@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-14T20:51:00Z'
+updated_date: '2026-11-14T21:05:00Z'
 labels:
   - github
   - pr
@@ -28,5 +29,11 @@ https://github.com/rvdbreemen/OTGW-firmware/pull/702 by justink0k (fork), base d
 - [ ] #1 Reviewed against the HA unit list and every consumer of haUnitStr(HaUnit::l_min) (review comment on the PR)
 - [ ] #2 Tests and the esp32-combo build green on the PR head
 - [ ] #3 Bench: HA discovery creates the DHW flow rate sensor with unit L/min (HA log shows no unit error)
-- [ ] #4 Robert decides on the merge; the author is credited in #alpha-testing
+- [x] #4 Robert decides on the merge; the author is credited in #alpha-testing
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-14 (comms): Robert merged PR #702 himself at 21:02:55Z (squash 2cc72d819 on origin/dev, author justink0k). Before that, comms posted the ack on the PR (https://github.com/rvdbreemen/OTGW-firmware/pull/702#issuecomment-6884052172) promising a build and bench result. AC4 (Robert decides the merge) is settled by the merge; the credit in #alpha-testing and AC2/AC3 (tests, combo build, HA bench with L/min) remain, now on dev.
+<!-- SECTION:NOTES:END -->
