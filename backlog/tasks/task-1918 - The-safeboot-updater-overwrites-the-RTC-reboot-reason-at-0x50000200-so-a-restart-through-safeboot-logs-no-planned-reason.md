@@ -3,11 +3,11 @@ id: TASK-1918
 title: >-
   The safeboot updater overwrites the RTC reboot reason at 0x50000200, so a
   restart through safeboot logs no planned reason
-status: In Progress
+status: In Review
 assignee:
   - '@claude'
 created_date: '2026-11-14T02:34:00Z'
-updated_date: '2026-11-14T15:28:00Z'
+updated_date: '2026-11-14T15:40:00Z'
 labels:
   - bug
   - ota
@@ -53,4 +53,6 @@ Build beta.248+5e8c416 (16:12, esp32-combo warm 3m32s + FS 25s): the build's own
 Bench by 09 on .63, beta.248+5e8c416 (sha256 zip 544700bd...092bd, ino efcb09ee...1b81cf, littlefs 7e6c6940...00d8e7), same reproduction old vs fix: RED on the old 247: app OTA via safeboot 247->247, new reboot_log line '16:23:18 - reboot cause: Software reset (3) [rst 0x0c/0x0c] ' (no reason). 248 app+FS via safeboot: the transition boot (old code's handover) has no reason, as designed and host-tested; the FS OTA keeps '[OTA] Rebooting...'. GREEN: second app OTA 248->248 via safeboot: '16:26:03 - reboot cause: Software reset (3) [rst 0x0c/0x0c] - [OTA] handover to safeboot'. reboot_log 20 lines CRLF, max 100 B; crashlog byte-identical; API and raw ini diff []; MQTT, PIC 6.8 OK; .63 stays on 248. AC1 and AC3 are 09's to tick. Evidence: 09 scratchpad b248/.
 
 Rebased onto origin/dev 3c30e3926 for the post build: my code identical (299 lines excl. banners); src differs from the benched 5e8c416 only by 09's benched TASK-1875 (v2.js, beta.247) and the version stamps. Re-bump beta.247 -> beta.248.
+
+Pushed origin/dev 3c30e3926..0a3dbd3bf (beta.248, my code identical to the benched 5e8c416); posted message 1571188033087217674 (covers 247). AC2 ticked with evidence; AC1 and AC3 for 09 to tick from its b248 bench.
 <!-- SECTION:NOTES:END -->
