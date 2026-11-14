@@ -38,9 +38,10 @@ from test_ot_reserved_range import GEN, HERE, REPO, find_vcvars
 FW = "src/OTGW-firmware/"
 HELP, INO, CORE, REST = FW + "helperStuff.ino", FW + "OTGW-firmware.ino", FW + "OTGW-Core.ino", FW + "restAPI.ino"
 PLAT = "src/libraries/Platform/src/platform_esp32.h"
+FWH = FW + "OTGW-firmware.h"
 RUNTIME = ["E1", "E2", "E3", "E4"]
-STATIC = ["S1", "S2", "S3", "S4"]
-OLD_MUST_FAIL = ["E1", "E2", "E4", "S1", "S2", "S3", "S4"]
+STATIC = ["S1", "S2", "S3", "S4", "S5"]
+OLD_MUST_FAIL = ["E1", "E2", "E4", "S1", "S2", "S3", "S4", "S5"]
 
 MUTANTS = [
     ("MC1", "the log gate goes back to platformIsExternalReset()", HELP,
@@ -58,6 +59,8 @@ MUTANTS = [
     ("MC6", "LOG_LINE_LENGTH back to 140 without the CRLF guard (the boot line runs into the next)", HELP,
      [("  #define LOG_LINE_LENGTH 160", "  #define LOG_LINE_LENGTH 140"),
       ("  if (lineLen > 0 && log_line[lineLen - 1] != '\\n') {", "  if (false) {")], ["E4"]),
+    ("MC7", "the flag is defined in OTGW-Core.ino instead of OTGW-firmware.h (does not compile)", FWH,
+     [("bool        g_extWdResetAtBoot = false;", "// moved")], ["S5"]),
     ("MC4", "the 0x01 label guesses one cause", PLAT,
      [('return "power-on, brown-out or super watchdog (not distinguishable)";', 'return "power-on";')], ["S4"]),
 ]
@@ -74,7 +77,7 @@ def read(path, rev):
 
 
 def sources(rev):
-    return {p: read(p, rev) for p in (HELP, INO, CORE, REST, PLAT)}
+    return {p: read(p, rev) for p in (HELP, INO, CORE, REST, PLAT, FWH)}
 
 
 def function_body(text, rx):
@@ -117,6 +120,10 @@ def static_cases(src):
     s2 = bool(m) and body.count("endTransmission(") == 1 and "for (" not in body and "while" not in body \
         and not re.search(r"Wire\.begin\(", body) and 0 <= i_wire < i_read
     rest = code(src[REST])
+    # The single translation unit puts OTGW-firmware.ino before OTGW-Core.ino; functions get hoisted prototypes,
+    # globals do not. A flag defined in OTGW-Core.ino and used in setup() does not compile (probe build, 2026-11-14).
+    fwh = code(src[FWH])
+    s5 = bool(re.search(r"^bool\s+g_extWdResetAtBoot\s*=\s*false;", fwh, re.M)) and         not any(re.search(r"^bool\s+g_extWdResetAtBoot", code(src[f]), re.M) for f in (INO, CORE, HELP, REST))
     s3 = all(f'F("{k}")' in rest for k in ("resetraw", "resetrawlabel", "extwdreset"))
     codes, header = reset_reason_codes()
     plat = src[PLAT]
@@ -138,6 +145,8 @@ def static_cases(src):
         "S3": ("pass" if s3 else "FAIL", "device/info carries resetraw, resetrawlabel and extwdreset",
                "all three" if s3 else "missing"),
         "S4": ("pass" if s4 else "FAIL", "every raw S3 reset code has a label; 0x01 is marked not distinguishable", got4),
+        "S5": ("pass" if s5 else "FAIL", "g_extWdResetAtBoot is defined once, in OTGW-firmware.h (ADR-044; setup() uses it)",
+               "defined in OTGW-firmware.h only" if s5 else "missing in OTGW-firmware.h or defined in an .ino"),
     }
 
 

@@ -1072,6 +1072,7 @@ char        cMsg[CMSG_SIZE];
 char        otTopic[OT_TOPIC_LEN];  // Shared MQTT topic scratch for OT print_* functions (sequential, not re-entrant)
 char        lastReset[129] = "";
 char        lastResetRaw[16] = "";   // TASK-1904: "0xNN/0xNN", the raw reset code of core 0 / core 1
+bool        g_extWdResetAtBoot = false;   // TASK-1904: the external 0x26 watchdog reset this boot (readExtWatchdogResetFlag())
 uint32_t    MQTTautoConfigMap[8] = { 0 };
 uint32_t    MQTTautoCfgPendingMap[8] = { 0 };  // bitmap for async MQTT discovery drip
 // Deferred settings write timer (Finding #23: coalesce flash writes)

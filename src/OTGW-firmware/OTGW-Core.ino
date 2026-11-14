@@ -1625,8 +1625,7 @@ void initWatchDog(char* reasonBuf, size_t reasonSize) {
 // in resetTarget() and clears it only on a feed (0xA5) or its own power-up; a read and the disarm (register 7)
 // leave it, so this read before the first feed sees the flag of the reset that started this boot. One
 // transaction, no retry: on a board without the chip it is one NACK (the ESP32-S3 i2c driver logs it), like the
-// disarm just before it.
-bool g_extWdResetAtBoot = false;
+// disarm just before it. The flag g_extWdResetAtBoot lives in OTGW-firmware.h (ADR-044).
 
 void readExtWatchdogResetFlag() {
   g_extWdResetAtBoot = false;
@@ -1686,8 +1685,7 @@ void feedWatchDog() {
 }
 
 #else  // !HAS_PIC_WATCHDOG — OTGW32 (ESP32-S3): use ESP32 Task Watchdog Timer
-bool g_extWdResetAtBoot = false;   // TASK-1904: no 0x26 on this board
-void readExtWatchdogResetFlag() {}
+void readExtWatchdogResetFlag() {}   // TASK-1904: no 0x26 on this board
 #include <esp_task_wdt.h>
 
 // True once the loop task is registered with the TWDT (initWatchDog ran).
