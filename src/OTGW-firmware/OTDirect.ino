@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTDirect.ino
-**  Version  : v2.0.0-beta.278
+**  Version  : v2.0.0-beta.279
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -1115,7 +1115,12 @@ static unsigned long buildStatusRequest() {
   // Master mode: CH enable (bit 0) stays on while SAT is enabled, also during its hand-back or before
   // its first CS. Without SAT and without a CS override (an external CS= or a thermostat write on the
   // slave interface) nothing sets a flow setpoint, so bit 0 is off. DHW and the other bits are unchanged.
-  if (IS_MASTER_MODE() && !otdCsOverrideActive() && !satOwnsControlSetpoint()) flags &= (uint8_t)~0x01;
+  // TASK-1806: the same in gateway mode, where the scheduler sends a status of its own only once the thermostat is
+  // gone (otdOwnFramesAllowed; the alternative slots never carry MsgID 0). Like the PIC's standalone status: CH enable
+  // only with a CS= in force (readstatus, gateway.asm 6.6 :2712-2742), not the board default that the 16 C setback
+  // used to pair with a flow setpoint.
+  const bool ownStatusRule = IS_MASTER_MODE() || otCurrentMode == OTD_MODE_GATEWAY;
+  if (ownStatusRule && !otdCsOverrideActive() && !satOwnsControlSetpoint()) flags &= (uint8_t)~0x01;
   return OpenTherm::buildRequest(
     OpenThermMessageType::READ_DATA,
     OpenThermMessageID::Status,
@@ -3099,28 +3104,19 @@ static void checkThermostatTimeout() {
               elapsed / 1000UL);
       sendWebSocketJSON("{\"type\":\"status\",\"msg\":\"OTDirect: disconnected\"}");
     }
-    // Engage setback if fail-safe enabled and in gateway mode
-    if (otFailSafeEnabled && otCurrentMode == OTD_MODE_GATEWAY && !otSetbackEngaged) {
-      otSetbackEngaged = true;
-      state.otd.bSetbackActive = true;
-      uint16_t f88 = floatToF88(settings.otd.fSetbackTemp);
-      setOverride(1, f88);        // Override TSet (MsgID 1) to setback temp
-      updateWriteCache(1, f88);   // Keep writing it to boiler
-      char tb[8]; dtostrf(settings.otd.fSetbackTemp, 1, 1, tb);
-      OTDDebugTf(PSTR("OTD: setback engaged — TSet overridden to %s C\r\n"), tb);
-    }
+    // TASK-1806 (Robert 2026-11-11, "Like the PIC"): no setback flow setpoint. The gateway's own frames carry CH off
+    // and no TSet unless a CS= is in force (buildStatusRequest), as the PIC's standalone frames (gateway.asm 6.6
+    // Disconnect :1770-1789, readstatus :2712-2742, MessageID1 :2796-2820).
   } else {
     if (picLineState == 2) picLine(PSTR("Thermostat connected"));   // independent of the setback
     picLineState = 1;
-    state.otd.bThermostatConnected = true;
-    // Release setback when thermostat reconnects
-    if (otSetbackEngaged) {
-      otSetbackEngaged = false;
-      state.otd.bSetbackActive = false;
-      clearWriteOverride(1);      // Release the TSet override and its cached write (TASK-1707)
-      OTDDebugTln(F("OTD: thermostat reconnected, setback released"));
+    // The return is reported on the transition, as the setback release did before (it ran on every return in gateway
+    // mode with the default FS on).
+    if (!state.otd.bThermostatConnected) {
+      OTDDebugTln(F("OTD: thermostat reconnected"));
       sendWebSocketJSON("{\"type\":\"status\",\"msg\":\"OTDirect: connected\"}");
     }
+    state.otd.bThermostatConnected = true;
   }
 }
 

@@ -596,7 +596,7 @@ Opmerking (TASK-438): `monitor` is nu gekoppeld aan `GW=0` voor parity met PIC-f
 
 ##### GET /api/v2/otdirect/settings
 
-Retourneert de opgeslagen OT-direct-configuratie: modus, noodinstelling (setback) en ventilatie. SAT is de enige temperatuurregelaar op OT-Direct; de voormalige parameters voor verwarmingscurve en PI-kamercompensatie zijn verwijderd.
+Retourneert de opgeslagen OT-direct-configuratie: modus, de thermostaat-timeout en ventilatie. SAT is de enige temperatuurregelaar op OT-Direct; de voormalige parameters voor verwarmingscurve en PI-kamercompensatie zijn verwijderd. Bij verlies van de thermostaat stuurt OT-Direct geen setback-aanvoertemperatuur meer (TASK-1806, zoals de PIC): na `setback_timeout` seconden zonder thermostaatframes stuurt de gateway eigen frames met CV uit, tenzij er een CS= actief is. `setback_temp` en de FS=-noodvlag worden nog opgeslagen en geaccepteerd, maar niet meer gebruikt.
 
 **Antwoord:**
 ```json
@@ -867,7 +867,7 @@ Tenzij anders vermeld zijn alle gepubliceerde onderwerpen retained.
 | `otgw-otdirect/mode` | Bedrijfsmodus (gateway, monitor, bypass, master, loopback) |
 | `otgw-otdirect/bypass` | Bypass-relais actief |
 | `otgw-otdirect/thermostat_connected` | Thermostaatframe ontvangen binnen timeout |
-| `otgw-otdirect/setback_active` | Setback-override actief |
+| `otgw-otdirect/setback_active` | Altijd OFF: OT-Direct heeft geen setback-override meer (TASK-1806) |
 | `otgw-otdirect/schedule_active` | Aantal actieve schema-items |
 | `otgw-otdirect/overrides_active` | Aantal actieve write-overrides |
 | `otgw-otdirect/boiler_connected` | Ketel OT-bus actief |

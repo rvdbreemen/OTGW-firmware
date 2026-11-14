@@ -709,7 +709,7 @@ Note (TASK-438): `monitor` is now mapped to `GW=0` for parity with PIC firmware 
 
 ##### GET /api/v2/otdirect/settings
 
-Returns the persisted OT-direct configuration settings: mode, fail-safe setback and ventilation. SAT is the only temperature controller on OT-Direct; the former heating curve and PI room compensation parameters are removed.
+Returns the persisted OT-direct configuration settings: mode, the thermostat timeout and ventilation. SAT is the only temperature controller on OT-Direct; the former heating curve and PI room compensation parameters are removed. On a thermostat loss OT-Direct no longer sends a setback flow setpoint (TASK-1806, like the PIC): after `setback_timeout` seconds without thermostat frames the gateway sends its own frames with CH off, unless a CS= is in force. `setback_temp` and the FS= fail-safe flag are still stored and accepted, but no longer used.
 
 **Response:**
 
@@ -1046,7 +1046,7 @@ Published only in OT-Direct mode, on hardware without a PIC. In PIC gateway mode
 | `otgw-otdirect/mode` | `"gateway"` | Current operating mode |
 | `otgw-otdirect/bypass` | `"ON"` / `"OFF"` | Bypass relay active |
 | `otgw-otdirect/thermostat_connected` | `"ON"` / `"OFF"` | Thermostat frame received within timeout |
-| `otgw-otdirect/setback_active` | `"ON"` / `"OFF"` | Setback override engaged |
+| `otgw-otdirect/setback_active` | `"ON"` / `"OFF"` | Always OFF: OT-Direct no longer has a setback override (TASK-1806) |
 | `otgw-otdirect/schedule_active` | `"11"` | Active schedule entry count |
 | `otgw-otdirect/overrides_active` | `"2"` | Active write-override count |
 | `otgw-otdirect/boiler_connected` | `"ON"` / `"OFF"` | Boiler OT bus active |

@@ -114,8 +114,11 @@ class SourcePatterns(unittest.TestCase):
         # TASK-1684: master mode has no thermostat; without SAT enabled and without a CS override nothing
         # sets a flow setpoint, so bit 0 of the MsgID 0 master status is off. The behaviour itself is
         # host-tested by test/host/test_override_reply.py (suite 1684, P1-P8).
+        # TASK-1806: the same rule covers gateway mode's own status (thermostat gone); behaviour host-tested by
+        # tests/test_otd_no_setback.py on the real buildStatusRequest().
         body = func_body(SRC, "static unsigned long buildStatusRequest()")
-        self.assertRegex(body, r"IS_MASTER_MODE\(\)\s*&&\s*!otdCsOverrideActive\(\)\s*&&\s*!satOwnsControlSetpoint\(\)")
+        self.assertRegex(body, r"ownStatusRule\s*=\s*IS_MASTER_MODE\(\)\s*\|\|\s*otCurrentMode\s*==\s*OTD_MODE_GATEWAY")
+        self.assertRegex(body, r"ownStatusRule\s*&&\s*!otdCsOverrideActive\(\)\s*&&\s*!satOwnsControlSetpoint\(\)")
 
     def test_ch_handler_writes_only_the_mode_flag(self):
         i = SRC.find("cmd0 == 'C' && cmd1 == 'H'")

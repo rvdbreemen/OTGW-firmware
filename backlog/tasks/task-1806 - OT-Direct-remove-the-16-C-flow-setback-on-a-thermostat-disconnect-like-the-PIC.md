@@ -3,9 +3,11 @@ id: TASK-1806
 title: >-
   OT-Direct: remove the 16 C flow setback on a thermostat disconnect, like the
   PIC
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-11-11T06:43:00Z'
+updated_date: '2026-11-14T22:30:00Z'
 labels:
   - otdirect
   - review-2026-11-11
@@ -24,8 +26,20 @@ Found in the TASK-1795 audit (docs/reviews/2026-11-11_otdirect-pic-parity-audit/
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 On thermostat loss OT-Direct no longer writes a setback flow setpoint or forces CH on; the boiler follows its own OpenTherm timeout
-- [ ] #2 Host test against the real checkThermostatTimeout path: red on the old code (16 C written), green on the fix
+- [x] #1 On thermostat loss OT-Direct no longer writes a setback flow setpoint or forces CH on; the boiler follows its own OpenTherm timeout
+- [x] #2 Host test against the real checkThermostatTimeout path: red on the old code (16 C written), green on the fix
 - [ ] #3 The manual (EN and NL) and the release notes describe the new behaviour and what happened to the setback settings
 - [ ] #4 esp32-combo build, evaluate.py --quick, bench check where the hardware allows (name what was not benched)
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Fix (d3, lane-1924), like the PIC (Robert 2026-11-11). checkThermostatTimeout(): the setback engage block (setOverride(1, fSetbackTemp) + updateWriteCache(1), bSetbackActive) and the setback release block are removed; loss detection, otdForgetThermostatWrites() and the 'disconnected' WS status stay; the return now sends 'OTDirect: connected' on the transition (before it came from the setback release, which ran on every return in gateway mode with the default FS on). buildStatusRequest(): the 'no CS, no SAT -> CH bit 0 off' rule of master mode now applies in gateway mode too; there the scheduler sends its own MsgID 0 only once the thermostat is gone (otdOwnFramesAllowed; alternative slots never carry MsgID 0, OTDirect.ino otdAltScheduleIndex). PIC: Disconnect clears the thermostat state (gateway.asm 6.6 :1770-1789), readstatus sets CH enable only with a CS= (:2712-2742), MessageID1 sends TSet 0 unless CS= (:2796-2820). Difference kept: OT-Direct sends no MsgID 1 at all without a CS= (no write entry is valued after otdForgetThermostatWrites), the PIC writes TSet 0; with CH off the boiler does not use TSet.
+
+Settings (decision via coordinator 2026-11-14: keep, removal is a separate task): OTDsetbacktemp, OTDfailsafe (FS=) and OTDsetbacktimeout stay stored and accepted; setbacktimeout is still the loss timeout; setback_temp and FS have no effect; REST/MQTT setback_active stays false. settingsHelp.h texts, manual EN ch09 + NL h09 (GET /api/v2/otdirect/settings note, MQTT setback_active row) updated. Dead code left on purpose for a small rebase against ba's TASK-1850: otSetbackEngaged / bSetbackActive clearing in resetTransientState, otFailSafeEnabled. AC3 part 'release notes': written by the beta flow; my share is a CHANGELOG [Unreleased] entry, added in one docs commit for all lane tasks at the rebase (the lane's CHANGELOG predates the beta.250 rollover).
+
+AC2 evidence: new tests/test_otd_no_setback.py compiles the real checkThermostatTimeout(), otdEffectiveMasterFlags() and buildStatusRequest(); 39 s of thermostat silence in gateway mode, then a return. Fix: 4/4 OK, 'wsconn=1 ovr1=0 cache1=0 val=0000 ... lost=1 back=1 chbit=0'; with CS= chbit=1; master mode unchanged. Old (HEAD b68921bf7 copy): FAILED (failures=2), 'ovr1=1 cache1=1 val=1000' (16.0 C written) and chbit=1.
+
+Tests updated on purpose: tests/test_otd_ch_override.py source pattern now the ownStatusRule form (master OR gateway); test/host/test_override_reply.cpp suite 1684 case P5 (gateway, no CS: own MsgID 0) expects 0x02 instead of 0x03. test/host/test_override_reply.py 4/4 suites OK; all tests/test_otd*.py OK; evaluate.py --quick 0 failed. AC3 open (CHANGELOG at rebase, release notes in the beta flow); AC4 open (build + bench). Follow-up TASK-1950 (remove the unused setback settings/fields, needs-maintainer-ok).
+<!-- SECTION:NOTES:END -->

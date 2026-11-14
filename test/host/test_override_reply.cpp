@@ -613,8 +613,8 @@ static void suite1684() {
   }
   {
     resetAll(); otCurrentMode = OTD_MODE_GATEWAY; otMasterStatusFlags = 0x03;
-    g_wantStatusHB = 0x03;
-    verdict("P5", "control: gateway mode, no CS override: the gateway's own MsgID 0 master status keeps CH+DHW (0x03)",
+    g_wantStatusHB = 0x02;   // TASK-1806: like the PIC standalone status, CH enable only with a CS= (was 0x03)
+    verdict("P5", "gateway mode, no CS override (thermostat gone): the gateway's own MsgID 0 master status has CH off, DHW kept (0x02)",
             {}, {}, "-", "-");
   }
   {
