@@ -3,11 +3,11 @@ id: TASK-1907
 title: >-
   OT-Direct: a boiler Data-Invalid to MsgID 99 does not start the spoofed DHW
   push
-status: In Progress
+status: In Review
 assignee:
   - '@claude'
 created_date: '2026-11-13T18:50:00Z'
-updated_date: '2026-11-13T21:47:00Z'
+updated_date: '2026-11-14T01:05:00Z'
 labels:
   - otdirect
   - parity
@@ -39,4 +39,6 @@ Scope OTDirect.ino only. (1) otdPushOnBoiler99: handle type 6 (DATA_INVALID) lik
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-11-13 d3, lane-1907 (wt-1907, uncommitted until a bump slot after 95's 230). Fix applied as planned. Evidence: tests/test_otd_dhw_push_pic.py on the old code 2 FAIL (test_dhw_enable_forced_when_the_boiler_refuses_or_lacks_the_push: b99:6 gave HB 00; test_handle_master_response_feeds_a_data_invalid_99_to_the_push: no call in the branch), on the fix OK. Related OTD tests OK (gateway_alt_slots, loopback_not_boiler_for_sat, msgid99_bytes, tt_pic_parity, write_once). evaluate --quick 85/0. AC1 note: the handleMasterResponse part is a source pin on the real branch (the push harness does not cut handleMasterResponse); the behaviour part runs the real otdPushOnBoiler99 + relayed-status code.
+
+2026-11-14 shipped in 2.0.0-beta.232 (9c3224077, post 1570967740544450631). Bench on .61 (09): no regression (HW=P in loopback as before, health OK). AC2 not bench-testable: the OT-Direct loopback answers go through simulateLoopbackResponse/bridgeFrameToParser and never reach the boilerDataInvalid branch of handleMasterResponse, and a test-only loopback hook would not exercise that branch either. Evidence for AC1: tests/test_otd_dhw_push_pic.py (old 2 FAIL, fix OK) plus the source pin on the real branch. In Review for field confirmation (a boiler that answers MsgID 99 with Data-Invalid).
 <!-- SECTION:NOTES:END -->
