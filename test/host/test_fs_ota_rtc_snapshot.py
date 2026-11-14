@@ -50,7 +50,7 @@ from test_ot_reserved_range import GEN, HERE, REPO, find_vcvars
 FW = "src/OTGW-firmware/"
 UPD, SET, HELP, HDR, INO = (FW + "OTGW-ModUpdateServer-esp32.h", FW + "settingStuff.ino", FW + "helperStuff.ino",
                             FW + "OTGW-firmware.h", FW + "OTGW-firmware.ino")
-RUNTIME = ["T1", "T2", "T3", "T4", "T5", "T6", "T7", "T8", "T9", "T10"]
+RUNTIME = ["T1", "T2", "T3", "T4", "T5", "T6", "T7", "T8", "T9", "T10", "T11", "T12"]
 STATIC = ["S1", "S2", "S3", "S4", "S5", "S6", "S7", "S8"]
 OLD_MUST_FAIL = ["T1", "T4", "T6", "T9", "T10", "S1", "S2", "S3", "S4", "S5", "S6", "S7", "S8"]
 
@@ -70,7 +70,7 @@ MUTANTS = [
     ("MB6", "the boot restore does not format a half-written image", UPD,
      [("  if (!g_fsOtaRtc.consistent) {   // the reset came during the image write: that half image takes no write\n",
        "  if (false) {   // the reset came during the image write: that half image takes no write\n")],
-     ["T6", "T9"]),
+     ["T11", "T12", "T6", "T9"]),
     ("MB7", "Update.end() no longer marks the snapshot consistent", UPD,
      [("      fsOtaRtcMarkConsistent();\n    }\n    if (updateOk) {", "    }\n    if (updateOk) {")],
      ["S7"]),

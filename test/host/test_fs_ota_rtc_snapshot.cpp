@@ -359,6 +359,35 @@ int main(int argc, char **argv) {
                   what(r.settingsFile) + ", count " + std::to_string(r.count) + ", log " + std::to_string(r.log.size()) +
                   " B, fs " + (fs.broken ? "still broken" : "writable") + ", formats " + std::to_string(fs.formats));
   }
+  if (c == "T11" || c == "T12") {
+    // TASK-1904 cross-check of the budget (7424 B of data): T11 the worst case, a 5700 B settings.ini and a
+    // reboot log of 20 full 160 B lines (3200 B): the log does not fit after the settings and is skipped whole,
+    // the settings and the counter still come back. T12 as measured on .63 (settings.ini 5659 B, log 1178 B) plus
+    // the 16 B the raw reset code adds to each of the 20 boot lines: all three fit.
+    const bool worst = (c == "T11");
+    const size_t wantSettings = worst ? 5700 : 5659;
+    const size_t logBytes = worst ? 20 * 160 : 1178 + 20 * 16;
+    g_ramSettings.clear();
+    fs = FsModel();
+    writeSettings(false);
+    const size_t overhead = fs.files[SET].size();
+    unitBefore(wantSettings > overhead ? wantSettings - overhead : 0);
+    fs.files[LOG] = std::string(logBytes, 'L');
+    const size_t settingsSize = g_userFile.size();
+    uploadStart(); firstChunk(); imageHalfWritten();
+    BootResult r = rebootUnit();
+    const bool settingsOk = r.settingsFile == g_userFile && r.count == 42;
+    const bool logBack = r.log.size() == logBytes;
+    const bool ok = worst ? (settingsOk && !logBack) : (settingsOk && logBack);
+    std::string got = "settings.ini " + std::to_string(settingsSize) + " B, log " + std::to_string(logBytes) + " B -> " +
+                      what(r.settingsFile) + ", count " + std::to_string(r.count) + ", log " +
+                      (logBack ? std::string("restored") : r.log == "(missing)" ? std::string("not restored (skipped)")
+                                                                               : std::to_string(r.log.size()) + " B");
+    return report(c.c_str(), ok,
+                  worst ? "worst case: the log does not fit after settings.ini and is skipped; settings and counter come back"
+                        : "the .63 sizes with the longer boot lines: settings, counter and log all fit and come back",
+                  got);
+  }
   if (c == "T10") {   // a reset between Update.end() of a complete image and the restore
     unitBefore();
     uploadStart(); firstChunk(); imageLanded(); imageComplete();
