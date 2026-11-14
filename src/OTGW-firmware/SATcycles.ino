@@ -1539,6 +1539,8 @@ static float _hcrIntraMedian()
 //--- Save HCR state to LittleFS (called on day-commit) ---
 void satHCRSaveState()
 {
+  // TASK-1900: no save from a SAT simulation run; the real heating-curve recommendation on flash stays (TASK-1869 rule)
+  if (settings.sat.bSimulation) return;
   // create=true makes the /sat folder: a fresh filesystem image has none, and without
   // it this open fails and the recommendation never survives a restart (TASK-1286).
   File f = LittleFS.open(FPSTR(SAT_HCR_FILE), "w", true);

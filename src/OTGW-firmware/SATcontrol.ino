@@ -3802,6 +3802,9 @@ static int satPidStateBuild(char* buf, size_t size, time_t ts)
 
 void satSavePidState()
 {
+  // TASK-1900: a SAT simulation run learns on the simulated room only, so the real PID state on flash stays as it was
+  // (the TASK-1869 rule). This covers every caller: the 5-minute save, satPersistAllToFs, satDisable and the flush.
+  if (settings.sat.bSimulation) return;
   File f = LittleFS.open(FPSTR(SAT_PID_STATE_FILE), "w");
   if (!f) return;
   char buf[256];
