@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-14T02:34:00Z'
-updated_date: '2026-11-14T15:26:00Z'
+updated_date: '2026-11-14T15:28:00Z'
 labels:
   - bug
   - ota
@@ -51,4 +51,6 @@ First fix build (beta.247 lane, 15:48) FAILED the new gate on the real ELF, as d
 Build beta.248+5e8c416 (16:12, esp32-combo warm 3m32s + FS 25s): the build's own gate says 'RTC layout check OK'. Real ELF (nm -n -S): g_rtcSafebootGuard 0x50000200 size 0x20 (D, .rtc.data), _rtc_noinit_start 0x50000220, g_rtcRebootReason 0x50000220, g_rtcWifiDeadRestarts 0x50000254, g_rtcWifiSkipPortal 0x5000025c, g_fsOtaRtc 0x50000264, _rtc_force_slow_end 0x50001f94 (108 B left), identical to the FIX layout of the host test. AC2 ticked: the check goes red on the real old ELFs (beta.243, the failed beta.247 lane build) and green on this one. Archived: OTGW-build-archive/beta.248-1918 (zip 544700bd...92bd, ino.bin efcb09ee...81cf, littlefs.bin 7e6c6940...d8e7).
 
 Bench by 09 on .63, beta.248+5e8c416 (sha256 zip 544700bd...092bd, ino efcb09ee...1b81cf, littlefs 7e6c6940...00d8e7), same reproduction old vs fix: RED on the old 247: app OTA via safeboot 247->247, new reboot_log line '16:23:18 - reboot cause: Software reset (3) [rst 0x0c/0x0c] ' (no reason). 248 app+FS via safeboot: the transition boot (old code's handover) has no reason, as designed and host-tested; the FS OTA keeps '[OTA] Rebooting...'. GREEN: second app OTA 248->248 via safeboot: '16:26:03 - reboot cause: Software reset (3) [rst 0x0c/0x0c] - [OTA] handover to safeboot'. reboot_log 20 lines CRLF, max 100 B; crashlog byte-identical; API and raw ini diff []; MQTT, PIC 6.8 OK; .63 stays on 248. AC1 and AC3 are 09's to tick. Evidence: 09 scratchpad b248/.
+
+Rebased onto origin/dev 3c30e3926 for the post build: my code identical (299 lines excl. banners); src differs from the benched 5e8c416 only by 09's benched TASK-1875 (v2.js, beta.247) and the version stamps. Re-bump beta.247 -> beta.248.
 <!-- SECTION:NOTES:END -->
