@@ -7,7 +7,7 @@ status: In Review
 assignee:
   - '@claude'
 created_date: '2026-11-13T23:14:00Z'
-updated_date: '2026-11-14T02:29:00Z'
+updated_date: '2026-11-14T07:13:00Z'
 labels: []
 dependencies: []
 priority: medium
@@ -53,4 +53,6 @@ Not verified on the device: (1) brief step 6, the FSexplorer auth guard on /sett
 Pushed 6afbade55 (beta.233) to origin/dev on fe6d35b59. Zip OTGW-firmware-esp32-combo-2.0.0-beta.233+6afbade-flash.zip, sha256 d83553017152dac6848578066eee2d43d81d4a85664d29f62822d847ceb40341, posted to #alpha-testing msg 1570984895382163647.
 
 Bench by otgw-bench-tester (09), .63 Classic + PIC 6.8, 2.0.0-beta.233+6afbade (app-only OTA), 2026-11-14 03:05-03:30, evidence 09 scratchpad b233ba\. AC3 first half PASS: settings survive save + reboot (one setting changed -> settings diff after /ReBoot = only that field; A then B saved back to back -> one coalesced flush ~0.7 s later, /settings.ini 5659 B holds B; no .tmp files after saves + reboot; 3 reboots -> reboot_count +1 each and one reboot_log line each; 0 '[Settings] Error: short write or rename failed' in telnet over 7 flushes incl. 3 doRestart flushes). AC3 second half NOT bench-proven: 'a reset during a save keeps a valid settings.ini'. Every bench reboot goes through doRestart, which flushes the settings cleanly before restarting. A hard reset over USB (RTS/DTR on COM8 USB-Serial-JTAG, the esptool HardReset sequence) did not reset the unit (bootcount and uptime unchanged; .61 untouched too), and the only other route is esptool's download mode, which leaves the unit in the bootloader; not done. The power-cut/reset case therefore rests on the host harness of AC2 only. Step 6 (401 on /settings.tmp) not testable: .63 has no HTTP password (the settings API shows a password=N placeholder); unauth GET /settings.tmp -> 404; the served /settings.ini has all secret fields empty.
+
+2026-11-14 08:10 (09, bench-tester): why the round-A reset trials were invalid, and the reset that works. On the ESP32-S3 USB-Serial-JTAG port the chip resets only while RTS=1 AND DTR=0, and the Windows driver usbser.sys sends the line state only on a DTR change. Round A (and esptool's HardReset class on a port opened with pyserial defaults) left DTR high or never sent the RTS change, so nothing reset: .61 bootcount stayed 629. Working in-process sequence (scratchpad tools/reset1913b.py usb_reset): open with dtr=False rts=False; rts=True + dtr=False write; 200 ms; rts=False + dtr=False. .61: bootcount 629->630, lastreset 'USB reset (host)', API back after 13.5 s; opening the port alone does not reset. Calibration on .61 (6 saves, no reset): flush line 2.02-2.17 s after the POST reply; write Flushing->saved 89-392 ms (device timestamps). Robert chose B (DM 1571058018039242833): trials on .63 triggered on the telnet flush line, offsets 0-350 ms step 50 plus 500 control, 5 reps; fail = any MIX/DEFAULT settings.ini or bootcount not +1.
 <!-- SECTION:NOTES:END -->
