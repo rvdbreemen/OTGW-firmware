@@ -4600,6 +4600,19 @@
     "TASK-1928"
    ],
    "confirmed_by_entry": null
+  },
+  {
+   "id": 346,
+   "title": "Q-338c A: the start-up following of entry 338 uses flow_setpoint_offset (2.0 C), the continuous clamp's own offset (Sergeant D, 2026-11-14; answers Q-338c, refines entries 338 and 344)",
+   "date": "2026-11-14",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1571145214733848687",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1924"
+   ],
+   "confirmed_by_entry": null
   }
  ]
 }

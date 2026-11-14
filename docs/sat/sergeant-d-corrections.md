@@ -7232,3 +7232,21 @@ Asked by DM (through the coordinator) whether the repeat is 60 s or 30 s, given 
 **Open:** when he is ready, the ideas go to him again one question per message.
 
 **Task:** TASK-1928 (AC4 settled: Robert shared it, Sergeant D chose to wait).
+
+## 346. Q-338c A: the start-up following of entry 338 uses flow_setpoint_offset (2.0 C), the continuous clamp's own offset (Sergeant D, 2026-11-14; answers Q-338c, refines entries 338 and 344)
+
+**Source:** #alpha-testing 2026-11-14, Q-338c: https://discord.com/channels/812969634638725140/1514720723980259460/1571145214733848687 . Sergeant D's reply, 12:51:40 UTC: https://discord.com/channels/812969634638725140/1514720723980259460/1571145597182804060
+
+**Quoted:**
+
+> "The answer is A"
+
+**Option A as posted:** "flow_setpoint_offset 2.0 C. This is the continuous clamp's own offset (thermo-nova const.py:154, used at heating_control.py:455/485)."
+
+**Settled (refines entries 338 and 344):** during the 60 s start-up period after flame-on (entry 344), CS = max(request, flow - flow_setpoint_offset), with the same offset (default 2.0 C) as the entry-112 clamp that takes over after it. Not the PWM suppression offset (1.0 C, `const.py:153`). This was our recommendation.
+
+**Checked against thermo-nova:** `const.py:154` `CONF_FLOW_SETPOINT_OFFSET_CELSIUS: 2.0`; used as `offset = self._config.flow_setpoint_offset_celsius` at `heating_control.py:455` and in the clamp at `:485-489`. Firmware: `settings.sat.fFlowOffset` (`SATcontrol.ino:2533` on origin/dev 0d3c120fd and later).
+
+**Open:** none for TASK-1924 Part 2's open points of entry 338 (period: entry 344; offset: this entry).
+
+**Task:** TASK-1924.
