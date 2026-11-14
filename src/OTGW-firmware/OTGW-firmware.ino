@@ -262,6 +262,7 @@ void setup() {
   captureRebootReason();  // TASK-1447: before any path that can restart (config-portal timeout)
   captureWifiDeadRestarts();  // TASK-1450: same rule, the dead-link restart count
   captureWifiSkipPortal();    // TASK-1455: one-boot skip-portal mark of a WiFi supervisor restart
+  (void)*(volatile uint8_t *)g_rtcSafebootGuard;   // TASK-1918: one reference keeps the guard through --gc-sections
   bootHeapPhase(PSTR("setup-early"));  // TASK-1339 diagnostics: windowed heap minimum over the boot path
   // TASK-1763 (b): GPIO ISR service now, before startWiFi() and before the first attachInterrupt()
   // (initOTDirect -> OpenTherm::begin): the install runs on the ipc1 stack (platform_esp32.h).

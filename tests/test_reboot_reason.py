@@ -113,6 +113,28 @@ int main() {
   // 7. null reason.
   storeRebootReason(nullptr);
   bootCapture(true);   logLine("null");
+
+  // 8. TASK-1918 upgrade transition: the new firmware keeps its records 0x20 B higher (safeboot guard at
+  //    0x50000200), so its first boot after the update reads the old firmware's RTC bytes 0x20 B in. The old
+  //    image (beta.243 layout, nm): reason record at +0x00 (0x34 B), WiFi dead-restart record at +0x34
+  //    ("OTDR", count), WiFi skip-portal record at +0x3c ("OTSP", marked), FS-OTA snapshot header at +0x44
+  //    (wiped). The new reason record must not take any of that for a reason, for the longest reasons too.
+  const char *oldReasons[] = {"[OTA] handover to safeboot", "WiFi: too many reconnect failures",
+                              "0123456789012345678901234567890123456789012345678901234567890123456789"};
+  for (int i = 0; i < 3; i++) {
+    unsigned char img[0x80];
+    memset(img, 0, sizeof(img));
+    storeRebootReason(oldReasons[i]);
+    memcpy(img, &g_rtcRebootReason, sizeof(g_rtcRebootReason));
+    const uint32_t dead[2] = {0x4F544452UL, 2}, skip[2] = {0x4F545350UL, 1};
+    memcpy(img + 0x34, dead, sizeof(dead));
+    memcpy(img + 0x3c, skip, sizeof(skip));
+    memcpy(&g_rtcRebootReason, img + 0x20, sizeof(g_rtcRebootReason));   // the new record's view
+    bootCapture(true);
+    char tag[24];
+    snprintf(tag, sizeof(tag), "transition%d", i);
+    logLine(tag);
+  }
   return 0;
 }
 """
@@ -168,6 +190,11 @@ class RebootReason(unittest.TestCase):
     def test_stale_record_is_not_handed_on_by_portal_timeout(self):
         self.assertEqual(self.rows["stale_then_portal"],
                          "reboot cause: Software reset (3) - WiFi: config portal timeout")
+
+    def test_old_layout_after_the_update_is_not_a_reason(self):
+        # TASK-1918: the first boot after the update reads the old firmware's bytes 0x20 B in; no reason.
+        for i in range(3):
+            self.assertEqual(self.rows[f"transition{i}"], "reboot cause: Software reset (3) ")
 
     def test_call_sites_are_wired(self):
         # Textual wiring check (the host harness cannot run setup()/startWiFi()).

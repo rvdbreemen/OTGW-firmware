@@ -19,6 +19,7 @@
 #include <map>
 #include <memory>
 #include <string>
+#include <vector>
 
 class __FlashStringHelper;
 #define F(s) (reinterpret_cast<const __FlashStringHelper *>(s))
@@ -387,6 +388,38 @@ int main(int argc, char **argv) {
                   worst ? "worst case: the log does not fit after settings.ini and is skipped; settings and counter come back"
                         : "the .63 sizes with the longer boot lines: settings, counter and log all fit and come back",
                   got);
+  }
+  if (c == "T13") {
+    // TASK-1918 upgrade transition: the new firmware places its RTC records 0x20 B higher (the safeboot guard
+    // takes 0x50000200-0x5000021f), so on its first boot g_fsOtaRtc holds the old firmware's bytes from offset
+    // 0x20 on. Worst stale case: the old firmware left an armed, not consistent snapshot, while the filesystem
+    // itself is intact (the app OTA does not touch it). The new firmware must not take that for a half-written
+    // image: no format, no restore over the user's files. Control: the same snapshot unshifted IS acted on.
+    auto run = [&](bool shifted, int &formats, std::string &settingsWhat) {
+      unitBefore();
+      const FsModel userFs = fs;
+      uploadStart(); firstChunk(); imageHalfWritten();   // armed, not consistent, as the old firmware leaves it
+      fs = userFs;                                        // the filesystem is intact
+      if (shifted) {
+        std::vector<uint8_t> raw(sizeof(g_fsOtaRtc));
+        memcpy(raw.data(), &g_fsOtaRtc, raw.size());
+        memset(&g_fsOtaRtc, 0xA5, sizeof(g_fsOtaRtc));    // past the old record: other data or garbage
+        memcpy(&g_fsOtaRtc, raw.data() + 0x20, raw.size() - 0x20);
+      }
+      const int before = fs.formats;
+      BootResult r = rebootUnit();
+      formats = fs.formats - before;
+      settingsWhat = what(r.settingsFile);
+    };
+    int fShift = 0, fCtl = 0;
+    std::string sShift, sCtl;
+    run(true, fShift, sShift);
+    run(false, fCtl, sCtl);
+    const bool ok = fShift == 0 && sShift == "the user's settings" && fCtl > 0;
+    return report("T13", ok,
+                  "old layout read 0x20 B higher is rejected (no format, user's files kept); unshifted it is acted on",
+                  "shifted: " + std::to_string(fShift) + " formats, " + sShift + "; unshifted control: " +
+                      std::to_string(fCtl) + " formats, " + sCtl);
   }
   if (c == "T10") {   // a reset between Update.end() of a complete image and the restore
     unitBefore();

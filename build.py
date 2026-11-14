@@ -2567,6 +2567,14 @@ def collect_pio_artifacts(project_dir, target, want_firmware=True, want_filesyst
             shutil.copy2(elf_src, elf_dest)
             print_info(f"Copied: firmware.elf -> {elf_dest.name}")
             collected.append(elf_dest)
+            # TASK-1918 / ADR-239: no RTC_NOINIT record may sit in the 0x20 B at 0x50000200 that the safeboot
+            # updater's bootloader load overwrites. The linker decides the order, so check the real ELF.
+            if "bootloader_offset" in tcfg:
+                rc = subprocess.run([sys.executable, str(project_dir / "scripts" / "check_rtc_layout.py"),
+                                     str(elf_src)]).returncode
+                if rc != 0:
+                    print_error("RTC layout check failed (scripts/check_rtc_layout.py): see the lines above")
+                    sys.exit(1)
 
     # ESP32 extras needed for merged binary (esp32 + esp32-classic: both ESP32-S3,
     # both carry a separate bootloader + partition table). Keyed on the presence

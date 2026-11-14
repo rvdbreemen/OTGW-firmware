@@ -9438,6 +9438,67 @@
         ],
         "superseded_by": null
       }
+    },
+    {
+      "id": "ADR-239",
+      "title": "The main firmware keeps its RTC_NOINIT records out of the first 32 bytes of RTC slow memory, which the safeboot updater owns",
+      "path": "ADR-239-the-main-firmware-keeps-its-rtc-noinit-records-out-of-the-first-32-bytes-of-rtc-slow-memory-which-the-safeboot-updater-owns.md",
+      "format": "canonical",
+      "status": "Proposed",
+      "date": "2026-11-14",
+      "decision_summary": "The first 32 bytes of RTC slow memory (0x50000200-0x5000021F) belong to the safeboot updater: the main firmware holds...",
+      "topics": [
+        "memory layout",
+        "reboot reason",
+        "RTC memory",
+        "safeboot"
+      ],
+      "aliases": [
+        "RTC_NOINIT placement",
+        "safeboot RTC overlap"
+      ],
+      "components": [
+        "RTC slow memory layout of the main firmware"
+      ],
+      "symbols": [
+        "check_rtc_layout",
+        "g_rtcSafebootGuard"
+      ],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [
+          "Keep grtcSafebootGuard (32 B, RTCNOINITATTR, used, referenced once in setup() so --gc-sections keeps it) at 0x50000200.",
+          "Run scripts/checkrtclayout.py on the ELF of every ESP32 build (build.py, collectpioartifacts()) and fail the build when a record other than the guard starts below 0x50000220 or the guard is missing or misplaced.",
+          "Validate every RTC record with a magic word (and the snapshot with its CRC32), so the bytes another layout leaves behind are rejected."
+        ],
+        "must_not": [
+          "Place an RTCNOINIT record, or initialised RTC data, of the main firmware in 0x50000200-0x5000021F.",
+          "Change safeboot's RTC usage without re-checking this range."
+        ],
+        "exceptions": [
+          "None."
+        ],
+        "verification": [
+          "scripts/checkrtclayout.py : red on the beta.243 ELF (grtcRebootReason at 0x50000200), green on the fix build; tests/testrtclayoutcheck.py (synthetic layouts plus the real old ELF).",
+          "Upgrade transition, real code: tests/testrebootreason.py (case 8), tests/testwifiskipportal.py and tests/testwifideadlink.py (old-layout subtests), test/host/testfsotartcsnapshot.py T13 (no format, no restore from an old snapshot read 0x...",
+          "Bench (TASK-1918 AC3): after an app OTA through safeboot the boot shows - [OTA] handover to safeboot."
+        ]
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": true,
+        "gate": "scripts/check_rtc_layout.py (run by build.py on every ESP32 ELF); tests/test_rtc_layout_check.py",
+        "documents_shipped": false,
+        "verified_in": [
+          "src/OTGW-firmware/OTGW-firmware.h:g_rtcSafebootGuard",
+          "scripts/check_rtc_layout.py",
+          "tests/test_rtc_layout_check.py"
+        ],
+        "supersedes": [],
+        "superseded_by": null
+      }
     }
   ],
   "relationships": [
@@ -16086,6 +16147,24 @@
     {
       "source": "ADR-238",
       "target": "ADR-211",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-239",
+      "target": "ADR-080",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-239",
+      "target": "ADR-191",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-239",
+      "target": "ADR-233",
       "type": "related",
       "resolved": true
     }

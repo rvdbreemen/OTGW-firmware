@@ -1073,6 +1073,11 @@ char        otTopic[OT_TOPIC_LEN];  // Shared MQTT topic scratch for OT print_* 
 char        lastReset[129] = "";
 char        lastResetRaw[16] = "";   // TASK-1904: "0xNN/0xNN", the raw reset code of core 0 / core 1
 bool        g_extWdResetAtBoot = false;   // TASK-1904: the external 0x26 watchdog reset this boot (readExtWatchdogResetFlag())
+// TASK-1918 / ADR-239: the safeboot updater's bootloader load writes 0x20 B at 0x50000200 every time safeboot
+// starts (an app OTA). This guard holds that range, so every RTC_NOINIT record of this firmware starts at or above
+// 0x50000220. Defined here, at the top of the translation unit, so the linker places it first; never read or
+// written as data. scripts/check_rtc_layout.py, run by build.py on the ELF, fails the build when a record lands below.
+RTC_NOINIT_ATTR __attribute__((used)) uint8_t g_rtcSafebootGuard[32];
 uint32_t    MQTTautoConfigMap[8] = { 0 };
 uint32_t    MQTTautoCfgPendingMap[8] = { 0 };  // bitmap for async MQTT discovery drip
 // Deferred settings write timer (Finding #23: coalesce flash writes)
