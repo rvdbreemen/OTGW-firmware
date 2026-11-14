@@ -3,11 +3,11 @@ id: TASK-1834
 title: >-
   OT-Direct: a CS=/C2= override expires after 60 s; the PIC keeps it at least
   62.9 s
-status: In Progress
+status: In Review
 assignee:
   - '@claude'
 created_date: '2026-11-11T23:43:00Z'
-updated_date: '2026-11-14T01:30:00Z'
+updated_date: '2026-11-14T03:00:00Z'
 labels:
   - otdirect
   - parity
@@ -48,4 +48,6 @@ Not verified (from the audit): copy the full 63-126 s window or only the lower b
 Part of the PIC 6.8 parity audit, parent TASK-1851.
 
 2026-11-14 d3, lane-1834 (wt-1834, uncommitted until a bump slot). Fix: OT_CSC2_EXPIRY_MS 60000 -> 63500 with the PIC citation. Evidence: new tests/test_otd_csc2_expiry.py (real constant + the real CS/C2 expiry statements of the 1-second timer, fake clock, CS= and C2= at t=0): old code FAIL at 61/62 s and at 63 s; fix: active at 61, 62, 63 s, expired at 64 and 70 s (CS and C2), SAT-owned CS still active at 150 s. All 43 tests that read OTDirect.ino OK, test_sat_lowload_contract OK (35, 495 s), evaluate --quick 85/0. Not in scope, noted: the PIC also keeps a CS below 8 C forever (CommandExpiry :1628-1633, review finding b1-7); OT-Direct still expires it after the window.
+
+2026-11-14 shipped in 2.0.0-beta.234 (08f42d625, #alpha-testing post 1570996739945537607, zip sha256 49eb9bbb83f28d7cdb7ced481b322e041c41e23eb23331a1fef300c456da409c). Bench by 09 on .61 (evidence 09 scratchpad b234): A: 16 x CS=45.5 in 15 min, 0 expiries, MsgID 1 only R90012D80; B: expiry 63.53 s after the last CS=; C2: expiry 63.73 s. Named limit for AC3: .61 runs in master mode without a thermostat, so the gateway-mode substitution against a real thermostat TSet was not exercised; the timer is proven, the substitution path is unchanged code. AC3 left for 09 to tick or waive (bench ACs are ticked by the bench tester).
 <!-- SECTION:NOTES:END -->
