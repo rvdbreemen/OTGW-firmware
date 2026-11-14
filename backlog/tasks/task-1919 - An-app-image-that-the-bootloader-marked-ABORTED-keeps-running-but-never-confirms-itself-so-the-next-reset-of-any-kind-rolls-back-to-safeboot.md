@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-14T04:02:00Z'
+updated_date: '2026-11-14T05:57:00Z'
 labels:
   - bug
   - ota
@@ -29,3 +30,9 @@ Found with the TASK-1774 RTC probe (otgw-bench-tester 09, .63, 2026-11-14 04:50-
 - [ ] #2 Robert decides how an ABORTED-running image is handled (options with consequences, put by the coordinator)
 - [ ] #3 If a change is decided: old-vs-fix bench on .63 (panic, ABORTED boot, planned restart: old rolls back, fix per the decision)
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Related incident (otgw-bench-tester 09, .63, 2026-11-14 ~06:40, evidence 09 scratchpad b1774c\ old-ota-app / fix-ota-app logs, esptool-readmac.log): an app OTA from probe1774c.old to probe1774c.fix through the safeboot handover hung at 'timeout waiting for safeboot updater'; .63 was off WiFi for about 7 min (router lease still bound, no AP seen). esptool read_mac --after hard_reset on COM8 brought it back ('USB reset (host)'), still on the OLD probe; the retry worked. So esptool's USB-JTAG reset works on .63 (09's own pyserial RTS sequence did not). Cause of the hang not known; not reproduced.
+<!-- SECTION:NOTES:END -->

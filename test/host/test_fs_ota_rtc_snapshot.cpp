@@ -32,7 +32,13 @@ class __FlashStringHelper;
 struct FsModel {
   std::map<std::string, std::string> files;
   std::map<std::string, int> openCount;
+  // A half-written image (a reset in the middle of the image write, 09 on .63 2026-11-14): it mounts and
+  // reads, but it is full (freeBytes 0); only a write that fits a littlefs inline entry still lands. A
+  // format makes it a clean, empty, writable filesystem again.
+  bool broken = false;
+  int formats = 0;
 };
+static const size_t kInlineMax = 256;   // model of littlefs inline data; reboot_count.txt (4 B) fits, settings.ini does not
 static FsModel fs;
 
 struct Handle {
@@ -50,12 +56,25 @@ class File {
   explicit operator bool() const { return h_ && h_->open; }
   size_t write(const uint8_t *p, size_t n) {
     if (!h_ || !h_->open || !h_->writing) return 0;
+    if (fs.broken && h_->buf.size() + n > kInlineMax) {   // no free block on the half-written image
+      size_t room = h_->buf.size() < kInlineMax ? kInlineMax - h_->buf.size() : 0;
+      h_->buf.append(reinterpret_cast<const char *>(p), room);
+      return room;
+    }
     h_->buf.append(reinterpret_cast<const char *>(p), n);
     return n;
   }
   size_t print(const char *s) { return write(reinterpret_cast<const uint8_t *>(s), strlen(s)); }
   size_t print(const __FlashStringHelper *s) { return print(reinterpret_cast<const char *>(s)); }
   size_t printf_P(const char *fmt, ...) {
+    char tmp[512];
+    va_list ap;
+    va_start(ap, fmt);
+    vsnprintf(tmp, sizeof(tmp), fmt, ap);
+    va_end(ap);
+    return print(tmp);
+  }
+  size_t printf(const char *fmt, ...) {
     char tmp[512];
     va_list ap;
     va_start(ap, fmt);
@@ -102,6 +121,7 @@ class File {
 struct LittleFSModel {
   bool begin() { return true; }
   void end() {}
+  bool format() { fs.files.clear(); fs.openCount.clear(); fs.broken = false; fs.formats++; return true; }
   bool exists(const char *p) { return fs.files.count(p) != 0; }
   File open(const char *p, const char *mode) {
     auto h = std::make_shared<Handle>();
@@ -127,6 +147,7 @@ struct LittleFSModel {
 };
 static LittleFSModel LittleFS;
 static bool LittleFSmounted = true;
+static unsigned long millis() { return 0; }
 
 // esp_rom_crc32_le() as in the ROM (the zlib CRC-32: reflected 0xEDB88320, ~crc in and out).
 static uint32_t esp_rom_crc32_le(uint32_t crc, const uint8_t *buf, uint32_t len) {
@@ -155,6 +176,7 @@ static void fsOtaRtcWipe() {}
 static void fsOtaRtcDropSettings() {}
 static void fsOtaRtcRestoreAtBoot(bool) {}
 static bool fsOtaRtcArmed() { return false; }
+static void fsOtaRtcMarkConsistent() {}
 #endif
 
 // RAM settings: what writeSettings() writes. The body stands in for the ~200 key lines.
@@ -184,7 +206,18 @@ static void unitBefore(size_t settingsBytes = 5600) {
 // The upload server's steps (OTGW-ModUpdateServer-esp32.h), in the order the Python side checks.
 static void uploadStart() { fsOtaRtcFill(); LittleFSmounted = false; }
 static void firstChunk() { fsOtaRtcArm(); }
+// Update.end(true) of a complete image (the upload server marks the snapshot consistent there).
+static void imageComplete() { fsOtaRtcMarkConsistent(); }
 static void imageLanded() { fs = FsModel(); fs.files[SET] = IMAGE_DEFAULT; fs.files["/v2.html.gz"] = "ui"; }
+// A reset in the middle of the image write: the half image mounts, shows a truncated settings.ini (here the
+// first 600 B of the user's file, as on .63) and is full.
+static void imageHalfWritten() {
+  std::string prefix = g_userFile.substr(0, 600);
+  fs = FsModel();
+  fs.files[SET] = prefix;
+  fs.files["/v2.html.gz"] = "u";
+  fs.broken = true;
+}
 static void restoreAtEnd() {   // _restoreRuntimeFiles(): settings from RAM, the kept files, then the wipe
   LittleFSmounted = true;
   bool saved = writeSettings(false);
@@ -247,7 +280,7 @@ int main(int argc, char **argv) {
   }
   if (c == "T2") {   // a complete filesystem OTA, then a normal reboot
     unitBefore();
-    uploadStart(); firstChunk(); imageLanded();
+    uploadStart(); firstChunk(); imageLanded(); imageComplete();
     g_ramSettings = std::string(5600, 'u');
     restoreAtEnd();
     bool armed = fsOtaRtcArmed();
@@ -259,7 +292,7 @@ int main(int argc, char **argv) {
   }
   if (c == "T3") {   // the restore wrote settings.ini, then a reset before the wipe at its end
     unitBefore();
-    uploadStart(); firstChunk(); imageLanded();
+    uploadStart(); firstChunk(); imageLanded(); imageComplete();
     LittleFSmounted = true;
     g_ramSettings = std::string(5600, 'n');   // RAM is newer than the snapshot (the user changed a setting)
     writeSettings(false);
@@ -277,8 +310,10 @@ int main(int argc, char **argv) {
     writeSettings(false);
     std::string later = fs.files[SET];
     BootResult r = rebootUnit();
-    bool ok = r.settingsFile == later && r.count == 42;
-    return report("T4", ok, "a settings save after a failed OTA wins over the snapshot; the counter is still kept",
+    // The write never completed, so the boot formats the half image and the later save is gone with it; the
+    // snapshot's copy (the settings before the OTA) is restored instead of the image's default.
+    bool ok = r.settingsFile == g_userFile && r.count == 42;
+    return report("T4", ok, "a settings save after a failed write does not drop the snapshot; the boot restores it",
                   (r.settingsFile == later ? std::string("the later save") : what(r.settingsFile)) +
                   ", count " + std::to_string(r.count));
   }
@@ -297,7 +332,9 @@ int main(int argc, char **argv) {
     unitBefore(7500);
     uploadStart(); firstChunk(); imageLanded();
     BootResult r = rebootUnit();
-    bool ok = r.settingsFile == IMAGE_DEFAULT && r.count == 42 && r.log.size() >= 1450;
+    // Not in the snapshot, so not protected: the half image is formatted and readSettings() finds no file
+    // (the firmware's own defaults), never a partial copy of the user's file.
+    bool ok = r.settingsFile == "(missing)" && r.count == 42 && r.log.size() >= 1450;
     return report("T6", ok, "a settings.ini that does not fit is not kept partly; the counter and log are kept",
                   what(r.settingsFile) + ", count " + std::to_string(r.count));
   }
@@ -313,9 +350,28 @@ int main(int argc, char **argv) {
     return report("T7", ok, "a snapshot with a bad CRC restores nothing and is wiped",
                   what(r.settingsFile) + (rtcClean() ? ", RTC clean" : ", RTC holds data"));
   }
+  if (c == "T9") {   // a reset in the middle of the image write leaves a half-written, full filesystem
+    unitBefore();
+    uploadStart(); firstChunk(); imageHalfWritten();
+    BootResult r = rebootUnit();
+    bool ok = r.settingsFile == g_userFile && r.count == 42 && r.log.size() >= 1450 && !fs.broken;
+    return report("T9", ok, "a reset mid-write: the half image is formatted and the user's settings, counter and log come back",
+                  what(r.settingsFile) + ", count " + std::to_string(r.count) + ", log " + std::to_string(r.log.size()) +
+                  " B, fs " + (fs.broken ? "still broken" : "writable") + ", formats " + std::to_string(fs.formats));
+  }
+  if (c == "T10") {   // a reset between Update.end() of a complete image and the restore
+    unitBefore();
+    uploadStart(); firstChunk(); imageLanded(); imageComplete();
+    BootResult r = rebootUnit();
+    bool ui = fs.files.count("/v2.html.gz") != 0;
+    bool ok = r.settingsFile == g_userFile && r.count == 42 && r.log.size() >= 1450 && fs.formats == 0 && ui;
+    return report("T10", ok, "a reset after a complete image: no format (the web UI stays), settings, counter and log restored",
+                  what(r.settingsFile) + ", count " + std::to_string(r.count) + ", formats " + std::to_string(fs.formats) +
+                  (ui ? ", web UI kept" : ", web UI lost"));
+  }
   if (c == "T8") {   // the counter and log on flash are not replaced; the snapshot is wiped after the boot
     unitBefore();
-    uploadStart(); firstChunk(); imageLanded();
+    uploadStart(); firstChunk(); imageLanded(); imageComplete();
     fs.files[CNT] = "77\r\n";
     fs.files[LOG] = std::string(30, 'N');
     BootResult r = rebootUnit();

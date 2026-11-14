@@ -101,8 +101,9 @@ the probe in TASK-1774 tests exactly that.
 
 At the start of a filesystem OTA the firmware copies `settings.ini`, `reboot_count.txt` and `reboot_log.txt`,
 in that order, into one RTC_NOINIT snapshot above 0x50000220 (magic, lengths, CRC32) and arms it at the first
-written chunk. A boot that finds it armed and valid takes `settings.ini` from it, and the counter and the log only
-where they are missing or empty; every successful settings write and every boot clear it.
+written chunk. A boot that finds it armed and valid first formats the partition when the image write itself was
+cut off, then takes `settings.ini` from the snapshot, and the counter and the log only where they are missing or
+empty; every successful settings write on a sound filesystem and every boot clear it.
 
 The snapshot is one buffer of the real budget (about 7.4 KB, the free RTC slow memory minus a margin; fixed at
 build time from the ELF). `settings.ini` is taken whole or not at all: when it alone does not fit, the snapshot
@@ -127,6 +128,16 @@ The boot restore runs in `setup()` after the mount (`:330`) and before `readSett
 `startWebserver()`, so no filesystem OTA can run at the same time (the TASK-1909 ordering). Each restored file is
 written through a temp file and `fsCommitTempFile()` (TASK-1913).
 
+A reset in the middle of the image write leaves a half-written image: the new superblock and metadata, the rest
+of the partition still old blocks. It mounts and reads, but it is full and takes no write that needs a new block
+(bench round 1, see Evidence). So the snapshot carries one more field, `consistent`: 0 when armed, 1 as soon as
+the partition holds a complete image (right after a successful `Update.end()` of a complete upload) or a fresh
+format (the in-session format of a partial image, `_remountAfterFsWrite()`). A boot that finds it armed and not
+consistent formats LittleFS before the restore and writes the TASK-1495 marker (`FS_UPDATE_INCOMPLETE_FILE`): the
+same end state as an upload that was aborted in-session today, settings, counter and log present and the web UI
+files gone until the filesystem is uploaded again. The settings slot is only dropped by a settings write on a
+consistent filesystem; on a half-written one the boot formats anyway and the snapshot's copy is the one left.
+
 ## Decision Contract
 
 ### Must
@@ -135,7 +146,10 @@ written through a temp file and `fsCommitTempFile()` (TASK-1913).
   filesystem target, not at upload start.
 - Wipe it when an upload is refused before any write (too large, `Update.begin()` failed), after a restore whose
   settings write succeeded, and at every boot, also when the boot restore fails.
-- Drop the settings slot after every successful `writeSettings()`.
+- Drop the settings slot after every successful `writeSettings()` while the snapshot is consistent.
+- Mark it consistent right after a successful `Update.end()` of a complete image and after the in-session format of
+  a partial image; at boot, format LittleFS before the restore when it is armed and not consistent, and write the
+  TASK-1495 marker.
 - At boot, take `settings.ini` from an armed, valid snapshot even when the file exists (the image ships a
   default); restore the counter and the log only when they are missing or 0 B.
 - Check magic, every length against its slot, and the CRC32 over the whole payload before using any of it.
@@ -191,6 +205,16 @@ proven identical to that source). The app running as ABORTED never confirms itse
 on PENDING_VERIFY only, `OTGW-ModUpdateServer-esp32.h:154-161`), so the next reset of any kind rolls back. For this
 decision it means the snapshot must survive two resets, which R1 shows it does. Tracked in TASK-1774.
 
+Bench round 1 of the implementation (otgw-bench-tester 09, .63, 2026-11-14 ~06:30-06:55, 09's scratchpad
+`b1774c\`): a panic at 300000 B of a filesystem OTA (throwaway hook, key K) on a confirmed image, the same hook on the
+real old code (`2.0.0-probe1774c.old+483b285`) and on the first implementation (`2.0.0-probe1774c.fix+ce53698`).
+Old: 16 settings changed, hostname `OTGW2`, boot count 27 -> 1, reboot log 20 -> 2 lines. First implementation: hostname
+and counter kept (30 -> 31), but 14 settings at defaults and the log lost; both left a full filesystem (freeBytes 0,
+every new file 507) and the settings write kept failing after the boot. That is the half-written image described
+above: the restore of `settings.ini` could not land, `readSettings()` read a truncated file (the first wrong key is
+the one written right after `MQTTseparatesources`), the 4 B counter fitted an inline write. The format at boot is the
+answer; host case T9 reproduces the round-1 result on the first implementation and passes on the rework.
+
 ## Alternatives Considered
 
 - **NVS blob (the ESP-IDF key-value store in flash).** It would also survive a power cut. Rejected for now: the
@@ -227,7 +251,11 @@ decision it means the snapshot must survive two resets, which R1 shows it does. 
 **Negative:**
 
 - Not protected: a power cut or brownout during the write or during the recovery (RTC slow memory loses its
-  content without power); the SAT state files, Dallas labels and heating-curve markers (heap copies only, as
+  content without power);
+- Not protected, and unchanged by this decision: a power cut during the image write leaves no snapshot, so the next
+  boot mounts the half-written image as before: it runs on whatever that image shows, takes no write, and needs a
+  filesystem upload (seen on .63 in the old build). Detecting that state without a snapshot is not part of this
+  decision; the SAT state files, Dallas labels and heating-curve markers (heap copies only, as
   today); `settings.ini` when it alone is larger than the snapshot (logged, then not protected at all); the
   counter or the log when they no longer fit after `settings.ini`.
 - The budget margin is thin: 7.2 KB of about 7.4 KB on the bench units. An install with BLE bind keys and more

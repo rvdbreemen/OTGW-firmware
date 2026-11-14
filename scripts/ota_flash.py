@@ -339,6 +339,11 @@ def main(argv=None):
     fs = None if a.no_fs else (a.fs or newest("build/*esp32-combo*.littlefs.bin"))
     if not app and not fs:
         raise SystemExit("nothing to flash")
+    # Before anything touches the unit: a missing image used to crash after the handover and left the unit in
+    # safeboot (09 on .63, 2026-11-14).
+    for what, path in (("app", app), ("filesystem", fs)):
+        if path and (not os.path.isfile(path) or os.path.getsize(path) == 0):
+            raise SystemExit(f"{what} image not found or empty: {path}; nothing was sent to the unit")
 
     # GET /api/v2/settings needs the admin password when one is set (restAPI.ino handleSettings).
     before = _get_json(a.host, "/api/v2/settings", password=a.password)["settings"]

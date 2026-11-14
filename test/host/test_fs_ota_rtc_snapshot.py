@@ -26,6 +26,8 @@ Runtime cases:
   T6  a settings.ini that does not fit is not kept partly; the counter and the log are
   T7  a snapshot with a bad CRC restores nothing and is wiped
   T8  an existing counter and log are not replaced; the snapshot is wiped at boot
+  T9  a reset in the middle of the image write: the half-written, full image is formatted, then restored
+  T10 a reset after Update.end() of a complete image: no format (the web UI stays), the restore as in T1
 Static cases, on the source text:
   S1  _handleUploadStart() fills the snapshot after _keepFiles() and before LittleFS.end()
   S2  _handleUploadWrite() arms it after a successful chunk write
@@ -33,6 +35,8 @@ Static cases, on the source text:
   S4  _restoreRuntimeFiles() wipes it only when the settings write succeeded
   S5  writeSettings() drops the settings slot after a successful commit
   S6  setup() restores between the LittleFS mount and readSettings()
+  S7  _handleUploadEnd() marks the snapshot consistent after Update.end() and before the remount
+  S8  _remountAfterFsWrite() marks it consistent after the format of a partial image
 
 Exit code: 0 PASS, 1 FAIL, 2 harness error. A slice or compile failure is a harness error.
 """
@@ -46,23 +50,30 @@ from test_ot_reserved_range import GEN, HERE, REPO, find_vcvars
 FW = "src/OTGW-firmware/"
 UPD, SET, HELP, HDR, INO = (FW + "OTGW-ModUpdateServer-esp32.h", FW + "settingStuff.ino", FW + "helperStuff.ino",
                             FW + "OTGW-firmware.h", FW + "OTGW-firmware.ino")
-RUNTIME = ["T1", "T2", "T3", "T4", "T5", "T6", "T7", "T8"]
-STATIC = ["S1", "S2", "S3", "S4", "S5", "S6"]
-OLD_MUST_FAIL = ["T1", "T4", "T6", "S1", "S2", "S3", "S4", "S5", "S6"]
+RUNTIME = ["T1", "T2", "T3", "T4", "T5", "T6", "T7", "T8", "T9", "T10"]
+STATIC = ["S1", "S2", "S3", "S4", "S5", "S6", "S7", "S8"]
+OLD_MUST_FAIL = ["T1", "T4", "T6", "T9", "T10", "S1", "S2", "S3", "S4", "S5", "S6", "S7", "S8"]
 
 MUTANTS = [
     ("MB1", "the boot restore treats settings.ini like the counter (only when missing)", UPD,
      [("    bool need = (i == 0);\n", "    bool need = false;\n")],
-     ["T1"]),
+     ["T10"]),   # T1 passes anyway: its half image is formatted first, so settings.ini is missing
     ("MB2", "writeSettings() no longer drops the settings slot", SET,
      [("  fsOtaRtcDropSettings();   // TASK-1774: flash now holds newer settings than an armed RTC snapshot\n", "")],
-     ["T3", "T4", "S5"]),
+     ["T3", "S5"]),   # T4: a write that never completed keeps the slot either way
     ("MB3", "the boot restore keeps the snapshot (no wipe)", UPD,
      [("    off += n;\n  }\n  fsOtaRtcWipe();\n}", "    off += n;\n  }\n}")],
      ["T8"]),
     ("MB4", "the boot restore skips the CRC check", UPD,
      [("|| g_fsOtaRtc.crc != fsOtaRtcCrc()) {", ") {")],
      ["T7"]),
+    ("MB6", "the boot restore does not format a half-written image", UPD,
+     [("  if (!g_fsOtaRtc.consistent) {   // the reset came during the image write: that half image takes no write\n",
+       "  if (false) {   // the reset came during the image write: that half image takes no write\n")],
+     ["T6", "T9"]),
+    ("MB7", "Update.end() no longer marks the snapshot consistent", UPD,
+     [("      fsOtaRtcMarkConsistent();\n    }\n    if (updateOk) {", "    }\n    if (updateOk) {")],
+     ["S7"]),
     ("MB5", "arming moves to upload start", UPD,
      [("      fsOtaRtcFill();   // TASK-1774: survives a reset during the write; armed at the first chunk\n",
        "      fsOtaRtcFill();   // TASK-1774: survives a reset during the write; armed at the first chunk\n"
@@ -129,11 +140,14 @@ def snapshot_block(src):
         b, n = re.subn(r"#define FS_OTA_RTC_MIN_ADDR\s+0x[0-9A-Fa-f]+UL", "#define FS_OTA_RTC_MIN_ADDR 0UL", b)
         if n != 1:
             raise SystemExit("fsOtaRtcSnapshot block: FS_OTA_RTC_MIN_ADDR define not found once")
+        if "fsOtaRtcMarkConsistent" not in b:   # the first (A), benched on .63 2026-11-14, had no such step
+            b += "\ninline void fsOtaRtcMarkConsistent() {}\n"
     return b
 
 
 def defines(src):
-    return "\n".join(l for l in src[HDR].split("\n") if re.match(r"#define SETTINGS_(TMP_)?FILE\s", l))
+    return "\n".join(l for l in src[HDR].split("\n")
+                     if re.match(r"#define (SETTINGS_(TMP_)?FILE|FS_UPDATE_INCOMPLETE_FILE)\s", l))
 
 
 def code(text):
@@ -164,6 +178,10 @@ def static_cases(src):
     setup = "\n".join(function_body(code(src[INO]), r"^void setup\(\)"))
     s6, p6 = order(setup, "LittleFSmounted = LittleFS.begin();", "fsOtaRtcRestoreAtBoot(LittleFSmounted);",
                    "readSettings(true);")
+    end = method_body(upd, r"^  void _handleUploadEnd\(")
+    s7, p7 = order(end, "Update.end(true);", "fsOtaRtcMarkConsistent();", "_remountAfterFsWrite(")
+    remount = method_body(upd, r"^  bool _remountAfterFsWrite\(")
+    s8, p8 = order(remount, "LittleFS.format();", "fsOtaRtcMarkConsistent();", "LittleFS.begin();")
     return {
         "S1": ("pass" if s1 else "FAIL", "_handleUploadStart() fills after _keepFiles() and before LittleFS.end()", str(p1)),
         "S2": ("pass" if s2 and not early_arm else "FAIL", "_handleUploadWrite() arms after a successful chunk write",
@@ -174,6 +192,8 @@ def static_cases(src):
                "if (saved) fsOtaRtcWipe() once" if s4 else "missing or unconditional"),
         "S5": ("pass" if s5 else "FAIL", "writeSettings() drops the settings slot after a successful commit", str(p5)),
         "S6": ("pass" if s6 else "FAIL", "setup() restores between the mount and readSettings()", str(p6)),
+        "S7": ("pass" if s7 else "FAIL", "_handleUploadEnd() marks consistent after Update.end(), before the remount", str(p7)),
+        "S8": ("pass" if s8 else "FAIL", "_remountAfterFsWrite() marks consistent after the format", str(p8)),
     }
 
 

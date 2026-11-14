@@ -9211,7 +9211,8 @@
         "must": [
           "Fill the snapshot before LittleFS.end() at upload start; arm it at the first successful Update.write() of a filesystem target, not at upload start.",
           "Wipe it when an upload is refused before any write (too large, Update.begin() failed), after a restore whose settings write succeeded, and at every boot, also when the boot restore fails.",
-          "Drop the settings slot after every successful writeSettings().",
+          "Drop the settings slot after every successful writeSettings() while the snapshot is consistent.",
+          "Mark it consistent right after a successful Update.end() of a complete image and after the in-session format of a partial image; at boot, format LittleFS before the restore when it is armed and not consistent, and write the TASK-1495 mar...",
           "At boot, take settings.ini from an armed, valid snapshot even when the file exists (the image ships a default); restore the counter and the log only when they are missing or 0 B.",
           "Check magic, every length against its slot, and the CRC32 over the whole payload before using any of it.",
           "Store settings.ini whole or not at all; log on telnet when it does not fit.",

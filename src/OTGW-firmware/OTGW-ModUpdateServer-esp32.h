@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTGW-ModUpdateServer-esp32.h
-**  Version  : v2.0.0-beta.237
+**  Version  : v2.0.0-beta.238
 **
 **  ESP32 OTA update server — functional equivalent of the ESP8266
 **  OTGW-ModUpdateServer with Nodoshop hardware watchdog feeding.
@@ -168,8 +168,11 @@ inline void safebootMarkAppValid() {
 // settings.ini, reboot_count.txt and reboot_log.txt in RTC slow memory, which survives such resets, the
 // rollback to safeboot and the safeboot run (probe 2.0.0-probe1774+370b324 on .63, ADR-233 Evidence); not a
 // power cut. Life cycle: filled before LittleFS.end() at upload start (unarmed), armed at the first written
-// chunk, the settings slot dropped by every successful writeSettings(), wiped after the restore and at every
-// boot. It holds the cleartext secrets of settings.ini (ADR-056): never printed, wiped as early as possible.
+// chunk, marked consistent once the partition holds a complete image or a fresh format again, the settings
+// slot dropped by every successful writeSettings(), wiped after the restore and at every boot. A boot that
+// finds it armed and not consistent formats the half-written image first: that image mounts but is full and
+// takes no write (09 on .63, 2026-11-14). It holds the cleartext secrets of settings.ini (ADR-056): never
+// printed, wiped as early as possible.
 #define FS_OTA_RTC_MAGIC      0x46534F54UL   // "FSOT"
 #define FS_OTA_RTC_DATA_BYTES 7424           // RTC slow 7680 B, minus the other RTC_NOINIT records and a margin
 #define FS_OTA_RTC_SLOTS      3
@@ -179,7 +182,7 @@ struct FsOtaRtcSnapshot {
   uint32_t magic;
   uint32_t crc;                        // over len[] and the used part of data[]
   uint16_t len[FS_OTA_RTC_SLOTS];      // 0 = slot empty
-  uint16_t pad;
+  uint16_t consistent;                 // 1 = the partition holds a complete image or a fresh format again
   uint8_t  data[FS_OTA_RTC_DATA_BYTES];
 };
 static RTC_NOINIT_ATTR FsOtaRtcSnapshot g_fsOtaRtc;
@@ -197,7 +200,8 @@ inline size_t fsOtaRtcUsed() {
 }
 
 inline uint32_t fsOtaRtcCrc() {
-  const uint32_t c = esp_rom_crc32_le(0, reinterpret_cast<const uint8_t *>(g_fsOtaRtc.len), sizeof(g_fsOtaRtc.len));
+  uint32_t c = esp_rom_crc32_le(0, reinterpret_cast<const uint8_t *>(g_fsOtaRtc.len), sizeof(g_fsOtaRtc.len));
+  c = esp_rom_crc32_le(c, reinterpret_cast<const uint8_t *>(&g_fsOtaRtc.consistent), sizeof(g_fsOtaRtc.consistent));
   return esp_rom_crc32_le(c, g_fsOtaRtc.data, static_cast<uint32_t>(fsOtaRtcUsed()));
 }
 
@@ -205,6 +209,7 @@ inline void fsOtaRtcWipe() {
   g_fsOtaRtc.magic = 0;
   memset(g_fsOtaRtc.data, 0, sizeof(g_fsOtaRtc.data));
   memset(g_fsOtaRtc.len, 0, sizeof(g_fsOtaRtc.len));
+  g_fsOtaRtc.consistent = 0;
   g_fsOtaRtc.crc = 0;
 }
 
@@ -240,13 +245,23 @@ inline void fsOtaRtcFill() {
 // First written chunk: from here the old filesystem is gone, so the snapshot becomes the one to restore.
 inline void fsOtaRtcArm() {
   if (fsOtaRtcArmed() || fsOtaRtcUsed() == 0) return;
+  g_fsOtaRtc.consistent = 0;
   g_fsOtaRtc.crc = fsOtaRtcCrc();
   g_fsOtaRtc.magic = FS_OTA_RTC_MAGIC;
 }
 
-// Every successful writeSettings(): settings.ini on flash is now newer than the snapshot's copy.
+// The partition holds a complete image (right after Update.end()) or a fresh format again: a reset from here on
+// needs the restore, not a format.
+inline void fsOtaRtcMarkConsistent() {
+  if (!fsOtaRtcArmed() || g_fsOtaRtc.consistent) return;
+  g_fsOtaRtc.consistent = 1;
+  g_fsOtaRtc.crc = fsOtaRtcCrc();
+}
+
+// Every successful writeSettings(): settings.ini on flash is now newer than the snapshot's copy. Not while the
+// partition still holds a half-written image: the boot formats that, so the snapshot's copy is the one left.
 inline void fsOtaRtcDropSettings() {
-  if (!fsOtaRtcArmed() || g_fsOtaRtc.len[0] == 0) return;
+  if (!fsOtaRtcArmed() || !g_fsOtaRtc.consistent || g_fsOtaRtc.len[0] == 0) return;
   const size_t n = g_fsOtaRtc.len[0];
   const size_t rest = fsOtaRtcUsed() - n;
   memmove(g_fsOtaRtc.data, g_fsOtaRtc.data + n, rest);
@@ -257,8 +272,10 @@ inline void fsOtaRtcDropSettings() {
 }
 
 // setup(), after the mount and before readSettings(): an armed, valid snapshot means a filesystem write
-// started and its restore never finished. settings.ini is always taken from it (the image's default must not
-// win); the counter and the log only fill a missing or empty file. Then the snapshot is wiped, also on failure.
+// started and its restore never finished. When the write itself was cut off, the half-written image is formatted
+// first and marked incomplete (TASK-1495: the web UI files are gone, the user uploads the filesystem again).
+// settings.ini is always taken from the snapshot (the image's default must not win); the counter and the log only
+// fill a missing or empty file. Then the snapshot is wiped, also on failure.
 inline void fsOtaRtcRestoreAtBoot(bool mounted) {
   if (!fsOtaRtcArmed()) return;   // nothing armed; a power-on leaves garbage without the magic
   const size_t used = fsOtaRtcUsed();
@@ -267,10 +284,28 @@ inline void fsOtaRtcRestoreAtBoot(bool mounted) {
     fsOtaRtcWipe();
     return;
   }
+  unsigned long formatMs = 0;
+  if (!g_fsOtaRtc.consistent) {   // the reset came during the image write: that half image takes no write
+    const unsigned long t0 = millis();
+    LittleFS.end();
+    const bool formatted = LittleFS.format();
+    mounted = LittleFS.begin();
+    LittleFSmounted = mounted;
+    formatMs = millis() - t0;
+    DebugTf(PSTR("[OTA] Half-written filesystem image after a reset: format %s, mount %s (%lu ms)\r\n"),
+            formatted ? "OK" : "FAILED", mounted ? "OK" : "FAILED", formatMs);
+  }
   if (!mounted) {
     DebugTln(F("[OTA] RTC snapshot not restored: LittleFS not mounted"));
     fsOtaRtcWipe();
     return;
+  }
+  if (!g_fsOtaRtc.consistent) {   // TASK-1495 marker: the web UI is gone until the filesystem is uploaded again
+    File m = LittleFS.open(FS_UPDATE_INCOMPLETE_FILE, "w");
+    if (m) {
+      m.printf("reset during the filesystem write, formatted at boot in %lu ms\n", formatMs);
+      m.close();
+    }
   }
   size_t off = 0;
   for (size_t i = 0; i < FS_OTA_RTC_SLOTS; i++) {
@@ -608,6 +643,11 @@ private:
     if (_serial_output) DebugTln(F("[OTA] End: finalizing flash..."));
 
     bool updateOk = Update.end(true);
+    // TASK-1774: a complete image is on flash now; a reset from here needs the restore, not a format.
+    if (updateOk && _uploadTarget == UploadTarget::Filesystem &&
+        !(_uploadExpectedBytes > 0 && _uploadWrittenBytes != _uploadExpectedBytes)) {
+      fsOtaRtcMarkConsistent();
+    }
     if (updateOk) {
       if (_serial_output) DebugTf(PSTR("[OTA] End: success (%u bytes)\r\n"), static_cast<unsigned>(totalSize));
       logBootSignature("[OTA] post-end");    // second probe: after Update.end(true) commits the image
@@ -667,6 +707,7 @@ private:
       if (_serial_output) DebugTln(F("[OTA] Filesystem image incomplete: formatting LittleFS"));
       unsigned long t0 = millis();
       bool formatted = LittleFS.format();
+      if (formatted) fsOtaRtcMarkConsistent();   // TASK-1774: an empty, writable filesystem again
       if (_serial_output) {
         DebugTf(PSTR("[OTA] LittleFS format %s (%lu ms)\r\n"), formatted ? "OK" : "FAILED", millis() - t0);
       }

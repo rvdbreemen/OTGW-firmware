@@ -350,6 +350,16 @@ class OtaFlashDroppedResponse(unittest.TestCase):
         waited = sum(s for e, s in (x for x in between if isinstance(x, tuple)))
         self.assertGreaterEqual(waited, 30, f"slept {waited} s between app and fs: {ev}")
 
+    # 09 on .63, 2026-11-14: an --app path that no longer existed crashed after the safeboot handover and left
+    # the unit in safeboot. The script must refuse before it sends anything.
+    def test_missing_app_image_is_refused_before_the_handover(self):
+        missing = os.path.join(self.tmp.name, "gone.ino.bin")
+        with self.assertRaises(SystemExit) as cm:
+            with redirect_stdout(io.StringIO()):
+                self.mod.main(["--host", self.host, "--app", missing, "--no-fs"])
+        self.assertIn("app image not found", str(cm.exception.code))
+        self.assertEqual(FakeDevice.events, [], "nothing may reach the unit")
+
     def test_no_fs_flashes_the_app_only(self):
         rc, out = self._run_both(["--no-fs"])
         self.assertEqual(rc, 0, out)
