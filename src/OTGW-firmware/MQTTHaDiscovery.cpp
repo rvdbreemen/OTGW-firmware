@@ -2135,7 +2135,7 @@ PGM_P haUnitStr(HaUnit u) {
         case HaUnit::bar: { static const char s[] PROGMEM = "bar"; return s; }
         case HaUnit::hPa: { static const char s[] PROGMEM = "hPa"; return s; }
         case HaUnit::percent: { static const char s[] PROGMEM = "%"; return s; }
-        case HaUnit::l_min: { static const char s[] PROGMEM = "l/min"; return s; }
+        case HaUnit::l_min: { static const char s[] PROGMEM = "L/min"; return s; }
         case HaUnit::kW: { static const char s[] PROGMEM = "kW"; return s; }
         case HaUnit::W: { static const char s[] PROGMEM = "W"; return s; }
         case HaUnit::kWh: { static const char s[] PROGMEM = "kWh"; return s; }
