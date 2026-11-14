@@ -3,11 +3,11 @@ id: TASK-1904
 title: >-
   Log the raw hardware reset reason and the external 0x26 watchdog status in the
   reboot log
-status: In Progress
+status: In Review
 assignee:
   - '@claude'
 created_date: '2026-11-13T16:52:00Z'
-updated_date: '2026-11-14T10:39:00Z'
+updated_date: '2026-11-14T11:04:00Z'
 labels:
   - bug
   - stability
@@ -26,7 +26,7 @@ From the TASK-1865/1899 trace (gruijter beta.218, 13 Nov): two resets were repor
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 reboot_log.txt and /api/v2/device/info carry the raw per-core hardware reset reason code next to the mapped text
+- [x] #1 reboot_log.txt and /api/v2/device/info carry the raw per-core hardware reset reason code next to the mapped text
 - [ ] #2 On the Classic the 0x26 external-reset indication is persisted to the reboot log
 - [ ] #3 Bench: a forced task-watchdog reset and a forced RTC-watchdog reset produce different, correct entries
 <!-- AC:END -->
@@ -51,4 +51,6 @@ Probe build 2.0.0-probe1904b FAILED to compile (2026-11-14 10:56): "'g_extWdRese
 AC3 bench by 09 (probe 2.0.0-probe1904c+72437d9, zip sha256 2417a8cc...217f0, OTA app+FS, githash checked) on .61 and .63, 2 trials per key per unit. T (task WDT): reboot after 39-46 s; device/info lastreset 'Task watchdog', resetraw 0x0c/0x0c, label 'software reset (CPU)', extwdreset false; reboot log 'Task watchdog (6) [rst 0x0c/0x0c]' + core-dump line. W (RTC WDT stage 0 RESET_SYSTEM): lastreset 'Other watchdog', resetraw 0x09/0x09, label 'RTC watchdog (digital core)', log 'Other watchdog (7) [rst 0x09/0x09]'. Correction of my brief: I expected 0x10; 09 checked ESP32-S3 rom/rtc.h:79 RTCWDT_SYS_RESET = 9 (digital core) vs :85 RTCWDT_RTC_RESET = 16 (digital core + RTC); a RESET_SYSTEM stage gives 0x09, so the firmware label is right and the brief was wrong. X (0x26) NOT testable: .63 boot telnet 'INIT : no external 0x26 watchdog responding' (twice); not pressed. The 0x26 hardware trigger stays untested on a unit; the code path is covered by host case E1 / mutant MC1. 0x26 read time at boot: .61 (no chip) 335-374 us, .63 287-296 us (one NACK; negligible boot cost). Every trial: bootcount +1, settings diff [] , reboot_log lines CRLF, no run-in (max line 92 B). PIC on .63 detected normally after every ESP reset (6.8), never flashed. Both units back on beta.240+a3dff10, settings diff []. Evidence: 09 scratchpad r1904/u61, r1904/u63.
 
 Rebased onto origin/dev bebecded7 (2026-11-14): only the version-banner hunks conflicted (one per file, both sides version lines only; upstream kept by a resolver that stops on any other hunk). Net code diff excluding banners identical before and after the rebase (525 lines). Re-bump beta.240 -> beta.241 in its own commit. After the rebase: both harnesses PASS (reset-raw incl. --old-rev ff5eb599e, RTC snapshot), 13 related test files PASS, evaluate --quick 85/0.
+
+No-regression bench by 09 on .63, beta.241+0d698c3 (sha256 zip 23ffe9ed...c8a60, ino bb31e550...ae47f, littlefs 7ec0b7de...f0190; githash checked): PASS. reboot_log line 1 'Software reset (3) [rst 0x0c/0x0c] - User reboot (/ReBoot)', 20 lines all CRLF, max 95 B; device/info resetraw 0x0c/0x0c, resetrawlabel 'software reset (CPU)', extwdreset false; settings diff [] (API and raw settings.ini); no crashlog entry from 241's boots. My brief named /api/v2/device/reboot, which does not exist (405); 09 used /ReBoot. AC1 ticked: host harness (E2/E4, S3) plus the probe bench and this bench show the raw code in the log and in device/info. AC2 NOT ticked: the code path is proven only by host case E1 (mutant MC1); no unit with a 0x26 chip was available (.63: 'no external 0x26 watchdog responding'), so the persistence is not proven on hardware. AC3 is 09's to tick (probe bench T/W PASS on .61 and .63).
 <!-- SECTION:NOTES:END -->
