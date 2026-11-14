@@ -9,7 +9,6 @@ documents_shipped: false
 verified_in: []
 supersedes: []
 superseded_by: null
-format: "canonical"
 topics:
   - "filesystem OTA"
   - "settings persistence"
@@ -29,6 +28,7 @@ symbols:
   - "_keepFiles"
   - "RTC_NOINIT_ATTR"
 context_scope: "selective"
+format: "canonical"
 ---
 
 <!-- markdownlint-disable MD025 -->
@@ -37,8 +37,8 @@ context_scope: "selective"
 
 ## Status
 
-Proposed, 2026-11-14. Gated: not to be accepted before the RTC survival probe (TASK-1774) shows the snapshot
-survives the safeboot route on a bench unit.
+Proposed, 2026-11-14. The RTC survival gate passed on 2026-11-14 (routes R1 and R2, see Evidence); the power-cut
+control R3 has not been run. Acceptance is the maintainer's decision; the implementation has not been written.
 
 **Decision Maker:** Agent (otgw-firmware-ba), proposed for the maintainer's decision; the coordinator asked for
 it (2026-11-14) after reviewing the TASK-1774 plan.
@@ -148,6 +148,31 @@ TASK-1909 ordering). Each restored file is written through a temp file and `fsCo
 - Bench (otgw-bench-tester): the RTC survival probe through the safeboot route on .63, then a forced reset in the
   middle of a filesystem OTA on .63, old build versus fix, comparing `/api/v2/settings` and the boot count.
 
+## Evidence
+
+RTC survival probe, a throwaway build `2.0.0-probe1774+370b324` (lane `lane/ba-1774-probe`, never pushed): a
+7168 B seeded pattern with magic and CRC32 in RTC_NOINIT at 0x50000244 (`nm`, 0x1C10 B), the image confirming itself
+only on a telnet key. Run by otgw-bench-tester 09 on .63 (Classic with PIC), 2026-11-14 04:50-04:57; logs in 09's
+scratchpad `b1774\` (`telnet-keys.log`, `r1-info.json`, OTA logs).
+
+- **R1, rollback route: PASS.** Armed (seed 0xb2f06eeb, img=PENDING_VERIFY), panic. The unit booted ota_0 again
+  with img=ABORTED (see below); a second panic rolled back to safeboot (`/info`: `"app_valid":false,
+  "app_rolled_back":true`). About 3.7 min in safeboot, then the app re-upload to `/update` (HTTP 200) and the main
+  boot: `addr=0x50000244 size=7184 len=7168 magic=ok crc=ok seed=0xb2f06eeb img=PENDING_VERIFY reset=3`.
+- **R2, plain panic on a confirmed image: PASS.** Seed 0xf9060ac3, panic, boot line `magic=ok crc=ok` with the same
+  seed, `img=VALID reset=4`.
+- **R3, power cut: not run** (needs a physical power cut by the maintainer). RTC slow memory losing its content
+  without power is the documented behaviour, not the claim under test; the Consequences list it as not protected.
+
+Deviation in R1, relevant to ADR-191: the first panic of a PENDING_VERIFY image did not roll back. The local
+framework-espidf `bootloader_utility.c:396-405` marks the entry ABORTED at the next boot (matches `img=ABORTED`),
+and `:407-416` defaults to factory only when both otadata entries are invalid; otherwise `:440-443` boots the
+active valid entry, which with one OTA slot is ota_0 again. The observation fits a second, still valid otadata
+entry; who left it is not shown by the code (and the bootloader in the pinned libs is a precompiled binary, not
+proven identical to that source). The app running as ABORTED never confirms itself (`safebootMarkAppValid()` acts
+on PENDING_VERIFY only, `OTGW-ModUpdateServer-esp32.h:154-161`), so the next reset of any kind rolls back. For this
+decision it means the snapshot must survive two resets, which R1 shows it does. Tracked in TASK-1774.
+
 ## Alternatives Considered
 
 - **NVS blob (the ESP-IDF key-value store in flash).** It would also survive a power cut. Rejected for now: the
@@ -198,10 +223,12 @@ TASK-1909 ordering). Each restored file is written through a temp file and `fsCo
 
 ## Open Questions
 
-- [ ] Does an armed snapshot survive panic, rollback, minutes in safeboot, the app re-upload and the main boot on
+- [x] Does an armed snapshot survive panic, rollback, minutes in safeboot, the app re-upload and the main boot on
   .63 (the TASK-1774 probe)? If not, this ADR is withdrawn in favour of the NVS alternative or option D.
-- [ ] Does IDF startup, the PHY or WiFi write into RTC slow memory above 0x50000220 in either binary? (Covered by
+  — **Answered 2026-11-14 by Agent: otgw-firmware-ba (Claude):** Yes, on .63 (otgw-bench-tester 09, 2026-11-14 04:50-04:57, probe 2.0.0-probe1774+370b324): seed 0xb2f06eeb with magic and CRC ok after panic, an ABORTED boot, a second panic, about 3.7 min in safeboot, the app re-upload and the main boot (route R1). See Evidence.
+- [x] Does IDF startup, the PHY or WiFi write into RTC slow memory above 0x50000220 in either binary? (Covered by
   the probe; not readable from the ELF.)
+  — **Answered 2026-11-14 by Agent: otgw-firmware-ba (Claude):** Not observed: the 7184 B probe at 0x50000244 came back intact through both routes (R1, R2), so nothing in that range was written by IDF startup, the PHY, WiFi or the safeboot updater on that run. Not a proof for other builds; the implementation keeps the boot address check.
 - [ ] The exact snapshot size: the free RTC slow memory of the build that implements this, minus what margin?
 
 ## Related Decisions
