@@ -7141,4 +7141,4 @@ Asked by DM (through the coordinator) whether the repeat is 60 s or 30 s, given 
 
 **Open:** (1) a superseding or amending ADR for ADR-205 decision 2 (via adr-kit); (2) whether "at least 90 %" counts against all ticks of the hour or against the expected 120; (3) more field data (Robert): one house, November, no run reached a full day, so the daily decision itself is untested.
 
-**Task:** TASK-1927 (evidence); implementation task to be filed.
+**Task:** TASK-1927 (evidence); TASK-1932 (implementation).
