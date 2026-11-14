@@ -33,23 +33,34 @@ int main(void) {
     unhex(tok, fmt, sizeof fmt);
     size_t o = 0;
     for (const char *p = fmt; *p;) {
+      if (o + 1 >= sizeof out) { fprintf(stderr, "output too long\n"); return 1; }
       if (*p != '%') { out[o++] = *p++; continue; }
       if (p[1] == '%') { out[o++] = '%'; p += 2; continue; }
+      /* The spec handed to snprintf is rebuilt from a whitelist: '%', flags, at most 3 width digits,
+         an optional '.' and at most 2 precision digits, 'l' for integers, one allowed conversion.
+         Anything else (an unknown conversion such as %n, a long width, a '%' at the end) is refused. */
       const char *s = p + 1;
-      while (strchr("-+ #0", *s)) s++;
-      while (*s >= '0' && *s <= '9') s++;
-      if (*s == '.') { s++; while (*s >= '0' && *s <= '9') s++; }
-      size_t head = (size_t)(s - p);
-      while (strchr("hlz", *s)) s++;
+      size_t k = 0;
+      spec[k++] = '%';
+      while (*s && strchr("-+ #0", *s) && k < 8) spec[k++] = *s++;
+      for (int d = 0; *s >= '0' && *s <= '9'; d++) { if (d == 3) goto bad_spec; spec[k++] = *s++; }
+      if (*s == '.') {
+        spec[k++] = *s++;
+        for (int d = 0; *s >= '0' && *s <= '9'; d++) { if (d == 2) goto bad_spec; spec[k++] = *s++; }
+      }
+      while (*s && strchr("hlz", *s)) s++;
       char conv = *s;
-      memcpy(spec, p, head);
-      size_t k = head;
-      if (strchr("diuxXc", conv) && conv != 'c') spec[k++] = 'l';
+      if (!conv || !strchr("diuxXcfsS", conv)) goto bad_spec;
+      if (strchr("diuxX", conv)) spec[k++] = 'l';
       spec[k++] = (conv == 'S') ? 's' : conv;
       spec[k] = 0;
       char *arg = strtok_r(NULL, "\t", &save);
-      if (!arg) { fprintf(stderr, "missing argument\n"); return 1; }
+      if (!arg || !arg[0] || arg[1] != ':') { fprintf(stderr, "missing argument\n"); return 1; }
       const char *v = arg + 2;
+      /* the argument type must match the conversion, so snprintf always gets the type it expects */
+      const char *want = strchr("di", conv) ? "d" : strchr("uxX", conv) ? "u" : conv == 'f' ? "f"
+                       : conv == 'c' ? "c" : "s";
+      if (arg[0] != want[0]) { fprintf(stderr, "argument type %c does not fit %%%c\n", arg[0], conv); return 1; }
       switch (arg[0]) {
         case 'd': snprintf(piece, sizeof piece, spec, strtol(v, NULL, 10)); break;
         case 'u': snprintf(piece, sizeof piece, spec, strtoul(v, NULL, 10)); break;
@@ -59,9 +70,14 @@ int main(void) {
         default: fprintf(stderr, "bad type %c\n", arg[0]); return 1;
       }
       size_t pl = strlen(piece);
+      if (o + pl >= sizeof out) { fprintf(stderr, "output too long\n"); return 1; }
       memcpy(out + o, piece, pl);
       o += pl;
       p = s + 1;
+      continue;
+    bad_spec:
+      fprintf(stderr, "refused conversion spec in the format\n");
+      return 1;
     }
     for (size_t i = 0; i < o; i++) printf("%02x", (unsigned char)out[i]);
     printf("\n");

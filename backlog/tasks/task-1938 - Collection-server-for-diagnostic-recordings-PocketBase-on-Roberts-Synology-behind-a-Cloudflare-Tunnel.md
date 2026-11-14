@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-14T15:21:00Z'
-updated_date: '2026-11-14T17:17:00Z'
+updated_date: '2026-11-14T17:21:00Z'
 labels:
   - diagnostics
   - tooling
@@ -49,4 +49,6 @@ Robert 2026-11-14 (session): he has a domain on Cloudflare and asks for help to 
 2026-11-14 Robert: one stream with all three on fixed intervals, also for boards without PSRAM. Built mix records (fmt 4, stream 'mix': OT/SAT/debug sections in one record per interval; otrec.pack_mix/unpack_mix; schema select gains 'mix'; export_batches.py --stream mix). Found and fixed: the OT section decoded every frame at the record t0 (codec assumes the first frame at t0); the section now starts with the offset of its first frame. mix_study.py, 1 h per profile, fresh local PocketBase: PSRAM 60 s full debug zlib: 60 rec/h, 0 early, max 22.1 KB, 1.75 MB sent, 1.78 MB db; no PSRAM 60 s 4 KB buffer debug 0.3 KB/s: 60 rec/h, 0 early, max 3.8 KB, 301 KB sent, 291 KB db; no PSRAM full debug: 480 rec/h, 420 early, max 4.1 KB, 2.49 MB sent; OT decoded identical in all three. End to end: 59 mix records posted (one left out), export --stream mix: 9,253 frames identical, one gap line. Boards without PSRAM: no TLS (ADR-218), so plain HTTP to the NAS on the LAN only.
 
 2026-11-14 decoders for all streams + proof (proof_all_streams.py). Image: CI artifact firmware.bin of research/cloud-recording 48a0eb2 (esp32-combo, digest sha256:59d8f3d8528ba433cfc55518dc0a76221dd5a83bd8fe724a55cbb93ada1f0f7c, only firmware.bin, no ELF). 791/854 BOL format strings and 801 function names found as whole C strings in DROM; both SATTICK formats found (0x3c1bee86, 0x3c1be7bc). Reference text by ref_printf.c (C snprintf per conversion). no-psram 30 min: 4,706 frames, 48 ticks, 5,554 debug lines (580,910 B) -> 51 mix records, largest 4,062 B, 128,953 B; decoded: PASS OT, PASS SATTICK, PASS debug bytes. psram 30 min: 53,857 debug lines (5,596,803 B) -> 30 records, largest 19,528 B, 568,926 B; PASS all three. Negative control: one flipped bit in a debug section -> debug identical False.
+
+2026-11-14 CodeQL on PR #701 (alerts 71-75, uncontrolled format string, ref_printf.c:54-58): real. The conversion char came unchecked from the input, the width was unbounded (memcpy into spec[64]) and a trailing '%' ran past the string. Old binary: 'a%n' abort (glibc '%n in writable segment'), 'abc%' SIGSEGV; fixed: spec rebuilt from a whitelist (flags, <=3 width, <=2 precision digits, conversion in diuxXcfsS), argument type must fit, output bounded; all three refused with exit 1. Proof rerun with the fixed renderer (no-psram, 30 min): PASS OT, PASS SATTICK, PASS debug bytes. The taint path fgets->snprintf stays by design (the tool renders formats it is given); left to Robert whether to dismiss the alerts.
 <!-- SECTION:NOTES:END -->
