@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-14T08:57:00Z'
-updated_date: '2026-11-14T12:43:00Z'
+updated_date: '2026-11-14T13:01:00Z'
 labels:
   - bug
   - wifi
@@ -27,7 +27,7 @@ Found during TASK-1904 (code reading, not seen on a device). shouldForceWifiConf
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [x] #1 Host reproduction on the real gate and counter: three reset-button boots (S3 ESP_RST_POWERON) do not open the portal on the old code and do on the fix (test/host/test_wifi_portal_reset.py P1, P5; P2/P3/P4/P6 green on both)
-- [ ] #2 Fix per Robert's decision A (DM 1571125618777522260; the S3 cannot tell a reset press from a power-on, reset_reasons.h:38-40): reset-button presses and power-ons count, software/USB/watchdog/system brown-out resets do not; ADR-238 Proposed supersedes ADR-043; OLED hint and WiFi recovery guide updated
+- [x] #2 Fix per Robert's decision A (DM 1571125618777522260; the S3 cannot tell a reset press from a power-on, reset_reasons.h:38-40): reset-button presses and power-ons count, software/USB/watchdog/system brown-out resets do not; ADR-238 Proposed supersedes ADR-043; OLED hint and WiFi recovery guide updated
 - [ ] #3 FIELD/MAINTAINER (not bench-testable: a USB reset reports ESP_RST_USB and no USB route presses the button): on a build with the fix, three reset-button presses or three plug pulls, each within 10 s of boot, open the config portal; a single power cut does not
 <!-- AC:END -->
 
@@ -45,4 +45,8 @@ Robert's decision A (DM 1571125618777522260, via the coordinator): count every p
 Where the counter lives (coordinator check): platformRtcRead/Write (platform_esp32.h:806-824) use Preferences namespace 'otgw_rtc', key 's96' = NVS in flash, despite the 'Rtc' name. It survives a real power-off, so pulling the plug three times does reach 3. The harness models that (g_nvs survives every boot; RAM globals and millis() restart). New case P7 pins wear and clearing: fix = 2 NVS writes per power-on (count 1, cleared after the 10 s window), 0 per software reset; old = 1 per power-on. FIX P1-P7 pass, OLD (4678e3481) P1/P5 FAIL, rest pass. The guide and OLED promise of 'pull the plug three times' therefore matches the code; on hardware it stays the field/maintainer AC3.
 
 Rebased onto origin/dev 67b137190 (banner and generated-index conflicts only; net code diff identical, 279 lines). Bump beta.243. ADR index regenerated (adr-index docs/adr, README mode writes README/MD/JSON) and the ADR-238 category entry added next to ADR-043 (tests/test_adr_governance.py counts those links): 17/17 OK. Harness --old-rev origin/dev: FIX P1-P7 pass, OLD P1/P5 FAIL rest pass. 8 related test files PASS, evaluate --quick 86/0.
+
+Build beta.243+c6dc184 (esp32-combo, cold, app 9m42s + FS 28s, max commit charge 86.1 %): SUCCESS. Archived in OTGW-build-archive/beta.243-1930: flash.zip acf28941...c9eef, ino.bin e4f624c3...c161c13, littlefs.bin e2d8c980...7af40e. AC2 ticked (fix per decision A, compiled; host proof in AC1).
+
+No-regression bench by 09 on .63, beta.243+c6dc184 (sha256 zip acf28941...c9eef, ino e4f624c3...61c13, littlefs e2d8c980...7af40e; OTA app+FS, 'changed: none', githash c6dc184): OK. 3x /ReBoot (Software reset, raw 0x0c/0x0c) and 2x USB reset (ESP_RST_USB '(b)', raw 0x15/0x15 = USB_UART_CHIP_RESET, settles the open raw-code question) each came back on WiFi in 7-9 s and MQTT in 9-12 s: no config portal, WiFi kept. Settings diff [] (API and raw settings.ini), crashlog byte-identical, bootcount +1 per reset. The telnet capture misses early setup lines, so the absence of 'External reset count' lines alone proves little; the evidence is the portal never coming plus the reasons reported (USB, SW), which the gate does not count. 3x power-on/button NOT done (AC3 field/maintainer).
 <!-- SECTION:NOTES:END -->

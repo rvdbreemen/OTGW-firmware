@@ -58,7 +58,7 @@ static bool boot(Kind k, uint32_t uptimeMs) {
     case POWER:    g_reason = ESP_RST_POWERON; g_raw = 0x01; break;
     case SOFTWARE: g_reason = ESP_RST_SW;      g_raw = 0x0C; break;
     case EXT8266:  g_reason = ESP_RST_EXT;     g_raw = 0x01; break;   // what ADR-043 was written for (ESP8266)
-    case USB:      g_reason = ESP_RST_USB;     g_raw = 0x15; break;   // host USB reset (09: ESP_RST_USB; raw not verified)
+    case USB:      g_reason = ESP_RST_USB;     g_raw = 0x15; break;   // host USB reset (09 on .63: ESP_RST_USB, raw 0x15)
     case SYSBROWNOUT: g_reason = ESP_RST_BROWNOUT; g_raw = 0x0F; break;
   }
   g_millis = 0;
