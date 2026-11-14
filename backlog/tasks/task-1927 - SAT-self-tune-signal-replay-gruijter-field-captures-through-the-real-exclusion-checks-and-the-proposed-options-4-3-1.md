@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-14T08:21:00Z'
-updated_date: '2026-11-14T09:43:00Z'
+updated_date: '2026-11-14T09:57:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -40,4 +40,6 @@ Counted hours (logged/today/opt4/opt3/opt1/1+3/1+3+4): r1 0/1/1/1/1/1/1; r2 0/0/
 Not done: the graph CSV runs (9-13 Nov) and tjfs b161 (no SATTUNEH lines) were not replayed; AC2 stays open for those. Posted to Robert: #dev-sat-mqtt 1571097840329953301 (interim 1571092002416893993). Subagent could not write REPORT.md (harness blocks report files for subagents).
 
 Agent final details (report saved: scratchpad/tune-replay/REPORT.md): boiler answers MsgID 15 Unknown-DataID, so min_mod used the 5 % default; signal clamp differs per commit (sysMax 62 before entry 317, MaxTSet 48 after); r1 today-column difference explained per hour (ADR-231: hours 10/18/19); opt 1 may conflict with entry 174 (one-sided exclusion rejected for selection bias); opt 3 touches entry 160, opt 4 entry 183; tjfs b161 not checkable (0 and 5 SATTICK lines, no SATTUNE).
+
+Follow-up (Robert 1571099021328650251 / 1571099487240323113 / 1571099749463887954 and siblings): window and filter variants on today's code ff5eb599e, 5 gruijter runs, 35 serial replays (out/followup_summary.txt, followup_windows.txt, followup_runlog.txt). Counted hours total: today 8; 30 min 11; >=95/90 % clean 10; >=80 % 14; >=50 % 17; per-tick 28; 30 min + >=90 % 13.5. 15 min not run. Votes: >=90-95 % leave every run's vote unchanged; 30 min, >=80 %, >=50 % and per-tick flip r1 band->raise, give r2 raise and g214 lower, driven by the morning warm-up after the night setback (r1 06:17-10:17 +6.2/+12.9/+8.4/+7.9). Per-tick resembles entry 174's rejected one-sided exclusion. Posted 1571101634497609743 / 1571101642227449997; recommendation >=90 % clean as a proposal for Sergeant D, asked Robert whether to put it.
 <!-- SECTION:NOTES:END -->
