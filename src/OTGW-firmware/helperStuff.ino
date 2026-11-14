@@ -451,7 +451,7 @@ bool updateRebootLog(String text)
   #define REBOOTLOG_FILE "/reboot_log.txt"
   #define TEMPLOG_FILE "/reboot_log.t.txt"
   #define LOG_LINES 20
-  #define LOG_LINE_LENGTH 140
+  #define LOG_LINE_LENGTH 160   // TASK-1904: the raw reset code added 16; worst case 157 incl. CRLF (host E4)
 
   char log_line[LOG_LINE_LENGTH] = {0};
   char log_line_regs[REBOOT_LOG_LINE_MAX] = {0};  // "Core dump: ..." with all 16 backtrace frames (TASK-1538)
@@ -467,10 +467,13 @@ bool updateRebootLog(String text)
   platformResetRegisterDump(log_line_regs, sizeof(log_line_regs));
   if (log_line_regs[0] != '\0') Debugf(log_line_regs);
 
-  if (platformIsExternalReset()) {
-    char wdReason[64]; initWatchDog(wdReason, sizeof(wdReason));
-    snprintf_P(log_line_regs, LOG_LINE_LENGTH, PSTR("External Reason: External Watchdog reason: %s\r\n"), wdReason);
-    Debugf(log_line_regs);
+  // TASK-1904: the 0x26 flag is read in setup() before this (readExtWatchdogResetFlag()). The old gate here,
+  // platformIsExternalReset(), is never true on the ESP32-S3 (its reset mapping has no ESP_RST_EXT), so the
+  // external watchdog never reached the log. Its own line, so a core dump line before it stays whole.
+  char log_line_extwd[64] = {0};
+  if (g_extWdResetAtBoot) {
+    strlcpy_P(log_line_extwd, PSTR("External watchdog 0x26 reset the ESP (status bit 0)\r\n"), sizeof(log_line_extwd));
+    Debugf(log_line_extwd);
   }
 
   platformResetExceptionInfo(log_line_excpt, sizeof(log_line_excpt));
@@ -491,10 +494,17 @@ bool updateRebootLog(String text)
   if (rebootLogClockValid(now)) {
     TimeZone myTz =  timezoneManager.createForZoneName(CSTR(settings.ntp.sTimezone));
     ZonedDateTime myTime = ZonedDateTime::forUnixSeconds64(now, myTz);
-    snprintf_P(log_line, LOG_LINE_LENGTH, PSTR("%d-%02d-%02d %02d:%02d:%02d - reboot cause: %s (%x) %s\r\n"), myTime.year(),  myTime.month(), myTime.day(), myTime.hour(), myTime.minute(), myTime.second(), CSTR(text), errorCode, log_line_excpt);
+    snprintf_P(log_line, LOG_LINE_LENGTH, PSTR("%d-%02d-%02d %02d:%02d:%02d - reboot cause: %s (%x) [rst %s] %s\r\n"), myTime.year(),  myTime.month(), myTime.day(), myTime.hour(), myTime.minute(), myTime.second(), CSTR(text), errorCode, lastResetRaw, log_line_excpt);
   } else {
     DebugTf(PSTR("reboot log: clock not set (time=%lld)\r\n"), (long long)now);
-    snprintf_P(log_line, LOG_LINE_LENGTH, PSTR("time not set - reboot cause: %s (%x) %s\r\n"), CSTR(text), errorCode, log_line_excpt);
+    snprintf_P(log_line, LOG_LINE_LENGTH, PSTR("time not set - reboot cause: %s (%x) [rst %s] %s\r\n"), CSTR(text), errorCode, lastResetRaw, log_line_excpt);
+  }
+  // A cut-off line lost its CRLF and ran into the next one in the file; end it properly (TASK-1904).
+  const size_t lineLen = strlen(log_line);
+  if (lineLen > 0 && log_line[lineLen - 1] != '\n') {
+    log_line[LOG_LINE_LENGTH - 3] = '\r';
+    log_line[LOG_LINE_LENGTH - 2] = '\n';
+    log_line[LOG_LINE_LENGTH - 1] = '\0';
   }
 
   if (!state.flash.bFsImageWriting && LittleFS.begin()) {   // TASK-1909: never mount over an image being written
@@ -508,6 +518,7 @@ bool updateRebootLog(String text)
       if (strlen(log_line_regs)>2) {
         outfh.print(log_line_regs);
       }
+      if (log_line_extwd[0] != '\0') outfh.print(log_line_extwd);   // TASK-1904
 
       File infh = LittleFS.open(REBOOTLOG_FILE, "r");
       

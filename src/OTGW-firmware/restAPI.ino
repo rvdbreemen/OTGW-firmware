@@ -3407,6 +3407,9 @@ void sendDeviceInfoV2()
     je.field(F("ntptimezone"), settings.ntp.sTimezone);
     je.field(F("uptime"), snap->uptimeStr);
     je.field(F("lastreset"), lastReset);
+    je.field(F("resetraw"), lastResetRaw);   // TASK-1904: "0xNN/0xNN" core 0 / core 1
+    je.field(F("resetrawlabel"), platformResetRawLabel(platformResetRawCode(0)));
+    je.field(F("extwdreset"), g_extWdResetAtBoot);   // TASK-1904: the external 0x26 watchdog reset this boot
     je.field(F("bootcount"), snap->st.uptime.iRebootCount);
     je.field(F("fsupdateincomplete"), LittleFSupdateIncomplete);  // TASK-1899: flag from the loop task, no LittleFS on async_tcp  // TASK-1495: last filesystem update interrupted: formatted and restored, web UI files missing until uploaded again
 

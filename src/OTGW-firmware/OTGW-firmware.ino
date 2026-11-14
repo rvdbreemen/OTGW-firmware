@@ -306,6 +306,7 @@ void setup() {
   // no-op. Fixed boards: PIN_I2C_SDA/SCL.
   Wire.begin(activeI2cSda(), activeI2cScl());
   WatchDogEnabled(0); // turn off watchdog
+  readExtWatchdogResetFlag();   // TASK-1904: before the first feed clears it, and before the reboot log
 
   SetupDebugln(F("\r\n[OTGW firmware - Nodoshop version]\r\n"));
   SetupDebugf(PSTR("Booting....[%s]\r\n\r\n"), _VERSION);
@@ -536,7 +537,9 @@ void setup() {
   // LittleFS; written after that, the new count and boot line were lost (and the write mounted the
   // partition being overwritten).
   platformResetReason(lastReset, sizeof(lastReset));
-  SetupDebugf(PSTR("Last reset reason: [%s]\r\n"), CSTR(lastReset));
+  platformResetRawCodes(lastResetRaw, sizeof(lastResetRaw));   // TASK-1904: raw per-core code next to the text
+  SetupDebugf(PSTR("Last reset reason: [%s] rst:%s, external 0x26 watchdog reset: %s\r\n"), CSTR(lastReset),
+              lastResetRaw, g_extWdResetAtBoot ? "yes" : "no");
   state.uptime.iRebootCount = updateRebootCount();
   updateRebootLog(lastReset);
   setupFSexplorer();

@@ -24,6 +24,7 @@
 #include <Preferences.h>
 #include <LittleFS.h>
 #include <esp_system.h>
+#include <esp_rom_sys.h>      // esp_rom_get_reset_reason (platformResetRawCode, TASK-1904)
 #include <esp_timer.h>          // esp_timer_get_time (platformUptimeSeconds, TASK-1449)
 #include <esp_heap_caps.h>      // heap_caps_malloc (platformPsramAllocOnce)
 #include <driver/gpio.h>        // gpio_install_isr_service (platformGpioIsrServiceInstallEarly, TASK-1763)
@@ -227,6 +228,41 @@ inline void platformResetReason(char *buf, size_t len) {
     default:               str = "Unknown";          break;
   }
   strlcpy(buf, str, len);
+}
+
+// TASK-1904: the raw hardware reset cause per core (soc_reset_reason_t, esp_rom_get_reset_reason()). The mapped
+// esp_reset_reason() folds six watchdog causes into ESP_RST_WDT ("Other watchdog"); the raw code tells them apart.
+// Codes and names: soc/esp32s3/include/soc/reset_reasons.h of the pinned libs (tests/test_reset_raw_codes.py).
+inline unsigned platformResetRawCode(int core) { return (unsigned)esp_rom_get_reset_reason(core); }
+
+inline const char *platformResetRawLabel(unsigned code) {
+  switch (code) {
+    // 0x01 is one value for three causes in the chip; it cannot be split further.
+    case 0x01: return "power-on, brown-out or super watchdog (not distinguishable)";
+    case 0x03: return "software reset (digital core)";
+    case 0x05: return "deep-sleep wake";
+    case 0x07: return "main watchdog 0 (digital core)";
+    case 0x08: return "main watchdog 1 (digital core)";
+    case 0x09: return "RTC watchdog (digital core)";
+    case 0x0B: return "main watchdog 0 (CPU)";
+    case 0x0C: return "software reset (CPU)";
+    case 0x0D: return "RTC watchdog (CPU)";
+    case 0x0F: return "brown-out (digital core)";
+    case 0x10: return "RTC watchdog (digital core and RTC)";
+    case 0x11: return "main watchdog 1 (CPU)";
+    case 0x12: return "super watchdog (digital core and RTC)";
+    case 0x13: return "clock glitch";
+    case 0x14: return "eFuse CRC error";
+    case 0x15: return "USB UART reset";
+    case 0x16: return "USB JTAG reset";
+    case 0x17: return "power glitch";
+    default:   return "unknown code";
+  }
+}
+
+// "0xNN/0xNN": core 0 / core 1, for the reboot log line and device info.
+inline void platformResetRawCodes(char *buf, size_t len) {
+  snprintf(buf, len, "0x%02x/0x%02x", platformResetRawCode(0), platformResetRawCode(1));
 }
 
 // WiFi scan: is the network at scan index `i` encrypted (not open)?

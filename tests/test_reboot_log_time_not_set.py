@@ -82,7 +82,8 @@ class RebootLogTimeNotSet(unittest.TestCase):
         body = self.helper[self.helper.find("bool updateRebootLog("):]
         body = body[:body.find("\n}\n")]
         self.assertRegex(body, r"if \(rebootLogClockValid\(now\)\)")
-        self.assertIn('PSTR("time not set - reboot cause: %s (%x) %s\\r\\n")', body)
+        # TASK-1904 added the raw reset code ("[rst 0xNN/0xNN]") between the mapped code and the details.
+        self.assertIn('PSTR("time not set - reboot cause: %s (%x) [rst %s] %s\\r\\n")', body)
         self.assertNotIn("forUnixSeconds64(time(nullptr)", body)
 
 

@@ -1620,6 +1620,23 @@ void initWatchDog(char* reasonBuf, size_t reasonSize) {
   }
 }
 
+// TASK-1904: did the external 0x26 watchdog reset the ESP? Read before updateRebootLog() so the boot line can say
+// so; initWatchDog() runs much later in setup(). TinyI2CWatchdog (rvdbreemen/ESPEasySlaves) sets Status bit 0
+// in resetTarget() and clears it only on a feed (0xA5) or its own power-up; a read and the disarm (register 7)
+// leave it, so this read before the first feed sees the flag of the reset that started this boot. One
+// transaction, no retry: on a board without the chip it is one NACK (the ESP32-S3 i2c driver logs it), like the
+// disarm just before it.
+bool g_extWdResetAtBoot = false;
+
+void readExtWatchdogResetFlag() {
+  g_extWdResetAtBoot = false;
+  Wire.beginTransmission(EXT_WD_I2C_ADDRESS);
+  Wire.write(0x83);   // set pointer
+  Wire.write(17);     // to the status byte
+  if (Wire.endTransmission() != 0) return;   // no 0x26 answering
+  if (Wire.requestFrom((uint8_t)EXT_WD_I2C_ADDRESS, (uint8_t)1) == 1 && (Wire.read() & 0x1)) g_extWdResetAtBoot = true;
+}
+
 void WatchDogEnabled(byte stateWatchdog) {
   // SECONDARY only (TWDT is primary, ADR-135). Arms/disarms the external 0x26 chip.
   // TASK-946: the ARM is gated on s_extWdPresent. feedWatchDog() likewise only
@@ -1669,6 +1686,8 @@ void feedWatchDog() {
 }
 
 #else  // !HAS_PIC_WATCHDOG — OTGW32 (ESP32-S3): use ESP32 Task Watchdog Timer
+bool g_extWdResetAtBoot = false;   // TASK-1904: no 0x26 on this board
+void readExtWatchdogResetFlag() {}
 #include <esp_task_wdt.h>
 
 // True once the loop task is registered with the TWDT (initWatchDog ran).
