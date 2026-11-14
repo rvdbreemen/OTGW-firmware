@@ -3,11 +3,11 @@ id: TASK-1746
 title: >-
   Unconfirmed crash risk: vendored AsyncTCP accept callback returns ERR_OK after
   tcp_abort() when the AsyncClient allocation fails
-status: In Progress
+status: In Review
 assignee:
   - '@claude'
 created_date: '2026-11-09T06:21:00Z'
-updated_date: '2026-11-12T23:06:00Z'
+updated_date: '2026-11-14T15:26:00Z'
 labels:
   - asynctcp
   - crash-risk
@@ -55,4 +55,6 @@ AC2 ticked: upstream checked by otgw-firmware-09 (2026-11-12): pinned 3.4.10 and
 AC5 evidence from otgw-firmware-09 (relayed by the coordinator, 2026-11-13). Old code: beta.215+242633e had 1 PANIC in 12 /ReBoot cycles (tcp_accept, ELF-decoded, elf bc261223, C:/Users/rvdbr/AppData/Local/Temp/claude/d9c572fbc7f8e9ee/4f6ad420-bf33-4a3a-88bc-4eb9890a2231/scratchpad/b215/); beta.217 0/38; beta.218 0/12 (partly mixed with bench208 strays); in total 1 panic in 62 teardowns on old code, the redirect page not checked there. New code beta.219: 0/21 panics, redirect (817 B) checked 21/21 (C:/Users/rvdbr/AppData/Local/Temp/claude/d9c572fbc7f8e9ee/4f6ad420-bf33-4a3a-88bc-4eb9890a2231/scratchpad/b219/, b219f/).
 
 AC5 ticked with an honest limit: statistically thin. Old 1/62 against new 0/21 does not tell the builds apart on its own. What carries the AC: the panic reproduced on 215 and decoded to tcp_accept, the code change (listener stopped before the teardown, host test red on the old code), and the redirect check 21/21 on the new build. A same-shape 20x run on the old build with the redirect check was NOT done (09 deliberately did not flash back). Robert can still reject this reading.
+
+Stale audit 2026-11-14 (coordinator decision): In Review. Waiting for Robert to accept or reject the reading of the redirect check (AC 4/5; the same-shape 20x run on the old build was not done).
 <!-- SECTION:NOTES:END -->

@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-05T20:34:00Z'
-updated_date: '2026-11-06T15:10:00Z'
+updated_date: '2026-11-14T15:27:00Z'
 labels:
   - diagnostics
 milestone: 2.0.0
@@ -43,4 +43,6 @@ Implement ADR-213 decisions 1-4: versioned 4 KiB-block format (16-byte block hea
 2026-11-06 landing on dev (one commit with TASK-1666, hooks on): test/host/test_diag_recorder.py --mutant RESULT PASS (real F1-F15 pass, guard and bridge mutants fail); evaluate --quick 85/0. Bench .61 lane build beta.103+fe969a5 (no PSRAM): ring 1 block x 4096 B, start costs -5124 B heap (71936 -> 66812), static +128 B RAM / +6156 B flash vs dev. AC2 still open: append cost and the PSRAM board (.63, after its overnight curve ends 2026-11-07 08:00).
 
 2026-11-06 security review finding (commit review): diagRedactSetting copied non-secret free-text values verbatim, so a WebhookPayload template with "token":"..." or key=... reached the ring. Fix: diagRedactBody() over the copied value. Test F10 (two payload cases) FAIL on the old code, PASS on the fix; test_diag_recorder.py --mutant and test_diag_recording_routes.py --mutant RESULT PASS.
+
+Stale audit 2026-11-14 (coordinator decision): AC2 needs a bench on .63 (PSRAM) by 09; the coordinator queues it.
 <!-- SECTION:NOTES:END -->

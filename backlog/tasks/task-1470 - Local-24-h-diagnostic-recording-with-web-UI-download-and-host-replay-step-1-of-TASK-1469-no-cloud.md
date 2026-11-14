@@ -3,11 +3,11 @@ id: TASK-1470
 title: >-
   Local 24 h diagnostic recording with web UI download and host replay (step 1
   of TASK-1469, no cloud)
-status: In Progress
+status: To Do
 assignee:
   - '@claude'
 created_date: '2026-10-29T09:03:00Z'
-updated_date: '2026-11-05T20:35:00Z'
+updated_date: '2026-11-14T15:26:00Z'
 labels:
   - sat
   - diagnostics
@@ -45,4 +45,6 @@ Triage 2026-11-02 (beta.5, origin/dev 6c41cc696) in code: no on-device recorder;
 2026-11-05 Robert's decisions on the ADR-213 open questions (AskUserQuestion in the lead session): (1) no-PSRAM boards: a 4 KB ring, allocated only while a recording runs (against the recommendation of no ring); (2) PSRAM ring 1.5 MB (~13.5 h; against the 1 MB recommendation); (3) download OPEN, not admin-protected (against the recommendation); (4) keep repeat records (~2.8 MB/day); (5) after a reboot a running recording resumes as a new recording starting with the reboot/crash record; (6) port 25238 bridge bytes not recorded in version 1. Measurements: docs/diagnostics/recording-budget-1470.md (wt-1470). AC2 still lacks the .61 heap read with UI open + BLE on.
 
 2026-11-05: ADR-213 Accepted by Robert (AskUserQuestion, 'Accepteren, dan bouwen'); acronyms expanded at first use for the strict lint. Implementation split: TASK-1665 recorder core, TASK-1666 download/status routes, TASK-1667 host decoder + replay + UI button. AC2 still lacks the .61 heap read with UI open + BLE on (TASK-1665 AC2 covers the real cost).
+
+Stale audit 2026-11-14 (coordinator decision): back to To Do until its children close (TASK-1665 recorder core, TASK-1666 routes, TASK-1667 decoder/replay/UI).
 <!-- SECTION:NOTES:END -->
