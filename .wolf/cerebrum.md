@@ -10,7 +10,7 @@
 - Version bump = one changeset via `bin/bump-prerelease.sh` (stages version.h + version.hash + ~42 banners).
 - OTGWSerial is the ONLY editable vendored lib; all other `src/libraries/**` read-only.
 - ADRs: never edit an Accepted ADR; write a new Proposed "…(Amends ADR-XXX)".
-- 2026-11-14 Robert: do not push in between to `dev` during research; the other agents are disturbed by it. Research work goes on its own branch (cloud recording: `research/cloud-recording`), committed locally; push only when Robert asks.
+- 2026-11-14 Robert: do not push in between to `dev` during research; the other agents are disturbed by it. Research work goes on its own branch (cloud recording: `research/cloud-recording`), push to that branch as often as useful without asking (Robert, 2026-11-14); a push to origin/dev needs Robert's permission each time.
 - 2026-11-14 coordinator rules for pushes to origin/dev from the cloud session (TASK-1862): commit locally, push at most once per hour as one batch; before a push check that origin/dev has no commit changing src/OTGW-firmware/version.h in the last 5 minutes (unsure: wait 15 min, check again); touch only docs/diagnostics/ and backlog/tasks/task-1862*; rebase onto origin/dev just before the push, never force-push; after the push write one line with the commit range in TASK-1862's notes. Reason: shared dev, a build zip's githash must equal dev HEAD.
 
 ## Key Learnings
