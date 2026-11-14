@@ -12,6 +12,17 @@ import ot_stream_codec_study as codec  # noqa: E402
 
 FMT_OT_V1 = 1
 
+# Batch sizes measured with batch_size_study.py (one hour of data per variant, local PocketBase):
+#   ot  300 s: 12 requests/h, 20.6 KB sent, 16 KB database per hour; 60 s costs 2.4x the traffic,
+#              900 s saves 28 % traffic but loses up to 15 min on a reboot. One record per frame
+#              ("per line") costs 1.75 MB sent and 1.6 MB database per hour.
+#   dbg  60 s: 1.73 MB sent per hour at full debug; 10 s costs 15 % more, 120 s saves 1.7 %.
+# A batch is also sent early when its payload reaches MAX_PAYLOAD_BYTES (the 65,536-char field).
+BATCH_SECONDS = {"ot": 300, "sat": 300, "dbg": 60}
+MAX_PAYLOAD_BYTES = 48 * 1024
+# The create reply carries only the new id (about 275 B with headers) instead of the whole record.
+CREATE_PATH = "/api/collections/batches/records?fields=id"
+
 
 def _leb(n):
     out = bytearray()

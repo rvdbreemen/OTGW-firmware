@@ -97,24 +97,16 @@ def render(rnd, fmt):
     return "".join(text), bytes(binary)
 
 
-def main():
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--rate", type=float, default=3000, help="text bytes per second to generate")
-    ap.add_argument("--seconds", type=int, default=3600)
-    ap.add_argument("--batch", type=int, default=60)
-    ap.add_argument("--seed", type=int, default=1)
-    a = ap.parse_args()
-    rnd = random.Random(a.seed)
+def generate(rate=3000, seconds=3600, batch=60, seed=1):
+    """Returns (batches, lines, call-site counts). A batch is (t0_ms, text bytes, token bytes)."""
+    rnd = random.Random(seed)
     sites = call_sites()
     bol = [s for s in sites if re.search(r"DebugT", s[0])]
-    print(f"call sites with a literal format: {len(sites)} (with the BOL prefix: {len(bol)})")
-
     t_ms, last_heap_s, lines = 0, -1, 0
     tb, kb = bytearray(), bytearray()
     batches = []
-    sums = {"text": 0, "token": 0, "text_z": 0, "token_z": 0}
     batch_start = 0
-    while t_ms < a.seconds * 1000:
+    while t_ms < seconds * 1000:
         macro, fmt, fn, line = rnd.choice(bol)
         body, args = render(rnd, fmt)
         sec = t_ms // 1000
@@ -130,20 +122,33 @@ def main():
                + (rnd.getrandbits(20) | 0x100000).to_bytes(3, "little") + varint(line) + args)
         tb += text
         lines += 1
-        t_ms += max(1, int(len(text) / a.rate * 1000 * rnd.uniform(0.2, 1.8)))
-        if t_ms - batch_start >= a.batch * 1000:
-            batches.append((bytes(tb), bytes(kb)))
+        t_ms += max(1, int(len(text) / rate * 1000 * rnd.uniform(0.2, 1.8)))
+        if t_ms - batch_start >= batch * 1000:
+            batches.append((batch_start, bytes(tb), bytes(kb)))
             tb, kb, batch_start = bytearray(), bytearray(), t_ms
     if tb:
-        batches.append((bytes(tb), bytes(kb)))
-    for tbytes, kbytes in batches:
+        batches.append((batch_start, bytes(tb), bytes(kb)))
+    return batches, lines, (len(sites), len(bol))
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--rate", type=float, default=3000, help="text bytes per second to generate")
+    ap.add_argument("--seconds", type=int, default=3600)
+    ap.add_argument("--batch", type=int, default=60)
+    ap.add_argument("--seed", type=int, default=1)
+    a = ap.parse_args()
+    batches, lines, (n_sites, n_bol) = generate(a.rate, a.seconds, a.batch, a.seed)
+    print(f"call sites with a literal format: {n_sites} (with the BOL prefix: {n_bol})")
+    sums = {"text": 0, "token": 0, "text_z": 0, "token_z": 0}
+    for _, tbytes, kbytes in batches:
         sums["text"] += len(tbytes)
         sums["token"] += len(kbytes)
         sums["text_z"] += len(zlib.compress(tbytes, 6))
         sums["token_z"] += len(zlib.compress(kbytes, 6))
     secs = a.seconds
     print(f"{lines} lines in {secs} s ({lines / secs:.1f} lines/s), batches of {a.batch} s: {len(batches)}")
-    per_batch_max = max(len(zlib.compress(k, 6)) for _, k in batches)
+    per_batch_max = max(len(zlib.compress(k, 6)) for _, _, k in batches)
     for k, label in (("text", "text (telnet bytes)"), ("text_z", "text + zlib"),
                      ("token", "token (address form)"), ("token_z", "token + zlib")):
         v = sums[k]

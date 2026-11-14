@@ -32,7 +32,7 @@ def main():
     ap.add_argument("email")
     ap.add_argument("password")
     ap.add_argument("--minutes", type=float, default=30)
-    ap.add_argument("--batch", type=int, default=300, help="seconds per batch")
+    ap.add_argument("--batch", type=int, default=otrec.BATCH_SECONDS["ot"], help="seconds per batch")
     ap.add_argument("--start", default="2026-11-14T08:00:00+01:00")
     ap.add_argument("--skip-seq", type=int, action="append", default=[])
     ap.add_argument("--frames-out")
@@ -53,7 +53,7 @@ def main():
         body = {"device": dev, "stream": "ot", "seq": seq, "t0": t0, "fmt": otrec.FMT_OT_V1,
                 "payload": base64.b64encode(payload).decode()}
         while True:
-            st, r = call(base, "/api/collections/batches/records", body, token)
+            st, r = call(base, otrec.CREATE_PATH, body, token)
             if st != 429:
                 break
             time.sleep(5)

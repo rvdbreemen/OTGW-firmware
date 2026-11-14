@@ -41,3 +41,33 @@ The address token is the function name's and the format string's flash offsets (
 identical strings can share one address under LTO), the line number, a time delta and the arguments in
 binary. The host resolves both offsets from the `.elf` of that build. The largest 60 s batch in token+zlib
 form was 21.7 KB, which fits the 65,536-character payload field (48 KiB binary).
+
+## Batch size (measured 2026-11-14, `batch_size_study.py`)
+
+One hour of data per variant, one device, one keep-alive connection, fresh local PocketBase; every create asks
+for `?fields=id`, so the reply is only the id (about 275 B with headers; without it the reply carried the whole
+payload back). Bytes are HTTP headers + body; TLS and TCP are not counted.
+
+| Variant | Requests/h | Sent | Received | Database growth | ms/request |
+|---|---|---|---|---|---|
+| OT, one record per frame (50 per `/api/batch` request) | 189 | 1,750 KB | 491 KB | 1,634 KB | 24.7 |
+| OT, 10 s | 342 | 193 KB | 94 KB | 98 KB | 1.5 |
+| OT, 60 s | 60 | 49 KB | 17 KB | 29 KB | 1.3 |
+| **OT, 300 s** | **12** | **20.6 KB** | **3.3 KB** | **16 KB** | 1.6 |
+| OT, 900 s | 4 | 14.9 KB | 1.1 KB | 16 KB | 1.7 |
+| Debug, 10 s | 360 | 1,977 KB | 99 KB | 1,933 KB | 1.6 |
+| Debug, 30 s | 120 | 1,773 KB | 33 KB | 1,868 KB | 1.9 |
+| **Debug, 60 s** | **60** | **1,725 KB** | **16.5 KB** | **1,745 KB** | 1.8 |
+| Debug, 120 s | 30 | 1,696 KB | 8.3 KB | 1,720 KB | 2.4 |
+
+Chosen (in `otrec.py`): **OT and SAT every 300 s, debug every 60 s, and any batch early at 48 KiB.**
+
+- One record per line costs about 85x the traffic and 100x the database of 300 s batches for the OT stream
+  (about 1.2 GB per gateway-month), and 15 times the server time per request.
+- OT: from 60 s to 300 s the traffic drops 58 % and the database 43 %; from 300 s to 900 s the database stays
+  the same while a reboot can lose 15 minutes instead of 5. A 300 s OT batch is about 1.3 KB in RAM.
+- Debug: from 10 s to 60 s saves 13 % traffic and 10 % database; 60 s to 120 s saves under 2 % and doubles the
+  loss window. A 60 s debug batch is up to 21.7 KB (PSRAM).
+- Rate: one gateway makes 12 + 12 + 60 = 84 requests per hour (1.4 per minute) against the limit of 30 per
+  minute. After an outage the gateway resends its backlog at no more than 25 per minute: two hours offline is
+  168 batches, about 7 minutes to catch up.
