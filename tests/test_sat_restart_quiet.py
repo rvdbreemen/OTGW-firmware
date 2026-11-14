@@ -108,6 +108,8 @@ static void satCycleSample() {}
 static void satGetWindow4hStats() {}
 static void satGetWindow24hStats() {}
 static void satPwmSuppressionRefresh() {}
+static void satContinuousClampRefresh() {}   // TASK-1924 Part 2: tested in test_sat_continuous_startup.py
+static uint32_t _sat_chFlameOnMs = 0;
 static void satMaxTSetSendStep() {}   // TASK-1373: the user MaxTSet SH= step is tested in test_sat_max_tset.py
 static void satPidService(uint32_t) {}
 static void satDhwSetpointSync() {}   // TASK-1376: SW= is covered by test_sat_dhw_sw_sync.py

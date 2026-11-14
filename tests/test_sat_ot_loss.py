@@ -94,6 +94,8 @@ static void satCycleSample() {}
 static void satGetWindow4hStats() {}
 static void satGetWindow24hStats() {}
 static void satPwmSuppressionRefresh() {}
+static void satContinuousClampRefresh() {}   // TASK-1924 Part 2: tested in test_sat_continuous_startup.py
+static uint32_t _sat_chFlameOnMs = 0;
 static void satMaxTSetSendStep() {}   // TASK-1373: the user MaxTSet SH= step is tested in test_sat_max_tset.py
 static void satDhwSetpointSync() {}   // TASK-1376: the SW= sync is tested in test_sat_dhw_sw_sync.py
 static void satMiStep() {}   // TASK-1371: MI=500 is tested in test_sat_no_return_ignition.py
@@ -244,7 +246,7 @@ class OtLoss(unittest.TestCase):
         # TASK-1370 premise: between control ticks (60 s) the resend repeats CS, so test_b's silence is a real check.
         # TASK-1570 (Sergeant D entry 237): MM and CH are on change only, the resend repeats CS alone.
         # TASK-1924 (entries 334, 335): the unchanged CS is repeated 30 s after the tick at 1 s (was 5 s).
-        self.assertEqual([c for t, c in cmds if t == 31], ["CS=45.0"], "premise: the 30 s repeat runs after the tick at 1 s")
+        self.assertEqual([c for t, c in cmds if t == 32], ["CS=45.0"], "premise: the 31 s repeat runs after the tick at 1 s (TASK-1924 Part 2)")
         self.assertFalse([c for t, c in cmds if 2 <= t <= 30], "TASK-1924: no repeat of the unchanged CS within 30 s")
 
     def test_b_loss_hands_back_once_then_silence(self):

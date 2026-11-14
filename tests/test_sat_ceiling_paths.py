@@ -171,6 +171,7 @@ class CeilingPaths(unittest.TestCase):
             ("satSendCS", "10.0f"),                                       # summer simmer: SAT_MIN_SETPOINT, below any ceiling
             ("satSendCS", "10.0f"),                                       # valves closed
             ("satSendCS", "finalSetpoint"),                               # main control tick: final clamp
+            ("satSendCS", "cs"),                                          # 5 s continuous recompute: cs <= satEffectiveMaxSetpoint() just above (TASK-1924 Part 2)
         ])
         self.assertEqual(sorted(self.senders()), want)
         # the PIC keepalive and the CS=0 release are the two other senders, outside satSendCS
@@ -186,7 +187,7 @@ class CeilingPaths(unittest.TestCase):
         a = s.index("// Ceiling: MaxTSet, system/source cap, hard safety ceiling, global cap (satEffectiveMaxSetpoint).\n  float maxSetpoint = satEffectiveMaxSetpoint();".replace("\n", "\r\n" if "\r\n" in s else "\n"))
         i_pid = s.index("if (pidOutput > maxSetpoint) pidOutput = maxSetpoint;", a)
         i_apply_pwm = s.index("finalSetpoint = satApplyPWM(pidOutput, true);", i_pid)       # ignition hold, PWM ON/OFF
-        i_apply_cont = s.index("finalSetpoint = satApplyContinuous(pidOutput, _sat_lastControlCS);", i_pid)   # continuous and recovery after an exit
+        i_apply_cont = s.index("finalSetpoint = satContinuousSetpoint(pidOutput, _sat_lastControlCS);", i_pid)   # continuous and recovery after an exit
         i_clamp = s.index("if (finalSetpoint > maxSetpoint) finalSetpoint = maxSetpoint;", max(i_apply_pwm, i_apply_cont))
         i_send = s.index("satSendCS(finalSetpoint);", i_clamp)
         self.assertLess(i_clamp, i_send)

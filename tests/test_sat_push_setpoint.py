@@ -180,7 +180,7 @@ class PushSetpoint(unittest.TestCase):
         # only on the lane: HEAD has no resend
         # TASK-1570 (entry 237): the resend repeats CS only; MM and CH are on change
         # TASK-1924 (entries 334, 335): one repeat of the unchanged CS 30 s after it, not every 5 s
-        self.assertEqual(self.run_sc("r"), "100:TC=20.0; 130:CS=45.0;")
+        self.assertEqual(self.run_sc("r"), "100:TC=20.0; 131:CS=45.0;")
 
     def test_f_cache_reset_forces_resend(self):
         self.assertEqual(self.run_sc("f"), "100:TC=20.0; 160:TC=20.0;")

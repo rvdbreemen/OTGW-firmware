@@ -82,6 +82,7 @@ static uint32_t millis() { return g_ms; }
 static bool satIsFlameOn() { return g_flame; }
 static float satGetFlowTemp() { return g_flow; }
 static float satApplyContinuous(float p, float /*previousCS*/) { return 1000.0f + p; }   // marker value: "the continuous setpoint was sent"
+static float satContinuousSetpoint(float p, float c) { return satApplyContinuous(p, c); }   // TASK-1924 Part 2: outside the 60 s start-up window
 void satPwmReset();                                                 // defined later in the cut block (the .ino gets Arduino prototypes)
 static float satGetReturnTemp() { return g_ret; }
 static bool satNoReturnTemp() { return false; }   // TASK-1371: a boiler with a return temperature; the no-return hold is tested in test_sat_no_return_ignition.py
