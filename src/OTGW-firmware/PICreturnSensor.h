@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : PICreturnSensor.h
-**  Version  : v2.0.0-beta.253
+**  Version  : v2.0.0-beta.254
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -53,6 +53,14 @@ static inline PicSensorEResult picParseSensorE(const char* value, float& out)
   if (!(v >= -40.0 && v <= 130.0)) return PIC_SENSOR_E_INVALID;  // also rejects NaN
   out = static_cast<float>(v);
   return PIC_SENSOR_E_VALID;
+}
+
+// TASK-1940 (1.x TASK-1147): gate for the opt-in readout of the PIC-attached temperature sensor, every 3 min.
+// Setting on, PIC path (PIC Classic in gateway firmware, never OT-Direct), not flashing, and the return water
+// poll below not running: that one already sends PR=E every 60 s and its replies serve both readers.
+static inline bool picTempSensorPollGate(bool settingOn, bool picPath, bool flashing, bool tretPollActive)
+{
+  return settingOn && picPath && !flashing && !tretPollActive;
 }
 
 // Gate for sending "PR=E": PIC path, not flashing, not in PS=1 mode (the summary

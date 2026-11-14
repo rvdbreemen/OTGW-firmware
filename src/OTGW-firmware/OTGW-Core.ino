@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v2.0.0-beta.253
+**  Version  : v2.0.0-beta.254
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -1205,6 +1205,36 @@ void pollPicReturnSensor()
   if (!cmdQueueHasPR('E')) addCommandToQueue("PR=E", 4, true);
 }
 
+//===================[ pollPicTempSensor ]=========================
+/*
+  TASK-1940 (port of 1.x TASK-1147): reads the temperature sensor wired to the PIC
+  (PR=E) once every 3 minutes, only when settings.picBoot.bTempSensor is on, only on
+  a PIC Classic (OT-Direct has no PIC to ask). The reply is handled by
+  handlePRresponse(). While the return water poll runs it already asks PR=E every
+  60 s, so no second PR=E is queued. Same burst/drip deferral as queryNextPICsetting();
+  the due check runs last, so a deferred tick fires as soon as the gate clears.
+*/
+void pollPicTempSensor()
+{
+#if HAS_PIC
+  DECLARE_TIMER_SEC(timerPicTempSensor, 180, SKIP_MISSED_TICKS);
+  if (!picTempSensorPollGate(settings.picBoot.bTempSensor,
+                             isPICEnabled() && !isOTDirectEnabled() && isGatewayFirmware(),
+                             isFlashing(), picSensorTretPollActive())) return;
+  if (isStatusBurstActive()) return;
+  if (dripDueWithinMs(500)) return;
+  if (!DUE(timerPicTempSensor)) return;
+  if (!cmdQueueHasPR('E')) addCommandToQueue("PR=E", 4, true);  // forceQueue=true: bypass PR prefix dedup
+#endif
+}
+
+// True once a valid PR=E reading arrived with the setting on; gates the Home Assistant
+// discovery of the reading, so a gateway without a sensor never announces it (ADR-094).
+bool picTempSensorHasData()
+{
+  return state.picSettings.sTempReading[0] != '\0';
+}
+
 //===================[ PIC settings readout control ]=============
 /*
   On-demand PIC settings readout.
@@ -1378,6 +1408,20 @@ static void handlePRresponse(const char* buf, size_t len) {
       picBoardTretMs = millis();
       picBoardTretSeen = true;
       applyFramelessTret(tret);
+    }
+    // TASK-1940 (1.x TASK-1147): the opt-in sensor readout. Only a complete number is
+    // published, on every reading; "-" or garbage clears it, so a missing sensor gives no
+    // topic and no entity. With the setting off the reply is ignored, so a tool on port
+    // 25238 asking PR=E cannot announce the entity.
+    if (settings.picBoot.bTempSensor) {
+      if (res != PIC_SENSOR_E_VALID) {
+        state.picSettings.sTempReading[0] = '\0';
+      } else {
+        const bool firstReading = !picTempSensorHasData();
+        strlcpy(state.picSettings.sTempReading, value, sizeof(state.picSettings.sTempReading));
+        if (firstReading) setMQTTConfigPending(OTGWpictempid);  // announce on first data (ADR-094)
+        sendMQTTDataPic(F("temperature_reading"), state.picSettings.sTempReading);
+      }
     }
     return;
   }

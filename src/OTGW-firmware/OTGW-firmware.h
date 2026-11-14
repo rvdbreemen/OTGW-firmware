@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v2.0.0-beta.253
+**  Version  : v2.0.0-beta.254
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -1178,6 +1178,10 @@ byte      OTGWdhwmeterid     = 241;
 // anchors the otgw-firmware/command_dropped sensor and the
 // otgw-firmware/command_retry_exceeded binary sensor. First free slot below 241.
 byte      OTGWcmddropid      = 240;
+// PIC-attached temperature sensor discovery pseudo-ID (TASK-1940; 1.x TASK-1147 uses 242 there,
+// which is OTGWhvacid here): anchors otgw-pic/temperature_reading. First free slot below 240.
+// Announced on the first valid PR=E reading only, so a gateway without a sensor never shows it.
+byte      OTGWpictempid      = 239;
 // Cumulative DHW water total (TASK-1123), see dhwWaterMeter.ino.
 extern double dhwWaterTotalL;
 void updateDHWWaterMeter(float flowLitresPerMin, uint32_t nowMs);

@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : MQTTstuff
-**  Version  : v2.0.0-beta.253
+**  Version  : v2.0.0-beta.254
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **      Modified version from (c) 2020 Willem Aandewiel
@@ -2498,6 +2498,7 @@ static void queueNonOTDiscoveryIds()
   setMQTTConfigPending(0);                  // climate: thermostat + DHW control
   setMQTTConfigPending(27);                 // number: outside temperature override
   setMQTTConfigPending(OTGWcmddropid);      // 240 TASK-1439 command_dropped + command_retry_exceeded
+  if (picTempSensorHasData()) setMQTTConfigPending(OTGWpictempid);      // 239 PIC temperature reading, first valid PR=E (TASK-1940)
   if (dhwWaterMeterHasData()) setMQTTConfigPending(OTGWdhwmeterid);     // 241 DHW water total, just in time (ADR-182)
   setMQTTConfigPending(OTGWhvacid);         // 242 TASK-942 hvac_mode/hvac_action companions
   setMQTTConfigPending(OTGWotdirectid);     // 243 ADR-124 OTDirect flame metrics
@@ -2566,6 +2567,7 @@ void markAllMQTTConfigPending()
   memset(MQTTautoCfgPendingMap, 0, sizeof(MQTTautoCfgPendingMap));
   for (uint16_t i = 0; i < 256; i++) {
     if (i == OTGWdhwmeterid) continue;   // 241 waits for a MsgID 19 sample: queueNonOTDiscoveryIds() decides (ADR-182)
+    if (i == OTGWpictempid) continue;    // 239 waits for a valid PR=E reading: queueNonOTDiscoveryIds() decides (TASK-1940)
     uint16_t sIdx = readSensorIndex(static_cast<uint8_t>(i));
     uint16_t bIdx = readBinSensorIndex(static_cast<uint8_t>(i));
     if (sIdx != MQTT_HA_INDEX_NONE || bIdx != MQTT_HA_INDEX_NONE) {
@@ -3168,6 +3170,7 @@ static HaDevice deviceForOTId(byte OTid) {
   // Real OT message IDs (DATA_*): the Boiler route, the one they are announced on.
   if (OTid <= 127) return HaDevice::Boiler;
   switch (OTid) {
+    case 239: return HaDevice::Sensors;     // TASK-1940 PIC-attached temperature sensor, with the Dallas sensors
     case 240: return HaDevice::Gateway;     // TASK-1439 dropped-command sensor + binary sensor
     case 241: return HaDevice::Sensors;     // TASK-1123 DHW water total: fixed "sensors_" uniq_id prefix
     case 242: return HaDevice::OtCore;      // TASK-942 hvac_mode/hvac_action companion sensors

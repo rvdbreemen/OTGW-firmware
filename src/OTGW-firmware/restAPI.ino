@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-beta.253
+**  Version  : v2.0.0-beta.254
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -4233,6 +4233,7 @@ void sendDeviceSettings()
   addInt(F("gpiooutputstriggerbit"), settings.outputs.iTriggerBit, "i", 0, 15);
   addBool(F("otgwcommandenable"), settings.picBoot.bEnable, "b");
   addStr(F("otgwcommands"), CSTR(settings.picBoot.sCommands), "s", 128);
+  addBool(F("pictempsensor"), settings.picBoot.bTempSensor, "b");   // TASK-1940
   addBool(F("webhookenable"), settings.webhook.bEnabled, "b");
   addStr(F("webhookurlon"), CSTR(settings.webhook.sURLon), "s", 100);
   addStr(F("webhookurloff"), CSTR(settings.webhook.sURLoff), "s", 100);
@@ -4521,6 +4522,7 @@ static const char* const PROGMEM knownSettings[] = {
   "otdsetbacktemp", "otdsetbacktimeout", "otdsummermode",
   "otdventenable", "otdventsetpoint",
   "otgwcommandenable", "otgwcommands",
+  "pictempsensor",  // TASK-1940
   "s0counterdebouncetime", "s0counterenabled", "s0counterinterval", "s0counterpin", "s0counterpulsekw",
   "satareaweight0", "satareaweight1", "satareaweight2", "satareaweight3",
   "satbleenable", "satbleriskack", "satblefailover", "satbleinterval", "satblemac",

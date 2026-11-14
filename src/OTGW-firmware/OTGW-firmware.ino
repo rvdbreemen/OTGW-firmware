@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.ino
-**  Version  : v2.0.0-beta.253
+**  Version  : v2.0.0-beta.254
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -864,6 +864,10 @@ void doTaskEvery3s(){
   // for, because the code that computes it only ran when a frame arrived.
   // Must stay ABOVE the picSettingsCycleActive early-return below.
   evaluateOTBusLiveness(OTBusLivenessTrigger::Tick);
+
+  // TASK-1940 (1.x TASK-1147): PR=E every 3 minutes when the PIC temperature sensor
+  // setting is on. Above the picSettingsCycleActive early-return, which ends after boot.
+  pollPicTempSensor();
 
   if (!picSettingsCycleActive) return;
   queryNextPICsetting();
