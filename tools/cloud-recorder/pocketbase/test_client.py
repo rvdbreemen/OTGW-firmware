@@ -23,7 +23,11 @@ def call(method, url, body=None, token=None):
         req.add_header("Authorization", token)
     try:
         with urllib.request.urlopen(req, timeout=20) as r:
-            return r.status, json.loads(r.read() or b"{}")
+            raw = r.read()
+            try:
+                return r.status, json.loads(raw or b"{}")
+            except ValueError:
+                return r.status, {"raw": raw[:200].decode(errors="replace")}
     except urllib.error.HTTPError as e:
         raw = e.read()
         try:

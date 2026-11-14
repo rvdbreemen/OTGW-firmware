@@ -65,7 +65,7 @@ gateway --HTTPS--> Cloudflare edge --tunnel (outbound from the NAS)--> cloudflar
 1. **Project** > **Create** > name `otgw-recorder`, path `/docker/otgw-recorder`, source "Use existing
    docker-compose.yml" (it picks up `compose.yaml`). Build and start.
 2. Open the `pocketbase` container log. On the first start it applies the migration and prints a link of
-   the form `http://0.0.0.0:8090/_/#/pbinstal/...`. Open that link with the NAS's LAN address instead of
+   the form `http://0.0.0.0:8090/_/#/pbinstall/...`. Open that link with the NAS's LAN address instead of
    `0.0.0.0` and create the superuser (your admin account).
 3. In Zero Trust > Tunnels, `otgw-recorder` should show **Healthy**.
 
@@ -86,17 +86,27 @@ All 7 checks must say PASS. Put the output in TASK-1938 (AC 2). Then check in th
 
 ### 6. Check the retention (AC 3)
 
-The cron runs at 03:17 UTC. For a quick test, set `RETENTION_DAYS=0` in `.env`, restart the project, wait
-until after 03:17 UTC, and confirm that the log line `otgw retention: deleted ...` appears and the test
-batch is gone. Then set it back to 30.
+The cron runs every night at 03:17 UTC. To test it at once:
+
+1. Set `RETENTION_DAYS=0` in `.env` and restart the project.
+2. Admin UI > **Settings > Crons** > run `otgwBatchRetention` (or `POST /api/crons/otgwBatchRetention`
+   with a superuser token, from the LAN).
+3. The `pocketbase` log shows `otgw retention: deleted N batches older than <now>` and **batches** is empty.
+4. Set `RETENTION_DAYS` back to 30 and restart.
 
 ### 7. Back-up
 
 Add `/docker/otgw-recorder/pb_data` to Hyper Backup. PocketBase keeps everything in that folder (SQLite).
 
-## Not verified here
+## Tested locally (2026-11-14)
 
-This container could not download and run PocketBase, so nothing above has run yet. The migration and hook
-follow the PocketBase docs (JS migrations, rate-limit rules, trusted proxy, raw SQL). Three names come from
-the reference types rather than a worked example: `authRule`, `authToken` and `@request.auth.collectionName`.
-If the migration fails on the first start, the container log names the field; report it in TASK-1938.
+Built and run in Docker in the development container (with that container's proxy CA added only for the
+test build). The `pocketbase_0.40.6_linux_amd64.zip` checksum check passed. The migration applied without errors, and reading the collections back showed
+the rules, fields, indexes, the 14-day token, the `CF-Connecting-IP` proxy header and the three rate limits as
+written. `test_client.py` against `http://127.0.0.1:8090`: checks 1 to 6 PASS; check 7 fails locally, as it should, because
+only the tunnel's path rule blocks the admin UI. Extra checks: a disabled device cannot log in (403), a batch
+without a token is refused (400). Retention: a batch backdated to 40 days old was deleted by the cron with
+`RETENTION_DAYS=30` while a new one stayed, and `RETENTION_DAYS=0` deleted the rest.
+
+Still to test on the Synology: the tunnel (check 7 and the path rule), the `arm64` build if the NAS is ARM,
+and Container Manager's handling of `compose.yaml`.
