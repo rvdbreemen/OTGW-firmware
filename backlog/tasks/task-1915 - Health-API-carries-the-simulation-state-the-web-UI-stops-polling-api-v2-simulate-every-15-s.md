@@ -3,11 +3,11 @@ id: TASK-1915
 title: >-
   Health API carries the simulation state; the web UI stops polling
   /api/v2/simulate every 15 s
-status: In Review
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-13T23:57:00Z'
-updated_date: '2026-11-14T09:53:00Z'
+updated_date: '2026-11-14T10:28:00Z'
 labels: []
 dependencies: []
 priority: medium
@@ -45,3 +45,9 @@ Pushed e0824f826..a3dff1054 (origin/dev), #alpha-testing post 157109969909894761
 
 2026-11-14 10:44-10:48 (09, bench-tester) AC4 bench, .61, 2.0.0-beta.240+a3dff10 (artifact sha256 ino 0427b924...e4070, littlefs 46c46b20...8f5e2; OTA app+FS exit 0, 'changed: none', bootcount 633->635). One headless v2 tab with the CDP network log; sim start/stop POSTed from Node outside the browser, so the log holds only the page's own requests. Sim off: health simulation_active false, simulation_source builtin (= /api/v2/simulate), badge #hdrSim hidden. POST /api/v2/simulate/start 200: badge visible after 6.1 s without a reload, health active true. 150 s with sim on: /api/v2/simulate 0 requests, /api/v2/health 10. Whole 3.2 min session: 0 /api/v2/simulate out of 84 requests, health 13/13 HTTP 200. POST stop 200: badge hidden after 14.2 s (next health poll), health false. Afterwards bootcount 635 (no extra reboot), crashlog empty, hash-check match, settings diff [] (API + raw ini). Screenshots (header only, synthetic hostname/IP): sim-badge-off.png, sim-badge-on.png, sim-badge-off-after.png in 09 scratchpad b240/ev with sim-log.txt and sim-network.json. Not done on the bench: an old-v2.js browser run (red-on-old is the AC2 host test).
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+AC1: /api/v2/health carries simulation_active and simulation_source from loop-task state, no LittleFS call in sendHealth(); tests/test_health_no_fs_flash_ops.py new case FAIL on the old restAPI.ino, OK on the fix (5/5 on a3dff1054); the TASK-1899 gate stays green. AC2: tests/webui/health-carries-simulation.test.mjs on the real v2.js in headless Chrome, 2/2 on the fix, 2 FAIL on the old v2.js (4 /simulate calls); rest-503-keeps-state 3/3 and health-chain-one-in-flight 2/2 updated; full webui folder 76/76 files, 372 pass, 0 fail; evaluate --quick 86 passed, 0 failed. AC3: sendSimulationStatus() and the /api/v2/simulate routes unchanged; on the bench GET /api/v2/simulate and POST start/stop answered 200 with the same source as health. AC4: 09 on .61 with 2.0.0-beta.240+a3dff10 (artifact sha256 match), steps 1-6 PASS: badge on after 6.1 s from health, off after 14.2 s, 0 /api/v2/simulate out of 84 page requests in 3.2 min, health 13/13 200, settings diff none, bootcount +2, no crashlog; screenshots sim-badge-off/on/off-after.png in 09's scratchpad b240/ev. Not done: no old-v2.js browser run on the bench (red-on-old is the host test of AC2). Pushed e0824f826..a3dff1054, post 1571099699098947614 (covers beta.238 and beta.239).
+<!-- SECTION:FINAL_SUMMARY:END -->
