@@ -5,7 +5,7 @@ status: In Review
 assignee:
   - '@claude'
 created_date: '2026-11-07T17:06:00Z'
-updated_date: '2026-11-07T22:51:00Z'
+updated_date: '2026-11-14T22:10:00Z'
 labels:
   - webui
   - field-report
@@ -24,7 +24,7 @@ tjfs 2026-11-07 14:21 UTC: after a successful update the user has to press a but
 <!-- AC:BEGIN -->
 - [x] #1 After a successful firmware or filesystem update the update page waits until the unit answers again and then opens the web UI without a click
 - [x] #2 On a failed update the page stays and shows the error
-- [ ] #3 Bench evidence (screenshots or capture of the redirect)
+- [x] #3 Bench evidence (screenshots or capture of the redirect)
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -43,4 +43,6 @@ Full tests/webui per file (120 s cap each): 38 of 39 files green, 0 fail; v2-set
 Lead integration on lane-1707 (on origin/dev 1d96ac6c1 + TASK-1707): patch applied cleanly; update-auto-return 4/4 pass, old page (HEAD copy via OTGW_UPDATE_HTML) 2 fail; update-orchestrator 47 pass 0 fail 11 skipped. Verifier (sound, real code, red/green reproduced): minor findings only; the safeboot page's fixed 20 s reload stays for a follow-up.
 
 Pushed origin/dev 8cbdebc3f (TASK-1703 = 8cbdebc3f, beta.133). Bench .61: the served /update (gzip) contains the new 'Opening the web UI...' path; build green. A real browser update with the redirect was not run (it needs another flash of the shared bench unit): AC3 open, In Review until a user update on beta.133+ confirms it. Follow-up candidate: the safeboot page's fixed 20 s reload (safeboot/src/main.cpp:63).
+
+AC3 bench by 09, 2026-11-14 23:08, .61 (OTGW32) on 2.0.0-beta.257+47f0ea3, real headless Chrome over CDP (scratchpad tools/otaredirect.mjs): GET /update, the release zip OTGW-firmware-esp32-combo-2.0.0-beta.257+47f0ea3-flash.zip into the one-file field (#oneFiles), Update clicked once, no further input. Timeline: t+2 s steps 1-3 green (same version already running, app step skipped), step 4 'Install the web files' 35 % (272.0 KB / 768.2 KB); t+28 s the page navigated by itself to /?_ota=<ts>; t+31 s the v2 web UI was loaded (nav present, footer v2.0.0-beta.257). No click after Update. Device after: bootcount 651 -> 652 (FS only), lastreset Software reset, hash-check fw 47f0ea3 = fs 47f0ea3, settings API diff [], crashlog unchanged. Screenshots: 09 scratchpad b1703/zip/shot-01-before.png, shot-02-update.png (progress), shot-03/04 (web UI after the redirect), log b1703/zip/redirect.log. Side note: a lone .ino.bin in the one-file field leaves Update disabled (the field asks for the release zip; the separate firmware form takes the .ino.bin), so the first try at 23:03 flashed nothing.
 <!-- SECTION:NOTES:END -->
