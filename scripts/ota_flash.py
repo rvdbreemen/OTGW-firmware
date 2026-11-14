@@ -34,6 +34,9 @@ Usage:
                               [--password <admin pw>]
   python scripts/ota_flash.py --host 192.168.88.61 --webui [--password <admin pw>]
 --no-fs flashes the app only, --no-app the filesystem only.
+Exit codes: 0 done and settings unchanged, 2 done but settings changed, 3 the unit answers
+only from the safeboot updater (nothing flashed; the recovery steps are printed, TASK-1774),
+1 any other error.
 Without --app/--fs it picks the newest esp32-combo .ino.bin and .littlefs.bin in build/.
 Stdlib only.
 """
@@ -54,6 +57,10 @@ import zlib
 
 BOUNDARY = "----otgwota7MA4YWxkTrZu0gW"
 FS_VERIFY_TIMEOUT = 120
+# ADR-191: a new app confirms itself 30 s after boot (OTGW-firmware.ino, millis() > 30000). A reset
+# before that rolls it back to safeboot, so the filesystem write waits until the app has confirmed
+# itself (TASK-1774). Counted from the first answer of the new app, which comes after its boot.
+APP_CONFIRM_WAIT = 35
 
 
 def _headers(host, password, extra=None):
@@ -65,8 +72,9 @@ def _headers(host, password, extra=None):
     return h
 
 
-def _get_json(host, path, timeout=5):
-    with urllib.request.urlopen(f"http://{host}{path}", timeout=timeout) as r:
+def _get_json(host, path, timeout=5, password=""):
+    req = urllib.request.Request(f"http://{host}{path}", headers=_headers(host, password))
+    with urllib.request.urlopen(req, timeout=timeout) as r:
         return json.load(r)
 
 
@@ -107,10 +115,50 @@ def _main_up(host):
     return d.get("fwversion")
 
 
-def _safeboot_up(host):
-    # The safeboot updater serves /info; the main firmware does not.
-    with urllib.request.urlopen(f"http://{host}/info", timeout=4) as r:
+def _safeboot_up(host, password=""):
+    # The safeboot updater serves /info; the main firmware does not. With an admin password
+    # set the updater asks for it on every route (safeboot/src/main.cpp authorized()).
+    req = urllib.request.Request(f"http://{host}/info", headers=_headers(host, password))
+    with urllib.request.urlopen(req, timeout=4) as r:
         return r.status == 200 and b"safeboot" in r.read().lower()
+
+
+def _require_main_firmware(host, password):
+    """Stop with exit code 3 when only the safeboot updater answers (TASK-1774).
+
+    The safeboot updater (safeboot/src/main.cpp) redirects every path it does not know,
+    /api/v2/... included, to its HTML upload page, so a JSON read fails there; with an
+    admin password set that page asks for Basic Auth first (401). The main firmware serves
+    /api/v2/device/info as JSON without a password. Either failure is checked against the
+    updater's own GET /info before reporting.
+    """
+    try:
+        _main_up(host)
+        return
+    except (ValueError, urllib.error.HTTPError) as e:  # JSONDecodeError is a ValueError
+        first = f"HTTP {e.code}" if isinstance(e, urllib.error.HTTPError) else type(e).__name__
+    req = urllib.request.Request(f"http://{host}/info", headers=_headers(host, password))
+    try:
+        with urllib.request.urlopen(req, timeout=5) as r:
+            info = json.load(r)
+    except urllib.error.HTTPError as e:
+        if e.code != 401:
+            raise
+        print(f"unit is probably in safeboot: /api/v2/device/info gave {first} and /info asks for "
+              "the admin password (HTTP 401); the main firmware serves device/info without one. "
+              "Check --password.")
+        raise SystemExit(3)
+    if "safeboot" not in info:
+        raise SystemExit(f"/api/v2/device/info gave {first} and /info is not the safeboot updater: {info}")
+    print(f"unit is in safeboot (updater {info.get('safeboot')}): app_valid="
+          f"{str(info.get('app_valid')).lower()} app_rolled_back={str(info.get('app_rolled_back')).lower()}. "
+          "The main firmware is not running, so its settings cannot be read or kept by this script.")
+    print("Recovery: upload a working app to the updater (curl -F update=@<app>.ino.bin "
+          f"http://{host}/update, with -H 'Origin: http://{host}' and -u admin:<pw> if a password is "
+          "set), then once the main firmware answers: ota_flash.py --host "
+          f"{host} --no-app --fs <image>.littlefs.bin. Check the settings afterwards: a rollback can "
+          "have reset them.")
+    raise SystemExit(3)
 
 
 def _version_hash(host):
@@ -240,7 +288,7 @@ def flash_app(host, password, app):
     """App OTA through the safeboot updater; returns once the main firmware answers again."""
     print("handover to safeboot")
     _post(host, "/safeboot", password)
-    _wait(lambda: _safeboot_up(host), "safeboot updater", 120)
+    _wait(lambda: _safeboot_up(host, password), "safeboot updater", 120)
     # The safeboot updater runs the synchronous WebServer; a urllib upload of the
     # whole body gets the connection closed without a response, curl's -F upload
     # (as a browser form) goes through.
@@ -264,6 +312,7 @@ def flash_app(host, password, app):
     time.sleep(5)
     ver = _wait(lambda: _main_up(host), "main firmware after app update", 180)
     print("  app running:", ver)
+    return time.time()
 
 
 def newest(pattern):
@@ -281,6 +330,7 @@ def main(argv=None):
     ap.add_argument("--no-fs", action="store_true")
     ap.add_argument("--webui", action="store_true", help="push the gzipped web pages only (debugging)")
     a = ap.parse_args(argv)
+    _require_main_firmware(a.host, a.password)
     if a.webui:
         print("running:", _main_up(a.host))
         push_webui(a.host, a.password)
@@ -290,18 +340,23 @@ def main(argv=None):
     if not app and not fs:
         raise SystemExit("nothing to flash")
 
-    before = _get_json(a.host, "/api/v2/settings")["settings"]
+    # GET /api/v2/settings needs the admin password when one is set (restAPI.ino handleSettings).
+    before = _get_json(a.host, "/api/v2/settings", password=a.password)["settings"]
     print("running:", _main_up(a.host))
 
-    if app:
-        flash_app(a.host, a.password, app)
+    app_up_at = flash_app(a.host, a.password, app) if app else None
 
+    if fs and app_up_at is not None:
+        left = APP_CONFIRM_WAIT - (time.time() - app_up_at)
+        if left > 0:
+            print(f"waiting {left:.0f} s until the new app has confirmed itself (ADR-191) before the filesystem write")
+            time.sleep(left)
     if fs:
         flash_fs(a.host, a.password, fs)
 
     ver = _wait(lambda: _main_up(a.host), "main firmware", 180)
     print("running:", ver)
-    after = _get_json(a.host, "/api/v2/settings")["settings"]
+    after = _get_json(a.host, "/api/v2/settings", password=a.password)["settings"]
     diff = sorted(k for k in set(before) | set(after)
                   if before.get(k, {}).get("value") != after.get(k, {}).get("value"))
     print(f"settings: {len(after)} keys, changed: {diff if diff else 'none'}")

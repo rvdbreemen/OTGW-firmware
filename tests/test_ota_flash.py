@@ -336,6 +336,20 @@ class OtaFlashDroppedResponse(unittest.TestCase):
         self.assertEqual(rc, 0, out)
         self.assertEqual(FakeDevice.events, ["safeboot", "app", "fs"], out)
 
+    # TASK-1774 (C): the new app confirms itself 30 s after boot (ADR-191); a reset during a
+    # filesystem write before that rolls it back to safeboot. The script must wait between the
+    # app coming up and the filesystem POST.
+    def test_filesystem_waits_until_the_new_app_confirmed_itself(self):
+        def record_sleep(s):
+            FakeDevice.events.append(("sleep", s))
+        self.mod.time.sleep = record_sleep
+        rc, out = self._run_both()
+        self.assertEqual(rc, 0, out)
+        ev = FakeDevice.events
+        between = ev[ev.index("app") + 1:ev.index("fs")]
+        waited = sum(s for e, s in (x for x in between if isinstance(x, tuple)))
+        self.assertGreaterEqual(waited, 30, f"slept {waited} s between app and fs: {ev}")
+
     def test_no_fs_flashes_the_app_only(self):
         rc, out = self._run_both(["--no-fs"])
         self.assertEqual(rc, 0, out)
@@ -345,6 +359,160 @@ class OtaFlashDroppedResponse(unittest.TestCase):
         rc, out = self._run_both(["--no-app"])
         self.assertEqual(rc, 0, out)
         self.assertEqual(FakeDevice.events, ["fs"], out)
+
+
+class SafebootOnlyDevice(http.server.BaseHTTPRequestHandler):
+    """TASK-1774: a unit that answers only from the safeboot updater (safeboot/src/main.cpp).
+
+    Routes as the real updater: GET / and GET /update serve the HTML upload page, GET /info
+    the JSON status, and every other path (so /api/v2/settings and /api/v2/device/info)
+    gets a 302 to / (onNotFound), which urllib follows to the HTML page. With an admin
+    password set, every route asks for Basic Auth first (authorized()).
+    """
+    rolled_back = True
+    password = ""
+    posts = []
+
+    def log_message(self, *args):
+        pass
+
+    def _authorized(self):
+        pw = type(self).password
+        if not pw:
+            return True
+        want = "Basic " + __import__("base64").b64encode(f"admin:{pw}".encode()).decode()
+        if self.headers.get("Authorization") == want:
+            return True
+        self.send_response(401)
+        self.send_header("WWW-Authenticate", 'Basic realm="Login Required"')
+        self.send_header("Content-Length", "0")
+        self.end_headers()
+        return False
+
+    def _send(self, code, body, ctype):
+        data = body.encode()
+        self.send_response(code)
+        self.send_header("Content-Type", ctype)
+        self.send_header("Content-Length", str(len(data)))
+        self.end_headers()
+        self.wfile.write(data)
+
+    def do_GET(self):
+        if self.path in ("/", "/update"):
+            if self._authorized():
+                note = "The firmware failed to start and was rolled back." if type(self).rolled_back else ""
+                self._send(200, f"<!DOCTYPE html><html><body>{note}<form></form></body></html>", "text/html")
+        elif self.path == "/info":
+            if self._authorized():
+                rb = "true" if type(self).rolled_back else "false"
+                self._send(200, '{"safeboot":"1.2.0","hostname":"otgw","ip":"127.0.0.1","ap_mode":false,'
+                                f'"app_valid":false,"app_rolled_back":{rb},"auth":false,"heap":200000}}',
+                           "application/json")
+        else:
+            self.send_response(302)
+            self.send_header("Location", "/")
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+
+    def do_POST(self):
+        n = int(self.headers.get("Content-Length", 0))
+        self.rfile.read(n)
+        type(self).posts.append(self.path)
+        self.send_response(302)
+        self.send_header("Location", "/")
+        self.send_header("Content-Length", "0")
+        self.end_headers()
+
+
+class OtaFlashUnitInSafeboot(unittest.TestCase):
+    """TASK-1774 AC4: a unit that answers only from safeboot is reported as such.
+
+    Before the fix main() died in _get_json() with a JSONDecodeError traceback (the 302
+    leads to the HTML page), or with an HTTPError 401 when a password is set.
+    """
+
+    def setUp(self):
+        SafebootOnlyDevice.rolled_back = True
+        SafebootOnlyDevice.password = ""
+        SafebootOnlyDevice.posts = []
+        self.srv = http.server.ThreadingHTTPServer(("127.0.0.1", 0), SafebootOnlyDevice)
+        threading.Thread(target=self.srv.serve_forever, daemon=True).start()
+        self.host = f"127.0.0.1:{self.srv.server_address[1]}"
+        self.tmp = tempfile.TemporaryDirectory()
+        self.fs = os.path.join(self.tmp.name,
+                               f"OTGW-firmware-esp32-combo-2.0.0-alpha.542+{NEW_HASH}.littlefs.bin")
+        with open(self.fs, "wb") as f:
+            f.write(b"\xff" * 4096)
+        self.mod = load_script()
+
+    def tearDown(self):
+        self.srv.shutdown()
+        self.srv.server_close()
+        self.tmp.cleanup()
+
+    def _run(self, *extra):
+        out = io.StringIO()
+        with redirect_stdout(out):
+            try:
+                rc = self.mod.main(["--host", self.host, "--fs", self.fs, "--no-app", *extra])
+            except SystemExit as e:
+                rc = e.code
+        return rc, out.getvalue()
+
+    def _assert_safeboot_report(self, rc, out):
+        self.assertEqual(rc, 3, out)
+        self.assertIn("unit is in safeboot", out)
+        self.assertIn("app_rolled_back=true", out)
+        self.assertIn("--no-app --fs", out)  # the recovery hint names the second step
+        self.assertEqual(SafebootOnlyDevice.posts, [], "nothing may be flashed")
+
+    def test_safeboot_unit_is_reported_not_a_traceback(self):
+        rc, out = self._run()
+        self._assert_safeboot_report(rc, out)
+
+    def test_safeboot_unit_with_password_is_reported(self):
+        SafebootOnlyDevice.password = "s3cret"
+        rc, out = self._run("--password", "s3cret")
+        self._assert_safeboot_report(rc, out)
+
+    def test_safeboot_unit_with_wrong_password_says_auth_failed(self):
+        SafebootOnlyDevice.password = "s3cret"
+        rc, out = self._run("--password", "wrong")
+        self.assertEqual(rc, 3, out)
+        self.assertIn("probably in safeboot", out)
+        self.assertIn("401", out)
+        self.assertEqual(SafebootOnlyDevice.posts, [], "nothing may be flashed")
+
+    # TASK-1774: flash_app() waits for the updater's /info after POST /safeboot. With a
+    # password set the updater answers 401 without credentials, so the old script polled
+    # until "timeout waiting for safeboot updater" and never uploaded the app.
+    def test_app_ota_waits_for_safeboot_with_password(self):
+        SafebootOnlyDevice.password = "s3cret"
+        app = os.path.join(self.tmp.name, "OTGW-firmware-esp32-combo-2.0.0-alpha.542+c00c5f0.ino.bin")
+        with open(app, "wb") as f:
+            f.write(bytes(1024))
+        uploads = []
+
+        class Done:
+            returncode = 0
+            stdout = " | HTTP 200"
+            stderr = ""
+
+        def fake_run(cmd, **kw):
+            uploads.append(cmd)
+            return Done()
+
+        self.addCleanup(setattr, self.mod.subprocess, "run", self.mod.subprocess.run)
+        self.mod.subprocess.run = fake_run
+        orig_wait = self.mod._wait
+        self.mod._wait = lambda fn, what, timeout: orig_wait(fn, what, 2)  # keep the old timeout short
+        self.mod._main_up = lambda host: "2.0.0-alpha.542"  # the new app answers after the upload
+        out = io.StringIO()
+        with redirect_stdout(out):
+            self.mod.flash_app(self.host, "s3cret", app)
+        self.assertEqual(SafebootOnlyDevice.posts, ["/safeboot"], out.getvalue())
+        self.assertEqual(len(uploads), 1, out.getvalue())
+        self.assertIn("app running: 2.0.0-alpha.542", out.getvalue())
 
 
 if __name__ == "__main__":
