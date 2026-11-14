@@ -295,6 +295,18 @@ The nightly restart causes a brief service interruption of approximately 30 seco
 | OLED Address | I2C address of the SSD1306 OLED display (typically `0x3C` or `0x3D`) |
 | OLED Timeout | Display off timeout in seconds (0 = always on) |
 
+#### OpenTherm Gateway (PIC)
+
+These settings apply to the OTGW Classic with its PIC. On hardware without a PIC they have no effect.
+
+| Setting | Description | Default |
+|---|---|---|
+| Run commands at boot | Send the boot commands below to the PIC at startup | Off |
+| Boot commands | PIC commands separated by semicolons, for example `PS=0;GW=1` (up to 128 characters) | `GW=1` in the shipped filesystem image |
+| PIC temperature sensor | Read the temperature sensor wired to the PIC every 3 minutes and publish it to MQTT (`otgw-pic/temperature_reading`) and Home Assistant (sensor `PIC_Temperature_Reading`). A PIC without a sensor publishes nothing, so no entity appears. Leave off when no sensor is connected | Off |
+
+The PIC temperature sensor reading is a temperature. The row **Temp sensor** under **Advanced > PIC firmware** is something else: it shows what the sensor is used for (`O` outside, `R` return water).
+
 #### OT-Direct Mode (Hardware Without a PIC)
 
 On hardware without a PIC, a dropdown appears in the settings to select the OT-Direct operating mode:

@@ -219,6 +219,20 @@ Veelgebruikte commando's:
 | `OT=12.0` | Buitentemperatuur doorgeven |
 | `SB=15.0` | Setback-temperatuur |
 
+Op hardware zonder PIC (OT-Direct) beantwoordt de firmware deze commando's zelf, met de tekst van PIC-firmware 6.8, zodat programma's die voor de PIC geschreven zijn dezelfde antwoorden lezen:
+
+| Commando | Antwoord op OT-Direct |
+|----------|-----------------------|
+| `PR=P` | `PR: P=Low power`, `Medium power` of `High power`: het Smart Power-niveau naar de thermostaat |
+| `PR=R` | `PR: R=D` (automatisch, de standaard), of `S`, `C`, `I` na `FT=` |
+| `PR=O` | `PR: O=N` zonder kamersetpoint-override; `T`/`C` en het setpoint bij een `TT=`/`TC=`-override, kleine `t`/`c` zolang de thermostaat hem nog niet heeft overgenomen, `n` zolang een wissen nog onderweg is. Alleen een `CS=`-override geeft `N`, net als de PIC |
+| `PR=C` | `PR: C=240 MHz` |
+| `PR=B` | `PR: B=UU:MM DD-MM-JJJJ`, de bouwtijd van de firmware |
+| `PR=L` | `PR: L=FXOMPC` totdat `LA=`..`LF=` het wijzigen |
+| `SC=9:05/3` | `SC: 09:05/3` (uren met twee cijfers) |
+| `SR=18:1,230` | `SR: 18:1/230`: het opgeslagen antwoord als `<id>:<hoge byte>/<lage byte>`, in welke vorm het argument ook kwam |
+| `FT=X` | `FT: D`: het gekozen model (`C`, `I`, `S` of `D`), niet het argument |
+
 Alias: `POST /api/v2/otgw/command` (achterwaartse compatibiliteit)
 
 ---

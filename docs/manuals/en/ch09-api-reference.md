@@ -197,7 +197,7 @@ Update one or more settings. Authentication required.
 
 Settings are validated server-side. Invalid values are silently ignored or constrained to safe ranges. Side effects (MQTT reconnect, NTP resync, mDNS restart) are applied within 2 seconds via a deferred-write timer.
 
-**Settings whitelist:** Only known setting names are accepted. The full list includes: `hostname`, `httppasswd`, `ledblink`, `nightlyrestart`, `nightlyrestarthour`, `mqttenable`, `mqttbroker`, `mqttbrokerport`, `mqttuser`, `mqttpasswd`, `mqtttoptopic`, `mqtthaprefix`, `mqttharebootdetection`, `mqttuniqueid`, `mqttotmessage`, `mqttinterval`, `mqttseparatesources`, `ntpenable`, `ntptimezone`, `ntphostname`, `ntpsendtime`, `darktheme`, `gpiosensorsenabled`, `gpiosensorspin`, `gpiosensorsinterval`, `s0counterenabled`, `s0counterpin`, `s0counterpulsekw`, `s0counterinterval`, `gpiooutputsenabled`, `gpiooutputspin`, `gpiooutputstriggerbit`, `otgwcommandenable`, `otgwcommands`, `webhookenable`, `webhookurlon`, `webhookurloff`, `webhooktriggerbit`, `webhookpayload`, `webhookcontenttype`, `satenabled`, `satsystem`, `sattargettemp`, `satcoefficient`, `satinterval`, and many more SAT-related settings.
+**Settings whitelist:** Only known setting names are accepted. The full list includes: `hostname`, `httppasswd`, `ledblink`, `nightlyrestart`, `nightlyrestarthour`, `mqttenable`, `mqttbroker`, `mqttbrokerport`, `mqttuser`, `mqttpasswd`, `mqtttoptopic`, `mqtthaprefix`, `mqttharebootdetection`, `mqttuniqueid`, `mqttotmessage`, `mqttinterval`, `mqttseparatesources`, `ntpenable`, `ntptimezone`, `ntphostname`, `ntpsendtime`, `darktheme`, `gpiosensorsenabled`, `gpiosensorspin`, `gpiosensorsinterval`, `s0counterenabled`, `s0counterpin`, `s0counterpulsekw`, `s0counterinterval`, `gpiooutputsenabled`, `gpiooutputspin`, `gpiooutputstriggerbit`, `otgwcommandenable`, `otgwcommands`, `pictempsensor`, `webhookenable`, `webhookurlon`, `webhookurloff`, `webhooktriggerbit`, `webhookpayload`, `webhookcontenttype`, `satenabled`, `satsystem`, `sattargettemp`, `satcoefficient`, `satinterval`, and many more SAT-related settings.
 
 ---
 
@@ -355,6 +355,20 @@ Common PIC command codes:
 | `GW=1` / `GW=0` | Gateway mode / monitor mode |
 | `PS=1` / `PS=0` | Print Summary mode on / off |
 | `PR=A` | Query PIC banner string |
+
+On hardware without a PIC (OT-Direct) the firmware answers these commands itself, with the text of PIC firmware 6.8, so tools written for the PIC read the same replies:
+
+| Command | Reply on OT-Direct |
+|---------|--------------------|
+| `PR=P` | `PR: P=Low power`, `Medium power` or `High power`: the Smart Power level towards the thermostat |
+| `PR=R` | `PR: R=D` (auto-detect, the default), or `S`, `C`, `I` after `FT=` |
+| `PR=O` | `PR: O=N` without a room setpoint override; `T`/`C` and the setpoint for a `TT=`/`TC=` override, lowercase `t`/`c` until the thermostat accepts it, `n` while a clear is pending. A `CS=` override alone answers `N`, as on the PIC |
+| `PR=C` | `PR: C=240 MHz` |
+| `PR=B` | `PR: B=HH:MM DD-MM-YYYY`, the firmware build time |
+| `PR=L` | `PR: L=FXOMPC` until `LA=`..`LF=` change it |
+| `SC=9:05/3` | `SC: 09:05/3` (two-digit hours) |
+| `SR=18:1,230` | `SR: 18:1/230`: the stored response as `<id>:<high byte>/<low byte>`, whatever form the argument had |
+| `FT=X` | `FT: D`: the selected model (`C`, `I`, `S` or `D`), not the argument |
 
 Commands are validated and queued. Responses are processed asynchronously and published to MQTT. The REST endpoint returns `"queued"` immediately without waiting for the PIC response.
 

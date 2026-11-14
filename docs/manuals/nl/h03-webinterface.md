@@ -325,6 +325,18 @@ De nachtelijke herstart veroorzaakt een korte onderbreking van ongeveer 30 secon
 | Dallas GPIO-pin | GPIO-pin voor de 1-Wire DS18B20 bus | (apparaatspecifiek) |
 | OLED | OLED-display inschakelen | uitgeschakeld |
 
+#### OpenTherm Gateway (PIC)
+
+Deze instellingen gelden voor de OTGW Classic met zijn PIC. Op hardware zonder PIC doen ze niets.
+
+| Instelling | Omschrijving | Standaard |
+|---|---|---|
+| Run commands at boot | Stuurt de opstartcommando's hieronder bij het starten naar de PIC | Uit |
+| Boot commands | PIC-commando's gescheiden door puntkomma's, bijvoorbeeld `PS=0;GW=1` (maximaal 128 tekens) | `GW=1` in het meegeleverde bestandssysteem-image |
+| PIC temperature sensor | Leest elke 3 minuten de temperatuursensor op de PIC en publiceert die naar MQTT (`otgw-pic/temperature_reading`) en Home Assistant (sensor `PIC_Temperature_Reading`). Een PIC zonder sensor publiceert niets, dus er verschijnt geen entity. Laat uit als er geen sensor is aangesloten | Uit |
+
+De meting van de PIC-temperatuursensor is een temperatuur. De regel **Temperatuursensor** onder **Advanced > PIC-firmware** is iets anders: die laat zien waarvoor de sensor dient (`O` buiten, `R` retourwater).
+
 #### OT-Direct modus (hardware zonder PIC)
 
 Op hardware zonder PIC verschijnt een dropdown om de OT-Direct bedrijfsmodus te selecteren:

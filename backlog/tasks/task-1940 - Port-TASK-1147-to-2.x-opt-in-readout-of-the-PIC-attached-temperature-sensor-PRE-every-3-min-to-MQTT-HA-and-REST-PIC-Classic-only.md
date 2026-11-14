@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-14T16:07:00Z'
-updated_date: '2026-11-14T16:20:00Z'
+updated_date: '2026-11-14T17:25:00Z'
 labels:
   - pic
   - port
@@ -37,4 +37,6 @@ Maintainer order (Robert, 2026-11-14): compare 1.x and 2.0.0 on reading the PIC 
 2026-11-14 (95) comparison 1.x (origin/otgw-1.x.x d0a5d290e) vs dev: 36 PIC-related function names in 1.x; all present on dev except pollPicTempSensor, picTempSensorHasData (the TASK-1147 readout) and buildPicDownloadUrl (dev builds the same URL with kPicUpdateUrlFmt, OTGW-Core.ino:6767). The PR= settings readout cycle (15 letters, 3 s), copyPicSettingValue (picSettingValue.h, TASK-1430) and publishAllPICsettings are on dev; dev gates them on isPICEnabled() = state.pic.bAvailable, so OT-Direct reads no PIC settings, as Robert wants. Robert's scope (2026-11-14, in session): only for the PIC Classic; OT-Direct reads no PIC settings.
 
 Port choices: setting in PICBootSection (settings.picBoot.bTempSensor) under the 1.x file key PICtempsensor, so a 1.x settings.ini carries over; REST pictempsensor in GET + knownSettings, updateSetting dispatch (ADR-051 triple). Faux id 239 (1.x used 242, which is OTGWhvacid on dev), Sensors device, flag 0x08 -> otgw-pic/temperature_reading, announced just in time like 241 (queueNonOTDiscoveryIds + skip in the bulk loop). PR=E shares the reply with TASK-1314: pollPicTempSensor sends nothing while picSensorTretPollActive(); the E block keeps feeding Tret for D=R and also publishes the reading when the setting is on. Validity via picParseSensorE (-40..130 C; 1.x used -60..150). Web UI: SET_META + en/nl/de/el label and hint ('PIC Classic only'); the Greek text is mine, unreviewed by a native speaker. Test: tests/test_pic_temp_sensor_port.py (real E block + real gate + source checks), not run yet (compile window).
+
+2026-11-14 18:16 (95) build 2.0.0-beta.254+f12af9f from lane-95-1848 HEAD f12af9f1d on origin/dev ef0c0884b (30d80a30c TASK-1848 beta.252, e4b8362a2 TASK-1849 beta.253, f12af9f1d TASK-1940 beta.254): exit 0, 5 min, 4 Compiling, 1 ESP32S3 image line (warm), RAM 130316 B, Flash 2149603 B; sha256 ino d2c427fbdc521cd9..., littlefs 1e43423a3acc1a6e..., zip f82a7690674d93f2.... Host tests on this HEAD: test_otd_pr_reports_pyotgw 15/15, test_otd_reply_texts_pic 4/4, test_pic_temp_sensor_port 8/8, test_otd_sc_clock 8/8. Old-vs-fix before the rebase: PR test 8 new FAIL on origin/dev OTDirect.ino; reply texts 3 FAIL on the 1848-only code; pic temp 7 FAIL on origin/dev (the setting-off case is trivially green there). evaluate --quick 86/0. Bench requested from 09 (.63 for 1940 + no regression, .61 for 1848/1849).
 <!-- SECTION:NOTES:END -->

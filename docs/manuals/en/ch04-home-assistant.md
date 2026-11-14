@@ -225,6 +225,8 @@ Two pseudo-IDs are used to hang non-OT entities off the bitmap:
 
 Dallas sensors have their own path (`streamDallasSensorDiscovery`) because their discovery depends on the actual 1-Wire address read at runtime, and they are published via `configSensors()` once those addresses are known.
 
+The PIC temperature sensor (OTGW Classic, setting **PIC temperature sensor**, off by default) is announced the same just-in-time way: the sensor `PIC_Temperature_Reading` (state topic `otgw-pic/temperature_reading`, temperature in °C, on the Sensors device) appears with the first valid reading. A PIC without a sensor answers `-`, so no entity is created. It is not the diagnostic entity `PIC_Temp_Sensor`, which shows what the sensor is used for (`O` outside, `R` return water).
+
 #### Heap safety
 
 Every `stream*Discovery` function checks free heap (`STREAM_HEAP_MIN = 4000` bytes) before composing a payload and returns `false` if heap is too low. The drip loop then re-tries later when memory has recovered. This keeps discovery alive through transient heap pressure without ever crashing the device.
