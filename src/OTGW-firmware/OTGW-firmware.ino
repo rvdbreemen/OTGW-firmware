@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.ino
-**  Version  : v2.0.0-beta.281
+**  Version  : v2.0.0-beta.282
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -207,11 +207,13 @@ static void appendBootDetectLog()
     }
     oldfh.close();
   }
+  const size_t written = outfh.position();   // bytes written; size() may lag the stdio buffer
   outfh.close();
 
-  // Swap temp -> live (mirrors updateRebootLog()).
-  if (LittleFS.exists(BOOTDETECT_FILE)) LittleFS.remove(BOOTDETECT_FILE);
-  LittleFS.rename(BOOTDETECT_TMP, BOOTDETECT_FILE);
+  // TASK-1916: rename the complete temp file over the live one (no remove first: lfs_rename replaces it).
+  if (!fsCommitTempFile(BOOTDETECT_TMP, BOOTDETECT_FILE, written)) {
+    SetupDebugln(F("*** WARN: bootdetect log: commit failed, previous log kept"));
+  }
 }
 
 // ADR-158: detect a LOLIN S3 Mini Pro in the Classic socket via its on-board

@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v2.0.0-beta.281
+**  Version  : v2.0.0-beta.282
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -7595,9 +7595,9 @@ void loadOtSupportFiles() {
   boilerFileDirty     = boilerMigrated;
 }
 
-// Atomic write: <path>.tmp -> remove canonical -> rename. A power loss between
-// the two final steps leaves only one valid file (either the old canonical or
-// the new *.tmp ignored by loadOtSupportFiles); next dirty write recovers.
+// Atomic write: <path>.tmp, then fsCommitTempFile() renames it over the canonical file (TASK-1916).
+// lfs_rename() replaces the destination in one commit, so the canonical file is always the old or
+// the new one; a short temp file is dropped and the old file stays.
 static bool writeOtThermoFile(const char* canonicalPath, const char* tmpPath) {
   File f = LittleFS.open(tmpPath, "w");
   if (!f) return false;
@@ -7607,9 +7607,9 @@ static bool writeOtThermoFile(const char* canonicalPath, const char* tmpPath) {
   f.print(F("],\"sw\":["));
   writeBitmapArrayToJson(f, thermostatSentWrite);
   f.print(F("]}\n"));
+  const size_t written = f.position();   // bytes written (as writeSettings); size() may lag the stdio buffer
   f.close();
-  LittleFS.remove(canonicalPath);  // no-op if absent
-  return LittleFS.rename(tmpPath, canonicalPath);
+  return fsCommitTempFile(tmpPath, canonicalPath, written);
 }
 
 static bool writeOtBoilerFile(const char* canonicalPath, const char* tmpPath) {
@@ -7626,9 +7626,9 @@ static bool writeOtBoilerFile(const char* canonicalPath, const char* tmpPath) {
   f.print(F("],\"uw\":["));
   writeBitmapArrayToJson(f, boilerUnsupportedWrite);
   f.print(F("]}\n"));
+  const size_t written = f.position();   // bytes written (as writeSettings); size() may lag the stdio buffer
   f.close();
-  LittleFS.remove(canonicalPath);
-  return LittleFS.rename(tmpPath, canonicalPath);
+  return fsCommitTempFile(tmpPath, canonicalPath, written);
 }
 
 void saveOtSupportFilesIfDirty() {
