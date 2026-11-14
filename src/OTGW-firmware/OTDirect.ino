@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTDirect.ino
-**  Version  : v2.0.0-beta.258
+**  Version  : v2.0.0-beta.259
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -3045,12 +3045,27 @@ static void setOTDirectMode(OTDirectMode newMode) {
 // Called once per second from loopOTDirect().
 // ---------------------------------------------------------------------------
 static void checkThermostatTimeout() {
-  if (!otThermostatSeen) return;  // no frame ever received — nothing to time out
-
-  uint32_t elapsed = millis() - otLastThermostatMs;
+  // TASK-1850: the PIC's own lines on loss and return (gateway.asm 6.8 TDisconnect/TConnect), to port 25238 and
+  // processOT() like every PIC line. At boot the thermostat counts as connected (no line), as on the PIC.
+  static uint8_t picLineState = 0;   // 0 boot, 1 connected, 2 disconnected (reported)
+  auto picLine = [](PGM_P text) {
+    char buf[32];
+    strlcpy_P(buf, text, sizeof(buf));
+    const size_t n = strlen(buf);
+    otDirectBridgeWriteLine(buf, n);
+    processOT(buf, (int)n);
+  };
   uint32_t timeoutMs = (uint32_t)settings.otd.iSetbackTimeout * 1000UL;
 
+  if (!otThermostatSeen) {   // no frame ever received: nothing to time out, but the PIC reports it once
+    if (picLineState == 0 && millis() > timeoutMs) { picLineState = 2; picLine(PSTR("Thermostat disconnected")); }
+    return;
+  }
+
+  uint32_t elapsed = millis() - otLastThermostatMs;
+
   if (elapsed > timeoutMs) {
+    if (picLineState != 2) { picLineState = 2; picLine(PSTR("Thermostat disconnected")); }
     // Thermostat disconnected
     if (state.otd.bThermostatConnected) {
       state.otd.bThermostatConnected = false;
@@ -3070,6 +3085,8 @@ static void checkThermostatTimeout() {
       OTDDebugTf(PSTR("OTD: setback engaged — TSet overridden to %s C\r\n"), tb);
     }
   } else {
+    if (picLineState == 2) picLine(PSTR("Thermostat connected"));   // independent of the setback
+    picLineState = 1;
     state.otd.bThermostatConnected = true;
     // Release setback when thermostat reconnects
     if (otSetbackEngaged) {
