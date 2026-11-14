@@ -7194,3 +7194,41 @@ Asked by DM (through the coordinator) whether the repeat is 60 s or 30 s, given 
 **Open:** none for the share basis. Interpretation (ours): with another control interval than 30 s, "120" scales to the expected number for that interval, as the minimum-ticks rule already does; to confirm with Sergeant D if the plan needs it.
 
 **Task:** TASK-1932.
+
+## 344. Q-338b B: the start-up following of entry 338 lasts 60 s after flame-on (Sergeant D, 2026-11-14; answers Q-338b, refines entry 338)
+
+**Source:** #alpha-testing 2026-11-14, Q-338b (drafted by d3 for TASK-1924 Part 2): https://discord.com/channels/812969634638725140/1514720723980259460/1571115278127857758 . Sergeant D's reply, 12:41:07 UTC: https://discord.com/channels/812969634638725140/1514720723980259460/1571142938665164951 . Our acknowledgement: https://discord.com/channels/812969634638725140/1514720723980259460/1571145208144339088
+
+**Quoted:**
+
+> "My answer is B"
+
+**Option B as posted:** "60 s after flame-on. That is the warm-up length of thermo-nova's cycle tracker, which it only uses for statistics (`cycles/tracker.py:114`, min(60 s, 25 % of the cycle))."
+
+**Settled (refines entry 338, open point 1):** in continuous mode the start-up period in which CS = max(request, flow - offset) is recomputed every 5 s without the previous-CS hold lasts 60 s from flame-on. After it, the entry-112 clamp with its 5 s recompute applies (entry 337). Our recommendation was A (20 s, `modulation_suppression_delay_seconds`, `const.py:152`); he chose B.
+
+**Checked against thermo-nova:** `cycles/tracker.py:114` `effective_warmup = min(60.0, duration * 0.25)` (statistics only); thermo-nova has no start-up following in continuous mode (entry 338).
+
+**Interpretation (ours):** a fixed 60 s from flame-on; the "25 % of the cycle" part of the tracker formula is not part of the rule, since the cycle length is not known at flame-on.
+
+**Open:** the offset (Q-338c, asked: https://discord.com/channels/812969634638725140/1514720723980259460/1571145214733848687).
+
+**Task:** TASK-1924.
+
+## 345. On the TASK-1928 research: not ready for new features yet; first make the controller robust (Sergeant D, 2026-11-14; answers Q-1928a in effect as D for now)
+
+**Source:** #dev-sat-mqtt 2026-11-14. Q-1928a (posted by the coordinator on Robert's order): https://discord.com/channels/812969634638725140/1105556725714649128/1571136222062186529 . Robert shared the report link: https://discord.com/channels/812969634638725140/1105556725714649128/1571140718020526131 . Sergeant D, 12:47:35 UTC: https://discord.com/channels/812969634638725140/1105556725714649128/1571144568307720205 . Robert, 12:48:04 UTC: https://discord.com/channels/812969634638725140/1105556725714649128/1571144690923999433
+
+**Quoted:**
+
+> Sergeant D: "@number3nl I don't feel that we are ready for the next step yet. We need to make the controller robust and then slowly adding some new features."
+
+> Robert: "That's fine. Just keep this as something to inspire you when you are ready."
+
+**Settled:** none of the TASK-1928 ideas is taken up now (Q-1928a read as D for now). The report stays as a reference for later (Robert). Priority stays on making the existing controller robust.
+
+**Interpretation (ours):** this is "not now", not a rejection of the ideas; the setback-recovery guard (idea A) is a self-tune correction, but it is also covered by "not now" until he says otherwise.
+
+**Open:** when he is ready, the ideas go to him again one question per message.
+
+**Task:** TASK-1928 (AC4 settled: Robert shared it, Sergeant D chose to wait).

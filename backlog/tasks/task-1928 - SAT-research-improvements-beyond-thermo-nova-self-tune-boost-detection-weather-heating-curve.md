@@ -3,11 +3,11 @@ id: TASK-1928
 title: >-
   SAT research: improvements beyond thermo-nova (self-tune, boost detection,
   weather, heating curve)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-14T08:32:00Z'
-updated_date: '2026-11-14T12:15:00Z'
+updated_date: '2026-11-14T12:51:00Z'
 labels:
   - sat
   - research
@@ -27,7 +27,7 @@ Maintainer order (Robert, session 2026-11-14): research what SAT can improve com
 - [x] #1 Each idea states: the mechanism, which inputs it needs (and whether the firmware has them today), what thermo-nova does in that area (file:line, or 'not found in the code'), the risk (comfort, gas, flame-outs, short cycling), and how to test it first (sim, replay of field captures, bench)
 - [x] #2 At least 7 ideas, ranked by expected benefit versus risk and effort
 - [x] #3 Model numbers are labelled MODEL RESULT; field numbers name their capture
-- [ ] #4 Report to Robert; ideas he picks are put to Sergeant D one question per message, recorded in sergeant-d-corrections.md before any implementation task
+- [x] #4 Report to Robert; ideas he picks are put to Sergeant D one question per message, recorded in sergeant-d-corrections.md before any implementation task
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -38,4 +38,12 @@ Picked up by comms (92) on coordinator assignment 2026-11-14. Coordinator's 9 se
 Report published 2026-11-14: https://claude.ai/artifact/RW714gjLDmnHUSSS5CEC8s (private), summary #dev-sat-mqtt 1571127034690936964. 11 ideas ranked: 1 setback-recovery guard (A), 2 curve on 6-12 h weighted outside temperature, 3 boost after a target step, 4 RLS learner (diagnostics), 5 deviation detection, 6 forecast feed-forward (conflicts entry 247), 7 warm-up rate as tune side signal, 8 excitation (replaced by passive night cool-down), 9 degree-hour budget, 10 wind correction, 11 solar detector (conflicts 160/161). All numbers FIELD (gruijter r1/r2/g167/g214/g68); no MODEL RESULT. Spot-checked: forecast and wind have no consumer in SAT control (only REST/MQTT/debug), entries 62/168/247 as cited. Evidence: scratchpad tune-replay/r1928/field_numbers.txt. Waiting for Robert's pick (AC4).
 
 Q-1928a asked to Sergeant D by the coordinator on Robert's order (DM 1571135435906875443): #dev-sat-mqtt 1571136222062186529, A guard only / B guard then weighted curve after a replay / C A+1+3 / D none; advice B. Registered in open-questions.md. AC4 waits for his answer, recorded as an entry before any task.
+
+Sergeant D on the research (#dev-sat-mqtt 1571144568307720205): 'not ready for the next step yet; make the controller robust and then slowly add new features'. Robert: 'keep this as something to inspire you when you are ready' (1571144690923999433). Recorded as entry 345; Q-1928a answered in effect D (not now).
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+AC1-3: report https://claude.ai/artifact/RW714gjLDmnHUSSS5CEC8s with 11 ideas (mechanism, inputs with firmware file:line, thermo-nova file:line or 'not found in the code', risks, test path), ranked; all numbers FIELD from gruijter captures r1/r2/g167/g214/g68 (scratchpad tune-replay/r1928/field_numbers.txt); spot-checked forecast/wind have no consumer in SAT control and entries 62/168/247 as cited. AC4: reported to Robert (#dev-sat-mqtt 1571127034690936964); on his order shared with Sergeant D as Q-1928a (1571136222062186529); Sergeant D chose to wait (entry 345). No implementation task filed. Not verified: forecast_days=1 horizon (API reading), 24-72 h effects (no run longer than 20 h).
+<!-- SECTION:FINAL_SUMMARY:END -->

@@ -4574,6 +4574,32 @@
     "TASK-1932"
    ],
    "confirmed_by_entry": null
+  },
+  {
+   "id": 344,
+   "title": "Q-338b B: the start-up following of entry 338 lasts 60 s after flame-on (Sergeant D, 2026-11-14; answers Q-338b, refines entry 338)",
+   "date": "2026-11-14",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1571115278127857758",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1924"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 345,
+   "title": "On the TASK-1928 research: not ready for new features yet; first make the controller robust (Sergeant D, 2026-11-14; answers Q-1928a in effect as D for now)",
+   "date": "2026-11-14",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1571136222062186529",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1928"
+   ],
+   "confirmed_by_entry": null
   }
  ]
 }
