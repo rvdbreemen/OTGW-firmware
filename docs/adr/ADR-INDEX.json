@@ -7357,7 +7357,7 @@
       "path": "ADR-203-sat-sends-cs-mm-and-ch-on-every-control-update-supersedes-adr-199-decision-4.md",
       "format": "canonical",
       "status": "Accepted",
-      "date": "2026-11-07",
+      "date": "2026-11-14",
       "decision_summary": "While SAT is the active controller, a 5 s resend timer sends the latest CS=, MM= and CH= values again, unchanged valu...",
       "topics": [
         "ch-enable",
@@ -7636,7 +7636,7 @@
       "path": "ADR-207-sat-sends-mm-the-immergas-tp-and-ch-on-change-cs-keeps-the-5-s-resend-partly-supersedes-adr-203.md",
       "format": "canonical",
       "status": "Accepted",
-      "date": "2026-11-02",
+      "date": "2026-11-14",
       "decision_summary": "SAT sends MM=, the Immergas TP=11:12 and CH= to the PIC only when the value changes.",
       "topics": [
         "ch-enable",
@@ -9256,7 +9256,7 @@
       "format": "canonical",
       "status": "Proposed",
       "date": "2026-11-14",
-      "decision_summary": "SAT sends CS= when the value it sends, rounded to 0.1, changes, and repeats an unchanged CS= every 30 s, timed on raw...",
+      "decision_summary": "SAT sends CS= when the value it sends, rounded to 0.1, changes, and repeats an unchanged CS= about every 30 s: the co...",
       "topics": [
         "command-cadence",
         "control-setpoint",
@@ -9277,7 +9277,10 @@
       "symbols": [
         "SAT_CS_REPEAT_MS",
         "SAT_CS_RETRY_MS",
+        "SAT_PIC_CS_KEEPALIVE_MS",
         "satCmdResend",
+        "satContinuousClampRefresh",
+        "satContinuousSetpoint",
         "satPicCSKeepalive",
         "satSendCS"
       ],
@@ -9291,16 +9294,20 @@
         ],
         "must_not": [
           "Repeat an unchanged CS= more often than every 29 s, except in the start-up flood.",
-          "Let the PIC keepalive and the repeat send two repeats in the same 30 s window."
+          "Let the PIC keepalive and the repeat send two repeats in the same window.",
+          "Send a loop repeat or PIC keepalive in the 30 s after the last accepted CS= (it would race the 30 s tick and send the old value just before a new one)."
         ],
         "exceptions": [
           "The no-return start-up flood (TASK-1371) sends every 2 s by design.",
           "satEnqueueIfChangedCS() (the 3 s PWM suppression refresh, entry 23) stays change-checked with its own 5 min staleness window; the 30 s repeat covers it in between."
         ],
         "verification": [
+          "tests/testsatcmdcache.py::CmdCacheReset::testnostalerepeatjustbeforea30stick: 10 stale repeats in 5 min of 30 s ticks on the code before TASK-1924 Part 2, 0 on this decision; a mutant with the keepalive back at 30 s also gives",
+          "testlargestgapata60sintervalstaysinsidethepicexpiry: largest gap at most 31 s.",
+          "tests/testsatcontinuousstartup.py: the real satContinuousSetpoint() and the 5 s refresh structure (gates, ceiling cap before satSendCS(cs)).",
           "tests/testsatcmdcache.py::CmdCacheReset::teststeadystatesendstwocsperminuteandachangeatonce: 60 s of steady state sends 2 CS= on this decision and 13 on the code before it (origin/dev SATcontrol.ino before TASK-1924).",
           "testresendrepeatstheunchangedcsafter30snotbefore, testdroppedsatsendcsisretriedwithitsownvalueafter5s, testpickeepaliveandtherepeatshareone30swindow in the same file; tests/testsatceilingpaths.py (the CS sender inventory, including the f...",
-          "Bench (TASK-1924 AC6): CS= count per minute in steady state and during a warm-up, and no PIC CS expiry over 30 min."
+          "Bench, beta.250 on a Classic with PIC (TASK-1924, 09): at a 30 s interval no old CS= within 1 s before a new value (beta.242: 29 of 37), largest gap 30.10 s; at a 60 s interval largest gap 31.00 s, no PIC expiry; the 5 s recompute steppe..."
         ]
       },
       "scope": {
@@ -15377,6 +15384,12 @@
       "resolved": true
     },
     {
+      "source": "ADR-203",
+      "target": "ADR-235",
+      "type": "related",
+      "resolved": true
+    },
+    {
       "source": "ADR-204",
       "target": "ADR-196",
       "type": "related",
@@ -15481,6 +15494,12 @@
     {
       "source": "ADR-207",
       "target": "ADR-203",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-207",
+      "target": "ADR-235",
       "type": "related",
       "resolved": true
     },
