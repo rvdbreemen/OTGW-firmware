@@ -115,6 +115,9 @@ def build(src):
     e = src.index("// ===========================================================================\n// TASK-184")
     parts.append("static void otdPsNoteFrame(char prefix, unsigned long frame);")
     parts.append(ps.cut_block(src, r"^static inline uint16_t floatToF88\(float celsius\)"))
+    blk = re.search(r"// --- otdPicFloat begin\r?\n(.*?)// --- otdPicFloat end", src, re.S)
+    if blk:   # TASK-1859: OT= parses with the PIC's GetFloatArg and answers with its PrintSigned
+        parts.append(blk.group(1))
     parts.append(ps.cut_block(src, r"^static inline bool checkBoolean\(const char\* value\)"))
     parts.append(ps.cut_block(src, r"^static void synthesizeResponse\(char c0, char c1, const char\* value\)"))
     parts.append(ps.cut_block(src, r"^static void synthesizeResponse\(const char\* cmd, const char\* value\)"))

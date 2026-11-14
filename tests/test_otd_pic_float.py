@@ -82,9 +82,16 @@ static int g_rmode = 0; static float g_rval = 0; static int g_rclear = 0;
 static void setRemoteOverride(OTRemoteOverrideMode m, float c) { g_rmode = (int)m; g_rval = c; }
 static void clearRemoteOverride() { g_rclear++; }
 static float otSetbackTemp = 16.0f;
-struct { struct { float fSetbackTemp = 16.0f; } otd; } settings;
+struct { struct { float fSetbackTemp = 16.0f; float fDhwSetpoint = 0; float fMaxChSetpoint = 0; } otd; } settings;
 static void otdPersistFloat(float& slot, float v) { slot = v; }
 static float constrain(double v, float lo, float hi) { return v < lo ? lo : (v > hi ? hi : (float)v); }   // the old SB= clamp
+// SW=/SH=/OT= doubles: the boiler cache for the MsgID 48/49 bounds, the PS=1 outside value, the system state
+static uint16_t otBoilerCache[256]; static bool otBoilerCacheValid[256];
+static float g_dhwPersist = -1, g_chPersist = -1;
+static uint16_t g_psOutside = 0;
+static void otdPsStoreOutside(uint16_t v) { g_psOutside = v; }
+struct { float Toutside = 0; } OTcurrentSystemState;
+static inline uint16_t otdUnused() { return 0; }
 """
 
 MAIN = r"""
@@ -93,6 +100,10 @@ static bool cmd(const char* buf, const char* value) {
   char rspBuf[16];
   g_rsp[0] = 0; g_status[0] = 0; g_enq = g_clear = g_set = -1; g_val = 0; g_rmode = 0; g_rval = 0; g_rclear = 0;
   if (false) {}
+  else if (cmd0 == 'X') {   // test only: X8=<hex> / X9=<hex> puts a boiler MsgID 48 / 49 reply in the cache
+    const uint8_t id = cmd1 == '8' ? 48 : 49;
+    otBoilerCache[id] = (uint16_t)strtoul(value, nullptr, 16); otBoilerCacheValid[id] = true;
+  }
   @BRANCHES@
   return true;
 }
@@ -100,8 +111,10 @@ int main(int argc, char** argv) {
   if (argc > 1 && !strcmp(argv[1], "cmd")) {
     for (int a = 2; a + 1 < argc; a += 2) {
       cmd(argv[a], argv[a + 1]);
-      printf("%s=%s|rsp=%s|st=%s|enq=%d|set=%d|clr=%d|val=%04X|rmode=%d|rval=%.4f|rclr=%d|sb=%.4f\n", argv[a],
-             argv[a + 1], g_rsp, g_status, g_enq, g_set, g_clr_dummy(), g_val, g_rmode, g_rval, g_rclear, otSetbackTemp);
+      printf("%s=%s|rsp=%s|st=%s|enq=%d|set=%d|clr=%d|val=%04X|rmode=%d|rval=%.4f|rclr=%d|sb=%.4f|dhw=%.4f|ch=%.4f"
+             "|ps=%04X|tout=%.4f\n", argv[a], argv[a + 1], g_rsp, g_status, g_enq, g_set, g_clr_dummy(), g_val, g_rmode,
+             g_rval, g_rclear, otSetbackTemp, settings.otd.fDhwSetpoint, settings.otd.fMaxChSetpoint, g_psOutside,
+             OTcurrentSystemState.Toutside);
     }
     return 0;
   }
@@ -136,6 +149,8 @@ def setUpModule():
     old = re.search(r"// --- otdPicPercentF88 begin\n(.*?)// --- otdPicPercentF88 end", SRC, re.S)
     f88 = braced(SRC, r"^static inline uint16_t floatToF88\(float celsius\) \{")
     helpers = (("#define HAVE_PICFLOAT 1\n" + blk.group(1)) if blk else (old.group(1) if old else ""))
+    if "static bool otdPicInBounds(" in SRC:   # the real SW=/SH= range check
+        helpers += "\n" + braced(SRC, r"^static bool otdPicInBounds\(")
     branches = "\n  ".join(braced(SRC, p) for p in (
         r"if \(cmd0 == 'C' && cmd1 == 'S'\) \{",
         r"else if \(cmd0 == 'B' && cmd1 == 'S'\) \{",
@@ -144,7 +159,11 @@ def setUpModule():
         r"else if \(cmd0 == 'C' && cmd1 == 'L'\) \{",
         r"else if \(cmd0 == 'T' && cmd1 == 'C'\) \{",
         r"else if \(cmd0 == 'T' && cmd1 == 'T'\) \{",
-        r"else if \(cmd0 == 'S' && cmd1 == 'B'\) \{")).replace("if (cmd0 == 'C' && cmd1 == 'S')",
+        r"else if \(cmd0 == 'S' && cmd1 == 'B'\) \{",
+        r"else if \(cmd0 == 'C' && cmd1 == 'C'\) \{",
+        r"else if \(cmd0 == 'S' && cmd1 == 'W'\) \{",
+        r"else if \(cmd0 == 'S' && cmd1 == 'H'\) \{",
+        r"else if \(cmd0 == 'O' && cmd1 == 'T'\) \{")).replace("if (cmd0 == 'C' && cmd1 == 'S')",
                                                              "else if (cmd0 == 'C' && cmd1 == 'S')", 1)
     main = MAIN.replace("@BRANCHES@", branches).replace("g_clr_dummy()", "g_clear")
     _tmp = Path(tempfile.mkdtemp(prefix="otd_pf_"))
@@ -237,6 +256,12 @@ class PercentCommands(unittest.TestCase):
         self.assertEqual((r["CL=0"]["enq"], r["CL=0"]["val"], r["CL=0"]["rsp"]), ("7", "0000", "0.00"))
 
 
+    def test_CC_like_its_sibling_CL(self):
+        r = cmds(("CC", "94.38"), ("CC", "101"), ("CC", "x"))
+        self.assertEqual((r["CC=94.38"]["enq"], r["CC=94.38"]["val"], r["CC=94.38"]["rsp"]), ("7", "5E62", "94.38"))
+        self.assertEqual((r["CC=101"]["st"], r["CC=x"]["st"]), ("OR", "SE"))
+
+
 class PosFloatCommands(unittest.TestCase):
     def test_TT_TC_values_from_the_pic_scripts(self):
         r = cmds(("TT", "16.1"), ("TC", "16.2"), ("TT", "0"), ("TC", "20.555"))
@@ -257,6 +282,40 @@ class PosFloatCommands(unittest.TestCase):
         self.assertEqual((r["SB=0.5"]["sb"], r["SB=0.5"]["rsp"]), ("0.5000", "0.50"))         # no clamp to 1
         self.assertEqual(r["SB=0"]["st"], "SE")                                                # zero is SE
         self.assertEqual(r["SB=-2"]["st"], "SE")
+
+
+class FloatCommands(unittest.TestCase):
+    def test_SW_SH_value_bounds_and_reset(self):
+        r = cmds(("SW", "55.7"), ("SW", "80"), ("SW", "80.01"), ("SW", "19.99"), ("SW", "-5"), ("SW", "0"),
+                 ("SH", "55"), ("SH", "90"), ("SH", "91"), ("SH", "9"))
+        self.assertEqual((r["SW=55.7"]["enq"], r["SW=55.7"]["val"], r["SW=55.7"]["rsp"], r["SW=55.7"]["dhw"]),
+                         ("56", "37B4", "55.70", "55.7031"))            # dhw-7.stc R903837B4
+        self.assertEqual(r["SW=80"]["val"], "5000")                      # the upper bound itself is allowed
+        for k in ("SW=80.01", "SW=19.99", "SW=-5", "SH=91", "SH=9"):
+            self.assertEqual((r[k]["st"], r[k]["enq"]), ("BV", "-1"), k)
+        self.assertEqual((r["SW=0"]["clr"], r["SW=0"]["rsp"]), ("56", "0.00"))
+        self.assertEqual((r["SH=55"]["enq"], r["SH=55"]["val"]), ("57", "3700"))
+        self.assertEqual(r["SH=90"]["val"], "5A00")
+
+    def test_SW_bounds_from_the_boiler(self):
+        r = cmds(("X8", "3C28"), ("SW", "65"), ("SW", "60"), ("SW", "39"), ("SW", "40"))   # boiler: 40..60
+        self.assertEqual((r["SW=65"]["st"], r["SW=39"]["st"]), ("BV", "BV"))
+        self.assertEqual((r["SW=60"]["val"], r["SW=40"]["val"]), ("3C00", "2800"))
+
+    def test_OT_values_from_the_pic_scripts(self):
+        r = cmds(("OT", "9.999"), ("OT", "-9.999"), ("OT", "-0.004"), ("OT", "-1.4"), ("OT", "7.6"))
+        self.assertEqual((r["OT=9.999"]["val"], r["OT=9.999"]["rsp"]), ("0A00", "10.00"))
+        self.assertEqual((r["OT=-9.999"]["val"], r["OT=-9.999"]["rsp"]), ("F600", "-10.00"))
+        self.assertEqual((r["OT=-0.004"]["val"], r["OT=-0.004"]["rsp"]), ("0000", "0.00"))
+        self.assertEqual((r["OT=-1.4"]["val"], r["OT=-1.4"]["ps"], r["OT=-1.4"]["rsp"]), ("FE9A", "FE9A", "-1.40"))
+        self.assertEqual((r["OT=7.6"]["val"], r["OT=7.6"]["tout"]), ("079A", "7.6016"))
+
+    def test_OT_clears_like_clr_outside_t(self):
+        r = cmds(("OT", "-"), ("OT", "x"), ("OT", "64"), ("OT", "99"), ("OT", "63.99"), ("OT", "200"))
+        for k in ("OT=-", "OT=x", "OT=64", "OT=99"):
+            self.assertEqual((r[k]["clr"], r[k]["enq"], r[k]["rsp"]), ("27", "-1", "-"), k)
+        self.assertEqual(r["OT=63.99"]["val"], "3FFE")
+        self.assertEqual((r["OT=200"]["val"], r["OT=200"]["rsp"]), ("C800", "-56.00"))   # bit 7 set: stored, as the PIC
 
 
 if __name__ == "__main__":

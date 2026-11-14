@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-12T05:19:00Z'
-updated_date: '2026-11-14T23:05:00Z'
+updated_date: '2026-11-14T23:29:00Z'
 labels:
   - otdirect
   - parity
@@ -47,4 +47,8 @@ Per command (dispatch :3786-3942, :5242): TT SetTempSetPoint :4089 and TC SetCon
 95 internal callers checked for the new SE/OR refusals (coordinator ask): SAT sends CS=%.1f (SATcontrol.ino:673/698/730, positive setpoints), CS=0 (:874), TC=%.1f (:909) and TC=0 (:869); the web UI sends only CS=0, C2=0, CL=0, BS=0, TT=0 to clear (data/v2.js:3846-3881) and free text from the console (:6709); HA discovery templates are TT={{ value }} and SW={{ value }} (MQTTHaDiscovery.cpp:3148-3150); the MQTT command path passes the payload as is (MQTTstuff.ino:1033, as on the PIC). None sends an empty or negative value, so no internal caller hits the new SE.
 
 95 commit 2 (GetPosFloat group): TT=, TC=, SB= use otdPicFloatF88(OTD_PIC_POSFLOAT): a minus is SE (the TASK-500 comment that negatives set an override contradicted gateway.asm :5114-5117 and is corrected), SB=0 is SE and SB= has no 1-30 clamp (SetSetBack :4155-4162), the override/setback gets the exact f8.8 value (f88/256.0f, floatToF88 reproduces it). tests/test_otd_pic_float.py 11/11 green; on the part-1 code (9c5effe57) the 3 new tests FAIL (TT=16.1 stored 16.1000 -> 0x1019 vs PIC 0x101A, TT=-5 set an override, SB=18.23 stored 18.2300). test_otd_persist_pic_eeprom harness gets the block (4/4); 37 tests/test_otd_*.py + test_sat_command_delivery + test_ino_prototype_hoisting exit 0; evaluate --quick 86/0. Left as is (AC4): setRemoteOverride() still takes a float and clamps -40..127 via floatToF88, so a TT= above 127.99 (PIC stores the raw byte) is clamped; no thermostat setpoint gets there.
+
+95 commit 3 (GetFloat group): SW=, SH= GetFloatArg + otdPicInBounds() (unsigned integer byte >= lower, < upper or == upper with no fraction; MsgID 48/49 bytes else the PIC defaults 20/80, 10/90; a cached upper byte 0 counts as no bound because the cache also stores Data-Invalid replies, which the PIC ignores); 0 resets; persisted value f88/256 (the boot re-send through floatToF88 reproduces the f8.8 exactly). OT= GetFloatArg: any parse error and 64.00-127.99 clear with reply 'OT: -' (was: echo of the value); 128-255 positive is stored as the PIC stores it (OT=200 -> 0xC800, -56.00), on purpose for parity. CC= (no PIC command) parses like CL=. tests/test_otd_pic_float.py 16/16 green; on the part-2 code 5 FAIL (OT=9.999 0x09FF, SW=55.7 0x37B3, no BV, OT clear reply echoed 'x', CC=101 accepted); on origin/dev 84944a95e 16/16 FAIL. 37 tests/test_otd_*.py + test_sat_command_delivery + test_ino_prototype_hoisting exit 0 (harness pins updated: persist_pic_eeprom, ps1_outside_temp); evaluate --quick 86/0. Overlap: OT=- / OT=99 of TASK-1799 are now done here; MM= (integer, GetDecimal) stays for 1799.
+
+AC4 (non-command paths): the boot re-send of SW/SH (otdRestorePersistedCommands, floatToF88 of the persisted f88/256 value) and the thermostat-loss setback (floatToF88(settings.otd.fSetbackTemp)) now get exact multiples of 1/256, so floatToF88 reproduces the PIC-parsed f8.8; left as they are. The MQTT room_temp (MsgID 24) and room_setpoint (16) inputs (OTDirect.ino around 2453-2460) are left on floatToF88: they are OT-Direct MQTT topics, not PIC commands, and get a float from the MQTT handler; no PIC parser applies.
 <!-- SECTION:NOTES:END -->

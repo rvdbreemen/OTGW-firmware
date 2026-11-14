@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTDirect.ino
-**  Version  : v2.0.0-beta.289
+**  Version  : v2.0.0-beta.290
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -607,6 +607,23 @@ static unsigned long otdPicAnswer(unsigned long thermostatReq, unsigned long rep
 static uint16_t otdUpperBoundF88(uint8_t boundId, uint8_t fallback) {
   const uint8_t hb = otBoilerCacheValid[boundId] ? (uint8_t)(otBoilerCache[boundId] >> 8) : 0;
   return (uint16_t)((hb ? hb : fallback) << 8);
+}
+
+// TASK-1859: the PIC's SW=/SH= range check (SetHotWaterTemp :4164-4177, SetHeatingTemp :4191-4204, Compare
+// :5227-5232): the integer byte at least the lower bound, and below the upper bound or equal to it with no
+// fraction; unsigned bytes, so a negative value is above any bound below 128. The bounds are the boiler's
+// MsgID 48/49 bytes (HB upper, LB lower, MessageID48/49 :3110-3131), else the PIC defaults (MIN/MAX_DHWSETPOINT
+// 20/80, MIN/MAX_CHSETPOINT 10/90, :262-265). As otdUpperBoundF88(), a cached upper byte of 0 counts as no bound:
+// the cache also holds a Data-Invalid reply, which the PIC ignores.
+static bool otdPicInBounds(uint8_t boundId, uint8_t defMin, uint8_t defMax, uint16_t f88) {
+  uint8_t lo = defMin, hi = defMax;
+  if (otBoilerCacheValid[boundId] && (otBoilerCache[boundId] >> 8) != 0) {
+    hi = (uint8_t)(otBoilerCache[boundId] >> 8);
+    lo = (uint8_t)(otBoilerCache[boundId] & 0xFF);
+  }
+  const uint8_t ip = (uint8_t)(f88 >> 8);
+  if (ip < lo) return false;
+  return ip < hi || (ip == hi && (f88 & 0xFF) == 0);
 }
 
 // Set an override value for a MsgID (activates repeater modification for that ID)
@@ -3556,41 +3573,50 @@ bool handleOTDirectCommand(const char* buf, int len, bool satOwn) {
   }
   // CC=xx.x — Cooling control signal (MsgID 7, 0-100%)
   else if (cmd0 == 'C' && cmd1 == 'C') {
-    uint16_t f88 = floatToF88(atof(value));
+    // TASK-1859: no PIC command; parsed like its MsgID 7 sibling CL= (GetPercentArg), errors answered as SE/OR.
+    uint16_t f88 = 0;
+    const char* err = otdPicFloatF88(value, OTD_PIC_PERCENT, f88);
+    if (err) { otDirectBridgeProcessStatus(err); return false; }
     if (enqueueWriteCommand(7, f88, "CC")) {
-      dtostrf(atof(value), 1, 2, rspBuf);
+      otdPicPrintF88(f88, rspBuf, sizeof(rspBuf));
       synthesizeResponse(buf, rspBuf);
     }
   }
   // SW=xx.x — DHW setpoint (MsgID 56 = TdhwSet). Value 0 clears.
   else if (cmd0 == 'S' && cmd1 == 'W') {
-    float temp = atof(value);
+    // TASK-1859: as the PIC SetHotWaterTemp :4164-4189: GetFloatArg, 0 resets, else BV outside the MsgID 48 bounds.
+    uint16_t f88 = 0;
+    const char* err = otdPicFloatF88(value, OTD_PIC_FLOAT, f88);
+    if (!err && f88 != 0 && !otdPicInBounds(48, 20, 80, f88)) err = "BV";
+    if (err) { otDirectBridgeProcessStatus(err); return false; }
     bool enqueued = true;
-    if (temp == 0.0f) {
+    if (f88 == 0) {
       clearWriteOverride(56);
     } else {
-      uint16_t f88 = floatToF88(temp);
       enqueued = enqueueWriteCommand(56, f88, "SW");
     }
     if (enqueued) {
-      otdPersistFloat(settings.otd.fDhwSetpoint, temp);   // TASK-1836: SaveConfig, re-sent at boot
-      dtostrf(temp, 1, 2, rspBuf);
+      otdPersistFloat(settings.otd.fDhwSetpoint, (int16_t)f88 / 256.0f);   // TASK-1836: SaveConfig, re-sent at boot
+      otdPicPrintF88(f88, rspBuf, sizeof(rspBuf));
       synthesizeResponse(buf, rspBuf);
     }
   }
   // SH=xx.x — Max CH water setpoint (MsgID 57 = MaxTSet). Value 0 clears.
   else if (cmd0 == 'S' && cmd1 == 'H') {
-    float temp = atof(value);
+    // TASK-1859: as the PIC SetHeatingTemp :4191-4216: GetFloatArg, 0 resets, else BV outside the MsgID 49 bounds.
+    uint16_t f88 = 0;
+    const char* err = otdPicFloatF88(value, OTD_PIC_FLOAT, f88);
+    if (!err && f88 != 0 && !otdPicInBounds(49, 10, 90, f88)) err = "BV";
+    if (err) { otDirectBridgeProcessStatus(err); return false; }
     bool enqueued = true;
-    if (temp == 0.0f) {
+    if (f88 == 0) {
       clearWriteOverride(57);
     } else {
-      uint16_t f88 = floatToF88(temp);
       enqueued = enqueueWriteCommand(57, f88, "SH");
     }
     if (enqueued) {
-      otdPersistFloat(settings.otd.fMaxChSetpoint, temp);   // TASK-1836: SaveConfig, re-sent at boot
-      dtostrf(temp, 1, 2, rspBuf);
+      otdPersistFloat(settings.otd.fMaxChSetpoint, (int16_t)f88 / 256.0f);   // TASK-1836: SaveConfig, re-sent at boot
+      otdPicPrintF88(f88, rspBuf, sizeof(rspBuf));
       synthesizeResponse(buf, rspBuf);
     }
   }
@@ -3609,18 +3635,21 @@ bool handleOTDirectCommand(const char* buf, int len, bool satOwn) {
   }
   // OT=xx.x — Outside temperature (MsgID 27 = Toutside). Non-numeric clears.
   else if (cmd0 == 'O' && cmd1 == 'T') {
-    // TASK-1846: a value is a digit, or a '-'/'+' sign followed by a digit (PIC GetFloatArg/GetFloat gateway.asm 6.8 :5118-5129); anything else,
-    // OT=- included, clears as the PIC's ClrOutsideT. Before, OT=- passed as a number and wrote 0.00.
-    const bool signedNum = (value[0] == '-' || value[0] == '+') && isdigit((unsigned char)value[1]);
-    if (!isdigit((unsigned char)value[0]) && !signedNum) {
+    // TASK-1846, TASK-1859: as the PIC SetOutsideT (gateway.asm 6.8:4256-4270): the value is parsed by GetFloatArg;
+    // any parse error clears (ClrOutsideT, OT=- included), and so does a value of 64.00-127.99 (integer byte bit 6
+    // set, bit 7 clear; the OR return is commented out in the PIC), with the ValueCleared reply "OT: -". A positive
+    // integer of 128-255 has bit 7 set and is stored as the PIC stores it (OT=200 is 0xC800, -56.00).
+    // OT=-1.4 -> 0xFE9A (tests/command-7.stc), OT=9.999 -> 10.00, OT=-0.004 -> 0.00 (command-6.stc).
+    uint16_t f88 = 0;
+    const char* err = otdPicFloatF88(value, OTD_PIC_FLOAT, f88);
+    if (err || ((f88 & 0x8000u) == 0 && (f88 & 0x4000u) != 0)) {
       clearWriteOverride(27);
-      synthesizeResponse(buf, value);
+      synthesizeResponse(buf, "-");
     } else {
-      uint16_t f88 = floatToF88(atof(value));
       if (enqueueWriteCommand(27, f88, "OT")) {
         otdPsStoreOutside(f88);   // TASK-1846: the PS=1 line shows the OT= value, as on the PIC
         OTcurrentSystemState.Toutside = (int16_t)f88 / 256.0f;
-        dtostrf(OTcurrentSystemState.Toutside, 1, 2, rspBuf);
+        otdPicPrintF88(f88, rspBuf, sizeof(rspBuf));
         synthesizeResponse(buf, rspBuf);
       }
     }
