@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-14T16:07:00Z'
-updated_date: '2026-11-14T22:07:00Z'
+updated_date: '2026-11-14T22:11:00Z'
 labels:
   - pic
   - port
@@ -28,7 +28,7 @@ Maintainer order (Robert, 2026-11-14): compare 1.x and 2.0.0 on reading the PIC 
 - [x] #1 Setting PIC temperature sensor (default off, settings.ini PICtempsensor, REST pictempsensor) exists on 2.x; with it on and a PIC Classic in gateway firmware 6.6+ the firmware sends PR=E every 3 min; with it off, or on OT-Direct, or with no PIC, no extra PR=E is sent (host test on the gate, red on current dev)
 - [x] #2 A valid PR: E=<value> is published to otgw-pic/temperature_reading and announced to HA as PIC_Temperature_Reading (temperature, C) on the first valid reading; '-' or garbage publishes nothing and announces nothing (ADR-094); the PR=D settings entity is untouched
 - [x] #3 The TASK-1314 return water path (D=R, 60 s) keeps working and both share one PR=E reply without a doubled poll (host test)
-- [ ] #4 build green, evaluate --quick no new FAIL, bench on the Classic (.63) by 09: setting on shows the topic or no entity without a sensor, setting off sends no PR=E
+- [x] #4 build green, evaluate --quick no new FAIL, bench on the Classic (.63) by 09: setting on shows the topic or no entity without a sensor, setting off sends no PR=E
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -45,4 +45,6 @@ Port choices: setting in PICBootSection (settings.picBoot.bTempSensor) under the
 95 (2026-11-14 22:4x): regression found and fixed: test/host/test_dhw_water_meter.py no longer compiled since the 1940 commit (the discovery slice of queueNonOTDiscoveryIds() needs picTempSensorHasData() and OTGWpictempid: 'error C3861: picTempSensorHasData: identifier not found', 'COMPILATION FAILED (discovery FIX)'). Fix: OTGWpictempid in FAUX_IDS and a picTempSensorHasData() stub returning false in test_dhw_water_discovery.cpp. After the fix: the full run compiles, 44/45 cases pass (D2 = the #702 unit, see TASK-1949), all 118 mutant checks yes.
 
 95 (2026-11-14 23:0x): second harness broken by the 1940 commit and fixed (test only, no bump): test/host/test_pic_settings_value.py failed 'COMPILATION FAILED (FIX (working tree))' (error C2065 'settings', C3861 'picTempSensorHasData', C2065 'OTGWpictempid', C3861 'setMQTTConfigPending' in the sliced handlePRresponse()). Doubles added in test_pic_settings_value.cpp (setting off); after: RESULT PASS, D1 C1 C2 C3 pass. Sweep of the other slicing harnesses on 47f0ea37e green: 36/36 tests/test_otd_*.py, test_pic_temp_sensor_port, test_settings_whitelist, test_discovery_drip_per_entity, test_ble_discovery_1462, test_sat_energy_discovery, test_sat_health_discovery, test_pic_pm_chain, test/host test_ha_discovery_json, test_cmd_queue_drop, test_override_reply, test_boiler_unsupported_origin.
+
+AC4 bench part ticked by 09 (bench-tester) from its 2026-11-14 bench on .63 (Classic, PIC 6.8 pic16f1847) with beta.254+f12af9f, plus .61 with beta.255/257: setting off (default) 4.5 min telnet 0x PR=E (.63, 18:35:46-18:40:22); setting on at 18:40:37 -> PR=E inserted at 18:40:38.405 and 18:43:38.464 (3 min cadence); no otgw-pic/temperature_reading topic and no PIC_Temperature_Reading discovery in 215 s (.63 has no sensor: 'no entity without a sensor' holds); on OT-Direct (.61, 255) setting on 4 min: 0x PR=E. Settings row 'PIC temperature sensor' under OpenTherm Gateway, i-text only, 0 JS errors (257 smoke, CDP). Build green (95: beta.257 22:39 exit 0) and evaluate are 95's evidence. CAVEAT: on .63 no PIC reply to any PR= is processed at all (TASK-1943), so the 'PR: E=-' reply itself was not seen; 'no entity' is observed, the '-' handling path is covered only by the host test of AC2. Evidence: 09 scratchpad b254/, b255/, b257/.
 <!-- SECTION:NOTES:END -->
