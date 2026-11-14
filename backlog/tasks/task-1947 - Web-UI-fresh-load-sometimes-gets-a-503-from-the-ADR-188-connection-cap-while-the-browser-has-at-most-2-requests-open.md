@@ -3,10 +3,11 @@ id: TASK-1947
 title: >-
   Web UI fresh load sometimes gets a 503 from the ADR-188 connection cap while
   the browser has at most 2 requests open
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-11-14T20:18:00Z'
-updated_date: '2026-11-14T21:16:00Z'
+updated_date: '2026-11-14T21:21:00Z'
 labels:
   - webui
   - bug
@@ -39,4 +40,6 @@ Run B (22:12, 6 loads) with telnet and PC-side netstat sampled every ~1-2 s: loa
 Pointer for AC2 (read in code, not verified on the device): webConnCapExceeded() (restAPI.ino:85) -> WebQueuedFileResponse::txHolding() (webServerCompat.h:540) -> platformTcpTxHoldingOnPort() (libraries/Platform/src/platform_esp32.h:502) counts every pcb on port 80 in tcp_active_pcbs with unsent or unacked data regardless of state. tcp_active_pcbs also holds FIN_WAIT_1, CLOSING, LAST_ACK and CLOSE_WAIT pcbs, and in lwIP a sent FIN stays in unacked until it is acked, so closing connections after Connection: close probably count as TX holders. Next step: dump pcb->state for the counted pcbs at the 503 moment (telnet), then decide: skip states past ESTABLISHED, or count only pcbs with unsent payload. Evidence: 09 scratchpad r1947/ (tel.raw, netload-*.json, b/tel.raw, b/netstat.txt).
 
 2026-11-14 22:20 (09): AC1 done by the bench. AC2/AC3 (pcb-state dump at the 503 moment, then the decision and fix with red/green over 20 loads) go to a developer; coordinator plans ba after its stack work. 09 benches the fix on request (netload.mjs + telnet + netstat recipe above).
+
+Research 2026-11-14 (ba, origin/dev 753d45581). The counting is ADR-188 by design (Decision: 'A connection counts when it is ESTABLISHED, or in any other active state with unsent or unacked segments'); platformTcpTxHoldingOnPort() (src/libraries/Platform/src/platform_esp32.h:502) does exactly that, so a change needs an ADR-188 amendment and Robert's yes. Two paths can make the server count more than the browser has open: (a) every ESTABLISHED pcb on :80 without data that is not a native file-queue waiter counts, also a socket the browser opened ahead of a request (Chrome speculative preconnect, up to 6 per host) or a request whose headers are still arriving; (b) a closing pcb (FIN_WAIT_1, CLOSING, LAST_ACK) counts while only a zero-length FIN sits in unacked. ESPAsyncWebServer 3.11.2 sends 'Connection: close' (WebResponses.cpp:270, 340), so every request is a new socket that closes after one round trip. Host characterisation test tests/test_web_conn_cap_states.py (sliced real shim, stub pcb list): est_idle 1, est_waiter 0, est_data 1, close_wait 0, fin_wait_1 FIN-only 1, closing FIN-only 1, last_ack FIN-only 1, fin_wait_2 0, other port 0; a modelled fresh load (2 in flight + 2 idle preconnects + 2 FIN-only closing; a model, not a measurement) gives 6, matching 09's 'WEB CONN CAP: 6 connections hold TX'. Which path dominates on the device is not proven: next step (coordinator agreed) is a diagnostic breakdown of the WEB CONN CAP line (est-idle / est-data / closing-data counts + payload bytes, no behaviour change) in a build after the 1937/1850/1778 stack, 09 reproduces with CDP + telnet, then the A/B fix choice goes to Robert by DM.
 <!-- SECTION:NOTES:END -->
