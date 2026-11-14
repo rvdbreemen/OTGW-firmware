@@ -5688,16 +5688,25 @@
   // its temperature drives OUTSIDE; otherwise OUTSIDE falls back to the OT-bus
   // Toutside (MsgID 27) / otmonitor value (the OT case 27 + fetchSeed both yield
   // to model.wxValid). Polled slowly — weather changes on the minute scale.
+  // TASK-1875: a weather value that is no longer refreshed is dropped, not kept: OUTSIDE (and the
+  // graph's outside column) goes empty until the OT bus (MsgID 27) or the next valid fetch fills it.
+  // Before, only wxValid was cleared, so the last weather value was recorded for hours.
+  function dropWeatherOutside() {
+    if (model.wxValid) { model.outside = null; scheduleRender(); }
+    model.wxValid = false;
+  }
+  var wxBusy = false;   // TASK-1875: one weather request at a time, also when hide/show toggles fast
   function fetchWeather() {
-    if (document.hidden) return;   // TASK-1741
+    if (document.hidden || wxBusy) return;   // TASK-1741
+    wxBusy = true;
     fetch(APIGW + 'v2/sat/weather').then(function (r) { return r.ok ? r.json() : null; }).then(function (w) {
       if (!w) return;
       if (w.enabled && w.valid) {
         var t = parseFloat(w.temperature);
         if (!isNaN(t)) { model.outside = t; model.wxValid = true; scheduleRender(); return; }
       }
-      model.wxValid = false;
-    }).catch(function () { });
+      dropWeatherOutside();
+    }).catch(function () { }).then(function () { wxBusy = false; });
   }
   // TASK-1837: which appliance labels Home shows for the effective source (1 gas, 2 heat pump, 3 hybrid,
   // 4 on/off heat pump); nothing while sat/status has not answered. hpDrawing: the schematic's heat pump.
@@ -8640,11 +8649,14 @@
     // pollers are refreshed once, staggered like the startup burst.
     var hiddenSince = 0;
     document.addEventListener('visibilitychange', function () {
-      if (document.hidden) { hiddenSince = Date.now(); gDallas = null; model.wxValid = false; return; }
-      if (Date.now() - hiddenSince < 15000) return;
+      if (document.hidden) { hiddenSince = Date.now(); gDallas = null; dropWeatherOutside(); return; }
+      // TASK-1875: the weather value was dropped on hide, so ask for it again on every show.
+      // (fetchSatPage's own weather call only renders the SAT card, it does not set OUTSIDE.)
+      if (Date.now() - hiddenSince < 15000) { setTimeout(fetchWeather, 700); return; }
       fetchConn();
-      if (satPollTimer) setTimeout(fetchSatPage, 700);   // the SAT page asks sat/status and weather itself
-      else { setTimeout(fetchSatStatus, 700); setTimeout(fetchWeather, 1400); }
+      if (satPollTimer) setTimeout(fetchSatPage, 700);   // the SAT page asks sat/status itself
+      else setTimeout(fetchSatStatus, 700);
+      setTimeout(fetchWeather, 1400);
       setTimeout(function () { pollDallasDiscovery(0); }, 2100);
       if (blePollTimer) setTimeout(fetchBle, 2800);   // Settings > Sensors is open
     });
