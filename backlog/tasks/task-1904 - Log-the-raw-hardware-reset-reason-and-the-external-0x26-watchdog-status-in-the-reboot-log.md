@@ -7,7 +7,7 @@ status: In Review
 assignee:
   - '@claude'
 created_date: '2026-11-13T16:52:00Z'
-updated_date: '2026-11-14T11:07:00Z'
+updated_date: '2026-11-14T21:28:00Z'
 labels:
   - bug
   - stability
@@ -28,7 +28,7 @@ From the TASK-1865/1899 trace (gruijter beta.218, 13 Nov): two resets were repor
 <!-- AC:BEGIN -->
 - [x] #1 reboot_log.txt and /api/v2/device/info carry the raw per-core hardware reset reason code next to the mapped text
 - [ ] #2 On the Classic the 0x26 external-reset indication is persisted to the reboot log
-- [ ] #3 Bench: a forced task-watchdog reset and a forced RTC-watchdog reset produce different, correct entries
+- [x] #3 Bench: a forced task-watchdog reset and a forced RTC-watchdog reset produce different, correct entries
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -55,4 +55,6 @@ Rebased onto origin/dev bebecded7 (2026-11-14): only the version-banner hunks co
 No-regression bench by 09 on .63, beta.241+0d698c3 (sha256 zip 23ffe9ed...c8a60, ino bb31e550...ae47f, littlefs 7ec0b7de...f0190; githash checked): PASS. reboot_log line 1 'Software reset (3) [rst 0x0c/0x0c] - User reboot (/ReBoot)', 20 lines all CRLF, max 95 B; device/info resetraw 0x0c/0x0c, resetrawlabel 'software reset (CPU)', extwdreset false; settings diff [] (API and raw settings.ini); no crashlog entry from 241's boots. My brief named /api/v2/device/reboot, which does not exist (405); 09 used /ReBoot. AC1 ticked: host harness (E2/E4, S3) plus the probe bench and this bench show the raw code in the log and in device/info. AC2 NOT ticked: the code path is proven only by host case E1 (mutant MC1); no unit with a 0x26 chip was available (.63: 'no external 0x26 watchdog responding'), so the persistence is not proven on hardware. AC3 is 09's to tick (probe bench T/W PASS on .61 and .63).
 
 AC2: not testable: no bench unit with a 0x26 chip; host test E1/MC1 only (coordinator, 2026-11-14: stays In Review on this line, no waiver question).
+
+AC3 ticked by 09 (bench-tester) from its own probe1904c bench (note above): forced task WDT -> reboot log 'Task watchdog (6) [rst 0x0c/0x0c]', device/info resetraw 0x0c/0x0c; forced RTC WDT (stage 0 RESET_SYSTEM) -> 'Other watchdog (7) [rst 0x09/0x09]', resetraw 0x09/0x09, label 'RTC watchdog (digital core)' (ESP32-S3 rom/rtc.h:79 RTCWDT_SYS_RESET = 9). Different and correct on .61 and .63, 2 trials per key per unit; files 09 scratchpad r1904/u61, r1904/u63 (reboot-log readouts: 'Task watchdog (6) [rst 0x0c/0x0c]' and 'Other watchdog (7) [rst 0x09/0x09]' present). AC2 stays open: needs a Classic whose boot telnet shows 'INIT : external 0x26 watchdog present'; .63 reports 'no external 0x26 watchdog responding'.
 <!-- SECTION:NOTES:END -->
