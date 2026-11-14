@@ -4532,6 +4532,32 @@
     "TASK-1932"
    ],
    "confirmed_by_entry": null
+  },
+  {
+   "id": 341,
+   "title": "Q-340a A: the 90 % clean share of entry 340 is measured against the ticks the hour actually had (Sergeant D, 2026-11-14; refines entry 340)",
+   "date": "2026-11-14",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1571109268634075239",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1932"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 342,
+   "title": "Q-338a A: replace the PWM underheat exit with his rule: flame on and request above the boiler temperature for 60 s, then continuous (Sergeant D, 2026-11-14; answers Q-338a, follows entry 339)",
+   "date": "2026-11-14",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1571100242093547533",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1924"
+   ],
+   "confirmed_by_entry": null
   }
  ]
 }

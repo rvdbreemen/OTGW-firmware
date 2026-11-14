@@ -7142,3 +7142,39 @@ Asked by DM (through the coordinator) whether the repeat is 60 s or 30 s, given 
 **Open:** (1) a superseding or amending ADR for ADR-205 decision 2 (via adr-kit); (2) whether "at least 90 %" counts against all ticks of the hour or against the expected 120; (3) more field data (Robert): one house, November, no run reached a full day, so the daily decision itself is untested.
 
 **Task:** TASK-1927 (evidence); TASK-1932 (implementation).
+
+## 341. Q-340a A: the 90 % clean share of entry 340 is measured against the ticks the hour actually had (Sergeant D, 2026-11-14; refines entry 340)
+
+**Source:** #dev-sat-mqtt 2026-11-14, Q-340a (drafted by 95 for TASK-1932): https://discord.com/channels/812969634638725140/1105556725714649128/1571109268634075239 . Sergeant D's reply, 10:31:30 UTC: https://discord.com/channels/812969634638725140/1105556725714649128/1571110323295879212
+
+**Quoted:**
+
+> "The answer is A"
+
+**Option A as posted:** "The ticks the hour actually had. An hour with 100 ticks (20 missed, for example after a short stall) counts with 90 clean ticks. Hours under 90 ticks are already dropped as too few (SAT_CT_MIN_TICK_FRACTION 0.75, SATcontrol.ino:6725)."
+
+**Settled (refines entry 340, open point 2):** the clean share is clean ticks divided by the ticks the hour actually logged. The existing minimum-ticks rule stays as the guard for gaps: an hour needs at least ceil(hour / control interval x 0.75) ticks (90 at a 30 s interval) or it is dropped as few_ticks. Our recommendation was B (the expected 120); Sergeant D chose A.
+
+**Checked against the firmware:** `SAT_CT_MIN_TICK_FRACTION 0.75f` (`SATcurveTune.h:19`), `minTicks = ceilf(satTuneHourMs() / intervalMs * SAT_CT_MIN_TICK_FRACTION)` (`SATcontrol.ino:6725`). thermo-nova has no coefficient self-tune (entry 72).
+
+**Open:** none for the share basis.
+
+**Task:** TASK-1932.
+
+## 342. Q-338a A: replace the PWM underheat exit with his rule: flame on and request above the boiler temperature for 60 s, then continuous (Sergeant D, 2026-11-14; answers Q-338a, follows entry 339)
+
+**Source:** #alpha-testing 2026-11-14, Q-338a: https://discord.com/channels/812969634638725140/1514720723980259460/1571100242093547533 ; our short reminder: https://discord.com/channels/812969634638725140/1514720723980259460/1571107373081296937 . Sergeant D's reply to the reminder, 10:32:08 UTC: https://discord.com/channels/812969634638725140/1514720723980259460/1571110480997523527
+
+**Quoted:**
+
+> "The answer is A"
+
+**Option A as posted:** "Replace the underheat exit with your rule. It goes back to continuous sooner. Risk: early in every PWM ON phase the flow is still below the request, so it may leave PWM about 60 s after each ignition. It could then toggle with the entry 327 rule (+1.5 for 30 s), because the two are only 1.5 C apart."
+
+**Settled:** the PWM-to-continuous underheat exit (thermo-nova `heating_control.py:331-356`: flow <= request - 3.0 for 180 s, `const.py:22`, `cycles/const.py:11`; firmware `SATcycles.ino:39-40`) is replaced by his rule from entry 339: while the flame is on and the requested setpoint is above the boiler (flow) temperature for 60 s, SAT goes to continuous. The saturation exit (`heating_control.py:358-378`, 300 s) is not part of the question and stays. This deviates from thermo-nova.
+
+**Interpretation (ours):** our recommendation qualified A with "only as a simulation test first, on the houses calibrated to gruijter, against today's exit; report back on toggling and starts per day before anything ships". His bare "A" is read as the choice of the rule; the simulation check before shipping is our plan, not his decision, and its result goes back to him.
+
+**Open:** (1) the simulation check (toggling against the entry-327 entry rule, starts per day) before it ships; (2) whether the rule also applies while PWM is not ON (thermo-nova's underheat exit only runs while PWM status is ON, `heating_control.py:321-323`); (3) "boiler temperature" read as the flow temperature, as in entries 22 and 327.
+
+**Task:** to be filed (follows TASK-1924's lane).
