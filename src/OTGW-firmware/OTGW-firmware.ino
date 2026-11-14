@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.ino
-**  Version  : v2.0.0-beta.232
+**  Version  : v2.0.0-beta.233
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -329,6 +329,7 @@ void setup() {
 
   LittleFSmounted = LittleFS.begin();
   if (!LittleFSmounted) SetupDebugln(F("*** ERROR: LittleFS mount FAILED - running on compile-time defaults ***"));
+  if (LittleFSmounted && LittleFS.exists(SETTINGS_TMP_FILE)) LittleFS.remove(SETTINGS_TMP_FILE);   // TASK-1913: a reset mid-save leaves it; it holds secrets, and the web server is not up yet
   cacheBootFlashInfo();   // A: cache static flash/FS values once; used by /api/v2/device/info
   readSettings(true);
   bootHeapPhase(PSTR("setup-net"));

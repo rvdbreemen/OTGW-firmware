@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : settingsStuff
-**  Version  : v2.0.0-beta.232
+**  Version  : v2.0.0-beta.233
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -285,10 +285,12 @@ bool writeSettings(bool show)
 
   DebugTf(PSTR("[Settings] State: writeSettings called (show=%s)\r\n"), show ? "true" : "false");
   DebugTf(PSTR("[Settings] Writing to [%s] ..\r\n"), SETTINGS_FILE);
-  File file = LittleFS.open(SETTINGS_FILE, "w");
+  // TASK-1913: write a temp file and rename it over settings.ini (fsCommitTempFile), so a
+  // reset or a full filesystem during the write keeps the old settings. Needs room for both.
+  File file = LittleFS.open(SETTINGS_TMP_FILE, "w");
   if (!file)
   {
-    DebugTf(PSTR("[Settings] Error: open(%s, 'w') FAILED!!! --> Bailout\r\n"), SETTINGS_FILE);
+    DebugTf(PSTR("[Settings] Error: open(%s, 'w') FAILED!!! --> Bailout\r\n"), SETTINGS_TMP_FILE);
     return false;
   }
 
@@ -518,14 +520,12 @@ bool writeSettings(bool show)
   Debugln(F("\r\n[Settings] State: File write complete, closing file"));
   file.close();  // Close write handle before any subsequent read
   safebootSyncNvs(settings.sHostname, settings.sHTTPpasswd);  // ADR-191: safeboot reads these from NVS
-  // TASK-1495: open("w") truncates first, so a write that fails later (full or
-  // partly written filesystem) leaves a short or empty file. Read the size back.
-  File check = LittleFS.open(SETTINGS_FILE, "r");
-  size_t onFlash = check ? check.size() : 0;
-  if (check) check.close();
-  if (!tailWritten || intended == 0 || onFlash != intended) {
-    DebugTf(PSTR("[Settings] Error: %s short write (%u of %u bytes)\r\n"), SETTINGS_FILE,
-            static_cast<unsigned>(onFlash), static_cast<unsigned>(intended));
+  // TASK-1495: a write that fails later (full or partly written filesystem) leaves a short
+  // file. TASK-1913: that is now the temp file; fsCommitTempFile() checks its size and only
+  // then renames it over settings.ini, so a short write keeps the old settings.
+  if (!fsCommitTempFile(SETTINGS_TMP_FILE, SETTINGS_FILE, tailWritten ? intended : 0)) {
+    DebugTf(PSTR("[Settings] Error: short write or rename failed (%u bytes intended), %s kept\r\n"),
+            static_cast<unsigned>(intended), SETTINGS_FILE);
     return false;
   }
   DebugTf(PSTR("[Settings] State: Settings saved successfully to %s\r\n"), SETTINGS_FILE);

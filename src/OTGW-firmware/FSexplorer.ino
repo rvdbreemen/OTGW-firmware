@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program : FSexplorer
-**  Version  : v2.0.0-beta.232
+**  Version  : v2.0.0-beta.233
 **
 **  Mostly stolen from https://www.arduinoforum.de/User-Fips
 **  For more information visit: https://fipsok.de
@@ -577,7 +577,9 @@ bool handleFile(String&& path)
   {
     const char *sp = path.c_str();
     while (sp[0] == '/' && sp[1] == '/') sp++;   // collapse a "//settings.ini" alias
-    if (strcasecmp_P(sp, PSTR(SETTINGS_FILE)) == 0 && !checkHttpAuth()) {
+    // TASK-1913: the temp file writeSettings() renames over settings.ini holds the same secrets.
+    if ((strcasecmp_P(sp, PSTR(SETTINGS_FILE)) == 0 || strcasecmp_P(sp, PSTR(SETTINGS_TMP_FILE)) == 0)
+        && !checkHttpAuth()) {
       // true, not false: checkHttpAuth() already sent the 401/403, and the
       // onNotFound catch-all sends its own 404 when handleFile() returns false.
       return true;

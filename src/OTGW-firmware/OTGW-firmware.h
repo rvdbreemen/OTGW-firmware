@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v2.0.0-beta.232
+**  Version  : v2.0.0-beta.233
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -132,6 +132,7 @@ void setLed(uint8_t, uint8_t);
 #define _HOSTNAME       "OTGW2"  // default hostname of the 2.0.0 line; 1.x keeps "OTGW" (TASK-1293)
 #define MQTT_NAME_DEFAULT "OTGW"  // MQTT top-topic fallback and client-id prefix, independent of the hostname default
 #define SETTINGS_FILE         "/settings.ini"
+#define SETTINGS_TMP_FILE     "/settings.tmp"  // TASK-1913: writeSettings() writes here, then renames it over SETTINGS_FILE; holds the same secrets (ADR-056)
 #define FS_UPDATE_INCOMPLETE_FILE "/.fs_update_incomplete"  // TASK-1495: set by an interrupted filesystem update (the filesystem was formatted and restored), gone after a complete one
 #define NTP_DEFAULT_TIMEZONE "Europe/Amsterdam"
 #define NTP_HOST_DEFAULT "pool.ntp.org"
@@ -215,6 +216,7 @@ void incrementStatusBurstPublishCount(); // called by status publishers on each 
 bool updateLittleFSStatus(const char *probePath = nullptr);
 bool updateLittleFSStatus(const __FlashStringHelper *probePath);
 void refreshLittleFSFileFlags();   // TASK-1899: file-exists flags for REST, on the loop task
+bool fsCommitTempFile(const char *tmpPath, const char *path, size_t expected);   // TASK-1913: rename a complete temp file over path
 void loopLittleFSStatus();   // TASK-1865: mount check + write probe on the loop task, not in /api/v2/health
 // Longest reboot-log line incl. CRLF and NUL: a core-dump detail line with all 16 backtrace frames the ESP-IDF
 // summary holds is 236 chars ("Core dump: " + task (15) + pc + elf + "bt=" + 16 PCs + "!\r\n"; TASK-1538).

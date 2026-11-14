@@ -347,11 +347,14 @@ class TestSettingsPersistence(unittest.TestCase):
         self.assertRegex(UPD, r"extern bool writeSettings\(bool show\);")
         body = function_body(self.st, r"bool writeSettings\(bool show\)")
         self.assertRegex(body, r"if \(!file\)\s*\{[^}]*return false;", "open failure")
-        # open("w") truncates first: a later short write must be caught by reading the size back
+        # A later short write must be caught by reading the size back. TASK-1913: the write goes to
+        # a temp file and fsCommitTempFile() checks its size before renaming it over settings.ini;
+        # the runtime behaviour is tested in test/host/test_settings_atomic_write.py.
         self.assertIn("file.position()", body)
-        self.assertRegex(body, r"File check = LittleFS\.open\(SETTINGS_FILE, \"r\"\);")
-        self.assertRegex(body, r"if \(!tailWritten \|\| intended == 0 \|\| onFlash != intended\) \{[^}]*return false;",
+        self.assertRegex(body, r"if \(!fsCommitTempFile\(SETTINGS_TMP_FILE, SETTINGS_FILE, tailWritten \? intended : 0\)\) \{[^}]*return false;",
                          "short write")
+        helper = function_body(code(*FWDIR, "helperStuff.ino"), r"bool fsCommitTempFile\(")
+        self.assertRegex(helper, r"if \(expected == 0 \|\| onFlash != expected \|\| !LittleFS\.rename\(tmpPath, path\)\) \{[^}]*return false;")
         self.assertTrue(body.rstrip("}").rstrip().endswith("return true;"))
 
     def test_failed_restore_write_stays_dirty(self):

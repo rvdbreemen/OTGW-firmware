@@ -286,6 +286,7 @@ static std::unique_ptr<AsyncWebServerRequest> sendFile(const char* path = "/asse
 // tests/test_web_file_scheduling.py and compiled here; only these boundary fakes are ours.
 #define GZIP_PAGES_TEST 1
 #define SETTINGS_FILE "/settings.ini"
+#define SETTINGS_TMP_FILE "/settings.tmp"   // TASK-1913: handleFile() guards it like SETTINGS_FILE
 #define DebugTf(...) do {} while (0)
 static const char* fsHashValue = "abc1234";
 const char* getFilesystemHash() { return fsHashValue; }

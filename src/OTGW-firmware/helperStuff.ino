@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : helperStuff
-**  Version  : v2.0.0-beta.232
+**  Version  : v2.0.0-beta.233
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -134,12 +134,34 @@ boolean isValidIP(IPAddress ip)
 } //  isValidIP()
 
 
+// --- fsCommitTempFile start
+// TASK-1913: open(path, "w") commits the truncation to flash at once (esp_littlefs syncs a file
+// opened for writing), and the new content only at close(). A reset in between leaves an empty
+// file. So a writer writes a temp file, closes it, and calls this: the temp file replaces path
+// only when it holds exactly `expected` bytes. lfs_rename() replaces an existing destination in
+// one metadata commit, so path is always the old or the new file, never a short one. On a short
+// write or a failed rename (EBUSY while path is open) the temp file goes and path stays as it was.
+bool fsCommitTempFile(const char *tmpPath, const char *path, size_t expected)
+{
+  File check = LittleFS.open(tmpPath, "r");
+  const size_t onFlash = check ? check.size() : 0;
+  if (check) check.close();
+  if (expected == 0 || onFlash != expected || !LittleFS.rename(tmpPath, path)) {
+    if (LittleFS.exists(tmpPath)) LittleFS.remove(tmpPath);
+    return false;
+  }
+  return true;
+}
+// --- fsCommitTempFile end
+
+
 uint32_t updateRebootCount()
 {
   //simple function to keep track of the number of reboots 
   //return: number of reboots (if it goes as planned)
   uint32_t _reboot = 0;
   #define REBOOTCNT_FILE "/reboot_count.txt"
+  #define REBOOTCNT_TMP_FILE "/reboot_count.tmp"
   if (!state.flash.bFsImageWriting && LittleFS.begin()) {   // TASK-1909: never mount over an image being written
     //start with opening the file
     File fh = LittleFS.open(REBOOTCNT_FILE, "r");
@@ -156,13 +178,16 @@ uint32_t updateRebootCount()
     fh.close();
     //increment reboot counter
     _reboot++;
-    //write back the reboot counter
-    fh = LittleFS.open(REBOOTCNT_FILE, "w");
+    //write back the reboot counter: temp file + rename, so a reset here cannot empty it (TASK-1913)
+    size_t written = 0;
+    fh = LittleFS.open(REBOOTCNT_TMP_FILE, "w");
     if (fh) {
-      //write to _reboot to file
-      fh.println(_reboot);
+      written = fh.println(_reboot);
+      fh.close();
     }
-    fh.close();
+    if (!fsCommitTempFile(REBOOTCNT_TMP_FILE, REBOOTCNT_FILE, written)) {
+      DebugTln(F("Reboot count: write failed, file kept"));
+    }
   }
   DebugTf(PSTR("Reboot count = [%d]\r\n"), _reboot);
   return _reboot;
@@ -490,12 +515,13 @@ bool updateRebootLog(String text)
         infh.close();
       }
       outfh.close();
-      
-      if (LittleFS.exists(REBOOTLOG_FILE)) {
-        LittleFS.remove(REBOOTLOG_FILE);
+
+      // TASK-1913: rename replaces the old log in one commit; a remove first left no log at all
+      // until the rename. A failed rename keeps the old log.
+      if (!LittleFS.rename(TEMPLOG_FILE, REBOOTLOG_FILE)) {
+        if (LittleFS.exists(TEMPLOG_FILE)) LittleFS.remove(TEMPLOG_FILE);
+        return false;
       }
-      
-      LittleFS.rename(TEMPLOG_FILE, REBOOTLOG_FILE);
 
       return true; // succesfully logged
     }
