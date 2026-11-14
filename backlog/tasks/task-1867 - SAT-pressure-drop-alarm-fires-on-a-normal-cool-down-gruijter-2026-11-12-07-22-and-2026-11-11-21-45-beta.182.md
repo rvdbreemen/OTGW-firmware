@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-12T12:09:00Z'
-updated_date: '2026-11-12T12:15:00Z'
+updated_date: '2026-11-14T21:59:00Z'
 labels:
   - sat
   - bug
@@ -24,8 +24,8 @@ From gruijter's capture of 12 Nov (#alpha-testing msg https://discord.com/channe
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 gruijter's MsgID 18 series of 11-12 Nov is replayed against the current alarm code (a host test on the real code) and reproduces both alarms
-- [ ] #2 The replay shows whether these alarms are the known pump-stop residual accepted in TASK-1579 / entry 262, or a different trigger, and the finding is written in the task notes
+- [x] #1 gruijter's MsgID 18 series of 11-12 Nov is replayed against the current alarm code (a host test on the real code) and reproduces both alarms
+- [x] #2 The replay shows whether these alarms are the known pump-stop residual accepted in TASK-1579 / entry 262, or a different trigger, and the finding is written in the task notes
 - [ ] #3 If a change is proposed, it is put to Sergeant D with the thermo-nova citations before any implementation; otherwise the task is closed with the evidence
 <!-- AC:END -->
 
@@ -37,4 +37,6 @@ Sources (comms, 2026-11-12): the analysis output is in C:\Users\rvdbr\AppData\Lo
 Update (comms, 2026-11-12, checked first-hand): raw source C:\Users\rvdbr\AppData\Local\Temp\claude\d9c572fbc7f8e9ee\9604259c-3cd4-4397-a002-3ea5ca73cb77\scratchpad\gruijter-20261112\work\x\csv\otframes.csv (MsgID 18 READ-ACK every ~5 min). 06:30:34 1.68, 06:35:29 1.98 (pump on), 07:04:39 1.98, 07:09:33 1.97, 07:14:31 1.70, 07:19:21 1.69, 07:24:11 1.69, 07:29:01 2.00 (pump on again), 07:33:53 1.97. The pressure is ~1.68 with the pump off and ~2.0 with it running, a ~0.3 bar pump step; the 07:22 alarm follows the heating-off at 07:09:54 (per the coordinator's check). So this is NOT thermal contraction, as the title says: it is the pump-stop residual accepted in TASK-1579 / entry 262. The task question (known residual or different trigger) is mostly answered: same trigger. The replay AC stays, to confirm it on the real code. The title wording 'normal cool-down' is the first reading and is kept for traceability. Public correction to gruijter: msg 1570411xxx (see channel).
 
 Correction to the note above: the public correction to gruijter is #alpha-testing msg 1570411600530243658 (https://discord.com/channels/812969634638725140/1514720723980259460/1570411600530243658).
+
+2026-11-14 coordinator (subagent, verified: python -m pytest -q tests/test_sat_pressure_alarm_replay.py -> 4 passed in 13.67s): replay of the REAL satUpdatePressure() (sliced from SATcontrol.ino, harness of test_sat_pressure_health.py) on gruijter's MsgID 0/18 series (fixture tests/fixtures/sat_pressure_gruijter_20261111.csv, 282 rows, timestamps + values only). AC1: 07:22:54 alarm exact (smoothed 1.813, drop 1.765, cleared 07:25:24, log 1.81/1.758); 01:31:24 onset/drop/clear match (smoothed 0.024 low, EMA seed before the capture); 21:45 only with an assumed 2.0 bar before the first captured read (labelled as assumption in the test). AC2: same trigger as the pump-stop residual of TASK-1579 / entry 262: the CH-mode bit falls -> ring cleared + 600 s suspension (SATcontrol.ino:5699-5709), the ring keeps recording (:5726-5735), the pump-stop step (~0.27 bar) lands 240 s later inside the suspension; at suspension end (:5745) the least-squares slope over pre/post step reads ~2.2 bar/h > 0.3, confirmed after 120 s (:5796, :5807) = 720 s after the CH bit. Not thermal contraction (title wording is the first reading). A flame-off suspension would not help: the step comes 870 s after flame-off (07:22) and there was no flame at all before 01:31. AC3 open: any change (e.g. drop samples taken during the suspension) deviates from thermo-nova and goes to Sergeant D as Q-1867a.
 <!-- SECTION:NOTES:END -->
