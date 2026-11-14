@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-14T14:45:00Z'
-updated_date: '2026-11-14T17:04:00Z'
+updated_date: '2026-11-14T18:18:00Z'
 labels:
   - bug
   - graph
@@ -26,7 +26,7 @@ By reading (09, TASK-1875 review): graphHistoryStuff.ino:67-69 stores state.sat.
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [x] #1 Reproduce: with the weather fetch failing for longer than its refresh age, the ring keeps writing the old weather value (host test or bench)
-- [ ] #2 Fix: the ring uses the same freshness rule as SAT (or MsgID 27 when the weather value is stale); red-then-green
+- [x] #2 Fix: the ring uses the same freshness rule as SAT (or MsgID 27 when the weather value is stale); red-then-green
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -43,4 +43,6 @@ Fix: graphHistoryTick() (graphHistoryStuff.ino) stores the weather value only wh
 Rebased onto origin/dev (beta.248 published by TASK-1918): code identical (146 lines); bump beta.248 -> beta.249 in its own commit.
 
 RED on .61 by 09 (2.0.0-beta.240+a3dff10, old code), 2026-11-14: satweatherenable true, weather valid, W 5.3 C, last fetch about 16:45:42; 16:52:14 satweatherenable false (valid stays true). 18:02:09, 76 min after the last fetch: /api/v2/sat/weather valid true, temperature 5.3, age 4582 s; /api/v2/graph/history newest 10 outside all 53 (5.3 C), the whole ring (120 slots, last hour) only [53], 0 nulls. No MsgID 27 on .61 (no boiler), so the fix should give null from about 1 h after the last fetch. Settings and crashlog unchanged. Evidence: 09 scratchpad r1937/. Build beta.249+45187f4 (18:03, 9m44s, RTC gate OK) for GREEN; archived in OTGW-build-archive/beta.249-1937.
+
+GREEN on .61 by 09 (2.0.0-beta.249+45187f4, sha256 x3 match): last valid fetch about 18:11:23 (W 3.3 C), satweatherenable false 18:11:41. Readout 19:17:09: /api/v2/sat/weather valid still true (unchanged, not part of this fix), age 3941 s; graph/history count 120, interval 30 s: slots 0-108 = 33 (age 3596..356 s), slots 109-119 = null (age 326..26 s). The switch lies between 356 and 326 s; the 1 h window ends at 3941-3600 = 341 s, so the boundary is where the rule puts it. No MsgID 27 on .61, so null. Red (240: 120 x 53, 0 nulls) -> green on the same reproduction. Settings diff [] (deferred settings.ini save a few s later), crashlog byte-identical, bootcount unchanged. AC2 ticked (host red/green + device red/green). Evidence: 09 scratchpad g1937/. Push waits for the beta freeze (public beta 250) and 95's push; then rebase, re-bump (256), warm rebuild, post.
 <!-- SECTION:NOTES:END -->
