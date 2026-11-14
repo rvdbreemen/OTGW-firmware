@@ -96,8 +96,31 @@ record 22 B, TCP/IP 52 B; ACKs and keep-alives come on top):
 | 300 s | 711 B | 82 B | 10 % |
 
 An HTTPS POST per batch adds about 150 to 300 B of HTTP headers per request and is worse at every interval.
-At 60 s batches a gateway sends 1,440 WebSocket messages per day: 72 request-equivalents on the Durable
-Objects free tier (20:1), so about 1,380 gateways fit in 100,000 per day.
+
+## Cost per gateway per month (Cloudflare, 2026-11-14)
+
+Prices from the [Durable Objects](https://developers.cloudflare.com/durable-objects/platform/pricing/) and
+[R2](https://developers.cloudflare.com/r2/pricing/) pricing pages. Assumed design: one Durable Object per
+gateway with a hibernatable WebSocket. Every batch goes into SQLite as one row, and an hourly alarm writes
+that hour as one R2 object and deletes the rows. The OT stream is about 209 KiB per day.
+The handler times are estimates and were not measured: 10 ms per message, 300 ms per flush.
+
+| Per gateway, 30 days | 60 s batches | 300 s batches |
+|---|---|---|
+| DO requests (WebSocket messages 20:1, alarms, reconnects) | 2,910 | 1,182 |
+| DO duration (hibernation) | 81 GB-s | 38 GB-s |
+| SQLite rows written | 44,640 | 10,080 |
+| R2 PutObject / storage | 720 / 6.4 MB | 720 / 6.4 MB |
+| Cost at the paid rates beyond the included amounts | $0.050 | $0.014 |
+| Free plan: gateways before the first limit (rows written, 100,000 per day) | about 67 | about 297 |
+| Workers Paid ($5 per month minimum): gateways inside the included amounts (DO requests, 1M per month) | about 340 | about 840 |
+
+- **The binding free limit is SQLite rows written, not requests.** An earlier version of this section
+  said about 1,380 gateways fit the free tier from requests alone; that was wrong.
+- Without hibernation a Durable Object bills its full wall-clock time: 324,000 GB-s, about $4.05 per gateway
+  per month. Hibernation is therefore a requirement.
+- Text debug output at about 3 KB/s would be 7.8 GB per gateway per month in R2: $0.12 per month and over
+  the free 10 GB with one gateway. Tokenized debug output keeps this in the range of the OT stream.
 
 ## The rest of the stream
 
