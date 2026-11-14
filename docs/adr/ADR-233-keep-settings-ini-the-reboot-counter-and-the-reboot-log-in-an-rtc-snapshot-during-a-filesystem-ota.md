@@ -215,6 +215,13 @@ above: the restore of `settings.ini` could not land, `readSettings()` read a tru
 the one written right after `MQTTseparatesources`), the 4 B counter fitted an inline write. The format at boot is the
 answer; host case T9 reproduces the round-1 result on the first implementation and passes on the rework.
 
+Bench round 2 of the rework (otgw-bench-tester 09, .63, 2026-11-14 09:02-09:11, `2.0.0-probe1774c.fix2+d3a2537`,
+09's scratchpad `r1774b\ev\`): the same panic at 300000 B of a filesystem OTA. After the boot: settings diff none
+(API and raw `settings.ini`), hostname kept, boot count +1, reboot log 20 -> 21 lines, filesystem 765 KB free and
+writable, the marker `/.fs_update_incomplete` read "reset during the filesystem write, formatted at boot in 62 ms",
+`/` served the built-in upload prompt and `/update` answered 200. A clean filesystem OTA then removed the marker and
+brought the web UI back with the settings unchanged.
+
 ## Alternatives Considered
 
 - **NVS blob (the ESP-IDF key-value store in flash).** It would also survive a power cut. Rejected for now: the
