@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-12T06:32:00Z'
-updated_date: '2026-11-14T15:17:00Z'
+updated_date: '2026-11-14T16:26:00Z'
 labels:
   - diagnostics
   - research
@@ -65,4 +65,10 @@ Requirements from Robert in #dev-sat-mqtt (2026-11-12, relayed by the coordinato
 2026-11-14 Google costs above the free tier. Firestore Standard europe-west1 (cloud.google.com/firestore/pricing, parsed 2026-11-14): writes $0.099/100k (free 20k/day), reads $0.033/100k (50k/day), deletes and TTL deletes $0.011/100k (TTL no free quota), storage $0.000226027 per GiB-hour = about $0.165/GiB-month (1 GiB free); eur3 writes $0.18/100k. No monthly minimum. One document per batch, TTL for 30-day retention. Monthly totals, 300 s batches: 100 gw $0.36, 300 gw $2.53, 1000 gw $10.20; 60 s: 100 gw $4.22, 300 gw $14.17, 1000 gw $49.02. RTDB Blaze ($5/GB stored, $1/GB down, new TLS per batch): 300 s 300 gw $7.80, 1000 gw $58.96. Blaze has no hard cap (budget alerts do not cap); a hard stop needs the budget-to-Pub/Sub-to-function pattern that disables billing. Firestore is the cheaper Google route at scale; RTDB storage price dominates.
 
 2026-11-14 self-hosted Firebase-like on Robert's Synology (Container Manager). PocketBase: MIT, single Go binary with SQLite, REST, auth, realtime, admin UI; pocketbase.io shows v0.42.2; the GitHub repo was archived 2026-10-26 (last GitHub release v0.40.6), development moved to ganigeorgiev.com; pre-1.0, no backward-compatibility guarantee. Retention via cronAdd in pb_hooks (JS, ES5.1+). Supabase self-hosted: 4 GB RAM min, 8 GB recommended, 2 cores, 40 GB SSD, about 13 components: too heavy for most Synology models. Appwrite not checked. Internet exposure for testers' gateways: Synology reverse proxy + Let's Encrypt with port 443 forwarded, or Cloudflare Tunnel (free plan, outbound only, needs a domain on Cloudflare DNS; one source says the Zero Trust dashboard asks for a payment method, unverified). Robert's own gateways on the LAN could post over plain HTTP (no TLS, also no-PSRAM boards). Recommendation: PocketBase in a container, one collection for batches, per-device auth records with create-only rules, nightly retention cron, Synology Hyper Backup for the SQLite file.
+
+2026-11-14 pushes to origin/dev from the cloud session today (before the coordinator's push rules): 3262a496c..3c30e3926 (8 commits, 13:05-15:25 UTC; docs/diagnostics, scripts/ot_stream_codec_study.py, tools/cloud-recorder/, backlog task-1862/1473/1938, .wolf). From now on: research on branch research/cloud-recording, local commits, at most one batch push per hour under the coordinator's rules.
+
+2026-11-14 Robert: build the export/replay tool, size the debug stream, and research tokenized logging (>=2 candidates on primary sources). Work on branch research/cloud-recording.
+
+2026-11-14 tokenized logging research (>=2 candidates, primary sources): pw_tokenizer (Apache-2.0; needs a linker section script and -fdata-sections; docs advise against PW_TOKENIZE_TO_BUFFER in widely expanded logging macros; PSTR() formats untested), Trice (MIT; IDs in til.json, runtime strings via triceS, library compiled as C, all 1,270 calls rewritten). Recommendation: own address form after Zephyr's dictionary-logging principle (format and function-name flash offsets + line + binary args, decoded from the build's ELF): no call-site and no linker change; measured 12 B/line with zlib vs 104 B text. Details in docs/diagnostics/ot-stream-encoding-study.md.
 <!-- SECTION:NOTES:END -->

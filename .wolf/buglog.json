@@ -3908,5 +3908,40 @@
     "related_bugs": [],
     "occurrences": 1,
     "last_seen": "2026-11-14T15:25:03.154900Z"
+  },
+  {
+    "id": "bug-222",
+    "timestamp": "2026-11-14T17:02:53.859065+00:00",
+    "error_message": "mix record OT section decoded with every frame shifted to the record t0 (mix_study OT identical: False)",
+    "file": "tools/cloud-recorder/otrec.py",
+    "root_cause": "the codec stores the first frame with dt 0, so it assumes the first frame is at t0; in a mix record t0 can belong to a debug or SAT item",
+    "fix": "OT section starts with a LEB128 offset of its first frame from the record t0",
+    "tags": [
+      "codec",
+      "timestamp",
+      "mix-record",
+      "TASK-1938"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-11-14T17:02:53.859065+00:00"
+  },
+  {
+    "id": "bug-223",
+    "timestamp": "2026-11-14T17:21:17.466170+00:00",
+    "error_message": "CodeQL: uncontrolled format string in ref_printf.c (PR #701); old binary aborts on %n and segfaults on a trailing %",
+    "file": "tools/cloud-recorder/ref_printf.c",
+    "root_cause": "the conversion char was taken unchecked from the input, the width was unbounded (memcpy into a 64 B spec buffer), strchr(set, '\\0') ran past the end of the format, the output buffer had no bound",
+    "fix": "rebuild the spec from a whitelist (flags, <=3 width digits, <=2 precision digits, conversion in diuxXcfsS), require the argument type to fit the conversion, bound the output buffer",
+    "tags": [
+      "c",
+      "format-string",
+      "codeql",
+      "buffer-overflow",
+      "TASK-1938"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-11-14T17:21:17.466170+00:00"
   }
 ]

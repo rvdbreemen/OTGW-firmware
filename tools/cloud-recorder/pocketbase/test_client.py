@@ -23,7 +23,11 @@ def call(method, url, body=None, token=None):
         req.add_header("Authorization", token)
     try:
         with urllib.request.urlopen(req, timeout=20) as r:
-            return r.status, json.loads(r.read() or b"{}")
+            raw = r.read()
+            try:
+                return r.status, json.loads(raw or b"{}")
+            except ValueError:
+                return r.status, {"raw": raw[:200].decode(errors="replace")}
     except urllib.error.HTTPError as e:
         raw = e.read()
         try:
@@ -34,16 +38,16 @@ def call(method, url, body=None, token=None):
         return 0, {"error": str(e.reason)}
 
 def sample_payload():
-    """One 300 s OT chunk from the codec study, or random bytes of the same size."""
-    here = os.path.dirname(os.path.abspath(__file__))
-    sys.path.insert(0, os.path.join(here, "..", "..", "..", "scripts"))
+    """One 300 s OT batch in the real batch format (otrec fmt 1), or random bytes when otrec is not found."""
+    sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
     try:
-        import ot_stream_codec_study as oc
-        frames = oc.synthetic(300 / 3600)
-        start, n, data = oc.model_codec(frames, 300)[0]
-        return data, f"codec chunk, {n} frames"
+        import otrec
+        frames = [(t + int(time.time() * 1000), L, f) for t, L, f in otrec.codec.synthetic(300 / 3600)]
+        t0, data = otrec.pack_ot(frames)
+        return data, f"otrec fmt 1 batch, {len(frames)} frames"
     except Exception:
         return os.urandom(330), "random bytes"
+
 
 def main():
     if len(sys.argv) != 4:
@@ -65,14 +69,14 @@ def main():
     seq = int(time.time())
     batch = {"device": dev, "stream": "ot", "seq": seq, "t0": int(time.time() * 1000), "fmt": 1,
              "payload": base64.b64encode(payload).decode()}
-    st, r = call("POST", f"{base}/api/collections/batches/records", batch, token)
+    st, r = call("POST", f"{base}/api/collections/batches/records?fields=id", batch, token)
     check("2 post batch", st == 200, f"HTTP {st}, {len(payload)} B ({kind})")
 
-    st, r = call("POST", f"{base}/api/collections/batches/records", batch, token)
+    st, r = call("POST", f"{base}/api/collections/batches/records?fields=id", batch, token)
     check("3 resend same seq refused", st == 400, f"HTTP {st}")
 
     other = dict(batch, device="aaaaaaaaaaaaaaa", seq=seq + 1)
-    st, r = call("POST", f"{base}/api/collections/batches/records", other, token)
+    st, r = call("POST", f"{base}/api/collections/batches/records?fields=id", other, token)
     check("4 batch for another device refused", st in (400, 403, 404), f"HTTP {st}")
 
     st, r = call("GET", f"{base}/api/collections/batches/records", None, token)
