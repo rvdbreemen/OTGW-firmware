@@ -1,10 +1,11 @@
 ---
 id: TASK-1848
 title: 'OT-Direct: PR= reports that are not the PIC''s text'
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-11-12T00:02:00Z'
-updated_date: '2026-11-12T00:11:00Z'
+updated_date: '2026-11-14T15:32:00Z'
 labels:
   - otdirect
   - parity
