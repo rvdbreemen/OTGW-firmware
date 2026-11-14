@@ -5,6 +5,29 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [2.0.0-beta.250] - 2026-11-14
+
+### Added
+- REST `/api/v2/health`: `simulation_active` and `simulation_source`, from loop-task state without a LittleFS call; the web UI SIMULATION badge reads them and the web UI no longer polls `/api/v2/simulate` every 15 s; `/api/v2/simulate` is unchanged (TASK-1915).
+- Reboot log: the boot line carries the raw reset code of both cores (`[rst 0xNN/0xNN]`), and a reset by the external 0x26 watchdog gets its own line; `device/info` adds `resetraw`, `resetrawlabel` and `extwdreset`; a log line may be 160 characters (was 140) and a cut-off line still ends with CRLF (TASK-1904).
+
+### Changed
+- SAT: `CS=` is sent when the 0.1-rounded value changes and an unchanged `CS=` is repeated every 30 s instead of every 5 s; a `CS=` the queue dropped is retried after 5 s with the dropped value; the no-return start-up keeps its 2 s cadence; `MM=`, `TP=` and `CH=` unchanged (ADR-235 Proposed; TASK-1924).
+- SAT: the `CS=` loop repeat and the PIC keepalive wait 31 s after the last accepted `CS=`, so an old value no longer goes out just before a control tick brings a new one (TASK-1924).
+- SAT continuous mode: for 60 s after a CH flame-on edge the control setpoint is at least the flow temperature minus 1.0 °C, recalculated every 5 s; after that the existing flow clamp (offset 2.0 °C), also recalculated every 5 s while the flame is on; a DHW flame-on does not open the window (TASK-1924).
+- WiFi: three resets in a row, by the reset button or a power-on, each within 10 s of boot, clear the stored WiFi credentials and open the setup portal again on the ESP32-S3; software, USB, watchdog and crash resets never count; a power supply that drops out three times that quickly does the same; OLED hint `3x reset/power=config` (ADR-238 Proposed, supersedes ADR-043; TASK-1930).
+- File paths are normalised before the access check (TASK-1934).
+- Build: the `buildfs` step of `build.py` runs in its own `.pio/build-fs`, so the firmware objects survive between builds (TASK-1921).
+
+### Fixed
+- `settings.ini`, the reboot counter and the reboot log survive a reset or panic during a filesystem OTA: an RTC snapshot is restored at boot, and a half-written image is formatted first and the user is asked to upload the filesystem again; a power cut is not covered; `scripts/ota_flash.py` refuses a missing or empty image before the safeboot handover (ADR-233 Proposed; TASK-1774).
+- The RTC records start at 0x50000220, out of the 32 B the safeboot updater overwrites, so the reboot log keeps `[OTA] handover to safeboot`; the build fails when a record lands below 0x50000220 (ADR-239 Proposed; TASK-1918).
+- OT-Direct master mode: a thermostat read of an id without a cached boiler value is answered Data-Invalid instead of Unknown-DataID; Unknown-DataID stays for an id the boiler last answered Unknown-DataID and for ids 128-255 (TASK-1808).
+- The file handler serves existing files when the web UI files are missing; only a missing path gets the upload prompt (TASK-1926).
+- The root route uses an exact matcher, so only `/` itself gets the index page and other paths reach the file handler (TASK-1936).
+- Web UI: the weather-derived outside value is dropped from the Monitor graph when a hidden tab stops the weather poll or the weather answer is invalid, and showing the tab fetches the weather again (TASK-1875).
+- Capture tool: frames that arrive together with the WebSocket upgrade are kept, so the first frames of a capture are no longer lost on a busy PC (TASK-1922).
+
 ## [2.0.0-beta.237] - 2026-11-14
 
 ### Added
@@ -934,7 +957,8 @@ Legacy release. See git history for details.
 
 Legacy releases. See git history for details.
 
-[Unreleased]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.237...HEAD
+[Unreleased]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.250...HEAD
+[2.0.0-beta.250]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.237...v2.0.0-beta.250
 [2.0.0-beta.237]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.224...v2.0.0-beta.237
 [2.0.0-beta.224]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.218...v2.0.0-beta.224
 [2.0.0-beta.218]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.203...v2.0.0-beta.218
