@@ -4628,6 +4628,19 @@
     "TASK-1924"
    ],
    "confirmed_by_entry": null
+  },
+  {
+   "id": 348,
+   "title": "Q-347a B: a start in continuous mode uses the PWM start too (return + 18 while the flame is off, 20 s hold after flame-on, then flow - 1.0), as a fail-safe guard (Sergeant D, 2026-11-14; answers Q-347a, extends entries 338, 344, 347)",
+   "date": "2026-11-14",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1571208650310291648",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1924"
+   ],
+   "confirmed_by_entry": null
   }
  ]
 }

@@ -7266,3 +7266,21 @@ Asked by DM (through the coordinator) whether the repeat is 60 s or 30 s, given 
 **Open:** Q-346a. Until it is answered, TASK-1924 Part 2 is not built with 2.0; the offset of the start-up following is 1.0 on this entry, the clamp offset waits for Q-346a.
 
 **Task:** TASK-1924.
+
+## 348. Q-347a B: a start in continuous mode uses the PWM start too (return + 18 while the flame is off, 20 s hold after flame-on, then flow - 1.0), as a fail-safe guard (Sergeant D, 2026-11-14; answers Q-347a, extends entries 338, 344, 347)
+
+**Source:** #alpha-testing 2026-11-14. His question on the beta.250 note, 17:02:13 UTC: https://discord.com/channels/812969634638725140/1514720723980259460/1571208650310291648 ("during start do we use the CS = return temperature + 18 for 20 seconds rule and then the suppression?") and 17:02:44 UTC https://discord.com/channels/812969634638725140/1514720723980259460/1571208779503247421 ("If not we are risking of a flame out"). Q-347a, 17:08 UTC: https://discord.com/channels/812969634638725140/1514720723980259460/1571210119918788619 . His answer, 17:18:38 UTC: https://discord.com/channels/812969634638725140/1514720723980259460/1571212780491640854
+
+**Quoted:**
+
+> "My answer is B as a fail safe guard ( e.g. sat is in PWM -> reboot -> starts again in suppression )."
+
+**Option B as posted:** "Use the PWM start in continuous mode too: return + 18 before and 20 s after flame-on, then flow - 1.0 until the 60 s are over. New, not in thermo-nova."
+
+**Settled (extends entries 338, 344, 347):** a heating start in continuous mode runs the same start sequence as PWM: while the flame is off, CS = return + flame_off_setpoint_offset (18.0); after flame-on that CS is held for modulation_suppression_delay (20 s); then CS = max(request, flow - 1.0) until 60 s after flame-on (entries 344, 347); then the entry-112 clamp. Interpretation we act on: his example ("sat is in PWM -> reboot -> starts again in suppression") is the reason, a guard against a start in continuous mode after the PWM state was lost; we read it as applying to every continuous heating start, not only after a reboot. If he meant only the reboot case, that is a later correction.
+
+**Compared with thermo-nova:** the start sequence is PWM-only there: `_compute_pwm_control_setpoint` (`heating_control.py:380`, called only in PWM at `:224-225`, guards `:384-389`), flame-off hold `return + 18` at `:392-405` (`const.py:151` `CONF_FLAME_OFF_SETPOINT_OFFSET_CELSIUS: 18.0`), the hold after flame-on for `modulation_suppression_delay_seconds` (`const.py:152`, 20) at `:414-433`, then suppression `flow - 1.0` at `:439-448`. In continuous mode with the flame off thermo-nova sends the request (`:476-482`). So this entry is a deliberate deviation from thermo-nova, decided by Sergeant D. Firmware on origin/dev (beta.250): continuous flame off -> CS = request (`satApplyContinuous`), then `satContinuousSetpoint()` 60 s flow - fModSupOffset; the PWM start lives in the PWM path only.
+
+**Open:** (1) whether the return-less case of entry 45 (no return temperature: flood and flow-based start) applies in continuous mode too; we read it as yes, the same start sequence. (2) Q-346a (the clamp offset) is still open.
+
+**Task:** a new follow-up of TASK-1924 for d3 (filed by the coordinator).
