@@ -113,7 +113,7 @@ The OTDirect module operates as a cooperative OpenTherm stack layered on the pro
   - Returns early if master busy (`otMasterRequestActive`)
   - Returns early if MI= minimum gap not satisfied
   - Dequeues and sends commands from ring buffer (command queue takes priority)
-  - Round-robins through schedule table (`otScheduleIdx`), skipping disabled entries. While the bus is offline (`!state.otBus.bOnline`) only MsgID 0 is sent, every `OT_OFFLINE_RETRY_MS` (5 s). MsgIDs 70 and 71 poll every 10 s instead of 60 s when the slave reports a ventilation/HRV application (`otIsVentSlave()`):
+  - Round-robins through schedule table (`otScheduleIdx`), skipping disabled entries. While the bus is offline (`!state.otBus.bOnline`) only MsgID 0 is sent, at its normal 800 ms interval (TASK-1802: a boiler gets a frame within the spec's 1.15 s after a failed one, as on the PIC; the old 5 s retry left it 5-6 s without a frame). MsgIDs 70 and 71 poll every 10 s instead of 60 s when the slave reports a ventilation/HRV application (`otIsVentSlave()`):
     - Status (MsgID 0): always ready, uses `buildStatusRequest()` with current flags
     - Read entries: sent on interval with READ_DATA
     - Write entries: sent only if `valueSet=true` (cache populated), uses cached value with WRITE_DATA
@@ -659,7 +659,6 @@ static uint8_t otUnknownCounters[32];     // 128 MsgIDs × 2 bits = 32 bytes
 | OT_TEMP_INTERVAL_MS     | 10 s      | Temperature, modulation, pressure reads |
 | OT_SLOW_INTERVAL_MS     | 60 s      | Config, diagnostics, boundaries, counters |
 | OT_WRITE_INTERVAL_MS    | 15 s      | Periodic writes (keep boiler values alive) |
-| OT_OFFLINE_RETRY_MS     | 5 s       | MsgID 0 probe interval while the bus is offline (everything else skipped) |
 | OT_VENT_FAST_INTERVAL_MS | 10 s     | MsgID 70/71 poll when the slave is a ventilation/HRV unit |
 | OT_CSC2_EXPIRY_MS / OT_SC_EXPIRY_MS | 63.5 s / 63.5 s | CS=/C2= (8 C or more) and SC= overrides expire without a refresh; CS=/C2= below 8 C never expire |
 | OT_DHW_PUSH_TIMEOUT_MS  | 30 s      | DHW push state machine timeout |

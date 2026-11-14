@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTDirect.ino
-**  Version  : v2.0.0-beta.276
+**  Version  : v2.0.0-beta.277
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -64,7 +64,6 @@ static void onThermostatMsgID16(uint8_t msgType, uint16_t f88);
 // Master request scheduler — periodic polls and writes to the boiler
 // ---------------------------------------------------------------------------
 static constexpr uint32_t OT_STATUS_INTERVAL_MS   = 800;    // MsgID 0 (status) every 800ms (OT-Thing parity)
-static constexpr uint32_t OT_OFFLINE_RETRY_MS     = 5000;   // When bus is offline: retry MsgID 0 every 5s, skip rest
 static constexpr uint32_t OT_TEMP_INTERVAL_MS     = 10000;  // Temperature reads every 10s
 static constexpr uint32_t OT_SLOW_INTERVAL_MS     = 60000;  // Slow-poll items every 60s
 static constexpr uint32_t OT_WRITE_INTERVAL_MS    = 15000;  // Periodic writes every 15s (keep boiler values alive)
@@ -1981,8 +1980,10 @@ static void scheduleMasterRequest() {
     return;
   }
 
-  // When the bus is offline: only probe MsgID 0 at a slow rate — no point
-  // cycling through the full schedule if nobody is home.
+  // When the bus is offline: only probe MsgID 0, no point cycling through the full schedule if nobody is home.
+  // TASK-1802: at its normal interval, so the boiler sees a frame within the spec's 1.15 s (OT spec v4.2 :1101) after
+  // a failed one, as on the PIC, which retries at the next 1 s tick (gateway.asm 6.6 :1490-1498). A 5 s retry left a
+  // boiler 5-6 s without a frame, and the spec lets it treat 5 s without a valid frame as a short circuit (:1006-1016).
   bool busOffline = !state.otBus.bOnline;
 
   // Round-robin through the schedule table, skipping disabled entries
@@ -1999,8 +2000,7 @@ static void scheduleMasterRequest() {
     // Write entries only fire when a value has been set by a command
     if (entry.isWrite && !entry.valueSet) continue;
 
-    // Offline: use slow retry interval for MsgID 0 to avoid hammering a dead bus
-    uint32_t interval = (busOffline && entry.msgId == 0) ? OT_OFFLINE_RETRY_MS : entry.intervalMs;
+    uint32_t interval = entry.intervalMs;
     // TASK-583: promote MsgID 70 (V/H status) and 71 (V/H setpoint) to fast-poll
     // when the slave configuration (MsgID 3 HB bits 6-7 == 0b11) indicates a
     // ventilation/HRV application.  MsgIDs 72-76 remain in the slow-poll tier.
