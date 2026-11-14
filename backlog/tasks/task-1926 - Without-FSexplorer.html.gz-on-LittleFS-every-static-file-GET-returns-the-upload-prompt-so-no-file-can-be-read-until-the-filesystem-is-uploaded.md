@@ -3,11 +3,11 @@ id: TASK-1926
 title: >-
   Without FSexplorer.html.gz on LittleFS every static file GET returns the
   upload prompt, so no file can be read until the filesystem is uploaded
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-14T08:18:00Z'
-updated_date: '2026-11-14T11:39:00Z'
+updated_date: '2026-11-14T13:45:00Z'
 labels:
   - bug
   - webui
@@ -27,7 +27,7 @@ Seen by otgw-bench-tester 09 in TASK-1774 round 2 (.63, 2026-11-14 ~09:07, evide
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [x] #1 Host or bench reproduction: with FSexplorer.html.gz absent, GET /reboot_log.txt returns the upload prompt instead of the file (old)
-- [ ] #2 Fix: existing files are served (auth guard unchanged), the prompt stays for the page routes; old red, fix green
+- [x] #2 Fix: existing files are served (auth guard unchanged), the prompt stays for the page routes; old red, fix green
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -40,4 +40,12 @@ Move the upload-prompt gate in handleFile() (FSexplorer.ino) from before the fil
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-11-14 (09) host evidence. tests/test_web_file_scheduling.py with the updated no-recovery-page case: on the current code (and --old-rev origin/dev) FAIL 4: lines 603 x3 (reboot_log.txt, .fs_update_incomplete, settings.ini answered the prompt, path empty) and 608 (settings.ini with a failed password check got the 200 prompt, because the prompt ran before the ADR-056 guard). On the fix: PASS 0 failures. Mutants still killed (exit 0 each, e.g. handlefile-gz-only-gate: 'KILLED (fixture failed as it must)' at line 615): handlefile-gz-only-gate, no-plain-fallback, double-encoding-file, double-encoding-progmem, etag-without-path. Related tests OK: test_fsexplorer_relative_urls, test_health_no_fs_flash_ops, test_dallas_labels_ram_copy. evaluate.py --quick: 92 checks, 0 failed (same FAIL set as the main tree).
+
+2026-11-14 (09) bench .63 on 2.0.0-beta.245+662a2a8 (pushed 662a2a859; 1926 is d7a40ea72): after deleting FSexplorer.html.gz, GET /reboot_log.txt 200 1642 B with the log, /reboot_count.txt 200 '114', /version.hash 200 '662a2a8'; a missing path (/nothing.ini) 200 with the upload prompt (466 B); directories /sat, /i18n, /sat/ 200 with 0 B (no crash). A clean FS OTA restored FSexplorer; settings diff [] (API and raw ini). Evidence: 09 scratchpad b245/.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+AC1: host test red on the old handleFile() (existing files answered the upload prompt without a recovery page). AC2: fix moves the prompt to the not-found branch; host test green, mutants killed; bench .63 beta.245: files served without FSexplorer, prompt only for a missing path, settings unchanged. Not verified: none open.
+<!-- SECTION:FINAL_SUMMARY:END -->
