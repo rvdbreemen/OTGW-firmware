@@ -3,11 +3,11 @@ id: TASK-1913
 title: >-
   writeSettings truncates settings.ini in place: a power cut mid-write can lose
   all settings
-status: In Review
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-13T23:14:00Z'
-updated_date: '2026-11-14T08:28:00Z'
+updated_date: '2026-11-14T08:42:00Z'
 labels: []
 dependencies: []
 priority: medium
@@ -62,3 +62,9 @@ Bench by otgw-bench-tester (09), .63 Classic + PIC 6.8, 2.0.0-beta.233+6afbade (
 
 Results: 42 resets, 42/42 landed (bootcount +1 each: 41-53 first run, 58-88 rerun), 0 MIX/DEFAULT, settings.ini parsed whole every time (5658/5659 B). Rerun 30 trials (offsets 2000-2125 ms step 25 x5; chunk 1 four seconds after boot, chunks 2-3 after a 20 s settle): old 27, new 3. Per offset: 2000 5 old; 2025 5 old; 2050 5 old; 2075 5 old (2 with the flush line received); 2100 4 old (3 with flush) + 1 new (flush, no saved line: late saved in TCP buffer); 2125 3 old (all with flush) + 2 new (1 late-saved, 1 with saved line). Certain mid-write hits (flush line received before the reset, no saved line, result complete old): 8 in the rerun + 1 in the first run (2025 ms) = 9; offsets inside the calibrated window without the flush line are probable hits but cannot be told apart from a late debounce. First run (12 resets, partly lost to a memory reap): 1950 x2 old, 2000 old, 2025 old (flush, no saved), 2050/2075/2100 old, 2150 new (late saved), 2250/2400/2700 new. Evidence: scratchpad r1913b/ (calib63*, trials63b, rerun-c1..c3: trials.log, trials.json, telnet raw). Settings restored, API diff vs pre-1913 [].
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+AC1: writeSettings() and updateRebootCount() write a temp file and swap it in with fsCommitTempFile() (size check, then LittleFS.rename over the old file); a short write or failed rename keeps the old file (beta.233, 6afbade55). AC2: host harness test/host/test_settings_atomic_write.py: red on fe6d35b59 (W1, W3, W4, R1, S1-S4: a power cut after the truncate left settings.ini at 0 B), green on the fix, mutants MA1-MA4 caught; LittleFS model per esp_littlefs 1.20.3 (open w syncs the truncation, content at close, rename replaces atomically). AC3: bench by otgw-bench-tester 09 on .63: save + reboot round trip, two saves in a row, no temp files left, boot counter +1 per reboot (2026-11-14 ~02:30); and, by Robert's choice B (no waiver), 42/42 USB-JTAG resets during a settings save left a whole settings.ini, 9 of them certain mid-write hits, 0 mixed or default results (09, e0edc98c1). Not tested: a real power cut (the USB-JTAG reset stands in for it; that a power cut behaves the same rests on littlefs's atomic rename, not on a measurement). Checked statically only: the FSexplorer auth guard on /settings.tmp (host S3, mutant MA4).
+<!-- SECTION:FINAL_SUMMARY:END -->

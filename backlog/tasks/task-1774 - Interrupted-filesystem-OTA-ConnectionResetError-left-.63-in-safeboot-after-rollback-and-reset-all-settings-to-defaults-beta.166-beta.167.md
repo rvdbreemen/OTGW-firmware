@@ -3,11 +3,11 @@ id: TASK-1774
 title: >-
   Interrupted filesystem OTA (ConnectionResetError) left .63 in safeboot after
   rollback and reset all settings to defaults (beta.166 -> beta.167)
-status: In Progress
+status: In Review
 assignee:
   - '@claude'
 created_date: '2026-11-10T05:53:00Z'
-updated_date: '2026-11-14T08:17:00Z'
+updated_date: '2026-11-14T08:41:00Z'
 labels:
   - bug
   - ota
@@ -41,7 +41,7 @@ Files (local, not in git): OTGW-build-archive\flash-logs\63-beta167-fs-ota-reset
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [x] #1 Reproduce on a bench unit: interrupt a filesystem OTA (e.g. drop the connection mid-upload) and record what the device does (serial + telnet), with settings and bootcount before/after
-- [ ] #2 Find the cause of (1) the settings/bootcount loss and (2) the app rollback to safeboot, with evidence
+- [x] #2 Find the cause of (1) the settings/bootcount loss and (2) the app rollback to safeboot, with evidence
 - [ ] #3 Fix so that an interrupted fs OTA keeps settings.ini and the boot counter, and the main app still starts (or safeboot can restore without data loss); old-vs-fix proof on the reproduction
 - [x] #4 scripts/ota_flash.py detects a unit in safeboot (no JSON from the main firmware) and says so, or can drive the safeboot recovery, instead of failing with JSONDecodeError
 <!-- AC:END -->
@@ -202,6 +202,10 @@ AC3 bench round 2 (otgw-bench-tester 09, .63, 2026-11-14 09:02-09:11, 2.0.0-prob
 Correction to the note above: AC3 is NOT ticked yet; it is the bench AC and 09 ticks it (after the real build is benched and pushed). AC2 (cause, with evidence) and AC3 (fix with old-vs-fix proof) are the developer's to close only through 09's tick for AC3.
 
 Lane rebuilt on origin/dev 97eacc37b (coordinator BUILD GO): only the five 1774 commits not yet on origin cherry-picked (the README fix, the TASK-1913 note and TASK-1922 went out as c312d9ff2 and 877476947), the task file merged by hand (my notes plus origin's wording of the README note, nothing of origin dropped), version beta.238 by bump-prerelease.sh. Re-verified: harness --old-rev 97eacc37b FIX PASS, OLD fails S1-S8/T1/T4/T6/T9/T10; 9 targeted test files PASS; evaluate --quick 85/0.
+
+Bench of the real build (otgw-bench-tester 09, .63, 2026-11-14 09:35-09:40, 2.0.0-beta.238+9eeb372, sha256 ino 8950707f...fe7e, littlefs 6f07d85c...c595, zip 9d9d969f...8dbd all matched; evidence 09 scratchpad b238\ev\): PASS. One ota_flash.py call app + fs: 'waiting 35 s until the new app has confirmed itself (ADR-191) before the filesystem write', fs confirmed c36a0b6 -> 9eeb372, 'settings: 150 keys, changed: none'; telnet '[OTA] RTC snapshot: 6841 B of settings, reboot counter and reboot log'. After: bootcount +2, reboot_log kept (cap 20, two new on top), no marker, fsupdateincomplete false, web UI complete, MQTT and PIC up, API and ini diff vs S0 []. Settings save and back: diff []. /ReBoot: diff [], no marker; no restore line on telnet, but telnet starts after WiFi so that alone proves nothing; indirect proof that no stale snapshot was restored: reboot_count 91 and the new /ReBoot entry on top (a restore from the 09:37:09 snapshot would have rolled both back). Second clean FS OTA: snapshot 6880 B, diff [], no marker. .63 stays on beta.238.
+
+AC2 ticked (developer, evidence in the notes above): cause (1), the settings and boot-counter loss, is a reset during the filesystem write: the boot then reads the image's default or a half-written image (round 1 on .63: 16 settings changed, bootcount 27 -> 1, FS full; host T9 reproduces it); cause (2), the rollback to safeboot, is a reset while the new app is still PENDING_VERIFY (confirmed only after 30 s, OTGW-firmware.ino:1175-1179): the probe on .63 showed PENDING_VERIFY -> panic -> an ABORTED boot of ota_0 -> panic -> safeboot (R1), and an ABORTED image never confirms itself. Open sub-question (which otadata entry lets the ABORTED image boot once more) is carried by TASK-1919, not by this task. AC3 is the bench AC: ticked by 09.
 <!-- SECTION:NOTES:END -->
 
 ## Comments
