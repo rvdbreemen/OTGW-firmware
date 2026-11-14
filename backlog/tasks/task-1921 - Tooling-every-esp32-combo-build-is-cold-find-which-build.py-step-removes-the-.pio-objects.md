@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-14T04:36:00Z'
-updated_date: '2026-11-14T11:41:00Z'
+updated_date: '2026-11-14T12:18:00Z'
 labels:
   - tooling
   - build
@@ -25,9 +25,9 @@ Seen 2026-11-14 on beta.234 and beta.236 (d3). A restart right after a build tha
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 the step that removes the .pio object files is named with file:line and shown in a log of one build
-- [ ] #2 decision recorded: keep (with the reason) or change so a second build without source changes recompiles only what changed
-- [ ] #3 if changed: a second esp32-combo build with no source change shows far fewer Compiling lines than the first, and the zip is identical in content to a clean build (checked against docs/guides/versioning-policy.md build-stamp restore)
+- [x] #1 the step that removes the .pio object files is named with file:line and shown in a log of one build
+- [x] #2 decision recorded: keep (with the reason) or change so a second build without source changes recompiles only what changed
+- [x] #3 if changed: a second esp32-combo build with no source change shows far fewer Compiling lines than the first, and the zip is identical in content to a clean build (checked against docs/guides/versioning-policy.md build-stamp restore)
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -44,4 +44,8 @@ AC1 cause (proven on PlatformIO's code, no build): platformio/run/helpers.py:26-
 Fix (AC2: change): build_filesystem_pio sets PLATFORMIO_BUILD_DIR=.pio/build-fs (pio_fs_build_root()), verifies and collects littlefs.bin there; clean_build also removes .pio/build-fs. .pio/build keeps one checksum and its objects. No change to the lock, the jobs cap or the artifact names. Tests: tests/test_build.py TestFilesystemStepKeepsFirmwareObjects (3): on the fix 3/3 OK; on origin/dev build.py (OTGW_BUILD_PY) test_buildfs_runs_in_its_own_build_directory FAILS ('the buildfs step must not run in .pio/build'); the checksum test pins the cause on PlatformIO's own compute_project_checksum (passes on both, it tests PlatformIO). Full test_build.py 16/16 under the build venv and the system Python. AC3 needs two builds in my slots.
 
 Coordinator review: (1) ADR-237 (Proposed, via adr-kit, renumbered from the auto-allocated 234 because 234-236 are taken on other lanes) records the build-tooling change; related ADR-190, ADR-083; README entry; adr governance OK. (2) Other readers of .pio/build/<env>/littlefs.bin: only flash_otgw.bat:383 as its last fallback (after ./ and build/), now also .pio\build-fs\*; scripts/ota_flash.py and flash_otgw.sh use build/; flash_esp.py reads only bootloader/partitions from .pio/build/esp32; safeboot is its own PIO project (build.py:2252); scripts/device-verify.sh runs pio buildfs itself without an override (unaffected, its default dir).
+
+AC3 measured 2026-11-14 on lane-95-1921 36fb13763 (no src change between the builds; build.bat, Start-Process, 4 jobs; logs in 95's scratchpad b1921/build1.log, build2.log, status.txt). Build 1 (cold: .pio/build/esp32-combo was empty): exit 0, 609 s, 364 Compiling lines, 2 'Successfully created ESP32S3 image' (bootloader + firmware). After it: 364 .o files kept in .pio/build/esp32-combo, .pio/build/project.checksum = b16a76e1... (the firmware run's), .pio/build-fs/project.checksum = fbf867c9... Build 2 (warm): exit 0, 253 s, 1 Compiling line (src/OTGW-firmware.ino.cpp.o, the sketch: version.h is restamped each build), 1 image line (firmware; the bootloader comes from the cache), 364 .o kept, same checksums. Before the fix every build looked like build 1 (d3's 236 rerun: 364 Compiling lines).
+
+AC3 artifacts (art1 vs art2, same githash 36fb137): flash zip has the same 14 entries; only .ino.bin and the two merged images that contain it differ. littlefs.bin: unpacked with mklittlefs -u, the 10 files are identical; the image differs in 204 bytes in blocks 0, 1 and 30 (LittleFS metadata: the staging copy is recreated per build, so file times differ). .ino.bin (same size 2147904): 137 bytes differ in 6 runs: the ELF sha256 at 0xb0 (32 B), the build time string at 0x5656e ('07:54' vs '12:47'), three small runs of Xtensa immediates (0xf2cf4 5 B, 0xf44c0 46 B, 0x1061c7 19 B, values that move with the build time), and the image hash at the end (33 B). Not proven byte by byte that the immediates are only the stamp: a cold and a warm build cannot carry the same _VERSION_TIME. Side effect recorded: the image-created count is 2 on a cold build and 1 on a warm one; .claude/skills/beta-release-2x and release-2x updated (they said 'expect 2'). Stamps restored with git checkout after the builds.
 <!-- SECTION:NOTES:END -->

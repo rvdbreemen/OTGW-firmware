@@ -128,7 +128,7 @@ from the file at create time.
 1. One build at a time (machine lock). esp32-combo only:
    ```bash
    OTGW_BUILD_JOBS=4 ./.build-python/python.exe build.py > "$TMP/build-beta.log" 2>&1
-   grep -c "Successfully created ESP32S3 image" "$TMP/build-beta.log"   # expect 2
+   grep -c "Successfully created ESP32S3 image" "$TMP/build-beta.log"   # 2 on a cold build (bootloader + firmware), 1 on a warm one (TASK-1921: the bootloader is cached)
    grep "Build completed successfully" "$TMP/build-beta.log"
    ls -la build | grep "beta.N+<githash>"                               # fresh mtimes
    ```

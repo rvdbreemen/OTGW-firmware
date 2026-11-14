@@ -139,7 +139,7 @@ Each push to `release/2.x` happens only inside this flow after checkpoint 1.
 1. Announce the build; one build at a time; esp32-combo only:
    ```bash
    OTGW_BUILD_JOBS=4 ./.build-python/python.exe build.py > "$TMP/build-<v>.log" 2>&1
-   grep -c "Successfully created ESP32S3 image" "$TMP/build-<v>.log"   # 2
+   grep -c "Successfully created ESP32S3 image" "$TMP/build-<v>.log"   # 2 on a cold build (bootloader + firmware), 1 on a warm one (TASK-1921: the bootloader is cached)
    grep "Build completed successfully" "$TMP/build-<v>.log"
    ls -la build | grep "<v>+"                                            # no -beta/-alpha in the name
    ```
