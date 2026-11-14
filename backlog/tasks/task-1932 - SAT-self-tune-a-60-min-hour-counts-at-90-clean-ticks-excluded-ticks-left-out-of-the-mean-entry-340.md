@@ -3,10 +3,11 @@ id: TASK-1932
 title: >-
   SAT self-tune: a 60 min hour counts at >=90 % clean ticks, excluded ticks left
   out of the mean (entry 340)
-status: To Do
+status: In Progress
 assignee:
-  - '@95'
+  - '@claude'
 created_date: '2026-11-14T10:22:00Z'
+updated_date: '2026-11-14T10:26:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -29,3 +30,14 @@ Maintainer + Sergeant D decision, entry 340: Robert 'Drop it to 90%?' (https://d
 - [ ] #4 Host test on the real tuner code: red on the old code (hour with 1 excluded tick of 120 not counted), green on the fix; and an hour below 90 % clean stays excluded
 - [ ] #5 Replay of the 5 gruijter field runs of TASK-1927 on the fix gives 10 counted hours with the same votes as the replay variant
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. AC1 first (hard stop): one question to Sergeant D via 92/coordinator, 90 % of the ticks the hour had (A) or of the expected 120 (B). Facts: the replay of TASK-1927 (scripts/replay.py G_CLOSE_FILTER) counted against the ticks the hour had; on the 5 gruijter runs every 60 min hour has exactly 120 ticks (59 of 59 in followup2_windows.txt), so A and B give the same 10 hours there. They differ only for an hour with missing ticks (90-119; under 90 the few_ticks marker at SAT_CT_MIN_TICK_FRACTION 0.75 already drops it). Recommendation B (at least 108 clean 30 s ticks = 54 min of clean data; stricter, no credit for a gap, same field result). Record his answer as a new entry in docs/sat/sergeant-d-corrections.md before code.
+2. ADR via adr-kit amending ADR-205 decision 2 (and entry 174's clean-hour rule): per-tick exclusions counted, hour counts at >= 90 % clean (per the AC1 answer); excluded ticks out of the hour mean and the phase counts; coeff_changed, not_sat at boot, few_ticks/no_ticks stay whole-hour; first-in-time reason kept for telemetry.
+3. Code (SATcontrol.ino satCurveTune block only): satTuneAddTick counts excluded ticks (exclTicks + first reason) and adds signal/phase only for clean ticks; satTuneCloseHour marks the first reason when the clean share is below 90 %; SAT_CT_MIN_CLEAN_TICK_FRACTION 0.90 in SATcurveTune.h. Check not_sat: the boot marker is per tick today (satActive false) - confirm with the code which path is 'boot' and keep it whole-hour.
+4. Host test (tests/test_sat_curve_selftune.py compiles the real block): 1 dhw tick of 120 -> counted, mean excludes it (red on old); 13 of 120 excluded -> not counted; coeff_changed and few_ticks stay whole-hour; mean equals the clean-tick mean. Old-vs-fix via the env override of the source.
+5. Replay of the 5 gruijter runs with 92's harness on the fix: 10 counted hours, same votes as the share10 variant.
+6. evaluate --quick, bump, build on GO, bench brief (no-regression; the tune telemetry on device/info), push, post.
+<!-- SECTION:PLAN:END -->
