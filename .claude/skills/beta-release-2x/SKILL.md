@@ -1,7 +1,6 @@
 ---
 name: beta-release-2x
 description: Publish a 2.x (ESP32-S3) beta prerelease from dev: set _VERSION_PRERELEASE to beta.N, roll the CHANGELOG, build esp32-combo, OTA bench check, annotated tag, draft-first GitHub prerelease, announce in #beta-testing
-disable-model-invocation: true
 ---
 
 # /beta-release-2x: OTGW-firmware 2.x Beta Prerelease Skill

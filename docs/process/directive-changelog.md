@@ -25,6 +25,7 @@ lives here.
 | 2026-10-29 | Open questions go to Robert interactively with a weighed recommendation | CLAUDE.md "Design Principles" |
 | 2026-10-30 | Per-task cadence: bench-test every firmware task before its zip is published (since 2026-11-11 the bench-tester agent runs that bench test) | `docs/guides/agent-build-and-bench.md`, CLAUDE.md summary |
 | 2026-11-01 | `release/2.x` is the stable 2.x line (TASK-1545) | CLAUDE.md "Git push policy" |
+| 2026-11-14 | Standing permission for 2.x public betas: the coordinator invokes `/beta-release-2x` itself in the 08:00/20:00 slot; stable releases keep the per-action yes (TASK-1948) | AGENT-CORE block (hard-stop exception), `.claude/skills/beta-release-2x/SKILL.md` (model invocation allowed) |
 
 ## Replaced directives
 
