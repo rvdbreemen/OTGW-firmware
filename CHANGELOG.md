@@ -8,6 +8,12 @@ For full release notes per version, see the matching `RELEASE_NOTES_<version>.md
 
 ## [Unreleased]
 
+## [1.7.10] - TBD
+
+### Fixed
+
+- **File paths are normalised before the access check.** The web server brings every requested file path into one normal form (repeated slashes collapsed, `.` dropped, `..` resolved, a path above the root refused) before it decides whether the admin password is needed, and it opens exactly that path. With an admin password set, protected files are only served after you log in, whichever way the path is written. Without a password nothing changes. (TASK-1935)
+
 ## [1.7.9] - 2026-11-04
 
 ### Added
