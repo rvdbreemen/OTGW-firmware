@@ -1069,7 +1069,6 @@
         "minutes": "Minutes",
         "optional": "Optional",
         "otgwcommands": "Semicolon separated, e.g. PS=0;GW=1",
-        "pictempsensor": "PIC Classic only. Reads the temperature sensor wired to the PIC every 3 minutes and publishes it to MQTT and Home Assistant. Leave off if no sensor is connected.",
         "protects_settings_advanced": "Protects Settings / Advanced",
         "satboilerratedkw": "kW gas input. Enables the gas estimate and caps it (0 = off)",
         "satmanufacturer": "Auto detects from the boiler; choose Immergas explicitly to enable its TP=11:12 modulation command",
@@ -4110,7 +4109,7 @@
     ntpsendtime:     { cat: 'ntp', label: 'Send time to thermostat' },
     otgwcommandenable: { cat: 'otgw', label: 'Run commands at boot' },
     otgwcommands:    { cat: 'otgw', label: 'Boot commands', hint: 'Semicolon separated, e.g. PS=0;GW=1' },
-    pictempsensor:   { cat: 'otgw', label: 'PIC temperature sensor', hint: 'PIC Classic only. Reads the temperature sensor wired to the PIC every 3 minutes and publishes it to MQTT and Home Assistant. Leave off if no sensor is connected.' },   // TASK-1940
+    pictempsensor:   { cat: 'otgw', label: 'PIC temperature sensor' },   // TASK-1940; the explanation is the i text (settingsHelp.h)
     gpiosensorsenabled:   { cat: 'sensors', label: 'Enable sensors' },
     gpiosensorspin:       { cat: 'sensors', label: 'GPIO pin' },
     gpiosensorsinterval:  { cat: 'sensors', label: 'Poll interval', hint: 'Seconds' },

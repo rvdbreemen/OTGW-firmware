@@ -948,7 +948,6 @@
       "minutes": "Minuten",
       "optional": "Optional",
       "otgwcommands": "Durch Semikolon getrennt, z. B. PS=0;GW=1",
-      "pictempsensor": "Nur PIC Classic. Liest alle 3 Minuten den Temperatursensor am PIC und veröffentlicht ihn über MQTT und an Home Assistant. Ausgeschaltet lassen, wenn kein Sensor angeschlossen ist.",
       "protects_settings_advanced": "Schützt Einstellungen / Erweitert",
       "satboilerratedkw": "kW Gas-Eingangsleistung. Aktiviert die Gasverbrauchsschätzung und begrenzt sie (0 = aus)",
       "satmanufacturer": "Wird automatisch am Kessel erkannt; Immergas ausdrücklich wählen, um dessen Modulationsbefehl TP=11:12 zu aktivieren",

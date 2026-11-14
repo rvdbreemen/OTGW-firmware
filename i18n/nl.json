@@ -948,7 +948,6 @@
       "minutes": "Minuten",
       "optional": "Optioneel",
       "otgwcommands": "Gescheiden door puntkomma's, bijv. PS=0;GW=1",
-      "pictempsensor": "Alleen PIC Classic. Leest elke 3 minuten de temperatuursensor op de PIC en publiceert die naar MQTT en Home Assistant. Laat uit als er geen sensor is aangesloten.",
       "protects_settings_advanced": "Beveiligt Instellingen / Geavanceerd",
       "satboilerratedkw": "kW nominale belasting (gas). Schakelt de gasschatting in en begrenst die (0 = uit)",
       "satmanufacturer": "Wordt automatisch herkend via de ketel; kies Immergas expliciet om het modulatiecommando TP=11:12 in te schakelen",
