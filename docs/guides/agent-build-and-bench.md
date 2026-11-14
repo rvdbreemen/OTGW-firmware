@@ -22,6 +22,17 @@ python evaluate.py           # Code quality check (PROGMEM, unsafe patterns)
 python evaluate.py --quick   # Fast check
 ```
 
+**Build log (TASK-1894).** Do not redirect `build.bat` to read its output: from an agent's Bash or PowerShell
+tool that gave 0-byte files. `build.py` writes its own log, the output of pio, esptool and the other child tools
+included: `build/logs/build-<YYYYmmdd-HHMMSS>.log` (the path is printed at the start), copied to
+`build/logs/latest.log` when the run ends. Run the build in the foreground as usual, then check the log:
+
+```bash
+cmd.exe //c build.bat                                  # Git Bash; or: & .\build.bat in PowerShell
+grep -cE "Successfully created ESP32S3 image" build/logs/latest.log   # 2 for firmware + safeboot
+grep -c  "Build completed successfully" build/logs/latest.log         # 1
+```
+
 Build targets on `dev` (`build.py --target` choices; ESP8266 exists only on `otgw-1.x.x`):
 
 | Target | Hardware | Asset name token |

@@ -193,6 +193,76 @@ def print_info(message):
     print(f"{Colors.OKCYAN}ℹ {message}{Colors.ENDC}")
 
 
+# TASK-1894: build.py writes its own log. Redirecting build.bat from an agent's shell tool gave 0-byte files, and
+# a child process started with stdout=None writes to file descriptor 1 directly, past sys.stdout. So: sys.stdout and
+# sys.stderr are teed into build/logs/build-<time>.log, and every streamed child runs through run_streamed(), which
+# reads its output line by line and writes it through the tee. At exit the log is copied to build/logs/latest.log.
+_BUILD_LOG = None
+
+
+class _TeeStream:
+    """Write to the console stream and to the build log."""
+
+    def __init__(self, stream):
+        self._stream = stream
+
+    def write(self, s):
+        n = self._stream.write(s)
+        if _BUILD_LOG is not None:
+            _BUILD_LOG.write(s)
+        return n
+
+    def flush(self):
+        self._stream.flush()
+        if _BUILD_LOG is not None:
+            _BUILD_LOG.flush()
+
+    def __getattr__(self, name):
+        return getattr(self._stream, name)
+
+
+def start_build_log(project_dir):
+    """Open build/logs/build-<time>.log, tee stdout/stderr into it; return its path."""
+    global _BUILD_LOG
+    log_dir = Path(project_dir) / "build" / "logs"
+    log_dir.mkdir(parents=True, exist_ok=True)
+    path = log_dir / f"build-{time.strftime('%Y%m%d-%H%M%S')}.log"
+    _BUILD_LOG = open(path, "w", encoding="utf-8", errors="replace", newline="\n")
+    if not isinstance(sys.stdout, _TeeStream):
+        sys.stdout = _TeeStream(sys.stdout)
+    if not isinstance(sys.stderr, _TeeStream):
+        sys.stderr = _TeeStream(sys.stderr)
+    return path
+
+
+def stop_build_log(path):
+    """Close the build log and copy it to build/logs/latest.log."""
+    global _BUILD_LOG
+    if _BUILD_LOG is None:
+        return
+    try:
+        sys.stdout.flush()
+        sys.stderr.flush()
+    except Exception:
+        pass
+    _BUILD_LOG.close()
+    _BUILD_LOG = None
+    try:
+        shutil.copyfile(path, Path(path).parent / "latest.log")
+    except OSError:
+        pass
+
+
+def run_streamed(cmd, cwd=None, env=None, shell=False):
+    """Run cmd with stdout+stderr piped through Python (so the build log sees it); return the exit code."""
+    p = subprocess.Popen(cmd, cwd=cwd, env=env, shell=shell, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                         text=True, encoding="utf-8", errors="replace", bufsize=1)
+    for line in p.stdout:
+        sys.stdout.write(line)
+        sys.stdout.flush()
+    return p.wait()
+
+
 def run_command(cmd, cwd=None, env=None, check=True, capture_output=False, show_output=True):
     """Run a shell command and handle errors"""
     try:
@@ -216,16 +286,21 @@ def run_command(cmd, cwd=None, env=None, check=True, capture_output=False, show_
                 capture_output=True,
                 text=True
             )
+        elif show_output:
+            # Stream output in real-time, through Python so the build log gets it too (TASK-1894)
+            rc = run_streamed(cmd, cwd=cwd, env=env, shell=shell)
+            if check and rc != 0:
+                raise subprocess.CalledProcessError(rc, cmd)
+            result = subprocess.CompletedProcess(cmd, rc)
         else:
-            # Stream output in real-time for better visibility
             result = subprocess.run(
                 cmd,
                 cwd=cwd,
                 env=env,
                 check=check,
                 shell=shell,
-                stdout=None if show_output else subprocess.DEVNULL,
-                stderr=None if show_output else subprocess.DEVNULL,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
                 text=True
             )
         return result
@@ -2570,8 +2645,8 @@ def collect_pio_artifacts(project_dir, target, want_firmware=True, want_filesyst
             # TASK-1918 / ADR-239: no RTC_NOINIT record may sit in the 0x20 B at 0x50000200 that the safeboot
             # updater's bootloader load overwrites. The linker decides the order, so check the real ELF.
             if "bootloader_offset" in tcfg:
-                rc = subprocess.run([sys.executable, str(project_dir / "scripts" / "check_rtc_layout.py"),
-                                     str(elf_src)]).returncode
+                rc = run_streamed([sys.executable, str(project_dir / "scripts" / "check_rtc_layout.py"),
+                                   str(elf_src)])
                 if rc != 0:
                     print_error("RTC layout check failed (scripts/check_rtc_layout.py): see the lines above")
                     sys.exit(1)
@@ -2759,8 +2834,7 @@ def verify_flash_on_device(project_dir, target, port):
         cmd.extend([off, str(path)])
 
     print_step(f"Verifying on-device flash [{tcfg['name']}] via {port}")
-    result = subprocess.run(cmd, check=False)
-    if result.returncode != 0:
+    if run_streamed(cmd) != 0:
         print_error("verify-flash reported a mismatch; see esptool output above")
         return False
     print_success("verify-flash: on-device image matches build output")
@@ -3190,6 +3264,11 @@ def main():
     import atexit
     _lock = acquire_build_lock(Path(__file__).parent.resolve())
     atexit.register(release_build_lock, _lock)
+
+    # TASK-1894: the whole run, child tools included, also goes to build/logs/ (latest.log after the run).
+    _log_path = start_build_log(Path(__file__).parent.resolve())
+    atexit.register(stop_build_log, _log_path)
+    print_info(f"Build log: {_log_path} (copied to build/logs/latest.log at the end)")
 
     # Disable colors if requested or on Windows (unless ANSICON is present)
     if args.no_color or (platform.system() == "Windows" and not os.environ.get("ANSICON")):
