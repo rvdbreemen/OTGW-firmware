@@ -2,7 +2,9 @@ name: PlatformIO firmware build
 
 # 4B-H2: PR-time compile gate. Catches build breakage before merge so
 # evaluate.py-clean code that nevertheless fails to compile cannot
-# silently land. Runs all three ESP32-S3 targets in parallel.
+# silently land.
+# TASK-1929 (Robert, 2026-11-14): "Just build combo." CI compiles esp32-combo only (the default
+# build). esp32 and esp32-classic are no longer built remotely; locally: build --target all.
 
 on:
   pull_request:
@@ -32,7 +34,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        env: [esp32, esp32-classic, esp32-combo]
+        env: [esp32-combo]
 
     steps:
       - name: Checkout code

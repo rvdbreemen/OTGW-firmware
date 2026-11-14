@@ -322,7 +322,7 @@ The `build.py` script replicates the GitHub Actions CI/CD workflow locally:
 
 ## Continuous Integration
 
-The GitHub Actions workflow (`.github/workflows/main.yml`) uses the same Makefile and processes as this local build script, ensuring consistency between local and CI builds.
+The GitHub Actions workflow `.github/workflows/build.yml` compiles `esp32-combo` only (`pio run -e esp32-combo`), on every pull request and on every push to `dev` that changes more than docs (TASK-1626, TASK-1929). The `esp32` and `esp32-classic` targets are not built in CI; build them locally with `build --target all`.
 
 ## Further Reading
 
