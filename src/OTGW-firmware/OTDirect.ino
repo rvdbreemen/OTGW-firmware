@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTDirect.ino
-**  Version  : v2.0.0-beta.277
+**  Version  : v2.0.0-beta.278
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -2971,6 +2971,12 @@ static void resetTransientState() {
   }
   // BS= fake room setpoint — clear on reset
   otFakeRoomSetpoint = 0.0f;
+  // TASK-1807: the boiler value cache holds only answers given after the reset. A synthetic loopback answer or one
+  // from a boiler that has since gone kept otDirectBoilerPresent() and otIsVentSlave() true across GW=R and a switch
+  // into or out of master, loopback or bypass. A gateway <-> monitor switch does not come here (TASK-1839).
+  memset(otBoilerCache, 0, sizeof(otBoilerCache));
+  memset(otBoilerCacheValid, 0, sizeof(otBoilerCacheValid));
+  otdMsgId3FromBoiler = false;
 }
 
 // ---------------------------------------------------------------------------
@@ -3133,6 +3139,11 @@ static unsigned long buildOTResponse(uint8_t type, uint8_t msgId, uint16_t data)
 }
 
 static void handleMasterModeSlaveFrame(unsigned long frame) {
+  // TASK-1807: while the boiler is offline (its last MsgID 0 failed) the thermostat gets no answer, as from a
+  // boiler that is gone, instead of READ_ACKs with its last cached status (flame on, CH active). The frame is
+  // still logged. Offline ends at the next good MsgID 0, about 1 s later (TASK-1802).
+  if (!state.otBus.bOnline) { bridgeFrameToParser('T', frame); return; }
+
   uint8_t msgId = (frame >> 16) & 0xFF;
   uint8_t msgType = (frame >> 28) & 0x07;
 

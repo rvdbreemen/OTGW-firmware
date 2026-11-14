@@ -114,6 +114,7 @@ static void otdNoteThermostatFrame(unsigned long, uint32_t) {}
 static unsigned long buildOTResponse(uint8_t, uint8_t, uint16_t) { return 0; }
 static void bridgeFrameToParser(char, unsigned long) {}
 static bool otdSendReply(unsigned long) { return true; }   // TASK-1798 slave-gate holder, not under test here
+static bool otdMsgId3FromBoiler = false;   // TASK-1807: resetTransientState() clears the boiler cache and this marker
 static void resetTransientState();
 static void (*g_onSend)() = nullptr;   // runs once inside the first send
 static int g_sent = 0;

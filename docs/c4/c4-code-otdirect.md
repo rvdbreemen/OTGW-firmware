@@ -135,6 +135,7 @@ The OTDirect module operates as a cooperative OpenTherm stack layered on the pro
 #### `static void handleMasterModeSlaveFrame(unsigned long frame)`
 - **Purpose**: In master mode (standalone), respond to thermostat as if we ARE the boiler
 - **Behavior**:
+  - While the boiler is offline (`!state.otBus.bOnline`, its last MsgID 0 failed) it only logs the thermostat frame and sends no answer, so the thermostat sees the loss instead of the last cached status (TASK-1807)
   - Extracts msgId and msgType (bits 28-30)
   - If READ_DATA (type 0):
     - Returns cached boiler value via `buildOTResponse(4, msgId, cache)` (READ_ACK)
@@ -347,6 +348,7 @@ The OTDirect module operates as a cooperative OpenTherm stack layered on the pro
 #### `static void resetTransientState()`
 - **Purpose**: Clear all non-persisted transient state (called on GW=R and on a mode change into or out of master, loopback or bypass; not between gateway and monitor, TASK-1839)
 - **Behavior**:
+  - Clears the boiler value cache (`otBoilerCache[]`, `otBoilerCacheValid[]`) and the MsgID 3 source marker, so `otDirectBoilerPresent()` and `otIsVentSlave()` read only answers given after the reset (TASK-1807)
   - Resets operating mode overrides (MH, MW, M2)
   - Clears DHW push state machine
   - Disables summary mode

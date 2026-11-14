@@ -83,6 +83,9 @@ struct State { OtdState otd; }; static State state = {};
 struct OtdSettings { bool bEnableSlave; bool bSummerMode; };
 struct Settings { OtdSettings otd; }; static Settings settings = { { true, false } };
 static void otdPushEnd() {}
+static uint16_t otBoilerCache[128]; static bool otBoilerCacheValid[128];   // TASK-1807
+static bool otdMsgId3FromBoiler = false;
+#define IS_LOOPBACK_MODE() (otCurrentMode == OTD_MODE_LOOPBACK)
 static void clearAllResponseModifiers() {}
 static void sendWebSocketJSON(const char*) {}
 static bool updateSetting(const char*, const char*) { return true; }
@@ -99,6 +102,8 @@ int main(int argc, char** argv) {
   otResponseOverrides[0] = { 60, true, 258 };
   otOverrides[0].active = true; otOverrides[0].overrideValue = 40 * 256;
   otSchedule[1].valueSet = true; otSchedule[1].cachedValue = 40 * 256;
+  // TASK-1807: a boiler answered MsgID 3 (ventilation application, HB bits 6-7 = 11) before the switches
+  otBoilerCache[3] = 0xC00B; otBoilerCacheValid[3] = true; otdMsgId3FromBoiler = true;
   for (int i = 1; i < argc; i++) {
     if (argv[i][0] == 'R') resetTransientState();               // GW=R
     else setOTDirectMode((OTDirectMode)atoi(argv[i]));
@@ -106,6 +111,7 @@ int main(int argc, char** argv) {
   printf("hw=%d bit1=%d sr=%d cs=%d cache=%d flush=%d mode=%d\n", (int)otDHWOverride, (otMasterStatusFlags >> 1) & 1,
          (int)otResponseOverrides[0].active, (int)otOverrides[0].active, (int)otSchedule[1].valueSet,
          (int)otCmdFlushPending, (int)otCurrentMode);
+  printf("valid3=%d present=%d vent=%d\n", (int)otBoilerCacheValid[3], (int)otDirectBoilerPresent(), (int)otIsVentSlave());
   return 0;
 }
 """
@@ -118,10 +124,11 @@ class ModeChangeKeepsState(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        names = ("static void otdFlushCmdQueue() {", "static void resetTransientState() {",
+        names = ("static inline bool otIsVentSlave() {", "bool otDirectBoilerPresent() {",
+                 "static void otdFlushCmdQueue() {", "static void resetTransientState() {",
                  "static void applyOTDirectMode(OTDirectMode newMode) {", "static void setOTDirectMode(OTDirectMode newMode) {")
         parts = [func(SRC, h) for h in names]
-        if not all(parts[1:]):
+        if not all(parts[:2] + parts[3:]):
             cls.err = "resetTransientState / applyOTDirectMode / setOTDirectMode not found"
             return
         remote = struct(TYPES, "OTRemoteOverrideState")
@@ -169,6 +176,20 @@ class ModeChangeKeepsState(unittest.TestCase):
     def test_gw_r_still_clears_and_flushes(self):
         r = self.run_seq("R")
         self.assertEqual((r["hw"], r["sr"], r["cs"], r["cache"], r["flush"]), ("255", "0", "0", "0", "1"), r)
+
+    # --- TASK-1807 AC2: the boiler value cache holds only answers given after a reset ---
+    def test_gw_r_and_a_switch_into_master_loopback_or_bypass_clear_the_boiler_cache(self):
+        # Old code: the cache survived, so otDirectBoilerPresent() and otIsVentSlave() kept answering for a boiler that
+        # may be gone (or for loopback's synthetic MsgID 3).
+        for steps in (("R",), (3,), (4,), (0,), (4, 1), (3, 1)):
+            with self.subTest(steps=steps):
+                r = self.run_seq(*steps)
+                self.assertEqual((r["valid3"], r["present"], r["vent"]), ("0", "0", "0"), r)
+
+    def test_gateway_monitor_switch_keeps_the_boiler_cache(self):
+        # TASK-1839 answer A: a gateway <-> monitor switch keeps the state; the cache is refreshed live in both modes
+        r = self.run_seq(2, 1)
+        self.assertEqual((r["valid3"], r["present"], r["vent"]), ("1", "1", "1"), r)
 
     # --- source: the kept state is not applied in monitor mode, and the CS expiry clock runs in every mode ---
     def test_monitor_mode_relays_raw_and_the_reply_modifiers_are_gateway_only(self):
