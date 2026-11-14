@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-beta.283
+**  Version  : v2.0.0-beta.284
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -299,6 +299,7 @@ static bool parseMsgId(const char *token, uint8_t &msgId) {
   msgId = static_cast<uint8_t>(val);
   return true;
 }
+
 
 //=======================================================================
 // v2 API Route Dispatch Table (ADR-050)
@@ -1731,154 +1732,63 @@ static void handleSAT(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod m
   // POST /api/v2/sat/markers           — add marker; body: {"outside_temp":5.0,"flow_temp":55.0,"label":"optional"}
   // DELETE /api/v2/sat/markers/<id>    — delete marker by integer id
   else if (strcasecmp_P(sub, PSTR("markers")) == 0) {
-    static const char kSatMarkersFile[] PROGMEM = "/sat_markers.json";
-    static const int  kSatMarkersMax    = 20;
-    char fname[24];
-    strlcpy_P(fname, kSatMarkersFile, sizeof(fname));
-
-    // Stream one JSON object {…} from f into buf (nul-terminated).
-    // Advances past any leading whitespace/commas/'['. Returns false at ']' or EOF.
-    auto readObj = [](File& f, char* buf, size_t sz) -> bool {
-      while (f.available()) {
-        char c = (char)f.read();
-        if (c == '{') {
-          buf[0] = '{'; size_t n = 1; int depth = 1;
-          while (f.available() && depth > 0 && n < sz - 1) {
-            char c2 = (char)f.read();
-            buf[n++] = c2;
-            if (c2 == '{') depth++;
-            else if (c2 == '}') depth--;
-          }
-          buf[n] = '\0';
-          return depth == 0;
-        }
-        if (c == ']') return false;
-      }
-      return false;
-    };
-
-    if (method == HTTP_GET) {
-      // Stream file directly; return empty array if not present
-      if (!LittleFS.exists(fname)) {
-        webSend(200, F("application/json"), F("[]"));
-      } else {
-        webPushHeader(F("Cache-Control"), F("no-cache"));
-        webSendFile(fname, F("application/json"), /*gzip=*/false);
-      }
+    // TASK-1911: served from the RAM copy (// --- satMarkers block above); the loop task writes the file.
+    if (method != HTTP_GET && method != HTTP_POST && method != HTTP_DELETE) {
+      sendApiMethodNotAllowed(F("GET, POST, DELETE"));
+      return;
     }
-    else if (method == HTTP_POST) {
+    float ot = 0.0f, ft = 0.0f;
+    char lblBuf[32] = {0};
+    int delId = 0;
+    if (method == HTTP_POST) {
       // Parse outside_temp, flow_temp, optional label from JSON body
       if (!hasArgCompat(F("plain"))) { sendApiError(400, F("Missing JSON body")); return; }
       const char* body = bodyCompat();
-      char otBuf[10], ftBuf[10], lblBuf[32];
-      otBuf[0] = '\0'; ftBuf[0] = '\0'; lblBuf[0] = '\0';
+      char otBuf[10], ftBuf[10];
+      otBuf[0] = 0; ftBuf[0] = 0;
       extractJsonField(body, F("outside_temp"), otBuf, sizeof(otBuf));
       extractJsonField(body, F("flow_temp"),    ftBuf, sizeof(ftBuf));
       extractJsonField(body, F("label"),        lblBuf, sizeof(lblBuf));
-      float ot = atof(otBuf);
-      float ft = atof(ftBuf);
-      if (otBuf[0] == '\0' || ftBuf[0] == '\0' ||
+      ot = atof(otBuf);
+      ft = atof(ftBuf);
+      if (otBuf[0] == 0 || ftBuf[0] == 0 ||
           ot < -15.0f || ot > 25.0f || ft < 10.0f || ft > 90.0f) {
         sendApiError(400, F("outside_temp (-15..25) and flow_temp (10..90) required"));
         return;
       }
-      // Pass 1: stream existing file to count markers and find max id (~200-byte stack)
-      int mcount = 0, maxId = 0;
-      {
-        char objBuf[200];
-        File rf = LittleFS.open(fname, "r");
-        if (rf) {
-          while (readObj(rf, objBuf, sizeof(objBuf))) {
-            mcount++;
-            const char* idp = strstr(objBuf, "\"id\":");
-            if (idp) {
-              idp += 5; while (*idp == ' ') idp++;
-              int v = atoi(idp); if (v > maxId) maxId = v;
-            }
-          }
-          rf.close();
-        }
-      }
-      if (mcount >= kSatMarkersMax) {
-        sendApiError(409, F("Maximum markers (20) reached; delete one first"));
-        return;
-      }
-      int newId = maxId + 1;
-      time_t now = time(nullptr);
-      char entry[192];
-      for (char* lp = lblBuf; *lp; lp++) { if (*lp == '"' || *lp == '\\') *lp = '_'; }
-      snprintf_P(entry, sizeof(entry),
-        PSTR("{\"id\":%d,\"outside_temp\":%.1f,\"flow_temp\":%.1f,\"added\":%lu,\"label\":\"%s\"}"),
-        newId, ot, ft, (unsigned long)now, lblBuf);
-      // Pass 2: write existing markers + new entry to temp file, then rename
-      char tmpname[28];
-      strlcpy_P(tmpname, PSTR("/sat_markers.tmp"), sizeof(tmpname));
-      {
-        char objBuf[200];
-        File wf = LittleFS.open(tmpname, "w");
-        if (!wf) { sendApiError(500, F("Cannot write markers file")); return; }
-        wf.print('[');
-        bool first = true;
-        File rf = LittleFS.open(fname, "r");
-        if (rf) {
-          while (readObj(rf, objBuf, sizeof(objBuf))) {
-            if (!first) wf.print(',');
-            wf.print(objBuf);
-            first = false;
-          }
-          rf.close();
-        }
-        if (!first) wf.print(',');
-        wf.print(entry);
-        wf.print(']');
-        wf.close();
-      }
-      if (!LittleFS.rename(tmpname, fname)) {
-        sendApiError(500, F("Cannot finalize markers file")); return;
-      }
-      char resp[64];
-      snprintf_P(resp, sizeof(resp), PSTR("{\"status\":\"ok\",\"id\":%d}"), newId);
-      webSend(201, F("application/json"), resp);
-    }
-    else if (method == HTTP_DELETE) {
+      // quotes, backslashes and braces would break the stored JSON or the object scan
+      for (char* lp = lblBuf; *lp; lp++) { if (*lp == '"' || *lp == '\\' || *lp == '{' || *lp == '}') *lp = '_'; }
+    } else if (method == HTTP_DELETE) {
       // DELETE /api/v2/sat/markers/<id>
       if (wc < 6) { sendApiError(400, F("Missing marker id in path")); return; }
-      int delId = atoi(words[5]);
+      delId = atoi(words[5]);
       if (delId <= 0) { sendApiError(400, F("Invalid marker id")); return; }
-      File rf = LittleFS.open(fname, "r");
-      if (!rf) { sendApiError(404, F("No markers found")); return; }
-      char tmpname[28];
-      strlcpy_P(tmpname, PSTR("/sat_markers.tmp"), sizeof(tmpname));
-      File wf = LittleFS.open(tmpname, "w");
-      if (!wf) { rf.close(); sendApiError(500, F("Cannot write temp file")); return; }
-      wf.print('[');
-      bool first = true, found = false;
-      char objBuf[200];
-      while (readObj(rf, objBuf, sizeof(objBuf))) {
-        const char* idp = strstr(objBuf, "\"id\":");
-        int thisId = 0;
-        if (idp) { idp += 5; while (*idp == ' ') idp++; thisId = atoi(idp); }
-        if (thisId == delId) { found = true; continue; }
-        if (!first) wf.print(',');
-        wf.print(objBuf);
-        first = false;
-      }
-      wf.print(']');
-      rf.close();
-      wf.close();
-      if (!found) {
-        LittleFS.remove(tmpname);
-        sendApiError(404, F("Marker id not found"));
-        return;
-      }
-      if (!LittleFS.rename(tmpname, fname)) {
-        sendApiError(500, F("Cannot finalize markers file")); return;
-      }
-      webSend(200, F("application/json"), F("{\"status\":\"ok\"}"));
     }
-    else {
-      sendApiMethodNotAllowed(F("GET, POST, DELETE"));
+    if (!satMarkersLock(100)) { sendApiError(503, F("Markers busy, retry")); return; }
+    if (method == HTTP_GET) {
+      webPushHeader(F("Cache-Control"), F("no-cache"));
+      webSend(200, F("application/json"), satMarkersJsonLocked());   // webSend copies the body before the unlock
+    } else if (method == HTTP_POST) {
+      int mcount = 0, maxId = 0;
+      satMarkersScanLocked(mcount, maxId);
+      const int newId = maxId + 1;
+      char entry[192];
+      snprintf_P(entry, sizeof(entry),
+        PSTR("{\"id\":%d,\"outside_temp\":%.1f,\"flow_temp\":%.1f,\"added\":%lu,\"label\":\"%s\"}"),
+        newId, ot, ft, (unsigned long)time(nullptr), lblBuf);
+      const int r = satMarkersAppendLocked(entry, mcount);
+      if (r == 1)      sendApiError(409, F("Maximum markers (20) reached; delete one first"));
+      else if (r != 0) sendApiError(500, F("Cannot store marker"));
+      else {
+        char resp[64];
+        snprintf_P(resp, sizeof(resp), PSTR("{\"status\":\"ok\",\"id\":%d}"), newId);
+        webSend(201, F("application/json"), resp);
+      }
+    } else {
+      if (satMarkersDeleteLocked(delId)) webSend(200, F("application/json"), F("{\"status\":\"ok\"}"));
+      else                               sendApiError(404, F("Marker id not found"));
     }
+    satMarkersUnlock();
   }
   // --- TASK-587: DS18B20 sensor-to-SAT-area mapping ---
   // GET   /api/v2/sat/sensor-areas         — return all 4 area mappings as JSON

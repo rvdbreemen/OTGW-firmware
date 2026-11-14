@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.ino
-**  Version  : v2.0.0-beta.283
+**  Version  : v2.0.0-beta.284
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -344,6 +344,7 @@ void setup() {
   loadOtSupportFiles();  // TASK-693 port: warm the in-RAM support bitmaps from prior-boot knowledge
   loadDHWWaterMeter();   // TASK-1123: restore the DHW water total before any OT frame is decoded
   loadDallasLabels();    // TASK-1912: the labels REST serves from RAM, read before the web server starts
+  loadSatMarkers();      // TASK-1911: the markers REST serves from RAM too
 
   // Set hostname ASAP after loading settings.  WiFi.persistent(true) from a
   // previous boot lets the SDK auto-connect before startWiFi() is reached;

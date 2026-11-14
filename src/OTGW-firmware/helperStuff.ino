@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : helperStuff
-**  Version  : v2.0.0-beta.283
+**  Version  : v2.0.0-beta.284
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -263,6 +263,7 @@ void loopLittleFSStatus() {
     refreshLittleFSFileFlags();
   }
   loopDallasLabels();   // TASK-1912: write a changed labels copy (cheap when nothing changed)
+  loopSatMarkers();     // TASK-1911: and a changed markers copy
   if (DUE(fsMountCheck) && LittleFSmounted) {
     LittleFSmounted = platformFSInfo(LittleFSinfo);
   }
@@ -849,6 +850,7 @@ void doRestart(const char* str) {
   uint32_t t = millis();
   flushSettings();        // persist any pending settings before reboot
   flushDallasLabels();    // TASK-1912: and a pending sensor label edit
+  flushSatMarkers();      // TASK-1911: and a pending calibration marker edit
   DebugTf(PSTR("[reboot]   flushSettings: %lums\r\n"), (unsigned long)(millis() - t));
 
   flushDHWWaterMeter();   // TASK-1123: an orderly restart loses no litres of the DHW water total

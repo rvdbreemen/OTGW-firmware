@@ -4046,7 +4046,7 @@ static void satLoadEstimatedEnergy()
 // hourly energy timer, the 0.1 kWh estimate boundary, the 5 min PID timer) live in
 // the callers, so nothing here can skip a write. RAM is fresher than the files
 // were: energy is only saved hourly.
-// What it does not cover: /sat_markers.json has no RAM copy (the update server
+// What it does not cover: /sat_markers.json (its RAM copy, TASK-1911, is written by loopSatMarkers(); the update server
 // keeps it on the heap) and /sat/sat_cycles.json is never written by the firmware.
 // TASK-1771: true once initSAT() has loaded the SAT state files into RAM. setup() starts the web
 // server before initSAT(), so a filesystem upload or a reboot request can arrive while RAM still holds

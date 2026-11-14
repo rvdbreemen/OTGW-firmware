@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v2.0.0-beta.283
+**  Version  : v2.0.0-beta.284
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -224,7 +224,17 @@ bool dallasLabelsLock(uint32_t waitMs);
 void dallasLabelsUnlock();
 const char* dallasLabelsJson();
 void dallasLabelsReplaceLocked(const char* json, size_t len);
-void dallasLabelsFileChanged(const char* path);   // FSexplorer uploaded or deleted path
+void dallasLabelsFileChanged(const char* path);
+void loadSatMarkers();              // TASK-1911: RAM copy of /sat_markers.json (restAPI.ino)
+void flushSatMarkers();
+void loopSatMarkers();
+void satMarkersFileChanged(const char* path);     // FSexplorer uploaded or deleted path
+bool satMarkersLock(uint32_t waitMs);              // REST side of the markers copy (satMarkers.ino)
+void satMarkersUnlock();
+const char* satMarkersJsonLocked();
+void satMarkersScanLocked(int& count, int& maxId);
+int  satMarkersAppendLocked(const char* entry, int count);   // 0 ok, 1 full, 2 no room
+bool satMarkersDeleteLocked(int id);   // FSexplorer uploaded or deleted path
 void loopLittleFSStatus();   // TASK-1865: mount check + write probe on the loop task, not in /api/v2/health
 // Longest reboot-log line incl. CRLF and NUL: a core-dump detail line with all 16 backtrace frames the ESP-IDF
 // summary holds is 236 chars ("Core dump: " + task (15) + pc + elf + "bt=" + 16 PCs + "!\r\n"; TASK-1538).

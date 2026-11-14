@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program : FSexplorer
-**  Version  : v2.0.0-beta.283
+**  Version  : v2.0.0-beta.284
 **
 **  Mostly stolen from https://www.arduinoforum.de/User-Fips
 **  For more information visit: https://fipsok.de
@@ -474,6 +474,7 @@ void apilistfiles()
       webSend(404, F("text/plain"), F("File not found"));
     } else if (LittleFS.remove(deletePath)) {
       dallasLabelsFileChanged(deletePath);   // TASK-1912: the labels RAM copy follows the file
+      satMarkersFileChanged(deletePath);     // TASK-1911: the markers RAM copy follows the file
       webSend(200, F("text/plain"), F("File deleted"));
     } else {
       webSend(500, F("text/plain"), F("Delete failed"));
@@ -599,6 +600,7 @@ bool handleFile(String&& rawPath)
     DebugTf(PSTR("Delete -> [%s]\n\r"), argCompat("delete"));
     LittleFS.remove(argCompat("delete"));    // Datei löschen
     dallasLabelsFileChanged(argCompat("delete"));   // TASK-1912: the labels RAM copy follows the file
+    satMarkersFileChanged(argCompat("delete"));     // TASK-1911: the markers RAM copy follows the file
     sendFSexplorerRedirect();
     return true;
   }
@@ -743,6 +745,7 @@ void handleFileUpload(AsyncWebServerRequest *request, const String &filename,
   {
     if (request->_tempFile) {
       dallasLabelsFileChanged(request->_tempFile.path());   // TASK-1912: the labels RAM copy follows the file
+      satMarkersFileChanged(request->_tempFile.path());     // TASK-1911: the markers RAM copy follows the file
       request->_tempFile.close();
       DebugT(F("FileUpload Size: ")); Debugln((String)(index + len));
     }

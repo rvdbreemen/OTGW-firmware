@@ -319,6 +319,7 @@ static int strcasecmp_P(const char* a, const char* b) {
 }
 const String& contentType(String& filename) { filename = "text/plain"; return filename; }
 void dallasLabelsFileChanged(const char*) {}   // TASK-1912: handleFile()'s delete tells the labels copy
+void satMarkersFileChanged(const char*) {}     // TASK-1911: and the markers copy
 #include "gzip_pages.inc"
 #endif
 static void reset() {

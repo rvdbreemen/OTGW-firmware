@@ -150,7 +150,7 @@ class TestKeepList(unittest.TestCase):
         """A rename in a writer must not leave the keep list pointing at a dead name."""
         writers = {
             "/dallas_labels.ini": ("sensors_ext.ino", "dallas_labels.ini"),
-            "/sat_markers.json": ("restAPI.ino", "/sat_markers.json"),
+            "/sat_markers.json": ("satMarkers.ino", "/sat_markers.json"),
             "/reboot_count.txt": ("helperStuff.ino", "/reboot_count.txt"),
             "/reboot_log.txt": ("helperStuff.ino", "/reboot_log.txt"),
         }
