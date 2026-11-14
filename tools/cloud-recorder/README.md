@@ -71,3 +71,29 @@ Chosen (in `otrec.py`): **OT and SAT every 300 s, debug every 60 s, and any batc
 - Rate: one gateway makes 12 + 12 + 60 = 84 requests per hour (1.4 per minute) against the limit of 30 per
   minute. After an outage the gateway resends its backlog at no more than 25 per minute: two hours offline is
   168 batches, about 7 minutes to catch up.
+
+## One stream, all three on a fixed interval (`mix`, fmt 4; measured 2026-11-14, `mix_study.py`)
+
+One record per interval holds an OT section, a SAT section and a debug section (`otrec.pack_mix`). The gateway
+keeps one record buffer and sends it at every interval boundary, or earlier when the next item would not fit.
+The SAT section is a 16 B stand-in every 38 s until the SAT encoder exists. One hour of data per profile,
+fresh local PocketBase, `?fields=id` replies:
+
+| Profile | Records/h | Sent early | Largest record | Sent/h | Database/h | OT decoded identical |
+|---|---|---|---|---|---|---|
+| PSRAM, 60 s, full debug (~3 KB/s text), zlib | 60 | 0 | 22.1 KB | 1.75 MB | 1.78 MB | yes |
+| No PSRAM, 60 s, 4 KB buffer, debug ~0.3 KB/s, no compression | 60 | 0 | 3.8 KB | 301 KB | 291 KB | yes |
+| No PSRAM, 60 s, 4 KB buffer, full debug, no compression | 480 | 420 | 4.1 KB | 2.49 MB | 2.47 MB | yes |
+
+- **Every board: one record every 60 s.** Compared with separate streams (OT 300 s + debug 60 s), the gateway
+  keeps one buffer and makes 60 instead of 72 requests per hour for the same bytes.
+- **Without PSRAM the fixed interval holds only with limited debug.** With the 4 KB buffer of ADR-213, debug up
+  to about 0.3 KB/s of text (about 3 lines/s) fits; with full debug the buffer fills every ~8 s (420 early sends
+  per hour, 8 requests per minute, still under the limit of 30), and nothing is lost.
+- **Without PSRAM there is no TLS** (ADR-218: the two 16.7 KB mbedTLS record buffers do not fit the 31.7 KB
+  largest block, 14 of 14 handshakes failed). Such a board sends plain HTTP to the collection point on its own
+  LAN (`http://<nas>:8090`), not through the tunnel. Over the internet only PSRAM boards can send.
+- No compression on a board without PSRAM: zlib's compressor state is too large for the heap there. A small
+  compressor (heatshrink, about 1 KB) was not measured.
+- Export: `export_batches.py ... --stream mix` reads the OT section. Round trip with 59 mix records (one left
+  out): 9,253 frames identical, one gap line.

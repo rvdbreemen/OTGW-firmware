@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-14T15:21:00Z'
-updated_date: '2026-11-14T16:34:00Z'
+updated_date: '2026-11-14T17:02:00Z'
 labels:
   - diagnostics
   - tooling
@@ -44,4 +44,6 @@ Robert 2026-11-14 (session): he has a domain on Cloudflare and asks for help to 
 2026-11-14 export tool and debug sizing (branch research/cloud-recording). Round trip: simulate_gateway.py 30 min, 300 s batches, batch 3 skipped -> 5 batches, 3,920 frames, 4,683 B (1.19 B/frame); export_batches.py -> 3,920 frames identical in ms time, letter and frame, one '# gap: batches 3..3 missing' line. Real replay code (tests/test_replay_timing.py harness from OTGW-Core.ino) on the first 400 exported lines: 400/400 dispatched as bare frames, mode=timed, 0 ms deviation. Debug sizing (dbg_size_study.py, 985 real format strings, generated values): at ~3 KB/s text 104 B/line, text+zlib 36, address token 16, token+zlib 12 (0.9 GB per gateway-month); largest 60 s token+zlib batch 21.7 KB -> payload max raised 16384 -> 65536 chars. Fresh-database run: test_client 1-6 PASS (7 needs the tunnel); 25 paced 13.3 KB dbg batches 200; burst of 40 -> 30x200, 10x429; 65,600 chars 400, 65,536 chars 200.
 
 2026-11-14 batch size measured (batch_size_study.py, 1 h of data per variant, fresh local PocketBase, keep-alive): OT per line (50/batch request) 189 req, 1,750 KB sent, 1,634 KB db, 24.7 ms/req; OT 10 s 193 KB / 98 KB; 60 s 49 / 29 KB; 300 s 20.6 KB sent, 3.3 KB received, 16 KB db; 900 s 14.9 / 16 KB. Debug 10 s 1,977 / 1,933 KB; 30 s 1,773 / 1,868; 60 s 1,725 / 1,745; 120 s 1,696 / 1,720. Found: the create reply echoed the whole payload (received = sent); ?fields=id cuts it to about 275 B per request. Chosen: OT and SAT 300 s, debug 60 s, early flush at 48 KiB (otrec.BATCH_SECONDS, MAX_PAYLOAD_BYTES, CREATE_PATH); 84 requests/h per gateway vs 30/min limit; backlog resend paced at <=25/min. Regression after the change: test_client 1-6 PASS (batch now in the real otrec fmt 1, 786 frames decode), round trip 60 min at 300 s: 8,626 frames identical, one gap note.
+
+2026-11-14 Robert: one stream with all three on fixed intervals, also for boards without PSRAM. Built mix records (fmt 4, stream 'mix': OT/SAT/debug sections in one record per interval; otrec.pack_mix/unpack_mix; schema select gains 'mix'; export_batches.py --stream mix). Found and fixed: the OT section decoded every frame at the record t0 (codec assumes the first frame at t0); the section now starts with the offset of its first frame. mix_study.py, 1 h per profile, fresh local PocketBase: PSRAM 60 s full debug zlib: 60 rec/h, 0 early, max 22.1 KB, 1.75 MB sent, 1.78 MB db; no PSRAM 60 s 4 KB buffer debug 0.3 KB/s: 60 rec/h, 0 early, max 3.8 KB, 301 KB sent, 291 KB db; no PSRAM full debug: 480 rec/h, 420 early, max 4.1 KB, 2.49 MB sent; OT decoded identical in all three. End to end: 59 mix records posted (one left out), export --stream mix: 9,253 frames identical, one gap line. Boards without PSRAM: no TLS (ADR-218), so plain HTTP to the NAS on the LAN only.
 <!-- SECTION:NOTES:END -->

@@ -32,7 +32,7 @@ migrate((app) => {
     createRule: '@request.auth.collectionName = "devices" && @request.body.device = @request.auth.id',
     fields: [
       { name: "device", type: "relation", collectionId: devices.id, maxSelect: 1, required: true, cascadeDelete: true },
-      { name: "stream", type: "select", values: ["ot", "sat", "dbg"], maxSelect: 1, required: true },
+      { name: "stream", type: "select", values: ["ot", "sat", "dbg", "mix"], maxSelect: 1, required: true },
       { name: "seq", type: "number", onlyInt: true, min: 0 },            // per device and stream, counts up
       { name: "t0", type: "number", onlyInt: true, required: true },     // epoch ms of the first record
       { name: "fmt", type: "number", onlyInt: true, min: 1, max: 255, required: true },

@@ -67,10 +67,15 @@ def write_otframes(batches, path, tz):
                 f.write(f"# gap: batches {prev + 1}..{b['seq'] - 1} missing\n")
                 gaps += 1
             prev = b["seq"]
-            if b["fmt"] != otrec.FMT_OT_V1:
+            raw = base64.b64decode(b["payload"])
+            if b["fmt"] == otrec.FMT_OT_V1:
+                frames = otrec.unpack_ot(b["t0"], raw)
+            elif b["fmt"] == otrec.FMT_MIX_V1:
+                frames = otrec.unpack_mix(b["t0"], raw).get(otrec.SEC_OT, [])
+            else:
                 f.write(f"# batch {b['seq']}: unknown fmt {b['fmt']}, skipped\n")
                 continue
-            for t, letter, fr in otrec.unpack_ot(b["t0"], base64.b64decode(b["payload"])):
+            for t, letter, fr in frames:
                 ts = datetime.datetime.fromtimestamp(t / 1000, tz)
                 f.write(f"{ts.isoformat(timespec='milliseconds')}\t{ts.strftime('%H:%M:%S.%f')}\t{letter}\t{fr:08X}\n")
                 frames_out += 1
@@ -87,6 +92,7 @@ def main():
     ap.add_argument("--since")
     ap.add_argument("--until")
     ap.add_argument("--tz", default="Europe/Amsterdam")
+    ap.add_argument("--stream", default="ot", choices=["ot", "mix"], help="ot records, or mix records (OT section)")
     a = ap.parse_args()
     base = a.base.rstrip("/")
     token = api(base, "/api/collections/_superusers/auth-with-password", None,
@@ -95,7 +101,7 @@ def main():
     found = api(base, f"/api/collections/devices/records?{q}", token)["items"]
     if not found:
         sys.exit(f"device {a.device_email} not found")
-    batches = fetch_batches(base, token, found[0]["id"], "ot", a.since, a.until)
+    batches = fetch_batches(base, token, found[0]["id"], a.stream, a.since, a.until)
     n, gaps = write_otframes(batches, a.out, ZoneInfo(a.tz))
     print(f"{len(batches)} batches, {n} frames, {gaps} gaps -> {a.out}")
 
