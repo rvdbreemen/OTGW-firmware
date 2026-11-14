@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v2.0.0-beta.262
+**  Version  : v2.0.0-beta.263
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -603,6 +603,10 @@ struct HeapDiagSection {                 // state.heapdiag — cumulative heap-p
   uint32_t iAckLowMin              = 0xFFFFFFFF;
   uint32_t iAckLowFreeBefore       = 0;
   uint32_t iAckLowHits             = 0;
+  // TASK-1870.1: ipc0/ipc1 stack bytes free at the low point, taken right after the hardware detection
+  // in setup(); -1 when not taken (no runtime detection, or the task was not found).
+  int32_t  iIpc0StackMinHwDetect   = -1;
+  int32_t  iIpc1StackMinHwDetect   = -1;
   uint8_t  iAckLowFiles            = 0;  // file streams admitted at that moment
   uint16_t iTcpActivePcbs          = 0; // lwIP active TCP PCB count, sampled 1 Hz from the loop task (platformTcpActivePcbCount)
 };

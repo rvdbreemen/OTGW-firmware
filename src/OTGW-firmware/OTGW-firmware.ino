@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.ino
-**  Version  : v2.0.0-beta.262
+**  Version  : v2.0.0-beta.263
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -502,8 +502,11 @@ void setup() {
   appendBootDetectLog();
   // TASK-1870: IPC stack low point after the PIC probe, next to the one after full init below,
   // so a bench log shows which boot phase uses the ipc0/ipc1 stacks (ADR-225).
+  // TASK-1870.1: kept in state as well, because this line prints before a telnet client can connect.
+  state.heapdiag.iIpc0StackMinHwDetect = platformIpcStackHighWater("ipc0");
+  state.heapdiag.iIpc1StackMinHwDetect = platformIpcStackHighWater("ipc1");
   SetupDebugf(PSTR("boot: ipc stack free min after hw detect ipc0=%ld ipc1=%ld B\r\n"),
-              (long)platformIpcStackHighWater("ipc0"), (long)platformIpcStackHighWater("ipc1"));
+              (long)state.heapdiag.iIpc0StackMinHwDetect, (long)state.heapdiag.iIpc1StackMinHwDetect);
 #else
   // UART0 was muted at the top of setup() (TASK-1131, TASK-1217).
   detectPIC();

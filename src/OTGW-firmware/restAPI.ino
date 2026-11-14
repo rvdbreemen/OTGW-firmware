@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-beta.262
+**  Version  : v2.0.0-beta.263
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -3498,6 +3498,8 @@ void sendDeviceInfoV2()
     je.field(F("hd_mqtt_queue_hwm"),       (uint32_t)snap->st.heapdiag.iMqttQueueHwm);
     je.field(F("hd_ipc0_stack_min"),       snap->ipc0StackMin);   // TASK-1865 / ADR-225: IPC stack headroom
     je.field(F("hd_ipc1_stack_min"),       snap->ipc1StackMin);
+    je.field(F("hd_ipc0_stack_min_hwdetect"), snap->st.heapdiag.iIpc0StackMinHwDetect);  // TASK-1870.1: boot phase
+    je.field(F("hd_ipc1_stack_min_hwdetect"), snap->st.heapdiag.iIpc1StackMinHwDetect);
     je.field(F("hd_ack_low_min"),          snap->st.heapdiag.iAckLowMin == 0xFFFFFFFF ? 0u : snap->st.heapdiag.iAckLowMin);
     je.field(F("hd_ack_low_free_before"),  snap->st.heapdiag.iAckLowFreeBefore);
     je.field(F("hd_ack_low_hits"),         snap->st.heapdiag.iAckLowHits);
