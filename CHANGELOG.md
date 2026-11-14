@@ -5,6 +5,30 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [2.0.0-beta.237] - 2026-11-14
+
+### Added
+- SAT heating curve self-tune progress, telemetry only (decision, thresholds and window file unchanged): every hour that does not count is counted per reason; REST `/api/v2/sat/status` object `curve_tune`; with curve self-tune on, 17 flat MQTT topics `sat/curve_tune/{running,days,clean_hours_today,last_decision,last_reason}` and `sat/curve_tune/excluded_hours/<reason>` (not retained, no discovery); the heating curve card shows the progress (TASK-1881).
+- SAT simulation prints one note per run when the default simulated house puts thermal learning out of range, and names the recipe `satsimcoolrate 0.016` and `satsimheatrate 0.08`; the recipe is in the manual (TASK-1891).
+
+### Changed
+- SAT: the gateway's own MsgID 27 Write-Data (a PIC with a DS18B20 or an `OT=` value on a boiler without MsgID 27) now counts as a fresh outside temperature source, with the 1-hour validity of entry 57 and the order of entry 139 (Robert entry 330, Sergeant D entry 331; TASK-1896). A replayed line, a parity error, an A frame, the PS=1 summary and a gateway-made loopback B Read-Ack 27 never stamp.
+- SAT: the weather fetch is skipped only for a fresh boiler MsgID 27 value that is not 0.0, no longer for any non-zero outside value in the OpenTherm state (TASK-1897).
+- Web UI: the SAT control loop chart panel titles read Modulation and Flame, with their own texts in en, nl, de and el; the Monitor graph is unchanged (TASK-1885).
+- Build: AsyncTCP 3.4.10 gets upstream commit 7befe25 (an aborted connection in the accept callback is reported as ERR_ABRT) through the pre-build library patch, hash-checked (ADR-232; TASK-1746.1).
+- `settings.ini`, `reboot_count.txt` and the reboot log are written to a temporary file and committed with a size check and a rename; a short write or a failed rename keeps the old file, and a save needs room for both files. A stale `/settings.tmp` is removed at boot and is behind the admin password in the file explorer (TASK-1913).
+- OT-Direct: a `CS=` or `C2=` override lives 63.5 s like the PIC, not 60 s (TASK-1834). A `CS=` or `C2=` below 8 C does not expire, as on the PIC (TASK-1917).
+- OT-Direct master mode: a thermostat MsgID 1 write above 0 expires after the same 63.5 s window, whatever its value, and a write of 0 releases the override like `CS=0`; the latest write wins between `CS=` and the thermostat, so a thermostat TSet of 0 also ends a `CS=` set by hand; nothing changes while SAT owns the setpoint (TASK-1811).
+
+### Fixed
+- `/api/v2/simulate` and `device/info` no longer call LittleFS on the async_tcp task; the two file flags are refreshed on the loop task every 10 s, and a test fails on any LittleFS call in a REST handler that is not on the counted list (TASK-1899).
+- A filesystem update that starts during `setup()` no longer loses the reboot counter and the boot line: both are written before the web server starts, and the LittleFS mount callers skip while an image is being written (TASK-1909).
+- Auto board mode on an OTGW Classic keeps the PIC UART open after a missed boot probe, so the per-minute `PR=A` probe can find a PIC that comes up late; the UART is closed only right before OT-Direct starts (ADR-201 unchanged; TASK-1790).
+- The first Dallas reading after boot, and after a sensor brown-out, no longer publishes the power-on value 85.0 (TASK-1824).
+- `GET` and `POST /api/v2/sensors/labels` work on a copy in memory and the loop task writes `/dallas_labels.ini`, so a save no longer makes the next `GET` answer 503; an upload or delete of that file in the file explorer reloads the copy (TASK-1912).
+- OT-Direct: `CS=0` and `C2=0` release, and so does a value that rounds to zero in the OpenTherm format (`CS=0.001`), instead of becoming a permanent 0 C override (TASK-1917).
+- OT-Direct: a boiler Data-Invalid answer to MsgID 99 starts a pending `HW=P` push, as on the PIC (TASK-1907).
+
 ## [2.0.0-beta.224] - 2026-11-13
 
 ### Added
@@ -910,7 +934,8 @@ Legacy release. See git history for details.
 
 Legacy releases. See git history for details.
 
-[Unreleased]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.224...HEAD
+[Unreleased]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.237...HEAD
+[2.0.0-beta.237]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.224...v2.0.0-beta.237
 [2.0.0-beta.224]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.218...v2.0.0-beta.224
 [2.0.0-beta.218]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.203...v2.0.0-beta.218
 [2.0.0-beta.203]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.174...v2.0.0-beta.203
