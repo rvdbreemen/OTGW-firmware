@@ -4555,7 +4555,8 @@
    "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1571100242093547533",
    "supersedes": [],
    "tasks": [
-    "TASK-1924"
+    "TASK-1924",
+    "TASK-1933"
    ],
    "confirmed_by_entry": null
   }

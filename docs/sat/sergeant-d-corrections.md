@@ -7177,4 +7177,4 @@ Asked by DM (through the coordinator) whether the repeat is 60 s or 30 s, given 
 
 **Open:** (1) the simulation check (toggling against the entry-327 entry rule, starts per day) before it ships; (2) whether the rule also applies while PWM is not ON (thermo-nova's underheat exit only runs while PWM status is ON, `heating_control.py:321-323`); (3) "boiler temperature" read as the flow temperature, as in entries 22 and 327.
 
-**Task:** to be filed (follows TASK-1924's lane).
+**Task:** TASK-1933 (lane d3, after TASK-1924).
