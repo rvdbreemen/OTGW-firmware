@@ -120,6 +120,22 @@ int main(int argc, char **argv) {
     std::string got = run({{POWER, 60000}, {USB, 3000}, {SYSBROWNOUT, 3000}, {USB, 3000}, {SYSBROWNOUT, 3000}}, f);
     return report("P6", !f[1] && !f[2] && !f[3] && !f[4], "USB resets and system brown-outs never force the portal", got);
   }
+  if (c == "P7") {   // flash wear and clearing: the counter lives in NVS (platformRtcWrite = Preferences)
+    g_nvs.clear();
+    g_nvsWrites = 0;
+    boot(POWER, 60000);                       // one ordinary power-on: count 1, then cleared after the window
+    const int powerOnWrites = g_nvsWrites;
+    WifiPortalResetState st = {0, 0};
+    const bool cleared = readWifiPortalResetState(st) && st.magic == WIFI_PORTAL_RESET_MAGIC && st.resetCount == 0;
+    g_nvsWrites = 0;
+    boot(SOFTWARE, 60000);                    // a software reset with the count already 0: no write at all
+    const int swWrites = g_nvsWrites;
+    char got[160];
+    snprintf(got, sizeof(got), "power-on: %d NVS writes, count after the window %s; software reset: %d writes",
+             powerOnWrites, cleared ? "0" : "NOT 0", swWrites);
+    return report("P7", powerOnWrites <= 2 && cleared && swWrites == 0,
+                  "a power-on costs at most 2 NVS writes and leaves the count 0 after the window; a software reset 0", got);
+  }
   printf("unknown case %s\n", c.c_str());
   return 2;
 }

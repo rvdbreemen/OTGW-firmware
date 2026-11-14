@@ -20,6 +20,7 @@ Cases:
   P4  the counter fed ESP_RST_EXT (ESP8266 semantics) forces the portal on the third
   P5  three power-ons (pull the plug three times) within the window force the portal (ADR-238)
   P6  USB resets and system brown-outs (0x0F) never force the portal
+  P7  the counter lives in NVS: a power-on costs at most 2 writes and is cleared after the window; a software reset 0
 
 Exit code: 0 PASS (fix all green; with --old-rev also the old code red on P1 and P5), 1 FAIL, 2 harness error.
 """
@@ -32,8 +33,8 @@ from test_ot_reserved_range import GEN, HERE, REPO, find_vcvars
 
 INO = "src/OTGW-firmware/OTGW-firmware.ino"
 PLAT = "src/libraries/Platform/src/platform_esp32.h"
-CASES = ["P1", "P2", "P3", "P4", "P5", "P6"]
-EXPECT_OLD = {"P1": "FAIL", "P2": "pass", "P3": "pass", "P4": "pass", "P5": "FAIL", "P6": "pass"}   # the dead path
+CASES = ["P1", "P2", "P3", "P4", "P5", "P6", "P7"]
+EXPECT_OLD = {"P1": "FAIL", "P2": "pass", "P3": "pass", "P4": "pass", "P5": "FAIL", "P6": "pass", "P7": "pass"}   # the dead path
 EXPECT_FIX = {c: "pass" for c in CASES}                                                             # ADR-238
 
 
