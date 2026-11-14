@@ -48,7 +48,7 @@ One row per Architecture Decision Record. Scope is the Enforcement `path_glob` s
 | ADR-040 | Accepted | - | Implement additive source-specific MQTT topics and Home Assistant discovery entries, controlled by an opt-in setting... |
 | ADR-041 | Accepted | - | Drop Path A from all automatic triggers. |
 | ADR-042 | Superseded | - | Never use ArduinoJson in this firmware. |
-| ADR-043 | Accepted | - | Implement a triple-reset trigger within a 10-second window to force WiFi recovery mode: |
+| ADR-043 | Superseded | - | Implement a triple-reset trigger within a 10-second window to force WiFi recovery mode: |
 | ADR-044 | Accepted | - | Use extern declarations in the header and a single definition in the owning .ino file. |
 | ADR-045 | Superseded | - | Implement processPSSummary() that fully parses PS=1 summary lines and publishes each field through the existing decod... |
 | ADR-046 | Accepted | - | Treat PS=1 as a dedicated summary-translation path with shared publish/state helpers, not as a synthetic raw-frame ad... |
@@ -237,8 +237,8 @@ One row per Architecture Decision Record. Scope is the Enforcement `path_glob` s
 | ADR-230 | Accepted | - | The floating phase votes only when its data in the window is at least 1 hour: its signal ticks over the counted days... |
 | ADR-231 | Accepted | - | On a gas boiler, a tick in SAT PWM is a warm-up tick of the self-tune, and the PWM-related exclusions do not drop its... |
 | ADR-232 | Accepted | - | Carry 7befe25 as a build-time patch on the registry copy of AsyncTCP 3.4.10, applied by scripts/patchpiolibs.py: |
-| ADR-233 | Proposed | - | At the start of a filesystem OTA the firmware copies settings.ini, rebootcount.txt and rebootlog.txt, in that order,... |
+| ADR-233 | Accepted | - | At the start of a filesystem OTA the firmware copies settings.ini, rebootcount.txt and rebootlog.txt, in that order,... |
 | ADR-235 | Proposed | - | SAT sends CS= when the value it sends, rounded to 0.1, changes, and repeats an unchanged CS= every 30 s, timed on raw... |
 | ADR-237 | Proposed | `build.py` | The buildfs step runs with PLATFORMIOBUILDDIR=.pio/build-fs (piofsbuildroot(), build.py:2488), so .pio/build keeps on... |
-| ADR-238 | Proposed | - | On the ESP32-S3 a boot counts towards the triple-reset WiFi recovery when it is a reset-button press or a power-on (E... |
-| ADR-239 | Proposed | - | The first 32 bytes of RTC slow memory (0x50000200-0x5000021F) belong to the safeboot updater: the main firmware holds... |
+| ADR-238 | Accepted | - | On the ESP32-S3 a boot counts towards the triple-reset WiFi recovery when it is a reset-button press or a power-on (E... |
+| ADR-239 | Accepted | - | The first 32 bytes of RTC slow memory (0x50000200-0x5000021F) belong to the safeboot updater: the main firmware holds... |

@@ -157,6 +157,7 @@ ADRs live in `docs/adr/`. Read relevant ADRs before architecture, NFR, API contr
 - **ADR-177**: Keep the PIC byte stream verbatim from the serial task to every consumer (gated by the adr-judge declarative rules on the raw-path files)
 - **ADR-201**: Combo board detection persists only a positive PIC verdict and re-probes every boot (gated by `tests/test_board_detect_persist_gate.py`, which compiles the real detection blocks and fails on a mutant that persists a no-PIC verdict)
 - **ADR-217**: While SAT is enabled the Classic port 25238 bridge filters inbound lines and drops CV control commands and binary data; byte-transparent with SAT off (gated by `tests/test_bridge25238_sat_filter.py`, which compiles the real `handlePICSerial()` and fails on the code from before the ADR)
+- **ADR-239**: The first 32 bytes of RTC slow memory belong to the safeboot updater: the main firmware holds them with the `g_rtcSafebootGuard` guard in `.rtc.data` and keeps every RTC_NOINIT record at 0x50000220 or higher (gated by `scripts/check_rtc_layout.py`, which build.py runs on every ESP32 ELF, and `tests/test_rtc_layout_check.py`)
 
 **Structural / architectural ADRs** (reviewed at PR, no automated gate — see ADR-080):
 - **ADR-044**: Single-point-of-instantiation for globals

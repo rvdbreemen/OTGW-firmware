@@ -1310,9 +1310,9 @@
       "id": "ADR-043",
       "title": "Reset-Pattern WiFi Recovery Trigger",
       "path": "ADR-043-reset-pattern-wifi-recovery.md",
-      "format": "unknown",
-      "status": "Accepted",
-      "date": null,
+      "format": "canonical",
+      "status": "Superseded",
+      "date": "2026-11-14",
       "decision_summary": "Implement a triple-reset trigger within a 10-second window to force WiFi recovery mode:",
       "topics": [],
       "aliases": [],
@@ -1334,7 +1334,7 @@
         "documents_shipped": false,
         "verified_in": [],
         "supersedes": [],
-        "superseded_by": null
+        "superseded_by": "ADR-238"
       }
     },
     {
@@ -9181,7 +9181,7 @@
       "title": "Keep settings.ini, the reboot counter and the reboot log in an RTC snapshot during a filesystem OTA",
       "path": "ADR-233-keep-settings-ini-the-reboot-counter-and-the-reboot-log-in-an-rtc-snapshot-during-a-filesystem-ota.md",
       "format": "canonical",
-      "status": "Proposed",
+      "status": "Accepted",
       "date": "2026-11-14",
       "decision_summary": "At the start of a filesystem OTA the firmware copies settings.ini, rebootcount.txt and rebootlog.txt, in that order,...",
       "topics": [
@@ -9221,7 +9221,7 @@
         "must_not": [
           "Must not write the snapshot to flash (NVS, LittleFS or a partition) in this decision.",
           "Must not keep a partial settings.ini.",
-          "Must not use RTC FAST memory: CONFIGESPSYSTEMALLOWRTCFASTMEMASHEAP=1 in the pinned libs gives it to the heap in both the main firmware and the safeboot updater.",
+          "Must not use RTC fast memory: CONFIGESPSYSTEMALLOWRTCFASTMEMASHEAP=1 in the pinned libs gives it to the heap in both the main firmware and the safeboot updater.",
           "Must not print the snapshot content (it holds secrets, see Consequences)."
         ],
         "exceptions": [
@@ -9381,7 +9381,7 @@
       "title": "On the ESP32-S3 the triple-reset WiFi recovery counts reset-button presses and power-ons alike",
       "path": "ADR-238-on-the-esp32-s3-the-triple-reset-wifi-recovery-counts-reset-button-presses-and-power-ons-alike.md",
       "format": "canonical",
-      "status": "Proposed",
+      "status": "Accepted",
       "date": "2026-11-14",
       "decision_summary": "On the ESP32-S3 a boot counts towards the triple-reset WiFi recovery when it is a reset-button press or a power-on (E...",
       "topics": [
@@ -9407,7 +9407,7 @@
         "must": [
           "Count a boot when espresetreason() is ESPRSTPOWERON or ESPRSTEXT, through the platform shim platformIsResetButtonOrPowerOn(); the firmware calls it only from isPortalResetGesture().",
           "Keep ADR-043's trigger count (3), window (10 s, cleared by loop() when it expires), magic value and the credential wipe before the portal.",
-          "Name the gesture as \"press reset, or pull the plug, three times\" in the user documentation and the OLED hint."
+          "Name the gesture as \"press reset, or pull the plug, three times\" in the user documentation and the OLED (organic light-emitting diode display) hint."
         ],
         "must_not": [
           "Count software resets (OTA, /ReBoot, the WiFi supervisor restart of ADR-211), panics, watchdog resets, ESPRSTBROWNOUT (raw 0x0F, system brown-out) or ESPRSTUSB.",
@@ -9444,7 +9444,7 @@
       "title": "The main firmware keeps its RTC_NOINIT records out of the first 32 bytes of RTC slow memory, which the safeboot updater owns",
       "path": "ADR-239-the-main-firmware-keeps-its-rtc-noinit-records-out-of-the-first-32-bytes-of-rtc-slow-memory-which-the-safeboot-updater-owns.md",
       "format": "canonical",
-      "status": "Proposed",
+      "status": "Accepted",
       "date": "2026-11-14",
       "decision_summary": "The first 32 bytes of RTC slow memory (0x50000200-0x5000021F) belong to the safeboot updater: the main firmware holds...",
       "topics": [
@@ -10508,6 +10508,12 @@
       "source": "ADR-043",
       "target": "ADR-036",
       "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-043",
+      "target": "ADR-238",
+      "type": "superseded-by",
       "resolved": true
     },
     {

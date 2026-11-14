@@ -1,7 +1,7 @@
 ---
 id: "ADR-239"
 title: "The main firmware keeps its RTC_NOINIT records out of the first 32 bytes of RTC slow memory, which the safeboot updater owns"
-status: "Proposed"
+status: "Accepted"
 date: "2026-11-14"
 binding: true
 gate: "scripts/check_rtc_layout.py (run by build.py on every ESP32 ELF); tests/test_rtc_layout_check.py"
@@ -12,7 +12,6 @@ verified_in:
   - "tests/test_rtc_layout_check.py"
 supersedes: []
 superseded_by: null
-format: "canonical"
 topics:
   - "RTC memory"
   - "safeboot"
@@ -27,15 +26,16 @@ symbols:
   - "g_rtcSafebootGuard"
   - "check_rtc_layout"
 context_scope: "selective"
+format: "canonical"
 ---
 
 <!-- markdownlint-disable MD025 -->
 
-# ADR-239 The main firmware keeps its RTC_NOINIT records out of the first 32 bytes of RTC slow memory, which the safeboot updater owns
+# ADR-239 The main firmware keeps its RTC_NOINIT records out of the first 32 bytes of RTC (real-time clock) slow memory, which the safeboot updater owns
 
 ## Status
 
-Proposed, 2026-11-14.
+Accepted, 2026-11-14.
 
 ## Status History
 
@@ -46,6 +46,11 @@ status_history:
     changed_by: "User: Robert van den Breemen"
     reason: Initial proposal
     changed_via: adr-kit
+  - date: 2026-11-14
+    status: Accepted
+    changed_by: "User: Robert van den Breemen"
+    reason: "Accepted 2026-11-14 by Robert in session: 'All ADR proposed 233, 238 and 239 should be accepted. So yes.'"
+    changed_via: adr-kit lifecycle
 ```
 
 ## Context
@@ -55,9 +60,9 @@ reason (`g_rtcRebootReason`, TASK-1447), the WiFi dead-restart count and skip-po
 the filesystem-OTA snapshot (`g_fsOtaRtc`, ADR-233). The ESP-IDF bootloader loads the initialised RTC segments of
 whichever app it starts.
 
-On the 4MB layout an app OTA passes through the safeboot updater (ADR-191: `POST /safeboot`, the updater writes the
-image, then restarts into the new app). The safeboot ELF has an initialised `.rtc.force_slow` segment of 0x20 B at
-0x50000200 (the IDF variable `s_sleep_sub_mode_ref_cnt`; `readelf -l` of the safeboot build: LOAD VirtAddr
+On the 4MB layout an app OTA (over-the-air update) passes through the safeboot updater (ADR-191: `POST /safeboot`, the updater writes the
+image, then restarts into the new app). The safeboot ELF (Executable and Linkable Format) has an initialised `.rtc.force_slow` segment of 0x20 B at
+0x50000200 (the IDF (Espressif IoT Development Framework) variable `s_sleep_sub_mode_ref_cnt`; `readelf -l` of the safeboot build: LOAD (loadable segment in readelf) VirtAddr
 0x50000200 FileSiz 0x20). The main firmware placed `g_rtcRebootReason` (0x34 B) exactly at 0x50000200 (`nm -n -S`
 of beta.243+c6dc184). Every pass through safeboot overwrote its magic and the first 28 reason bytes.
 
@@ -65,7 +70,7 @@ Device evidence on that code: the .63 reboot log of the beta.241 bench shows, af
 safeboot without a reason ("11:59:31 Software reset (3) [rst 0x0c/0x0c]") where `[OTA] handover to safeboot` was
 stored, while the filesystem OTA right after it, which does not pass safeboot, keeps its reason (TASK-1918).
 
-The linker decides the order of `.rtc_noinit`; with LTO no source order is guaranteed.
+The linker decides the order of `.rtc_noinit`; with LTO (link-time optimisation) no source order is guaranteed.
 
 ## Decision
 
