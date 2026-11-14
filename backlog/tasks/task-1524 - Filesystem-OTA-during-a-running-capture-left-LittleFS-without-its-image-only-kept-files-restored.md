@@ -7,7 +7,7 @@ status: To Do
 assignee:
   - '@claude'
 created_date: '2026-10-31T12:49:00Z'
-updated_date: '2026-11-14T18:42:00Z'
+updated_date: '2026-11-14T18:43:00Z'
 labels:
   - alpha
   - bug
@@ -27,7 +27,7 @@ Bench 2026-10-31 13:42, OTGW32 .61 on alpha.569, a long-run capture running (tel
 <!-- AC:BEGIN -->
 - [ ] #1 Reproduce on the bench: filesystem OTA while a capture (telnet + /ws + MQTT + snapshots) runs; record what the device logs during the upload (telnet, crashlog) and whether the image write fails or the upload stalls
 - [ ] #2 Root cause named with evidence (load gate, WS/TCP pressure, timeout in the upload handler, or the kept-file restore path)
-- [ ] #3 Either fix it (e.g. refuse or pause other clients during filesystem OTA, or keep the old image until the new one is complete) or document the limit for testers; old-vs-fix bench run
+- [x] #3 Either fix it (e.g. refuse or pause other clients during filesystem OTA, or keep the old image until the new one is complete) or document the limit for testers; old-vs-fix bench run
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -40,4 +40,6 @@ Triage 2026-11-02 (beta.5, origin/dev 6c41cc696) in code: no repro or fix. Needs
 Stale audit 2026-11-14 (coordinator decision): back to To Do, waiting for a reproduction. Not seen again since alpha.569; the REST/file gate changes since then are a candidate reason, not proven.
 
 Research 2026-11-14 (read-only, origin/dev 82560d1d5): the reported end state is what the current code does by design on an interrupted filesystem upload. OTGW-ModUpdateServer-esp32.h _handleUploadAbort() (request->onDisconnect, there is no UPLOAD_FILE_ABORTED callback): Update.end(); for a filesystem upload with bytes written, _remountAfterFsWrite(true) formats the partial image and remounts, _restoreRuntimeFiles() puts settings.ini and the other kept files back from RAM/heap copies (TASK-1495), _markFsUpdateIncomplete() leaves the marker. Result: settings and runtime files intact, no web files, so the upload/helper page is served (TASK-1926 keeps that only for a filesystem without FSexplorer). Since TASK-1774 a reset during the write is also covered (RTC snapshot + boot-time format). So the user-visible effect is 'retry the filesystem upload', not data loss. What research cannot answer is AC2: why the upload connection dropped (RemoteDisconnected) under the capture load on alpha.569. That needs the bench reproduction of AC1 (filesystem OTA while telnet + /ws + MQTT + snapshots run). Proposal: AC3's 'document the limit' part can be met now (an interrupted filesystem OTA shows the upload page; settings are kept; upload again), the root-cause part stays bench-only.
+
+AC3 documentation part done (coordinator, 2026-11-14): docs/guides/WIFI_FIRMWARE_UPDATE.md section 3: the row for an interrupted filesystem step now says what the current code does (half image cleared, settings, reboot counter and reboot log written back, upload page shown; a reset during the write covered by ADR-233; upload again, settings kept) instead of 'settings only live in memory, do not switch off', plus the advice not to run a filesystem update while a capture or another heavy client is connected. AC3 is only partly met: its 'old-vs-fix bench run' part belongs with a fix, if AC2 finds one. AC2 (why the upload dropped) is in 09's brief for the stack build: filesystem OTA on .61 while a capture runs.
 <!-- SECTION:NOTES:END -->

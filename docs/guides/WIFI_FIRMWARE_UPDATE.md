@@ -100,7 +100,9 @@ Guard: `node --test tests/webui/update-orchestrator.test.mjs`. The contract test
 | The new firmware crashes during its first 30 seconds | The unit returns to safeboot on its own and shows "The firmware failed to start and was rolled back" | Upload a working firmware |
 | The unit is not on WiFi in safeboot (no stored WiFi) | Safeboot opens an access point `<hostname>-safeboot` | Connect to it and open `http://192.168.4.1/` |
 | The one-action page does not find the updater within a minute (Ethernet unit, fixed IP address) | The updater always uses WiFi and DHCP, so it may sit at another address | Find the unit in your router, upload the `.ino.bin` there, then open `/update` again and choose the same files to finish the web files. Or switch the unit off and on: it returns to the old firmware |
-| The filesystem step fails or the connection drops in the middle | The new firmware is installed; the web files may be half written and the settings only live in memory | Press Try again on the page straight away and do not switch the unit off. Or upload only the `.littlefs.bin` in the second form |
+| The filesystem step fails or the connection drops in the middle | The new firmware is installed. The half-written web files are cleared and the settings, the reboot counter and the reboot log are written back, so the unit opens the upload page instead of the web UI (TASK-1495, TASK-1524). A power cut or reset during the write is covered too: the next boot clears the half image and puts the same files back (ADR-233) | Press Try again on the page, or upload only the `.littlefs.bin` in the second form. Your settings are kept |
+
+Do not run a filesystem update while a capture (`capture-mqtt-debug`, `otgw_capture.py`) or another heavy client is connected to the unit: on a busy unit the upload can drop halfway (TASK-1524, seen once on a bench unit under a full capture). Stop the capture, update, then start it again.
 
 Unlike phones and PCs, the unit has room for only one firmware, so there is no automatic return to the previous version. Safeboot keeps the unit reachable until a good firmware is uploaded. The gateway does not run while safeboot is active.
 
