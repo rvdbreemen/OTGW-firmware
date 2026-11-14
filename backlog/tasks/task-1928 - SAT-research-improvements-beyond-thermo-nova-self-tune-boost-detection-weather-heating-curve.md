@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-14T08:32:00Z'
-updated_date: '2026-11-14T11:29:00Z'
+updated_date: '2026-11-14T11:38:00Z'
 labels:
   - sat
   - research
@@ -24,9 +24,9 @@ Maintainer order (Robert, session 2026-11-14): research what SAT can improve com
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Each idea states: the mechanism, which inputs it needs (and whether the firmware has them today), what thermo-nova does in that area (file:line, or 'not found in the code'), the risk (comfort, gas, flame-outs, short cycling), and how to test it first (sim, replay of field captures, bench)
-- [ ] #2 At least 7 ideas, ranked by expected benefit versus risk and effort
-- [ ] #3 Model numbers are labelled MODEL RESULT; field numbers name their capture
+- [x] #1 Each idea states: the mechanism, which inputs it needs (and whether the firmware has them today), what thermo-nova does in that area (file:line, or 'not found in the code'), the risk (comfort, gas, flame-outs, short cycling), and how to test it first (sim, replay of field captures, bench)
+- [x] #2 At least 7 ideas, ranked by expected benefit versus risk and effort
+- [x] #3 Model numbers are labelled MODEL RESULT; field numbers name their capture
 - [ ] #4 Report to Robert; ideas he picks are put to Sergeant D one question per message, recorded in sergeant-d-corrections.md before any implementation task
 <!-- AC:END -->
 
@@ -34,4 +34,6 @@ Maintainer order (Robert, session 2026-11-14): research what SAT can improve com
 
 <!-- SECTION:NOTES:BEGIN -->
 Picked up by comms (92) on coordinator assignment 2026-11-14. Coordinator's 9 seed ideas: weighted outside temperature 12-24 h, forecast feed-forward, boost detection on a learned warm-up rate, deviation detection, cool-down phase/excitation for the self-tune, RLS with forgetting factor, degree-hour budget, wind correction, solar detector instead of the 12 deg gate. Research via the tune-replay agent (light, serial), report to Robert; nothing to Sergeant D before Robert picks.
+
+Report published 2026-11-14: https://claude.ai/artifact/RW714gjLDmnHUSSS5CEC8s (private), summary #dev-sat-mqtt 1571127034690936964. 11 ideas ranked: 1 setback-recovery guard (A), 2 curve on 6-12 h weighted outside temperature, 3 boost after a target step, 4 RLS learner (diagnostics), 5 deviation detection, 6 forecast feed-forward (conflicts entry 247), 7 warm-up rate as tune side signal, 8 excitation (replaced by passive night cool-down), 9 degree-hour budget, 10 wind correction, 11 solar detector (conflicts 160/161). All numbers FIELD (gruijter r1/r2/g167/g214/g68); no MODEL RESULT. Spot-checked: forecast and wind have no consumer in SAT control (only REST/MQTT/debug), entries 62/168/247 as cited. Evidence: scratchpad tune-replay/r1928/field_numbers.txt. Waiting for Robert's pick (AC4).
 <!-- SECTION:NOTES:END -->
