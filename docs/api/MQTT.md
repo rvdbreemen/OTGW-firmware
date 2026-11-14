@@ -246,7 +246,7 @@ Published when OpenTherm messages are received. The topic name matches the OpenT
 | `oemdiagnosticcode` | - | OEM diagnostic code |
 | `controlsetpoint2` | C | Control setpoint for CH2 |
 | `roomsetpoint2` | C | Room setpoint for CH2 |
-| `dhw_flowrate` | l/min | DHW flow rate |
+| `dhw_flowrate` | L/min | DHW flow rate |
 | `exhaust_temperature` | C | Exhaust temperature |
 | `boiler_fan_speed` | rpm | Boiler fan speed |
 | `electrical_current_burner_flame` | uA | Burner flame current |
@@ -749,7 +749,7 @@ Published when S0 counter is enabled (`settings.s0.bEnabled`):
 
 ### DHW Water Total (Energy Dashboard)
 
-A cumulative domestic hot water volume, integrated by the gateway from MsgID 19 (DHW flow rate, l/min), so the Home Assistant Energy dashboard can use it as a water source without a helper (ADR-176, TASK-1123). Topic, unit and discovery fields match the 1.x line.
+A cumulative domestic hot water volume, integrated by the gateway from MsgID 19 (DHW flow rate, L/min), so the Home Assistant Energy dashboard can use it as a water source without a helper (ADR-176, TASK-1123). Topic, unit and discovery fields match the 1.x line.
 
 | Topic | Value | Description |
 | ----- | ----- | ----------- |
