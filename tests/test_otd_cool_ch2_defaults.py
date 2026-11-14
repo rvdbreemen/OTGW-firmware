@@ -65,6 +65,7 @@ static SchedEntry otSchedule[] = { { 7, true, 0, false }, { 8, true, 0, false } 
 static const uint8_t OT_SCHEDULE_SIZE = 2;
 static unsigned long millis() { return 1000; }
 static uint32_t otC2LastCommandMs = 0;
+static uint32_t otdCsc2ExpiryStamp(uint16_t) { return 1; }  // TASK-1917 expiry rule, tested in test_otd_csc2_below8
 static uint16_t floatToF88(float v) { return (uint16_t)(int16_t)(v * 256.0f); }
 static char* dtostrf(double v, int w, int p, char* out) { sprintf(out, "%*.*f", w, p, v); return out; }
 enum DHWPushState { PUSH_IDLE, PUSH_PENDING, PUSH_ACTIVE };

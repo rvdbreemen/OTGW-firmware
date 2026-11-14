@@ -28,7 +28,7 @@ The OTDirect module operates as a cooperative OpenTherm stack layered on the pro
 - **Repeater Overrides**: Thermostat frames can be intercepted and their data values replaced before forwarding to boiler (gateway mode)
 - **Response Modifiers**: Boiler responses can be intercepted and their data bytes modified before forwarding to thermostat
 - **Thermostat Timeout & Setback**: Fail-safe mechanism applies room setpoint override when thermostat offline for >N seconds
-- **SAT is the only temperature controller**: OT-Direct has no heating curve, PI room compensation or CH hysteresis of its own (removed in TASK-1684). In master mode without SAT enabled and without a `CS=` override, no MsgID 1 is written and CH enable (bit 0) of the MsgID 0 master status is off (`buildStatusRequest()`: `IS_MASTER_MODE() && !otdCsOverrideActive() && !satOwnsControlSetpoint()`); an external `CS=` expires after 60 s (`OT_CSC2_EXPIRY_MS`) and must be repeated
+- **SAT is the only temperature controller**: OT-Direct has no heating curve, PI room compensation or CH hysteresis of its own (removed in TASK-1684). In master mode without SAT enabled and without a `CS=` override, no MsgID 1 is written and CH enable (bit 0) of the MsgID 0 master status is off (`buildStatusRequest()`: `IS_MASTER_MODE() && !otdCsOverrideActive() && !satOwnsControlSetpoint()`); an external `CS=` of 8 C or more expires after 63.5 s (`OT_CSC2_EXPIRY_MS`, TASK-1834) and must be repeated; below 8 C it stays until `CS=0` (TASK-1917)
 - **Flame Ratio Tracking (TASK-184)**: 3-hour rolling window of flame on/off duty cycle and transition frequency
 
 ## Code Elements
@@ -65,7 +65,7 @@ The OTDirect module operates as a cooperative OpenTherm stack layered on the pro
     - **Gateway mode**: Check UI/SR tables, apply value overrides, forward to boiler
   - Schedules next periodic master request (every 100ms, skipped in monitor mode)
   - Emits PS=1 summary line if pending
-  - Updates state.otd stats once per second and expires the CS= and C2= overrides after 60 s without a refresh and the SC= override after 61 s (PIC `CommandExpiry` parity; the CS= expiry is skipped while SAT owns the control setpoint)
+  - Updates state.otd stats once per second and expires the CS= and C2= overrides of 8 C or more after 63.5 s without a refresh (below 8 C they stay, TASK-1917) and the SC= override after 63.5 s (PIC `CommandExpiry` parity; the CS= expiry is skipped while SAT owns the control setpoint)
   - Publishes flame ratio metrics every 60s
 
 #### `static bool sendMasterRequestAsync(unsigned long request, OTDirectRequestOrigin origin)`
@@ -193,7 +193,7 @@ The OTDirect module operates as a cooperative OpenTherm stack layered on the pro
   - Implements full PIC command set across 9 categories:
 
 **Category 1: Setpoint Write Commands** (enqueue + cache + override)
-- `CS=xx.x` - Control setpoint (MsgID 1, TSet). Value 0 clears. While `satOwnsControlSetpoint()` is true an external `CS=` is refused and answered `NG`; SAT's own `CS=` passes on the `satCommandInFlight()` marker (ADR-179, TASK-1150). A non-zero `CS=` expires after 60 s without a refresh, unless SAT owns the setpoint (PIC parity, TASK-442).
+- `CS=xx.x` - Control setpoint (MsgID 1, TSet). Value 0 clears. While `satOwnsControlSetpoint()` is true an external `CS=` is refused and answered `NG`; SAT's own `CS=` passes on the `satCommandInFlight()` marker (ADR-179, TASK-1150). A `CS=` of 8 C or more expires after 63.5 s without a refresh, unless SAT owns the setpoint (PIC parity, TASK-442, TASK-1834); a `CS=` or `C2=` below 8 C stays until `CS=0`/`C2=0`, as on the PIC (`otdCsc2ExpiryStamp()`, TASK-1917). The release tests the f8.8 value, like the PIC's `SetCtrlSetpoint` (gateway.asm:4218-4226), so a value that converts to 0 (for example `CS=0.001`) releases too.
 - `TT=xx.x` - Temporary thermostat-side room override (ADR-223). Gateway mode: answered to the thermostat only, as MsgID 9 (value) and MsgID 100 (flags, priority bit 0x02), nothing is written to the boiler; released by the PIC rule (see the remote-override state machine below). Master mode: writes MsgID 16 + MsgID 100. Value 0 clears.
 - `TC=xx.x` - Constant thermostat-side room override (ADR-223). Same as `TT=` with MsgID 100 priority bit 0x01; released by the same rule. Value 0 clears.
 - `BS=xx.x` - Fake boiler room setpoint (intercepts thermostat MsgID 16 frame, replaces data bytes before forwarding). Value 0 clears.
@@ -208,7 +208,7 @@ The OTDirect module operates as a cooperative OpenTherm stack layered on the pro
 
 **Category 2: Status Flag Commands** (immediate effect on MsgID 0 master status byte)
 - `HW=0/1/A/P` - DHW enable + DHW push state machine
-- `CH=0/1` - CH enable override of bit 0, PIC `CHModeOff` semantics (TASK-1346): the command sets `otChModeOff`, which persists until the next `CH=` and is cleared at init. It reaches MsgID 0 only while a `CS=` override is active (gateway.asm:53; pyotgw/pyotgw.py:602-603): `otdEffectiveMasterFlags(otMasterStatusFlags, otChModeOff, otdCsOverrideActive())` in `buildStatusRequest()`. Without a CS override bit 0 is the board's own value (boot 1, hysteresis suspend, setback), so `CS=0`, the 60 s CS expiry and `satDisable()` hand bit 0 back. Gateway mode with a real thermostat (TASK-1238) is not covered.
+- `CH=0/1` - CH enable override of bit 0, PIC `CHModeOff` semantics (TASK-1346): the command sets `otChModeOff`, which persists until the next `CH=` and is cleared at init. It reaches MsgID 0 only while a `CS=` override is active (gateway.asm:53; pyotgw/pyotgw.py:602-603): `otdEffectiveMasterFlags(otMasterStatusFlags, otChModeOff, otdCsOverrideActive())` in `buildStatusRequest()`. Without a CS override bit 0 is the board's own value (boot 1, hysteresis suspend, setback), so `CS=0`, the 63.5 s CS expiry and `satDisable()` hand bit 0 back. Gateway mode with a real thermostat (TASK-1238) is not covered.
 - `H2=0/1` - CH2 enable (bit 4)
 - `SM=0/1` - Summer mode (bit 5, persisted)
 - `BW=0/1` - DHW blocking (bit 6)
@@ -656,7 +656,7 @@ static uint8_t otUnknownCounters[32];     // 128 MsgIDs × 2 bits = 32 bytes
 | OT_WRITE_INTERVAL_MS    | 15 s      | Periodic writes (keep boiler values alive) |
 | OT_OFFLINE_RETRY_MS     | 5 s       | MsgID 0 probe interval while the bus is offline (everything else skipped) |
 | OT_VENT_FAST_INTERVAL_MS | 10 s     | MsgID 70/71 poll when the slave is a ventilation/HRV unit |
-| OT_CSC2_EXPIRY_MS / OT_SC_EXPIRY_MS | 60 s / 61 s | CS=/C2= and SC= overrides expire without a refresh |
+| OT_CSC2_EXPIRY_MS / OT_SC_EXPIRY_MS | 63.5 s / 63.5 s | CS=/C2= (8 C or more) and SC= overrides expire without a refresh; CS=/C2= below 8 C never expire |
 | OT_DHW_PUSH_TIMEOUT_MS  | 30 s      | DHW push state machine timeout |
 | FLAME_BUF_SIZE          | 180 min   | 3-hour rolling window (flame ratio) |
 | Loop schedule check     | 100 ms    | Scheduler polling interval |

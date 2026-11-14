@@ -59,6 +59,7 @@ struct OpenTherm { static unsigned long buildRequest(OpenThermMessageType t, Ope
   return ((unsigned long)t << 28) | ((unsigned long)(uint8_t)id << 16) | d; } };
 static bool satOwnsControlSetpoint();
 static unsigned long otCSLastCommandMs = 0;
+static uint32_t otdCsc2ExpiryStamp(uint16_t) { return 1; }  // TASK-1917 expiry rule, tested in test_otd_csc2_below8
 static uint16_t floatToF88(float f) { return (uint16_t)(int16_t)(f * 256.0f); }
 static void updateWriteCache(uint8_t, uint16_t) {}
 static void setOverride(uint8_t, uint16_t) {}

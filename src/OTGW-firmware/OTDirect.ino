@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTDirect.ino
-**  Version  : v2.0.0-beta.235
+**  Version  : v2.0.0-beta.236
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -512,7 +512,7 @@ static inline uint16_t floatToF88(float celsius) {
 // underlying intent is safety: a stale flow setpoint should not stay
 // active forever. Track last-command timestamp per command; the periodic
 // task in loopOTDirect() clears the override when stale.
-// 0 means "no active override" (skip expiry check).
+// 0 means "no expiry": no override, or one below 8 C (TASK-1917, otdCsc2ExpiryStamp).
 static uint32_t otCSLastCommandMs = 0;
 static uint32_t otC2LastCommandMs = 0;
 // TASK-1834: the PIC counts 121 Timer-1 overflows of 524.288 ms (gateway.asm:157-158, StartTimer :4233-4239,
@@ -520,6 +520,15 @@ static uint32_t otC2LastCommandMs = 0;
 // window up to ~126.9 s. OT-Direct keeps 63.5 s from the last command (the SC= window, OT_SC_EXPIRY_MS), never shorter
 // than the PIC, so a client refreshing every 60 s never lapses. Checked once a second below.
 static constexpr uint32_t OT_CSC2_EXPIRY_MS = 63500;
+// TASK-1917: the PIC keeps a CS=/C2= whose integer part is below 8 for good: CommandExpiry masks the integer byte with
+// b'11111000' and skips the release when it is 0 (gateway.asm:1626-1639; tests/control-4.stc; command reference "Values
+// below 8 are maintained without the need to be repeated", PIC 6.5 changelog). Returns the expiry stamp for a new
+// CS/C2 value: 0 (no expiry) below 8, else now (never 0, the sentinel). The last value sent decides, as on the PIC.
+static uint32_t otdCsc2ExpiryStamp(uint16_t f88) {
+  if (((f88 >> 8) & 0xF8) == 0) return 0;
+  uint32_t now = millis();
+  return now == 0 ? 1 : now;
+}
 // TASK-733, TASK-1840: SC= stores the time for the thermostat's MsgID 20 only; nothing goes to
 // the boiler (PIC SetClock, gateway.asm:4331-4388). The value is valid until CommandExpiry sets
 // InvalidTime (gateway.asm:1623-1646): at least 121 Timer-1 overflows of 524.288 ms = 63.4 s
@@ -3282,7 +3291,9 @@ bool handleOTDirectCommand(const char* buf, int len, bool satOwn) {
   if (cmd0 == 'C' && cmd1 == 'S') {
     float temp = atof(value);
     bool enqueued = true;
-    if (temp == 0.0f) {
+    // TASK-1917: release when the f8.8 value is 0, as the PIC does (SetCtrlSetpoint tests the converted bytes,
+    // gateway.asm:4218-4226): a CS=0.001 would otherwise be a permanent 0 C override under the below-8 rule.
+    if (floatToF88(temp) == 0) {
       // CS=0 clears the flow setpoint override only and does not write bit0 (CH enable)
       // of MsgID 0. CH= overrides bit0 only while a CS override is active (gateway.asm:53;
       // pyotgw/pyotgw.py:602-603), so clearing the override hands bit0 back to the board's
@@ -3293,8 +3304,7 @@ bool handleOTDirectCommand(const char* buf, int len, bool satOwn) {
       uint16_t f88 = floatToF88(temp);
       enqueued = enqueueWriteCommand(1, f88, "CS");
       if (enqueued) {
-        otCSLastCommandMs = millis();  // TASK-442: refresh expiry timer
-        if (otCSLastCommandMs == 0) otCSLastCommandMs = 1;  // 0 sentinel reserved
+        otCSLastCommandMs = otdCsc2ExpiryStamp(f88);  // TASK-442 refresh; TASK-1917: below 8 never expires
       }
     }
     if (enqueued) {
@@ -3381,15 +3391,14 @@ bool handleOTDirectCommand(const char* buf, int len, bool satOwn) {
   else if (cmd0 == 'C' && cmd1 == '2') {
     float temp = atof(value);
     bool enqueued = true;
-    if (temp == 0.0f) {
+    if (floatToF88(temp) == 0) {   // TASK-1917: release on a zero f8.8 value, as for CS=
       clearWriteOverride(8);
       otC2LastCommandMs = 0;  // TASK-442: explicit clear, no expiry
     } else {
       uint16_t f88 = floatToF88(temp);
       enqueued = enqueueWriteCommand(8, f88, "C2");
       if (enqueued) {
-        otC2LastCommandMs = millis();  // TASK-442: refresh expiry timer
-        if (otC2LastCommandMs == 0) otC2LastCommandMs = 1;
+        otC2LastCommandMs = otdCsc2ExpiryStamp(f88);  // TASK-442 refresh; TASK-1917: below 8 never expires
       }
     }
     if (enqueued) {
