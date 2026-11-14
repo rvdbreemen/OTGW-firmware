@@ -3,11 +3,11 @@ id: TASK-1891
 title: >-
   SAT simulation: default satsimcoolrate 0.1 C/min gives a thermal coefficient
   above SAT_THERMAL_COEFF_MAX, so the sim never exercises thermal learning
-status: In Review
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-13T08:27:00Z'
-updated_date: '2026-11-14T01:05:00Z'
+updated_date: '2026-11-14T01:09:00Z'
 labels:
   - sat
   - simulation
@@ -41,4 +41,12 @@ Evidence: tests/test_sat_sim_thermal_learning.py 4/4 on the fix (default sim 0 a
 2026-11-14 bench finding by 09 on 231+9cede93 (via the coordinator): the narration fired once (01:05:42) but was cut at 127 characters (satNarratef_P buf SAT_NARRATE_BUF 128, SATcontrol.ino:33/:110-113; my text was 172), and it printed the measured sample (0.49) next to 'from satsimcoolrate 0.100', which read as derived. My miss: tests/test_sat_narrate_fits.py already gates every narration format against SAT_NARRATE_BUF - 1 and was red on that text (worst 181 > 127); I had run only the tests I picked. Fix (not pushed yet): 'Sim: thermal learning skips samples (measured %.2f > %.2f); test with satsimcoolrate 0.016 + satsimheatrate 0.08' (gate worst case 118, coordinator's worst case coef 99.99 -> 113 chars); shared buffer unchanged. Gate OK, test_sat_sim_thermal_learning OK, evaluate 86/0. Rebased onto cfd389c17, re-bumped to beta.232 (commit 408e62d7f). 09 re-checks only the 1891 line on the rebuild.
 
 2026-11-14 shipped in 2.0.0-beta.232 (9c3224077, post 1570967740544450631, zip sha256 3ed5847165f6e25ba28596dc83683ebf130f645a5896c2bdf06f5048bd3d6c64). Bench by 09 on .61 (evidence 09 scratchpad b232d3): the narration is complete at 117 chars, once per run, no repeat after 21 min; satthermalcoeff unchanged; settings diff none. Earlier on 231+9cede93 the line fired once but was cut at 127 chars (fixed in 232, see above). In Review for 09's bench ACs.
+
+Bench by otgw-bench-tester (09) on .61, 2026-11-14. beta.231+9cede93 (evidence 09 scratchpad b231d3\): defaults 0.1/0.5 flame off, ONE line at 01:05:42 but cut at 127 chars (reported, fixed in 232); no repeat in 20 min; sim off/on -> exactly one more line (01:25:30); 0.016/0.08 + sim off/on -> no line, thermal_drop_rate 0.0917 accepted 01:37:59; satthermalcoeff 0.0966 unchanged throughout. beta.232+9c32240 (b232d3\): ONE complete line at 01:47:22, 'SAT: Sim: thermal learning skips samples (measured 0.47 > 0.30); test with satsimcoolrate 0.016 + satsimheatrate 0.08' (117 chars incl. prefix), no repeat in 21 min (count 1 at 02:03:18); bootcount +2 per OTA, crashlog empty, settings diff none after restore, satthermalcoeff 0.0966 unchanged.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Robert chose B: keep the fast sim defaults (0.1/0.5) and say once per sim run that thermal learning skips samples, with the recipe 0.016/0.08. AC1: tests/test_sat_sim_thermal_learning.py 4/4 on the fix (d3), and on the bench (.61): beta.232+9c32240 logs one complete narration line ~5 min after sim on with the defaults, no repeat in 21 min; on 231 sim off/on gave exactly one more line and 0.016/0.08 gave no line with an accepted sample of 0.0917. satthermalcoeff unchanged in every run (TASK-1869). Evidence paths in the notes.
+<!-- SECTION:FINAL_SUMMARY:END -->
