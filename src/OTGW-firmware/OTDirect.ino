@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTDirect.ino
-**  Version  : v2.0.0-beta.236
+**  Version  : v2.0.0-beta.237
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -3085,10 +3085,21 @@ static void handleMasterModeSlaveFrame(unsigned long frame) {
     // TASK-1150: not while SAT owns the control setpoint — a thermostat writing MsgID 1
     // in master mode would otherwise silently replace SAT's setpoint. The WRITE_ACK is
     // still echoed above so the thermostat sees a well-formed exchange. A write of MsgID 1 > 0
-    // sets the CS override, which enables CH in buildStatusRequest(); a later write of 0 is ignored.
-    if (msgId == 1 && dataVal != 0 && !satOwnsControlSetpoint()) {
-      setOverride(1, dataVal);
-      updateWriteCache(1, dataVal);
+    // sets the CS override, which enables CH in buildStatusRequest().
+    // TASK-1811 (Robert 2026-11-11, "Expiry + TSet=0 respected"): the thermostat's TSet gets the CS
+    // expiry window (OT_CSC2_EXPIRY_MS) whatever its value, so a thermostat that goes silent never
+    // leaves a stuck setpoint; the below-8 permanence of a user CS= (otdCsc2ExpiryStamp, TASK-1917)
+    // does not apply to a thermostat write. A TSet of 0 releases the override like CS=0.
+    if (msgId == 1 && !satOwnsControlSetpoint()) {
+      if (dataVal == 0) {
+        clearWriteOverride(1);
+        otCSLastCommandMs = 0;
+      } else {
+        setOverride(1, dataVal);
+        updateWriteCache(1, dataVal);
+        uint32_t now = millis();
+        otCSLastCommandMs = now == 0 ? 1 : now;   // always expires: not otdCsc2ExpiryStamp()
+      }
     }
     // Apply thermostat's room setpoint
     if (msgId == 16) {

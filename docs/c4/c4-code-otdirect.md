@@ -142,6 +142,7 @@ The OTDirect module operates as a cooperative OpenTherm stack layered on the pro
   - If WRITE_DATA (type 1):
     - Echoes back as WRITE_ACK (type 5)
     - Updates write cache for MsgID 1 (TSet, not while SAT owns the control setpoint), 16 (room setpoint), 24 (room temp) so scheduler keeps sending to boiler
+    - MsgID 1 > 0 sets the CS override and starts the CS expiry window (`OT_CSC2_EXPIRY_MS`, 63.5 s) for every value, also below 8 C (the TASK-1917 permanence is for a user `CS=` only); MsgID 1 = 0 clears the override like `CS=0` (TASK-1811)
   - Otherwise: Returns UNKNOWN_DATA_ID
   - Bridges frame and response to parser ('T' + 'A' prefixes)
   - Sends response via `otSlave.sendResponse()`
