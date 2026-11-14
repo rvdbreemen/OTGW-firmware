@@ -3,11 +3,11 @@ id: TASK-1909
 title: >-
   OTA: reboot_count.txt reset to 1 and the app-boot reboot_log entry missing
   after a safeboot OTA (.63, beta.224 release flash 2026-11-13 19:37)
-status: In Review
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-13T18:53:00Z'
-updated_date: '2026-11-13T23:57:00Z'
+updated_date: '2026-11-14T00:02:00Z'
 labels:
   - bug
   - ota
@@ -25,9 +25,9 @@ ordinal: 975000
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Reproduce with a telnet capture across an OTA of app+fs on a Classic bench unit (09), or a host test of the keep/restore path that shows the counter lost
+- [x] #1 Reproduce with a telnet capture across an OTA of app+fs on a Classic bench unit (09), or a host test of the keep/restore path that shows the counter lost
 - [x] #2 Root cause named with file:line
-- [ ] #3 Fix: reboot_count and reboot_log survive an OTA; red on the old code, green on the fix
+- [x] #3 Fix: reboot_count and reboot_log survive an OTA; red on the old code, green on the fix
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -56,10 +56,12 @@ Correction to the previous note: on origin/dev all 5 tests of test_fs_upload_boo
 Correction (coordinator, per CLAUDE.md: the bench-tester ticks bench ACs): AC1/AC3 unticked again and status In Review; 09 ticks AC1/AC3 on top of this commit on the evidence above, then Done.
 
 2026-11-14: pushed b14cce850 (beta.231) to origin/dev; posted in #alpha-testing, msg 1570950792754499636.
+
+Bench (otgw-bench-tester, 2026-11-14 00:39-00:49, .63 Classic + PIC 6.8): race repro driver race1909.py: app via safeboot, then the FS upload the moment the new app answers its first HTTP 200 (6.7-7.9 s after the app upload, while setup() still runs), telnet from boot. OLD beta.230+5a23184, 3/3 red: old1 reboot_count 5->6 (+1 for two boots) and the app-boot reboot_log line missing; telnet shows the race: '[OTA] Flash start ...littlefs.bin' 00:40:10.145, '[OTA] kept 1808 bytes' .847, then setup()'s updateRebootCount prints 'Reboot count = [0]' at 00:40:10.913 in the middle of the filesystem write; old2 6->7 (+1), line missing ('Reboot count = [1]'); old3 7->9 (+2 by chance), line missing. FIX beta.231+b14cce8, 3/3 green: fix1 9->11, fix2 11->13, fix3 13->15 (+2 each), both lines (app-boot 'Software reset' + '[OTA] Rebooting...') every time, 0 'LittleFS Already Mounted', settings diff none; the window was really hit (fix1 Flash start 00:45:07.45 vs setup end 00:45:09.20, fix3 00:48:26.50 vs 00:48:28.36). End state .63 on the FIX build, settings diff vs the snapshot before old1: none. Evidence (bench-tester scratchpad): b1909\old1..3-*, b1909\fix1..3-* (events.log, telnet.txt, settings-pre.json).
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
 
 <!-- SECTION:FINAL_SUMMARY:BEGIN -->
-Fix in beta.231 (b14cce850): an OTA filesystem upload that starts while setup() still runs no longer loses /reboot_count.txt or the app-boot line of /reboot_log.txt. AC1: 09 reproduced it on .63 with beta.230+5a23184, RED 3/3, telnet shows the FS write start (00:40:10.145) before setup() wrote the counter (00:40:10.913). AC2: root cause in notes: web server started before updateRebootCount/updateRebootLog (OTGW-firmware.ino), helpers mounted LittleFS mid-write (helperStuff.ino), _remountAfterFsWrite begin() a no-op on an existing mount (OTGW-ModUpdateServer-esp32.h). AC3: fix GREEN 3/3 on .63 (count +2, 2 log lines per cycle, no 'Already Mounted', settings unchanged); static gate tests/test_fs_upload_boot_writes.py red 5/5 on old, green 5/5 on fix; related tests rc=0; evaluate --quick 85 PASS 0 FAIL. Not verified: OT-Direct board (.61) and the release safeboot path end to end beyond this bench recipe.
+Cause: a filesystem OTA that starts while setup() still runs makes updateRebootCount() and the reboot_log write land in the LittleFS image that is being replaced; the keep/restore then puts back the pre-boot copies (counter loses the app boot, app-boot log line missing). Fixed in beta.231+b14cce8 (ba). Bench evidence, .63 Classic: race repro red on beta.230 3/3 (counter +1 for two boots or app-boot line missing, telnet 'Reboot count = [0]' during the FS write), green on the fix 3/3 (+2 and both lines each time, no 'LittleFS Already Mounted', settings unchanged, race window demonstrably hit). Evidence paths in the notes.
 <!-- SECTION:FINAL_SUMMARY:END -->
