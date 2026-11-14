@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTDirect.ino
-**  Version  : v2.0.0-beta.233
+**  Version  : v2.0.0-beta.234
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -515,7 +515,11 @@ static inline uint16_t floatToF88(float celsius) {
 // 0 means "no active override" (skip expiry check).
 static uint32_t otCSLastCommandMs = 0;
 static uint32_t otC2LastCommandMs = 0;
-static constexpr uint32_t OT_CSC2_EXPIRY_MS = 60000;  // ~1 minute, matches PIC heartbeat window
+// TASK-1834: the PIC counts 121 Timer-1 overflows of 524.288 ms (gateway.asm:157-158, StartTimer :4233-4239,
+// CommandExpiry :1623-1646); a single CS=/C2= lives 120..121 ticks, 62.9..63.4 s by tick phase, a refresh inside a running
+// window up to ~126.9 s. OT-Direct keeps 63.5 s from the last command (the SC= window, OT_SC_EXPIRY_MS), never shorter
+// than the PIC, so a client refreshing every 60 s never lapses. Checked once a second below.
+static constexpr uint32_t OT_CSC2_EXPIRY_MS = 63500;
 // TASK-733, TASK-1840: SC= stores the time for the thermostat's MsgID 20 only; nothing goes to
 // the boiler (PIC SetClock, gateway.asm:4331-4388). The value is valid until CommandExpiry sets
 // InvalidTime (gateway.asm:1623-1646): at least 121 Timer-1 overflows of 524.288 ms = 63.4 s
