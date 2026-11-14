@@ -513,7 +513,8 @@ static void oledStart(bool attachButton) {
   oledRow(7);
   // Our WiFi wipe is a triple-reset (shouldForceWifiConfigPortal), not a
   // reset-hold, so the hint must name the right gesture for this firmware.
-  oledDisplay.print(F("Triple-reset = config"));
+  // ADR-238: a reset-button press and a power-on count alike (21 chars max).
+  oledDisplay.print(F("3x reset/power=config"));
 
   // Button for page cycling — polled in loopOLED() with a millis() debounce.
   // Portable Arduino API (no ISR / FreeRTOS queue), so it works identically on

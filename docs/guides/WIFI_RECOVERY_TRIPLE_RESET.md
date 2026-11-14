@@ -1,53 +1,70 @@
 # WiFi Recovery: Force Config Portal with Triple Reset
 
-This guide documents the reset-only recovery flow for ESP8266 boards (including Wemos D1 mini), where holding the reset button cannot be detected by the firmware.
+This guide documents the reset-only recovery flow on the 2.x firmware (ESP32-S3 boards: the OTGW32 and the OTGW
+Classic with an ESP32-S3 module). It clears the stored WiFi credentials and opens the WiFiManager configuration
+portal, so you can reach a gateway whose WiFi network or password has changed.
 
-## Why this method exists
+## The gesture: three resets in a row
 
-On ESP8266, the firmware does not run while the reset button is held down. The CPU is held in reset, so a "hold reset during reboot" gesture cannot be detected in software. Holding the reset button therefore does nothing useful for recovery: it is not a missing feature, it is a hardware limitation.
+Reset the gateway **three times in a row**, each reset within **10 seconds** of the board coming back up. A reset is
+either of these, and they may be mixed:
 
-To provide reliable recovery without an extra hardware button, OTGW-firmware uses a reset-count trigger instead. The gesture is three short presses, not one long hold.
+- press and release the **reset button**, or
+- **pull the plug** (or the USB cable that powers it) and put it back.
 
-## The exact gesture
+The firmware boots between resets, so wait for the board to come back up, then reset it again. On the third reset it
+boots into the WiFiManager configuration portal instead of connecting to your saved network.
 
-- Press and release the hardware **reset button 3 times in a row**.
-- Each press must follow the previous one within **10 seconds** (the firmware boots between presses, so wait for the board to come back up, then press again).
-- On the 3rd press the firmware boots into the WiFiManager configuration portal instead of connecting to your saved network.
+Why both count: the ESP32-S3 reports a press of the reset button and a power-on with the same reset reason, so the
+firmware cannot tell them apart (ADR-238). Pulling the plug three times is therefore a supported route, which helps
+on boards without a reachable reset button.
 
-The trigger counts presses of the **reset button** specifically. A power-cycle (pulling and re-applying power) is reported by the chip as a different reset reason and does **not** increment the counter. Use the reset button.
+What does not count: a software restart (an update, a reboot from the web UI, the firmware's own WiFi recovery
+restart), a crash or watchdog reset, and a reset from a computer over USB. These never start the recovery.
 
-If the resets are spaced more than 10 seconds apart, the counter is cleared and the sequence has to start over. This 10-second window is what keeps an ordinary single reboot from accidentally entering recovery.
+If a reset comes more than 10 seconds after the board came up, the counter is cleared and the sequence starts over.
+This window is what keeps an ordinary single reboot or a single power cut from entering recovery.
+
+**Be aware:** a power supply that drops out three times in quick succession (each within 10 seconds of the
+previous return) looks exactly like this gesture and clears the WiFi credentials too. The gateway then waits in the
+configuration portal until you set the WiFi again.
 
 ## What happens on the 3rd reset
 
 The device boots straight into the WiFiManager configuration portal:
 
-1. It starts an access point named `<hostname>-XXXXXX`, where `<hostname>` is the configured device hostname (default `OTGW`) and `XXXXXX` is the last three bytes of the MAC address, for example `OTGW-21B4F8`.
+1. It starts an access point named `<hostname>-XXXXXX`, where `<hostname>` is the configured device hostname
+   (default `OTGW`) and `XXXXXX` is the last three bytes of the MAC address, for example `OTGW-21B4F8`.
 2. Connect to that access point from a phone or laptop.
 3. A captive portal page opens automatically, or browse to `http://192.168.4.1/` manually.
-4. Enter your WiFi SSID and password and save. The new credentials replace the old ones, and the device reboots and connects to the new network.
+4. Enter your WiFi SSID and password and save. The new credentials replace the old ones, and the device reboots and
+   connects to the new network.
 
-The triple-reset clears the stored WiFi credentials (per ADR-043) and then opens the config portal. If the portal times out without a save, the device reboots with no stored network: it re-enters the config portal (or, on prerelease builds, the AP fallback) rather than reconnecting to the old network.
+The triple reset clears the stored WiFi credentials (ADR-043, ADR-238) and then opens the config portal. If the
+portal times out (240 seconds) without a save, the device reboots with no stored network: it re-enters the config
+portal (or, on prerelease builds, the AP fallback) rather than reconnecting to the old network.
 
 ## Recovery steps
 
-1. Power the OTGW board and wait for it to finish booting.
-2. Press and release the reset button. Wait for the board to boot again.
-3. Press and release the reset button a second time. Wait for it to boot again.
-4. Press and release the reset button a third time, all within roughly 10 seconds of each previous press.
+1. Power the gateway and wait for it to finish booting.
+2. Press the reset button, or pull the plug and put it back. Wait for the board to boot again.
+3. Do it a second time. Wait for it to boot again.
+4. Do it a third time, each within roughly 10 seconds of the board coming back up.
 5. The device boots into WiFi config mode.
 6. Connect to the access point (`<hostname>-XXXXXX`).
 7. Open the portal and configure the new WiFi network.
 
 ## Notes
 
-- Holding the reset button does nothing on ESP8266 (the CPU cannot sample a held reset). This is intentional behaviour, not a bug. The three-press gesture is the recognised ESP/IoT-community recovery pattern and was chosen deliberately to prevent accidental wipes.
-- The trigger is only for manual recovery and does not affect a normal single reboot.
+- The trigger is only for manual recovery and does not affect a normal single reboot or power cut.
 - If the resets are too slow (outside the 10-second window), forced recovery is not triggered.
-- The Web UI reset path (`/ResetWireless`) and the Telnet `resetwifi` command both clear the stored WiFi credentials directly, which is a different mechanism from the triple-reset trigger.
+- The Web UI reset path (`/ResetWireless`) and the Telnet `resetwifi` command both clear the stored WiFi credentials
+  directly, which is a different mechanism from the triple-reset trigger.
+- On the 1.x firmware (ESP8266) only the reset button counts; a power cycle does not. See that line's documentation.
 
 ## Troubleshooting
 
-- If the portal does not appear, repeat the three presses with shorter intervals so each falls inside the 10-second window.
-- If needed, power cycle once and retry the 3-press sequence.
+- If the portal does not appear, repeat the three resets with shorter intervals so each falls inside the
+  10-second window.
+- A reset from a computer over USB does not count; use the button or the power plug.
 - After a successful save, the device returns to normal WiFi startup behaviour.

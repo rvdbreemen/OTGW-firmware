@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-14T08:57:00Z'
-updated_date: '2026-11-14T11:34:00Z'
+updated_date: '2026-11-14T11:47:00Z'
 labels:
   - bug
   - wifi
@@ -26,8 +26,9 @@ Found during TASK-1904 (code reading, not seen on a device). shouldForceWifiConf
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Reproduce on a bench unit: N quick reset-button presses (or EN pulses) do not open the WiFi config portal on the old build; record the reset reason codes
-- [ ] #2 A fix that tells a reset press from a power-on on the S3 (decision on the signal recorded in the task), with old red / fix green on the same reproduction
+- [x] #1 Host reproduction on the real gate and counter: three reset-button boots (S3 ESP_RST_POWERON) do not open the portal on the old code and do on the fix (test/host/test_wifi_portal_reset.py P1, P5; P2/P3/P4/P6 green on both)
+- [ ] #2 Fix per Robert's decision A (DM 1571125618777522260; the S3 cannot tell a reset press from a power-on, reset_reasons.h:38-40): reset-button presses and power-ons count, software/USB/watchdog/system brown-out resets do not; ADR-238 Proposed supersedes ADR-043; OLED hint and WiFi recovery guide updated
+- [ ] #3 FIELD/MAINTAINER (not bench-testable: a USB reset reports ESP_RST_USB and no USB route presses the button): on a build with the fix, three reset-button presses or three plug pulls, each within 10 s of boot, open the config portal; a single power cut does not
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -38,4 +39,6 @@ Analysis (2026-11-14): shouldForceWifiConfigPortal() (OTGW-firmware.ino:95) coun
 Option C corrected (coordinator): GPIO0 is a strapping pin on the S3, holding BOOT at reset enters the ROM download mode, so C is a long press (>=5 s) while the firmware runs, not during boot. Button pin per board (activeButton(), OTGW-firmware.h:946): OTGW32 GPIO0 (boards.h:58), Classic+S3 Mini GPIO18 D3 (boards.h:269), Classic+S3 Mini Pro GPIO13 (boards.h:291). The OLED page switch reacts to the falling edge with debounce (OLED.ino:580), so a long press is distinguishable. The button pin is set up only when an OLED is found (oledStart(true), OLED.ino:521-523), so C needs its own setup. Unknown: whether every Classic PCB revision has a button fitted on D3. Suggested guard for C: only in the first 120 s after boot, LED fast-blink after 5 s, portal on release.
 
 Host harness (prepared before the decision, coordinator): test/host/test_wifi_portal_reset.py + .cpp compile the real WIFI_PORTAL_RESET block of OTGW-firmware.ino and the real platformIsExternalReset() with the S3 reset mapping (button and power-on = ESP_RST_POWERON / raw 0x01, NVS survives boots, RAM and millis() restart). On the current code: P1 (three reset-button presses within the window force the portal) FAIL = the bug reproduced; P2 (software resets never count) pass; P3 (presses after the window) pass; P4 (counter fed ESP_RST_EXT, ESP8266 semantics) forces the portal on the third = the counting logic works, only the gate is dead. P1 is the expectation of options A/B; under C it is replaced by long-press cases. 09 (2026-11-14): the .63 USB reset is ESP_RST_USB (raw expected 0x15/0x16, not verified), not power-on, and no USB route holds GPIO0 low while the firmware runs; so neither A/B nor C can be bench-tested without a physical button press (field/maintainer AC).
+
+Robert's decision A (DM 1571125618777522260, via the coordinator): count every power-on-type boot; risk accepted (three power interruptions in the windows also wipe the WiFi). D3 button on every Classic revision: 'Not sure' (DM 1571125777720672267), so pulling the plug is named as a route. ACs rewritten to the decision (old AC2 asked to tell a press from a power-on, which the S3 cannot do). Fix: platformIsResetButtonOrPowerOn() in platform_esp32.h (ESP_RST_EXT or ESP_RST_POWERON); isExternalSystemReset() renamed isPortalResetGesture() (its only caller is the counter) and calls it; OLED hint 'Triple-reset = config' -> '3x reset/power=config' (21 chars); docs/guides/WIFI_RECOVERY_TRIPLE_RESET.md rewritten for 2.x (the old text said a power cycle does not count); c4-code-sensors.md hint text. ADR-238 Proposed (number from the coordinator; 234-237 reserved) supersedes ADR-043; strict lint: only the two-sided supersede link open, which 'adr supersede' writes at acceptance. Host evidence (AC1): test_wifi_portal_reset.py --old-rev HEAD (pre-fix) -> FIX P1-P6 pass; OLD P1 and P5 FAIL, P2/P3/P4/P6 pass; RESULT PASS. Related: 9 test files PASS (incl. test_wifi_skip_portal 37, ADR-211), evaluate --quick 86/0.
 <!-- SECTION:NOTES:END -->

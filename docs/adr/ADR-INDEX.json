@@ -9238,6 +9238,52 @@
       "metadata": {
         "binding": false,
         "gate": null,
+        "documents_shipped": true,
+        "verified_in": [
+          "commit:3d147974e",
+          "commit:03ea54036",
+          "src/OTGW-firmware/OTGW-ModUpdateServer-esp32.h:fsOtaRtcRestoreAtBoot",
+          "test/host/test_fs_ota_rtc_snapshot.py"
+        ],
+        "supersedes": [],
+        "superseded_by": null
+      }
+    },
+    {
+      "id": "ADR-234",
+      "title": "On the ESP32-S3 the triple-reset WiFi recovery counts reset-button presses and power-ons alike",
+      "path": "ADR-234-on-the-esp32-s3-the-triple-reset-wifi-recovery-counts-reset-button-presses-and-power-ons-alike.md",
+      "format": "canonical",
+      "status": "Proposed",
+      "date": "2026-11-14",
+      "decision_summary": "State one concrete chosen approach and its rationale.",
+      "topics": [],
+      "aliases": [],
+      "components": [],
+      "symbols": [],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [
+          "State required implementation constraints."
+        ],
+        "must_not": [
+          "State prohibited implementation choices."
+        ],
+        "exceptions": [
+          "State explicit exceptions, or None."
+        ],
+        "verification": [
+          "Name the test, command, or source anchor that verifies this decision."
+        ]
+      },
+      "scope": {
+        "path_globs": [
+          "src/**/*.py"
+        ]
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
         "documents_shipped": false,
         "verified_in": [],
         "supersedes": [],

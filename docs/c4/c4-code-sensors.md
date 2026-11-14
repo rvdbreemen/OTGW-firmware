@@ -156,7 +156,7 @@
 - `void initOLED(void)`
   - **Location**: `OLED.ino:466`
   - **Signature**: Initializes the display at I2C address 0x3C
-  - **Description**: Probes 0x3C via `probeOLED()`; if absent logs and leaves `oledPresent = false`. Otherwise begins the driver (`Adafruit128x64`, System5x7 font), sets `oledPresent`, `oledPage = 1`, `state.hw.bOLEDPresent = true` (ADR-114) and draws the boot splash: a 16x16 flame bitmap (raw GDDRAM writes via `oledDrawFlame()`), the title ("OTGW32" when `isOTDirectEnabled()`, else "OTGW"), "OpenTherm Gateway", "Press button for info" and "Triple-reset = config". Configures the button pin `OLED_BUTTON_PIN` (`BUTTON` alias) as `INPUT_PULLUP`. Called from `setup()` before `startWiFi()` (so the config portal screen can be shown) and again from `applyResolvedComboPins()` after combo hardware-mode resolution (re-probe and re-pin).
+  - **Description**: Probes 0x3C via `probeOLED()`; if absent logs and leaves `oledPresent = false`. Otherwise begins the driver (`Adafruit128x64`, System5x7 font), sets `oledPresent`, `oledPage = 1`, `state.hw.bOLEDPresent = true` (ADR-114) and draws the boot splash: a 16x16 flame bitmap (raw GDDRAM writes via `oledDrawFlame()`), the title ("OTGW32" when `isOTDirectEnabled()`, else "OTGW"), "OpenTherm Gateway", "Press button for info" and "3x reset/power=config" (ADR-238). Configures the button pin `OLED_BUTTON_PIN` (`BUTTON` alias) as `INPUT_PULLUP`. Called from `setup()` before `startWiFi()` (so the config portal screen can be shown) and again from `applyResolvedComboPins()` after combo hardware-mode resolution (re-probe and re-pin).
   - **Dependencies**:
     - `Wire` (I2C started earlier in `setup()` on `activeI2cSda()/activeI2cScl()`)
     - `SSD1306Ascii`, `SSD1306AsciiWire`

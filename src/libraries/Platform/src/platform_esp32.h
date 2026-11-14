@@ -828,6 +828,14 @@ inline bool platformIsExternalReset() {
   return (esp_reset_reason() == ESP_RST_EXT);
 }
 
+// TASK-1930 / ADR-238: the ESP32-S3 gives the reset button (EN pin), a power-on, a chip brown-out and the super
+// watchdog the same raw code 0x01 (soc/esp32s3 reset_reasons.h), reported as ESP_RST_POWERON; it never reports
+// ESP_RST_EXT. A reset-button press therefore cannot be told apart from a power-on, and both count.
+inline bool platformIsResetButtonOrPowerOn() {
+  const esp_reset_reason_t r = esp_reset_reason();
+  return (r == ESP_RST_EXT || r == ESP_RST_POWERON);
+}
+
 // Seconds since boot from the 64-bit boot clock (TASK-1449, port of 1.x TASK-1289): counts setup()
 // time and loop stalls too. Not micros(): that is 32-bit and wraps after ~71.6 minutes.
 inline uint32_t platformUptimeSeconds() {

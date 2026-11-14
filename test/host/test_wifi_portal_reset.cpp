@@ -1,7 +1,7 @@
 // TASK-1930 host harness: the reset-button WiFi portal trigger (ADR-043) on the ESP32-S3.
 // Compiled by test_wifi_portal_reset.py with code extracted from the revision under test:
 //   portal.inc   the WIFI_PORTAL_RESET_* block of OTGW-firmware.ino, from the #defines to wifiPortalResetWindowExpired()
-//   extreset.inc platformIsExternalReset() of platform_esp32.h
+//   extreset.inc the platformIs...Reset/PowerOn() shims of platform_esp32.h
 // The S3 reset mapping is modelled from the pinned libs: the EN pin (reset button) and a power-on both give raw
 // 0x01 (soc/esp32s3 reset_reasons.h:38-40), which esp_reset_reason() reports as ESP_RST_POWERON; it never reports
 // ESP_RST_EXT. NVS (platformRtcRead/Write) survives every boot; RAM globals and millis() start at 0 on every boot.
@@ -44,9 +44,10 @@ static bool platformRtcWrite(uint32_t slot, const uint32_t *data, size_t len) {
 #include "extreset.inc"
 #include "portal.inc"
 
-enum Kind { BUTTON, POWER, SOFTWARE, EXT8266 };
+enum Kind { BUTTON, POWER, SOFTWARE, EXT8266, USB, SYSBROWNOUT };
 static const char *kindName(Kind k) {
-  return k == BUTTON ? "reset button" : k == POWER ? "power-on" : k == SOFTWARE ? "software reset" : "ESP_RST_EXT";
+  return k == BUTTON ? "reset button" : k == POWER ? "power-on" : k == SOFTWARE ? "software reset"
+       : k == EXT8266 ? "ESP_RST_EXT" : k == USB ? "USB reset" : "system brown-out";
 }
 
 // One boot: the reset kind sets the reason the S3 reports, setup() asks the trigger, then loop() runs for uptimeMs
@@ -57,6 +58,8 @@ static bool boot(Kind k, uint32_t uptimeMs) {
     case POWER:    g_reason = ESP_RST_POWERON; g_raw = 0x01; break;
     case SOFTWARE: g_reason = ESP_RST_SW;      g_raw = 0x0C; break;
     case EXT8266:  g_reason = ESP_RST_EXT;     g_raw = 0x01; break;   // what ADR-043 was written for (ESP8266)
+    case USB:      g_reason = ESP_RST_USB;     g_raw = 0x15; break;   // host USB reset (09: ESP_RST_USB; raw not verified)
+    case SYSBROWNOUT: g_reason = ESP_RST_BROWNOUT; g_raw = 0x0F; break;
   }
   g_millis = 0;
   wifiPortalResetWindowOpen = false;
@@ -108,6 +111,14 @@ int main(int argc, char **argv) {
   if (c == "P4") {   // the counting logic itself, fed with the reason it was written for
     std::string got = run({{POWER, 60000}, {EXT8266, 3000}, {EXT8266, 3000}, {EXT8266, 3000}}, f);
     return report("P4", !f[1] && !f[2] && f[3], "with ESP_RST_EXT (ESP8266 semantics) the counter does force the portal", got);
+  }
+  if (c == "P5") {   // ADR-238 (Robert, option A): pulling the plug three times is the same gesture
+    std::string got = run({{POWER, 60000}, {POWER, 3000}, {POWER, 3000}, {POWER, 3000}}, f);
+    return report("P5", !f[1] && !f[2] && f[3], "three power-ons within the window force the portal (ADR-238)", got);
+  }
+  if (c == "P6") {   // ADR-238 Must Not: USB resets and system brown-outs never count
+    std::string got = run({{POWER, 60000}, {USB, 3000}, {SYSBROWNOUT, 3000}, {USB, 3000}, {SYSBROWNOUT, 3000}}, f);
+    return report("P6", !f[1] && !f[2] && !f[3] && !f[4], "USB resets and system brown-outs never force the portal", got);
   }
   printf("unknown case %s\n", c.c_str());
   return 2;

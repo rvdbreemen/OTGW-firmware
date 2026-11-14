@@ -88,8 +88,10 @@ void clearWifiPortalResetState() {
   writeWifiPortalResetState(portalState);
 }
 
-bool isExternalSystemReset() {
-  return platformIsExternalReset();
+// ADR-238 (supersedes ADR-043's "external resets" on the ESP32-S3): a reset-button press and a power-on both count,
+// so pulling the plug three times also opens the portal and wipes the WiFi credentials (Robert, TASK-1930).
+bool isPortalResetGesture() {
+  return platformIsResetButtonOrPowerOn();
 }
 
 bool shouldForceWifiConfigPortal() {
@@ -100,7 +102,7 @@ bool shouldForceWifiConfigPortal() {
     portalState = storedState;
   }
 
-  bool externalReset = isExternalSystemReset();
+  bool externalReset = isPortalResetGesture();
   if (externalReset) {
     if (portalState.resetCount < 255) {
       portalState.resetCount++;
