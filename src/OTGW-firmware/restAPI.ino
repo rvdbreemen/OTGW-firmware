@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-beta.284
+**  Version  : v2.0.0-beta.285
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -4087,7 +4087,11 @@ void sendDeviceSettings()
     // TASK-1359: min/max are floats so a fractional bound (0.1) reaches the UI; whole bounds stay integers.
     auto addBound = [&](const __FlashStringHelper* key, float b) {
       if (b == (float)(int32_t)b) je.field(key, (int32_t)b);
-      else                        je.field(key, b, 2);
+      else {
+        // TASK-1941: 2 decimals unless that loses the bound (satthermalcoeff min 0.005 printed as 0)
+        const float c = b * 100.0f;
+        je.field(key, b, fabsf(c - roundf(c)) > 0.001f ? 3 : 2);
+      }
     };
     auto addNum = [&](const __FlashStringHelper* name, const char* numStr, const char* type, float minValue, float maxValue) {
       je.beginObject(name);
