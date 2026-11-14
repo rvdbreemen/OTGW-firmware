@@ -3,9 +3,11 @@ id: TASK-1924
 title: >-
   SAT: send CS= on change with a 30 s repeat, recompute the flow clamp every 5 s
   while the flame is on (entries 334-337)
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-11-14T07:58:00Z'
+updated_date: '2026-11-14T09:17:00Z'
 labels:
   - sat
 milestone: 2.0.0
