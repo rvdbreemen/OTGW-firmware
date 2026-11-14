@@ -332,7 +332,10 @@ The OTDirect module operates as a cooperative OpenTherm stack layered on the pro
 - **Purpose**: Switch operating mode with hardware reconfiguration
 - **Parameters**: `OTD_MODE_BYPASS`, `OTD_MODE_GATEWAY`, `OTD_MODE_MONITOR`, `OTD_MODE_MASTER`, `OTD_MODE_LOOPBACK`
 - **Behavior**:
-  - Calls `resetTransientState()` to clear non-persisted state
+  - A GW= for the mode already running applies nothing (TASK-1839); the setting is still written
+  - A switch between gateway and monitor keeps all command state, as on the PIC, and only flushes the command queue
+    (`otdFlushCmdQueue()`, ADR-223; Robert's decision, TASK-1839). A switch into or out of master, loopback or bypass
+    calls `resetTransientState()` to clear non-persisted state
   - Manages bypass relay: HIGH for bypass, LOW for other modes
   - Conditionally starts/stops slave interface based on mode:
     - Bypass: leaves the slave interface as it was
@@ -342,7 +345,7 @@ The OTDirect module operates as a cooperative OpenTherm stack layered on the pro
   - Persists mode to settings via `updateSetting("OTDmode", ...)`
 
 #### `static void resetTransientState()`
-- **Purpose**: Clear all non-persisted transient state (called on mode change or GW=R reset)
+- **Purpose**: Clear all non-persisted transient state (called on GW=R and on a mode change into or out of master, loopback or bypass; not between gateway and monitor, TASK-1839)
 - **Behavior**:
   - Resets operating mode overrides (MH, MW, M2)
   - Clears DHW push state machine

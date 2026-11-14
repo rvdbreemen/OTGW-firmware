@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTDirect.ino
-**  Version  : v2.0.0-beta.271
+**  Version  : v2.0.0-beta.272
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -2886,16 +2886,23 @@ static void onThermostatMsgID16(uint8_t msgType, uint16_t f88) {
 }
 
 // ---------------------------------------------------------------------------
-// resetTransientState — clear all transient state (called on GW=R and mode change)
-// Mirrors PIC hardware reset clearing all RAM, except persisted settings.
+// otdFlushCmdQueue — flush the command ring at a mode change or GW=R: a frame queued under the
+// previous mode (a WRITE 16/100 from TT= in master mode) must not reach the boiler after the
+// switch (ADR-223). The consumer applies the flush; frames queued after this point are kept.
+// otCmdQueueHighWater stays: it is a diagnostic peak, not queue content.
 // ---------------------------------------------------------------------------
-static void resetTransientState() {
-  // Flush the command ring: a frame queued under the previous mode (a WRITE 16/100 from TT= in
-  // master mode) must not reach the boiler after the switch (ADR-223). The consumer applies the
-  // flush; frames queued after this point are kept. otCmdQueueHighWater stays: it is a diagnostic
-  // peak, not queue content.
+static void otdFlushCmdQueue() {
   __atomic_store_n(&otCmdFlushHead, otCmdHead, __ATOMIC_RELAXED);
   __atomic_store_n(&otCmdFlushPending, true, __ATOMIC_RELEASE);
+}
+
+// ---------------------------------------------------------------------------
+// resetTransientState — clear all transient state: GW=R, and a mode change into or out of master,
+// loopback or bypass (applyOTDirectMode). Mirrors the PIC's reset clearing all RAM, except
+// persisted settings. A switch between gateway and monitor keeps the state (TASK-1839).
+// ---------------------------------------------------------------------------
+static void resetTransientState() {
+  otdFlushCmdQueue();
   // Operating mode overrides
   otOperModeDHW = 0;
   otOperModeCH1 = 0;
@@ -2969,7 +2976,16 @@ static void resetTransientState() {
 // boot (TASK-1694). setOTDirectMode() below also persists the mode for user changes.
 // ---------------------------------------------------------------------------
 static void applyOTDirectMode(OTDirectMode newMode) {
-  resetTransientState();  // Clear all transient state on mode change
+  // TASK-1839 (Robert, DM 1570230662743592961, answer A to 1570229987825418384): a real switch between
+  // gateway and monitor keeps all command state, as on the PIC (SetGatewayMode only switches the
+  // comparators, gateway.asm 6.8 :4729-4774); only the queue is flushed (ADR-223). A CS= keeps its
+  // expiry clock (loopOTDirect, every mode). Monitor mode applies none of it (transparent relay, no
+  // own frames). The PIC has no master, loopback or bypass mode; a switch into or out of one of
+  // those still clears the transient state.
+  const bool keep = (otCurrentMode == OTD_MODE_GATEWAY && newMode == OTD_MODE_MONITOR) ||
+                    (otCurrentMode == OTD_MODE_MONITOR && newMode == OTD_MODE_GATEWAY);
+  if (keep) otdFlushCmdQueue();
+  else      resetTransientState();
   otCurrentMode  = newMode;
 
   switch (newMode) {

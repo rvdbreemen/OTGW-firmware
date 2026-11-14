@@ -256,6 +256,8 @@ def build_source():
          if "static void otdNoteCmdSent(" in src else ""),
         cut_braced(src, "static void scheduleMasterRequest()"),
         cut_braced(src, "static bool otdAltSlotTaken(unsigned long thermostatFrame)"),
+        (cut_braced(src, "static void otdFlushCmdQueue()")   # TASK-1839: the flush is its own helper now
+         if "static void otdFlushCmdQueue()" in src else ""),
         cut_braced(src, "static void resetTransientState()"),
         cut_braced(src, "static void applyOTDirectMode(OTDirectMode newMode)"),
     ]
