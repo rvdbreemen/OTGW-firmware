@@ -4558,7 +4558,7 @@
     "TASK-1924",
     "TASK-1933"
    ],
-   "confirmed_by_entry": null
+   "confirmed_by_entry": 350
   },
   {
    "id": 343,
@@ -4652,6 +4652,19 @@
    "supersedes": [],
    "tasks": [
     "TASK-1924"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 350,
+   "title": "Q-342a A: build the entry-342 PWM exit now; watch the testers' captures for toggling (Sergeant D, 2026-11-14; answers Q-342a, confirms entry 342)",
+   "date": "2026-11-14",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1571219870551507057",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1933"
    ],
    "confirmed_by_entry": null
   }

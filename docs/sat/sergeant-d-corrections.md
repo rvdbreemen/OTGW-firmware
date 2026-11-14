@@ -7302,3 +7302,21 @@ Asked by DM (through the coordinator) whether the repeat is 60 s or 30 s, given 
 **Open:** none for the offsets.
 
 **Task:** TASK-1924.
+
+## 350. Q-342a A: build the entry-342 PWM exit now; watch the testers' captures for toggling (Sergeant D, 2026-11-14; answers Q-342a, confirms entry 342)
+
+**Source:** #alpha-testing 2026-11-14. Q-342a (drafted by d3 from the TASK-1933 simulation, docs/sat/sim-1933/report.md, commit 26a8ebe47): https://discord.com/channels/812969634638725140/1514720723980259460/1571219870551507057 (17:46 UTC). His answer, 17:54:04 UTC: https://discord.com/channels/812969634638725140/1514720723980259460/1571221697703710812
+
+**Quoted:**
+
+> "A"
+
+**Option A as posted:** "Build your rule now, as decided (entry 342). We watch the testers' captures for toggling and come back to you if it shows up."
+
+**Settled (confirms entry 342):** TASK-1933 builds entry 342 unchanged: while PWM is ON, flame on and the request above the boiler (flow) temperature for 60 s switches to continuous; it replaces thermo-nova's underheat exit (flow <= request - 3.0 for 180 s, `heating_control.py:331-356`, `cycles/const.py:11`, `const.py:22`), the saturation exit stays (entry 342). The simulated toggling in 2 of 5 house classes (up to 12.5 PWM re-entries per day, limit 4) is not a reason to wait; it is read as a model artefact (no return delay in `sat_closedloop_sim_1412_19.py:152`). Not our recommendation (we recommended B, a better plant model first).
+
+**Follow-up we committed to:** watch tester captures after the build for PWM re-entries shortly after ignition and report to him if toggling shows up. The two failing simulation classes (hot water, slow ignition) are the ones to look at first.
+
+**Open:** none for the rule.
+
+**Task:** TASK-1933.
