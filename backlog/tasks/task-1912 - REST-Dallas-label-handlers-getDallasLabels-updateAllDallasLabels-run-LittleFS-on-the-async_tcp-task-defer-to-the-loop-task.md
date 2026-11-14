@@ -3,11 +3,11 @@ id: TASK-1912
 title: >-
   REST Dallas label handlers (getDallasLabels, updateAllDallasLabels) run
   LittleFS on the async_tcp task: defer to the loop task
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-13T19:17:00Z'
-updated_date: '2026-11-14T02:24:00Z'
+updated_date: '2026-11-14T04:06:00Z'
 labels:
   - bug
   - stability
@@ -26,7 +26,7 @@ Follow-up of TASK-1899 (narrow scope, coordinator 2026-11-13). getDallasLabels()
 <!-- AC:BEGIN -->
 - [x] #1 No LittleFS call in the Dallas label handlers runs on async_tcp; /dallas_labels.ini is read and written on the loop task
 - [x] #2 The TASK-1899 gate allow-list entries for getDallasLabels and updateAllDallasLabels are removed and the gate stays green; red on the old code
-- [ ] #3 Host or source test on the real handlers; bench by the bench-tester: read and save sensor labels from the web UI, no watchdog reset
+- [x] #3 Host or source test on the real handlers; bench by the bench-tester: read and save sensor labels from the web UI, no watchdog reset
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -55,4 +55,12 @@ Bench 30-min load on 962a3c7 (09, evidence b233): 892 GET ok, 8 GET 503 (all wit
 Round 2, FSexplorer reload: dallasLabelsFileChanged(path) is called from all three places that change a file on async_tcp: the apilistfiles delete after LittleFS.remove, the handleFile ?delete, and handleFileUpload before the final close (File::path(), mount-relative, checked in framework vfs_api.cpp:398). Only the labels file counts, with or without the leading slash. It records the generation and sets a request flag (atomic, no lock); loopDallasLabels() consumes it before the flush. reloadDallasLabels() reads the file into s_dlFlushBuf outside the lock, then takes it over only if no POST came after the request: the last action wins, and an older pending edit is dropped, not written over the upload. Remaining window: a flush already writing when the upload lands can rename over it; that needs a save and an upload within the same ~1 s.
 
 Round 2, shared helper: the flush now writes the temp file and commits it with ba's fsCommitTempFile() (TASK-1913, helperStuff.ino: size check, rename, temp removed on failure); the host test compiles that real block. Host tests on the final code (rebased on 5cc1612c0): tests/test_dallas_labels_ram_copy.py 12/12 OK. Old 962a3c7 sensors_ext.ino with a no-op dallasLabelsFileChanged shim: 2 FAIL, '503' != '200' (POST during the flash write) and '{"28AA":"P"}' != '{"28AA":"U"}' (stale copy after an upload). Mutant without the generation check: FAIL, second POST lost. Mutant without the reload: FAIL P != U. Old FSexplorer.ino: wiring FAIL. tests/fixtures/web_file_scheduling.cpp got a dallasLabelsFileChanged stub (it compiles handleFile()). Also OK: 1899 gate, flags_loop, health, dallas_first_reading, fs_update_keep, web_file_scheduling, fsexplorer_relative_urls, ota_flash, reboot_listener_and_reason, favicon_flash, test/host webserver_listener_retry and settings_atomic_write; evaluate --quick Failed 0, health 100 %.
+
+Bench round 2 (09, .61, simulated Dallas, 2.0.0-beta.235+124965a, evidence 09 scratchpad b235): PASS on every point. 30-min load: 900 GET ok, 0 GET 503 (233 baseline: 8), 0 POST 503, 0 wrong read-backs, no reset. Step 3 read-after-write 10/10. FSexplorer upload: GET showed the uploaded names, and a later save kept them. FSexplorer delete: GET {}, no file until the next save. Build: exit 0, 'Successfully created ESP32S3 image' 2x, RAM 130244 B (39.7 %), Flash 2144675 B (93.5 %), zip sha256 1d2cdc237035ac12d0122df9a64ef051f84319265c5d34770e86880f2e326dd2. Pushed 4bcf241fa..124965a30, posted Discord message 1571013138881450045.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+GET/POST /api/v2/sensors/labels now work on a RAM copy of /dallas_labels.ini; the loop task writes the file through a temp file committed by fsCommitTempFile() (TASK-1913). AC1: no LittleFS call in getDallasLabels/updateAllDallasLabels (tests/test_rest_no_littlefs_on_async_tcp.py, red on the old handlers at 4632/4692, green). AC2: the gate allow-list entries are gone and the gate is green. AC3: tests/test_dallas_labels_ram_copy.py 12/12 OK on the real handlers and the real labels block. On the old code it is red for the lost update, for a POST during the flash write ('503' != '200') and for the stale copy after an FSexplorer upload (P != U). Mutants without the generation check and without the reload are both red. Bench by 09: round 1 on 233 found the 503 window and the FSexplorer staleness; round 2 on 235+124965a PASS (0 GET 503 against 8, 10/10 read-after-write, upload and delete follow the file, no reset). Kept on purpose: ensureSensorDefaultLabels() holds the lock across its file edit (boot only; the UI retries a 503). Known window: a flush already writing when an FSexplorer upload lands can rename over it (save and upload within ~1 s).
+<!-- SECTION:FINAL_SUMMARY:END -->
