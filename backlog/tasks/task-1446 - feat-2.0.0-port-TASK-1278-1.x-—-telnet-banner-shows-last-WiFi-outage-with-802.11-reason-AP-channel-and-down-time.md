@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-29T06:16:00Z'
-updated_date: '2026-11-04T22:23:00Z'
+updated_date: '2026-11-14T15:40:00Z'
 labels:
   - port-from-1.x
   - wifi
@@ -77,11 +77,11 @@ Source: port evaluation 2026-10-29 (1.x v1.7.7..otgw-1.x.x 76a89bc3d against ori
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 On 2.0.0, each telnet connect prints a 'Link :' line (joined AP BSSID, channel, outages since boot, disconnect events since boot) and either 'Drop : none since boot' or a 'Drop :' line with age, down duration, first and last reason code plus name, event count, AP BSSID and channel left, and a self-caused marker when applicable
+- [x] #1 On 2.0.0, each telnet connect prints a 'Link :' line (joined AP BSSID, channel, outages since boot, disconnect events since boot) and either 'Drop : none since boot' or a 'Drop :' line with age, down duration, first and last reason code plus name, event count, AP BSSID and channel left, and a self-caused marker when applicable
 - [ ] #2 Disconnect/connect events are captured via WiFi.onEvent in arduino-esp32 3.x; the callback only records into a lock-protected record (portMUX or equivalent), and logging happens from loopWifi() on the loop task
-- [ ] #3 Repeated disconnect events during one outage (SDK retries) count as one outage with an event count and a last reason, matching 1.x semantics
+- [x] #3 Repeated disconnect events during one outage (SDK retries) count as one outage with an event count and a last reason, matching 1.x semantics
 - [ ] #4 WiFi.disconnect() calls initiated by the firmware (Ethernet.ino switch-over, BETA AP_RETRY timeout) are marked self-caused in the record
-- [ ] #5 The boot association that completes before the handler is registered still fills the joined BSSID/channel shown in the banner
+- [x] #5 The boot association that completes before the handler is registered still fills the joined BSSID/channel shown in the banner
 - [ ] #6 Bench check on .63 (Classic+S3) or .61 (OTGW32): router-forced deauth via MikroTik shows reason 2 (or the IDF equivalent) in the 'WiFi: link lost' log line and in the next telnet banner; a ~90 s access-list block shows one outage with duration about 90-110 s and an event count above 1; before the change (current dev) the banner shows no such information. Capture both transcripts as evidence
 - [ ] #7 python build.py builds esp32, esp32-classic and esp32-combo targets green and python evaluate.py --quick shows no new failures
 - [ ] #8 After an Ethernet takeover (Ethernet.ino:103-104 disconnect plus WIFI_OFF), the banner's last drop is marked self-caused and is not counted as a field outage.
@@ -96,4 +96,12 @@ Triage 2026-11-02 (beta.5, origin/dev 6c41cc696) in code: no event handlers/wifi
 2026-11-04 Robert: MikroTik fault injection allowed: one rule per test, scoped to the bench boards' MAC/IP (.61/.63), comment-tagged, scheduler auto-removal within 30 min, removed right after; config export before and after recorded in the notes.
 
 2026-11-04 (opus agent; lead reran in wt-int4): one WiFi link/outage record from WiFi.onEvent (STA_CONNECTED/DISCONNECTED; callbacks only write under portMUX g_wifiLinkMux, no log/alloc), retries in one outage = 1 outage with event count + first/last reason (WiFi.disconnectReasonName), self-caused drops (Ethernet takeover, AP-retry timeout, TASK-1450 dead-link reconnect) marked and not counted (mark only while the link is up, cleared by every event), boot catch-up of BSSID/channel; telnet banner Link/Drop lines; device/info 14 wifi_* keys (the AC's '15' lists 14 names; the 15th in the 1.x commit was cmd_dropped of another task); openapi documented. tests/test_wifi_link_record.py 15 OK (old: 15 FAIL; 2 mutants red each), deadlink 28, rest_contract 16 OK, evaluate 0 failed. Tag beta.84; firmware build + MikroTik deauth/access-list bench pending.
+
+2026-11-14 (09) bench .63 (2.0.0-beta.248+5e8c416, CAPsMAN '1e verdieping-1' + router wlan2 'KeepOut2'; evidence 09 scratchpad b1444/ and b1444b/). Fresh state: wifi_outages 0, wifi_disconnect_events 0, wifi_ap_bssid C4:AD:34:FE:E5:43 ch 6 = the CAPsMAN registration-table entry for AC:27:6E:CE:45:D8 (interface MAC C4:AD:34:FE:E5:43); banner 'Link : AP C4:AD:34:FE:E5:43 ch 6 outages 0 disconnect events 0' and 'Drop : none since boot'. Deauth (/caps-man registration-table remove): API back after 6 s; wifi_outages 1, wifi_drop_reason 2 AUTH_EXPIRE (last 2), drop_bssid C4:AD:34:FE:E5:43 ch 6, drop_events 1, drop_down_sec 4, drop_self false; banner 'Drop : 14 s ago, down 4 s, reason 2 AUTH_EXPIRE (last 2 AUTH_EXPIRE, 1 events), AP C4:AD:34:FE:E5:43 ch 6'. A first block attempt with only the CAPsMAN access list was not a block: the unit roamed to the router's own wlan2 (74:4D:28:C7:07:40, same SSID) after 4 s, which the record showed correctly as a new outage. 90 s block with both access lists (/caps-man access-list reject + /interface wireless access-list authentication=no, comment-tagged, scheduler safety net): API answered 0 of 15 polls during the block, back 5 s after the unblock; device/info: wifi_outages 2->3 (exactly one outage), wifi_disconnect_events 2->21 (+19) = wifi_drop_events 19, first reason 2 AUTH_EXPIRE, last reason 203 ASSOC_FAIL, drop_bssid 74:4D:28:C7:07:40 ch 1, drop_down_sec 93 (block 91 s + reconnect). Banner 'Link : AP C4:AD:34:FE:E5:43 ch 6 outages 3 disconnect events 21' / 'Drop : 104 s ago, down 93 s, reason 2 AUTH_EXPIRE (last 203 ASSOC_FAIL, 19 events), AP 74:4D:28:C7:07:40 ch 1'. Router afterwards: both access lists 0, scheduler 0, /export terse identical before/after apart from the timestamp header. Settings untouched (no setting changed).
+
+Not shown on the bench: the 'WiFi: link lost' log line (networkStuff.ino:199) is written while the link is down and the 'joined AP ... after N s' line right at reconnect, before a telnet client can reconnect, so neither reached the telnet capture; the same data is in the next banner (above). AC9 bench red not done (no pre-beta.84 build compatible with the current layout; the red is the host test). AC5 boot catch-up: the fresh-boot banner shows the joined AP and channel (above). AC8 by reading only (no Ethernet on .63): Ethernet.ino:103 marks the drop WIFI_SELF_ETHERNET, not counted (networkStuff.ino:129).
+
+AC2 by reading: WiFi.onEvent callbacks write only under portENTER_CRITICAL(&g_wifiLinkMux) (networkStuff.ino:110-118 connected, 123-144 disconnected; no logging, no allocation); logging is wifiLinkEventsLog() on the loop task (networkStuff.ino:185-210). AC4 (self-caused marks for the Ethernet and AP-retry disconnects) not verified on the bench by 09.
+
+Correction (09, coordinator review): AC2 and AC8 unticked, their text does not allow code reading as evidence. AC8 is not verifiable on hardware (no Ethernet on the bench); the reading evidence for AC2 and AC8 stays in the notes above. 1444 AC5 and AC6 stay ticked: their text allows reading (AC5 'or by reading the code ... say which', AC6 'Verified by reading the code'); the file:line citations are in the 1444 notes for the owner's Final Summary.
 <!-- SECTION:NOTES:END -->
