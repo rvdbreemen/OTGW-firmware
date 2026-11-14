@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-14T07:58:00Z'
-updated_date: '2026-11-14T10:49:00Z'
+updated_date: '2026-11-14T12:32:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -24,9 +24,9 @@ Maintainer order by Robert, #alpha-testing 2026-11-14: https://discord.com/chann
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 CS= is sent when the sent value (0.1 resolution) changes, and an unchanged CS= is repeated every 30 s; the 5 s resend of an unchanged CS= is gone (entries 334, 335)
+- [x] #1 CS= is sent when the sent value (0.1 resolution) changes, and an unchanged CS= is repeated every 30 s; the 5 s resend of an unchanged CS= is gone (entries 334, 335)
 - [ ] #2 While the flame is on and the flow clamp of entry 112 is active, the clamped CS is recomputed every 5 s and sent when it changes (entry 337)
-- [ ] #3 MM=, TP= and CH= keep their on-change plus 60 s repair cadence (entries 237, 239); PIC keepalive and the 3 s PWM suppression refresh are consistent with the new CS rule
+- [x] #3 MM=, TP= and CH= keep their on-change plus 60 s repair cadence (entries 237, 239); PIC keepalive and the 3 s PWM suppression refresh are consistent with the new CS rule
 - [ ] #4 A new ADR supersedes the CS part of ADR-207 (and ADR-203 where still in force), via adr-kit
 - [ ] #5 Host tests call the real sender code and fail on the old code (5 s repeat, no 5 s clamp recompute) and pass on the fix
 - [ ] #6 Bench (bench-tester): CS= count per minute in steady state and during a warm-up, and no PIC CS expiry over 30 min
@@ -46,4 +46,8 @@ Part 1 (entries 334, 335; GO by coordinator 2026-11-14): satSendCS() on change (
 Part 1 evidence (host, real code): tests/test_sat_cmd_cache.py new test_steady_state_sends_two_cs_per_minute_and_a_change_at_once: fix cs=2 per 60 s, old code (origin/dev SATcontrol.ino) cs=13; whole file fix 29/29 OK, old 13 FAIL. Updated for a stated reason (5 s resend -> 30 s repeat, CS on change): test_sat_cmd_cache, test_sat_ceiling_paths (inventory + forced flood), test_sat_cs_ceiling_1536 (repeat after 30 s), test_sat_cs_wire_matches_cache (cut starts at the new constants, repeat after 30 s), test_sat_no_return_ignition (normal boiler hold not repeated within 30 s), test_sat_ot_loss (premise repeat at 31 s, none at 2-30 s), test_sat_push_setpoint (one repeat at 130 s), test_sat_lowload_contract (LL-013 renamed tests). All 93 tests/test_sat_*.py files PASS (chunks 26+18+45 files, lowload contract 35 tests separately). Non-SAT: 153/156 PASS; test/host/test_dhw_water_meter.py FAILED after 452 s in a run that overlapped a peer build (sources not touched by this diff), rerun pending; test_refresh_storm cut off by my timeout, rerun pending. One transient WinError 225 (Defender on a temp test exe) in test_sat_ceiling_paths, rerun OK.
 
 Part 2 (AC2): Q-337b answered by Robert B (entry 338, 'improve on the boost but only in the same method of thermo nova'): continuous mode, start-up period after flame-on: CS = max(request, flow - offset) every 5 s without the previous-CS hold; outside it the entry-112 clamp with the 5 s recompute. Open before building Part 2: start-up period length/end from thermo-nova timers (cite), which offset, Sergeant D's OK. Host sim of the real satApplyContinuous: scratchpad sim1924-clamp.cpp (request 50 constant, flow 30->60: CS stays 50).
+
+Part 1 shipped as beta.242: cdc9003ac on origin/dev (parent 002d1fbc2), build exit 0 (wrapper log), zip posted #alpha-testing message 1571140677746561166 (covers beta.241 TASK-1904). ADR-235 Proposed (open: the flood question; acceptance needs Robert's DM yes).
+
+Bench 09 on .63 (PIC 6.8, SAT sim, interval 30 s), 12:47-13:29: sha256 match, OTA exit 0, settings changed none, bootcount 103->105; 113 SAT CS= inserts, 0 drops; steady 2.7/min (min 2, max 4, never 12+); setpoint step 19.8->21.0: CS=51.5 inserted on the tick that computed it (12:58:54.518); largest CS gap 30.110 s, 0 > 31 s; githash cdc9003, no extra reboot, crashlog unchanged, settings diff []. NOT observable: MsgID 1 on the bus (.63 has no boiler). Finding (09): at a 30 s control interval the loop repeat fires 2-6 ms before the tick that brings a new value, so the OLD CS= goes to the PIC queue just before the new one (29 of 37 changes). Coordinator decision A: shipped as is; fix in Part 2 (loop repeat at 31 s / repeat timer reset on a change, plus a host test with the tick at 30 s).
 <!-- SECTION:NOTES:END -->
