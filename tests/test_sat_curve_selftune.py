@@ -36,6 +36,10 @@ REPO = Path(__file__).resolve().parent.parent
 SRC = REPO / "src" / "OTGW-firmware"
 SAT_INO = Path(os.environ.get("OTGW_SAT_INO", SRC / "SATcontrol.ino"))
 SAT_HDR = Path(os.environ.get("OTGW_SAT_HDR", SAT_INO.with_name("SATcurveTune.h")))   # old-vs-fix: both files from one commit
+# The compiled tuner keeps its window file at SATTUNE_FILE, else "sat_tune_test.json" in the cwd (STUBS). Every run here
+# passes its own file; this default catches a run that does not (or a module that imports these stubs), so no file lands
+# in the working tree.
+os.environ.setdefault("SATTUNE_FILE", str(Path(tempfile.gettempdir()) / f"sat_tune_test_{os.getpid()}.json"))
 
 STUBS = r"""
 #include <cstdint>
@@ -263,6 +267,11 @@ ALL_EXCL = list(EXCL)
 # ADR-231: a PWM tick excludes the hour only on a heat pump or a hybrid; the generic exclusion tests run the pwm case on a
 # hybrid (src:3). The gas-boiler PWM rule has its own tests (PwmGasRule).
 EXCL_PRE = {"pwm": ["src:3"]}
+# TASK-1932 (entries 340, 343, 369): one excluded tick no longer drops an hour, only a clean share under 90 % of the EXPECTED
+# ticks does. The default test interval (3600 s) expects 1 tick an hour, so a mixed hour always counts there. A 900 s
+# interval expects 4: excluded_hour() (3 clean + 1 excluded = 75 %) is below the 90 % share and is not counted, as the older
+# tests below need; clean_hour() (4 clean) still counts. Put SHARE first: run_tokens() reads leading int: tokens as settings.
+SHARE = ["int:900"]
 
 
 def day(sig, clean=24, excl=None, excl_sig_clean=None):
@@ -349,17 +358,17 @@ class SatCurveSelfTune(unittest.TestCase):
     def test_uncounted_day_does_not_fill_the_window(self):
         # counted, uncounted (5 clean hours, big signal), counted: still no change; the fourth day (counted) completes it
         u = day(3.0, clean=5, excl="dhw", excl_sig_clean=3.0)
-        o = self.run_tokens(day(1.5) + u + day(1.5))
+        o = self.run_tokens(SHARE + day(1.5) + u + day(1.5))   # TASK-1932 (entry 369): SHARE makes the mixed hours fall under 90 %
         self.assertEqual((o.coeff, o.writes), (2.0, 0))
         self.assertEqual(o.days[1]["counted"], "0")
         self.assertEqual(o.days[1]["reason"], "day_not_counted")
-        o = self.run_tokens(day(1.5) + u + day(1.5) + day(1.5))
+        o = self.run_tokens(SHARE + day(1.5) + u + day(1.5) + day(1.5))
         self.assertEqual((o.coeff, o.writes), (2.1, 1))
 
     def test_hour_weighted_mean_over_the_window(self):
         # day mean would be (3 + 3 - 0.5) / 3 = 1.83 (raise); hour-weighted is (18 + 18 - 12) / 36 = 0.67 (hold)
         a = day(3.0, clean=6, excl="dhw", excl_sig_clean=3.0)
-        o = self.run_tokens(a + a + day(-0.5))
+        o = self.run_tokens(SHARE + a + a + day(-0.5))   # TASK-1932 (entry 369): SHARE, see above
         self.assertEqual((o.coeff, o.writes), (2.0, 0))
         self.assertEqual(o.days[2]["mean3"], "0.67")
 
@@ -367,7 +376,8 @@ class SatCurveSelfTune(unittest.TestCase):
     def test_each_exclusion_makes_the_hour_not_count(self):
         for ex in ALL_EXCL:
             with self.subTest(exclusion=ex):
-                o = self.run_tokens(EXCL_PRE.get(ex, []) + excluded_hour(0.5, ex) + clean_hour(0.5))
+                # TASK-1932 (entry 369): SHARE puts the 3 clean + 1 excluded hour at 75 %, under the 90 % share, so it is not counted
+                o = self.run_tokens(SHARE + EXCL_PRE.get(ex, []) + excluded_hour(0.5, ex) + clean_hour(0.5))
                 self.assertEqual((o.hours[0]["counted"], o.hours[0]["reason"]), ("0", ex))
                 self.assertEqual((o.hours[1]["counted"], o.hours[1]["reason"]), ("1", "none"))
 
@@ -403,14 +413,14 @@ class SatCurveSelfTune(unittest.TestCase):
         # With any one exclusion removed the +9 hours count and the coefficient moves (see the mutation test).
         for ex in ALL_EXCL:
             with self.subTest(exclusion=ex):
-                o = self.run_tokens(EXCL_PRE.get(ex, []) + day(0.5, clean=6, excl=ex) * 3)
+                o = self.run_tokens(SHARE + EXCL_PRE.get(ex, []) + day(0.5, clean=6, excl=ex) * 3)   # TASK-1932 (entry 369): SHARE
                 self.assertEqual((o.coeff, o.writes), (2.0, 0))
                 self.assertEqual(o.days[2]["clean"], "6")
                 self.assertEqual((o.days[2]["mean3"], o.days[2]["decision"], o.days[2]["reason"]),
                                  ("0.50", "hold", "inside_band"))
 
     def test_a_day_needs_six_clean_hours(self):
-        o = self.run_tokens(day(1.5, clean=5, excl="dhw") + day(1.5, clean=6, excl="dhw"))
+        o = self.run_tokens(SHARE + day(1.5, clean=5, excl="dhw") + day(1.5, clean=6, excl="dhw"))   # TASK-1932 (entry 369): SHARE
         self.assertEqual([(d["clean"], d["counted"]) for d in o.days], [("5", "0"), ("6", "1")])
 
     def test_coefficient_change_in_the_hour_excludes_it(self):
@@ -516,8 +526,10 @@ class SatCurveSelfTune(unittest.TestCase):
         self.assertEqual(o.narr, ["NARR Heating curve self-tune: coefficient 2.0 -> 1.9 (3-day warm-up -1.50 C and floating -1.50 C, both below the curve)"])
 
     def test_hour_record_of_an_excluded_hour_keeps_its_mean(self):
-        o = self.run_tokens(["src:3", tk(sig=2.0), tk(sig=4.0, pwm=1), f"A:{HOUR}"])
-        self.assertEqual((o.hours[0]["mean"], o.hours[0]["ticks"], o.hours[0]["reason"]), ("3.00", "2", "pwm"))
+        # TASK-1932 (entry 369): 2 clean + 2 pwm ticks of 4 expected (900 s) = 50 % clean, under 90 %: not counted, so the
+        # record keeps the mean over all four signal ticks (TASK-1551), not the clean mean 2.00
+        o = self.run_tokens(SHARE + ["src:3", tk(sig=2.0), tk(sig=4.0, pwm=1), tk(sig=4.0, pwm=1), tk(sig=2.0), f"A:{HOUR}"])
+        self.assertEqual((o.hours[0]["mean"], o.hours[0]["ticks"], o.hours[0]["reason"]), ("3.00", "4", "pwm"))
 
     # --- review round: not controlling, few ticks, simulation switch, window file, manual day counters, no_room -----------
     def test_early_return_paths_make_the_hour_not_count(self):
@@ -529,12 +541,17 @@ class SatCurveSelfTune(unittest.TestCase):
         self.assertEqual([h["reason"] for h in o.hours], ["pwm", "not_controlling"])
 
     def test_hour_needs_75_percent_of_the_expected_ticks(self):
-        # control interval 900 s: 4 ticks expected in 3600 s, 3 needed (ceil(4 * 0.75))
-        o = self.run_tokens(["int:900"] + [tk(sig=0.5)] * 3 + [f"A:{HOUR}"] + [tk(sig=0.5)] * 2 + [f"A:{HOUR}"])
-        self.assertEqual([(h["counted"], h["reason"]) for h in o.hours], [("1", "none"), ("0", "few_ticks")])
-        o = self.run_tokens(["int:30"] + [tk(sig=0.5)] * 89 + [f"A:{HOUR}"] + [tk(sig=0.5)] * 90 + [f"A:{HOUR}"])
-        self.assertEqual([(h["counted"], h["reason"]) for h in o.hours], [("0", "few_ticks"), ("1", "none")],
-                         "120 expected at 30 s, 90 needed")
+        # control interval 900 s: 4 ticks expected in 3600 s. Under 3 (ceil(4 * 0.75)) the hour is few_ticks as before;
+        # since TASK-1932 (entry 343) a counted hour needs 90 % of the expected ticks clean, so 3 of 4 is short too
+        o = self.run_tokens(["int:900"] + [tk(sig=0.5)] * 4 + [f"A:{HOUR}"] + [tk(sig=0.5)] * 3 + [f"A:{HOUR}"]
+                            + [tk(sig=0.5)] * 2 + [f"A:{HOUR}"])
+        self.assertEqual([(h["counted"], h["reason"]) for h in o.hours],
+                         [("1", "none"), ("0", "few_ticks"), ("0", "few_ticks")])
+        o = self.run_tokens(["int:30"] + [tk(sig=0.5)] * 89 + [f"A:{HOUR}"] + [tk(sig=0.5)] * 90 + [f"A:{HOUR}"]
+                            + [tk(sig=0.5)] * 108 + [f"A:{HOUR}"])
+        self.assertEqual([(h["counted"], h["reason"]) for h in o.hours],
+                         [("0", "few_ticks"), ("0", "few_ticks"), ("1", "none")],
+                         "120 expected at 30 s: under 90 few_ticks, 108 clean needed to count (entry 343)")
 
     def test_few_ticks_does_not_hide_an_earlier_reason(self):
         o = self.run_tokens(["int:900", "src:3", tk(pwm=1), f"A:{HOUR}"])
@@ -611,7 +628,8 @@ class SatCurveSelfTune(unittest.TestCase):
 
     # --- TASK-1551 (entry 205): heat pumps log the PWM ticks of an hour, the tuner ignores them -----------------------
     def test_heat_pump_hour_logs_pwm_ticks_and_mean(self):
-        o = self.run_tokens(["src:2", tk(sig=2.0), tk(sig=4.0, pwm=1), tk(sig=3.0, pwm=1), f"A:{HOUR}"])
+        # TASK-1932 (entry 369): 2 clean + 2 pwm ticks of 4 expected (900 s) = 50 % clean: not counted, mean over all ticks
+        o = self.run_tokens(SHARE + ["src:2", tk(sig=2.0), tk(sig=4.0, pwm=1), tk(sig=3.0, pwm=1), tk(sig=3.0), f"A:{HOUR}"])
         h = o.hours[0]
         self.assertEqual((h["mean"], h["counted"], h["reason"], h.get("pwm")), ("3.00", "0", "pwm", "2"))
 
@@ -621,9 +639,11 @@ class SatCurveSelfTune(unittest.TestCase):
 
     def test_hybrid_record_unchanged(self):
         # a gas boiler counts this hour since ADR-231 (PwmGasRule); a hybrid keeps the record of TASK-1551
-        o = self.run_tokens(["src:3", tk(sig=2.0), tk(sig=4.0, pwm=1), f"A:{HOUR}"])
-        self.assertRegex(o.log[0], r"^SATTUNEH hour=0 mean=3\.00 ticks=2 counted=0 reason=pwm "
-                                   r"wmean=2\.00 wticks=1 fmean=4\.00 fticks=1$")   # no pwm= field (ADR-228 adds the phases)
+        # TASK-1932 (entry 369): 4 ticks of 4 expected (900 s), 2 of them pwm = 50 % clean: not counted; the phases alternate
+        # warm-up (2.0) / floating (4.0 pwm), two ticks each
+        o = self.run_tokens(SHARE + ["src:3", tk(sig=2.0), tk(sig=4.0, pwm=1), tk(sig=2.0), tk(sig=4.0, pwm=1), f"A:{HOUR}"])
+        self.assertRegex(o.log[0], r"^SATTUNEH hour=0 mean=3\.00 ticks=4 counted=0 reason=pwm "
+                                   r"wmean=2\.00 wticks=2 fmean=4\.00 fticks=2$")   # no pwm= field (ADR-228 adds the phases)
 
     def test_heat_pump_logging_does_not_change_the_decision(self):
         toks = day(1.5) * 3 + [tk(sig=2.0, pwm=1), f"A:{HOUR}"] + day(1.5) * 3
@@ -637,7 +657,9 @@ class SatCurveSelfTune(unittest.TestCase):
         self.assertEqual((o.hours[0]["counted"], o.hours[0]["reason"]), ("0", "no_room"))
 
     def test_room_lost_hour_excluded_then_a_clean_hour_counts(self):
-        o = self.run_tokens([tk(sig=0.5), tk(sig=0.0, room=1), f"A:{HOUR}", tk(sig=0.5), f"A:{HOUR}"])
+        # TASK-1932 (entry 369): the room-lost hour is 3 of 4 expected ticks (900 s) excluded = 25 % clean: not counted
+        o = self.run_tokens(SHARE + [tk(sig=0.5), tk(sig=0.0, room=1), tk(sig=0.0, room=1), tk(sig=0.0, room=1), f"A:{HOUR}"]
+                            + clean_hour(0.5))
         self.assertEqual([(h["counted"], h["reason"]) for h in o.hours], [("0", "no_room"), ("1", "none")])
 
     # --- simulation-only hour length -----------------------------------------------------------------------------
@@ -786,8 +808,9 @@ class PhaseSplit(unittest.TestCase):
     def test_excluded_hours_never_reach_a_phase(self):
         bad = []
         for h in range(24):
-            bad += [tk(sig=0.0, err=0.5), tk(sig=0.0, err=0.0), tk(sig=9.0, err=0.0, pwm=1), f"A:{HOUR}"]
-        o = self.run_tokens(["src:3"] + phase_day(2.0, 2.0, clean=6) + bad + phase_day(2.0, 2.0, clean=6) + phase_day(2.0, 2.0, clean=6))
+            # TASK-1932 (entry 369): 2 clean + 2 pwm ticks of 4 expected (900 s) = 50 % clean, so the hour is not counted
+            bad += [tk(sig=0.0, err=0.5), tk(sig=0.0, err=0.0), tk(sig=9.0, err=0.0, pwm=1), tk(sig=9.0, err=0.0, pwm=1), f"A:{HOUR}"]
+        o = self.run_tokens(SHARE + ["src:3"] + phase_day(2.0, 2.0, clean=6) + bad + phase_day(2.0, 2.0, clean=6) + phase_day(2.0, 2.0, clean=6))
         self.assertEqual((o.days[3]["wmean3"], o.days[3]["fmean3"]), ("2.00", "2.00"))
 
     def test_hot_water_tick_has_no_phase(self):
@@ -876,10 +899,12 @@ class PwmGasRule(unittest.TestCase):
         self.assertEqual((o.hours[0]["counted"], o.hours[0]["reason"]), ("0", "few_ticks"))
 
     def test_non_pwm_tick_keeps_the_deadband_rule(self):
-        o = self.run_tokens(["src:1", tk(sig=1.0, err=0.0), tk(sig=1.0, err=0.5), tk(sig=1.0, err=0.0, ch=1, flame=0),
-                             f"A:{HOUR}"])
+        # TASK-1932 (entry 369): 2 clean + 2 flame_off ticks of 4 expected (900 s) = 50 % clean: not counted, the record
+        # keeps all four ticks in their phases
+        o = self.run_tokens(SHARE + ["src:1", tk(sig=1.0, err=0.0), tk(sig=1.0, err=0.5), tk(sig=1.0, err=0.0, ch=1, flame=0),
+                                     tk(sig=1.0, err=0.5, ch=1, flame=0), f"A:{HOUR}"])
         h = o.hours[0]
-        self.assertEqual((h["wticks"], h["fticks"], h["counted"], h["reason"]), ("1", "2", "0", "flame_off"))
+        self.assertEqual((h["wticks"], h["fticks"], h["counted"], h["reason"]), ("2", "2", "0", "flame_off"))
 
     def test_three_gas_pwm_days_raise_the_curve(self):
         # 3 days of PWM-only hours at +1.5: warm-up decides alone (floating has no data, entry 305), the curve goes up
@@ -929,6 +954,79 @@ class ExclusionMutation(unittest.TestCase):
                 self.assertTrue(caught, f"removing the {ex} exclusion went unnoticed")
 
 
+class CleanShare(unittest.TestCase):
+    """TASK-1932 (Sergeant D entries 340 and 343, ADR-234): a 60 min hour counts when its clean ticks are at least 90 % of
+    the expected ticks (108 of 120, whatever the hour logged, entry 369); the excluded ticks stay out of the hour mean and the phase counts; the whole-hour markers
+    (service not_sat, not_controlling, coeff_changed, few_ticks) still drop the hour.
+    Red on the tuner from before TASK-1932 (OTGW_SAT_INO/OTGW_SAT_HDR from e6bcfc2da): one excluded tick drops the hour."""
+    @classmethod
+    def setUpClass(cls):
+        cls.tmp = tempfile.TemporaryDirectory()
+        cls.exe = build(Path(cls.tmp.name))
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.tmp.cleanup()
+
+    setUp = SatCurveSelfTune.setUp
+    run_tokens = SatCurveSelfTune.run_tokens
+    MINMOD = dict(rm=4.0, mm=0)   # a min_mod tick (5 % default minimum), carries a signal that must not leak into the mean
+
+    def hour(self, n_clean, n_excl, sig=1.0, excl_sig=50.0, **clean_kw):
+        return [tk(sig=sig, **clean_kw)] * n_clean + [tk(sig=excl_sig, **self.MINMOD)] * n_excl + [f"A:{HOUR}"]
+
+    def test_one_excluded_tick_of_120_counts_and_stays_out_of_the_mean(self):
+        o = self.run_tokens(["int:30"] + self.hour(119, 1))
+        h = o.hours[0]
+        self.assertEqual((h["counted"], h["reason"], h["ticks"], h["mean"]), ("1", "none", "120", "1.00"),
+                         "an hour with 1 excluded tick of 120 counts, its mean is the clean-tick mean")
+
+    def test_ninety_percent_boundary_against_120_ticks(self):
+        o = self.run_tokens(["int:30"] + self.hour(108, 12) + self.hour(107, 13))
+        self.assertEqual([(h["counted"], h["reason"]) for h in o.hours], [("1", "none"), ("0", "min_mod")])
+        self.assertEqual(o.hours[0]["mean"], "1.00")
+        # a not-counted hour keeps the record of all its signal ticks, as before (TASK-1551): (107 + 13 * 50) / 120
+        self.assertEqual(o.hours[1]["mean"], f"{(107 + 13 * 50) / 120:.2f}")
+
+    def test_share_is_against_the_expected_ticks_a_gap_counts_against_the_hour(self):
+        # entry 343 (Q-340a B, supersedes 341): 90 % of the expected 120, so 108 clean ticks. 100 logged ticks with 10
+        # excluded do not count (90 clean); 108 clean with 12 missed count; 107 clean with 13 missed do not (few_ticks:
+        # nothing was excluded, the gap is what is short)
+        o = self.run_tokens(["int:30"] + self.hour(90, 10) + self.hour(108, 0) + self.hour(107, 0))
+        self.assertEqual([(h["counted"], h["ticks"], h["reason"]) for h in o.hours],
+                         [("0", "100", "min_mod"), ("1", "108", "none"), ("0", "107", "few_ticks")])
+
+    def test_an_hour_with_more_ticks_than_expected_needs_108_clean_whatever_it_logged(self):
+        # entry 369 (Q-343a B, replaces our earlier reading of entry 340): 108 clean ticks (90 % of the expected 120) count,
+        # also when the hour logged 121; 107 clean of 121 do not
+        o = self.run_tokens(["int:30"] + self.hour(108, 13) + self.hour(107, 14))
+        self.assertEqual([(h["counted"], h["ticks"]) for h in o.hours], [("1", "121"), ("0", "121")])
+
+    def test_whole_hour_markers_still_drop_the_hour(self):
+        o = self.run_tokens(["int:30"] + [tk(sig=1.0)] * 60 + ["M:2.5"] + [tk(sig=1.0)] * 60 + [f"A:{HOUR}"])
+        self.assertEqual((o.hours[0]["counted"], o.hours[0]["reason"]), ("0", "coeff_changed"))
+        o = self.run_tokens(["int:30"] + [tk(sig=1.0)] * 119 + ["NC", tk(sig=1.0), f"A:{HOUR}"])
+        self.assertEqual((o.hours[0]["counted"], o.hours[0]["reason"]), ("0", "not_controlling"))
+        o = self.run_tokens(["int:30"] + [tk(sig=1.0)] * 60 + ["act:0", "S", "act:1"] + [tk(sig=1.0)] * 60 + [f"A:{HOUR}"])
+        self.assertEqual((o.hours[0]["counted"], o.hours[0]["reason"]), ("0", "not_sat"))
+        o = self.run_tokens(["int:30"] + [tk(sig=1.0)] * 89 + [f"A:{HOUR}"])
+        self.assertEqual((o.hours[0]["counted"], o.hours[0]["reason"]), ("0", "few_ticks"))
+
+    def test_excluded_ticks_stay_out_of_the_phase_counts(self):
+        # 119 clean warm-up ticks, 1 excluded floating tick with a big signal: the counted hour has no floating data
+        o = self.run_tokens(["int:30"] + [tk(sig=1.0, err=0.5)] * 119 + [tk(sig=50.0, err=0.0, **self.MINMOD), f"A:{HOUR}"])
+        h = o.hours[0]
+        self.assertEqual((h["counted"], h["wticks"], h["wmean"], h["fticks"], h["fmean"]), ("1", "119", "1.00", "0", "na"))
+
+    def test_three_days_with_one_excluded_tick_an_hour_decide_on_the_clean_ticks(self):
+        # 10 ticks an hour (360 s interval): 9 clean at +1.5, 1 min_mod tick at -50. Clean mean +1.5 raises; a leaked tick
+        # would give (13.5 - 50) / 10 = -3.65 and lower; the old tuner counts no hour and holds.
+        o = self.run_tokens(["int:360"] + self.hour(9, 1, sig=1.5, excl_sig=-50.0) * 24 * 3)
+        self.assertEqual([d["clean"] for d in o.days], ["24", "24", "24"])
+        self.assertEqual((o.coeff, o.writes), (2.1, 1))
+        self.assertEqual(o.days[2]["mean3"], "1.50")
+
+
 REASONS = ["not_sat", "dhw", "no_sun", "sun", "pwm", "flame_off", "min_mod", "coeff_changed", "no_ticks", "not_controlling",
            "few_ticks", "no_room"]
 
@@ -955,7 +1053,7 @@ class ExclusionCounters(unittest.TestCase):
     def test_each_tick_exclusion_counts_its_hours(self):
         for ex in ALL_EXCL:
             with self.subTest(excl=ex):
-                o = self.run_tokens(EXCL_PRE.get(ex, []) + day(0.5, clean=18, excl=ex))
+                o = self.run_tokens(SHARE + EXCL_PRE.get(ex, []) + day(0.5, clean=18, excl=ex))   # TASK-1932 (entry 369): SHARE
                 self.zero_but(o, **{ex: 6})
                 p = o.progress[-1]
                 self.assertEqual((p["running"], p["days"], p["clean_today"], p["hours_today"]), ("1", "1", "0", "0"))
@@ -977,14 +1075,14 @@ class ExclusionCounters(unittest.TestCase):
         self.zero_but(o, dhw=1)
 
     def test_manual_change_empties_the_counters(self):
-        toks = excluded_hour(0.5, "dhw") * 3 + ["P", tk(sig=0.5), "M:2.5", "S", f"A:{HOUR}"]
+        toks = SHARE + excluded_hour(0.5, "dhw") * 3 + ["P", tk(sig=0.5), "M:2.5", "S", f"A:{HOUR}"]   # TASK-1932 (entry 369): SHARE
         o = self.run_tokens(toks)
         self.assertEqual(int(o.excl_all[0]["dhw"]), 3)
         self.zero_but(o, coeff_changed=1)
 
     def test_tuner_change_empties_the_counters(self):
         d = day(1.5, clean=20, excl="dhw")
-        o = self.run_tokens(d * 2 + ["P"] + d)
+        o = self.run_tokens(SHARE + d * 2 + ["P"] + d)   # TASK-1932 (entry 369): SHARE
         self.assertEqual(o.coeff, 2.1)
         self.assertEqual(int(o.excl_all[0]["dhw"]), 8)
         self.assertEqual(o.progress[0]["days"], "2")
@@ -993,7 +1091,7 @@ class ExclusionCounters(unittest.TestCase):
         self.assertEqual((p["days"], p["last_day"], p["last_decision"], p["last_reason"]), ("0", "2", "1", "phases_agree"))
 
     def test_counters_survive_a_hold_and_an_uncounted_day(self):
-        o = self.run_tokens(day(0.5, clean=20, excl="sun") + day(0.5, clean=4, excl="flame_off"))
+        o = self.run_tokens(SHARE + day(0.5, clean=20, excl="sun") + day(0.5, clean=4, excl="flame_off"))   # TASK-1932 (entry 369): SHARE
         self.zero_but(o, sun=4, flame_off=20)
         self.assertEqual((o.progress[-1]["days"], o.progress[-1]["last_reason"]), ("1", "day_not_counted"))
 

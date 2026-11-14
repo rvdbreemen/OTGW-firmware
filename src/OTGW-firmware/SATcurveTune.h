@@ -17,6 +17,12 @@
 #define SAT_CT_COEFF_MAX        5.0f
 #define SAT_CT_DEFAULT_MIN_MOD  5.0f   // minimum modulation when MsgID 15 was never seen (entry 174)
 #define SAT_CT_MIN_TICK_FRACTION  0.75f  // an hour counts only with this share of its expected control ticks (hour length / control interval)
+// TASK-1932 (Sergeant D entries 340, 343; ADR-234): an hour counts when its clean ticks (those that passed the per-tick
+// exclusions of satTuneTickReason) are at least this share, in percent, of the EXPECTED ticks (hour length / control
+// interval: 108 of 120 at 30 s); a missed tick counts against the hour like an excluded one (entry 343, Q-340a B). An hour
+// that logged more ticks than expected still needs only this share of the EXPECTED ticks (entry 369, Q-343a B).
+// Its excluded ticks stay out of the hour mean and the phase counts. SAT_CT_MIN_TICK_FRACTION (few_ticks) stays.
+#define SAT_CT_MIN_CLEAN_PCT      90u
 // Phase split (ADR-228, entry 304, Q-1787d A by our reading): a tick is floating when |error| <= this band, warm-up when
 // |error| > it. The value is thermo-nova DEADBAND (const.py:16, used at pid.py:187 `> DEADBAND` and pid.py:205 `<= DEADBAND`,
 // pin 7beaaf5), the same 0.1 C as SAT_PID_DEADBAND in SATtypes.h (not included here: this header comes first).
@@ -71,8 +77,16 @@ struct SatTune {
   uint32_t pwmTicks;     // ticks in SAT PWM this hour (logged for heat pumps, not used by the tuner; entry 205, TASK-1551)
   uint32_t phTicks[SATP_COUNT];   // signal ticks per phase this hour (ADR-228)
   float    phSum[SATP_COUNT];     // sum of their signals
-  uint8_t  reason;       // first exclusion seen this hour (SATT_NONE while every tick was clean)
+  uint8_t  reason;       // first exclusion seen this hour, tick or whole-hour marker (SATT_NONE while nothing was excluded)
   bool     coeffChanged; // the coefficient changed during this hour
+  // TASK-1932 (ADR-234): per-tick exclusions only lower the clean share; a whole-hour marker (not_sat from the service,
+  // not_controlling, coeff_changed, few_ticks, no_ticks) still drops the hour. The clean sums carry only clean ticks.
+  bool     hourMarked;   // a whole-hour marker was set this hour
+  uint32_t exclTicks;    // ticks a per-tick exclusion applied to
+  uint32_t cSigTicks;    // clean ticks that carried a signal
+  float    cSigSum;
+  uint32_t cPhTicks[SATP_COUNT];
+  float    cPhSum[SATP_COUNT];
   // current day
   uint8_t  hoursInDay;
   uint8_t  cleanInDay;
@@ -114,7 +128,7 @@ struct SatTuneHourOut {
   uint32_t hour;
   uint32_t ticks;
   bool     haveMean;
-  float    mean;        // mean signal of the hour (all ticks that carried one)
+  float    mean;        // mean signal of the hour: a counted hour over its clean ticks, a not-counted hour over all ticks that carried one
   uint32_t phTicks[SATP_COUNT];   // per-phase signal ticks of the hour (ADR-228)
   bool     phHaveMean[SATP_COUNT];
   float    phMean[SATP_COUNT];

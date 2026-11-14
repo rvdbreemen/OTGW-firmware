@@ -7503,7 +7503,7 @@
       "path": "ADR-205-sat-heating-curve-self-tune-hourly-evaluation-daily-decision-on-the-curve-integral.md",
       "format": "canonical",
       "status": "Accepted",
-      "date": "2026-11-12",
+      "date": "2026-11-14",
       "decision_summary": "SAT gets an on/off self-tune, on by default, that evaluates every clean hour, logs it, and changes the heating curve...",
       "topics": [
         "clean hour",
@@ -8872,7 +8872,7 @@
       "path": "ADR-228-sat-heating-curve-self-tune-splits-the-signal-into-warm-up-and-floating-phases-and-changes-the-coefficient-only-when-both-agree.md",
       "format": "canonical",
       "status": "Accepted",
-      "date": "2026-11-12",
+      "date": "2026-11-14",
       "decision_summary": "Each signal tick of the self-tune is assigned to the warm-up phase (|PID error| > 0.1 C) or the floating phase (|PID...",
       "topics": [
         "deadband",
@@ -9056,7 +9056,7 @@
       "path": "ADR-231-sat-heating-curve-self-tune-pwm-ticks-on-a-gas-boiler-count-for-the-warm-up-phase-hybrid-and-heat-pump-pwm-hours-are-logged-not-used.md",
       "format": "canonical",
       "status": "Accepted",
-      "date": "2026-11-12",
+      "date": "2026-11-14",
       "decision_summary": "On a gas boiler, a tick in SAT PWM is a warm-up tick of the self-tune, and the PWM-related exclusions do not drop its...",
       "topics": [
         "clean hour exclusions",
@@ -9245,6 +9245,70 @@
           "src/OTGW-firmware/OTGW-ModUpdateServer-esp32.h:fsOtaRtcRestoreAtBoot",
           "test/host/test_fs_ota_rtc_snapshot.py"
         ],
+        "supersedes": [],
+        "superseded_by": null
+      }
+    },
+    {
+      "id": "ADR-234",
+      "title": "SAT heating curve self-tune: a 60 min hour counts when at least 90 % of its expected ticks are clean; excluded ticks stay out of the mean (amends ADR-205 decision 2)",
+      "path": "ADR-234-sat-heating-curve-self-tune-a-60-min-hour-counts-when-at-least-90-of-its-expected-ticks-are-clean-excluded-ticks-stay-out-of-the-mean-amends-adr-205-decision-2.md",
+      "format": "canonical",
+      "status": "Proposed",
+      "date": "2026-11-14",
+      "decision_summary": "A tuner hour stays 60 min and counts when no whole-hour marker was set and its clean ticks are at least 90 % of the t...",
+      "topics": [
+        "clean hour",
+        "clean hour exclusions",
+        "clean tick share",
+        "heating curve self-tune"
+      ],
+      "aliases": [
+        "90 percent clean hour",
+        "clean share of an hour",
+        "per-tick exclusions"
+      ],
+      "components": [
+        "self-tune clean-hour rule"
+      ],
+      "symbols": [
+        "SAT_CT_MIN_CLEAN_PCT",
+        "satTuneAddTick",
+        "satTuneCloseHour",
+        "satTuneMarkReason",
+        "satTuneNoteReason"
+      ],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [
+          "Count an hour only when no whole-hour marker was set, at least 90 % of the ticks it logged are clean, and a clean tick carried a signal.",
+          "Measure the share against the expected ticks of the hour, or the logged ticks when there are more (entries 340, 343).",
+          "Keep excluded ticks out of the mean and the phase sums that reach the day and the decision.",
+          "Keep notsat from the service pass, notcontrolling, coeffchanged, fewticks and noticks as whole-hour markers."
+        ],
+        "must_not": [
+          "Change the per-tick exclusions themselves, their order, or the phase rule of ADR-228 and ADR-231.",
+          "Shorten the hour or lower the share below 90 % (entry 340, option C rejected).",
+          "Let a tick a per-tick exclusion applies to enter the clean sums."
+        ],
+        "exceptions": [
+          "None."
+        ],
+        "verification": [
+          "tests/testsatcurveselftune.py, class CleanShare (compiles the real tuner blocks): an hour of 120 ticks with 1 excluded tick counts and its mean is the clean-tick mean; 108 of 120 clean counts, 107 does not; 100 logged ticks with 10 exclu...",
+          "The replay of the 5 gruijter runs of TASK-1927 on the fix gives 10 counted hours (base 8) with the same votes and pooled clean means as the share10 replay variant: r1 +0.97 band, g167 +3.19 raise, g68 +0.23 band; every counted hour has 1..."
+        ]
+      },
+      "scope": {
+        "path_globs": [
+          "src/OTGW-firmware/SATcurveTune.h"
+        ]
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
         "supersedes": [],
         "superseded_by": null
       }
@@ -16089,6 +16153,12 @@
       "resolved": true
     },
     {
+      "source": "ADR-205",
+      "target": "ADR-234",
+      "type": "related",
+      "resolved": true
+    },
+    {
       "source": "ADR-206",
       "target": "ADR-051",
       "type": "related",
@@ -16689,6 +16759,12 @@
       "resolved": true
     },
     {
+      "source": "ADR-228",
+      "target": "ADR-234",
+      "type": "related",
+      "resolved": true
+    },
+    {
       "source": "ADR-229",
       "target": "ADR-208",
       "type": "related",
@@ -16737,6 +16813,12 @@
       "resolved": true
     },
     {
+      "source": "ADR-231",
+      "target": "ADR-234",
+      "type": "related",
+      "resolved": true
+    },
+    {
       "source": "ADR-232",
       "target": "ADR-083",
       "type": "related",
@@ -16775,6 +16857,24 @@
     {
       "source": "ADR-233",
       "target": "ADR-191",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-234",
+      "target": "ADR-205",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-234",
+      "target": "ADR-228",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-234",
+      "target": "ADR-231",
       "type": "related",
       "resolved": true
     },

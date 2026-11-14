@@ -238,6 +238,7 @@ One row per Architecture Decision Record. Scope is the Enforcement `path_glob` s
 | ADR-231 | Accepted | - | On a gas boiler, a tick in SAT PWM is a warm-up tick of the self-tune, and the PWM-related exclusions do not drop its... |
 | ADR-232 | Accepted | - | Carry 7befe25 as a build-time patch on the registry copy of AsyncTCP 3.4.10, applied by scripts/patchpiolibs.py: |
 | ADR-233 | Accepted | - | At the start of a filesystem OTA the firmware copies settings.ini, rebootcount.txt and rebootlog.txt, in that order,... |
+| ADR-234 | Proposed | `src/OTGW-firmware/SATcurveTune.h` | A tuner hour stays 60 min and counts when no whole-hour marker was set and its clean ticks are at least 90 % of the t... |
 | ADR-235 | Accepted | - | SAT sends CS= when the value it sends, rounded to 0.1, changes, and repeats an unchanged CS= about every 30 s: the co... |
 | ADR-236 | Proposed | - | While SAT is in PWM and the PWM phase is ON, it switches to continuous when the flame is on and the requested setpoin... |
 | ADR-237 | Proposed | `build.py` | The buildfs step runs with PLATFORMIOBUILDDIR=.pio/build-fs (piofsbuildroot(), build.py:2488), so .pio/build keeps on... |

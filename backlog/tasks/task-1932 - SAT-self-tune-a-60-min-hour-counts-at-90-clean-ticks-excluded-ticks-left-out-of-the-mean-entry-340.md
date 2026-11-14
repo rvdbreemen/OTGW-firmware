@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-14T10:22:00Z'
-updated_date: '2026-11-15T21:36:00Z'
+updated_date: '2026-11-16T01:17:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -24,10 +24,10 @@ Maintainer + Sergeant D decision, entry 340: Robert 'Drop it to 90%?' (https://d
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Open point of entry 340 settled in the plan with Sergeant D before the build: is 90 % counted against all ticks of the hour or against the expected 120
-- [ ] #2 The tuner counts a 60 min hour when at least 90 % of its ticks are clean; excluded ticks do not enter the hour mean or the warm-up/floating counts; boot, coeff_changed and few_ticks markers stay whole-hour
+- [x] #1 Open point of entry 340 settled in the plan with Sergeant D before the build: is 90 % counted against all ticks of the hour or against the expected 120
+- [x] #2 The tuner counts a 60 min hour when at least 90 % of its ticks are clean; excluded ticks do not enter the hour mean or the warm-up/floating counts; boot, coeff_changed and few_ticks markers stay whole-hour
 - [ ] #3 An ADR amending or superseding ADR-205 decision 2, via adr-kit
-- [ ] #4 Host test on the real tuner code: red on the old code (hour with 1 excluded tick of 120 not counted), green on the fix; and an hour below 90 % clean stays excluded
+- [x] #4 Host test on the real tuner code: red on the old code (hour with 1 excluded tick of 120 not counted), green on the fix; and an hour below 90 % clean stays excluded
 - [ ] #5 Replay of the 5 gruijter field runs of TASK-1927 on the fix gives 10 counted hours with the same votes as the replay variant
 <!-- AC:END -->
 
@@ -48,4 +48,6 @@ Maintainer + Sergeant D decision, entry 340: Robert 'Drop it to 90%?' (https://d
 Q-343a decided 2026-11-15 by the coordinator under Robert's directive (CLI) 'Do not wait for Sergeant D. Finish everything that can be finished.'; Sergeant D may overrule, his answer later becomes a follow-up task; asked in the 18-question batch in #dev-sat-mqtt (item 16, https://discord.com/channels/812969634638725140/1105556725714649128/1571633470696980583): option A, 90 % of the ticks the hour logged (109 of 121), meets entries 340 and 343. Unblocked (build was held for this answer).
 
 Sergeant D answered Q-343a with B (entry 369, https://discord.com/channels/812969634638725140/1105556725714649128/1571637957230862506): an hour counts at 108 clean ticks whatever it logged (90 % of the expected 120), NOT 90 % of the ticks it logged (the directive choice A is replaced). Assignee per coordinator: 95.
+
+Session 95, 2026-11-16 ~03:00, lane-95-1932 (worktree wt-95-1932 on origin/dev): the old lane commit 66eff3998 (ADR-234 + tuner + CleanShare) cherry-picked onto dev; conflicts: task file and ADR index files taken from dev (index regenerated with adr-doctor --fix-index), the one test hunk resolved per hunk (a first whole-file --ours lost the CleanShare tests; caught by grep, conflict recreated with checkout -m and fixed). Changed for entry 369 (Q-343a B): satTuneCloseHour() measures the clean share against the EXPECTED ticks only ((ticks - exclTicks) * 100 >= 90 * expected), not max(logged, expected); SATcurveTune.h comment; ADR-234 Decision/Contract/test list/Open Questions updated (adr_lint: ADR-234 PASS). AC1 settled: entries 343 (expected 120) and 369 (108 clean whatever it logged). Tests: CleanShare 'an hour with more ticks than expected needs 108 clean whatever it logged' (121 logged: 108 clean counts, 107 not). 15 older tuner tests assumed the old whole-hour rule; their stub default interval 3600 s made an hour expect 1 tick, so any mixed hour counted under the new rule: they now run at int:900 (4 ticks/hour) so their mixed hours are really below 90 % (sonnet agent, each change commented 'TASK-1932 (entry 369)', no assertion removed). Main-session run: tests/test_sat_curve_selftune.py 101 passed, 1 skipped (compiler-skip). Old code (origin/dev SATcontrol.ino + SATcurveTune.h via OTGW_SAT_INO/OTGW_SAT_HDR): CleanShare 6 failed, 1 passed (the whole-hour marker test, unchanged behaviour). AC3: ADR-234 stays Proposed (acceptance needs the human yes). AC5 open: the TASK-1927 replay harness lives in 92's scratchpad (tune-replay); asked 92 to run it on this tree. On those runs every 60 min hour has exactly 120 ticks (followup2_windows.txt, 59 of 59), so entry 369 changes nothing there; still to be shown.
 <!-- SECTION:NOTES:END -->

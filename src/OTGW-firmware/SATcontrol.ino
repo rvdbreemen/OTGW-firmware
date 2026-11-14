@@ -6538,7 +6538,8 @@ static void satTuneClearDay(SatTune& t)
 static void satTuneClearHour(SatTune& t)
 {
   t.ticks = 0; t.sigTicks = 0; t.sigSum = 0.0f; t.reason = SATT_NONE; t.coeffChanged = false; t.pwmTicks = 0;
-  for (uint8_t p = 0; p < SATP_COUNT; p++) { t.phTicks[p] = 0; t.phSum[p] = 0.0f; }
+  t.hourMarked = false; t.exclTicks = 0; t.cSigTicks = 0; t.cSigSum = 0.0f;
+  for (uint8_t p = 0; p < SATP_COUNT; p++) { t.phTicks[p] = 0; t.phSum[p] = 0.0f; t.cPhTicks[p] = 0; t.cPhSum[p] = 0.0f; }
 }
 
 static void satTuneEmptyWindow(SatTune& t)
@@ -6562,24 +6563,36 @@ static void satTuneReset(SatTune& t)
 
 // Note one exclusion for the current hour. "First reason" means first in time: the earliest exclusion noted in the hour
 // stays, later ones (also other kinds, such as a tick path against a service mark) do not replace it.
-static void satTuneMarkReason(SatTune& t, uint8_t reason)
+static void satTuneNoteReason(SatTune& t, uint8_t reason)
 {
   if (t.reason == SATT_NONE) t.reason = reason;
 }
 
-// Add one control tick to the current hour.
+// A whole-hour marker (service not_sat, not_controlling, coeff_changed, few_ticks, no_ticks): the hour does not count.
+static void satTuneMarkReason(SatTune& t, uint8_t reason)
+{
+  satTuneNoteReason(t, reason);
+  t.hourMarked = true;
+}
+
+// Add one control tick to the current hour. TASK-1932 (ADR-234): a tick a per-tick exclusion applies to counts against the
+// clean share and stays out of the clean sums; the all-tick sums keep it for the record of a not-counted hour (TASK-1551).
 static void satTuneAddTick(SatTune& t, const SatTuneTickIn& in)
 {
   t.ticks++;
   if (in.pwm) t.pwmTicks++;   // TASK-1551: logged for heat pumps, the tuner still excludes their hour (reason pwm)
   const uint8_t r = satTuneTickReason(in);
-  if (r != SATT_NONE) satTuneMarkReason(t, r);
+  if (r != SATT_NONE) { satTuneNoteReason(t, r); t.exclTicks++; }
   if (in.satActive && !in.dhw && isfinite(in.signal)) {
     t.sigSum += in.signal; t.sigTicks++;
+    if (r == SATT_NONE) { t.cSigSum += in.signal; t.cSigTicks++; }
     // inside the signal block: a hot-water tick never reaches a phase. ADR-231 (entry 318): a PWM tick on a gas boiler is
     // a warm-up tick whatever its PID error.
     const uint8_t ph = (in.pwm && in.pwmGas) ? (uint8_t)SATP_WARMUP : satTuneTickPhase(in.error);
-    if (ph < SATP_COUNT) { t.phSum[ph] += in.signal; t.phTicks[ph]++; }
+    if (ph < SATP_COUNT) {
+      t.phSum[ph] += in.signal; t.phTicks[ph]++;
+      if (r == SATT_NONE) { t.cPhSum[ph] += in.signal; t.cPhTicks[ph]++; }
+    }
   }
 }
 
@@ -6595,31 +6608,41 @@ static void satTuneNoteCoeffChange(SatTune& t, bool manual)
   }
 }
 
-// Close the current hour and start the next. An hour counts with at least one tick that carried a signal and no exclusion.
-// minTicks = the least control ticks the hour needs (SAT_CT_MIN_TICK_FRACTION of the expected number).
-static void satTuneCloseHour(SatTune& t, SatTuneHourOut& out, uint32_t minTicks)
+// Close the current hour and start the next. TASK-1932 (ADR-234, entries 340, 343): an hour counts when no whole-hour
+// marker was set, its clean ticks are at least SAT_CT_MIN_CLEAN_PCT % of the expected ticks (108 of 120 at 30 s; a gap counts
+// against the hour like an excluded tick, entry 343; whatever the hour logged, entry 369 Q-343a B), and a clean tick carried a signal.
+// minTicks = the least control ticks the hour needs (SAT_CT_MIN_TICK_FRACTION of the expected number);
+// expected = the control ticks a full hour has (hour length / control interval, 120 at 30 s).
+static void satTuneCloseHour(SatTune& t, SatTuneHourOut& out, uint32_t minTicks, uint32_t expected)
 {
   if (t.coeffChanged) satTuneMarkReason(t, SATT_COEFF_CHANGED);
   if (t.ticks == 0)   satTuneMarkReason(t, SATT_NO_TICKS);
   else if (t.ticks < minTicks) satTuneMarkReason(t, SATT_FEW_TICKS);
+  const bool shareOk = ((uint64_t)(t.ticks - t.exclTicks) * 100u >= (uint64_t)SAT_CT_MIN_CLEAN_PCT * expected);   // integers; entry 369
+  out.counted  = !t.hourMarked && shareOk && (t.cSigTicks > 0);
+  out.reason   = out.counted ? (uint8_t)SATT_NONE : t.reason;
+  // nothing excluded, but too few clean ticks against the expected number (a gap), or no clean signal at all
+  if (!out.counted && out.reason == SATT_NONE) out.reason = shareOk ? (uint8_t)SATT_NO_TICKS : (uint8_t)SATT_FEW_TICKS;
   out.hour     = t.hourNo;
   out.ticks    = t.ticks;
   out.pwmTicks = t.pwmTicks;
-  out.haveMean = (t.sigTicks > 0);
-  out.mean     = out.haveMean ? t.sigSum / (float)t.sigTicks : 0.0f;
-  out.reason   = t.reason;
-  if (t.reason == SATT_NONE && !out.haveMean) out.reason = SATT_NO_TICKS;
-  out.counted  = (out.reason == SATT_NONE);
+  // a counted hour reports what the decision uses (clean ticks); a not-counted one all signal ticks, as before (TASK-1551)
+  const uint32_t sTicks = out.counted ? t.cSigTicks : t.sigTicks;
+  const float    sSum   = out.counted ? t.cSigSum   : t.sigSum;
+  out.haveMean = (sTicks > 0);
+  out.mean     = out.haveMean ? sSum / (float)sTicks : 0.0f;
   // TASK-1881 telemetry: the hour that does not count adds one to its reason (the decision never reads these)
   if (!out.counted && out.reason < SATT_COUNT && t.exclHours[out.reason] < 0xFFFF) t.exclHours[out.reason]++;
   for (uint8_t p = 0; p < SATP_COUNT; p++) {
-    out.phTicks[p]    = t.phTicks[p];
-    out.phHaveMean[p] = (t.phTicks[p] > 0);
-    out.phMean[p]     = out.phHaveMean[p] ? t.phSum[p] / (float)t.phTicks[p] : 0.0f;
+    const uint32_t pt = out.counted ? t.cPhTicks[p] : t.phTicks[p];
+    const float    ps = out.counted ? t.cPhSum[p]   : t.phSum[p];
+    out.phTicks[p]    = pt;
+    out.phHaveMean[p] = (pt > 0);
+    out.phMean[p]     = out.phHaveMean[p] ? ps / (float)pt : 0.0f;
   }
   if (out.counted) {
     t.cleanInDay++; t.cleanSumInDay += out.mean;
-    for (uint8_t p = 0; p < SATP_COUNT; p++) { t.phTicksInDay[p] += t.phTicks[p]; t.phSumInDay[p] += t.phSum[p]; }
+    for (uint8_t p = 0; p < SATP_COUNT; p++) { t.phTicksInDay[p] += t.cPhTicks[p]; t.phSumInDay[p] += t.cPhSum[p]; }
   }
   t.hoursInDay++;
   t.hourNo++;
@@ -6942,7 +6965,10 @@ static void satTuneRollHour()
   const uint32_t intervalMs = (settings.sat.iControlInterval > 0 ? (uint32_t)settings.sat.iControlInterval : 1UL) * 1000UL;
   uint32_t minTicks = (uint32_t)ceilf((float)satTuneHourMs() / (float)intervalMs * SAT_CT_MIN_TICK_FRACTION);
   if (minTicks < 1) minTicks = 1;
-  satTuneCloseHour(_sat_tune, h, minTicks);
+  // TASK-1932 (entry 343, Q-340a B): the clean share is against the expected ticks (120 at 30 s, so 108 clean)
+  uint32_t expected = satTuneHourMs() / intervalMs;
+  if (expected < 1) expected = 1;
+  satTuneCloseHour(_sat_tune, h, minTicks, expected);
   satTuneLogHour(h);
   if (!h.dayComplete) return;
   const float oldCoeff = settings.sat.fHeatingCurveCoeff;

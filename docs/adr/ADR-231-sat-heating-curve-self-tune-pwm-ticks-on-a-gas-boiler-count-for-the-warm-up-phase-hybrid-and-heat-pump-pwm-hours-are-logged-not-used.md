@@ -12,6 +12,7 @@ superseded_by: null
 related:
   - "ADR-205"
   - "ADR-228"
+  - "ADR-234"
 topics:
   - "heating curve self-tune"
   - "PWM hours"
@@ -71,6 +72,11 @@ status_history:
     status: Accepted
     changed_by: "User: Robert van den Breemen"
     reason: "Accepted by Robert: DM msg 1570402646186139730 (2026-11-12 11:39:27 UTC), \"A\", reply to accept question 1570337513208414273"
+    changed_via: adr-kit lifecycle
+  - date: 2026-11-14
+    status: Accepted
+    changed_by: "User: Robert van den Breemen"
+    reason: Related to ADR-234
     changed_via: adr-kit lifecycle
 ```
 
