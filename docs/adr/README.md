@@ -434,6 +434,9 @@ Counts above are advisory rather than hand-maintained; the canonical set is the 
 - **[ADR-202: Replace the two capture scripts with one Python capture tool behind thin launchers](ADR-202-replace-the-two-capture-scripts-with-one-python-capture-tool-behind-thin-launchers.md)** 🆕 *(Accepted)*  
   One standard-library Python program, `scripts/otgw_capture.py`, replaces the PowerShell payload of `capture-mqtt-debug.bat` and the bash + heredoc workers of `capture-mqtt-debug.sh`. The launchers only find a Python 3.9+, or on Windows bootstrap a SHA-256-checked embeddable CPython 3.12.10. MQTT uses the vendored paho-mqtt 2.1.0 wheel (zipimport) instead of `mosquitto_sub`. Each source degrades on its own and nothing is uploaded (TASK-1475; TASK-1473 parked).
 
+- **[ADR-232: Patch AsyncTCP 3.4.10 with upstream fix 7befe25 at build time through the patch_pio_libs pre-hook](ADR-232-patch-asynctcp-3-4-10-with-upstream-fix-7befe25-at-build-time-through-the-patch-pio-libs-pre-hook.md)** 🆕 *(Accepted)*  
+  Carries upstream AsyncTCP commit 7befe25 as a build-time patch on the registry copy of 3.4.10, applied by `scripts/patch_pio_libs.py` before the compile.
+
 ### Core Services
 
 - **[ADR-015: NTP and AceTime for Time Management](ADR-015-ntp-acetime-time-management.md)**  
@@ -531,6 +534,9 @@ Counts above are advisory rather than hand-maintained; the canonical set is the 
 
 - **[ADR-191: Update firmware over WiFi on 4MB boards through a safeboot factory partition](ADR-191-update-firmware-over-wifi-on-4mb-boards-through-a-safeboot-factory-partition.md)** 🆕 *(Accepted)*  
   Supersedes ADR-166. The 4MB layout gets a safeboot updater in the factory partition (0x10000, 960K), one app slot ota_0 (0x100000, 2240K) and LittleFS (0x330000, 768K). The main firmware erases otadata and restarts into safeboot, which writes ota_0 and restarts into it; bootloader rollback returns to safeboot when the new image fails early. Units on the old layout need one USB `flash_otgw --migrate`.
+
+- **[ADR-233: Keep settings.ini, the reboot counter and the reboot log in an RTC snapshot during a filesystem OTA](ADR-233-keep-settings-ini-the-reboot-counter-and-the-reboot-log-in-an-rtc-snapshot-during-a-filesystem-ota.md)** 🆕 *(Proposed)*  
+  A reset during a filesystem OTA used to boot on the image's default settings.ini with the counter lost. The three files go into an RTC_NOINIT snapshot above 0x50000220 (the safeboot updater overwrites the 32 B below it), armed at the first chunk and restored at the next boot (TASK-1774). Not protected: a power cut.
 
 ### OTGW32 and Dual Platform
 

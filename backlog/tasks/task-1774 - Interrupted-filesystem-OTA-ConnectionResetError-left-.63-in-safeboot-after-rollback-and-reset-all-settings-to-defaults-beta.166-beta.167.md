@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-10T05:53:00Z'
-updated_date: '2026-11-14T02:39:00Z'
+updated_date: '2026-11-14T04:53:00Z'
 labels:
   - bug
   - ota
@@ -172,6 +172,8 @@ AC4 addendum (coordinator: same commit): flash_app() waited for the updater with
 Fix option C (coordinator decision, in the same script commit): ota_flash.py waits APP_CONFIRM_WAIT = 35 s from the new app's first answer before the filesystem POST, so the FS write never falls inside the 30 s PENDING_VERIFY window (OTGW-firmware.ino:1175-1179; IDF bootloader_utility.c:396-405). device/info has no usable uptime (upTime() is minutes only, helperStuff.ino:858), so the script times it itself. Test test_filesystem_waits_until_the_new_app_confirmed_itself: origin script and the (a) commit both FAIL (5 s between app and fs), fix OK; file 25/25 OK.
 
 ADR-233 drafted (Proposed, gated on the RTC survival probe): RTC_NOINIT snapshot of settings.ini, reboot_count.txt, reboot_log.txt above 0x50000220; armed at the first Update.write, cleared on every exit and right after the boot restore; boot restores only missing or empty files; settings.ini whole or not at all (logged when it does not fit); secrets named (ADR-056). Not protected: power cut, SAT/Dallas/markers files (heap copies only), oversized settings.ini. adr-lint: 0 FAIL, 1 advisory. Number 233 checked free on origin/dev and in the other worktrees at creation.
+
+docs/adr/README.md had no list entry for ADR-232 (Accepted) and none for ADR-233 (pushed in 4bcf241fa): tests/test_adr_governance.py test_live_index_complete failed on origin with both. Both entries added in a docs-only commit on origin (coordinator order); the test is OK.
 <!-- SECTION:NOTES:END -->
 
 ## Comments
