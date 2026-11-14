@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-12T00:08:00Z'
-updated_date: '2026-11-14T15:30:00Z'
+updated_date: '2026-11-14T15:32:00Z'
 labels:
   - otdirect
   - parity
@@ -55,4 +55,6 @@ Successor of the 6.6 audit (TASK-1795, docs/reviews/2026-11-11_otdirect-pic-pari
 Child status 2026-11-14 (comms, stale audit): Done 9 (1831, 1832, 1833, 1836, 1840, 1842, 1844, 1846, + none else); In Review 4 (1834 AC 3/3, 1835 AC 2/3, 1845 AC 3/4, 1907 AC 1/2); In Progress 1 (1839, Robert answered A in DM 1570230662743592961, implementation queued with d3 after TASK-1924 Part 2); To Do without owner 6 (1847 PM TSP/fault history, 1848 PR texts, 1849 success/clear replies, 1850 thermostat (dis)connected lines, 1906 thermostat's own MsgID 99, 1908 SC= validation). AC1 cannot be ticked until those close; the parent stays In Progress.
 
 Correction to the line above: Done is 8, not 9 (1831, 1832, 1833, 1836, 1840, 1842, 1844, 1846); 8 + 4 + 1 + 6 = 19 children incl. 1906-1908.
+
+Assignment of the 6 open children (coordinator 2026-11-14; owners claim them themselves): 95 -> TASK-1848 (PR texts) + TASK-1849 (success/clear replies); ba -> TASK-1850 (thermostat (dis)connected lines) + TASK-1908 (SC= validation), after TASK-1937; d3 -> TASK-1847 (PM TSP/fault history) + TASK-1906 (the thermostat's own MsgID 99), after TASK-1924 Part 2 and TASK-1839.
 <!-- SECTION:NOTES:END -->
