@@ -7098,3 +7098,23 @@ Asked by DM (through the coordinator) whether the repeat is 60 s or 30 s, given 
 **Open:** (1) the length or end condition of the start-up period (d3 proposes a rule in the TASK-1924 plan, built from thermo-nova's own timers; it goes to Sergeant D before it is built); (2) Sergeant D may still object; (3) which offset applies (`flow_setpoint_offset_celsius` of the clamp or the suppression offset), to settle in the plan.
 
 **Task:** TASK-1924.
+
+## 339. Sergeant D on entry 338: "worth testing", "a clean solution"; he proposes a continuous exit rule (flame on, request > boiler temperature for 60 s) (2026-11-14, follows entry 338; question Q-338a asked)
+
+**Source:** #alpha-testing 2026-11-14, sergeantd: 09:38:12 UTC https://discord.com/channels/812969634638725140/1514720723980259460/1571096907789639765 ; 09:40:34 UTC https://discord.com/channels/812969634638725140/1514720723980259460/1571097503636652094 ; 09:41:09 UTC https://discord.com/channels/812969634638725140/1514720723980259460/1571097651225694339 . Our answer and Q-338a: https://discord.com/channels/812969634638725140/1514720723980259460/1571100242093547533
+
+**Quoted:**
+
+> "@BlueFlame Bot @number3nl  I am not so sure if it will work but it worth testing. For me sounds like we always start at PWM and if the request setpoint is still above the flow water temperature we go in continuous mode. Am I correct?"
+
+> "@BlueFlame Bot we can add a rule, If flame == on and request setpoint > boiler  temperature for 60s then go in continuous mode"
+
+> "@number3nl It looks a clean solution 👏"
+
+**Interpretation (ours):** the first and third messages react to entry 338 (Robert's B): not an objection, "worth testing". His premise that SAT always starts in PWM does not match the code, which we answered: both start in continuous (`pwm.py:87-89`; firmware `SATcontrol.ino:3804-3811`), except a restored PWM flag after a restart (`pwm.py:112-115`, entries 121/140). The second message proposes a new PWM-to-continuous rule; we read it as a faster version of the underheat exit (thermo-nova `heating_control.py:331-356`, flow <= request - 3.0 for 180 s, `const.py:22`, `cycles/const.py:11`; firmware `SATcycles.ino:39-41`): margin 0 instead of -3, 60 s instead of 180 s.
+
+**Settled:** entry 338 stands; Sergeant D wants it tested. Nothing is settled yet on his proposed rule.
+
+**Open:** Q-338a (asked): A) replace the underheat exit with his rule; B) add it beside the underheat exit only in a start-up window after flame-on; C) keep the thermo-nova exit. Our recommendation: A, but first as a simulation test on the gruijter-calibrated houses (toggling against the entry-327 rule, +1.5 C for 30 s; starts per day).
+
+**Task:** TASK-1924.

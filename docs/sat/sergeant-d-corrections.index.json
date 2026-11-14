@@ -4505,6 +4505,19 @@
     "TASK-1924"
    ],
    "confirmed_by_entry": null
+  },
+  {
+   "id": 339,
+   "title": "Sergeant D on entry 338: \"worth testing\", \"a clean solution\"; he proposes a continuous exit rule (flame on, request > boiler temperature for 60 s) (2026-11-14, follows entry 338; question Q-338a asked)",
+   "date": "2026-11-14",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1571096907789639765",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1924"
+   ],
+   "confirmed_by_entry": null
   }
  ]
 }
