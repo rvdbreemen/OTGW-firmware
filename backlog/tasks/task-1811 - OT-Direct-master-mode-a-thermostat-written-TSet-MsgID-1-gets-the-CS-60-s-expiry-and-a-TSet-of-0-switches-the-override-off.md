@@ -3,11 +3,11 @@ id: TASK-1811
 title: >-
   OT-Direct master mode: a thermostat-written TSet (MsgID 1) gets the CS= 60 s
   expiry and a TSet of 0 switches the override off
-status: In Progress
+status: In Review
 assignee:
   - '@claude'
 created_date: '2026-11-11T12:28:00Z'
-updated_date: '2026-11-14T05:03:00Z'
+updated_date: '2026-11-14T05:59:00Z'
 labels:
   - otdirect
   - review-2026-11-11
@@ -38,4 +38,6 @@ Found in the TASK-1795 audit (docs/reviews/2026-11-11_otdirect-pic-parity-audit/
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-11-14 d3, lane-1811. Below-8 question (TASK-1917 came after Robert's decision): coordinator decision A, recorded as its reading of Robert's 2026-11-11 decision, not a new one from Robert: a thermostat TSet always expires after OT_CSC2_EXPIRY_MS (63.5 s) whatever its value; the below-8 permanence is the PIC's semantics for a deliberate user CS= (CS + CH=0 to stop heating), not for a thermostat write, and a vanished thermostat must never leave a stuck setpoint. Fix in handleMasterModeSlaveFrame (OTDirect.ino): WRITE MsgID 1 while SAT does not own the setpoint: 0 -> clearWriteOverride(1) + otCSLastCommandMs = 0 (like CS=0); > 0 -> setOverride + updateWriteCache + otCSLastCommandMs = millis() (never 0), a separate path from otdCsc2ExpiryStamp. The existing 1-second expiry then clears it (and CH follows, as after a CS= expiry). Note: a thermostat write of 0 also ends a user CS= override; a thermostat write > 0 already replaced it before this change. Evidence: new tests/test_otd_master_tset_expiry.py, compiling the real buildOTResponse, handleMasterModeSlaveFrame and expiry statements with a fake clock: TSet 45.5 at 1 s active at 64 s, gone at 66 s; TSet 5.0 likewise gone at 66 s and otdCsc2ExpiryStamp never called; TSet 0 at 10 s ends it at 10 s; SAT owner: no override. Old code (origin/dev): 3 FAIL (SAT case passes on both, unchanged as AC3 asks). Mutant (thermostat path through otdCsc2ExpiryStamp): 2 FAIL. All 43 tests reading OTDirect.ino OK; evaluate --quick 85/0. Docs: BREAKING_CHANGES.md master-mode paragraph (also the stale 60 s -> 63.5 s and the CS below 8 rule), c4-code-otdirect.md handler section. Not in scope, as the task says: thermostat MsgID 16/24 writes are still re-sent after the thermostat goes silent.
+
+2026-11-14 shipped in 2.0.0-beta.237 (c66c9b912, #alpha-testing post 1571041876306432021, zip sha256 86bbb59ca63f163c837efb9414eee8589a7057d4670e563f9c1926ac10584416). AC6: esp32-combo build OK (exit 0, Build completed successfully, 4 images), evaluate --quick 85/0. No-regression bench by 09 on .61: CS=45 expires after 64.06 s; CS=5 stays 2 min with 0 expired lines, then CS=0 releases in 1.2 s; bootcount 627 -> 629 (the flash), crashlog empty, settings diff none. NOT benched: the thermostat-write path itself (no bench unit has a thermostat on the OT-Direct slave side); field-only. AC6 stays open for that field confirmation; In Review.
 <!-- SECTION:NOTES:END -->
