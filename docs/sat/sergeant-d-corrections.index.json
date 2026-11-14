@@ -4446,6 +4446,52 @@
     "TASK-1890"
    ],
    "confirmed_by_entry": null
+  },
+  {
+   "id": 334,
+   "title": "Maintainer decision: SAT sends CS= only when its value changes, repeated every 30 s while unchanged (2026-11-14, supersedes the CS part of entries 44 and 237)",
+   "date": "2026-11-14",
+   "source": "maintainer",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1571061727917768815",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1924"
+   ],
+   "confirmed_by_entry": 335
+  },
+  {
+   "id": 335,
+   "title": "Sergeant D agrees with entry 334: CS= on change, a fresh CS at least every minute (2026-11-14, confirms entry 334)",
+   "date": "2026-11-14",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1571063490989523060",
+   "supersedes": [],
+   "tasks": [],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 336,
+   "title": "Start-up: CS must follow the boiler flow temperature, or the boiler hysteresis can cause a flame out (statement, Sergeant D, 2026-11-14; question Q-336a, answered in entry 337)",
+   "date": "2026-11-14",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1571064606154031237",
+   "supersedes": [],
+   "tasks": [],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 337,
+   "title": "Q-336a B: while the flame is on and the flow clamp is active, SAT recomputes the CS every 5 s and sends CS= on change (Sergeant D, 2026-11-14; answers Q-336a, follows entries 334-336)",
+   "date": "2026-11-14",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1571066425966067824",
+   "supersedes": [],
+   "tasks": [],
+   "confirmed_by_entry": null
   }
  ]
 }

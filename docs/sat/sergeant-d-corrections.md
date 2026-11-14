@@ -6999,3 +6999,78 @@ This follows the existing PM=25 logic in SATcontrol.ino (TASK-1412.5, entry 276)
 **Open:** (1) what happens at a deadband exit right after a reset (integral already 0: halving is a no-op); (2) whether the halving also applies to the zone PIDs (`SATcontrol.ino` zone integrals, entry 329 named only the main PID); (3) the faster self-tune part of entry 329 is unchanged and waits for the PID study; (4) Sergeant D may still object.
 
 **Task:** TASK-1890.
+
+## 334. Maintainer decision: SAT sends CS= only when its value changes, repeated every 30 s while unchanged (2026-11-14, supersedes the CS part of entries 44 and 237)
+
+**Not by Sergeant D.** This is a maintainer decision by Robert, recorded here because it changes how often SAT sends the control setpoint. Sergeant D gets one "agree?" question.
+
+**Source:** Robert, #alpha-testing, 2026-11-14 07:18:24 UTC: https://discord.com/channels/812969634638725140/1514720723980259460/1571061727917768815
+
+**Quoted:**
+
+> "Make sure that the SAT control tick sends out the CS command only when value changes and if it does not change at least one a minute. That way the value does not get dropped."
+
+Asked by DM (through the coordinator) whether the repeat is 60 s or 30 s, given the PIC expiry window, Robert answered (DM 1571063604466417735, 2026-11-14):
+
+> "B once every 30s is fine. It give a margin."
+
+**Settled:** SAT sends CS= when the value it sends changes (rounded to 0.1, as `satQuantizeTenths()`). While the value stays unchanged, SAT repeats it every 30 s (option B), which keeps a margin below the PIC expiry window. This replaces, for CS= only, the every-tick send plus the 5 s resend of entry 44 and of entry 237 ("CS stays on the 5 s resend"). MM=, TP= and CH= stay as entries 237 and 239 set them (on change, plus a 60 s repair).
+
+**Checked against the PIC, thermo-nova and the firmware:**
+- PIC 6.8 (`OTGW-other-projects/otgw-6.8/gateway.asm`): `CommandExpiry` (:1623-1640) runs on each `FlashTimer` pass and counts down `minutetimer`. `StartTimer` (:4233-4239) loads it with 120 and clears the heartbeat flags. When the timer runs out without a CS= in that window (`HeartbeatCS` clear) and the control setpoint is 8 C or more, the PIC invalidates it (`SysCtrlSetpoint`). Below 8 C it keeps the value. The firmware comment `SATcontrol.ino:684-685` puts the drop at about 63 to 126 s after the last CS=, depending on where it fell in the window; the FlashTimer period itself was not re-checked for this entry.
+- Firmware before this decision (dev f419d5571): `satSendCS()` sends on every control tick without a change check (`SATcontrol.ino:673-683`), and `satCmdResend()` repeats the last CS= every `SAT_CMD_RESEND_MS` = 5000 ms between ticks (`:595`, `:756-761`). `satPicCSKeepalive()` (`:691-699`, 30 s) and the change-checked `satEnqueueIfChangedCS()` (`:654-668`, used by the 3 s PWM suppression refresh, entry 23) are already there. ADR-203 and ADR-207 (Accepted) record the 5 s CS cadence.
+- thermo-nova sends CS on every 5 s heating-loop run with no deduplication (entry 44: `heating_control.py:236-238`, `coordinator/mqtt/opentherm.py:195-197`, `coordinator/mqtt/__init__.py:134-147`). This decision is a deliberate deviation from thermo-nova.
+
+**Open:** (1) Sergeant D's answer to the "agree?" question; (2) a new ADR that supersedes the CS part of ADR-207 (and of ADR-203 as far as ADR-207 left it in force); (3) whether the 3 s PWM suppression refresh (`satEnqueueIfChangedCS()`, entry 23) and the PIC keepalive (`satPicCSKeepalive()`) fold into the same 30 s repeat, decided in the task plan.
+
+**Task:** TASK-1924.
+
+## 335. Sergeant D agrees with entry 334: CS= on change, a fresh CS at least every minute (2026-11-14, confirms entry 334)
+
+**Source:** #alpha-testing, 2026-11-14 07:25:25 UTC, a reply to our message about entry 334: https://discord.com/channels/812969634638725140/1514720723980259460/1571063490989523060. Robert's follow-up, 07:26:56 UTC: https://discord.com/channels/812969634638725140/1514720723980259460/1571063874235666433
+
+**Quoted:**
+
+> "@BlueFlame Bot I agree with @number3nl the max limit is to send a fresh CS value every minute otherwise on the CS value change"
+
+> Robert: "Yeah. My worry is the 3 second margin so once per 30 seconds is just fine."
+
+**Settled:** Sergeant D agrees with the rule of entry 334. His bound is "a fresh CS value every minute" at most. Robert's 30 s repeat sits inside that bound, so both agree on 30 s. With this entry the CS part of entries 44 and 237 is superseded by entries 334 and 335.
+
+**Open:** none for the cadence. The start-up point he raised next is entry 336.
+
+**Task:** as entry 334.
+
+## 336. Start-up: CS must follow the boiler flow temperature, or the boiler hysteresis can cause a flame out (statement, Sergeant D, 2026-11-14; question Q-336a, answered in entry 337)
+
+**Source:** #alpha-testing, 2026-11-14 07:29:51 UTC: https://discord.com/channels/812969634638725140/1514720723980259460/1571064606154031237. Our question Q-336a: https://discord.com/channels/812969634638725140/1514720723980259460/1571066087632801823
+
+**Quoted:**
+
+> "During start up we need to follow the boiler flow water temperature otherwise we may have a flame out due to boiler flow water temperature hysterisis"
+
+**Interpretation (ours):** a remark on entry 334. The on-change rule must not stop CS from following the rising flow during the start-up. That following is the flow clamp of entry 112: CS = max(request, flow - offset) while the flame is on (thermo-nova `heating_control.py:485-489`; firmware `SATcontrol.ino:2486-2496`). Entry 334 does not hold back a changed CS, so the clamp keeps working. Open is how often the clamp is recomputed.
+
+**Checked against thermo-nova and the firmware:** thermo-nova runs the whole heating update every 5 s (`climate.py:706-710`, `timedelta(seconds=5)`), so the clamp follows the flow at 5 s. The firmware recomputes CS only on its control tick (`timerSATControl`, `settings.sat.iControlInterval`, default 30 s, `SATcontrol.ino:901`). The 5 s resend (`satCmdResend()`, `:756-761`) repeats the last sent value and does not recompute it. So today the firmware already follows the flow at 30 s, and entry 334 does not change that.
+
+**Open (answered in entry 337):** Q-336a: A) keep the clamp on the control tick (30 s); B) recompute the clamp every 5 s while the flame is on and the clamp is active, and send CS= when it changes; C) something else. Our recommendation: B.
+
+**Task:** as entry 334 (the plan waits for Q-336a).
+
+## 337. Q-336a B: while the flame is on and the flow clamp is active, SAT recomputes the CS every 5 s and sends CS= on change (Sergeant D, 2026-11-14; answers Q-336a, follows entries 334-336)
+
+**Source:** #alpha-testing, 2026-11-14, his reply to Q-336a (1571066087632801823): https://discord.com/channels/812969634638725140/1514720723980259460/1571066425966067824. Our acknowledgement: https://discord.com/channels/812969634638725140/1514720723980259460/1571067719837687829
+
+**Quoted:**
+
+> "@BlueFlame Bot my answer is B."
+
+**Option B as posted:** "While the flame is on and the flow clamp is active, recompute it every 5 s as thermo-nova does, and send CS= when it changes."
+
+**Settled:** while the flame is on and the flow clamp of entry 112 sets the CS (the flow minus the offset is above the requested setpoint), SAT recomputes the clamped CS every 5 s and sends CS= when the value changes (rounded to 0.1, entry 334). Outside that state the CS is computed on the control tick, as before. The 30 s repeat of an unchanged CS (entries 334, 335) stays.
+
+**Checked against thermo-nova and the firmware:** thermo-nova runs the heating update, clamp included, every 5 s (`climate.py:706-710`; clamp `heating_control.py:485-489`, the flame-off branch `:476-482` follows the request). The firmware computes the clamp only on the control tick (`SATcontrol.ino:2486-2496`, `timerSATControl` `:901`). For this phase that moves the firmware to thermo-nova's cadence.
+
+**Open:** (1) what "the clamp is active" means exactly in code: the clamp result is above the PID output, or flame on with a valid flow while the clamp is evaluated; to settle in the task plan, reported back if it is not clear; (2) whether the PWM ON phase computes its CS through the same clamp is checked in the task plan; if it does, the plan states how this rule applies there and asks Sergeant D when that is unclear.
+
+**Task:** as entry 334.
