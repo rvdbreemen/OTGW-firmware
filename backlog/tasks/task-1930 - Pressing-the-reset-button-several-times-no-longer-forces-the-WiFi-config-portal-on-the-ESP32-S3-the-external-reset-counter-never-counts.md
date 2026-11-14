@@ -3,11 +3,11 @@ id: TASK-1930
 title: >-
   Pressing the reset button several times no longer forces the WiFi config
   portal on the ESP32-S3: the external-reset counter never counts
-status: In Progress
+status: In Review
 assignee:
   - '@claude'
 created_date: '2026-11-14T08:57:00Z'
-updated_date: '2026-11-14T13:01:00Z'
+updated_date: '2026-11-14T13:02:00Z'
 labels:
   - bug
   - wifi
@@ -49,4 +49,6 @@ Rebased onto origin/dev 67b137190 (banner and generated-index conflicts only; ne
 Build beta.243+c6dc184 (esp32-combo, cold, app 9m42s + FS 28s, max commit charge 86.1 %): SUCCESS. Archived in OTGW-build-archive/beta.243-1930: flash.zip acf28941...c9eef, ino.bin e4f624c3...c161c13, littlefs.bin e2d8c980...7af40e. AC2 ticked (fix per decision A, compiled; host proof in AC1).
 
 No-regression bench by 09 on .63, beta.243+c6dc184 (sha256 zip acf28941...c9eef, ino e4f624c3...61c13, littlefs e2d8c980...7af40e; OTA app+FS, 'changed: none', githash c6dc184): OK. 3x /ReBoot (Software reset, raw 0x0c/0x0c) and 2x USB reset (ESP_RST_USB '(b)', raw 0x15/0x15 = USB_UART_CHIP_RESET, settles the open raw-code question) each came back on WiFi in 7-9 s and MQTT in 9-12 s: no config portal, WiFi kept. Settings diff [] (API and raw settings.ini), crashlog byte-identical, bootcount +1 per reset. The telnet capture misses early setup lines, so the absence of 'External reset count' lines alone proves little; the evidence is the portal never coming plus the reasons reported (USB, SW), which the gate does not count. 3x power-on/button NOT done (AC3 field/maintainer).
+
+In Review: AC1 and AC2 ticked with evidence; AC3 is FIELD/MAINTAINER (three button presses or plug pulls on a build with the fix, by Robert or in the field). ADR-238 stays Proposed until Robert's in-session yes.
 <!-- SECTION:NOTES:END -->
