@@ -7,7 +7,7 @@ status: In Review
 assignee:
   - '@claude'
 created_date: '2026-11-12T18:20:00Z'
-updated_date: '2026-11-13T11:27:00Z'
+updated_date: '2026-11-14T21:25:00Z'
 labels:
   - feature
   - rest-api
@@ -50,4 +50,6 @@ Plan (ba, 2026-11-12). Today: sendOTValue (restAPI.ino:2933) returns label/value
 2026-11-13 bench beta.222+a5e61eb by otgw-bench-tester 09 (relayed by coordinator): PASS never_seen/-1 with label/value/unit unchanged; PASS .61 OT-Direct loopback: gateway-made answers do not count; PASS ID>127 (128 reserved, 400 unchanged); no extra reboots, crashlog empty, settings diff none on both units. NOT testable on the bench (no boiler): ack with rising age, unknown_dataid after PM=, data_invalid -> host test only (test_boiler_answer_status 11/11, red on f1b2731fd), field validation open. AC3 stays open for that field part. AC1: host test (gateway answer not counting) + .61 bench; PIC path by host test only. Pushed a5e61ebd7 to origin/dev (f1b2731fd..a5e61ebd7). Posted zip to #alpha-testing, Discord message 1570761730533883964.
 
 AC4: /messages/<id> checked on the bench; /otgw/id/<id> and /otgw/label/<label> share sendOTValue/sendOTLabel, both checked on the source by test_boiler_answer_status (wiring test), not separately on the bench. Status In Review: AC3 waits on field validation with a real boiler (ack age, unknown_dataid).
+
+2026-11-14 22:25 (09, bench part of AC3, partial): .61 (OTGW32, beta.252+941a224, no boiler): GET /api/v2/otgw/messages/0, /25, /99 -> status never_seen, last_seen_age_s -1, existing label/value/unit unchanged (never_seen case PASS). Loopback (GW=L, 30 s, IDs 0-127 scanned): still 113x never_seen, 0 ack, 0 unknown_dataid, 0 data_invalid; correct per AC1 (loopback answers are gateway-local and must not count). The ack/rising last_seen and unknown_dataid cases need a real boiler: none of the bench units (.61, .63) has an OT bus, so these stay unverified on the bench; options: a field capture from a tester, or a boiler simulator on the OT bus. .61 restored to GW=S. Evidence: 09 scratchpad b1871/scan1.txt.
 <!-- SECTION:NOTES:END -->
