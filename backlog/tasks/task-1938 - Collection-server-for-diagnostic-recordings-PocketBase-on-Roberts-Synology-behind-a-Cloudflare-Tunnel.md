@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-14T15:21:00Z'
-updated_date: '2026-11-14T17:21:00Z'
+updated_date: '2026-11-14T17:24:00Z'
 labels:
   - diagnostics
   - tooling
@@ -51,4 +51,6 @@ Robert 2026-11-14 (session): he has a domain on Cloudflare and asks for help to 
 2026-11-14 decoders for all streams + proof (proof_all_streams.py). Image: CI artifact firmware.bin of research/cloud-recording 48a0eb2 (esp32-combo, digest sha256:59d8f3d8528ba433cfc55518dc0a76221dd5a83bd8fe724a55cbb93ada1f0f7c, only firmware.bin, no ELF). 791/854 BOL format strings and 801 function names found as whole C strings in DROM; both SATTICK formats found (0x3c1bee86, 0x3c1be7bc). Reference text by ref_printf.c (C snprintf per conversion). no-psram 30 min: 4,706 frames, 48 ticks, 5,554 debug lines (580,910 B) -> 51 mix records, largest 4,062 B, 128,953 B; decoded: PASS OT, PASS SATTICK, PASS debug bytes. psram 30 min: 53,857 debug lines (5,596,803 B) -> 30 records, largest 19,528 B, 568,926 B; PASS all three. Negative control: one flipped bit in a debug section -> debug identical False.
 
 2026-11-14 CodeQL on PR #701 (alerts 71-75, uncontrolled format string, ref_printf.c:54-58): real. The conversion char came unchecked from the input, the width was unbounded (memcpy into spec[64]) and a trailing '%' ran past the string. Old binary: 'a%n' abort (glibc '%n in writable segment'), 'abc%' SIGSEGV; fixed: spec rebuilt from a whitelist (flags, <=3 width, <=2 precision digits, conversion in diuxXcfsS), argument type must fit, output bounded; all three refused with exit 1. Proof rerun with the fixed renderer (no-psram, 30 min): PASS OT, PASS SATTICK, PASS debug bytes. The taint path fgets->snprintf stays by design (the tool renders formats it is given); left to Robert whether to dismiss the alerts.
+
+2026-11-14 Robert: the CodeQL alerts may go. No dismiss tool in this session, so the cause is removed: ref_printf.c now only passes fixed format literals to snprintf (flag '', '0', '-', '+' x conversion table, width/precision as '*' arguments; integers width only). Builds clean with -Wall -Wextra -Wformat=2 -Wformat-nonliteral; hostile specs (%n, long width, trailing %, space flag, type mismatch) refused. Proof rerun: no-psram and psram, PASS OT, PASS SATTICK, PASS debug bytes (same counts as before).
 <!-- SECTION:NOTES:END -->
