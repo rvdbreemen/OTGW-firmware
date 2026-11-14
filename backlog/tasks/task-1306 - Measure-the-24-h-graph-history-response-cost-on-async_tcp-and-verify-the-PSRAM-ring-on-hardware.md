@@ -3,11 +3,11 @@ id: TASK-1306
 title: >-
   Measure the 24 h graph history response cost on async_tcp and verify the PSRAM
   ring on hardware
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-10-23T06:27:00Z'
-updated_date: '2026-11-12T06:12:00Z'
+updated_date: '2026-11-14T15:31:00Z'
 labels:
   - webui
   - graph
@@ -28,7 +28,7 @@ Follow-up of TASK-1296. Boards with PSRAM keep a 726 x 120 s ring and serve ~24 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [x] #1 Temporary uncommitted build with the 726-slot ring forced static and a 1 s interval on the no-PSRAM bench: full 24 KB body served, curl time_total recorded, hd_max_loop_gap_ms before/after 5 requests recorded, no TWDT reset
-- [ ] #2 On a PSRAM board (LOLIN S3 Mini/Pro): /api/v2/graph/history reports interval_s 120, PSRAM free size before/after boot recorded, 24 h window filled after the run time allows
+- [x] #2 On a PSRAM board (LOLIN S3 Mini/Pro): /api/v2/graph/history reports interval_s 120, PSRAM free size before/after boot recorded, 24 h window filled after the run time allows
 - [x] #3 Decision on the reboot-while-page-open history drop recorded (accept or fix)
 <!-- AC:END -->
 
@@ -52,4 +52,12 @@ Triage 2026-11-02 (beta.5, origin/dev 6c41cc696) in code: measurement only, need
 2026-11-11 08:49 otgw-firmware-09, AC2 read-only on .63 (beta.174+e6b4037, uptime 2:16, bootcount 11, so it restarted ~06:33 with the public beta.174): psram_found 1, psram_size 2097152, psram_free 2057544; GET /api/v2/graph/history HTTP 200, 2776 B in 0.059 s, interval_s 120, count 67, newest_age_ms 115005. 67 slots x 120 s = 134 min matches the uptime: the ring fills at one slot per 2 min. The full 24 h window (720 slots) needs uptime >= 24 h without a reboot: earliest check 2026-11-12 ~06:40. Series flow/ret/mod are null because .63 has no boiler on the bus (outside has values).
 
 2026-11-12 06:08 AC2 capture on .63 (otgw-bench-tester), PSRAM board (ESP32-S3FH4R2), 2.0.0-beta.174+e6b4037, uptime 23:35, bootcount 11: psram_found 1, psram_size 2097152, psram_free 2057576; GET /api/v2/graph/history x3: HTTP 200, 27736 B each, time_total 0.368 / 0.282 / 0.421 s; interval_s 120, count 707; hd_max_loop_gap_ms 399 before and after; no reboot. AC2 NOT ticked: 24 h = 720 slots and the window was 26 min (13 slots) short, because .63 had to be flashed with the public-beta candidate at 06:09 (Robert wanted the beta earlier). Ticking needs either Robert accepting 707/720, or a fresh 24 h run on .63 (now on beta.203, boot 06:09:23; full at about 06:10 on 2026-11-13).
+
+AC2 accepted by Robert, DM 1571184575894397039 (2026-11-14, relayed by the coordinator): option A, accept 707/720. Basis: the .63 capture of 2026-11-12 06:08 (otgw-bench-tester, beta.174+e6b4037, PSRAM ESP32-S3FH4R2, psram_found 1, psram_size 2097152, psram_free 2057576; interval_s 120, count 707, 3x HTTP 200 27736 B in 0.282-0.421 s, hd_max_loop_gap_ms 399 before/after, bootcount 11, no reboot) stopped at uptime 23:35, 13 slots (26 min) short of 720, because .63 had to be flashed with the public-beta candidate at 06:09; earlier 67 slots x 120 s matched the uptime exactly, so no interval drift. AC2 ticked on that maintainer decision.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+AC1: no-PSRAM bench .61 (psram_found 0), temporary uncommitted build with the 726-slot static ring at 1 s: ring full at count 720, 5x GET /api/v2/graph/history 28753-28756 B in 0.245-0.324 s, HTTP 200, hd_max_loop_gap_ms 416 before/after, no TWDT, crashlog empty (2026-11-05). AC2: PSRAM .63, interval_s 120, psram_free recorded, count 707 of 720 at uptime 23:35 with no reboot and no drift; the missing 13 slots are the beta flash at 06:09; accepted by Robert (DM 1571184575894397039, option A). AC3: decision on the reboot-while-page-open history drop recorded earlier in the notes. Not verified: a full 720-slot window on a PSRAM board.
+<!-- SECTION:FINAL_SUMMARY:END -->
