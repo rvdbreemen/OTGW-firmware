@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-13T23:18:00Z'
-updated_date: '2026-11-14T22:24:00Z'
+updated_date: '2026-11-14T22:26:00Z'
 labels:
   - webui
   - diagnostics
@@ -34,4 +34,6 @@ Sergeant D read gruijter's beta.218 graph export (13 Nov, #alpha-testing 1570893
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-11-14 (92, lane wt-92-webui). v2.js: each mark line gets an SVG <title> tooltip and a legend line #gMarkLegend (v2.html) under the series legend names the kinds on screen: 'live link lost' / 'live link back' (dashed red/green, tooltip '... Not a restart.') and 'gateway restarted' (solid amber #d29922). Restart detection: noteWsMark() reads device/info (withDeviceInfo, 8 s cache, so the startup snapshot on the first open and a fresh read after an outage) on the first open and on each return; noteDeviceBoot() keeps the boot counter as baseline and adds a restart mark when it went up (a lower count = counter reset = new baseline). Strings EN + NL/DE/EL (EL: my translation, consistent with el.json's 'ζωντανή σύνδεση με το gateway'; worth a native check). Tests one file at a time: new graph-mark-kinds.test.mjs 4/4 (real helpers cut from v2.js; on the old v2.js extraction fails: 0 pass 1 fail); graph-panels 7/7 (harness updated: device/info read once on the first open and once on the return, not on a drop; graphMarkKind now in graphMarkLines); i18n-lang 6/6; graph-break 8/8; panel-chart-style 2/2; graph-time-axis-and-png-export 11/11; evaluate --quick 0 FAIL. Screenshots (harness, fake WebSocket: open, drop, ~10 s outage, back; device/info boot count 7 -> 8): comms scratchpad t1914/old-graph-marks.png (two dashed lines, no legend) and fix-graph-marks.png (three lines, legend 'live link lost / live link back / gateway restarted').
+
+2026-11-14 (92): NEEDS NATIVE CHECK: the six Greek strings graph.mark_* in i18n/el.json are my own translation (consistent with the pack's 'ζωντανή σύνδεση με το gateway'), not reviewed by a Greek speaker; a translate_webui_otgw-firmware el refresh or Sergeant D can check them.
 <!-- SECTION:NOTES:END -->
