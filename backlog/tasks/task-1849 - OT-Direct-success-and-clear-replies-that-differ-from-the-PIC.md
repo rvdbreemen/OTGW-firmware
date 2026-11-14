@@ -1,10 +1,11 @@
 ---
 id: TASK-1849
 title: 'OT-Direct: success and clear replies that differ from the PIC'
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-11-12T00:04:00Z'
-updated_date: '2026-11-13T18:39:00Z'
+updated_date: '2026-11-14T15:56:00Z'
 labels:
   - otdirect
   - parity

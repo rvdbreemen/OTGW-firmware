@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTDirect.ino
-**  Version  : v2.0.0-beta.252
+**  Version  : v2.0.0-beta.253
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -3563,7 +3563,8 @@ bool handleOTDirectCommand(const char* buf, int len, bool satOwn) {
       otSCClockData = (uint16_t)(((dow & 0x07) << 5 | (hh & 0x1F)) << 8) | (mm & 0x3F);
       otSCLastCommandMs = millis();
       if (otSCLastCommandMs == 0) otSCLastCommandMs = 1;  // 0 sentinel reserved
-      snprintf_P(rspBuf, sizeof(rspBuf), PSTR("%d:%02d/%d"), hh & 0x1F, mm & 0x3F, dow & 0x07);
+      // TASK-1849: two-digit hours like the PIC (PrintDecimal, gateway.asm 6.8:4374-4388): "SC: 09:05/3"
+      snprintf_P(rspBuf, sizeof(rspBuf), PSTR("%02d:%02d/%d"), hh & 0x1F, mm & 0x3F, dow & 0x07);
       synthesizeResponse(buf, rspBuf);
     }
   }
@@ -4058,7 +4059,10 @@ bool handleOTDirectCommand(const char* buf, int len, bool satOwn) {
     otResponseOverrides[slot].msgId = (uint8_t)msgId;
     otResponseOverrides[slot].value = (uint16_t)dataVal;
     otResponseOverrides[slot].active = true;
-    synthesizeResponse(buf, value);
+    // TASK-1849: the stored value as the PIC prints it (UpdateResponse gateway.asm 6.8:4856-4859):
+    // "<id>:<high byte>/<low byte>", e.g. "SR: 18:1/230", whatever form the argument had.
+    snprintf_P(rspBuf, sizeof(rspBuf), PSTR("%u:%u/%u"), msgId, (dataVal >> 8) & 0xFF, dataVal & 0xFF);
+    synthesizeResponse(buf, rspBuf);
   }
   // CR=MsgID — Clear response override
   else if (cmd0 == 'C' && cmd1 == 'R') {
@@ -4272,7 +4276,8 @@ bool handleOTDirectCommand(const char* buf, int len, bool satOwn) {
   // FT=x — Force thermostat detection
   else if (cmd0 == 'F' && cmd1 == 'T') {
     otForceThermostat = otdThermostatModelChar(value[0]);   // TASK-1848: stored as PR=R prints it
-    rspBuf[0] = value[0]; rspBuf[1] = '\0';
+    // TASK-1849: the reply is the selected model as PrintRemeha prints it (gateway.asm 6.8:4727), not the argument
+    rspBuf[0] = otForceThermostat; rspBuf[1] = '\0';
     synthesizeResponse(buf, rspBuf);
   }
   // DP=x — Debug pointer (no-op, just acknowledge)
