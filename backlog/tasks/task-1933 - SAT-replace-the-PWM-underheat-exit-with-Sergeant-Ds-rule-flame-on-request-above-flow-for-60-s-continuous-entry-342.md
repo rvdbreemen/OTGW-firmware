@@ -3,10 +3,11 @@ id: TASK-1933
 title: >-
   SAT: replace the PWM underheat exit with Sergeant D's rule (flame on, request
   above flow for 60 s -> continuous), entry 342
-status: To Do
+status: In Progress
 assignee:
-  - '@d3'
+  - '@claude'
 created_date: '2026-11-14T10:36:00Z'
+updated_date: '2026-11-14T13:01:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -31,3 +32,9 @@ Maintainer + Sergeant D decision, entry 342: Q-338a A (https://discord.com/chann
 - [ ] #5 Host test on the real exit code: red on the old code (flow 1 C below request for 60 s does not exit), green on the fix; the saturation exit unchanged
 - [ ] #6 Bench run by the bench-tester (otgw-bench-tester): no reboot, the exit fires as specified in a simulated warm-up
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Step 1, FIELD DATA (EXPLORATORY: one house, gruijter, 5 telnet captures beta.68/167/171/214/218, 04-12 Nov, 8420 SATTICK ticks, about 70 h; script scratchpad t1933/rise_after_ignition.py, data stays local). Per CH ignition inside a PWM ON phase (pwm=1, ch=1; pon= is the ON duration, not a phase flag): time until flow >= the requested setpoint (pid=). Result: 91 ignitions; flow reached the request within one 30 s tick in 90 of them (median 0 s, max 30 s), never in 1. The entry-342 rule (flame on, request > flow for >= 60 s) would have fired in 1 of 91 ON phases (beta.167, 90 s after an ignition, request 41.1 vs flow 37.3: a real underheat). Today's underheat exit (flow <= request - 3.0 for 180 s, PWM ON) was due once, at another moment (beta.218, request 36.7 vs flow 30.1). Reading: on this house the risk named in option A (an exit about 60 s after every ignition, then toggling with the entry-327 rule) does not show, because PWM starts only when the flow is 1.5 C above the request and the ON-phase CS (flow - 1) keeps it there. Limits: one house, 30 s tick resolution, no heat pump, no low-power boiler; the simulation check (AC1) is still to do.
+<!-- SECTION:NOTES:END -->
