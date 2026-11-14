@@ -7,7 +7,7 @@ status: In Review
 assignee:
   - '@claude'
 created_date: '2026-11-13T23:14:00Z'
-updated_date: '2026-11-14T02:13:00Z'
+updated_date: '2026-11-14T02:29:00Z'
 labels: []
 dependencies: []
 priority: medium
@@ -51,4 +51,6 @@ Bench by 09 on .63, 2.0.0-beta.233+6afbade (evidence in 09's scratchpad b233ba\)
 Not verified on the device: (1) brief step 6, the FSexplorer auth guard on /settings.tmp, was skipped because .63 has no HTTP password. The guard is covered only statically: host harness case S3 checks the handleFile() guard names SETTINGS_TMP_FILE, and mutant MA4 (guard drops the temp file) fails S3. No runtime 401 seen. (2) The 'reset during a save' half of AC3 cannot be run on the bench; host harness W1/W3/R1 carry old-vs-fix (OLD fe6d35b59 red, FIX green).
 
 Pushed 6afbade55 (beta.233) to origin/dev on fe6d35b59. Zip OTGW-firmware-esp32-combo-2.0.0-beta.233+6afbade-flash.zip, sha256 d83553017152dac6848578066eee2d43d81d4a85664d29f62822d847ceb40341, posted to #alpha-testing msg 1570984895382163647.
+
+Bench by otgw-bench-tester (09), .63 Classic + PIC 6.8, 2.0.0-beta.233+6afbade (app-only OTA), 2026-11-14 03:05-03:30, evidence 09 scratchpad b233ba\. AC3 first half PASS: settings survive save + reboot (one setting changed -> settings diff after /ReBoot = only that field; A then B saved back to back -> one coalesced flush ~0.7 s later, /settings.ini 5659 B holds B; no .tmp files after saves + reboot; 3 reboots -> reboot_count +1 each and one reboot_log line each; 0 '[Settings] Error: short write or rename failed' in telnet over 7 flushes incl. 3 doRestart flushes). AC3 second half NOT bench-proven: 'a reset during a save keeps a valid settings.ini'. Every bench reboot goes through doRestart, which flushes the settings cleanly before restarting. A hard reset over USB (RTS/DTR on COM8 USB-Serial-JTAG, the esptool HardReset sequence) did not reset the unit (bootcount and uptime unchanged; .61 untouched too), and the only other route is esptool's download mode, which leaves the unit in the bootloader; not done. The power-cut/reset case therefore rests on the host harness of AC2 only. Step 6 (401 on /settings.tmp) not testable: .63 has no HTTP password (the settings API shows a password=N placeholder); unauth GET /settings.tmp -> 404; the served /settings.ini has all secret fields empty.
 <!-- SECTION:NOTES:END -->

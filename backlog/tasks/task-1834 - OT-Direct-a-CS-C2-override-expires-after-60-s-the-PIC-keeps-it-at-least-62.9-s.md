@@ -7,7 +7,7 @@ status: In Review
 assignee:
   - '@claude'
 created_date: '2026-11-11T23:43:00Z'
-updated_date: '2026-11-14T03:00:00Z'
+updated_date: '2026-11-14T03:02:00Z'
 labels:
   - otdirect
   - parity
@@ -31,7 +31,7 @@ From the PIC 6.8 parity audit (N4), docs/reviews/2026-11-12_pic68-otdirect-parit
 <!-- AC:BEGIN -->
 - [x] #1 host test with fake clock on real expiry code: last CS= at t=0 still active at t=62 s; red on current code
 - [x] #2 expiry not earlier than 63 s for CS and C2
-- [ ] #3 bench: CS= every 60 s for 15 min, no thermostat-valued MsgID 1 in the capture
+- [x] #3 bench: CS= every 60 s for 15 min, no thermostat-valued MsgID 1 in the capture
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -50,4 +50,6 @@ Part of the PIC 6.8 parity audit, parent TASK-1851.
 2026-11-14 d3, lane-1834 (wt-1834, uncommitted until a bump slot). Fix: OT_CSC2_EXPIRY_MS 60000 -> 63500 with the PIC citation. Evidence: new tests/test_otd_csc2_expiry.py (real constant + the real CS/C2 expiry statements of the 1-second timer, fake clock, CS= and C2= at t=0): old code FAIL at 61/62 s and at 63 s; fix: active at 61, 62, 63 s, expired at 64 and 70 s (CS and C2), SAT-owned CS still active at 150 s. All 43 tests that read OTDirect.ino OK, test_sat_lowload_contract OK (35, 495 s), evaluate --quick 85/0. Not in scope, noted: the PIC also keeps a CS below 8 C forever (CommandExpiry :1628-1633, review finding b1-7); OT-Direct still expires it after the window.
 
 2026-11-14 shipped in 2.0.0-beta.234 (08f42d625, #alpha-testing post 1570996739945537607, zip sha256 49eb9bbb83f28d7cdb7ced481b322e041c41e23eb23331a1fef300c456da409c). Bench by 09 on .61 (evidence 09 scratchpad b234): A: 16 x CS=45.5 in 15 min, 0 expiries, MsgID 1 only R90012D80; B: expiry 63.53 s after the last CS=; C2: expiry 63.73 s. Named limit for AC3: .61 runs in master mode without a thermostat, so the gateway-mode substitution against a real thermostat TSet was not exercised; the timer is proven, the substitution path is unchanged code. AC3 left for 09 to tick or waive (bench ACs are ticked by the bench tester).
+
+Bench AC3 by otgw-bench-tester (09), .61 OT-Direct otdmode 3 (master), SAT off, sim off, 2.0.0-beta.234+08f42d6 (OTA, bootcount 621->623, crashlog empty), 2026-11-14, evidence 09 scratchpad b234\ (61-telnet.txt, events.log). Test A 03:40:58-03:55:58: 16x CS=45.5 over REST every 60 s; telnet 16x 'OTD: cmd "CS=45.5"', 0 'CS heartbeat expired' lines in the window; every MsgID 1 write in the window is R90012D80 (TSet 45.50), 16 frames, no other value. Test B: last CS= on the device 03:55:56.924, 'OTD: CS heartbeat expired, clearing MsgID 1 override' 03:57:00.457 = 63.53 s (device clock). C2: C2=40 at 03:57:15.861, MsgID 8 written once (R10082800), 'OTD: C2 heartbeat expired, clearing MsgID 8 override' 03:58:19.587 = 63.73 s. Cleanup CS=0 + C2=0, settings diff none. Limit: .61 has no thermostat (master mode), so 'no thermostat-valued MsgID 1' holds trivially; in this mode MsgID 1 is written once per CS= command (~1.2 s after it), not on a schedule. The bench proves the 60 s refresh never lapses and the 63.5 s expiry, not the gateway-mode substitution against a real thermostat TSet.
 <!-- SECTION:NOTES:END -->
