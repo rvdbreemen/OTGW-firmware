@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-14T07:58:00Z'
-updated_date: '2026-11-14T16:11:00Z'
+updated_date: '2026-11-14T16:58:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -25,10 +25,10 @@ Maintainer order by Robert, #alpha-testing 2026-11-14: https://discord.com/chann
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [x] #1 CS= is sent when the sent value (0.1 resolution) changes, and an unchanged CS= is repeated every 30 s; the 5 s resend of an unchanged CS= is gone (entries 334, 335)
-- [ ] #2 While the flame is on and the flow clamp of entry 112 is active, the clamped CS is recomputed every 5 s and sent when it changes (entry 337)
+- [x] #2 While the flame is on and the flow clamp of entry 112 is active, the clamped CS is recomputed every 5 s and sent when it changes (entry 337)
 - [x] #3 MM=, TP= and CH= keep their on-change plus 60 s repair cadence (entries 237, 239); PIC keepalive and the 3 s PWM suppression refresh are consistent with the new CS rule
 - [ ] #4 A new ADR supersedes the CS part of ADR-207 (and ADR-203 where still in force), via adr-kit
-- [ ] #5 Host tests call the real sender code and fail on the old code (5 s repeat, no 5 s clamp recompute) and pass on the fix
+- [x] #5 Host tests call the real sender code and fail on the old code (5 s repeat, no 5 s clamp recompute) and pass on the fix
 - [ ] #6 Bench (bench-tester): CS= count per minute in steady state and during a warm-up, and no PIC CS expiry over 30 min
 <!-- AC:END -->
 
@@ -52,4 +52,6 @@ Part 1 shipped as beta.242: cdc9003ac on origin/dev (parent 002d1fbc2), build ex
 Bench 09 on .63 (PIC 6.8, SAT sim, interval 30 s), 12:47-13:29: sha256 match, OTA exit 0, settings changed none, bootcount 103->105; 113 SAT CS= inserts, 0 drops; steady 2.7/min (min 2, max 4, never 12+); setpoint step 19.8->21.0: CS=51.5 inserted on the tick that computed it (12:58:54.518); largest CS gap 30.110 s, 0 > 31 s; githash cdc9003, no extra reboot, crashlog unchanged, settings diff []. NOT observable: MsgID 1 on the bus (.63 has no boiler). Finding (09): at a 30 s control interval the loop repeat fires 2-6 ms before the tick that brings a new value, so the OLD CS= goes to the PIC queue just before the new one (29 of 37 changes). Coordinator decision A: shipped as is; fix in Part 2 (loop repeat at 31 s / repeat timer reset on a change, plus a host test with the tick at 30 s).
 
 PART 2 coded and host-tested (d3, 2026-11-14). (1) satCmdResend loop repeat AND satPicCSKeepalive wait 31 s (SAT_CS_REPEAT_MS + SAT_CS_REPEAT_SLACK_MS): 09's beta.242 finding (old CS= 2-6 ms before the tick, 29/37) came on .63 (PIC) most likely from the keepalive, which runs first in the loop at 30 s; fixing only the resend would not fix it. Host test test_sat_cmd_cache mode 20 (real code, loop order, tick 4 ms late): stale repeats 10 on HEAD, 0 on the fix; mutant with keepalive back at 30 s: 10 (red). Mode 21: largest CS gap at a 60 s interval <= 31 s. (2) Continuous start-up (entries 338, 344, 347): for SAT_CONT_STARTUP_MS 60000 after a CH flame-on edge, CS = max(request, flow - settings.sat.fModSupOffset) (1.0 C, const.py:153), else the entry-112 clamp with fFlowOffset 2.0 (unchanged; Q-346a open: A start-up 1.0/clamp 2.0, B both 1.0). Recomputed every 5 s (timerSATContClamp, satContinuousClampRefresh, entry 337) and at the tick (satContinuousSetpoint). New test tests/test_sat_continuous_startup.py on the real satApplyContinuous+satContinuousSetpoint: CS at t=55 s HEAD 50.0, fix 56.5; mutant with the entry-346 offset (2.0): 55.5 (red). Interpretations (ours, not asked): a DHW flame-on does not open the window; a flame already on at boot/enable gets no window (no edge seen). Tests updated for the 31 s repeat or the new symbols: test_sat_cmd_cache, test_sat_ceiling_paths, test_sat_previous_cs_clamp, test_sat_cs_ceiling_1536, test_sat_ot_loss, test_sat_restart_quiet, test_sat_push_setpoint, test_sat_pwm_override, test_sat_pwm_start_limit, test_sat_no_return_ignition. Runs: SAT chunk a-o 45 files (4 fixed then green individually), p-s 36 files (2 fixed then green), t-9+l 13/13, 7 non-SAT tests reading SATcontrol 7/7, evaluate --quick exit 0. Logs in the d3 scratchpad (p2-*.log).
+
+PART 2 shipped: beta.250+baf84d9 pushed to origin/dev (52be60d25..baf84d9f6, with the TASK-1933 docs commits e711f16b9, aa599b541), #alpha-testing post 1571207444875444356. Build: esp32-combo, 2x Successfully created ESP32S3 image, wrapper exit 0, githash = HEAD. Bench 09 on .63 (Classic + PIC, OTA, settings changed: none, bootcount 126 stable): A (30 s interval, 9.5 min) old CS < 1 s before a new value 0 (beta.242: 29/37), largest gap 30.10 s, 0 drops; B (SATinterval 60, 9.5 min) largest gap 31.00 s, no PIC expiry lines, and the 5 s continuous recompute stepped the CS down 0.1 at a time with the falling flow (cs ~ flow - 2.0, e.g. 17:45:11 flow 37.7 -> cs 35.7) = AC2 on hardware; C start-up follow NOT triggered (sim flow 21.8-23.5 below request 31.2-38.2 in the 60 s after flame-on): field-only, host test test_sat_continuous_startup covers it; D no regression (CS=0 on disable, MM/CH 60 s repair, CS on change + 30 s repeat); the 2 s start-up flood was not reached in this sim setup: NOT verified on the bench. AC2: host test (real satContinuousSetpoint, structural refresh gates) + bench B. AC5: Part 1 AC5 test (2 vs 13 CS/min) + Part 2 tests red on HEAD (stale 10 vs 0; start-up 50.0 vs 56.5; refresh structure absent). AC6 left to 09 (bench AC; this run was 2 x 9.5 min, not 30 min continuous). AC4 open: ADR-235 Proposed, acceptance by Robert's DM yes; it does not yet describe Part 2 (31 s, start-up follow), to be added before acceptance. Open follow-up: Q-346a (clamp offset 2.0 vs 1.0).
 <!-- SECTION:NOTES:END -->
