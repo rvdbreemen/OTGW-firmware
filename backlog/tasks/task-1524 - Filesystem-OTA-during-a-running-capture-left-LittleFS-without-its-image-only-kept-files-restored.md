@@ -7,7 +7,7 @@ status: To Do
 assignee:
   - '@claude'
 created_date: '2026-10-31T12:49:00Z'
-updated_date: '2026-11-14T18:43:00Z'
+updated_date: '2026-11-14T18:44:00Z'
 labels:
   - alpha
   - bug
@@ -27,7 +27,7 @@ Bench 2026-10-31 13:42, OTGW32 .61 on alpha.569, a long-run capture running (tel
 <!-- AC:BEGIN -->
 - [ ] #1 Reproduce on the bench: filesystem OTA while a capture (telnet + /ws + MQTT + snapshots) runs; record what the device logs during the upload (telnet, crashlog) and whether the image write fails or the upload stalls
 - [ ] #2 Root cause named with evidence (load gate, WS/TCP pressure, timeout in the upload handler, or the kept-file restore path)
-- [x] #3 Either fix it (e.g. refuse or pause other clients during filesystem OTA, or keep the old image until the new one is complete) or document the limit for testers; old-vs-fix bench run
+- [ ] #3 Either fix it (e.g. refuse or pause other clients during filesystem OTA, or keep the old image until the new one is complete) or document the limit for testers; old-vs-fix bench run
 <!-- AC:END -->
 
 ## Implementation Notes
