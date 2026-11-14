@@ -7,7 +7,7 @@ status: In Review
 assignee:
   - '@claude'
 created_date: '2026-11-13T23:57:00Z'
-updated_date: '2026-11-14T09:50:00Z'
+updated_date: '2026-11-14T09:53:00Z'
 labels: []
 dependencies: []
 priority: medium
@@ -25,7 +25,7 @@ Maintainer go, Robert in #alpha-testing (message 1570947181945299066): "Yes add 
 - [x] #1 /api/v2/health carries the simulation state (active, source), from loop-task state; sendHealth makes no LittleFS call (test_health_no_fs_flash_ops and the TASK-1899 gate stay green)
 - [x] #2 Test on the real v2.js: the 15 s poll chain sends no /api/v2/simulate request, and the SIMULATION badge follows the health answer (shown when active, hidden when not or when the field is missing); red on the old v2.js
 - [x] #3 /api/v2/simulate still answers as before for its other callers: API clients and the bench and test scripts (scripts/sat_bench_scenarios_1412_20.py, heap_soak_driver.py, tests/run_coverage_test.py, diag_decode.py)
-- [ ] #4 Bench: in simulation mode the badge appears from the health poll and the browser network log shows no periodic /simulate request
+- [x] #4 Bench: in simulation mode the badge appears from the health poll and the browser network log shows no periodic /simulate request
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -42,4 +42,6 @@ Rebased onto origin/dev 6eb3aa713 (after the beta.237 release); banner-only conf
 Build 2.0.0-beta.240+a3dff10 (HEAD a3dff1054 on origin/dev e0824f826): exit 0, 13 min, ESP32S3 image created x2, RAM 130236 B, Flash 2146491 B; sha256 ino.bin 0427b924..., littlefs.bin 46c46b20..., flash.zip 29c07ef0.... Gates on this commit: webui folder 76/76 files, 372 pass 0 fail; test_health_no_fs_flash_ops 5/5; evaluate --quick 86 passed 0 failed. Bench request (AC4) sent to 09 via the coordinator, unit .61.
 
 Pushed e0824f826..a3dff1054 (origin/dev), #alpha-testing post 1571099699098947614 (zip 2.0.0-beta.240+a3dff10, also covers beta.238 TASK-1774 and beta.239 TASK-1808). 09 bench on .61 PASS steps 1-6: badge on after 6.1 s from health, off after 14.2 s, 0 /api/v2/simulate out of 84 page requests in 3.2 min (150 s with sim on: 0 simulate, 10 health), health 13/13 200, settings diff none, bootcount 633->635, no crashlog; GET/POST /api/v2/simulate start/stop still 200 (AC3). Evidence: 09 scratchpad b240/ev (flash.log, sim-network.json, sim-badge-off/on/off-after.png). AC4 is ticked by 09.
+
+2026-11-14 10:44-10:48 (09, bench-tester) AC4 bench, .61, 2.0.0-beta.240+a3dff10 (artifact sha256 ino 0427b924...e4070, littlefs 46c46b20...8f5e2; OTA app+FS exit 0, 'changed: none', bootcount 633->635). One headless v2 tab with the CDP network log; sim start/stop POSTed from Node outside the browser, so the log holds only the page's own requests. Sim off: health simulation_active false, simulation_source builtin (= /api/v2/simulate), badge #hdrSim hidden. POST /api/v2/simulate/start 200: badge visible after 6.1 s without a reload, health active true. 150 s with sim on: /api/v2/simulate 0 requests, /api/v2/health 10. Whole 3.2 min session: 0 /api/v2/simulate out of 84 requests, health 13/13 HTTP 200. POST stop 200: badge hidden after 14.2 s (next health poll), health false. Afterwards bootcount 635 (no extra reboot), crashlog empty, hash-check match, settings diff [] (API + raw ini). Screenshots (header only, synthetic hostname/IP): sim-badge-off.png, sim-badge-on.png, sim-badge-off-after.png in 09 scratchpad b240/ev with sim-log.txt and sim-network.json. Not done on the bench: an old-v2.js browser run (red-on-old is the AC2 host test).
 <!-- SECTION:NOTES:END -->
