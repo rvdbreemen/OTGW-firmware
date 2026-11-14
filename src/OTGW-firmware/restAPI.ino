@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-beta.282
+**  Version  : v2.0.0-beta.283
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -2159,6 +2159,7 @@ struct DebugDumpSnap {
   uint32_t  heapFragPct;
   uint32_t  heapMinFree;
   uint32_t  heapMaxAlloc;
+  uint32_t  nowMs;                    // TASK-1910: millis() once, so a time-based class cannot change between window passes
   bool      wifiConnected;
   int32_t   rssi;
   float     roomTemp;
@@ -2233,6 +2234,7 @@ static void handleDebugDump(const char words[][API_WORD_LEN], uint8_t wc, HTTPMe
   snap->heapFragPct  = platformHeapFragmentation();
   snap->heapMinFree  = platformMinFreeHeap();
   snap->heapMaxAlloc = platformMaxFreeBlock();
+  snap->nowMs        = millis();
   snap->wifiConnected = (WiFi.status() == WL_CONNECTED);
   snap->rssi         = WiFi.RSSI();
   snap->roomTemp     = satGetRoomTemp();
@@ -2424,7 +2426,7 @@ static void handleDebugDump(const char words[][API_WORD_LEN], uint8_t wc, HTTPMe
     je.field(F("state.sat.pid_i"), snap->st.sat.fPidI);
     je.field(F("state.sat.pid_d"), snap->st.sat.fPidD);
     je.field(F("state.sat.cycle_count"), (uint32_t)snap->st.sat.iCycleCount);
-    je.field(F("state.sat.last_cycle_class"), (int32_t)satReportedLastCycleClass(snap->st.sat, millis()));
+    je.field(F("state.sat.last_cycle_class"), (int32_t)satReportedLastCycleClass(snap->st.sat, snap->nowMs));
     je.field(F("state.sat.duty_ratio"), snap->st.sat.fDutyRatio);
     je.field(F("state.sat.pwm_duty"), snap->st.sat.fPwmDutyCycle);
     je.field(F("state.sat.active_preset"), (int32_t)snap->st.sat.eActivePreset);
@@ -3185,6 +3187,9 @@ struct DeviceInfoSnap {
   uint32_t  freeHeap;
   uint32_t  maxFreeBlock;
   uint32_t  heapMinFree;         // TASK-1017: platformMinFreeHeap(), frozen (was a live read the closure would need)
+  int32_t   psramFree;           // TASK-1910: the three heap reads were live in the closure; a value that gained a
+  int32_t   internalFree;        // digit between window passes repeated the closing '}' (DETERMINISM CONTRACT,
+  int32_t   internalMaxBlk;      // jsonChunked.h)
   int32_t   ipc0StackMin;        // TASK-1865: ipc0 / ipc1 stack free at its low point since boot, bytes (-1 = not found)
   int32_t   ipc1StackMin;
   uint8_t   fragPct;
@@ -3242,6 +3247,9 @@ void sendDeviceInfoV2()
   snap->heapMinFree     = platformMinFreeHeap();  // TASK-1017
   snap->ipc0StackMin    = platformIpcStackHighWater("ipc0");  // TASK-1865: bytes free at the low point, -1 = not found
   snap->ipc1StackMin    = platformIpcStackHighWater("ipc1");
+  snap->psramFree       = (int32_t)ESP.getFreePsram();
+  snap->internalFree    = (int32_t)heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
+  snap->internalMaxBlk  = (int32_t)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL);
   snap->fragPct         = getHeapFragmentation();
   snap->pendingDiscoveryIds = countPendingDiscoveryIds();
   snap->rssi            = WiFi.RSSI();
@@ -3451,10 +3459,10 @@ void sendDeviceInfoV2()
     je.field(F("status_pixel_gpio"), (int32_t)statusPixelGpio());  // TASK-1221: 0 = no LOLIN pixel driven
 #endif
     je.field(F("psram_size"),     (int32_t)ESP.getPsramSize());
-    je.field(F("psram_free"),     (int32_t)ESP.getFreePsram());
+    je.field(F("psram_free"),     snap->psramFree);
     je.field(F("flash_size"),     (int32_t)ESP.getFlashChipSize());
-    je.field(F("internal_free"),  (int32_t)heap_caps_get_free_size(MALLOC_CAP_INTERNAL));
-    je.field(F("internal_maxblk"),(int32_t)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL));
+    je.field(F("internal_free"),  snap->internalFree);
+    je.field(F("internal_maxblk"),snap->internalMaxBlk);
     {
       const uint32_t flashMB = ESP.getFlashChipSize() / (1024UL * 1024UL);
       const uint32_t psramMB = ESP.getPsramSize()    / (1024UL * 1024UL);
