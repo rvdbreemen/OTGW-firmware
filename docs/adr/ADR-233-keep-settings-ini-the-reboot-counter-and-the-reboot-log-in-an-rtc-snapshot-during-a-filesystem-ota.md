@@ -5,8 +5,12 @@ status: "Proposed"
 date: "2026-11-14"
 binding: false
 gate: null
-documents_shipped: false
-verified_in: []
+documents_shipped: true
+verified_in:
+  - "commit:3d147974e"
+  - "commit:03ea54036"
+  - "src/OTGW-firmware/OTGW-ModUpdateServer-esp32.h:fsOtaRtcRestoreAtBoot"
+  - "test/host/test_fs_ota_rtc_snapshot.py"
 supersedes: []
 superseded_by: null
 topics:
@@ -273,6 +277,12 @@ brought the web UI back with the settings unchanged.
   SAT settings can push `settings.ini` past 6 KB, and then the counter and log drop out first, and later the
   settings themselves. *Mitigation*: the size is logged at every filesystem OTA; compression is the named
   follow-up.
+- The reboot log is the first to drop out. It is a ring of 20 lines; a boot line is at most 160 B (TASK-1904 added
+  the raw reset code, 16 B) and a core-dump line up to 240 B (`REBOOT_LOG_LINE_MAX`), so the log can reach about
+  4.8 KB, while 7424 B minus a 5.7 KB `settings.ini` leaves about 1.7 KB. A log that does not fit is skipped whole
+  (settings and counter stay protected) and the boot starts a new one. Host cases T11 (5700 B settings, 3200 B log:
+  log skipped, settings and counter restored) and T12 (the .63 sizes, 5659 B and 1178 B, plus the 16 B per boot line
+  of TASK-1904: all three restored) pin both; on .63 the margin drops from about 580 B to about 260 B.
 - Secrets: `settings.ini` holds the HTTP and MQTT passwords in clear text (ADR-056), so the snapshot holds them in
   RTC slow memory across a reset. *Mitigation*: cleared on every OTA exit and right after the boot restore; never
   printed. A physical attacker with a debugger could read RTC memory, but could read flash too.
@@ -286,7 +296,7 @@ brought the web UI back with the settings unchanged.
 - [x] Does IDF startup, the PHY or WiFi write into RTC slow memory above 0x50000220 in either binary? (Covered by
   the probe; not readable from the ELF.)
   — **Answered 2026-11-14 by Agent: otgw-firmware-ba (Claude):** Not observed: the 7184 B probe at 0x50000244 came back intact through both routes (R1, R2), so nothing in that range was written by IDF startup, the PHY, WiFi or the safeboot updater on that run. Not a proof for other builds; the implementation keeps the boot address check.
-- [ ] The exact snapshot size: the free RTC slow memory of the build that implements this, minus what margin?
+- [x] The exact snapshot size: the free RTC slow memory of the build that implements this, minus what margin? — **Answered 2026-11-14 by Agent: otgw-firmware-ba (Claude):** 7424 B of data (FS_OTA_RTC_DATA_BYTES), struct 0x1D10 B at 0x50000244 in the beta.238 ELF (nm), 140 B of RTC slow memory left; the bench snapshot held 6841 B and 6880 B of the two files plus the counter (09, .63, beta.238 bench 2026-11-14).
 
 ## Related Decisions
 
