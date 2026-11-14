@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTDirect.ino
-**  Version  : v2.0.0-beta.250
+**  Version  : v2.0.0-beta.252
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -33,7 +33,16 @@
 // OpenTherm interface instances — master talks to boiler, slave listens to thermostat
 // ---------------------------------------------------------------------------
 static OpenTherm otMaster(PIN_OT_MASTER_IN, PIN_OT_MASTER_OUT);
-static OpenTherm otSlave(PIN_OT_SLAVE_IN, PIN_OT_SLAVE_OUT, true);  // true = slave mode
+// TASK-1848: the thermostat side exposes its two Smart Power idle levels for PR=P. The library's own
+// getSmartPowerState() (OpenTherm.cpp:540-544) returns LOW or HIGH and never MEDIUM, so it cannot give the
+// PIC's three levels; the levels are protected members, read here without changing the library.
+class OTDSlaveLine : public OpenTherm {
+public:
+  using OpenTherm::OpenTherm;
+  bool txRaised()   const { return txIdleLevel; }   // PIC TransmitMode: raised idle current to the thermostat
+  bool rxInverted() const { return rxIdleLevel; }   // PIC ReceiveModeT: thermostat line voltage inverted
+};
+static OTDSlaveLine otSlave(PIN_OT_SLAVE_IN, PIN_OT_SLAVE_OUT, true);  // true = slave mode
 
 // ISR handlers — must be free functions for attachInterrupt
 static void IRAM_ATTR masterISR() { otMaster.handleInterrupt(); }
@@ -633,10 +642,35 @@ const char* otdPicCompatVersion() { return OTD_PIC_COMPAT_VERSION; }
 static uint8_t otIgnoreTransitions = 1;      // IT= (1=ignore, PIC default)
 static uint8_t otOverrideHB      = 0;        // OH= override high byte flag
 static char    otGpioFunctions[3] = "00";    // GA=/GB= function codes
-static char    otLedFunctions[7]  = "XXXXXX";// LA=-LF= config chars
+static char    otLedFunctions[7]  = "FXOMPC";// LA=-LF= config chars, PIC default (gateway.asm 6.8:5462-5468, TASK-1848)
 static uint8_t otVoltageRef      = 5;        // VR= voltage reference digit
 static char    otTempSensor      = 'O';      // TS= temp sensor function
-static char    otForceThermostat = 'A';      // FT= thermostat detection
+static char    otForceThermostat = 'D';      // FT= thermostat model, as PR=R prints it (D = auto-detect, PIC default)
+
+// --- otdPrHelpers begin
+// TASK-1848: PR=P text of PrintPowerlevel (gateway.asm 6.8:2262-2268, strings :5499-5502): no raised
+// transmit level is Low, raised transmit with a normal receive level is Medium, both is High.
+static const char* otdPowerLevelText(bool txRaised, bool rxInverted) {
+  if (!txRaised) return PSTR("Low power");
+  return rxInverted ? PSTR("High power") : PSTR("Medium power");
+}
+// TASK-1848: the model letter PR=R prints for an FT= argument (SetTStatModel gateway.asm 6.8:4705-4727,
+// PrintRemeha :2270-2280). C, I and S are set by hand; any other letter means auto-detect, printed as D.
+// OT-Direct has no Remeha detection, so R never appears.
+static char otdThermostatModelChar(char c) {
+  return (c == 'C' || c == 'I' || c == 'S') ? c : 'D';
+}
+// TASK-1848: PR=B in the PIC's build stamp format "HH:MM DD-MM-YYYY" (otgw-6.8 tools/build.tcl:83),
+// from the compiler's __DATE__ ("Nov 14 2026", day space-padded) and __TIME__ ("14:05:33").
+static void otdPicBuildStamp(const char* date, const char* time, char* out, size_t n) {
+  static const char months[] = "JanFebMarAprMayJunJulAugSepOctNovDec";
+  int mon = 0;
+  for (int i = 0; i < 12; i++) {
+    if (strncmp(date, months + 3 * i, 3) == 0) { mon = i + 1; break; }
+  }
+  snprintf_P(out, n, PSTR("%.5s %02d-%02d-%.4s"), time, atoi(date + 4), mon, date + 7);
+}
+// --- otdPrHelpers end
 static uint8_t otDHWOverride     = 0xFF;     // HW state: 0='0', 1='1', 0xFF='A' (auto)
 static bool    otDHWBlocking     = false;    // BW= DHW blocking (bit6, not persisted); read by otdRelayedStatusFrame (ADR-229)
 // TASK-1833: CE= and H2= as the PIC's CoolModeOff/CH2ModeOff, clear at reset (gateway.asm 6.8:1178-1188): while a CL= or
@@ -3778,31 +3812,18 @@ bool handleOTDirectCommand(const char* buf, int len, bool satOwn) {
         }
         break;
       case 'O': {
-        // Setpoint override report. TASK-466: TT/TC remote-override state
-        // machine takes precedence — it carries the explicit mode (T or C).
-        // Falls back to CS (boiler control setpoint) if no TT/TC is active
-        // and a CS override is in force.
-        if (otRemoteOverride.mode == OT_OVERRIDE_TEMPORARY) {
-          dtostrf((int16_t)otRemoteOverride.f88Value / 256.0f, 1, 2, rspBuf);
-          snprintf_P(prBuf, sizeof(prBuf), PSTR("PR: O=T%s"), rspBuf);
-        } else if (otRemoteOverride.mode == OT_OVERRIDE_CONSTANT) {
-          dtostrf((int16_t)otRemoteOverride.f88Value / 256.0f, 1, 2, rspBuf);
-          snprintf_P(prBuf, sizeof(prBuf), PSTR("PR: O=C%s"), rspBuf);
+        // TASK-1848: the remote room setpoint override (TT=/TC=) as PrintOverride prints it (gateway.asm
+        // 6.8:2201-2226): N for none, n while a clear still has to reach the thermostat, else T or C and the
+        // setpoint, the letter in lowercase until the thermostat took the override over (OverrideSet,
+        // set at :3016-3018 when its MsgID 16 matches; here bAccepted, ADR-223). CS= is not part of it on
+        // the PIC (SetSetPoint :4095 only serves TT/TC), so a CS= override reports N.
+        if (otRemoteOverride.mode == OT_OVERRIDE_NONE) {
+          snprintf_P(prBuf, sizeof(prBuf), PSTR("PR: O=%c"), otRemoteOverrideClearPending ? 'n' : 'N');
         } else {
-          // No TT/TC: check for a CS (MsgID 1) flow setpoint override.
-          bool csActive = false;
-          uint16_t csVal = 0;
-          for (uint8_t i = 0; i < OT_OVERRIDE_COUNT; i++) {
-            if (otOverrides[i].active && otOverrides[i].msgId == 1) {
-              csActive = true; csVal = otOverrides[i].overrideValue; break;
-            }
-          }
-          if (csActive) {
-            dtostrf((int16_t)csVal / 256.0f, 1, 2, rspBuf);
-            snprintf_P(prBuf, sizeof(prBuf), PSTR("PR: O=C%s"), rspBuf);
-          } else {
-            snprintf_P(prBuf, sizeof(prBuf), PSTR("PR: O=N"));
-          }
+          char letter = (otRemoteOverride.mode == OT_OVERRIDE_TEMPORARY) ? 'T' : 'C';
+          if (!otRemoteOverride.bAccepted) letter = (char)(letter | 0x20);
+          dtostrf((int16_t)otRemoteOverride.f88Value / 256.0f, 1, 2, rspBuf);
+          snprintf_P(prBuf, sizeof(prBuf), PSTR("PR: O=%c%s"), letter, rspBuf);
         }
         otDirectBridgeProcessPRResponse(prBuf);
         break;
@@ -3840,19 +3861,25 @@ bool handleOTDirectCommand(const char* buf, int len, bool satOwn) {
         otDirectBridgeProcessPRResponse(prBuf);
         break;
       case 'P':
-        snprintf_P(prBuf, sizeof(prBuf), PSTR("PR: P=M"));  // medium power (default)
+        // TASK-1848: the Smart Power level towards the thermostat, in the PIC's words.
+        snprintf_P(prBuf, sizeof(prBuf), PSTR("PR: P=%s"),
+                   otdPowerLevelText(otSlave.txRaised(), otSlave.rxInverted()));
         otDirectBridgeProcessPRResponse(prBuf);
         break;
       case 'R':
-        snprintf_P(prBuf, sizeof(prBuf), PSTR("PR: R=I"));  // internal detection
+        snprintf_P(prBuf, sizeof(prBuf), PSTR("PR: R=%c"), otForceThermostat);  // TASK-1848: FT= model, D by default
         otDirectBridgeProcessPRResponse(prBuf);
         break;
-      case 'B':
-        snprintf_P(prBuf, sizeof(prBuf), PSTR("PR: B=%s"), __DATE__);
+      case 'B': {
+        char stamp[20];   // "HH:MM DD-MM-YYYY" is 16 characters, longer than rspBuf
+        otdPicBuildStamp(__DATE__, __TIME__, stamp, sizeof(stamp));   // TASK-1848: PIC format
+        snprintf_P(prBuf, sizeof(prBuf), PSTR("PR: B=%s"), stamp);
         otDirectBridgeProcessPRResponse(prBuf);
         break;
+      }
       case 'C':
-        snprintf_P(prBuf, sizeof(prBuf), PSTR("PR: C=240"));  // ESP32-S3 @ 240MHz
+        // TASK-1848: the PIC's "<n> MHz" (SpeedString gateway.asm 6.8:5506-5507) with the ESP32-S3's clock.
+        snprintf_P(prBuf, sizeof(prBuf), PSTR("PR: C=240 MHz"));
         otDirectBridgeProcessPRResponse(prBuf);
         break;
       case 'Q': {
@@ -4244,7 +4271,7 @@ bool handleOTDirectCommand(const char* buf, int len, bool satOwn) {
   }
   // FT=x — Force thermostat detection
   else if (cmd0 == 'F' && cmd1 == 'T') {
-    otForceThermostat = value[0];
+    otForceThermostat = otdThermostatModelChar(value[0]);   // TASK-1848: stored as PR=R prints it
     rspBuf[0] = value[0]; rspBuf[1] = '\0';
     synthesizeResponse(buf, rspBuf);
   }

@@ -5,6 +5,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Changed
+- OT-Direct: `PR=` reports use the PIC 6.8 text. `PR=P` reports the real Smart Power level towards the thermostat (`Low power`, `Medium power`, `High power`); `PR=R` reports the `FT=` model (`D` by default); `PR=C` is `240 MHz`, `PR=B` the build time as `HH:MM DD-MM-YYYY`, and the `PR=L` default is `FXOMPC` (Robert, DM 1571191256833331375). `PR=O` covers only the `TT=`/`TC=` room setpoint override, with the lowercase `t`/`c` until the thermostat accepts it and `n` while a clear is pending. An active `CS=` (also the one SAT sends) now reports `N` instead of `C<flow temperature>`, so `otgw-pic/settings/setpoint_override`, the Home Assistant sensor PIC_Setpoint_Override, REST `/api/v2/pic/settings` `setpoint_override` and the web UI PIC panel show "no override" there (Robert, DM 1571191595498340544; TASK-1848).
+
 ## [2.0.0-beta.250] - 2026-11-14
 
 ### Added
