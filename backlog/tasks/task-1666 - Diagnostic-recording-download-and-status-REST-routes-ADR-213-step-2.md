@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-05T20:34:00Z'
-updated_date: '2026-11-14T15:27:00Z'
+updated_date: '2026-11-14T15:50:00Z'
 labels:
   - diagnostics
 milestone: 2.0.0
@@ -33,4 +33,6 @@ GET /api/v2/diag/recording?since= as an octet-stream filler with the block range
 2026-11-06 implemented (sonnet subagent, reviewed): routes GET /api/v2/diag/recording[?since=N] (octet-stream, range fixed at request start, header OTGWREC v1: version, block size, first_seq, count, ring, boot, flags, route names), GET .../status, POST .../start|stop. Host test test/host/test_diag_recording_routes.py --mutant RESULT PASS (W1-W4, R1-R8; range mutant fails R1/R6, since mutant fails R2). ESP32 build OK. Bench .61 (no PSRAM): start ok, download 200 4300 B in 0.155 s with 5 concurrent device/info polls 200 in 0.09-0.18 s, stop ok. AC2 (1.5 MB download time) needs the PSRAM board .63 (after 2026-11-07 08:00). Open: the ADR-214 topic/setting name sections in the file header are not in this version (header format v1 has route names only).
 
 Stale audit 2026-11-14 (coordinator decision): AC2 needs a bench on .63 (PSRAM) by 09; the coordinator queues it.
+
+2026-11-14 (09) toward AC2 (not ticked). The ring on .63 fills too slowly for a 1.5 MB download today (first 4 KB block > 3 min). On a partial ring (8396 B, 2 blocks): 3 downloads, TTFB 25-82 ms, transfer 15-18 ms (446-531 KB/s). Extrapolation to 1 572 864 B gives about 3 s, an ESTIMATE only and an optimistic one: 8 KB fits in a few TCP windows, so it does not show the per-window fill over 384 blocks under the lock; the first download of the day took 1.6 s for 4300 B. Web UI responsiveness during a download not measured yet. Plan (coordinator): an overnight recording on .63 after d3's 1924 part 2 bench, then the real 1.5 MB download time and the web UI check. Evidence: 09 scratchpad b1665/ (dl*.bin, throughput.txt).
 <!-- SECTION:NOTES:END -->
