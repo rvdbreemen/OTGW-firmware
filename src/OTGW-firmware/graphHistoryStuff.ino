@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : graphHistoryStuff.ino
-**  Version  : v2.0.0-beta.257
+**  Version  : v2.0.0-beta.258
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -64,8 +64,11 @@ void graphHistoryTick()
   s.room    = graphHistEncRoom(OTcurrentSystemState.Tr, trAt != 0, satIsEnabled() && state.sat.bRoomTempLost,
                                elapsedTrackedSeconds(currentTrackedSeconds(), trAt));
   s.mod     = graphHistEncMod (OTcurrentSystemState.RelModLevel, graphHistSeen(17));
-  // Outside follows the browser rule (v2.js): weather API when valid, else MsgID 27.
-  if (state.sat.weather.bValid) s.outside = graphHistEncTemp(state.sat.weather.fTemperature, true);
+  // Outside follows the browser rule (v2.js): weather API when valid, else MsgID 27. TASK-1937: valid means fresh,
+  // SAT's rule (bValid only ever goes true, so after the fetch stops the last value would be written forever).
+  const bool wxFresh = state.sat.weather.bValid && state.sat.weather.iLastUpdateMs != 0 &&
+                       (uint32_t)(millis() - state.sat.weather.iLastUpdateMs) < GRAPH_HIST_WEATHER_VALID_MS;
+  if (wxFresh) s.outside = graphHistEncTemp(state.sat.weather.fTemperature, true);
   else                          s.outside = graphHistEncTemp(OTcurrentSystemState.Toutside, graphHistSeen(27));
 
   platformMutexLock(graphHistMutex);
