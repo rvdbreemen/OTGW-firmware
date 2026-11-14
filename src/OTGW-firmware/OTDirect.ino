@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTDirect.ino
-**  Version  : v2.0.0-beta.274
+**  Version  : v2.0.0-beta.275
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -1258,16 +1258,6 @@ void initOTDirect() {
   otMinIntervalMs   = settings.otd.iMsgInterval;
   if (otSummerMode) otMasterStatusFlags |= 0x20;
 
-  // TASK-584: restore persisted ventilation setpoint to write cache so the
-  // scheduler will re-apply it to the boiler after boot without a new command.
-  if (settings.otd.iVentSetpoint > 0) {
-    uint16_t ventData = (uint16_t)settings.otd.iVentSetpoint;   // TASK-1831: MsgID 71 LB (spec v4.2 MsgID 71)
-    updateWriteCache(71, ventData);
-    setOverride(71, ventData);
-    OTDDebugTf(PSTR("OT-direct: restored vent setpoint %u%% from settings\r\n"),
-               settings.otd.iVentSetpoint);
-  }
-  otdRestorePersistedCommands();   // TASK-1836: HW, SW, SH, IT, OH and the UI= list
 
   {
     const char* modeNames[] = { "bypass", "gateway", "monitor", "master" };
@@ -1347,6 +1337,19 @@ void initOTDirect() {
       OTDDebugTln(F("OT-direct: Thermostat present — staying in gateway mode"));
     }
   }
+
+  // TASK-1944: the persisted command state is restored after the auto-detect, so the full reset of its switch into master
+  // (applyOTDirectMode -> resetTransientState) cannot wipe it again.
+  // TASK-584: restore persisted ventilation setpoint to write cache so the
+  // scheduler will re-apply it to the boiler after boot without a new command.
+  if (settings.otd.iVentSetpoint > 0) {
+    uint16_t ventData = (uint16_t)settings.otd.iVentSetpoint;   // TASK-1831: MsgID 71 LB (spec v4.2 MsgID 71)
+    updateWriteCache(71, ventData);
+    setOverride(71, ventData);
+    OTDDebugTf(PSTR("OT-direct: restored vent setpoint %u%% from settings\r\n"),
+               settings.otd.iVentSetpoint);
+  }
+  otdRestorePersistedCommands();   // TASK-1836: HW, SW, SH, IT, OH and the UI= list
 
   // 10. TASK-1835 (PIC 6.8 parity audit N5): the boot status request and the protocol handshake go out only when the
   //     gateway is the master, i.e. in master mode, also when the auto-detect above just chose it for this boot. In
