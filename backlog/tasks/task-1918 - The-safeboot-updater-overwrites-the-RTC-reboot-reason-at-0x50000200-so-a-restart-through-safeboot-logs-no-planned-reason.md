@@ -7,7 +7,7 @@ status: In Review
 assignee:
   - '@claude'
 created_date: '2026-11-14T02:34:00Z'
-updated_date: '2026-11-14T15:40:00Z'
+updated_date: '2026-11-14T21:22:00Z'
 labels:
   - bug
   - ota
@@ -26,9 +26,9 @@ Found while planning TASK-1774 (ELF evidence, not seen on a device). The main fi
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Bench: the reason of a planned restart through safeboot is shown on device as lost on the old build (reboot_log line after an app OTA)
+- [x] #1 Bench: the reason of a planned restart through safeboot is shown on device as lost on the old build (reboot_log line after an app OTA)
 - [x] #2 Fix keeps every main-firmware RTC_NOINIT record out of 0x50000200-0x5000021F, with a check that goes red when one lands there
-- [ ] #3 Bench: after the fix the planned reason survives an app OTA through safeboot
+- [x] #3 Bench: after the fix the planned reason survives an app OTA through safeboot
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -55,4 +55,6 @@ Bench by 09 on .63, beta.248+5e8c416 (sha256 zip 544700bd...092bd, ino efcb09ee.
 Rebased onto origin/dev 3c30e3926 for the post build: my code identical (299 lines excl. banners); src differs from the benched 5e8c416 only by 09's benched TASK-1875 (v2.js, beta.247) and the version stamps. Re-bump beta.247 -> beta.248.
 
 Pushed origin/dev 3c30e3926..0a3dbd3bf (beta.248, my code identical to the benched 5e8c416); posted message 1571188033087217674 (covers 247). AC2 ticked with evidence; AC1 and AC3 for 09 to tick from its b248 bench.
+
+AC1/AC3 ticked by 09 (bench-tester) from its own 2026-11-14 bench on .63, reboot_log readouts in 09 scratchpad b248/: RED (AC1), old beta.247 app OTA through safeboot 247->247, rlog1 top line '2026-11-14 16:23:18 - reboot cause: Software reset (3) [rst 0x0c/0x0c] ' (planned reason lost). GREEN (AC3), beta.248+5e8c416 app OTA through safeboot 248->248, rlog3 top line '2026-11-14 16:26:03 - reboot cause: Software reset (3) [rst 0x0c/0x0c] - [OTA] handover to safeboot' (reason survives). The 16:25:03 line '- [OTA] Rebooting...' is the 247->248 transition boot (old code's handover), as designed. Status left to the owner.
 <!-- SECTION:NOTES:END -->
