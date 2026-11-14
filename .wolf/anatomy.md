@@ -1,7 +1,7 @@
 # anatomy.md
 
-> Auto-maintained by OpenWolf. Last scanned: 2026-11-13T06:13:01.639Z
-> Files: 156 tracked | Anatomy hits: 0 | Misses: 0
+> Auto-maintained by OpenWolf. Last scanned: 2026-11-14T13:05:42.350Z
+> Files: 158 tracked | Anatomy hits: 0 | Misses: 0
 
 ## ../../../../AppData/Local/Temp/
 
@@ -942,6 +942,10 @@
 
 ## docs/design/
 
+
+## docs/diagnostics/
+
+- `ot-stream-encoding-study.md` — Encoding the OT stream for minimal bytes: study (~2136 tok)
 
 ## docs/evidence/
 
