@@ -54,6 +54,7 @@ PRE = r"""
 #include <cmath>
 #include <cstdlib>
 #define PSTR(s) (s)
+#define snprintf_P snprintf
 #define OTDDebugTf(...) do {} while (0)
 enum OTDirectMode { OTD_MODE_BYPASS = 0, OTD_MODE_GATEWAY = 1 };
 static OTDirectMode otCurrentMode = OTD_MODE_GATEWAY;
@@ -118,6 +119,9 @@ def build_source():
              r"^static unsigned long applyOverrides\(unsigned long frame, bool &modified\) \{",
              r"^static unsigned long buildOverriddenReply\("]
     parts = [table.group(0) if table else None] + [braced(SRC, n) for n in names]
+    blk = re.search(r"// --- otdPicFloat begin\n(.*?)// --- otdPicFloat end", SRC, re.S)
+    if blk:   # TASK-1859: the parsers share one block; otdPicPercentF88() wraps otdPicFloatF88()
+        parts[1] = blk.group(1)
     if parts[1] is None:   # the code before TASK-1842 has no parser and no RT= branch
         parts[1] = 'static const char* otdPicPercentF88(const char*, uint16_t&) { return "NG"; }'
     assert all(parts), "a slice is missing"

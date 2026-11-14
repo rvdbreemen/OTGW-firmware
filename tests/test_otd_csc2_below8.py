@@ -134,8 +134,10 @@ class CsC2Below8(unittest.TestCase):
         # Source pin on the real handlers (they are not compiled here).
         src = OTD_INO.read_text(encoding="utf-8").replace("\r\n", "\n")
         for cmd, msgid, stamp in (("'S'", 1, "otCSLastCommandMs"), ("'2'", 8, "otC2LastCommandMs")):
-            m = re.search(r"cmd0 == 'C' && cmd1 == " + cmd + r"\) \{\n    float temp = atof\(value\);\n.*?"
-                          r"(?:    //[^\n]*\n)*    if \(floatToF88\(temp\) == 0\) \{[^\n]*\n((?:(?!\} else \{).)*?)\} else \{(.*?)\n    \}\n", src, re.S)
+            # TASK-1859: the value is parsed by the PIC's GetPercentArg (otdPicFloatF88) instead of atof/floatToF88
+            m = re.search(r"cmd0 == 'C' && cmd1 == " + cmd + r"\) \{\n(?:    float temp = atof\(value\);\n|(?:    //[^\n]*\n)*"
+                          r"    uint16_t f88 = 0;\n    const char\* err = otdPicFloatF88\(value, OTD_PIC_PERCENT, f88\);\n).*?"
+                          r"(?:    //[^\n]*\n)*    if \((?:floatToF88\(temp\)|f88) == 0\) \{[^\n]*\n((?:(?!\} else \{).)*?)\} else \{(.*?)\n    \}\n", src, re.S)
             self.assertIsNotNone(m, cmd)
             zero, rest = m.group(1), m.group(2)
             self.assertIn("clearWriteOverride(%d);" % msgid, zero, cmd)
@@ -149,8 +151,12 @@ class CsC2Below8(unittest.TestCase):
         out = subprocess.run([str(self.exe), "conv", "0.001", "-0.001", "0", "0.004", "0.0039"], capture_output=True,
                              text=True, check=True).stdout.split()
         self.assertEqual(out, ["0000", "0000", "0000", "0001", "0000"], out)
-        src = OTD_INO.read_text(encoding="utf-8")
-        self.assertEqual(src.count("if (floatToF88(temp) == 0) {"), 2)   # the CS= and C2= release branches
+        src = OTD_INO.read_text(encoding="utf-8").replace("\r\n", "\n")
+        # the CS= and C2= release branches test the f8.8 value (TASK-1859: the PIC-parsed one, which is 0 for 0.001)
+        for cmd in ("'S'", "'2'"):
+            b = src[src.index("cmd0 == 'C' && cmd1 == " + cmd + ") {"):]
+            b = b[:b.index("\n  }\n")]
+            self.assertRegex(b, r"if \((?:floatToF88\(temp\)|f88) == 0\) \{", cmd)
 
     def test_negative_still_expires(self):
         # integer byte 0xFF masks to 0xF8 (non-zero) on the PIC too: -1.0 (0xFF00) and -0.5 (0xFF80) expire

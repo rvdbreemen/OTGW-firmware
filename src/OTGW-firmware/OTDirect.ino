@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTDirect.ino
-**  Version  : v2.0.0-beta.286
+**  Version  : v2.0.0-beta.288
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -3256,35 +3256,74 @@ static unsigned long applyResponseModifiers(unsigned long response) {
   return response;
 }
 
-// TASK-1842: the PIC's GetPercentArg (gateway.asm GetPosFloat :5114-5117 + GetFloat :5118-5185, GetPercent
-// :5099-5112) as an f8.8 value. An integer part of 0-255 digits, an optional '.' and digits: the first two
-// fraction digits are kept, the third rounds (:5138-5159), further digits are checked but ignored; the hundredths
-// become 1/256 steps rounded UP when not exact (:5169-5178, "the honeywell thermostat always rounds down").
-// No sign other than '+'; above 100.00 is OR. Returns nullptr on success, else the PIC error code.
-// --- otdPicPercentF88 begin
-static const char* otdPicPercentF88(const char* s, uint16_t &out) {
-  if (*s == '+') s++;
+// TASK-1842, TASK-1859: the PIC 6.8 number parsers (gateway.asm, repo 770aa45) as f8.8 values, so a command
+// stores the same two bytes the PIC stores.
+//   GetFloat :5118-5185: an optional '-' or '+', an integer part of 0-255 (GetDecimal :5045-5069: no digit = SE,
+//     above 255 = OR), then only a '.' and digits (anything else SE). The first two fraction digits are kept, the
+//     third rounds (:5138-5159), further digits are checked but ignored. The hundredths become 1/256 steps
+//     (Divide100 :5211-5225, carry into the integer at 100) rounded UP when not exact (:5172-5175, "the honeywell
+//     thermostat always rounds down"). A negative value inverts the integer byte and takes 100 - hundredths, or
+//     adds 1 to the inverted byte when there is no fraction (:5160-5167, :5183-5184). The bytes wrap as on the PIC.
+//   GetPosFloat :5114-5117: a '-' is not a sign, so it reaches GetDecimal and is SE.
+//   GetPercent :5099-5112: GetPosFloat, then above 100.00 is OR. Parse errors and the range error differ for
+//     CL= (SetCoolLevel :4454-4462 clears on a parse error, answers OR on the range error): *parseErr tells them apart.
+// Returns nullptr on success, else the PIC error code.
+// --- otdPicFloat begin
+// uint8_t, not an enum: the Arduino prototype generator puts the prototype above any type declared in this file.
+static constexpr uint8_t OTD_PIC_FLOAT = 0, OTD_PIC_POSFLOAT = 1, OTD_PIC_PERCENT = 2;
+
+static const char* otdPicFloatF88(const char* s, uint8_t kind, uint16_t &out, bool* parseErr = nullptr) {
+  if (parseErr) *parseErr = true;
+  bool neg = false;
+  if (*s == '-' && kind == OTD_PIC_FLOAT) { neg = true; s++; }
+  else if (*s == '+') s++;
   if (*s < '0' || *s > '9') return "SE";
   unsigned ip = 0;
   while (*s >= '0' && *s <= '9') { ip = ip * 10 + (unsigned)(*s - '0'); if (ip > 255) return "OR"; s++; }
   unsigned h = 0;
   if (*s == '.') {
     s++;
-    for (uint8_t n = 0; *s; n++, s++) {
+    for (uint8_t n = 0; *s; s++) {
       if (*s < '0' || *s > '9') return "SE";
-      if (n < 2) h = h * 10 + (unsigned)(*s - '0');
-      else if (n == 2 && *s >= '5') h++;
+      if (n == 0) h = (unsigned)(*s - '0') * 10;       // tenths (Multiply10, :5144-5145)
+      else if (n == 1) h += (unsigned)(*s - '0');      // hundredths
+      else if (n == 2 && *s >= '5') h++;               // the third digit rounds
+      if (n < 3) n++;
     }
   } else if (*s) {
     return "SE";
   }
-  if (h >= 100) { ip++; h -= 100; }                  // Divide100 carry (:5170-5172)
-  if (ip > 100 || (ip == 100 && h > 0)) return "OR";  // GetPercent: above 100.00
-  const unsigned frac = (h * 256u + 99u) / 100u;     // round up when not exact
-  out = (uint16_t)((ip << 8) | frac);
+  uint8_t hi = (uint8_t)ip;
+  if (neg) {
+    hi = (uint8_t)~hi;                                // comf temp
+    if (h == 0) hi++;                                 // GetFloatNegInt
+    else h = 100 - h;
+  }
+  if (h >= 100) { hi++; h -= 100; }                   // Divide100 carry
+  const unsigned frac = (h * 256u + 99u) / 100u;      // round up when not exact
+  if (parseErr) *parseErr = false;
+  if (kind == OTD_PIC_PERCENT && (hi > 100 || (hi == 100 && frac > 0))) return "OR";   // above 100.00
+  out = (uint16_t)((hi << 8) | frac);
   return nullptr;
 }
-// --- otdPicPercentF88 end
+
+static inline const char* otdPicPercentF88(const char* s, uint16_t &out) {
+  return otdPicFloatF88(s, OTD_PIC_PERCENT, out);
+}
+
+// The PIC's CommandFloat reply, PrintSigned :2043-2064: a negative value is negated and gets a '-'; a fraction
+// byte of 0xFF prints as the next integer; else the hundredths are frac * 100 / 256, rounded half up (float2
+// bit 7). Two decimals, no leading zeros on the integer.
+static void otdPicPrintF88(uint16_t f88, char* buf, size_t len) {
+  const bool neg = (f88 & 0x8000u) != 0;
+  if (neg) f88 = (uint16_t)(0u - f88);
+  unsigned hi = f88 >> 8, lo = f88 & 0xFFu;
+  if (lo == 0xFFu) { hi = (hi + 1u) & 0xFFu; lo = 0; }
+  const unsigned p = lo * 100u;
+  const unsigned hund = (p >> 8) + ((p & 0x80u) ? 1u : 0u);
+  snprintf_P(buf, len, PSTR("%s%u.%02u"), neg ? "-" : "", hi, hund);
+}
+// --- otdPicFloat end
 
 // ---------------------------------------------------------------------------
 // handleOTDirectCommand — translate PIC-style commands to OT frames
@@ -3387,11 +3426,15 @@ bool handleOTDirectCommand(const char* buf, int len, bool satOwn) {
 
   // CS=xx.x — Control setpoint (MsgID 1 = TSet). Value 0 clears override.
   if (cmd0 == 'C' && cmd1 == 'S') {
-    float temp = atof(value);
+    // TASK-1859: parsed as the PIC's GetPercentArg (SetCtrlSetpoint gateway.asm 6.8:4218): SE/OR as on the PIC
+    // (CS= with no value is SE, tests/command-4.stc), same f8.8 (CS=49.72 -> 0x31B9, control-1.stc).
+    uint16_t f88 = 0;
+    const char* err = otdPicFloatF88(value, OTD_PIC_PERCENT, f88);
+    if (err) { otDirectBridgeProcessStatus(err); return false; }
     bool enqueued = true;
     // TASK-1917: release when the f8.8 value is 0, as the PIC does (SetCtrlSetpoint tests the converted bytes,
     // gateway.asm:4218-4226): a CS=0.001 would otherwise be a permanent 0 C override under the below-8 rule.
-    if (floatToF88(temp) == 0) {
+    if (f88 == 0) {
       // CS=0 clears the flow setpoint override only and does not write bit0 (CH enable)
       // of MsgID 0. CH= overrides bit0 only while a CS override is active (gateway.asm:53;
       // pyotgw/pyotgw.py:602-603), so clearing the override hands bit0 back to the board's
@@ -3399,14 +3442,13 @@ bool handleOTDirectCommand(const char* buf, int len, bool satOwn) {
       clearWriteOverride(1);
       otCSLastCommandMs = 0;  // TASK-442: explicit clear, no expiry
     } else {
-      uint16_t f88 = floatToF88(temp);
       enqueued = enqueueWriteCommand(1, f88, "CS");
       if (enqueued) {
         otCSLastCommandMs = otdCsc2ExpiryStamp(f88);  // TASK-442 refresh; TASK-1917: below 8 never expires
       }
     }
     if (enqueued) {
-      dtostrf(temp, 1, 2, rspBuf);
+      otdPicPrintF88(f88, rspBuf, sizeof(rspBuf));
       synthesizeResponse(buf, rspBuf);
     }
   }
@@ -3453,16 +3495,19 @@ bool handleOTDirectCommand(const char* buf, int len, bool satOwn) {
   // is the thermostat's own request, not a separate WRITE_DATA from the gateway.
   // BS=0 clears the fake and restores the thermostat's original room setpoint.
   else if (cmd0 == 'B' && cmd1 == 'S') {
-    float temp = atof(value);
-    if (temp == 0.0f) {
+    // TASK-1859: parsed as the PIC's GetPercentArg (SetFakeSetpoint gateway.asm 6.8:4289-4298); BS=24.6 -> 0x189A
+    // (control-5.stc).
+    uint16_t f88 = 0;
+    const char* err = otdPicFloatF88(value, OTD_PIC_PERCENT, f88);
+    if (err) { otDirectBridgeProcessStatus(err); return false; }
+    if (f88 == 0) {
       otFakeRoomSetpoint = 0.0f;
       clearWriteOverride(16);   // also an MQTT room_setpoint write
     } else {
-      otFakeRoomSetpoint = temp;
-      uint16_t f88 = floatToF88(temp);
+      otFakeRoomSetpoint = f88 / 256.0f;
       setOverride(16, f88);
     }
-    dtostrf(temp, 1, 2, rspBuf);
+    otdPicPrintF88(f88, rspBuf, sizeof(rspBuf));
     synthesizeResponse(buf, rspBuf);
   }
   // RT=xx.xx — Room temperature for the boiler (MsgID 24 = Tr), PIC 6.8 (gateway.asm SetRoomTemp
@@ -3482,25 +3527,27 @@ bool handleOTDirectCommand(const char* buf, int len, bool satOwn) {
       setOverride(24, f88);
       updateWriteCache(24, f88);
     }
-    dtostrf(f88 / 256.0f, 1, 2, rspBuf);
+    otdPicPrintF88(f88, rspBuf, sizeof(rspBuf));
     synthesizeResponse(buf, rspBuf);
   }
   // C2=xx.x — Control setpoint CH2 (MsgID 8 = TsetCH2). Value 0 clears.
   else if (cmd0 == 'C' && cmd1 == '2') {
-    float temp = atof(value);
+    // TASK-1859: parsed as the PIC's GetPercentArg (SetCtrlSetpt2 gateway.asm 6.8:5272); C2=45.6 -> 45.60 (command-2.stc).
+    uint16_t f88 = 0;
+    const char* err = otdPicFloatF88(value, OTD_PIC_PERCENT, f88);
+    if (err) { otDirectBridgeProcessStatus(err); return false; }
     bool enqueued = true;
-    if (floatToF88(temp) == 0) {   // TASK-1917: release on a zero f8.8 value, as for CS=
+    if (f88 == 0) {   // TASK-1917: release on a zero f8.8 value, as for CS=
       clearWriteOverride(8);
       otC2LastCommandMs = 0;  // TASK-442: explicit clear, no expiry
     } else {
-      uint16_t f88 = floatToF88(temp);
       enqueued = enqueueWriteCommand(8, f88, "C2");
       if (enqueued) {
         otC2LastCommandMs = otdCsc2ExpiryStamp(f88);  // TASK-442 refresh; TASK-1917: below 8 never expires
       }
     }
     if (enqueued) {
-      dtostrf(temp, 1, 2, rspBuf);
+      otdPicPrintF88(f88, rspBuf, sizeof(rspBuf));
       synthesizeResponse(buf, rspBuf);
     }
   }
@@ -3703,18 +3750,22 @@ bool handleOTDirectCommand(const char* buf, int len, bool satOwn) {
   // CL=xx.x — Cooling level (PIC-compatible alias for CC=, MsgID 7)
   else if (cmd0 == 'C' && cmd1 == 'L') {
     // TASK-1833: as the PIC SetCoolLevel (gateway.asm 6.8:4454-4464): a number, 0 included, is held as the
-    // cooling level; only a value that is not a number clears it, with the ValueCleared reply "CL: -".
-    char* end = nullptr;
-    float cl = strtof(value, &end);
+    // cooling level; a value the PIC's GetPercentArg cannot parse clears it, with the ValueCleared reply "CL: -";
+    // above 100.00 is OR (TASK-1859). CL=94.38 -> 0x5E62 (heatpump-2.stc).
+    uint16_t f88 = 0;
+    bool parseErr = false;
+    const char* err = otdPicFloatF88(value, OTD_PIC_PERCENT, f88, &parseErr);
     bool enqueued = true;
-    if (end == value) {
+    if (err && !parseErr) {
+      otDirectBridgeProcessStatus(err);
+      return false;
+    } else if (err) {
       clearWriteOverride(7);
       synthesizeResponse(buf, "-");
     } else {
-      uint16_t f88 = floatToF88(cl);
       enqueued = enqueueWriteCommand(7, f88, "CL");
       if (enqueued) {
-        dtostrf(cl, 1, 2, rspBuf);
+        otdPicPrintF88(f88, rspBuf, sizeof(rspBuf));
         synthesizeResponse(buf, rspBuf);
       }
     }

@@ -20,8 +20,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - OT-Direct: on a thermostat loss the gateway no longer writes the 16 C setback temperature as a flow setpoint; its own frames carry CH off unless a `CS=` is in force, like the PIC. `OTDsetbacktemp` and the `FS=` flag are still stored but have no effect, `setback_active` stays false (TASK-1806).
 - SAT continuous mode: a CH flame-on start runs the PWM start sequence first (flame-off hold at return + 18 C, a 20 s hold, then the 60 s follow), as a fail-safe (Sergeant D entry 348, TASK-1942).
 - SAT: PWM ends for continuous when the flame is on and the request stays above the flow for 60 s, instead of the flow at 3 C below the request for 180 s (Sergeant D entries 342, 350, ADR-236, TASK-1933).
+- OT-Direct: `CS=`, `C2=`, `BS=` and `CL=` parse their value as the PIC 6.8 GetPercentArg does: an empty, negative or malformed value is `SE` and above 100.00 is `OR`, where it used to clear (`CS=` with no value) or pass through; `CL=` with a value that is not a number still clears. The stored f8.8 value rounds like the PIC instead of truncating (`CS=49.72` sends 0x31B9, was 0x31B8), and the replies print that stored value as the PIC's PrintSigned does (TASK-1859).
 
 ### Fixed
+- OT-Direct `RT=`: a value with one decimal is tenths, as on the PIC (`RT=25.4` sends 0x1967); it was read as hundredths (TASK-1859).
 - Home Assistant discovery: the DHW flow rate sensor (MsgID 19, `DHWFlowRate`) announces the unit `L/min`; Home Assistant rejected `l/min` for device class `volume_flow_rate` and did not create the sensor (PR #702 by justink0k; TASK-1949).
 - Monitor > Graph: the 24 h history stores the weather outside temperature only while it is fresh (younger than 1 h) and falls back to MsgID 27, instead of repeating the last value after the weather fetch stopped (TASK-1937).
 - MQTT: a SUBSCRIBE that the MQTT library refused during the connect burst (low free block on a board without PSRAM) is retried until it is accepted, so MQTT commands no longer stay dead until the next reconnect (TASK-1778).
