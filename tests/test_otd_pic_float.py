@@ -278,8 +278,9 @@ class PosFloatCommands(unittest.TestCase):
     def test_SB_like_set_setback(self):
         r = cmds(("SB", "18.23"), ("SB", "35"), ("SB", "0"), ("SB", "-2"), ("SB", "0.5"))
         self.assertEqual((r["SB=18.23"]["sb"], r["SB=18.23"]["rsp"]), ("18.2305", "18.23"))   # 0x123B, gpio-5.stc
-        self.assertEqual((r["SB=35"]["sb"], r["SB=35"]["rsp"]), ("35.0000", "35.00"))         # no clamp to 30
-        self.assertEqual((r["SB=0.5"]["sb"], r["SB=0.5"]["rsp"]), ("0.5000", "0.50"))         # no clamp to 1
+        # the 1-30 clamp of the old OT-Direct fail-safe setback stays (stored only since TASK-1806)
+        self.assertEqual((r["SB=35"]["sb"], r["SB=35"]["rsp"]), ("30.0000", "30.00"))
+        self.assertEqual((r["SB=0.5"]["sb"], r["SB=0.5"]["rsp"]), ("1.0000", "1.00"))
         self.assertEqual(r["SB=0"]["st"], "SE")                                                # zero is SE
         self.assertEqual(r["SB=-2"]["st"], "SE")
 

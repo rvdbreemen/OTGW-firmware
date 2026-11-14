@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-12T05:19:00Z'
-updated_date: '2026-11-14T23:29:00Z'
+updated_date: '2026-11-15T02:20:00Z'
 labels:
   - otdirect
   - parity
@@ -29,10 +29,10 @@ Also check per command which PIC parser it uses (GetFloat, GetPosFloat, GetPerce
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Every OT-Direct command that takes a temperature or percentage converts it like the PIC's parser for that command (GetFloat / GetPosFloat / GetPercent): same f8.8 value, same SE/OR/BV refusals; the list of commands and their PIC parser is in the notes with gateway.asm citations
-- [ ] #2 Host test on the real handlers with the PIC's examples (25.41 -> 0x1969, 0.02 -> 0x0006, OT=9.999 -> 10.00, OT=-0.004 -> 0.00 from tests/command-6.stc); red on the old code
-- [ ] #3 Replies print the stored value with two decimals, as the PIC
-- [ ] #4 Non-command paths (MQTT room_temp/room_setpoint, setback, boot re-send) are either converted the same way or explicitly left as they are with a reason
+- [x] #1 Every OT-Direct command that takes a temperature or percentage converts it like the PIC's parser for that command (GetFloat / GetPosFloat / GetPercent): same f8.8 value, same SE/OR/BV refusals; the list of commands and their PIC parser is in the notes with gateway.asm citations
+- [x] #2 Host test on the real handlers with the PIC's examples (25.41 -> 0x1969, 0.02 -> 0x0006, OT=9.999 -> 10.00, OT=-0.004 -> 0.00 from tests/command-6.stc); red on the old code
+- [x] #3 Replies print the stored value with two decimals, as the PIC
+- [x] #4 Non-command paths (MQTT room_temp/room_setpoint, setback, boot re-send) are either converted the same way or explicitly left as they are with a reason
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -51,4 +51,10 @@ Per command (dispatch :3786-3942, :5242): TT SetTempSetPoint :4089 and TC SetCon
 95 commit 3 (GetFloat group): SW=, SH= GetFloatArg + otdPicInBounds() (unsigned integer byte >= lower, < upper or == upper with no fraction; MsgID 48/49 bytes else the PIC defaults 20/80, 10/90; a cached upper byte 0 counts as no bound because the cache also stores Data-Invalid replies, which the PIC ignores); 0 resets; persisted value f88/256 (the boot re-send through floatToF88 reproduces the f8.8 exactly). OT= GetFloatArg: any parse error and 64.00-127.99 clear with reply 'OT: -' (was: echo of the value); 128-255 positive is stored as the PIC stores it (OT=200 -> 0xC800, -56.00), on purpose for parity. CC= (no PIC command) parses like CL=. tests/test_otd_pic_float.py 16/16 green; on the part-2 code 5 FAIL (OT=9.999 0x09FF, SW=55.7 0x37B3, no BV, OT clear reply echoed 'x', CC=101 accepted); on origin/dev 84944a95e 16/16 FAIL. 37 tests/test_otd_*.py + test_sat_command_delivery + test_ino_prototype_hoisting exit 0 (harness pins updated: persist_pic_eeprom, ps1_outside_temp); evaluate --quick 86/0. Overlap: OT=- / OT=99 of TASK-1799 are now done here; MM= (integer, GetDecimal) stays for 1799.
 
 AC4 (non-command paths): the boot re-send of SW/SH (otdRestorePersistedCommands, floatToF88 of the persisted f88/256 value) and the thermostat-loss setback (floatToF88(settings.otd.fSetbackTemp)) now get exact multiples of 1/256, so floatToF88 reproduces the PIC-parsed f8.8; left as they are. The MQTT room_temp (MsgID 24) and room_setpoint (16) inputs (OTDirect.ino around 2453-2460) are left on floatToF88: they are OT-Direct MQTT topics, not PIC commands, and get a float from the MQTT handler; no PIC parser applies.
+
+95 correction after review (advisor + code read): SB= keeps its 1-30 C clamp. On OT-Direct the setback is not the PIC's room setpoint (AwaySetpoint): checkThermostatTimeout() writes settings.otd.fSetbackTemp as TSet to MsgID 1 for the thermostat-loss fail-safe (ADR-179), so SB=100 without the clamp would ask a 100 C flow. Commit 2 had removed the clamp; commit 4 restores it (parse still PIC: minus/zero/garbage SE); test SB=35 -> 30.00, SB=0.5 -> 1.00, FAIL on the part-3 code (35.00). Caller audit part 3: SAT SW=%d 30-60 (SATtypes.h:490-491) and SH=%d bounded by MsgID 49 and the hard max (SATcontrol.ino:347-360, :400-410, :7398-7410); HA water_heater SW= 40-60 and climate TT= 12-30 (MQTTHaDiscovery.cpp ~3156-3158), HA number Toutside_override -40..50 step 0.5 (:3254), so no internal sender reaches the new BV or the OT= 64+ clear. Line endings: the 25238 bridge cuts at CR, NUL-terminates and skips LF (OTDirect.ino:968-990); REST/MQTT/boot/SC pass NUL-terminated strings, so no CR/LF reaches the parser. Harness sweep on HEAD: 13 non-otd slicing tests exit 0 after one pin fix (tests/test_evaluate.py OT reply form, 80/80), test/host local_frame_consumers + override_modlevel exit 0, ps1 harnesses loopback (6144 cases), unknown_counters, override_reply (40/40) PASS. Accepted ADRs grep (SB=/setback/negative TT/OT clear): only ADR-179 (setback as fail-safe, kept) and ADR-065 (topic tree), no conflict.
+
+95: AC4 limit: a SW=/SH= value persisted by firmware before 1859 is an atof float (55.7), so the boot re-send still truncates it (0x37B3) until the user sends SW=/SH= once more; new values are stored as f88/256 and re-sent exactly. Docs: manual ch09/h09 paragraph 'OT-Direct reads command numbers like the PIC 6.8' (commit 5c5e15d30). ACs 1-4 ticked on host evidence (see the commit notes above); bench items in scratchpad t1859/bench-brief.md, build pending (queue d3 -> ba -> 95).
+
+95 (rebase onto 2f4818aa1): d3's TASK-1806 removed the setback write in checkThermostatTimeout, so SB= is stored and reported only; the 1-30 C clamp stays (comment, CHANGELOG and test comment updated; behaviour unchanged).
 <!-- SECTION:NOTES:END -->

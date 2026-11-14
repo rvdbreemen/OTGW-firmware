@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTDirect.ino
-**  Version  : v2.0.0-beta.290
+**  Version  : v2.0.0-beta.291
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -4278,15 +4278,17 @@ bool handleOTDirectCommand(const char* buf, int len, bool satOwn) {
 
   // SB=xx.x — Setback temperature (used when thermostat disconnects)
   else if (cmd0 == 'S' && cmd1 == 'B') {
-    // TASK-1859: as the PIC SetSetBack (gateway.asm 6.8:4155-4162): GetPosFloatArg, a zero value is SE, no clamp;
-    // SB=18.23 -> PR: S=18.23 (tests/gpio-5.stc). Was constrain(atof, 1, 30).
+    // TASK-1859: parsed as the PIC SetSetBack (gateway.asm 6.8:4155-4162): GetPosFloatArg, a zero value is SE;
+    // SB=18.23 -> PR: S=18.23 (tests/gpio-5.stc). Stored and reported only: since TASK-1806 nothing writes the
+    // setback (TASK-1950 decides whether it goes). The 1-30 C clamp it had as the old fail-safe TSet stays, so a
+    // stored value never exceeds what that path once allowed; the reply prints the stored (clamped) value.
     uint16_t f88 = 0;
     const char* err = otdPicFloatF88(value, OTD_PIC_POSFLOAT, f88);
     if (!err && f88 == 0) err = "SE";
     if (err) { otDirectBridgeProcessStatus(err); return false; }
-    otSetbackTemp = (int16_t)f88 / 256.0f;
+    otSetbackTemp = constrain((int16_t)f88 / 256.0f, 1.0f, 30.0f);
     otdPersistFloat(settings.otd.fSetbackTemp, otSetbackTemp);   // TASK-1836: persist (marks dirty)
-    otdPicPrintF88(f88, rspBuf, sizeof(rspBuf));
+    otdPicPrintF88(floatToF88(otSetbackTemp), rspBuf, sizeof(rspBuf));
     synthesizeResponse(buf, rspBuf);
   }
   // IT=0/1 — Ignore transitions
