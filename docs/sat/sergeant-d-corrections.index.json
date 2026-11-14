@@ -4613,6 +4613,21 @@
     "TASK-1924"
    ],
    "confirmed_by_entry": null
+  },
+  {
+   "id": 347,
+   "title": "The start-up following is not flow - 2.0; Sergeant D names flow - 1.0 (Sergeant D, 2026-11-14; corrects entry 346, Q-346a open)",
+   "date": "2026-11-14",
+   "source": "sergeant-d",
+   "kind": "correction",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1571152712291192954",
+   "supersedes": [
+    346
+   ],
+   "tasks": [
+    "TASK-1924"
+   ],
+   "confirmed_by_entry": null
   }
  ]
 }

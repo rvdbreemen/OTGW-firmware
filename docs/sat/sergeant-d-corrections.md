@@ -7250,3 +7250,19 @@ Asked by DM (through the coordinator) whether the repeat is 60 s or 30 s, given 
 **Open:** none for TASK-1924 Part 2's open points of entry 338 (period: entry 344; offset: this entry).
 
 **Task:** TASK-1924.
+
+## 347. The start-up following is not flow - 2.0; Sergeant D names flow - 1.0 (Sergeant D, 2026-11-14; corrects entry 346, Q-346a open)
+
+**Source:** #alpha-testing 2026-11-14, Sergeant D, 15:55:54 UTC, reply to our context post https://discord.com/channels/812969634638725140/1514720723980259460/1571152712291192954 : https://discord.com/channels/812969634638725140/1514720723980259460/1571191959073325077 . Our reply with Q-346a, 16:06 UTC: https://discord.com/channels/812969634638725140/1514720723980259460/1571194589082292296
+
+**Quoted:**
+
+> "wait a moment. Flow above request: CS =max(request, min(flow - 1.0, previous CS)) is the correct. Did I decided to be `flow -2.0`? If yes then it is wrong. The suppression mechanism should flow -1."
+
+**Settled (corrects entry 346):** entry 346 (his A on Q-338c, flow_setpoint_offset 2.0 C for the start-up following) is withdrawn by him: "If yes then it is wrong". He did choose A (https://discord.com/channels/812969634638725140/1514720723980259460/1571145597182804060). Interpretation we act on: the start-up following of entries 338/344 uses 1.0 C, not 2.0 C. Entries 338 and 344 (the rule and the 60 s period) stay.
+
+**Conflict with thermo-nova, put to him as Q-346a:** his formula also gives the continuous clamp 1.0 C. thermo-nova has two offsets: `const.py:153` `CONF_MODULATION_SUPPRESSION_OFFSET_CELSIUS: 1.0`, used for the PWM suppression at `heating_control.py:440-441` (CS = flow - 1.0); and `const.py:154` `CONF_FLOW_SETPOINT_OFFSET_CELSIUS: 2.0`, used for the continuous clamp at `heating_control.py:455` and `:485-489`. Firmware matches both: `fModSupOffset = 1.0f` (`SATtypes.h:519`), `fFlowOffset = 2.0f` (`SATtypes.h:533`, used at `SATcontrol.ino:2533`). His statement about the PWM suppression ("should flow -1") agrees with thermo-nova and the firmware. Whether the continuous clamp (entry 112) also moves to 1.0 is not decided: Q-346a, A) start-up following 1.0, clamp stays 2.0; B) both 1.0. Our recommendation A.
+
+**Open:** Q-346a. Until it is answered, TASK-1924 Part 2 is not built with 2.0; the offset of the start-up following is 1.0 on this entry, the clamp offset waits for Q-346a.
+
+**Task:** TASK-1924.
