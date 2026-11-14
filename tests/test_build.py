@@ -182,6 +182,80 @@ class TestArtifactVerificationFailFast(unittest.TestCase):
             )
 
 
+class TestFilesystemStepKeepsFirmwareObjects(unittest.TestCase):
+    """TASK-1921: every esp32-combo build was cold. PlatformIO removes a build directory whose
+    project.checksum differs from the current configuration (platformio/run/helpers.py
+    clean_build_dir), and the buildfs step sets PLATFORMIO_DATA_DIR, which changes that checksum.
+    Firmware and buildfs runs in the same .pio/build removed each other's tree. The buildfs step now
+    runs in its own build directory. Red on the build.py from before TASK-1921 (OTGW_BUILD_PY)."""
+
+    @classmethod
+    def setUpClass(cls):
+        import importlib.util, os
+        path = Path(os.environ.get("OTGW_BUILD_PY", BUILD_PY))
+        if str(REPO_ROOT) not in sys.path:
+            sys.path.insert(0, str(REPO_ROOT))   # build.py imports its sibling modules (config, ...)
+        spec = importlib.util.spec_from_file_location("build_under_test", path)
+        cls.build = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(cls.build)
+
+    def run_buildfs(self, project_dir, fs_dir):
+        seen = {}
+
+        def fake_run(cmd, cwd=None, env=None, **kw):
+            seen["cmd"], seen["env"] = cmd, dict(env or {})
+            out = Path(env.get("PLATFORMIO_BUILD_DIR", project_dir / ".pio" / "build"))
+            target_env = cmd[cmd.index("-e") + 1]
+            (out / target_env).mkdir(parents=True, exist_ok=True)
+            (out / target_env / "littlefs.bin").write_bytes(b"fs")   # what pio would leave behind
+        target = next(t for t, e in self.build.PIO_ENV_MAP.items() if e == "esp32-combo")
+        with mock.patch.object(self.build, "run_command", side_effect=fake_run):
+            self.build.build_filesystem_pio(project_dir, target, fs_dir)
+        return seen
+
+    def test_buildfs_runs_in_its_own_build_directory(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            project_dir = Path(tmp)
+            seen = self.run_buildfs(project_dir, project_dir / ".pio" / "data-staging")
+            self.assertEqual(seen["env"].get("PLATFORMIO_DATA_DIR"), str(project_dir / ".pio" / "data-staging"))
+            bdir = seen["env"].get("PLATFORMIO_BUILD_DIR")
+            self.assertIsNotNone(bdir, "the buildfs step must not run in .pio/build (it would wipe the firmware objects)")
+            self.assertNotEqual(Path(bdir), project_dir / ".pio" / "build")
+            self.assertFalse((project_dir / ".pio" / "build").exists(), "nothing written into the firmware build dir")
+
+    def test_collect_takes_the_filesystem_image_from_the_buildfs_directory(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            project_dir = Path(tmp)
+            self.run_buildfs(project_dir, project_dir / "staging")
+            target = next(t for t, e in self.build.PIO_ENV_MAP.items() if e == "esp32-combo")
+            with mock.patch.object(self.build.config, "BUILD_DIR", project_dir / "build"):
+                got = self.build.collect_pio_artifacts(project_dir, target, want_firmware=False,
+                                                       want_filesystem=True, want_elf=False)
+            self.assertEqual([p.name for p in got], [f"{self.build.config.PROJECT_NAME}-esp32-combo.littlefs.bin"])
+
+    def test_platformio_checksum_differs_with_the_data_dir_override(self):
+        # the cause, on PlatformIO's own code: the override changes the checksum PlatformIO compares
+        try:
+            from platformio.project.config import ProjectConfig
+            from platformio.project.helpers import compute_project_checksum
+        except ImportError:
+            self.skipTest("platformio not importable in this Python")
+        import os
+
+        def cksum(extra):
+            old = {k: os.environ.get(k) for k in extra}
+            os.environ.update(extra)
+            try:
+                return compute_project_checksum(ProjectConfig(str(REPO_ROOT / "platformio.ini")))
+            finally:
+                for k, v in old.items():
+                    if v is None:
+                        os.environ.pop(k, None)
+                    else:
+                        os.environ[k] = v
+        self.assertNotEqual(cksum({}), cksum({"PLATFORMIO_DATA_DIR": str(REPO_ROOT / ".pio" / "data-staging")}))
+
+
 class TestDistributionZipComplete(unittest.TestCase):
     """TASK-1263: the flash zip is a complete package. Testers who only got
     the zip could not update over WiFi or run 'flash_otgw --update', because

@@ -2485,10 +2485,21 @@ def build_firmware_pio(project_dir, target):
     print_success(f"Firmware build complete [{tcfg['name']}]")
 
 
+def pio_fs_build_root(project_dir):
+    """TASK-1921: the build directory of the `pio run -t buildfs` step. PlatformIO keeps a checksum of the
+    project configuration in <build_dir>/project.checksum and removes the whole build directory when it
+    differs (platformio/run/helpers.py clean_build_dir). PLATFORMIO_DATA_DIR changes that configuration,
+    so a buildfs run in .pio/build removed every firmware object, and the next firmware run removed the
+    filesystem run's directory again: every build was cold. The buildfs step gets its own build directory,
+    so .pio/build keeps one checksum and its objects."""
+    return project_dir / ".pio" / "build-fs"
+
+
 def build_filesystem_pio(project_dir, target, fs_dir):
     """Build LittleFS filesystem using PlatformIO from fs_dir (the staging copy,
     see prepare_filesystem_staging). PLATFORMIO_DATA_DIR overrides data_dir in
-    platformio.ini for this one run."""
+    platformio.ini for this one run; PLATFORMIO_BUILD_DIR moves the run to its own
+    build directory (pio_fs_build_root, TASK-1921)."""
     tcfg = TARGETS[target]
     env_name = PIO_ENV_MAP[target]
     print_step(f"Building filesystem [{tcfg['name']}] (PlatformIO)")
@@ -2499,13 +2510,14 @@ def build_filesystem_pio(project_dir, target, fs_dir):
     })
     pio_env = {k: v for k, v in os.environ.items() if k not in _MSYS_KEYS}
     pio_env["PLATFORMIO_DATA_DIR"] = str(fs_dir)
+    pio_env["PLATFORMIO_BUILD_DIR"] = str(pio_fs_build_root(project_dir))
     # `python -m platformio`, not bare `pio` (see _pio_in_path / build_firmware_pio).
     run_command([sys.executable, "-m", "platformio", "run", "-e", env_name, "-t", "buildfs",
                  "--jobs", str(pio_jobs())], cwd=project_dir, env=pio_env)
     # TASK-337: same fail-fast pattern as build_firmware_pio. The buildfs target
     # can also be silently skipped on toolchain misconfiguration.
     verify_artifact_exists(
-        project_dir / ".pio" / "build" / env_name / "littlefs.bin",
+        pio_fs_build_root(project_dir) / env_name / "littlefs.bin",
         f"pio run -t buildfs [{tcfg['name']}]",
     )
     print_success(f"Filesystem build complete [{tcfg['name']}]")
@@ -2514,9 +2526,10 @@ def build_filesystem_pio(project_dir, target, fs_dir):
 def collect_pio_artifacts(project_dir, target, want_firmware=True, want_filesystem=True, want_elf=True):
     """Copy PlatformIO build artifacts to the common build/ directory.
 
-    On Windows, `pio run -t buildfs` may clean parts of `.pio/build/<env>` and
-    remove `firmware.bin` produced by an earlier firmware step. Call this in
-    phases (firmware first, filesystem later) to make artifact persistence robust.
+    Call this in phases (firmware first, filesystem later). Before TASK-1921 the
+    buildfs step ran in `.pio/build` with another project checksum and PlatformIO
+    removed `.pio/build/<env>` (firmware.bin included); it now has its own build
+    directory (pio_fs_build_root), and the phases stay as a safe order.
     """
     tcfg = TARGETS[target]
     env_name = PIO_ENV_MAP[target]
@@ -2537,9 +2550,9 @@ def collect_pio_artifacts(project_dir, target, want_firmware=True, want_filesyst
             print_info(f"Copied: firmware.bin -> {fw_dest.name}")
             collected.append(fw_dest)
 
-    # Filesystem binary
+    # Filesystem binary (from the buildfs step's own build directory, TASK-1921)
     if want_filesystem:
-        fs_src = pio_build_dir / "littlefs.bin"
+        fs_src = pio_fs_build_root(project_dir) / env_name / "littlefs.bin"
         if fs_src.exists():
             fs_dest = build_dir / f"{config.PROJECT_NAME}-{asset_slug(target)}.littlefs.bin"
             shutil.copy2(fs_src, fs_dest)
@@ -2600,6 +2613,7 @@ def clean_build(project_dir, distclean=False):
         config.BUILD_DIR,
         config.TEMP_DIR,
         project_dir / ".pio" / "build",   # PlatformIO incremental build cache
+        pio_fs_build_root(project_dir),   # the buildfs step's own build directory (TASK-1921)
     ]
 
     # Only on distclean: arduino-cli downloads and full PlatformIO directory
