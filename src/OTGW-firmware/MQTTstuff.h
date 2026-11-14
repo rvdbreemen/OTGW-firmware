@@ -124,7 +124,7 @@ enum class HaDeviceClass : uint8_t {
     power_factor,       // "power_factor"
     energy,             // "energy"
     carbon_dioxide,     // "carbon_dioxide"
-    volume_flow_rate,   // "volume_flow_rate" (a rate, e.g. l/min — not "water",
+    volume_flow_rate,   // "volume_flow_rate" (a rate, e.g. L/min — not "water",
                         // which HA reserves for a cumulative volume in L/m3/gal)
     water,              // "water": a cumulative volume, e.g. dhw_water_total in L (TASK-1123)
     signal_strength,    // "signal_strength": BLE sensor RSSI in dBm (TASK-1462)

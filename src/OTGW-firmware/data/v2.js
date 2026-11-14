@@ -2577,7 +2577,7 @@
   /*  16 */ { name: "Room Setpoint", spec: "TrSet", type: "f8.8", dir: "Write · thermostat → boiler", unit: "°C", concl: "Thermostat's current room setpoint." },
   /*  17 */ { name: "Relative Modulation Level", spec: "RelModLevel", type: "f8.8", dir: "Read · boiler → thermostat", unit: "%", concl: "Boiler's actual relative modulation level (burner output, %)." },
   /*  18 */ { name: "CH water pressure", spec: "CHPressure", type: "f8.8", dir: "Read · boiler → thermostat", unit: "bar", concl: "Boiler's central-heating water pressure." },
-  /*  19 */ { name: "DHW flow rate", spec: "DHWFlowRate", type: "f8.8", dir: "Read · boiler → thermostat", unit: "l/min", concl: "Domestic-hot-water flow rate through the boiler." },
+  /*  19 */ { name: "DHW flow rate", spec: "DHWFlowRate", type: "f8.8", dir: "Read · boiler → thermostat", unit: "L/min", concl: "Domestic-hot-water flow rate through the boiler." },
   /*  20 */ { name: "Day of Week and Time of Day", spec: "DayTime", type: "special", dir: "Read / Write", unit: "", concl: "Day-of-week and time-of-day clock exchanged between thermostat and boiler." },
   /*  21 */ { name: "Calendar date", spec: "Date", type: "u8/u8", dir: "Read / Write", unit: "", concl: "Calendar month and day." },
   /*  22 */ { name: "Calendar year", spec: "Year", type: "u16", dir: "Read / Write", unit: "", concl: "Calendar year." },
