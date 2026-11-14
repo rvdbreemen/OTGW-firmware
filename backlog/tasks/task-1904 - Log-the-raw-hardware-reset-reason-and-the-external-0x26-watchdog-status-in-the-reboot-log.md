@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-13T16:52:00Z'
-updated_date: '2026-11-14T10:01:00Z'
+updated_date: '2026-11-14T10:30:00Z'
 labels:
   - bug
   - stability
@@ -47,4 +47,6 @@ Key X (stop the 0x26 feed) and the PIC, checked before the bench (coordinator): 
 Hardware fact, source Robert (DM 1571095401417809941, relayed by the coordinator, 2026-11-14, answer A): on the Classic PCB the 0x26 watchdog's reset line goes only to the ESP's reset, not to the PIC. So probe key X (stop the 0x26 feed) is in 09's AC3 brief, on .63 only and only if its boot telnet shows 'INIT : external 0x26 watchdog present'. The armed 0x26 timeout is not verified from source; the brief says wait up to 3 min. Cross-check on that trial: initWatchDog()'s own existing read logs 'INIT : Reset by external WD!' (OTGW-Core.ino:1613).
 
 Probe build 2.0.0-probe1904b FAILED to compile (2026-11-14 10:56): "'g_extWdResetAtBoot' was not declared in this scope" at OTGW-firmware.ino:546 (and the probe's g_probeExtWdReadUs at :310). Cause: the flag was defined in OTGW-Core.ino, which follows OTGW-firmware.ino in the single translation unit; the .ino prototype hoisting covers functions, not globals. The host harness compiled extracted functions with stubs and could not see it. Fix: the global moves to OTGW-firmware.h next to lastResetRaw (ADR-044, single point of instantiation); both definitions in OTGW-Core.ino removed. New static case S5 (flag defined once, in OTGW-firmware.h) and mutant MC7 (flag back in an .ino) in test_reboot_log_reset_raw.py: FIX PASS, OLD ff5eb599e fails S5 too, MC7 caught. tests/test_ino_prototype_hoisting.py OK.
+
+AC3 bench by 09 (probe 2.0.0-probe1904c+72437d9, zip sha256 2417a8cc...217f0, OTA app+FS, githash checked) on .61 and .63, 2 trials per key per unit. T (task WDT): reboot after 39-46 s; device/info lastreset 'Task watchdog', resetraw 0x0c/0x0c, label 'software reset (CPU)', extwdreset false; reboot log 'Task watchdog (6) [rst 0x0c/0x0c]' + core-dump line. W (RTC WDT stage 0 RESET_SYSTEM): lastreset 'Other watchdog', resetraw 0x09/0x09, label 'RTC watchdog (digital core)', log 'Other watchdog (7) [rst 0x09/0x09]'. Correction of my brief: I expected 0x10; 09 checked ESP32-S3 rom/rtc.h:79 RTCWDT_SYS_RESET = 9 (digital core) vs :85 RTCWDT_RTC_RESET = 16 (digital core + RTC); a RESET_SYSTEM stage gives 0x09, so the firmware label is right and the brief was wrong. X (0x26) NOT testable: .63 boot telnet 'INIT : no external 0x26 watchdog responding' (twice); not pressed. The 0x26 hardware trigger stays untested on a unit; the code path is covered by host case E1 / mutant MC1. 0x26 read time at boot: .61 (no chip) 335-374 us, .63 287-296 us (one NACK; negligible boot cost). Every trial: bootcount +1, settings diff [] , reboot_log lines CRLF, no run-in (max line 92 B). PIC on .63 detected normally after every ESP reset (6.8), never flashed. Both units back on beta.240+a3dff10, settings diff []. Evidence: 09 scratchpad r1904/u61, r1904/u63.
 <!-- SECTION:NOTES:END -->
