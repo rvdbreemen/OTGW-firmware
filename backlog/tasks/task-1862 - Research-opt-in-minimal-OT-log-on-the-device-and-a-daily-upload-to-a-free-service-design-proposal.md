@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-12T06:32:00Z'
-updated_date: '2026-11-14T14:58:00Z'
+updated_date: '2026-11-14T15:04:00Z'
 labels:
   - diagnostics
   - research
@@ -59,4 +59,6 @@ Requirements from Robert in #dev-sat-mqtt (2026-11-12, relayed by the coordinato
 2026-11-14 cost per gateway per month (Cloudflare DO + R2 pricing pages): hibernatable WS DO, 1 SQLite row per batch, hourly R2 flush; 60 s batches $0.050 marginal, 300 s $0.014; free plan binds on SQLite rows written (100k/day): about 67 gateways at 60 s, 297 at 300 s (earlier 1,380 from requests alone was wrong, corrected in the study); Workers Paid $5 minimum covers about 340 / 840 gateways. Handler times estimated, not measured.
 
 2026-11-14 Robert: must be free, never pay. Zero-cost guarantee = no payment method on the account, so limits become hard errors. Options checked (primary pages 2026-11-14): (1) Cloudflare Workers Free + Durable Objects SQLite, no R2 (R2 reportedly asks for a payment method): no card, 'If you exceed any one of the free tier limits, further operations of that type will fail with an error' (DO pricing page); 5 GB SQLite; binding limit rows written 100k/day: about 67 gateways at 60 s batches, 297 at 300 s; buffering batches in the WebSocket attachment (2,048 B, third-party source) before one row write could raise that, unverified; DO EU jurisdiction on Free unverified. (2) Firebase Realtime Database Spark: 'No payment method needed', 100 simultaneous connections, 1 GB stored, 360 MB/day download; europe-west1 exists, Spark eligibility not stated; no Cloud Functions on Spark, so retention cleanup must run elsewhere. (3) Firestore Spark: 20K writes/day, 1 GiB. (4) Grafana Cloud Free: no card, 50 GB/month, 14 d, EU choice on Free unverified. (5) Supabase Free: 500 MB, paused after 1 week inactivity, EU region not stated. Recommendation: Cloudflare Free without R2, 300 s batches, firmware drops quietly on errors (TASK-1471).
+
+2026-11-14 Firebase Realtime Database cost (firebase.google.com/pricing and /docs/database/usage/billing): Spark no payment method, 1 GB stored, 360 MB/day download, 100 simultaneous connections; Blaze $5/GB-month stored, $1/GB downloaded, budget alerts do not cap. Writes are not billed as such, but all outbound traffic is, incl. about 3.5 KB TLS handshake per connection and tens of bytes per TLS record. Estimate per gateway-month (binary batch base64 in JSON, +40 B key): 300 s batches 8.5 MB stored, 1 MB download with keep-alive / 31 MB with a new TLS connection per batch; 60 s 9.9 MB, 5 / 156 MB. Spark capacity at 30-day retention bound by storage: about 117 gateways (300 s), 100 (60 s); download with new TLS per batch: 319 / 63. Blaze beyond free: about $0.07 per gateway-month (300 s). REST with ?print=silent keeps responses empty. No Cloud Functions on Spark: retention cleanup from a host script. Unverified: Spark behaviour at the limit, europe-west1 on Spark, auth token flow on the device.
 <!-- SECTION:NOTES:END -->
