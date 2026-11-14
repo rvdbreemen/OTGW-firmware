@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-beta.263
+**  Version  : v2.0.0-beta.264
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -4285,7 +4285,7 @@ void sendDeviceSettings()
   {
     char tmpBuf[8];
     dtostrf(settings.sat.fOvershootMargin, 1, 1, tmpBuf);
-    addNum(F("satovershootmargin"), tmpBuf, "f", 0, 5);
+    addNum(F("satovershootmargin"), tmpBuf, "f", 0.5f, 5.0f);
   }
   // --- SAT Weather settings (Task #50) ---
   addBool(F("satweatherenable"), settings.sat.bWeatherEnable, "b");
@@ -4313,24 +4313,24 @@ void sendDeviceSettings()
   {
     char tmpBuf[8];
     dtostrf(settings.sat.fSimHeatRate, 1, 2, tmpBuf);
-    addNum(F("satsimheatrate"), tmpBuf, "f", 0, 5);
+    addNum(F("satsimheatrate"), tmpBuf, "f", 0.01f, 5.0f);
     dtostrf(settings.sat.fSimCoolRate, 1, 2, tmpBuf);
-    addNum(F("satsimcoolrate"), tmpBuf, "f", 0, 5);
+    addNum(F("satsimcoolrate"), tmpBuf, "f", 0.01f, 5.0f);
   }
   // --- SAT Thermal Drop Learning (Task #21) ---
   {
     char tmpBuf[8];
     dtostrf(settings.sat.fThermalCoeff, 1, 4, tmpBuf);
-    addNum(F("satthermalcoeff"), tmpBuf, "f", 0, 1);
+    addNum(F("satthermalcoeff"), tmpBuf, "f", 0.005f, 0.3f);
   }
   // --- SAT Solar Gain settings (Task #23) ---
   addBool(F("satsolargain"), settings.sat.bSolarGainEnable, "b");
   {
     char tmpBuf[8];
     dtostrf(settings.sat.fSolarMinRiseRate, 1, 1, tmpBuf);
-    addNum(F("satsolarminrise"), tmpBuf, "f", 0, 5);
+    addNum(F("satsolarminrise"), tmpBuf, "f", 0.1f, 5.0f);
     dtostrf(settings.sat.fSolarSetpointOffset, 1, 1, tmpBuf);
-    addNum(F("satsolaroffset"), tmpBuf, "f", 0, 10);
+    addNum(F("satsolaroffset"), tmpBuf, "f", 0.5f, 10.0f);
   }
   // --- SAT Summer Simmer settings (Task #24) ---
   addBool(F("satsummersimmer"), settings.sat.bSummerSimmer, "b");
@@ -4372,7 +4372,7 @@ void sendDeviceSettings()
   {
     char tmpBuf[8];
     dtostrf(settings.sat.fPvBoostDeltaC, 1, 2, tmpBuf);
-    addNum(F("satpvboostdeltac"), tmpBuf, "f", 0, 5);
+    addNum(F("satpvboostdeltac"), tmpBuf, "f", 0.5f, 5.0f);
   }
   {
     char tmpBuf[8];
@@ -4411,16 +4411,16 @@ void sendDeviceSettings()
     dtostrf(settings.sat.fDhwSetpoint,             1, 1, tmpBuf); addNum(F("satdhwsetpoint"),      tmpBuf, "f", 0, SAT_DHW_SETPOINT_MAX);
     dtostrf(settings.sat.fMaxTSetUser,             1, 1, tmpBuf); addNum(F("satmaxsetpoint"),      tmpBuf, "f", 0, SAT_MAXTSET_MAX);
     dtostrf(settings.sat.fFlameOffOffset,          1, 1, tmpBuf); addNum(F("satflameoffset"),      tmpBuf, "f", 0, 30);
-    dtostrf(settings.sat.fFlowOffset,              1, 1, tmpBuf); addNum(F("satflowoffset"),       tmpBuf, "f", 0, 10);
+    dtostrf(settings.sat.fFlowOffset,              1, 1, tmpBuf); addNum(F("satflowoffset"), tmpBuf, "f", 0.5f, 10.0f);
     dtostrf(settings.sat.fModSupDelay,             1, 1, tmpBuf); addNum(F("satmodsupdelay"),      tmpBuf, "f", 0, 120);
     dtostrf(settings.sat.fModSupOffset,            1, 1, tmpBuf); addNum(F("satmodsupoffset"),     tmpBuf, "f", 0, 5);
     dtostrf(settings.sat.fMinPressure,             1, 2, tmpBuf); addNum(F("satminpressure"),      tmpBuf, "f", 0, 3);
     dtostrf(settings.sat.fMaxPressure,             1, 2, tmpBuf); addNum(F("satmaxpressure"),      tmpBuf, "f", 1, 4);
-    dtostrf(settings.sat.fMaxPressureDrop,         1, 2, tmpBuf); addNum(F("satmaxpressdrop"),     tmpBuf, "f", 0, 2);
+    dtostrf(settings.sat.fMaxPressureDrop,         1, 2, tmpBuf); addNum(F("satmaxpressdrop"), tmpBuf, "f", 0.05f, 2.0f);
     dtostrf(settings.sat.fZoneAggregationHeadroom, 1, 1, tmpBuf); addNum(F("satzoneheadroom"),     tmpBuf, "f", 0, 15);
     dtostrf(settings.sat.fSolarMinElevation,       1, 1, tmpBuf); addNum(F("satsolarminelev"),     tmpBuf, "f", -10, 45);
     dtostrf(settings.sat.fBoilerRatedKW,           1, 1, tmpBuf); addNum(F("satboilerratedkw"),    tmpBuf, "f", 0, 200);
-    dtostrf(settings.sat.fBoilerEfficiency,        1, 2, tmpBuf); addNum(F("satboilerefficiency"), tmpBuf, "f", 0, 1);
+    dtostrf(settings.sat.fBoilerEfficiency,        1, 2, tmpBuf); addNum(F("satboilerefficiency"), tmpBuf, "f", 0.5f, 1.0f);
     dtostrf(settings.sat.fMinConsumption,          1, 2, tmpBuf); addNum(F("satminconsumption"),   tmpBuf, "f", 0, 8);
     dtostrf(settings.sat.fMaxConsumption,          1, 2, tmpBuf); addNum(F("satmaxconsumption"),   tmpBuf, "f", 0, 8);
   }
