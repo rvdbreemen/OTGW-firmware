@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : MQTTstuff
-**  Version  : v2.0.0-beta.261
+**  Version  : v2.0.0-beta.262
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **      Modified version from (c) 2020 Willem Aandewiel
@@ -575,7 +575,17 @@ static int findMQTTSetCommandIndex(const char *topicToken)
 // so without this the TCP socket lingers in lwIP and the next boot comes up in a
 // weird half-state (WiFi associated but services non-responsive).
 void doMqttDisconnect() {
-  if (MQTTclient.connected()) MQTTclient.disconnect();
+  if (!MQTTclient.connected()) return;
+  // TASK-1780: with UseInternalTask::NO only loop() sends, and the reboot path restarts without one.
+  // A clean DISCONNECT suppresses the will, so publish the retained "offline" first; disconnect()
+  // queues the DISCONNECT once the outbox is empty. Pump until disconnected, at most 500 ms.
+  MQTTclient.publish(MQTTPubNamespace, 0, true, "offline");
+  MQTTclient.disconnect();
+  const uint32_t t0 = millis();
+  while (!MQTTclient.disconnected() && (millis() - t0) < 500) {
+    MQTTclient.loop();
+    delay(1);
+  }
 }
 
 //===========================================================================================
