@@ -4,9 +4,8 @@ title: 'Monitor graph and CSV export: add the DHW temperature (MsgID 26) series'
 status: To Do
 assignee: []
 created_date: '2026-11-10T09:41:00Z'
-updated_date: '2026-11-10T19:10:00Z'
+updated_date: '2026-11-14T21:27:00Z'
 labels:
-  - needs-maintainer-ok
   - web-ui
   - feature-request
 milestone: 2.0.0
@@ -22,7 +21,7 @@ Tester request (fegyosz_47807, #alpha-testing 2026-11-10 08:45:41 UTC, https://d
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Robert decided whether the DHW temperature is added (and whether an amending ADR to ADR-193 is needed)
+- [x] #1 Robert decided whether the DHW temperature is added (and whether an amending ADR to ADR-193 is needed)
 - [ ] #2 If added: the graph shows a DHW temperature series and the CSV export has a DHW temperature column, shown as a dash when the boiler does not report MsgID 26
 <!-- AC:END -->
 
@@ -30,4 +29,6 @@ Tester request (fegyosz_47807, #alpha-testing 2026-11-10 08:45:41 UTC, https://d
 
 <!-- SECTION:NOTES:BEGIN -->
 Time correction (2026-11-10): the report time above is local CET. From the message snowflake the correct time is 2026-11-10 07:45:41 UTC (msg 1569619039276245013).
+
+2026-11-14 Robert (DM 1571274763941449850, relayed by the coordinator, answer 'A'): A, yes, only if it fits in the existing ADR-193 14-byte slot; otherwise it comes back to Robert as an ADR-193 amendment. Label needs-maintainer-ok removed.
 <!-- SECTION:NOTES:END -->

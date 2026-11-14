@@ -4,9 +4,9 @@ title: Home Mission control keeps a fixed dark palette in the light theme
 status: To Do
 assignee: []
 created_date: '2026-11-12T08:06:00Z'
+updated_date: '2026-11-14T21:27:00Z'
 labels:
   - webui
-  - needs-maintainer-ok
 dependencies: []
 priority: low
 ordinal: 939000
@@ -20,7 +20,13 @@ Bench finding by otgw-bench-tester (09) on 2.0.0-beta.208+e449692 (TASK-1841 ben
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Robert's choice (A follow the theme / B stay dark on purpose) recorded in the notes
+- [x] #1 Robert's choice (A follow the theme / B stay dark on purpose) recorded in the notes
 - [ ] #2 If A: Mission control uses the theme tokens in light and dark; test red on the old code; screenshots light and dark
 - [ ] #3 If B: a comment at the .mc palette and a line in the UI docs say it is dark on purpose
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-14 Robert (DM 1571274595758248078, relayed by the coordinator, answer 'A'): A, follow the theme. Label needs-maintainer-ok removed.
+<!-- SECTION:NOTES:END -->

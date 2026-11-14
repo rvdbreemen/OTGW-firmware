@@ -640,6 +640,8 @@ html[data-theme="dark"]{--accent:var(--brand-cyan);--nav:#383838;--tile-off:#545
   @media(max-width:719px){
     /* lift sub-44px controls to the 44px comfortable touch target */
     .connsum,.connpill,.viewpick-btn,.vp-item,.tbtn,.theme-switch button,.ovr-badge{min-height:44px}
+    /* TASK-1873: the theme switch is its 44px buttons + 2x2 padding + 2x1 border = 50px; the language button next to it matches */
+    .lang-menu summary{min-height:50px}
     /* bump the smallest labels for phone readability */
     .ble-tag{font-size:.66rem}
     .mc-cell .lbl{font-size:.68rem}
