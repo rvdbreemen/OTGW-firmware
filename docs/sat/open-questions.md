@@ -33,6 +33,7 @@ History at the end of this file.
 - **Q-338b** (asked): entries 337, 338, TASK-1924
 - **Q-338c** (queued): entries 112, 338, TASK-1924
 - **Q-343a** (asked): entries 340, 343, TASK-1932
+- **Q-1928a** (asked): entries 160, 161, 168, 174, 247, 343, TASK-1928
 <!-- live-queue:end -->
 
 A new correction from Sergeant D (e.g. 2026-10-26 'CH=1 stays during PWM OFF') is handled before the queue.
@@ -283,6 +284,7 @@ Status values: **queued** (not asked yet), **asked** (waiting for the answer),
 | Q-338b | — | asked 2026-11-14 ([msg](https://discord.com/channels/812969634638725140/1514720723980259460/1571115278127857758); drafted by d3 for TASK-1924 Part 2): how long is the start-up period of entry 338? A) 20 s after flame-on (thermo-nova modulation_suppression_delay_seconds default 20, const.py:152, heating_control.py:410-433); B) 60 s (cycle tracker warm-up, statistics only, cycles/tracker.py:114); C) until the flow stops rising (no thermo-nova timer). Recommendation A. | entries 337, 338, TASK-1924 |
 | Q-338c | — | queued (ask right after Q-338b is answered; drafted by d3 for TASK-1924 Part 2): which offset does the start-up following of entry 338 use? A) flow_setpoint_offset 2.0 C, the continuous clamp's own (const.py:154, heating_control.py:455/485); B) modulation_suppression_offset 1.0 C, the PWM suppression's (const.py:153, heating_control.py:440). Recommendation A. | entries 112, 338, TASK-1924 |
 | Q-343a | — | asked 2026-11-14, low ([msg](https://discord.com/channels/812969634638725140/1105556725714649128/1571118180041105611); drafted by 95 for TASK-1932, build held until answered): an hour that logs one tick more than expected (121 at 30 s): A) 90 % of the ticks it logged (109 of 121), meets entries 340 and 343; B) 108 clean whatever it logged (90 % of the expected 120). Recommendation A. On gruijter's 5 runs every counted hour has 120 ticks; the fix replays to 10 counted hours either way. | entries 340, 343, TASK-1932 |
+| Q-1928a | — | asked 2026-11-14 ([msg](https://discord.com/channels/812969634638725140/1105556725714649128/1571136222062186529); posted by the coordinator on Robert's order, DM 1571135435906875443 "share the research with sergeant to get his opinion. Tell him what you advise and why."; TASK-1928 report https://claude.ai/artifact/RW714gjLDmnHUSSS5CEC8s): which of the top ideas to pursue? A) only the setback-recovery guard in the self-tune (leave the minutes after a morning target step out of the vote); B) A, then the heating curve on a 6-12 h weighted outside temperature as a separate question after a replay of the 12 Nov run; C) A, the weighted curve and a short boost after a target step; D) none. Dropped as conflicts: forecast feed-forward (entry 247), solar detector instead of the 12 deg sun-elevation gate (entries 160/161). Recommendation B. | entries 160, 161, 168, 174, 247, 343, TASK-1928 |
 
 Questions Q5 onwards come from the SAT port audit of 2026-10-24
 ([`sat-port-audit-2026-10-24.md`](sat-port-audit-2026-10-24.md)); the numbers in brackets are its
