@@ -10,6 +10,7 @@
 - Version bump = one changeset via `bin/bump-prerelease.sh` (stages version.h + version.hash + ~42 banners).
 - OTGWSerial is the ONLY editable vendored lib; all other `src/libraries/**` read-only.
 - ADRs: never edit an Accepted ADR; write a new Proposed "…(Amends ADR-XXX)".
+- 2026-11-14 Robert: do not push in between to `dev` during research; the other agents are disturbed by it. Research work goes on its own branch (cloud recording: `research/cloud-recording`), committed locally; push only when Robert asks.
 
 ## Key Learnings
 - **Sharing screenshots on Discord** (2026-10-23): the discord-mcp send_message cannot attach files and discord-post-build.sh only posts the zip; commit the PNGs under docs/evidence/task-NNN/, push, and post raw.githubusercontent.com/rvdbreemen/OTGW-firmware/dev/... links (verify each returns 200 first).
