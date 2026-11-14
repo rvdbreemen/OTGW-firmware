@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-14T04:36:00Z'
-updated_date: '2026-11-14T11:35:00Z'
+updated_date: '2026-11-14T11:41:00Z'
 labels:
   - tooling
   - build
@@ -42,4 +42,6 @@ Seen 2026-11-14 on beta.234 and beta.236 (d3). A restart right after a build tha
 AC1 cause (proven on PlatformIO's code, no build): platformio/run/helpers.py:26-45 clean_build_dir() compares <build_dir>/project.checksum with compute_project_checksum(config) (platformio/project/helpers.py:93, config.to_json() + PIO version + source path list) and fs.rmtree(build_dir) on a mismatch (helpers.py:41). build.py build_filesystem_pio() sets PLATFORMIO_DATA_DIR=.pio/data-staging for 'pio run -t buildfs'. Measured with the build venv: checksum without the override b16a76e10b81c30f051c3ec4742bda3469e0f4bc, with it a52dde20dc6f340b1399c0a0192a8f41dbea4062; .pio/build/project.checksum after build 240 = a52dde... and .pio/build/esp32-combo holds only littlefs.bin. So the buildfs run wipes the firmware objects, and the next firmware run wipes again: every build is cold. Not the cause: create_build_directory() rmtree(config.BUILD_DIR) at build.py:650 removes build/ (the artifact dir), and clean_build() at :2594 runs only with --clean/--distclean (build.py:3211-3214).
 
 Fix (AC2: change): build_filesystem_pio sets PLATFORMIO_BUILD_DIR=.pio/build-fs (pio_fs_build_root()), verifies and collects littlefs.bin there; clean_build also removes .pio/build-fs. .pio/build keeps one checksum and its objects. No change to the lock, the jobs cap or the artifact names. Tests: tests/test_build.py TestFilesystemStepKeepsFirmwareObjects (3): on the fix 3/3 OK; on origin/dev build.py (OTGW_BUILD_PY) test_buildfs_runs_in_its_own_build_directory FAILS ('the buildfs step must not run in .pio/build'); the checksum test pins the cause on PlatformIO's own compute_project_checksum (passes on both, it tests PlatformIO). Full test_build.py 16/16 under the build venv and the system Python. AC3 needs two builds in my slots.
+
+Coordinator review: (1) ADR-237 (Proposed, via adr-kit, renumbered from the auto-allocated 234 because 234-236 are taken on other lanes) records the build-tooling change; related ADR-190, ADR-083; README entry; adr governance OK. (2) Other readers of .pio/build/<env>/littlefs.bin: only flash_otgw.bat:383 as its last fallback (after ./ and build/), now also .pio\build-fs\*; scripts/ota_flash.py and flash_otgw.sh use build/; flash_esp.py reads only bootloader/partitions from .pio/build/esp32; safeboot is its own PIO project (build.py:2252); scripts/device-verify.sh runs pio buildfs itself without an override (unaffected, its default dir).
 <!-- SECTION:NOTES:END -->

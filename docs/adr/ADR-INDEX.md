@@ -239,3 +239,4 @@ One row per Architecture Decision Record. Scope is the Enforcement `path_glob` s
 | ADR-232 | Accepted | - | Carry 7befe25 as a build-time patch on the registry copy of AsyncTCP 3.4.10, applied by scripts/patchpiolibs.py: |
 | ADR-233 | Proposed | - | At the start of a filesystem OTA the firmware copies settings.ini, rebootcount.txt and rebootlog.txt, in that order,... |
 | ADR-235 | Proposed | - | SAT sends CS= when the value it sends, rounded to 0.1, changes, and repeats an unchanged CS= every 30 s, timed on raw... |
+| ADR-237 | Proposed | `build.py` | The buildfs step runs with PLATFORMIOBUILDDIR=.pio/build-fs (piofsbuildroot(), build.py:2488), so .pio/build keeps on... |

@@ -2564,7 +2564,7 @@
       "path": "ADR-083-platformio-as-primary-build-system.md",
       "format": "canonical",
       "status": "Accepted",
-      "date": "2026-04-24",
+      "date": "2026-11-14",
       "decision_summary": "For the 2.0.0 line (dual-target ESP8266 + ESP32), PlatformIO is the primary build system.",
       "topics": [],
       "aliases": [],
@@ -6478,7 +6478,7 @@
       "path": "ADR-190-build-the-littlefs-image-from-a-minified-staging-copy-of-the-web-assets.md",
       "format": "canonical",
       "status": "Accepted",
-      "date": "2026-11-06",
+      "date": "2026-11-14",
       "decision_summary": "build.py builds the LittleFS image from a staging copy of src/OTGW-firmware/data/ in which the .js and .css files are...",
       "topics": [
         "build-pipeline",
@@ -9309,6 +9309,67 @@
         "supersedes": [],
         "superseded_by": null
       }
+    },
+    {
+      "id": "ADR-237",
+      "title": "Run the PlatformIO buildfs step in its own build directory so firmware objects survive between builds",
+      "path": "ADR-237-run-the-platformio-buildfs-step-in-its-own-build-directory-so-firmware-objects-survive-between-builds.md",
+      "format": "canonical",
+      "status": "Proposed",
+      "date": "2026-11-14",
+      "decision_summary": "The buildfs step runs with PLATFORMIOBUILDDIR=.pio/build-fs (piofsbuildroot(), build.py:2488), so .pio/build keeps on...",
+      "topics": [
+        "build tooling",
+        "incremental build",
+        "LittleFS image build",
+        "PlatformIO build directory"
+      ],
+      "aliases": [
+        "buildfs wipes firmware objects",
+        "every build is cold",
+        "project.checksum"
+      ],
+      "components": [
+        "buildfs build directory"
+      ],
+      "symbols": [
+        "build_filesystem_pio",
+        "collect_pio_artifacts",
+        "pio_fs_build_root",
+        "PLATFORMIO_BUILD_DIR"
+      ],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [
+          "Run pio run -t buildfs with a build directory other than the firmware build directory whenever it sets an option override such as PLATFORMIODATADIR.",
+          "Read the filesystem image from the buildfs build directory.",
+          "Keep the build lock, the jobs cap and the artifact names in build/ unchanged."
+        ],
+        "must_not": [
+          "Let a build step that changes the PlatformIO configuration run in .pio/build.",
+          "Point datadir in platformio.ini at the staging directory to hide the override."
+        ],
+        "exceptions": [
+          "scripts/device-verify.sh runs pio run -t buildfs itself without an override; it keeps the default directory."
+        ],
+        "verification": [
+          "tests/testbuild.py, class TestFilesystemStepKeepsFirmwareObjects: the buildfs step gets its own PLATFORMIOBUILDDIR (fails on the build.py from before TASK-1921), the image is collected from there, and PlatformIO's own computeprojectcheck...",
+          "Two consecutive esp32-combo builds without a source change: the second shows far fewer Compiling lines than the first, with the same filesystem image (TASK-1921 AC3)."
+        ]
+      },
+      "scope": {
+        "path_globs": [
+          "build.py"
+        ]
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
     }
   ],
   "relationships": [
@@ -10941,6 +11002,12 @@
     {
       "source": "ADR-083",
       "target": "ADR-082",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-083",
+      "target": "ADR-237",
       "type": "related",
       "resolved": true
     },
@@ -14599,6 +14666,12 @@
       "resolved": true
     },
     {
+      "source": "ADR-190",
+      "target": "ADR-237",
+      "type": "related",
+      "resolved": true
+    },
+    {
       "source": "ADR-191",
       "target": "ADR-003",
       "type": "related",
@@ -15915,6 +15988,18 @@
     {
       "source": "ADR-235",
       "target": "ADR-207",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-237",
+      "target": "ADR-083",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-237",
+      "target": "ADR-190",
       "type": "related",
       "resolved": true
     }

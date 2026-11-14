@@ -380,6 +380,7 @@ REM Auto-detect filesystem (LittleFS) when not given explicitly.
 if not defined FS_FILE (
     for %%F in ("%SCRIPT_DIR%OTGW-firmware-*.littlefs.bin") do if not defined FS_FILE set "FS_FILE=%%F"
     if not defined FS_FILE for %%F in ("%SCRIPT_DIR%build\OTGW-firmware-*.littlefs.bin") do if not defined FS_FILE set "FS_FILE=%%F"
+    if not defined FS_FILE for %%F in ("%SCRIPT_DIR%.pio\build-fs\*\littlefs.bin") do if not defined FS_FILE set "FS_FILE=%%F"
     if not defined FS_FILE for %%F in ("%SCRIPT_DIR%.pio\build\*\littlefs.bin") do if not defined FS_FILE set "FS_FILE=%%F"
 )
 

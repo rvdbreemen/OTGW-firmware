@@ -10,12 +10,30 @@ verified_in: []
 supersedes:
   - "ADR-014"
 superseded_by: null
+related:
+  - "ADR-237"
 ---
 # ADR-083: PlatformIO as primary build system for dual-target firmware
 
 ## Status
 
 Accepted, 2026-04-24. Supersedes ADR-014 (Dual Build System: Makefile + Python Script).
+## Status History
+
+```yaml
+status_history:
+  - date: 2026-04-24
+    status: Accepted
+    changed_by: unknown
+    reason: "Recovered from the record as it stood before this transition; this ADR predates the status_history convention. The actor was never recorded and is not guessed here. The Status line read: Accepted, 2026-04-24. Supersedes ADR-014 (Dual Build System: Makefile + Python Script)."
+    changed_via: unrecorded
+  - date: 2026-11-14
+    status: Accepted
+    changed_by: "User: Robert van den Breemen"
+    reason: Related to ADR-237
+    changed_via: adr-kit lifecycle
+```
+
 
 ## Context
 

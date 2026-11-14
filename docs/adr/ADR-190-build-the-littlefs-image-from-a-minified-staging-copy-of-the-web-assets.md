@@ -15,6 +15,7 @@ related:
   - "ADR-192"
   - "ADR-194"
   - "ADR-215"
+  - "ADR-237"
 topics:
   - "littlefs"
   - "web-assets"
@@ -85,6 +86,11 @@ status_history:
     status: Accepted
     changed_by: "User: Robert van den Breemen"
     reason: Related to ADR-215
+    changed_via: adr-kit lifecycle
+  - date: 2026-11-14
+    status: Accepted
+    changed_by: "User: Robert van den Breemen"
+    reason: Related to ADR-237
     changed_via: adr-kit lifecycle
 ```
 
