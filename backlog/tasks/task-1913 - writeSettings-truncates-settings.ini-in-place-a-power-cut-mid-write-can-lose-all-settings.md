@@ -7,7 +7,7 @@ status: In Review
 assignee:
   - '@claude'
 created_date: '2026-11-13T23:14:00Z'
-updated_date: '2026-11-14T08:00:00Z'
+updated_date: '2026-11-14T08:28:00Z'
 labels: []
 dependencies: []
 priority: medium
@@ -24,7 +24,7 @@ Found during TASK-1912, not reproduced. writeSettings() (settingStuff.ino:288) o
 <!-- AC:BEGIN -->
 - [x] #1 writeSettings() writes a temp file and renames it over /settings.ini; a failed write keeps the old file
 - [x] #2 Host test: a write cut off after the truncate leaves the old settings readable (red on the old code, green on the fix)
-- [ ] #3 Bench: settings survive save + reboot; a reset during a save keeps a valid settings.ini
+- [x] #3 Bench: settings survive save + reboot; a reset during a save keeps a valid settings.ini
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -57,4 +57,8 @@ Bench by otgw-bench-tester (09), .63 Classic + PIC 6.8, 2.0.0-beta.233+6afbade (
 2026-11-14 08:10 (09, bench-tester): why the round-A reset trials were invalid, and the reset that works. On the ESP32-S3 USB-Serial-JTAG port the chip resets only while RTS=1 AND DTR=0, and the Windows driver usbser.sys sends the line state only on a DTR change. Round A (and esptool's HardReset class on a port opened with pyserial defaults) left DTR high or never sent the RTS change, so nothing reset: .61 bootcount stayed 629. Working in-process sequence (scratchpad tools/reset1913b.py usb_reset): open with dtr=False rts=False; rts=True + dtr=False write; 200 ms; rts=False + dtr=False. .61: bootcount 629->630, lastreset 'USB reset (host)', API back after 13.5 s; opening the port alone does not reset. Calibration on .61 (6 saves, no reset): flush line 2.02-2.17 s after the POST reply; write Flushing->saved 89-392 ms (device timestamps). Robert chose B (DM 1571058018039242833): trials on .63 triggered on the telnet flush line, offsets 0-350 ms step 50 plus 500 control, 5 reps; fail = any MIX/DEFAULT settings.ini or bootcount not +1.
 
 2026-11-14, maintainer decision relayed by the coordinator: Robert chose B for AC3, no waiver. otgw-bench-tester 09 runs USB-reset trials during a settings save on .63 (esptool's USB-JTAG reset works on .63, seen in the TASK-1774 round-1 incident) after the 2.0.0 public beta and before the TASK-1774 round 2. AC3 stays open until 09's evidence is in.
+
+2026-11-14 09:27 (09, bench-tester) AC3 bench, Robert's option B (DM 1571058018039242833), .63 Classic-S3 on 2.0.0-beta.237+c36a0b6 (release build, same source as the fix). Method: POST darktheme (toggle), then an in-process USB-Serial-JTAG reset at a fixed offset after the POST reply. Telnet output only reliably leaves after writeSettings() returns, so the flush line cannot trigger; /settings.tmp is deleted at boot (OTGW-firmware.ino:332), so a leftover tmp cannot prove a hit. Write window from device timestamps (calibration before/between chunks, clock offset 316-354 ms): start 1982-2039 ms after the POST reply, end 2087-2541 ms (write 76-532 ms). Per trial: bootcount +1, lastreset 'USB reset (host)', whole settings.ini parsed and compared with the old and the new version (fail = MIX/DEFAULT).
+
+Results: 42 resets, 42/42 landed (bootcount +1 each: 41-53 first run, 58-88 rerun), 0 MIX/DEFAULT, settings.ini parsed whole every time (5658/5659 B). Rerun 30 trials (offsets 2000-2125 ms step 25 x5; chunk 1 four seconds after boot, chunks 2-3 after a 20 s settle): old 27, new 3. Per offset: 2000 5 old; 2025 5 old; 2050 5 old; 2075 5 old (2 with the flush line received); 2100 4 old (3 with flush) + 1 new (flush, no saved line: late saved in TCP buffer); 2125 3 old (all with flush) + 2 new (1 late-saved, 1 with saved line). Certain mid-write hits (flush line received before the reset, no saved line, result complete old): 8 in the rerun + 1 in the first run (2025 ms) = 9; offsets inside the calibrated window without the flush line are probable hits but cannot be told apart from a late debounce. First run (12 resets, partly lost to a memory reap): 1950 x2 old, 2000 old, 2025 old (flush, no saved), 2050/2075/2100 old, 2150 new (late saved), 2250/2400/2700 new. Evidence: scratchpad r1913b/ (calib63*, trials63b, rerun-c1..c3: trials.log, trials.json, telnet raw). Settings restored, API diff vs pre-1913 [].
 <!-- SECTION:NOTES:END -->
