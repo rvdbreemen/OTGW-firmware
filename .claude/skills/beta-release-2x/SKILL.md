@@ -191,16 +191,33 @@ from the file at create time.
 
 ### Phase 6: Publish the zip and announce
 
-1. **#alpha-testing zip post** (every tag is published): the post script refuses
-   unless the zip githash is HEAD. If HEAD moved after the tag, post from a temp
-   worktree at the tag:
+1. **#alpha-testing: zip post or note** (every tag is published once, TASK-1809).
+   First look the key up in the machine-wide post ledger:
+   ```bash
+   P="${LOCALAPPDATA:-$HOME/.local/share}/OTGW-capture"
+   grep -x "<semver>-beta.N" "$P/published-tags.txt"; grep -P "\t<semver>-beta.N\t" "$P/published-posts.tsv"
+   ```
+   - **Key found** (the normal case: the release commit is docs-only on top of the
+     candidate, so it carries the candidate's beta.N, and the candidate's developer
+     already posted that zip on the alpha track): do NOT run the post script. It
+     refuses with "prerelease ... was already published", in any phase, before or
+     after the GitHub publish; the refusal comes from this local ledger, not from
+     GitHub (beta.174, beta.224 and beta.237 all hit or skipped it). Instead the
+     coordinator posts a short #alpha-testing note: "beta.N is now the public beta",
+     the release link, and the message id of the earlier zip post from
+     `published-posts.tsv`. The firmware in that zip equals the release build except
+     the githash string (the release commit changes only docs).
+   - **Key not found** (the release commit carries its own bump, e.g. the first beta
+     after the alphas): post the zip as below. The post script refuses unless the zip
+     githash is HEAD. If HEAD moved after the tag, post from a temp worktree at the tag:
    ```bash
    git worktree add --detach ../wt-beta-post <tag-commit>
    OTGW_REPO="$(cd ../wt-beta-post && pwd)" bash scripts/discord-post-build.sh \
      -m "<short note + release link>" "$PWD/build/<flash zip>"
    git worktree remove ../wt-beta-post && git worktree prune
    ```
-   Add the row to `.claude/alpha-build-ledger.local.md`.
+   Add the row to `.claude/alpha-build-ledger.local.md` (for a note: "zip already
+   posted as alpha beta.N" and both message ids).
 2. **#beta-testing announcement** (sent without showing it first under the 12-hour slot rule
    above; show it first only when it announces something new to weigh).
    Channel `914498730001072149`, via `mcp__discord-mcp__send_message` (the webhook
@@ -238,7 +255,8 @@ Assets are immutable after publish; the body is not.
 3. **`--latest=false` is required** on every 2.x beta (dev is the default branch).
 4. **Moving HEAD** (a peer push, a rebase) after the build means the post script refuses that zip: rebuild, or post from a worktree at the tag commit.
 5. **Stale narrative at the tag** is permanent in the tagged tree: finish Phase 1 before Phase 2.
-6. **`bin/bump-prerelease.sh` cannot change the word** (alpha -> beta): use `autoinc-semver.py --prerelease`.
+6. **"prerelease ... was already published"** from the post script means the beta.N key is in the local post ledger (Phase 6.1), not that GitHub refused anything. Moving the post before the publish does not help; post the note instead (TASK-1809).
+7. **`bin/bump-prerelease.sh` cannot change the word** (alpha -> beta): use `autoinc-semver.py --prerelease`.
 
 ## Important rules
 
