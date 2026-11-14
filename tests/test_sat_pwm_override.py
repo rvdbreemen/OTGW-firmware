@@ -172,6 +172,7 @@ int main(int argc, char** argv) {
     state.sat.eControlMode = os ? SAT_MODE_CONTINUOUS : SAT_MODE_PWM;
     state.sat.bPwmFlameRequested = !os; state.sat.fFinalSetpoint = pid; SYNC_SUSTAIN_CLOCK();
     g_flow = os ? 45.0f : (sat ? 35.0f : 20.0f);     // overshoot: flow above request + margin; underheat: far below; saturation: on target
+    g_flame = true;                                  // TASK-1933: the underheat exit counts with the flame on (entry 342)
     _pwm_lastOffTimeMs = sat ? 0 : 1;                // saturation: the PWM off time stays 0
     int calls = 0;
     for (int i = 0; i < 400 && state.sat.eControlMode == (os ? SAT_MODE_CONTINUOUS : SAT_MODE_PWM); i++) { g_ms += 1000; CALL_AUTOSWITCH(pid); calls++; }
@@ -252,7 +253,7 @@ int main(int argc, char** argv) {
   }
   if (!strcmp(sc, "uh")) {                 // uh protection pwmFlameRequested: 200 s of low flow, 1 s calls
     state.sat.eControlMode = SAT_MODE_PWM; state.sat.bPwmFlameRequested = atoi(argv[3]) != 0;
-    state.sat.fFinalSetpoint = pid; g_flow = 20.0f; SYNC_SUSTAIN_CLOCK();
+    state.sat.fFinalSetpoint = pid; g_flow = 20.0f; g_flame = true; SYNC_SUSTAIN_CLOCK();   // TASK-1933: the exit needs the flame on
     for (int i = 0; i < 200; i++) { g_ms += 1000; CALL_AUTOSWITCH(pid); }
     printf("mode=%d req=%d\n", state.sat.eControlMode, (int)state.sat.bPwmFlameRequested);
     return 0;
@@ -891,7 +892,7 @@ class SatPwmOverride(unittest.TestCase):
         self.assertEqual(r["ch"], "1", r)
 
     def test_underheat_exit_tick_sends_the_continuous_setpoint(self):
-        self._exit_tick("uh", "7", "19.0")        # 180 s after the first qualifying tick at 30 s steps
+        self._exit_tick("uh", "3", "19.0")        # TASK-1933: 60 s after the first qualifying tick at 30 s steps (was 180 s: tick 7)
 
     def test_saturation_exit_tick_sends_the_continuous_setpoint(self):
         self._exit_tick("sat", "11", "45.0")      # 300 s; the off time 0 of the tick's own schedule step counts from tick 1
@@ -909,7 +910,7 @@ class SatPwmOverride(unittest.TestCase):
     # ticks needed to span the limit (ceil(limit / interval)); the transition tick itself carries the new mode's CS.
     def test_same_tick_exits_at_10s_60s_and_90s_ticks(self):
         for step_s in (10, 60, 90):
-            for kind, limit_s, prev in (("uh", 180, "19.0"), ("sat", 300, "45.0")):
+            for kind, limit_s, prev in (("uh", 60, "19.0"), ("sat", 300, "45.0")):   # TASK-1933: underheat 60 s (entries 342, 350)
                 with self.subTest(tick_s=step_s, exit=kind):
                     r = self.run_sc("exittick", 1, kind, step_s * 1000)
                     self.assertEqual(r["mode"], "1", r)

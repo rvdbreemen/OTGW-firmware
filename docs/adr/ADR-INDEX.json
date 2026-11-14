@@ -9323,6 +9323,64 @@
       }
     },
     {
+      "id": "ADR-236",
+      "title": "SAT leaves PWM for continuous when the flame is on and the request stays above the flow for 60 s (replaces the thermo-nova underheat exit)",
+      "path": "ADR-236-sat-leaves-pwm-for-continuous-when-the-flame-is-on-and-the-request-stays-above-the-flow-for-60-s-replaces-the-thermo-nova-underheat-exit.md",
+      "format": "canonical",
+      "status": "Proposed",
+      "date": "2026-11-14",
+      "decision_summary": "While SAT is in PWM and the PWM phase is ON, it switches to continuous when the flame is on and the requested setpoin...",
+      "topics": [
+        "control-mode",
+        "pwm",
+        "sat"
+      ],
+      "aliases": [
+        "entry 342 exit",
+        "PWM to continuous",
+        "PWM underheat exit",
+        "Q-342a"
+      ],
+      "components": [
+        "SAT PWM to continuous exit"
+      ],
+      "symbols": [
+        "SAT_UNDERHEAT_SUSTAIN_MS",
+        "satCycleCheckPwmExits"
+      ],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [
+          "Count a tick only with the flame on and the request strictly above the flow (satIsFlameOn() && requestedSetpoint > flowTemp); any other tick clears the timer.",
+          "Fire on the first control tick at least SATUNDERHEATSUSTAINMS (60 000 ms) after the first qualifying tick.",
+          "Keep the PWM ON, hot-water and 300 s guards and the saturation exit as they are."
+        ],
+        "must_not": [
+          "Count a tick with the flame off, or with the flow equal to or above the request.",
+          "Use the 3.0 C margin for this exit (SATUNDERSHOOTMARGINC stays for the cycle classifier only)."
+        ],
+        "exceptions": [
+          "None."
+        ],
+        "verification": [
+          "tests/testsatovershootsustain.py compiles the real satCycleCheckPwmExits(): the exit fires 60 s after the first tick at 30 s and 60 s intervals, a flow 0.5 C below the request counts, a flow equal to the request does not, the flame off n...",
+          "Bench (TASK-1933 AC6, bench-tester): the exit fires as specified in a simulated warm-up, no reboot.",
+          "Field: the testers' captures are watched for PWM re-entries shortly after an ignition (hot water and slow ignition first), as promised to Sergeant D in entry 350."
+        ]
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
+    },
+    {
       "id": "ADR-237",
       "title": "Run the PlatformIO buildfs step in its own build directory so firmware objects survive between builds",
       "path": "ADR-237-run-the-platformio-buildfs-step-in-its-own-build-directory-so-firmware-objects-survive-between-builds.md",
@@ -16142,6 +16200,12 @@
     {
       "source": "ADR-235",
       "target": "ADR-207",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-236",
+      "target": "ADR-235",
       "type": "related",
       "resolved": true
     },

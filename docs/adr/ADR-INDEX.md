@@ -239,6 +239,7 @@ One row per Architecture Decision Record. Scope is the Enforcement `path_glob` s
 | ADR-232 | Accepted | - | Carry 7befe25 as a build-time patch on the registry copy of AsyncTCP 3.4.10, applied by scripts/patchpiolibs.py: |
 | ADR-233 | Accepted | - | At the start of a filesystem OTA the firmware copies settings.ini, rebootcount.txt and rebootlog.txt, in that order,... |
 | ADR-235 | Proposed | - | SAT sends CS= when the value it sends, rounded to 0.1, changes, and repeats an unchanged CS= about every 30 s: the co... |
+| ADR-236 | Proposed | - | While SAT is in PWM and the PWM phase is ON, it switches to continuous when the flame is on and the requested setpoin... |
 | ADR-237 | Proposed | `build.py` | The buildfs step runs with PLATFORMIOBUILDDIR=.pio/build-fs (piofsbuildroot(), build.py:2488), so .pio/build keeps on... |
 | ADR-238 | Accepted | - | On the ESP32-S3 a boot counts towards the triple-reset WiFi recovery when it is a reset-button press or a power-on (E... |
 | ADR-239 | Accepted | - | The first 32 bytes of RTC slow memory (0x50000200-0x5000021F) belong to the safeboot updater: the main firmware holds... |
