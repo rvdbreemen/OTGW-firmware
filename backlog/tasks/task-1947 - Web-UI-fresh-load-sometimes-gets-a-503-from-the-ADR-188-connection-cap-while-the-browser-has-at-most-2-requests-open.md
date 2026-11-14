@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-14T20:18:00Z'
-updated_date: '2026-11-14T21:56:00Z'
+updated_date: '2026-11-14T23:20:00Z'
 labels:
   - webui
   - bug
@@ -46,4 +46,6 @@ Research 2026-11-14 (ba, origin/dev 753d45581). The counting is ADR-188 by desig
 Diagnostic breakdown (no behaviour change, ba 2026-11-14): platformTcpTxBreakdownOnPort() in platform_esp32.h splits the same count into est-idle / est-data / closing-data / closing-fin plus queued payload bytes; webConnCapExceeded() prints it on the refusal path only ('WEB CONN CAP: N connections hold TX (ws, cap) => 503 [est-idle a est-data b closing-data c closing-fin d, B queued]'). Host: tests/test_web_conn_cap_states.py 7/7 (breakdown sums to the count in every state; modelled fresh load 6 = 3,1,0,2, 2872 B); tests/test_web_file_scheduling.py PASS (fixture stub for the new shim, slice ends before it); evaluate --quick 0 FAIL. Build after the stack; 09 then reproduces on .61 with CDP + telnet (AC1/AC2).
 
 Stack repair (ba 2026-11-14): when f75ffb1ab was cherry-picked onto the 1937 stack, resolving the version-banner conflicts with the upstream side for every conflicted file also dropped this commit's changes in restAPI.ino and webServerCompat.h (only the Platform shim and the tests landed; the tests passed because they slice the shim and stub the rest). Found by comparing every stacked fix commit with its original (1937, 1850, 1778 identical apart from build stamps; 1947 not). Restored both hunks byte for byte (diff vs 537ace5e5 empty), and tests/test_web_conn_cap_states.py now also checks that webConnCapExceeded() calls the breakdown and that txBreakdown() exists: FAIL on the broken stack, 8/8 OK after the repair. Committed as a fixup, squashed into the 1947 commit at the final rebase.
+
+Bench of the diagnostic (09, .61, beta.264+a695744, 2026-11-15, 20 fresh loads with netload.mjs + telnet; evidence 09 scratchpad s1780/i5/tel.raw and i5/netload-*.json): 9 of 20 loads got 503s, 36 refusals (hd_webconn_503 0 -> 36) while the browser had at most 2 API requests open. Breakdown per refusal: closing-fin 2-5 in EVERY refusal (the largest share), closing-data always 0, est-data 0-1, est-idle 1-3 (incl. the ws client): e.g. 10x '6 hold TX (1 ws) [est-idle 2 est-data 1 closing-data 0 closing-fin 3, 228 B queued]', 8x '[3/0/0/3, 0 B]'. So the cap is crossed by closing connections whose only queued segment is the zero-length FIN (path (b) of the research note). Fix choice (count only connections with payload or a received request) goes to Robert by DM through the coordinator (ADR-188 change).
 <!-- SECTION:NOTES:END -->

@@ -7,7 +7,7 @@ status: To Do
 assignee:
   - '@claude'
 created_date: '2026-10-31T12:49:00Z'
-updated_date: '2026-11-14T18:44:00Z'
+updated_date: '2026-11-14T23:20:00Z'
 labels:
   - alpha
   - bug
@@ -42,4 +42,6 @@ Stale audit 2026-11-14 (coordinator decision): back to To Do, waiting for a repr
 Research 2026-11-14 (read-only, origin/dev 82560d1d5): the reported end state is what the current code does by design on an interrupted filesystem upload. OTGW-ModUpdateServer-esp32.h _handleUploadAbort() (request->onDisconnect, there is no UPLOAD_FILE_ABORTED callback): Update.end(); for a filesystem upload with bytes written, _remountAfterFsWrite(true) formats the partial image and remounts, _restoreRuntimeFiles() puts settings.ini and the other kept files back from RAM/heap copies (TASK-1495), _markFsUpdateIncomplete() leaves the marker. Result: settings and runtime files intact, no web files, so the upload/helper page is served (TASK-1926 keeps that only for a filesystem without FSexplorer). Since TASK-1774 a reset during the write is also covered (RTC snapshot + boot-time format). So the user-visible effect is 'retry the filesystem upload', not data loss. What research cannot answer is AC2: why the upload connection dropped (RemoteDisconnected) under the capture load on alpha.569. That needs the bench reproduction of AC1 (filesystem OTA while telnet + /ws + MQTT + snapshots run). Proposal: AC3's 'document the limit' part can be met now (an interrupted filesystem OTA shows the upload page; settings are kept; upload again), the root-cause part stays bench-only.
 
 AC3 documentation part done (coordinator, 2026-11-14): docs/guides/WIFI_FIRMWARE_UPDATE.md section 3: the row for an interrupted filesystem step now says what the current code does (half image cleared, settings, reboot counter and reboot log written back, upload page shown; a reset during the write covered by ADR-233; upload again, settings kept) instead of 'settings only live in memory, do not switch off', plus the advice not to run a filesystem update while a capture or another heavy client is connected. AC3 is only partly met: its 'old-vs-fix bench run' part belongs with a fix, if AC2 finds one. AC2 (why the upload dropped) is in 09's brief for the stack build: filesystem OTA on .61 while a capture runs.
+
+AC2 bench (09, .61, beta.264, 2026-11-15, capture s1780/i4/cap/): filesystem OTA (ota_flash.py --no-app --fs) while otgw_capture.py ran telnet + /ws frame recorder + MQTT + headless browser + 10 s snapshots + crashlog poll: not reproduced (0/1). Upload 00:12:11-00:12:40 exit 0, '[OTA] End: success (786432 bytes)', settings and kept files restored, changed: none; only the expected reboot gaps; bootcount +1, crashlog unchanged, settings diff [], reboot_log intact, web UI 200. The alpha.569 drop did not recur on current code (the ADR-188 cap and the REST/file gates since then are candidate reasons, not proven).
 <!-- SECTION:NOTES:END -->

@@ -3,11 +3,11 @@ id: TASK-1918
 title: >-
   The safeboot updater overwrites the RTC reboot reason at 0x50000200, so a
   restart through safeboot logs no planned reason
-status: In Review
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-14T02:34:00Z'
-updated_date: '2026-11-14T21:22:00Z'
+updated_date: '2026-11-14T23:20:00Z'
 labels:
   - bug
   - ota
@@ -58,3 +58,9 @@ Pushed origin/dev 3c30e3926..0a3dbd3bf (beta.248, my code identical to the bench
 
 AC1/AC3 ticked by 09 (bench-tester) from its own 2026-11-14 bench on .63, reboot_log readouts in 09 scratchpad b248/: RED (AC1), old beta.247 app OTA through safeboot 247->247, rlog1 top line '2026-11-14 16:23:18 - reboot cause: Software reset (3) [rst 0x0c/0x0c] ' (planned reason lost). GREEN (AC3), beta.248+5e8c416 app OTA through safeboot 248->248, rlog3 top line '2026-11-14 16:26:03 - reboot cause: Software reset (3) [rst 0x0c/0x0c] - [OTA] handover to safeboot' (reason survives). The 16:25:03 line '- [OTA] Rebooting...' is the 247->248 transition boot (old code's handover), as designed. Status left to the owner.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+AC1 (bench, 09): RED on the old beta.247, app OTA through safeboot 247->247: the new reboot_log line lost the planned reason (09 scratchpad b248/, rlog1). AC2 (developer): the 32 B guard g_rtcSafebootGuard (RTC_DATA_ATTR, .rtc.data) holds 0x50000200-0x5000021F so every RTC_NOINIT record starts at 0x50000220 (ADR-239, Accepted); scripts/check_rtc_layout.py runs in build.py collect_pio_artifacts() on the real ELF and failed the first beta.247 lane build as designed (guard at 0x50000244), then 'RTC layout check OK' on beta.248+5e8c416 (nm: guard 0x50000200 size 0x20, _rtc_noinit_start 0x50000220); tests/test_rtc_layout_check.py red/green. AC3 (bench, 09): GREEN on beta.248, the planned reason survives an app OTA through safeboot (09 scratchpad b248/). Shipped in beta.248 (0a3dbd3bf), post 1571188033087217674.
+<!-- SECTION:FINAL_SUMMARY:END -->
