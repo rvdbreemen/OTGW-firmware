@@ -7,7 +7,7 @@ status: To Do
 assignee:
   - '@claude'
 created_date: '2026-10-31T12:49:00Z'
-updated_date: '2026-11-14T15:26:00Z'
+updated_date: '2026-11-14T18:42:00Z'
 labels:
   - alpha
   - bug
@@ -38,4 +38,6 @@ Triage 2026-11-02 (beta.5, origin/dev 6c41cc696) in code: no repro or fix. Needs
 2026-11-04 21:07-21:13 repro attempt on .63 (Classic+PIC) beta.79: full capture running (scripts/otgw_capture.py: telnet, MQTT 2521 msgs, browser capture with /ws, snapshots every 30 s, frame recorder 319 frames); three filesystem-only OTAs (ota_flash.py --no-app --fs, beta.79 image) at 21:08:41, 21:10:08, 21:11:10: all rc 0, 'filesystem confirmed /version.hash a9dd048', '/v2.js complete 266132 bytes', settings 175 keys unchanged (cmp before/after identical). Not reproduced (0/3). The original was on .61 OT-Direct alpha.569 with SAT simulation + OT replay; repeat there with that setup after the TASK-1528 night run (.61 busy until ~06:00). Since alpha.569 the REST/file gates changed (TASK-1565 body/gate release, ADR-188 tx cap), a candidate reason it no longer happens; not proven.
 
 Stale audit 2026-11-14 (coordinator decision): back to To Do, waiting for a reproduction. Not seen again since alpha.569; the REST/file gate changes since then are a candidate reason, not proven.
+
+Research 2026-11-14 (read-only, origin/dev 82560d1d5): the reported end state is what the current code does by design on an interrupted filesystem upload. OTGW-ModUpdateServer-esp32.h _handleUploadAbort() (request->onDisconnect, there is no UPLOAD_FILE_ABORTED callback): Update.end(); for a filesystem upload with bytes written, _remountAfterFsWrite(true) formats the partial image and remounts, _restoreRuntimeFiles() puts settings.ini and the other kept files back from RAM/heap copies (TASK-1495), _markFsUpdateIncomplete() leaves the marker. Result: settings and runtime files intact, no web files, so the upload/helper page is served (TASK-1926 keeps that only for a filesystem without FSexplorer). Since TASK-1774 a reset during the write is also covered (RTC snapshot + boot-time format). So the user-visible effect is 'retry the filesystem upload', not data loss. What research cannot answer is AC2: why the upload connection dropped (RemoteDisconnected) under the capture load on alpha.569. That needs the bench reproduction of AC1 (filesystem OTA while telnet + /ws + MQTT + snapshots run). Proposal: AC3's 'document the limit' part can be met now (an interrupted filesystem OTA shows the upload page; settings are kept; upload again), the root-cause part stays bench-only.
 <!-- SECTION:NOTES:END -->
