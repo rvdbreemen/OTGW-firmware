@@ -72,11 +72,14 @@ The window in which those files exist only in RAM, traced in `OTGW-ModUpdateServ
    last restored file.
 
 A reset in that window (a panic, a watchdog, a software reset or a power cut) boots into a partial or fresh image.
-`OTGW-firmware.ino:334` `readSettings()` then finds no `settings.ini` and creates one with the compile-time defaults
-(`settingStuff.ino:571-576`). `reboot_count.txt` is gone too, so the counter starts over. This is what bench unit .63
-showed on 2026-11-10 (16 settings at their defaults, boot count 178 to 3), and the beta.217 panic during a
-filesystem write on .63 (09, 2026-11-12, 1 of 9 writes) is a reset in this window. The cause is read from the
-code; bench proof is part of TASK-1774.
+The image ships a default `settings.ini` (`src/OTGW-firmware/data/settings.ini`, 400 B, hostname `OTGW2`, broker
+`homeassistant.local`; present in the beta.233 `littlefs.bin`, `build.py` staging does not drop it). Once the
+image is written over it, `OTGW-firmware.ino:334` `readSettings()` reads that default; when the write stopped
+before it, the file is missing and `readSettings()` creates one with the compile-time defaults
+(`settingStuff.ino:571-576`). Either way the user's settings are gone, and `reboot_count.txt` is gone too, so the
+counter starts over. This is what bench unit .63 showed on 2026-11-10 (16 settings changed, the hostname among them,
+boot count 178 to 3), and the beta.217 panic during a filesystem write on .63 (09, 2026-11-12, 1 of 9 writes) is a
+reset in this window. The cause is read from the code; bench proof is part of TASK-1774.
 
 Measured sizes on the bench units (09, 2026-11-14): `settings.ini` 5640 B (.61) and 5659 B (.63);
 `reboot_count.txt` 4-5 B; `reboot_log.txt` 1435-1470 B (a 20-line ring, so this is its steady state); the rest of
@@ -96,9 +99,10 @@ the probe in TASK-1774 tests exactly that.
 
 ## Decision
 
-At the first chunk write of a filesystem OTA, the firmware copies `settings.ini`, `reboot_count.txt` and
-`reboot_log.txt`, in that order, into one RTC_NOINIT snapshot above 0x50000220 (magic, lengths, CRC32). The next
-boot restores from that snapshot only files that are missing or empty, and every exit of the OTA clears it.
+At the start of a filesystem OTA the firmware copies `settings.ini`, `reboot_count.txt` and `reboot_log.txt`,
+in that order, into one RTC_NOINIT snapshot above 0x50000220 (magic, lengths, CRC32) and arms it at the first
+written chunk. A boot that finds it armed and valid takes `settings.ini` from it, and the counter and the log only
+where they are missing or empty; every successful settings write and every boot clear it.
 
 The snapshot is one buffer of the real budget (about 7.4 KB, the free RTC slow memory minus a margin; fixed at
 build time from the ELF). `settings.ini` is taken whole or not at all: when it alone does not fit, the snapshot
@@ -106,22 +110,34 @@ holds no settings and the firmware logs that on telnet ("settings.ini N B does n
 not protected during this filesystem write"). The counter and the log follow while they fit, each whole or not at
 all. The other KEEP_LIST files keep their existing heap copies only (TASK-1266/1286) and are not in the snapshot.
 
-Arming at the first `Update.write()` and not at upload start means an upload that never writes a byte (image too
-large `:392`, `Update.begin()` failed `:395`) never leaves a snapshot. Clearing on every exit (end `:507`, abort
-`:592`, write error `:448`, too large, begin failed) and right after the boot restore means a stale snapshot can
-never overwrite newer settings days later. The boot restore runs in `setup()` after the mount (`:330`) and
-before `readSettings()` (`:334`), before `startWebserver()`, so no filesystem OTA can run at the same time (the
-TASK-1909 ordering). Each restored file is written through a temp file and `fsCommitTempFile()` (TASK-1913).
+The copy is made before `LittleFS.end()` (`:388`), the last moment the files can be read, and stays unarmed;
+it is armed at the first successful `Update.write()` (`:445`), when the old filesystem starts to disappear. An
+upload refused before any byte (image too large `:392`, `Update.begin()` failed `:395`) wipes it.
+
+`settings.ini` must win over a file that exists, because the image ships a default one; an armed snapshot is itself
+the proof that a filesystem write started and its restore never finished. Staleness is closed by the other side:
+every successful `writeSettings()` drops the settings slot, because the file on flash is then newer than the copy.
+During the write, `flushSettings()` does not run (it is behind `isFlashing()`), so the only settings write in that
+window is the restore itself (`:542`). A settings save after a failed OTA drops the slot too. The counter and the
+log are not in the image, so for them "missing or empty" is the right test, and a counter that the device already
+wrote again after the OTA is never replaced. The snapshot is wiped after a restore whose settings write succeeded
+(`_restoreRuntimeFiles()`), and at every boot, also when the restore there fails, so it lives at most one boot
+session. A failed end (no remount) or a write error keep it armed, so that the next boot can still restore.
+The boot restore runs in `setup()` after the mount (`:330`) and before `readSettings()` (`:334`), before
+`startWebserver()`, so no filesystem OTA can run at the same time (the TASK-1909 ordering). Each restored file is
+written through a temp file and `fsCommitTempFile()` (TASK-1913).
 
 ## Decision Contract
 
 ### Must
 
-- Arm the snapshot at the first successful `Update.write()` of a filesystem target, not at upload start.
-- Clear the magic on every exit of a filesystem OTA (end, abort, write error, too large, begin failed) and
-  immediately after a boot restore, also when that restore fails.
-- At boot, restore a file only when it is missing or 0 B on the mounted filesystem; never overwrite an existing
-  file from the snapshot.
+- Fill the snapshot before `LittleFS.end()` at upload start; arm it at the first successful `Update.write()` of a
+  filesystem target, not at upload start.
+- Wipe it when an upload is refused before any write (too large, `Update.begin()` failed), after a restore whose
+  settings write succeeded, and at every boot, also when the boot restore fails.
+- Drop the settings slot after every successful `writeSettings()`.
+- At boot, take `settings.ini` from an armed, valid snapshot even when the file exists (the image ships a
+  default); restore the counter and the log only when they are missing or 0 B.
 - Check magic, every length against its slot, and the CRC32 over the whole payload before using any of it.
 - Store `settings.ini` whole or not at all; log on telnet when it does not fit.
 - Keep the snapshot outside 0x50000200-0x5000021F, checked at boot (address of the buffer >= 0x50000220, else the
@@ -141,10 +157,12 @@ TASK-1909 ordering). Each restored file is written through a temp file and `fsCo
 
 ### Verification
 
-- Host harness on the real `_handleUploadStart` / `_handleUploadWrite` / `_restoreRuntimeFiles` blocks and the
-  boot-restore block, with a simulated reset at chunk N: old code boots with default settings and a reset counter,
-  the fix restores them; plus a stale-snapshot case (existing `settings.ini` is not overwritten) and a
-  never-armed case (too large, begin failed).
+- `test/host/test_fs_ota_rtc_snapshot.py` (TASK-1774): the real snapshot block, `fsCommitTempFile()`,
+  `writeSettings()` and `updateRebootCount()` against a LittleFS model with a reset after the image replaced the
+  partition. The old code boots on the image's default `settings.ini` with the counter at 1, the fix restores
+  both. Further cases: a reset after the restore's own settings write, a settings save after a failed OTA, a
+  refused upload, an oversized `settings.ini`, a damaged CRC, an existing counter. The call order in the upload
+  server and in `setup()` is checked on the source text; five mutants are each caught.
 - Bench (otgw-bench-tester): the RTC survival probe through the safeboot route on .63, then a forced reset in the
   middle of a filesystem OTA on .63, old build versus fix, comparing `/api/v2/settings` and the boot count.
 

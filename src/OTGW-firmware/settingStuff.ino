@@ -529,6 +529,7 @@ bool writeSettings(bool show)
     return false;
   }
   DebugTf(PSTR("[Settings] State: Settings saved successfully to %s\r\n"), SETTINGS_FILE);
+  fsOtaRtcDropSettings();   // TASK-1774: flash now holds newer settings than an armed RTC snapshot
 
   if (show) {
     DebugTln(F("\r\n[Settings] JSON content:"));

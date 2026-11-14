@@ -9183,7 +9183,7 @@
       "format": "canonical",
       "status": "Proposed",
       "date": "2026-11-14",
-      "decision_summary": "At the first chunk write of a filesystem OTA, the firmware copies settings.ini, rebootcount.txt and rebootlog.txt, in...",
+      "decision_summary": "At the start of a filesystem OTA the firmware copies settings.ini, rebootcount.txt and rebootlog.txt, in that order,...",
       "topics": [
         "filesystem OTA",
         "kept files",
@@ -9209,9 +9209,10 @@
       "context_scope": "selective",
       "decision_contract": {
         "must": [
-          "Arm the snapshot at the first successful Update.write() of a filesystem target, not at upload start.",
-          "Clear the magic on every exit of a filesystem OTA (end, abort, write error, too large, begin failed) and immediately after a boot restore, also when that restore fails.",
-          "At boot, restore a file only when it is missing or 0 B on the mounted filesystem; never overwrite an existing file from the snapshot.",
+          "Fill the snapshot before LittleFS.end() at upload start; arm it at the first successful Update.write() of a filesystem target, not at upload start.",
+          "Wipe it when an upload is refused before any write (too large, Update.begin() failed), after a restore whose settings write succeeded, and at every boot, also when the boot restore fails.",
+          "Drop the settings slot after every successful writeSettings().",
+          "At boot, take settings.ini from an armed, valid snapshot even when the file exists (the image ships a default); restore the counter and the log only when they are missing or 0 B.",
           "Check magic, every length against its slot, and the CRC32 over the whole payload before using any of it.",
           "Store settings.ini whole or not at all; log on telnet when it does not fit.",
           "Keep the snapshot outside 0x50000200-0x5000021F, checked at boot (address of the buffer >= 0x50000220, else the snapshot is disabled and that is logged)."
@@ -9226,7 +9227,7 @@
           "None."
         ],
         "verification": [
-          "Host harness on the real handleUploadStart / handleUploadWrite / restoreRuntimeFiles blocks and the boot-restore block, with a simulated reset at chunk N: old code boots with default settings and a reset counter, the fix restores them; p...",
+          "test/host/testfsotartcsnapshot.py (TASK-1774): the real snapshot block, fsCommitTempFile(), writeSettings() and updateRebootCount() against a LittleFS model with a reset after the image replaced the partition. The old code boots on the i...",
           "Bench (otgw-bench-tester): the RTC survival probe through the safeboot route on .63, then a forced reset in the middle of a filesystem OTA on .63, old build versus fix, comparing /api/v2/settings and the boot count."
         ]
       },

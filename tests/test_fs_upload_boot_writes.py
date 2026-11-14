@@ -62,7 +62,8 @@ class FsUploadBootWrites(unittest.TestCase):
 
     def test_the_upload_marks_the_image_write_right_after_unmounting(self):
         upd = code("OTGW-ModUpdateServer-esp32.h")
-        m = re.search(r"_keepFiles\(\);\s*LittleFS\.end\(\);\s*::state\.flash\.bFsImageWriting = true;", upd)
+        # TASK-1774: the RTC snapshot is filled between the heap copies and the unmount.
+        m = re.search(r"_keepFiles\(\);\s*(?:fsOtaRtcFill\(\);\s*)?LittleFS\.end\(\);\s*::state\.flash\.bFsImageWriting = true;", upd)
         self.assertIsNotNone(m, "the flag is not set where the upload unmounts LittleFS")
         # The error response path (image too large, Update.begin() failed) clears it again.
         self.assertRegex(upd, r"bESPactive = false;\s*_dropKeptFiles\(\);\s*::state\.flash\.bFsImageWriting = false;")

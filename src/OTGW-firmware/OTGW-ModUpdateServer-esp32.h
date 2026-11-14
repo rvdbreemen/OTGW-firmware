@@ -46,6 +46,7 @@
 #include <LittleFS.h>
 #include <Preferences.h>       // ADR-191: hostname/password mirror for the safeboot updater
 #include "Wire.h"
+#include <esp_rom_crc.h>     // TASK-1774: CRC32 of the RTC snapshot (ROM, no flash cost)
 #include "webServerCompat.h"   // webBeginRequest / webSendP / webSend / g_responseSent
 
 // External declarations (same as the sync variant)
@@ -159,6 +160,141 @@ inline void safebootMarkAppValid() {
     esp_ota_mark_app_valid_cancel_rollback();
   }
 }
+
+// --- fsOtaRtcSnapshot begin
+// TASK-1774 / ADR-233: a filesystem OTA erases the LittleFS partition from its first chunk on, and the image
+// it writes ships a default settings.ini. A reset before the restore at the end (a panic, a watchdog, a
+// software reset) used to boot on that default and on a lost reboot counter. This snapshot keeps
+// settings.ini, reboot_count.txt and reboot_log.txt in RTC slow memory, which survives such resets, the
+// rollback to safeboot and the safeboot run (probe 2.0.0-probe1774+370b324 on .63, ADR-233 Evidence); not a
+// power cut. Life cycle: filled before LittleFS.end() at upload start (unarmed), armed at the first written
+// chunk, the settings slot dropped by every successful writeSettings(), wiped after the restore and at every
+// boot. It holds the cleartext secrets of settings.ini (ADR-056): never printed, wiped as early as possible.
+#define FS_OTA_RTC_MAGIC      0x46534F54UL   // "FSOT"
+#define FS_OTA_RTC_DATA_BYTES 7424           // RTC slow 7680 B, minus the other RTC_NOINIT records and a margin
+#define FS_OTA_RTC_SLOTS      3
+#define FS_OTA_RTC_MIN_ADDR   0x50000220UL   // the safeboot updater loads 0x20 B at 0x50000200 (TASK-1918)
+
+struct FsOtaRtcSnapshot {
+  uint32_t magic;
+  uint32_t crc;                        // over len[] and the used part of data[]
+  uint16_t len[FS_OTA_RTC_SLOTS];      // 0 = slot empty
+  uint16_t pad;
+  uint8_t  data[FS_OTA_RTC_DATA_BYTES];
+};
+static RTC_NOINIT_ATTR FsOtaRtcSnapshot g_fsOtaRtc;
+
+// settings.ini first: it is the file that matters most, and the only one the image ships a default of.
+static const char *const kFsOtaRtcPath[FS_OTA_RTC_SLOTS] = {"/settings.ini", "/reboot_count.txt", "/reboot_log.txt"};
+static const char *const kFsOtaRtcTmp[FS_OTA_RTC_SLOTS]  = {"/settings.tmp", "/reboot_count.tmp", "/reboot_log.t.txt"};
+
+inline bool fsOtaRtcPlaced() { return reinterpret_cast<uintptr_t>(&g_fsOtaRtc) >= FS_OTA_RTC_MIN_ADDR; }
+
+inline size_t fsOtaRtcUsed() {
+  size_t used = 0;
+  for (size_t i = 0; i < FS_OTA_RTC_SLOTS; i++) used += g_fsOtaRtc.len[i];
+  return used;
+}
+
+inline uint32_t fsOtaRtcCrc() {
+  const uint32_t c = esp_rom_crc32_le(0, reinterpret_cast<const uint8_t *>(g_fsOtaRtc.len), sizeof(g_fsOtaRtc.len));
+  return esp_rom_crc32_le(c, g_fsOtaRtc.data, static_cast<uint32_t>(fsOtaRtcUsed()));
+}
+
+inline void fsOtaRtcWipe() {
+  g_fsOtaRtc.magic = 0;
+  memset(g_fsOtaRtc.data, 0, sizeof(g_fsOtaRtc.data));
+  memset(g_fsOtaRtc.len, 0, sizeof(g_fsOtaRtc.len));
+  g_fsOtaRtc.crc = 0;
+}
+
+inline bool fsOtaRtcArmed() { return g_fsOtaRtc.magic == FS_OTA_RTC_MAGIC; }
+
+// Upload start, while LittleFS is still mounted: copy each file whole, or not at all when it does not fit.
+inline void fsOtaRtcFill() {
+  fsOtaRtcWipe();
+  if (!LittleFSmounted || !fsOtaRtcPlaced()) return;
+  size_t used = 0;
+  for (size_t i = 0; i < FS_OTA_RTC_SLOTS; i++) {
+    File f = LittleFS.open(kFsOtaRtcPath[i], "r");
+    if (!f) continue;
+    const size_t n = f.size();
+    if (n == 0) { f.close(); continue; }
+    if (n > sizeof(g_fsOtaRtc.data) - used) {
+      DebugTf(PSTR("[OTA] %s (%u B) does not fit the RTC snapshot (%u B free): not protected during this filesystem write\r\n"),
+              kFsOtaRtcPath[i], static_cast<unsigned>(n), static_cast<unsigned>(sizeof(g_fsOtaRtc.data) - used));
+      f.close();
+      continue;
+    }
+    if (f.read(g_fsOtaRtc.data + used, n) == n) {
+      g_fsOtaRtc.len[i] = static_cast<uint16_t>(n);
+      used += n;
+    } else {
+      memset(g_fsOtaRtc.data + used, 0, n);   // a short read keeps nothing of this file
+    }
+    f.close();
+  }
+  DebugTf(PSTR("[OTA] RTC snapshot: %u B of settings, reboot counter and reboot log\r\n"), static_cast<unsigned>(used));
+}
+
+// First written chunk: from here the old filesystem is gone, so the snapshot becomes the one to restore.
+inline void fsOtaRtcArm() {
+  if (fsOtaRtcArmed() || fsOtaRtcUsed() == 0) return;
+  g_fsOtaRtc.crc = fsOtaRtcCrc();
+  g_fsOtaRtc.magic = FS_OTA_RTC_MAGIC;
+}
+
+// Every successful writeSettings(): settings.ini on flash is now newer than the snapshot's copy.
+inline void fsOtaRtcDropSettings() {
+  if (!fsOtaRtcArmed() || g_fsOtaRtc.len[0] == 0) return;
+  const size_t n = g_fsOtaRtc.len[0];
+  const size_t rest = fsOtaRtcUsed() - n;
+  memmove(g_fsOtaRtc.data, g_fsOtaRtc.data + n, rest);
+  memset(g_fsOtaRtc.data + rest, 0, n);
+  g_fsOtaRtc.len[0] = 0;
+  if (fsOtaRtcUsed() == 0) fsOtaRtcWipe();
+  else g_fsOtaRtc.crc = fsOtaRtcCrc();
+}
+
+// setup(), after the mount and before readSettings(): an armed, valid snapshot means a filesystem write
+// started and its restore never finished. settings.ini is always taken from it (the image's default must not
+// win); the counter and the log only fill a missing or empty file. Then the snapshot is wiped, also on failure.
+inline void fsOtaRtcRestoreAtBoot(bool mounted) {
+  if (!fsOtaRtcArmed()) return;   // nothing armed; a power-on leaves garbage without the magic
+  const size_t used = fsOtaRtcUsed();
+  if (!fsOtaRtcPlaced() || used > sizeof(g_fsOtaRtc.data) || g_fsOtaRtc.crc != fsOtaRtcCrc()) {
+    DebugTln(F("[OTA] RTC snapshot invalid: ignored"));
+    fsOtaRtcWipe();
+    return;
+  }
+  if (!mounted) {
+    DebugTln(F("[OTA] RTC snapshot not restored: LittleFS not mounted"));
+    fsOtaRtcWipe();
+    return;
+  }
+  size_t off = 0;
+  for (size_t i = 0; i < FS_OTA_RTC_SLOTS; i++) {
+    const size_t n = g_fsOtaRtc.len[i];
+    if (n == 0) continue;
+    bool need = (i == 0);
+    if (!need) {
+      File cur = LittleFS.open(kFsOtaRtcPath[i], "r");
+      need = !cur || cur.size() == 0;
+      if (cur) cur.close();
+    }
+    if (need) {
+      File t = LittleFS.open(kFsOtaRtcTmp[i], "w");
+      const size_t w = t ? t.write(g_fsOtaRtc.data + off, n) : 0;
+      if (t) t.close();
+      const bool ok = fsCommitTempFile(kFsOtaRtcTmp[i], kFsOtaRtcPath[i], w == n ? n : 0);
+      DebugTf(PSTR("[OTA] Restored %s from the RTC snapshot (%u B): %s\r\n"), kFsOtaRtcPath[i],
+              static_cast<unsigned>(n), ok ? "OK" : "FAILED");
+    }
+    off += n;
+  }
+  fsOtaRtcWipe();
+}
+// --- fsOtaRtcSnapshot end
 
 class OTGWUpdateServer {
 public:
@@ -385,14 +521,17 @@ private:
       // initSAT() during the write reads nothing and holds defaults (bench .61: preset and energy lost).
       _satLoadedAtFsStart = satStateLoaded();
       _keepFiles();   // TASK-1266/1286: the image lacks these files; copy them to the heap, restore after the remount
+      fsOtaRtcFill();   // TASK-1774: survives a reset during the write; armed at the first chunk
       LittleFS.end();
       ::state.flash.bFsImageWriting = true;   // TASK-1909: no LittleFS.begin() elsewhere until the remount below
       if (uploadTotal > 0 && uploadTotal > fsSize) {
         strlcpy(_updaterError, "filesystem image too large", sizeof(_updaterError));
         _dropKeptFiles();   // the old filesystem is untouched; the copies are not needed
+        fsOtaRtcWipe();
       } else if (!Update.begin(fsSize, U_SPIFFS)) {  // U_SPIFFS covers LittleFS on ESP32
         _setUpdaterError();
         _dropKeptFiles();
+        fsOtaRtcWipe();
       }
     } else {
       _uploadTarget = UploadTarget::Firmware;
@@ -450,6 +589,7 @@ private:
     }
     _uploadBlockIndex++;
     _uploadWrittenBytes += written;
+    if (_uploadTarget == UploadTarget::Filesystem) fsOtaRtcArm();   // TASK-1774: the old filesystem is being erased from here
 
     if (_serial_output && _uploadExpectedBytes > 0) {
       unsigned long pct = static_cast<unsigned long>((_uploadWrittenBytes * 100UL) / _uploadExpectedBytes);
@@ -545,6 +685,7 @@ private:
     _restoreKeptFiles();           // TASK-1266/1286: files without a RAM copy, from the heap
     saveOtSupportFilesForced();    // TASK-1286: the OT profiles live in RAM, so no heap copy is needed
     if (_satLoadedAtFsStart) satPersistAllToFs();   // TASK-1286: SAT state from RAM; TASK-1771: only a RAM loaded before the write
+    if (saved) fsOtaRtcWipe();   // TASK-1774: restored; a failed settings write keeps the snapshot for the next boot
   }
 
   // TASK-1495: the filesystem was formatted after an incomplete image, so the web UI

@@ -152,6 +152,9 @@ static void writeSettingsBody(File &file) {
 }
 
 #include "helper.inc"
+// TASK-1774: writeSettings() drops the settings slot of the RTC snapshot after a commit (ADR-233);
+// test_fs_ota_rtc_snapshot.py covers that, here it does nothing.
+static void fsOtaRtcDropSettings() {}
 #include "settings.inc"
 #include "rebootcount.inc"
 
