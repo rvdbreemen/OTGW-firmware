@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-14T08:57:00Z'
-updated_date: '2026-11-14T11:49:00Z'
+updated_date: '2026-11-14T12:43:00Z'
 labels:
   - bug
   - wifi
@@ -43,4 +43,6 @@ Host harness (prepared before the decision, coordinator): test/host/test_wifi_po
 Robert's decision A (DM 1571125618777522260, via the coordinator): count every power-on-type boot; risk accepted (three power interruptions in the windows also wipe the WiFi). D3 button on every Classic revision: 'Not sure' (DM 1571125777720672267), so pulling the plug is named as a route. ACs rewritten to the decision (old AC2 asked to tell a press from a power-on, which the S3 cannot do). Fix: platformIsResetButtonOrPowerOn() in platform_esp32.h (ESP_RST_EXT or ESP_RST_POWERON); isExternalSystemReset() renamed isPortalResetGesture() (its only caller is the counter) and calls it; OLED hint 'Triple-reset = config' -> '3x reset/power=config' (21 chars); docs/guides/WIFI_RECOVERY_TRIPLE_RESET.md rewritten for 2.x (the old text said a power cycle does not count); c4-code-sensors.md hint text. ADR-238 Proposed (number from the coordinator; 234-237 reserved) supersedes ADR-043; strict lint: only the two-sided supersede link open, which 'adr supersede' writes at acceptance. Host evidence (AC1): test_wifi_portal_reset.py --old-rev HEAD (pre-fix) -> FIX P1-P6 pass; OLD P1 and P5 FAIL, P2/P3/P4/P6 pass; RESULT PASS. Related: 9 test files PASS (incl. test_wifi_skip_portal 37, ADR-211), evaluate --quick 86/0.
 
 Where the counter lives (coordinator check): platformRtcRead/Write (platform_esp32.h:806-824) use Preferences namespace 'otgw_rtc', key 's96' = NVS in flash, despite the 'Rtc' name. It survives a real power-off, so pulling the plug three times does reach 3. The harness models that (g_nvs survives every boot; RAM globals and millis() restart). New case P7 pins wear and clearing: fix = 2 NVS writes per power-on (count 1, cleared after the 10 s window), 0 per software reset; old = 1 per power-on. FIX P1-P7 pass, OLD (4678e3481) P1/P5 FAIL, rest pass. The guide and OLED promise of 'pull the plug three times' therefore matches the code; on hardware it stays the field/maintainer AC3.
+
+Rebased onto origin/dev 67b137190 (banner and generated-index conflicts only; net code diff identical, 279 lines). Bump beta.243. ADR index regenerated (adr-index docs/adr, README mode writes README/MD/JSON) and the ADR-238 category entry added next to ADR-043 (tests/test_adr_governance.py counts those links): 17/17 OK. Harness --old-rev origin/dev: FIX P1-P7 pass, OLD P1/P5 FAIL rest pass. 8 related test files PASS, evaluate --quick 86/0.
 <!-- SECTION:NOTES:END -->

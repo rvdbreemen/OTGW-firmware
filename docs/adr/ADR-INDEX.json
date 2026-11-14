@@ -9250,47 +9250,6 @@
       }
     },
     {
-      "id": "ADR-234",
-      "title": "On the ESP32-S3 the triple-reset WiFi recovery counts reset-button presses and power-ons alike",
-      "path": "ADR-234-on-the-esp32-s3-the-triple-reset-wifi-recovery-counts-reset-button-presses-and-power-ons-alike.md",
-      "format": "canonical",
-      "status": "Proposed",
-      "date": "2026-11-14",
-      "decision_summary": "State one concrete chosen approach and its rationale.",
-      "topics": [],
-      "aliases": [],
-      "components": [],
-      "symbols": [],
-      "context_scope": "selective",
-      "decision_contract": {
-        "must": [
-          "State required implementation constraints."
-        ],
-        "must_not": [
-          "State prohibited implementation choices."
-        ],
-        "exceptions": [
-          "State explicit exceptions, or None."
-        ],
-        "verification": [
-          "Name the test, command, or source anchor that verifies this decision."
-        ]
-      },
-      "scope": {
-        "path_globs": [
-          "src/**/*.py"
-        ]
-      },
-      "metadata": {
-        "binding": false,
-        "gate": null,
-        "documents_shipped": false,
-        "verified_in": [],
-        "supersedes": [],
-        "superseded_by": null
-      }
-    },
-    {
       "id": "ADR-235",
       "title": "SAT sends CS= on change with a 30 s repeat (supersedes the CS part of ADR-207 and ADR-203)",
       "path": "ADR-235-sat-sends-cs-on-change-with-a-30-s-repeat-supersedes-the-cs-part-of-adr-207-and-adr-203.md",
@@ -9414,6 +9373,69 @@
         "documents_shipped": false,
         "verified_in": [],
         "supersedes": [],
+        "superseded_by": null
+      }
+    },
+    {
+      "id": "ADR-238",
+      "title": "On the ESP32-S3 the triple-reset WiFi recovery counts reset-button presses and power-ons alike",
+      "path": "ADR-238-on-the-esp32-s3-the-triple-reset-wifi-recovery-counts-reset-button-presses-and-power-ons-alike.md",
+      "format": "canonical",
+      "status": "Proposed",
+      "date": "2026-11-14",
+      "decision_summary": "On the ESP32-S3 a boot counts towards the triple-reset WiFi recovery when it is a reset-button press or a power-on (E...",
+      "topics": [
+        "config portal",
+        "reset reason",
+        "triple reset",
+        "WiFi recovery"
+      ],
+      "aliases": [
+        "pull the plug three times",
+        "reset button WiFi portal"
+      ],
+      "components": [
+        "WiFi recovery trigger"
+      ],
+      "symbols": [
+        "isPortalResetGesture",
+        "platformIsResetButtonOrPowerOn",
+        "shouldForceWifiConfigPortal"
+      ],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [
+          "Count a boot when espresetreason() is ESPRSTPOWERON or ESPRSTEXT, through the platform shim platformIsResetButtonOrPowerOn(); the firmware calls it only from isPortalResetGesture().",
+          "Keep ADR-043's trigger count (3), window (10 s, cleared by loop() when it expires), magic value and the credential wipe before the portal.",
+          "Name the gesture as \"press reset, or pull the plug, three times\" in the user documentation and the OLED hint."
+        ],
+        "must_not": [
+          "Count software resets (OTA, /ReBoot, the WiFi supervisor restart of ADR-211), panics, watchdog resets, ESPRSTBROWNOUT (raw 0x0F, system brown-out) or ESPRSTUSB.",
+          "Read the reset reason with a raw #ifdef ESP32 outside the Platform library."
+        ],
+        "exceptions": [
+          "None."
+        ],
+        "verification": [
+          "python test/host/testwifiportalreset.py compiles the real gate and counter: three reset-button boots force the portal (P1), three power-ons force it (P5), software resets (P2) and boots outside the window (P3) do not; red on the code bef...",
+          "Bench: not possible on the bench units over USB (a USB reset reports ESPRSTUSB); a power cycle or button press by the maintainer or in the field is the hardware check (TASK-1930)."
+        ]
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [
+          "src/libraries/Platform/src/platform_esp32.h:platformIsResetButtonOrPowerOn",
+          "src/OTGW-firmware/OTGW-firmware.ino:isPortalResetGesture",
+          "test/host/test_wifi_portal_reset.py"
+        ],
+        "supersedes": [
+          "ADR-043"
+        ],
         "superseded_by": null
       }
     }
@@ -16046,6 +16068,24 @@
     {
       "source": "ADR-237",
       "target": "ADR-190",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-238",
+      "target": "ADR-043",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-238",
+      "target": "ADR-043",
+      "type": "supersedes",
+      "resolved": true
+    },
+    {
+      "source": "ADR-238",
+      "target": "ADR-211",
       "type": "related",
       "resolved": true
     }
