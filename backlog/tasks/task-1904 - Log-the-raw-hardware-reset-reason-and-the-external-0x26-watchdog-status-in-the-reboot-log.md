@@ -7,7 +7,7 @@ status: In Review
 assignee:
   - '@claude'
 created_date: '2026-11-13T16:52:00Z'
-updated_date: '2026-11-14T11:04:00Z'
+updated_date: '2026-11-14T11:07:00Z'
 labels:
   - bug
   - stability
@@ -53,4 +53,6 @@ AC3 bench by 09 (probe 2.0.0-probe1904c+72437d9, zip sha256 2417a8cc...217f0, OT
 Rebased onto origin/dev bebecded7 (2026-11-14): only the version-banner hunks conflicted (one per file, both sides version lines only; upstream kept by a resolver that stops on any other hunk). Net code diff excluding banners identical before and after the rebase (525 lines). Re-bump beta.240 -> beta.241 in its own commit. After the rebase: both harnesses PASS (reset-raw incl. --old-rev ff5eb599e, RTC snapshot), 13 related test files PASS, evaluate --quick 85/0.
 
 No-regression bench by 09 on .63, beta.241+0d698c3 (sha256 zip 23ffe9ed...c8a60, ino bb31e550...ae47f, littlefs 7ec0b7de...f0190; githash checked): PASS. reboot_log line 1 'Software reset (3) [rst 0x0c/0x0c] - User reboot (/ReBoot)', 20 lines all CRLF, max 95 B; device/info resetraw 0x0c/0x0c, resetrawlabel 'software reset (CPU)', extwdreset false; settings diff [] (API and raw settings.ini); no crashlog entry from 241's boots. My brief named /api/v2/device/reboot, which does not exist (405); 09 used /ReBoot. AC1 ticked: host harness (E2/E4, S3) plus the probe bench and this bench show the raw code in the log and in device/info. AC2 NOT ticked: the code path is proven only by host case E1 (mutant MC1); no unit with a 0x26 chip was available (.63: 'no external 0x26 watchdog responding'), so the persistence is not proven on hardware. AC3 is 09's to tick (probe bench T/W PASS on .61 and .63).
+
+AC2: not testable: no bench unit with a 0x26 chip; host test E1/MC1 only (coordinator, 2026-11-14: stays In Review on this line, no waiver question).
 <!-- SECTION:NOTES:END -->
