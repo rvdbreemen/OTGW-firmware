@@ -6,10 +6,12 @@
 The safeboot updater (ADR-191) has an initialised .rtc.force_slow segment of 0x20 B at 0x50000200 (the IDF variable
 s_sleep_sub_mode_ref_cnt). The bootloader loads it every time safeboot starts, so anything the main firmware keeps
 in 0x50000200-0x5000021F is overwritten on the way through safeboot (an app OTA). The main firmware reserves that
-range with the guard array g_rtcSafebootGuard and keeps every other RTC_NOINIT record at or above 0x50000220.
+range with the guard array g_rtcSafebootGuard (initialised RTC data, .rtc.data, which the IDF linker script
+places before .rtc_noinit) and keeps every RTC_NOINIT record at or above 0x50000220.
 
-The check reads the ELF symbol table with the toolchain nm (-n -S) and fails when a sized symbol inside
-[_rtc_noinit_start, _rtc_noinit_end) other than the guard starts below 0x50000220, or when the guard is missing.
+The check reads the ELF symbol table with the toolchain nm (-n -S) and fails when the guard is missing or not at
+0x50000200 with at least 0x20 B, when _rtc_noinit_start is not exactly 0x50000220 (the records keep their address
+across versions), or when a sized symbol inside [_rtc_noinit_start, _rtc_noinit_end) starts below 0x50000220.
 """
 import os
 import re
@@ -53,16 +55,18 @@ def check(nm_text):
     start, end = markers.get("_rtc_noinit_start"), markers.get("_rtc_noinit_end")
     if start is None or end is None:
         return ["_rtc_noinit_start/_rtc_noinit_end not in the symbol table"]
-    records = [(a, s, n) for a, s, n in sized if start <= a < end]
     bad = []
-    if not any(GUARD in n for _, _, n in records):
-        bad.append(f"{GUARD} (the 32 B safeboot guard) is not in .rtc_noinit")
-    for a, s, n in records:
-        if GUARD in n:
-            if a != 0x50000200 or s < SAFEBOOT_RTC_END - 0x50000200:
-                bad.append(f"{GUARD} at 0x{a:08x} size 0x{s:x}: must start at 0x50000200 and cover 0x20 B")
-            continue
-        if a < SAFEBOOT_RTC_END:
+    if start != SAFEBOOT_RTC_END:
+        bad.append(f"_rtc_noinit_start is 0x{start:08x}, must be exactly 0x{SAFEBOOT_RTC_END:08x}: the records must keep "
+                   "their address across versions, so the reason the old firmware wrote is found after an OTA")
+    guard = [(a, s, n) for a, s, n in sized if GUARD in n]
+    if not guard:
+        bad.append(f"{GUARD} (the 32 B safeboot guard) is not in the ELF")
+    for a, s, n in guard:
+        if a != 0x50000200 or s < SAFEBOOT_RTC_END - 0x50000200:
+            bad.append(f"{GUARD} at 0x{a:08x} size 0x{s:x}: must start at 0x50000200 and cover 0x20 B")
+    for a, s, n in sized:
+        if start <= a < end and GUARD not in n and a < SAFEBOOT_RTC_END:
             bad.append(f"{n} at 0x{a:08x} (size 0x{s:x}) lies in safeboot's RTC range 0x50000200-0x5000021f")
     return bad
 

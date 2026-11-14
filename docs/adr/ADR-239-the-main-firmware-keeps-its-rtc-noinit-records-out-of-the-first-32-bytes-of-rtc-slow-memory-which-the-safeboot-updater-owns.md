@@ -70,23 +70,27 @@ The linker decides the order of `.rtc_noinit`; with LTO no source order is guara
 ## Decision
 
 The first 32 bytes of RTC slow memory (0x50000200-0x5000021F) belong to the safeboot updater: the main firmware
-holds them with a 32 B guard array, `g_rtcSafebootGuard` (OTGW-firmware.h, never read or written as data), keeps
-every other RTC_NOINIT record at or above 0x50000220, and checks the real ELF on every build.
+holds them with a 32 B guard array, `g_rtcSafebootGuard` (OTGW-firmware.h, `RTC_DATA_ATTR`: initialised RTC data,
+which the IDF linker script places in `.rtc.data` before `.rtc.bss` and `.rtc_noinit`), so `.rtc_noinit` starts at
+exactly 0x50000220 in every version, and it checks the real ELF on every build.
 
 ## Decision Contract
 
 ### Must
 
-- Keep `g_rtcSafebootGuard` (32 B, `RTC_NOINIT_ATTR`, `used`, referenced once in `setup()` so `--gc-sections`
-  keeps it) at 0x50000200.
+- Keep `g_rtcSafebootGuard` (32 B, `RTC_DATA_ATTR`, `used`, referenced once in `setup()` so `--gc-sections`
+  keeps it) at 0x50000200, so `_rtc_noinit_start` is exactly 0x50000220.
 - Run `scripts/check_rtc_layout.py` on the ELF of every ESP32 build (build.py, `collect_pio_artifacts()`) and fail
-  the build when a record other than the guard starts below 0x50000220 or the guard is missing or misplaced.
+  the build when the guard is missing or not at 0x50000200, when `_rtc_noinit_start` is not exactly 0x50000220
+  (the records keep their address across versions, so a reason the old firmware stored is found after an OTA), or
+  when a record starts below 0x50000220.
 - Validate every RTC record with a magic word (and the snapshot with its CRC32), so the bytes another layout leaves
   behind are rejected.
 
 ### Must Not
 
-- Place an RTC_NOINIT record, or initialised RTC data, of the main firmware in 0x50000200-0x5000021F.
+- Place an RTC_NOINIT record of the main firmware in 0x50000200-0x5000021F, or add initialised or zeroed RTC data
+  (`RTC_DATA_ATTR`, `RTC_BSS`) that moves `_rtc_noinit_start` away from 0x50000220.
 - Change safeboot's RTC usage without re-checking this range.
 
 ### Exceptions
@@ -104,6 +108,9 @@ every other RTC_NOINIT record at or above 0x50000220, and checks the real ELF on
 
 ## Alternatives Considered
 
+- **A guard in `.rtc_noinit`, defined first in the translation unit.** Tried first and rejected by the gate: in the
+  real ELF the linker placed the global guard after the three static records (guard at 0x50000244,
+  `g_rtcRebootReason` still at 0x50000200). Source order is no mechanism under LTO.
 - **Pin each record to an address (linker script or a custom section).** Rejected: it needs our own linker
   fragment for the Arduino IDF build, more machinery than one guard array plus a check, for the same guarantee.
 - **Move the records in safeboot instead (or drop safeboot's `.rtc.force_slow` data).** Rejected: the variable
@@ -128,6 +135,9 @@ every other RTC_NOINIT record at or above 0x50000220, and checks the real ELF on
   (magic, CRC; tests above), so that boot logs no reason and keeps no WiFi mark: one boot without a planned
   reason, accepted.
 - build.py gets one post-build step on the ESP32 targets (nm on the ELF, about a second).
+- The bootloader reloads the guard's 32 B on every boot of the main firmware; harmless, it is padding.
+- A future `RTC_DATA_ATTR` or `RTC_BSS` variable fails the build; it needs its own decision (shrink the guard is not
+  an option; place it elsewhere or supersede this ADR).
 
 ## Open Questions
 

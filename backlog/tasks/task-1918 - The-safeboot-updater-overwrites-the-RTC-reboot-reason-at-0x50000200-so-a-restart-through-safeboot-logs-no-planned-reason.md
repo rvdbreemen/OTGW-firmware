@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-14T02:34:00Z'
-updated_date: '2026-11-14T14:32:00Z'
+updated_date: '2026-11-14T14:51:00Z'
 labels:
   - bug
   - ota
@@ -45,4 +45,6 @@ Verified (2026-11-14, primary sources): safeboot ELF (wt-1924 build 12:28) LOAD 
 Implementation (coordinator GO 2026-11-14): 32 B RTC_NOINIT guard g_rtcSafebootGuard in OTGW-firmware.h (used attribute + one volatile read in setup() after the capture*() calls, which the wiring tests require first, so --gc-sections keeps it); scripts/check_rtc_layout.py (toolchain nm -n -S on the ELF: fails when a .rtc_noinit symbol other than the guard starts below 0x50000220, or the guard is missing or not at 0x50000200) called from build.py collect_pio_artifacts() right after the ELF copy for the ESP32 family, failing the build; ADR-239 Proposed (binding, gate per ADR-080). Gate red on the real beta.243 ELF (g_rtcRebootReason at 0x50000200). Upgrade transition (coordinator point 2), real code: test_reboot_reason case 8 (old reason, WiFi records and snapshot header read 0x20 B in: no reason, 3 reasons incl. the longest), test_wifi_skip_portal and test_wifi_deadlink subtests (old snapshot data[] bytes, zeros and the real settings.ini head: portal opens, count restarts from 0), test_fs_ota_rtc_snapshot T13 (stale armed, not consistent snapshot read 0x20 B higher: 0 formats, user's settings kept; unshifted control: 1 format) with MB6 now also failing T13. Host: 13 related test files PASS (rtc_layout_check 7, reboot_reason 10, wifi_skip_portal 38, wifi_deadlink 29, fs_ota_rtc_snapshot, reboot_log_reset_raw, reboot_log_time_not_set, crashlog_coredump, static_integrity, ino_prototype_hoisting, build 16, build_safeboot 11, build_staging 18, build_lock, build_jobs, build_config_path, build_bat_call_probes, firmware_ota_path); test_adr_governance 17/17; evaluate --quick 85/0. RTC slow left after the fix: 108 B. Still to prove on the real fix ELF: the guard lands at 0x50000200 (gate result in the build).
 
 Rebased onto origin/dev fbcf1e6db (09's beta.246, TASK-1936): code identical (271 lines excl. banners); re-bump beta.246 -> beta.247.
+
+First fix build (beta.247 lane, 15:48) FAILED the new gate on the real ELF, as designed: the RTC_NOINIT guard landed at 0x50000244 after the three static records, g_rtcRebootReason stayed at 0x50000200. Mechanism changed: the guard is RTC_DATA_ATTR (.rtc.data), which the IDF linker script (framework libs esp32s3 sections.ld: .rtc.data, then .rtc.bss, then .rtc_noinit, all in rtc_data_location) places first, so .rtc_noinit starts at 0x50000220 independent of source/LTO order. Gate extended (coordinator): _rtc_noinit_start must be exactly 0x50000220, so the records keep their address across versions and a future RTC_DATA/RTC_BSS variable cannot shift them silently. tests/test_rtc_layout_check.py 8/8 (incl. the real failed layout as NOINIT_GUARD_AFTER_STATICS, noinit moved down, noinit moved up); the failed lane ELF stays red with all three reasons. ADR-239 updated (mechanism, the rejected first attempt, the exact-start rule); strict lint PASS, governance OK.
 <!-- SECTION:NOTES:END -->

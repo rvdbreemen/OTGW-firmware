@@ -9467,12 +9467,12 @@
       "context_scope": "selective",
       "decision_contract": {
         "must": [
-          "Keep grtcSafebootGuard (32 B, RTCNOINITATTR, used, referenced once in setup() so --gc-sections keeps it) at 0x50000200.",
-          "Run scripts/checkrtclayout.py on the ELF of every ESP32 build (build.py, collectpioartifacts()) and fail the build when a record other than the guard starts below 0x50000220 or the guard is missing or misplaced.",
+          "Keep grtcSafebootGuard (32 B, RTCDATAATTR, used, referenced once in setup() so --gc-sections keeps it) at 0x50000200, so rtcnoinitstart is exactly 0x50000220.",
+          "Run scripts/checkrtclayout.py on the ELF of every ESP32 build (build.py, collectpioartifacts()) and fail the build when the guard is missing or not at 0x50000200, when rtcnoinitstart is not exactly 0x50000220 (the records keep their addr...",
           "Validate every RTC record with a magic word (and the snapshot with its CRC32), so the bytes another layout leaves behind are rejected."
         ],
         "must_not": [
-          "Place an RTCNOINIT record, or initialised RTC data, of the main firmware in 0x50000200-0x5000021F.",
+          "Place an RTCNOINIT record of the main firmware in 0x50000200-0x5000021F, or add initialised or zeroed RTC data (RTCDATAATTR, RTCBSS) that moves rtcnoinitstart away from 0x50000220.",
           "Change safeboot's RTC usage without re-checking this range."
         ],
         "exceptions": [

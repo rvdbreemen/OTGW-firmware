@@ -26,13 +26,26 @@ OLD = MARKERS + """50000200 00000034 B _ZL17g_rtcRebootReason$lto_priv$0
 50001f54 00000020 d s_sleep_sub_mode_ref_cnt
 """
 
-FIX = MARKERS + """50000200 00000020 B g_rtcSafebootGuard
+FIX = """50000200 A _rtc_data_start
+50000200 00000020 D g_rtcSafebootGuard
+50000220 A _rtc_data_end
+50000220 A _rtc_noinit_start
 50000220 00000034 B _ZL17g_rtcRebootReason$lto_priv$0
 50000254 00000008 B _ZL21g_rtcWifiDeadRestarts$lto_priv$0
 5000025c 00000008 B _ZL19g_rtcWifiSkipPortal$lto_priv$0
 50000264 00001d10 B _ZL10g_fsOtaRtc$lto_priv$0
 50001f74 A _rtc_noinit_end
 50001f74 00000020 d s_sleep_sub_mode_ref_cnt
+"""
+
+# The first fix attempt (an RTC_NOINIT guard): the linker put it after the static records (real ELF, beta.247
+# lane build): this layout must be red.
+NOINIT_GUARD_AFTER_STATICS = MARKERS + """50000200 00000034 B _ZL17g_rtcRebootReason$lto_priv$0
+50000234 00000008 B _ZL21g_rtcWifiDeadRestarts$lto_priv$0
+5000023c 00000008 B _ZL19g_rtcWifiSkipPortal$lto_priv$0
+50000244 00000020 B g_rtcSafebootGuard
+50000264 00001d10 B _ZL10g_fsOtaRtc$lto_priv$0
+50001f74 A _rtc_noinit_end
 """
 
 ARCHIVE_ELF = (REPO.parent / "OTGW-build-archive" / "beta.243-1930" /
@@ -48,18 +61,27 @@ class RtcLayoutCheck(unittest.TestCase):
         self.assertEqual(chk.check(FIX), [])
 
     def test_missing_guard_is_red(self):
-        no_guard = FIX.replace("50000200 00000020 B g_rtcSafebootGuard\n", "")
-        self.assertTrue(any("not in .rtc_noinit" in b for b in chk.check(no_guard)))
+        no_guard = FIX.replace("50000200 00000020 D g_rtcSafebootGuard\n", "")
+        self.assertNotEqual(no_guard, FIX)
+        self.assertTrue(any("is not in the ELF" in b for b in chk.check(no_guard)))
 
-    def test_record_moved_below_0x220_is_red(self):
-        moved = FIX.replace("50000220 00000034 B _ZL17g_rtcRebootReason", "50000210 00000034 B _ZL17g_rtcRebootReason")
-        self.assertTrue(any("g_rtcRebootReason" in b for b in chk.check(moved)))
+    def test_noinit_moved_down_is_red(self):
+        # a smaller guard would let .rtc_noinit start inside safeboot's range
+        moved = FIX.replace("50000220 A _rtc_noinit_start", "50000210 A _rtc_noinit_start").replace(
+            "50000220 00000034 B _ZL17g_rtcRebootReason", "50000210 00000034 B _ZL17g_rtcRebootReason")
+        bad = chk.check(moved)
+        self.assertTrue(any("g_rtcRebootReason" in b for b in bad), bad)
+        self.assertTrue(any("_rtc_noinit_start" in b for b in bad), bad)
+
+    def test_noinit_moved_up_is_red(self):
+        # one more RTC_DATA_ATTR variable would shift every record: the old firmware's reason, written at
+        # 0x50000220, would then not be found by the new firmware after an OTA (coordinator 2026-11-14)
+        shifted = FIX.replace("50000220 A _rtc_data_end", "50000240 A _rtc_data_end").replace(
+            "50000220 A _rtc_noinit_start", "50000240 A _rtc_noinit_start")
+        self.assertTrue(any("_rtc_noinit_start" in b for b in chk.check(shifted)))
 
     def test_guard_not_first_is_red(self):
-        swapped = FIX.replace("50000200 00000020 B g_rtcSafebootGuard",
-                              "50000300 00000020 B g_rtcSafebootGuard").replace(
-            "50000220 00000034 B _ZL17g_rtcRebootReason", "50000200 00000034 B _ZL17g_rtcRebootReason")
-        bad = chk.check(swapped)
+        bad = chk.check(NOINIT_GUARD_AFTER_STATICS)
         self.assertTrue(any("must start at 0x50000200" in b for b in bad), bad)
         self.assertTrue(any("g_rtcRebootReason" in b for b in bad), bad)
 

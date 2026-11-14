@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v2.0.0-beta.247
+**  Version  : v2.0.0-beta.248
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -1075,9 +1075,11 @@ char        lastResetRaw[16] = "";   // TASK-1904: "0xNN/0xNN", the raw reset co
 bool        g_extWdResetAtBoot = false;   // TASK-1904: the external 0x26 watchdog reset this boot (readExtWatchdogResetFlag())
 // TASK-1918 / ADR-239: the safeboot updater's bootloader load writes 0x20 B at 0x50000200 every time safeboot
 // starts (an app OTA). This guard holds that range, so every RTC_NOINIT record of this firmware starts at or above
-// 0x50000220. Defined here, at the top of the translation unit, so the linker places it first; never read or
-// written as data. scripts/check_rtc_layout.py, run by build.py on the ELF, fails the build when a record lands below.
-RTC_NOINIT_ATTR __attribute__((used)) uint8_t g_rtcSafebootGuard[32];
+// 0x50000220. It is initialised RTC data (.rtc.data), which the IDF linker script places before .rtc.bss and
+// .rtc_noinit, so its place does not depend on source or LTO order (an RTC_NOINIT guard landed after the static
+// records). The bootloader reloads it on every boot of this firmware; it is padding, never read or written as data.
+// scripts/check_rtc_layout.py, run by build.py on the ELF, fails the build when a record lands below 0x50000220.
+RTC_DATA_ATTR __attribute__((used)) uint8_t g_rtcSafebootGuard[32] = {0x5B};
 uint32_t    MQTTautoConfigMap[8] = { 0 };
 uint32_t    MQTTautoCfgPendingMap[8] = { 0 };  // bitmap for async MQTT discovery drip
 // Deferred settings write timer (Finding #23: coalesce flash writes)
