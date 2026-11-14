@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-14T20:51:00Z'
-updated_date: '2026-11-14T22:10:00Z'
+updated_date: '2026-11-14T22:11:00Z'
 labels:
   - github
   - pr
@@ -41,4 +41,5 @@ https://github.com/rvdbreemen/OTGW-firmware/pull/702 by justink0k (fork), base d
 95 (2026-11-14 22:4x): Robert merged #702 himself (squash 2cc72d819, no bump); lane-95-1848 rebased onto it, beta.257 bump covers it. Consumers of HaUnit::l_min: only the two MsgID 19 rows (MQTTHaDiscovery.cpp:930-931, both volume_flow_rate); haUnitStr() used at :2555 (sensor configs) and :2913 (degC only). Host test test/host/test_dhw_water_meter.py D2 expected 'l/min' and FAILED on the PR code (got unit=L/min; scratchpad t1949 dhw_mid.txt, 44 other cases pass, 118 mutant checks yes). D2 now expects L/min: discovery-only run 24/24 pass on 2cc72d819 code; with haUnitStr l_min set back to 'l/min' D2 FAIL (rc=1, failed=[D2]); source restored. MQTTstuff.h:142 comment updated; CHANGELOG Fixed line credits justink0k.
 
 2026-11-14 (92): the other 'l/min' strings. docs/api/MQTT.md:249 and :752 -> 'L/min' (wt-comms b18c98996). Robert's 47f0ea37e already fixed test/host/test_dhw_water_discovery.cpp D2 (it expected 'l/min' from the real haUnitStr() and went red after #702). Left for the firmware lane wt-92-webui (needs a bump): OTGW-Core.h:392 OT map unit (log text only: AddLogf in OTGW-Core.ino), v2.js:2580 OTMSG display unit, MQTTstuff.h:127 comment.
+AC3 bench by 09, 2026-11-14, .61 beta.257+47f0ea3 against broker 192.168.88.32: payload part PASS. RED on 252: retained homeassistant/sensor/otgw-1020BA21B4F8/boiler_DHWFlowRate/config had unit_of_measurement l/min. On 257 the config is only re-announced after the first MsgID 19 sample (ADR-182); triggered with 2 min GW=L loopback, then GW=S: the config came live and retained with device_class volume_flow_rate, unit_of_measurement L/min, state_class measurement (GREEN). NOT verified: the Home Assistant side (sensor created, HA log without the unit error): no HA instance is attached to this broker on the bench; the ha-ingress rig needs Docker. AC3 left open for the HA part.
 <!-- SECTION:NOTES:END -->
