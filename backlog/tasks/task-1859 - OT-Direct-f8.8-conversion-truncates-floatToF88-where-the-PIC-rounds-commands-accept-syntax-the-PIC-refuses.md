@@ -3,9 +3,11 @@ id: TASK-1859
 title: >-
   OT-Direct: f8.8 conversion truncates (floatToF88) where the PIC rounds;
   commands accept syntax the PIC refuses
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-11-12T05:19:00Z'
+updated_date: '2026-11-14T21:44:00Z'
 labels:
   - otdirect
   - parity
@@ -32,3 +34,11 @@ Also check per command which PIC parser it uses (GetFloat, GetPosFloat, GetPerce
 - [ ] #3 Replies print the stored value with two decimals, as the PIC
 - [ ] #4 Non-command paths (MQTT room_temp/room_setpoint, setback, boot re-send) are either converted the same way or explicitly left as they are with a reason
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+95 research 2026-11-14 (gateway.asm 6.8 in RvdB/OTGW-other-projects/otgw-6.8, file lines): GetDecimal :5045-5069 integer 0..255, first char not a digit = SE, >255 = OR. GetFloat :5118-5185 optional sign ('-' via GetSignedTemp, '+' skipped), integer by GetDecimal, then only '.' allowed else SE; first two fraction digits kept, the third rounds (>=5 adds 1), further digits only checked for being digits (SE otherwise); hundredths h -> Divide100 :5211-5225 (h*256/100, carry when h=100 adds 1 to the integer) and rounds UP when the remainder is not 0 (:5172-5175). Negative: integer inverted (comf), fraction 100-h, h=0 -> integer+1 (:5160-5167, :5183-5184). GetPosFloat :5114-5117: a '-' is not a sign, so GetDecimal sees '-' -> SE. GetPercent :5099-5112: GetPosFloat, then above 100.00 = OR; parse errors return with DC set (CL uses that, :4454-4462).
+
+Per command (dispatch :3786-3942, :5242): TT SetTempSetPoint :4089 and TC SetContSetPoint :4084 GetPosFloat, 0 clears; SB SetSetBack :4155 GetPosFloat, 0 = SE; SW SetHotWaterTemp :4164 GetFloat, 0 resets, else BV outside dhwsetpointmin..max (MsgID 48); SH SetHeatingTemp :4191 GetFloat, 0 resets, else BV outside chsetpointmin..max (MsgID 49); CS SetCtrlSetpoint :4218 and C2 SetCtrlSetpt2 :5272 GetPercent, 0 clears; OT SetOutsideT :4256 GetFloat, any parse error clears, a value >= 64.00 clears too (bit6 test :4259-4262, the OR return is commented out), negative stored; BS SetFakeSetpoint :4289 GetPercent, 0 = no fake; RT SetRoomTemp :4300 GetPercent (done, TASK-1842); CL SetCoolLevel :4454 GetPercent, parse error clears, OR returned; MM SetMaxModLevel :4794 GetDecimal (integer, TASK-1799 scope). CC= has no PIC command. Replies: CommandFloat -> PrintSigned :2043-2064: negative is negated and '-', a fraction byte 0xFF rounds to the next integer, else hundredths = (frac*100 + 128) >> 8 (round half up via float2 bit7), so 0x0020 prints 0.13 where printf %.2f of 0.125 can print 0.12.
+<!-- SECTION:NOTES:END -->

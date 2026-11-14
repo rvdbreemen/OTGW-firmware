@@ -1,11 +1,11 @@
 ---
 id: TASK-1849
 title: 'OT-Direct: success and clear replies that differ from the PIC'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-12T00:04:00Z'
-updated_date: '2026-11-14T18:30:00Z'
+updated_date: '2026-11-14T22:08:00Z'
 labels:
   - otdirect
   - parity
@@ -30,7 +30,7 @@ From the PIC 6.8 parity audit (N15), docs/reviews/2026-11-12_pic68-otdirect-pari
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [x] #1 host test per reply, byte-exact; red on current code
-- [ ] #2 one line per item in the final summary
+- [x] #2 one line per item in the final summary
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -46,3 +46,9 @@ Part of the PIC 6.8 parity audit, parent TASK-1851.
 
 09 bench beta.255+58b387a on .61, b255/replies.txt: SC=9:05/3 'SC: 09:05/3'; SR=18:1,230 'SR: 18:1/230'; CR=18 'CR: 18'; FT=X 'FT: D'; FT=C 'FT: C' then PR=R 'PR: R=C'; FT=D 'FT: D' then PR=R 'PR: R=D'.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Shipped in beta.253 (commit 4055e6a35 on origin/dev, pushed 47f0ea37e, alpha post 1571285029886103774). One line per item: (1) SC= replies 'HH:MM/D' with a two-digit hour like the PIC SetClock (gateway.asm 6.8 :4331-4388): host test 'SC: 09:05/3', 'SC: 00:00/1'; bench .61 'SC: 09:05/3'. (2) SR= replies '<id>:<hi>/<lo>' with the stored bytes like UpdateResponse (:4846-4859), any argument form: host 'SR: 18:1/230', 'SR: 70:0/14'; bench 'SR: 18:1/230'; refusals stay BV. (3) FT= replies the selected model letter C/I/S/D like SetTStatModel + PrintRemeha (:4705-4727, :2270-2280): host 'FT: X' -> 'FT: D'; bench 'FT: D', 'FT: C'. Test tests/test_otd_reply_texts_pic.py 4/4 green on the final HEAD, 3 FAIL on the code with only 1848. Gates: evaluate --quick 86/0, build beta.257+47f0ea3 exit 0, 09 PASS on .61.
+<!-- SECTION:FINAL_SUMMARY:END -->

@@ -1,11 +1,11 @@
 ---
 id: TASK-1848
 title: 'OT-Direct: PR= reports that are not the PIC''s text'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-12T00:02:00Z'
-updated_date: '2026-11-14T18:30:00Z'
+updated_date: '2026-11-14T22:08:00Z'
 labels:
   - otdirect
   - parity
@@ -33,7 +33,7 @@ From the PIC 6.8 parity audit (N14), docs/reviews/2026-11-12_pic68-otdirect-pari
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [x] #1 host test per letter, byte-exact; red on current code
-- [ ] #2 PR=P follows the real power level
+- [x] #2 PR=P follows the real power level
 - [x] #3 decision for C, B and L recorded (PIC text or agreed OT-Direct value)
 <!-- AC:END -->
 
@@ -52,3 +52,9 @@ Findings: (1) OpenTherm library getSmartPowerState() (OpenTherm.cpp:540-544) ret
 
 09 bench beta.255+58b387a on .61 (OT-Direct), 2026-11-14 19:2x, evidence 09 scratchpad b255/replies.txt: PR=P 'PR: P=Low power', PR=R 'PR: R=D', PR=C 'PR: C=240 MHz', PR=B 'PR: B=18:50 14-11-2026', PR=L 'PR: L=FXOMPC', PR=O 'PR: O=N'; after CS=40 still 'PR: O=N'; TT=20.5 -> 'PR: O=t20.50' (no thermostat on .61, so it stays lowercase); TT=0 -> 'PR: O=n' (stays n without a thermostat MsgID 9 read). AC2 limit: the bench has no Smart Power thermostat, so Medium/High were only host-tested (mapping), not seen on hardware.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Shipped in beta.252 (commit 9299addd5 on origin/dev, pushed 47f0ea37e, alpha post 1571285029886103774). AC1: tests/test_otd_pr_reports_pyotgw.py on the real OTDirect.ino helpers, 15/15 green on the final HEAD; 8 cases FAIL on the old code. AC2: PR=P text from the real line state (class OTDSlaveLine, otdPowerLevelText) for Low/Medium/High in the host test; on hardware 09 saw only 'Low power' on .61 (beta.255, byte-exact), Medium/High need a thermostat that raises the line and were not seen on hardware. AC3: Robert DM 1571191256833331375 (C '240 MHz', B PIC build stamp, L 'FXOMPC') and DM 1571191595498340544 (CS= alone reports PR=O N). Bench 09 on .61 (255): P, R=D, C=240 MHz, B=18:50 14-11-2026, L=FXOMPC, O=N/t20.50/n all byte-exact. Not seen on hardware: the t->T and n->N transitions with a real thermostat. Gates: evaluate --quick 86/0; esp32-combo build beta.257+47f0ea3 exit 0; 09 PASS on .61 for 257.
+<!-- SECTION:FINAL_SUMMARY:END -->
