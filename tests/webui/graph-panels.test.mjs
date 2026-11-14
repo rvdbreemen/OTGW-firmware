@@ -89,8 +89,10 @@ test('disconnect markers: a toolbar chip, translated', () => {
 test('connection marks: a drop only after an open socket, a return only after a drop', () => {
   const body = 'var gMarks = [], gWsUp = false, gWsDown = false, now = 1000;\n' +
     'Date = { now: function () { return now; } };\n' +
-    'var renders = 0; function isMonitorVisible(id) { return id === "mgraph"; } function renderGraph() { renders++; }\n' + fn('noteWsMark') +
-    '\nreturn { note: noteWsMark, marks: function () { return gMarks; }, at: function (t) { now = t; }, renders: function () { return renders; } };';
+    'var renders = 0; function isMonitorVisible(id) { return id === "mgraph"; } function renderGraph() { renders++; }\n' +
+    // TASK-1914: the first open and each return read device/info (boot counter); a drop does not.
+    'var infoReads = 0; function withDeviceInfo(cb) { infoReads++; }\n' + fn('noteWsMark') +
+    '\nreturn { note: noteWsMark, marks: function () { return gMarks; }, at: function (t) { now = t; }, renders: function () { return renders; }, infoReads: function () { return infoReads; } };';
   const h = new Function(body)();
   h.note(false); h.note(false);              // failed connects before the first open: no marks
   assert.deepEqual(h.marks(), []);
@@ -100,13 +102,15 @@ test('connection marks: a drop only after an open socket, a return only after a 
   h.at(3500); h.note(false);                 // failed reconnect: same outage
   const r0 = h.renders();
   assert.ok(r0 > 0, 'a visible graph redraws on a drop, also while no data arrives');
+  assert.equal(h.infoReads(), 1, 'device/info read once: the first open (boot counter baseline)');
   h.at(5000); h.note(true);                  // back
   assert.deepEqual(h.marks(), [{ t: 3000, up: 0 }, { t: 5000, up: 1 }]);
   assert.ok(h.renders() > r0, 'and on the return');
+  assert.equal(h.infoReads(), 2, 'and once more on the return, to see a restart');
 });
 
 test('marks map to x inside the window only', () => {
-  const body = 'var C_X0 = 34, C_X1 = 772;\n' + fn('graphMarkLines') + '\nreturn graphMarkLines;';
+  const body = 'var C_X0 = 34, C_X1 = 772;\n' + fn('graphMarkKind') + fn('graphMarkLines') + '\nreturn graphMarkLines;';
   const lines = new Function(body)();
   const t0 = 100000, win = 10000;
   const r = lines([{ t: 90000, up: 0 }, { t: 100000, up: 0 }, { t: 105000, up: 1 }, { t: 111000, up: 0 }], t0, win);
