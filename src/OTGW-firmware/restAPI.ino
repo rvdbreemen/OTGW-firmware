@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-beta.239
+**  Version  : v2.0.0-beta.240
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -3640,6 +3640,10 @@ void sendHealth()
       je.field(F("picfwtype"), state.pic.sType);
     }
     je.field(F("ntpenable"),      settings.ntp.bEnable);
+    // TASK-1915: the SIMULATION badge reads these from this poll instead of a /api/v2/simulate call after every
+    // health poll. Same values as sendSimulationStatus(); the file flag is kept by the loop task (TASK-1899).
+    je.field(F("simulation_active"), state.debug.bOTGWSimulation);
+    je.field(F("simulation_source"), LittleFSsimFilePresent ? "file" : "builtin");
     je.field(F("littlefsMounted"), LittleFSmounted);
     je.endObject();                   // close "health"
     je.endObject();                   // close root

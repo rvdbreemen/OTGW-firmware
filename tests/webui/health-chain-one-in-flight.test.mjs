@@ -1,8 +1,9 @@
 // TASK-1747: after TASK-1741 two visible tabs still got 1.9 REST 503s per minute, 26 of 38 on
 // otdirect/overrides: one health poll fired simulate and overrides at the same time, so one tab
 // filled the device's 2-request REST cap (ADR-165) on its own.
-//   1. The chain behind a health poll (overrides, then otdirect/status on OT-Direct, then
-//      simulate) keeps at most one request in flight.
+//   1. The chain behind a health poll (overrides, then otdirect/status on OT-Direct) keeps at
+//      most one request in flight. Since TASK-1915 simulate is no longer part of it: the badge
+//      reads the health answer.
 //   2. A busy 503 on the overrides list leaves the shown override badge as it is (it used to
 //      clear the list, so the '⛓ n injected' badge vanished on a busy answer).
 // Drives the REAL v2.html/v2.js in headless Chrome against a fake device. A beforeScript holds
@@ -42,9 +43,11 @@ test('the health chain keeps at most one request in flight', { skip: !CHROME && 
   } });
   try {
     // The startup health poll runs at 0.4 s; its whole chain is done well within 3 s.
-    const seen = await h.until(`(window.__chainSeen || []).length >= 3 && window.__chainOpen === 0 && window.__chainSeen.join(' ')`, 15000);
+    const seen = await h.until(`(window.__chainSeen || []).length >= 2 && window.__chainOpen === 0 && window.__chainSeen.join(' ')`, 15000);
     assert.ok(seen, 'the chain ran: ' + await h.evalJs('JSON.stringify(window.__chainSeen)'));
-    assert.match(seen, /simulate/); assert.match(seen, /otdirect\/overrides/); assert.match(seen, /otdirect\/status/);
+    assert.match(seen, /otdirect\/overrides/); assert.match(seen, /otdirect\/status/);
+    await h.sleep(1000);   // a simulate call behind the status read would have been asked by now
+    assert.doesNotMatch(await h.evalJs(`window.__chainSeen.join(' ')`), /simulate/, 'TASK-1915: no simulate in the chain');
     const max = await h.evalJs('window.__chainMax');
     assert.equal(max, 1, max + ' chain requests in flight at once (' + seen + ')');
   } finally { await h.close(); }

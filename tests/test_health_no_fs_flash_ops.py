@@ -89,6 +89,15 @@ class HealthDoesNoFlashOp(unittest.TestCase):
         self.assertNotIn("updateLittleFSStatus(", body, "sendHealth() still runs the flash write probe on async_tcp")
         self.assertIn("LittleFSmounted", body, "the health answer still reports the mount state")
 
+    def test_sendHealth_carries_the_simulation_state_from_loop_task_state(self):
+        # TASK-1915: the SIMULATION badge reads health instead of /api/v2/simulate; the same values as
+        # sendSimulationStatus(), the file flag from the loop task (TASK-1899), no LittleFS call
+        a = REST.find("\nvoid sendHealth()\n")
+        body = REST[a:REST.index("} // sendHealth()", a)]
+        self.assertRegex(body, r'je\.field\(F\("simulation_active"\),\s*state\.debug\.bOTGWSimulation\);')
+        self.assertRegex(body, r'je\.field\(F\("simulation_source"\),\s*LittleFSsimFilePresent \? "file" : "builtin"\);')
+        self.assertNotIn("LittleFS.", body)
+
     def test_loop_task_runs_the_check_outside_flashing(self):   # the flash guard sits in the caller
         body = braced(MAIN, r"^void doBackgroundTasks\(\)\s*\{")
         self.assertIsNotNone(body)

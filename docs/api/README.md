@@ -112,6 +112,8 @@ Returns the current health status of the device.
 | `mqttconnected` | string | `"true"` / `"false"` |
 | `otgwconnected` | string | `"true"` / `"false"` |
 | `picavailable` | string | `"true"` / `"false"` |
+| `simulation_active` | boolean | OT frame replay (simulation mode) is running |
+| `simulation_source` | string | `"file"` (`/otgw_simulation.log`) or `"builtin"`: what the next replay reads |
 | `littlefsMounted` | string | `"true"` / `"false"` |
 
 ---

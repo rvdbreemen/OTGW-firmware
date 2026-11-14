@@ -130,6 +130,8 @@ Returns system health metrics. No authentication required.
 | `mqttconnected` | string | MQTT broker connection status |
 | `otgwconnected` | string | PIC or OTDirect link active |
 | `picavailable` | string | PIC co-processor detected and responding |
+| `simulation_active` | boolean | Simulation mode (OT frame replay) is running |
+| `simulation_source` | string | `file` (`/otgw_simulation.log`) or `builtin`: what the next replay reads |
 | `littlefsMounted` | string | LittleFS filesystem healthy |
 
 This endpoint is safe to poll at 30-60 second intervals. Typical use: OTA update completion detection, watchdog integration, Home Assistant availability sensor.

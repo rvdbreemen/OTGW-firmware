@@ -3,9 +3,11 @@ id: TASK-1915
 title: >-
   Health API carries the simulation state; the web UI stops polling
   /api/v2/simulate every 15 s
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-11-13T23:57:00Z'
+updated_date: '2026-11-14T08:00:00Z'
 labels: []
 dependencies: []
 priority: medium
@@ -22,6 +24,18 @@ Maintainer go, Robert in #alpha-testing (message 1570947181945299066): "Yes add 
 <!-- AC:BEGIN -->
 - [ ] #1 /api/v2/health carries the simulation state (active, source), from loop-task state; sendHealth makes no LittleFS call (test_health_no_fs_flash_ops and the TASK-1899 gate stay green)
 - [ ] #2 Test on the real v2.js: the 15 s poll chain sends no /api/v2/simulate request, and the SIMULATION badge follows the health answer (shown when active, hidden when not or when the field is missing); red on the old v2.js
-- [ ] #3 C:/Program Files/Git/api/v2/simulate still answers as before for the simulation page and the one-time offer
+- [ ] #3 /api/v2/simulate still answers as before for its other callers: API clients and the bench and test scripts (scripts/sat_bench_scenarios_1412_20.py, heap_soak_driver.py, tests/run_coverage_test.py, diag_decode.py)
 - [ ] #4 Bench: in simulation mode the badge appears from the health poll and the browser network log shows no periodic /simulate request
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Correction to the description: the one-time simulation offer (v2.js maybePromptSimulation/showSimModal) switches simulation on through POST /api/v2/settings {name: simulation}, and there is no simulation page that polls /simulate. fetchSim() was the only /api/v2/simulate caller in the web UI. The endpoint stays for API clients and the bench/test scripts that read it (scripts/sat_bench_scenarios_1412_20.py, scripts/heap_soak_driver.py, scripts/tests/run_coverage_test.py, scripts/diag_decode.py). AC3 is reworded to that.
+
+Implementation: sendHealth() (restAPI.ino) emits simulation_active (state.debug.bOTGWSimulation) and simulation_source (LittleFSsimFilePresent ? file : builtin), the same values as sendSimulationStatus(), with no LittleFS call. v2.js: fetchSim() is gone. fetchConn() calls applySimBadge(h), which shows #hdrSim only when simulation_active === true (missing field = hidden). A failed or busy health poll returns before it, so the badge keeps its state (TASK-1741). The chain after health is overrides, then otdirect/status on OT-Direct. Docs: openapi.yaml, docs/api/README.md, manuals en ch09 and nl h09 list the two fields; v2.html comment updated.
+
+Tests: tests/webui/health-carries-simulation.test.mjs (new) 2/2 on the fix. On the old v2.js (OTGW_DATA_DIR = data with git show HEAD:v2.js) 2 FAIL: 'the poll chain asked /api/v2/simulate' (4 calls) and the badge did not follow health. tests/test_health_no_fs_flash_ops.py has a new source case: OK on the fix, FAIL on the old restAPI.ino. Updated for the new chain: rest-503-keeps-state (the badge now survives a 503 on /health, 3/3) and health-chain-one-in-flight (no simulate in the chain, still max 1 in flight, 2/2). Also OK: 1899 gate, flags_loop, fs_update_keep, dallas-discovery-toast, poll-spread-hidden, connection-map-text-fits; evaluate --quick 86 passed, 0 failed. Full webui folder: the sequential run was killed by the memory reaper after 20 of 76 files (96 tests passed, 0 failed in the 19 completed). The other 56 files have not run yet.
+
+Rebased onto origin/dev 6eb3aa713 (after the beta.237 release); banner-only conflicts kept upstream, bump beta.237 -> beta.238 (commit 3ad0b57b2 before amend).
+<!-- SECTION:NOTES:END -->

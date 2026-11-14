@@ -121,6 +121,8 @@ Systeemgezondheid opvragen. Geen authenticatie vereist.
 | `mqttconnected` | string | MQTT-verbinding actief |
 | `otgwconnected` | string | PIC of OTDirect actief |
 | `picavailable` | string | PIC aanwezig en reagerend |
+| `simulation_active` | boolean | Simulatiemodus (afspelen van OT-frames) staat aan |
+| `simulation_source` | string | `file` (`/otgw_simulation.log`) of `builtin`: wat de volgende afspeelronde leest |
 | `littlefsMounted` | string | LittleFS bestandssysteem gezond |
 
 ---

@@ -142,6 +142,13 @@ paths:
                       otgwconnected:
                         type: boolean
                         description: OpenTherm gateway/bus online
+                      simulation_active:
+                        type: boolean
+                        description: OT frame replay (simulation mode) is running; the web UI's SIMULATION badge follows it (TASK-1915)
+                      simulation_source:
+                        type: string
+                        enum: [file, builtin]
+                        description: What the next replay reads, /otgw_simulation.log on LittleFS or the built-in fixture (as in /api/v2/simulate)
                       littlefsMounted:
                         type: boolean
                         description: LittleFS mounted and writable

@@ -4,7 +4,8 @@
 //   1. SAT page: after good data, a 503 keeps the page and its data (no 'Couldn't load' banner).
 //   2. SAT setup wizard, source health check: a failed request shows 'Unknown' in grey, not a
 //      false 'Offline' / 'Not connected' warning.
-//   3. SIMULATION header badge: a 503 leaves it as it is (a running simulation stays flagged).
+//   3. SIMULATION header badge: a 503 leaves it as it is (a running simulation stays flagged). Since TASK-1915
+//      the badge follows simulation_active in the health answer, so the 503 that matters is on /health.
 // Drives the REAL v2.html/v2.js in headless Chrome against a fake device.
 // Point OTGW_DATA_DIR at an older copy of data/ to see it red.
 //
@@ -87,17 +88,19 @@ test('SAT wizard health check shows Unknown, not a false warning, when /health g
 test('SIMULATION badge stays while a simulation runs and a poll gets 503', { skip: !CHROME && 'no Chrome' }, async () => {
   let busy = false;
   const h = await startPage({ api: (m, p) => {
-    if (p.endsWith('/v2/simulate')) return busy ? BUSY : { simulation: { active: true } };
-    if (p.endsWith('/v2/health')) return HEALTH;
+    if (p.endsWith('/v2/health')) return busy ? BUSY : { health: { ...HEALTH.health, simulation_active: true } };
     return undefined;
   } });
   try {
     assert.ok(await h.until(`!document.getElementById('hdrSim').classList.contains('hidden')`), 'badge shows while simulating');
     busy = true;
-    const n0 = h.log.filter((l) => l.includes('/v2/simulate')).length;
-    for (let i = 0; i < 300 && h.log.filter((l) => l.includes('/v2/simulate')).length < n0 + 1; i++) await h.sleep(100);
+    const n0 = h.log.filter((l) => l.includes('/v2/health')).length;
+    // Monitor > Connection runs a health poll at once (v2.js: the mconn tab calls fetchConn()).
+    await h.evalJs(`(function(){ var s = document.querySelector('.seg[data-page="monitor"]'); if (s) s.click();
+      var c = document.querySelector('.subtab[data-tab="mconn"]'); if (c) c.click(); })()`);
+    for (let i = 0; i < 300 && h.log.filter((l) => l.includes('/v2/health')).length < n0 + 1; i++) await h.sleep(100);
     await h.sleep(500);
-    assert.ok(h.log.filter((l) => l.includes('/v2/simulate')).length >= n0 + 1, 'a simulate poll ran while busy');
+    assert.ok(h.log.filter((l) => l.includes('/v2/health')).length >= n0 + 1, 'a health poll ran while busy');
     const hidden = await h.evalJs(`document.getElementById('hdrSim').classList.contains('hidden')`);
     assert.equal(hidden, false, 'a 503 must not hide the SIMULATION badge');
     assert.deepEqual(h.exceptions, []);

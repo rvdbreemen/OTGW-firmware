@@ -2293,14 +2293,12 @@
   // SIMULATION badge. An error (404, transport failure) reads as "not simulating" and
   // hides the badge. TASK-1741: a 503 is the device's busy answer (REST in-flight cap),
   // not a state, so it leaves the badge as it is; the next poll decides.
-  function fetchSim() {
-    return fetch(APIGW + 'v2/simulate').then(function (r) { return r.status === 503 ? undefined : (r.ok ? r.json() : null); }).then(function (j) {
-      if (j === undefined) return;
-      var active = !!(j && j.simulation && j.simulation.active);
-      var el = document.getElementById('hdrSim'); if (el) el.classList.toggle('hidden', !active);
-    }).catch(function () {
-      var el = document.getElementById('hdrSim'); if (el) el.classList.add('hidden');
-    });
+  // TASK-1915: the SIMULATION header badge follows simulation_active in the /api/v2/health answer (one request
+  // less per poll than the former /api/v2/simulate call). A firmware without the field shows no badge. A failed
+  // or busy health poll does not get here, so the badge keeps its state (TASK-1741).
+  function applySimBadge(h) {
+    var el = document.getElementById('hdrSim'); if (!el) return;
+    el.classList.toggle('hidden', h.simulation_active !== true);
   }
 
   // ============================================================
@@ -3677,6 +3675,7 @@
     fetch(APIGW + 'v2/health').then(function (r) { return r.ok ? r.json() : null; }).then(function (j) {
       if (!j || !j.health) return;
       var h = j.health;
+      applySimBadge(h);
       connRssi = (typeof h.wifirssi === 'number' && h.wifirssi !== 0) ? h.wifirssi : null;
       var iface = h.otcommandinterface || '';
       var isPic = iface === 'PIC';
@@ -3743,12 +3742,11 @@
       renderConnMap(); renderConnStrip(); renderConnDetail();
       renderHdrNet();   // TASK-983: refresh Wi-Fi bars + dBm tooltip from the live RSSI
       // TASK-984: refresh the injected-override count/list (source by interface); TASK-1223.16:
-      // on OT-Direct the status read follows; TASK-983: the SIMULATION-badge poll rides this
-      // cadence last. TASK-1747: one request at a time, so one tab never fills the device's
-      // 2-request REST cap on its own.
+      // on OT-Direct the status read follows. TASK-1747: one request at a time, so one tab never
+      // fills the device's 2-request REST cap on its own. The SIMULATION badge comes from this
+      // health answer (applySimBadge, TASK-1915).
       var chain = fetchOverrides(iface);
       if (iface === 'OT-Direct') chain = chain.then(fetchOtdStatus);
-      chain.then(fetchSim);
     }).catch(function () { });
   }
   // ---------- Monitor > Connection > OT-Direct status (TASK-1223.16) ----------
