@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-14T08:21:00Z'
-updated_date: '2026-11-14T09:42:00Z'
+updated_date: '2026-11-14T09:43:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -38,4 +38,6 @@ Replay done 2026-11-14 (agent tune-replay). Evidence: C:/Users/rvdbr/AppData/Loc
 Counted hours (logged/today/opt4/opt3/opt1/1+3/1+3+4): r1 0/1/1/1/1/1/1; r2 0/0/0/0/0/0/0; b167 0/4/4/4/4/4/4; b214 0/0/0/0/0/0/0; b68 0/3/3/3/3/3/3. The 8 extra hours of today's code are gas PWM hours (ADR-231), warm-up only, votes 4 raise 4 band. Options gain 0 hours: (1) min_mod is mostly SAT sending CH=0 with the room above target; room-below-target ticks fall in hours excluded for other reasons, 0 raise votes; (3) thermo-nova solar_gain event is active in nearly every sun hour (fires on a 0.01 C/min step; disabled by default const.py:132); (4) the 5 restarts held 0 clean hours, no run reaches 24 h. Observation: one excluded tick excludes the whole hour (ADR-205 d2); hours with 78-98 % clean ticks fall on 2-20 dhw/sun/flame_off ticks. SUBSTITUTE for opt 1/3: held PID error, 60 s room sampling, valves_open=True.
 
 Not done: the graph CSV runs (9-13 Nov) and tjfs b161 (no SATTUNEH lines) were not replayed; AC2 stays open for those. Posted to Robert: #dev-sat-mqtt 1571097840329953301 (interim 1571092002416893993). Subagent could not write REPORT.md (harness blocks report files for subagents).
+
+Agent final details (report saved: scratchpad/tune-replay/REPORT.md): boiler answers MsgID 15 Unknown-DataID, so min_mod used the 5 % default; signal clamp differs per commit (sysMax 62 before entry 317, MaxTSet 48 after); r1 today-column difference explained per hour (ADR-231: hours 10/18/19); opt 1 may conflict with entry 174 (one-sided exclusion rejected for selection bias); opt 3 touches entry 160, opt 4 entry 183; tjfs b161 not checkable (0 and 5 SATTICK lines, no SATTUNE).
 <!-- SECTION:NOTES:END -->
