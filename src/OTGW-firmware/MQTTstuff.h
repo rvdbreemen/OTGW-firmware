@@ -139,7 +139,7 @@ enum class HaUnit : uint8_t {
     percent,            // "%"
     bar,                // "bar"
     hPa,                // "hPa"
-    l_min,              // "l/min"
+    l_min,              // "L/min" (the Home Assistant unit for volume_flow_rate, PR #702)
     kW,                 // "kW"
     W,                  // "W"
     kWh,                // "kWh"

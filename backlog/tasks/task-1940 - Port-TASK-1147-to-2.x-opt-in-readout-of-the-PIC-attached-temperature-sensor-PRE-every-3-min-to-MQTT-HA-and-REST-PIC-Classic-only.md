@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-14T16:07:00Z'
-updated_date: '2026-11-14T18:30:00Z'
+updated_date: '2026-11-14T21:31:00Z'
 labels:
   - pic
   - port
@@ -41,4 +41,6 @@ Port choices: setting in PICBootSection (settings.picBoot.bTempSensor) under the
 2026-11-14 18:16 (95) build 2.0.0-beta.254+f12af9f from lane-95-1848 HEAD f12af9f1d on origin/dev ef0c0884b (30d80a30c TASK-1848 beta.252, e4b8362a2 TASK-1849 beta.253, f12af9f1d TASK-1940 beta.254): exit 0, 5 min, 4 Compiling, 1 ESP32S3 image line (warm), RAM 130316 B, Flash 2149603 B; sha256 ino d2c427fbdc521cd9..., littlefs 1e43423a3acc1a6e..., zip f82a7690674d93f2.... Host tests on this HEAD: test_otd_pr_reports_pyotgw 15/15, test_otd_reply_texts_pic 4/4, test_pic_temp_sensor_port 8/8, test_otd_sc_clock 8/8. Old-vs-fix before the rebase: PR test 8 new FAIL on origin/dev OTDirect.ino; reply texts 3 FAIL on the 1848-only code; pic temp 7 FAIL on origin/dev (the setting-off case is trivially green there). evaluate --quick 86/0. Bench requested from 09 (.63 for 1940 + no regression, .61 for 1848/1849).
 
 09 bench: .63 beta.254+f12af9f (b254/): setting off 4.5 min 0x PR=E; on: PR=E queued at 18:40:38 and 18:43:38 (3 min); no reply, no topic, no discovery (.63 has no sensor: expected); settings diff only pictempsensor; web UI row present. .61 beta.255+58b387a (b255/): OT-Direct with the setting on sends 0x PR=E in 4 min; /settings-help.json carries the pictempsensor text. Not seen on hardware: a real sensor reading (no bench unit has a sensor on the PIC); the '-' reply was not visible on .63 because .63 shows no PR: replies at all (separate finding, also on beta.250). 09 note on two texts for one setting -> 205648770 beta.256 drops the inline hint, the i text stays.
+
+95 (2026-11-14 22:4x): regression found and fixed: test/host/test_dhw_water_meter.py no longer compiled since the 1940 commit (the discovery slice of queueNonOTDiscoveryIds() needs picTempSensorHasData() and OTGWpictempid: 'error C3861: picTempSensorHasData: identifier not found', 'COMPILATION FAILED (discovery FIX)'). Fix: OTGWpictempid in FAUX_IDS and a picTempSensorHasData() stub returning false in test_dhw_water_discovery.cpp. After the fix: the full run compiles, 44/45 cases pass (D2 = the #702 unit, see TASK-1949), all 118 mutant checks yes.
 <!-- SECTION:NOTES:END -->

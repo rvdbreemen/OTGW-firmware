@@ -62,6 +62,8 @@ static void webSend(int code, const __FlashStringHelper*, const __FlashStringHel
 #include "gen_disc_fw_h.inc"
 // ---- dhwWaterMeter.ino, sliced ------------------------------------------------------------
 #include "gen_meter.inc"
+// picTempSensorHasData() lives in OTGW-Core.ino (TASK-1940); no PIC sensor reading in these cases.
+static bool picTempSensorHasData() { return false; }
 // ---- MQTTstuff.ino, sliced ---------------------------------------------------------------
 #include "gen_disc_mqtt.inc"
 
@@ -173,11 +175,11 @@ static void caseD2() {
     const MqttHaSensorCfg c = readSensorCfg(i);
     rows++;
     dc = str(haDeviceClassStr(c.deviceClass)); unit = str(haUnitStr(c.unit)); sc = str(haStateClassStr(c.stateClass));
-    if (dc == "volume_flow_rate" && unit == "l/min" && sc == "measurement") same++;
+    if (dc == "volume_flow_rate" && unit == "L/min" && sc == "measurement") same++;   // HA unit for volume_flow_rate (PR #702)
   }
   std::snprintf(g_got, sizeof g_got, "MsgID 19 rows=%d, unchanged=%d (device_class=%s unit=%s state_class=%s)",
                 rows, same, dc.c_str(), unit.c_str(), sc.c_str());
-  verdict("D2", "the MsgID 19 rate sensor rows are unchanged (volume_flow_rate, l/min, measurement)",
+  verdict("D2", "the MsgID 19 rate sensor rows: volume_flow_rate, L/min (the Home Assistant unit, PR #702), measurement",
           rows == 2 && same == 2, g_got);
 }
 

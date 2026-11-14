@@ -260,7 +260,8 @@ WIRING = [
 FAUX_IDS = ["OTGWdallasdataid", "OTGWs0dataid", "OTGWheapstatsid", "OTGWpiccontrolsid", "OTGWfwinfoid",
             "OTGWpicinfoid", "OTGWpicsettingsid", "OTGWotdirectid", "OTGWdiag200id", "OTGWsatcoreid",
             "OTGWsatweatherid", "OTGWsatbinaryid", "OTGWsatzoneid", "OTGWhvacid", "OTGWdhwmeterid",
-            "OTGWcmddropid"]   # 240, TASK-1439: queued by queueNonOTDiscoveryIds()
+            "OTGWcmddropid",   # 240, TASK-1439: queued by queueNonOTDiscoveryIds()
+            "OTGWpictempid"]   # 239, TASK-1940: queued by queueNonOTDiscoveryIds() after the first PR=E reading
 
 
 def read(path, rev):
