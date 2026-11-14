@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program : FSexplorer
-**  Version  : v2.0.0-beta.243
+**  Version  : v2.0.0-beta.244
 **
 **  Mostly stolen from https://www.arduinoforum.de/User-Fips
 **  For more information visit: https://fipsok.de
@@ -568,9 +568,6 @@ bool handleFile(String&& path)
     sendFSexplorerRedirect();
     return true;
   }
-  // The upload prompt only when no recovery page exists at all: a filesystem from before
-  // the gzipped pages has the plain /FSexplorer.html and keeps serving settings.ini etc.
-  if (!LittleFS.exists("/FSexplorer.html.gz") && !LittleFS.exists("/FSexplorer.html")) { webSendP(200, PSTR("text/html; charset=UTF-8"), (PGM_P)Helper); return true; }
   // ADR-056 §1: settings.ini stores httppasswd and MQTTpasswd in cleartext, so this
   // read path sits INSIDE the protected admin boundary — it is not one of the "read
   // paths that do not expose secret values" the open carve-out covers. Every sibling
@@ -601,7 +598,13 @@ bool handleFile(String&& path)
       return serveGzipPage(gz, nullptr, F("application/json"));
     }
   }
-  if (!LittleFS.exists(path)) return false;
+  if (!LittleFS.exists(path)) {
+    // The upload prompt only for a missing path when no recovery page exists at all (a filesystem
+    // from before the gzipped pages has the plain /FSexplorer.html). TASK-1926: existing files are
+    // served first, so after a boot-time format the marker, reboot log and settings stay readable.
+    if (!LittleFS.exists("/FSexplorer.html.gz") && !LittleFS.exists("/FSexplorer.html")) { webSendP(200, PSTR("text/html; charset=UTF-8"), (PGM_P)Helper); return true; }
+    return false;
+  }
   // contentType() mutates its argument into the mime string, so snapshot the
   // file path first, then derive the mime from a throwaway copy.
   String filePath = path;

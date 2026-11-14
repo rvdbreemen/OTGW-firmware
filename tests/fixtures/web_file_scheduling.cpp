@@ -290,7 +290,8 @@ static std::unique_ptr<AsyncWebServerRequest> sendFile(const char* path = "/asse
 #define DebugTf(...) do {} while (0)
 static const char* fsHashValue = "abc1234";
 const char* getFilesystemHash() { return fsHashValue; }
-bool checkHttpAuth() { return true; }
+static bool httpAuthOk = true;   // TASK-1926: false = the request fails the admin password check
+bool checkHttpAuth() { return httpAuthOk; }
 static int strcasecmp_P(const char* a, const char* b) {
   for (; *a && *b; ++a, ++b) if (std::tolower((unsigned char)*a) != std::tolower((unsigned char)*b)) break;
   return std::tolower((unsigned char)*a) - std::tolower((unsigned char)*b);
@@ -593,10 +594,21 @@ static void handle_file_keeps_serving_on_an_older_filesystem() {
   files({"/FSexplorer.html.gz", "/settings.ini"});
   { bool handled = false; auto r = serve([&] { handled = handleFile(String("/settings.ini")); });
     EXPECT(handled); EXPECT(r->wire.path == "/settings.ini"); }
-  // No recovery page at all: the upload prompt.
-  files({"/settings.ini"});
+  // TASK-1926: no recovery page at all (a boot-time format after an interrupted filesystem
+  // update leaves only the restored files). Existing files are still served, so the marker, the
+  // reboot log and a settings backup can be read; only a missing path gets the upload prompt.
+  files({"/settings.ini", "/reboot_log.txt", "/.fs_update_incomplete"});
+  for (const char* name : {"/reboot_log.txt", "/.fs_update_incomplete", "/settings.ini"}) {
+    bool handled = false; auto r = serve([&] { handled = handleFile(String(name)); });
+    EXPECT(handled); EXPECT(r->wire.status == 200); EXPECT(r->wire.path == name);
+  }
+  // The ADR-056 guard on settings.ini still runs first: a failed password check sends nothing.
+  httpAuthOk = false;
   { bool handled = false; auto r = serve([&] { handled = handleFile(String("/settings.ini")); });
-    EXPECT(handled); EXPECT(r->wire.status == 200); EXPECT(r->wire.path.empty()); }
+    EXPECT(handled); EXPECT(r->wire.path.empty()); EXPECT(r->wire.status != 200); }
+  httpAuthOk = true;
+  { bool handled = false; auto r = serve([&] { handled = handleFile(String("/nothing.ini")); });
+    EXPECT(handled); EXPECT(r->wire.status == 200); EXPECT(r->wire.path.empty()); }  // the upload prompt
   // A missing file is still a 404 for the caller.
   files({"/FSexplorer.html"});
   { bool handled = true; auto r = serve([&] { handled = handleFile(String("/nothing.ini")); });

@@ -11,7 +11,8 @@ TASK-1640 (ADR-215): the same fixture also compiles the real gzipped-page servin
 sliced by text anchors out of FSexplorer.ino (Helper, serveGzipPage, sendFSexplorerPage,
 sendIndex, handleFile) and webServerCompat.h (webSendGzipPage). It checks the ETag
 "<githash>-<path>", 304 on a matching If-None-Match, Content-Encoding gzip exactly once, the
-plain-page fallback on a filesystem from before ADR-215 and the handleFile upload-prompt gate.
+plain-page fallback on a filesystem from before ADR-215 and the handleFile upload-prompt gate
+(TASK-1926: existing files are served without a recovery page; the prompt only for a missing path).
 --mutant <name> applies one defect to that production text and passes only when the fixture
 FAILS on it (proof the checks bite): no-plain-fallback, double-encoding-file,
 double-encoding-progmem, etag-without-path, handlefile-gz-only-gate.

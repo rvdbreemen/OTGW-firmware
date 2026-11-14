@@ -3,9 +3,11 @@ id: TASK-1926
 title: >-
   Without FSexplorer.html.gz on LittleFS every static file GET returns the
   upload prompt, so no file can be read until the filesystem is uploaded
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-11-14T08:18:00Z'
+updated_date: '2026-11-14T11:39:00Z'
 labels:
   - bug
   - webui
@@ -24,6 +26,18 @@ Seen by otgw-bench-tester 09 in TASK-1774 round 2 (.63, 2026-11-14 ~09:07, evide
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Host or bench reproduction: with FSexplorer.html.gz absent, GET /reboot_log.txt returns the upload prompt instead of the file (old)
+- [x] #1 Host or bench reproduction: with FSexplorer.html.gz absent, GET /reboot_log.txt returns the upload prompt instead of the file (old)
 - [ ] #2 Fix: existing files are served (auth guard unchanged), the prompt stays for the page routes; old red, fix green
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+Move the upload-prompt gate in handleFile() (FSexplorer.ino) from before the file lookup to the not-found branch: an existing file is served (ADR-056 settings.ini/settings.tmp auth guard unchanged and still first), and only a missing path without any recovery page (no /FSexplorer.html.gz and no /FSexplorer.html) gets the Helper prompt. Page routes keep their own Helper fallback (sendFSexplorerHtml, sendIndex). Test: tests/test_web_file_scheduling.py compiles the real handleFile(); its no-recovery-page case changes from 'prompt for settings.ini' to: /reboot_log.txt, /.fs_update_incomplete, /settings.ini served 200; settings.ini with a failed auth check not served; a missing path gets the prompt. checkHttpAuth() in the fixture becomes switchable. Red on origin/dev (--old-rev), green on the fix, all 5 mutants still killed. Bench on .63: FS without FSexplorer.html.gz (remove it via FSexplorer delete), GET /reboot_log.txt returns the file, GET of a missing path returns the prompt, then restore with a clean FS OTA. Not on otgw-1.x.x (2.x FSexplorer code).
+<!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-14 (09) host evidence. tests/test_web_file_scheduling.py with the updated no-recovery-page case: on the current code (and --old-rev origin/dev) FAIL 4: lines 603 x3 (reboot_log.txt, .fs_update_incomplete, settings.ini answered the prompt, path empty) and 608 (settings.ini with a failed password check got the 200 prompt, because the prompt ran before the ADR-056 guard). On the fix: PASS 0 failures. Mutants still killed (exit 0 each, e.g. handlefile-gz-only-gate: 'KILLED (fixture failed as it must)' at line 615): handlefile-gz-only-gate, no-plain-fallback, double-encoding-file, double-encoding-progmem, etag-without-path. Related tests OK: test_fsexplorer_relative_urls, test_health_no_fs_flash_ops, test_dallas_labels_ram_copy. evaluate.py --quick: 92 checks, 0 failed (same FAIL set as the main tree).
+<!-- SECTION:NOTES:END -->
