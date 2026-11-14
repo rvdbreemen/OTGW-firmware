@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-14T15:21:00Z'
-updated_date: '2026-11-14T17:02:00Z'
+updated_date: '2026-11-14T17:17:00Z'
 labels:
   - diagnostics
   - tooling
@@ -32,6 +32,7 @@ Robert 2026-11-14 (session): he has a domain on Cloudflare and asks for help to 
 - [x] #4 Setup guide with every manual step on Synology and in the Cloudflare dashboard
 - [x] #5 Host export tool: fetches a device's batches from PocketBase, decodes the OT stream and writes an otframes.log in the ADR-209 replay layout; a round trip (generated stream -> batches -> PocketBase -> export) gives identical frames and ms times, gaps in seq are marked
 - [x] #6 Debug stream sized: bytes per line for text, tokenized and compressed forms measured on lines built from the firmware's real format strings; the batches schema and limits fit the result; a sustained debug upload to the local PocketBase is accepted and the rate limiter refuses a burst
+- [x] #7 Decoders for all three streams: a generated recording (OT, both SATTICK formats, debug lines from call sites resolved in a real firmware.bin) goes through mix records, PocketBase and decode_all.py and comes back identical (OT frames + ms, SATTICK text, debug telnet bytes vs C snprintf), for the no-PSRAM and PSRAM profiles; a one-bit corruption makes it fail
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -46,4 +47,6 @@ Robert 2026-11-14 (session): he has a domain on Cloudflare and asks for help to 
 2026-11-14 batch size measured (batch_size_study.py, 1 h of data per variant, fresh local PocketBase, keep-alive): OT per line (50/batch request) 189 req, 1,750 KB sent, 1,634 KB db, 24.7 ms/req; OT 10 s 193 KB / 98 KB; 60 s 49 / 29 KB; 300 s 20.6 KB sent, 3.3 KB received, 16 KB db; 900 s 14.9 / 16 KB. Debug 10 s 1,977 / 1,933 KB; 30 s 1,773 / 1,868; 60 s 1,725 / 1,745; 120 s 1,696 / 1,720. Found: the create reply echoed the whole payload (received = sent); ?fields=id cuts it to about 275 B per request. Chosen: OT and SAT 300 s, debug 60 s, early flush at 48 KiB (otrec.BATCH_SECONDS, MAX_PAYLOAD_BYTES, CREATE_PATH); 84 requests/h per gateway vs 30/min limit; backlog resend paced at <=25/min. Regression after the change: test_client 1-6 PASS (batch now in the real otrec fmt 1, 786 frames decode), round trip 60 min at 300 s: 8,626 frames identical, one gap note.
 
 2026-11-14 Robert: one stream with all three on fixed intervals, also for boards without PSRAM. Built mix records (fmt 4, stream 'mix': OT/SAT/debug sections in one record per interval; otrec.pack_mix/unpack_mix; schema select gains 'mix'; export_batches.py --stream mix). Found and fixed: the OT section decoded every frame at the record t0 (codec assumes the first frame at t0); the section now starts with the offset of its first frame. mix_study.py, 1 h per profile, fresh local PocketBase: PSRAM 60 s full debug zlib: 60 rec/h, 0 early, max 22.1 KB, 1.75 MB sent, 1.78 MB db; no PSRAM 60 s 4 KB buffer debug 0.3 KB/s: 60 rec/h, 0 early, max 3.8 KB, 301 KB sent, 291 KB db; no PSRAM full debug: 480 rec/h, 420 early, max 4.1 KB, 2.49 MB sent; OT decoded identical in all three. End to end: 59 mix records posted (one left out), export --stream mix: 9,253 frames identical, one gap line. Boards without PSRAM: no TLS (ADR-218), so plain HTTP to the NAS on the LAN only.
+
+2026-11-14 decoders for all streams + proof (proof_all_streams.py). Image: CI artifact firmware.bin of research/cloud-recording 48a0eb2 (esp32-combo, digest sha256:59d8f3d8528ba433cfc55518dc0a76221dd5a83bd8fe724a55cbb93ada1f0f7c, only firmware.bin, no ELF). 791/854 BOL format strings and 801 function names found as whole C strings in DROM; both SATTICK formats found (0x3c1bee86, 0x3c1be7bc). Reference text by ref_printf.c (C snprintf per conversion). no-psram 30 min: 4,706 frames, 48 ticks, 5,554 debug lines (580,910 B) -> 51 mix records, largest 4,062 B, 128,953 B; decoded: PASS OT, PASS SATTICK, PASS debug bytes. psram 30 min: 53,857 debug lines (5,596,803 B) -> 30 records, largest 19,528 B, 568,926 B; PASS all three. Negative control: one flipped bit in a debug section -> debug identical False.
 <!-- SECTION:NOTES:END -->

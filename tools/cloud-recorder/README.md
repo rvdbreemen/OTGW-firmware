@@ -97,3 +97,31 @@ fresh local PocketBase, `?fields=id` replies:
   compressor (heatshrink, about 1 KB) was not measured.
 - Export: `export_batches.py ... --stream mix` reads the OT section. Round trip with 59 mix records (one left
   out): 9,253 frames identical, one gap line.
+
+## Decoders for all three streams, and the proof (2026-11-14)
+
+| File | What it does |
+|---|---|
+| `otrec.py` | The section formats and their encoders/decoders: OT (fmt 1 inside the mix record), SAT (`sat_encode`/`sat_decode`: per tick a field mask and fixed-point deltas, exact SATTICK text back), debug (`dbg_encode`/`dbg_decode`: address tokens, rebuilt into the telnet bytes) |
+| `esp_image.py` | Reads C strings from an ESP32 `firmware.bin` by their load address (DROM segment) |
+| `decode_all.py` | Downloads a gateway's mix records and writes `otframes.log`, `sat.log` and `debug.log`; needs the `firmware.bin` of the build that recorded |
+| `ref_printf.c` | Reference renderer: the C library's `snprintf` per conversion, as `vsnprintf_P` on the device |
+| `proof_all_streams.py` | The end-to-end proof below |
+
+The proof uses the `firmware.bin` of the CI build of this branch (esp32-combo, commit `48a0eb2`, artifact digest
+`sha256:59d8f3d8…`). 791 of the 854 debug calls with a line prefix have their format string as a whole C string
+in that image (the rest are mostly a UTF-8 artefact of the source scan); both SATTICK format strings are in it
+byte for byte. 30 minutes per profile, uploaded to a fresh local PocketBase, downloaded and decoded:
+
+| Profile | OT frames | SATTICK lines | Debug lines (text) | Mix records | Largest | Stored | Result |
+|---|---|---|---|---|---|---|---|
+| No PSRAM (4 KB buffer, ~0.3 KB/s debug, no compression) | 4,706 | 48 | 5,554 (581 KB) | 51 | 4,062 B | 129 KB | all three identical |
+| PSRAM (60 s, full debug, zlib) | 4,706 | 48 | 53,857 (5.6 MB) | 30 | 19,528 B | 569 KB | all three identical |
+
+"Identical" means: the OT frames with their ms times, every SATTICK line (both formats, with `nan` and `-0.00`
+fields, which go as text), and the debug output byte for byte against the text that C's `snprintf` renders,
+including the `_debugBOL` prefix with time, heap and function name. Negative control: one flipped bit in one
+debug section makes the debug comparison fail.
+
+Not covered: a real device. The encoders here stand in for the firmware's; the formats are what a device-side
+encoder has to write (TASK-1473, on hold). The argument values are generated, so the sizes are estimates.
