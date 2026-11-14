@@ -3,11 +3,11 @@ id: TASK-1915
 title: >-
   Health API carries the simulation state; the web UI stops polling
   /api/v2/simulate every 15 s
-status: In Progress
+status: In Review
 assignee:
   - '@claude'
 created_date: '2026-11-13T23:57:00Z'
-updated_date: '2026-11-14T08:00:00Z'
+updated_date: '2026-11-14T09:50:00Z'
 labels: []
 dependencies: []
 priority: medium
@@ -22,9 +22,9 @@ Maintainer go, Robert in #alpha-testing (message 1570947181945299066): "Yes add 
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 /api/v2/health carries the simulation state (active, source), from loop-task state; sendHealth makes no LittleFS call (test_health_no_fs_flash_ops and the TASK-1899 gate stay green)
-- [ ] #2 Test on the real v2.js: the 15 s poll chain sends no /api/v2/simulate request, and the SIMULATION badge follows the health answer (shown when active, hidden when not or when the field is missing); red on the old v2.js
-- [ ] #3 /api/v2/simulate still answers as before for its other callers: API clients and the bench and test scripts (scripts/sat_bench_scenarios_1412_20.py, heap_soak_driver.py, tests/run_coverage_test.py, diag_decode.py)
+- [x] #1 /api/v2/health carries the simulation state (active, source), from loop-task state; sendHealth makes no LittleFS call (test_health_no_fs_flash_ops and the TASK-1899 gate stay green)
+- [x] #2 Test on the real v2.js: the 15 s poll chain sends no /api/v2/simulate request, and the SIMULATION badge follows the health answer (shown when active, hidden when not or when the field is missing); red on the old v2.js
+- [x] #3 /api/v2/simulate still answers as before for its other callers: API clients and the bench and test scripts (scripts/sat_bench_scenarios_1412_20.py, heap_soak_driver.py, tests/run_coverage_test.py, diag_decode.py)
 - [ ] #4 Bench: in simulation mode the badge appears from the health poll and the browser network log shows no periodic /simulate request
 <!-- AC:END -->
 
@@ -38,4 +38,8 @@ Implementation: sendHealth() (restAPI.ino) emits simulation_active (state.debug.
 Tests: tests/webui/health-carries-simulation.test.mjs (new) 2/2 on the fix. On the old v2.js (OTGW_DATA_DIR = data with git show HEAD:v2.js) 2 FAIL: 'the poll chain asked /api/v2/simulate' (4 calls) and the badge did not follow health. tests/test_health_no_fs_flash_ops.py has a new source case: OK on the fix, FAIL on the old restAPI.ino. Updated for the new chain: rest-503-keeps-state (the badge now survives a 503 on /health, 3/3) and health-chain-one-in-flight (no simulate in the chain, still max 1 in flight, 2/2). Also OK: 1899 gate, flags_loop, fs_update_keep, dallas-discovery-toast, poll-spread-hidden, connection-map-text-fits; evaluate --quick 86 passed, 0 failed. Full webui folder: the sequential run was killed by the memory reaper after 20 of 76 files (96 tests passed, 0 failed in the 19 completed). The other 56 files have not run yet.
 
 Rebased onto origin/dev 6eb3aa713 (after the beta.237 release); banner-only conflicts kept upstream, bump beta.237 -> beta.238 (commit 3ad0b57b2 before amend).
+
+Build 2.0.0-beta.240+a3dff10 (HEAD a3dff1054 on origin/dev e0824f826): exit 0, 13 min, ESP32S3 image created x2, RAM 130236 B, Flash 2146491 B; sha256 ino.bin 0427b924..., littlefs.bin 46c46b20..., flash.zip 29c07ef0.... Gates on this commit: webui folder 76/76 files, 372 pass 0 fail; test_health_no_fs_flash_ops 5/5; evaluate --quick 86 passed 0 failed. Bench request (AC4) sent to 09 via the coordinator, unit .61.
+
+Pushed e0824f826..a3dff1054 (origin/dev), #alpha-testing post 1571099699098947614 (zip 2.0.0-beta.240+a3dff10, also covers beta.238 TASK-1774 and beta.239 TASK-1808). 09 bench on .61 PASS steps 1-6: badge on after 6.1 s from health, off after 14.2 s, 0 /api/v2/simulate out of 84 page requests in 3.2 min (150 s with sim on: 0 simulate, 10 health), health 13/13 200, settings diff none, bootcount 633->635, no crashlog; GET/POST /api/v2/simulate start/stop still 200 (AC3). Evidence: 09 scratchpad b240/ev (flash.log, sim-network.json, sim-badge-off/on/off-after.png). AC4 is ticked by 09.
 <!-- SECTION:NOTES:END -->
