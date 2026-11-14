@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program : FSexplorer
-**  Version  : v2.0.0-beta.245
+**  Version  : v2.0.0-beta.246
 **
 **  Mostly stolen from https://www.arduinoforum.de/User-Fips
 **  For more information visit: https://fipsok.de
@@ -191,7 +191,10 @@ void startWebserver(){
   //  - FS upgraded/OTA → ETag changes → server replies 200 with fresh content on the very next load (no stale window).
   // TASK-1640: the page carries its CSS, JavaScript and fonts, so there are no asset routes.
   // sendIndex() falls back to FSexplorer when v2.html.gz is missing.
-  server.on("/",           HTTP_GET, sendIndex);
+  // TASK-1936: exact match. A plain "/" is a BackwardCompatible matcher in ESPAsyncWebServer 3.11
+  // (WebServer.cpp AsyncURIMatcher::matches: path == "/" || path.startsWith("//")), so every "//<file>"
+  // request got the index page. With an exact "/" those requests reach handleFile() like any other path.
+  server.on(AsyncURIMatcher::exact("/"), HTTP_GET, sendIndex);
   server.on("/index",      HTTP_GET, sendIndex);
   server.on("/index.html", HTTP_GET, sendIndex);
   server.on("/v2.html",    HTTP_GET, sendIndex);
