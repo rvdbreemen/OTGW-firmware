@@ -1,0 +1,131 @@
+# Encoding the OT stream for minimal bytes: study
+
+Status: research for the maintainer (TASK-1862, input for TASK-1473 which is on hold), 2026-11-14.
+Nothing is implemented in the firmware. Prototype: `scripts/ot_stream_codec_study.py`.
+
+## The question
+
+Robert, 2026-11-14: the stream carries little data. How do we encode it so that the fewest bytes go
+over the line while the most information arrives, with minimal storage and the data streamed to an
+online cloud service?
+
+## Short answer
+
+- **An OpenTherm-aware model with an adaptive range coder brings every frame, with its exact ms timing,
+  to about 0.9 to 1.1 bytes**: about 200 to 240 KiB per day per gateway. That is 3.5x to 4x smaller than ADR-213
+  layout B (3.8 B per frame) and about 2x smaller than layout B with zlib. It is lossless: the prototype
+  decodes its own output back to the identical frames and times.
+- **Most of the remaining bits are timing**: about 5 of the 7 bits per frame. A time unit of 4 ms instead of
+  1 ms gives 0.68 B per frame (150 KiB per day), and 10 ms gives 0.56 B (123 KiB per day). On PIC boards the
+  device time is only good to about ±2 ms (2 ms serial task tick, then queue latency), so 1 ms already
+  carries some noise. 4 ms is the honest resolution there.
+- **On the wire, the packet overhead decides, not the payload.** At about 2.4 B/s, a 10 s batch carries 24 B
+  of data in about 80 B of WebSocket, TLS 1.3 and TCP/IP headers (77 % overhead). A 60 s batch has 37 %
+  overhead; a 300 s batch has 10 %. Batch per 60 s on one persistent connection.
+- **Storage barely matters any more.** At about 200 KiB per day:
+  - The cloud keeps exactly what the device sends, with no decoding on the server. 10 GB of R2 then
+    holds about 1,700 gateway-months.
+  - On the device, a 16 KB RAM buffer covers about 2 h of connection loss.
+  - The free LittleFS space (about 230 KiB, TASK-1862) holds about a day of every frame with timing. That
+    changes the earlier conclusion that 24 h of every frame does not fit on LittleFS.
+
+## What the model uses
+
+Each frame is: source letter (T B R A E), time since the previous frame, and the 32-bit frame (parity,
+message type, spare, DataID, 16-bit value). The model predicts each part from what came before. The range
+coder (LZMA style, 12-bit adaptive probabilities) then spends close to nothing on a correct prediction.
+
+| Part | Prediction | Why it works on OpenTherm |
+|---|---|---|
+| Source letter | From the previous letter (T is followed by B, or by R in an override) | The bus is strictly request, then reply |
+| DataID of a reply (B, A) and of a gateway frame (R) | Same ID as the request it answers | A reply always carries the request's ID |
+| DataID of a request (T) | The ID that followed this ID the last time | Thermostats poll a fixed cycle |
+| Message type | Read becomes Read-Ack, Write becomes Write-Ack; else the last type for this source and ID | Spec v4.2 message types |
+| Value of a Write-Ack | The value of the write request (echo) | The slave echoes the written value |
+| Other values | The last value for this source and ID; otherwise a signed delta coded by bit length | Temperatures in f8.8 move slowly; status flags rarely change |
+| Time | The last gap for the same letter pair (for example T to B), coded as a signed residual | The cadence and the boiler's reply delay are steady |
+| Parity, spare bits | Recomputed; a frame with bad parity or spare bits set is stored raw (32 bits) | Nothing is lost, also not a corrupt frame |
+
+The model resets at the start of each stored chunk, so every chunk decodes on its own (as in ADR-213).
+The reset costs bits while the model learns again: per 10 s chunk 3.2 B per frame, per 600 s 1.1 B,
+per 3600 s 0.95 B. So **send in small batches, but store in chunks of 10 to 60 minutes**: the model
+keeps running across batches on one connection, and the server appends the batches of one chunk to one
+R2 object.
+
+## Measurements
+
+Generated stream, 24 h, 224,518 frames (2.60 frames per second, a 34-ID poll cycle, SAT overriding
+MsgID 1 with T R B A, sensor noise on the low bits, an occasional bus gap). The generator is calibrated
+against the real 20 h tester capture of TASK-1862: layout B gives 831 KiB per day here against 848
+measured, and layout B with zlib per 4 KiB block gives 425 against 479.
+
+| Encoding (lossless: letter, frame, ms time) | B per frame | KiB per day | B/s |
+|---|---|---|---|
+| Text line (device time, letter, 8 hex) | 27.0 | 5,920 | 70.2 |
+| ADR-213 layout B, 4 KiB blocks | 3.79 | 831 | 9.85 |
+| Layout B, zlib -9 per 4 KiB block | 1.94 | 425 | 5.04 |
+| Layout B, one zlib stream, sync flush every 10 s | 1.94 | 426 | 5.05 |
+| Model + range coder, reset per 600 s | 1.10 | 241 | 2.86 |
+| Model + range coder, reset per 3600 s | 0.95 | 209 | 2.48 |
+| Model + range coder, no reset (upper bound) | 0.91 | 200 | 2.37 |
+| Same, time unit 4 ms (no reset) | 0.68 | 150 | 1.78 |
+| Same, time unit 10 ms (no reset) | 0.56 | 123 | 1.46 |
+
+Bit budget per frame (6 h, 600 s chunks): frame structure 2.7 bits, time 5.2, values 0.8.
+
+Model state on the device: 195 probability tables with 4,353 entries, about 8.7 KB as u16 for the
+34 IDs of the generated stream. A real installation with more IDs needs more; that has to be measured
+(estimate 10 to 15 KB, PSRAM). Speed is no issue at 2.6 frames per second.
+
+**The generated stream decides nothing on its own.** Timing jitter and sensor noise set the result, and
+both are guesses here. Run the script on the real capture before any decision:
+
+```bash
+python3 scripts/ot_stream_codec_study.py <capture>/otframes.log --chunks 60,600,3600
+```
+
+## Transport overhead per batch
+
+At 2.37 B/s of payload, over one persistent WebSocket over TLS 1.3 (WebSocket client frame 6 to 8 B, TLS 1.3
+record 22 B, TCP/IP 52 B; ACKs and keep-alives come on top):
+
+| Batch interval | Payload | Headers | Overhead |
+|---|---|---|---|
+| 10 s | 24 B | 80 B | 77 % |
+| 60 s | 142 B | 82 B | 37 % |
+| 300 s | 711 B | 82 B | 10 % |
+
+An HTTPS POST per batch adds about 150 to 300 B of HTTP headers per request and is worse at every interval.
+At 60 s batches a gateway sends 1,440 WebSocket messages per day: 72 request-equivalents on the Durable
+Objects free tier (20:1), so about 1,380 gateways fit in 100,000 per day.
+
+## The rest of the stream
+
+- **SAT events**: the SATTICK control tick (30 fields, 95 per hour) goes into the same coder. Each field
+  has its own context and is predicted from its previous value, as in the "delta-coded" row of TASK-1862
+  (38 KiB per day). Expect less than that; not measured.
+- **Debug text** is the large stream (up to about 3 KB/s with every module on). Text does not compress
+  well. The known technique is tokenized logging: at compile time each format string becomes a 32-bit
+  hash, the device sends the hash and the binary arguments, and the host turns them back into text from
+  a token database cut from the ELF. Candidate: Pigweed `pw_tokenizer` (Apache-2.0, 65599 hash)
+  ([source](https://pigweed.googlesource.com/pigweed/pigweed/+/6dc23f7e09c19eded0065aab3ba7f65ab1a95036/pw_tokenizer/public/pw_tokenizer/internal/)).
+  Second candidate to check: Trice (licence not verified). It fits our macros, because every
+  `DebugTf(PSTR(...))` passes through `_debugPrintf_P` (`debugStuff.ino:34-41`). A typical 60 to 100 B
+  line becomes about 6 to 12 B before the range coder.
+- **Inputs instead of outputs**: maximum information per byte comes from recording what the firmware cannot
+  compute: OT frames, external commands, sensor readings, weather, setting changes, reboots. MQTT publishes
+  and most debug lines follow from those on the same build. ADR-213 rejected "inputs only" for the local
+  recording, because a replay on an older build does not reproduce the field outputs. For the cloud stream
+  it is still the cheapest base, with outputs added per module as needed.
+
+## Open points
+
+1. Run the script on the real 20 h capture (and on a second unit). Choose the time unit (1 or 4 ms) from
+   the measured jitter.
+2. Model RAM with a real ID set; whether a fixed starting table (priors) shipped in the firmware makes
+   short chunks cheap.
+3. Port the encoder to C for the device. The decoder and the chunk-to-replay converter (ADR-209 replay
+   format) stay on the host.
+4. Licence and size check of the tokenizer candidates under the open-source rule in CLAUDE.md.
+5. Everything here assumes Robert's TASK-1473 decisions (continuous stream, Cloudflare Durable Object + R2
+   EU, outbound TLS on PSRAM boards). TASK-1473 stays on hold.

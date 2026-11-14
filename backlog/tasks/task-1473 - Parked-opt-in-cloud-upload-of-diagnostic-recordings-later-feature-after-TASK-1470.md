@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-29T12:45:00Z'
-updated_date: '2026-11-05T17:46:00Z'
+updated_date: '2026-11-14T13:05:00Z'
 labels:
   - parked
   - on-hold
@@ -101,4 +101,6 @@ Robert 2026-11-03 (interactive): keep ON HOLD; not the moment yet.
 2026-11-04 Robert (interactive): moved to milestone 2.1.0, out of the 2.0.0 scope.
 
 Robert 2026-11-05 (session otgw-firmware-54, AskUserQuestion): stays parked until 2.1.0; labels parked/on-hold stay.
+
+2026-11-14 encoding study for this feature: docs/diagnostics/ot-stream-encoding-study.md (see TASK-1862 notes). Task stays on hold.
 <!-- SECTION:NOTES:END -->

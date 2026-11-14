@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-12T06:32:00Z'
-updated_date: '2026-11-12T19:48:00Z'
+updated_date: '2026-11-14T13:05:00Z'
 labels:
   - diagnostics
   - research
@@ -53,4 +53,6 @@ Robert answered Q2 by DM (via coordinator, msgs 1570328825353609217 and 15703292
 ADR numbering (coordinator, 2026-11-12): ADR-231 is reserved for d3 (TASK-1817). Any ADR this task needs (accepting ADR-218 for streaming, amending ADR-213 decision 1) asks the coordinator for the next number first (then ADR-232).
 
 Requirements from Robert in #dev-sat-mqtt (2026-11-12, relayed by the coordinator, recorded by otgw-firmware-95): (R1) EU hosting: 'I need to look at something that lands into a European server' (message 1570518857121271941). (R2) Explicit opt-in dialog: replying to Sergeant D's 'We need their permission first' (1570519191797112963), Robert: 'Yep it would be an opt in dialog' (1570520075755323554). Consequence for the ranking: only services that store the data in an EU region stay in; candidates without an EU data location drop out. Re-rank on that basis before the next proposal; the opt-in dialog becomes part of the onboarding/settings design, off by default.
+
+2026-11-14 Robert (session): encode the stream for minimal bytes and maximal information, minimal storage, streamed to a cloud service. Study in docs/diagnostics/ot-stream-encoding-study.md, prototype scripts/ot_stream_codec_study.py (lossless encoder+decoder, round trip verified). Generated 24 h stream calibrated against the real capture (layout B 831 vs 848 KiB/day measured, layout B+zlib 425 vs 479): OT-aware model + adaptive range coder 0.95 B/frame (209 KiB/day, 3600 s chunks), 1.10 B/frame per 600 s chunk, vs layout B 3.79 and layout B+zlib 1.94. Time is about 5 of 7 bits per frame; 4 ms resolution 0.68 B/frame, 10 ms 0.56 (continuous model). Wire overhead dominates: 10 s batches 77 % headers (WS+TLS1.3+TCP/IP), 60 s 37 %, 300 s 10 %; recommendation 60 s batches on one connection, stored chunks of 10-60 min. Model state about 8.7 KB for 34 IDs. Debug text: tokenized logging candidate pw_tokenizer (Apache-2.0), Trice licence unverified. Not verified: the real capture (generated stream only), real-ID model RAM, C port.
 <!-- SECTION:NOTES:END -->
