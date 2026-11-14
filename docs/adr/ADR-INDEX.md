@@ -237,3 +237,4 @@ One row per Architecture Decision Record. Scope is the Enforcement `path_glob` s
 | ADR-230 | Accepted | - | The floating phase votes only when its data in the window is at least 1 hour: its signal ticks over the counted days... |
 | ADR-231 | Accepted | - | On a gas boiler, a tick in SAT PWM is a warm-up tick of the self-tune, and the PWM-related exclusions do not drop its... |
 | ADR-232 | Accepted | - | Carry 7befe25 as a build-time patch on the registry copy of AsyncTCP 3.4.10, applied by scripts/patchpiolibs.py: |
+| ADR-233 | Proposed | - | At the first chunk write of a filesystem OTA, the firmware copies settings.ini, rebootcount.txt and rebootlog.txt, in... |

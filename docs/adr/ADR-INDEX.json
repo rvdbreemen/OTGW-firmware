@@ -9175,6 +9175,72 @@
         "supersedes": [],
         "superseded_by": null
       }
+    },
+    {
+      "id": "ADR-233",
+      "title": "Keep settings.ini, the reboot counter and the reboot log in an RTC snapshot during a filesystem OTA",
+      "path": "ADR-233-keep-settings-ini-the-reboot-counter-and-the-reboot-log-in-an-rtc-snapshot-during-a-filesystem-ota.md",
+      "format": "canonical",
+      "status": "Proposed",
+      "date": "2026-11-14",
+      "decision_summary": "At the first chunk write of a filesystem OTA, the firmware copies settings.ini, rebootcount.txt and rebootlog.txt, in...",
+      "topics": [
+        "filesystem OTA",
+        "kept files",
+        "reset safety",
+        "RTC memory",
+        "settings persistence"
+      ],
+      "aliases": [
+        "FS OTA settings loss",
+        "kept files across a reset",
+        "RTC snapshot"
+      ],
+      "components": [
+        "boot restore from the RTC snapshot",
+        "RTC_NOINIT filesystem-OTA snapshot"
+      ],
+      "symbols": [
+        "_handleUploadWrite",
+        "_keepFiles",
+        "_restoreRuntimeFiles",
+        "RTC_NOINIT_ATTR"
+      ],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [
+          "Arm the snapshot at the first successful Update.write() of a filesystem target, not at upload start.",
+          "Clear the magic on every exit of a filesystem OTA (end, abort, write error, too large, begin failed) and immediately after a boot restore, also when that restore fails.",
+          "At boot, restore a file only when it is missing or 0 B on the mounted filesystem; never overwrite an existing file from the snapshot.",
+          "Check magic, every length against its slot, and the CRC32 over the whole payload before using any of it.",
+          "Store settings.ini whole or not at all; log on telnet when it does not fit.",
+          "Keep the snapshot outside 0x50000200-0x5000021F, checked at boot (address of the buffer >= 0x50000220, else the snapshot is disabled and that is logged)."
+        ],
+        "must_not": [
+          "Must not write the snapshot to flash (NVS, LittleFS or a partition) in this decision.",
+          "Must not keep a partial settings.ini.",
+          "Must not use RTC FAST memory: CONFIGESPSYSTEMALLOWRTCFASTMEMASHEAP=1 in the pinned libs gives it to the heap in both the main firmware and the safeboot updater.",
+          "Must not print the snapshot content (it holds secrets, see Consequences)."
+        ],
+        "exceptions": [
+          "None."
+        ],
+        "verification": [
+          "Host harness on the real handleUploadStart / handleUploadWrite / restoreRuntimeFiles blocks and the boot-restore block, with a simulated reset at chunk N: old code boots with default settings and a reset counter, the fix restores them; p...",
+          "Bench (otgw-bench-tester): the RTC survival probe through the safeboot route on .63, then a forced reset in the middle of a filesystem OTA on .63, old build versus fix, comparing /api/v2/settings and the boot count."
+        ]
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
     }
   ],
   "relationships": [
@@ -15757,6 +15823,18 @@
     {
       "source": "ADR-232",
       "target": "ADR-187",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-233",
+      "target": "ADR-056",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-233",
+      "target": "ADR-191",
       "type": "related",
       "resolved": true
     }
