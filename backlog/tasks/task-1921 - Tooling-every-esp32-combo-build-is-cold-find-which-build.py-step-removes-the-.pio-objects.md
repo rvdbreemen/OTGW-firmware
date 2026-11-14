@@ -3,11 +3,11 @@ id: TASK-1921
 title: >-
   Tooling: every esp32-combo build is cold; find which build.py step removes the
   .pio objects
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-14T04:36:00Z'
-updated_date: '2026-11-14T12:18:00Z'
+updated_date: '2026-11-14T12:33:00Z'
 labels:
   - tooling
   - build
@@ -49,3 +49,9 @@ AC3 measured 2026-11-14 on lane-95-1921 36fb13763 (no src change between the bui
 
 AC3 artifacts (art1 vs art2, same githash 36fb137): flash zip has the same 14 entries; only .ino.bin and the two merged images that contain it differ. littlefs.bin: unpacked with mklittlefs -u, the 10 files are identical; the image differs in 204 bytes in blocks 0, 1 and 30 (LittleFS metadata: the staging copy is recreated per build, so file times differ). .ino.bin (same size 2147904): 137 bytes differ in 6 runs: the ELF sha256 at 0xb0 (32 B), the build time string at 0x5656e ('07:54' vs '12:47'), three small runs of Xtensa immediates (0xf2cf4 5 B, 0xf44c0 46 B, 0x1061c7 19 B, values that move with the build time), and the image hash at the end (33 B). Not proven byte by byte that the immediates are only the stamp: a cold and a warm build cannot carry the same _VERSION_TIME. Side effect recorded: the image-created count is 2 on a cold build and 1 on a warm one; .claude/skills/beta-release-2x and release-2x updated (they said 'expect 2'). Stamps restored with git checkout after the builds.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+AC1: the step is PlatformIO's own clean_build_dir() (.build-venv/Lib/site-packages/platformio/run/helpers.py:26-45, rmtree at :41), triggered because build.py build_filesystem_pio() set PLATFORMIO_DATA_DIR for pio run -t buildfs: project checksum b16a76e1... without, a52dde20... with the override (compute_project_checksum, platformio/project/helpers.py:93). State after build 240: .pio/build/project.checksum = a52dde..., esp32-combo held only littlefs.bin. build.py:650 (build/) and clean_build :2594 (--clean only) are not the cause. AC2: changed, ADR-237 (Proposed): the buildfs step runs with PLATFORMIO_BUILD_DIR=.pio/build-fs (pio_fs_build_root), verify/collect read littlefs.bin there, --clean removes it, flash_otgw.bat falls back to it. tests/test_build.py TestFilesystemStepKeepsFirmwareObjects: 3/3 on the fix, the core test fails on origin's build.py; test_build 16/16; evaluate --quick 86/0; adr governance OK. AC3: two builds on 36fb13763 without a source change: cold 609 s / 364 Compiling / 2 image lines; warm 253 s / 1 Compiling (the sketch) / 1 image line (bootloader cached); 364 .o kept. Zip: same 14 entries; littlefs files identical (metadata/file times differ); ino.bin differs in 137 bytes (ELF sha, build-time string, time-dependent immediates, image hash). Not proven byte by byte that the immediates are only the stamp. Release skills updated for the 1-vs-2 image-line count.
+<!-- SECTION:FINAL_SUMMARY:END -->
