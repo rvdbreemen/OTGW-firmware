@@ -3,9 +3,11 @@ id: TASK-1902
 title: >-
   A replayed PIC banner must not set the persisted board mode
   (settings.iBoardMode)
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-11-13T16:23:00Z'
+updated_date: '2026-11-14T22:07:00Z'
 labels:
   - otgw
   - simulation
@@ -22,6 +24,12 @@ Found in d3's read-only analysis for TASK-1895 (workflow wf_a2aa95ff-0f6, trace 
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Host test: a replayed banner line leaves settings.iBoardMode at 0; red on the current code, green on the fix
-- [ ] #2 A real banner still sets it, and satNotifyPicRestart() still runs for a replayed banner (regression checks)
+- [x] #1 Host test: a replayed banner line leaves settings.iBoardMode at 0; red on the current code, green on the fix
+- [x] #2 A real banner still sets it, and satNotifyPicRestart() still runs for a replayed banner (regression checks)
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-14 (92, lane wt-92-webui). Fix: the PIC-recovery block after the processOT() banner branch gets && !replayed (processOT's own parameter; a banner is not a frame, so OTdata.bReplayed is not valid there); satNotifyPicRestart() untouched. test/host/test_replay_frame_guards.py slices the REAL processOT() blocks from OTGW-Core.ino (banner, PIC-recovery block after the banner, the T MsgID 16 feed) and compiles them with MSVC. --rev HEAD (5ac0a2f52, before the fix): FAIL 4 = replayed banner -> iBoardMode 1, state.pic.bAvailable 1, writeSettings 1; replayed T Write-Data 16 -> satOnThermostatSetpoint called once; every regression check PASS (real banner sets iBoardMode 1 + bAvailable + one write; satNotifyPicRestart still runs for a replayed banner on a PIC board; real T Write-Data 16 reaches SAT once with 20.50). Working tree (fix): 20/20 PASS. Evidence: comms scratchpad t1901/old.txt, new.txt.
+<!-- SECTION:NOTES:END -->
