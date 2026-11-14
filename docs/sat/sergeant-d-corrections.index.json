@@ -4492,6 +4492,19 @@
    "supersedes": [],
    "tasks": [],
    "confirmed_by_entry": null
+  },
+  {
+   "id": 338,
+   "title": "Q-337b B (maintainer answer): in continuous mode the CS follows a rising flow during a start-up period, recomputed every 5 s (2026-11-14, refines entry 337)",
+   "date": "2026-11-14",
+   "source": "unknown",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1514720723980259460/1571093486889992274",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1924"
+   ],
+   "confirmed_by_entry": null
   }
  ]
 }

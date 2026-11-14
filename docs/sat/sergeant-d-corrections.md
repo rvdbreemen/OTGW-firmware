@@ -7074,3 +7074,27 @@ Asked by DM (through the coordinator) whether the repeat is 60 s or 30 s, given 
 **Open:** (1) what "the clamp is active" means exactly in code: the clamp result is above the PID output, or flame on with a valid flow while the clamp is evaluated; to settle in the task plan, reported back if it is not clear; (2) whether the PWM ON phase computes its CS through the same clamp is checked in the task plan; if it does, the plan states how this rule applies there and asks Sergeant D when that is unclear.
 
 **Task:** as entry 334.
+
+## 338. Q-337b B (maintainer answer): in continuous mode the CS follows a rising flow during a start-up period, recomputed every 5 s (2026-11-14, refines entry 337)
+
+**Not by Sergeant D.** Robert answered the question we had put to Sergeant D; Sergeant D was invited to say if he sees it differently.
+
+**Source:** Q-337b, #alpha-testing 2026-11-14: https://discord.com/channels/812969634638725140/1514720723980259460/1571093486889992274 (drafted by d3 for TASK-1924, second reader the coordinator; option B rewritten by us right after posting because the first wording was a no-op). Robert's answer, 09:28:21 UTC, a reply to that question: https://discord.com/channels/812969634638725140/1514720723980259460/1571094429660356639 . His follow-up, 09:30:09 UTC: https://discord.com/channels/812969634638725140/1514720723980259460/1571094882284732517 . Our acknowledgement: https://discord.com/channels/812969634638725140/1514720723980259460/1571096114805874740
+
+**Quoted:**
+
+> "B"
+
+> "My thinking is to improve on the boost but only in the same method of thermo nova. So we diverge a little to improve on it."
+
+**Option B as posted (after the edit):** "Also follow a rising flow in continuous mode at start-up: once the flow is above the request, CS = max(request, flow - offset) every 5 s, without the hold on the previous CS, for a start-up period after flame-on. Not in thermo-nova. It needs a new rule for how long the start-up lasts, and it lifts the CS above the request while the flow climbs."
+
+**Settled (refines entry 337):** in continuous mode, during a start-up period after flame-on, SAT recomputes CS = max(request, flow - offset) every 5 s without the previous-CS hold of entry 112, so the CS follows a rising flow; it is sent on change (entry 334). Outside the start-up period the entry-112 clamp with its hold applies, recomputed every 5 s while the flame is on (entry 337). Robert's follow-up frames this as a deliberate, small divergence from thermo-nova that builds on thermo-nova's own method.
+
+**Checked against thermo-nova and the firmware:** thermo-nova `heating_control.py:466-467` (flow at or below the request: CS = request) and `:485-489` (clamp: a rising request follows max(request, flow - offset), otherwise max(request, min(flow - offset, previous CS)), so with a constant request the CS never follows a rising flow); the start-up following in thermo-nova is the PWM path (flame-off hold `:392-408`, suppression CS = flow - offset `:440-448`). Firmware: the same clamp at `SATcontrol.ino:2486-2496`, on the control tick only. Option B is not in thermo-nova.
+
+**Interpretation (ours):** "improve on the boost ... in the same method of thermo nova" read as: reuse thermo-nova's flow - offset form and its timers for the start-up period, not a new controller.
+
+**Open:** (1) the length or end condition of the start-up period (d3 proposes a rule in the TASK-1924 plan, built from thermo-nova's own timers; it goes to Sergeant D before it is built); (2) Sergeant D may still object; (3) which offset applies (`flow_setpoint_offset_celsius` of the clamp or the suppression offset), to settle in the plan.
+
+**Task:** TASK-1924.
