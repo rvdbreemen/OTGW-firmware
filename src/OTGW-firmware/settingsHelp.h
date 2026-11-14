@@ -44,6 +44,7 @@ static const char SETTINGS_HELP_JSON[] PROGMEM = R"json({
 "ntpsendtime":"While NTP is synced and gateway mode is on, send the clock to the gateway every minute (SC=, SR= on a day change).",
 "otgwcommandenable":"Send the boot commands below to the gateway at startup.",
 "otgwcommands":"PIC commands sent at boot, separated by semicolons, for example PS=0;GW=1. Up to 128 characters.",
+"pictempsensor":"PIC Classic only. Read the temperature sensor wired to the PIC every 3 minutes and publish it to MQTT and Home Assistant. Leave off without a sensor.",
 "gpiosensorsenabled":"Read DS18B20 sensors on the 1-Wire pin and publish them. Up to 16.",
 "gpiosensorspin":"GPIO number of the DS18B20 data line, not the hole: D8 is GPIO 10 on the S3 Mini (D6 and D7 are the S0 and output defaults on a Classic).",
 "gpiosensorsinterval":"Seconds between sensor reads and MQTT updates. Default 20.",
