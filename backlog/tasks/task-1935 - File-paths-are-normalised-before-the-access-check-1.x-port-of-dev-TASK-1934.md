@@ -1,9 +1,11 @@
 ---
 id: TASK-1935
 title: File paths are normalised before the access check (1.x port of dev TASK-1934)
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-11-14T13:16:00Z'
+updated_date: '2026-11-14T13:23:00Z'
 labels:
   - 1.x
   - security
@@ -26,3 +28,9 @@ ordinal: 263000
 - [ ] #2 Other path-taking routes on 1.x checked; findings filed
 - [ ] #3 Bench by otgw-firmware-09 on .35 (1.x, password set): the probe set from the pre-fix run returns 0 protected bodies without credentials; web UI and authorised reads unchanged; without a password unchanged
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Fix (commit 00499860e): fsCanonicalPath() before handleFile()'s access check, the same function as the 2.x change; the access check and the open use one normalised path; a directory request keeps its index.html. Host harness test/host/test_fileAccessPath.py (real handleFile() + the real littlefs of core 2.7.4 on a RAM block device, the decoded form of 09's pre-fix request set on .35): OLD (d0a5d290e) reproduces every case 09 saw on the device and passes the 8 controls; FIX 0 of 11, controls ok; RESULT PASS. Other path-taking routes (AC2): FSexplorer delete and the delete branch of handleFile() call checkHttpAuth() first, upload is gated by uploadAuthorized, the remaining LittleFS opens use fixed paths: nothing else to change. evaluate.py --quick 38/0. test/run_tests.bat: stops at test_mqttBeginPublishDesync (PubSubClient source not in the repo; build.py installs it), unrelated to this change. Details of the probe set are kept locally until both lines have shipped.
+<!-- SECTION:NOTES:END -->
