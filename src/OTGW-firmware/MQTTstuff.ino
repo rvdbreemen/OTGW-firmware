@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : MQTTstuff
-**  Version  : v2.0.0-beta.259
+**  Version  : v2.0.0-beta.260
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **      Modified version from (c) 2020 Willem Aandewiel
@@ -219,6 +219,7 @@ uint16_t mqttQueueNow() { const size_t n = MQTTclient.queueSize(); return n > 0x
 // onConnect/onDisconnect handlers (defined below) need a forward declaration so
 // they can be wired with onConnect()/onDisconnect() in startMQTT().
 static void onMqttConnect(bool sessionPresent);
+static void mqttRetryPendingSubscribes();   // TASK-1778: defined next to onMqttConnect()
 static void onMqttDisconnect(espMqttClientTypes::DisconnectReason reason);
 static void onMqttMessage(const espMqttClientTypes::MessageProperties& properties,
                           const char* topic, const uint8_t* payload,
@@ -1605,6 +1606,7 @@ void handleMQTT()
       { // engine already pumped by the unconditional loop() at top of handleMQTT()
         state.mqtt.iLastConnectedMs = millis();  // stamp each confirmed-live tick for offline-duration tracking
         connStageTick();  // TASK-1757: rest of the connect burst, in portions
+        mqttRetryPendingSubscribes();  // TASK-1778: a SUBSCRIBE refused at connect
         // ADR-118: periodically refresh the retained gateway-override topics so HA / dashboards
         // reflect active overrides even when no new override frame arrived this minute.
         if (DUE(timerMQTToverridepublish)) publishActiveOverrides();
@@ -1810,6 +1812,36 @@ bool mqttConnectPaceHold() {
 }
 // --- end connStage -----------------------------------------------------------
 
+// TASK-1778 begin: a SUBSCRIBE that espMqttClient refuses at connect is retried. The library refuses every
+// packet while its largest free block (max of heap and PSRAM) is below EMC_MIN_FREE_MEMORY = 16384 B
+// (espMqttClient Helpers.h, Packets/Packet.cpp), which a board without PSRAM reaches in the connect burst.
+// With a clean session a refused command SUBSCRIBE left every MQTT command dead until the next reconnect.
+static bool     mqttSubCmdPending   = false;   // <namespace>/# not subscribed yet
+static bool     mqttSubHaPending    = false;   // homeassistant/status not subscribed yet
+static uint32_t mqttSubRetryLastMs  = 0;
+
+static bool mqttSubscribeCommandTopic() {
+  char topic[MQTT_TOPIC_MAX_LEN];
+  strlcpy(topic, MQTTSubNamespace, sizeof(topic));
+  strlcat(topic, "/#", sizeof(topic));
+  MQTTDebugTf(PSTR("Subscribe to MQTT: TopicId [%s]\r\n"), topic);
+  const bool ok = MQTTclient.subscribe(topic, 0) != 0;   // packetId 0 == refused / not queued
+  if (ok) MQTTDebugTf(PSTR("MQTT: Subscribed successfully to TopicId [%s]\r\n"), topic);
+  else    MQTTDebugTf(PSTR("MQTT: Subscribe TopicId [%s] FAILED, retried while connected\r\n"), topic);
+  return ok;
+}
+
+// Connected-state loop: at most one attempt per second until both topics are subscribed. A refused attempt
+// costs nothing (the library refuses before it allocates). Cleared on success; set again on every connect.
+static void mqttRetryPendingSubscribes() {
+  if (!mqttSubCmdPending && !mqttSubHaPending) return;
+  if ((uint32_t)(millis() - mqttSubRetryLastMs) < 1000UL) return;
+  mqttSubRetryLastMs = millis();
+  if (mqttSubCmdPending && mqttSubscribeCommandTopic()) mqttSubCmdPending = false;
+  if (mqttSubHaPending && MQTTclient.subscribe("homeassistant/status", 0) != 0) mqttSubHaPending = false;
+}
+// TASK-1778 end
+
 static void onMqttConnect(bool sessionPresent) {
   (void)sessionPresent;
   if (sBootHeapState == BOOTHEAP_RUN) {
@@ -1853,18 +1885,11 @@ static void onMqttConnect(bool sessionPresent) {
   }
   DebugTf(PSTR("[HEAP] post-republish: free=%u max_block=%u\r\n"), platformFreeHeap(), platformMaxFreeBlock());
 
-  //Subscribe to topics
-  char topic[MQTT_TOPIC_MAX_LEN];
-  strlcpy(topic, MQTTSubNamespace, sizeof(topic));
-  strlcat(topic, "/#", sizeof(topic));
-  MQTTDebugTf(PSTR("Subscribe to MQTT: TopicId [%s]\r\n"), topic);
-  if (MQTTclient.subscribe(topic, 0)) {
-    MQTTDebugTf(PSTR("MQTT: Subscribed successfully to TopicId [%s]\r\n"), topic);
-  } else {
-    MQTTDebugTf(PSTR("MQTT: Subscribe TopicId [%s] FAILED! \r\n"), topic);
-    PrintMQTTError();
-  }
-  MQTTclient.subscribe("homeassistant/status", 0);
+  //Subscribe to topics (TASK-1778: a refused one is retried from the connected state)
+  mqttSubRetryLastMs = millis();
+  mqttSubCmdPending = !mqttSubscribeCommandTopic();
+  if (mqttSubCmdPending) PrintMQTTError();
+  mqttSubHaPending = (MQTTclient.subscribe("homeassistant/status", 0) == 0);
   DebugTf(PSTR("[HEAP] post-subscribe: free=%u max_block=%u\r\n"), platformFreeHeap(), platformMaxFreeBlock());
   connProbe(CPROBE_CONN_SUBS);   // TASK-1757 AC3
   connTraceSample();  // TASK-1757
