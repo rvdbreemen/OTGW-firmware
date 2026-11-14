@@ -265,12 +265,11 @@ html[data-theme="dark"]{--accent:var(--brand-cyan);--nav:#383838;--tile-off:#545
     background-size:100% 64px;background-position:bottom;transition:height .6s}
 
   /* ================= DESIGN C — mission control ================= */
-  .mc{--bg:#0d1117;--panel:#161b22;--panel-2:#1c2129;--border:#2d333b;--text:#e6edf3;
-      --muted:#8b949e;--gauge-track:#2d333b;
-      background:var(--bg);border-radius:var(--radius-2xl);padding:14px;color:var(--text)}
+  /* TASK-1863 (Robert, A): Mission control follows the theme; it no longer carries its own dark palette */
+  .mc{background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-2xl);padding:14px;color:var(--text)}
   .mc h2{font-family:var(--font-mono);font-size:.95rem;margin:2px 4px 12px;color:var(--muted);
     letter-spacing:.08em}
-  .mc h2 b{color:#79f2c0}
+  .mc h2 b{color:var(--zone-ok)}
   .stripcard{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius-2xl);padding:8px}
   .stripcard svg{width:100%;height:auto;display:block}
   .axis-txt{fill:var(--muted);font-size:10px;font-family:var(--font-mono)}
@@ -283,10 +282,10 @@ html[data-theme="dark"]{--accent:var(--brand-cyan);--nav:#383838;--tile-off:#545
   .mc-cell .lbl{font-family:var(--font-mono);font-size:.64rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
   .mc-cell .val{font-family:var(--font-mono);font-size:1.3rem;font-weight:700;margin-top:2px}
   .mc-cell .val.hot{color:var(--hot)} .mc-cell .val.cold{color:var(--cold)}
-  .mc-cell .val.ok{color:#79f2c0} .mc-cell .val.warn{color:var(--zone-warn)} .mc-cell .val.alert{color:var(--zone-alert)}
-  .ticker{background:#0a0e14;border:1px solid var(--border);border-radius:10px;margin-top:12px;
+  .mc-cell .val.ok{color:var(--zone-ok)} .mc-cell .val.warn{color:var(--zone-warn)} .mc-cell .val.alert{color:var(--zone-alert)}
+  .ticker{background:var(--panel);border:1px solid var(--border);border-radius:10px;margin-top:12px;
     height:138px;overflow-y:auto;padding:8px 10px;font-family:var(--font-mono);font-size:.72rem;line-height:1.5}
-  .ticker .t{color:#00bffe} .ticker .b{color:#79f2c0} .ticker .ts{color:#566069}
+  .ticker .t{color:var(--accent)} .ticker .b{color:var(--zone-ok)} .ticker .ts{color:var(--muted)}
   @media(max-width:719px){
     .hero svg{width:200px;height:200px}
   }
