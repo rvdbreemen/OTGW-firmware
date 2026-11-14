@@ -84,7 +84,10 @@ int main(int argc, char **argv) {
     add(LAST_ACK, nullptr, &g_fin);
     add(FIN_WAIT_1, nullptr, &g_fin);
   }
-  printf("%s|%u\n", c.c_str(), (unsigned)platformTcpTxHoldingOnPort(80, idle, nidle));
+  PlatformTcpTxBreakdown w;
+  platformTcpTxBreakdownOnPort(80, idle, nidle, &w);
+  printf("%s|%u|%u,%u,%u,%u|%u\n", c.c_str(), (unsigned)platformTcpTxHoldingOnPort(80, idle, nidle),
+         w.estIdle, w.estData, w.closingData, w.closingFin, (unsigned)w.payloadBytes);
   return 0;
 }
 """
@@ -99,7 +102,7 @@ class WebConnCapStates(unittest.TestCase):
     def setUpClass(cls):
         src = SHIM.read_text(encoding="utf-8").replace("\r\n", "\n")
         a = src.find("struct PlatformTcpIdleConnection {")
-        b = src.find("\n}\n", src.find("inline uint16_t platformTcpTxHoldingOnPort(", a))
+        b = src.find("\n}\n", src.find("inline void platformTcpTxBreakdownOnPort(", a))
         if a < 0 or b < 0:
             raise AssertionError("platformTcpTxHoldingOnPort() not found in platform_esp32.h")
         cls.tmp = tempfile.TemporaryDirectory()
@@ -108,11 +111,13 @@ class WebConnCapStates(unittest.TestCase):
         exe = compile_cpp(cpp, Path(cls.tmp.name) / "t.exe")
         if exe is None:
             raise unittest.SkipTest("no host C++ compiler")
-        cls.n = {}
+        cls.n, cls.why, cls.bytes = {}, {}, {}
         for case in CASES:
             out = subprocess.run([str(exe), case], capture_output=True, text=True, check=True).stdout.strip()
-            name, held = out.split("|")
+            name, held, why, payload = out.split("|")
             cls.n[name] = int(held)
+            cls.why[name] = tuple(int(x) for x in why.split(","))
+            cls.bytes[name] = int(payload)
             print(out)
 
     @classmethod
@@ -136,6 +141,30 @@ class WebConnCapStates(unittest.TestCase):
         held = self.n["fresh_load"]
         self.assertEqual(held, 6, "matches 09's 'WEB CONN CAP: 6 connections hold TX'")
         self.assertGreater(held, WEB_MAX_TX_CONNECTIONS)
+
+
+    def test_breakdown_adds_up_to_the_count_in_every_case(self):
+        for case in CASES:
+            self.assertEqual(sum(self.why[case]), self.n[case], case)
+
+    def test_breakdown_names_the_reason(self):
+        # (est-idle, est-data, closing-data, closing-fin)
+        self.assertEqual(self.why["est_idle"], (1, 0, 0, 0))
+        self.assertEqual(self.why["est_data"], (0, 1, 0, 0))
+        self.assertEqual(self.why["fin_wait_1_data"], (0, 0, 1, 0))
+        self.assertEqual(self.why["last_ack_fin"], (0, 0, 0, 1))
+        self.assertEqual(self.why["fresh_load"], (3, 1, 0, 2))
+        self.assertEqual(self.bytes["fresh_load"], 2 * 1436)
+
+
+    def test_refusal_line_is_wired_to_the_breakdown(self):
+        rest = (REPO / "src/OTGW-firmware/restAPI.ino").read_text(encoding="utf-8")
+        compat = (REPO / "src/OTGW-firmware/webServerCompat.h").read_text(encoding="utf-8")
+        a = rest.find("static bool webConnCapExceeded(")
+        body = rest[a:rest.find("\n}\n", a)].replace("\r\n", "\n")
+        self.assertIn("WebQueuedFileResponse::txBreakdown(&why);", body)
+        self.assertIn("closing-fin %u", body)
+        self.assertIn("platformTcpTxBreakdownOnPort(WEB_HTTP_PORT, idle, count, out);", compat)
 
 
 if __name__ == "__main__":

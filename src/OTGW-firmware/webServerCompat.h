@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : webServerCompat.h
-**  Version  : v2.0.0-beta.260
+**  Version  : v2.0.0-beta.261
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -546,6 +546,17 @@ public:
       idle[count++] = {request->client()->pcb(), request->client()};
     }
     return platformTcpTxHoldingOnPort(WEB_HTTP_PORT, idle, count);
+  }
+  // TASK-1947: why each counted connection counts, for the refusal line.
+  static void txBreakdown(PlatformTcpTxBreakdown* out) {
+    PlatformTcpIdleConnection idle[4];
+    uint8_t count = 0;
+    for (uint8_t i = 0; i < queue().count; ++i) {
+      AsyncWebServerRequest* request = queue().entries[i]->_request;
+      if (!request || !request->client()) continue;
+      idle[count++] = {request->client()->pcb(), request->client()};
+    }
+    platformTcpTxBreakdownOnPort(WEB_HTTP_PORT, idle, count, out);
   }
   static void pump() {
     Queue& pending = queue();

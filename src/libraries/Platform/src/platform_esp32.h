@@ -518,6 +518,42 @@ inline uint16_t platformTcpTxHoldingOnPort(uint16_t localPort,
   return count;
 }
 
+// TASK-1947: the same count as platformTcpTxHoldingOnPort(), split by why each connection counts,
+// for the WEB CONN CAP refusal line only. estIdle: ESTABLISHED, empty queues, not a waiter.
+// estData: ESTABLISHED with queued segments. closingData: another state with a payload segment.
+// closingFin: another state whose queued segments are all zero length (only the FIN).
+// payloadBytes: payload queued in unsent + unacked over all counted connections.
+struct PlatformTcpTxBreakdown {
+  uint16_t estIdle, estData, closingData, closingFin;
+  uint32_t payloadBytes;
+};
+inline void platformTcpTxBreakdownOnPort(uint16_t localPort,
+                                        const PlatformTcpIdleConnection* idle,
+                                        uint8_t idleCount, PlatformTcpTxBreakdown* out) {
+  *out = PlatformTcpTxBreakdown{0, 0, 0, 0, 0};
+  LOCK_TCPIP_CORE();
+  for (struct tcp_pcb *pcb = tcp_active_pcbs; pcb != nullptr; pcb = pcb->next) {
+    if (pcb->local_port != localPort) continue;
+    if (pcb->unsent != nullptr || pcb->unacked != nullptr) {
+      uint32_t bytes = 0;
+      for (struct tcp_seg *seg = pcb->unsent; seg != nullptr; seg = seg->next) bytes += seg->len;
+      for (struct tcp_seg *seg = pcb->unacked; seg != nullptr; seg = seg->next) bytes += seg->len;
+      out->payloadBytes += bytes;
+      if (pcb->state == ESTABLISHED) out->estData++;
+      else if (bytes != 0) out->closingData++;
+      else out->closingFin++;
+      continue;
+    }
+    if (pcb->state != ESTABLISHED) continue;
+    bool waiting = false;
+    for (uint8_t i = 0; i < idleCount; ++i) {
+      if (pcb == idle[i].pcb && pcb->callback_arg == idle[i].owner) { waiting = true; break; }
+    }
+    if (!waiting) out->estIdle++;
+  }
+  UNLOCK_TCPIP_CORE();
+}
+
 // TASK-1605: resolve a hostname to an IPv4 address without Network/WiFi.hostByName().
 // arduino-esp32 3.3.5 NetworkManager::hostByName() (NetworkManager.cpp:78-82) calls
 // dns_clear_cache() without the lwIP core lock whenever its static "have IPv4/IPv6" flags
