@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTDirect.ino
-**  Version  : v2.0.0-beta.275
+**  Version  : v2.0.0-beta.276
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -3773,6 +3773,11 @@ bool handleOTDirectCommand(const char* buf, int len, bool satOwn) {
     // TASK-438: PIC parity. gateway.asm: GW=0 = monitor, GW=1 = gateway,
     // GW=R = reset. Bypass moved to GW=P (OTDirect-only alias) so PIC
     // tooling sending GW=0 cannot accidentally engage bypass relay.
+    // TASK-1946: one character only (else "GW: SE"), and a value outside 0, 1, R and the OT-Direct extensions
+    // M, 2/S, P, L answers "GW: BV" and changes nothing, as the PIC: SerialCommand prints "GW: " first
+    // (gateway.asm 6.6 :3695-3703), SetGatewayMode checks the length (:4687-4690, SyntaxError), CheckBoolean
+    // accepts 0 and 1 (:4041-4051) and ResetGateway answers BadValue to anything but R (:4734-4738).
+    if (value[0] == '\0' || value[1] != '\0') { synthesizeResponse(buf, "SE"); return false; }
     if (value[0] == '0' || value[0] == 'M') {
       // GW=0 / GW=M — Monitor mode: transparent pass-through.
       setOTDirectMode(OTD_MODE_MONITOR);
@@ -3814,6 +3819,9 @@ bool handleOTDirectCommand(const char* buf, int len, bool satOwn) {
       otMaster.begin(masterISR);
       otSlave.begin(slaveISR, handleSlaveRequest);
       OTDDebugTln(F("OTD: OT interfaces restarted"));
+    } else {
+      synthesizeResponse(buf, "BV");
+      return false;
     }
     rspBuf[0] = value[0]; rspBuf[1] = '\0';
     synthesizeResponse(buf, rspBuf);
