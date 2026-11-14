@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-14T09:22:00Z'
+updated_date: '2026-11-14T18:45:00Z'
 labels:
   - reliability
   - ota
@@ -26,4 +27,11 @@ Follow-up from TASK-1904 / ADR-233 (coordinator, 2026-11-14). fsOtaRtcFill() (OT
 - [ ] #1 An amending/superseding ADR for ADR-233 (log: newest whole lines that fit) is accepted
 - [ ] #2 Host case: a log larger than the free budget restores its newest whole lines (cut at a CRLF, never a partial line) together with settings.ini and the counter; old (skip whole) red, fix green
 - [ ] #3 Bench on a unit with a near-full budget: after a reset during a filesystem OTA the newest reboot-log lines are back
+- [ ] #4 The filesystem-OTA keep list keeps a full reboot log: the reboot_log.txt cap in KEEP_LIST (OTGW-ModUpdateServer-esp32.h) and KEEP_TOTAL_MAX follow the real worst case (LOG_LINES x line length), with a check that fails when they drift apart; heap trade-off recorded
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Second budget for the reboot log (found 2026-11-14 while documenting TASK-1524, coordinator: add here, not a new task). The filesystem-OTA keep path (heap copies, src/OTGW-firmware/OTGW-ModUpdateServer-esp32.h KEEP_LIST, about line 824; firmware code, not a library under src/libraries) caps reboot_log.txt at 3072 B, commented '20 lines of at most 140 B'. Since TASK-1904 a boot line is up to 160 B (LOG_LINE_LENGTH), so 20 full boot lines are 3200 B and the log is skipped on a filesystem update (logged as over its cap); core-dump lines of up to 240 B (REBOOT_LOG_LINE_MAX) could already exceed 3072 before TASK-1904. Typical logs stay under (09 measured at most about 100 B per line, about 2 KB). KEEP_TOTAL_MAX is 10240 and the sum of the per-file maxima is already 9824, so raising the reboot-log cap by 1024 B (to 4096) needs KEEP_TOTAL_MAX raised too: a heap trade-off (KEEP_HEAP_RESERVE 8192 above each copy still applies). The RTC path (ADR-233) covers a reset during the write separately. Root issue for both: '20 x 140' is baked into constants; a single source (LOG_LINES x REBOOT_LOG_LINE_MAX) would prevent the drift.
+<!-- SECTION:NOTES:END -->
