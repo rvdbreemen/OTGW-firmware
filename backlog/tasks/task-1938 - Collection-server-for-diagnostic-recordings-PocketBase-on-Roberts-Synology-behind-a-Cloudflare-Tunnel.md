@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-14T15:21:00Z'
-updated_date: '2026-11-14T15:46:00Z'
+updated_date: '2026-11-14T16:26:00Z'
 labels:
   - diagnostics
   - tooling
@@ -30,6 +30,8 @@ Robert 2026-11-14 (session): he has a domain on Cloudflare and asks for help to 
 - [ ] #2 Host test client: a device authenticates, posts a batch, a resend of the same seq is refused, a read of batches and the admin path through the tunnel are refused (run on Robert's Synology, transcript in the notes)
 - [ ] #3 Retention: records older than the configured days are deleted by the cron (evidence from the Synology run)
 - [x] #4 Setup guide with every manual step on Synology and in the Cloudflare dashboard
+- [x] #5 Host export tool: fetches a device's batches from PocketBase, decodes the OT stream and writes an otframes.log in the ADR-209 replay layout; a round trip (generated stream -> batches -> PocketBase -> export) gives identical frames and ms times, gaps in seq are marked
+- [x] #6 Debug stream sized: bytes per line for text, tokenized and compressed forms measured on lines built from the firmware's real format strings; the batches schema and limits fit the result; a sustained debug upload to the local PocketBase is accepted and the rate limiter refuses a burst
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -38,4 +40,6 @@ Robert 2026-11-14 (session): he has a domain on Cloudflare and asks for help to 
 2026-11-14 written: tools/cloud-recorder/pocketbase/ (Dockerfile with checksum check, compose.yaml, migration, retention hook, test_client.py, README guide). Reviewed against pocketbase.io docs (js-migrations, js-database, RateLimitRule, TrustedProxyConfig, api-rules: locked rule = 403, failed createRule = 400). Not in the docs as a worked example: authRule, authToken, @request.auth.collectionName. Rate-limit label changed to the documented tag form batches:create. Self-review found and fixed: RETENTION_DAYS=0 fell back to 30 (parseInt || 30). node --check passes on both JS files; test_client sample payload = 916 B codec chunk (786 frames, 300 s). Could not run PocketBase here (binary download refused in this container). AC 2 and 3 need Robert's Synology run.
 
 2026-11-14 local Docker test (Robert approved): image built from the shipped Dockerfile plus only the sandbox proxy CA (test context in scratchpad); release checksum OK (pocketbase_0.40.6_linux_amd64.zip: OK). Migration applied, no errors; read back: devices auth (authRule 'enabled = true', all CRUD rules locked, authToken 1209600), batches (createRule as written, other rules locked, fields device/stream/seq/t0/fmt/payload/created, unique index device+stream+seq, index on created), trustedProxy CF-Connecting-IP, rate limits batches:create 30/60s, auth-with-password 5/60s, /api/ 120/60s. test_client.py vs http://127.0.0.1:8090: 1 login 200, 2 post 200 (916 B codec chunk, 786 frames), 3 resend 400, 4 other device 400, 5 list 403, 6 wrong password 400 = PASS; 7 admin UI 200 locally = expected FAIL without the tunnel path rule. Extra: disabled device login 403, post without token 400. Retention via POST /api/crons/otgwBatchRetention: RETENTION_DAYS=30 deleted 1 batch backdated to 2026-10-05, kept today's (cutoff 2026-10-15 15:46:08Z); RETENTION_DAYS=0 deleted the rest (0 left). Fixed during the test: test_client crashed on a non-JSON 200 (admin HTML); README typo pbinstal -> pbinstall; README retention test now uses the cron API. AC 2 and 3 stay open by their wording (Synology run, incl. the tunnel).
+
+2026-11-14 export tool and debug sizing (branch research/cloud-recording). Round trip: simulate_gateway.py 30 min, 300 s batches, batch 3 skipped -> 5 batches, 3,920 frames, 4,683 B (1.19 B/frame); export_batches.py -> 3,920 frames identical in ms time, letter and frame, one '# gap: batches 3..3 missing' line. Real replay code (tests/test_replay_timing.py harness from OTGW-Core.ino) on the first 400 exported lines: 400/400 dispatched as bare frames, mode=timed, 0 ms deviation. Debug sizing (dbg_size_study.py, 985 real format strings, generated values): at ~3 KB/s text 104 B/line, text+zlib 36, address token 16, token+zlib 12 (0.9 GB per gateway-month); largest 60 s token+zlib batch 21.7 KB -> payload max raised 16384 -> 65536 chars. Fresh-database run: test_client 1-6 PASS (7 needs the tunnel); 25 paced 13.3 KB dbg batches 200; burst of 40 -> 30x200, 10x429; 65,600 chars 400, 65,536 chars 200.
 <!-- SECTION:NOTES:END -->

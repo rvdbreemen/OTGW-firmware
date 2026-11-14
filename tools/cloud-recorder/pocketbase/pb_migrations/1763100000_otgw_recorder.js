@@ -36,7 +36,9 @@ migrate((app) => {
       { name: "seq", type: "number", onlyInt: true, min: 0 },            // per device and stream, counts up
       { name: "t0", type: "number", onlyInt: true, required: true },     // epoch ms of the first record
       { name: "fmt", type: "number", onlyInt: true, min: 1, max: 255, required: true },
-      { name: "payload", type: "text", max: 16384, required: true },     // base64 of the encoded chunk
+      // base64 of the encoded chunk; 65536 chars = 48 KiB binary, room for 60 s of full debug output
+      // in the token+zlib form (largest measured batch 21.7 KB, dbg_size_study.py)
+      { name: "payload", type: "text", max: 65536, required: true },
       { name: "created", type: "autodate", onCreate: true, onUpdate: false },
     ],
     indexes: [

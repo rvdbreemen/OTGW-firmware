@@ -108,5 +108,7 @@ only the tunnel's path rule blocks the admin UI. Extra checks: a disabled device
 without a token is refused (400). Retention: a batch backdated to 40 days old was deleted by the cron with
 `RETENTION_DAYS=30` while a new one stayed, and `RETENTION_DAYS=0` deleted the rest.
 
+Debug-size batches (after the payload limit went to 65,536 characters, fresh database): 25 batches of 13,301 B paced just under the limit were all accepted; a burst of 40 got 30 accepted and 10 refused with 429; a payload of 65,600 characters was refused (400) and one of exactly 65,536 accepted.
+
 Still to test on the Synology: the tunnel (check 7 and the path rule), the `arm64` build if the NAS is ARM,
 and Container Manager's handling of `compose.yaml`.
