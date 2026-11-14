@@ -7118,3 +7118,27 @@ Asked by DM (through the coordinator) whether the repeat is 60 s or 30 s, given 
 **Open:** Q-338a (asked): A) replace the underheat exit with his rule; B) add it beside the underheat exit only in a start-up window after flame-on; C) keep the thermo-nova exit. Our recommendation: A, but first as a simulation test on the gruijter-calibrated houses (toggling against the entry-327 rule, +1.5 C for 30 s; starts per day).
 
 **Task:** TASK-1924.
+
+## 340. Q-TUNE2 B: a 60 min self-tune hour counts when at least 90 % of its ticks are clean; the excluded ticks are left out of the mean (Sergeant D with Robert, 2026-11-14; changes ADR-205 decision 2)
+
+**Source:** #dev-sat-mqtt 2026-11-14. Robert to Sergeant D, 10:00:27 UTC: https://discord.com/channels/812969634638725140/1105556725714649128/1571102509303332867 ; Robert's order to put it to him, 10:04:54 UTC: https://discord.com/channels/812969634638725140/1105556725714649128/1571103627807039599 ; our question Q-TUNE2: https://discord.com/channels/812969634638725140/1105556725714649128/1571104705197908121 ; Sergeant D's replies, 10:13:10 UTC (to Robert): https://discord.com/channels/812969634638725140/1105556725714649128/1571105706982121514 and 10:13:49 UTC (to Q-TUNE2): https://discord.com/channels/812969634638725140/1105556725714649128/1571105869733564439 . Our acknowledgement: https://discord.com/channels/812969634638725140/1105556725714649128/1571107371126886401
+
+**Quoted:**
+
+> Robert: "@Sergeant D we need more field data too. But the proposal should work I think. What do you think? Drop it to 90%?"
+
+> Sergeant D: "I agree"
+
+> Sergeant D: "The answer s B"
+
+**Option B as posted:** "A 60 min hour counts when at least 90 % of its ticks are clean, and the excluded ticks are left out of the mean. About +25 % hours on this data, same votes."
+
+**Settled (changes ADR-205 decision 2 and entry 174's clean-hour rule):** the self-tune hour stays 60 min. It counts when at least 90 % of its ticks pass the per-tick exclusions (SAT active, no hot water, valid sun below 12 degrees, the PWM rule of ADR-231, flame not off with CH on, modulation above the minimum, room temperature valid); the excluded ticks do not enter the hour's mean or its warm-up/floating counts. The markers that are not per tick stay whole-hour (SAT not in control at boot, coefficient changed this hour, too few ticks). Shorter windows and a share below 90 % are not adopted (option C), because on the field data they flip the votes through the morning warm-up after the night setback (selection bias, the one-sided exclusion entry 174 rejected).
+
+**Evidence (TASK-1927, FIELD inputs, SUBSTITUTE code variants):** 5 gruijter runs (betas 68, 167, 171, 214, 218), 67 tuner hours; the real tuner code cut from each run's own commit reproduces reason and counted in 67 of 67 hours. Today 8 counted hours; at >=90 % clean 10 hours, same votes on every run, no hour shifted more than 0.5 C by its excluded ticks. Details: comms scratchpad tune-replay/out/followup_summary.txt and followup2_summary.txt.
+
+**Checked against thermo-nova and the firmware:** thermo-nova has no coefficient self-tune (entry 72, quoted in entry 329), so this is firmware-only. Firmware: satTuneTickReason() (SATcontrol.ino ~6290-6305) gives the first exclusion per tick; ADR-205 decision 2 drops an hour on any excluded tick.
+
+**Open:** (1) a superseding or amending ADR for ADR-205 decision 2 (via adr-kit); (2) whether "at least 90 %" counts against all ticks of the hour or against the expected 120; (3) more field data (Robert): one house, November, no run reached a full day, so the daily decision itself is untested.
+
+**Task:** TASK-1927 (evidence); implementation task to be filed.

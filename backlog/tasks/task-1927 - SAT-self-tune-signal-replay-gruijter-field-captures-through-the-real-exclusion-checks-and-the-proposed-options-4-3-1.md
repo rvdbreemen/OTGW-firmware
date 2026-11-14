@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-14T08:21:00Z'
-updated_date: '2026-11-14T10:09:00Z'
+updated_date: '2026-11-14T10:20:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -46,4 +46,6 @@ Follow-up (Robert 1571099021328650251 / 1571099487240323113 / 157109974946388795
 Follow-up 2 (75 serial replays, out/followup2_summary.txt, followup2_windows.txt, followup2_runlog.txt): counted hours at >=100/95/90/80/50 % clean: 60 min 8/10/10/14/17; 30 min 11/13/13.5/14/20.5; 15 min 14/15.8/16.8/18/20.2. Control: 60 min >=100 % reproduces today (1/0/4/0/3). Contamination at >=90-95 %: <=0.5 C shift, no vote flips; at >=50 % shifts up to -3.55 C (min_mod). 30/15 min windows flip votes even at 100 % clean (morning warm-up after setback; selection bias as in entry 174). Only 60 min >=90-95 % counts more (+2 h) without changing a vote. Posted 1571103069767471156.
 
 Q-TUNE2 asked to Sergeant D on Robert's order (1571103627807039599): #dev-sat-mqtt 1571104705197908121; A keep all-clean / B 60 min hour at >=90 % clean / C shorter or lower; recommendation B. His answer becomes an entry before anything is built.
+
+Q-TUNE2 answered B by Sergeant D (#dev-sat-mqtt 1571105869733564439; 'I agree' to Robert 1571105706982121514): recorded as entry 340. A 60 min hour counts at >=90 % clean ticks, excluded ticks out of the mean; shorter windows not adopted. Implementation needs its own task and an ADR amending ADR-205 d2.
 <!-- SECTION:NOTES:END -->

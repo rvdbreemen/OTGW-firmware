@@ -4518,6 +4518,19 @@
     "TASK-1924"
    ],
    "confirmed_by_entry": null
+  },
+  {
+   "id": 340,
+   "title": "Q-TUNE2 B: a 60 min self-tune hour counts when at least 90 % of its ticks are clean; the excluded ticks are left out of the mean (Sergeant D with Robert, 2026-11-14; changes ADR-205 decision 2)",
+   "date": "2026-11-14",
+   "source": "sergeant-d",
+   "kind": "decision",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1571102509303332867",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1927"
+   ],
+   "confirmed_by_entry": null
   }
  ]
 }
