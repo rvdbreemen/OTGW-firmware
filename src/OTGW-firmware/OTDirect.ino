@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTDirect.ino
-**  Version  : v2.0.0-beta.288
+**  Version  : v2.0.0-beta.289
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -3458,19 +3458,20 @@ bool handleOTDirectCommand(const char* buf, int len, bool satOwn) {
   // boiler; master mode writes MsgID 16 / 100. Ends at TC=0, a replacement TT=/TC=,
   // or the release rule of onThermostatMsgID16.
   //
-  // TASK-500 (1A-M3): "clear" trigger is exact-zero (gateway.asm SetSetPoint
-  // parity). Negative values are NOT treated as clear; they set a TEMPORARY/
-  // CONSTANT override at the negative °C, clamped to -40 °C by the floatToF88
-  // helper (f8.8 lower bound). This is by design, not a bug — matches PIC
-  // behaviour. To clear, send TC=0 (or TT=0).
+  // TASK-500 (1A-M3): "clear" trigger is exact-zero (gateway.asm SetSetPoint parity). TASK-1859: the value is
+  // parsed as the PIC's GetPosFloatArg (SetContSetPoint :4084, SetTempSetPoint :4089), so a negative value is SE
+  // as on the PIC (the TASK-500 note that negatives set an override did not match gateway.asm). TC=16.2 -> 0x1034,
+  // TT=16.1 -> 0x101A (tests/override-1.stc, override-2.stc). To clear, send TC=0 (or TT=0).
   else if (cmd0 == 'T' && cmd1 == 'C') {
-    float temp = atof(value);
-    if (temp == 0.0f) {
+    uint16_t f88 = 0;
+    const char* err = otdPicFloatF88(value, OTD_PIC_POSFLOAT, f88);
+    if (err) { otDirectBridgeProcessStatus(err); return false; }
+    if (f88 == 0) {
       clearRemoteOverride();
     } else {
-      setRemoteOverride(OT_OVERRIDE_CONSTANT, temp);
+      setRemoteOverride(OT_OVERRIDE_CONSTANT, (int16_t)f88 / 256.0f);
     }
-    dtostrf(temp, 1, 2, rspBuf);
+    otdPicPrintF88(f88, rspBuf, sizeof(rspBuf));
     synthesizeResponse(buf, rspBuf);
   }
   // TT=xx.x — Temporary room setpoint override.
@@ -3479,13 +3480,15 @@ bool handleOTDirectCommand(const char* buf, int len, bool satOwn) {
   // boiler; master mode writes MsgID 16 / 100. Ends at TT=0, a replacement TT=/TC=,
   // or the release rule of onThermostatMsgID16.
   else if (cmd0 == 'T' && cmd1 == 'T') {
-    float temp = atof(value);
-    if (temp == 0.0f) {
+    uint16_t f88 = 0;
+    const char* err = otdPicFloatF88(value, OTD_PIC_POSFLOAT, f88);   // TASK-1859: GetPosFloatArg, see TC=
+    if (err) { otDirectBridgeProcessStatus(err); return false; }
+    if (f88 == 0) {
       clearRemoteOverride();
     } else {
-      setRemoteOverride(OT_OVERRIDE_TEMPORARY, temp);
+      setRemoteOverride(OT_OVERRIDE_TEMPORARY, (int16_t)f88 / 256.0f);
     }
-    dtostrf(temp, 1, 2, rspBuf);
+    otdPicPrintF88(f88, rspBuf, sizeof(rspBuf));
     synthesizeResponse(buf, rspBuf);
   }
   // BS=xx.x — Fake boiler room setpoint (MsgID 16 frame interception).
@@ -4246,9 +4249,15 @@ bool handleOTDirectCommand(const char* buf, int len, bool satOwn) {
 
   // SB=xx.x — Setback temperature (used when thermostat disconnects)
   else if (cmd0 == 'S' && cmd1 == 'B') {
-    otSetbackTemp = constrain(atof(value), 1.0f, 30.0f);
+    // TASK-1859: as the PIC SetSetBack (gateway.asm 6.8:4155-4162): GetPosFloatArg, a zero value is SE, no clamp;
+    // SB=18.23 -> PR: S=18.23 (tests/gpio-5.stc). Was constrain(atof, 1, 30).
+    uint16_t f88 = 0;
+    const char* err = otdPicFloatF88(value, OTD_PIC_POSFLOAT, f88);
+    if (!err && f88 == 0) err = "SE";
+    if (err) { otDirectBridgeProcessStatus(err); return false; }
+    otSetbackTemp = (int16_t)f88 / 256.0f;
     otdPersistFloat(settings.otd.fSetbackTemp, otSetbackTemp);   // TASK-1836: persist (marks dirty)
-    dtostrf(otSetbackTemp, 1, 2, rspBuf);
+    otdPicPrintF88(f88, rspBuf, sizeof(rspBuf));
     synthesizeResponse(buf, rspBuf);
   }
   // IT=0/1 — Ignore transitions

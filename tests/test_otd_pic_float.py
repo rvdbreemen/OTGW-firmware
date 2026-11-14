@@ -76,13 +76,22 @@ static void updateWriteCache(uint8_t, uint16_t) {}
 static uint32_t otdCsc2ExpiryStamp(uint16_t) { return 1; }
 static uint32_t otCSLastCommandMs = 0, otC2LastCommandMs = 0;
 static float otFakeRoomSetpoint = 0.0f;
+// TT=/TC=/SB= doubles
+enum OTRemoteOverrideMode { OT_OVERRIDE_TEMPORARY = 1, OT_OVERRIDE_CONSTANT = 2 };
+static int g_rmode = 0; static float g_rval = 0; static int g_rclear = 0;
+static void setRemoteOverride(OTRemoteOverrideMode m, float c) { g_rmode = (int)m; g_rval = c; }
+static void clearRemoteOverride() { g_rclear++; }
+static float otSetbackTemp = 16.0f;
+struct { struct { float fSetbackTemp = 16.0f; } otd; } settings;
+static void otdPersistFloat(float& slot, float v) { slot = v; }
+static float constrain(double v, float lo, float hi) { return v < lo ? lo : (v > hi ? hi : (float)v); }   // the old SB= clamp
 """
 
 MAIN = r"""
 static bool cmd(const char* buf, const char* value) {
   const char cmd0 = buf[0], cmd1 = buf[1];
   char rspBuf[16];
-  g_rsp[0] = 0; g_status[0] = 0; g_enq = g_clear = g_set = -1; g_val = 0;
+  g_rsp[0] = 0; g_status[0] = 0; g_enq = g_clear = g_set = -1; g_val = 0; g_rmode = 0; g_rval = 0; g_rclear = 0;
   if (false) {}
   @BRANCHES@
   return true;
@@ -91,8 +100,8 @@ int main(int argc, char** argv) {
   if (argc > 1 && !strcmp(argv[1], "cmd")) {
     for (int a = 2; a + 1 < argc; a += 2) {
       cmd(argv[a], argv[a + 1]);
-      printf("%s=%s|rsp=%s|st=%s|enq=%d|set=%d|clr=%d|val=%04X\n", argv[a], argv[a + 1], g_rsp, g_status,
-             g_enq, g_set, g_clr_dummy(), g_val);
+      printf("%s=%s|rsp=%s|st=%s|enq=%d|set=%d|clr=%d|val=%04X|rmode=%d|rval=%.4f|rclr=%d|sb=%.4f\n", argv[a],
+             argv[a + 1], g_rsp, g_status, g_enq, g_set, g_clr_dummy(), g_val, g_rmode, g_rval, g_rclear, otSetbackTemp);
     }
     return 0;
   }
@@ -132,7 +141,10 @@ def setUpModule():
         r"else if \(cmd0 == 'B' && cmd1 == 'S'\) \{",
         r"else if \(cmd0 == 'R' && cmd1 == 'T'\) \{",
         r"else if \(cmd0 == 'C' && cmd1 == '2'\) \{",
-        r"else if \(cmd0 == 'C' && cmd1 == 'L'\) \{")).replace("if (cmd0 == 'C' && cmd1 == 'S')",
+        r"else if \(cmd0 == 'C' && cmd1 == 'L'\) \{",
+        r"else if \(cmd0 == 'T' && cmd1 == 'C'\) \{",
+        r"else if \(cmd0 == 'T' && cmd1 == 'T'\) \{",
+        r"else if \(cmd0 == 'S' && cmd1 == 'B'\) \{")).replace("if (cmd0 == 'C' && cmd1 == 'S')",
                                                              "else if (cmd0 == 'C' && cmd1 == 'S')", 1)
     main = MAIN.replace("@BRANCHES@", branches).replace("g_clr_dummy()", "g_clear")
     _tmp = Path(tempfile.mkdtemp(prefix="otd_pf_"))
@@ -223,6 +235,28 @@ class PercentCommands(unittest.TestCase):
         self.assertEqual((r["CL=x"]["clr"], r["CL=x"]["rsp"]), ("7", "-"))
         self.assertEqual((r["CL=101"]["st"], r["CL=101"]["enq"], r["CL=101"]["clr"]), ("OR", "-1", "-1"))
         self.assertEqual((r["CL=0"]["enq"], r["CL=0"]["val"], r["CL=0"]["rsp"]), ("7", "0000", "0.00"))
+
+
+class PosFloatCommands(unittest.TestCase):
+    def test_TT_TC_values_from_the_pic_scripts(self):
+        r = cmds(("TT", "16.1"), ("TC", "16.2"), ("TT", "0"), ("TC", "20.555"))
+        self.assertEqual((r["TT=16.1"]["rmode"], r["TT=16.1"]["rval"], r["TT=16.1"]["rsp"]), ("1", "16.1016", "16.10"))  # 0x101A
+        self.assertEqual((r["TC=16.2"]["rmode"], r["TC=16.2"]["rval"], r["TC=16.2"]["rsp"]), ("2", "16.2031", "16.20"))  # 0x1034
+        self.assertEqual((r["TT=0"]["rclr"], r["TT=0"]["rsp"]), ("1", "0.00"))
+        self.assertEqual(r["TC=20.555"]["rsp"], "20.56")
+
+    def test_TT_TC_refuse_a_minus_and_garbage(self):
+        r = cmds(("TT", "-5"), ("TC", "-1.5"), ("TT", ""), ("TC", "abc"))
+        for k in ("TT=-5", "TC=-1.5", "TT=", "TC=abc"):
+            self.assertEqual((r[k]["st"], r[k]["rmode"], r[k]["rclr"]), ("SE", "0", "0"), k)
+
+    def test_SB_like_set_setback(self):
+        r = cmds(("SB", "18.23"), ("SB", "35"), ("SB", "0"), ("SB", "-2"), ("SB", "0.5"))
+        self.assertEqual((r["SB=18.23"]["sb"], r["SB=18.23"]["rsp"]), ("18.2305", "18.23"))   # 0x123B, gpio-5.stc
+        self.assertEqual((r["SB=35"]["sb"], r["SB=35"]["rsp"]), ("35.0000", "35.00"))         # no clamp to 30
+        self.assertEqual((r["SB=0.5"]["sb"], r["SB=0.5"]["rsp"]), ("0.5000", "0.50"))         # no clamp to 1
+        self.assertEqual(r["SB=0"]["st"], "SE")                                                # zero is SE
+        self.assertEqual(r["SB=-2"]["st"], "SE")
 
 
 if __name__ == "__main__":
