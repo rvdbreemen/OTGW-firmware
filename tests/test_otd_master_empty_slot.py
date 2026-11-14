@@ -155,6 +155,17 @@ class MasterEmptySlot(unittest.TestCase):
         r = self.run_script("B7:48:0000", "B4:48:3C14", "R48")
         self.assertEqual(r, [(48, 4, "3C14")])
 
+    def test_data_invalid_is_not_cached_on_an_empty_slot(self):
+        # TASK-1925: a Data-Invalid reply carries no value; the old store kept its data bytes and the thermostat got
+        # READ_ACK 0000. The empty slot stays empty: Data-Invalid (6), as right after boot.
+        r = self.run_script("B6:5:0000", "R5")
+        self.assertEqual(r, [(5, 6, "0000")])
+
+    def test_data_invalid_keeps_the_previous_value(self):
+        # TASK-1925 rule: the previous value stays, as handleMasterResponse already does for a real boiler
+        r = self.run_script("B4:25:3C00", "B6:25:1234", "R25")
+        self.assertEqual(r, [(25, 4, "3C00")])
+
     def test_oem_id_stays_unknown(self):
         # ids 128-255 are never cached (otBoilerCacheStore): Unknown-DataID, as before
         r = self.run_script("R131")

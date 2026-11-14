@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTDirect.ino
-**  Version  : v2.0.0-beta.279
+**  Version  : v2.0.0-beta.280
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -1796,6 +1796,9 @@ static void otBoilerCacheStore(unsigned long response) {
     otBoilerCacheValid[id] = false;
     return;
   }
+  // TASK-1925: a DATA-INVALID reply carries no value (spec v4.2 4.3): the slot keeps its previous value, the rule
+  // handleMasterResponse already applies to a real boiler's DATA-INVALID (it never calls this for one).
+  if (OpenTherm::getMessageType(response) == OpenThermMessageType::DATA_INVALID) return;
   otBoilerCache[id] = response & 0xFFFF;
   otBoilerCacheValid[id] = true;
 }

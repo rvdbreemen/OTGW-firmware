@@ -168,7 +168,7 @@ The OTDirect module operates as a cooperative OpenTherm stack layered on the pro
 - **Purpose**: Log a request that is about to go to the boiler. An overridden thermostat frame logs the thermostat's original as 'T' and the sent frame as 'R'; an unchanged thermostat frame logs 'T'; everything else logs 'R'
 
 #### `static void otBoilerCacheStore(unsigned long response)`
-- **Purpose**: Store a boiler reply in `otBoilerCache[]`. Data-ids 128-255 are skipped; an UNKNOWN-DATA-ID reply clears the slot (see Boiler Response Cache)
+- **Purpose**: Store a boiler reply in `otBoilerCache[]`. Data-ids 128-255 are skipped; an UNKNOWN-DATA-ID reply clears the slot; a DATA-INVALID reply keeps the previous value (TASK-1925) (see Boiler Response Cache)
 
 #### `bool otDirectBoilerPresent()`
 - **Purpose**: True once the boiler has answered MsgID 3 (`otBoilerCacheValid[3]`), false in loopback mode. Read cross-file by `satBoilerHardwarePresent()` so SAT simulation cannot switch itself off on synthetic traffic (TASK-795, ADR-117)
