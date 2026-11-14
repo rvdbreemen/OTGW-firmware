@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : PICtypes.h
-**  Version  : v2.0.0-beta.238
+**  Version  : v2.0.0-beta.239
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **

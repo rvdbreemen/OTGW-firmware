@@ -138,7 +138,8 @@ The OTDirect module operates as a cooperative OpenTherm stack layered on the pro
   - Extracts msgId and msgType (bits 28-30)
   - If READ_DATA (type 0):
     - Returns cached boiler value via `buildOTResponse(4, msgId, cache)` (READ_ACK)
-    - Returns UNKNOWN_DATA_ID (type 7) if no cached value yet, and always for an OEM data-id 128-255 (the cache holds 0-127)
+    - Returns DATA_INVALID (type 6) if no cached value yet, e.g. the 60 s schedule tier for up to 60 s after a master-mode boot (ADR-066, spec v4.2 4.3: supported, no value now; TASK-1808)
+    - Returns UNKNOWN_DATA_ID (type 7) when the boiler's last answer for that id was Unknown-DataID (`getUnknownCount() > 0`), and always for an OEM data-id 128-255 (the cache holds 0-127)
   - If WRITE_DATA (type 1):
     - Echoes back as WRITE_ACK (type 5)
     - Updates write cache for MsgID 1 (TSet, not while SAT owns the control setpoint), 16 (room setpoint), 24 (room temp) so scheduler keeps sending to boiler

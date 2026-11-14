@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTDirect.ino
-**  Version  : v2.0.0-beta.238
+**  Version  : v2.0.0-beta.239
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -3055,7 +3055,7 @@ static void checkThermostatTimeout() {
 // boiler values from OTcurrentSystemState so the thermostat sees valid data.
 // ---------------------------------------------------------------------------
 // Helper: build an OT response frame with parity (no library buildResponse needed)
-// type: 4=READ_ACK, 5=WRITE_ACK, 7=UNKNOWN_DATAID
+// type: 4=READ_ACK, 5=WRITE_ACK, 6=DATA_INVALID, 7=UNKNOWN_DATAID
 static unsigned long buildOTResponse(uint8_t type, uint8_t msgId, uint16_t data) {
   unsigned long resp = ((unsigned long)type << 28) | ((unsigned long)msgId << 16) | data;
   setOTParityBit(resp);
@@ -3071,10 +3071,17 @@ static void handleMasterModeSlaveFrame(unsigned long frame) {
   if (msgType == 0) {
     // READ_DATA: respond with the cached boiler value. The cache holds data-ids
     // 0-127 only (otBoilerCacheStore), so an OEM id 128-255 is always unknown.
-    if (msgId < sizeof(otBoilerCacheValid) && otBoilerCacheValid[msgId]) {
+    // TASK-1808 (ADR-066, spec v4.2 4.3): an id without a cached value yet is answered
+    // Data-Invalid ("supported, no value now"); Unknown-DataID only when the boiler's
+    // last answer for it was Unknown-DataID (otUnknownCounters, cleared by any other answer).
+    if (msgId >= sizeof(otBoilerCacheValid)) {
+      response = buildOTResponse(7, msgId, 0);  // 7 = UNKNOWN_DATAID
+    } else if (otBoilerCacheValid[msgId]) {
       response = buildOTResponse(4, msgId, otBoilerCache[msgId]);  // 4 = READ_ACK
+    } else if (getUnknownCount(msgId) > 0) {
+      response = buildOTResponse(7, msgId, 0);  // 7 = UNKNOWN_DATAID (the boiler said so)
     } else {
-      response = buildOTResponse(7, msgId, 0);  // 7 = UNKNOWN_DATAID (no cached data yet)
+      response = buildOTResponse(6, msgId, 0);  // 6 = DATA_INVALID (not polled yet)
     }
   }
   else if (msgType == 1) {
