@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-12T00:02:00Z'
-updated_date: '2026-11-14T17:25:00Z'
+updated_date: '2026-11-14T18:30:00Z'
 labels:
   - otdirect
   - parity
@@ -32,9 +32,9 @@ From the PIC 6.8 parity audit (N14), docs/reviews/2026-11-12_pic68-otdirect-pari
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 host test per letter, byte-exact; red on current code
+- [x] #1 host test per letter, byte-exact; red on current code
 - [ ] #2 PR=P follows the real power level
-- [ ] #3 decision for C, B and L recorded (PIC text or agreed OT-Direct value)
+- [x] #3 decision for C, B and L recorded (PIC text or agreed OT-Direct value)
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -49,4 +49,6 @@ Part of the PIC 6.8 parity audit, parent TASK-1851.
 Findings: (1) OpenTherm library getSmartPowerState() (OpenTherm.cpp:540-544) returns LOW or HIGH, never MEDIUM; not patched (no library changes): OTDirect.ino derives OTDSlaveLine from OpenTherm and reads the protected txIdleLevel/rxIdleLevel, mapped as PrintPowerlevel :2262-2268 (tx=TransmitMode, rx=ReceiveModeT). (2) FT= is stored as the model letter PR=R prints (C, I, S by hand, else D; SetTStatModel :4705-4727); OT-Direct has no Remeha detection so R never appears. AC2 'follows the real power level' is host-tested on the mapping only; a Smart Power thermostat on the bench would be needed for the hardware path.
 
 2026-11-14 18:16 (95) build 2.0.0-beta.254+f12af9f from lane-95-1848 HEAD f12af9f1d on origin/dev ef0c0884b (30d80a30c TASK-1848 beta.252, e4b8362a2 TASK-1849 beta.253, f12af9f1d TASK-1940 beta.254): exit 0, 5 min, 4 Compiling, 1 ESP32S3 image line (warm), RAM 130316 B, Flash 2149603 B; sha256 ino d2c427fbdc521cd9..., littlefs 1e43423a3acc1a6e..., zip f82a7690674d93f2.... Host tests on this HEAD: test_otd_pr_reports_pyotgw 15/15, test_otd_reply_texts_pic 4/4, test_pic_temp_sensor_port 8/8, test_otd_sc_clock 8/8. Old-vs-fix before the rebase: PR test 8 new FAIL on origin/dev OTDirect.ino; reply texts 3 FAIL on the 1848-only code; pic temp 7 FAIL on origin/dev (the setting-off case is trivially green there). evaluate --quick 86/0. Bench requested from 09 (.63 for 1940 + no regression, .61 for 1848/1849).
+
+09 bench beta.255+58b387a on .61 (OT-Direct), 2026-11-14 19:2x, evidence 09 scratchpad b255/replies.txt: PR=P 'PR: P=Low power', PR=R 'PR: R=D', PR=C 'PR: C=240 MHz', PR=B 'PR: B=18:50 14-11-2026', PR=L 'PR: L=FXOMPC', PR=O 'PR: O=N'; after CS=40 still 'PR: O=N'; TT=20.5 -> 'PR: O=t20.50' (no thermostat on .61, so it stays lowercase); TT=0 -> 'PR: O=n' (stays n without a thermostat MsgID 9 read). AC2 limit: the bench has no Smart Power thermostat, so Medium/High were only host-tested (mapping), not seen on hardware.
 <!-- SECTION:NOTES:END -->

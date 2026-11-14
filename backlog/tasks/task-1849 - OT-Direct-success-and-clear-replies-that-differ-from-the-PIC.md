@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-12T00:04:00Z'
-updated_date: '2026-11-14T17:25:00Z'
+updated_date: '2026-11-14T18:30:00Z'
 labels:
   - otdirect
   - parity
@@ -29,7 +29,7 @@ From the PIC 6.8 parity audit (N15), docs/reviews/2026-11-12_pic68-otdirect-pari
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 host test per reply, byte-exact; red on current code
+- [x] #1 host test per reply, byte-exact; red on current code
 - [ ] #2 one line per item in the final summary
 <!-- AC:END -->
 
@@ -43,4 +43,6 @@ Part of the PIC 6.8 parity audit, parent TASK-1851.
 2026-11-13 delta parity check (TASK-1851, comms, read-only, OT-Direct at origin/dev 479e49391 vs PIC 6.8 gateway.asm; G=gateway.asm, O=OTDirect.ino): partly fixed: VS clear (1d4b8fdac) and CL clear (60c0fbc50) replies match now. Still open: SR= echo (O:3999), FT= echo of any character (O:4211-4214), SC hours printed with %d (O:3497).
 
 2026-11-14 18:16 (95) build 2.0.0-beta.254+f12af9f from lane-95-1848 HEAD f12af9f1d on origin/dev ef0c0884b (30d80a30c TASK-1848 beta.252, e4b8362a2 TASK-1849 beta.253, f12af9f1d TASK-1940 beta.254): exit 0, 5 min, 4 Compiling, 1 ESP32S3 image line (warm), RAM 130316 B, Flash 2149603 B; sha256 ino d2c427fbdc521cd9..., littlefs 1e43423a3acc1a6e..., zip f82a7690674d93f2.... Host tests on this HEAD: test_otd_pr_reports_pyotgw 15/15, test_otd_reply_texts_pic 4/4, test_pic_temp_sensor_port 8/8, test_otd_sc_clock 8/8. Old-vs-fix before the rebase: PR test 8 new FAIL on origin/dev OTDirect.ino; reply texts 3 FAIL on the 1848-only code; pic temp 7 FAIL on origin/dev (the setting-off case is trivially green there). evaluate --quick 86/0. Bench requested from 09 (.63 for 1940 + no regression, .61 for 1848/1849).
+
+09 bench beta.255+58b387a on .61, b255/replies.txt: SC=9:05/3 'SC: 09:05/3'; SR=18:1,230 'SR: 18:1/230'; CR=18 'CR: 18'; FT=X 'FT: D'; FT=C 'FT: C' then PR=R 'PR: R=C'; FT=D 'FT: D' then PR=R 'PR: R=D'.
 <!-- SECTION:NOTES:END -->
