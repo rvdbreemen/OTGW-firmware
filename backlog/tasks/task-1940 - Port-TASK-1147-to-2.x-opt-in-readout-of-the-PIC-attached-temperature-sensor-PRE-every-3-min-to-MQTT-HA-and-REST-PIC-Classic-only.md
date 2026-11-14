@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-14T16:07:00Z'
-updated_date: '2026-11-14T21:31:00Z'
+updated_date: '2026-11-14T22:07:00Z'
 labels:
   - pic
   - port
@@ -43,4 +43,6 @@ Port choices: setting in PICBootSection (settings.picBoot.bTempSensor) under the
 09 bench: .63 beta.254+f12af9f (b254/): setting off 4.5 min 0x PR=E; on: PR=E queued at 18:40:38 and 18:43:38 (3 min); no reply, no topic, no discovery (.63 has no sensor: expected); settings diff only pictempsensor; web UI row present. .61 beta.255+58b387a (b255/): OT-Direct with the setting on sends 0x PR=E in 4 min; /settings-help.json carries the pictempsensor text. Not seen on hardware: a real sensor reading (no bench unit has a sensor on the PIC); the '-' reply was not visible on .63 because .63 shows no PR: replies at all (separate finding, also on beta.250). 09 note on two texts for one setting -> 205648770 beta.256 drops the inline hint, the i text stays.
 
 95 (2026-11-14 22:4x): regression found and fixed: test/host/test_dhw_water_meter.py no longer compiled since the 1940 commit (the discovery slice of queueNonOTDiscoveryIds() needs picTempSensorHasData() and OTGWpictempid: 'error C3861: picTempSensorHasData: identifier not found', 'COMPILATION FAILED (discovery FIX)'). Fix: OTGWpictempid in FAUX_IDS and a picTempSensorHasData() stub returning false in test_dhw_water_discovery.cpp. After the fix: the full run compiles, 44/45 cases pass (D2 = the #702 unit, see TASK-1949), all 118 mutant checks yes.
+
+95 (2026-11-14 23:0x): second harness broken by the 1940 commit and fixed (test only, no bump): test/host/test_pic_settings_value.py failed 'COMPILATION FAILED (FIX (working tree))' (error C2065 'settings', C3861 'picTempSensorHasData', C2065 'OTGWpictempid', C3861 'setMQTTConfigPending' in the sliced handlePRresponse()). Doubles added in test_pic_settings_value.cpp (setting off); after: RESULT PASS, D1 C1 C2 C3 pass. Sweep of the other slicing harnesses on 47f0ea37e green: 36/36 tests/test_otd_*.py, test_pic_temp_sensor_port, test_settings_whitelist, test_discovery_drip_per_entity, test_ble_discovery_1462, test_sat_energy_discovery, test_sat_health_discovery, test_pic_pm_chain, test/host test_ha_discovery_json, test_cmd_queue_drop, test_override_reply, test_boiler_unsupported_origin.
 <!-- SECTION:NOTES:END -->

@@ -67,6 +67,13 @@ static uint16_t picTretPollResults = 0;
 struct OtBusDouble { bool bGatewayMode = false; bool bGatewayModeKnown = false; };
 struct StateDouble { PicSettingsSection picSettings; OtBusDouble otBus; };
 static StateDouble state;
+// TASK-1940: the PR=E branch publishes the opt-in PIC sensor reading; off here, so these are never reached.
+struct PicBootDouble { bool bTempSensor = false; };
+struct SettingsDouble { PicBootDouble picBoot; };
+static SettingsDouble settings;
+static const uint8_t OTGWpictempid = 239;
+static bool picTempSensorHasData() { return false; }
+static void setMQTTConfigPending(uint8_t) {}
 
 #include "pic_settings_handler.inc"
 
