@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v2.0.0-beta.269
+**  Version  : v2.0.0-beta.270
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -3235,9 +3235,12 @@ void print_slavememberid(uint16_t& value)
 {
   AddLogf("%s = Slave Config[%s] MemberID code [%3d]", OTlookupitem.label, byte_to_binary(OTdata.valueHB), OTdata.valueLB);
   if (is_value_valid(OTdata, OTlookupitem)){
+    // TASK-1857, TASK-1903 item 1: an OT-Direct loopback answer (bLocalAnswer) or a replayed line (bReplayed) is no
+    // evidence about a real boiler, so it feeds neither the SAT PWM permission nor the source/manufacturer detection.
+    const bool boilerEvidence = !OTdata.bLocalAnswer && !OTdata.bReplayed;
     // SAT PWM permission (TASK-1412.4): only the boiler's own READ-ACK counts, on the PIC path and on OT-Direct alike
     // (OT-Direct feeds its replies through bridgeFrameToParser('B', ...)). HB bit 4 = 1: master low-off not allowed.
-    if (OTdata.rsptype == OTGW_BOILER) satNoteSlaveConfig(OTdata.valueHB);
+    if (OTdata.rsptype == OTGW_BOILER && boilerEvidence) satNoteSlaveConfig(OTdata.valueHB);
     //Build string for SendMQTT
     sendMQTTData(F("slave_configuration"), byte_to_binary(OTdata.valueHB));
     char _msg[15] {0};
@@ -3281,9 +3284,11 @@ void print_slavememberid(uint16_t& value)
     // resolves AUTO to a safe gas-boiler default. OpenTherm has no source-class field
     // (spec v4.2:1606), so cooling-capable is a lossy proxy (heating-only heat pumps do
     // not set it; hybrid is invisible on one OT bus) — never drive control off this bit.
-    state.sat.iDetectedHeatingSource = ((OTdata.valueHB) & 0x04) ? SAT_SRC_HEAT_PUMP : SAT_SRC_GAS_BOILER;
-    // SAT: auto-detect manufacturer from slave MemberID code
-    satDetectManufacturer(OTdata.valueLB);
+    if (boilerEvidence) {
+      state.sat.iDetectedHeatingSource = ((OTdata.valueHB) & 0x04) ? SAT_SRC_HEAT_PUMP : SAT_SRC_GAS_BOILER;
+      // SAT: auto-detect manufacturer from slave MemberID code
+      satDetectManufacturer(OTdata.valueLB);
+    }
     value = OTdata.u16();
   }
 }
