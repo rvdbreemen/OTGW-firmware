@@ -7178,3 +7178,19 @@ Asked by DM (through the coordinator) whether the repeat is 60 s or 30 s, given 
 **Open:** (1) the simulation check (toggling against the entry-327 entry rule, starts per day) before it ships; (2) whether the rule also applies while PWM is not ON (thermo-nova's underheat exit only runs while PWM status is ON, `heating_control.py:321-323`); (3) "boiler temperature" read as the flow temperature, as in entries 22 and 327.
 
 **Task:** TASK-1933 (lane d3, after TASK-1924).
+
+## 343. Q-340a changed to B: the 90 % clean share of entry 340 is measured against the expected 120 ticks of the hour (Sergeant D, 2026-11-14; supersedes entry 341)
+
+**Source:** #dev-sat-mqtt 2026-11-14, Sergeant D, 10:37:21 UTC, a reply to Q-340a (1571109268634075239): https://discord.com/channels/812969634638725140/1105556725714649128/1571111795874209925 . His earlier answer "The answer is A" (10:31:30 UTC, 1571110323295879212) is entry 341. Our acknowledgement: https://discord.com/channels/812969634638725140/1105556725714649128/1571114972409503759
+
+**Quoted:**
+
+> "@BlueFlame Bot Change my answer to B"
+
+**Option B as posted:** "The 120 ticks an hour should have: at least 108 clean ticks, so 54 min of clean data. A gap counts against the hour like an excluded tick."
+
+**Settled (supersedes entry 341):** the clean share is counted against the expected number of ticks of the hour (hour length / control interval; 120 at the 30 s default): at least 90 % of that number must be clean ticks, so a missed tick counts against the hour like an excluded tick. This was our recommendation. The minimum-ticks rule (`SAT_CT_MIN_TICK_FRACTION 0.75`, `SATcontrol.ino:6725`) is then always met by a counted hour.
+
+**Open:** none for the share basis. Interpretation (ours): with another control interval than 30 s, "120" scales to the expected number for that interval, as the minimum-ticks rule already does; to confirm with Sergeant D if the plan needs it.
+
+**Task:** TASK-1932.

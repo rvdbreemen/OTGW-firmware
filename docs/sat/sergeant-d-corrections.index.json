@@ -4559,6 +4559,21 @@
     "TASK-1933"
    ],
    "confirmed_by_entry": null
+  },
+  {
+   "id": 343,
+   "title": "Q-340a changed to B: the 90 % clean share of entry 340 is measured against the expected 120 ticks of the hour (Sergeant D, 2026-11-14; supersedes entry 341)",
+   "date": "2026-11-14",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1571111795874209925",
+   "supersedes": [
+    341
+   ],
+   "tasks": [
+    "TASK-1932"
+   ],
+   "confirmed_by_entry": null
   }
  ]
 }
