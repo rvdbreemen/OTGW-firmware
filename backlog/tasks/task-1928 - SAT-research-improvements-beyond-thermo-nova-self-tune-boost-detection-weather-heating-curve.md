@@ -3,9 +3,11 @@ id: TASK-1928
 title: >-
   SAT research: improvements beyond thermo-nova (self-tune, boost detection,
   weather, heating curve)
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-11-14T08:32:00Z'
+updated_date: '2026-11-14T11:29:00Z'
 labels:
   - sat
   - research
@@ -27,3 +29,9 @@ Maintainer order (Robert, session 2026-11-14): research what SAT can improve com
 - [ ] #3 Model numbers are labelled MODEL RESULT; field numbers name their capture
 - [ ] #4 Report to Robert; ideas he picks are put to Sergeant D one question per message, recorded in sergeant-d-corrections.md before any implementation task
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Picked up by comms (92) on coordinator assignment 2026-11-14. Coordinator's 9 seed ideas: weighted outside temperature 12-24 h, forecast feed-forward, boost detection on a learned warm-up rate, deviation detection, cool-down phase/excitation for the self-tune, RLS with forgetting factor, degree-hour budget, wind correction, solar detector instead of the 12 deg gate. Research via the tune-replay agent (light, serial), report to Robert; nothing to Sergeant D before Robert picks.
+<!-- SECTION:NOTES:END -->
