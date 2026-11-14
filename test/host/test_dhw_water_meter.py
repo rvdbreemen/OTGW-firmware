@@ -479,8 +479,10 @@ def build_and_run(label, out_dir, cpp):
 
 
 def run_mutants(root, mutants, exporter, cpp, checks):
-    for mid, what, fname, subs, case, keeps, *rest in mutants:
+    for i, (mid, what, fname, subs, case, keeps, *rest) in enumerate(mutants, 1):
         crash_ok = bool(rest and rest[0])
+        # TASK-1853: a run cut off here ends on this line, not on a mutant's intended FAIL.
+        print(f"-- mutant {i}/{len(mutants)} {mid}: building (its CASE FAIL lines are expected)", flush=True)
         mdir = root / f"mutant_{mid}"
         exporter(mdir)
         mutate(mdir, fname, subs)

@@ -51,6 +51,8 @@ SERIAL_ONLY = {
 # TASK-1723: test_sat_lowload_contract runs its full simulation matrix in about 644 s.
 MIN_TIMEOUT = {
     "test_sat_lowload_contract.py": 1200,
+    # TASK-1853: about 40 serial MSVC mutant builds; 1500 s alone to RESULT: PASS (d3, 2026-11-12).
+    "test_dhw_water_meter.py": 1800,
 }
 
 # Words too generic to link a changed file to a test by name.
@@ -75,7 +77,7 @@ def kill_tree(proc):
 
 def run_one(cmd, timeout):
     """Run cmd; return (rc or None on timeout, output, seconds)."""
-    env = dict(os.environ, PYTHONUTF8="1", PYTHONIOENCODING="utf-8")
+    env = dict(os.environ, PYTHONUTF8="1", PYTHONIOENCODING="utf-8", PYTHONUNBUFFERED="1")
     t0 = time.time()
     proc = subprocess.Popen(cmd, cwd=str(ROOT), env=env, stdin=subprocess.DEVNULL,
                             stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
@@ -263,6 +265,9 @@ def main():
     for t, status, secs, out, _ in sorted(bad, key=lambda r: r[0].name):
         print(f"\n===== {status}: {t.relative_to(ROOT).as_posix()} (last 40 lines) =====")
         print("\n".join(out.splitlines()[-40:]))
+        if status == "TIMEOUT":
+            # TASK-1853: a cut-off run has no verdict; a FAIL line above may be a mutant's intended failure.
+            print(f"INCOMPLETE: cut off after {secs:.0f} s before the test printed its verdict")
     n = lambda s: sum(1 for r in results if r[1] == s)
     print(f"\nfiles: {len(results)}  passed: {n('PASS')}  failed: {n('FAILED')}  "
           f"timeout: {n('TIMEOUT')}  skipped: {n('SKIP')}  total time: {total:.1f}s  (-j {a.jobs})")

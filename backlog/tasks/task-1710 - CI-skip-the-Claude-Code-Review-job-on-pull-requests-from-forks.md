@@ -1,10 +1,11 @@
 ---
 id: TASK-1710
 title: 'CI: skip the Claude Code Review job on pull requests from forks'
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-11-07T19:31:00Z'
-updated_date: '2026-11-14T15:55:00Z'
+updated_date: '2026-11-14T15:56:00Z'
 labels:
   - ci
   - github-actions
