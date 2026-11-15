@@ -210,6 +210,7 @@
     "series_room_set": "thermostaat-setpoint",
     "series_room": "kamer",
     "series_outside": "buiten",
+    "series_dhw": "tapwatertemperatuur",
     "series_mod": "modulatie",
     "series_flame": "vlam",
     "series_dhw_on": "tapwaterbedrijf",

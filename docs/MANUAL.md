@@ -471,7 +471,7 @@ Below the log viewer, an ECharts temperature graph shows a rolling 24-hour view 
 - Outside temperature (if available). When it comes only from the weather service and the browser tab is hidden, or the weather answer is invalid, the graph shows a gap instead of repeating the last value; a boiler-reported outside temperature (MsgID 27) still fills it (beta.247, TASK-1875).
 - Modulation level (percentage)
 - Flame status
-- DHW (hot water) temperature
+- DHW (hot water) temperature (MsgID 26, when the boiler reports it). This line starts when the page opens: the 24-hour history that the gateway keeps does not hold it, so after a reload the earlier part of the window has no DHW line. The CSV export has a `dhw` column, empty where there is no value.
 
 Dallas DS18B20 sensors are automatically discovered and added to the graph with dynamically assigned colors. Sensor labels (configured on the Settings page) appear in the graph legend.
 

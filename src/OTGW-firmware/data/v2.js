@@ -331,6 +331,7 @@
       "series_room_set": "thermostat setpoint",
       "series_room": "room",
       "series_outside": "outside",
+      "series_dhw": "DHW temperature",
       "series_mod": "modulation",
       "series_flame": "flame",
       "series_dhw_on": "DHW mode",
@@ -3191,7 +3192,7 @@
   var GSLOT = 5000, GHIST_MAX = 86400000 / GSLOT, GBREAK_MS = 150000, gHist = [], gDallas = null, gLastRender = 0;
   // [key, label, colour, kind]: t = temperature line (auto-scaled), m = modulation area, l = on/off lane
   var GSER = [['flow', 'boiler', '#f85149', 't'], ['ret', 'return', '#58a6ff', 't'], ['chSet', 'control setpoint', '#8b949e', 't'],
-    ['roomSet', 'thermostat setpoint', '#d29922', 't'], ['room', 'room', '#3fb950', 't'], ['outside', 'outside', '#a371f7', 't'],
+    ['roomSet', 'thermostat setpoint', '#d29922', 't'], ['room', 'room', '#3fb950', 't'], ['outside', 'outside', '#a371f7', 't'], ['dhw', 'DHW temperature', '#f778ba', 't'],
     ['mod', 'modulation', '#00bffe', 'm'], ['flame', 'flame', '#ff7b00', 'l'], ['dhw_on', 'DHW mode', '#2f81f7', 'l'], ['ch', 'boiler CH mode', '#e5534b', 'l']];
   // 'ch' is the boiler's own CH-mode status bit (MsgID 0 slave bit 1; pump overrun keeps it on), not SAT's CH enable (Sergeant D entry 219)
   var GDCOL = ['#56d4dd', '#db61a2', '#7ee787', '#f0883e', '#79c0ff', '#bc8cff'];
@@ -3295,7 +3296,7 @@
       r = { t: t, flame: 0, dhw_on: 0, ch: 0 }; gHist.push(r);
       if (gHist.length > GHIST_MAX + 256) gHist = gHist.slice(-GHIST_MAX);   // trim in batches
     }
-    ['flow', 'ret', 'chSet', 'roomSet', 'room', 'outside', 'mod'].forEach(function (k) { r[k] = model[k]; });
+    ['flow', 'ret', 'chSet', 'roomSet', 'room', 'outside', 'dhw', 'mod'].forEach(function (k) { r[k] = model[k]; });   // dhw: MsgID 26, live only (TASK-1776: not in the device history)
     r.roomX = graphRoomLost(now) ? 1 : 0;   // TASK-1546: a dropout is no reading: the room value is empty (CSV, line break)
     if (r.roomX) r.room = null;
     ['flame', 'dhw_on', 'ch'].forEach(function (k) { if (model[k]) r[k] = 1; });
@@ -3398,7 +3399,7 @@
   }
   // Series labels are translated at render time (the GSER labels are the English defaults).
   var GSER_LABEL_KEY = { flow: 'graph.series_flow', ret: 'graph.series_ret', chSet: 'graph.series_ch_set', roomSet: 'graph.series_room_set',
-    room: 'graph.series_room', outside: 'graph.series_outside', mod: 'graph.series_mod', flame: 'graph.series_flame', dhw_on: 'graph.series_dhw_on', ch: 'graph.series_ch' };
+    room: 'graph.series_room', outside: 'graph.series_outside', dhw: 'graph.series_dhw', mod: 'graph.series_mod', flame: 'graph.series_flame', dhw_on: 'graph.series_dhw_on', ch: 'graph.series_ch' };
   // TASK-1297: values of the visible series at time tMs. arr is ascending by t. Returns null when no
   // record covers tMs (before the first record, or more than GBREAK_MS past the record's data end).
   // The time is not called t: t() is the translation helper used below (TASK-1768).

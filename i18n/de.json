@@ -210,6 +210,7 @@
     "series_room_set": "Thermostat-Soll",
     "series_room": "Raum",
     "series_outside": "Außen",
+    "series_dhw": "WW-Temperatur",
     "series_mod": "Modulation",
     "series_flame": "Flamme",
     "series_dhw_on": "WW-Betrieb",
