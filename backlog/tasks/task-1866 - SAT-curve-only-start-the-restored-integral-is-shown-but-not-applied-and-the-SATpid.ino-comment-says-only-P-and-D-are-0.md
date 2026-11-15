@@ -4,8 +4,10 @@ title: >-
   SAT curve-only start: the restored integral is shown but not applied, and the
   SATpid.ino comment says only P and D are 0
 status: To Do
-assignee: []
+assignee:
+  - '@claude'
 created_date: '2026-11-12T11:54:00Z'
+updated_date: '2026-11-15T10:51:00Z'
 labels:
   - sat
   - docs
@@ -26,3 +28,9 @@ Found by the second reader of Q-P1 (gruijter capture 2026-11-12, msg https://dis
 - [ ] #1 After Q-P1 is answered and recorded as an entry, the SATpid.ino comment at the curve-only exception describes exactly which terms are in the output
 - [ ] #2 The web UI and REST show the I term that is actually applied during the curve-only window (or mark it as not applied), with a host test on the real code
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-15 (d3) picked up in the backlog sweep and put back: both ACs wait for Q-P1, which docs/sat/open-questions.md (origin/dev 341291f2b) still lists as 'asked' 2026-11-12 11:53 UTC with no entry in sergeant-d-corrections.md. AC1 needs the recorded answer; AC2 depends on it too (if Sergeant D wants the restored I applied, the display already matches after that change; if not, the UI must mark I as not applied). No code or comment change before the answer (ADR-196).
+<!-- SECTION:NOTES:END -->
