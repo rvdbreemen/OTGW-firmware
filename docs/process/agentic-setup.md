@@ -48,7 +48,7 @@ Het document beschrijft wat er nu is, met bronvermelding (`pad:regel`). Waar de 
    - Sergeant D is de eerste bron van waarheid voor SAT-gedrag; elk besluit van hem wordt eerst vastgelegd (353 entries) en dan pas uitgevoerd.
    - Testers leveren bewijs, maar hun verzoeken worden taken met `needs-maintainer-ok`.
    - Een publieke beta draait op een staand mandaat; een stabiele release, een PIC-flash en een push naar `main` vragen elk een expliciet "ja".
-4. **Kwaliteit zit in poorten die weigeren.** Git-hooks, `evaluate.py` (42 checks), een build-lock voor de hele machine, een benchtest per firmwaretaak door de bench-tester en een post-script dat bij elke twijfel weigert. Sinds 2026-11-05 draaien evaluate, ADR-governance en de build ook in CI bij een push naar `dev`.
+4. **Kwaliteit zit in poorten die weigeren.** Git-hooks, `evaluate.py` (42 checks), een build-lock voor de hele machine, een benchtest per firmwaretaak door de bench-tester en een postscript dat bij elke twijfel weigert. Sinds 2026-11-05 draaien evaluate, ADR-governance en de build ook in CI bij een push naar `dev`.
 5. **De risico's van 2026-11-04 zijn aangepakt; de nieuwe zitten in drift tussen praktijk en regels.**
    - Alle twaalf verbetertaken zijn uitgevoerd.
    - Rollen, kanalen en een delegatie bestaan alleen in taaknotities.
@@ -522,9 +522,9 @@ sequenceDiagram
   end
 ```
 
-Bronnen bij de stappen: de eis van een antwoord op een DM die actie en doel noemt, en de uitsluiting van een algemeen "go on" (`CLAUDE.md:18`, `:60`); gates melden als gehaald of niet gehaald en de antwoorden vastleggen vóór een push (`.claude/skills/release-2x/SKILL.md:58-69`); de controle uit de eerste hand op auteur en verwijzing, in de praktijk door de ontwikkelsessie (d3) en niet door de coördinator; een regel die die controle voorschrijft is niet gevonden in de repo (`backlog/tasks/task-1817 - SAT-self-tune-PWM-hours-count-for-the-warm-up-phase-Q-1796b-Robert-B-waits-for-Sergeant-D.md:46`; `backlog/tasks/task-1829 - Agent-rule-questions-to-Robert-only-by-Discord-DM-never-as-an-interactive-CLI-question-asynchronous-in-the-session-when-DM-is-unavailable.md:38`); het overslaan van een taak die maintainer-toestemming nodig heeft, met een notitie waarom (`.claude/skills/implement-next-task/SKILL.md:116-119`).
+Bronnen bij de stappen: de eis van een antwoord op een DM die actie en doel noemt, en de uitsluiting van een algemeen "go on" (`CLAUDE.md:18`, `:60`); gates melden als gehaald of niet gehaald en de antwoorden vastleggen vóór een push (`.claude/skills/release-2x/SKILL.md:58-69`); de controle uit de eerste hand op auteur en verwijzing, in de praktijk door de ontwikkelsessie (d3) en niet door de coördinator; een regel die die controle voorschrijft is niet gevonden in de repo (`task-1817:46`; `task-1829:38`); het overslaan van een taak die maintainer-toestemming nodig heeft, met een notitie waarom (`.claude/skills/implement-next-task/SKILL.md:116-119`).
 
-De regel zelf is langs dezelfde weg ontstaan. De coördinator legde Robert per DM voor of een harde stop ook per DM bevestigd mag worden; hij antwoordde "B", waarna de bot de waarborg aan hem terugmeldde: alleen een expliciete ja voor die ene actie (`backlog/tasks/task-1829 - Agent-rule-questions-to-Robert-only-by-Discord-DM-never-as-an-interactive-CLI-question-asynchronous-in-the-session-when-DM-is-unavailable.md:38`).
+De regel zelf is langs dezelfde weg ontstaan. De coördinator legde Robert per DM voor of een harde stop ook per DM bevestigd mag worden; hij antwoordde "B", waarna de bot de waarborg aan hem terugmeldde: alleen een expliciete ja voor die ene actie (`task-1829:38`).
 
 ### 4.9 Hoe een verzoek het label `needs-maintainer-ok` krijgt
 
@@ -559,7 +559,7 @@ Drie dingen vallen buiten de poort. Een bugmelding of PR op GitHub wordt direct 
 
 | # | Spanning | De ene kant | De andere kant |
 |---|---|---|---|
-| S4.1 | **De delegatie van 2026-11-15 staat in geen regelbestand.** Robert gaf de coördinator ruimte om zelf te beslissen; die besliste daarop een AC en meldde dat achteraf per DM met een aanbod om terug te draaien. Leidend: formeel `CLAUDE.md:18` en `:60`, tot de delegatie als directive is vastgelegd (voorstel P6, beslissing 2 in §14.3). | "Ask me only if you really can't do it yourself. You have my permission." (`backlog/tasks/task-1919 - An-app-image-that-the-bootloader-marked-ABORTED-keeps-running-but-never-confirms-itself-so-the-next-reset-of-any-kind-rolls-back-to-safeboot.md:58`) | "Do not decide it silently" en "Robert (maintainer) decides scope, priority, waivers and releases" (`CLAUDE.md:60`, `:18`); geen rij in `docs/process/directive-changelog.md:10-28` |
+| S4.1 | **De delegatie van 2026-11-15 staat in geen regelbestand.** Robert gaf de coördinator ruimte om zelf te beslissen; die besliste daarop een AC en meldde dat achteraf per DM met een aanbod om terug te draaien. Leidend: formeel `CLAUDE.md:18` en `:60`, tot de delegatie als directive is vastgelegd (voorstel P6, beslissing 2 in §14.3). | "Ask me only if you really can't do it yourself. You have my permission." (`task-1919:58`) | "Do not decide it silently" en "Robert (maintainer) decides scope, priority, waivers and releases" (`CLAUDE.md:60`, `:18`); geen rij in `docs/process/directive-changelog.md:10-28` |
 | S4.2 | **De directive-changelog noemt de oude vraagroute nog als geldend.** → zie S8.1 | — | — |
 | S4.3 | **De lijst harde stops verschilt per plek.** Van de vier opsommingen in `CLAUDE.md` en `/implement-next-task` missen er twee het mergen van andermans PR. | vijf acties, inclusief "merging someone else's PR" (`CLAUDE.md:18`; `.claude/skills/implement-next-task/SKILL.md:24-25`) | vier acties, zonder mergen (`CLAUDE.md:50`; `.claude/skills/implement-next-task/SKILL.md:117-119`) |
 | S4.4 | **Het beta-mandaat noemt de coördinator, de praktijk een andere sessie.** → zie S5.8 | — | — |
@@ -584,7 +584,7 @@ De werkplaats draait op meerdere Claude Code-sessies tegelijk, elk met een eigen
 
 ### 5.1 Sessietopologie
 
-Sessies heten in de taaknotes `otgw-firmware-<id>` of kortweg hun id, zoals 95, 92 of 09 (`backlog/tasks/task-1870 - ADR-225-raise-the-ESP32-S3-IPC-task-stack-ipc0-and-ipc1-to-at-least-1280-B-via-a-custom_sdkconfig-framework-lib-rebuild.md:38-40`, `backlog/tasks/task-1982 - Public-beta-v2.0.0-beta.323-2026-11-15-20-00-slot.md:20`). De rol is een afspraak, geen bestand: `.claude/agents/` bevat alleen `otgw-device-verify.md`, dus voor de bench-tester bestaat geen eigen agentdefinitie; het is de agent die Robert op 2026-11-11 van `otgw-cycle` hernoemde tot `otgw-bench-tester` (§3.3; `backlog/tasks/task-1826 - Process-one-bench-tester-agent-flashes-and-tests-every-unit-developers-request-it.md:23`, `.claude/agents/otgw-device-verify.md:3`).
+Sessies heten in de taaknotities `otgw-firmware-<id>` of kortweg hun id, zoals 95, 92 of 09 (`backlog/tasks/task-1870 - ADR-225-raise-the-ESP32-S3-IPC-task-stack-ipc0-and-ipc1-to-at-least-1280-B-via-a-custom_sdkconfig-framework-lib-rebuild.md:38-40`, `task-1982:20`). De rol is een afspraak, geen bestand: `.claude/agents/` bevat alleen `otgw-device-verify.md`, dus voor de bench-tester bestaat geen eigen agentdefinitie; het is de agent die Robert op 2026-11-11 van `otgw-cycle` hernoemde tot `otgw-bench-tester` (§3.3; `task-1826:23`, `.claude/agents/otgw-device-verify.md:3`).
 
 ```mermaid
 flowchart TB
@@ -639,14 +639,14 @@ flowchart TB
 |---|---|---|---|
 | Coördinerende 2.0.0-sessie (coördinator) | Ontvangt build-aankondigingen, kondigt build- en push-freezes af, beheert het DM-kanaal met Robert, geeft bench-aanvragen door, post het verslag in `#alpha-testing`, houdt het ledger bij, start de beta in het slot; spreekt op Discord als BlueFlame Bot (hoofdstuk 6) | Geen harde stop zonder Roberts ja per actie | `CLAUDE.md:18`, `CLAUDE.md:21`, `CLAUDE.md:60`, `CLAUDE.md:113`, `.claude/rules/discord.md:21-22` |
 | Ontwikkelsessie (developer) | Draait `/implement-next-task` als hoofdsessie met eigen subagents; host-tests rood en groen, `evaluate.py --quick`, eigen bump, commit, esp32-combo-build; vraagt een bench-run aan; pusht en publiceert na het OK | Flasht nooit | `CLAUDE.md:114`, `CLAUDE.md:21` |
-| `otgw-bench-tester` | Beheert alle hardware-units, flasht via OTA of USB, kiest de tests, legt bewijs vast en vinkt de bench-AC's af | Bouwt de taak niet | `CLAUDE.md:21`, `backlog/tasks/task-1826 - Process-one-bench-tester-agent-flashes-and-tests-every-unit-developers-request-it.md:23-25` |
+| `otgw-bench-tester` | Beheert alle hardware-units, flasht via OTA of USB, kiest de tests, legt bewijs vast en vinkt de bench-AC's af | Bouwt de taak niet | `CLAUDE.md:21`, `task-1826:23-25` |
 | Comms-sessie | Enige eigenaar van de notes-draft en de Discord-postdraft, bijgewerkt na elke push; spreekt ook als BlueFlame Bot (hoofdstuk 6) | Niet vermeld; CLAUDE.md definieert de rol niet | `.claude/skills/beta-release-2x/SKILL.md:72-73` |
 | Subagents | Implementeren, draaien gates, reviewen; rapporteren aan de hoofdsessie | Bumpen, committen en pushen nooit | `.claude/skills/implement-next-task/SKILL.md:42-43` |
 | Cloudsessie (Claude Code on the web) | Een SessionStart-hook zet de build-toolchain klaar als `CLAUDE_CODE_REMOTE` waar is | Een rol in de sessietopologie (berichten, bench, ledger) is niet gevonden in de repo | `.claude/hooks/session-start-build-toolchain.sh:2-16`, `.claude/settings.json:27` |
 
 Er zijn drie bench-units: .63 (Classic met PIC, de soak-unit voor beta's), .61 (OT-Direct) en .39 (OT-Direct, met USB, de vaste unit van `otgw-device-verify`). Volgens de gids voor een tweede machine staat het overzicht van alle units in het sessiegeheugen van de werkplek van de maintainer, niet in de repo (`docs/guides/second-machine-setup.md:44-46`); losse adressen staan wel in agent- en skillbestanden: .61 en .63 in de bench-gids en de beta-skill, .39 in de agentdefinitie (`docs/guides/agent-build-and-bench.md:82`, `.claude/skills/beta-release-2x/SKILL.md:80`, `.claude/agents/otgw-device-verify.md:10-13`; §11.7). Het ledger, de post-registers en de webhook leven buiten git (`docs/guides/second-machine-setup.md:9-18`).
 
-**Worktrees en lanes.** Werk op één lijn gaat direct op `dev`. Een extra worktree is er alleen voor een echt parallelle lane en verdwijnt direct na de merge; per live sessie geldt één worktree (`CLAUDE.md:170`). Die regel komt uit een waargenomen fout van 2026-05-29: twee sessies in één tree gaven indexcorruptie en botsende `.pio`-builds (`docs/guides/worktrees.md:37-45`). Afsluiten gaat volgens "Finish a lane": pushen, `git fetch --prune`, met `git cherry origin/dev <branch>` bewijzen dat het werk geland is, dan branch en worktree weg; andermans branch of vuile tree gaat naar de coordinator (`CLAUDE.md:24`, `docs/guides/worktrees.md:15-25`). Cross-line werk krijgt één masterplan dat Robert goedkeurt, daarna één taak en één agent per lijn (`CLAUDE.md:170`, `docs/guides/worktrees.md:67-86`).
+**Worktrees en lanes.** Werk op één lijn gaat direct op `dev`. Een extra worktree is er alleen voor een echt parallelle lane en verdwijnt direct na de merge; per live sessie geldt één worktree (`CLAUDE.md:170`). Die regel komt uit een waargenomen fout van 2026-05-29: twee sessies in één tree gaven indexcorruptie en botsende `.pio`-builds (`docs/guides/worktrees.md:37-45`). Afsluiten gaat volgens "Finish a lane": pushen, `git fetch --prune`, met `git cherry origin/dev <branch>` bewijzen dat het werk geland is, dan branch en worktree weg; andermans branch of vuile tree gaat naar de coördinator (`CLAUDE.md:24`, `docs/guides/worktrees.md:15-25`). Cross-line werk krijgt één masterplan dat Robert goedkeurt, daarna één taak en één agent per lijn (`CLAUDE.md:170`, `docs/guides/worktrees.md:67-86`).
 
 ### 5.2 Hoe sessies met elkaar praten
 
@@ -654,21 +654,21 @@ Er zijn drie dragers: berichten tussen sessies met de coördinator als knooppunt
 
 | Van | Naar | Drager | Inhoud | Bron |
 |---|---|---|---|---|
-| Developer | Coordinator | sessiebericht | Build-aankondiging vóór de start en bij het einde | `CLAUDE.md:113` |
-| Coordinator | Developers | sessiebericht | Build- of push-freeze | `CLAUDE.md:113` |
-| Developer | Coordinator, dan bench-tester | sessiebericht | Bench-aanvraag: githash, absoluut artefactpad, te controleren gedrag | `CLAUDE.md:21`, `docs/guides/agent-build-and-bench.md:9` |
-| Bench-tester | Coordinator, dan taaknotes | sessiebericht | Uitslag met bewijs; hij vinkt de bench-AC's zelf af | `CLAUDE.md:21` |
-| Pushende sessie | Coordinator | sessiebericht | Tag, commit, taken en bewijs | `.claude/rules/discord.md:21` |
+| Developer | Coördinator | sessiebericht | Build-aankondiging vóór de start en bij het einde | `CLAUDE.md:113` |
+| Coördinator | Developers | sessiebericht | Build- of push-freeze | `CLAUDE.md:113` |
+| Developer | Coördinator, dan bench-tester | sessiebericht | Bench-aanvraag: githash, absoluut artefactpad, te controleren gedrag | `CLAUDE.md:21`, `docs/guides/agent-build-and-bench.md:9` |
+| Bench-tester | Coördinator, dan taaknotities | sessiebericht | Uitslag met bewijs; hij vinkt de bench-AC's zelf af | `CLAUDE.md:21` |
+| Pushende sessie | Coördinator | sessiebericht | Tag, commit, taken en bewijs | `.claude/rules/discord.md:21` |
 | Pushende sessie | `#alpha-testing` | webhook via `scripts/discord-post-build.sh` | Flashzip met `-m "TASK-NNN: ..."`; weigert als de githash niet HEAD is of `src/` vuil is | `.claude/rules/discord.md:19`, `scripts/discord-post-build.sh:2-15` |
-| Coordinator | `#alpha-testing` | Discord MCP | Verslag in gewone taal; meerdere tags mogen in één bericht | `.claude/rules/discord.md:21` |
-| Coordinator | Ledger tegen git | `git log -G"_VERSION_PRERELEASE"` | Vóór elke post: elke tag die niet gepost of gedekt is, gaat mee met de volgende zip | `.claude/rules/discord.md:22` |
-| Elke sessie | Robert | Discord-DM via de coordinator | Eén vraag per bericht, opties met gevolgen, gewogen aanbeveling; nooit een blokkerende CLI-vraag (directive 2026-11-12, TASK-1829) | `CLAUDE.md:60` |
+| Coördinator | `#alpha-testing` | Discord MCP | Verslag in gewone taal; meerdere tags mogen in één bericht | `.claude/rules/discord.md:21` |
+| Coördinator | Ledger tegen git | `git log -G"_VERSION_PRERELEASE"` | Vóór elke post: elke tag die niet gepost of gedekt is, gaat mee met de volgende zip | `.claude/rules/discord.md:22` |
+| Elke sessie | Robert | Discord-DM via de coördinator | Eén vraag per bericht, opties met gevolgen, gewogen aanbeveling; nooit een blokkerende CLI-vraag (directive 2026-11-12, TASK-1829) | `CLAUDE.md:60` |
 | `/release-2x` | Alle live peers | `ListAgents` plus bericht | Freeze van dev-pushes en builds | `.claude/skills/release-2x/SKILL.md:70` |
 | `/update-docs-2x` | 2.0.0-lead-sessie | `ListAgents` plus bericht | Toestemming vóór een docs-push | `.claude/skills/update-docs-2x/SKILL.md:287` |
 
 Het ledger `.claude/alpha-build-ledger.local.md` staat in de hoofd-dev-tree en is gitignored; `scripts/alpha_ledger.py` bouwt het opnieuw op uit git en de lokale post-registers (`.claude/rules/discord.md:21`, `.gitignore:47`, `scripts/alpha_ledger.py:2-16`).
 
-In de taaknotes is de knooppuntrol breder dan de regeltekst: de coordinator wijst taken toe, geeft het GO voor een push en regelt een onafhankelijke review door een andere sessie (`backlog/tasks/task-1870 - ADR-225-raise-the-ESP32-S3-IPC-task-stack-ipc0-and-ipc1-to-at-least-1280-B-via-a-custom_sdkconfig-framework-lib-rebuild.md:38`, `backlog/tasks/task-1919 - An-app-image-that-the-bootloader-marked-ABORTED-keeps-running-but-never-confirms-itself-so-the-next-reset-of-any-kind-rolls-back-to-safeboot.md:52-56`).
+In de taaknotities is de knooppuntrol breder dan de regeltekst: de coördinator wijst taken toe, geeft het GO voor een push en regelt een onafhankelijke review door een andere sessie (`task-1870:38`, `task-1919:52-56`).
 
 ### 5.3 Subagents en modelverdeling
 
@@ -793,7 +793,7 @@ De repo telt 11 skills in `.claude/skills/`, 2 commands in `.claude/commands/`, 
 | Skill of command | Trigger | Doel | Kanalen | Toestemmingsniveau | Bron |
 |---|---|---|---|---|---|
 | `/implement-next-task` | "pak de volgende taak", "implement next task"; door het model aan te roepen | Doorlopende cyclus over het 2.0.0-backlog, taak voor taak | `#alpha-testing` (meldingen zijn notices), DM aan Robert, Sergeant D bij SAT, GitHub via `gh` | Autonoom; stopt voor PIC-flash, release, push naar `main`, force-push en andermans werk mergen | `.claude/skills/implement-next-task/SKILL.md:1-25`, `:57`, `:86`, `:132-133`, `:168-171` |
-| `/beta-release-2x` | Slot 08:00 of 20:00; door de coordinator zelf gestart | Publieke 2.x-beta vanaf `dev`: release-commit, build, 1 h soak, tag, draft-first prerelease | `#beta-testing`, `#alpha-testing`, GitHub Releases | Staande toestemming van Robert sinds 2026-11-14 | `CLAUDE.md:18`, `.claude/skills/beta-release-2x/SKILL.md:64-67` |
+| `/beta-release-2x` | Slot 08:00 of 20:00; door de coördinator zelf gestart | Publieke 2.x-beta vanaf `dev`: release-commit, build, 1 h soak, tag, draft-first prerelease | `#beta-testing`, `#alpha-testing`, GitHub Releases | Staande toestemming van Robert sinds 2026-11-14 | `CLAUDE.md:18`, `.claude/skills/beta-release-2x/SKILL.md:64-67` |
 | `/release-2x` | Alleen gebruiker | Stabiele 2.x-release op `release/2.x` | Aankondiging NL en EN, GitHub Releases, DM | Drie checkpoints; per actie een expliciete ja per DM | `.claude/skills/release-2x/SKILL.md:4`, `.claude/skills/release-2x/SKILL.md:43-69` |
 | `/update-docs-2x` | Alleen gebruiker, of release-mode vanuit de twee 2.x-releaseskills | Handleidingen EN en NL, API-docs en C4-docs bijwerken sinds de laatste v2-tag | Geen Discord; bericht aan de 2.0.0-lead-sessie | Vraagt toestemming vóór de push; één background-subagent tegelijk, die alleen docs wijzigt | `.claude/skills/update-docs-2x/SKILL.md:1-34`, `.claude/skills/update-docs-2x/SKILL.md:112-117`, `.claude/skills/update-docs-2x/SKILL.md:287-289` |
 | `/release` | Alleen gebruiker | Doorverwijzing naar de 1.x-releaseskill in de `otgw-1.x.x`-worktree | geen | Eigen proces staat op de 1.x-lijn | `.claude/skills/release/SKILL.md:1-43` |
@@ -801,7 +801,7 @@ De repo telt 11 skills in `.claude/skills/`, 2 commands in `.claude/commands/`, 
 | `/update-docs` | Alleen gebruiker | 1.x-documentatie-update; volledige kopie in de dev-tree | niet vermeld | Alleen 1.x-lijn | `.claude/skills/update-docs/SKILL.md:1-26` |
 | `/flash` | Alleen gebruiker | Bouwen en via USB flashen; verouderd, zie S7.11 | geen | Botst met de bench-tester-regel | `.claude/skills/flash/SKILL.md:1-20` |
 | `analyze-capture` | Een tester post of mailt een capture; Robert vraagt wat een ketel deed; door het model aan te roepen | Capture omzetten in getelde feiten, een verhaal in tijdsvolgorde en grafieken | niet vermeld | Geen eigen stop | `.claude/skills/analyze-capture/SKILL.md:1-11` |
-| `translate_webui_otgw-firmware` | Robert vraagt een nieuwe web-UI-taal, ontbrekende vertalingen of een review; door het model aan te roepen | Taalpakket toevoegen of bijwerken via het Workflow-script | Materiaal naar de comms-agent | Push na het go van de coordinator | `.claude/skills/translate_webui_otgw-firmware/SKILL.md:1-22`, `.claude/skills/translate_webui_otgw-firmware/SKILL.md:65-69` |
+| `translate_webui_otgw-firmware` | Robert vraagt een nieuwe web-UI-taal, ontbrekende vertalingen of een review; door het model aan te roepen | Taalpakket toevoegen of bijwerken via het Workflow-script | Materiaal naar de comms-agent | Push na het go van de coördinator | `.claude/skills/translate_webui_otgw-firmware/SKILL.md:1-22`, `.claude/skills/translate_webui_otgw-firmware/SKILL.md:65-69` |
 | `firmware-design-handoff` | Door het model aan te roepen; generieke skill | Design-system-pakket voor een on-device web-UI | geen | Geen eigen stop | `.claude/skills/firmware-design-handoff/SKILL.md:1-73` |
 | `/backlog_discord` | Stap 0 van de cyclus, of los | Onbeantwoorde berichten beantwoorden en backlog-verzoeken uit Discord afhandelen; zie hoofdstuk 6 | `#dev-sat-mqtt` (backlog-commando's) en `#alpha-testing` (gelezen, geen commando's) | Phase 0 draait altijd; Phase 1 stopt bij een watermerk jonger dan 5 minuten | `.claude/commands/backlog_discord.md:1-18`, `:27-41`, `.claude/skills/implement-next-task/SKILL.md:45-48` |
 | `/check_otgw_issues` | Handmatig | Discord, GitHub en Tweakers scannen op meldingen; zie hoofdstuk 6 | Discord, GitHub, Tweakers | Fixes pas na goedkeuring van de ontwikkelaar | `.claude/commands/check_otgw_issues.md:1-3` |
@@ -941,14 +941,14 @@ Bron per rij: de frontmatter van `.github/agents/<profiel>.agent.md` (regels 1-1
 
 | # | Spanning | Ene kant | Andere kant | Leidend |
 |---|---|---|---|---|
-| S5.1 | Wie post het verslag in `#alpha-testing` | De skill laat de sessie zelf posten (`.claude/skills/implement-next-task/SKILL.md:243-248`) | De pushende sessie meldt aan de coordinator, die het verslag post (`.claude/rules/discord.md:21`) | `.claude/rules/discord.md:21`; de skill zegt zelf dat `CLAUDE.md` wint (`.claude/skills/implement-next-task/SKILL.md:19-20`) |
+| S5.1 | Wie post het verslag in `#alpha-testing` | De skill laat de sessie zelf posten (`.claude/skills/implement-next-task/SKILL.md:243-248`) | De pushende sessie meldt aan de coördinator, die het verslag post (`.claude/rules/discord.md:21`) | `.claude/rules/discord.md:21`; de skill zegt zelf dat `CLAUDE.md` wint (`.claude/skills/implement-next-task/SKILL.md:19-20`) |
 | S5.2 | Developer controleert zelf de hardware | Stap 1 laat de sessie nagaan welke boards aangesloten zijn (`.claude/skills/implement-next-task/SKILL.md:127-129`) | De bench-tester beheert elke unit (`CLAUDE.md:21`) | `CLAUDE.md:21` |
 | S5.3 | `otgw-device-verify` bouwt en flasht buiten de regels om | USB-flash en eigen build via `scripts/device-verify.sh`, met een vast bench-adres en een vaste seriële poort (`.claude/agents/otgw-device-verify.md:11-21`); het script roept PlatformIO direct aan voor env `esp32` en flasht met `esptool` (`scripts/device-verify.sh:57-76`) | OTA eerst; alleen via de wrapper bouwen, nooit een directe `pio run`; op `dev` alleen `esp32-combo` (`CLAUDE.md:112-113`, `CLAUDE.md:115`) | `CLAUDE.md`; alleen de beschrijving van de agent is bijgewerkt (`.claude/agents/otgw-device-verify.md:3`) |
 | S5.4 | `/flash` → zie S7.11 | — | — | — |
 | S5.5 | Vertaalskill flasht zelf | De uitvoerende agent doet de OTA en de soak (`.claude/skills/translate_webui_otgw-firmware/SKILL.md:65-69`) | `CLAUDE.md:21` | `CLAUDE.md:21` |
 | S5.6 | Cloudsessie-hook bouwt direct met `build.py` → zie S8.8 | — | — | — |
 | S5.7 | Bench-tester zonder definitie → zie S7.10 | — | — | — |
-| S5.8 | Wie start de beta | De coordinator "itself" (`CLAUDE.md:18`, `.claude/skills/beta-release-2x/SKILL.md:64-66`) | De beta van 2026-11-15 20:00 is samengesteld, gebouwd en gepubliceerd door sessie 92, die vanuit een schone `wt-comms`-tree bouwde en elders "comms (92)" heet (`backlog/tasks/task-1928 - SAT-research-improvements-beyond-thermo-nova-self-tune-boost-detection-weather-heating-curve.md:36`); de soak deed de bench-tester (09) (`backlog/tasks/task-1982 - Public-beta-v2.0.0-beta.323-2026-11-15-20-00-slot.md:20`, `:40-46`) | `CLAUDE.md:18`; een delegatie is niet vastgelegd |
+| S5.8 | Wie start de beta | De coördinator "itself" (`CLAUDE.md:18`, `.claude/skills/beta-release-2x/SKILL.md:64-66`) | De beta van 2026-11-15 20:00 is samengesteld, gebouwd en gepubliceerd door sessie 92, die vanuit een schone `wt-comms`-tree bouwde en elders "comms (92)" heet (`backlog/tasks/task-1928 - SAT-research-improvements-beyond-thermo-nova-self-tune-boost-detection-weather-heating-curve.md:36`); de soak deed de bench-tester (09) (`task-1982:20`, `:40-46`) | `CLAUDE.md:18`; een delegatie is niet vastgelegd |
 | S5.9 | Delegatie aan de coördinator → zie S4.1 | — | — | — |
 | S5.10 | `AGENTS.md` buiten het core-blok | Schrijft `python build.py` voor en laat na Done direct committen en pushen (`AGENTS.md:117`, `AGENTS.md:36`) | Core-blok: alleen de wrapper, push na gates, freezes en bench-OK (`AGENTS.md:16`, `AGENTS.md:19-20`) | Het core-blok |
 | S5.11 | Copilot-restanten uit 1.x | De prompt maakt een `fix-issue-*`-branch, bumpt de patchversie met `autoinc-semver.py` en bouwt met `python build.py --firmware` (`.github/prompts/check-discord-issues.prompt.md:69-91`); de instructies noemen `addOTWGcmdtoqueue` (`.github/copilot-instructions.md:551`) | `addCommandToQueue()`, wrapper, direct op `dev` (`CLAUDE.md:22`, `CLAUDE.md:25`, `CLAUDE.md:170`) | `CLAUDE.md` |
@@ -976,7 +976,7 @@ Het ontwerp is daarmee **instructiegedreven**: wie wil weten wat de bot doet, le
 | Gezicht | Waar | Hoe | Bron |
 |---|---|---|---|
 | **BlueFlame Bot** (botaccount) | Discord-guild `812969634638725140`: kanalen en DM | `mcp__discord-mcp__*` via het lokale `saseq/discord-mcp`-proces | `docs/guides/discord-mcp-server.md:18`, `:38` |
-| **BlueFlame Build Bot** (webhook) | alleen #alpha-testing | `scripts/discord-post-build.sh`, multipart-upload van de flash-zip | `backlog/archive/tasks/task-1313 - Post-the-combo-flash-zip-to-alpha-testing-via-webhook-after-each-build.md:32`; `scripts/discord-post-build.sh:1-15` |
+| **BlueFlame Build Bot** (webhook) | alleen #alpha-testing | `scripts/discord-post-build.sh`, multipart-upload van de flash-zip | `task-1313:32`; `scripts/discord-post-build.sh:1-15` |
 | **Maintainer-account op GitHub** | issues, PR's en releases van `rvdbreemen/OTGW-firmware` | `gh` "is logged in as the maintainer"; een eigen GitHub-identiteit voor de bot is niet gevonden in de repo | `.claude/skills/implement-next-task/SKILL.md:57` |
 | **Anonieme lezer** | Tweakers-forumtopic 1653967 | `curl` op de RSS-feed, alleen lezen | `.claude/commands/check_otgw_issues.md:84-92` |
 
@@ -985,9 +985,9 @@ Op GitHub is de bot dus niet als bot herkenbaar: een commentaar dat om captures 
 **Twee stemmen achter de persona.**
 
 - De **coördinerende sessie** beheert de DM-route naar Robert, post de verslagen en houdt het alpha-ledger bij (`CLAUDE.md:18`, `:60`; `.claude/rules/discord.md:21`). Daarnaast post elke ontwikkelsessie die de cyclus draait haar eigen taak- en planmelding en haar zip (§3.3, §6.7.1).
-- De **comms-sessie** is een rol die alleen terloops is beschreven: "one owner, the comms session" voor het concept van de releasenotities en de Discord-post (`.claude/skills/beta-release-2x/SKILL.md:72-73`). Taaknotities met de markering "(comms)" laten zien wat zij in de praktijk doet: antwoorden en capture-verzoeken in de supportkanalen (`backlog/tasks/task-1544 - beta.1-follow-up-24-h-soak-and-macOS-capture-run-waived-for-v2.0.0-beta.1.md:45`; `backlog/tasks/task-1786 - Classic-S3-Mini-PIC-no-longer-detected-after-flashing-with-migrate.md:50`), een bevestiging op een PR (`backlog/tasks/task-1949 - Review-PR-702-Use-L-min-for-the-DHW-flow-rate-unit-in-Home-Assistant-discovery.md:39`), de beta-aankondiging toen de MCP in de releasesessie plat lag (`backlog/tasks/task-1745 - Public-beta-v2.0.0-beta.158-08-00-slot-over-beta.145-158.md:34`) en het nalopen van citaten in SAT-vragen als tweede lezer (`docs/sat/open-questions.md:237`, `:269`). CLAUDE.md definieert deze rol niet.
+- De **comms-sessie** is een rol die alleen terloops is beschreven: "one owner, the comms session" voor het concept van de releasenotities en de Discord-post (`.claude/skills/beta-release-2x/SKILL.md:72-73`). Taaknotities met de markering "(comms)" laten zien wat zij in de praktijk doet: antwoorden en capture-verzoeken in de supportkanalen (`task-1544:45`; `backlog/tasks/task-1786 - Classic-S3-Mini-PIC-no-longer-detected-after-flashing-with-migrate.md:50`), een bevestiging op een PR (`backlog/tasks/task-1949 - Review-PR-702-Use-L-min-for-the-DHW-flow-rate-unit-in-Home-Assistant-discovery.md:39`), de beta-aankondiging toen de MCP in de releasesessie plat lag (`task-1745:34`) en het nalopen van citaten in SAT-vragen als tweede lezer (`docs/sat/open-questions.md:237`, `:269`). CLAUDE.md definieert deze rol niet.
 
-**Drie technische paden.** Naast de MCP-tools en de webhook bestaat een derde pad: de **Discord REST API met het bottoken** uit de gebruikersomgeving. De comms-sessie leest er berichten "first-hand" mee (`docs/sat/sergeant-d-corrections.md:6503`), een ontwikkelsessie controleerde er een DM-antwoord van Robert mee (`backlog/tasks/task-1817 - SAT-self-tune-PWM-hours-count-for-the-warm-up-phase-Q-1796b-Robert-B-waits-for-Sergeant-D.md:46`), en `/beta-release-2x` noemt het als terugval voor posten als de MCP niet draait (`.claude/skills/beta-release-2x/SKILL.md:280-283`). Posten langs dit pad is niet aangetoond: bij TASK-1313 blokkeerde de auto-mode-classifier een POST met bottoken als "Credential Exploration" (`task-1313:32`), en daarom gaat de zip via een webhook.
+**Drie technische paden.** Naast de MCP-tools en de webhook bestaat een derde pad: de **Discord REST API met het bottoken** uit de gebruikersomgeving. De comms-sessie leest er berichten "first-hand" mee (`docs/sat/sergeant-d-corrections.md:6503`), een ontwikkelsessie controleerde er een DM-antwoord van Robert mee (`task-1817:46`), en `/beta-release-2x` noemt het als terugval voor posten als de MCP niet draait (`.claude/skills/beta-release-2x/SKILL.md:280-283`). Posten langs dit pad is niet aangetoond: bij TASK-1313 blokkeerde de auto-mode-classifier een POST met bottoken als "Credential Exploration" (`task-1313:32`), en daarom gaat de zip via een webhook.
 
 ```mermaid
 flowchart LR
@@ -1030,6 +1030,7 @@ flowchart LR
   classDef store fill:#ffffff,stroke:#56616c,color:#151a1f
   classDef ext fill:#f4f6f7,stroke:#56616c,color:#151a1f,stroke-dasharray:4 3
   classDef stop fill:#fde4e1,stroke:#b42318,color:#151a1f
+  classDef risk fill:#ffffff,stroke:#b42318,color:#151a1f,stroke-dasharray:4 3
   subgraph WS["Maintainer's Windows workstation"]
     TASK["Scheduled task<br/>OTGW Discord MCP<br/>at logon and every minute"]:::store
     SUP["supervise-discord-mcp.ps1<br/>single instance, port check every 30 s"]:::store
@@ -1137,7 +1138,7 @@ flowchart LR
   BF -.->|"in practice: replies, capture requests"| BT & ES & NL
 ```
 
-Voor de vier kanalen onderaan lopen **procedure en praktijk uiteen**. Volgens de commands zijn het luisterposten met een aankondigingsfunctie: `/check_otgw_issues` leest ze en post nergens (`.claude/commands/check_otgw_issues.md:155-212`, `:271-277`), en de gids noemt ze alleen "Read by `/check_otgw_issues`" (`docs/guides/discord-mcp-server.md:44-47`). In de praktijk antwoorden coördinator en comms-sessie er gebruikers (`backlog/tasks/task-1896 - SAT-a-PIC-measured-outside-temperature-DS18B20-on-the-gateway-boiler-without-MsgID-27-never-counts-as-valid-SAT-stays-handed-back-outside_temp_missing.md:57`). Sinds 2026-11-15 is #beta-testing bovendien een verzoek- en ontwerpkanaal: een tester vraagt er een feature, Robert vraagt de bot daar het beste ontwerp uit te zoeken, Sergeant D geeft ontwerpinput en de bot post een voorstel dat Robert met een reply goedkeurt (`backlog/tasks/task-1979 - HA-climate-entity-follows-SAT-when-SAT-is-enabled-target-temperature-and-presets-like-the-web-UI.md:25`; `docs/sat/sergeant-d-corrections.md:7324-7370`). De releasenotities sturen gebruikers ook zelf naar #beta-testing of #alpha-testing met hun capture-zip (`docs/releases/RELEASE_NOTES_2.0.0-beta.323.md:523-526`).
+Voor de vier kanalen onderaan lopen **procedure en praktijk uiteen**. Volgens de commands zijn het luisterposten met een aankondigingsfunctie: `/check_otgw_issues` leest ze en post nergens (`.claude/commands/check_otgw_issues.md:155-212`, `:271-277`), en de gids noemt ze alleen "Read by `/check_otgw_issues`" (`docs/guides/discord-mcp-server.md:44-47`). In de praktijk antwoorden coördinator en comms-sessie er gebruikers (`backlog/tasks/task-1896 - SAT-a-PIC-measured-outside-temperature-DS18B20-on-the-gateway-boiler-without-MsgID-27-never-counts-as-valid-SAT-stays-handed-back-outside_temp_missing.md:57`). Sinds 2026-11-15 is #beta-testing bovendien een verzoek- en ontwerpkanaal: een tester vraagt er een feature, Robert vraagt de bot daar het beste ontwerp uit te zoeken, Sergeant D geeft ontwerpinput en de bot post een voorstel dat Robert met een reply goedkeurt (`task-1979:25`; `docs/sat/sergeant-d-corrections.md:7324-7370`). De releasenotities sturen gebruikers ook zelf naar #beta-testing of #alpha-testing met hun capture-zip (`docs/releases/RELEASE_NOTES_2.0.0-beta.323.md:523-526`).
 
 ### 6.4 Drie lussen, vier paden
 
@@ -1241,6 +1242,7 @@ flowchart TD
   classDef human fill:#fde7d9,stroke:#c2410c,color:#151a1f
   classDef store fill:#ffffff,stroke:#56616c,color:#151a1f
   classDef stop fill:#fde4e1,stroke:#b42318,color:#151a1f
+  classDef risk fill:#ffffff,stroke:#b42318,color:#151a1f,stroke-dasharray:4 3
   E{"all three watermarks<br/>younger than 2 hours?"}:::gate
   STOP["Nothing new since last check"]:::store
   D["Discord: 4 channels x 25<br/>skip maintainer and bots"]:::agent
@@ -1297,6 +1299,7 @@ flowchart LR
   classDef ext fill:#f4f6f7,stroke:#56616c,color:#151a1f,stroke-dasharray:4 3
   classDef stop fill:#fde4e1,stroke:#b42318,color:#151a1f
   classDef store fill:#ffffff,stroke:#56616c,color:#151a1f
+  classDef risk fill:#ffffff,stroke:#b42318,color:#151a1f,stroke-dasharray:4 3
   P0["Phase 0 sweep<br/>before every task, replies"]:::agent
   P1["Phase 1 to 4<br/>backlog commands"]:::agent
   S0B["Step 0b GitHub sweep<br/>before every task, replies"]:::agent
@@ -1462,7 +1465,7 @@ sequenceDiagram
   end
 ```
 
-Bronnen: `CLAUDE.md:18`, `:60`; `backlog/tasks/task-1829 - Agent-rule-questions-to-Robert-only-by-Discord-DM-never-as-an-interactive-CLI-question-asynchronous-in-the-session-when-DM-is-unavailable.md:23`, `:38`; `backlog/tasks/task-1955 - esp32-combo-app-slot-at-93.8-141-KB-headroom-left-in-ota_0-beta.287.md:35`. De regel dateert van 2026-11-12 en vervangt de interactieve vraag van 2026-10-29.
+Bronnen: `CLAUDE.md:18`, `:60`; `task-1829:23`, `:38`; `backlog/tasks/task-1955 - esp32-combo-app-slot-at-93.8-141-KB-headroom-left-in-ota_0-beta.287.md:35`. De regel dateert van 2026-11-12 en vervangt de interactieve vraag van 2026-10-29.
 
 Sinds 2026-11-15 bestaat daarnaast een bredere delegatie aan de coördinator (§3.4; uitgewerkt in S4.1).
 
@@ -1503,8 +1506,8 @@ De dialoog loopt in #alpha-testing en #dev-sat-mqtt en sinds 2026-11-15 ook in #
 | Watermerk backlog-bot | `.claude/discord_backlog_last_checked.txt` | nee: gitignored en afwezig in deze checkout | `/backlog_discord` Phase 1 | `.claude/commands/backlog_discord.md:16`, `:45`; `.gitignore:74-78` |
 | Watermerken monitor | `.claude/discord_last_checked.txt`, `github_last_checked.txt`, `tweakers_last_checked.txt`, alle drie `2026-11-14T21:15:27Z` | ja, ondanks `.gitignore` | `/check_otgw_issues` | `.claude/discord_last_checked.txt:1`; `.gitignore:74-78` |
 | People-file | `.claude/discord-people.local.md`, sjabloon `.claude/discord-people.example.md` | nee | Robert | `.claude/discord-people.example.md:1-9` |
-| Gepubliceerde tags | `%LOCALAPPDATA%\OTGW-capture\published-tags.txt`, gedeeld door alle worktrees | nee | post-script | `scripts/discord-post-build.sh:63-80`, `:140` |
-| Postlog | `published-posts.tsv` naast de tags: tijd, tag, versie, bericht-ID, `-m`-tekst | nee | post-script | `scripts/discord-post-build.sh:141-145` |
+| Gepubliceerde tags | `%LOCALAPPDATA%\OTGW-capture\published-tags.txt`, gedeeld door alle worktrees | nee | postscript | `scripts/discord-post-build.sh:63-80`, `:140` |
+| Postlog | `published-posts.tsv` naast de tags: tijd, tag, versie, bericht-ID, `-m`-tekst | nee | postscript | `scripts/discord-post-build.sh:141-145` |
 | Alpha-ledger | `.claude/alpha-build-ledger.local.md`, herbouwbaar met `python scripts/alpha_ledger.py --last 40` | nee | coördinator | `.claude/rules/discord.md:21-22`; `docs/guides/second-machine-setup.md:12` |
 | SAT-register en wachtrij | `docs/sat/sergeant-d-corrections.md`, `docs/sat/open-questions.md` | ja | de sessie die het antwoord verwerkt | `.claude/rules/sat-ground-truth.md:21-23` |
 
@@ -1540,7 +1543,7 @@ Elke rij noemt beide kanten met citaat en wat leidend is. CLAUDE.md wint van elk
 | S6.8 | kanalen | Gat voor verzoeken en besluiten in #beta-testing | Phase 0 leest alleen #alpha-testing en #dev-sat-mqtt (`.claude/commands/backlog_discord.md:31`); `/check_otgw_issues` sluit de maintainer uit en kent geen SAT-stap (`.claude/commands/check_otgw_issues.md:48-53`) | Robert vraagt de bot daar iets uit te zoeken (`task-1979:25`); Sergeant D besluit er (`docs/sat/sergeant-d-corrections.md:7326`) | Niet geregeld in de repo; "record before implement" geldt in elk kanaal (`.claude/rules/sat-ground-truth.md:21`) |
 | S6.9 | kanalen | Kanaal van de SAT-dialoog | "answer him in `#alpha-testing`" (`.claude/commands/backlog_discord.md:20`); "one question at a time in #alpha-testing" (`docs/sat/open-questions.md:4-5`) | "SAT simulation rounds" in #dev-sat-mqtt (`docs/guides/discord-mcp-server.md:43`); een ronde op Roberts order verplaatst (`docs/sat/open-questions.md:160-161`); sinds 2026-11-15 #beta-testing (`docs/sat/sergeant-d-corrections.md:7350`) | Onbeslist: `.claude/rules/sat-ground-truth.md:23` noemt geen kanaal |
 | S6.10 | kanalen | Reikwijdte van de MCP in de regels | "Discord I/O for `#dev-sat-mqtt` and the support channels" (`.claude/rules/discord.md:12`) | De gids noemt ook #alpha-testing en #beta-testing; DM's zijn de vaste route naar Robert (`docs/guides/discord-mcp-server.md:40-47`; `CLAUDE.md:60`) | De gids en CLAUDE.md |
-| S6.11 | kanalen | Zonder people-file alleen Sergeant D en Robert | "Without that file, answer only Sergeant D and Robert" (`docs/guides/discord-mcp-server.md:57-59`; `.claude/commands/backlog_discord.md:19`) | Eindgebruikers in supportkanalen krijgen antwoord (`task-1544:45`) | Niet te bepalen: het lokale bestand zit niet in de checkout |
+| S6.11 | kanalen | Zonder people-bestand alleen Sergeant D en Robert | "Without that file, answer only Sergeant D and Robert" (`docs/guides/discord-mcp-server.md:57-59`; `.claude/commands/backlog_discord.md:19`) | Eindgebruikers in supportkanalen krijgen antwoord (`task-1544:45`) | Niet te bepalen: het lokale bestand zit niet in de checkout |
 | S6.12 | kanalen | "Check the chat every hour" zonder mechanisme | "Check the chat every hour" (`.claude/rules/sat-ground-truth.md:23`) | `/backlog_discord` draait alleen vóór elke taak (`.claude/skills/implement-next-task/SKILL.md:47`); geen planner gevonden | De regel; hoe het uurritme wordt afgedwongen is niet gevonden in de repo |
 | S6.13 | kanalen | Eén vraag per bericht, met uitzonderingen | "one question per Discord message" (`.claude/rules/sat-ground-truth.md:23`) | Overzicht Q2-Q28 in één keer (`docs/sat/open-questions.md:49-52`); alle 13 vragen tegelijk op Roberts order (`:389`) | De regel; uitzonderingen alleen op order van Robert, per rij vastgelegd |
 | S6.14 | kanalen | Engels tegenover een Nederlandse post | "Answer in English" (`CLAUDE.md:26`) | "Dutch in `#nederlandse-ondersteuning`" (`.claude/skills/release-2x/SKILL.md:191`) | CLAUDE.md formeel; de NL-post is een aankondiging, geen antwoord, en gaat langs CHECKPOINT 3 |
@@ -1734,7 +1737,7 @@ Een definitiebestand voor `otgw-bench-tester` is niet gevonden in de repo; `.cla
 
 ### 7.6 Push, zip en ledger
 
-Na het OK van de bench-tester volgen push, zip-post, verslag en ledgerregel, in die volgorde (`docs/guides/agent-build-and-bench.md:9`). Een rebase vóór de push betekent een nieuwe build vanaf de gerebasede HEAD, omdat het post-script een zip weigert waarvan de githash niet HEAD is; de bench-tester flasht en controleert die zip opnieuw (`docs/guides/agent-build-and-bench.md:9`). De Discord-kant van deze stap (wie wat in welk kanaal zegt) staat in §6.7; hier alleen het pijplijndeel.
+Na het OK van de bench-tester volgen push, zip-post, verslag en ledgerregel, in die volgorde (`docs/guides/agent-build-and-bench.md:9`). Een rebase vóór de push betekent een nieuwe build vanaf de gerebasede HEAD, omdat het postscript een zip weigert waarvan de githash niet HEAD is; de bench-tester flasht en controleert die zip opnieuw (`docs/guides/agent-build-and-bench.md:9`). De Discord-kant van deze stap (wie wat in welk kanaal zegt) staat in §6.7; hier alleen het pijplijndeel.
 
 | Onderdeel | Wat het doet | Bron |
 |---|---|---|
@@ -1799,7 +1802,7 @@ flowchart LR
 
 | Product | Lijn en tag | Skill | Wie start | Poorten | Kanaal | Bron |
 |---|---|---|---|---|---|---|
-| Alpha-zip | `dev`, elke `2.0.0-beta.N`-bump van een firmwaretaak | skillstap 9 van `/implement-next-task` | De pushende sessie | Bench-OK, weigeringen van het post-script | #alpha-testing (webhook) | `.claude/skills/beta-release-2x/SKILL.md:47-50`, `.claude/rules/discord.md:18-22` |
+| Alpha-zip | `dev`, elke `2.0.0-beta.N`-bump van een firmwaretaak | skillstap 9 van `/implement-next-task` | De pushende sessie | Bench-OK, weigeringen van het postscript | #alpha-testing (webhook) | `.claude/skills/beta-release-2x/SKILL.md:47-50`, `.claude/rules/discord.md:18-22` |
 | Publieke 2.x-beta | `dev`, annotated tag `v2.0.0-beta.N` op de release-commit, GitHub-prerelease met `--latest=false` | `/beta-release-2x` | De coördinator zelf, op staand mandaat (Robert, 2026-11-14) | Hoogstens één per 12 uur in het slot; 1 uur soak op `.63`, geen soak-waiver; draft eerst | GitHub Releases, #beta-testing | `CLAUDE.md:18`, `.claude/skills/beta-release-2x/SKILL.md:47-90`, `.claude/skills/beta-release-2x/SKILL.md:326-330` |
 | Stabiele 2.x | `release/2.x`, tag `v<v>` | `/release-2x` (`disable-model-invocation: true`) | Robert, met een ja per actie via DM | Drie checkpoints; 24 uur soak, captureruns op Windows, Linux en macOS; push- en buildfreeze; bench minimaal 30 minuten | GitHub Releases, #nederlandse-ondersteuning, #english-support, #beta-testing | `.claude/skills/release-2x/SKILL.md:43-70`, `.claude/skills/release-2x/SKILL.md:159`, `.claude/skills/release-2x/SKILL.md:189-202` |
 | 1.x beta en stabiel | `otgw-1.x.x`, stabiel naar `main` | `/beta-prerelease`, `/release` (in de `dev`-tree alleen doorverwijzingen) | Robert | De gezaghebbende skill staat in de `otgw-1.x.x`-worktree; nooit vanuit `dev` | Volgens de 1.x-skill (buiten deze checkout) | `CLAUDE.md:158`, `.claude/skills/release/SKILL.md:20-43`, `.claude/skills/beta-prerelease/SKILL.md:33-36` |
@@ -1855,7 +1858,7 @@ sequenceDiagram
 | T-62 | Flash op `.63`; deze flash start de soak van 1 uur. Elke nieuwe flash herstart de soak | `.claude/skills/beta-release-2x/SKILL.md:80-81`, `.claude/skills/beta-release-2x/SKILL.md:55-56` |
 | T | Soakoordeel, dan tag, draft, verificatie, publicatie en posts. Geen rebuild: de gesoakte binary is de gepubliceerde binary | `.claude/skills/beta-release-2x/SKILL.md:82-84` |
 | Bij een fout | Publiceren zodra een soak van 1 uur van de herstelde build klaar kan zijn; het slot vervalt alleen als de fix nieuwe firmware vraagt | `.claude/skills/beta-release-2x/SKILL.md:85-86` |
-| Na publicatie | Staat de tag al in de lokale post-ledger, dan draait het post-script niet en volgt alleen een notitie in #alpha-testing | `.claude/skills/beta-release-2x/SKILL.md:251-277` |
+| Na publicatie | Staat de tag al in de lokale post-ledger, dan draait het postscript niet en volgt alleen een notitie in #alpha-testing | `.claude/skills/beta-release-2x/SKILL.md:251-277` |
 
 Releases zijn immutable: eerst een draft, assets controleren, dan publiceren; een verwijderde release verbrandt de tagnaam (`.claude/skills/beta-release-2x/SKILL.md:326-329`). Hoe de coördinator het moment T-75 bewaakt (scheduler of handmatig) is niet gevonden in de repo.
 
@@ -1883,7 +1886,7 @@ flowchart TB
   subgraph WS["Windows workstation - not in git"]
     LK["OTGW-build/build.lock"]:::gate
     PT["OTGW-capture/published-tags.txt<br/>published-posts.tsv"]:::store
-    WH["OTGW-capture/discord-alpha-webhook.url<br/>secret"]:::stop
+    WH["OTGW-capture/discord-alpha-webhook.url<br/>secret"]:::store
     LD[".claude/alpha-build-ledger.local.md"]:::store
     ARC["../OTGW-build-archive/semver.zip"]:::store
     MEM["Session memory<br/>bench unit addresses"]:::store
@@ -1912,7 +1915,7 @@ flowchart TB
 | Webhook voor de zips | `%LOCALAPPDATA%\OTGW-capture\discord-alpha-webhook.url` | Nee, geheim | Nieuwe webhook op het kanaal aanmaken; nooit printen of committen | `docs/guides/second-machine-setup.md:15` |
 | Alpha/beta-ledger | `.claude/alpha-build-ledger.local.md` in de hoofd-`dev`-tree | Nee, gitignored | `python scripts/alpha_ledger.py --last 40` | `docs/guides/second-machine-setup.md:12` |
 | Build-archief | `../OTGW-build-archive/<semver>.zip`, gedeeld door de worktrees | Nee | Niet beschreven in de repo | `config.py:16-21` |
-| Benchunits | Sessiegeheugen van de hoofdwerkplek | Nee | Via het MAC-adres in de ARP-tabel van de router | `docs/guides/second-machine-setup.md:42-46` |
+| Benchunits | Sessiegeheugen van de werkplek van de maintainer | Nee | Via het MAC-adres in de ARP-tabel van de router | `docs/guides/second-machine-setup.md:42-46` |
 | Code, tags, releases, taken | Git en GitHub | Ja | `git clone` plus submodules | `docs/guides/second-machine-setup.md:5` |
 
 Een cloud-sessie richt bij de start zelf de toolchain in en zet het build-stempel daarna terug (`.claude/hooks/session-start-build-toolchain.sh:13-67`). Zo'n sessie heeft geen `LOCALAPPDATA`, dus geen webhook en geen post-ledger: `discord-post-build.sh` hoort in Git Bash op de werkplek te draaien (`docs/guides/second-machine-setup.md:30-31`).
@@ -1925,7 +1928,7 @@ Een cloud-sessie richt bij de start zelf de toolchain in en zet het build-stempe
 | S7.2 | De release-skills bouwen met `build.py` direct en leiden de uitvoer om | `./.build-python/python.exe build.py` (`.claude/skills/beta-release-2x/SKILL.md:172`, `.claude/skills/release-2x/SKILL.md:141`) | Alleen de wrappers; omleiden gaf bestanden van 0 bytes (`CLAUDE.md:112`, `docs/guides/agent-build-and-bench.md:25-28`) | `CLAUDE.md:112`. Ook de cloud-hook roept `build.py` direct aan, buiten de wrapper maar wel onder de lock die in `build.py` zit (`.claude/hooks/session-start-build-toolchain.sh:48`, `build.py:3291-3294`); CI draait `pio run` direct, buiten wrapper én lock (`.github/workflows/build.yml:74`) |
 | S7.3 | De beta-skill beschrijft CI onjuist | `build.yml` zou alleen op PR's draaien (`.claude/skills/beta-release-2x/SKILL.md:32-34`) | Ook op push naar `dev` sinds TASK-1626 (`.github/workflows/build.yml:18-27`) | Het workflowbestand |
 | S7.4 | Restanten van de oude beta-flow in dezelfde skill | Phase 4 eist nog "origin/dev must still be the parent", tagt de "bump commit" en stuurt "beta.N tag out" (`.claude/skills/beta-release-2x/SKILL.md:203`, `:205-209`, `:245`) | Die checks vervallen en de tag gaat op de docs-only release-commit (`.claude/skills/beta-release-2x/SKILL.md:82`, `:87-90`, `:154-157`) | De latere directive van 2026-11-15 |
-| S7.5 | Praktijk wijkt af van de slotregel | Tag en draft pas op T na het soakoordeel (`.claude/skills/beta-release-2x/SKILL.md:82-84`) | Bij beta.323 zijn tag en draft om 18:38 gemaakt, het soakoordeel kwam om 19:38 en de publicatie om 20:00:21 (`backlog/tasks/task-1982 - Public-beta-v2.0.0-beta.323-2026-11-15-20-00-slot.md:42`, `:44`) | De skill; de taak toont de afwijking |
+| S7.5 | Praktijk wijkt af van de slotregel | Tag en draft pas op T na het soakoordeel (`.claude/skills/beta-release-2x/SKILL.md:82-84`) | Bij beta.323 zijn tag en draft om 18:38 gemaakt, het soakoordeel kwam om 19:38 en de publicatie om 20:00:21 (`task-1982:42`, `:44`) | De skill; de taak toont de afwijking |
 | S7.6 | Wie de beta uitvoert → zie S5.8 | — | — | — |
 | S7.7 | Naam van de prerelease | "dev builds after beta.1 are 2.0.1-alpha.N" en buildtag `2.0.0-alpha.N+hash` (`scripts/discord-post-build.sh:66-68`, `.claude/skills/implement-next-task/SKILL.md:246`) | `version.h` staat op `beta.327`; elke taak houdt een `2.0.0-beta.N`-bump (`src/OTGW-firmware/version.h:8-16`, `.claude/skills/beta-release-2x/SKILL.md:47-49`) | `version.h` en de beta-skill |
 | S7.8 | De hooktekst stuurt naar de foute handeling | De pre-commit-melding en de hooks-README zeggen `version.h` en `data/version.hash` te stagen (`.githooks/pre-commit:31-34`, `.githooks/README.md:22-28`) | Niet met de hand alleen die twee stagen; het bump-script staget alle banners (`docs/guides/versioning-policy.md:25-30`) | Het versiebeleid |
@@ -2145,6 +2148,7 @@ flowchart LR
   classDef ext fill:#f4f6f7,stroke:#56616c,color:#151a1f,stroke-dasharray:4 3
   classDef stop fill:#fde4e1,stroke:#b42318,color:#151a1f
   classDef ship fill:#e3f1e4,stroke:#2f7d32,color:#151a1f
+  classDef risk fill:#ffffff,stroke:#b42318,color:#151a1f,stroke-dasharray:4 3
 
   E["Edit"]:::agent --> R1
   subgraph R1["Ring 1: Claude hooks"]
@@ -2174,9 +2178,9 @@ flowchart LR
     G9["adr-governance.yml<br/>ADR paths only"]:::gate
   end
   R5 --> OUT["Published build"]:::ship
-  BY["Bypass variables and --no-verify"]:::stop -.-> R2
-  BASH["Bash edit of a task file"]:::stop -.->|"not checked"| G1
-  CONV["Convention only: hard stops, wrapper build,<br/>bench-tester flashes, DM route"]:::stop -.-> OUT
+  BY["Bypass variables and --no-verify"]:::risk -.-> R2
+  BASH["Bash edit of a task file"]:::risk -.->|"not checked"| G1
+  CONV["Convention only: hard stops, wrapper build,<br/>bench-tester flashes, DM route"]:::risk -.-> OUT
 ```
 
 | Ring | Mechanisme | Omvang | Waar het draait | Bron |
@@ -2647,7 +2651,7 @@ flowchart TD
 | Verzoek van een tester | Label `needs-maintainer-ok` en een notitie met de naam van de tester | `.claude/commands/backlog_discord.md:21` |
 | Oppakken | `In Progress` als eerste actie, daarna `/adr-kit:context`; voor SAT het register | `CLAUDE.md:38`; `.claude/skills/implement-next-task/SKILL.md:141-143` |
 | SAT-antwoord | Genummerde entry vóór de implementatie; daarna een backlogtaak per besluit | `.claude/rules/sat-ground-truth.md:21`; `.claude/rules/sat-ground-truth.md:23` |
-| ADR | Proposed bij de taak zelf sinds 2026-10-20, nooit door de agent zelf geaccepteerd; acceptatie door Robert, sinds 2026-11-12 als antwoord op een DM (hoofdstuk 10) | `.claude/skills/implement-next-task/SKILL.md:159-161`; `.wolf/cerebrum.md:178`; `.claude/adr-kit-guide.md:55`; `backlog/tasks/task-1817 - SAT-self-tune-PWM-hours-count-for-the-warm-up-phase-Q-1796b-Robert-B-waits-for-Sergeant-D.md:46` |
+| ADR | Proposed bij de taak zelf sinds 2026-10-20, nooit door de agent zelf geaccepteerd; acceptatie door Robert, sinds 2026-11-12 als antwoord op een DM (hoofdstuk 10) | `.claude/skills/implement-next-task/SKILL.md:159-161`; `.wolf/cerebrum.md:178`; `.claude/adr-kit-guide.md:55`; `task-1817:46` |
 | Done | AC's met bewijs uit dezelfde sessie, eindsamenvatting per AC | `CLAUDE.md:48` |
 | Kennis bijwerken | `graphify update src`, entry in `buglog.json`, les in `cerebrum.md` | `.claude/skills/implement-next-task/SKILL.md:237-238` |
 | Documentatie | `/update-docs-2x`, standalone of in releasemodus, met fase 3C voor C4 | `.claude/skills/update-docs-2x/SKILL.md:174-181` |
@@ -2747,7 +2751,7 @@ flowchart LR
 | Onderdeel | Soort | Wat het doet | Bron |
 |---|---|---|---|
 | `/adr-kit:context <topic>` | skill | Geeft de relevante Accepted ADR's voor een onderwerp; in de cyclus sinds 2026-07-09 (TASK-708) | `CLAUDE.md:174`, `backlog/archive/tasks/task-708 - choreadr-kit-adopt-adr-kit-context-once-available-—-wire-into-agent-prompts.md:34` |
-| `bin/adr-context` | script | Zoeker achter de skill, met vijf gewogen signalen: exact trefwoord 0,40, domeintag 0,25, gerelateerde besluiten 0,15, status 0,10, recentheid 0,10 | `bin/adr-context:1-14`, `bin/adr-context:228-249`, `backlog/archive/tasks/task-708 - choreadr-kit-adopt-adr-kit-context-once-available-—-wire-into-agent-prompts.md:21` |
+| `bin/adr-context` | script | Zoeker achter de skill, met vijf gewogen signalen: exact trefwoord 0,40, domeintag 0,25, gerelateerde besluiten 0,15, status 0,10, recentheid 0,10 | `bin/adr-context:1-14`, `bin/adr-context:228-249`, `task-708:21` |
 | `/adr-kit:adr` | skill | Schrijft één ADR, delegeert aan `adr-generator` en draait de vier poorten; het model mag hem zelf aanroepen | `.claude/adr-kit-guide.md:29` |
 | `adr-generator` | subagent | Schrijft één volledig ADR-bestand; schrijft geen code en bewerkt geen andere bestanden. Model `sonnet` in de gevendorde kopie; het model van de geïnstalleerde versie is niet gevonden in de repo | `tools/adr-kit/agents/adr-generator.md:1-12` |
 | `/adr-kit:judge`, `/adr-kit:guardian` | commando | Diff beoordelen tegen ADR's; gezondheidssweep. Het model mag ze zelf aanroepen | `.claude/adr-kit-guide.md:30`, `.claude/adr-kit-guide.md:36` |
@@ -2791,10 +2795,10 @@ stateDiagram-v2
 | Stap | Wat er gebeurt | Wie | Bron |
 |---|---|---|---|
 | 1. Aanleiding | Architectuurwijziging, nieuwe of vervangen dependency, wijziging van API-contract of build-tooling. Niet voor refactors, bugfixes of kleine features binnen bestaande patronen | ontwikkelagent | `CLAUDE.md:105-106` |
-| 2. Nummer | De coördinator reserveert het volgende ADR-nummer | coördinator | `backlog/tasks/task-1805 - OT-Direct-gateway-mode-rewrites-MsgID-0-bits-1-2-4-5-and-6-like-the-PIC-HW-SM-BW-CE-H2-new-ADR-superseding-ADR-208.md:38` |
+| 2. Nummer | De coördinator reserveert het volgende ADR-nummer | coördinator | `task-1805:38` |
 | 3. Proposed | `/adr-kit:adr` of `adr-generator` schrijft `docs/adr/ADR-NNN-kebab-titel.md` met status Proposed | subagent | `.claude/adr-kit-guide.md:49-56` |
 | 4. Vier poorten | Completeness, Evidence, Clarity, Consistency. De eerste en de laatste zijn deterministisch, de middelste twee heuristisch | `adr-lint`, `adr accept` | `.claude/adr-kit-guide.md:38-47` |
-| 5. Goedkeuring | Robert accepteert elke ADR afzonderlijk. Sinds 2026-11-12 is zijn antwoord op een Discord-DM het bewijs; tot en met 2026-11-11 was dat een interactieve vraag in de sessie | Robert | `backlog/tasks/task-1817 - SAT-self-tune-PWM-hours-count-for-the-warm-up-phase-Q-1796b-Robert-B-waits-for-Sergeant-D.md:46`, `backlog/tasks/task-1805 - OT-Direct-gateway-mode-rewrites-MsgID-0-bits-1-2-4-5-and-6-like-the-PIC-HW-SM-BW-CE-H2-new-ADR-superseding-ADR-208.md:44` |
+| 5. Goedkeuring | Robert accepteert elke ADR afzonderlijk. Sinds 2026-11-12 is zijn antwoord op een Discord-DM het bewijs; tot en met 2026-11-11 was dat een interactieve vraag in de sessie | Robert | `task-1817:46`, `task-1805:44` |
 | 6. Accepted | `adr accept --confirm` draait een strengere lint dan de maplint: niet-uitgeschreven acroniemen en onbekende Enforcement-sleutels blokkeren | beherende sessie | `.wolf/cerebrum.md:107` |
 | 7. Immutabel | Alleen de Status-regel en een aangevulde Status History mogen nog veranderen | iedereen | `.claude/adr-kit-guide.md:102-110` |
 | 8. Supersede of amend | Supersede als het oude besluit vervalt; amend als het blijft staan en één aspect smaller of breder wordt | nieuwe ADR | `tools/adr-kit/instructions/adr.coding.md:36-43` |
@@ -2981,7 +2985,7 @@ sequenceDiagram
 | S10.2 | Poort van ADR-101 en ADR-177 | `CLAUDE.md:80` en `CLAUDE.md:82` noemen `bin/adr-judge` als poort; `.githooks/README.md:17-20` beschrijft de adr-kit-gate als actieve pas | `.githooks/pre-commit:50-53`: "DISABLED 2026-05-31 by user request". Geen CI-workflow draait adr-judge, en `adr_governance.py lint` toetst alleen `check_*`-namen (`scripts/adr_governance.py:159-163`). Deze twee binding ADR's hebben nu geen automatische poort |
 | S10.3 | Kit-ontwerp tegenover de projecthook | `.claude/adr-kit-guide.md:89-90`: declaratieve pas "always-on", LLM-pas "opt-in as of v0.17.0" | `.githooks/pre-commit:53` schakelt beide passen samen uit; staat de stap aan, dan geeft `.githooks/pre-commit:88` altijd `--llm` mee |
 | S10.4 | CI-bereik van de lijstcontrole | `CLAUDE.md:76`: de test faalt als de binding-lijst afwijkt | `.github/workflows/adr-governance.yml:20-33`: de workflow start niet bij een wijziging in alleen `CLAUDE.md` of `AGENTS.md`; dan bewaakt alleen een lokale testrun de lijst |
-| S10.5 | Vier versies naast elkaar, op de vier plekken van §10.1 | `tools/adr-kit/.claude-plugin/plugin.json:4`: 0.11.0; `.claude/adr-kit-guide.md:1`: 0.30.5 | `.wolf/cerebrum.md:106`: geïnstalleerd 0.61.0; `bin/adr-judge` "v0.12.0+" (`bin/adr-judge:1-35`). Op 2026-07-09 was 0.31.0 geïnstalleerd (`backlog/archive/tasks/task-708 - choreadr-kit-adopt-adr-kit-context-once-available-—-wire-into-agent-prompts.md:34`); dat is historie, geen vijfde kopie. `/adr-kit:context` is verplicht (`CLAUDE.md:174`) maar staat niet in de commandotabel van de gids (`.claude/adr-kit-guide.md:24-36`) |
+| S10.5 | Vier versies naast elkaar, op de vier plekken van §10.1 | `tools/adr-kit/.claude-plugin/plugin.json:4`: 0.11.0; `.claude/adr-kit-guide.md:1`: 0.30.5 | `.wolf/cerebrum.md:106`: geïnstalleerd 0.61.0; `bin/adr-judge` "v0.12.0+" (`bin/adr-judge:1-35`). Op 2026-07-09 was 0.31.0 geïnstalleerd (`task-708:34`); dat is historie, geen vijfde kopie. `/adr-kit:context` is verplicht (`CLAUDE.md:174`) maar staat niet in de commandotabel van de gids (`.claude/adr-kit-guide.md:24-36`) |
 | S10.6 | ADR-formaat | `CLAUDE.md:103`: "Status / Context / Decision / Consequences / Related" | `docs/adr/.adr-kit.json:8-17` eist zes secties, waaronder Alternatives Considered en References |
 | S10.7 | Status volgens index en frontmatter | `docs/adr/README.md:1079-1086`: de gegenereerde index telt 199 Accepted | Frontmatter: 196 Accepted (`scripts/adr_governance.py:72-82`); ADR-124, ADR-140 en ADR-141 wijken af. Alle drie hebben in hun `## Status`-sectie een vette "Superseded by"- of "Amended by"-regel boven de oude "Accepted"-regel; dat `adr-index` die tweede regel leest, is een vermoeden: de tool staat niet in de repo (`.wolf/cerebrum.md:106`) |
 | S10.8 | Guardian-state | `.claude/adr-kit-guide.md:180`: "gitignored, per-machine" | `docs/adr/.adr-kit-state.json:1-33` wordt getrackt (`git ls-files`, niet genegeerd volgens `git check-ignore`) en bevat nudges uit juli 2026 |
@@ -3124,7 +3128,7 @@ Er zijn twee uitgangen voor het product: de webhook naar `#alpha-testing` voor e
 | Supportlinks in de zip | Discord-uitnodiging en GitHub-issues | tekst in de README die `build.py` schrijft | uit | geen | Wijst testers naar Discord en GitHub | `build.py` | `build.py:1697-1702` |
 | PIC-download (product, geen agent) | `http://otgw.tclcode.com/download/%s/%s` | HTTP vanuit de firmware | in | geen | PIC-firmware ophalen; de capture-sweep slaat de update-check bewust over | firmware; `scripts/otgw_capture.py` sluit de route uit | `src/OTGW-firmware/OTGW-Core.ino:6919-6920`, `scripts/otgw_capture.py:2740-2741` |
 
-Het post-script weigert met exit 2 als de githash niet HEAD is, `src/` vuil is, de tag al gepubliceerd is of de zip te groot is, en controleert na de post dat het antwoord een bijlage met precies de zipgrootte bevat (`scripts/discord-post-build.sh:48-90`, `scripts/discord-post-build.sh:135-136`). Sinds 2026-11-15 bevat elke Discord-releasepost alle wijzigingen sinds de vorige post in dat kanaal (`.claude/skills/beta-release-2x/SKILL.md:284-293`, `.claude/skills/release-2x/SKILL.md:195-197`).
+Het postscript weigert met exit 2 als de githash niet HEAD is, `src/` vuil is, de tag al gepubliceerd is of de zip te groot is, en controleert na de post dat het antwoord een bijlage met precies de zipgrootte bevat (`scripts/discord-post-build.sh:48-90`, `scripts/discord-post-build.sh:135-136`). Sinds 2026-11-15 bevat elke Discord-releasepost alle wijzigingen sinds de vorige post in dat kanaal (`.claude/skills/beta-release-2x/SKILL.md:284-293`, `.claude/skills/release-2x/SKILL.md:195-197`).
 
 ### 11.5 Toolchains en registries
 
@@ -3229,6 +3233,7 @@ flowchart TB
   classDef ext fill:#f4f6f7,stroke:#56616c,color:#151a1f,stroke-dasharray:4 3
   classDef stop fill:#fde4e1,stroke:#b42318,color:#151a1f
   classDef ship fill:#e3f1e4,stroke:#2f7d32,color:#151a1f
+  classDef risk fill:#ffffff,stroke:#b42318,color:#151a1f,stroke-dasharray:4 3
 
   subgraph R1["Ring 1: one Windows workstation"]
     S["Claude Code sessions<br/>coordinator, developers, bench tester"]:::agent
@@ -3272,7 +3277,7 @@ flowchart TB
 | Eén bot-token, één proces | Een tweede machine kan niet meekijken zolang de eerste draait | Named mutex in de supervisor; op een tweede machine eerst de server op de eerste stoppen | `docs/guides/discord-mcp-server.md:13-22`, `docs/guides/second-machine-setup.md:39-40` |
 | Webhook-URL en post-ledger buiten de repo | Geen alpha-zip naar testers; het ledger is machinegebonden | Geen; het script weigert zonder `LOCALAPPDATA` (Git Bash, niet WSL) | `scripts/discord-post-build.sh:9-21`, `docs/guides/second-machine-setup.md:30-31` |
 | `gh`-login van de maintainer | GitHub-sweep, commentaar en releases | Geen gevonden in de repo | `.claude/skills/implement-next-task/SKILL.md:57` |
-| Bench-units en hun adressen | Geen flash, geen bench-bewijs, geen beta-soak | Units terugvinden via het ARP-overzicht van de router; de beschrijving staat in het sessiegeheugen van de hoofdwerkplek, niet in de repo | `docs/guides/second-machine-setup.md:42-46`, `CLAUDE.md:21` |
+| Bench-units en hun adressen | Geen flash, geen bench-bewijs, geen beta-soak | Units terugvinden via het ARP-overzicht van de router; de beschrijving staat in het sessiegeheugen van de werkplek van de maintainer, niet in de repo | `docs/guides/second-machine-setup.md:42-46`, `CLAUDE.md:21` |
 | Lokale build | Geen alpha- of beta-artefact: `dev` heeft geen release-CI | CI compileert `esp32-combo` wel bij elke push naar `dev` die niet alleen docs raakt, maar publiceert niets | `CLAUDE.md:162`, `.github/workflows/build.yml:6-27` |
 | Externe downloads (platformzip, bibliotheken, Python) | Een schone build op een nieuwe machine of in CI | Vaste versies in `platformio.ini` en `requirements-build.txt`; geen lokale spiegel gevonden in de repo | `platformio.ini:108-111`, `requirements-build.txt:3-4` |
 | Claude Code en de Anthropic-modeldienst | Alle lokale sessies, subagents en het advisor-tool; de cyclus stopt bij een rate limit of toolfout | Geen; de skill stopt en geeft een samenvatting. Account, plan en limieten staan niet in de repo | `.claude/skills/implement-next-task/SKILL.md:285-294` |
@@ -3298,7 +3303,7 @@ Wat zonder de werkplek blijft draaien: de zeven workflows in GitHub Actions, dus
 | S11.12 | `otgw-bench-tester` zonder agentdefinitie → zie S7.10 | — | — |
 | S11.13 | De equipment-matrixregel (2026-11-11) staat alleen in `.claude/rules/discord.md`; de commands die supportvragen afhandelen noemen de matrix niet, en `docs/process/directive-changelog.md` mist de directive | `.claude/rules/discord.md:26`; `docs/process/directive-changelog.md:10-28` | `.claude/rules/discord.md` |
 | S11.14 | Getrackte watermerkbestanden → zie S6.18 | — | — |
-| S11.15 | De bench-tester beheert de units "on the laptop"; de tweede-machinegids en de servergids spreken van de hoofdwerkplek van Robert. Of dat dezelfde machine is, is niet gevonden in de repo | `CLAUDE.md:21`; `docs/guides/agent-build-and-bench.md:74-75`; `docs/guides/second-machine-setup.md:42-44`; `docs/guides/discord-mcp-server.md:12` | onbeslist, vraag aan Robert |
+| S11.15 | De bench-tester beheert de units "on the laptop"; de tweede-machinegids en de servergids spreken van de werkplek van de maintainer van Robert. Of dat dezelfde machine is, is niet gevonden in de repo | `CLAUDE.md:21`; `docs/guides/agent-build-and-bench.md:74-75`; `docs/guides/second-machine-setup.md:42-44`; `docs/guides/discord-mcp-server.md:12` | onbeslist, vraag aan Robert |
 
 > **Voor de plaat:** dit hoofdstuk heeft geen eigen zone op plaat A; het staat op drie plekken uit de beeldbrief. De kanalen zijn de zes gestippelde tegels van zone "CHANNELS": Tweakers alleen met een gestippelde petrol pijl naar de waakvlam; Discord-support, GitHub, DM, `#dev-sat-mqtt` en `#alpha-testing` in twee richtingen, want ook in de supportkanalen antwoordt de bot in de praktijk (§6.3). Plaat A tekent Discord-support nog als "read + announcements" met een gestippelde lijn; bij een volgende render wordt dat "read · announcements · replies in practice" met een dunne terugpijl. De kennisbronnen zijn de vier kleine grijze ronde badges in zone "EXTERNAL KNOWLEDGE" ("OpenTherm matrix", "thermo-nova", "OpenTherm spec", "toolchains"), en de distributie is de dikke bosgroene pijl van station 9 naar de tegel "Alpha zip"; de beta loopt niet over die pijl. Wie het concentratierisico wil tonen, tekent één dunne gestippelde leigrijze contour om de waakvlam en de bench-tester met het label "one workstation", zonder nieuwe kleur of nieuw icoon (oranje is voorbehouden aan mensen, een sleutel aan de maintainer).
 
@@ -3357,7 +3362,7 @@ Doorlooptijden en wachttijden staan niet in deze tabel: die meet `scripts/agenti
 
 - De SAT-rangorde met verplichte `file:line`-citaten en een register dat vóór de bouw wordt bijgewerkt, dwingt elke SAT-claim terug naar een citaat of een registerentry. Er zijn nu 353 entries, met een machineleesbare herkomst per entry.
 - Eén tag per firmwarecommit maakt testerfeedback toewijsbaar.
-- Het post-script weigert bij elke twijfel.
+- Het postscript weigert bij elke twijfel.
 - Alle twaalf verbetertaken uit de momentopname van 2026-11-04 zijn uitgevoerd (§13.1).
 
 De nieuwe risico's (§13.2) zitten op twee plekken. Het eerste is het verschil tussen de praktijk en wat in de regels staat. Het tweede zijn oudere procedures die de nieuwe harde regels nog niet volgen.
@@ -3368,7 +3373,7 @@ De nieuwe risico's (§13.2) zitten op twee plekken. Het eerste is het verschil t
 |---|---|---|---|---|
 | F1 | Hoog | Instructies lopen uiteen tussen agents | Opgelost in TASK-1625 (2026-11-05): gedeeld AGENT-CORE-blok in CLAUDE.md, AGENTS.md en de Copilot-instructies, met drifttest `tests/test_agent_core_block.py`; bridge-doc vervangen door `docs/guides/discord-mcp-server.md`. Restant: zie F13 (regels die alleen in `.claude/rules/` staan, bereiken Codex en Copilot niet). | `tests/test_agent_core_block.py:1-9`; `AGENTS.md:7-22` |
 | F2 | Hoog | CI ziet de hoofdlijn niet | Opgelost in TASK-1626 (2026-11-05): evaluate, ADR-governance en build draaien op push naar `dev`, build niet bij docs-only. Restant: zie F12 (een wijziging van alleen CLAUDE.md start `adr-governance.yml` niet). | `.github/workflows/build.yml:18-27`; `.github/workflows/evaluate.yml:12-15` |
-| F3 | Middel | De omgeving zit vast aan één werkplek | Opgelost in TASK-1627 en TASK-1632: hooks draagbaar en zichtbaar bij FAIL, `core.hooksPath` bij sessiestart, ledger herbouwbaar met `scripts/alpha_ledger.py`, sjabloon voor de people-file, runbook `docs/guides/second-machine-setup.md`. Bewust geaccepteerd restrisico: één bench, geen build-runner, geen always-on Discord-host (besluit TASK-1636, 2026-11-05). | `docs/guides/second-machine-setup.md:9-18`; `scripts/alpha_ledger.py:2-17`; `task-1636:41` |
+| F3 | Middel | De omgeving zit vast aan één werkplek | Opgelost in TASK-1627 en TASK-1632: hooks draagbaar en zichtbaar bij FAIL, `core.hooksPath` bij sessiestart, ledger herbouwbaar met `scripts/alpha_ledger.py`, sjabloon voor de people-bestand, runbook `docs/guides/second-machine-setup.md`. Bewust geaccepteerd restrisico: één bench, geen build-runner, geen always-on Discord-host (besluit TASK-1636, 2026-11-05). | `docs/guides/second-machine-setup.md:9-18`; `scripts/alpha_ledger.py:2-17`; `task-1636:41` |
 | F3b | Middel | Builds door hooks laten een build-stempel achter | Opgelost in TASK-1628: de toolchain-hook zet `version.h` en `data/version.hash` terug als ze vóór de build schoon waren; de controle in een echte cloudsessie is naar TASK-1658 verplaatst. | `.claude/hooks/session-start-build-toolchain.sh:13-67` |
 | F4 | Middel | Regels groeien als lagen bij | Opgelost in TASK-1631 en TASK-1635: CLAUDE.md van 673 naar 189 regels (testlimiet 230) met regels in `.claude/rules/` en gidsen in `docs/guides/`, plus `docs/process/directive-changelog.md`. Restant: zie F11 (de changelog loopt achter). | `tests/test_claude_md_core.py:15`; `docs/process/directive-changelog.md:3-6` |
 | F5 | Middel | SAT-register en wachtrij ongestructureerd | Opgelost in TASK-1629 en TASK-1630: statuskolom genormaliseerd met generator, JSON-index met bron per entry. | `scripts/sat_open_questions.py:20`; `docs/sat/sergeant-d-corrections.index.json:1-14` |
@@ -3394,7 +3399,7 @@ Gebundeld per thema. Elke bevinding noemt het bewijs; de volledige lijst spannin
 | F18 | Middel | **De ADR-kit bestaat in vier versies naast elkaar**, op de vier plekken van §10.1: de gevendorde spiegel `tools/adr-kit` (0.11.0), de repokopie `bin/adr-*` (`adr-judge` "v0.12.0+"), de projectgids (0.30.5) en de geïnstalleerde plugin (0.61.0); 0.31.0 was de geïnstalleerde versie op 2026-07-09 (S10.5). `/adr-kit:context`, dat CLAUDE.md bij elk ontwerp verplicht stelt, zit niet in de gevendorde versie. De gegenereerde ADR-index telt andere statussen dan de frontmatter, en de generator `bin/adr-index` ontbreekt in de repo. | `tools/adr-kit/CHANGELOG.md:7`; `bin/adr-judge:1-35`; `.claude/adr-kit-guide.md:1`; `.wolf/cerebrum.md:106`; `CLAUDE.md:174`; `docs/adr/README.md:1079-1086` |
 | F19 | Middel | **Het geheugen van de werkplaats veroudert.** OpenWolf-hooks lezen de buglog als `{bugs: [...]}` terwijl het bestand een lijst is, dus de buglog-waarschuwingen tonen nooit iets; 224 buglog-entries hebben 219 unieke id's; `anatomy.md` in HEAD bevat 171 secties buiten de repo, terwijl een Do-Not-Repeat dat verbiedt; het graphify-rapport is van 2026-07-26 en noemt een `index.html` die niet meer bestaat. | `.wolf/hooks/pre-write.js:77-92`; `.wolf/hooks/post-write.js:244-276`; `.wolf/buglog.json:1-3`; `.wolf/anatomy.md:6-25`; `.wolf/cerebrum.md:152-153`; `graphify-out/GRAPH_REPORT.md:1` |
 
-Hoe zwaar weegt dit? Geen van de bevindingen raakt de firmware of de bewijsketen van een taak direct: de poorten die echt weigeren (post-script, build-lock, commit-msg, evaluate, tests) werken. Het risico zit in **de volgende agent**. Die leest een command, skill of profiel dat een oudere werkwijze voorschrijft (F10, F13), of mist een rol of kanaal dat alleen in taaknotities bestaat (F9). En F12 verdient extra aandacht: daar beloven de regels een automatische poort die er niet is.
+Hoe zwaar weegt dit? Geen van de bevindingen raakt de firmware of de bewijsketen van een taak direct: de poorten die echt weigeren (postscript, build-lock, commit-msg, evaluate, tests) werken. Het risico zit in **de volgende agent**. Die leest een command, skill of profiel dat een oudere werkwijze voorschrijft (F10, F13), of mist een rol of kanaal dat alleen in taaknotities bestaat (F9). En F12 verdient extra aandacht: daar beloven de regels een automatische poort die er niet is.
 
 ```mermaid
 flowchart LR
@@ -3520,18 +3525,46 @@ flowchart LR
 
 | Stap | Uitkomst |
 |---|---|
-| Feitenbladen | 10 bladen, 1.863 claims getoetst: 1.696 bevestigd, 163 gecorrigeerd (vooral regelnummers en te brede citaten), 4 weerlegd en verwijderd. Per blad: bf-discord 177, bf-monitor 184, sat-chain 158, coordinator 172, skills 207, other-agents 184, rules 201, knowledge 202, pipeline 179, external 199 |
+| Feitenbladen | 10 bladen, 1.863 claims getoetst: 1.696 bevestigd, 163 gecorrigeerd (vooral regelnummers en te brede citaten), 4 weerlegd en verwijderd. Per blad: bf-discord 177, bf-monitor 184, sat-chain 158, coördinator 172, skills 207, other-agents 184, rules 201, knowledge 202, pipeline 179, external 199 |
 | Hoofdstukreview | 9 hoofdstukken (3 t/m 11) geschreven op Fable 5.2 en daarna adversarieel gereviewd: 1.442 citaten opnieuw geopend, 151 correcties (per hoofdstuk: definities 150/17, mensen 90/18, agents 165/19, BlueFlame Bot 315/12, pijplijn 170/16, regels 189/8, kennisbank 112/20, ADR-kit 121/18, externe bronnen 130/23) |
 | Diagrammen | Alle Mermaid-blokken met Engelse teksten, gerenderd met mermaid 11.4.1 in headless Chromium (uitkomst in de taaknotities van TASK-1984); de twee platen gegenereerd met `tools/agentic-plates/` en visueel gecontroleerd |
 
 ### 15.2 Beperkingen
 
 - **Discord is niet gelezen.** Deze cloudsessie heeft geen Discord-MCP. Wat in de kanalen gebeurt, is afgeleid uit commands, regels, het register en taaknotities. Waar de praktijk afwijkt van de procedure, berust dat op die notities.
-- **Lokale bestanden ontbraken:** de people-file, het alpha-ledger, `published-tags.txt` en `published-posts.tsv`, de webhook, de gebruikers-`settings.json` met de SessionStart-hook voor de Discord-MCP, en het watermerk van `/backlog_discord`.
+- **Lokale bestanden ontbraken:** de people-bestand, het alpha-ledger, `published-tags.txt` en `published-posts.tsv`, de webhook, de gebruikers-`settings.json` met de SessionStart-hook voor de Discord-MCP, en het watermerk van `/backlog_discord`.
 - **Geïnstalleerde plugins zijn niet zichtbaar.** De geïnstalleerde ADR-kit-versie en de superpowers-skills staan buiten de repo.
 - **Geschiedenis:** de clone is shallow (50 commits, allemaal van 2026-11-15). Trends komen daarom uit taakbestanden en uit `docs/process/agentic-throughput-2026-11-05.md`.
 - **Tellingen** zijn gedaan op bestandsniveau, met de meetwijze in §12.
 - **Submodules ontbraken.** In deze cloud-container zijn de drie submodules niet uitgecheckt (`git submodule status` toont `-` voor alle drie, gemeten 2026-11-15); de lokale thermo-nova-kopie was dus niet aanwezig.
+
+### 15.3 Taakbestanden
+
+Elk taakbestand staat in de tekst bij zijn eerste vermelding met volledig pad en daarna als `task-NNNN:regel`.
+
+- `task-240`: `backlog/archive/tasks/task-240 - Fix-upgrade-to-v6.6-fails-reported-by-Tomba-on-Tweakers.md`
+- `task-708`: `backlog/archive/tasks/task-708 - choreadr-kit-adopt-adr-kit-context-once-available-—-wire-into-agent-prompts.md`
+- `task-1313`: `backlog/archive/tasks/task-1313 - Post-the-combo-flash-zip-to-alpha-testing-via-webhook-after-each-build.md`
+- `task-1544`: `backlog/tasks/task-1544 - beta.1-follow-up-24-h-soak-and-macOS-capture-run-waived-for-v2.0.0-beta.1.md`
+- `task-1636`: `backlog/tasks/task-1636 - Decide-on-scaling-the-build-bench-and-Discord-host.md`
+- `task-1637`: `backlog/tasks/task-1637 - implement-next-task-sweep-GitHub-issues-and-PRs-file-new-ones-as-tasks-and-pick-them-up.md`
+- `task-1707`: `backlog/tasks/task-1707 - OT-Direct-gateway-mode-own-reads-and-commands-only-in-alternative-slots-as-on-the-PIC-follow-up-of-TASK-1701.md`
+- `task-1745`: `backlog/tasks/task-1745 - Public-beta-v2.0.0-beta.158-08-00-slot-over-beta.145-158.md`
+- `task-1746`: `backlog/tasks/task-1746 - Unconfirmed-crash-risk-vendored-AsyncTCP-accept-callback-returns-ERR_OK-after-tcp_abort-when-the-AsyncClient-allocation-fails.md`
+- `task-1786`: `backlog/tasks/task-1786 - Classic-S3-Mini-PIC-no-longer-detected-after-flashing-with-migrate.md`
+- `task-1793`: `backlog/tasks/task-1793 - Discord-MCP-server-robust-autostart-supervisor-scheduled-task-SessionStart-hook.md`
+- `task-1805`: `backlog/tasks/task-1805 - OT-Direct-gateway-mode-rewrites-MsgID-0-bits-1-2-4-5-and-6-like-the-PIC-HW-SM-BW-CE-H2-new-ADR-superseding-ADR-208.md`
+- `task-1817`: `backlog/tasks/task-1817 - SAT-self-tune-PWM-hours-count-for-the-warm-up-phase-Q-1796b-Robert-B-waits-for-Sergeant-D.md`
+- `task-1826`: `backlog/tasks/task-1826 - Process-one-bench-tester-agent-flashes-and-tests-every-unit-developers-request-it.md`
+- `task-1829`: `backlog/tasks/task-1829 - Agent-rule-questions-to-Robert-only-by-Discord-DM-never-as-an-interactive-CLI-question-asynchronous-in-the-session-when-DM-is-unavailable.md`
+- `task-1870`: `backlog/tasks/task-1870 - ADR-225-raise-the-ESP32-S3-IPC-task-stack-ipc0-and-ipc1-to-at-least-1280-B-via-a-custom_sdkconfig-framework-lib-rebuild.md`
+- `task-1896`: `backlog/tasks/task-1896 - SAT-a-PIC-measured-outside-temperature-DS18B20-on-the-gateway-boiler-without-MsgID-27-never-counts-as-valid-SAT-stays-handed-back-outside_temp_missing.md`
+- `task-1919`: `backlog/tasks/task-1919 - An-app-image-that-the-bootloader-marked-ABORTED-keeps-running-but-never-confirms-itself-so-the-next-reset-of-any-kind-rolls-back-to-safeboot.md`
+- `task-1928`: `backlog/tasks/task-1928 - SAT-research-improvements-beyond-thermo-nova-self-tune-boost-detection-weather-heating-curve.md`
+- `task-1949`: `backlog/tasks/task-1949 - Review-PR-702-Use-L-min-for-the-DHW-flow-rate-unit-in-Home-Assistant-discovery.md`
+- `task-1955`: `backlog/tasks/task-1955 - esp32-combo-app-slot-at-93.8-141-KB-headroom-left-in-ota_0-beta.287.md`
+- `task-1979`: `backlog/tasks/task-1979 - HA-climate-entity-follows-SAT-when-SAT-is-enabled-target-temperature-and-presets-like-the-web-UI.md`
+- `task-1982`: `backlog/tasks/task-1982 - Public-beta-v2.0.0-beta.323-2026-11-15-20-00-slot.md`
 
 ---
 
