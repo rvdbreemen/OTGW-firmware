@@ -152,3 +152,37 @@ The handler times are estimates and were not measured: 10 ms per message, 300 ms
 4. Licence and size check of the tokenizer candidates under the open-source rule in CLAUDE.md.
 5. Everything here assumes Robert's TASK-1473 decisions (continuous stream, Cloudflare Durable Object + R2
    EU, outbound TLS on PSRAM boards). TASK-1473 stays on hold.
+
+## Debug stream: measured size and the tokenizer choice (2026-11-14)
+
+Measured with `tools/cloud-recorder/dbg_size_study.py` on lines built from the 985 Debug calls with a literal
+format in `src/OTGW-firmware` (help menu left out) and the real `_debugBOL` prefix. The call-site mix and the
+argument values are generated, so the volume is an estimate; the ratios hold. At about 3 KB/s of telnet text:
+text 104 B per line (7.9 GB per gateway-month), text + zlib 36 B (2.7 GB), address token 16 B (1.2 GB),
+address token + zlib 12 B (0.9 GB). At 0.3 KB/s the token + zlib form is 15 % of the text.
+
+The candidates, checked on their primary sources:
+
+| | pw_tokenizer (Pigweed) | Trice | Address form (the principle of Zephyr's dictionary logging) |
+|---|---|---|---|
+| Licence | Apache-2.0 | MIT | own code (Zephyr itself is Zephyr-only) |
+| Token | 32-bit hash of the format string at compile time (C++ constexpr) | ID per call, list in `til.json` | flash offset of the format string (and of the function name), resolved from the build's ELF |
+| Arguments | ints zigzag varint, float 4 B, strings length byte + up to 127 B | binary; runtime strings through `triceS` | same encoding as pw_tokenizer (own) |
+| Build change | linker section script (`pw_add_tokenizer_sections_to_default_script.ld` or an include in the custom ESP32 script) and `-fdata-sections`; Pigweed source files | library compiled as C; Go host tool | none |
+| Call sites | the docs advise against `PW_TOKENIZE_TO_BUFFER` in widely expanded macros such as a logging macro (use `pw_log_tokenized`); our formats sit in `PSTR(...)`, untested | all 1,270 calls rewritten to Trice calls | unchanged: only `_debugPrintf_P` and `_debugBOL` change |
+| Host side | `database.py` builds a token CSV from the ELF | `til.json` | a decoder that reads strings at the given offsets from the ELF of the githash in the stream header |
+
+Sources: [pw_tokenizer tokenization](https://pigweed.dev/pw_tokenizer/tokenization.html),
+[pw_tokenizer get started](https://pigweed.dev/pw_tokenizer/get_started.html),
+[Trice](https://github.com/rokath/trice) and its user manual,
+[Zephyr logging](https://docs.zephyrproject.org/latest/services/logging/index.html) (dictionary-based logging:
+"references to the ELF file are encoded instead of the whole strings"; the database works only with the same build).
+
+Recommendation: the address form, built here (estimate 150 to 200 lines on the device, a host decoder next to
+`export_batches.py`). Reason: no change to any of the 1,270 call sites and no linker-script change on the
+ESP32 Arduino build, while the result is as small as a hashed token. Cost: the decoder needs the exact `.elf`
+of each build that recorded, which we already publish with every zip. Under LTO, identical format strings can
+share one address, so the record also carries the function name's offset and the line (included in the
+numbers above). Known Zephyr issue for comparison: its database generator missed strings with section
+stripping under LTO (zephyr issue 115815); reading the string directly at its address in the final ELF avoids
+a separate database.
