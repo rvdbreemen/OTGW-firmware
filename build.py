@@ -712,6 +712,34 @@ def get_semver(project_dir):
     return "unknown"
 
 
+def verify_app_version_string(project_dir, semver, target):
+    """TASK-1976: the app image must carry the exact semver this build stamped.
+
+    The artifact names, the zip and /version.hash take the githash from build.py, the app's own version string
+    (device/info fwversion, the MQTT version topic) comes from version.h as it stood when pio compiled
+    OTGW-firmware.ino.cpp. A version.h that changed in between (the beta.318 bench build: a `git checkout --
+    version.h` while the build ran) gave an image named +56fb6db that reported +1233ba9. Returns True when the
+    renamed .ino.bin holds `semver`, or when there is no app image (a filesystem-only build); False otherwise,
+    after naming the version strings the image does hold.
+    """
+    build_dir = Path(project_dir) / "build"
+    images = sorted(build_dir.glob(f"*-{asset_slug(target)}-{semver}.ino.bin"))
+    if not images:
+        return True
+    import re
+    for img in images:
+        data = img.read_bytes()
+        if semver.encode() in data:
+            continue
+        found = sorted({m.decode(errors="replace") for m in
+                        re.findall(rb"\d+\.\d+\.\d+(?:-[0-9A-Za-z.]+)?\+[0-9a-f]{7}", data)})
+        print_error(f"{img.name} does not carry its own version {semver}; it holds: {', '.join(found) or 'none'}")
+        print_error("version.h changed while the build ran (a checkout, stash or bump during the build?): rebuild")
+        return False
+    print_success(f"App version check: {', '.join(i.name for i in images)} carries {semver}")
+    return True
+
+
 def create_build_directory(project_dir):
     """Create and clean build directory"""
     print_step("Preparing build directory")
@@ -3408,6 +3436,8 @@ def main():
 
         # Rename artifacts with version
         rename_build_artifacts(project_dir, semver, target)
+        if not verify_app_version_string(project_dir, semver, target):
+            sys.exit(4)
 
         # Create merged binaries if requested
         if args.merged:
