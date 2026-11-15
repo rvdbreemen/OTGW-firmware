@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-14T09:22:00Z'
-updated_date: '2026-11-14T23:21:00Z'
+updated_date: '2026-11-15T14:57:00Z'
 labels:
   - reliability
   - ota
@@ -26,9 +26,9 @@ Follow-up from TASK-1904 / ADR-233 (coordinator, 2026-11-14). fsOtaRtcFill() (OT
 <!-- AC:BEGIN -->
 - [ ] #1 An amending/superseding ADR for ADR-233 (log: newest whole lines that fit) is accepted
 - [ ] #2 Host case: a log larger than the free budget restores its newest whole lines (cut at a CRLF, never a partial line) together with settings.ini and the counter; old (skip whole) red, fix green
-- [ ] #3 Bench on a unit with a near-full budget: after a reset during a filesystem OTA the newest reboot-log lines are back
+- [x] #3 Bench on a unit with a near-full budget: after a reset during a filesystem OTA the newest reboot-log lines are back
 - [ ] #4 The filesystem-OTA keep list keeps a full reboot log: the reboot_log.txt cap in KEEP_LIST (OTGW-ModUpdateServer-esp32.h) and KEEP_TOTAL_MAX follow the real worst case (LOG_LINES x line length), with a check that fails when they drift apart; heap trade-off recorded
-- [ ] #5 A full 20-line reboot log is protected by the RTC snapshot during a filesystem write: 09 on beta.264 (.61, 2026-11-15): '[OTA] /reboot_log.txt (1920 B) does not fit the RTC snapshot (1755 B free): not protected during this filesystem write' (ADR-233 skip path); either the budget fits the real worst case or the newest whole lines are kept
+- [x] #5 A full 20-line reboot log is protected by the RTC snapshot during a filesystem write: 09 on beta.264 (.61, 2026-11-15): '[OTA] /reboot_log.txt (1920 B) does not fit the RTC snapshot (1755 B free): not protected during this filesystem write' (ADR-233 skip path); either the budget fits the real worst case or the newest whole lines are kept
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -38,4 +38,6 @@ Second budget for the reboot log (found 2026-11-14 while documenting TASK-1524, 
 
 Third budget finding (09, beta.264 bench item 4, 2026-11-15, capture s1780/i4/cap/): with 20 lines the reboot log is 1920 B and the RTC snapshot has 1755 B free after settings.ini and the counter, so ADR-233 skips it and the log is unprotected during the write (here it survived through the heap keep/restore; a failed write would lose it). Same theme as this task's first AC (keep the newest whole lines that fit) and the keep-list cap AC.
 Bench observation by 09 (2026-11-15 00:12, .61 beta.264+a695744, FS OTA via ota_flash.py --no-app --fs during a capture, TASK-1524 AC2): telnet '[OTA] /reboot_log.txt (1920 B) does not fit the RTC snapshot (1755 B free): not protected during this filesystem write' followed by '[OTA] RTC snapshot: 5669 B of settings, reboot counter and reboot log'. With 20 reboot-log lines (1920 B) the ADR-233 RTC snapshot skips the reboot log, so it is protected only by the heap keep/restore path. In this run it survived (20 lines after the reboot, top line '[OTA] Rebooting...'), settings API + settings.ini diff [] . Evidence: 09 scratchpad s1780/i4/cap/ (merged transcript, telnet section).
+
+2026-11-15 15:49-16:00 bench 09 on .61 (OTGW32), ba's bench build: zip OTGW-firmware-esp32-combo-2.0.0-beta.318+56fb6db-flash.zip sha256 c9756f4fc52e78ab..., loose ino/fs equal the zip contents, /version.hash 56fb6db; NOTE the app reports fwversion 2.0.0-beta.318+1233ba9 (stamp from the parent commit: built from the uncommitted tree, then committed); the 1931 code is provably in it (the new telnet line below). Budget on .61 near full by itself: settings.ini 5693 B, reboot_log.txt 20 lines ~1750 B, RTC 7424 B. AC5: FS OTA (normal) telnet: '[OTA] /reboot_log.txt (1753 B) does not fit the RTC snapshot (1726 B free): kept its newest 1657 B of whole lines' and '[OTA] RTC snapshot: 7355 B of settings, reboot counter and reboot log' (beta.264 on the same unit said 'not protected during this filesystem write'). AC3: FS OTA (ota_flash --no-app --fs) with a USB reset (esptool chip_id, default_reset) ~2.8 s into the upload: the filesystem was left half written (/version.hash and FSexplorer missing, the stub page served), yet after the boot settings.ini was byte-identical (diff empty), reboot_count 761 -> 762 (+1 for the reset), reboot_log.txt 20 lines CRLF = the new boot line + the newest 19 lines of the log before the reset in order, every line whole (starts with the date, ends with CRLF), the oldest line dropped. A first try reset too late (after the write, nothing to restore) and an earlier slip of mine killed an upload mid-write without a reset (settings/counter/log intact, web files half). Finally a whole FS image was flashed again ('filesystem confirmed', version.hash 56fb6db), settings.ini diff vs before the 318 flash empty, bootcount 763, no crashlog. Evidence: 09 scratchpad b318/ (tel-flash.raw, ac3/t2 before-/after-*, fs-final.log).
 <!-- SECTION:NOTES:END -->
