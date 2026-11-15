@@ -1,4 +1,4 @@
-# Bench job: cloud recorder PoC (TASK-1963, TASK-1971, TASK-1972, TASK-1974)
+# Bench job: cloud recorder PoC (TASK-1963, TASK-1971, TASK-1972, TASK-1974, TASK-1979)
 
 For the bench-tester (`otgw-bench-tester`), through the coordinator. Branch `research/cloud-recording`, never on
 `dev`. Build env `esp32-combo-tlsdyn` only; the developer has built it, the bench-tester flashes it (OTA first) and
@@ -52,6 +52,7 @@ Restart the unit. Keep a telnet capture (port 23) running for every check.
 | 11 | Own network down | Switch the unit's WiFi AP off for 2 minutes: capture pauses without a backoff step, uploads resume within a minute after the AP is back | 1971 AC 3 |
 | 12 | Blocked | Admin UI: `blocked` on for the unit. Within about a minute telnet shows `… is blocked by the collection point; telemetry opt-in turned off`; `/cloudrec.cfg` says `enabled=0`; the PocketBase log shows no further requests from the unit, also after a restart (`cloudrec: off`) | 1972 AC 2 |
 | 13 | Soak, no PSRAM | 12 h with OT traffic: no reboot, heap stable, count of `lost` notes in `decode_all.py` output | 1963 AC 3 |
+| 14 | Telemetry mode | Admin UI: `mode` = `custom`, `flags` = `sat`, `mode_until` = now + 20 min. Within 15 min telnet shows `cloudrec: telemetry mode 3, log flags 0x010 (until mode_until)` and SAT debug lines appear; after `mode_until` (within a second) `log flags 0x000` and the SAT lines stop. Repeat with `full` while the user has `mqtt` debug on locally: at the end `mqtt` stays on, the rest goes off. `otgwsim`/`sensorsim` never change | 1979 AC 3 |
 
 ## Report
 

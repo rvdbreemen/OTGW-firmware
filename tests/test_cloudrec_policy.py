@@ -6,6 +6,8 @@ The real header is compiled into a small C++ program; nothing is re-implemented 
   2. With any random value a wait is 100 to 120 % of its base and never above 24 h; the first wait is 5 to 6 min.
   3. HTTP statuses map to OK / REFUSED / AUTH / DOWN; only a 403 whose body holds "otgw-blocked" is BLOCKED.
   4. The send queue: one slot without PSRAM, two with; a full queue loses the record; the oldest goes first.
+  5. The telemetry mode (TASK-1979): parsed from a real login reply; full / full+trace / custom / default; back to
+     default at mode_until; the simulation switches can never be set.
 """
 import os, shutil, subprocess, tempfile, unittest
 
@@ -23,6 +25,26 @@ int main() {
   const int rs[] = {403, 401, 400};
   for (int x : rs) for (int i = 0; i < 3; i++) printf("R %d %d %d\n", x, i, (int)crec::classifyReply(x, bodies[i]));
   printf("R 403 9 %d\n", (int)crec::classifyReply(403, nullptr));
+  // TASK-1979: telemetry mode from a real PocketBase login reply (captured 2026-11-15), and variants.
+  const char *rec = "{\"record\":{\"blocked\":false,\"flags\":[\"sat\",\"mqtt\"],\"id\":\"k6wsnb20w3ns7yi\","
+                    "\"mode\":\"custom\",\"mode_note\":\"mode \\\"full\\\" for issue \\\"mode\\\":\\\"full\\\"\","
+                    "\"mode_until\":\"2030-01-02 03:04:05.000Z\",\"uid\":\"otgw-859030f1724d\"},\"token\":\"x\"}";
+  crec::RemoteCfg c = crec::parseRemote(rec);
+  printf("M custom %d %u %lld\n", (int)c.mode, (unsigned)c.flags, (long long)c.untilEpoch);
+  printf("M eff-before %u\n", (unsigned)crec::remoteEffective(c, c.untilEpoch - 1));
+  printf("M eff-after %u\n", (unsigned)crec::remoteEffective(c, c.untilEpoch));
+  const char *variants[] = {
+      "{\"record\":{\"flags\":[],\"mode\":\"\",\"mode_until\":\"\"}}",
+      "{\"record\":{\"flags\":[],\"mode\":\"full\",\"mode_until\":\"\"}}",
+      "{\"record\":{\"flags\":[\"sat\"],\"mode\":\"full+trace\",\"mode_until\":\"\"}}",
+      "{\"record\":{\"flags\":[\"otgwsim\",\"sensorsim\",\"ntp\"],\"mode\":\"custom\",\"mode_until\":\"\"}}",
+      "{\"record\":{\"mode\":\"default\",\"mode_until\":\"2000-01-01 00:00:00.000Z\"}}",
+      "{\"record\":{\"flags\":[],\"mode\":\"full\",\"mode_until\":\"garbage\"}}"};
+  for (int i = 0; i < 6; i++) {
+    crec::RemoteCfg v = crec::parseRemote(variants[i]);
+    printf("V %d %d %u %lld %u\n", i, (int)v.mode, (unsigned)v.flags, (long long)v.untilEpoch,
+           (unsigned)crec::remoteEffective(v, 1763200000));
+  }
   static uint8_t b0[4], b1[4];
   for (int two = 0; two < 2; two++) {                      // one slot (no PSRAM) and two slots (PSRAM)
     crec::Slot q[2] = {{b0, 0, 0, 0, false}, {two ? b1 : nullptr, 0, 0, 0, false}};
@@ -91,6 +113,37 @@ class CloudRecPolicyTest(unittest.TestCase):
         self.assertEqual(got[(403, 9)], 2)                       # no body
         self.assertEqual(got[(401, 0)], 2)                       # only a 403 counts
         self.assertEqual(got[(400, 0)], 1)
+
+
+class CloudRecRemoteModeTest(unittest.TestCase):
+    """TASK-1979: crec::parseRemote / remoteEffective on the real header."""
+    SAT, MQTT, NTP, TRACE = 1 << 4, 1 << 2, 1 << 9, 1 << 7
+
+    def row(self, *key):
+        for l in OUT:
+            p = l.split()
+            if p[:1 + len(key)] == ["M" if key[0].startswith(("custom", "eff")) else "V", *key]:
+                return p[1 + len(key):]
+        raise AssertionError(key)
+
+    def test_real_reply(self):
+        import calendar
+        mode, flags, until = map(int, self.row("custom"))
+        self.assertEqual(mode, 3)                                          # custom
+        self.assertEqual(flags, self.SAT | self.MQTT)
+        self.assertEqual(until, calendar.timegm((2030, 1, 2, 3, 4, 5)))   # the date, exact to the second
+        self.assertEqual(int(self.row("eff-before")[0]), self.SAT | self.MQTT)
+        self.assertEqual(int(self.row("eff-after")[0]), 0)                # back to default at mode_until
+
+    def test_variants(self):
+        rows = {int(p[1]): list(map(int, p[2:])) for p in (l.split() for l in OUT) if p[:1] == ["V"]}
+        all10 = (1 << 10) - 1
+        self.assertEqual(rows[0], [0, 0, 0, 0])                           # empty mode = default
+        self.assertEqual(rows[1][3], all10 & ~self.TRACE)                 # full: everything but sattrace
+        self.assertEqual(rows[2][3], all10)                               # full+trace: all ten, flags ignored
+        self.assertEqual(rows[3][3], self.NTP)                            # custom: simulation names never map
+        self.assertEqual(rows[4][3], 0)                                   # default, and long expired
+        self.assertEqual(rows[5][2:], [0, all10 & ~self.TRACE])           # unreadable date: no end, mode holds
 
 
 class CloudRecSlotTest(unittest.TestCase):

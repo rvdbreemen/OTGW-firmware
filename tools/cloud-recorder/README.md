@@ -143,6 +143,9 @@ The gateway records and uploads by itself over HTTPS, also on a board without PS
   to a full handshake; TASK-1974) to the collection point, certificate check against GTS Root R1/R4 and
   ISRG Root X1/X2, `?fields=id`. Off unless `/cloudrec.cfg` on LittleFS has `enabled=1` plus `host` and `port`
   (the opt-in).
+- **Telemetry mode (TASK-1979):** the device record's `mode` / `flags` / `mode_until` (set by the maintainer) switch
+  the log flags of `debugFlags.h` from the login and the token refresh every 15 minutes (`crec::parseRemote`,
+  `crec::remoteEffective`, `cloudRecApplyRemote`); flags the user had on stay on afterwards.
 - **Send queue (TASK-1974):** one record slot; a second one in PSRAM on PSRAM boards, oldest sent first.
 - **SATTICK (TASK-1974):** with SAT debug off the SATTICK lines go only to the recorder (`SATTickTf` in
   `SATcontrol.ino`); with SAT debug on they go to telnet and are recorded from there, once.

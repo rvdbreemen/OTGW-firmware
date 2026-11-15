@@ -7,16 +7,19 @@
 //   batches: create-only for the device that owns the batch (a blocked one gets 403, pb_hooks/blocked.pb.js). Nobody but a
 //            superuser can list, read, change or delete batches.
 migrate((app) => {
+  const OTGW_MODE_FIELDS_UNSET = ' && @request.body.mode:isset = false && @request.body.flags:isset = false' +
+                                 ' && @request.body.mode_until:isset = false && @request.body.mode_note:isset = false';
   const devices = new Collection({
     type: "auth",
     name: "devices",
     listRule: null,
     viewRule: null,
     // Anyone may enroll a new uid (the unique index refuses an existing one); "blocked" may not be sent.
-    createRule: '@request.body.blocked:isset = false && @request.body.verified:isset = false',
+    // The maintainer's fields (blocked, and the telemetry mode of TASK-1979) may not be sent by a gateway.
+    createRule: '@request.body.blocked:isset = false && @request.body.verified:isset = false' + OTGW_MODE_FIELDS_UNSET,
     // A gateway may update its own label, firmware and board; not its uid and not "blocked".
     updateRule: 'id = @request.auth.id && @request.body.blocked:isset = false && @request.body.uid:isset = false' +
-                ' && @request.body.verified:isset = false',
+                ' && @request.body.verified:isset = false' + OTGW_MODE_FIELDS_UNSET,
     deleteRule: null,
     authRule: "",                       // a blocked gateway can still log in: it reads "blocked" and turns itself off
     passwordAuth: { enabled: true, identityFields: ["uid"] },
@@ -27,6 +30,13 @@ migrate((app) => {
       { name: "fw", type: "text", max: 64 },
       { name: "board", type: "text", max: 32 },
       { name: "blocked", type: "bool" },
+      // TASK-1979: telemetry mode, set by the maintainer; empty = default. The gateway reads it at every login and
+      // token refresh (every 15 min) and goes back to default by itself after mode_until.
+      { name: "mode", type: "select", values: ["default", "full", "full+trace", "custom"], maxSelect: 1 },
+      { name: "flags", type: "select", maxSelect: 10,
+        values: ["otmsg", "restapi", "mqtt", "sensors", "sat", "otdirect", "satble", "sattrace", "mqttgate", "ntp"] },
+      { name: "mode_until", type: "date" },
+      { name: "mode_note", type: "text", max: 200 },
       { name: "updated", type: "autodate", onCreate: true, onUpdate: true },   // last login
     ],
     indexes: ["CREATE UNIQUE INDEX idx_devices_uid ON devices (uid)"],

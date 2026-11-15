@@ -415,7 +415,37 @@ static void cloudRecWriteJson(CloudRecTls &c, const char *method, const char *pa
   c.print(body);
 }
 
-static char cloudRecResp[1024];                  // a login or refresh reply: the device record and the token
+static char cloudRecResp[1536];                  // a login or refresh reply: the device record and the token
+
+// ---------------------------------------------------------------- TASK-1979: telemetry mode set centrally
+
+static const uint32_t CLOUDREC_REFRESH_MS = 15UL * 60UL * 1000UL;   // token refresh: picks up a changed mode
+static crec::RemoteCfg cloudRecRemote = {crec::RM_DEFAULT, 0, 0};
+static uint16_t cloudRecRemoteApplied = 0;        // the log flags the current mode switches on
+static uint16_t cloudRecRemoteOwned = 0;          // the ones this code switched on (the user had them off)
+static uint32_t cloudRecLastRefresh = 0;
+
+// Switches the log flags to what the mode asks at this moment. A flag the user had on stays on when the mode ends;
+// a flag this code switched on goes off again. Never a simulation switch (an entry with an onChange action).
+static void cloudRecApplyRemote() {
+  uint16_t want = crec::remoteEffective(cloudRecRemote, (int64_t)time(nullptr));
+  if (want == cloudRecRemoteApplied) return;
+  for (int i = 0; i < crec::REMOTE_FLAG_COUNT; i++) {
+    const DebugFlagDef *d = debugFlagByName(crec::REMOTE_FLAGS[i]);
+    if (!d || d->onChange) continue;
+    bool &f = state.debug.*(d->member);
+    uint16_t bit = (uint16_t)(1u << i);
+    if (want & bit) {
+      if (!f) { f = true; cloudRecRemoteOwned |= bit; }
+    } else if (cloudRecRemoteOwned & bit) {
+      f = false;
+      cloudRecRemoteOwned &= (uint16_t)~bit;
+    }
+  }
+  cloudRecRemoteApplied = want;
+  DebugTf(PSTR("cloudrec: telemetry mode %u, log flags 0x%03x%s\r\n"), (unsigned)cloudRecRemote.mode, (unsigned)want,
+          cloudRecRemote.untilEpoch ? " (until mode_until)" : "");
+}
 
 // Reads the token and the record id from a login reply.
 static bool cloudRecTakeAuth() {
@@ -450,6 +480,9 @@ static int cloudRecLogin(CloudRecTls &c, bool &blocked) {
   if (crec::classifyReply(st, cloudRecResp) == crec::OUT_BLOCKED) { blocked = true; return st; }
   if (st != 200) return st;
   if (!cloudRecTakeAuth()) return 0;
+  cloudRecRemote = crec::parseRemote(cloudRecResp);   // TASK-1979: the mode the maintainer set for this gateway
+  cloudRecApplyRemote();
+  cloudRecLastRefresh = millis();
   if (!cloudRecFwSynced) {            // keep the register current: label, firmware, board
     char path[64];
     snprintf_P(path, sizeof(path), PSTR("/api/collections/devices/records/%s?fields=id"), cloudRecDevId);
@@ -458,6 +491,24 @@ static int cloudRecLogin(CloudRecTls &c, bool &blocked) {
     cloudRecWriteJson(c, "PATCH", path, body, true);
     cloudRecFwSynced = cloudRecReadStatus(c, nullptr, 0) == 200;
   }
+  return 200;
+}
+
+// Token refresh on a fresh connection (TASK-1979): a new token, and the device record with its current mode.
+// Returns the HTTP status; blocked is set on a 403 otgw-blocked.
+static int cloudRecRefresh(bool &blocked) {
+  blocked = false;
+  CloudRecTls c;
+  c.setTimeout(10000);
+  if (!c.connect(cloudRecCfg.host, cloudRecCfg.port)) return 0;
+  cloudRecWriteJson(c, "POST", "/api/collections/devices/auth-refresh", "{}", true);
+  int st = cloudRecReadStatus(c, cloudRecResp, sizeof(cloudRecResp));
+  c.stop(st > 0);
+  if (crec::classifyReply(st, cloudRecResp) == crec::OUT_BLOCKED) { blocked = true; return st; }
+  if (st != 200 || !cloudRecTakeAuth()) return st == 200 ? 0 : st;
+  cloudRecRemote = crec::parseRemote(cloudRecResp);
+  cloudRecApplyRemote();
+  cloudRecLastRefresh = millis();
   return 200;
 }
 
@@ -623,6 +674,8 @@ static void cloudRecWriteConfig() {
 
 static void cloudRecBlocked() {                   // the maintainer blocked this gateway: the opt-in goes off
   cloudRecPause(false);
+  cloudRecRemote = {crec::RM_DEFAULT, 0, 0};       // and any central telemetry mode ends with it
+  cloudRecApplyRemote();
   cloudRecSvc = SVC_OFF;
   cloudRecCfg.enabled = false;
   cloudRecWriteConfig();
@@ -648,6 +701,15 @@ static void cloudRecTask(void *) {
       else if (st == 409) cloudRecBackoff(F("uid enrolled with another secret (delete it on the server)"), true);
       else cloudRecBackoff(F("service unreachable"), false);
       continue;
+    }
+    cloudRecApplyRemote();                        // a mode past its mode_until ends here, within a second
+    if (millis() - cloudRecLastRefresh >= CLOUDREC_REFRESH_MS) {
+      bool blocked;
+      int st = cloudRecRefresh(blocked);
+      if (blocked) { cloudRecBlocked(); continue; }
+      if (crec::classify(st) == crec::OUT_AUTH) cloudRecToken[0] = 0;          // log in again at the next upload
+      else if (crec::classify(st) == crec::OUT_DOWN) { cloudRecBackoff(F("token refresh failed"), false); continue; }
+      cloudRecLastRefresh = millis();
     }
     if (millis() - lastClose >= CLOUDREC_INTERVAL_MS) {
       lastClose = millis();

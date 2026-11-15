@@ -16,6 +16,8 @@ Checks, each printed as PASS or FAIL:
       update all get HTTP 403 with 'otgw-blocked' (pb_hooks/blocked.pb.js)
   10. with --db: a batch made 31 days old is deleted by the retention cron, a fresh one stays
   11. the admin UI is not reachable (only meaningful through the tunnel: expect 404 from its path rule)
+  12. telemetry mode (TASK-1979): a gateway cannot set mode/flags/mode_until/mode_note on enroll or update; after
+      the maintainer sets them, the gateway's login and token refresh both return them
 Waits out the per-IP rate limits (429). Standard library only.
 """
 import base64, json, os, secrets, sqlite3, sys, time, urllib.error, urllib.request
@@ -134,6 +136,25 @@ def main():
         st_new, _ = call("GET", f"{base}/api/collections/batches/records/{new.get('id')}", None, admin)
         check("10 retention deletes a 31-day-old batch, keeps a fresh one", st_run == 204 and st_old == 404 and st_new == 200,
               f"run {st_run}, old {st_old}, new {st_new}")
+
+    uid3, pw3 = "otgw-" + secrets.token_hex(6), secrets.token_urlsafe(18)
+    st_e, _ = enroll(base, uid3, pw3, mode="full")
+    st_e2, _ = enroll(base, uid3, pw3)
+    _, a3 = login(base, uid3, pw3)
+    url3 = f"{base}/api/collections/devices/records/{a3.get('record', {}).get('id')}"
+    refused = [call("PATCH", url3, {k: v}, a3.get("token"))[0] for k, v in
+               (("mode", "full"), ("flags", ["sat"]), ("mode_until", "2030-01-01 00:00:00.000Z"), ("mode_note", "x"))]
+    st_m, _ = call("PATCH", url3, {"mode": "custom", "flags": ["sat", "mqtt"], "mode_until": "2030-01-01 00:00:00.000Z",
+                                   "mode_note": "test"}, admin)
+    _, a4 = login(base, uid3, pw3)
+    _, r4 = call("POST", f"{base}/api/collections/devices/auth-refresh", {}, a4.get("token"))
+    rec4, rr4 = a4.get("record", {}), r4.get("record", {})
+    ok = (st_e == 400 and st_e2 == 200 and a3.get("record", {}).get("mode") in ("", None) and
+          all(x in (400, 403, 404) for x in refused) and st_m == 200 and
+          all(r.get("mode") == "custom" and sorted(r.get("flags") or []) == ["mqtt", "sat"] and
+              str(r.get("mode_until", "")).startswith("2030-01-01") for r in (rec4, rr4)))
+    check("12 telemetry mode: only the maintainer sets it; login and refresh return it", ok,
+          f"enroll {st_e}/{st_e2}, gateway updates {refused}, admin {st_m}, login {rec4.get('mode')}, refresh {rr4.get('mode')}")
 
     st, _ = call("GET", f"{base}/_/")
     check("11 admin UI not reachable (tunnel only)", st == 404, f"{st}: expected through the tunnel, not on the LAN")

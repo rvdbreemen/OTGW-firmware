@@ -18,6 +18,12 @@ gateway --HTTPS--> Cloudflare edge --tunnel (outbound from the NAS)--> cloudflar
   `Gateway blocked (otgw-blocked): telemetry opt-in off` (`pb_hooks/blocked.pb.js`). The gateway turns its own
   telemetry opt-in off at its next request (within about a minute) and makes no further connection. Its `label`, `fw`, `board` and `updated`
   (last login) show which gateways log.
+- **Telemetry mode per gateway (TASK-1979):** a new gateway always starts in the default mode. To log more for a
+  while, set on its record: `mode` = `full` (every log flag but `sattrace`), `full+trace` (all ten) or `custom`
+  (the ticked `flags`); `mode_until` = when it goes back to default by itself (recommended, so it is never
+  forgotten); `mode_note` = why (issue or Discord link, for you only). The gateway picks up a change within 15
+  minutes (token refresh) and an expiry within a second; the extra debug lines also show on its telnet. It can set
+  none of these fields itself, and the two simulation switches can never be set this way.
 - **What it stores:** `batches` holds the encoded chunks. A device can create batches for itself and nothing else: no reading,
   no changing, no deleting. A resend of the same `stream` + `seq` is refused (unique index), so a gateway can
   safely send a batch again after a lost reply.
