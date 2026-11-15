@@ -3,11 +3,11 @@ id: TASK-1803
 title: >-
   OT-Direct gateway mode: OT=, SW= and SH= reach the boiler only in alternative
   slots; the PIC rewrites the thermostat's own READ 27/56/57
-status: In Progress
+status: In Review
 assignee:
   - '@claude'
 created_date: '2026-11-11T06:41:00Z'
-updated_date: '2026-11-15T06:33:00Z'
+updated_date: '2026-11-15T10:28:00Z'
 labels:
   - otdirect
   - review-2026-11-11
@@ -40,4 +40,6 @@ Found in the TASK-1795 audit (docs/reviews/2026-11-11_otdirect-pic-parity-audit/
 Bench 09 on .61 (OT-Direct, no boiler, no thermostat), beta.298+bb38dc5 (bench-only build of lane-95-next on c2cd68b16, 2026-11-15 07:25, exit 0, RAM 130572 B, Flash 2156679 B): regression PASS (OT=7.6 -> WRITE 27 0x079A, OT=- clears, SW=55.7 0x37B4, SH=60). AC4: build exit 0, evaluate --quick 86/0, bench where the hardware allows done; NOT benched (field only): the rewrite of the thermostat's READ 27/56/57 (AC1/AC2) needs a thermostat; host test tests/test_otd_relay_rw.py.
 
 AC review (coordinator rule 2026-11-15): AC1 and AC2 ask for live behaviour with a thermostat; they are proven by tests/test_otd_relay_rw.py only, so they stay open as field ACs. AC3 (host test) and AC4 (build/evaluate/bench where possible, field part named) stay ticked.
+
+Landed: Pushed origin/dev 2e4ca9c05..3e29faa63; zip beta.301+2b3d9a2 posted (Discord 1571471374038470711); final build exit 0 'Build completed successfully', RAM 130572 B, Flash 2157483 B; sweep 88/88, evaluate --quick 86/0; bench 09 on .61 beta.301+2b3d9a2 PASS (smoke + re-check). Status In Review (convention: field ACs open, see AC list; host-proven).
 <!-- SECTION:NOTES:END -->

@@ -3,11 +3,11 @@ id: TASK-1750
 title: >-
   OT-Direct: MsgID 100 remote override flags like the PIC (TT b'11', OH= high
   byte)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-09T09:28:00Z'
-updated_date: '2026-11-15T07:57:00Z'
+updated_date: '2026-11-15T10:28:00Z'
 labels:
   - otdirect
   - needs-maintainer-ok
@@ -38,3 +38,9 @@ Decision (Robert, DM 1571426506259963986, reply to the coordinator triage questi
 
 Implemented (lane-95-next): otdOverrideFlagsData(temporary, overrideHigh) in the otdRemoteOverrideReply block of OTDirect.ino: TT= 0x0003, TC= 0x0001, with OH=1 the low byte copied into the high byte (0x0303 / 0x0101); used for the thermostat's MsgID 100 read answer (replyToThermostat) and the master-mode WRITE 100; otdRemoteOverrideReply no longer masks the flags to the low byte. Evidence: tests/test_otd_tt_pic_parity.py (real handleOTDirectCommand, setRemoteOverride, replyToThermostat gateway loop) 46/46 OK on the lane; with OTGW_OTD_INO=HEAD's OTDirect.ino 7 FAIL, of them for this task B2 (TT flags 0x0002 != 0x0003), M1 (master WRITE 100 0x0002), O1 (OH=1 TT -> 0x0303), O2 (OH=1 TC -> 0x0101), O3 (OH=0 TT 0x0003). The OH default (PIC 1, OT-Direct 0) is a separate task.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+beta.300. AC1: Robert A (DM 1571426506259963986). AC2: tests/test_otd_tt_pic_parity.py B2/M1/O1-O3: TT 0x0003, TC 0x0001, OH=1 0x0303/0x0101, OH=0 high byte 0; 46/46 on the fix, 7 FAIL on the old code. Bench: smoke only (no thermostat on .61 to read MsgID 100), TT=/TT=0 replies and no crash on beta.301. OH default split to TASK-1961. Pushed origin/dev 2e4ca9c05..3e29faa63; zip beta.301+2b3d9a2 posted (Discord 1571471374038470711); final build exit 0 'Build completed successfully', RAM 130572 B, Flash 2157483 B; sweep 88/88, evaluate --quick 86/0; bench 09 on .61 beta.301+2b3d9a2 PASS (smoke + re-check).
+<!-- SECTION:FINAL_SUMMARY:END -->

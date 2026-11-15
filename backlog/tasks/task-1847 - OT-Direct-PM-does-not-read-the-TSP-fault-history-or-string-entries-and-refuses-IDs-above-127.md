@@ -3,11 +3,11 @@ id: TASK-1847
 title: >-
   OT-Direct: PM= does not read the TSP, fault-history or string entries, and
   refuses IDs above 127
-status: In Progress
+status: In Review
 assignee:
   - '@claude'
 created_date: '2026-11-12T00:01:00Z'
-updated_date: '2026-11-15T08:35:00Z'
+updated_date: '2026-11-15T10:28:00Z'
 labels:
   - otdirect
   - parity
@@ -47,4 +47,6 @@ Bench 09 on .61 (OT-Direct, no boiler, no thermostat), beta.298+bb38dc5 (bench-o
 AC review (coordinator rule 2026-11-15): AC2 'PM=93 reads all characters' asks for live behaviour; it is proven by the host test only (str-1.stc reproduced), so it stays open as a field AC until a boiler with strings is benched.
 
 Seam fix (found by the lane sweep 2026-11-15): tests/test_sat_lowload_contract.py LL-018h and LL-018j still named test_sat_no_return_startup's old test_pm_out_of_range_is_refused_with_bv, which this task renamed to test_pm_takes_0_to_255_like_the_pic (PM=256 is OR now, not BV). The full contract run showed 'ERROR: test_ll018h ... no such test method'. Both references renamed; the LL-018h delegation (3 modules) and ll018j run green afterwards.
+
+Landed: Pushed origin/dev 2e4ca9c05..3e29faa63; zip beta.301+2b3d9a2 posted (Discord 1571471374038470711); final build exit 0 'Build completed successfully', RAM 130572 B, Flash 2157483 B; sweep 88/88, evaluate --quick 86/0; bench 09 on .61 beta.301+2b3d9a2 PASS (smoke + re-check). Status In Review (convention: field ACs open, see AC list; host-proven).
 <!-- SECTION:NOTES:END -->

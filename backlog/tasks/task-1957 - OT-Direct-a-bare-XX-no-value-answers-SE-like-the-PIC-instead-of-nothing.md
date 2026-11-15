@@ -1,11 +1,11 @@
 ---
 id: TASK-1957
 title: 'OT-Direct: a bare XX= (no value) answers SE like the PIC instead of nothing'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-15T04:22:00Z'
-updated_date: '2026-11-15T06:32:00Z'
+updated_date: '2026-11-15T10:28:00Z'
 labels:
   - otdirect
   - parity
@@ -35,3 +35,9 @@ Found by 09 on the TASK-1859 bench (beta.294+67e3f51, .61, item 3): 'CS=' gets n
 
 Bench 09 on .61 (OT-Direct, no boiler, no thermostat), beta.298+bb38dc5 (bench-only build of lane-95-next on c2cd68b16, 2026-11-15 07:25, exit 0, RAM 130572 B, Flash 2156679 B): items 1-5 PASS: CS= -> SE, TT=/SW= -> SE, OT= -> 'OT: -', MM= -> 'MM: -', GW= stays silent. evaluate --quick 86/0.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+beta.296. AC1-AC3: tests/test_otd_bare_commands.py 4/4 through the real handleOTDirectCommand entry (2 FAIL on the old code); bench 09 .61 beta.298 items 1-5 PASS (CS= -> SE, TT=/SW= -> SE, OT= -> 'OT: -', MM= -> 'MM: -', GW= silent) and re-checked on beta.301. Pushed origin/dev 2e4ca9c05..3e29faa63; zip beta.301+2b3d9a2 posted (Discord 1571471374038470711); final build exit 0 'Build completed successfully', RAM 130572 B, Flash 2157483 B; sweep 88/88, evaluate --quick 86/0; bench 09 on .61 beta.301+2b3d9a2 PASS (smoke + re-check).
+<!-- SECTION:FINAL_SUMMARY:END -->
