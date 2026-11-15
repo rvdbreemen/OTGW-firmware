@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-15T09:35:00Z'
-updated_date: '2026-11-15T12:18:00Z'
+updated_date: '2026-11-15T12:19:00Z'
 labels:
   - research
   - tls
@@ -64,4 +64,6 @@ Out of scope for the PoC: web UI settings, consent dialog, SAT encoding without 
 2026-11-15 Robert decision 1 (bridge 25238): A. Record inbound bridge commands only, as text, only while cloud recording runs; needs a new ADR superseding the bridge exclusion of ADR-213; SAT-filtered commands (ADR-217) marked as refused. Outbound stream not recorded (already in the OT section).
 
 2026-11-15 Robert decision 2 (REST GET): A. Record route id, method, status per request, no body; consecutive identical GET 200s collapse into a per-minute counter; every non-200 recorded individually.
+
+2026-11-15 Robert decision 3 (SAT): A. While cloud recording runs, SATTICK always goes to the SAT section, independent of state.debug.bSAT (SATcontrol.ino:20), not to telnet; SAT behaviour unchanged. Which SAT decisions become SAT_EVENT records is queued as a question for Sergeant D.
 <!-- SECTION:NOTES:END -->

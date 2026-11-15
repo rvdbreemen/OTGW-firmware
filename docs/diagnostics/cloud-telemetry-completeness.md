@@ -86,13 +86,16 @@ Gaps that matter for "everything":
    Order of size at these rates: under 0.05 KB/s, so it fits the no-PSRAM budget next to the OT section.
 3. **Debug text stays optional** (a per-subsystem selection), not the carrier of completeness.
 
-## Decisions for Robert (one at a time, by DM)
+## Decisions (Robert, 2026-11-15)
 
-1. **Port 25238 bridge traffic**: ADR-213 leaves it out on purpose. Recording it needs a new ADR that supersedes
-   that part. Recommendation: commands in only, as text, and only while the cloud recording runs.
-2. **REST GET**: status code and route only, no body (recommended), or not at all.
-3. **SAT_EVENT fields**: which SAT decisions belong in a record is a SAT behaviour question and goes to Sergeant D
-   under `.claude/rules/sat-ground-truth.md`; until then SATTICK (debug on) is the SAT source.
+1. **Port 25238 bridge traffic: A.** Inbound bridge commands only, as text, only while the cloud recording runs.
+   Needs a new ADR that supersedes the bridge exclusion of ADR-213; a command the ADR-217 SAT filter drops is
+   recorded as refused. The outbound stream is not recorded (it is already in the OT section).
+2. **REST GET: A.** Per request route id, method and status, no body. Consecutive identical GETs with status 200
+   collapse into a per-minute counter; every other status is its own record.
+3. **SAT: A.** While the cloud recording runs, SATTICK always goes to the SAT section, independent of
+   `state.debug.bSAT` (`SATcontrol.ino:20`), and not to telnet. SAT behaviour does not change. Which SAT decisions
+   become `SAT_EVENT` records is a question for Sergeant D (TASK-1970).
 
 ## Not verified in this analysis
 
