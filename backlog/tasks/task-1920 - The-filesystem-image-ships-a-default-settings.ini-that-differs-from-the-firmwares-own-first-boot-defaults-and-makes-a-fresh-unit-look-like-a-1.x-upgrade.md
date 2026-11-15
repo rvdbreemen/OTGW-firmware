@@ -4,8 +4,9 @@ title: >-
   The filesystem image ships a default settings.ini that differs from the
   firmware's own first-boot defaults and makes a fresh unit look like a 1.x
   upgrade
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-11-14T04:28:00Z'
 updated_date: '2026-11-15T15:07:00Z'
 labels:
@@ -36,5 +37,6 @@ Found during TASK-1774 (code reading, not seen on a device). src/OTGW-firmware/d
 <!-- SECTION:NOTES:BEGIN -->
 Released by Robert (DM 1571454228763779093, relayed by the coordinator 2026-11-15): needs-maintainer-ok removed; queued for session 95 after the lane-95-next build/push.
 
+Analysis (session 95, 2026-11-15, code read): the shipped data/settings.ini (14 keys) differs from the struct defaults in MQTTenable (false vs true), OTGWcommands (GW=1 vs empty) and lacks MQTTuseLegacyOtTopics and ui_onboarded, so readSettings() takes the 1.x-upgrade path (:654-658 legacy topics on) and skips the wizard (:671-675). New fact: the GW=1 in the file never ran: picBoot.bEnable defaults to false (PICtypes.h:83), the file has no OTGWcommandenable key, and sendPICBootCommands() returns when disabled (OTGW-Core.ino:1539-1540). Option A therefore loses nothing functional. Side fact (not this task): the PIC's factory EEPROM is monitor mode (gateway.asm 6.8 Configuration de 0 :5471, SetMonitorMode :4750-4756), so a brand-new PIC needs GW=1 once, as before. Question A/B/C put to Robert through the coordinator with recommendation A (remove the file from the image; one source of defaults). Waiting for the answer (AC2) and for a bench slot for AC1.
 2026-11-15 15:58-16:12 bench 09 on .61, beta.320+5b9efcc (image without data/settings.ini). (a) filesystem OTA over existing settings: ota_flash 'settings: 165 keys, changed: none', REST diff [], settings.ini diff empty (ADR-233 RTC restore). (b) 'fresh unit': saved settings.ini, deleted it (/api/listfiles?delete=/settings.ini -> 'File deleted', GET /settings.ini 404), reboot: the unit came back with the firmware defaults: hostname OTGW2, MQTTenable true, MQTTuseLegacyOtTopics false, ui_onboarded false, mqttbroker homeassistant.local (REST and the newly written settings.ini agree); WiFi kept (credentials in NVS, WifiStaticIP empty). Restore: saved settings.ini uploaded (POST /upload path=// -> 303, byte-identical), reboot, hostname marvin-otgw32, REST diff [] and settings.ini diff vs before 320 empty. Not done: a full USB erase + fresh image flash (would wipe the WiFi credentials); the deleted-ini boot plus this image (no settings.ini inside) stands in for it. Evidence: 09 scratchpad b320/fresh (defaults.json, defaults.ini, saved/after files).
 <!-- SECTION:NOTES:END -->
