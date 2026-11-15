@@ -7479,10 +7479,31 @@ static void satSendMMDuringDhw() {
                          settings.sat.iMaxRelModulation, satGetManufacturerQuirks()));
 }
 
+// TASK-1952: when a SAT simulation run ends, the PID state and the heating-curve recommendation in RAM are the ones
+// the run learned on the simulated room. The files were not written during the run (TASK-1900), so they hold the real
+// state: reload both the way a boot does (satPidReset() then satLoadPidState(), which warm-starts the integral and raw
+// derivative; satHCRLoadState() and a recomputed recommendation). Also right for a unit that booted with simulation on.
+// RAM cost 0, against a 5.7 KB stash of the HCR intra-day ring. Runs every pass, before every early return.
+// --- satSimEndRestore begin
+static void satSimEndRestore()
+{
+  static bool s_wasSim = false;
+  if (settings.sat.bSimulation == s_wasSim) return;
+  s_wasSim = settings.sat.bSimulation;
+  if (s_wasSim) return;   // entering a run: nothing to keep, the files stay untouched
+  satPidReset();
+  satLoadPidState();
+  satHCRLoadState();
+  satHeatingCurveRecommendation();
+  SATDebugTln(F("SAT: simulation ended, real PID state and heating-curve data reloaded"));
+}
+// --- satSimEndRestore end
+
 static void satControlLoopRun()
 {
   satApplyControlStateReset();    // TASK-1414: a reset requested from any task (REST, MQTT, SAT itself) is applied here, once
   satCurveTuneService(millis());  // TASK-1525: starts, stops and rolls the self-tune clock; before every early return
+  satSimEndRestore();             // TASK-1952: the real learned state comes back when a simulation run ends
   // TASK-1574 (commit-on-success): before the enabled gate and every other early return, so a dropped hand-back is repeated
   // also while SAT is switched off (satDisable() then has no later pass of its own).
   satRetryRelease();
