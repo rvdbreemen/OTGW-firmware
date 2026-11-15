@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v2.0.0-beta.329
+**  Version  : v2.0.0-beta.330
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -6334,6 +6334,13 @@ void processOT(const char *buf, int len, bool suppressOutput, bool localAnswer, 
                                                             OTdata.type == OT_READ_ACK, OTdata.type == OT_DATA_INVALID,
                                                             OTdata.type == OT_UNKNOWN_DATA_ID);
         satFeedNote(OTdata.id == OT_Tboiler ? state.otBus.feedTboiler : state.otBus.feedTret, feedEvent, millis());
+      }
+      // TASK-1990 (entry 364): the same valid boiler flow sample (the feed filter above) into the 2 minute average of the PWM ON
+      // suppression, not while the boiler reports hot water (slave status bit 2): that water is the DHW circuit, not the heating flow.
+      if (OTdata.id == OT_Tboiler && OTdata.masterslave == 1 && !OTdata.skipthis && !(OTcurrentSystemState.SlaveStatus & 0x04) &&
+          satFeedEventForFrame(OTdata.rsptype == OTGW_BOILER, OTdata.bLocalAnswer || OTdata.bReplayed, OTdata.type == OT_READ_ACK,
+                               OTdata.type == OT_DATA_INVALID, OTdata.type == OT_UNKNOWN_DATA_ID) == SatFeedEvent::Valid) {
+        satFlowAvgNote(state.otBus.flowAvg, millis(), OTdata.f88());
       }
 
       // TASK-1412.13 (entry 252): the boiler's answer to a MsgID 57 write (SAT's SH=), observed for the status only. Write-Ack =

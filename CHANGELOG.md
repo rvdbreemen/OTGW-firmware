@@ -6,6 +6,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## [Unreleased]
 
 ### Changed
+- SAT: during a PWM ON phase the modulation suppression setpoint is now the average boiler flow temperature of the last 2 minutes minus the suppression offset, instead of the latest flow reading. Only readings since the current ignition count, and none taken during hot water, so standing water read before the burner lit does not enter it. The start-up flood and the continuous mode keep the latest flow. This follows Sergeant D's answer (entry 364) and deliberately differs from thermo-nova, which takes the latest flow (TASK-1990).
 - OT-Direct master mode: a thermostat on the thermostat port that writes a value (any Data-ID except 1, 16 and 24, and 8/14 while SAT owns the setpoint) now has that write sent to the boiler in the next free master slot, and gets the boiler's own answer back (WRITE-ACK, Data-Invalid or Unknown-DataID) instead of a local acknowledgement. Reads stay answered from the boiler cache. The thermostat interface is on by default in master mode (Robert, DM 1571427398485024889; ADR-241, ADR-243; TASK-1812).
 
 ### Fixed

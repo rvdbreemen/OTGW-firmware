@@ -105,7 +105,10 @@ def build(workdir, sat_text):
     stubs = stubs.replace("float fMaxTSetUser = 0.0f;", "float fMaxTSetUser = 0.0f; float fFlameOffOffset = 18; float fModSupOffset = 1;")
     funcs = funcs.replace("settings.sat.fFlameOffOffset", "g_flameOff").replace("settings.sat.fModSupOffset", "g_modSup")
     cpp = workdir / "ceiling.cpp"
-    cpp.write_text(stubs + EXTRA_STUBS + block + funcs + MAIN, encoding="utf-8")
+    # TASK-1990: the suppression reads its flow through satSuppressionFlowTemp() (the 2 minute average); this sweep is about the
+    # ceiling, so the stub hands it the swept flow (the average of a constant flow is that flow).
+    avg = "static float satSuppressionFlowTemp() { return satGetFlowTemp(); }\n" if "satSuppressionFlowTemp(" in src else ""
+    cpp.write_text(stubs + EXTRA_STUBS + avg + block + funcs + MAIN, encoding="utf-8")
     return mt.base.compile_cpp(cpp, workdir / "ceiling.exe")
 
 

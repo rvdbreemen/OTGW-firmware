@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-15T10:12:00Z'
-updated_date: '2026-11-15T12:31:00Z'
+updated_date: '2026-11-15T21:55:00Z'
 labels:
   - rest
   - bug
@@ -40,4 +40,6 @@ Beta feedback, reporter indigo_light (Discord 301077214374658048), #beta-testing
 Evidence: tests/test_ot_value_source.py (REAL block sliced by marker + wiring on the source text): fix 9/9 OK, indigo case 'id=27 status=data_invalid source=gateway'; against origin's sources (OTGW_SRC_DIR, temp copy) FAILED (failures=3, errors=1): the block has no value source, no wiring. tests/test_boiler_answer_status.py (TASK-1871): its harness now also takes the two enums the block uses; 11/11 OK, every 1871 expectation unchanged. Related: test_boiler_support_bitmap_b_only, test_sat_rest_contract_1496, test_rest_* PASS. openapi.yaml: source on /v2/otgw/messages/{id}; /v2/otgw/label/{msglabel} gained status, last_seen_age_s (missing before) and source; yaml parses. docs/api/README.md updated. evaluate --quick 0 FAIL. Build and field confirmation (AC4) pending.
 
 2026-11-15 bench (09 on .63, ffd0a64): the source field is present on otgw/messages and otgw/label; without a PIC outside sensor and without an OT bus it reads none, as expected. The gateway case (PIC DS18B20, boiler without MsgID 27) is the field AC4 with indigo_light.
+
+indigo_light capture 2026-11-15 10:50-13:26 (beta.250+aed38bf, PIC gateway 6.8, Vitodens + Honeywell Round, sent to Robert by DM, kept local in session 95 scratchpad indigo1115/): 28020 frames. The Round never reads MsgID 27 (no T 27 frame at all), so the capture cannot show how the PIC answers 27 to a thermostat; that last check stays open. What it does show: the PIC writes the DS18B20 outside temperature to the boiler itself, R WRITE-DATA 27 3020 times (~19/min, values 6.19-8.8 C), and the boiler answers Data-Invalid every time (B 601B0000); the firmware sent no OT= (no OT= in the telnet command log). Source: PIC 6.6 gateway.asm MessageTable :1820-1830 lists MSG_OUTSIDETEMP among the alternatives, MessageID27 :3050-3067 turns the request into T_WRITE with outside1/outside2 when OutsideTemp is set (6.8 source not in the repo; 6.6 checked).
 <!-- SECTION:NOTES:END -->

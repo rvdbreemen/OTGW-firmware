@@ -1259,11 +1259,23 @@ static float satPwmFlameOffHold(float maxSetpoint)
   return cs;
 }
 
-// Modulation-suppression setpoint of the PWM ON phase after the hold: flow temperature minus
-// fModSupOffset, clamped to MINIMUM..max. Used by the 30 s control tick and the 3 s refresh.
+// Flow temperature the PWM ON suppression subtracts its offset from: the mean of the valid MsgID 25 samples of the last 2 minutes
+// since the current flame-on (Sergeant D entry 364, TASK-1990; thermo-nova takes the latest flow, heating_control.py:435-441).
+// Same validity gate as satGetFlowTemp(): without a fresh flow there is no average either. No sample yet: the latest flow.
+static float satSuppressionFlowTemp()
+{
+  const float latest = satGetFlowTemp();
+  if (latest <= 0.0f) return latest;
+  float mean = 0.0f;
+  if (satFlowAvgMean(state.otBus.flowAvg, millis(), satCycleGetFlameOnStartMs(), &mean) == 0) return latest;
+  return mean;
+}
+
+// Modulation-suppression setpoint of the PWM ON phase after the hold: the 2 minute flow average minus
+// fModSupOffset, clamped to MINIMUM..max. Used by the 30 s control tick, the 3 s refresh and the flood hand-over.
 static float satPwmSuppressionSetpoint(float maxSetpoint)
 {
-  float cs = satGetFlowTemp() - settings.sat.fModSupOffset;
+  float cs = satSuppressionFlowTemp() - settings.sat.fModSupOffset;
   if (cs < SAT_MIN_SETPOINT) cs = SAT_MIN_SETPOINT;
   if (cs > maxSetpoint) cs = maxSetpoint;
   return cs;
