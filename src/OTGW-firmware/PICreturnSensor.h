@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : PICreturnSensor.h
-**  Version  : v2.0.0-beta.316
+**  Version  : v2.0.0-beta.317
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **

@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-beta.316
+**  Version  : v2.0.0-beta.317
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -1536,7 +1536,7 @@ static void handleSAT(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod m
     webSend(200, F("application/json"), F("{\"status\":\"ok\"}"));
   }
   else if (strcasecmp_P(sub, PSTR("weather")) == 0) {
-    if (wc == 5 && strcasecmp_P(words[5], PSTR("needs-setup")) == 0) {
+    if (wc > 5 && strcasecmp_P(words[5], PSTR("needs-setup")) == 0) {   // TASK-1969: six words, words[5] exists only from wc 6
       if (method != HTTP_GET) { sendApiMethodNotAllowed(F("GET")); return; }
       // "Needs setup" means: after startup grace, outside temp still missing
       // AND weather not yet valid. Browser uses this to trigger the wizard.
