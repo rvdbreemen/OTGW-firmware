@@ -28,7 +28,7 @@ Werkafspraken:
 
 - **Prompts en labels zijn in het Engels.** Alle diagrammen van dit project zijn Engels (maintainer, 2026-11-15), en de meeste generators volgen Engelse compositie-instructies nauwkeuriger. Hoofdstuk 6 geeft de Engelse labelset; de Nederlandse kolom is alleen ter vertaling.
 - **Korte labels.** Maximaal drie woorden per knoop. Details horen in het document, niet op de plaat.
-- **Publicatieregels van het project gelden ook voor de plaat.** Noem de OTGW32-hardware niet bij naam (CLAUDE.md, AGENT-CORE, Discord-regel), zet geen Discord-ID's (van gebruikers of kanalen), webhook-URL's, tokens of IP-adressen van testunits in beeld, en gebruik voor personen de Engelse rolnamen ("Maintainer", "SAT designer", "Alpha testers"), geen foto-achtige portretten. Een mention staat alleen als de letterlijke placeholder `<@ID>` op de plaat.
+- **Publicatieregels van het project gelden ook voor de plaat.** Noem de boardnaam van de hardware nergens (CLAUDE.md, AGENT-CORE, Discord-regel), zet geen Discord-ID's (van gebruikers of kanalen), webhook-URL's, tokens of IP-adressen van testunits in beeld, en gebruik voor personen de Engelse rolnamen ("Maintainer", "SAT designer", "Alpha testers"), geen foto-achtige portretten. Een mention staat alleen als de letterlijke placeholder `<@ID>` op de plaat.
 - **Geen merklogo's.** Gebruik generieke glyphs voor Discord, GitHub en Tweakers (een spraakwolk, een vertakking, een forumtegel). Generators vervormen logo's, en een vervormd logo oogt slordiger dan een neutraal icoon.
 - **Controleer het resultaat** met de lijst in hoofdstuk 7 voordat je het deelt. Een mooie plaat met een pijl de verkeerde kant op is erger dan geen plaat.
 
@@ -163,7 +163,7 @@ De kijker moet na tien seconden drie dingen begrijpen:
 |---|---|---|
 | Tweakers topic | RSS · read only | in |
 | GitHub | issues · PRs · releases | beide |
-| Discord support | 4 channels · read · announcements · replies in practice | in; uit: aankondigingen en, in de praktijk, antwoorden |
+| Discord support | 4 channels · read · announce · replies | in; uit: aankondigingen en, in de praktijk, antwoorden |
 | DM with maintainer | one question per message | beide |
 | #dev-sat-mqtt | backlog commands | beide |
 | #alpha-testing | builds · reports · SAT | beide |
@@ -202,7 +202,7 @@ De kijker moet na tien seconden drie dingen begrijpen:
 | Comms-sessie | BlueFlame Bot | gestippeld kobalt, twee punten | tweede stem van de persona: postconcepten en antwoorden in de supportkanalen |
 | BlueFlame Bot | Discord-support | dun groen, terug | aankondigingen en, in de praktijk, antwoorden |
 
-De referentieplaat tekent Discord-support nog als "4 channels · read + announcements" met alleen de gestippelde leeslijn. De dunne groene terugpijl en de ondertitel uit de tabel in 3.3 horen bij een volgende render.
+De referentieplaat tekent Discord-support met de gestippelde leeslijn naar de kanaalbus en daarnaast een dunne groene pijl terug: aankondigingen en, in de praktijk, antwoorden.
 
 ### 3.5 Legenda
 
@@ -412,7 +412,7 @@ Lower-right beam reaches a white panel labelled "TWEAKERS" with the caption "RSS
 
 Below the centre, a band labelled "WHAT IT PRODUCES": one straight petrol line drops from the flame to a horizontal rail feeding six tiles: "Reply", "Backlog task", "Register entry", "Triage list" (white with petrol outlines), "Question to maintainer" (pale peach fill #fde7d9, orange outline, orange arrow), "Alpha zip + report" (pale green fill #e3f1e4, green outline, green arrow).
 
-Bottom band labelled "FOUNDATION": three thin white bars with grey outlines and monospace text: "discord-mcp · supervisor · scheduled task", "watermarks", "gh as maintainer · RSS · build webhook · bot REST".
+Bottom band labelled "FOUNDATION": three thin white bars with grey outlines and monospace text: "discord-mcp (Java) · supervisor · scheduled task", "watermarks", "gh as maintainer · RSS · build webhook · bot REST".
 
 Typography: Archivo for headings, Source Sans for labels, JetBrains Mono for commands and the foundation bars. Only the flame glows. Palette: background #f4f6f7, cards #ffffff, text #151a1f, orange #c2410c, petrol #0e7490, cobalt #1d4ed8, ochre #a15c00, green #2f7d32.
 ```
@@ -448,17 +448,17 @@ Breed **3:1** (wireframe niet nodig; de compositie is één lijn). Een horizonta
 
 | # | Station | Kleur | Poort die kan weigeren |
 |---|---|---|---|
-| 1 | Backlog-taak | petrol | geen taak, geen werk (commit-msg-hook) |
+| 1 | Backlog-taak | petrol | geen taak, geen werk (conventie; een hook blokkeert directe edits van taakbestanden) |
 | 2 | Plan + zelfreview | petrol | advisor of Opus-review |
 | 3 | SAT? → OK van de SAT-ontwerper | oranje | geen bouw zonder zijn OK bij regelgedrag |
 | 4 | Code rood → groen | petrol | oude code faalt, fix slaagt |
 | 5 | Reviewteam | petrol | reviewers moeten weerleggen |
 | 6 | evaluate · tests | oker | geen nieuwe FAIL |
-| 7 | Bump + commit-hooks | oker | geen nieuwe prerelease-tag, geen taakbestand |
+| 7 | Bump + commit-hooks | oker | firmwarewijziging zonder prerelease-bump, `TASK-NNN` zonder gestaged taakbestand |
 | 8 | Build esp32-combo | oker | één build tegelijk op de machine |
 | 9 | Bench via OTA | oker | bench-tester flasht en test |
 | 10 | Push `dev` | petrol | pas na het OK van de bench |
-| 11 | Post alpha-zip | groen | githash ≠ HEAD, vuile `src/`, tag al gepubliceerd |
+| 11 | Post alpha-zip | groen | githash ≠ HEAD, vuile `src/`, tag al gepubliceerd of niet nieuwer, zip groter dan 10 MB |
 
 Boven de band, op afstand: "Beta 2.x" met een klokje (08:00/20:00, staand mandaat, geen hangslot) en met een steenrood hangslot "Stable 2.x" en "1.x LTS" (`otgw-1.x.x` naar `main`).
 
@@ -467,7 +467,7 @@ Boven de band, op afstand: "Beta 2.x" met een klokje (08:00/20:00, staand mandaa
 **Scènebeschrijving (van links naar rechts).** Over de volle breedte van een gebroken witte strook loopt één transportband, dun en strak getekend, van de linkerrand naar de rechterrand. Helemaal links ligt het eerste witte station met een petrol rand, een kanbanbordje: de taak waarmee alles begint. Daarna volgen de stations elkaar op als kralen aan een snoer; het derde valt op door zijn perzikkleurige vlak en oranje rand, want daar beslist een mens. Voorbij het midden staan vier stations met een oker rand en een schildje op een rij, als poortjes waar de band doorheen moet. Bij het negende station staat een kleine werkbank met twee printplaatjes en een WiFi-boog: de enige plek waar hardware in beeld is. Rechts eindigt de band in een zachtgroen station, waar een pakje de strook naar rechts verlaat. Hoog boven de band, met duidelijke afstand, hangen drie tegels: één met een klokje op 08:00 en 20:00 en twee met een steenrood hangslot.
 
 ```text
-A wide 3:1 light infographic banner: a horizontal conveyor belt from left to right on an off-white background with eleven stations as rounded white chips: petrol-blue chips for agent work, ochre shield chips for gates, one burnt-orange chip for a human approval, a forest-green chip at the end with a small package leaving to the right. A small workbench with two circuit boards and a WiFi arc stands at the ninth station. Above the belt, at a distance, one tile with a small clock and two tiles with brick-red padlocks. Flat vector, precise thin lines, calm editorial style, labels short and legible.
+A wide 3:1 light infographic banner: a horizontal conveyor belt from left to right on an off-white background (#f4f6f7) with eleven stations as rounded white chips, in this order: "Task", "Plan + review", "SAT designer OK", "Red to green", "Review team", "Gates", "Bump + hooks", "Build (lock)", "Bench (OTA)", "Push dev", "Post zip". Stations 1, 2, 4, 5 and 10 have a petrol-blue outline (#0e7490) for agent work; stations 6 to 9 have an ochre outline and a small ochre shield (#a15c00) for gates; station 3 has a pale peach fill (#fde7d9) and a burnt-orange outline (#c2410c) for a human approval; station 11 has a pale green fill (#e3f1e4) and a forest-green outline (#2f7d32), with a small package leaving to the right. A small workbench with two circuit boards and a WiFi arc stands at station 9, the only hardware in the picture. Above the belt, at a distance, three tiles: "Beta 2.x" with a small ochre clock, "Stable 2.x" and "1.x LTS" with brick-red padlocks (#b42318). Flat vector, precise thin lines, calm editorial style, labels short and legible.
 ```
 
 ---
@@ -491,6 +491,9 @@ De platen gebruiken de Engelse kolom (alle diagrammen zijn Engels). De Nederland
 | Externe kennis | OpenTherm-matrix · thermo-nova · OpenTherm-spec · toolchains | OpenTherm matrix · thermo-nova · OpenTherm spec · toolchains |
 | Naar buiten | 1.x LTS · Stabiel 2.x · Beta 2.x · Alpha-zip | 1.x LTS · Stable 2.x · Beta 2.x · Alpha zip |
 | Legenda | besluit van een mens · werk tussen agents · alleen lezen · gaat naar buiten · poort · harde stop | human decision · work between agents · read only · ships · gate · hard stop |
+| Lijnlabels | opdrachten in de sessie / leest regels · schrijft register en notes / voert uit / naar testers | instructions in the session / reads rules · writes register and notes / executes / to testers |
+
+De referentieplaat gebruikt voor de pijplijn de langere labels uit 3.3 ("Build esp32-combo · lock") en voor de kennis "Backlog.md" en "graphify"; beide varianten zijn juist.
 
 ### 6.2 Plaat B
 
@@ -510,6 +513,13 @@ De platen gebruiken de Engelse kolom (alle diagrammen zijn Engels). De Nederland
 | Fundament | discord-mcp · supervisor · geplande taak · watermerken · gh als maintainer · RSS · build-webhook · bot-REST | discord-mcp · supervisor · scheduled task · watermarks · gh as maintainer · RSS · build webhook · bot REST |
 | Legenda | bewaken · lezen en antwoorden · alleen lezen · naar de maintainer · gaat naar buiten · spelregel | monitoring · read and reply · read only · to the maintainer · ships · ground rule |
 
+### 6.3 Plaat C
+
+| Knoop | Nederlands | English |
+|---|---|---|
+| Stations | Taak · Plan + review · OK SAT-ontwerper · Rood → groen · Reviewteam · Poorten · Bump + hooks · Build (lock) · Bench (OTA) · Push dev · Post zip | Task · Plan + review · SAT designer OK · Red to green · Review team · Gates · Bump + hooks · Build (lock) · Bench (OTA) · Push dev · Post zip |
+| Boven de band | Beta 2.x · Stabiel 2.x · 1.x LTS | Beta 2.x · Stable 2.x · 1.x LTS |
+
 ---
 
 ## 7. Controlelijst voor het resultaat
@@ -520,9 +530,9 @@ Loop deze lijst na voordat je een gegenereerde plaat deelt. Elk punt is een inho
 
 - [ ] Het thema is licht (gebroken witte achtergrond, witte kaarten, donkere tekst) en alleen de vlam heeft een zachte gloed.
 - [ ] Alle tekst op de plaat is Engels, leesbaar en correct gespeld; bij twijfel route A (labels erover).
-- [ ] Er staat nergens een hardwarenaam, gebruikers-ID, webhook-URL of token in beeld. Wat wel mag: de naam van het builddoel in station 7, de publieke hostnaam van het forum en de letterlijke placeholder `<@ID>`.
-- [ ] Geen merklogo's en geen portretten: generieke glyphs en rolnamen.
-- [ ] Oranje lijnen beginnen of eindigen altijd bij een mens (op plaat B ook bij de tegel "Question to maintainer"). Geen oranje lijn tussen twee agents.
+- [ ] Er staat nergens een hardwarenaam, Discord-ID (gebruiker of kanaal), webhook-URL, token of IP-adres van een testunit in beeld. Wat wel mag: de naam van het builddoel (station 7 van plaat A, station 8 van plaat C), de publieke hostnaam van het forum en de letterlijke placeholder `<@ID>`.
+- [ ] Geen merklogo's en geen portretten: generieke glyphs en Engelse rolnamen.
+- [ ] Oranje lijnen beginnen of eindigen altijd bij een mens of bij de DM met de maintainer (op plaat B ook bij de tegel "Question to maintainer"). Geen oranje lijn tussen twee agents.
 
 **Plaat A**
 
@@ -551,7 +561,7 @@ Loop deze lijst na voordat je een gegenereerde plaat deelt. Elk punt is een inho
 
 **Plaat C**
 
-- [ ] Elf stations van links naar rechts; alleen station 3 is oranje en alleen het laatste groen.
+- [ ] Elf stations van links naar rechts in de volgorde van 5.2; alleen station 3 is oranje, de stations 6 tot en met 9 oker en alleen het laatste groen.
 - [ ] Hardware staat alleen bij station 9.
 - [ ] Boven de band: "Beta 2.x" met een klokje, "Stable 2.x" en "1.x LTS" met een hangslot.
 

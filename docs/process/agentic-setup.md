@@ -6,7 +6,7 @@
 | Peildatum | 2026-11-15, `dev` @ `e22c59e`, firmware 2.0.0-beta.327 (vorige peildatum 2026-11-04, beta.79) |
 | Taak | TASK-1984 (vorige versie TASK-1624, verbetertaken TASK-1625 t/m TASK-1636) |
 | Visuele versie | [`agentic-setup.html`](agentic-setup.html): Engelstalige web-asset met visualisaties, ook voor wie het project niet kent. Peildatum 2026-11-15. Open het bestand lokaal in een browser (de platen staan ernaast in `images/`); de maintainer heeft het ook als privé-pagina gepubliceerd |
-| Platen | [Plaat A, overzicht](images/agentic-setup-plate-a.svg) en [plaat B, BlueFlame Bot](images/agentic-setup-plate-b.svg), licht thema; generator in [`tools/agentic-plates/`](../../tools/agentic-plates/README.md) |
+| Platen | [Overzichtsplaat "architecture at a glance"](images/agentic-setup-overview.png), [plaat A, de zes zones](images/agentic-setup-plate-a.png) en [plaat B, BlueFlame Bot](images/agentic-setup-plate-b.png), licht thema, Engelse labels; SVG-bronnen en generator in [`tools/agentic-plates/`](../../tools/agentic-plates/README.md) |
 | Beeldbrief | [`agentic-setup-image-brief.md`](agentic-setup-image-brief.md): compositie en prompts voor een image generator |
 | Taal | Lopende tekst Nederlands; alle diagrammen Engels (maintainer, 2026-11-15) |
 | Opgesteld door | Claude Code (cloudsessie) in opdracht van Robert. Gebaseerd op tien geverifieerde feitenbladen; schrijvers op Fable 5.2 en adversariële reviewers (hoofdstuk 15) |
@@ -60,6 +60,10 @@ Het document beschrijft wat er nu is, met bronvermelding (`pad:regel`). Waar de 
 ---
 
 ## 2. Het geheel in één beeld
+
+![Overview plate: OTGW agentic workshop, architecture at a glance](images/agentic-setup-overview.png)
+
+*Overzichtsplaat "architecture at a glance" (2560 × 1440, [SVG](images/agentic-setup-overview.svg)). Alles op één plaat: wie wat beslist, de kanalen, BlueFlame Bot met zijn drie bewakingslussen en spelregels, de sessies en modellen, de regellagen naast wat een wijziging echt tegenhoudt (gevuld schild: weigert; gestippeld schild: afspraak of review), de kennisbank met omvang, de ADR-kit, de pijplijn met de releaseproducten, de externe bronnen en de kerncijfers. Een adversariële reviewer heeft elk label en getal getoetst tegen dit document. Plaat A hieronder is de eenvoudigere kaart van de zones.*
 
 ![Plate A: reference wireframe of the agentic workshop](images/agentic-setup-plate-a.png)
 
@@ -1942,7 +1946,7 @@ Een cloud-sessie richt bij de start zelf de toolchain in en zet het build-stempe
 
 Naast deze tegenstrijdigheden is het grootste structurele punt dat een flink deel van de keten alleen op conventie rust: combo-only, de buildaankondiging, de 3-uursregel, het slot, "alleen de bench-tester flasht" en de volgorde bench vóór push hebben geen script of hook die weigert (kolom "Poort en handhaving" in §7.2 en §7.10).
 
-> **Voor de plaat:** de pijplijn is op plaat A de rechterflank (zone "PIPELINE & GATES"): een verticale transportband met negen witte stations met een oker schildje: "Backlog task", "Plan + self-review", "Code red → green", "Review team", "evaluate · tests", "Bump + commit hooks", "Build esp32-combo · lock", "Bench via OTA" en "Push dev · post zip" (`docs/process/agentic-setup-image-brief.md:181`; de prompt op `:222` gebruikt kortere labels). De bench-tester staat als werkbank met twee printplaatjes en een WiFi-boog rechtsonder in de agentzone en is met station Bench (OTA) verbonden (`docs/process/agentic-setup-image-brief.md:177`). Onderaan gaan vier tegels naar buiten: 1.x LTS en Stable 2.x met een steenrood hangslot, Beta 2.x met een oker klokje (08:00/20:00) en de groene Alpha zip (`docs/process/agentic-setup-image-brief.md:183`). De beeldbrief beschrijft daarnaast een optionele plaat C, nog niet gegenereerd: dezelfde keten als horizontale banner met een eigen stationsvolgorde, waarin het OK van de SAT-ontwerper een genummerd station is en verslag en ledger geen eigen station hebben (`docs/process/agentic-setup-image-brief.md:360-376`). Alles in het lichte thema, witte kaarten op gebroken wit.
+> **Voor de plaat:** de pijplijn is op plaat A de rechterflank (zone "PIPELINE & GATES"): een verticale transportband met negen witte stations met een oker schildje: "Backlog task", "Plan + self-review", "Code red → green", "Review team", "evaluate · tests", "Bump + commit hooks", "Build esp32-combo · lock", "Bench via OTA" en "Push dev · post zip" (`docs/process/agentic-setup-image-brief.md:181`; de prompt op `:222` gebruikt kortere labels). De bench-tester staat als werkbank met twee printplaatjes en een WiFi-boog rechtsonder in de agentzone en is met station Bench (OTA) verbonden (`docs/process/agentic-setup-image-brief.md:177`). Onderaan gaan vier tegels naar buiten: 1.x LTS en Stable 2.x met een steenrood hangslot, Beta 2.x met een oker klokje (08:00/20:00) en de groene Alpha zip (`docs/process/agentic-setup-image-brief.md:183`). De beeldbrief beschrijft daarnaast een optionele plaat C, nog niet gegenereerd: dezelfde keten als horizontale banner met een eigen stationsvolgorde, waarin het OK van de SAT-ontwerper een genummerd station is en verslag en ledger geen eigen station hebben (`docs/process/agentic-setup-image-brief.md:439-474`). Alles in het lichte thema, witte kaarten op gebroken wit.
 
 ---
 

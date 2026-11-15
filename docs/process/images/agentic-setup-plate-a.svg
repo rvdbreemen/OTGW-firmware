@@ -47,7 +47,7 @@
 <rect x="665" y="212" width="270" height="76" rx="6" fill="#f4f6f7" stroke="#56616c" stroke-width="1.1" stroke-dasharray="5 4"/>
 <use href="#chat" x="682.0" y="236.0" width="28" height="28" style="color:#56616c"/>
 <text x="720" y="244" font-family="Archivo, 'Helvetica Neue', Arial, sans-serif" font-size="16" font-weight="700" fill="#151a1f" text-anchor="start">Discord support</text>
-<text x="720" y="266" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="12" font-weight="400" fill="#56616c" text-anchor="start">4 channels · read + announcements</text>
+<text x="720" y="266" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="12" font-weight="400" fill="#56616c" text-anchor="start">4 channels · read · announce · replies</text>
 <rect x="985" y="212" width="270" height="76" rx="6" fill="#f4f6f7" stroke="#56616c" stroke-width="1.1" stroke-dasharray="5 4"/>
 <use href="#mail" x="1002.0" y="236.0" width="28" height="28" style="color:#56616c"/>
 <text x="1040" y="244" font-family="Archivo, 'Helvetica Neue', Arial, sans-serif" font-size="16" font-weight="700" fill="#151a1f" text-anchor="start">DM with maintainer</text>
@@ -74,6 +74,7 @@
 <path d="M1120,290 V328" fill="none" stroke="#0e7490" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" marker-start="url(#ah-cool)" marker-end="url(#ah-cool)"/>
 <path d="M1440,290 V328" fill="none" stroke="#0e7490" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" marker-start="url(#ah-cool)" marker-end="url(#ah-cool)"/>
 <path d="M1760,290 V328" fill="none" stroke="#0e7490" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" marker-start="url(#ah-cool)" marker-end="url(#ah-cool)"/>
+<path d="M812,328 V292" fill="none" stroke="#2f7d32" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#ah-ok)"/>
 <text x="40" y="382" font-family="'JetBrains Mono', ui-monospace, Consolas, monospace" font-size="13" font-weight="700" fill="#c2410c" text-anchor="start" letter-spacing="2">KNOWLEDGE &amp; RULES</text>
 <text x="460" y="382" font-family="'JetBrains Mono', ui-monospace, Consolas, monospace" font-size="13" font-weight="700" fill="#c2410c" text-anchor="start" letter-spacing="2">AGENT LAYER</text>
 <text x="1510" y="382" font-family="'JetBrains Mono', ui-monospace, Consolas, monospace" font-size="13" font-weight="700" fill="#c2410c" text-anchor="start" letter-spacing="2">PIPELINE &amp; GATES</text>

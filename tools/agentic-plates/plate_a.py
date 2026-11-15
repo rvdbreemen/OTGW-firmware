@@ -11,7 +11,7 @@ L = {
         persons=[('group', 'Eindgebruikers', 'meldingen en vragen'), ('key', 'Maintainer', 'scope, prioriteit, vrijgave'),
                  ('designer', 'SAT-ontwerper', 'bron van waarheid voor SAT'), ('tester', 'Alpha-testers', 'flashen, captures, geen beslismacht')],
         chans=[('rss', 'Tweakers-topic', 'RSS · alleen lezen'), ('branch', 'GitHub', 'issues · PR\'s · releases'),
-               ('chat', 'Discord-support', '4 kanalen · lezen + aankondigingen'), ('mail', 'DM met maintainer', 'één vraag per bericht'),
+               ('chat', 'Discord-support', '4 kanalen · lezen · aankondigen · antwoorden'), ('mail', 'DM met maintainer', 'één vraag per bericht'),
                ('chat', '#dev-sat-mqtt', 'backlog-commando\'s'), ('chat', '#alpha-testing', 'builds · verslagen · SAT')],
         bot='BlueFlame Bot', botsub='coördinator en comms-sessie',
         hexes=[('S', 'Sonnet', 'implementatie'), ('H', 'Haiku', 'runners'), ('O', 'Opus', 'correctheidsreview'),
@@ -36,7 +36,7 @@ L = {
         persons=[('group', 'End users', 'reports and questions'), ('key', 'Maintainer', 'scope, priority, release'),
                  ('designer', 'SAT designer', 'source of truth for SAT'), ('tester', 'Alpha testers', 'flash, capture, no decisions')],
         chans=[('rss', 'Tweakers topic', 'RSS · read only'), ('branch', 'GitHub', 'issues · PRs · releases'),
-               ('chat', 'Discord support', '4 channels · read + announcements'), ('mail', 'DM with maintainer', 'one question per message'),
+               ('chat', 'Discord support', '4 channels · read · announce · replies'), ('mail', 'DM with maintainer', 'one question per message'),
                ('chat', '#dev-sat-mqtt', 'backlog commands'), ('chat', '#alpha-testing', 'builds · reports · SAT')],
         bot='BlueFlame Bot', botsub='coordinator and comms session',
         hexes=[('S', 'Sonnet', 'implementation'), ('H', 'Haiku', 'runners'), ('O', 'Opus', 'correctness review'),
@@ -111,6 +111,8 @@ for cx in ccx:
         s.path(f'M{cx},290 V{BUS - 2}', P['cool'], sw=1.6, start='ah-cool', end='ah-cool')
     else:
         s.path(f'M{cx},290 V{BUS - 2}', P['cool'], sw=1.6, dash='5 4', end='ah-cool')
+# Discord support: besides the read line, a thin green return arrow (announcements, replies in practice)
+s.path(f'M812,{BUS - 2} V292', P['ok'], sw=1.4, end='ah-ok')
 
 # ---- zones frame
 s.zone_label(40, 382, L['knowledge'])

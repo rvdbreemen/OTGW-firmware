@@ -3960,5 +3960,21 @@
     "related_bugs": [],
     "occurrences": 1,
     "last_seen": "2026-11-15T21:30:00+01:00"
+  },
+  {
+    "error_message": "Mermaid timeline in docs/process/agentic-setup.md failed to parse: 'Parse error on line 12: ...n Fixed times    08:00 and 20:00 : publ'",
+    "file": "docs/process/agentic-setup.md",
+    "root_cause": "In a Mermaid timeline the colon separates a period from its events, so a period label with a clock time (08:00) breaks the parser.",
+    "fix": "Period label rewritten as 'Twice a day, 8 am and 8 pm'; all 51 diagrams re-validated with mermaid 11.4.1 in headless Chromium (TASK-1984).",
+    "tags": [
+      "docs",
+      "mermaid",
+      "timeline"
+    ],
+    "id": "bug-225",
+    "timestamp": "2026-11-15T22:50:00+01:00",
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-11-15T22:50:00+01:00"
   }
 ]
