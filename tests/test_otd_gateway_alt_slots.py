@@ -210,6 +210,7 @@ static bool satIsEnabled() { return g_satEnabled; }
 static bool isBoilerMsgIdUnsupportedRead(uint8_t id) { return id == 28 && g_ret28Unsupported; }
 // TASK-1761: the sliced head of loopOTDirect() drains the off-loop command ring; nothing is queued here.
 static void otdCmdTextDrain() {}
+static void otdMasterGuard() {}   // TASK-1966: boiler line guard, tests/test_otd_master_line_stale_delay.py
 static bool otdRelayRead99(unsigned long, unsigned long &) { return false; }   // TASK-1906: MsgID 99 relay, tests/test_otd_msgid99_relay.py
 static bool otdRelayRewriteRead(unsigned long, unsigned long &) { return false; }   // TASK-1803, tests/test_otd_relay_rw.py
 static unsigned long otdReply99(unsigned long r) { return r; }

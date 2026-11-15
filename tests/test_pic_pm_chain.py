@@ -59,6 +59,7 @@ static bool isOTDirectEnabled() { return true; }
 // TASK-1761: the host program is the loop task, so the OT-Direct branch runs the handler directly; the ring is empty.
 static bool platformOnLoopTask() { return true; }
 static void otdCmdTextDrain() {}
+static void otdMasterGuard() {}   // TASK-1966: boiler line guard, tests/test_otd_master_line_stale_delay.py
 static bool otdCmdTextPush(const char*, int, bool) { return false; }
 static bool otdCmdTextMustWait() { return false; }
 static char g_direct[256];

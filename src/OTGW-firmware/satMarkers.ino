@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : satMarkers.ino
-**  Version  : v2.0.0-beta.313
+**  Version  : v2.0.0-beta.314
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **

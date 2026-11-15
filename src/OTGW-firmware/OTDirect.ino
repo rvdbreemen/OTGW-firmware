@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTDirect.ino
-**  Version  : v2.0.0-beta.313
+**  Version  : v2.0.0-beta.314
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -32,7 +32,33 @@
 // ---------------------------------------------------------------------------
 // OpenTherm interface instances — master talks to boiler, slave listens to thermostat
 // ---------------------------------------------------------------------------
-static OpenTherm otMaster(PIN_OT_MASTER_IN, PIN_OT_MASTER_OUT);
+// --- otdMasterLine begin
+// TASK-1966: the library's isReady() (OpenTherm.cpp:134-137) also needs micros() - delayTimestamp < 2^31, and
+// delayTimestamp moves only on a valid answer (:443) or in setDelay() (:390-394). micros() wraps every 71.6 min, so
+// without a valid boiler answer for 35.8 min (no boiler, boiler off, only timeouts) isReady() turns false for the
+// next 35.8 min: no frame goes out, so no answer comes to refresh it, and otMasterRequestActive stays set. The
+// fields are protected, so this subclass keeps them sane without changing the library (as OTDSlaveLine below).
+static constexpr uint32_t OTD_LINE_MAX_DELAY_US = 2000000UL;   // the library's delays are at most 50 ms
+static constexpr uint32_t OTD_LINE_TX_STALL_US  = 500000UL;    // no TX timer tick (every 0.5 ms) for 500 ms; above a flash-write pause, below the 1 s timeout
+class OTDMasterLine : public OpenTherm {
+public:
+  using OpenTherm::OpenTherm;
+  // Every loop pass, after process(). 0 = nothing to report, 1 = a stale delay was cleared, 2 = the transmit
+  // timer stopped mid-frame (the caller restarts the line). A finished delay is pinned to now, so it never ages
+  // past 2^31 us; a delay still running (set at most 50 ms ahead) is left alone.
+  uint8_t keepFresh(uint32_t now) {
+    // Signed: the TX timer ISR rewrites requestTimestamp every tick and may do so just after `now` was sampled
+    // (a few us ahead), which as unsigned would read as a stall (d3's review of TASK-1966).
+    if (txStatus == OpenThermTxStatus::TX_DATA)
+      return (int32_t)(now - requestTimestamp) > (int32_t)OTD_LINE_TX_STALL_US ? 2 : 0;
+    if ((uint32_t)(now - delayTimestamp) < 0x80000000UL) { delayTimestamp = now; return 0; }
+    if ((uint32_t)(delayTimestamp - now) > OTD_LINE_MAX_DELAY_US) { delayTimestamp = now; return 1; }
+    return 0;
+  }
+  void clearTx() { txStatus = OpenThermTxStatus::IDLE; }   // after end()/begin(), which do not reset it
+};
+// --- otdMasterLine end
+static OTDMasterLine otMaster(PIN_OT_MASTER_IN, PIN_OT_MASTER_OUT);
 // TASK-1848: the thermostat side exposes its two Smart Power idle levels for PR=P. The library's own
 // getSmartPowerState() (OpenTherm.cpp:540-544) returns LOW or HIGH and never MEDIUM, so it cannot give the
 // PIC's three levels; the levels are protected members, read here without changing the library.
@@ -47,6 +73,7 @@ static OTDSlaveLine otSlave(PIN_OT_SLAVE_IN, PIN_OT_SLAVE_OUT, true);  // true =
 // ISR handlers — must be free functions for attachInterrupt
 static void IRAM_ATTR masterISR() { otMaster.handleInterrupt(); }
 static void IRAM_ATTR slaveISR()  { otSlave.handleInterrupt(); }
+
 
 // Forward declarations for static helpers defined later in this file.
 // ctags does not evaluate #if guards, so it may not generate these
@@ -2631,6 +2658,27 @@ void otdMqttSetRoomSetpoint(float tempC) {
 // loopOTDirect — called from doBackgroundTasks() on OTGW32 builds
 // Non-blocking: uses async requests, never blocks for OT response.
 // ---------------------------------------------------------------------------
+// --- otdMasterGuard begin
+// TASK-1966: keeps the boiler line usable (OTDMasterLine::keepFresh) and counts what it had to repair; the counts and
+// the in-flight flag go to state.otd for /api/v2/device/info.
+static void otdMasterGuard() {
+  const uint8_t r = otMaster.keepFresh(micros());
+  if (r == 1) {
+    state.otd.iLineStaleFixes++;
+    DebugTf(PSTR("OTD: boiler line delay was stale (no valid boiler answer for 35 min), cleared (#%u)\r\n"),
+            (unsigned)state.otd.iLineStaleFixes);
+  } else if (r == 2) {
+    state.otd.iLineTxRestarts++;
+    DebugTf(PSTR("OTD: boiler line transmit stalled mid-frame, line restarted (#%u)\r\n"),
+            (unsigned)state.otd.iLineTxRestarts);
+    otMaster.end();
+    otMaster.begin(masterISR);
+    otMaster.clearTx();
+  }
+  state.otd.bMasterRequestActive = otMasterRequestActive;
+}
+// --- otdMasterGuard end
+
 void loopOTDirect() {
   // Apply a pending command-ring flush every pass, also in modes where no consumer runs.
   otCmdApplyPendingFlush();
@@ -2647,6 +2695,7 @@ void loopOTDirect() {
 
   // Process OpenTherm library state machines (drives ISR-based TX/RX)
   otMaster.process();
+  otdMasterGuard();    // TASK-1966: before isReady() is asked below
   otSlave.process();
   otdReplyService();   // TASK-1798: a held answer leaves once the slave gate opens
 
@@ -3608,6 +3657,7 @@ bool otdCmdTextPush(const char* buf, int len, bool satOwn) {
     ok = true;
   } else {
     otdCmdTextDropped++;
+    state.otd.iCmdRingDropped++;   // TASK-1966: shown in /api/v2/device/info
   }
   portEXIT_CRITICAL(&otdCmdTextMux);
   return ok;

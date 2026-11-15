@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-beta.313
+**  Version  : v2.0.0-beta.314
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -3247,6 +3247,11 @@ void sendDeviceInfoV2()
       je.field(F("otdschedactive"), snap->st.otd.iScheduleActive);
       je.field(F("otdscheddisabled"), snap->st.otd.iScheduleDisabled);
       je.field(F("otdoverrides"), snap->st.otd.iOverrideCount);
+      // TASK-1966: boiler line health (a request in flight, repairs since boot, commands refused by a full ring)
+      je.field(F("otdrequestactive"), snap->st.otd.bMasterRequestActive);
+      je.field(F("otdlinestalefixes"), snap->st.otd.iLineStaleFixes);
+      je.field(F("otdlinetxrestarts"), snap->st.otd.iLineTxRestarts);
+      je.field(F("otdcmdringdropped"), snap->st.otd.iCmdRingDropped);
       // TASK-1860: the PIC command set OT-Direct implements (also PR=X and the PR=A banner); absent on a PIC board,
       // where picfwversion is the real PIC's version.
       je.field(F("otdpiccompat"), otdPicCompatVersion());

@@ -64,6 +64,7 @@ PRE = r"""
 #include <cstdio>
 #include <cstdint>
 #include <cstring>
+static struct { struct { uint16_t iCmdRingDropped = 0; } otd; } state;   // TASK-1966: the ring counts refused commands
 #include <cstdlib>
 #include <mutex>
 #include <thread>
@@ -105,6 +106,7 @@ static void dump(const char* tag) {
 }
 #ifndef HAVE_RING
 static void otdCmdTextDrain() {}
+static void otdMasterGuard() {}   // TASK-1966: boiler line guard, tests/test_otd_master_line_stale_delay.py
 #endif
 int main(int argc, char** argv) {
   const std::string mode = argc > 1 ? argv[1] : "";
