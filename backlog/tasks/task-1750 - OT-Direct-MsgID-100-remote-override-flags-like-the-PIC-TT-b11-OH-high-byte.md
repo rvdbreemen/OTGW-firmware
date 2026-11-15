@@ -3,10 +3,11 @@ id: TASK-1750
 title: >-
   OT-Direct: MsgID 100 remote override flags like the PIC (TT b'11', OH= high
   byte)
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-11-09T09:28:00Z'
-updated_date: '2026-11-12T00:07:00Z'
+updated_date: '2026-11-15T07:33:00Z'
 labels:
   - otdirect
   - needs-maintainer-ok
@@ -24,7 +25,7 @@ Follow-up of TASK-1733 / ADR-223 (found by the 2026-11-09 correctness review, ot
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Robert decides: keep 0x0002 or move to PIC parity (TT 0x03, OH= high byte)
+- [x] #1 Robert decides: keep 0x0002 or move to PIC parity (TT 0x03, OH= high byte)
 - [ ] #2 If parity: MsgID 100 answers match gateway.asm for TT=, TC= with OH on/off; host test red before, green after
 <!-- AC:END -->
 
@@ -32,4 +33,6 @@ Follow-up of TASK-1733 / ADR-223 (found by the 2026-11-09 correctness review, ot
 
 <!-- SECTION:NOTES:BEGIN -->
 PIC 6.8 parity audit 2026-11-12 (docs/reviews/2026-11-12_pic68-otdirect-parity-audit/REVIEW.md), section 3 'Corrections to existing tasks'. G: = gateway.asm 6.8 (OTGW-other-projects/otgw-6.8, 770aa45); O: = OTDirect.ino at fa5790118. Read from code only. Correction (AC gap): description says OH defaults on, ACs do not. PIC default IgnoreErr1 and OverrideHigh set (G:5459) -> `PR: T=11` (tests/serial-2.stc). OT-Direct otOverrideHB=0 (O:535) -> T=10.
+
+Decision (Robert, DM 1571426506259963986, reply to the coordinator triage question 5/5 DM 1571283755438448772: "TASK-1750 + TASK-1751 (OT-Direct): MsgID 100 remote-override flags like the PIC (TT b'11', OH= high byte), and TT=0 also clears an MQTT room_setpoint/BS= on MsgID 16. A) both PIC parity, consistent with your 'like the PIC' on 1806. B) keep ADR-223 as is. Recommendation: A"): "A". Reading: PIC parity. PIC source (OTGW-other-projects/otgw-6.8 gateway.asm): SetTempSetPoint :4088-4092 passes b'11' (manual + program change), SetContSetPoint :4083-4087 passes b'01'; SetSetPoint :4096-4098 stores them in the low nibble of RemOverrideFunc; OH= (header :142) copies the low byte of MsgID 100 into the high byte. Implement in lane-95-next with a host test red/green. ADR-223 needs no amendment for this: its Decision already says the MsgID 100 function bits are b'11' for TT and b'01' for TC (gateway.asm:4053-4063 in its citation); OT-Direct's 0x0002 is a deviation from it.
 <!-- SECTION:NOTES:END -->
