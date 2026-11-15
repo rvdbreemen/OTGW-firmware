@@ -5,6 +5,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Fixed
+- SAT: when a simulation run ends, the real PID state and heating-curve data are reloaded from the filesystem, so SAT does not go on with the values learned on the simulated room (TASK-1952).
+
 ## [2.0.0-beta.294] - 2026-11-15
 
 ### Added
