@@ -1,7 +1,7 @@
 ---
 id: "ADR-247"
 title: "The settings help and the built-in replay fixture may be stored deflated in firmware flash (amends ADR-194)"
-status: "Proposed"
+status: "Accepted"
 date: "2026-11-15"
 binding: false
 gate: null
@@ -9,7 +9,6 @@ documents_shipped: false
 verified_in: []
 supersedes: []
 superseded_by: null
-format: "canonical"
 topics:
   - "flash budget"
   - "progmem assets"
@@ -29,6 +28,7 @@ symbols:
   - "serveProgmemAsset"
   - "tinfl_decompress"
 context_scope: "selective"
+format: "canonical"
 ---
 
 <!-- markdownlint-disable MD025 -->
@@ -37,7 +37,7 @@ context_scope: "selective"
 
 ## Status
 
-Proposed, 2026-11-15.
+Accepted, 2026-11-15.
 
 ## Status History
 
@@ -48,6 +48,11 @@ status_history:
     changed_by: "Claude (session 95) for the coordinator"
     reason: Initial proposal (TASK-1955 options 1 and 2)
     changed_via: adr-kit
+  - date: 2026-11-15
+    status: Accepted
+    changed_by: Robert van den Breemen (Discord DM 1571521326060146782 on question 1571520520153735261, option A), recorded by Agent (95)
+    reason: "Robert chose A: accept the ADR-194 amendment as written (TASK-1955 options 1 and 2)"
+    changed_via: adr-kit lifecycle
 ```
 
 ## Context
@@ -138,7 +143,8 @@ Estimated saving about 22 KB of flash (11 107 B + 11 326 B, measured gzip-9 on t
 
 ## Open Questions
 
-- [ ] Robert: accept this amendment of ADR-194 (TASK-1955 options 1 and 2)?
+- [x] Robert: accept this amendment of ADR-194 (TASK-1955 options 1 and 2)?
+  Answered A (accept as written) by Discord DM 1571521326060146782 (reply to question DM 1571520520153735261) on 2026-11-15.
 
 ## Related Decisions
 

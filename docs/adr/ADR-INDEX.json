@@ -9820,7 +9820,7 @@
       "title": "The settings help and the built-in replay fixture may be stored deflated in firmware flash (amends ADR-194)",
       "path": "ADR-247-the-settings-help-and-the-built-in-replay-fixture-may-be-stored-deflated-in-firmware-flash-amends-adr-194.md",
       "format": "canonical",
-      "status": "Proposed",
+      "status": "Accepted",
       "date": "2026-11-15",
       "decision_summary": "The two PROGMEM assets of ADR-194 may be stored deflated in firmware flash (coordinator decision for TASK-1955 option...",
       "topics": [
