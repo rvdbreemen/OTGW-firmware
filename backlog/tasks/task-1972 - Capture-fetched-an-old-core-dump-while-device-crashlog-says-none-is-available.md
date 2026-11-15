@@ -5,7 +5,7 @@ status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-15T11:57:00Z'
-updated_date: '2026-11-15T20:11:00Z'
+updated_date: '2026-11-15T21:29:00Z'
 labels:
   - capture
   - coredump
@@ -39,5 +39,5 @@ AC2: scripts/otgw_capture.py coredump_age() + fetch_coredump(): after a 200 the 
 ## Final Summary
 
 <!-- SECTION:FINAL_SUMMARY:BEGIN -->
-AC1: the two endpoints read different stores. device/crashlog is the newest reboot-cause + detail pair in /reboot_log.txt (helperStuff.ino:371, 20 lines, OTGW-firmware.h:248); device/coredump serves the core-dump partition whenever its checksum holds (platform_esp32.h:985); nothing in src/ erases that partition, so an earlier crash's dump stays downloadable after its log lines rolled out: 09's .63 state (crashlog available:false next to a 31 KB dump). Both are right for their own store. AC2: otgw_capture.py coredump_age(): the dump is named coredump-<run>-app-<9 hex ELF sha>-<latest|old|unknown>.bin, latest when the newest logged 'Core dump: ... elf=<8 hex>' matches the dump's sha, and the summary gives the reason with the running fwversion and the last reset; 4 new cases in tests/test_capture_tool.py red on the old tool (4 failed), green on the fix; test_capture_tool 57 (2 skipped), test_capture_device_data 18, the 6 other files that import the tool 14/14, all -j 1. Same commit fixes test_capture_device_data, red on origin since 3a156a401 (graphTrim) and 8cdb13ae4 (live-only dhw CSV column). AC3: split into TASK-1983 (coordinator decision 2026-11-15), not needed for 09's case: the firmware does not publish the running image's ELF sha256, which an exact same-build test would need. Pushed in df031a0c3.
+AC1: the two endpoints read different stores. device/crashlog is the newest reboot-cause + detail pair in /reboot_log.txt (helperStuff.ino:371, 20 lines, OTGW-firmware.h:248); device/coredump serves the core-dump partition whenever its checksum holds (platform_esp32.h:985); nothing in src/ erases that partition, so an earlier crash's dump stays downloadable after its log lines rolled out: 09's .63 state (crashlog available:false next to a 31 KB dump). Both are right for their own store. AC2: otgw_capture.py coredump_age(): the dump is named coredump-<run>-app-<9 hex ELF sha>-<latest|old|unknown>.bin, latest when the newest logged 'Core dump: ... elf=<8 hex>' matches the dump's sha, and the summary gives the reason with the running fwversion and the last reset; 4 new cases in tests/test_capture_tool.py red on the old tool (4 failed), green on the fix; test_capture_tool 57 (2 skipped), test_capture_device_data 18, the 6 other files that import the tool 14/14, all -j 1. Same commit fixes test_capture_device_data, red on origin since 3a156a401 (graphTrim) and 8cdb13ae4 (live-only dhw CSV column). AC3: split into TASK-1983 (coordinator decision 2026-11-15), not needed for 09's case: the firmware does not publish the running image's ELF sha256, which an exact same-build test would need. Pushed in e22c59ed1.
 <!-- SECTION:FINAL_SUMMARY:END -->
