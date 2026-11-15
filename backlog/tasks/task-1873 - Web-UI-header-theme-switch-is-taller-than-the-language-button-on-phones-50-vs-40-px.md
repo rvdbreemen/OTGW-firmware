@@ -3,11 +3,11 @@ id: TASK-1873
 title: >-
   Web UI header: theme switch is taller than the language button on phones (50
   vs 40 px)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-12T20:35:00Z'
-updated_date: '2026-11-15T00:23:00Z'
+updated_date: '2026-11-15T00:25:00Z'
 labels:
   - webui
   - bug
@@ -38,3 +38,9 @@ Reporter Sergeant D (Discord 821036882946424852), #dev-sat-mqtt https://discord.
 
 AC3 ticked by 09: 2026-11-15 bench on .61 (OTGW32) with 2.0.0-beta.271+7ecd150, headless Chrome over CDP at 390x844 (mobile emulation): #langMenu summary 50 px high, #themeSwitch 50 px (its two buttons 44 px), both visible side by side. Screenshot of the header only (IP/hostname scrubbed): 09 scratchpad b271/t1873-header-390.png.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+AC1 at phone width the language button and the theme switch are both 50 px (tests/webui/header-controls-same-height.test.mjs: old CSS 40 vs 50 red, fix green). AC2 desktop stays 40/40 (same test). AC3 build 2.0.0-beta.271+7ecd150 (lane wt-92-webui, pushed as origin/dev 57781677e; zip post 1571319345743667231, alpha note 1571319448298852516), bench by 09 on .61: 390x844 header 50/50 px (09 b271/t1873-header-390.png).
+<!-- SECTION:FINAL_SUMMARY:END -->

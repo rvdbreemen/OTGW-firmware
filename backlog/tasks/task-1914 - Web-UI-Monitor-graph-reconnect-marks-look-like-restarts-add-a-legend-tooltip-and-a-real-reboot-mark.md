@@ -3,11 +3,11 @@ id: TASK-1914
 title: >-
   Web UI Monitor graph: reconnect marks look like restarts; add a legend/tooltip
   and a real reboot mark
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-13T23:18:00Z'
-updated_date: '2026-11-15T00:22:00Z'
+updated_date: '2026-11-15T00:25:00Z'
 labels:
   - webui
   - diagnostics
@@ -39,3 +39,9 @@ Sergeant D read gruijter's beta.218 graph export (13 Nov, #alpha-testing 1570893
 
 09 bench evidence for AC1-AC3: 09 bench 2026-11-15 on .61 (OTGW32), 2.0.0-beta.271+7ecd150 (OTA app+FS, changed none, bootcount 697->699), headless Chrome over CDP (scratchpad tools/uishot.mjs), screenshots in 09 scratchpad b271/ with IP/hostname scrubbed. Pure link loss (tab frozen 60 s via Page.setWebLifecycleState, then a client-side WS close): dashed red/green marks, legend 'live link lost' / 'live link back', no 'gateway restarted'; tooltip texts 'The live connection to the gateway dropped here (a sleeping tab or a Wi-Fi hiccup does the same). Not a restart.' and '... came back here. Not a restart.' (read as title/data-tip, not a rendered hover). Real reboot from the open page (bootcount 699->700): solid amber mark + legend 'gateway restarted'. Screenshots b271/t1914-linkloss-only.png, t1914-after-reboot.png. CDP network-offline emulation alone did not drop the WebSocket.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+AC1 legend line + tooltips name the dashed marks as live link lost/back, not a restart (tests/webui/graph-mark-kinds.test.mjs red on the old v2.js, green on the fix). AC2 a restart (boot counter up, read from device/info on the first open and after each return) is a solid amber mark (same test, simulated counter 41->42 and a reset; graph-panels harness checks the device/info reads). AC3 screenshots before/after (92 scratchpad t1914) and build 2.0.0-beta.271+7ecd150 (lane wt-92-webui, pushed as origin/dev 57781677e; zip post 1571319345743667231, alpha note 1571319448298852516), bench by 09 on .61: link loss only = dashed lines without a restart mark; real reboot = amber 'gateway restarted' (09 t1914-linkloss-only.png, t1914-after-reboot.png). Note: Greek strings need a native check.
+<!-- SECTION:FINAL_SUMMARY:END -->

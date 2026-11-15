@@ -3,11 +3,11 @@ id: TASK-1792
 title: >-
   Firmware help text: self-tune cadence in settingsHelp.h:96 and the
   SATtypes.h:521 comment (one 0.1 step, at least 3 counted days apart)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-10T23:08:00Z'
-updated_date: '2026-11-15T00:22:00Z'
+updated_date: '2026-11-15T00:25:00Z'
 labels:
   - firmware
   - webui
@@ -38,3 +38,9 @@ Found in TASK-1740.3 (docs side fixed there). The i-button help of satcurveselft
 
 AC3 ticked by 09: 09 bench 2026-11-15 on .61 (OTGW32), 2.0.0-beta.271+7ecd150 (OTA app+FS, changed none, bootcount 697->699), headless Chrome over CDP (scratchpad tools/uishot.mjs), screenshots in 09 scratchpad b271/ with IP/hostname scrubbed. Bump and esp32-combo build are 92's (beta.271, lane 7ecd150d4). SAT page -> Technical -> i of 'Heating curve self-tune' shows: 'Let SAT adjust the curve slope by 0.1 when 3 counted days point the same way (a counted day has at least 6 clean heating hours: sun low, no hot water). It decides once a day; a change starts the count again, so two steps are at least 3 counted days apart. Each step is logged. Default on.' (same text in /settings-help.json). Screenshot b271/t1792-selftune-help.png.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+AC1 settingsHelp.h satcurveselftune states the real cadence (one 0.1 step when 3 counted days agree, at least 3 counted days between steps; English only, no pack carries help texts). AC2 SATtypes.h bCurveSelfTune comment matches satTuneCloseDay. tests/test_selftune_help_cadence.py red on the old text, green on the fix. AC3 build 2.0.0-beta.271+7ecd150 (lane wt-92-webui, pushed as origin/dev 57781677e; zip post 1571319345743667231, alpha note 1571319448298852516), bench by 09 on .61: help popup text seen on the SAT page and in /settings-help.json (09 b271/t1792-selftune-help.png).
+<!-- SECTION:FINAL_SUMMARY:END -->
