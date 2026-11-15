@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTDirect.ino
-**  Version  : v2.0.0-beta.307
+**  Version  : v2.0.0-beta.308
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -3325,7 +3325,11 @@ static void checkThermostatTimeout() {
     otDirectBridgeWriteLine(buf, n);
     processOT(buf, (int)n);
   };
-  uint32_t timeoutMs = (uint32_t)settings.otd.iSetbackTimeout * 1000UL;
+  // TASK-1802 bug 9 (Robert 2026-11-15: A): the thermostat counts as lost after about 3 s without a frame, so the
+  // boiler gets the gateway's own frames within seconds; before, iSetbackTimeout (default 30 s) left it without frames
+  // that long. A thermostat sends at least every 1.15 s (spec v4.2 :1101), so 3 s is two to three missed frames. The PIC
+  // sees the open line within tens of ms (gateway.asm 6.6 CheckThermostat :1728-1816); OT-Direct has no line sense.
+  static constexpr uint32_t timeoutMs = 3000;
 
   if (!otThermostatSeen) {   // no frame ever received: nothing to time out, but the PIC reports it once
     if (picLineState == 0 && millis() > timeoutMs) { picLineState = 2; picLine(PSTR("Thermostat disconnected")); }
@@ -3334,7 +3338,7 @@ static void checkThermostatTimeout() {
 
   uint32_t elapsed = millis() - otLastThermostatMs;
 
-  if (elapsed > timeoutMs) {
+  if (elapsed >= timeoutMs) {
     if (picLineState != 2) { picLineState = 2; picLine(PSTR("Thermostat disconnected")); }
     // Thermostat disconnected
     if (state.otd.bThermostatConnected) {

@@ -1462,7 +1462,7 @@ All fields are **read-only** runtime state except where noted.
 | `monitor_mode` | `otdmonitor` | `bMonitorMode` | boolean | read-only | True when engine is in transparent pass-through mode |
 | `master_mode` | `otdmaster` | `bMasterMode` | boolean | read-only | True when OTGW32 is acting as sole OT master with no thermostat |
 | `stepup` | `otdstepup` | `bStepUpEnabled` | boolean | read-only | True when the 24V step-up converter is active |
-| `thermostat_connected` | `otdthermostat` | `bThermostatConnected` | boolean | read-only | True when a thermostat frame has been received within the setback timeout |
+| `thermostat_connected` | `otdthermostat` | `bThermostatConnected` | boolean | read-only | True when a thermostat frame has been received within the last 3 s |
 | `setback_active` | `otdsetback` | `bSetbackActive` | boolean | read-only | True when thermostat is disconnected and setback override is engaged |
 | `schedule_total` | `otdschedtotal` | `iScheduleTotal` | integer | read-only | Total number of OT message IDs in the polling schedule |
 | `schedule_active` | `otdschedactive` | `iScheduleActive` | integer | read-only | Number of schedule entries currently active (not disabled by boiler) |
@@ -1472,7 +1472,7 @@ All fields are **read-only** runtime state except where noted.
 | `ot_online` | _(not in device/info)_ | _(otBus.bOnline)_ | boolean | read-only | True when the OT bus is alive (frames recently received) |
 | `thermostat` | _(not in device/info)_ | _(otBus.bThermostatState)_ | boolean | read-only | True when the thermostat OT bus side is active |
 | `boiler` | _(not in device/info)_ | _(otBus.bBoilerState)_ | boolean | read-only | True when the boiler OT bus side is active |
-| _(not exposed)_ | _(not in device/info)_ | `iLastThermostatMs` | uint32 | internal | `millis()` timestamp of last thermostat frame received; used internally for setback timeout, not exposed via REST |
+| _(not exposed)_ | _(not in device/info)_ | `iLastThermostatMs` | uint32 | internal | `millis()` timestamp of last thermostat frame received; used internally for the 3 s thermostat-loss check, not exposed via REST |
 
 The `otdirectavailable` field in `/api/v2/device/info` is always present (boolean). When `false`, all other `otd*` fields are absent from the response.
 

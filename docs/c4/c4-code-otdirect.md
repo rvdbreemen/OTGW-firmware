@@ -365,14 +365,12 @@ The OTDirect module operates as a cooperative OpenTherm stack layered on the pro
   - Clears fake room setpoint (BS=)
 
 #### `static void checkThermostatTimeout()`
-- **Purpose**: Detect thermostat disconnect and apply fail-safe setback (called once per second)
+- **Purpose**: Detect thermostat disconnect and reconnect (called once per second)
 - **Behavior**:
-  - Returns if no thermostat frame ever seen
-  - Compares elapsed time since last frame against `settings.otd.iSetbackTimeout`
-  - On timeout:
-    - Sets `state.otd.bThermostatConnected = false`
-    - If fail-safe enabled and in gateway mode: engages setback by overriding MsgID 1 (TSet) to `settings.otd.fSetbackTemp`
-  - On reconnect: disables setback, releases TSet override
+  - If no thermostat frame was ever seen: prints the PIC line "Thermostat disconnected" once (TASK-1850) and returns
+  - Counts the thermostat as lost after 3 s without a frame (a fixed `timeoutMs`, TASK-1802 bug 9; `settings.otd.iSetbackTimeout` is no longer read)
+  - On loss: sets `state.otd.bThermostatConnected = false`, forgets the thermostat's writes, prints "Thermostat disconnected"; there is no setback (TASK-1806): the gateway's own frames carry CH off unless a CS= is in force
+  - On return: sets `bThermostatConnected = true` and prints "Thermostat connected"
 
 ### Loopback Test Mode
 
@@ -673,7 +671,7 @@ static uint8_t otUnknownCounters[32];     // 128 MsgIDs × 2 bits = 32 bytes
 ## Known Constraints & Edge Cases
 
 1. **Manchester Encoding**: OT bus operates at ~1kHz; frame transmission takes ~150ms
-2. **Thermostat Timeout**: Configurable via `settings.otd.iSetbackTimeout`; fail-safe applies setback (MsgID 1 override) if enabled
+2. **Thermostat Timeout**: fixed 3 s without a thermostat frame (TASK-1802 bug 9); no setback on a loss (TASK-1806)
 3. **3-Strike Auto-Blacklist**: MsgIDs returning UNKNOWN_DATA_ID ≥3 times are auto-disabled; manual `AA=MsgID` re-enables
 4. **Response vs Request Paths**: Response modifiers (RM=) applied only in gateway mode; repeater overrides (value injection) applied in both gateway and master modes
 5. **Loopback Mode**: Simulation is instant (no timing); useful for testing parser/MQTT without OT hardware

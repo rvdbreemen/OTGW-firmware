@@ -86,7 +86,7 @@ static const char SETTINGS_HELP_JSON[] PROGMEM = R"json({
 "otdhasbypassrelay":"Tick if a bypass relay is fitted on this board. Bypass mode falls back to Gateway without it.",
 "otdautodetect":"Detect at boot whether a thermostat is connected.",
 "otdsetbacktemp":"Not used: on a thermostat loss the gateway sends CH off, like the PIC. Kept for settings compatibility.",
-"otdsetbacktimeout":"Seconds without thermostat frames before it counts as disconnected; then the gateway sends its own frames, CH off unless a CS= is set. Default 30.",
+"otdsetbacktimeout":"Not used: a thermostat counts as disconnected after about 3 s without frames; then the gateway sends its own frames, CH off unless a CS= is set. Kept for settings compatibility.",
 "otdenableslave":"Keep the thermostat (slave) interface active in Master mode. Default on.",
 "otdsummermode":"Set the summer-mode bit in the master status (SM=). The boiler decides what it does.",
 "otdfailsafe":"Not used: there is no setback on a thermostat loss any more. Kept for settings compatibility.",
