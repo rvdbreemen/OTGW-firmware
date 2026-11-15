@@ -9756,6 +9756,64 @@
         "supersedes": [],
         "superseded_by": null
       }
+    },
+    {
+      "id": "ADR-244",
+      "title": "A PR= report command passes the SAT simulation gate on the PIC serial path (amends ADR-117)",
+      "path": "ADR-244-a-pr-report-command-passes-the-sat-simulation-gate-on-the-pic-serial-path-amends-adr-117.md",
+      "format": "canonical",
+      "status": "Accepted",
+      "date": "2026-11-15",
+      "decision_summary": "On the PIC serial path, a command that starts with PR= is sent to the PIC also while a simulation is on; every other...",
+      "topics": [
+        "bus isolation",
+        "PIC serial",
+        "PIC settings",
+        "PR= report command",
+        "SAT simulation"
+      ],
+      "aliases": [
+        "pic-serial",
+        "PR=A",
+        "satSimulationBlocksBusTx",
+        "simulation gate"
+      ],
+      "components": [
+        "sendPICSerial"
+      ],
+      "symbols": [
+        "satSimulationBlocksBusTx",
+        "sendPICSerial"
+      ],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [
+          "sendPICSerial() sends a command that starts with PR= without calling the simulation gate.",
+          "Every other command (for example CS=, GW=, SW=) still goes through satSimulationBlocksBusTx() and is dropped while a simulation is on, with the trace and the last-blocked command as before."
+        ],
+        "must_not": [
+          "Must not exempt anything on the OT-Direct master path (sendMasterRequestAsync(), ADR-117 paths (b) and (c)): that path sends real OpenTherm frames.",
+          "Must not exempt other PIC commands: commands such as PS= change what the PIC prints or its state and are outside this decision."
+        ],
+        "exceptions": [
+          "None."
+        ],
+        "verification": [
+          "test/host/testpicsimgatepr.py: compiles the real gate block of sendPICSerial() and the real satSimulationBlocksBusTx(), sliced by anchor. With the SAT simulation on, PR=A and PR=E pass and leave no blocked-command trace, CS=40 and GW=1 a...",
+          "Bench: on .63 with the SAT simulation on, the settings cycle fills /api/v2/pic/settings (TASK-1943 AC3)."
+        ]
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
     }
   ],
   "relationships": [
@@ -16494,6 +16552,18 @@
     {
       "source": "ADR-242",
       "target": "ADR-213",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-244",
+      "target": "ADR-058",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-244",
+      "target": "ADR-117",
       "type": "related",
       "resolved": true
     }

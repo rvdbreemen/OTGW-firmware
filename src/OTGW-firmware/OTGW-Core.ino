@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v2.0.0-beta.305
+**  Version  : v2.0.0-beta.306
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -4492,7 +4492,11 @@ bool sendPICSerial(const char* buf, int len)
     picCmd[n] = '\0';
     // strip a trailing CR/LF so the trace line stays single-line
     while (n > 0 && (picCmd[n - 1] == '\r' || picCmd[n - 1] == '\n')) picCmd[--n] = '\0';
-    if (satSimulationBlocksBusTx(picCmd, F("pic-serial"))) return false;   // TASK-1580: held back, the queue consumes it
+    // TASK-1943 (ADR-244): PR= only makes the PIC print a setting (6.8 gateway.asm ReportSetting -> PrintSetting), it puts
+    // nothing on the OpenTherm bus and changes no PIC state, so it passes the simulation gate. Without
+    // this, /api/v2/pic/settings stayed empty on a boiler-less bench with the SAT simulation on.
+    const bool printOnly = (strncmp_P(picCmd, PSTR("PR="), 3) == 0);
+    if (!printOnly && satSimulationBlocksBusTx(picCmd, F("pic-serial"))) return false;   // TASK-1580: held back, the queue consumes it
   }
 
   // TASK-865.6: the dedicated PIC task is the sole UART writer. Build the full
