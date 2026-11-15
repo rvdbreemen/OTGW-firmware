@@ -2405,6 +2405,354 @@ def fetch_coredump(cap, http_base, timeout):
     return line
 
 
+# --------------------------------------------------------------------------- #
+# Device graph history and diagnostic recording (TASK-1964)
+# --------------------------------------------------------------------------- #
+# GET /api/v2/graph/history (ADR-193, graphHistoryStuff.h graphHistEmitJson): interval_s, newest_age_ms,
+# count, scale and one array per column, oldest slot first. Temperatures are value*scale or null, mod is
+# 0..100 or null, the flags are 0/1. The CSV mirrors the web UI export (v2.js exportCsv over the records
+# mergeGraphHistory builds): slot i of n is stamped x = now - newest_age_ms - (n - i) * interval, snapped
+# down to the 5 s GSLOT; a slot without any value or flag is dropped; null is an empty cell.
+GRAPH_HISTORY_PATH = "/api/v2/graph/history"
+GRAPH_HISTORY_VARIANTS = (("24h", ""), ("7d", "?hours=168"))   # 7d: ADR-245 firmware; older firmware ignores it
+GRAPH_TEMP_COLUMNS = ("flow", "ret", "chSet", "roomSet", "room", "outside")
+GRAPH_CSV_COLUMNS = GRAPH_TEMP_COLUMNS + ("mod", "flame", "dhw_on", "ch")
+GRAPH_GSLOT_MS = 5000
+GRAPH_HISTORY_BODY_CAP = 2 * 1024 * 1024
+GRAPH_HISTORY_SECONDS = 3600   # long run: one fetch per hour besides start and stop
+GRAPH_HISTORY_TIMEOUT = 20     # the web UI's GHIST_TIMEOUT_MS
+DIAG_STATUS_PATH = "/api/v2/diag/recording/status"
+DIAG_DOWNLOAD_PATH = "/api/v2/diag/recording"
+DIAG_BODY_CAP = 16 * 1024 * 1024
+
+
+def _js_number(v):
+    """The text JavaScript's String(v) gives for the numbers the export holds."""
+    if isinstance(v, float):
+        if v != v or v in (float("inf"), float("-inf")):
+            return ""
+        if v.is_integer():
+            return str(int(v))
+        return repr(v)
+    return str(v)
+
+
+def graph_history_rows(j, now_ms):
+    """The records the web UI's mergeGraphHistory() makes from one response, as (t_ms, {column: value}).
+    Returns None when the response is not usable (the same checks as the web UI)."""
+    if not isinstance(j, dict):
+        return None
+    n, iv, age, sc = j.get("count"), j.get("interval_s"), j.get("newest_age_ms"), j.get("scale")
+    nums = (int, float)
+    if not all(isinstance(x, nums) and not isinstance(x, bool) for x in (n, iv, age, sc)):
+        return None
+    if not (n > 0 and iv > 0 and sc > 0 and age >= 0):
+        return None
+    for c in GRAPH_CSV_COLUMNS:
+        if not isinstance(j.get(c), list) or len(j[c]) != n:
+            return None
+    iv_ms = iv * 1000
+    rows = []
+    for i in range(int(n)):
+        x = now_ms - age - (n - i) * iv_ms
+        t = x - x % GRAPH_GSLOT_MS
+        rec, any_value = {}, False
+        for c in GRAPH_TEMP_COLUMNS:
+            v = j[c][i]
+            rec[c] = v / sc if isinstance(v, nums) and not isinstance(v, bool) else None
+            any_value = any_value or rec[c] is not None
+        m = j["mod"][i]
+        rec["mod"] = m if isinstance(m, nums) and not isinstance(m, bool) else None
+        for c in ("flame", "dhw_on", "ch"):
+            rec[c] = 1 if j[c][i] else 0
+        if not any_value and rec["mod"] is None and not (rec["flame"] or rec["dhw_on"] or rec["ch"]):
+            continue   # a pure gap slot: the web UI drops it too
+        if rows and rows[-1][0] == t:
+            rows[-1] = (t, rec)
+        else:
+            rows.append((t, rec))
+    return rows
+
+
+def graph_history_csv(j, now_ms):
+    """The web UI export (epoch_ms plus the fixed columns, LF, no final newline), or None."""
+    rows = graph_history_rows(j, now_ms)
+    if rows is None:
+        return None
+    lines = ["epoch_ms," + ",".join(GRAPH_CSV_COLUMNS)]
+    for t, rec in rows:
+        lines.append(_js_number(int(t)) + "," + ",".join("" if rec[c] is None else _js_number(rec[c])
+                                                           for c in GRAPH_CSV_COLUMNS))
+    return "\n".join(lines)
+
+
+def _timed_get(url, timeout, max_bytes):
+    """GET that also returns the host time in ms at which the response headers arrived (the web UI's
+    tHead, the moment newest_age_ms refers to). Returns (status or None, body, headers_ms, error)."""
+    request = urllib.request.Request(url, headers={"User-Agent": "OTGW-capture/2"})
+    try:
+        with urllib.request.urlopen(request, timeout=timeout) as response:
+            head_ms = int(time.time() * 1000)
+            return response.status, response.read(max_bytes + 1), head_ms, None
+    except urllib.error.HTTPError as exc:
+        return exc.code, b"", None, str(exc)
+    except Exception as exc:
+        return None, b"", None, f"{type(exc).__name__}: {exc}"
+
+
+def fetch_graph_history(cap, http_base, label, timeout=GRAPH_HISTORY_TIMEOUT):
+    """GET both graph history variants once and keep each as graph-history-<variant>-<label>-<time>.json
+    (the body as served) and .csv (the web UI export of it). The 7 d variant is kept only when the firmware
+    answers it with a coarser interval than the 24 h one; an older firmware ignores ?hours=168 and answers
+    the 24 h ring, which is then not stored twice. Every outcome is one summary line; nothing raises."""
+    stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+    lines, base_interval = [], None
+    for variant, query in GRAPH_HISTORY_VARIANTS:
+        with HTTP_SLOT:
+            status, body, head_ms, err = _timed_get(http_base + GRAPH_HISTORY_PATH + query, timeout, GRAPH_HISTORY_BODY_CAP)
+        if status != 200:
+            what = f"HTTP {status}" if status is not None else f"request failed ({err})"
+            lines.append(f"Graph history {variant} ({label}): {what}, not kept")
+            continue
+        if len(body) > GRAPH_HISTORY_BODY_CAP:
+            lines.append(f"Graph history {variant} ({label}): answer above {GRAPH_HISTORY_BODY_CAP} bytes, not kept")
+            continue
+        try:
+            j = json.loads(body.decode("utf-8"))
+        except Exception as exc:
+            lines.append(f"Graph history {variant} ({label}): not JSON ({type(exc).__name__}), not kept")
+            continue
+        interval = j.get("interval_s") if isinstance(j, dict) else None
+        if variant == "24h":
+            base_interval = interval
+        elif base_interval is not None and (not isinstance(interval, (int, float)) or interval <= base_interval):
+            lines.append(f"Graph history {variant} ({label}): not supported by this firmware (interval_s {interval}), not kept")
+            continue
+        csv_text = graph_history_csv(j, head_ms)
+        name = f"graph-history-{variant}-{label}-{stamp}"
+        cap.path(name + ".json").write_bytes(body)
+        if csv_text is None:
+            lines.append(f"Graph history {variant} ({label}): {len(body)} bytes kept as {name}.json, no usable slots for a CSV")
+            continue
+        cap.path(name + ".csv").write_text(csv_text, encoding="utf-8", newline="")
+        lines.append(f"Graph history {variant} ({label}): {csv_text.count(chr(10))} rows, interval {interval} s -> {name}.csv")
+    for line in lines:
+        cap.summary(line, echo=False)
+    return lines
+
+
+class DeviceDataCapture(threading.Thread):
+    """The start reads (device state, graph history, a diagnostic recording) off the main thread, so the
+    other streams start at once; in a long run (hourly=True) then once per `interval` seconds the changing
+    device state, the graph history and the new recording blocks. main() reads the stop round itself after
+    joining this thread. `diag_since` carries the newest block number already downloaded, so the downloads
+    together hold the whole recording without overlap."""
+
+    def __init__(self, cap, http_base, graph=True, diag=True, state=True, hourly=False, interval=GRAPH_HISTORY_SECONDS):
+        super().__init__(name="device-data", daemon=True)
+        self.cap = cap
+        self.http_base = http_base
+        self.state = state
+        self.graph = graph
+        self.diag = diag
+        self.hourly = hourly
+        self.diag_since = None
+        self.interval = interval
+        self.rounds = 0
+
+    def start_round(self):
+        for enabled, what, call in ((self.state, "Device state", lambda: sweep_device(self.cap, self.http_base, "start")),
+                                    (self.graph, "Graph history", lambda: fetch_graph_history(self.cap, self.http_base, "start")),
+                                    (self.diag, "Diag recording", lambda: fetch_diag_recording(self.cap, self.http_base, "start"))):
+            if not enabled or self.cap.stopping():
+                continue
+            try:
+                result = call()
+                if what == "Diag recording":
+                    self.diag_since = result[1]
+            except Exception as exc:
+                self.cap.script_error(f"{what} at start failed: {type(exc).__name__}: {exc}")
+
+    def run(self):
+        self.start_round()
+        while self.hourly and not self.cap.stopping():
+            self.cap.wait(self.interval)
+            if self.cap.stopping():
+                break
+            try:
+                if self.state:
+                    sweep_device(self.cap, self.http_base, "hourly", hourly_only=True)
+                if self.graph:
+                    fetch_graph_history(self.cap, self.http_base, "hourly")
+                if self.diag:
+                    _line, newest = fetch_diag_recording(self.cap, self.http_base, "hourly", since=self.diag_since)
+                    if newest is not None and (self.diag_since is None or newest > self.diag_since):
+                        self.diag_since = newest
+                self.rounds += 1
+            except Exception as exc:
+                self.cap.script_error(f"device data: {type(exc).__name__}: {exc}")
+
+
+def fetch_diag_recording(cap, http_base, label, since=None, timeout=60):
+    """When the device holds a diagnostic recording (ADR-213: status active or has_data), download it as
+    diag-recording-<label>-<time>.bin. Only GETs: the recording is never started or stopped (a stop makes
+    the PSRAM ring unreadable, TASK-1960). since= asks only for the blocks after that block number.
+    Returns (summary line, newest_seq or None)."""
+    with HTTP_SLOT:
+        status, body, _err, _ctype = http_get(http_base + DIAG_STATUS_PATH, 10, 65536)
+    if status != 200:
+        line = f"Diag recording ({label}): status HTTP {status}" if status is not None else f"Diag recording ({label}): status request failed"
+        cap.summary(line, echo=False)
+        return line, None
+    try:
+        rec = json.loads(body.decode("utf-8")).get("recording", {})
+    except Exception:
+        rec = {}
+    newest = rec.get("newest_seq") if isinstance(rec.get("newest_seq"), int) else None
+    if not (rec.get("active") or rec.get("has_data")):
+        line = f"Diag recording ({label}): none on the device (state {rec.get('state', '?')}), nothing fetched"
+        cap.summary(line, echo=False)
+        return line, newest
+    if since is not None and newest is not None and newest <= since:
+        line = f"Diag recording ({label}): no new blocks since {since}"
+        cap.summary(line, echo=False)
+        return line, newest
+    query = f"?since={since}" if since is not None else ""
+    with HTTP_SLOT:
+        status, data, err, _ctype = http_get(http_base + DIAG_DOWNLOAD_PATH + query, timeout, DIAG_BODY_CAP + 1)
+    if status != 200 or not data or len(data) > DIAG_BODY_CAP:
+        what = f"HTTP {status}" if status is not None else f"request failed ({err})"
+        line = f"Diag recording ({label}): download {what} ({len(data)} bytes), not kept"
+        cap.summary(line, echo=False)
+        return line, newest
+    name = f"diag-recording-{label}-{datetime.now().strftime('%Y%m%d-%H%M%S')}.bin"
+    cap.path(name).write_bytes(data)
+    line = (f"Diag recording ({label}): {len(data)} bytes (state {rec.get('state', '?')}, blocks "
+            f"{rec.get('oldest_seq', '?')}-{newest}{', since ' + str(since) if since is not None else ''}) -> {name}; "
+            f"decode with scripts/diag_decode.py")
+    cap.summary(line, echo=False)
+    return line, newest
+
+
+# Device state sweep (TASK-1964, Robert DM 1571452141237968907: "collect ALL possible data"). Every GET here
+# was checked in the route table (restAPI.ino processAPI and the handlers) to be read-only. The task notes
+# hold the full in/out list with the reasons; tests/test_capture_device_data.py fails when a GET route of
+# restAPI.ino is in neither list. "hourly" marks the ones that change during a run.
+SWEEP_ENDPOINTS = (
+    ("/api/v2/health", True),
+    ("/api/v2/device/info", True),
+    ("/api/v2/device/time", False),
+    ("/api/v2/device/crashlog", False),
+    ("/api/v2/flash/status", False),
+    ("/api/v2/settings", False),
+    ("/api/v2/debug", True),
+    ("/api/v2/debug/flags", False),
+    ("/api/v2/sensors/status", True),
+    ("/api/v2/sensors/labels", False),
+    ("/api/v2/simulate", False),
+    ("/api/v2/discovery", False),
+    ("/api/v2/filesystem/files", False),
+    ("/api/v2/filesystem/hash-check", False),
+    ("/api/v2/pic/flash-status", False),
+    ("/api/v2/pic/settings", False),
+    ("/api/v2/otgw/otmonitor", True),
+    ("/api/v2/otgw/overrides", True),
+    ("/api/v2/otgw/boiler-support", True),
+    ("/api/v2/otgw/ot-support", True),
+    ("/api/v2/otdirect/status", True),
+    ("/api/v2/otdirect/settings", False),
+    ("/api/v2/otdirect/overrides", True),
+    ("/api/v2/sat/status?detail=full", True),
+    ("/api/v2/sat/markers", False),
+    ("/api/v2/sat/sensor-areas", False),
+    ("/api/v2/sat/ble/roster", False),
+    ("/api/v2/sat/ble/discovery", True),
+    ("/api/v2/sat/weather", True),
+    ("/api/v2/diag/recording/status", True),
+)
+# LittleFS files the firmware writes, served by handleFile() as plain GETs. /settings.ini is not here: it
+# holds the passwords in plain text. Fetched at start and stop only.
+SWEEP_FILES = (
+    "/reboot_log.txt", "/reboot_count.txt", "/bootdetect.log", "/dallas_labels.ini", "/ot-boiler.json",
+    "/ot-thermo.json", "/dhw_water.json", "/sat_pid_state.json", "/sat_pwm_state.json", "/sat_tune.json",
+    "/sat_markers.json", "/sat_energy.json", "/sat_energy_estimate.json", "/sat_hcr.json",
+)
+# Routes left out on purpose, with the reason (the task notes carry the same list).
+SWEEP_EXCLUDED = {
+    "/api/v2/pic/update-check": "queues an outbound request to otgw.tclcode.com",
+    "/api/v2/firmware/files": "can write .ver files to LittleFS",
+    "/api/v2/network/scan": "starts a WiFi scan and consumes its result",
+    "/api/v2/otgw/messages/<id>": "one value per request (134 IDs); otmonitor and ot-support hold the same data",
+    "/api/v2/otgw/id/<id>": "alias of otgw/messages/<id>",
+    "/api/v2/otgw/label/<label>": "one value per request; otmonitor holds the same data",
+    "/api/v2/otgw/telegraf": "same body as otgw/otmonitor",
+    "/api/v2/graph/history": "fetched separately (fetch_graph_history)",
+    "/api/v2/diag/recording": "fetched separately (fetch_diag_recording), never start or stop",
+    "/api/v2/device/coredump": "fetched separately at the end (fetch_coredump)",
+    "/api/v2/sat": "same body as sat/status",
+    "/api/v2/sensors": "same body as sensors/status",
+    "/api/v2/webhook": "no GET route",
+    "/api/v2/mqtt": "no GET route (republish command)",
+    "/settings.ini": "passwords in plain text",
+    "/ReBoot": "reboots the gateway",
+    "/ResetWireless": "erases the WiFi settings and reboots",
+    "/pic": "can start a PIC flash, a download or a file delete",
+}
+SWEEP_BODY_CAP = 262144
+SWEEP_TIMEOUT = 15
+# Keys whose values never leave the device in a capture, at any depth of a JSON body: passwords, tokens,
+# webhook URLs and payloads (they can carry tokens), BLE bind keys, and the home location of the weather source.
+SWEEP_SECRET_KEY = re.compile(r"(?i)(passw|token|secret|api_?key|bindkey|webhook(url|payload)|latitude|longitude|^lat$|^lon$)")
+
+
+def redact_json(value):
+    """A copy of a parsed JSON body with every value under a secret key replaced by "[REDACTED]"."""
+    if isinstance(value, dict):
+        return {k: ("[REDACTED]" if SWEEP_SECRET_KEY.search(str(k)) else redact_json(v)) for k, v in value.items()}
+    if isinstance(value, list):
+        return [redact_json(v) for v in value]
+    return value
+
+
+def sweep_device(cap, http_base, label, hourly_only=False):
+    """GET every SWEEP_ENDPOINTS route (only the hourly ones when hourly_only) and, unless hourly_only, every
+    SWEEP_FILES file, one request at a time, into device-state-<label>-<time>.txt: one section per request with
+    the status and the body (JSON redacted with redact_json, text with redact). Returns the summary line."""
+    stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+    paths = [p for p, changes in SWEEP_ENDPOINTS if changes or not hourly_only]
+    if not hourly_only:
+        paths += list(SWEEP_FILES)
+    name = f"device-state-{label}-{stamp}.txt"
+    ok = missing = failed = 0
+    with open(cap.path(name), "w", encoding="utf-8", newline="\n") as out:
+        out.write(f"# OTGW device state ({label}), {now_iso()}, {http_base}. Secrets redacted (TASK-1964).\n")
+        for path in paths:
+            if cap.stopping() and hourly_only:
+                break
+            with HTTP_SLOT:
+                status, body, err, ctype = http_get(http_base + path, SWEEP_TIMEOUT, SWEEP_BODY_CAP + 1)
+            if status is None:
+                failed += 1
+                out.write(f"\n### GET {path} -> ERROR {err}\n")
+                continue
+            if status == 200:
+                ok += 1
+            elif status == 404:
+                missing += 1
+            else:
+                failed += 1
+            cut = len(body) > SWEEP_BODY_CAP
+            text = body[:SWEEP_BODY_CAP].decode("utf-8", "replace")
+            try:
+                shown = json.dumps(redact_json(json.loads(text)), indent=1, ensure_ascii=False)
+            except Exception:
+                shown = redact(text)
+            out.write(f"\n### GET {path} -> {status} ({len(body)} bytes, {ctype}){' [truncated]' if cut else ''}\n{shown}\n")
+    line = f"Device state ({label}): {ok} answered, {missing} not on this firmware (404), {failed} failed -> {name}"
+    cap.summary(line, echo=False)
+    return line
+
+
 def resolve_metadata(cap, device_host, http_base, run_name):
     metadata = {"hostname": "", "firmware_version": "", "unique_id": "", "pic_device_id": ""}
     sources = []
@@ -2574,8 +2922,9 @@ def build_upload_zip(cap, transcript, hourly):
             items.append((path, arcname))
 
     add(transcript, Path(transcript).name)
-    for path in sorted(cap.run_path.glob("coredump-*.bin")):
-        add(path, path.name)
+    for pattern in ("coredump-*.bin", "device-state-*.txt", "graph-history-*.json", "graph-history-*.csv", "diag-recording-*.bin"):
+        for path in sorted(cap.run_path.glob(pattern)):
+            add(path, path.name)
     csv_dir = cap.run_path / "csv-run.tmp"
     try:
         if hourly:
@@ -2915,6 +3264,7 @@ ALIASES = {
     "-TelnetIdleCheckSeconds": "--telnet-idle-check-seconds",
     "-SkipBrowserCapture": "--skip-browser-capture", "-BrowserUrl": "--browser-url",
     "-BrowserDebugPort": "--browser-debug-port", "-BrowserPath": "--browser-path", "-Browser": "--browser",
+    "-SkipDeviceState": "--skip-device-state", "-SkipGraphHistory": "--skip-graph-history", "-SkipDiagRecording": "--skip-diag-recording",
     "-SkipHttpProbes": "--skip-http-probes", "-HttpProbeTimeoutSeconds": "--http-probe-timeout-seconds",
     "-SkipCrashlogCapture": "--skip-crashlog-capture", "-CrashlogUrl": "--crashlog-url",
     "-CrashlogPollSeconds": "--crashlog-poll-seconds", "-NoPrompt": "--no-prompt",
@@ -3004,6 +3354,15 @@ def build_parser():
     p.add_argument("--skip-http-probes", action="store_true")
     p.add_argument("--skip-coredump", action="store_true",
                    help="do not fetch the stored core dump (GET /api/v2/device/coredump) at the end of the capture")
+    p.add_argument("--skip-graph-history", action="store_true",
+                   help="do not fetch the device graph history (GET /api/v2/graph/history, kept as JSON and as the "
+                        "web UI CSV) at start, stop and every hour of a long run")
+    p.add_argument("--skip-device-state", action="store_true",
+                   help="do not read the device state (every read-only diagnostic REST GET and the state files the "
+                        "firmware keeps, secrets redacted) at start, stop and, for the changing ones, every hour")
+    p.add_argument("--skip-diag-recording", action="store_true",
+                   help="do not download a diagnostic recording the device holds (GET /api/v2/diag/recording); "
+                        "the tool never starts or stops a recording")
     p.add_argument("--http-probe-timeout-seconds", type=ranged(1, 60), default=10)
     p.add_argument("--skip-frame-capture", action="store_true",
                    help="do not record otframes.log / otgw_simulation.log (raw OpenTherm frames)")
@@ -3252,6 +3611,9 @@ def main(argv=None):
     s(f"SkipFrameCapture: {args.skip_frame_capture}", echo=False)
     s(f"SkipHttpProbes: {args.skip_http_probes}", echo=False)
     s(f"SkipCoredump: {args.skip_coredump}", echo=False)
+    s(f"SkipDeviceState: {args.skip_device_state}", echo=False)
+    s(f"SkipGraphHistory: {args.skip_graph_history}", echo=False)
+    s(f"SkipDiagRecording: {args.skip_diag_recording}", echo=False)
     s(f"HttpProbeTimeoutSeconds: {args.http_probe_timeout_seconds}", echo=False)
     s(f"CrashlogPollSeconds: {args.crashlog_poll_seconds}", echo=False)
     snapshot_seconds = args.snapshot_seconds if args.snapshot_seconds is not None else (SNAPSHOT_SECONDS_DEFAULT if long_run else 0)
@@ -3331,6 +3693,16 @@ def main(argv=None):
         workers.append((frames, 10))
         s(f"Frame recorder started: ws://{args.device}:{args.http_port}/ws -> {FRAMES_LOG}, {SIM_LOG} (kept next to the transcript).")
 
+    device_data = None
+    if not (args.skip_graph_history and args.skip_diag_recording and args.skip_device_state):
+        device_data = DeviceDataCapture(cap, http_base, graph=not args.skip_graph_history,
+                                        diag=not args.skip_diag_recording, state=not args.skip_device_state,
+                                        hourly=long_run)
+        device_data.start()
+        workers.append((device_data, GRAPH_HISTORY_TIMEOUT + 65))
+        s("Device data: device state, graph history and diag recording at start and stop"
+          + (", and every hour." if long_run else "."))
+
     if snapshot_seconds:
         snapshots = SnapshotCapture(cap, http_base, snapshot_seconds)
         snapshots.start()
@@ -3409,6 +3781,23 @@ def main(argv=None):
         except Exception as exc:
             s("HTTP probes: failed (see error.txt)", echo=False)
             cap.script_error(f"HTTP probes failed: {type(exc).__name__}: {exc}")
+
+    diag_since = device_data.diag_since if device_data is not None else None
+    if not args.skip_device_state:
+        try:
+            sweep_device(cap, http_base, "stop")
+        except Exception as exc:
+            cap.script_error(f"Device state at stop failed: {type(exc).__name__}: {exc}")
+    if not args.skip_graph_history:
+        try:
+            fetch_graph_history(cap, http_base, "stop")
+        except Exception as exc:
+            cap.script_error(f"Graph history at stop failed: {type(exc).__name__}: {exc}")
+    if not args.skip_diag_recording:
+        try:
+            fetch_diag_recording(cap, http_base, "stop", since=diag_since)
+        except Exception as exc:
+            cap.script_error(f"Diag recording at stop failed: {type(exc).__name__}: {exc}")
 
     if args.skip_coredump:
         s("Core dump: not fetched (--skip-coredump).", echo=False)

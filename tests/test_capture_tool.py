@@ -285,7 +285,10 @@ class ToolCase(unittest.TestCase):
                 "--telnet-connect-timeout-seconds", "2", "--telnet-reconnect-delay-ms", "250",
                 "--telnet-post-disconnect-delay-ms", "250", "--idle-check-floor", "1",
                 "--telnet-idle-check-seconds", str(idle), "--skip-browser-capture", "--skip-crashlog-capture",
-                "--skip-http-probes"]
+                "--skip-http-probes",
+                # TASK-1964: the device state sweep also GETs /api/v2/health, which these watchdog cases count as
+                # probes; the sweep, graph history and diag recording have their own test_capture_device_data.py.
+                "--skip-device-state", "--skip-graph-history", "--skip-diag-recording"]
         if broker is not None:
             args += ["--broker", "127.0.0.1", "--broker-port", str(broker.port)]
         else:
@@ -451,6 +454,32 @@ class ToolCase(unittest.TestCase):
         self.assertIn("hd_min_free_heap", probes)
         self.assertIn("hd_min_max_block", probes)
         self.assertRegex(probes, r"HTTP\s+404 .*/api/v2/sat/status")
+
+    def test_j2_device_state_start_and_stop_land_in_the_upload(self):
+        """TASK-1964: main() reads the device state at start (off the main thread) and at stop, and both files
+        travel in the upload zip; graph history and diag recording answer 404 here and leave one line each."""
+        dev = FakeDevice()
+        self.addCleanup(dev.shutdown)
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        out = Path(tmp.name) / "out"
+        env = dict(os.environ, OTGW_CAPTURE_SETTINGS=str(Path(tmp.name) / "settings.json"))
+        rc = subprocess.run([sys.executable, str(TOOL), "--device", "127.0.0.1", "--telnet-port", str(dev.telnet_port),
+                             "--http-port", str(dev.http_port), "--output-root", str(out), "--broker", "",
+                             "--duration", "3", "--telnet-idle-check-seconds", "0", "--skip-browser-capture",
+                             "--skip-crashlog-capture", "--skip-http-probes"],
+                            stdin=subprocess.DEVNULL, capture_output=True, env=env, timeout=120).returncode
+        self.assertEqual(rc, 0)
+        upload = next(out.glob("*-upload.zip"))
+        with zipfile.ZipFile(upload) as z:
+            names = z.namelist()
+            start = [n for n in names if n.startswith("device-state-start-")]
+            stop = [n for n in names if n.startswith("device-state-stop-")]
+            self.assertEqual((len(start), len(stop)), (1, 1), names)
+            self.assertIn("### GET /api/v2/health -> 200", z.read(start[0]).decode("utf-8"))
+        transcript = next(out.glob("*/transcript-*.txt")).read_text(encoding="utf-8")
+        self.assertIn("Graph history 24h (stop): HTTP 404", transcript)
+        self.assertIn("Diag recording (stop): status HTTP 404", transcript)
 
     # ---- TASK-1453 ------------------------------------------------------
     def test_k_no_broker_skips_mqtt_and_keeps_telnet(self):
