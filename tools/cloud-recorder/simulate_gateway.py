@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Uploads a generated OT stream to the collection point the way a gateway would (TASK-1938 test tool).
 
-    python3 simulate_gateway.py <base> <device-email> <password> --minutes 30 --batch 300 \
+    python3 simulate_gateway.py <base> <device-uid> <password> --minutes 30 --batch 300 \
         [--start 2026-11-14T08:00:00+01:00] [--skip-seq 3] [--frames-out ref.tsv]
 
 The frames are the codec study's generated stream, shifted to --start. --skip-seq leaves one batch out,
@@ -29,7 +29,7 @@ def call(base, path, body, token=None):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("base")
-    ap.add_argument("email")
+    ap.add_argument("uid", help="otgw-<12 hex>; enrolled on first use, as a gateway does")
     ap.add_argument("password")
     ap.add_argument("--minutes", type=float, default=30)
     ap.add_argument("--batch", type=int, default=otrec.BATCH_SECONDS["ot"], help="seconds per batch")
@@ -38,7 +38,12 @@ def main():
     ap.add_argument("--frames-out")
     a = ap.parse_args()
     base = a.base.rstrip("/")
-    st, auth = call(base, "/api/collections/devices/auth-with-password", {"identity": a.email, "password": a.password})
+    login = {"identity": a.uid, "password": a.password}
+    st, auth = call(base, "/api/collections/devices/auth-with-password", login)
+    if st == 400:                                       # unknown uid: enroll, as the firmware does (TASK-1971)
+        call(base, "/api/collections/devices/records?fields=id",
+             {"uid": a.uid, "password": a.password, "passwordConfirm": a.password})
+        st, auth = call(base, "/api/collections/devices/auth-with-password", login)
     if st != 200:
         sys.exit(f"login failed: HTTP {st}")
     token, dev = auth["token"], auth["record"]["id"]

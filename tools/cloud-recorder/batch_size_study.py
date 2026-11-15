@@ -25,7 +25,7 @@ import otrec  # noqa: E402
 import dbg_size_study  # noqa: E402
 
 ADMIN, ADMIN_PW = "admin@test.invalid", "Adm1n-test-pass-123"
-DEV, DEV_PW = "gw-test@devices.invalid", "gw-test-pass-123456"
+DEV, DEV_PW = "otgw-00000000beef", "gw-test-pass-123456"   # uid (TASK-1971)
 
 
 class Conn:
@@ -77,7 +77,7 @@ def start(image, data_dir, port):
     adm.call("PATCH", "/api/settings", {"rateLimits": {"enabled": False},
                                         "batch": {"enabled": True, "maxRequests": 100, "timeout": 10, "maxBodySize": 0}})
     adm.call("POST", "/api/collections/devices/records",
-             {"email": DEV, "password": DEV_PW, "passwordConfirm": DEV_PW, "enabled": True, "label": "study"})
+             {"uid": DEV, "password": DEV_PW, "passwordConfirm": DEV_PW, "label": "study"})
     dev = Conn(port)
     st, a = dev.call("POST", "/api/collections/devices/auth-with-password", {"identity": DEV, "password": DEV_PW})
     dev.token = a["token"]

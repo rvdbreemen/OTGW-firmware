@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Exports one gateway's OT stream from the OTGW collection point as a replay file (TASK-1938).
 
-    python3 export_batches.py http://<nas>:8090 <superuser-email> <password> <device-email> out/otframes.log \
+    python3 export_batches.py http://<nas>:8090 <superuser-email> <password> <device-uid> out/otframes.log \
         [--since 2026-11-14T00:00] [--until ...] [--tz Europe/Amsterdam]
 
 Run it on the LAN: the superuser API is not exposed through the tunnel.
@@ -87,7 +87,7 @@ def main():
     ap.add_argument("base")
     ap.add_argument("admin_email")
     ap.add_argument("admin_password")
-    ap.add_argument("device_email")
+    ap.add_argument("device_uid", help="otgw-<12 hex>, the uid the gateway enrolled with")
     ap.add_argument("out")
     ap.add_argument("--since")
     ap.add_argument("--until")
@@ -97,10 +97,10 @@ def main():
     base = a.base.rstrip("/")
     token = api(base, "/api/collections/_superusers/auth-with-password", None,
                 {"identity": a.admin_email, "password": a.admin_password})["token"]
-    q = urllib.parse.urlencode({"filter": f'email="{a.device_email}"', "fields": "id"})
+    q = urllib.parse.urlencode({"filter": f'uid="{a.device_uid}"', "fields": "id"})
     found = api(base, f"/api/collections/devices/records?{q}", token)["items"]
     if not found:
-        sys.exit(f"device {a.device_email} not found")
+        sys.exit(f"device {a.device_uid} not found")
     batches = fetch_batches(base, token, found[0]["id"], a.stream, a.since, a.until)
     n, gaps = write_otframes(batches, a.out, ZoneInfo(a.tz))
     print(f"{len(batches)} batches, {n} frames, {gaps} gaps -> {a.out}")

@@ -109,8 +109,8 @@ def build(image, ref_exe, minutes, profile, seed=7):
 
     sites = []
     for macro, fmt, fn, line in dbg_size_study.call_sites():
-        if "DebugT" not in macro:
-            continue
+        if "DebugT" not in macro or "*" in fmt:      # a "*" width/precision takes an extra argument the generator
+            continue                                 # does not make; the device sends such lines as line raw
         fa, na = image.find_cstr(fmt), image.find_cstr(fn)
         if fa and na:
             sites.append(("println" if "ln" in macro.lower() else "printf", fmt, fn, line, fa, na))
@@ -152,6 +152,10 @@ def make_records(frames, sat_ref, dbg_events, profile):
         ot = [f for f in frames if lo <= f[0] < hi]
         sat = [s for s in sat_ref if lo <= s[0] < hi]
         dbg = [d[1] for d in dbg_events if lo * 1000 <= d[0] < hi * 1000]
+        if dbg and dbg[0][0] != "heap":              # a record that starts mid-second carries the current heap
+            prev = [d[1] for d in dbg_events if d[0] < lo * 1000 and d[1][0] == "heap"]   # values, as the device's
+            if prev:                                                                      # first dbgHeap() does
+                dbg.insert(0, prev[-1])
         if not (ot or sat or any(d[0] != "heap" for d in dbg)):
             return []
         t0 = lo

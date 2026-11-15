@@ -14,8 +14,8 @@ anything yet: device streaming is TASK-1473, which is on hold.
 ## Round trip (tested 2026-11-14, local PocketBase in Docker)
 
 ```bash
-python3 simulate_gateway.py http://127.0.0.1:8090 gw-test@devices.invalid '<pw>' --minutes 30 --batch 300 --skip-seq 3 --frames-out ref.tsv
-python3 export_batches.py http://127.0.0.1:8090 <admin-email> '<admin-pw>' gw-test@devices.invalid otframes.log
+python3 simulate_gateway.py http://127.0.0.1:8090 otgw-00000000beef '<pw>' --minutes 30 --batch 300 --skip-seq 3 --frames-out ref.tsv
+python3 export_batches.py http://127.0.0.1:8090 <admin-email> '<admin-pw>' otgw-00000000beef otframes.log
 ```
 
 Result: 5 batches sent (batch 3 left out), 3,920 frames, 4,683 B payload (1.19 B per frame). The export

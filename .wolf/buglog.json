@@ -3943,5 +3943,37 @@
     "related_bugs": [],
     "occurrences": 1,
     "last_seen": "2026-11-14T17:21:17.466170+00:00"
+  },
+  {
+    "id": "bug-224",
+    "timestamp": "2026-11-15T13:36:50+00:00",
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-11-15T13:36:50+00:00",
+    "error_message": "decode_all.py / export_batches.py look up the gateway by email; after TASK-1971 devices have no email (uid identity)",
+    "file": "tools/cloud-recorder/decode_all.py, export_batches.py, simulate_gateway.py, batch_size_study.py",
+    "root_cause": "schema change to uid identity not propagated to host scripts",
+    "fix": "filter uid=..., simulate enrolls on unknown uid, study creates by uid",
+    "tags": [
+      "cloudrec",
+      "pocketbase",
+      "uid"
+    ]
+  },
+  {
+    "id": "bug-225",
+    "timestamp": "2026-11-15T13:36:50+00:00",
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-11-15T13:36:50+00:00",
+    "error_message": "proof_all_streams: debug bytes differ, prefix heap 0|0 after a record split mid-second; ref_printf refused %.*s",
+    "file": "tools/cloud-recorder/proof_all_streams.py",
+    "root_cause": "split records lacked the current heap item; generator picked a call site with a * precision that it cannot fill",
+    "fix": "prepend the last heap event to a record that starts mid-second; skip formats with *",
+    "tags": [
+      "cloudrec",
+      "proof",
+      "heap"
+    ]
   }
 ]
