@@ -39,6 +39,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - OT-Direct master mode: a thermostat on the slave port gets no answer while the boiler is offline, instead of the last cached boiler status; `GW=R` and a switch into or out of master, loopback or bypass clear the boiler value cache, so boiler presence and the ventilation detection only count answers given after the switch (TASK-1807).
 - OT-Direct: a boiler Data-Invalid reply never becomes a cached value; the slot keeps its previous value (TASK-1925).
 - SAT simulation no longer saves the PID state or the heating-curve recommendation to the filesystem, so the next boot does not restore values learned on a simulated room (TASK-1900).
+- The OT support files of the thermostat and the boiler and the boot-detect log are written to a temporary file and renamed over the live file without removing it first, so a reset during the write keeps the previous file (TASK-1916).
+- REST `/api/v2/device/info` no longer sends a second closing `}` under load: the heap values it reports are read once per response instead of on every chunk (TASK-1910).
+- SAT calibration markers are served from a RAM copy of `/sat_markers.json`; the file is written on the loop task, so the markers request makes no LittleFS call; a request during a write gets a 503; braces in a label are removed like other unsafe characters (TASK-1911).
+- REST `/api/v2/settings`: a minimum or maximum below 0.01 is printed with 3 decimals instead of as `0`, so `satthermalcoeff` reports its real lower bound (TASK-1941).
 
 ## [2.0.0-beta.250] - 2026-11-14
 
