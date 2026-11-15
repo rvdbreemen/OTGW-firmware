@@ -5,6 +5,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [2.0.0-beta.294] - 2026-11-15
+
 ### Added
 - PIC Classic: the temperature sensor wired to the PIC can reach MQTT and Home Assistant, as on the 1.x line (1.x TASK-1147). A new setting, PIC temperature sensor (off by default, `PICtempsensor` in `settings.ini`, `pictempsensor` in the REST settings), makes the gateway read it with `PR=E` every 3 minutes and publish it to `otgw-pic/temperature_reading`, with a Home Assistant temperature sensor PIC_Temperature_Reading on the Sensors device. The entity is announced on the first valid reading only; a PIC without a sensor answers `-`, and then nothing is published. While the return water readout of TASK-1314 runs (sensor function `R`) its once-a-minute `PR=E` serves both, so no second poll is sent. OT-Direct boards read no PIC and never send it (Robert, 2026-11-14; TASK-1940).
 - Monitor > Graph: the dashed live-connection marks get a legend line and a tooltip that say they are the live connection dropping or coming back, not a restart; a real restart of the gateway (its boot counter went up, read from device/info when the live connection returns) is drawn as a solid amber "gateway restarted" mark (TASK-1914).
@@ -1003,7 +1005,8 @@ Legacy release. See git history for details.
 
 Legacy releases. See git history for details.
 
-[Unreleased]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.250...HEAD
+[Unreleased]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.294...HEAD
+[2.0.0-beta.294]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.250...v2.0.0-beta.294
 [2.0.0-beta.250]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.237...v2.0.0-beta.250
 [2.0.0-beta.237]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.224...v2.0.0-beta.237
 [2.0.0-beta.224]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.218...v2.0.0-beta.224
