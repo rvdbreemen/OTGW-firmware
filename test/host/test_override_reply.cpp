@@ -191,6 +191,7 @@ static bool otdModeSettingPending = false;
 static OTDirectMode otdModeFromSetting(int iMode) { return static_cast<OTDirectMode>(iMode); }
 static void applyOTDirectMode(OTDirectMode) {}
 static void otCmdApplyPendingFlush() {}   // the ring flush itself: tests/test_otd_mode_switch_queue_reset.py
+static void otdCmdTextDrain() {}          // TASK-1761: the off-loop command ring, tests/test_otd_loop_task_commands.py
 
 static void sendWebSocketJSON(const char*) {}
 static bool satSimulationBlocksBusTx(const char*, const __FlashStringHelper*) { return false; }
