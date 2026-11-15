@@ -1,9 +1,11 @@
 ---
 id: TASK-1961
 title: 'OT-Direct: OH= default 1 like the PIC'
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-11-15T07:58:00Z'
+updated_date: '2026-11-15T08:59:00Z'
 labels:
   - otdirect
 dependencies: []
@@ -19,6 +21,14 @@ Split from TASK-1750. The PIC factory default sets OverrideHigh (gateway.asm 6.8
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Robert's answer on the nuance (A as stated / B one-time migration) recorded with the DM id
-- [ ] #2 Settings default changed as decided; host test on the real settings load: a new install (no settings.ini) gives OH=1, a stored OTDoverridehb=false gives 0 (and, for B, the migration runs once)
+- [x] #1 Robert's answer on the nuance (A as stated / B one-time migration) recorded with the DM id
+- [x] #2 Settings default changed as decided; host test on the real settings load: a new install (no settings.ini) gives OH=1, a stored OTDoverridehb=false gives 0 (and, for B, the migration runs once)
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Decision on the nuance (relayed by the coordinator): Robert chose B, DM 1571441135526875227 (reply to the coordinator's question DM 1571433984439750759): a one-time migration. Every unit goes to OH=1 once, with a persistent marker so it never repeats; a user who sets OH=0 afterwards keeps it. Plus a release-notes line and a CHANGELOG entry. Tests: (a) old settings.ini with OH=0 and no marker -> 1 + marker, (b) marker + OH=0 -> stays 0, (c) new install -> 1. Pattern reused: the key-presence sentinel + deferred settingsDirty persist of readSettings() (ui_onboarded TASK-997, SATbleenable TASK-1693, SATfollowthermostat TASK-1259); no new mechanism. needs-maintainer-ok: not set on this task.
+
+Implemented (lane-95-next): OTDirecttypes.h bOverrideHB default true; settingStuff.ino writeSettings() writes the marker OTDohpicdefault (kOtdOhMarkerValue), updateSetting() sets the sentinel g_sawOtdOhMarkerKey on it, readSettings() resets the sentinel per parse and after the parse, in the [otd-oh-migrate] block, sets OH=1 + settingsDirty when the marker was absent (deferred flush stores the marker, so it runs once). A fresh install writes the defaults with the marker, so the re-read keeps OH=1 without a migration. Evidence: new tests/test_otd_oh_default_migration.py on the real setter/writer lines, the migration block and the struct default: (a) OH=0 file without marker -> boot1 oh=1 dirty=1, boot2 oh=1 marker=1 dirty=0; (b) marker + OH=0 -> 0; (c) new install -> 1; (d) OH=0 after the migration -> stays 0. 4/4 OK; on HEAD's settingStuff.ino + OTDirecttypes.h (a)(c)(d) FAIL. tests/test_otd_persist_pic_eeprom.py now starts its OH step from a stored 0 (OH_PRESET) because OH=1 equals the new default. evaluate.py --quick 86 passed / 0 failed (a literal 'true' in writeJsonBoolKV tripped check_settings_writer_separator, hence the named constant). Settings tests (test_settings_* 4, ble_nopsram, sat_follow, fs_update_keep, boot_restore_order) green. CHANGELOG [Unreleased] Changed line added. Release-notes line for the next public beta (to carry into its notes file): 'OT-Direct: OH= (copy the MsgID 100 override flags into the high byte) is now on by default like the PIC; every OT-Direct board switches to OH=1 once at its first boot on this version. Send OH=0 again if your thermostat needs it; that choice then stays.' NOT verified: a real boot on the bench (09) with an old settings.ini.
+<!-- SECTION:NOTES:END -->

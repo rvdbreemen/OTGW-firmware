@@ -136,6 +136,7 @@ int main() {
   step("MI", "MI", "500");
   step("FS", "FS", "0");
   step("IT", "IT", "0");
+  OH_PRESET
   step("OH", "OH", "1");
   step("SW", "SW", "55");
   step("SH", "SH", "70");
@@ -184,6 +185,8 @@ def build_source():
         "HAS_UI_FIELD": "settings.otd.sUnknownIds" if "sUnknownIds" in struct else '"none"',
     }
     defs = "".join("#define %s %s\n" % kv for kv in fields.items())
+    # TASK-1961: OH defaults to 1 now; the OH step starts from a stored 0 so OH=1 is a change that must be stored
+    defs += "#define OH_PRESET %s\n" % ("settings.otd.bOverrideHB = false;" if "bOverrideHB" in struct else "")
     if restore:
         defs += "#define HAS_RESTORE 1\n"
     return (PRE.replace("@SETTINGS_STRUCT@", struct + ";") + defs +

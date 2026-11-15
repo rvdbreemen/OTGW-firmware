@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTDirecttypes.h
-**  Version  : v2.0.0-beta.300
+**  Version  : v2.0.0-beta.301
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -128,7 +128,7 @@ struct OTDirectSettingsSection {
   float    fDhwSetpoint       = 0.0f;  // SW= DHW setpoint (MsgID 56), 0 = none
   float    fMaxChSetpoint     = 0.0f;  // SH= max CH setpoint (MsgID 57), 0 = none
   bool     bIgnoreTransitions = true;  // IT= (PIC default 1)
-  bool     bOverrideHB        = false; // OH= (OT-Direct default 0; the PIC default is TASK-1750)
+  bool     bOverrideHB        = true;  // OH= (PIC default 1, TASK-1961; settings without the OTDohpicdefault marker migrate once)
   char     sUnknownIds[64]    = "";    // UI= list, Data-IDs separated by a space (KI= removes)
 };
 

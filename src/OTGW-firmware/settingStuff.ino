@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : settingsStuff
-**  Version  : v2.0.0-beta.300
+**  Version  : v2.0.0-beta.301
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -280,6 +280,8 @@ static void writeJsonIndexedStringKV(File& file, PGM_P keyBase, unsigned index, 
 }
 
 //=======================================================================
+static constexpr bool kOtdOhMarkerValue = true;   // TASK-1961: the OTDohpicdefault marker; its presence counts, not its value
+
 bool writeSettings(bool show)
 {
 
@@ -497,6 +499,7 @@ bool writeSettings(bool show)
   writeJsonFloatKV(file, F("OTDmaxchsetpoint"), settings.otd.fMaxChSetpoint);
   writeJsonBoolKV(file, F("OTDignoretransitions"), settings.otd.bIgnoreTransitions);
   writeJsonBoolKV(file, F("OTDoverridehb"), settings.otd.bOverrideHB);
+  writeJsonBoolKV(file, F("OTDohpicdefault"), kOtdOhMarkerValue);   // TASK-1961: marker, the one-time OH=1 migration is done
   writeJsonStringKV(file, F("OTDunknownids"), settings.otd.sUnknownIds);
 #endif
 #if defined(HAS_ETH_CAPABLE) && HAS_ETH_CAPABLE
@@ -550,6 +553,7 @@ bool writeSettings(bool show)
 static bool g_sawLegacyTopicsKey = false;
 static bool g_satCphOutOfSet = false;    // TASK-1375: set when the file carried a SATcyclesperhour other than 3 or 4; the deferred flush then rewrites the snapped value
 static bool g_sawSatFollowKey = false;   // TASK-1259: set when SATfollowthermostat is parsed; its absence means "default to the push-setpoint value"
+static bool g_sawOtdOhMarkerKey = false;   // TASK-1961: set when OTDohpicdefault is parsed; absent = OH not yet migrated to 1
 static bool g_sawOnboardedKey = false;   // TASK-997: set when ui_onboarded is parsed; its absence marks a pre-feature (existing) install
 static bool g_sawBleEnableKey = false;   // TASK-1693: set when SATbleenable is parsed; its absence means no stored BLE choice yet
 // [ble-nopsram-default:begin] TASK-1693
@@ -570,6 +574,7 @@ void readSettings(bool show)
   g_sawBleEnableKey = false;     // TASK-1693: same sentinel pattern for the BLE default
   g_satCphOutOfSet = false;      // TASK-1375: same sentinel pattern for SATcyclesperhour
   g_sawSatFollowKey = false;     // TASK-1259: same sentinel pattern for SATfollowthermostat
+  g_sawOtdOhMarkerKey = false;   // TASK-1961: same sentinel pattern for the OH=1 migration marker
   if (!LittleFS.exists(SETTINGS_FILE))
   {  //create settings file if it does not exist yet.
     DebugTln(F(" .. file not found! --> created file!"));
@@ -669,6 +674,18 @@ void readSettings(bool show)
     settingsDirty = true;
     DebugTln(F("[Settings] no SATbleenable key on a board without PSRAM: BLE off by default"));
   }
+#if defined(HAS_DIRECT_OT) && HAS_DIRECT_OT
+  // [otd-oh-migrate:begin] TASK-1961 (Robert, option B): OH= defaults to 1 like the PIC (gateway.asm 6.8 SavedSettings
+  // :5459 sets OverrideHigh). A file without the OTDohpicdefault marker was written before this release; it gets OH=1
+  // once, whatever OTDoverridehb it holds (since beta.203 every save wrote that key, so a stored 0 is no user choice).
+  // The deferred flush writes the marker, so an OH=0 set after this boot stays.
+  if (!g_sawOtdOhMarkerKey) {
+    settings.otd.bOverrideHB = true;
+    settingsDirty = true;
+    DebugTln(F("[Settings] no OTDohpicdefault marker: OH= set to 1 once (PIC default)"));
+  }
+  // [otd-oh-migrate:end]
+#endif
   if (!g_sawOnboardedKey) {
     settings.ui.bOnboarded = true;
     settingsDirty = true;              // persist the key so this migration runs once
@@ -1351,6 +1368,7 @@ void updateSetting(const char *field, const char *newValue)
   else if (strcasecmp_P(field, PSTR("OTDmaxchsetpoint")) == 0)   settings.otd.fMaxChSetpoint = clampSettingFloat(newValue, settings.otd.fMaxChSetpoint, 0.0f, 127.0f);
   else if (strcasecmp_P(field, PSTR("OTDignoretransitions")) == 0) settings.otd.bIgnoreTransitions = EVALBOOLEAN(newValue);
   else if (strcasecmp_P(field, PSTR("OTDoverridehb")) == 0)      settings.otd.bOverrideHB = EVALBOOLEAN(newValue);
+  else if (strcasecmp_P(field, PSTR("OTDohpicdefault")) == 0)    g_sawOtdOhMarkerKey = true;   // TASK-1961: key presence = migrated
   else if (strcasecmp_P(field, PSTR("OTDunknownids")) == 0)      strlcpy(settings.otd.sUnknownIds, newValue, sizeof(settings.otd.sUnknownIds));
 #endif
 #if defined(HAS_ETH_CAPABLE) && HAS_ETH_CAPABLE
