@@ -370,6 +370,16 @@ On hardware without a PIC (OT-Direct) the firmware answers these commands itself
 | `SR=18:1,230` | `SR: 18:1/230`: the stored response as `<id>:<high byte>/<low byte>`, whatever form the argument had |
 | `FT=X` | `FT: D`: the selected model (`C`, `I`, `S` or `D`), not the argument |
 
+On OT-Direct the numbers in these commands are read as PIC firmware 6.8 reads them, so the boiler gets the same bytes and a wrong value gets the same answer:
+
+- Two decimals count and the third rounds (`CS=49.72` sends 49.72, `OT=9.999` sends 10.00); one decimal is tenths (`RT=25.4` is 25.40). The reply prints the stored value with two decimals.
+- `CS=`, `C2=`, `BS=`, `CL=`, `CC=` and `RT=` take 0 to 100: above 100 is `OR`, a minus sign, an empty value or text is `SE`. `CL=` with text clears the cooling level instead (`CL: -`).
+- `TT=`, `TC=` and `SB=` refuse a minus sign (`SE`); `SB=0` is `SE`. `SB=` is kept between 1 and 30.
+- `SW=` and `SH=` answer `BV` outside the bounds the boiler reports in MsgID 48 and 49, or 20-80 and 10-90 before it has; 0 resets them.
+- `OT=` clears the outside temperature (`OT: -`) for text, `OT=-` and a value of 64 or more.
+- `MM=` takes a whole number: text, `MM=-` or a minus sign clears it (`MM: -`), above 100 is `OR`.
+- Unknown-DataID answers never switch off MsgID 0, 1, 3, 14, 17 and 25, as on the PIC.
+
 Commands are validated and queued. Responses are processed asynchronously and published to MQTT. The REST endpoint returns `"queued"` immediately without waiting for the PIC response.
 
 Alias: `POST /api/v2/otgw/command` (backward compatibility)

@@ -233,6 +233,16 @@ Op hardware zonder PIC (OT-Direct) beantwoordt de firmware deze commando's zelf,
 | `SR=18:1,230` | `SR: 18:1/230`: het opgeslagen antwoord als `<id>:<hoge byte>/<lage byte>`, in welke vorm het argument ook kwam |
 | `FT=X` | `FT: D`: het gekozen model (`C`, `I`, `S` of `D`), niet het argument |
 
+Op OT-Direct leest de firmware de getallen in deze commando's zoals PIC-firmware 6.8 ze leest. De ketel krijgt daardoor dezelfde bytes, en een verkeerde waarde krijgt hetzelfde antwoord:
+
+- Twee decimalen tellen mee en de derde rondt af (`CS=49.72` stuurt 49,72, `OT=9.999` stuurt 10,00); één decimaal is tienden (`RT=25.4` is 25,40). Het antwoord toont de opgeslagen waarde met twee decimalen.
+- `CS=`, `C2=`, `BS=`, `CL=`, `CC=` en `RT=` nemen 0 tot 100: boven 100 is `OR`, een minteken, een lege waarde of tekst is `SE`. `CL=` met tekst wist het koelniveau juist (`CL: -`).
+- `TT=`, `TC=` en `SB=` weigeren een minteken (`SE`); `SB=0` is `SE`. `SB=` blijft tussen 1 en 30.
+- `SW=` en `SH=` antwoorden `BV` buiten de grenzen die de ketel in MsgID 48 en 49 meldt, of 20-80 en 10-90 zolang hij die nog niet gemeld heeft; 0 zet ze terug.
+- `OT=` wist de buitentemperatuur (`OT: -`) bij tekst, bij `OT=-` en bij een waarde van 64 of hoger.
+- `MM=` neemt een heel getal: tekst, `MM=-` of een minteken wist hem (`MM: -`), boven 100 is `OR`.
+- Unknown-DataID-antwoorden schakelen MsgID 0, 1, 3, 14, 17 en 25 nooit uit, net als op de PIC.
+
 Alias: `POST /api/v2/otgw/command` (achterwaartse compatibiliteit)
 
 ---
