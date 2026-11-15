@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-14T20:18:00Z'
-updated_date: '2026-11-15T07:46:00Z'
+updated_date: '2026-11-15T09:01:00Z'
 labels:
   - webui
   - bug
@@ -58,4 +58,6 @@ Fix prepared, NOT for merge until Robert answers the coordinator's DM (A = this 
 2026-11-15 ADR-240 text aligned with the code after 92's review (F1 scope, F2 consistency): title, Context, Decision and Must now all say 'not ESTABLISHED and no payload segment' (closing FIN-only and half-open SYN_RCVD SYN-ACK-only), evidence reworded as zero-length-only until the split bench, Related states ADR-188 stays Accepted; file renamed to ADR-240-a-web-connection-that-is-not-established-and-holds-no-payload-does-not-count-towards-the-adr-188-send-cap.md; adr-doctor index fixed, adr_lint ADVISORY only (open question A/B), test_adr_governance OK.
 
 2026-11-15 decision (Robert, Discord DM, relayed by the coordinator): "A" on the TASK-1947 question (message 1571427079680041031) and "A" again on both corrections (1571427204842266678, 1571427621433118872); verified in the DM history. ADR-240 Accepted through adr-kit (adr accept --confirm, strict lint passed after inline acronym expansions; Decision Maker and DM ids in its Status; README entry and index refreshed; tests/test_adr_governance.py 17/17 OK). Firmware (the A rule in platformTcpTxHoldingOnPort) follows in the next build after the beta slot, then 09's AC3 bench on .61.
+
+2026-11-15 A rebuilt on beta.295 (lane/ba-1947, after ADR-240 Accepted): the three-file diff of cc719fea3 (platform_esp32.h, tests/fixtures/web_file_scheduling.cpp, tests/test_web_conn_cap_states.py) applied unchanged (+/- lines identical to the original). test_web_conn_cap_states.py: FAILED (failures=3) on the beta.294 shim, OK 9/9 on A; test_web_file_scheduling PASS. AC3 bench (20 fresh loads on .61) follows on the next build.
 <!-- SECTION:NOTES:END -->

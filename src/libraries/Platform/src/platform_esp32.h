@@ -516,7 +516,17 @@ inline uint16_t platformTcpTxHoldingOnPort(uint16_t localPort,
   LOCK_TCPIP_CORE();
   for (struct tcp_pcb *pcb = tcp_active_pcbs; pcb != nullptr; pcb = pcb->next) {
     if (pcb->local_port != localPort) continue;
-    if (pcb->unsent != nullptr || pcb->unacked != nullptr) { count++; continue; }
+    if (pcb->unsent != nullptr || pcb->unacked != nullptr) {
+      if (pcb->state == ESTABLISHED) { count++; continue; }
+      // TASK-1947 (ADR-240, Proposed, amends ADR-188): a connection that is not ESTABLISHED counts only
+      // while a segment with payload is queued. A closing one with only its zero-length FIN, or a
+      // half-open SYN_RCVD one with only its zero-length SYN-ACK, holds no send data and no request.
+      bool payload = false;
+      for (struct tcp_seg *seg = pcb->unsent; seg != nullptr && !payload; seg = seg->next) payload = seg->len != 0;
+      for (struct tcp_seg *seg = pcb->unacked; seg != nullptr && !payload; seg = seg->next) payload = seg->len != 0;
+      if (payload) count++;
+      continue;
+    }
     if (pcb->state != ESTABLISHED) continue;
     bool waiting = false;
     for (uint8_t i = 0; i < idleCount; ++i) {

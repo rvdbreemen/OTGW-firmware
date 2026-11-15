@@ -41,13 +41,16 @@ public:
 static uint32_t clockMs = 0, maxBlock = 32000, freeHeap = 64000;
 static uint16_t wsClients = 0;
 enum { ESTABLISHED, FIN_WAIT_1 };
+// TASK-1947: the TX gate walks queued segments of closing connections; one payload segment stands for 'data queued'.
+struct tcp_seg { tcp_seg* next; uint16_t len; };
+static tcp_seg g_dataSeg = {nullptr, 1};
 struct tcp_pcb {
   tcp_pcb* next = nullptr;
   uint16_t local_port = 80;
   int state = ESTABLISHED;
   void* callback_arg = nullptr;
-  void* unsent = nullptr;
-  void* unacked = nullptr;
+  tcp_seg* unsent = nullptr;
+  tcp_seg* unacked = nullptr;
   uint16_t snd_buf = 5744;
 };
 static tcp_pcb* tcp_active_pcbs = nullptr;
@@ -64,7 +67,7 @@ static tcp_pcb blockers[6];
 static void setSenders(unsigned count) {
   for (auto& pcb : blockers) unlinkPcb(&pcb);
   for (unsigned i = 0; i < count; ++i) {
-    blockers[i] = {}; blockers[i].unsent = &blockers[i]; linkPcb(&blockers[i]);
+    blockers[i] = {}; blockers[i].unsent = &g_dataSeg; linkPcb(&blockers[i]);
   }
 }
 static unsigned sendCapCalls = 0;
@@ -269,7 +272,7 @@ public:
 };
 void BoundaryResponse::_respond(AsyncWebServerRequest* req) {
   req->wire.status = _code; req->wire.type = _contentType; req->wire.path = path;
-  if (trackClients) req->client()->pcb()->unacked = req->client();
+  if (trackClients) req->client()->pcb()->unacked = &g_dataSeg;
   for (const auto& h : _headers) req->wire.headers[h.name()] = h.value();
   _state = RESPONSE_WAIT_ACK;
 }
@@ -488,13 +491,13 @@ static void pending_identity_never_hides_tx_or_unrelated_pcbs() {
   auto first = sendFile(); auto pending = sendFile();
   setSenders(4);
   EXPECT(webConnCapExceeded());
-  pending->client()->pcb()->unsent = pending.get();
+  pending->client()->pcb()->unsent = &g_dataSeg;
   const PlatformTcpIdleConnection excluded[] = {{pending->client()->pcb(), pending->client()}};
   EXPECT(platformTcpTxHoldingOnPort(80, excluded, 1) == 6);
   pending->client()->pcb()->state = FIN_WAIT_1;
   EXPECT(platformTcpTxHoldingOnPort(80, excluded, 1) == 6);
   pending->client()->pcb()->unsent = nullptr;
-  pending->client()->pcb()->unacked = pending.get();
+  pending->client()->pcb()->unacked = &g_dataSeg;
   EXPECT(platformTcpTxHoldingOnPort(80, excluded, 1) == 6);
   unlinkPcb(pending->client()->pcb());
   EXPECT(platformTcpTxHoldingOnPort(80, excluded, 1) == 5);
