@@ -460,7 +460,7 @@ Twee pushdoelen staan niet in dat rijtje maar vragen wel een bevestiging per kee
 
 Vóór dat derde mandaat bleef de publicatiestap van een beta geweigerd door de permissiecontrole tot Robert de skill zelf aanriep (`backlog/tasks/task-1745 - Public-beta-v2.0.0-beta.158-08-00-slot-over-beta.145-158.md:34`). Bij twijfel of een push "logical" is, geldt: vragen (`CLAUDE.md:151`).
 
-**Handhaving.** In de repo zijn de harde stops conventie. De projectinstelling zet `defaultMode` op `bypassPermissions` (`.claude/settings.json:8`), en geen hook in `.claude/settings.json` of `.githooks/` controleert een push naar `main` of een force-push, dus een permissieprompt uit de projectinstellingen houdt een harde stop niet tegen. Een permissiecontrole buiten de repo kan wel weigeren, zoals bij beta.158 hierboven. De technische rem in de repo is `disable-model-invocation: true`, dat op zes skills staat (geteld met `grep -rl "disable-model-invocation: true" .claude/skills`): het model kan onder meer `/release-2x`, `/release` en `/flash` niet zelf starten (`.claude/skills/release-2x/SKILL.md:4`; `.claude/skills/release/SKILL.md:4`; `.claude/skills/flash/SKILL.md:4`). `/beta-release-2x` heeft die regel niet, in lijn met het staande mandaat (`.claude/skills/beta-release-2x/SKILL.md:1-4`). Een `git push` buiten een skill houdt de vlag niet tegen.
+**Handhaving.** In de repo zijn de harde stops conventie: de projectinstelling zet `defaultMode` op `bypassPermissions` (`.claude/settings.json:8`) en geen hook bewaakt ze; de enige technische rem is `disable-model-invocation: true` op zes skills (geteld met `grep -rl "disable-model-invocation: true" .claude/skills`). `/beta-release-2x` heeft die regel niet, in lijn met het staande mandaat (`.claude/skills/beta-release-2x/SKILL.md:1-4`). Uitwerking in §8.6.
 
 ### 4.7 Een besluit van Robert vragen en vastleggen
 
@@ -1945,7 +1945,7 @@ Naast deze tegenstrijdigheden is het grootste structurele punt dat een flink dee
 
 ## 8. Het regelsysteem: lagen, laden, toepassen en handhaven
 
-Het regelsysteem bestaat uit lagen met een vaste rangorde: gedateerde maintainer-directives bovenaan, daaronder `CLAUDE.md` met het gedeelde AGENT-CORE-blok, dan de regelbestanden in `.claude/rules/`, skills, ADR's en het OpenWolf-protocol. Een regel komt op drie manieren in een sessie: automatisch bij de start, pad-geladen bij het eerste bestand in een bepaalde map, of pas bij het aanroepen van een skill. Handhaving loopt in vijf ringen (Claude-hooks, git-hooks, `evaluate.py`, tests, CI), maar een groot deel van de regels rust alleen op afspraak. De projectinstelling `bypassPermissions` met `Bash(*)` betekent bovendien dat de harde stops vanuit de projectinstellingen niet door een permissieprompt worden bewaakt (`.claude/settings.json:2-9`); wat in de gebruikersinstellingen staat, is niet gevonden in de repo.
+Het regelsysteem bestaat uit lagen met een vaste rangorde: gedateerde maintainer-directives bovenaan, daaronder `CLAUDE.md` met het gedeelde AGENT-CORE-blok, dan de regelbestanden in `.claude/rules/`, skills, ADR's en het OpenWolf-protocol. Een regel komt op drie manieren in een sessie: automatisch bij de start, pad-geladen bij het eerste bestand in een bepaalde map, of pas bij het aanroepen van een skill. Handhaving loopt in vijf ringen (Claude-hooks, git-hooks, `evaluate.py`, tests, CI), maar een groot deel van de regels rust alleen op afspraak; wat dat voor de harde stops betekent, staat in §8.6.
 
 ### 8.1 De lagen en hun rangorde
 
@@ -2015,6 +2015,7 @@ flowchart TB
 | Structurele ADR's | ADR-044, 051, 056, 077, 078, 079, 080, 081, 090, 167, 180 | Beoordeeld bij review, geen automatische poort | `CLAUDE.md:88-99` |
 | SAT-grondwaarheid | Vier treden: register van Sergeant D (SAT-ontwerper), thermo-nova op de gepinde commit, de spec, de eigen firmware | Eigen rangorde binnen het SAT-domein; de firmware is nooit bron van waarheid | `.claude/rules/sat-ground-truth.md:10-14` |
 | Guides | Build en bench, versiebeleid, worktrees, backlog-CLI, PR-checklist | Op aanwijzing van `CLAUDE.md`, vóór de betreffende stap | `CLAUDE.md:177-189` |
+| Ontwerpprincipes | KISS, YAGNI, minimale wijziging, commentaar alleen over het heden, de documentatie fixen en niet de identifier, aannames benoemen, verifieerbare doelen, en eerst open source hergebruiken: minstens twee kandidaten vergelijken op primaire bronnen (repo, releases, licentie, gemeten grootte) en de keuze vastleggen in de taaknotities (directive 2026-10-14) | Afspraak en reviewerlens; geen poort. De OSS-vergelijking hoort in skillstap 2-3 (plan en zelfreview), vóór er code is | `CLAUDE.md:52-62`; `.claude/skills/implement-next-task/SKILL.md:137-161` |
 
 Twee details bepalen hoe de lagen zich in de praktijk gedragen:
 
@@ -2064,6 +2065,7 @@ sequenceDiagram
 | Eerste bestand in `src/`, `docs/c4/`, `other-projects/` | `navigation.md` | `paths:`-match | `.claude/rules/navigation.md:1-6` |
 | Skill-aanroep | De betreffende `SKILL.md` | Aanroep door mens of, zonder `disable-model-invocation`, door het model | `.claude/skills/release-2x/SKILL.md:1-5`, `.claude/skills/beta-release-2x/SKILL.md:1-4` |
 | Vóór ontwerpwerk | `/adr-kit:context <topic>` | Voorgeschreven, niet afgedwongen | `CLAUDE.md:174` |
+| Vóór de keuze van een SAT-taak onder TASK-1412 | `docs/sat/sat-low-load-agent-handoff-2026-10-28.md`, de overdracht van de Codex graph updater | Voorgeschreven, niet afgedwongen | `CLAUDE.md:46`; `docs/sat/sat-low-load-agent-handoff-2026-10-28.md:3` |
 
 Of de drie SessionStart-hooks van het project na elkaar of parallel lopen: niet gevonden in de repo; alleen de volgorde van registratie staat vast (`.claude/settings.json:11-42`). Voor planwerk aan firmware zonder een bronbestand te openen laadt er niets vanzelf: `CLAUDE.md` vraagt dan om de twee pad-regels zelf te lezen (`CLAUDE.md:70`).
 
@@ -2236,7 +2238,7 @@ Legenda bij de kolom Mechanisme: **blokkeert** (weigert de stap), **waarschuwt**
 
 ### 8.6 Permissiemodus en risico's
 
-De projectinstelling staat `Bash(*)`, `Write(.claude/*)` en `Edit(.claude/*)` toe en zet `defaultMode` op `bypassPermissions` (`.claude/settings.json:2-9`). Vanuit de projectinstellingen komt er dus geen permissieprompt. Wat een harde stop tegenhoudt, is de regeltekst en de skill-frontmatter.
+De projectinstelling staat `Bash(*)`, `Write(.claude/*)` en `Edit(.claude/*)` toe en zet `defaultMode` op `bypassPermissions` (`.claude/settings.json:2-9`). Vanuit de projectinstellingen komt er dus geen permissieprompt, en geen hook in `.claude/settings.json` of `.githooks/` controleert een push naar `main` of een force-push. Wat een harde stop tegenhoudt, is de regeltekst en de skill-frontmatter: `disable-model-invocation: true` staat op zes skills, zodat het model onder meer `/release-2x`, `/release` en `/flash` niet zelf kan starten (`.claude/skills/release-2x/SKILL.md:4`, `.claude/skills/release/SKILL.md:4`, `.claude/skills/flash/SKILL.md:4`); een `git push` buiten een skill houdt de vlag niet tegen. Een permissiecontrole buiten de repo kan wel weigeren: vóór het beta-mandaat bleef de publicatiestap van beta.158 geweigerd tot Robert de skill zelf aanriep (§4.6). Wat in de gebruikersinstellingen staat, is niet gevonden in de repo.
 
 | Risico | Waarom het bestaat | Wat het nu afdekt | Bron |
 |---|---|---|---|
@@ -2305,7 +2307,7 @@ Voorbeeld van een volledige vervanging: de directive van 2026-10-29 over batch-c
 | S8.15 | `CLAUDE.md` zegt dat de governancetest faalt bij een afwijkende ADR-lijst; in CI start de workflow niet bij een wijziging van alleen `CLAUDE.md` of `AGENTS.md` | `CLAUDE.md:76` | `.github/workflows/adr-governance.yml:20-33`; uitwerking in S10.4 | De workflow |
 | S8.16 | De equipment-matrix-directive staat alleen in een Claude-rule; `AGENTS.md` en Copilot dragen hem niet, terwijl hij ook voor GitHub en Tweakers geldt | `.claude/rules/discord.md:26` | `AGENTS.md:1-3` | `.claude/rules/discord.md` |
 | S8.17 | `beta-release-2x` (door het model te starten) noemt `/update-docs-2x` als stap; die skill is alleen door de mens te starten | `.claude/skills/beta-release-2x/SKILL.md:138` | `.claude/skills/update-docs-2x/SKILL.md:4` | Niet bepaald; de stap is optioneel |
-| S8.18 | `CLAUDE.md` vraagt `superpowers:verification-before-completion`; de projectinstellingen zetten alleen de adr-kit-plugin aan. Waar superpowers geïnstalleerd is: niet gevonden in de repo | `CLAUDE.md:48` | `.claude/settings.json:121-123` | Niet bepaald |
+| S8.18 | `CLAUDE.md` vraagt `superpowers:verification-before-completion`; de projectinstellingen zetten alleen de adr-kit-plugin aan. Waar superpowers geïnstalleerd is, staat niet in de repo; dat de skills gebruikt worden, wel: `docs/superpowers/` bevat plannen en specs die hun subagent-skills voorschrijven (§5.5) | `CLAUDE.md:48` | `.claude/settings.json:121-123` | Niet bepaald |
 | S8.19 | `discord.md` noemt een SessionStart-hook `ensure-discord-mcp.ps1` zonder te zeggen waar hij staat; hij staat niet in de projectinstellingen maar in de user-settings | `.claude/rules/discord.md:12` | `.claude/settings.json:11-42`, `docs/guides/discord-mcp-server.md:15` | De guide |
 | S8.20 | De docstring van `evaluate.py` noemt `--fix`; argparse kent die optie niet | `evaluate.py:19` | `evaluate.py:3888-3918` | argparse |
 
@@ -2315,7 +2317,7 @@ Voorbeeld van een volledige vervanging: de directive van 2026-10-29 over batch-c
 
 ## 9. De kennisbank
 
-De kennisbank is alles wat een agent leest voordat hij iets doet en bijschrijft nadat hij iets deed: de werkvoorraad (Backlog.md), de regels (CLAUDE.md-familie), de besluiten (ADR's en het SAT-register), de kaart van de code (C4 en graphify), het sessie-overstijgende geheugen (OpenWolf) en de referenties (OpenTherm-specificatie, `other-projects`, onderzoek en bewijs). Bijna elke bron heeft één schrijfroute en een regel of skill die het lezen voorschrijft; alleen de bewijs- en onderzoeksmappen hebben geen van beide (9.3). Alleen bij Backlog.md, de binding ADR's en de afgeleide SAT-bestanden dwingt een hook, test of CI-stap die route ook af. De versheid loopt sterk uiteen: backlog en SAT-register worden vrijwel dagelijks bijgeschreven (`updated_date` in `backlog/tasks/*.md`; `date` in `docs/sat/sergeant-d-corrections.index.json`), de codegraaf dateert van 2026-07-26 (`graphify-out/GRAPH_REPORT.md:1`). Dit hoofdstuk geeft per bron inhoud, omvang, schrijver, lezer en levenscyclus; de regels zelf staan in hoofdstuk 8, de ADR-kit in hoofdstuk 10 en de SAT-dialoog in §6.8.
+De kennisbank is alles wat een agent leest voordat hij iets doet en bijschrijft nadat hij iets deed: de werkvoorraad (Backlog.md), de regels (CLAUDE.md-familie), de besluiten (ADR's en het SAT-register), de kaart van de code (C4 en graphify), het sessie-overstijgende geheugen (OpenWolf) en de referenties (OpenTherm-specificatie, `other-projects`, onderzoek en bewijs). Bijna elke bron heeft één schrijfroute en een regel of skill die het lezen voorschrijft; alleen de bewijs- en onderzoeksmappen hebben geen van beide (§9.3). Alleen bij Backlog.md, de binding ADR's en de afgeleide SAT-bestanden dwingt een hook, test of CI-stap die route ook af. De versheid loopt sterk uiteen: backlog en SAT-register worden vrijwel dagelijks bijgeschreven (`updated_date` in `backlog/tasks/*.md`; `date` in `docs/sat/sergeant-d-corrections.index.json`), de codegraaf dateert van 2026-07-26 (`graphify-out/GRAPH_REPORT.md:1`).
 
 ### 9.1 De kaart: wie leest, wie schrijft
 
@@ -2387,7 +2389,7 @@ flowchart LR
 
 Peildatum 2026-11-15. De kolom "Meetwijze" noemt het commando waarmee het getal is geteld.
 
-| Bron | Inhoud | Omvang | Meetwijze | Bron |
+| Kennisbron | Inhoud | Omvang | Meetwijze | Bron |
 |---|---|---|---|---|
 | Backlog.md | Taken met AC's, plan, notities en eindsamenvatting; statussen `To Do`, `In Progress`, `In Review`, `Done` | 477 actief (357 Done, 58 To Do, 44 In Progress, 18 In Review), 1.323 gearchiveerd, 4 milestones, 8 docs, hoogste id `TASK-1984` | `status:` in de frontmatter van `backlog/tasks/*.md`; `ls backlog/archive/tasks` | `backlog/config.yml:3` |
 | CLAUDE.md-familie | Kernregels, padgebonden regels, gidsen (hoofdstuk 8) | `CLAUDE.md` 189 regels plus 287 in `.claude/rules/` | `wc -l` | `CLAUDE.md:177-189`; `.claude/rules/*.md` |
@@ -2407,11 +2409,17 @@ Peildatum 2026-11-15. De kolom "Meetwijze" noemt het commando waarmee het getal 
 | `tools/research/sat` | Simulatiescripts achter de SAT-rondes | 51 scripts plus README | `ls` | `tools/research/sat/README.md:7-9` |
 | `docs/evidence` | Bewijs per taak: schermafdrukken, benchlogs, verificatierapporten | 74 bestanden, 37 items op het hoogste niveau waarvan 7 mappen | `find docs/evidence -type f`; `ls` | eigen telling 2026-11-15 |
 | `docs/guides` | Gebruikers- en agentgidsen | 26 bestanden | `ls docs/guides` | eigen telling 2026-11-15; vier ervan staan in `CLAUDE.md:185-189` |
-| `docs/process` | Procesbeschrijvingen, doorloopmetingen, dit document | 17 bestanden: 13 op het hoogste niveau plus 4 platen in `images/` | `find docs/process -type f`; `git ls-files docs/process` | eigen telling 2026-11-15 |
+| `docs/process` | Procesbeschrijvingen, doorloopmetingen, dit document | 17 bestanden in git: 13 op het hoogste niveau plus 4 plaatbestanden in `images/` (platen A en B, elk PNG en SVG) | `git ls-files docs/process` | eigen telling 2026-11-15 |
+| `docs/releases` | Releasenotities per beta en release; voeden de aankondigingen (§6.3) | 52 bestanden | `find docs/releases -type f` | `docs/releases/RELEASE_NOTES_2.0.0-beta.323.md:523-526` |
+| `docs/manuals`, `docs/api` | Gebruikershandleidingen EN en NL en de API-documentatie | 20 en 9 bestanden | `find -type f` | `.claude/skills/update-docs-2x/SKILL.md:1-34` |
+| `docs/plan`, `docs/plans` | Oudere implementatieplannen | 8 en 1 bestanden | `find -type f` | eigen telling 2026-11-15 |
+| `docs/superpowers` | Specs en plannen uit de superpowers-keten brainstorm, spec, plan | 11 bestanden (5 plannen, 6 specs), mei tot juli 2026 | `find docs/superpowers -type f` | §5.5 |
+| Reviews en audits | `.full-review/`, `.external-reviews/`, `docs/reviews/`, `docs/audits/` | 34, 2, 82 en 6 bestanden | `find -type f`; `ls` | §5.4 |
+| `.copilot-tracking/research` | Onderzoeksnotities van het Copilot-profiel `task-researcher` voor `task-planner` | 2 bestanden, maart 2026 | `ls` | §5.7 |
 
 ### 9.3 Schrijver en lezer per bron
 
-| Bron | Wie schrijft, wanneer | Wie leest, wanneer | Verplichtende regel of skill | Handhaving |
+| Kennisbron | Wie schrijft, wanneer | Wie leest, wanneer | Verplichtende regel of skill | Handhaving |
 |---|---|---|---|---|
 | Backlog.md | Elke agent via de `backlog`-CLI: bij oppakken, per AC, bij afronden | Elke agent vóór elk werk (`backlog search`) | `CLAUDE.md:33`; `CLAUDE.md:35-44` | Hook `backlog-mcp-guard.py` blokkeert Edit/Write op taakbestanden (`.claude/hooks/backlog-mcp-guard.py:46-58`); `commit-msg` eist een taakbestand bij elke `TASK-NNN` (`.githooks/commit-msg:85-99`) |
 | ADR's | Agent met `/adr-kit:adr`; Robert accepteert per ADR | Agent vóór feature- of architectuurwerk met `/adr-kit:context` | `CLAUDE.md:174`; `.claude/skills/implement-next-task/SKILL.md:141` | CI `adr-governance.yml`, `tests/test_adr_governance.py` (hoofdstuk 10) |
@@ -2427,6 +2435,10 @@ Peildatum 2026-11-15. De kolom "Meetwijze" noemt het commando waarmee het getal 
 | `other-projects` | Nooit; alleen-lezen | Agent na de spec, via `other-projects/README.md` | `.claude/rules/firmware-coding.md:156-157`; `.claude/rules/navigation.md:42-49` | Alleen conventie |
 | `docs/guides` | Agent of maintainer bij een proceswijziging | Agent vóór bouwen, een firmware-commit of een parallelle lane | `CLAUDE.md:185-187` | Alleen conventie |
 | `directive-changelog.md` | Agent die een directive verwerkt: rij toevoegen, vervangen rij verplaatsen | Op verzoek | `docs/process/directive-changelog.md:42-46`; `CLAUDE.md:188` | Alleen conventie |
+| `docs/manuals`, `docs/api` | Subagents van `/update-docs-2x` in fase 3, standalone of in releasemodus | Gebruikers; agents bij supportvragen | `.claude/skills/update-docs-2x/SKILL.md:1-34` | Alleen conventie |
+| `docs/releases` | De sessie die een beta of release samenstelt | Testers; de releaseposts | `.claude/skills/beta-release-2x/SKILL.md:284-296` | Alleen conventie |
+| `docs/superpowers` | De superpowers-skills (brainstorm, spec, plan) | De uitvoerende subagent, taak voor taak | de kop van elk plan | Alleen conventie |
+| Reviews en audits | Review- en auditagents (§5.4) | Maintainer; de taken die eruit volgen | Een regel die deze mappen voorschrijft is niet gevonden in de repo | Geen |
 | `docs/evidence`, `docs/research` | Agent tijdens een taak | Reviewer en maintainer | Een regel die deze mappen voorschrijft is niet gevonden in de repo; de bewijsplicht zelf staat in `CLAUDE.md:20` en `CLAUDE.md:48` | Geen |
 
 ### 9.4 Backlog.md: werkvoorraad en taakgeheugen
@@ -2437,7 +2449,7 @@ Backlog.md is tegelijk planbord en archief van wat is besloten en bewezen. De co
 |---|---|---|---|
 | Actieve taken | `backlog/tasks/` | 477 | Waarvan 31 subtaken; prioriteit: 164 low, 159 medium, 114 high, 40 zonder |
 | Archief | `backlog/archive/tasks/` | 1.323 | 1.285 Done, 36 To Do, 2 In Progress |
-| Milestones | `backlog/milestones/` | 4 | `m-0 audit-sat-c++`, `m-1 otgw32-support`, `m-2 v2.0.0`, `m-3 v2.1.0`; op actieve taken 300 keer 2.0.0, 24 keer 2.1.0, 1 keer 1.8.0 |
+| Milestones | `backlog/milestones/` | 4 | `m-2 v2.0.0` en `m-3 v2.1.0`, plus twee oudere milestones; op actieve taken 300 keer 2.0.0, 24 keer 2.1.0, 1 keer 1.8.0 |
 | Docs | `backlog/docs/` | 8 | SAT-inventarissen en -handleidingen |
 | Decisions, drafts | `backlog/decisions/`, `backlog/drafts/` | 0 | Leeg; besluiten staan in ADR's en het SAT-register |
 | Labels | frontmatter `labels:` | 135 verschillende | Top: `sat` 123, `webui` 87, `bug` 83, `otdirect` 78, `mqtt` 30; `config.yml` definieert er geen (`backlog/config.yml:4`) |
@@ -2511,8 +2523,8 @@ sequenceDiagram
   H-->>A: reminder to update buglog and cerebrum
   Note over D,CE: Outside the session, if the daemon runs
   D->>AN: rescan every 6 hours
-  D->>ME: consolidate at 02.00
-  D->>CE: weekly AI task on Sunday 03.00
+  D->>ME: consolidate at 02:00
+  D->>CE: weekly AI task on Sunday 03:00
 ```
 
 | Bestand | Getrackt | Levenscyclus | Bron |
@@ -2547,11 +2559,11 @@ De regel is: eerst `graphify query|path|explain` voor structuurvragen, het rappo
 
 ### 9.8 SAT-register, wachtrij en spec in het kort
 
-De rangorde voor SAT-gedrag is vast: register, thermo-nova op de gepinde commit, `thermo-nova-spec.md`, en pas daarna de firmware, die nooit een bron is (`.claude/rules/sat-ground-truth.md:10-14`). Twee scripts houden de afgeleide bestanden bij: `sat_corrections_index.py --update` na elke entry en `sat_open_questions.py --update` voor de Live queue (`.claude/rules/sat-ground-truth.md:21`; `.claude/rules/sat-ground-truth.md:23`). De index geeft per entry `source`, `kind`, `discord_link`, `supersedes` en `tasks` (`scripts/sat_corrections_index.py:8-24`). Oude entries worden nooit herschreven; een latere entry noemt de entry die hij wijzigt (`.claude/rules/sat-ground-truth.md:21`). De dialoog zelf staat in §6.8.
+De rangorde voor SAT-gedrag is vast: register, thermo-nova op de gepinde commit, `thermo-nova-spec.md`, en pas daarna de firmware met `docs/sat/firmware-sat-spec.md` en `docs/sat/sat-comparison.md`, die beschrijven wat de port nu doet en nooit een bron zijn (`.claude/rules/sat-ground-truth.md:10-14`). Twee scripts houden de afgeleide bestanden bij: `sat_corrections_index.py --update` na elke entry en `sat_open_questions.py --update` voor de Live queue (`.claude/rules/sat-ground-truth.md:21`; `.claude/rules/sat-ground-truth.md:23`). De index geeft per entry `source`, `kind`, `discord_link`, `supersedes` en `tasks` (`scripts/sat_corrections_index.py:8-24`). Oude entries worden nooit herschreven; een latere entry noemt de entry die hij wijzigt (`.claude/rules/sat-ground-truth.md:21`). De dialoog zelf staat in §6.8.
 
 ### 9.9 Referenties, onderzoek en bewijs
 
-| Bron | Rol | Rangorde of gebruik | Bron |
+| Kennisbron | Rol | Rangorde of gebruik | Bron |
 |---|---|---|---|
 | OpenTherm-specificatie v4.2 | Grondwaarheid voor protocolvragen | Eerste stap bij elke gebruikersbug; bij een ontwerpkeuze wint de spec | `.claude/rules/firmware-coding.md:153-159` |
 | `other-projects/` | Referentie-implementaties: vier mappen voor de ESP32-port, thermo-nova (`SAT-releases-thermo-nova/`), de PIC-firmware 6.6 (`otgw-6.6/`) en otmonitor 6.6 (`otmonitor-6.6/`) | Tweede stap; alleen-lezen, nooit letterlijk kopiëren | `.claude/rules/navigation.md:42-49` |
@@ -2570,6 +2582,7 @@ Bij de eerste checkout van een nieuwe worktree (`git worktree add`) initialiseer
 |---|---|---|---|
 | Bestaat er al werk aan, wat is besloten, wat is het bewijs? | `backlog search "<topic>" --plain` | Taaknotities en eindsamenvatting | `CLAUDE.md:35-44` |
 | Welk architectuurbesluit geldt hier? | `/adr-kit:context <topic>` | De ADR zelf in `docs/adr/` | `CLAUDE.md:174` |
+| Welke SAT-taak is de volgende, en wie bezit welk SAT-bestand? | `docs/sat/sat-low-load-agent-handoff-2026-10-28.md` (overdracht van de Codex graph updater) | De taakmetadata in de backlog, die leidend is voor afhankelijkheden | `CLAUDE.md:46`; `docs/sat/sat-low-load-agent-handoff-2026-10-28.md:3`, `:35` |
 | Welk component bezit deze code, wat lees ik eerst? | `docs/c4/c4-context.md`, `docs/c4/c4-component.md` | Scenariotabel in de navigatieregel | `.claude/rules/navigation.md:10-40` |
 | Wat roept X aan, hoe hangt de code samen? | `graphify query`, `path`, `explain` | `GRAPH_REPORT.md` bij een brede review | `CLAUDE.md:175` |
 | Is dit bestand het lezen waard? | `.wolf/anatomy.md` | Grep of Glob als het ontbreekt | `.wolf/OPENWOLF.md:7-9` |
@@ -2662,7 +2675,7 @@ flowchart TD
 
 De telling van de vragenwachtrij hangt af van de meetwijze: 227 rijen met de ROW-regex van `scripts/sat_open_questions.py:20`, 223 met `grep '^| Q'`. Dit document gebruikt de regex van het script.
 
-> **Voor de plaat:** de kennisbank is zone 4 van plaat A, links: een witte archiefkast (rand `#d5dce2`) met acht laden van boven naar beneden, elk met zijn icoon uit de beeldbrief: boek met bladwijzer (regels), stempel op dossiermap (ADR's en ADR-kit), geneste rechthoeken (C4-kaart), gebonden logboek (SAT-register), rij genummerde kaartjes (open vragen), kanbanbord (Backlog), wolvenkop boven een kaartenbak (OpenWolf) en een knopennetwerk (codegraaf). Eén grijze lijn met twee punten verbindt de kast met de waakvlam in het midden: BlueFlame Bot leest de regels en schrijft register en notities. Geef de graphify-lade de kleine zandloper van het watermerk, als teken dat de graaf van juli dateert; de externe referenties (OpenTherm-spec, thermo-nova) staan niet in de kast maar als ronde grijze badges in de onderband.
+> **Voor de plaat:** de kennisbank is zone 4 van plaat A, links: een witte archiefkast (rand `#d5dce2`) met acht laden van boven naar beneden, elk met zijn icoon uit de beeldbrief: boek met bladwijzer (regels), stempel op dossiermap (ADR's en ADR-kit), geneste rechthoeken (C4-kaart), gebonden logboek (SAT-register), rij genummerde kaartjes (open vragen), kanbanbord (Backlog), wolvenkop boven een kaartenbak (OpenWolf) en een knopennetwerk (codegraaf). Eén grijze lijn met twee punten verbindt de kast met de waakvlam in het midden: BlueFlame Bot leest de regels en schrijft register en notities. Een zandloper op de graphify-lade, als teken dat de graaf van juli dateert, staat nog niet op plaat A en is een wens voor een volgende render; de externe referenties (OpenTherm-spec, thermo-nova) staan niet in de kast maar als ronde grijze badges in de onderband.
 
 ---
 
@@ -2713,6 +2726,7 @@ flowchart LR
 
   DEV["Developer agent"]:::agent
   ROBERT["Robert, maintainer"]:::human
+  COP["Copilot ADR instructions,<br/>.github/skills/adr, profile adr-generator"]:::ext
 
   DEV --> CTX
   CTX -->|"ranked Accepted ADRs"| DEV
@@ -2727,6 +2741,7 @@ flowchart LR
   README --> GOV
   CORPUS --> BIN
   GUIDE -.->|"reference"| DEV
+  COP -.->|"second generator, same corpus"| CORPUS
 ```
 
 | Onderdeel | Soort | Wat het doet | Bron |
@@ -2743,6 +2758,8 @@ flowchart LR
 | `bin/adr-quality`, `adr-status`, `adr-retire`, `adr-audit`, `adr-generate-scripts` | script | Score per poort, dashboard, kandidaten voor herbeoordeling, scan op beslisvormige artefacten, validatiescripts uit Enforcement-blokken | `bin/adr-quality:1-13`, `bin/adr-status:1-10`, `bin/adr-retire:1-13`, `bin/adr-audit:1-23`, `bin/adr-generate-scripts:1-15` |
 | `instructions/adr.coding.md`, `adr.review.md` | instructies | Regels voor coderen (wanneer een ADR, supersede of amend) en de benoemde reviewchecks | `.claude/adr-kit-guide.md:187-188`, `tools/adr-kit/instructions/adr.coding.md:36-43` |
 | Guardian | hook plus commando | Meldt bij SessionStart dat een gezondheidsronde aan de beurt is: cheap dagelijks en gratis, llm tweewekelijks na kostenbevestiging. Blokkeert nooit | `.claude/adr-kit-guide.md:138-153` |
+
+Copilot gebruikt de kit langs een eigen route: `.github/instructions/adr.coding-agent.instructions.md` en `adr.code-review.instructions.md`, de skill `.github/skills/adr` en het profiel `adr-generator` in `.github/agents/`, een tweede generator naast die van de kit (§5.7; `.github/instructions/adr.coding-agent.instructions.md:1-47`, `.github/skills/adr/SKILL.md:1-11`). Of die tweede generator dezelfde vier poorten toepast, is niet gevonden in de repo.
 
 De getrackte kopie van de guardian-state registreert voor geen van beide rondes een run: `cheap_tier` en `llm_tier` hebben `last_run` null, en de laatste nudge is van 2026-07-20 (`docs/adr/.adr-kit-state.json:2-14`).
 
@@ -2964,14 +2981,14 @@ sequenceDiagram
 | S10.2 | Poort van ADR-101 en ADR-177 | `CLAUDE.md:80` en `CLAUDE.md:82` noemen `bin/adr-judge` als poort; `.githooks/README.md:17-20` beschrijft de adr-kit-gate als actieve pas | `.githooks/pre-commit:50-53`: "DISABLED 2026-05-31 by user request". Geen CI-workflow draait adr-judge, en `adr_governance.py lint` toetst alleen `check_*`-namen (`scripts/adr_governance.py:159-163`). Deze twee binding ADR's hebben nu geen automatische poort |
 | S10.3 | Kit-ontwerp tegenover de projecthook | `.claude/adr-kit-guide.md:89-90`: declaratieve pas "always-on", LLM-pas "opt-in as of v0.17.0" | `.githooks/pre-commit:53` schakelt beide passen samen uit; staat de stap aan, dan geeft `.githooks/pre-commit:88` altijd `--llm` mee |
 | S10.4 | CI-bereik van de lijstcontrole | `CLAUDE.md:76`: de test faalt als de binding-lijst afwijkt | `.github/workflows/adr-governance.yml:20-33`: de workflow start niet bij een wijziging in alleen `CLAUDE.md` of `AGENTS.md`; dan bewaakt alleen een lokale testrun de lijst |
-| S10.5 | Vier versies naast elkaar | `tools/adr-kit/.claude-plugin/plugin.json:4`: 0.11.0; `.claude/adr-kit-guide.md:1`: 0.30.5 | `.wolf/cerebrum.md:106`: geïnstalleerd 0.61.0. `/adr-kit:context` is verplicht (`CLAUDE.md:174`) maar staat niet in de commandotabel van de gids (`.claude/adr-kit-guide.md:24-36`) |
+| S10.5 | Vier versies naast elkaar, op de vier plekken van §10.1 | `tools/adr-kit/.claude-plugin/plugin.json:4`: 0.11.0; `.claude/adr-kit-guide.md:1`: 0.30.5 | `.wolf/cerebrum.md:106`: geïnstalleerd 0.61.0; `bin/adr-judge` "v0.12.0+" (`bin/adr-judge:1-35`). Op 2026-07-09 was 0.31.0 geïnstalleerd (`backlog/archive/tasks/task-708 - choreadr-kit-adopt-adr-kit-context-once-available-—-wire-into-agent-prompts.md:34`); dat is historie, geen vijfde kopie. `/adr-kit:context` is verplicht (`CLAUDE.md:174`) maar staat niet in de commandotabel van de gids (`.claude/adr-kit-guide.md:24-36`) |
 | S10.6 | ADR-formaat | `CLAUDE.md:103`: "Status / Context / Decision / Consequences / Related" | `docs/adr/.adr-kit.json:8-17` eist zes secties, waaronder Alternatives Considered en References |
 | S10.7 | Status volgens index en frontmatter | `docs/adr/README.md:1079-1086`: de gegenereerde index telt 199 Accepted | Frontmatter: 196 Accepted (`scripts/adr_governance.py:72-82`); ADR-124, ADR-140 en ADR-141 wijken af. Alle drie hebben in hun `## Status`-sectie een vette "Superseded by"- of "Amended by"-regel boven de oude "Accepted"-regel; dat `adr-index` die tweede regel leest, is een vermoeden: de tool staat niet in de repo (`.wolf/cerebrum.md:106`) |
 | S10.8 | Guardian-state | `.claude/adr-kit-guide.md:180`: "gitignored, per-machine" | `docs/adr/.adr-kit-state.json:1-33` wordt getrackt (`git ls-files`, niet genegeerd volgens `git check-ignore`) en bevat nudges uit juli 2026 |
 | S10.9 | Ernst van de ADR-091-poort | `CLAUDE.md:78`: "WARN for one release, TASK-480 promotes to FAIL" | `evaluate.py:2055-2059`: "Grace release complete (TASK-480): actionable drift is now FAIL"; de regel in `CLAUDE.md` en `AGENTS.md` is verouderd |
 | S10.10 | Binding betekent niet: in CI | `CLAUDE.md:76`: binding ADR's zijn "enforced by `evaluate.py` or tests" | Geen workflow draait `tests/test_*.py` of `scripts/check_rtc_layout.py` (`.github/workflows/build.yml:73-74`, `.github/workflows/evaluate.yml:31-34`); ADR-201, 217, 239 en 242 hangen af van de lokale testrun en build door de ontwikkelaar (`CLAUDE.md:25`) |
 
-> **Voor de plaat:** de ADR-kit is de tweede lade van de archiefkast in de linkerkolom "Kennis en regels", met het icoon uit de beeldbrief: een stempel met vinkje op een dossiermap (`docs/process/agentic-setup-image-brief.md:85`, `:179`). Kleur de lade wit met grijze rand zoals de andere kennisbronnen, en geef het stempel het oranje van de menselijke rol: alleen een mens zet het, in de praktijk de maintainer. Voeg geen eigen lijnsoort toe: de lade hangt aan de bestaande grijze lijn met twee punten tussen BlueFlame Bot en "Kennis en regels" (`docs/process/agentic-setup-image-brief.md:197`), en de ADR-poorten vallen onder de okerschildjes van station 5 "evaluate · tests" (`:181`).
+> **Voor de plaat:** de ADR-kit is de tweede lade van de archiefkast in de linkerkolom "KNOWLEDGE & RULES", met het icoon uit de beeldbrief: een stempel met vinkje op een dossiermap (`docs/process/agentic-setup-image-brief.md:85`, `:179`). Kleur de lade wit met grijze rand zoals de andere kennisbronnen, en het stempel is op plaat A petrol zoals de andere iconen; een oranje stempel, als teken dat alleen een mens een ADR accepteert, is een wens voor een volgende render. Voeg geen eigen lijnsoort toe: de lade hangt aan de bestaande grijze lijn met twee punten tussen BlueFlame Bot en "KNOWLEDGE & RULES" (`docs/process/agentic-setup-image-brief.md:197`), en de ADR-poorten vallen onder de okerschildjes van station 5 "evaluate · tests" (`:181`).
 
 ---
 
@@ -3072,7 +3089,7 @@ Zes Discord-kanalen plus de DM met de maintainer lopen via één lokaal MCP-endp
 | GitHub issues en PR's | `github.com/rvdbreemen/OTGW-firmware` | `gh issue list/view`, `gh pr list`, `gh pr checkout`, commentaar en PR-review | beide | `gh`-login van de maintainer | Meldingen en PR's worden taken; captures opvragen; reviewbevindingen terug | `/implement-next-task` stap 0b, `/check_otgw_issues` Phase 1b | `.claude/skills/implement-next-task/SKILL.md:57-64`, `.claude/skills/implement-next-task/SKILL.md:90-96` |
 | Tweakers-forum | `https://gathering.tweakers.net/rss/list_messages/1653967` | `curl` op de RSS-feed naar `.tmp/tweakers_rss.xml` | in | geen | Nederlandstalige meldingen, in het Engels samengevat | `/check_otgw_issues` Phase 1c | `.claude/commands/check_otgw_issues.md:84-103` |
 
-De GitHub-sweep bestaat sinds de directive van 2026-11-05 (TASK-1637) (`.claude/skills/implement-next-task/SKILL.md:52`). De DM-route voor open beslissingen geldt sinds 2026-11-12 (TASK-1829) (`CLAUDE.md:60`). Het transport van berichten tussen sessies onderling (pushende sessie naar coördinator) is niet gevonden in de repo; de regel noemt alleen dat het gebeurt (`.claude/rules/discord.md:21`).
+De GitHub-sweep bestaat sinds de directive van 2026-11-05 (TASK-1637) (`.claude/skills/implement-next-task/SKILL.md:52`). De DM-route voor open beslissingen geldt sinds 2026-11-12 (TASK-1829) (`CLAUDE.md:60`). Berichten tussen sessies onderling lopen, waar een skill de drager noemt, als peer-bericht van Claude Code: `ListAgents` plus een bericht aan een live sessie (`.claude/skills/release-2x/SKILL.md:70`, `.claude/skills/update-docs-2x/SKILL.md:287`). Voor de melding van een pushende sessie aan de coördinator, de build-aankondiging en de bench-aanvraag noemt de repo geen drager; de regel zegt alleen dat ze gebeuren (`.claude/rules/discord.md:21`, `CLAUDE.md:113`, `:21`).
 
 ### 11.3 Kennisbronnen
 
@@ -3088,8 +3105,11 @@ Agents raadplegen een vaste rangorde van bronnen; het merendeel is lokaal of vas
 | Referentieprojecten | submodule `other-projects`, `https://github.com/rvdbreemen/OTGW-other-projects.git` | git submodule, read-only | in | geen (CI heeft geen toegang) | PIC-firmware en OTmonitor van Schelte Bron, HA `opentherm_gw`, pyotgw, OT-Thing en SAT als referentie-implementaties | firmware-agents via de navigatieregels | `.gitmodules:7-9`, `.claude/rules/firmware-coding.md:156`, `.claude/rules/navigation.md:46-49`, `.github/workflows/build.yml:40-50` |
 | Discord-CDN | getekende bijlage-URL's uit `read_messages` | WebFetch voor tekst tot 50 KB, anders downloaden naar een eigen lege map en Grep | in | getekende URL, ongeveer 7 dagen geldig | Logs, screenshots en captures van testers | `/check_otgw_issues`, `/backlog_discord`, `analyze-capture` | `.claude/commands/check_otgw_issues.md:111-148`, `.claude/commands/backlog_discord.md:68`, `.claude/skills/analyze-capture/SKILL.md:15-16` |
 | Context7 | `https://mcp.context7.com/mcp` | MCP over HTTP, tools `get-library-docs`, `resolve-library-id` | in | `COPILOT_MCP_CONTEXT7` (GitHub-secret) | Actuele bibliotheekdocumentatie | Copilot-profiel `Context7-Expert` | `.github/agents/context7.agent.md:5-11` |
+| Microsoft Docs MCP | tool `microsoft.docs.mcp` | MCP | in | niet gevonden in de repo | C++- en platformdocumentatie | Copilot-profiel `C++ Expert` | `.github/agents/expert-cpp-software-engineer.agent.md:4` |
+| Projectwiki | `https://github.com/rvdbreemen/OTGW-firmware/wiki` | web | in | geen | Gebruikersdocumentatie | Copilot-instructies | `.github/copilot-instructions.md:625` |
+| Open-sourcekandidaten | repo's, releases en licenties van kandidaatbibliotheken | web, raadplegen | in | geen | Eerst hergebruiken: minstens twee kandidaten vergelijken op primaire bronnen vóór een eigen bibliotheek of tool (directive 2026-10-14) | elke agent die een bibliotheek of helper overweegt | `CLAUDE.md:62` |
 
-In de checkout waarin dit hoofdstuk is geschreven (een cloud-container, niet de werkplek) zijn de drie submodules niet uitgecheckt (`git submodule status` toont `-` voor alle drie, gemeten 2026-11-15); de lokale thermo-nova-kopie is hier dus niet aanwezig. De matrixregel staat alleen in het altijd geladen `.claude/rules/discord.md`; de twee bewakingscommands noemen de matrix niet (`.claude/rules/discord.md:26`).
+De matrixregel staat alleen in het altijd geladen `.claude/rules/discord.md`; de twee bewakingscommands noemen de matrix niet (`.claude/rules/discord.md:26`).
 
 ### 11.4 Distributie
 
@@ -3130,6 +3150,7 @@ Drie agentproducten lezen dezelfde kernregels: het AGENT-CORE-blok staat woordel
 | Claude Code Action | `anthropics/claude-code-action@v1`; plugin `code-review@claude-code-plugins` uit `https://github.com/anthropics/claude-code.git` | workflow-event; job met leesrechten plus `id-token: write`; geen model ingesteld | beide | `CLAUDE_CODE_OAUTH_TOKEN` (GitHub-secret) | Automatische PR-review (niet op fork-PR's) en `@claude`-opdrachten | `claude-code-review.yml`, `claude.yml` | `.github/workflows/claude-code-review.yml:15-47`, `.github/workflows/claude-code-review.yml:44-47`, `.github/workflows/claude.yml:15-37` |
 | GitHub Copilot coding agent | repo-instelling Coding agent | `workflow_dispatch` maakt een issue met label `copilot` en een persona-hint (11 keuzes uit `.github/agents/`) | uit | `GITHUB_TOKEN` | Een taak via een issue bij Copilot leggen | `trigger-copilot-agent.yml` | `.github/workflows/trigger-copilot-agent.yml:13-17`, `.github/workflows/trigger-copilot-agent.yml:38-50`, `.github/workflows/trigger-copilot-agent.yml:59-114` |
 | Codex | instructiebestand `AGENTS.md` | leest de repo-instructies; geen workflow of secret gevonden in de repo | in | niet gevonden in de repo | Zelfde kernregels voor een Codex-agent | Codex-sessies | `CLAUDE.md:15` |
+| Claude Code en de Anthropic-modeldienst | lokale Claude Code-sessies op de werkplek | modellen voor hoofdsessies, subagents en het advisor-tool (§5.3) | beide | login van de lokale Claude Code; account en plan niet in de repo | Al het agentwerk buiten CI | alle lokale sessies | `.claude/skills/implement-next-task/SKILL.md:29-37`, `:290` |
 | Claude-CLI als ADR-judge | lokale `claude`-CLI, `claude -p --model claude-sonnet-4-6` | opt-in LLM-pass van `adr-judge`; staat in de pre-commit-hook standaard uit | uit | login van de lokale CLI (niet in de repo) | Optioneel oordeel over een gestagede diff | `bin/adr-judge`, `.githooks/pre-commit` | `bin/adr-judge:14-18`, `bin/adr-judge:55`, `.githooks/pre-commit:50-53` |
 | CI-poorten (geen AI) | 4 van de 7 workflows in `.github/workflows/` (`build`, `evaluate`, `adr-governance`, `dependency-scan`; geteld met `ls .github/workflows`) | PR's en push naar `dev` (`build` niet bij docs-only, `adr-governance` alleen bij ADR-bestanden); dependency-scan wekelijks op maandag 06:00 UTC en bij PR's op `platformio.ini` | in | `GITHUB_TOKEN` | Build `esp32-combo`, `evaluate.py --quick`, ADR-governance, dependency-scan (alleen zichtbaarheid) | CI | `.github/workflows/build.yml:6-27`, `.github/workflows/evaluate.yml:12-15`, `.github/workflows/adr-governance.yml:11-20`, `.github/workflows/dependency-scan.yml:5-12`, `.github/workflows/dependency-scan.yml:18-21` |
 
@@ -3137,7 +3158,7 @@ Drie agentproducten lezen dezelfde kernregels: het AGENT-CORE-blok staat woordel
 
 | Systeem | Adres of host | Toegang | Richting | Auth (alleen naam) | Doel | Gebruiker | Bron |
 |---|---|---|---|---|---|---|---|
-| Bench-units | `192.168.88.39` (OT-Direct, geen PIC, USB op `COM4`), `192.168.88.61` (OT-Direct, geen PSRAM), `192.168.88.63` (Classic met S3 Mini-module, de soak-unit voor beta's) | REST `/api/v2/*`, OTA via `POST /safeboot`, `/update`, `/update?cmd=100`, telnet; USB alleen als OTA niet kan | beide | admin-routes met optionele HTTP Basic Auth (ADR-056); of de bench-units een wachtwoord hebben is niet gevonden in de repo | Flashen en bench-bewijs | `otgw-bench-tester`, `otgw-device-verify`, `scripts/ota_flash.py`, `scripts/bench_check.py` | `.claude/agents/otgw-device-verify.md:10-13`, `tools/bench/ot-boiler-sim/README.md:93`, `docs/adr/ADR-218-allow-outbound-tls-client-requests-on-boards-with-psram-inbound-stays-plain-http-amends-adr-003.md:54`, `docs/guides/agent-build-and-bench.md:77-82`, `docs/guides/agent-build-and-bench.md:95-98`, `.claude/skills/beta-release-2x/SKILL.md:51`, `.claude/skills/beta-release-2x/SKILL.md:184-186`, `CLAUDE.md:91` |
+| Bench-units | `.39` (OT-Direct, geen PIC, met USB), `.61` (OT-Direct, geen PSRAM), `.63` (Classic met S3 Mini-module, de soak-unit voor beta's); het subnet en de seriële poort laat dit document weg | REST `/api/v2/*`, OTA via `POST /safeboot`, `/update`, `/update?cmd=100`, telnet; USB alleen als OTA niet kan | beide | admin-routes met optionele HTTP Basic Auth (ADR-056); of de bench-units een wachtwoord hebben is niet gevonden in de repo | Flashen en bench-bewijs | `otgw-bench-tester`, `otgw-device-verify`, `scripts/ota_flash.py`, `scripts/bench_check.py` | `.claude/agents/otgw-device-verify.md:10-13`, `tools/bench/ot-boiler-sim/README.md:93`, `docs/adr/ADR-218-allow-outbound-tls-client-requests-on-boards-with-psram-inbound-stays-plain-http-amends-adr-003.md:54`, `docs/guides/agent-build-and-bench.md:77-82`, `docs/guides/agent-build-and-bench.md:95-98`, `.claude/skills/beta-release-2x/SKILL.md:51`, `.claude/skills/beta-release-2x/SKILL.md:184-186`, `CLAUDE.md:91` |
 | MQTT-broker | LAN-broker, poort 1883; adres overgenomen uit de gateway-instellingen | `paho-mqtt` uit de meegeleverde wheel | in | niet gevonden in de repo | MQTT-stroom in captures en soaks | `scripts/otgw_capture.py`, `capture-mqtt-debug.*` | `scripts/otgw_capture.py:44`, `scripts/otgw_capture.py:3506-3509` |
 | Home Assistant-testrig | `ghcr.io/home-assistant/home-assistant:2026.10.4` op `http://localhost:18123`, Caddy op 18443, nginx op 19443/19080, `hass_ingress` 1.4.0 | Docker Compose; HTTP naar een echt apparaat op het LAN | beide | geen gevonden in de repo | Ingress- en reverse-proxytests | `scripts/ha-ingress-rig/*` | `scripts/ha-ingress-rig/docker-compose.yml:1-41`, `scripts/ha-ingress-rig/setup_rig.py:30-31` |
 | Cloud-recorder (gepland) | PocketBase 0.40.6 op een Synology-NAS achter `cloudflare/cloudflared:2024.12.2`, hostname `rec.<domein>` | HTTPS via Cloudflare Tunnel; alleen login- en batch-uploadpaden | in (naar de NAS) | `TUNNEL_TOKEN`, `RETENTION_DAYS` in een `.env` op de NAS; een login per gateway | Diagnostische batches van gateways verzamelen | `tools/cloud-recorder/pocketbase/test_client.py` | `tools/cloud-recorder/pocketbase/README.md:1-18`, `tools/cloud-recorder/pocketbase/README.md:46`, `tools/cloud-recorder/pocketbase/compose.yaml:2-27` |
@@ -3160,17 +3181,17 @@ flowchart LR
   classDef ship fill:#e3f1e4,stroke:#2f7d32,color:#151a1f
 
   subgraph WSK["Windows workstation"]
-    K1["DISCORD_TOKEN<br/>DISCORD_GUILD_ID<br/>user environment"]:::gate
-    K2["discord-alpha-webhook.url<br/>LOCALAPPDATA"]:::gate
-    K3["gh login<br/>maintainer account"]:::gate
+    K1["DISCORD_TOKEN<br/>DISCORD_GUILD_ID<br/>user environment"]:::store
+    K2["discord-alpha-webhook.url<br/>LOCALAPPDATA"]:::store
+    K3["gh login<br/>maintainer account"]:::store
   end
   subgraph GHS["GitHub secrets"]
-    K4["CLAUDE_CODE_OAUTH_TOKEN"]:::gate
-    K5["GITHUB_TOKEN"]:::gate
-    K6["COPILOT_MCP_CONTEXT7"]:::gate
+    K4["CLAUDE_CODE_OAUTH_TOKEN"]:::store
+    K5["GITHUB_TOKEN"]:::store
+    K6["COPILOT_MCP_CONTEXT7"]:::store
   end
   subgraph NAS["NAS, planned"]
-    K7["TUNNEL_TOKEN<br/>.env file"]:::gate
+    K7["TUNNEL_TOKEN<br/>.env file"]:::store
   end
 
   K1 --> U1["Discord MCP server<br/>all channels and DM"]:::bot
@@ -3212,10 +3233,10 @@ flowchart TB
   subgraph R1["Ring 1: one Windows workstation"]
     S["Claude Code sessions<br/>coordinator, developers, bench tester"]:::agent
     J["Discord MCP java process<br/>supervisor, scheduled task"]:::bot
-    T["Bot token, webhook URL, gh login"]:::stop
+    T["Bot token, webhook URL, gh login"]:::risk
     L["Post ledger and watermarks"]:::store
     B["Build wrappers<br/>machine-wide build lock"]:::gate
-    M["Bench knowledge<br/>session memory only"]:::stop
+    M["Bench knowledge<br/>session memory only"]:::risk
   end
   subgraph R2["Ring 2: bench LAN"]
     U["Bench units"]:::store
@@ -3254,6 +3275,7 @@ flowchart TB
 | Bench-units en hun adressen | Geen flash, geen bench-bewijs, geen beta-soak | Units terugvinden via het ARP-overzicht van de router; de beschrijving staat in het sessiegeheugen van de hoofdwerkplek, niet in de repo | `docs/guides/second-machine-setup.md:42-46`, `CLAUDE.md:21` |
 | Lokale build | Geen alpha- of beta-artefact: `dev` heeft geen release-CI | CI compileert `esp32-combo` wel bij elke push naar `dev` die niet alleen docs raakt, maar publiceert niets | `CLAUDE.md:162`, `.github/workflows/build.yml:6-27` |
 | Externe downloads (platformzip, bibliotheken, Python) | Een schone build op een nieuwe machine of in CI | Vaste versies in `platformio.ini` en `requirements-build.txt`; geen lokale spiegel gevonden in de repo | `platformio.ini:108-111`, `requirements-build.txt:3-4` |
+| Claude Code en de Anthropic-modeldienst | Alle lokale sessies, subagents en het advisor-tool; de cyclus stopt bij een rate limit of toolfout | Geen; de skill stopt en geeft een samenvatting. Account, plan en limieten staan niet in de repo | `.claude/skills/implement-next-task/SKILL.md:285-294` |
 | Submodule `other-projects` | thermo-nova-citaten en referentiecode ontbreken (in CI en in deze checkout) | CI slaat de submodule bewust over | `.github/workflows/build.yml:40-50`, `.gitmodules:7-9` |
 
 Wat zonder de werkplek blijft draaien: de zeven workflows in GitHub Actions, dus de build- en evaluate-poorten, ADR-governance, de dependency-scan, de Claude-review en de Copilot-trigger (`.github/workflows/build.yml:18-37`, `.github/workflows/claude-code-review.yml:28-47`, `.github/workflows/trigger-copilot-agent.yml:59-114`). Wat stilvalt: elk contact met testers en met Sergeant D, elke DM-beslissing van Robert, elke flash en elke publicatie. De handleiding voor een tweede machine bestaat (`docs/guides/second-machine-setup.md:20-46`), maar draagt het token, de webhook-URL, het ledger en de bench-kennis niet over: die staan buiten de repo.
@@ -3278,7 +3300,7 @@ Wat zonder de werkplek blijft draaien: de zeven workflows in GitHub Actions, dus
 | S11.14 | Getrackte watermerkbestanden → zie S6.18 | — | — |
 | S11.15 | De bench-tester beheert de units "on the laptop"; de tweede-machinegids en de servergids spreken van de hoofdwerkplek van Robert. Of dat dezelfde machine is, is niet gevonden in de repo | `CLAUDE.md:21`; `docs/guides/agent-build-and-bench.md:74-75`; `docs/guides/second-machine-setup.md:42-44`; `docs/guides/discord-mcp-server.md:12` | onbeslist, vraag aan Robert |
 
-> **Voor de plaat:** dit hoofdstuk heeft geen eigen zone op plaat A; het staat op drie plekken uit de beeldbrief. De kanalen zijn de zes gestippelde tegels van zone 2 (Tweakers en Discord-support met een gestippelde petrol pijl naar de waakvlam, GitHub, DM, `#dev-sat-mqtt` en `#alpha-testing` met een petrol pijl met twee punten), de kennisbronnen zijn de vier kleine grijze ronde badges links in zone 6 ("OpenTherm matrix", "thermo-nova", "OpenTherm spec", "toolchains"), en de distributie is de dikke bosgroene pijl naar de tegels "Alpha zip" en "Beta 2.x". Wie het concentratierisico wil tonen, tekent één dunne gestippelde leigrijze contour om de waakvlam en de bench-tester met het label "one workstation", zonder nieuwe kleur of nieuw icoon (oranje is voorbehouden aan mensen, een sleutel aan de maintainer).
+> **Voor de plaat:** dit hoofdstuk heeft geen eigen zone op plaat A; het staat op drie plekken uit de beeldbrief. De kanalen zijn de zes gestippelde tegels van zone "CHANNELS": Tweakers alleen met een gestippelde petrol pijl naar de waakvlam; Discord-support, GitHub, DM, `#dev-sat-mqtt` en `#alpha-testing` in twee richtingen, want ook in de supportkanalen antwoordt de bot in de praktijk (§6.3). Plaat A tekent Discord-support nog als "read + announcements" met een gestippelde lijn; bij een volgende render wordt dat "read · announcements · replies in practice" met een dunne terugpijl. De kennisbronnen zijn de vier kleine grijze ronde badges in zone "EXTERNAL KNOWLEDGE" ("OpenTherm matrix", "thermo-nova", "OpenTherm spec", "toolchains"), en de distributie is de dikke bosgroene pijl van station 9 naar de tegel "Alpha zip"; de beta loopt niet over die pijl. Wie het concentratierisico wil tonen, tekent één dunne gestippelde leigrijze contour om de waakvlam en de bench-tester met het label "one workstation", zonder nieuwe kleur of nieuw icoon (oranje is voorbehouden aan mensen, een sleutel aan de maintainer).
 
 ---
 
