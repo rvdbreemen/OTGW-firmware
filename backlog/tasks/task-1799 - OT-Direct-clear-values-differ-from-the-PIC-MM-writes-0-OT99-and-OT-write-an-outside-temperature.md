@@ -3,11 +3,11 @@ id: TASK-1799
 title: >-
   OT-Direct: clear values differ from the PIC: MM=- writes 0 %, OT=99 and OT=-
   write an outside temperature
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-11T06:37:00Z'
-updated_date: '2026-11-15T00:02:00Z'
+updated_date: '2026-11-15T04:32:00Z'
 labels:
   - otdirect
   - review-2026-11-11
@@ -29,7 +29,7 @@ Found in the TASK-1795 audit (docs/reviews/2026-11-11_otdirect-pic-parity-audit/
 - [x] #1 MM=- and any other non-numeric MM clear the override and reply 'MM: -'
 - [x] #2 OT= with a value of 64 or more, and OT=-, clear and reply 'OT: -'; nothing is written to MsgID 27 or to the outside-temperature state
 - [x] #3 Host test against the real code (not a re-implementation): red on the old code, green on the fix
-- [ ] #4 esp32-combo build, evaluate.py --quick, bench check where the hardware allows (name what was not benched)
+- [x] #4 esp32-combo build, evaluate.py --quick, bench check where the hardware allows (name what was not benched)
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -41,3 +41,9 @@ PIC 6.8 parity audit 2026-11-12 (docs/reviews/2026-11-12_pic68-otdirect-parity-a
 
 95 (2026-11-15, lane-95-1859): PIC 6.8 ground truth SetMaxModLevel gateway.asm 6.8:4794-4807 + GetDecimal :5045-5069 (GetDecimal's OR also returns with carry, so above 255 clears too); SetOutsideT :4256-4270. AC1: MM= rewritten: parse error -> clearWriteOverride(14) + 'MM: -', trailing chars SE, >100 OR, reply PrintByte. AC2: done in TASK-1859 commit a148e41eb (OT= GetFloatArg; parse error or 64.00-127.99 clears with 'OT: -', no write to 27, PS=1 value or Toutside; 128-255 stored as the PIC). AC3: tests/test_otd_pic_float.py (real branches) class MaxModulation + test_OT_clears_like_clr_outside_t: 19/19 green; on 34a23dc25 (code before this fix) MM=- enqueued MsgID 14 = 0 and MM=150 was accepted (2 FAIL); OT on origin/dev 84944a95e: OT=99 enqueued (FAIL). Callers: SAT sends MM=T (clear) and MM=%u (SATcontrol.ino:761-762, :876), unchanged behaviour. Sweep: 37 test_otd_* + sat_command_delivery + prototype_hoisting + test_evaluate + sat_max_modulation_1514 exit 0; evaluate --quick 86/0. AC4 (build + bench) with the 1859 build.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Shipped in beta.292 (origin/dev 542f95db1). AC1: MM= as SetMaxModLevel (gateway.asm 6.8:4794-4807) with GetDecimal: parse error (MM=-, MM=, minus, >255) clears with 'MM: -', trailing chars SE, >100 OR. AC2: OT= 64+ / OT=- clear with 'OT: -', no write to 27 / PS=1 / Toutside (landed in TASK-1859 beta.290). AC3: tests/test_otd_pic_float.py MaxModulation + OT clear tests on the real branches, green; red on the code before (MM=- wrote 14 = 0, MM=150 accepted; OT=99 wrote on origin). AC4: build beta.294+67e3f51 exit 0, evaluate --quick 86/0, bench 09 on .61 MM items 17-19 PASS.
+<!-- SECTION:FINAL_SUMMARY:END -->

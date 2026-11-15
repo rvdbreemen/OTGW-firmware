@@ -3,11 +3,11 @@ id: TASK-1761
 title: >-
   OT-Direct: run REST/GW= mode switches and GW=R on the loop task
   (resetTransientState races loopOTDirect from async_tcp)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-09T18:51:00Z'
-updated_date: '2026-11-15T03:59:00Z'
+updated_date: '2026-11-15T04:32:00Z'
 labels:
   - otdirect
   - bug
@@ -52,3 +52,9 @@ Analysis 2026-11-15 (d3, not implemented). Deferring only GW=x / GW=R to the loo
 
 95 final rebase onto dacf35147: test_ino_prototype_hoisting caught otdCmdTextPop(OtdCmdText&) (an .ino struct as a parameter: the Arduino prototype lands above the type = compile error); the pop is folded into otdCmdTextDrain(), handler call outside the lock, no behaviour change (test_otd_loop_task_commands 8/8, 6 FAIL on origin/dev; hoisting 2/2). test/host/test_override_reply.cpp gets an otdCmdTextDrain() stub (its loopOTDirect slice), 4/4.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Shipped in beta.294 (origin/dev 542f95db1), ADR-242 Proposed (92 second-reader review: F1-F3 resolved). AC1: tests/test_otd_loop_task_commands.py (real ring + real addCommandToQueue OT-Direct branch): REST burst GW=R, CS=20 runs on the loop thread in order, a queued GW=R never runs while a master request is in flight (a loop-task command queues behind it), 8/8 green, 6 FAIL on origin/dev. AC2: loopOTDirect drains only with no request in flight, before otMaster.process(); the PIC part of addCommandToQueue equals origin/dev; all OTD tests green. Bench 09 on .61 beta.294: items 20-23 PASS (REST GW=R then CS= in order, 503 on a full ring). Not verified: the ESP32 portMUX under load (host uses a mutex stand-in).
+<!-- SECTION:FINAL_SUMMARY:END -->

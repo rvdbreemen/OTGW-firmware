@@ -3,11 +3,11 @@ id: TASK-1859
 title: >-
   OT-Direct: f8.8 conversion truncates (floatToF88) where the PIC rounds;
   commands accept syntax the PIC refuses
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-12T05:19:00Z'
-updated_date: '2026-11-15T04:19:00Z'
+updated_date: '2026-11-15T04:32:00Z'
 labels:
   - otdirect
   - parity
@@ -60,3 +60,9 @@ AC4 (non-command paths): the boot re-send of SW/SH (otdRestorePersistedCommands,
 
 95 bench result (09, beta.294+67e3f51 on .61, 2026-11-15): PASS 22/23. Item 3 half FAIL: a bare 'CS=' gets NO reply (expected SE); the effect is right (nothing written, no clear). Cause: handleOTDirectCommand() returns false at 'if (len < 4) return false;' (OTDirect.ino ~3511) before any branch for every bare 'XX='. My host test test_CS_refusals feeds value='' straight into the cut-out CS= branch, so it does not go through that entry check: the 'CS= -> SE' claim was proven for the branch, not for the real entry path. Coordinator: not blocking; follow-up task filed for 'bare XX= answers SE on OT-Direct' with a test through handleOTDirectCommand() itself.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Shipped in beta.288-291 (origin/dev 542f95db1, alpha post 1571379615799316540, bench 09 beta.294+67e3f51 on .61: 22/23). AC1: one otdPicFloat block mirrors GetFloat/GetPosFloat/GetPercent (gateway.asm 6.8 :5045-5225) and PrintSigned (:2043-2064); per command parser and refusals in the notes with citations (CS/C2/BS/CL/RT/CC GetPercent, TT/TC/SB GetPosFloat, SW/SH GetFloat + MsgID 48/49 BV, OT GetFloat + 64+ clear). AC2: tests/test_otd_pic_float.py on the real block and branches, 19/19 green, 16/16 FAIL on the pre-1859 code; PIC values from the .stc scripts (CS=49.72 0x31B9, OT=-1.4 0xFE9A, SW=55.7 0x37B4, OT=9.999 10.00, OT=-0.004 0.00). AC3: replies via otdPicPrintF88 (two decimals, PIC rounding). AC4: boot re-send and setback get exact f88/256 values; MQTT room_temp/room_setpoint left on floatToF88 (OT-Direct topics, no PIC parser); values persisted before 1859 still truncate once at boot. Also fixed: TASK-1842 RT= read one decimal as hundredths. SB= keeps its 1-30 clamp (stored only since TASK-1806). Bench: 22/23; item 3 'CS=' bare gets no reply because handleOTDirectCommand() returns at len < 4 before the parser (effect correct, nothing written); the host test fed value='' into the branch and did not reach that entry check; follow-up TASK-1957.
+<!-- SECTION:FINAL_SUMMARY:END -->
