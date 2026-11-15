@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-12T05:19:00Z'
-updated_date: '2026-11-15T02:20:00Z'
+updated_date: '2026-11-15T04:19:00Z'
 labels:
   - otdirect
   - parity
@@ -57,4 +57,6 @@ AC4 (non-command paths): the boot re-send of SW/SH (otdRestorePersistedCommands,
 95: AC4 limit: a SW=/SH= value persisted by firmware before 1859 is an atof float (55.7), so the boot re-send still truncates it (0x37B3) until the user sends SW=/SH= once more; new values are stored as f88/256 and re-sent exactly. Docs: manual ch09/h09 paragraph 'OT-Direct reads command numbers like the PIC 6.8' (commit 5c5e15d30). ACs 1-4 ticked on host evidence (see the commit notes above); bench items in scratchpad t1859/bench-brief.md, build pending (queue d3 -> ba -> 95).
 
 95 (rebase onto 2f4818aa1): d3's TASK-1806 removed the setback write in checkThermostatTimeout, so SB= is stored and reported only; the 1-30 C clamp stays (comment, CHANGELOG and test comment updated; behaviour unchanged).
+
+95 bench result (09, beta.294+67e3f51 on .61, 2026-11-15): PASS 22/23. Item 3 half FAIL: a bare 'CS=' gets NO reply (expected SE); the effect is right (nothing written, no clear). Cause: handleOTDirectCommand() returns false at 'if (len < 4) return false;' (OTDirect.ino ~3511) before any branch for every bare 'XX='. My host test test_CS_refusals feeds value='' straight into the cut-out CS= branch, so it does not go through that entry check: the 'CS= -> SE' claim was proven for the branch, not for the real entry path. Coordinator: not blocking; follow-up task filed for 'bare XX= answers SE on OT-Direct' with a test through handleOTDirectCommand() itself.
 <!-- SECTION:NOTES:END -->
