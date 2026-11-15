@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-11T06:40:00Z'
-updated_date: '2026-11-15T02:20:00Z'
+updated_date: '2026-11-15T07:52:00Z'
 labels:
   - otdirect
   - review-2026-11-11
@@ -42,4 +42,6 @@ AC1/AC3 evidence for Bug 1: new tests/test_otd_offline_retry.py compiles the rea
 Bug 9 (gateway: thermostat lost, no own frame until iSetbackTimeout 30 s) is NOT in this commit. The gap is not only timing: once the gateway sends its own MsgID 0 the CH enable comes from otMasterStatusFlags (board default bit 0 on), so starting own frames early would turn CH on for a thermostat that had it off. The PIC clears HeatDemand and all thermostat state on an open line (gateway.asm 6.6 Disconnect :1770-1789) before it sends StandAloneMsg (:1796). What the boiler gets after the loss is TASK-1806's subject (remove the 16 C setback, like the PIC); Bug 9 goes with 1806. ba's TASK-1850 also edits checkThermostatTimeout.
 
 Lane-1924 pushed 2026-11-15: origin/dev 5da0c91df..2f4818aa1. Build esp32-combo 2.0.0-beta.281+fe0e61a OK (build/logs/build-20261115-020302.log, 'Build completed successfully'); 'git diff fe0e61a48 2f4818aa1 -- src/' empty, so the pushed code is the benched code. evaluate.py --quick 0 failed; OTD tests 42 files, host suites, SAT suite per file green on the rebased tree. Bug 1 shipped in beta.277; bench 09 on .61 with beta.281: master mode without a boiler, only MsgID 0, interval 1.04-1.13 s (median 1.12). PASS for AC1. Bug 9 (AC2) waits for Robert's answer A/B/C.
+
+2026-11-15 Robert decided bug 9 = A: detect thermostat loss after about 3 s (fixed), not the 30 s iSetbackTimeout default. Discord DM 1571431149795024929 (his item 2 'a'), answer to question 1571287312292253820. Plan (d3): implement on lane-1954 after TASK-1954, with a host test red on the old code and green on the fix; it goes in the next build after 'beta tag out'.
 <!-- SECTION:NOTES:END -->
