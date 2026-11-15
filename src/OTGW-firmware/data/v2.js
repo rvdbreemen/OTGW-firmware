@@ -193,6 +193,9 @@
       "pic_ovr_none": "No override",
       "pic_ovr_temp": "Temporary override to {{temp}} °C",
       "pic_ovr_const": "Constant override to {{temp}} °C",
+      "pic_ovr_temp_pending": "Temporary override to {{temp}} °C (not yet accepted by the thermostat)",
+      "pic_ovr_const_pending": "Constant override to {{temp}} °C (not yet accepted by the thermostat)",
+      "pic_ovr_clearing": "Override being cleared",
       "pic_vref_level": "Level {{level}}",
       "pic_vref_detail": "Level {{level}} (F88: {{f88}} V / F1847: {{f1847}} V)",
       "pic_grp_firmware": "Firmware",
@@ -6357,6 +6360,11 @@
         if (v === 'N' || v === '0') return t('adv.pic_ovr_none');
         if (v.length > 1 && v.charAt(0) === 'T') return t('adv.pic_ovr_temp', { temp: v.slice(1) });
         if (v.length > 1 && v.charAt(0) === 'C') return t('adv.pic_ovr_const', { temp: v.slice(1) });
+        // TASK-1939: the PIC (PrintOverride, gateway.asm 6.6:2198-2222) prints t/c in lowercase while the thermostat has
+        // not yet accepted the TT=/TC= override, and n while a cleared override waits to be released.
+        if (v.length > 1 && v.charAt(0) === 't') return t('adv.pic_ovr_temp_pending', { temp: v.slice(1) });
+        if (v.length > 1 && v.charAt(0) === 'c') return t('adv.pic_ovr_const_pending', { temp: v.slice(1) });
+        if (v === 'n') return t('adv.pic_ovr_clearing');
         return v;
       case 'dhw_override': return picCode(v, { '0': 'adv.pic_dhw_0', '1': 'adv.pic_dhw_1', A: 'adv.pic_dhw_a', P: 'adv.pic_dhw_p' });
       case 'gpio': return picLetters(v, ['A', 'B'], function (c) { return picCode(c, PIC_GPIO); });
