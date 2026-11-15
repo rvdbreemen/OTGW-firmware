@@ -4693,6 +4693,19 @@
     "TASK-1979"
    ],
    "confirmed_by_entry": null
+  },
+  {
+   "id": 353,
+   "title": "Robert approves the concrete HA climate proposal of entry 352 and asks for validation on a Home Assistant instance (maintainer decision, 2026-11-15; settles entry 352's open point)",
+   "date": "2026-11-15",
+   "source": "maintainer",
+   "kind": "decision",
+   "discord_link": "https://discord.com/channels/812969634638725140/914498730001072149/1571561199928221728",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1979"
+   ],
+   "confirmed_by_entry": null
   }
  ]
 }

@@ -7360,3 +7360,17 @@ Robert, 16:18:42 UTC (https://discord.com/channels/812969634638725140/9144987300
 **Open:** Robert's OK on that concrete proposal (asked in the post). The meaning of "displayed as `OTGW_Thermostat`" (entry 351) stays open. Known limit named in the post: some thermostats (Honeywell Round) do not mirror an accepted override in MsgID 16 (entry 2).
 
 **Task:** TASK-1979.
+
+## 353. Robert approves the concrete HA climate proposal of entry 352 and asks for validation on a Home Assistant instance (maintainer decision, 2026-11-15; settles entry 352's open point)
+
+**Source:** #beta-testing 2026-11-15, 16:23:08 UTC, https://discord.com/channels/812969634638725140/914498730001072149/1571561199928221728, a reply to the bot's proposal https://discord.com/channels/812969634638725140/914498730001072149/1571560639548104886.
+
+**Quoted:**
+
+> "I agree with this <@1487467924351357049> validate it on your home assistant instance best you can."
+
+**Settled:** the proposal of entry 352 is the design for TASK-1979: one thermostat card, the existing climate entity; while SAT is on it shows SAT's room temperature and target and a temperature or preset on the card sets SAT's target as the web UI does; with follow thermostat and push setpoint on, the wall thermostat and the card stay in step through SAT (entry 2); standalone the card is the thermostat; with SAT off the card works as today. Validation on a Home Assistant instance, as far as possible, is part of the task (Robert's words).
+
+**Open:** the meaning of "displayed as `OTGW_Thermostat`" (entry 351). Implementation needs a Proposed ADR (MQTT contract and discovery payload change) before code.
+
+**Task:** TASK-1979.
