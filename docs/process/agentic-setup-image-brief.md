@@ -3,10 +3,11 @@
 | | |
 |---|---|
 | Doel | Een image generator (of een illustrator) genoeg houvast geven om een mooie, inhoudelijk juiste overzichtsplaat te maken van de agentic werkplaats en van BlueFlame Bot |
-| Inhoudelijke bron | [`agentic-architecture.md`](agentic-architecture.md): elke knoop en elke pijl in deze brief staat daar beschreven met bronvermelding |
+| Inhoudelijke bron | [`agentic-setup.md`](agentic-setup.md): elke knoop en elke pijl in deze brief staat daar beschreven met bronvermelding |
 | Peildatum | 2026-11-15, `dev` @ `e22c59e` |
 | Taak | TASK-1984 |
-| Referentiewireframes | [`images/agentic-architecture-plate-a.svg`](images/agentic-architecture-plate-a.svg) (overzicht), [`images/agentic-architecture-plate-b.svg`](images/agentic-architecture-plate-b.svg) (BlueFlame Bot), met PNG-versies ernaast |
+| Referentiewireframes | [`images/agentic-setup-plate-a.svg`](images/agentic-setup-plate-a.svg) (overzicht), [`images/agentic-setup-plate-b.svg`](images/agentic-setup-plate-b.svg) (BlueFlame Bot), met PNG-versies ernaast |
+| Thema | Licht (op verzoek van de maintainer, 2026-11-15): het lichte palet van `agentic-setup.html` |
 
 Deze brief beschrijft drie platen. **Plaat A** is het overzicht van de hele werkplaats. **Plaat B** zoomt in op BlueFlame Bot: hoe hij Discord, GitHub en Tweakers bewaakt en waar hij antwoordt. **Plaat C** is een smalle banner met de pijplijn van taak tot tester. Per plaat staan hier de boodschap, het raster, de zones met hun knopen, de verbindingen, de legenda en kant-en-klare prompts.
 
@@ -40,25 +41,24 @@ Het project maakt firmware voor een OpenTherm-gateway: het apparaat tussen therm
 
 ### 2.2 Stijl
 
-`dark technical infographic, clean flat vector with a slight isometric depth, thin precise linework, soft glow on the central flame only, generous negative space, editorial and calm, no clutter, no photorealism, no 3D render look`
+`light technical infographic on an off-white background, clean flat vector with a slight isometric depth, thin precise dark-grey linework, white cards with soft shadows, a soft blue glow on the central flame only, generous negative space, editorial and calm, no clutter, no photorealism, no 3D render look`
 
 ### 2.3 Palet
 
-Overgenomen uit de bestaande visuele versie (`agentic-setup.html`, donkere modus) en uitgebreid met één blauwe accentkleur voor de vlam.
+Het lichte palet van de bestaande visuele versie (`agentic-setup.html`, `:root`), uitgebreid met één blauwe accentkleur voor de vlam. Elke kleur heeft een zachte vulkleur voor vlakken en een volle kleur voor randen, lijnen en iconen.
 
-| Rol | Kleur | Hex | Betekenis |
-|---|---|---|---|
-| Achtergrond | antraciet | `#101417` | De ruimte |
-| Vlak | donker leisteen | `#171d21` | Kaarten en panelen |
-| Lijnen en randen | grafiet | `#2b343b` | Rasters en kaders |
-| Tekst | gebroken wit | `#e6eaed` | Labels |
-| Gedempte tekst | staalgrijs | `#9aa6b0` | Subtitels, alleen-lezen-pijlen |
-| **Mensen en beslismacht** | vlamoranje | `#ff8a4c` (zacht `#3a2216`) | Personen, mandaten, besluiten, wat naar buiten gaat |
-| **Agents en AI-werk** | koel teal | `#4fc3d6` (zacht `#12313a`) | Sessies, subagents, opdrachten tussen agents |
-| **BlueFlame Bot** | elektrisch blauw met witte kern | `#3d8bff` → `#4fc3d6`, kern `#e6f7ff` | Alleen de waakvlam en zijn bewakingsstralen |
-| Poorten | amber | `#f0b04a` | Controles die een stap kunnen weigeren |
-| Geslaagd, distributie | zachtgroen | `#7bc47f` | Groen licht, product naar buiten |
-| Harde stop | koraalrood | `#ff7b6b` | Acties die per keer Roberts "ja" nodig hebben |
+| Rol | Kleur | Rand / lijn | Vulling | Betekenis |
+|---|---|---|---|---|
+| Achtergrond | gebroken wit | | `#f4f6f7` | De ruimte |
+| Vlak | wit | `#d5dce2` | `#ffffff` | Kaarten en panelen, met een zachte schaduw |
+| Tekst | inktzwart | | `#151a1f` | Labels |
+| Gedempte tekst | leigrijs | | `#56616c` | Subtitels, alleen-lezen-pijlen |
+| **Mensen en beslismacht** | gebrand oranje | `#c2410c` | `#fde7d9` | Personen, mandaten, besluiten |
+| **Agents en AI-werk** | petrol | `#0e7490` | `#d9eff4` | Sessies, subagents, opdrachten tussen agents |
+| **BlueFlame Bot** | kobaltblauw naar cyaan, witte kern | `#1d4ed8` → `#06b6d4` | halo `#dbeafe` | Alleen de waakvlam en zijn bewakingsstralen |
+| Poorten | oker | `#a15c00` | `#fdf0d5` | Controles die een stap kunnen weigeren |
+| Geslaagd, distributie | bosgroen | `#2f7d32` | `#e3f1e4` | Groen licht, product naar buiten |
+| Harde stop | steenrood | `#b42318` | `#fde4e1` | Acties die per keer Roberts "ja" nodig hebben |
 
 ### 2.4 Typografie
 
@@ -88,8 +88,8 @@ Koppen in **Archivo** (vet, kapitalen met ruime letterafstand voor zonelabels), 
 | Backlog.md | kanbanbord met drie kolommen |
 | OpenWolf | wolvenkop-silhouet boven een kaartenbak |
 | graphify | netwerk van knopen en lijnen |
-| Poort | schild met vinkje (amber) |
-| Harde stop | hangslot (koraalrood) |
+| Poort | schild met vinkje (oker) |
+| Harde stop | hangslot (steenrood) |
 | Staand mandaat | klok met twee wijzers op 08:00 en 20:00 |
 | Watermerk (laatst gecontroleerd) | zandloper |
 
@@ -97,8 +97,8 @@ Koppen in **Archivo** (vet, kapitalen met ruime letterafstand voor zonelabels), 
 
 | Lijn | Betekenis |
 |---|---|
-| Doorgetrokken teal | opdracht of werk tussen agents |
-| Gestippeld teal | alleen lezen, bewaken |
+| Doorgetrokken petrol | opdracht of werk tussen agents |
+| Gestippeld petrol | alleen lezen, bewaken |
 | Doorgetrokken blauw, gloeiend | bewakingsstraal van BlueFlame Bot (alleen plaat B) |
 | Doorgetrokken oranje, dik | besluit of mandaat van een mens |
 | Gestippeld grijs | input van gebruikers naar een kanaal |
@@ -114,7 +114,7 @@ Koppen in **Archivo** (vet, kapitalen met ruime letterafstand voor zonelabels), 
 De kijker moet na tien seconden drie dingen begrijpen:
 
 1. **Eén coördinerende sessie, met BlueFlame Bot als stem, staat in het midden** en verbindt mensen, kanalen, kennis en pijplijn.
-2. **Mensen beslissen, agents voeren uit.** Oranje lijnen (besluiten) komen alleen van mensen; teal lijnen (werk) lopen tussen agents.
+2. **Mensen beslissen, agents voeren uit.** Oranje lijnen (besluiten) komen alleen van mensen; petrol lijnen (werk) lopen tussen agents.
 3. **Niets gaat naar buiten zonder poorten.** De pijplijn rechts is een reeks controles, en de harde stops zitten op slot.
 
 ### 3.2 Formaat en raster
@@ -169,14 +169,14 @@ De kijker moet na tien seconden drie dingen begrijpen:
 **Zone 3, Agentlaag (midden, y 30-85 %, x 24-76 %).**
 
 - **Hart:** een ronde brander met een blauwe vlam, label "BlueFlame Bot", ondertitel "coördinerende sessie". Dit is het visuele zwaartepunt: de enige gloed op de plaat.
-- **Ring eromheen (teal zeshoeken):** "Sonnet · implementatie", "Haiku · runners", "Opus · correctheidsreview", "Advisor · zelfreview", "Reviewlenzen".
+- **Ring eromheen (petrol zeshoeken):** "Sonnet · implementatie", "Haiku · runners", "Opus · correctheidsreview", "Advisor · zelfreview", "Reviewlenzen".
 - **Linksonder in de zone:** "Bench-tester" als werkbank met twee printplaatjes en een WiFi-boog, ondertitel "flasht en test als enige". Verbonden met de pijplijnstap "Bench · OTA".
 - **Rechtsonder in de zone:** drie kleine satellieten, label "Andere agents", ondertitel "Codex · Copilot · CI-Claude".
 - Boven de brander, klein: de skills als chips in een boog: `/implement-next-task`, `/backlog_discord`, `/check_otgw_issues`, `/beta-release-2x`, `/release-2x`, `/update-docs-2x`, `/analyze-capture`.
 
 **Zone 4, Kennis en regels (links, y 30-85 %, x 0-22 %).** Een archiefkast met acht laden van boven naar beneden: Regels (CLAUDE.md, AGENTS.md), ADR's + ADR-kit, C4-kaart, SAT-beslisregister, Open vragen, Backlog.md, OpenWolf-geheugen, graphify-codegraaf.
 
-**Zone 5, Pijplijn en poorten (rechts, y 30-85 %, x 78-100 %).** Een verticale transportband met negen stations van boven naar beneden; elk station een chip met een amber schildje: Taak, Plan + zelfreview, Code rood → groen, Reviewteam, evaluate · tests, Bump · hooks, Build · lock, Bench · OTA, Push · post.
+**Zone 5, Pijplijn en poorten (rechts, y 30-85 %, x 78-100 %).** Een verticale transportband met negen stations van boven naar beneden; elk station een chip met een oker schildje: Taak, Plan + zelfreview, Code rood → groen, Reviewteam, evaluate · tests, Bump · hooks, Build · lock, Bench · OTA, Push · post.
 
 **Zone 6, Naar buiten (y 87-100 %).** Vier tegels: "Alpha-zip per taak" (groen, met een klein lusje terug naar #alpha-testing), "Beta 2.x" (met klokje 08:00/20:00, staand mandaat), "Stabiel 2.x" (hangslot), "1.x LTS" (hangslot). Rechts in dezelfde band, klein en grijs: vier ronde badges voor externe kennisbronnen: "OpenTherm-matrix", "thermo-nova", "OpenTherm-spec", "toolchains".
 
@@ -189,40 +189,40 @@ De kijker moet na tien seconden drie dingen begrijpen:
 | SAT-ontwerper | #alpha-testing, #dev-sat-mqtt | oranje, twee punten | antwoorden, besluiten |
 | Maintainer | DM met de maintainer | oranje, dik | besluiten, "ja" per harde stop |
 | Maintainer | BlueFlame Bot | oranje, dik | opdrachten in de sessie |
-| Tweakers, Discord-support | BlueFlame Bot | gestippeld teal | bewaken |
-| GitHub, #alpha-testing, #dev-sat-mqtt, DM | BlueFlame Bot | teal, twee punten | lezen en antwoorden |
-| BlueFlame Bot | ring subagents | teal | opdrachten |
+| Tweakers, Discord-support | BlueFlame Bot | gestippeld petrol | bewaken |
+| GitHub, #alpha-testing, #dev-sat-mqtt, DM | BlueFlame Bot | petrol, twee punten | lezen en antwoorden |
+| BlueFlame Bot | ring subagents | petrol | opdrachten |
 | BlueFlame Bot | Kennis en regels | grijs, twee punten | leest regels, schrijft register en notes |
-| BlueFlame Bot | Pijplijn | teal | voert uit |
-| Pijplijn "Bench · OTA" | Bench-tester | teal, twee punten | testverzoek en OK |
+| BlueFlame Bot | Pijplijn | petrol | voert uit |
+| Pijplijn "Bench · OTA" | Bench-tester | petrol, twee punten | testverzoek en OK |
 | Pijplijn "Push · post" | Alpha-zip | groen, dik | publiceert |
 | Alpha-zip | #alpha-testing | groen, dun, lus omhoog | naar testers |
 
 ### 3.5 Legenda
 
-Onderin rechts, klein: oranje lijn = besluit van een mens; teal lijn = werk tussen agents; gestippeld = alleen lezen; groen = gaat naar buiten; amber schild = poort; hangslot = harde stop, alleen met Roberts "ja".
+Onderin rechts, klein: oranje lijn = besluit van een mens; petrol lijn = werk tussen agents; gestippeld = alleen lezen; groen = gaat naar buiten; oker schild = poort; hangslot = harde stop, alleen met Roberts "ja".
 
 ### 3.6 Prompts voor plaat A
 
 **Volledig (route B):**
 
 ```text
-A dark technical infographic poster, 16:9, titled "OTGW agentic workshop". Charcoal background (#101417), panels in dark slate (#171d21), thin graphite grid lines. Clean flat vector style with slight isometric depth, calm editorial layout, generous spacing, no clutter.
+A light technical infographic poster, 16:9, titled "OTGW agentic workshop". Off-white background (#f4f6f7), white panels with thin light-grey borders (#d5dce2) and soft shadows, dark ink text (#151a1f). Clean flat vector style with slight isometric depth, calm editorial layout, generous spacing, no clutter.
 
-Top band labelled "PEOPLE": four orange-outlined cards evenly spaced: "End users" (group icon), "Alpha testers" (figure with test tube), "SAT designer" (figure with compass), "Maintainer" (figure with key).
+Top band labelled "PEOPLE": four cards with a pale peach fill (#fde7d9) and a burnt-orange outline (#c2410c), evenly spaced: "End users" (group icon), "Maintainer" (figure with key), "SAT designer" (figure with compass), "Alpha testers" (figure with test tube).
 
 Second band labelled "CHANNELS": six dashed tiles: "Tweakers (RSS)", "GitHub", "Discord support", "DM", "#dev-sat-mqtt", "#alpha-testing".
 
-Centre: a round burner with a glowing electric-blue flame with a white-hot core, labelled "BlueFlame Bot" and "coordinating session". It is the only glowing element. Around it a ring of five small teal hexagons: "Sonnet", "Haiku", "Opus", "Advisor", "Review lenses". Lower left of the centre: a workbench with two small circuit boards and a WiFi arc, labelled "Bench tester". Lower right: three small satellites labelled "Other agents".
+Centre: a round burner with a pale blue face (#dbeafe) and a cobalt rim, holding a vivid blue flame (cobalt #1d4ed8 at the base fading to cyan #06b6d4 at the tip) with a white core, labelled "BlueFlame Bot" and "coordinating session". It is the only element with a soft glow. Around it a ring of five small petrol-blue hexagons (#0e7490 outline, #d9eff4 fill): "Sonnet", "Haiku", "Opus", "Advisor", "Review lenses". Lower left of the centre: a workbench with two small circuit boards and a WiFi arc, labelled "Bench tester". Lower right: three small satellites labelled "Other agents".
 
 Left column labelled "KNOWLEDGE & RULES": a filing cabinet with eight drawers: "Rules", "ADRs + ADR kit", "C4 map", "SAT register", "Open questions", "Backlog", "OpenWolf memory", "Code graph".
 
-Right column labelled "PIPELINE & GATES": a vertical conveyor with nine stations, each with a small amber shield: "Task", "Plan + review", "Red to green", "Review team", "Gates", "Bump + hooks", "Build (lock)", "Bench (OTA)", "Push + post".
+Right column labelled "PIPELINE & GATES": a vertical conveyor with nine white stations, each with a small ochre shield (#a15c00): "Task", "Plan + review", "Red to green", "Review team", "Gates", "Bump + hooks", "Build (lock)", "Bench (OTA)", "Push + post".
 
-Bottom band labelled "WHAT SHIPS": four tiles: "Alpha zip" (green), "Beta 2.x" (small clock icon), "Stable 2.x" (coral padlock), "1.x LTS" (coral padlock).
+Bottom band labelled "WHAT SHIPS": four tiles: "Alpha zip" (pale green fill, forest-green outline #2f7d32), "Beta 2.x" (small ochre clock icon), "Stable 2.x" (brick-red padlock #b42318), "1.x LTS" (brick-red padlock).
 
-Connectors: thick orange lines only from people (decisions), teal lines between agents (work), dashed teal lines for read-only monitoring from "Tweakers" and "Discord support" to the flame, double-headed teal arrows between the flame and "GitHub", "#alpha-testing", "#dev-sat-mqtt", "DM", a thick green arrow from "Push + post" to "Alpha zip" looping back up to "#alpha-testing".
-Typography: Archivo for headings, Source Sans for labels, JetBrains Mono for small code labels. Palette: orange #ff8a4c, teal #4fc3d6, blue #3d8bff, amber #f0b04a, green #7bc47f, coral #ff7b6b, text #e6eaed.
+Connectors: thick burnt-orange lines only from people (decisions), petrol-blue lines between agents (work), dashed petrol-blue lines for read-only monitoring from "Tweakers" and "Discord support" to the flame, double-headed petrol-blue arrows between the flame and "GitHub", "#alpha-testing", "#dev-sat-mqtt", "DM", a thick forest-green arrow from "Push + post" to "Alpha zip" looping back up to "#alpha-testing".
+Typography: Archivo for headings, Source Sans for labels, JetBrains Mono for small code labels. Palette: background #f4f6f7, cards #ffffff, text #151a1f, orange #c2410c, petrol #0e7490, cobalt #1d4ed8, ochre #a15c00, green #2f7d32, brick red #b42318.
 ```
 
 **Zonder tekst (route A):** gebruik dezelfde prompt, vervang elk label tussen aanhalingstekens door "an empty label plate", en voeg toe: `No text anywhere, no letters, no numbers; leave clean empty label plates for overlay.`
@@ -230,13 +230,13 @@ Typography: Archivo for headings, Source Sans for labels, JetBrains Mono for sma
 **Kort (generators met een korte promptlimiet):**
 
 ```text
-Dark charcoal tech infographic, 16:9: glowing electric-blue pilot flame in a round burner at the centre ringed by small teal hexagons; orange person cards across the top; dashed channel tiles below them; a filing cabinet on the left; a vertical conveyor with amber shield checkpoints on the right; four output tiles along the bottom, two with coral padlocks; thin orange, teal and green connector lines; flat vector, calm, precise, generous negative space.
+Light off-white tech infographic, 16:9: a vivid cobalt-to-cyan pilot flame in a round pale-blue burner at the centre ringed by small petrol-blue hexagons; peach person cards with burnt-orange outlines across the top; dashed channel tiles below them; a white filing cabinet on the left; a vertical conveyor of white stations with ochre shield checkpoints on the right; four output tiles along the bottom, two with brick-red padlocks; thin orange, petrol and green connector lines; flat vector, white cards, soft shadows, calm, precise, generous negative space.
 ```
 
 **Negatief (waar ondersteund):**
 
 ```text
-photorealism, 3D render, people's faces, brand logos, watermark, lens flare, neon cyberpunk overload, clutter, tiny unreadable text, random numbers, gibberish lettering, extra glowing elements besides the central flame
+dark background, night mode, photorealism, 3D render, people's faces, brand logos, watermark, lens flare, neon, heavy gradients, clutter, tiny unreadable text, random numbers, gibberish lettering, extra glowing elements besides the central flame
 ```
 
 ---
@@ -274,7 +274,7 @@ Liggend **16:9** (wireframe: viewBox 1920 × 1080). De vlam staat iets onder het
 
 ### 4.3 Knopen
 
-**De vlam.** Blauwe vlam met witte kern in een ronde brander, label "BlueFlame Bot". Om de brander vijf kleine amber schilden met elk een regel (zie 4.4).
+**De vlam.** Blauwe vlam met witte kern in een ronde brander, label "BlueFlame Bot". Om de brander vijf kleine oker schilden met elk een regel (zie 4.4).
 
 **Buitenpost Discord (links, x 0-36 %).** Een gebouw met zeven deuren, elk een kanaal. De drie bovenste deuren hebben een pijl met twee punten (lezen en antwoorden). De vier onderste hebben een inkomende gestippelde pijl (lezen); drie daarvan hebben daarnaast een dunne groene uitgaande pijl voor release-aankondigingen.
 
@@ -319,11 +319,11 @@ Liggend **16:9** (wireframe: viewBox 1920 × 1080). De vlam staat iets onder het
 **Volledig:**
 
 ```text
-A dark technical infographic poster, 16:9, titled "BlueFlame Bot: the pilot flame". Charcoal background (#101417), dark slate panels (#171d21), flat vector with slight isometric depth, calm and precise.
+A light technical infographic poster, 16:9, titled "BlueFlame Bot: the pilot flame". Off-white background (#f4f6f7), white panels with thin light-grey borders and soft shadows, dark ink text, flat vector with slight isometric depth, calm and precise.
 
-Centre, slightly below middle: a round burner with a glowing electric-blue flame (#3d8bff fading to teal #4fc3d6) with a white-hot core, labelled "BlueFlame Bot". Five small amber shields orbit the burner, labelled "English, answer first", "No board name", "Testers advise", "Record first", "One token". Three soft blue beams fan out from the flame like a lighthouse.
+Centre, slightly below middle: a round burner with a pale blue face (#dbeafe) and a cobalt rim, holding a vivid blue flame (cobalt #1d4ed8 fading to cyan #06b6d4) with a white core and a soft blue halo, labelled "BlueFlame Bot". Five small ochre shields (#a15c00) orbit the burner, labelled "English, answer first", "No board name", "Testers advise", "Record first", "One token". Three translucent pale-blue beams fan out from the flame like a lighthouse.
 
-Left beam reaches a building labelled "DISCORD" with seven doors in a column: "#alpha-testing", "#dev-sat-mqtt", "DM maintainer" each with a double-headed teal arrow; "#beta-testing", "#devs-esp-firmware", "#english-support", "#nederlandse-ondersteuning" each with a dashed incoming arrow, and all of them except "#devs-esp-firmware" also with a thin green outgoing arrow for release announcements.
+Left beam reaches a building labelled "DISCORD" with seven doors in a column: "#alpha-testing", "#dev-sat-mqtt", "DM maintainer" each with a double-headed petrol-blue arrow; "#beta-testing", "#devs-esp-firmware", "#english-support", "#nederlandse-ondersteuning" each with a dashed incoming arrow, and all of them except "#devs-esp-firmware" also with a thin green outgoing arrow for release announcements.
 
 Upper-right beam reaches a panel labelled "GITHUB" with three tiles: "Issues" and "Pull requests" with double-headed arrows, "Releases" with an outgoing arrow.
 
@@ -340,7 +340,7 @@ Typography: Archivo headings, Source Sans labels. Only the flame glows.
 **Kort:**
 
 ```text
-Dark charcoal infographic, 16:9: a glowing electric-blue pilot flame in a round burner at the centre, five small amber shields orbiting it, three soft blue lighthouse beams reaching a Discord building with seven doors on the left, a GitHub panel upper right and a forum tile with RSS arcs lower right; looping arrows with hourglasses across the top; a thin grey foundation bar under the flame; five output tiles along the bottom; flat vector, precise, calm.
+Light off-white infographic, 16:9: a vivid cobalt-to-cyan pilot flame in a round pale-blue burner at the centre, five small ochre shields orbiting it, three translucent pale-blue lighthouse beams reaching a Discord building with seven doors on the left, a GitHub panel upper right and a forum tile with RSS arcs lower right; looping arrows with hourglasses across the top; a thin grey foundation bar under the flame; five output tiles along the bottom; flat vector, precise, calm.
 ```
 
 Negatief: zoals bij plaat A.
@@ -355,20 +355,20 @@ Elke wijziging loopt dezelfde reeks poorten door, en alleen de bench-tester raak
 
 ### 5.2 Formaat en compositie
 
-Breed **3:1** (wireframe niet nodig; de compositie is één lijn). Een horizontale transportband van links naar rechts met elf stations. Teal stations zijn werk van agents, amber schilden zijn poorten, het oranje station is de mens, groen is publicatie.
+Breed **3:1** (wireframe niet nodig; de compositie is één lijn). Een horizontale transportband van links naar rechts met elf stations. Petrol stations zijn werk van agents, oker schilden zijn poorten, het oranje station is de mens, groen is publicatie.
 
 | # | Station | Kleur | Poort die kan weigeren |
 |---|---|---|---|
-| 1 | Backlog-taak | teal | geen taak, geen werk (commit-msg-hook) |
-| 2 | Plan + zelfreview | teal | advisor of Opus-review |
+| 1 | Backlog-taak | petrol | geen taak, geen werk (commit-msg-hook) |
+| 2 | Plan + zelfreview | petrol | advisor of Opus-review |
 | 3 | SAT? → OK van de SAT-ontwerper | oranje | geen bouw zonder zijn OK bij regelgedrag |
-| 4 | Code rood → groen | teal | oude code faalt, fix slaagt |
-| 5 | Reviewteam | teal | reviewers moeten weerleggen |
-| 6 | evaluate · tests | amber | geen nieuwe FAIL |
-| 7 | Bump + commit-hooks | amber | geen nieuwe prerelease-tag, geen taakbestand |
-| 8 | Build esp32-combo | amber | één build tegelijk op de machine |
-| 9 | Bench via OTA | amber | bench-tester flasht en test |
-| 10 | Push `dev` | teal | pas na het OK van de bench |
+| 4 | Code rood → groen | petrol | oude code faalt, fix slaagt |
+| 5 | Reviewteam | petrol | reviewers moeten weerleggen |
+| 6 | evaluate · tests | oker | geen nieuwe FAIL |
+| 7 | Bump + commit-hooks | oker | geen nieuwe prerelease-tag, geen taakbestand |
+| 8 | Build esp32-combo | oker | één build tegelijk op de machine |
+| 9 | Bench via OTA | oker | bench-tester flasht en test |
+| 10 | Push `dev` | petrol | pas na het OK van de bench |
 | 11 | Post alpha-zip | groen | githash ≠ HEAD, vuile `src/`, tag al gepubliceerd |
 
 Boven de band, op afstand en met hangsloten: "Beta 2.x (08:00/20:00, staand mandaat)", "Stabiel 2.x", "main (1.x)".
@@ -376,7 +376,7 @@ Boven de band, op afstand en met hangsloten: "Beta 2.x (08:00/20:00, staand mand
 ### 5.3 Prompt
 
 ```text
-A wide 3:1 dark infographic banner: a horizontal conveyor belt from left to right on a charcoal background with eleven stations as rounded chips: teal chips for agent work, amber shield chips for gates, one orange chip for a human approval, a green chip at the end with a small package leaving to the right. Above the belt, at a distance, three locked tiles with coral padlocks and one tile with a small clock. Flat vector, precise thin lines, calm editorial style, labels short and legible.
+A wide 3:1 light infographic banner: a horizontal conveyor belt from left to right on an off-white background with eleven stations as rounded white chips: petrol-blue chips for agent work, ochre shield chips for gates, one burnt-orange chip for a human approval, a forest-green chip at the end with a small package leaving to the right. Above the belt, at a distance, three locked tiles with brick-red padlocks and one tile with a small clock. Flat vector, precise thin lines, calm editorial style, labels short and legible.
 ```
 
 ---
@@ -412,13 +412,13 @@ Loop deze lijst na voordat je een gegenereerde plaat deelt. Elk punt is een inho
 - [ ] De alpha-zip gaat naar #alpha-testing, niet naar GitHub-releases.
 - [ ] De SAT-ontwerper is verbonden met #alpha-testing en #dev-sat-mqtt, niet met GitHub of Tweakers.
 - [ ] Er staat nergens een hardwarenaam, gebruikers-ID, URL of token in beeld.
-- [ ] Er gloeit maar één element: de vlam.
+- [ ] Het thema is licht (gebroken witte achtergrond, witte kaarten, donkere tekst) en alleen de vlam heeft een zachte gloed.
 - [ ] Labels zijn leesbaar en correct gespeld; bij twijfel route A (labels erover).
 
 ---
 
 ## 8. Deze brief bijwerken
 
-- Verandert de architectuur in `agentic-architecture.md`, werk dan eerst de knopen- en verbindingstabellen hier bij, daarna de SVG-wireframes in `images/`, en pas als laatste de prompts.
+- Verandert de architectuur in `agentic-setup.md`, werk dan eerst de knopen- en verbindingstabellen hier bij, daarna de SVG-wireframes in `images/`, en pas als laatste de prompts.
 - Houd de labels kort en in beide talen gelijk.
 - Docs-only: geen prerelease-bump, wel een `TASK-NNN` in de commit.

@@ -1,13 +1,13 @@
 ---
 id: TASK-1984
 title: >-
-  Docs: architecture description of the agentic setup, BlueFlame Bot deep dive
-  and an image-generator brief
+  Docs: update the agentic setup document (architecture, BlueFlame Bot deep
+  dive) and add an image-generator brief in a light theme
 status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-15T20:26:00Z'
-updated_date: '2026-11-15T20:50:00Z'
+updated_date: '2026-11-15T20:53:00Z'
 labels:
   - docs
   - process
@@ -25,16 +25,18 @@ Robert asked (cloud session 2026-11-15) for a documentation project: inventory t
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 docs/process/agentic-architecture.md describes people and roles, channels, the agent layer with models, the software pipeline, rules and how each is enforced, the knowledge base and the ADR kit, with file:line citations opened in this session
-- [ ] #2 A BlueFlame Bot chapter describes how it watches Discord, GitHub and Tweakers (trigger, cadence, watermarks, filters) and how it answers per channel, with a flow or sequence diagram per path
-- [ ] #3 Every Mermaid diagram in the new document passes a render check in this session
-- [ ] #4 docs/process/agentic-architecture-image-brief.md gives an image generator a composition (zones, nodes, connectors, palette, labels) and ready-to-use prompts for an overview plate and a BlueFlame Bot plate
+- [ ] #1 docs/process/agentic-setup.md is updated to the 2026-11-15 state and describes people and roles, channels, the agent layer with models, the software pipeline, rules and how each is enforced, the knowledge base and the ADR kit, with file:line citations opened in this session; findings F1-F8 keep their history
+- [ ] #2 A BlueFlame Bot chapter describes how it watches Discord, GitHub and Tweakers (trigger, cadence, watermarks, filters) and how it answers per channel, procedure and practice, with a flow or sequence diagram per path
+- [ ] #3 Every Mermaid diagram in the updated document passes a render check in this session
+- [ ] #4 An image brief next to the document gives an image generator a light-theme composition (zones, nodes, connectors, palette, labels) and ready-to-use prompts for an overview plate and a BlueFlame Bot plate, with light-theme SVG and PNG reference wireframes
 - [ ] #5 An adversarial verification pass re-opened the cited sources and its corrections are applied; the result is logged in the task notes
-- [ ] #6 docs/process/agentic-setup.md points to the new document as its current successor
+- [ ] #6 docs/process/agentic-setup.html (the visual version) shows the updated architecture in the light theme
 <!-- AC:END -->
 
 ## Implementation Notes
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-11-15 tussenstand: inventarisatie loopt als vier parallelle workflows (10 deelgebieden, lezer plus verificateur die elk citaat heropent; actualiteitscheck voor bf-discord, bf-monitor, sat-chain). Beeldbrief docs/process/agentic-architecture-image-brief.md in concept. Correctie uit eigen lezing: #beta-testing, #english-support en #nederlandse-ondersteuning krijgen release-aankondigingen (.claude/skills/beta-release-2x/SKILL.md:278-283, .claude/skills/release-2x/SKILL.md:190-202); ze zijn dus niet puur alleen-lezen. Mermaid-batchcheck opgezet (mermaid 11.4.1 in headless Chromium); conceptdiagrammen 10/10 OK.
+
+2026-11-15 Robert (cloud session): 'Update het gevonden document. Je mag fable 5.2 voor het beschrijven van de architectuur op een zeer visuele manier. Kan je een light theme gebruiken voor de plaat?' Scope changed: update docs/process/agentic-setup.md and agentic-setup.html instead of a new document; chapter writers and the HTML visual run on Fable 5.2, adversarial reviewers on the session model; plates and prompts in the light palette of agentic-setup.html. ACs rewritten accordingly.
 <!-- SECTION:NOTES:END -->
