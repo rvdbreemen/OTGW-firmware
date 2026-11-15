@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-15T21:35:00Z'
-updated_date: '2026-11-15T23:52:00Z'
+updated_date: '2026-11-15T23:59:00Z'
 labels:
   - sat
   - sergeant-d
@@ -53,4 +53,6 @@ AC4 evidence (SIMULATION, NOT hardware-verified; no bench per Robert): real MsgI
 Smoke 09 on .61 (2026-11-16 00:38-00:51, beta.330+e18d182, sha ino 7c2682c5...576f / fs abe7e48e...c8d7 checked): PASS. OTA app+fs via safeboot EXIT 0; device and /version.hash e18d182; /api/v2/debug/crash githash e18d182, no crash record; bootcount 795 -> 797 (the two OTA restarts), none during the run. settings.ini byte-identical and /api/v2/settings identical before/after. Telnet 1.1 MB, 0 panic|guru|abort|CRITICAL. A master, SAT off: 54 R/min, MQTT connected, freeheap 55188-56772, maxblock 31732. B GW=L loopback, SAT off: 464-466 frames/min, MsgID 25 slave answers 6/min (the samples the ring sees), freeheap 55584-55600 constant. C back to master: 53 R/min, freeheap 55600. hd_min_free_heap 31620 -> 24312 during the run (same-boot watermark: new MsgIDs in loopback, discovery burst; not a trend). Not verified on the bench: the 2 min average itself, any SAT behaviour (no SAT scenarios per Robert). Evidence: 09 scratchpad b1990/. The pushed commit 6836283d3 has src identical to e18d1826e (git diff = 0 lines).
 
 AC1: plan with citations in the plan field; the reading (A: samples since the current flame-on, none during hot water) goes ahead under Robert's directive, the confirmation question Q-SUP1b is with Sergeant D (92, 78c77ed07); a different answer becomes a follow-up. AC2: tests/test_sat_flow_avg.py 7/7 on the fix, 2 red on HEAD (40->50 step: 44.0 vs 49.0; 2 s spacing). AC3: the start-up flood (satPwmFlameOffHold, satNoReturnFlood*, entries 45/151) and the continuous follow/clamp (satContinuousSetpoint, entries 336-349) still read satGetFlowTemp() (code unchanged there; test_sat_no_return_startup 20/20, test_sat_continuous_startup 11/11 green). AC4 stays open: only an open-loop replay of field samples through the real code (simulation, not hardware) exists; the CS in a real PWM ON phase is not benched (no SAT scenarios on the bench per Robert).
+
+Thread safety (advisor point): writer processOT() and reader satControlLoop() both run on the loop task. processOT() runs from the otFrameQueue drain in loop() (OTGW-Core.ino:560-591: 'Called from loop() AFTER ...', processOT() under the OTStateLock writer side) and from OTDirect.ino on the loop task (ADR-242 single writer). The PIC-UART FreeRTOS task only enqueues raw lines (TASK-865.6). So the multi-field ring state.otBus.flowAvg is never read mid-write; no lock needed.
 <!-- SECTION:NOTES:END -->
