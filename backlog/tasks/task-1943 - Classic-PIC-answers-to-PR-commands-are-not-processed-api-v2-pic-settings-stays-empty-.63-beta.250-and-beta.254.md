@@ -3,11 +3,11 @@ id: TASK-1943
 title: >-
   Classic PIC: answers to PR= commands are not processed; /api/v2/pic/settings
   stays empty (.63, beta.250 and beta.254)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-14T17:47:00Z'
-updated_date: '2026-11-15T15:20:00Z'
+updated_date: '2026-11-15T15:42:00Z'
 labels:
   - bug
 milestone: 2.0.0
@@ -54,3 +54,9 @@ Scope: the SAT simulation can only stay on without a boiler: a real boiler frame
 
 2026-11-15 16:13-16:19 (09, closes the AC3 MQTT gap noted at 12:42): .63 (Classic, PIC 6.8) on the post build beta.317+c1005d1 (contains the 1943 fix, origin/dev c1005d199), SAT enabled + SAT simulation ON, passive mosquitto_sub on OTGW/value/otgw-AC276ECE45D8/otgw-pic/# for 330 s from the boot, no commands to the unit: all otgw-pic/settings/* were published after the boot cycle - setpoint_override N, setback 16.00, dhw_override 1, gpio 00, gpio_states 11, led FXOMPC, tweaks 11, temp_sensor O, smart_power Low power, thermostat_detect D, builddate 11:55 25-08-2026, clock_mhz 4 MHz, reset_cause E, standalone_interval 1000, voltage_ref 5 - plus otgw-pic/gateway_mode ON and version/deviceid/firmwaretype/designer. Evidence: 09 scratchpad p317/63/mqtt-pic.txt.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+On a boiler-less Classic with the SAT simulation on, the ADR-117 simulation gate held back every PIC command, PR= included, so /api/v2/pic/settings stayed empty. AC1/AC2: 09 reproduced it on .63 and confirmed the cause red/green (sim on: no PR= sent, 0/15; sim off: answers in 15-50 ms). AC3: Robert chose A (DM 1571450830035484673); ADR-244 (amends ADR-117 path (a)) Accepted; sendPICSerial() lets PR= past the gate, CS=/GW= and every other command stay held; test/host/test_pic_sim_gate_pr.py red on the old code (PR=A/E/M held), 8/8 on the fix; 09 on .63 with beta.306: pic/settings 15/15 with the sim on, and with beta.317+c1005d1 every otgw-pic/settings/* topic published with SAT and the simulation on (09's note 16:13-16:19). Shipped in origin/dev 3556d199e (beta.306).
+<!-- SECTION:FINAL_SUMMARY:END -->
