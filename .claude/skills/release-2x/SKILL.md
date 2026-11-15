@@ -191,8 +191,13 @@ Each push to `release/2.x` happens only inside this flow after checkpoint 1.
 1. Draft both posts: Dutch in `#nederlandse-ondersteuning` (`815561033036333076`),
    English in `#english-support` (`931267109726593116`). A short note in
    `#beta-testing` (`914498730001072149`) for the testers, with thanks. Each under
-   2000 characters: version, what it is, who should update and how, the release
-   link, contributor credits.
+   2000 characters per message: version, what it is, who should update and how, the release
+   link, contributor credits. **Every post lists all changes since the previous release post
+   in that same channel** (Robert 2026-11-15), not only highlights: one plain-language line per
+   user-visible change; split into numbered parts ("1/3", ...) when it passes 2000 characters.
+   For the support channels the previous post is the last stable announcement there; for
+   `#beta-testing` it is the last beta announcement (so the list there covers what changed since
+   the last announced beta). Record all message ids in the tracking task.
 2. **CHECKPOINT 3**: show the posts; send after approval with
    `mcp__discord-mcp__send_message`; read each channel back.
 

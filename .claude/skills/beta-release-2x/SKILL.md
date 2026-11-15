@@ -261,17 +261,33 @@ from the file at create time.
    only reaches #alpha-testing). If the MCP is down, post through the Discord REST API with the
    bot token from the user environment (`DISCORD_TOKEN`, header `User-Agent: DiscordBot (local, 1.0)`,
    never print the token) and read the message back by its id.
-   Under 2000 characters. Content, for testers coming from 1.x:
-   - title line with the version, the release link
+   **Every change since the previous #beta-testing release post** (Robert 2026-11-15: "de
+   releases notes op discord altijd alle wijzigingen sinds laatste discord publicatie laten
+   zien"). Not highlights: the full list. Scope = every beta.N since the previous public beta
+   that was announced in #beta-testing (find that post: read the channel back for the last
+   bot message with a `releases/tag/v2.0.0-beta.` link; a skipped slot means its betas are
+   still unannounced and belong in this post). Source = the "What changed since" section of
+   the notes file plus the CHANGELOG `[<semver>-beta.N]` section; one plain-language line per
+   user- or tester-visible change with its TASK number, grouped by beta.N or by theme;
+   internal-only or CI-only changes may be left out but are counted ("plus N internal
+   changes"). Cross-check: every TASK id in the CHANGELOG section is in the post or in that count.
+   Discord caps a message at 2000 characters: split into numbered parts ("1/3", "2/3", ...),
+   each under 2000, sent in order; part 1 carries the title line and the release link, the
+   last part the disclaimer, before-you-flash and how-to-report blocks.
+   Content, for testers coming from 1.x:
+   - title line with the version, the release link, and "changes since beta.<previous announced>"
    - what 2.x is (ESP32-S3, S3 Mini replaces the Wemos, PIC stays, combo zip)
-   - 4-6 highlights, SAT experimental and off by default
+   - the full change list as above, SAT experimental and off by default
+   - BREAKING changes since the previous announced beta, each on its own line
    - the beta disclaimer: what was not tested, stay on 1.x if you need stability,
      going back to 1.x means the Wemos back in
    - before you flash: save settings, USB first flash for a new S3 Mini
      (`flash_otgw.bat` / `./flash_otgw.sh`, factory mode), `/update` with the zip on
      a 2.0.0 unit, port 25238 opt-in, read Breaking changes + Known issues
    - how to report (here or a GitHub issue, the capture upload zip)
-   After sending, read the channel back and check the text arrived intact.
+   After sending, read the channel back and check the text arrived intact (every part, in order).
+   Record the message ids of all parts in the tracking task; the next release starts its
+   change list from this post.
 
 ### Phase 7: Close out
 
