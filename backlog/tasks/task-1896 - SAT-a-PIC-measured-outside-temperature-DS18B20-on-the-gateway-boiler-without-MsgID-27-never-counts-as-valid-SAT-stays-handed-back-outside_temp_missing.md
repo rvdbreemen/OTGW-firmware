@@ -8,7 +8,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-13T09:55:00Z'
-updated_date: '2026-11-13T18:27:00Z'
+updated_date: '2026-11-15T10:15:00Z'
 labels:
   - bug
   - sat
@@ -29,7 +29,7 @@ Report: indigo_light (Discord 301077214374658048), #nederlandse-ondersteuning ht
 - [ ] #1 Capture from the reporter (or a bench reproduction) shows how the PIC reports the DS18B20 outside value (frame type for MsgID 27)
 - [x] #2 Sergeant D decides whether a gateway-measured outside value counts as a valid source (recorded as an entry)
 - [ ] #3 If yes: host test red on the old stamp rule, green on the fix; outside_temp_missing clears with only the PIC sensor present
-- [ ] #4 Bench or field confirmation
+- [x] #4 Bench or field confirmation
 - [ ] #5 Bench (Classic + PIC): with a PIC DS18B20 (or OT=) value and a boiler without MsgID 27, SAT reports the outside temperature as valid (osrc=O), outside_temp_missing is false, and no weather fetch is started
 <!-- AC:END -->
 
@@ -63,4 +63,6 @@ Firmware fix commit rebased onto ed751972a (docs pushed separately); the code-on
 Follow-up 1903 item 2 (2026-11-13, wt-95w lane-95-219b, coordinator decision after 92's check): otFrameIsFreshOutsideTemp() also returns false for bLocalAnswer, so an OT-Direct loopback B Read-Ack 27 (OTDirect.ino:973 marks B as local only in loopback; R frames are never local, so OT= on OT-Direct still stamps) no longer stamps iToutsideBoilerMs. SAT sim is unaffected (satResolveOutsideTemp returns the sim outdoor first, osrc S). Pre-existing gap, the old inline block had the same conditions. Tests: tests/test_outside_stamp_gateway_frames.py test_local_answer_boiler_read_ack_does_not_stamp and test/host/test_replay_frame_guards.cpp 'B Read-Ack 27 with bLocalAnswer=1 does not stamp'. Red on the predicate without the condition: py FAILED (failures=1), cpp 'got 5000 want 111'; green with it: py 10 OK, cpp PASS. --rev origin/dev fails on both the bLocalAnswer and the Write-Data case. Also green: sat_restart_quiet 20, boiler_unsupported_origin, ino_prototype_hoisting 2, boiler_support_bitmap_b_only 11, weather_worker_handoff 11.
 
 Bench limit (2026-11-13, 09 via the coordinator, build 2.0.0-beta.226+e86aed9): not demonstrable on the bench unit .61. OT-Direct loopback never asks MsgID 27, and the bench has neither a thermostat nor a boiler that would make the PIC send a Write-Data 27. Evidence stays host tests (tests/test_outside_stamp_gateway_frames.py, test/host/test_replay_frame_guards.py with the --rev origin/dev red run, including the bLocalAnswer follow-up) plus field confirmation by indigo_light. Not shown on a device.
+
+2026-11-15 AC4 field confirmation (d3 read the message itself): indigo_light in #beta-testing, https://discord.com/channels/812969634638725140/914498730001072149/1571465125280350249 (10:01 UTC). Setup: beta.250+aed38bf, OTGW Classic + LOLIN S3 Mini, PIC 6.8, Viessmann Vitodens 100-W (boiler sends no MsgID 27), DS18B20 on the PIC, SAT on, Open-Meteo off, no external outdoor temperature. sat/status: active true, outside_temp_missing false, external_outdoor_valid false, outside_temp 6.31, heating_curve 33.7, final_setpoint 33.95. On beta.218 SAT stayed inactive with outside_temp_missing true. AC1 waits for his --long-run --sat-trace capture (running since 10:50 local) for the PIC frame type of MsgID 27. Not covered by this report: AC5 (osrc=O and no weather fetch; with Open-Meteo off a fetch is not expected anyway) and TASK-1897 (weather off). New finding in the same message: otgw/label/Toutside reports status data_invalid while SAT uses the value; Robert answered 'Nee gaan we fixen' (msg 1571466554011553823), so that inconsistency is to be fixed (task to be filed by the coordinator or under this task).
 <!-- SECTION:NOTES:END -->
