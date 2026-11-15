@@ -597,7 +597,12 @@ static uint8_t otUnknownCounters[32];     // 128 MsgIDs × 2 bits = 32 bytes
 - `DebugTln()`, `DebugTf()` - Telnet debug output
 
 ### External Dependencies
-- **OpenTherm.h** (project-pinned library, `/src/libraries/OpenTherm/src/OpenTherm.h`)
+- **OpenTherm.h** (project-pinned library, `/src/libraries/OpenTherm/src/OpenTherm.h`): the submodule points at
+  `rvdbreemen/opentherm_library`, branch `fix-timer-wrap`, commit `51aa68e` (Phunkafizer master `720cee9` plus the
+  timer fixes of upstream PR Phunkafizer/opentherm_library#1: `isReady()` stays usable without a valid answer past
+  2^31 us, `setDelay()` across the `micros()` wrap, `end()` resets the transmit state, a stalled transmit ends with
+  TIMEOUT after 10 ms). Maintainer exception to the no-library-changes rule (Robert, DM 1571553430923911252 and
+  1571560593712746617; TASK-1980). Back to Phunkafizer once the PR is merged there.
   - Classes: `OpenTherm` (master/slave, async/sync modes)
   - Enums: `OpenThermMessageType`, `OpenThermMessageID`, `OpenThermResponseStatus`
   - Methods: `begin()`, `sendRequestAsync()`, `sendResponse()`, `process()`, `getLastResponse()`, `getLastResponseStatus()`, `isReady()`, `handleInterrupt()`, `buildRequest()`, `buildResponse()`, `getMessageType()`, `getDataID()`, `isValidResponse()`, `parity()`

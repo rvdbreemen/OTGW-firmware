@@ -106,7 +106,7 @@ static void dump(const char* tag) {
 }
 #ifndef HAVE_RING
 static void otdCmdTextDrain() {}
-static void otdMasterGuard() {}   // TASK-1966: boiler line guard, tests/test_otd_master_line_stale_delay.py
+static void otdMasterStatus() {}   // TASK-1980: mirrors the in-flight flag to state.otd, not under test here
 #endif
 int main(int argc, char** argv) {
   const std::string mode = argc > 1 ? argv[1] : "";
