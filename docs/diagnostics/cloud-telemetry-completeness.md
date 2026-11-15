@@ -146,3 +146,20 @@ Findings:
   debug text.
 - The synthetic OT stream stands in for the field stream in the v2 figure; encoding the field stream with v2 is
   still to do.
+
+## Storage per gateway (2026-11-15)
+
+PocketBase stores the payload as base64 text (x 4/3); in the measured runs the database grew by about the base64
+payload (mix study: 291 KB/h stored against 301 KB/h sent, headers included). Payload figures from the table above.
+
+| Profile | Per day | 7 days | 30 days | 90 days | 1 year |
+|---|---:|---:|---:|---:|---:|
+| Full telemetry, no debug text | 3.0-3.9 MB | 21-27 MB | 90-117 MB | 270-350 MB | 1.1-1.4 GB |
+| + debug text, no-PSRAM budget | ~12-13 MB | ~85-90 MB | ~360-390 MB | ~1.1 GB | ~4.5 GB |
+| + all debug text (PSRAM, token + zlib) | ~43-44 MB | ~0.3 GB | ~1.3 GB | ~3.9 GB | ~16 GB |
+
+- SQLite reuses the pages that the nightly retention delete frees, so the file levels off at about the retention
+  window; it only shrinks with a `VACUUM` (`retention.pb.js` does not run one).
+- PocketBase also logs every request in `auxiliary.db` (1,440 per gateway per day; estimate under 1 MB per day,
+  kept for the log retention days set in the dashboard).
+- A NAS backup (Hyper Backup) multiplies this by the number of versions it keeps.
