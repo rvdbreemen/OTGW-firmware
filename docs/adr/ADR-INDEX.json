@@ -10060,7 +10060,7 @@
       "title": "The Home Assistant climate entity follows SAT while SAT is enabled, with a fixed discovery and routing in the firmware",
       "path": "ADR-248-the-home-assistant-climate-entity-follows-sat-while-sat-is-enabled-with-a-fixed-discovery-and-routing-in-the-firmware.md",
       "format": "canonical",
-      "status": "Proposed",
+      "status": "Accepted",
       "date": "2026-11-15",
       "decision_summary": "The existing climate.Thermostat entity keeps its uniqid and its discovery payload is fixed; the firmware routes the c...",
       "topics": [

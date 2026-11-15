@@ -7374,3 +7374,236 @@ Robert, 16:18:42 UTC (https://discord.com/channels/812969634638725140/9144987300
 **Open:** the meaning of "displayed as `OTGW_Thermostat`" (entry 351). Implementation needs a Proposed ADR (MQTT contract and discovery payload change) before code.
 
 **Task:** TASK-1979.
+
+## 354. Q-PWM1 answered A: PWM cycle length (Sergeant D, 2026-11-15; batch item 1 of 18)
+
+**Source:** #dev-sat-mqtt 2026-11-15, the 18-question batch (item 1: https://discord.com/channels/812969634638725140/1105556725714649128/1571633449331069052), his answer 21:28:08 UTC: https://discord.com/channels/812969634638725140/1105556725714649128/1571637957230862506
+
+**Quoted:**
+
+> "1: A"
+
+**Settled:** A mid-range PWM cycle follows the duty: on/off are recomputed every update, as thermo-nova (pwm.py:135, 1200 s at pwm.py:274-283). It matches the choice taken under Robert's directive (option A).
+
+**Task:** none.
+
+
+## 355. Q-PWM2 answered B: PWM evaluation rate (Sergeant D, 2026-11-15; batch item 2 of 18)
+
+**Source:** #dev-sat-mqtt 2026-11-15, the 18-question batch (item 2: https://discord.com/channels/812969634638725140/1105556725714649128/1571633449331069052), his answer 21:28:08 UTC: https://discord.com/channels/812969634638725140/1105556725714649128/1571637957230862506
+
+**Quoted:**
+
+> "2: B"
+
+**Settled:** The firmware keeps evaluating PWM on the 30 s control tick (SATtypes.h:506, satPwmSchedule() at SATcontrol.ino:8006); the firmware does not move to the 5 s loop that thermo-nova uses (climate.py:707-708). It differs from the choice taken under Robert's directive (option A (weighed by comms)), so that choice is replaced.
+
+**Task:** none: the planned 5 s task is not filed.
+
+
+## 356. Q-P2 answered open: he asks for the graph: Saturation timer while the flame is off (Sergeant D, 2026-11-15; batch item 3 of 18)
+
+**Source:** #dev-sat-mqtt 2026-11-15, the 18-question batch (item 3: https://discord.com/channels/812969634638725140/1105556725714649128/1571633449331069052), his answer 21:28:08 UTC: https://discord.com/channels/812969634638725140/1105556725714649128/1571637957230862506
+
+**Quoted:**
+
+> "3: I need to see the graph"
+
+**Settled:** nothing. Nothing yet: he asks to see the graph before he chooses.
+
+**Task:** Q-P2 stays open; the graph comes from the gruijter analysis (ba).
+
+
+## 357. Q-P1 answered A: PID after a reboot (Sergeant D, 2026-11-15; batch item 4 of 18)
+
+**Source:** #dev-sat-mqtt 2026-11-15, the 18-question batch (item 4: https://discord.com/channels/812969634638725140/1105556725714649128/1571633449331069052), his answer 21:28:08 UTC: https://discord.com/channels/812969634638725140/1105556725714649128/1571637957230862506
+
+**Quoted:**
+
+> "4: A"
+
+**Settled:** After a reboot SAT sends curve + P + I + D from the restored state, as thermo-nova (pid.py:150-155; climate.py:375). Supersedes the curve-only reading of entry 115. It matches the choice taken under Robert's directive (option A).
+
+**Task:** check the firmware against it.
+
+
+## 358. Q-1882a answered A: Self-tune and heating failures (Sergeant D, 2026-11-15; batch item 5 of 18)
+
+**Source:** #dev-sat-mqtt 2026-11-15, the 18-question batch (item 5: https://discord.com/channels/812969634638725140/1105556725714649128/1571633456381694074), his answer 21:28:08 UTC: https://discord.com/channels/812969634638725140/1105556725714649128/1571637957230862506
+
+**Quoted:**
+
+> "5: A"
+
+**Settled:** Hours with a heating-failure or no-ignition event are left out of the heating curve self-tune (firmware rule; thermo-nova has no tuner, entry_data.py:213). It matches the choice taken under Robert's directive (option A (weighed by comms)).
+
+**Task:** TASK-1882.
+
+
+## 359. Q-327a answered A: Overshoot fail-safe (Sergeant D, 2026-11-15; batch item 6 of 18)
+
+**Source:** #dev-sat-mqtt 2026-11-15, the 18-question batch (item 6: https://discord.com/channels/812969634638725140/1105556725714649128/1571633456381694074), his answer 21:28:08 UTC: https://discord.com/channels/812969634638725140/1105556725714649128/1571637957230862506
+
+**Quoted:**
+
+> "6: A"
+
+**Settled:** The 3.5 C / 30 s fail-safe stays next to the 1.5 C / 30 s rule of entry 327. It matches the choice taken under Robert's directive (option A).
+
+**Task:** TASK-1888.
+
+
+## 360. Q-327b answered A: Where the 1.5 C lives (Sergeant D, 2026-11-15; batch item 7 of 18)
+
+**Source:** #dev-sat-mqtt 2026-11-15, the 18-question batch (item 7: https://discord.com/channels/812969634638725140/1105556725714649128/1571633456381694074), his answer 21:28:08 UTC: https://discord.com/channels/812969634638725140/1105556725714649128/1571637957230862506
+
+**Quoted:**
+
+> "7: A"
+
+**Settled:** A separate value for the switch (1.5 C / 30 s); the overshoot margin keeps 2.0 for the classifier (entry 37 unchanged, no migration). It matches the choice taken under Robert's directive (option A).
+
+**Task:** TASK-1888.
+
+
+## 361. Q-328a answered A: Tolerance band (Sergeant D, 2026-11-15; batch item 8 of 18)
+
+**Source:** #dev-sat-mqtt 2026-11-15, the 18-question batch (item 8: https://discord.com/channels/812969634638725140/1105556725714649128/1571633456381694074), his answer 21:28:08 UTC: https://discord.com/channels/812969634638725140/1105556725714649128/1571637957230862506
+
+**Quoted:**
+
+> "8: A"
+
+**Settled:** The tolerance band of entry 328 only decides CH on/off; the PID keeps running; the cold cutoff (ADR-199) is unchanged. It matches the choice taken under Robert's directive (option A).
+
+**Task:** TASK-1887.
+
+
+## 362. Q-1867a answered B: Pressure drop alarm after a pump stop (Sergeant D, 2026-11-15; batch item 9 of 18)
+
+**Source:** #dev-sat-mqtt 2026-11-15, the 18-question batch (item 9: https://discord.com/channels/812969634638725140/1105556725714649128/1571633456381694074), his answer 21:28:08 UTC: https://discord.com/channels/812969634638725140/1105556725714649128/1571637957230862506
+
+**Quoted:**
+
+> "9: B"
+
+**Settled:** The pressure samples recorded during the 600 s settle window are thrown away (thermo-nova binary_sensor.py:25 PRESSURE_DROP_RATE_SETTLE_SECONDS 600). It matches the choice taken under Robert's directive (option B).
+
+**Task:** TASK-1867.
+
+
+## 363. Q-215a answered A: PWM permission after a restart (Sergeant D, 2026-11-15; batch item 10 of 18)
+
+**Source:** #dev-sat-mqtt 2026-11-15, the 18-question batch (item 10: https://discord.com/channels/812969634638725140/1105556725714649128/1571633463910727722), his answer 21:28:08 UTC: https://discord.com/channels/812969634638725140/1105556725714649128/1571637957230862506
+
+**Quoted:**
+
+> "10: A"
+
+**Settled:** Entry 215 stays as it is: after a restart SAT runs continuous until the boiler answers MsgID 3 again. It matches the choice taken under Robert's directive (option A).
+
+**Task:** none (TASK-1899 note).
+
+
+## 364. Q-SUP1 answered A: Average flow for the suppression (Sergeant D, 2026-11-15; batch item 11 of 18)
+
+**Source:** #dev-sat-mqtt 2026-11-15, the 18-question batch (item 11: https://discord.com/channels/812969634638725140/1105556725714649128/1571633463910727722), his answer 21:28:08 UTC: https://discord.com/channels/812969634638725140/1105556725714649128/1571637957230862506
+
+**Quoted:**
+
+> "11: A, 2 minutes window"
+
+**Settled:** During PWM ON the suppression setpoint uses an average flow temperature over a 2 minute window, not the latest value (our reading of "2 minutes window": a moving average of the flow readings of the last 2 minutes; to be confirmed when the task is planned). This is a deviation from thermo-nova, which uses the latest flow (heating_control.py:435-441, coordinator/__init__.py:139, coordinator/mqtt/opentherm.py:107-110). It differs from the choice taken under Robert's directive (option B), so that choice is replaced.
+
+**Task:** new follow-up task (his answer differs from the directive choice B).
+
+
+## 365. Q-LRN1 answered A: PWM ticks lowering the curve (Sergeant D, 2026-11-15; batch item 12 of 18)
+
+**Source:** #dev-sat-mqtt 2026-11-15, the 18-question batch (item 12: https://discord.com/channels/812969634638725140/1105556725714649128/1571633463910727722), his answer 21:28:08 UTC: https://discord.com/channels/812969634638725140/1105556725714649128/1571637957230862506
+
+**Quoted:**
+
+> "12: A"
+
+**Settled:** On a gas boiler PWM ticks may raise and lower the self-tune, as now (entries 304, 316, 318). It matches the choice taken under Robert's directive (option A).
+
+**Task:** none.
+
+
+## 366. Q-LRN2 answered B: Freeze learning under a supervisor (Sergeant D, 2026-11-15; batch item 13 of 18)
+
+**Source:** #dev-sat-mqtt 2026-11-15, the 18-question batch (item 13: https://discord.com/channels/812969634638725140/1105556725714649128/1571633463910727722), his answer 21:28:08 UTC: https://discord.com/channels/812969634638725140/1105556725714649128/1571637957230862506
+
+**Quoted:**
+
+> "13: B"
+
+**Settled:** If a supervisor is ever added, learning keeps running (entry 305). It matches the choice taken under Robert's directive (option B).
+
+**Task:** none.
+
+
+## 367. Q-TUNE1 answered A: Faster self-tune (Sergeant D, 2026-11-15; batch item 14 of 18)
+
+**Source:** #dev-sat-mqtt 2026-11-15, the 18-question batch (item 14: https://discord.com/channels/812969634638725140/1105556725714649128/1571633463910727722), his answer 21:28:08 UTC: https://discord.com/channels/812969634638725140/1105556725714649128/1571637957230862506
+
+**Quoted:**
+
+> "14: A"
+
+**Settled:** Keep the exclusions; only a faster window and step. It matches the choice taken under Robert's directive (option A).
+
+**Task:** none.
+
+
+## 368. Q-334b answered A: Start-up flood rate (Sergeant D, 2026-11-15; batch item 15 of 18)
+
+**Source:** #dev-sat-mqtt 2026-11-15, the 18-question batch (item 15: https://discord.com/channels/812969634638725140/1105556725714649128/1571633470696980583), his answer 21:28:08 UTC: https://discord.com/channels/812969634638725140/1105556725714649128/1571637957230862506
+
+**Quoted:**
+
+> "15: A"
+
+**Settled:** The 2 s start-up flood stays (not on change + 30 s inside the flood). It matches the choice taken under Robert's directive (option A).
+
+**Task:** none (TASK-1924 note).
+
+
+## 369. Q-343a answered B: Self-tune hour with one extra tick (Sergeant D, 2026-11-15; batch item 16 of 18)
+
+**Source:** #dev-sat-mqtt 2026-11-15, the 18-question batch (item 16: https://discord.com/channels/812969634638725140/1105556725714649128/1571633470696980583), his answer 21:28:08 UTC: https://discord.com/channels/812969634638725140/1105556725714649128/1571637957230862506
+
+**Quoted:**
+
+> "16: B"
+
+**Settled:** An hour counts with 108 clean ticks whatever it logged (90 % of the expected 120), not 90 % of what it logged. It differs from the choice taken under Robert's directive (option A), so that choice is replaced.
+
+**Task:** TASK-1932 changes (his answer differs from the directive choice A).
+
+
+## 370. Q-1804a answered A: Boiler refuses SAT's setpoint (boards without a PIC) (Sergeant D, 2026-11-15; batch item 17 of 18)
+
+**Source:** #dev-sat-mqtt 2026-11-15, the 18-question batch (item 17: https://discord.com/channels/812969634638725140/1105556725714649128/1571633470696980583), his answer 21:28:08 UTC: https://discord.com/channels/812969634638725140/1105556725714649128/1571637957230862506
+
+**Quoted:**
+
+> "17: A"
+
+**Settled:** Like the PIC: a Data-Invalid/Unknown-DataID answer to SAT's CS (MsgID 1) or DHW setpoint (MsgID 56) clears them; SAT sets them again on its next send (PIC gateway.asm 6.6 :2822-2825, :3141-3147). SH= stays per entry 252. It matches the choice taken under Robert's directive (option A).
+
+**Task:** TASK-1804 item A2.
+
+
+## 371. Q-1979a answered with an explanation: "OTGW_Thermostat" (Sergeant D, 2026-11-15; batch item 18 of 18)
+
+**Source:** #dev-sat-mqtt 2026-11-15, the 18-question batch (item 18: https://discord.com/channels/812969634638725140/1105556725714649128/1571633470696980583), his answer 21:28:08 UTC: https://discord.com/channels/812969634638725140/1105556725714649128/1571637957230862506
+
+**Quoted:**
+
+> "18: In gateway mode ( without physical thermostat) the OTGW mqtt climate doesn’t have a room temperature and setpoint. Therefore if sat is enabled can use this climate entity. No need for a second mqtt entity"
+
+**Settled:** His explanation of entry 351: in gateway mode without a physical thermostat the OTGW MQTT climate entity has no room temperature and setpoint, so while SAT is enabled SAT can use this climate entity; no second MQTT entity. Read as option B: keep the existing entity (and its name "Thermostat"), as ADR-248 decides.
+
+**Task:** ADR-248 (accept question to Robert).

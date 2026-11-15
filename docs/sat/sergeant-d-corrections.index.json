@@ -4706,6 +4706,222 @@
     "TASK-1979"
    ],
    "confirmed_by_entry": null
+  },
+  {
+   "id": 354,
+   "title": "Q-PWM1 answered A: PWM cycle length (Sergeant D, 2026-11-15; batch item 1 of 18)",
+   "date": "2026-11-15",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1571633449331069052",
+   "supersedes": [],
+   "tasks": [],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 355,
+   "title": "Q-PWM2 answered B: PWM evaluation rate (Sergeant D, 2026-11-15; batch item 2 of 18)",
+   "date": "2026-11-15",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1571633449331069052",
+   "supersedes": [],
+   "tasks": [],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 356,
+   "title": "Q-P2 answered open: he asks for the graph: Saturation timer while the flame is off (Sergeant D, 2026-11-15; batch item 3 of 18)",
+   "date": "2026-11-15",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1571633449331069052",
+   "supersedes": [],
+   "tasks": [],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 357,
+   "title": "Q-P1 answered A: PID after a reboot (Sergeant D, 2026-11-15; batch item 4 of 18)",
+   "date": "2026-11-15",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1571633449331069052",
+   "supersedes": [],
+   "tasks": [],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 358,
+   "title": "Q-1882a answered A: Self-tune and heating failures (Sergeant D, 2026-11-15; batch item 5 of 18)",
+   "date": "2026-11-15",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1571633456381694074",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1882"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 359,
+   "title": "Q-327a answered A: Overshoot fail-safe (Sergeant D, 2026-11-15; batch item 6 of 18)",
+   "date": "2026-11-15",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1571633456381694074",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1888"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 360,
+   "title": "Q-327b answered A: Where the 1.5 C lives (Sergeant D, 2026-11-15; batch item 7 of 18)",
+   "date": "2026-11-15",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1571633456381694074",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1888"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 361,
+   "title": "Q-328a answered A: Tolerance band (Sergeant D, 2026-11-15; batch item 8 of 18)",
+   "date": "2026-11-15",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1571633456381694074",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1887"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 362,
+   "title": "Q-1867a answered B: Pressure drop alarm after a pump stop (Sergeant D, 2026-11-15; batch item 9 of 18)",
+   "date": "2026-11-15",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1571633456381694074",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1867"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 363,
+   "title": "Q-215a answered A: PWM permission after a restart (Sergeant D, 2026-11-15; batch item 10 of 18)",
+   "date": "2026-11-15",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1571633463910727722",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1899"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 364,
+   "title": "Q-SUP1 answered A: Average flow for the suppression (Sergeant D, 2026-11-15; batch item 11 of 18)",
+   "date": "2026-11-15",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1571633463910727722",
+   "supersedes": [],
+   "tasks": [],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 365,
+   "title": "Q-LRN1 answered A: PWM ticks lowering the curve (Sergeant D, 2026-11-15; batch item 12 of 18)",
+   "date": "2026-11-15",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1571633463910727722",
+   "supersedes": [],
+   "tasks": [],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 366,
+   "title": "Q-LRN2 answered B: Freeze learning under a supervisor (Sergeant D, 2026-11-15; batch item 13 of 18)",
+   "date": "2026-11-15",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1571633463910727722",
+   "supersedes": [],
+   "tasks": [],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 367,
+   "title": "Q-TUNE1 answered A: Faster self-tune (Sergeant D, 2026-11-15; batch item 14 of 18)",
+   "date": "2026-11-15",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1571633463910727722",
+   "supersedes": [],
+   "tasks": [],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 368,
+   "title": "Q-334b answered A: Start-up flood rate (Sergeant D, 2026-11-15; batch item 15 of 18)",
+   "date": "2026-11-15",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1571633470696980583",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1924"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 369,
+   "title": "Q-343a answered B: Self-tune hour with one extra tick (Sergeant D, 2026-11-15; batch item 16 of 18)",
+   "date": "2026-11-15",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1571633470696980583",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1932"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 370,
+   "title": "Q-1804a answered A: Boiler refuses SAT's setpoint (boards without a PIC) (Sergeant D, 2026-11-15; batch item 17 of 18)",
+   "date": "2026-11-15",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1571633470696980583",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1804"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 371,
+   "title": "Q-1979a answered with an explanation: \"OTGW_Thermostat\" (Sergeant D, 2026-11-15; batch item 18 of 18)",
+   "date": "2026-11-15",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1571633470696980583",
+   "supersedes": [],
+   "tasks": [],
+   "confirmed_by_entry": null
   }
  ]
 }
