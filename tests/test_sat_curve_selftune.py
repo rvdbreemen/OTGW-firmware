@@ -920,8 +920,10 @@ class ExclusionMutation(unittest.TestCase):
                 if not exe:
                     self.skipTest("no host C++ compiler")
                 tokens = EXCL_PRE.get(ex, []) + ["S"] + day(0.5, clean=6, excl=ex) * 3
+                # TASK-1878: the tune file goes to the temp dir, not to the runner's cwd (the repo root)
+                env = dict(os.environ, SATTUNE_FILE=str(Path(self.tmp.name) / f"mut_{ex}.json"))
                 out = Out(subprocess.run([str(exe)], input="\n".join(tokens), capture_output=True, text=True,
-                                         check=True).stdout)
+                                         check=True, env=env).stdout)
                 # a tick of dhw / not_sat carries no signal, so its removal shows in the clean-hour count, the others in the mean
                 caught = out.coeff != 2.0 or out.days[2]["clean"] != "6"
                 self.assertTrue(caught, f"removing the {ex} exclusion went unnoticed")
