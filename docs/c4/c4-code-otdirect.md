@@ -113,6 +113,7 @@ The OTDirect module operates as a cooperative OpenTherm stack layered on the pro
   - Returns early if master busy (`otMasterRequestActive`)
   - Returns early if MI= minimum gap not satisfied
   - Dequeues and sends commands from ring buffer (command queue takes priority)
+  - Waits for MI= (`otMinIntervalMs`, from the start of the previous send) and for the 100 ms MWT from the end of the previous conversation (`OTD_MWT_MS`, `otdLastConvEndMs` stamped by `handleMasterResponse()`, OT spec v4.2 :1100, TASK-1954)
   - Round-robins through schedule table (`otScheduleIdx`), skipping disabled entries. While the bus is offline (`!state.otBus.bOnline`) only MsgID 0 is sent, at its normal 800 ms interval (TASK-1802: a boiler gets a frame within the spec's 1.15 s after a failed one, as on the PIC; the old 5 s retry left it 5-6 s without a frame). MsgIDs 70 and 71 poll every 10 s instead of 60 s when the slave reports a ventilation/HRV application (`otIsVentSlave()`):
     - Status (MsgID 0): always ready, uses `buildStatusRequest()` with current flags
     - Read entries: sent on interval with READ_DATA

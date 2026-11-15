@@ -431,6 +431,8 @@ struct State { OTBus otBus; OTD otd; }; static State state;
 enum OTDirectMode { OTD_MODE_GATEWAY = 1 }; static OTDirectMode otCurrentMode = OTD_MODE_GATEWAY;
 static unsigned long buildStatusRequest() { return 0xFFFF0000UL; }
 static bool otIsVentSlave() { return false; }
+static constexpr uint32_t OTD_MWT_MS = 100;   // TASK-1954: MWT floor of the scheduler; never stamped in this harness
+static uint32_t otdLastConvEndMs = 0;
 static bool otCmdQueueEmpty() { return true; }
 static void otCmdApplyPendingFlush() {}
 static bool otCmdEnqueue(unsigned long f) { printf("%lu ENQ %lu\n", (unsigned long)g_ms, f & 0xFFFF); return true; }

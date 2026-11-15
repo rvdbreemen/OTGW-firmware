@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTDirect.ino
-**  Version  : v2.0.0-beta.306
+**  Version  : v2.0.0-beta.307
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -132,6 +132,11 @@ static bool otSummerMode       = false;     // SM= summer mode (bit5 of MsgID 0 
 // Phase 4: Message interval — MI= global minimum inter-message gap
 static uint32_t otMinIntervalMs  = 100;     // default 100ms
 static uint32_t otLastAnySendMs  = 0;       // timestamp of last frame sent
+// TASK-1954: the master waits 100 ms (MWT) from the END of the previous conversation before it starts a new one
+// (OT spec v4.2 :1100). MI= counts from the start of the previous send, so with a late boiler answer it alone could
+// start the next frame inside the MWT. handleMasterResponse() stamps the end of every real bus conversation.
+static constexpr uint32_t OTD_MWT_MS = 100;
+static uint32_t otdLastConvEndMs = 0;
 
 // Phase 5: Fail safety — FS= controls setback on thermostat disconnect
 static bool otFailSafeEnabled    = true;    // default: enabled
@@ -2083,6 +2088,10 @@ static void handleMasterResponse() {
     replyToThermostat(otLastRequestOrigin, otLastSentRequest, response);
   }
 
+  // TASK-1954: a received frame (an answer or an invalid one) ends the conversation now; the MWT counts from here.
+  // A timeout does not: the bus has been quiet since our own frame (about 1 s), and an extra 100 ms would push the
+  // next status request past the spec's 1.15 s master interval (v4.2 :1101) while the boiler is offline.
+  if (status != OpenThermResponseStatus::TIMEOUT) otdLastConvEndMs = millis();
   otMasterRequestActive = false;
   otLastRequestOrigin = OT_DIRECT_ORIGIN_GATEWAY;
 }
@@ -2102,6 +2111,8 @@ static void scheduleMasterRequest() {
 
   // MI= global minimum inter-message gap
   if ((now - otLastAnySendMs) < otMinIntervalMs) return;
+  // TASK-1954: and the MWT, 100 ms from the end of the previous conversation (spec v4.2 :1100)
+  if ((now - otdLastConvEndMs) < OTD_MWT_MS) return;
 
   // Pending commands from the ring buffer take priority.
   // Peek first — only dequeue after successful async send (Codex P1 fix).
@@ -2121,6 +2132,18 @@ static void scheduleMasterRequest() {
   // a failed one, as on the PIC, which retries at the next 1 s tick (gateway.asm 6.6 :1490-1498). A 5 s retry left a
   // boiler 5-6 s without a frame, and the spec lets it treat 5 s without a valid frame as a short circuit (:1006-1016).
   bool busOffline = !state.otBus.bOnline;
+
+  // TASK-1804 Bug 4: MsgID 0 (status) goes first whenever it is due. In the round-robin below it only came round when
+  // the scan wrapped, so a chain of due entries (the 10 s tier, the 60 s slow-poll burst) held it back by seconds; the
+  // MWT of TASK-1954 made each frame longer and that worse. The PIC sends its status in every standalone cycle
+  // (MessageTable, gateway.asm 6.6 :1818-1836).
+  for (uint8_t i = 0; i < OT_SCHEDULE_SIZE; i++) {
+    OTScheduleEntry &st = otSchedule[i];
+    if (st.msgId != 0 || st.disabled || st.isWrite) continue;
+    if ((now - st.lastSentMs) < st.intervalMs) break;
+    if (sendMasterRequestAsync(buildStatusRequest(), OT_DIRECT_ORIGIN_GATEWAY)) st.lastSentMs = now;
+    return;
+  }
 
   // Round-robin through the schedule table, skipping disabled entries
   uint8_t startIdx = otScheduleIdx;

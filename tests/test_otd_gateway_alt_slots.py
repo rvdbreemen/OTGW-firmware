@@ -520,7 +520,12 @@ class GatewayAltSlots(unittest.TestCase):
 
     def test_S1_standalone_runs_own_schedule(self):
         r = self.rows["S1"]
-        self.assertGreater(r["status0"], 300, "without a thermostat the gateway is the only master and sends MsgID 0")
+        # TASK-1804 Bug 4 (in TASK-1954's lane): MsgID 0 goes first whenever it is due, so it runs at its own 800 ms
+        # interval: 450 frames in the 360 s run (measured; 297 before, when the round-robin held it back behind the other
+        # due entries). The band catches both "no MsgID 0" and a return of the hold-back; the MWT is tested in
+        # tests/test_otd_mwt.py, the priority in tests/test_otd_status_priority.py.
+        self.assertGreater(r["status0"], 430, "without a thermostat the gateway is the only master and sends MsgID 0")
+        self.assertLessEqual(r["status0"], 451, "at most one MsgID 0 per 800 ms interval")
         self.assertGreater(r["bframes"], 1000)
 
     @unittest.skipUnless(REF_INO, "OTGW_OTD_REF not set")

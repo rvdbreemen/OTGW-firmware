@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-11T12:30:00Z'
-updated_date: '2026-11-14T23:41:00Z'
+updated_date: '2026-11-15T06:00:00Z'
 labels:
   - otdirect
   - review-2026-11-11
@@ -47,4 +47,6 @@ D2 Timing (spec v4.2: the slave answers 20-800 ms after the request): the write 
 D3 Answers: the boiler's reply goes back through replyToThermostat() as in gateway mode: WRITE_ACK with the boiler's data, Data-Invalid (the boilerDataInvalid path), Unknown-DataID; a timeout or corrupt reply gives no answer (the thermostat retries, as behind a PIC). Unknown-DataID counts toward the 3-strike UI= rule as for the gateway's own frames. While the boiler is offline (TASK-1807) nothing is forwarded or answered. D4 READs: unchanged (cache answers, ADR-066). D5 Tests (AC3/AC4): the real handleMasterModeSlaveFrame + the master consumer with a fake bus: a 56 write reaches the boiler with the thermostat's data and the thermostat gets the boiler's WRITE_ACK/DI/UNK; 1/16/24 and the SAT-owned 8/14 keep the local echo; an SW= override replaces the data; a write arriving while an own frame is in flight goes out right after it, ahead of the schedule.
 
 Correction to D2 (spec read in full): the answer window is 20-400 ms, typically 100 ms or less (spec v4.2 :1093-1095), not 800 ms; and a slave that functions as a gateway may exceed it: 'the maximum waiting time does not apply' (:1097-1098). A forwarded write is exactly that case, so the relay is within the spec. ADR-241 Proposed (number reserved by the coordinator), amends ADR-066; 'adr relate' to ADR-066 refused (ADR-066 has no Status History block), so ADR-066 is named in the text only; related to ADR-179. Open question in ADR-241 for Robert: the slot rule and the SAT exclusion of 8/14. bEnableSlave default conflict filed as TASK-1953. No code until Robert accepts.
+
+Merge note (2026-11-15, coordinator): TASK-1954 lands first and owns OTD_MWT_MS and otdLastConvEndMs (declared next to otLastAnySendMs, stamped in handleMasterResponse() on every received frame, not on a timeout). At its rebase lane-1924-1812 removes its own definitions (OTDirect.ino ~:840-844) and its own stamp in the TASK-1812 block, and its relay uses 1954's otdLastConvEndMs. Check test_otd_master_write_relay 'busy' (MWT) after the rebase.
 <!-- SECTION:NOTES:END -->

@@ -81,6 +81,8 @@ $otdAnchors = @(
   @{ Name = 'thermostat seen state';        Kind = 'range';     Regex = '^static bool\s+otThermostatSeen\b';
      EndRegex = '^static uint32_t otLastThermostatMs\b'; EndKind = 'construct' },
   @{ Name = 'otLastAnySendMs';              Kind = 'construct'; Regex = '^static uint32_t otLastAnySendMs\b' },
+  @{ Name = 'MWT (TASK-1954)';              Kind = 'range';     Regex = '^static constexpr uint32_t OTD_MWT_MS\b';
+     EndRegex = '^static uint32_t otdLastConvEndMs\b'; EndKind = 'construct'; Optional = $true },   # scheduler + handleMasterResponse
   @{ Name = 'DHW push and PS=1 state';      Kind = 'range';     Regex = '^(enum DHWPushState\b|static bool\s+otPushManual\b)';   # TASK-1845 renamed the push state to PIC-named flags
      EndRegex = '^static bool otSummaryPending\b'; EndKind = 'construct' },
   @{ Name = 'otBoilerCache[]';              Kind = 'range';     Regex = '^static uint16_t otBoilerCache\[128\];';

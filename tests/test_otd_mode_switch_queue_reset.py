@@ -109,6 +109,8 @@ static uint32_t g_now = 0;
 static uint32_t millis() { return g_now; }
 static bool otdOwnFramesAllowed(bool, bool) { return true; }
 static bool otIsVentSlave() { return false; }
+static constexpr uint32_t OTD_MWT_MS = 100;   // TASK-1954: MWT floor of the scheduler; never stamped in this harness
+static uint32_t otdLastConvEndMs = 0;
 static unsigned long buildStatusRequest() { return 0; }
 static bool otdIsAltSlot(uint8_t) { return true; }
 static uint8_t otdAltScheduleIndex(uint32_t) { return OT_SCHEDULE_SIZE; }
