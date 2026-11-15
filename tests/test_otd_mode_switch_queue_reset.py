@@ -101,6 +101,7 @@ enum class OpenThermMessageID : uint8_t { Status = 0 };
 struct OpenTherm { static unsigned long buildRequest(OpenThermMessageType, OpenThermMessageID, uint16_t) { return 0; } };
 static constexpr uint32_t OT_OFFLINE_RETRY_MS = 60000;
 static constexpr uint32_t OT_VENT_FAST_INTERVAL_MS = 1000;
+static constexpr uint32_t OT_SLOW_INTERVAL_MS = 60000;   // TASK-1981: the scheduler scans the faster tiers first
 static bool otMasterRequestActive = false;
 static uint32_t otMinIntervalMs = 100;
 static uint32_t otLastAnySendMs = 0;
