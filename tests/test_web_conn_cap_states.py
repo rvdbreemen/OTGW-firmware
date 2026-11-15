@@ -11,7 +11,10 @@ What it shows (ADR-188 Decision, by design):
   - an ESTABLISHED connection counts even with empty queues, unless it is a waiter of the native file
     queue: an idle socket the browser opened ahead of a request (speculative preconnect) counts;
   - a closing connection (FIN_WAIT_1, CLOSING, LAST_ACK) counts while any segment sits in unsent or
-    unacked, also when that segment is only the zero-length FIN.
+    unacked, also when that segment is only the zero-length FIN;
+  - a half-open passive connection (SYN_RCVD) counts too: lwIP registers it in tcp_active_pcbs and
+    queues its SYN-ACK as a zero-length segment (tcp_listen_input, tcp_enqueue_flags).
+The breakdown keeps those two apart (closing-fin vs syn-rcvd), so the bench can tell them apart.
 ESPAsyncWebServer 3.11.2 answers with "Connection: close", so every request is a new socket that then
 closes; a fresh load therefore leaves closing sockets behind for one round trip each.
 
@@ -73,6 +76,8 @@ int main(int argc, char **argv) {
   else if (c == "fin_wait_2")   add(FIN_WAIT_2, nullptr, nullptr);
   else if (c == "closing_fin")  add(CLOSING, nullptr, &g_fin);
   else if (c == "last_ack_fin") add(LAST_ACK, nullptr, &g_fin);
+  else if (c == "syn_rcvd_synack") add(SYN_RCVD, nullptr, &g_fin);   // the SYN-ACK: also len 0
+  else if (c == "close_wait_ctl") add(CLOSE_WAIT, nullptr, &g_fin);  // a zero-length segment, other state
   else if (c == "other_port")   add(ESTABLISHED, &g_data, nullptr, 25238);
   else if (c == "fresh_load") {
     // 2 requests in flight (one draining the index, one API call being received), 2 sockets the
@@ -86,14 +91,15 @@ int main(int argc, char **argv) {
   }
   PlatformTcpTxBreakdown w;
   platformTcpTxBreakdownOnPort(80, idle, nidle, &w);
-  printf("%s|%u|%u,%u,%u,%u|%u\n", c.c_str(), (unsigned)platformTcpTxHoldingOnPort(80, idle, nidle),
-         w.estIdle, w.estData, w.closingData, w.closingFin, (unsigned)w.payloadBytes);
+  printf("%s|%u|%u,%u,%u,%u,%u,%u|%u\n", c.c_str(), (unsigned)platformTcpTxHoldingOnPort(80, idle, nidle),
+         w.estIdle, w.estData, w.closingData, w.closingFin, w.synRcvd, w.otherEmpty, (unsigned)w.payloadBytes);
   return 0;
 }
 """
 
 CASES = ("est_idle", "est_waiter", "est_data", "close_wait", "fin_wait_1_fin", "fin_wait_1_data",
-         "fin_wait_2", "closing_fin", "last_ack_fin", "other_port", "fresh_load")
+         "fin_wait_2", "closing_fin", "last_ack_fin", "syn_rcvd_synack", "close_wait_ctl", "other_port",
+         "fresh_load")
 WEB_MAX_TX_CONNECTIONS = 4
 
 
@@ -129,6 +135,9 @@ class WebConnCapStates(unittest.TestCase):
 
     def test_closing_counts_on_a_zero_length_fin(self):
         self.assertEqual((self.n["fin_wait_1_fin"], self.n["closing_fin"], self.n["last_ack_fin"]), (1, 1, 1))
+
+    def test_half_open_with_only_its_syn_ack_counts(self):
+        self.assertEqual((self.n["syn_rcvd_synack"], self.n["close_wait_ctl"]), (1, 1))
         self.assertEqual(self.n["fin_wait_1_data"], 1)
 
     def test_closing_without_segments_does_not_count(self):
@@ -148,12 +157,15 @@ class WebConnCapStates(unittest.TestCase):
             self.assertEqual(sum(self.why[case]), self.n[case], case)
 
     def test_breakdown_names_the_reason(self):
-        # (est-idle, est-data, closing-data, closing-fin)
-        self.assertEqual(self.why["est_idle"], (1, 0, 0, 0))
-        self.assertEqual(self.why["est_data"], (0, 1, 0, 0))
-        self.assertEqual(self.why["fin_wait_1_data"], (0, 0, 1, 0))
-        self.assertEqual(self.why["last_ack_fin"], (0, 0, 0, 1))
-        self.assertEqual(self.why["fresh_load"], (3, 1, 0, 2))
+        # (est-idle, est-data, closing-data, closing-fin, syn-rcvd, other)
+        self.assertEqual(self.why["est_idle"], (1, 0, 0, 0, 0, 0))
+        self.assertEqual(self.why["est_data"], (0, 1, 0, 0, 0, 0))
+        self.assertEqual(self.why["fin_wait_1_data"], (0, 0, 1, 0, 0, 0))
+        self.assertEqual(self.why["last_ack_fin"], (0, 0, 0, 1, 0, 0))
+        self.assertEqual(self.why["closing_fin"], (0, 0, 0, 1, 0, 0))
+        self.assertEqual(self.why["syn_rcvd_synack"], (0, 0, 0, 0, 1, 0))
+        self.assertEqual(self.why["close_wait_ctl"], (0, 0, 0, 0, 0, 1))
+        self.assertEqual(self.why["fresh_load"], (3, 1, 0, 2, 0, 0))
         self.assertEqual(self.bytes["fresh_load"], 2 * 1436)
 
 
@@ -163,7 +175,8 @@ class WebConnCapStates(unittest.TestCase):
         a = rest.find("static bool webConnCapExceeded(")
         body = rest[a:rest.find("\n}\n", a)].replace("\r\n", "\n")
         self.assertIn("WebQueuedFileResponse::txBreakdown(&why);", body)
-        self.assertIn("closing-fin %u", body)
+        self.assertIn("closing-fin %u syn-rcvd %u other %u", body)
+        self.assertIn("why.closingFin, why.synRcvd, why.otherEmpty", body)
         self.assertIn("platformTcpTxBreakdownOnPort(WEB_HTTP_PORT, idle, count, out);", compat)
 
 

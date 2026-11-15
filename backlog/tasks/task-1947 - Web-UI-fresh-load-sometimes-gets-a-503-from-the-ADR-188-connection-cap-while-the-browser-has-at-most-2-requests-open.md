@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-14T20:18:00Z'
-updated_date: '2026-11-14T23:20:00Z'
+updated_date: '2026-11-15T00:43:00Z'
 labels:
   - webui
   - bug
@@ -48,4 +48,6 @@ Diagnostic breakdown (no behaviour change, ba 2026-11-14): platformTcpTxBreakdow
 Stack repair (ba 2026-11-14): when f75ffb1ab was cherry-picked onto the 1937 stack, resolving the version-banner conflicts with the upstream side for every conflicted file also dropped this commit's changes in restAPI.ino and webServerCompat.h (only the Platform shim and the tests landed; the tests passed because they slice the shim and stub the rest). Found by comparing every stacked fix commit with its original (1937, 1850, 1778 identical apart from build stamps; 1947 not). Restored both hunks byte for byte (diff vs 537ace5e5 empty), and tests/test_web_conn_cap_states.py now also checks that webConnCapExceeded() calls the breakdown and that txBreakdown() exists: FAIL on the broken stack, 8/8 OK after the repair. Committed as a fixup, squashed into the 1947 commit at the final rebase.
 
 Bench of the diagnostic (09, .61, beta.264+a695744, 2026-11-15, 20 fresh loads with netload.mjs + telnet; evidence 09 scratchpad s1780/i5/tel.raw and i5/netload-*.json): 9 of 20 loads got 503s, 36 refusals (hd_webconn_503 0 -> 36) while the browser had at most 2 API requests open. Breakdown per refusal: closing-fin 2-5 in EVERY refusal (the largest share), closing-data always 0, est-data 0-1, est-idle 1-3 (incl. the ws client): e.g. 10x '6 hold TX (1 ws) [est-idle 2 est-data 1 closing-data 0 closing-fin 3, 228 B queued]', 8x '[3/0/0/3, 0 B]'. So the cap is crossed by closing connections whose only queued segment is the zero-length FIN (path (b) of the research note). Fix choice (count only connections with payload or a received request) goes to Robert by DM through the coordinator (ADR-188 change).
+
+2026-11-15 split of the diagnostic (92's second-reader F1): lwIP registers a passive open in tcp_active_pcbs as SYN_RCVD and queues its SYN-ACK as a zero-length segment (framework-espidf 3.50501 lwip tcp_in.c:693 state=SYN_RCVD, :714 TCP_REG_ACTIVE, :735 tcp_enqueue_flags(SYN|ACK); tcp_out.c:1036 pbuf of optlen only). The beta.264 breakdown put those in closing-fin too, so 'closing-fin 2-5 in every refusal' does not yet prove they were closing. The breakdown now splits zero-length-only pcbs by state: closing-fin (FIN_WAIT_1/CLOSING/LAST_ACK), syn-rcvd, other. Counting unchanged (ADR-188). tests/test_web_conn_cap_states.py 9/9 with new cases syn_rcvd_synack and close_wait_ctl; on the old shim it fails (the new fields do not exist). test_web_file_scheduling PASS; evaluate.py --quick 85 pass 0 fail. Bench: 20 fresh loads, report closing-fin vs syn-rcvd per refusal.
 <!-- SECTION:NOTES:END -->

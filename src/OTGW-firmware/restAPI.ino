@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-beta.285
+**  Version  : v2.0.0-beta.286
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -91,9 +91,10 @@ static bool webConnCapExceeded(bool report = true, bool reserve = false) {
   PlatformTcpTxBreakdown why;   // TASK-1947: a second walk, on the refusal path only
   WebQueuedFileResponse::txBreakdown(&why);
   RESTDebugTf(PSTR("WEB CONN CAP: %u connections hold TX (%u ws, cap %u) => 503 "
-                   "[est-idle %u est-data %u closing-data %u closing-fin %u, %u B queued]\r\n"),
+                   "[est-idle %u est-data %u closing-data %u closing-fin %u syn-rcvd %u other %u, %u B queued]\r\n"),
               held, ws, (unsigned)WEB_MAX_TX_CONNECTIONS, why.estIdle, why.estData,
-              why.closingData, why.closingFin, (unsigned)why.payloadBytes);
+              why.closingData, why.closingFin, why.synRcvd, why.otherEmpty,
+              (unsigned)why.payloadBytes);
   state.heapdiag.iWebConn503Count++;
   return true;
 }

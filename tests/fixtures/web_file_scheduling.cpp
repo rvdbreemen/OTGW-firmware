@@ -78,9 +78,9 @@ uint32_t platformFreeHeap() { return freeHeap; }
 #include "tcp_gate.inc"
 // TASK-1947: the refusal-line breakdown shim walks lwIP segments this fixture does not fake; the
 // slice stops before it and this stub stands in (it only feeds a debug line).
-struct PlatformTcpTxBreakdown { uint16_t estIdle, estData, closingData, closingFin; uint32_t payloadBytes; };
+struct PlatformTcpTxBreakdown { uint16_t estIdle, estData, closingData, closingFin, synRcvd, otherEmpty; uint32_t payloadBytes; };
 inline void platformTcpTxBreakdownOnPort(uint16_t, const PlatformTcpIdleConnection*, uint8_t,
-                                         PlatformTcpTxBreakdown* out) { *out = PlatformTcpTxBreakdown{0, 0, 0, 0, 0}; }
+                                         PlatformTcpTxBreakdown* out) { *out = PlatformTcpTxBreakdown{0, 0, 0, 0, 0, 0, 0}; }
 uint16_t webSocketClientCount() { return wsClients; }
 #include "heap_diag.inc"
 struct { HeapDiagSection heapdiag; } state;
