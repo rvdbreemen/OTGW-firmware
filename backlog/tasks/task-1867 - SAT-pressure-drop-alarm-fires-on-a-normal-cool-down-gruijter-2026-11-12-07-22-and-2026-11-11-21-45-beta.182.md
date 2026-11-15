@@ -3,10 +3,11 @@ id: TASK-1867
 title: >-
   SAT pressure-drop alarm fires on a normal cool-down (gruijter 2026-11-12 07:22
   and 2026-11-11 21:45, beta.182)
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-11-12T12:09:00Z'
-updated_date: '2026-11-15T21:11:00Z'
+updated_date: '2026-11-15T23:15:00Z'
 labels:
   - sat
   - bug
@@ -26,7 +27,10 @@ From gruijter's capture of 12 Nov (#alpha-testing msg https://discord.com/channe
 <!-- AC:BEGIN -->
 - [x] #1 gruijter's MsgID 18 series of 11-12 Nov is replayed against the current alarm code (a host test on the real code) and reproduces both alarms
 - [x] #2 The replay shows whether these alarms are the known pump-stop residual accepted in TASK-1579 / entry 262, or a different trigger, and the finding is written in the task notes
-- [ ] #3 If a change is proposed, it is put to Sergeant D with the thermo-nova citations before any implementation; otherwise the task is closed with the evidence
+- [x] #3 If a change is proposed, it is put to Sergeant D with the thermo-nova citations before any implementation; otherwise the task is closed with the evidence
+- [x] #4 Sergeant D's B (entry 362) is implemented: satUpdatePressure() records no pressure samples while the drop rate is suspended (600 s after a CH-mode change, PRESSURE_DROP_RATE_SETTLE_SECONDS at thermo-nova binary_sensor.py:25)
+- [x] #5 The replay of gruijter's series (tests/test_sat_pressure_alarm_replay.py) is red on the old code (the three field alarms reproduce) and green on the fix (none of them fires)
+- [x] #6 A real pressure loss that continues after the suspension still raises the alarm on the fix (host test with a synthetic series through the real code)
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -41,4 +45,10 @@ Correction to the note above: the public correction to gruijter is #alpha-testin
 2026-11-14 coordinator (subagent, verified: python -m pytest -q tests/test_sat_pressure_alarm_replay.py -> 4 passed in 13.67s): replay of the REAL satUpdatePressure() (sliced from SATcontrol.ino, harness of test_sat_pressure_health.py) on gruijter's MsgID 0/18 series (fixture tests/fixtures/sat_pressure_gruijter_20261111.csv, 282 rows, timestamps + values only). AC1: 07:22:54 alarm exact (smoothed 1.813, drop 1.765, cleared 07:25:24, log 1.81/1.758); 01:31:24 onset/drop/clear match (smoothed 0.024 low, EMA seed before the capture); 21:45 only with an assumed 2.0 bar before the first captured read (labelled as assumption in the test). AC2: same trigger as the pump-stop residual of TASK-1579 / entry 262: the CH-mode bit falls -> ring cleared + 600 s suspension (SATcontrol.ino:5699-5709), the ring keeps recording (:5726-5735), the pump-stop step (~0.27 bar) lands 240 s later inside the suspension; at suspension end (:5745) the least-squares slope over pre/post step reads ~2.2 bar/h > 0.3, confirmed after 120 s (:5796, :5807) = 720 s after the CH bit. Not thermal contraction (title wording is the first reading). A flame-off suspension would not help: the step comes 870 s after flame-off (07:22) and there was no flame at all before 01:31. AC3 open: any change (e.g. drop samples taken during the suspension) deviates from thermo-nova and goes to Sergeant D as Q-1867a.
 
 Q-1867a decided 2026-11-15 by the coordinator under Robert's directive (CLI) 'Do not wait for Sergeant D. Finish everything that can be finished.'; Sergeant D may overrule, his answer later becomes a follow-up task; asked in the 18-question batch in #dev-sat-mqtt (item 9, https://discord.com/channels/812969634638725140/1105556725714649128/1571633456381694074): option B, discard the pressure samples recorded during the 600 s settle window (thermo-nova binary_sensor.py:25 PRESSURE_DROP_RATE_SETTLE_SECONDS 600, opened 2026-11-15). Unblocked.
+
+AC3: put to Sergeant D in the 18-question batch (item 9) and answered B on 2026-11-15 (entry 362, https://discord.com/channels/812969634638725140/1105556725714649128/1571637957230862506): discard the samples recorded during the 600 s settle window. Implementation ACs #4-#6 added; picked up by 92.
+
+Implementation (92, impl agent, verified by 92 2026-11-16): satUpdatePressure() records no samples while the drop rate is suspended (entry 362 B), and after a settle the first fit waits until the fresh samples span 600 s (choice A, coordinator 2026-11-15; thermo-nova keeps recording during its settle, binary_sensor.py:340-342, SETTLE 600 :25, MIN_WINDOW 300 :28, so its first fit spans ~600 s; asked as Q-1867b, https://discord.com/channels/812969634638725140/1105556725714649128/1571662081084629088). Constants PRESS_SETTLE_MS/PRESS_MIN_SPAN_MS, flag _press_postSettle.
+
+Evidence (run by 92): tests/test_sat_pressure_alarm_replay.py PressureAlarmReplayFixed + SyntheticLoss with OTGW_SAT_INO = origin/dev SATcontrol.ino: Ran 5, FAILED (failures=4) (field alarms 01:31/07:22 still fire, assumed-seed 21:45 fires, leak-after-CH timing). Fix, whole file: Ran 9, OK. Alarm onsets: gruijter replay old 01:31:24.99 + 07:22:54.99, B-only adds 10:28:24.99, A none; synthetic 0.5 bar/h leak with a CH change at 120 s: old 840 s, B-only 1140 s, A 1440 s (+600 s vs old, the cost of A); without a CH change 420 s on all. The B-only red: the 10:28:24 assertion fails on the B-only copy (impl agent). run_tests test_sat_pressure_alarm_replay/test_sat_pressure_health/test_sat_ch_signals PASS; evaluate --quick 0 failed. Note: the thermo-nova oracle in test_sat_pressure_health.py now has drop_settle_samples=True (our deliberate deviation, entry 362 + A); False gives thermo-nova as written.
 <!-- SECTION:NOTES:END -->

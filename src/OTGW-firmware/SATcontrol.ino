@@ -5766,6 +5766,8 @@ static void satUpdatePowerEnergy()
 // in the window (8 bytes per slot, ~1 KB static RAM).
 static const uint32_t PRESS_WINDOW_MS     = 3600000UL;
 static const uint32_t PRESS_SAMPLE_MS     = 30000UL;
+static const uint32_t PRESS_SETTLE_MS     = 600000UL;   // binary_sensor.py:25 SETTLE
+static const uint32_t PRESS_MIN_SPAN_MS   = 300000UL;   // binary_sensor.py:28 MIN_WINDOW
 static const uint8_t  PRESS_RING_SIZE     = (uint8_t)(PRESS_WINDOW_MS / PRESS_SAMPLE_MS + 1);
 struct PressSample { uint32_t ms; float val; };
 static PressSample _press_ring[PRESS_RING_SIZE];
@@ -5780,6 +5782,7 @@ static bool     _press_lastActive     = false;
 static bool     _press_lastActiveInit = false;
 static bool     _press_suspended      = false;
 static uint32_t _press_suspendStartMs = 0;            // elapsed-time test, safe across the millis() wrap
+static bool     _press_postSettle     = false;        // set at a CH-mode change, cleared once the fresh samples span PRESS_SETTLE_MS
 
 static void satUpdatePressure()
 {
@@ -5797,6 +5800,7 @@ static void satUpdatePressure()
   } else if (_press_lastActive != active) {
     _press_suspended      = true;
     _press_suspendStartMs = now;
+    _press_postSettle     = true;
     _press_ringCount = 0;
     _press_ringTail  = 0;
     _press_lastSampleMs = 0;
@@ -5816,8 +5820,14 @@ static void satUpdatePressure()
   }
   float smoothed = state.sat.fSmoothedPressure;
 
+  // TASK-1867 / entry 362: samples taken while the drop rate is suspended (600 s after a CH-mode change) are thrown
+  // away. The pump-stop pressure step falls inside that settle window; recorded, it would sit in the fresh ring when
+  // the suspension ends and the fit would read it as a fast drop (false alarm). The ring refills from the end of the
+  // suspension; the >= 3 samples rule below then applies, with the span rule of choice A.
+  bool dropRateSuspended = (_press_suspended && (now - _press_suspendStartMs) < PRESS_SETTLE_MS);
+
   // --- Record a raw pressure sample at most every 30 s, keep the last 3600 s ---
-  if (_press_lastSampleMs == 0 || (now - _press_lastSampleMs) >= PRESS_SAMPLE_MS) {
+  if (!dropRateSuspended && (_press_lastSampleMs == 0 || (now - _press_lastSampleMs) >= PRESS_SAMPLE_MS)) {
     _press_lastSampleMs = now;
     if (_press_ringCount == PRESS_RING_SIZE) {               // cannot happen at >= 30 s spacing
       _press_ringTail = (_press_ringTail + 1) % PRESS_RING_SIZE;
@@ -5836,7 +5846,6 @@ static void satUpdatePressure()
   }
 
   // --- Least-squares drop rate: >= 3 samples spanning >= 300 s (binary_sensor.py:367-388) ---
-  bool dropRateSuspended = (_press_suspended && (now - _press_suspendStartMs) < 600000UL);
   float dropRate = -1.0f;  // sentinel: not calculated
 
   if (!dropRateSuspended && _press_ringCount >= 3) {
@@ -5844,7 +5853,12 @@ static void satUpdatePressure()
     uint8_t newestIdx = (_press_ringTail + _press_ringCount - 1) % PRESS_RING_SIZE;
     uint32_t elapsed = _press_ring[newestIdx].ms - _press_ring[oldestIdx].ms;
 
-    if (elapsed >= 300000UL) {  // 300s minimum window
+    // TASK-1867 / entry 362, choice A (coordinator 2026-11-15): thermo-nova keeps recording during its settle, so its
+    // first fit after the settle spans ~600 s. Ours starts with an empty ring (readings in the settle are dropped), so
+    // after a CH-mode change the fit waits for fresh samples spanning PRESS_SETTLE_MS; one 0.027 bar step in a 300 s
+    // window would read as 0.32-0.38 bar/h. Without a CH-mode change the minimum stays 300 s.
+    if (_press_postSettle && elapsed >= PRESS_SETTLE_MS) _press_postSettle = false;
+    if (elapsed >= (_press_postSettle ? PRESS_SETTLE_MS : PRESS_MIN_SPAN_MS)) {
       // Time from the oldest sample and pressure from the oldest value: the slope is the same as
       // thermo-nova's absolute-time sums, and float32 keeps its precision over 121 samples.
       float sum_t = 0.0f, sum_p = 0.0f, sum_tp = 0.0f, sum_t2 = 0.0f;

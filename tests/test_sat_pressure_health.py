@@ -131,7 +131,14 @@ class ThermoNovaPressureHealth:
     CONFIRM = 120           # :27
     MIN_WINDOW = 300        # :28
 
-    def __init__(self, minimum=0.8, maximum=2.5, max_age=1800, max_drop=0.3):
+    def __init__(self, minimum=0.8, maximum=2.5, max_age=1800, max_drop=0.3, drop_settle_samples=True):
+        # drop_settle_samples=True: the firmware's deliberate deviation (TASK-1867, Sergeant D entry 362, option B):
+        # readings taken while the drop rate is suspended are thrown away. False = thermo-nova as written (:275 records
+        # every reading, also during the 600 s settle window).
+        self.drop_settle_samples = drop_settle_samples
+        # TASK-1867 choice A (coordinator 2026-11-15): with the settle samples dropped, the first fit after a settle
+        # waits for fresh samples spanning SETTLE (thermo-nova's own first fit spans ~SETTLE because it keeps recording)
+        self.post_settle = False
         # defaults: const.py:157-160 (pressure_max_value_age "00:30:00")
         self.minimum, self.maximum, self.max_age, self.max_drop = minimum, maximum, max_age, max_drop
         self.samples = collections.deque()
@@ -144,10 +151,11 @@ class ThermoNovaPressureHealth:
     def is_on(self, now, raw, active):                                   # :253-295
         self._track_active_state(now, active)                            # :262
         smoothed = self._update_smoothed(raw)                            # :274
-        self._record(now, raw, self.max_age)                             # :275
+        allowed = self._allowed(now)                                     # :284 (moved before :275, see drop_settle_samples)
+        if allowed or not self.drop_settle_samples:
+            self._record(now, raw, self.max_age)                         # :275
         drop_rate = self._drop_rate()                                    # :277
         low, high = smoothed < self.minimum, smoothed > self.maximum     # :282-283
-        allowed = self._allowed(now)                                     # :284
         if not allowed:                                                  # :286-288
             drop_rate = None
             self.last_drop_rate = None
@@ -178,6 +186,7 @@ class ThermoNovaPressureHealth:
         if self.last_active != active:
             self.suspended_until = now + self.SETTLE
             self.samples.clear()
+            self.post_settle = True
         self.last_active = active
 
     def _allowed(self, now):                                             # :347-355
@@ -199,7 +208,11 @@ class ThermoNovaPressureHealth:
     def _drop_rate(self):                                                # :367-388
         if len(self.samples) < 3:
             return None
-        if self.samples[-1][0] - self.samples[0][0] < self.MIN_WINDOW:
+        span = self.samples[-1][0] - self.samples[0][0]
+        if self.drop_settle_samples and self.post_settle and span >= self.SETTLE:
+            self.post_settle = False
+        need = self.SETTLE if (self.drop_settle_samples and self.post_settle) else self.MIN_WINDOW
+        if span < need:
             return None
         n = len(self.samples)
         st = sp = stp = st2 = 0.0
