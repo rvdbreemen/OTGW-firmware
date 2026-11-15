@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : graphHistoryStuff.h
-**  Version  : v2.0.0-beta.310
+**  Version  : v2.0.0-beta.311
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -18,8 +18,11 @@
 **  Two sizes, one slot layout (14 B):
 **    - every board:  126 slots of 30 s in a static array (1764 B, ADR-053),
 **                    120 emitted = 1 h;
-**    - PSRAM boards: 726 slots of 120 s in one never-freed PSRAM block
-**                    (10164 B), 720 emitted = 24 h.
+**    - PSRAM boards: 5046 slots of 120 s in one never-freed PSRAM block
+**                    (70644 B), up to 5040 emitted = 7 days (TASK-1963,
+**                    ADR-245). A response holds at most 1008 slots: 24 h by
+**                    default (720 x 2 min); ?hours= up to 7 d is thinned to
+**                    longer slots (7 d = 1008 x 10 min).
 **
 **  Header naming: ADR-081. The component has a functional .ino, so its header
 **  is <Component>stuff.h and holds the types as well.
@@ -39,7 +42,10 @@
 #define GRAPH_HIST_SMALL_INTERVAL_S  30    // no PSRAM: one slot per 30 s
 #define GRAPH_HIST_SMALL_SLOTS       126   // ring capacity; 120 emitted = 1 h
 #define GRAPH_HIST_LARGE_INTERVAL_S  120   // PSRAM: one slot per 2 minutes
-#define GRAPH_HIST_LARGE_SLOTS       726   // ring capacity; 720 emitted = 24 h
+#define GRAPH_HIST_LARGE_SLOTS       5046  // ring capacity; 5040 = 7 d (TASK-1963, ADR-245)
+#define GRAPH_HIST_DEFAULT_WINDOW_S  86400 // a response without ?hours= covers at most 24 h
+#define GRAPH_HIST_MAX_WINDOW_S      604800 // ?hours= is capped at 7 d
+#define GRAPH_HIST_MAX_EMIT          1008  // slots per response: 7 d at 10 min; a longer window is thinned
 // TASK-1937: a weather value older than this is stale for the ring, the same 1 h rule as SAT_OUTSIDE_VALID_MS
 // (SATcontrol.ino, Sergeant D entry 57). tests/test_graph_outside_source.py checks both stay equal.
 #define GRAPH_HIST_WEATHER_VALID_MS  3600000UL
@@ -188,16 +194,35 @@ inline void graphHistCommit(GraphHistRing& r, GraphHistClock& c, uint32_t k, Gra
 struct GraphHistSnapshot {
   uint32_t newestAgeMs;   // millis() at snapshot time minus the newest slot time; 0 if no slot
   uint16_t start;         // ring index of the oldest emitted slot
-  uint16_t n;             // emitted slots, at most cap - GRAPH_HIST_MARGIN
+  uint16_t n;             // emitted (group) slots, at most GRAPH_HIST_MAX_EMIT
+  uint16_t step;          // ring slots per emitted slot (1 = full resolution)
 };
 
-inline GraphHistSnapshot graphHistMakeSnapshot(const GraphHistRing& r, const GraphHistClock& c, uint32_t nowMs) {
+// TASK-1963 (ADR-245): windowS is the span the response covers (default 24 h, capped at 7 d and at
+// what the ring holds, cap - GRAPH_HIST_MARGIN). The restSendChunked emitter re-runs the whole body
+// for every TCP window, so its cost grows with the square of the body; a window of more than
+// GRAPH_HIST_MAX_EMIT ring slots is therefore served as groups of `step` slots, aligned to the
+// newest slot. step 1 gives the same body as before.
+inline GraphHistSnapshot graphHistMakeSnapshot(const GraphHistRing& r, const GraphHistClock& c, uint32_t nowMs,
+                                               uint32_t windowS = GRAPH_HIST_DEFAULT_WINDOW_S) {
   GraphHistSnapshot s;
   const uint16_t emitMax = (uint16_t)(r.cap - GRAPH_HIST_MARGIN);
-  s.n = (r.count < emitMax) ? r.count : emitMax;
-  s.start = (uint16_t)((r.head + r.cap - s.n) % r.cap);
+  uint32_t slots = (r.count < emitMax) ? r.count : emitMax;
+  if (windowS > GRAPH_HIST_MAX_WINDOW_S) windowS = GRAPH_HIST_MAX_WINDOW_S;
+  uint32_t want = (r.intervalS == 0) ? slots : windowS / r.intervalS;
+  if (want < 1) want = 1;
+  if (slots > want) slots = want;
+  s.step = (uint16_t)((slots + GRAPH_HIST_MAX_EMIT - 1) / GRAPH_HIST_MAX_EMIT);
+  if (s.step < 1) s.step = 1;
+  s.n = (uint16_t)(slots / s.step);
+  s.start = (uint16_t)((r.head + r.cap - (uint32_t)s.n * s.step) % r.cap);
   s.newestAgeMs = (r.total == 0) ? 0 : (nowMs - c.lastCommitMs);
   return s;
+}
+
+// Ring index of the newest ring slot of emitted group g.
+inline uint16_t graphHistGroupNewest(const GraphHistRing& r, const GraphHistSnapshot& s, uint16_t g) {
+  return (uint16_t)((s.start + (uint32_t)g * s.step + s.step - 1) % r.cap);
 }
 
 // ---- JSON ------------------------------------------------------------------
@@ -221,7 +246,10 @@ void graphHistEmitTempColumn(W& je, const __FlashStringHelper* key, const GraphH
   char b[8];
   je.beginArray(key);
   for (uint16_t i = 0; i < s.n; i++) {
-    const int16_t v = r.slot[(s.start + i) % r.cap].*member;
+    // A group shows its newest value (the last one that is not empty), as one 2 min slot shows its last sample.
+    int16_t v = GRAPH_HIST_NO_TEMP;
+    for (uint16_t k = 0; k < s.step && v == GRAPH_HIST_NO_TEMP; k++)
+      v = r.slot[(graphHistGroupNewest(r, s, i) + r.cap - k) % r.cap].*member;
     if (v == GRAPH_HIST_NO_TEMP) je.raw("null");
     else                         je.raw(graphHistFmtInt(b, v));
   }
@@ -233,7 +261,10 @@ void graphHistEmitFlagColumn(W& je, const __FlashStringHelper* key, const GraphH
                              const GraphHistSnapshot& s, uint8_t mask) {
   je.beginArray(key);
   for (uint16_t i = 0; i < s.n; i++) {
-    je.raw((r.slot[(s.start + i) % r.cap].flags & mask) ? "1" : "0");
+    // A flag is set for a group when it was set in any of its slots, so a short burn stays visible.
+    uint8_t f = 0;
+    for (uint16_t k = 0; k < s.step; k++) f |= r.slot[(s.start + (uint32_t)i * s.step + k) % r.cap].flags;
+    je.raw((f & mask) ? "1" : "0");
   }
   je.endArray();
 }
@@ -252,7 +283,7 @@ template <class W>
 void graphHistEmitJson(W& je, const GraphHistRing& r, const GraphHistSnapshot& s) {
   char b[8];
   je.beginObject();
-  je.field(F("interval_s"), (uint32_t)r.intervalS);
+  je.field(F("interval_s"), (uint32_t)r.intervalS * s.step);
   je.field(F("newest_age_ms"), (uint32_t)s.newestAgeMs);
   je.field(F("count"), (uint32_t)s.n);
   je.field(F("scale"), (uint32_t)GRAPH_HIST_SCALE);
@@ -264,7 +295,9 @@ void graphHistEmitJson(W& je, const GraphHistRing& r, const GraphHistSnapshot& s
   graphHistEmitTempColumn(je, F("outside"), r, s, &GraphHistSlot::outside);
   je.beginArray(F("mod"));
   for (uint16_t i = 0; i < s.n; i++) {
-    const uint8_t v = r.slot[(s.start + i) % r.cap].mod;
+    uint8_t v = GRAPH_HIST_NO_MOD;
+    for (uint16_t k = 0; k < s.step && v == GRAPH_HIST_NO_MOD; k++)
+      v = r.slot[(graphHistGroupNewest(r, s, i) + r.cap - k) % r.cap].mod;
     if (v == GRAPH_HIST_NO_MOD) je.raw("null");
     else                        je.raw(graphHistFmtInt(b, v));
   }

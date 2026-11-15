@@ -463,7 +463,7 @@ The browser persists the log buffer to `localStorage` between sessions, so a pag
 
 #### Real-Time Temperature Graph
 
-Below the log viewer, an ECharts temperature graph shows a rolling 24-hour view of:
+Below the log viewer, an ECharts temperature graph shows a rolling view of up to 24 hours (up to 7 days on a board with PSRAM, through the 7 days window) of:
 
 - Boiler flow temperature (CH water temperature)
 - Return temperature

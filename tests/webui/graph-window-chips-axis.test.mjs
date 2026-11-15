@@ -27,8 +27,8 @@ test('window chips carry their window in ms and a translation key', () => {
   const chips = [...toolbar.matchAll(/<span class="tchip[^"]*"([^>]*)>/g)].map((m) => m[1]).filter((a) => !/\bid="/.test(a));
   const got = chips.map((a) => [(/data-win-ms="(\d+)"/.exec(a) || [])[1], (/data-i18n="([^"]+)"/.exec(a) || [])[1]]);
   assert.deepEqual(got, [['600000', 'h_mon.graph_win_10m'], ['3600000', 'h_mon.graph_win_1h'],
-    ['14400000', 'h_mon.graph_win_4h'], ['86400000', 'h_mon.graph_win_24h']]);
-  for (const l of ['nl', 'de', 'el']) for (const k of ['graph_win_10m', 'graph_win_1h', 'graph_win_4h', 'graph_win_24h']) {
+    ['14400000', 'h_mon.graph_win_4h'], ['86400000', 'h_mon.graph_win_24h'], ['604800000', 'h_mon.graph_win_7d']]);   // 7d: TASK-1963
+  for (const l of ['nl', 'de', 'el']) for (const k of ['graph_win_10m', 'graph_win_1h', 'graph_win_4h', 'graph_win_24h', 'graph_win_7d']) {
     assert.ok(PACK(l).h_mon[k], l + ' has ' + k);
   }
 });

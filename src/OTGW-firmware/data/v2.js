@@ -500,6 +500,7 @@
       "graph_win_1h": "1 hour",
       "graph_win_4h": "4 h",
       "graph_win_24h": "24 h",
+      "graph_win_7d": "7 days",
       "graph_marks": "Disconnects",
       "graph_marks_title": "Show where the live connection dropped (red) and came back (green)",
       "log_aria": "Live OpenTherm log",
@@ -3190,6 +3191,12 @@
   // stamped at the START of its slot (the device reports the age of the slot END).
   // The device does not record Dallas sensors, so those lines still start at page load.
   var GSLOT = 5000, GHIST_MAX = 86400000 / GSLOT, GBREAK_MS = 150000, gHist = [], gDallas = null, gLastRender = 0;
+  // TASK-1963 (ADR-245): the graph keeps device records (h) up to 7 days and live 5 s records up to 24 h, trimmed by
+  // time, not by count: a count limit of 24 h of live slots would cut the 7-day device history away after a day.
+  var GHIST_LIVE_MS = 86400000, GHIST_SPAN_MS = 7 * 86400000, gTrimN = 0;
+  function graphTrim(arr, now) {
+    return arr.filter(function (r) { return r.t >= now - GHIST_SPAN_MS && (r.h || r.t >= now - GHIST_LIVE_MS); });
+  }
   // [key, label, colour, kind]: t = temperature line (auto-scaled), m = modulation area, l = on/off lane
   var GSER = [['flow', 'boiler', '#f85149', 't'], ['ret', 'return', '#58a6ff', 't'], ['chSet', 'control setpoint', '#8b949e', 't'],
     ['roomSet', 'thermostat setpoint', '#d29922', 't'], ['room', 'room', '#3fb950', 't'], ['outside', 'outside', '#a371f7', 't'], ['dhw', 'DHW temperature', '#f778ba', 't'],
@@ -3294,7 +3301,7 @@
     var now = Date.now(), t = now - now % GSLOT, r = gHist[gHist.length - 1];
     if (!r || r.t !== t) {
       r = { t: t, flame: 0, dhw_on: 0, ch: 0 }; gHist.push(r);
-      if (gHist.length > GHIST_MAX + 256) gHist = gHist.slice(-GHIST_MAX);   // trim in batches
+      if (++gTrimN >= 60) { gTrimN = 0; gHist = graphTrim(gHist, now); }   // trim once per 5 minutes (TASK-1963)
     }
     ['flow', 'ret', 'chSet', 'roomSet', 'room', 'outside', 'dhw', 'mod'].forEach(function (k) { r[k] = model[k]; });   // dhw: MsgID 26, live only (TASK-1776: not in the device history)
     r.roomX = graphRoomLost(now) ? 1 : 0;   // TASK-1546: a dropout is no reading: the room value is empty (CSV, line break)
@@ -3353,20 +3360,22 @@
       else if (a < out.length && out[a].t === live[b].t) { a++; }
       else merged.push(live[b++]);
     }
-    return merged.length > GHIST_MAX ? merged.slice(-GHIST_MAX) : merged;
+    return graphTrim(merged, nowMs);   // TASK-1963: by time (7 d device, 24 h live), not by count
   }
   // 'idle' -> 'loading' -> 'done' | 'unavailable' (404 on older firmware, permanent for the page).
   // A failed, empty or unusable load goes back to 'idle'; a 'done' load is repeated when the tab
   // opens and the last one is older than GHIST_RELOAD_MS (the time-based merge makes that safe).
-  var gHistState = 'idle', gHistLoadedAt = 0, GHIST_RELOAD_MS = 600000, GHIST_TIMEOUT_MS = 20000;
+  var gHistState = 'idle', gHistLoadedAt = 0, GHIST_RELOAD_MS = 600000, GHIST_TIMEOUT_MS = 20000, gHistHours = 0;
   function loadGraphHistory() {
     if (gHistState === 'unavailable' || gHistState === 'loading') return;
     if (gHistState === 'done' && Date.now() - gHistLoadedAt < GHIST_RELOAD_MS) return;
     gHistState = 'loading';
+    // TASK-1963 (ADR-245): ask for 7 days only when a window longer than 24 h is shown; the device thins it.
+    var hours = graphWindowMs > 86400000 ? 168 : 0;
     var tHead = 0, ac = (typeof AbortController !== 'undefined') ? new AbortController() : null;
     var timer = ac ? setTimeout(function () { ac.abort(); }, GHIST_TIMEOUT_MS) : 0;
     function finish() { if (timer) clearTimeout(timer); }
-    fetchWithRetry(APIGW + 'v2/graph/history', ac ? { signal: ac.signal } : undefined).then(function (r) {
+    fetchWithRetry(APIGW + 'v2/graph/history' + (hours ? '?hours=' + hours : ''), ac ? { signal: ac.signal } : undefined).then(function (r) {
       tHead = Date.now();   // the device computed newest_age_ms when it handled the request
       if (r.status === 404) { gHistState = 'unavailable'; return null; }
       if (!r.ok) throw new Error('HTTP ' + r.status);
@@ -3374,6 +3383,9 @@
     }).then(function (j) {
       finish();
       if (!j) return;
+      // TASK-1963: the 7-day chip only on a board whose ring holds days (2 min slots or longer: PSRAM).
+      if (typeof j.interval_s === 'number') document.querySelectorAll('#mgraph .tchip[data-psram-only]').forEach(function (c) { c.hidden = !(j.interval_s >= 120); });
+      gHistHours = hours || 24;
       var merged = mergeGraphHistory(gHist, j, tHead);
       if (merged === gHist || !merged.some(function (r) { return r.h; })) { gHistState = 'idle'; return; }
       gHist = merged;
@@ -8657,6 +8669,7 @@
     document.querySelectorAll('#mgraph .tchip:not([id])').forEach(function (ch) {
       ch.addEventListener('click', function () {
         graphWindowMs = graphChipWindowMs(ch);   // TASK-1828: from data-win-ms, not the (translated) chip text
+        if (graphWindowMs > 86400000 && gHistHours < 168 && gHistState !== 'loading') { gHistState = 'idle'; loadGraphHistory(); }   // TASK-1963
         document.querySelectorAll('#mgraph .tchip:not([id])').forEach(function (x) { x.classList.toggle('on', x === ch); });
         if (isMonitorVisible('mgraph')) renderGraph();
       });

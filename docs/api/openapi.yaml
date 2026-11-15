@@ -200,11 +200,15 @@ paths:
     get:
       tags:
         - Monitor
-      summary: Monitor graph history (1 hour, or 24 hours with PSRAM)
+      summary: Monitor graph history (1 hour, or up to 7 days with PSRAM)
       description: |
         Returns the device-side history of the Monitor > Graph series (TASK-1296):
         oldest first, in columns. A board without PSRAM serves up to 120 slots of
-        30 s (1 hour); a board with PSRAM serves up to 720 slots of 120 s (24 hours).
+        30 s (1 hour); a board with PSRAM keeps 7 days (5040 slots of 120 s) and serves
+        24 hours (720 slots) by default. `hours` asks for another window, up to 168
+        (7 days); a response holds at most 1008 slots, so a longer window comes back
+        thinned to longer slots (`hours=168`: 1008 slots of 600 s), each with the
+        newest value of its group and the flags of any slot in it (TASK-1963, ADR-245).
         The web UI loads it when the Graph tab opens and merges it into the live
         samples it collects itself. Dallas sensors are not recorded.
 
@@ -221,10 +225,19 @@ paths:
 
         The history lives in RAM and starts empty after a reboot, so `count` grows
         by one slot per `interval_s` until it reaches 120 (no PSRAM, about 1.8 KB
-        of internal RAM, body about 4 KB) or 720 (PSRAM, about 10 KB of PSRAM, body
-        about 25 KB). The body is sent in chunks. Returns 503 with `Retry-After`
+        of internal RAM, body about 4 KB) or the requested window (PSRAM, about 70 KB
+        of PSRAM for 7 days; a 24 h body is about 25 KB, a 7-day body about 35 KB). The body is sent in chunks. Returns 503 with `Retry-After`
         when the heap is low.
       operationId: getGraphHistory
+      parameters:
+        - name: hours
+          in: query
+          required: false
+          description: Window in hours, 1 to 168 (default 24). Capped at what the ring holds.
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 168
       responses:
         '200':
           description: History retrieved successfully
@@ -236,7 +249,7 @@ paths:
                 properties:
                   interval_s:
                     type: integer
-                    description: Seconds between two slots (30 without PSRAM, 120 with PSRAM)
+                    description: Seconds per slot (30 without PSRAM, 120 with PSRAM, longer for a thinned window, 600 for hours=168)
                   newest_age_ms:
                     type: integer
                     description: Age in milliseconds of the END of the newest slot when the response was produced; 0 when there is no slot yet

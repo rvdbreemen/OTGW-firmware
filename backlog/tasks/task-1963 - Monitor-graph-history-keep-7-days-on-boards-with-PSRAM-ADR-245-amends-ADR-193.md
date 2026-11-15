@@ -1,0 +1,45 @@
+---
+id: TASK-1963
+title: >-
+  Monitor graph history: keep 7 days on boards with PSRAM (ADR-245 amends
+  ADR-193)
+status: In Progress
+assignee:
+  - '@claude'
+created_date: '2026-11-15T09:22:00Z'
+updated_date: '2026-11-15T10:10:00Z'
+labels:
+  - graph
+  - webui
+  - psram
+milestone: 2.0.0
+dependencies: []
+priority: medium
+ordinal: 1004000
+---
+
+## Description
+
+<!-- SECTION:DESCRIPTION:BEGIN -->
+Robert's decision A (DM 1571454228763779093, item 1, reply to question 1 of the bot list 1571452589231439943: 'A) keep 7 days on PSRAM boards instead of 24 h (~70 KB PSRAM)'; option B, a flash copy every 15 min, was not chosen). On a board with PSRAM the device graph history (graphHistoryStuff, ADR-193) grows from 24 h to 7 days: GRAPH_HIST_LARGE_SLOTS 726 to about 5046 slots of 120 s (about 70 KB PSRAM at 14 B per slot), /api/v2/graph/history serves a window up to 7 days, the Monitor graph gets a 7 d window chip, and the CSV export covers the window shown. Boards without PSRAM keep their current ring unchanged. The ring stays in RAM only: a reboot still empties it. Related: ADR-193, TASK-1306 (response cost of the history on async_tcp), TASK-1776.
+<!-- SECTION:DESCRIPTION:END -->
+
+## Acceptance Criteria
+<!-- AC:BEGIN -->
+- [ ] #1 ADR-245 (amends ADR-193) records Robert's decision with the DM id, the slot count, the PSRAM cost and the served window; created and gated through adr-kit
+- [ ] #2 Host test on the real graphHistoryStuff code: on a PSRAM board the ring holds 7 days at 120 s per slot and the history endpoint serves up to 7 days; without PSRAM the slot count and window are unchanged; red on the current code, green on the fix
+- [ ] #3 Monitor > Graph offers a 7 d window (chip), the CSV export covers the window shown; web UI test on the real v2.js
+- [ ] #4 Bench on .63 (PSRAM): free PSRAM and internal heap before and after (the ring cost matches the estimate), /api/v2/graph/history with the full window answers without a web connection refusal, and the graph shows the 7 d window
+<!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+Robert's A (DM 1571454228763779093) and A for the serving question + ADR-245 accept (DM 1571457707725168736 on 1571457301280202873). Firmware: GRAPH_HIST_LARGE_SLOTS 726 -> 5046 (7 d at 120 s, 70644 B PSRAM); graphHistMakeSnapshot(windowS) with default 24 h, cap 7 d, at most GRAPH_HIST_MAX_EMIT 1008 slots per response, longer windows thinned to groups aligned to the newest slot (temps/mod newest non-empty, flags OR); sendGraphHistory reads ?hours=1..168. Reason: restSendChunked re-runs the whole emitter per TCP window (cost ~ body^2), full 7 d would be ~49x. Web UI: 7 days chip (data-psram-only, shown when interval_s >= 120), ?hours=168 only for windows > 24 h, trim by time (device 7 d, live 24 h) via graphTrim(), CSS .tchip[hidden]. Docs: ADR-245, openapi, REST README, C4, MANUAL, CHANGELOG.
+<!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-15 evidence (wt-comms, before build): tests/test_graph_history.py (new runner for tests/test_graph_history.cpp on the real graphHistoryStuff.h): ALL TESTS PASSED, failures=0 (7 d ring holds exactly 7 days; default 720 x 120 s; ?hours=168 = 1008 groups of 5, interval_s 600, flags OR; >7 d capped; no PSRAM 120 x 30 s unchanged; 24 h body 25355 B unchanged). Red: OTGW_GRAPH_REV=HEAD fails to compile (no step/windowS API); mutant with GRAPH_HIST_LARGE_SLOTS 726 on the new code fails 7 checks. Web UI: tests/webui/graph-7day-window.test.mjs 5 pass on the fix / 5 fail on the old v2.js; seams fixed in graph-control-setpoint-source, graph-dhw-temperature, graph-history-merge (count trim -> time trim, rewritten case), graph-window-chips-axis (7 d chip added); 18 graph/i18n web UI files 109 pass 0 fail. test_graph_outside_source 5 pass, test_sat_pwm_anchors 64 pass. evaluate --quick 92 checks 0 FAIL. ADR-245 Accepted via adr-kit (quality A 0.94, readiness ready-for-confirmation, related ADR-193 both sides via adr relate). Pending: esp32-combo build and bench on .63 (PSRAM free before/after, 7 d fetch time, no WEB CONN CAP refusal).
+<!-- SECTION:NOTES:END -->

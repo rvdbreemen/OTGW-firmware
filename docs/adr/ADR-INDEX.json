@@ -6671,7 +6671,7 @@
       "path": "ADR-193-keep-a-bounded-24-h-monitor-graph-history-on-the-device.md",
       "format": "canonical",
       "status": "Accepted",
-      "date": "2026-10-23",
+      "date": "2026-11-15",
       "decision_summary": "The firmware keeps a ring of 14-byte slots and serves it through an HTTP (Hypertext Transfer Protocol) GET request on...",
       "topics": [
         "graph",
@@ -9801,6 +9801,69 @@
         "verification": [
           "test/host/testpicsimgatepr.py: compiles the real gate block of sendPICSerial() and the real satSimulationBlocksBusTx(), sliced by anchor. With the SAT simulation on, PR=A and PR=E pass and leave no blocked-command trace, CS=40 and GW=1 a...",
           "Bench: on .63 with the SAT simulation on, the settings cycle fills /api/v2/pic/settings (TASK-1943 AC3)."
+        ]
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
+    },
+    {
+      "id": "ADR-245",
+      "title": "On boards with PSRAM the Monitor graph history keeps 7 days; a response holds at most 1008 slots and a longer window is thinned (amends ADR-193)",
+      "path": "ADR-245-on-boards-with-psram-the-monitor-graph-history-keeps-7-days-a-response-holds-at-most-1008-slots-and-a-longer-window-is-thinned-amends-adr-193.md",
+      "format": "canonical",
+      "status": "Accepted",
+      "date": "2026-11-15",
+      "decision_summary": "On a board with PSRAM the ring holds 5046 slots of 120 s (GRAPHHISTLARGESLOTS), 5040 of them readable: 7 days.",
+      "topics": [
+        "graph",
+        "psram",
+        "rest-api",
+        "web-ui"
+      ],
+      "aliases": [
+        "7 day graph",
+        "graph history 7 days",
+        "GRAPH_HIST_MAX_EMIT",
+        "hours parameter"
+      ],
+      "components": [
+        "GET /api/v2/graph/history ?hours= window",
+        "Monitor graph device history (graphHistoryStuff)"
+      ],
+      "symbols": [
+        "GRAPH_HIST_DEFAULT_WINDOW_S",
+        "GRAPH_HIST_LARGE_SLOTS",
+        "GRAPH_HIST_MAX_EMIT",
+        "GRAPH_HIST_MAX_WINDOW_S",
+        "graphHistMakeSnapshot",
+        "graphTrim"
+      ],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [
+          "Keep the default response (no ?hours=) at most 24 h and at full ring resolution.",
+          "Cap a response at GRAPHHISTMAXEMIT slots and serve a longer window thinned, aligned to the newest slot.",
+          "Keep the ring in RAM only and leave boards without PSRAM unchanged."
+        ],
+        "must_not": [
+          "Serve 7 days at full resolution in one response.",
+          "Trim the browser's graph history by record count."
+        ],
+        "exceptions": [
+          "None."
+        ],
+        "verification": [
+          "tests/testgraphhistory.py (runs tests/testgraphhistory.cpp on the real graphHistoryStuff.h): the ring holds exactly 7 days, the default response is 720 slots of 120 s, ?hours=168 is 1008 groups of 5 slots with intervals 600 and flags OR-...",
+          "tests/webui/graph-7day-window.test.mjs (the real graphTrim(), mergeGraphHistory() and loadGraphHistory() of data/v2.js): the trim by time, a 7-day response surviving a day of live records, ?hours=168 only for the 7-day window, and the ch..."
         ]
       },
       "scope": {
@@ -15342,6 +15405,12 @@
       "resolved": true
     },
     {
+      "source": "ADR-193",
+      "target": "ADR-245",
+      "type": "related",
+      "resolved": true
+    },
+    {
       "source": "ADR-194",
       "target": "ADR-080",
       "type": "related",
@@ -16628,6 +16697,12 @@
     {
       "source": "ADR-244",
       "target": "ADR-117",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-245",
+      "target": "ADR-193",
       "type": "related",
       "resolved": true
     },

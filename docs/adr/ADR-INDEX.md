@@ -247,4 +247,5 @@ One row per Architecture Decision Record. Scope is the Enforcement `path_glob` s
 | ADR-241 | Proposed | - | In master mode a thermostat WRITEDATA of any ID except 1, 16 and 24 is sent to the boiler as a relay in the next free... |
 | ADR-242 | Accepted | - | Every OT-Direct state change runs on the loop task: addCommandToQueue() and sendPICSerial() hand a command that arriv... |
 | ADR-244 | Accepted | - | On the PIC serial path, a command that starts with PR= is sent to the PIC also while a simulation is on; every other... |
+| ADR-245 | Accepted | - | On a board with PSRAM the ring holds 5046 slots of 120 s (GRAPHHISTLARGESLOTS), 5040 of them readable: 7 days. |
 | ADR-247 | Accepted | - | The two PROGMEM assets of ADR-194 may be stored deflated in firmware flash (coordinator decision for TASK-1955 option... |

@@ -5,6 +5,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Added
+- Monitor > Graph: on a board with PSRAM the gateway keeps 7 days of graph history instead of 24 h (about 70 KB of PSRAM, still RAM only), and the graph gets a 7 days window. `GET /api/v2/graph/history` serves 24 h by default as before; `?hours=N` (1 to 168) asks for another window, and a window of more than 1008 slots is thinned (7 days: 10 minute slots, the newest value per slot, flame/DHW/CH set when any part of the slot had them). The chip shows only on boards with PSRAM. The CSV export covers the window shown (TASK-1963, ADR-245).
+- Monitor > Graph and its CSV export: a DHW temperature line (MsgID 26) from the moment the page opens; the device history does not hold it, so after a reload the earlier part of the window has no DHW line (TASK-1776).
+
 ### Changed
 - OT-Direct: `OH=` (copy the MsgID 100 override flags into the high byte) is on by default, like the PIC. Every OT-Direct board switches to `OH=1` once at its first boot on this version, whatever it had stored (since beta.203 every settings save stored `OH=0` without anyone choosing it); a marker in `settings.ini` (`OTDohpicdefault`) makes sure it happens once, so an `OH=0` sent afterwards stays. A thermostat that reads MsgID 100 during a `TT=`/`TC=` override then sees the flags in both bytes (Robert, DM 1571441135526875227; TASK-1961).
 - OT-Direct: during a `TT=` override the thermostat's MsgID 100 read is answered with the PIC's flags `0x03` (manual and program change; was `0x02`), `TC=` stays `0x01`, and with `OH=1` the flags are copied into the high byte. In master mode the MsgID 100 write to the boiler carries the same value (Robert, DM 1571426506259963986; TASK-1750).

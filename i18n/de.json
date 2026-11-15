@@ -379,6 +379,7 @@
     "graph_win_1h": "1 Std.",
     "graph_win_4h": "4 Std.",
     "graph_win_24h": "24 Std.",
+    "graph_win_7d": "7 Tage",
     "graph_marks": "Unterbrechungen",
     "graph_marks_title": "Zeigen, wo die Live-Verbindung abbrach (rot) und zurückkam (grün)",
     "log_aria": "Live-OpenTherm-Log",

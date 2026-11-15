@@ -46,8 +46,10 @@ const GHIST_MAX = 86400000 / GSLOT;
 // GBREAK_MS is read from v2.js itself, so the seam test follows the shipped value.
 const m = SRC.match(/\bGBREAK_MS\s*=\s*(\d+)/);
 const GBREAK_MS = m ? Number(m[1]) : undefined;
-const merge = new Function('GSLOT', 'GHIST_MAX',
-  extractFunction(SRC, 'mergeGraphHistory') + '\nreturn mergeGraphHistory;')(GSLOT, GHIST_MAX);
+// TASK-1963: the merge trims by time through graphTrim() (7 d device records, 24 h live records).
+const GHIST_LIVE_MS = 86400000, GHIST_SPAN_MS = 7 * 86400000;
+const merge = new Function('GSLOT', 'GHIST_MAX', 'GHIST_LIVE_MS', 'GHIST_SPAN_MS',
+  extractFunction(SRC, 'graphTrim') + '\n' + extractFunction(SRC, 'mergeGraphHistory') + '\nreturn mergeGraphHistory;')(GSLOT, GHIST_MAX, GHIST_LIVE_MS, GHIST_SPAN_MS);
 
 const NOW = 1_800_000_000_000;   // a multiple of 5000
 const IV = 120000;
@@ -226,11 +228,14 @@ test('TASK-1306: history from before a device reboot survives the next reload', 
   assert.equal(again.filter(s => !s.h).length, 2);
 });
 
-test('result is trimmed to GHIST_MAX, keeping the newest', () => {
-  const hist = col(GHIST_MAX - 50, i => live(NOW + i * GSLOT));       // 50 below the cap
+test('result is trimmed by time: live records older than 24 h and device records older than 7 d go (TASK-1963)', () => {
+  const old = merge([], body(4, { newest_age_ms: 8 * 86400000 }), NOW);   // a device response 8 days old
+  assert.equal(old.length, 0, 'device records older than 7 days are dropped');
+  const hist = [live(NOW - 25 * 3600000), live(NOW - 3600000), live(NOW)];
   const r = merge(hist, body(120, { newest_age_ms: 10000 }), NOW);
-  assert.equal(r.length, GHIST_MAX, 'capped');
-  assert.equal(r[r.length - 1].t, hist[hist.length - 1].t, 'newest live record kept');
+  assert.ok(!r.some(s => !s.h && s.t === NOW - 25 * 3600000), 'a live record older than 24 h is dropped');
+  assert.ok(r.some(s => !s.h && s.t === NOW - 3600000), 'a live record within 24 h is kept');
+  assert.equal(r[r.length - 1].t, NOW, 'newest live record kept');
   assertSortedUnique(r);
 });
 

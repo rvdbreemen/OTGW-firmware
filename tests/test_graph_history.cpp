@@ -4,7 +4,8 @@
 // src/OTGW-firmware/jsonEmit.h (only Arduino.h / platform.h are stubbed, see
 // tests/stubs). The same checks run for BOTH ring configurations the firmware uses:
 //   small (no PSRAM): 126 slots of 30 s,  120 emitted = 1 h
-//   large (PSRAM):    726 slots of 120 s, 720 emitted = 24 h
+//   large (PSRAM):    5046 slots of 120 s, 5040 = 7 days (TASK-1963, ADR-245); a response holds at
+//                     most 1008 slots: 24 h by default (720 x 2 min), ?hours= up to 7 d thinned (1008 x 10 min)
 // Covers: ring wrap, commit with gap fill, flag accumulation, encoders (rounding,
 // sentinels, NaN), the emit cap, the JSON shape (exact string compare, interval_s per
 // config), null for no value, the empty ring, and chunked reassembly over 1460 B windows
@@ -173,9 +174,9 @@ static bool jsonValue(const std::string& s, size_t& i) {
 static void runCommon() {
   check(sizeof(GraphHistSlot) == 14, "slot is 14 bytes");
   check(GRAPH_HIST_SMALL_SLOTS * sizeof(GraphHistSlot) == 1764, "small ring is 1764 B");
-  check(GRAPH_HIST_LARGE_SLOTS * sizeof(GraphHistSlot) == 10164, "large ring is 10164 B");
+  check(GRAPH_HIST_LARGE_SLOTS * sizeof(GraphHistSlot) == 70644, "large ring is 70644 B (TASK-1963)");
   check((GRAPH_HIST_SMALL_SLOTS - GRAPH_HIST_MARGIN) * GRAPH_HIST_SMALL_INTERVAL_S == 3600, "small ring emits exactly 1 h");
-  check((GRAPH_HIST_LARGE_SLOTS - GRAPH_HIST_MARGIN) * GRAPH_HIST_LARGE_INTERVAL_S == 24 * 3600, "large ring emits exactly 24 h");
+  check((GRAPH_HIST_LARGE_SLOTS - GRAPH_HIST_MARGIN) * GRAPH_HIST_LARGE_INTERVAL_S == 7 * 24 * 3600, "large ring holds exactly 7 days (TASK-1963)");
 
   // TASK-1578: a slot taken during a room dropout stores no value for the room (live-graph rule, TASK-1546).
   check(graphHistEncRoom(19.3f, true, false, 10) == 193, "room: current reading is stored");
@@ -220,7 +221,10 @@ static void runCommon() {
 static void runConfig(const char* name, uint16_t CAP, uint16_t IVS) {
   const std::string tag = std::string("[") + name + "] ";
   const uint32_t IV = (uint32_t)IVS * 1000UL;
-  const int EMIT = CAP - GRAPH_HIST_MARGIN;
+  // A default response covers the whole ring minus the margin, or 24 h when the ring holds more (TASK-1963).
+  const int RINGEMIT = CAP - GRAPH_HIST_MARGIN, DAYEMIT = (int)(GRAPH_HIST_DEFAULT_WINDOW_S / IVS);
+  const int EMIT = RINGEMIT < DAYEMIT ? RINGEMIT : DAYEMIT;
+  const bool emitsWholeRing = (EMIT == RINGEMIT);
   auto ck = [&](bool ok, const std::string& what) { check(ok, tag + what); };
 
   // ---- clock ------------------------------------------------------------
@@ -249,7 +253,7 @@ static void runConfig(const char* name, uint16_t CAP, uint16_t IVS) {
        r.slot[1].mod == GRAPH_HIST_NO_MOD && r.slot[1].flags == 0, "gap slots hold no values and no flags");
     ck(r.slot[5].flow == 200, "real slot is last");
     ck(c.slotStartMs == 6 * IV, "slot start advanced by k intervals (no drift)");
-    uint32_t k2 = graphHistIntervalsDue(r, c, c.slotStartMs + 5000UL * IV);
+    uint32_t k2 = graphHistIntervalsDue(r, c, c.slotStartMs + ((uint32_t)CAP + 100UL) * IV);   // longer than the ring
     graphHistCommit(r, c, k2, slotWithFlow(300));
     ck(r.count == CAP, "huge gap fills at most the ring");
     ck(r.slot[(r.head + CAP - 1) % CAP].flow == 300, "real slot still newest after a capped gap");
@@ -395,10 +399,17 @@ static void runConfig(const char* name, uint16_t CAP, uint16_t IVS) {
     std::string burstOver = reassemble(r, snap, [&](int pass) { if (pass == 0) for (int k = 0; k < over; k++) commitOne(); });
     restore();
     std::string spreadOver = reassemble(r, snap, [&](int pass) { if (pass < over) commitOne(); });
+    // The margin only binds when the response covers the whole ring. On the 7-day ring a default
+    // (24 h) response leaves thousands of older slots between the writer and the oldest emitted slot,
+    // so even MARGIN+1 pushes leave the stream byte-identical (TASK-1963).
+    if (!emitsWholeRing) {
+      ck(burstOver == single && spreadOver == single, "24 h response on the 7-day ring: MARGIN+1 pushes leave the stream identical");
+    } else {
     ck(burstOver != single, "MARGIN+1 pushed slots in a burst change the stream (pins the margin)");
     // With a short body (small ring: about 5 windows) the spread variant lands its last push after the
     // stream ended, so only the burst is pinned there; the large ring pins both.
     if (single.size() > (size_t)(over + 1) * 1460) ck(spreadOver != single, "MARGIN+1 pushed slots spread over the windows change the stream (pins the margin)");
+    }
     std::cout << "  (" << name << " body " << single.size() << " bytes in " << (single.size() + 1459) / 1460 << " windows)\n";
   }
 
@@ -417,10 +428,50 @@ static void runConfig(const char* name, uint16_t CAP, uint16_t IVS) {
   }
 }
 
+// TASK-1963 (ADR-245): the PSRAM ring holds 7 days; a response covers 24 h by default and up to 7 d on
+// request, at most GRAPH_HIST_MAX_EMIT slots, a longer window thinned to groups aligned to the newest slot.
+static void runSevenDay() {
+  const uint32_t IV = GRAPH_HIST_LARGE_INTERVAL_S * 1000UL;
+  RingBox rb(GRAPH_HIST_LARGE_SLOTS, GRAPH_HIST_LARGE_INTERVAL_S);
+  graphHistIntervalsDue(rb.r, rb.c, 0);
+  const uint32_t N = GRAPH_HIST_LARGE_SLOTS + 20;   // fill past the capacity: the ring wraps
+  for (uint32_t i = 1; i <= N; i++) {
+    GraphHistSlot v = slotWithFlow((int16_t)(i % 30000));
+    if (i % 5 == 3) rb.c.flagsAcc = GRAPH_HIST_FLAG_FLAME;   // one burning slot in every group of 5
+    graphHistCommit(rb.r, rb.c, graphHistIntervalsDue(rb.r, rb.c, i * IV), v);
+  }
+  GraphHistSnapshot d = graphHistMakeSnapshot(rb.r, rb.c, rb.c.lastCommitMs);
+  check(d.n == 720 && d.step == 1, "7 d ring: the default response is 720 slots of 120 s (24 h, as before)");
+  GraphHistSnapshot w = graphHistMakeSnapshot(rb.r, rb.c, rb.c.lastCommitMs, 168UL * 3600UL);
+  check(w.step == 5 && w.n == 1008, "7 d ring: ?hours=168 is 1008 groups of 5 slots (10 min each, Robert's A)");
+  check((uint32_t)w.n * w.step * GRAPH_HIST_LARGE_INTERVAL_S == 7UL * 24 * 3600, "?hours=168 covers exactly 7 days");
+  const std::string body = emit(rb.r, w);
+  check(body.find("\"interval_s\":600") != std::string::npos, "thinned response reports interval_s 600");
+  std::vector<std::string> flow, flame;
+  check(column(body, "flow", flow) && flow.size() == 1008 && flow.back() == std::to_string(N % 30000),
+        "thinned flow: 1008 values, the newest group shows the newest slot");
+  check(column(body, "flame", flame) && flame.size() == 1008 && flame.front() == "1" && flame.back() == "1",
+        "thinned flame: a group with one burning slot shows 1 (OR over the group)");
+  GraphHistSnapshot big = graphHistMakeSnapshot(rb.r, rb.c, rb.c.lastCommitMs, 100000UL * 3600UL);
+  check(big.n == w.n && big.step == w.step, "a window above 7 d is capped at 7 d");
+  GraphHistSnapshot h1 = graphHistMakeSnapshot(rb.r, rb.c, rb.c.lastCommitMs, 3600UL);
+  check(h1.n == 30 && h1.step == 1, "?hours=1 on the 7 d ring is 30 slots of 120 s");
+
+  RingBox sb(GRAPH_HIST_SMALL_SLOTS, GRAPH_HIST_SMALL_INTERVAL_S);
+  graphHistIntervalsDue(sb.r, sb.c, 0);
+  for (uint32_t i = 1; i <= 400; i++)
+    graphHistCommit(sb.r, sb.c, graphHistIntervalsDue(sb.r, sb.c, i * GRAPH_HIST_SMALL_INTERVAL_S * 1000UL), slotWithFlow(1));
+  GraphHistSnapshot sd = graphHistMakeSnapshot(sb.r, sb.c, sb.c.lastCommitMs);
+  GraphHistSnapshot sw = graphHistMakeSnapshot(sb.r, sb.c, sb.c.lastCommitMs, 168UL * 3600UL);
+  check(sd.n == 120 && sd.step == 1 && sw.n == 120 && sw.step == 1,
+        "no PSRAM: 120 slots of 30 s whatever the window (unchanged)");
+}
+
 int main() {
   runCommon();
+  runSevenDay();
   runConfig("small 126x30s", GRAPH_HIST_SMALL_SLOTS, GRAPH_HIST_SMALL_INTERVAL_S);
-  runConfig("large 726x120s", GRAPH_HIST_LARGE_SLOTS, GRAPH_HIST_LARGE_INTERVAL_S);
+  runConfig("large 5046x120s", GRAPH_HIST_LARGE_SLOTS, GRAPH_HIST_LARGE_INTERVAL_S);
   std::cout << (g_failures ? "=== FAILED ===\n" : "=== ALL TESTS PASSED ===\n") << "failures=" << g_failures << "\n";
   return g_failures ? 1 : 0;
 }

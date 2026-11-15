@@ -986,7 +986,7 @@ Quotes and backslashes in SSIDs are replaced with `_` to keep the JSON valid wit
 
 #### `GET /api/v2/graph/history`
 
-The device-side history of the Monitor > Graph series (TASK-1296): oldest first, in columns: up to 120 slots of 30 s (1 hour) on a board without PSRAM, up to 720 slots of 120 s (24 hours) on a board with PSRAM. The v2 UI loads it when the Graph tab opens and merges it into the samples it collects itself, so the chart windows and the CSV export are filled right away. Dallas sensors are not recorded.
+The device-side history of the Monitor > Graph series (TASK-1296): oldest first, in columns: up to 120 slots of 30 s (1 hour) on a board without PSRAM, up to 720 slots of 120 s (24 hours) by default on a board with PSRAM. The v2 UI loads it when the Graph tab opens and merges it into the samples it collects itself, so the chart windows and the CSV export are filled right away. Dallas sensors are not recorded. A board with PSRAM keeps 7 days; `?hours=N` (1 to 168, default 24) asks for another window. A response holds at most 1008 slots, so a longer window comes back thinned: `?hours=168` is 1008 slots of 600 s, each with the newest value of its group and the flame/DHW/CH flags of any slot in it (TASK-1963, ADR-245).
 
 **Authentication**: Not required
 

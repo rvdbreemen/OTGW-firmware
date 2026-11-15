@@ -700,6 +700,7 @@ html[data-theme="dark"]{--accent:var(--brand-cyan);--nav:#383838;--tile-off:#545
   /* TASK-1823: compact grid view of Monitor > Values, as the 1.x Home screen (columns, on/off boxes) */
   .valgrid{column-width:300px;column-gap:10px;background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:6px}
   .valgrid[hidden]{display:none}
+  .tchip[hidden]{display:none}   /* TASK-1963: the 7-day chip stays hidden without PSRAM */
   .vg-cell{display:flex;align-items:center;gap:6px;break-inside:avoid;padding:5px 8px;border-bottom:1px solid var(--border);font-size:13px}
   .vg-n{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .vg-v{min-width:56px;text-align:right;font-family:var(--font-mono);font-weight:600}
