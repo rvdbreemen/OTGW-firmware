@@ -7,11 +7,11 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-14T04:28:00Z'
+updated_date: '2026-11-15T09:49:00Z'
 labels:
   - bug
   - settings
   - filesystem
-  - needs-maintainer-ok
 milestone: 2.0.0
 dependencies: []
 priority: medium
@@ -30,3 +30,9 @@ Found during TASK-1774 (code reading, not seen on a device). src/OTGW-firmware/d
 - [ ] #2 Robert chose A, B or C (put by the coordinator with the consequences above)
 - [ ] #3 The chosen option is implemented with a host or build check that fails on the old image content
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Released by Robert (DM 1571454228763779093, relayed by the coordinator 2026-11-15): needs-maintainer-ok removed; queued for session 95 after the lane-95-next build/push.
+<!-- SECTION:NOTES:END -->

@@ -6,10 +6,9 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-04T23:53:00Z'
-updated_date: '2026-11-05T17:27:00Z'
+updated_date: '2026-11-15T09:49:00Z'
 labels:
   - github
-  - needs-maintainer-ok
 milestone: 2.1.0
 dependencies: []
 priority: low
@@ -28,4 +27,6 @@ https://github.com/rvdbreemen/OTGW-firmware/issues/10 by STemplar (2022). Featur
 2026-11-05 Robert (session): parked for 2.1.0.
 
 Robert 2026-11-05 (session, AskUserQuestion): keep waiting (label needs-maintainer-ok stays).
+
+Released by Robert (DM 1571454228763779093, relayed by the coordinator 2026-11-15): needs-maintainer-ok removed; queued for session 95 after the lane-95-next build/push.
 <!-- SECTION:NOTES:END -->
