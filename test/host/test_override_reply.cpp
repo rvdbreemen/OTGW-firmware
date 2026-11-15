@@ -193,6 +193,11 @@ static void applyOTDirectMode(OTDirectMode) {}
 static void otCmdApplyPendingFlush() {}   // the ring flush itself: tests/test_otd_mode_switch_queue_reset.py
 static void otdCmdTextDrain() {}          // TASK-1761: the off-loop command ring, tests/test_otd_loop_task_commands.py
 static bool otCmdEnqueue(uint32_t) { return true; }   // TASK-1847: the PM= chain's next read (tests/test_otd_pm_chain_tsp.py)
+// TASK-1906: the thermostat's own MsgID 99 (tests/test_otd_msgid99_relay.py); nothing pending here
+static bool otdRelayRead99(unsigned long, unsigned long &) { return false; }
+static unsigned long otdReply99(unsigned long r) { return r; }
+static void otdOnThermostatWrite99(uint16_t) {}
+static uint16_t otdOperModeData(bool) { return 0; }   // not in otd_slice.inc
 
 static void sendWebSocketJSON(const char*) {}
 static bool satSimulationBlocksBusTx(const char*, const __FlashStringHelper*) { return false; }

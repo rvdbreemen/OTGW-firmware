@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTDirect.ino
-**  Version  : v2.0.0-beta.297
+**  Version  : v2.0.0-beta.298
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -59,6 +59,10 @@ static unsigned long applyResponseModifiers(unsigned long response);
 static void setRemoteOverride(OTRemoteOverrideMode mode, float celsius);
 static void clearRemoteOverride();
 static void onThermostatMsgID16(uint8_t msgType, uint16_t f88);
+static uint16_t otdOperModeData(bool);                               // TASK-1906, defined with the MsgID 99 state
+static bool otdRelayRead99(unsigned long, unsigned long &);           // TASK-1906, otdOper99 block
+static unsigned long otdReply99(unsigned long);                       // TASK-1906, otdOper99 block
+static void otdOnThermostatWrite99(uint16_t);                         // TASK-1906, otdOper99 block
 
 // ---------------------------------------------------------------------------
 // Master request scheduler — periodic polls and writes to the boiler
@@ -795,6 +799,11 @@ static unsigned long applyOverrides(unsigned long frame, bool &modified) {
         return frame;
       }
     }
+  }
+  // TASK-1906: a thermostat READ 99 becomes the gateway's operating mode WRITE while one is pending (ID99ReadData).
+  if (otCurrentMode == OTD_MODE_GATEWAY) {
+    unsigned long w99;
+    if (otdRelayRead99(frame, w99)) { modified = true; return w99; }
   }
   if (msgType != 1 /* WRITE_DATA */) return frame;
 
@@ -1700,6 +1709,11 @@ static unsigned long buildOverriddenReply(unsigned long thermostatReq, unsigned 
     if (((boilerResp >> 28) & 0x07) != 4) return boilerResp;
     return buildOTResponse(type, msgId, otdStatusReplyData(data, (uint16_t)(boilerResp & 0xFFFF)));
   }
+  if (msgId == 99) {
+    // TASK-1906: the rewritten READ 99 is answered with the gateway's operating modes (OperModeAck/OperModeData,
+    // gateway.asm 6.8:3245-3250), whatever the boiler answered.
+    return buildOTResponse(type, msgId, otdOperModeData(otPushManual));
+  }
   if (msgId == 56 || msgId == 57) {
     const uint8_t boilerType = (boilerResp >> 28) & 0x07;
     if (boilerType == 5) data = boilerResp & 0xFFFF;         // WRITE_ACK: the value the boiler took
@@ -1764,6 +1778,7 @@ static void replyToThermostat(OTDirectRequestOrigin origin, unsigned long sentRe
     reply = otdClockReply(sentReq, reply, otSCLastCommandMs != 0, otSCClockData);
     // TASK-1844: MsgID 6, 125 and an unsupported 56/57 get the PIC's own answer
     reply = otdPicAnswer(sentReq, reply, otdUpperBoundF88(48, 80), otdUpperBoundF88(49, 90));
+    reply = otdReply99(reply);   // TASK-1906: the push bit while the gateway spoofs a push (ID99ReadAck)
     // ADR-223: the release rule counts thermostat MsgID 16 frames only after this answer.
     if (otRemoteOverride.mode != OT_OVERRIDE_NONE && ((reply >> 16) & 0xFF) == 9
         && ((reply >> 28) & 0x07) == 4) {
@@ -2621,6 +2636,8 @@ void loopOTDirect() {
       if (!otSlaveFrameNoted) {
         otSlaveFrameNoted = true;
         if (slaveMsgId == 16) onThermostatMsgID16((uint8_t)((otSlaveFrame >> 28) & 0x07), (uint16_t)(otSlaveFrame & 0xFFFF));
+        // TASK-1906: a thermostat WRITE 99 sets the operating modes (ID99WriteData, gateway.asm:3268-3279)
+        if (slaveMsgId == 99 && ((otSlaveFrame >> 28) & 0x07) == 1) otdOnThermostatWrite99((uint16_t)(otSlaveFrame & 0xFFFF));
       }
 
       // TASK-1707: the slot of a Data-ID the boiler does not support carries the gateway's own request
@@ -2806,6 +2823,7 @@ static inline bool checkBoolean(const char* value) {
 static uint8_t otOperModeDHW   = 0;         // MW= MsgID 99 HB bits 0..3
 static uint8_t otOperModeCH1   = 0;         // MH= MsgID 99 LB bits 0..3
 static uint8_t otOperModeCH2   = 0;         // M2= MsgID 99 LB bits 4..7
+static bool    otOperModeWrite = false;     // TASK-1906: the PIC's opermodewrite (otdOper99 block)
 // TASK-1832: MsgID 99 data as the spec (v4.2 MsgID 99) and the PIC (OperModeData, gateway.asm 6.8:3247-3250) lay it out:
 // HB = DHW operating mode (bits 0..3) + manual DHW push (bit 4), LB = HC1 (bits 0..3) + HC2 (bits 4..7).
 static uint16_t otdOperModeData(bool push) {
@@ -2825,6 +2843,7 @@ static void otdPushStart() {
   otPushManual = true;
   if (isUnknownId(99)) { otPushSpoof = true; return; }
   otPushPending = true;
+  otOperModeWrite = true;   // TASK-1906: PushOperModes (gateway.asm:3281-3288)
   unsigned long frame99 = OpenTherm::buildRequest(OpenThermMessageType::WRITE_DATA,
                                                   static_cast<OpenThermMessageID>(99), otdOperModeData(true));
   if (!otCmdEnqueue(frame99)) { OTDDebugTf(PSTR("OTD: queue full, dropped frame %08lX\r\n"), frame99); }
@@ -2835,6 +2854,7 @@ static void otdPushStart() {
 // a push the boiler ran ends when it clears the bit.
 static void otdPushOnBoiler99(uint8_t type, uint16_t data) {
   const bool boilerPush = (data & 0x1000) != 0;
+  if (type == 5 /* WRITE_ACK */) otOperModeWrite = false;   // TASK-1906: OperModeBoiler (gateway.asm:3239)
   if (type == 7 /* UNKNOWN_DATA_ID */ || type == 6 /* DATA_INVALID */) { if (otPushManual) otPushSpoof = true; return; }
   if (type == 5 /* WRITE_ACK */ && otPushPending && !boilerPush) { otPushSpoof = true; otPushPending = false; return; }
   if (type != 4 /* READ_ACK */ && type != 5 /* WRITE_ACK */) return;
@@ -2859,6 +2879,42 @@ static void otdPushOnBoilerStatus(uint8_t slaveLB) {
   if (!(slaveLB & 0x04)) otdPushEnd();
 }
 // --- otdPush end
+
+// TASK-1906: the thermostat's own MsgID 99 in gateway mode, as the PIC 6.8 MessageID99 (gateway.asm:3219-3279).
+// otOperModeWrite is the PIC's opermodewrite: set when the gateway has operating modes to write (MW=/MH=/M2=, HW=P;
+// PushOperModes :3281-3288), cleared by the boiler's WRITE_ACK 99 (OperModeBoiler :3239).
+//  - a thermostat READ 99 goes to the boiler as a WRITE 99 with the gateway's modes while one is pending
+//    (ID99ReadData :3252-3256); the thermostat gets the ack with those modes (OperModeData :3247-3250);
+//  - a thermostat WRITE 99 sets the stored modes, and a push bit in it starts a push (ID99WriteData :3268-3279);
+//  - a boiler READ_ACK 99 without the push bit goes to the thermostat with the bit set while the gateway spoofs a push
+//    (ID99ReadAck :3258-3265).
+// --- otdOper99 begin
+static bool otdRelayRead99(unsigned long frame, unsigned long &out) {
+  if (!otOperModeWrite || ((frame >> 28) & 0x07) != 0 || ((frame >> 16) & 0xFF) != 99) return false;
+  out = (1UL << 28) | (99UL << 16) | otdOperModeData(otPushManual);   // WRITE_DATA 99
+  setOTParityBit(out);
+  return true;
+}
+
+static void otdOnThermostatWrite99(uint16_t data) {
+  otOperModeDHW = (uint8_t)((data >> 8) & 0x0F);
+  otOperModeCH1 = (uint8_t)(data & 0x0F);
+  otOperModeCH2 = (uint8_t)((data >> 4) & 0x0F);
+  if ((data & 0x1000) && !otPushManual) {          // StartDHWPush; the thermostat's own write carries the push bit
+    otPushManual = true;
+    if (isUnknownId(99)) otPushSpoof = true;
+    else otPushPending = true;
+  }
+}
+
+static unsigned long otdReply99(unsigned long boilerResp) {
+  if (((boilerResp >> 16) & 0xFF) != 99 || ((boilerResp >> 28) & 0x07) != 4) return boilerResp;   // READ_ACK 99 only
+  if ((boilerResp & 0x1000) || !otPushSpoof) return boilerResp;
+  unsigned long r = (4UL << 28) | (99UL << 16) | otdOperModeData(true);
+  setOTParityBit(r);
+  return r;
+}
+// --- otdOper99 end
 
 // ---------------------------------------------------------------------------
 // clearWriteOverride — helper to clear both write cache and repeater override
@@ -3009,6 +3065,7 @@ static void resetTransientState() {
   otOperModeDHW = 0;
   otOperModeCH1 = 0;
   otOperModeCH2 = 0;
+  otOperModeWrite = false;   // TASK-1906
   // DHW push (TASK-1845)
   otdPushEnd();
   // PS=1 is not touched here: a GW= mode switch leaves HideReports alone on the PIC (gateway.asm:4690-4733);
@@ -3987,6 +4044,7 @@ bool handleOTDirectCommand(const char* buf, int len, bool satOwn) {
     otOperModeCH1 = val;
     // Send MsgID 99 WRITE_DATA
     uint16_t data99 = otdOperModeData(otPushManual);   // TASK-1845: the push bit stays while a push runs (operatingmode1 bit 4)
+    otOperModeWrite = true;   // TASK-1906: PushOperModes, a thermostat READ 99 carries it too
     unsigned long frame99 = OpenTherm::buildRequest(
       OpenThermMessageType::WRITE_DATA,
       static_cast<OpenThermMessageID>(99), data99);
@@ -4000,6 +4058,7 @@ bool handleOTDirectCommand(const char* buf, int len, bool satOwn) {
     if (val > 15) { otDirectBridgeProcessStatus("BV"); return false; }
     otOperModeDHW = val;
     uint16_t data99 = otdOperModeData(otPushManual);   // TASK-1845: the push bit stays while a push runs (operatingmode1 bit 4)
+    otOperModeWrite = true;   // TASK-1906: PushOperModes, a thermostat READ 99 carries it too
     unsigned long frame99 = OpenTherm::buildRequest(
       OpenThermMessageType::WRITE_DATA,
       static_cast<OpenThermMessageID>(99), data99);
@@ -4013,6 +4072,7 @@ bool handleOTDirectCommand(const char* buf, int len, bool satOwn) {
     if (val > 15) { otDirectBridgeProcessStatus("BV"); return false; }
     otOperModeCH2 = val;
     uint16_t data99 = otdOperModeData(otPushManual);   // TASK-1845: the push bit stays while a push runs (operatingmode1 bit 4)
+    otOperModeWrite = true;   // TASK-1906: PushOperModes, a thermostat READ 99 carries it too
     unsigned long frame99 = OpenTherm::buildRequest(
       OpenThermMessageType::WRITE_DATA,
       static_cast<OpenThermMessageID>(99), data99);

@@ -210,6 +210,10 @@ static bool satIsEnabled() { return g_satEnabled; }
 static bool isBoilerMsgIdUnsupportedRead(uint8_t id) { return id == 28 && g_ret28Unsupported; }
 // TASK-1761: the sliced head of loopOTDirect() drains the off-loop command ring; nothing is queued here.
 static void otdCmdTextDrain() {}
+static bool otdRelayRead99(unsigned long, unsigned long &) { return false; }   // TASK-1906: MsgID 99 relay, tests/test_otd_msgid99_relay.py
+static unsigned long otdReply99(unsigned long r) { return r; }
+static void otdOnThermostatWrite99(uint16_t) {}
+static uint16_t otdOperModeData(bool);   // the real one is cut in further down
 // TASK-1702: the sliced mode-apply head of loopOTDirect() needs these; its flag stays false here.
 #ifndef constrain
 #define constrain(v, lo, hi) ((v) < (lo) ? (lo) : ((v) > (hi) ? (hi) : (v)))

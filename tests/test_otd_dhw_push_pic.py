@@ -73,6 +73,7 @@ static uint8_t otMasterStatusFlags = 0x01;
 static uint8_t otDHWOverride = 0xFF;
 static bool otChModeOff = false, otSummerMode = false, otDHWBlocking = false, otCoolingEnable = true, otCH2Enable = true;
 static uint8_t otOperModeDHW = 0, otOperModeCH1 = 0, otOperModeCH2 = 0;
+static bool otOperModeWrite = false;   // TASK-1906: the PIC's opermodewrite
 // state of the code before TASK-1845 (unused by the fix)
 enum DHWPushState : uint8_t { PUSH_IDLE = 0, PUSH_PENDING, PUSH_STARTED };
 static DHWPushState otDHWPushState = PUSH_IDLE;

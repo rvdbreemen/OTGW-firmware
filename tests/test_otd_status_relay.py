@@ -70,6 +70,11 @@ static Ov otOverrides[OT_OVERRIDE_COUNT] = { {1, false, 0}, {9, false, 0} };
 static void onThermostatMsgID16(uint8_t, uint16_t) {}
 static unsigned long buildOTResponse(uint8_t type, uint8_t msgId, uint16_t data);
 static unsigned long otdRelayedStatusFrame(unsigned long frame);
+static bool otdRelayRead99(unsigned long, unsigned long &) { return false; }   // TASK-1906: MsgID 99 relay, tests/test_otd_msgid99_relay.py
+static unsigned long otdReply99(unsigned long r) { return r; }
+static void otdOnThermostatWrite99(uint16_t) {}
+static uint16_t otdOperModeData(bool) { return 0; }
+static bool otPushManual = false;
 static uint16_t otdStatusReplyData(uint16_t thermostatData, uint16_t boilerData);
 static bool otdCsOverrideActive() { return otOverrides[0].active; }
 """

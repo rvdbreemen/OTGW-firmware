@@ -63,6 +63,7 @@ static unsigned long otDHWPushStartMs = 0;
 static uint8_t otMasterStatusFlags = 0;
 static uint8_t otDHWOverride = 0xFF;
 static uint8_t otOperModeDHW = 0, otOperModeCH1 = 0, otOperModeCH2 = 0;
+static bool otOperModeWrite = false;   // TASK-1906: the PIC's opermodewrite
 // TASK-1845: the push flags and isUnknownId the HW=P path reads (the push functions are cut from the source)
 static bool otPushManual = false, otPushPending = false, otPushSpoof = false, otPushStarted = false;
 static uint8_t otPushFails = 0;

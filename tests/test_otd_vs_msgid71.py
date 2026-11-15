@@ -69,6 +69,10 @@ static void writeSettings(bool) { g_writes++; }
 enum { OTD_MODE_GATEWAY = 1 };
 static int otCurrentMode = OTD_MODE_GATEWAY;
 static unsigned long otdRelayedStatusFrame(unsigned long f) { return f; }
+static bool otdRelayRead99(unsigned long, unsigned long &) { return false; }   // TASK-1906: MsgID 99 relay, tests/test_otd_msgid99_relay.py
+static unsigned long otdReply99(unsigned long r) { return r; }
+static void otdOnThermostatWrite99(uint16_t) {}
+static uint16_t otdOperModeData(bool) { return 0; }
 static char g_reply[32];
 static void synthesizeResponse(const char* c, const char* v) { snprintf(g_reply, sizeof g_reply, "%.2s: %s", c, v); }
 static void otDirectBridgeProcessStatus(const char* s) { snprintf(g_reply, sizeof g_reply, "%s", s); }

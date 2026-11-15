@@ -74,6 +74,7 @@ static OTResponseOverride otResponseOverrides[OT_RESPONSE_OVERRIDE_MAX];
 static OTRemoteOverrideState otRemoteOverride = { OT_OVERRIDE_NONE, 0, 0, 0, 0, false, 0, false, false };
 static bool otRemoteOverrideClearPending = false;
 static uint8_t otOperModeDHW, otOperModeCH1, otOperModeCH2, otMasterStatusFlags, otDHWOverride, otUnknownIdCount;
+static bool otOperModeWrite = false;   // TASK-1906: the PIC's opermodewrite
 static uint8_t otUnknownCounters[32];
 static DHWPushState otDHWPushState; static uint32_t otDHWPushStartMs, otLastThermostatMs;
 static void otdPushEnd() {}   // TASK-1845: resetTransientState() ends a manual DHW push
