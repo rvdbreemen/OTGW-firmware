@@ -11,6 +11,7 @@
 //                                                     type d u f c s(hex); the text is the line raw fallback
 //   L <t_us> <str addr> <fn addr> <line>               println line
 //   X <t_us> <fn addr> <line> <text hex>               line raw
+//   G <items> <records>                                count items/records as lost (SEC_LOST in the next record)
 //   E                                                  close the last record
 #include <cstdio>
 #include <cstdlib>
@@ -70,6 +71,7 @@ int main() {
     if (k == 'B') { rec.begin(strtoll(tok[1], nullptr, 10)); continue; }
     if (k == 'E') { emit(); continue; }
     if (k == 'H') { heapNow = strtoul(tok[1], nullptr, 10); blockNow = strtoul(tok[2], nullptr, 10); continue; }
+    if (k == 'G') { rec.lostItems += strtoul(tok[1], nullptr, 10); rec.lostRecords += strtoul(tok[2], nullptr, 10); continue; }
     if (k == 'O') {
       int64_t t = strtoll(tok[1], nullptr, 10);
       uint32_t f = strtoul(tok[3], nullptr, 16);

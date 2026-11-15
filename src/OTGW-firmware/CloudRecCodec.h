@@ -381,6 +381,7 @@ inline char dbgConv(const char *&fmt, int *lenMod) {
 // ---------------------------------------------------------------- mix record assembly
 
 static const uint8_t SEC_SAT = 2, SEC_DBG = 3, SEC_OT2 = 5;
+static const uint8_t SEC_LOST = 7;   // TASK-1972: LEB128 items, LEB128 records lost since the previous record
 
 // Writes section `type` with `data` into out. Returns false when it does not fit.
 inline bool mixSection(Buf &out, uint8_t type, const uint8_t *data, size_t n) {
@@ -405,7 +406,7 @@ inline bool mixOtSection(Buf &out, int64_t t0Ms, int64_t firstMs, uint32_t count
 // (ADR-213). An append that does not fit returns false; the caller then closes the record (send it), opens
 // a new one and appends again.
 static const size_t REC_OT_BYTES = 768, REC_SAT_BYTES = 512, REC_DBG_BYTES = 2816;
-static const size_t REC_MAX_BYTES = REC_OT_BYTES + REC_SAT_BYTES + REC_DBG_BYTES + 16;
+static const size_t REC_MAX_BYTES = REC_OT_BYTES + REC_SAT_BYTES + REC_DBG_BYTES + 32;   // + section headers, SEC_LOST
 
 struct Recorder {
   uint8_t otMem[REC_OT_BYTES], satMem[REC_SAT_BYTES], dbgMem[REC_DBG_BYTES];
@@ -424,6 +425,9 @@ struct Recorder {
     t0Ms = t0ms; firstOtMs = t0ms; otCount = 0; open = true;
   }
   bool empty() const { return !otCount && !sat.n && !dbg.n; }
+  // Loss since the previous record (busy recorder, a record that could not be queued, a pause). Kept across
+  // begin() and written as SEC_LOST at the head of the next closed record, so a gap is never silent.
+  uint32_t lostItems = 0, lostRecords = 0;
 
   bool otFrame(int64_t tMs, char letter, uint32_t frame) {
     int li = otLetterIndex(letter);
@@ -453,6 +457,13 @@ struct Recorder {
   size_t close(uint8_t *out, size_t cap) {
     Buf b; b.init(out, cap);
     if (otCount) rc.finish();
+    if (lostItems || lostRecords) {
+      uint8_t g[12];
+      Buf gb; gb.init(g, sizeof(g));
+      gb.leb(lostItems); gb.leb(lostRecords);
+      mixSection(b, SEC_LOST, g, gb.n);
+      lostItems = lostRecords = 0;
+    }
     mixOtSection(b, t0Ms, firstOtMs, otCount, ot.p, ot.n);
     mixSection(b, SEC_SAT, sat.p, sat.n);
     mixSection(b, SEC_DBG, dbg.p, dbg.n);
@@ -500,8 +511,9 @@ TokResult dbgPrintfTokens(Recorder &r, int64_t tUs, uint32_t fmtAddr, uint32_t f
 
 // ---------------------------------------------------------------- TASK-1972: LZ + range coder over a whole record
 //
-// A closed record (fmt 4) is sent as fmt 5 when this makes it smaller: LEB128 raw length, then the range coder's
-// bytes. LZ77 whose window is the record itself, so no window buffer; the match finder keeps the last position per
+// A closed record (fmt 4) is sent as fmt 5 when this makes it smaller: LEB128 raw length, CRC-32 (IEEE, little
+// endian) of the raw record, then the range coder's bytes. The decoder refuses a record whose output does not
+// match the CRC, so a fault in either coder can never change data unnoticed. LZ77 whose window is the record itself, so no window buffer; the match finder keeps the last position per
 // 3-byte hash. Every decision goes through the range coder: match flag (context: previous token was a match),
 // literal (one 256-node bit tree), length 3..258 (4-bit tree, 15 = an 8-bit tree follows), distance 1..4096
 // (6-bit tree of the high bits, 6 direct bits). otrec.lz_encode() / lz_decode() are the reference; the host test
@@ -521,12 +533,24 @@ inline uint32_t lzHash(const uint8_t *d, size_t i) {
   return (x * 2654435761u) >> (32 - LZ_HASH_BITS);
 }
 
+// CRC-32 as zlib.crc32 (reflected, polynomial 0xEDB88320), bitwise: no table.
+inline uint32_t crc32(const uint8_t *d, size_t n) {
+  uint32_t c = 0xFFFFFFFFu;
+  for (size_t i = 0; i < n; i++) {
+    c ^= d[i];
+    for (int k = 0; k < 8; k++) c = (c >> 1) ^ (0xEDB88320u & (0u - (c & 1u)));
+  }
+  return ~c;
+}
+
 inline void lzEncode(const uint8_t *in, size_t n, Buf &out, LzWork &w) {
   for (auto &h : w.head) h = 0;
   uint16_t *tables[] = {w.match, w.lit, w.len, w.len2, w.dist};
   const size_t sizes[] = {2, 256, 16, 256, 64};
   for (int t = 0; t < 5; t++) for (size_t k = 0; k < sizes[t]; k++) tables[t][k] = RC_INIT;
   out.leb(n);
+  uint32_t crc = crc32(in, n);
+  for (int k = 0; k < 4; k++) out.put((uint8_t)(crc >> (8 * k)));
   RcEnc e;
   e.init(&out);
   int prev = 0;

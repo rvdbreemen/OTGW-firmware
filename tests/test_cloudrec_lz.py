@@ -7,6 +7,9 @@ The real header is compiled with the host C++ compiler; nothing is re-implemente
      reference otrec.lz_encode, and otrec.lz_decode gives every record back exactly.
   2. The counting sink (Buf::initSink) counts exactly the bytes the memory form writes.
   3. On the harness records the compressed form is smaller in total.
+  4. Fuzz: 3,000 generated inputs (random, runs, repeats at distances around 4,096, matches around 258, up to the
+     maximum record size) give the same bytes in C and Python and come back exactly.
+  5. The CRC-32: no single flipped bit in an encoded record decodes to wrong data unnoticed.
 """
 import os, random, shutil, subprocess, sys, tempfile, unittest
 
@@ -61,6 +64,24 @@ def harness_records():
     return [p for _, p in t.Harness.run(lines)]
 
 
+def fuzz_input(rnd):
+    n = rnd.choice([rnd.randint(0, 40), rnd.randint(0, 600), rnd.randint(3000, 4112)])
+    out = bytearray()
+    while len(out) < n:
+        k = rnd.random()
+        if k < 0.3:
+            out += bytes(rnd.getrandbits(8) for _ in range(rnd.randint(1, 50)))
+        elif k < 0.5:
+            out += bytes([rnd.getrandbits(8)]) * rnd.randint(1, 600)              # runs, matches past 258
+        elif k < 0.8 and out:
+            d = rnd.choice([1, 2, 3, rnd.randint(1, len(out)), min(len(out), rnd.randint(4090, 4100))])
+            start = max(0, len(out) - d)
+            out += out[start:start + rnd.randint(3, 300)]                       # repeats, distances near 4096
+        else:
+            out += bytes(rnd.choice(b"\x00\x01\xff ab") for _ in range(rnd.randint(1, 80)))
+    return bytes(out[:n])
+
+
 EXE = build()
 
 
@@ -72,7 +93,8 @@ class CloudRecLzTest(unittest.TestCase):
         edge = [b"", b"a", b"ab", b"abc", b"aaaa", bytes(300), bytes(range(256)) * 3, os.urandom(1000),
                 bytes(rnd.choice(b"abc\x00\xff") for _ in range(4112)), b"xyz" * 1400]
         cls.recs = harness_records()
-        cls.inputs = edge + cls.recs
+        cls.fuzz = [fuzz_input(rnd) for _ in range(3000)]
+        cls.inputs = edge + cls.fuzz + cls.recs
         r = subprocess.run([EXE], input="\n".join(x.hex() for x in cls.inputs) + "\n", capture_output=True,
                            text=True, check=True)
         cls.out = [l.split(" ") for l in r.stdout.splitlines()]
@@ -89,6 +111,24 @@ class CloudRecLzTest(unittest.TestCase):
     def test_counting_sink(self):
         for count, _, hx in self.out:
             self.assertEqual(int(count), len(hx) // 2)
+
+    def test_fuzz_inputs_covered(self):
+        self.assertEqual(len(self.fuzz), 3000)
+        self.assertTrue(any(len(x) >= 4096 for x in self.fuzz))
+
+    def test_crc_catches_every_changing_flip(self):
+        raw = self.recs[0] if self.recs else bytes(range(256)) * 8
+        enc = otrec.lz_encode(raw)
+        rnd = random.Random(9)
+        for _ in range(400):
+            b = bytearray(enc)
+            i = rnd.randrange(len(b))
+            b[i] ^= 1 << rnd.randrange(8)
+            try:
+                out = otrec.lz_decode(bytes(b))
+            except (otrec.LzCrcError, IndexError, ValueError):
+                continue
+            self.assertEqual(out, raw, f"flip at byte {i} changed the data without an error")
 
     def test_harness_records_get_smaller(self):
         n = len(self.inputs) - len(self.recs)

@@ -124,6 +124,7 @@ def unpack_mix(t0, payload):
 
 import re as _re
 import struct as _struct
+import zlib as _zlib
 
 SPEC = _re.compile(r"%([-+ #0]*)(\d*)(?:\.(\d+))?(hh|h|ll|l|z)?([diuxXfcsS%])")
 
@@ -600,7 +601,9 @@ def unpack_ot2(t0, data):
 
 # ---------------------------------------------------------------- TASK-1972: smaller records, lossless
 
-FMT_MIX_LZ = 5        # a fmt-4 payload, LZ + range-coded as a whole (lz_encode); sent only when it is smaller
+SEC_LOST = 7          # LEB128 items, LEB128 records the gateway lost since the previous record
+FMT_MIX_LZ = 5        # a fmt-4 payload, LZ + range-coded as a whole (lz_encode); sent only when it is smaller.
+                      # Layout: LEB128 raw length, CRC-32 (IEEE, little endian) of the raw payload, range-coder bytes.
 LZ_HASH_BITS = 10     # match finder: the last position per 3-byte hash, 1,024 entries
 LZ_MAX_MATCH = 258    # length 3..258: 4-bit tree, 15 = 8-bit tree of length - 18 follows
 LZ_MAX_DIST = 4096    # distance 1..4096: 6-bit tree of the high bits + 6 direct bits
@@ -619,7 +622,8 @@ def _lz_hash(d, i):
 def lz_encode(raw):
     """LZ77 over the record itself (no window buffer: the input is the window) with a range coder for every
     decision: match flag (context: was the previous token a match), literal (one 256-node bit tree), length and
-    distance (bit trees). Output: LEB128 raw length + range-coder bytes. Mirrors crec::lzEncode() byte for byte."""
+    distance (bit trees). Output: LEB128 raw length + CRC-32 of raw + range-coder bytes. Mirrors crec::lzEncode()
+    byte for byte."""
     e, m, head, i, n, prev = codec.Enc(), _LzProbs(), [0] * (1 << LZ_HASH_BITS), 0, len(raw), 0
 
     def tree(probs, v, bits):
@@ -660,12 +664,17 @@ def lz_encode(raw):
             tree(m.lit, raw[i], 8)
             i += 1
             prev = 0
-    return _leb(n) + e.finish()
+    return _leb(n) + _struct.pack("<I", _zlib.crc32(raw)) + e.finish()
+
+
+class LzCrcError(ValueError):
+    """The decoded record does not match the CRC-32 the gateway computed over the original: never accept it."""
 
 
 def lz_decode(data):
     n, used = _unleb(data)
-    d, m, out, prev = codec.Dec(data[used:]), _LzProbs(), bytearray(), 0
+    crc = _struct.unpack("<I", data[used:used + 4])[0]
+    d, m, out, prev = codec.Dec(data[used + 4:]), _LzProbs(), bytearray(), 0
 
     def tree(probs, bits):
         node = 1
@@ -685,9 +694,22 @@ def lz_decode(data):
         else:
             out.append(tree(m.lit, 8))
             prev = 0
-    return bytes(out)
+    out = bytes(out)
+    if _zlib.crc32(out) != crc:
+        raise LzCrcError(f"record CRC mismatch: {_zlib.crc32(out):08x} != {crc:08x}")
+    return out
 
 
 def record_payload(fmt, payload):
     """The fmt-4 payload of a stored record, whether it was sent plain (4) or LZ-coded (5)."""
     return lz_decode(payload) if fmt == FMT_MIX_LZ else payload
+
+
+def lost_counts(sec):
+    """(items, records) from a record's SEC_LOST section, or (0, 0)."""
+    data = sec.get(SEC_LOST, b"")
+    if not data:
+        return 0, 0
+    items, u = _unleb(data)
+    records, _ = _unleb(data[u:])
+    return items, records

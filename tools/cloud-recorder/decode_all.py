@@ -9,7 +9,8 @@ Reads the device's "mix" records (fmt 4) in seq order and writes:
   sat.log       one SATTICK line per tick: ISO time, tab, the exact SATTICK text
   debug.log     the telnet bytes the gateway printed, rebuilt from the address tokens; the format strings
                 and function names are read from --image, the firmware.bin (or .elf) of the build that recorded
-Missing records become "#" lines in otframes.log and sat.log and a "### gap" line in debug.log.
+Missing records become "#" lines in otframes.log and sat.log and a "### gap" line in debug.log; so does what the
+gateway itself reports as lost (SEC_LOST: items or records it could not record).
 Run it on the LAN: the superuser API is not exposed through the tunnel.
 """
 import argparse, base64, datetime, os, sys, zlib
@@ -41,6 +42,14 @@ def decode_records(records, image, tz, out_dir):
                 continue
             counts["records"] += 1
             sec = otrec.unpack_mix(r["t0"], otrec.record_payload(r["fmt"], base64.b64decode(r["payload"])))
+            items, recs = otrec.lost_counts(sec)
+            if items or recs:                         # the gateway reports what it could not record
+                note = f"lost on the gateway before record {r['seq']}: {items} items, {recs} records"
+                fo.write(f"# {note}\n")
+                fs.write(f"# {note}\n")
+                fd.write(f"\r\n### {note}\r\n".encode())
+                counts["lost_items"] = counts.get("lost_items", 0) + items
+                counts["lost_records"] = counts.get("lost_records", 0) + recs
             for t, letter, fr in sec.get(otrec.SEC_OT, []):
                 ts = datetime.datetime.fromtimestamp(t / 1000, tz)
                 fo.write(f"{ts.isoformat(timespec='milliseconds')}\t{ts.strftime('%H:%M:%S.%f')}\t{letter}\t{fr:08X}\n")

@@ -190,7 +190,7 @@ class CloudRecCodecTest(unittest.TestCase):
         lines, frames, sat, dbg_text, img = build_events(30, 300)
         recs = Harness.run(lines)
         self.assertGreater(len(recs), 30)              # 30 minutes, and some records closed early
-        self.assertLessEqual(max(len(p) for _, p in recs), 4096 + 16)
+        self.assertLessEqual(max(len(p) for _, p in recs), 4096 + 32)
         ot, sat_out, dbg = decode(recs, img)
         self.assertEqual(ot, frames)
         self.assertEqual([(t, fi, x) for t, fi, x in sat_out], sat)
@@ -213,6 +213,21 @@ class CloudRecCodecTest(unittest.TestCase):
         self.assertEqual(dbg, want)
         items = otrec.unpack_mix(recs[0][0], recs[0][1])[otrec.SEC_DBG]
         self.assertEqual(sum(1 for b in [items[0]] if b == otrec.DBG_HEAP), 1)
+
+
+    def test_lost_items_are_reported_in_the_next_record(self):
+        lines, frames, _, _, _ = build_events(2, 1)
+        ot = [f"O {t} {L} {f:08X}" for t, L, f in frames]
+        mid = len(ot) // 2
+        recs = Harness.run([lines[0]] + ot[:mid] + ["G 3 1"] + ot[mid:] + ["E"])
+        counts = [otrec.lost_counts(otrec.unpack_mix(t0, p)) for t0, p in recs]
+        self.assertEqual(sum(c[0] for c in counts), 3)
+        self.assertEqual(sum(c[1] for c in counts), 1)
+        self.assertEqual(sum(1 for c in counts if c != (0, 0)), 1)       # reported once, then reset
+        got = []
+        for t0, p in recs:
+            got += otrec.unpack_mix(t0, p).get(otrec.SEC_OT, [])
+        self.assertEqual(got, [f for f in frames])                       # and the OT data is untouched
 
 
 if __name__ == "__main__":

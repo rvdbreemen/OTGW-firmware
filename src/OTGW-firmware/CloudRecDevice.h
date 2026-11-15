@@ -22,7 +22,8 @@
 **  no further connection: the opt-in is off until the user turns it on again.
 **
 **  Built only in the esp32-combo-tlsdyn env (HAS_CLOUD_REC), whose IDF libraries use dynamic mbedTLS buffers.
-**  Capture points never block: when the recorder is busy an item is counted as dropped.
+**  A capture point waits at most 10 ms for the recorder; an item or record that is still lost is counted and
+**  reported in the next record (SEC_LOST, TASK-1972), so a gap in the data is never silent.
 **  Not recorded: output that bypasses the Debug* macros (e.g. the telnet banner).
 ***************************************************************************
 */
@@ -44,6 +45,7 @@
 
 static const uint32_t CLOUDREC_INTERVAL_MS = 60000;
 static const uint32_t CLOUDREC_TASK_STACK  = 10240;
+static const uint32_t CLOUDREC_LOCK_WAIT_MS = 10;   // a capture point waits this long for the recorder (TASK-1972)
 
 struct CloudRecConfig {
   bool enabled = false;
@@ -100,13 +102,22 @@ static inline bool cloudRecInFlash(const void *p) {
   return a >= crec::DROM_BASE && a < crec::DROM_BASE + 0x1000000u;
 }
 
+// Items lost while the recorder was not available; moved into the next record's SEC_LOST under the lock.
+static uint32_t cloudRecLostPending = 0;
+static inline void cloudRecLoseItem() {
+  __atomic_fetch_add(&cloudRecLostPending, 1u, __ATOMIC_RELAXED);
+  cloudRecDroppedItems++;
+}
+
 // ---------------------------------------------------------------- record queue (caller holds cloudRecLock)
 
 static void cloudRecCloseLocked(int64_t reopenMs) {
+  cloudRec.lostItems += __atomic_exchange_n(&cloudRecLostPending, 0u, __ATOMIC_RELAXED);
   if (cloudRec.open && !cloudRec.empty()) {
     uint64_t seq = cloudRecSeqNext++;
     if (cloudRecSendBusy) {
-      cloudRecDroppedRecords++;                     // the previous record is still on its way: this one is lost
+      cloudRecDroppedRecords++;                     // the previous record is still on its way: this one is lost,
+      cloudRec.lostRecords++;                       // and the next record says so
     } else {
       cloudRecSendT0 = cloudRec.t0Ms;
       cloudRecSendLen = cloudRec.close(cloudRecSendBuf, sizeof(cloudRecSendBuf));
@@ -119,10 +130,10 @@ static void cloudRecCloseLocked(int64_t reopenMs) {
 
 template <typename F> static void cloudRecAppend(int64_t tMs, F f) {
   if (!cloudRecActive) return;
-  if (!platformMutexTryLock(cloudRecLock)) { cloudRecDroppedItems++; return; }
+  if (!platformMutexLock(cloudRecLock, CLOUDREC_LOCK_WAIT_MS)) { cloudRecLoseItem(); return; }
   if (!f()) {
     cloudRecCloseLocked(tMs);
-    if (!f()) cloudRecDroppedItems++;
+    if (!f()) cloudRecLoseItem();
   }
   platformMutexUnlock(cloudRecLock);
 }
@@ -152,7 +163,7 @@ static void cloudRecTeeFlushLocked() {
       cloudRecCloseLocked(recBolUs / 1000);
       crec::dbgHeap(cloudRec.dbg, cloudRec.dbgSt, recHeap, recBlock);
       crec::dbgLineRaw(cloudRec.dbg, cloudRec.dbgSt, recBolUs, (uint32_t)(uintptr_t)recBolFn, recBolLine, recTee, recTeeLen);
-      if (cloudRec.dbg.full) { cloudRec.dbg.full = false; cloudRecDroppedItems++; }
+      if (cloudRec.dbg.full) { cloudRec.dbg.full = false; cloudRecLoseItem(); }
     }
     recBolPending = false;
   } else {
@@ -162,7 +173,7 @@ static void cloudRecTeeFlushLocked() {
       cloudRec.dbg.n = mark; cloudRec.dbg.full = false;
       cloudRecCloseLocked(cloudRecNowUs() / 1000);
       crec::dbgRaw(cloudRec.dbg, recTee, recTeeLen);
-      if (cloudRec.dbg.full) { cloudRec.dbg.full = false; cloudRecDroppedItems++; }
+      if (cloudRec.dbg.full) { cloudRec.dbg.full = false; cloudRecLoseItem(); }
     }
   }
   recTeeLen = 0;
@@ -170,7 +181,7 @@ static void cloudRecTeeFlushLocked() {
 
 void cloudRecTeeFlush() {
   if (!cloudRecActive || !recTeeLen) return;
-  if (!platformMutexTryLock(cloudRecLock)) { recTeeLen = 0; cloudRecDroppedItems++; return; }
+  if (!platformMutexLock(cloudRecLock, CLOUDREC_LOCK_WAIT_MS)) { recTeeLen = 0; cloudRecLoseItem(); return; }
   cloudRecTeeFlushLocked();
   platformMutexUnlock(cloudRecLock);
 }
@@ -198,14 +209,14 @@ void cloudRecBol(const char *fn, int line, int64_t tUs, uint32_t heap, uint32_t 
 void cloudRecPrintf(const char *fmt, va_list ap, const char *printed, size_t printedLen, bool truncated) {
   if (!cloudRecActive) return;
   cloudRecTeeFlush();                               // text printed after the prefix and before this printf
-  if (!platformMutexTryLock(cloudRecLock)) { cloudRecDroppedItems++; recBolPending = false; return; }
+  if (!platformMutexLock(cloudRecLock, CLOUDREC_LOCK_WAIT_MS)) { cloudRecLoseItem(); recBolPending = false; return; }
   int64_t tUs = recBolPending ? recBolUs : cloudRecNowUs();
   if (!strncmp(printed, "SATTICK ", 8)) {
     for (int fi = 0; fi < 2; fi++) {
       if (strcmp(fmt, crec::SAT_FORMATS[fi])) continue;
       if (!cloudRec.satTick(tUs / 1000, fi, printed)) {
         cloudRecCloseLocked(tUs / 1000);
-        if (!cloudRec.satTick(tUs / 1000, fi, printed)) cloudRecDroppedItems++;
+        if (!cloudRec.satTick(tUs / 1000, fi, printed)) cloudRecLoseItem();
       }
     }
   }
@@ -227,7 +238,7 @@ void cloudRecPrintf(const char *fmt, va_list ap, const char *printed, size_t pri
         cloudRec.dbg.n = mark; cloudRec.dbgSt = before;
       }
       if (tr == crec::TOK_OK) break;
-      if (attempt == 0) cloudRecCloseLocked(tUs / 1000); else cloudRecDroppedItems++;
+      if (attempt == 0) cloudRecCloseLocked(tUs / 1000); else cloudRecLoseItem();
     }
     recBolPending = false;
   } else {
@@ -466,12 +477,18 @@ static int cloudRecProbe(bool &blocked) {
 
 // ---------------------------------------------------------------- service state
 
-static void cloudRecPause() {                     // stop capture and drop what was not sent
+// Stops capture. keep: the open record joins the send slot (or is counted lost when the slot is taken) and the
+// queued record waits for the service; it is sent first after the next successful login. !keep (blocked): all
+// of it goes.
+static void cloudRecPause(bool keep) {
   cloudRecActive = false;
   if (platformMutexLock(cloudRecLock, 200)) {
-    if (cloudRecSendBusy || (cloudRec.open && !cloudRec.empty())) cloudRecDroppedRecords++;
-    cloudRecSendBusy = false;
-    cloudRec.begin(cloudRecNowUs() / 1000);
+    if (keep) {
+      cloudRecCloseLocked(cloudRecNowUs() / 1000);
+    } else {
+      cloudRecSendBusy = false;
+      cloudRec.begin(cloudRecNowUs() / 1000);
+    }
     platformMutexUnlock(cloudRecLock);
   }
 }
@@ -491,7 +508,7 @@ static void cloudRecResume() {
 }
 
 static void cloudRecBackoff(const __FlashStringHelper *why, bool maxWait) {
-  cloudRecPause();
+  cloudRecPause(true);
   uint32_t wait = maxWait ? crec::BACKOFF_MAX_MS : crec::backoffMs(cloudRecBackoffStep, platformHardwareRandom());
   if (!maxWait && cloudRecBackoffStep < 255) cloudRecBackoffStep++;
   cloudRecNextProbe = millis() + wait;
@@ -507,7 +524,7 @@ static void cloudRecWriteConfig() {
 }
 
 static void cloudRecBlocked() {                   // the maintainer blocked this gateway: the opt-in goes off
-  cloudRecPause();
+  cloudRecPause(false);
   cloudRecSvc = SVC_OFF;
   cloudRecCfg.enabled = false;
   cloudRecWriteConfig();
@@ -520,7 +537,7 @@ static void cloudRecTask(void *) {
     platformTaskDelay(500);
     if (cloudRecSvc == SVC_OFF) break;            // blocked: no further connection, the task ends
     if (!isNetworkUp()) {                         // own network down: pause, no backoff step
-      if (cloudRecSvc == SVC_UP) { cloudRecPause(); cloudRecSvc = SVC_PROBE; cloudRecNextProbe = millis(); }
+      if (cloudRecSvc == SVC_UP) { cloudRecPause(true); cloudRecSvc = SVC_PROBE; cloudRecNextProbe = millis(); }
       continue;
     }
     if (cloudRecSvc != SVC_UP) {
