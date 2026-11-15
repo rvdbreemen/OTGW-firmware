@@ -170,9 +170,11 @@ class TestArtifactVerificationFailFast(unittest.TestCase):
 
             target = next(iter(self.build.PIO_ENV_MAP))
 
+            # TASK-1894: run_command() streams through run_streamed() (Popen) so the build log sees the output;
+            # mock that seam too, or the real pio starts in the temp dir and fails with exit 1.
             with mock.patch.object(
                 self.build.subprocess, "run", return_value=fake_completed
-            ):
+            ), mock.patch.object(self.build, "run_streamed", return_value=0):
                 with self.assertRaises(SystemExit) as ctx:
                     self.build.build_firmware_pio(project_dir, target)
             self.assertEqual(
