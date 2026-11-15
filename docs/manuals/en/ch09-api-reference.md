@@ -378,6 +378,7 @@ On OT-Direct the numbers in these commands are read as PIC firmware 6.8 reads th
 - `SW=` and `SH=` answer `BV` outside the bounds the boiler reports in MsgID 48 and 49, or 20-80 and 10-90 before it has; 0 resets them.
 - `OT=` clears the outside temperature (`OT: -`) for text, `OT=-` and a value of 64 or more.
 - `MM=` takes a whole number: text, `MM=-` or a minus sign clears it (`MM: -`), above 100 is `OR`.
+- `PM=` takes a Data-ID of 0 to 255. For a table size (10, 12, 88, 90, 105, 107) it then reads every entry of the next ID, and for a string (93, 94, 95) every character, as the PIC does.
 - Unknown-DataID answers never switch off MsgID 0, 1, 3, 14, 17 and 25, as on the PIC.
 
 Commands are validated and queued. Responses are processed asynchronously and published to MQTT. The REST endpoint returns `"queued"` immediately without waiting for the PIC response.

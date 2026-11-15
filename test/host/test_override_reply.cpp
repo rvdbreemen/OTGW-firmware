@@ -192,6 +192,7 @@ static OTDirectMode otdModeFromSetting(int iMode) { return static_cast<OTDirectM
 static void applyOTDirectMode(OTDirectMode) {}
 static void otCmdApplyPendingFlush() {}   // the ring flush itself: tests/test_otd_mode_switch_queue_reset.py
 static void otdCmdTextDrain() {}          // TASK-1761: the off-loop command ring, tests/test_otd_loop_task_commands.py
+static bool otCmdEnqueue(uint32_t) { return true; }   // TASK-1847: the PM= chain's next read (tests/test_otd_pm_chain_tsp.py)
 
 static void sendWebSocketJSON(const char*) {}
 static bool satSimulationBlocksBusTx(const char*, const __FlashStringHelper*) { return false; }

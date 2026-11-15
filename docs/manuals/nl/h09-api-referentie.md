@@ -241,6 +241,7 @@ Op OT-Direct leest de firmware de getallen in deze commando's zoals PIC-firmware
 - `SW=` en `SH=` antwoorden `BV` buiten de grenzen die de ketel in MsgID 48 en 49 meldt, of 20-80 en 10-90 zolang hij die nog niet gemeld heeft; 0 zet ze terug.
 - `OT=` wist de buitentemperatuur (`OT: -`) bij tekst, bij `OT=-` en bij een waarde van 64 of hoger.
 - `MM=` neemt een heel getal: tekst, `MM=-` of een minteken wist hem (`MM: -`), boven 100 is `OR`.
+- `PM=` neemt een Data-ID van 0 tot 255. Bij een tabelgrootte (10, 12, 88, 90, 105, 107) leest hij daarna elke entry van het volgende ID, en bij een tekst (93, 94, 95) elk teken, net als de PIC.
 - Unknown-DataID-antwoorden schakelen MsgID 0, 1, 3, 14, 17 en 25 nooit uit, net als op de PIC.
 
 Alias: `POST /api/v2/otgw/command` (achterwaartse compatibiliteit)

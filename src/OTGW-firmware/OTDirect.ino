@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTDirect.ino
-**  Version  : v2.0.0-beta.296
+**  Version  : v2.0.0-beta.297
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -1905,6 +1905,47 @@ static void otdNoteBoilerAnswer(uint8_t id, bool unknownDataId) {
 }
 // --- otdUnknownStrike end
 
+// TASK-1847: PM= reads the whole table or string, as the PIC (gateway.asm 6.8, repo 770aa45). SetPrioMessage
+// (:5026-5038) takes a Data-ID of 0-255 and starts at index 0. The answer to a size ID (TSPBufferSize :3363-3378:
+// 10, 12, 88, 90, 105, 107) that is valid (type bit 5 clear) with a count above 0 starts reads of ID + 1 with the
+// index in the high byte; each answer to such an entry ID (TSPReadEntry :3389-3397) moves the index on while it is
+// below the count; a string ID (StringCharacter :3399-3407: 93, 94, 95) takes its count from the high byte of each
+// answer. Requests go out with data <index>:0 (SendPriorityMsg :3464-3470). tests/tsp-1.stc and str-1.stc show it.
+// otdPmOnAnswer() returns the next request, or 0 when the chain ends.
+// --- otdPmChain begin
+static uint8_t otdPmId = 0, otdPmCount = 0, otdPmIndex = 0;
+static bool otdPmActive = false;
+
+static inline bool otdPmSizeId(uint8_t id)   { return id == 10 || id == 12 || id == 88 || id == 90 || id == 105 || id == 107; }
+static inline bool otdPmEntryId(uint8_t id)  { return id == 11 || id == 13 || id == 89 || id == 91 || id == 106 || id == 108; }
+static inline bool otdPmStringId(uint8_t id) { return id == 93 || id == 94 || id == 95; }
+
+static uint32_t otdPmRequest(uint8_t id, uint8_t index) {
+  return OpenTherm::buildRequest(OpenThermMessageType::READ_DATA, static_cast<OpenThermMessageID>(id), (uint16_t)(index << 8));
+}
+
+static void otdPmStart(uint8_t id) {
+  otdPmId = id; otdPmCount = 0; otdPmIndex = 0; otdPmActive = true;
+}
+
+static uint32_t otdPmOnAnswer(uint8_t id, uint8_t type, uint16_t data) {
+  if (!otdPmActive || id != otdPmId) return 0;
+  const uint8_t hb = (uint8_t)(data >> 8);
+  if (otdPmSizeId(id)) {
+    if ((type & 0x02) || hb == 0) { otdPmActive = false; return 0; }   // Data-Invalid / Unknown, or no entries
+    otdPmCount = hb; otdPmId = (uint8_t)(id + 1); otdPmIndex = 0;
+    return otdPmRequest(otdPmId, 0);
+  }
+  if (otdPmEntryId(id) || otdPmStringId(id)) {
+    otdPmIndex++;
+    const uint8_t count = otdPmStringId(id) ? hb : otdPmCount;
+    if (otdPmIndex < count) return otdPmRequest(id, otdPmIndex);
+  }
+  otdPmActive = false;
+  return 0;
+}
+// --- otdPmChain end
+
 // ---------------------------------------------------------------------------
 // handleMasterResponse — process a completed async master request
 // ---------------------------------------------------------------------------
@@ -1985,6 +2026,14 @@ static void handleMasterResponse() {
       }
       state.otBus.bOnline = false;
     }
+  }
+
+  // TASK-1847: a PM= read of a TSP / fault-history size, entry or string goes on with the next entry (otdPmChain),
+  // from the answers to the gateway's own requests only (the PIC's AlternativeUsed test).
+  if ((status == OpenThermResponseStatus::SUCCESS || boilerDataInvalid) && otLastRequestOrigin == OT_DIRECT_ORIGIN_GATEWAY) {
+    const uint32_t next = otdPmOnAnswer((uint8_t)((response >> 16) & 0xFF), (uint8_t)OpenTherm::getMessageType(response),
+                                        (uint16_t)(response & 0xFFFF));
+    if (next && !otCmdEnqueue(next)) OTDDebugTf(PSTR("OTD: queue full, PM chain stops at %08lX\r\n"), (unsigned long)next);
   }
 
   // A forwarded thermostat frame gets its one reply now. A timeout or a corrupt
@@ -4238,10 +4287,19 @@ bool handleOTDirectCommand(const char* buf, int len, bool satOwn) {
   }
   // PM=MsgID — Priority message: send immediately on next cycle
   else if (cmd0 == 'P' && cmd1 == 'M') {
-    uint8_t msgId = atoi(value);
-    if (msgId > 127) {
-      otDirectBridgeProcessStatus("BV"); return false;
+    // TASK-1847: as the PIC SetPrioMessage (gateway.asm 6.8:5026-5038): GetDecimalArg, 0-255 (above 255 OR,
+    // no digit first SE), characters after the number SE; a TSP / fault-history / string ID reads on (otdPmChain).
+    const char* p = value;
+    unsigned id = 0;
+    if (!isdigit((unsigned char)*p)) { otDirectBridgeProcessStatus("SE"); return false; }
+    while (isdigit((unsigned char)*p)) {
+      id = id * 10 + (unsigned)(*p - '0');
+      if (id > 255) { otDirectBridgeProcessStatus("OR"); return false; }
+      p++;
     }
+    if (*p) { otDirectBridgeProcessStatus("SE"); return false; }
+    const uint8_t msgId = (uint8_t)id;
+    otdPmStart(msgId);
     bool found = false;
     for (uint8_t i = 0; i < OT_SCHEDULE_SIZE; i++) {
       if (otSchedule[i].msgId == msgId) {

@@ -3,10 +3,11 @@ id: TASK-1847
 title: >-
   OT-Direct: PM= does not read the TSP, fault-history or string entries, and
   refuses IDs above 127
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-11-12T00:01:00Z'
-updated_date: '2026-11-12T00:11:00Z'
+updated_date: '2026-11-15T05:11:00Z'
 labels:
   - otdirect
   - parity
@@ -27,9 +28,9 @@ From the PIC 6.8 parity audit (N13), docs/reviews/2026-11-12_pic68-otdirect-pari
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 host test: PM=10 against a mock boiler with 3 TSPs produces the R frames of tsp-1.stc; red on current code
-- [ ] #2 PM=93 reads all characters
-- [ ] #3 PM=131 accepted
+- [x] #1 host test: PM=10 against a mock boiler with 3 TSPs produces the R frames of tsp-1.stc; red on current code
+- [x] #2 PM=93 reads all characters
+- [x] #3 PM=131 accepted
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -38,4 +39,6 @@ From the PIC 6.8 parity audit (N13), docs/reviews/2026-11-12_pic68-otdirect-pari
 Not verified (from the audit): interaction with the PM slot rule of TASK-1572 and TASK-1767.
 
 Part of the PIC 6.8 parity audit, parent TASK-1851.
+
+95 (2026-11-15, lane-95-next): PM slot rule checked first (TASK-1572: one PIC priority slot, the request only in an alternative slot; TASK-1767 open): on OT-Direct the PM= read and its follow-ups go through otCmdEnqueue(), which in gateway mode with a thermostat sends only in an alternative slot (otdAltSlotTaken) and otherwise on the free bus, so the same rule holds. New '// --- otdPmChain' block (otdPmStart, otdPmOnAnswer) mirrors SetPrioMessage :5026-5038, TSPBufferSize :3363-3378 (valid = type bit 5 clear, count > 0), TSPReadEntry :3389-3397, StringCharacter :3399-3407, SendPriorityMsg :3464-3470 (data <index>:0). handleMasterResponse() feeds it the answers to the gateway's own requests only (origin GATEWAY = the PIC's AlternativeUsed), before the origin reset; the next request goes to otCmdEnqueue(). PM= parses GetDecimal: 0-255, SE without a digit or with trailing characters, OR above 255 (the old atoi wrapped PM=256 to PM=0). Test tests/test_otd_pm_chain_tsp.py (real block + real PM= branch, stand-in boiler with the .stc data): 6/6; on origin/dev c2cd68b16 4 FAIL (PM=10 only R000A0000, PM=93 only R805D0000, PM=131 BV, PM=256 -> 0). AC1: frames R000A0000 R800B0000 R000B0100 R000B0200 = tsp-1.stc; AC2: R805D0000 R005D0100 R005D0200 R805D0300 = str-1.stc; AC3: PM=131 accepted. Pins updated: test_sat_no_return_startup (PM=200 now accepted, PM=256 OR), host test_override_reply (otCmdEnqueue stub). Sweep 51 test_otd_*/sat/pm_chain/hoisting/evaluate + 8 other OTDirect slicers exit 0; evaluate --quick 86/0. Not verified: a real boiler's TSP answers (bench .61 has none).
 <!-- SECTION:NOTES:END -->

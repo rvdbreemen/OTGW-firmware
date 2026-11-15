@@ -413,10 +413,12 @@ OTD_STUBS = r"""
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <cctype>
 #define PSTR(x) x
 #define F(x) x
 #define snprintf_P snprintf
 #define OTDDebugTf(...) ((void)0)
+static void otdPmStart(uint8_t) {}   // TASK-1847: the TSP/string chain of PM=; MsgID 25 is not a chain ID
 #define OTDDebugTln(...) ((void)0)
 static uint32_t g_ms = 0;
 static uint32_t millis() { return g_ms; }
@@ -553,9 +555,10 @@ class OtDirectPm(unittest.TestCase):
         rows = self.sim(["run 1000", "pm 2"])
         self.assertIn(["1000", "ENQ", "2"], rows)
 
-    def test_pm_out_of_range_is_refused_with_bv(self):
-        rows = self.sim(["pm 200"])
-        self.assertEqual(rows, [["0", "STATUS", "BV"]])
+    def test_pm_takes_0_to_255_like_the_pic(self):
+        # TASK-1847: SetPrioMessage (gateway.asm 6.8:5026-5038) takes any Data-ID of 0-255 (was BV above 127 here)
+        self.assertEqual(self.sim(["pm 200"]), [["0", "ENQ", "200"]])
+        self.assertEqual(self.sim(["pm 256"]), [["0", "STATUS", "OR"]])
 
 
 if __name__ == "__main__":
