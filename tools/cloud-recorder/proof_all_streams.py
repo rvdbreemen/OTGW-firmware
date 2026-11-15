@@ -94,7 +94,7 @@ def sat_args(rnd, fi, k):
             flow, ret, ord("V"), rnd.randint(0, 3000), ord("V"), rnd.randint(0, 3000), "OT"]
 
 
-def build(image, ref_exe, minutes, profile, seed=7):
+def build(image, ref_exe, minutes, profile, seed=7, site_dist="uniform"):
     rnd = random.Random(seed)
     end_ms = T_START + int(minutes * 60000)
     frames = [(t + T_START, L, f) for t, L, f in otrec.codec.synthetic(minutes / 60)]
@@ -114,10 +114,14 @@ def build(image, ref_exe, minutes, profile, seed=7):
         fa, na = image.find_cstr(fmt), image.find_cstr(fn)
         if fa and na:
             sites.append(("println" if "ln" in macro.lower() else "printf", fmt, fn, line, fa, na))
+    zipf_w = [1 / (k + 1) ** 1.1 for k in range(len(sites))]
     rate = 300 if profile == "no-psram" else 3000
     dbg_events, t_us, heap, heap_sec = [], T_START * 1000 + 500, None, -1
     while t_us < end_ms * 1000:
-        kind, fmt, fn, line, fa, na = rnd.choice(sites)
+        if site_dist == "zipf":                     # a few call sites print most lines (s = 1.1)
+            kind, fmt, fn, line, fa, na = rnd.choices(sites, weights=zipf_w)[0]
+        else:
+            kind, fmt, fn, line, fa, na = rnd.choice(sites)
         sec = t_us // 1000000
         if sec != heap_sec:
             heap_sec = sec
@@ -200,12 +204,16 @@ def main():
     subprocess.run(["rm", "-rf", data_dir])
     os.makedirs(data_dir)
     dev, dev_id = bss.start(a.docker_image, data_dir, a.port)
+    sent = 0
     for seq, (t0, payload) in enumerate(records):
+        lz = otrec.lz_encode(payload)                 # as the gateway does (TASK-1972): LZ when that is smaller
+        fmt, body = (otrec.FMT_MIX_LZ, lz) if len(lz) < len(payload) else (otrec.FMT_MIX_V1, payload)
+        sent += len(body)
         st, r = dev.call("POST", otrec.CREATE_PATH, {"device": dev_id, "stream": "mix", "seq": seq, "t0": t0,
-                                                     "fmt": otrec.FMT_MIX_V1,
-                                                     "payload": base64.b64encode(payload).decode()})
+                                                     "fmt": fmt, "payload": base64.b64encode(body).decode()})
         if st != 200:
             sys.exit(f"record {seq}: HTTP {st} {r}")
+    print(f"sent {sent} B after LZ ({100 * sent / sum(sizes):.1f} % of the records)")
     base = f"http://127.0.0.1:{a.port}"
     token = eb.api(base, "/api/collections/_superusers/auth-with-password", None,
                    {"identity": bss.ADMIN, "password": bss.ADMIN_PW})["token"]

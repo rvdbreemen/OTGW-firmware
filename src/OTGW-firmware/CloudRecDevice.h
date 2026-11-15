@@ -16,9 +16,10 @@
 **
 **  TASK-1971: the gateway enrolls itself with its unique id (otgw-<MAC hex>) and a random secret that it keeps
 **  in NVS (survives a filesystem flash), then logs in with those. Capture runs only while the service answers:
-**  it starts paused, resumes after a login that says the gateway is not blocked, and pauses again when the
-**  service is unreachable, with the backoff of CloudRecPolicy.h before each new attempt. When the maintainer
-**  blocks the gateway it writes enabled=0 to /cloudrec.cfg: the opt-in is off until the user turns it on again.
+**  it starts paused, resumes after a successful login, and pauses again when the service is unreachable, with
+**  the backoff of CloudRecPolicy.h before each new attempt. TASK-1972: when the maintainer blocks the gateway,
+**  every request gets 403 "otgw-blocked"; the gateway then writes enabled=0 to /cloudrec.cfg at once and makes
+**  no further connection: the opt-in is off until the user turns it on again.
 **
 **  Built only in the esp32-combo-tlsdyn env (HAS_CLOUD_REC), whose IDF libraries use dynamic mbedTLS buffers.
 **  Capture points never block: when the recorder is busy an item is counted as dropped.
@@ -307,9 +308,8 @@ static void cloudRecWriteJson(NetworkClientSecure &c, const char *method, const 
 
 static char cloudRecResp[1024];                  // a login or refresh reply: the device record and the token
 
-// Reads the token, the record id and the blocked flag from a login or refresh reply.
-static bool cloudRecTakeAuth(bool &blocked) {
-  blocked = strstr(cloudRecResp, "\"blocked\":true") != nullptr;
+// Reads the token and the record id from a login reply.
+static bool cloudRecTakeAuth() {
   if (!cloudRecJsonString(cloudRecResp, nullptr, "\"token\":\"", cloudRecToken, sizeof(cloudRecToken))) return false;
   if (!cloudRecJsonString(cloudRecResp, "\"record\"", "\"id\":\"", cloudRecDevId, sizeof(cloudRecDevId))) return false;
   char fw[sizeof(_VERSION)];
@@ -319,7 +319,7 @@ static bool cloudRecTakeAuth(bool &blocked) {
 }
 
 // Logs in with uid + secret; enrolls the uid first when the server does not know it. Returns the HTTP status
-// of the last step (200 = logged in); blocked tells whether the maintainer blocked this gateway.
+// of the last step (200 = logged in); blocked is set when the reply says the maintainer blocked this gateway.
 static int cloudRecLogin(NetworkClientSecure &c, bool &blocked) {
   char body[200];
   blocked = false;
@@ -338,9 +338,10 @@ static int cloudRecLogin(NetworkClientSecure &c, bool &blocked) {
     cloudRecWriteJson(c, "POST", "/api/collections/devices/auth-with-password", body, false);
     st = cloudRecReadStatus(c, cloudRecResp, sizeof(cloudRecResp));
   }
+  if (crec::classifyReply(st, cloudRecResp) == crec::OUT_BLOCKED) { blocked = true; return st; }
   if (st != 200) return st;
-  if (!cloudRecTakeAuth(blocked)) return 0;
-  if (!cloudRecFwSynced && !blocked) {            // keep the register current: label, firmware, board
+  if (!cloudRecTakeAuth()) return 0;
+  if (!cloudRecFwSynced) {            // keep the register current: label, firmware, board
     char path[64];
     snprintf_P(path, sizeof(path), PSTR("/api/collections/devices/records/%s?fields=id"), cloudRecDevId);
     snprintf_P(body, sizeof(body), PSTR("{\"label\":\"%s\",\"fw\":\"%s\",\"board\":\"%s\"}"),
@@ -351,29 +352,40 @@ static int cloudRecLogin(NetworkClientSecure &c, bool &blocked) {
   return 200;
 }
 
-// After a refused batch: is this gateway blocked now? (Otherwise the refusal was a resend of a stored seq.)
-static int cloudRecRefresh(NetworkClientSecure &c, bool &blocked) {
-  blocked = false;
-  cloudRecWriteJson(c, "POST", "/api/collections/devices/auth-refresh", "{}", true);
-  int st = cloudRecReadStatus(c, cloudRecResp, sizeof(cloudRecResp));
-  if (st == 200 && !cloudRecTakeAuth(blocked)) st = 0;
-  return st;
+// Base64 straight to the TLS client, one byte at a time; used as a crec::Buf sink, so the LZ-coded record never
+// needs its own buffer (TASK-1972).
+struct CloudRecB64 {
+  NetworkClientSecure *c;
+  uint8_t q[3];
+  uint8_t nq;
+  size_t o;
+  char out[256];
+};
+
+static void cloudRecB64Emit(CloudRecB64 &s, int n) {
+  static const char tab[] PROGMEM = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+  uint32_t v = (uint32_t)s.q[0] << 16 | (n > 1 ? (uint32_t)s.q[1] << 8 : 0) | (n > 2 ? s.q[2] : 0);
+  s.out[s.o++] = tab[(v >> 18) & 63];
+  s.out[s.o++] = tab[(v >> 12) & 63];
+  s.out[s.o++] = n > 1 ? tab[(v >> 6) & 63] : '=';
+  s.out[s.o++] = n > 2 ? tab[v & 63] : '=';
+  if (s.o + 4 > sizeof(s.out)) { s.c->write((const uint8_t *)s.out, s.o); s.o = 0; }
 }
 
-static void cloudRecWriteBase64(NetworkClientSecure &c, const uint8_t *d, size_t n) {
-  static const char tab[] PROGMEM = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-  char out[256];
-  size_t o = 0;
-  for (size_t i = 0; i < n; i += 3) {
-    uint32_t v = (uint32_t)d[i] << 16 | (i + 1 < n ? (uint32_t)d[i + 1] << 8 : 0) | (i + 2 < n ? d[i + 2] : 0);
-    out[o++] = tab[(v >> 18) & 63];
-    out[o++] = tab[(v >> 12) & 63];
-    out[o++] = i + 1 < n ? tab[(v >> 6) & 63] : '=';
-    out[o++] = i + 2 < n ? tab[v & 63] : '=';
-    if (o + 4 > sizeof(out)) { c.write((const uint8_t *)out, o); o = 0; }
-  }
-  if (o) c.write((const uint8_t *)out, o);
+static void cloudRecB64Put(void *ctx, uint8_t b) {
+  CloudRecB64 &s = *(CloudRecB64 *)ctx;
+  s.q[s.nq++] = b;
+  if (s.nq == 3) { cloudRecB64Emit(s, 3); s.nq = 0; }
 }
+
+static void cloudRecB64End(CloudRecB64 &s) {
+  if (s.nq) cloudRecB64Emit(s, s.nq);
+  if (s.o) s.c->write((const uint8_t *)s.out, s.o);
+}
+
+static void cloudRecCountPut(void *, uint8_t) {}
+
+static crec::LzWork cloudRecLz;                    // 3.2 KB, used only by the upload task
 
 static bool cloudRecConnect(NetworkClientSecure &c) {
   c.setCACert(CLOUDREC_ROOTS);
@@ -395,6 +407,13 @@ static crec::Outcome cloudRecUpload(bool &blocked) {
   uint32_t t = millis();
   NetworkClientSecure c;
   if (!cloudRecConnect(c)) { cloudRecLastStatus = 0; return crec::OUT_DOWN; }
+  // TASK-1972: send the record LZ-coded (fmt 5) when that is smaller, else as it is (fmt 4). The first pass only
+  // counts, so Content-Length is known before anything is sent.
+  crec::Buf cnt;
+  cnt.initSink(cloudRecCountPut, nullptr);
+  crec::lzEncode(cloudRecSendBuf, cloudRecSendLen, cnt, cloudRecLz);
+  const bool lz = cnt.n < cloudRecSendLen;
+  const size_t sendLen = lz ? cnt.n : cloudRecSendLen;
   int st = 200;
   for (int attempt = 0; attempt < 2; attempt++) {
     if (!cloudRecToken[0]) {
@@ -402,28 +421,33 @@ static crec::Outcome cloudRecUpload(bool &blocked) {
       if (st != 200 || blocked) break;
     }
     char head[200];
-    int hl = snprintf_P(head, sizeof(head), PSTR("{\"device\":\"%s\",\"stream\":\"mix\",\"seq\":%llu,\"t0\":%lld,\"fmt\":4,\"payload\":\""),
-                        cloudRecDevId, (unsigned long long)cloudRecSendSeq, (long long)cloudRecSendT0);
-    size_t b64 = 4 * ((cloudRecSendLen + 2) / 3);
+    int hl = snprintf_P(head, sizeof(head), PSTR("{\"device\":\"%s\",\"stream\":\"mix\",\"seq\":%llu,\"t0\":%lld,\"fmt\":%d,\"payload\":\""),
+                        cloudRecDevId, (unsigned long long)cloudRecSendSeq, (long long)cloudRecSendT0, lz ? 5 : 4);
+    size_t b64 = 4 * ((sendLen + 2) / 3);
     cloudRecWriteHead(c, "/api/collections/batches/records?fields=id", (size_t)hl + b64 + 2, true);
     c.write((const uint8_t *)head, hl);
-    cloudRecWriteBase64(c, cloudRecSendBuf, cloudRecSendLen);
+    CloudRecB64 s64{&c, {0, 0, 0}, 0, 0, {}};
+    if (lz) {                                     // second pass: the same bytes, now to the wire
+      crec::Buf b;
+      b.initSink(cloudRecB64Put, &s64);
+      crec::lzEncode(cloudRecSendBuf, cloudRecSendLen, b, cloudRecLz);
+    } else {
+      for (size_t k = 0; k < cloudRecSendLen; k++) cloudRecB64Put(&s64, cloudRecSendBuf[k]);
+    }
+    cloudRecB64End(s64);
     c.print(F("\"}"));
-    st = cloudRecReadStatus(c, nullptr, 0);
+    st = cloudRecReadStatus(c, cloudRecResp, sizeof(cloudRecResp));
+    if (crec::classifyReply(st, cloudRecResp) == crec::OUT_BLOCKED) { blocked = true; break; }
     if (crec::classify(st) != crec::OUT_AUTH) break;
     cloudRecToken[0] = 0;                         // expired or revoked token: log in once more and resend
-  }
-  if (st == 400 && !blocked && cloudRecToken[0]) {
-    int rs = cloudRecRefresh(c, blocked);         // refused: blocked, or a resend of a stored seq?
-    if (crec::classify(rs) == crec::OUT_DOWN) st = rs;
   }
   c.stop();
   cloudRecLastStatus = (uint32_t)st;
   cloudRecLastMs = millis() - t;
   crec::Outcome o = st == 409 ? crec::OUT_REFUSED : crec::classify(st);
   if (o == crec::OUT_OK || (o == crec::OUT_REFUSED && !blocked && st != 409)) cloudRecSent++; else cloudRecFailed++;
-  DebugTf(PSTR("cloudrec: seq %llu %u B HTTP %d in %u ms; TLS low %u/%u, min %u\r\n"),
-          (unsigned long long)cloudRecSendSeq, (unsigned)cloudRecSendLen, st, (unsigned)cloudRecLastMs,
+  DebugTf(PSTR("cloudrec: seq %llu %u B (%u B sent) HTTP %d in %u ms; TLS low %u/%u, min %u\r\n"),
+          (unsigned long long)cloudRecSendSeq, (unsigned)cloudRecSendLen, (unsigned)sendLen, st, (unsigned)cloudRecLastMs,
           (unsigned)cloudRecHeapLow, (unsigned)cloudRecBlockLow, (unsigned)platformMinFreeHeap());
   return st == 409 ? crec::OUT_DOWN : o;          // 409 only comes from a login; handled by the probe
 }
@@ -494,7 +518,7 @@ static void cloudRecTask(void *) {
   uint32_t lastClose = millis();
   for (;;) {
     platformTaskDelay(500);
-    if (cloudRecSvc == SVC_OFF) { platformTaskDelay(60000); continue; }
+    if (cloudRecSvc == SVC_OFF) break;            // blocked: no further connection, the task ends
     if (!isNetworkUp()) {                         // own network down: pause, no backoff step
       if (cloudRecSvc == SVC_UP) { cloudRecPause(); cloudRecSvc = SVC_PROBE; cloudRecNextProbe = millis(); }
       continue;
@@ -504,7 +528,7 @@ static void cloudRecTask(void *) {
       if (!cloudRecSecret[0]) continue;
       bool blocked;
       int st = cloudRecProbe(blocked);
-      if (st == 200 && blocked) cloudRecBlocked();
+      if (blocked) cloudRecBlocked();
       else if (st == 200) { cloudRecResume(); lastClose = millis(); }
       else if (st == 409) cloudRecBackoff(F("uid enrolled with another secret (delete it on the server)"), true);
       else cloudRecBackoff(F("service unreachable"), false);
@@ -524,6 +548,7 @@ static void cloudRecTask(void *) {
     else if (o == crec::OUT_DOWN || o == crec::OUT_AUTH) cloudRecBackoff(F("upload failed"), false);
     else cloudRecSendBusy = false;                // stored, or a resend of a stored seq
   }
+  platformTaskExit();
 }
 
 // ---------------------------------------------------------------- setup

@@ -12,7 +12,8 @@ Checks, each printed as PASS or FAIL:
    6. it posts a batch; a resend of the same stream and seq is refused (unique index)
    7. a batch claimed for another device is refused (create rule)
    8. a gateway cannot list batches
-   9. the maintainer blocks the gateway: its login shows blocked = true and its batches are refused
+   9. the maintainer blocks the gateway: its login, uploads (old token too), token refresh and own record
+      update all get HTTP 403 with 'otgw-blocked' (pb_hooks/blocked.pb.js)
   10. with --db: a batch made 31 days old is deleted by the retention cron, a fresh one stays
   11. the admin UI is not reachable (only meaningful through the tunnel: expect 404 from its path rule)
 Waits out the per-IP rate limits (429). Standard library only.
@@ -109,10 +110,14 @@ def main():
     st, a = call("POST", f"{base}/api/collections/_superusers/auth-with-password", {"identity": admin_email, "password": admin_pw})
     admin = a.get("token")
     st_b, _ = call("PATCH", url, {"blocked": True}, admin)
-    st2, auth2 = login(base, uid, pw)
-    st3, _ = call("POST", f"{base}/api/collections/batches/records?fields=id", dict(batch, seq=3), auth2.get("token"))
-    check("9 blocked: login shows it, batches refused",
-          st_b == 200 and st2 == 200 and auth2.get("record", {}).get("blocked") is True and st3 == 400, f"{st_b} {st2} {st3}")
+    blk = lambda r: "otgw-blocked" in json.dumps(r)
+    st2, r2 = login(base, uid, pw)                                                   # a new login
+    st3, r3 = call("POST", f"{base}/api/collections/batches/records?fields=id", dict(batch, seq=3), tok)   # old token
+    st4, r4 = call("POST", f"{base}/api/collections/devices/auth-refresh", {}, tok)
+    st5, r5 = call("PATCH", url, {"label": "x"}, tok)
+    check("9 blocked: login, upload, refresh and own update all get 403 otgw-blocked",
+          st_b == 200 and all(s == 403 and blk(r) for s, r in ((st2, r2), (st3, r3), (st4, r4), (st5, r5))),
+          f"{st_b} {st2} {st3} {st4} {st5}")
 
     if db:
         call("PATCH", url, {"blocked": False}, admin)

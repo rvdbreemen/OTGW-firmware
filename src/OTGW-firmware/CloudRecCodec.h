@@ -27,8 +27,11 @@ struct Buf {
   size_t cap;
   size_t n;
   bool full;
-  void init(uint8_t *mem, size_t size) { p = mem; cap = size; n = 0; full = false; }
-  void put(uint8_t b) { if (n < cap) p[n++] = b; else full = true; }
+  void (*sink)(void *ctx, uint8_t b);   // TASK-1972: when set, bytes go to sink() instead of memory (and are counted)
+  void *ctx;
+  void init(uint8_t *mem, size_t size) { p = mem; cap = size; n = 0; full = false; sink = nullptr; ctx = nullptr; }
+  void initSink(void (*f)(void *, uint8_t), void *c) { p = nullptr; cap = (size_t)-1; n = 0; full = false; sink = f; ctx = c; }
+  void put(uint8_t b) { if (sink) { sink(ctx, b); n++; } else if (n < cap) p[n++] = b; else full = true; }
   void bytes(const void *d, size_t k) { const uint8_t *s = (const uint8_t *)d; for (size_t i = 0; i < k; i++) put(s[i]); }
   void leb(uint64_t v) { do { uint8_t b = v & 0x7F; v >>= 7; put(b | (v ? 0x80 : 0)); } while (v); }
   void u24(uint32_t v) { put(v & 0xFF); put((v >> 8) & 0xFF); put((v >> 16) & 0xFF); }
@@ -493,6 +496,73 @@ TokResult dbgPrintfTokens(Recorder &r, int64_t tUs, uint32_t fmtAddr, uint32_t f
   if (ok && !full) return TOK_OK;
   r.dbg.n = mark; r.dbg.full = false; r.dbgSt = before;
   return full ? TOK_FULL : TOK_NO;
+}
+
+// ---------------------------------------------------------------- TASK-1972: LZ + range coder over a whole record
+//
+// A closed record (fmt 4) is sent as fmt 5 when this makes it smaller: LEB128 raw length, then the range coder's
+// bytes. LZ77 whose window is the record itself, so no window buffer; the match finder keeps the last position per
+// 3-byte hash. Every decision goes through the range coder: match flag (context: previous token was a match),
+// literal (one 256-node bit tree), length 3..258 (4-bit tree, 15 = an 8-bit tree follows), distance 1..4096
+// (6-bit tree of the high bits, 6 direct bits). otrec.lz_encode() / lz_decode() are the reference; the host test
+// checks that both give the same bytes. RAM: LzWork, 3.2 KB.
+
+static const int LZ_HASH_BITS = 10;
+static const size_t LZ_MAX_MATCH = 258;
+static const size_t LZ_MAX_DIST = 4096;
+
+struct LzWork {
+  uint16_t head[1 << LZ_HASH_BITS];     // position + 1 of the last 3-byte string with this hash, 0 = none
+  uint16_t match[2], lit[256], len[16], len2[256], dist[64];
+};
+
+inline uint32_t lzHash(const uint8_t *d, size_t i) {
+  uint32_t x = (uint32_t)d[i] << 16 | (uint32_t)d[i + 1] << 8 | d[i + 2];
+  return (x * 2654435761u) >> (32 - LZ_HASH_BITS);
+}
+
+inline void lzEncode(const uint8_t *in, size_t n, Buf &out, LzWork &w) {
+  for (auto &h : w.head) h = 0;
+  uint16_t *tables[] = {w.match, w.lit, w.len, w.len2, w.dist};
+  const size_t sizes[] = {2, 256, 16, 256, 64};
+  for (int t = 0; t < 5; t++) for (size_t k = 0; k < sizes[t]; k++) tables[t][k] = RC_INIT;
+  out.leb(n);
+  RcEnc e;
+  e.init(&out);
+  int prev = 0;
+  size_t i = 0;
+  while (i < n) {
+    size_t best = 0, dist = 0;
+    if (i + 3 <= n) {
+      uint32_t h = lzHash(in, i);
+      size_t j = w.head[h];
+      w.head[h] = (uint16_t)(i + 1);
+      if (j && i - (j - 1) <= LZ_MAX_DIST) {
+        j--;
+        while (best < LZ_MAX_MATCH && i + best < n && in[j + best] == in[i + best]) best++;
+        dist = i - j;
+      }
+    }
+    if (best >= 3) {
+      e.encodeBit(&w.match[prev], 1);
+      uint32_t L = (uint32_t)(best - 3);
+      if (L < 15) treeEnc(e, w.len, L, 4);
+      else { treeEnc(e, w.len, 15, 4); treeEnc(e, w.len2, L - 15, 8); }
+      uint32_t d = (uint32_t)(dist - 1);
+      treeEnc(e, w.dist, d >> 6, 6);
+      e.direct(d & 63, 6);
+      for (size_t k = i + 1; k < i + best; k++)
+        if (k + 3 <= n) w.head[lzHash(in, k)] = (uint16_t)(k + 1);
+      i += best;
+      prev = 1;
+    } else {
+      e.encodeBit(&w.match[prev], 0);
+      treeEnc(e, w.lit, in[i], 8);
+      i++;
+      prev = 0;
+    }
+  }
+  e.finish();
 }
 
 }  // namespace crec

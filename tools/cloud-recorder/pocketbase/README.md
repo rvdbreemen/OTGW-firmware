@@ -13,8 +13,10 @@ gateway --HTTPS--> Cloudflare edge --tunnel (outbound from the NAS)--> cloudflar
 - **The register of gateways:** `devices` holds one record per gateway. A gateway enrolls itself on first
   contact with its unique id (`uid`, `otgw-` + its MAC in hex) and a secret it generated, and logs in with
   those; a second enrollment of the same uid is refused. A new gateway may log by default. To stop one, switch
-  on **blocked** on its record in the admin UI: the gateway sees it at its next login and turns its own
-  telemetry opt-in off; batches from a blocked gateway are refused. Its `label`, `fw`, `board` and `updated`
+  on **blocked** on its record in the admin UI: from then on every request of that gateway (login, token
+  refresh, its own record update, uploads, also with an older token) gets HTTP 403 with
+  `Gateway blocked (otgw-blocked): telemetry opt-in off` (`pb_hooks/blocked.pb.js`). The gateway turns its own
+  telemetry opt-in off at its next request (within about a minute) and makes no further connection. Its `label`, `fw`, `board` and `updated`
   (last login) show which gateways log.
 - **What it stores:** `batches` holds the encoded chunks. A device can create batches for itself and nothing else: no reading,
   no changing, no deleting. A resend of the same `stream` + `seq` is refused (unique index), so a gateway can
@@ -31,6 +33,7 @@ gateway --HTTPS--> Cloudflare edge --tunnel (outbound from the NAS)--> cloudflar
 | `Dockerfile` | Alpine + the PocketBase release binary, checked against the release's `checksums.txt` |
 | `pb_migrations/1763100000_otgw_recorder.js` | Creates `devices` and `batches`, the rules, the indexes, the trusted proxy header and the rate limits |
 | `pb_hooks/retention.pb.js` | Hourly retention cron (30 days, fixed) |
+| `pb_hooks/blocked.pb.js` | 403 `otgw-blocked` for every request of a blocked gateway (required: without it a blocked gateway is not refused) |
 | `test_client.py` | Acts as gateways and checks the rules, blocking and retention (Python 3, standard library only) |
 
 ## What you need
@@ -57,7 +60,7 @@ gateway --HTTPS--> Cloudflare edge --tunnel (outbound from the NAS)--> cloudflar
 ### 2. Put the files on the NAS
 
 1. In File Station create `/docker/otgw-recorder/`, and in it the folders `pb_data`, `pb_hooks` and `pb_migrations`.
-2. Copy `compose.yaml`, `Dockerfile`, `pb_hooks/retention.pb.js` and `pb_migrations/1763100000_otgw_recorder.js`
+2. Copy `compose.yaml`, `Dockerfile`, `pb_hooks/retention.pb.js`, `pb_hooks/blocked.pb.js` and `pb_migrations/1763100000_otgw_recorder.js`
    into the matching places.
 3. Create `/docker/otgw-recorder/.env` with one line:
 
@@ -111,6 +114,9 @@ Debug-size batches (after the payload limit went to 65,536 characters, fresh dat
 Enrollment, blocking and fixed retention (TASK-1971, 2026-11-15, fresh local PocketBase 0.40.6): `test_client.py`
 checks 1 to 10 PASS (11 fails on the LAN, as it should). Against a mutant migration without the two "blocked"
 rules, checks 3 and 9 FAIL, so the test sees those rules.
+
+Blocked reply (TASK-1972): check 9 now expects 403 with "otgw-blocked" on login, upload (old token), refresh and
+own update; PASS. Without `blocked.pb.js` check 9 FAILs (all 200), so the test sees the hook.
 
 Still to test on the Synology: the tunnel (check 7 and the path rule), the `arm64` build if the NAS is ARM,
 and Container Manager's handling of `compose.yaml`.

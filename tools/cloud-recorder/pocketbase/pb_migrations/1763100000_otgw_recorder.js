@@ -1,10 +1,10 @@
 /// <reference path="../pb_data/types.d.ts" />
-// OTGW diagnostic collection point (TASK-1938, TASK-1971). All logic is in collection rules; the only code is
-// the retention cron in pb_hooks/retention.pb.js.
+// OTGW diagnostic collection point (TASK-1938, TASK-1971, TASK-1972). The logic is in collection rules plus two
+// small hooks: the retention cron (pb_hooks/retention.pb.js) and the blocked reply (pb_hooks/blocked.pb.js).
 //   devices: the register of gateways that log, one auth record each. A gateway enrolls itself on first contact
 //            with its unique id (uid, from the MAC) and a secret it generated; it logs in with uid + secret.
 //            "blocked" is set by the maintainer in the dashboard; a gateway can neither set nor clear it.
-//   batches: create-only for the device that owns the batch, and only while it is not blocked. Nobody but a
+//   batches: create-only for the device that owns the batch (a blocked one gets 403, pb_hooks/blocked.pb.js). Nobody but a
 //            superuser can list, read, change or delete batches.
 migrate((app) => {
   const devices = new Collection({
@@ -42,8 +42,8 @@ migrate((app) => {
     viewRule: null,
     updateRule: null,
     deleteRule: null,
-    createRule: '@request.auth.collectionName = "devices" && @request.auth.blocked = false' +
-                ' && @request.body.device = @request.auth.id',
+    // A blocked gateway is refused by pb_hooks/blocked.pb.js with 403 "otgw-blocked" (the rule would give a bare 400).
+    createRule: '@request.auth.collectionName = "devices" && @request.body.device = @request.auth.id',
     fields: [
       { name: "device", type: "relation", collectionId: devices.id, maxSelect: 1, required: true, cascadeDelete: true },
       { name: "stream", type: "select", values: ["ot", "sat", "dbg", "mix"], maxSelect: 1, required: true },

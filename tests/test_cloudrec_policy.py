@@ -4,7 +4,7 @@
 The real header is compiled into a small C++ program; nothing is re-implemented here.
   1. Without jitter the waits are 5, 10, 20, ... min, capped at 24 h, and stay at 24 h.
   2. With any random value a wait is 100 to 120 % of its base and never above 24 h; the first wait is 5 to 6 min.
-  3. HTTP statuses map to OK / REFUSED / AUTH / DOWN.
+  3. HTTP statuses map to OK / REFUSED / AUTH / DOWN; only a 403 whose body holds "otgw-blocked" is BLOCKED.
 """
 import os, shutil, subprocess, tempfile, unittest
 
@@ -17,6 +17,11 @@ int main() {
   for (int s = 0; s < 16; s++) for (unsigned r : rnds) printf("B %d %u %u\n", s, r, crec::backoffMs((uint8_t)s, r));
   const int st[] = {0, 200, 400, 401, 403, 404, 429, 500, 502, 503};
   for (int x : st) printf("C %d %d\n", x, (int)crec::classify(x));
+  const char *bodies[] = {"{\"message\":\"Gateway blocked (otgw-blocked): telemetry opt-in off.\",\"status\":403}",
+                          "{\"message\":\"The request requires valid record authorization token.\",\"status\":403}", ""};
+  const int rs[] = {403, 401, 400};
+  for (int x : rs) for (int i = 0; i < 3; i++) printf("R %d %d %d\n", x, i, (int)crec::classifyReply(x, bodies[i]));
+  printf("R 403 9 %d\n", (int)crec::classifyReply(403, nullptr));
 }
 '''.replace("@HDR@", os.path.join(ROOT, "src", "OTGW-firmware", "CloudRecPolicy.h").replace("\\", "/"))
 
@@ -62,6 +67,15 @@ class CloudRecPolicyTest(unittest.TestCase):
     def test_classify(self):
         got = {s: o for s, o in self.rows("C")}
         self.assertEqual(got, {0: 3, 200: 0, 400: 1, 401: 2, 403: 2, 404: 3, 429: 3, 500: 3, 502: 3, 503: 3})
+
+    def test_blocked_reply(self):
+        got = {(s, i): o for s, i, o in self.rows("R")}
+        self.assertEqual(got[(403, 0)], 4)                       # the hook's message: BLOCKED
+        self.assertEqual(got[(403, 1)], 2)                       # an ordinary 403: log in again
+        self.assertEqual(got[(403, 2)], 2)
+        self.assertEqual(got[(403, 9)], 2)                       # no body
+        self.assertEqual(got[(401, 0)], 2)                       # only a 403 counts
+        self.assertEqual(got[(400, 0)], 1)
 
 
 if __name__ == "__main__":

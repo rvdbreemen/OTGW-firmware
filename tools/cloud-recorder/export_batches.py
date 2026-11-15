@@ -70,8 +70,8 @@ def write_otframes(batches, path, tz):
             raw = base64.b64decode(b["payload"])
             if b["fmt"] == otrec.FMT_OT_V1:
                 frames = otrec.unpack_ot(b["t0"], raw)
-            elif b["fmt"] == otrec.FMT_MIX_V1:
-                frames = otrec.unpack_mix(b["t0"], raw).get(otrec.SEC_OT, [])
+            elif b["fmt"] in (otrec.FMT_MIX_V1, otrec.FMT_MIX_LZ):
+                frames = otrec.unpack_mix(b["t0"], otrec.record_payload(b["fmt"], raw)).get(otrec.SEC_OT, [])
             else:
                 f.write(f"# batch {b['seq']}: unknown fmt {b['fmt']}, skipped\n")
                 continue

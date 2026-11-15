@@ -37,10 +37,10 @@ def decode_records(records, image, tz, out_dir):
                 fd.write(f"\r\n### {note}\r\n".encode())
                 counts["gaps"] += 1
             prev = r["seq"]
-            if r["fmt"] != otrec.FMT_MIX_V1:
+            if r["fmt"] not in (otrec.FMT_MIX_V1, otrec.FMT_MIX_LZ):
                 continue
             counts["records"] += 1
-            sec = otrec.unpack_mix(r["t0"], base64.b64decode(r["payload"]))
+            sec = otrec.unpack_mix(r["t0"], otrec.record_payload(r["fmt"], base64.b64decode(r["payload"])))
             for t, letter, fr in sec.get(otrec.SEC_OT, []):
                 ts = datetime.datetime.fromtimestamp(t / 1000, tz)
                 fo.write(f"{ts.isoformat(timespec='milliseconds')}\t{ts.strftime('%H:%M:%S.%f')}\t{letter}\t{fr:08X}\n")

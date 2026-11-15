@@ -10,6 +10,7 @@ anything yet: device streaming is TASK-1473, which is on hold.
 | `simulate_gateway.py` | Uploads a generated OT stream the way a gateway would (test tool) |
 | `export_batches.py` | Fetches one gateway's OT batches (superuser, LAN only) and writes an `otframes.log` that the firmware replay reads (ADR-209); missing batches become `#` note lines |
 | `dbg_size_study.py` | Sizes the debug stream (text, address-token, both with zlib) on lines built from the firmware's real format strings |
+| `compress_study.py` | Compares lossless record compressors (zlib, LZSS, order-0/1/2 range coding, LZ-RC) on realistic records (TASK-1972) |
 
 ## Round trip (tested 2026-11-14, local PocketBase in Docker)
 
@@ -141,10 +142,18 @@ The gateway records and uploads by itself over HTTPS, also on a board without PS
 - **Upload:** own task, HTTPS POST to the collection point, certificate check against GTS Root R1/R4 and
   ISRG Root X1/X2, `?fields=id`. Off unless `/cloudrec.cfg` on LittleFS has `enabled=1` plus `host` and `port`
   (the opt-in).
+- **Compression (TASK-1972):** a closed record goes out LZ-coded (fmt 5: LEB128 raw length + range-coder bytes,
+  `crec::lzEncode`, reference `otrec.lz_encode`/`lz_decode`) when that is smaller, else as it is (fmt 4). LZ77 over
+  the record itself (no window buffer), every decision through the range coder; 3.2 KB of RAM. Two passes: the
+  first counts (Content-Length, raw or LZ), the second streams the bytes as base64 to TLS, so there is no second
+  record buffer. Measured with `compress_study.py` (random argument values, so on the high side): 72 to 84 % of the
+  raw record with light debug, 65 to 81 % with full debug, within 0.5 point of zlib level 9 (whose compressor does
+  not fit a board without PSRAM). `tests/test_cloudrec_lz.py`: same bytes as the reference, lossless.
 - **Enrollment and blocking (TASK-1971):** the gateway's uid is `otgw-` + its factory MAC; its secret (128 bits)
   is made once and kept in NVS, so a filesystem flash keeps the enrollment. The first login of an unknown uid
-  enrolls it. A login whose record says `blocked` makes the gateway write `enabled=0` to `/cloudrec.cfg` and stop:
-  the opt-in is off until the user turns it on again. A uid that is enrolled with another secret (after a full
+  enrolls it. A 403 reply that holds `otgw-blocked` (TASK-1972, any request) makes the gateway write `enabled=0` to
+  `/cloudrec.cfg` at once and end its upload task: no further connection, and the opt-in is off until the user
+  turns it on again. A uid that is enrolled with another secret (after a full
   flash erase) is retried every 24 h until the maintainer deletes the old record.
 - **Service down (TASK-1971):** capture runs only while the service answers. It starts paused and resumes after a
   login that is not blocked. A failed upload or login pauses capture, drops what was not sent, and waits

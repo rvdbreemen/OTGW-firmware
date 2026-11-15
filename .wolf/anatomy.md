@@ -1,7 +1,7 @@
 # anatomy.md
 
-> Auto-maintained by OpenWolf. Last scanned: 2026-11-15T13:38:57.764Z
-> Files: 163 tracked | Anatomy hits: 0 | Misses: 0
+> Auto-maintained by OpenWolf. Last scanned: 2026-11-15T13:49:35.837Z
+> Files: 164 tracked | Anatomy hits: 0 | Misses: 0
 
 ## ../../../../AppData/Local/Temp/
 
@@ -1014,6 +1014,10 @@
 
 ## tests/webui/
 
+
+## tools/cloud-recorder/
+
+- `compress_study.py` — Which lossless compression fits the gateway? (TASK-1972) (~1877 tok)
 
 ## tools/cloud-recorder/pocketbase/
 

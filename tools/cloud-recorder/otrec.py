@@ -596,3 +596,98 @@ def unpack_ot2(t0, data):
     n, used = _unleb(data)
     d, m = codec.Dec(data[used:]), ModelV2()
     return [(t0 + t, L, f) for t, L, f in (ot2_decode_frame(d, m) for _ in range(n))]
+
+
+# ---------------------------------------------------------------- TASK-1972: smaller records, lossless
+
+FMT_MIX_LZ = 5        # a fmt-4 payload, LZ + range-coded as a whole (lz_encode); sent only when it is smaller
+LZ_HASH_BITS = 10     # match finder: the last position per 3-byte hash, 1,024 entries
+LZ_MAX_MATCH = 258    # length 3..258: 4-bit tree, 15 = 8-bit tree of length - 18 follows
+LZ_MAX_DIST = 4096    # distance 1..4096: 6-bit tree of the high bits + 6 direct bits
+
+
+class _LzProbs:
+    def __init__(self):
+        P = 1 << (codec.PB - 1)
+        self.match, self.lit, self.len, self.len2, self.dist = [P] * 2, [P] * 256, [P] * 16, [P] * 256, [P] * 64
+
+
+def _lz_hash(d, i):
+    return ((d[i] << 16 | d[i + 1] << 8 | d[i + 2]) * 2654435761 >> (32 - LZ_HASH_BITS)) & ((1 << LZ_HASH_BITS) - 1)
+
+
+def lz_encode(raw):
+    """LZ77 over the record itself (no window buffer: the input is the window) with a range coder for every
+    decision: match flag (context: was the previous token a match), literal (one 256-node bit tree), length and
+    distance (bit trees). Output: LEB128 raw length + range-coder bytes. Mirrors crec::lzEncode() byte for byte."""
+    e, m, head, i, n, prev = codec.Enc(), _LzProbs(), [0] * (1 << LZ_HASH_BITS), 0, len(raw), 0
+
+    def tree(probs, v, bits):
+        node = 1
+        for k in range(bits - 1, -1, -1):
+            b = (v >> k) & 1
+            e.bit(probs, node, b)
+            node = node * 2 + b
+
+    while i < n:
+        best = dist = 0
+        if i + 3 <= n:
+            h = _lz_hash(raw, i)
+            j = head[h] - 1
+            head[h] = i + 1
+            if j >= 0 and i - j <= LZ_MAX_DIST:
+                while best < LZ_MAX_MATCH and i + best < n and raw[j + best] == raw[i + best]:
+                    best += 1
+                dist = i - j
+        if best >= 3:
+            e.bit(m.match, prev, 1)
+            L = best - 3
+            if L < 15:
+                tree(m.len, L, 4)
+            else:
+                tree(m.len, 15, 4)
+                tree(m.len2, L - 15, 8)
+            d = dist - 1
+            tree(m.dist, d >> 6, 6)
+            e.direct(d & 63, 6)
+            for k in range(i + 1, i + best):
+                if k + 3 <= n:
+                    head[_lz_hash(raw, k)] = k + 1
+            i += best
+            prev = 1
+        else:
+            e.bit(m.match, prev, 0)
+            tree(m.lit, raw[i], 8)
+            i += 1
+            prev = 0
+    return _leb(n) + e.finish()
+
+
+def lz_decode(data):
+    n, used = _unleb(data)
+    d, m, out, prev = codec.Dec(data[used:]), _LzProbs(), bytearray(), 0
+
+    def tree(probs, bits):
+        node = 1
+        for _ in range(bits):
+            node = node * 2 + d.bit(probs, node)
+        return node - (1 << bits)
+
+    while len(out) < n:
+        if d.bit(m.match, prev):
+            L = tree(m.len, 4)
+            if L == 15:
+                L = 15 + tree(m.len2, 8)
+            dist = ((tree(m.dist, 6) << 6) | d.direct(6)) + 1
+            for _ in range(L + 3):
+                out.append(out[-dist])
+            prev = 1
+        else:
+            out.append(tree(m.lit, 8))
+            prev = 0
+    return bytes(out)
+
+
+def record_payload(fmt, payload):
+    """The fmt-4 payload of a stored record, whether it was sent plain (4) or LZ-coded (5)."""
+    return lz_decode(payload) if fmt == FMT_MIX_LZ else payload

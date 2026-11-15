@@ -31,9 +31,10 @@ inline uint32_t backoffMs(uint8_t step, uint32_t rnd) {
 
 enum Outcome : uint8_t {
   OUT_OK,        // 200: stored
-  OUT_REFUSED,   // 400: refused by a rule or the unique index (a resend, or the gateway is blocked)
+  OUT_REFUSED,   // 400: refused by a rule or the unique index (a resend of a stored seq)
   OUT_AUTH,      // 401/403: the token is no longer valid; log in again
-  OUT_DOWN       // no answer, a timeout, 404 from the tunnel, 429, 5xx: the service counts as unreachable
+  OUT_DOWN,      // no answer, a timeout, 404 from the tunnel, 429, 5xx: the service counts as unreachable
+  OUT_BLOCKED    // 403 whose body holds "otgw-blocked" (pb_hooks/blocked.pb.js): turn the opt-in off, stop
 };
 
 inline Outcome classify(int status) {
@@ -41,6 +42,15 @@ inline Outcome classify(int status) {
   if (status == 400) return OUT_REFUSED;
   if (status == 401 || status == 403) return OUT_AUTH;
   return OUT_DOWN;
+}
+
+// classify() plus the reply body: the collection point marks a blocked gateway in its 403 message.
+inline Outcome classifyReply(int status, const char *body) {
+  if (status == 403 && body) {
+    for (const char *p = body; *p; p++)
+      if (p[0] == 'o' && !__builtin_strncmp(p, "otgw-blocked", 12)) return OUT_BLOCKED;
+  }
+  return classify(status);
 }
 
 }  // namespace crec
