@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-15T09:35:00Z'
-updated_date: '2026-11-15T12:15:00Z'
+updated_date: '2026-11-15T12:18:00Z'
 labels:
   - research
   - tls
@@ -62,4 +62,6 @@ Out of scope for the PoC: web UI settings, consent dialog, SAT encoding without 
 2026-11-15 telemetry completeness analysis: docs/diagnostics/cloud-telemetry-completeness.md. Verdict: not complete. PoC = OT frames + SATTICK + Debug text; diagRec (ADR-213) adds commands/responses/MQTT/REST writes/settings/BLE/weather/NTP/reboot. Gaps: Dallas, S0 (only via MQTT publish), REST GET + status, telnet commands, WebSocket, webhook, MQTT discovery/connection, network events, OTA/safeboot/PIC flash, heap/task health, SAT decisions, port 25238 bridge. Proposal: cloud upload as second sink of diagRec + 11 new record types. Open for Robert: bridge (new ADR vs ADR-213), REST GET, SAT_EVENT fields (Sergeant D).
 
 2026-11-15 Robert decision 1 (bridge 25238): A. Record inbound bridge commands only, as text, only while cloud recording runs; needs a new ADR superseding the bridge exclusion of ADR-213; SAT-filtered commands (ADR-217) marked as refused. Outbound stream not recorded (already in the OT section).
+
+2026-11-15 Robert decision 2 (REST GET): A. Record route id, method, status per request, no body; consecutive identical GET 200s collapse into a per-minute counter; every non-200 recorded individually.
 <!-- SECTION:NOTES:END -->
