@@ -1296,11 +1296,14 @@ def load_paho():
 class MqttCapture:
     """Subscribes like `mosquitto_sub -v`: one 'topic payload' line per message."""
 
-    def __init__(self, cap, host, port, topic, username, password):
+    def __init__(self, cap, host, port, topics, username, password, keep=None):
         self.cap = cap
         self.host = host
         self.port = port
-        self.topic = topic
+        self.topics = [topics] if isinstance(topics, str) else list(topics)   # TASK-1988: one or more filters
+        self.topic = ", ".join(self.topics)
+        self.keep = keep            # TASK-1988: per-message check before a line is written (None: keep all)
+        self.dropped = 0
         self.username = username
         self.password = password
         self.client = None
@@ -1332,7 +1335,7 @@ class MqttCapture:
             if reason_code.is_failure:
                 self.errline(f"Connection refused: {reason_code}")
                 return
-            c.subscribe(self.topic)
+            c.subscribe([(t, 0) for t in self.topics])
             if not self.connected_once:
                 self.connected_once = True
                 self.cap.summary(f"MQTT connected: {self.host}:{self.port}, subscribed to '{self.topic}'")
@@ -1358,17 +1361,7 @@ class MqttCapture:
             self.errline(f"Connect to {self.host}:{self.port} failed; retrying")
 
         def on_message(c, userdata, msg):
-            self.messages += 1
-            try:
-                payload = msg.payload.decode("utf-8", "replace")
-                if self.cap.store.hourly:
-                    payload = payload.replace("\r", "\\r").replace("\n", "\\n")
-                    stamp = datetime.now().astimezone().isoformat(timespec="milliseconds")
-                    self.log.write(f"{stamp}\t{int(bool(msg.retain))}\t{msg.topic}\t{payload}\n")
-                else:
-                    self.log.write(f"{msg.topic} {payload}\n")
-            except Exception:
-                pass
+            self.handle(msg.topic, msg.payload, msg.retain)
 
         client.on_connect = on_connect
         client.on_disconnect = on_disconnect
@@ -1378,6 +1371,23 @@ class MqttCapture:
         client.connect_async(self.host, self.port, keepalive=60)
         client.loop_start()
         self.client = client
+
+    def handle(self, topic, payload_bytes, retain=False):
+        """One received message: written to mqtt.log unless keep() says it is another device's (TASK-1988)."""
+        if self.keep is not None and not self.keep(topic):
+            self.dropped += 1
+            return
+        self.messages += 1
+        try:
+            payload = payload_bytes.decode("utf-8", "replace")
+            if self.cap.store.hourly:
+                payload = payload.replace("\r", "\\r").replace("\n", "\\n")
+                stamp = datetime.now().astimezone().isoformat(timespec="milliseconds")
+                self.log.write(f"{stamp}\t{int(bool(retain))}\t{topic}\t{payload}\n")
+            else:
+                self.log.write(f"{topic} {payload}\n")
+        except Exception:
+            pass
 
     def stop(self):
         if self.client is not None:
@@ -1396,7 +1406,9 @@ class MqttCapture:
             pass
         if self.gap_start is not None:
             self.cap.summary(f"MQTT gap still open at stop: since {self.gap_start.isoformat(timespec='seconds')} ({self.gap_reason})")
-        self.cap.summary(f"MQTT capture: {self.messages} message(s) written to mqtt.log.")
+        self.cap.summary(f"MQTT capture: {self.messages} message(s) written to mqtt.log."
+                         + (f" {self.dropped} message(s) of other devices on the broker not recorded."
+                            if self.keep is not None else ""))
 
 
 # --------------------------------------------------------------------------- #
@@ -3284,7 +3296,8 @@ def save_settings(args, persist_password):
         data["DeviceHost"] = args.device
         if args.broker:
             data.update({"BrokerHost": args.broker, "BrokerPort": args.broker_port,
-                         "Topic": args.topic, "Username": args.username or ""})
+                         "Username": args.username or ""})
+            data.pop("Topic", None)   # TASK-1988: the topic filter is never kept; each run derives it from the gateway
         if persist_password and args.password:
             data["MqttPassword"] = args.password
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -3315,7 +3328,7 @@ def ask(prompt, default=""):
 
 ALIASES = {
     "-DeviceHost": "--device", "-BrokerHost": "--broker", "-BrokerPort": "--broker-port",
-    "-Topic": "--topic", "-Username": "--username", "-Password": "--password",
+    "-Topic": "--topic", "-MqttAllTopics": "--mqtt-all-topics", "-Username": "--username", "-Password": "--password",
     "-SaveSecrets": "--save-secrets", "-OutputRoot": "--output-root", "-DurationSeconds": "--duration",
     "-TelnetConnectTimeoutSeconds": "--telnet-connect-timeout-seconds",
     "-TelnetReconnectDelayMilliseconds": "--telnet-reconnect-delay-ms",
@@ -3381,7 +3394,11 @@ def build_parser():
     p.add_argument("--broker", metavar="HOST", help="MQTT broker host; empty = skip the MQTT stream")
     p.add_argument("--broker-port", type=ranged(1, 65535), default=None,
                    help="MQTT broker port (default: the gateway's own setting, else 1883)")
-    p.add_argument("--topic", default="#", help="MQTT topic filter (default '#')")
+    p.add_argument("--mqtt-all-topics", action="store_true",
+                   help="record EVERY topic on the broker ('#'), other devices included; without it the capture "
+                        "records only what this gateway publishes (TASK-1988)")
+    p.add_argument("--topic", default=None,
+                   help="MQTT topic filter, only together with --mqtt-all-topics (default with it: '#')")
     p.add_argument("--username", help="MQTT username (blank = anonymous)")
     p.add_argument("--password", help="MQTT password (prompted when a username is given)")
     p.add_argument("--save-secrets", action="store_true",
@@ -3442,6 +3459,61 @@ def build_parser():
     return p
 
 
+MQTT_ALL_TOPICS_WARNING = ("WARNING: --mqtt-all-topics records EVERY topic on the broker, so messages of other "
+                           "devices on it (and of other gateways) are in this capture. Check before you share it.")
+
+
+def own_mqtt_topic(topic, gateway):
+    """TASK-1988: True when the firmware of this gateway publishes `topic`. Every publish funnels through
+    mqttPublishRaw() (MQTTstuff.ino); its topics are, checked against the source on 2026-11-15:
+      - <toptopic>/value/<uniqueid> itself (the retained LWT online/offline) and everything below it: values, state,
+        SAT and the SAT BLE state topics (sendMQTTData() prefixes MQTTPubNamespace; the v2 migration clears retained
+        topics under the same namespace);
+      - <haprefix>/<component>/<uniqueid>/.../config: every HA discovery config (MQTTHaDiscovery.cpp, MQTTstuff.ino);
+      - <haprefix>/sensor/<uniqueid>_ble_<mac>_<kind>/config: the SAT BLE sensor configs (MQTTstuff.ino), the one
+        format where the unique id is a prefix inside a level.
+    Never the command topics <toptopic>/set/<uniqueid>/...: other clients publish those."""
+    top, uid, ha = gateway["toptopic"], gateway["uniqueid"], gateway.get("haprefix") or ""
+    ns = f"{top}/value/{uid}"
+    if topic == ns or topic.startswith(ns + "/"):
+        return True
+    if ha and topic.startswith(ha + "/"):
+        rest = topic[len(ha) + 1:].split("/")
+        if len(rest) >= 3 and rest[-1] == "config":
+            return rest[1] == uid or (rest[0] == "sensor" and len(rest) == 3 and rest[1].startswith(uid + "_ble_"))
+    return False
+
+
+def mqtt_topic_filters(gateway, all_topics, topic):
+    """TASK-1988 (Robert, 2026-11-15): by default the capture records only what this gateway publishes
+    (own_mqtt_topic()). Not other devices, not other gateways, not the command topics others publish.
+    --mqtt-all-topics is the deliberate opt-in for '#' (or --topic with it).
+
+    gateway: read_gateway_mqtt()'s dict or None. Returns (filters, keep, warning, note): filters is the list to
+    subscribe to (empty: record no MQTT), keep the per-message check before a line is written (None: keep all),
+    warning is set for the opt-in, note says why the list is empty. Raises ValueError for --topic without
+    --mqtt-all-topics."""
+    if topic and not all_topics:
+        raise ValueError("--topic only works together with --mqtt-all-topics; without it the capture records "
+                         "this gateway's own topics")
+    if all_topics:
+        return [topic or "#"], None, MQTT_ALL_TOPICS_WARNING, None
+    top = (gateway or {}).get("toptopic") or ""
+    uid = (gateway or {}).get("uniqueid") or ""
+    ha = (gateway or {}).get("haprefix") or ""
+    if not top or not uid or any(c in top + uid + ha for c in "#+"):
+        return [], None, None, ("this gateway's MQTT topic prefix or unique id could not be read, so no MQTT is "
+                                "recorded (the capture never falls back to every topic; --mqtt-all-topics does that "
+                                "on purpose)")
+    filters = [f"{top}/value/{uid}/#"]
+    if ha:
+        # the BLE configs carry the unique id inside a level, which no MQTT filter can express: subscribe to the
+        # sensor configs and let own_mqtt_topic() drop every other device's before anything is written
+        filters += [f"{ha}/+/{uid}/#", f"{ha}/sensor/+/config"]
+    gw = {"toptopic": top, "uniqueid": uid, "haprefix": ha}
+    return filters, (lambda t: own_mqtt_topic(t, gw)), None, None
+
+
 def read_gateway_mqtt(device, http_port, timeout=5):
     """Reads the MQTT settings the gateway itself uses from GET /api/v2/settings (TASK-1677), so the
     capture listens on the same broker instead of a typed address. Returns (dict or None, reason).
@@ -3457,7 +3529,12 @@ def read_gateway_mqtt(device, http_port, timeout=5):
         settings = json.loads(body.decode("utf-8", "replace")).get("settings", {})
         value = lambda name: (settings.get(name) or {}).get("value")
         found = {"enable": bool(value("mqttenable")), "broker": str(value("mqttbroker") or "").strip(),
-                 "port": value("mqttbrokerport"), "user": str(value("mqttuser") or "").strip()}
+                 "port": value("mqttbrokerport"), "user": str(value("mqttuser") or "").strip(),
+                 # TASK-1988: what this gateway publishes under (MQTTstuff.ino: <toptopic>/value/<uniqueid>,
+                 # HA discovery <haprefix>/<component>/<uniqueid>/.../config)
+                 "toptopic": str(value("mqtttoptopic") or "").strip(),
+                 "haprefix": str(value("mqtthaprefix") or "").strip(),
+                 "uniqueid": str(value("mqttuniqueid") or "").strip()}
         length = re.fullmatch(r"password=(\d+)", str(value("mqttpasswd") or ""))
         found["password_length"] = int(length.group(1)) if length else None
     except Exception as exc:
@@ -3505,6 +3582,14 @@ def resolve_inputs(args, parser):
 
     # TASK-1677: take the broker from the gateway, so a typo cannot leave the MQTT stream empty.
     gateway, reason = read_gateway_mqtt(args.device, getattr(args, "http_port", 80))
+    # TASK-1988: subscribe only to what this gateway publishes, unless --mqtt-all-topics asks for everything.
+    try:
+        args.mqtt_filters, args.mqtt_keep, args.mqtt_warning, args.mqtt_note = mqtt_topic_filters(
+            gateway, getattr(args, "mqtt_all_topics", False), getattr(args, "topic", None))
+    except ValueError as exc:
+        parser.error(str(exc))
+    if args.mqtt_warning:
+        print(args.mqtt_warning)
     if gateway is not None and gateway["enable"] and gateway["broker"]:
         gw_port = gateway["port"] or 1883
         if broker_given and args.broker.strip() and (args.broker.strip(), args.broker_port or gw_port) != (gateway["broker"], gw_port):
@@ -3662,7 +3747,8 @@ def main(argv=None):
     s(f"TelnetIdleCheckSeconds: {args.telnet_idle_check_seconds}", echo=False)
     s(f"BrokerHost: {args.broker or '(none)'}", echo=False)
     s(f"BrokerPort: {args.broker_port}", echo=False)
-    s(f"Topic: {args.topic}", echo=False)
+    s(f"Topic: {', '.join(getattr(args, 'mqtt_filters', None) or []) or 'none'}"
+      + (" (--mqtt-all-topics)" if getattr(args, "mqtt_all_topics", False) else ""), echo=False)
     s(f"Username supplied: {bool(args.username)}", echo=False)
     s(f"DurationSeconds: {args.duration or 'until manual stop'}", echo=False)
     s(f"SkipBrowserCapture: {args.skip_browser_capture}", echo=False)
@@ -3769,13 +3855,23 @@ def main(argv=None):
         s(f"Device snapshots started: every {snapshot_seconds} s, {', '.join(SNAPSHOT_PATHS)} -> {SNAPSHOTS_LOG}")
 
     mqtt_capture = None
+    mqtt_filters = getattr(args, "mqtt_filters", None) or []
     if not args.broker:
         s("MQTT capture skipped: no BrokerHost given (telnet, probe and crash log still run).")
+    elif not mqtt_filters:
+        s(f"MQTT capture skipped: {getattr(args, 'mqtt_note', None) or 'no topics to record'}.")
     else:
+        if getattr(args, "mqtt_warning", None):
+            s(args.mqtt_warning)   # TASK-1988: console and summary.txt say other devices are in this capture
         try:
-            mqtt_capture = MqttCapture(cap, args.broker, args.broker_port, args.topic, args.username, args.password)
+            mqtt_capture = MqttCapture(cap, args.broker, args.broker_port, mqtt_filters, args.username, args.password,
+                                       keep=getattr(args, "mqtt_keep", None))
             mqtt_capture.start()
-            s(f"MQTT capture started: paho-mqtt, broker {args.broker}:{args.broker_port}, topic '{args.topic}' (writing mqtt.log).")
+            s(f"MQTT capture started: paho-mqtt, broker {args.broker}:{args.broker_port}, "
+              f"topics {', '.join(mqtt_filters)}"
+              + (" (only what this gateway publishes; the sensor-config subscription also brings other devices' "
+                 "configs to the tool, dropped before writing)" if getattr(args, "mqtt_keep", None) else "")
+              + " (writing mqtt.log).")
         except Exception as exc:
             mqtt_capture = None
             s(f"MQTT capture disabled: {type(exc).__name__}: {exc}")

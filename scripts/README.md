@@ -124,7 +124,9 @@ empty broker skips the MQTT stream and writes one summary line saying so
 - `--device` / `-DeviceHost`: OTGW device IP address or hostname
 - `--broker` / `-BrokerHost`: MQTT broker; empty skips the MQTT stream
 - `--broker-port` / `-BrokerPort`: MQTT broker port (default `1883`)
-- `--topic` / `-Topic`: MQTT topic filter (default `#`)
+- MQTT topics (TASK-1988): by default the capture records only what this gateway publishes itself: its own namespace `<top topic>/value/<unique id>` (values, state, SAT and the retained online/offline status) and its own Home Assistant discovery configs under `<HA prefix>/.../<unique id>/...` (the SAT BLE sensor configs included). The prefix and unique id come from the gateway's settings. Messages of other devices on the broker, of other gateways and the command topics others publish are never written; the summary counts them. One subscription is wider than the gateway: `<HA prefix>/sensor/+/config`, because the SAT BLE sensor configs carry the unique id inside a topic level. It also brings other devices' sensor discovery configs over the wire to the tool; they are dropped before anything is written and never end up in the capture (only their count does). When the gateway's MQTT settings cannot be read (an admin password, no answer), no MQTT is recorded rather than everything.
+- `--mqtt-all-topics` / `-MqttAllTopics`: record EVERY topic on the broker (`#`), other devices included, on purpose. The console and `summary.txt` then carry a warning; check the capture before you share it.
+- `--topic` / `-Topic`: a topic filter instead of `#`, only together with `--mqtt-all-topics`
 - `--username` / `--user` / `-Username`, `--password` / `-Password`: MQTT credentials
 - `--save-secrets` / `-SaveSecrets`: also store the MQTT password in the settings file (for unattended runs)
 - `--duration` / `-DurationSeconds`: stop after N seconds (`259200` = 3 days; above 2 hours the long-run mode starts by itself)
