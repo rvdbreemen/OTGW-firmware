@@ -5,9 +5,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [2.0.0-beta.323] - 2026-11-15
+
 ### Added
 - Monitor > Graph: on a board with PSRAM the gateway keeps 7 days of graph history instead of 24 h (about 70 KB of PSRAM, still RAM only), and the graph gets a 7 days window. `GET /api/v2/graph/history` serves 24 h by default as before; `?hours=N` (1 to 168) asks for another window, and a window of more than 1008 slots is thinned (7 days: 10 minute slots, the newest value per slot, flame/DHW/CH set when any part of the slot had them). The chip shows only on boards with PSRAM. The CSV export covers the window shown (TASK-1963, ADR-245).
 - Monitor > Graph and its CSV export: a DHW temperature line (MsgID 26) from the moment the page opens; the device history does not hold it, so after a reload the earlier part of the window has no DHW line (TASK-1776).
+- Capture tool: `capture-mqtt-debug` also saves the device state (read-only diagnostic REST routes and state files at start and stop, hourly in a long run, secrets redacted, `settings.ini` excluded), the graph history (24 h, plus 7 days where the firmware answers `?hours=168`) as JSON and CSV, and a diagnostic recording the device holds, all into the upload zip; GETs only, one request at a time; `--skip-device-state`, `--skip-graph-history`, `--skip-diag-recording` (TASK-1964).
+- REST: `otgw/messages` and `otgw/label` add a `source` field (none, boiler, gateway, thermostat, summary, replay): where the served value came from (TASK-1965).
 
 ### Changed
 - A freshly flashed unit now starts with the normal defaults (MQTT on, new topic names, setup wizard) instead of looking like a 1.x upgrade: the filesystem image no longer contains a default `settings.ini`, so the first boot writes the firmware's own defaults. A filesystem update still puts your own settings back (TASK-1920).
@@ -15,6 +19,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - OT-Direct: `OH=` (copy the MsgID 100 override flags into the high byte) is on by default, like the PIC. Every OT-Direct board switches to `OH=1` once at its first boot on this version, whatever it had stored (since beta.203 every settings save stored `OH=0` without anyone choosing it); a marker in `settings.ini` (`OTDohpicdefault`) makes sure it happens once, so an `OH=0` sent afterwards stays. A thermostat that reads MsgID 100 during a `TT=`/`TC=` override then sees the flags in both bytes (Robert, DM 1571441135526875227; TASK-1961).
 - OT-Direct: during a `TT=` override the thermostat's MsgID 100 read is answered with the PIC's flags `0x03` (manual and program change; was `0x02`), `TC=` stays `0x01`, and with `OH=1` the flags are copied into the high byte. In master mode the MsgID 100 write to the boiler carries the same value (Robert, DM 1571426506259963986; TASK-1750).
 - OT-Direct master mode: `TT=0` (or a release of the override) puts a `BS=` or MQTT `room_setpoint` value back on MsgID 16 instead of clearing it, as the PIC's `TT=0` never touches `BS=` (Robert, DM 1571426506259963986; TASK-1751).
+- REST: a control command that SAT refuses answers 409 "Command refused: SAT is in control of the boiler" instead of 503 "queue full"; 503 stays for a full queue (TASK-1970).
 
 ### Removed
 - **BREAKING (REST, OT-Direct):** the setback fields that no longer do anything are gone: `setback_active` (device info `otdirect_status`, the flat `state.otd.setback_active` and `otdsetback` fields), `setback_timeout` (`otdirect_settings`, `settings.otd.setback_timeout`) and the `otdsetbacktimeout` setting with its web UI rows. Since TASK-1806 there is no setback, and since TASK-1802 a thermostat counts as lost after a fixed 3 s. An old `settings.ini` with `OTDsetbacktimeout` still loads; the key is ignored and dropped at the next save. `SB=` and `FS=` stay: they are PIC commands, stored and answered like the PIC (`PR=S` unchanged), with no effect on OT-Direct (TASK-1950).
@@ -29,6 +34,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - OT-Direct gateway mode handles the thermostat's own MsgID 99 as the PIC: while an `MW=`/`MH=`/`M2=` or `HW=P` write is pending, a thermostat read of MsgID 99 goes to the boiler as that write; a thermostat write of MsgID 99 sets the stored operating modes (its push bit starts a push); while the gateway runs a push itself, the boiler's MsgID 99 answer to the thermostat carries the push bit (TASK-1906).
 - OT-Direct `PM=`: takes Data-IDs 0-255 (was BV above 127, and above 255 wrapped around) and, as the PIC, reads a whole TSP or fault-history table after its size (10, 12, 88, 90, 105, 107) and every character of a string (93, 94, 95); before, only the first read went out (TASK-1847).
 - OT-Direct: a command without a value (`CS=`, `TT=`, `SW=` ...) answers `SE` like the PIC, and `OT=`, `MM=` and `CL=` without a value clear like the PIC (`XX: -`); they used to get no answer at all. Other commands without a value stay unanswered (TASK-1957).
+- Web UI: the cooling level Clear sends `CL=-`; it sent `CL=0`, which holds a level of 0 (TASK-1958).
+- Web UI: the PIC panel shows a pending (`t`/`c`) or a clearing (`n`) setpoint override as text instead of the raw value such as `t20.50` (TASK-1939).
+- REST: `GET /api/v2/sat/weather/needs-setup` gives its own answer; the route never matched and returned the full weather status (TASK-1969).
+- PIC: during a SAT simulation the `PR=` report commands reach the PIC again, so the PIC settings fill (ADR-244; TASK-1943).
+- Web server: a connection without payload that is not established no longer counts towards the connection cap, so a page load no longer gets 503 answers (TASK-1947).
+- OT-Direct: `PR=M` accepts the mode letters S, L and P (TASK-1951).
 
 ## [2.0.0-beta.294] - 2026-11-15
 
@@ -1033,7 +1044,8 @@ Legacy release. See git history for details.
 
 Legacy releases. See git history for details.
 
-[Unreleased]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.294...HEAD
+[Unreleased]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.323...HEAD
+[2.0.0-beta.323]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.294...v2.0.0-beta.323
 [2.0.0-beta.294]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.250...v2.0.0-beta.294
 [2.0.0-beta.250]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.237...v2.0.0-beta.250
 [2.0.0-beta.237]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.224...v2.0.0-beta.237
