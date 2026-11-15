@@ -95,7 +95,7 @@ Gaps that matter for "everything":
    collapse into a per-minute counter; every other status is its own record.
 3. **SAT: A.** While the cloud recording runs, SATTICK always goes to the SAT section, independent of
    `state.debug.bSAT` (`SATcontrol.ino:20`), and not to telnet. SAT behaviour does not change. Which SAT decisions
-   become `SAT_EVENT` records is a question for Sergeant D (TASK-1970).
+   become `SAT_EVENT` records follows from the firmware's own SAT code (TASK-1970): the recording is telemetry of the firmware, not of thermo-nova (Robert, 2026-11-15), so no Sergeant D question is needed.
 
 ## Not verified in this analysis
 

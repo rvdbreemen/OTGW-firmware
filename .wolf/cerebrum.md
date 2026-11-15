@@ -202,3 +202,4 @@
 - 2026-10-24: host tests that stub isPICEnabled()=true never compile the OT-Direct path; a passing build + green host test is no proof for OT-Direct. The bench (OTGW32 = OT-Direct) + sat_boiler_emulator via port 25238 injects B40030004 (MsgID 3) for a real check.
 - 2026-10-24: Arduino .ino auto-prototypes break functions whose signature uses a struct defined later in the same file; use plain types in signatures (TASK-1337).
 - 2026-10-24: git log --format=%h can give 9 chars; build artifact names use 7 (git rev-parse --short=7 HEAD).
+- 2026-11-15 (Robert): cloud recording / telemetry describes what OUR firmware does, not thermo-nova. Deriving telemetry fields (e.g. SAT_EVENT) from firmware code is fine and needs no Sergeant D question; only a claim about how SAT *should* behave goes to Sergeant D.
