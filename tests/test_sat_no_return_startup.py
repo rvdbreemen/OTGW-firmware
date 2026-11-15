@@ -536,14 +536,12 @@ class OtDirectPm(unittest.TestCase):
         lat = self.pm25_latencies(False)
         self.assertLessEqual(max(lat), 1150, lat)
 
-    def test_pm25_latency_in_the_slow_poll_burst_is_bounded_but_not_one_interval(self):
-        # Characterization of the CURRENT OT-Direct scheduler (one request per call, round-robin from otScheduleIdx): when all slow-poll
-        # entries come due together (they all start at boot with lastSentMs = 0, so they stay in step), a PM=25 sets lastSentMs = 0 but
-        # waits behind the entries already due. The model has no entry disabled; a boiler that answers Unknown-DataID to many of them
-        # (the entries disable themselves) has a shorter burst. The bench has to measure the real burst (TASK-1412.21).
+    def test_pm25_goes_out_within_a_communication_interval_also_in_the_slow_poll_burst(self):
+        # TASK-1981: the scheduler serves the faster tiers before the 60 s slow-poll tier, so a PM=25 (lastSentMs = 0 on the 10 s
+        # entry) no longer waits behind the slow entries that are due (was up to ~9 s, characterized here before the fix). It goes out
+        # within the spec's 1.15 s master communication interval (OpenTherm v4.2 section 4.3.1), as with the slow tier idle.
         lat = self.pm25_latencies(True)
-        self.assertLessEqual(max(lat), 10000, lat)
-        self.assertGreater(max(lat), 1150, "the scheduler now serves PM=25 inside one interval in the burst: tighten the assertion above")
+        self.assertLessEqual(max(lat), 1150, lat)
 
     def test_without_pm25_the_msgid25_read_is_only_every_10_s_on_ot_direct(self):
         rows = self.sim(["run 120000"])

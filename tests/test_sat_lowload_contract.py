@@ -242,7 +242,7 @@ DELEGATED = {
     "LL-018h": [("test_sat_no_return_ignition", "NoReturnIgnition", ["test_mi500_never_on_ot_direct"]),
                 ("test_pic_pm_chain", "PmChain", ["test_not_armed_on_ot_direct"]),
                 ("test_sat_no_return_startup", "OtDirectPm", ["test_pm25_goes_out_within_a_communication_interval_when_the_slow_poll_tier_is_idle",
-                "test_pm25_latency_in_the_slow_poll_burst_is_bounded_but_not_one_interval", "test_without_pm25_the_msgid25_read_is_only_every_10_s_on_ot_direct",
+                "test_pm25_goes_out_within_a_communication_interval_also_in_the_slow_poll_burst", "test_without_pm25_the_msgid25_read_is_only_every_10_s_on_ot_direct",
                 "test_pm_for_an_unscheduled_id_is_a_one_shot_read", "test_pm_takes_0_to_255_like_the_pic"])],
     # LL-019 (TASK-1412.9): the whole phase-anchor and start-count suites run, not a subset: every test of test_sat_pwm_anchors (anchors,
     # ignition wait, relight, DHW interruptions, per-source start counting, millis rollover) and test_sat_pwm_start_limit (limit windows,

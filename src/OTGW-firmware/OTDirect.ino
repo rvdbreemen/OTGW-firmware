@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTDirect.ino
-**  Version  : v2.0.0-beta.324
+**  Version  : v2.0.0-beta.325
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -2201,7 +2201,11 @@ static void scheduleMasterRequest() {
     return;
   }
 
-  // Round-robin through the schedule table, skipping disabled entries
+  // Round-robin through the schedule table, skipping disabled entries. Two passes: first only the entries whose interval
+  // is shorter than the slow-poll tier, then all of them. TASK-1981: with one pass a 10 s entry that came due just after
+  // the 60 s burst had started (about 80 IDs, ~9 s at one frame per 100 ms MWT) waited for the whole burst, so SAT's
+  // flow read (MsgID 25) was up to 19 s apart once a minute on OT-Direct (regression of the status-first rule above).
+  for (uint8_t pass = 0; pass < 2; pass++) {
   uint8_t startIdx = otScheduleIdx;
   do {
     OTScheduleEntry &entry = otSchedule[otScheduleIdx];
@@ -2222,6 +2226,7 @@ static void scheduleMasterRequest() {
     if ((entry.msgId == 70 || entry.msgId == 71) && otIsVentSlave()) {
       interval = OT_VENT_FAST_INTERVAL_MS;
     }
+    if (pass == 0 && interval >= OT_SLOW_INTERVAL_MS) continue;   // TASK-1981: the faster tiers first
 
     if ((now - entry.lastSentMs) >= interval) {
       unsigned long request;
@@ -2248,6 +2253,7 @@ static void scheduleMasterRequest() {
       return;  // One request per call
     }
   } while (otScheduleIdx != startIdx);
+  }
 }
 
 // ---------------------------------------------------------------------------
