@@ -1,7 +1,7 @@
 # anatomy.md
 
-> Auto-maintained by OpenWolf. Last scanned: 2026-11-14T13:05:42.350Z
-> Files: 158 tracked | Anatomy hits: 0 | Misses: 0
+> Auto-maintained by OpenWolf. Last scanned: 2026-11-15T20:49:15.984Z
+> Files: 165 tracked | Anatomy hits: 0 | Misses: 0
 
 ## ../../../../AppData/Local/Temp/
 
@@ -961,6 +961,7 @@
 
 ## docs/process/
 
+- `agentic-architecture-image-brief.md` — Beeldbrief: de OTGW agentic werkplaats als overzichtsplaat (~7222 tok)
 
 ## docs/releases/
 
