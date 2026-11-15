@@ -3908,5 +3908,57 @@
     "related_bugs": [],
     "occurrences": 1,
     "last_seen": "2026-11-14T15:25:03.154900Z"
+  },
+  {
+    "error_message": "beta.318+56fb6db image reports fwversion 2.0.0-beta.318+1233ba9 (TASK-1976)",
+    "file": "build.py",
+    "root_cause": "My post-build 'git checkout -- version.h' ran while pio still compiled (wait loop had timed out to the background); OTGW-firmware.ino.cpp.o compiled from the reverted stamp",
+    "fix": "build.py verify_app_version_string(): after the rename the .ino.bin must hold the stamped semver, else exit 4; logs '✓ App version check'. Process: no worktree action until EXIT= is in the build log",
+    "tags": [
+      "build",
+      "version",
+      "race",
+      "process"
+    ],
+    "id": "bug-222",
+    "timestamp": "2026-11-15T21:30:00+01:00",
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-11-15T21:30:00+01:00"
+  },
+  {
+    "error_message": "beta.324+c1fa2b2 hangs early at boot on .61, no panic, no reset (TASK-1919)",
+    "file": "src/OTGW-firmware/OTGW-firmware.ino",
+    "root_cause": "safebootDropStaleOtadata() as the first call in setup(): hasSafeboot() -> esp_ota_get_partition_description() (flash read) hangs that early; why is unproven. The two partition lookups before it return",
+    "fix": "Call moved to right after LittleFS.begin(); call-site gate in test/host/test_otadata_stale.py (fails on the early placement); 09 benched probe + clean image on .61",
+    "tags": [
+      "ota",
+      "safeboot",
+      "otadata",
+      "boot-hang",
+      "esp32s3"
+    ],
+    "id": "bug-223",
+    "timestamp": "2026-11-15T21:30:00+01:00",
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-11-15T21:30:00+01:00"
+  },
+  {
+    "error_message": "origin/dev red: 7 host tests fail to compile ('OT_VALSRC_GATEWAY': undeclared, 'recordValueSource': not found) after TASK-1965",
+    "file": "tests/test_otd_pic_float.py",
+    "root_cause": "New calls in OT-Direct OT= and processOT(); harnesses that slice the CALLER carry their own preludes without stubs; my related-test grep on the new names missed them",
+    "fix": "No-op stubs + enum in the preludes, regex in test_evaluate tolerates the record line; for processOT/OTDirect changes run all tests/test_otd_* plus all test/host",
+    "tags": [
+      "tests",
+      "seam",
+      "prelude",
+      "otdirect"
+    ],
+    "id": "bug-224",
+    "timestamp": "2026-11-15T21:30:00+01:00",
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-11-15T21:30:00+01:00"
   }
 ]
