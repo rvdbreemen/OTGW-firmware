@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-14T17:47:00Z'
-updated_date: '2026-11-15T09:52:00Z'
+updated_date: '2026-11-15T12:26:00Z'
 labels:
   - bug
 milestone: 2.0.0
@@ -47,4 +47,6 @@ Scope: the SAT simulation can only stay on without a boiler: a real boiler frame
 2026-11-15 decision (Robert, Discord DM 1571450830035484673 on question 1571450615744168028, relayed by the coordinator): "A". PR= passes the simulation gate on the PIC serial path; CS= and every other command stay held back. 09 had confirmed the cause red/green on .63 (sim on: no PR= sent, 0/15 settings; sim off: PIC answers in 15-50 ms). ADR-244 (amends ADR-117 path (a)) Accepted through adr-kit with that DM id.
 
 2026-11-15 fix: sendPICSerial() (OTGW-Core.ino, ADR-117 path (a) block) skips satSimulationBlocksBusTx() for a command starting with PR=; nothing changed on the OT-Direct master path. Host test test/host/test_pic_sim_gate_pr.py (real gate block + real satSimulationBlocksBusTx sliced by anchor) --old-rev origin/dev: OLD fails exactly D1 PR=A, D2 PR=E (SAT sim) and D3 PR=M (replay sim), passes the controls (CS=40 and GW=1 held and traced, no-sim cases sent); FIX 8/8, RESULT PASS. AC3 bench (settings cycle fills /api/v2/pic/settings on .63 with the SAT sim on) follows on the next build.
+
+2026-11-15 bench (09 on .63, beta.306+041400e, relayed by the coordinator): PASS for AC3: PR= passes the simulation gate, /api/v2/pic/settings 15/15 (0/15 on beta.294). Correction to my bench brief: with SAT enabled a REST CS=40 is refused by the ADR-179 queue rule ('CS=40 refused, SAT is enabled'), before the simulation gate, so the 'SAT-SIM trace: CS=40' line I asked for cannot appear; nothing reaches the PIC either way. That 503 answer is TASK-1970. Side finding TASK-1971 (PIC cycle waits ~4-5 min after boot while the discovery drip runs). Pushed: origin/dev 11c5b268a..aa7b7f382 (beta.304-306, src identical to the benched 041400e: git diff 041400e aa7b7f382 -- src/ is empty); build posted in #alpha-testing (message 1571501313064312873). AC3 left for the bench-tester to tick.
 <!-- SECTION:NOTES:END -->

@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-14T20:18:00Z'
-updated_date: '2026-11-15T09:01:00Z'
+updated_date: '2026-11-15T12:26:00Z'
 labels:
   - webui
   - bug
@@ -60,4 +60,6 @@ Fix prepared, NOT for merge until Robert answers the coordinator's DM (A = this 
 2026-11-15 decision (Robert, Discord DM, relayed by the coordinator): "A" on the TASK-1947 question (message 1571427079680041031) and "A" again on both corrections (1571427204842266678, 1571427621433118872); verified in the DM history. ADR-240 Accepted through adr-kit (adr accept --confirm, strict lint passed after inline acronym expansions; Decision Maker and DM ids in its Status; README entry and index refreshed; tests/test_adr_governance.py 17/17 OK). Firmware (the A rule in platformTcpTxHoldingOnPort) follows in the next build after the beta slot, then 09's AC3 bench on .61.
 
 2026-11-15 A rebuilt on beta.295 (lane/ba-1947, after ADR-240 Accepted): the three-file diff of cc719fea3 (platform_esp32.h, tests/fixtures/web_file_scheduling.cpp, tests/test_web_conn_cap_states.py) applied unchanged (+/- lines identical to the original). test_web_conn_cap_states.py: FAILED (failures=3) on the beta.294 shim, OK 9/9 on A; test_web_file_scheduling PASS. AC3 bench (20 fresh loads on .61) follows on the next build.
+
+2026-11-15 bench (09 on .61, beta.306+041400e, relayed by the coordinator): AC3 PASS: 20 fresh web UI loads, 0 WEB CONN CAP refusals (hd_webconn_503 delta 0). No refusal happened, so the closing-fin vs syn-rcvd split of the refusal line was not triggered and is not shown by this bench. Pushed: origin/dev 11c5b268a..aa7b7f382 (beta.305 = acc352d2f, src identical to 041400e); posted (message 1571501313064312873). AC3 left for the bench-tester to tick.
 <!-- SECTION:NOTES:END -->

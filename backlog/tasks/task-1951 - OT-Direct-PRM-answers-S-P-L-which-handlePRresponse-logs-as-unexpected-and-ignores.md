@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-14T22:57:00Z'
-updated_date: '2026-11-15T07:55:00Z'
+updated_date: '2026-11-15T12:26:00Z'
 labels:
   - needs-maintainer-ok
 dependencies: []
@@ -38,4 +38,6 @@ Options for Robert. A = the consumer accepts the OT-Direct letters: handlePRresp
 2026-11-15 decision (Robert, Discord DM 1571428391457005750, relayed by the coordinator): "A". handlePRresponse() accepts the OT-Direct letters: G, S, L = gateway mode ON; M, P = OFF; no 'unexpected value' warning for a valid OT-Direct letter; PIC behaviour unchanged.
 
 2026-11-15 fix (option A): handlePRresponse() 'M' branch (OTGW-Core.ino) maps G/S/L (any case) to gateway ON and M/P to OFF; any other letter still logs 'unexpected value' and leaves the state alone. Host test test/host/test_pr_m_otd_letters.py (real handlePRresponse + PicSettingsSection sliced by anchor): --old-rev origin/dev -> OLD fails exactly D1 (S), D2 (L), D3 (P) (known=0, warned=1, nothing published), passes controls C1 G, C2/C2b M, C3 X; FIX 7/7 pass (published gateway_mode ON/OFF, no warning). RESULT PASS. Neighbours on the same handler: test_pic_settings_value, test_boiler_unsupported_origin, test_local_frame_consumers PASS; tests/test_pic_temp_sensor_port OK. Commit + bump after the beta slot, together with 1947-A in one build.
+
+2026-11-15 bench (09 on .61, beta.306+041400e, relayed by the coordinator): AC3 PASS for S and M: GW=S then PR=M -> 'PR: M=S', gateway_mode ON, no 'unexpected value'; the OFF path via GW=0 -> 'PR: M=M', gateway_mode OFF. P (bypass) not benchable: .61 has no bypass relay; P is covered by the host test (D3). Pushed: origin/dev 11c5b268a..aa7b7f382 (beta.304 = 11c5b268a); posted (message 1571501313064312873). AC3 left for the bench-tester to tick.
 <!-- SECTION:NOTES:END -->
