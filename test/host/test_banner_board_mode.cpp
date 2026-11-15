@@ -23,7 +23,10 @@ static void writeSettings(bool) { g_writes++; }
 static bool g_otDirect = false;                 // hardware state double (TASK-1181)
 static bool isOTDirectEnabled() { return g_otDirect; }
 
+static bool g_replayed = false;                 // TASK-1902: processOT()'s `replayed` (a line from the frame replay)
 static void bannerRecovery() {
+  const bool replayed = g_replayed;
+  (void)replayed;
 #include "generated/banner_board_mode.inc"
 }
 
@@ -60,6 +63,18 @@ int main() {
               "replayed banner while OT-Direct runs", (int)state.pic.bAvailable, settings.iBoardMode, g_writes);
   if (!ok) g_failures++;
   g_otDirect = false;
+
+  // TASK-1902: a replayed banner on a unit where neither the PIC nor OT-Direct runs must not re-enable the PIC
+  // or persist a board mode either.
+  g_replayed = true;
+  state.pic.bAvailable = false; state.hw.eMode = HW_MODE_DEGRADED;
+  state.hw.bClassicPro = false; settings.iBoardMode = 0; g_writes = 0;
+  bannerRecovery();
+  ok = !state.pic.bAvailable && state.hw.eMode == HW_MODE_DEGRADED && settings.iBoardMode == 0 && g_writes == 0;
+  std::printf("  %s  %-42s bAvailable %d, mode %d, writes %d (want 0, 0, 0)\n", ok ? "PASS" : "FAIL",
+              "replayed banner without PIC or OT-Direct", (int)state.pic.bAvailable, settings.iBoardMode, g_writes);
+  if (!ok) g_failures++;
+  g_replayed = false;
   std::printf("%s (%d failure(s))\n", g_failures ? "FAIL" : "PASS", g_failures);
   return g_failures ? 1 : 0;
 }
