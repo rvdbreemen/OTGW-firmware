@@ -102,3 +102,47 @@ Gaps that matter for "everything":
 - Whether the streaming HA discovery path (ADR-077) goes through `recMqttPublish`.
 - Whether PIC error lines (`Error 0x`, startup text) go through `recResponse`.
 - Whether simulated frames are marked in the recording.
+
+## Data per day (2026-11-15)
+
+Basis: the field run of ADR-213 (`docs/diagnostics/recording-budget-1470.md`: PIC gateway, SAT on, 9,155 OT frames,
+5,779 MQTT publishes, 1,047 PIC commands and 1,047 responses per hour) and the encoders on this branch. Measured
+means measured on real or encoded data; estimate means a rate or size that was not measured.
+
+| Part | KiB per day | Basis |
+|---|---:|---|
+| OT frames, range-coded (v2) | ~206 | 0.96 B/frame measured on the synthetic stream (`otrec.pack_ot2`); diagRec layout B needs 881 |
+| MQTT publishes (incl. repeats) | 1,308 | measured, diagRec layout B |
+| PIC commands + responses | 522 | measured, diagRec layout B |
+| Weather, settings, MQTT in, reboot | < 10 | measured (< 10 per hour) |
+| SATTICK always on (decision 3) | 110 to 670 | rate from ADR-213; 38 B/tick (estimate) up to 78 B/tick (this encoder, random values) |
+| REST with GET collapsed (decision 2) | 30 to 60 | estimate; 230 without collapsing |
+| Bridge inbound commands (decision 1) | < 10 | estimate |
+| Dallas, S0, NET, MQTT_CONN, WEBHOOK, FW_EVENT, MODE, TELNET_CMD | 25 to 65 | estimate (3 sensors, on change + every 5 min) |
+| HEALTH every 60 s | ~17 | estimate (12 B) |
+| **Payload, full telemetry without debug text** | **~2.2 to 2.9 MB** | MQTT publishes are half of it |
+| Debug text, no-PSRAM budget (~0.3 KB/s text) | + ~6.5 MB | measured, mix study |
+| Debug text, everything on (PSRAM, token + zlib) | + ~30 MB | measured, debug study |
+
+On the line and in storage (no debug text):
+
+| Item | MB per day | Basis |
+|---|---:|---|
+| Payload as base64 in the JSON field (x 4/3), also what PocketBase stores | 3.0 to 3.9 | computed |
+| HTTP headers, 1,440 records per day (one per 60 s) | ~1.3 | measured, batch study (~600 B up, ~280 B down per request) |
+| TLS handshake per record (the PoC connects and stops per upload) | ~6 to 9 | estimate, 4 to 6 KB per full TLS 1.3 handshake with the certificate chain; not measured |
+| **Total traffic** | **~10 to 14** | about 300 to 420 MB per month |
+| Stored with 30 days retention | ~90 to 120 MB per gateway | |
+
+Findings:
+
+- **The TLS handshake costs more than the data.** The PoC (`CloudRecDevice.h:313-342`) makes a new TLS connection for
+  every record. TLS session resumption (session tickets) or a connection that stays open brings that to well
+  under 1 MB per day; resumption also saves the handshake heap peak. To measure on the bench (TASK-1963).
+- **MQTT publishes are the largest part.** Most of them follow from OT frames. Range-coding the MQTT section like
+  the OT section, or recording only the changed values (ADR-213: about -145 KiB per day), makes it smaller; leaving
+  out derived publishes loses the build-against-build diff that ADR-213 is for. Not measured.
+- **No-PSRAM buffer:** at about 34 B/s the 4 KB record fills in about 2 minutes, so the 60 s interval holds without
+  debug text.
+- The synthetic OT stream stands in for the field stream in the v2 figure; encoding the field stream with v2 is
+  still to do.
