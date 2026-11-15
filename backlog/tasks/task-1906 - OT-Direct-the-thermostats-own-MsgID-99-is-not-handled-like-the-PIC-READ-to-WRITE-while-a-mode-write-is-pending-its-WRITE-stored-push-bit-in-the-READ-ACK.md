@@ -8,7 +8,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-13T18:48:00Z'
-updated_date: '2026-11-15T05:50:00Z'
+updated_date: '2026-11-15T06:32:00Z'
 labels:
   - otdirect
   - parity
@@ -35,4 +35,6 @@ Orphan from the 2026-11-12 PIC 6.8 parity audit (REVIEW.md N11 'thermostat's own
 
 <!-- SECTION:NOTES:BEGIN -->
 95 (2026-11-15, lane-95-next): PIC 6.8 MessageID99 :3219-3279 read in full (ID99ReadData :3252-3256, OperModeAck/OperModeData :3245-3250, ID99WriteData :3268-3279 with StartDHWPush, ID99ReadAck :3258-3265, OperModeBoiler :3239, PushOperModes :3281-3288). New flag otOperModeWrite (= opermodewrite): set by MW=/MH=/M2= and otdPushStart(), cleared by a boiler WRITE_ACK 99 (otdPushOnBoiler99) and resetTransientState(). New '// --- otdOper99' block: otdRelayRead99() (applyOverrides, gateway mode: thermostat READ 99 -> WRITE 99 with otdOperModeData), buildOverriddenReply() answers that read with the gateway's modes; otdOnThermostatWrite99() (loopOTDirect gateway branch next to onThermostatMsgID16) stores DHW/HC1/HC2 and a push bit starts a push (pending, or spoof when 99 is known unsupported; no extra write, the thermostat's own write carries the bit); otdReply99() in replyToThermostat sets the push bit on a boiler READ_ACK 99 while the gateway spoofs. Not ported: PushOperModes also sets dhwpushpending for a plain MW=/MH= write, so the PIC would spoof a push on that WRITE_ACK; OT-Direct keeps the TASK-1845 rule (pending only for HW=P). Test tests/test_otd_msgid99_relay.py (real applyOverrides, buildOverriddenReply, MW=/MH= branches, otdPush + otdOper99 blocks): 5/5; on origin/dev c2cd68b16 the 3 AC tests FAIL (read passes unchanged, thermostat write ignored, no push bit). 12 harnesses got stubs (they cut applyOverrides/buildOverriddenReply/loop or the push block); forward declarations without parameter names so test_otd_dhw_push_pic's signature lookup finds the real otdOperModeData. Sweep 52 test_otd_*/sat/pm_chain/hoisting/evaluate + 8 other OTDirect slicers + 3 ps1 harnesses green; evaluate --quick 86/0. Not verified: a real thermostat that reads/writes MsgID 99 (bench needed).
+
+Bench 09 on .61 (OT-Direct, no boiler, no thermostat), beta.298+bb38dc5 (bench-only build of lane-95-next on c2cd68b16, 2026-11-15 07:25, exit 0, RAM 130572 B, Flash 2156679 B): regression PASS (MW=/MH=/M2= replies and WRITE 99 as before, HW=P as TASK-1845). NOT benched (field only): AC1-AC3 need a thermostat that reads/writes MsgID 99; host test tests/test_otd_msgid99_relay.py.
 <!-- SECTION:NOTES:END -->
