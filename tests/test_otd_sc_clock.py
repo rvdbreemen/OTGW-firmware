@@ -61,6 +61,7 @@ PRE = r"""
 #include <cstdio>
 #include <cstdint>
 #include <cstring>
+#include <cctype>   // TASK-1908: the SC= branch parses with isdigit()
 #define PSTR(s) (s)
 #define snprintf_P snprintf
 #define siscanf sscanf
@@ -77,14 +78,17 @@ static uint32_t otSCLastCommandMs = 0;
 static uint16_t otSCClockData = 0;
 static void setWriteOverride(uint8_t, uint16_t) {}
 static void clearWriteOverride(uint8_t) {}
+static char g_status[8];   // TASK-1908: a refused SC= answers SE/OR/BV
+static void otDirectBridgeProcessStatus(const char* s) { snprintf(g_status, sizeof g_status, "%s", s); }
 """
 
 SC_MAIN = r"""
-static void scCmd(const char* buf, const char* value) {
+static bool scCmd(const char* buf, const char* value) {
   const char cmd0 = 'S', cmd1 = 'C';
   char rspBuf[24];
   if (false) {}
   @BRANCH@
+  return true;
 }
 int main() {
   scCmd("SC", "21:50/3");

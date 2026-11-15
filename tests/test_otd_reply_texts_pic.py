@@ -53,6 +53,7 @@ PRE = r"""
 #include <cstdint>
 #include <cstring>
 #include <cstdlib>
+#include <cctype>   // TASK-1908: the SC= branch parses with isdigit()
 #define PSTR(s) (s)
 #define snprintf_P snprintf
 #define siscanf sscanf

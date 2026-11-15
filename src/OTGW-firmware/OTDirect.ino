@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTDirect.ino
-**  Version  : v2.0.0-beta.317
+**  Version  : v2.0.0-beta.319
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -4065,16 +4065,36 @@ bool handleOTDirectCommand(const char* buf, int len, bool satOwn) {
   }
   // SC=HH:MM/DOW — Time sync (MsgID 20 = day/time, ~61s expiry per PIC CommandExpiry)
   else if (cmd0 == 'S' && cmd1 == 'C') {
-    int hh = 0, mm = 0, dow = 0;
-    if (siscanf(value, "%d:%d/%d", &hh, &mm, &dow) >= 2) {
-      // TASK-1840: stored for the thermostat's MsgID 20 only, never written to the boiler
-      otSCClockData = (uint16_t)(((dow & 0x07) << 5 | (hh & 0x1F)) << 8) | (mm & 0x3F);
-      otSCLastCommandMs = millis();
-      if (otSCLastCommandMs == 0) otSCLastCommandMs = 1;  // 0 sentinel reserved
-      // TASK-1849: two-digit hours like the PIC (PrintDecimal, gateway.asm 6.8:4374-4388): "SC: 09:05/3"
-      snprintf_P(rspBuf, sizeof(rspBuf), PSTR("%02d:%02d/%d"), hh & 0x1F, mm & 0x3F, dow & 0x07);
-      synthesizeResponse(buf, rspBuf);
+    // TASK-1908: parsed as the PIC SetClock (gateway.asm 6.8:4331-4370): the hours by GetDecimalArg (:5044-5069: no
+    // digit first SE, above 255 OR), above 23 OR; then ':' or SE; the minutes by GetDecimal (any error SE), above 59
+    // OR; then '/' or SE; the day of the week one character '1'-'7' (else BV, also for nothing after the '/');
+    // anything after it SE. A refused value stores nothing.
+    const char* p = value;
+    unsigned hh = 0, mm = 0;
+    if (!isdigit((unsigned char)*p)) { otDirectBridgeProcessStatus("SE"); return false; }
+    while (isdigit((unsigned char)*p)) {
+      hh = hh * 10 + (unsigned)(*p++ - '0');
+      if (hh > 255) { otDirectBridgeProcessStatus("OR"); return false; }
     }
+    if (hh > 23) { otDirectBridgeProcessStatus("OR"); return false; }
+    if (*p++ != ':') { otDirectBridgeProcessStatus("SE"); return false; }
+    if (!isdigit((unsigned char)*p)) { otDirectBridgeProcessStatus("SE"); return false; }
+    while (isdigit((unsigned char)*p)) {
+      mm = mm * 10 + (unsigned)(*p++ - '0');
+      if (mm > 255) { otDirectBridgeProcessStatus("SE"); return false; }
+    }
+    if (mm > 59) { otDirectBridgeProcessStatus("OR"); return false; }
+    if (*p++ != '/') { otDirectBridgeProcessStatus("SE"); return false; }
+    if (*p < '1' || *p > '7') { otDirectBridgeProcessStatus("BV"); return false; }
+    const unsigned dow = (unsigned)(*p++ - '0');
+    if (*p) { otDirectBridgeProcessStatus("SE"); return false; }
+    // TASK-1840: stored for the thermostat's MsgID 20 only, never written to the boiler
+    otSCClockData = (uint16_t)((dow << 5 | hh) << 8) | mm;
+    otSCLastCommandMs = millis();
+    if (otSCLastCommandMs == 0) otSCLastCommandMs = 1;  // 0 sentinel reserved
+    // TASK-1849: two-digit hours like the PIC (PrintDecimal, gateway.asm 6.8:4374-4388): "SC: 09:05/3"
+    snprintf_P(rspBuf, sizeof(rspBuf), PSTR("%02u:%02u/%u"), hh, mm, dow);
+    synthesizeResponse(buf, rspBuf);
   }
 
   // =====================================================================

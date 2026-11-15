@@ -249,6 +249,7 @@ Op OT-Direct leest de firmware de getallen in deze commando's zoals PIC-firmware
 - Zolang een `MW=`-, `MH=`-, `M2=`- of `HW=P`-schrijfactie wacht, behandelt de gateway de eigen MsgID 99 van de thermostaat zoals de PIC (zijn READ wordt de WRITE van de gateway) (TASK-1906).
 - `TT=` beantwoordt de MsgID 100-read van de thermostaat met `0x03` en `TC=` met `0x01`; `OH=1`, sinds TASK-1961 de standaard net als op de PIC, zet dat ook in de high byte. Elk OT-Direct-board gaat bij de eerste boot met deze versie één keer naar `OH=1` (marker `OTDohpicdefault` in `settings.ini`); een `OH=0` daarna blijft staan.
 - Master mode: `TT=0` zet een `BS=`- of MQTT-`room_setpoint`-waarde terug op MsgID 16 (TASK-1751).
+- `SC=` neemt precies `UU:MM/D`: uren boven 23 en minuten boven 59 zijn `OR`, een ontbrekende `:` of `/` of iets na de dag is `SE`, een dag buiten 1-7 is `BV`; een geweigerde waarde verandert niets (TASK-1908).
 
 Alias: `POST /api/v2/otgw/command` (achterwaartse compatibiliteit)
 
