@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.ino
-**  Version  : v2.0.0-beta.293
+**  Version  : v2.0.0-beta.294
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -265,6 +265,7 @@ void setup() {
   captureWifiDeadRestarts();  // TASK-1450: same rule, the dead-link restart count
   captureWifiSkipPortal();    // TASK-1455: one-boot skip-portal mark of a WiFi supervisor restart
   (void)*(volatile uint8_t *)g_rtcSafebootGuard;   // TASK-1918: one reference keeps the guard through --gc-sections
+  platformMarkLoopTask();  // TASK-1761: setup() runs on the loop task (before WiFi starts async_tcp); off-loop OT-Direct commands go via a ring
   bootHeapPhase(PSTR("setup-early"));  // TASK-1339 diagnostics: windowed heap minimum over the boot path
   // TASK-1763 (b): GPIO ISR service now, before startWiFi() and before the first attachInterrupt()
   // (initOTDirect -> OpenTherm::begin): the install runs on the ipc1 stack (platform_esp32.h).

@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTDirect.ino
-**  Version  : v2.0.0-beta.293
+**  Version  : v2.0.0-beta.294
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -2526,6 +2526,8 @@ void loopOTDirect() {
     OTDirectMode wanted = otdModeFromSetting(settings.otd.iMode);
     if (wanted != otCurrentMode) applyOTDirectMode(wanted);
   }
+  // TASK-1761: commands from other tasks, in order, between frames.
+  if (!otMasterRequestActive) otdCmdTextDrain();
 
   // Process OpenTherm library state machines (drives ISR-based TX/RX)
   otMaster.process();
@@ -3364,6 +3366,72 @@ static void otdPicPrintF88(uint16_t f88, char* buf, size_t len) {
   snprintf_P(buf, len, PSTR("%s%u.%02u"), neg ? "-" : "", hi, hund);
 }
 // --- otdPicFloat end
+
+// TASK-1761: every OT-Direct state change runs on the loop task. A command from another task (the REST and
+// settings handlers run on async_tcp) is copied into this ring in arrival order and run by otdCmdTextDrain():
+// from loopOTDirect() between frames (no master request in flight, like the TASK-1702 pending mode), and by
+// addCommandToQueue()/sendPICSerial() on the loop task before their own command, so a loop-task command never
+// overtakes an older queued one (otdCmdTextMustWait() makes it queue too while a request is in flight).
+// 8 slots, one kept free to tell full from empty: 7 commands. Several producers: the portMUX guards head and
+// tail; one consumer, the loop task.
+// --- otdCmdTextRing begin
+struct OtdCmdText { uint8_t len; bool satOwn; char text[PIC_CMD_MAX_LEN + 1]; };
+static constexpr uint8_t OTD_CMD_TEXT_SLOTS = 8;
+static OtdCmdText otdCmdText[OTD_CMD_TEXT_SLOTS];
+static uint8_t otdCmdTextHead = 0;   // next slot to write
+static uint8_t otdCmdTextTail = 0;   // next slot to read
+static uint32_t otdCmdTextDropped = 0;
+static portMUX_TYPE otdCmdTextMux = portMUX_INITIALIZER_UNLOCKED;
+
+bool otdCmdTextPush(const char* buf, int len, bool satOwn) {
+  if (buf == nullptr || len <= 0 || len > PIC_CMD_MAX_LEN) return false;
+  bool ok = false;
+  portENTER_CRITICAL(&otdCmdTextMux);
+  const uint8_t next = (uint8_t)((otdCmdTextHead + 1) % OTD_CMD_TEXT_SLOTS);
+  if (next != otdCmdTextTail) {
+    OtdCmdText& e = otdCmdText[otdCmdTextHead];
+    memcpy(e.text, buf, (size_t)len);
+    e.text[len] = '\0';
+    e.len = (uint8_t)len;
+    e.satOwn = satOwn;
+    otdCmdTextHead = next;
+    ok = true;
+  } else {
+    otdCmdTextDropped++;
+  }
+  portEXIT_CRITICAL(&otdCmdTextMux);
+  return ok;
+}
+
+// The pop lives inside the drain: a function with an OtdCmdText parameter would get an Arduino-generated prototype
+// above the struct (test_ino_prototype_hoisting).
+void otdCmdTextDrain() {
+  OtdCmdText c;
+  for (;;) {
+    bool ok = false;
+    portENTER_CRITICAL(&otdCmdTextMux);
+    if (otdCmdTextTail != otdCmdTextHead) {
+      c = otdCmdText[otdCmdTextTail];
+      otdCmdTextTail = (uint8_t)((otdCmdTextTail + 1) % OTD_CMD_TEXT_SLOTS);
+      ok = true;
+    }
+    portEXIT_CRITICAL(&otdCmdTextMux);
+    if (!ok) break;
+    handleOTDirectCommand(c.text, c.len, c.satOwn);   // outside the lock: the handler can take its own locks
+  }
+}
+
+// A queued command (a GW=R or GW= from REST) must not run while a master request is in flight: GW= calls
+// setOTDirectMode() at once, not through the TASK-1702 pending mode. So while commands wait and a request is in
+// flight, a loop-task command queues behind them too (the order stays; it answers Queued instead of Sent/Dropped,
+// as a command to the PIC does). Loop task only.
+bool otdCmdTextMustWait() {
+  portENTER_CRITICAL(&otdCmdTextMux);
+  const bool queued = otdCmdTextHead != otdCmdTextTail;
+  portEXIT_CRITICAL(&otdCmdTextMux);
+  return queued && otMasterRequestActive;
+}
+// --- otdCmdTextRing end
 
 // ---------------------------------------------------------------------------
 // handleOTDirectCommand — translate PIC-style commands to OT frames

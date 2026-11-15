@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : MQTTstuff
-**  Version  : v2.0.0-beta.293
+**  Version  : v2.0.0-beta.294
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **      Modified version from (c) 2020 Willem Aandewiel
@@ -1008,7 +1008,9 @@ static void handleMQTTcallback(char* topic, byte* payload, unsigned int length, 
               DebugTf(PSTR("MQTT raw command dropped: payload too long (%d >= %u)\r\n"), n, (unsigned)sizeof(otgwcmd));
             } else {
               MQTTDebugf(PSTR(" found command, sending payload [%s]\r\n"), otgwcmd);
-              addCommandToQueue(otgwcmd, strlen(otgwcmd), true);
+              if (addCommandToQueue(otgwcmd, strlen(otgwcmd), true) == CmdQueueResult::Dropped) {   // TASK-1761: no reply topic, so log it
+                DebugTf(PSTR("MQTT command [%s] dropped (refused or queue full)\r\n"), otgwcmd);
+              }
             }
           } else if (pOtType == s_reset) {
             // TASK-669 (port of dev TASK-661): payload validation + rate-limit.
@@ -1046,7 +1048,9 @@ static void handleMQTTcallback(char* topic, byte* payload, unsigned int length, 
               DebugTf(PSTR("MQTT command [%s] dropped: composed command too long (%d >= %u)\r\n"), cmdBuf, n, (unsigned)sizeof(otgwcmd));
             } else {
               MQTTDebugf(PSTR(" found command, sending payload [%s]\r\n"), otgwcmd);
-              addCommandToQueue(otgwcmd, strlen(otgwcmd), true);
+              if (addCommandToQueue(otgwcmd, strlen(otgwcmd), true) == CmdQueueResult::Dropped) {   // TASK-1761: no reply topic, so log it
+                DebugTf(PSTR("MQTT command [%s] dropped (refused or queue full)\r\n"), otgwcmd);
+              }
             }
           }
         } else {

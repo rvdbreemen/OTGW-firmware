@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-beta.293
+**  Version  : v2.0.0-beta.294
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -368,7 +368,11 @@ static void handleCommandSubmit(const char* cmdStr) {
     sendApiError(413, F("Command too long"));
     return;
   }
-  addCommandToQueue(cmdStr, static_cast<int>(cmdLen));
+  // TASK-1761: a full queue (PIC) or a full OT-Direct text ring is Dropped: say so instead of 202.
+  if (addCommandToQueue(cmdStr, static_cast<int>(cmdLen)) == CmdQueueResult::Dropped) {
+    sendApiError(503, F("Command not queued (queue full)"));
+    return;
+  }
   sendCorsOriginHeader();
   webSend(202, F("application/json"), F("{\"status\":\"queued\"}"));
 }
@@ -538,13 +542,15 @@ static void handleOTDirect(const char words[][API_WORD_LEN], uint8_t wc, HTTPMet
     if (!hasArgCompat("mode")) { sendApiError(400, F("Missing 'mode' parameter")); return; }
     String modeStr = argCompat("mode");
     // TASK-438: GW=0 is now monitor (PIC parity); bypass moved to GW=P alias.
-    if (modeStr == F("gateway"))       addCommandToQueue("GW=1", 4, true);
-    else if (modeStr == F("monitor"))  addCommandToQueue("GW=0", 4, true);
-    else if (modeStr == F("bypass"))   addCommandToQueue("GW=P", 4, true);
-    else if (modeStr == F("master"))   addCommandToQueue("GW=S", 4, true);
-    else if (modeStr == F("loopback")) addCommandToQueue("GW=L", 4, true);
+    const char* gw = nullptr;
+    if (modeStr == F("gateway"))       gw = "GW=1";
+    else if (modeStr == F("monitor"))  gw = "GW=0";
+    else if (modeStr == F("bypass"))   gw = "GW=P";
+    else if (modeStr == F("master"))   gw = "GW=S";
+    else if (modeStr == F("loopback")) gw = "GW=L";
     else { sendApiError(400, F("Invalid mode. Use: gateway, monitor, bypass, master, loopback")); return; }
-    // Return current status (mode will be updated by the time response renders)
+    if (addCommandToQueue(gw, 4, true) == CmdQueueResult::Dropped) { sendApiError(503, F("Command not queued (queue full)")); return; }
+    // TASK-1761: the switch runs on the loop task at its next pass, so this status can still show the old mode.
     sendOTDirectStatus();
   }
   // GET /api/v2/otdirect/settings — read OTD settings
@@ -631,8 +637,10 @@ static void handleOTDirect(const char words[][API_WORD_LEN], uint8_t wc, HTTPMet
       } else {
         sendApiError(400, F("Invalid action. Use: sr, cr, rm, cm, ui, ki")); return;
       }
-      addCommandToQueue(cmdBuf, strlen(cmdBuf), true);
-      // Return updated override list
+      if (addCommandToQueue(cmdBuf, strlen(cmdBuf), true) == CmdQueueResult::Dropped) {   // TASK-1761
+        sendApiError(503, F("Command not queued (queue full)")); return;
+      }
+      // Return the override list (TASK-1761: the command runs at the next loop pass, so it may not show yet)
       sendCorsOriginHeader();
       sendOTDirectOverridesJSON();
     } else {

@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v2.0.0-beta.293
+**  Version  : v2.0.0-beta.294
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -113,6 +113,9 @@ void otdModeSettingChanged();   // TASK-1702: settings path, applied by loopOTDi
 void otdModeSettingCancel();
 void handleOTDirectBridgeStream();
 bool handleOTDirectCommand(const char* buf, int len, bool satOwn = false);   // satOwn: TASK-1575, see addCommandToQueue; false = refused (TASK-1593)
+bool otdCmdTextPush(const char* buf, int len, bool satOwn);   // TASK-1761: a command from another task, run on the loop task
+void otdCmdTextDrain();                                        // TASK-1761: run the queued commands, in order (loop task)
+bool otdCmdTextMustWait();                                     // TASK-1761: queued commands wait for the frame in flight
 void sendOTDirectOverridesJSON();
 bool sendPICSerial(const char* buf, int len);
 bool otDirectBoilerPresent();  // TASK-795 §4.2: real boiler answered MsgID 3 (excludes loopback)

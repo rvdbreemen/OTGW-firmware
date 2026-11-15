@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v2.0.0-beta.293
+**  Version  : v2.0.0-beta.294
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -3917,6 +3917,15 @@ CmdQueueResult addCommandToQueue(const char* buf, const int len, const bool forc
 #if HAS_DIRECT_OT
     // On OTGW32, route commands directly to OT-direct handler
     if (isOTDirectEnabled()) {
+      // TASK-1761: from another task (REST, settings: async_tcp) the command waits in the OT-Direct text ring and runs
+      // on the loop task, in order; a full ring is Dropped. On the loop task the older queued commands run first, and
+      // while they must wait for a frame in flight, this one queues behind them.
+      if (!platformOnLoopTask() || otdCmdTextMustWait()) {
+        if (otdCmdTextPush(buf, len, satOwn)) return CmdQueueResult::Queued;
+        OTDebugTf(PSTR("CmdQueue: OT-Direct command [%.*s] dropped, text ring full\r\n"), len, buf);
+        return CmdQueueResult::Dropped;
+      }
+      otdCmdTextDrain();
       // TASK-1593: a command the OT-Direct handler refused (ring full, validation error, SAT-owned CS=) is Dropped, not Sent,
       // so SAT does not cache it as delivered.
       return handleOTDirectCommand(buf, len, satOwn) ? CmdQueueResult::Sent : CmdQueueResult::Dropped;
@@ -4452,8 +4461,15 @@ bool sendPICSerial(const char* buf, int len)
 {
   if (!isPICEnabled()) {
 #if HAS_DIRECT_OT
-    // On OTGW32, route commands through OT-direct command handler
-    handleOTDirectCommand(buf, len);
+    // On OTGW32, route commands through OT-direct command handler (TASK-1761: on the loop task, in order)
+    if (!platformOnLoopTask() || otdCmdTextMustWait()) {
+      if (!otdCmdTextPush(buf, len, false)) {
+        OTDebugTf(PSTR("sendPICSerial: OT-Direct command [%.*s] dropped, text ring full\r\n"), len, buf);
+      }
+    } else {
+      otdCmdTextDrain();
+      handleOTDirectCommand(buf, len);
+    }
 #else
     OTDebugTln(F("sendPICSerial: No PIC detected - command ignored"));
 #endif

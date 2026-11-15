@@ -196,9 +196,11 @@ class RequestedVsTransmitted(unittest.TestCase):
     # ---- MM travels in MsgID 14 --------------------------------------------------------------------------------------------------
     def test_mm_unit_on_ot_direct_is_percent_as_f8_8_and_mm_t_clears_the_override(self):
         od = (FW / "OTDirect.ino").read_text(encoding="utf-8").replace("\r\n", "\n")
-        seg = od[od.index("cmd0 == 'M' && cmd1 == 'M'"):][:700]
-        self.assertIn("floatToF88(atof(value))", seg)
-        self.assertIn("enqueueWriteCommand(14, f88", seg)
+        seg = od[od.index("cmd0 == 'M' && cmd1 == 'M'"):][:1500]
+        # TASK-1799: the percentage is the high byte of the f8.8 value (PIC SetMaxModLevel); a value that is not a
+        # number (MM=T) clears the override.
+        self.assertRegex(seg, r"floatToF88\(atof\(value\)\)|\(uint16_t\)\(mm << 8\)")
+        self.assertRegex(seg, r"enqueueWriteCommand\(14, (?:f88|\(uint16_t\)\(mm << 8\))")
         self.assertIn("clearWriteOverride(14)", seg)
 
 

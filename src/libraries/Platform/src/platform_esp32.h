@@ -320,6 +320,16 @@ inline void platformIgnoreDhcpNtp() {
   }
 }
 
+// TASK-1761: which FreeRTOS task runs the Arduino loop. setup() runs on that task and marks it; before the mark
+// only that task runs, so an unmarked handle counts as the loop task. The handle lives in a function-local static
+// of an inline function, so every translation unit shares one copy.
+inline TaskHandle_t& platformLoopTaskRef() { static TaskHandle_t h = nullptr; return h; }
+inline void platformMarkLoopTask() { platformLoopTaskRef() = xTaskGetCurrentTaskHandle(); }
+inline bool platformOnLoopTask() {
+  const TaskHandle_t h = platformLoopTaskRef();
+  return h == nullptr || h == xTaskGetCurrentTaskHandle();
+}
+
 // Heap information
 inline uint32_t platformFreeHeap() {
   return ESP.getFreeHeap();
