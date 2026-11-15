@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTDirect.ino
-**  Version  : v2.0.0-beta.334
+**  Version  : v2.0.0-beta.335
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -2028,6 +2028,9 @@ static uint32_t otdPmOnAnswer(uint8_t id, uint8_t type, uint16_t data) {
 // ---------------------------------------------------------------------------
 static void otdRetNoteReply(OTDirectRequestOrigin origin, unsigned long request, unsigned long response,
                             uint32_t now);   // TASK-1759, otdRetSlot block below
+static void otdZapInvalid(uint8_t msgId);   // TASK-1804 A2, defined after otdPersistFloat()
+
+
 static void handleMasterResponse() {
   unsigned long response = otMaster.getLastResponse();
   OpenThermResponseStatus status = otMaster.getLastResponseStatus();
@@ -2081,6 +2084,7 @@ static void handleMasterResponse() {
     OpenThermMessageType respType = OpenTherm::getMessageType(response);
     uint8_t respMsgId = (response >> 16) & 0xFF;
     otdNoteBoilerAnswer(respMsgId, respType == OpenThermMessageType::UNKNOWN_DATA_ID);
+    if (respType == OpenThermMessageType::UNKNOWN_DATA_ID) otdZapInvalid(respMsgId);   // TASK-1804 A2
 
     // TASK-1845: the DHW push follows the boiler's answers, as the PIC (MessageID99, statusreturn).
     if (respMsgId == 99) otdPushOnBoiler99((uint8_t)respType, (uint16_t)(response & 0xFFFF));
@@ -2100,6 +2104,7 @@ static void handleMasterResponse() {
     // resets the count on any other (HandleResponse / MsgSupported, gateway.asm 6.8 :2440-2455), so Unknown, Unknown,
     // Data-Invalid, Unknown does not blacklist the ID there either.
     otdNoteBoilerAnswer((response >> 16) & 0xFF, false);
+    otdZapInvalid((uint8_t)((response >> 16) & 0xFF));   // TASK-1804 A2
     // TASK-1907: the PIC handles a Data-Invalid answer to MsgID 99 as Unknown-DataID (MessageID99: the Data-Invalid
     // entry is a nop that falls into ID99Unknown, gateway.asm:3227-3230), so a pending HW=P push is spoofed.
     if (((response >> 16) & 0xFF) == 99) otdPushOnBoiler99(6 /* DATA_INVALID */, (uint16_t)(response & 0xFFFF));
@@ -3803,6 +3808,27 @@ static void otdPersistUnknownIds() {
   }
 }
 // --- otdPersist end
+
+// --- otdZapInvalid begin
+// TASK-1804 A2 (Q-1804a = A, decided 2026-11-15 under Robert's directive, docs/sat/open-questions.md): a boiler that answers
+// Data-Invalid or Unknown-DataID to the gateway's control setpoint or DHW setpoint drops that value, as the PIC: for MsgID 1
+// ctrlsetptreturn sets SysCtrlSetpoint, so the thermostat's own setpoint goes to the boiler again (gateway.asm 6.6
+// :2822-2825); for MsgID 56 InvalidHotWater clears dhwsetpoint1/2 and the stored value (:3141-3147). SAT sends CS= and
+// SW= again on its next send (ADR-235). SH= (MsgID 57) stays as it is (entry 252).
+static void otdZapInvalid(uint8_t msgId) {
+  if (msgId == 1 && otdCsOverrideActive()) {
+    clearWriteOverride(1);
+    otCSLastCommandMs = 0;
+    OTDDebugTln(F("OTD: boiler refused CS, control setpoint override dropped"));
+  } else if (msgId == 56 && otdDhwSetF88 != 0) {
+    otdDhwSetF88 = 0;
+    otdInitSW = false;
+    clearWriteOverride(56);
+    otdPersistFloat(settings.otd.fDhwSetpoint, 0.0f);
+    OTDDebugTln(F("OTD: boiler refused SW, DHW setpoint dropped"));
+  }
+}
+// --- otdZapInvalid end
 
 // TASK-1836: apply the stored command state at boot, as the PIC does after a reset. SW/SH are
 // re-sent to the boiler (gateway.asm:1218-1229) through the same write path as the commands;

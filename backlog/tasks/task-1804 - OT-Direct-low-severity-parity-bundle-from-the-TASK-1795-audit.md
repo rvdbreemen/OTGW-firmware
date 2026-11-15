@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-11T06:41:00Z'
-updated_date: '2026-11-15T21:12:00Z'
+updated_date: '2026-11-15T22:12:00Z'
 labels:
   - otdirect
   - review-2026-11-11
@@ -63,4 +63,6 @@ PIC 6.8 parity audit 2026-11-12 (docs/reviews/2026-11-12_pic68-otdirect-parity-a
 2026-11-15 commits A+B pushed as beta.324 (origin/dev 37af3e82b..626b6b179). Open for AC1: A2 (Q-1804a), A6, B2, B3e, B3a, Bug 8 + the OT-Direct part of Bug 7.
 
 Q-1804a (item A2) decided 2026-11-15 by the coordinator under Robert's directive (CLI) 'Do not wait for Sergeant D. Finish everything that can be finished.'; Sergeant D may overrule, his answer later becomes a follow-up task; asked in the 18-question batch in #dev-sat-mqtt (item 17, https://discord.com/channels/812969634638725140/1105556725714649128/1571633470696980583): option A, like the PIC: a Data-Invalid/Unknown-DataID answer to SAT's CS (MsgID 1) or SW (MsgID 56) clears them on OT-Direct; SAT sets them again on its next send (~30 s, ADR-235). PIC source gateway.asm 6.6 :2822-2825, :3141-3147. SH= stays per entry 252. Unblocked for d3.
+
+2026-11-15 A2 implemented on Q-1804a = A (decided 2026-11-15 by the coordinator under Robert's directive 'Do not wait for Sergeant D. Finish everything that can be finished.', recorded by 92 in docs/sat/open-questions.md, Q-1804a row; Sergeant D may overrule, then a follow-up task). PIC opened in this session: gateway.asm 6.6 ctrlsetptreturn :2822-2825 (Data-Invalid response to MsgID 1 sets SysCtrlSetpoint; byte1 bit 5 = Data-Invalid and Unknown-DataID) and InvalidHotWater :3141-3147 (clears dhwsetpoint1/2 and the stored value, nothing when none is set). OTDirect.ino: new block otdZapInvalid (markers), called from handleMasterResponse() for an Unknown-DataID answer and in the Data-Invalid branch: MsgID 1 with a CS override -> clearWriteOverride(1), otCSLastCommandMs = 0; MsgID 56 with a SW value -> otdDhwSetF88 = 0, otdInitSW = false, clearWriteOverride(56), stored fDhwSetpoint 0 (as SW=0). SH= unchanged (entry 252). tests/test_otd_zap_invalid.py: 6 cases on the real block + both call sites; on the code before (origin a2bfce174) the block and the calls do not exist (red: setUpModule fails, no zap path). Harness stubs for the forward declaration: test/host/test_override_reply.cpp, tests/test_otd_gateway_alt_slots.py. Gates: test_otd_* 62 files green, bridge25238 + core_error_lines + sat_no_return_startup green, override_reply 41/41, evaluate 87/0. Bench: needs a boiler that answers Data-Invalid (not on .61); a host-only item unless the sim can force it.
 <!-- SECTION:NOTES:END -->

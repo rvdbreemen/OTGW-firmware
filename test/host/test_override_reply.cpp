@@ -237,6 +237,10 @@ static void updateOTDirectStatus() {}
 static void checkThermostatTimeout() {}
 static void loopFlameRatio() {}
 static void clearWriteOverride(uint8_t) {}
+// TASK-1804 A2: handleMasterResponse() calls otdZapInvalid(), defined further down OTDirect.ino (not in this slice);
+// its behaviour is tested on the real block in tests/test_otd_zap_invalid.py. Here it is a no-op like
+// clearWriteOverride(), so these cases keep testing the reply path only.
+static void otdZapInvalid(uint8_t) {}
 #ifdef OTD_OLD_CONTROLLER
 static void loopPiCtrl() {}
 static void loopCHHysteresis() {}
