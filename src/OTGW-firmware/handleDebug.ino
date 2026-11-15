@@ -125,7 +125,6 @@ static void dumpDebugInfo() {
     Debugf(PSTR("mode: %u\r\n"), (unsigned)settings.otd.iMode);
     Debugf(PSTR("auto_detect: %s\r\n"), settings.otd.bAutoDetect ? "true" : "false");
     Debugf(PSTR("setback_temp: %.1f\r\n"), settings.otd.fSetbackTemp);
-    Debugf(PSTR("setback_timeout: %u\r\n"), (unsigned)settings.otd.iSetbackTimeout);
     Debugf(PSTR("enable_slave: %s\r\n"), settings.otd.bEnableSlave ? "true" : "false");
     Debugf(PSTR("summer_mode: %s\r\n"), settings.otd.bSummerMode ? "true" : "false");
     Debugf(PSTR("fail_safe: %s\r\n"), settings.otd.bFailSafe ? "true" : "false");
@@ -277,7 +276,6 @@ static void dumpDebugInfo() {
     Debugf(PSTR("mode: %d\r\n"), (int)state.otd.eMode);
     Debugf(PSTR("master_mode: %s\r\n"), state.otd.bMasterMode ? "true" : "false");
     Debugf(PSTR("thermostat_connected: %s\r\n"), state.otd.bThermostatConnected ? "true" : "false");
-    Debugf(PSTR("setback_active: %s\r\n"), state.otd.bSetbackActive ? "true" : "false");
     Debugf(PSTR("override_mode: %d\r\n"), (int)state.otd.eOverrideMode);
     Debugf(PSTR("override_f88: %u\r\n"), (unsigned)state.otd.iOverrideF88);
 #endif

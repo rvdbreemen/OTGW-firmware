@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTDirecttypes.h
-**  Version  : v2.0.0-beta.308
+**  Version  : v2.0.0-beta.309
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -95,7 +95,6 @@ struct OTDirectSection {       // state.otd — OT-direct (OTGW32) runtime statu
   OTDirectMode eMode         = OTD_MODE_GATEWAY; // current operating mode
   bool     bMasterMode       = false;    // true = standalone master, no thermostat
   bool     bThermostatConnected = false; // thermostat recently seen (within timeout)
-  bool     bSetbackActive    = false;    // thermostat disconnected → setback override engaged
   uint32_t iLastThermostatMs = 0;        // millis() of last thermostat frame received
   // TASK-466: PIC-style TT=/TC= remote-override mode (none/temporary/constant)
   OTRemoteOverrideMode eOverrideMode = OT_OVERRIDE_NONE;
@@ -109,11 +108,10 @@ struct OTDirectSection {       // state.otd — OT-direct (OTGW32) runtime statu
 struct OTDirectSettingsSection {
   uint8_t  iMode              = 1;     // OTD_MODE_GATEWAY default, persisted across reboot
   bool     bAutoDetect        = true;  // Auto-detect thermostat presence at boot
-  float    fSetbackTemp       = 16.0f; // Setback temp on thermostat disconnect (°C)
-  uint8_t  iSetbackTimeout    = 30;    // Seconds before thermostat considered disconnected
+  float    fSetbackTemp       = 16.0f; // SB= setback temperature, stored and printed (PR=S) like the PIC; no effect on OT-Direct
   bool     bEnableSlave       = true;  // Enable slave interface in master mode
   bool     bSummerMode        = false; // SM= summer mode (bit5 of master status)
-  bool     bFailSafe          = true;  // FS= fail-safe setback on thermostat disconnect
+  bool     bFailSafe          = true;  // FS= stored and answered like the PIC; no effect on OT-Direct (TASK-1950)
   uint16_t iMsgInterval       = 100;   // MI= minimum inter-message gap (ms, 100-1275)
   bool     bHasBypassRelay    = false; // Persisted: bypass relay fitted on this board (user-declared, TASK-933 P2)
   // --- TASK-584: ventilation override persistence ---

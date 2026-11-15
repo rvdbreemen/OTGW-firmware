@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTDirect.ino
-**  Version  : v2.0.0-beta.308
+**  Version  : v2.0.0-beta.309
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -121,10 +121,9 @@ static inline void setOTParityBit(unsigned long &frame) {
   if (p & 1) frame |= 0x80000000UL;
 }
 
-// Thermostat connectivity tracking — detect disconnect and apply setback
+// Thermostat connectivity tracking — detect disconnect (checkThermostatTimeout)
 static bool     otThermostatSeen    = false;   // at least one frame received since boot
 static uint32_t otLastThermostatMs  = 0;       // millis() of last thermostat frame
-static bool     otSetbackEngaged    = false;    // setback override currently active
 
 // Phase 1: Additional master status flags (moved here: used before original definition)
 static bool otSummerMode       = false;     // SM= summer mode (bit5 of MsgID 0 master status)
@@ -138,7 +137,8 @@ static uint32_t otLastAnySendMs  = 0;       // timestamp of last frame sent
 static constexpr uint32_t OTD_MWT_MS = 100;
 static uint32_t otdLastConvEndMs = 0;
 
-// Phase 5: Fail safety — FS= controls setback on thermostat disconnect
+// FS= stored and answered like the PIC (gateway.asm 6.6 SetFailSafety :5252-5259: the PIC's fail-safe start in
+// monitor mode after a watchdog reset); it has no effect on OT-Direct (TASK-1950)
 static bool otFailSafeEnabled    = true;    // default: enabled
 
 // TASK-1845: manual DHW push (HW=P) as the PIC 6.8 (gateway.asm: StartDHWPush/PushOperModes 3270-3288, MessageID99
@@ -3207,11 +3207,6 @@ static void resetTransientState() {
   state.otd.iOverrideF88               = 0;
   // Clear response modifiers
   clearAllResponseModifiers();
-  // Clear setback state
-  if (otSetbackEngaged) {
-    otSetbackEngaged = false;
-    state.otd.bSetbackActive = false;
-  }
   // BS= fake room setpoint — clear on reset
   otFakeRoomSetpoint = 0.0f;
   otdRoom16CacheSet = false;   // TASK-1751
@@ -3326,7 +3321,7 @@ static void checkThermostatTimeout() {
     processOT(buf, (int)n);
   };
   // TASK-1802 bug 9 (Robert 2026-11-15: A): the thermostat counts as lost after about 3 s without a frame, so the
-  // boiler gets the gateway's own frames within seconds; before, iSetbackTimeout (default 30 s) left it without frames
+  // boiler gets the gateway's own frames within seconds; the old 30 s setback-timeout setting left it without frames
   // that long. A thermostat sends at least every 1.15 s (spec v4.2 :1101), so 3 s is two to three missed frames. The PIC
   // sees the open line within tens of ms (gateway.asm 6.6 CheckThermostat :1728-1816); OT-Direct has no line sense.
   static constexpr uint32_t timeoutMs = 3000;
@@ -4690,7 +4685,7 @@ bool handleOTDirectCommand(const char* buf, int len, bool satOwn) {
     snprintf_P(rspBuf, sizeof(rspBuf), PSTR("%u"), val);
     synthesizeResponse(buf, rspBuf);
   }
-  // FS=0/1 — Fail safety (controls setback on thermostat disconnect)
+  // FS=0/1 — Fail safety: stored and answered like the PIC, no effect on OT-Direct (TASK-1950)
   else if (cmd0 == 'F' && cmd1 == 'S') {
     if (!checkBoolean(value)) { otDirectBridgeProcessStatus("BV"); return false; }
     otFailSafeEnabled = (value[0] == '1');

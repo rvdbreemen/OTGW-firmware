@@ -368,7 +368,7 @@ The OTDirect module operates as a cooperative OpenTherm stack layered on the pro
 - **Purpose**: Detect thermostat disconnect and reconnect (called once per second)
 - **Behavior**:
   - If no thermostat frame was ever seen: prints the PIC line "Thermostat disconnected" once (TASK-1850) and returns
-  - Counts the thermostat as lost after 3 s without a frame (a fixed `timeoutMs`, TASK-1802 bug 9; `settings.otd.iSetbackTimeout` is no longer read)
+  - Counts the thermostat as lost after 3 s without a frame (a fixed `timeoutMs`, TASK-1802 bug 9; the setting it replaced was removed by TASK-1950)
   - On loss: sets `state.otd.bThermostatConnected = false`, forgets the thermostat's writes, prints "Thermostat disconnected"; there is no setback (TASK-1806): the gateway's own frames carry CH off unless a CS= is in force
   - On return: sets `bThermostatConnected = true` and prints "Thermostat connected"
 

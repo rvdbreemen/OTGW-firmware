@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : settingsStuff
-**  Version  : v2.0.0-beta.308
+**  Version  : v2.0.0-beta.309
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -478,7 +478,6 @@ bool writeSettings(bool show)
   writeJsonIntKV(file, F("OTDmode"), settings.otd.iMode);
   writeJsonBoolKV(file, F("OTDautodetect"), settings.otd.bAutoDetect);
   writeJsonFloatKV(file, F("OTDsetbacktemp"), settings.otd.fSetbackTemp);
-  writeJsonIntKV(file, F("OTDsetbacktimeout"), settings.otd.iSetbackTimeout);
   writeJsonBoolKV(file, F("OTDenableslave"), settings.otd.bEnableSlave);
   writeJsonBoolKV(file, F("OTDsummermode"), settings.otd.bSummerMode);
   writeJsonBoolKV(file, F("OTDfailsafe"), settings.otd.bFailSafe);
@@ -788,7 +787,6 @@ void readSettings(bool show)
     Debugf(PSTR("OTD Auto-detect       : %s\r\n"), CBOOLEAN(settings.otd.bAutoDetect));
     Debugf(PSTR("OTD Setback temp      : "));
     { char tb[8]; dtostrf(settings.otd.fSetbackTemp, 1, 1, tb); Debugf(PSTR("%s\r\n"), tb); }
-    Debugf(PSTR("OTD Setback timeout   : %d\r\n"), settings.otd.iSetbackTimeout);
     Debugf(PSTR("OTD Enable slave      : %s\r\n"), CBOOLEAN(settings.otd.bEnableSlave));
 #endif
   }
@@ -1347,7 +1345,6 @@ void updateSetting(const char *field, const char *newValue)
   }
   else if (strcasecmp_P(field, PSTR("OTDautodetect")) == 0)    settings.otd.bAutoDetect = EVALBOOLEAN(newValue);
   else if (strcasecmp_P(field, PSTR("OTDsetbacktemp")) == 0)    settings.otd.fSetbackTemp = clampSettingFloat(newValue, settings.otd.fSetbackTemp, 1.0f, 30.0f);
-  else if (strcasecmp_P(field, PSTR("OTDsetbacktimeout")) == 0) settings.otd.iSetbackTimeout = constrain(atoi(newValue), 5, 255);
   else if (strcasecmp_P(field, PSTR("OTDenableslave")) == 0)   settings.otd.bEnableSlave = EVALBOOLEAN(newValue);
   else if (strcasecmp_P(field, PSTR("OTDsummermode")) == 0)    settings.otd.bSummerMode = EVALBOOLEAN(newValue);
   else if (strcasecmp_P(field, PSTR("OTDfailsafe")) == 0)      settings.otd.bFailSafe = EVALBOOLEAN(newValue);

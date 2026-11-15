@@ -140,7 +140,6 @@ Note: the OT-bus presence values (`boiler_connected`, `thermostat_connected`) an
 | `otgw-otdirect/monitor_mode` | `"ON"` / `"OFF"` | Whether transparent pass-through mode is active |
 | `otgw-otdirect/master_mode` | `"ON"` / `"OFF"` | Whether OTGW32 is acting as sole OT master |
 | `otgw-otdirect/stepup` | `"ON"` / `"OFF"` | Whether the 24V step-up converter is active |
-| `otgw-otdirect/setback_active` | `"ON"` / `"OFF"` | Whether setback override is active (thermostat disconnected) |
 | `otgw-otdirect/schedule_active` | `"11"` | Number of OT polling schedule entries currently active |
 | `otgw-otdirect/schedule_disabled` | `"1"` | Number of schedule entries disabled because boiler returned UNKNOWN_DATA_ID |
 | `otgw-otdirect/overrides_active` | `"2"` | Number of active write-override slots, plus 1 while a `TT=`/`TC=` remote override is active |
@@ -909,7 +908,7 @@ The firmware subscribes to `{TopTopic}/set/{UniqueId}/#` and processes commands 
 | `timesync` | `"HH:MM/DOW"` | `SC=HH:MM/DOW` | Time/day sync (MsgID 20). DOW is day-of-week 1-7. No response synthesized. |
 | `printsummary` | `"0"` / `"1"` | `PS=0` / `PS=1` | Print summary mode. 1=suppress frame-by-frame output; emit periodic CSV summary. 0=resume normal output. |
 | `msginterval` | `"500"` | `MI=500` | Minimum OT message interval in ms (100-1275). OTGW32 only; persisted. Acknowledge value is in centiseconds (divide by 10). |
-| `failsafe` | `"0"` / `"1"` | `FS=0` / `FS=1` | Fail-safety on thermostat disconnect. 1=activate setback when thermostat is silent; 0=disable. Persisted. |
+| `failsafe` | `"0"` / `"1"` | `FS=0` / `FS=1` | Fail safety, stored and answered like the PIC (there: a monitor-mode start after a watchdog reset). Persisted. No effect on OT-Direct. |
 | `gpioa` | `"0"`-`"9"` | `GA=x` | GPIO-A function code. On OTGW32: stored locally and returned by PR=G query, but has no hardware effect. |
 | `gpiob` | `"0"`-`"9"` | `GB=x` | GPIO-B function code. On OTGW32: stored locally and returned by PR=G query, but has no hardware effect. |
 | `leda` | `"F"` | `LA=F` | LED A function code (B/C/E/F/H/M/O/P/R/T/W/X). Dedicated topic for `LA=`. |

@@ -432,7 +432,6 @@ struct OTDirectSettingsSection {
   uint8_t  iMode              = 1;             // OT Direct mode (0=bypass, 1=gateway, 2=monitor, 3=master, 4=loopback)
   bool     bAutoDetect        = true;          // Auto-detect thermostat at boot
   float    fSetbackTemp       = 16.0f;         // Setback temp on disconnect (°C)
-  uint8_t  iSetbackTimeout    = 30;            // Not used since TASK-1802 bug 9 (fixed 3 s); kept for settings compatibility
   bool     bEnableSlave       = true;          // Enable slave interface in master mode
   bool     bSummerMode        = false;         // SM= summer mode bit
   bool     bFailSafe          = true;          // FS= fail-safe setback

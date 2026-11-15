@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-beta.308
+**  Version  : v2.0.0-beta.309
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -564,7 +564,6 @@ static void handleOTDirect(const char words[][API_WORD_LEN], uint8_t wc, HTTPMet
         je.beginObject(F("otdirect_settings")); // "otdirect_settings":{
         je.field(F("mode"),            (int32_t)settings.otd.iMode);
         je.field(F("setback_temp"),    settings.otd.fSetbackTemp);
-        je.field(F("setback_timeout"), (int32_t)settings.otd.iSetbackTimeout);
         // TASK-584: ventilation override persistence
         je.field(F("vent_enable"),      settings.otd.bVentEnable);
         je.field(F("open_bypass"),      settings.otd.bOpenBypass);
@@ -577,7 +576,6 @@ static void handleOTDirect(const char words[][API_WORD_LEN], uint8_t wc, HTTPMet
       restFinalize();
     } else if (method == HTTP_POST || method == HTTP_PUT) {
       if (hasArgCompat("setbacktemp"))    updateSetting("OTDsetbacktemp", argCompat("setbacktemp"));
-      if (hasArgCompat("setbacktimeout")) updateSetting("OTDsetbacktimeout", argCompat("setbacktimeout"));
       // TASK-584: ventilation override persistence settings
       if (hasArgCompat("ventenable"))    updateSetting("OTDventenable", argCompat("ventenable"));
       if (hasArgCompat("openbypass"))    updateSetting("OTDopenbypass", argCompat("openbypass"));
@@ -2280,7 +2278,6 @@ static void handleDebugDump(const char words[][API_WORD_LEN], uint8_t wc, HTTPMe
     je.field(F("settings.otd.mode"), (uint32_t)settings.otd.iMode);
     je.field(F("settings.otd.auto_detect"), settings.otd.bAutoDetect);
     je.field(F("settings.otd.setback_temp"), settings.otd.fSetbackTemp);
-    je.field(F("settings.otd.setback_timeout"), (uint32_t)settings.otd.iSetbackTimeout);
     je.field(F("settings.otd.enable_slave"), settings.otd.bEnableSlave);
     je.field(F("settings.otd.summer_mode"), settings.otd.bSummerMode);
     je.field(F("settings.otd.fail_safe"), settings.otd.bFailSafe);
@@ -2397,7 +2394,6 @@ static void handleDebugDump(const char words[][API_WORD_LEN], uint8_t wc, HTTPMe
     je.field(F("state.otd.mode"), (int32_t)snap->st.otd.eMode);
     je.field(F("state.otd.master_mode"), snap->st.otd.bMasterMode);
     je.field(F("state.otd.thermostat_connected"), snap->st.otd.bThermostatConnected);
-    je.field(F("state.otd.setback_active"), snap->st.otd.bSetbackActive);
     je.field(F("state.otd.override_mode"), (int32_t)snap->st.otd.eOverrideMode);
     je.field(F("state.otd.override_f88"), (uint32_t)snap->st.otd.iOverrideF88);
 #endif
@@ -3247,7 +3243,6 @@ void sendDeviceInfoV2()
       je.field(F("otdmaster"), snap->st.otd.bMasterMode);
       je.field(F("otdstepup"), snap->st.otd.bStepUpEnabled);
       je.field(F("otdthermostat"), snap->st.otd.bThermostatConnected);
-      je.field(F("otdsetback"), snap->st.otd.bSetbackActive);
       je.field(F("otdschedtotal"), snap->st.otd.iScheduleTotal);
       je.field(F("otdschedactive"), snap->st.otd.iScheduleActive);
       je.field(F("otdscheddisabled"), snap->st.otd.iScheduleDisabled);
@@ -3851,7 +3846,6 @@ void sendOTDirectStatus()
     je.field(F("master_mode"),  state.otd.bMasterMode);
     // Thermostat connectivity
     je.field(F("thermostat_connected"), state.otd.bThermostatConnected);
-    je.field(F("setback_active"), state.otd.bSetbackActive);
     // Schedule statistics
     je.field(F("schedule_total"),    state.otd.iScheduleTotal);
     je.field(F("schedule_active"),   state.otd.iScheduleActive);
@@ -4378,7 +4372,6 @@ void sendDeviceSettings()
       dtostrf(settings.otd.fSetbackTemp, 1, 1, tmpBuf);
       addNum(F("otdsetbacktemp"), tmpBuf, "f", 1, 30);
     }
-    addInt(F("otdsetbacktimeout"), settings.otd.iSetbackTimeout, "i", 5, 255);
     addBool(F("otdenableslave"), settings.otd.bEnableSlave, "b");
     addBool(F("otdsummermode"), settings.otd.bSummerMode, "b");
     addBool(F("otdfailsafe"), settings.otd.bFailSafe, "b");
@@ -4456,7 +4449,7 @@ static const char* const PROGMEM knownSettings[] = {
   "ntpenable", "ntphostname", "ntpsendtime", "ntptimezone",
   "otdautobypass", "otdautodetect", "otdenableslave", "otdfailsafe", "otdfreeventenable",
   "otdhasbypassrelay", "otdmode", "otdmsginterval", "otdopenbypass",
-  "otdsetbacktemp", "otdsetbacktimeout", "otdsummermode",
+  "otdsetbacktemp", "otdsummermode",
   "otdventenable", "otdventsetpoint",
   "otgwcommandenable", "otgwcommands",
   "pictempsensor",  // TASK-1940

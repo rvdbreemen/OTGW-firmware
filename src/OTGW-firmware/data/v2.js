@@ -372,7 +372,6 @@
       "otd_row_ot_bus": "OT bus",
       "otd_row_thermostat": "Thermostat",
       "otd_row_boiler": "Boiler",
-      "otd_row_setback": "Setback",
       "otd_row_stepup": "Step-up",
       "otd_row_schedule": "Schedule (active / total)",
       "otd_row_overrides": "Active overrides",
@@ -1139,7 +1138,6 @@
         "otdmsginterval": "Message interval",
         "otdopenbypass": "Open bypass now",
         "otdsetbacktemp": "Setback temperature",
-        "otdsetbacktimeout": "Setback timeout",
         "otdsummermode": "Summer mode (CH off)",
         "otdventenable": "Ventilation enabled",
         "otdventsetpoint": "Ventilation setpoint",
@@ -3845,7 +3843,6 @@
       [t('graph.otd_row_ot_bus'), onoff(s.ot_online, t('graph.otd_online'), t('graph.otd_offline')), s.ot_online],
       [t('graph.otd_row_thermostat'), onoff(s.thermostat_connected, t('graph.otd_connected'), t('graph.otd_none')), s.thermostat_connected],
       [t('graph.otd_row_boiler'), onoff(s.boiler, t('graph.otd_active'), t('graph.otd_idle')), s.boiler],
-      [t('graph.otd_row_setback'), onoff(s.setback_active, t('graph.otd_active'), t('graph.otd_off')), s.setback_active],
       [t('graph.otd_row_stepup'), onoff(s.stepup, t('graph.otd_on'), t('graph.otd_off')), s.stepup],
       [t('graph.otd_row_schedule'), (s.schedule_active || 0) + ' / ' + (s.schedule_total || 0) + (s.schedule_disabled ? ' ' + t('graph.otd_schedule_disabled', { n: s.schedule_disabled }) : ''), null],
       [t('graph.otd_row_overrides'), '' + (s.overrides_active || 0), null]
@@ -4197,7 +4194,6 @@
     // TASK-935: remaining OT-Direct config keys (were falling back to humanizeKey)
     otdautodetect:       { cat: 'otd', label: 'Auto-detect OT-Direct mode' },
     otdsetbacktemp:      { cat: 'otd', label: 'Setback temperature', hint: '°C' },
-    otdsetbacktimeout:   { cat: 'otd', label: 'Setback timeout', hint: 'Seconds' },   // OTDirect.ino multiplies by 1000 (TASK-1281)
     otdenableslave:      { cat: 'otd', label: 'Enable slave (thermostat) passthrough' },
     otdsummermode:       { cat: 'otd', label: 'Summer mode (CH off)' },
     otdfailsafe:         { cat: 'otd', label: 'Fail-safe on OT bus loss' },

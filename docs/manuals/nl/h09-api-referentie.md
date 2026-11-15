@@ -583,7 +583,6 @@ Retourneert de bedrijfsmodus, schema-tellingen, thermostaatverbindingsstatus, by
     "monitor_mode": false,
     "master_mode": false,
     "thermostat_connected": true,
-    "setback_active": false,
     "schedule_total": 12,
     "schedule_active": 11,
     "schedule_disabled": 1,
@@ -613,7 +612,7 @@ Opmerking (TASK-438): `monitor` is nu gekoppeld aan `GW=0` voor parity met PIC-f
 
 ##### GET /api/v2/otdirect/settings
 
-Retourneert de opgeslagen OT-direct-configuratie: modus, de thermostaat-timeout en ventilatie. SAT is de enige temperatuurregelaar op OT-Direct; de voormalige parameters voor verwarmingscurve en PI-kamercompensatie zijn verwijderd. Bij verlies van de thermostaat stuurt OT-Direct geen setback-aanvoertemperatuur meer (TASK-1806, zoals de PIC): na `setback_timeout` seconden zonder thermostaatframes stuurt de gateway eigen frames met CV uit, tenzij er een CS= actief is. `setback_temp` en de FS=-noodvlag worden nog opgeslagen en geaccepteerd, maar niet meer gebruikt.
+Retourneert de opgeslagen OT-direct-configuratie: modus, de setback-temperatuur en ventilatie. SAT is de enige temperatuurregelaar op OT-Direct; de voormalige parameters voor verwarmingscurve en PI-kamercompensatie zijn verwijderd. Bij verlies van de thermostaat stuurt OT-Direct geen setback-aanvoertemperatuur meer (TASK-1806, zoals de PIC): na ongeveer 3 s zonder thermostaatframes (TASK-1802) stuurt de gateway eigen frames met CV uit, tenzij er een CS= actief is. `setback_temp` en de FS=-noodvlag worden nog opgeslagen en geaccepteerd, maar niet meer gebruikt.
 
 **Antwoord:**
 ```json
@@ -621,7 +620,6 @@ Retourneert de opgeslagen OT-direct-configuratie: modus, de thermostaat-timeout 
   "otdirect_settings": {
     "mode": 1,
     "setback_temp": 15.0,
-    "setback_timeout": 300,
     "vent_enable": false,
     "open_bypass": false,
     "auto_bypass": false,
@@ -633,7 +631,7 @@ Retourneert de opgeslagen OT-direct-configuratie: modus, de thermostaat-timeout 
 
 ##### POST /api/v2/otdirect/settings
 
-OT-direct-instellingen bijwerken. Alleen meegegeven parameters worden gewijzigd. Parameters: `setbacktemp`, `setbacktimeout`, `ventenable`, `openbypass`, `autobypass`, `freeventenable`, `ventsetpoint`. Onbekende parameters worden genegeerd.
+OT-direct-instellingen bijwerken. Alleen meegegeven parameters worden gewijzigd. Parameters: `setbacktemp`, `ventenable`, `openbypass`, `autobypass`, `freeventenable`, `ventsetpoint`. Onbekende parameters worden genegeerd.
 
 ##### GET /api/v2/otdirect/overrides
 
@@ -884,7 +882,6 @@ Tenzij anders vermeld zijn alle gepubliceerde onderwerpen retained.
 | `otgw-otdirect/mode` | Bedrijfsmodus (gateway, monitor, bypass, master, loopback) |
 | `otgw-otdirect/bypass` | Bypass-relais actief |
 | `otgw-otdirect/thermostat_connected` | Thermostaatframe ontvangen binnen timeout |
-| `otgw-otdirect/setback_active` | Altijd OFF: OT-Direct heeft geen setback-override meer (TASK-1806) |
 | `otgw-otdirect/schedule_active` | Aantal actieve schema-items |
 | `otgw-otdirect/overrides_active` | Aantal actieve write-overrides |
 | `otgw-otdirect/boiler_connected` | Ketel OT-bus actief |

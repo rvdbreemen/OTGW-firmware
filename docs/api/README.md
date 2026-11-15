@@ -188,7 +188,6 @@ Returns comprehensive device information as a flat JSON map. Boolean values are 
     "otdmaster": false,
     "otdstepup": true,
     "otdthermostat": true,
-    "otdsetback": false,
     "otdschedtotal": 12,
     "otdschedactive": 11,
     "otdscheddisabled": 1,
@@ -1327,7 +1326,6 @@ Returns the full OTGW32 OT-direct runtime state.
     "monitor_mode": false,
     "master_mode": false,
     "thermostat_connected": true,
-    "setback_active": false,
     "schedule_total": 12,
     "schedule_active": 11,
     "schedule_disabled": 1,
@@ -1375,7 +1373,6 @@ Returns the persisted OT-direct configuration settings.
   "otdirect_settings": {
     "mode": 1,
     "setback_temp": 15.0,
-    "setback_timeout": 300,
     "vent_enable": false,
     "open_bypass": false,
     "auto_bypass": false,
@@ -1388,8 +1385,7 @@ Returns the persisted OT-direct configuration settings.
 | Field | Type | Description |
 |-------|------|-------------|
 | `mode` | integer | Persisted mode index: 0=bypass, 1=gateway, 2=monitor, 3=master, 4=loopback |
-| `setback_temp` | float | Setback temperature applied when thermostat disconnects (C, range 1-30) |
-| `setback_timeout` | integer | Seconds without a thermostat frame before setback activates |
+| `setback_temp` | float | SB= setback temperature, stored and printed (PR=S) like the PIC; no effect on OT-Direct (C, range 1-30) |
 | `vent_enable` | boolean | Ventilation control enabled (OT MsgID 70 HB bit 0) |
 | `open_bypass` | boolean | Open the ventilation bypass valve (OT MsgID 70 HB bit 2) |
 | `auto_bypass` | boolean | Automatic ventilation bypass valve mode (OT MsgID 70 HB bit 3) |
@@ -1404,7 +1400,7 @@ Update OT-direct settings. Only provided parameters are updated.
 
 **Authentication**: Not required
 
-**Form parameters**: `setbacktemp` (float, 1.0-30.0), `setbacktimeout` (integer, seconds), `ventenable` (bool), `openbypass` (bool), `autobypass` (bool), `freeventenable` (bool), `ventsetpoint` (integer, 0-100). Unknown parameters, including the removed controller parameters, are ignored.
+**Form parameters**: `setbacktemp` (float, 1.0-30.0), `ventenable` (bool), `openbypass` (bool), `autobypass` (bool), `freeventenable` (bool), `ventsetpoint` (integer, 0-100). Unknown parameters, including the removed controller parameters, are ignored.
 
 **Response** `200 OK`: Full `otdirect_status` object.
 
@@ -1463,7 +1459,6 @@ All fields are **read-only** runtime state except where noted.
 | `master_mode` | `otdmaster` | `bMasterMode` | boolean | read-only | True when OTGW32 is acting as sole OT master with no thermostat |
 | `stepup` | `otdstepup` | `bStepUpEnabled` | boolean | read-only | True when the 24V step-up converter is active |
 | `thermostat_connected` | `otdthermostat` | `bThermostatConnected` | boolean | read-only | True when a thermostat frame has been received within the last 3 s |
-| `setback_active` | `otdsetback` | `bSetbackActive` | boolean | read-only | True when thermostat is disconnected and setback override is engaged |
 | `schedule_total` | `otdschedtotal` | `iScheduleTotal` | integer | read-only | Total number of OT message IDs in the polling schedule |
 | `schedule_active` | `otdschedactive` | `iScheduleActive` | integer | read-only | Number of schedule entries currently active (not disabled by boiler) |
 | `schedule_disabled` | `otdscheddisabled` | `iScheduleDisabled` | integer | read-only | Number of entries disabled (boiler returned UNKNOWN_DATA_ID three times) |

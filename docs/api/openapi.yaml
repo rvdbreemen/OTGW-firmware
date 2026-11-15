@@ -2180,7 +2180,6 @@ paths:
                   monitor_mode: false
                   master_mode: false
                   thermostat_connected: true
-                  setback_active: false
                   schedule_total: 12
                   schedule_active: 11
                   schedule_disabled: 1
@@ -2317,12 +2316,8 @@ paths:
                         description: Persisted mode index (0=bypass, 1=gateway, 2=monitor, 3=master, 4=loopback)
                       setback_temp:
                         type: number
-                        description: Setback temperature applied when thermostat disconnects (C, range 1-30)
+                        description: SB= setback temperature, stored and printed (PR=S) like the PIC; no effect on OT-Direct (C, range 1-30)
                         example: 15.0
-                      setback_timeout:
-                        type: integer
-                        description: Seconds without a thermostat frame before setback activates
-                        example: 300
                       vent_enable:
                         type: boolean
                         description: Ventilation control enabled (OT MsgID 70 HB bit 0)
@@ -2342,7 +2337,6 @@ paths:
                 otdirect_settings:
                   mode: 1
                   setback_temp: 15.0
-                  setback_timeout: 300
                   vent_enable: false
                   open_bypass: false
                   auto_bypass: false
@@ -2383,10 +2377,6 @@ paths:
                   type: string
                   description: Setback temperature in C (range 1.0-30.0)
                   example: "15.0"
-                setbacktimeout:
-                  type: string
-                  description: Setback timeout in seconds
-                  example: "300"
                 ventenable:
                   type: string
                   description: Ventilation control enabled (true/false)
@@ -5032,10 +5022,7 @@ components:
               description: True when OTGW32 is the sole OT master (equivalent to `mode == "master"`)
             thermostat_connected:
               type: boolean
-              description: True when a thermostat frame has been received within the configured setback timeout
-            setback_active:
-              type: boolean
-              description: True when thermostat is considered disconnected and the setback temperature override is engaged
+              description: True when a thermostat frame has been received within the last 3 s
             schedule_total:
               type: integer
               description: Total number of OpenTherm Message IDs in the polling schedule
