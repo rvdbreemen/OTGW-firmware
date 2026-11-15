@@ -92,6 +92,9 @@ static float g_dhwPersist = -1, g_chPersist = -1;
 static uint16_t g_psOutside = 0;
 static void otdPsStoreOutside(uint16_t v) { g_psOutside = v; }
 struct { float Toutside = 0; } OTcurrentSystemState;
+// TASK-1965: OT= records that the outside value is the gateway's own (OTGW-firmware.h, OTGW-Core.ino).
+enum : uint8_t { OT_VALSRC_NONE = 0, OT_VALSRC_BOILER, OT_VALSRC_GATEWAY, OT_VALSRC_THERMOSTAT, OT_VALSRC_SUMMARY, OT_VALSRC_REPLAY };
+static void recordValueSource(uint8_t, uint8_t) {}
 static inline uint16_t otdUnused() { return 0; }
 """
 

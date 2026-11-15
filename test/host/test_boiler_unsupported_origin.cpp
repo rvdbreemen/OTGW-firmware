@@ -190,6 +190,10 @@ static struct { bool pending; } mqttPendingSlot;
 struct OTPublishGate { explicit OTPublishGate(bool) {} };
 static bool shouldPublishMQTTForID(byte, byte, uint16_t) { return false; }
 static void decodeAndPublishOTValue() {}
+// TASK-1965: the value-source record processOT() makes after decodeAndPublishOTValue(); not observed here.
+static bool is_value_valid_for_master_topic(OpenthermData_t, OTlookup_t) { return false; }
+static uint8_t otValueSourceOfFrame(uint8_t, bool, bool) { return 0; }
+static void recordValueSource(uint8_t, uint8_t) {}
 static void confirmMQTTPublishSlot() {}
 static bool getMQTTConfigDone(uint8_t) { return true; }
 static void setMQTTConfigPending(uint8_t) {}
