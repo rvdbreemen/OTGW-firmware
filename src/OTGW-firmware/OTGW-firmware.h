@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v2.0.0-beta.325
+**  Version  : v2.0.0-beta.326
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -242,6 +242,11 @@ void loopLittleFSStatus();   // TASK-1865: mount check + write probe on the loop
 // Longest reboot-log line incl. CRLF and NUL: a core-dump detail line with all 16 backtrace frames the ESP-IDF
 // summary holds is 236 chars ("Core dump: " + task (15) + pc + elf + "bt=" + 16 PCs + "!\r\n"; TASK-1538).
 #define REBOOT_LOG_LINE_MAX 240
+// TASK-1931: the reboot log keeps this many lines (updateRebootLog(), helperStuff.ino), so its worst case is
+// REBOOT_LOG_FILE_MAX: every line at REBOOT_LOG_LINE_MAX - 1 bytes incl. CRLF. The filesystem-OTA keep list
+// (OTGW-ModUpdateServer-esp32.h KEEP_LIST) checks its cap against this at compile time.
+#define REBOOT_LOG_LINES 20
+#define REBOOT_LOG_FILE_MAX (REBOOT_LOG_LINES * (REBOOT_LOG_LINE_MAX - 1))
 bool readLatestCrashLog(char* summary, size_t summarySize, char* details, size_t detailsSize);
 
 //prototype

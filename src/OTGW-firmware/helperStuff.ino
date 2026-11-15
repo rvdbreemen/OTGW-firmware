@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : helperStuff
-**  Version  : v2.0.0-beta.325
+**  Version  : v2.0.0-beta.326
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -451,7 +451,7 @@ bool updateRebootLog(String text)
 {
   #define REBOOTLOG_FILE "/reboot_log.txt"
   #define TEMPLOG_FILE "/reboot_log.t.txt"
-  #define LOG_LINES 20
+  #define LOG_LINES REBOOT_LOG_LINES   // TASK-1931: one source with the keep-list cap (OTGW-firmware.h)
   #define LOG_LINE_LENGTH 160   // TASK-1904: the raw reset code added 16; worst case 157 incl. CRLF (host E4)
 
   char log_line[LOG_LINE_LENGTH] = {0};

@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTGW-ModUpdateServer-esp32.h
-**  Version  : v2.0.0-beta.325
+**  Version  : v2.0.0-beta.326
 **
 **  ESP32 OTA update server — functional equivalent of the ESP8266
 **  OTGW-ModUpdateServer with Nodoshop hardware watchdog feeding.
@@ -215,7 +215,8 @@ inline void fsOtaRtcWipe() {
 
 inline bool fsOtaRtcArmed() { return g_fsOtaRtc.magic == FS_OTA_RTC_MAGIC; }
 
-// Upload start, while LittleFS is still mounted: copy each file whole, or not at all when it does not fit.
+// Upload start, while LittleFS is still mounted: copy settings.ini and the counter whole, or not at all when they
+// do not fit; the reboot log whole or, when it does not fit, its newest whole lines (ADR-246).
 inline void fsOtaRtcFill() {
   fsOtaRtcWipe();
   if (!LittleFSmounted || !fsOtaRtcPlaced()) return;
@@ -225,7 +226,26 @@ inline void fsOtaRtcFill() {
     if (!f) continue;
     const size_t n = f.size();
     if (n == 0) { f.close(); continue; }
-    if (n > sizeof(g_fsOtaRtc.data) - used) {
+    const size_t room = sizeof(g_fsOtaRtc.data) - used;
+    if (n > room && i == FS_OTA_RTC_SLOTS - 1) {
+      // ADR-246 (TASK-1931): the reboot log is newest-first, so its newest whole lines are a prefix. Keep the
+      // longest prefix that fits and ends with a CRLF, never a partial line; an empty prefix keeps nothing.
+      size_t keep = 0;
+      const size_t got = f.read(g_fsOtaRtc.data + used, room);
+      for (size_t k = got; k >= 2; k--) {
+        if (g_fsOtaRtc.data[used + k - 2] == '\r' && g_fsOtaRtc.data[used + k - 1] == '\n') { keep = k; break; }
+      }
+      memset(g_fsOtaRtc.data + used + keep, 0, room - keep);
+      if (keep > 0) {
+        g_fsOtaRtc.len[i] = static_cast<uint16_t>(keep);
+        used += keep;
+      }
+      DebugTf(PSTR("[OTA] %s (%u B) does not fit the RTC snapshot (%u B free): kept its newest %u B of whole lines\r\n"),
+              kFsOtaRtcPath[i], static_cast<unsigned>(n), static_cast<unsigned>(room), static_cast<unsigned>(keep));
+      f.close();
+      continue;
+    }
+    if (n > room) {
       DebugTf(PSTR("[OTA] %s (%u B) does not fit the RTC snapshot (%u B free): not protected during this filesystem write\r\n"),
               kFsOtaRtcPath[i], static_cast<unsigned>(n), static_cast<unsigned>(sizeof(g_fsOtaRtc.data) - used));
       f.close();
@@ -821,10 +841,17 @@ private:
     {"/dallas_labels.ini", 2048},   // the user's Dallas sensor names
     {"/sat_markers.json",  2560},   // at most 20 heating-curve markers of at most 110 B
     {"/reboot_count.txt",    16},   // one decimal number
-    {"/reboot_log.txt",    3072},   // 20 lines of at most 140 B
+    {"/reboot_log.txt",    4780},   // REBOOT_LOG_FILE_MAX: 20 lines of at most 239 B (TASK-1931, asserted below)
   };
   static constexpr size_t   KEEP_COUNT        = sizeof(KEEP_LIST) / sizeof(KEEP_LIST[0]);
-  static constexpr size_t   KEEP_TOTAL_MAX    = 10240;  // all copies together (the maxima add up to 9824)
+  // TASK-1931: all copies together. The maxima add up to 11532 B; each copy is only made while the largest free
+  // block stays KEEP_HEAP_RESERVE above it, so the higher total costs heap only when the files are that large.
+  static constexpr size_t   KEEP_TOTAL_MAX    = 12288;
+  // A lambda, not a member function: the class is still incomplete here, so a member could not be evaluated.
+  static_assert(KEEP_LIST[KEEP_COUNT - 1].maxLen == REBOOT_LOG_FILE_MAX,
+                "KEEP_LIST: the reboot_log.txt cap must follow REBOOT_LOG_FILE_MAX (OTGW-firmware.h)");
+  static_assert([] { size_t s = 0; for (const KeepEntry &e : KEEP_LIST) s += e.maxLen; return s; }() <= KEEP_TOTAL_MAX,
+                "KEEP_LIST: the per-file maxima exceed KEEP_TOTAL_MAX");
   static constexpr uint32_t KEEP_HEAP_RESERVE = 8192;   // largest free block must stay this far above a copy
 
   void _keepFiles() {

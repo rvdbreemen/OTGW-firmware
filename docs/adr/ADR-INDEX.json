@@ -9879,6 +9879,63 @@
       }
     },
     {
+      "id": "ADR-246",
+      "title": "When the reboot log does not fit the filesystem-OTA RTC snapshot, keep its newest whole lines (amends ADR-233)",
+      "path": "ADR-246-when-the-reboot-log-does-not-fit-the-filesystem-ota-rtc-snapshot-keep-its-newest-whole-lines-amends-adr-233.md",
+      "format": "canonical",
+      "status": "Accepted",
+      "date": "2026-11-15",
+      "decision_summary": "When rebootlog.txt does not fit the free part of the RTC snapshot, fsOtaRtcFill() stores the longest prefix of it tha...",
+      "topics": [
+        "crash diagnostics",
+        "filesystem OTA",
+        "reboot log",
+        "RTC snapshot"
+      ],
+      "aliases": [
+        "fsOtaRtcFill",
+        "reboot_log.txt",
+        "RTC snapshot budget"
+      ],
+      "components": [
+        "fsOtaRtcFill"
+      ],
+      "symbols": [
+        "FS_OTA_RTC_DATA_BYTES",
+        "fsOtaRtcFill"
+      ],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [
+          "Fill the slots in the ADR-233 order: settings.ini, then the counter, then the log.",
+          "For the log only: when the file is larger than the free budget, read the free budget, keep the bytes up to and including the last CRLF, zero the rest of the read bytes, and log on telnet how much was kept.",
+          "Keep nothing of the log when the free budget holds no complete line."
+        ],
+        "must_not": [
+          "Must not store a partial line of the log.",
+          "Must not cut settings.ini or the counter: their rule stays whole or not at all."
+        ],
+        "exceptions": [
+          "None."
+        ],
+        "verification": [
+          "test/host/testfsotartcsnapshot.py (real fsOtaRtcSnapshot block): T11 (5700 B settings.ini, a 3200 B log of 20 x 160 B lines) restores settings, counter and the log's newest 1600 B of whole lines; T14 (lines of 60 to 239 B, the budget end...",
+          "Bench: a reset during a filesystem OTA on a unit with a near-full budget brings the newest reboot-log lines back (TASK-1931 AC3)."
+        ]
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
+    },
+    {
       "id": "ADR-247",
       "title": "The settings help and the built-in replay fixture may be stored deflated in firmware flash (amends ADR-194)",
       "path": "ADR-247-the-settings-help-and-the-built-in-replay-fixture-may-be-stored-deflated-in-firmware-flash-amends-adr-194.md",
@@ -16788,6 +16845,12 @@
     {
       "source": "ADR-245",
       "target": "ADR-193",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-246",
+      "target": "ADR-233",
       "type": "related",
       "resolved": true
     },

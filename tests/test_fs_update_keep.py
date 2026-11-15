@@ -92,9 +92,9 @@ EXPECTED_KEEP = {
     "/dallas_labels.ini": 2048,
     "/sat_markers.json": 2560,
     "/reboot_count.txt": 16,
-    "/reboot_log.txt": 3072,
+    "/reboot_log.txt": 4780,   # TASK-1931: REBOOT_LOG_FILE_MAX, 20 x 239 B
 }
-TOTAL_MAX = 10240
+TOTAL_MAX = 12288   # TASK-1931
 
 
 def function_body(src, signature_regex):
@@ -142,7 +142,11 @@ class TestKeepList(unittest.TestCase):
     def test_caps(self):
         caps = keep_list()
         self.assertEqual(caps["/dallas_labels.ini"], 2048, "labels behaviour must stay as TASK-1266 left it")
-        self.assertTrue(all(0 < c <= 3072 for c in caps.values()), caps)
+        self.assertTrue(all(0 < c <= 4780 for c in caps.values()), caps)
+        self.assertLessEqual(sum(caps.values()), TOTAL_MAX)
+        # TASK-1931: the compiler keeps the reboot-log cap on its single source and the total above the maxima
+        self.assertIn("static_assert(KEEP_LIST[KEEP_COUNT - 1].maxLen == REBOOT_LOG_FILE_MAX", UPD)
+        self.assertRegex(UPD, r"static_assert\(\[\] \{ size_t s = 0; for \(const KeepEntry &e : KEEP_LIST\) s \+= e\.maxLen; return s; \}\(\) <= KEEP_TOTAL_MAX")
         self.assertRegex(UPD, r"KEEP_TOTAL_MAX\s*=\s*%d\s*;" % TOTAL_MAX)
         self.assertRegex(UPD, r"KEEP_HEAP_RESERVE\s*=\s*\d+\s*;")
 
