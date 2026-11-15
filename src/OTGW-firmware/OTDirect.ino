@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTDirect.ino
-**  Version  : v2.0.0-beta.292
+**  Version  : v2.0.0-beta.293
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -1866,6 +1866,45 @@ static bool sendMasterRequestAsync(unsigned long request, OTDirectRequestOrigin 
   return otMasterRequestActive;
 }
 
+// TASK-1801: the PIC never blacklists the Data-IDs it needs: MandatoryID (gateway.asm 6.8:3409-3416) unmarks
+// 0 (readstatus :2720), 1 (MessageID1 :2806), 14 (MessageID14 :2967) and 3, 17, 25 (MandatoryWord :2544, :2558,
+// :2566, :3651) on every request, "so even (accidental) manual action cannot blacklist the DataID". (27 only when
+// an external sensor is used as an alternative, :3071-3075; OT-Direct has no such sensor.)
+// otdNoteBoilerAnswer() is the 3-strike rule of handleMasterResponse(): an Unknown-DataID answer counts a strike
+// for a non-mandatory ID and disables its schedule entry at 3; any other answer clears the strikes and enables an
+// entry the strikes disabled again (a relayed success shows the boiler knows the ID).
+// --- otdUnknownStrike begin
+static inline bool otdPicMandatoryId(uint8_t id) {
+  return id == 0 || id == 1 || id == 3 || id == 14 || id == 17 || id == 25;
+}
+
+static void otdNoteBoilerAnswer(uint8_t id, bool unknownDataId) {
+  if (otdPicMandatoryId(id)) return;
+  if (unknownDataId) {
+    incUnknownCount(id);
+    if (getUnknownCount(id) < 3) return;
+    for (uint8_t i = 0; i < OT_SCHEDULE_SIZE; i++) {
+      if (otSchedule[i].msgId == id && !otSchedule[i].disabled) {
+        otSchedule[i].disabled = true;
+        OTDDebugTf(PSTR("OTD: MsgID %u disabled (3x UNKNOWN_DATA_ID)\r\n"), id);
+        break;
+      }
+    }
+  } else {
+    // Only an entry the strikes disabled comes back (counter at 3); DA= and UI= disable on purpose and stay.
+    const bool struck = getUnknownCount(id) >= 3;
+    clearUnknownCount(id);
+    if (!struck || isUnknownId(id)) return;
+    for (uint8_t i = 0; i < OT_SCHEDULE_SIZE; i++) {
+      if (otSchedule[i].msgId == id && otSchedule[i].disabled) {
+        otSchedule[i].disabled = false;
+        OTDDebugTf(PSTR("OTD: MsgID %u enabled again (boiler answered it)\r\n"), id);
+      }
+    }
+  }
+}
+// --- otdUnknownStrike end
+
 // ---------------------------------------------------------------------------
 // handleMasterResponse — process a completed async master request
 // ---------------------------------------------------------------------------
@@ -1912,28 +1951,11 @@ static void handleMasterResponse() {
       flameRatioSet(flameOn);
     }
 
-    // 3-strike auto-blacklist: if boiler responds with UNKNOWN_DATA_ID,
-    // increment 2-bit counter. Disable schedule entry after 3 consecutive unknowns.
-    // MsgID 0 (status) is never disabled — it's mandatory.
+    // 3-strike auto-blacklist (otdNoteBoilerAnswer): 3 Unknown-DataID answers disable a schedule entry, any
+    // other answer enables it again; the PIC's mandatory IDs 0, 1, 3, 14, 17, 25 never count (TASK-1801).
     OpenThermMessageType respType = OpenTherm::getMessageType(response);
     uint8_t respMsgId = (response >> 16) & 0xFF;
-    if (respType == OpenThermMessageType::UNKNOWN_DATA_ID) {
-      if (respMsgId != 0) {
-        incUnknownCount(respMsgId);
-        if (getUnknownCount(respMsgId) >= 3) {
-          for (uint8_t i = 0; i < OT_SCHEDULE_SIZE; i++) {
-            if (otSchedule[i].msgId == respMsgId && !otSchedule[i].disabled) {
-              otSchedule[i].disabled = true;
-              OTDDebugTf(PSTR("OTD: MsgID %u disabled (3x UNKNOWN_DATA_ID)\r\n"), respMsgId);
-              break;
-            }
-          }
-        }
-      }
-    } else if (respMsgId != 0) {
-      // Successful response — reset unknown counter for this MsgID
-      clearUnknownCount(respMsgId);
-    }
+    otdNoteBoilerAnswer(respMsgId, respType == OpenThermMessageType::UNKNOWN_DATA_ID);
 
     // TASK-1845: the DHW push follows the boiler's answers, as the PIC (MessageID99, statusreturn).
     if (respMsgId == 99) otdPushOnBoiler99((uint8_t)respType, (uint16_t)(response & 0xFFFF));
@@ -2087,6 +2109,7 @@ static bool otdResponseOverrideActive(uint8_t msgId) {
 static bool otdRemoteOverrideHoldsSlot(uint8_t msgId);
 static bool otdIsAltSlot(uint8_t msgId) {
   if (otdRemoteOverrideHoldsSlot(msgId)) return false;
+  if (otdPicMandatoryId(msgId)) return false;   // TASK-1801: MandatoryID, also against a UI= mark
   if (isUnknownId(msgId)) return true;
   return getUnknownCount(msgId) >= 3 && !otdResponseOverrideActive(msgId);
 }
