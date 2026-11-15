@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-15T10:12:00Z'
-updated_date: '2026-11-15T11:49:00Z'
+updated_date: '2026-11-15T12:31:00Z'
 labels:
   - rest
   - bug
@@ -38,4 +38,6 @@ Beta feedback, reporter indigo_light (Discord 301077214374658048), #beta-testing
 2026-11-15 choice for AC1 (smallest contract change): keep status as it is (the boiler's own last answer, TASK-1871; clients that read it keep their meaning) and add one field, source: none / boiler / gateway / thermostat / summary / replay, the writer of the value getOTGWValue() serves. Rejected: let status follow the served value (changes the meaning of an existing field for every client, and loses the 'boiler does not support this ID' signal indigo's case needs). Implementation: OTGW-Core.ino boiler-answer block gains otValueSource[], recordValueSource(), otValueSourceOfFrame(rsptype, bLocalAnswer, bReplayed), valueSourceName(); recorded after decodeAndPublishOTValue() under the same store gate the print_* functions use (is_value_valid && is_value_valid_for_master_topic), in the PS=1 summary store (summary) and in OT-Direct OT= (OTDirect.ino, gateway); enum OT_VALSRC_* and prototypes in OTGW-firmware.h; both REST senders emit source.
 
 Evidence: tests/test_ot_value_source.py (REAL block sliced by marker + wiring on the source text): fix 9/9 OK, indigo case 'id=27 status=data_invalid source=gateway'; against origin's sources (OTGW_SRC_DIR, temp copy) FAILED (failures=3, errors=1): the block has no value source, no wiring. tests/test_boiler_answer_status.py (TASK-1871): its harness now also takes the two enums the block uses; 11/11 OK, every 1871 expectation unchanged. Related: test_boiler_support_bitmap_b_only, test_sat_rest_contract_1496, test_rest_* PASS. openapi.yaml: source on /v2/otgw/messages/{id}; /v2/otgw/label/{msglabel} gained status, last_seen_age_s (missing before) and source; yaml parses. docs/api/README.md updated. evaluate --quick 0 FAIL. Build and field confirmation (AC4) pending.
+
+2026-11-15 bench (09 on .63, ffd0a64): the source field is present on otgw/messages and otgw/label; without a PIC outside sensor and without an OT bus it reads none, as expected. The gateway case (PIC DS18B20, boiler without MsgID 27) is the field AC4 with indigo_light.
 <!-- SECTION:NOTES:END -->
