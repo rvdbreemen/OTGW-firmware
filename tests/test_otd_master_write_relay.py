@@ -109,6 +109,10 @@ static void replyToThermostat(OTDirectRequestOrigin o, unsigned long, unsigned l
   g_replies++; g_reply = resp;
 }
 static int g_local = 0;
+// TASK-1906 / TASK-1803: applyOverrides() also rewrites some thermostat READs (MsgID 99, 27/56/57); this test relays
+// WRITEs only, so those rewrites never apply here
+static bool otdRelayRead99(unsigned long, unsigned long &) { return false; }
+static bool otdRelayRewriteRead(unsigned long, unsigned long &) { return false; }
 """
 
 MAIN = r"""
@@ -155,6 +159,9 @@ int main(int argc, char** argv) {
   } else if (!strcmp(s, "late")) {       // the answer comes 800 ms after the relay's send: past the deadline
     thermostat(W(56, 0x3C00)); relayPass();
     g_now += 800; responsePass(OpenThermResponseStatus::SUCCESS, (5UL << 28) | (56UL << 16) | 0x3C00);
+  } else if (!strcmp(s, "reads")) {      // reads stay local: answered from the boiler cache (ADR-066), no boiler frame
+    const unsigned long R0 = 0UL, R25 = 25UL << 16, R56 = 56UL << 16, R57 = 57UL << 16;
+    thermostat(R0); relayPass(); thermostat(R25); relayPass(); thermostat(R56); relayPass(); thermostat(R57); relayPass();
   } else if (!strcmp(s, "newer")) {      // a newer thermostat frame arrived: the old answer is not sent
     thermostat(W(56, 0x3C00)); relayPass(); g_now += 50; otdSlaveFrameSeq++;
     g_now += 50; responsePass(OpenThermResponseStatus::SUCCESS, (5UL << 28) | (56UL << 16) | 0x3C00);
@@ -194,6 +201,14 @@ class MasterWriteRelay(unittest.TestCase):
         cpp.write_text(PRE.replace("@DEADLINE@", deadline) + relays + "\n" + apply + "\n" +
                        MAIN.replace("@BRANCH@", branch).replace("@REPLY@", reply), encoding="utf-8")
         cls.exe = compile_cpp(cpp, Path(cls.tmp) / ("t.exe" if os.name == "nt" else "t"))
+        # mutant: the predicate without its WRITE_DATA check, to show the read case catches a relayed read
+        guard = "((frame >> 28) & 0x07) != 1 /* WRITE_DATA */ ||"
+        cls.mut = None
+        if guard in relays:
+            mcpp = Path(cls.tmp) / "m.cpp"
+            mcpp.write_text(PRE.replace("@DEADLINE@", deadline) + relays.replace(guard, "") + "\n" + apply + "\n" +
+                            MAIN.replace("@BRANCH@", branch).replace("@REPLY@", reply), encoding="utf-8")
+            cls.mut = compile_cpp(mcpp, Path(cls.tmp) / ("m.exe" if os.name == "nt" else "m"))
         # the real scheduler with the real relay predicate
         stub = "static bool otdMasterRelaysWrite(unsigned long) { return false; }"
         pre = msq.PRELUDE.replace(stub, "static bool satOwnsControlSetpoint() { return false; }\n" + relays)
@@ -257,6 +272,15 @@ class MasterWriteRelay(unittest.TestCase):
         # ADR-241 F1: SAT sends SH= through enqueueWriteCommand(), which sets the 57 override; the boiler gets SAT's value
         r = self.run_case(self.exe, "satsh")
         self.assertEqual((r["sent"], r["id"], r["data"], r["origin"]), ("1", "57", "4600", "2"))
+
+    def test_a_thermostat_read_in_master_mode_is_answered_from_the_cache_not_relayed(self):
+        # regression guard (TASK-1812 bench brief): a READ_DATA of any ID takes the local handler path
+        # (handleMasterModeSlaveFrame, answered from otBoilerCache, ADR-066); no master frame goes out for it
+        r = self.run_case(self.exe, "reads")
+        self.assertEqual((r["sent"], r["local"]), ("0", "4"))
+        if self.mut:
+            m = self.run_case(self.mut, "reads")
+            self.assertNotEqual(m["sent"], "0", "the mutant without the WRITE_DATA check relays reads: the case sees it")
 
     def test_an_answer_for_an_older_request_is_not_sent(self):
         self.assertEqual(self.run_case(self.exe, "newer")["replies"], "0")
