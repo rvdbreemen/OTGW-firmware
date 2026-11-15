@@ -3,11 +3,11 @@ id: TASK-1951
 title: >-
   OT-Direct PR=M answers S/P/L, which handlePRresponse logs as unexpected and
   ignores
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-14T22:57:00Z'
-updated_date: '2026-11-15T12:33:00Z'
+updated_date: '2026-11-15T12:38:00Z'
 labels:
   - needs-maintainer-ok
 dependencies: []
@@ -43,3 +43,9 @@ Options for Robert. A = the consumer accepts the OT-Direct letters: handlePRresp
 
 2026-11-15 13:16-13:18 bench 09 on .61 (OT-Direct), beta.306+041400e: GW=S -> 'GW: S'; PR=M -> 'PR: M=S', no 'unexpected value', MQTT otgw-pic/gateway_mode ON. GW=P -> 'OTD: GW=P not supported (no bypass relay on this board)' + NG, so the P -> OFF branch is not benchable on .61 (has_bypass_relay false; host test D3 covers it). OFF path through the existing M branch: GW=0 -> 'GW: 0', PR=M -> 'PR: M=M', gateway_mode OFF; GW=S -> 'PR: M=S', gateway_mode ON. Mode restored to master, settings.ini diff empty. Evidence: 09 scratchpad b306/61/gw, gw2 (telnet.raw local, mqtt.txt).
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+OT-Direct answers PR=M with its own modes; handlePRresponse() took only G/M. AC1: Robert chose A (DM 1571428391457005750). AC2: test/host/test_pr_m_otd_letters.py on the real handlePRresponse: OLD fails S/L/P, FIX 7/7; S, L = gateway ON, P = OFF, unknown letters still warn. AC3: 09 on .61 with beta.306+041400e: GW=S + PR=M -> 'PR: M=S', gateway_mode ON, no warning; OFF path via GW=0 -> M=M, OFF; P not benchable on .61 (no bypass relay), covered by host case D3. Shipped in origin/dev 11c5b268a (beta.304), posted (1571501313064312873).
+<!-- SECTION:FINAL_SUMMARY:END -->
