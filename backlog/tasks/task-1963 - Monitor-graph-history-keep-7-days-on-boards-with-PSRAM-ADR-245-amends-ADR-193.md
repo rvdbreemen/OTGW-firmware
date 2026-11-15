@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-15T09:22:00Z'
-updated_date: '2026-11-15T11:59:00Z'
+updated_date: '2026-11-15T12:25:00Z'
 labels:
   - graph
   - webui
@@ -44,4 +44,6 @@ Robert's A (DM 1571454228763779093) and A for the serving question + ADR-245 acc
 2026-11-15 evidence (wt-comms, before build): tests/test_graph_history.py (new runner for tests/test_graph_history.cpp on the real graphHistoryStuff.h): ALL TESTS PASSED, failures=0 (7 d ring holds exactly 7 days; default 720 x 120 s; ?hours=168 = 1008 groups of 5, interval_s 600, flags OR; >7 d capped; no PSRAM 120 x 30 s unchanged; 24 h body 25355 B unchanged). Red: OTGW_GRAPH_REV=HEAD fails to compile (no step/windowS API); mutant with GRAPH_HIST_LARGE_SLOTS 726 on the new code fails 7 checks. Web UI: tests/webui/graph-7day-window.test.mjs 5 pass on the fix / 5 fail on the old v2.js; seams fixed in graph-control-setpoint-source, graph-dhw-temperature, graph-history-merge (count trim -> time trim, rewritten case), graph-window-chips-axis (7 d chip added); 18 graph/i18n web UI files 109 pass 0 fail. test_graph_outside_source 5 pass, test_sat_pwm_anchors 64 pass. evaluate --quick 92 checks 0 FAIL. ADR-245 Accepted via adr-kit (quality A 0.94, readiness ready-for-confirmation, related ADR-193 both sides via adr relate). Pending: esp32-combo build and bench on .63 (PSRAM free before/after, 7 d fetch time, no WEB CONN CAP refusal).
 
 2026-11-15 bench by 09 on .63 (Classic + S3, PSRAM), 2.0.0-beta.310+4c57d94 (via the coordinator): (a) the 7 days chip appears after the first history response (Graph sub-tab open); (c) the ring costs +58.6 KB PSRAM (estimate 60480 B: matches); (b) GET /api/v2/graph/history?hours=168: HTTP 200, 163 B, 0.08-0.40 s, 0 WEB CONN CAP refusals. The full 7-day body (1008 x 600 s, about 35 KB) only exists after >= 33.6 h of data, so the full-window part of AC4 stays open as a field/overnight check (coordinator decision); its size and shape are covered by the host test (tests/test_graph_history.py: 1008 groups, interval_s 600). AC1-AC3 ticked on the evidence in the earlier notes (ADR-245 Accepted; host test red/green; web UI test red/green). AC4 open: the full-window fetch after 7 days of uptime.
+
+2026-11-15 bench by 09 on .61 (OT-Direct, no PSRAM), beta.310+4c57d94: no 7 days chip (f PASS); the history stays at 30 s slots (h PASS).
 <!-- SECTION:NOTES:END -->
