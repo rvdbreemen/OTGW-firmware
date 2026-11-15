@@ -176,8 +176,14 @@ Everything except the two frame files is merged into
 are removed. At the end the tool also writes ONE upload file next to the run folder, `<run folder>-upload.zip`, and prints
 its path as the last line (`Upload this one file: ...`). It holds the merged transcript, the two frame files, the CSV files
 converted from the logs (`csv/sattick.csv` and the other SAT record types from the telnet log, `csv/otframes.csv`), and the
-`device-state-*`, `graph-history-*`, `diag-recording-*` and `coredump-*` files, so nothing has to be exported by hand. Upload that
-one file; keep `otframes.log` and `otgw_simulation.log` in the run folder for replays.
+`device-state-*`, `graph-history-*`, `diag-recording-*` and `coredump-*` files, plus `summary.txt` and `crashlog.log`, so nothing
+has to be exported by hand. Upload that one file; keep `otframes.log` and `otgw_simulation.log` in the run folder for replays.
+
+The upload fits one Discord attachment (TASK-1986, limit 24 MB): when the zip is bigger, the tool packs the same files as
+`<run folder>-upload.tar.xz` instead (xz packs a long telnet transcript about twice as small as zip: a real 24 h capture,
+229 MB transcript, was 19.5 MB as zip and 10.1 MB as xz). When even that is too big, the first `.tar.xz` holds the transcript,
+summary, crash log, core dump and device state and `<run folder>-upload-part2.tar.xz` holds the rest; the tool then prints
+`Upload these two files: ...`. Every such step is written to the summary.
 
 ### 3-day capture (long-run mode, TASK-1523)
 

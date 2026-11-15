@@ -2982,24 +2982,73 @@ def upload_zip_path(run_path):
     return run_path.parent / (run_path.name + UPLOAD_SUFFIX)
 
 
-def build_upload_zip(cap, transcript, hourly):
-    """The one file a tester uploads, next to the run folder. Long run: the transcript, summary, gaps.log, index.csv and
-    every hours/*.zip (these already hold the CSVs). Short run: the transcript, the raw frame files and the CSVs
-    converted from the logs. Written with the same verify-and-flush rules as the hour zips."""
-    items = []
+# TASK-1986: what one Discord attachment may be (the limit testers met; gruijter packed by hand when the zip was too
+# big). A little under 25 MB, so the upload is not refused on a rounding difference.
+UPLOAD_LIMIT_BYTES = 24 * 1000 * 1000
 
-    def add(path, arcname):
+
+def write_tar_xz_verified(target, items):
+    """A .tar.xz of (path, arcname) items, read back and flushed before it is moved into place (as write_zip_verified).
+    xz packs a long telnet transcript several times smaller than the zip's deflate."""
+    import tarfile
+    target = Path(target)
+    tmp = target.with_name(target.name + ".tmp")
+    try:
+        with tarfile.open(tmp, "w:xz", preset=6) as t:
+            for path, arcname in items:
+                t.add(str(path), arcname=arcname, recursive=False)
+        with tarfile.open(tmp, "r:xz") as t:
+            sizes = {m.name: m.size for m in t.getmembers()}
+        for path, arcname in items:
+            if sizes.get(arcname) != Path(path).stat().st_size:
+                raise RuntimeError(f"tar size mismatch for {arcname}")
+        with open(tmp, "r+b") as f:
+            os.fsync(f.fileno())
+        os.replace(tmp, target)
+    except BaseException:
+        try:
+            tmp.unlink()
+        except OSError:
+            pass
+        raise
+
+
+def upload_part2_path(run_path):
+    return run_path.parent / (run_path.name + "-upload-part2.tar.xz")
+
+
+def build_upload_zip(cap, transcript, hourly, limit=UPLOAD_LIMIT_BYTES):
+    """The file a tester uploads, next to the run folder. Long run: the transcript, summary, gaps.log, index.csv and
+    every hours/*.zip (these already hold the CSVs). Short run: the transcript, summary, the raw frame files and the
+    CSVs converted from the logs. Written with the same verify-and-flush rules as the hour zips.
+
+    TASK-1986: the upload has to fit one Discord attachment (`limit`). A zip that is too big is packed as .tar.xz
+    instead; when that is still too big, the transcript, summary.txt, crashlog.log, the core dump and the device state
+    go into the first file and everything else into <run>-upload-part2.tar.xz. Every step is said on the console
+    and in summary.txt. Returns the path of the (first) file to upload."""
+    items, must = [], set()
+
+    def add(path, arcname, required=False):
         if Path(path).is_file():
             items.append((path, arcname))
+            if required:
+                must.add(arcname)
 
-    add(transcript, Path(transcript).name)
-    for pattern in ("coredump-*.bin", "device-state-*.txt", "graph-history-*.json", "graph-history-*.csv", "diag-recording-*.bin"):
+    add(transcript, Path(transcript).name, required=True)
+    add(cap.path("summary.txt"), "summary.txt", required=True)
+    add(cap.path("crashlog.log"), "crashlog.log", required=True)
+    for pattern, required in (("coredump-*.bin", True), ("device-state-*.txt", True), ("graph-history-*.json", False),
+                              ("graph-history-*.csv", False), ("diag-recording-*.bin", False)):
         for path in sorted(cap.run_path.glob(pattern)):
-            add(path, path.name)
+            add(path, path.name, required)
     csv_dir = cap.run_path / "csv-run.tmp"
+
+    def say(line):
+        cap.summary(line)
+
     try:
         if hourly:
-            for name in ("summary.txt", GAPS_LOG, INDEX_CSV):
+            for name in (GAPS_LOG, INDEX_CSV):
                 add(cap.path(name), name)
             for path in sorted(cap.store.hours_root.glob("*.zip")):
                 add(path, f"hours/{path.name}")
@@ -3010,9 +3059,33 @@ def build_upload_zip(cap, transcript, hourly):
                 add(path, f"csv/{path.name}")
         target = upload_zip_path(cap.run_path)
         write_zip_verified(target, items)
+        size = target.stat().st_size
+        if size <= limit:
+            return target
+        xz = target.with_name(target.name[:-len(".zip")] + ".tar.xz")
+        write_tar_xz_verified(xz, items)
+        xz_size = xz.stat().st_size
+        target.unlink()
+        if xz_size <= limit:
+            say(f"Upload: the zip was {size / 1e6:.1f} MB, more than one Discord attachment ({limit / 1e6:.0f} MB); "
+                f"packed as {xz.name} ({xz_size / 1e6:.1f} MB) instead, with every file.")
+            return xz
+        first = [it for it in items if it[1] in must]
+        rest = [it for it in items if it[1] not in must]
+        write_tar_xz_verified(xz, first)
+        part2 = upload_part2_path(cap.run_path)
+        write_tar_xz_verified(part2, rest)
+        say(f"Upload: one archive would be {xz_size / 1e6:.1f} MB, more than one Discord attachment "
+            f"({limit / 1e6:.0f} MB). {xz.name} ({xz.stat().st_size / 1e6:.1f} MB) holds the transcript, summary, "
+            f"crash log, core dump and device state; {part2.name} ({part2.stat().st_size / 1e6:.1f} MB) holds "
+            f"the rest: {', '.join(a for _, a in rest) or 'nothing'}. Upload both.")
+        for p in (xz, part2):
+            if p.stat().st_size > limit:
+                say(f"Upload: {p.name} is still {p.stat().st_size / 1e6:.1f} MB; share it another way "
+                    "(a cloud link) or ask in the channel.")
+        return xz
     finally:
         shutil.rmtree(csv_dir, ignore_errors=True)
-    return target
 
 
 # --------------------------------------------------------------------------- #
@@ -4005,7 +4078,11 @@ def main(argv=None):
     print(f"Diagnostic capture folder: {run_path}")
     print(f"Merged transcript: {transcript}")
     if upload is not None:
-        print(f"Upload this one file: {upload}", flush=True)
+        part2 = upload_part2_path(run_path)
+        if part2.exists():   # TASK-1986: too big for one Discord attachment
+            print(f"Upload these two files: {upload} and {part2}", flush=True)
+        else:
+            print(f"Upload this one file: {upload}", flush=True)
     signalled = cap.stop_reason in ("Ctrl+C/Ctrl+Break", "terminated (SIGTERM)", "terminal closed (SIGHUP)")
     if upload is None:
         return 1

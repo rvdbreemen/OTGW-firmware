@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Summarise an OTGW capture upload (TASK-1676).
 
-Input: an upload .zip / .7z, or a folder that holds one (long-run hours/*.zip or a flat run).
+Input: an upload .zip / .7z / .tar.xz (with its -part2), or a folder that holds one (long-run hours/*.zip or a flat run).
 Output: a Markdown report on stdout and a JSON file with the same facts (--json), so the
 analysis starts from counted facts instead of eyeballed log lines.
 
@@ -62,6 +62,13 @@ def unpack(src, work):
             if not exe:
                 sys.exit("7z archive but no 7-Zip found")
             subprocess.run([exe, "x", "-y", f"-o{out}", str(src)], check=True, stdout=subprocess.DEVNULL)
+        elif src.name.lower().endswith((".tar.xz", ".txz")):
+            # TASK-1986: an upload too big for one Discord attachment is a .tar.xz, with an optional -part2 next to it
+            import tarfile
+            part2 = src.with_name(src.name.replace("-upload.tar.xz", "-upload-part2.tar.xz"))
+            for part in [src] + ([part2] if part2 != src and part2.exists() else []):
+                with tarfile.open(part, "r:xz") as t:
+                    t.extractall(out, filter="data")   # the data filter refuses absolute paths and ../
         else:
             with zipfile.ZipFile(src) as z:
                 z.extractall(out)
