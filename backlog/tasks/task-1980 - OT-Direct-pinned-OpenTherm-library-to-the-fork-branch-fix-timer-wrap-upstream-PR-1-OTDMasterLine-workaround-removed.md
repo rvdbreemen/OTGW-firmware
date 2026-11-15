@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-15T16:03:00Z'
-updated_date: '2026-11-15T21:07:00Z'
+updated_date: '2026-11-15T21:11:00Z'
 labels:
   - otdirect
   - upstream
@@ -30,7 +30,7 @@ Robert DM 1571553430923911252 (answer B to 1571553264380547104), relayed by the 
 - [x] #3 TX stall 10 ms checked against frame length and ISR latency (CONFIG_GPTIMER_ISR_IRAM_SAFE, flash writes), reasoning + evidence in the notes
 - [x] #4 test_otd_master_line_stale_delay rewritten on the real library code with fake micros() across 2^31 and 2^32 us: red on the old pin f7d8254, green on the new pin
 - [ ] #5 Full test sweep and evaluate --quick green
-- [ ] #6 Bench by the bench tester on an OT-Direct unit: >= 80 min without a boiler past the 2^31 us mark, frames keep going, commands run
+- [x] #6 Bench by the bench tester on an OT-Direct unit: >= 80 min without a boiler past the 2^31 us mark, frames keep going, commands run
 - [x] #7 Bench limit stated: the boiler-side rxIdleLevel change of upstream 720cee9 is NOT testable without a boiler; it is listed as untested in the alpha note
 <!-- AC:END -->
 
@@ -54,4 +54,6 @@ Bench 09 FINAL (beta.325+9dba970 on .61, 89 min, uptime 5337 s, past 2^31 and 2^
 Push (21:4x): restacked on origin/dev e22c59ed1, renumbered beta.325 -> beta.328 (9918e9b88 + b6c91b3f4). Content checked against the benched a1a1e4175 minus version banners: only build-stamp lines differ; submodule 51aa68e. After the rebase: test_capture_device_data + test_capture_tool + test_otd_master_line_stale_delay + test_otd_slave_reply_gate 86 passed 2 skipped; all tests/test_otd_*.py + test_pic_pm_chain green; evaluate --quick 87 passed 0 failed. Bench ran on beta.325+9dba970 (same firmware code under a different label, below it origin moved by d3/ba lanes).
 
 Posted beta.328+c89f9b6 to #alpha-testing (Discord 1571632219645149195): zip sha256 44ef87d9b8d9ef47..., ino.bin 00d9408d610e75af...; app 2137699 B of 2293760 (93.2 %), safeboot 931648 B; build exit 0, built from pushed HEAD c89f9b6e6. AC7: the post line states as NOT tested the library's boiler-side idle-level change (upstream 720cee9, no boiler on the bench) and gateway mode with a thermostat (no thermostat sim). AC5 open: the full sweep has not been rerun on c89f9b6e6 (the targeted set and all test_otd_* are green; earlier 223/228 with the 5 red also red on origin). AC6 is 09's tick (final PASS in the notes above).
+
+2026-11-15 22:45 09: AC6 ticked from the 89 min bench on .61 with beta.325+9dba970 (past 2^31 and 2^32 us, frames kept going, REST TT=/MM= no 503, GW=R without a stall, otdcmdringdropped 0). Transfer to beta.328+c89f9b6 checked: the fix lives in the OpenTherm submodule, and src/libraries/OpenTherm points to 51aa68e in both 9dba970 and b6c91b3f4. NOT identical overall: OTDirect.ino differs by 159 lines and OTGW-ModUpdateServer-esp32.h by 117 between 9dba970 and b6c91b3f4, from other tasks rebased in (e.g. TASK-1981, TASK-1919); those are covered by their own benches. 328 runs on .61 tonight for TASK-1412.20/.21.
 <!-- SECTION:NOTES:END -->
