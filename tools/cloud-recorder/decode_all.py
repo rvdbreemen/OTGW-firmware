@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Decodes every stream of one gateway from the OTGW collection point (TASK-1938).
 
+    python3 decode_all.py --file otgw-recording.bin <out-dir> --image firmware.bin     (a local download)
     python3 decode_all.py http://<nas>:8090 <superuser-email> <password> <device-uid> <out-dir> \
         --image firmware.bin [--tz Europe/Amsterdam]
 
@@ -73,16 +74,54 @@ def decode_records(records, image, tz, out_dir):
     return counts
 
 
+def read_mix_file(path):
+    """The records of a local download (TASK-1991, "OTGWMIX1", RecRing.h) in the form fetch_batches returns.
+    Returns (records, header) with header = {"version", "firmware", "githash", "uid"}."""
+    import struct
+    data = open(path, "rb").read()
+    if data[:8] != b"OTGWMIX1":
+        raise ValueError(f"{path}: not an OTGWMIX1 recording")
+    version, hlen = struct.unpack_from("<HH", data, 8)
+    texts, i = [], 12
+    for _ in range(3):
+        n = data[i]
+        texts.append(data[i + 1:i + 1 + n].decode(errors="replace"))
+        i += 1 + n
+    records, i = [], hlen
+    while i + 20 <= len(data):
+        if data[i] != 0xA5:
+            raise ValueError(f"{path}: bad entry at byte {i}")
+        fmt, ln, seq, t0 = struct.unpack_from("<BHQq", data, i + 1)
+        if i + 20 + ln > len(data):
+            break                                          # the download ended inside this record
+        records.append({"seq": seq, "t0": t0, "fmt": fmt,
+                        "payload": base64.b64encode(data[i + 20:i + 20 + ln]).decode()})
+        i += 20 + ln
+    return records, {"version": version, "firmware": texts[0], "githash": texts[1], "uid": texts[2]}
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("base")
-    ap.add_argument("admin_email")
-    ap.add_argument("admin_password")
-    ap.add_argument("device_uid", help="otgw-<12 hex>, the uid the gateway enrolled with")
-    ap.add_argument("out_dir")
+    ap.add_argument("base", nargs="?", help="collection point URL (not with --file)")
+    ap.add_argument("admin_email", nargs="?")
+    ap.add_argument("admin_password", nargs="?")
+    ap.add_argument("device_uid", nargs="?", help="otgw-<12 hex>, the uid the gateway enrolled with")
+    ap.add_argument("out_dir", nargs="?")
+    ap.add_argument("--file", help="decode a local download (GET /api/v2/diag/recording) instead; then give only out_dir")
     ap.add_argument("--image", required=True)
     ap.add_argument("--tz", default="Europe/Amsterdam")
     a = ap.parse_args()
+    if a.file:
+        out = a.out_dir or a.base                          # with --file the only positional is the output folder
+        if not out:
+            sys.exit("--file needs an output folder")
+        records, hdr = read_mix_file(a.file)
+        c = decode_records(records, esp_image.EspImage(a.image), ZoneInfo(a.tz), out)
+        print(f"{hdr['uid']} {hdr['firmware']}: {c['records']} records, {c['frames']} OT frames, {c['ticks']} SAT "
+              f"ticks, {c.get('events', 0)} events, {c['debug_bytes']} debug bytes, {c['gaps']} gaps -> {out}")
+        return
+    if not (a.base and a.admin_email and a.admin_password and a.device_uid and a.out_dir):
+        sys.exit("give base admin_email admin_password device_uid out_dir, or --file <download> out_dir")
     base = a.base.rstrip("/")
     token = eb.api(base, "/api/collections/_superusers/auth-with-password", None,
                    {"identity": a.admin_email, "password": a.admin_password})["token"]

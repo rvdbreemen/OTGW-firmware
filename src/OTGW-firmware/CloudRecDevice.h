@@ -35,6 +35,7 @@
 #include <sys/time.h>
 #include "CloudRecCodec.h"
 #include "CloudRecPolicy.h"
+#include "RecRing.h"
 
 // Roots that sign the certificates Cloudflare serves for a proxied hostname (Google Trust Services, Let's
 // Encrypt). SHA-256 fingerprints checked against the system store on 2026-11-15:
@@ -139,7 +140,7 @@ struct CloudRecConfig {
 
 // Service state of the upload task. Capture (cloudRecActive) is on only in SVC_UP.
 enum CloudRecSvc : uint8_t { SVC_PROBE, SVC_UP, SVC_BACKOFF, SVC_UID_TAKEN, SVC_OFF };
-static volatile CloudRecSvc cloudRecSvc = SVC_PROBE;
+static volatile CloudRecSvc cloudRecSvc = SVC_OFF;   // SVC_PROBE once cloudRecSetup() finds the opt-in on
 static uint8_t  cloudRecBackoffStep = 0;
 static uint32_t cloudRecNextProbe = 0;            // millis() of the next attempt in SVC_PROBE/BACKOFF/UID_TAKEN
 static char cloudRecUid[18] = "";                 // otgw-<12 hex>
@@ -150,7 +151,7 @@ static CloudRecConfig cloudRecCfg;
 static crec::Recorder cloudRec;                     // the open record (about 13.5 KB, static: ADR-053)
 static uint8_t  cloudRecSendBuf[crec::REC_MAX_BYTES];
 // Slot 0 is the static buffer; slot 1 exists only on a PSRAM board (allocated in cloudRecSetup, TASK-1974).
-static crec::Slot cloudRecSlots[2] = {{cloudRecSendBuf, 0, 0, 0, false}, {nullptr, 0, 0, 0, false}};
+static crec::Slot cloudRecSlots[2] = {{cloudRecSendBuf, 0, 0, 0, false, false}, {nullptr, 0, 0, 0, false, false}};
 static uint64_t cloudRecSeqNext = 0;
 static PlatformMutex cloudRecLock = nullptr;
 static volatile bool cloudRecActive = false;
@@ -205,6 +206,7 @@ static void cloudRecCloseLocked(int64_t reopenMs) {
       f->t0 = cloudRec.t0Ms;
       f->len = cloudRec.close(f->buf, crec::REC_MAX_BYTES);
       f->seq = seq;
+      f->stored = false;
       f->busy = f->len > 0;
     }
   }
@@ -865,10 +867,162 @@ static int cloudRecProbe(bool &blocked) {
 // Stops capture. keep: the open record joins the send slot (or is counted lost when the slot is taken) and the
 // queued record waits for the service; it is sent first after the next successful login. !keep (blocked): all
 // of it goes.
+// ---------------------------------------------------------------- TASK-1991: the local sink (one recorder, two sinks)
+//
+// The same closed records go to a local ring (RecRing.h) while local recording is on, and to the collection point
+// while the cloud logs. Local recording is the ADR-213 switch (settings.diag.bRecordingOn, the /api/v2/diag/recording
+// routes); in this env it drives this ring instead of diagRec. PSRAM boards: a 1.5 MB ring, allocated once.
+// Boards without PSRAM: 8 KB of heap, refused when less than 5,120 B (ADR-030) would stay free.
+
+static const uint32_t CLOUDREC_RING_PSRAM = 1536u * 1024u;
+static const uint32_t CLOUDREC_RING_HEAP = 8192u;
+static crec::RecRing cloudRecRing;
+static PlatformMutex cloudRecRingLock = nullptr;
+static volatile bool cloudRecLocalOn = false;
+static uint8_t cloudRecLocalLastStart = DIAG_START_OK;
+static uint8_t *cloudRecRingPsram = nullptr;      // allocated once, never freed
+static uint8_t *cloudRecRingHeap = nullptr;
+static uint32_t cloudRecLocalLost = 0;            // records that did not get into the ring
+static bool cloudRecTaskStarted = false;
+
+static void cloudRecTask(void *);
+static void cloudRecIdentity();
+
+// The recorder itself: lock, first record, the second send slot on a PSRAM board, the task. Once.
+static bool cloudRecInitCore() {
+  if (!cloudRecLock) {
+    cloudRecLock = platformMutexCreate();
+    cloudRecSlots[1].buf = (uint8_t *)platformPsramAllocOnce(crec::REC_MAX_BYTES);   // nullptr without PSRAM
+    cloudRec.begin(cloudRecNowUs() / 1000);
+    cloudRecIdentity();
+  }
+  if (!cloudRecTaskStarted) {
+    cloudRecTaskStarted = platformTaskCreatePinned(cloudRecTask, "cloudrec", CLOUDREC_TASK_STACK, nullptr, 1);
+    if (!cloudRecTaskStarted) DebugTln(F("cloudrec: task create failed"));
+  }
+  return cloudRecLock && cloudRecTaskStarted;
+}
+
+// Capture runs while local recording is on or the cloud logs, once the clock is set (t0 and seq are epoch based).
+static void cloudRecUpdateActive() {
+  bool want = (cloudRecLocalOn || cloudRecSvc == SVC_UP) && time(nullptr) >= 1700000000;
+  if (want && !cloudRecActive) {
+    if (platformMutexLock(cloudRecLock, 200)) {
+      timeval tv;
+      gettimeofday(&tv, nullptr);
+      if (!cloudRecSeqNext) cloudRecSeqNext = (uint64_t)tv.tv_sec << 20;   // consecutive within a boot
+      cloudRec.begin(cloudRecNowUs() / 1000);
+      platformMutexUnlock(cloudRecLock);
+      cloudRecActive = true;
+      cloudRecEvBoot();                           // TASK-1473: reset reason of this boot, once
+    }
+  } else if (!want && cloudRecActive) {
+    cloudRecActive = false;
+  }
+}
+
+static void cloudRecRingPut(void *, uint8_t b) { cloudRecRing.byte(b); }
+
+// Writes a closed record into the ring, LZ-coded when that is smaller, exactly as it would be sent.
+static void cloudRecStoreLocal(crec::Slot &q) {
+  crec::Buf cnt;
+  cnt.initSink(cloudRecCountPut, nullptr);
+  crec::lzEncode(q.buf, q.len, cnt, cloudRecLz);
+  const bool lz = cnt.n < q.len;
+  const size_t n = lz ? cnt.n : q.len;
+  if (!platformMutexLock(cloudRecRingLock, 200)) { cloudRecLocalLost++; return; }
+  if (!cloudRecRing.begin(lz ? 5 : 4, (uint32_t)n, q.seq, q.t0, millis())) {
+    cloudRecLocalLost++;
+  } else {
+    if (lz) {
+      crec::Buf b;
+      b.initSink(cloudRecRingPut, nullptr);
+      crec::lzEncode(q.buf, q.len, b, cloudRecLz);
+    } else {
+      for (size_t k = 0; k < q.len; k++) cloudRecRing.byte(q.buf[k]);
+    }
+    cloudRecRing.commit();
+  }
+  platformMutexUnlock(cloudRecRingLock);
+}
+
+uint8_t cloudRecLocalStart() {
+  if (cloudRecLocalOn) return DIAG_START_ALREADY;
+  if (!cloudRecRingLock) cloudRecRingLock = platformMutexCreate();
+  uint8_t *mem = nullptr;
+  uint32_t cap = 0;
+  if (platformHasPsram()) {
+    if (!cloudRecRingPsram) cloudRecRingPsram = (uint8_t *)platformPsramAllocOnce(CLOUDREC_RING_PSRAM);
+    mem = cloudRecRingPsram;
+    cap = CLOUDREC_RING_PSRAM;
+    if (!mem) return cloudRecLocalLastStart = DIAG_REFUSED_ALLOC;
+  } else {
+    const uint32_t need = CLOUDREC_RING_HEAP + (cloudRecTaskStarted ? 0 : CLOUDREC_TASK_STACK);
+    if (platformFreeHeap() < need + DIAG_REC_MIN_FREE_AFTER) return cloudRecLocalLastStart = DIAG_REFUSED_HEAP;
+    mem = (uint8_t *)malloc(CLOUDREC_RING_HEAP);
+    cap = CLOUDREC_RING_HEAP;
+    if (!mem) return cloudRecLocalLastStart = DIAG_REFUSED_ALLOC;
+    cloudRecRingHeap = mem;
+  }
+  if (!platformMutexLock(cloudRecRingLock, 200)) {
+    if (cloudRecRingHeap) { free(cloudRecRingHeap); cloudRecRingHeap = nullptr; }
+    return cloudRecLocalLastStart = DIAG_REFUSED_ALLOC;
+  }
+  cloudRecRing.init(mem, cap);
+  cloudRecLocalLost = 0;
+  platformMutexUnlock(cloudRecRingLock);
+  if (!cloudRecInitCore()) return cloudRecLocalLastStart = DIAG_REFUSED_ALLOC;
+  cloudRecLocalOn = true;
+  DebugTf(PSTR("cloudrec: local recording on, %u KB ring in %s\r\n"), (unsigned)(cap / 1024),
+          cloudRecRingPsram && mem == cloudRecRingPsram ? "PSRAM" : "heap");
+  return cloudRecLocalLastStart = DIAG_START_OK;
+}
+
+bool cloudRecLocalStop() {
+  cloudRecLocalOn = false;
+  if (!cloudRecRingLock || !platformMutexLock(cloudRecRingLock, 200)) return false;
+  uint8_t *toFree = cloudRecRingHeap;
+  cloudRecRingHeap = nullptr;
+  if (toFree) cloudRecRing.init(nullptr, 0);   // a PSRAM ring keeps its records for a download after the stop
+  platformMutexUnlock(cloudRecRingLock);
+  if (toFree) free(toFree);
+  DebugTln(F("cloudrec: local recording off"));
+  return true;
+}
+
+void cloudRecLocalStatusRead(CloudRecLocalStatus &st) {
+  st.active = cloudRecLocalOn;
+  st.lastStart = cloudRecLocalLastStart;
+  st.psram = platformHasPsram();
+  st.exact = cloudRecRingLock && platformMutexTryLock(cloudRecRingLock);
+  st.entries = cloudRecRing.entries;
+  st.capBytes = cloudRecRing.cap;
+  st.dropped = cloudRecRing.evicted + cloudRecLocalLost;
+  uint64_t o = 0, nw = 0;
+  st.hasData = cloudRecRing.ready() && cloudRecRing.oldestSeq(o) && cloudRecRing.newestSeq(nw);
+  st.oldest = o;
+  st.newest = nw;
+  if (st.exact) platformMutexUnlock(cloudRecRingLock);
+}
+
+// One chunk of the download (async_tcp): never waits for the lock. DIAG_FILL_TRY_AGAIN when busy, 0 at the end.
+size_t cloudRecLocalFill(crec::RingCursor &c, uint8_t *buf, size_t cap) {
+  if (!cloudRecRingLock || !platformMutexTryLock(cloudRecRingLock)) return DIAG_FILL_TRY_AGAIN;
+  size_t n = cloudRecRing.ready() ? crec::ringFill(cloudRecRing, c, buf, cap, millis()) : 0;
+  if (!n) crec::ringFillDone(cloudRecRing);
+  platformMutexUnlock(cloudRecRingLock);
+  return n;
+}
+
+const char *cloudRecUidText() { return cloudRecUid; }
+
+// ---------------------------------------------------------------- service state
+
+// Stops the cloud side's capture (local recording keeps capturing). keep: the open record joins the send queue;
+// !keep (blocked): the queue goes, unless local recording still needs it.
 static void cloudRecPause(bool keep) {
-  cloudRecActive = false;
   if (platformMutexLock(cloudRecLock, 200)) {
-    if (keep) {
+    if (keep || cloudRecLocalOn) {
       cloudRecCloseLocked(cloudRecNowUs() / 1000);
     } else {
       for (auto &q : cloudRecSlots) q.busy = false;
@@ -879,17 +1033,9 @@ static void cloudRecPause(bool keep) {
 }
 
 static void cloudRecResume() {
-  if (platformMutexLock(cloudRecLock, 200)) {
-    timeval tv;
-    gettimeofday(&tv, nullptr);
-    if (!cloudRecSeqNext) cloudRecSeqNext = (uint64_t)tv.tv_sec << 20;   // consecutive within a boot
-    cloudRec.begin(cloudRecNowUs() / 1000);
-    platformMutexUnlock(cloudRecLock);
-  }
   cloudRecBackoffStep = 0;
   cloudRecSvc = SVC_UP;
-  cloudRecActive = true;
-  cloudRecEvBoot();                               // TASK-1473: reset reason of this boot, once
+  cloudRecUpdateActive();
   DebugTf(PSTR("cloudrec: logging as %s\r\n"), cloudRecUid);
 }
 
@@ -899,7 +1045,9 @@ static void cloudRecBackoff(const __FlashStringHelper *why, bool maxWait) {
   if (!maxWait && cloudRecBackoffStep < 255) cloudRecBackoffStep++;
   cloudRecNextProbe = millis() + wait;
   cloudRecSvc = maxWait ? SVC_UID_TAKEN : SVC_BACKOFF;
-  DebugTf(PSTR("cloudrec: %s; capture paused, next attempt in %u min\r\n"), (const char *)why, (unsigned)(wait / 60000));
+  cloudRecUpdateActive();
+  DebugTf(PSTR("cloudrec: %s; %s, next attempt in %u min\r\n"), (const char *)why,
+          cloudRecLocalOn ? "local recording goes on" : "capture paused", (unsigned)(wait / 60000));
 }
 
 static void cloudRecWriteConfig() {
@@ -913,7 +1061,8 @@ static void cloudRecBlocked() {                   // the maintainer blocked this
   cloudRecPause(false);
   cloudRecRemote = {crec::RM_DEFAULT, 0, 0};       // and any central telemetry mode ends with it
   cloudRecApplyRemote();
-  cloudRecSvc = SVC_OFF;
+  cloudRecSvc = SVC_OFF;                           // no further connection; local recording, if on, goes on
+  cloudRecUpdateActive();
   cloudRecCfg.enabled = false;
   cloudRecWriteConfig();
   DebugTf(PSTR("cloudrec: %s is blocked by the collection point; telemetry opt-in turned off\r\n"), cloudRecUid);
@@ -923,9 +1072,36 @@ static void cloudRecTask(void *) {
   uint32_t lastClose = millis();
   for (;;) {
     platformTaskDelay(500);
-    if (cloudRecSvc == SVC_OFF) break;            // blocked: no further connection, the task ends
+    cloudRecUpdateActive();                       // local recording on, or the clock just became valid
+    if (cloudRecActive && millis() - lastClose >= CLOUDREC_INTERVAL_MS) {
+      lastClose = millis();
+      cloudRecEvMinute();                         // TASK-1473: health and GET counts, then the record closes
+      if (platformMutexLock(cloudRecLock, 200)) {
+        cloudRecCloseLocked(cloudRecNowUs() / 1000);
+        platformMutexUnlock(cloudRecLock);
+      }
+    }
+    // Every closed record: first the local ring, then the cloud.
+    crec::Slot *q = crec::slotOldest(cloudRecSlots, 2);
+    if (q) {
+      if (cloudRecLocalOn && !q->stored) { cloudRecStoreLocal(*q); q->stored = true; }
+      if (cloudRecSvc == SVC_UP && isNetworkUp()) {
+        bool blocked;
+        crec::Outcome o = cloudRecUpload(*q, blocked);
+        if (blocked) cloudRecBlocked();
+        else if (o == crec::OUT_DOWN || o == crec::OUT_AUTH) {
+          cloudRecBackoff(F("upload failed"), false);
+          if (cloudRecLocalOn) q->busy = false;   // it is in the ring; the cloud gets the records from here on
+        } else {
+          q->busy = false;                        // stored, or a resend of a stored seq
+        }
+      } else if (cloudRecLocalOn || cloudRecSvc == SVC_OFF) {
+        q->busy = false;                          // local only, or no cloud at all
+      }
+    }
+    if (cloudRecSvc == SVC_OFF) continue;         // no cloud: nothing to connect
     if (!isNetworkUp()) {                         // own network down: pause, no backoff step
-      if (cloudRecSvc == SVC_UP) { cloudRecPause(true); cloudRecSvc = SVC_PROBE; cloudRecNextProbe = millis(); }
+      if (cloudRecSvc == SVC_UP) { cloudRecPause(true); cloudRecSvc = SVC_PROBE; cloudRecNextProbe = millis(); cloudRecUpdateActive(); }
       continue;
     }
     if (cloudRecSvc != SVC_UP) {
@@ -934,7 +1110,7 @@ static void cloudRecTask(void *) {
       bool blocked;
       int st = cloudRecProbe(blocked);
       if (blocked) cloudRecBlocked();
-      else if (st == 200) { cloudRecResume(); lastClose = millis(); }
+      else if (st == 200) { cloudRecResume(); }
       else if (st == 409) cloudRecBackoff(F("uid enrolled with another secret (delete it on the server)"), true);
       else cloudRecBackoff(F("service unreachable"), false);
       continue;
@@ -948,23 +1124,7 @@ static void cloudRecTask(void *) {
       else if (crec::classify(st) == crec::OUT_DOWN) { cloudRecBackoff(F("token refresh failed"), false); continue; }
       cloudRecLastRefresh = millis();
     }
-    if (millis() - lastClose >= CLOUDREC_INTERVAL_MS) {
-      lastClose = millis();
-      cloudRecEvMinute();                         // TASK-1473: health and GET counts, then the record closes
-      if (platformMutexLock(cloudRecLock, 200)) {
-        cloudRecCloseLocked(cloudRecNowUs() / 1000);
-        platformMutexUnlock(cloudRecLock);
-      }
-    }
-    crec::Slot *q = crec::slotOldest(cloudRecSlots, 2);
-    if (!q) continue;
-    bool blocked;
-    crec::Outcome o = cloudRecUpload(*q, blocked);
-    if (blocked) cloudRecBlocked();
-    else if (o == crec::OUT_DOWN || o == crec::OUT_AUTH) cloudRecBackoff(F("upload failed"), false);
-    else q->busy = false;                         // stored, or a resend of a stored seq
   }
-  platformTaskExit();
 }
 
 // ---------------------------------------------------------------- setup
@@ -1007,19 +1167,12 @@ static void cloudRecIdentity() {
 void cloudRecSetup() {
   cloudRecReadConfig();
   if (!cloudRecCfg.enabled || !cloudRecCfg.host[0]) {
-    DebugTln(F("cloudrec: off (no /cloudrec.cfg with enabled=1)"));
+    DebugTln(F("cloudrec: cloud upload off (no /cloudrec.cfg with enabled=1); local recording works as before"));
     return;
   }
-  cloudRecIdentity();
-  cloudRecSlots[1].buf = (uint8_t *)platformPsramAllocOnce(crec::REC_MAX_BYTES);   // nullptr without PSRAM
-  cloudRecLock = platformMutexCreate();
-  cloudRec.begin(cloudRecNowUs() / 1000);
-  cloudRecSvc = SVC_PROBE;                          // capture starts after the first login says it may
+  if (!cloudRecInitCore()) return;
+  cloudRecSvc = SVC_PROBE;                          // the cloud starts after the first login says it may
   cloudRecNextProbe = millis();
-  if (!platformTaskCreatePinned(cloudRecTask, "cloudrec", CLOUDREC_TASK_STACK, nullptr, 1)) {
-    DebugTln(F("cloudrec: task create failed"));
-    return;
-  }
   DebugTf(PSTR("cloudrec: on, %s:%u as %s, %d send slot(s), heap %u, block %u\r\n"), cloudRecCfg.host,
           (unsigned)cloudRecCfg.port, cloudRecUid, cloudRecSlots[1].buf ? 2 : 1, (unsigned)platformFreeHeap(),
           (unsigned)platformMaxFreeBlock());

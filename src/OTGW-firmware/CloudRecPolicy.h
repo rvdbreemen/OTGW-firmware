@@ -62,6 +62,7 @@ struct Slot {
   int64_t t0;
   uint64_t seq;
   volatile bool busy;
+  bool stored;           // TASK-1991: already written to the local ring
 };
 
 inline Slot *slotFree(Slot *s, int n) {

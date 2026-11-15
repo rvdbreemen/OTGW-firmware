@@ -1,7 +1,7 @@
 # anatomy.md
 
-> Auto-maintained by OpenWolf. Last scanned: 2026-11-15T21:45:28.293Z
-> Files: 167 tracked | Anatomy hits: 0 | Misses: 0
+> Auto-maintained by OpenWolf. Last scanned: 2026-11-15T22:27:38.904Z
+> Files: 168 tracked | Anatomy hits: 0 | Misses: 0
 
 ## ../../../../AppData/Local/Temp/
 
@@ -990,6 +990,7 @@
 
 - `CloudRecEvents.h` — pragma once (~858 tok)
 - `CloudRecPolicy.h` — pragma once (~563 tok)
+- `RecRing.h` — Declares uint32_t (~1282 tok)
 
 ## src/OTGW-firmware/data/
 

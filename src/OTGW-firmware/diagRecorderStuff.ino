@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : diagRecorderStuff.ino
-**  Version  : v2.0.0-poc.7
+**  Version  : v2.0.0-poc.8
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -55,15 +55,24 @@ void diagRecorderInit()
 // reports diagStartReasonText(diagRec.lastStart). Without the lock there is no safe recorder.
 DiagStartResult diagRecorderStart()
 {
+#if HAS_CLOUD_REC   // TASK-1991: one recorder; local recording is the cloud recorder's ring in this env
+  const DiagStartResult r = (DiagStartResult)cloudRecLocalStart();
+  if (r == DIAG_START_OK) updateSetting("DiagRecordingOn", "true");
+  return r;
+#else
   if (diagRecMutex == nullptr) return DIAG_REFUSED_ALLOC;
   const DiagStartResult r = diagRec.start(diagEnv);
   if (r == DIAG_START_OK) updateSetting("DiagRecordingOn", "true");   // first Setting record of the recording
   return r;
+#endif
 }
 
 bool diagRecorderStop()
 {
   updateSetting("DiagRecordingOn", "false");                          // last Setting record of the recording
+#if HAS_CLOUD_REC   // TASK-1991
+  return cloudRecLocalStop();
+#endif
   return diagRec.stop();
 }
 
@@ -72,6 +81,14 @@ bool diagRecorderStop()
 // manual start applies; a refusal leaves the flag set and the reason in diagRec.lastStart.
 void diagRecorderBootResume()
 {
+#if HAS_CLOUD_REC   // TASK-1991: the reboot is the first event (EV_REBOOT) once the recorder captures
+  if (settings.diag.bRecordingOn) {
+    const uint8_t r = cloudRecLocalStart();
+    DebugTf(PSTR("Recorder: resume %s%s%s\r\n"), r == DIAG_START_OK ? "started" : "refused", r == DIAG_START_OK ? "" : ": ",
+            diagStartReasonText((DiagStartResult)r));
+  }
+  return;
+#endif
   if (!settings.diag.bRecordingOn || diagRecMutex == nullptr) return;
   // platformResetReason(): "Exception/panic", "Interrupt watchdog", "Task watchdog", "Other watchdog", "CPU lock-up"
   const bool crashed = strstr_P(lastReset, PSTR("panic")) != nullptr || strstr_P(lastReset, PSTR("atchdog")) != nullptr ||

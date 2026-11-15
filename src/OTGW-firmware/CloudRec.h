@@ -22,6 +22,20 @@ void cloudRecTeeFlush();                                                        
 void cloudRecSetup();                                                                     // from setup()
 void cloudRecSatTickf(const char *fmt, ...);   // a SATTICK line with SAT debug off: recorder only (TASK-1974)
 
+// TASK-1991: local recording into a ring of the same records (the /api/v2/diag/recording routes in this env).
+#include "RecRing.h"
+struct CloudRecLocalStatus {
+  bool active, psram, exact, hasData;
+  uint8_t lastStart;                 // a DiagStartResult
+  uint32_t entries, capBytes, dropped;
+  uint64_t oldest, newest;
+};
+uint8_t cloudRecLocalStart();        // a DiagStartResult
+bool cloudRecLocalStop();
+void cloudRecLocalStatusRead(CloudRecLocalStatus &st);
+size_t cloudRecLocalFill(crec::RingCursor &c, uint8_t *buf, size_t cap);   // DIAG_FILL_TRY_AGAIN when busy, 0 at the end
+const char *cloudRecUidText();
+
 // Print that writes through to the telnet debug sink and keeps a copy of the current line.
 class CloudRecTee : public Print {
  public:

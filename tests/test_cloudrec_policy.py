@@ -47,7 +47,7 @@ int main() {
   }
   static uint8_t b0[4], b1[4];
   for (int two = 0; two < 2; two++) {                      // one slot (no PSRAM) and two slots (PSRAM)
-    crec::Slot q[2] = {{b0, 0, 0, 0, false}, {two ? b1 : nullptr, 0, 0, 0, false}};
+    crec::Slot q[2] = {{b0, 0, 0, 0, false, false}, {two ? b1 : nullptr, 0, 0, 0, false, false}};
     uint64_t seq = 10;
     int lost = 0;
     for (int step = 0; step < 6; step++) {                 // close three records, send one, close three more

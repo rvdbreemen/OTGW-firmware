@@ -46,7 +46,7 @@ the bench (`docs/diagnostics/cloudrec-bench-job.md`).
 
 ## Status History
 
-- 2026-11-15: Proposed (TASK-1473, built on TASK-1862, TASK-1938, TASK-1963, TASK-1971, TASK-1972, TASK-1974,
+- 2026-11-15: Proposed (TASK-1473, TASK-1991, built on TASK-1862, TASK-1938, TASK-1963, TASK-1971, TASK-1972, TASK-1974,
   TASK-1979).
 
 ## Context
@@ -86,10 +86,15 @@ traffic out.
    2026-11-15). This narrows ADR-213's bridge exclusion for this recorder only: the local recorder of ADR-213 keeps
    leaving bridge traffic out, and the outbound PIC stream stays untouched (ADR-177). A line the ADR-217 SAT filter
    drops is recorded as refused.
-7. **Telemetry mode per gateway**, set in its record by the maintainer only: default, full, full+trace or custom
+7. **One recorder, two sinks** (maintainer decision 2026-11-15, option A): the closed records also go to a local
+   ring (PSRAM 1.5 MB or 8 KB heap), so local recording without a backend keeps working and both sinks carry the
+   same records; one decoder reads a download and the collection point. In the PoC env the ADR-213 routes and
+   switch drive this ring; the normal build and the retirement of `diagRec` follow after the bench (a separate
+   ADR then supersedes ADR-213's format).
+8. **Telemetry mode per gateway**, set in its record by the maintainer only: default, full, full+trace or custom
    log flags, with an end time after which the gateway returns to default by itself; never the simulation
    switches.
-8. **Accepted exposure:** TLS ends at the Cloudflare edge, so Cloudflare can read the payload (maintainer
+9. **Accepted exposure:** TLS ends at the Cloudflare edge, so Cloudflare can read the payload (maintainer
    decision 2026-11-15, no device-side encryption).
 
 ## Decision Contract

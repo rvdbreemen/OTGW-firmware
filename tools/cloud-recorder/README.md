@@ -143,6 +143,13 @@ The gateway records and uploads by itself over HTTPS, also on a board without PS
   to a full handshake; TASK-1974) to the collection point, certificate check against GTS Root R1/R4 and
   ISRG Root X1/X2, `?fields=id`. Off unless `/cloudrec.cfg` on LittleFS has `enabled=1` plus `host` and `port`
   (the opt-in).
+- **One recorder, two sinks (TASK-1991):** the same closed records also go to a local ring (`RecRing.h`: 1.5 MB
+  of PSRAM, or 8 KB of heap with the ADR-213 start rule), LZ-coded as sent. Local recording is the existing switch
+  (web UI Advanced > Debug, `/api/v2/diag/recording/start|stop`, resumes at boot); in this env it drives this ring
+  and `diagRec` stays off. Capture runs while local recording is on or the cloud logs, so a cloud outage no longer
+  pauses a local recording. `GET /api/v2/diag/recording` gives an `OTGWMIX1` file:
+  `python3 decode_all.py --file otgw-recording.bin out/ --image <the .ino.bin>` writes the same four logs.
+  Phase 2 (after the bench): the normal build switches and `diagRec` retires.
 - **Events (TASK-1473, ADR-243):** a fifth section (SEC_EVT, 1,408 B) records everything the firmware receives,
   sends or measures besides OT/SATTICK/debug: commands and responses, MQTT, REST (GET 200 counted per route per
   minute), sensors (Dallas, S0, BLE, weather), WiFi, settings, time sync, reboot, telnet keys, webhook, firmware
