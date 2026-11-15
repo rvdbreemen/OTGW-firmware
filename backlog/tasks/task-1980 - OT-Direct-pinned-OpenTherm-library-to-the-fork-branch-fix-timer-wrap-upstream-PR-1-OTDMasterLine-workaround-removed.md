@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-15T16:03:00Z'
-updated_date: '2026-11-15T20:54:00Z'
+updated_date: '2026-11-15T21:07:00Z'
 labels:
   - otdirect
   - upstream
@@ -31,7 +31,7 @@ Robert DM 1571553430923911252 (answer B to 1571553264380547104), relayed by the 
 - [x] #4 test_otd_master_line_stale_delay rewritten on the real library code with fake micros() across 2^31 and 2^32 us: red on the old pin f7d8254, green on the new pin
 - [ ] #5 Full test sweep and evaluate --quick green
 - [ ] #6 Bench by the bench tester on an OT-Direct unit: >= 80 min without a boiler past the 2^31 us mark, frames keep going, commands run
-- [ ] #7 Bench limit stated: the boiler-side rxIdleLevel change of upstream 720cee9 is NOT testable without a boiler; it is listed as untested in the alpha note
+- [x] #7 Bench limit stated: the boiler-side rxIdleLevel change of upstream 720cee9 is NOT testable without a boiler; it is listed as untested in the alpha note
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -52,4 +52,6 @@ Bench 09 check #2 (beta.325 on .61): PASS. Past 2^31 us (uptime 2147 s, ~20:30:3
 Bench 09 FINAL (beta.325+9dba970 on .61, 89 min, uptime 5337 s, past 2^31 and 2^32 us): PASS. R frames >=49/min in every sample except the three GW=R minutes (46-48); PR=T answered 96/96; otdcmdringdropped 0; otdrequestactive toggles; bootcount 791 constant; no new crashlog; settings diff empty. Not testable on the bench: the boiler-side idle-level change of upstream 720cee9 (no boiler), gateway mode with a thermostat (no thermostat sim). Evidence: 09 scratchpad b325/ (watch.log, telnet.raw).
 
 Push (21:4x): restacked on origin/dev e22c59ed1, renumbered beta.325 -> beta.328 (9918e9b88 + b6c91b3f4). Content checked against the benched a1a1e4175 minus version banners: only build-stamp lines differ; submodule 51aa68e. After the rebase: test_capture_device_data + test_capture_tool + test_otd_master_line_stale_delay + test_otd_slave_reply_gate 86 passed 2 skipped; all tests/test_otd_*.py + test_pic_pm_chain green; evaluate --quick 87 passed 0 failed. Bench ran on beta.325+9dba970 (same firmware code under a different label, below it origin moved by d3/ba lanes).
+
+Posted beta.328+c89f9b6 to #alpha-testing (Discord 1571632219645149195): zip sha256 44ef87d9b8d9ef47..., ino.bin 00d9408d610e75af...; app 2137699 B of 2293760 (93.2 %), safeboot 931648 B; build exit 0, built from pushed HEAD c89f9b6e6. AC7: the post line states as NOT tested the library's boiler-side idle-level change (upstream 720cee9, no boiler on the bench) and gateway mode with a thermostat (no thermostat sim). AC5 open: the full sweep has not been rerun on c89f9b6e6 (the targeted set and all test_otd_* are green; earlier 223/228 with the 5 red also red on origin). AC6 is 09's tick (final PASS in the notes above).
 <!-- SECTION:NOTES:END -->

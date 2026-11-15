@@ -4,11 +4,11 @@ title: >-
   The filesystem image ships a default settings.ini that differs from the
   firmware's own first-boot defaults and makes a fresh unit look like a 1.x
   upgrade
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-14T04:28:00Z'
-updated_date: '2026-11-15T15:07:00Z'
+updated_date: '2026-11-15T21:07:00Z'
 labels:
   - bug
   - settings
@@ -42,3 +42,9 @@ Analysis (session 95, 2026-11-15, code read): the shipped data/settings.ini (14 
 Decision: coordinator under Robert's delegation (CLI 2026-11-15: 'only ask what we really can't'), option A: remove data/settings.ini from the image; B (align the file + an equality test, defaults in two places) and C (keep, document a fresh flash as a 1.x upgrade) considered. Implemented: git rm src/OTGW-firmware/data/settings.ini; tests/webui/update-orchestrator.test.mjs now lists settings.ini among the runtime files that must not be in the image (it asserted the opposite); tests/test_wifi_deadlink.py and test_wifi_skip_portal.py take the 16 header bytes writeSettings() writes as a literal instead of reading the shipped file; docstring of test/host/test_fs_ota_rtc_snapshot.py, docs/guides/WIFI_FIRMWARE_UPDATE.md (image holds no settings.ini), CHANGELOG Changed line; manual ch02/h02 note that a factory-new PIC starts in monitor mode and needs GW=1 once. AC3 evidence: new tests/test_fs_image_settings_defaults.py (no settings.ini in data/ or added by stage_data_dir(); readSettings() writes and re-reads the defaults and writeSettings() writes MQTTenable/MQTTuseLegacyOtTopics/ui_onboarded; struct defaults MQTT on, new topics, wizard not done): 3/3 OK, test_1 FAIL with the file back. Sweep 27 tests touching data/ or the image green. AC1 (bench: what a fresh image flash starts with) open, low priority in 09's queue. Release-notes line to 92: 'A freshly flashed unit now starts with the normal defaults (MQTT on, new topic names, setup wizard) instead of looking like a 1.x upgrade.'
 2026-11-15 15:58-16:12 bench 09 on .61, beta.320+5b9efcc (image without data/settings.ini). (a) filesystem OTA over existing settings: ota_flash 'settings: 165 keys, changed: none', REST diff [], settings.ini diff empty (ADR-233 RTC restore). (b) 'fresh unit': saved settings.ini, deleted it (/api/listfiles?delete=/settings.ini -> 'File deleted', GET /settings.ini 404), reboot: the unit came back with the firmware defaults: hostname OTGW2, MQTTenable true, MQTTuseLegacyOtTopics false, ui_onboarded false, mqttbroker homeassistant.local (REST and the newly written settings.ini agree); WiFi kept (credentials in NVS, WifiStaticIP empty). Restore: saved settings.ini uploaded (POST /upload path=// -> 303, byte-identical), reboot, hostname marvin-otgw32, REST diff [] and settings.ini diff vs before 320 empty. Not done: a full USB erase + fresh image flash (would wipe the WiFi credentials); the deleted-ini boot plus this image (no settings.ini inside) stands in for it. Evidence: 09 scratchpad b320/fresh (defaults.json, defaults.ini, saved/after files).
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Option A (coordinator under Robert's delegation): data/settings.ini removed from the LittleFS image; a fresh unit now starts on the firmware's own defaults. AC1 (09, bench .61, beta.320+5b9efcc): with settings.ini deleted the unit booted on the struct defaults (MQTTenable true, MQTTuseLegacyOtTopics false, ui_onboarded false, hostname OTGW2); a filesystem OTA over existing settings changed nothing (165 keys, REST diff [], ADR-233 restore); red/green image evidence by 09 on 317 vs 323 in the notes. AC2: option A chosen. AC3: tests/test_fs_image_settings_defaults.py 3/3 OK, test_1 FAIL with the file put back; update-orchestrator.test.mjs lists settings.ini as a runtime file that must not be in the image; sweep of 27 tests touching data/ or the image green. Not done: a full USB erase + fresh image flash (would wipe WiFi credentials); the deleted-ini boot on an image without settings.ini stands in for it.
+<!-- SECTION:FINAL_SUMMARY:END -->
