@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-14T17:47:00Z'
-updated_date: '2026-11-15T12:33:00Z'
+updated_date: '2026-11-15T15:20:00Z'
 labels:
   - bug
 milestone: 2.0.0
@@ -51,4 +51,6 @@ Scope: the SAT simulation can only stay on without a boiler: a real boiler frame
 2026-11-15 bench (09 on .63, beta.306+041400e, relayed by the coordinator): PASS for AC3: PR= passes the simulation gate, /api/v2/pic/settings 15/15 (0/15 on beta.294). Correction to my bench brief: with SAT enabled a REST CS=40 is refused by the ADR-179 queue rule ('CS=40 refused, SAT is enabled'), before the simulation gate, so the 'SAT-SIM trace: CS=40' line I asked for cannot appear; nothing reaches the PIC either way. That 503 answer is TASK-1970. Side finding TASK-1971 (PIC cycle waits ~4-5 min after boot while the discovery drip runs). Pushed: origin/dev 11c5b268a..aa7b7f382 (beta.304-306, src identical to the benched 041400e: git diff 041400e aa7b7f382 -- src/ is empty); build posted in #alpha-testing (message 1571501313064312873). AC3 left for the bench-tester to tick.
 
 2026-11-15 12:35-12:42 bench 09 on .63 (Classic, PIC 6.8), beta.306+041400e (on origin/dev aa7b7f382), SAT enabled + SAT simulation ON, no OT bus. GREEN with the sim on: telnet 'Sending to Serial [PR=O/S/W/M/G/I/L…]', each answered (PR: O=N, S=16.00, W=1, M=G, G=00, I=11, L=FXOMPC …); GET /api/v2/pic/settings 15/15 filled; otgwmode ON. RED for this (beta.294 same unit, sim on, 10:00 run): 0/15, queue entries consumed without 'Sending to Serial'. Right after the boot the cycle waits ~4-5 min while the MQTT discovery drip ticks every 1 s (queryNextPICsetting dripDueWithinMs(500), OTGW-Core.ino:1300); in that window 0/15 even after 80 s; after the drip it runs at once (UX note, not a regression). CS=40 with SAT on: refused before the sim gate ('CS=40 refused, SAT is enabled'), nothing to the PIC; REST then said 503 'queue full' (fixed by TASK-1970: 409, verified on beta.304). NOT separately captured on 306: the otgw-pic/settings/* MQTT publish with the sim on (the publish path itself was seen on 294 with the sim off at 10:00: tweaks, temp_sensor, smart_power, … + gateway_mode ON). Evidence: 09 scratchpad b306/63 (t1943.log, telnet1943.raw, run2/, picsettings.json).
+
+2026-11-15 16:13-16:19 (09, closes the AC3 MQTT gap noted at 12:42): .63 (Classic, PIC 6.8) on the post build beta.317+c1005d1 (contains the 1943 fix, origin/dev c1005d199), SAT enabled + SAT simulation ON, passive mosquitto_sub on OTGW/value/otgw-AC276ECE45D8/otgw-pic/# for 330 s from the boot, no commands to the unit: all otgw-pic/settings/* were published after the boot cycle - setpoint_override N, setback 16.00, dhw_override 1, gpio 00, gpio_states 11, led FXOMPC, tweaks 11, temp_sensor O, smart_power Low power, thermostat_detect D, builddate 11:55 25-08-2026, clock_mhz 4 MHz, reset_cause E, standalone_interval 1000, voltage_ref 5 - plus otgw-pic/gateway_mode ON and version/deviceid/firmwaretype/designer. Evidence: 09 scratchpad p317/63/mqtt-pic.txt.
 <!-- SECTION:NOTES:END -->
