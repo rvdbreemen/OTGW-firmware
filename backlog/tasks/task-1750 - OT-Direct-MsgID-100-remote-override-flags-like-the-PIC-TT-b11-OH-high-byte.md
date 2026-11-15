@@ -7,7 +7,7 @@ status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-09T09:28:00Z'
-updated_date: '2026-11-15T10:28:00Z'
+updated_date: '2026-11-15T11:37:00Z'
 labels:
   - otdirect
   - needs-maintainer-ok
@@ -37,6 +37,8 @@ PIC 6.8 parity audit 2026-11-12 (docs/reviews/2026-11-12_pic68-otdirect-parity-a
 Decision (Robert, DM 1571426506259963986, reply to the coordinator triage question 5/5 DM 1571283755438448772: "TASK-1750 + TASK-1751 (OT-Direct): MsgID 100 remote-override flags like the PIC (TT b'11', OH= high byte), and TT=0 also clears an MQTT room_setpoint/BS= on MsgID 16. A) both PIC parity, consistent with your 'like the PIC' on 1806. B) keep ADR-223 as is. Recommendation: A"): "A". Reading: PIC parity. PIC source (OTGW-other-projects/otgw-6.8 gateway.asm): SetTempSetPoint :4088-4092 passes b'11' (manual + program change), SetContSetPoint :4083-4087 passes b'01'; SetSetPoint :4096-4098 stores them in the low nibble of RemOverrideFunc; OH= (header :142) copies the low byte of MsgID 100 into the high byte. Implement in lane-95-next with a host test red/green. ADR-223 needs no amendment for this: its Decision already says the MsgID 100 function bits are b'11' for TT and b'01' for TC (gateway.asm:4053-4063 in its citation); OT-Direct's 0x0002 is a deviation from it.
 
 Implemented (lane-95-next): otdOverrideFlagsData(temporary, overrideHigh) in the otdRemoteOverrideReply block of OTDirect.ino: TT= 0x0003, TC= 0x0001, with OH=1 the low byte copied into the high byte (0x0303 / 0x0101); used for the thermostat's MsgID 100 read answer (replyToThermostat) and the master-mode WRITE 100; otdRemoteOverrideReply no longer masks the flags to the low byte. Evidence: tests/test_otd_tt_pic_parity.py (real handleOTDirectCommand, setRemoteOverride, replyToThermostat gateway loop) 46/46 OK on the lane; with OTGW_OTD_INO=HEAD's OTDirect.ino 7 FAIL, of them for this task B2 (TT flags 0x0002 != 0x0003), M1 (master WRITE 100 0x0002), O1 (OH=1 TT -> 0x0303), O2 (OH=1 TC -> 0x0101), O3 (OH=0 TT 0x0003). The OH default (PIC 1, OT-Direct 0) is a separate task.
+
+Seam fix (ba, 2026-11-15): test/host/test_override_reply.cpp went red on origin after this task (43db6fda1): its slice 'otLoopbackData .. handleMasterResponse' now holds replyToThermostat() calling otdOverrideFlagsData(..., otOverrideHB != 0), and otOverrideHB (OTDirect.ino:691) was in no slice (C2065, with a C2660 follow-up error). Fix: anchor 'otOverrideHB' in test/host/build_and_run_override_reply.ps1. Red on 19a9f1adf, test/host/test_override_reply.py 4/4 after. My sweeps had run tests/*.py only, not test/host/.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary

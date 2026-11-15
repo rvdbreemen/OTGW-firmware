@@ -100,6 +100,7 @@ $otdAnchors = @(
      EndRegex = '^static uint16_t otdUpperBoundF88\(uint8_t boundId, uint8_t fallback\)\s*\{'; EndKind = 'construct'; Optional = $true },   # TASK-1844
   @{ Name = 'setOverride, clearOverride';   Kind = 'range';     Regex = '^static void setOverride\(uint8_t msgId, uint16_t value\)\s*\{';
      EndRegex = '^static void clearOverride\(uint8_t msgId\)\s*\{'; EndKind = 'construct' },
+  @{ Name = 'otOverrideHB';                 Kind = 'construct'; Regex = '^static uint8_t otOverrideHB\b'; Optional = $true },   # TASK-1750: replyToThermostat builds the MsgID 100 flags with OH=
   @{ Name = 'otDHWOverride';                Kind = 'construct'; Regex = '^static uint8_t otDHWOverride\b' },
   @{ Name = 'SR, UI and RM tables';         Kind = 'range';     Regex = '^static constexpr uint8_t OT_RESPONSE_OVERRIDE_MAX\b';
      EndRegex = '^static void clearUnknownCount\(uint8_t msgId\)\s*\{'; EndKind = 'construct' },
