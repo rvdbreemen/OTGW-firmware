@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v2.0.0-beta.301
+**  Version  : v2.0.0-beta.304
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -1363,15 +1363,19 @@ static void handlePRresponse(const char* buf, size_t len) {
   const char  reg   = payload[0];
   const char* value = payload + 2;
 
-  // --- Gateway mode (register 'M'): "M=G" or "M=M" ---
+  // --- Gateway mode (register 'M'): the PIC answers "M=G" or "M=M" ---
+  // OT-Direct also answers its own modes (OTDirect.ino, PR=M; TASK-1951):
+  // S (standalone master) and L (loopback) generate the frames, so gateway ON;
+  // P (bypass relay, thermostat wired to the boiler) is OFF like M.
   if (reg == 'M') {
     static bool prevGatewayMode = false;
     static bool prevGatewayKnown = false;
     char modeVal = value[0];
     bool isGateway;
-    if (modeVal == 'G' || modeVal == 'g') {
+    if (modeVal == 'G' || modeVal == 'g' || modeVal == 'S' || modeVal == 's' ||
+        modeVal == 'L' || modeVal == 'l') {
       isGateway = true;
-    } else if (modeVal == 'M' || modeVal == 'm') {
+    } else if (modeVal == 'M' || modeVal == 'm' || modeVal == 'P' || modeVal == 'p') {
       isGateway = false;
     } else {
       OTDebugTf(PSTR("handlePRresponse: PR=M unexpected value [%c]\r\n"), modeVal);
