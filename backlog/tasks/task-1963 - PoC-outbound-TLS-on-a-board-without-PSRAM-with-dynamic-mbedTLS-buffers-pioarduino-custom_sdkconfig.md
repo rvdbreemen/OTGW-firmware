@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-15T09:35:00Z'
-updated_date: '2026-11-15T10:54:00Z'
+updated_date: '2026-11-15T12:15:00Z'
 labels:
   - research
   - tls
@@ -60,4 +60,6 @@ Out of scope for the PoC: web UI settings, consent dialog, SAT encoding without 
 2026-11-15 firmware PoC built in the cloud container (build.sh --target esp32-combo-tlsdyn --firmware, version 2.0.0-poc.1). sdkconfig.esp32-combo-tlsdyn: CONFIG_MBEDTLS_DYNAMIC_BUFFER=y, DYNAMIC_FREE_CONFIG_DATA=y, DYNAMIC_FREE_CA_CERT=y, ASYMMETRIC_CONTENT_LEN=y (IN 16384, OUT 4096), SSL_PROTO_DTLS not set (Kconfig drops DYNAMIC_BUFFER while DTLS is on, as the Arduino defaults have it), CONFIG_SPIRAM=y. Sizes vs a normal esp32-combo build of the same tree: static RAM 152,524 B vs 130,524 B (+22.0 KB: recorder 15.2 KB, send buffer 4.1 KB, login reply 1 KB, token 0.4 KB, tee 0.25 KB, TLS client code); app 2,267,467 B vs 2,153,863 B of the 2,293,760 B slot (98.9 % vs 93.9 %, 26 KB left; this env has no LTO). Build time: IDF hybrid compile about 2.5 min + firmware about 1 min per clean build. Firmware module: CloudRecCodec.h (encoders, shared with the host test), CloudRec.h/.ino + CloudRecDevice.h (capture tee in Debug/Debugln, _debugBOL/_debugPrintf_P hooks, processOT hook next to diagRec, uploader task 10 KB stack, HTTPS POST with 4 pinned roots, PocketBase login, /cloudrec.cfg). HAS_CLOUD_REC only in this env; normal esp32-combo builds unchanged (verified: SUCCESS, sizes above). Host test tests/test_cloudrec_codec.py (real header compiled): 3/3 OK; mutation RC_SHIFT 4->5 makes 2 of 3 fail. evaluate.py --quick: 100 %, exit 0. Not done here: the bench (AC 2, 3).
 
 2026-11-15 telemetry completeness analysis: docs/diagnostics/cloud-telemetry-completeness.md. Verdict: not complete. PoC = OT frames + SATTICK + Debug text; diagRec (ADR-213) adds commands/responses/MQTT/REST writes/settings/BLE/weather/NTP/reboot. Gaps: Dallas, S0 (only via MQTT publish), REST GET + status, telnet commands, WebSocket, webhook, MQTT discovery/connection, network events, OTA/safeboot/PIC flash, heap/task health, SAT decisions, port 25238 bridge. Proposal: cloud upload as second sink of diagRec + 11 new record types. Open for Robert: bridge (new ADR vs ADR-213), REST GET, SAT_EVENT fields (Sergeant D).
+
+2026-11-15 Robert decision 1 (bridge 25238): A. Record inbound bridge commands only, as text, only while cloud recording runs; needs a new ADR superseding the bridge exclusion of ADR-213; SAT-filtered commands (ADR-217) marked as refused. Outbound stream not recorded (already in the OT section).
 <!-- SECTION:NOTES:END -->
