@@ -3,11 +3,11 @@ id: TASK-1952
 title: >-
   SAT simulation: put the real PID and heating-curve recommendation RAM state
   back when a simulation run ends
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-14T23:22:00Z'
-updated_date: '2026-11-15T02:50:00Z'
+updated_date: '2026-11-15T05:32:00Z'
 labels:
   - sat
   - simulation
@@ -38,4 +38,12 @@ Implementation changed from the stash in the design note to a reload from the fi
 Evidence AC1: new tests/test_sat_sim_end_restore.py on the real satSimEndRestore(): on->off reloads once in boot order (reset, loadpid, loadhcr, rec), entering a run or never simulating reloads nothing, a unit booted in simulation reloads when it ends, two runs reload twice, and it sits before the first early return of satControlLoopRun (5/5 OK). On the code before (HEAD 147324f96) the function does not exist: red by construction. That the files hold the pre-run state is TASK-1900's tests/test_sat_sim_no_learner_save.py; that satLoadPidState() restores them is tests/test_sat_pid_persist.py (both OK). Harnesses cutting satControlLoopRun: 27 files OK; test_sat_curve_selftune needed the call after satCurveTuneService() (its source check), done. evaluate.py --quick 0 failed. Not benched (needs a sim run + file comparison on .61: suggested for the next bench).
 
 Behaviour proof added (coordinator review): class SimEndRestoreBehaviour in tests/test_sat_sim_end_restore.py compiles the real PID persistence and PID state code (pieces of test_sat_pid_persist, real files) and the real head of satControlLoopRun() up to satRetryRelease() (present in old and new code): save I=1.25 RD=0.02, simulation on, the run moves them to 7.77/0.5, simulation off. Fix: 'I=1.2500 RD=0.0200 HCR=1 REC=1' OK. Old (SATcontrol.ino at 147324f96): FAILED, 'I=7.7700 RD=0.5000 HCR=0 REC=0' (fails on the values). Whole file 6/6 OK; test_sat_pid_persist OK.
+
+Build esp32-combo 2.0.0-beta.295+58332e4 OK (wrapper exit 0, 05:42; ino sha256 6b11f926ffd7..., littlefs 4480311997ab...). Bench 09 on .61 (via coordinator): PASS incl. step 5 (boot with simulation on): reload line seen, file i=1.2345 -> status PID I 1.235 after the run, files untouched during the simulation, 4x simulation on/off without a crash. Field only: 'the next 5-min save keeps the real value' (on the bench SAT goes inactive after the no-boiler hand-back, so no periodic save runs).
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+When a SAT simulation run ends, satSimEndRestore() reloads the real PID state (satPidReset + satLoadPidState, the boot path) and the heating-curve data (satHCRLoadState + recommendation) from the files, which TASK-1900 keeps untouched during the run; RAM cost 0; also right for a unit that boots with simulation on. AC1: tests/test_sat_sim_end_restore.py, behaviour class red on old (I=7.7700) and green on the fix (I=1.2500); bench 09 beta.295 PASS. AC2: method and RAM cost named. Field: the next periodic save after a run.
+<!-- SECTION:FINAL_SUMMARY:END -->
