@@ -3897,7 +3897,9 @@
   // The table holds the ids of otOverrides[] in OTDirect.ino; no other id can be a write override.
   var OTD_WRITE_CMD = {
     1: { cmd: 'CS', what: 'graph.otd_what_cs', clear: 'CS=0', sat: true },
-    7: { cmd: 'CC/CL', what: 'graph.otd_what_cooling', clear: 'CL=0' },   // CL=0 clears 7; CC=0 would write 0
+    // TASK-1958: CL=0 holds a cooling level of 0 (PIC SetCoolLevel, gateway.asm 6.8:4454-4464; OT-Direct the same);
+    // only a value that is not a number clears 7, answered "CL: -". CC= has no clear of its own.
+    7: { cmd: 'CC/CL', what: 'graph.otd_what_cooling', clear: 'CL=-' },
     8: { cmd: 'C2', what: 'graph.otd_what_ch2', clear: 'C2=0', sat: true },
     14: { cmd: 'MM', what: 'graph.otd_what_mm', clear: 'MM=T', sat: true },   // a non-numeric MM= clears
     // 16 is set by BS= and the MQTT room_setpoint route (TT=/TC= only in master mode); BS=0 clears it whatever set it.
