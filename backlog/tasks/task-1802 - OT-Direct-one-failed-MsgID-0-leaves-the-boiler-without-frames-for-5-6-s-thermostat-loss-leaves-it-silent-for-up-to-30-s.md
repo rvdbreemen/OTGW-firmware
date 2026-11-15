@@ -3,11 +3,11 @@ id: TASK-1802
 title: >-
   OT-Direct: one failed MsgID 0 leaves the boiler without frames for 5-6 s;
   thermostat loss leaves it silent for up to 30 s
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-11T06:40:00Z'
-updated_date: '2026-11-15T12:08:00Z'
+updated_date: '2026-11-15T14:20:00Z'
 labels:
   - otdirect
   - review-2026-11-11
@@ -29,7 +29,7 @@ Found in the TASK-1795 audit (docs/reviews/2026-11-11_otdirect-pic-parity-audit/
 - [x] #1 After a failed MsgID 0 in master mode the next frame goes out within 1.15 s
 - [x] #2 The gap between the thermostat's last frame and the gateway's first own frame stays within the spec's 5 s, or the remaining gap is a recorded decision by Robert; both gaps measured in a host test with fake time
 - [x] #3 Host test against the real code (not a re-implementation): red on the old code, green on the fix
-- [ ] #4 esp32-combo build, evaluate.py --quick, bench check where the hardware allows (name what was not benched)
+- [x] #4 esp32-combo build, evaluate.py --quick, bench check where the hardware allows (name what was not benched)
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -49,3 +49,9 @@ Lane-1924 pushed 2026-11-15: origin/dev 5da0c91df..2f4818aa1. Build esp32-combo 
 
 2026-11-15 Bench 09 on .61 with beta.297+85bc0dc (1954 + bug 9), gateway mode without a thermostat since boot: 'Thermostat disconnected' about 2.6-3.3 s after boot, once (was 30 s); own MsgID 0 from t+2.6 s about every 1.12 s; health and settings OK. The thermostat-pull timing (a thermostat that disappears) needs a thermostat on the slave port: host test only (3.5 s vs 30.5 s). AC4 is ticked after the final build of lane-1954.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Bug 1 (beta.277) and bug 9 (pushed 2026-11-15 as beta.308, origin/dev 22f4fece5). AC1: master mode without a boiler, only MsgID 0 every 1.04-1.13 s (bench beta.281). AC2/AC3: tests/test_otd_thermostat_loss_time.py on the real checkThermostatTimeout() + scheduleMasterRequest() + otdOwnFramesAllowed(): first own frame after the thermostat's last frame old 30500 ms, fix 3500 ms (< spec 5 s); loss after 31 s -> 3 s. Robert decided bug 9 = A (DM 1571431149795024929). AC4: esp32-combo builds beta.297+85bc0dc and beta.309+ada14c6 exit 0, evaluate --quick 86/0, bench 09 on .61: 'Thermostat disconnected' 2.3-3.3 s after boot (was 30 s), own MsgID 0 about every 1.1 s. Not benched: a thermostat that disappears during operation (no thermostat on the bench): host test only.
+<!-- SECTION:FINAL_SUMMARY:END -->

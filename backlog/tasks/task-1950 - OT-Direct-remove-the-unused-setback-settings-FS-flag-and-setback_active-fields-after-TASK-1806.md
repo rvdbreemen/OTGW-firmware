@@ -3,11 +3,11 @@ id: TASK-1950
 title: >-
   OT-Direct: remove the unused setback settings, FS= flag and setback_active
   fields after TASK-1806
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-14T22:21:00Z'
-updated_date: '2026-11-15T11:39:00Z'
+updated_date: '2026-11-15T14:20:00Z'
 labels:
   - otdirect
   - cleanup
@@ -25,7 +25,7 @@ Follow-up of TASK-1806 (lane-1924, d3). Since 1806 OT-Direct no longer applies a
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [x] #1 Robert decided which fields go and how a stored value migrates
-- [ ] #2 The removed fields are gone from firmware, REST, MQTT, web UI and the manual EN/NL; a settings.ini with the old keys still loads
+- [x] #2 The removed fields are gone from firmware, REST, MQTT, web UI and the manual EN/NL; a settings.ini with the old keys still loads
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -41,3 +41,9 @@ Follow-up of TASK-1806 (lane-1924, d3). Since 1806 OT-Direct no longer applies a
 
 2026-11-15 Follow-up: the nl/de/el web UI packs still had graph.otd_row_setback and settings otdsetbacktimeout; tests/webui/i18n-lang.test.mjs failed on 'de.json has graph.otd_row_setback, English does not'. Removed from the three packs (i18n/*.json), JSON valid.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Pushed 2026-11-15 as beta.309 (origin/dev 22f4fece5). AC1: decided option A by the coordinator under Robert's delegation; the release text 'remove FS=' was a wrong reading (FS= and SB= are PIC commands, gateway.asm 6.6 :5252-5259, :4124). AC2: removed setback_active / otdsetback / setback_timeout / otdsetbacktimeout from firmware, REST, web UI (+ nl/de/el packs), openapi.yaml, MQTT.md and the manuals EN/NL (the MQTT topic was no longer published). tests/test_otd_setback_fields_removed.py: fix 8 OK, old FAILED 15. Bench 09 on .61 with beta.309: settings.ini with OTDsetbacktimeout loads without an error, the key is gone after the next save, device/info has no setback_active/otdsetback, SB= / PR=S / FS= answer like the PIC. BREAKING (REST) line in the CHANGELOG.
+<!-- SECTION:FINAL_SUMMARY:END -->

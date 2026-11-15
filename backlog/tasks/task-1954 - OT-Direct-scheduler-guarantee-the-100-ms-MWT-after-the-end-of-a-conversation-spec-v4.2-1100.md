@@ -3,11 +3,11 @@ id: TASK-1954
 title: >-
   OT-Direct scheduler: guarantee the 100 ms MWT after the end of a conversation
   (spec v4.2 :1100)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-15T02:12:00Z'
-updated_date: '2026-11-15T12:27:00Z'
+updated_date: '2026-11-15T14:20:00Z'
 labels:
   - otdirect
   - spec
@@ -41,3 +41,9 @@ Review by 92 handled: (1) a TIMEOUT no longer stamps the end of the conversation
 
 2026-11-15 Added in this lane (coordinator decision B): TASK-1804 Bug 4, MsgID 0 goes first whenever it is due (scheduleMasterRequest). Reason: the 1804 C/D triage found that 1954's MWT is ~150 ms in practice (handleMasterResponse runs after isReady(), which the library holds 50 ms after the stop bit, OpenTherm.cpp:443), so every own frame got ~50 ms longer and the round-robin held MsgID 0 back longer. New tests/test_otd_status_priority.py (real scheduleMasterRequest, 105-entry table shape, 50 ms boiler + 50 ms library hold + MWT): max MsgID 0 gap 10 s tier / 60 s burst: origin 2000 / 10100 ms, this lane before the fix 2150 / 12700 ms, fix 900 / 900 ms. test_otd_gateway_alt_slots S1 band updated (MsgID 0 now 450 in 360 s, was 297). All 54 test_otd_*.py green, evaluate 86/0. The MWT refinement (count from the stop bit) stays in TASK-1804, after 95's OTDMasterLine (TASK-1966) is on origin. Final build gets a short bench (coordinator).
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Pushed 2026-11-15 as beta.307 (origin/dev 22f4fece5; src identical to the benched 2.0.0-beta.309+ada14c6). AC1: tests/test_otd_mwt.py on the real scheduleMasterRequest(): old min gap 1 ms (900 ms answer) / 70 ms (30 ms answer), fix >= 100 ms; max start-to-start gap 120..1090 ms at answer delays 20..990 ms. AC2: MI= stays a gap from the start of the previous send, the MWT is an extra floor from its end (timeout does not stamp). Added in this lane (coordinator B): TASK-1804 Bug 4, MsgID 0 first when due: tests/test_otd_status_priority.py max MsgID 0 gap origin 2000/10100 ms -> 900/900 ms. Bench 09 on .61: beta.297 avg 1.116 / max 1.171 s; 301 reference avg 1.117 / max 1.229 s (the > 1150 ms gap is the old no-boiler timeout path); final 309 avg 1.120 / max 1.145 s, 0 > 1150 ms. Not benchable: the 100 ms after a real boiler answer (no boiler on the bench). Open follow-up in TASK-1804: count the MWT from the stop bit (the library's 50 ms hold makes it ~150 ms in practice).
+<!-- SECTION:FINAL_SUMMARY:END -->
