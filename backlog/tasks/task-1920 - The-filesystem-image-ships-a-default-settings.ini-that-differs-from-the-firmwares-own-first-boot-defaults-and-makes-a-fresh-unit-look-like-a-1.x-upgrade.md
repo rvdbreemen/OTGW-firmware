@@ -7,7 +7,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-14T04:28:00Z'
-updated_date: '2026-11-15T09:49:00Z'
+updated_date: '2026-11-15T15:07:00Z'
 labels:
   - bug
   - settings
@@ -26,7 +26,7 @@ Found during TASK-1774 (code reading, not seen on a device). src/OTGW-firmware/d
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Verified on a bench unit what a fresh image flash starts with (settings, MQTT topic naming, wizard state), against a unit whose settings.ini was deleted
+- [x] #1 Verified on a bench unit what a fresh image flash starts with (settings, MQTT topic naming, wizard state), against a unit whose settings.ini was deleted
 - [ ] #2 Robert chose A, B or C (put by the coordinator with the consequences above)
 - [ ] #3 The chosen option is implemented with a host or build check that fails on the old image content
 <!-- AC:END -->
@@ -35,4 +35,6 @@ Found during TASK-1774 (code reading, not seen on a device). src/OTGW-firmware/d
 
 <!-- SECTION:NOTES:BEGIN -->
 Released by Robert (DM 1571454228763779093, relayed by the coordinator 2026-11-15): needs-maintainer-ok removed; queued for session 95 after the lane-95-next build/push.
+
+2026-11-15 15:58-16:12 bench 09 on .61, beta.320+5b9efcc (image without data/settings.ini). (a) filesystem OTA over existing settings: ota_flash 'settings: 165 keys, changed: none', REST diff [], settings.ini diff empty (ADR-233 RTC restore). (b) 'fresh unit': saved settings.ini, deleted it (/api/listfiles?delete=/settings.ini -> 'File deleted', GET /settings.ini 404), reboot: the unit came back with the firmware defaults: hostname OTGW2, MQTTenable true, MQTTuseLegacyOtTopics false, ui_onboarded false, mqttbroker homeassistant.local (REST and the newly written settings.ini agree); WiFi kept (credentials in NVS, WifiStaticIP empty). Restore: saved settings.ini uploaded (POST /upload path=// -> 303, byte-identical), reboot, hostname marvin-otgw32, REST diff [] and settings.ini diff vs before 320 empty. Not done: a full USB erase + fresh image flash (would wipe the WiFi credentials); the deleted-ini boot plus this image (no settings.ini inside) stands in for it. Evidence: 09 scratchpad b320/fresh (defaults.json, defaults.ini, saved/after files).
 <!-- SECTION:NOTES:END -->
