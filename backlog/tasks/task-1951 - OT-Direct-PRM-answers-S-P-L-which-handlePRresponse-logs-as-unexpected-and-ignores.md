@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-14T22:57:00Z'
-updated_date: '2026-11-15T12:26:00Z'
+updated_date: '2026-11-15T12:33:00Z'
 labels:
   - needs-maintainer-ok
 dependencies: []
@@ -25,7 +25,7 @@ Seen by 09 on .61 (beta.264, OT-Direct, no boiler) 2026-11-14: MQTT command PR=M
 <!-- AC:BEGIN -->
 - [x] #1 Decide (coordinator/Robert): the consumer accepts S/P/L, or OT-Direct answers PR=M with G/M like the PIC
 - [x] #2 Host test on the real handlePRresponse / OT-Direct PR=M path: red on the current code, green on the fix; no 'unexpected value' for a valid OT-Direct mode
-- [ ] #3 Bench: PR=M on an OT-Direct unit updates the gateway-mode state without the warning
+- [x] #3 Bench: PR=M on an OT-Direct unit updates the gateway-mode state without the warning
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -40,4 +40,6 @@ Options for Robert. A = the consumer accepts the OT-Direct letters: handlePRresp
 2026-11-15 fix (option A): handlePRresponse() 'M' branch (OTGW-Core.ino) maps G/S/L (any case) to gateway ON and M/P to OFF; any other letter still logs 'unexpected value' and leaves the state alone. Host test test/host/test_pr_m_otd_letters.py (real handlePRresponse + PicSettingsSection sliced by anchor): --old-rev origin/dev -> OLD fails exactly D1 (S), D2 (L), D3 (P) (known=0, warned=1, nothing published), passes controls C1 G, C2/C2b M, C3 X; FIX 7/7 pass (published gateway_mode ON/OFF, no warning). RESULT PASS. Neighbours on the same handler: test_pic_settings_value, test_boiler_unsupported_origin, test_local_frame_consumers PASS; tests/test_pic_temp_sensor_port OK. Commit + bump after the beta slot, together with 1947-A in one build.
 
 2026-11-15 bench (09 on .61, beta.306+041400e, relayed by the coordinator): AC3 PASS for S and M: GW=S then PR=M -> 'PR: M=S', gateway_mode ON, no 'unexpected value'; the OFF path via GW=0 -> 'PR: M=M', gateway_mode OFF. P (bypass) not benchable: .61 has no bypass relay; P is covered by the host test (D3). Pushed: origin/dev 11c5b268a..aa7b7f382 (beta.304 = 11c5b268a); posted (message 1571501313064312873). AC3 left for the bench-tester to tick.
+
+2026-11-15 13:16-13:18 bench 09 on .61 (OT-Direct), beta.306+041400e: GW=S -> 'GW: S'; PR=M -> 'PR: M=S', no 'unexpected value', MQTT otgw-pic/gateway_mode ON. GW=P -> 'OTD: GW=P not supported (no bypass relay on this board)' + NG, so the P -> OFF branch is not benchable on .61 (has_bypass_relay false; host test D3 covers it). OFF path through the existing M branch: GW=0 -> 'GW: 0', PR=M -> 'PR: M=M', gateway_mode OFF; GW=S -> 'PR: M=S', gateway_mode ON. Mode restored to master, settings.ini diff empty. Evidence: 09 scratchpad b306/61/gw, gw2 (telnet.raw local, mqtt.txt).
 <!-- SECTION:NOTES:END -->

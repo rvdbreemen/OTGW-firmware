@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-14T17:47:00Z'
-updated_date: '2026-11-15T12:26:00Z'
+updated_date: '2026-11-15T12:33:00Z'
 labels:
   - bug
 milestone: 2.0.0
@@ -26,7 +26,7 @@ Seen by 09 on .63 (Classic + ESP32-S3, PIC pic16f1847 gateway 6.8, device/info p
 <!-- AC:BEGIN -->
 - [x] #1 Reproduce on a Classic: PR=A (or the settings cycle) gives no processed reply and an empty /api/v2/pic/settings; capture the raw PIC serial answer if possible
 - [x] #2 Find the cause (parser, queue, SAT/simulation interaction or the bench PIC) with evidence
-- [ ] #3 Fix if it is firmware: /api/v2/pic/settings filled and otgw-pic/settings/* published after the cycle; red-then-green on the bench
+- [x] #3 Fix if it is firmware: /api/v2/pic/settings filled and otgw-pic/settings/* published after the cycle; red-then-green on the bench
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -49,4 +49,6 @@ Scope: the SAT simulation can only stay on without a boiler: a real boiler frame
 2026-11-15 fix: sendPICSerial() (OTGW-Core.ino, ADR-117 path (a) block) skips satSimulationBlocksBusTx() for a command starting with PR=; nothing changed on the OT-Direct master path. Host test test/host/test_pic_sim_gate_pr.py (real gate block + real satSimulationBlocksBusTx sliced by anchor) --old-rev origin/dev: OLD fails exactly D1 PR=A, D2 PR=E (SAT sim) and D3 PR=M (replay sim), passes the controls (CS=40 and GW=1 held and traced, no-sim cases sent); FIX 8/8, RESULT PASS. AC3 bench (settings cycle fills /api/v2/pic/settings on .63 with the SAT sim on) follows on the next build.
 
 2026-11-15 bench (09 on .63, beta.306+041400e, relayed by the coordinator): PASS for AC3: PR= passes the simulation gate, /api/v2/pic/settings 15/15 (0/15 on beta.294). Correction to my bench brief: with SAT enabled a REST CS=40 is refused by the ADR-179 queue rule ('CS=40 refused, SAT is enabled'), before the simulation gate, so the 'SAT-SIM trace: CS=40' line I asked for cannot appear; nothing reaches the PIC either way. That 503 answer is TASK-1970. Side finding TASK-1971 (PIC cycle waits ~4-5 min after boot while the discovery drip runs). Pushed: origin/dev 11c5b268a..aa7b7f382 (beta.304-306, src identical to the benched 041400e: git diff 041400e aa7b7f382 -- src/ is empty); build posted in #alpha-testing (message 1571501313064312873). AC3 left for the bench-tester to tick.
+
+2026-11-15 12:35-12:42 bench 09 on .63 (Classic, PIC 6.8), beta.306+041400e (on origin/dev aa7b7f382), SAT enabled + SAT simulation ON, no OT bus. GREEN with the sim on: telnet 'Sending to Serial [PR=O/S/W/M/G/I/L…]', each answered (PR: O=N, S=16.00, W=1, M=G, G=00, I=11, L=FXOMPC …); GET /api/v2/pic/settings 15/15 filled; otgwmode ON. RED for this (beta.294 same unit, sim on, 10:00 run): 0/15, queue entries consumed without 'Sending to Serial'. Right after the boot the cycle waits ~4-5 min while the MQTT discovery drip ticks every 1 s (queryNextPICsetting dripDueWithinMs(500), OTGW-Core.ino:1300); in that window 0/15 even after 80 s; after the drip it runs at once (UX note, not a regression). CS=40 with SAT on: refused before the sim gate ('CS=40 refused, SAT is enabled'), nothing to the PIC; REST then said 503 'queue full' (fixed by TASK-1970: 409, verified on beta.304). NOT separately captured on 306: the otgw-pic/settings/* MQTT publish with the sim on (the publish path itself was seen on 294 with the sim off at 10:00: tweaks, temp_sensor, smart_power, … + gateway_mode ON). Evidence: 09 scratchpad b306/63 (t1943.log, telnet1943.raw, run2/, picsettings.json).
 <!-- SECTION:NOTES:END -->
