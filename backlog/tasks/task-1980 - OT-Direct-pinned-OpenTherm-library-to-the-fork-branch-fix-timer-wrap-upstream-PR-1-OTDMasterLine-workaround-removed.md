@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-15T16:03:00Z'
-updated_date: '2026-11-15T16:41:00Z'
+updated_date: '2026-11-15T17:20:00Z'
 labels:
   - otdirect
   - upstream
@@ -40,4 +40,6 @@ Robert DM 1571553430923911252 (answer B to 1571553264380547104), relayed by the 
 AC3 analysis (session 95, 2026-11-15, code + config read, no bench yet). Our libs sdkconfig (framework-arduinoespressif32-libs/esp32s3/qio_qspi/include/sdkconfig.h, memory_type qio_qspi per platformio.ini:26): CONFIG_GPTIMER_ISR_HANDLER_IN_IRAM=1, CONFIG_GPTIMER_OBJ_CACHE_SAFE=1, CONFIG_GPTIMER_ISR_CACHE_SAFE not set, no SPI_FLASH_AUTO_SUSPEND. So the tx alarm interrupt is not IRAM-flagged and is deferred while the flash cache is off (a LittleFS sector erase, typically tens of ms). In that window process() cannot run either (loop task stalled). Normal operation: one tick per 500 us half bit, a frame is 68 ticks = 34 ms; the 10 ms limit is 20 missed ticks, far above ISR latency. A flash write in the middle of a frame stretches its bits, so the boiler gets a broken frame either way; with 10 ms the library ends it right after the write and reports TIMEOUT, with our 500 ms guard the stretched tail is sent and the 1 s WAIT_RESPONSE timeout follows. Both lose one frame; 10 ms recovers faster. Race to keep in mind: sendRequestAsync() sets requestTimestamp only after sendFrame() starts the timer; a process() on ANOTHER task in that gap would see TX_DATA with an old requestTimestamp and end the frame at once. Not reachable for us: sendRequestAsync() and process() both run on the loop task (ADR-242). To verify on the bench: otd frames during settings saves (flash writes) with the new library.
 
 Robert chose A (DM 1571560593712746617, relayed by the coordinator): 'A and validate it on the bench best you can right now.' The fork branch is taken as is, including the 4 upstream commits. The boiler-side change of 720cee9 (idle-level detection also without Smart Power) cannot be tested on our bench (.61 has no boiler): that stays a field item.
+
+Sweep (scripts/run_tests.py --changed origin/dev, 228 files, -j 4, 1951 s): 223 passed. Failed: test_capture_device_data (graphTrim not defined, TASK-1963 web UI; red on origin 2c4b462fd too), test_sat_no_return_startup (MsgID 25 gap, red on origin since fff3604f4 TASK-1954, d3), test_override_reply (ran before the commit: its pointer check compares the OpenTherm checkout with HEAD; after the commit 11/11 with the stale-delay test), test_otd_slave_reply_gate (sliced the library line 'delayTimestamp = ts + RESPONSE_TIME', which upstream c6a8dae changed to 'newTs + (isSlave ? RESPONSE_TIME : requestDelay)': harness accepts both forms now, 6/6). test_sat_lowload_contract hit the 1200 s timeout under -j 4; run alone next.
 <!-- SECTION:NOTES:END -->
