@@ -67,7 +67,7 @@ P = PAL
 # title + legend
 s.text(40, 42, L['title'], size=28, weight=800, family='d')
 s.text(54 + len(L['title']) * 16.2, 42, L['sub'], size=13, fill=P['muted'], family='m')
-lx, ly = 1010, 36
+lx, ly = 1100, 36
 for color, dash, key, sw, ends in [(P['blue'], None, 'beam', 5, None), (P['cool'], None, 'two', 1.8, 'both'),
                                     (P['cool'], '5 4', 'read', 1.8, 'end'), (P['flame'], None, 'dm', 2.4, 'end'), (P['ok'], None, 'ship', 2.6, 'end')]:
     st = 'ah-cool' if ends == 'both' else None

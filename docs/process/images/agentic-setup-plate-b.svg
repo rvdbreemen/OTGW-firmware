@@ -5,18 +5,18 @@
 <rect width="1920" height="1080" fill="#f4f6f7"/>
 <text x="40" y="42" font-family="Archivo, 'Helvetica Neue', Arial, sans-serif" font-size="28" font-weight="800" fill="#151a1f" text-anchor="start">BlueFlame Bot: the pilot flame</text>
 <text x="540.0" y="42" font-family="'JetBrains Mono', ui-monospace, Consolas, monospace" font-size="13" font-weight="400" fill="#56616c" text-anchor="start">monitoring and replies per channel · plate B · as of 2026-11-15</text>
-<path d="M1010,32 H1038" fill="none" stroke="#1d4ed8" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" opacity="0.5"/>
-<text x="1046" y="36" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="12" font-weight="400" fill="#56616c" text-anchor="start">monitoring</text>
-<path d="M1130.0,32 H1158.0" fill="none" stroke="#0e7490" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" marker-start="url(#ah-cool)" marker-end="url(#ah-cool)"/>
-<text x="1166.0" y="36" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="12" font-weight="400" fill="#56616c" text-anchor="start">read and reply</text>
-<path d="M1275.6,32 H1303.6" fill="none" stroke="#0e7490" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="5 4" marker-end="url(#ah-cool)"/>
-<text x="1311.6" y="36" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="12" font-weight="400" fill="#56616c" text-anchor="start">read only</text>
-<path d="M1389.1999999999998,32 H1417.1999999999998" fill="none" stroke="#c2410c" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#ah-flame)"/>
-<text x="1425.1999999999998" y="36" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="12" font-weight="400" fill="#56616c" text-anchor="start">to the maintainer</text>
-<path d="M1553.9999999999998,32 H1581.9999999999998" fill="none" stroke="#2f7d32" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#ah-ok)"/>
-<text x="1589.9999999999998" y="36" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="12" font-weight="400" fill="#56616c" text-anchor="start">ships</text>
-<use href="#shield" x="1640.9999999999998" y="23.0" width="18" height="18" style="color:#a15c00"/>
-<text x="1663.9999999999998" y="36" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="12" font-weight="400" fill="#56616c" text-anchor="start">ground rule</text>
+<path d="M1100,32 H1128" fill="none" stroke="#1d4ed8" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" opacity="0.5"/>
+<text x="1136" y="36" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="12" font-weight="400" fill="#56616c" text-anchor="start">monitoring</text>
+<path d="M1220.0,32 H1248.0" fill="none" stroke="#0e7490" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" marker-start="url(#ah-cool)" marker-end="url(#ah-cool)"/>
+<text x="1256.0" y="36" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="12" font-weight="400" fill="#56616c" text-anchor="start">read and reply</text>
+<path d="M1365.6,32 H1393.6" fill="none" stroke="#0e7490" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="5 4" marker-end="url(#ah-cool)"/>
+<text x="1401.6" y="36" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="12" font-weight="400" fill="#56616c" text-anchor="start">read only</text>
+<path d="M1479.1999999999998,32 H1507.1999999999998" fill="none" stroke="#c2410c" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#ah-flame)"/>
+<text x="1515.1999999999998" y="36" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="12" font-weight="400" fill="#56616c" text-anchor="start">to the maintainer</text>
+<path d="M1643.9999999999998,32 H1671.9999999999998" fill="none" stroke="#2f7d32" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#ah-ok)"/>
+<text x="1679.9999999999998" y="36" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="12" font-weight="400" fill="#56616c" text-anchor="start">ships</text>
+<use href="#shield" x="1730.9999999999998" y="23.0" width="18" height="18" style="color:#a15c00"/>
+<text x="1753.9999999999998" y="36" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="12" font-weight="400" fill="#56616c" text-anchor="start">ground rule</text>
 <path d="M30,60 H1890" fill="none" stroke="#d5dce2" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
 <text x="40" y="84" font-family="'JetBrains Mono', ui-monospace, Consolas, monospace" font-size="13" font-weight="700" fill="#c2410c" text-anchor="start" letter-spacing="2">WATCH LOOPS</text>
 <rect x="40" y="94" width="590" height="70" rx="6" fill="#ffffff" stroke="#1d4ed8" stroke-width="1.2" filter="url(#card)"/>

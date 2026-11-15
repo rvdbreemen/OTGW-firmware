@@ -5,7 +5,8 @@ sessions and agents, rule layers and enforcement, the knowledge base, the ADR ki
 its gates, what ships, external sources and a strip of key numbers. Facts come from
 docs/process/agentic-setup.md (as of 2026-11-15). Reuses the palette, symbols and flame of svgkit.py.
 
-Every text carries a data-box attribute with the card it must stay inside; check_overview.js uses it.
+Every text carries a data-box attribute with the card it must stay inside, so a renderer-side check can
+compare each text's bounding box with its card.
 """
 import math
 import sys
@@ -156,7 +157,7 @@ rows = [  # action lines, values per column
 ]
 val = {
     'dec': ('decides', P['flame_soft'], P['flame'], None), 'yes': ('yes, directly', P['flame_soft'], P['flame'], None),
-    'exc': ('exceptions only', P['surface'], P['flame'], '4 3'), 'gated': ('input, gated', P['amber_soft'], P['amber'], None),
+    'exc': ('exceptions only', P['surface'], P['flame'], '4 3'), 'gated': ('input, partly gated', P['amber_soft'], P['amber'], None),
     'stand': ('standing permission', P['cool_soft'], P['cool'], None), 'bench': ('bench tester only', P['cool_soft'], P['cool'], None),
     'per': ('per-action yes via DM', P['crit_soft'], P['crit'], None),
 }
@@ -188,7 +189,7 @@ CY0, CH, CWD = 262, 84, 240
 chans = [  # symbol, name, sub1, sub2, two-way
     ('rss', 'Tweakers topic', 'RSS · read only', 'no way to post', False),
     ('branch', 'GitHub', 'issues · PRs · releases', 'two-way · maintainer account', True),
-    ('chat', 'Discord support', 'read + announcements', 'replies in practice', False),
+    ('chat', 'Discord support', 'read + announcements', 'replies in practice', True),
     ('chat', '#alpha-testing', 'zips · reports · SAT questions', 'two-way', True),
     ('chat', '#dev-sat-mqtt', 'backlog commands · SAT', 'two-way', True),
     ('mail', 'DM with maintainer', 'one question per message', 'decisions · hard-stop yes', True),
@@ -202,7 +203,7 @@ for i, (sym, name, s1, s2, two) in enumerate(chans):
     s.use(sym, x + 26, CY0 + 30, 28, P['muted'])
     s.text(x + 50, CY0 + 30, name, size=16, weight=700, family='d')
     s.text(x + 50, CY0 + 52, s1, size=13, fill=P['muted'])
-    s.text(x + 50, CY0 + 70, s2, size=13, fill=P['cool'] if two else P['muted'])
+    s.text(x + 50, CY0 + 70, s2, size=13, fill=P['cool'] if two and i != 2 else P['muted'])
 s.free()
 
 # people -> channels (no line for read-only members: nothing they write triggers the bot)
@@ -212,7 +213,7 @@ for cx in ccx[0:3]:
 s.path(curve(pcx[2], PB, ccx[3] - 30, CY0 - 3), P['muted'], sw=1.3, dash='3 4', start='ah-muted', end='ah-muted')
 s.path(curve(pcx[3] - 20, PB, ccx[3] + 30, CY0 - 3), P['flame'], sw=1.9, start='ah-flame', end='ah-flame')
 s.path(curve(pcx[3] + 20, PB, ccx[4], CY0 - 3), P['flame'], sw=1.9, start='ah-flame', end='ah-flame')
-s.path(curve(pcx[4], PB, ccx[5], CY0 - 3), P['flame'], sw=3.0, start='ah-flame', end='ah-flame')
+s.path(f'M{ccx[5]},{PB + 3} V{CY0 - 3}', P['flame'], sw=2.4, start='ah-flame', end='ah-flame')
 
 BUS = 368
 FX, FY, FR = 1280, 606, 104
@@ -271,7 +272,7 @@ plays = ['English · answer first · real mention', 'Never names the 2.x gateway
          'Technical claims verified in the code first', 'Zip post pings no one and must match HEAD']
 for i, t in enumerate(plays):
     y = 458 + i * 46
-    s.use('shield', RX + 12, y + 17, 24, P['amber'])
+    s.use('shield_f' if i == len(plays) - 1 else 'shield_o', RX + 12, y + 17, 22, P['amber'])
     s.text(RX + 34, y + 22, t, size=14, box=(RX, y, 362, 34))
 
 # rules -> bot and knowledge <-> bot
@@ -383,7 +384,7 @@ enf = [  # name, tag, kind, line1, line2
     ('Git hooks', 'REFUSES', 'gate', 'no bump or no TASK id: commit rejected', 'the adr-judge pass is off by default'),
     ('evaluate.py', 'REFUSES', 'gate', '42 checks, 34 in --quick · exit 1 on FAIL', 'String in hot paths only warns'),
     ('Tests', 'LOCAL ONLY', 'local', '274 Python tests through run_tests.py', 'CI runs only test_adr_governance.py'),
-    ('CI on push to dev', 'REFUSES', 'gate', 'evaluate.yml · build.yml esp32-combo', 'adr-governance.yml on ADR paths only'),
+    ('CI on push to dev', 'AFTER PUSH', 'local', 'evaluate.yml · build.yml esp32-combo', 'adr-governance.yml · red after the push'),
     ('Script refusals', 'REFUSES', 'gate', 'build lock: one build, at most 4 jobs', 'post script: the zip must come from HEAD'),
     ('Review', 'JUDGEMENT', 'review', 'the reviewer team is told to refute', 'main session reads the raw evidence itself'),
     ('Convention only', 'NO GATE', 'conv', 'hard stops · wrapper build · DM route', 'only the bench tester flashes · register first'),
@@ -476,7 +477,7 @@ s.path(f'M{KX + 169},{l2 + 14} H{KX + 199}', P['amber'], sw=1.6, end='ah-amber')
 s.pill(KX + 204, l2, 220, 28, 'check_* gate in evaluate.py', P['amber_soft'], P['amber'], color=P['fg'], family='b', size=13)
 s.path(f'M{KX + 429},{l2 + 14} H{KX + 459}', P['amber'], sw=1.6, end='ah-amber')
 s.pill(KX + 464, l2, 196, 28, 'CI gate on push to dev', P['amber_soft'], P['amber'], color=P['fg'], family='b', size=13)
-s.text(KX, l2 + 46, 'Of the 10 binding ADRs: 4 gated in CI · 4 by local tests or build · 2 through adr-judge', size=13, fill=P['muted'])
+s.text(KX, l2 + 46, 'Of the 10 binding ADRs: 4 gated in CI · 4 by local tests or build · 2 via adr-judge, now off', size=13, fill=P['muted'])
 
 # =====================================================================================================
 # 9. Pipeline and gates, what ships
@@ -531,7 +532,7 @@ s.text(rx - 12, 1064, 'sessions run the pipeline', size=13, fill=P['cool'], anch
 SX = 1840
 s.zl(SX, PZ, 'WHAT SHIPS')
 ships = [  # symbol, name, line1, line2, soft, strong
-    ('package', 'Alpha zip', 'per tested task · from dev', 'bench OK + post script → #alpha-testing', 'ok_soft', 'ok'),
+    ('package', 'Alpha zip', 'every firmware tag · from dev', 'bench OK + post script → #alpha-testing', 'ok_soft', 'ok'),
     ('clock', 'Beta 2.x', 'standing permission · 08:00 / 20:00 slot', '1 h soak · GitHub prerelease', 'amber_soft', 'amber'),
     ('lock', 'Stable 2.x', 'per-action yes via DM · release/2.x', '3 checkpoints · 24 h soak · freeze', 'crit_soft', 'crit'),
     ('lock', '1.x LTS', 'per-action yes · otgw-1.x.x → main', 'skill lives in the 1.x worktree', 'crit_soft', 'crit'),
@@ -567,7 +568,7 @@ for i, (sym, name, sub) in enumerate(ext):
 
 NX = 1200
 s.zl(NX, BZ, 'THE WORKSHOP IN NUMBERS')
-nums = [('327', 'firmware beta,', '79 eleven days ago'), ('8.7', 'prerelease tags', 'per day'), ('42', 'checks in', 'evaluate.py'),
+nums = [('327', 'firmware beta,', 'beta.79 on 11-04'), ('8.7', 'prerelease tags', 'per day'), ('42', 'checks in', 'evaluate.py'),
         ('274', 'Python tests', ''), ('11 + 2', 'skills and', 'commands'), ('7', 'GitHub', 'workflows'),
         ('293', 'register entries', 'by Sergeant D')]
 for i, (n, a, b) in enumerate(nums):
