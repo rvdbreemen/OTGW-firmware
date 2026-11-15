@@ -3,11 +3,11 @@ id: TASK-1931
 title: >-
   RTC snapshot: restore the newest whole reboot-log lines that fit instead of
   skipping the whole log
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-14T09:22:00Z'
-updated_date: '2026-11-15T19:18:00Z'
+updated_date: '2026-11-15T19:34:00Z'
 labels:
   - reliability
   - ota
@@ -46,3 +46,9 @@ Bench observation by 09 (2026-11-15 00:12, .61 beta.264+a695744, FS OTA via ota_
 
 AC4: OTGW-firmware.h REBOOT_LOG_LINES 20 and REBOOT_LOG_FILE_MAX = REBOOT_LOG_LINES x (REBOOT_LOG_LINE_MAX - 1) = 4780 B (a line incl. CRLF is at most 239 B: the 240 B buffer holds the NUL); helperStuff.ino LOG_LINES = REBOOT_LOG_LINES; KEEP_LIST reboot_log.txt cap 3072 -> 4780, KEEP_TOTAL_MAX 10240 -> 12288 (maxima now add up to 11532 B). Check: two static_asserts in the keep-list class (cap == REBOOT_LOG_FILE_MAX, sum of maxima <= KEEP_TOTAL_MAX; a lambda, since a member function cannot be evaluated in the incomplete class: verified with the xtensa g++ that a member fails and the lambda fires on both drifts). Heap trade-off: a copy is still only made while the largest free block stays KEEP_HEAP_RESERVE (8192 B) above it, so the higher caps cost heap only when the files are that large (worst +1708 B for the log). tests/test_fs_update_keep.py updated (4780, 12288, both asserts): 38/38 OK; against origin FAILED (failures=2, errors=1). AC3 and AC5 need the bench (a reset during a filesystem OTA with a near-full budget; 09's 20-line case on .61).
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+During a filesystem OTA the RTC snapshot (ADR-233) now keeps the reboot log's newest whole lines when the whole log does not fit, and the keep list's reboot_log cap follows the real worst case. AC1: ADR-246 Accepted by Robert (DM 1571505912303059000, 'A and accept 246'). AC2: test_fs_ota_rtc_snapshot T11/T14 restore the newest whole lines, mutant MB8 (skip whole log, the old rule) fails exactly them. AC3 + AC5: 09 on .61 with the bench build 318+56fb6db (code = 56fb6db3d; its app string said +1233ba9, cause TASK-1976): a USB reset 2.8 s into an FS OTA left settings.ini byte-identical, reboot_count +1, reboot_log 20 whole CRLF lines (new boot line + the newest 19). AC4: REBOOT_LOG_LINES/REBOOT_LOG_FILE_MAX 4780 B one source for writer and KEEP_LIST cap, KEEP_TOTAL_MAX 12288, static_asserts; test_fs_update_keep follows the caps. Pushed as e2a9abce5 (beta.326, origin/dev 0d0606972); restacked code identical per hunk to the benched 56fb6db3d; test_fs_ota_rtc_snapshot, test_fs_update_keep, test_reboot_log_reset_raw, test_adr_governance, test_evaluate pass on the stack; ADR-246 lint PASS.
+<!-- SECTION:FINAL_SUMMARY:END -->

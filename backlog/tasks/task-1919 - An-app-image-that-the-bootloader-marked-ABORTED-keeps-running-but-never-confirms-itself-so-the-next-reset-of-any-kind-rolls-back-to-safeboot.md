@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-14T04:02:00Z'
-updated_date: '2026-11-15T17:00:00Z'
+updated_date: '2026-11-15T19:41:00Z'
 labels:
   - bug
   - ota
@@ -28,7 +28,7 @@ Found with the TASK-1774 RTC probe (otgw-bench-tester 09, .63, 2026-11-14 04:50-
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [x] #1 otadata dumps in the three states show the mechanism (which entry is active, its state and seq) or refute this reading
-- [ ] #2 Robert decides how an ABORTED-running image is handled (options with consequences, put by the coordinator)
+- [x] #2 Robert decides how an ABORTED-running image is handled (options with consequences, put by the coordinator)
 - [ ] #3 If a change is decided: old-vs-fix bench on .63 (panic, ABORTED boot, planned restart: old rolls back, fix per the decision)
 <!-- AC:END -->
 
@@ -52,4 +52,8 @@ Next (debug build 2, beta.324dbg2, local commit 707e10f07 + the TASK-1976 check)
 Host: test/host/test_otadata_stale.py compiles the REAL otadataStale block and runs a model of the bootloader for one failed boot: E nothing; G erase 1 -> a failure boots safeboot; H erase 1; L (second life) erase 0 -> safeboot; B and S1 (only sector 1 valid) nothing; X (other higher seq but ABORTED) erase 1; C (bad CRC in [0]) erase 0; in no case the sector the bootloader boots from. RESULT PASS; mutant MN (nothing erased, the code before) fails G, L (and C, H, X). Pending: independent review of the diff (coordinator asks 95), build (beta.324), bench by 09 (E/G/H dumps on the new image: G -> only [0] PENDING, panic probe -> safeboot on the 1st failure; a normal OTA -> confirm -> only [0] VALID).
 
 2026-11-15 review by 95 (via the coordinator): no wrong-sector case, a power loss during our own erase is safe, the layout gate holds. Finding (4) fixed: esp_ota_mark_app_valid_cancel_rollback() rewrites the active sector erase-then-write (esp_ota_ops.c:533-539); with the stale duplicate gone, a power loss in that window would leave no valid otadata. safebootMarkAppValid() now first writes the other sector as a VALID copy of the active PENDING entry (same seq, CRC over seq unchanged), then confirms; the early-boot erase keeps such a copy (VALID, same seq as the active). Order reasoning: a power loss while writing the copy leaves the image unconfirmed -> safeboot (as before, not confirmed yet); a power loss in the confirm's own rewrite boots the copy = the health-checked image. Host: new cases P (both VALID, same seq -> keep) and PL (power loss in the confirm: [0] PENDING | [1] VALID copy -> nothing erased, a reset boots ota_0); mutant MK (copy erased too) fails exactly P and PL; MN still fails G and L. RESULT PASS; evaluate 0 FAIL.
+
+2026-11-15 evening: pushed as 0d0606972 (beta.327) on the coordinator's GO. Bench 09 on .61 (OTGW32): probe beta.324probe+a14587c (abort at 15 s, before the 30 s health gate) -> the very next boot is the safeboot updater (app_rolled_back true), otadata [0] ABORTED | [1] FF, no second boot of the probe; clean beta.324+ba9a2fd (code identical per hunk to the pushed 0d0606972) -> boot, erase line, after the confirm [0] VALID | [1] VALID copy, no erase on the next boot, smoke OK, settings diff empty. Open: AC2 (Robert's decision on how an ABORTED-running image is handled) is not recorded in this task, and AC3 names the bench on .63 (Classic); the bench ran on .61 (same esp32-combo image and partition table) only.
+
+AC2: decided by the coordinator under Robert's delegation of 2026-11-15 ('Ask me only if you really can't do it yourself. You have my permission.'): a new image that fails before its health gate rolls back to the safeboot updater on the first failure, matching ADR-191; reported to Robert by DM 1571609547100135555 with a revert offer; Robert may still overrule (then revert 0d0606972). AC3: the coordinator accepts .61 as equivalent for the panic case (same esp32-combo image and partition table; the rollback is bootloader and otadata logic, independent of the PIC). Remaining before Done: 09 OTAs a clean beta.327+ on .63 (Classic) for boot plus confirm (part B, no probe), planned 2026-11-16 morning; .63 stays on the public beta overnight. Posted as beta.327+0d06069 (Discord message 1571610902225096879; post build log '✓ App version check ... carries 2.0.0-beta.327+0d06069').
 <!-- SECTION:NOTES:END -->
