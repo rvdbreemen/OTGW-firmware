@@ -3,11 +3,11 @@ id: TASK-1981
 title: >-
   OT-Direct: 10 s tier starved by the 60 s slow-poll burst after the
   status-first rule (MsgID 25 gap 19 s, regression of beta.307)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-15T16:38:00Z'
-updated_date: '2026-11-15T18:46:00Z'
+updated_date: '2026-11-15T19:13:00Z'
 labels:
   - otdirect
   - regression
@@ -39,6 +39,8 @@ Regression of fff3604f4 (TASK-1804 Bug 4, MsgID 0 first). Status-first shifts th
 2026-11-15 d3: full test_sat_lowload_contract (detached, 15 min): 1 failed, 32 passed, 1 skipped, 1 xfailed. The one failure was an UNEXPECTED SUCCESS of ll018j (PM=25 within one communication interval in the full schedule), marked open_decision with question OTD-PM25 that was never asked (not in docs/sat/open-questions.md). It is OT-Direct transport, not SAT control, so the PIC decides: SendPriorityMsg (gateway.asm 6.6 :3436-3441) is checked before the alternatives and repeats until answered (HandleResponse :2431-2434). ll018j reclassified to contract (task TASK-1981): red on lane-1804 HEAD OTDirect.ino, green on the fix (ll018h + ll018j 2 passed).
 
 2026-11-15 bench 09 on .61 (relayed by the coordinator, evidence 09 scratchpad m25/): GW=L loopback, no SAT, 270 s. RED on release build 323: one R25 gap of 19.05 s. GREEN on f1df3fd: 27 R25 frames, max start-to-start 10.17 s, none above 10.2 s; MsgID 0 max gap 1.204 s (Bug 4 intact); 1804 regression on port 25238 as on 2e80ebe; bootcount stable, no crashlog.
+
+2026-11-15 pushed: origin/dev 37af3e82b..626b6b179, as beta.325 (fix commit), on top of beta.324 (TASK-1804 A+B). After the rebase onto the beta.323 tag-out HEAD (src changed upstream, TASK-1955) the sweep ran again: test_otd_* 63 files green, LL-018 10 passed, override_reply 41/41, evaluate 87/0, test_evaluate 80 OK. Net lane diff identical to before the rebase (0 lines); CHANGELOG lines moved from the beta.323 section (where the rebase put them) back into [Unreleased].
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
