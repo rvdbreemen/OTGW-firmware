@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-11T06:41:00Z'
-updated_date: '2026-11-15T15:03:00Z'
+updated_date: '2026-11-15T18:46:00Z'
 labels:
   - otdirect
   - review-2026-11-11
@@ -57,4 +57,6 @@ PIC 6.8 parity audit 2026-11-12 (docs/reviews/2026-11-12_pic68-otdirect-parity-a
 2026-11-15 Commit B part 3 (fixup): Bug 7, the Core part. OTGW-Core.ino matched 'Error 01' as "\r\nError 01" (since 25663ea01), but handlePICSerial() cuts every PIC line at CR/LF before queueing it, so error01 never counted on any board (02..04 matched). Fixed to 'Error 01'. tests/test_core_error_lines.py (source test on the real matcher literals + the CR/LF cut): old FAIL, fix OK. The 1.x line has the same pattern (origin/otgw-1.x.x OTGW-Core.ino:4684): reported to the coordinator for a separate 1.x task, not ported here. The OT-Direct part of Bug 7 (Error 04 + E lines) is deferred to Bug 8: the library reports a parity-bad full frame and an incomplete frame both as INVALID, so without its bit index (protected) an incomplete frame would be miscounted as error 04 (PIC: error 03).
 
 2026-11-15 Commit B part 4 (fixup): B3b a too short command (< 3 characters without the CR) or one without '=' as its 3rd character answers a bare SE, as the PIC SerialCmdSub (gateway.asm 6.6 :3686-3695; the PIC's length 4 counts the CR, TASK-1957); test_otd_bare_commands new case through the real entry, old FAIL ('C' is now SE like the PIC). B3c PR= as PrintSetting (:2150-2186): exactly one letter else SE, a letter without a PIC report is BV (was silent), PR=E is the PIC's '-' (no external sensor on OT-Direct); PR=F reads the PIC's configuration word and has no OT-Direct counterpart: BV, a recorded difference. B4 GW=R sends the PIC greeting 'OpenTherm Gateway 6.8 OTGW32' (GreetingStr :5435) to the port 25238 bridge only (Core reads a banner through processOT() as PIC detection); the 'GW: R' reply stays. tests/test_otd_pr_gw_pic.py (source checks on the real branches, they depend on much state), old FAIL 4. Harness stubs: test_otd_pr_reports_pyotgw (status), test_otd_gw_bad_value (version macro, bridge writer). 60/60 tests, host slice 41/41, evaluate 86/0.
+
+2026-11-15 bench 09 on .61, 2e80ebe (commits A+B): PASS. Two brief-vs-code points settled by the coordinator against gateway.asm 6.6, the code is PIC-exact: B8 SetOperModeHC1 :4424-4430 GetDecimalArg without a trailing check, >15 = OR, GetDecimal :5002-5025 stops at the first non-digit (MW=1.5 -> 1, MW=1x -> 1); B9 SetVentSetpoint :4210-4218 trailing = SE, 101 = OR (not BV), non-numeric -> clear. Not benchable on .61 (needs a thermostat, a fault sim or a Classic), covered by host tests on the real code: A3 (test_otd_thermostat_loss_time ovr), Bug 5 (test_otd_fault_edge), Bug 7 (test_core_error_lines), E5 (override_reply C13c). Re-checked on f1df3fd (with TASK-1981): port 25238 regression as on 2e80ebe. Still open for AC1: A2 (Q-1804a), A6, B2, B3e, B3a, Bug 8 (+ the OT-Direct part of Bug 7): task stays In Progress.
 <!-- SECTION:NOTES:END -->
