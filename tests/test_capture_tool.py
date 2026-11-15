@@ -1152,9 +1152,10 @@ class SatTraceToggleCase(unittest.TestCase):
 class CoreDumpFetchCase(unittest.TestCase):
     DUMP = bytes(range(256)) * 20
 
-    def serve(self, status, sha="a1b2c3d4e", body=None):
+    def serve(self, status, sha="a1b2c3d4e", body=None, crashlog=None, info=None):
         seen = []
         dump = self.DUMP if body is None else body
+        side = {"/api/v2/device/crashlog": crashlog, "/api/v2/device/info": info}   # TASK-1972
 
         class H(BaseHTTPRequestHandler):
             def log_message(self, *a):
@@ -1162,6 +1163,13 @@ class CoreDumpFetchCase(unittest.TestCase):
 
             def do_GET(self):
                 seen.append((self.path, self.headers.get("Authorization")))
+                if self.path in side:   # the two answers coredump_age() reads; 404 when the case gives none
+                    msg = json.dumps(side[self.path]).encode() if side[self.path] is not None else b"{}"
+                    self.send_response(200 if side[self.path] is not None else 404)
+                    self.send_header("Content-Length", str(len(msg)))
+                    self.end_headers()
+                    self.wfile.write(msg)
+                    return
                 self.send_response(status)
                 if status == 200:
                     self.send_header("Content-Type", "application/octet-stream")
@@ -1195,15 +1203,17 @@ class CoreDumpFetchCase(unittest.TestCase):
 
     def test_200_is_kept_with_the_app_sha(self):
         cap, line, seen = self.fetch(200)
-        target = cap.run_path / "coredump-20261104-120000.bin"
+        target = cap.run_path / "coredump-20261104-120000-app-a1b2c3d4e-unknown.bin"
         self.assertEqual(target.read_bytes(), self.DUMP)
         self.assertIn("a1b2c3d4e", line)
-        self.assertEqual(seen, [("/api/v2/device/coredump", None)])   # once, and no credentials sent
+        self.assertEqual(seen[0], ("/api/v2/device/coredump", None))   # the dump once, first
+        self.assertEqual([p for p, _ in seen].count("/api/v2/device/coredump"), 1)
+        self.assertTrue(all(a is None for _, a in seen))                # and no credentials sent anywhere
         self.assertIn(line, (cap.run_path / "summary.txt").read_text(encoding="utf-8"))
 
     def test_200_without_sha_header_still_kept(self):
         cap, line, _ = self.fetch(200, sha="")
-        self.assertEqual((cap.run_path / "coredump-20261104-120000.bin").read_bytes(), self.DUMP)
+        self.assertEqual((cap.run_path / "coredump-20261104-120000-unknown.bin").read_bytes(), self.DUMP)
         self.assertNotIn("sha256", line)
 
     def test_404_logs_one_line_and_keeps_nothing(self):
@@ -1235,9 +1245,40 @@ class CoreDumpFetchCase(unittest.TestCase):
         transcript.write_text("t", encoding="utf-8")
         target = oc.build_upload_zip(cap, transcript, False)
         with zipfile.ZipFile(target) as z:
-            self.assertIn("coredump-20261104-120000.bin", z.namelist())
-            self.assertEqual(z.read("coredump-20261104-120000.bin"), self.DUMP)
+            self.assertIn("coredump-20261104-120000-app-a1b2c3d4e-unknown.bin", z.namelist())
+            self.assertEqual(z.read("coredump-20261104-120000-app-a1b2c3d4e-unknown.bin"), self.DUMP)
         target.unlink()
+
+    # TASK-1972: the dump is labelled with its age. The detail line is the one platformResetRegisterDump()
+    # writes at the boot after the crash: 'Core dump: <task> pc=0x... elf=<8 hex of the dump's ELF> bt=...'.
+    INFO = {"device": {"fwversion": "2.0.0-beta.327+0d06069", "lastreset": "Software reset"}}
+
+    def crashlog(self, elf8, available=True):
+        return {"crashlog": {"available": available,
+                             "summary": "2026-11-15 19:48:24 - reboot cause: Panic" if available else "",
+                             "details": f"Core dump: loopTask pc=0x42001234 elf={elf8} bt=0x42001234" if available else ""}}
+
+    def test_dump_of_the_latest_logged_crash(self):
+        cap, line, _ = self.fetch(200, crashlog=self.crashlog("a1b2c3d4"), info=self.INFO)
+        self.assertTrue((cap.run_path / "coredump-20261104-120000-app-a1b2c3d4e-latest.bin").exists())
+        self.assertIn("latest crash in the reboot log", line)
+        self.assertIn("2.0.0-beta.327+0d06069", line)
+
+    def test_dump_without_a_logged_crash_is_old(self):   # 09 on .63: crashlog available:false, a dump served
+        cap, line, _ = self.fetch(200, crashlog=self.crashlog("", available=False), info=self.INFO)
+        self.assertTrue((cap.run_path / "coredump-20261104-120000-app-a1b2c3d4e-old.bin").exists())
+        self.assertIn("OLD", line)
+        self.assertIn("Software reset", line)
+
+    def test_dump_of_another_elf_than_the_logged_crash_is_old(self):
+        cap, line, _ = self.fetch(200, crashlog=self.crashlog("ffff0000"), info=self.INFO)
+        self.assertTrue((cap.run_path / "coredump-20261104-120000-app-a1b2c3d4e-old.bin").exists())
+        self.assertIn("ffff0000", line)
+
+    def test_age_unknown_without_the_crashlog_or_the_sha(self):
+        self.assertEqual(oc.coredump_age("a1b2c3d4e", None, self.INFO)[0], "unknown")
+        self.assertEqual(oc.coredump_age("", self.crashlog("a1b2c3d4"), self.INFO)[0], "unknown")
+        self.assertEqual(oc.coredump_age("A1B2C3D4E", self.crashlog("a1b2c3d4"), None)[0], "latest")   # case-blind
 
     def test_skip_flag_and_call_site(self):
         self.assertTrue(oc.build_parser().parse_args(["--skip-coredump"]).skip_coredump)

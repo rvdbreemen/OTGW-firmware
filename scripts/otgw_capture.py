@@ -2370,11 +2370,61 @@ COREDUMP_PATH = "/api/v2/device/coredump"
 COREDUMP_MAX_BYTES = 1024 * 1024   # the partition is 64 KB; anything larger is not a core dump
 
 
+CRASHLOG_PATH = "/api/v2/device/crashlog"
+DEVICE_INFO_PATH = "/api/v2/device/info"
+
+
+def coredump_age(dump_sha, crashlog, info):
+    """TASK-1972: say whether a stored core dump belongs to the latest crash in the reboot log or is older.
+
+    The firmware never erases the core-dump partition: a dump stays until the next crash overwrites it. When it
+    boots after a crash it writes the dump into /reboot_log.txt once, as a 'Core dump: <task> pc=... elf=<8 hex> bt=...'
+    detail line under the reboot-cause line (platform_esp32.h platformResetRegisterDump()), and device/crashlog
+    returns the newest such pair (helperStuff.ino readLatestCrashLog()). The log keeps 20 lines, so after enough
+    reboots, or a filesystem reset, the pair is gone while the dump remains: device/crashlog says available:false
+    and the dump is from an earlier crash (09 on .63, 2026-11-15).
+
+    dump_sha: the X-Coredump-App-Sha256 the dump carries ('' when unknown); crashlog / info: the parsed
+    device/crashlog and device/info answers, or None. Returns (tag, sentence): tag 'latest' when the newest crash in
+    the reboot log names this dump's ELF, 'old' when the log holds no crash or a crash of another ELF, 'unknown'
+    when there is not enough to tell."""
+    log = (crashlog or {}).get("crashlog") or {}
+    dev = (info or {}).get("device") or {}
+    running = dev.get("fwversion") or "?"
+    reset = dev.get("lastreset") or "?"
+    tail = f"running firmware {running}, last reset '{reset}'"
+    if not dump_sha:
+        return "unknown", f"age unknown: the dump carries no app ELF hash ({tail})"
+    if crashlog is None:
+        return "unknown", f"age unknown: device/crashlog not read ({tail})"
+    details = log.get("details") or ""
+    match = re.search(r"\belf=([0-9a-fA-F]{8})", details)
+    if log.get("available") and match and dump_sha.lower().startswith(match.group(1).lower()):
+        return "latest", (f"the latest crash in the reboot log ('{log.get('summary', '')}') names this dump's ELF "
+                          f"({tail})")
+    if log.get("available") and match:
+        return "old", (f"OLD: the latest crash in the reboot log names ELF {match.group(1)}, not this dump's "
+                       f"{dump_sha[:8]}; the dump is from an earlier crash ({tail})")
+    return "old", (f"OLD: the reboot log holds no crash, so this dump is from an earlier crash that has rolled out "
+                   f"of the 20-line log or a filesystem reset; the partition keeps a dump until the next crash ({tail})")
+
+
+def _get_json(http_base, path, timeout):
+    """GET a small JSON answer; None on any failure (the capture never stops for it)."""
+    try:
+        request = urllib.request.Request(http_base + path, headers={"User-Agent": "OTGW-capture/2"})
+        with urllib.request.urlopen(request, timeout=timeout) as response:
+            return json.loads(response.read(256 * 1024).decode("utf-8", errors="replace"))
+    except Exception:
+        return None
+
+
 def fetch_coredump(cap, http_base, timeout):
-    """One GET of the stored core dump at the end of a capture (TASK-1560, ADR-210). 200: the body is kept as
-    coredump-<run>.bin in the run folder (and goes into the upload zip) and the dump's app ELF SHA256 is logged;
-    404: no dump stored, one line; 401/403: the admin password is set, one line, and no credentials are asked for
-    or sent. Returns the summary line it logged."""
+    """One GET of the stored core dump at the end of a capture (TASK-1560, ADR-210). 200: the body is kept in the
+    run folder (and goes into the upload zip) as coredump-<run>-app-<first 9 hex of its ELF sha256>-<latest|old|
+    unknown>.bin, and the summary says whether it belongs to the latest crash in the reboot log (TASK-1972,
+    coredump_age()); 404: no dump stored, one line; 401/403: the admin password is set, one line, and no
+    credentials are asked for or sent. Returns the summary line it logged."""
     url = http_base + COREDUMP_PATH
     request = urllib.request.Request(url, headers={"User-Agent": "OTGW-capture/2"})
     status, body, sha, err = None, b"", "", None
@@ -2388,9 +2438,14 @@ def fetch_coredump(cap, http_base, timeout):
     except Exception as exc:
         err = f"{type(exc).__name__}: {exc}"
     if status == 200 and 0 < len(body) <= COREDUMP_MAX_BYTES:
-        target = cap.path(f"coredump-{cap.run_path.name}.bin")
+        tag, age = coredump_age(sha, _get_json(http_base, CRASHLOG_PATH, timeout),
+                                _get_json(http_base, DEVICE_INFO_PATH, timeout))
+        app = f"-app-{sha[:9].lower()}" if re.fullmatch(r"[0-9a-fA-F]{9,64}", sha or "") else ""
+        target = cap.path(f"coredump-{cap.run_path.name}{app}-{tag}.bin")
         target.write_bytes(body)
-        line = f"Core dump: {len(body)} bytes -> {target.name}" + (f" (app ELF sha256 {sha}: decode with the .elf whose sha256sum starts with it)" if sha else "")
+        line = (f"Core dump: {len(body)} bytes -> {target.name}"
+                + (f" (app ELF sha256 {sha}: decode with the .elf whose sha256sum starts with it)" if sha else "")
+                + f"; {age}")
     elif status == 200:
         line = f"Core dump: answer of {len(body)} bytes is empty or too large, not kept"
     elif status == 404:
@@ -2416,7 +2471,10 @@ def fetch_coredump(cap, http_base, timeout):
 GRAPH_HISTORY_PATH = "/api/v2/graph/history"
 GRAPH_HISTORY_VARIANTS = (("24h", ""), ("7d", "?hours=168"))   # 7d: ADR-245 firmware; older firmware ignores it
 GRAPH_TEMP_COLUMNS = ("flow", "ret", "chSet", "roomSet", "room", "outside")
-GRAPH_CSV_COLUMNS = GRAPH_TEMP_COLUMNS + ("mod", "flame", "dhw_on", "ch")
+GRAPH_JSON_COLUMNS = GRAPH_TEMP_COLUMNS + ("mod", "flame", "dhw_on", "ch")   # what /api/v2/graph/history sends
+# The web UI CSV follows v2.js GSER, which also has the live-only DHW temperature (TASK-1776, MsgID 26): the device
+# history has no such column, so its cell is empty in every history row, as in the web UI export.
+GRAPH_CSV_COLUMNS = GRAPH_TEMP_COLUMNS + ("dhw", "mod", "flame", "dhw_on", "ch")
 GRAPH_GSLOT_MS = 5000
 GRAPH_HISTORY_BODY_CAP = 2 * 1024 * 1024
 GRAPH_HISTORY_SECONDS = 3600   # long run: one fetch per hour besides start and stop
@@ -2448,7 +2506,7 @@ def graph_history_rows(j, now_ms):
         return None
     if not (n > 0 and iv > 0 and sc > 0 and age >= 0):
         return None
-    for c in GRAPH_CSV_COLUMNS:
+    for c in GRAPH_JSON_COLUMNS:
         if not isinstance(j.get(c), list) or len(j[c]) != n:
             return None
     iv_ms = iv * 1000
@@ -2461,6 +2519,7 @@ def graph_history_rows(j, now_ms):
             v = j[c][i]
             rec[c] = v / sc if isinstance(v, nums) and not isinstance(v, bool) else None
             any_value = any_value or rec[c] is not None
+        rec["dhw"] = None   # live-only in the web UI, never in the device history
         m = j["mod"][i]
         rec["mod"] = m if isinstance(m, nums) and not isinstance(m, bool) else None
         for c in ("flame", "dhw_on", "ch"):

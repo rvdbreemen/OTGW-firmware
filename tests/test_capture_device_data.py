@@ -68,18 +68,18 @@ class ConverterCase(unittest.TestCase):
     def test_header_and_rows(self):
         text = oc.graph_history_csv(response(), NOW_MS)
         lines = text.split("\n")
-        self.assertEqual(lines[0], "epoch_ms,flow,ret,chSet,roomSet,room,outside,mod,flame,dhw_on,ch")
+        self.assertEqual(lines[0], "epoch_ms,flow,ret,chSet,roomSet,room,outside,dhw,mod,flame,dhw_on,ch")
         self.assertFalse(text.endswith("\n"))
         # slot 1 has no value and no flag: dropped; slot 2 has only dhw_on: kept
         self.assertEqual(len(lines), 1 + 5)
         t0 = NOW_MS - 37000 - 6 * 120000
         t0 -= t0 % 5000
-        self.assertEqual(lines[1], f"{t0},45.2,30.1,50,20.5,19.8,7.3,34,1,0,1")
+        self.assertEqual(lines[1], f"{t0},45.2,30.1,50,20.5,19.8,7.3,,34,1,0,1")
         t2 = NOW_MS - 37000 - 4 * 120000
         t2 -= t2 % 5000
-        self.assertEqual(lines[2], f"{t2},,,,,,,,0,1,0")
-        self.assertTrue(lines[3].endswith(",45.5,30.2,50,20.5,,7.2,0,0,0,1"))   # room null -> empty cell
-        self.assertTrue(lines[5].endswith(",-0.5,0,10,20.5,19.9,-1.2,,0,0,0"))
+        self.assertEqual(lines[2], f"{t2},,,,,,,,,0,1,0")
+        self.assertTrue(lines[3].endswith(",45.5,30.2,50,20.5,,7.2,,0,0,0,1"))   # room null -> empty cell
+        self.assertTrue(lines[5].endswith(",-0.5,0,10,20.5,19.9,-1.2,,,0,0,0"))
 
     def test_slot_times_step_by_the_interval(self):
         rows = oc.graph_history_rows(response(iv=30), NOW_MS)
@@ -115,7 +115,12 @@ function extract(name) {
 // GSER is a literal array of strings in our own shipped v2.js; eval of that one literal is the simplest exact read.
 const gser = src.match(/var GSER = (\[[\s\S]*?\]\]);/);
 const GSER = eval(gser[1]);
-const merge = new Function('GSLOT', 'GHIST_MAX', extract('mergeGraphHistory') + '\nreturn mergeGraphHistory;')(5000, 86400000 / 5000);
+// TASK-1963 (3a156a401): mergeGraphHistory() ends with graphTrim(), which reads GHIST_LIVE_MS and GHIST_SPAN_MS;
+// both come from the same shipped v2.js line, so nothing is restated here.
+const span = src.match(/GHIST_LIVE_MS = (\d+), GHIST_SPAN_MS = (\d+) \* (\d+),/);   // '7 * 86400000': two numbers
+const merge = new Function('GSLOT', 'GHIST_MAX', 'GHIST_LIVE_MS', 'GHIST_SPAN_MS',
+  extract('graphTrim') + '\n' + extract('mergeGraphHistory') + '\nreturn mergeGraphHistory;')
+  (5000, 86400000 / 5000, Number(span[1]), Number(span[2]) * Number(span[3]));
 const j = JSON.parse(fs.readFileSync(process.argv[3], 'utf8'));
 const arr = merge([], j, Number(process.argv[4]));
 const keys = GSER.map(function (x) { return x[0]; });
