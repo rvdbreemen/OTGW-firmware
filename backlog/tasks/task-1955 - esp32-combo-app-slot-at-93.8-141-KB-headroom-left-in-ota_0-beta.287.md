@@ -4,7 +4,7 @@ title: 'esp32-combo app slot at 93.8 %: 141 KB headroom left in ota_0 (beta.287)
 status: To Do
 assignee: []
 created_date: '2026-11-15T03:20:00Z'
-updated_date: '2026-11-15T17:07:00Z'
+updated_date: '2026-11-15T20:29:00Z'
 labels:
   - build
   - flash-size
@@ -42,4 +42,6 @@ App size per beta (esp32-combo .ino.bin; published GitHub release assets, the la
 Implementation (options 1+2, ADR-247) pushed as 2bd950c7c (beta.323): app 2 136 816 B vs 2 159 120 B = 22 304 B less. Bench 09 on .61 (beta.323+c9dd325, app sha256 1165305443dbe3bb...): settings-help.json Content-Encoding gzip, If-None-Match 304, 166 keys = settingsHelp.h, built-in replay OK, heap back to baseline (~55.5 KB) after the replay, an uploaded /otgw_simulation.log still wins. Zip posted, Discord 1571570226049450017. Host: test_progmem_assets_deflated 4/4 (red when settingsHelpGz.h is stale: regenerated after 1785ac494), test_sim_fixture_builtin, replay harnesses green; evaluate --quick 0 FAIL; lowload_contract fails only ll018h, identical on origin (fff3604f4 TASK-1954, d3).
 
 AC2: threshold proposal (A WARN 95 % / FAIL 98 %, B WARN only, C nothing, each with its consequence) sent to the coordinator for Robert; the coordinator decided A under Robert's delegation (2026-11-15) and asked for its own task: TASK-1981 (implementation after 20:00 and after TASK-1980).
+
+Correction (session 95): the size guard of AC2 is NOT TASK-1981 (that is the OT-Direct MsgID 25 tier fix); its own task is still to be created, after TASK-1980.
 <!-- SECTION:NOTES:END -->
