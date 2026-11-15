@@ -1081,7 +1081,7 @@ timeline
     After every bench OK : zip and report in alpha-testing, about 8.7 tags a day
     Every hour : check whether Sergeant D is back, rule without a scheduler
   section Fixed times
-    08:00 and 20:00 : public beta slot, announcement in beta-testing
+    Twice a day, 8 am and 8 pm : public beta slot, announcement in beta-testing
   section By hand
     When Robert asks : /check_otgw_issues over Discord, GitHub and Tweakers
   section Silent periods
@@ -3306,7 +3306,7 @@ Wat zonder de werkplek blijft draaien: de zeven workflows in GitHub Actions, dus
 
 ## 12. Cijfers
 
-Gemeten op 2026-11-15 in deze checkout, naast de waarden van de vorige peildatum. Elke rij noemt de meetwijze, zodat de volgende versie dezelfde meting kan herhalen. De groei in elf dagen laat zien hoe hard de werkplaats draait. De firmware ging van beta.79 naar beta.327: één prerelease-tag per firmwarecommit (zie hoofdstuk 7). Het SAT-register groeide met 84 entries, het aantal Python-tests ruim verdubbelde.
+Gemeten op 2026-11-15 in deze checkout, naast de waarden van de vorige peildatum. Elke rij noemt de meetwijze, zodat de volgende versie dezelfde meting kan herhalen. De firmware ging van beta.79 naar beta.327: één prerelease-tag per firmwarecommit (zie hoofdstuk 7). Het SAT-register groeide met 84 entries, het aantal Python-tests ruim verdubbelde.
 
 | Meetpunt | 2026-11-04 | 2026-11-15 | Meetwijze |
 |---|---|---|---|
@@ -3355,7 +3355,7 @@ Doorlooptijden en wachttijden staan niet in deze tabel: die meet `scripts/agenti
 
 **Wat goed werkt.** Het bewijsregime is streng en concreet: oud tegen fix, Done alleen met bewijs uit dezelfde sessie, reviewers die moeten weerleggen. Daarnaast:
 
-- De SAT-rangorde met verplichte `file:line`-citaten en een register dat vóór de bouw wordt bijgewerkt, houdt hallucinatie buiten de deur. Er zijn nu 353 entries, met een machineleesbare herkomst per entry.
+- De SAT-rangorde met verplichte `file:line`-citaten en een register dat vóór de bouw wordt bijgewerkt, dwingt elke SAT-claim terug naar een citaat of een registerentry. Er zijn nu 353 entries, met een machineleesbare herkomst per entry.
 - Eén tag per firmwarecommit maakt testerfeedback toewijsbaar.
 - Het post-script weigert bij elke twijfel.
 - Alle twaalf verbetertaken uit de momentopname van 2026-11-04 zijn uitgevoerd (§13.1).
@@ -3364,38 +3364,85 @@ De nieuwe risico's (§13.2) zitten op twee plekken. Het eerste is het verschil t
 
 ### 13.1 Bevindingen van 2026-11-04: status
 
-| # | Ernst | Bevinding (2026-11-04) | Status op 2026-11-15 |
-|---|---|---|---|
-| F1 | Hoog | Instructies lopen uiteen tussen agents | Opgelost in TASK-1625 (2026-11-05): gedeeld AGENT-CORE-blok in CLAUDE.md, AGENTS.md en de Copilot-instructies, met drifttest `tests/test_agent_core_block.py`; bridge-doc vervangen door `docs/guides/discord-mcp-server.md`. Restant: zie F13 (regels die alleen in `.claude/rules/` staan, bereiken Codex en Copilot niet). |
-| F2 | Hoog | CI ziet de hoofdlijn niet | Opgelost in TASK-1626 (2026-11-05): evaluate, ADR-governance en build draaien op push naar `dev`, build niet bij docs-only. Restant: zie F12 (een wijziging van alleen CLAUDE.md start `adr-governance.yml` niet). |
-| F3 | Middel | De omgeving zit vast aan één werkplek | Opgelost in TASK-1627 en TASK-1632: hooks draagbaar en zichtbaar bij FAIL, `core.hooksPath` bij sessiestart, ledger herbouwbaar met `scripts/alpha_ledger.py`, sjabloon voor de people-file, runbook `docs/guides/second-machine-setup.md`. Bewust geaccepteerd restrisico: één bench, geen build-runner, geen always-on Discord-host (besluit TASK-1636, 2026-11-05). |
-| F3b | Middel | Builds door hooks laten een build-stempel achter | Opgelost in TASK-1628: de toolchain-hook zet `version.h` en `data/version.hash` terug als ze vóór de build schoon waren; de controle in een echte cloudsessie is naar TASK-1658 verplaatst. |
-| F4 | Middel | Regels groeien als lagen bij | Opgelost in TASK-1631 en TASK-1635: CLAUDE.md van 673 naar 189 regels (testlimiet 230) met regels in `.claude/rules/` en gidsen in `docs/guides/`, plus `docs/process/directive-changelog.md`. Restant: zie F11 (de changelog loopt achter). |
-| F5 | Middel | SAT-register en wachtrij ongestructureerd | Opgelost in TASK-1629 en TASK-1630: statuskolom genormaliseerd met generator, JSON-index met bron per entry. |
-| F6 | Laag | Doorvoer niet gemeten | Opgelost in TASK-1633 en TASK-1636: `scripts/agentic_throughput.py`; 8,7 tags per dag, 80 % van de getimede SAT-antwoorden binnen 2,4 uur; de wachttijd zit in de voorraad open taken. Besluit: nu niet opschalen. |
-| F7 | Laag | Onderzoek tussen gereedschap | Opgelost in TASK-1634: 42 SAT-studies naar `tools/research/sat/`; zes operationele SAT-scripts blijven in `scripts/`. |
-| F8 | Laag | Workaround "`backlog task list` is leeg" | Opgelost in TASK-1635: de bug reproduceert niet; vervangen door de echte Windows-valkuil (`backlog.cmd` kapt meerregelige argumenten af). |
+| # | Ernst | Bevinding (2026-11-04) | Status op 2026-11-15 | Bron |
+|---|---|---|---|---|
+| F1 | Hoog | Instructies lopen uiteen tussen agents | Opgelost in TASK-1625 (2026-11-05): gedeeld AGENT-CORE-blok in CLAUDE.md, AGENTS.md en de Copilot-instructies, met drifttest `tests/test_agent_core_block.py`; bridge-doc vervangen door `docs/guides/discord-mcp-server.md`. Restant: zie F13 (regels die alleen in `.claude/rules/` staan, bereiken Codex en Copilot niet). | `tests/test_agent_core_block.py:1-9`; `AGENTS.md:7-22` |
+| F2 | Hoog | CI ziet de hoofdlijn niet | Opgelost in TASK-1626 (2026-11-05): evaluate, ADR-governance en build draaien op push naar `dev`, build niet bij docs-only. Restant: zie F12 (een wijziging van alleen CLAUDE.md start `adr-governance.yml` niet). | `.github/workflows/build.yml:18-27`; `.github/workflows/evaluate.yml:12-15` |
+| F3 | Middel | De omgeving zit vast aan één werkplek | Opgelost in TASK-1627 en TASK-1632: hooks draagbaar en zichtbaar bij FAIL, `core.hooksPath` bij sessiestart, ledger herbouwbaar met `scripts/alpha_ledger.py`, sjabloon voor de people-file, runbook `docs/guides/second-machine-setup.md`. Bewust geaccepteerd restrisico: één bench, geen build-runner, geen always-on Discord-host (besluit TASK-1636, 2026-11-05). | `docs/guides/second-machine-setup.md:9-18`; `scripts/alpha_ledger.py:2-17`; `task-1636:41` |
+| F3b | Middel | Builds door hooks laten een build-stempel achter | Opgelost in TASK-1628: de toolchain-hook zet `version.h` en `data/version.hash` terug als ze vóór de build schoon waren; de controle in een echte cloudsessie is naar TASK-1658 verplaatst. | `.claude/hooks/session-start-build-toolchain.sh:13-67` |
+| F4 | Middel | Regels groeien als lagen bij | Opgelost in TASK-1631 en TASK-1635: CLAUDE.md van 673 naar 189 regels (testlimiet 230) met regels in `.claude/rules/` en gidsen in `docs/guides/`, plus `docs/process/directive-changelog.md`. Restant: zie F11 (de changelog loopt achter). | `tests/test_claude_md_core.py:15`; `docs/process/directive-changelog.md:3-6` |
+| F5 | Middel | SAT-register en wachtrij ongestructureerd | Opgelost in TASK-1629 en TASK-1630: statuskolom genormaliseerd met generator, JSON-index met bron per entry. | `scripts/sat_open_questions.py:20`; `docs/sat/sergeant-d-corrections.index.json:1-14` |
+| F6 | Laag | Doorvoer niet gemeten | Opgelost in TASK-1633 en TASK-1636: `scripts/agentic_throughput.py`; 8,7 tags per dag, 80 % van de getimede SAT-antwoorden binnen 2,4 uur; de wachttijd zit in de voorraad open taken. Besluit: nu niet opschalen. | `docs/process/agentic-throughput-2026-11-05.md:16-24`; `task-1636:41` |
+| F7 | Laag | Onderzoek tussen gereedschap | Opgelost in TASK-1634: 42 SAT-studies naar `tools/research/sat/`; zes operationele SAT-scripts blijven in `scripts/`. | `tools/research/sat/README.md:7-9` |
+| F8 | Laag | Workaround "`backlog task list` is leeg" | Opgelost in TASK-1635: de bug reproduceert niet; vervangen door de echte Windows-valkuil (`backlog.cmd` kapt meerregelige argumenten af). | `CLAUDE.md:46` |
 
 ### 13.2 Nieuwe bevindingen
 
-Gebundeld per thema. Elke bevinding noemt het bewijs; de volledige lijst spanningen staat aan het eind van de hoofdstukken 4 tot en met 11.
+Gebundeld per thema. Elke bevinding noemt het bewijs; de volledige lijst spanningen staat aan het eind van de hoofdstukken 3 tot en met 11.
 
 | # | Ernst | Bevinding | Bewijs |
 |---|---|---|---|
-| F9 | Hoog | **De praktijk is verder dan de regels.** De comms-sessie spreekt namens BlueFlame Bot en bezit de postconcepten, maar CLAUDE.md kent die rol niet. Coördinator en comms beantwoorden gebruikers in de supportkanalen zonder vastgelegde procedure. #beta-testing is sinds 2026-11-15 een verzoek- en SAT-kanaal dat geen command leest (Phase 0 leest alleen #alpha-testing en #dev-sat-mqtt; `/check_otgw_issues` negeert de maintainer). De delegatie van 2026-11-15 staat alleen in een taaknotitie. | `.claude/skills/beta-release-2x/SKILL.md:72-73`; `backlog/tasks/task-1896 - …md:57`; `backlog/tasks/task-1979 - …md:25`; `.claude/commands/backlog_discord.md:31`; `.claude/commands/check_otgw_issues.md:53`; `backlog/tasks/task-1919 - …md:58`; `CLAUDE.md:18-21` |
+| F9 | Hoog | **De praktijk is verder dan de regels.** De comms-sessie spreekt namens BlueFlame Bot en bezit de postconcepten, maar CLAUDE.md kent die rol niet. Coördinator en comms beantwoorden gebruikers in de supportkanalen zonder vastgelegde procedure. #beta-testing is sinds 2026-11-15 een verzoek- en SAT-kanaal dat geen command leest (Phase 0 leest alleen #alpha-testing en #dev-sat-mqtt; `/check_otgw_issues` negeert de maintainer). De delegatie van 2026-11-15 staat alleen in een taaknotitie. | `.claude/skills/beta-release-2x/SKILL.md:72-73`; `task-1896:57`; `task-1979:25`; `.claude/commands/backlog_discord.md:31`; `.claude/commands/check_otgw_issues.md:53`; `task-1919:58`; `CLAUDE.md:18-21` |
 | F10 | Hoog | **Oudere procedures volgen de harde regels niet.** `/check_otgw_issues` fasen 4-6 schrijven een fix-branch, een patchbump, `python build.py --firmware`, `addOTWGcmdtoqueue()` en interactieve checkpoints voor; `/flash` bouwt met `python build.py` en flasht zelf; de vertaalskill laat de agent zelf OTA-flashen; `otgw-device-verify` flasht via esptool over USB; de Copilot-Discord-prompt herhaalt het oude patroon. Een agent die zo'n procedure letterlijk volgt, overtreedt CLAUDE.md. | `.claude/commands/check_otgw_issues.md:212-277`; `.claude/skills/flash/SKILL.md:16-20`; `.claude/skills/translate_webui_otgw-firmware/SKILL.md:65-69`; `.claude/agents/otgw-device-verify.md:3`; `.github/prompts/check-discord-issues.prompt.md:69-91`; `CLAUDE.md:21`, `:112` |
 | F11 | Middel | **De directive-changelog loopt achter.** "2026-10-29: Open questions go to Robert interactively" staat nog als geldend; de DM-route van 2026-11-12 (TASK-1829), de GitHub-sweep (2026-11-05), de equipment matrix (2026-11-11), de beta-slotregels en de delegatie ontbreken. | `docs/process/directive-changelog.md:25`; `CLAUDE.md:60` |
-| F12 | Hoog | **Twee binding ADR's hebben in de praktijk geen automatische poort, en de drifttests draaien niet in CI.** CLAUDE.md noemt ADR-101 en ADR-177 "gated by bin/adr-judge", maar de adr-judge-pass in pre-commit staat sinds 2026-05-31 standaard uit en niets anders roept hem aan. De tests op het AGENT-CORE- en SAT-blok draaien in geen workflow of git-hook; in CI draait van de 274 Python-tests alleen `tests/test_adr_governance.py`, en `adr-governance.yml` start niet bij een wijziging van alleen CLAUDE.md of AGENTS.md. Dat schuurt met ADR-080 ("binding rules must have a CI gate"). | `CLAUDE.md:76-86`; `.githooks/pre-commit`; `.github/workflows/adr-governance.yml:20-33`; `tests/test_agent_core_block.py` |
+| F12 | Hoog | **Twee binding ADR's hebben geen enkele automatische poort, vier andere alleen een lokale, en de drifttests draaien niet in CI.** CLAUDE.md noemt ADR-101 en ADR-177 "gated by bin/adr-judge", maar de adr-judge-pass in pre-commit staat sinds 2026-05-31 standaard uit en niets anders roept hem aan. ADR-201, 217, 239 en 242 worden bewaakt door host-tests en de RTC-layoutcheck in `build.py`, die alleen lokaal draaien (S10.10); zes van de tien binding ADR's hebben dus geen CI-poort. De tests op het AGENT-CORE- en SAT-blok draaien in geen workflow of git-hook; in CI draait van de 274 Python-tests alleen `tests/test_adr_governance.py`, en `adr-governance.yml` start niet bij een wijziging van alleen CLAUDE.md of AGENTS.md. Dat schuurt met ADR-080 ("binding rules must have a CI gate"). | `CLAUDE.md:76-86`; `.githooks/pre-commit:50-53`; `.github/workflows/adr-governance.yml:20-33`; `.github/workflows/build.yml:73-74`; `tests/test_agent_core_block.py:1-11` |
 | F13 | Middel | **Regels die alleen in `.claude/rules/` staan, bereiken Codex en Copilot niet.** De equipment-matrixregel (2026-11-11) en het SAT-blok ontbreken in de Copilot-instructies; het gedeelde blok verwijst voor Copilot naar een SAT-blok dat er niet is. AGENTS.md en de Copilot-instructies bevatten nog `python build.py` en `addOTWGcmdtoqueue`. | `.claude/rules/discord.md:26`; `.github/copilot-instructions.md:9`, `:551`; `AGENTS.md:117` |
 | F14 | Middel | **Handhavingsgaten in de hooks.** De backlog-guard blokkeert Edit en Write, maar niet een bewerking via Bash; zijn foutmelding verwijst naar de verboden backlog-MCP. Het commit-msg-hook accepteert ook een al getrackt taakbestand. De harde stops (push naar `main`, force-push) zijn in de repo conventie: geen hook bewaakt ze, de sessies draaien met `bypassPermissions`, en alleen zes skills zijn met `disable-model-invocation: true` voor het model afgesloten. | `.claude/hooks/backlog-mcp-guard.py:46-58`; `.claude/settings.json:8`, `:110`; `.githooks/commit-msg:8-11`; `.claude/skills/release-2x/SKILL.md:4` |
 | F15 | Middel | **Toestand en watermerken.** Het watermerk van `/backlog_discord` is gitignored en ontbreekt in een verse checkout; de drie monitorwatermerken staan in `.gitignore` maar worden toch getrackt; ze worden vóór de triage geschreven, zodat een afgebroken run berichten als gezien markeert. | `.claude/commands/backlog_discord.md:16`; `.gitignore:74-78`; `.claude/commands/check_otgw_issues.md:54`, `:77`, `:102` |
 | F16 | Middel | **Zeggenschap bij backlog-commando's.** In #dev-sat-mqtt mag volgens de command iedereen "mark done", "move" en "assign" geven, terwijl testers niets mogen sluiten of herprioriteren en de maintainer voor backlog-commando's wordt genegeerd. Wie statusmutaties mag geven, staat nergens. | `.claude/commands/backlog_discord.md:21`, `:44`, `:76-104` |
 | F17 | Laag | **Documentatiedrift in gidsen en profielen.** O.a. `second-machine-setup.md` mist de supervisor; `RELEASE_PROCESS.md` en `release-workflow.md` beschrijven het 1.x-proces en een niet-bestaande `release.yml`; CLAUDE.md spreekt zichzelf tegen over `python build.py`; CLAUDE.md noemt zes ADR-reviewchecks, de kit zeven; het Copilot-profiel `gpt-5-beast-mode` zet "persistence > safety > correctness" en laat aannames invullen, tegen de projectregel in. | `docs/guides/second-machine-setup.md:33-37`; `docs/process/release-workflow.md:35-37`; `CLAUDE.md:144`; `.claude/adr-kit-guide.md:114`; `.github/agents/gpt-5-beast-mode.agent.md:9-12` |
-
-| F18 | Middel | **De ADR-kit bestaat in vier versies naast elkaar.** De gevendorde spiegel `tools/adr-kit` is v0.11.0, de projectgids v0.30.5, de plugin in de cache v0.31.0 en de lokaal geïnstalleerde 0.61.0. `/adr-kit:context`, dat CLAUDE.md bij elk ontwerp verplicht stelt, zit niet in de gevendorde versie. De gegenereerde ADR-index telt andere statussen dan de frontmatter, en de generator `bin/adr-index` ontbreekt in de repo. | `tools/adr-kit/CHANGELOG.md`; `.claude/adr-kit-guide.md:1`; `CLAUDE.md` (ADR kit and graphify); `docs/adr/README.md`; `docs/adr/ADR-INDEX.md` |
-| F19 | Middel | **Het geheugen van de werkplaats veroudert.** OpenWolf-hooks lezen de buglog als `{bugs: [...]}` terwijl het bestand een lijst is, dus de buglog-waarschuwingen tonen nooit iets; 224 buglog-entries hebben 219 unieke id's; `anatomy.md` in HEAD bevat 171 secties buiten de repo, terwijl een Do-Not-Repeat dat verbiedt; het graphify-rapport is van 2026-07-26 en noemt een `index.html` die niet meer bestaat. | `.wolf/hooks/*.js`; `.wolf/buglog.json`; `.wolf/anatomy.md`; `.wolf/cerebrum.md`; `graphify-out/GRAPH_REPORT.md:1` |
+| F18 | Middel | **De ADR-kit bestaat in vier versies naast elkaar**, op de vier plekken van §10.1: de gevendorde spiegel `tools/adr-kit` (0.11.0), de repokopie `bin/adr-*` (`adr-judge` "v0.12.0+"), de projectgids (0.30.5) en de geïnstalleerde plugin (0.61.0); 0.31.0 was de geïnstalleerde versie op 2026-07-09 (S10.5). `/adr-kit:context`, dat CLAUDE.md bij elk ontwerp verplicht stelt, zit niet in de gevendorde versie. De gegenereerde ADR-index telt andere statussen dan de frontmatter, en de generator `bin/adr-index` ontbreekt in de repo. | `tools/adr-kit/CHANGELOG.md:7`; `bin/adr-judge:1-35`; `.claude/adr-kit-guide.md:1`; `.wolf/cerebrum.md:106`; `CLAUDE.md:174`; `docs/adr/README.md:1079-1086` |
+| F19 | Middel | **Het geheugen van de werkplaats veroudert.** OpenWolf-hooks lezen de buglog als `{bugs: [...]}` terwijl het bestand een lijst is, dus de buglog-waarschuwingen tonen nooit iets; 224 buglog-entries hebben 219 unieke id's; `anatomy.md` in HEAD bevat 171 secties buiten de repo, terwijl een Do-Not-Repeat dat verbiedt; het graphify-rapport is van 2026-07-26 en noemt een `index.html` die niet meer bestaat. | `.wolf/hooks/pre-write.js:77-92`; `.wolf/hooks/post-write.js:244-276`; `.wolf/buglog.json:1-3`; `.wolf/anatomy.md:6-25`; `.wolf/cerebrum.md:152-153`; `graphify-out/GRAPH_REPORT.md:1` |
 
 Hoe zwaar weegt dit? Geen van de bevindingen raakt de firmware of de bewijsketen van een taak direct: de poorten die echt weigeren (post-script, build-lock, commit-msg, evaluate, tests) werken. Het risico zit in **de volgende agent**. Die leest een command, skill of profiel dat een oudere werkwijze voorschrijft (F10, F13), of mist een rol of kanaal dat alleen in taaknotities bestaat (F9). En F12 verdient extra aandacht: daar beloven de regels een automatische poort die er niet is.
+
+```mermaid
+flowchart LR
+  classDef stop fill:#fde4e1,stroke:#b42318,color:#151a1f
+  classDef gate fill:#fdf0d5,stroke:#a15c00,color:#151a1f
+  classDef store fill:#ffffff,stroke:#56616c,color:#151a1f
+  classDef ship fill:#e3f1e4,stroke:#2f7d32,color:#151a1f
+  subgraph FH["High findings"]
+    F9["F9 practice ahead of rules"]:::stop
+    F10["F10 old procedures"]:::stop
+    F12["F12 binding ADRs without gate"]:::stop
+  end
+  subgraph FM["Medium and low findings"]
+    F11["F11 changelog behind"]:::gate
+    F13["F13 rules miss Codex, Copilot"]:::gate
+    F14["F14 hook gaps"]:::gate
+    F15["F15 watermarks"]:::gate
+    F16["F16 backlog commands"]:::gate
+    F17["F17 doc drift, low"]:::store
+    F18["F18 four ADR kit versions"]:::gate
+    F19["F19 ageing memory"]:::gate
+  end
+  P1["P1 rewrite old procedures"]:::ship
+  P2["P2 changelog"]:::ship
+  P3["P3 gates in CI"]:::ship
+  P4["P4 guard on Bash"]:::ship
+  P5["P5 comms role"]:::ship
+  P6["P6 delegation directive"]:::ship
+  P7["P7 backlog command rights"]:::ship
+  P8["P8 watermarks"]:::ship
+  P9["P9 rules for Codex, Copilot"]:::ship
+  P10["P10 clean-up round"]:::ship
+  F10 --> P1
+  F11 --> P2
+  F12 --> P3
+  F14 --> P4
+  F9 --> P5 & P6
+  F11 --> P6
+  F16 --> P7
+  F15 --> P8
+  F13 --> P9
+  F17 & F18 & F19 --> P10
+  P1 & P2 & P4 & P7 & P8 & P9 -.- A["Scenario A: correct, one day"]:::store
+  P3 & P5 & P6 -.- B["Scenario B: record, one week"]:::store
+  P10 -.- C["Scenario C: maintain"]:::store
+```
+
+---
 
 ## 14. Verbetervoorstellen en scenario's
 
@@ -3407,7 +3454,7 @@ De voorstellen zijn nog geen backlog-taken. Welke wordt opgepakt, is aan Robert.
 |---|---|---|---|---|
 | P1 | Herschrijf `/check_otgw_issues` fase 3-6 tot een overdracht aan de `/implement-next-task`-cyclus; zet `/flash` om naar een verzoek aan de bench-tester of trek hem in; laat de vertaalskill de bench-run aanvragen in plaats van zelf te flashen; laat `otgw-device-verify` OTA en de wrapper gebruiken; trek de Copilot-Discord-prompt gelijk | F10 | klein, vijf bestanden | geen |
 | P2 | Werk de directive-changelog bij: "interactively" naar Replaced, rijen voor de DM-route, de GitHub-sweep, CI op push, de equipment matrix, Finish a lane en de beta-slotregels | F11 | klein | geen |
-| P3 | Geef ADR-101 en ADR-177 weer een werkende poort: de declaratieve adr-judge-pass (gratis, zonder LLM) weer aan in pre-commit of in `adr-governance.yml`; laat de drifttests (AGENT-CORE, SAT-blok, binding-lijst) in CI draaien en laat `adr-governance.yml` ook starten op CLAUDE.md, AGENTS.md en de Copilot-instructies | F12 | klein tot middel | P3a: beslissing over adr-judge (§14.3) |
+| P3 | Geef ADR-101 en ADR-177 weer een werkende poort: de declaratieve adr-judge-pass (gratis, zonder LLM) weer aan in pre-commit of in `adr-governance.yml`; laat de drifttests (AGENT-CORE, SAT-blok, binding-lijst) in CI draaien en laat `adr-governance.yml` ook starten op CLAUDE.md, AGENTS.md en de Copilot-instructies; draai `scripts/run_tests.py` in CI, minstens de host-tests van ADR-201, 217 en 242 en de RTC-layoutcheck van ADR-239 | F12 | klein tot middel | beslissing 3 over adr-judge (§14.3) |
 | P4 | Laat de backlog-guard ook Bash-commando's op `backlog/tasks/` weigeren en verwijs in de melding naar de CLI | F14 | klein | geen |
 | P5 | Leg de comms-sessie als rol vast in het AGENT-CORE-blok, met eigenaarschap van postconcepten en een procedure voor antwoorden in de supportkanalen en #beta-testing; breid de onbeantwoord-sweep uit naar berichten in #beta-testing die de bot aanspreken | F9 | middel | beslissing over de rol (§14.3) |
 | P6 | Leg de delegatie van 2026-11-15 vast als directive met een afgebakende reikwijdte (wat de coördinator zelf mag besluiten, wat altijd een DM blijft) | F9, F11 | klein | beslissing over de reikwijdte (§14.3) |
@@ -3449,6 +3496,8 @@ Deze sessie heeft geen Discord-DM-kanaal. Daarom staan de vragen hier asynchroon
 
    Advies: **A**. Gratis, deterministisch, en het herstelt wat ADR-080 belooft. Risico: oude overtredingen kunnen bij de eerste run opduiken; die zijn dan zichtbaar in plaats van verborgen.
 
+---
+
 ## 15. Verificatie en beperkingen
 
 ### 15.1 Hoe dit document tot stand kwam
@@ -3482,6 +3531,9 @@ flowchart LR
 - **Geïnstalleerde plugins zijn niet zichtbaar.** De geïnstalleerde ADR-kit-versie en de superpowers-skills staan buiten de repo.
 - **Geschiedenis:** de clone is shallow (50 commits, allemaal van 2026-11-15). Trends komen daarom uit taakbestanden en uit `docs/process/agentic-throughput-2026-11-05.md`.
 - **Tellingen** zijn gedaan op bestandsniveau, met de meetwijze in §12.
+- **Submodules ontbraken.** In deze cloud-container zijn de drie submodules niet uitgecheckt (`git submodule status` toont `-` voor alle drie, gemeten 2026-11-15); de lokale thermo-nova-kopie was dus niet aanwezig.
+
+---
 
 ## 16. Dit document bijwerken
 

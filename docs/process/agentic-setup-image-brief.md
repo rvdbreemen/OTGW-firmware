@@ -163,7 +163,7 @@ De kijker moet na tien seconden drie dingen begrijpen:
 |---|---|---|
 | Tweakers topic | RSS · read only | in |
 | GitHub | issues · PRs · releases | beide |
-| Discord support | 4 channels · read + announcements | in (aankondigingen uit) |
+| Discord support | 4 channels · read · announcements · replies in practice | in; uit: aankondigingen en, in de praktijk, antwoorden |
 | DM with maintainer | one question per message | beide |
 | #dev-sat-mqtt | backlog commands | beide |
 | #alpha-testing | builds · reports · SAT | beide |
@@ -248,7 +248,7 @@ dark background, night mode, photorealism, 3D render, people's faces, brand logo
 ### 4.1 Boodschap
 
 1. **BlueFlame Bot is één persona met drie bewakingsstralen**: Discord, GitHub en Tweakers. Hij leest veel en antwoordt alleen waar dat mag.
-2. **Per kanaal gelden andere regels.** Tweakers wordt alleen gelezen. De vier Discord-supportkanalen worden gelezen; daar post hij alleen release-aankondigingen, nooit antwoorden op meldingen. In #alpha-testing, #dev-sat-mqtt, de DM met de maintainer en op GitHub reageert hij op personen.
+2. **Per kanaal gelden andere regels.** Tweakers wordt alleen gelezen. De vier Discord-supportkanalen worden gelezen; daar post hij release-aankondigingen en, in de praktijk, ook antwoorden van de coördinator en de comms-sessie, zonder vastgelegde procedure. In #alpha-testing, #dev-sat-mqtt, de DM met de maintainer en op GitHub reageert hij op personen.
 3. **Alles wat binnenkomt, eindigt als iets controleerbaars**: een antwoord met mention, een backlog-taak, een genummerde registerentry of een vraag aan de maintainer.
 
 ### 4.2 Formaat en raster
@@ -325,7 +325,7 @@ A light technical infographic poster, 16:9, titled "BlueFlame Bot: the pilot fla
 
 Centre, slightly below middle: a round burner with a pale blue face (#dbeafe) and a cobalt rim, holding a vivid blue flame (cobalt #1d4ed8 fading to cyan #06b6d4) with a white core and a soft blue halo, labelled "BlueFlame Bot". Five small ochre shields (#a15c00) orbit the burner, labelled "English, answer first", "No board name", "Testers advise", "Record first", "One token". Three translucent pale-blue beams fan out from the flame like a lighthouse.
 
-Left beam reaches a building labelled "DISCORD" with seven doors in a column: "#alpha-testing", "#dev-sat-mqtt", "DM maintainer" each with a double-headed petrol-blue arrow; "#beta-testing", "#devs-esp-firmware", "#english-support", "#nederlandse-ondersteuning" each with a dashed incoming arrow, and all of them except "#devs-esp-firmware" also with a thin green outgoing arrow for release announcements.
+Left beam reaches a building labelled "DISCORD" with seven doors in a column: "#alpha-testing", "#dev-sat-mqtt", "DM maintainer" each with a double-headed petrol-blue arrow; "#beta-testing", "#devs-esp-firmware", "#english-support", "#nederlandse-ondersteuning" each with a dashed incoming arrow, and all of them except "#devs-esp-firmware" also with a thin green outgoing arrow for release announcements and, in practice, replies.
 
 Upper-right beam reaches a panel labelled "GITHUB" with three tiles: "Issues" and "Pull requests" with double-headed arrows, "Releases" with an outgoing arrow.
 
