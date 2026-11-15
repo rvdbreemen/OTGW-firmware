@@ -140,7 +140,7 @@ De kijker moet na tien seconden drie dingen begrijpen:
     │ [Questions]  │                                        │ [5 Gates]        │
     │ [Backlog]    │ [Comms session][Other agents] [Bench   │ [6 Bump+hooks]   │
     │ [OpenWolf]   │                                tester] │ [7 Build·lock]   │
-    │ [graphify]   │                                        │ [8 Bench·OTA]    │
+    │ [graphify]   │                                        │ [8 Bench][9 Push]│
 86% ├──────────────┴────────────────────────────────────────┴──────────────────┤
     │ EXTERNAL KNOWLEDGE ○ ○ ○ ○      WHAT SHIPS [1.x LTS 🔒][Stable 2.x 🔒][Beta 2.x ◷][Alpha zip] │
 100%└──────────────────────────────────────────────────────────────────────────┘
@@ -198,7 +198,7 @@ De kijker moet na tien seconden drie dingen begrijpen:
 | BlueFlame Bot | Pijplijn | petrol | voert uit |
 | Pijplijn "Bench · OTA" | Bench-tester | petrol, twee punten | testverzoek en OK |
 | Pijplijn "Push · post" | Alpha-zip | groen, dik | publiceert |
-| Alpha-zip | #alpha-testing | groen, dun, lus omhoog | naar testers |
+| Alpha-zip | #alpha-testing | groen, dun, gestippeld, lus omhoog langs de rechterrand | naar testers |
 | Comms-sessie | BlueFlame Bot | gestippeld kobalt, twee punten | tweede stem van de persona: postconcepten en antwoorden in de supportkanalen |
 | BlueFlame Bot | Discord-support | dun groen, terug | aankondigingen en, in de praktijk, antwoorden |
 
@@ -225,11 +225,11 @@ Centre: a round burner with a pale blue face (#dbeafe) and a cobalt rim, holding
 
 Left column labelled "KNOWLEDGE & RULES": a filing cabinet with eight drawers: "Rules", "ADRs + ADR kit", "C4 map", "SAT register", "Open questions", "Backlog", "OpenWolf memory", "Code graph".
 
-Right column labelled "PIPELINE & GATES": a vertical conveyor with nine white stations, each with a small ochre shield (#a15c00): "Task", "Plan + review", "Red to green", "Review team", "Gates", "Bump + hooks", "Build (lock)", "Bench (OTA)", "Push + post".
+Right column labelled "PIPELINE & GATES": a vertical conveyor with nine white stations, each with a small ochre shield (#a15c00); stations 5 to 8 have an ochre outline, the others a petrol outline: "Task", "Plan + review", "Red to green", "Review team", "Gates", "Bump + hooks", "Build (lock)", "Bench (OTA)", "Push + post".
 
 Bottom band, right half, labelled "WHAT SHIPS": four tiles from left to right: "1.x LTS" (pale red fill, brick-red padlock #b42318), "Stable 2.x" (pale red fill, brick-red padlock), "Beta 2.x" (pale ochre fill, small ochre clock icon), "Alpha zip" (pale green fill, forest-green outline #2f7d32) directly under the conveyor. Bottom band, left half, labelled "EXTERNAL KNOWLEDGE": four small grey round badges: "OpenTherm matrix", "thermo-nova", "OpenTherm spec", "toolchains".
 
-Connectors: thick burnt-orange lines only from people (decisions), petrol-blue lines between agents (work), dashed petrol-blue lines for read-only monitoring from "Tweakers" and "Discord support" to the flame, a thin green return arrow from the flame to "Discord support" (announcements and, in practice, replies), a dashed cobalt line between the flame and "Comms session", double-headed petrol-blue arrows between the flame and "GitHub", "#alpha-testing", "#dev-sat-mqtt", "DM", a thick forest-green arrow from "Push + post" to "Alpha zip", and a thin dashed green line from "Alpha zip" up the right edge to "#alpha-testing".
+Connectors: burnt-orange lines only from people (decisions): two thick ones from "Maintainer", down to "DM" and straight down to the flame, and two double-headed ones from "SAT designer" to "#dev-sat-mqtt" and "#alpha-testing"; thin dashed grey lines from "End users" to "Tweakers", "GitHub" and "Discord support", and a double-headed dashed grey line between "Alpha testers" and "#alpha-testing"; one double-headed solid grey line between the flame and the filing cabinet; petrol-blue lines between agents (work): from the flame to each hexagon, from the flame to the conveyor, and double-headed between "Bench (OTA)" and the workbench; dashed petrol-blue lines for read-only monitoring from "Tweakers" and "Discord support" to the flame, a thin green return arrow from the flame to "Discord support" (announcements and, in practice, replies), a dashed cobalt line between the flame and "Comms session", double-headed petrol-blue arrows between the flame and "GitHub", "#alpha-testing", "#dev-sat-mqtt", "DM", a thick forest-green arrow from "Push + post" to "Alpha zip", and a thin dashed green line from "Alpha zip" up the right edge to "#alpha-testing".
 Typography: Archivo for headings, Source Sans for labels, JetBrains Mono for small code labels. Palette: background #f4f6f7, cards #ffffff, text #151a1f, orange #c2410c, petrol #0e7490, cobalt #1d4ed8, ochre #a15c00, green #2f7d32, brick red #b42318.
 ```
 
