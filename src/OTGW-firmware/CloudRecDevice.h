@@ -353,6 +353,241 @@ void cloudRecSatTickf(const char *fmt, ...) {
   cloudRecAppend(tMs, [&] { return cloudRec.satTick(tMs, fi, text); });
 }
 
+// ---------------------------------------------------------------- TASK-1473: events (SEC_EVT)
+
+static const size_t CLOUDREC_EV_TEXT_MAX = 480;    // a longer text is cut and the cut counted as a lost item
+
+struct CloudRecEv {
+  uint8_t m[1024];
+  crec::Buf b;
+  CloudRecEv() { b.init(m, sizeof(m)); }
+  void text(const char *s, size_t n) {
+    if (!s) n = 0;
+    if (n > CLOUDREC_EV_TEXT_MAX) { n = CLOUDREC_EV_TEXT_MAX; cloudRecLoseItem(); }
+    b.leb(n);
+    b.bytes(s, n);
+  }
+  void textz(const char *s) { text(s, s ? strlen(s) : 0); }
+  void u8(uint8_t v) { b.put(v); }
+  void u(uint64_t v) { b.leb(v); }
+  void z(int64_t v) { b.leb(crec::zz(v)); }
+  void f(float v) { uint8_t x[4]; memcpy(x, &v, 4); b.bytes(x, 4); }
+  void u32le(uint32_t v) { for (int k = 0; k < 4; k++) b.put((uint8_t)(v >> (8 * k))); }
+  void send(uint8_t type) {
+    if (!cloudRecActive) return;
+    if (b.full) { cloudRecLoseItem(); return; }
+    int64_t tMs = cloudRecNowUs() / 1000;
+    cloudRecAppend(tMs, [&] { return cloudRec.event(tMs, type, m, b.n); });
+  }
+};
+
+static void cloudRecEvText(uint8_t type, const char *text, size_t n) {
+  if (!cloudRecActive) return;
+  CloudRecEv e;
+  e.text(text, n);
+  e.send(type);
+}
+void cloudRecEvPicCmd(const char *text, size_t n) { cloudRecEvText(crec::EV_PIC_CMD, text, n); }
+void cloudRecEvOtdCmd(const char *text, size_t n) { cloudRecEvText(crec::EV_OTD_CMD, text, n); }
+void cloudRecEvResponse(const char *text, size_t n) { cloudRecEvText(crec::EV_RESPONSE, text, n); }
+
+void cloudRecEvMqttPub(const char *topic, const char *value) {
+  if (!cloudRecActive) return;
+  CloudRecEv e;
+  e.textz(topic);
+  e.textz(value);
+  e.send(crec::EV_MQTT_PUB);
+}
+
+void cloudRecEvMqttIn(const char *topic, const char *value, size_t n) {
+  if (!cloudRecActive) return;
+  char tmp[CLOUDREC_EV_TEXT_MAX + 1];
+  size_t k = n < CLOUDREC_EV_TEXT_MAX ? n : CLOUDREC_EV_TEXT_MAX;
+  if (k) memcpy(tmp, value, k);
+  tmp[k] = 0;
+  diagRedactBody(tmp, k);                         // the same redaction as the local recorder (ADR-213)
+  if (n > k) cloudRecLoseItem();
+  CloudRecEv e;
+  e.textz(topic);
+  e.text(tmp, k);
+  e.send(crec::EV_MQTT_IN);
+}
+
+// body: nullptr or "" when the route's body must stay out (settings, secret-like route names).
+void cloudRecEvRestIn(uint8_t route, uint8_t method, const char *body, size_t n) {
+  if (!cloudRecActive) return;
+  char tmp[CLOUDREC_EV_TEXT_MAX + 1];
+  size_t k = (body && n) ? (n < CLOUDREC_EV_TEXT_MAX ? n : CLOUDREC_EV_TEXT_MAX) : 0;
+  if (k) memcpy(tmp, body, k);
+  tmp[k] = 0;
+  diagRedactBody(tmp, k);
+  if (body && n > k) cloudRecLoseItem();
+  CloudRecEv e;
+  e.u8(route);
+  e.u8(method);
+  e.text(tmp, k);
+  e.send(crec::EV_REST_IN);
+}
+
+// GETs answered 200 are counted per route and sent as one EV_REST_GETS item a minute (decision 2 A, TASK-1963).
+static const uint8_t CLOUDREC_ROUTES_MAX = 96;
+static uint32_t cloudRecGets[CLOUDREC_ROUTES_MAX];
+
+void cloudRecEvRest(uint8_t route, uint8_t method, int status) {
+  if (!cloudRecActive) return;
+  if (method == HTTP_GET && status == 200 && route < CLOUDREC_ROUTES_MAX) {
+    __atomic_fetch_add(&cloudRecGets[route], 1u, __ATOMIC_RELAXED);
+    return;
+  }
+  CloudRecEv e;
+  e.u8(route);
+  e.u8(method);
+  e.u((uint64_t)(status < 0 ? 0 : status));
+  e.send(crec::EV_REST);
+}
+
+static void cloudRecFlushGets() {
+  CloudRecEv e;
+  uint8_t n = 0;
+  size_t at = e.b.n;
+  e.u8(0);                                        // count, patched below
+  for (uint8_t r = 0; r < CLOUDREC_ROUTES_MAX; r++) {
+    uint32_t c = __atomic_exchange_n(&cloudRecGets[r], 0u, __ATOMIC_RELAXED);
+    if (!c) continue;
+    e.u8(r);
+    e.u(c);
+    n++;
+  }
+  if (!n) return;
+  e.m[at] = n;
+  e.send(crec::EV_REST_GETS);
+}
+
+void cloudRecEvWeather(float temperature, float humidity, float wind) {
+  if (!cloudRecActive) return;
+  CloudRecEv e;
+  e.f(temperature); e.f(humidity); e.f(wind);
+  e.send(crec::EV_WEATHER);
+}
+
+void cloudRecEvBle(uint8_t slot, float temperature, float humidity, uint8_t battery, int8_t rssi) {
+  if (!cloudRecActive) return;
+  CloudRecEv e;
+  e.u8(slot); e.f(temperature); e.f(humidity); e.u8(battery); e.z(rssi);
+  e.send(crec::EV_BLE);
+}
+
+void cloudRecEvSetting(const char *field, const char *value) {
+  if (!cloudRecActive) return;
+  char red[CLOUDREC_EV_TEXT_MAX + 1];
+  diagRedactSetting(field, value ? value : "", red, sizeof(red));
+  CloudRecEv e;
+  e.textz(field);
+  e.textz(red);
+  e.send(crec::EV_SETTING);
+}
+
+void cloudRecEvTimeSync(uint32_t epoch) {
+  if (!cloudRecActive) return;
+  CloudRecEv e;
+  e.u(epoch);
+  e.send(crec::EV_TIME_SYNC);
+}
+
+void cloudRecEvDallas(uint8_t index, const char *address, float tempC) {
+  if (!cloudRecActive) return;
+  CloudRecEv e;
+  e.u8(index);
+  e.textz(address);
+  float x = tempC * 128.0f;                       // the DS18B20 steps are 1/128 degC: exact as an integer
+  e.z((int64_t)(x < 0 ? x - 0.5f : x + 0.5f));
+  e.send(crec::EV_DALLAS);
+}
+
+void cloudRecEvS0(uint32_t pulses, uint32_t total, uint32_t durationMs) {
+  if (!cloudRecActive) return;
+  CloudRecEv e;
+  e.u(pulses); e.u(total); e.u(durationMs);
+  e.send(crec::EV_S0);
+}
+
+void cloudRecEvNet(uint8_t kind, int8_t rssi, uint32_t ip) {
+  if (!cloudRecActive) return;
+  CloudRecEv e;
+  e.u8(kind); e.z(rssi); e.u32le(ip);
+  e.send(crec::EV_NET);
+}
+
+void cloudRecEvMqttConn(bool up, uint8_t reason) {
+  if (!cloudRecActive) return;
+  CloudRecEv e;
+  e.u8(up ? 1 : 0); e.u8(reason);
+  e.send(crec::EV_MQTT_CONN);
+}
+
+void cloudRecEvTelnetKey(char key) {
+  if (!cloudRecActive) return;
+  CloudRecEv e;
+  e.u8((uint8_t)key);
+  e.send(crec::EV_TELNET_KEY);
+}
+
+void cloudRecEvWebhook(bool on, int status) {
+  if (!cloudRecActive) return;
+  CloudRecEv e;
+  e.u8(on ? 1 : 0); e.z(status);
+  e.send(crec::EV_WEBHOOK);
+}
+
+void cloudRecEvFw(uint8_t kind, int result, const char *text) {
+  if (!cloudRecActive) return;
+  CloudRecEv e;
+  e.u8(kind); e.z(result); e.textz(text);
+  e.send(crec::EV_FW);
+}
+
+void cloudRecEvMode(uint8_t kind, uint32_t value) {
+  if (!cloudRecActive) return;
+  CloudRecEv e;
+  e.u8(kind); e.u(value);
+  e.send(crec::EV_MODE);
+}
+
+// A command line from the port 25238 bridge (ADR decision 1 A, TASK-1963): recorded only while the cloud
+// recorder logs; refused = dropped by the ADR-217 SAT filter (or another drop reason).
+void cloudRecEvBridge(const char *text, size_t n, bool refused) {
+  if (!cloudRecActive) return;
+  CloudRecEv e;
+  e.u8(refused ? 1 : 0);
+  e.text(text, n);
+  e.send(crec::EV_BRIDGE_IN);
+}
+
+// Once a minute from the upload task: health, and the GET counts.
+static void cloudRecEvMinute() {
+  if (!cloudRecActive) return;
+  CloudRecEv e;
+  e.u(platformFreeHeap()); e.u(platformMaxFreeBlock()); e.u(platformMinFreeHeap());
+  e.z(WiFi.isConnected() ? WiFi.RSSI() : 0);
+  e.u(millis() / 1000u);
+  e.send(crec::EV_HEALTH);
+  cloudRecFlushGets();
+}
+
+// The reboot that started this session, once, at the first resume.
+static bool cloudRecRebootSent = false;
+static void cloudRecEvBoot() {
+  if (cloudRecRebootSent || !cloudRecActive) return;
+  cloudRecRebootSent = true;
+  char reason[48];
+  platformResetReason(reason, sizeof(reason));
+  CloudRecEv e;
+  e.u(state.uptime.iRebootCount);
+  e.textz(reason);
+  e.textz("");
+  e.send(crec::EV_REBOOT);
+}
+
 void cloudRecOtFrame(char letter, uint32_t frame) {
   int64_t tMs = cloudRecNowUs() / 1000;
   cloudRecAppend(tMs, [&] { return cloudRec.otFrame(tMs, letter, frame); });
@@ -443,6 +678,7 @@ static void cloudRecApplyRemote() {
     }
   }
   cloudRecRemoteApplied = want;
+  cloudRecEvMode(2, ((uint32_t)cloudRecRemote.mode << 16) | want);   // TASK-1473: mode << 16 | log flags
   DebugTf(PSTR("cloudrec: telemetry mode %u, log flags 0x%03x%s\r\n"), (unsigned)cloudRecRemote.mode, (unsigned)want,
           cloudRecRemote.untilEpoch ? " (until mode_until)" : "");
 }
@@ -653,6 +889,7 @@ static void cloudRecResume() {
   cloudRecBackoffStep = 0;
   cloudRecSvc = SVC_UP;
   cloudRecActive = true;
+  cloudRecEvBoot();                               // TASK-1473: reset reason of this boot, once
   DebugTf(PSTR("cloudrec: logging as %s\r\n"), cloudRecUid);
 }
 
@@ -713,6 +950,7 @@ static void cloudRecTask(void *) {
     }
     if (millis() - lastClose >= CLOUDREC_INTERVAL_MS) {
       lastClose = millis();
+      cloudRecEvMinute();                         // TASK-1473: health and GET counts, then the record closes
       if (platformMutexLock(cloudRecLock, 200)) {
         cloudRecCloseLocked(cloudRecNowUs() / 1000);
         platformMutexUnlock(cloudRecLock);

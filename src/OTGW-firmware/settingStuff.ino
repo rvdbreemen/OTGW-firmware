@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : settingsStuff
-**  Version  : v2.0.0-poc.6
+**  Version  : v2.0.0-poc.7
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -1410,6 +1410,9 @@ void updateSetting(const char *field, const char *newValue)
   // This coalesces multiple field updates into a single flash write and at most
   // one restart per service (Finding #23: reduce flash wear + MQTT churn).
   if (diagRec.active) diagRec.recSetting(field, newValue);   // TASK-1665: a changed value only; secrets are redacted inside
+#if HAS_CLOUD_REC
+  cloudRecEvSetting(field, newValue);   // TASK-1473
+#endif
 
   settingsDirty = true;
   RESTART_TIMER(timerFlushSettings);

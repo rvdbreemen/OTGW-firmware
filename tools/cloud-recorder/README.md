@@ -143,6 +143,11 @@ The gateway records and uploads by itself over HTTPS, also on a board without PS
   to a full handshake; TASK-1974) to the collection point, certificate check against GTS Root R1/R4 and
   ISRG Root X1/X2, `?fields=id`. Off unless `/cloudrec.cfg` on LittleFS has `enabled=1` plus `host` and `port`
   (the opt-in).
+- **Events (TASK-1473, ADR-243):** a fifth section (SEC_EVT, 1,408 B) records everything the firmware receives,
+  sends or measures besides OT/SATTICK/debug: commands and responses, MQTT, REST (GET 200 counted per route per
+  minute), sensors (Dallas, S0, BLE, weather), WiFi, settings, time sync, reboot, telnet keys, webhook, firmware
+  events, health every minute, mode changes and the port 25238 bridge commands. `decode_all.py` writes them to
+  `events.log` (one line per event: time, type, fields as JSON). Every call site is inside `#if HAS_CLOUD_REC`.
 - **Telemetry mode (TASK-1979):** the device record's `mode` / `flags` / `mode_until` (set by the maintainer) switch
   the log flags of `debugFlags.h` from the login and the token refresh every 15 minutes (`crec::parseRemote`,
   `crec::remoteEffective`, `cloudRecApplyRemote`); flags the user had on stay on afterwards.

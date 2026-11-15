@@ -1,7 +1,7 @@
 # anatomy.md
 
-> Auto-maintained by OpenWolf. Last scanned: 2026-11-15T16:05:24.875Z
-> Files: 165 tracked | Anatomy hits: 0 | Misses: 0
+> Auto-maintained by OpenWolf. Last scanned: 2026-11-15T21:45:28.293Z
+> Files: 167 tracked | Anatomy hits: 0 | Misses: 0
 
 ## ../../../../AppData/Local/Temp/
 
@@ -937,6 +937,7 @@
 
 ## docs/adr/
 
+- `ADR-243-opt-in-cloud-telemetry-from-the-gateway.md` — ADR-243: Opt-in cloud telemetry from the gateway (~1730 tok)
 
 ## docs/api/
 
@@ -987,6 +988,7 @@
 
 ## src/OTGW-firmware/
 
+- `CloudRecEvents.h` — pragma once (~858 tok)
 - `CloudRecPolicy.h` — pragma once (~563 tok)
 
 ## src/OTGW-firmware/data/

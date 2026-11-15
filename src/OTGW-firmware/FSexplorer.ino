@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program : FSexplorer
-**  Version  : v2.0.0-poc.6
+**  Version  : v2.0.0-poc.7
 **
 **  Mostly stolen from https://www.arduinoforum.de/User-Fips
 **  For more information visit: https://fipsok.de
@@ -473,6 +473,9 @@ void apilistfiles()
     if (!LittleFS.exists(deletePath)) {
       webSend(404, F("text/plain"), F("File not found"));
     } else if (LittleFS.remove(deletePath)) {
+#if HAS_CLOUD_REC
+      cloudRecEvFw(crec_FW_FILE_DELETE, 0, deletePath);   // TASK-1473
+#endif
       dallasLabelsFileChanged(deletePath);   // TASK-1912: the labels RAM copy follows the file
       satMarkersFileChanged(deletePath);     // TASK-1911: the markers RAM copy follows the file
       webSend(200, F("text/plain"), F("File deleted"));
@@ -746,6 +749,9 @@ void handleFileUpload(AsyncWebServerRequest *request, const String &filename,
     if (request->_tempFile) {
       dallasLabelsFileChanged(request->_tempFile.path());   // TASK-1912: the labels RAM copy follows the file
       satMarkersFileChanged(request->_tempFile.path());     // TASK-1911: the markers RAM copy follows the file
+#if HAS_CLOUD_REC
+      cloudRecEvFw(crec_FW_FILE_UPLOAD, (int)(index + len), request->_tempFile.path());   // TASK-1473
+#endif
       request->_tempFile.close();
       DebugT(F("FileUpload Size: ")); Debugln((String)(index + len));
     }

@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v2.0.0-poc.6
+**  Version  : v2.0.0-poc.7
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -4511,6 +4511,10 @@ bool sendPICSerial(const char* buf, int len)
     OTDebug(F("] (")); OTDebug(len); OTDebug(F(")")); OTDebugln();
 
     if (diagRec.active) diagRec.recPicCommand(buf, (size_t)n);   // TASK-1665: the command as sent (ADR-213)
+
+#if HAS_CLOUD_REC
+    cloudRecEvPicCmd(buf, (size_t)n);   // TASK-1473
+#endif
     if (enqueuePICTx(txbuf, n + 2)) {
       sendEventToWebSocket('>', buf, len);
     } else {
@@ -6302,6 +6306,9 @@ void processOT(const char *buf, int len, bool suppressOutput, bool localAnswer, 
     } 
   } else if (buf[2]==':') { //seems to be a response to a command, so check to verify if it was
     if (diagRec.active) diagRec.recResponse(buf, (size_t)len);   // TASK-1665: PIC and OT-Direct response lines (ADR-213)
+#if HAS_CLOUD_REC
+    cloudRecEvResponse(buf, (size_t)len);   // TASK-1473
+#endif
     checkCommandResponse(buf, len);
     if (buf[0] == 'P' && buf[1] == 'R') {
       handlePRresponse(buf, len);  // process PR: responses (PIC settings, gateway mode; PR=A's register A is ignored)
@@ -6609,12 +6616,18 @@ void handlePICSerial()
             dropReason = PSTR("tx queue full");
           }
           if (dropReason != nullptr) {   // dropped whole: no echo, no ADR-059 override, no readout trigger, no GW=R or PS= handling
+#if HAS_CLOUD_REC
+            cloudRecEvBridge(sWrite, bytes_write, true);   // TASK-1473: a refused bridge command
+#endif
             bytes_write = 0; rawLen = 0; lineOverflow = false; lineStart = true;
             continue;
           }
         } else {
           sWrite[bytes_write] = 0;
         }
+#if HAS_CLOUD_REC
+        if (bytes_write > 0) cloudRecEvBridge(sWrite, bytes_write, false);   // TASK-1473: a bridge command line
+#endif
         if (state.debug.bOTGWSimulation) {
           OTDebugTf(PSTR("Net2Ser blocked by simulation mode: [%s] (%d)\r\n"), sWrite, bytes_write);
           if (bytes_write > 0) {
@@ -6885,6 +6898,9 @@ static void jsonEscape(const char *in, char *out, size_t outSize) {
 
 #if HAS_PIC
 void fwupgradedone(OTGWError result, short errors = 0, short retries = 0) {
+#if HAS_CLOUD_REC
+  cloudRecEvFw(crec_FW_PIC_DONE, (int)result, "");   // TASK-1473
+#endif
   DebugTln(F(""));
   DebugTln(F("=== PIC Upgrade Complete ==="));
   DebugTf(PSTR("Result code: %d\r\n"), (int)result);
@@ -7037,6 +7053,9 @@ static void picProgressLedWrite(int pin, bool on) {
 }
 
 void fwupgradestart(const char *hexfile) {
+#if HAS_CLOUD_REC
+  cloudRecEvFw(crec_FW_PIC_START, 0, hexfile);   // TASK-1473
+#endif
   DebugTln(F("--- fwupgradestart() ---"));
 #ifdef OTGWSERIAL_DEBUG
   OTGWSerial.registerDebugFunc(picUpgradeDebug);

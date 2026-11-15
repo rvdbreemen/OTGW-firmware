@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v2.0.0-poc.6
+**  Version  : v2.0.0-poc.7
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -1234,6 +1234,7 @@ void maybeWarnFlashMismatch();                     // one-shot flash-config sani
 //Now load Debug & network library
 #include "debugStuff.h"
 #include "debugFlags.h"          // TASK-1561: debug log flags by name (telnet keys + REST /api/v2/debug/flags)
+#include "CloudRecEvents.h"      // TASK-1473: cloud recorder event capture points (empty inline without HAS_CLOUD_REC)
 #include "networkStuff.h"
 #include "helperStuff.h"
 #include "graphHistoryStuff.h"   // TASK-1296: device-side Monitor graph history (ADR-081 stuff.h)

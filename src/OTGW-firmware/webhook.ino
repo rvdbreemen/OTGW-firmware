@@ -1,6 +1,6 @@
 /*********
 **  Program  : webhook.ino
-**  Version  : v2.0.0-poc.6
+**  Version  : v2.0.0-poc.7
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -251,6 +251,9 @@ static bool sendWebhookJob(const WebhookJob& job) {
     code = http.GET();
   }
   http.end();
+#if HAS_CLOUD_REC
+  cloudRecEvWebhook(job.stateOn, code);   // TASK-1473
+#endif
 
   if (code >= 200 && code < 300) {
     DebugTf(PSTR("Webhook: HTTP response code: %d\r\n"), code);

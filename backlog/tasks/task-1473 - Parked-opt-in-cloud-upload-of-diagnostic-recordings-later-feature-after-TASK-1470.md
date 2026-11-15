@@ -1,18 +1,17 @@
 ---
 id: TASK-1473
 title: >-
-  On hold: continuous opt-in cloud recording (debug + timed OT stream) to
-  Cloudflare R2 EU over outbound TLS, PSRAM boards
-status: To Do
-assignee: []
+  Opt-in cloud telemetry: the full event stream (inputs, outputs, sensors) in
+  the cloud recorder, bridge commands included
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-10-29T12:45:00Z'
-updated_date: '2026-11-14T13:13:00Z'
+updated_date: '2026-11-15T21:47:00Z'
 labels:
-  - parked
-  - on-hold
-  - needs-maintainer-ok
   - diagnostics
   - tooling
+  - cloud-recording
 milestone: 2.1.0
 dependencies: []
 priority: low
@@ -22,30 +21,16 @@ ordinal: 633000
 ## Description
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
-ON HOLD (Robert 2026-10-30): worked out, NOT to be implemented until Robert says it is the right moment. Low priority. Do not pick this up in /implement-next-task.
-
-Goal: a capture-like recording without a separate script, so Robert can check how the firmware, the boiler, the thermostat and SAT behave after the fact. Two separate streams:
-1. Debug stream: a copy of all telnet debug output (all modules), with timestamps.
-2. OT stream: every OpenTherm frame (T/B/R/A, source PIC/OTDirect/replay) with its reception time in microseconds (epoch), compact, so a day can be replayed with the real timing.
-
-Decisions (Robert, interactive, 2026-10-30):
-- Continuous streaming from the device itself (not a browser relay, not local-only).
-- Backend: Cloudflare Worker + R2 bucket with EU jurisdiction (free tier, serverless, minimal maintenance).
-- Transport: outbound TLS client (HTTPS POST batches), on PSRAM boards only (precedent ADR-169). Web server stays HTTP. Needs a new ADR that partly supersedes ADR-003.
-- Opt-in, off by default; local-first stays the default (TASK-1470 shares the recording format).
-Hard constraints: fail quietly on a LAN with internet blocked (TASK-1471): drop/buffer, no loop stall, no reboot, no log flood. No ArduinoJson (ADR-146). No String in hot paths (ADR-180). No blocking network call in the loop or on async_tcp (ADR-137). Raw PIC stream rules (ADR-177) apply to any new consumer. Secrets redacted. GDPR: consent text, retention, controller named.
-Rejected alternatives and research: see notes (2026-10-30).
+Released by Robert 2026-11-15 ('Bouw TASK-1473'). The original plan (Cloudflare Worker + R2, PSRAM boards only) was replaced by the research PoC of TASK-1862/1938/1963/1971/1972/1974/1979: PocketBase self-hosted, outbound TLS with dynamic mbedTLS buffers also without PSRAM, one LZ-coded record a minute. This task adds the rest of the telemetry decided in docs/diagnostics/cloud-telemetry-completeness.md: an events section with everything the firmware receives, sends or measures besides OT/SATTICK/debug, the port 25238 bridge commands inbound (decision 1 A), REST results with GET 200 counted per route per minute (decision 2 A), and an ADR for the whole design. Research branch only (esp32-combo-tlsdyn, HAS_CLOUD_REC).
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Bench measurement of TLS heap peak/steady state on a PSRAM board recorded in notes; go/no-go decided
-- [ ] #2 Proposed ADR (outbound TLS client on PSRAM boards, recording format) accepted by Robert
-- [ ] #3 OT frames carry a microsecond reception timestamp set at enqueue; a recorded day replays with the original timing (old fixed-750 ms vs new paced, demonstrated)
-- [ ] #4 Debug and OT streams upload continuously to an R2 EU bucket via the Worker; 24 h bench run shows no loop gap above normal and the real volume per stream
-- [ ] #5 With outbound internet blocked the upload fails quietly: no loop stall, no reboot, at most one log line per retry interval (capture transcript)
-- [ ] #6 Opt-in off by default, consent text in the web UI, secrets redacted, retention lifecycle rule set on the bucket
-- [ ] #7 Robert releases this task for implementation (removes the on-hold and parked labels); until then nothing beyond this worked-out design is done
+- [x] #1 Events section (SEC_EVT) in CloudRecCodec.h with a host decoder; every event type round-trips through the real recorder
+- [x] #2 Capture points for the diagRec events, sensors outside the bus, WiFi, MQTT connection, REST results, telnet keys, webhook, firmware events, health, mode and the bridge, each inside #if HAS_CLOUD_REC
+- [x] #3 No new test failures against the HEAD baseline; esp32-combo-tlsdyn builds; evaluate --quick no new FAIL
+- [x] #4 ADR for the cloud telemetry written (Proposed) and indexed
+- [ ] #5 Events visible on a device in events.log (bench check 15)
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -105,4 +90,6 @@ Robert 2026-11-05 (session otgw-firmware-54, AskUserQuestion): stays parked unti
 2026-11-14 encoding study for this feature: docs/diagnostics/ot-stream-encoding-study.md (see TASK-1862 notes). Task stays on hold.
 
 2026-11-14 #dev-sat-mqtt (see TASK-1862, owned by Robert's cloud session): Robert to Sergeant D: 'I'm really looking into building an opt in feature to get data from users so you have more to work with.' https://discord.com/channels/812969634638725140/1105556725714649128/1571146379177234436 ; Sergeant D: 'Even with data only from gruijter we made the software even more robust.' https://discord.com/channels/812969634638725140/1105556725714649128/1571146720300105811 (after 'We don't need to be in a hurry', 1571146149442756669). Local per-user field-data archive exists since 2026-11-14 (RvdB/OTGW-field-data, Robert 1571077884976701491).
+
+2026-11-15 built (2.0.0-poc.7). SEC_EVT = 8, 1,408 B (OT 384, SAT 512, debug 1,792; record still 4,096 + 32): 23 event types (EV_* in CloudRecCodec.h; layouts in otrec.EV_LAYOUT; texts LEB length + bytes, floats exact float32, Dallas in exact 1/128 degC steps, cut texts counted as lost). tests/test_cloudrec_codec.py new test: 900 events of every type through the real crec::Recorder, records close when the section is full, every event back in order with its ms time; 5/5 OK. Capture points (32, each in #if HAS_CLOUD_REC so test harnesses that cut real functions stay unchanged): next to the ten diagRec points (OTD commands from the bridge excluded, they go as bridge_in), REST body + result after the handler (restResponseStatus, single async_tcp task), 429 path, Dallas every reading, S0, WiFi connect/disconnect, MQTT connect/disconnect, telnet key, sensor/OTGW simulation switches, webhook result, PIC flash start/done, OTA start/end, FSexplorer upload/delete, bridge lines on both paths (refused flag on the PIC path), health + GET counts every minute, reboot once per boot, central mode change. Not recorded: Ethernet up/down (no event handler exists), WebSocket data (unused). Test suite: 46 failing files on a clean HEAD worktree and the same 46 with the change (pre-existing in this container), no new failure. Build esp32-combo-tlsdyn exit 0: RAM 156,772 B, app 2,258,351 B (98.5 %), 18 cloudRecEv functions linked, no new warnings in the touched files. evaluate --quick 0 FAIL 0 WARN. ADR-243 (Proposed, guideline-level) + README index; tests/test_adr_governance.py OK. Docs: completeness doc status table, tools README, bench check 15. AC 5 needs the bench.
 <!-- SECTION:NOTES:END -->

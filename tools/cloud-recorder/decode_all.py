@@ -7,13 +7,14 @@
 Reads the device's "mix" records (fmt 4) in seq order and writes:
   otframes.log  OT frames in the ADR-209 replay layout (host_time, device_time, source, frame)
   sat.log       one SATTICK line per tick: ISO time, tab, the exact SATTICK text
+  events.log    one line per event (TASK-1473): ISO time, tab, type, tab, the fields as JSON
   debug.log     the telnet bytes the gateway printed, rebuilt from the address tokens; the format strings
                 and function names are read from --image, the firmware.bin (or .elf) of the build that recorded
 Missing records become "#" lines in otframes.log and sat.log and a "### gap" line in debug.log; so does what the
 gateway itself reports as lost (SEC_LOST: items or records it could not record).
 Run it on the LAN: the superuser API is not exposed through the tunnel.
 """
-import argparse, base64, datetime, os, sys, zlib
+import argparse, json, base64, datetime, os, sys, zlib
 from zoneinfo import ZoneInfo
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -27,7 +28,8 @@ def decode_records(records, image, tz, out_dir):
     counts = {"records": 0, "frames": 0, "ticks": 0, "debug_bytes": 0, "gaps": 0}
     with open(os.path.join(out_dir, "otframes.log"), "w", newline="\n") as fo, \
             open(os.path.join(out_dir, "sat.log"), "w", newline="\n") as fs, \
-            open(os.path.join(out_dir, "debug.log"), "wb") as fd:
+            open(os.path.join(out_dir, "debug.log"), "wb") as fd, \
+            open(os.path.join(out_dir, "events.log"), "w", newline="\n") as fe:
         fo.write(eb.HEADER + "\n")
         prev = None
         for r in records:
@@ -61,6 +63,11 @@ def decode_records(records, image, tz, out_dir):
             dbg = sec.get(otrec.SEC_DBG_Z)
             dbg = zlib.decompress(dbg) if dbg is not None else sec.get(otrec.SEC_DBG, b"")
             text = otrec.dbg_decode(r["t0"], dbg, image, tz)
+            for t, typ, fields in otrec.evt_decode(r["t0"], sec.get(otrec.SEC_EVT, b"")):
+                ts = datetime.datetime.fromtimestamp(t / 1000, tz)
+                fe.write(f"{ts.isoformat(timespec='milliseconds')}\t{otrec.EV_NAMES[typ]}\t"
+                         + json.dumps(fields, ensure_ascii=False, separators=(",", ":")) + "\n")
+                counts["events"] = counts.get("events", 0) + 1
             fd.write(text)
             counts["debug_bytes"] += len(text)
     return counts

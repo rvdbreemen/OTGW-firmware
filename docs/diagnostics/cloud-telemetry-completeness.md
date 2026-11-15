@@ -174,3 +174,34 @@ payload (mix study: 291 KB/h stored against 301 KB/h sent, headers included). Pa
 5. The upload rate limit stays per IP (B).
 6. Bench job: `docs/diagnostics/cloudrec-bench-job.md`.
 7. PocketBase does not run on the Synology yet: the migration stays edited in place.
+
+## Status after TASK-1473 (2026-11-15, 2.0.0-poc.7)
+
+The cloud record now has an events section (SEC_EVT, `CloudRecCodec.h`); each capture point below sits inside
+`#if HAS_CLOUD_REC` next to the ADR-213 capture point, or where the firmware had none. Decoded by `otrec.evt_decode`
+into `events.log` (`decode_all.py`). Decision record: ADR-243 (Proposed).
+
+| # | Source / event | Cloud recorder now |
+|---|---|---|
+| 1 | OT frames | ✓ OT section |
+| 2-4 | PIC commands, OTDirect commands, PIC responses | ✓ `pic_cmd`, `otd_cmd`, `response` |
+| 5 | Port 25238 bridge, inbound | ✓ `bridge_in` (refused flag for the ADR-217 filter); outbound stays out (it is the OT section) |
+| 6-7 | MQTT in, MQTT value publishes | ✓ `mqtt_in` (redacted), `mqtt_pub` |
+| 8 | MQTT connection | ✓ `mqtt_conn`; HA discovery publishes: not verified that they pass `sendMQTTData` |
+| 9-10 | REST requests and results | ✓ `rest_in` (body, redacted), `rest` (every non-GET-200 with status), `rest_gets` (GET 200 counts per route per minute) |
+| 11 | PIC flash, OTA, file upload and delete | ✓ `fw` |
+| 12 | WebSocket | – (WS data is not used by the firmware; connects are in the debug text) |
+| 13 | Telnet keys | ✓ `telnet_key` |
+| 14 | Webhook | ✓ `webhook` (state, HTTP status) |
+| 15 | Settings | ✓ `setting` (redacted) |
+| 16-17 | Dallas, S0 | ✓ `dallas` (every reading, 1/128 degC exact), `s0` |
+| 18 | PIC return/temp sensor | ✓ through `pic_cmd` / `response` |
+| 19-20 | BLE, weather | ✓ `ble`, `weather` (float32, exact) |
+| 21-22 | DHW water meter, GPIO outputs | derivable from the OT frames (not recorded separately) |
+| 23 | SAT | ✓ SATTICK always; `SAT_EVENT` list still TASK-1970 |
+| 24 | WiFi up/down | ✓ `net` (RSSI, IP or reason); Ethernet up/down: no event handler in the firmware, not recorded |
+| 25-26 | NTP, reboot | ✓ `time_sync`, `reboot` (reset reason, once per boot) |
+| 27-28 | Heap, health | ✓ `health` every minute (free heap, largest block, minimum, RSSI, uptime); losses in SEC_LOST |
+| 29 | Simulation and telemetry mode | ✓ `mode` |
+
+Still outside the recording: output that bypasses the `Debug*` macros (the telnet banner, file dumps).

@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-poc.6
+**  Version  : v2.0.0-poc.7
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -2722,8 +2722,15 @@ bool restRequestWithin(uint32_t ms)
 // its handler. The body is redacted inside diagRecordRestIn().
 static void diagCaptureRest(uint8_t routeIdx, PGM_P segment, HTTPMethod method)
 {
-  if (!diagRec.active) return;
   if (method != HTTP_POST && method != HTTP_PUT && method != HTTP_PATCH && method != HTTP_DELETE) return;
+#if HAS_CLOUD_REC   // TASK-1473: the cloud recorder, with the same body rule as diagRec
+  {
+    const bool skip = strcasecmp_P(segment, PSTR("settings")) == 0 || diagNameIsSecret(segment, strlen_P(segment));
+    const char* body = (!skip && hasArgCompat(F("plain"))) ? argCompat(F("plain")) : "";
+    cloudRecEvRestIn(routeIdx, (uint8_t)method, body, strlen(body));
+  }
+#endif
+  if (!diagRec.active) return;
   diagRecordRestIn(routeIdx, segment, httpMethodToStr(method), hasArgCompat(F("plain")) ? argCompat(F("plain")) : "");
 }
 
@@ -2830,10 +2837,16 @@ void processAPI(AsyncWebServerRequest *request)
             if (!checkApiRateLimit(words, wc, method)) {
               RESTDebugTf(PSTR("REST %s %s => 429 rate-limited %lums\r\n"),
                           httpMethodToStr(method), originalURI, millis() - startMs);
+#if HAS_CLOUD_REC
+              cloudRecEvRest((uint8_t)i, (uint8_t)method, 429);   // TASK-1473
+#endif
               return;
             }
             diagCaptureRest((uint8_t)i, r.segment, method);
             r.handler(words, wc, method, originalURI);
+#if HAS_CLOUD_REC
+            cloudRecEvRest((uint8_t)i, (uint8_t)method, restResponseStatus);   // TASK-1473: GET 200s are counted
+#endif
             RESTDebugTf(PSTR("REST %s %s => %d v2/%S %lums\r\n"), httpMethodToStr(method), originalURI, restResponseStatus, r.segment, millis() - startMs);
             return;
           }

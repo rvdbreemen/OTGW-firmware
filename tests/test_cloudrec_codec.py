@@ -230,5 +230,36 @@ class CloudRecCodecTest(unittest.TestCase):
         self.assertEqual(got, [f for f in frames])                       # and the OT data is untouched
 
 
+    def test_events_round_trip(self):
+        """TASK-1473: every event type through the real recorder; records close when the section is full."""
+        rnd = random.Random(11)
+        samples = {11: ["CS=45.0"], 12: ["TT=20.5"], 13: ["CS: 45.00"], 14: ["boiler_temp", "45.50"],
+                   16: ["set/otgw/command", "TT=21"], 17: [3, 1, '{"value":"*****"}'], 18: [f32(7.25), f32(81.5), f32(3.5)],
+                   19: [2, f32(20.125), f32(55.0), 87, -71], 20: ["MQTTbroker", "10.0.0.2"],
+                   21: [42, "Software reset", ""], 23: [1763200000], 30: [1, "28ff641e8016043c", 2731],
+                   31: [3, 1200, 850], 32: [0, -63, 0x0A00000C], 33: [1, 0], 34: [5, 1, 400],
+                   35: [[(2, 30), (7, 6)]], 36: [ord("5")], 37: [1, 200], 38: [0, 0, "gateway.hex"],
+                   39: [61234, 30212, 11588, -63, 86400], 40: [2, 3], 41: [1, "CS=60"]}
+        lines, events, t = [f"B {T0}"], [], T0
+        for k in range(900):
+            typ = rnd.choice(sorted(samples))
+            t += rnd.randint(0, 900)
+            item = otrec.evt_encode_item(t, t, typ, samples[typ])          # dt 0: only the payload is used
+            payload = item[2:]
+            lines.append(f"V {t} {typ} {payload.hex()}")
+            events.append((t, typ))
+        recs = Harness.run(lines + ["E"])
+        got = []
+        for t0, p in recs:
+            sec = otrec.unpack_mix(t0, p)
+            got += [(tt, ty, f) for tt, ty, f in otrec.evt_decode(t0, sec.get(otrec.SEC_EVT, b""))]
+        self.assertGreater(len(recs), 3)                                   # the 1,408 B section filled up
+        self.assertEqual([(tt, ty) for tt, ty, _ in got], events)          # every event, in order, exact ms
+        names = dict(zip(otrec.EV_FIELDS[30], samples[30]))
+        self.assertTrue(any(f == names for _, ty, f in got if ty == 30))
+        ble = [f for _, ty, f in got if ty == 19][0]
+        self.assertEqual((ble["temperature"], ble["rssi"]), (20.125, -71))
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : MQTTstuff
-**  Version  : v2.0.0-poc.6
+**  Version  : v2.0.0-poc.7
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **      Modified version from (c) 2020 Willem Aandewiel
@@ -819,6 +819,10 @@ static void handleMQTTcallback(char* topic, byte* payload, unsigned int length, 
   }
 
   if (diagRec.active) diagRec.recMqttIn(topic, msgPayload, strlen(msgPayload));   // TASK-1665: inbound command or status (ADR-213); the topic as received
+
+#if HAS_CLOUD_REC
+  cloudRecEvMqttIn(topic, msgPayload, strlen(msgPayload));   // TASK-1473
+#endif
 
   if (strcasecmp_P(topic, PSTR("homeassistant/status")) == 0) {
     //incoming message on status, detect going down
@@ -1857,6 +1861,9 @@ static void mqttRetryPendingSubscribes() {
 // TASK-1778 end
 
 static void onMqttConnect(bool sessionPresent) {
+#if HAS_CLOUD_REC
+  cloudRecEvMqttConn(true, sessionPresent ? 1 : 0);   // TASK-1473
+#endif
   (void)sessionPresent;
   if (sBootHeapState == BOOTHEAP_RUN) {
     bootHeapPhase(PSTR("connect"));  // TASK-1339: closes wait-mqtt
@@ -1922,6 +1929,9 @@ static void onMqttConnect(bool sessionPresent) {
 //   - from MQTT_STATE_WAIT_CONNECTION_ATTEMPT -> retry after the per-attempt
 //     backoff, with the 5-attempts-then-42s fallback preserved.
 static void onMqttDisconnect(espMqttClientTypes::DisconnectReason reason) {
+#if HAS_CLOUD_REC
+  cloudRecEvMqttConn(false, (uint8_t)reason);   // TASK-1473
+#endif
   lastMqttDisconnectReason = reason;
   state.mqtt.bConnected = false;
   connStageReset();  // TASK-1757: the next connect starts the portions again
@@ -1962,6 +1972,9 @@ bool sendMQTTData(const char* topic, const char *json, const bool retain)
   MQTTDebugTf(PSTR("Sending MQTT: server %s:%d => TopicId [%s] --> Message [%s]\r\n"), settings.mqtt.sBroker, settings.mqtt.iBrokerPort, full_topic, json);
   const size_t payloadLen = strlen(json);
   if (diagRec.active) diagRec.recMqttPublish(topic, json);   // TASK-1665: value publishes only (ADR-213); discovery uses mqttPublishRaw()
+#if HAS_CLOUD_REC
+  cloudRecEvMqttPub(topic, json);   // TASK-1473
+#endif
   // espMqttClient frames atomically (copies topic+payload into its Outbox); the
   // TASK-770 disconnect-on-truncated-write guard is obsolete.
   if (!mqttPublishRaw(full_topic, reinterpret_cast<const uint8_t*>(json), payloadLen, retain)) {
@@ -2019,6 +2032,9 @@ bool sendMQTTData(const __FlashStringHelper *topic, const __FlashStringHelper *j
   strlcpy_P(payloadBuf, payload, sizeof(payloadBuf));
   const size_t payloadLen = strlen(payloadBuf);
   if (diagRec.active) diagRec.recMqttPublish(topicBuf, payloadBuf);   // TASK-1665 (ADR-213)
+#if HAS_CLOUD_REC
+  cloudRecEvMqttPub(topicBuf, payloadBuf);   // TASK-1473
+#endif
   if (!mqttPublishRaw(full_topic, reinterpret_cast<const uint8_t*>(payloadBuf), payloadLen, retain)) {
     PrintMQTTError();
     return false;

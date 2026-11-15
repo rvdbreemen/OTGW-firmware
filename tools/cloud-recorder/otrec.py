@@ -713,3 +713,88 @@ def lost_counts(sec):
     items, u = _unleb(data)
     records, _ = _unleb(data[u:])
     return items, records
+
+
+# ---------------------------------------------------------------- TASK-1473: the events section
+
+SEC_EVT = 8
+EV_NAMES = {11: "pic_cmd", 12: "otd_cmd", 13: "response", 14: "mqtt_pub", 16: "mqtt_in", 17: "rest_in",
+            18: "weather", 19: "ble", 20: "setting", 21: "reboot", 23: "time_sync", 30: "dallas", 31: "s0",
+            32: "net", 33: "mqtt_conn", 34: "rest", 35: "rest_gets", 36: "telnet_key", 37: "webhook", 38: "fw",
+            39: "health", 40: "mode", 41: "bridge_in"}
+# Payload layout per type: t text, b u8, u LEB128, z zigzag LEB128, f float32 LE, i u32 LE, G the REST_GETS list
+EV_LAYOUT = {11: "t", 12: "t", 13: "t", 14: "tt", 16: "tt", 17: "bbt", 18: "fff", 19: "bffbz", 20: "tt",
+             21: "utt", 23: "u", 30: "btz", 31: "uuu", 32: "bzi", 33: "bb", 34: "bbu", 35: "G", 36: "b",
+             37: "bz", 38: "bzt", 39: "uuuzu", 40: "bu", 41: "bt"}
+EV_FIELDS = {11: ("text",), 12: ("text",), 13: ("text",), 14: ("topic", "value"), 16: ("topic", "value"),
+             17: ("route", "method", "body"), 18: ("temperature", "humidity", "wind"),
+             19: ("slot", "temperature", "humidity", "battery", "rssi"), 20: ("field", "value"),
+             21: ("boot_count", "reason", "crash"), 23: ("epoch",), 30: ("index", "address", "temp_x128"),
+             31: ("pulses", "total", "duration_ms"), 32: ("kind", "rssi", "ip_or_reason"), 33: ("up", "reason"),
+             34: ("route", "method", "status"), 35: ("counts",), 36: ("key",), 37: ("state", "status"),
+             38: ("kind", "result", "text"), 39: ("free_heap", "max_block", "min_free_heap", "rssi", "uptime_s"),
+             40: ("kind", "value"), 41: ("refused", "text")}
+
+
+def evt_encode_item(t_ms, prev_ms, typ, values):
+    """One event as the device writes it (reference for the tests)."""
+    out = bytearray([typ]) + _leb(max(0, t_ms - prev_ms))
+    for kind, v in zip(EV_LAYOUT[typ], values):
+        if kind == "t":
+            b = v if isinstance(v, bytes) else str(v).encode()
+            out += _leb(len(b)) + b
+        elif kind == "b":
+            out.append(int(v) & 0xFF)
+        elif kind == "u":
+            out += _leb(int(v))
+        elif kind == "z":
+            out += _leb(_zz(int(v)))
+        elif kind == "f":
+            out += _struct.pack("<f", v)
+        elif kind == "i":
+            out += _struct.pack("<I", int(v) & 0xFFFFFFFF)
+        elif kind == "G":
+            out.append(len(v))
+            for route, n in v:
+                out += bytes([route]) + _leb(n)
+    return bytes(out)
+
+
+def evt_decode(t0_ms, data):
+    """[(t_ms, type, {field: value})] of one events section."""
+    out, i, t = [], 0, t0_ms
+    while i < len(data):
+        typ = data[i]
+        i += 1
+        dt, u = _unleb(data[i:])
+        i += u
+        t += dt
+        vals = []
+        for kind in EV_LAYOUT.get(typ, ""):
+            if kind == "t":
+                n, u = _unleb(data[i:]); i += u
+                vals.append(data[i:i + n].decode(errors="replace")); i += n
+            elif kind == "b":
+                vals.append(data[i]); i += 1
+            elif kind == "u":
+                v, u = _unleb(data[i:]); i += u
+                vals.append(v)
+            elif kind == "z":
+                v, u = _unleb(data[i:]); i += u
+                vals.append(_unzz(v))
+            elif kind == "f":
+                vals.append(_struct.unpack("<f", data[i:i + 4])[0]); i += 4
+            elif kind == "i":
+                vals.append(_struct.unpack("<I", data[i:i + 4])[0]); i += 4
+            elif kind == "G":
+                n = data[i]; i += 1
+                lst = []
+                for _ in range(n):
+                    r = data[i]; i += 1
+                    c, u = _unleb(data[i:]); i += u
+                    lst.append((r, c))
+                vals.append(lst)
+        if typ not in EV_LAYOUT:
+            raise ValueError(f"unknown event type {typ} at byte {i - 1}")
+        out.append((t, typ, dict(zip(EV_FIELDS[typ], vals))))
+    return out

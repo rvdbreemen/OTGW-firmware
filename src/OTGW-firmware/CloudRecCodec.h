@@ -381,7 +381,8 @@ inline char dbgConv(const char *&fmt, int *lenMod) {
 // ---------------------------------------------------------------- mix record assembly
 
 static const uint8_t SEC_SAT = 2, SEC_DBG = 3, SEC_OT2 = 5;
-static const uint8_t SEC_LOST = 7;   // TASK-1972: LEB128 items, LEB128 records lost since the previous record
+static const uint8_t SEC_LOST = 7;
+static const uint8_t SEC_EVT = 8;   // TASK-1473: the events section   // TASK-1972: LEB128 items, LEB128 records lost since the previous record
 
 // Writes section `type` with `data` into out. Returns false when it does not fit.
 inline bool mixSection(Buf &out, uint8_t type, const uint8_t *data, size_t n) {
@@ -405,12 +406,49 @@ inline bool mixOtSection(Buf &out, int64_t t0Ms, int64_t firstMs, uint32_t count
 // Section buffers of one record; together they fit the 4 KB recording budget of a board without PSRAM
 // (ADR-213). An append that does not fit returns false; the caller then closes the record (send it), opens
 // a new one and appends again.
-static const size_t REC_OT_BYTES = 768, REC_SAT_BYTES = 512, REC_DBG_BYTES = 2816;
-static const size_t REC_MAX_BYTES = REC_OT_BYTES + REC_SAT_BYTES + REC_DBG_BYTES + 32;   // + section headers, SEC_LOST
+// TASK-1473: the events section took 1,408 B: OT needs about 200 B a minute (384 B), SAT up to ~470 (512 B).
+static const size_t REC_OT_BYTES = 384, REC_SAT_BYTES = 512, REC_DBG_BYTES = 1792, REC_EVT_BYTES = 1408;
+static const size_t REC_MAX_BYTES = REC_OT_BYTES + REC_SAT_BYTES + REC_DBG_BYTES + REC_EVT_BYTES + 32;   // + headers
+
+// ---------------------------------------------------------------- TASK-1473: the events section (SEC_EVT)
+//
+// Everything the firmware does or receives besides the OT frames, SATTICK and debug text: commands to the PIC and
+// OTDirect, PIC responses, MQTT in and out, REST, sensors outside the bus, network, firmware events, health. One
+// item: type u8, dt LEB128 (ms since the previous event of this record; the first from t0), payload. In a payload
+// a text is LEB128 length + bytes, z = zigzag LEB128, f = float32 little endian (exact), u = LEB128. Secrets are
+// redacted by the device before an item is built (diagRedactBody / diagRedactSetting, as ADR-213).
+enum EventType : uint8_t {
+  EV_PIC_CMD = 11,     // text
+  EV_OTD_CMD = 12,     // text
+  EV_RESPONSE = 13,    // text
+  EV_MQTT_PUB = 14,    // topic text, value text
+  EV_MQTT_IN = 16,     // topic text, value text (redacted)
+  EV_REST_IN = 17,     // route u8, method u8, body text (redacted)
+  EV_WEATHER = 18,     // f temperature, f humidity, f wind
+  EV_BLE = 19,         // slot u8, f temperature, f humidity, battery u8, z rssi
+  EV_SETTING = 20,     // field text, value text (redacted)
+  EV_REBOOT = 21,      // u boot count, reason text, crash text
+  EV_TIME_SYNC = 23,   // u epoch
+  EV_DALLAS = 30,      // index u8, address text, z temperature x 128 (the sensor's 1/128 degC steps, exact)
+  EV_S0 = 31,          // u pulses, u total, u last pulse duration ms
+  EV_NET = 32,         // kind u8 (0 WiFi up, 1 WiFi down), z rssi, u32 LE: the IP when up, the reason when down
+  EV_MQTT_CONN = 33,   // up u8, reason u8
+  EV_REST = 34,        // route u8, method u8, u status (every request except a GET answered 200)
+  EV_REST_GETS = 35,   // n u8, then n x (route u8, u count): GETs answered 200 since the previous item
+  EV_TELNET_KEY = 36,  // key u8
+  EV_WEBHOOK = 37,     // state u8, z HTTP status (or a negative HTTPClient error)
+  EV_FW = 38,          // kind u8 (FW_*), z result, text
+  EV_HEALTH = 39,      // u free heap, u largest block, u minimum free heap, z rssi, u uptime s
+  EV_MODE = 40,        // kind u8 (0 sensor simulation, 1 OTGW simulation, 2 central telemetry mode), u value
+  EV_BRIDGE_IN = 41    // refused u8, text: a command line from the port 25238 bridge
+};
+enum FwEventKind : uint8_t { FW_PIC_START = 0, FW_PIC_DONE = 1, FW_OTA_START = 2, FW_OTA_END = 3, FW_FILE_UPLOAD = 4,
+                             FW_FILE_DELETE = 5 };
 
 struct Recorder {
-  uint8_t otMem[REC_OT_BYTES], satMem[REC_SAT_BYTES], dbgMem[REC_DBG_BYTES];
-  Buf ot, sat, dbg;
+  uint8_t otMem[REC_OT_BYTES], satMem[REC_SAT_BYTES], dbgMem[REC_DBG_BYTES], evtMem[REC_EVT_BYTES];
+  Buf ot, sat, dbg, evt;
+  int64_t evtLastMs;
   RcEnc rc;
   OtModel model;
   SatState satSt;
@@ -421,10 +459,11 @@ struct Recorder {
 
   void begin(int64_t t0ms) {
     ot.init(otMem, sizeof(otMem)); sat.init(satMem, sizeof(satMem)); dbg.init(dbgMem, sizeof(dbgMem));
+    evt.init(evtMem, sizeof(evtMem)); evtLastMs = t0ms;
     rc.init(&ot); model.reset(); satSt.reset(t0ms); dbgSt.reset(t0ms);
     t0Ms = t0ms; firstOtMs = t0ms; otCount = 0; open = true;
   }
-  bool empty() const { return !otCount && !sat.n && !dbg.n; }
+  bool empty() const { return !otCount && !sat.n && !dbg.n && !evt.n; }
   // Loss since the previous record (busy recorder, a record that could not be queued, a pause). Kept across
   // begin() and written as SEC_LOST at the head of the next closed record, so a gap is never silent.
   uint32_t lostItems = 0, lostRecords = 0;
@@ -444,6 +483,17 @@ struct Recorder {
     bool full = sat.full;
     sat.n = mark; sat.full = false;
     return !full;                                    // a line that is not a SATTICK is simply not recorded
+  }
+  // One event (EventType + its payload). False when it does not fit: nothing is left behind.
+  bool event(int64_t tMs, uint8_t type, const uint8_t *payload, size_t n) {
+    size_t mark = evt.n;
+    int64_t d = tMs - evtLastMs;
+    evt.put(type);
+    evt.leb((uint64_t)(d > 0 ? d : 0));
+    evt.bytes(payload, n);
+    if (evt.full) { evt.n = mark; evt.full = false; return false; }
+    if (d > 0) evtLastMs = tMs;
+    return true;
   }
   // Debug items: the caller writes the item into dbg and then calls dbgCommit(mark); a full buffer rolls back.
   size_t dbgMark() const { return dbg.n; }
@@ -467,6 +517,7 @@ struct Recorder {
     mixOtSection(b, t0Ms, firstOtMs, otCount, ot.p, ot.n);
     mixSection(b, SEC_SAT, sat.p, sat.n);
     mixSection(b, SEC_DBG, dbg.p, dbg.n);
+    mixSection(b, SEC_EVT, evt.p, evt.n);
     open = false;
     return b.full ? 0 : b.n;
   }
