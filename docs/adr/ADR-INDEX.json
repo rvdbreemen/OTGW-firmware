@@ -9566,6 +9566,70 @@
       }
     },
     {
+      "id": "ADR-240",
+      "title": "A web connection that is not ESTABLISHED and holds no payload does not count towards the ADR-188 send cap",
+      "path": "ADR-240-a-web-connection-that-is-not-established-and-holds-no-payload-does-not-count-towards-the-adr-188-send-cap.md",
+      "format": "canonical",
+      "status": "Accepted",
+      "date": "2026-11-15",
+      "decision_summary": "A connection on port 80 that is not ESTABLISHED counts towards the ADR-188 cap only while at least one queued segment...",
+      "topics": [
+        "503",
+        "connection cap",
+        "fresh page load",
+        "lwIP",
+        "TCP",
+        "web server"
+      ],
+      "aliases": [
+        "closing-fin",
+        "FIN-only connection",
+        "hd_webconn_503",
+        "syn-rcvd",
+        "WEB CONN CAP",
+        "webConnCapExceeded"
+      ],
+      "components": [
+        "platformTcpTxHoldingOnPort"
+      ],
+      "symbols": [
+        "platformTcpTxBreakdownOnPort",
+        "platformTcpTxHoldingOnPort",
+        "WEB_MAX_TX_CONNECTIONS",
+        "webConnCapExceeded"
+      ],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [
+          "platformTcpTxHoldingOnPort() counts a non-ESTABLISHED connection only when a segment in unsent or unacked has len != 0.",
+          "An ESTABLISHED connection keeps counting as before: with queued segments, or without them unless it is a native file-queue waiter. A request that is being admitted is ESTABLISHED and counts.",
+          "The refusal line keeps the zero-length-only connections apart by state (closing-fin, syn-rcvd, other)."
+        ],
+        "must_not": [
+          "Must not stop counting idle ESTABLISHED connections: a request whose handler has not answered yet is idle at admission, so a storm of new requests would all be admitted and then fill their send queues at once, which is the starvation ADR...",
+          "Must not change WEBMAXTXCONNECTIONS."
+        ],
+        "exceptions": [
+          "None."
+        ],
+        "verification": [
+          "tests/testwebconncapstates.py: compiles the real shim against a stub list of pcbs (lwIP protocol control blocks); a FIN-only FINWAIT1, CLOSING and LASTACK connection, a SYNRCVD connection with only its SYN-ACK and another state with only...",
+          "Bench: 20 fresh loads on .61 with the diagnostic line show 0 refusals caused by zero-length-only connections, and report closing-fin against syn-rcvd (TASK-1947 AC3)."
+        ]
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
+    },
+    {
       "id": "ADR-241",
       "title": "OT-Direct master mode relays the thermostat's writes to the boiler in the next free master slot and returns the boiler's answer (amends ADR-066)",
       "path": "ADR-241-ot-direct-master-mode-relays-the-thermostat-s-writes-to-the-boiler-in-the-next-free-master-slot-and-returns-the-boiler-s-answer-amends-adr-066.md",
@@ -16388,6 +16452,24 @@
     {
       "source": "ADR-239",
       "target": "ADR-233",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-240",
+      "target": "ADR-184",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-240",
+      "target": "ADR-188",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-240",
+      "target": "ADR-212",
       "type": "related",
       "resolved": true
     },
