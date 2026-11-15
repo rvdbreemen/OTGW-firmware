@@ -50,7 +50,7 @@ When an admin password is set, the browser asks for it again when the updater st
 
 ### What a filesystem update keeps and loses
 
-The image replaces the whole filesystem partition (768 KB). It is built from the web assets plus a default `settings.ini`, and nothing else. The running firmware puts the runtime files back after the remount (`OTGW-ModUpdateServer-esp32.h`), in two ways.
+The image replaces the whole filesystem partition (768 KB). It is built from the web assets and nothing else; it holds no `settings.ini` (TASK-1920: a first boot writes the firmware defaults). The running firmware puts the runtime files back after the remount (`OTGW-ModUpdateServer-esp32.h`), in two ways.
 
 Kept, written back from RAM (the firmware holds the value, so it is current even when the file was older):
 

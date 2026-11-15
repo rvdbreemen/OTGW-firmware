@@ -83,6 +83,8 @@ De OpenTherm bus is polariteitsonafhankelijk: het maakt niet uit welke draad u o
 
 **Let op:** Gebruik uitsluitend de voor de OTGW bestemde aansluitklemmen. Andere aansluitingen op de ketel (220V, potentiaalvrij) zijn niet bedoeld voor OpenTherm.
 
+**Nieuwe PIC:** een PIC rechtstreeks uit de fabriek start in monitor mode: hij luistert alleen en geeft de bus door, dus commando's als `CS=` of `TT=` doen niets. Stuur een keer `GW=1` (via de commandobalk in de webinterface of poort 25238); de PIC bewaart de modus in zijn EEPROM en houdt hem vast. Een PIC die al met een eerdere OTGW-firmware draaide, houdt de modus die hij heeft.
+
 #### Voeding
 
 De OTGW wordt gevoed via de OpenTherm bus. Een externe voeding is normaal gesproken niet nodig. Als u de OTGW wilt voeden zonder actieve OpenTherm-verbinding (bijv. tijdens testen op een bureau), gebruik dan de USB-aansluiting van de ESP-module.

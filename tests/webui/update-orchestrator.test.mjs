@@ -650,10 +650,11 @@ test('page: the Kept and Starts fresh lines match what the firmware writes back'
 
 test('filesystem image: the runtime files the firmware writes back are not in it', { skip }, () => {
   const img = fs.readFileSync(A.fsimg);
-  const runtime = ['sat_pid_state.json', 'sat_energy.json', 'sat_energy_estimate.json', 'sat_hcr.json', 'sat_markers.json',
+  // TASK-1920: settings.ini is a runtime file too; the image no longer ships a default one (the firmware writes its own
+  // defaults on a first boot and puts the user's file back after a filesystem update).
+  const runtime = ['settings.ini', 'sat_pid_state.json', 'sat_energy.json', 'sat_energy_estimate.json', 'sat_hcr.json', 'sat_markers.json',
     'ot-boiler.json', 'ot-thermo.json', 'reboot_count.txt', 'reboot_log.txt', 'bootdetect.log', 'topic_cleanup.bin'];
   for (const n of runtime) assert.equal(img.indexOf(n), -1, n + ' is in the image');
-  assert.ok(img.indexOf('settings.ini') > 0, 'the default settings.ini ships (the firmware overwrites it from RAM)');
 });
 
 // ---------- 5. cross-version contract (docs/guides/WIFI_FIRMWARE_UPDATE.md) ----------

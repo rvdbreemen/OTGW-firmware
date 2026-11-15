@@ -69,6 +69,8 @@ The OTGW PCB has clearly labelled terminal blocks for the thermostat side (TT) a
 
 > **Important**: Only connect one end of the OpenTherm bus to the OTGW at a time during installation. Follow your boiler manufacturer's instructions for any work on the boiler terminals.
 
+> **New PIC**: a PIC straight from the factory starts in monitor mode: it only listens and passes the bus through, so commands such as `CS=` or `TT=` have no effect. Send `GW=1` once (the command bar of the web UI, or port 25238); the PIC stores the mode in its EEPROM and keeps it. A PIC that ran with an earlier OTGW firmware keeps the mode it has.
+
 #### Power
 
 The OTGW derives operating power from the OpenTherm bus itself when wired to a boiler. No separate power supply is required once the device is in circuit. During initial flashing via USB, power is supplied through the USB cable.

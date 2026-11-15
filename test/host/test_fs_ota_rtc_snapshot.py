@@ -4,8 +4,8 @@
     python test/host/test_fs_ota_rtc_snapshot.py                        # FIX and mutants
     python test/host/test_fs_ota_rtc_snapshot.py --old-rev 08f42d625    # plus OLD, before the fix
 
-A filesystem OTA erases the LittleFS partition from its first chunk on, and the image it writes ships a
-default settings.ini (src/OTGW-firmware/data/settings.ini, hostname OTGW2). A reset before the restore at
+A filesystem OTA erases the LittleFS partition from its first chunk on; the image it wrote then shipped a
+default settings.ini (until TASK-1920 took it out). A reset before the restore at
 the end booted on that default with a lost counter (.63, 2026-11-10: 16 settings changed, boot count
 178 -> 3). The fix (ADR-233) keeps the three files in an RTC_NOINIT snapshot.
 
