@@ -67,6 +67,11 @@ static void otDirectBridgeWriteLine(const char *l, size_t n) { g_lines.push_back
 static void processOT(const char *l, int n) { g_processed.push_back(std::string(l, (size_t)n)); }
 static void sendWebSocketJSON(const char *) {}
 static void otdForgetThermostatWrites() {}
+// TASK-1804 A3: the loss forgets a TT=/TC= override (clearRemoteOverride), recorded here
+enum { OT_OVERRIDE_NONE = 0, OT_OVERRIDE_TEMPORARY = 1 };
+static struct { int mode; } otRemoteOverride = { OT_OVERRIDE_NONE };
+static int g_overrideClears = 0;
+static void clearRemoteOverride() { g_overrideClears++; otRemoteOverride.mode = OT_OVERRIDE_NONE; }
 static uint16_t floatToF88(float f) { return (uint16_t)(f * 256.0f); }
 static void setOverride(int, uint16_t) {}
 static void updateWriteCache(int, uint16_t) {}

@@ -193,7 +193,8 @@ class CallSites(unittest.TestCase):
         alt = braced(SRC, r"static bool otdAltSlotTaken\(unsigned long thermostatFrame\) \{")
         self.assertIn("otdClockReply(sentReq, reply", reply or "")
         self.assertIn("otdClockReply(thermostatFrame, unknownResp", alt or "")
-        self.assertRegex(SRC, r"otdClockReply\(otSlaveFrame, unknownResp")
+        # TASK-1804 A5: a UI= ID without an alternative is forwarded like the PIC; the reply path gives the clock
+        self.assertNotRegex(SRC, r"otdClockReply\(otSlaveFrame, unknownResp")
 
     def test_expiry_invalidates_the_time_and_is_not_shorter_than_the_pic(self):
         m = re.search(r"OT_SC_EXPIRY_MS\s*=\s*(\d+)", SRC)

@@ -37,6 +37,11 @@ int main(int argc, char **argv) {
     int lost = 0;
     for (int i = 0; i < 60; i++) { tick(i % 2 == 0); if (!state.otd.bThermostatConnected) lost++; }
     printf("gaps|%d|%d\n", lost, (int)state.otd.bThermostatConnected);
+  } else if (c == "ovr" || c == "noovr") {   // TASK-1804 A3: a TT=/TC= override is forgotten with the thermostat
+    if (c == "ovr") otRemoteOverride.mode = OT_OVERRIDE_TEMPORARY;
+    for (int i = 0; i < 20; i++) tick(true);
+    for (int i = 0; i < 10; i++) tick(false);
+    printf("%s|%d|%d\n", c.c_str(), g_overrideClears, (int)otRemoteOverride.mode);
   } else if (c == "return") {   // lost, then one frame: connected again at once
     for (int i = 0; i < 20; i++) tick(true);
     for (int i = 0; i < 10; i++) tick(false);
@@ -66,7 +71,7 @@ class ThermostatLossTime(unittest.TestCase):
         if exe is None:
             raise unittest.SkipTest("no host C++ compiler")
         cls.rows = {}
-        for case in ("loss", "gaps", "return"):
+        for case in ("loss", "gaps", "return", "ovr", "noovr"):
             out = subprocess.run([str(exe), case], capture_output=True, text=True, check=True).stdout.strip()
             print(out)
             name, n, connected = out.split("|")
@@ -86,6 +91,11 @@ class ThermostatLossTime(unittest.TestCase):
         lost, connected = self.rows["gaps"]
         self.assertEqual(lost, 0)
         self.assertTrue(connected)
+
+    def test_a_tt_override_is_forgotten_with_the_thermostat(self):
+        # TASK-1804 A3: PIC Disconnect clears override/setpoint1/setpoint2 (gateway.asm 6.8 :1786-1788)
+        self.assertEqual(self.rows["ovr"], (1, False), "one clearRemoteOverride(), override gone")
+        self.assertEqual(self.rows["noovr"][0], 0, "no clear without an override")
 
     def test_one_frame_after_a_loss_reconnects(self):
         self.assertTrue(self.rows["return"][1])
@@ -149,6 +159,7 @@ static size_t strlcpy_P(char *d, const char *s, size_t n) { size_t l = strlen(s)
 static void otDirectBridgeWriteLine(const char *, size_t) {}
 static void processOT(const char *, int) {}
 static void otdForgetThermostatWrites() {}
+static void clearRemoteOverride() { otRemoteOverride.mode = OT_OVERRIDE_NONE; }
 """
     a = src.find("// checkThermostatTimeout")
     a = src.rfind("// -----", 0, a)

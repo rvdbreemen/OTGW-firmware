@@ -152,10 +152,10 @@ static void step(uint32_t ms) {
   if (g_pend >= 0) { g_fr[g_pend].active = otRemoteOverride.mode != OT_OVERRIDE_NONE; g_pend = -1; }
 }
 
-static int countAltSlotsOf(int id) {
+static int countAltSlotsOf(int id, int ansType = 7) {
   int n = 0;
   for (size_t i = 0; i + 1 < g_log.size(); i++)
-    if (g_log[i].prefix == 'T' && idOf(g_log[i].frame) == id && g_log[i + 1].prefix == 'A' && typeOf(g_log[i + 1].frame) == 7) n++;
+    if (g_log[i].prefix == 'T' && idOf(g_log[i].frame) == id && g_log[i + 1].prefix == 'A' && typeOf(g_log[i + 1].frame) == ansType) n++;
   return n;
 }
 static int countAltSlots() { return countAltSlotsOf(24); }
@@ -188,7 +188,7 @@ static void report(const char* tag, size_t fromLog, size_t fromSent, size_t from
   printf("READS %d %d\n", g_reads9, g_reads100);
   for (uint8_t i = 0; i < OT_SCHEDULE_SIZE; i++)
     if (otSchedule[i].isWrite && otSchedule[i].msgId == 16) printf("VS16 %d\n", otSchedule[i].valueSet ? 1 : 0);
-  printf("ALT16 %d\n", countAltSlotsOf(16));
+  printf("ALT16 %d\n", countAltSlotsOf(16, 5));   // TASK-1804 A1: the slot answer of MsgID 16 is WRITE_ACK, as the PIC
   printf("END %s\n", mname(otRemoteOverride.mode));
 }
 
@@ -547,7 +547,7 @@ class AltSlotCases:
 
     def test_H1_msgid16_is_an_alternative_slot(self):
         r = RES[f"H_{self.KIND}"]
-        self.assertGreaterEqual(r["alt16"], 3, "precondition: the thermostat's WRITE 16 must be answered Unknown-DataID in a slot")
+        self.assertGreaterEqual(r["alt16"], 3, "precondition: the thermostat's WRITE 16 must be answered by the gateway in a slot, WRITE_ACK like the PIC (TASK-1804 A1)")
         self.assertEqual(r["bw16"], [], f"precondition: no WRITE 16 reaches the boiler as a slot request: {hexl(r['bw16'])}")
 
     def test_H2_release_after_4_mismatches_once_msgid9_was_answered(self):

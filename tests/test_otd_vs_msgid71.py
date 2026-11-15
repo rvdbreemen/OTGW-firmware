@@ -28,6 +28,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+import otd_pic_decimal_block as opd  # noqa: E402  (TASK-1804 B8/B9)
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
@@ -145,7 +146,7 @@ def setUpModule():
     global _tmp, _exe
     _tmp = Path(tempfile.mkdtemp(prefix="otd_71_"))
     cpp = _tmp / "otd_71.cpp"
-    cpp.write_text(build_source(), encoding="utf-8")
+    cpp.write_text(opd.with_block(build_source()), encoding="utf-8")
     _exe = compile_cpp(cpp, _tmp / ("otd_71.exe" if os.name == "nt" else "otd_71"))
     if _exe is None:
         raise unittest.SkipTest("no C++ compiler")

@@ -142,6 +142,19 @@ class MandatoryIds(unittest.TestCase):
         r = run("U5", "U5", "U5", "S5", "Q5")["5"]
         self.assertEqual((r["count"], r["disabled"], r["alt"]), ("0", "0", "0"))
 
+    def test_a_data_invalid_answer_resets_the_strikes_like_the_pic(self):
+        # TASK-1804 E6: the PIC counts only Unknown-DataID answers and resets on any other, Data-Invalid included
+        # (HandleResponse / MsgSupported, gateway.asm 6.8 :2440-2455). Source check: handleMasterResponse() feeds a
+        # Data-Invalid answer to the rule as a non-Unknown answer; behaviour of that rule: Unknown, Unknown, a
+        # non-Unknown answer, Unknown leaves the ID enabled with one strike.
+        h = braced(SRC, r"^static void handleMasterResponse\(\) \{") or ""
+        i = h.find("} else if (boilerDataInvalid) {")
+        self.assertGreater(i, 0, "Data-Invalid branch of handleMasterResponse() not found")
+        branch = h[i:h.find("} else {", i)]
+        self.assertRegex(branch, r"otdNoteBoilerAnswer\(\(response >> 16\) & 0xFF, false\)")
+        r = run("U5", "U5", "S5", "U5", "Q5")["5"]
+        self.assertEqual((r["count"], r["disabled"]), ("1", "0"), "not blacklisted, as on the PIC")
+
     def test_a_success_does_not_undo_da_or_ui(self):
         r = run("D56", "S56", "Q56", "M27", "D27", "S27", "Q27")
         self.assertEqual(r["56"]["disabled"], "1")   # DA= stays

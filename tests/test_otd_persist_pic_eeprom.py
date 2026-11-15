@@ -22,6 +22,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+import otd_pic_decimal_block as opd  # noqa: E402  (TASK-1804 B8/B9)
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
@@ -201,7 +202,7 @@ class Persist(unittest.TestCase):
     def setUpClass(cls):
         with tempfile.TemporaryDirectory() as d:
             cpp = Path(d) / "t.cpp"
-            cpp.write_text(build_source(), encoding="utf-8")
+            cpp.write_text(opd.with_block(build_source()), encoding="utf-8")
             exe = compile_cpp(cpp, Path(d) / ("t.exe" if os.name == "nt" else "t"))
             if exe is None:
                 raise unittest.SkipTest("no host compiler")

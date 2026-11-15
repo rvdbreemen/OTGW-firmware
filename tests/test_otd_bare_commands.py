@@ -113,9 +113,16 @@ class BareCommands(unittest.TestCase):
         self.assertEqual(r["MM=50"]["rsp"], "50")
 
     def test_other_bare_commands_stay_unanswered(self):
-        r = run("GW=", "XX=", "C")
-        for c in ("GW=", "XX=", "C"):
+        r = run("GW=", "XX=")
+        for c in ("GW=", "XX="):
             self.assertEqual((r[c]["ok"], r[c]["rsp"], r[c]["st"]), ("0", "", ""), c)
+
+    def test_a_bad_header_is_a_bare_se_like_the_pic(self):
+        # TASK-1804 B3b: SerialCmdSub (gateway.asm 6.6 :3686-3695) answers a too short command or one without '=' as
+        # its third character with SE before the "XX: " prefix (the PIC's length 4 counts the CR)
+        r = run("C", "CS", "CSX5", "AB-1")
+        for c in ("C", "CS", "CSX5", "AB-1"):
+            self.assertEqual((r[c]["ok"], r[c]["st"]), ("0", "SE"), c)
 
 
 if __name__ == "__main__":

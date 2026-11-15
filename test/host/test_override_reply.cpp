@@ -869,10 +869,13 @@ int main(int argc, char** argv) {
   {
     resetAll();
     otUnknownIds[0] = 70; otUnknownIdCount = 1;               // UI=70
-    const unsigned long t = otFrame(kReadData, 70, 0), a = otFrame(kUnknownId, 70, 0);
-    thermostatSends(t); loopOTDirect(); loopOTDirect();
-    verdict("C13a", "UI table hit (UI=70): answered UNKNOWN-DATAID at once, nothing to the boiler",
-            {}, { a }, logOf({ { 'T', t }, { 'A', a } }));
+    // TASK-1804 A5: no alternative for the slot, so the PIC forwards the frame unchanged (RestoreRequest ->
+    // SendDefaultMsg, gateway.asm 6.8 :2404-2414, :3475-3500) and relays the boiler's answer
+    const unsigned long t = otFrame(kReadData, 70, 0), b = otFrame(kReadAck, 70, 0x1234);
+    thermostatSends(t); loopOTDirect();
+    otMaster.boilerFrame(b); loopOTDirect(); loopOTDirect();
+    verdict("C13a", "UI table hit (UI=70) with no alternative for the slot: forwarded unchanged, the boiler's answer relayed",
+            { t }, { b }, logOf({ { 'T', t }, { 'B', b } }));
   }
   {
     resetAll();
@@ -880,6 +883,16 @@ int main(int argc, char** argv) {
     const unsigned long t = otFrame(kReadData, 26, 0), a = otFrame(kReadAck, 26, 0x3200);
     thermostatSends(t); loopOTDirect(); loopOTDirect();
     verdict("C13b", "SR table hit (SR=26): answered READ-ACK(26, 50.0) at once, nothing to the boiler",
+            {}, { a }, logOf({ { 'T', t }, { 'A', a } }));
+  }
+  {
+    // TASK-1804 E5: a WRITE gets WRITE-ACK, the request's own type with the response bit (messageack, gateway.asm 6.8
+    // :2676-2679, :3659-3662; spec v4.2 4.3.1)
+    resetAll();
+    otResponseOverrides[0] = OTResponseOverride{ 26, true, 0x3200 };   // SR=26:50.0
+    const unsigned long t = otFrame(kWriteData, 26, 0x1000), a = otFrame(kWriteAck, 26, 0x3200);
+    thermostatSends(t); loopOTDirect(); loopOTDirect();
+    verdict("C13c", "SR table hit (SR=26) on a WRITE: answered WRITE-ACK(26, 50.0), not READ-ACK",
             {}, { a }, logOf({ { 'T', t }, { 'A', a } }));
   }
 

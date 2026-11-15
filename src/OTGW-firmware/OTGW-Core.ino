@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v2.0.0-beta.323
+**  Version  : v2.0.0-beta.324
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -6398,7 +6398,7 @@ void processOT(const char *buf, int len, bool suppressOutput, bool localAnswer, 
   // needed by the time any yield can occur. Exception: reportOTGWEvent (below) calls both
   // sendMQTTData AND sendEventToWebSocket; feedWatchDog in the MQTT path can yield between
   // the two calls, so callers of reportOTGWEvent must use a local buffer (see evtBuf below).
-  } else if (strstr_P(buf, PSTR("\r\nError 01"))!= NULL) {
+  } else if (strstr_P(buf, PSTR("Error 01"))!= NULL) {   // TASK-1804: lines arrive without CR/LF (the serial reader cuts at them), so "\r\nError 01" never matched
     char errorBuf[12];
     OTcurrentSystemState.error01++;
     OTDebugTf(PSTR("\r\nError 01 = %d\r\n"),OTcurrentSystemState.error01);

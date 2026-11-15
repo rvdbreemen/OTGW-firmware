@@ -57,6 +57,10 @@ static void resetTransientState() { g_resets++; }
 static void synthesizeResponse(const char* cmd, const char* v) { snprintf(g_reply, sizeof(g_reply), "%c%c: %s", cmd[0], cmd[1], v); }
 static void otDirectBridgeProcessStatus(const char* s) { snprintf(g_reply, sizeof(g_reply), "%s", s); }
 static void delay(int) {}
+#define OTD_PIC_COMPAT_VERSION "6.8"                       // TASK-1804 B4: the GW=R banner
+#define snprintf_P snprintf
+static int g_bannerLines = 0;
+static void otDirectBridgeWriteLine(const char*, size_t) { g_bannerLines++; }
 struct MockOT { void begin(void (*)()) {} void begin(void (*)(), void (*)(unsigned long, int)) {} void end() {} };
 static MockOT otMaster, otSlave;
 static void masterISR() {}

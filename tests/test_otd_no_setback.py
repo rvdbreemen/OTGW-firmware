@@ -72,6 +72,9 @@ struct { struct { bool bThermostatConnected = true; bool bSetbackActive = false;
 static int g_forget = 0, g_ovr1 = 0, g_cache1 = 0, g_clear1 = 0;
 static uint16_t g_ovr1Val = 0;
 static void otdForgetThermostatWrites() { g_forget++; }
+enum { OT_OVERRIDE_NONE = 0 };   // TASK-1804 A3 (tested in tests/test_otd_thermostat_lines.py)
+static struct { int mode; } otRemoteOverride = { OT_OVERRIDE_NONE };
+static void clearRemoteOverride() { otRemoteOverride.mode = OT_OVERRIDE_NONE; }
 static int g_wsConnected = 0;
 static void sendWebSocketJSON(const char* m) { if (strstr(m, "OTDirect: connected")) g_wsConnected++; }
 static uint16_t floatToF88(float c) { return (uint16_t)(int16_t)(c * 256.0f); }

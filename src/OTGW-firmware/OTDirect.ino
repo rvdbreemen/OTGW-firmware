@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTDirect.ino
-**  Version  : v2.0.0-beta.323
+**  Version  : v2.0.0-beta.324
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -635,6 +635,12 @@ static unsigned long otdPicAnswer(unsigned long thermostatReq, unsigned long rep
   }
   if ((id == 56 || id == 57) && replyType == 7) {
     return buildOTResponse((uint8_t)(reqType | 0x04), id, id == 56 ? dhwUpperF88 : chUpperF88);
+  }
+  // TASK-1804 A1: MsgID 16 (room setpoint) is always acknowledged, "we don't want an überclever thermostat to stop
+  // sending these messages" (MessageID16 :2984-2987 -> missingdata :2696-2701): a WRITE gets WRITE_ACK with the
+  // thermostat's own value, a READ gets Data-Invalid with its own data, whatever the boiler answered.
+  if (id == 16) {
+    return buildOTResponse(reqType == 1 ? 5 : 6, 16, (uint16_t)(thermostatReq & 0xFFFF));
   }
   return reply;
 }
@@ -1945,6 +1951,18 @@ static bool sendMasterRequestAsync(unsigned long request, OTDirectRequestOrigin 
 // otdNoteBoilerAnswer() is the 3-strike rule of handleMasterResponse(): an Unknown-DataID answer counts a strike
 // for a non-mandatory ID and disables its schedule entry at 3; any other answer clears the strikes and enables an
 // entry the strikes disabled again (a relayed success shows the boiler knows the ID).
+// TASK-1804 Bug 5: the PIC's BoilerFault rule (statusreturn, gateway.asm 6.6 :2745-2758) on a valid MsgID 0 answer:
+// slave status LB & 0x41 (fault bit 0 or diagnostic bit 6) clear forgets the fault; set, and not seen before, is a
+// new fault: true once, so the caller reads MsgID 5.
+// --- otdFaultEdge begin
+static bool otdBoilerFault = false;
+static bool otdFaultEdge(uint8_t slaveStatus) {
+  if ((slaveStatus & 0x41) == 0) { otdBoilerFault = false; return false; }
+  if (otdBoilerFault) return false;
+  otdBoilerFault = true;
+  return true;
+}
+// --- otdFaultEdge end
 // --- otdUnknownStrike begin
 static inline bool otdPicMandatoryId(uint8_t id) {
   return id == 0 || id == 1 || id == 3 || id == 14 || id == 17 || id == 25;
@@ -2063,6 +2081,13 @@ static void handleMasterResponse() {
       bool flameOn = (otBoilerCache[0] & 0x08) != 0;  // bit 3 of LB = flame active
       flameRatioSet(flameOn);
     }
+    // TASK-1804 Bug 5: a new fault or diagnostic indication reads the fault code (MsgID 5) at the first opportunity,
+    // as the PIC's statusreturn -> SetPriorityMsg(MSG_FAULTCODE); the command ring is that opportunity here
+    if (((response >> 16) & 0xFF) == 0 && otdFaultEdge((uint8_t)(response & 0xFF))) {
+      const unsigned long read5 = OpenTherm::buildRequest(OpenThermMessageType::READ_DATA,
+                                                          static_cast<OpenThermMessageID>(5), 0);
+      if (!otCmdEnqueue(read5)) { OTDDebugTln(F("OTD: queue full, fault-code read dropped")); }
+    }
 
     // 3-strike auto-blacklist (otdNoteBoilerAnswer): 3 Unknown-DataID answers disable a schedule entry, any
     // other answer enables it again; the PIC's mandatory IDs 0, 1, 3, 14, 17, 25 never count (TASK-1801).
@@ -2084,6 +2109,10 @@ static void handleMasterResponse() {
   } else if (boilerDataInvalid) {
     // Logged like any boiler reply. Not cached: its data is not a boiler value.
     bridgeFrameToParser('B', response);
+    // TASK-1804 E6: a Data-Invalid answer shows the boiler knows the ID. The PIC counts only Unknown-DataID answers and
+    // resets the count on any other (HandleResponse / MsgSupported, gateway.asm 6.8 :2440-2455), so Unknown, Unknown,
+    // Data-Invalid, Unknown does not blacklist the ID there either.
+    otdNoteBoilerAnswer((response >> 16) & 0xFF, false);
     // TASK-1907: the PIC handles a Data-Invalid answer to MsgID 99 as Unknown-DataID (MessageID99: the Data-Invalid
     // entry is a nop that falls into ID99Unknown, gateway.asm:3227-3230), so a pending HW=P push is spoofed.
     if (((response >> 16) & 0xFF) == 99) otdPushOnBoiler99(6 /* DATA_INVALID */, (uint16_t)(response & 0xFFFF));
@@ -2749,25 +2778,19 @@ void loopOTDirect() {
       else if (otdRetSlotTaken(otSlaveFrame)) {
         otSlaveFramePending = false;
       }
-      // UI table: respond UNKNOWN_DATAID directly, don't forward to boiler
-      else if (isUnknownId(slaveMsgId) && !otdRemoteOverrideHoldsSlot(slaveMsgId)) {
-        unsigned long unknownResp = (otSlaveFrame & 0x00FF0000UL) | (7UL << 28);  // type=UNKNOWN_DATAID
-        setOTParityBit(unknownResp);
-        // TASK-1840: UI=20 still gets the PIC's clock answer (MessageID20 on the fake Unknown-DataID)
-        unknownResp = otdClockReply(otSlaveFrame, unknownResp, otSCLastCommandMs != 0, otSCClockData);
-        unknownResp = otdPicAnswer(otSlaveFrame, unknownResp, otdUpperBoundF88(48, 80), otdUpperBoundF88(49, 90));   // TASK-1844
-        bridgeFrameToParser('T', otSlaveFrame);
-        bridgeFrameToParser('A', unknownResp);
-        otdSendReply(unknownResp);
-        otSlaveFramePending = false;
-      }
+      // TASK-1804 A5: a UI= ID whose slot found no alternative is forwarded unchanged and the boiler's answer goes back,
+      // as on the PIC: Alternative finds no candidate, RestoreRequest/CreateMessage restore the thermostat's frame and
+      // SendAltRequest falls into SendDefaultMsg (gateway.asm 6.8 :2404-2414, :3475-3500). The slot with a candidate is
+      // taken above (otdAltSlotTaken), and the reply path gives the clock (UI=20) and PIC answers (replyToThermostat).
       // SR table: respond with stored value directly, don't forward to boiler
       else {
         bool srHandled = false;
         for (uint8_t i = 0; i < OT_RESPONSE_OVERRIDE_MAX; i++) {
           if (otResponseOverrides[i].active && otResponseOverrides[i].msgId == slaveMsgId) {
-            // Build READ_ACK with the stored data value
-            unsigned long srResp = (4UL << 28) | ((unsigned long)slaveMsgId << 16) | otResponseOverrides[i].value;
+            // The request's own type with the response bit (READ -> READ_ACK, WRITE -> WRITE_ACK), as the PIC's
+            // messageack (gateway.asm 6.8 :2676-2679, :3659-3662; spec v4.2 4.3.1); TASK-1804 E5
+            const unsigned long ackType = ((otSlaveFrame >> 28) & 0x07) | 0x04;
+            unsigned long srResp = (ackType << 28) | ((unsigned long)slaveMsgId << 16) | otResponseOverrides[i].value;
             setOTParityBit(srResp);
             bridgeFrameToParser('T', otSlaveFrame);
             bridgeFrameToParser('A', srResp);
@@ -3388,6 +3411,8 @@ static void checkThermostatTimeout() {
     if (state.otd.bThermostatConnected) {
       state.otd.bThermostatConnected = false;
       otdForgetThermostatWrites();   // TASK-1707: standalone writes its own values again
+      // TASK-1804 A3: the PIC forgets a TT=/TC= override with the thermostat (Disconnect, gateway.asm 6.8 :1786-1788)
+      if (otRemoteOverride.mode != OT_OVERRIDE_NONE) clearRemoteOverride();
       OTDDebugTf(PSTR("OTD: thermostat disconnected (no frame for %lus)\r\n"),
               elapsed / 1000UL);
       sendWebSocketJSON("{\"type\":\"status\",\"msg\":\"OTDirect: disconnected\"}");
@@ -3553,6 +3578,23 @@ static unsigned long applyResponseModifiers(unsigned long response) {
 //   GetPercent :5099-5112: GetPosFloat, then above 100.00 is OR. Parse errors and the range error differ for
 //     CL= (SetCoolLevel :4454-4462 clears on a parse error, answers OR on the range error): *parseErr tells them apart.
 // Returns nullptr on success, else the PIC error code.
+// TASK-1804 B8: the PIC GetDecimalArg (gateway.asm 6.6 :5002-5025): the first character must be a digit (else SE),
+// digits are read up to the first non-digit (the rest is not checked here; a caller that wants the end checks
+// it itself, as SetPrioMessage does), and a value above 255 is OR.
+// --- otdPicDecimal begin
+static const char* otdPicDecimalArg(const char* s, uint8_t &out, const char** end = nullptr) {
+  if (!isdigit((unsigned char)*s)) return "SE";
+  unsigned v = 0;
+  while (isdigit((unsigned char)*s)) {
+    v = v * 10 + (unsigned)(*s - '0');
+    if (v > 255) return "OR";
+    s++;
+  }
+  out = (uint8_t)v;
+  if (end) *end = s;   // the first character after the number
+  return nullptr;
+}
+// --- otdPicDecimal end
 // --- otdPicFloat begin
 // uint8_t, not an enum: the Arduino prototype generator puts the prototype above any type declared in this file.
 static constexpr uint8_t OTD_PIC_FLOAT = 0, OTD_PIC_POSFLOAT = 1, OTD_PIC_PERCENT = 2;
@@ -3768,13 +3810,16 @@ static void otdRestorePersistedCommands() {
 bool handleOTDirectCommand(const char* buf, int len, bool satOwn) {
   otdWriteRefused = false;
   if (diagRec.active) diagRec.recOtdCommand(buf, (size_t)len);   // TASK-1665 (ADR-213)
-  if (len < 3) return false;  // minimum "XX="
+  // TASK-1804 B3b: the PIC's header checks (SerialCmdSub, gateway.asm 6.6 :3686-3695) answer a too short command or one
+  // without '=' as its third character with a bare SE, before the "XX: " prefix; OT-Direct stayed silent. The PIC's
+  // length 4 counts the CR, so "XX=" (3 characters here) passes, as TASK-1957 found (command-4.stc).
+  if (len < 3) { otDirectBridgeProcessStatus("SE"); return false; }
 
   OTDDebugTf(PSTR("OTD: cmd \"%s\" (len=%d)\r\n"), buf, len);
 
   char cmd0 = buf[0];
   char cmd1 = buf[1];
-  if (buf[2] != '=') return false;
+  if (buf[2] != '=') { otDirectBridgeProcessStatus("SE"); return false; }
   // TASK-1957: a bare "XX=" reaches the commands whose PIC parser answers it (SE, or the clear of OT=, MM=, CL=);
   // any other bare command stays unanswered, as before.
   if (len == 3 && !otdPicBareValueCmd(cmd0, cmd1)) return false;
@@ -4041,7 +4086,14 @@ bool handleOTDirectCommand(const char* buf, int len, bool satOwn) {
   // TASK-584: accepted value is also written through to settings.otd.iVentSetpoint
   // so it survives a reboot without user re-applying the command.
   else if (cmd0 == 'V' && cmd1 == 'S') {
-    if (!isdigit((unsigned char)value[0])) {
+    // TASK-1804 B9: as the PIC SetVentSetpoint (gateway.asm 6.6, after GetDecimalArg): any parse error clears
+    // (ClrVentSetpoint -> ValueCleared), characters after the number are SE, above 100 is OR (was a silent clamp)
+    uint8_t vs = 0;
+    const char* vsEnd = value;
+    const bool vsParsed = otdPicDecimalArg(value, vs, &vsEnd) == nullptr;
+    if (vsParsed && *vsEnd) { otDirectBridgeProcessStatus("SE"); return false; }
+    if (vsParsed && vs > 100) { otDirectBridgeProcessStatus("OR"); return false; }
+    if (!vsParsed) {
       clearWriteOverride(71);
       synthesizeResponse(buf, "-");   // TASK-1831: the PIC's ValueCleared reply
       // Clear persisted ventilation setpoint on explicit clear command
@@ -4050,7 +4102,7 @@ bool handleOTDirectCommand(const char* buf, int len, bool satOwn) {
         writeSettings(false);
       }
     } else {
-      int setpt = constrain(atoi(value), 0, 100);
+      const int setpt = vs;
       uint16_t data = (uint16_t)(setpt & 0xFF);   // TASK-1831: LB, as the spec and the PIC (setbyte4)
       if (enqueueWriteCommand(71, data, "VS")) {
         snprintf_P(rspBuf, sizeof(rspBuf), PSTR("%d"), setpt);
@@ -4212,8 +4264,11 @@ bool handleOTDirectCommand(const char* buf, int len, bool satOwn) {
 
   // MH=x — Remote override operating mode CH1 (LB bits 0..3)
   else if (cmd0 == 'M' && cmd1 == 'H') {
-    uint8_t val = atoi(value);
-    if (val > 15) { otDirectBridgeProcessStatus("BV"); return false; }
+    // TASK-1804 B8: as the PIC SetOperModeHC1/DHW/HC2 (gateway.asm 6.6 :4424-4436, :4440, :5208): GetDecimalArg,
+    // then above 15 is OR (was atoi: a non-number became 0, 256 wrapped to 0, and 16-255 answered BV)
+    uint8_t val = 0;
+    if (const char* err = otdPicDecimalArg(value, val)) { otDirectBridgeProcessStatus(err); return false; }
+    if (val > 15) { otDirectBridgeProcessStatus("OR"); return false; }
     otOperModeCH1 = val;
     // Send MsgID 99 WRITE_DATA
     uint16_t data99 = otdOperModeData(otPushManual);   // TASK-1845: the push bit stays while a push runs (operatingmode1 bit 4)
@@ -4227,8 +4282,11 @@ bool handleOTDirectCommand(const char* buf, int len, bool satOwn) {
   }
   // MW=x — Remote override operating mode DHW (HB bits 0..3)
   else if (cmd0 == 'M' && cmd1 == 'W') {
-    uint8_t val = atoi(value);
-    if (val > 15) { otDirectBridgeProcessStatus("BV"); return false; }
+    // TASK-1804 B8: as the PIC SetOperModeHC1/DHW/HC2 (gateway.asm 6.6 :4424-4436, :4440, :5208): GetDecimalArg,
+    // then above 15 is OR (was atoi: a non-number became 0, 256 wrapped to 0, and 16-255 answered BV)
+    uint8_t val = 0;
+    if (const char* err = otdPicDecimalArg(value, val)) { otDirectBridgeProcessStatus(err); return false; }
+    if (val > 15) { otDirectBridgeProcessStatus("OR"); return false; }
     otOperModeDHW = val;
     uint16_t data99 = otdOperModeData(otPushManual);   // TASK-1845: the push bit stays while a push runs (operatingmode1 bit 4)
     otOperModeWrite = true;   // TASK-1906: PushOperModes, a thermostat READ 99 carries it too
@@ -4241,8 +4299,11 @@ bool handleOTDirectCommand(const char* buf, int len, bool satOwn) {
   }
   // M2=x — Remote override operating mode CH2 (LB bits 4..7)
   else if (cmd0 == 'M' && cmd1 == '2') {
-    uint8_t val = atoi(value);
-    if (val > 15) { otDirectBridgeProcessStatus("BV"); return false; }
+    // TASK-1804 B8: as the PIC SetOperModeHC1/DHW/HC2 (gateway.asm 6.6 :4424-4436, :4440, :5208): GetDecimalArg,
+    // then above 15 is OR (was atoi: a non-number became 0, 256 wrapped to 0, and 16-255 answered BV)
+    uint8_t val = 0;
+    if (const char* err = otdPicDecimalArg(value, val)) { otDirectBridgeProcessStatus(err); return false; }
+    if (val > 15) { otDirectBridgeProcessStatus("OR"); return false; }
     otOperModeCH2 = val;
     uint16_t data99 = otdOperModeData(otPushManual);   // TASK-1845: the push bit stays while a push runs (operatingmode1 bit 4)
     otOperModeWrite = true;   // TASK-1906: PushOperModes, a thermostat READ 99 carries it too
@@ -4318,6 +4379,14 @@ bool handleOTDirectCommand(const char* buf, int len, bool satOwn) {
       otMaster.begin(masterISR);
       otSlave.begin(slaveISR, handleSlaveRequest);
       OTDDebugTln(F("OTD: OT interfaces restarted"));
+      // TASK-1804 B4: after its reset the PIC greets with its banner (GreetingStr "OpenTherm Gateway ", version,
+      // gateway.asm 6.6 :5435, printed at boot :1322). The same line, in the PR=A form, goes to the port 25238 bridge
+      // only: Core reads a banner through processOT() as the PIC detection, which must not fire on OT-Direct.
+      {
+        char banner[48];
+        snprintf_P(banner, sizeof(banner), PSTR("OpenTherm Gateway " OTD_PIC_COMPAT_VERSION " OTGW32"));
+        otDirectBridgeWriteLine(banner, strlen(banner));
+      }
     } else {
       synthesizeResponse(buf, "BV");
       return false;
@@ -4333,7 +4402,14 @@ bool handleOTDirectCommand(const char* buf, int len, bool satOwn) {
   else if (cmd0 == 'P' && cmd1 == 'R') {
     char reg = value[0];
     char prBuf[48];
-    switch (reg) {
+    // TASK-1804 B3c: as the PIC PrintSetting (gateway.asm 6.6 :2150-2186): exactly one letter (else SE), a letter
+    // outside A-Z or one the PIC has no report for is BV (PrintTable). PR=E reports the PIC's external sensor; there
+    // is none on OT-Direct, which is the PIC's '-' answer (PrintSettingE). PR=F reads the PIC's own configuration
+    // word, which has no OT-Direct counterpart: BV (a recorded difference, TASK-1804).
+    if (strlen(value) != 1) reg = 0;            // -> SE below, before the letter is looked at
+    if (reg == 0) otDirectBridgeProcessStatus("SE");
+    else if (reg == 'E') otDirectBridgeProcessPRResponse("PR: E=-");
+    else switch (reg) {
       case 'A':
         // Banner "OpenTherm Gateway <version> OTGW32" (Robert, 2026-11-12): the PIC format (gateway.asm:5434-5435)
         // with the board after the version, a deliberate difference from the PIC. The version is the PIC command
@@ -4453,6 +4529,7 @@ bool handleOTDirectCommand(const char* buf, int len, bool satOwn) {
         break;
       default:
         OTDDebugTf(PSTR("OTD: PR=%c unknown register\r\n"), reg);
+        otDirectBridgeProcessStatus("BV");   // TASK-1804 B3c: PrintTable's BadValue
         break;
     }
   }
@@ -4747,8 +4824,26 @@ bool handleOTDirectCommand(const char* buf, int len, bool satOwn) {
   }
   // MI=nnn — Message interval (minimum gap between OT messages, 100-1275ms)
   else if (cmd0 == 'M' && cmd1 == 'I') {
-    uint16_t val = atoi(value);
-    if (val < 100 || val > 1275) { otDirectBridgeProcessStatus("OR"); return false; }
+    // TASK-1804 B9: as the PIC SetInterval (gateway.asm 6.6, before SaveConfig): the last character must be a digit
+    // (else SE), a single digit is OR, the digits before it are GetDecimal (SE / OR, then SE on anything after them);
+    // the value is rounded to 5 ms units in the PIC's 8-bit register (last digit 0-2 down, 3-7 to 5, 8-9 up), below
+    // 100 ms is OR. MI=99 answers MI: 100 (tests/interval-1.stc); was atoi, so MI=99 gave OR and MI=abc gave OR.
+    const size_t miLen = strlen(value);
+    if (miLen == 0 || !isdigit((unsigned char)value[miLen - 1])) { otDirectBridgeProcessStatus("SE"); return false; }
+    if (miLen == 1) { otDirectBridgeProcessStatus("OR"); return false; }
+    unsigned tens = 0;
+    for (size_t i = 0; i + 1 < miLen; i++) {
+      if (!isdigit((unsigned char)value[i])) { otDirectBridgeProcessStatus("SE"); return false; }
+      tens = tens * 10 + (unsigned)(value[i] - '0');
+      if (tens > 255) { otDirectBridgeProcessStatus("OR"); return false; }
+    }
+    if (2 * tens > 255) { otDirectBridgeProcessStatus("OR"); return false; }
+    const uint8_t last = (uint8_t)(value[miLen - 1] - '0');
+    uint8_t ticks = (uint8_t)(2 * tens);           // the PIC's 8-bit temp: arg / 5
+    if (last >= 8) ticks++;
+    if (last > 2) ticks++;
+    if (ticks < 100 / 5) { otDirectBridgeProcessStatus("OR"); return false; }
+    const uint16_t val = (uint16_t)ticks * 5;
     otMinIntervalMs = val;
     otdPersistU16(settings.otd.iMsgInterval, val);   // TASK-1836: SaveConfig (gateway.asm:4610-4611)
     // TASK-440: PIC SetInterval/PrintInterval reports milliseconds, not
