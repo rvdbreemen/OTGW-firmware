@@ -7,7 +7,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-09T21:51:00Z'
-updated_date: '2026-11-15T12:03:00Z'
+updated_date: '2026-11-15T12:04:00Z'
 labels:
   - sat
   - pic
@@ -42,4 +42,6 @@ Not measured on a PIC bench with such a thermostat. Related TASK-1759, TASK-1412
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-11-15 (d3) Third reading of other-projects/otgw-6.6/gateway.asm, agrees with the finding: in gateway mode CreateRequest (:2387-2402) calls UnknownMask and goes to SendAltRequest (:2404-2414) only for an ID the boiler is known not to support, or when SendUserMessage is set; SendUserMessage is set only by the standalone table (StandAloneMsg :1801 clears it, UserMsg :1837 sets it). Alternative (:3390) reaches SendPriorityMsg (:3436) through InitCmdLoop (:3394-3396), so PM=<id> (SetPrioMessage :4984-4995, sets prioritymsgid + PriorityMsg only) waits for such a slot. Still source-only: AC1 needs a PIC bench with a thermostat that asks only supported IDs, or a tester capture. No code before AC2.
+
+2026-11-15 Coordinator: AC1 cannot be benched (09 has no thermostat on a PIC unit). AC1 is a field AC: a capture from a PIC user whose thermostat asks only boiler-supported IDs, with PM=25 / PM=28 sent; expected no R frame for 25/28. Left In To Do until such a capture exists; AC2 and AC3 follow it.
 <!-- SECTION:NOTES:END -->
