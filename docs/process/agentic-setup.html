@@ -1,453 +1,981 @@
-<!doctype html>
-<html lang="nl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>OTGW agentic werkplaats</title>
+<title>OTGW Agentic Workshop</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;700;800&family=Source+Sans+3:ital,wght@0,400;0,600;1,400&family=JetBrains+Mono:wght@400;600&display=swap">
 <style>
-/* Layout: één leeskolom (≈70ch) met brede diagrammen die eruit mogen breken; secties als hoofdstukken van een technisch dossier. */
+/* Light theme only, by the maintainer's choice. Every colour is a token; a colour always means the same thing. */
 :root{
-  --bg:#f4f6f7; --surface:#ffffff; --fg:#151a1f; --muted:#56616c; --line:#d5dce2;
-  --flame:#c2410c; --flame-soft:#fde7d9; --cool:#0e7490; --cool-soft:#d9eff4;
-  --ok:#2f7d32; --warn:#a15c00; --crit:#b42318;
-  --f-display:"Archivo", "Helvetica Neue", Arial, sans-serif;
-  --f-body:"Source Sans 3", "Segoe UI", system-ui, sans-serif;
-  --f-mono:"JetBrains Mono", ui-monospace, Consolas, monospace;
+  --bg:#f4f6f7; --surface:#ffffff; --line:#d5dce2; --fg:#151a1f; --muted:#56616c;
+  --human:#c2410c; --human-soft:#fde7d9;
+  --agent:#0e7490; --agent-soft:#d9eff4;
+  --bf:#1d4ed8; --bf2:#06b6d4; --bf-soft:#dbeafe;
+  --gate:#a15c00; --gate-soft:#fdf0d5;
+  --ship:#2f7d32; --ship-soft:#e3f1e4;
+  --stop:#b42318; --stop-soft:#fde4e1;
+  --shade:rgba(21,26,31,.07);
+  --f-display:"Archivo","Helvetica Neue",Arial,sans-serif;
+  --f-body:"Source Sans 3","Segoe UI",system-ui,sans-serif;
+  --f-mono:"JetBrains Mono",ui-monospace,Consolas,monospace;
+  color-scheme:light;
 }
-@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
-  --bg:#101417; --surface:#171d21; --fg:#e6eaed; --muted:#9aa6b0; --line:#2b343b;
-  --flame:#ff8a4c; --flame-soft:#3a2216; --cool:#4fc3d6; --cool-soft:#12313a;
-  --ok:#7bc47f; --warn:#f0b04a; --crit:#ff7b6b; color-scheme:dark}}
-:root[data-theme="dark"]{
-  --bg:#101417; --surface:#171d21; --fg:#e6eaed; --muted:#9aa6b0; --line:#2b343b;
-  --flame:#ff8a4c; --flame-soft:#3a2216; --cool:#4fc3d6; --cool-soft:#12313a;
-  --ok:#7bc47f; --warn:#f0b04a; --crit:#ff7b6b; color-scheme:dark}
-body{background:var(--bg);color:var(--fg);font:17px/1.6 var(--f-body);
-  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:32px 64px}
-.wrap{max-width:1080px;margin:0 auto;display:flex;flex-direction:column;gap:56px}
-.col{max-width:72ch}
-h1,h2,h3{font-family:var(--f-display);text-wrap:balance;line-height:1.15;margin:0}
-h1{font-size:clamp(30px,5vw,46px);font-weight:800;letter-spacing:-.01em}
-h2{font-size:clamp(23px,3vw,30px);font-weight:700}
-h3{font-size:18px;font-weight:700}
+*,*::before,*::after{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:17px/1.55 var(--f-body);-webkit-text-size-adjust:100%}
+.page{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-top:28px;padding-bottom:72px;background:var(--bg);color:var(--fg)}
+.wrap{max-width:1120px;margin:0 auto;display:flex;flex-direction:column;gap:64px}
+h1,h2,h3,h4{font-family:var(--f-display);line-height:1.15;margin:0;text-wrap:balance;color:var(--fg)}
+h1{font-size:clamp(32px,5.4vw,52px);font-weight:800;letter-spacing:-.015em}
+h2{font-size:clamp(24px,3.2vw,32px);font-weight:700}
+h3{font-size:19px;font-weight:700}
+h4{font-size:15.5px;font-weight:700}
 p{margin:0}
-section{display:flex;flex-direction:column;gap:18px}
-.eyebrow{font:600 12px/1 var(--f-mono);letter-spacing:.12em;text-transform:uppercase;color:var(--flame)}
-.lede{font-size:19px;color:var(--muted);max-width:68ch}
-code,.mono{font-family:var(--f-mono);font-size:.86em}
-code{background:var(--cool-soft);color:var(--fg);padding:1px 5px;border-radius:3px}
-a{color:var(--cool)}
-header{display:flex;flex-direction:column;gap:14px;border-bottom:2px solid var(--fg);padding-bottom:24px}
-.meta{font:13px/1.5 var(--f-mono);color:var(--muted)}
-
-/* Kernpunten */
-.keys{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:14px}
-.key{background:var(--surface);border:1px solid var(--line);padding:16px 18px;display:flex;flex-direction:column;gap:6px;min-width:0}
-.key b{font-family:var(--f-display);font-size:16px}
-.key p{color:var(--muted);font-size:15.5px}
-
-/* Diagram */
-.fig{background:var(--surface);border:1px solid var(--line);overflow-x:auto}
-.fig svg{display:block;min-width:900px;width:100%;height:auto}
-.fig figcaption{padding:10px 16px;border-top:1px solid var(--line);font-size:14px;color:var(--muted)}
+ul,ol{margin:0;padding-left:1.15em}
+li{margin:2px 0}
+a{color:var(--agent);text-underline-offset:2px}
+a:hover{color:var(--bf)}
+:focus-visible{outline:3px solid var(--bf);outline-offset:2px;border-radius:3px}
+code,.mono{font-family:var(--f-mono);font-size:.84em}
+code{background:var(--agent-soft);color:var(--fg);padding:1px 5px;border-radius:3px;overflow-wrap:anywhere}
+.sec{display:flex;flex-direction:column;gap:20px;scroll-margin-top:16px}
+.sub{display:flex;flex-direction:column;gap:14px;margin-top:10px}
+.kicker{font:600 12px/1 var(--f-mono);letter-spacing:.14em;text-transform:uppercase;color:var(--human)}
+.lede{font-size:19px;color:var(--muted);max-width:70ch}
+.col{max-width:72ch}
+.muted{color:var(--muted)}
+.small{font-size:14.5px}
+.grid{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(min(100%,var(--min,260px)),1fr))}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:16px 18px;display:flex;flex-direction:column;gap:8px;min-width:0;box-shadow:0 1px 2px var(--shade)}
+.card p,.card li{font-size:15.5px;color:var(--muted)}
+.card p b,.card li b{color:var(--fg)}
+.card .tag{align-self:flex-start}
+.c-human{border-color:var(--human);background:var(--human-soft)}
+.c-agent{border-color:var(--agent);background:var(--agent-soft)}
+.c-bf{border-color:var(--bf);background:var(--bf-soft)}
+.c-gate{border-color:var(--gate);background:var(--gate-soft)}
+.c-ship{border-color:var(--ship);background:var(--ship-soft)}
+.c-stop{border-color:var(--stop);background:var(--stop-soft)}
+.c-human p,.c-agent p,.c-bf p,.c-gate p,.c-ship p,.c-stop p,.c-human li,.c-agent li,.c-bf li,.c-gate li,.c-ship li,.c-stop li{color:var(--fg)}
+.top-human{border-top:4px solid var(--human)}.top-agent{border-top:4px solid var(--agent)}.top-bf{border-top:4px solid var(--bf)}
+.top-gate{border-top:4px solid var(--gate)}.top-ship{border-top:4px solid var(--ship)}.top-stop{border-top:4px solid var(--stop)}.top-plain{border-top:4px solid var(--muted)}
+.tag{display:inline-flex;align-items:center;gap:6px;font:600 11.5px/1.2 var(--f-mono);letter-spacing:.04em;padding:4px 8px;border-radius:999px;border:1px solid var(--line);background:var(--surface);color:var(--muted);white-space:nowrap}
+.tag.human{border-color:var(--human);background:var(--human-soft);color:var(--human)}
+.tag.agent{border-color:var(--agent);background:var(--agent-soft);color:var(--agent)}
+.tag.bf{border-color:var(--bf);background:var(--bf-soft);color:var(--bf)}
+.tag.gate{border-color:var(--gate);background:var(--gate-soft);color:var(--gate)}
+.tag.ship{border-color:var(--ship);background:var(--ship-soft);color:var(--ship)}
+.tag.stop{border-color:var(--stop);background:var(--stop-soft);color:var(--stop)}
+.tags{display:flex;flex-wrap:wrap;gap:6px}
+.ico{width:26px;height:26px;flex:none}
+.cardhead{display:flex;align-items:center;gap:10px}
+/* tension callout: where practice and written rules differ */
+.gap{border:1px dashed var(--fg);border-radius:10px;padding:14px 18px;background:var(--surface);display:flex;flex-direction:column;gap:8px}
+.gap>.lab{font:600 11.5px/1 var(--f-mono);letter-spacing:.12em;text-transform:uppercase;color:var(--fg)}
+.gap p,.gap li{font-size:15.5px;color:var(--fg)}
+/* figures */
 figure{margin:0}
+.fig{background:var(--surface);border:1px solid var(--line);border-radius:10px;overflow:hidden;box-shadow:0 1px 2px var(--shade)}
+.fig .scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.fig svg{display:block;width:100%;height:auto}
+.fig figcaption{padding:10px 16px;border-top:1px solid var(--line);font-size:14.5px;color:var(--muted)}
+.plate img{display:block;width:100%;height:auto;background:var(--bg)}
+.plate>a{display:block}
+.w760{min-width:760px}.w860{min-width:860px}.w680{min-width:680px}
 svg text{font-family:var(--f-body);fill:var(--fg)}
 svg .t{font-size:14px;font-weight:600}
 svg .s{font-size:12px;fill:var(--muted)}
+svg .halo-t{paint-order:stroke;stroke:var(--surface);stroke-width:5px;stroke-linejoin:round}
 svg .m{font-family:var(--f-mono);font-size:11px;fill:var(--muted)}
-svg .lbl{font-family:var(--f-mono);font-size:11px;letter-spacing:.12em;fill:var(--flame);font-weight:600}
-svg .box{fill:var(--surface);stroke:var(--line);stroke-width:1.2}
-svg .person{fill:var(--flame-soft);stroke:var(--flame);stroke-width:1.2}
-svg .chan{fill:var(--bg);stroke:var(--muted);stroke-width:1;stroke-dasharray:4 3}
-svg .core{fill:var(--cool-soft);stroke:var(--cool);stroke-width:1.6}
-svg .band{fill:none;stroke:var(--line);stroke-dasharray:2 4}
-svg .chip{fill:var(--bg);stroke:var(--cool);stroke-width:1}
-svg .gate{fill:var(--flame-soft);stroke:var(--flame);stroke-width:1}
-svg .ln{stroke:var(--muted);stroke-width:1.3;fill:none}
-svg .ln-hot{stroke:var(--flame);stroke-width:1.8;fill:none}
-svg .ln-cool{stroke:var(--cool);stroke-width:1.6;fill:none}
-svg .ah{fill:var(--muted)} svg .ah-hot{fill:var(--flame)} svg .ah-cool{fill:var(--cool)}
-
-/* Definities */
-dl.defs{display:grid;grid-template-columns:minmax(0,220px) minmax(0,1fr);gap:0;margin:0;border-top:1px solid var(--line)}
-dl.defs dt,dl.defs dd{padding:11px 0;border-bottom:1px solid var(--line);margin:0}
-dl.defs dt{font-family:var(--f-display);font-weight:700;font-size:15.5px;padding-right:18px}
-dl.defs dd{font-size:16px}
-dl.defs .cat{grid-column:1/-1;font:600 12px/1 var(--f-mono);letter-spacing:.12em;text-transform:uppercase;color:var(--cool);padding:22px 0 8px;border-bottom:1px solid var(--line)}
-@media (max-width:620px){dl.defs{grid-template-columns:1fr} dl.defs dt{border-bottom:0;padding-bottom:0}}
-
-/* Cyclus */
-ol.cycle{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,230px),1fr));gap:12px;counter-reset:st}
-ol.cycle li{counter-increment:st;background:var(--surface);border:1px solid var(--line);padding:14px 16px 16px;display:flex;flex-direction:column;gap:6px;min-width:0}
-ol.cycle li::before{content:"Stap " counter(st, decimal);font:600 11px/1 var(--f-mono);letter-spacing:.1em;text-transform:uppercase;color:var(--flame)}
-ol.cycle.from0 li::before{content:"Stap " counter(st, decimal)}
-ol.cycle li b{font-family:var(--f-display);font-size:16px}
-ol.cycle li span{font-size:15px;color:var(--muted)}
-ol.cycle li.stop{border-color:var(--flame);background:var(--flame-soft)}
-
-/* Tabellen */
-.tbl{overflow-x:auto;border:1px solid var(--line);background:var(--surface)}
-table{border-collapse:collapse;width:100%;font-size:15px;min-width:640px}
-th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--line);vertical-align:top}
-th{font:600 12px/1.3 var(--f-mono);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);background:var(--bg)}
-td.c{text-align:center;font-family:var(--f-mono)}
-.y{color:var(--ok);font-weight:600}.n{color:var(--muted)}.p{color:var(--warn);font-weight:600}
-tr:last-child td{border-bottom:0}
-
-/* Cijfers */
-.nums{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,170px),1fr));gap:1px;background:var(--line);border:1px solid var(--line)}
-.num{background:var(--surface);padding:14px 16px;display:flex;flex-direction:column;gap:2px}
-.num b{font:700 28px/1.1 var(--f-display);font-variant-numeric:tabular-nums}
-.num span{font-size:14px;color:var(--muted)}
-
-/* Bevindingen */
-.finds{display:flex;flex-direction:column;gap:10px}
-.find{display:grid;grid-template-columns:92px minmax(0,1fr);gap:14px;background:var(--surface);border:1px solid var(--line);padding:14px 16px}
-.sev{font:600 11px/1 var(--f-mono);letter-spacing:.08em;text-transform:uppercase;padding:6px 8px;border:1px solid;align-self:start;text-align:center}
-.sev.hi{color:var(--crit);border-color:var(--crit)}.sev.md{color:var(--warn);border-color:var(--warn)}.sev.lo{color:var(--muted);border-color:var(--line)}
-.find h3{font-size:16.5px;margin-bottom:4px}
-.find p{font-size:15.5px}
-.find .ev{font-size:14px;color:var(--muted);margin-top:6px}
-@media (max-width:560px){.find{grid-template-columns:1fr}}
-
-/* Voorstellen */
-.props{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr));gap:14px}
-.prop{background:var(--surface);border:1px solid var(--line);border-top:3px solid var(--cool);padding:16px 18px;display:flex;flex-direction:column;gap:8px;min-width:0}
-.prop .tag{font:600 11px/1 var(--f-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--cool)}
-.prop p{font-size:15.5px}
-.prop .why{color:var(--muted);font-size:14.5px}
-.scen{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,280px),1fr));gap:14px}
-.sc{border:1px solid var(--line);padding:16px 18px;background:var(--bg);display:flex;flex-direction:column;gap:6px}
-.sc b{font-family:var(--f-display)}
-.sc p{font-size:15px;color:var(--muted)}
-.note{border-left:3px solid var(--warn);padding:10px 16px;background:var(--surface);font-size:15.5px}
-ul.tight{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:4px}
-@media (prefers-reduced-motion:reduce){*{scroll-behavior:auto}}
+svg .lbl{font-family:var(--f-mono);font-size:11px;letter-spacing:.1em;font-weight:600}
+svg .n-plain{fill:var(--surface);stroke:var(--line);stroke-width:1.2}
+svg .n-human{fill:var(--human-soft);stroke:var(--human);stroke-width:1.4}
+svg .n-agent{fill:var(--agent-soft);stroke:var(--agent);stroke-width:1.4}
+svg .n-bf{fill:var(--surface);stroke:var(--bf);stroke-width:1.6}
+svg .n-gate{fill:var(--gate-soft);stroke:var(--gate);stroke-width:1.4}
+svg .n-ship{fill:var(--ship-soft);stroke:var(--ship);stroke-width:1.4}
+svg .n-stop{fill:var(--stop-soft);stroke:var(--stop);stroke-width:1.4}
+svg .l-agent{stroke:var(--agent);stroke-width:1.6;fill:none}
+svg .l-human{stroke:var(--human);stroke-width:2.6;fill:none}
+svg .l-muted{stroke:var(--muted);stroke-width:1.3;fill:none}
+svg .l-ship{stroke:var(--ship);stroke-width:2.4;fill:none}
+svg .dash{stroke-dasharray:5 4}
+svg .f-human{fill:var(--human)}svg .f-agent{fill:var(--agent)}svg .f-bf{fill:var(--bf)}svg .f-gate{fill:var(--gate)}svg .f-ship{fill:var(--ship)}svg .f-stop{fill:var(--stop)}
+/* hero */
+.hero{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:28px;align-items:center;border-bottom:2px solid var(--fg);padding-bottom:28px}
+.hero .txt{display:flex;flex-direction:column;gap:16px;min-width:0}
+.hero .flame{width:clamp(120px,22vw,220px);height:auto}
+.meta{font:13px/1.6 var(--f-mono);color:var(--muted)}
+@media (max-width:640px){.hero{grid-template-columns:1fr}.hero .flame{width:110px;order:-1}}
+.toc{display:flex;flex-wrap:wrap;gap:8px;padding:0;list-style:none;margin:0}
+.toc a{display:inline-block;padding:7px 12px;border:1px solid var(--line);border-radius:999px;background:var(--surface);text-decoration:none;font:600 13px/1.2 var(--f-mono);color:var(--fg)}
+.toc a:hover{border-color:var(--bf);color:var(--bf)}
+.legend{display:flex;flex-wrap:wrap;gap:8px 14px;padding:12px 16px;background:var(--surface);border:1px solid var(--line);border-radius:10px;font-size:14.5px;color:var(--muted)}
+.legend span{display:inline-flex;align-items:center;gap:7px}
+.sw{width:14px;height:14px;border-radius:4px;border:1.5px solid;display:inline-block;flex:none}
+.sw.human{background:var(--human-soft);border-color:var(--human)}.sw.agent{background:var(--agent-soft);border-color:var(--agent)}
+.sw.bf{background:linear-gradient(135deg,var(--bf),var(--bf2));border-color:var(--bf)}.sw.gate{background:var(--gate-soft);border-color:var(--gate)}
+.sw.ship{background:var(--ship-soft);border-color:var(--ship)}.sw.stop{background:var(--stop-soft);border-color:var(--stop)}.sw.plain{background:var(--surface);border-color:var(--muted)}
+/* matrices */
+.mxwrap{overflow-x:auto;background:var(--surface);border:1px solid var(--line);border-radius:10px;box-shadow:0 1px 2px var(--shade)}
+table.mx{border-collapse:separate;border-spacing:0;width:100%;font-size:14.5px}
+.mx th,.mx td{padding:8px 10px;border-bottom:1px solid var(--line);text-align:left;vertical-align:middle}
+.mx thead th{font:600 12px/1.25 var(--f-mono);letter-spacing:.04em;color:var(--muted);background:var(--bg);position:sticky;top:0;vertical-align:bottom}
+.mx tbody th{font-weight:600;color:var(--fg);min-width:170px}
+.mx tr:last-child td,.mx tr:last-child th{border-bottom:0}
+.mx td.c{text-align:center}
+.cell{display:block;border-radius:6px;padding:6px 6px;font:600 12px/1.25 var(--f-mono);text-align:center;border:1px solid transparent;min-width:84px}
+.cell small{display:block;font:400 11.5px/1.25 var(--f-body);margin-top:2px}
+.cell.d{background:var(--human-soft);border-color:var(--human);color:var(--human)}
+.cell.h{background:var(--stop-soft);border-color:var(--stop);color:var(--stop)}
+.cell.s{background:var(--gate-soft);border-color:var(--gate);color:var(--gate)}
+.cell.i{background:var(--surface);border:1px dashed var(--muted);color:var(--muted)}
+.cell.x{background:var(--agent-soft);border-color:var(--agent);color:var(--agent)}
+.cell.n{color:var(--line)}
+.cell.d small,.cell.h small,.cell.s small,.cell.x small{color:var(--fg)}
+.dot{display:inline-block;width:14px;height:14px;border-radius:50%;vertical-align:-2px}
+.dot.b{background:var(--gate)}.dot.w{background:var(--surface);border:3px solid var(--gate)}.dot.o{background:var(--surface);border:2px dashed var(--stop)}.dot.c{background:var(--surface);border:2px solid var(--muted)}
+.dot.y{background:var(--agent)}.dot.p{background:var(--surface);border:3px solid var(--bf)}.dot.g{background:var(--ship)}
+/* dm mock */
+.dm{max-width:520px;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px 16px;display:flex;flex-direction:column;gap:10px;box-shadow:0 2px 8px var(--shade)}
+.dm .who{display:flex;align-items:center;gap:8px;font:600 13px/1 var(--f-mono);color:var(--bf)}
+.dm .opt{display:grid;grid-template-columns:auto 1fr;gap:4px 10px;font-size:15px}
+.dm .opt b{font-family:var(--f-mono);color:var(--agent)}
+.dm .rec{border-left:3px solid var(--agent);padding-left:10px;font-size:15px}
+.dm .ans{align-self:flex-end;background:var(--human-soft);border:1px solid var(--human);border-radius:12px;padding:6px 12px;font:600 14px/1.3 var(--f-body);color:var(--human)}
+/* locks list */
+.locks{display:grid;gap:8px;grid-template-columns:repeat(auto-fit,minmax(min(100%,200px),1fr));list-style:none;padding:0}
+.locks li{display:flex;gap:10px;align-items:flex-start;border-radius:8px;padding:10px 12px;font-size:15px;border:1px solid;margin:0}
+.locks.stop li{background:var(--stop-soft);border-color:var(--stop)}
+.locks.perm li{background:var(--gate-soft);border-color:var(--gate)}
+.locks svg{width:20px;height:20px;flex:none;margin-top:1px}
+/* numbered zone legend */
+.zones{display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));list-style:none;padding:0;counter-reset:z}
+.zones li{counter-increment:z;display:grid;grid-template-columns:auto 1fr;gap:12px;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px 14px;font-size:15.5px;color:var(--muted);margin:0}
+.zones li::before{content:counter(z);font:700 15px/28px var(--f-display);width:28px;height:28px;border-radius:50%;text-align:center;background:var(--fg);color:var(--surface)}
+.zones b{color:var(--fg);display:block}
+/* model cards */
+.hex{width:44px;height:48px;flex:none;display:grid;place-items:center;font:800 18px/1 var(--f-display);color:var(--agent);background:var(--agent-soft);clip-path:polygon(50% 0,100% 25%,100% 75%,50% 100%,0 75%,0 25%);position:relative}
+.q{font-style:italic;color:var(--fg)}
+/* three identical files */
+.files{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.file{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:10px;display:flex;flex-direction:column;gap:6px;min-width:0}
+.file .fn{font:600 12px/1.3 var(--f-mono);overflow-wrap:anywhere}
+.file .core{background:var(--agent-soft);border:1.5px solid var(--agent);border-radius:5px;padding:6px;font:600 11px/1.3 var(--f-mono);color:var(--agent);text-align:center}
+.file .rest{height:var(--h,30px);border-radius:5px;background:repeating-linear-gradient(180deg,var(--line) 0 3px,transparent 3px 9px)}
+.file .ln{font-size:13px;color:var(--muted)}
+/* channel map */
+.seg{display:none;gap:0;border:1px solid var(--fg);border-radius:999px;overflow:hidden;align-self:flex-start}
+.js .seg{display:inline-flex}
+.seg button{font:600 13px/1 var(--f-mono);padding:9px 14px;border:0;background:var(--surface);color:var(--fg);cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--fg);color:var(--surface)}
+.chan .grp td{background:var(--bg);font:600 12px/1 var(--f-mono);letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.chan td small{display:block;color:var(--muted);font-size:13px;line-height:1.3}
+.chan .prac{color:var(--bf);font-weight:600}
+.chan.book .prac{display:none}
+.chan.book .dot.p{border-color:var(--line)}
+.chan .nm{font-family:var(--f-mono);font-size:13.5px;font-weight:600;white-space:nowrap}
+/* decision tree */
+.tree{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(min(100%,200px),1fr))}
+.tree .card{position:relative}
+.tree .does{border-top:1px solid var(--line);padding-top:8px}
+.yes::before{content:"does: ";font:600 11.5px var(--f-mono);color:var(--ship)}
+.no::before{content:"never: ";font:600 11.5px var(--f-mono);color:var(--stop)}
+/* conveyor */
+.belt{display:grid;grid-template-columns:repeat(11,minmax(86px,1fr));gap:0;min-width:980px;padding:16px 14px 20px;position:relative}
+.belt::before{content:"";position:absolute;left:14px;right:14px;top:50px;height:10px;background:repeating-linear-gradient(90deg,var(--line) 0 10px,var(--bg) 10px 20px);border-radius:5px}
+.st{position:relative;display:flex;flex-direction:column;align-items:center;gap:6px;background:none;border:0;padding:4px 3px;cursor:pointer;font:inherit;color:var(--fg);text-align:center;border-radius:8px}
+.st .num{font:600 11px/1 var(--f-mono);color:var(--muted)}
+.st .bx{width:44px;height:44px;border-radius:10px;background:var(--surface);border:2px solid var(--line);display:grid;place-items:center;position:relative;z-index:1}
+.st .bx svg{width:24px;height:24px}
+.st.hard .bx{border-color:var(--gate);background:var(--gate-soft)}
+.st.soft .bx{border-style:dashed;border-color:var(--muted)}
+.st .nm{font:600 13px/1.2 var(--f-display)}
+.st .who{font:11.5px/1.2 var(--f-body);color:var(--muted)}
+.st[aria-pressed="true"] .bx{border-color:var(--bf);box-shadow:0 0 0 4px var(--bf-soft)}
+.st:hover .bx{border-color:var(--bf)}
+.stps{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr))}
+.stp h4{display:flex;gap:8px;align-items:baseline;flex-wrap:wrap}
+.stp dl{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;margin:0;font-size:15px}
+.stp dt{font:600 11.5px/1.7 var(--f-mono);color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.stp dd{margin:0}
+.jsonly{display:none}.js .jsonly{display:inline}
+.js .stps{grid-template-columns:1fr}
+.js .stp{display:none}
+.js .stp.on{display:flex;border-color:var(--bf);box-shadow:0 0 0 3px var(--bf-soft)}
+/* products */
+.prod{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(min(100%,230px),1fr))}
+.prod .card h3{font-size:17px}
+/* rule stack */
+.stack{display:flex;flex-direction:column;gap:6px}
+.layer{display:grid;grid-template-columns:minmax(0,220px) minmax(0,1fr) auto;gap:6px 14px;align-items:center;background:var(--surface);border:1px solid var(--line);border-left:6px solid var(--muted);border-radius:8px;padding:10px 14px}
+.layer b{font-family:var(--f-display);font-size:15.5px}
+.layer span.d{font-size:15px;color:var(--muted)}
+.layer.l1{border-left-color:var(--human)}.layer.l2{border-left-color:var(--agent)}.layer.l3{border-left-color:var(--gate)}
+@media (max-width:720px){.layer{grid-template-columns:1fr}}
+/* onion */
+.ring{border:1.5px solid var(--gate);border-radius:14px;padding:8px 10px 10px;background:var(--surface);display:flex;flex-direction:column;gap:8px}
+.ring>.rl{display:flex;flex-wrap:wrap;gap:4px 10px;align-items:baseline;font-size:14.5px;color:var(--muted)}
+.ring>.rl b{font:700 14.5px var(--f-display);color:var(--gate)}
+.ring.r2{background:var(--gate-soft)}.ring.r4{background:var(--gate-soft)}
+.ring .core{border-radius:10px;background:var(--fg);color:var(--surface);padding:10px 14px;font:600 14.5px/1.3 var(--f-display);text-align:center}
+/* routing list */
+.route{display:flex;flex-direction:column;gap:6px;list-style:none;padding:0}
+.route li{display:grid;grid-template-columns:minmax(0,1.1fr) auto minmax(0,1fr) minmax(0,1fr);gap:10px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:9px 14px;font-size:15px;margin:0}
+.route .arrow{color:var(--agent);font-weight:700}
+.route .first{font-weight:600}
+.route .then{color:var(--muted)}
+@media (max-width:720px){.route li{grid-template-columns:1fr}.route .arrow{display:none}.route .first::before{content:"first: ";font:600 11.5px var(--f-mono);color:var(--agent)}.route .then::before{content:"then: ";font:600 11.5px var(--f-mono)}}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:3px 10px;margin:0;font-size:14.5px}
+.kv dt{font:600 11px/1.75 var(--f-mono);color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.kv dd{margin:0;color:var(--fg)}
+/* ladder */
+.ladder{display:flex;flex-direction:column;gap:6px;list-style:none;padding:0;counter-reset:l}
+.ladder li{counter-increment:l;margin:0;padding:10px 14px 10px 48px;position:relative;border:1px solid var(--line);border-radius:8px;background:var(--surface);font-size:15.5px}
+.ladder li::before{content:counter(l);position:absolute;left:12px;top:10px;width:24px;height:24px;border-radius:50%;background:var(--agent);color:var(--surface);font:700 13px/24px var(--f-display);text-align:center}
+.ladder li:nth-child(1){border-color:var(--human);background:var(--human-soft)}.ladder li:nth-child(1)::before{background:var(--human)}
+.ladder li:nth-child(2){margin-left:4%}.ladder li:nth-child(3){margin-left:8%}.ladder li:nth-child(4){margin-left:12%;color:var(--muted)}
+/* bars */
+.bar{display:flex;height:26px;border-radius:6px;overflow:hidden;border:1px solid var(--line);background:var(--surface)}
+.bar i{display:block;height:100%}
+.barkey{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:14.5px;color:var(--muted)}
+.barkey span{display:inline-flex;gap:6px;align-items:center}
+.barkey i{width:12px;height:12px;border-radius:3px;display:inline-block}
+/* external */
+.ext .card ul{list-style:none;padding:0;display:flex;flex-direction:column;gap:6px}
+.ext .card li{display:grid;grid-template-columns:22px 1fr;gap:6px;font-size:15px;margin:0}
+.dir{font:700 19px/1.25 var(--f-body);color:var(--agent)}
+.ws{font:600 10.5px/1 var(--f-mono);padding:2px 5px;border-radius:4px;border:1px solid var(--muted);color:var(--muted);white-space:nowrap;margin-left:4px}
+.two{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr))}
+/* stats */
+.stats{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr))}
+.stat{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:16px 18px;display:flex;flex-direction:column;gap:6px;min-width:0}
+.stat .v{font:800 clamp(24px,3vw,30px)/1.05 var(--f-display);letter-spacing:-.01em;font-variant-numeric:tabular-nums}
+.stat .v small{font:600 15px var(--f-display);color:var(--muted)}
+.stat .l{font-size:15.5px}
+.stat .how{font:12px/1.45 var(--f-mono);color:var(--muted);border-top:1px solid var(--line);padding-top:6px;margin-top:auto;overflow-wrap:anywhere}
+.cmp{display:grid;grid-template-columns:auto 1fr;gap:3px 8px;align-items:center;font:12px/1 var(--f-mono);color:var(--muted)}
+.cmp i{display:block;height:8px;border-radius:4px;background:var(--line)}
+.cmp i.now{background:var(--agent)}
+/* findings */
+.sev{font:600 11px/1 var(--f-mono);padding:3px 7px;border-radius:4px;border:1px solid}
+.sev.hi{color:var(--stop);border-color:var(--stop);background:var(--stop-soft)}
+.sev.mid{color:var(--gate);border-color:var(--gate);background:var(--gate-soft)}
+.sev.lo{color:var(--muted);border-color:var(--muted)}
+.find{list-style:none;padding:0;display:flex;flex-direction:column;gap:6px}
+.find li{display:grid;grid-template-columns:auto auto 1fr;gap:10px;align-items:baseline;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:9px 14px;font-size:15.5px;margin:0}
+.find .id{font:600 12.5px var(--f-mono);color:var(--muted)}
+@media (max-width:560px){.find li{grid-template-columns:auto 1fr}.find li>span:last-child{grid-column:1/-1}}
+/* glossary */
+.gloss{display:grid;gap:10px 28px;grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr));margin:0}
+.gloss div{border-top:1px solid var(--line);padding-top:8px}
+.gloss dt{font:700 15.5px var(--f-display)}
+.gloss dd{margin:2px 0 0;color:var(--muted);font-size:15.5px}
+footer{border-top:2px solid var(--fg);padding-top:20px;font-size:14.5px;color:var(--muted);display:flex;flex-direction:column;gap:8px}
+details{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:10px 16px}
+details summary{cursor:pointer;font-weight:600}
+details[open] summary{margin-bottom:10px}
+@media (prefers-reduced-motion:no-preference){
+  html{scroll-behavior:smooth}
+  .st .bx,.toc a,.seg button{transition:border-color .15s,box-shadow .15s,background-color .15s,color .15s}
+  .hero .halo{animation:breathe 5s ease-in-out infinite;transform-origin:center;transform-box:fill-box}
+  @keyframes breathe{50%{opacity:.55;transform:scale(1.04)}}
+}
 </style>
-
-</head><body>
-<div class="wrap">
-
-<header>
-  <span class="eyebrow">OTGW-firmware · ontwikkelorganisatie</span>
-  <h1>Hoe het OTGW-project zich ontwikkelt met agents, testers en de SAT-ontwerper</h1>
-  <p class="lede">Een functionele beschrijving van de agentic werkplaats rond de OTGW-firmware 2.x: wie er beslist, welke agents wat doen, langs welke kanalen informatie binnenkomt en welke poorten een wijziging moet passeren voordat een tester hem krijgt.</p>
-  <p class="meta">Bron: lokale repo, branch <code>claude/amazing-babbage-j1mdcm</code> @ 19e318b, stand 2026-11-04 · huidige firmware-tag 2.0.0-beta.79 · uitgebreide rapportage: <code>docs/process/agentic-setup.md</code> · taken TASK-1624..1636</p>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false"><defs>
+<marker id="a-agent" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--agent)"/></marker>
+<marker id="a-human" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="5.5" markerHeight="5.5" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--human)"/></marker>
+<marker id="a-muted" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--muted)"/></marker>
+<marker id="a-ship" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="5.5" markerHeight="5.5" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--ship)"/></marker>
+<marker id="a-gate" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--gate)"/></marker>
+<linearGradient id="g-flame" x1="0" y1="1" x2="0" y2="0"><stop offset="0%" style="stop-color:var(--bf-soft)"/><stop offset="35%" style="stop-color:var(--bf)"/><stop offset="100%" style="stop-color:var(--bf2)"/></linearGradient>
+<radialGradient id="g-halo" cx="50%" cy="55%" r="50%"><stop offset="0%" style="stop-color:var(--bf);stop-opacity:.30"/><stop offset="60%" style="stop-color:var(--bf2);stop-opacity:.10"/><stop offset="100%" style="stop-color:var(--bg);stop-opacity:0"/></radialGradient>
+<symbol id="i-flame" viewBox="915 540 90 122"><path d="M960.0,545.1 C980.9,575.5 1001.8,596.4 998.0,621.1 C994.2,645.8 977.1,657.2 960.0,657.2 C942.9,657.2 925.8,645.8 922.0,621.1 C919.1,602.1 931.5,586.9 942.9,575.5 C944.8,592.6 952.4,600.2 958.1,604.0 C961.9,583.1 954.3,566.0 960.0,545.1 Z" fill="url(#g-flame)" style="stroke:var(--bf)" stroke-width="1.4"/><path d="M960,612 C968,624 973,632 971,641 C969,649 965,652 960,652 C955,652 951,649 949,641 C947,632 952,624 960,612 Z" style="fill:var(--surface)"/></symbol>
+<symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="10" width="14" height="11" rx="2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M8,10 V7 C8,2 16,2 16,7 V10" fill="none" stroke="currentColor" stroke-width="1.8"/></symbol>
+<symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M12,6 V12 L16,14" fill="none" stroke="currentColor" stroke-width="1.7"/></symbol>
+<symbol id="i-shield" viewBox="0 0 24 24"><path d="M12,2 L20,5 V11 C20,16 16,20 12,22 C8,20 4,16 4,11 V5 Z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M8,12 L11,15 L16,9" fill="none" stroke="currentColor" stroke-width="1.9"/></symbol>
+<symbol id="i-person" viewBox="0 0 24 24"><circle cx="12" cy="7" r="4" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M4,22 C4,15 20,15 20,22" fill="none" stroke="currentColor" stroke-width="1.8"/></symbol>
+<symbol id="i-group" viewBox="0 0 24 24"><circle cx="12" cy="7" r="3.2" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="5" cy="9" r="2.4" fill="none" stroke="currentColor" stroke-width="1.4"/><circle cx="19" cy="9" r="2.4" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M6,21 C6,15 18,15 18,21 M1,20 C1,16 6,15 7.5,15.5 M23,20 C23,16 18,15 16.5,15.5" fill="none" stroke="currentColor" stroke-width="1.5"/></symbol>
+<symbol id="i-key" viewBox="0 0 24 24"><circle cx="9" cy="7" r="3.5" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M2,22 C2,15 16,15 16,22" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="20" cy="5" r="2.5" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M20,7.5 L20,15 M20,11 L22.5,11 M20,14 L22,14" fill="none" stroke="currentColor" stroke-width="1.4"/></symbol>
+<symbol id="i-designer" viewBox="0 0 24 24"><circle cx="9" cy="7" r="3.5" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M2,22 C2,15 16,15 16,22" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M20,3 L17,13 M20,3 L23,13 M18,9 L22,9" fill="none" stroke="currentColor" stroke-width="1.4"/></symbol>
+<symbol id="i-tester" viewBox="0 0 24 24"><circle cx="9" cy="7" r="3.5" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M2,22 C2,15 16,15 16,22" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M19,4 L19,14 C19,16 22,16 22,14 L22,4 M18,4 L23,4" fill="none" stroke="currentColor" stroke-width="1.4"/></symbol>
+<symbol id="i-chat" viewBox="0 0 24 24"><path d="M3,4 H21 V16 H10 L5,20 V16 H3 Z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></symbol>
+<symbol id="i-kanban" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M9,3 V21 M15,3 V21" stroke="currentColor" stroke-width="1.2"/><rect x="4.5" y="6" width="3" height="3" fill="currentColor"/><rect x="10.5" y="6" width="3" height="3" fill="currentColor"/><rect x="16.5" y="6" width="3" height="3" fill="currentColor"/></symbol>
+<symbol id="i-plan" viewBox="0 0 24 24"><rect x="5" y="3" width="14" height="18" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8,8 H16 M8,12 H16 M8,16 H13" stroke="currentColor" stroke-width="1.4"/></symbol>
+<symbol id="i-redgreen" viewBox="0 0 24 24"><circle cx="7" cy="12" r="4" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M5,10 L9,14 M9,10 L5,14" stroke="currentColor" stroke-width="1.4"/><circle cx="17" cy="12" r="4" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M15,12 L16.5,13.5 L19,10.5" fill="none" stroke="currentColor" stroke-width="1.4"/></symbol>
+<symbol id="i-eyes" viewBox="0 0 24 24"><path d="M2,12 C5,6 19,6 22,12 C19,18 5,18 2,12 Z" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="1.6"/></symbol>
+<symbol id="i-tag" viewBox="0 0 24 24"><path d="M3,3 H12 L21,12 L12,21 L3,12 Z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><circle cx="8" cy="8" r="1.6" fill="currentColor"/></symbol>
+<symbol id="i-build" viewBox="0 0 24 24"><path d="M14,4 A5,5 0 0 0 9,11 L3,17 L7,21 L13,15 A5,5 0 0 0 20,10 L16.5,13 L13,11 L11,7.5 Z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></symbol>
+<symbol id="i-bench" viewBox="0 0 24 24"><path d="M2,15 H22 M4,15 V21 M20,15 V21" fill="none" stroke="currentColor" stroke-width="1.6"/><rect x="4" y="9" width="7" height="6" rx="1" fill="none" stroke="currentColor" stroke-width="1.4"/><rect x="13" y="9" width="7" height="6" rx="1" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M8,5 A6,6 0 0 1 16,5 M10,7 A3,3 0 0 1 14,7" fill="none" stroke="currentColor" stroke-width="1.3"/></symbol>
+<symbol id="i-push" viewBox="0 0 24 24"><path d="M12,20 V5 M6,11 L12,5 L18,11" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M4,21 H20" stroke="currentColor" stroke-width="1.6"/></symbol>
+<symbol id="i-package" viewBox="0 0 24 24"><path d="M12,2 L21,7 V17 L12,22 L3,17 V7 Z M3,7 L12,12 L21,7 M12,12 V22" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></symbol>
+<symbol id="i-ledger" viewBox="0 0 24 24"><rect x="5" y="3" width="14" height="18" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8,3 V21 M10,8 H16 M10,11 H16 M10,14 H16" fill="none" stroke="currentColor" stroke-width="1.2"/></symbol>
+</defs></svg>
+<div class="page"><div class="wrap">
+<header class="hero">
+  <div class="txt">
+    <span class="kicker">How this firmware gets built</span>
+    <h1>The OTGW agentic workshop</h1>
+    <p class="lede">A small team of AI agents writes, tests and ships this firmware. Two people decide; the agents carry out the work; and a chain of gates that can say no keeps the result honest.</p>
+    <p class="meta">As of 2026-11-15 · firmware 2.0.0-beta.327 on the <code>dev</code> line · visual companion to <a href="agentic-setup.md">agentic-setup.md</a> (Dutch, with sources for every fact)</p>
+  </div>
+  <svg class="flame" viewBox="0 0 220 220" role="img" aria-label="A calm blue pilot flame, the symbol of BlueFlame Bot">
+    <circle class="halo" cx="110" cy="118" r="104" fill="url(#g-halo)"/>
+    <circle cx="110" cy="118" r="70" style="fill:var(--surface);stroke:var(--bf)" stroke-width="1.6"/>
+    <use href="#i-flame" x="68" y="58" width="84" height="114"/>
+  </svg>
 </header>
 
-<section>
-  <span class="eyebrow">Kernpunten</span>
-  <h2>In vijf zinnen</h2>
-  <div class="keys">
-    <div class="key"><b>Eén coördinerende AI-sessie draait een continue cyclus</b><p>De skill <code>/implement-next-task</code> kiest de volgende taak, ontwerpt, laat zichzelf reviewen, delegeert code naar subagents en zet een taak alleen op Done met bewijs uit dezelfde sessie.</p></div>
-    <div class="key"><b>Robert is de enige met beslismacht over scope en vrijgave</b><p>Testers leveren input en bewijs maar kunnen niets prioriteren. Wat zij vragen krijgt het label <code>needs-maintainer-ok</code>.</p></div>
-    <div class="key"><b>Sergeant D is de enige bron van waarheid voor SAT-gedrag</b><p>Daarna komt de vastgepinde thermo-nova-code. De firmware zelf telt nooit als bron. Elke uitspraak van hem wordt eerst vastgelegd (269 entries) en pas daarna uitgevoerd.</p></div>
-    <div class="key"><b>Kwaliteit is ingebed in de werkwijze, niet in CI</b><p>Git-hooks, <code>evaluate.py</code>, een build-lock, een benchtest per taak en een post-script dat weigert bij twijfel. De GitHub-CI draait alleen op pull requests, en die worden op <code>dev</code> niet gebruikt.</p></div>
-    <div class="key"><b>De grootste risico's zijn drift en concentratie</b><p>Instructies per agent lopen uiteen, regels groeien als lagen bij, en kritieke state staat op één Windows-machine.</p></div>
+<nav aria-label="Sections">
+  <ul class="toc">
+    <li><a href="#start">Start here</a></li><li><a href="#cast">The cast</a></li><li><a href="#overview">Overview plate</a></li>
+    <li><a href="#agents">Who does what</a></li><li><a href="#blueflame">BlueFlame Bot</a></li><li><a href="#pipeline">Task to tester</a></li>
+    <li><a href="#rules">Rules</a></li><li><a href="#knowledge">Knowledge base</a></li><li><a href="#adr">ADR kit</a></li>
+    <li><a href="#external">Outside sources</a></li><li><a href="#numbers">Numbers</a></li><li><a href="#gaps">Open gaps</a></li><li><a href="#glossary">Glossary</a></li>
+  </ul>
+</nav>
+
+<section class="sec" id="start">
+  <span class="kicker">Start here</span>
+  <h2>Six things to know before you read on</h2>
+  <p class="lede">You do not need to know this project. These six terms carry the rest of the page; the <a href="#glossary">glossary</a> has the others.</p>
+  <div class="grid" style="--min:300px">
+    <div class="card top-plain"><h3>The gateway</h3><p>The <b>NodoShop OpenTherm Gateway</b> (OTGW) is a small device that sits between a room thermostat and a central-heating boiler and listens to, or changes, what they say to each other. This project is its open-source firmware. The 2.x line (branch <code>dev</code>) runs on ESP32-S3 boards; the 1.x line is in maintenance.</p></div>
+    <div class="card top-plain"><h3>SAT</h3><p><b>Smart Autotune Thermostat</b>: a control mode in which the gateway itself steers the boiler. It was designed on paper by one person (Sergeant D) and coded by another (Alex). There is no written design, so what the designer says is recorded before anything is built.</p></div>
+    <div class="card top-agent"><h3>Agent and session</h3><p>An <b>agent</b> is an AI model that reads files, runs commands and edits code. A <b>session</b> is one running agent with its own working folder. Several sessions run at once, each with a role. A <b>subagent</b> is a helper that a session starts for one narrow job.</p></div>
+    <div class="card top-agent"><h3>Skill and command</h3><p>A <b>skill</b> is a written procedure that an agent loads when it is called, for example <code>/implement-next-task</code>. The behaviour of the workshop lives in these text files, not in program code. That makes it easy to review and easy to change.</p></div>
+    <div class="card top-gate"><h3>Hook and gate</h3><p>A <b>hook</b> is a small script that runs automatically around an action (an edit, a commit). A <b>gate</b> is any automatic check that can refuse a step. Some rules have a gate; many rest on agreement only. This page shows which is which.</p></div>
+    <div class="card top-plain"><h3>ADR</h3><p>An <b>Architecture Decision Record</b>: one numbered file per design decision, with the context and the alternatives. Agents may propose one; only a person accepts it. After that it is never edited, only replaced by a new one.</p></div>
+  </div>
+  <div class="legend" aria-label="Colour legend">
+    <span><i class="sw human"></i>people and their decisions</span>
+    <span><i class="sw agent"></i>agents and their work</span>
+    <span><i class="sw bf"></i>BlueFlame Bot</span>
+    <span><i class="sw gate"></i>gate or standing permission</span>
+    <span><i class="sw stop"></i>hard stop</span>
+    <span><i class="sw ship"></i>what ships</span>
+    <span><i class="sw plain"></i>file or store</span>
   </div>
 </section>
 
-<section>
-  <span class="eyebrow">Overzicht</span>
-  <h2>De architectuur in één beeld</h2>
-  <p class="col">Lees van boven naar beneden: mensen en hun kanalen, de agentlaag die alles verwerkt, de kennis waar die laag zich aan houdt, de uitvoeringsstraat met poorten, en wat er uiteindelijk naar buiten gaat. De oranje lijn is Roberts directe stuurlijn via de Claude Code-sessie.</p>
-  <figure class="fig">
-  <svg viewBox="0 0 1040 830" role="img" aria-label="Lagendiagram van de OTGW agentic ontwikkelomgeving">
-    <defs>
-      <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="ah"/></marker>
-      <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="ah-hot"/></marker>
-      <marker id="ac" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="ah-cool"/></marker>
-    </defs>
-
-    <!-- Band 1: Mensen -->
-    <text x="40" y="28" class="lbl">MENSEN (ROLLEN)</text>
-    <rect x="40" y="38" width="210" height="74" class="person"/>
-    <text x="54" y="62" class="t">Eindgebruikers</text>
-    <text x="54" y="82" class="s">support-vragen, issues,</text>
-    <text x="54" y="98" class="s">bugmeldingen</text>
-    <rect x="290" y="38" width="210" height="74" class="person"/>
-    <text x="304" y="62" class="t">Alpha-testers</text>
-    <text x="304" y="82" class="s">flashen elke alpha, leveren</text>
-    <text x="304" y="98" class="s">captures · geen beslismacht</text>
-    <rect x="540" y="38" width="210" height="74" class="person"/>
-    <text x="554" y="62" class="t">Sergeant D</text>
-    <text x="554" y="82" class="s">ontwerper van SAT · bron van</text>
-    <text x="554" y="98" class="s">waarheid voor SAT-gedrag</text>
-    <rect x="790" y="38" width="210" height="74" class="person"/>
-    <text x="804" y="62" class="t">Robert (maintainer)</text>
-    <text x="804" y="82" class="s">scope, prioriteit, vrijgave,</text>
-    <text x="804" y="98" class="s">push naar main, releases</text>
-
-    <!-- Band 2: Kanalen -->
-    <text x="40" y="160" class="lbl">KANALEN</text>
-    <rect x="40" y="170" width="176" height="66" class="chan"/>
-    <text x="52" y="194" class="t">Tweakers-topic</text>
-    <text x="52" y="214" class="s">RSS, alleen lezen</text>
-    <rect x="236" y="170" width="176" height="66" class="chan"/>
-    <text x="248" y="194" class="t">GitHub issues</text>
-    <text x="248" y="214" class="s">via gh, triage</text>
-    <rect x="432" y="170" width="176" height="66" class="chan"/>
-    <text x="444" y="194" class="t">Discord support</text>
-    <text x="444" y="214" class="s">NL/EN, #beta-testing</text>
-    <rect x="628" y="170" width="176" height="66" class="chan"/>
-    <text x="640" y="194" class="t">#alpha-testing</text>
-    <text x="640" y="214" class="s">builds, SAT-vragen, verslag</text>
-    <rect x="824" y="170" width="176" height="66" class="chan"/>
-    <text x="836" y="194" class="t">#dev-sat-mqtt</text>
-    <text x="836" y="214" class="s">backlog-bot, SAT-rondes</text>
-
-    <path d="M145 112 L128 168" class="ln" marker-end="url(#a)"/>
-    <path d="M145 112 L322 168" class="ln" marker-end="url(#a)"/>
-    <path d="M145 112 L512 168" class="ln" marker-end="url(#a)"/>
-    <path d="M395 112 L660 168" class="ln" marker-end="url(#a)"/>
-    <path d="M645 112 L700 168" class="ln" marker-end="url(#a)"/>
-    <path d="M645 112 L890 168" class="ln" marker-end="url(#a)"/>
-
-    <!-- Robert direct line -->
-    <path d="M1000 75 L1026 75 L1026 350 L1004 350" class="ln-hot" marker-end="url(#ah)"/>
-    <text x="1018" y="215" class="m" transform="rotate(-90 1018 215)" text-anchor="middle">Claude Code-sessie · AskUserQuestion</text>
-
-    <!-- Channels down to core -->
-    <text x="40" y="270" class="m">gelezen en beantwoord via discord-mcp (lokaal, Java) · zip-post via webhook · gh · RSS</text>
-    <path d="M128 236 L128 298" class="ln-cool" marker-end="url(#ac)"/>
-    <path d="M324 236 L324 298" class="ln-cool" marker-end="url(#ac)"/>
-    <path d="M520 236 L520 298" class="ln-cool" marker-end="url(#ac)"/>
-    <path d="M716 298 L716 238" class="ln-cool" marker-end="url(#ac)" marker-start="url(#ac)"/>
-    <path d="M912 298 L912 238" class="ln-cool" marker-end="url(#ac)" marker-start="url(#ac)"/>
-
-    <!-- Band 3: Agentlaag -->
-    <text x="40" y="290" class="lbl">AGENTLAAG</text>
-    <rect x="30" y="296" width="980" height="190" class="band"/>
-    <rect x="40" y="304" width="960" height="102" class="core"/>
-    <text x="56" y="330" class="t" style="font-size:16px">Coördinerende hoofdsessie (Claude Code, door Robert gekozen model)</text>
-    <text x="56" y="350" class="s">kiest en plant taken · beslist binnen de regels · enige die post op Discord, bumpt, commit en pusht · beoordeelt zelf het bewijs</text>
-    <rect x="56" y="364" width="150" height="28" class="chip"/><text x="66" y="383" class="m">/implement-next-task</text>
-    <rect x="214" y="364" width="136" height="28" class="chip"/><text x="224" y="383" class="m">/backlog_discord</text>
-    <rect x="358" y="364" width="150" height="28" class="chip"/><text x="368" y="383" class="m">/check_otgw_issues</text>
-    <rect x="516" y="364" width="136" height="28" class="chip"/><text x="526" y="383" class="m">/beta-release-2x</text>
-    <rect x="660" y="364" width="108" height="28" class="chip"/><text x="670" y="383" class="m">/release-2x</text>
-    <rect x="776" y="364" width="128" height="28" class="chip"/><text x="786" y="383" class="m">/update-docs-2x</text>
-    <rect x="912" y="364" width="76" height="28" class="chip"/><text x="922" y="383" class="m">/flash</text>
-
-    <rect x="40" y="420" width="176" height="56" class="box"/>
-    <text x="52" y="442" class="t">Implementatie</text>
-    <text x="52" y="461" class="s">subagent, Sonnet</text>
-    <rect x="236" y="420" width="176" height="56" class="box"/>
-    <text x="248" y="442" class="t">Runners</text>
-    <text x="248" y="461" class="s">build, tests · Haiku</text>
-    <rect x="432" y="420" width="176" height="56" class="box"/>
-    <text x="444" y="442" class="t">Reviewteam</text>
-    <text x="444" y="461" class="s">Opus correctheid + lenzen</text>
-    <rect x="628" y="420" width="176" height="56" class="box"/>
-    <text x="640" y="442" class="t">otgw-device-verify</text>
-    <text x="640" y="461" class="s">flash + UI-check op bench</text>
-    <rect x="824" y="420" width="176" height="56" class="box"/>
-    <text x="836" y="442" class="t">Andere agents</text>
-    <text x="836" y="461" class="s">Codex · Copilot · CI-Claude</text>
-
-    <!-- Band 3 → 4 -->
-    <path d="M226 488 L226 532" class="ln" marker-end="url(#a)" marker-start="url(#a)"/>
-    <text x="236" y="514" class="m">leest regels en ADR's · schrijft register, notes, cerebrum</text>
-    <path d="M814 488 L814 532" class="ln" marker-end="url(#a)"/>
-    <text x="804" y="514" class="m" text-anchor="end">stuurt de uitvoeringsstraat</text>
-
-    <!-- Band 4 -->
-    <text x="40" y="528" class="lbl" dy="0"> </text>
-    <rect x="40" y="536" width="470" height="170" class="box"/>
-    <text x="56" y="560" class="lbl">KENNIS EN REGELS</text>
-    <text x="56" y="586" class="t">CLAUDE.md · AGENTS.md</text><text x="56" y="603" class="s">673 + 918 regels projectregels</text>
-    <text x="56" y="630" class="t">ADR's</text><text x="56" y="647" class="s">±210 besluiten, 7 binding met CI-poort</text>
-    <text x="56" y="674" class="t">C4-documentatie</text><text x="56" y="691" class="s">welk component bezit welke code</text>
-    <text x="290" y="586" class="t">SAT-beslisregister</text><text x="290" y="603" class="s">269 entries, append-only</text>
-    <text x="290" y="630" class="t">Open-vragenwachtrij</text><text x="290" y="647" class="s">thermo-nova pin 7beaaf5</text>
-    <text x="290" y="674" class="t">OpenWolf · graphify</text><text x="290" y="691" class="s">geheugen, buglog, codegraaf</text>
-
-    <rect x="530" y="536" width="470" height="170" class="box"/>
-    <text x="546" y="560" class="lbl">UITVOERING EN POORTEN</text>
-    <rect x="546" y="572" width="134" height="30" class="chip"/><text x="556" y="592" class="m">backlog-taak</text>
-    <rect x="696" y="572" width="134" height="30" class="chip"/><text x="706" y="592" class="m">plan + zelfreview</text>
-    <rect x="846" y="572" width="140" height="30" class="chip"/><text x="856" y="592" class="m">code + test rood→groen</text>
-    <rect x="546" y="618" width="134" height="30" class="gate"/><text x="556" y="638" class="m">evaluate · tests</text>
-    <rect x="696" y="618" width="134" height="30" class="gate"/><text x="706" y="638" class="m">bump + commit-hooks</text>
-    <rect x="846" y="618" width="140" height="30" class="gate"/><text x="856" y="638" class="m">build combo (lock)</text>
-    <rect x="546" y="664" width="134" height="30" class="gate"/><text x="556" y="684" class="m">OTA-benchtest</text>
-    <rect x="696" y="664" width="134" height="30" class="chip"/><text x="706" y="684" class="m">push origin/dev</text>
-    <rect x="846" y="664" width="140" height="30" class="gate"/><text x="856" y="684" class="m">discord-post-build</text>
-    <path d="M680 587 L694 587" class="ln" marker-end="url(#a)"/>
-    <path d="M830 587 L844 587" class="ln" marker-end="url(#a)"/>
-    <path d="M916 602 L916 610 L613 610 L613 616" class="ln" marker-end="url(#a)"/>
-    <path d="M680 633 L694 633" class="ln" marker-end="url(#a)"/>
-    <path d="M830 633 L844 633" class="ln" marker-end="url(#a)"/>
-    <path d="M916 648 L916 656 L613 656 L613 662" class="ln" marker-end="url(#a)"/>
-    <path d="M680 679 L694 679" class="ln" marker-end="url(#a)"/>
-    <path d="M830 679 L844 679" class="ln" marker-end="url(#a)"/>
-
-    <!-- Band 5 -->
-    <path d="M916 706 L916 748" class="ln-hot" marker-end="url(#ah)"/>
-    <text x="40" y="740" class="lbl">WAT NAAR BUITEN GAAT</text>
-    <rect x="40" y="750" width="210" height="66" class="box"/>
-    <text x="54" y="774" class="t">1.x LTS</text><text x="54" y="794" class="s">otgw-1.x.x → main, via CI</text>
-    <rect x="290" y="750" width="210" height="66" class="box"/>
-    <text x="304" y="774" class="t">Stabiel 2.x</text><text x="304" y="794" class="s">release/2.x · alleen na Roberts go</text>
-    <rect x="540" y="750" width="210" height="66" class="box"/>
-    <text x="554" y="774" class="t">Beta 2.x</text><text x="554" y="794" class="s">GitHub-prerelease, lokaal gebouwd</text>
-    <rect x="790" y="750" width="210" height="66" class="person"/>
-    <text x="804" y="774" class="t">Alpha-zip per taak</text><text x="804" y="794" class="s">→ #alpha-testing → testers</text>
-  </svg>
-  <figcaption>Pijlen tussen kanalen en agentlaag in twee richtingen betekenen dat de sessie daar zowel leest als post. Codex, Copilot en de CI-Claude werken met eigen instructiebestanden. Zie bevinding 1.</figcaption>
-  </figure>
-</section>
-
-<section>
-  <span class="eyebrow">Begrippen</span>
-  <h2>Definities</h2>
-  <p class="col">Deze termen gebruik ik in de rest van het stuk. Waar het project zelf een term vastlegt, volg ik die definitie.</p>
-  <dl class="defs">
-    <div class="cat">Rollen</div>
-    <dt>Maintainer</dt><dd>Robert. Bezit scope, prioriteit, uitzonderingen (waivers) en elke actie die niet terug te draaien is: PIC flashen, release, push naar <code>main</code>, force-push. Agents leggen open beslissingen aan hem voor als één vraag per beslissing, met opties en een gewogen advies.</dd>
-    <dt>SAT-ontwerper</dt><dd>Sergeant D (George). Ontwierp SAT op papier. Zijn vastgelegde uitspraken staan boven de code. Hij krijgt vragen in het Engels, één per bericht, in een tempo dat afhangt van zijn aanwezigheid.</dd>
-    <dt>Tester</dt><dd>Deelnemer in #alpha-testing die alpha-builds draait en captures levert. Bewijs van een tester mag een bestaande taak sluiten. Een verzoek van een tester wordt een taak met <code>needs-maintainer-ok</code> en blijft liggen tot Robert hem vrijgeeft.</dd>
-    <dt>Read-only lid</dt><dd>Discord-lid van wie niets tot actie leidt. Krijgt één keer het antwoord "Changes go through Robert."</dd>
-    <dt>Hoofdsessie</dt><dd>De Claude Code-sessie die de cyclus draait. Ontwerpt, roept de advisor of reviewers aan, beoordeelt het ruwe bewijs, en doet als enige de Discord-posts, bumps, commits en pushes.</dd>
-    <dt>Coördinerende 2.0.0-sessie</dt><dd>Bij meerdere gelijktijdige sessies: de sessie die builds aankondigt, het verslag in #alpha-testing schrijft en het alpha-ledger bijhoudt.</dd>
-    <dt>Subagent</dt><dd>Een door de hoofdsessie gestarte agent met een smalle opdracht: implementeren (Sonnet), mechanisch uitvoeren en output citeren (Haiku), of reviewen (Opus plus lenzen). Bumpt, commit en pusht nooit.</dd>
-
-    <div class="cat">Werkeenheden en bewijs</div>
-    <dt>Backlog-taak</dt><dd>De eenheid van werk in Backlog.md (<code>TASK-NNN</code>). Elke wijziging begint met een taak. Agents gebruiken altijd de CLI, nooit de MCP-server en nooit een directe bestandsbewerking. Hooks dwingen dat af.</dd>
-    <dt>AC / DoD</dt><dd>Acceptatiecriteria en Definition of Done per taak. Een AC mag alleen worden afgevinkt met bewijs uit dezelfde sessie, zoals build-output, een capture, een curl-respons of een screenshot.</dd>
-    <dt>Oud-tegen-fix-bewijs</dt><dd>Dezelfde reproductie gefaald op de oude code en geslaagd op de fix. Een groene run op alleen de fix telt niet als bewijs.</dd>
-    <dt>Poort (gate)</dt><dd>Een geautomatiseerde controle die een stap kan weigeren: <code>evaluate.py</code> (42 checks), de pre-commit- en commit-msg-hooks, de build-lock en de weigerregels van <code>discord-post-build.sh</code>.</dd>
-    <dt>Bench</dt><dd>Fysieke testunits (OTGW32 en S3 Classic) op Roberts werkplek. Ze worden over WiFi-OTA geflasht via safeboot. USB alleen als OTA niet lukt.</dd>
-
-    <div class="cat">Versies en distributie</div>
-    <dt>Alpha-tag</dt><dd>Een unieke <code>_VERSION_PRERELEASE</code> per firmwarecommit, zodat een tester twee builds kan vergelijken (A/B). De pre-commit-hook dwingt dat af.</dd>
-    <dt>Alpha-ledger</dt><dd>Lokaal, gitignored bestand van de coördinator dat bijhoudt welke tags zijn gepost. Voor elke post wordt het vergeleken met de git-log.</dd>
-    <dt>Lijnen</dt><dd><code>dev</code> is 2.x (ESP32-S3, async) en de werklijn. <code>release/2.x</code> is stabiel 2.x. <code>otgw-1.x.x</code> is 1.x LTS. <code>main</code> is de laatste publieke 1.x-release.</dd>
-
-    <div class="cat">Kennis</div>
-    <dt>ADR, binding</dt><dd>Een architectuurbesluit dat een patroon vastlegt en een CI- of testpoort heeft (ADR-080). Er zijn er nu 7. Structurele ADR's worden alleen bij review gecontroleerd.</dd>
-    <dt>Ground truth (SAT)</dt><dd>De rangorde voor SAT-gedrag: (1) register van Sergeant D, (2) thermo-nova-code op commit <code>7beaaf5</code>, (3) de spec die uit die code is afgeleid, (4) de firmware. Elke uitspraak citeert <code>file:line</code>.</dd>
-    <dt>Beslisregister</dt><dd><code>docs/sat/sergeant-d-corrections.md</code>: genummerde, onveranderlijke entries met citaat, Discord-link, vergelijking met thermo-nova en de firmware, de taak die eruit volgt en wat nog open staat.</dd>
-    <dt>Open-vragenwachtrij</dt><dd><code>docs/sat/open-questions.md</code>: de SAT-vragen die het port-team niet zelf mag beantwoorden, elk met de status queued, asked, answered of dropped.</dd>
-    <dt>OpenWolf</dt><dd>Een contextlaag in <code>.wolf/</code>: anatomy (bestandsindex), cerebrum (lessen en Do-Not-Repeat), buglog en memory. Hooks rond Read en Write houden die bij.</dd>
-  </dl>
-</section>
-
-<section>
-  <span class="eyebrow">Werkwijze</span>
-  <h2>De ontwikkelcyclus</h2>
-  <p class="col">De skill <code>implement-next-task</code> ordent de regels uit CLAUDE.md tot een lus die blijft draaien tot er niets meer uitvoerbaar is. Sinds 2026-10-20 vervangt een kritische zelfreview plus een melding in #alpha-testing het wachten op Roberts goedkeuring van het plan. Gemarkeerde stappen zijn stoppunten.</p>
-  <ol class="cycle">
-    <li><b>Testervragen eerst</b><span><code>/backlog_discord</code> zoekt onbeantwoorde berichten van Sergeant D, testers of Robert en beantwoordt die vóór nieuw werk.</span></li>
-    <li><b>Selecteren en aankondigen</b><span>Eerst lopende taken die nu af te ronden zijn, daarna To Do op prioriteit. Taken die op hardware, Sergeant D of <code>needs-maintainer-ok</code> wachten worden overgeslagen. De keuze wordt in #alpha-testing gemeld.</span></li>
-    <li><b>Ontwerpen</b><span>C4 en ADR-context lezen, bij SAT het register doornemen, eerst open source zoeken, de reproductie vastleggen. Het plan gaat de taak in.</span></li>
-    <li><b>Kritische zelfreview</b><span>Een advisor of een Opus-reviewer toetst het plan. Bevindingen worden overgenomen of met reden afgewezen. Bij een architectuurwijziging komt er een Proposed ADR bij.</span></li>
-    <li class="stop"><b>Plan melden, of wachten bij SAT</b><span>Gewoonlijk alleen een melding. Verandert de taak hoe SAT de ketel regelt, dan gaat het plan met thermo-nova-citaten naar Sergeant D en wordt er niets gebouwd tot hij akkoord is.</span></li>
-    <li><b>Implementeren met bewijs</b><span>Een Sonnet-subagent schrijft de code. De bug eerst rood reproduceren, dan groen. Daarna build, evaluate en tests. De hoofdsessie leest het ruwe bewijs zelf.</span></li>
-    <li><b>Reviewteam</b><span>Parallelle reviewers, gevraagd om te weerleggen en niet om goed te keuren: correctheid, projectregels, de echtheid van tests en bij SAT het register. Elke bevinding wordt zelf gecontroleerd.</span></li>
-    <li><b>Done met bewijs</b><span>Een final summary met bewijs per AC, de prerelease-bump, één commit per taak met expliciete paden, en graphify, buglog en cerebrum bijwerken.</span></li>
-    <li class="stop"><b>Build, bench, publiceren</b><span>Een esp32-combo-build (machinebreed één tegelijk), OTA naar een benchunit en een benchtest. Alleen als die slaagt: push, de zip in #alpha-testing en een verslag in gewone taal.</span></li>
-  </ol>
-  <p class="col">De cyclus stopt als er niets uitvoerbaar is, als Robert stop zegt, na twee mislukte reviewrondes op dezelfde taak, of bij een rate limit. Een gate die niet groen wordt houdt het werk tegen. De regels laten geen omweg toe.</p>
-</section>
-
-<section>
-  <span class="eyebrow">Interactie</span>
-  <h2>Zo werkt het samenspel op Discord</h2>
-  <p class="col">Discord is tegelijk distributiekanaal, feedbackkanaal en ontwerpoverleg. De bot leest en post via een lokale Discord-MCP (Java, op Roberts machine) en post zips via een webhook. Wie wat mag, staat vast:</p>
-  <div class="tbl"><table>
-    <thead><tr><th>Actor</th><th>Taak laten aanmaken</th><th>Prioriteit en selectie</th><th>SAT-gedrag bepalen</th><th>Code laten wijzigen</th><th>Push naar dev</th><th>Release en main</th></tr></thead>
-    <tbody>
-      <tr><td>Robert</td><td class="c y">ja</td><td class="c y">ja</td><td class="c p">beslist mee*</td><td class="c y">ja</td><td class="c y">staand mandaat</td><td class="c y">per keer</td></tr>
-      <tr><td>Sergeant D</td><td class="c y">ja</td><td class="c n">nee</td><td class="c y">ja, eerste bron</td><td class="c p">via register → taak</td><td class="c n">nee</td><td class="c n">nee</td></tr>
-      <tr><td>Alpha-tester</td><td class="c p">met label</td><td class="c n">nee</td><td class="c n">nee</td><td class="c n">nee</td><td class="c n">nee</td><td class="c n">nee</td></tr>
-      <tr><td>Read-only lid</td><td class="c n">nee</td><td class="c n">nee</td><td class="c n">nee</td><td class="c n">nee</td><td class="c n">nee</td><td class="c n">nee</td></tr>
-      <tr><td>Hoofdsessie</td><td class="c y">ja</td><td class="c p">binnen de regels</td><td class="c n">nee, vraagt</td><td class="c y">ja</td><td class="c y">na de poorten</td><td class="c n">nee</td></tr>
-      <tr><td>Subagent</td><td class="c n">nee</td><td class="c n">nee</td><td class="c n">nee</td><td class="c y">bewerkt alleen</td><td class="c n">nee</td><td class="c n">nee</td></tr>
-    </tbody>
-  </table></div>
-  <p class="col" style="font-size:15px;color:var(--muted)">* Robert neemt ook SAT-besluiten. Ze staan als "maintainer decision" in hetzelfde register (minstens 18 entries), soms achteraf door Sergeant D bevestigd (entry 265). Zie bevinding 5.</p>
-
-  <h3 style="margin-top:12px">De SAT-beslisketen</h3>
-  <ol class="cycle">
-    <li><b>Gat ontdekt</b><span>De code of de spec laat het gedrag niet zien. De regel is dan: schrijf "not found in the code" en vul het niet zelf in.</span></li>
-    <li><b>Vraag opstellen</b><span>Eén vraag in eenvoudig Engels, met opties A/B/C, de gevolgen, het thermo-nova-citaat en een advies. Volgorde van het advies: beste regelresultaat, dan zijn eerdere antwoorden, dan thermo-nova.</span></li>
-    <li><b>Wachtrij en tempo</b><span>Is hij actief, dan meteen de volgende vraag. Elk uur kijken. Reageert hij niet, dan stil wachten. Is hij terug, dan de openstaande vraag kort opnieuw stellen met een link.</span></li>
-    <li class="stop"><b>Vastleggen vóór uitvoeren</b><span>Een nieuwe genummerde entry: zijn letterlijke woorden, de Discord-link, wat het besluit vastlegt ten opzichte van thermo-nova en de firmware, en wat open blijft. Een korte reactie wordt expliciet als interpretatie vastgelegd.</span></li>
-    <li><b>Taak en implementatie</b><span>Elk besluit wordt een backlog-taak. Het plan noemt de entries waarop het steunt, en een reviewer controleert de diff tegen het hele register.</span></li>
-    <li><b>Terug naar het veld</b><span>De alpha-zip gaat naar testers. Hun captures leveren bewijs of nieuwe vragen op. Simulatierondes worden ook in #dev-sat-mqtt besproken.</span></li>
-  </ol>
-
-  <h3 style="margin-top:12px">Instroom van gebruikers</h3>
-  <p class="col"><code>/check_otgw_issues</code> loopt Discord-support, GitHub-issues en het Tweakers-topic af. Ingebouwde zuinigheidsregels: stoppen als alles korter dan 2 uur geleden is bekeken, lazy loading van bijlagen, Tweakers eerst alleen op omschrijving. Daarna triage naar bug, feature of vraag en een backlog-taak na akkoord van de ontwikkelaar.</p>
-</section>
-
-<section>
-  <span class="eyebrow">Omvang</span>
-  <h2>De werkplaats in cijfers</h2>
-  <div class="nums">
-    <div class="num"><b>269</b><span>entries in het SAT-beslisregister (6.013 regels)</span></div>
-    <div class="num"><b>±86</b><span>vragen in de SAT-wachtrij, waarvan het grootste deel beantwoord</span></div>
-    <div class="num"><b>115</b><span>actieve taken: 36 To Do, 14 In Progress, 65 Done</span></div>
-    <div class="num"><b>1.321</b><span>gearchiveerde taken, de hoogste nu TASK-1610</span></div>
-    <div class="num"><b>±210</b><span>ADR's, waarvan 7 binding</span></div>
-    <div class="num"><b>42</b><span>checks in evaluate.py</span></div>
-    <div class="num"><b>125 + 43</b><span>Python-tests en host-harnassen (MSVC)</span></div>
-    <div class="num"><b>9 · 2 · 1</b><span>skills, commands en eigen subagents</span></div>
+<section class="sec" id="cast">
+  <span class="kicker">The cast</span>
+  <h2>People decide, agents carry out</h2>
+  <p class="lede">Exactly two people hold decision power. Everyone else gives input and evidence: they can cause a task to exist, but not cause it to be built.</p>
+  <div class="grid" style="--min:240px">
+    <div class="card c-human"><div class="cardhead"><svg class="ico f-human" style="color:var(--human)" aria-hidden="true"><use href="#i-key"/></svg><h3>Robert, maintainer</h3></div><p>Decides scope, priority, waivers and releases. Accepts every ADR. Unlocks each hard stop with an explicit yes for that one action.</p></div>
+    <div class="card c-human"><div class="cardhead"><svg class="ico" style="color:var(--human)" aria-hidden="true"><use href="#i-designer"/></svg><h3>Sergeant D, SAT designer</h3></div><p>Decides how SAT behaves. His recorded words rank above the reference code. A change to how SAT controls the boiler waits for his OK.</p></div>
+    <div class="card"><div class="cardhead"><svg class="ico" style="color:var(--human)" aria-hidden="true"><use href="#i-tester"/></svg><h3>Testers</h3></div><p>Flash builds and send captures. They give evidence, never decisions: a change request becomes a task labelled <code>needs-maintainer-ok</code>. Their evidence may verify and close an existing task.</p></div>
+    <div class="card"><div class="cardhead"><svg class="ico" style="color:var(--human)" aria-hidden="true"><use href="#i-group"/></svg><h3>End users and contributors</h3></div><p>Report on GitHub, in the Discord support channels and on the Tweakers forum. A bug report or pull request becomes a task directly; a feature request waits for the maintainer.</p></div>
   </div>
-  <p class="col" style="font-size:15px;color:var(--muted)">Deze checkout is een shallow clone van 50 commits, allemaal van 2026-11-04. Een betrouwbare commitfrequentie of doorlooptijd valt hier daarom niet uit af te leiden. Alle 50 dragen een Claude co-author-trailer: 47 op naam van Robert en 3 van Andre Brait.</p>
-</section>
+  <p class="col small muted">In the background: <b>Alex</b> wrote the upstream SAT code (pinned, read-only, no decision role here); <b>Schelte Bron</b> wrote the PIC firmware and keeps the equipment matrix that is checked first for every "does my boiler work?" question; <b>read-only members</b> on Discord get one answer, "Changes go through Robert." Who is a tester or a read-only member is kept in a local file, not in the repository.</p>
 
-<section>
-  <span class="eyebrow">Analyse</span>
-  <h2>Bevindingen</h2>
-  <p class="col">Wat goed werkt, eerst kort. Het bewijsregime (oud tegen fix, Done alleen met bewijs, reviewers die moeten weerleggen) is streng en goed uitgewerkt. De SAT-rangorde met verplichte <code>file:line</code>-citaten is een sterke maatregel tegen hallucinatie. Dat elke firmwarecommit een eigen tag krijgt, maakt testerfeedback goed toe te wijzen. De risico's hieronder gaan over beheersbaarheid op termijn.</p>
-  <div class="finds">
-    <div class="find"><span class="sev hi">Hoog</span><div><h3>1. Instructies lopen uiteen tussen agents</h3><p>CLAUDE.md verbiedt de backlog-MCP en schrijft de CLI voor. AGENTS.md (Codex) noemt de MCP juist het primaire kanaal. <code>.github/copilot-instructions.md</code> beschrijft nog ESP8266 en ArduinoJson, terwijl ADR-146 ArduinoJson verbiedt. <code>.claude/docs/discord-backlog-bridge.md</code> beschrijft een npx-<code>mcp-discord</code>, een bot "OTGW bot#0128" en alleen #dev-sat-mqtt. De werkelijkheid is een Java-saseq-server, de bot "BlueFlame Bot" en ook #alpha-testing.</p><p class="ev">Gevolg: een andere agent of een nieuwe sessie handelt aantoonbaar tegen de regels. Alleen het blok met binding ADR's wordt al op gelijkheid getest (<code>tests/test_adr_governance.py</code>).</p></div></div>
-    <div class="find"><span class="sev hi">Hoog</span><div><h3>2. CI ziet de hoofdlijn niet</h3><p><code>build.yml</code>, <code>evaluate.yml</code> en <code>adr-governance.yml</code> reageren alleen op <code>pull_request</code>. Op <code>dev</code> wordt rechtstreeks gecommit en gepusht. De git-hooks zijn opt-in per clone (<code>core.hooksPath</code>) en kunnen met env-vars worden omzeild.</p><p class="ev">Gevolg: de enige objectieve poort is lokaal. Een sessie zonder hooks, of in een andere omgeving, pusht ongecontroleerd.</p></div></div>
-    <div class="find"><span class="sev md">Middel</span><div><h3>3. De omgeving zit vast aan één Windows-machine</h3><p>De PostToolUse-hook in <code>.claude/settings.json</code> heeft een hardcoded <code>cd 'D:/Users/Robert/...'</code> en eindigt op <code>|| true</code>. In deze cloudsessie of op een Mac draait de evaluator dus stil niet. Daarnaast staan de bench-IP en COM4, de webhook in <code>%LOCALAPPDATA%</code>, de Discord-MCP, de people-file en het ledger allemaal lokaal en gitignored. Alles draait op <code>bypassPermissions</code> met <code>Bash(*)</code>.</p><p class="ev">Gevolg: een hoge bus-factor. Zonder die machine valt het hele publicatie- en Discord-pad weg en is het ledger niet te reconstrueren.</p></div></div>
-    <div class="find"><span class="sev md">Middel</span><div><h3>4. De regels groeien als lagen bij</h3><p>CLAUDE.md telt 673 regels met 14 gedateerde "maintainer directive/decision"-amendementen, en wordt elke sessie volledig geladen. Samen met AGENTS.md is dat ±120 KB. Sommige regels vervangen eerdere maar laten die staan, zoals de cadans 2026-10-29 → 10-30 en het SAT-vraagritme 10-24 → 10-25. Bekende bugs, zoals een lege <code>backlog task list</code>, worden op meerdere plekken omzeild in plaats van opgelost.</p><p class="ev">Gevolg: hoge contextkosten per sessie, een groter risico op tegenstrijdige lezingen, en een nieuwe deelnemer kan het systeem moeilijk overzien.</p></div></div>
-    <div class="find"><span class="sev md">Middel</span><div><h3>5. Het SAT-register en de wachtrij zijn ongestructureerd</h3><p>Het register is één markdownbestand van 6.013 regels zonder machineleesbare metadata. Besluiten van de maintainer staan tussen die van Sergeant D. In <code>open-questions.md</code> is de geschiedenis in "Update"-alinea's opgestapeld, en in de statuskolom staan rijen nog op "asked" terwijl de kolom "Answered" al een entry noemt (bijvoorbeeld Q-1519b → 163).</p><p class="ev">Gevolg: de herkomst ("wie besliste dit?") en de actuele status zijn alleen te achterhalen door het bestand volledig te lezen. Daar zitten precies de hallucinatie- en driftrisico's die de regels willen voorkomen.</p></div></div>
-    <div class="find"><span class="sev lo">Laag</span><div><h3>6. Doorvoer is bewust geserialiseerd</h3><p>Machinebreed één build tegelijk, maximaal 4 jobs, een benchtest per taak en maximaal 3 uur tussen builds. Dat is een verdedigbare keuze voor betrouwbaarheid, maar het plafond ligt bij één bench en één machine.</p></div></div>
-    <div class="find"><span class="sev lo">Laag</span><div><h3>7. Onderzoek staat tussen gereedschap</h3><p>45 van de 84 scripts in <code>scripts/</code> zijn <code>sat_*</code>-studies en simulaties (study 2 tot en met 25). Ze staan naast operationeel gereedschap zoals <code>discord-post-build.sh</code> en <code>ota_flash.py</code>.</p></div></div>
-  </div>
-</section>
-
-<section>
-  <span class="eyebrow">Vervolg</span>
-  <h2>Verbetervoorstellen</h2>
-  <div class="props">
-    <div class="prop"><span class="tag">Eén bron · klein</span><h3>Genereer de agentinstructies uit één kern</h3><p class="mono" style="color:var(--flame)">TASK-1625</p><p>Maak een gedeelde kern (rollen, poorten, backlog via de CLI, Discord-regels) en genereer daaruit CLAUDE.md, AGENTS.md en copilot-instructions.md. Breid <code>test_adr_governance.py</code> uit tot een driftcheck over alle drie. Werk de bridge-doc bij of verwijder hem.</p><p class="why">Lost bevinding 1 structureel op. Dezelfde aanpak als het blok met binding ADR's, dat al wordt getest.</p></div>
-    <div class="prop"><span class="tag">Vangnet · klein</span><h3>CI op push naar dev</h3><p class="mono" style="color:var(--flame)">TASK-1626</p><p>Voeg <code>push: branches: [dev]</code> toe aan evaluate en adr-governance. Voeg aan de SessionStart-hook <code>git config core.hooksPath .githooks</code> toe, zodat elke sessie de hooks heeft.</p><p class="why">Geen blokkade op de werkstroom, wel een signaal achteraf. De build kan op een runner blijven als die kosten te hoog zijn.</p></div>
-    <div class="prop"><span class="tag">Draagbaarheid · klein</span><h3>Haal machinepaden uit de hooks</h3><p class="mono" style="color:var(--flame)">TASK-1627 · TASK-1628</p><p>Vervang het D:-pad door <code>$CLAUDE_PROJECT_DIR</code> en laat een FAIL zichtbaar worden in plaats van <code>|| true</code>. Zet bench-IP en poort in een lokaal env-bestand met een geversioneerd voorbeeld.</p><p class="why">Dan werkt de evaluator ook in cloud- en Mac-sessies, zoals deze.</p></div>
-    <div class="prop"><span class="tag">Structuur · middel</span><h3>Maak het SAT-register machineleesbaar</h3><p class="mono" style="color:var(--flame)">TASK-1629 · TASK-1630</p><p>Geef elke entry een korte YAML-kop: id, datum, bron (SergeantD of maintainer), soort (correctie, antwoord of interpretatie), supersedes, taken, link en bevestigd-door. Genereer de statuskolom van de wachtrij daaruit en laat een test falen als een beantwoorde vraag nog op "asked" staat.</p><p class="why">Herkomst en status zijn dan op te vragen zonder 6.000 regels te lezen. Dat is tegelijk een maatregel tegen hallucinatie.</p></div>
-    <div class="prop"><span class="tag">Context · middel</span><h3>Maak CLAUDE.md slanker</h3><p class="mono" style="color:var(--flame)">TASK-1631 · TASK-1635</p><p>Houd een kern van ±150 regels: rollen, harde verboden en poorten. Verplaats domeinregels (SAT, builds, releases, Discord) naar skills of <code>.claude/rules/</code> die alleen laden als ze relevant zijn. Leg vervangen directives vast in een changelog en niet in de lopende tekst.</p><p class="why">Lagere tokenkosten per sessie en minder ruimte voor tegenstrijdige lezingen.</p></div>
-    <div class="prop"><span class="tag">Continuïteit · middel</span><h3>Maak lokale state reconstrueerbaar</h3><p class="mono" style="color:var(--flame)">TASK-1632</p><p>Leid het alpha-ledger af uit de git-log en de Discord-berichten met een script, in plaats van het met de hand bij te houden. Versioneer een geanonimiseerd sjabloon van de people-file. Leg vast hoe Discord-MCP en webhook op een tweede machine worden opgezet.</p><p class="why">Verlaagt de bus-factor zonder secrets of persoonsregels in de publieke repo te zetten.</p></div>
-    <div class="prop"><span class="tag">Inzicht · klein</span><h3>Meet de doorstroom</h3><p class="mono" style="color:var(--flame)">TASK-1633 → TASK-1636</p><p>Een klein rapport met doorlooptijd per taak, tijd tot antwoord per SAT-vraag, de leeftijd van open vragen en het aantal taken met <code>needs-maintainer-ok</code>. Dat laat zien waar de echte bottleneck zit: bij Robert, Sergeant D of de bench.</p><p class="why">Maakt bevinding 6 van een vermoeden tot een getal.</p></div>
-    <div class="prop"><span class="tag">Opruimen · klein</span><h3>Scheid onderzoek van gereedschap</h3><p class="mono" style="color:var(--flame)">TASK-1634</p><p>Verplaats de <code>sat_*study*</code>-scripts naar <code>tools/research/sat/</code> of naast de bijbehorende <code>docs/sat/sim-*</code>-map.</p></div>
+  <div class="sub">
+    <h3>Who may do what</h3>
+    <div class="legend">
+      <span><span class="cell d" style="min-width:0;display:inline-block">decides</span></span>
+      <span><span class="cell h" style="min-width:0;display:inline-block">per-action yes</span> a hard stop: needs an explicit yes each time</span>
+      <span><span class="cell s" style="min-width:0;display:inline-block">standing permission</span> may act without asking, within conditions</span>
+      <span><span class="cell i" style="min-width:0;display:inline-block">input only</span> passes through a gate first</span>
+      <span><span class="cell x" style="min-width:0;display:inline-block">carries out</span> no say of its own</span>
+    </div>
+    <div class="mxwrap" tabindex="0" role="region" aria-label="Authority matrix"><table class="mx" style="min-width:760px"><thead><tr><th>Action</th><th>Robert<br>maintainer</th><th>Sergeant D<br>SAT designer</th><th>Testers</th><th>End users,<br>contributors</th><th>Agents</th></tr></thead><tbody><tr><th scope="row">Have a task created</th><td class="c"><span class="cell d">decides</span></td><td class="c"><span class="cell i">input only<small>a task may follow at once</small></span></td><td class="c"><span class="cell i">input only<small>task waits for his OK</small></span></td><td class="c"><span class="cell i">input only<small>bug or PR: direct; feature: waits</small></span></td><td class="c"><span class="cell s">standing permission<small>every change starts with a task</small></span></td></tr><tr><th scope="row">Prioritise and release work</th><td class="c"><span class="cell d">decides</span></td><td class="c"><span class="cell n">·</span></td><td class="c"><span class="cell n">·</span></td><td class="c"><span class="cell n">·</span></td><td class="c"><span class="cell x">carries out<small>fixed selection order</small></span></td></tr><tr><th scope="row">Define SAT behaviour</th><td class="c"><span class="cell d">decides<small>only in listed exceptions</small></span></td><td class="c"><span class="cell d">decides</span></td><td class="c"><span class="cell n">·</span></td><td class="c"><span class="cell n">·</span></td><td class="c"><span class="cell n">·</span></td></tr><tr><th scope="row">Have code changed</th><td class="c"><span class="cell d">decides</span></td><td class="c"><span class="cell d">decides<small>SAT control behaviour</small></span></td><td class="c"><span class="cell n">·</span></td><td class="c"><span class="cell n">·</span></td><td class="c"><span class="cell s">standing permission<small>inside a task</small></span></td></tr><tr><th scope="row">Accept an ADR</th><td class="c"><span class="cell d">decides</span></td><td class="c"><span class="cell n">·</span></td><td class="c"><span class="cell n">·</span></td><td class="c"><span class="cell n">·</span></td><td class="c"><span class="cell x">carries out<small>may only propose</small></span></td></tr><tr><th scope="row">Grant a waiver</th><td class="c"><span class="cell d">decides</span></td><td class="c"><span class="cell n">·</span></td><td class="c"><span class="cell n">·</span></td><td class="c"><span class="cell n">·</span></td><td class="c"><span class="cell n">·</span></td></tr><tr><th scope="row">Push to the two working lines</th><td class="c"><span class="cell d">decides</span></td><td class="c"><span class="cell n">·</span></td><td class="c"><span class="cell n">·</span></td><td class="c"><span class="cell n">·</span></td><td class="c"><span class="cell s">standing permission<small>after the gates</small></span></td></tr><tr><th scope="row">Flash a bench unit</th><td class="c"><span class="cell d">decides</span></td><td class="c"><span class="cell n">·</span></td><td class="c"><span class="cell n">·</span></td><td class="c"><span class="cell n">·</span></td><td class="c"><span class="cell x">carries out<small>only the bench tester</small></span></td></tr><tr><th scope="row">Publish a public 2.x beta</th><td class="c"><span class="cell d">decides</span></td><td class="c"><span class="cell n">·</span></td><td class="c"><span class="cell n">·</span></td><td class="c"><span class="cell n">·</span></td><td class="c"><span class="cell s">standing permission<small>slot at 08:00 or 20:00</small></span></td></tr><tr><th scope="row">Stable release</th><td class="c"><span class="cell h">per-action yes<small>hard stop</small></span></td><td class="c"><span class="cell n">·</span></td><td class="c"><span class="cell n">·</span></td><td class="c"><span class="cell n">·</span></td><td class="c"><span class="cell n">·</span></td></tr><tr><th scope="row">Push to <code>main</code>, force-push</th><td class="c"><span class="cell h">per-action yes<small>hard stop</small></span></td><td class="c"><span class="cell n">·</span></td><td class="c"><span class="cell n">·</span></td><td class="c"><span class="cell n">·</span></td><td class="c"><span class="cell n">·</span></td></tr><tr><th scope="row">Flash the PIC chip</th><td class="c"><span class="cell h">per-action yes<small>hard stop</small></span></td><td class="c"><span class="cell n">·</span></td><td class="c"><span class="cell n">·</span></td><td class="c"><span class="cell n">·</span></td><td class="c"><span class="cell n">·</span></td></tr><tr><th scope="row">Merge someone else's pull request</th><td class="c"><span class="cell h">per-action yes<small>hard stop</small></span></td><td class="c"><span class="cell n">·</span></td><td class="c"><span class="cell n">·</span></td><td class="c"><span class="cell i">input only<small>submits the PR</small></span></td><td class="c"><span class="cell x">carries out<small>review and test</small></span></td></tr></tbody></table></div>
+    <p class="small muted col">The Agents column is room to act, not authority: every cell rests on a permission or a decision from a person. In the register, 41 of 353 SAT entries were decided by the maintainer ("Not by Sergeant D."), so that exception is not rare.</p>
   </div>
 
-  <h3 style="margin-top:8px">Drie scenario's</h3>
-  <div class="scen">
-    <div class="sc"><b>A. Consolideren (dagen)</b><p>Drift weghalen, de CI-trigger op dev, de hook-paden, hooksPath bij de start van een sessie. Weinig risico en direct minder kans op fouten. Mijn advies voor nu.</p></div>
-    <div class="sc"><b>B. Herstructureren (weken)</b><p>A plus een slanke CLAUDE.md met regels op aanvraag, een register met metadata en een gegenereerde wachtrij. Raakt de werkwijze van de lopende SAT-campagne (TASK-1412), dus pas na een rustig moment in die campagne.</p></div>
-    <div class="sc"><b>C. Opschalen (maanden)</b><p>B plus een tweede bench of een self-hosted build-runner, zodat de build-lock niet meer aan één machine hangt, en de Discord-MCP op een kleine always-on host. Alleen zinvol als de metingen uit het voorstel "Meet de doorstroom" laten zien dat de bench of de machine echt de bottleneck is.</p></div>
+  <div class="two">
+    <div class="sub">
+      <h3>Five hard stops</h3>
+      <p class="small muted">Each needs Robert's explicit yes for that one action, as a reply to a direct message that names the action and its target. A general "go on" does not count.</p>
+      <ul class="locks stop">
+        <li style="color:var(--stop)"><svg aria-hidden="true"><use href="#i-lock"/></svg><span style="color:var(--fg)">Stable release</span></li>
+        <li style="color:var(--stop)"><svg aria-hidden="true"><use href="#i-lock"/></svg><span style="color:var(--fg)">Push to <code>main</code></span></li>
+        <li style="color:var(--stop)"><svg aria-hidden="true"><use href="#i-lock"/></svg><span style="color:var(--fg)">Force-push (to <code>main</code>: never)</span></li>
+        <li style="color:var(--stop)"><svg aria-hidden="true"><use href="#i-lock"/></svg><span style="color:var(--fg)">Flashing the PIC chip</span></li>
+        <li style="color:var(--stop)"><svg aria-hidden="true"><use href="#i-lock"/></svg><span style="color:var(--fg)">Merging someone else's PR</span></li>
+      </ul>
+    </div>
+    <div class="sub">
+      <h3>Three standing permissions</h3>
+      <p class="small muted">Inside these, agents work on without asking, as long as the conditions hold.</p>
+      <ul class="locks perm">
+        <li style="color:var(--gate)"><svg aria-hidden="true"><use href="#i-clock"/></svg><span style="color:var(--fg)">Push to <code>dev</code> (2.x) once the task is committed, build and evaluator are green and the bench is OK</span></li>
+        <li style="color:var(--gate)"><svg aria-hidden="true"><use href="#i-clock"/></svg><span style="color:var(--fg)">Push to <code>otgw-1.x.x</code> (1.x) under the same conditions</span></li>
+        <li style="color:var(--gate)"><svg aria-hidden="true"><use href="#i-clock"/></svg><span style="color:var(--fg)">Public 2.x beta, since 2026-11-14: at most one per 12 hours, at 08:00 or 20:00, after a one-hour soak</span></li>
+      </ul>
+    </div>
   </div>
-</section>
 
-<section>
-  <span class="eyebrow">Beperkingen</span>
-  <h2>Wat ik niet heb kunnen zien</h2>
-  <div class="note">
-    <ul class="tight">
-      <li>Discord zelf. Deze cloudsessie heeft geen Discord-MCP. De beschrijving van de interactie komt uit de regels, commands en het register, niet uit de gesprekken zelf.</li>
-      <li>Lokale, gitignored bestanden: <code>discord-people.local.md</code>, het alpha-ledger, <code>.mcp.json</code> en de webhook.</li>
-      <li>Geschiedenis. De shallow clone van 50 commits laat geen trend in tempo of doorlooptijd zien.</li>
-      <li>Aantallen zoals "±86 vragen" en "±210 ADR's" zijn telling op bestandsniveau. Varianten en meta-bestanden kunnen ze een paar procent laten afwijken.</li>
+  <div class="two">
+    <div class="sub">
+      <h3>How a decision is asked</h3>
+      <p class="col">Since 2026-11-12 an open decision goes to Robert as a Discord direct message, through the coordinator session. Never as a blocking question in the terminal: his reason was that a stopped terminal session freezes the progress. The agent keeps working on what is not blocked.</p>
+      <ul class="small muted">
+        <li>One question per message, never several bundled.</li>
+        <li>Concrete options with their consequences.</li>
+        <li>A critically weighed recommendation.</li>
+        <li>The answer is written down where the next session finds it: task note, register, or rule file.</li>
+      </ul>
+    </div>
+    <div class="dm" role="img" aria-label="Illustration of a decision message: one question, options A, B and C, a recommendation, and a one-letter reply">
+      <div class="who"><svg width="18" height="24" aria-hidden="true"><use href="#i-flame"/></svg>BlueFlame Bot · direct message</div>
+      <p style="font-size:15.5px"><b>One open decision.</b> May a hard stop also be confirmed by direct message?</p>
+      <div class="opt"><b>A</b><span>No: only in the session.</span><b>B</b><span>Yes, but only an explicit yes for that one action.</span><b>C</b><span>Yes, any reply counts.</span></div>
+      <div class="rec"><b>Recommendation: B.</b> Keeps work moving; the safeguard stays.</div>
+      <div class="ans">Robert: "B"</div>
+    </div>
+  </div>
+
+  <div class="gap"><span class="lab">Where practice and rules differ</span>
+    <ul>
+      <li><b>Hard stops rest on convention inside the repository.</b> The project runs agents without permission prompts, and no hook guards a push to <code>main</code> or a force-push. The technical brake is that six skills, among them the release and flash skills, cannot be started by the model itself. A permission check outside the repository can still refuse.</li>
+      <li><b>A delegation exists only in a task note.</b> On 2026-11-15 Robert told the coordinator: "Ask me only if you really can't do it yourself. You have my permission." The coordinator now decides some things itself and reports afterwards with an offer to revert. No rule file records this or its limits.</li>
+      <li><b>The list of hard stops is not the same everywhere.</b> Two of the four places that list them leave out merging someone else's pull request.</li>
     </ul>
   </div>
 </section>
 
-</div>
+<section class="sec" id="overview">
+  <span class="kicker">The whole in one picture</span>
+  <h2>Six zones around one blue flame</h2>
+  <p class="lede">Plate A is the map of the workshop. Read it from the top: people, the channels they use, the agents in the middle, knowledge on the left, the pipeline on the right, and what ships at the bottom.</p>
+  <figure class="fig plate">
+    <a href="images/agentic-setup-plate-a.svg" title="Open plate A at full size"><img src="images/agentic-setup-plate-a.svg" width="1920" height="1080" alt="Plate A: architecture overview of the agentic workshop. Four people cards at the top, six channel tiles below them, BlueFlame Bot in the centre surrounded by model helpers, a knowledge and rules column on the left, a nine-step pipeline with gates on the right, and four shipped products at the bottom."></a>
+    <figcaption>Plate A, architecture overview. Orange lines are human decisions, petrol lines are work between agents, dashed lines are read-only, green lines ship. <a href="images/agentic-setup-plate-a.svg">Open the full-size plate</a>.</figcaption>
+  </figure>
+  <ol class="zones">
+    <li><span><b>People</b>End users, the maintainer, the SAT designer and the alpha testers. Only two of them send orange decision lines.</span></li>
+    <li><span><b>Channels</b>The Tweakers forum topic, GitHub, the Discord support channels, the direct message with the maintainer, <code>#dev-sat-mqtt</code> and <code>#alpha-testing</code>.</span></li>
+    <li><span><b>Agent layer</b>A coordinating session and a comms session that appear to the outside as BlueFlame Bot, with model helpers around them, a separate bench tester and other agents.</span></li>
+    <li><span><b>Knowledge and rules</b>Rules, ADRs, the code map, the SAT register and its question queue, the backlog, and two memory tools.</span></li>
+    <li><span><b>Pipeline and gates</b>Nine stations from backlog task to pushed code. An ochre shield marks a check on the way.</span></li>
+    <li><span><b>What ships</b>The alpha zip per tested task, the 2.x beta in its time slot, and the locked stable lines.</span></li>
+  </ol>
+</section>
 
-</body></html>
+<section class="sec" id="agents">
+  <span class="kicker">Who does what</span>
+  <h2>Several sessions, one hub</h2>
+  <p class="lede">The workshop runs as a handful of Claude Code sessions at the same time. One coordinates; the others build, talk or test. A role is an agreement between sessions, not a program.</p>
+  <figure class="fig">
+    <div class="scroll" tabindex="0" role="region" aria-label="Session topology diagram"><svg class="w860" viewBox="0 0 1040 540" role="img" aria-label="Session topology. The maintainer sends decisions by direct message to the coordinator session. The coordinator and the comms session speak on Discord as BlueFlame Bot. Developer sessions send build notices and bench requests to the coordinator and receive freezes and the go to push. The coordinator relays bench requests to the bench tester, the only agent that flashes the bench units. Inside one work cycle a developer session delegates to Sonnet, Haiku, Opus and the advisor. Codex, Copilot and Claude in CI read the same core rules.">
+      <rect class="n-human" x="400" y="14" width="240" height="50" rx="8"/>
+      <text class="t" x="520" y="36" text-anchor="middle">Robert, the maintainer</text>
+      <text class="s" x="520" y="53" text-anchor="middle">scope, priority, waivers, releases</text>
+      <path class="l-human" d="M520,64 V142" marker-end="url(#a-human)"/>
+      <text class="s f-human" x="532" y="92">decisions by direct message,</text>
+      <text class="s f-human" x="532" y="107">one question at a time</text>
+
+      <rect x="170" y="118" width="700" height="150" rx="14" style="fill:var(--bf-soft);stroke:var(--bf);opacity:.55" stroke-dasharray="6 5"/>
+      <text class="lbl f-bf" x="186" y="138">SPEAK ON DISCORD AS BLUEFLAME BOT</text>
+      <rect class="n-bf" x="390" y="148" width="260" height="104" rx="10"/>
+      <text class="t" x="520" y="172" text-anchor="middle">Coordinator session</text>
+      <text class="s" x="520" y="192" text-anchor="middle">owns the DM channel and the ledger</text>
+      <text class="s" x="520" y="208" text-anchor="middle">announces freezes, relays bench requests</text>
+      <text class="s" x="520" y="224" text-anchor="middle">posts reports, starts the beta slot</text>
+      <text class="s" x="520" y="240" text-anchor="middle">reserves ADR numbers</text>
+      <rect class="n-bf" x="190" y="160" width="172" height="74" rx="10" stroke-dasharray="5 4"/>
+      <text class="t" x="276" y="184" text-anchor="middle">Comms session</text>
+      <text class="s" x="276" y="202" text-anchor="middle">drafts notes and posts,</text>
+      <text class="s" x="276" y="217" text-anchor="middle">answers in support channels</text>
+      <text class="m f-gate" x="276" y="254" text-anchor="middle">a practice, not a written rule</text>
+      <use href="#i-flame" x="690" y="160" width="46" height="62"/>
+      <text class="t f-bf" x="748" y="186">BlueFlame Bot</text>
+      <text class="s" x="748" y="203">one Discord identity,</text>
+      <text class="s" x="748" y="218">two sessions behind it</text>
+
+      <rect class="n-plain" x="890" y="14" width="140" height="92" rx="8" stroke-dasharray="5 4"/>
+      <text class="t" x="960" y="36" text-anchor="middle">Other agents</text>
+      <text class="s" x="960" y="54" text-anchor="middle">Codex · Copilot</text>
+      <text class="s" x="960" y="69" text-anchor="middle">Claude in CI</text>
+      <text class="m" x="960" y="92" text-anchor="middle">same core rules</text>
+
+      <rect class="n-agent" x="52" y="332" width="200" height="84" rx="8"/>
+      <rect class="n-agent" x="46" y="326" width="200" height="84" rx="8"/>
+      <rect class="n-agent" x="40" y="320" width="200" height="84" rx="8"/>
+      <text class="t" x="140" y="344" text-anchor="middle">Developer sessions</text>
+      <text class="s" x="140" y="362" text-anchor="middle">one working folder each</text>
+      <text class="s" x="140" y="377" text-anchor="middle">tests, bump, commit, build</text>
+      <text class="m f-stop" x="140" y="394" text-anchor="middle">never flash</text>
+      <path class="l-agent" d="M200,318 C200,286 452,304 452,256" marker-start="url(#a-agent)" marker-end="url(#a-agent)"/>
+      <text class="s" x="188" y="282" text-anchor="end">up: build notice, bench request</text>
+      <text class="s" x="188" y="298" text-anchor="end">down: freeze, go to push</text>
+
+      <rect class="n-agent" x="800" y="320" width="210" height="84" rx="8"/>
+      <text class="t" x="905" y="344" text-anchor="middle">Bench tester</text>
+      <text class="s" x="905" y="362" text-anchor="middle">the only agent that flashes</text>
+      <text class="s" x="905" y="377" text-anchor="middle">picks the tests, records evidence</text>
+      <text class="s" x="905" y="392" text-anchor="middle">ticks the bench criteria</text>
+      <path class="l-agent" d="M652,222 C800,222 965,250 965,318" marker-start="url(#a-agent)" marker-end="url(#a-agent)"/>
+      <text class="s" x="690" y="300">request in, verdict and evidence out</text>
+      <path class="l-agent" d="M905,404 V436" marker-end="url(#a-agent)"/>
+      <rect class="n-plain" x="868" y="440" width="32" height="24" rx="3"/><rect class="n-plain" x="910" y="440" width="32" height="24" rx="3"/>
+      <text class="s" x="905" y="484" text-anchor="middle">bench units, over WiFi first</text>
+
+      <text class="lbl f-agent" x="262" y="446">HELPERS INSIDE ONE WORK CYCLE</text>
+      <path class="l-agent" d="M140,416 V492 H258" marker-end="url(#a-agent)"/>
+      <text class="s" x="150" y="484">delegates</text>
+      <g>
+        <rect class="n-agent" x="262" y="458" width="104" height="66" rx="8"/><text class="t" x="314" y="484" text-anchor="middle">Sonnet</text><text class="s" x="314" y="503" text-anchor="middle">implements</text>
+        <rect class="n-agent" x="376" y="458" width="104" height="66" rx="8"/><text class="t" x="428" y="484" text-anchor="middle">Haiku</text><text class="s" x="428" y="503" text-anchor="middle">runs the gates</text>
+        <rect class="n-agent" x="490" y="458" width="104" height="66" rx="8"/><text class="t" x="542" y="484" text-anchor="middle">Opus</text><text class="s" x="542" y="503" text-anchor="middle">hunts the fault</text>
+        <rect class="n-agent" x="604" y="458" width="104" height="66" rx="8"/><text class="t" x="656" y="484" text-anchor="middle">Sonnet</text><text class="s" x="656" y="503" text-anchor="middle">review lenses</text>
+        <rect class="n-agent" x="718" y="458" width="104" height="66" rx="8"/><text class="t" x="770" y="484" text-anchor="middle">Advisor</text><text class="s" x="770" y="503" text-anchor="middle">plan self-review</text>
+      </g>
+    </svg></div>
+    <figcaption>Session topology. Petrol lines are messages between sessions; the orange line is the only route for a decision.</figcaption>
+  </figure>
+
+  <div class="sub">
+    <h3>Which model does which kind of work</h3>
+    <p class="col">Inside the work cycle (<code>/implement-next-task</code>) the main session keeps four things in its own hands: the design, the advisor calls, the final judgement on evidence, and every Discord post. The rest is delegated by kind of work.</p>
+    <div class="grid" style="--min:190px">
+      <div class="card"><div class="cardhead"><span class="hex" aria-hidden="true">M</span><h3>Main session</h3></div><p>Model chosen by the maintainer. Designs, judges the evidence, and is the only one that bumps, commits and pushes.</p></div>
+      <div class="card"><div class="cardhead"><span class="hex" aria-hidden="true">S</span><h3>Sonnet</h3></div><p>Implements code, tests and docs. <span class="q">"Strong coder, faster and cheaper."</span> Also reviews through separate lenses: project rules, tests and evidence.</p></div>
+      <div class="card"><div class="cardhead"><span class="hex" aria-hidden="true">H</span><h3>Haiku</h3></div><p>Runs the build, the evaluator and the tests and reports the raw output. <span class="q">"Mechanical; must quote output verbatim."</span></p></div>
+      <div class="card"><div class="cardhead"><span class="hex" aria-hidden="true">O</span><h3>Opus</h3></div><p>One strong critic on end-to-end correctness. The assignment is to refute, not to approve.</p></div>
+      <div class="card"><div class="cardhead"><span class="hex" aria-hidden="true">A</span><h3>Advisor</h3></div><p>Critical review of the plan before any code is written. Without the advisor tool, one Opus reviewer does it.</p></div>
+    </div>
+    <p class="col"><b>The main session reads the raw evidence itself.</b> The skill says why: <span class="q">"A weaker model claims PASS more easily. Never accept a subagent's verdict on its own."</span> Before a criterion is ticked, it reads the exit code, the success line, the timestamps of the artefacts and the test counts. Helpers never bump, commit or push.</p>
+  </div>
+
+  <div class="sub">
+    <h3>Other agents share one block of core rules</h3>
+    <p class="col">Besides Claude Code, Codex and GitHub Copilot each read their own instruction file, and Claude also runs in GitHub Actions (on an <code>@claude</code> mention, and as a reviewer on pull requests from the same repository). One block of core rules is word-for-word identical in all three instruction files. A test compares them; where a file disagrees outside the block, <code>CLAUDE.md</code> wins.</p>
+    <div class="files" role="img" aria-label="Three instruction files of different length, each containing the same core block">
+      <div class="file"><span class="fn">CLAUDE.md</span><div class="core">AGENT-CORE</div><div class="rest" style="--h:26px"></div><span class="ln">189 lines · Claude Code</span></div>
+      <div class="file"><span class="fn">AGENTS.md</span><div class="core">AGENT-CORE</div><div class="rest" style="--h:74px"></div><span class="ln">938 lines · Codex</span></div>
+      <div class="file"><span class="fn">copilot-instructions.md</span><div class="core">AGENT-CORE</div><div class="rest" style="--h:110px"></div><span class="ln">1,487 lines · Copilot</span></div>
+    </div>
+  </div>
+
+  <div class="gap"><span class="lab">Where practice and rules differ</span>
+    <ul>
+      <li><b>The comms session exists in practice, not in the rules.</b> One skill and several task notes describe it; <code>CLAUDE.md</code> does not define it.</li>
+      <li><b>The bench tester has a name but no definition file.</b> Every rule points to it, yet the agents folder holds only an older device-verify agent that flashes over USB and builds outside the wrapper.</li>
+      <li><b>Who posts the report to testers?</b> The work-cycle skill lets the session post it; the always-loaded Discord rule says the coordinator does. The rule file leads.</li>
+      <li><b>Older procedures still describe the old way.</b> The <code>/flash</code> skill, the translation skill and parts of the Codex and Copilot files still build or flash directly. An agent that follows them literally breaks the core rules.</li>
+      <li><b>The drift tests do not run in CI.</b> They run only in the local test run.</li>
+    </ul>
+  </div>
+</section>
+
+<section class="sec" id="blueflame">
+  <span class="kicker">BlueFlame Bot</span>
+  <h2>The pilot flame: one persona that watches three outposts</h2>
+  <p class="lede">BlueFlame Bot is not a program with its own logic. It is the Discord identity under which agent sessions read and write, and the face of the workshop to the outside world. What it does is written in commands, skills and rule files that a session loads.</p>
+  <div class="grid" style="--min:230px">
+    <div class="card c-bf"><h3>BlueFlame Bot</h3><p>The bot account on Discord: channels and direct messages. Runs through one small local server process that holds the bot token.</p></div>
+    <div class="card c-bf"><h3>BlueFlame Build Bot</h3><p>A separate sender (a webhook) that can do one thing: post the flash zip to <code>#alpha-testing</code>.</p></div>
+    <div class="card"><h3>The maintainer's GitHub account</h3><p>On GitHub the bot is not recognisable as a bot: a comment asking for captures or a review appears under the maintainer's name.</p></div>
+    <div class="card"><h3>An anonymous reader</h3><p>On the Tweakers forum it only reads the public feed. It never posts there.</p></div>
+  </div>
+  <p class="col">Two sessions speak through the persona: the <b>coordinator</b> (decisions to the maintainer, reports, the ledger) and the <b>comms session</b> (drafts of release notes and posts, answers in support channels). The design is instruction-driven: to know what the bot does, read the commands and rules. That makes it easy to review and quick to change, and it also makes it depend on the discipline of the session that follows them.</p>
+
+  <figure class="fig plate">
+    <a href="images/agentic-setup-plate-b.svg" title="Open plate B at full size"><img src="images/agentic-setup-plate-b.svg" width="1920" height="1080" alt="Plate B: BlueFlame Bot in the centre. Three watch loops at the top. Discord on the left with seven channels, GitHub at the top right with issues, pull requests and releases, the Tweakers forum topic at the bottom right, read only. Five ground rules around the flame. Below, the six things the bot produces, and the technical foundation."></a>
+    <figcaption>Plate B, monitoring and replies per channel. Solid frames are channels where the bot reads and replies; dashed frames are listening posts. <a href="images/agentic-setup-plate-b.svg">Open the full-size plate</a>.</figcaption>
+  </figure>
+
+  <div class="sub">
+    <h3>Channel map: read, reply, announce</h3>
+    <p class="col">By the written procedure, the four support channels are listening posts with an announcement function. In practice the coordinator and the comms session also answer users there. The blue rings mark what happens in practice without a written procedure.</p>
+    <div class="seg" role="group" aria-label="Channel map view">
+      <button type="button" data-mode="prac" aria-pressed="true">In practice</button><button type="button" data-mode="book" aria-pressed="false">By the book</button>
+    </div>
+    <div class="legend">
+      <span><i class="dot y"></i>reads or replies, by procedure</span>
+      <span><i class="dot p"></i>replies in practice, no written procedure</span>
+      <span><i class="dot g"></i>announces or ships</span>
+    </div>
+    <div class="mxwrap" tabindex="0" role="region" aria-label="Channel map"><table class="mx chan" id="chan" style="min-width:820px"><thead><tr><th>Channel</th><th>Reads</th><th>Replies</th><th>Announces</th><th>Triggered by</th></tr></thead><tbody><tr class="grp"><td colspan="5">Discord, as BlueFlame Bot</td></tr><tr><th scope="row"><span class="nm">#alpha-testing</span><small style="font-weight:400;color:var(--muted);display:block;font-size:13px">builds, reports, testers</small></th><td><span class="dot y" aria-hidden="true"></span> <span>newest 40 on every run</span></td><td><span class="dot y" aria-hidden="true"></span> <span>answers testers, SAT questions</span></td><td><span class="dot g" aria-hidden="true"></span> <span>task notice, plan, report, alpha zip</span></td><td><small>unanswered sweep; work cycle</small></td></tr><tr><th scope="row"><span class="nm">#dev-sat-mqtt</span><small style="font-weight:400;color:var(--muted);display:block;font-size:13px">backlog commands, SAT rounds</small></th><td><span class="dot y" aria-hidden="true"></span> <span>newest 25 plus new since last run</span></td><td><span class="dot y" aria-hidden="true"></span> <span>backlog answers, SAT questions</span></td><td class="c"><span class="muted">–</span></td><td><small>unanswered sweep</small></td></tr><tr><th scope="row"><span class="nm">DM with the maintainer</span><small style="font-weight:400;color:var(--muted);display:block;font-size:13px">one decision per message</small></th><td><span class="dot y" aria-hidden="true"></span> <span>his answers</span></td><td><span class="dot y" aria-hidden="true"></span> <span>questions with options and advice</span></td><td class="c"><span class="muted">–</span></td><td><small>any session, through the coordinator</small></td></tr><tr><th scope="row"><span class="nm">#beta-testing</span><small style="font-weight:400;color:var(--muted);display:block;font-size:13px">public beta testers</small></th><td><span class="dot y" aria-hidden="true"></span> <span>25 per broad scan</span></td><td><span class="dot p" aria-hidden="true"></span> <span class="prac">answers and a design proposal, in practice</span></td><td><span class="dot g" aria-hidden="true"></span> <span>beta announcement; note on a stable release</span></td><td><small>broad scan; release skills</small></td></tr><tr><th scope="row"><span class="nm">#english-support</span><small style="font-weight:400;color:var(--muted);display:block;font-size:13px">end users</small></th><td><span class="dot y" aria-hidden="true"></span> <span>25 per broad scan</span></td><td><span class="dot p" aria-hidden="true"></span> <span class="prac">answers and capture requests, in practice</span></td><td><span class="dot g" aria-hidden="true"></span> <span>stable release, in English</span></td><td><small>broad scan; release skill</small></td></tr><tr><th scope="row"><span class="nm">#nederlandse-ondersteuning</span><small style="font-weight:400;color:var(--muted);display:block;font-size:13px">end users, Dutch</small></th><td><span class="dot y" aria-hidden="true"></span> <span>25 per broad scan</span></td><td><span class="dot p" aria-hidden="true"></span> <span class="prac">answers, in practice</span></td><td><span class="dot g" aria-hidden="true"></span> <span>stable release, in Dutch</span></td><td><small>broad scan; release skill</small></td></tr><tr><th scope="row"><span class="nm">#devs-esp-firmware</span><small style="font-weight:400;color:var(--muted);display:block;font-size:13px">developers</small></th><td><span class="dot y" aria-hidden="true"></span> <span>25 per broad scan</span></td><td class="c"><span class="muted">–</span></td><td class="c"><span class="muted">–</span></td><td><small>broad scan</small></td></tr><tr class="grp"><td colspan="5">GitHub, under the maintainer's account</td></tr><tr><th scope="row"><span class="nm">Issues</span><small style="font-weight:400;color:var(--muted);display:block;font-size:13px">bug reports, questions</small></th><td><span class="dot y" aria-hidden="true"></span> <span>open issues; comments only on bugs</span></td><td><span class="dot y" aria-hidden="true"></span> <span>asks for captures, answers questions</span></td><td class="c"><span class="muted">–</span></td><td><small>GitHub sweep; broad scan</small></td></tr><tr><th scope="row"><span class="nm">Pull requests</span><small style="font-weight:400;color:var(--muted);display:block;font-size:13px">outside contributions</small></th><td><span class="dot y" aria-hidden="true"></span> <span>open pull requests</span></td><td><span class="dot y" aria-hidden="true"></span> <span>review as a comment; merge only after a yes</span></td><td class="c"><span class="muted">–</span></td><td><small>GitHub sweep</small></td></tr><tr><th scope="row"><span class="nm">Releases</span><small style="font-weight:400;color:var(--muted);display:block;font-size:13px">downloads</small></th><td class="c"><span class="muted">–</span></td><td class="c"><span class="muted">–</span></td><td><span class="dot g" aria-hidden="true"></span> <span>beta prerelease, stable release; draft first</span></td><td><small>release skills</small></td></tr><tr class="grp"><td colspan="5">Tweakers forum, as an anonymous reader</td></tr><tr><th scope="row"><span class="nm">Forum topic</span><small style="font-weight:400;color:var(--muted);display:block;font-size:13px">Dutch community</small></th><td><span class="dot y" aria-hidden="true"></span> <span>RSS feed, keyword filter, English summary</span></td><td class="c"><span class="muted">–</span></td><td class="c"><span class="muted">–</span></td><td><small>broad scan</small></td></tr></tbody></table></div>
+  </div>
+
+  <div class="sub">
+    <h3>Three watch loops</h3>
+    <p class="col">Nothing runs on a timer. Two loops run before every new task; the broad scan is started by hand. Each loop keeps a <b>watermark</b>, a small timestamp file that says when it last looked, and may skip a run that comes too soon.</p>
+    <figure class="fig">
+      <div class="scroll" tabindex="0" role="region" aria-label="Watch loop timeline"><svg class="w760" viewBox="0 0 1000 300" role="img" aria-label="Timeline of three watch loops across three tasks. The backlog Discord command runs before every task; its unanswered sweep always runs and the rest is skipped if the last run was under five minutes ago. The GitHub sweep runs before every task and has no early exit. The broad scan is started by hand and is skipped if all three sources were read under two hours ago.">
+        <text class="lbl" x="20" y="30" style="fill:var(--muted)">WORK CYCLE</text>
+        <rect class="n-agent" x="180" y="14" width="210" height="28" rx="6"/><text class="t" x="285" y="33" text-anchor="middle">task N</text>
+        <rect class="n-agent" x="430" y="14" width="210" height="28" rx="6"/><text class="t" x="535" y="33" text-anchor="middle">task N+1</text>
+        <rect class="n-agent" x="680" y="14" width="210" height="28" rx="6"/><text class="t" x="785" y="33" text-anchor="middle">task N+2</text>
+        <g class="l-muted dash"><path d="M165,10 V225"/><path d="M415,10 V225"/><path d="M665,10 V225"/></g>
+
+        <text class="m" x="20" y="88" style="fill:var(--fg);font-weight:600">/backlog_discord</text>
+        <path class="l-agent" d="M150,84 H960"/>
+        <circle cx="165" cy="84" r="9" style="fill:var(--bf)"/><circle cx="415" cy="84" r="9" style="fill:var(--bf)"/><circle cx="665" cy="84" r="9" style="fill:var(--bf)"/>
+        <text class="s halo-t" x="180" y="108">unanswered sweep: always runs · backlog commands: skipped if the last run was</text>
+        <rect class="n-gate" x="822" y="94" width="120" height="22" rx="11"/><text class="m f-gate" x="882" y="109" text-anchor="middle">under 5 minutes</text>
+
+        <text class="m" x="20" y="158" style="fill:var(--fg);font-weight:600">GitHub sweep</text>
+        <path class="l-agent" d="M150,154 H960"/>
+        <circle cx="165" cy="154" r="9" style="fill:var(--bf)"/><circle cx="415" cy="154" r="9" style="fill:var(--bf)"/><circle cx="665" cy="154" r="9" style="fill:var(--bf)"/>
+        <text class="s halo-t" x="180" y="178">every open issue and pull request becomes a task · duplicates caught on the full link</text>
+        <rect class="n-gate" x="822" y="164" width="120" height="22" rx="11"/><text class="m f-gate" x="882" y="179" text-anchor="middle">no early exit</text>
+
+        <text class="m" x="20" y="238" style="fill:var(--fg);font-weight:600">/check_otgw_issues</text>
+        <path class="l-agent dash" d="M150,234 H960"/>
+        <rect x="531" y="225" width="18" height="18" transform="rotate(45 540 234)" style="fill:var(--surface);stroke:var(--bf)" stroke-width="2.5"/>
+        <text class="s halo-t" x="560" y="222">started by hand</text>
+        <text class="s halo-t" x="180" y="262">broad scan of Discord, GitHub and Tweakers · triage only, no replies · skipped if all three were read</text>
+        <rect class="n-gate" x="822" y="268" width="120" height="22" rx="11"/><text class="m f-gate" x="882" y="283" text-anchor="middle">under 2 hours ago</text>
+      </svg></div>
+      <figcaption>Blue dots are runs. The ochre pills are the early-exit timers: 5 minutes, none, and 2 hours.</figcaption>
+    </figure>
+  </div>
+
+  <div class="sub">
+    <h3>Whether and how it answers</h3>
+    <p class="col">The bot first asks who is speaking. Answers on Discord are in English, start with the answer, and use a real mention. Technical claims are checked in the code first.</p>
+    <div class="tree">
+      <div class="card top-human"><h4>The maintainer</h4><p class="yes">answers when he addresses the bot; a decision typed in a channel counts</p><p class="no does">treats his ordinary chat as a backlog command</p></div>
+      <div class="card top-human"><h4>Sergeant D</h4><p class="yes">records every correction or decision first, then answers</p><p class="no does">announces builds to him; changes SAT control behaviour without his OK</p></div>
+      <div class="card top-plain"><h4>A tester</h4><p class="yes">asks questions, uses the feedback, lets evidence close an existing task</p><p class="no does">implements, re-prioritises or closes anything because a tester asks</p></div>
+      <div class="card top-plain"><h4>A read-only member</h4><p class="yes">one reply: "Changes go through Robert."</p><p class="no does">turns anything they write into code, a task, a build or a register entry</p></div>
+      <div class="card top-plain"><h4>An end user</h4><p class="yes">triage, a task or a note; asks for captures on GitHub; checks the equipment matrix first for boiler questions</p><p class="no does">posts on Tweakers; claims support from the brand name alone</p></div>
+    </div>
+    <div class="tags" aria-label="Ground rules">
+      <span class="tag gate">English, answer first</span><span class="tag gate">one token holder</span><span class="tag gate">never name the 2.x board in public</span><span class="tag gate">testers advise, never decide</span><span class="tag gate">record first, then build</span>
+    </div>
+  </div>
+
+  <div class="sub">
+    <h3>The SAT question rhythm with Sergeant D</h3>
+    <p class="col">An unclear point in SAT is never filled with a guess. It becomes a question in a queue: one question per message, in plain English, with possible answers A, B, C, their consequences and a recommendation. He often answers in one line. On 2026-11-15 the queue held 18 open questions: 4 asked, 14 waiting.</p>
+    <figure class="fig">
+      <div class="scroll" tabindex="0" role="region" aria-label="SAT question state diagram"><svg class="w760" viewBox="0 0 1000 280" role="img" aria-label="State diagram of a SAT question. Queued, then asked, then answered, then recorded as a numbered register entry, then a backlog task. From asked: no reaction in the first hour leads to waiting quietly; when he posts again the question is asked again, short, with a link. From answered: while he is active the next queued question is posted at once. A queued question may be dropped. The maintainer may answer instead; that entry starts with Not by Sergeant D.">
+        <rect class="n-plain" x="30" y="70" width="120" height="50" rx="8"/><text class="t" x="90" y="92" text-anchor="middle">queued</text><text class="s" x="90" y="109" text-anchor="middle">waiting its turn</text>
+        <rect class="n-bf" x="200" y="70" width="120" height="50" rx="8"/><text class="t" x="260" y="92" text-anchor="middle">asked</text><text class="s" x="260" y="109" text-anchor="middle">one per message</text>
+        <rect class="n-human" x="430" y="70" width="130" height="50" rx="8"/><text class="t" x="495" y="92" text-anchor="middle">answered</text><text class="s" x="495" y="109" text-anchor="middle">often one line</text>
+        <rect class="n-plain" x="620" y="70" width="160" height="50" rx="8"/><text class="t" x="700" y="92" text-anchor="middle">recorded</text><text class="s" x="700" y="109" text-anchor="middle">numbered register entry</text>
+        <rect class="n-agent" x="840" y="70" width="140" height="50" rx="8"/><text class="t" x="910" y="92" text-anchor="middle">backlog task</text><text class="s" x="910" y="109" text-anchor="middle">then the build</text>
+        <path class="l-agent" d="M150,95 H196" marker-end="url(#a-agent)"/>
+        <path class="l-human" d="M320,95 H424" marker-end="url(#a-human)"/><text class="s" x="372" y="88" text-anchor="middle">he replies</text>
+        <path class="l-agent" d="M560,95 H616" marker-end="url(#a-agent)"/>
+        <path class="l-agent" d="M780,95 H836" marker-end="url(#a-agent)"/>
+        <path class="l-agent" d="M495,70 C495,22 260,22 260,66" marker-end="url(#a-agent)"/>
+        <text class="s" x="377" y="26" text-anchor="middle">he is active: post the next one at once</text>
+        <rect class="n-plain" x="195" y="200" width="130" height="50" rx="8" stroke-dasharray="5 4"/><text class="t" x="260" y="222" text-anchor="middle">waiting</text><text class="s" x="260" y="239" text-anchor="middle">no posts meanwhile</text>
+        <path class="l-muted" d="M245,120 V196" marker-end="url(#a-muted)"/><path class="l-agent" d="M275,200 V124" marker-end="url(#a-agent)"/>
+        <text class="s" x="236" y="156" text-anchor="end">no reaction in</text><text class="s" x="236" y="171" text-anchor="end">the first hour</text>
+        <text class="s" x="286" y="156">he posts again:</text><text class="s" x="286" y="171">re-ask, short, with a link</text>
+        <rect class="n-plain" x="30" y="200" width="120" height="50" rx="8" stroke-dasharray="5 4"/><text class="t" x="90" y="222" text-anchor="middle">dropped</text><text class="s" x="90" y="239" text-anchor="middle">no longer needed</text>
+        <path class="l-muted" d="M90,120 V196" marker-end="url(#a-muted)"/>
+        <rect class="n-human" x="450" y="200" width="190" height="50" rx="8"/><text class="t" x="545" y="222" text-anchor="middle">the maintainer answers</text><text class="s" x="545" y="239" text-anchor="middle">when a question stays open</text>
+        <path class="l-human" d="M640,225 C700,225 700,170 700,126" marker-end="url(#a-human)"/>
+        <text class="s" x="712" y="176">entry starts with</text><text class="s" x="712" y="192">"Not by Sergeant D."</text>
+        <text class="s" x="910" y="140" text-anchor="middle">one task per decision</text>
+      </svg></div>
+      <figcaption>An open question blocks the implementation, never a guess. Old entries are never rewritten: a changed answer becomes a new entry that names the old one.</figcaption>
+    </figure>
+    <ol class="ladder" aria-label="Order of truth for SAT behaviour">
+      <li><b>The decision register.</b> Sergeant D's recorded corrections and decisions, 353 numbered entries.</li>
+      <li><b>The reference code</b> (thermo-nova), pinned at one fixed commit and read-only.</li>
+      <li><b>The cited specification</b> written from that code.</li>
+      <li><b>This firmware.</b> It only shows what the port does today, never what SAT should do.</li>
+    </ol>
+  </div>
+
+  <div class="sub">
+    <h3>What the bot produces</h3>
+    <div class="grid" style="--min:170px">
+      <div class="card top-agent"><h4>A reply</h4><p>With a real mention, answer first.</p></div>
+      <div class="card top-agent"><h4>A backlog task</h4><p>From a bug, an issue or a request that waits for the maintainer.</p></div>
+      <div class="card top-agent"><h4>A register entry</h4><p>A SAT decision, written down before the build.</p></div>
+      <div class="card top-agent"><h4>A triage list</h4><p>In the session; a developer picks.</p></div>
+      <div class="card c-human"><h4>A question to the maintainer</h4><p>Direct message: options and advice.</p></div>
+      <div class="card c-ship"><h4>An alpha zip and report</h4><p>Only after the bench tester's OK.</p></div>
+    </div>
+  </div>
+
+  <div class="gap"><span class="lab">Where practice and rules differ</span>
+    <ul>
+      <li><b>Support channels: listening post or two-way?</b> The scan command reads them and posts nowhere; in practice users get answers there. No procedure describes those answers.</li>
+      <li><b><code>#beta-testing</code> has no watch loop for requests.</b> Since 2026-11-15 a tester asks for features there, the maintainer gives the bot orders there and Sergeant D decides there, but the unanswered sweep covers only <code>#alpha-testing</code> and <code>#dev-sat-mqtt</code>.</li>
+      <li><b>The broad scan writes its watermark before the triage.</b> If a run breaks off halfway, those messages still count as seen.</li>
+      <li><b>"Check the chat every hour" has no mechanism.</b> The rule says it; the loop only runs before each task.</li>
+      <li><b>Anyone can give status commands in <code>#dev-sat-mqtt</code>.</b> The command accepts "mark task done" or "assign" without checking who asks; only the general tester rules limit it.</li>
+      <li><b>No always-on host, by decision.</b> The bot lives only while the maintainer's workstation is on and a session runs. On 2026-11-05 Robert decided this is not the bottleneck.</li>
+    </ul>
+  </div>
+</section>
+
+<section class="sec" id="pipeline">
+  <span class="kicker">From task to tester</span>
+  <h2>A conveyor with gates that can say no</h2>
+  <p class="lede">Every firmware task travels the same chain and gets its own version tag, so a tester can tell two builds apart. Almost all of it runs on the maintainer's workstation; GitHub's CI is a safety net, not the release machine.</p>
+  <div class="fig"><div class="scroll" tabindex="0" role="region" aria-label="Pipeline conveyor"><div class="belt" role="group" aria-label="Pipeline stages"><button type="button" class="st hard" data-st="1" aria-pressed="true"><span class="num">01</span><span class="bx"><svg aria-hidden="true" style="color:var(--gate)"><use href="#i-kanban"/></svg></span><span class="nm">Task</span><span class="who">any agent</span></button><button type="button" class="st soft" data-st="2" aria-pressed="false"><span class="num">02</span><span class="bx"><svg aria-hidden="true" style="color:var(--muted)"><use href="#i-plan"/></svg></span><span class="nm">Plan + self-review</span><span class="who">main session, advisor</span></button><button type="button" class="st soft" data-st="3" aria-pressed="false"><span class="num">03</span><span class="bx"><svg aria-hidden="true" style="color:var(--muted)"><use href="#i-redgreen"/></svg></span><span class="nm">Red to green</span><span class="who">Sonnet implements</span></button><button type="button" class="st soft" data-st="4" aria-pressed="false"><span class="num">04</span><span class="bx"><svg aria-hidden="true" style="color:var(--muted)"><use href="#i-eyes"/></svg></span><span class="nm">Review team</span><span class="who">Opus + Sonnet lenses</span></button><button type="button" class="st hard" data-st="5" aria-pressed="false"><span class="num">05</span><span class="bx"><svg aria-hidden="true" style="color:var(--gate)"><use href="#i-shield"/></svg></span><span class="nm">Static gates + tests</span><span class="who">Haiku runs, main session reads</span></button><button type="button" class="st hard" data-st="6" aria-pressed="false"><span class="num">06</span><span class="bx"><svg aria-hidden="true" style="color:var(--gate)"><use href="#i-tag"/></svg></span><span class="nm">Bump + commit</span><span class="who">main session only</span></button><button type="button" class="st hard" data-st="7" aria-pressed="false"><span class="num">07</span><span class="bx"><svg aria-hidden="true" style="color:var(--gate)"><use href="#i-build"/></svg></span><span class="nm">Build</span><span class="who">one build per machine</span></button><button type="button" class="st soft" data-st="8" aria-pressed="false"><span class="num">08</span><span class="bx"><svg aria-hidden="true" style="color:var(--muted)"><use href="#i-bench"/></svg></span><span class="nm">Bench</span><span class="who">bench tester only</span></button><button type="button" class="st soft" data-st="9" aria-pressed="false"><span class="num">09</span><span class="bx"><svg aria-hidden="true" style="color:var(--muted)"><use href="#i-push"/></svg></span><span class="nm">Push</span><span class="who">developer session</span></button><button type="button" class="st hard" data-st="10" aria-pressed="false"><span class="num">10</span><span class="bx"><svg aria-hidden="true" style="color:var(--gate)"><use href="#i-package"/></svg></span><span class="nm">Zip post</span><span class="who">pushing session</span></button><button type="button" class="st soft" data-st="11" aria-pressed="false"><span class="num">11</span><span class="bx"><svg aria-hidden="true" style="color:var(--muted)"><use href="#i-ledger"/></svg></span><span class="nm">Report + ledger</span><span class="who">coordinator</span></button></div></div><div class="figcaption" style="padding:10px 16px;border-top:1px solid var(--line);font-size:14.5px;color:var(--muted)">Ochre stations have a script or hook that refuses. Dashed stations rest on agreement and review. <span class="jsonly">Select a station to see its tool, its gate and what it refuses.</span></div></div><div class="stps" id="stps"><div class="card stp on" id="st-1"><h4><span class="mono muted">01</span> Task <span class="tag gate">a script or hook refuses</span></h4><dl><dt>Who</dt><dd>any agent</dd><dt>Tool</dt><dd>The <code>backlog</code> command-line tool. First action on pickup: mark the task In Progress.</dd><dt>Gate</dt><dd>Agreement, plus a hook that blocks direct edits of task files.</dd><dt>Refuses</dt><dd>No task, no work. If no task is actionable: post nothing, report and stop.</dd></dl></div><div class="card stp" id="st-2"><h4><span class="mono muted">02</span> Plan + self-review <span class="tag">agreement and review</span></h4><dl><dt>Who</dt><dd>main session, advisor</dd><dt>Tool</dt><dd>The plan goes into the task. The ADR context lookup returns the accepted decisions for the topic. The advisor (or one Opus reviewer) criticises the plan.</dd><dt>Gate</dt><dd>Agreement. Inside the cycle, the self-review and a notice to testers replace waiting for the maintainer's approval.</dd><dt>Refuses</dt><dd>A change to how SAT controls the boiler is not built without Sergeant D's OK. Hard stops stay hard stops.</dd></dl></div><div class="card stp" id="st-3"><h4><span class="mono muted">03</span> Red to green <span class="tag">agreement and review</span></h4><dl><dt>Who</dt><dd>Sonnet implements</dd><dt>Tool</dt><dd>Host tests, frame replay, the boiler emulator or the bench.</dd><dt>Gate</dt><dd>Review: the same reproduction fails on the old code and passes on the fix.</dd><dt>Refuses</dt><dd>A green run on the fix alone is no proof. A test that re-implements the code instead of calling it proves nothing.</dd></dl></div><div class="card stp" id="st-4"><h4><span class="mono muted">04</span> Review team <span class="tag">agreement and review</span></h4><dl><dt>Who</dt><dd>Opus + Sonnet lenses</dd><dt>Tool</dt><dd>Parallel reviewers on the uncommitted change: correctness, project rules, tests and evidence, and an extra lens where needed (security, user interface, the SAT register).</dd><dt>Gate</dt><dd>Agreement: the main session checks every finding against the code itself.</dd><dt>Refuses</dt><dd>A finding that holds is fixed. What does not fit the task becomes its own task.</dd></dl></div><div class="card stp" id="st-5"><h4><span class="mono muted">05</span> Static gates + tests <span class="tag gate">a script or hook refuses</span></h4><dl><dt>Who</dt><dd>Haiku runs, main session reads</dd><dt>Tool</dt><dd><code>evaluate.py --quick</code> (34 of its 42 checks) and the test runner.</dd><dt>Gate</dt><dd>A hook runs the evaluator after every edit of a firmware source file; CI runs it on every push.</dd><dt>Refuses</dt><dd>Any FAIL. Warnings are reported but do not block the hook.</dd></dl></div><div class="card stp" id="st-6"><h4><span class="mono muted">06</span> Bump + commit <span class="tag gate">a script or hook refuses</span></h4><dl><dt>Who</dt><dd>main session only</dd><dt>Tool</dt><dd>The bump script gives the commit its own prerelease tag, then one commit.</dd><dt>Gate</dt><dd>Two git hooks: pre-commit and commit-msg.</dd><dt>Refuses</dt><dd>A firmware change without a new tag. A task number without its task file. A firmware, docs or backlog commit without a task number.</dd></dl></div><div class="card stp" id="st-7"><h4><span class="mono muted">07</span> Build <span class="tag gate">a script or hook refuses</span></h4><dl><dt>Who</dt><dd>one build per machine</dd><dt>Tool</dt><dd>Only the wrappers <code>build.bat</code> and <code>./build.sh</code>.</dd><dt>Gate</dt><dd>The build script: a machine-wide lock (one build at a time across all sessions, at most 4 compiler jobs), a version check and a memory-layout check.</dd><dt>Refuses</dt><dd>A second build waits for the lock, up to 120 minutes. Exit code 0 is no proof: the proof is the success line plus fresh artefacts.</dd></dl></div><div class="card stp" id="st-8"><h4><span class="mono muted">08</span> Bench <span class="tag">agreement and review</span></h4><dl><dt>Who</dt><dd>bench tester only</dd><dt>Tool</dt><dd>The over-the-air flash script, the bench check and whatever tests the bench tester picks. The device must report the build's hash.</dd><dt>Gate</dt><dd>Agreement since 2026-11-11: only the bench tester flashes and ticks the bench criteria. The flash script itself refuses when only the updater answers or the settings differ afterwards.</dd><dt>Refuses</dt><dd>A failed bench test publishes nothing: fix, rebuild, request a new run.</dd></dl></div><div class="card stp" id="st-9"><h4><span class="mono muted">09</span> Push <span class="tag">agreement and review</span></h4><dl><dt>Who</dt><dd>developer session</dd><dt>Tool</dt><dd><code>git push</code> to the <code>dev</code> line.</dd><dt>Gate</dt><dd>Agreement: the standing permission applies once the task is committed, build and evaluator are green and the bench is OK. Docs-only commits may skip the gates.</dd><dt>Refuses</dt><dd>An announced build or push freeze. After a rebase: rebuild and bench again first.</dd></dl></div><div class="card stp" id="st-10"><h4><span class="mono muted">10</span> Zip post <span class="tag gate">a script or hook refuses</span></h4><dl><dt>Who</dt><dd>pushing session</dd><dt>Tool</dt><dd>The post script sends the flash zip through the webhook to <code>#alpha-testing</code>, without pinging anyone.</dd><dt>Gate</dt><dd>The script refuses on any doubt.</dd><dt>Refuses</dt><dd>The zip was not built from the current commit. The tag was already published or is not newer. The source tree is not clean. The zip is over 10 MB.</dd></dl></div><div class="card stp" id="st-11"><h4><span class="mono muted">11</span> Report + ledger <span class="tag">agreement and review</span></h4><dl><dt>Who</dt><dd>coordinator</dd><dt>Tool</dt><dd>A message to the coordinator with tag, commit, tasks and evidence; a plain-language report to testers; a local ledger of posted tags.</dd><dt>Gate</dt><dd>Agreement: before every post the coordinator compares the ledger with the git history.</dd><dt>Refuses</dt><dd>A tag that is neither posted nor named as covered goes out with the next zip.</dd></dl></div></div>
+  <div class="grid" style="--min:260px">
+    <div class="card c-human"><h4>Where people sit on the belt</h4><p>Station 2: Sergeant D's OK for SAT control behaviour. Any station: a question to Robert by direct message. After the belt: every hard stop.</p></div>
+    <div class="card c-agent"><h4>Where the bench tester sits</h4><p>Station 8, between build and push. The developer asks through the coordinator, with the build hash, the artefact path and the behaviour to check. For a bug: the reproduction on the old code too.</p></div>
+    <div class="card c-gate"><h4>One tag per firmware commit</h4><p>Several fixes under one tag would destroy the tester's A/B signal, so the bump is enforced by a git hook. In eleven days the tag went from beta.79 to beta.327.</p></div>
+  </div>
+
+  <div class="sub">
+    <h3>Four products, three lines</h3>
+    <div class="prod">
+      <div class="card c-ship"><div class="cardhead"><svg class="ico" style="color:var(--ship)" aria-hidden="true"><use href="#i-package"/></svg><h3>Alpha zip</h3></div><p>From <code>dev</code>, for every tested firmware task. Posted to <code>#alpha-testing</code> by the pushing session.</p><span class="tag ship">bench OK + post script</span></div>
+      <div class="card c-gate"><div class="cardhead"><svg class="ico" style="color:var(--gate)" aria-hidden="true"><use href="#i-clock"/></svg><h3>Public 2.x beta</h3></div><p>From <code>dev</code>, as a GitHub prerelease and a post in <code>#beta-testing</code>. At most one per 12 hours, at 08:00 or 20:00; one-hour soak, no waiver; draft first.</p><span class="tag gate">standing permission</span></div>
+      <div class="card c-stop"><div class="cardhead"><svg class="ico" style="color:var(--stop)" aria-hidden="true"><use href="#i-lock"/></svg><h3>Stable 2.x</h3></div><p>On its own branch <code>release/2.x</code>. Three checkpoints, a 24-hour soak, capture runs on Windows, Linux and macOS, a push and build freeze. Announced in Dutch and English.</p><span class="tag stop">yes per action</span></div>
+      <div class="card c-stop"><div class="cardhead"><svg class="ico" style="color:var(--stop)" aria-hidden="true"><use href="#i-lock"/></svg><h3>1.x beta and stable</h3></div><p>From the maintenance line <code>otgw-1.x.x</code>; stable goes to <code>main</code>. The procedure lives on that line and is never run from <code>dev</code>.</p><span class="tag stop">yes per action</span></div>
+    </div>
+  </div>
+
+  <div class="sub">
+    <h3>The beta slot as a timeline</h3>
+    <p class="col">Since 2026-11-15 the beta is put together shortly before the slot and the soak runs on the release build itself, so the end of the soak is the moment of publication. A <b>soak</b> is simply letting the build run on a real unit and watching it.</p>
+    <figure class="fig">
+      <div class="scroll" tabindex="0" role="region" aria-label="Beta slot timeline"><svg class="w760" viewBox="0 0 1000 190" role="img" aria-label="Beta slot timeline. 75 minutes before the slot the release commit is pushed. From 70 to 62 minutes before, the build runs. At 62 minutes before, the bench unit is flashed and the one-hour soak starts. At the slot time, 08:00 or 20:00, the soak verdict is followed by tag, draft release, verification, publication and posts.">
+        <rect class="n-gate" x="250" y="96" width="630" height="24" rx="6"/>
+        <text class="s" x="565" y="112" text-anchor="middle" style="fill:var(--fg)">one-hour soak on the bench unit · the soaked binary is the published binary</text>
+        <path class="l-muted" d="M60,108 H246"/><path class="l-ship" d="M880,108 H948" marker-end="url(#a-ship)"/>
+        <g class="l-muted"><path d="M100,42 V108"/><path d="M160,64 V108"/><path d="M250,86 V96"/></g>
+        <circle cx="100" cy="108" r="5" class="f-agent"/><circle cx="160" cy="108" r="5" class="f-agent"/><circle cx="250" cy="108" r="6" class="f-gate"/><circle cx="880" cy="108" r="7" class="f-ship"/>
+        <text class="t" x="106" y="36">T−75 min</text><text class="s" x="176" y="36">release commit on top of dev, pushed at once</text>
+        <text class="t" x="166" y="60">T−70 to T−62</text><text class="s" x="262" y="60">build of exactly that commit</text>
+        <text class="t" x="256" y="82">T−62</text><text class="s" x="296" y="82">flash the bench unit: the soak starts; a new flash restarts it</text>
+        <text class="t" x="940" y="146" text-anchor="end">T = 08:00 or 20:00</text>
+        <text class="s" x="940" y="164" text-anchor="end">verdict, then tag, draft release, check the files, publish, post</text>
+        <text class="s" x="60" y="146">all day: the comms session keeps</text><text class="s" x="60" y="162">the release-notes draft current</text>
+      </svg></div>
+      <figcaption>Releases cannot be changed after publication, so a draft is made first and its files are checked. No rebuild after the soak.</figcaption>
+    </figure>
+  </div>
+
+  <div class="gap"><span class="lab">Where practice and rules differ</span>
+    <ul>
+      <li><b>A large part of the chain rests on agreement only.</b> "Only the bench tester flashes", "bench before push", the build announcement and the beta slot have no script or hook that refuses.</li>
+      <li><b>The beta of 2026-11-15, 20:00, did not follow the slot rule exactly.</b> The tag was pushed at 18:38; the soak verdict came at 19:38. It was also composed and published by the comms session, while the rule names the coordinator.</li>
+      <li><b>The push rule names a forbidden command as its proof.</b> One line asks for <code>python build.py</code> to return 0; another forbids calling it directly because of a lying exit code. The wrapper rule leads. The release skills and the CI workflow also build outside the wrapper.</li>
+      <li><b>What happens when CI turns red on an already pushed commit</b> (who sees it, who reverts) is not written down.</li>
+      <li><b>Three names for one tag.</b> The rules say "alpha tag", the script comments describe a third scheme, and the actual tag is <code>beta.N</code>.</li>
+    </ul>
+  </div>
+</section>
+
+<section class="sec" id="rules">
+  <span class="kicker">Rules that keep it honest</span>
+  <h2>Layers of rules, rings of enforcement</h2>
+  <p class="lede">Rules reach a session in three ways: at session start, when the first file in a certain folder is opened, or when a skill is called. Some rules have a script that refuses. Many rest on agreement. Both are shown here.</p>
+  <div class="sub">
+    <h3>The rule layers, highest authority first</h3>
+    <div class="stack">
+      <div class="layer l1"><b>Maintainer directive</b><span class="d">A dated statement by Robert, often quoted word for word. It is written into the file where it applies; a changelog keeps the history.</span><span class="tag human">highest authority</span></div>
+      <div class="layer l2"><b>Shared core block</b><span class="d">Lines, roles, tasks, evidence, flashing, firmware rules, versions, gates, Discord. Identical in three instruction files.</span><span class="tag agent">session start</span></div>
+      <div class="layer l2"><b>Rest of CLAUDE.md</b><span class="d">Task discipline, design principles, ADR lists, build and flash rules, the bug-fix rule, the push policy. 189 lines; a test caps it at 230.</span><span class="tag agent">session start</span></div>
+      <div class="layer l2"><b>Always-loaded rule files</b><span class="d">Three files: SAT ground truth, Discord, and the OpenWolf memory rules.</span><span class="tag agent">session start</span></div>
+      <div class="layer l2"><b>Path-loaded rule files</b><span class="d">Two files: firmware coding rules and "what to read before you touch code".</span><span class="tag agent">on first source file</span></div>
+      <div class="layer l2"><b>Skills and commands</b><span class="d">11 skills and 2 commands. Six skills can only be started by a person, among them release and flash.</span><span class="tag agent">when called</span></div>
+      <div class="layer l3"><b>Binding ADRs</b><span class="d">Ten design decisions that each name the automatic gate that enforces them.</span><span class="tag gate">gate named</span></div>
+      <div class="layer"><b>Structural ADRs</b><span class="d">Design decisions checked at review, without an automatic gate.</span><span class="tag">review</span></div>
+      <div class="layer l1"><b>SAT ground truth</b><span class="d">Its own four-step order inside the SAT domain; the firmware is never a source of truth.</span><span class="tag human">designer first</span></div>
+      <div class="layer"><b>Guides</b><span class="d">Build and bench, versioning, working folders, the backlog tool, the pre-merge checklist.</span><span class="tag">before the step</span></div>
+    </div>
+    <p class="small muted col">Codex and Copilot do not load the rule files. A rule that lives only there, such as the equipment-matrix rule, does not reach them.</p>
+  </div>
+
+  <div class="two">
+    <div class="sub">
+      <h3>Five rings around one change</h3>
+      <div class="ring" role="img" aria-label="Five nested rings of enforcement around one change: CI, tests, the evaluator, git hooks and Claude hooks">
+        <div class="rl"><b>5 · CI on GitHub</b> evaluator on every push; build except docs-only; ADR governance on ADR files</div>
+        <div class="ring r2"><div class="rl"><b>4 · Tests</b> 274 Python tests; run locally, not in CI</div>
+          <div class="ring"><div class="rl"><b>3 · Evaluator</b> 42 checks, 34 in the quick run</div>
+            <div class="ring r4"><div class="rl"><b>2 · Git hooks</b> 3 hooks, 5 passes, 2 switched off</div>
+              <div class="ring"><div class="rl"><b>1 · Claude hooks</b> 10 registrations; 2 can refuse</div>
+                <div class="core">one change to the firmware</div>
+              </div></div></div></div>
+      </div>
+    </div>
+    <div class="sub">
+      <h3>What the rings do not cover</h3>
+      <ul class="col">
+        <li>The project runs agents without permission prompts, so a hard stop is held by the rule text and by skills that the model cannot start.</li>
+        <li>Every blocking git hook can be switched off with a variable, and <code>--no-verify</code> skips them all. The skill forbids both; nothing checks it.</li>
+        <li>Git hooks only work once the repository is told where they are. A session-start hook does that for Claude; a fresh clone used by another tool has none.</li>
+        <li>Six of the ten Claude hooks belong to the memory tool. They advise and always let the action through.</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="sub">
+    <h3>Enforcement map: which rule has which kind of guard</h3>
+    <div class="legend">
+      <span><i class="dot b"></i>blocks the step</span>
+      <span><i class="dot w"></i>warns, or runs only on the developer's machine</span>
+      <span><i class="dot o"></i>exists but is switched off</span>
+      <span><i class="dot c"></i>agreement only</span>
+    </div>
+    <div class="mxwrap" tabindex="0" role="region" aria-label="Enforcement map"><table class="mx" style="min-width:880px"><thead><tr><th>Rule</th><th>Claude hook</th><th>Git hook</th><th>Evaluator</th><th>Test</th><th>CI</th><th>Script</th><th>Review</th><th>Agreement only</th><th>Note</th></tr></thead><tbody><tr><th scope="row">Task files are never edited directly</th><td class="c"><span class="dot b" role="img" aria-label="blocks"></span></td><td class="c"></td><td class="c"></td><td class="c"></td><td class="c"></td><td class="c"></td><td class="c"></td><td class="c"></td><td><small class="muted">blocks the edit tools; a shell command slips past</small></td></tr><tr><th scope="row">The evaluator shows no new FAIL</th><td class="c"><span class="dot b" role="img" aria-label="blocks"></span></td><td class="c"></td><td class="c"><span class="dot b" role="img" aria-label="blocks"></span></td><td class="c"></td><td class="c"><span class="dot b" role="img" aria-label="blocks"></span></td><td class="c"></td><td class="c"></td><td class="c"></td><td><small class="muted"></small></td></tr><tr><th scope="row">A firmware commit carries its own version bump</th><td class="c"></td><td class="c"><span class="dot b" role="img" aria-label="blocks"></span></td><td class="c"></td><td class="c"></td><td class="c"></td><td class="c"></td><td class="c"></td><td class="c"></td><td><small class="muted"></small></td></tr><tr><th scope="row">A commit names its task, and the task file exists</th><td class="c"></td><td class="c"><span class="dot b" role="img" aria-label="blocks"></span></td><td class="c"></td><td class="c"></td><td class="c"></td><td class="c"></td><td class="c"></td><td class="c"></td><td><small class="muted"></small></td></tr><tr><th scope="row">No ArduinoJson; text stays in flash; platform boundary</th><td class="c"></td><td class="c"></td><td class="c"><span class="dot b" role="img" aria-label="blocks"></span></td><td class="c"></td><td class="c"><span class="dot b" role="img" aria-label="blocks"></span></td><td class="c"></td><td class="c"></td><td class="c"></td><td><small class="muted">binding ADR-146 and others</small></td></tr><tr><th scope="row">No String class in hot code paths</th><td class="c"></td><td class="c"></td><td class="c"><span class="dot w" role="img" aria-label="warns or runs only locally"></span></td><td class="c"></td><td class="c"></td><td class="c"></td><td class="c"></td><td class="c"></td><td><small class="muted">warning only, full run only</small></td></tr><tr><th scope="row">The firmware compiles</th><td class="c"></td><td class="c"></td><td class="c"></td><td class="c"></td><td class="c"><span class="dot b" role="img" aria-label="blocks"></span></td><td class="c"></td><td class="c"></td><td class="c"></td><td><small class="muted">not on docs-only pushes</small></td></tr><tr><th scope="row">One build at a time, at most 4 compiler jobs</th><td class="c"></td><td class="c"></td><td class="c"></td><td class="c"></td><td class="c"></td><td class="c"><span class="dot b" role="img" aria-label="blocks"></span></td><td class="c"></td><td class="c"></td><td><small class="muted"></small></td></tr><tr><th scope="row">The alpha zip comes from the current commit</th><td class="c"></td><td class="c"></td><td class="c"></td><td class="c"></td><td class="c"></td><td class="c"><span class="dot b" role="img" aria-label="blocks"></span></td><td class="c"></td><td class="c"></td><td><small class="muted"></small></td></tr><tr><th scope="row">The three instruction files do not drift apart</th><td class="c"></td><td class="c"></td><td class="c"></td><td class="c"><span class="dot w" role="img" aria-label="warns or runs only locally"></span></td><td class="c"></td><td class="c"></td><td class="c"></td><td class="c"></td><td><small class="muted">local test run only</small></td></tr><tr><th scope="row">Changes respect ADR enforcement blocks (ADR-101, ADR-177)</th><td class="c"></td><td class="c"><span class="dot o" role="img" aria-label="switched off"></span></td><td class="c"></td><td class="c"></td><td class="c"></td><td class="c"></td><td class="c"></td><td class="c"></td><td><small class="muted">off since 2026-05-31</small></td></tr><tr><th scope="row">Binding ADRs 201, 217, 242 and 239</th><td class="c"></td><td class="c"></td><td class="c"></td><td class="c"><span class="dot w" role="img" aria-label="warns or runs only locally"></span></td><td class="c"></td><td class="c"><span class="dot w" role="img" aria-label="warns or runs only locally"></span></td><td class="c"></td><td class="c"></td><td><small class="muted">host tests and layout check, local only</small></td></tr><tr><th scope="row">OpenWolf memory rules</th><td class="c"><span class="dot w" role="img" aria-label="warns or runs only locally"></span></td><td class="c"></td><td class="c"></td><td class="c"></td><td class="c"></td><td class="c"></td><td class="c"></td><td class="c"></td><td><small class="muted">advises, never blocks</small></td></tr><tr><th scope="row">Build only through the wrapper</th><td class="c"></td><td class="c"></td><td class="c"></td><td class="c"></td><td class="c"></td><td class="c"></td><td class="c"></td><td class="c"><span class="dot c" role="img" aria-label="agreement only"></span></td><td><small class="muted"></small></td></tr><tr><th scope="row">Only the bench tester flashes</th><td class="c"></td><td class="c"></td><td class="c"></td><td class="c"></td><td class="c"></td><td class="c"></td><td class="c"></td><td class="c"><span class="dot c" role="img" aria-label="agreement only"></span></td><td><small class="muted"></small></td></tr><tr><th scope="row">A hard stop needs a yes per action</th><td class="c"></td><td class="c"></td><td class="c"></td><td class="c"></td><td class="c"></td><td class="c"></td><td class="c"></td><td class="c"><span class="dot c" role="img" aria-label="agreement only"></span></td><td><small class="muted">release skills cannot be started by the model</small></td></tr><tr><th scope="row">Questions go by direct message, not in the terminal</th><td class="c"></td><td class="c"></td><td class="c"></td><td class="c"></td><td class="c"></td><td class="c"></td><td class="c"></td><td class="c"><span class="dot c" role="img" aria-label="agreement only"></span></td><td><small class="muted"></small></td></tr><tr><th scope="row">Done only with evidence; old code against fix</th><td class="c"></td><td class="c"></td><td class="c"></td><td class="c"></td><td class="c"></td><td class="c"></td><td class="c"><span class="dot w" role="img" aria-label="warns or runs only locally"></span></td><td class="c"><span class="dot c" role="img" aria-label="agreement only"></span></td><td><small class="muted"></small></td></tr><tr><th scope="row">A SAT decision is recorded before it is built</th><td class="c"></td><td class="c"></td><td class="c"></td><td class="c"><span class="dot w" role="img" aria-label="warns or runs only locally"></span></td><td class="c"></td><td class="c"></td><td class="c"><span class="dot w" role="img" aria-label="warns or runs only locally"></span></td><td class="c"><span class="dot c" role="img" aria-label="agreement only"></span></td><td><small class="muted">the test guards the rule text, not the behaviour</small></td></tr></tbody></table></div>
+  </div>
+
+  <div class="gap"><span class="lab">Where practice and rules differ</span>
+    <ul>
+      <li><b>Two binding ADRs have no automatic gate today.</b> The rules call ADR-101 and ADR-177 "gated", but that commit-time check has been off since 2026-05-31 and nothing else runs it.</li>
+      <li><b>The directive changelog is behind.</b> It still lists "questions go to Robert interactively" as in force and misses the direct-message route, the GitHub sweep, the equipment matrix and the beta slot rules.</li>
+      <li><b>The task-file guard has a hole.</b> It blocks the edit tools but not a shell command, and its refusal message points to a tool that the rules forbid.</li>
+    </ul>
+  </div>
+</section>
+
+<section class="sec" id="knowledge">
+  <span class="kicker">Knowledge base</span>
+  <h2>What an agent reads before it acts, and writes after</h2>
+  <p class="lede">Almost every store has one way in for writing and a rule that says when to read it. Only a few have a hook, test or CI step that enforces that. Freshness differs a lot: the backlog and the SAT register change almost daily; the code graph dates from July.</p>
+  <div class="grid" style="--min:300px"><div class="card top-agent"><h3>Backlog</h3><p>The work queue and the memory of each task: criteria, plan, notes, final summary.</p><dl class="kv"><dt>Size</dt><dd>477 active tasks, 1,323 archived</dd><dt>Writes</dt><dd>every agent, through the command-line tool</dd><dt>Reads</dt><dd>every agent, before any work</dd><dt>Guard</dt><dd>a hook and a commit hook</dd></dl></div><div class="card top-gate"><h3>ADRs</h3><p>Numbered design decisions.</p><dl class="kv"><dt>Size</dt><dd>245 files, 10 binding</dd><dt>Writes</dt><dd>an agent proposes; Robert accepts</dd><dt>Reads</dt><dd>before feature or architecture work</dd><dt>Guard</dt><dd>CI lint and a test</dd></dl></div><div class="card top-human"><h3>SAT decision register</h3><p>Every correction and decision by the SAT designer, numbered.</p><dl class="kv"><dt>Size</dt><dd>353 entries</dd><dt>Writes</dt><dd>the session that receives the answer, before building</dd><dt>Reads</dt><dd>every agent before a SAT decision; the reviewer too</dd><dt>Guard</dt><dd>a test on the index; review</dd></dl></div><div class="card top-human"><h3>SAT question queue</h3><p>The open questions and their status: queued, asked, answered, dropped.</p><dl class="kv"><dt>Size</dt><dd>227 rows, 18 open</dd><dt>Writes</dt><dd>the session that asks or answers</dd><dt>Reads</dt><dd>the coordinator, to pick the next question</dd><dt>Guard</dt><dd>a script check and a test</dd></dl></div><div class="card top-plain"><h3>C4 code map</h3><p>Which component owns which code, in 20 documents.</p><dl class="kv"><dt>Size</dt><dd>20 files</dd><dt>Writes</dt><dd>a docs subagent, when sources change</dd><dt>Reads</dt><dd>any agent that touches source code</dd><dt>Guard</dt><dd>agreement only</dd></dl></div><div class="card top-plain"><h3>graphify code graph</h3><p>A graph of the source: what calls what.</p><dl class="kv"><dt>Size</dt><dd>1,628 nodes, 3,220 edges</dd><dt>Writes</dt><dd>a developer, after a source change</dd><dt>Reads</dt><dd>an agent with a structure question</dd><dt>Guard</dt><dd>agreement only; the report dates from 2026-07-26</dd></dl></div><div class="card top-plain"><h3>OpenWolf memory</h3><p>Memory between sessions: a file index, lessons and do-not-repeat notes, a bug log.</p><dl class="kv"><dt>Size</dt><dd>224 bug entries, 70 do-not-repeat notes</dd><dt>Writes</dt><dd>hooks on every write, and agents</dd><dt>Reads</dt><dd>before a read, before code, before a fix</dd><dt>Guard</dt><dd>hooks warn, never block; Claude only</dd></dl></div><div class="card top-plain"><h3>Reference specs</h3><p>The OpenTherm protocol specification v4.2, the cited SAT specification, the PIC firmware specification, read-only reference projects.</p><dl class="kv"><dt>Size</dt><dd>spec v4.2: 2,602 lines</dd><dt>Writes</dt><dd>never changed by agents</dd><dt>Reads</dt><dd>first step for any user-reported bug</dd><dt>Guard</dt><dd>agreement only</dd></dl></div><div class="card top-plain"><h3>Guides and directive changelog</h3><p>How to build, bench, version and work in parallel; which directive holds since when.</p><dl class="kv"><dt>Size</dt><dd>26 guides</dd><dt>Writes</dt><dd>an agent or the maintainer, at a process change</dd><dt>Reads</dt><dd>before the step in question</dd><dt>Guard</dt><dd>agreement only</dd></dl></div><div class="card top-plain"><h3>Evidence and research</h3><p>Screenshots, bench logs, verification reports, spike notes.</p><dl class="kv"><dt>Size</dt><dd>74 evidence files, 15 research notes</dd><dt>Writes</dt><dd>an agent, during a task</dd><dt>Reads</dt><dd>reviewer and maintainer</dd><dt>Guard</dt><dd>none: no rule names these folders</dd></dl></div></div>
+  <div class="sub">
+    <h3>Which question goes to which source</h3>
+    <ul class="route"><li><span>Is there already work on this, and what was decided?</span><span class="arrow" aria-hidden="true">&rarr;</span><span class="first">Search the backlog</span><span class="then">task notes and final summary</span></li><li><span>Which design decision applies here?</span><span class="arrow" aria-hidden="true">&rarr;</span><span class="first">The ADR context lookup</span><span class="then">the ADR itself</span></li><li><span>Which component owns this code?</span><span class="arrow" aria-hidden="true">&rarr;</span><span class="first">The C4 context and component documents</span><span class="then">the scenario table in the navigation rule</span></li><li><span>What calls this function?</span><span class="arrow" aria-hidden="true">&rarr;</span><span class="first">The code graph</span><span class="then">its report, for a broad review</span></li><li><span>Is this file worth reading?</span><span class="arrow" aria-hidden="true">&rarr;</span><span class="first">The OpenWolf file index</span><span class="then">a search, if the file is missing</span></li><li><span>Which mistake did we make before?</span><span class="arrow" aria-hidden="true">&rarr;</span><span class="first">The do-not-repeat notes</span><span class="then">the bug log</span></li><li><span>What does the protocol say?</span><span class="arrow" aria-hidden="true">&rarr;</span><span class="first">The OpenTherm specification v4.2</span><span class="then">the reference projects</span></li><li><span>What does the PIC chip do exactly?</span><span class="arrow" aria-hidden="true">&rarr;</span><span class="first">The PIC firmware specification</span><span class="then">its source in the reference projects</span></li><li><span>Does boiler or thermostat X work?</span><span class="arrow" aria-hidden="true">&rarr;</span><span class="first">The equipment matrix</span><span class="then">a capture from the user's own system, which outranks it</span></li><li><span>What should SAT do?</span><span class="arrow" aria-hidden="true">&rarr;</span><span class="first">The decision register</span><span class="then">the pinned reference code, then its spec; otherwise ask Sergeant D</span></li><li><span>Which SAT question is still open?</span><span class="arrow" aria-hidden="true">&rarr;</span><span class="first">The live queue</span><span class="then">the question table</span></li><li><span>How do I build, flash or bench?</span><span class="arrow" aria-hidden="true">&rarr;</span><span class="first">The build-and-bench guide</span><span class="then">the versioning and working-folder guides</span></li></ul>
+  </div>
+  <div class="gap"><span class="lab">Where practice and rules differ</span>
+    <ul>
+      <li><b>The code graph is stale</b>, and the prescribed refresh command writes to a folder that git ignores, so the tracked graph does not update.</li>
+      <li><b>The memory hooks read the bug log in a different format than the file has.</b> The warnings they should give never appear. 224 entries carry 219 unique ids.</li>
+      <li><b>The file index holds 171 sections that point outside the repository</b>, although one of its own lessons forbids that.</li>
+      <li><b>No rule says where evidence files belong.</b> Task notes are the fixed place; the evidence folder is free use.</li>
+    </ul>
+  </div>
+</section>
+
+<section class="sec" id="adr">
+  <span class="kicker">The ADR kit</span>
+  <h2>How a design decision is written, accepted and guarded</h2>
+  <p class="lede">The ADR kit is the maintainer's open-source toolkit for architecture decisions. Agents write a decision as Proposed. It becomes Accepted only after explicit human approval, and from then on its content does not change.</p>
+  <figure class="fig">
+    <div class="scroll" tabindex="0" role="region" aria-label="ADR lifecycle diagram"><svg class="w760" viewBox="0 0 1000 230" role="img" aria-label="ADR lifecycle. A trigger leads to a Proposed ADR written by an agent. It passes four gates: completeness, evidence, clarity and consistency. A failed gate sends it back to the author. Then Robert approves it, per ADR, as a reply to a direct message. It becomes Accepted and immutable. Later it can only be superseded or amended by a new ADR.">
+        <rect class="n-plain" x="10" y="40" width="160" height="64" rx="8"/><text class="t" x="90" y="64" text-anchor="middle">Trigger</text><text class="s" x="90" y="81" text-anchor="middle">architecture, dependency,</text><text class="s" x="90" y="95" text-anchor="middle">API or build change</text>
+        <rect class="n-agent" x="200" y="40" width="140" height="64" rx="8"/><text class="t" x="270" y="64" text-anchor="middle">Proposed</text><text class="s" x="270" y="81" text-anchor="middle">written by an agent,</text><text class="s" x="270" y="95" text-anchor="middle">never self-accepted</text>
+        <rect class="n-gate" x="370" y="40" width="170" height="64" rx="8"/><text class="t" x="455" y="64" text-anchor="middle">Four gates</text><text class="s" x="455" y="81" text-anchor="middle">completeness · evidence</text><text class="s" x="455" y="95" text-anchor="middle">clarity · consistency</text>
+        <rect class="n-human" x="570" y="40" width="170" height="64" rx="8"/><text class="t" x="655" y="64" text-anchor="middle">Human approval</text><text class="s" x="655" y="81" text-anchor="middle">Robert, per ADR, as a</text><text class="s" x="655" y="95" text-anchor="middle">reply to a direct message</text>
+        <rect class="n-ship" x="770" y="40" width="140" height="64" rx="8"/><text class="t" x="840" y="64" text-anchor="middle">Accepted</text><text class="s" x="840" y="81" text-anchor="middle">binding, and</text><text class="s" x="840" y="95" text-anchor="middle">immutable from here</text>
+        <path class="l-agent" d="M170,72 H196" marker-end="url(#a-agent)"/><path class="l-agent" d="M340,72 H366" marker-end="url(#a-agent)"/><path class="l-agent" d="M540,72 H566" marker-end="url(#a-agent)"/><path class="l-human" d="M740,72 H764" marker-end="url(#a-human)"/>
+        <path class="l-muted dash" d="M455,104 C455,150 270,150 270,108" marker-end="url(#a-muted)"/><text class="s" x="362" y="158" text-anchor="middle">a gate fails: back to the author</text>
+        <rect class="n-plain" x="770" y="160" width="140" height="50" rx="8" stroke-dasharray="5 4"/><text class="t" x="840" y="182" text-anchor="middle">Superseded</text><text class="s" x="840" y="198" text-anchor="middle">only by a new ADR</text>
+        <path class="l-muted" d="M840,104 V156" marker-end="url(#a-muted)"/>
+        <text class="s" x="828" y="128" text-anchor="end">supersede or amend:</text><text class="s" x="828" y="143" text-anchor="end">the text itself never changes</text>
+        <text class="lbl" x="10" y="22" style="fill:var(--muted)">LIFECYCLE OF ONE DECISION</text>
+    </svg></div>
+    <figcaption>Not every change needs an ADR: refactors, bug fixes and small features inside existing patterns do not.</figcaption>
+  </figure>
+  <div class="grid" style="--min:210px">
+    <div class="card top-gate"><h4>Completeness</h4><p>All required sections are present and filled; file name and number match.</p><span class="tag">deterministic</span></div>
+    <div class="card top-gate"><h4>Evidence</h4><p>The context names at least one concrete artefact.</p><span class="tag">heuristic</span></div>
+    <div class="card top-gate"><h4>Clarity</h4><p>The decision names one concrete choice, in the imperative, without hedging.</p><span class="tag">heuristic</span></div>
+    <div class="card top-gate"><h4>Consistency</h4><p>File name, number and cross-references agree; no duplicate numbers.</p><span class="tag">deterministic</span></div>
+  </div>
+
+  <div class="sub">
+    <h3>245 decisions on 2026-11-15</h3>
+    <div class="bar" role="img" aria-label="Of 245 ADRs: 196 accepted, 40 superseded, 5 proposed, 2 rejected, 2 amended">
+      <i style="width:80%;background:var(--ship)"></i><i style="width:16.3%;background:var(--muted)"></i><i style="width:2.1%;background:var(--bf)"></i><i style="width:.8%;background:var(--stop)"></i><i style="width:.8%;background:var(--gate)"></i>
+    </div>
+    <div class="barkey">
+      <span><i style="background:var(--ship)"></i>196 accepted</span><span><i style="background:var(--muted)"></i>40 superseded</span><span><i style="background:var(--bf)"></i>5 proposed</span><span><i style="background:var(--stop)"></i>2 rejected</span><span><i style="background:var(--gate)"></i>2 amended</span>
+    </div>
+    <p class="small muted">Counted from the status field in each file. 40 new ADRs in October 2026 and 43 in the first half of November.</p>
+  </div>
+
+  <div class="sub">
+    <h3>The enforcement path: what actually guards a decision</h3>
+    <p class="col">An ADR can end with an <b>Enforcement block</b>: a few machine-readable rules ("this pattern must not appear in a change"). A tool called <code>adr-judge</code> is meant to check each commit against those blocks. A <b>binding</b> ADR goes further and must name an automatic gate. In practice the ten binding ADRs fall into three groups.</p>
+    <div class="grid" style="--min:280px">
+      <div class="card c-ship"><h4>Checked in CI on every push</h4><p><b>ADR-088, 091, 097, 146.</b> Each has a check in the evaluator, and the evaluator runs in CI.</p><p class="small">Binding ADR &rarr; evaluator check &rarr; CI</p></div>
+      <div class="card c-gate"><h4>Checked on the developer's machine only</h4><p><b>ADR-201, 217, 242</b> have host tests in the local test run. <b>ADR-239</b> has a layout check inside the local build. No CI workflow runs them.</p><p class="small">Binding ADR &rarr; test or build script &rarr; local run</p></div>
+      <div class="card c-stop"><h4>No automatic gate today</h4><p><b>ADR-101, 177.</b> Their gate is <code>adr-judge</code> at commit time, and that step has been switched off since 2026-05-31. Review is what remains.</p><p class="small">Enforcement block &rarr; adr-judge in pre-commit &rarr; off</p></div>
+    </div>
+    <p class="small muted col">Separately, a governance lint does run in CI when ADR files change: it checks that replaced decisions link both ways, that every ADR is in the index, and that a named gate really exists.</p>
+  </div>
+
+  <div class="gap"><span class="lab">Where practice and rules differ</span>
+    <ul>
+      <li><b>"Binding" does not mean "in CI".</b> One project rule says a binding rule must have a CI gate; six of the ten depend on a local run or on a step that is off.</li>
+      <li><b>Four versions of the kit sit side by side</b>: the installed plugin, a project guide, a set of script copies and an old vendored mirror.</li>
+      <li><b>The generated index counts 199 accepted</b>; the files themselves say 196.</li>
+    </ul>
+  </div>
+</section>
+
+<section class="sec" id="external">
+  <span class="kicker">Outside sources</span>
+  <h2>What the workshop talks to</h2>
+  <p class="lede">Arrows show direction: <span class="mono">&larr;</span> read only, <span class="mono">&rarr;</span> write, <span class="mono">&harr;</span> both. The label "workstation" marks a link that only works from the maintainer's own machine.</p>
+  <div class="grid ext" style="--min:300px">
+<div class="card top-bf"><h3>Channels</h3><ul><li><span class="dir" aria-label="reads and writes">↔</span><span>Discord: six channels and one direct message, through one local server process<span class=ws>workstation</span></span></li><li><span class="dir" aria-label="writes">→</span><span>A webhook for files, because that server cannot attach them<span class=ws>workstation</span></span></li><li><span class="dir" aria-label="reads and writes">↔</span><span>GitHub issues and pull requests, under the maintainer's login<span class=ws>workstation</span></span></li><li><span class="dir" aria-label="reads">←</span><span>The Tweakers forum topic, as a public feed<span class=ws>workstation</span></span></li></ul></div><div class="card top-plain"><h3>Knowledge</h3><ul><li><span class="dir" aria-label="reads">←</span><span>The OpenTherm equipment matrix: which boiler or thermostat answered which messages. Best effort, not a guarantee</span></li><li><span class="dir" aria-label="reads">←</span><span>The SAT reference code (thermo-nova), pinned at one commit</span></li><li><span class="dir" aria-label="reads">←</span><span>The OpenTherm protocol specification v4.2, kept in the repository</span></li><li><span class="dir" aria-label="reads">←</span><span>Reference projects in a private side repository; CI has no access</span></li><li><span class="dir" aria-label="reads">←</span><span>Attachments from testers: logs, screenshots, captures. Treated as untrusted data<span class=ws>workstation</span></span></li></ul></div><div class="card top-ship"><h3>Distribution</h3><ul><li><span class="dir" aria-label="writes">→</span><span>The alpha zip to <code>#alpha-testing</code> (at most 10 MB)<span class=ws>workstation</span></span></li><li><span class="dir" aria-label="writes">→</span><span>GitHub Releases: betas as prerelease, stable releases with checksums; always draft first<span class=ws>workstation</span></span></li><li><span class="dir" aria-label="">·</span><span>On the tester's machine, the flash and capture scripts download the tools they need</span></li></ul></div><div class="card top-plain"><h3>Toolchains</h3><ul><li><span class="dir" aria-label="reads">←</span><span>The ESP32 build platform, at a pinned version</span></li><li><span class="dir" aria-label="reads">←</span><span>Libraries at pinned versions; two as git submodules</span></li><li><span class="dir" aria-label="reads">←</span><span>A Python runtime that the build wrappers fetch themselves</span></li><li><span class="dir" aria-label="reads">←</span><span>The backlog tool (npm) and the ADR kit plugin</span></li></ul></div><div class="card top-agent"><h3>AI services</h3><ul><li><span class="dir" aria-label="reads and writes">↔</span><span>Claude Code sessions on the workstation: the workshop itself<span class=ws>workstation</span></span></li><li><span class="dir" aria-label="reads and writes">↔</span><span>Claude in GitHub Actions: pull-request review and <code>@claude</code> requests</span></li><li><span class="dir" aria-label="writes">→</span><span>GitHub Copilot coding agent: a workflow files an issue for it</span></li><li><span class="dir" aria-label="reads">←</span><span>Codex: reads its instruction file; no workflow found</span></li><li><span class="dir" aria-label="">·</span><span>Claude as an optional judge of ADR compliance at commit time: off</span></li></ul></div><div class="card top-agent"><h3>Bench and local network</h3><ul><li><span class="dir" aria-label="reads and writes">↔</span><span>The bench units: flashing over WiFi, tests, evidence<span class=ws>workstation</span></span></li><li><span class="dir" aria-label="reads">←</span><span>The local MQTT broker, for captures and soaks<span class=ws>workstation</span></span></li><li><span class="dir" aria-label="reads and writes">↔</span><span>A Home Assistant test rig in containers<span class=ws>workstation</span></span></li><li><span class="dir" aria-label="">·</span><span>A cloud recorder for diagnostics: designed, not active</span></li></ul></div>
+  </div>
+  <div class="sub">
+    <h3>One workstation carries almost everything</h3>
+    <div class="two">
+      <div class="card c-ship"><h4>Keeps running without it</h4><p>The seven GitHub workflows: the build and evaluator gates, ADR governance, the dependency scan, the Claude review and the Copilot trigger.</p></div>
+      <div class="card c-stop"><h4>Stops without it</h4><p>Every contact with testers and with Sergeant D, every decision by direct message, every flash and every publication.</p></div>
+    </div>
+    <p class="col">No secret is stored in the repository; it only names them and says where they live. A guide for a second machine exists, but the bot token, the webhook address, the ledger and the knowledge about the bench units stay outside the repository. On 2026-11-05 Robert decided not to add a second bench, a build runner or an always-on host for now.</p>
+  </div>
+</section>
+
+<section class="sec" id="numbers">
+  <span class="kicker">Numbers</span>
+  <h2>How hard the workshop runs</h2>
+  <p class="lede">Measured in the repository on 2026-11-15, next to the previous snapshot of 2026-11-04 where one exists. Each tile says how it was counted, so the count can be repeated.</p>
+  <div class="stats"><div class="stat"><span class="v">beta.79 <small>to</small> beta.327</span><span class="l">firmware version tag on the main line in eleven days: one tag per firmware commit</span><div class="cmp" aria-hidden="true"><span>Nov 4</span><i style="width:24%"></i><span>Nov 15</span><i class="now" style="width:100%"></i></div><span class="how">the version line in version.h</span></div><div class="stat"><span class="v">8.7 <small>per day</small></span><span class="l">prerelease tags per day</span><span class="how">30-day window, measured 2026-11-05 with agentic_throughput.py; not repeated</span></div><div class="stat"><span class="v">353</span><span class="l">entries in the SAT decision register: 293 from Sergeant D, 41 from the maintainer, 16 from the port team, 3 unknown</span><div class="cmp" aria-hidden="true"><span>Nov 4</span><i style="width:76%"></i><span>Nov 15</span><i class="now" style="width:100%"></i></div><span class="how">numbered headings in the register; source field of its index</span></div><div class="stat"><span class="v">80% <small>within 2.4 h</small></span><span class="l">of timed answers from Sergeant D; the median was 0.3 hours</span><span class="how">12 timed answers, 2026-10-06 to 2026-11-04; not repeated</span></div><div class="stat"><span class="v">227 <small>· 18 open</small></span><span class="l">SAT questions: 184 answered, 25 dropped, 14 queued, 4 asked</span><span class="how">row pattern of sat_open_questions.py</span></div><div class="stat"><span class="v">477</span><span class="l">active tasks: 357 done, 58 to do, 44 in progress, 18 in review. Another 1,323 are archived</span><span class="how">status field of each task file</span></div><div class="stat"><span class="v">245 <small>· 10 binding</small></span><span class="l">architecture decision records; 196 accepted</span><div class="cmp" aria-hidden="true"><span>Nov 4 (about)</span><i style="width:86%"></i><span>Nov 15</span><i class="now" style="width:100%"></i></div><span class="how">files in docs/adr; binding flag in each file</span></div><div class="stat"><span class="v">42</span><span class="l">checks in the evaluator; 34 run in the quick mode</span><span class="how">count of check functions in evaluate.py</span></div><div class="stat"><span class="v">274</span><span class="l">Python tests. In CI, only one test file runs</span><div class="cmp" aria-hidden="true"><span>Nov 4</span><i style="width:46%"></i><span>Nov 15</span><i class="now" style="width:100%"></i></div><span class="how">files named test_*.py; no workflow calls the test runner</span></div><div class="stat"><span class="v">673 <small>to</small> 189</span><span class="l">lines in the main instruction file, after moving detail into 287 lines of rule files</span><div class="cmp" aria-hidden="true"><span>Nov 4</span><i style="width:100%"></i><span>Nov 15</span><i class="now" style="width:28%"></i></div><span class="how">line count</span></div><div class="stat"><span class="v">11 · 2 · 1</span><span class="l">skills, commands and agent definitions in the repository, plus one workflow script</span><span class="how">directory listings of .claude/</span></div><div class="stat"><span class="v">7</span><span class="l">GitHub workflows; four are gates without AI</span><span class="how">directory listing of .github/workflows</span></div></div>
+  <p class="col">The last throughput measurement found the largest wait in the stock of open tasks, not in the build, the bench or the answers. That is why the maintainer decided on 2026-11-05 not to scale up for now.</p>
+</section>
+
+<section class="sec" id="gaps">
+  <span class="kicker">Open gaps</span>
+  <h2>Where it stands, said plainly</h2>
+  <p class="lede">All twelve improvement tasks from the snapshot of 2026-11-04 were carried out. The new risks sit in the drift between what happens and what is written down.</p>
+  <div class="two">
+    <div class="card c-ship"><h3>What works well</h3><ul>
+      <li>The evidence regime is strict and concrete: old code against fix, done only with evidence from the same session, reviewers who must refute.</li>
+      <li>The SAT order of truth, with mandatory citations and a register that is updated before the build, keeps invented behaviour out.</li>
+      <li>One tag per firmware commit makes tester feedback traceable.</li>
+      <li>The post script refuses on any doubt.</li>
+    </ul></div>
+    <div class="card"><h3>How much does it weigh?</h3><p>None of the findings touches the firmware or the evidence chain of a task directly: the gates that really refuse all work. The risk is in <b>the next agent</b>, which reads a command or profile that prescribes an older way, or misses a role or channel that exists only in task notes. The finding on binding ADRs deserves extra attention: there the rules promise an automatic gate that is not there.</p></div>
+  </div>
+  <ul class="find"><li><span class="id">F9</span><span class="sev hi">High</span><span>Practice is ahead of the rules: the comms session, answers in support channels, <code>#beta-testing</code> as a request channel and the delegation of 2026-11-15 exist only in skills and task notes.</span></li><li><span class="id">F10</span><span class="sev hi">High</span><span>Older procedures do not follow the hard rules: the scan command, the flash skill, the translation skill, the device-verify agent and a Copilot prompt still build, branch or flash the old way.</span></li><li><span class="id">F12</span><span class="sev hi">High</span><span>Two binding ADRs have no automatic gate in practice, and the drift tests do not run in CI.</span></li><li><span class="id">F11</span><span class="sev mid">Medium</span><span>The directive changelog is behind the rules that are actually in force.</span></li><li><span class="id">F13</span><span class="sev mid">Medium</span><span>Rules that live only in the Claude rule files do not reach Codex and Copilot.</span></li><li><span class="id">F14</span><span class="sev mid">Medium</span><span>Gaps in the hooks: the task-file guard misses shell edits; hard stops rest on convention.</span></li><li><span class="id">F15</span><span class="sev mid">Medium</span><span>Watermarks: one is missing in a fresh checkout, three are tracked although ignored, and they are written before the triage.</span></li><li><span class="id">F16</span><span class="sev mid">Medium</span><span>Nobody has written down who may give status commands for the backlog on Discord.</span></li><li><span class="id">F18</span><span class="sev mid">Medium</span><span>The ADR kit exists in four versions side by side; the generated index disagrees with the files.</span></li><li><span class="id">F19</span><span class="sev mid">Medium</span><span>The workshop's memory is ageing: bug-log format mismatch, duplicate ids, an index with sections outside the repository, a code graph from July.</span></li><li><span class="id">F17</span><span class="sev lo">Low</span><span>Documentation drift in guides and agent profiles, such as release documents that still describe the 1.x process.</span></li></ul>
+  <div class="sub">
+    <h3>Three decisions that only the maintainer can take</h3>
+    <div class="grid" style="--min:280px">
+      <div class="card c-human"><h4>1 · The comms session as a role</h4><p>Write it down as a fixed role with its own rules, leave it as a practice, or move its tasks back to the coordinator?</p><p class="small"><b>Advice in the document:</b> write it down.</p></div>
+      <div class="card c-human"><h4>2 · The scope of the delegation</h4><p>May the coordinator make technical choices inside a task and report afterwards, while scope, priority and hard stops stay a question up front?</p><p class="small"><b>Advice in the document:</b> yes, exactly that.</p></div>
+      <div class="card c-human"><h4>3 · Switch the ADR judge back on</h4><p>Only the free, deterministic pass; also the model-based pass; or drop the claim from the rules?</p><p class="small"><b>Advice in the document:</b> the deterministic pass, at commit time and in CI.</p></div>
+    </div>
+    <p class="small muted col">These are proposals, not tasks yet. The document groups ten proposals into three scenarios: correct (a day), write down (a week, after these decisions), maintain (ongoing).</p>
+  </div>
+</section>
+
+<section class="sec" id="glossary">
+  <span class="kicker">Glossary</span>
+  <h2>The words used on this page</h2>
+  <dl class="gloss"><div><dt>OpenTherm</dt><dd>The protocol that a room thermostat and a boiler use to talk to each other.</dd></div><div><dt>Gateway (OTGW)</dt><dd>The device between thermostat and boiler that this firmware runs on.</dd></div><div><dt>PIC</dt><dd>The small controller chip on the classic gateway that handles the OpenTherm signal. Flashing it is a hard stop.</dd></div><div><dt>SAT</dt><dd>Smart Autotune Thermostat: a mode in which the gateway controls the boiler itself.</dd></div><div><dt>thermo-nova</dt><dd>The upstream SAT code by Alex, pinned at one commit and used as the second source of truth.</dd></div><div><dt>Agent</dt><dd>An AI model that reads files, runs commands and edits code under written instructions.</dd></div><div><dt>Session</dt><dd>One running agent with its own working folder and role.</dd></div><div><dt>Subagent</dt><dd>A helper started by a session for one narrow job: implement, run gates, or review.</dd></div><div><dt>Coordinator</dt><dd>The session that is the hub between the other sessions and the maintainer.</dd></div><div><dt>Bench tester</dt><dd>The only agent that flashes a test unit and runs bench tests.</dd></div><div><dt>BlueFlame Bot</dt><dd>The Discord identity under which sessions read and write; the persona of the workshop.</dd></div><div><dt>Skill / command</dt><dd>A written procedure an agent loads when it is called.</dd></div><div><dt>Hook</dt><dd>A small script that runs automatically around an agent action or a git commit.</dd></div><div><dt>Gate</dt><dd>An automatic check that can refuse a step.</dd></div><div><dt>ADR</dt><dd>Architecture Decision Record: one numbered file per design decision.</dd></div><div><dt>Binding ADR</dt><dd>An ADR that must name the automatic gate that enforces it.</dd></div><div><dt>AGENT-CORE block</dt><dd>The block of core rules that is identical in the three instruction files.</dd></div><div><dt>Directive</dt><dd>A dated statement by the maintainer that becomes a rule.</dd></div><div><dt>Backlog task</dt><dd>The unit of work. Every change starts with one; it carries acceptance criteria and the evidence.</dd></div><div><dt>needs-maintainer-ok</dt><dd>The label on a task that may only be picked up after Robert releases it.</dd></div><div><dt>Hard stop</dt><dd>An action that needs the maintainer's explicit yes each time.</dd></div><div><dt>Standing permission</dt><dd>An ongoing permission with conditions, such as pushing to the working line.</dd></div><div><dt>Capture</dt><dd>A diagnostic recording a user makes with a script: logs, messages and raw frames in one zip, with secrets masked.</dd></div><div><dt>Old-versus-fix evidence</dt><dd>The same reproduction fails on the old code and passes on the fix.</dd></div><div><dt>Bench</dt><dd>The physical test units on the maintainer's machine.</dd></div><div><dt>OTA</dt><dd>Over the air: flashing a unit over WiFi instead of a USB cable.</dd></div><div><dt>Soak</dt><dd>Letting a build run on a real unit for a set time before release.</dd></div><div><dt>Build lock</dt><dd>A machine-wide lock: one build at a time across all sessions.</dd></div><div><dt>Prerelease tag</dt><dd>The version label, such as beta.327, by which a tester recognises a build.</dd></div><div><dt>Alpha zip</dt><dd>The complete flash set of one tested build, posted for testers.</dd></div><div><dt>Beta slot</dt><dd>The fixed moment, 08:00 or 20:00, at which a public beta may be published.</dd></div><div><dt>Ledger</dt><dd>The coordinator's local list of which tag was posted or covered by a later zip.</dd></div><div><dt>Watermark</dt><dd>A timestamp file that tells a watch loop what is new since its last run.</dd></div><div><dt>Decision register</dt><dd>The numbered record of every correction and decision by the SAT designer.</dd></div><div><dt>Equipment matrix</dt><dd>A community table of which boilers and thermostats answer which OpenTherm messages.</dd></div><div><dt>Worktree / lane</dt><dd>A separate working folder for one session; a lane is a parallel line of work that is removed after it lands.</dd></div><div><dt>MCP server</dt><dd>A small local service that gives an agent tools, here for reading and posting on Discord.</dd></div><div><dt>OpenWolf</dt><dd>A memory layer for Claude: a file index, lessons and a bug log kept between sessions.</dd></div><div><dt>graphify</dt><dd>A tool that builds a graph of the source code for structure questions.</dd></div><div><dt>C4</dt><dd>A documentation model that describes a system by context, containers, components and code.</dd></div><div><dt>CI</dt><dd>Continuous integration: checks that run on GitHub after a push.</dd></div></dl>
+</section>
+
+<footer>
+  <p><b>Source.</b> Every fact on this page comes from <a href="agentic-setup.md">agentic-setup.md</a> (Dutch), which cites a file and line for each statement. This page simplifies; it adds nothing. The plates are generated files: <a href="images/agentic-setup-plate-a.svg">plate A</a>, <a href="images/agentic-setup-plate-b.svg">plate B</a>.</p>
+  <p><b>Limits.</b> The document was written from the repository in a cloud session that could not read Discord. What happens in the channels is derived from commands, rules, the register and task notes. Local files such as the people list, the ledger and the webhook address were not available. Counts are file-level counts on 2026-11-15.</p>
+  <p class="meta">OTGW-firmware · process documentation · TASK-1984 · light theme by the maintainer's choice</p>
+</footer>
+</div></div>
+<script>
+(function(){
+  var root=document.documentElement; root.classList.add('js');
+  var sts=[].slice.call(document.querySelectorAll('.st')), panels=[].slice.call(document.querySelectorAll('.stp'));
+  function pick(n){
+    sts.forEach(function(b){b.setAttribute('aria-pressed', b.getAttribute('data-st')===n?'true':'false');});
+    panels.forEach(function(p){p.classList.toggle('on', p.id==='st-'+n);});
+  }
+  sts.forEach(function(b){
+    var n=b.getAttribute('data-st');
+    b.addEventListener('click',function(){pick(n);});
+    b.addEventListener('mouseenter',function(){pick(n);});
+    b.addEventListener('focus',function(){pick(n);});
+  });
+  var chan=document.getElementById('chan');
+  [].slice.call(document.querySelectorAll('.seg button')).forEach(function(b){
+    b.addEventListener('click',function(){
+      var book=b.getAttribute('data-mode')==='book';
+      chan.classList.toggle('book',book);
+      [].slice.call(b.parentNode.children).forEach(function(x){x.setAttribute('aria-pressed', x===b?'true':'false');});
+    });
+  });
+})();
+</script>
