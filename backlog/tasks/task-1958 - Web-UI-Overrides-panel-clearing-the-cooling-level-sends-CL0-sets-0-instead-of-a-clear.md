@@ -3,7 +3,7 @@ id: TASK-1958
 title: >-
   Web UI Overrides panel: clearing the cooling level sends CL=0 (sets 0 %)
   instead of a clear
-status: Done
+status: In Review
 assignee:
   - '@claude'
 created_date: '2026-11-15T04:26:00Z'
@@ -25,7 +25,7 @@ Found by 09 on the TASK-1859 bench: the Overrides panel clear action for CL send
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [x] #1 The clear action sends a value that clears (e.g. CL=-) and the panel shows the override gone
+- [ ] #1 The clear action sends a value that clears (e.g. CL=-) and the panel shows the override gone
 - [x] #2 Web UI test (headless Chrome) red on the current v2.js, green on the fix
 <!-- AC:END -->
 
@@ -33,6 +33,8 @@ Found by 09 on the TASK-1859 bench: the Overrides panel clear action for CL send
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-11-15 fix: data/v2.js OTD_WRITE_CMD[7].clear 'CL=0' -> 'CL=-'. OT-Direct (OTDirect.ino CL= handler, otdPicFloatF88 with OTD_PIC_PERCENT): a '-' is no sign there, so it is a parse error (parseErr true) and lands in clearWriteOverride(7) with the reply 'CL: -', as the PIC SetCoolLevel clears on a parse error. Evidence: tests/webui/otd-override-clear.test.mjs (headless Chrome, real v2.html/v2.js against a fake OT-Direct device), CLEARS[7] corrected to 'CL=-' (the test pinned the bug): 5 pass on the fix; on the old data/ (git archive HEAD) 1 fail 'MsgID 7 Clear sends CL=-'. AC1 'the panel shows the override gone' is the firmware's clearWriteOverride(7) after the queued command; not seen on a bench.
+
+Correction (same session): AC1 unticked and status In Review: the panel showing the override gone needs the bench (the web UI test proves the command sent, not the firmware clearing it on a unit). To check in the next bench run on .61 (OT-Direct): set CL=50, Clear, the MsgID 7 row disappears.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
