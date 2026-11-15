@@ -7,7 +7,8 @@
 | Peildatum | 2026-11-15, `dev` @ `e22c59e` |
 | Taak | TASK-1984 |
 | Referentiewireframes | [`images/agentic-setup-plate-a.svg`](images/agentic-setup-plate-a.svg) (overzicht), [`images/agentic-setup-plate-b.svg`](images/agentic-setup-plate-b.svg) (BlueFlame Bot), met PNG-versies ernaast |
-| Thema | Licht (op verzoek van de maintainer, 2026-11-15): het lichte palet van `agentic-setup.html` |
+| Thema en taal | Licht thema en Engelse labels (maintainer, 2026-11-15: "light theme voor de plaat", "alle diagrammen in het Engels"). De brief zelf is Nederlands; prompts en labels zijn Engels |
+| Generator | [`tools/agentic-plates/`](../../tools/agentic-plates/README.md) maakt beide wireframes opnieuw |
 
 Deze brief beschrijft drie platen. **Plaat A** is het overzicht van de hele werkplaats. **Plaat B** zoomt in op BlueFlame Bot: hoe hij Discord, GitHub en Tweakers bewaakt en waar hij antwoordt. **Plaat C** is een smalle banner met de pijplijn van taak tot tester. Per plaat staan hier de boodschap, het raster, de zones met hun knopen, de verbindingen, de legenda en kant-en-klare prompts.
 
@@ -25,7 +26,7 @@ Image generators zijn goed in sfeer, compositie en iconen, en slecht in veel kle
 
 Werkafspraken:
 
-- **Prompts zijn in het Engels.** De meeste generators zijn vooral op Engelstalige bijschriften getraind en volgen Engelse compositie-instructies nauwkeuriger. De labels staan in beide talen in hoofdstuk 6; kies er één per plaat.
+- **Prompts en labels zijn in het Engels.** Alle diagrammen van dit project zijn Engels (maintainer, 2026-11-15), en de meeste generators volgen Engelse compositie-instructies nauwkeuriger. Hoofdstuk 6 geeft de Engelse labelset; de Nederlandse kolom is alleen ter vertaling.
 - **Korte labels.** Maximaal drie woorden per knoop. Details horen in het document, niet op de plaat.
 - **Publicatieregels van het project gelden ook voor de plaat.** Noem de OTGW32-hardware niet bij naam (CLAUDE.md, AGENT-CORE, Discord-regel), zet geen Discord-gebruikers-ID's, webhook-URL's of tokens in beeld, en gebruik voor personen rolnamen ("Maintainer", "SAT-ontwerper"), geen foto-achtige portretten.
 - **Geen merklogo's.** Gebruik generieke glyphs voor Discord, GitHub en Tweakers (een spraakwolk, een vertakking, een forumtegel). Generators vervormen logo's, en een vervormd logo oogt slordiger dan een neutraal icoon.
@@ -126,21 +127,22 @@ De kijker moet na tien seconden drie dingen begrijpen:
 ```
  x→ 0%                25%                 50%                 75%               100%
  y  ┌──────────────────────────────────────────────────────────────────────────┐
- 0% │ MENSEN   [Eindgebruikers] [Alpha-testers] [SAT-ontwerper] [Maintainer]   │
-14% │ KANALEN  [Tweakers][GitHub][Discord-support][#alpha-testing][#dev-sat-mqtt][DM] │
+ 0% │ PEOPLE   [End users]     [Maintainer]     [SAT designer]   [Alpha testers] │
+14% │ CHANNELS [Tweakers][GitHub][Discord support][DM][#dev-sat-mqtt][#alpha-testing] │
+    │ ────────────────────────── channel bus ──────────────────────────────────  │
 30% ├──────────────┬────────────────────────────────────────┬──────────────────┤
-    │ KENNIS EN    │                                        │ PIJPLIJN EN      │
-    │ REGELS       │      ( BlueFlame Bot: waakvlam )       │ POORTEN          │
-    │ [Regels]     │   coördinerende sessie, met een ring   │ [Taak]           │
-    │ [ADR-kit]    │   subagents eromheen:                  │ [Plan+review]    │
-    │ [C4-kaart]   │   Sonnet · Haiku · Opus · Advisor      │ [Rood → groen]   │
-    │ [SAT-reg.]   │                                        │ [Reviewteam]     │
-    │ [Vragen]     │  [Bench-tester + testunits]  [Andere   │ [Gates]          │
-    │ [Backlog]    │                               agents]  │ [Build · lock]   │
-    │ [OpenWolf]   │                                        │ [Bench · OTA]    │
-    │ [graphify]   │                                        │ [Push · post]    │
+    │ KNOWLEDGE &  │  skill chips          skill chips      │ PIPELINE &       │
+    │ RULES        │      ( BlueFlame Bot: pilot flame )    │ GATES            │
+    │ [Rules]      │  coordinator and comms session, ring:  │ [1 Task]         │
+    │ [ADR kit]    │  Sonnet · Haiku · Opus · Advisor ·     │ [2 Plan+review]  │
+    │ [C4 map]     │  Review lenses                         │ [3 Red→green]    │
+    │ [SAT reg.]   │                                        │ [4 Review team]  │
+    │ [Questions]  │                                        │ [5 Gates]        │
+    │ [Backlog]    │ [Comms session][Other agents] [Bench   │ [6 Bump+hooks]   │
+    │ [OpenWolf]   │                                tester] │ [7 Build·lock]   │
+    │ [graphify]   │                                        │ [8 Bench·OTA]    │
 86% ├──────────────┴────────────────────────────────────────┴──────────────────┤
-    │ NAAR BUITEN  [Alpha-zip] [Beta 2.x] [Stabiel 2.x 🔒] [1.x LTS 🔒]   bronnen: ○○○○ │
+    │ EXTERNAL KNOWLEDGE ○ ○ ○ ○      WHAT SHIPS [1.x LTS 🔒][Stable 2.x 🔒][Beta 2.x ◷][Alpha zip] │
 100%└──────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -148,37 +150,37 @@ De kijker moet na tien seconden drie dingen begrijpen:
 
 **Zone 1, Mensen (y 0-13 %, oranje kaarten).** Vier kaarten op gelijke afstand, elk met icoon, label en één regel ondertitel.
 
-| Knoop | Ondertitel | x-midden |
+| Knoop (label) | Ondertitel | x-midden |
 |---|---|---|
-| Eindgebruikers | meldingen en vragen | 14 % |
-| Alpha-testers | flashen, captures, geen beslismacht | 38 % |
-| SAT-ontwerper | bron van waarheid voor SAT | 62 % |
-| Maintainer | scope, prioriteit, vrijgave | 86 % |
+| End users | reports and questions | 14 % |
+| Maintainer | scope, priority, release | 38 % |
+| SAT designer | source of truth for SAT | 62 % |
+| Alpha testers | flash, capture, no decisions | 86 % |
 
-**Zone 2, Kanalen (y 15-28 %, gestippelde tegels).** Zes tegels.
+**Zone 2, Kanalen (y 15-28 %, gestippelde tegels).** Zes tegels, met daaronder een dunne petrol "kanaalbus" waarop elk kanaal aansluit.
 
-| Knoop | Ondertitel | Richting t.o.v. BlueFlame Bot |
+| Knoop (label) | Ondertitel | Richting t.o.v. BlueFlame Bot |
 |---|---|---|
-| Tweakers-topic | RSS, alleen lezen | in |
-| GitHub | issues, PR's, releases | beide |
-| Discord-support | vier kanalen: gelezen, plus release-aankondigingen | in (aankondigingen uit) |
-| #alpha-testing | builds, verslagen, SAT-vragen | beide |
-| #dev-sat-mqtt | backlog-commando's | beide |
-| DM met de maintainer | één vraag per bericht | beide |
+| Tweakers topic | RSS · read only | in |
+| GitHub | issues · PRs · releases | beide |
+| Discord support | 4 channels · read + announcements | in (aankondigingen uit) |
+| DM with maintainer | one question per message | beide |
+| #dev-sat-mqtt | backlog commands | beide |
+| #alpha-testing | builds · reports · SAT | beide |
 
 **Zone 3, Agentlaag (midden, y 30-85 %, x 24-76 %).**
 
-- **Hart:** een ronde brander met een blauwe vlam, label "BlueFlame Bot", ondertitel "coördinerende sessie". Dit is het visuele zwaartepunt: de enige gloed op de plaat.
-- **Ring eromheen (petrol zeshoeken):** "Sonnet · implementatie", "Haiku · runners", "Opus · correctheidsreview", "Advisor · zelfreview", "Reviewlenzen".
-- **Linksonder in de zone:** "Bench-tester" als werkbank met twee printplaatjes en een WiFi-boog, ondertitel "flasht en test als enige". Verbonden met de pijplijnstap "Bench · OTA".
-- **Rechtsonder in de zone:** drie kleine satellieten, label "Andere agents", ondertitel "Codex · Copilot · CI-Claude".
-- Boven de brander, klein: de skills als chips in een boog: `/implement-next-task`, `/backlog_discord`, `/check_otgw_issues`, `/beta-release-2x`, `/release-2x`, `/update-docs-2x`, `/analyze-capture`.
+- **Hart:** een ronde brander met een blauwe vlam, label "BlueFlame Bot", ondertitel "coordinator and comms session". Dit is het visuele zwaartepunt: het enige element met een zachte gloed.
+- **Ring eromheen (petrol zeshoeken met een monogram):** "Sonnet · implementation", "Haiku · runners", "Opus · correctness review", "Advisor · plan self-review", "Review lenses · rules, tests, SAT".
+- **Boven de brander:** de skills als chips in twee kolommen: `/implement-next-task`, `/backlog_discord`, `/check_otgw_issues` links; `/beta-release-2x`, `/release-2x`, `/update-docs-2x`, `/analyze-capture` rechts.
+- **Linksonder in de zone:** twee kaarten naast elkaar: "Comms session" (blauwe rand, "Discord talk · post drafts", met een gestippelde blauwe lijn naar de brander, want ook de comms-sessie spreekt als BlueFlame Bot) en "Other agents" (drie kleine satellieten, "Codex · Copilot · CI Claude").
+- **Rechtsonder in de zone:** "Bench tester" als werkbank met twee printplaatjes en een WiFi-boog, ondertitel "the only one that flashes", verbonden met pijplijnstap 8 "Bench via OTA".
 
 **Zone 4, Kennis en regels (links, y 30-85 %, x 0-22 %).** Een archiefkast met acht laden van boven naar beneden: Regels (CLAUDE.md, AGENTS.md), ADR's + ADR-kit, C4-kaart, SAT-beslisregister, Open vragen, Backlog.md, OpenWolf-geheugen, graphify-codegraaf.
 
-**Zone 5, Pijplijn en poorten (rechts, y 30-85 %, x 78-100 %).** Een verticale transportband met negen stations van boven naar beneden; elk station een chip met een oker schildje: Taak, Plan + zelfreview, Code rood → groen, Reviewteam, evaluate · tests, Bump · hooks, Build · lock, Bench · OTA, Push · post.
+**Zone 5, Pijplijn en poorten (rechts, y 30-85 %, x 78-100 %).** Een verticale transportband met negen genummerde witte stations van boven naar beneden, elk met een oker schildje: Backlog task, Plan + self-review, Code red → green, Review team, evaluate · tests, Bump + commit hooks, Build esp32-combo · lock, Bench via OTA, Push dev · post zip. Stations 5 tot en met 8 hebben een oker rand (de harde poorten), de andere een petrol rand.
 
-**Zone 6, Naar buiten (y 87-100 %).** Vier tegels: "Alpha-zip per taak" (groen, met een klein lusje terug naar #alpha-testing), "Beta 2.x" (met klokje 08:00/20:00, staand mandaat), "Stabiel 2.x" (hangslot), "1.x LTS" (hangslot). Rechts in dezelfde band, klein en grijs: vier ronde badges voor externe kennisbronnen: "OpenTherm-matrix", "thermo-nova", "OpenTherm-spec", "toolchains".
+**Zone 6, Naar buiten (y 87-100 %, rechterhelft).** Vier tegels van links naar rechts, de alpha-zip direct onder de pijplijn: "1.x LTS" (steenrood hangslot), "Stable 2.x" (steenrood hangslot), "Beta 2.x" (oker klokje, "standing permission 08:00/20:00"), "Alpha zip" (groen, "per tested task", met een gestippelde groene lus langs de rechterrand terug naar #alpha-testing). Links in dezelfde band, klein en grijs: vier ronde badges voor externe kennisbronnen: "OpenTherm matrix", "thermo-nova", "OpenTherm spec", "toolchains".
 
 ### 3.4 Verbindingen
 
@@ -213,7 +215,7 @@ Top band labelled "PEOPLE": four cards with a pale peach fill (#fde7d9) and a bu
 
 Second band labelled "CHANNELS": six dashed tiles: "Tweakers (RSS)", "GitHub", "Discord support", "DM", "#dev-sat-mqtt", "#alpha-testing".
 
-Centre: a round burner with a pale blue face (#dbeafe) and a cobalt rim, holding a vivid blue flame (cobalt #1d4ed8 at the base fading to cyan #06b6d4 at the tip) with a white core, labelled "BlueFlame Bot" and "coordinating session". It is the only element with a soft glow. Around it a ring of five small petrol-blue hexagons (#0e7490 outline, #d9eff4 fill): "Sonnet", "Haiku", "Opus", "Advisor", "Review lenses". Lower left of the centre: a workbench with two small circuit boards and a WiFi arc, labelled "Bench tester". Lower right: three small satellites labelled "Other agents".
+Centre: a round burner with a pale blue face (#dbeafe) and a cobalt rim, holding a vivid blue flame (cobalt #1d4ed8 at the base fading to cyan #06b6d4 at the tip) with a white core, labelled "BlueFlame Bot" and "coordinator and comms session". It is the only element with a soft glow. Around it a ring of five small petrol-blue hexagons (#0e7490 outline, #d9eff4 fill): "Sonnet", "Haiku", "Opus", "Advisor", "Review lenses". Lower left of the centre: two small cards, "Comms session" (cobalt outline, a dashed cobalt line to the flame) and "Other agents" (three small satellites). Lower right: a workbench with two small circuit boards and a WiFi arc, labelled "Bench tester", connected to the pipeline station "Bench (OTA)".
 
 Left column labelled "KNOWLEDGE & RULES": a filing cabinet with eight drawers: "Rules", "ADRs + ADR kit", "C4 map", "SAT register", "Open questions", "Backlog", "OpenWolf memory", "Code graph".
 
