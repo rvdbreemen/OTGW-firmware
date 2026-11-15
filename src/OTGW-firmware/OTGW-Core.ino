@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v2.0.0-beta.320
+**  Version  : v2.0.0-beta.323
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -4546,19 +4546,55 @@ static void dispatchOTGWInputLine(const char* buf, size_t len)
 // choice is made at every (re)open: the start of a replay and each wrap-around.
 // Builtin reads go through pgm_read_byte(); the lines are synthesised either way, so
 // the PIC byte stream (ADR-177) is not involved.
-#include "otgwSimulationFixture.h"
+#include "otgwSimulationFixtureZ.h"   // TASK-1955 (ADR-247): generated, a zlib stream
+#include <miniz.h>                    // the ESP32-S3 ROM inflater (tinfl_decompress, esp32s3.rom.ld)
 
 enum class OTGWReplaySource : uint8_t { None, File, Builtin };
-static const size_t OTGW_SIM_FIXTURE_LEN = sizeof(OTGW_SIM_FIXTURE) - 1;
 static OTGWReplaySource otgwReplaySource = OTGWReplaySource::None;
 static size_t           otgwReplayBuiltinPos = 0;
+// --- otgwFixtureInflate begin
+// TASK-1955 (ADR-247): the fixture is inflated once into this buffer when a built-in replay starts and freed when
+// the replay ends or an uploaded file takes over; a wrap-around re-reads the buffer. A failed allocation is logged
+// once per replay and the replay then has no built-in source.
+static uint8_t* otgwFixtureBuf = nullptr;
+static bool     otgwFixtureFailed = false;
+static void otgwFixtureFree() {
+  free(otgwFixtureBuf);
+  otgwFixtureBuf = nullptr;
+  otgwFixtureFailed = false;
+}
+static bool otgwFixtureInflate() {
+  if (otgwFixtureBuf) return true;
+  if (otgwFixtureFailed) return false;
+  uint8_t* out = static_cast<uint8_t*>(malloc(OTGW_SIM_FIXTURE_RAW_LEN));
+  tinfl_decompressor* dec = static_cast<tinfl_decompressor*>(malloc(sizeof(tinfl_decompressor)));
+  bool ok = out && dec;
+  if (ok) {
+    tinfl_init(dec);
+    size_t inLen = OTGW_SIM_FIXTURE_Z_LEN, outLen = OTGW_SIM_FIXTURE_RAW_LEN;
+    const tinfl_status st = tinfl_decompress(dec, OTGW_SIM_FIXTURE_Z, &inLen, out, out, &outLen,
+                                             TINFL_FLAG_PARSE_ZLIB_HEADER | TINFL_FLAG_USING_NON_WRAPPING_OUTPUT_BUF);
+    ok = (st == TINFL_STATUS_DONE) && (outLen == OTGW_SIM_FIXTURE_RAW_LEN);
+  }
+  free(dec);
+  if (!ok) {
+    free(out);
+    otgwFixtureFailed = true;
+    DebugTf(PSTR("OTGW simulation: built-in replay not started, inflating the fixture failed (%u B heap free)\r\n"),
+            (unsigned)ESP.getFreeHeap());
+    return false;
+  }
+  otgwFixtureBuf = out;
+  return true;
+}
+// --- otgwFixtureInflate end
 
 // Next byte of the active replay source, or -1 at its end.
 static int nextOTGWSimulationByte(File& replayFile)
 {
   if (otgwReplaySource == OTGWReplaySource::Builtin) {
-    if (otgwReplayBuiltinPos >= OTGW_SIM_FIXTURE_LEN) return -1;
-    return pgm_read_byte(OTGW_SIM_FIXTURE + otgwReplayBuiltinPos++);
+    if (!otgwFixtureBuf || otgwReplayBuiltinPos >= OTGW_SIM_FIXTURE_RAW_LEN) return -1;
+    return otgwFixtureBuf[otgwReplayBuiltinPos++];
   }
   if (!replayFile.available()) return -1;
   return replayFile.read();
@@ -4645,9 +4681,11 @@ static void reopenOTGWSimulationFile(File& otgwSimulationFile)
     otgwSimulationFile = LittleFS.open(F("/otgw_simulation.log"), "r");
     if (otgwSimulationFile) {
       otgwReplaySource = OTGWReplaySource::File;
+      otgwFixtureFree();   // TASK-1955: an uploaded file took over
       return;
     }
   }
+  otgwFixtureInflate();   // TASK-1955: kept across wrap-arounds; a failure leaves the built-in source empty
   otgwReplaySource = OTGWReplaySource::Builtin;
 }
 
@@ -4794,6 +4832,7 @@ static bool replayNextOTGWSimulationLine(File& otgwSimulationFile, char* sReplay
     // hide the built-in fixture or spin the reopen every loop pass: fall back and wait a tick.
     if (otgwReplaySource == OTGWReplaySource::File) {
       closeOTGWSimulationSource(otgwSimulationFile);
+      otgwFixtureInflate();   // TASK-1955
       otgwReplaySource = OTGWReplaySource::Builtin;
     }
     state.debug.iOTGWSimulationNextDueMs = millis() + state.debug.iOTGWSimulationIntervalMs;
@@ -4842,6 +4881,7 @@ static bool handlePICSerialSimulation(File& otgwSimulationFile,
 {
   if (!state.debug.bOTGWSimulation && otgwSimulationWasEnabled) {
     closeOTGWSimulationSource(otgwSimulationFile);
+    otgwFixtureFree();   // TASK-1955: the replay ended, give the buffer back
     otgwSimulationWasEnabled = false;
     resetOTGWLineBuffers(bytesRead, bytesWrite, discardCurrentReadLine);
   }

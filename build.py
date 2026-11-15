@@ -3348,6 +3348,7 @@ def main():
     # TASK-1640: gzip the firmware update pages into their PROGMEM header before any
     # compile (the arduino-cli path does not run the PlatformIO pre-scripts).
     webui_pages.write_update_header(project_dir)
+    webui_pages.write_asset_headers(project_dir)   # TASK-1955 (ADR-247): settings help + replay fixture, deflated
 
     # TASK-1224: stage (and minify) the web assets once for all targets; the
     # filesystem image is built from this copy, data/ stays untouched.

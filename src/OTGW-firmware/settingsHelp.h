@@ -1,8 +1,9 @@
 // Settings help texts served at /settings-help.json (TASK-1294, from TASK-1281).
 //
-// This header is the source of truth. The JSON is a PROGMEM string in the app slot
-// (ADR-194), not a LittleFS file; FSexplorer.ino streams it from flash with
-// serveProgmemAsset(), without a RAM copy. Size limit 24 KB (TASK-1688).
+// This header is the source of truth, but it is no longer compiled (TASK-1955, ADR-247):
+// scripts/webui_pages.py gzips the JSON below into settingsHelpGz.h, which FSexplorer.ino
+// serves from flash with Content-Encoding: gzip (serveProgmemAsset()). Edit the JSON here;
+// the build regenerates the gzip header. Size limit 24 KB of JSON (TASK-1688).
 // The body below is exactly the JSON document: v2.js fetches it and tests/webui/
 // settings-help.test.mjs parses it out of this raw string. One key per line.
 // A key needs a matching entry in SET_META (v2.js); the test checks both ways.

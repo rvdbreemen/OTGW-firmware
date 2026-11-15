@@ -17,3 +17,5 @@ import webui_pages  # noqa: E402
 
 if webui_pages.write_update_header(_project):
     print("webui: regenerated updateServerHtml.h")
+if webui_pages.write_asset_headers(_project):   # TASK-1955 (ADR-247)
+    print("webui: regenerated settingsHelpGz.h / otgwSimulationFixtureZ.h")
