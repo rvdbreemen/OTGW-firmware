@@ -5,7 +5,7 @@ status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-15T07:58:00Z'
-updated_date: '2026-11-15T10:36:00Z'
+updated_date: '2026-11-15T12:14:00Z'
 labels:
   - otdirect
 dependencies: []
@@ -35,6 +35,8 @@ Implemented (lane-95-next): OTDirecttypes.h bOverrideHB default true; settingStu
 Docs (Robert asked 'is de documentatie op orde?', 2026-11-15): manual ch05/h05 (MsgID 100 flags 0x03/0x01, OH default 1, master TT=0), ch09/h09 (PIC-parity list: bare XX=, OT=/SW=/SH= relay, MsgID 99, TT/OH flags + one-time OH migration with the OTDohpicdefault marker, master TT=0; PR=T row), docs/c4/c4-code-otdirect.md, docs/c4/c4-code-settings.md (migration list, OTD key count 21, struct with the TASK-1836 fields), docs/api/MQTT.md (overridehb default; PR=A/O/L/T/P/R rows that were stale since TASK-1797/1848). Covers TASK-1957, 1847, 1906, 1803, 1750, 1751 and this task. Checks: manual OTGW32 count 0 in the touched chapters, test_manual_sat_commands / test_sat_mqtt_contract_1485 / test_sat_pm25_poll OK, evaluate --quick 86/0.
 
 Known edge (09, bench 2026-11-15, accepted and documented, no code): a firmware older than beta.301 drops the unknown OTDohpicdefault key when it saves settings.ini (seen with d3's beta.297 on .61). After upgrade -> downgrade -> upgrade the migration therefore runs again and sets OH=1 over a user's OH=0. A guard 'migrate only when OTDoverridehb is missing' was rejected: every unit since beta.203 has OTDoverridehb=false stored, so the migration Robert chose (B) would never run. Downgrades within the beta are rare; the CHANGELOG line says to send OH=0 again after one.
+
+Downgrade edge CONFIRMED on the bench (09, .61, 2026-11-15): after beta.297 (marker gone, OH=0) beta.301 migrated again (PR: T=11, OTDoverridehb true + marker). Accepted as documented behaviour; Known issues line for the next public release notes sent to 92: 'After going back to a build older than beta.301 and up again, OH= is set to 1 once more; set OH=0 again if you had chosen that.'
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
