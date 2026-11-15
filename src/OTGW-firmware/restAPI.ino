@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-beta.315
+**  Version  : v2.0.0-beta.316
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -366,6 +366,15 @@ static void handleCommandSubmit(const char* cmdStr) {
   }
   if (cmdLen > kMaxCmdLen) {
     sendApiError(413, F("Command too long"));
+    return;
+  }
+  // TASK-1970: while SAT is enabled an external CV control command is refused (ADR-179, the same rule
+  // addCommandToQueue() and the OT-Direct handler apply). Refuse it here with its own answer: it stays
+  // refused while SAT controls the boiler, a full queue (503 below) clears by itself. On OT-Direct the
+  // command was queued with 202 and refused later on the loop task, out of the client's sight.
+  if (satOwnsControlSetpoint() && satBlocksExternalCommand(cmdStr, static_cast<int>(cmdLen))) {
+    satNoteExternalRefused(cmdStr, static_cast<int>(cmdLen));
+    sendApiError(409, F("Command refused: SAT is in control of the boiler (disable SAT to send it)"));
     return;
   }
   // TASK-1761: a full queue (PIC) or a full OT-Direct text ring is Dropped: say so instead of 202.

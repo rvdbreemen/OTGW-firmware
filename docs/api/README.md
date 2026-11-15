@@ -478,6 +478,8 @@ If the body is not valid JSON with a `command` field, the raw body text is used 
 **Error responses**:
 - `400` - Missing command, or invalid format (must be `LL=value`)
 - `413` - Command too long
+- `409` - Refused: SAT is enabled and controls the boiler, so an external CV control command (`CS=`, `CH=`, `MM=`, `C2=`, `H2=`, `TT=`, `TC=`) is not sent (ADR-179). It stays refused while SAT is enabled; other commands are not affected (TASK-1970)
+- `503` - Not queued: the command queue or the OT-Direct command ring is full; retry later
 
 #### `POST /api/v2/otgw/command/{cmd}` | `PUT /api/v2/otgw/command/{cmd}`
 

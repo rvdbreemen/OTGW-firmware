@@ -1696,6 +1696,23 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApiError'
+        '409':
+          description: |
+            Refused: SAT is enabled and controls the boiler, so an external CV control command
+            (CS=, CH=, MM=, C2=, H2=, TT=, TC=) is not sent (ADR-179, TASK-1970). It stays refused while
+            SAT is enabled; disable SAT to send it. Other commands (HW=, PR=, GW=, ...) are not affected.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '503':
+          description: |
+            Not queued: the command queue (PIC) or the OT-Direct command ring is full (TASK-1761), or the
+            board has no OT command interface. Retry later.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
     put:
       security:
         - basicAuth: []
