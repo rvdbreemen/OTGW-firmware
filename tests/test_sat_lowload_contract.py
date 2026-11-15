@@ -523,8 +523,11 @@ class LowLoadContract(unittest.TestCase):
     def test_ll018i_runtime_enable_sends_the_boot_pm_chain(self):
         self.delegated("LL-018i")
 
-    @ll("LL-018", "open_decision", "none: a PM=25 on OT-Direct waits behind the entries already due in the schedule (a minute-aligned slow-poll burst delays it by seconds, not by one communication interval); no decision records what OT-Direct must do for PM=",
-        task="TASK-1412.12 finding", question="OTD-PM25 (new, to be asked)")
+    # TASK-1981: OT-Direct transport, not SAT control, so the PIC decides (coordinator rule 2026-11-15): SendPriorityMsg
+    # (gateway.asm 6.6 :3436-3441) is checked before the alternatives list, so the PM= message goes in the next free slot and
+    # repeats until answered (HandleResponse :2431-2434). Since the faster tiers go before the slow-poll burst this holds.
+    @ll("LL-018", "contract", "scheduleMasterRequest() (OTDirect.ino): a PM=25 sets the 10 s entry due; the faster tiers go before the 60 s slow-poll burst",
+        task="TASK-1981")
     def test_ll018j_ot_direct_pm25_goes_out_within_one_communication_interval_in_the_full_schedule(self):
         import test_sat_no_return_startup as nrs
         cls = nrs.OtDirectPm
