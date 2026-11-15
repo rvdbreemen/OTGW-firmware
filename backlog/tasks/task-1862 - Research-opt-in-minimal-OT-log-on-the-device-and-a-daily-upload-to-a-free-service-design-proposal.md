@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-12T06:32:00Z'
-updated_date: '2026-11-14T16:26:00Z'
+updated_date: '2026-11-15T08:29:00Z'
 labels:
   - diagnostics
   - research
@@ -71,4 +71,6 @@ Requirements from Robert in #dev-sat-mqtt (2026-11-12, relayed by the coordinato
 2026-11-14 Robert: build the export/replay tool, size the debug stream, and research tokenized logging (>=2 candidates on primary sources). Work on branch research/cloud-recording.
 
 2026-11-14 tokenized logging research (>=2 candidates, primary sources): pw_tokenizer (Apache-2.0; needs a linker section script and -fdata-sections; docs advise against PW_TOKENIZE_TO_BUFFER in widely expanded logging macros; PSTR() formats untested), Trice (MIT; IDs in til.json, runtime strings via triceS, library compiled as C, all 1,270 calls rewritten). Recommendation: own address form after Zephyr's dictionary-logging principle (format and function-name flash offsets + line + binary args, decoded from the build's ELF): no call-site and no linker change; measured 12 B/line with zlib vs 104 B text. Details in docs/diagnostics/ot-stream-encoding-study.md.
+
+2026-11-15 Robert: is there a way without PSRAM? Options: (1) TLS with CONFIG_MBEDTLS_DYNAMIC_BUFFER (+ dynamic free options) through pioarduino custom_sdkconfig: Espressif measures about 22,013 B peak heap vs about 42,196 B default (docs.espressif.com esp32s3 mbedtls page, https_request example); fits the 31.7 KB largest block in principle; cost: self-built IDF libraries, heavier build, maintenance on core updates; ADR-218 listed it as untested. (2) payload encryption over plain HTTP (X25519 + ChaCha20-Poly1305, HMAC per request), about 2-3 KB RAM, own crypto, no server authentication. (3) LAN relay (MQTT -> Home Assistant -> HTTPS), per-tester config. (4) local store + browser upload, not continuous. (5) PSRAM board revision. Recommendation: (1) after a bench PoC on .61 (handshake peak with the Cloudflare chain, low-water with the web UI open, custom_sdkconfig vs include/sdkconfig.h and LTO); fallback (2). Risk: low-water 536 B on that board (TASK-1528). Decision open for Robert; the PoC needs the bench-tester.
 <!-- SECTION:NOTES:END -->
