@@ -3,11 +3,11 @@ id: TASK-1944
 title: >-
   OT-Direct: at boot the restored HW= and UI= list are wiped again when the
   auto-detect switches to master
-status: In Progress
+status: In Review
 assignee:
   - '@claude'
 created_date: '2026-11-14T18:07:00Z'
-updated_date: '2026-11-14T19:15:00Z'
+updated_date: '2026-11-15T02:19:00Z'
 labels:
   - otdirect
   - bug
@@ -42,4 +42,6 @@ Order decided (AC2): restore after the auto-detect. initOTDirect() moves the TAS
 Citations (lane-1924 941a224f9): src/OTGW-firmware/OTDirect.ino:1202 initOTDirect(), :1236 otdRestorePersistedCommands(), :1311 applyOTDirectMode(OTD_MODE_MASTER) after the auto-detect finds no thermostat; resetTransientState() clears HW/UI at :2886-2896 region (otDHWOverride = 0xFF, otMasterStatusFlags = 0x01, otUnknownIdCount = 0, schedule disabled flags).
 
 Implemented (d3, 2026-11-14, local, placeholder beta.254, not yet built). initOTDirect(): the TASK-584 vent restore and otdRestorePersistedCommands() moved from before the bus probe to after the auto-detect block and before otdBootHandshake() (order decided, see plan). Also the vent setpoint (write cache + override 71) was lost by the master reset, now kept too. tests/test_otd_boot_restore_order.py (source order on the real initOTDirect, which waits 5 s on hardware and cannot run on the host): 3/3 on the fix, 2 FAIL on HEAD. OTD suite + init-related tests 41/41, evaluate --quick exit 0. Not verified: whether the SW/SH boot writes were also dropped by the queue flush before (they are enqueued after the switch now, so the question is moot). AC3 (bench) open.
+
+Lane-1924 pushed 2026-11-15: origin/dev 5da0c91df..2f4818aa1. Build esp32-combo 2.0.0-beta.281+fe0e61a OK (build/logs/build-20261115-020302.log, 'Build completed successfully'); 'git diff fe0e61a48 2f4818aa1 -- src/' empty, so the pushed code is the benched code. evaluate.py --quick 0 failed; OTD tests 42 files, host suites, SAT suite per file green on the rebased tree. Bench 09 on .61 with beta.281: HW=0, UI=36, VS=40 -> /ReBoot (702->703) -> auto-detect to master (PR: M=S) -> PR: W=0, write [71:40], unknown [36] retained. PASS (AC3 evidence, for 09 to tick). Version beta.275.
 <!-- SECTION:NOTES:END -->

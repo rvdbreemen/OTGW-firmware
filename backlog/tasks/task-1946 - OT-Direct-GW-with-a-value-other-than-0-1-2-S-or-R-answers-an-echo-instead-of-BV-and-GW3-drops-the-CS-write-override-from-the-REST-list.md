@@ -3,11 +3,11 @@ id: TASK-1946
 title: >-
   OT-Direct: GW= with a value other than 0, 1, 2/S or R answers an echo instead
   of BV, and GW=3 drops the CS write override from the REST list
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-14T19:06:00Z'
-updated_date: '2026-11-14T21:24:00Z'
+updated_date: '2026-11-15T02:18:00Z'
 labels:
   - otdirect
   - parity
@@ -39,4 +39,12 @@ AC1 evidence: new tests/test_otd_gw_bad_value.py compiles the real GW= branch. F
 AC2 (not a defect, shown from 09's bench log b1839/telnet.raw + replies.txt): CS=40 at 19:32:11; PR=O answered C40.00 at 19:33:11.82; at 19:33:12.36 'OTD: CS heartbeat expired, clearing MsgID 1 override' (the ~64 s CS expiry, TASK-1811). GW=3 changed nothing; the REST list was read after the expiry and PR=O just before it, both from the same otOverrides[] table (sendOTDirectOverridesJSON OTDirect.ino:1376, PR=O case 'O'). They agree. Side note, not in scope: other OT-Direct handlers answer a bare 'BV'/'NG' (otDirectBridgeProcessStatus) where the PIC prints 'XX: BV'; only PS= and now GW= carry the prefix. Not verified on the bench (field-only? no: bench-checkable, part of the lane bench request).
 
 Correction of the previous note's last sentence: the GW= replies are bench-checkable on .61 and go into the lane bench request; until then only host-tested.
+
+Lane-1924 pushed 2026-11-15: origin/dev 5da0c91df..2f4818aa1. Build esp32-combo 2.0.0-beta.281+fe0e61a OK (build/logs/build-20261115-020302.log, 'Build completed successfully'); 'git diff fe0e61a48 2f4818aa1 -- src/' empty, so the pushed code is the benched code. evaluate.py --quick 0 failed; OTD tests 42 files, host suites, SAT suite per file green on the rebased tree. Bench 09 on .61 with beta.281: GW=3 -> 'GW: BV', GW=10 -> 'GW: SE'; PR=M and overrides unchanged; GW=R and GW=S work. PASS. Version beta.276.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+GW= with an unsupported value answers BV, longer than one character SE, no state change, as PIC 6.6. AC1: tests/test_otd_gw_bad_value.py 4/4, 8 subtests red on old; bench 09 PASS. AC2: the lost [1:10240] was the TASK-1811 CS expiry (telnet 19:33:12.36), not GW=3. Shipped in beta.276.
+<!-- SECTION:FINAL_SUMMARY:END -->

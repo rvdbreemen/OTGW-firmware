@@ -3,11 +3,11 @@ id: TASK-1933
 title: >-
   SAT: replace the PWM underheat exit with Sergeant D's rule (flame on, request
   above flow for 60 s -> continuous), entry 342
-status: In Progress
+status: In Review
 assignee:
   - '@claude'
 created_date: '2026-11-14T10:36:00Z'
-updated_date: '2026-11-14T19:06:00Z'
+updated_date: '2026-11-15T02:19:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -43,4 +43,6 @@ Simulation (MODEL RESULT), script tools/research/sat/sat_pwm_exit_sim_1933.py, t
 POST-HOC trace (d3, 2026-11-14, labelled post-hoc; MODEL RESULT): worst run dhw/3_1983-92/rad/fixed/5.5/MM ignored/seed 1. e342 12.5 toggles/day, 44 e342 exits; 99 of 105 PWM ON ignitions have flow >= request at the first tick, so the ignition is not the cause; 36 of 44 exits fire in the second minute of the ON phase. Cause in the model: one water node (sat_closedloop_sim_1412_19.py:152, flow/return = Tr +- P/(2 mcp), no transport delay): flow spikes ~13 C at ignition, return drops below room air (14.6 C, 125 ticks < 19.5 C), then the flow settles at Tr + Pmin/(2 mcp), 1-2 C below the request for 60-90 s after an OFF phase. Share of ON ticks with request > flow at 60-90 s after ON start: model 0.35/0.25, field gruijter (3 local captures, 3906 ticks) 0.05/0.00. Reading: likely a model artefact, not proven (one house, 30 s ticks). Pre-registered verdict unchanged (no ship recommendation). Report docs/sat/sim-1933/report.md, trace driver tools/research/sat/sat_pwm_exit_trace_1933.py. Next: question to Sergeant D via 92 (with both citations), not as a conclusion.
 
 Implemented (d3, 2026-11-14, local, placeholder beta.253, not yet built). Sergeant D chose A on Q-342a (entry 350, msg 1571221697703710812): build entry 342 unchanged, watch the field. Entry 350 settles open points 2 and 3 ('while PWM is ON', 'the boiler (flow) temperature'). satCycleCheckPwmExits() (SATcycles.ino): underheat now counts while satIsFlameOn() && requestedSetpoint > flowTemp, SAT_UNDERHEAT_SUSTAIN_MS 60000 (was flow <= request - 3.0 for 180000); gates unchanged (PWM mode, PWM ON, DHW + 300 s guard, missing flow clears, saturation exit unchanged). SAT_UNDERSHOOT_MARGIN_C stays for the classifier. ADR-236 Proposed (adr-kit, reserved number; README bullet added; changed_by Agent (d3)). Tests: tests/test_sat_overshoot_sustain.py on the real exit: 79/79 on the fix, 13 FAIL on HEAD (old exit), a mutant without the flame condition fails test_underheat_never_counts_with_the_flame_off. Updated for 60 s: test_sat_overshoot_sustain (new tokens f/v), test_sat_pwm_override (flame on in the uh/sw scenarios, exit tick 3 not 7), test_sat_lowload_contract LL-004/LL-020b (u threshold 60; plan doc correction 2026-11-14). Runs: SAT a-h 31/31, i-o 17/17 + LL contract 35/35 alone, p-s 36/36, t-9 + adr_governance 10/10 (at -j 2, commit charge 91 %), evaluate --quick exit 0. AC6 (bench) open. Field follow-up promised in entry 350: watch tester captures for PWM re-entries shortly after ignition (hot water, slow ignition first).
+
+Lane-1924 pushed 2026-11-15: origin/dev 5da0c91df..2f4818aa1. Build esp32-combo 2.0.0-beta.281+fe0e61a OK (build/logs/build-20261115-020302.log, 'Build completed successfully'); 'git diff fe0e61a48 2f4818aa1 -- src/' empty, so the pushed code is the benched code. evaluate.py --quick 0 failed; OTD tests 42 files, host suites, SAT suite per file green on the rebased tree. Bench 09: NOT reproduced, SAT did not reach PWM in the simulation in 8 min (control_mode 1). Host test only (test_sat_overshoot_sustain, 13 cases red on old); field: watch tester captures (entry 350). AC6 stays open for 09/field. Version beta.274.
 <!-- SECTION:NOTES:END -->

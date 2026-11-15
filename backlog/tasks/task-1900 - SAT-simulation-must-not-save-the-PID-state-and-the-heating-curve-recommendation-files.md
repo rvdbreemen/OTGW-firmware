@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-13T16:21:00Z'
-updated_date: '2026-11-14T23:37:00Z'
+updated_date: '2026-11-15T02:20:00Z'
 labels:
   - sat
   - simulation
@@ -37,4 +37,6 @@ Fix (d3, lane-1924): satSavePidState() (SATcontrol.ino) and satHCRSaveState() (S
 AC3 NOT done, reason: the real PID integral and HCR day data stay correct ON FLASH (the files are not written during the run), so the next boot restores the real state. The RAM state after a run is still the simulated one until a reboot, and once simulation is off the 5-minute save would write it. Restoring RAM at the end of a run is more than the TASK-1869 stash: the PID restore at boot runs through the restart state machine (satRestartNotePidLoad / satRestartStep), and satHCRLoadState() is boot-only (it does not reset _hcr_lastDayNum or the recommendation text), and a RAM stash of the HCR intra-day ring is 1440 floats (5.7 KB). The open part goes to a follow-up task, see below.
 
 AC1/AC2 evidence: new tests/test_sat_sim_no_learner_save.py compiles the real satSavePidState() and satHCRSaveState(): fix OK, 'sim=1 pid=0 hcr=0', 'sim=0 pid=1 hcr=1'; old (HEAD 690b47ec8 copies) FAILED, 'sim=1 pid=1 hcr=1'. Updated on purpose: tests/test_fs_update_keep.py (test_savers_write_unconditionally now allows exactly the simulation guard, with the reason) and tests/test_sat_pid_cadence.py (bSimulation in the settings stub). Full SAT suite: 93 files OK in foreground chunks; test_sat_lowload_contract.py separately: 'Ran 35 tests in 809.970s, OK (skipped=1, expected failures=2)', missing LL ids none. evaluate.py --quick 0 failed. AC3 open: follow-up TASK-1952.
+
+Lane-1924 pushed 2026-11-15: origin/dev 5da0c91df..2f4818aa1. Build esp32-combo 2.0.0-beta.281+fe0e61a OK (build/logs/build-20261115-020302.log, 'Build completed successfully'); 'git diff fe0e61a48 2f4818aa1 -- src/' empty, so the pushed code is the benched code. evaluate.py --quick 0 failed; OTD tests 42 files, host suites, SAT suite per file green on the rebased tree. Bench 09 on .61 with beta.281: SAT sim on 7 min: /sat_pid_state.json and /sat/sat_hcr.json hash unchanged; after sim off the PID file rewritten within 6.7 min. PASS for AC1/AC2. AC3 -> TASK-1952. Version beta.281.
 <!-- SECTION:NOTES:END -->

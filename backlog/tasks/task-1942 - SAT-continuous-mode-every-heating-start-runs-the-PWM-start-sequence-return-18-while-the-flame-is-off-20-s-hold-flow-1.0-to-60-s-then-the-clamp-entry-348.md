@@ -4,11 +4,11 @@ title: >-
   SAT continuous mode: every heating start runs the PWM start sequence (return +
   18 while the flame is off, 20 s hold, flow - 1.0 to 60 s, then the clamp)
   (entry 348)
-status: In Progress
+status: In Review
 assignee:
   - '@claude'
 created_date: '2026-11-14T17:23:00Z'
-updated_date: '2026-11-14T18:04:00Z'
+updated_date: '2026-11-15T02:19:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -43,4 +43,6 @@ Entries relied on: 45, 112, 337, 338, 344, 347, 348 (agree with all; 348 is a de
 
 <!-- SECTION:NOTES:BEGIN -->
 Implemented (d3, 2026-11-14, local, beta.252, not yet built). satContinuousSetpoint(): PWM ON gates (overshoot protection on, no DHW, request above the cold threshold) -> flame off: satPwmFlameOffHold() (return + 18 / flow for a no-return boiler, clamped cold..max) in _sat_contFlameOffHold; flame on < fModSupDelay since the CH flame-on edge: that hold (no-return: live flow + 18), or the previous CS if none (pending); then to 60 s max(request, flow - fModSupOffset); then the entry-112 clamp (fFlowOffset 2.0, entry 349). Return unknown at boot and not a no-return boiler: the request, as before. Flood (entry 348 point 1, read as yes): satNoReturnFloodAllowed() also in continuous mode, hand-over to satContinuousSetpoint(); the 5 s refresh skips while it runs. FINDING fixed with it: satControlLoopRun() returns before the flame-edge code while SAT is off, so switching SAT on with a burning boiler gave a fake CH flame-on edge; in continuous mode that would have started the flood (10x PM=25 + flow + 18 on a running boiler). New _sat_flameOffSeen (false while SAT is off, true once the flame is seen off): a CH start (window and continuous flood) needs it. The cycle tracker keeps its edge (unchanged). Caught by test_sat_no_return_startup::test_runtime_enable_with_a_running_boiler_sends_no_flood... (red on the first version of this change, green with the guard). Tests: tests/test_sat_continuous_startup.py on the real satPwmFlameOffHold + satContinuousSetpoint, 11/11 on the fix; on beta.250 (baf84d9) 3 FAIL: start with return 30 -> 50.0 (request) instead of 48.0, no-return 50.0 vs 48.0, flood gate absent. Harnesses updated for the new symbols: test_sat_no_return_ignition, test_sat_no_return_startup, test_sat_ot_loss, test_sat_restart_quiet, test_sat_ceiling_paths (flood hand-over anchor). Runs: SAT a-o 45/45, p-s 36/36, t-9+l + OTD + adr_governance 50/50, evaluate --quick exit 0. ADR-235 names the continuous start sequence and entries 348/349 (AC6). AC5 (bench) open.
+
+Lane-1924 pushed 2026-11-15: origin/dev 5da0c91df..2f4818aa1. Build esp32-combo 2.0.0-beta.281+fe0e61a OK (build/logs/build-20261115-020302.log, 'Build completed successfully'); 'git diff fe0e61a48 2f4818aa1 -- src/' empty, so the pushed code is the benched code. evaluate.py --quick 0 failed; OTD tests 42 files, host suites, SAT suite per file green on the rebased tree. Bench 09 on .61 with beta.281 (SAT sim): run 1 cs=38.0 = ret 20+18 held, then max(request, flow-1); run 2 flame-off cs tracks ret+18, flame ON -> 20 s hold (56.9), then cs=62.0 = max(request 62, flow-1 43.5). PASS for the start sequence. NOT benchable: 'already burning when SAT goes on = no start' (satDisable sends CS=0, the sim boiler goes off), and the 60 s clamp was not reached (request above flow). Host tests cover both. Version beta.273.
 <!-- SECTION:NOTES:END -->

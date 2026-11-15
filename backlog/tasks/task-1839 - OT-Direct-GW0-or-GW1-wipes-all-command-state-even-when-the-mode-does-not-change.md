@@ -3,11 +3,11 @@ id: TASK-1839
 title: >-
   OT-Direct: GW=0 or GW=1 wipes all command state, even when the mode does not
   change
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-11T23:50:00Z'
-updated_date: '2026-11-14T21:25:00Z'
+updated_date: '2026-11-15T02:18:00Z'
 labels:
   - otdirect
   - parity
@@ -52,4 +52,12 @@ AC2/AC3 implemented (d3, 2026-11-14, local, not yet built). Scope of Robert's an
 Bench 09 on .61 (OTGW32, OT-Direct), bench build 2.0.0-beta.252+941a224 (d3 lane; sha256 match, OTA OK, bootcount 647 -> 649, crashlog identical, MQTT up). PASS core case: in gateway HW=0, CS=40, SR=60:1,2 (write override [1:10240], response [60:258], PR W=0, O=C40.00); GW=0 -> M=M with W=0, O=C40.00, overrides unchanged; GW=1 -> M=G, all unchanged. PASS: GW=S (master) and GW=R from gateway with state clear everything (W=A, O=N, overrides empty); a first GW=0 from S (boot auto-detect master) clears, as a switch out of master should. NOT testable on .61: monitor-mode relay with a kept SR=/HW=0 (no thermostat or boiler, no relayed frames; covered by the source checks in test_otd_mode_change_keeps_state) and the queue flush (queue empty before every switch; covered by the host test). Evidence: 09 scratchpad b1839/. CORRECTION of d3's bench brief: it said 'GW=3 (master)'; master is GW=2 / GW=S in the handler (OTDirect.ino ~3725); 3 is only the enum value OTD_MODE_MASTER. 09's finding from that: GW=3 gets an echo 'GW: 3' with no mode change, where the PIC answers BV (BadValue) to any GW= value other than 0, 1 or R (gateway.asm 6.8 CheckBoolean :4072-4082, ResetGateway :4776-4780); also after GW=3 the REST write-override list lost [1:10240] while PR=O still said C40.00 (cause not traced). Filed as a separate low parity task.
 
 Cause of the lost [1:10240] after GW=3 in 09's bench (see TASK-1946): the ~64 s CS heartbeat expiry (TASK-1811), logged at 19:33:12.36, 0.5 s after PR=O still answered C40.00 (09 scratchpad b1839/telnet.raw). Not related to TASK-1839's mode-change code.
+
+Lane-1924 pushed 2026-11-15: origin/dev 5da0c91df..2f4818aa1. Build esp32-combo 2.0.0-beta.281+fe0e61a OK (build/logs/build-20261115-020302.log, 'Build completed successfully'); 'git diff fe0e61a48 2f4818aa1 -- src/' empty, so the pushed code is the benched code. evaluate.py --quick 0 failed; OTD tests 42 files, host suites, SAT suite per file green on the rebased tree. Bench 09 on .61 with beta.281 (TASK-1839 regression): G with HW=0/CS=40/SR=60:1,2 -> GW=0 -> GW=1: W=0, overrides [1:10240] and [60:258] unchanged. PASS. Version beta.272.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+A real gateway<->monitor switch keeps the command state and flushes only the queue (Robert DM answer A); master/loopback/bypass switches and GW=R still reset. Evidence: tests/test_otd_mode_change_keeps_state.py red/green, bench 09 on .61 (beta.252 and beta.281) PASS. Shipped in beta.272 (pushed 2f4818aa1).
+<!-- SECTION:FINAL_SUMMARY:END -->
