@@ -7,13 +7,28 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Added
 - PIC Classic: the temperature sensor wired to the PIC can reach MQTT and Home Assistant, as on the 1.x line (1.x TASK-1147). A new setting, PIC temperature sensor (off by default, `PICtempsensor` in `settings.ini`, `pictempsensor` in the REST settings), makes the gateway read it with `PR=E` every 3 minutes and publish it to `otgw-pic/temperature_reading`, with a Home Assistant temperature sensor PIC_Temperature_Reading on the Sensors device. The entity is announced on the first valid reading only; a PIC without a sensor answers `-`, and then nothing is published. While the return water readout of TASK-1314 runs (sensor function `R`) its once-a-minute `PR=E` serves both, so no second poll is sent. OT-Direct boards read no PIC and never send it (Robert, 2026-11-14; TASK-1940).
+- Monitor > Graph: the dashed live-connection marks get a legend line and a tooltip that say they are the live connection dropping or coming back, not a restart; a real restart of the gateway (its boot counter went up, read from device/info when the live connection returns) is drawn as a solid amber "gateway restarted" mark (TASK-1914).
+- `/api/v2/device/info` reports the IPC task stack low points taken after hardware detection (TASK-1870.1).
+- Tools: `build.py` writes its own build log, child tools included, to `build/logs/build-<time>.log` and copies it to `build/logs/latest.log` (TASK-1894).
 
 ### Changed
 - OT-Direct: `PR=` reports use the PIC 6.8 text. `PR=P` reports the real Smart Power level towards the thermostat (`Low power`, `Medium power`, `High power`); `PR=R` reports the `FT=` model (`D` by default); `PR=C` is `240 MHz`, `PR=B` the build time as `HH:MM DD-MM-YYYY`, and the `PR=L` default is `FXOMPC` (Robert, DM 1571191256833331375). `PR=O` covers only the `TT=`/`TC=` room setpoint override, with the lowercase `t`/`c` until the thermostat accepts it and `n` while a clear is pending. An active `CS=` (also the one SAT sends) now reports `N` instead of `C<flow temperature>`, so `otgw-pic/settings/setpoint_override`, the Home Assistant sensor PIC_Setpoint_Override, REST `/api/v2/pic/settings` `setpoint_override` and the web UI PIC panel show "no override" there (Robert, DM 1571191595498340544; TASK-1848).
 - OT-Direct: the replies to `SC=`, `SR=` and `FT=` use the PIC 6.8 text: `SC: 09:05/3` with two-digit hours, `SR: <id>:<high>/<low>` (e.g. `SR: 18:1/230`) whatever form the argument had, and `FT:` the selected model (`C`, `I`, `S` or `D`) instead of the argument (TASK-1849).
+- OT-Direct: the thermostat lost and back events print the PIC 6.8 lines `Thermostat disconnected` and `Thermostat connected`, also to port 25238 (TASK-1850).
+- Web server: the WEB CONN CAP refusal line splits the counted port-80 connections by state and shows the queued bytes; the limit itself is unchanged (TASK-1947).
 
 ### Fixed
 - Home Assistant discovery: the DHW flow rate sensor (MsgID 19, `DHWFlowRate`) announces the unit `L/min`; Home Assistant rejected `l/min` for device class `volume_flow_rate` and did not create the sensor (PR #702 by justink0k; TASK-1949).
+- Monitor > Graph: the 24 h history stores the weather outside temperature only while it is fresh (younger than 1 h) and falls back to MsgID 27, instead of repeating the last value after the weather fetch stopped (TASK-1937).
+- MQTT: a SUBSCRIBE that the MQTT library refused during the connect burst (low free block on a board without PSRAM) is retried until it is accepted, so MQTT commands no longer stay dead until the next reconnect (TASK-1778).
+- MQTT: a planned reboot publishes the retained `offline` status and disconnects cleanly before the restart (TASK-1780).
+- REST: `GET /api/v2/settings` advertises the same min/max as the setter clamps for ten SAT settings (a flow offset of 0 was silently stored as 0.5) (TASK-1941).
+- SAT: the help text of Heating curve self-tune states the real cadence: one 0.1 step when 3 counted days agree, so two steps are at least 3 counted days apart; behaviour unchanged (TASK-1792).
+- Web UI: on a phone the language button and the Light/Dark switch have the same height (TASK-1873).
+- Web UI: Home > Mission control follows the light and dark theme instead of keeping a fixed dark palette (TASK-1863).
+- Simulation replay: a replayed thermostat MsgID 16 no longer reaches SAT's follow-thermostat (it could overwrite the stored SAT target), and a replayed PIC banner no longer re-enables the PIC or stores a PIC board mode on a unit without a PIC (TASK-1901, TASK-1902).
+- The DHW flow rate unit reads `L/min` in the OT log, the web UI message table and the MQTT docs too (follow-up of PR #702).
+- OT-Direct loopback and simulation replay: a synthetic or replayed MsgID 3 no longer sets SAT's slave configuration (PWM permission), detected heating source or manufacturer (TASK-1857, TASK-1903).
 
 ## [2.0.0-beta.250] - 2026-11-14
 
