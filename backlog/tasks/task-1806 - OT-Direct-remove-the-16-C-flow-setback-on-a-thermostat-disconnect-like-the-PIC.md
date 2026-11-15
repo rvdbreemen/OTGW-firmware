@@ -3,11 +3,11 @@ id: TASK-1806
 title: >-
   OT-Direct: remove the 16 C flow setback on a thermostat disconnect, like the
   PIC
-status: In Review
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-11T06:43:00Z'
-updated_date: '2026-11-15T02:20:00Z'
+updated_date: '2026-11-15T02:26:00Z'
 labels:
   - otdirect
   - review-2026-11-11
@@ -29,7 +29,7 @@ Found in the TASK-1795 audit (docs/reviews/2026-11-11_otdirect-pic-parity-audit/
 - [x] #1 On thermostat loss OT-Direct no longer writes a setback flow setpoint or forces CH on; the boiler follows its own OpenTherm timeout
 - [x] #2 Host test against the real checkThermostatTimeout path: red on the old code (16 C written), green on the fix
 - [x] #3 The manual (EN and NL) and the release notes describe the new behaviour and what happened to the setback settings
-- [ ] #4 esp32-combo build, evaluate.py --quick, bench check where the hardware allows (name what was not benched)
+- [x] #4 esp32-combo build, evaluate.py --quick, bench check where the hardware allows (name what was not benched)
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -44,4 +44,6 @@ AC2 evidence: new tests/test_otd_no_setback.py compiles the real checkThermostat
 Tests updated on purpose: tests/test_otd_ch_override.py source pattern now the ownStatusRule form (master OR gateway); test/host/test_override_reply.cpp suite 1684 case P5 (gateway, no CS: own MsgID 0) expects 0x02 instead of 0x03. test/host/test_override_reply.py 4/4 suites OK; all tests/test_otd*.py OK; evaluate.py --quick 0 failed. AC3 open (CHANGELOG at rebase, release notes in the beta flow); AC4 open (build + bench). Follow-up TASK-1950 (remove the unused setback settings/fields, needs-maintainer-ok).
 
 Lane-1924 pushed 2026-11-15: origin/dev 5da0c91df..2f4818aa1. Build esp32-combo 2.0.0-beta.281+fe0e61a OK (build/logs/build-20261115-020302.log, 'Build completed successfully'); 'git diff fe0e61a48 2f4818aa1 -- src/' empty, so the pushed code is the benched code. evaluate.py --quick 0 failed; OTD tests 42 files, host suites, SAT suite per file green on the rebased tree. Bench 09 on .61 with beta.281: GW=1 without thermostat: own MsgID 0 HB 0x00 for 55 s, no MsgID 1 write; after CS=40 HB 0x01 and one MsgID 1 write 0x2800; setback_active false; 'Thermostat disconnected' once per boot. PASS. A real thermostat loss is field-only. AC3: manual EN ch09 + NL h09 and CHANGELOG [Unreleased] done; the release notes come from the beta flow. Version beta.279.
+
+AC4 ticked by 09 (bench part; build and evaluate are d3's lane evidence): 09 bench 2026-11-15 02:12-02:57 on .61 (OTGW32, OT-Direct, no boiler, no thermostat), 2.0.0-beta.281+fe0e61a (OTA app+FS, changed none, bootcount 700->702), evidence 09 scratchpad b281/. GW=1 without a thermostat: own MsgID 0 HB 0x00 (CH bit0 = 0) for 55 s, no MsgID 1 write (no 16 C setback); after CS=40 HB 0x01 and exactly one MsgID 1 write 0x2800 (40.0); /api/v2/otdirect/status setback_active false throughout; 'Thermostat disconnected' printed once per boot (none on the S->G switch). NOT benched (no hardware): the loss of a real, connected thermostat, field only. All ACs ticked; Done.
 <!-- SECTION:NOTES:END -->

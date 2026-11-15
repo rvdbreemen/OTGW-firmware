@@ -3,11 +3,11 @@ id: TASK-1944
 title: >-
   OT-Direct: at boot the restored HW= and UI= list are wiped again when the
   auto-detect switches to master
-status: In Review
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-14T18:07:00Z'
-updated_date: '2026-11-15T02:19:00Z'
+updated_date: '2026-11-15T02:25:00Z'
 labels:
   - otdirect
   - bug
@@ -27,7 +27,7 @@ Found by d3 while doing TASK-1839 (2026-11-14), read from code only, not reprodu
 <!-- AC:BEGIN -->
 - [x] #1 A boot with auto-detect on and no thermostat keeps the persisted HW=, UI= list, SW= and SH= (host test on the real initOTDirect order or the real reset, red on current code)
 - [x] #2 The order is decided: restore after the auto-detect, or the boot switch flushes only the queue; recorded in the task notes
-- [ ] #3 Bench via 09 on an OTGW32 with no thermostat: HW=0 and a UI= entry survive a reboot
+- [x] #3 Bench via 09 on an OTGW32 with no thermostat: HW=0 and a UI= entry survive a reboot
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -44,4 +44,6 @@ Citations (lane-1924 941a224f9): src/OTGW-firmware/OTDirect.ino:1202 initOTDirec
 Implemented (d3, 2026-11-14, local, placeholder beta.254, not yet built). initOTDirect(): the TASK-584 vent restore and otdRestorePersistedCommands() moved from before the bus probe to after the auto-detect block and before otdBootHandshake() (order decided, see plan). Also the vent setpoint (write cache + override 71) was lost by the master reset, now kept too. tests/test_otd_boot_restore_order.py (source order on the real initOTDirect, which waits 5 s on hardware and cannot run on the host): 3/3 on the fix, 2 FAIL on HEAD. OTD suite + init-related tests 41/41, evaluate --quick exit 0. Not verified: whether the SW/SH boot writes were also dropped by the queue flush before (they are enqueued after the switch now, so the question is moot). AC3 (bench) open.
 
 Lane-1924 pushed 2026-11-15: origin/dev 5da0c91df..2f4818aa1. Build esp32-combo 2.0.0-beta.281+fe0e61a OK (build/logs/build-20261115-020302.log, 'Build completed successfully'); 'git diff fe0e61a48 2f4818aa1 -- src/' empty, so the pushed code is the benched code. evaluate.py --quick 0 failed; OTD tests 42 files, host suites, SAT suite per file green on the rebased tree. Bench 09 on .61 with beta.281: HW=0, UI=36, VS=40 -> /ReBoot (702->703) -> auto-detect to master (PR: M=S) -> PR: W=0, write [71:40], unknown [36] retained. PASS (AC3 evidence, for 09 to tick). Version beta.275.
+
+AC3 ticked by 09: 09 bench 2026-11-15 02:12-02:57 on .61 (OTGW32, OT-Direct, no boiler, no thermostat), 2.0.0-beta.281+fe0e61a (OTA app+FS, changed none, bootcount 700->702), evidence 09 scratchpad b281/. In gateway mode HW=0, UI=36, VS=40 -> overrides write [71:40], unknown [36], PR: W=0; POST /ReBoot (702->703), auto-detect to master (PR: M=S); after the boot PR: W=0, write [71:40], unknown [36], all kept. Cleaned up afterwards (HW=A, KI=36, VS=-). All ACs ticked; Done.
 <!-- SECTION:NOTES:END -->

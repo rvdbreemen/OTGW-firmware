@@ -7,7 +7,7 @@ status: In Review
 assignee:
   - '@claude'
 created_date: '2026-11-14T10:36:00Z'
-updated_date: '2026-11-15T02:19:00Z'
+updated_date: '2026-11-15T02:26:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -45,4 +45,6 @@ POST-HOC trace (d3, 2026-11-14, labelled post-hoc; MODEL RESULT): worst run dhw/
 Implemented (d3, 2026-11-14, local, placeholder beta.253, not yet built). Sergeant D chose A on Q-342a (entry 350, msg 1571221697703710812): build entry 342 unchanged, watch the field. Entry 350 settles open points 2 and 3 ('while PWM is ON', 'the boiler (flow) temperature'). satCycleCheckPwmExits() (SATcycles.ino): underheat now counts while satIsFlameOn() && requestedSetpoint > flowTemp, SAT_UNDERHEAT_SUSTAIN_MS 60000 (was flow <= request - 3.0 for 180000); gates unchanged (PWM mode, PWM ON, DHW + 300 s guard, missing flow clears, saturation exit unchanged). SAT_UNDERSHOOT_MARGIN_C stays for the classifier. ADR-236 Proposed (adr-kit, reserved number; README bullet added; changed_by Agent (d3)). Tests: tests/test_sat_overshoot_sustain.py on the real exit: 79/79 on the fix, 13 FAIL on HEAD (old exit), a mutant without the flame condition fails test_underheat_never_counts_with_the_flame_off. Updated for 60 s: test_sat_overshoot_sustain (new tokens f/v), test_sat_pwm_override (flame on in the uh/sw scenarios, exit tick 3 not 7), test_sat_lowload_contract LL-004/LL-020b (u threshold 60; plan doc correction 2026-11-14). Runs: SAT a-h 31/31, i-o 17/17 + LL contract 35/35 alone, p-s 36/36, t-9 + adr_governance 10/10 (at -j 2, commit charge 91 %), evaluate --quick exit 0. AC6 (bench) open. Field follow-up promised in entry 350: watch tester captures for PWM re-entries shortly after ignition (hot water, slow ignition first).
 
 Lane-1924 pushed 2026-11-15: origin/dev 5da0c91df..2f4818aa1. Build esp32-combo 2.0.0-beta.281+fe0e61a OK (build/logs/build-20261115-020302.log, 'Build completed successfully'); 'git diff fe0e61a48 2f4818aa1 -- src/' empty, so the pushed code is the benched code. evaluate.py --quick 0 failed; OTD tests 42 files, host suites, SAT suite per file green on the rebased tree. Bench 09: NOT reproduced, SAT did not reach PWM in the simulation in 8 min (control_mode 1). Host test only (test_sat_overshoot_sustain, 13 cases red on old); field: watch tester captures (entry 350). AC6 stays open for 09/field. Version beta.274.
+
+AC6 left OPEN by 09 (09 bench 2026-11-15 02:12-02:57 on .61 (OTGW32, OT-Direct, no boiler, no thermostat), 2.0.0-beta.281+fe0e61a (OTA app+FS, changed none, bootcount 700->702), evidence 09 scratchpad b281/): not reproduced. With satsimulation on, SAT stayed in continuous (control_mode 1, pwm none) for 8 min at target 17 (no demand, flame off) and at target 23 (high demand). A PWM phase with flame on and request above flow for 60 s was not reached in the simulation; host test only so far. Needs sim tuning that reaches PWM, or .63/field.
 <!-- SECTION:NOTES:END -->
