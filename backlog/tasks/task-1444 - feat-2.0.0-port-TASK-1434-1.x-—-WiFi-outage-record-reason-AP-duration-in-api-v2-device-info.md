@@ -3,11 +3,11 @@ id: TASK-1444
 title: >-
   feat-2.0.0: port TASK-1434 (1.x) — WiFi outage record (reason, AP, duration)
   in /api/v2/device/info
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-10-29T06:14:00Z'
-updated_date: '2026-11-14T15:38:00Z'
+updated_date: '2026-11-15T07:33:00Z'
 labels:
   - port-from-1.x
   - wifi
@@ -99,4 +99,12 @@ Triage 2026-11-02 (beta.5, origin/dev 6c41cc696) in code: no. Waits on TASK-1446
 2026-11-14 (09) bench .63 (2.0.0-beta.248+5e8c416, CAPsMAN '1e verdieping-1' + router wlan2 'KeepOut2'; evidence 09 scratchpad b1444/ and b1444b/). Fresh state: wifi_outages 0, wifi_disconnect_events 0, wifi_ap_bssid C4:AD:34:FE:E5:43 ch 6 = the CAPsMAN registration-table entry for AC:27:6E:CE:45:D8 (interface MAC C4:AD:34:FE:E5:43); banner 'Link : AP C4:AD:34:FE:E5:43 ch 6 outages 0 disconnect events 0' and 'Drop : none since boot'. Deauth (/caps-man registration-table remove): API back after 6 s; wifi_outages 1, wifi_drop_reason 2 AUTH_EXPIRE (last 2), drop_bssid C4:AD:34:FE:E5:43 ch 6, drop_events 1, drop_down_sec 4, drop_self false; banner 'Drop : 14 s ago, down 4 s, reason 2 AUTH_EXPIRE (last 2 AUTH_EXPIRE, 1 events), AP C4:AD:34:FE:E5:43 ch 6'. A first block attempt with only the CAPsMAN access list was not a block: the unit roamed to the router's own wlan2 (74:4D:28:C7:07:40, same SSID) after 4 s, which the record showed correctly as a new outage. 90 s block with both access lists (/caps-man access-list reject + /interface wireless access-list authentication=no, comment-tagged, scheduler safety net): API answered 0 of 15 polls during the block, back 5 s after the unblock; device/info: wifi_outages 2->3 (exactly one outage), wifi_disconnect_events 2->21 (+19) = wifi_drop_events 19, first reason 2 AUTH_EXPIRE, last reason 203 ASSOC_FAIL, drop_bssid 74:4D:28:C7:07:40 ch 1, drop_down_sec 93 (block 91 s + reconnect). Banner 'Link : AP C4:AD:34:FE:E5:43 ch 6 outages 3 disconnect events 21' / 'Drop : 104 s ago, down 93 s, reason 2 AUTH_EXPIRE (last 203 ASSOC_FAIL, 19 events), AP 74:4D:28:C7:07:40 ch 1'. Router afterwards: both access lists 0, scheduler 0, /export terse identical before/after apart from the timestamp header. Settings untouched (no setting changed).
 
 Not done on the bench: the red half of AC2 (no pre-beta.84 2.x build compatible with the current partition layout of .63; coordinator: the red is the host test tests/test_wifi_link_record.py, 15 FAIL on old + 2 mutants). AC5 by reading only (no Ethernet on .63): Ethernet.ino:103 wifiLinkMarkSelf(WIFI_SELF_ETHERNET) before the switch-over disconnect; networkStuff.ino:129 counts iOutages only when self == WIFI_SELF_NONE. AC6 by reading: the event callbacks write under portENTER_CRITICAL(&g_wifiLinkMux) (networkStuff.ino:110-118, 123-144) with no logging or allocation; logging is wifiLinkEventsLog() on the loop task (networkStuff.ino:185-210).
+
+2026-11-15 Robert's decision (DM 1571425876204331070, reply 'A' to triage question 1571283737377771682: 'A) accept the host red/green and waive the Ethernet ACs as field ACs, close both'). Closed on that decision.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Closed on Robert's decision A (DM 1571425876204331070 on question 1571283737377771682, 2026-11-15): host red/green accepted, Ethernet ACs waived as field ACs. Per AC: #1 #3 #4 #6 ticked earlier with bench evidence on .63 beta.248+5e8c416 (09 scratchpad b1444/, b1444b/) and code reading. #2 red half: accepted as the host test tests/test_wifi_link_record.py (15 FAIL on the old code + 2 mutants), green half on the bench (router deauth reason 2); not ticked, waived by A. #5 Ethernet: ticked earlier by code reading; no Ethernet hardware on the bench (field AC). #7: docs/api/openapi.yaml documents all 14 keys named in AC1 (counted 14/14 on origin/dev d7b614534); CHANGELOG has the user entry in [2.0.0-beta.95] (TASK-1446, TASK-1444, GH #682) but names the 1.x port only as '1.x outage record port', not TASK-1434/TASK-1278; not ticked. #8: the esp32 and esp32-classic targets no longer exist on dev (combo-only, maintainer 2026-10-29); the code is in every esp32-combo build since beta.95, latest beta.294+67e3f51; not ticked as written.
+<!-- SECTION:FINAL_SUMMARY:END -->

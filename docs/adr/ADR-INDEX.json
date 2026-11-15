@@ -9254,8 +9254,8 @@
       "title": "SAT sends CS= on change with a 30 s repeat (supersedes the CS part of ADR-207 and ADR-203)",
       "path": "ADR-235-sat-sends-cs-on-change-with-a-30-s-repeat-supersedes-the-cs-part-of-adr-207-and-adr-203.md",
       "format": "canonical",
-      "status": "Proposed",
-      "date": "2026-11-14",
+      "status": "Accepted",
+      "date": "2026-11-15",
       "decision_summary": "SAT sends CS= when the value it sends, rounded to 0.1, changes, and repeats an unchanged CS= about every 30 s: the co...",
       "topics": [
         "command-cadence",

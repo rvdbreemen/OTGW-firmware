@@ -1,8 +1,8 @@
 ---
 id: "ADR-235"
 title: "SAT sends CS= on change with a 30 s repeat (supersedes the CS part of ADR-207 and ADR-203)"
-status: "Proposed"
-date: "2026-11-14"
+status: "Accepted"
+date: "2026-11-15"
 binding: false
 gate: null
 documents_shipped: false
@@ -45,7 +45,9 @@ format: "canonical"
 
 ## Status
 
-Proposed, 2026-11-14. Guideline-level per ADR-080: verified by host tests, no evaluate.py gate.
+Accepted, 2026-11-15.
+
+Guideline-level per ADR-080: verified by host tests, no evaluate.py gate.
 
 ## Status History
 
@@ -66,12 +68,17 @@ status_history:
     changed_by: "Agent (d3)"
     reason: Related to ADR-207
     changed_via: adr-kit lifecycle
+  - date: 2026-11-15
+    status: Accepted
+    changed_by: Robert van den Breemen (maintainer), recorded by Agent (92)
+    reason: "Robert chose A, Discord DM 1571426159260991561 on question 1571283743061311579: Accept ADR-235 (flood question deferred)"
+    changed_via: adr-kit lifecycle
 ```
 
 ## Context
 
-While SAT controls the boiler it sends the control setpoint as `CS=<value>` (CS: control setpoint, OpenTherm MsgID 1) to the
-PIC, or to the OT-Direct command handler. ADR-203 made every control tick send CS=, MM= and CH=, with a 5 s resend between
+While SAT (Smart Autotune Thermostat) controls the boiler it sends the control setpoint as `CS=<value>` (CS: control setpoint, OpenTherm MsgID 1) to the
+PIC (the gateway's PIC microcontroller), or to the OT-Direct command handler. ADR-203 made every control tick send CS=, MM= and CH= (the MM (maximum modulation) and CH (central heating enable) commands), with a 5 s resend between
 ticks, as thermo-nova does: its heating loop runs every 5 s (`climate.py:706-710` at the pinned commit 7beaaf5) and sends all
 three at the end of each update (`heating_control.py:236-238`). ADR-207 moved MM=, TP= and CH= to on-change plus a 60 s
 repair (Sergeant D entries 237, 239) and kept CS= on the 5 s resend.
@@ -95,7 +102,7 @@ tick repeats it once it is 29 s old, and a loop repeat timed on raw `millis()` s
   OpenTherm link back, boot) stamps the cache stale, so the first CS= after it always goes out.
 - `satCmdResend()` (`:793`) runs every loop pass and repeats the last accepted CS= once it is 31 s old
   (`SAT_CS_REPEAT_MS` + the 1 s slack). Its gates stay: armed by a tick send, SAT active, an OT command interface, and
-  paused by the live DHW and fault bits. The 31 s, not 30 s, keeps a loop repeat out of the pass of a 30 s tick: the tick
+  paused by the live DHW (domestic hot water) and fault bits. The 31 s, not 30 s, keeps a loop repeat out of the pass of a 30 s tick: the tick
   repeats the CS itself from 29 s, so at the default interval the loop repeat never fires, and at a 60 s interval it keeps
   the largest gap at about 31 s (TASK-1924 Part 2; at 30 s the loop sent the old value 2-6 ms before a tick that brought a
   new one, in 29 of 37 changes on the beta.242 bench).
@@ -107,7 +114,7 @@ tick repeats it once it is 29 s old, and a loop repeat timed on raw `millis()` s
 - In continuous mode the CS is also recomputed every 5 s while the flame is on (`satContinuousClampRefresh()`, `:2577`,
   timer `:963`; Sergeant D entry 337, thermo-nova's 5 s heating loop `climate.py:706-710`) and goes out through
   `satSendCS()`, so on change only. The value comes from `satContinuousSetpoint()`, shared with the tick. A heating start in
-  continuous mode runs the PWM start sequence (TASK-1942, entry 348): while the flame is off the flame-off hold
+  continuous mode runs the PWM (pulse width modulation) start sequence (TASK-1942, entry 348): while the flame is off the flame-off hold
   `satPwmFlameOffHold()` (return + `fFlameOffOffset` 18, the flow for a boiler without a return temperature), held for
   `fModSupDelay` (20 s) after the CH flame-on; then for 60 s after the flame-on (`SAT_CONT_STARTUP_MS`) max(request, flow -
   `fModSupOffset` 1.0); then the entry-112 clamp with `fFlowOffset` 2.0 (entry 349). A boiler without a return temperature
@@ -188,7 +195,7 @@ tick repeats it once it is 29 s old, and a loop repeat timed on raw `millis()` s
 
 ## Open Questions
 
-- [ ] Should the no-return start-up flood (TASK-1371) also send CS= on change only? (queued for Sergeant D, recommendation: keep 2 s)
+- [x] Should the no-return start-up flood (TASK-1371) also send CS= on change only? (queued for Sergeant D, recommendation: keep 2 s) Deferred by Robert when he accepted this ADR (Discord direct message 1571426159260991561, 2026-11-15, option A: "Accept ADR-235 (flood question deferred)"). This ADR does not decide the flood cadence; the question stays with Sergeant D.
 
 ## Related Decisions
 
@@ -201,5 +208,5 @@ tick repeats it once it is 29 s old, and a loop repeat timed on raw `millis()` s
 - TASK-1924, TASK-1942; Sergeant D corrections entries 334, 335, 337, 338, 344, 347, 348, 349 (`docs/sat/sergeant-d-corrections.md`), 44, 237, 239.
 - `src/OTGW-firmware/SATcontrol.ino:600`, `:687`, `:719`, `:721`, `:793`, `:951`, `:963`, `:1987`, `:1999`, `:2560`, `:2577`
   (lane-1924 at beta.250, baf84d9).
-- thermo-nova 7beaaf5: `custom_components/sat/climate.py:706-710`, `custom_components/sat/heating_control.py:236-238`.
+- thermo-nova 7beaaf5 (https://github.com/Alexwijn/SAT/tree/7beaaf531ee99dc74a19ac74f3c06ce7f2922cfb): `custom_components/sat/climate.py:706-710`, `custom_components/sat/heating_control.py:236-238`.
 - TASK-1834 (PIC CS expiry measured at about 63 s on the bench).

@@ -3,11 +3,11 @@ id: TASK-1446
 title: >-
   feat-2.0.0: port TASK-1278 (1.x) — telnet banner shows last WiFi outage with
   802.11 reason, AP, channel and down time
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-10-29T06:16:00Z'
-updated_date: '2026-11-14T15:40:00Z'
+updated_date: '2026-11-15T07:33:00Z'
 labels:
   - port-from-1.x
   - wifi
@@ -104,4 +104,12 @@ Not shown on the bench: the 'WiFi: link lost' log line (networkStuff.ino:199) is
 AC2 by reading: WiFi.onEvent callbacks write only under portENTER_CRITICAL(&g_wifiLinkMux) (networkStuff.ino:110-118 connected, 123-144 disconnected; no logging, no allocation); logging is wifiLinkEventsLog() on the loop task (networkStuff.ino:185-210). AC4 (self-caused marks for the Ethernet and AP-retry disconnects) not verified on the bench by 09.
 
 Correction (09, coordinator review): AC2 and AC8 unticked, their text does not allow code reading as evidence. AC8 is not verifiable on hardware (no Ethernet on the bench); the reading evidence for AC2 and AC8 stays in the notes above. 1444 AC5 and AC6 stay ticked: their text allows reading (AC5 'or by reading the code ... say which', AC6 'Verified by reading the code'); the file:line citations are in the 1444 notes for the owner's Final Summary.
+
+2026-11-15 Robert's decision (DM 1571425876204331070, reply 'A' to triage question 1571283737377771682: 'A) accept the host red/green and waive the Ethernet ACs as field ACs, close both'). Closed on that decision.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Closed on Robert's decision A (DM 1571425876204331070 on question 1571283737377771682, 2026-11-15): host red/green accepted, Ethernet ACs waived as field ACs. Per AC: #1 #3 #5 ticked earlier with bench evidence on .63 beta.248+5e8c416 (09 scratchpad b1444/, b1444b/: router deauth -> reason 2; 90 s access-list block -> one outage, 31 events, 101 s, first 2 last 203). #2: by code reading only (callbacks write under portENTER_CRITICAL(&g_wifiLinkMux), networkStuff.ino:110-144; logging in wifiLinkEventsLog on the loop task :185-210); the AC text needs more than reading, so not ticked. #4: a self-forced reconnect is marked self on the bench (reason 8); the Ethernet switch-over case needs Ethernet; not ticked, waived as field AC. #6: reason 2 shown in the telnet banner; the 'WiFi: link lost' log line is written while the link is down and never reached the telnet capture; not ticked. #7: esp32/esp32-classic targets no longer exist on dev (combo-only, maintainer 2026-10-29); the code is in every esp32-combo build since beta.95 (latest beta.294+67e3f51); not ticked as written. #8 Ethernet takeover: field AC, waived by A. #9: red accepted as the host test tests/test_wifi_link_record.py (15 FAIL on the old code + 2 mutants), green on the bench; waived by A.
+<!-- SECTION:FINAL_SUMMARY:END -->
