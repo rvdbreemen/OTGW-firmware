@@ -32,6 +32,10 @@ export function stopChromeTree(child) {
   if (!child || child.exitCode !== null) return;
   if (process.platform === 'win32' && child.pid) {
     try { spawnSync('taskkill', ['/PID', String(child.pid), '/T', '/F'], { stdio: 'ignore', timeout: 10000 }); } catch { /* ignore */ }
+  } else if (child.pid && child.__otgwGroup) {
+    // TASK-1744: on Linux and macOS launchChrome() starts Chrome as the leader of its own process group, so a
+    // signal to -pid reaches its renderer, GPU and utility children too; child.kill() alone ends only the browser.
+    try { process.kill(-child.pid, 'SIGKILL'); } catch { /* ignore: the group is gone */ }
   }
   try { child.kill(); } catch { /* ignore */ }
 }
@@ -103,7 +107,10 @@ export async function acquireChromeSlot() {
 export async function launchChrome(bin, args, opts = { stdio: 'ignore' }) {
   const slot = await acquireChromeSlot();
   let child;
-  try { child = spawn(bin, args, { windowsHide: true, ...opts }); } catch (e) { fs.rmSync(slot, { force: true }); throw e; }
+  // TASK-1744: detached on POSIX makes Chrome a process group leader (stopChromeTree kills -pid); Windows unchanged.
+  const posix = process.platform !== 'win32';
+  try { child = spawn(bin, args, { windowsHide: true, ...(posix ? { detached: true } : {}), ...opts }); } catch (e) { fs.rmSync(slot, { force: true }); throw e; }
+  if (posix) child.__otgwGroup = true;
   return guardChrome(child, slot);
 }
 
