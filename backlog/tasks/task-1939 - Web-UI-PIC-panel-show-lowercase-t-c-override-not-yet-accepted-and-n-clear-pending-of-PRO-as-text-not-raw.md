@@ -7,7 +7,7 @@ status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-14T15:51:00Z'
-updated_date: '2026-11-15T10:38:00Z'
+updated_date: '2026-11-15T12:00:00Z'
 labels:
   - webui
   - parity
@@ -35,6 +35,8 @@ Found in TASK-1848 (95, 2026-11-14). fmtPicSetting() in src/OTGW-firmware/data/v
 2026-11-14 (95) prepared, NOT applied and NOT run (commit charge 95 %, and a src/ change in wt-95w would block the beta.252-254 post): patch C:\Users\rvdbr\AppData\Local\Temp\claude\d9c572fbc7f8e9ee\87fc885c-0e3d-40a7-9313-4a23af8d2bc3\scratchpad\t1939\t1939.patch (fmtPicSetting in v2.js: n -> adv.pic_ovr_clearing; t/c -> the temp/const text wrapped in adv.pic_ovr_pending; new keys in en (built in), nl, de, el; JSON validated) and a draft headless-Chrome test pic-setpoint-override-text.test.mjs next to it (6 cases N, n, T, C, t, c via a fake /api/v2/pic/settings). Next: apply after the 1848/1849/1940 push, run the test red on the current v2.js and green on the patch, one file at a time.
 
 2026-11-15: PIC source checked in this session: other-projects/otgw-6.6/gateway.asm:2198-2222 PrintOverride (the task cites 6.8:2201-2226; 6.8 is not in the repo): N = no override flags, n = flags set but setpoint 0 ('Waiting to clear the override'), T/C with iorlw 0x20 (lowercase) while OverrideSet is clear ('Override accepted by the thermostat?'). fmtPicSetting() renders t/c as adv.pic_ovr_temp_pending/const_pending and n as adv.pic_ovr_clearing; en, nl, de, el. Evidence: tests/webui/pic-setpoint-override-text.test.mjs (real fmtPicSetting): 4 pass on the fix; on the old v2.js 3 fail (t/c, n, keys) and 1 pass (T/C/N unchanged). i18n-followups, i18n-lang, i18n-no-hardcoded, values-names-follow-language pass. The Greek strings are a first translation (George reviews, TASK-1724).
+
+2026-11-15 bench by 09 on .63, beta.310+4c57d94: with a pending TT= the PIC panel shows 't20.00' as text, not raw (e PASS).
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
