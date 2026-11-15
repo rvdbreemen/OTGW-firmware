@@ -16,6 +16,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - OT-Direct: the replies to `SC=`, `SR=` and `FT=` use the PIC 6.8 text: `SC: 09:05/3` with two-digit hours, `SR: <id>:<high>/<low>` (e.g. `SR: 18:1/230`) whatever form the argument had, and `FT:` the selected model (`C`, `I`, `S` or `D`) instead of the argument (TASK-1849).
 - OT-Direct: the thermostat lost and back events print the PIC 6.8 lines `Thermostat disconnected` and `Thermostat connected`, also to port 25238 (TASK-1850).
 - Web server: the WEB CONN CAP refusal line splits the counted port-80 connections by state and shows the queued bytes; the limit itself is unchanged (TASK-1947).
+- OT-Direct: a switch between gateway and monitor mode keeps the command state (HW, SR=, CS=, UI= and the other overrides) and flushes only the command queue, as on the PIC; a switch into or out of master, loopback or bypass and `GW=R` still clear it (TASK-1839).
+- OT-Direct: on a thermostat loss the gateway no longer writes the 16 C setback temperature as a flow setpoint; its own frames carry CH off unless a `CS=` is in force, like the PIC. `OTDsetbacktemp` and the `FS=` flag are still stored but have no effect, `setback_active` stays false (TASK-1806).
+- SAT continuous mode: a CH flame-on start runs the PWM start sequence first (flame-off hold at return + 18 C, a 20 s hold, then the 60 s follow), as a fail-safe (Sergeant D entry 348, TASK-1942).
+- SAT: PWM ends for continuous when the flame is on and the request stays above the flow for 60 s, instead of the flow at 3 C below the request for 180 s (Sergeant D entries 342, 350, ADR-236, TASK-1933).
 
 ### Fixed
 - Home Assistant discovery: the DHW flow rate sensor (MsgID 19, `DHWFlowRate`) announces the unit `L/min`; Home Assistant rejected `l/min` for device class `volume_flow_rate` and did not create the sensor (PR #702 by justink0k; TASK-1949).
@@ -29,6 +33,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Simulation replay: a replayed thermostat MsgID 16 no longer reaches SAT's follow-thermostat (it could overwrite the stored SAT target), and a replayed PIC banner no longer re-enables the PIC or stores a PIC board mode on a unit without a PIC (TASK-1901, TASK-1902).
 - The DHW flow rate unit reads `L/min` in the OT log, the web UI message table and the MQTT docs too (follow-up of PR #702).
 - OT-Direct loopback and simulation replay: a synthetic or replayed MsgID 3 no longer sets SAT's slave configuration (PWM permission), detected heating source or manufacturer (TASK-1857, TASK-1903).
+- OT-Direct: the persisted HW, SW, SH, IT, OH, UI= list and vent setpoint survive the boot auto-detect switch to master mode; they were restored before the switch and wiped by it (TASK-1944, TASK-1760).
+- OT-Direct: `GW=` with an unsupported value answers `GW: BV` and a value longer than one character `GW: SE`, as the PIC; before, `GW=10` switched to gateway and `GW=RR` ran a full reset (TASK-1946).
+- OT-Direct master mode: after a failed MsgID 0 the boiler gets the next status request within about 1 s instead of 5 to 6 s, inside the OpenTherm 1.15 s master interval (TASK-1802).
+- OT-Direct master mode: a thermostat on the slave port gets no answer while the boiler is offline, instead of the last cached boiler status; `GW=R` and a switch into or out of master, loopback or bypass clear the boiler value cache, so boiler presence and the ventilation detection only count answers given after the switch (TASK-1807).
+- OT-Direct: a boiler Data-Invalid reply never becomes a cached value; the slot keeps its previous value (TASK-1925).
+- SAT simulation no longer saves the PID state or the heating-curve recommendation to the filesystem, so the next boot does not restore values learned on a simulated room (TASK-1900).
 
 ## [2.0.0-beta.250] - 2026-11-14
 
