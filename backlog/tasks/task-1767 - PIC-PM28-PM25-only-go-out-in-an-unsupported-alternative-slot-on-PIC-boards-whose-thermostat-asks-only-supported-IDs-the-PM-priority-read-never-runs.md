@@ -7,6 +7,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-09T21:51:00Z'
+updated_date: '2026-11-15T12:03:00Z'
 labels:
   - sat
   - pic
@@ -36,3 +37,9 @@ Not measured on a PIC bench with such a thermostat. Related TASK-1759, TASK-1412
 - [ ] #2 Robert / Sergeant D decide what SAT does on such PIC installations (recorded as a corrections entry), before any code
 - [ ] #3 Entries 45/151/276 and the firmware docs state the limitation
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-15 (d3) Third reading of other-projects/otgw-6.6/gateway.asm, agrees with the finding: in gateway mode CreateRequest (:2387-2402) calls UnknownMask and goes to SendAltRequest (:2404-2414) only for an ID the boiler is known not to support, or when SendUserMessage is set; SendUserMessage is set only by the standalone table (StandAloneMsg :1801 clears it, UserMsg :1837 sets it). Alternative (:3390) reaches SendPriorityMsg (:3436) through InitCmdLoop (:3394-3396), so PM=<id> (SetPrioMessage :4984-4995, sets prioritymsgid + PriorityMsg only) waits for such a slot. Still source-only: AC1 needs a PIC bench with a thermostat that asks only supported IDs, or a tester capture. No code before AC2.
+<!-- SECTION:NOTES:END -->
