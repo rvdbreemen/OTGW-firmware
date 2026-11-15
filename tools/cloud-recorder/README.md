@@ -139,8 +139,18 @@ The gateway records and uploads by itself over HTTPS, also on a board without PS
   `Debugln()`, hooks in `_debugBOL` / `_debugPrintf_P`, and `processOT()` next to the ADR-213 recorder.
   OT section v2 (fixed tables, `otrec.unpack_ot2`), mix record every 60 s or when a section is full.
 - **Upload:** own task, HTTPS POST to the collection point, certificate check against GTS Root R1/R4 and
-  ISRG Root X1/X2, PocketBase password login, `?fields=id`. Off unless `/cloudrec.cfg` on LittleFS has
-  `enabled=1` plus `host`, `port`, `email`, `password`.
+  ISRG Root X1/X2, `?fields=id`. Off unless `/cloudrec.cfg` on LittleFS has `enabled=1` plus `host` and `port`
+  (the opt-in).
+- **Enrollment and blocking (TASK-1971):** the gateway's uid is `otgw-` + its factory MAC; its secret (128 bits)
+  is made once and kept in NVS, so a filesystem flash keeps the enrollment. The first login of an unknown uid
+  enrolls it. A login whose record says `blocked` makes the gateway write `enabled=0` to `/cloudrec.cfg` and stop:
+  the opt-in is off until the user turns it on again. A uid that is enrolled with another secret (after a full
+  flash erase) is retried every 24 h until the maintainer deletes the old record.
+- **Service down (TASK-1971):** capture runs only while the service answers. It starts paused and resumes after a
+  login that is not blocked. A failed upload or login pauses capture, drops what was not sent, and waits
+  5, 10, 20, 40, 80, 160, 320, 640, 1280 min and then 24 h per further failure (each + 0 to 20 % random), back to
+  5 min after a success (`CloudRecPolicy.h`, `tests/test_cloudrec_policy.py`). The gateway's own network going
+  down pauses capture without a backoff step.
 - **Sizes against a normal esp32-combo build:** static RAM +22.0 KB (152,524 vs 130,524 B); app 98.9 % of the
   2240K slot (26 KB left; this env cannot use LTO).
 - **Build caveats found:** PlatformIO 6.2.0 fails the hybrid compile (SCons 4.11; 6.1.18 works); `-flto` must

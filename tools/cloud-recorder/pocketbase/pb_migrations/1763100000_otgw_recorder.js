@@ -1,7 +1,10 @@
 /// <reference path="../pb_data/types.d.ts" />
-// OTGW diagnostic collection point (TASK-1938).
-//   devices: one auth record per gateway; only enabled devices can log in.
-//   batches: create-only for the device that owns the batch; nobody but a
+// OTGW diagnostic collection point (TASK-1938, TASK-1971). All logic is in collection rules; the only code is
+// the retention cron in pb_hooks/retention.pb.js.
+//   devices: the register of gateways that log, one auth record each. A gateway enrolls itself on first contact
+//            with its unique id (uid, from the MAC) and a secret it generated; it logs in with uid + secret.
+//            "blocked" is set by the maintainer in the dashboard; a gateway can neither set nor clear it.
+//   batches: create-only for the device that owns the batch, and only while it is not blocked. Nobody but a
 //            superuser can list, read, change or delete batches.
 migrate((app) => {
   const devices = new Collection({
@@ -9,17 +12,27 @@ migrate((app) => {
     name: "devices",
     listRule: null,
     viewRule: null,
-    createRule: null,
-    updateRule: null,
+    // Anyone may enroll a new uid (the unique index refuses an existing one); "blocked" may not be sent.
+    createRule: '@request.body.blocked:isset = false && @request.body.verified:isset = false',
+    // A gateway may update its own label, firmware and board; not its uid and not "blocked".
+    updateRule: 'id = @request.auth.id && @request.body.blocked:isset = false && @request.body.uid:isset = false' +
+                ' && @request.body.verified:isset = false',
     deleteRule: null,
-    authRule: "enabled = true",
-    passwordAuth: { enabled: true, identityFields: ["email"] },
-    authToken: { duration: 1209600 },   // 14 days; the device refreshes before expiry
+    authRule: "",                       // a blocked gateway can still log in: it reads "blocked" and turns itself off
+    passwordAuth: { enabled: true, identityFields: ["uid"] },
+    authToken: { duration: 1209600 },   // 14 days
     fields: [
+      { name: "uid", type: "text", required: true, pattern: "^otgw-[0-9a-f]{12}$", min: 17, max: 17 },
       { name: "label", type: "text", max: 80 },
-      { name: "enabled", type: "bool" },
+      { name: "fw", type: "text", max: 64 },
+      { name: "board", type: "text", max: 32 },
+      { name: "blocked", type: "bool" },
+      { name: "updated", type: "autodate", onCreate: true, onUpdate: true },   // last login
     ],
+    indexes: ["CREATE UNIQUE INDEX idx_devices_uid ON devices (uid)"],
   });
+  app.save(devices);
+  devices.fields.getByName("email").required = false;   // a gateway has no mailbox; it logs in with its uid
   app.save(devices);
 
   const batches = new Collection({
@@ -29,7 +42,8 @@ migrate((app) => {
     viewRule: null,
     updateRule: null,
     deleteRule: null,
-    createRule: '@request.auth.collectionName = "devices" && @request.body.device = @request.auth.id',
+    createRule: '@request.auth.collectionName = "devices" && @request.auth.blocked = false' +
+                ' && @request.body.device = @request.auth.id',
     fields: [
       { name: "device", type: "relation", collectionId: devices.id, maxSelect: 1, required: true, cascadeDelete: true },
       { name: "stream", type: "select", values: ["ot", "sat", "dbg", "mix"], maxSelect: 1, required: true },
@@ -48,12 +62,14 @@ migrate((app) => {
   });
   app.save(batches);
 
-  // Real client IP behind the tunnel, and rate limits per IP.
+  // Real client IP behind the tunnel, rate limits per IP, and request logs (they hold IP addresses) for 7 days.
   const settings = app.settings();
   settings.trustedProxy.headers = ["CF-Connecting-IP"];
+  settings.logs.maxDays = 7;
   settings.rateLimits.enabled = true;
   settings.rateLimits.rules = [
     { label: "batches:create", maxRequests: 30, duration: 60 },
+    { label: "devices:create", maxRequests: 3, duration: 60 },
     { label: "/api/collections/devices/auth-with-password", maxRequests: 5, duration: 60 },
     { label: "/api/", maxRequests: 120, duration: 60 },
   ];

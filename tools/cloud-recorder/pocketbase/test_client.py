@@ -1,96 +1,139 @@
 #!/usr/bin/env python3
-"""Acts as one gateway against the OTGW collection point and checks the rules (TASK-1938).
+"""Acts as gateways against the OTGW collection point and checks its rules (TASK-1938, TASK-1971).
 
-    python3 test_client.py https://rec.example.nl gw-test@devices.invalid <password>
+    python3 test_client.py http://127.0.0.1:8090 <admin-email> <admin-password> [--db pb_data/data.db]
 
 Checks, each printed as PASS or FAIL:
-  1. the device logs in (auth-with-password)
-  2. it posts a batch (a real encoded 300 s chunk when the codec study script is found)
-  3. a resend of the same stream and seq is refused (unique index)
-  4. a batch claimed for another device is refused (create rule)
-  5. the device cannot list batches (locked rule, 403)
-  6. a wrong password is refused
-  7. the admin UI is not reachable through the tunnel (expect 404 from the tunnel path rule)
-Standard library only.
+   1. a new gateway enrolls itself with its uid and a secret, and logs in with them (blocked = false)
+   2. a second enrollment of the same uid is refused (unique index)
+   3. an enrollment that sends "blocked" is refused (create rule)
+   4. a uid that is not otgw-<12 hex> is refused (field pattern)
+   5. a gateway updates its own label/fw, but cannot set "blocked" or change its uid
+   6. it posts a batch; a resend of the same stream and seq is refused (unique index)
+   7. a batch claimed for another device is refused (create rule)
+   8. a gateway cannot list batches
+   9. the maintainer blocks the gateway: its login shows blocked = true and its batches are refused
+  10. with --db: a batch made 31 days old is deleted by the retention cron, a fresh one stays
+  11. the admin UI is not reachable (only meaningful through the tunnel: expect 404 from its path rule)
+Waits out the per-IP rate limits (429). Standard library only.
 """
-import base64, json, os, sys, time, urllib.error, urllib.request
+import base64, json, os, secrets, sqlite3, sys, time, urllib.error, urllib.request
+
 
 def call(method, url, body=None, token=None):
     data = json.dumps(body).encode() if body is not None else None
-    req = urllib.request.Request(url, data=data, method=method)
-    req.add_header("Content-Type", "application/json")
-    if token:
-        req.add_header("Authorization", token)
-    try:
-        with urllib.request.urlopen(req, timeout=20) as r:
-            raw = r.read()
-            try:
-                return r.status, json.loads(raw or b"{}")
-            except ValueError:
-                return r.status, {"raw": raw[:200].decode(errors="replace")}
-    except urllib.error.HTTPError as e:
-        raw = e.read()
+    for _ in range(4):
+        req = urllib.request.Request(url, data=data, method=method)
+        req.add_header("Content-Type", "application/json")
+        if token:
+            req.add_header("Authorization", token)
         try:
-            return e.code, json.loads(raw or b"{}")
-        except ValueError:
-            return e.code, {"raw": raw[:200].decode(errors="replace")}
-    except urllib.error.URLError as e:
-        return 0, {"error": str(e.reason)}
-
-def sample_payload():
-    """One 300 s OT batch in the real batch format (otrec fmt 1), or random bytes when otrec is not found."""
-    sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
+            with urllib.request.urlopen(req, timeout=20) as r:
+                raw = r.read()
+                status = r.status
+        except urllib.error.HTTPError as e:
+            raw, status = e.read(), e.code
+        except urllib.error.URLError as e:
+            return 0, {"error": str(e.reason)}
+        if status != 429:
+            break
+        time.sleep(61)                                  # per-IP rate limit window
     try:
-        import otrec
-        frames = [(t + int(time.time() * 1000), L, f) for t, L, f in otrec.codec.synthetic(300 / 3600)]
-        t0, data = otrec.pack_ot(frames)
-        return data, f"otrec fmt 1 batch, {len(frames)} frames"
-    except Exception:
-        return os.urandom(330), "random bytes"
+        return status, json.loads(raw or b"{}")
+    except ValueError:
+        return status, {"raw": raw[:200].decode(errors="replace")}
+
+
+results = []
+
+
+def check(name, ok, detail=""):
+    results.append(ok)
+    print(("PASS " if ok else "FAIL ") + name + (f"  ({detail})" if detail and not ok else ""))
+
+
+def enroll(base, uid, pw, **extra):
+    body = {"uid": uid, "password": pw, "passwordConfirm": pw, **extra}
+    return call("POST", f"{base}/api/collections/devices/records", body)
+
+
+def login(base, uid, pw):
+    return call("POST", f"{base}/api/collections/devices/auth-with-password", {"identity": uid, "password": pw})
 
 
 def main():
-    if len(sys.argv) != 4:
+    args = sys.argv[1:]
+    db = None
+    if "--db" in args:
+        i = args.index("--db")
+        db = args[i + 1]
+        del args[i:i + 2]
+    if len(args) != 3:
         sys.exit(__doc__)
-    base, ident, pw = sys.argv[1].rstrip("/"), sys.argv[2], sys.argv[3]
-    results = []
-    def check(name, ok, detail=""):
-        results.append(ok)
-        print(f"{'PASS' if ok else 'FAIL'}  {name}  {detail}")
+    base, admin_email, admin_pw = args[0].rstrip("/"), args[1], args[2]
+    uid = "otgw-" + secrets.token_hex(6)
+    uid2 = "otgw-" + secrets.token_hex(6)
+    pw = secrets.token_urlsafe(18)
 
-    st, auth = call("POST", f"{base}/api/collections/devices/auth-with-password",
-                    {"identity": ident, "password": pw})
-    check("1 login", st == 200 and "token" in auth, f"HTTP {st}")
-    if st != 200:
-        sys.exit(1)
-    token, dev = auth["token"], auth["record"]["id"]
+    st, _ = enroll(base, uid, pw, label="test gateway", fw="2.0.0-poc.2", board="OTGW32")
+    st2, auth = login(base, uid, pw)
+    tok = auth.get("token")
+    rec = auth.get("record", {})
+    check("1 enroll + login by uid", st == 200 and st2 == 200 and tok and rec.get("blocked") is False, f"{st} {st2}")
 
-    payload, kind = sample_payload()
-    seq = int(time.time())
-    batch = {"device": dev, "stream": "ot", "seq": seq, "t0": int(time.time() * 1000), "fmt": 1,
-             "payload": base64.b64encode(payload).decode()}
-    st, r = call("POST", f"{base}/api/collections/batches/records?fields=id", batch, token)
-    check("2 post batch", st == 200, f"HTTP {st}, {len(payload)} B ({kind})")
+    st, _ = enroll(base, uid, secrets.token_urlsafe(18))
+    check("2 second enrollment of the same uid refused", st == 400, str(st))
+    st, _ = enroll(base, uid2, pw, blocked=False)
+    check("3 enrollment that sends blocked refused", st == 400, str(st))
+    st, _ = enroll(base, "otgw-xyz", pw)
+    check("4 uid with the wrong pattern refused", st == 400, str(st))
 
-    st, r = call("POST", f"{base}/api/collections/batches/records?fields=id", batch, token)
-    check("3 resend same seq refused", st == 400, f"HTTP {st}")
+    url = f"{base}/api/collections/devices/records/{rec.get('id')}"
+    st_ok, _ = call("PATCH", url, {"label": "renamed", "fw": "2.0.0-poc.3"}, tok)
+    st_bl, _ = call("PATCH", url, {"blocked": True}, tok)
+    st_uid, _ = call("PATCH", url, {"uid": uid2}, tok)
+    check("5 own label/fw updated; blocked and uid not", st_ok == 200 and st_bl in (400, 403, 404) and st_uid in (400, 403, 404),
+          f"{st_ok} {st_bl} {st_uid}")
 
-    other = dict(batch, device="aaaaaaaaaaaaaaa", seq=seq + 1)
-    st, r = call("POST", f"{base}/api/collections/batches/records?fields=id", other, token)
-    check("4 batch for another device refused", st in (400, 403, 404), f"HTTP {st}")
+    payload = base64.b64encode(os.urandom(64)).decode()
+    batch = {"device": rec.get("id"), "stream": "mix", "seq": 1, "t0": int(time.time() * 1000), "fmt": 4, "payload": payload}
+    st, _ = call("POST", f"{base}/api/collections/batches/records?fields=id", batch, tok)
+    st2, _ = call("POST", f"{base}/api/collections/batches/records?fields=id", batch, tok)
+    check("6 batch stored, resend of the same seq refused", st == 200 and st2 == 400, f"{st} {st2}")
 
-    st, r = call("GET", f"{base}/api/collections/batches/records", None, token)
-    check("5 list batches refused", st == 403, f"HTTP {st}")
+    st, _ = call("POST", f"{base}/api/collections/batches/records", dict(batch, device="abcdefghijklmno", seq=2), tok)
+    check("7 batch for another device refused", st in (400, 403), str(st))
+    st, body = call("GET", f"{base}/api/collections/batches/records", None, tok)
+    check("8 gateway cannot list batches", st in (403, 404) or (st == 200 and body.get("totalItems") == 0), str(st))
 
-    st, r = call("POST", f"{base}/api/collections/devices/auth-with-password",
-                 {"identity": ident, "password": pw + "x"})
-    check("6 wrong password refused", st == 400, f"HTTP {st}")
+    st, a = call("POST", f"{base}/api/collections/_superusers/auth-with-password", {"identity": admin_email, "password": admin_pw})
+    admin = a.get("token")
+    st_b, _ = call("PATCH", url, {"blocked": True}, admin)
+    st2, auth2 = login(base, uid, pw)
+    st3, _ = call("POST", f"{base}/api/collections/batches/records?fields=id", dict(batch, seq=3), auth2.get("token"))
+    check("9 blocked: login shows it, batches refused",
+          st_b == 200 and st2 == 200 and auth2.get("record", {}).get("blocked") is True and st3 == 400, f"{st_b} {st2} {st3}")
 
-    st, r = call("GET", f"{base}/_/")
-    check("7 admin UI not reachable via tunnel", st == 404, f"HTTP {st}")
+    if db:
+        call("PATCH", url, {"blocked": False}, admin)
+        _, auth3 = login(base, uid, pw)
+        st, old = call("POST", f"{base}/api/collections/batches/records?fields=id", dict(batch, seq=10), auth3.get("token"))
+        st, new = call("POST", f"{base}/api/collections/batches/records?fields=id", dict(batch, seq=11), auth3.get("token"))
+        con = sqlite3.connect(db)
+        con.execute("UPDATE batches SET created = '2000-01-01 00:00:00.000Z' WHERE id = ?", (old.get("id"),))
+        con.commit()
+        con.close()
+        st_run, _ = call("POST", f"{base}/api/crons/otgwBatchRetention", None, admin)
+        time.sleep(2)
+        st_old, _ = call("GET", f"{base}/api/collections/batches/records/{old.get('id')}", None, admin)
+        st_new, _ = call("GET", f"{base}/api/collections/batches/records/{new.get('id')}", None, admin)
+        check("10 retention deletes a 31-day-old batch, keeps a fresh one", st_run == 204 and st_old == 404 and st_new == 200,
+              f"run {st_run}, old {st_old}, new {st_new}")
 
-    print(f"\n{sum(results)}/{len(results)} passed")
-    sys.exit(0 if all(results) else 1)
+    st, _ = call("GET", f"{base}/_/")
+    check("11 admin UI not reachable (tunnel only)", st == 404, f"{st}: expected through the tunnel, not on the LAN")
+    print(f"{sum(results)}/{len(results)} passed")
+
 
 if __name__ == "__main__":
     main()

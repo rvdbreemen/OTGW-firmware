@@ -1,7 +1,7 @@
 # anatomy.md
 
-> Auto-maintained by OpenWolf. Last scanned: 2026-11-15T12:19:40.430Z
-> Files: 158 tracked | Anatomy hits: 0 | Misses: 0
+> Auto-maintained by OpenWolf. Last scanned: 2026-11-15T13:23:25.038Z
+> Files: 162 tracked | Anatomy hits: 0 | Misses: 0
 
 ## ../../../../AppData/Local/Temp/
 
@@ -982,6 +982,7 @@
 
 ## src/OTGW-firmware/
 
+- `CloudRecPolicy.h` — pragma once (~563 tok)
 
 ## src/OTGW-firmware/data/
 
@@ -1009,3 +1010,15 @@
 
 ## tests/webui/
 
+
+## tools/cloud-recorder/pocketbase/
+
+- `test_client.py` — Acts as gateways against the OTGW collection point and checks its rules (TASK-1938, TASK-1971). (~1977 tok)
+
+## tools/cloud-recorder/pocketbase/pb_hooks/
+
+- `retention.pb.js` — / <reference path="../pb_data/types.d.ts" /> (~219 tok)
+
+## tools/cloud-recorder/pocketbase/pb_migrations/
+
+- `1763100000_otgw_recorder.js` — / <reference path="../pb_data/types.d.ts" /> (~1202 tok)
