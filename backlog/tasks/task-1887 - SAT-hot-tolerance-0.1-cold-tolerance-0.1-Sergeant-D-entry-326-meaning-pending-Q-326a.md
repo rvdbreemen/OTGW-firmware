@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-13T07:25:00Z'
-updated_date: '2026-11-13T07:35:00Z'
+updated_date: '2026-11-15T21:11:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -24,4 +24,6 @@ Sergeant D decision 2026-11-13 (https://discord.com/channels/812969634638725140/
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-11-13: meaning settled by entry 328 (Q-326a answered A, Sergeant D msg 1570701593073025099): Home Assistant generic-thermostat hysteresis on the heating demand, start below target - 0.1, stop at or above target + 0.1. Open for the plan (entry 328): how the band combines with the PID and the cold cutoff (ADR-199). Plan with citations and Sergeant D's OK before code.
+
+Q-328a decided 2026-11-15 by the coordinator under Robert's directive (CLI) 'Do not wait for Sergeant D. Finish everything that can be finished.'; Sergeant D may overrule, his answer later becomes a follow-up task; asked in the 18-question batch in #dev-sat-mqtt (item 8, https://discord.com/channels/812969634638725140/1105556725714649128/1571633456381694074): the tolerance band of entry 328 only decides CH on/off; the PID keeps running; the cold cutoff (ADR-199) is unchanged. Unblocked.
 <!-- SECTION:NOTES:END -->

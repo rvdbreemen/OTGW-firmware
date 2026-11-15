@@ -4,6 +4,7 @@ title: SAT continuous->PWM threshold 1.5 C / 30 s (entry 327)
 status: To Do
 assignee: []
 created_date: '2026-11-13T07:28:00Z'
+updated_date: '2026-11-15T21:11:00Z'
 labels:
   - sat
   - adr
@@ -26,3 +27,9 @@ Sergeant D decision 2026-11-13 (https://discord.com/channels/812969634638725140/
 - [ ] #3 Host test on the real code: red on the old rule (2.0 C / 60 s), green on the new rule (1.5 C / 30 s)
 - [ ] #4 Bench test by the bench-tester
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Q-327a and Q-327b decided 2026-11-15 by the coordinator under Robert's directive (CLI) 'Do not wait for Sergeant D. Finish everything that can be finished.'; Sergeant D may overrule, his answer later becomes a follow-up task; asked in the 18-question batch in #dev-sat-mqtt (items 6-7, https://discord.com/channels/812969634638725140/1105556725714649128/1571633456381694074): Q-327a A (keep the 3.5 C / 30 s fail-safe next to the 1.5 C rule of entry 327), Q-327b A (a separate value for the switch, fOvershootMargin keeps 2.0 for the classifier, entry 37 unchanged). Unblocked.
+<!-- SECTION:NOTES:END -->

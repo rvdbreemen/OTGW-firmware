@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-11T06:41:00Z'
-updated_date: '2026-11-15T19:14:00Z'
+updated_date: '2026-11-15T21:12:00Z'
 labels:
   - otdirect
   - review-2026-11-11
@@ -61,4 +61,6 @@ PIC 6.8 parity audit 2026-11-12 (docs/reviews/2026-11-12_pic68-otdirect-parity-a
 2026-11-15 bench 09 on .61, 2e80ebe (commits A+B): PASS. Two brief-vs-code points settled by the coordinator against gateway.asm 6.6, the code is PIC-exact: B8 SetOperModeHC1 :4424-4430 GetDecimalArg without a trailing check, >15 = OR, GetDecimal :5002-5025 stops at the first non-digit (MW=1.5 -> 1, MW=1x -> 1); B9 SetVentSetpoint :4210-4218 trailing = SE, 101 = OR (not BV), non-numeric -> clear. Not benchable on .61 (needs a thermostat, a fault sim or a Classic), covered by host tests on the real code: A3 (test_otd_thermostat_loss_time ovr), Bug 5 (test_otd_fault_edge), Bug 7 (test_core_error_lines), E5 (override_reply C13c). Re-checked on f1df3fd (with TASK-1981): port 25238 regression as on 2e80ebe. Still open for AC1: A2 (Q-1804a), A6, B2, B3e, B3a, Bug 8 (+ the OT-Direct part of Bug 7): task stays In Progress.
 
 2026-11-15 commits A+B pushed as beta.324 (origin/dev 37af3e82b..626b6b179). Open for AC1: A2 (Q-1804a), A6, B2, B3e, B3a, Bug 8 + the OT-Direct part of Bug 7.
+
+Q-1804a (item A2) decided 2026-11-15 by the coordinator under Robert's directive (CLI) 'Do not wait for Sergeant D. Finish everything that can be finished.'; Sergeant D may overrule, his answer later becomes a follow-up task; asked in the 18-question batch in #dev-sat-mqtt (item 17, https://discord.com/channels/812969634638725140/1105556725714649128/1571633470696980583): option A, like the PIC: a Data-Invalid/Unknown-DataID answer to SAT's CS (MsgID 1) or SW (MsgID 56) clears them on OT-Direct; SAT sets them again on its next send (~30 s, ADR-235). PIC source gateway.asm 6.6 :2822-2825, :3141-3147. SH= stays per entry 252. Unblocked for d3.
 <!-- SECTION:NOTES:END -->

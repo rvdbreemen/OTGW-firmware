@@ -181,7 +181,7 @@ so the card is SAT's thermostat while SAT is enabled and today's thermostat card
 
 ## Open Questions
 
-- [ ] What Sergeant D meant by "SAT should be displayed as `OTGW_Thermostat`" (entry 351): the entity's display name, or the gateway taking the thermostat role. Queued as Q-1979a in docs/sat/open-questions.md; this ADR keeps the name "Thermostat" until it is answered.
+- [x] What Sergeant D meant by "SAT should be displayed as `OTGW_Thermostat`" (entry 351): the entity's display name, or the gateway taking the thermostat role. Queued as Q-1979a in docs/sat/open-questions.md; this ADR keeps the name "Thermostat" until it is answered. — **Answered 2026-11-15 by User: Robert van den Breemen:** Keep the name 'Thermostat'. Decided by the coordinator under Robert's directive 2026-11-15 (CLI) 'Do not wait for Sergeant D. Finish everything that can be finished.' (Q-1979a option B, our recommendation); Sergeant D is asked in the same batch and may overrule, which then becomes a follow-up task.
 
 ## Related Decisions
 

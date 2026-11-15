@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-14T10:22:00Z'
-updated_date: '2026-11-14T10:26:00Z'
+updated_date: '2026-11-15T21:12:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -41,3 +41,9 @@ Maintainer + Sergeant D decision, entry 340: Robert 'Drop it to 90%?' (https://d
 5. Replay of the 5 gruijter runs with 92's harness on the fix: 10 counted hours, same votes as the share10 variant.
 6. evaluate --quick, bump, build on GO, bench brief (no-regression; the tune telemetry on device/info), push, post.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Q-343a decided 2026-11-15 by the coordinator under Robert's directive (CLI) 'Do not wait for Sergeant D. Finish everything that can be finished.'; Sergeant D may overrule, his answer later becomes a follow-up task; asked in the 18-question batch in #dev-sat-mqtt (item 16, https://discord.com/channels/812969634638725140/1105556725714649128/1571633470696980583): option A, 90 % of the ticks the hour logged (109 of 121), meets entries 340 and 343. Unblocked (build was held for this answer).
+<!-- SECTION:NOTES:END -->

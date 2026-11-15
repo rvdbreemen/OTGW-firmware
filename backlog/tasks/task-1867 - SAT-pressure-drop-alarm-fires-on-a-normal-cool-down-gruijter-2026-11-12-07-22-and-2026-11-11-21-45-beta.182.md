@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-12T12:09:00Z'
-updated_date: '2026-11-14T21:59:00Z'
+updated_date: '2026-11-15T21:11:00Z'
 labels:
   - sat
   - bug
@@ -39,4 +39,6 @@ Update (comms, 2026-11-12, checked first-hand): raw source C:\Users\rvdbr\AppDat
 Correction to the note above: the public correction to gruijter is #alpha-testing msg 1570411600530243658 (https://discord.com/channels/812969634638725140/1514720723980259460/1570411600530243658).
 
 2026-11-14 coordinator (subagent, verified: python -m pytest -q tests/test_sat_pressure_alarm_replay.py -> 4 passed in 13.67s): replay of the REAL satUpdatePressure() (sliced from SATcontrol.ino, harness of test_sat_pressure_health.py) on gruijter's MsgID 0/18 series (fixture tests/fixtures/sat_pressure_gruijter_20261111.csv, 282 rows, timestamps + values only). AC1: 07:22:54 alarm exact (smoothed 1.813, drop 1.765, cleared 07:25:24, log 1.81/1.758); 01:31:24 onset/drop/clear match (smoothed 0.024 low, EMA seed before the capture); 21:45 only with an assumed 2.0 bar before the first captured read (labelled as assumption in the test). AC2: same trigger as the pump-stop residual of TASK-1579 / entry 262: the CH-mode bit falls -> ring cleared + 600 s suspension (SATcontrol.ino:5699-5709), the ring keeps recording (:5726-5735), the pump-stop step (~0.27 bar) lands 240 s later inside the suspension; at suspension end (:5745) the least-squares slope over pre/post step reads ~2.2 bar/h > 0.3, confirmed after 120 s (:5796, :5807) = 720 s after the CH bit. Not thermal contraction (title wording is the first reading). A flame-off suspension would not help: the step comes 870 s after flame-off (07:22) and there was no flame at all before 01:31. AC3 open: any change (e.g. drop samples taken during the suspension) deviates from thermo-nova and goes to Sergeant D as Q-1867a.
+
+Q-1867a decided 2026-11-15 by the coordinator under Robert's directive (CLI) 'Do not wait for Sergeant D. Finish everything that can be finished.'; Sergeant D may overrule, his answer later becomes a follow-up task; asked in the 18-question batch in #dev-sat-mqtt (item 9, https://discord.com/channels/812969634638725140/1105556725714649128/1571633456381694074): option B, discard the pressure samples recorded during the 600 s settle window (thermo-nova binary_sensor.py:25 PRESSURE_DROP_RATE_SETTLE_SECONDS 600, opened 2026-11-15). Unblocked.
 <!-- SECTION:NOTES:END -->
