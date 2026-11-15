@@ -4680,6 +4680,19 @@
     "TASK-1979"
    ],
    "confirmed_by_entry": null
+  },
+  {
+   "id": 352,
+   "title": "Robert decides: follow Sergeant D's approach of entry 351 for the HA climate entity, as user friendly and simple as possible (maintainer decision, 2026-11-15; follows entry 351)",
+   "date": "2026-11-15",
+   "source": "maintainer",
+   "kind": "decision",
+   "discord_link": "https://discord.com/channels/812969634638725140/914498730001072149/1571557990392402042",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1979"
+   ],
+   "confirmed_by_entry": null
   }
  ]
 }

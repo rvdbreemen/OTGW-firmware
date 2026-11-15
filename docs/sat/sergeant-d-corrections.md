@@ -7344,3 +7344,19 @@ Asked by DM (through the coordinator) whether the repeat is 60 s or 30 s, given 
 **Open:** what "SAT should be displayed as `OTGW_Thermostat`" means (the entity's name, or the device taking the thermostat role) is to be confirmed with Sergeant D. Also whether case 1 needs anything on the card beyond showing the thermostat's setpoint.
 
 **Task:** TASK-1979.
+
+## 352. Robert decides: follow Sergeant D's approach of entry 351 for the HA climate entity, as user friendly and simple as possible (maintainer decision, 2026-11-15; follows entry 351)
+
+**Source:** #beta-testing 2026-11-15. Sergeant D, 16:10:23 UTC (https://discord.com/channels/812969634638725140/914498730001072149/1571557990392402042), explaining entry 351:
+
+> "The idea behind that is the minimum hassle for the user. The family members are operating the physical thermostat as before and at the same time SAT regulates heating. Win-Win"
+
+Robert, 16:18:42 UTC (https://discord.com/channels/812969634638725140/914498730001072149/1571560085124288626):
+
+> "We are going for the best user experience. So follow <@821036882946424852> and give me how we can make it as user friendly and simple in home assistant too."
+
+**Settled:** the HA climate entity follows Sergeant D's approach of entry 351: the existing MQTT climate entity, the physical thermostat stays the family's control while SAT regulates, and Home Assistant should be as simple to use. This is TASK-1979 recommendation A. Robert asked for the concrete HA proposal; the bot posted it the same minute as a reply (https://discord.com/channels/812969634638725140/914498730001072149/1571560639548104886): one card, the same entity as today; while SAT is on it shows SAT's room temperature and target, and a temperature or preset on the card sets SAT's target as the web UI does; with follow thermostat and push setpoint on, a wall-thermostat change becomes SAT's target (`satOnThermostatSetpoint`, `src/OTGW-firmware/SATcontrol.ino:2428-2436`, entry 2) and a card change is pushed to the thermostat with `TC=` (`SATcontrol.ino:8051-8055`); standalone the card is the thermostat; with SAT off the card works as today.
+
+**Open:** Robert's OK on that concrete proposal (asked in the post). The meaning of "displayed as `OTGW_Thermostat`" (entry 351) stays open. Known limit named in the post: some thermostats (Honeywell Round) do not mirror an accepted override in MsgID 16 (entry 2).
+
+**Task:** TASK-1979.
