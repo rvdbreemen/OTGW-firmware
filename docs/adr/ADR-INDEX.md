@@ -244,7 +244,7 @@ One row per Architecture Decision Record. Scope is the Enforcement `path_glob` s
 | ADR-238 | Accepted | - | On the ESP32-S3 a boot counts towards the triple-reset WiFi recovery when it is a reset-button press or a power-on (E... |
 | ADR-239 | Accepted | - | The first 32 bytes of RTC slow memory (0x50000200-0x5000021F) belong to the safeboot updater: the main firmware holds... |
 | ADR-240 | Accepted | - | A connection on port 80 that is not ESTABLISHED counts towards the ADR-188 cap only while at least one queued segment... |
-| ADR-241 | Proposed | - | In master mode a thermostat WRITEDATA of any ID except 1, 16 and 24 is sent to the boiler as a relay in the next free... |
+| ADR-241 | Accepted | - | In master mode a thermostat WRITEDATA of any ID except 1, 16 and 24 is sent to the boiler as a relay in the next free... |
 | ADR-242 | Accepted | - | Every OT-Direct state change runs on the loop task: addCommandToQueue() and sendPICSerial() hand a command that arriv... |
 | ADR-244 | Accepted | - | On the PIC serial path, a command that starts with PR= is sent to the PIC also while a simulation is on; every other... |
 | ADR-245 | Accepted | - | On a board with PSRAM the ring holds 5046 slots of 120 s (GRAPHHISTLARGESLOTS), 5040 of them readable: 7 days. |

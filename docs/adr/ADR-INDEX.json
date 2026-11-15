@@ -9634,7 +9634,7 @@
       "title": "OT-Direct master mode relays the thermostat's writes to the boiler in the next free master slot and returns the boiler's answer (amends ADR-066)",
       "path": "ADR-241-ot-direct-master-mode-relays-the-thermostat-s-writes-to-the-boiler-in-the-next-free-master-slot-and-returns-the-boiler-s-answer-amends-adr-066.md",
       "format": "canonical",
-      "status": "Proposed",
+      "status": "Accepted",
       "date": "2026-11-15",
       "decision_summary": "In master mode a thermostat WRITEDATA of any ID except 1, 16 and 24 is sent to the boiler as a relay in the next free...",
       "topics": [
@@ -9664,7 +9664,8 @@
         "must": [
           "Send a thermostat WRITEDATA of an ID other than 1, 16 and 24 to the boiler with the thermostat's data, or with the data of an active write override for that ID.",
           "Return the boiler's reply to the thermostat (WRITEACK, Data-Invalid, Unknown-DataID), never a local echo, for a forwarded write.",
-          "Send the forwarded write before any queued command or scheduled frame, once the frame in flight has ended.",
+          "Send the forwarded write before any queued command or scheduled frame, once the frame in flight has ended and the 100 ms MWT after it has passed.",
+          "Return an answer only for the current thermostat request and only within OTDREPLYDEADLINEMS of the relay's send.",
           "Keep MsgID 1, 16 and 24 on today's local WRITEACK and write-cache path (TASK-1150, TASK-1811).",
           "Keep MsgID 1, 8 and 14 on the local echo while SAT owns the setpoint."
         ],
@@ -9678,7 +9679,7 @@
           "None."
         ],
         "verification": [
-          "Host test on the real handleMasterModeSlaveFrame() and the master-mode consumer with a fake bus and fake time: a MsgID 56 write reaches the boiler with the thermostat's data and the thermostat gets the boiler's WRITEACK, Data-Invalid or...",
+          "tests/testotdmasterwriterelay.py on the real otdMasterRelaysWrite(), applyOverrides(), the master-mode relay branch of loopOTDirect(), the reply check of handleMasterResponse() and scheduleMasterRequest(), with a fake bus and fake time:...",
           "Bench where the hardware allows: a thermostat on the slave port of an OTGW32 in master mode with a boiler (or a boiler simulator); none on the current bench, so this is field-only until then."
         ]
       },

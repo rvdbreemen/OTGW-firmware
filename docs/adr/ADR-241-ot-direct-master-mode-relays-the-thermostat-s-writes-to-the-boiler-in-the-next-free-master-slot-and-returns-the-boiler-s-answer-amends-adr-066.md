@@ -1,7 +1,7 @@
 ---
 id: "ADR-241"
 title: "OT-Direct master mode relays the thermostat's writes to the boiler in the next free master slot and returns the boiler's answer (amends ADR-066)"
-status: "Proposed"
+status: "Accepted"
 date: "2026-11-15"
 binding: false
 gate: null
@@ -39,7 +39,7 @@ format: "canonical"
 
 ## Status
 
-Proposed, 2026-11-15. Guideline-level per ADR-080: verified by host tests, no evaluate.py gate.
+Accepted, 2026-11-15.
 
 ## Status History
 
@@ -55,18 +55,23 @@ status_history:
     changed_by: "Agent (d3)"
     reason: Related to ADR-179
     changed_via: adr-kit lifecycle
+  - date: 2026-11-15
+    status: Accepted
+    changed_by: "Agent (d3)"
+    reason: Robert decided A by Discord DM 1571427398485024889 and 1571427991219867750; all four gates passed
+    changed_via: adr-kit lifecycle
 ```
 
 ## Context
 
-OT-Direct is the gateway firmware path without a PIC: the ESP32-S3 drives the OpenTherm boiler (master port) and the
+OT-Direct is the gateway firmware path without a PIC (the gateway's PIC microcontroller): the ESP32-S3 drives the OpenTherm boiler (master port) and the
 thermostat (slave port) itself. In master mode the gateway runs its own polling schedule to the boiler. When a
 thermostat is still on the slave port (`bEnableSlave`), ADR-066 lets the gateway answer it as a "virtual boiler" from
 the boiler value cache, with "instant responses" listed as a benefit.
 
 ADR-066 does not cover the thermostat's writes. Today `handleMasterModeSlaveFrame()` (`OTDirect.ino`) answers every
 thermostat WRITE_DATA with a local WRITE_ACK echo of the thermostat's own data, and acts only on MsgID 1, 16 and 24.
-A write of the DHW setpoint (MsgID 56), the max CH setpoint (57), the max modulation (14) or any other ID is
+A write of the DHW (domestic hot water) setpoint (MsgID 56), the max CH setpoint (57), the max modulation (14) or any other ID is
 acknowledged and dropped: the thermostat believes the boiler has the value, the boiler never saw it (audit TASK-1795,
 report E, U1). The PIC relays a thermostat frame and returns the boiler's reply (WRITE_ACK, Data-Invalid or
 Unknown-DataID). Robert decided on 2026-11-11: "Forward to the boiler" (TASK-1812).
@@ -82,7 +87,7 @@ one of the gateway's own frames when a thermostat write arrives.
 
 In master mode a thermostat WRITE_DATA of any ID except 1, 16 and 24 is sent to the boiler as a relay in the next free
 master slot, ahead of the command ring and the schedule, and the thermostat gets the boiler's own answer through
-`replyToThermostat()`, as in gateway mode; MsgID 1, 16 and 24, the IDs SAT owns while it is enabled, and every READ
+`replyToThermostat()`, as in gateway mode; MsgID 1, 16 and 24, the IDs SAT (Smart Autotune Thermostat) owns while it is enabled, and every read
 keep their current handling.
 
 1. **Forwarded.** Every thermostat WRITE_DATA except MsgID 1, 16 and 24. While `satOwnsControlSetpoint()` is true, the
@@ -173,8 +178,9 @@ keep their current handling.
 
 ## Open Questions
 
-- [ ] Robert: accept the slot rule (relay in the next free master slot, ahead of the ring and the schedule) and the
-  SAT exclusion of MsgID 8 and 14?
+- [x] Robert: accept the slot rule (relay in the next free master slot, ahead of the ring and the schedule) and the
+  SAT exclusion of MsgID 8 and 14? Answered A (accept) by Discord DM 1571427398485024889 and, on the corrected
+  re-question, 1571427991219867750 (2026-11-15).
 
 ## Related Decisions
 
