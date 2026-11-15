@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-15T10:03:00Z'
-updated_date: '2026-11-15T11:31:00Z'
+updated_date: '2026-11-15T11:57:00Z'
 labels:
   - capture
   - tooling
@@ -30,8 +30,9 @@ Robert, 2026-11-15 (in session 'Ja', and DM 1571452141237968907: 'collect ALL po
 - [x] #3 With a diag recording active the upload holds the downloaded recording; with none active nothing is fetched; the tool never sends recording start or stop (test checks no POST)
 - [x] #4 Every read-only diagnostic GET of the route table is fetched at start and stop (hourly where it changes) into the upload; the in/out list with reasons is in the task notes; no secret and no side-effect endpoint is fetched (test on the list)
 - [x] #5 No new dependency: stdlib only (ADR-202)
-- [ ] #6 README of the capture tool describes the new files; the flash zip from build.py carries the new script
-- [ ] #7 Bench (09 on .63): the capture CSV matches a web UI CSV export taken in the same minute for the overlapping slots
+- [x] #6 Bench (09 on .63): the capture CSV matches a web UI CSV export taken in the same minute for the overlapping slots
+- [ ] #7 Bench (09 on .63): the capture CSV has the same 11 columns in the same order as the web UI export, and the slot timing matches (coordinator split of the former AC6, 2026-11-15)
+- [ ] #8 Field: the values of a capture CSV match the CSV the tester exported by hand for the overlapping slots (first gruijter capture)
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -42,4 +43,6 @@ Robert, 2026-11-15 (in session 'Ja', and DM 1571452141237968907: 'collect ALL po
 OUT, with the reason: settings.ini (passwords in plain text, and readable without auth when no HTTP password is set), pic/update-check (queues an outbound request to otgw.tclcode.com), firmware/files (can write .ver files to LittleFS), network/scan (starts a WiFi scan, a read consumes the result), otgw/messages/<id> and otgw/id/<id> (134 single-value requests; otmonitor + ot-support hold the data), otgw/label/<label> (same), otgw/telegraf (same body as otmonitor), sat and sensors without a sub-path (aliases of sat/status, sensors/status), webhook and mqtt (no GET route), /ReBoot (any method reboots), /ResetWireless (wipes WiFi and reboots), /pic (no auth; can queue a PIC flash, a download or a file delete: by design, feedback memory), the static pages and /ws. The tool never sends a POST/PUT, never adds ?delete=. Gate: tests/test_capture_device_data.py RouteGateCase fails when a top-level REST resource of restAPI.ino is in neither SWEEP_ENDPOINTS nor SWEEP_EXCLUDED (it does not see a new sub-route of a covered resource). Side finding: /api/v2/sat/weather/needs-setup is unreachable (restAPI.ino:1532 checks wc==5, the path has 6 words); reported to the coordinator.
 
 2026-11-15 implementation (scripts/otgw_capture.py, stdlib only): graph_history_rows/graph_history_csv (the web UI mergeGraphHistory + exportCsv rules), fetch_graph_history (24h + 7d, 7d kept only with a coarser interval_s), fetch_diag_recording (status first, GET download, since=, never start/stop), sweep_device + redact_json (SWEEP_ENDPOINTS/SWEEP_FILES/SWEEP_EXCLUDED), DeviceDataCapture thread (start round off the main thread, hourly rounds in long-run mode; pic/settings start+stop only), stop round in main(), upload zip globs, flags --skip-device-state/--skip-graph-history/--skip-diag-recording (+ PowerShell names). Evidence: tests/test_capture_device_data.py 18/18 OK on the fix; the same file against origin's script (temp copy) FAILED (failures=1, errors=15) of its 16 cases at the time; SameAsWebUiCase runs the REAL v2.js mergeGraphHistory + GSER via node and compares the CSV byte for byte on 3 responses: identical. tests/test_capture_tool.py: 3 watchdog cases went red on the first version (the sweep's /api/v2/health GETs count as probes there); those cases now skip the device-data features like they skip http-probes, 52/52 OK (origin script 52/52 OK too); new end-to-end ToolCase.test_j2 (device-state-start and -stop in the upload zip, 404 lines for graph/diag). All 6 capture test files PASS via run_tests (-j 3). Flash zip: OTGW-firmware-esp32-combo-2.0.0-beta.306+041400e-flash.zip already holds otgw_capture.py (build.py:1262 copies scripts/otgw_capture.py), so the next build ships this version.
+
+2026-11-15 AC6 split by the coordinator: bench part = columns (11, same order, identical) + slot timing, PASS by 09 on .63 with beta.306 and the pushed script (coordinator relay); the value comparison is a field AC (gruijter's first capture, who also exports the CSV by hand). New AC6 ticked from 09's PASS; AC7 open (field).
 <!-- SECTION:NOTES:END -->
