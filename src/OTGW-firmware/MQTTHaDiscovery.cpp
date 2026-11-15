@@ -3123,7 +3123,8 @@ bool streamClimateDiscovery(uint8_t climateIdx,
     if (!w.writeProgmem(PSTR("\"curr_temp_t\":\""))) return false;
     if (!w.writeRam(ctx.mqttPubTopic)) return false;
     if (climateIdx == 0) {
-      if (!w.writeProgmem(PSTR("/Tr\""))) return false;
+      // TASK-1979 / ADR-248: SAT's room temperature while SAT is enabled, Tr while it is off (published by the firmware)
+      if (!w.writeProgmem(PSTR("/sat/climate_current\""))) return false;
     } else {
       if (!w.writeProgmem(PSTR("/Tdhw\""))) return false;
     }
@@ -3133,7 +3134,8 @@ bool streamClimateDiscovery(uint8_t climateIdx,
     if (!w.writeProgmem(PSTR("\"temp_stat_t\":\""))) return false;
     if (!w.writeRam(ctx.mqttPubTopic)) return false;
     if (climateIdx == 0) {
-      if (!w.writeProgmem(PSTR("/TrSet\""))) return false;
+      // TASK-1979 / ADR-248: SAT's target while SAT is enabled, TrSet while it is off (published by the firmware)
+      if (!w.writeProgmem(PSTR("/sat/climate_target\""))) return false;
     } else {
       if (!w.writeProgmem(PSTR("/TdhwSet\""))) return false;
     }
@@ -3142,10 +3144,12 @@ bool streamClimateDiscovery(uint8_t climateIdx,
     // temp_cmd_t + temp_cmd_tpl
     if (!w.writeProgmem(PSTR("\"temp_cmd_t\":\""))) return false;
     if (!w.writeRam(ctx.mqttSubTopic)) return false;
-    if (!w.writeProgmem(PSTR("/command\""))) return false;
+    // TASK-1979 / ADR-248: the thermostat card sends the bare value to sat/climate_target; the firmware routes it
+    // to SAT's target while SAT is enabled and queues TT= otherwise. The DHW card keeps its command topic.
+    if (!w.writeProgmem(climateIdx == 0 ? PSTR("/sat/climate_target\"") : PSTR("/command\""))) return false;
     if (!writeJsonComma(w)) return false;
     if (climateIdx == 0) {
-      if (!writeJsonKV_P(w, PSTR("temp_cmd_tpl"), PSTR("TT={{ value }}"))) return false;
+      if (!writeJsonKV_P(w, PSTR("temp_cmd_tpl"), PSTR("{{ value }}"))) return false;
     } else {
       if (!writeJsonKV_P(w, PSTR("temp_cmd_tpl"), PSTR("SW={{ value }}"))) return false;
     }
@@ -3153,13 +3157,24 @@ bool streamClimateDiscovery(uint8_t climateIdx,
 
     // temp bounds + settings
     if (climateIdx == 0) {
-      if (!w.writeProgmem(PSTR("\"initial\":\"20\",\"min_temp\":\"12\",\"max_temp\":\"30\",\"temp_step\":\"0.5\",\"precision\":0.1"))) return false;  // GH #665: cooling headroom
+      if (!w.writeProgmem(PSTR("\"initial\":\"20\",\"min_temp\":\"5\",\"max_temp\":\"30\",\"temp_step\":\"0.5\",\"precision\":0.1"))) return false;  // GH #665: cooling headroom
     } else {
       if (!w.writeProgmem(PSTR("\"min_temp\":\"40\",\"max_temp\":\"60\",\"temp_step\":\"1\",\"precision\":1"))) return false;
     }
     if (!writeJsonComma(w)) return false;
 
     if (!writeJsonKV_P(w, PSTR("temp_unit"), PSTR("C"))) return false;
+
+    if (climateIdx == 0) {
+      // TASK-1979 / ADR-248: SAT presets on the thermostat card. "none" is not listed (HA refuses it in
+      // preset_modes) and the list goes out together with its command topic (HA requires both).
+      if (!writeJsonComma(w)) return false;
+      if (!w.writeProgmem(PSTR("\"pr_modes\":[\"comfort\",\"eco\",\"away\",\"sleep\",\"activity\",\"home\"],\"pr_mode_cmd_t\":\""))) return false;
+      if (!w.writeRam(ctx.mqttSubTopic)) return false;
+      if (!w.writeProgmem(PSTR("/sat/preset\",\"pr_mode_stat_t\":\""))) return false;
+      if (!w.writeRam(ctx.mqttPubTopic)) return false;
+      if (!w.writeProgmem(PSTR("/sat/preset\""))) return false;
+    }
 
     if (climateIdx == 0) {
       if (!writeJsonComma(w)) return false;

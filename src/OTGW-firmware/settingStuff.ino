@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : settingsStuff
-**  Version  : v2.0.0-beta.330
+**  Version  : v2.0.0-beta.331
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -1096,6 +1096,7 @@ void updateSetting(const char *field, const char *newValue)
   else if (strcasecmp_P(field, PSTR("SATenabled")) == 0) {
     bool wasEnabled = settings.sat.bEnabled;
     settings.sat.bEnabled = EVALBOOLEAN(newValue);
+    if (wasEnabled != settings.sat.bEnabled) satClimateBridgeForce();   // TASK-1979 / ADR-248: the HA card's target and temperature topics change meaning
     // TASK-1345: a user switch-off also ends and blocks an MQTT-loss takeover, even when the setting was already off
     if (!settings.sat.bEnabled && state.bSetupComplete) state.sat.bFallbackSuppressed = true;
     // Only disable on actual enabled→disabled transition, and not during boot

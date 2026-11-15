@@ -315,7 +315,7 @@ SAT topics no longer publish on every control cycle. Each topic under `sat/*` us
 
 **Maximum observation delay:** 11 minutes in the worst case (silent value, first heartbeat not yet due). Retained topics recover immediately from broker memory on reconnect; non-retained topics re-appear within 11 minutes.
 
-**MQTT reconnect:** most SAT shadows are **not** reset on reconnect. Retained topics are already present on the broker. Non-retained topics re-publish within 11 minutes via the scheduled heartbeat. This is an intentional divergence from the OT publish contract (ADR-052), whose trackers are reset on a reconnect after more than 5 minutes offline. Exception: the full republish (`requestMQTTRepublishAll()`) also resets the core-state shadows (`satRepublishCoreState()`, TASK-1284), so `sat/enabled`, `sat/active`, `sat/safety_tripped`, `sat/fallback_active`, `sat/push_refused`, `sat/sh_rejected`, `sat/pm25_no_slot`, `sat/room_temp_lost`, `sat/ot_link_lost`, `sat/outside_temp_missing`, `sat/external_temp_enable`, `sat/mode`, `sat/control_mode` and `sat/preset` publish again on the next pass.
+**MQTT reconnect:** most SAT shadows are **not** reset on reconnect. Retained topics are already present on the broker. Non-retained topics re-publish within 11 minutes via the scheduled heartbeat. This is an intentional divergence from the OT publish contract (ADR-052), whose trackers are reset on a reconnect after more than 5 minutes offline. Exception: the full republish (`requestMQTTRepublishAll()`) also resets the core-state shadows (`satRepublishCoreState()`, TASK-1284), so `sat/enabled`, `sat/active`, `sat/safety_tripped`, `sat/fallback_active`, `sat/push_refused`, `sat/sh_rejected`, `sat/pm25_no_slot`, `sat/room_temp_lost`, `sat/ot_link_lost`, `sat/outside_temp_missing`, `sat/external_temp_enable`, `sat/mode`, `sat/control_mode`, `sat/preset`, `sat/climate_target` and `sat/climate_current` publish again on the next pass.
 
 **Home Assistant restart:** the ADR-174 republish resets the OT trackers and the SAT core-state shadows listed above. The other SAT shadows keep their last-published state, so the other non-retained `sat/*` topics (the BLE values included) wait for their next change or heartbeat, up to 11 minutes.
 
@@ -361,6 +361,8 @@ These thresholds are tunable; they are guideline-level under ADR-111 and may be 
 | `sat/active` | `"true"` / `"false"` | yes | Whether SAT controller is actively controlling; `"false"` while disabled or tripped |
 | `sat/setpoint` | `"43.1"` | yes | Final flow temperature setpoint sent to boiler (°C) |
 | `sat/target` | `"21.0"` | yes | Target room temperature (°C) |
+| `sat/climate_target` | `"21.0"` | yes | Target on the Home Assistant thermostat card: SAT's target while SAT is enabled, the thermostat setpoint (TrSet) while SAT is off (°C). Also published while SAT is off (TASK-1979) |
+| `sat/climate_current` | `"20.8"` | yes | Room temperature on the thermostat card: the temperature SAT regulates on while SAT is enabled, the thermostat room temperature (Tr) while SAT is off (°C). Also published while SAT is off (TASK-1979) |
 | `sat/heating_curve` | `"42.3"` | yes | Heating curve calculated value (°C) |
 | `sat/pid_output` | `"43.1"` | yes | PID output = curve + P + I + D (°C) |
 | `sat/overshoot_margin` | `"2.0"` | yes | Configured overshoot margin (°C) |
@@ -1015,6 +1017,7 @@ SAT-specific commands are nested under the `sat/` sub-topic. All commands are su
 | Topic Suffix | Payload | Description |
 | ------------ | ------- | ----------- |
 | `sat/target` | `"21.5"` | Set SAT target room temperature (5.0-30.0 °C, persisted to flash) |
+| `sat/climate_target` | `"21.5"` | The Home Assistant thermostat card's target (°C). While SAT is enabled it sets SAT's target like `sat/target` (and selects a preset with the same temperature); while SAT is off it sends `TT=<value>` as before (TASK-1979). The thermostat card in Home Assistant sends the bare number here |
 | `sat/indoor_temp` | `"20.8"` | Push external indoor temperature (expires after sensor max age) |
 | `sat/outdoor_temp` | `"8.0"` | Push external outdoor temperature (expires after sensor max age) |
 | `sat/enabled` | `"true"` / `"false"` | Enable or disable SAT controller |
@@ -1300,7 +1303,7 @@ SAT entities are announced with the non-OT discovery IDs 251 to 255 (`queueNonOT
 
 Not every `sat/*` topic has an entity. The audit in [`docs/sat/sat-ha-entity-audit.md`](../sat/sat-ha-entity-audit.md) (TASK-1486) lists the 91 published `sat/*` state topics without one, with a decision per topic: add an entity, MQTT-only, or open.
 
-**Thermostat climate entity:** there is no separate SAT climate entity. The thermostat climate entity (`<HaPrefix>/climate/<node>/climate/config`, room temperature from `Tr`, target from `TrSet`) carries `json_attributes_topic` = `sat/climate_attributes`.
+**Thermostat climate entity:** there is no separate SAT climate entity. The thermostat climate entity (`<HaPrefix>/climate/<node>/climate/config`) keeps its unique id and carries `json_attributes_topic` = `sat/climate_attributes`. Since TASK-1979 (ADR-248) it follows SAT while SAT is enabled: the target command goes to `set/<node>/sat/climate_target` (bare value, `{{ value }}`), the target and current temperature come from `sat/climate_target` and `sat/climate_current`, and the presets `comfort`, `eco`, `away`, `sleep`, `activity` and `home` use `set/<node>/sat/preset` and `sat/preset` (`none` is not listed, Home Assistant refuses it). While SAT is off `sat/climate_target` and `sat/climate_current` carry `TrSet` and `Tr`, and the card sends `TT=` as before. The two state topics are forced out again on every SAT enable or disable and on a full republish (Home Assistant online), and are re-sent at least every 300 s when unchanged, like `hvac_mode`. `min_temp` is 5 C. The mode (off/heat/cool) stays read-only; the discovery payload does not change when SAT is switched.
 
 **Sensor entities, SAT control (ID 252):**
 

@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v2.0.0-beta.330
+**  Version  : v2.0.0-beta.331
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -485,6 +485,7 @@ void satCurveTuneSetHourS(uint32_t s);    // TASK-1525: simulation-only bench ho
 void satOnThermostatSetpoint(float tr);  // TASK-1259: thermostat MsgID 16 Write-Data (T frame), edge detector for follow-thermostat
 void satClearSafetyTrip();  // TASK-1159: the one place a SAT safety trip is cleared
 void satPublishMQTT();
+void satClimateBridgeForce();  // TASK-1979 / ADR-248: any task; the HA thermostat card's sat/climate_target and sat/climate_current publish again on the next pass
 void satRepublishCoreState();  // TASK-1284: re-arm the enabled/active/mode/... shadows so the next pass re-publishes (ADR-174)
 bool satHandleExternalTemp(const char* value);
 bool satHandleExternalOutdoor(const char* value);

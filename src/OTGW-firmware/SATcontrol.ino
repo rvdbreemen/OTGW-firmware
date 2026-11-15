@@ -5015,6 +5015,7 @@ void satRepublishCoreState()
   memset(&s_core_ot_link_lost, 0, sizeof(s_core_ot_link_lost));
   memset(&s_core_outside_temp_missing, 0, sizeof(s_core_outside_temp_missing));
   memset(&s_core_external_temp_enable, 0, sizeof(s_core_external_temp_enable));
+  satClimateBridgeForce();   // TASK-1979 / ADR-248: the HA thermostat card's two scalar topics go out again too
   memset(&s_core_mode, 0, sizeof(s_core_mode));
   memset(&s_core_control_mode, 0, sizeof(s_core_control_mode));
   memset(&s_core_preset, 0, sizeof(s_core_preset));
@@ -5022,6 +5023,52 @@ void satRepublishCoreState()
   // A uint8_t wrap is harmless: shadows compare with !=, and only a shadow that missed exactly 256 bumps
   // would skip one redundant resend; its normal change and heartbeat publishing is unaffected.
   g_satShadowEpoch++;
+}
+
+// TASK-1979 / ADR-248: the two state topics of the HA thermostat card. While SAT owns the control setpoint they carry
+// SAT's target and the room temperature SAT regulates on; while it is off they carry the thermostat setpoint (TrSet) and
+// room temperature (Tr), which the card showed before. Separate from satPublishMQTT(), which returns while SAT is off.
+// Loop task only (satControlLoop() runs it every pass); other tasks only raise the force flag.
+static SATShadowF s_climate_target, s_climate_current;
+static volatile bool s_climateForce = false;
+// Heartbeat as hvac_mode/hvac_action (OTGW-Core.ino, TASK-1061): both topics go out at least every
+// HVAC_HEARTBEAT_INTERVAL_SEC (300 s) even when unchanged. The stamp moves only on a confirmed send.
+static uint16_t s_climateTargetSent  = TRACKED_TIME_UNSEEN;
+static uint16_t s_climateCurrentSent = TRACKED_TIME_UNSEEN;
+
+// Any task: updateSetting("SATenabled") and satRepublishCoreState() ask for both topics to go out on the next pass.
+void satClimateBridgeForce()
+{
+  s_climateForce = true;
+}
+
+static void satPublishClimateBridge()
+{
+  if (!settings.mqtt.bEnable || !state.mqtt.bConnected) return;
+  if (s_climateForce) {
+    s_climateForce = false;   // cleared first; a request raised after this line is served next pass
+    memset(&s_climate_target, 0, sizeof(s_climate_target));
+    memset(&s_climate_current, 0, sizeof(s_climate_current));
+  }
+  // A due heartbeat makes the shadow read as unseen: the helper sends, or leaves it unseen when the outbox is full (retry next pass)
+  if (hvacHeartbeatDue(s_climateTargetSent))  s_climate_target.valid = false;
+  if (hvacHeartbeatDue(s_climateCurrentSent)) s_climate_current.valid = false;
+  const bool satOn = satOwnsControlSetpoint();
+  const float target  = satOn ? settings.sat.fTargetTemp : OTcurrentSystemState.TrSet;
+  const float current = satOn ? satGetRoomTemp()         : OTcurrentSystemState.Tr;
+  // ADR-088: one burst window around the two publishes, so the discovery drip does not allocate on top of them
+  beginStatusBurst();
+  bool sent = false;
+  if (!isnan(target) && publishIfChangedF(F("sat/climate_target"), target, s_climate_target, SAT_EPS_TEMP, 2, true)) {
+    s_climateTargetSent = currentTrackedSeconds();
+    sent = true;
+  }
+  if (!isnan(current) && publishIfChangedF(F("sat/climate_current"), current, s_climate_current, SAT_EPS_TEMP, 2, true)) {
+    s_climateCurrentSent = currentTrackedSeconds();
+    sent = true;
+  }
+  if (sent) incrementStatusBurstPublishCount();
+  endStatusBurst();
 }
 
 void satPublishMQTT()
@@ -7472,6 +7519,7 @@ void satControlLoop()
   OTGW_CONN_PROBE(CPROBE_SAT_RUN);   // TASK-1757 AC3 diagnostics (MQTTstuff.h); absent in host test harnesses
 #endif
   satPublishCoreState();
+  satPublishClimateBridge();   // TASK-1979 / ADR-248: also while SAT is off
 #ifdef OTGW_CONN_PROBE
   OTGW_CONN_PROBE(CPROBE_SAT_CORE);  // TASK-1757 AC3: the first pass after a connect publishes the whole core set
 #endif

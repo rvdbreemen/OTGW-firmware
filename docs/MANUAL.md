@@ -867,6 +867,8 @@ When SAT is enabled, the firmware auto-discovers additional diagnostic entities.
 |---|---|---|
 | `sat/setpoint` | Final flow temperature sent to boiler | °C |
 | `sat/target` | Target room temperature | °C |
+| `sat/climate_target` | Target on the HA thermostat card: SAT target while SAT is enabled, TrSet while off | °C |
+| `sat/climate_current` | Room temperature on the HA thermostat card: SAT room temperature while SAT is enabled, Tr while off | °C |
 | `sat/mode` | Control mode: `off`, `continuous`, or `pwm` | - |
 | `sat/heating_curve` | Heating curve base value | °C |
 | `sat/pid_output` | PID corrected output | °C |
@@ -883,6 +885,7 @@ When SAT is enabled, the firmware auto-discovers additional diagnostic entities.
 | Topic suffix | Accepted values | Description |
 |---|---|---|
 | `sat/target` | Float, e.g. `21.0` | Set target room temperature |
+| `sat/climate_target` | Float, e.g. `21.5` | The Home Assistant thermostat card's target (°C). While SAT is enabled it sets SAT's target like `sat/target` (and selects a preset with the same temperature); while SAT is off it sends `TT=<value>` as before (TASK-1979) |
 | `sat/control_mode` | `continuous`, `pwm`, `auto`, `off` | Set control mode; `off` switches SAT off (same as `sat/enabled` 0) |
 | `sat/enabled` | `true` / `false` | Enable or disable SAT |
 | `sat/indoor_temp` | Float, e.g. `20.5` | Push indoor temperature from external sensor |
@@ -3130,6 +3133,8 @@ Published every SAT control loop interval (default 30 seconds) when SAT is enabl
 | `sat/active` | yes | `"true"` when SAT is actively controlling (`"false"` while disabled or tripped) |
 | `sat/setpoint` | yes | Final flow temperature setpoint sent to boiler (°C) |
 | `sat/target` | yes | Target room temperature (°C) |
+| `sat/climate_target` | yes | Target on the Home Assistant thermostat card: SAT's target while SAT is enabled, the thermostat setpoint (TrSet) while SAT is off (°C). Also published while SAT is off (TASK-1979) |
+| `sat/climate_current` | yes | Room temperature on the thermostat card: the temperature SAT regulates on while SAT is enabled, the thermostat room temperature (Tr) while SAT is off (°C). Also published while SAT is off (TASK-1979) |
 | `sat/heating_curve` | yes | Heating curve calculated value (°C) |
 | `sat/pid_output` | yes | PID controller output = curve + P + I + D |
 | `sat/error` | no | PID error = target - room temperature (°C) |
@@ -3196,6 +3201,7 @@ Topic: `{TopTopic}/set/{UniqueId}/sat/<command>`. Command names are matched case
 | Topic suffix | Payload | Description |
 |-------------|---------|-------------|
 | `sat/target` | `"21.0"` (5 to 30) | Set target room temperature (°C) |
+| `sat/climate_target` | `"21.5"` (5 to 30) | The Home Assistant thermostat card's target (°C). While SAT is enabled it sets SAT's target like `sat/target` (and selects a preset with the same temperature); while SAT is off it sends `TT=<value>` as before (TASK-1979) |
 | `sat/indoor_temp` | `"20.8"` | Push external room temperature (°C) |
 | `sat/outdoor_temp` | `"7.5"` | Push external outdoor temperature (°C) |
 | `sat/pv_surplus_w` | `"1500"` (0 to 50000) | Push PV surplus power (W) for PV boost |

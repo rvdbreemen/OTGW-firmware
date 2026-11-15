@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : MQTTstuff
-**  Version  : v2.0.0-beta.330
+**  Version  : v2.0.0-beta.331
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **      Modified version from (c) 2020 Willem Aandewiel
@@ -629,6 +629,28 @@ bool bHAcycle = false;
 // --- Adapters: wrap bool-returning and no-arg handlers into the uniform
 // void(const char*) signature expected by the dispatch table. ---
 static void _satTargetTempCmd(const char* v)     { satHandleTargetTemp(v); }
+// TASK-1979 / ADR-248: the HA thermostat card's target. While SAT owns the control setpoint (ADR-179) the value is
+// SAT's target (satHandleTargetTemp also selects a matching preset); otherwise it is today's TT= command. The card
+// sends a bare number, so the payload is validated here before TT= is built.
+static void _satClimateTargetCmd(const char* v) {
+  if (!v || !*v) return;
+  if (satOwnsControlSetpoint()) { satHandleTargetTemp(v); return; }
+  char* endp = nullptr;
+  const float t = strtof(v, &endp);
+  if (endp == v || *endp != '\0' || !isfinite(t)) {
+    DebugTf(PSTR("MQTT sat/climate_target ignored, not a number [%s]\r\n"), v);
+    return;
+  }
+  char cmd[24];
+  const int n = snprintf_P(cmd, sizeof(cmd), PSTR("TT=%s"), v);
+  if (n < 0 || (size_t)n >= sizeof(cmd)) {
+    DebugTf(PSTR("MQTT sat/climate_target ignored, payload too long\r\n"));
+    return;
+  }
+  if (addCommandToQueue(cmd, n, true) == CmdQueueResult::Dropped) {
+    DebugTf(PSTR("MQTT sat/climate_target [%s] dropped (refused or queue full)\r\n"), cmd);
+  }
+}
 static void _satExtTempCmd(const char* v)        { satHandleExternalTemp(v); }
 static void _satExtOutdoorCmd(const char* v)     { satHandleExternalOutdoor(v); }
 static void _satPvSurplusCmd(const char* v)      { satHandlePvSurplus(v); }                  // TASK-640
@@ -673,6 +695,7 @@ struct SatMqttCmdEntry {
 static const SatMqttCmdEntry kSatMqttCmds[] PROGMEM = {
   // --- Typed handlers (payload parsing lives in the handler) ---
   { "target",                 nullptr,                _satTargetTempCmd },
+  { "climate_target",         nullptr,                _satClimateTargetCmd },   // TASK-1979 / ADR-248
   { "indoor_temp",            nullptr,                _satExtTempCmd },
   { "outdoor_temp",           nullptr,                _satExtOutdoorCmd },
   // TASK-640: PV-surplus boost. set/<nodeId>/sat/pv_surplus_w (watts),

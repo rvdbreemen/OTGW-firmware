@@ -932,6 +932,8 @@ In PIC-gatewaymodus wordt alleen `otgw-otdirect/available` gepubliceerd met waar
 | `sat/active` | ja | Controller actief |
 | `sat/setpoint` | ja | Aanvoertemperatuur setpoint (C) |
 | `sat/target` | ja | Gewenste kamertemperatuur (C) |
+| `sat/climate_target` | ja | Doel op de Home Assistant-thermostaatkaart: SAT's doel met SAT aan, het thermostaat-setpoint (TrSet) met SAT uit (°C). Ook gepubliceerd met SAT uit (TASK-1979) |
+| `sat/climate_current` | ja | Kamertemperatuur op de thermostaatkaart: de temperatuur waarop SAT regelt met SAT aan, de kamertemperatuur van de thermostaat (Tr) met SAT uit (°C). Ook gepubliceerd met SAT uit (TASK-1979) |
 | `sat/heating_curve` | ja | Verwarmingscurve berekende waarde (C) |
 | `sat/pid_output` | ja | PID-output = curve + P + I + D |
 | `sat/error` | nee | PID-fout = doel - kamertemperatuur (C) |
@@ -1029,6 +1031,7 @@ Onderwerp: `{TopTopic}/set/{UniqueId}/sat/<commando>`. Commandonamen zijn niet h
 | Onderwerpsuffix | Payload | Beschrijving |
 |----------------|---------|-------------|
 | `sat/target` | `"21.0"` (5 tot 30) | Doeltemperatuur van de kamer instellen (°C) |
+| `sat/climate_target` | `"21.5"` (5 tot 30) | Doeltemperatuur van de Home Assistant-thermostaatkaart (°C). Met SAT aan stelt het SAT's doel in, zoals `sat/target` (en kiest een preset met dezelfde temperatuur); met SAT uit stuurt het `TT=<waarde>`, zoals voorheen (TASK-1979) |
 | `sat/indoor_temp` | `"20.8"` | Externe kamertemperatuur doorgeven (°C) |
 | `sat/outdoor_temp` | `"7.5"` | Externe buitentemperatuur doorgeven (°C) |
 | `sat/pv_surplus_w` | `"1500"` (0 tot 50000) | PV-overschot (W) doorgeven voor PV-boost |
