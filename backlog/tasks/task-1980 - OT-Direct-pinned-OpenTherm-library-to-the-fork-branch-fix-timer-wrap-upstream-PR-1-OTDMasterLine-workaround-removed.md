@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-15T16:03:00Z'
-updated_date: '2026-11-15T21:11:00Z'
+updated_date: '2026-11-15T21:47:00Z'
 labels:
   - otdirect
   - upstream
@@ -56,4 +56,5 @@ Push (21:4x): restacked on origin/dev e22c59ed1, renumbered beta.325 -> beta.328
 Posted beta.328+c89f9b6 to #alpha-testing (Discord 1571632219645149195): zip sha256 44ef87d9b8d9ef47..., ino.bin 00d9408d610e75af...; app 2137699 B of 2293760 (93.2 %), safeboot 931648 B; build exit 0, built from pushed HEAD c89f9b6e6. AC7: the post line states as NOT tested the library's boiler-side idle-level change (upstream 720cee9, no boiler on the bench) and gateway mode with a thermostat (no thermostat sim). AC5 open: the full sweep has not been rerun on c89f9b6e6 (the targeted set and all test_otd_* are green; earlier 223/228 with the 5 red also red on origin). AC6 is 09's tick (final PASS in the notes above).
 
 2026-11-15 22:45 09: AC6 ticked from the 89 min bench on .61 with beta.325+9dba970 (past 2^31 and 2^32 us, frames kept going, REST TT=/MM= no 503, GW=R without a stall, otdcmdringdropped 0). Transfer to beta.328+c89f9b6 checked: the fix lives in the OpenTherm submodule, and src/libraries/OpenTherm points to 51aa68e in both 9dba970 and b6c91b3f4. NOT identical overall: OTDirect.ino differs by 159 lines and OTGW-ModUpdateServer-esp32.h by 117 between 9dba970 and b6c91b3f4, from other tasks rebased in (e.g. TASK-1981, TASK-1919); those are covered by their own benches. 328 runs on .61 tonight for TASK-1412.20/.21.
+Correction (09, 2026-11-15 ~22:20): 'same firmware code under a different label' above is wrong. 9dba970 is not an ancestor of c89f9b6: the rebase put TASK-1981/1919/1931 code under it (OTDirect.ino differs by 159 lines, OTGW-ModUpdateServer-esp32.h by 117). My banner-stripped check compared the 1980 patch, not the tree. What carries over from the beta.325 bench is the library fix itself (submodule 51aa68e in both builds); the rest of beta.328 gets its runtime evidence from 09's flash of 328 on .61 (TASK-1812 bench PASS on beta.329 above it).
 <!-- SECTION:NOTES:END -->

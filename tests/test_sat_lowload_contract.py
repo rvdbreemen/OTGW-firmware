@@ -175,6 +175,14 @@ DELEGATED = {
                ("test_sat_cycle_classifier", "CycleClassifier", ["test_R2_master_ch_enable_decides_the_kind"]),
                ("test_sat_pressure_health", "SatPressureHealth", ["test_ch_enable_transition_suspends_and_clears", "test_sat_on_off_alone_does_not_suspend",
                 "test_pwm_off_phase_does_not_suspend"])],
+    # TASK-1412.18 / QD-8 A (entry 270): no post-hot-water setpoint hold. The real satApplyContinuous() after a draw keeps the
+    # request level (previous-CS clamp, entry 112), not the boiler temperature; the DHW branch sends no CS and keeps the previous CS.
+    "LL-012b": [("test_sat_post_dhw_traces", "PostDhwTraces",
+                 ["test_first_tick_after_a_draw_keeps_the_pre_draw_cs_when_the_request_did_not_rise",
+                  "test_a_lower_request_after_the_draw_also_keeps_the_previous_cs_until_flow_minus_offset_meets_it",
+                  "test_flame_out_at_the_draw_end_sends_the_request",
+                  "test_the_gap_to_the_supply_temperature_today_versus_the_hold_model",
+                  "test_a_draw_sends_no_cs_and_does_not_move_the_previous_cs"])],
     "LL-013b": [("test_sat_command_delivery", "OtDirectRefusal", None)],
     "LL-013": [("test_sat_cmd_cache", "CmdCacheReset", ["test_dropped_enqueue_is_not_cached_and_sent_again", "test_dropped_satsendcs_is_retried_with_its_own_value_after_5s",
                 "test_dropped_keepalive_is_tried_again_on_the_next_pass", "test_resend_repeats_the_unchanged_cs_after_30s_not_before",
@@ -451,10 +459,13 @@ class LowLoadContract(unittest.TestCase):
     def test_ll012_dhw_transitions(self):
         self.delegated("LL-012")
 
-    @ll("LL-012", "open_decision", "none: no one-minute post-hot-water setpoint hold exists (structural)", task="TASK-1412.7", question="QD-8")
-    def test_ll012b_post_dhw_one_minute_setpoint_hold(self):
-        sat = (FW / "SATcontrol.ino").read_text(encoding="utf-8")
-        self.assertRegex(sat, r"(?i)post[- ]?(dhw|hot[- ]?water)[^\n]*hold[^\n]*(60|one minute)", "no post-DHW setpoint hold; QD-8 not asked yet")
+    @ll("LL-012", "contract", "satApplyContinuous after a draw and the DHW branch of the control loop (SATcontrol.ino, via test_sat_post_dhw_traces)",
+        task="TASK-1412.18 (QD-8 answered A, entry 270): no one-minute post-hot-water setpoint hold, as thermo-nova 7beaaf5 "
+             "(const.py:19 DHW_OVERSHOOT_GUARD_SECONDS, heating_control.py:268-274 overshoot timer reset, :380/:385 PWM setpoint path "
+             "skipped during a draw; neither holds the setpoint after a draw)", question="QD-8")
+    def test_ll012b_no_post_dhw_setpoint_hold(self):
+        # Reaches satApplyContinuous() and the DHW branch only: a hold added elsewhere in the control loop is not seen here.
+        self.delegated("LL-012b")
 
     @ll("LL-013", "contract", "satEnqueueOwnCS/satSendCS/satCmdResend/satEnqueueIfChanged* (SATcontrol.ino, via test_sat_cmd_cache)",
         task="TASK-1574 (commit-on-success) and TASK-1412.11 (separate intent / enqueue / transmission / echo events, full queue, interrupted exchange, "
