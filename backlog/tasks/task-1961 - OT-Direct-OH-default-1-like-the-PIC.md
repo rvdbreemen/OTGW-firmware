@@ -5,7 +5,7 @@ status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-15T07:58:00Z'
-updated_date: '2026-11-15T10:28:00Z'
+updated_date: '2026-11-15T10:36:00Z'
 labels:
   - otdirect
 dependencies: []
@@ -33,6 +33,8 @@ Decision on the nuance (relayed by the coordinator): Robert chose B, DM 15714411
 Implemented (lane-95-next): OTDirecttypes.h bOverrideHB default true; settingStuff.ino writeSettings() writes the marker OTDohpicdefault (kOtdOhMarkerValue), updateSetting() sets the sentinel g_sawOtdOhMarkerKey on it, readSettings() resets the sentinel per parse and after the parse, in the [otd-oh-migrate] block, sets OH=1 + settingsDirty when the marker was absent (deferred flush stores the marker, so it runs once). A fresh install writes the defaults with the marker, so the re-read keeps OH=1 without a migration. Evidence: new tests/test_otd_oh_default_migration.py on the real setter/writer lines, the migration block and the struct default: (a) OH=0 file without marker -> boot1 oh=1 dirty=1, boot2 oh=1 marker=1 dirty=0; (b) marker + OH=0 -> 0; (c) new install -> 1; (d) OH=0 after the migration -> stays 0. 4/4 OK; on HEAD's settingStuff.ino + OTDirecttypes.h (a)(c)(d) FAIL. tests/test_otd_persist_pic_eeprom.py now starts its OH step from a stored 0 (OH_PRESET) because OH=1 equals the new default. evaluate.py --quick 86 passed / 0 failed (a literal 'true' in writeJsonBoolKV tripped check_settings_writer_separator, hence the named constant). Settings tests (test_settings_* 4, ble_nopsram, sat_follow, fs_update_keep, boot_restore_order) green. CHANGELOG [Unreleased] Changed line added. Release-notes line for the next public beta (to carry into its notes file): 'OT-Direct: OH= (copy the MsgID 100 override flags into the high byte) is now on by default like the PIC; every OT-Direct board switches to OH=1 once at its first boot on this version. Send OH=0 again if your thermostat needs it; that choice then stays.' NOT verified: a real boot on the bench (09) with an old settings.ini.
 
 Docs (Robert asked 'is de documentatie op orde?', 2026-11-15): manual ch05/h05 (MsgID 100 flags 0x03/0x01, OH default 1, master TT=0), ch09/h09 (PIC-parity list: bare XX=, OT=/SW=/SH= relay, MsgID 99, TT/OH flags + one-time OH migration with the OTDohpicdefault marker, master TT=0; PR=T row), docs/c4/c4-code-otdirect.md, docs/c4/c4-code-settings.md (migration list, OTD key count 21, struct with the TASK-1836 fields), docs/api/MQTT.md (overridehb default; PR=A/O/L/T/P/R rows that were stale since TASK-1797/1848). Covers TASK-1957, 1847, 1906, 1803, 1750, 1751 and this task. Checks: manual OTGW32 count 0 in the touched chapters, test_manual_sat_commands / test_sat_mqtt_contract_1485 / test_sat_pm25_poll OK, evaluate --quick 86/0.
+
+Known edge (09, bench 2026-11-15, accepted and documented, no code): a firmware older than beta.301 drops the unknown OTDohpicdefault key when it saves settings.ini (seen with d3's beta.297 on .61). After upgrade -> downgrade -> upgrade the migration therefore runs again and sets OH=1 over a user's OH=0. A guard 'migrate only when OTDoverridehb is missing' was rejected: every unit since beta.203 has OTDoverridehb=false stored, so the migration Robert chose (B) would never run. Downgrades within the beta are rare; the CHANGELOG line says to send OH=0 again after one.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
