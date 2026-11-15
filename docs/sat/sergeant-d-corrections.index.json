@@ -4667,6 +4667,19 @@
     "TASK-1933"
    ],
    "confirmed_by_entry": null
+  },
+  {
+   "id": 351,
+   "title": "Sergeant D proposes the existing MQTT climate entity for SAT, with two cases (proposal, open discussion; Robert decides) (Sergeant D, 2026-11-15)",
+   "date": "2026-11-15",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/914498730001072149/1571549406790946897",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1979"
+   ],
+   "confirmed_by_entry": null
   }
  ]
 }

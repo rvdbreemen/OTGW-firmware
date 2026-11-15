@@ -7320,3 +7320,27 @@ Asked by DM (through the coordinator) whether the repeat is 60 s or 30 s, given 
 **Open:** none for the rule.
 
 **Task:** TASK-1933.
+
+## 351. Sergeant D proposes the existing MQTT climate entity for SAT, with two cases (proposal, open discussion; Robert decides) (Sergeant D, 2026-11-15)
+
+**Source:** #beta-testing 2026-11-15, in reply to Robert's request on indigo_light's feature request (a usable HA climate entity while SAT is on, https://discord.com/channels/812969634638725140/914498730001072149/1571549406790946897; Robert https://discord.com/channels/812969634638725140/914498730001072149/1571549972367810602). His message, 15:53:15 UTC: https://discord.com/channels/812969634638725140/914498730001072149/1571553680577138709
+
+**Quoted:**
+
+> "We can use a simpler approach. We can use the existing mqtt climate entity. But we need to follow 2 approaches:
+> 1. Physical thermostat attached to OTGW. No need to do anything since the physical thermostat and OTGW-SAT climate entity are in sync.
+> 2. Standalone operation. If SAT is enabled and there is no physical thermostat then SAT should be displayed as `OTGW_Thermostat`. What do you think? This is an open discussion"
+
+**Robert's answer** (15:54:31 UTC, https://discord.com/channels/812969634638725140/914498730001072149/1571553998408913006):
+
+> "I think standalone still could mean control the settings from home assistant."
+
+**Related, same thread** (16:01:43 UTC, https://discord.com/channels/812969634638725140/914498730001072149/1571555811304407263, to indigo_light's use case of the physical thermostat as a temporary override):
+
+> "If you enable the follow thermostat option in sat settings then SAT will be in charge all the time but you will be able to control the room setpoint via the physical thermostat. WAF is our top priority since they are the real testers 😂"
+
+**Settled:** nothing yet. This is a proposal in an open discussion; the HA entity design is Robert's decision (TASK-1979). It agrees with the research recommendation A of TASK-1979 (the existing climate entity follows SAT while SAT is on) and adds the split into two cases. Case 1 relies on the follow-thermostat option (setting `SATfollowthermostat`, `settings.sat.bFollowThermostat`, `src/OTGW-firmware/SATcontrol.ino:2430`; entries 2 and 169). Robert's answer reads case 2 as also controllable from Home Assistant. thermo-nova's own climate entity offers a target temperature and presets (`custom_components/sat/climate.py:858-865`, `:101`, `:557-568`, `:604-624` at 7beaaf5), and entry 311 already has Sergeant D saying the SAT climate entity handles the room setpoint.
+
+**Open:** what "SAT should be displayed as `OTGW_Thermostat`" means (the entity's name, or the device taking the thermostat role) is to be confirmed with Sergeant D. Also whether case 1 needs anything on the card beyond showing the thermostat's setpoint.
+
+**Task:** TASK-1979.
