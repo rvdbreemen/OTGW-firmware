@@ -79,6 +79,7 @@ static constexpr uint8_t OT_OVERRIDE_COUNT = sizeof(otOverrides) / sizeof(otOver
 static OTRemoteOverrideState otRemoteOverride = {};
 static bool otRemoteOverrideClearPending = false;
 static bool otSetbackEngaged = false; static float otFakeRoomSetpoint = 0.0f;
+static bool otdRoom16CacheSet = false, otdRoom16OvrSet = false; static uint16_t otdRoom16CacheF88 = 0, otdRoom16OvrF88 = 0;   // TASK-1751
 struct OtdState { int eOverrideMode; uint16_t iOverrideF88; bool bSetbackActive; };
 struct State { OtdState otd; }; static State state = {};
 struct OtdSettings { bool bEnableSlave; bool bSummerMode; };

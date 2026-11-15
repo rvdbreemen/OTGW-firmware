@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTDirect.ino
-**  Version  : v2.0.0-beta.299
+**  Version  : v2.0.0-beta.300
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -703,6 +703,15 @@ static bool    otCH2Enable       = true;     // H2= CH2 enable for the relayed s
 // and replaces the data bytes with the fake setpoint before forwarding to boiler.
 // 0.0 = disabled (BS=0 clears the fake). Mirrors PIC gateway.asm:3019-3024.
 static float otFakeRoomSetpoint = 0.0f;
+
+// TASK-1751: what BS= and an MQTT room_setpoint put in the MsgID 16 slot, kept apart from TT=/TC=. In master
+// mode TT=/TC= write the same slot (write cache and frame override); TT=0 or a release puts this back instead of
+// clearing the slot, as the PIC's TT=0 never touches the BS= value (ClearSetPoint gateway.asm 6.8:4144-4153 leaves
+// fakesetpoint1/2, written only by SetFakeSetpoint :4289-4298).
+static bool     otdRoom16CacheSet = false;   // MQTT room_setpoint: the periodic WRITE 16 value
+static uint16_t otdRoom16CacheF88 = 0;
+static bool     otdRoom16OvrSet   = false;   // BS= or MQTT room_setpoint: the thermostat frame override value
+static uint16_t otdRoom16OvrF88   = 0;
 
 // SR/CR response override table
 static constexpr uint8_t OT_RESPONSE_OVERRIDE_MAX = 16;
@@ -1734,10 +1743,17 @@ static unsigned long buildOverriddenReply(unsigned long thermostatReq, unsigned 
 // MsgID 100 (remote override function flags) to learn about a TT=/TC= override (OT spec v4.2
 // 5.3.9/5.3.10: MsgID 9 value != 0 = override active, 0 = none). Parity with the PIC
 // (gateway.asm MessageID9 / MessageID100): an active override answers READ_ACK with the override
-// setpoint / the flags in the low byte; the first MsgID 9 read after a clear answers READ_ACK 0
+// setpoint / the flags (otdOverrideFlagsData); the first MsgID 9 read after a clear answers READ_ACK 0
 // once; a boiler Data-Invalid / Unknown-DataID on either id becomes READ_ACK 0; a boiler
 // READ_ACK passes through. Any other frame is returned unchanged.
 // --- otdRemoteOverrideReply begin
+// TASK-1750: the MsgID 100 data of a TT=/TC= override, as the PIC: TT= b'11' (manual and program change,
+// SetTempSetPoint gateway.asm 6.8:4089-4092), TC= b'01' (manual only, SetContSetPoint :4084-4088) in the low
+// byte; with OH=1 the low byte is copied into the high byte, else the high byte is 0 (MessageID100 :3303-3311).
+static uint16_t otdOverrideFlagsData(bool temporary, bool overrideHigh) {
+  const uint16_t f = temporary ? 0x0003 : 0x0001;
+  return overrideHigh ? (uint16_t)((f << 8) | f) : f;
+}
 static unsigned long otdRemoteOverrideReply(unsigned long boilerResp, bool overrideActive,
                                             uint16_t f88Value, uint16_t flags, bool &clearPending) {
   const uint8_t msgId = (uint8_t)((boilerResp >> 16) & 0xFF);
@@ -1747,7 +1763,7 @@ static unsigned long otdRemoteOverrideReply(unsigned long boilerResp, bool overr
   uint16_t data = 0;
   bool own = false;
   if (overrideActive) {
-    data = (msgId == 9) ? f88Value : (uint16_t)(flags & 0x00FF);
+    data = (msgId == 9) ? f88Value : flags;
     own = true;
   } else if (msgId == 9 && clearPending) {
     clearPending = false;
@@ -1780,7 +1796,8 @@ static void replyToThermostat(OTDirectRequestOrigin origin, unsigned long sentRe
     reply = applyResponseModifiers(boilerResp);
     reply = otdRemoteOverrideReply(reply, otRemoteOverride.mode != OT_OVERRIDE_NONE,
                                    otRemoteOverride.f88Value,
-                                   otRemoteOverride.mode == OT_OVERRIDE_TEMPORARY ? 0x0002 : 0x0001,
+                                   otdOverrideFlagsData(otRemoteOverride.mode == OT_OVERRIDE_TEMPORARY,
+                                                        otOverrideHB != 0),
                                    otRemoteOverrideClearPending);
     // TASK-1840: MsgID 20 is answered from the SC= time (sentReq is the thermostat's own frame here)
     reply = otdClockReply(sentReq, reply, otSCLastCommandMs != 0, otSCClockData);
@@ -2580,7 +2597,11 @@ void otdMqttSetRoomTemp(float tempC) {
 void otdMqttSetRoomSetpoint(float tempC) {
   if (!isOTDirectEnabled()) return;
   if (tempC < -40.0f || tempC > 127.0f) return;  // sanity range — drop, don't clamp
-  enqueueWriteCommand(16, floatToF88(tempC), "MQTT-room_setpoint");
+  const uint16_t f88 = floatToF88(tempC);
+  if (enqueueWriteCommand(16, f88, "MQTT-room_setpoint")) {   // TASK-1751: kept for TT=0 in master mode
+    otdRoom16CacheSet = true;  otdRoom16CacheF88 = f88;
+    otdRoom16OvrSet   = true;  otdRoom16OvrF88   = f88;
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -2999,7 +3020,7 @@ static void setRemoteOverride(OTRemoteOverrideMode mode, float celsius) {
     }
     // MsgID 100: low byte = priority bits. If MsgID 16 made it through but
     // MsgID 100 did not, the state is still committed.
-    uint16_t flags = (mode == OT_OVERRIDE_TEMPORARY) ? 0x0002 : 0x0001;
+    uint16_t flags = otdOverrideFlagsData(mode == OT_OVERRIDE_TEMPORARY, otOverrideHB != 0);   // TASK-1750
     if (!enqueueWriteCommand(100, flags, "OVR-flags")) {
       OTDDebugTln(F("OTD: OVR-flags MsgID 100 dropped (queue full); MsgID 16 in flight"));
     }
@@ -3033,7 +3054,10 @@ static void clearRemoteOverride() {
   // Gateway mode: answer state only. A BS= or MQTT room_setpoint override on MsgID 16 stays.
   if (otCurrentMode != OTD_MODE_MASTER) return;
 
+  // TASK-1751: TT=0 clears only what TT= set. A BS= or MQTT room_setpoint value on MsgID 16 goes back into the slot.
   clearWriteOverride(16);
+  if (otdRoom16CacheSet) updateWriteCache(16, otdRoom16CacheF88);
+  if (otdRoom16OvrSet) setOverride(16, otdRoom16OvrF88);
   clearWriteOverride(100);
   // Push a clearing MsgID 100 = 0 frame so the thermostat's UI flips back to
   // its own program. This is a one-shot WRITE_DATA, not a sticky override.
@@ -3167,6 +3191,8 @@ static void resetTransientState() {
   }
   // BS= fake room setpoint — clear on reset
   otFakeRoomSetpoint = 0.0f;
+  otdRoom16CacheSet = false;   // TASK-1751
+  otdRoom16OvrSet   = false;
   // TASK-1807: the boiler value cache holds only answers given after the reset. A synthetic loopback answer or one
   // from a boiler that has since gone kept otDirectBoilerPresent() and otIsVentSlave() true across GW=R and a switch
   // into or out of master, loopback or bypass. A gateway <-> monitor switch does not come here (TASK-1839).
@@ -3779,9 +3805,12 @@ bool handleOTDirectCommand(const char* buf, int len, bool satOwn) {
     if (f88 == 0) {
       otFakeRoomSetpoint = 0.0f;
       clearWriteOverride(16);   // also an MQTT room_setpoint write
+      otdRoom16CacheSet = false;   // TASK-1751
+      otdRoom16OvrSet   = false;
     } else {
       otFakeRoomSetpoint = f88 / 256.0f;
       setOverride(16, f88);
+      otdRoom16OvrSet = true;  otdRoom16OvrF88 = f88;   // TASK-1751
     }
     otdPicPrintF88(f88, rspBuf, sizeof(rspBuf));
     synthesizeResponse(buf, rspBuf);

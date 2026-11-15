@@ -76,6 +76,7 @@ static void updateWriteCache(uint8_t, uint16_t) {}
 static uint32_t otdCsc2ExpiryStamp(uint16_t) { return 1; }
 static uint32_t otCSLastCommandMs = 0, otC2LastCommandMs = 0;
 static float otFakeRoomSetpoint = 0.0f;
+static bool otdRoom16CacheSet = false, otdRoom16OvrSet = false; static uint16_t otdRoom16CacheF88 = 0, otdRoom16OvrF88 = 0;   // TASK-1751
 // TT=/TC=/SB= doubles
 enum OTRemoteOverrideMode { OT_OVERRIDE_TEMPORARY = 1, OT_OVERRIDE_CONSTANT = 2 };
 static int g_rmode = 0; static float g_rval = 0; static int g_rclear = 0;

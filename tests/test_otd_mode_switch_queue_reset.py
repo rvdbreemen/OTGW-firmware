@@ -81,6 +81,7 @@ static void otdPushEnd() {}   // TASK-1845: resetTransientState() ends a manual 
 static bool otSummaryMode, otHideReports, otSummaryPending, otThermostatSeen, otDHWBlocking, otCoolingEnable, otCH2Enable,
             otChModeOff, otSetbackEngaged;
 static float otFakeRoomSetpoint;
+static bool otdRoom16CacheSet = false, otdRoom16OvrSet = false; static uint16_t otdRoom16CacheF88 = 0, otdRoom16OvrF88 = 0;   // TASK-1751
 static OTDirectMode otCurrentMode = OTD_MODE_MASTER;
 struct { struct { bool bSummerMode = false; bool bEnableSlave = false; } otd; } settings;
 struct { struct { bool bSetbackActive; bool bThermostatConnected = true; OTRemoteOverrideMode eOverrideMode;

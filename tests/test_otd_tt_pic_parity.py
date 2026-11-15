@@ -49,10 +49,10 @@ if os.environ.get("OTGW_OTD_TYPES"):
     alt.TYPES_H = Path(os.environ["OTGW_OTD_TYPES"])   # alt.lib_and_types() reads the types header from here
 
 # ADR-223 numbers. EXPECT_TT_FLAGS is a named constant so the TT flags value can change on its own
-# (gateway.asm:4061 uses b'11' for TT; the firmware answers 0x0002 today).
+# (gateway.asm 6.8 SetTempSetPoint :4089-4092 uses b'11' for TT; TASK-1750 moved the firmware from 0x0002 to it).
 OVR_F88 = 0x1580          # TT=21.5 / TC=21.5
 THERMO_F88 = 0x1400       # the thermostat's own room setpoint, 20.0
-EXPECT_TT_FLAGS = 0x0002
+EXPECT_TT_FLAGS = 0x0003   # TASK-1750: b'11' like the PIC (was 0x0002)
 EXPECT_TC_FLAGS = 0x0001
 MATCH_F88 = 0x0040        # 0.25 C, OT_OVERRIDE_HONOR_DELTA_F88 (ADR-223 sub-point 3)
 RELEASE_N = 4             # before acceptance the 4th mismatch releases (gateway.asm:3025-3036)
@@ -73,6 +73,7 @@ static void onThermostatMsgID16(uint8_t msgType, uint16_t f88);
 static void clearWriteOverride(uint8_t msgId);
 static void setRemoteOverride(OTRemoteOverrideMode mode, float celsius);
 static void clearRemoteOverride();
+static bool isOTDirectEnabled() { return true; }   // TASK-1751: otdMqttSetRoomSetpoint() is cut from the real code
 """
 
 MAIN2 = r"""
@@ -211,6 +212,15 @@ static void dumpQueue(const char* tag) {
     printf("Q %s %u %04X\n", tag, (unsigned)typeOf(otCmdQueue[i]) * 1000 + idOf(otCmdQueue[i]), (unsigned)(otCmdQueue[i] & 0xFFFF));
 }
 
+static void dump16(const char* tag) {   // TASK-1751: the MsgID 16 slot (schedule write value, frame override)
+  int vs = 0; unsigned val = 0, oa = 0, ov = 0;
+  for (uint8_t i = 0; i < OT_SCHEDULE_SIZE; i++)
+    if (otSchedule[i].isWrite && otSchedule[i].msgId == 16) { vs = otSchedule[i].valueSet ? 1 : 0; val = otSchedule[i].cachedValue; }
+  for (uint8_t i = 0; i < OT_OVERRIDE_COUNT; i++)
+    if (otOverrides[i].msgId == 16) { oa = otOverrides[i].active ? 1 : 0; ov = otOverrides[i].overrideValue; }
+  printf("S16 %s %d %04X %u %04X\n", tag, vs, vs ? val : 0, oa, oa ? ov : 0);
+}
+
 static void startOverride(const char* cmd) {
   mark();
   command(cmd);
@@ -227,6 +237,9 @@ int main(int argc, char** argv) {
     step(60000);
     report("P", g_fromLog, g_fromSent, g_fromSlave);
   } else if (c.rfind("A_", 0) == 0) { setupCase(0, 0); startOverride(cmd); step(120000); report("A", g_fromLog, g_fromSent, g_fromSlave); }
+  else if (c.rfind("O_", 0) == 0) {          // TASK-1750: OH=1 copies the MsgID 100 flags into the high byte
+    setupCase(1, 1); otOverrideHB = 1; startOverride(cmd); step(120000); report("O", g_fromLog, g_fromSent, g_fromSlave);   // E setup: echo, override stays
+  }
   else if (c.rfind("B_", 0) == 0) { setupCase(1, 0); startOverride(cmd); step(120000); report("B", g_fromLog, g_fromSent, g_fromSlave); }
   else if (c.rfind("E_", 0) == 0) { setupCase(1, 1); startOverride(cmd); step(120000); report("E", g_fromLog, g_fromSent, g_fromSlave); }
   else if (c.rfind("D_", 0) == 0) { setupCase(1, 2); startOverride(cmd); step(120000); report("D", g_fromLog, g_fromSent, g_fromSlave); }
@@ -266,6 +279,14 @@ int main(int argc, char** argv) {
     otCmdTail = otCmdHead;
     command("TC=21.5"); dumpQueue("TC");
   }
+  else if (c == "MR" || c == "MB" || c == "MN") {   // TASK-1751: master mode TT=0 puts a room_setpoint / BS= back
+    resetAll(); otCurrentMode = OTD_MODE_MASTER;
+    if (c == "MR") otdMqttSetRoomSetpoint(19.0f);   // MQTT room_setpoint: write value + frame override 0x1300
+    if (c == "MB") command("BS=19.0");              // BS=: frame override 0x1300 only
+    dump16("before");
+    command("TT=21.5"); dump16("tt");
+    command("TT=0"); dump16("tt0");
+  }
   else { printf("unknown case %s\n", c.c_str()); return 2; }
   return 0;
 }
@@ -303,6 +324,7 @@ def build_source(ino_path):
         alt.construct(src, r"^static void setRemoteOverride\([^;{]*\)\s*\{"),
         alt.construct(src, r"^static void clearRemoteOverride\([^;{]*\)\s*\{"),
         alt.construct(src, r"^static void onThermostatMsgID16\([^;{]*\)\s*\{"),
+        alt.construct(src, r"^void otdMqttSetRoomSetpoint\([^;{]*\)\s*\{"),   # TASK-1751
         # TASK-1842: the RT= branch (before C2, so inside the cut) calls the PIC GetPercentArg parser
         (alt.construct(src, r"^static const char\* otdPicPercentF88\([^;{]*\)\s*\{")
          if "// --- otdPicPercentF88 begin" in src else ""),
@@ -320,7 +342,8 @@ def build_source(ino_path):
 CASES_TT = ["A_TT", "B_TT", "E_TT", "D_TT", "G_TT"]
 CASES_TC = ["A_TC", "B_TC", "E_TC", "D_TC", "G_TC"]
 CASES_H = ["H_TT", "H_TC"]
-ALL_CASES = ["P"] + CASES_TT + CASES_TC + CASES_H + ["F", "N", "BS", "MQ", "M"]
+CASES_M16 = ["MR", "MB", "MN"]   # TASK-1751
+ALL_CASES = ["P"] + CASES_TT + CASES_TC + CASES_H + ["O_TT", "O_TC", "F", "N", "BS", "MQ", "M"] + CASES_M16
 RES = {}
 ERR = None
 TMP = None
@@ -344,6 +367,9 @@ def setUpModule():
         if name == "M":
             print("    queue=" + str(r["q"]))
             continue
+        if name in CASES_M16:
+            print("    slot16=" + str(r["s16"]))
+            continue
         print(f"    bw16={len(r['bw16'])} thermo_w16={len(r['tw16'])} bw100={len(r['bw100'])} r16={r['r16']} "
               f"rp9={len(r['rp9'])} rp100={len(r['rp100'])} reads={r['reads']} end={r['end']}")
 
@@ -355,7 +381,7 @@ def tearDownModule():
 
 def parse(out):
     r = {"bw16": [], "bw100": [], "bw14": [], "r16": 0, "rp16": [], "rp9": [], "rp100": [], "tw16": [], "fr": [],
-         "reads": (0, 0), "end": None, "pre": None, "cmd": {}, "vs16": [], "alt16": 0, "q": {}}
+         "reads": (0, 0), "end": None, "pre": None, "cmd": {}, "vs16": [], "alt16": 0, "q": {}, "s16": {}}
     for line in out.splitlines():
         t = line.split()
         if not t:
@@ -372,6 +398,7 @@ def parse(out):
         elif k == "END": r["end"] = t[1]
         elif k == "VS16": r["vs16"].append(int(t[1]))
         elif k == "ALT16": r["alt16"] = int(t[1])
+        elif k == "S16": r["s16"][t[1]] = (int(t[2]), int(t[3], 16), int(t[4]), int(t[5], 16))
         elif k == "Q": r["q"].setdefault(t[1], []).append((int(t[2]), int(t[3], 16)))
         elif k == "PRE": r["pre"] = {a.split("=")[0]: int(a.split("=")[1]) for a in t[1:]}
         elif k == "CMD":
@@ -391,7 +418,7 @@ class Base(unittest.TestCase):
 
 class Precondition(Base):
     def test_00_alternative_slots_exist_and_the_ring_drains(self):
-        for name in [n for n in ALL_CASES if n != "M"]:
+        for name in [n for n in ALL_CASES if n != "M" and n not in CASES_M16]:
             self.assertGreaterEqual(RES[name]["pre"]["altslots"], 3,
                                     f"{name}: MsgID 24 did not become an alternative slot; the ring would never drain")
         p = RES["P"]
@@ -588,6 +615,45 @@ class MasterModeCases(Base):
     def test_M3_master_mode_tc_writes_trset_and_flags(self):
         q = RES["M"]["q"]
         self.assertEqual(sorted(q["TC"]), sorted([(1016, OVR_F88), (1100, EXPECT_TC_FLAGS)]), f"TC=21.5 in master mode queued {q['TC']}")
+
+
+
+class OverrideHighCases(Base):
+    """TASK-1750: with OH=1 the PIC copies the MsgID 100 flags into the high byte (MessageID100 gateway.asm 6.8
+    :3303-3311, 'btfsc OverrideHigh / movfw byte4 / call setbyte3'); with OH=0 the high byte is 0 (setbyte4 ends in
+    retlw 0)."""
+    def test_O1_tt_flags_in_both_bytes(self):
+        r = RES["O_TT"]
+        self.assertTrue(r["rp100"], "the thermostat's MsgID 100 read must be answered")
+        self.assertEqual({d for _, d, _ in r["rp100"]}, {0x0303}, f"OH=1 TT=21.5 MsgID 100 answers {r['rp100'][:3]}")
+
+    def test_O2_tc_flags_in_both_bytes(self):
+        r = RES["O_TC"]
+        self.assertTrue(r["rp100"])
+        self.assertEqual({d for _, d, _ in r["rp100"]}, {0x0101}, f"OH=1 TC=21.5 MsgID 100 answers {r['rp100'][:3]}")
+
+    def test_O3_oh0_high_byte_zero(self):
+        self.assertEqual({d for _, d, _ in RES["E_TT"]["rp100"]}, {0x0003})
+        self.assertEqual({d for _, d, _ in RES["E_TC"]["rp100"]}, {0x0001})
+
+
+class MasterSlot16Cases(Base):
+    """TASK-1751: in master mode TT=0 clears only what TT= set, like the PIC's TT=0 that never touches the BS= value
+    (ClearSetPoint gateway.asm 6.8:4144-4153 vs SetFakeSetpoint :4289-4298). S16 = (write value set, value,
+    override active, override value)."""
+    def test_R1_mqtt_room_setpoint_back_after_tt0(self):
+        s = RES["MR"]["s16"]
+        self.assertEqual(s["before"], (1, 0x1300, 1, 0x1300))
+        self.assertEqual(s["tt"], (1, OVR_F88, 1, OVR_F88), "TT=21.5 in master mode writes the slot")
+        self.assertEqual(s["tt0"], (1, 0x1300, 1, 0x1300), f"TT=0 must put the room_setpoint back, got {s['tt0']}")
+
+    def test_R2_bs_back_after_tt0(self):
+        s = RES["MB"]["s16"]
+        self.assertEqual(s["before"], (0, 0, 1, 0x1300))
+        self.assertEqual(s["tt0"], (0, 0, 1, 0x1300), f"TT=0 must leave the BS= override, got {s['tt0']}")
+
+    def test_R3_nothing_before_tt_clears_as_before(self):
+        self.assertEqual(RES["MN"]["s16"]["tt0"], (0, 0, 0, 0))
 
 
 if __name__ == "__main__":
