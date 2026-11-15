@@ -21,14 +21,14 @@ Image generators zijn goed in sfeer, compositie en iconen, en slecht in veel kle
 | Route | Wanneer | Werkwijze |
 |---|---|---|
 | **A. Basis zonder tekst, labels erover** (aanbevolen) | Als de plaat inhoudelijk moet kloppen, bijvoorbeeld voor een presentatie of de README | Genereer de plaat met de prompt uit de sectie "zonder tekst". Leg daarna de labels uit de SVG-wireframe eroverheen in Figma, Inkscape of Affinity. De wireframe heeft dezelfde zones en coördinaten als de prompt. |
-| **B. Directe prompt met labels** | Voor een snelle sfeerplaat of een model dat tekst goed rendert | Gebruik de volledige prompt. Houd je aan maximaal ongeveer 25 korte labels per plaat; de rest valt weg of wordt onleesbaar. |
+| **B. Directe prompt met labels** | Voor een snelle sfeerplaat of een model dat tekst goed rendert | Gebruik de volledige prompt. Houd je aan maximaal ongeveer 25 korte labels per plaat; de rest valt weg of wordt onleesbaar. De volledige prompts voor plaat A en B noemen er meer: laat voor deze route eerst de ondertitels en daarna de kennislades of de skillchips weg, of kies route A. |
 | **C. Structuurreferentie** | Bij generators die een referentiebeeld accepteren (image-to-image, structure of layout reference) | Geef de PNG van de wireframe mee als layoutreferentie met lage tot middelhoge sterkte, en de prompt voor stijl en sfeer. |
 
 Werkafspraken:
 
 - **Prompts en labels zijn in het Engels.** Alle diagrammen van dit project zijn Engels (maintainer, 2026-11-15), en de meeste generators volgen Engelse compositie-instructies nauwkeuriger. Hoofdstuk 6 geeft de Engelse labelset; de Nederlandse kolom is alleen ter vertaling.
 - **Korte labels.** Maximaal drie woorden per knoop. Details horen in het document, niet op de plaat.
-- **Publicatieregels van het project gelden ook voor de plaat.** Noem de OTGW32-hardware niet bij naam (CLAUDE.md, AGENT-CORE, Discord-regel), zet geen Discord-gebruikers-ID's, webhook-URL's of tokens in beeld, en gebruik voor personen rolnamen ("Maintainer", "SAT-ontwerper"), geen foto-achtige portretten.
+- **Publicatieregels van het project gelden ook voor de plaat.** Noem de OTGW32-hardware niet bij naam (CLAUDE.md, AGENT-CORE, Discord-regel), zet geen Discord-ID's (van gebruikers of kanalen), webhook-URL's, tokens of IP-adressen van testunits in beeld, en gebruik voor personen de Engelse rolnamen ("Maintainer", "SAT designer", "Alpha testers"), geen foto-achtige portretten. Een mention staat alleen als de letterlijke placeholder `<@ID>` op de plaat.
 - **Geen merklogo's.** Gebruik generieke glyphs voor Discord, GitHub en Tweakers (een spraakwolk, een vertakking, een forumtegel). Generators vervormen logo's, en een vervormd logo oogt slordiger dan een neutraal icoon.
 - **Controleer het resultaat** met de lijst in hoofdstuk 7 voordat je het deelt. Een mooie plaat met een pijl de verkeerde kant op is erger dan geen plaat.
 
@@ -53,7 +53,7 @@ Het lichte palet van de bestaande visuele versie (`agentic-setup.html`, `:root`)
 | Achtergrond | gebroken wit | | `#f4f6f7` | De ruimte |
 | Vlak | wit | `#d5dce2` | `#ffffff` | Kaarten en panelen, met een zachte schaduw |
 | Tekst | inktzwart | | `#151a1f` | Labels |
-| Gedempte tekst | leigrijs | | `#56616c` | Subtitels, alleen-lezen-pijlen |
+| Gedempte tekst en grijze lijnen | leigrijs | `#56616c` | | Subtitels, gestippelde randen van de kanaaltegels, gebruikersinput, de kennislijn (alleen-lezen-pijlen zijn petrol gestippeld) |
 | **Mensen en beslismacht** | gebrand oranje | `#c2410c` | `#fde7d9` | Personen, mandaten, besluiten |
 | **Agents en AI-werk** | petrol | `#0e7490` | `#d9eff4` | Sessies, subagents, opdrachten tussen agents |
 | **BlueFlame Bot** | kobaltblauw naar cyaan, witte kern | `#1d4ed8` → `#06b6d4` | halo `#dbeafe` | Alleen de waakvlam en zijn bewakingsstralen |
@@ -100,10 +100,10 @@ Koppen in **Archivo** (vet, kapitalen met ruime letterafstand voor zonelabels), 
 |---|---|
 | Doorgetrokken petrol | opdracht of werk tussen agents |
 | Gestippeld petrol | alleen lezen, bewaken |
-| Doorgetrokken blauw, gloeiend | bewakingsstraal van BlueFlame Bot (alleen plaat B) |
+| Blauw | plaat B: brede doorschijnende bewakingsbundel van BlueFlame Bot; plaat A: gestippeld kobalt met twee punten tussen de vlam en de comms-sessie (de tweede stem) |
 | Doorgetrokken oranje, dik | besluit of mandaat van een mens |
-| Gestippeld grijs | input van gebruikers naar een kanaal |
-| Dik groen met pijlpunt | product gaat naar buiten; dun groen op plaat B: aankondiging of antwoord in een supportkanaal |
+| Grijs | gestippeld: input van gebruikers naar een kanaal; doorgetrokken met twee punten (plaat A): de vlam leest de kennis en schrijft register en notes |
+| Groen met pijlpunt | dik: product gaat naar buiten; dun gestippeld op plaat A: de zip terug naar #alpha-testing; dun op plaat B: aankondiging of antwoord in een supportkanaal |
 | Pijl met twee punten | tweerichtingsverkeer (lezen en antwoorden) |
 
 ---
