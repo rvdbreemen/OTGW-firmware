@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v2.0.0-beta.314
+**  Version  : v2.0.0-beta.315
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -313,6 +313,9 @@ void clearBoilerUnsupportedDirty();
 void recordBoilerAnswer(uint8_t id, uint8_t type, uint32_t nowMs);
 int32_t boilerAnswerAgeS(uint8_t id, uint32_t nowMs);   // -1 = not seen this boot
 const char* boilerAnswerStatus(uint8_t id);              // PSTR: never_seen / ack / unknown_dataid / data_invalid
+enum : uint8_t { OT_VALSRC_NONE = 0, OT_VALSRC_BOILER, OT_VALSRC_GATEWAY, OT_VALSRC_THERMOSTAT, OT_VALSRC_SUMMARY, OT_VALSRC_REPLAY };  // TASK-1965
+void recordValueSource(uint8_t id, uint8_t src);           // TASK-1965: which frame wrote the served value
+const char* valueSourceName(uint8_t id);                   // PSTR: none / boiler / gateway / thermostat / summary / replay
 void publishBoilerUnsupportedMsgids();    // MQTT retained CSV ("14W,16W,24R,...")
 void loadOtSupportFiles();                 // read /ot-thermo.json and /ot-boiler.json at boot
 void saveOtSupportFilesIfDirty();          // 15-min debounced atomic write

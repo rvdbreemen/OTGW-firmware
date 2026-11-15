@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v2.0.0-beta.314
+**  Version  : v2.0.0-beta.315
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -5235,6 +5235,7 @@ static bool publishPSSummaryFieldValue(uint8_t msgid, uint8_t valueType, const c
       if (validForMaster) sendMQTTData(label, valueBuf);
       setMsgLastUpdated(msgid, trackedNow);
       if (validForMaster) updatePSSummaryFloatState(msgid, value);
+      if (validForMaster) recordValueSource(msgid, OT_VALSRC_SUMMARY);   // TASK-1965
       return true;
     }
 
@@ -5774,6 +5775,39 @@ const char* boilerAnswerStatus(uint8_t id) {
     default:                  return PSTR("never_seen");
   }
 }
+
+// TASK-1965: which frame wrote the value getOTGWValue() serves for this ID, so a client can tell a
+// boiler value from one the gateway supplies itself (a PIC outside sensor's Write-Data 27, an
+// OT-Direct OT= value, a PIC answer to the thermostat). The status above stays the boiler's last
+// answer: a boiler without MsgID 27 answers Data-Invalid while the gateway serves its own sensor.
+// RAM only, this boot; set where the canonical value is written (ADR-097 store gate).
+static uint8_t otValueSource[OT_MSGID_MAX + 1] = {0};
+
+void recordValueSource(uint8_t id, uint8_t src) {
+  if (id <= OT_MSGID_MAX) otValueSource[id] = src;
+}
+
+// The source of a decoded frame: a B the boiler sent, an A/R the gateway made (or a B it made itself,
+// bLocalAnswer), a T from the thermostat, or a replayed line.
+uint8_t otValueSourceOfFrame(uint8_t rsptype, bool localAnswer, bool replayed) {
+  if (replayed) return OT_VALSRC_REPLAY;
+  if (rsptype == OTGW_BOILER) return localAnswer ? OT_VALSRC_GATEWAY : OT_VALSRC_BOILER;
+  if (rsptype == OTGW_ANSWER_THERMOSTAT || rsptype == OTGW_REQUEST_BOILER) return OT_VALSRC_GATEWAY;
+  if (rsptype == OTGW_THERMOSTAT) return OT_VALSRC_THERMOSTAT;
+  return OT_VALSRC_NONE;
+}
+
+// none / boiler / gateway / thermostat / summary / replay
+const char* valueSourceName(uint8_t id) {
+  switch (id <= OT_MSGID_MAX ? otValueSource[id] : OT_VALSRC_NONE) {
+    case OT_VALSRC_BOILER:     return PSTR("boiler");
+    case OT_VALSRC_GATEWAY:    return PSTR("gateway");
+    case OT_VALSRC_THERMOSTAT: return PSTR("thermostat");
+    case OT_VALSRC_SUMMARY:    return PSTR("summary");
+    case OT_VALSRC_REPLAY:     return PSTR("replay");
+    default:                   return PSTR("none");
+  }
+}
 // end boiler-answer record
 
 //===========================================================================================
@@ -6229,6 +6263,9 @@ void processOT(const char *buf, int len, bool suppressOutput, bool localAnswer, 
         const uint32_t preSuccessCount = mqttSendSuccessCount;
         OTPublishGate gate(shouldPublishMQTTForID(OTdata.id, OTdata.masterslave, OTdata.value));
         decodeAndPublishOTValue();
+        // TASK-1965: the same gate the print_* store uses (is_value_valid + ADR-097 master validity).
+        if (is_value_valid(OTdata, OTlookupitem) && is_value_valid_for_master_topic(OTdata, OTlookupitem))
+          recordValueSource(OTdata.id, otValueSourceOfFrame(OTdata.rsptype, OTdata.bLocalAnswer, OTdata.bReplayed));
         if (mqttPendingSlot.pending) {
           if (mqttSendSuccessCount > preSuccessCount) confirmMQTTPublishSlot();
           else {

@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-beta.314
+**  Version  : v2.0.0-beta.315
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -2880,6 +2880,8 @@ void sendOTValue(int msgid){
     // TASK-1871: what the boiler answered last for this ID this boot, and how long ago.
     je.field(F("status"), FPSTR(boilerAnswerStatus((uint8_t)msgid)));
     je.field(F("last_seen_age_s"), boilerAnswerAgeS((uint8_t)msgid, millis()));
+    // TASK-1965: where the served value came from; status above is the boiler's last answer only.
+    je.field(F("source"), FPSTR(valueSourceName((uint8_t)msgid)));
     je.endObject();                   // close root
   }
   restFinalize();
@@ -2917,6 +2919,8 @@ void sendOTLabel(const char *msglabel){
     // TASK-1871: what the boiler answered last for this ID this boot, and how long ago.
     je.field(F("status"), FPSTR(boilerAnswerStatus((uint8_t)msgid)));
     je.field(F("last_seen_age_s"), boilerAnswerAgeS((uint8_t)msgid, millis()));
+    // TASK-1965: where the served value came from; status above is the boiler's last answer only.
+    je.field(F("source"), FPSTR(valueSourceName((uint8_t)msgid)));
     je.endObject();                   // close root
   }
   restFinalize();

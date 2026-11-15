@@ -1619,12 +1619,23 @@ paths:
                   last_seen_age_s:
                     type: integer
                     description: Seconds since that answer; -1 when status is never_seen (same convention as boiler_age_s in /v2/health).
+                  source:
+                    type: string
+                    enum: [none, boiler, gateway, thermostat, summary, replay]
+                    description: |
+                      Which frame wrote the `value` served here (TASK-1965): `boiler` (a boiler answer),
+                      `gateway` (a value the gateway supplies itself: a PIC sensor's Write-Data, an OT-Direct
+                      `OT=` value, a PIC answer to the thermostat), `thermostat` (a thermostat write),
+                      `summary` (the PIC PS=1 summary), `replay` (a replayed line) or `none` (no value this
+                      boot). `status` stays the boiler's own last answer, so `status: data_invalid` with
+                      `source: gateway` is a valid gateway value for an ID the boiler does not support.
               example:
                 label: "boilertemperature"
                 value: 45.5
                 unit: "\u00b0C"
                 status: "ack"
                 last_seen_age_s: 3
+                source: "boiler"
         '400':
           $ref: '#/components/responses/BadRequestJson'
         '405':
@@ -2651,6 +2662,17 @@ paths:
                   value: {}
                   unit:
                     type: string
+                  status:
+                    type: string
+                    enum: [never_seen, ack, unknown_dataid, data_invalid]
+                    description: The boiler's latest answer for this ID since boot, as on /v2/otgw/messages/{id} (TASK-1871).
+                  last_seen_age_s:
+                    type: integer
+                    description: Seconds since that answer; -1 when status is never_seen.
+                  source:
+                    type: string
+                    enum: [none, boiler, gateway, thermostat, summary, replay]
+                    description: Which frame wrote the served value, as on /v2/otgw/messages/{id} (TASK-1965).
         '400':
           $ref: '#/components/responses/BadRequestJson'
         '405':

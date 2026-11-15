@@ -89,7 +89,12 @@ class BoilerAnswerRecord(unittest.TestCase):
         assert m and consts.count("#define") == 4, "OT message types / OT_MSGID_MAX not found in OTGW-Core.h"
         cls.tmp = tempfile.TemporaryDirectory()
         cpp = Path(cls.tmp.name) / "rec.cpp"
-        cpp.write_text(STUBS + consts + f"#define OT_MSGID_MAX {m.group(1)}\n" + block + MAIN, encoding="utf-8")
+        # TASK-1965: the block also holds the value source record, which uses the frame-source enum of
+        # OTGW-Core.h and the OT_VALSRC_* enum of OTGW-firmware.h (absent before TASK-1965).
+        rsp = re.search(r"enum OTGW_response_type\s*\{[^}]*\};", h)
+        valsrc = re.search(r"enum : uint8_t \{ OT_VALSRC_NONE[^}]*\};", (SRC / "OTGW-firmware.h").read_text(encoding="utf-8"))
+        extra = "".join(x.group(0) + "\n" for x in (rsp, valsrc) if x)
+        cpp.write_text(STUBS + consts + f"#define OT_MSGID_MAX {m.group(1)}\n" + extra + block + MAIN, encoding="utf-8")
         cls.exe = base.compile_cpp(cpp, Path(cls.tmp.name) / ("rec" + (".exe" if os.name == "nt" else "")))
         if cls.exe is None:
             raise unittest.SkipTest("no C++ compiler on this host")

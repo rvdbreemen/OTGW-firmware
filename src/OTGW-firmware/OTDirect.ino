@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTDirect.ino
-**  Version  : v2.0.0-beta.314
+**  Version  : v2.0.0-beta.315
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -4031,6 +4031,7 @@ bool handleOTDirectCommand(const char* buf, int len, bool satOwn) {
       if (enqueueWriteCommand(27, f88, "OT")) {
         otdPsStoreOutside(f88);   // TASK-1846: the PS=1 line shows the OT= value, as on the PIC
         OTcurrentSystemState.Toutside = (int16_t)f88 / 256.0f;
+        recordValueSource(27, OT_VALSRC_GATEWAY);   // TASK-1965: an OT= value, not the boiler's
         otdPicPrintF88(f88, rspBuf, sizeof(rspBuf));
         synthesizeResponse(buf, rspBuf);
       }
