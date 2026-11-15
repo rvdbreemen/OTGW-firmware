@@ -5,7 +5,7 @@
 | Status | Bijgewerkte architectuurbeschrijving; vervangt de momentopname van 2026-11-04 |
 | Peildatum | 2026-11-15, `dev` @ `e22c59e`, firmware 2.0.0-beta.327 (vorige peildatum 2026-11-04, beta.79) |
 | Taak | TASK-1984 (vorige versie TASK-1624, verbetertaken TASK-1625 t/m TASK-1636) |
-| Visuele versie | [`agentic-setup.html`](agentic-setup.html): Engelstalige web-asset met visualisaties, ook voor wie het project niet kent. Peildatum 2026-11-15; de gepubliceerde link wordt hier toegevoegd zodra het asset gepubliceerd is |
+| Visuele versie | [`agentic-setup.html`](agentic-setup.html): Engelstalige web-asset met visualisaties, ook voor wie het project niet kent. Peildatum 2026-11-15. Open het bestand lokaal in een browser (de platen staan ernaast in `images/`); de maintainer heeft het ook als privé-pagina gepubliceerd |
 | Platen | [Plaat A, overzicht](images/agentic-setup-plate-a.svg) en [plaat B, BlueFlame Bot](images/agentic-setup-plate-b.svg), licht thema; generator in [`tools/agentic-plates/`](../../tools/agentic-plates/README.md) |
 | Beeldbrief | [`agentic-setup-image-brief.md`](agentic-setup-image-brief.md): compositie en prompts voor een image generator |
 | Taal | Lopende tekst Nederlands; alle diagrammen Engels (maintainer, 2026-11-15) |
