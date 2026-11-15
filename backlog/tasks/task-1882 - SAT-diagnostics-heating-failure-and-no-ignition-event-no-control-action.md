@@ -4,7 +4,7 @@ title: 'SAT diagnostics: heating-failure and no-ignition event (no control actio
 status: To Do
 assignee: []
 created_date: '2026-11-13T06:13:00Z'
-updated_date: '2026-11-15T21:12:00Z'
+updated_date: '2026-11-15T21:26:00Z'
 labels:
   - sat
   - diagnostics
@@ -40,4 +40,6 @@ Lesson 3 of docs/sat/vtherm-comparison-2026-11-13.md (TASK-1879). VTherm raises 
 2026-11-15 Robert released this task: '2. OK' in Discord DM 1571454228763779093 (answer to the coordinator's list 1571452589231439943, item 1882 'SAT diagnostic event for heating failure / no ignition, no control action (rec. yes, low)'; acknowledged in 1571454958447099976). Scope as released: diagnostic event only, NO control action. Sergeant D entries checked (docs/sat/sergeant-d-corrections.md at origin/dev): entry 80 (PWM ON phase waits for ignition as thermo-nova; ON only when the ON time is >= 180 s): no conflict, the no-ignition event observes that wait and changes nothing in it; entry 142 (flood on CH relight): no conflict, an ignition is a real off-to-on of the CH flame, the event uses the same definition; entry 329 (faster self-tune, Robert's approach) names Q-1882a as applying to the new tune: the tuner-marking part (AC1 part 2) stays blocked on Sergeant D's Q-1882a, still queued in docs/sat/open-questions.md. Queue (coordinator): after 1954, 1812 and 1802 bug 9.
 
 Q-1882a asked in the 18-question batch (item 5, https://discord.com/channels/812969634638725140/1105556725714649128/1571633456381694074) WITHOUT a decision: the question had no recommendation recorded, so nothing was decided by directive. Still open.
+
+Q-1882a decided 2026-11-15 by directive (weighed by comms on the coordinator's order; the question had no recommendation): option A, hours with a heating-failure or no-ignition event are left out of the heating curve self-tune once the event exists. Reason: the room does not respond to the curve in such an hour, so it would push the coefficient up for a boiler fault (like the existing restart and not-SAT exclusions); thermo-nova has no coefficient tuner (entry_data.py:213). Sergeant D may overrule (asked in the batch, item 5).
 <!-- SECTION:NOTES:END -->
