@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-11T06:40:00Z'
-updated_date: '2026-11-15T09:25:00Z'
+updated_date: '2026-11-15T12:08:00Z'
 labels:
   - otdirect
   - review-2026-11-11
@@ -46,4 +46,6 @@ Lane-1924 pushed 2026-11-15: origin/dev 5da0c91df..2f4818aa1. Build esp32-combo 
 2026-11-15 Robert decided bug 9 = A: detect thermostat loss after about 3 s (fixed), not the 30 s iSetbackTimeout default. Discord DM 1571431149795024929 (his item 2 'a'), answer to question 1571287312292253820. Plan (d3): implement on lane-1954 after TASK-1954, with a host test red on the old code and green on the fix; it goes in the next build after 'beta tag out'.
 
 2026-11-15 bug 9 implemented (d3, lane-1954, beta.297 placeholder; renumbered at the rebase after 95). checkThermostatTimeout() counts the thermostat as lost after a fixed 3 s without a frame (static constexpr timeoutMs = 3000, '>='); iSetbackTimeout is no longer read (help text now 'Not used', TASK-1950 covers removal). Evidence, tests/test_otd_thermostat_loss_time.py on the real checkThermostatTimeout() and, for the gap, the real scheduleMasterRequest() + otdOwnFramesAllowed() (scheduler harness of test_otd_offline_retry; the prelude's always-true gate stub is replaced by the real gate): FIX loss after 3 s, first own frame 3500 ms after the thermostat's last frame, no own frame while it is there, a thermostat with 2 s gaps never counts as lost. OLD (HEAD before the fix): loss after 31 s, first own frame after 30500 ms -> FAILED 2. AC2: gap 3.5 s < spec 5 s. AC3: red/green on the real code. Neighbours green: test_otd_thermostat_lines 5 OK, test_otd_no_setback 4 OK. evaluate --quick 86/0. AC4 (build, bench) follows with the next build.
+
+2026-11-15 Bench 09 on .61 with beta.297+85bc0dc (1954 + bug 9), gateway mode without a thermostat since boot: 'Thermostat disconnected' about 2.6-3.3 s after boot, once (was 30 s); own MsgID 0 from t+2.6 s about every 1.12 s; health and settings OK. The thermostat-pull timing (a thermostat that disappears) needs a thermostat on the slave port: host test only (3.5 s vs 30.5 s). AC4 is ticked after the final build of lane-1954.
 <!-- SECTION:NOTES:END -->
