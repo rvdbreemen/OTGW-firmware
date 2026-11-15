@@ -5,6 +5,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Changed
+- OT-Direct master mode: a thermostat on the thermostat port that writes a value (any Data-ID except 1, 16 and 24, and 8/14 while SAT owns the setpoint) now has that write sent to the boiler in the next free master slot, and gets the boiler's own answer back (WRITE-ACK, Data-Invalid or Unknown-DataID) instead of a local acknowledgement. Reads stay answered from the boiler cache. The thermostat interface is on by default in master mode (Robert, DM 1571427398485024889; ADR-241, ADR-243; TASK-1812).
+
 ### Fixed
 - OT-Direct: once a minute the flow temperature (MsgID 25) was read up to about 19 s apart instead of every 10 s, because the 10 s reads waited behind the 60 s slow-poll burst (since beta.307). The faster reads now go first; a `PM=25` goes out within about one second also during the burst. The OTGW Classic (PIC) was not affected (TASK-1981).
 - OT-Direct now answers more commands as the PIC does (TASK-1804): a too short command or one without `=` gets `SE`; `PR=` with more than one letter is `SE`, an unknown letter `BV` (was no answer), `PR=E` answers `E=-` (no external sensor), `PR=F` stays `BV`; after `GW=R` the PIC's greeting line goes to port 25238; `MH=`, `MW=`, `M2=` read their value like the PIC; `VS=` above 100 is refused instead of capped and `MI=` rounds to 5 ms like the PIC; the thermostat's MsgID 16 is always acknowledged; a `TT=`/`TC=` override is cleared when the thermostat is lost; `SR=` on a thermostat write answers WRITE-ACK; a Data-Invalid answer resets the unsupported-ID count; a new boiler fault reads the fault code (MsgID 5) at once.

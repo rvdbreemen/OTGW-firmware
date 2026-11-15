@@ -3,11 +3,11 @@ id: TASK-1812
 title: >-
   OT-Direct master mode: forward the thermostat's WRITEs of other IDs (56, 57,
   14, ...) to the boiler and return the boiler's answer, like the PIC
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-11T12:30:00Z'
-updated_date: '2026-11-15T12:01:00Z'
+updated_date: '2026-11-15T21:27:00Z'
 labels:
   - otdirect
   - review-2026-11-11
@@ -30,7 +30,7 @@ Found in the TASK-1795 audit (docs/reviews/2026-11-11_otdirect-pic-parity-audit/
 - [x] #2 The thermostat receives the boiler's own answer to that write (WRITE_ACK with the boiler's data, Data-Invalid or Unknown-DataID), not a local echo; the answer stays within the OpenTherm response window or the task notes show why it cannot and what was chosen instead
 - [x] #3 MsgID 1, 16 and 24 and the SAT ownership rules behave as before this change, shown by a test
 - [x] #4 Host test against the real code (not a re-implementation): red on the old code, green on the fix
-- [ ] #5 esp32-combo build, evaluate.py --quick, bench check where the hardware allows (name what was not benched)
+- [x] #5 esp32-combo build, evaluate.py --quick, bench check where the hardware allows (name what was not benched)
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -59,4 +59,12 @@ Review by 92 (ADR-241, 2026-11-15) handled on branch lane-1924-1812 (still dropp
 2026-11-15 Robert decided ADR-241 = A (accept the slot rule and the SAT exclusion of MsgID 8/14): Discord DM 1571427398485024889 (original question) and 1571427991219867750 (corrected re-question), acknowledged by the coordinator in 1571428099210612777. ADR-241 is Accepted via adr-kit on lane-1924-1812 (strict lint clean after expanding PIC/DHW/SAT and lowercasing READ). Order after 'beta tag out': TASK-1952 push, TASK-1954, then this lane rebased onto 1954, dropping its own OTD_MWT_MS/otdLastConvEndMs and stamp and reusing 1954's.
 
 2026-11-15 (d3) Restacked on lane-1954 (1954, bug 9, 1878, 1950). Added the READ regression case of the bench brief to tests/test_otd_master_write_relay.py: thermostat READ_DATA of MsgID 0, 25, 56, 57 in master mode takes the local handler path (handleMasterModeSlaveFrame, answered from otBoilerCache, ADR-066) and sends no boiler frame: FIX sent=0 local=4; a mutant without the WRITE_DATA check in otdMasterRelaysWrite() relays them (sent=1): the case catches it. The rebased harness also needed stubs for otdRelayRead99/otdRelayRewriteRead (TASK-1906/TASK-1803 now call them from applyOverrides; they rewrite READs only, the test relays WRITEs). 12/12 OK. All 54 tests/test_otd_*.py green (run_tests -j 4), evaluate --quick 86/0. test/host/build_and_run_override_reply.ps1 fails to compile on this base (otOverrideHB, TASK-1750); origin fixed that in accb07e13, which is not in this base yet and comes with the final rebase.
+
+2026-11-15 bench 09 on .61, 2.0.0-beta.328+044654d (relayed by the coordinator): items 1-7 PASS: health (bootcount flash+2, no crashlog), bEnableSlave true kept, no relay and no relay log lines without a thermostat, MsgID 0 cadence, SW/SH/CS in master mode, mode switch (master in/out resets the command state as designed, applyOTDirectMode/resetTransientState; gateway<->monitor keeps it, TASK-1839), TASK-1981 GW=L R25 max 10.15 s. One MsgID 0 gap of 1.75 s in the GW=L run (beta.322: 1.204 s): not from this change: the relay branch in loopOTDirect() runs only with otSlaveFramePending in master mode (no thermostat on .61, the run was in loopback) and the diff does not touch scheduleMasterRequest(), applyOTDirectMode() or the command drain (0 lines). Most likely the switch moment: GW=L is applied only with no request in flight (otdCmdTextDrain/otdModeSettingPending gated on !otMasterRequestActive), so it waits for the offline MsgID 0 timeout; timestamp not checked. Found on the bench, filed as TASK-1985: the retained <label>/override MQTT topic keeps its value after the override ends. Not benchable on .61 (no thermostat on the slave port): the relay itself and the 750 ms answer deadline; covered by tests/test_otd_master_write_relay.py and the override_reply slice on the real code, field check open.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+AC1/AC2: tests/test_otd_master_write_relay.py on the real loopOTDirect()/handleMasterResponse() slices: a thermostat WRITE (not 1/16/24, not 8/14 under SAT) goes to the boiler as WRITE_DATA with the thermostat's data (through applyOverrides), the thermostat gets the boiler's WRITE-ACK / Data-Invalid / Unknown-DataID within 750 ms of the send, nothing when late or offline; red on the code before 2eb78c060, green on the fix. AC3: the same test keeps MsgID 1/16/24 and SAT ownership on the local path, and the READ case stays answered from otBoilerCache with no master frame (mutant check). AC4: as AC1-3, plus test_otd_* 61/61, override_reply 41/41 (otdMasterRelaysWrite slice), evaluate 87/0, test_evaluate 80 OK, test_adr_governance 17 passed. AC5: esp32-combo build beta.328+044654d exit 0; bench 09 .61 items 1-7 PASS; not benched: the relay with a real thermostat and the answer deadline (field). ADR-241 and ADR-243 Accepted (Robert, DM 1571427398485024889 / 1571432519373557801).
+<!-- SECTION:FINAL_SUMMARY:END -->
