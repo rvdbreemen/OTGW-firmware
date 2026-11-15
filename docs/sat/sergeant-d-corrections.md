@@ -7607,3 +7607,15 @@ Robert, 16:18:42 UTC (https://discord.com/channels/812969634638725140/9144987300
 **Settled:** His explanation of entry 351: in gateway mode without a physical thermostat the OTGW MQTT climate entity has no room temperature and setpoint, so while SAT is enabled SAT can use this climate entity; no second MQTT entity. Read as option B: keep the existing entity (and its name "Thermostat"), as ADR-248 decides.
 
 **Task:** ADR-248 (accept question to Robert).
+
+## 372. Q-1867b answered A by Robert: after a settle the pressure drop rate waits for 600 s of fresh readings (maintainer decision, 2026-11-16; follows entry 362)
+
+**Source:** #dev-sat-mqtt, Robert's reply 2026-11-15 23:11:14 UTC (https://discord.com/channels/812969634638725140/1105556725714649128/1571663900985000038) to the follow-up question Q-1867b (https://discord.com/channels/812969634638725140/1105556725714649128/1571662081084629088), posted under Sergeant D's batch answers.
+
+**Quoted:**
+
+> "A"
+
+**Settled:** option A of Q-1867b. With entry 362 (B: the readings of the 600 s settle window are not recorded) the first drop-rate fit after a CH-mode change would span only the 300 s minimum, and in gruijter's capture a 0.027 bar step then reads as 0.32-0.38 bar/h (a new false alarm, 12 Nov 10:28). After a settle the firmware computes the drop rate only once the fresh readings span 600 s, which matches thermo-nova's effective first window: thermo-nova keeps recording during its settle (custom_components/sat/binary_sensor.py:340-342 at 7beaaf5; PRESSURE_DROP_RATE_SETTLE_SECONDS 600 at :25, PRESSURE_DROP_RATE_MIN_WINDOW_SECONDS 300 at :28). A real leak after a CH-mode change is seen about 5 minutes later than with B alone. Without a CH-mode change nothing changes. Sergeant D may still answer Q-1867b himself; a different answer becomes a follow-up task.
+
+**Task:** TASK-1867 (implemented as commit 5ef1c1d46, host evidence in the task).

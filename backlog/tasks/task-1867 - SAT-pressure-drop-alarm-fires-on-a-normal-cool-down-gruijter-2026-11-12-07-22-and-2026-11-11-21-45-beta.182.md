@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-12T12:09:00Z'
-updated_date: '2026-11-15T23:15:00Z'
+updated_date: '2026-11-15T23:20:00Z'
 labels:
   - sat
   - bug
@@ -51,4 +51,6 @@ AC3: put to Sergeant D in the 18-question batch (item 9) and answered B on 2026-
 Implementation (92, impl agent, verified by 92 2026-11-16): satUpdatePressure() records no samples while the drop rate is suspended (entry 362 B), and after a settle the first fit waits until the fresh samples span 600 s (choice A, coordinator 2026-11-15; thermo-nova keeps recording during its settle, binary_sensor.py:340-342, SETTLE 600 :25, MIN_WINDOW 300 :28, so its first fit spans ~600 s; asked as Q-1867b, https://discord.com/channels/812969634638725140/1105556725714649128/1571662081084629088). Constants PRESS_SETTLE_MS/PRESS_MIN_SPAN_MS, flag _press_postSettle.
 
 Evidence (run by 92): tests/test_sat_pressure_alarm_replay.py PressureAlarmReplayFixed + SyntheticLoss with OTGW_SAT_INO = origin/dev SATcontrol.ino: Ran 5, FAILED (failures=4) (field alarms 01:31/07:22 still fire, assumed-seed 21:45 fires, leak-after-CH timing). Fix, whole file: Ran 9, OK. Alarm onsets: gruijter replay old 01:31:24.99 + 07:22:54.99, B-only adds 10:28:24.99, A none; synthetic 0.5 bar/h leak with a CH change at 120 s: old 840 s, B-only 1140 s, A 1440 s (+600 s vs old, the cost of A); without a CH change 420 s on all. The B-only red: the 10:28:24 assertion fails on the B-only copy (impl agent). run_tests test_sat_pressure_alarm_replay/test_sat_pressure_health/test_sat_ch_signals PASS; evaluate --quick 0 failed. Note: the thermo-nova oracle in test_sat_pressure_health.py now has drop_settle_samples=True (our deliberate deviation, entry 362 + A); False gives thermo-nova as written.
+
+Choice A confirmed by Robert (maintainer): reply 'A' to Q-1867b, 2026-11-15 23:11:14 UTC, https://discord.com/channels/812969634638725140/1105556725714649128/1571663900985000038; recorded as entry 372.
 <!-- SECTION:NOTES:END -->

@@ -4922,6 +4922,19 @@
    "supersedes": [],
    "tasks": [],
    "confirmed_by_entry": null
+  },
+  {
+   "id": 372,
+   "title": "Q-1867b answered A by Robert: after a settle the pressure drop rate waits for 600 s of fresh readings (maintainer decision, 2026-11-16; follows entry 362)",
+   "date": "2026-11-16",
+   "source": "maintainer",
+   "kind": "decision",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1571663900985000038",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1867"
+   ],
+   "confirmed_by_entry": null
   }
  ]
 }
