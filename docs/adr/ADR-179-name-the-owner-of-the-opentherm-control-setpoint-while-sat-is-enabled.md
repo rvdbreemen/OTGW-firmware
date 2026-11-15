@@ -12,6 +12,7 @@ superseded_by: null
 related:
   - "ADR-217"
   - "ADR-241"
+  - "ADR-248"
 topics:
   - "control setpoint ownership"
   - "msgid 1 tset"
@@ -62,6 +63,11 @@ status_history:
     status: Accepted
     changed_by: "Agent (d3)"
     reason: Related to ADR-241
+    changed_via: adr-kit lifecycle
+  - date: 2026-11-15
+    status: Accepted
+    changed_by: "User: Robert van den Breemen"
+    reason: Related to ADR-248
     changed_via: adr-kit lifecycle
 ```
 

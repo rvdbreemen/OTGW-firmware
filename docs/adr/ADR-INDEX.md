@@ -249,3 +249,4 @@ One row per Architecture Decision Record. Scope is the Enforcement `path_glob` s
 | ADR-244 | Accepted | - | On the PIC serial path, a command that starts with PR= is sent to the PIC also while a simulation is on; every other... |
 | ADR-245 | Accepted | - | On a board with PSRAM the ring holds 5046 slots of 120 s (GRAPHHISTLARGESLOTS), 5040 of them readable: 7 days. |
 | ADR-247 | Accepted | - | The two PROGMEM assets of ADR-194 may be stored deflated in firmware flash (coordinator decision for TASK-1955 option... |
+| ADR-248 | Proposed | - | The existing climate.Thermostat entity keeps its uniqid and its discovery payload is fixed; the firmware routes the c... |

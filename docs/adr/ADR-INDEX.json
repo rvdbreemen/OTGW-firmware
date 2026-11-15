@@ -3128,7 +3128,7 @@
       "path": "ADR-101-flat-per-value-mqtt-topics-over-aggregated-json-payloads.md",
       "format": "canonical",
       "status": "Accepted",
-      "date": "2026-05-08",
+      "date": "2026-11-15",
       "decision_summary": "OTGW-firmware 2.0.0 uses flat per-value MQTT topics.",
       "topics": [],
       "aliases": [],
@@ -5497,7 +5497,7 @@
       "path": "ADR-174-republish-on-change-gated-mqtt-state-when-home-assistant-comes-back-online.md",
       "format": "canonical",
       "status": "Accepted",
-      "date": "2026-08-07",
+      "date": "2026-11-15",
       "decision_summary": "Chosen option: Option A, because homeassistant/status is a Home Assistant side contract and the two firmware lines mu...",
       "topics": [
         "availability",
@@ -9941,6 +9941,73 @@
         "supersedes": [],
         "superseded_by": null
       }
+    },
+    {
+      "id": "ADR-248",
+      "title": "The Home Assistant climate entity follows SAT while SAT is enabled, with a fixed discovery and routing in the firmware",
+      "path": "ADR-248-the-home-assistant-climate-entity-follows-sat-while-sat-is-enabled-with-a-fixed-discovery-and-routing-in-the-firmware.md",
+      "format": "canonical",
+      "status": "Proposed",
+      "date": "2026-11-15",
+      "decision_summary": "The existing climate.Thermostat entity keeps its uniqid and its discovery payload is fixed; the firmware routes the c...",
+      "topics": [
+        "climate-entity",
+        "discovery",
+        "home-assistant",
+        "mqtt",
+        "presets",
+        "sat"
+      ],
+      "aliases": [
+        "climate_target topic",
+        "HA thermostat card follows SAT",
+        "SAT climate entity",
+        "TT refused while SAT is enabled"
+      ],
+      "components": [
+        "HA climate discovery (Thermostat entity)",
+        "SAT climate bridge topics"
+      ],
+      "symbols": [
+        "kSatMqttCmds",
+        "satHandlePreset",
+        "satHandleTargetTemp",
+        "satOwnsControlSetpoint",
+        "streamClimateDiscovery"
+      ],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [
+          "Keep the climate entity's uniqid and HA device (ADR-140) unchanged.",
+          "Route the target command by satOwnsControlSetpoint() (ADR-179): SAT target while SAT is enabled, TT= otherwise.",
+          "Publish sat/climatetarget and sat/climatecurrent also while SAT is disabled, and force both on every SAT enable/disable.",
+          "Keep none out of presetmodes and publish presetmodes only together with its command topic."
+        ],
+        "must_not": [
+          "Republish or change the climate discovery payload when SAT is toggled.",
+          "Send TT= from the climate entity while SAT is enabled.",
+          "Publish the new topics from processOT() or outside the ADR-088 burst wrapper."
+        ],
+        "exceptions": [
+          "The card's mode (off/heat/cool) stays read-only; switching SAT on or off from the card is out of scope (SAT keeps its own switch entity)."
+        ],
+        "verification": [
+          "A host test that compiles the real streamClimateDiscovery() compose and checks tempcmdt, tempcmdtpl, tempstatt, currtempt, mintemp and the three preset fields; it fails on the code before TASK-1979.",
+          "A host test on the climatetarget handler: SAT enabled calls the SAT target path, SAT disabled queues TT= .",
+          "Bench on both board types and an HA screenshot of the card with SAT on and off (TASK-1979 ACs)."
+        ]
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
     }
   ],
   "relationships": [
@@ -12185,6 +12252,12 @@
     {
       "source": "ADR-101",
       "target": "ADR-098",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-101",
+      "target": "ADR-248",
       "type": "related",
       "resolved": true
     },
@@ -14973,6 +15046,12 @@
       "resolved": true
     },
     {
+      "source": "ADR-174",
+      "target": "ADR-248",
+      "type": "related",
+      "resolved": true
+    },
+    {
       "source": "ADR-175",
       "target": "ADR-116",
       "type": "related",
@@ -15053,6 +15132,12 @@
     {
       "source": "ADR-179",
       "target": "ADR-241",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-179",
+      "target": "ADR-248",
       "type": "related",
       "resolved": true
     },
@@ -16727,6 +16812,42 @@
     {
       "source": "ADR-247",
       "target": "ADR-221",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-248",
+      "target": "ADR-077",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-248",
+      "target": "ADR-088",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-248",
+      "target": "ADR-101",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-248",
+      "target": "ADR-140",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-248",
+      "target": "ADR-174",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-248",
+      "target": "ADR-179",
       "type": "related",
       "resolved": true
     }
