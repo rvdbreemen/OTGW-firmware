@@ -250,8 +250,7 @@ class FirmwareReplayReadsTheFixtures(unittest.TestCase):
         work = Path(cls.tmp.name)
         text = rt.CORE_INO.read_text(encoding="utf-8")
         a, b = text.index(rt.START), text.index(rt.END)
-        body = text[a:b].replace('#include "otgwSimulationFixture.h"', "")
-        fixture = (REPO / "src" / "OTGW-firmware" / "otgwSimulationFixture.h").read_text(encoding="utf-8").replace("#pragma once", "")
+        fixture, body = rt.fixture_source(text[a:b])   # TASK-1955: the fixture is a zlib stream, shimmed on the host
         stubs = rt.STUBS.replace("g_ms < 1000 + 600000", "g_ms < 1000 + 3600000")   # fixtures run up to ~12 minutes
         assert stubs != rt.STUBS, "harness loop bound changed in test_replay_timing.py"
         cpp = work / "replay.cpp"

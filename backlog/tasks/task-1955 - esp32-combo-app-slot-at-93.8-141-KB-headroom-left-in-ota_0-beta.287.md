@@ -4,7 +4,7 @@ title: 'esp32-combo app slot at 93.8 %: 141 KB headroom left in ota_0 (beta.287)
 status: To Do
 assignee: []
 created_date: '2026-11-15T03:20:00Z'
-updated_date: '2026-11-15T14:02:00Z'
+updated_date: '2026-11-15T14:41:00Z'
 labels:
   - build
   - flash-size
@@ -35,4 +35,5 @@ ADR number: the amendment is ADR-247, not ADR-245 (245 is reserved for 92's 7-da
 ADR-247 Accepted: Robert chose A (Discord DM 1571521326060146782, answer to question 1571520520153735261, relayed by the coordinator). Implementation of options 1+2 follows after the TASK-1966 rebuild (number 323).
 
 Analysis (session 95, 2026-11-15, beta.320+5b9efcc, re-added after a rebase): image 2 157 711 B of 2 293 760 B (94.1 %, headroom 133 KB). Compiler already -Os (platform _bare.py) + -flto + function/data sections + --gc-sections. Sections: .flash.text 1 465 652, .flash.rodata 559 556, .iram0.text 100 047, .dram0.data 32 020. By origin (nm -S -l): WiFi/BT binary blobs ~470 KB (net80211 161, btdm 85, pp 61, phy 35), lwip 106, newlib 72, mbedtls 62 (WPA), wpa_supplicant 56, NimBLE 50, our app 233 KB (SATcontrol 43, restAPI 31, OTGW-firmware 30, OTGW-Core 26). rodata strings ~318 KB: our debug formats ~50 KB, IDF ESP_LOG ~40 KB (precompiled). Largest blobs, all in flash: SETTINGS_HELP_JSON 17.8 KB, UpdateServerIndex 16.1 KB (gzip already), OTGW_SIM_FIXTURE 11.6 KB, mqttHaSensors 11.3 KB. Growth beta.250 -> beta.320: +8.5 KB over 70 tags (~120 B per tag).
+Harness seams: tests/test_replay_timing.py and test_sat_bench_scenarios_1412_20.py compile the real replay code, now with the inflate: fixture_source() gives the host a tinfl shim that returns the canonical log bytes (the inflate itself is proven by test_sim_fixture_builtin on the generated stream, the ROM call on the bench); both OK. Sweep (57 tests touching OTGW-Core/FSexplorer/webui_pages/help/fixture) green except test_sat_lowload_contract (needs ~500 s, run separately); node tests/webui/settings-help.test.mjs 29/29; host harnesses banner_board_mode, boiler_unsupported_origin, cmd_queue_drop, ha_discovery_json, ot_reserved_range green.
 <!-- SECTION:NOTES:END -->

@@ -94,12 +94,45 @@ int main(int argc, char** argv) {
 """
 
 
+def fixture_source(body):
+    """The replay code without its fixture includes, plus what those headers provide on the host.
+
+    Before TASK-1955 the fixture was a PROGMEM string (otgwSimulationFixture.h). Since ADR-247 it is a zlib stream that
+    the device inflates with the ROM tinfl (miniz.h); the host has no ROM, so a shim stands in for tinfl: it hands back
+    the canonical log bytes, which is what the real inflate yields (tests/test_sim_fixture_builtin.py proves that on the
+    generated stream; the bench proves the ROM call)."""
+    old = REPO / "src" / "OTGW-firmware" / "otgwSimulationFixture.h"
+    if '#include "otgwSimulationFixture.h"' in body:
+        return old.read_text(encoding="utf-8").replace("#pragma once", ""), body.replace('#include "otgwSimulationFixture.h"', "")
+    raw = (REPO / "tests" / "fixtures" / "otgw_simulation.builtin.log").read_bytes().replace(b"\r\n", b"\n")
+    arr = ",".join(str(x) for x in raw)
+    shim = (
+        "#include <cstdlib>\n#include <cstring>\n"
+        "typedef unsigned char mz_uint8;\n"
+        "struct tinfl_decompressor { int m_state; };\n"
+        "typedef enum { TINFL_STATUS_FAILED = -1, TINFL_STATUS_DONE = 0 } tinfl_status;\n"
+        "enum { TINFL_FLAG_PARSE_ZLIB_HEADER = 1, TINFL_FLAG_USING_NON_WRAPPING_OUTPUT_BUF = 4 };\n"
+        "#define tinfl_init(r) do { (r)->m_state = 0; } while (0)\n"
+        "static const unsigned char kFixtureRaw[] = {" + arr + "};\n"
+        "static const uint8_t OTGW_SIM_FIXTURE_Z[1] = {0};\n"
+        "static const size_t OTGW_SIM_FIXTURE_Z_LEN = 1;\n"
+        "static const size_t OTGW_SIM_FIXTURE_RAW_LEN = sizeof(kFixtureRaw);\n"
+        "static int g_tinflCalls = 0;\n"
+        "static tinfl_status tinfl_decompress(tinfl_decompressor*, const mz_uint8*, size_t*, mz_uint8* out, mz_uint8*,\n"
+        "                                     size_t* outLen, unsigned) {\n"
+        "  g_tinflCalls++; if (*outLen < sizeof(kFixtureRaw)) return TINFL_STATUS_FAILED;\n"
+        "  memcpy(out, kFixtureRaw, sizeof(kFixtureRaw)); *outLen = sizeof(kFixtureRaw); return TINFL_STATUS_DONE; }\n"
+        "struct EspShim { unsigned getFreeHeap() { return 100000; } };\n"
+        "#ifndef DebugTf\n#define DebugTf(...) ((void)0)\n#endif\n#ifndef PSTR\n#define PSTR(s) (s)\n#endif\n"
+        "static EspShim ESP;\n")
+    body = body.replace('#include "otgwSimulationFixtureZ.h"', "").replace("#include <miniz.h>", "")
+    return shim, body
+
+
 def build(workdir: Path):
     text = CORE_INO.read_text(encoding="utf-8")
     a, b = text.index(START), text.index(END)
-    body = text[a:b].replace('#include "otgwSimulationFixture.h"', "")
-    fixture = (REPO / "src" / "OTGW-firmware" / "otgwSimulationFixture.h").read_text(encoding="utf-8")
-    fixture = fixture.replace("#pragma once", "")
+    fixture, body = fixture_source(text[a:b])
     cpp = workdir / "replay.cpp"
     defs = "#define HAVE_MODE 1\n" if "otgwReplayTimingMode" in body else ""
     cpp.write_text(defs + STUBS.replace("@BODY@", fixture + "\n" + body), encoding="utf-8")
