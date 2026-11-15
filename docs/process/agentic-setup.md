@@ -584,7 +584,7 @@ De werkplaats draait op meerdere Claude Code-sessies tegelijk, elk met een eigen
 
 ### 5.1 Sessietopologie
 
-Sessies heten in de taaknotes `otgw-firmware-<id>` of kortweg hun id, zoals 95, 92 of 09 (`backlog/tasks/task-1870 - ADR-225-raise-the-ESP32-S3-IPC-task-stack-ipc0-and-ipc1-to-at-least-1280-B-via-a-custom_sdkconfig-framework-lib-rebuild.md:38-40`, `backlog/tasks/task-1982 - Public-beta-v2.0.0-beta.323-2026-11-15-20-00-slot.md:20`). De rol is een afspraak, geen bestand: `.claude/agents/` bevat alleen `otgw-device-verify.md`, dus voor de bench-tester bestaat geen eigen agentdefinitie; het is de agent `otgw-cycle`, die Robert op 2026-11-11 `otgw-bench-tester` noemde (`backlog/tasks/task-1826 - Process-one-bench-tester-agent-flashes-and-tests-every-unit-developers-request-it.md:23`, `.claude/agents/otgw-device-verify.md:3`).
+Sessies heten in de taaknotes `otgw-firmware-<id>` of kortweg hun id, zoals 95, 92 of 09 (`backlog/tasks/task-1870 - ADR-225-raise-the-ESP32-S3-IPC-task-stack-ipc0-and-ipc1-to-at-least-1280-B-via-a-custom_sdkconfig-framework-lib-rebuild.md:38-40`, `backlog/tasks/task-1982 - Public-beta-v2.0.0-beta.323-2026-11-15-20-00-slot.md:20`). De rol is een afspraak, geen bestand: `.claude/agents/` bevat alleen `otgw-device-verify.md`, dus voor de bench-tester bestaat geen eigen agentdefinitie; het is de agent die Robert op 2026-11-11 van `otgw-cycle` hernoemde tot `otgw-bench-tester` (§3.3; `backlog/tasks/task-1826 - Process-one-bench-tester-agent-flashes-and-tests-every-unit-developers-request-it.md:23`, `.claude/agents/otgw-device-verify.md:3`).
 
 ```mermaid
 flowchart TB
@@ -610,7 +610,7 @@ flowchart TB
     LEDGER["alpha-build-ledger.local.md<br/>gitignored"]:::store
   end
 
-  UNITS["Bench units .61 and .63"]:::ext
+  UNITS["Bench units .39, .61 and .63"]:::ext
   ALPHA["Discord alpha-testing"]:::ext
   BETA["Discord beta-testing"]:::ext
   GH["GitHub origin/dev"]:::ship
@@ -618,10 +618,10 @@ flowchart TB
 
   R -- "DM: decision or explicit yes" --> CO
   CO -- "DM: one question, options, advice" --> R
-  DEV -- "build start and end, bench request,<br/>tag + commit + tasks + evidence" --> CO
-  CO -- "freeze, GO, task assignment" --> DEV
-  CO -- "bench brief" --> BT
-  BT -- "verdict and evidence" --> CO
+  DEV -- "peer message: build start and end,<br/>bench request, tag + commit + tasks + evidence" --> CO
+  CO -- "peer message: freeze, GO, task assignment" --> DEV
+  CO -- "peer message: bench brief" --> BT
+  BT -- "peer message: verdict and evidence" --> CO
   BT -- "WiFi OTA, REST, telnet" --> UNITS
   CO -- "plain-language report" --> ALPHA
   CO --- LEDGER
@@ -629,7 +629,7 @@ flowchart TB
   DEV -- "push after bench OK" --> GH
   DEV --- SUB
   DEV --- LOCK
-  COMMS -- "notes and post drafts,<br/>kept current after every push" --> CO
+  COMMS -- "peer message: notes and post drafts,<br/>kept current after every push" --> CO
   COMMS -- "beta announcement" --> BETA
   DEV -- "SAT plan, wait for OK" --> SD
   CLOUD -.-> GH
@@ -637,20 +637,20 @@ flowchart TB
 
 | Sessie of rol | Wat zij doet | Wat zij niet doet | Bron |
 |---|---|---|---|
-| Coördinerende 2.0.0-sessie (coordinator) | Ontvangt build-aankondigingen, kondigt build- en push-freezes af, beheert het DM-kanaal met Robert, geeft bench-aanvragen door, post het verslag in `#alpha-testing`, houdt het ledger bij, start de beta in het slot; spreekt op Discord als BlueFlame Bot (hoofdstuk 6) | Geen harde stop zonder Roberts ja per actie | `CLAUDE.md:18`, `CLAUDE.md:21`, `CLAUDE.md:60`, `CLAUDE.md:113`, `.claude/rules/discord.md:21-22` |
-| Ontwikkelsessie (developer) | Host-tests rood en groen, `evaluate.py --quick`, eigen bump, commit, esp32-combo-build; vraagt een bench-run aan; pusht en publiceert na het OK | Flasht nooit | `CLAUDE.md:114`, `CLAUDE.md:21` |
+| Coördinerende 2.0.0-sessie (coördinator) | Ontvangt build-aankondigingen, kondigt build- en push-freezes af, beheert het DM-kanaal met Robert, geeft bench-aanvragen door, post het verslag in `#alpha-testing`, houdt het ledger bij, start de beta in het slot; spreekt op Discord als BlueFlame Bot (hoofdstuk 6) | Geen harde stop zonder Roberts ja per actie | `CLAUDE.md:18`, `CLAUDE.md:21`, `CLAUDE.md:60`, `CLAUDE.md:113`, `.claude/rules/discord.md:21-22` |
+| Ontwikkelsessie (developer) | Draait `/implement-next-task` als hoofdsessie met eigen subagents; host-tests rood en groen, `evaluate.py --quick`, eigen bump, commit, esp32-combo-build; vraagt een bench-run aan; pusht en publiceert na het OK | Flasht nooit | `CLAUDE.md:114`, `CLAUDE.md:21` |
 | `otgw-bench-tester` | Beheert alle hardware-units, flasht via OTA of USB, kiest de tests, legt bewijs vast en vinkt de bench-AC's af | Bouwt de taak niet | `CLAUDE.md:21`, `backlog/tasks/task-1826 - Process-one-bench-tester-agent-flashes-and-tests-every-unit-developers-request-it.md:23-25` |
 | Comms-sessie | Enige eigenaar van de notes-draft en de Discord-postdraft, bijgewerkt na elke push; spreekt ook als BlueFlame Bot (hoofdstuk 6) | Niet vermeld; CLAUDE.md definieert de rol niet | `.claude/skills/beta-release-2x/SKILL.md:72-73` |
 | Subagents | Implementeren, draaien gates, reviewen; rapporteren aan de hoofdsessie | Bumpen, committen en pushen nooit | `.claude/skills/implement-next-task/SKILL.md:42-43` |
 | Cloudsessie (Claude Code on the web) | Een SessionStart-hook zet de build-toolchain klaar als `CLAUDE_CODE_REMOTE` waar is | Een rol in de sessietopologie (berichten, bench, ledger) is niet gevonden in de repo | `.claude/hooks/session-start-build-toolchain.sh:2-16`, `.claude/settings.json:27` |
 
-Volgens de gids voor een tweede machine staan de bench-units, hun adressen en seriële poorten in het sessiegeheugen van het hoofdwerkstation, niet in de repo (`docs/guides/second-machine-setup.md:44-46`); losse adressen staan wel in de repo, zoals .61 en .63 in de bench-gids en de beta-skill (`docs/guides/agent-build-and-bench.md:82`, `.claude/skills/beta-release-2x/SKILL.md:80`). Het ledger, de post-registers en de webhook leven buiten git (`docs/guides/second-machine-setup.md:9-18`).
+Er zijn drie bench-units: .63 (Classic met PIC, de soak-unit voor beta's), .61 (OT-Direct) en .39 (OT-Direct, met USB, de vaste unit van `otgw-device-verify`). Volgens de gids voor een tweede machine staat het overzicht van alle units in het sessiegeheugen van de werkplek van de maintainer, niet in de repo (`docs/guides/second-machine-setup.md:44-46`); losse adressen staan wel in agent- en skillbestanden: .61 en .63 in de bench-gids en de beta-skill, .39 in de agentdefinitie (`docs/guides/agent-build-and-bench.md:82`, `.claude/skills/beta-release-2x/SKILL.md:80`, `.claude/agents/otgw-device-verify.md:10-13`; §11.7). Het ledger, de post-registers en de webhook leven buiten git (`docs/guides/second-machine-setup.md:9-18`).
 
 **Worktrees en lanes.** Werk op één lijn gaat direct op `dev`. Een extra worktree is er alleen voor een echt parallelle lane en verdwijnt direct na de merge; per live sessie geldt één worktree (`CLAUDE.md:170`). Die regel komt uit een waargenomen fout van 2026-05-29: twee sessies in één tree gaven indexcorruptie en botsende `.pio`-builds (`docs/guides/worktrees.md:37-45`). Afsluiten gaat volgens "Finish a lane": pushen, `git fetch --prune`, met `git cherry origin/dev <branch>` bewijzen dat het werk geland is, dan branch en worktree weg; andermans branch of vuile tree gaat naar de coordinator (`CLAUDE.md:24`, `docs/guides/worktrees.md:15-25`). Cross-line werk krijgt één masterplan dat Robert goedkeurt, daarna één taak en één agent per lijn (`CLAUDE.md:170`, `docs/guides/worktrees.md:67-86`).
 
 ### 5.2 Hoe sessies met elkaar praten
 
-Er zijn drie dragers: berichten tussen sessies met de coordinator als knooppunt, het lokale ledger, en Discord. De Discord-kant (kanalen, toon, DM-opmaak) staat in hoofdstuk 6; hier alleen wie wat aan wie meldt.
+Er zijn drie dragers: berichten tussen sessies met de coördinator als knooppunt, het lokale ledger, en Discord. Voor berichten tussen sessies noemen twee skills de drager: de peer-berichten van Claude Code, `ListAgents` plus een bericht aan een live sessie (`.claude/skills/release-2x/SKILL.md:70`, `.claude/skills/update-docs-2x/SKILL.md:287`). Voor de build-aankondiging, de bench-aanvraag en het bench-oordeel noemen de regels alleen dat ze gebeuren, niet langs welke drager; "sessiebericht" in de tabel betekent daarom: drager niet vastgelegd, in de praktijk vermoedelijk hetzelfde peer-bericht. De Discord-kant (kanalen, toon, DM-opmaak) staat in hoofdstuk 6; hier alleen wie wat aan wie meldt.
 
 | Van | Naar | Drager | Inhoud | Bron |
 |---|---|---|---|---|
@@ -728,6 +728,44 @@ De reviewlenzen zijn: correctheid end-to-end (`opus`); projectregels en regressi
 
 **De hoofdsessie leest het ruwe bewijs zelf.** De skill zegt het zo: "A weaker model claims PASS more easily. Never accept a subagent's verdict on its own". Vóór het afvinken van een AC leest de hoofdsessie de exitcode, de SUCCESS-regel, de tijdstempels van de artefacten, de testaantallen en de voor- en nawaarden (`.claude/skills/implement-next-task/SKILL.md:39-41`). Elke reviewbevinding toetst zij zelf aan de code voordat die wordt verwerkt of gemotiveerd afgewezen (`.claude/skills/implement-next-task/SKILL.md:218-220`). Bumpen, committen en pushen doet alleen de hoofdsessie, één voor één, omdat `.pio/` en de git-index gedeeld zijn (`.claude/skills/implement-next-task/SKILL.md:42-43`).
 
+#### Alle modellen in de werkplaats
+
+De skill noemt modellen bij hun alias; andere bestanden noemen concrete versies. Het model van de hoofdsessie kiest de maintainer per sessie en staat niet in de repo.
+
+| Model of alias | Waar | Voor welk werk | Wie kiest | Bron |
+|---|---|---|---|---|
+| Model van de hoofdsessie | elke lokale Claude Code-sessie (coördinator, comms, ontwikkelaar, bench-tester) | ontwerp, advisor-calls, eindoordeel, posts | de maintainer met `/model`; welk model: niet in de repo | `.claude/skills/implement-next-task/SKILL.md:29-30` |
+| `sonnet` | implementatie-subagents, reviewlenzen; de agentdefinities `otgw-device-verify` en `adr-generator` | code, tests, docs; review per lens; device-verificatie; ADR schrijven | de skill of de frontmatter | `.claude/skills/implement-next-task/SKILL.md:35`, `:37`; `.claude/agents/otgw-device-verify.md:2-8`; `tools/adr-kit/agents/adr-generator.md:2-5` |
+| `haiku` | runner-subagents | build, evaluator, tests en bench-scripts draaien, uitvoer letterlijk citeren | de skill | `.claude/skills/implement-next-task/SKILL.md:36` |
+| `opus` | één reviewer op correctheid; plan-review zonder advisor-tool; vertaal-, review- en editoragents | de sterkste kritiek | de skill of het workflowscript | `.claude/skills/implement-next-task/SKILL.md:37`, `:157-161`; `.claude/workflows/translate-webui-language.js:24-80` |
+| advisor-tool | plan-zelfreview in stap 3 | kritische toets vóór de implementatie | de skill | `.claude/skills/implement-next-task/SKILL.md:157-161` |
+| Fable 5.2 | read-only auditsubagent van de coördinator (2026-11-12); de hoofdstukschrijvers van dit document | audit van code en specificatie; beschrijven | de sessie die de subagent start | `docs/reviews/2026-11-12_pic68-otdirect-parity-audit/REVIEW.md:3`, `:6`; §15.1 |
+| Claude Opus 4.7 | externe codereview van 2026-04-21, buiten de eigen pijplijn | review van de C-codebase | niet vermeld | `.external-reviews/HANDOFF-claude-review-c-codebase-303Qj.md:3-4` |
+| `claude-sonnet-4-6`, alternatief `claude-haiku-4-5` | LLM-pass van `adr-judge`; staat uit | oordeel van een diff tegen ADR-tekst | `judge.llm_model` in `.adr-kit.json` | `.claude/adr-kit-guide.md:92`, `:99`; `bin/adr-judge:13-14` |
+| GPT-5 (copilot) | Copilot-profiel `gpt-5-beast-mode` | autonoom probleemoplossen | de frontmatter | `.github/agents/gpt-5-beast-mode.agent.md:3` |
+| Claude Sonnet 4 | promptsjabloon in het Copilot-profiel `task-planner` | plannen | het sjabloon | `.github/agents/task-planner.agent.md:266` |
+| niet in de repo | Codex; Claude Code Action (`claude.yml`, `claude-code-review.yml`); de review-agents van `.full-review/` | zie §5.4 en §5.7 | de dienst | `.github/workflows/claude.yml:35-43`; `AGENTS.md:1-3` |
+
+```mermaid
+flowchart LR
+  classDef bot fill:#dbeafe,stroke:#1d4ed8,color:#151a1f
+  classDef agent fill:#d9eff4,stroke:#0e7490,color:#151a1f
+  classDef gate fill:#fdf0d5,stroke:#a15c00,color:#151a1f
+  classDef ext fill:#f4f6f7,stroke:#56616c,color:#151a1f,stroke-dasharray:4 3
+  ORC["Orchestrator<br/>main session, model via /model"]:::bot
+  IMP["Implementer<br/>sonnet"]:::agent
+  RUN["Runner<br/>haiku"]:::agent
+  CRI["Critic<br/>opus plus sonnet lenses"]:::agent
+  PLN["Plan check<br/>advisor or opus"]:::agent
+  AUD["External auditor<br/>Fable 5.2 · Opus 4.7"]:::ext
+  JDG["Gate judge<br/>claude-sonnet-4-6, off"]:::gate
+  OTH["Other products<br/>GPT-5 · Codex · CI Claude, model not set"]:::ext
+  ORC --> IMP & RUN & CRI & PLN
+  ORC -.->|"read-only audit"| AUD
+  JDG -.->|"would judge commits"| ORC
+  OTH -.->|"same repo, own instructions"| ORC
+```
+
 ### 5.4 Eigen agentdefinities en workflows
 
 | Artefact | Soort | Model | Wat het doet | Bron |
@@ -737,11 +775,20 @@ De reviewlenzen zijn: correctheid end-to-end (`opus`); projectregels en regressi
 | `.claude/workflows/archive/implement-next-task-865-drain.js` | Workflow-script, gearchiveerd | niet vermeld | De oude drain-engine voor TASK-865 (Audit, Select, Implement, Review, Land, Announce, ADR Evaluation). De skill zegt: "do not run it" | `.claude/skills/implement-next-task/SKILL.md:15-17`, `.claude/workflows/archive/implement-next-task-865-drain.js:4-12` |
 | `tools/adr-kit/agents/adr-generator.md` | agentdefinitie van de ADR-kit | `sonnet`; tools Read, Write, Edit, Glob, Grep, Bash | Schrijft één volledige ADR in `docs/adr/`; zie hoofdstuk 10 | `CLAUDE.md:174`, `tools/adr-kit/agents/adr-generator.md:2-5` |
 
-De vertaalworkflow laat het patroon van 5.3 in het klein zien: het sterkste model voor het inhoudelijke werk en de twee adversariële reviewers, en een editor die elke bevinding zelf tegen de code toetst (`.claude/workflows/translate-webui-language.js:47-67`).
+**Review- en auditagents.** Naast de cyclus bestaat een aparte laag van reviews en audits, met hun uitkomst als kennisbron in de repo (§9.2).
+
+| Artefact | Wie start het, welk model | Uitkomst | Bron |
+|---|---|---|---|
+| `.full-review/` | Meerfasige review van 2026-04-30 met de agents `comprehensive-review:code-reviewer`, `architect-review` en `security-auditor`; model niet vermeld | 18 fasebestanden en een state-bestand; alle 15 Highs gesloten | `.full-review/state.json:1-16`; `.full-review/01-quality-architecture.md:3-5`; `.full-review/02-security-performance.md:3` |
+| `.external-reviews/` | Review buiten de eigen pijplijn, Claude Opus 4.7, 2026-04-21 | handoff-document met bevindingen | `.external-reviews/HANDOFF-claude-review-c-codebase-303Qj.md:3-4` |
+| `docs/reviews/` | Reviews en audits per onderwerp, onder meer de read-only Fable 5.2-audit van de coördinator (2026-11-12) | 16 reviewmappen plus `archive/`, 82 bestanden | `docs/reviews/2026-11-12_pic68-otdirect-parity-audit/REVIEW.md:3`, `:6`; `find docs/reviews -type f` |
+| `docs/audits/` | Losse audits, mei tot november 2026 | 6 bestanden | `ls docs/audits` |
+
+De vertaalworkflow laat het patroon van §5.3 in het klein zien: het sterkste model voor het inhoudelijke werk en de twee adversariële reviewers, en een editor die elke bevinding zelf tegen de code toetst (`.claude/workflows/translate-webui-language.js:47-67`).
 
 ### 5.5 Skill-inventaris
 
-De repo telt 11 skills in `.claude/skills/`, 2 commands in `.claude/commands/`, 1 agentdefinitie in `.claude/agents/` en 1 actief Workflow-script in `.claude/workflows/` (plus 1 in `archive/`). Zes skills dragen `disable-model-invocation: true`: alleen de gebruiker roept ze aan (`beta-prerelease`, `flash`, `release`, `release-2x`, `update-docs`, `update-docs-2x`). Meetwijze: `ls` van de vier mappen op `dev` @ 105a8fe en `grep -l "disable-model-invocation: true" .claude/skills/*/SKILL.md`.
+De repo telt 11 skills in `.claude/skills/`, 2 commands in `.claude/commands/`, 1 agentdefinitie in `.claude/agents/` en 1 actief Workflow-script in `.claude/workflows/` (plus 1 in `archive/`). Zes skills dragen `disable-model-invocation: true`: alleen de gebruiker roept ze aan (`beta-prerelease`, `flash`, `release`, `release-2x`, `update-docs`, `update-docs-2x`). Meetwijze: `ls` van de vier mappen op `dev` @ `e22c59e` (`git diff --stat e22c59e 105a8fe` over die mappen is leeg) en `grep -l "disable-model-invocation: true" .claude/skills/*/SKILL.md`.
 
 | Skill of command | Trigger | Doel | Kanalen | Toestemmingsniveau | Bron |
 |---|---|---|---|---|---|
@@ -759,6 +806,8 @@ De repo telt 11 skills in `.claude/skills/`, 2 commands in `.claude/commands/`, 
 | `/backlog_discord` | Stap 0 van de cyclus, of los | Onbeantwoorde berichten beantwoorden en backlog-verzoeken uit Discord afhandelen; zie hoofdstuk 6 | `#dev-sat-mqtt` (backlog-commando's) en `#alpha-testing` (gelezen, geen commando's) | Phase 0 draait altijd; Phase 1 stopt bij een watermerk jonger dan 5 minuten | `.claude/commands/backlog_discord.md:1-18`, `:27-41`, `.claude/skills/implement-next-task/SKILL.md:45-48` |
 | `/check_otgw_issues` | Handmatig | Discord, GitHub en Tweakers scannen op meldingen; zie hoofdstuk 6 | Discord, GitHub, Tweakers | Fixes pas na goedkeuring van de ontwikkelaar | `.claude/commands/check_otgw_issues.md:1-3` |
 
+**Plugin-skills buiten de repo.** Twee plugins leveren skills die niet in `.claude/skills/` staan. De ADR-kit levert `/adr-kit:context`, `/adr-kit:adr` en de `adr-generator`-subagent (§10.2). De superpowers-skills zijn niet in de repo geïnstalleerd, maar hun gebruik is aantoonbaar: `CLAUDE.md` vraagt `superpowers:verification-before-completion` vóór elke Done-claim, en `docs/superpowers/` bevat 11 bestanden (5 plannen, 6 specs, mei tot juli 2026) uit de keten brainstorm, spec en plan; elk plan opent met "REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans" voor de uitvoerende subagent (`CLAUDE.md:48`; `.claude/settings.json:121-123`; `find docs/superpowers -type f`; `grep -l "REQUIRED SUB-SKILL" docs/superpowers`).
+
 ### 5.6 De ontwikkelcyclus in het kort
 
 Eén aanroep van `/implement-next-task` werkt het backlog taak voor taak af tot niets meer uitvoerbaar is; de hoofdsessie stuurt elke stap zelf (`.claude/skills/implement-next-task/SKILL.md:8-10`). De poorten, de build-lock en de publicatie staan in hoofdstuk 7; hier alleen de volgorde en wie er aan zet is.
@@ -770,7 +819,7 @@ Eén aanroep van `/implement-next-task` werkt het backlog taak voor taak af tot 
 5. **Stap 5, implementeren.** Rood op de oude code, `sonnet` wijzigt, gates in de hoofdsessie of via `haiku` (`.claude/skills/implement-next-task/SKILL.md:182-203`).
 6. **Stap 6, reviewteam.** Parallel op de uncommitted diff (`.claude/skills/implement-next-task/SKILL.md:205-220`).
 7. **Stap 7, Done met bewijs.** Final summary per AC, bump, één commit; nog niet pushen (`.claude/skills/implement-next-task/SKILL.md:222-238`).
-8. **Stap 9 en 8, build, bench, push, post, verslag.** Daarna terug naar stap 0 (`.claude/skills/implement-next-task/SKILL.md:243-285`).
+8. **Stap 8 en 9, build, bench, push, post, verslag.** De skill nummert het verslag als stap 8, maar laat het pas posten na build, bench en push uit stap 9: "Only after its passing report: push, post the zip and the step 8 report". Daarna terug naar stap 0 (`.claude/skills/implement-next-task/SKILL.md:243-285`, `:259-260`).
 
 ```mermaid
 sequenceDiagram
@@ -857,7 +906,7 @@ flowchart TB
 
 | Agent | Leest | Trigger | Model | Bron |
 |---|---|---|---|---|
-| Codex | `AGENTS.md`: "These instructions adapt the repository's Claude guidance for Codex agents" | Lokale sessie naast Claude-sessies; geen workflow gevonden | niet vermeld in de repo | `AGENTS.md:1-3`, `docs/guides/worktrees.md:39` |
+| Codex | `AGENTS.md`: "These instructions adapt the repository's Claude guidance for Codex agents" | Lokale sessie naast Claude-sessies; geen workflow gevonden. Twee rollen zijn vastgelegd: de "Codex review chat", waarin Robert op 2026-10-28 de SAT-uitvoeringsoverdracht liet maken, en de "Codex graph updater", die alleen de uitvoeringsindex, de graph-audit, het handoff-document en de navigatieverwijzingen bezit en geen bronbestanden van andere workers wijzigt. `CLAUDE.md` verplicht elke agent dat handoff-document te lezen vóór SAT-werk onder TASK-1412 | niet vermeld in de repo | `AGENTS.md:1-3`, `docs/guides/worktrees.md:39`, `docs/sat/sat-low-load-agent-handoff-2026-10-28.md:3`, `:35`; `CLAUDE.md:46` |
 | GitHub Copilot (IDE) | `.github/copilot-instructions.md`; zegt zelf dat delen onder het core-blok voor 1.x geschreven zijn en dat `CLAUDE.md` wint | niet vermeld | niet vermeld | `.github/copilot-instructions.md:1-24` |
 | Copilot coding agent | `.github/instructions/adr.coding-agent.instructions.md`, optioneel een persona uit `.github/agents/` | `workflow_dispatch` van `trigger-copilot-agent.yml` met `title`, `task`, `agent`, `labels`; de workflow maakt een issue met label `copilot` | niet vermeld | `.github/workflows/trigger-copilot-agent.yml:3-52`, `.github/instructions/adr.coding-agent.instructions.md:1-47` |
 | Copilot code review | `.github/instructions/adr.code-review.instructions.md` | PR-review op ADR-compliance | niet vermeld | `.github/instructions/adr.code-review.instructions.md:1-40` |
@@ -865,6 +914,26 @@ flowchart TB
 | Claude Code Review, `claude-code-review.yml` | plugin `code-review@claude-code-plugins` | `pull_request` (opened, synchronize, ready_for_review, reopened); alleen PR's uit dezelfde repo, forks worden overgeslagen | geen model-parameter | `.github/workflows/claude-code-review.yml:3-5`, `.github/workflows/claude-code-review.yml:15-20`, `.github/workflows/claude-code-review.yml:42-47` |
 
 **Copilot-bestanden.** `.github/agents/` bevat 13 profielen; de keuzelijst van `trigger-copilot-agent.yml` biedt er 11 aan. Alleen `gpt-5-beast-mode` declareert in de frontmatter een model, "GPT-5 (copilot)"; `task-planner` noemt "Claude Sonnet 4" alleen in een promptsjabloon (`.github/agents/task-planner.agent.md:264-267`) (`.github/workflows/trigger-copilot-agent.yml:38-50`, `.github/agents/gpt-5-beast-mode.agent.md:1-15`). Daarnaast staan er twee instructiebestanden in `.github/instructions/` en één prompt, `.github/prompts/check-discord-issues.prompt.md`, die vier Discord-kanalen scant (`.github/prompts/check-discord-issues.prompt.md:1-40`). Van de 18 skills in `.github/skills/` is alleen `adr` projectspecifiek (`.github/skills/adr/SKILL.md:1-11`).
+
+**De dertien Copilot-profielen.** Elk profiel is een persona in `.github/agents/`; de keuzelijst van `trigger-copilot-agent.yml` biedt er 11 aan (niet `expert-react-frontend-engineer` en `gpt-5-beast-mode`) (`.github/workflows/trigger-copilot-agent.yml:38-50`).
+
+| Profiel | Doel volgens de frontmatter | Model in frontmatter | Externe tools of MCP | In de keuzelijst |
+|---|---|---|---|---|
+| `adr-generator` | ADR's schrijven, een tweede generator naast die van de ADR-kit | geen | geen | ja |
+| `api-architect` | API-ontwerp met werkende code | geen | geen | ja |
+| `context7` | actuele bibliotheekdocumentatie | geen | `context7/*` (MCP), `web` | ja |
+| `critical-thinking` | aannames uitdagen | geen | `web/fetch`, `githubRepo` | ja |
+| `debug` | een bug vinden en fixen | geen | terminal | ja |
+| `devils-advocate` | ideeën stresstesten | geen | `web` | ja |
+| `expert-cpp-software-engineer` | C++-advies | geen | `microsoft.docs.mcp`, `web/fetch` | ja |
+| `expert-react-frontend-engineer` | React 19.2-frontend; past niet bij dit project | geen | `fetch` | nee |
+| `gpt-5-beast-mode` | autonome agent; botst met de projectregels (F17) | GPT-5 (copilot) | zoeken, notebooks | nee |
+| `implementation-plan` | implementatieplan | geen | `think`, zoeken | ja |
+| `specification` | specificaties | geen | `web/fetch` | ja |
+| `task-planner` | plannen; keten met `task-researcher` | geen (sjabloon noemt Claude Sonnet 4) | `fetch` | ja |
+| `task-researcher` | onderzoek vóór het plan; schrijft naar `.copilot-tracking/research/` (2 bestanden, maart 2026) | geen | `fetch` | ja |
+
+Bron per rij: de frontmatter van `.github/agents/<profiel>.agent.md` (regels 1-12), `ls .copilot-tracking/research`. De Copilot-instructies verwijzen gebruikers bovendien naar de projectwiki (`.github/copilot-instructions.md:625`).
 
 **De drifttest.** `tests/test_agent_core_block.py` bevat zes tests: elk bestand draagt het blok, de blokken zijn identiek, het blok noemt de gedeelde regels, `AGENTS.md` verkiest de backlog-MCP-server niet, de Copilot-instructies beschrijven de 2.x-lijn, en `CLAUDE.md` wijst naar een bestaande Discord-gids (`tests/test_agent_core_block.py:36-69`). De test bestaat omdat de bestanden elkaar vóór TASK-1625 tegenspraken (`tests/test_agent_core_block.py:1-9`). Twee zustertests bewaken andere gedeelde blokken: het SAT-blok tussen `.claude/rules/sat-ground-truth.md` en `AGENTS.md`, en de lijst met binding ADR's tussen `CLAUDE.md` en `AGENTS.md` (`tests/test_sat_ground_truth_block.py:1-40`, `tests/test_adr_governance.py:112-119`). Het blok groeit mee met de directives: de bench-tester-regel van 2026-11-11 en de beta-uitzondering van 2026-11-14 staan erin (`CLAUDE.md:18`, `CLAUDE.md:21`, `docs/process/directive-changelog.md:23`, `docs/process/directive-changelog.md:28`).
 
@@ -888,7 +957,7 @@ flowchart TB
 | S5.14 | Dode verwijzing voor Copilot | Het core-blok verwijst naar "the SAT ground truth block" (`.github/copilot-instructions.md:9`) | Dat blok staat alleen in `.claude/rules/sat-ground-truth.md` en `AGENTS.md` (`tests/test_sat_ground_truth_block.py:3-4`) | `CLAUDE.md` met `.claude/rules/sat-ground-truth.md` |
 | S5.15 | DM-route in de directive-changelog → zie S8.1 | — | — | — |
 
-> **Voor de plaat:** de coördinerende sessie is de ronde brander met de blauwe waakvlam in het midden (kobalt `#1d4ed8` naar cyaan, halo `#dbeafe`), label "BlueFlame Bot"; daaromheen een ring van vijf petrol zeshoeken (`#0e7490` op `#d9eff4`): Sonnet, Haiku en Opus met hun monogram, plus Advisor en Review lenses. Linksonder in de agentzone staan de kaart "Comms session" met kobaltrand en een gestippelde kobaltlijn naar de brander, en drie kleine satellieten "Other agents" (Codex · Copilot · CI Claude). Rechtsonder staat de bench-tester als werkbank met twee printplaatjes en een WiFi-boog; alleen hij is verbonden met de testunits. Lijnen tussen agents zijn petrol en doorgetrokken; oranje lijnen beginnen alleen bij mensen.
+> **Voor de plaat:** de coördinerende sessie is de ronde brander met de blauwe waakvlam in het midden (kobalt `#1d4ed8` naar cyaan, halo `#dbeafe`), label "BlueFlame Bot"; daaromheen een ring van vijf petrol zeshoeken (`#0e7490` op `#d9eff4`): Sonnet, Haiku en Opus met hun monogram, plus Advisor en Review lenses. De ring rond de brander is een vereenvoudiging: de subagents horen bij de ontwikkelsessie die de cyclus draait (§3.3); een volgende render kan ze rond een kaart "Developer sessions" zetten. Linksonder in de agentzone staan de kaart "Comms session" met kobaltrand en een gestippelde kobaltlijn naar de brander, en drie kleine satellieten "Other agents" (Codex · Copilot · CI Claude). Rechtsonder staat de bench-tester als werkbank; hij is als enige agent verbonden met station 8 "Bench via OTA". De testunits zelf staan niet op plaat A. Lijnen tussen agents zijn petrol en doorgetrokken; oranje lijnen beginnen alleen bij mensen.
 
 ---
 
@@ -898,7 +967,9 @@ BlueFlame Bot is geen apart programma met eigen logica. Het is de **Discord-iden
 
 Het ontwerp is daarmee **instructiegedreven**: wie wil weten wat de bot doet, leest de commands en regels; er is geen botcode om te inspecteren. Dat maakt het gedrag reviewbaar en snel aan te passen, maar ook afhankelijk van de discipline van de sessie die de instructies uitvoert. De harde waarborgen zitten in scripts die weigeren (§6.10); de rest is conventie, en daar zitten de meeste spanningen (§6.11).
 
-Taakbestanden worden na hun eerste volledige vermelding afgekort tot `task-NNNN:regel`.
+![Plate B: BlueFlame Bot, watch loops and replies per channel](images/agentic-setup-plate-b.png)
+
+*Plaat B, referentiewireframe in het lichte thema ([SVG](images/agentic-setup-plate-b.svg)): de drie bewakingslussen bovenaan, Discord links, GitHub en Tweakers rechts, de spelregels als schilden rond de vlam, onderaan wat de bot oplevert en het fundament (Java-server, watermerken, `gh`, RSS, webhook, bot-REST). De dunne groene terugpijlen bij #beta-testing en de twee ondersteuningskanalen zijn de antwoorden uit de praktijk (§6.3). Zie [de beeldbrief](agentic-setup-image-brief.md), hoofdstuk 4.*
 
 ### 6.1 Eén persona, vier gezichten, twee stemmen
 
@@ -913,7 +984,7 @@ Op GitHub is de bot dus niet als bot herkenbaar: een commentaar dat om captures 
 
 **Twee stemmen achter de persona.**
 
-- De **coördinerende sessie** beheert de DM-route naar Robert, post de verslagen en houdt het alpha-ledger bij (`CLAUDE.md:18`, `:60`; `.claude/rules/discord.md:21`). Volgens de skill is de hoofdsessie eigenaar van "every Discord post" (`.claude/skills/implement-next-task/SKILL.md:29-30`).
+- De **coördinerende sessie** beheert de DM-route naar Robert, post de verslagen en houdt het alpha-ledger bij (`CLAUDE.md:18`, `:60`; `.claude/rules/discord.md:21`). Daarnaast post elke ontwikkelsessie die de cyclus draait haar eigen taak- en planmelding en haar zip (§3.3, §6.7.1).
 - De **comms-sessie** is een rol die alleen terloops is beschreven: "one owner, the comms session" voor het concept van de releasenotities en de Discord-post (`.claude/skills/beta-release-2x/SKILL.md:72-73`). Taaknotities met de markering "(comms)" laten zien wat zij in de praktijk doet: antwoorden en capture-verzoeken in de supportkanalen (`backlog/tasks/task-1544 - beta.1-follow-up-24-h-soak-and-macOS-capture-run-waived-for-v2.0.0-beta.1.md:45`; `backlog/tasks/task-1786 - Classic-S3-Mini-PIC-no-longer-detected-after-flashing-with-migrate.md:50`), een bevestiging op een PR (`backlog/tasks/task-1949 - Review-PR-702-Use-L-min-for-the-DHW-flow-rate-unit-in-Home-Assistant-discovery.md:39`), de beta-aankondiging toen de MCP in de releasesessie plat lag (`backlog/tasks/task-1745 - Public-beta-v2.0.0-beta.158-08-00-slot-over-beta.145-158.md:34`) en het nalopen van citaten in SAT-vragen als tweede lezer (`docs/sat/open-questions.md:237`, `:269`). CLAUDE.md definieert deze rol niet.
 
 **Drie technische paden.** Naast de MCP-tools en de webhook bestaat een derde pad: de **Discord REST API met het bottoken** uit de gebruikersomgeving. De comms-sessie leest er berichten "first-hand" mee (`docs/sat/sergeant-d-corrections.md:6503`), een ontwikkelsessie controleerde er een DM-antwoord van Robert mee (`backlog/tasks/task-1817 - SAT-self-tune-PWM-hours-count-for-the-warm-up-phase-Q-1796b-Robert-B-waits-for-Sergeant-D.md:46`), en `/beta-release-2x` noemt het als terugval voor posten als de MCP niet draait (`.claude/skills/beta-release-2x/SKILL.md:280-283`). Posten langs dit pad is niet aangetoond: bij TASK-1313 blokkeerde de auto-mode-classifier een POST met bottoken als "Credential Exploration" (`task-1313:32`), en daarom gaat de zip via een webhook.
@@ -925,9 +996,9 @@ flowchart LR
   classDef bot fill:#dbeafe,stroke:#1d4ed8,color:#151a1f
   classDef store fill:#ffffff,stroke:#56616c,color:#151a1f
   classDef stop fill:#fde4e1,stroke:#b42318,color:#151a1f
-  CO["Coordinator session<br/>DM channel, reports, ledger"]:::agent
-  CM["Comms session<br/>drafts, support replies, PR acks"]:::agent
-  DV["Developer session<br/>posts its own bench-tested zip"]:::agent
+  CO["Coordinator session<br/>DM channel, reports, ledger"]:::bot
+  CM["Comms session<br/>drafts, support replies, PR acks"]:::bot
+  DV["Developer main session<br/>task and plan notices, own zip"]:::agent
   P1["Path 1: MCP tools<br/>mcp__discord-mcp__*"]:::store
   P2["Path 2: Discord REST API<br/>bot token from user environment"]:::store
   P3["Path 3: webhook<br/>discord-post-build.sh"]:::store
@@ -971,7 +1042,7 @@ flowchart LR
   DG["Discord<br/>guild and DM"]:::ext
   GH["GitHub<br/>rvdbreemen/OTGW-firmware"]:::ext
   TW["Tweakers<br/>RSS topic 1653967"]:::ext
-  HOST["Always-on Discord host<br/>rejected 2026-11-05"]:::stop
+  HOST["Always-on Discord host<br/>rejected 2026-11-05"]:::risk
   TASK --> SUP -->|"starts or adopts"| MCP
   HOOK -->|"port closed: start task"| TASK
   CC -->|"mcp__discord-mcp__*"| MCP -->|"JDA gateway, bot token"| DG
@@ -994,13 +1065,36 @@ flowchart LR
 | Herstel | Bij "Expected token to be set" of HTTP 401 het Java-proces killen; de supervisor start een nieuwe (ongeveer 15 s back-off plus 18 s opstarten). Een verbonden sessie werkt door; een sessie die startte terwijl de server plat lag, voert één keer `/mcp` uit | `docs/guides/discord-mcp-server.md:66-78` |
 | Gemeten herstel | Gekilde java na 53 s terug, gekilde supervisor na 54 s, hook bracht `:8085` in 38 s omhoog. Wachten op het netwerk bij een echte herstart (AC2) is niet geverifieerd; de taak staat op To Do | `backlog/tasks/task-1793 - Discord-MCP-server-robust-autostart-supervisor-scheduled-task-SessionStart-hook.md:42`, `:28`, `:6` |
 
-**Bewust geen always-on host.** De bot leeft alleen zolang de werkplek van de maintainer aanstaat en er een sessie draait die de commands uitvoert. Robert besloot op 2026-11-05 om nu geen always-on Discord-host (en geen tweede bench of build-runner) in te richten: met 8,7 tags per dag en 80% van de getimede antwoorden van Sergeant D binnen 2,4 uur is geen van beide de bottleneck (`backlog/tasks/task-1636 - Decide-on-scaling-the-build-bench-and-Discord-host.md:41`). Een cron of geplande trigger voor de twee commands is niet gevonden in de repo.
+**Bewust geen always-on host.** De bot leeft alleen zolang de werkplek van de maintainer aanstaat en er een sessie draait die de commands uitvoert. Robert besloot op 2026-11-05 om nu geen always-on Discord-host (en geen tweede bench of build-runner) in te richten: met 8,7 tags per dag en 80% van de getimede antwoorden van Sergeant D binnen 2,4 uur is geen van beide de bottleneck (`backlog/tasks/task-1636 - Decide-on-scaling-the-build-bench-and-Discord-host.md:41`). Een cron of geplande trigger voor de twee commands is niet gevonden in de repo. De bot moet in het Discord Developer Portal bovendien de privileged intents Message Content, Server Members en Presence hebben; de gids zegt dat die instelling sinds het opheffen van het oude brugdocument niet opnieuw is gecontroleerd (`docs/guides/discord-mcp-server.md:80-84`). Ontbreekt een intent, dan leest de bot berichten zonder inhoud zonder dat iets faalt.
+
+**Een etmaal van BlueFlame Bot.** De bewaking volgt het werk, niet de klok. Alleen de infrastructuur en het beta-slot hebben een vaste tijd; de lussen lopen vóór elke taak.
+
+```mermaid
+timeline
+  title A day of BlueFlame Bot
+  section Always, while the workstation is on
+    Every 30 s : supervisor checks port 8085
+    Every minute : scheduled task restarts a missing supervisor
+  section While a cycle runs
+    Before every task : /backlog_discord Phase 0, answers in alpha-testing and dev-sat-mqtt
+                      : step 0b GitHub sweep
+    After every bench OK : zip and report in alpha-testing, about 8.7 tags a day
+    Every hour : check whether Sergeant D is back, rule without a scheduler
+  section Fixed times
+    08:00 and 20:00 : public beta slot, announcement in beta-testing
+  section By hand
+    When Robert asks : /check_otgw_issues over Discord, GitHub and Tweakers
+  section Silent periods
+    No cycle running or workstation off : nothing is read or answered
+```
+
+In de stille periodes blijft alles liggen: een vraag in #alpha-testing wacht tot de volgende `/backlog_discord`-run, een GitHub-issue tot de volgende sweep, en #beta-testing, de supportkanalen en Tweakers tot iemand `/check_otgw_issues` start (`docs/guides/discord-mcp-server.md:13-14`; `.claude/skills/implement-next-task/SKILL.md:45-52`; `.claude/skills/beta-release-2x/SKILL.md:47-50`; `.claude/rules/sat-ground-truth.md:23`; `task-1636:41`).
 
 ### 6.3 Kanalenkaart
 
 | Kanaal | ID | Wat de bot leest | Wat de bot schrijft | Wie triggert | Bron |
 |---|---|---|---|---|---|
-| #alpha-testing | `1514720723980259460` | elke run de nieuwste 40 (Phase 0) | taakaankondiging, planmelding, verslag per taak, alpha-zip (webhook), SAT-vragen, antwoorden aan testers | `/backlog_discord`, `/implement-next-task` stap 1, 4, 8, 9 | `.claude/commands/backlog_discord.md:18`, `:31`; `.claude/skills/implement-next-task/SKILL.md:132-133`, `:165`, `:243-248` |
+| #alpha-testing | `1514720723980259460` | elke run de nieuwste 40 (Phase 0) | taakaankondiging, planmelding, verslag per taak, alpha-zip (webhook), SAT-vragen, antwoorden aan testers | `/backlog_discord`, `/implement-next-task` skillstap 1, 4, 8, 9 | `.claude/commands/backlog_discord.md:18`, `:31`; `.claude/skills/implement-next-task/SKILL.md:132-133`, `:165`, `:243-248` |
 | #dev-sat-mqtt | `1105556725714649128` | nieuwste 25 (Phase 0) plus nieuw sinds het watermerk | antwoorden op backlog-commando's, SAT-vragen en simulatierondes | `/backlog_discord` | `.claude/commands/backlog_discord.md:15`, `:74-108`; `docs/guides/discord-mcp-server.md:43` |
 | DM met Robert | n.v.t. | antwoorden van Robert | één open beslissing per bericht, met opties, gevolgen en advies | elke sessie, via de coördinator | `CLAUDE.md:18`, `:60` |
 | #beta-testing | `914498730001072149` | 25 per run van `/check_otgw_issues` | beta-aankondiging, korte noot bij een stabiele release; in de praktijk ook antwoorden en een ontwerpvoorstel | `/check_otgw_issues`, releaseskills | `.claude/commands/check_otgw_issues.md:10`, `:48`; `.claude/skills/beta-release-2x/SKILL.md:278-283`; `docs/sat/sergeant-d-corrections.md:7358-7370` |
@@ -1019,10 +1113,10 @@ flowchart LR
   classDef agent fill:#d9eff4,stroke:#0e7490,color:#151a1f
   classDef human fill:#fde7d9,stroke:#c2410c,color:#151a1f
   BF(("BlueFlame Bot")):::bot
-  AT["#alpha-testing"]:::agent
-  DS["#dev-sat-mqtt"]:::agent
-  DM["DM with Robert"]:::human
-  GHI["GitHub issues and PRs"]:::agent
+  AT["#alpha-testing"]:::ext
+  DS["#dev-sat-mqtt"]:::ext
+  DM["DM with Robert"]:::ext
+  GHI["GitHub issues and PRs"]:::ext
   BT["#beta-testing"]:::ext
   ES["#english-support"]:::ext
   NL["#nederlandse-ondersteuning"]:::ext
@@ -1045,7 +1139,9 @@ flowchart LR
 
 Voor de vier kanalen onderaan lopen **procedure en praktijk uiteen**. Volgens de commands zijn het luisterposten met een aankondigingsfunctie: `/check_otgw_issues` leest ze en post nergens (`.claude/commands/check_otgw_issues.md:155-212`, `:271-277`), en de gids noemt ze alleen "Read by `/check_otgw_issues`" (`docs/guides/discord-mcp-server.md:44-47`). In de praktijk antwoorden coördinator en comms-sessie er gebruikers (`backlog/tasks/task-1896 - SAT-a-PIC-measured-outside-temperature-DS18B20-on-the-gateway-boiler-without-MsgID-27-never-counts-as-valid-SAT-stays-handed-back-outside_temp_missing.md:57`). Sinds 2026-11-15 is #beta-testing bovendien een verzoek- en ontwerpkanaal: een tester vraagt er een feature, Robert vraagt de bot daar het beste ontwerp uit te zoeken, Sergeant D geeft ontwerpinput en de bot post een voorstel dat Robert met een reply goedkeurt (`backlog/tasks/task-1979 - HA-climate-entity-follows-SAT-when-SAT-is-enabled-target-temperature-and-presets-like-the-web-UI.md:25`; `docs/sat/sergeant-d-corrections.md:7324-7370`). De releasenotities sturen gebruikers ook zelf naar #beta-testing of #alpha-testing met hun capture-zip (`docs/releases/RELEASE_NOTES_2.0.0-beta.323.md:523-526`).
 
-### 6.4 Vier bewakingspaden
+### 6.4 Drie lussen, vier paden
+
+Er zijn drie bewakingslussen (`/backlog_discord`, de GitHub-sweep en `/check_otgw_issues`), maar vier paden: `/backlog_discord` bestaat uit twee fasen met een verschillende vroege stop, Phase 0 die altijd draait en Phase 1-4 die stopt bij een vers watermerk.
 
 | Pad | Wanneer | Vroege stop | Watermerk | Reageert het? | Bron |
 |---|---|---|---|---|---|
@@ -1054,6 +1150,15 @@ Voor de vier kanalen onderaan lopen **procedure en praktijk uiteen**. Volgens de
 | GitHub-sweep (stap 0b, directive 2026-11-05) | vóór elke nieuwe taak | geen | geen bestand: ontdubbeling op de URL in `backlog/` | ja, op het issue of de PR | `.claude/skills/implement-next-task/SKILL.md:52-101` |
 | `/check_otgw_issues` | met de hand; geen skill roept het aan | alle drie watermerken jonger dan 2 uur | `.claude/discord_last_checked.txt`, `github_last_checked.txt`, `tweakers_last_checked.txt` (zonder bestand: 7 dagen terug) | nee, alleen triage en taken | `.claude/commands/check_otgw_issues.md:9`, `:19-38`, `:46` |
 
+**Andere bewakings- en reactiepaden.** Buiten de drie lussen reageren of lezen nog vier paden mee. Geen ervan spreekt als BlueFlame Bot.
+
+| Pad | Trigger | Wie reageert, onder welke naam | Bron |
+|---|---|---|---|
+| `claude-code-review.yml` | elke PR uit dezelfde repo (opened, synchronize, ready_for_review, reopened); forks overgeslagen | Claude Code Action, automatische PR-review onder de GitHub-app | `.github/workflows/claude-code-review.yml:3-5`, `:15-20` |
+| `claude.yml` | `@claude` in een issue, PR-commentaar of review | Claude Code Action, voert de vraag uit | `.github/workflows/claude.yml:3-19` |
+| Copilot-prompt `check-discord-issues` | met de hand in de IDE | GitHub Copilot, scant vier Discord-kanalen; volgt nog het 1.x-patroon (S5.11) | `.github/prompts/check-discord-issues.prompt.md:1-40` |
+| `docs/daily-issue-report.md` | onbekend; de generator staat niet in de repo | een dagrapport over GitHub en Tweakers (24 uur), laatste versie van 2026-07-11; verweesd | `docs/daily-issue-report.md:1-4` |
+
 #### 6.4.1 `/backlog_discord`: eerst niemand onbeantwoord laten
 
 Phase 0 negeert het watermerk bewust, omdat een tijdfilter berichten mist die binnenkwamen terwijl een vorige run bezig was, of die wel gelezen maar niet beantwoord zijn (`.claude/commands/backlog_discord.md:29`).
@@ -1061,7 +1166,7 @@ Phase 0 negeert het watermerk bewust, omdat een tijdfilter berichten mist die bi
 ```mermaid
 sequenceDiagram
   autonumber
-  participant S as Coordinator as BlueFlame Bot
+  participant S as Main session, BlueFlame Bot
   participant P as People file, local
   participant A as #alpha-testing
   participant D as #dev-sat-mqtt
@@ -1090,7 +1195,13 @@ sequenceDiagram
   S->>S: count line: unanswered found N, answered N, held N
 ```
 
-**Wie een antwoord krijgt** (`.claude/commands/backlog_discord.md:32`): Sergeant D, een tester uit de people-file, iemand anders die `@BlueFlame Bot` aanspreekt, of Robert als hij de bot aanspreekt, mits de people-file het niet uitsluit en er nog geen later botbericht is dat die persoon met `<@ID>` noemt en de inhoud behandelt. Een losse wedervraag aan iemand anders telt niet. **Backlog-commando's** komen alleen uit #dev-sat-mqtt (`:18`); de command wijzigt nooit een taak zonder expliciet verzoek en reageert niet op algemene chat (`:161-167`). **Zuinigheidsregels** B1-B5: altijd een statusfilter of `--limit`, nooit het volledige bord, bijlagen alleen bij een bugwoord, antwoorden onder 1500 tekens (`:5-11`).
+De hoofdsessie die stap 0 van de cyclus draait, voert deze command uit; los aanroepen kan ook (`.claude/skills/implement-next-task/SKILL.md:45-48`).
+
+| Onderwerp | Regel | Bron |
+|---|---|---|
+| Wie een antwoord krijgt | Sergeant D, een tester uit het people-bestand, iemand anders die `@BlueFlame Bot` aanspreekt, of Robert als hij de bot aanspreekt; mits het people-bestand het niet uitsluit en er nog geen later botbericht is dat die persoon met `<@ID>` noemt en de inhoud behandelt. Een losse wedervraag aan iemand anders telt niet | `.claude/commands/backlog_discord.md:32` |
+| Backlog-commando's | Alleen uit #dev-sat-mqtt; nooit een taak wijzigen zonder expliciet verzoek; niet reageren op algemene chat | `.claude/commands/backlog_discord.md:18`, `:161-167` |
+| Zuinigheid (B1-B5) | Altijd een statusfilter of `--limit`, nooit het volledige bord, bijlagen alleen bij een bugwoord, antwoorden onder 1500 tekens | `.claude/commands/backlog_discord.md:5-11` |
 
 #### 6.4.2 GitHub-sweep: elke issue en PR wordt een taak
 
@@ -1135,13 +1246,13 @@ flowchart TD
   D["Discord: 4 channels x 25<br/>skip maintainer and bots"]:::agent
   G["GitHub: 50 open issues with body<br/>comments max 5, bugs only"]:::agent
   T["Tweakers: RSS feed<br/>description first, keyword filter, NL to EN"]:::agent
-  W["watermark written right after each read<br/>before triage"]:::stop
+  W["watermark written right after each read<br/>before triage"]:::risk
   A["attachments in two passes<br/>metadata, then WebFetch or Grep, never a full log"]:::agent
   TR["triage to .tmp/triage_result.json<br/>one item per report, sources merged"]:::store
   BL["backlog task list -l bug, match locally<br/>note, or new task Fix: ... with bug,needs-info"]:::agent
   CP1{"checkpoint 1<br/>which issue to pick up?"}:::human
   CP2{"checkpoint 2<br/>plan approved?"}:::human
-  FIX["Phase 4 to 6: branch, bump, build<br/>outdated, see S6.19"]:::stop
+  FIX["Phase 4 to 6: branch, bump, build<br/>outdated, see S6.19"]:::risk
   E -->|"yes"| STOP
   E -->|"no"| D & G & T
   D & G & T --> W --> A --> TR --> BL --> CP1 --> CP2 --> FIX
@@ -1196,10 +1307,14 @@ flowchart LR
   BT["#beta-testing"]:::ext
   SUP["#english-support<br/>#nederlandse-ondersteuning<br/>#devs-esp-firmware"]:::ext
   TW["Tweakers"]:::ext
-  GAP["No loop picks up:<br/>Robert asking the bot in #beta-testing<br/>Sergeant D deciding in #beta-testing<br/>unanswered users in support channels"]:::stop
+  GAP["No loop picks up:<br/>Robert asking the bot in #beta-testing<br/>Sergeant D deciding in #beta-testing<br/>unanswered users in support channels"]:::risk
+  CA["Claude Action<br/>@claude and auto PR review<br/>not BlueFlame"]:::ext
+  CPD["Copilot Discord prompt<br/>manual, four channels"]:::ext
   P0 --> AT & DS
   P1 --> DS
   S0B --> GH
+  CA --> GH
+  CPD -.-> BT & SUP
   CHK -.-> GH & BT & SUP & TW
   BT --- GAP
   SUP --- GAP
@@ -1262,19 +1377,19 @@ flowchart TD
 
 ### 6.7 Uitgaande stromen
 
-#### Taak, plan, verslag en zip in #alpha-testing
+#### 6.7.1 Taak, plan, verslag en zip in #alpha-testing
 
 ```mermaid
 sequenceDiagram
   autonumber
-  participant C as Coordinator as BlueFlame Bot
-  participant Dv as Developer session
+  participant C as Coordinator, BlueFlame Bot
+  participant Dv as Developer main session, BlueFlame Bot
   participant BT as Bench-tester
   participant G as origin/dev
   participant W as discord-post-build.sh
   participant A as #alpha-testing
-  C->>A: step 1: which task, in one or two sentences
-  C->>A: step 4: what changes and how it is proven, a notice, no approval wait
+  Dv->>A: skill step 1: which task, in one or two sentences
+  Dv->>A: skill step 4: what changes and how it is proven, a notice, no approval wait
   Dv->>Dv: red on old code, green on fix, evaluate, bump, commit, build esp32-combo
   Dv->>C: bench request: githash, artifact path, behaviour to check
   C->>BT: bench run
@@ -1286,16 +1401,16 @@ sequenceDiagram
     W->>W: refuses on githash not HEAD, dirty src, tag already published or not newer, zip over 10 MB
     W->>A: zip as BlueFlame Build Bot
     Dv->>C: tag, commit, tasks and evidence
-    C->>A: step 8: plain-language report, old versus new, what is not verified
+    C->>A: skill step 8: plain-language report, old versus new, what is not verified
     C->>C: update ledger, compare with git log
   else FAIL
-    BT-->>Dv: publish nothing, fix and build again
+    C-->>Dv: publish nothing, fix and build again
   end
 ```
 
 Bronnen: `.claude/skills/implement-next-task/SKILL.md:130-133`, `:163-166`, `:243-281`; `.claude/rules/discord.md:18-22`; `scripts/discord-post-build.sh:13-15`, `:48-90`; `CLAUDE.md:21`. Het script draait onder Git Bash; een kale `bash` vanuit PowerShell kan WSL zijn, waar `LOCALAPPDATA` ontbreekt (`.claude/skills/implement-next-task/SKILL.md:274-276`). Is er geen uitvoerbare taak, dan post de cyclus niets (`:134-135`).
 
-#### Release-aankondigingen
+#### 6.7.2 Release-aankondigingen
 
 ```mermaid
 flowchart LR
@@ -1324,13 +1439,13 @@ flowchart LR
 
 Bronnen: `.claude/skills/beta-release-2x/SKILL.md:47-67`, `:257-283`; `.claude/skills/release-2x/SKILL.md:61-63`, `:189-202`. De staande toestemming voor publieke beta's ("Ik wil dat je de release van een beta gewoon uitvoert") geldt alleen voor het slot van 08:00 of 20:00; een stabiele release blijft een harde stop (`CLAUDE.md:18`).
 
-#### Een beslissing aan Robert voorleggen
+#### 6.7.3 Een beslissing aan Robert voorleggen
 
 ```mermaid
 sequenceDiagram
   autonumber
   participant X as Any session or agent
-  participant C as Coordinator as BlueFlame Bot
+  participant C as Coordinator, BlueFlame Bot
   participant R as Robert, DM
   participant T as Task notes
   X->>C: open decision: one question, options, consequences, weighed advice
@@ -1349,7 +1464,7 @@ sequenceDiagram
 
 Bronnen: `CLAUDE.md:18`, `:60`; `backlog/tasks/task-1829 - Agent-rule-questions-to-Robert-only-by-Discord-DM-never-as-an-interactive-CLI-question-asynchronous-in-the-session-when-DM-is-unavailable.md:23`, `:38`; `backlog/tasks/task-1955 - esp32-combo-app-slot-at-93.8-141-KB-headroom-left-in-ota_0-beta.287.md:35`. De regel dateert van 2026-11-12 en vervangt de interactieve vraag van 2026-10-29.
 
-Sinds 2026-11-15 bestaat daarnaast een bredere **delegatie**: "Ask me only if you really can't do it yourself. You have my permission." De coördinator nam daarop zelf een keuze binnen een taak en meldde die per DM met een aanbod om terug te draaien (`backlog/tasks/task-1919 - An-app-image-that-the-bootloader-marked-ABORTED-keeps-running-but-never-confirms-itself-so-the-next-reset-of-any-kind-rolls-back-to-safeboot.md:58`). Die delegatie staat alleen in taaknotities (§6.11).
+Sinds 2026-11-15 bestaat daarnaast een bredere delegatie aan de coördinator (§3.4; uitgewerkt in S4.1).
 
 ### 6.8 De SAT-dialoog met Sergeant D
 
@@ -1407,6 +1522,8 @@ De dialoog loopt in #alpha-testing en #dev-sat-mqtt en sinds 2026-11-15 ook in #
 | Berichten blijven liggen | Phase 0 negeert het watermerk; telregel aan het eind; alleen voor twee kanalen | procedure | `.claude/commands/backlog_discord.md:27-36` |
 | Geheimen lekken | Webhook-URL buiten de repo en nooit geprint; token uit de Windows-gebruikersomgeving; capture-tool redigeert wachtwoorden en tokens | conventie plus script | `scripts/discord-post-build.sh:9-11`; `docs/guides/discord-mcp-server.md:13`, `:19`; `scripts/otgw_capture.py:85-88` |
 
+De weigeringen van het postscript zijn de enige waarborgen in deze tabel met eigen tests: `tests/test_discord_post_build.py` (10 tests, `--dry-run` tegen een tijdelijke repo: githash niet HEAD, vuile `src/`, te grote zip, URL nooit afgedrukt) en `tests/test_discord_post_payload.py` (2 tests, ASCII-veilige payload). Ze draaien alleen lokaal via `python scripts/run_tests.py`; in CI draait van de Python-tests alleen `tests/test_adr_governance.py` (§12).
+
 ### 6.11 Spanningen
 
 Elke rij noemt beide kanten met citaat en wat leidend is. CLAUDE.md wint van elk ander instructiebestand (`CLAUDE.md:15`); de implement-next-task-skill zegt dat zelf ook (`.claude/skills/implement-next-task/SKILL.md:19-20`).
@@ -1444,7 +1561,7 @@ Elke rij noemt beide kanten met citaat en wat leidend is. CLAUDE.md wint van elk
 | S6.29 | Verwijzingen naar het SAT-blok "in CLAUDE.md" → zie S8.12 | — | — | — | — |
 | S6.30 | Changelog mist de Discord-directives → zie S8.1 en S8.2 | — | — | — | — |
 
-> **Voor de plaat:** BlueFlame Bot is de blauwe waakvlam met witte kern in het hart van plaat A en het onderwerp van plaat B (`docs/process/agentic-setup-image-brief.md`, hoofdstuk 4), in het lichte thema. Drie stralen gaan naar drie buitenposten: Discord links met zeven deuren, GitHub rechtsboven onder het maintainer-account en Tweakers rechtsonder, alleen lezen. Nieuw ten opzichte van de brief: teken achter de vlam twee kleine teal sessiefiguren (coördinator en comms), geef de deuren #beta-testing, #english-support en #nederlandse-ondersteuning een dunne tweede pijl voor antwoorden uit de praktijk, en markeer #beta-testing met een rood gestippeld randje als plek zonder bewakingslus. De vijf oker schilden rond de vlam blijven de spelregels; het fundament toont de Java-server, de supervisor en het losse webhookblokje.
+> **Voor de plaat:** BlueFlame Bot is de blauwe waakvlam met witte kern in het hart van plaat A en het onderwerp van plaat B (`docs/process/agentic-setup-image-brief.md`, hoofdstuk 4), in het lichte thema. Drie stralen gaan naar drie buitenposten: Discord links met zeven deuren, GitHub rechtsboven onder het maintainer-account en Tweakers rechtsonder, alleen lezen. Plaat B toont bij #beta-testing, #english-support en #nederlandse-ondersteuning al een dunne groene terugpijl voor de antwoorden uit de praktijk, zoals de beeldbrief nu ook zegt. Twee wensen staan nog niet op de render en blijven open voor een volgende versie: twee kleine petrol sessiefiguren achter de vlam ("coordinator · comms") en een rood gestippeld randje met het label "no watch loop" om #beta-testing. De vijf oker schilden rond de vlam blijven de spelregels; het fundament toont de Java-server, de supervisor en het losse webhookblokje.
 
 ---
 
@@ -1504,9 +1621,25 @@ flowchart TD
 
 Het diagram vereenvoudigt de volgorde. In `/implement-next-task` draaien de reproductie en de gates (inclusief een build) in skillstap 5, dan het reviewerteam van skillstap 6 op de ongecommitte diff, en daarna opnieuw de geraakte gates (`.claude/skills/implement-next-task/SKILL.md:182-220`). De bump en de commit komen pas daarna (`.claude/skills/implement-next-task/SKILL.md:222-238`).
 
-### 7.2 Per stap: gereedschap, poort en weigerconditie
+### 7.2 Per station: gereedschap, poort en weigerconditie
 
-| # | Stap | Gereedschap | Poort en handhaving | Weigert of stopt wanneer | Bron |
+Dit document gebruikt drie nummeringen. De **stations** 1-11 zijn die van het diagram in §7.1 en de tabel hieronder. De **skillstappen** 0-9 zijn die van `/implement-next-task`; daar komt het verslag (skillstap 8) pas na build, bench en push (skillstap 9). **Plaat A** toont negen stations: zij voegt de push, de zip-post en het verslag samen in station 9 "Push dev · post zip".
+
+| Station | Skillstap | Plaat A |
+|---|---|---|
+| 1 Taak | 1 | 1 Backlog task |
+| 2 Plan en zelfreview | 2, 3, 4 | 2 Plan + self-review |
+| 3 Rood-groen | 5 | 3 Code red → green |
+| 4 Reviewerteam | 6 | 4 Review team |
+| 5 Statische gates en tests | 5, opnieuw na 6 | 5 evaluate · tests |
+| 6 Bump en commit | 7 | 6 Bump + commit hooks |
+| 7 Build | 9 | 7 Build esp32-combo · lock |
+| 8 Bench | 9 | 8 Bench via OTA |
+| 9 Push naar `dev` | 9 | 9 Push dev · post zip |
+| 10 Zip-post | 9 | 9 Push dev · post zip |
+| 11 Verslag en ledger | 8 (gepost na 9) | 9 Push dev · post zip |
+
+| Station | Stap | Gereedschap | Poort en handhaving | Weigert of stopt wanneer | Bron |
 |---|---|---|---|---|---|
 | 1 | Taak | `backlog` CLI; eerste actie `backlog task edit <n> -s "In Progress" -a @claude` | Conventie plus hook: `.claude/hooks/backlog-mcp-guard.py` blokkeert Edit/Write op taakbestanden | Geen taak, geen werk; geen uitvoerbare taak: niets posten, rapporteren en stoppen | `CLAUDE.md:19`, `CLAUDE.md:46`, `.claude/skills/implement-next-task/SKILL.md:130-135` |
 | 2 | Plan en zelfreview | `backlog task edit <n> --plan`, `/adr-kit:context`, de advisor (zonder advisor-tool één `opus`-reviewagent) | Conventie. Binnen de cyclus vervangt de zelfreview plus de notitie in #alpha-testing het wachten op Roberts akkoord | SAT-regelgedrag: niet implementeren zonder OK van Sergeant D (SAT-ontwerper). Harde stops blijven staan | `.claude/skills/implement-next-task/SKILL.md:20-25`, `:137-166`, `:168-170` |
@@ -1595,7 +1728,7 @@ Sinds de directive van 2026-11-11 flasht alleen `otgw-bench-tester`, over USB of
 | Weigeringen van het script | Exit 3 als alleen de safeboot-updater antwoordt (er wordt niets geflasht), weigering vooraf bij een ontbrekende of lege image, exit 2 als de settings na afloop verschillen | `scripts/ota_flash.py:37-39`, `scripts/ota_flash.py:126-161`, `scripts/ota_flash.py:342-346`, `scripts/ota_flash.py:364-368` |
 | Controle | Het apparaat meldt de githash van de build; daarna `scripts/bench_check.py` of zelfgekozen tests, met een transcript als bewijs | `docs/guides/agent-build-and-bench.md:9`, `docs/guides/bench-check.md:3-15` |
 | Verboden | Een merged image over WiFi; `--update --fs` over USB; PIC-firmware over WiFi via OTmonitor | `docs/guides/agent-build-and-bench.md:100`, `docs/guides/agent-build-and-bench.md:104`, `CLAUDE.md:115` |
-| Benchunits | `.63` is de Classic-unit met PIC en draagt de beta-soak; `.61` is de OT-Direct-unit. De volledige adressen en seriële poorten staan in het sessiegeheugen van de werkplek, niet in de repo | `.claude/skills/beta-release-2x/SKILL.md:51`, `tools/bench/ot-boiler-sim/README.md:93`, `docs/guides/second-machine-setup.md:42-46` |
+| Benchunits | `.63` is de Classic-unit met PIC en draagt de beta-soak; `.61` is een OT-Direct-unit; `.39` is een OT-Direct-unit met USB, de vaste unit van `otgw-device-verify`. Het overzicht van alle units staat in het sessiegeheugen van de werkplek van de maintainer; losse adressen staan in agent- en skillbestanden (§11.7) | `.claude/skills/beta-release-2x/SKILL.md:51`, `tools/bench/ot-boiler-sim/README.md:93`, `.claude/agents/otgw-device-verify.md:10-13`, `docs/guides/second-machine-setup.md:42-46` |
 
 Een definitiebestand voor `otgw-bench-tester` is niet gevonden in de repo; `.claude/agents/` bevat alleen `otgw-device-verify.md` (zie S7.10).
 
@@ -1666,7 +1799,7 @@ flowchart LR
 
 | Product | Lijn en tag | Skill | Wie start | Poorten | Kanaal | Bron |
 |---|---|---|---|---|---|---|
-| Alpha-zip | `dev`, elke `2.0.0-beta.N`-bump van een firmwaretaak | stap 9 van `/implement-next-task` | De pushende sessie | Bench-OK, weigeringen van het post-script | #alpha-testing (webhook) | `.claude/skills/beta-release-2x/SKILL.md:47-50`, `.claude/rules/discord.md:18-22` |
+| Alpha-zip | `dev`, elke `2.0.0-beta.N`-bump van een firmwaretaak | skillstap 9 van `/implement-next-task` | De pushende sessie | Bench-OK, weigeringen van het post-script | #alpha-testing (webhook) | `.claude/skills/beta-release-2x/SKILL.md:47-50`, `.claude/rules/discord.md:18-22` |
 | Publieke 2.x-beta | `dev`, annotated tag `v2.0.0-beta.N` op de release-commit, GitHub-prerelease met `--latest=false` | `/beta-release-2x` | De coördinator zelf, op staand mandaat (Robert, 2026-11-14) | Hoogstens één per 12 uur in het slot; 1 uur soak op `.63`, geen soak-waiver; draft eerst | GitHub Releases, #beta-testing | `CLAUDE.md:18`, `.claude/skills/beta-release-2x/SKILL.md:47-90`, `.claude/skills/beta-release-2x/SKILL.md:326-330` |
 | Stabiele 2.x | `release/2.x`, tag `v<v>` | `/release-2x` (`disable-model-invocation: true`) | Robert, met een ja per actie via DM | Drie checkpoints; 24 uur soak, captureruns op Windows, Linux en macOS; push- en buildfreeze; bench minimaal 30 minuten | GitHub Releases, #nederlandse-ondersteuning, #english-support, #beta-testing | `.claude/skills/release-2x/SKILL.md:43-70`, `.claude/skills/release-2x/SKILL.md:159`, `.claude/skills/release-2x/SKILL.md:189-202` |
 | 1.x beta en stabiel | `otgw-1.x.x`, stabiel naar `main` | `/beta-prerelease`, `/release` (in de `dev`-tree alleen doorverwijzingen) | Robert | De gezaghebbende skill staat in de `otgw-1.x.x`-worktree; nooit vanuit `dev` | Volgens de 1.x-skill (buiten deze checkout) | `CLAUDE.md:158`, `.claude/skills/release/SKILL.md:20-43`, `.claude/skills/beta-prerelease/SKILL.md:33-36` |
@@ -1806,7 +1939,7 @@ Een cloud-sessie richt bij de start zelf de toolchain in en zet het build-stempe
 
 Naast deze tegenstrijdigheden is het grootste structurele punt dat een flink deel van de keten alleen op conventie rust: combo-only, de buildaankondiging, de 3-uursregel, het slot, "alleen de bench-tester flasht" en de volgorde bench vóór push hebben geen script of hook die weigert (kolom "Poort en handhaving" in §7.2 en §7.10).
 
-> **Voor de plaat:** de pijplijn is op plaat A de rechterflank (zone "Pipeline & gates"): een verticale transportband met negen witte stations met een oker schildje (Task, Plan + review, Red to green, Review team, Gates, Bump + hooks, Build (lock), Bench (OTA), Push + post), zoals de beeldbrief ze benoemt (`docs/process/agentic-setup-image-brief.md:181`, `:222`). De bench-tester staat als werkbank met twee printplaatjes en een WiFi-boog rechtsonder in de agentzone en is met station Bench (OTA) verbonden (`docs/process/agentic-setup-image-brief.md:177`). Onderaan gaan vier tegels naar buiten: 1.x LTS en Stable 2.x met een steenrood hangslot, Beta 2.x met een oker klokje (08:00/20:00) en de groene Alpha zip (`docs/process/agentic-setup-image-brief.md:183`). Plaat C toont dezelfde keten als horizontale banner van links naar rechts met elf stations, inclusief het oranje station voor het OK van de SAT-ontwerper (`docs/process/agentic-setup-image-brief.md:360-376`); alles in het lichte thema, witte kaarten op gebroken wit.
+> **Voor de plaat:** de pijplijn is op plaat A de rechterflank (zone "PIPELINE & GATES"): een verticale transportband met negen witte stations met een oker schildje: "Backlog task", "Plan + self-review", "Code red → green", "Review team", "evaluate · tests", "Bump + commit hooks", "Build esp32-combo · lock", "Bench via OTA" en "Push dev · post zip" (`docs/process/agentic-setup-image-brief.md:181`; de prompt op `:222` gebruikt kortere labels). De bench-tester staat als werkbank met twee printplaatjes en een WiFi-boog rechtsonder in de agentzone en is met station Bench (OTA) verbonden (`docs/process/agentic-setup-image-brief.md:177`). Onderaan gaan vier tegels naar buiten: 1.x LTS en Stable 2.x met een steenrood hangslot, Beta 2.x met een oker klokje (08:00/20:00) en de groene Alpha zip (`docs/process/agentic-setup-image-brief.md:183`). De beeldbrief beschrijft daarnaast een optionele plaat C, nog niet gegenereerd: dezelfde keten als horizontale banner met een eigen stationsvolgorde, waarin het OK van de SAT-ontwerper een genummerd station is en verslag en ledger geen eigen station hebben (`docs/process/agentic-setup-image-brief.md:360-376`). Alles in het lichte thema, witte kaarten op gebroken wit.
 
 ---
 

@@ -339,8 +339,8 @@ details[open] summary{margin-bottom:10px}
   <h2>Six things to know before you read on</h2>
   <p class="lede">You do not need to know this project. These six terms carry the rest of the page; the <a href="#glossary">glossary</a> has the others.</p>
   <div class="grid" style="--min:300px">
-    <div class="card top-plain"><h3>The gateway</h3><p>The <b>NodoShop OpenTherm Gateway</b> (OTGW) is a small device that sits between a room thermostat and a central-heating boiler and listens to, or changes, what they say to each other. This project is its open-source firmware. The 2.x line (branch <code>dev</code>) runs on ESP32-S3 boards; the 1.x line is in maintenance.</p></div>
-    <div class="card top-plain"><h3>SAT</h3><p><b>Smart Autotune Thermostat</b>: a control mode in which the gateway itself steers the boiler. It was designed on paper by one person (Sergeant D) and coded by another (Alex). There is no written design, so what the designer says is recorded before anything is built.</p></div>
+    <div class="card top-plain"><h3>The gateway</h3><p>The <b>NodoShop OpenTherm Gateway</b> (OTGW) is a small device that sits between a room thermostat and a central-heating boiler (or heat pump) and listens to, or changes, what they say to each other. This project is its open-source firmware. The 2.x line (branch <code>dev</code>) runs on ESP32-S3 boards; the 1.x line is in maintenance.</p></div>
+    <div class="card top-plain"><h3>SAT</h3><p><b>Smart Autotune Thermostat</b>: a control mode in which the gateway itself steers the boiler, ported from a Home Assistant integration. It was designed on paper by one person (Sergeant D) and coded by another (Alex). There is no written design, so what the designer says is recorded before anything is built.</p></div>
     <div class="card top-agent"><h3>Agent and session</h3><p>An <b>agent</b> is an AI model that reads files, runs commands and edits code. A <b>session</b> is one running agent with its own working folder. Several sessions run at once, each with a role. A <b>subagent</b> is a helper that a session starts for one narrow job.</p></div>
     <div class="card top-agent"><h3>Skill and command</h3><p>A <b>skill</b> is a written procedure that an agent loads when it is called, for example <code>/implement-next-task</code>. The behaviour of the workshop lives in these text files, not in program code. That makes it easy to review and easy to change.</p></div>
     <div class="card top-gate"><h3>Hook and gate</h3><p>A <b>hook</b> is a small script that runs automatically around an action (an edit, a commit). A <b>gate</b> is any automatic check that can refuse a step. Some rules have a gate; many rest on agreement only. This page shows which is which.</p></div>
@@ -437,18 +437,19 @@ details[open] summary{margin-bottom:10px}
 
 <section class="sec" id="overview">
   <span class="kicker">The whole in one picture</span>
-  <h2>Six zones around one blue flame</h2>
-  <p class="lede">Plate A is the map of the workshop. Read it from the top: people, the channels they use, the agents in the middle, knowledge on the left, the pipeline on the right, and what ships at the bottom.</p>
+  <h2>Seven zones around one blue flame</h2>
+  <p class="lede">Plate A is the map of the workshop. Read it from the top: people, the channels they use, the agents in the middle, knowledge and rules on the left, the pipeline on the right, external knowledge at the bottom left and what ships at the bottom right.</p>
   <figure class="fig plate">
     <a href="images/agentic-setup-plate-a.svg" title="Open plate A at full size"><img src="images/agentic-setup-plate-a.svg" width="1920" height="1080" alt="Plate A: architecture overview of the agentic workshop. Four people cards at the top, six channel tiles below them, BlueFlame Bot in the centre surrounded by model helpers, a knowledge and rules column on the left, a nine-step pipeline with gates on the right, and four shipped products at the bottom."></a>
-    <figcaption>Plate A, architecture overview. Orange lines are human decisions, petrol lines are work between agents, dashed lines are read-only, green lines ship. <a href="images/agentic-setup-plate-a.svg">Open the full-size plate</a>.</figcaption>
+    <figcaption>Plate A, architecture overview. Orange lines are human decisions, petrol lines are work between agents, dashed lines are read-only, green lines ship. The plate draws the model helpers and the arrow to the pipeline at the flame; in the work-cycle skill they belong to the developer session that runs the cycle (see "Who does what"). <a href="images/agentic-setup-plate-a.svg">Open the full-size plate</a>.</figcaption>
   </figure>
   <ol class="zones">
     <li><span><b>People</b>End users, the maintainer, the SAT designer and the alpha testers. Only two of them send orange decision lines.</span></li>
     <li><span><b>Channels</b>The Tweakers forum topic, GitHub, the Discord support channels, the direct message with the maintainer, <code>#dev-sat-mqtt</code> and <code>#alpha-testing</code>.</span></li>
-    <li><span><b>Agent layer</b>A coordinating session and a comms session that appear to the outside as BlueFlame Bot, with model helpers around them, a separate bench tester and other agents.</span></li>
+    <li><span><b>Agent layer</b>A coordinating session and a comms session that appear to the outside as BlueFlame Bot; developer sessions that run the work cycle with their own model helpers; a separate bench tester; and other agents.</span></li>
     <li><span><b>Knowledge and rules</b>Rules, ADRs, the code map, the SAT register and its question queue, the backlog, and two memory tools.</span></li>
     <li><span><b>Pipeline and gates</b>Nine stations from backlog task to pushed code. An ochre shield marks a check on the way.</span></li>
+    <li><span><b>External knowledge</b>The equipment matrix, the pinned SAT reference code, the OpenTherm specification and the toolchains. Read only.</span></li>
     <li><span><b>What ships</b>The alpha zip per tested task, the 2.x beta in its time slot, and the locked stable lines.</span></li>
   </ol>
 </section>
@@ -746,7 +747,7 @@ details[open] summary{margin-bottom:10px}
   <div class="gap"><span class="lab">Where practice and rules differ</span>
     <ul>
       <li><b>A large part of the chain rests on agreement only.</b> "Only the bench tester flashes", "bench before push", the build announcement and the beta slot have no script or hook that refuses.</li>
-      <li><b>The beta of 2026-11-15, 20:00, did not follow the slot rule exactly.</b> The tag was pushed at 18:38; the soak verdict came at 19:38. It was also composed and published by another session (judging by its working folder, the comms session), while the rule names the coordinator.</li>
+      <li><b>The beta of 2026-11-15, 20:00, did not follow the slot rule exactly.</b> Tag and draft release were made at 18:38; the soak verdict came at 19:38 and publication at 20:00. It was also composed and published by another session (judging by its working folder, the comms session), while the rule names the coordinator.</li>
       <li><b>The push rule names a forbidden command as its proof.</b> One line asks for <code>python build.py</code> to return 0; another forbids calling it directly because of a lying exit code. The wrapper rule leads. The release skills and the CI workflow also build outside the wrapper.</li>
       <li><b>What happens when CI turns red on an already pushed commit</b> (who sees it, who reverts) is not written down.</li>
       <li><b>Three names for one tag.</b> The rules say "alpha tag", the script comments describe a third scheme, and the actual tag is <code>beta.N</code>.</li>
@@ -850,7 +851,7 @@ details[open] summary{margin-bottom:10px}
         <rect class="n-human" x="570" y="40" width="170" height="64" rx="8"/><text class="t" x="655" y="64" text-anchor="middle">Human approval</text><text class="s" x="655" y="81" text-anchor="middle">Robert, per ADR, as a</text><text class="s" x="655" y="95" text-anchor="middle">reply to a direct message</text>
         <rect class="n-ship" x="770" y="40" width="140" height="64" rx="8"/><text class="t" x="840" y="64" text-anchor="middle">Accepted</text><text class="s" x="840" y="81" text-anchor="middle">binding, and</text><text class="s" x="840" y="95" text-anchor="middle">immutable from here</text>
         <path class="l-agent" d="M170,72 H196" marker-end="url(#a-agent)"/><path class="l-agent" d="M340,72 H366" marker-end="url(#a-agent)"/><path class="l-agent" d="M540,72 H566" marker-end="url(#a-agent)"/><path class="l-human" d="M740,72 H764" marker-end="url(#a-human)"/>
-        <text class="s" x="655" y="124" text-anchor="middle">a no from Robert: Rejected</text>
+        <path class="l-muted" d="M600,104 V144"/><text class="s" x="600" y="160" text-anchor="middle">a no from Robert: Rejected</text>
         <path class="l-muted dash" d="M455,104 C455,150 270,150 270,108" marker-end="url(#a-muted)"/><text class="s" x="362" y="158" text-anchor="middle">a gate fails: back to the author</text>
         <rect class="n-plain" x="770" y="160" width="140" height="50" rx="8" stroke-dasharray="5 4"/><text class="t" x="840" y="182" text-anchor="middle">Superseded</text><text class="s" x="840" y="198" text-anchor="middle">only by a new ADR</text>
         <path class="l-muted" d="M840,104 V156" marker-end="url(#a-muted)"/>
