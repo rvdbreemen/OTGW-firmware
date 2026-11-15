@@ -245,4 +245,4 @@ One row per Architecture Decision Record. Scope is the Enforcement `path_glob` s
 | ADR-239 | Accepted | - | The first 32 bytes of RTC slow memory (0x50000200-0x5000021F) belong to the safeboot updater: the main firmware holds... |
 | ADR-240 | Accepted | - | A connection on port 80 that is not ESTABLISHED counts towards the ADR-188 cap only while at least one queued segment... |
 | ADR-241 | Proposed | - | In master mode a thermostat WRITEDATA of any ID except 1, 16 and 24 is sent to the boiler as a relay in the next free... |
-| ADR-242 | Proposed | - | Every OT-Direct state change runs on the loop task: addCommandToQueue() and sendPICSerial() hand a command that arriv... |
+| ADR-242 | Accepted | - | Every OT-Direct state change runs on the loop task: addCommandToQueue() and sendPICSerial() hand a command that arriv... |

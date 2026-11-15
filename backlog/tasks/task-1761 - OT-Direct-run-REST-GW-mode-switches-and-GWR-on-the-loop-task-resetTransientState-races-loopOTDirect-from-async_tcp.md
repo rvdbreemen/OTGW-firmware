@@ -7,7 +7,7 @@ status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-09T18:51:00Z'
-updated_date: '2026-11-15T04:32:00Z'
+updated_date: '2026-11-15T07:40:00Z'
 labels:
   - otdirect
   - bug
@@ -51,6 +51,8 @@ Analysis 2026-11-15 (d3, not implemented). Deferring only GW=x / GW=R to the loo
 95 after 92's second-reader review of ADR-242 (2026-11-15): F1 confirmed in code: GW=/GW=R call setOTDirectMode() at once (OTDirect.ino GW= branch), not the TASK-1702 pending mode, and the loop-task paths drained unconditionally, so a queued REST GW=R could run mid-frame when SAT/MQTT/25238 sent while a master request was in flight. Fix: otdCmdTextMustWait() (commands queued and otMasterRequestActive): then the loop-task command queues behind them (answers Queued, the PIC answer; order wins over the synchronous result in that window, written in ADR-242). Test test_queued_commands_never_run_while_a_frame_is_in_flight: green; on b8cbe065d FAIL (CS=21 'results S', GW=R ran mid-frame). F2: the ring holds 7 commands (8 slots, one free); comment, ADR and README say so; the test already expects Dropped at the 8th. F3: addCommandToQueue() and sendPICSerial() now log a dropped OT-Direct command (sendPICSerial has no off-loop caller today). tests/test_otd_loop_task_commands.py 8/8; the 28 tests that read addCommandToQueue/sendPICSerial/otdCmdText/loopOTDirect exit 0; evaluate --quick 86/0; ADR lint pass.
 
 95 final rebase onto dacf35147: test_ino_prototype_hoisting caught otdCmdTextPop(OtdCmdText&) (an .ino struct as a parameter: the Arduino prototype lands above the type = compile error); the pop is folded into otdCmdTextDrain(), handler call outside the lock, no behaviour change (test_otd_loop_task_commands 8/8, 6 FAIL on origin/dev; hoisting 2/2). test/host/test_override_reply.cpp gets an otdCmdTextDrain() stub (its loopOTDirect slice), 4/4.
+
+ADR-242 decision: Robert chose B (Discord DM 1571427835682234442, 2026-11-15, relayed by the coordinator): accept ADR-242 as BINDING with tests/test_otd_loop_task_commands.py as the CI gate. Done in lane-95-next: Open Question ticked with the answer, binding: true, 5 acronyms expanded for the strict clarity lint, then 'adr accept ADR-242 --confirm' (accepted, Status History entry by Robert via that DM); ADR-242 added to the binding list in CLAUDE.md and AGENTS.md. Evidence: tests/test_adr_governance.py 17/17 OK (frontmatter vs lists, both blocks equal); gate tests/test_otd_loop_task_commands.py 8/8 OK on the lane (6 FAIL on origin/dev before TASK-1761, recorded above).
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary

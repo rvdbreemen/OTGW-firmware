@@ -9699,7 +9699,7 @@
       "title": "OT-Direct state has one writer: commands from other tasks run on the loop task through an ordered text ring",
       "path": "ADR-242-ot-direct-state-has-one-writer-commands-from-other-tasks-run-on-the-loop-task-through-an-ordered-text-ring.md",
       "format": "canonical",
-      "status": "Proposed",
+      "status": "Accepted",
       "date": "2026-11-15",
       "decision_summary": "Every OT-Direct state change runs on the loop task: addCommandToQueue() and sendPICSerial() hand a command that arriv...",
       "topics": [
@@ -9749,7 +9749,7 @@
         "path_globs": []
       },
       "metadata": {
-        "binding": false,
+        "binding": true,
         "gate": "tests/test_otd_loop_task_commands.py",
         "documents_shipped": false,
         "verified_in": [],

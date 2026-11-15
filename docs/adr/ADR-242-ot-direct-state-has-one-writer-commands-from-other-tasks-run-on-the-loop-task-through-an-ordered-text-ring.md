@@ -1,15 +1,14 @@
 ---
 id: "ADR-242"
 title: "OT-Direct state has one writer: commands from other tasks run on the loop task through an ordered text ring"
-status: "Proposed"
+status: "Accepted"
 date: "2026-11-15"
-binding: false
+binding: true
 gate: "tests/test_otd_loop_task_commands.py"
 documents_shipped: false
 verified_in: []
 supersedes: []
 superseded_by: null
-format: "canonical"
 topics:
   - "ot-direct"
   - "concurrency"
@@ -31,6 +30,7 @@ symbols:
   - "platformMarkLoopTask"
   - "addCommandToQueue"
 context_scope: "selective"
+format: "canonical"
 ---
 
 <!-- markdownlint-disable MD025 -->
@@ -39,7 +39,8 @@ context_scope: "selective"
 
 ## Status
 
-Proposed, 2026-11-15. Guideline-level per ADR-080 until accepted; the gate is `tests/test_otd_loop_task_commands.py`.
+Accepted, 2026-11-15.
+`tests/test_otd_loop_task_commands.py`.
 
 ## Status History
 
@@ -50,21 +51,26 @@ status_history:
     changed_by: Claude (session 95) for Robert van den Breemen
     reason: Initial proposal
     changed_via: adr-kit
+  - date: 2026-11-15
+    status: Accepted
+    changed_by: Robert van den Breemen (Discord DM 1571427835682234442, option B), recorded by Claude session 95
+    reason: "Robert chose B: accept as binding with tests/test_otd_loop_task_commands.py as the CI gate"
+    changed_via: adr-kit lifecycle
 ```
 
 ## Context
 
-On the OTGW32 (OT-Direct, no PIC) every OpenTherm command is handled by `handleOTDirectCommand()` in
+On the OTGW32 (OT-Direct, no PIC (Programmable Interface Controller) co-processor) every OpenTherm command is handled by `handleOTDirectCommand()` in
 `src/OTGW-firmware/OTDirect.ino`, which writes the OT-Direct state: the schedule table, the write caches and
 overrides, the remote override, `otCurrentMode` and, for `GW=`/`GW=R`, the whole `resetTransientState()`.
 `addCommandToQueue()` (OTGW-Core.ino) called it on the caller's FreeRTOS task. The REST handlers
-(`/api/v2/otgw/commands`, `/api/v2/otdirect/mode`, the override actions, restAPI.ino) and the settings POST
+(`/api/v2/otgw/commands`, `/api/v2/otdirect/mode`, the override actions, restAPI.ino) and the settings POST (HTTP Post method)
 (settingStuff.ino, `HW=`) run on the AsyncTCP task (`async_tcp`), while `loopOTDirect()` runs on the Arduino loop
 task. So a REST `GW=R` reset the state while the loop task was in the middle of a frame, and a `CS=` sent right
 after it in the same burst ran first on `async_tcp` and was then wiped by the reset (found in the TASK-1752
-review, TASK-1761). TASK-1752 made only the frame ring safe (a consumer-side flush). MQTT command callbacks fire
+review, TASK-1761). TASK-1752 made only the frame ring safe (a consumer-side flush). MQTT (Message Queuing Telemetry Transport) command callbacks fire
 from `MQTTclient.loop()` on the loop task (MQTTstuff.ino), and the port 25238 bridge, boot commands, the SC= clock
-and SAT also run there, so REST and settings are the only other-task callers today.
+and SAT (Smart Autotune Thermostat) also run there, so REST and settings are the only other-task callers today.
 
 ## Decision
 
@@ -142,13 +148,14 @@ them with `otdCmdTextDrain()`.
   flight) answers `Queued`. SAT treats every answer but `Dropped` as delivered (SATcontrol.ino `!= Dropped` checks),
   so a later refusal by the handler (its frame ring full, TASK-1593) does not reach SAT for that one value; the
   next change or the 30 s `CS=` repeat (ADR-235) sends it again. This is what SAT always has on the PIC path.
-- 8 × 18 bytes of RAM for the ring (7 commands).
+- 8 × 18 bytes of RAM (Random Access Memory) for the ring (7 commands).
 - `platformOnLoopTask()` counts every task that is not the marked one as "other"; a new caller on a third task is
   handled correctly but has to be named in this ADR.
 
 ## Open Questions
 
-- [ ] Robert: accept the one-writer rule as a binding pattern (gated by `tests/test_otd_loop_task_commands.py`)?
+- [x] Robert: accept the one-writer rule as a binding pattern (gated by `tests/test_otd_loop_task_commands.py`)?
+  Answered B (binding, with that test as the CI gate) by Discord DM 1571427835682234442 on 2026-11-15.
 
 ## Related Decisions
 
