@@ -438,10 +438,15 @@ details[open] summary{margin-bottom:10px}
 <section class="sec" id="overview">
   <span class="kicker">The whole in one picture</span>
   <h2>Seven zones around one blue flame</h2>
+  <p class="lede">The overview plate puts the whole architecture on one page: who decides what, the channels, BlueFlame Bot with its watch loops, the sessions and models, the rule layers and what actually stops a change, the knowledge base, the ADR kit, the pipeline, what ships, the outside sources and the key numbers. Plate A below it is the simpler map.</p>
+  <figure class="fig plate">
+    <a href="images/agentic-setup-overview.png" title="Open the overview plate at full size"><img src="images/agentic-setup-overview.png" width="2560" height="1440" loading="lazy" alt="Overview plate, architecture at a glance. Top: the people with a who-decides-what matrix, and six channels on a bus to the bot. Centre: BlueFlame Bot as a blue pilot flame with three watch loops on the left and its rules of play on the right, and below it the sessions, the subagents per model, other agents and skills. Left: nine rule layers next to what actually stops a change. Right: the knowledge base with sizes and the ADR kit. Bottom: the pipeline from backlog task to alpha zip with what each step refuses, the four release products, outside sources and key numbers."></a>
+    <figcaption>Overview plate, architecture at a glance. Each enforcement row and pipeline step shows whether something really refuses (filled shield) or rests on agreement or review (dashed shield). <a href="images/agentic-setup-overview.png">Open the full-size plate</a>.</figcaption>
+  </figure>
   <p class="lede">Plate A is the map of the workshop. Read it from the top: people, the channels they use, the agents in the middle, knowledge and rules on the left, the pipeline on the right, external knowledge at the bottom left and what ships at the bottom right.</p>
   <figure class="fig plate">
-    <a href="images/agentic-setup-plate-a.svg" title="Open plate A at full size"><img src="images/agentic-setup-plate-a.svg" width="1920" height="1080" alt="Plate A: architecture overview of the agentic workshop. Four people cards at the top, six channel tiles below them, BlueFlame Bot in the centre surrounded by model helpers, a knowledge and rules column on the left, a nine-step pipeline with gates on the right, and four shipped products at the bottom."></a>
-    <figcaption>Plate A, architecture overview. Orange lines are human decisions, petrol lines are work between agents, dashed lines are read-only, green lines ship. The plate draws the model helpers and the arrow to the pipeline at the flame; in the work-cycle skill they belong to the developer session that runs the cycle (see "Who does what"). <a href="images/agentic-setup-plate-a.svg">Open the full-size plate</a>.</figcaption>
+    <a href="images/agentic-setup-plate-a.png" title="Open plate A at full size"><img src="images/agentic-setup-plate-a.png" width="1920" height="1080" alt="Plate A: architecture overview of the agentic workshop. Four people cards at the top, six channel tiles below them, BlueFlame Bot in the centre surrounded by model helpers, a knowledge and rules column on the left, a nine-step pipeline with gates on the right, and four shipped products at the bottom."></a>
+    <figcaption>Plate A, architecture overview. Orange lines are human decisions, petrol lines are work between agents, dashed lines are read-only, green lines ship. The plate draws the model helpers and the arrow to the pipeline at the flame; in the work-cycle skill they belong to the developer session that runs the cycle (see "Who does what"). <a href="images/agentic-setup-plate-a.png">Open the full-size plate</a>.</figcaption>
   </figure>
   <ol class="zones">
     <li><span><b>People</b>End users, the maintainer, the SAT designer and the alpha testers. Only two of them send orange decision lines.</span></li>
@@ -574,8 +579,8 @@ details[open] summary{margin-bottom:10px}
   <p class="col">Two sessions speak through the persona: the <b>coordinator</b> (decisions to the maintainer, reports, the ledger) and the <b>comms session</b> (drafts of release notes and posts, answers in support channels). The design is instruction-driven: to know what the bot does, read the commands and rules. That makes it easy to review and quick to change, and it also makes it depend on the discipline of the session that follows them.</p>
 
   <figure class="fig plate">
-    <a href="images/agentic-setup-plate-b.svg" title="Open plate B at full size"><img src="images/agentic-setup-plate-b.svg" width="1920" height="1080" alt="Plate B: BlueFlame Bot in the centre. Three watch loops at the top. Discord on the left with seven channels, GitHub at the top right with issues, pull requests and releases, the Tweakers forum topic at the bottom right, read only. Five ground rules around the flame. Below, the six things the bot produces, and the technical foundation."></a>
-    <figcaption>Plate B, monitoring and replies per channel. Solid frames are channels where the bot reads and replies; dashed frames are listening posts. <a href="images/agentic-setup-plate-b.svg">Open the full-size plate</a>.</figcaption>
+    <a href="images/agentic-setup-plate-b.png" title="Open plate B at full size"><img src="images/agentic-setup-plate-b.png" width="1920" height="1080" alt="Plate B: BlueFlame Bot in the centre. Three watch loops at the top. Discord on the left with seven channels, GitHub at the top right with issues, pull requests and releases, the Tweakers forum topic at the bottom right, read only. Five ground rules around the flame. Below, the six things the bot produces, and the technical foundation."></a>
+    <figcaption>Plate B, monitoring and replies per channel. Solid frames are channels where the bot reads and replies; dashed frames are listening posts. <a href="images/agentic-setup-plate-b.png">Open the full-size plate</a>.</figcaption>
   </figure>
 
   <div class="sub">
@@ -955,7 +960,7 @@ details[open] summary{margin-bottom:10px}
 </section>
 
 <footer>
-  <p><b>Source.</b> Every fact on this page comes from <a href="agentic-setup.md">agentic-setup.md</a> (Dutch), which cites a file and line for each statement. This page simplifies; it adds nothing. The plates are generated files: <a href="images/agentic-setup-plate-a.svg">plate A</a>, <a href="images/agentic-setup-plate-b.svg">plate B</a>.</p>
+  <p><b>Source.</b> Every fact on this page comes from <a href="agentic-setup.md">agentic-setup.md</a> (Dutch), which cites a file and line for each statement. This page simplifies; it adds nothing. The plates are generated files: <a href="images/agentic-setup-overview.png">the overview plate</a>, <a href="images/agentic-setup-plate-a.png">plate A</a>, <a href="images/agentic-setup-plate-b.png">plate B</a> (vector versions and their generator live in the repository).</p>
   <p><b>Limits.</b> The document was written from the repository in a cloud session that could not read Discord. What happens in the channels is derived from commands, rules, the register and task notes. Local files such as the people list, the ledger and the webhook address were not available. Counts are file-level counts on 2026-11-15.</p>
   <p class="meta">OTGW-firmware · process documentation · TASK-1984 · light theme by the maintainer's choice</p>
 </footer>
