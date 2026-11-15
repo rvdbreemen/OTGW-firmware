@@ -4,7 +4,7 @@ title: 'esp32-combo app slot at 93.8 %: 141 KB headroom left in ota_0 (beta.287)
 status: To Do
 assignee: []
 created_date: '2026-11-15T03:20:00Z'
-updated_date: '2026-11-15T13:49:00Z'
+updated_date: '2026-11-15T14:02:00Z'
 labels:
   - build
   - flash-size
@@ -33,4 +33,6 @@ Coordinator decision (2026-11-15): do options 1 (built-in replay fixture stored 
 ADR number: the amendment is ADR-247, not ADR-245 (245 is reserved for 92's 7-day graph ADR, 246 for ba's TASK-1931; renumbered before the push at the coordinator's request).
 
 ADR-247 Accepted: Robert chose A (Discord DM 1571521326060146782, answer to question 1571520520153735261, relayed by the coordinator). Implementation of options 1+2 follows after the TASK-1966 rebuild (number 323).
+
+Analysis (session 95, 2026-11-15, beta.320+5b9efcc, re-added after a rebase): image 2 157 711 B of 2 293 760 B (94.1 %, headroom 133 KB). Compiler already -Os (platform _bare.py) + -flto + function/data sections + --gc-sections. Sections: .flash.text 1 465 652, .flash.rodata 559 556, .iram0.text 100 047, .dram0.data 32 020. By origin (nm -S -l): WiFi/BT binary blobs ~470 KB (net80211 161, btdm 85, pp 61, phy 35), lwip 106, newlib 72, mbedtls 62 (WPA), wpa_supplicant 56, NimBLE 50, our app 233 KB (SATcontrol 43, restAPI 31, OTGW-firmware 30, OTGW-Core 26). rodata strings ~318 KB: our debug formats ~50 KB, IDF ESP_LOG ~40 KB (precompiled). Largest blobs, all in flash: SETTINGS_HELP_JSON 17.8 KB, UpdateServerIndex 16.1 KB (gzip already), OTGW_SIM_FIXTURE 11.6 KB, mqttHaSensors 11.3 KB. Growth beta.250 -> beta.320: +8.5 KB over 70 tags (~120 B per tag).
 <!-- SECTION:NOTES:END -->
