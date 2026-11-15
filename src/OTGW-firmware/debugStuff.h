@@ -67,8 +67,16 @@ struct DebugSection {          // state.debug — Runtime diagnostic output flag
 
 /*---- start macros -------------------------------------------------------*/
 
+#if HAS_CLOUD_REC
+// TASK-1963 PoC: the same output, through the cloud recorder's tee (CloudRec.h), which writes every byte on to
+// debugTelnet and keeps a copy of the line. Each argument is still evaluated once.
+#include "CloudRec.h"
+#define Debug(...)      ({ cloudRecTee.print(__VA_ARGS__);    })
+#define Debugln(...)    ({ cloudRecTee.println(__VA_ARGS__);  })
+#else
 #define Debug(...)      ({ debugTelnet.print(__VA_ARGS__);    })
 #define Debugln(...)    ({ debugTelnet.println(__VA_ARGS__);  })
+#endif
 #define Debugf(...)     ({ _debugPrintf_P(__VA_ARGS__);       })
 
 #define DebugFlush()    ({ debugTelnet.flush(); })

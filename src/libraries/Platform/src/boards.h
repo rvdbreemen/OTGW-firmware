@@ -325,6 +325,14 @@ typedef uint16_t SAT_RING_IDX_T;
 #define HAS_STATUS_PIXEL 0
 #endif
 
+// HAS_CLOUD_REC: TASK-1963 proof of concept only (branch research/cloud-recording): the cloud recorder with
+// an outbound TLS upload. Set by the esp32-combo-tlsdyn env (-DOTGW_CLOUD_REC_POC=1); 0 in every other build.
+#if defined(OTGW_CLOUD_REC_POC) && OTGW_CLOUD_REC_POC
+#define HAS_CLOUD_REC 1
+#else
+#define HAS_CLOUD_REC 0
+#endif
+
 /***************************************************************************
 *
 * This program is free software: you can redistribute it and/or modify

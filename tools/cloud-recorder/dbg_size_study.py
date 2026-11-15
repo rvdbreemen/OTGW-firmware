@@ -32,7 +32,8 @@ def call_sites():
     for path in sorted(glob.glob(os.path.join(SRC, "*.ino")) + glob.glob(os.path.join(SRC, "*.h"))):
         if os.path.basename(path) == "handleDebug.ino":
             continue
-        text = open(path, errors="replace").read()
+        with open(path, errors="replace") as fh:
+            text = fh.read()
         for m in CALL.finditer(text):
             macro, fmt = m.group(1), bytes(m.group(2), "utf-8").decode("unicode_escape", errors="replace")
             line = text.count("\n", 0, m.start()) + 1

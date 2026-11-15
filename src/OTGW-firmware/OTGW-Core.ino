@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v2.0.0-beta.295
+**  Version  : v2.0.0-poc.1
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -5963,6 +5963,9 @@ void processOT(const char *buf, int len, bool suppressOutput, bool localAnswer, 
     if (siscanf(bufval, "%8x", &value) != 1) return;    // extract the value, abort on parse failure
     OTdata.value = value;                             // store the value
     if (diagRec.active) diagRec.recOtFrame(buf[0], value);   // TASK-1665: every decoded frame, arrival order (ADR-213)
+#if HAS_CLOUD_REC
+    cloudRecOtFrame(buf[0], value);   // TASK-1963 PoC: the same frames for the cloud recorder
+#endif
     OTdata.type = (value >> 28) & 0x7;               // byte 1 = take 3 bits that define msg msgType
     OTdata.masterslave = (OTdata.type >> 2) & 0x1;    // MSB from type --> 0 = master and 1 = slave
     OTdata.id = (value >> 16) & 0xFF;                 // byte 2 = message id 8 bits 

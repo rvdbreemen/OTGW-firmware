@@ -132,6 +132,14 @@ TARGETS["esp32-combo"] = {
     # app slot holds both engines.
 }
 
+# esp32-combo-tlsdyn (TASK-1963 PoC, branch research/cloud-recording only): the esp32-combo image with the IDF
+# libraries rebuilt for dynamic mbedTLS buffers and the cloud recorder compiled in. Never published.
+TARGETS["esp32-combo-tlsdyn"] = {
+    **TARGETS["esp32-combo"],
+    "name": "ESP32-S3 Combo TLS-dyn PoC",
+    "slug": "esp32-combo-tlsdyn",
+}
+
 def asset_slug(target):
     """Filename token for a target: OTGW-firmware-<slug>-<semver>-*. Defaults to
     the target key; the esp32 (OTGW32) target overrides it with esp32-otgw32 so
@@ -2429,6 +2437,7 @@ PIO_ENV_MAP = {
     "esp32": "esp32",
     "esp32-classic": "esp32-classic",
     "esp32-combo": "esp32-combo",
+    "esp32-combo-tlsdyn": "esp32-combo-tlsdyn",
 }
 
 
@@ -3023,7 +3032,7 @@ Examples:
     )
     parser.add_argument(
         "--target",
-        choices=["esp32", "esp32-classic", "esp32-combo", "all"],
+        choices=["esp32", "esp32-classic", "esp32-combo", "esp32-combo-tlsdyn", "all"],
         default="esp32-combo",
         help="Target platform: esp32, esp32-classic, esp32-combo, or all (default = esp32-combo)"
     )

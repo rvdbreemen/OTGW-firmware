@@ -125,3 +125,26 @@ debug section makes the debug comparison fail.
 
 Not covered: a real device. The encoders here stand in for the firmware's; the formats are what a device-side
 encoder has to write (TASK-1473, on hold). The argument values are generated, so the sizes are estimates.
+
+## Firmware proof of concept (TASK-1963, branch only, `2.0.0-poc.N`)
+
+The gateway records and uploads by itself over HTTPS, also on a board without PSRAM. Built in the env
+`esp32-combo-tlsdyn` (`./build.sh --target esp32-combo-tlsdyn`), never in a normal build.
+
+- **TLS without PSRAM:** the IDF libraries are rebuilt (pioarduino `custom_sdkconfig`) with
+  `CONFIG_MBEDTLS_DYNAMIC_BUFFER` and its free options, and DTLS off (Kconfig drops the dynamic buffers while
+  DTLS is on). Records are allocated when needed and freed after the handshake.
+- **Firmware:** `CloudRecCodec.h` (the encoders, shared with `tests/test_cloudrec_codec.py`), `CloudRecDevice.h`
+  (capture, record queue, upload task), `CloudRec.h` / `CloudRec.ino`. Capture: a tee behind `Debug()` /
+  `Debugln()`, hooks in `_debugBOL` / `_debugPrintf_P`, and `processOT()` next to the ADR-213 recorder.
+  OT section v2 (fixed tables, `otrec.unpack_ot2`), mix record every 60 s or when a section is full.
+- **Upload:** own task, HTTPS POST to the collection point, certificate check against GTS Root R1/R4 and
+  ISRG Root X1/X2, PocketBase password login, `?fields=id`. Off unless `/cloudrec.cfg` on LittleFS has
+  `enabled=1` plus `host`, `port`, `email`, `password`.
+- **Sizes against a normal esp32-combo build:** static RAM +22.0 KB (152,524 vs 130,524 B); app 98.9 % of the
+  2240K slot (26 KB left; this env cannot use LTO).
+- **Build caveats found:** PlatformIO 6.2.0 fails the hybrid compile (SCons 4.11; 6.1.18 works); `-flto` must
+  not reach the IDF sources; ESP Insights must be removed; and the hybrid compile writes its libraries into the
+  shared `framework-arduinoespressif32-libs` package, so later builds on the same machine use them until that
+  package is reinstalled.
+- **Not tested yet:** everything on a device (TLS heap peak, low-water, soak). That is the bench run of TASK-1963.

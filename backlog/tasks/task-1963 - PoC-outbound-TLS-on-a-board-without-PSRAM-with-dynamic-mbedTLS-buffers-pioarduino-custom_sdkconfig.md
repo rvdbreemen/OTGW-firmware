@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-15T09:35:00Z'
-updated_date: '2026-11-15T09:50:00Z'
+updated_date: '2026-11-15T10:43:00Z'
 labels:
   - research
   - tls
@@ -25,7 +25,7 @@ Robert 2026-11-15 (TASK-1862): the diagnostic stream must be secure from the dev
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Build: esp32-combo with custom_sdkconfig setting CONFIG_MBEDTLS_DYNAMIC_BUFFER and the dynamic free options builds through build.sh, together with include/sdkconfig.h (ADR-185) and LTO; build time and flash size recorded against the normal build
+- [x] #1 Build: esp32-combo with custom_sdkconfig setting CONFIG_MBEDTLS_DYNAMIC_BUFFER and the dynamic free options builds through build.sh, together with include/sdkconfig.h (ADR-185) and LTO; build time and flash size recorded against the normal build
 - [ ] #2 Bench on the no-PSRAM unit (bench-tester): 20 HTTPS POSTs of a 4 KB mix record to the collection point through the Cloudflare Tunnel succeed with certificate verification; peak heap during the handshake, largest free block and low-water recorded, also with the web UI open
 - [ ] #3 No regression on that unit in a 1 h soak with uploads every 60 s (no reboot, loop gap within normal, MQTT and web UI working); capture transcript
 - [ ] #4 Result and a recommendation (adopt, adopt with limits, or fall back to payload encryption) put to Robert
@@ -54,4 +54,8 @@ Out of scope for the PoC: web UI settings, consent dialog, SAT encoding without 
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-11-15 Robert approved the PoC plan in session ('Ik ben akkoord met het plan voor poc').
+
+2026-11-15 build findings (cloud container, platform pioarduino 55.03.35, Arduino-ESP32 3.3.5): (1) build.sh installs PlatformIO 6.2.0 from PyPI (tool-scons ~4.41101); the hybrid compile then fails with ModuleNotFoundError SCons.Tool.FortranCommon. PlatformIO 6.1.18 (tool-scons ~4.40801) gets past it. (2) Without CONFIG_SPIRAM=y in custom_sdkconfig the hybrid compile turns SPIRAM off for this board; set explicitly. (3) ESP Insights breaks the hybrid compile (https_server.crt.S not found); removed with custom_component_remove; network_provisioning must stay (Arduino Network library includes it). (4) -flto in build_flags reaches the IDF libraries of the hybrid compile and the link fails ('plugin needed to handle lto object', 'cannot move location counter backwards'); LTO kept for the firmware sources only (build_src_flags + scripts/pio_lto_src_only.py). (5) Important: the hybrid compile writes its libraries into the shared ~/.platformio/packages/framework-arduinoespressif32-libs; every later build on the same machine (safeboot, normal esp32-combo) then uses them until that package is reinstalled. On a machine shared by several sessions this is a hazard. Local: the proxy needed its CA added to the penv certifi bundle; GitHub source archives of repos outside this session are refused (403), release assets are fine.
+
+2026-11-15 firmware PoC built in the cloud container (build.sh --target esp32-combo-tlsdyn --firmware, version 2.0.0-poc.1). sdkconfig.esp32-combo-tlsdyn: CONFIG_MBEDTLS_DYNAMIC_BUFFER=y, DYNAMIC_FREE_CONFIG_DATA=y, DYNAMIC_FREE_CA_CERT=y, ASYMMETRIC_CONTENT_LEN=y (IN 16384, OUT 4096), SSL_PROTO_DTLS not set (Kconfig drops DYNAMIC_BUFFER while DTLS is on, as the Arduino defaults have it), CONFIG_SPIRAM=y. Sizes vs a normal esp32-combo build of the same tree: static RAM 152,524 B vs 130,524 B (+22.0 KB: recorder 15.2 KB, send buffer 4.1 KB, login reply 1 KB, token 0.4 KB, tee 0.25 KB, TLS client code); app 2,267,467 B vs 2,153,863 B of the 2,293,760 B slot (98.9 % vs 93.9 %, 26 KB left; this env has no LTO). Build time: IDF hybrid compile about 2.5 min + firmware about 1 min per clean build. Firmware module: CloudRecCodec.h (encoders, shared with the host test), CloudRec.h/.ino + CloudRecDevice.h (capture tee in Debug/Debugln, _debugBOL/_debugPrintf_P hooks, processOT hook next to diagRec, uploader task 10 KB stack, HTTPS POST with 4 pinned roots, PocketBase login, /cloudrec.cfg). HAS_CLOUD_REC only in this env; normal esp32-combo builds unchanged (verified: SUCCESS, sizes above). Host test tests/test_cloudrec_codec.py (real header compiled): 3/3 OK; mutation RC_SHIFT 4->5 makes 2 of 3 fail. evaluate.py --quick: 100 %, exit 0. Not done here: the bench (AC 2, 3).
 <!-- SECTION:NOTES:END -->

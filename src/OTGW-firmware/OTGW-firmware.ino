@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.ino
-**  Version  : v2.0.0-beta.295
+**  Version  : v2.0.0-poc.1
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -610,6 +610,9 @@ void setup() {
   // test endpoint only detect+enqueue. Created once (ADR-044); blocks on an
   // empty queue until an edge fires, so order vs settings load is immaterial.
   startWebhookTask();
+#if HAS_CLOUD_REC
+  cloudRecSetup();          // TASK-1963 PoC: off unless /cloudrec.cfg enables it
+#endif
  // initSensors();        // init DS18B20 (after MQ is up! )
   applyLegacyPinDefaults();   // TASK-1698: 1.x S0/output defaults are board pins on a Classic S3
   initOutputs();

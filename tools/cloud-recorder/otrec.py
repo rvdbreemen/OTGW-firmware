@@ -112,9 +112,9 @@ def unpack_mix(t0, payload):
         n, used = _unleb(payload[i + 1:])
         data = payload[i + 1 + used:i + 1 + used + n]
         i += 1 + used + n
-        if typ == SEC_OT:
+        if typ in (SEC_OT, SEC_OT_V2):
             off, used2 = _unleb(data)
-            out[typ] = unpack_ot(t0 + off, data[used2:])
+            out[SEC_OT] = (unpack_ot if typ == SEC_OT else unpack_ot2)(t0 + off, data[used2:])
         else:
             out[typ] = data
     return out
@@ -236,17 +236,30 @@ def sat_encode(t0, ticks):
 
 
 def _fixed(text, p, conv):
-    """Fixed-point int of a printed number, or None when it would not print back to the same text."""
-    try:
-        if conv == "f":
-            n = round(float(text) * 10 ** p)
-            back = "%.*f" % (p, n / 10 ** p)
-        else:
-            n = int(text)
-            back = str(n)
-    except ValueError:
+    """Fixed-point int of a printed number, or None when the text is not in canonical form.
+    Exact and string based (no floats), so a C encoder makes the same decision: optional '-', digits
+    without a leading zero, and for f exactly p decimals; '-0', '-0.00', nan and inf go as text."""
+    neg = text.startswith("-")
+    body = text[1:] if neg else text
+    if conv == "f" and p > 0:
+        whole, dot, frac = body.partition(".")
+        if not dot or len(frac) != p or not frac.isdigit():
+            return None
+    else:
+        whole, frac = body, ""
+    if not whole.isdigit() or (len(whole) > 1 and whole[0] == "0"):
         return None
-    return n if back == text else None
+    n = int(whole + frac)
+    if neg and n == 0:
+        return None
+    return -n if neg else n
+
+
+def _fixed_text(n, p, conv):
+    if conv != "f" or p == 0:
+        return str(n)
+    sign, a = ("-", -n) if n < 0 else ("", n)
+    return f"{sign}{a // 10 ** p}.{a % 10 ** p:0{p}d}"
 
 
 def sat_decode(t0, data):
@@ -273,7 +286,7 @@ def sat_decode(t0, data):
                 else:
                     ref = _fixed(old[k], p, conv) if old is not None else 0
                     n = (ref or 0) + _unzz(code >> 1)
-                    vals.append("%.*f" % (p, n / 10 ** p) if conv == "f" else str(n))
+                    vals.append(_fixed_text(n, p, conv))
             elif conv == "c":
                 vals.append(data[i:i + 1].decode("latin-1")); i += 1
             else:
@@ -297,10 +310,12 @@ def sat_decode(t0, data):
 #                  f float32 LE, c 1 byte, s length byte (up to 127) + bytes
 #   0x02 println:  LEB128 us, string offset, function offset, LEB128 line (prints the string and \r\n)
 #   0x03 raw:      LEB128 length + bytes, printed as they are (no line prefix)
+#   0x04 line raw: LEB128 us, function offset, LEB128 line, LEB128 length + bytes: the line prefix, then the
+#                  bytes as they are (a body that cannot be sent as a format address, e.g. a runtime string)
 # Rendering (as _debugBOL + _debugPrintf_P do): "%02d:%02d:%02d.%06d (%7u|%6u) %-12.12s(%4d): " + body.
 
 DROM_BASE = 0x3C000000
-DBG_HEAP, DBG_PRINTF, DBG_PRINTLN, DBG_RAW = 0, 1, 2, 3
+DBG_HEAP, DBG_PRINTF, DBG_PRINTLN, DBG_RAW, DBG_LINE_RAW = 0, 1, 2, 3, 4
 
 
 def _u24(n):
@@ -318,6 +333,10 @@ def dbg_encode(t0_ms, items):
             out += bytes([DBG_HEAP]) + _leb(it[1]) + _leb(it[2])
         elif kind == "raw":
             out += bytes([DBG_RAW]) + _leb(len(it[1])) + it[1]
+        elif kind == "line_raw":
+            _, t_us, fn_addr, line, raw = it
+            out += bytes([DBG_LINE_RAW]) + _leb(t_us - prev_us) + _u24(fn_addr - DROM_BASE) + _leb(line) + _leb(len(raw)) + raw
+            prev_us = t_us
         else:
             t_us, fmt_addr, fn_addr, line = it[1:5]
             out += bytes([DBG_PRINTF if kind == "printf" else DBG_PRINTLN]) + _leb(t_us - prev_us)
@@ -363,6 +382,16 @@ def dbg_decode(t0_ms, data, image, tz):
             continue
         dt, u = _unleb(data[i:]); i += u
         t_us += dt
+        if kind == DBG_LINE_RAW:
+            fn = image.read_cstr(DROM_BASE + int.from_bytes(data[i:i + 3], "little"))
+            i += 3
+            line, u = _unleb(data[i:]); i += u
+            n, u = _unleb(data[i:]); i += u
+            ts = datetime.datetime.fromtimestamp(t_us // 1000000, tz)
+            out += ("%02d:%02d:%02d.%06d (%7u|%6u) %-12.12s(%4d): " % (
+                ts.hour, ts.minute, ts.second, t_us % 1000000, heap[0], heap[1], fn, line)).encode() + data[i:i + n]
+            i += n
+            continue
         fmt = image.read_cstr(DROM_BASE + int.from_bytes(data[i:i + 3], "little"))
         fn = image.read_cstr(DROM_BASE + int.from_bytes(data[i + 3:i + 6], "little"))
         i += 6
@@ -390,3 +419,180 @@ def dbg_decode(t0_ms, data, image, tz):
                 args.append(data[i:i + n].decode(errors="replace")); i += n
         out += (prefix + py_printf(fmt, args)).encode()
     return bytes(out)
+
+
+# ---------------------------------------------------------------- OT model v2 (section type 5): fixed table sizes
+#
+# The same prediction scheme as v1 (scripts/ot_stream_codec_study.py), with every table a fixed size so a
+# device can hold it in a static block (about 9.4 KB) and the C encoder in src/OTGW-firmware/CloudRecCodec.h
+# matches it bit for bit:
+#   let[5][8]     source letter, 3-bit tree, context: previous letter
+#   raw[1]        frame stored raw (bad parity or spare bits set)
+#   idhit[5]      DataID equals the prediction
+#   id[256]       DataID, 8-bit tree, shared by all letters
+#   thit[5][128]  message type equals the prediction, per letter and DataID & 0x7F
+#   type[5][8]    message type, 3-bit tree
+#   vsame[5][128] value equals the reference, per letter and DataID & 0x7F
+#   dtlen[5][5][64]  bit length of the zigzag time residual, per (previous letter, letter)
+#   vlen[5][64]   bit length of the value delta, per letter
+#   The bits under the top bit of a number are sent direct (no model).
+# State: last value and type per letter and DataID & 0x7F, the DataID that followed each request DataID,
+# the last time gap per letter pair, and the pending request(s) a reply answers.
+
+SEC_OT_V2 = 5
+
+
+class ModelV2:
+    def __init__(self):
+        P = P_INIT_V2
+        self.let = [[P] * 8 for _ in range(5)]
+        self.raw = [P]
+        self.idhit = [P] * 5
+        self.id = [P] * 256
+        self.thit = [[P] * 128 for _ in range(5)]
+        self.type = [[P] * 8 for _ in range(5)]
+        self.vsame = [[P] * 128 for _ in range(5)]
+        self.dtlen = [[[P] * 64 for _ in range(5)] for _ in range(5)]
+        self.vlen = [[P] * 64 for _ in range(5)]
+        self.prev_letter = 0
+        self.last_t = None
+        self.last_dt = [[0] * 5 for _ in range(5)]
+        self.next_id = [0] * 256
+        self.last_tid = 0
+        self.pend_t = None          # (id, type, value) of the last T
+        self.pend_r = None          # of the last R after that T
+        self.last_val = [[0] * 128 for _ in range(5)]
+        self.last_type = [[0] * 128 for _ in range(5)]
+
+
+P_INIT_V2 = 1 << 11
+
+
+def _tree_enc2(e, probs, v, nbits):
+    m = 1
+    for k in range(nbits - 1, -1, -1):
+        b = (v >> k) & 1
+        e.bit(probs, m, b)
+        m = (m << 1) | b
+
+
+def _tree_dec2(d, probs, nbits):
+    m = 1
+    for _ in range(nbits):
+        m = (m << 1) | d.bit(probs, m)
+    return m - (1 << nbits)
+
+
+def _num_enc2(e, lenprobs, u):
+    n = u.bit_length()
+    _tree_enc2(e, lenprobs, n, 6)
+    if n > 1:
+        e.direct(u - (1 << (n - 1)), n - 1)
+
+
+def _num_dec2(d, lenprobs):
+    n = _tree_dec2(d, lenprobs, 6)
+    if n <= 1:
+        return n
+    return (1 << (n - 1)) + d.direct(n - 1)
+
+
+LETTERS2 = "TBRAE"
+
+
+def _predict2(m, li):
+    L = LETTERS2[li]
+    if L == "T":
+        return m.next_id[m.last_tid], None, None
+    if L == "R":
+        return (m.pend_t[0] if m.pend_t else 0), None, None
+    src = m.pend_r if (L == "B" and m.pend_r) else m.pend_t
+    rid, rt, rv = src if src else (0, 0, 0)
+    ptype = {0: 4, 1: 5}.get(rt, 7)
+    return rid, ptype, (rv if rt == 1 else None)
+
+
+def _update2(m, li, did, mt, val, pl, dt):
+    m.last_dt[pl][li] = dt
+    L = LETTERS2[li]
+    if L == "T":
+        m.next_id[m.last_tid] = did
+        m.last_tid = did
+        m.pend_t, m.pend_r = (did, mt, val), None
+    elif L == "R":
+        m.pend_r = (did, mt, val)
+    m.last_val[li][did & 0x7F] = val
+    m.last_type[li][did & 0x7F] = mt
+    m.prev_letter = li
+
+
+def ot2_encode_frame(e, m, t, L, f):
+    li = LETTERS2.index(L)
+    pl = m.prev_letter
+    _tree_enc2(e, m.let[pl], li, 3)
+    dt = 0 if m.last_t is None else t - m.last_t
+    m.last_t = t
+    _num_enc2(e, m.dtlen[pl][li], _zz(dt - m.last_dt[pl][li]))
+    ok = codec.parity_ok(f) and ((f >> 24) & 0xF) == 0
+    e.bit(m.raw, 0, 0 if ok else 1)
+    mt, did, val = (f >> 28) & 7, (f >> 16) & 0xFF, f & 0xFFFF
+    if not ok:
+        e.direct(f, 32)
+        _update2(m, li, did, mt, val, pl, dt)
+        return
+    pid, ptype, pval = _predict2(m, li)
+    e.bit(m.idhit, li, 0 if did == pid else 1)
+    if did != pid:
+        _tree_enc2(e, m.id, did, 8)
+    k = did & 0x7F
+    if ptype is None:
+        ptype = m.last_type[li][k]
+    e.bit(m.thit[li], k, 0 if mt == ptype else 1)
+    if mt != ptype:
+        _tree_enc2(e, m.type[li], mt, 3)
+    ref = pval if pval is not None else m.last_val[li][k]
+    e.bit(m.vsame[li], k, 0 if val == ref else 1)
+    if val != ref:
+        delta = ((val - ref + 0x8000) & 0xFFFF) - 0x8000
+        _num_enc2(e, m.vlen[li], _zz(delta) - 1)
+    _update2(m, li, did, mt, val, pl, dt)
+
+
+def ot2_decode_frame(d, m):
+    pl = m.prev_letter
+    li = _tree_dec2(d, m.let[pl], 3)
+    dt = _unzz(_num_dec2(d, m.dtlen[pl][li])) + m.last_dt[pl][li]
+    t = dt if m.last_t is None else m.last_t + dt
+    m.last_t = t
+    if d.bit(m.raw, 0):
+        f = d.direct(32)
+        _update2(m, li, (f >> 16) & 0xFF, (f >> 28) & 7, f & 0xFFFF, pl, dt)
+        return t, LETTERS2[li], f
+    pid, ptype, pval = _predict2(m, li)
+    did = pid if d.bit(m.idhit, li) == 0 else _tree_dec2(d, m.id, 8)
+    k = did & 0x7F
+    if ptype is None:
+        ptype = m.last_type[li][k]
+    mt = ptype if d.bit(m.thit[li], k) == 0 else _tree_dec2(d, m.type[li], 3)
+    ref = pval if pval is not None else m.last_val[li][k]
+    if d.bit(m.vsame[li], k) == 0:
+        val = ref
+    else:
+        val = (ref + _unzz(_num_dec2(d, m.vlen[li]) + 1)) & 0xFFFF
+    _update2(m, li, did, mt, val, pl, dt)
+    return t, LETTERS2[li], codec.with_parity((mt << 28) | (did << 16) | val)
+
+
+def pack_ot2(frames):
+    """OT section v2 data: LEB128 frame count + coded bytes; times relative to the first frame."""
+    t0 = frames[0][0]
+    e, m = codec.Enc(), ModelV2()
+    for t, L, f in frames:
+        ot2_encode_frame(e, m, t - t0, L, f)
+    return t0, _leb(len(frames)) + e.finish()
+
+
+def unpack_ot2(t0, data):
+    n, used = _unleb(data)
+    d, m = codec.Dec(data[used:]), ModelV2()
+    return [(t0 + t, L, f) for t, L, f in (ot2_decode_frame(d, m) for _ in range(n))]
