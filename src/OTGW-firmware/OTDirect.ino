@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTDirect.ino
-**  Version  : v2.0.0-beta.295
+**  Version  : v2.0.0-beta.296
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -3349,6 +3349,22 @@ static const char* otdPicFloatF88(const char* s, uint8_t kind, uint16_t &out, bo
   return nullptr;
 }
 
+// TASK-1957: the commands that parse an empty value like the PIC: GetPercent/GetPosFloat/GetFloat refuse it with SE
+// (CS=, C2=, BS=, CC=, RT=, TT=, TC=, SB=, SW=, SH=; tests/command-4.stc 'CS=' -> SE), and OT=, MM=, CL= clear on
+// it (ClrOutsideT :4263, ClrMaxModLevel :4806, ClrCoolLevel :4463: "XX: -").
+static inline bool otdPicBareValueCmd(char c0, char c1) {
+  switch (c0) {
+    case 'C': return c1 == 'S' || c1 == '2' || c1 == 'C' || c1 == 'L';
+    case 'B': return c1 == 'S';
+    case 'R': return c1 == 'T';
+    case 'T': return c1 == 'T' || c1 == 'C';
+    case 'S': return c1 == 'B' || c1 == 'W' || c1 == 'H';
+    case 'O': return c1 == 'T';
+    case 'M': return c1 == 'M';
+    default:  return false;
+  }
+}
+
 static inline const char* otdPicPercentF88(const char* s, uint16_t &out) {
   return otdPicFloatF88(s, OTD_PIC_PERCENT, out);
 }
@@ -3508,13 +3524,16 @@ static void otdRestorePersistedCommands() {
 bool handleOTDirectCommand(const char* buf, int len, bool satOwn) {
   otdWriteRefused = false;
   if (diagRec.active) diagRec.recOtdCommand(buf, (size_t)len);   // TASK-1665 (ADR-213)
-  if (len < 4) return false;  // minimum "XX=Y"
+  if (len < 3) return false;  // minimum "XX="
 
   OTDDebugTf(PSTR("OTD: cmd \"%s\" (len=%d)\r\n"), buf, len);
 
   char cmd0 = buf[0];
   char cmd1 = buf[1];
   if (buf[2] != '=') return false;
+  // TASK-1957: a bare "XX=" reaches the commands whose PIC parser answers it (SE, or the clear of OT=, MM=, CL=);
+  // any other bare command stays unanswered, as before.
+  if (len == 3 && !otdPicBareValueCmd(cmd0, cmd1)) return false;
   const char* value = buf + 3;
   char rspBuf[16];  // scratch for formatting response values
 
