@@ -243,7 +243,7 @@ DELEGATED = {
                 ("test_pic_pm_chain", "PmChain", ["test_not_armed_on_ot_direct"]),
                 ("test_sat_no_return_startup", "OtDirectPm", ["test_pm25_goes_out_within_a_communication_interval_when_the_slow_poll_tier_is_idle",
                 "test_pm25_latency_in_the_slow_poll_burst_is_bounded_but_not_one_interval", "test_without_pm25_the_msgid25_read_is_only_every_10_s_on_ot_direct",
-                "test_pm_for_an_unscheduled_id_is_a_one_shot_read", "test_pm_out_of_range_is_refused_with_bv"])],
+                "test_pm_for_an_unscheduled_id_is_a_one_shot_read", "test_pm_takes_0_to_255_like_the_pic"])],
     # LL-019 (TASK-1412.9): the whole phase-anchor and start-count suites run, not a subset: every test of test_sat_pwm_anchors (anchors,
     # ignition wait, relight, DHW interruptions, per-source start counting, millis rollover) and test_sat_pwm_start_limit (limit windows,
     # PWM entry, range 5, flame lag, ring rollover), plus the P / 2P mapper, minimum ON / OFF and range-5 cells of test_sat_hp_pwm.
@@ -532,7 +532,7 @@ class LowLoadContract(unittest.TestCase):
         try:
             if not cls.exe:
                 raise InfrastructureError("no host C++ compiler")
-            lat = cls("test_pm_out_of_range_is_refused_with_bv").pm25_latencies(True)
+            lat = cls("test_pm_takes_0_to_255_like_the_pic").pm25_latencies(True)
         finally:
             cls.tearDownClass()
         self.assertLessEqual(max(lat), 1150, lat)

@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-12T00:01:00Z'
-updated_date: '2026-11-15T06:33:00Z'
+updated_date: '2026-11-15T08:35:00Z'
 labels:
   - otdirect
   - parity
@@ -45,4 +45,6 @@ Part of the PIC 6.8 parity audit, parent TASK-1851.
 Bench 09 on .61 (OT-Direct, no boiler, no thermostat), beta.298+bb38dc5 (bench-only build of lane-95-next on c2cd68b16, 2026-11-15 07:25, exit 0, RAM 130572 B, Flash 2156679 B): PM=131 -> 'PM: 131' with one READ 131, PM=256 -> OR, PM=10x -> SE: PASS. NOT benched (field / host only): the indexed follow-up reads of PM=10 / PM=93 need a boiler with TSPs or strings; tests/test_otd_pm_chain_tsp.py reproduces tsp-1.stc and str-1.stc.
 
 AC review (coordinator rule 2026-11-15): AC2 'PM=93 reads all characters' asks for live behaviour; it is proven by the host test only (str-1.stc reproduced), so it stays open as a field AC until a boiler with strings is benched.
+
+Seam fix (found by the lane sweep 2026-11-15): tests/test_sat_lowload_contract.py LL-018h and LL-018j still named test_sat_no_return_startup's old test_pm_out_of_range_is_refused_with_bv, which this task renamed to test_pm_takes_0_to_255_like_the_pic (PM=256 is OR now, not BV). The full contract run showed 'ERROR: test_ll018h ... no such test method'. Both references renamed; the LL-018h delegation (3 modules) and ll018j run green afterwards.
 <!-- SECTION:NOTES:END -->
