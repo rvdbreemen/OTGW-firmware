@@ -53,6 +53,7 @@ error, never a reproduction.
 """
 import argparse
 import re
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -458,18 +459,46 @@ def mutate(out_dir, fname, subs):
     path.write_text(text, encoding="utf-8")
 
 
+_VC_ENV = None
+
+
+def vc_env():
+    """The environment vcvars sets up, captured once (TASK-1956: calling vcvars took about 8 of the 10.6 s of
+    each of the ~34 builds, the bulk of this file's run time under run_tests.py -j 4)."""
+    global _VC_ENV
+    if _VC_ENV is None:
+        GEN.mkdir(parents=True, exist_ok=True)
+        bat = GEN / "_dhw_vcenv.bat"
+        bat.write_text(f"@echo off\r\ncall \"{find_vcvars()}\" >nul 2>nul\r\nset\r\n", encoding="ascii")
+        r = subprocess.run(["cmd.exe", "/c", str(bat)], capture_output=True, text=True, errors="replace")
+        env = {}
+        for line in r.stdout.splitlines():
+            k, sep, v = line.partition("=")
+            if sep and k:
+                env[k] = v
+        if "INCLUDE" not in env or "LIB" not in env:
+            print(r.stdout[-2000:], r.stderr[-1000:])
+            print("vcvars did not set up the compiler environment")
+            sys.exit(2)
+        path = next((v for k, v in env.items() if k.upper() == "PATH"), "")
+        cl = shutil.which("cl", path=path)   # CreateProcess searches the parent's PATH, not env's
+        if not cl:
+            print("cl.exe not found on the vcvars PATH")
+            sys.exit(2)
+        _VC_ENV = (env, cl)
+    return _VC_ENV
+
+
 def build_and_run(label, out_dir, cpp):
     exe = out_dir / (Path(cpp).stem + ".exe")
     if exe.exists():
         exe.unlink()
-    bat = out_dir / "_compile.bat"
     fwd = str(out_dir).replace("\\", "/")
-    bat.write_text("@echo off\r\n"
-                   f"call \"{find_vcvars()}\" >nul 2>nul\r\n"
-                   f"cl /nologo /EHsc /W3 /std:c++17 /utf-8 /D_CRT_SECURE_NO_WARNINGS "
-                   f"/Fo:\"{fwd}/\" /Fe:\"{exe}\" \"{HERE / cpp}\" /I\"{out_dir}\" /I\"{HERE}\"\r\n",
-                   encoding="ascii")
-    c = subprocess.run(["cmd.exe", "/c", str(bat)], capture_output=True, text=True, errors="replace")
+    # Same compiler and flags as before, without paying for vcvars on every build.
+    env, cl = vc_env()
+    c = subprocess.run([cl, "/nologo", "/EHsc", "/W3", "/std:c++17", "/utf-8", "/D_CRT_SECURE_NO_WARNINGS",
+                        f"/Fo:{fwd}/", f"/Fe:{exe}", str(HERE / cpp), f"/I{out_dir}", f"/I{HERE}"],
+                       capture_output=True, text=True, errors="replace", env=env, cwd=str(out_dir))
     if c.returncode != 0 or not exe.exists():
         print(c.stdout[-4000:], c.stderr[-2000:])
         print(f"COMPILATION FAILED ({label})")
