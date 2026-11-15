@@ -3,11 +3,11 @@ id: TASK-1707
 title: >-
   OT-Direct gateway mode: own reads and commands only in alternative slots, as
   on the PIC (follow-up of TASK-1701)
-status: In Review
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-07T17:50:00Z'
-updated_date: '2026-11-09T06:16:00Z'
+updated_date: '2026-11-15T08:39:00Z'
 labels:
   - otdirect
 dependencies: []
@@ -62,4 +62,12 @@ Pushed origin/dev 8cbdebc3f (TASK-1707 = 2ca74eae5, beta.132). Build of the same
 Old (OTDirect.ino at 2ca74eae5^): bframes 1159 for 369 thermostat frames, maxper 21 (up to 21 own frames between two thermostat frames), own reads of ~80 IDs, altslots 0. RED.
 Fix (origin/dev ba8747234): bframes 369 = tframes, minper = maxper = 1, replies 369, altslots 9, badslotreply 0. Boiler per ID: the thermostat's IDs relayed 1:1 (0:137 1:23 15:1 16:12 17:68 25:116); MsgID 24 reaches the boiler 3 times (3 Unknown-DataID strikes), the other 9 MsgID 24 requests become slots carrying the gateway's own reads (18,19,26,28,29,30,31,32,35) and the thermostat gets Unknown-DataID: the PIC model (gateway.asm UnknownMask/SendAltRequest). GREEN.
 Caveat: the capture's own firmware predates TASK-1701 (its 634 own frames include 299 own MsgID 0), so the old-code replay (which has 1701) is not a 1:1 reproduction of the field log (790 own frames in the replay vs 335 non-MsgID-0 own frames in the field; the fake boiler answers at once). The check is the fix's frame ratio on the real recorded thermostat timing, not a re-creation of the field bus. AC4 (bench with a thermostat) unchanged.
+
+2026-11-15: closed on Robert's A (DM 1571431149795024929, triage question 1/5 = DM 1571283730117562467).
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Closed on Robert's decision A to triage question 1/5 (bot DM 1571283730117562467: close the tasks whose bench/host ACs are green and only a field AC is left, naming it; reopen on a field report). His answer: '1. A' in DM 1571431149795024929 (2026-11-15), reply to the list 1571430657609957510. Open field AC #4: bench with a thermostat on an OT-Direct unit and the MQTT values that depend on gateway reads; no thermostat on the bench.
+<!-- SECTION:FINAL_SUMMARY:END -->

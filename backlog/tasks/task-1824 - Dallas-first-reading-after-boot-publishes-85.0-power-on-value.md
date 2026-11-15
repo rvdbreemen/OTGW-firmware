@@ -1,11 +1,11 @@
 ---
 id: TASK-1824
 title: 'Dallas: first reading after boot publishes 85.0 power-on value'
-status: In Review
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-11T21:39:00Z'
-updated_date: '2026-11-13T21:29:00Z'
+updated_date: '2026-11-15T08:40:00Z'
 labels:
   - sensors
   - bug
@@ -44,4 +44,12 @@ Read the scratchpad only after a conversion was started on an earlier poll (stat
 2026-11-13 rebased onto 746ccd426, sharing one build with the TASK-1885 titles follow-up (2ec6d946d, beta.228). After the rebase: test_dallas_first_reading 4/4, test_ino_prototype_hoisting, test_board_pin_reserved, test_fs_update_keep, test_setting_gpio_range, test_static_integrity green; test/host 26/27 green; the one red, test/host/test_ot_support_migration.py (CASE M5/M6), is also red on clean origin/dev 746ccd426 (checked in a detached worktree), a known pre-existing red fixed by d3 in 9cdae6938 (test only, waiting in the push queue), not from this lane. evaluate.py --quick 85 PASS 0 FAIL.
 
 2026-11-13 build beta.229+eea80bd (with beta.228) green; bench by otgw-bench-tester 09 on .63: health OK (settings unchanged, bootcount +2, crashlog empty, MQTT up). TASK-1824 NOT bench-testable: .63 has no DS18B20, so the fix rests on the host test (red on the old code, 4/4 on the fix) plus field validation; In Review, not Done. Pushed 746ccd426..eea80bd3d (ff), zip posted to #alpha-testing message 1570913314350047273. FYI 95: its local TASK-1912 reworks ensureSensorDefaultLabels() in sensors_ext.ino and resolves the overlap with this change on its rebase.
+
+2026-11-15: closed on Robert's A (DM 1571431149795024929, triage question 1/5 = DM 1571283730117562467).
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Closed on Robert's decision A to triage question 1/5 (bot DM 1571283730117562467: close the tasks whose bench/host ACs are green and only a field AC is left, naming it; reopen on a field report). His answer: '1. A' in DM 1571431149795024929 (2026-11-15), reply to the list 1571430657609957510. No open AC was left; closed in the same batch.
+<!-- SECTION:FINAL_SUMMARY:END -->

@@ -3,11 +3,11 @@ id: TASK-1885
 title: >-
   SAT REST: add actual flow temperature, flame state and sensor ages to
   /api/v2/sat/status, and plot real flow in the SAT chart
-status: In Review
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-13T06:23:00Z'
-updated_date: '2026-11-14T21:36:00Z'
+updated_date: '2026-11-15T08:41:00Z'
 labels:
   - webui
   - sat
@@ -57,4 +57,12 @@ Evidence so far (2026-11-13, uncommitted in wt-ba-1885): python tests/test_sat_s
 2026-11-13 titles follow-up 2ec6d946d (beta.228) built with beta.229+eea80bd; bench by 09 on .63: Modulation and Flame panel titles correct in EN and NL on the real page (screenshot 09 scratchpad b229/after-229-en-chart.png). Pushed 746ccd426..eea80bd3d, posted message 1570913314350047273. Status stays In Review for real-boiler validation (AC3).
 
 AC 3: field AC (Robert C, 2026-11-14, DM 1571276554430976183 via the coordinator, no OT bus on the bench): the bench comparison of flow_temp/flame_on with the OT data is verified from a tester capture, not on the bench. Status stays In Review until a tester capture covers it.
+
+2026-11-15: closed on Robert's A (DM 1571431149795024929, triage question 1/5 = DM 1571283730117562467).
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Closed on Robert's decision A to triage question 1/5 (bot DM 1571283730117562467: close the tasks whose bench/host ACs are green and only a field AC is left, naming it; reopen on a field report). His answer: '1. A' in DM 1571431149795024929 (2026-11-15), reply to the list 1571430657609957510. Open field AC #3, bench part: flow_temp/flame_on against a real flame on a PIC and an OT-Direct unit; the esp32-combo build (build 4 of 33e3a0728 SUCCESS) and evaluate no new FAIL are in the notes.
+<!-- SECTION:FINAL_SUMMARY:END -->

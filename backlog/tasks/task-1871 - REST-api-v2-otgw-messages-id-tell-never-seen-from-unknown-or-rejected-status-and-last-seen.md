@@ -3,11 +3,11 @@ id: TASK-1871
 title: >-
   REST /api/v2/otgw/messages/<id>: tell never seen from unknown or rejected
   (status and last-seen)
-status: In Review
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-12T18:20:00Z'
-updated_date: '2026-11-14T21:36:00Z'
+updated_date: '2026-11-15T08:41:00Z'
 labels:
   - feature
   - rest-api
@@ -54,4 +54,12 @@ AC4: /messages/<id> checked on the bench; /otgw/id/<id> and /otgw/label/<label> 
 2026-11-14 22:25 (09, bench part of AC3, partial): .61 (OTGW32, beta.252+941a224, no boiler): GET /api/v2/otgw/messages/0, /25, /99 -> status never_seen, last_seen_age_s -1, existing label/value/unit unchanged (never_seen case PASS). Loopback (GW=L, 30 s, IDs 0-127 scanned): still 113x never_seen, 0 ack, 0 unknown_dataid, 0 data_invalid; correct per AC1 (loopback answers are gateway-local and must not count). The ack/rising last_seen and unknown_dataid cases need a real boiler: none of the bench units (.61, .63) has an OT bus, so these stay unverified on the bench; options: a field capture from a tester, or a boiler simulator on the OT bus. .61 restored to GW=S. Evidence: 09 scratchpad b1871/scan1.txt.
 
 AC 3: field AC (Robert C, 2026-11-14, DM 1571276554430976183 via the coordinator, no OT bus on the bench): the ack/rising last_seen and unknown_dataid cases (the never_seen case is bench-verified on .61) is verified from a tester capture, not on the bench. Status stays In Review until a tester capture covers it.
+
+2026-11-15: closed on Robert's A (DM 1571431149795024929, triage question 1/5 = DM 1571283730117562467).
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Closed on Robert's decision A to triage question 1/5 (bot DM 1571283730117562467: close the tasks whose bench/host ACs are green and only a field AC is left, naming it; reopen on a field report). His answer: '1. A' in DM 1571431149795024929 (2026-11-15), reply to the list 1571430657609957510. Open field AC #3, bench part: an acked ID needs a real boiler (already marked as field AC by Robert's C, DM 1571276554430976183); openapi documents the fields (never_seen present), evaluate no new FAIL in the notes.
+<!-- SECTION:FINAL_SUMMARY:END -->
