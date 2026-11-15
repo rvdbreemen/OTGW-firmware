@@ -108,6 +108,14 @@ class Mwt(unittest.TestCase):
         r = self.run_case(1000, "t")
         self.assertLessEqual(r["maxstartgap"], 1150)
 
+    def test_the_mwt_keeps_the_master_interval_at_every_answer_delay(self):
+        # bench 09 (beta.297, 2026-11-15): one gap of 1171 ms in master mode without a boiler; the MWT must not push a
+        # frame past the spec's 1.15 s master interval (v4.2 :1101) for any answer delay a slave may use (20-800 ms,
+        # :1097) up to the library's 1 s timeout. Start-to-start gap, no loop latency in this harness.
+        for answer in (20, 30, 300, 600, 800, 900, 990):
+            with self.subTest(answer=answer):
+                self.assertLessEqual(self.run_case(answer)["maxstartgap"], 1150)
+
     def test_the_scheduler_still_sends(self):
         self.assertGreater(self.run_case(30)["sent"], 50, "about one frame per 130 ms for 19 s")
 
