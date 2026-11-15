@@ -1018,4 +1018,5 @@
 - `plate_b.py` — Plate B generator: BlueFlame Bot, watch loops and replies per channel (~3500 tok)
 - `plate_overview.py` — Overview plate generator: architecture at a glance, 2560x1440 (~12000 tok)
 - `render.js` — Renders a plate SVG to PNG with Playwright and Google Fonts (~250 tok)
+- `render_pdf.js` — Renders a plate SVG to a one-page vector PDF with embedded fonts (~300 tok)
 - `svgkit.py` — Shared palette, symbols, markers and flame for the plates (~4000 tok)

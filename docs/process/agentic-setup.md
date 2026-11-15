@@ -6,7 +6,7 @@
 | Peildatum | 2026-11-15, `dev` @ `e22c59e`, firmware 2.0.0-beta.327 (vorige peildatum 2026-11-04, beta.79) |
 | Taak | TASK-1984 (vorige versie TASK-1624, verbetertaken TASK-1625 t/m TASK-1636) |
 | Visuele versie | [`agentic-setup.html`](agentic-setup.html): Engelstalige web-asset met visualisaties, ook voor wie het project niet kent. Peildatum 2026-11-15. Open het bestand lokaal in een browser (de platen staan ernaast in `images/`); de maintainer heeft het ook als privé-pagina gepubliceerd |
-| Platen | [Overzichtsplaat "architecture at a glance"](images/agentic-setup-overview.png), [plaat A, de zes zones](images/agentic-setup-plate-a.png) en [plaat B, BlueFlame Bot](images/agentic-setup-plate-b.png), licht thema, Engelse labels; SVG-bronnen en generator in [`tools/agentic-plates/`](../../tools/agentic-plates/README.md) |
+| Platen | [Overzichtsplaat "architecture at a glance"](images/agentic-setup-overview.png) (downloads: [PDF](images/agentic-setup-overview.pdf), [PNG 5120 × 2880](images/agentic-setup-overview-2x.png), [SVG](images/agentic-setup-overview.svg)), [plaat A, de zes zones](images/agentic-setup-plate-a.png) en [plaat B, BlueFlame Bot](images/agentic-setup-plate-b.png), licht thema, Engelse labels; SVG-bronnen en generator in [`tools/agentic-plates/`](../../tools/agentic-plates/README.md) |
 | Beeldbrief | [`agentic-setup-image-brief.md`](agentic-setup-image-brief.md): compositie en prompts voor een image generator |
 | Taal | Lopende tekst Nederlands; alle diagrammen Engels (maintainer, 2026-11-15) |
 | Opgesteld door | Claude Code (cloudsessie) in opdracht van Robert. Gebaseerd op tien geverifieerde feitenbladen; schrijvers op Fable 5.2 en adversariële reviewers (hoofdstuk 15) |
