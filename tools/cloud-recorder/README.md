@@ -139,9 +139,13 @@ The gateway records and uploads by itself over HTTPS, also on a board without PS
   (capture, record queue, upload task), `CloudRec.h` / `CloudRec.ino`. Capture: a tee behind `Debug()` /
   `Debugln()`, hooks in `_debugBOL` / `_debugPrintf_P`, and `processOT()` next to the ADR-213 recorder.
   OT section v2 (fixed tables, `otrec.unpack_ot2`), mix record every 60 s or when a section is full.
-- **Upload:** own task, HTTPS POST to the collection point, certificate check against GTS Root R1/R4 and
+- **Upload:** own task, HTTPS POST over esp-tls with TLS session resumption (tickets; a failed resumption falls back
+  to a full handshake; TASK-1974) to the collection point, certificate check against GTS Root R1/R4 and
   ISRG Root X1/X2, `?fields=id`. Off unless `/cloudrec.cfg` on LittleFS has `enabled=1` plus `host` and `port`
   (the opt-in).
+- **Send queue (TASK-1974):** one record slot; a second one in PSRAM on PSRAM boards, oldest sent first.
+- **SATTICK (TASK-1974):** with SAT debug off the SATTICK lines go only to the recorder (`SATTickTf` in
+  `SATcontrol.ino`); with SAT debug on they go to telnet and are recorded from there, once.
 - **Compression (TASK-1972):** a closed record goes out LZ-coded (fmt 5: LEB128 raw length + range-coder bytes,
   `crec::lzEncode`, reference `otrec.lz_encode`/`lz_decode`) when that is smaller, else as it is (fmt 4). LZ77 over
   the record itself (no window buffer), every decision through the range coder; 3.2 KB of RAM. Two passes: the
@@ -162,8 +166,14 @@ The gateway records and uploads by itself over HTTPS, also on a board without PS
   down pauses capture without a backoff step.
 - **Sizes against a normal esp32-combo build:** static RAM +22.0 KB (152,524 vs 130,524 B); app 98.9 % of the
   2240K slot (26 KB left; this env cannot use LTO).
+- **Fixed 2026-11-15 (TASK-1974): poc.1 to poc.4 did not contain the dynamic mbedTLS buffers.** The hybrid compile
+  rebuilt mbedTLS with the env's settings but copied only top-level archives, so the firmware linked the prebuilt
+  mbedTLS of the Arduino release (static 16 KB record buffers, no session tickets). `scripts/tlsdyn_mbedtls_libs.py`
+  copies the nested archives; from poc.5 the ELF has the dynamic-buffer code (`esp_mbedtls_free_buf`,
+  `esp_mbedtls_reset_free_rx_buffer`) and the session tickets. The app shrank by 21 KB (2,250,611 B, 98.1 %).
 - **Build caveats found:** PlatformIO 6.2.0 fails the hybrid compile (SCons 4.11; 6.1.18 works); `-flto` must
   not reach the IDF sources; ESP Insights must be removed; and the hybrid compile writes its libraries into the
   shared `framework-arduinoespressif32-libs` package, so later builds on the same machine use them until that
-  package is reinstalled.
+  package is reinstalled. A line added to `custom_sdkconfig` only takes effect after deleting the generated
+  `sdkconfig.esp32-combo-tlsdyn` in the repo root (gitignored): an existing file wins over the new defaults.
 - **Not tested yet:** everything on a device (TLS heap peak, low-water, soak). That is the bench run of TASK-1963.

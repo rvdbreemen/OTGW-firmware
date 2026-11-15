@@ -3975,5 +3975,22 @@
       "proof",
       "heap"
     ]
+  },
+  {
+    "id": "bug-226",
+    "timestamp": "2026-11-15T15:12:38+00:00",
+    "error_message": "undefined reference to esp_mbedtls_dynamic_set_rx_buf_static (esp-tls with session tickets); and poc.1-4 silently linked the prebuilt mbedTLS without dynamic buffers",
+    "file": "platformio.ini, scripts/tlsdyn_mbedtls_libs.py",
+    "root_cause": "pioarduino idf_lib_copy copies only top-level .a per component; mbedTLS core archives live in mbedtls/mbedtls/library and stayed prebuilt",
+    "fix": "pre: extra script adds a checkprogsize post action that copies the nested mbedTLS archives under the Arduino link names before pioarduino cleans the build dir",
+    "tags": [
+      "pioarduino",
+      "mbedtls",
+      "hybrid-compile",
+      "tls"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-11-15T15:12:38+00:00"
   }
 ]

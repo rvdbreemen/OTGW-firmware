@@ -2,7 +2,7 @@
 ***************************************************************************
 **  Program  : CloudRecDevice.h
 **  (Implementation in a header: the Arduino builder generates prototypes for every .ino function before the
-**  includes, which breaks on the NetworkClientSecure and crec types. CloudRec.ino only includes this file.)
+**  includes, which breaks on the CloudRecTls and crec types. CloudRec.ino only includes this file.)
 **  TASK-1963 proof of concept (branch research/cloud-recording only, never published): the cloud recorder.
 **
 **  Records the OT frames, the SATTICK lines and the debug output into one mix record (CloudRecCodec.h, 4 KB),
@@ -30,7 +30,8 @@
 
 #pragma once
 
-#include <NetworkClientSecure.h>
+#include <Stream.h>
+#include "esp_tls.h"
 #include <sys/time.h>
 #include "CloudRecCodec.h"
 #include "CloudRecPolicy.h"
@@ -42,6 +43,89 @@
 //   ISRG Root X1 96:BC:EC:06:26:49:76:F3:74:60:77:9A:CF:28:C5:A7:CF:E8:A3:C0:AA:E1:1A:8F:FC:EE:05:C0:BD:DF:08:C6
 //   ISRG Root X2 69:72:9B:8E:15:A8:6E:FC:17:7A:57:AF:B7:17:1D:FC:64:AD:D2:8C:2F:CA:8C:F1:50:7E:34:45:3C:CB:14:70
 #include "CloudRecRoots.h"
+
+// TASK-1974: the upload connection, on ESP-IDF's esp-tls instead of CloudRecTls, because esp-tls can
+// resume a TLS session from a ticket (CONFIG_ESP_TLS_CLIENT_SESSION_TICKETS in the tlsdyn env): a resumed
+// handshake skips the certificate chain and the key exchange's heavy part. The ticket of the last good connection
+// is kept; a connect with it that fails is retried once with a full handshake. A Stream, so the HTTP code reads
+// and writes it as before.
+static esp_tls_client_session_t *cloudRecSession = nullptr;
+static uint32_t cloudRecResumes = 0, cloudRecFullHandshakes = 0;
+
+class CloudRecTls : public Stream {
+ public:
+  ~CloudRecTls() { stop(); }
+  bool connect(const char *host, uint16_t port) {
+    for (int attempt = 0; attempt < 2; attempt++) {
+      esp_tls_cfg_t cfg = {};
+      cfg.cacert_buf = (const unsigned char *)CLOUDREC_ROOTS;
+      cfg.cacert_bytes = strlen(CLOUDREC_ROOTS) + 1;
+      cfg.timeout_ms = 10000;
+      cfg.client_session = cloudRecSession;
+      t_ = esp_tls_init();
+      if (!t_) return false;
+      if (esp_tls_conn_new_sync(host, (int)strlen(host), port, &cfg, t_) == 1) {
+        if (cloudRecSession) cloudRecResumes++; else cloudRecFullHandshakes++;
+        return true;
+      }
+      esp_tls_conn_destroy(t_);
+      t_ = nullptr;
+      if (!cloudRecSession) return false;
+      esp_tls_free_client_session(cloudRecSession);   // the server would not resume: once more in full
+      cloudRecSession = nullptr;
+    }
+    return false;
+  }
+  // keep: the exchange went well, so this connection's ticket is the one to resume next time.
+  void stop(bool keep = false) {
+    if (!t_) return;
+    if (keep) {
+      esp_tls_client_session_t *ns = esp_tls_get_client_session(t_);
+      if (ns) {
+        if (cloudRecSession) esp_tls_free_client_session(cloudRecSession);
+        cloudRecSession = ns;
+      }
+    }
+    esp_tls_conn_destroy(t_);
+    t_ = nullptr;
+    rp_ = rn_ = 0;
+  }
+  size_t write(uint8_t b) override { return write(&b, 1); }
+  size_t write(const uint8_t *buf, size_t n) override {
+    size_t off = 0;
+    uint32_t start = millis();
+    while (t_ && off < n) {
+      ssize_t r = esp_tls_conn_write(t_, buf + off, n - off);
+      if (r > 0) { off += (size_t)r; continue; }
+      if ((r == ESP_TLS_ERR_SSL_WANT_READ || r == ESP_TLS_ERR_SSL_WANT_WRITE) && millis() - start < 10000) continue;
+      break;
+    }
+    return off;
+  }
+  int available() override {
+    if (rp_ < rn_) return (int)(rn_ - rp_);
+    if (!t_) return 0;
+    ssize_t a = esp_tls_get_bytes_avail(t_);
+    return a > 0 ? (int)a : 0;
+  }
+  int read() override { return fill() ? rb_[rp_++] : -1; }
+  int peek() override { return fill() ? rb_[rp_] : -1; }
+  void flush() override {}
+
+ private:
+  bool fill() {
+    if (rp_ < rn_) return true;
+    if (!t_) return false;
+    ssize_t r = esp_tls_conn_read(t_, rb_, sizeof(rb_));
+    if (r <= 0) return false;
+    rp_ = 0;
+    rn_ = (size_t)r;
+    return true;
+  }
+  esp_tls_t *t_ = nullptr;
+  uint8_t rb_[256];
+  size_t rp_ = 0, rn_ = 0;
+};
 
 static const uint32_t CLOUDREC_INTERVAL_MS = 60000;
 static const uint32_t CLOUDREC_TASK_STACK  = 10240;
@@ -65,10 +149,8 @@ static bool cloudRecFwSynced = false;             // label/fw/board sent this bo
 static CloudRecConfig cloudRecCfg;
 static crec::Recorder cloudRec;                     // the open record (about 13.5 KB, static: ADR-053)
 static uint8_t  cloudRecSendBuf[crec::REC_MAX_BYTES];
-static size_t   cloudRecSendLen = 0;
-static int64_t  cloudRecSendT0 = 0;
-static uint64_t cloudRecSendSeq = 0;
-static volatile bool cloudRecSendBusy = false;
+// Slot 0 is the static buffer; slot 1 exists only on a PSRAM board (allocated in cloudRecSetup, TASK-1974).
+static crec::Slot cloudRecSlots[2] = {{cloudRecSendBuf, 0, 0, 0, false}, {nullptr, 0, 0, 0, false}};
 static uint64_t cloudRecSeqNext = 0;
 static PlatformMutex cloudRecLock = nullptr;
 static volatile bool cloudRecActive = false;
@@ -115,14 +197,15 @@ static void cloudRecCloseLocked(int64_t reopenMs) {
   cloudRec.lostItems += __atomic_exchange_n(&cloudRecLostPending, 0u, __ATOMIC_RELAXED);
   if (cloudRec.open && !cloudRec.empty()) {
     uint64_t seq = cloudRecSeqNext++;
-    if (cloudRecSendBusy) {
-      cloudRecDroppedRecords++;                     // the previous record is still on its way: this one is lost,
+    crec::Slot *f = crec::slotFree(cloudRecSlots, 2);
+    if (!f) {
+      cloudRecDroppedRecords++;                     // every slot still waits to be sent: this record is lost,
       cloudRec.lostRecords++;                       // and the next record says so
     } else {
-      cloudRecSendT0 = cloudRec.t0Ms;
-      cloudRecSendLen = cloudRec.close(cloudRecSendBuf, sizeof(cloudRecSendBuf));
-      cloudRecSendSeq = seq;
-      cloudRecSendBusy = cloudRecSendLen > 0;
+      f->t0 = cloudRec.t0Ms;
+      f->len = cloudRec.close(f->buf, crec::REC_MAX_BYTES);
+      f->seq = seq;
+      f->busy = f->len > 0;
     }
   }
   cloudRec.begin(reopenMs);
@@ -255,6 +338,21 @@ void cloudRecPrintf(const char *fmt, va_list ap, const char *printed, size_t pri
   platformMutexUnlock(cloudRecLock);
 }
 
+void cloudRecSatTickf(const char *fmt, ...) {
+  if (!cloudRecActive) return;
+  int fi = -1;
+  for (int k = 0; k < 2; k++) if (!strcmp(fmt, crec::SAT_FORMATS[k])) fi = k;
+  if (fi < 0) return;
+  char text[512];
+  va_list ap;
+  va_start(ap, fmt);
+  int n = vsnprintf(text, sizeof(text), fmt, ap);
+  va_end(ap);
+  if (n < 0 || n >= (int)sizeof(text)) { cloudRecLoseItem(); return; }
+  int64_t tMs = cloudRecNowUs() / 1000;
+  cloudRecAppend(tMs, [&] { return cloudRec.satTick(tMs, fi, text); });
+}
+
 void cloudRecOtFrame(char letter, uint32_t frame) {
   int64_t tMs = cloudRecNowUs() / 1000;
   cloudRecAppend(tMs, [&] { return cloudRec.otFrame(tMs, letter, frame); });
@@ -262,7 +360,7 @@ void cloudRecOtFrame(char letter, uint32_t frame) {
 
 // ---------------------------------------------------------------- upload
 
-static int cloudRecReadStatus(NetworkClientSecure &c, char *body, size_t bodyCap) {
+static int cloudRecReadStatus(CloudRecTls &c, char *body, size_t bodyCap) {
   char line[160];
   size_t n = c.readBytesUntil('\n', line, sizeof(line) - 1);
   line[n] = 0;
@@ -298,7 +396,7 @@ static bool cloudRecJsonString(const char *json, const char *after, const char *
   return *p == '"';
 }
 
-static void cloudRecWriteHead(NetworkClientSecure &c, const char *path, size_t len, bool auth) {
+static void cloudRecWriteHead(CloudRecTls &c, const char *path, size_t len, bool auth) {
   char h[256];
   snprintf_P(h, sizeof(h), PSTR("POST %s HTTP/1.1\r\nHost: %s\r\nContent-Type: application/json\r\nContent-Length: %u\r\n"
                                 "Connection: keep-alive\r\n"), path, cloudRecCfg.host, (unsigned)len);
@@ -307,7 +405,7 @@ static void cloudRecWriteHead(NetworkClientSecure &c, const char *path, size_t l
   c.print(F("\r\n"));
 }
 
-static void cloudRecWriteJson(NetworkClientSecure &c, const char *method, const char *path, const char *body, bool auth) {
+static void cloudRecWriteJson(CloudRecTls &c, const char *method, const char *path, const char *body, bool auth) {
   char h[256];
   snprintf_P(h, sizeof(h), PSTR("%s %s HTTP/1.1\r\nHost: %s\r\nContent-Type: application/json\r\nContent-Length: %u\r\n"
                                 "Connection: keep-alive\r\n"), method, path, cloudRecCfg.host, (unsigned)strlen(body));
@@ -331,7 +429,7 @@ static bool cloudRecTakeAuth() {
 
 // Logs in with uid + secret; enrolls the uid first when the server does not know it. Returns the HTTP status
 // of the last step (200 = logged in); blocked is set when the reply says the maintainer blocked this gateway.
-static int cloudRecLogin(NetworkClientSecure &c, bool &blocked) {
+static int cloudRecLogin(CloudRecTls &c, bool &blocked) {
   char body[200];
   blocked = false;
   snprintf_P(body, sizeof(body), PSTR("{\"identity\":\"%s\",\"password\":\"%s\"}"), cloudRecUid, cloudRecSecret);
@@ -366,7 +464,7 @@ static int cloudRecLogin(NetworkClientSecure &c, bool &blocked) {
 // Base64 straight to the TLS client, one byte at a time; used as a crec::Buf sink, so the LZ-coded record never
 // needs its own buffer (TASK-1972).
 struct CloudRecB64 {
-  NetworkClientSecure *c;
+  CloudRecTls *c;
   uint8_t q[3];
   uint8_t nq;
   size_t o;
@@ -398,9 +496,8 @@ static void cloudRecCountPut(void *, uint8_t) {}
 
 static crec::LzWork cloudRecLz;                    // 3.2 KB, used only by the upload task
 
-static bool cloudRecConnect(NetworkClientSecure &c) {
-  c.setCACert(CLOUDREC_ROOTS);
-  c.setTimeout(10);
+static bool cloudRecConnect(CloudRecTls &c) {
+  c.setTimeout(10000);                              // Stream read timeout, ms
   if (!c.connect(cloudRecCfg.host, cloudRecCfg.port)) {
     DebugTf(PSTR("cloudrec: connect to %s:%u failed (heap %u, block %u)\r\n"), cloudRecCfg.host,
             (unsigned)cloudRecCfg.port, (unsigned)platformFreeHeap(), (unsigned)platformMaxFreeBlock());
@@ -413,18 +510,18 @@ static bool cloudRecConnect(NetworkClientSecure &c) {
 }
 
 // Sends the queued record. Returns the outcome; blocked is set when the server says this gateway is blocked.
-static crec::Outcome cloudRecUpload(bool &blocked) {
+static crec::Outcome cloudRecUpload(crec::Slot &q, bool &blocked) {
   blocked = false;
   uint32_t t = millis();
-  NetworkClientSecure c;
+  CloudRecTls c;
   if (!cloudRecConnect(c)) { cloudRecLastStatus = 0; return crec::OUT_DOWN; }
   // TASK-1972: send the record LZ-coded (fmt 5) when that is smaller, else as it is (fmt 4). The first pass only
   // counts, so Content-Length is known before anything is sent.
   crec::Buf cnt;
   cnt.initSink(cloudRecCountPut, nullptr);
-  crec::lzEncode(cloudRecSendBuf, cloudRecSendLen, cnt, cloudRecLz);
-  const bool lz = cnt.n < cloudRecSendLen;
-  const size_t sendLen = lz ? cnt.n : cloudRecSendLen;
+  crec::lzEncode(q.buf, q.len, cnt, cloudRecLz);
+  const bool lz = cnt.n < q.len;
+  const size_t sendLen = lz ? cnt.n : q.len;
   int st = 200;
   for (int attempt = 0; attempt < 2; attempt++) {
     if (!cloudRecToken[0]) {
@@ -433,7 +530,7 @@ static crec::Outcome cloudRecUpload(bool &blocked) {
     }
     char head[200];
     int hl = snprintf_P(head, sizeof(head), PSTR("{\"device\":\"%s\",\"stream\":\"mix\",\"seq\":%llu,\"t0\":%lld,\"fmt\":%d,\"payload\":\""),
-                        cloudRecDevId, (unsigned long long)cloudRecSendSeq, (long long)cloudRecSendT0, lz ? 5 : 4);
+                        cloudRecDevId, (unsigned long long)q.seq, (long long)q.t0, lz ? 5 : 4);
     size_t b64 = 4 * ((sendLen + 2) / 3);
     cloudRecWriteHead(c, "/api/collections/batches/records?fields=id", (size_t)hl + b64 + 2, true);
     c.write((const uint8_t *)head, hl);
@@ -441,9 +538,9 @@ static crec::Outcome cloudRecUpload(bool &blocked) {
     if (lz) {                                     // second pass: the same bytes, now to the wire
       crec::Buf b;
       b.initSink(cloudRecB64Put, &s64);
-      crec::lzEncode(cloudRecSendBuf, cloudRecSendLen, b, cloudRecLz);
+      crec::lzEncode(q.buf, q.len, b, cloudRecLz);
     } else {
-      for (size_t k = 0; k < cloudRecSendLen; k++) cloudRecB64Put(&s64, cloudRecSendBuf[k]);
+      for (size_t k = 0; k < q.len; k++) cloudRecB64Put(&s64, q.buf[k]);
     }
     cloudRecB64End(s64);
     c.print(F("\"}"));
@@ -452,14 +549,15 @@ static crec::Outcome cloudRecUpload(bool &blocked) {
     if (crec::classify(st) != crec::OUT_AUTH) break;
     cloudRecToken[0] = 0;                         // expired or revoked token: log in once more and resend
   }
-  c.stop();
+  c.stop(st > 0);                                   // an HTTP answer came back: keep this session's ticket
   cloudRecLastStatus = (uint32_t)st;
   cloudRecLastMs = millis() - t;
   crec::Outcome o = st == 409 ? crec::OUT_REFUSED : crec::classify(st);
   if (o == crec::OUT_OK || (o == crec::OUT_REFUSED && !blocked && st != 409)) cloudRecSent++; else cloudRecFailed++;
-  DebugTf(PSTR("cloudrec: seq %llu %u B (%u B sent) HTTP %d in %u ms; TLS low %u/%u, min %u\r\n"),
-          (unsigned long long)cloudRecSendSeq, (unsigned)cloudRecSendLen, (unsigned)sendLen, st, (unsigned)cloudRecLastMs,
-          (unsigned)cloudRecHeapLow, (unsigned)cloudRecBlockLow, (unsigned)platformMinFreeHeap());
+  DebugTf(PSTR("cloudrec: seq %llu %u B (%u B sent) HTTP %d in %u ms; TLS resumed %u full %u, low %u/%u, min %u\r\n"),
+          (unsigned long long)q.seq, (unsigned)q.len, (unsigned)sendLen, st, (unsigned)cloudRecLastMs,
+          (unsigned)cloudRecResumes, (unsigned)cloudRecFullHandshakes, (unsigned)cloudRecHeapLow,
+          (unsigned)cloudRecBlockLow, (unsigned)platformMinFreeHeap());
   return st == 409 ? crec::OUT_DOWN : o;          // 409 only comes from a login; handled by the probe
 }
 
@@ -467,11 +565,11 @@ static crec::Outcome cloudRecUpload(bool &blocked) {
 // (200 logged in, 409 uid enrolled with another secret, 0 no answer).
 static int cloudRecProbe(bool &blocked) {
   blocked = false;
-  NetworkClientSecure c;
+  CloudRecTls c;
   if (!cloudRecConnect(c)) return 0;
   cloudRecToken[0] = 0;
   int st = cloudRecLogin(c, blocked);
-  c.stop();
+  c.stop(st > 0);
   return st;
 }
 
@@ -486,7 +584,7 @@ static void cloudRecPause(bool keep) {
     if (keep) {
       cloudRecCloseLocked(cloudRecNowUs() / 1000);
     } else {
-      cloudRecSendBusy = false;
+      for (auto &q : cloudRecSlots) q.busy = false;
       cloudRec.begin(cloudRecNowUs() / 1000);
     }
     platformMutexUnlock(cloudRecLock);
@@ -558,12 +656,13 @@ static void cloudRecTask(void *) {
         platformMutexUnlock(cloudRecLock);
       }
     }
-    if (!cloudRecSendBusy) continue;
+    crec::Slot *q = crec::slotOldest(cloudRecSlots, 2);
+    if (!q) continue;
     bool blocked;
-    crec::Outcome o = cloudRecUpload(blocked);
+    crec::Outcome o = cloudRecUpload(*q, blocked);
     if (blocked) cloudRecBlocked();
     else if (o == crec::OUT_DOWN || o == crec::OUT_AUTH) cloudRecBackoff(F("upload failed"), false);
-    else cloudRecSendBusy = false;                // stored, or a resend of a stored seq
+    else q->busy = false;                         // stored, or a resend of a stored seq
   }
   platformTaskExit();
 }
@@ -612,6 +711,7 @@ void cloudRecSetup() {
     return;
   }
   cloudRecIdentity();
+  cloudRecSlots[1].buf = (uint8_t *)platformPsramAllocOnce(crec::REC_MAX_BYTES);   // nullptr without PSRAM
   cloudRecLock = platformMutexCreate();
   cloudRec.begin(cloudRecNowUs() / 1000);
   cloudRecSvc = SVC_PROBE;                          // capture starts after the first login says it may
@@ -620,6 +720,7 @@ void cloudRecSetup() {
     DebugTln(F("cloudrec: task create failed"));
     return;
   }
-  DebugTf(PSTR("cloudrec: on, %s:%u as %s, heap %u, block %u\r\n"), cloudRecCfg.host, (unsigned)cloudRecCfg.port,
-          cloudRecUid, (unsigned)platformFreeHeap(), (unsigned)platformMaxFreeBlock());
+  DebugTf(PSTR("cloudrec: on, %s:%u as %s, %d send slot(s), heap %u, block %u\r\n"), cloudRecCfg.host,
+          (unsigned)cloudRecCfg.port, cloudRecUid, cloudRecSlots[1].buf ? 2 : 1, (unsigned)platformFreeHeap(),
+          (unsigned)platformMaxFreeBlock());
 }

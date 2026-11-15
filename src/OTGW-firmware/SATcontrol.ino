@@ -20,6 +20,12 @@
 #define SATDebugTf(fmt, ...)  do { if (state.debug.bSAT) DebugTf(fmt,  ##__VA_ARGS__); } while(0)
 #define SATDebugTln(s)        do { if (state.debug.bSAT) DebugTln(s);                  } while(0)
 #define SATDebugf(fmt, ...)   do { if (state.debug.bSAT) Debugf(fmt,   ##__VA_ARGS__); } while(0)
+// SATTICK lines: to telnet with SAT debug on (as before); with SAT debug off, only to the cloud recorder while it
+// records (TASK-1974, PoC env only). Each argument is evaluated once on either path.
+#if !HAS_CLOUD_REC
+#define cloudRecSatTickf(fmt, ...)  do {} while (0)
+#endif
+#define SATTickTf(fmt, ...)   do { if (state.debug.bSAT) DebugTf(fmt, ##__VA_ARGS__); else cloudRecSatTickf(fmt, ##__VA_ARGS__); } while(0)
 // High-volume SAT trace (per pass, PID detail), key '8', default off (TASK-1521)
 #define SATTraceTf(fmt, ...)  do { if (state.debug.bSATTrace) DebugTf(fmt, ##__VA_ARGS__); } while(0)
 #define SATTraceTln(s)        do { if (state.debug.bSATTrace) DebugTln(s);                 } while(0)
@@ -7679,7 +7685,7 @@ static void satControlLoopRun()
       satCurveTuneNoteTick(ti);
     }
     _sat_prevDhwActive = true;
-    SATDebugTf(PSTR("SATTICK target=%.1f mode=%d flame=%d flow=%.1f ret=%.1f fc=%c fage=%lu rc=%c rage=%lu rsrc=%s dhw=1\r\n"),   // TASK-1521
+    SATTickTf(PSTR("SATTICK target=%.1f mode=%d flame=%d flow=%.1f ret=%.1f fc=%c fage=%lu rc=%c rage=%lu rsrc=%s dhw=1\r\n"),   // TASK-1521
                settings.sat.fTargetTemp, (int)state.sat.eControlMode, (int)satIsFlameOn(),
                satGetFlowTemp(), satGetReturnTemp(),   // TASK-1532: the simulated values in SAT simulation
                satFeedClassLetter(satFlowFeedClass()), (unsigned long)satFlowSampleAgeMs(),     // TASK-1412.5
@@ -8096,7 +8102,7 @@ static void satControlLoopRun()
   // zones, solar offset and clamps; osrc see _sat_outsideSrc. Hot-water ticks log a short SATTICK with dhw=1.
   // PWM, three separate outputs (TASK-1412.9): commanded = pwm (phase asked for), duty, pon / poff (mapped ON / OFF seconds, 0 outside PWM);
   // counted = starts (PWM ON-phase starts in the rolling hour); observed = flame (boiler flame bit).
-  SATDebugTf(PSTR("SATTICK room=%.2f raw=%.2f rv=%d target=%.1f out=%.1f osrc=%c curve=%.2f p=%.2f i=%.2f d=%.2f praw=%.2f pid=%.2f cs=%.1f mm=%s ch=%u mode=%d pwm=%d duty=%.2f pon=%lu poff=%lu starts=%u flame=%d flow=%.1f ret=%.1f fc=%c fage=%lu rc=%c rage=%lu rsrc=%s dhw=0\r\n"),
+  SATTickTf(PSTR("SATTICK room=%.2f raw=%.2f rv=%d target=%.1f out=%.1f osrc=%c curve=%.2f p=%.2f i=%.2f d=%.2f praw=%.2f pid=%.2f cs=%.1f mm=%s ch=%u mode=%d pwm=%d duty=%.2f pon=%lu poff=%lu starts=%u flame=%d flow=%.1f ret=%.1f fc=%c fage=%lu rc=%c rage=%lu rsrc=%s dhw=0\r\n"),
           roomTemp, rawRoom, (int)roomValid, targetTemp, outsideTemp, _sat_outsideSrc, curveValue,
           state.sat.fPidP, state.sat.fPidI, state.sat.fPidD, pidRaw,
           pidOutput, finalSetpoint, mmTxt, (unsigned)state.sat.iLastSentCH,

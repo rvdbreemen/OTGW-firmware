@@ -13,6 +13,7 @@
 */
 #pragma once
 
+#include <stddef.h>
 #include <stdint.h>
 
 namespace crec {
@@ -51,6 +52,27 @@ inline Outcome classifyReply(int status, const char *body) {
       if (p[0] == 'o' && !__builtin_strncmp(p, "otgw-blocked", 12)) return OUT_BLOCKED;
   }
   return classify(status);
+}
+
+// The send queue (TASK-1974): one slot on every board, a second one in PSRAM where there is PSRAM. A closed record
+// takes a free slot; the upload task always sends the oldest (lowest seq) first, so records arrive in order.
+struct Slot {
+  uint8_t *buf;          // nullptr: this slot does not exist on this board
+  size_t len;
+  int64_t t0;
+  uint64_t seq;
+  volatile bool busy;
+};
+
+inline Slot *slotFree(Slot *s, int n) {
+  for (int i = 0; i < n; i++) if (s[i].buf && !s[i].busy) return &s[i];
+  return nullptr;
+}
+
+inline Slot *slotOldest(Slot *s, int n) {
+  Slot *o = nullptr;
+  for (int i = 0; i < n; i++) if (s[i].busy && (!o || s[i].seq < o->seq)) o = &s[i];
+  return o;
 }
 
 }  // namespace crec

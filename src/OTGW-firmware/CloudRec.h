@@ -20,6 +20,7 @@ void cloudRecPrintf(const char *fmt, va_list ap, const char *printed, size_t pri
 void cloudRecOtFrame(char letter, uint32_t frame);                                       // processOT()
 void cloudRecTeeFlush();                                                                  // end of a tee line
 void cloudRecSetup();                                                                     // from setup()
+void cloudRecSatTickf(const char *fmt, ...);   // a SATTICK line with SAT debug off: recorder only (TASK-1974)
 
 // Print that writes through to the telnet debug sink and keeps a copy of the current line.
 class CloudRecTee : public Print {

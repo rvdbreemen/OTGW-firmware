@@ -23,6 +23,8 @@ gateway --HTTPS--> Cloudflare edge --tunnel (outbound from the NAS)--> cloudflar
   safely send a batch again after a lost reply.
 - **Retention:** every hour at minute 17, all batches older than 30 days are deleted, for every gateway. This
   is fixed, not a setting. Request logs (they hold IP addresses) are kept 7 days.
+- **Who can read the data on the way:** TLS ends at the Cloudflare edge, so Cloudflare can read the payload.
+  Accepted by the maintainer on 2026-11-15 (no device-side encryption).
 - **Cost:** none beyond the NAS and the domain you already have. Cloudflare Tunnel is available on the free plan.
 
 ## Files

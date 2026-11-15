@@ -5,6 +5,7 @@ The real header is compiled into a small C++ program; nothing is re-implemented 
   1. Without jitter the waits are 5, 10, 20, ... min, capped at 24 h, and stay at 24 h.
   2. With any random value a wait is 100 to 120 % of its base and never above 24 h; the first wait is 5 to 6 min.
   3. HTTP statuses map to OK / REFUSED / AUTH / DOWN; only a 403 whose body holds "otgw-blocked" is BLOCKED.
+  4. The send queue: one slot without PSRAM, two with; a full queue loses the record; the oldest goes first.
 """
 import os, shutil, subprocess, tempfile, unittest
 
@@ -22,6 +23,20 @@ int main() {
   const int rs[] = {403, 401, 400};
   for (int x : rs) for (int i = 0; i < 3; i++) printf("R %d %d %d\n", x, i, (int)crec::classifyReply(x, bodies[i]));
   printf("R 403 9 %d\n", (int)crec::classifyReply(403, nullptr));
+  static uint8_t b0[4], b1[4];
+  for (int two = 0; two < 2; two++) {                      // one slot (no PSRAM) and two slots (PSRAM)
+    crec::Slot q[2] = {{b0, 0, 0, 0, false}, {two ? b1 : nullptr, 0, 0, 0, false}};
+    uint64_t seq = 10;
+    int lost = 0;
+    for (int step = 0; step < 6; step++) {                 // close three records, send one, close three more
+      if (step == 3) { crec::Slot *o = crec::slotOldest(q, 2); printf("S %d sent %llu\n", two, (unsigned long long)o->seq); o->busy = false; }
+      crec::Slot *f = crec::slotFree(q, 2);
+      if (!f) { lost++; seq++; continue; }
+      f->seq = seq++; f->busy = true;
+    }
+    crec::Slot *o = crec::slotOldest(q, 2);
+    printf("S %d lost %d oldest %llu\n", two, lost, (unsigned long long)(o ? o->seq : 0));
+  }
 }
 '''.replace("@HDR@", os.path.join(ROOT, "src", "OTGW-firmware", "CloudRecPolicy.h").replace("\\", "/"))
 
@@ -76,6 +91,18 @@ class CloudRecPolicyTest(unittest.TestCase):
         self.assertEqual(got[(403, 9)], 2)                       # no body
         self.assertEqual(got[(401, 0)], 2)                       # only a 403 counts
         self.assertEqual(got[(400, 0)], 1)
+
+
+class CloudRecSlotTest(unittest.TestCase):
+    def test_queue(self):
+        rows = [l.split() for l in OUT if l.startswith("S ")]
+        got = {(r[1], r[2]): r[3:] for r in rows}
+        # one slot: 10 queued, 11 and 12 lost, 10 sent, 13 queued, 14 and 15 lost -> 4 lost, 13 waiting
+        self.assertEqual(got[("0", "sent")], ["10"])
+        self.assertEqual(got[("0", "lost")], ["4", "oldest", "13"])
+        # two slots: 10 and 11 queued, 12 lost, 10 sent, 13 queued, 14 and 15 lost -> 3 lost, 11 is the oldest
+        self.assertEqual(got[("1", "sent")], ["10"])
+        self.assertEqual(got[("1", "lost")], ["3", "oldest", "11"])
 
 
 if __name__ == "__main__":

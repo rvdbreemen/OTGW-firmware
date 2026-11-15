@@ -163,3 +163,14 @@ payload (mix study: 291 KB/h stored against 301 KB/h sent, headers included). Pa
 - PocketBase also logs every request in `auxiliary.db` (1,440 per gateway per day; estimate under 1 MB per day,
   kept for the log retention days set in the dashboard).
 - A NAS backup (Hyper Backup) multiplies this by the number of versions it keeps.
+
+## Decisions (Robert, 2026-11-15, second round)
+
+1. SATTICK always to the recorder while it records (A), built in TASK-1974.
+2. **Accepted: the Cloudflare edge can read the payload (C).** The tunnel ends TLS at Cloudflare; no device-side
+   encryption is added. Anyone who sets up a collection point on this design should know this.
+3. TLS session resumption (A), TASK-1974.
+4. A second send slot on PSRAM boards only (A); without PSRAM a lost record stays reported in SEC_LOST.
+5. The upload rate limit stays per IP (B).
+6. Bench job: `docs/diagnostics/cloudrec-bench-job.md`.
+7. PocketBase does not run on the Synology yet: the migration stays edited in place.

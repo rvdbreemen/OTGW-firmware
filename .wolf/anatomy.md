@@ -1,7 +1,7 @@
 # anatomy.md
 
-> Auto-maintained by OpenWolf. Last scanned: 2026-11-15T14:18:27.269Z
-> Files: 164 tracked | Anatomy hits: 0 | Misses: 0
+> Auto-maintained by OpenWolf. Last scanned: 2026-11-15T14:50:59.697Z
+> Files: 165 tracked | Anatomy hits: 0 | Misses: 0
 
 ## ../../../../AppData/Local/Temp/
 
@@ -950,6 +950,7 @@
 ## docs/diagnostics/
 
 - `cloud-telemetry-completeness.md` — Cloud telemetry: completeness analysis (TASK-1963, 2026-11-15) (~1879 tok)
+- `cloudrec-bench-job.md` — Bench job: cloud recorder PoC (TASK-1963, TASK-1971, TASK-1972, TASK-1974) (~1136 tok)
 - `ot-stream-encoding-study.md` — Encoding the OT stream for minimal bytes: study (~2136 tok)
 
 ## docs/evidence/
