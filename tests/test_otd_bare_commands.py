@@ -70,7 +70,7 @@ def setUpModule():
     if "static bool otdPicInBounds(" in SRC:
         helpers += "\n" + pf.braced(SRC, r"^static bool otdPicInBounds\(")
     f88 = pf.braced(SRC, r"^static inline uint16_t floatToF88\(float celsius\) \{")
-    src = pf.PRE + EXTRA + f88 + "\n" + helpers + "\n" + handler + MAIN
+    src = pf.PRE + EXTRA + pf.RELAY_STUBS + f88 + "\n" + helpers + "\n" + handler + MAIN
     _tmp = Path(tempfile.mkdtemp(prefix="otd_bare_"))
     cpp = _tmp / "t.cpp"
     cpp.write_text(src, encoding="utf-8")

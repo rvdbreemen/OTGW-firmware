@@ -211,6 +211,7 @@ static bool isBoilerMsgIdUnsupportedRead(uint8_t id) { return id == 28 && g_ret2
 // TASK-1761: the sliced head of loopOTDirect() drains the off-loop command ring; nothing is queued here.
 static void otdCmdTextDrain() {}
 static bool otdRelayRead99(unsigned long, unsigned long &) { return false; }   // TASK-1906: MsgID 99 relay, tests/test_otd_msgid99_relay.py
+static bool otdRelayRewriteRead(unsigned long, unsigned long &) { return false; }   // TASK-1803, tests/test_otd_relay_rw.py
 static unsigned long otdReply99(unsigned long r) { return r; }
 static void otdOnThermostatWrite99(uint16_t) {}
 static uint16_t otdOperModeData(bool);   // the real one is cut in further down

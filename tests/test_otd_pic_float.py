@@ -139,6 +139,14 @@ int main(int argc, char** argv) {
 }
 """
 
+# TASK-1803: the OT=/SW=/SH= branches keep the relay state of the otdRelayRw block (tests/test_otd_relay_rw.py
+# tests it); kept out of PRE because test_otd_relay_rw.py builds on PRE with the real block.
+RELAY_STUBS = r"""
+static bool otdOutsideSet = false; static uint16_t otdOutsideF88 = 0;
+static bool otdInitSW = false, otdInitSH = false; static uint16_t otdDhwSetF88 = 0, otdMaxChSetF88 = 0;
+static bool otdBoilerAllowsWrite(uint8_t) { return false; }
+"""
+
 _tmp = None
 _exe = None
 
@@ -169,7 +177,7 @@ def setUpModule():
     main = MAIN.replace("@BRANCHES@", branches).replace("g_clr_dummy()", "g_clear")
     _tmp = Path(tempfile.mkdtemp(prefix="otd_pf_"))
     cpp = _tmp / "t.cpp"
-    cpp.write_text(PRE + f88 + "\n" + helpers + main, encoding="utf-8")
+    cpp.write_text(PRE + RELAY_STUBS + f88 + "\n" + helpers + main, encoding="utf-8")
     _exe = compile_cpp(cpp, _tmp / ("t.exe" if os.name == "nt" else "t"))
     if _exe is None:
         raise unittest.SkipTest("no C++ compiler")

@@ -67,6 +67,9 @@ PRE = r"""
 #define OTDDebugTln(...) do {} while (0)
 #define OTDDebugTf(...) do {} while (0)
 #define constrain(v, lo, hi) ((v) < (lo) ? (lo) : ((v) > (hi) ? (hi) : (v)))   /* Arduino's macro */
+static bool otdOutsideSet = false; static uint16_t otdOutsideF88 = 0;   // TASK-1803 relay state (tests/test_otd_relay_rw.py)
+static bool otdInitSW = false, otdInitSH = false; static uint16_t otdDhwSetF88 = 0, otdMaxChSetF88 = 0;
+static bool otdBoilerAllowsWrite(uint8_t) { return false; }
 static size_t strlcpy(char* d, const char* s, size_t n) { size_t l = strlen(s); if (n) { size_t c = l < n - 1 ? l : n - 1; memcpy(d, s, c); d[c] = 0; } return l; }
 static char* dtostrf(double v, int w, int p, char* out) { sprintf(out, "%*.*f", w, p, v); return out; }
 @SETTINGS_STRUCT@

@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTDirect.ino
-**  Version  : v2.0.0-beta.298
+**  Version  : v2.0.0-beta.299
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -63,6 +63,7 @@ static uint16_t otdOperModeData(bool);                               // TASK-190
 static bool otdRelayRead99(unsigned long, unsigned long &);           // TASK-1906, otdOper99 block
 static unsigned long otdReply99(unsigned long);                       // TASK-1906, otdOper99 block
 static void otdOnThermostatWrite99(uint16_t);                         // TASK-1906, otdOper99 block
+static bool otdRelayRewriteRead(unsigned long, unsigned long &);      // TASK-1803, otdRelayRw block
 
 // ---------------------------------------------------------------------------
 // Master request scheduler — periodic polls and writes to the boiler
@@ -804,6 +805,8 @@ static unsigned long applyOverrides(unsigned long frame, bool &modified) {
   if (otCurrentMode == OTD_MODE_GATEWAY) {
     unsigned long w99;
     if (otdRelayRead99(frame, w99)) { modified = true; return w99; }
+    // TASK-1803: a thermostat READ 27 carries the OT= value, a READ 56/57 the new SW=/SH= value once
+    if (otdRelayRewriteRead(frame, w99)) { modified = true; return w99; }
   }
   if (msgType != 1 /* WRITE_DATA */) return frame;
 
@@ -1708,6 +1711,11 @@ static unsigned long buildOverriddenReply(unsigned long thermostatReq, unsigned 
     // any other boiler answer goes back to the thermostat as it came.
     if (((boilerResp >> 28) & 0x07) != 4) return boilerResp;
     return buildOTResponse(type, msgId, otdStatusReplyData(data, (uint16_t)(boilerResp & 0xFFFF)));
+  }
+  if (msgId == 27) {
+    // TASK-1803: the thermostat gets the OT= value back with the ack of its request (UserOutsideTemp, gateway.asm
+    // 6.8:3078-3088), whatever the boiler answered.
+    return buildOTResponse(type, msgId, (uint16_t)(sentReq & 0xFFFF));
   }
   if (msgId == 99) {
     // TASK-1906: the rewritten READ 99 is answered with the gateway's operating modes (OperModeAck/OperModeData,
@@ -2916,6 +2924,38 @@ static unsigned long otdReply99(unsigned long boilerResp) {
 }
 // --- otdOper99 end
 
+// TASK-1803: a thermostat with a supported Data-ID in every slot leaves no alternative slot, so OT=, SW= and SH= must
+// ride on the thermostat's own frames, as on the PIC (gateway.asm 6.8, repo 770aa45):
+//  - MessageID27 / UserOutsideTemp (:3071-3088): while an OT= value is set (OutsideTemp) any thermostat request for
+//    MsgID 27 goes to the boiler as a WRITE with that value; the thermostat gets the ack with the value;
+//  - MessageID56 / MessageID57 (:3135-3148, :3171-3184): a thermostat READ 56/57 becomes a WRITE of the SW=/SH= value
+//    once after the command (INITSW / INITSH), which SW=/SH= set only when the boiler allows the write (MsgID 6
+//    LB bit 0 dhwupdate / bit 1 maxchupdate, HotWaterTempOK :4181, HeatingTempOK :4208). A thermostat WRITE 56/57
+//    already carries the value through the otOverrides table.
+// --- otdRelayRw begin
+static bool     otdOutsideSet = false;                 // OutsideTemp
+static uint16_t otdOutsideF88 = 0;                     // outside1/outside2
+static bool     otdInitSW = false, otdInitSH = false;  // INITSW / INITSH
+static uint16_t otdDhwSetF88 = 0, otdMaxChSetF88 = 0;  // dhwsetpoint1/2, maxchsetpoint1/2
+
+static bool otdBoilerAllowsWrite(uint8_t ld6Bit) {     // MsgID 6 LB: bit 0 DHW setpoint, bit 1 max CH setpoint
+  return otBoilerCacheValid[6] && (otBoilerCache[6] & ld6Bit) != 0;
+}
+
+static bool otdRelayRewriteRead(unsigned long frame, unsigned long &out) {
+  if (((frame >> 28) & 0x07) != 0) return false;       // READ_DATA only
+  const uint8_t id = (uint8_t)((frame >> 16) & 0xFF);
+  uint16_t v;
+  if (id == 27 && otdOutsideSet) v = otdOutsideF88;
+  else if (id == 56 && otdInitSW && otdDhwSetF88) { v = otdDhwSetF88; otdInitSW = false; }
+  else if (id == 57 && otdInitSH && otdMaxChSetF88) { v = otdMaxChSetF88; otdInitSH = false; }
+  else return false;
+  out = (1UL << 28) | ((unsigned long)id << 16) | v;  // WRITE_DATA
+  setOTParityBit(out);
+  return true;
+}
+// --- otdRelayRw end
+
 // ---------------------------------------------------------------------------
 // clearWriteOverride — helper to clear both write cache and repeater override
 // for a MsgID (used by TT=0, CS=0, etc.)
@@ -3805,6 +3845,10 @@ bool handleOTDirectCommand(const char* buf, int len, bool satOwn) {
     const char* err = otdPicFloatF88(value, OTD_PIC_FLOAT, f88);
     if (!err && f88 != 0 && !otdPicInBounds(48, 20, 80, f88)) err = "BV";
     if (err) { otDirectBridgeProcessStatus(err); return false; }
+    // TASK-1803: the value and the one-shot rewrite of the thermostat's next READ 56 (INITSW, only when MsgID 6
+    // allows the write)
+    otdDhwSetF88 = f88;
+    otdInitSW = f88 != 0 && otdBoilerAllowsWrite(0x01);
     bool enqueued = true;
     if (f88 == 0) {
       clearWriteOverride(56);
@@ -3824,6 +3868,10 @@ bool handleOTDirectCommand(const char* buf, int len, bool satOwn) {
     const char* err = otdPicFloatF88(value, OTD_PIC_FLOAT, f88);
     if (!err && f88 != 0 && !otdPicInBounds(49, 10, 90, f88)) err = "BV";
     if (err) { otDirectBridgeProcessStatus(err); return false; }
+    // TASK-1803: the value and the one-shot rewrite of the thermostat's next READ 57 (INITSH, only when MsgID 6
+    // allows the write)
+    otdMaxChSetF88 = f88;
+    otdInitSH = f88 != 0 && otdBoilerAllowsWrite(0x02);
     bool enqueued = true;
     if (f88 == 0) {
       clearWriteOverride(57);
@@ -3874,8 +3922,11 @@ bool handleOTDirectCommand(const char* buf, int len, bool satOwn) {
     const char* err = otdPicFloatF88(value, OTD_PIC_FLOAT, f88);
     if (err || ((f88 & 0x8000u) == 0 && (f88 & 0x4000u) != 0)) {
       clearWriteOverride(27);
+      otdOutsideSet = false;   // TASK-1803: ClrOutsideT clears OutsideTemp
       synthesizeResponse(buf, "-");
     } else {
+      otdOutsideSet = true;    // TASK-1803: StoreOutTemp sets OutsideTemp; the thermostat's READ 27 carries it
+      otdOutsideF88 = f88;
       if (enqueueWriteCommand(27, f88, "OT")) {
         otdPsStoreOutside(f88);   // TASK-1846: the PS=1 line shows the OT= value, as on the PIC
         OTcurrentSystemState.Toutside = (int16_t)f88 / 256.0f;

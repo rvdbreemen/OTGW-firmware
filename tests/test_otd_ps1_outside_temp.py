@@ -115,6 +115,8 @@ def build(src):
     e = src.index("// ===========================================================================\n// TASK-184")
     parts.append("static void otdPsNoteFrame(char prefix, unsigned long frame);")
     parts.append(ps.cut_block(src, r"^static inline uint16_t floatToF88\(float celsius\)"))
+    if "otdOutsideSet" in src:   # TASK-1803: OT= also keeps the relay state for the thermostat's READ 27
+        parts.append("static bool otdOutsideSet = false; static uint16_t otdOutsideF88 = 0;")
     blk = re.search(r"// --- otdPicFloat begin\r?\n(.*?)// --- otdPicFloat end", src, re.S)
     if blk:   # TASK-1859: OT= parses with the PIC's GetFloatArg and answers with its PrintSigned
         parts.append(blk.group(1))

@@ -195,6 +195,7 @@ static void otdCmdTextDrain() {}          // TASK-1761: the off-loop command rin
 static bool otCmdEnqueue(uint32_t) { return true; }   // TASK-1847: the PM= chain's next read (tests/test_otd_pm_chain_tsp.py)
 // TASK-1906: the thermostat's own MsgID 99 (tests/test_otd_msgid99_relay.py); nothing pending here
 static bool otdRelayRead99(unsigned long, unsigned long &) { return false; }
+static bool otdRelayRewriteRead(unsigned long, unsigned long &) { return false; }   // TASK-1803 (tests/test_otd_relay_rw.py)
 static unsigned long otdReply99(unsigned long r) { return r; }
 static void otdOnThermostatWrite99(uint16_t) {}
 static uint16_t otdOperModeData(bool) { return 0; }   // not in otd_slice.inc
