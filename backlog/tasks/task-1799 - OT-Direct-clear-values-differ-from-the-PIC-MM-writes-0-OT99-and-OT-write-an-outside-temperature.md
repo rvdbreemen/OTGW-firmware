@@ -3,10 +3,11 @@ id: TASK-1799
 title: >-
   OT-Direct: clear values differ from the PIC: MM=- writes 0 %, OT=99 and OT=-
   write an outside temperature
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-11-11T06:37:00Z'
-updated_date: '2026-11-13T18:38:00Z'
+updated_date: '2026-11-15T00:02:00Z'
 labels:
   - otdirect
   - review-2026-11-11
@@ -25,9 +26,9 @@ Found in the TASK-1795 audit (docs/reviews/2026-11-11_otdirect-pic-parity-audit/
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 MM=- and any other non-numeric MM clear the override and reply 'MM: -'
-- [ ] #2 OT= with a value of 64 or more, and OT=-, clear and reply 'OT: -'; nothing is written to MsgID 27 or to the outside-temperature state
-- [ ] #3 Host test against the real code (not a re-implementation): red on the old code, green on the fix
+- [x] #1 MM=- and any other non-numeric MM clear the override and reply 'MM: -'
+- [x] #2 OT= with a value of 64 or more, and OT=-, clear and reply 'OT: -'; nothing is written to MsgID 27 or to the outside-temperature state
+- [x] #3 Host test against the real code (not a re-implementation): red on the old code, green on the fix
 - [ ] #4 esp32-combo build, evaluate.py --quick, bench check where the hardware allows (name what was not benched)
 <!-- AC:END -->
 
@@ -37,4 +38,6 @@ Found in the TASK-1795 audit (docs/reviews/2026-11-11_otdirect-pic-parity-audit/
 PIC 6.8 parity audit 2026-11-12 (docs/reviews/2026-11-12_pic68-otdirect-parity-audit/REVIEW.md), section 3 'Corrections to existing tasks'. G: = gateway.asm 6.8 (OTGW-other-projects/otgw-6.8, 770aa45); O: = OTDirect.ino at fa5790118. Read from code only. Correction (incomplete): OT=+15.4 clears on OT-Direct (test `!isdigit && != '-'`, O:3141-3144). PIC accepts a leading + (GetFloat G:5118-5127) and documents that form (G:45).
 
 2026-11-13 delta parity check (TASK-1851, comms, read-only, OT-Direct at origin/dev 479e49391 vs PIC 6.8 gateway.asm; G=gateway.asm, O=OTDirect.ino): partial: OT=- and OT=+x fixed by 9aa81609c (TASK-1846). Still open: MM=- goes into the numeric branch and writes 0 (O:3433-3436; PIC clears, G:4806-4807); OT>=64 still written (PIC clears, G:4259-4263); clear replies echo the input instead of '-' (G:4264).
+
+95 (2026-11-15, lane-95-1859): PIC 6.8 ground truth SetMaxModLevel gateway.asm 6.8:4794-4807 + GetDecimal :5045-5069 (GetDecimal's OR also returns with carry, so above 255 clears too); SetOutsideT :4256-4270. AC1: MM= rewritten: parse error -> clearWriteOverride(14) + 'MM: -', trailing chars SE, >100 OR, reply PrintByte. AC2: done in TASK-1859 commit a148e41eb (OT= GetFloatArg; parse error or 64.00-127.99 clears with 'OT: -', no write to 27, PS=1 value or Toutside; 128-255 stored as the PIC). AC3: tests/test_otd_pic_float.py (real branches) class MaxModulation + test_OT_clears_like_clr_outside_t: 19/19 green; on 34a23dc25 (code before this fix) MM=- enqueued MsgID 14 = 0 and MM=150 was accepted (2 FAIL); OT on origin/dev 84944a95e: OT=99 enqueued (FAIL). Callers: SAT sends MM=T (clear) and MM=%u (SATcontrol.ino:761-762, :876), unchanged behaviour. Sweep: 37 test_otd_* + sat_command_delivery + prototype_hoisting + test_evaluate + sat_max_modulation_1514 exit 0; evaluate --quick 86/0. AC4 (build + bench) with the 1859 build.
 <!-- SECTION:NOTES:END -->

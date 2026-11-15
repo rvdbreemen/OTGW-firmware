@@ -163,7 +163,8 @@ def setUpModule():
         r"else if \(cmd0 == 'C' && cmd1 == 'C'\) \{",
         r"else if \(cmd0 == 'S' && cmd1 == 'W'\) \{",
         r"else if \(cmd0 == 'S' && cmd1 == 'H'\) \{",
-        r"else if \(cmd0 == 'O' && cmd1 == 'T'\) \{")).replace("if (cmd0 == 'C' && cmd1 == 'S')",
+        r"else if \(cmd0 == 'O' && cmd1 == 'T'\) \{",
+        r"else if \(cmd0 == 'M' && cmd1 == 'M'\) \{")).replace("if (cmd0 == 'C' && cmd1 == 'S')",
                                                              "else if (cmd0 == 'C' && cmd1 == 'S')", 1)
     main = MAIN.replace("@BRANCHES@", branches).replace("g_clr_dummy()", "g_clear")
     _tmp = Path(tempfile.mkdtemp(prefix="otd_pf_"))
@@ -315,8 +316,30 @@ class FloatCommands(unittest.TestCase):
         r = cmds(("OT", "-"), ("OT", "x"), ("OT", "64"), ("OT", "99"), ("OT", "63.99"), ("OT", "200"))
         for k in ("OT=-", "OT=x", "OT=64", "OT=99"):
             self.assertEqual((r[k]["clr"], r[k]["enq"], r[k]["rsp"]), ("27", "-1", "-"), k)
+            # TASK-1799 AC2: a clear writes nothing to MsgID 27, the PS=1 outside value or the outside state
+            self.assertEqual((r[k]["ps"], r[k]["tout"]), ("0000", "0.0000"), k)
         self.assertEqual(r["OT=63.99"]["val"], "3FFE")
         self.assertEqual((r["OT=200"]["val"], r["OT=200"]["rsp"]), ("C800", "-56.00"))   # bit 7 set: stored, as the PIC
+
+
+class MaxModulation(unittest.TestCase):
+    """TASK-1799: MM= as the PIC SetMaxModLevel (gateway.asm 6.8:4794-4807) with GetDecimalArg (:5045-5069)."""
+
+    def test_MM_value_and_reply(self):
+        r = cmds(("MM", "50"), ("MM", "0"), ("MM", "100"))
+        self.assertEqual((r["MM=50"]["enq"], r["MM=50"]["val"], r["MM=50"]["rsp"]), ("14", "3200", "50"))
+        self.assertEqual((r["MM=0"]["val"], r["MM=0"]["rsp"]), ("0000", "0"))
+        self.assertEqual(r["MM=100"]["val"], "6400")
+
+    def test_MM_parse_errors_clear(self):
+        r = cmds(("MM", "-"), ("MM", "T"), ("MM", "-5"), ("MM", ""), ("MM", "300"))
+        for k in ("MM=-", "MM=T", "MM=-5", "MM=", "MM=300"):
+            self.assertEqual((r[k]["clr"], r[k]["enq"], r[k]["rsp"]), ("14", "-1", "-"), k)
+
+    def test_MM_refusals(self):
+        r = cmds(("MM", "150"), ("MM", "50x"), ("MM", "5.5"))
+        self.assertEqual((r["MM=150"]["st"], r["MM=150"]["enq"]), ("OR", "-1"))
+        self.assertEqual((r["MM=50x"]["st"], r["MM=5.5"]["st"]), ("SE", "SE"))
 
 
 if __name__ == "__main__":

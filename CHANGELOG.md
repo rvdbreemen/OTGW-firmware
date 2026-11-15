@@ -25,6 +25,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - OT-Direct: `SW=`, `SH=` and `OT=` parse their value as the PIC 6.8 GetFloatArg does. `SW=`/`SH=` answer `BV` outside the boiler's MsgID 48/49 bounds (20-80 and 10-90 until the boiler reports them), as the PIC; `OT=` clears on any value it cannot parse and on 64.00-127.99 (`OT=99` clears) and answers `OT: -`; the stored values round like the PIC (`OT=9.999` is 10.00, was 0x09FF; `SW=55.7` is 0x37B4). `CC=` parses like `CL=` (TASK-1859).
 
 ### Fixed
+- OT-Direct `MM=`: a value the PIC cannot parse (`MM=-`, `MM=`, a minus or above 255) clears the maximum modulation override and answers `MM: -`, as the PIC SetMaxModLevel; `MM=-` used to write 0 % to MsgID 14. Characters after the number are `SE` and above 100 is `OR` (TASK-1799).
 - OT-Direct `RT=`: a value with one decimal is tenths, as on the PIC (`RT=25.4` sends 0x1967); it was read as hundredths (TASK-1859).
 - Home Assistant discovery: the DHW flow rate sensor (MsgID 19, `DHWFlowRate`) announces the unit `L/min`; Home Assistant rejected `l/min` for device class `volume_flow_rate` and did not create the sensor (PR #702 by justink0k; TASK-1949).
 - Monitor > Graph: the 24 h history stores the weather outside temperature only while it is fresh (younger than 1 h) and falls back to MsgID 27, instead of repeating the last value after the weather fetch stopped (TASK-1937).

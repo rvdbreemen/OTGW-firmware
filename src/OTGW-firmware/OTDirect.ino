@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTDirect.ino
-**  Version  : v2.0.0-beta.291
+**  Version  : v2.0.0-beta.292
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -3622,15 +3622,29 @@ bool handleOTDirectCommand(const char* buf, int len, bool satOwn) {
   }
   // MM=xx — Max relative modulation level (MsgID 14). Non-numeric clears.
   else if (cmd0 == 'M' && cmd1 == 'M') {
-    if (!isdigit((unsigned char)value[0]) && value[0] != '-') {
+    // TASK-1799: as the PIC SetMaxModLevel (gateway.asm 6.8:4794-4807): GetDecimalArg (:5045-5069); any parse error
+    // (no digit first, MM=- and MM= included, or above 255) clears with the ValueCleared reply "MM: -"; characters
+    // after the number are SE; above 100 is OR; the reply is the stored percentage (PrintByte).
+    const char* p = value;
+    unsigned mm = 0;
+    bool parsed = isdigit((unsigned char)*p) != 0;
+    while (parsed && isdigit((unsigned char)*p)) {
+      mm = mm * 10 + (unsigned)(*p - '0');
+      if (mm > 255) parsed = false;
+      p++;
+    }
+    if (!parsed) {
       clearWriteOverride(14);
-      synthesizeResponse(buf, value);
-    } else {
-      uint16_t f88 = floatToF88(atof(value));
-      if (enqueueWriteCommand(14, f88, "MM")) {
-        snprintf_P(rspBuf, sizeof(rspBuf), PSTR("%d"), atoi(value));
-        synthesizeResponse(buf, rspBuf);
-      }
+      synthesizeResponse(buf, "-");
+    } else if (*p) {
+      otDirectBridgeProcessStatus("SE");
+      return false;
+    } else if (mm > 100) {
+      otDirectBridgeProcessStatus("OR");
+      return false;
+    } else if (enqueueWriteCommand(14, (uint16_t)(mm << 8), "MM")) {
+      snprintf_P(rspBuf, sizeof(rspBuf), PSTR("%u"), mm);
+      synthesizeResponse(buf, rspBuf);
     }
   }
   // OT=xx.x — Outside temperature (MsgID 27 = Toutside). Non-numeric clears.
