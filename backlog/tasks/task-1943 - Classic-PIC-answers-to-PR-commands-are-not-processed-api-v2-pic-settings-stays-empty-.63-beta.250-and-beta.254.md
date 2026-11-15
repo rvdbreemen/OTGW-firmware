@@ -3,10 +3,11 @@ id: TASK-1943
 title: >-
   Classic PIC: answers to PR= commands are not processed; /api/v2/pic/settings
   stays empty (.63, beta.250 and beta.254)
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-11-14T17:47:00Z'
-updated_date: '2026-11-14T18:09:00Z'
+updated_date: '2026-11-15T03:32:00Z'
 labels:
   - bug
 milestone: 2.0.0
@@ -32,4 +33,6 @@ Seen by 09 on .63 (Classic + ESP32-S3, PIC pic16f1847 gateway 6.8, device/info p
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-11-14 19:09 (09, coordinator hint): GET /api/v2/health on .63 (beta.250 again) reports otgwconnected:false, otgwmode:"detecting", boilerconnected:false, thermostatconnected:false, simulation_active:false. The R80000200 frames seen every second are the gateway's own R (request) frames towards the boiler, with no boiler answer: the PIC on .63 is not on an OT bus or a simulator. Open question for whoever picks this up: does the PIC answer PR= at all without an OT bus (it should; PR= is a local query), or does the firmware ignore PIC lines while otgwmode is 'detecting'? A raw serial capture or a test on a Classic with a boiler or the boiler simulator settles it.
+
+2026-11-15 picked up by ba (wt-ba-1916): first a code trace of the Classic PR: reply path (serial task -> processOT -> handlePRresponse -> state.pic settings / REST), then a bench brief for 09 on .63 (raw PIC serial capture of PR=A and the settings cycle).
 <!-- SECTION:NOTES:END -->
