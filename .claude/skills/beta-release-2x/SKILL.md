@@ -47,9 +47,9 @@ nothing builds or publishes for you. `dev` is the GitHub default branch: without
 1. **CHECKPOINT 1: the 12-hour slots** (Robert 2026-11-02 evening; replaces that day's daily 08:00 rule and its
    "every beta public" morning rule): at most one public beta per 12 hours, at 08:00 or 20:00 local time. Every firmware task keeps its own
    `2.0.0-beta.N` bump and its #alpha-testing zip (alpha track); only the daily release gets a
-   GitHub prerelease and a #beta-testing post. Candidate: the newest beta.N that ran at least
-   1 h on the bench unit (.63) with MQTT connected, without a restart (bootcount = flash + 2, no
-   crashlog, heap not trending down). Robert 2026-11-03: "Soak terugbrengen naar zinvol minimum. Beta
+   GitHub prerelease and a #beta-testing post. Candidate: origin/dev HEAD at the freeze (T-80, see
+   below), published as the release build that ran at least 1 h on the bench unit (.63) with MQTT
+   connected, without a restart (bootcount = flash + 2, no crashlog, heap not trending down). Robert 2026-11-03: "Soak terugbrengen naar zinvol minimum. Beta
    testers zijn er ook om problemen te ontdekken." (was 8 h). 1 h covers boot, the safeboot rollback
    window, WiFi/MQTT connect and the first hourly timers; slow failures are for the field testers.
    No soak waiver: a slot whose candidate has not finished its 1 h soak waits until it has. Every flash
@@ -62,12 +62,30 @@ nothing builds or publishes for you. `dev` is the GitHub default branch: without
    since the previous public beta, CHANGELOG rollover, README link), tagged and built from
    that commit (the beta.7 model); Phase 1/2 go into that commit.
    **Who starts it** (Robert 2026-11-14, standing permission: "Ik wil dat je de release van een beta
-   gewoon uitvoert"): the coordinator invokes this skill itself at the slot once the candidate passed
-   its soak; Robert does not have to type it. Stable releases (`/release-2x`, `/release`) keep the
+   gewoon uitvoert"): the coordinator invokes this skill itself at T-80 (freeze + compose), and
+   publishes at T once the release build passed its soak; Robert does not have to type it. Stable releases (`/release-2x`, `/release`) keep the
    per-action yes.
-   **Slot freeze:** from the slot time until "beta.N tag out", no firmware commit lands on `dev`,
-   or the candidate is no longer the firmware at HEAD. Docs pushes are fine until Phase 2. Keep the
-   bench unit untouched as well (the release bench needs it).
+   **Compose shortly before, publish at the slot** (Robert 2026-11-15: "de release kort van
+   tevoren samenstelt. Zodat elke user de nieuwst mogelijke release krijgt. Geen vertraging na de
+   soak van een 1 uur."). The soak runs on the RELEASE BUILD itself, so the soak end is the
+   publish moment. Timeline for slot T (08:00 or 20:00):
+   - all day: the notes draft and the Discord post draft are kept current after every push
+     (one owner, the comms session), so composing takes minutes, not an hour;
+   - **T-80 min: freeze** firmware pushes on `dev` (announce to every peer); the candidate is
+     origin/dev HEAD at that moment, i.e. the newest firmware that passed its own bench;
+   - **T-80 to T-70: compose** Phase 1 + 2 on top of that HEAD (notes, CHANGELOG rollover, README,
+     Discord draft) and commit; **T-70 to T-62: build** that release commit (Phase 3.1);
+   - **T-62: flash** the release build on the bench unit (.63) and run the Phase 3 checks: this
+     flash starts the 1 h soak (soak end = T-2 at the latest);
+   - **T: soak verdict, then at once** push, tag, draft, verify, publish, posts (Phase 4-6). No
+     rebuild after the soak: the soaked binary is the published binary (sha256 of the bench
+     artifact = the release asset).
+   A firmware commit that lands during the freeze waits for the next slot. If the build or the
+   bench check fails, the slot moves to the earliest time the 1 h soak can still finish (publish
+   then, not at the next slot), or is skipped if the fix needs new firmware.
+   **Slot freeze:** from T-80 until "beta.N tag out", no firmware commit lands on `dev`,
+   or the candidate is no longer the firmware at HEAD. Docs pushes are fine until the release
+   commit (T-70). Keep the bench unit untouched as well (the soak runs on it).
 2. Run from the main dev tree, on `dev`: `git rev-parse --abbrev-ref HEAD` prints `dev`.
 3. `git fetch origin && git status -sb`: local `dev` equals `origin/dev`. When the main tree is
    behind with local edits that conflict (`.wolf/*`, a peer's task file): save them first
