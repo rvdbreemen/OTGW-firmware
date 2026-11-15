@@ -1,7 +1,7 @@
 # anatomy.md
 
-> Auto-maintained by OpenWolf. Last scanned: 2026-11-15T13:23:25.038Z
-> Files: 162 tracked | Anatomy hits: 0 | Misses: 0
+> Auto-maintained by OpenWolf. Last scanned: 2026-11-15T13:38:57.764Z
+> Files: 163 tracked | Anatomy hits: 0 | Misses: 0
 
 ## ../../../../AppData/Local/Temp/
 
@@ -11,6 +11,10 @@
 
 ## ../../../Claude/Projects/Kluis/02-wiki/
 
+
+## ../../../tmp/claude-0/-home-user-OTGW-firmware/b0efc78d-150b-5ddf-9903-449e86f8c5c8/scratchpad/
+
+- `otgw-cloud-telemetry.html` — OTGW cloudtelemetrie (~7442 tok)
 
 ## ../OTGW-firmware.wiki/
 
