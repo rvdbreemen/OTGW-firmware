@@ -87,16 +87,23 @@ keep their current handling.
 
 1. **Forwarded.** Every thermostat WRITE_DATA except MsgID 1, 16 and 24. While `satOwnsControlSetpoint()` is true, the
    writes behind the commands SAT refuses from outside (`satBlocksExternalCommand()`: CS = MsgID 1, C2 = MsgID 8,
-   MM = MsgID 14) keep the local echo and are not forwarded.
-2. **A user override wins.** When a write override is in force for the ID (for example SW= on 56, SH= on 57), the frame
-   goes out with the override's data (origin `OT_DIRECT_ORIGIN_THERMOSTAT_OVERRIDDEN`, reply from
-   `buildOverriddenReply()`), the gateway-mode rule, so the thermostat and the scheduled user write do not fight.
-3. **Slot.** The pending thermostat frame waits only for a master request already in flight (`otMasterRequestActive`),
-   then goes out before the command ring and the schedule; `scheduleMasterRequest()` starts no own frame while one
-   waits.
-4. **Answer.** The boiler's reply goes back unchanged: WRITE_ACK with the boiler's data, Data-Invalid, Unknown-DataID.
-   A timeout or a corrupt reply gives no answer, and the thermostat retries (spec 4.5). The reply hold of TASK-1798
-   (`OTD_REPLY_DEADLINE_MS`) counts from the thermostat frame's arrival on this path.
+   MM = MsgID 14) keep the local echo and are not forwarded. The other commands that function refuses (CH=, H2=,
+   TT=, TC=) map to no thermostat write: CH and H2 are MsgID 0 bits, TT/TC are answer state on MsgID 9 (a READ).
+2. **An override in force wins.** When a write override is in force for the ID, the frame goes out with the override's
+   data (origin `OT_DIRECT_ORIGIN_THERMOSTAT_OVERRIDDEN`, reply from `buildOverriddenReply()`), the gateway-mode rule,
+   so the thermostat and the scheduled write do not fight. This covers a user's SW= (56) and SH= (57) and also SAT's:
+   SAT sends SW= and SH= as commands (`SATcontrol.ino`), and `enqueueWriteCommand()` sets the 56/57 override, so while
+   SAT holds a value the boiler gets SAT's value, not the thermostat's (review F1).
+3. **Slot.** The pending thermostat frame waits for a master request already in flight (`otMasterRequestActive`) and
+   then the master wait time of 100 ms after the end of that conversation (MWT, spec :1100, `OTD_MWT_MS`), then goes
+   out before the command ring and the schedule; `scheduleMasterRequest()` starts no own frame while one waits.
+4. **Answer.** The boiler's reply goes back unchanged: WRITE_ACK with the boiler's data, Data-Invalid, Unknown-DataID,
+   when it belongs to the current thermostat request (no newer thermostat frame arrived) and comes within
+   `OTD_REPLY_DEADLINE_MS` (750 ms) of the relay's send. A timeout, a corrupt reply, a late or a superseded answer
+   gives no answer, and the thermostat retries (spec 4.5). The deadline counts from the send, not from the
+   thermostat's frame (review F2): the worst case from the arrival is a 34 ms own frame + up to 400 ms boiler answer +
+   100 ms MWT + the 34 ms relay + up to 400 ms boiler answer, about 970 ms; as a gateway the spec sets no maximum
+   (:1097-1098), and the sequence check makes a late answer harmless.
 5. **Offline.** While the boiler is offline (TASK-1807) nothing is forwarded or answered.
 
 ## Decision Contract
@@ -107,7 +114,9 @@ keep their current handling.
   data of an active write override for that ID.
 - Return the boiler's reply to the thermostat (WRITE_ACK, Data-Invalid, Unknown-DataID), never a local echo, for a
   forwarded write.
-- Send the forwarded write before any queued command or scheduled frame, once the frame in flight has ended.
+- Send the forwarded write before any queued command or scheduled frame, once the frame in flight has ended and the
+  100 ms MWT after it has passed.
+- Return an answer only for the current thermostat request and only within `OTD_REPLY_DEADLINE_MS` of the relay's send.
 - Keep MsgID 1, 16 and 24 on today's local WRITE_ACK and write-cache path (TASK-1150, TASK-1811).
 - Keep MsgID 1, 8 and 14 on the local echo while SAT owns the setpoint.
 
@@ -124,11 +133,13 @@ keep their current handling.
 
 ### Verification
 
-- Host test on the real `handleMasterModeSlaveFrame()` and the master-mode consumer with a fake bus and fake time:
-  a MsgID 56 write reaches the boiler with the thermostat's data and the thermostat gets the boiler's WRITE_ACK,
-  Data-Invalid or Unknown-DataID; MsgID 1, 16, 24 and, with SAT active, 8 and 14 keep the local echo; an SW= override
-  replaces the data of a 56 write; a write that arrives while an own frame is in flight goes out right after it,
-  before the schedule. Red on the code before TASK-1812, green after.
+- `tests/test_otd_master_write_relay.py` on the real `otdMasterRelaysWrite()`, `applyOverrides()`, the master-mode
+  relay branch of `loopOTDirect()`, the reply check of `handleMasterResponse()` and `scheduleMasterRequest()`, with a
+  fake bus and fake time: a MsgID 56 write reaches the boiler with the thermostat's data and the thermostat gets the
+  boiler's answer; MsgID 1, 16, 24 and, with SAT active, 8 and 14 keep the local echo; an SW= override and SAT's SH=
+  replace the data; a write behind an own frame goes out exactly when the 100 ms MWT after it has passed, before the
+  schedule; an answer 300 ms after the send is returned, one 800 ms after the send or for an older request is not.
+  On the code before TASK-1812 the relay path does not exist (red).
 - Bench where the hardware allows: a thermostat on the slave port of an OTGW32 in master mode with a boiler (or a
   boiler simulator); none on the current bench, so this is field-only until then.
 

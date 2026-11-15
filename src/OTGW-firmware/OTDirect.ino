@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTDirect.ino
-**  Version  : v2.0.0-beta.328
+**  Version  : v2.0.0-beta.329
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -886,13 +886,22 @@ static unsigned long otLastThermostatRequest = 0;
 // before the alternative-slot, UI= and SR= branches (gateway.asm TreatMessage runs before them),
 // although it may take several loop passes before the frame is forwarded.
 static bool otSlaveFrameNoted = false;
+// TASK-1812 (ADR-241): a master-mode relay of a thermostat write answers only its own request. Every received
+// thermostat frame counts up otdSlaveFrameSeq; the relay keeps the count of its frame and the time it was sent.
+// The relay waits the master wait time like the scheduler: OTD_MWT_MS from otdLastConvEndMs (TASK-1954, declared
+// next to otLastAnySendMs, stamped by handleMasterResponse()).
+static uint32_t otdSlaveFrameSeq = 0;
+static uint32_t otdRelaySeq = 0;
+static uint32_t otdRelaySentMs = 0;
 
 // TASK-1798: an answer to the thermostat goes out once the slave side is ready. The library refuses a
 // slave send for RESPONSE_TIME (50 ms) after a received frame (OpenTherm.cpp:443, sendResponse() returns
 // false while isReady() is false), and the gateway makes some answers itself in the same loop pass
 // (master mode, UI=, SR=, the alternative and MsgID 28 slots). A refused answer is kept here and sent
 // from loopOTDirect() as soon as the gate opens; it is dropped, and logged, when the next thermostat
-// frame arrives or after OTD_REPLY_DEADLINE_MS (the slave must answer within 800 ms, OT spec).
+// frame arrives or after OTD_REPLY_DEADLINE_MS. OT spec v4.2: a slave answers 20-400 ms after the master frame
+// (:1093-1095), a slave that is a gateway waits for the next slave in line and has no maximum (:1097-1098); the 800 ms
+// in the library comment (OpenTherm.cpp:8) is not in v4.2. 750 ms bounds how long a held answer is still useful.
 static constexpr uint32_t OTD_REPLY_DEADLINE_MS = 750;
 static unsigned long otdReplyFrame = 0;
 static uint32_t otdReplySinceMs = 0;
@@ -933,6 +942,7 @@ static void otdReplyService() {
 
 static void handleSlaveRequest(unsigned long request, OpenThermResponseStatus status) {
   otdReplyDrop("next thermostat frame");   // any received frame, also an invalid one, ends the old request
+  otdSlaveFrameSeq++;   // TASK-1812: also an invalid frame starts a new conversation
   if (status == OpenThermResponseStatus::SUCCESS) {
     otSlaveFrame = request;
     otSlaveFramePending = true;
@@ -2117,8 +2127,20 @@ static void handleMasterResponse() {
   // A forwarded thermostat frame gets its one reply now. A timeout or a corrupt
   // reply gets none: the thermostat notes the incomplete conversation and
   // retries (OT spec v4.2 section 4.5), as it does behind a PIC gateway.
-  if (status == OpenThermResponseStatus::SUCCESS || boilerDataInvalid) {
+  // TASK-1812 (ADR-241): in master mode a relayed write answers only its own thermostat request (no newer frame
+  // arrived, so a late answer can never reach a later request) and only within OTD_REPLY_DEADLINE_MS of the relay's
+  // send; as a gateway the wait has no spec maximum (v4.2 :1097-1098). Otherwise the thermostat retries (4.5).
+  bool relayCurrent = true;
+  if (IS_MASTER_MODE() && otLastRequestOrigin != OT_DIRECT_ORIGIN_GATEWAY) {
+    relayCurrent = otdRelaySeq == otdSlaveFrameSeq &&
+                   (uint32_t)(millis() - otdRelaySentMs) < OTD_REPLY_DEADLINE_MS;
+    if (!relayCurrent) OTDDebugTln(F("OTD: relayed write answered too late or superseded, no reply to the thermostat"));
+  }
+  if ((status == OpenThermResponseStatus::SUCCESS || boilerDataInvalid) && relayCurrent) {
     replyToThermostat(otLastRequestOrigin, otLastSentRequest, response);
+    if (IS_MASTER_MODE() && otLastRequestOrigin != OT_DIRECT_ORIGIN_GATEWAY && otdReplyPending) {
+      otdReplySinceMs = otdRelaySentMs;   // a held answer keeps the relay's deadline
+    }
   }
 
   // TASK-1954: a received frame (an answer or an invalid one) ends the conversation now; the MWT counts from here.
@@ -2130,11 +2152,28 @@ static void handleMasterResponse() {
 }
 
 // ---------------------------------------------------------------------------
+// TASK-1812 (ADR-241): whether master mode relays this thermostat frame to the boiler. A WRITE_DATA of any ID
+// except 1, 16 and 24 (they keep the local write-cache path, TASK-1150, TASK-1811) goes to the boiler; while SAT
+// owns the setpoint, MsgID 8 and 14 (C2=, MM=, refused from outside by satBlocksExternalCommand) keep the local
+// echo too. Nothing is relayed while the boiler is offline (TASK-1807). Reads stay cache-answered (ADR-066).
+// --- otdMasterRelaysWrite begin
+static bool otdMasterRelaysWrite(unsigned long frame) {
+  if (((frame >> 28) & 0x07) != 1 /* WRITE_DATA */ || !state.otBus.bOnline) return false;
+  const uint8_t id = (frame >> 16) & 0xFF;
+  if (id == 1 || id == 16 || id == 24) return false;
+  if ((id == 8 || id == 14) && satOwnsControlSetpoint()) return false;
+  return true;
+}
+// --- otdMasterRelaysWrite end
+
+// ---------------------------------------------------------------------------
 // scheduleMasterRequest — pick next scheduled message and send async
 // ---------------------------------------------------------------------------
 static void scheduleMasterRequest() {
   // Don't schedule if master is already busy (collision avoidance)
   if (otMasterRequestActive) return;
+  // TASK-1812: a thermostat write waiting for the master port goes first, before the ring and the schedule
+  if (IS_MASTER_MODE() && otSlaveFramePending && otdMasterRelaysWrite(otSlaveFrame)) return;
 
   // TASK-1707: with a thermostat in gateway mode the queue and the schedule go out only in
   // alternative slots (otdAltSlotTaken), never between the thermostat's frames.
@@ -2713,7 +2752,23 @@ void loopOTDirect() {
   // Monitor mode: forward all frames unmodified — skip UI/SR/override tables.
   // Gateway mode: check UI (unknown-ID) and SR (response override) tables first,
   // then apply repeater-mode value overrides before forwarding to boiler.
-  if (otSlaveFramePending && IS_MASTER_MODE()) {
+  if (otSlaveFramePending && IS_MASTER_MODE() && otdMasterRelaysWrite(otSlaveFrame)) {
+    // TASK-1812 (ADR-241): a thermostat write goes to the boiler in the next free master slot, through the
+    // gateway-mode override rule (a user write override replaces the data), and the boiler's answer goes back
+    // through replyToThermostat(). It waits for a frame already in flight and then the MWT (OTD_MWT_MS).
+    if (!otMasterRequestActive && (uint32_t)(millis() - otdLastConvEndMs) >= OTD_MWT_MS) {
+      bool modified = false;
+      unsigned long frameToSend = applyOverrides(otSlaveFrame, modified);
+      otLastThermostatRequest = otSlaveFrame;
+      if (sendMasterRequestAsync(frameToSend,
+            modified ? OT_DIRECT_ORIGIN_THERMOSTAT_OVERRIDDEN : OT_DIRECT_ORIGIN_THERMOSTAT)) {
+        otSlaveFramePending = false;
+        otdRelaySentMs = millis();
+        otdRelaySeq = otdSlaveFrameSeq;
+      }
+    }
+  }
+  else if (otSlaveFramePending && IS_MASTER_MODE()) {
     // Master mode: we are the sole OT master — respond to thermostat ourselves.
     // If a thermostat reconnects while in master mode, we serve it cached data.
     handleMasterModeSlaveFrame(otSlaveFrame);

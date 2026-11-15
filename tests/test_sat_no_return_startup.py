@@ -440,6 +440,11 @@ static void otDirectBridgeProcessStatus(const char* s) { printf("%lu STATUS %s\n
 static void synthesizeResponse(char*, const char*) {}
 static bool otMasterRequestActive = false; static uint32_t otLastAnySendMs = 0; static uint32_t otMinIntervalMs = 100; static uint8_t otScheduleIdx = 0;
 static const uint32_t OT_OFFLINE_RETRY_MS = 30000, OT_VENT_FAST_INTERVAL_MS = 10000, OT_SLOW_INTERVAL_MS = 60000;
+#ifndef IS_MASTER_MODE
+#define IS_MASTER_MODE() (true)
+#endif
+static bool otSlaveFramePending = false; static unsigned long otSlaveFrame = 0;   // TASK-1812: no thermostat write waits
+static bool otdMasterRelaysWrite(unsigned long) { return false; }
 enum { OT_DIRECT_ORIGIN_GATEWAY = 1 };
 static unsigned long otCmdQueue[4]; static uint8_t otCmdTail = 0; static const int OT_CMD_QUEUE_SIZE = 4;
 static uint32_t g_busyUntil = 0;

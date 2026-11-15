@@ -113,6 +113,8 @@ $otdAnchors = @(
      EndRegex = '^static unsigned long buildStatusRequest\(\)\s*\{'; EndKind = 'construct' },
   @{ Name = 'otLoopbackData[] .. handleMasterResponse'; Kind = 'range'; Regex = '^static const uint16_t PROGMEM otLoopbackData\[';
      EndRegex = '^static void handleMasterResponse\(\)\s*\{'; EndKind = 'construct' },
+  @{ Name = 'otdMasterRelaysWrite';         Kind = 'range';     Regex = '^// --- otdMasterRelaysWrite begin';
+     EndRegex = '^// --- otdMasterRelaysWrite end'; EndKind = 'line'; Optional = $true },   # TASK-1812: loopOTDirect calls it
   @{ Name = 'PI state, getFlowTemp';        Kind = 'range';     Regex = '^static float\s+otPiIntegState\b';
      EndRegex = '^float getFlowTemp\(\)\s*\{'; EndKind = 'construct'; Optional = $true },   # only in the revisions before TASK-1684
   @{ Name = 'loopOTDirect';                 Kind = 'construct'; Regex = '^void loopOTDirect\(\)\s*\{' },

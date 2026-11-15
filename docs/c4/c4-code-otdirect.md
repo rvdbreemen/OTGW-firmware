@@ -137,6 +137,7 @@ The OTDirect module operates as a cooperative OpenTherm stack layered on the pro
 - **Purpose**: In master mode (standalone), respond to thermostat as if we ARE the boiler
 - **Behavior**:
   - While the boiler is offline (`!state.otBus.bOnline`, its last MsgID 0 failed) it only logs the thermostat frame and sends no answer, so the thermostat sees the loss instead of the last cached status (TASK-1807)
+  - A thermostat WRITE_DATA of any ID except 1, 16 and 24 (and 8, 14 while SAT owns the setpoint) never reaches this handler: `loopOTDirect()` relays it to the boiler in the next free master slot (after the frame in flight and the 100 ms MWT, `OTD_MWT_MS`) through `applyOverrides()`, ahead of the ring and the schedule, and `handleMasterResponse()` returns the boiler's answer when it belongs to the current thermostat request and comes within `OTD_REPLY_DEADLINE_MS` of the relay's send (`otdMasterRelaysWrite()`, TASK-1812, ADR-241 Proposed)
   - Extracts msgId and msgType (bits 28-30)
   - If READ_DATA (type 0):
     - Returns cached boiler value via `buildOTResponse(4, msgId, cache)` (READ_ACK)
