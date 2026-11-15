@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-29T12:45:00Z'
-updated_date: '2026-11-15T21:47:00Z'
+updated_date: '2026-11-15T23:05:00Z'
 labels:
   - diagnostics
   - tooling
@@ -92,4 +92,6 @@ Robert 2026-11-05 (session otgw-firmware-54, AskUserQuestion): stays parked unti
 2026-11-14 #dev-sat-mqtt (see TASK-1862, owned by Robert's cloud session): Robert to Sergeant D: 'I'm really looking into building an opt in feature to get data from users so you have more to work with.' https://discord.com/channels/812969634638725140/1105556725714649128/1571146379177234436 ; Sergeant D: 'Even with data only from gruijter we made the software even more robust.' https://discord.com/channels/812969634638725140/1105556725714649128/1571146720300105811 (after 'We don't need to be in a hurry', 1571146149442756669). Local per-user field-data archive exists since 2026-11-14 (RvdB/OTGW-field-data, Robert 1571077884976701491).
 
 2026-11-15 built (2.0.0-poc.7). SEC_EVT = 8, 1,408 B (OT 384, SAT 512, debug 1,792; record still 4,096 + 32): 23 event types (EV_* in CloudRecCodec.h; layouts in otrec.EV_LAYOUT; texts LEB length + bytes, floats exact float32, Dallas in exact 1/128 degC steps, cut texts counted as lost). tests/test_cloudrec_codec.py new test: 900 events of every type through the real crec::Recorder, records close when the section is full, every event back in order with its ms time; 5/5 OK. Capture points (32, each in #if HAS_CLOUD_REC so test harnesses that cut real functions stay unchanged): next to the ten diagRec points (OTD commands from the bridge excluded, they go as bridge_in), REST body + result after the handler (restResponseStatus, single async_tcp task), 429 path, Dallas every reading, S0, WiFi connect/disconnect, MQTT connect/disconnect, telnet key, sensor/OTGW simulation switches, webhook result, PIC flash start/done, OTA start/end, FSexplorer upload/delete, bridge lines on both paths (refused flag on the PIC path), health + GET counts every minute, reboot once per boot, central mode change. Not recorded: Ethernet up/down (no event handler exists), WebSocket data (unused). Test suite: 46 failing files on a clean HEAD worktree and the same 46 with the change (pre-existing in this container), no new failure. Build esp32-combo-tlsdyn exit 0: RAM 156,772 B, app 2,258,351 B (98.5 %), 18 cloudRecEv functions linked, no new warnings in the touched files. evaluate --quick 0 FAIL 0 WARN. ADR-243 (Proposed, guideline-level) + README index; tests/test_adr_governance.py OK. Docs: completeness doc status table, tools README, bench check 15. AC 5 needs the bench.
+
+2026-11-15 Robert: 'Akkoord met ADR 243' -> ADR-243 Accepted (status, history, README index). Device evidence still to come from the bench job.
 <!-- SECTION:NOTES:END -->

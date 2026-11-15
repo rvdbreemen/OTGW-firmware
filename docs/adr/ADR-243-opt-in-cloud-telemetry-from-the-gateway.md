@@ -1,7 +1,7 @@
 ---
 id: "ADR-243"
 title: "Opt-in cloud telemetry from the gateway: outbound TLS to a self-hosted collection point, one compressed record a minute, bridge commands included"
-status: "Proposed"
+status: "Accepted"
 date: "2026-11-15"
 binding: false
 gate: null
@@ -38,7 +38,7 @@ format: "canonical"
 
 ## Status
 
-Proposed (2026-11-15). Guideline-level per ADR-080: it governs a proof of concept that exists only in the
+Accepted (2026-11-15, Robert: "Akkoord met ADR 243"). Guideline-level per ADR-080: it governs a proof of concept that exists only in the
 `esp32-combo-tlsdyn` build env (`HAS_CLOUD_REC`) on branch `research/cloud-recording`; no normal build contains
 it. Host tests cover the format and the policy (`tests/test_cloudrec_codec.py`, `tests/test_cloudrec_lz.py`,
 `tests/test_cloudrec_policy.py`, `tools/cloud-recorder/pocketbase/test_client.py`); the device behaviour waits for
@@ -46,6 +46,8 @@ the bench (`docs/diagnostics/cloudrec-bench-job.md`).
 
 ## Status History
 
+- 2026-11-15: Accepted by the maintainer. The device-side evidence (bench job, 16 checks) is still to come; a bench
+  result that contradicts this decision is a reason to supersede it.
 - 2026-11-15: Proposed (TASK-1473, TASK-1991, built on TASK-1862, TASK-1938, TASK-1963, TASK-1971, TASK-1972, TASK-1974,
   TASK-1979).
 
