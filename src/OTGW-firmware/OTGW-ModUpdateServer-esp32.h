@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTGW-ModUpdateServer-esp32.h
-**  Version  : v2.0.0-beta.326
+**  Version  : v2.0.0-beta.327
 **
 **  ESP32 OTA update server — functional equivalent of the ESP8266
 **  OTGW-ModUpdateServer with Nodoshop hardware watchdog feeding.
@@ -148,6 +148,88 @@ inline bool safebootHandover() {
   return esp_partition_erase_range(otadata, 0, otadata->size) == ESP_OK;
 }
 
+// --- otadataStale begin (TASK-1919, sliced by test/host/test_otadata_stale.py)
+// With one OTA slot, esp_ota_set_boot_partition() writes the SAME seq into the other otadata sector
+// (esp_ota_ops.c esp_rewrite_ota_data(): (0 + 1) % 1 + i * 1 with the smallest i >= seq), and the safeboot
+// updater calls it twice per update (at its start and in Update.end()): 09's dumps on .61 show
+// [0] seq 1 PENDING_VERIFY | [1] seq 1 NEW on the first boot of a new image. When that image fails, the
+// bootloader marks [0] ABORTED and boots [1], the same image, a second time instead of the safeboot
+// updater (ADR-191 wants the first failure to roll back). The other sector is never useful with one slot:
+// the bootloader boots the active entry, and a valid other entry can only point back at the same ota_0.
+// Which sector to erase, judged as the bootloader judges (bootloader_common_ota_select_valid() and
+// bootloader_common_select_otadata(): highest seq, an equal seq picks sector 0); -1 = erase nothing.
+inline bool otadataEntryValid(uint32_t seq, uint32_t state, bool crcOk) {
+  return seq != UINT32_MAX && state != 3u /* INVALID */ && state != 4u /* ABORTED */ && crcOk;
+}
+inline int otadataStaleSector(const uint32_t seq[2], const uint32_t state[2], const bool valid[2]) {
+  int active = -1;
+  if (valid[0] && valid[1]) active = (seq[0] >= seq[1]) ? 0 : 1;
+  else if (valid[0]) active = 0;
+  else if (valid[1]) active = 1;
+  if (active < 0) return -1;                    // nothing the bootloader boots from here: leave it all
+  const int other = active ^ 1;
+  if (seq[other] == UINT32_MAX && state[other] == UINT32_MAX) return -1;   // already erased: no flash wear
+  // A VALID copy of the active entry is kept: safebootMarkAppValid() writes it before the confirm, so a power
+  // loss during the confirm's own erase-then-write of the active sector still boots this image (95's review).
+  if (valid[other] && state[other] == 2u /* VALID */ && seq[other] == seq[active]) return -1;
+  return other;
+}
+// --- otadataStale end
+
+// In setup() right after the LittleFS mount (not earlier: see the call site), on the safeboot layout: erase
+// the stale other otadata sector, so a failure of this image rolls back to the safeboot updater at once. Writes one line into msg (empty when nothing is done).
+inline void safebootDropStaleOtadata(char *msg, size_t msgSize) {
+  if (msgSize) msg[0] = '\0';
+  if (!hasSafeboot() || esp_ota_get_app_partition_count() != 1) return;
+  const esp_partition_t *od = esp_partition_find_first(ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_DATA_OTA, nullptr);
+  if (od == nullptr || od->size < 2 * od->erase_size) return;
+  esp_ota_select_entry_t e[2];
+  if (esp_partition_read(od, 0, &e[0], sizeof(e[0])) != ESP_OK ||
+      esp_partition_read(od, od->erase_size, &e[1], sizeof(e[1])) != ESP_OK) return;
+  uint32_t seq[2], st[2];
+  bool valid[2];
+  for (int i = 0; i < 2; i++) {
+    seq[i] = e[i].ota_seq;
+    st[i] = e[i].ota_state;
+    const bool crcOk = e[i].crc == esp_rom_crc32_le(UINT32_MAX, reinterpret_cast<const uint8_t *>(&e[i].ota_seq), 4);
+    valid[i] = otadataEntryValid(seq[i], st[i], crcOk);
+  }
+  const int s = otadataStaleSector(seq, st, valid);
+  if (s < 0) return;
+  const esp_err_t err = esp_partition_erase_range(od, s * od->erase_size, od->erase_size);
+  snprintf_P(msg, msgSize, PSTR("otadata: erased stale sector %d (seq %u state %u; active sector %d seq %u state %u): %s"),
+             s, static_cast<unsigned>(seq[s]), static_cast<unsigned>(st[s]), s ^ 1, static_cast<unsigned>(seq[s ^ 1]),
+             static_cast<unsigned>(st[s ^ 1]), err == ESP_OK ? "OK" : "FAILED");
+}
+
+// TASK-1919 (95's review): esp_ota_mark_app_valid_cancel_rollback() rewrites the active otadata sector in place
+// (esp_ota_ops.c rewrite_ota_seq(): erase, then write). Before it, write the other sector as a VALID entry with
+// the same seq: a power loss in that window then boots this (health-checked) image from the copy, instead of
+// finding no valid otadata and starting the safeboot updater. Only on the one-slot safeboot layout, and only
+// when the active entry is the one this image runs from.
+inline void safebootWriteValidCopy() {
+  if (!hasSafeboot() || esp_ota_get_app_partition_count() != 1) return;
+  const esp_partition_t *od = esp_partition_find_first(ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_DATA_OTA, nullptr);
+  if (od == nullptr || od->size < 2 * od->erase_size) return;
+  esp_ota_select_entry_t e[2];
+  if (esp_partition_read(od, 0, &e[0], sizeof(e[0])) != ESP_OK ||
+      esp_partition_read(od, od->erase_size, &e[1], sizeof(e[1])) != ESP_OK) return;
+  uint32_t seq[2], st[2];
+  bool valid[2];
+  for (int i = 0; i < 2; i++) {
+    seq[i] = e[i].ota_seq;
+    st[i] = e[i].ota_state;
+    valid[i] = otadataEntryValid(seq[i], st[i],
+                                 e[i].crc == esp_rom_crc32_le(UINT32_MAX, reinterpret_cast<const uint8_t *>(&e[i].ota_seq), 4));
+  }
+  const int active = (valid[0] && valid[1]) ? (seq[0] >= seq[1] ? 0 : 1) : valid[0] ? 0 : valid[1] ? 1 : -1;
+  if (active < 0 || st[active] != 1u /* PENDING_VERIFY */) return;
+  esp_ota_select_entry_t copy = e[active];
+  copy.ota_state = 2u;   // VALID; the CRC covers ota_seq only, so it stays the same
+  const uint32_t at = (active ^ 1) * od->erase_size;
+  if (esp_partition_erase_range(od, at, od->erase_size) == ESP_OK) esp_partition_write(od, at, &copy, sizeof(copy));
+}
+
 // Bootloader app rollback (ADR-191): a new image starts as PENDING_VERIFY
 // (verifyRollbackLater() in OTGW-firmware.ino) and must confirm itself, or the
 // next reset rolls back to safeboot. Called after the health gate and before any
@@ -157,6 +239,7 @@ inline void safebootMarkAppValid() {
   const esp_partition_t *running = esp_ota_get_running_partition();
   if (running && esp_ota_get_state_partition(running, &st) == ESP_OK &&
       st == ESP_OTA_IMG_PENDING_VERIFY) {
+    safebootWriteValidCopy();   // TASK-1919: the fallback for the in-place rewrite below
     esp_ota_mark_app_valid_cancel_rollback();
   }
 }

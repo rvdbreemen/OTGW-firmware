@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.ino
-**  Version  : v2.0.0-beta.326
+**  Version  : v2.0.0-beta.327
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -335,6 +335,16 @@ void setup() {
   setLed(LED2, ON);
 
   LittleFSmounted = LittleFS.begin();
+  // TASK-1919: drop the stale otadata entry, so a failure of this new image from here on rolls back to the
+  // safeboot updater at once. Not earlier: as the first call in setup() it hung the boot inside hasSafeboot()
+  // (esp_ota_get_partition_description(), a flash read; the two partition lookups before it returned), with no
+  // panic and no reset; right after this mount it runs (09's markers on .61, debug builds beta.324dbg and
+  // beta.324dbg2, 2026-11-15). Why the read hangs that early is not known.
+  {
+    char otadataMsg[120];
+    safebootDropStaleOtadata(otadataMsg, sizeof(otadataMsg));
+    if (otadataMsg[0]) SetupDebugf(PSTR("%s\r\n"), otadataMsg);
+  }
   if (!LittleFSmounted) SetupDebugln(F("*** ERROR: LittleFS mount FAILED - running on compile-time defaults ***"));
   if (LittleFSmounted && LittleFS.exists(SETTINGS_TMP_FILE)) LittleFS.remove(SETTINGS_TMP_FILE);   // TASK-1913: a reset mid-save leaves it; it holds secrets, and the web server is not up yet
   fsOtaRtcRestoreAtBoot(LittleFSmounted);   // TASK-1774: a reset during a filesystem OTA; before readSettings()
