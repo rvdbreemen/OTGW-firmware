@@ -26,7 +26,7 @@
   - Calls `updateSetting()` for each field (applies validation, constraints, defaults)
   - Clears `settingsDirty` and `pendingSideEffects` after load (prevent unwanted service restarts during boot)
   - Post-processing applies defaults for empty values (hostname, MQTT top topic and HA prefix, unique id, NTP timezone/hostname) and trims MQTT user/password
-  - One-time migrations, persisted through the deferred flush (never a write inside the load): a file without `MQTTuseLegacyOtTopics` is a 1.x.x upgrade and keeps legacy OT topic names (TASK-648); a file without `ui_onboarded` marks the install as already onboarded (TASK-997); `MQTTinterval` 0 with on-change publishing is bumped to `MQTT_DEFAULT_PUBLISH_INTERVAL_SEC` (60, ADR-116)
+  - One-time migrations, persisted through the deferred flush (never a write inside the load): a file without `MQTTuseLegacyOtTopics` is a 1.x.x upgrade and keeps legacy OT topic names (TASK-648); a file without `ui_onboarded` marks the install as already onboarded (TASK-997); a file without the `OTDohpicdefault` marker gets `OTDoverridehb` = true once, like the PIC default (TASK-1961); `MQTTinterval` 0 with on-change publishing is bumped to `MQTT_DEFAULT_PUBLISH_INTERVAL_SEC` (60, ADR-116)
   - Updates timer intervals for sensors and S0 counter based on loaded settings
   - Ends with `safebootSyncNvs(hostname, HTTP password)` so the safeboot updater can read them from NVS (ADR-191)
 - **Dependencies**:
@@ -50,7 +50,7 @@
   - Closes file before optional echo read
   - Covers every persisted sub-section (device, mqtt, ntp, ui, sensors, s0, picBoot, outputs, webhook, sat, wifi) plus the device-level fields (`hostname`, `httppasswd`, `LEDblink`, `darktheme`, `nightlyrestart`, `nightlyrestarthour`, `telnetenabled`, `boardmode`)
   - SAT settings alone: ~100 fields (heating system and source, presets, weather, multi-area, PV boost, BLE roster with per-slot bindkeys, etc.)
-  - OT-direct settings (`HAS_DIRECT_OT`): 14 `OTD*` keys (mode, bypass relay, setback, ventilation)
+  - OT-direct settings (`HAS_DIRECT_OT`): 21 `OTD*` keys (mode, bypass relay, setback, ventilation, the TASK-1836 command state and the TASK-1961 `OTDohpicdefault` marker)
   - Ethernet settings (`HAS_ETH_CAPABLE`): static IP configuration
   - WiFi static IP (`WifiStaticIP`, `WifiSubnet`, `WifiGateway`, `WifiDns1`, `WifiDns2`; empty IP = DHCP) and `WifiNoPortal` (TASK-1645)
   - Ends with `safebootSyncNvs()` like `readSettings()`
@@ -443,6 +443,13 @@ struct OTDirectSettingsSection {
   // Ventilation override persistence (TASK-584)
   bool     bVentEnable, bOpenBypass, bAutoBypass, bFreeVentEnable;  // OT MsgID 70 bits
   uint8_t  iVentSetpoint      = 0;             // Ventilation setpoint 0-100% (OT MsgID 71)
+  // TASK-1836: command state the PIC keeps in EEPROM, written by the commands only (not in /api/v2/settings)
+  uint8_t  iDhwOverride       = 0xFF;          // HW= 0 or 1, 0xFF = A; HW=P is not stored
+  float    fDhwSetpoint       = 0.0f;          // SW= (MsgID 56), 0 = none
+  float    fMaxChSetpoint     = 0.0f;          // SH= (MsgID 57), 0 = none
+  bool     bIgnoreTransitions = true;          // IT= (PIC default 1)
+  bool     bOverrideHB        = true;          // OH= (PIC default 1, TASK-1961 one-time migration)
+  char     sUnknownIds[64]    = "";            // UI= list
 };
 ```
 

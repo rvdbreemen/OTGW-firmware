@@ -229,6 +229,7 @@ Op hardware zonder PIC (OT-Direct) beantwoordt de firmware deze commando's zelf,
 | `PR=C` | `PR: C=240 MHz` |
 | `PR=B` | `PR: B=UU:MM DD-MM-JJJJ`, de bouwtijd van de firmware |
 | `PR=L` | `PR: L=FXOMPC` totdat `LA=`..`LF=` het wijzigen |
+| `PR=T` | `PR: T=11`: overgangen negeren (`IT=`) en override high byte (`OH=`), allebei standaard 1 net als op de PIC |
 | `SC=9:05/3` | `SC: 09:05/3` (uren met twee cijfers) |
 | `SR=18:1,230` | `SR: 18:1/230`: het opgeslagen antwoord als `<id>:<hoge byte>/<lage byte>`, in welke vorm het argument ook kwam |
 | `FT=X` | `FT: D`: het gekozen model (`C`, `I`, `S` of `D`), niet het argument |
@@ -243,6 +244,11 @@ Op OT-Direct leest de firmware de getallen in deze commando's zoals PIC-firmware
 - `MM=` neemt een heel getal: tekst, `MM=-` of een minteken wist hem (`MM: -`), boven 100 is `OR`.
 - `PM=` neemt een Data-ID van 0 tot 255. Bij een tabelgrootte (10, 12, 88, 90, 105, 107) leest hij daarna elke entry van het volgende ID, en bij een tekst (93, 94, 95) elk teken, net als de PIC.
 - Unknown-DataID-antwoorden schakelen MsgID 0, 1, 3, 14, 17 en 25 nooit uit, net als op de PIC.
+- Een commando zonder waarde (`CS=`, `TT=`, `SW=` ...) antwoordt `SE`; `OT=`, `MM=` en `CL=` zonder waarde wissen (`OT: -`), net als op de PIC (TASK-1957).
+- `OT=`, `SW=` en `SH=` bereiken de ketel ook als de thermostaat geen vrij slot overlaat: met een `OT=`-waarde gaat de eigen READ van MsgID 27 van de thermostaat als WRITE 27 met die waarde naar de ketel, en na `SW=` / `SH=` gaat zijn volgende READ van MsgID 56 / 57 één keer als de WRITE, als MsgID 6 die schrijfactie toestaat (TASK-1803).
+- Zolang een `MW=`-, `MH=`-, `M2=`- of `HW=P`-schrijfactie wacht, behandelt de gateway de eigen MsgID 99 van de thermostaat zoals de PIC (zijn READ wordt de WRITE van de gateway) (TASK-1906).
+- `TT=` beantwoordt de MsgID 100-read van de thermostaat met `0x03` en `TC=` met `0x01`; `OH=1`, sinds TASK-1961 de standaard net als op de PIC, zet dat ook in de high byte. Elk OT-Direct-board gaat bij de eerste boot met deze versie één keer naar `OH=1` (marker `OTDohpicdefault` in `settings.ini`); een `OH=0` daarna blijft staan.
+- Master mode: `TT=0` zet een `BS=`- of MQTT-`room_setpoint`-waarde terug op MsgID 16 (TASK-1751).
 
 Alias: `POST /api/v2/otgw/command` (achterwaartse compatibiliteit)
 

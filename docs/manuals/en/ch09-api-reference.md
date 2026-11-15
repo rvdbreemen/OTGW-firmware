@@ -366,6 +366,7 @@ On hardware without a PIC (OT-Direct) the firmware answers these commands itself
 | `PR=C` | `PR: C=240 MHz` |
 | `PR=B` | `PR: B=HH:MM DD-MM-YYYY`, the firmware build time |
 | `PR=L` | `PR: L=FXOMPC` until `LA=`..`LF=` change it |
+| `PR=T` | `PR: T=11`: ignore transitions (`IT=`) and override high byte (`OH=`), both 1 by default as on the PIC |
 | `SC=9:05/3` | `SC: 09:05/3` (two-digit hours) |
 | `SR=18:1,230` | `SR: 18:1/230`: the stored response as `<id>:<high byte>/<low byte>`, whatever form the argument had |
 | `FT=X` | `FT: D`: the selected model (`C`, `I`, `S` or `D`), not the argument |
@@ -380,6 +381,11 @@ On OT-Direct the numbers in these commands are read as PIC firmware 6.8 reads th
 - `MM=` takes a whole number: text, `MM=-` or a minus sign clears it (`MM: -`), above 100 is `OR`.
 - `PM=` takes a Data-ID of 0 to 255. For a table size (10, 12, 88, 90, 105, 107) it then reads every entry of the next ID, and for a string (93, 94, 95) every character, as the PIC does.
 - Unknown-DataID answers never switch off MsgID 0, 1, 3, 14, 17 and 25, as on the PIC.
+- A command without a value (`CS=`, `TT=`, `SW=` ...) answers `SE`; `OT=`, `MM=` and `CL=` without a value clear (`OT: -`), as on the PIC (TASK-1957).
+- `OT=`, `SW=` and `SH=` reach the boiler also when the thermostat leaves no free slot: with an `OT=` value the thermostat's own READ of MsgID 27 goes out as WRITE 27 with that value, and after `SW=` / `SH=` its next READ of MsgID 56 / 57 goes out once as the WRITE, when MsgID 6 allows that write (TASK-1803).
+- While an `MW=`, `MH=`, `M2=` or `HW=P` write is pending, the thermostat's own MsgID 99 is handled as on the PIC (its READ becomes the gateway's WRITE) (TASK-1906).
+- `TT=` answers the thermostat's MsgID 100 read with `0x03` and `TC=` with `0x01`; `OH=1`, the default since TASK-1961 as on the PIC, copies that into the high byte. Every OT-Direct board switches to `OH=1` once on its first boot with this version (marker `OTDohpicdefault` in `settings.ini`); an `OH=0` sent afterwards stays.
+- Master mode: `TT=0` puts a `BS=` or MQTT `room_setpoint` value back on MsgID 16 (TASK-1751).
 
 Commands are validated and queued. Responses are processed asynchronously and published to MQTT. The REST endpoint returns `"queued"` immediately without waiting for the PIC response.
 

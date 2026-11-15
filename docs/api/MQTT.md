@@ -949,7 +949,7 @@ On standard PIC firmware, only `0` (monitor) and `1` (gateway) are recognized.
 | `clearresponsemod` | `"12"` | `CM=12` | Clear response modifier for MsgID |
 | `resetcounter` | `"HBS"` | `RS=HBS` | Reset a boiler energy/runtime counter (see table below) |
 | `ignoretransitations` | `"0"` / `"1"` | `IT=0` / `IT=1` | Ignore transitions in OT signal (0=off, 1=on) |
-| `overridehb` | `"0"` / `"1"` | `OH=0` / `OH=1` | Override high byte of OT frames (0=off, 1=on) |
+| `overridehb` | `"0"` / `"1"` | `OH=0` / `OH=1` | Copy the MsgID 100 override flags into the high byte (0=off, 1=on, default 1 like the PIC; TASK-1961) |
 | `forcethermostat` | `"I"` | `FT=I` | Force thermostat detection mode (mirrors PIC FT= command) |
 | `voltageref` | `"3"` | `VR=3` | Voltage reference setting (stored locally, returned by PR=V) |
 | `debugptr` | `"0"` | `DP=0` | Debug pointer (no-op; acknowledged but has no effect on OTGW32) |
@@ -976,18 +976,18 @@ Sending `PR=X` returns the current value of register `X`. On OTGW32 these are sy
 
 | Topic suffix | Payload | Returns | Description |
 |--------------|---------|---------|-------------|
-| `command` | `"PR=A"` | `PR: A=OpenTherm Gateway 6.6` | Banner in the PIC format; the version is the PIC command set OT-Direct implements (pyotgw and OTmonitor read it) |
+| `command` | `"PR=A"` | `PR: A=OpenTherm Gateway 6.8 OTGW32` | Banner in the PIC format, the board after the version; the version is the PIC command set OT-Direct implements (pyotgw and OTmonitor read it) |
 | `command` | `"PR=M"` | `PR: M=G` / `M=M` / `M=P` / `M=S` / `M=L` | Current gateway mode: G=gateway, M=monitor, P=passthru (bypass), S=standalone, L=loopback |
-| `command` | `"PR=O"` | `PR: O=T20.50` / `O=C20.50` / `O=N` | Setpoint override: T=temporary (TT=), C=constant (TC=), N=none |
+| `command` | `"PR=O"` | `PR: O=T20.50` / `O=C20.50` / `O=N` | Room setpoint override: T=temporary (TT=), C=constant (TC=), lowercase `t`/`c` until the thermostat accepts it, N=none, `n` while a clear is pending; a `CS=` override reports N (TASK-1848) |
 | `command` | `"PR=S"` | `PR: S=15.00` | Setback temperature (SB= value) |
 | `command` | `"PR=W"` | `PR: W=0` / `W=1` / `W=A` | DHW override: 0=off, 1=on, A=auto |
 | `command` | `"PR=G"` | `PR: G=00` | GPIO A+B function codes (stored locally, no hardware effect on OTGW32) |
 | `command` | `"PR=I"` | `PR: I=00` | GPIO A+B input states (always `00` on OTGW32, no GPIO inputs) |
-| `command` | `"PR=L"` | `PR: L=RFFTTT` | LED A–F function chars (stored locally, no hardware effect on OTGW32) |
-| `command` | `"PR=T"` | `PR: T=0/0` | Tweaks: ignore_transitions/override_high_byte |
+| `command` | `"PR=L"` | `PR: L=FXOMPC` | LED A–F function chars, PIC default `FXOMPC` (stored locally, no hardware effect on OTGW32) |
+| `command` | `"PR=T"` | `PR: T=11` | Tweaks: two digits without separator, ignore transitions (`IT=`) then override high byte (`OH=`); both default 1 as on the PIC (TASK-1797, TASK-1961) |
 | `command` | `"PR=D"` | `PR: D=O` | Temp sensor function (O=outside, R=return) |
-| `command` | `"PR=P"` | `PR: P=M` | Smart power mode (always M=medium on OTGW32) |
-| `command` | `"PR=R"` | `PR: R=I` | Thermostat detection mode (always I=internal on OTGW32) |
+| `command` | `"PR=P"` | `PR: P=Medium power` | Smart Power level towards the thermostat: `Low power`, `Medium power` or `High power` (TASK-1848) |
+| `command` | `"PR=R"` | `PR: R=D` | Thermostat model: `D` (auto-detect, default) or `S`, `C`, `I` after `FT=` (TASK-1848) |
 | `command` | `"PR=B"` | `PR: B=Apr  8 2026` | Firmware build date |
 | `command` | `"PR=C"` | `PR: C=240` | CPU clock in MHz (ESP32-S3 at 240 MHz) |
 | `command` | `"PR=Q"` | `PR: Q=P` / `Q=C` / `Q=W` / `Q=B` / `Q=E` | Reset cause: P=power-on, C=software(cold), W=watchdog, B=brownout, E=external |
