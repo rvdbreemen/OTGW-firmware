@@ -7,6 +7,7 @@ status: To Do
 assignee:
   - '@claude'
 created_date: '2026-11-15T21:35:00Z'
+updated_date: '2026-11-15T21:39:00Z'
 labels:
   - sat
   - sergeant-d
@@ -29,3 +30,9 @@ Sergeant D answered Q-SUP1 with 'A, 2 minutes window' (entry 364, https://discor
 - [ ] #3 The start-up flood (entry 334b/Q-334b, 2 s) and the flow clamp (entries 336-349) keep their own flow source unless the plan says otherwise, with the entries named
 - [ ] #4 Bench or simulation evidence of the CS during a PWM ON phase
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Owner: 95 (after TASK-1412.18), per the coordinator 2026-11-15.
+<!-- SECTION:NOTES:END -->
