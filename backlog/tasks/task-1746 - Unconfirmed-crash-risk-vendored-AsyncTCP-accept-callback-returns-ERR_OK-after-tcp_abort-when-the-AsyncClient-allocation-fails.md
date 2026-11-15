@@ -3,11 +3,11 @@ id: TASK-1746
 title: >-
   Unconfirmed crash risk: vendored AsyncTCP accept callback returns ERR_OK after
   tcp_abort() when the AsyncClient allocation fails
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-09T06:21:00Z'
-updated_date: '2026-11-12T23:06:00Z'
+updated_date: '2026-11-15T07:34:00Z'
 labels:
   - asynctcp
   - crash-risk
@@ -55,4 +55,14 @@ AC2 ticked: upstream checked by otgw-firmware-09 (2026-11-12): pinned 3.4.10 and
 AC5 evidence from otgw-firmware-09 (relayed by the coordinator, 2026-11-13). Old code: beta.215+242633e had 1 PANIC in 12 /ReBoot cycles (tcp_accept, ELF-decoded, elf bc261223, C:/Users/rvdbr/AppData/Local/Temp/claude/d9c572fbc7f8e9ee/4f6ad420-bf33-4a3a-88bc-4eb9890a2231/scratchpad/b215/); beta.217 0/38; beta.218 0/12 (partly mixed with bench208 strays); in total 1 panic in 62 teardowns on old code, the redirect page not checked there. New code beta.219: 0/21 panics, redirect (817 B) checked 21/21 (C:/Users/rvdbr/AppData/Local/Temp/claude/d9c572fbc7f8e9ee/4f6ad420-bf33-4a3a-88bc-4eb9890a2231/scratchpad/b219/, b219f/).
 
 AC5 ticked with an honest limit: statistically thin. Old 1/62 against new 0/21 does not tell the builds apart on its own. What carries the AC: the panic reproduced on 215 and decoded to tcp_accept, the code change (listener stopped before the teardown, host test red on the old code), and the redirect check 21/21 on the new build. A same-shape 20x run on the old build with the redirect check was NOT done (09 deliberately did not flash back). Robert can still reject this reading.
+
+Stale audit 2026-11-14 (coordinator decision): In Review. Waiting for Robert to accept or reject the reading of the redirect check (AC 4/5; the same-shape 20x run on the old build was not done).
+
+2026-11-15 Robert's decision (DM 1571426306359562321, reply 'A' to triage question 1571283749482668066: 'A) accept that evidence and close (AC3 superseded)'). Closed on that decision.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Closed on Robert's decision A (DM 1571426306359562321 on question 1571283749482668066, 2026-11-15). Per AC: #1 Robert decided (his earlier B, recorded in the notes); #2 upstream checked (in the notes); #3 superseded by that earlier B decision, not ticked; #4 the port-80 listener closes before /ReBoot and the reset-wireless teardown, host/source test red on the old code (in the notes); #5 bench by 09 on .61: 1 panic in 62 reboots on the old build, 0 in 21 on the new one, accepted by Robert as sufficient (A).
+<!-- SECTION:FINAL_SUMMARY:END -->

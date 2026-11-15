@@ -112,11 +112,16 @@ def cut_setup(src: str) -> str:
 
 
 def cut_core(src: str) -> str:
-    a = src.index("    if (!state.pic.bAvailable && !isOTDirectEnabled()) {")
+    # TASK-1902 added `&& !replayed` (a replayed banner never re-enables the PIC). The gate cuts the block either
+    # way and runs it as a live banner (replayed = false), so it still tests ADR-201's persist rule.
+    m = re.search(r"    if \(!state\.pic\.bAvailable && !isOTDirectEnabled\(\)( && !replayed)?\) \{", src)
+    assert m, "banner persist anchor not found"
+    a = m.start()
     b = src.index("    strlcpy(state.pic.sFwversion", a)
     block = src[a:b]
     assert "writeSettings(false)" in block, "banner persist site moved"
-    return "#define HAS_RUNTIME_HW_DETECT 1\nstatic void bannerHandler() {\n" + block + "}\n"
+    return ("#define HAS_RUNTIME_HW_DETECT 1\nstatic void bannerHandler() {\n  const bool replayed = false;\n  (void)replayed;\n"
+            + block + "}\n")
 
 
 def load(path: Path) -> str:

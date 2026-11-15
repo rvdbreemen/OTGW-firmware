@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-beta.247
+**  Version  : v2.0.0-beta.295
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -88,8 +88,13 @@ static bool webConnCapExceeded(bool report = true, bool reserve = false) {
   const uint16_t http = (held > ws) ? (uint16_t)(held - ws) : 0;
   if (http <= WEB_MAX_TX_CONNECTIONS) return false;
   if (!report) return true;
-  RESTDebugTf(PSTR("WEB CONN CAP: %u connections hold TX (%u ws, cap %u) => 503\r\n"),
-              held, ws, (unsigned)WEB_MAX_TX_CONNECTIONS);
+  PlatformTcpTxBreakdown why;   // TASK-1947: a second walk, on the refusal path only
+  WebQueuedFileResponse::txBreakdown(&why);
+  RESTDebugTf(PSTR("WEB CONN CAP: %u connections hold TX (%u ws, cap %u) => 503 "
+                   "[est-idle %u est-data %u closing-data %u closing-fin %u syn-rcvd %u other %u, %u B queued]\r\n"),
+              held, ws, (unsigned)WEB_MAX_TX_CONNECTIONS, why.estIdle, why.estData,
+              why.closingData, why.closingFin, why.synRcvd, why.otherEmpty,
+              (unsigned)why.payloadBytes);
   state.heapdiag.iWebConn503Count++;
   return true;
 }
@@ -296,6 +301,7 @@ static bool parseMsgId(const char *token, uint8_t &msgId) {
   return true;
 }
 
+
 //=======================================================================
 // v2 API Route Dispatch Table (ADR-050)
 // Each resource gets its own handler function. Adding a new endpoint
@@ -362,7 +368,11 @@ static void handleCommandSubmit(const char* cmdStr) {
     sendApiError(413, F("Command too long"));
     return;
   }
-  addCommandToQueue(cmdStr, static_cast<int>(cmdLen));
+  // TASK-1761: a full queue (PIC) or a full OT-Direct text ring is Dropped: say so instead of 202.
+  if (addCommandToQueue(cmdStr, static_cast<int>(cmdLen)) == CmdQueueResult::Dropped) {
+    sendApiError(503, F("Command not queued (queue full)"));
+    return;
+  }
   sendCorsOriginHeader();
   webSend(202, F("application/json"), F("{\"status\":\"queued\"}"));
 }
@@ -532,13 +542,15 @@ static void handleOTDirect(const char words[][API_WORD_LEN], uint8_t wc, HTTPMet
     if (!hasArgCompat("mode")) { sendApiError(400, F("Missing 'mode' parameter")); return; }
     String modeStr = argCompat("mode");
     // TASK-438: GW=0 is now monitor (PIC parity); bypass moved to GW=P alias.
-    if (modeStr == F("gateway"))       addCommandToQueue("GW=1", 4, true);
-    else if (modeStr == F("monitor"))  addCommandToQueue("GW=0", 4, true);
-    else if (modeStr == F("bypass"))   addCommandToQueue("GW=P", 4, true);
-    else if (modeStr == F("master"))   addCommandToQueue("GW=S", 4, true);
-    else if (modeStr == F("loopback")) addCommandToQueue("GW=L", 4, true);
+    const char* gw = nullptr;
+    if (modeStr == F("gateway"))       gw = "GW=1";
+    else if (modeStr == F("monitor"))  gw = "GW=0";
+    else if (modeStr == F("bypass"))   gw = "GW=P";
+    else if (modeStr == F("master"))   gw = "GW=S";
+    else if (modeStr == F("loopback")) gw = "GW=L";
     else { sendApiError(400, F("Invalid mode. Use: gateway, monitor, bypass, master, loopback")); return; }
-    // Return current status (mode will be updated by the time response renders)
+    if (addCommandToQueue(gw, 4, true) == CmdQueueResult::Dropped) { sendApiError(503, F("Command not queued (queue full)")); return; }
+    // TASK-1761: the switch runs on the loop task at its next pass, so this status can still show the old mode.
     sendOTDirectStatus();
   }
   // GET /api/v2/otdirect/settings — read OTD settings
@@ -625,8 +637,10 @@ static void handleOTDirect(const char words[][API_WORD_LEN], uint8_t wc, HTTPMet
       } else {
         sendApiError(400, F("Invalid action. Use: sr, cr, rm, cm, ui, ki")); return;
       }
-      addCommandToQueue(cmdBuf, strlen(cmdBuf), true);
-      // Return updated override list
+      if (addCommandToQueue(cmdBuf, strlen(cmdBuf), true) == CmdQueueResult::Dropped) {   // TASK-1761
+        sendApiError(503, F("Command not queued (queue full)")); return;
+      }
+      // Return the override list (TASK-1761: the command runs at the next loop pass, so it may not show yet)
       sendCorsOriginHeader();
       sendOTDirectOverridesJSON();
     } else {
@@ -1727,154 +1741,63 @@ static void handleSAT(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod m
   // POST /api/v2/sat/markers           — add marker; body: {"outside_temp":5.0,"flow_temp":55.0,"label":"optional"}
   // DELETE /api/v2/sat/markers/<id>    — delete marker by integer id
   else if (strcasecmp_P(sub, PSTR("markers")) == 0) {
-    static const char kSatMarkersFile[] PROGMEM = "/sat_markers.json";
-    static const int  kSatMarkersMax    = 20;
-    char fname[24];
-    strlcpy_P(fname, kSatMarkersFile, sizeof(fname));
-
-    // Stream one JSON object {…} from f into buf (nul-terminated).
-    // Advances past any leading whitespace/commas/'['. Returns false at ']' or EOF.
-    auto readObj = [](File& f, char* buf, size_t sz) -> bool {
-      while (f.available()) {
-        char c = (char)f.read();
-        if (c == '{') {
-          buf[0] = '{'; size_t n = 1; int depth = 1;
-          while (f.available() && depth > 0 && n < sz - 1) {
-            char c2 = (char)f.read();
-            buf[n++] = c2;
-            if (c2 == '{') depth++;
-            else if (c2 == '}') depth--;
-          }
-          buf[n] = '\0';
-          return depth == 0;
-        }
-        if (c == ']') return false;
-      }
-      return false;
-    };
-
-    if (method == HTTP_GET) {
-      // Stream file directly; return empty array if not present
-      if (!LittleFS.exists(fname)) {
-        webSend(200, F("application/json"), F("[]"));
-      } else {
-        webPushHeader(F("Cache-Control"), F("no-cache"));
-        webSendFile(fname, F("application/json"), /*gzip=*/false);
-      }
+    // TASK-1911: served from the RAM copy (// --- satMarkers block above); the loop task writes the file.
+    if (method != HTTP_GET && method != HTTP_POST && method != HTTP_DELETE) {
+      sendApiMethodNotAllowed(F("GET, POST, DELETE"));
+      return;
     }
-    else if (method == HTTP_POST) {
+    float ot = 0.0f, ft = 0.0f;
+    char lblBuf[32] = {0};
+    int delId = 0;
+    if (method == HTTP_POST) {
       // Parse outside_temp, flow_temp, optional label from JSON body
       if (!hasArgCompat(F("plain"))) { sendApiError(400, F("Missing JSON body")); return; }
       const char* body = bodyCompat();
-      char otBuf[10], ftBuf[10], lblBuf[32];
-      otBuf[0] = '\0'; ftBuf[0] = '\0'; lblBuf[0] = '\0';
+      char otBuf[10], ftBuf[10];
+      otBuf[0] = 0; ftBuf[0] = 0;
       extractJsonField(body, F("outside_temp"), otBuf, sizeof(otBuf));
       extractJsonField(body, F("flow_temp"),    ftBuf, sizeof(ftBuf));
       extractJsonField(body, F("label"),        lblBuf, sizeof(lblBuf));
-      float ot = atof(otBuf);
-      float ft = atof(ftBuf);
-      if (otBuf[0] == '\0' || ftBuf[0] == '\0' ||
+      ot = atof(otBuf);
+      ft = atof(ftBuf);
+      if (otBuf[0] == 0 || ftBuf[0] == 0 ||
           ot < -15.0f || ot > 25.0f || ft < 10.0f || ft > 90.0f) {
         sendApiError(400, F("outside_temp (-15..25) and flow_temp (10..90) required"));
         return;
       }
-      // Pass 1: stream existing file to count markers and find max id (~200-byte stack)
-      int mcount = 0, maxId = 0;
-      {
-        char objBuf[200];
-        File rf = LittleFS.open(fname, "r");
-        if (rf) {
-          while (readObj(rf, objBuf, sizeof(objBuf))) {
-            mcount++;
-            const char* idp = strstr(objBuf, "\"id\":");
-            if (idp) {
-              idp += 5; while (*idp == ' ') idp++;
-              int v = atoi(idp); if (v > maxId) maxId = v;
-            }
-          }
-          rf.close();
-        }
-      }
-      if (mcount >= kSatMarkersMax) {
-        sendApiError(409, F("Maximum markers (20) reached; delete one first"));
-        return;
-      }
-      int newId = maxId + 1;
-      time_t now = time(nullptr);
-      char entry[192];
-      for (char* lp = lblBuf; *lp; lp++) { if (*lp == '"' || *lp == '\\') *lp = '_'; }
-      snprintf_P(entry, sizeof(entry),
-        PSTR("{\"id\":%d,\"outside_temp\":%.1f,\"flow_temp\":%.1f,\"added\":%lu,\"label\":\"%s\"}"),
-        newId, ot, ft, (unsigned long)now, lblBuf);
-      // Pass 2: write existing markers + new entry to temp file, then rename
-      char tmpname[28];
-      strlcpy_P(tmpname, PSTR("/sat_markers.tmp"), sizeof(tmpname));
-      {
-        char objBuf[200];
-        File wf = LittleFS.open(tmpname, "w");
-        if (!wf) { sendApiError(500, F("Cannot write markers file")); return; }
-        wf.print('[');
-        bool first = true;
-        File rf = LittleFS.open(fname, "r");
-        if (rf) {
-          while (readObj(rf, objBuf, sizeof(objBuf))) {
-            if (!first) wf.print(',');
-            wf.print(objBuf);
-            first = false;
-          }
-          rf.close();
-        }
-        if (!first) wf.print(',');
-        wf.print(entry);
-        wf.print(']');
-        wf.close();
-      }
-      if (!LittleFS.rename(tmpname, fname)) {
-        sendApiError(500, F("Cannot finalize markers file")); return;
-      }
-      char resp[64];
-      snprintf_P(resp, sizeof(resp), PSTR("{\"status\":\"ok\",\"id\":%d}"), newId);
-      webSend(201, F("application/json"), resp);
-    }
-    else if (method == HTTP_DELETE) {
+      // quotes, backslashes and braces would break the stored JSON or the object scan
+      for (char* lp = lblBuf; *lp; lp++) { if (*lp == '"' || *lp == '\\' || *lp == '{' || *lp == '}') *lp = '_'; }
+    } else if (method == HTTP_DELETE) {
       // DELETE /api/v2/sat/markers/<id>
       if (wc < 6) { sendApiError(400, F("Missing marker id in path")); return; }
-      int delId = atoi(words[5]);
+      delId = atoi(words[5]);
       if (delId <= 0) { sendApiError(400, F("Invalid marker id")); return; }
-      File rf = LittleFS.open(fname, "r");
-      if (!rf) { sendApiError(404, F("No markers found")); return; }
-      char tmpname[28];
-      strlcpy_P(tmpname, PSTR("/sat_markers.tmp"), sizeof(tmpname));
-      File wf = LittleFS.open(tmpname, "w");
-      if (!wf) { rf.close(); sendApiError(500, F("Cannot write temp file")); return; }
-      wf.print('[');
-      bool first = true, found = false;
-      char objBuf[200];
-      while (readObj(rf, objBuf, sizeof(objBuf))) {
-        const char* idp = strstr(objBuf, "\"id\":");
-        int thisId = 0;
-        if (idp) { idp += 5; while (*idp == ' ') idp++; thisId = atoi(idp); }
-        if (thisId == delId) { found = true; continue; }
-        if (!first) wf.print(',');
-        wf.print(objBuf);
-        first = false;
-      }
-      wf.print(']');
-      rf.close();
-      wf.close();
-      if (!found) {
-        LittleFS.remove(tmpname);
-        sendApiError(404, F("Marker id not found"));
-        return;
-      }
-      if (!LittleFS.rename(tmpname, fname)) {
-        sendApiError(500, F("Cannot finalize markers file")); return;
-      }
-      webSend(200, F("application/json"), F("{\"status\":\"ok\"}"));
     }
-    else {
-      sendApiMethodNotAllowed(F("GET, POST, DELETE"));
+    if (!satMarkersLock(100)) { sendApiError(503, F("Markers busy, retry")); return; }
+    if (method == HTTP_GET) {
+      webPushHeader(F("Cache-Control"), F("no-cache"));
+      webSend(200, F("application/json"), satMarkersJsonLocked());   // webSend copies the body before the unlock
+    } else if (method == HTTP_POST) {
+      int mcount = 0, maxId = 0;
+      satMarkersScanLocked(mcount, maxId);
+      const int newId = maxId + 1;
+      char entry[192];
+      snprintf_P(entry, sizeof(entry),
+        PSTR("{\"id\":%d,\"outside_temp\":%.1f,\"flow_temp\":%.1f,\"added\":%lu,\"label\":\"%s\"}"),
+        newId, ot, ft, (unsigned long)time(nullptr), lblBuf);
+      const int r = satMarkersAppendLocked(entry, mcount);
+      if (r == 1)      sendApiError(409, F("Maximum markers (20) reached; delete one first"));
+      else if (r != 0) sendApiError(500, F("Cannot store marker"));
+      else {
+        char resp[64];
+        snprintf_P(resp, sizeof(resp), PSTR("{\"status\":\"ok\",\"id\":%d}"), newId);
+        webSend(201, F("application/json"), resp);
+      }
+    } else {
+      if (satMarkersDeleteLocked(delId)) webSend(200, F("application/json"), F("{\"status\":\"ok\"}"));
+      else                               sendApiError(404, F("Marker id not found"));
     }
+    satMarkersUnlock();
   }
   // --- TASK-587: DS18B20 sensor-to-SAT-area mapping ---
   // GET   /api/v2/sat/sensor-areas         — return all 4 area mappings as JSON
@@ -2155,6 +2078,7 @@ struct DebugDumpSnap {
   uint32_t  heapFragPct;
   uint32_t  heapMinFree;
   uint32_t  heapMaxAlloc;
+  uint32_t  nowMs;                    // TASK-1910: millis() once, so a time-based class cannot change between window passes
   bool      wifiConnected;
   int32_t   rssi;
   float     roomTemp;
@@ -2229,6 +2153,7 @@ static void handleDebugDump(const char words[][API_WORD_LEN], uint8_t wc, HTTPMe
   snap->heapFragPct  = platformHeapFragmentation();
   snap->heapMinFree  = platformMinFreeHeap();
   snap->heapMaxAlloc = platformMaxFreeBlock();
+  snap->nowMs        = millis();
   snap->wifiConnected = (WiFi.status() == WL_CONNECTED);
   snap->rssi         = WiFi.RSSI();
   snap->roomTemp     = satGetRoomTemp();
@@ -2420,7 +2345,7 @@ static void handleDebugDump(const char words[][API_WORD_LEN], uint8_t wc, HTTPMe
     je.field(F("state.sat.pid_i"), snap->st.sat.fPidI);
     je.field(F("state.sat.pid_d"), snap->st.sat.fPidD);
     je.field(F("state.sat.cycle_count"), (uint32_t)snap->st.sat.iCycleCount);
-    je.field(F("state.sat.last_cycle_class"), (int32_t)satReportedLastCycleClass(snap->st.sat, millis()));
+    je.field(F("state.sat.last_cycle_class"), (int32_t)satReportedLastCycleClass(snap->st.sat, snap->nowMs));
     je.field(F("state.sat.duty_ratio"), snap->st.sat.fDutyRatio);
     je.field(F("state.sat.pwm_duty"), snap->st.sat.fPwmDutyCycle);
     je.field(F("state.sat.active_preset"), (int32_t)snap->st.sat.eActivePreset);
@@ -3181,6 +3106,9 @@ struct DeviceInfoSnap {
   uint32_t  freeHeap;
   uint32_t  maxFreeBlock;
   uint32_t  heapMinFree;         // TASK-1017: platformMinFreeHeap(), frozen (was a live read the closure would need)
+  int32_t   psramFree;           // TASK-1910: the three heap reads were live in the closure; a value that gained a
+  int32_t   internalFree;        // digit between window passes repeated the closing '}' (DETERMINISM CONTRACT,
+  int32_t   internalMaxBlk;      // jsonChunked.h)
   int32_t   ipc0StackMin;        // TASK-1865: ipc0 / ipc1 stack free at its low point since boot, bytes (-1 = not found)
   int32_t   ipc1StackMin;
   uint8_t   fragPct;
@@ -3238,6 +3166,9 @@ void sendDeviceInfoV2()
   snap->heapMinFree     = platformMinFreeHeap();  // TASK-1017
   snap->ipc0StackMin    = platformIpcStackHighWater("ipc0");  // TASK-1865: bytes free at the low point, -1 = not found
   snap->ipc1StackMin    = platformIpcStackHighWater("ipc1");
+  snap->psramFree       = (int32_t)ESP.getFreePsram();
+  snap->internalFree    = (int32_t)heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
+  snap->internalMaxBlk  = (int32_t)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL);
   snap->fragPct         = getHeapFragmentation();
   snap->pendingDiscoveryIds = countPendingDiscoveryIds();
   snap->rssi            = WiFi.RSSI();
@@ -3447,10 +3378,10 @@ void sendDeviceInfoV2()
     je.field(F("status_pixel_gpio"), (int32_t)statusPixelGpio());  // TASK-1221: 0 = no LOLIN pixel driven
 #endif
     je.field(F("psram_size"),     (int32_t)ESP.getPsramSize());
-    je.field(F("psram_free"),     (int32_t)ESP.getFreePsram());
+    je.field(F("psram_free"),     snap->psramFree);
     je.field(F("flash_size"),     (int32_t)ESP.getFlashChipSize());
-    je.field(F("internal_free"),  (int32_t)heap_caps_get_free_size(MALLOC_CAP_INTERNAL));
-    je.field(F("internal_maxblk"),(int32_t)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL));
+    je.field(F("internal_free"),  snap->internalFree);
+    je.field(F("internal_maxblk"),snap->internalMaxBlk);
     {
       const uint32_t flashMB = ESP.getFlashChipSize() / (1024UL * 1024UL);
       const uint32_t psramMB = ESP.getPsramSize()    / (1024UL * 1024UL);
@@ -3494,6 +3425,8 @@ void sendDeviceInfoV2()
     je.field(F("hd_mqtt_queue_hwm"),       (uint32_t)snap->st.heapdiag.iMqttQueueHwm);
     je.field(F("hd_ipc0_stack_min"),       snap->ipc0StackMin);   // TASK-1865 / ADR-225: IPC stack headroom
     je.field(F("hd_ipc1_stack_min"),       snap->ipc1StackMin);
+    je.field(F("hd_ipc0_stack_min_hwdetect"), snap->st.heapdiag.iIpc0StackMinHwDetect);  // TASK-1870.1: boot phase
+    je.field(F("hd_ipc1_stack_min_hwdetect"), snap->st.heapdiag.iIpc1StackMinHwDetect);
     je.field(F("hd_ack_low_min"),          snap->st.heapdiag.iAckLowMin == 0xFFFFFFFF ? 0u : snap->st.heapdiag.iAckLowMin);
     je.field(F("hd_ack_low_free_before"),  snap->st.heapdiag.iAckLowFreeBefore);
     je.field(F("hd_ack_low_hits"),         snap->st.heapdiag.iAckLowHits);
@@ -4163,7 +4096,11 @@ void sendDeviceSettings()
     // TASK-1359: min/max are floats so a fractional bound (0.1) reaches the UI; whole bounds stay integers.
     auto addBound = [&](const __FlashStringHelper* key, float b) {
       if (b == (float)(int32_t)b) je.field(key, (int32_t)b);
-      else                        je.field(key, b, 2);
+      else {
+        // TASK-1941: 2 decimals unless that loses the bound (satthermalcoeff min 0.005 printed as 0)
+        const float c = b * 100.0f;
+        je.field(key, b, fabsf(c - roundf(c)) > 0.001f ? 3 : 2);
+      }
     };
     auto addNum = [&](const __FlashStringHelper* name, const char* numStr, const char* type, float minValue, float maxValue) {
       je.beginObject(name);
@@ -4233,6 +4170,7 @@ void sendDeviceSettings()
   addInt(F("gpiooutputstriggerbit"), settings.outputs.iTriggerBit, "i", 0, 15);
   addBool(F("otgwcommandenable"), settings.picBoot.bEnable, "b");
   addStr(F("otgwcommands"), CSTR(settings.picBoot.sCommands), "s", 128);
+  addBool(F("pictempsensor"), settings.picBoot.bTempSensor, "b");   // TASK-1940
   addBool(F("webhookenable"), settings.webhook.bEnabled, "b");
   addStr(F("webhookurlon"), CSTR(settings.webhook.sURLon), "s", 100);
   addStr(F("webhookurloff"), CSTR(settings.webhook.sURLoff), "s", 100);
@@ -4278,7 +4216,7 @@ void sendDeviceSettings()
   {
     char tmpBuf[8];
     dtostrf(settings.sat.fOvershootMargin, 1, 1, tmpBuf);
-    addNum(F("satovershootmargin"), tmpBuf, "f", 0, 5);
+    addNum(F("satovershootmargin"), tmpBuf, "f", 0.5f, 5.0f);
   }
   // --- SAT Weather settings (Task #50) ---
   addBool(F("satweatherenable"), settings.sat.bWeatherEnable, "b");
@@ -4306,24 +4244,24 @@ void sendDeviceSettings()
   {
     char tmpBuf[8];
     dtostrf(settings.sat.fSimHeatRate, 1, 2, tmpBuf);
-    addNum(F("satsimheatrate"), tmpBuf, "f", 0, 5);
+    addNum(F("satsimheatrate"), tmpBuf, "f", 0.01f, 5.0f);
     dtostrf(settings.sat.fSimCoolRate, 1, 2, tmpBuf);
-    addNum(F("satsimcoolrate"), tmpBuf, "f", 0, 5);
+    addNum(F("satsimcoolrate"), tmpBuf, "f", 0.01f, 5.0f);
   }
   // --- SAT Thermal Drop Learning (Task #21) ---
   {
     char tmpBuf[8];
     dtostrf(settings.sat.fThermalCoeff, 1, 4, tmpBuf);
-    addNum(F("satthermalcoeff"), tmpBuf, "f", 0, 1);
+    addNum(F("satthermalcoeff"), tmpBuf, "f", 0.005f, 0.3f);
   }
   // --- SAT Solar Gain settings (Task #23) ---
   addBool(F("satsolargain"), settings.sat.bSolarGainEnable, "b");
   {
     char tmpBuf[8];
     dtostrf(settings.sat.fSolarMinRiseRate, 1, 1, tmpBuf);
-    addNum(F("satsolarminrise"), tmpBuf, "f", 0, 5);
+    addNum(F("satsolarminrise"), tmpBuf, "f", 0.1f, 5.0f);
     dtostrf(settings.sat.fSolarSetpointOffset, 1, 1, tmpBuf);
-    addNum(F("satsolaroffset"), tmpBuf, "f", 0, 10);
+    addNum(F("satsolaroffset"), tmpBuf, "f", 0.5f, 10.0f);
   }
   // --- SAT Summer Simmer settings (Task #24) ---
   addBool(F("satsummersimmer"), settings.sat.bSummerSimmer, "b");
@@ -4365,7 +4303,7 @@ void sendDeviceSettings()
   {
     char tmpBuf[8];
     dtostrf(settings.sat.fPvBoostDeltaC, 1, 2, tmpBuf);
-    addNum(F("satpvboostdeltac"), tmpBuf, "f", 0, 5);
+    addNum(F("satpvboostdeltac"), tmpBuf, "f", 0.5f, 5.0f);
   }
   {
     char tmpBuf[8];
@@ -4404,16 +4342,16 @@ void sendDeviceSettings()
     dtostrf(settings.sat.fDhwSetpoint,             1, 1, tmpBuf); addNum(F("satdhwsetpoint"),      tmpBuf, "f", 0, SAT_DHW_SETPOINT_MAX);
     dtostrf(settings.sat.fMaxTSetUser,             1, 1, tmpBuf); addNum(F("satmaxsetpoint"),      tmpBuf, "f", 0, SAT_MAXTSET_MAX);
     dtostrf(settings.sat.fFlameOffOffset,          1, 1, tmpBuf); addNum(F("satflameoffset"),      tmpBuf, "f", 0, 30);
-    dtostrf(settings.sat.fFlowOffset,              1, 1, tmpBuf); addNum(F("satflowoffset"),       tmpBuf, "f", 0, 10);
+    dtostrf(settings.sat.fFlowOffset,              1, 1, tmpBuf); addNum(F("satflowoffset"), tmpBuf, "f", 0.5f, 10.0f);
     dtostrf(settings.sat.fModSupDelay,             1, 1, tmpBuf); addNum(F("satmodsupdelay"),      tmpBuf, "f", 0, 120);
     dtostrf(settings.sat.fModSupOffset,            1, 1, tmpBuf); addNum(F("satmodsupoffset"),     tmpBuf, "f", 0, 5);
     dtostrf(settings.sat.fMinPressure,             1, 2, tmpBuf); addNum(F("satminpressure"),      tmpBuf, "f", 0, 3);
     dtostrf(settings.sat.fMaxPressure,             1, 2, tmpBuf); addNum(F("satmaxpressure"),      tmpBuf, "f", 1, 4);
-    dtostrf(settings.sat.fMaxPressureDrop,         1, 2, tmpBuf); addNum(F("satmaxpressdrop"),     tmpBuf, "f", 0, 2);
+    dtostrf(settings.sat.fMaxPressureDrop,         1, 2, tmpBuf); addNum(F("satmaxpressdrop"), tmpBuf, "f", 0.05f, 2.0f);
     dtostrf(settings.sat.fZoneAggregationHeadroom, 1, 1, tmpBuf); addNum(F("satzoneheadroom"),     tmpBuf, "f", 0, 15);
     dtostrf(settings.sat.fSolarMinElevation,       1, 1, tmpBuf); addNum(F("satsolarminelev"),     tmpBuf, "f", -10, 45);
     dtostrf(settings.sat.fBoilerRatedKW,           1, 1, tmpBuf); addNum(F("satboilerratedkw"),    tmpBuf, "f", 0, 200);
-    dtostrf(settings.sat.fBoilerEfficiency,        1, 2, tmpBuf); addNum(F("satboilerefficiency"), tmpBuf, "f", 0, 1);
+    dtostrf(settings.sat.fBoilerEfficiency,        1, 2, tmpBuf); addNum(F("satboilerefficiency"), tmpBuf, "f", 0.5f, 1.0f);
     dtostrf(settings.sat.fMinConsumption,          1, 2, tmpBuf); addNum(F("satminconsumption"),   tmpBuf, "f", 0, 8);
     dtostrf(settings.sat.fMaxConsumption,          1, 2, tmpBuf); addNum(F("satmaxconsumption"),   tmpBuf, "f", 0, 8);
   }
@@ -4521,6 +4459,7 @@ static const char* const PROGMEM knownSettings[] = {
   "otdsetbacktemp", "otdsetbacktimeout", "otdsummermode",
   "otdventenable", "otdventsetpoint",
   "otgwcommandenable", "otgwcommands",
+  "pictempsensor",  // TASK-1940
   "s0counterdebouncetime", "s0counterenabled", "s0counterinterval", "s0counterpin", "s0counterpulsekw",
   "satareaweight0", "satareaweight1", "satareaweight2", "satareaweight3",
   "satbleenable", "satbleriskack", "satblefailover", "satbleinterval", "satblemac",

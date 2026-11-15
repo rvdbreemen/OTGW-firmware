@@ -415,6 +415,9 @@ const char ha_lbl_otgw_connected[] PROGMEM = "otgw_connected";
 // Dropped PIC commands (faux dataid 240, TASK-1439 = 1.x TASK-1431). Bare labels: the
 // topics are the 1.x ones, otgw-firmware/command_dropped and command_retry_exceeded.
 const char ha_lbl_cmd_dropped[] PROGMEM = "otgw-firmware/command_dropped";
+// PIC-attached temperature sensor (faux dataid 239, TASK-1940 = 1.x TASK-1147). The 0x08 flag
+// prepends "otgw-pic/", so the topic is otgw-pic/temperature_reading as on the 1.x line.
+const char ha_lbl_pic_temperature_reading[] PROGMEM = "temperature_reading";
 const char ha_lbl_cmd_retry_exceeded[] PROGMEM = "otgw-firmware/command_retry_exceeded";
 const char ha_lbl_master_configuration_smart_power[] PROGMEM = "master_configuration_smart_power";
 const char ha_lbl_ch2_present[] PROGMEM = "ch2_present";
@@ -779,6 +782,7 @@ const char ha_name_thermostat_connected[] PROGMEM = "Thermostat_Connected";
 const char ha_name_gateway_mode[] PROGMEM = "Gateway_Mode";
 const char ha_name_otgw_connected[] PROGMEM = "OTGW_Connected";
 const char ha_name_cmd_dropped[] PROGMEM = "Last_Dropped_Command";        // TASK-1439
+const char ha_name_pic_temperature_reading[] PROGMEM = "PIC_Temperature_Reading";  // TASK-1940; not "PIC_Temp_Sensor", the PR=D setting
 const char ha_name_cmd_retry_exceeded[] PROGMEM = "Command_Dropped";       // TASK-1439
 const char ha_name_master_configuration_smart_power[] PROGMEM = "master_configuration_smart_power";
 const char ha_name_ch2_present[] PROGMEM = "CH2_present";
@@ -860,7 +864,7 @@ const char ha_name_alias_ventilation_system_type[]                           PRO
 const char ha_name_alias_ventilation_speed_control_type[]                    PROGMEM = "Ventilation_speed_control_type";
 const char ha_name_alias_solar_storage_fault[]                               PROGMEM = "Solar_storage_fault";
 // ========== Sensor array (400 entries) ==========
-const uint16_t MQTT_HA_SENSOR_COUNT = 404;  // +5 SAT PWM ON-phase telemetry (id 252, TASK-1880), +4 SAT requested_setpoint/curve recommendation/manufacturer/pressure_drop_rate (id 254, TASK-1490), +2 SAT CH/DHW gas consumption (id 252, TASK-1506), +1 dhw_water_total (faux id 241, TASK-1123), +3 SAT power/energy (id 252, TASK-1276), +1 command_dropped (faux id 240, TASK-1439)
+const uint16_t MQTT_HA_SENSOR_COUNT = 405;  // +1 PIC temperature_reading (faux id 239, TASK-1940), +5 SAT PWM ON-phase telemetry (id 252, TASK-1880), +4 SAT requested_setpoint/curve recommendation/manufacturer/pressure_drop_rate (id 254, TASK-1490), +2 SAT CH/DHW gas consumption (id 252, TASK-1506), +1 dhw_water_total (faux id 241, TASK-1123), +3 SAT power/energy (id 252, TASK-1276), +1 command_dropped (faux id 240, TASK-1439)
 
 const MqttHaSensorCfg PROGMEM mqttHaSensors[] = {
 //  {id, flags, label, friendlyName, deviceClass, unit, stateClass, icon, entityCat, enabledByDefault}
@@ -1423,6 +1427,10 @@ const MqttHaSensorCfg PROGMEM mqttHaSensors[] = {
     {241, 0x00, ha_lbl_dhw_water_total,            ha_name_dhw_water_total,            HaDeviceClass::water,       HaUnit::L,       HaStateClass::total_increasing, HaIcon::water,  HaEntityCat::none, true, nullptr,              nullptr},
     // --- Faux ID 240 (OTGWcmddropid): last command dropped after 5 unanswered tries, TASK-1439 ---
     {240, 0x00, ha_lbl_cmd_dropped,                ha_name_cmd_dropped,                HaDeviceClass::none,        HaUnit::none,    HaStateClass::none,        HaIcon::alert_circle,  HaEntityCat::diagnostic, true},
+    // --- Faux ID 239 (OTGWpictempid): PIC-attached temperature sensor, PR=E (TASK-1940 = 1.x TASK-1147) ---
+    // Announced on the first valid reading (handlePRresponse) and skipped at boot, so a gateway
+    // without a sensor, with the setting off, or on OT-Direct never shows the entity (ADR-094).
+    {239, 0x08, ha_lbl_pic_temperature_reading,    ha_name_pic_temperature_reading,    HaDeviceClass::temperature, HaUnit::degC,    HaStateClass::measurement, HaIcon::thermometer,   HaEntityCat::none, true},
 };
 
 // ========== Binary sensor array (73 indexed entries) ==========
@@ -1828,7 +1836,7 @@ const uint16_t PROGMEM mqttHaSensorIndex[256] = {
     0xFFFF, // id 236
     0xFFFF, // id 237
     0xFFFF, // id 238
-    0xFFFF, // id 239
+    404, // id 239, 1 entry (TASK-1940: OTGWpictempid PIC temperature_reading)
     403, // id 240, 1 entry (TASK-1439: OTGWcmddropid command_dropped)
     402, // id 241, 1 entry (TASK-1123: OTGWdhwmeterid dhw_water_total)
     400, // id 242, 2 entries (TASK-942: OTGWhvacid hvac_mode/hvac_action companion sensors)
@@ -2135,7 +2143,7 @@ PGM_P haUnitStr(HaUnit u) {
         case HaUnit::bar: { static const char s[] PROGMEM = "bar"; return s; }
         case HaUnit::hPa: { static const char s[] PROGMEM = "hPa"; return s; }
         case HaUnit::percent: { static const char s[] PROGMEM = "%"; return s; }
-        case HaUnit::l_min: { static const char s[] PROGMEM = "l/min"; return s; }
+        case HaUnit::l_min: { static const char s[] PROGMEM = "L/min"; return s; }
         case HaUnit::kW: { static const char s[] PROGMEM = "kW"; return s; }
         case HaUnit::W: { static const char s[] PROGMEM = "W"; return s; }
         case HaUnit::kWh: { static const char s[] PROGMEM = "kWh"; return s; }
@@ -3974,6 +3982,7 @@ static const char *topoDeviceName(HaDevice d) {
 // there; this local copy exists solely to avoid cross-TU access to a static).
 static HaDevice topoDeviceForPseudoId(uint8_t otId) {
   switch (otId) {
+    case 239: return HaDevice::Sensors;     // TASK-1940 PIC-attached temperature sensor, with the Dallas sensors
     case 240: return HaDevice::Gateway;     // TASK-1439 dropped-command sensor + binary sensor
     case 241: return HaDevice::Sensors;     // TASK-1123 DHW water total
     case 242: return HaDevice::OtCore;      // TASK-942 hvac_mode/hvac_action companion sensors

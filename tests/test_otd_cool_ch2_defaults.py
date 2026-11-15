@@ -153,6 +153,8 @@ def build_source() -> str:
                 "static void clearWriteOverride(uint8_t msgId)", "static bool otdCsOverrideActive()",
                 "static inline bool checkBoolean(const char* value)"):
         parts.append(func(src, sig))
+    if "// --- otdPicFloat begin" in src:   # TASK-1859: CL= parses with the PIC's GetPercentArg
+        parts.append(block(src, "otdPicFloat"))
     parts.append(block(src, "otdEffectiveMasterFlags"))
     parts.append(block(src, "otdRelayedStatus"))
     body = "".join(branch(src, a, b) + "\n  " for a, b in (("C", "2"), ("C", "L"), ("C", "E"), ("H", "2")))

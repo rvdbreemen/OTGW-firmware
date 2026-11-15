@@ -50,6 +50,7 @@ static bool otBoilerCacheValid[128];
 static uint16_t otBoilerCache[128];
 static uint32_t otCSLastCommandMs = 0;
 static uint32_t otC2LastCommandMs = 0;
+static struct { struct { bool bOnline = true; } otBus; } state;   // TASK-1807: no answer while offline
 static uint8_t getUnknownCount(uint8_t) { return 0; }   // TASK-1808: READ path only
 """
 

@@ -37,7 +37,10 @@ static const uint32_t SAT_OVERSHOOT_SUSTAIN_MS      = 60000UL;  // Sustained ove
 static const float    SAT_OVERSHOOT_FAILSAFE_DELTA_C = 3.5f;
 static const uint32_t SAT_OVERSHOOT_FAILSAFE_SUSTAIN_MS = 30000UL;
 static const float    SAT_UNDERSHOOT_MARGIN_C       = 3.0f;    // Below-setpoint margin for underheat (Python UNDERSHOOT_MARGIN_CELSIUS=-3.0)
-static const uint32_t SAT_UNDERHEAT_SUSTAIN_MS      = 180000UL; // Sustained underheat before continuous switch
+// TASK-1933 (Sergeant D entries 339, 342, 350): the PWM -> continuous exit is "flame on and request above the flow for 60 s",
+// replacing thermo-nova's flow <= request - 3.0 for 180 s (heating_control.py:337-347, const.py:22). SAT_UNDERSHOOT_MARGIN_C stays for the
+// cycle classifier.
+static const uint32_t SAT_UNDERHEAT_SUSTAIN_MS      = 60000UL;  // Request above the flow (flame on) before the continuous switch
 static const uint32_t SAT_SATURATION_SUSTAIN_MS     = 300000UL; // Sustained saturation before continuous switch
 static const uint32_t SAT_DHW_OVERSHOOT_GUARD_MS    = 300000UL; // 300s guard: no overshoot count and no PWM exit count during/after DHW (heating_control.py:272-274, :313-315)
 
@@ -1431,8 +1434,8 @@ bool satCycleCheckOvershootSwitch(float requestedSetpoint, uint32_t tickMs)
 // that fires sends the continuous CS in that tick, entry 134), with the tick time (entry 95, Q46b). Returns true if the mode was switched.
 // Both timers reset while PWM is not the mode (:308-311), during hot water and within 300 s after it (:313-315,
 // entry 108), and outside the PWM ON phase (:321-323): in the OFF phase the flow is low by design.
-// Underheat counts while flow <= requested - 3 and resets on a higher flow (:337-340); 180 s from the first
-// qualifying tick (Q44 A). Saturation counts while the last PWM off time is 0, 300 s from the first such tick
+// Underheat (TASK-1933, entries 339, 342, 350; thermo-nova: flow <= requested - 3 for 180 s, :337-347) counts while the flame
+// is on and the requested setpoint is above the flow, and resets otherwise; 60 s from the first qualifying tick (Q44 A). Saturation counts while the last PWM off time is 0, 300 s from the first such tick
 // (:359-362), and is only looked at when underheat did not fire (:217-220, :325-329).
 bool satCycleCheckPwmExits(float requestedSetpoint, uint32_t tickMs)
 {
@@ -1447,9 +1450,10 @@ bool satCycleCheckPwmExits(float requestedSetpoint, uint32_t tickMs)
   // low flow (heating_control.py:333-335, entry 218). The saturation timer does not look at the flow (:353-367).
   if (flowTemp <= 0.0f) {
     _sustain_underheatRunning = false;
-  } else if (flowTemp <= requestedSetpoint - SAT_UNDERSHOOT_MARGIN_C) {
+  } else if (satIsFlameOn() && requestedSetpoint > flowTemp) {
     if (satSustainedFor(_sustain_underheatRunning, _sustain_underheatStartMs, tickMs, SAT_UNDERHEAT_SUSTAIN_MS)) {
-      SATDebugTln(F("SAT: sustained underheat detected, switching to continuous mode"));
+      SATDebugTf(PSTR("SAT: flame on and request %.1f above flow %.1f for %lus, switching to continuous mode\r\n"),
+                 requestedSetpoint, flowTemp, (unsigned long)(SAT_UNDERHEAT_SUSTAIN_MS / 1000UL));
       satSetControlMode(SAT_MODE_CONTINUOUS);
       satNarrate_P(PSTR("Control mode: continuous (flow stayed below the setpoint, PWM ended)"));   // TASK-1521
       satCycleResetSustainGuards();
@@ -1535,6 +1539,8 @@ static float _hcrIntraMedian()
 //--- Save HCR state to LittleFS (called on day-commit) ---
 void satHCRSaveState()
 {
+  // TASK-1900: no save from a SAT simulation run; the real heating-curve recommendation on flash stays (TASK-1869 rule)
+  if (settings.sat.bSimulation) return;
   // create=true makes the /sat folder: a fresh filesystem image has none, and without
   // it this open fails and the recommendation never survives a restart (TASK-1286).
   File f = LittleFS.open(FPSTR(SAT_HCR_FILE), "w", true);

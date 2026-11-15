@@ -54,6 +54,7 @@ static void otdSendReply(unsigned long r) { g_reply = r; }
 static bool otBoilerCacheValid[128];
 static uint16_t otBoilerCache[128];
 static uint32_t otCSLastCommandMs = 0;
+static struct { struct { bool bOnline = true; } otBus; } state;   // TASK-1807: no answer while offline
 """
 
 MAIN = r"""
@@ -68,7 +69,9 @@ static void boiler(uint8_t type, uint8_t id, uint16_t v) {
   else if (id != 0) clearUnknownCount(id);
 }
 static void ask(uint8_t id) {
+  g_reply = 0xFFFFFFFFUL;   // TASK-1807: no answer leaves the sentinel
   handleMasterModeSlaveFrame(frame(0, id, 0));
+  if (g_reply == 0xFFFFFFFFUL) { printf("id=%u none\n", id); return; }
   printf("id=%u type=%lu data=%04lX\n", id, (g_reply >> 28) & 7, g_reply & 0xFFFF);
 }
 // argv: a script of steps: "Bt:id:hex" = boiler answer of type t, "Rid" = thermostat READ of id
@@ -77,6 +80,10 @@ int main(int argc, char** argv) {
     const char* a = argv[i];
     if (a[0] == 'B') {
       unsigned t, id, v; sscanf(a + 1, "%u:%u:%x", &t, &id, &v); boiler((uint8_t)t, (uint8_t)id, (uint16_t)v);
+    } else if (a[0] == 'O') {
+      state.otBus.bOnline = false;   // the boiler's last MsgID 0 failed
+    } else if (a[0] == 'N') {
+      state.otBus.bOnline = true;
     } else if (a[0] == 'R') {
       ask((uint8_t)atoi(a + 1));
     }
@@ -121,6 +128,13 @@ class MasterEmptySlot(unittest.TestCase):
         return [(int(m.group(1)), int(m.group(2)), m.group(3))
                 for m in re.finditer(r"id=(\d+) type=(\d) data=([0-9A-F]{4})", out)]
 
+    def test_no_answer_from_the_cache_while_the_boiler_is_offline(self):
+        # TASK-1807 AC1: the boiler answered (flame on), then its MsgID 0 failed: the thermostat gets no answer, as from
+        # a boiler that is gone, not READ_ACK with the last status. Back online: the cache answers again.
+        out = subprocess.run([str(self.exe), "B4:0:0308", "B4:25:3C00", "O", "R0", "R25", "N", "R0"],
+                             capture_output=True, text=True, check=True).stdout.splitlines()
+        self.assertEqual(out[:3], ["id=0 none", "id=25 none", "id=0 type=4 data=0308"], out)
+
     def test_empty_slot_after_boot_is_data_invalid(self):
         # AC1: right after a master-mode boot MsgID 3, 5, 48, 49 have no value yet: Data-Invalid (6), not 7
         r = self.run_script("R3", "R5", "R48", "R49")
@@ -140,6 +154,17 @@ class MasterEmptySlot(unittest.TestCase):
         # a later boiler READ_ACK clears the unknown count and fills the cache: READ_ACK again
         r = self.run_script("B7:48:0000", "B4:48:3C14", "R48")
         self.assertEqual(r, [(48, 4, "3C14")])
+
+    def test_data_invalid_is_not_cached_on_an_empty_slot(self):
+        # TASK-1925: a Data-Invalid reply carries no value; the old store kept its data bytes and the thermostat got
+        # READ_ACK 0000. The empty slot stays empty: Data-Invalid (6), as right after boot.
+        r = self.run_script("B6:5:0000", "R5")
+        self.assertEqual(r, [(5, 6, "0000")])
+
+    def test_data_invalid_keeps_the_previous_value(self):
+        # TASK-1925 rule: the previous value stays, as handleMasterResponse already does for a real boiler
+        r = self.run_script("B4:25:3C00", "B6:25:1234", "R25")
+        self.assertEqual(r, [(25, 4, "3C00")])
 
     def test_oem_id_stays_unknown(self):
         # ids 128-255 are never cached (otBoilerCacheStore): Unknown-DataID, as before

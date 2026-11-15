@@ -541,6 +541,12 @@ Counts above are advisory rather than hand-maintained; the canonical set is the 
 - **[ADR-191: Update firmware over WiFi on 4MB boards through a safeboot factory partition](ADR-191-update-firmware-over-wifi-on-4mb-boards-through-a-safeboot-factory-partition.md)** 🆕 *(Accepted)*  
   Supersedes ADR-166. The 4MB layout gets a safeboot updater in the factory partition (0x10000, 960K), one app slot ota_0 (0x100000, 2240K) and LittleFS (0x330000, 768K). The main firmware erases otadata and restarts into safeboot, which writes ota_0 and restarts into it; bootloader rollback returns to safeboot when the new image fails early. Units on the old layout need one USB `flash_otgw --migrate`.
 
+- **[ADR-240: A web connection that is not ESTABLISHED and holds no payload does not count towards the ADR-188 send cap](ADR-240-a-web-connection-that-is-not-established-and-holds-no-payload-does-not-count-towards-the-adr-188-send-cap.md)** 🆕 *(Accepted, amends ADR-188)*  
+  A connection that is not ESTABLISHED counts only while a queued segment carries payload: a closing one with only its zero-length FIN and a half-open one with only its zero-length SYN-ACK no longer count, so a fresh page load is not refused with 503 by connections that hold no payload and no request. ESTABLISHED connections and the cap of 4 stay; ADR-188 stays Accepted apart from this rule (TASK-1947).
+
+- **[ADR-239: The main firmware keeps its RTC_NOINIT records out of the first 32 bytes of RTC slow memory, which the safeboot updater owns](ADR-239-the-main-firmware-keeps-its-rtc-noinit-records-out-of-the-first-32-bytes-of-rtc-slow-memory-which-the-safeboot-updater-owns.md)** 🆕 *(Proposed, binding: gate scripts/check_rtc_layout.py in build.py)*  
+  The safeboot bootloader load writes 0x20 B at 0x50000200 on every pass (an app OTA). A 32 B guard holds that range, every other RTC_NOINIT record starts at 0x50000220 or higher, and build.py checks the real ELF. Every record rejects the old layout's bytes on the first boot after the update (TASK-1918).
+
 - **[ADR-233: Keep settings.ini, the reboot counter and the reboot log in an RTC snapshot during a filesystem OTA](ADR-233-keep-settings-ini-the-reboot-counter-and-the-reboot-log-in-an-rtc-snapshot-during-a-filesystem-ota.md)** 🆕 *(Proposed)*  
   A reset during a filesystem OTA used to boot on the image's default settings.ini with the counter lost. The three files go into an RTC_NOINIT snapshot above 0x50000220 (the safeboot updater overwrites the 32 B below it), armed at the first chunk and restored at the next boot (TASK-1774). Not protected: a power cut.
 
@@ -602,6 +608,9 @@ Counts above are advisory rather than hand-maintained; the canonical set is the 
 
 - **[ADR-172: Rate-Limit the UI-Polled REST Endpoints with RFC 9457 429 Responses](ADR-172-rate-limit-ui-polled-rest-endpoints.md)** 🆕 *(Accepted)*  
   Port of 1.x ADR-086 (TASK-1037), correcting two defects found by adversarial review of 1.7.2-beta.4: the `telegraf` alias served identical bytes uncapped, and two dashboards phase-locked so the same client was refused every cycle. Adds a per-endpoint global budget checked before handler dispatch, with aliases sharing one budget id and GCRA burst 2 (so telegraf is limited without being starved at ~75%). `retry_after` is repeated in the problem body because `Retry-After` is not CORS-safelisted. 503 (device-wide) stays ordered before and semantically distinct from 429 (endpoint quota). Gated by `check_api_rate_limit_alias_coverage` and `check_poll_window_coupling`.
+
+- **[ADR-242: OT-Direct state has one writer: commands from other tasks run on the loop task through an ordered text ring](ADR-242-ot-direct-state-has-one-writer-commands-from-other-tasks-run-on-the-loop-task-through-an-ordered-text-ring.md)** 🆕 *(Proposed)*  
+  A REST `GW=R` ran `resetTransientState()` on async_tcp next to `loopOTDirect()`, and a `CS=` right after it was wiped by the late reset (TASK-1761). Commands from another task go into a text ring (7 commands) in arrival order and run on the loop task between frames, never while a frame is in flight; a loop-task caller drains the ring first and keeps SAT's synchronous result; a full ring is Dropped and REST answers 503. Gate: `tests/test_otd_loop_task_commands.py`.
 
 - **[ADR-173: Client Poll Pacing, Locally-Ticked Device Clock, and 429 Pause in the v2 Web UI](ADR-173-client-poll-pacing-local-clock-429-rephase.md)** 🆕 *(Accepted)*  
   Rewritten for the v2-only UI (ADR-192). `v2.js` names its poll periods (`OTMON_POLL_MS` 2 s, `DEVTIME_POLL_MS` 10 s) so `check_poll_window_coupling` can pair them with the firmware windows, polls otmonitor only while Monitor > Values is open or the PIC is in PS=1 mode, and routes every caller through one fetcher with an in-flight guard. A 429 pauses all callers for the `retry_after` read from the problem body (3 s fallback). The device clock ticks locally.
@@ -746,6 +755,9 @@ Counts above are advisory rather than hand-maintained; the canonical set is the 
 - **[ADR-229: OT-Direct gateway mode rewrites MsgID 0 bits 1, 2, 4, 5 and 6 of the relayed thermostat status like the PIC](ADR-229-ot-direct-gateway-mode-rewrites-msgid-0-bits-1-2-4-5-and-6-of-the-relayed-thermostat-status-like-the-pic.md)** 🆕 *(Accepted)*  
   In gateway mode the relayed thermostat MsgID 0 gets bits 0, 1, 2, 4, 5 and 6 by the PIC readstatus rule (gateway.asm:2712-2742): HW=0/1 (or a DHW push) sets bit 1, CE= sets bit 2 while a CL= level is held, H2= sets bit 4 while a C2= setpoint is held, SM=1 and BW=1 force bits 5 and 6; bit 0 stays as ADR-208. User Decision (Robert): 'Like the PIC: new ADR'. Supersedes ADR-208. Gate: host test on the real relay block (TASK-1805).
 
+- **[ADR-241: OT-Direct master mode relays the thermostat's writes to the boiler in the next free master slot and returns the boiler's answer (amends ADR-066)](ADR-241-ot-direct-master-mode-relays-the-thermostat-s-writes-to-the-boiler-in-the-next-free-master-slot-and-returns-the-boiler-s-answer-amends-adr-066.md)** 🆕 *(Proposed)*  
+  Guideline-level (ADR-080). In master mode a thermostat WRITE_DATA of any ID except 1, 16 and 24 goes to the boiler in the next free master slot, ahead of the ring and the schedule, and the thermostat gets the boiler's own answer; a user write override wins; MsgID 1, 8 and 14 keep the local echo while SAT owns the setpoint; reads stay cache-answered. Spec v4.2 :1097-1098 lifts the 400 ms answer limit for a gateway. User Decision (Robert, 2026-11-11): 'Forward to the boiler' (TASK-1812).
+
 - **[ADR-225: Raise the ESP32-S3 IPC task stack to at least 1280 B by rebuilding the Arduino framework libs with a custom sdkconfig](ADR-225-raise-the-esp32-s3-ipc-task-stack-to-at-least-1280-b-by-rebuilding-the-arduino-framework-libs-with-a-custom-sdkconfig.md)** 🆕 *(Proposed)*  
   Rebuild the Arduino framework libraries with a custom sdkconfig so the ipc0/ipc1 task stacks are at least 1280 B, the fix for the rare boot panic (TASK-1763).
 
@@ -763,6 +775,9 @@ Counts above are advisory rather than hand-maintained; the canonical set is the 
 
 - **[ADR-235: SAT sends CS= on change with a 30 s repeat (supersedes the CS part of ADR-207 and ADR-203)](ADR-235-sat-sends-cs-on-change-with-a-30-s-repeat-supersedes-the-cs-part-of-adr-207-and-adr-203.md)** 🆕 *(Proposed)*  
   Guideline-level (ADR-080) with a test gate (`tests/test_sat_cmd_cache.py`). CS= goes out when its 0.1-rounded value changes and is repeated every 30 s while unchanged, on raw `millis()` in the loop, inside the PIC's ~63 s expiry (Sergeant D entries 334, 335); a dropped CS= is retried after 5 s with its own value; the PIC keepalive shares the stamp; the no-return start-up flood keeps its 2 s cadence (open question). MM/TP/CH stay as ADR-207 (TASK-1924).
+
+- **[ADR-236: SAT leaves PWM for continuous when the flame is on and the request stays above the flow for 60 s (replaces the thermo-nova underheat exit)](ADR-236-sat-leaves-pwm-for-continuous-when-the-flame-is-on-and-the-request-stays-above-the-flow-for-60-s-replaces-the-thermo-nova-underheat-exit.md)** 🆕 *(Proposed)*  
+  Guideline-level (ADR-080) with a test gate (`tests/test_sat_overshoot_sustain.py`). While PWM is ON, flame on and the request above the flow for 60 s switches to continuous, replacing thermo-nova's flow <= request - 3.0 for 180 s; the hot-water, OFF-phase and missing-flow gates and the saturation exit stay (Sergeant D entries 339, 342, 350; simulation and field check in `docs/sat/sim-1933/`, TASK-1933).
 
 - **[ADR-196: SAT behaviour ground truth: Sergeant D's recorded decisions, then pinned thermo-nova, then specs, then firmware](ADR-196-sat-behaviour-ground-truth-sergeant-d-s-recorded-decisions-then-pinned-thermo-nova-then-specs-then-firmware.md)** 🆕 *(Accepted)*  
   Source order for every SAT statement or change: `docs/sat/sergeant-d-corrections.md` entries, then thermo-nova at 7beaaf5 (`file:line`), then `thermo-nova-spec.md`, then the firmware and its docs, which are never the authority. Read the corrections file first, cite the entry or say none covers it, put conflicts to Sergeant D. Guideline-level, no CI gate.
@@ -1048,12 +1063,12 @@ Generated by `bin/adr-index`. Do not edit between the sentinels.
 
 | Metric | Count |
 | --- | ---: |
-| Total ADRs | 235 |
-| Accepted | 190 |
+| Total ADRs | 240 |
+| Accepted | 194 |
 | Amended | 1 |
 | Proposed | 5 |
 | Rejected | 2 |
-| Superseded | 36 |
+| Superseded | 37 |
 | Superseded by adr-124 | 1 |
 | Duplicate IDs | 0 |
 
@@ -1103,7 +1118,7 @@ Generated by `bin/adr-index`. Do not edit between the sentinels.
 | ADR-040 | MQTT Source-Specific Topics for OpenTherm Values | Accepted | - | - | ADR-040-mqtt-source-specific-topics.md |
 | ADR-041 | Just-In-Time Home Assistant MQTT Discovery | Accepted | - | - | ADR-041-jit-ha-discovery.md |
 | ADR-042 | Streaming JSON I/O — No ArduinoJson | Superseded | - | Superseded by ADR-141; Supersedes ADR-018 | ADR-042-streaming-json-no-arduinojson.md |
-| ADR-043 | Reset-Pattern WiFi Recovery Trigger | Accepted | - | - | ADR-043-reset-pattern-wifi-recovery.md |
+| ADR-043 | Reset-Pattern WiFi Recovery Trigger | Superseded | 2026-11-14 | Superseded by ADR-238 | ADR-043-reset-pattern-wifi-recovery.md |
 | ADR-044 | Global State — extern Declaration in Header, Definition in .ino | Accepted | - | - | ADR-044-global-state-header-definition-pattern.md |
 | ADR-045 | PS=1 Print Summary Parsing | Superseded | - | Superseded by ADR-046 | ADR-045-ps1-print-summary-parsing.md |
 | ADR-046 | PS=1 Summary Translation with Shared Publish Helpers | Accepted | - | Supersedes ADR-045 | ADR-046-ps1-summary-translation-shared-publish-helpers.md |
@@ -1239,7 +1254,7 @@ Generated by `bin/adr-index`. Do not edit between the sentinels.
 | ADR-176 | Publish a firmware-integrated cumulative DHW water total for the Home Assistant Energy dashboard | Accepted | 2026-10-01 | - | ADR-176-publish-a-firmware-integrated-cumulative-dhw-water-total-for-the-home-assistant-energy-dashboard.md |
 | ADR-177 | Keep the PIC byte stream verbatim from the serial task to every consumer | Accepted | 2026-11-07 | - | ADR-177-keep-the-pic-byte-stream-verbatim-from-the-serial-task-to-every-consumer.md |
 | ADR-178 | Widen the SAT area-sensor reference to accept a Bluetooth sensor address alongside a Dallas address | Accepted | 2026-10-15 | - | ADR-178-widen-the-sat-area-sensor-reference-to-accept-a-ble-mac-alongside-a-dallas-address.md |
-| ADR-179 | Name the owner of the OpenTherm control setpoint while SAT is enabled | Accepted | 2026-11-07 | - | ADR-179-name-the-owner-of-the-opentherm-control-setpoint-while-sat-is-enabled.md |
+| ADR-179 | Name the owner of the OpenTherm control setpoint while SAT is enabled | Accepted | 2026-11-15 | - | ADR-179-name-the-owner-of-the-opentherm-control-setpoint-while-sat-is-enabled.md |
 | ADR-180 | Keep the Arduino String class out of hot-path source files | Accepted | 2026-10-01 | - | ADR-180-keep-the-arduino-string-class-out-of-hot-path-source-files.md |
 | ADR-181 | Count only boiler Read-Ack frames into the DHW water total, not the PIC PS=1 summary | Accepted | 2026-10-01 | - | ADR-181-count-only-boiler-read-ack-frames-into-the-dhw-water-total-not-the-pic-ps-1-summary.md |
 | ADR-182 | Announce the DHW water total just in time, after the first MsgID 19 sample of a boot | Accepted | 2026-10-15 | - | ADR-182-announce-the-dhw-water-total-just-in-time-after-the-first-msgid-19-sample-of-a-boot.md |
@@ -1263,11 +1278,11 @@ Generated by `bin/adr-index`. Do not edit between the sentinels.
 | ADR-200 | GPIO output trigger bit indexes the MsgID 0 status word (proposed successor to ADR-022) | Accepted | 2026-10-24 | Supersedes ADR-022 | ADR-200-gpio-output-trigger-bit-indexes-the-msgid-0-status-word-supersedes-adr-022.md |
 | ADR-201 | Combo board detection persists only a positive PIC verdict and re-probes every boot (supersedes ADR-164) | Accepted | 2026-10-25 | Supersedes ADR-164 | ADR-201-combo-board-detection-persists-only-a-positive-pic-verdict-and-re-probes-every-boot-supersedes-adr-164.md |
 | ADR-202 | Replace the two capture scripts with one Python capture tool behind thin launchers | Accepted | 2026-11-02 | - | ADR-202-replace-the-two-capture-scripts-with-one-python-capture-tool-behind-thin-launchers.md |
-| ADR-203 | SAT sends CS MM and CH on every control update (supersedes ADR-199 decision 4) | Accepted | 2026-11-07 | - | ADR-203-sat-sends-cs-mm-and-ch-on-every-control-update-supersedes-adr-199-decision-4.md |
+| ADR-203 | SAT sends CS MM and CH on every control update (supersedes ADR-199 decision 4) | Accepted | 2026-11-14 | - | ADR-203-sat-sends-cs-mm-and-ch-on-every-control-update-supersedes-adr-199-decision-4.md |
 | ADR-204 | SAT PID reset triggers (supersedes ADR-197 decision 8) | Accepted | 2026-10-31 | - | ADR-204-sat-pid-reset-triggers-supersedes-adr-197-decision-8.md |
 | ADR-205 | SAT heating curve self-tune: hourly evaluation, daily decision on the curve integral | Accepted | 2026-11-12 | - | ADR-205-sat-heating-curve-self-tune-hourly-evaluation-daily-decision-on-the-curve-integral.md |
 | ADR-206 | REST API sets the telnet debug log flags by name from one shared table | Accepted | 2026-11-02 | - | ADR-206-rest-api-sets-the-telnet-debug-log-flags-by-name-from-one-shared-table.md |
-| ADR-207 | SAT sends MM, the Immergas TP and CH on change, CS keeps the 5 s resend (partly supersedes ADR-203) | Accepted | 2026-11-02 | - | ADR-207-sat-sends-mm-the-immergas-tp-and-ch-on-change-cs-keeps-the-5-s-resend-partly-supersedes-adr-203.md |
+| ADR-207 | SAT sends MM, the Immergas TP and CH on change, CS keeps the 5 s resend (partly supersedes ADR-203) | Accepted | 2026-11-14 | - | ADR-207-sat-sends-mm-the-immergas-tp-and-ch-on-change-cs-keeps-the-5-s-resend-partly-supersedes-adr-203.md |
 | ADR-208 | OT-Direct gateway mode applies the CH= override to the relayed thermostat MsgID 0 | Superseded | 2026-11-11 | Superseded by ADR-229 | ADR-208-ot-direct-gateway-mode-applies-the-ch-override-to-the-relayed-thermostat-msgid-0.md |
 | ADR-209 | Replay file lines may carry the otframes.log device time and the replay waits the recorded gap | Accepted | 2026-11-05 | - | ADR-209-replay-file-lines-may-carry-the-otframes-log-device-time-and-the-replay-waits-the-recorded-gap.md |
 | ADR-210 | REST API streams the stored ESP32 core dump as an admin download | Accepted | 2026-11-05 | - | ADR-210-rest-api-streams-the-stored-esp32-core-dump-as-an-admin-download.md |
@@ -1292,8 +1307,13 @@ Generated by `bin/adr-index`. Do not edit between the sentinels.
 | ADR-230 | SAT heating curve self-tune: the floating phase needs one hour of data to vote (amends ADR-228) | Accepted | 2026-11-12 | - | ADR-230-sat-heating-curve-self-tune-the-floating-phase-needs-one-hour-of-data-to-vote-amends-adr-228.md |
 | ADR-231 | SAT heating curve self-tune: PWM ticks on a gas boiler count for the warm-up phase; hybrid and heat pump PWM hours are logged, not used | Accepted | 2026-11-12 | - | ADR-231-sat-heating-curve-self-tune-pwm-ticks-on-a-gas-boiler-count-for-the-warm-up-phase-hybrid-and-heat-pump-pwm-hours-are-logged-not-used.md |
 | ADR-232 | Patch AsyncTCP 3.4.10 with upstream fix 7befe25 at build time through the patch_pio_libs pre-hook | Accepted | 2026-11-13 | - | ADR-232-patch-asynctcp-3-4-10-with-upstream-fix-7befe25-at-build-time-through-the-patch-pio-libs-pre-hook.md |
-| ADR-233 | Keep settings.ini, the reboot counter and the reboot log in an RTC snapshot during a filesystem OTA | Proposed | 2026-11-14 | - | ADR-233-keep-settings-ini-the-reboot-counter-and-the-reboot-log-in-an-rtc-snapshot-during-a-filesystem-ota.md |
-| ADR-235 | SAT sends CS= on change with a 30 s repeat (supersedes the CS part of ADR-207 and ADR-203) | Proposed | 2026-11-14 | - | ADR-235-sat-sends-cs-on-change-with-a-30-s-repeat-supersedes-the-cs-part-of-adr-207-and-adr-203.md |
+| ADR-233 | Keep settings.ini, the reboot counter and the reboot log in an RTC snapshot during a filesystem OTA | Accepted | 2026-11-14 | - | ADR-233-keep-settings-ini-the-reboot-counter-and-the-reboot-log-in-an-rtc-snapshot-during-a-filesystem-ota.md |
+| ADR-235 | SAT sends CS= on change with a 30 s repeat (supersedes the CS part of ADR-207 and ADR-203) | Accepted | 2026-11-15 | - | ADR-235-sat-sends-cs-on-change-with-a-30-s-repeat-supersedes-the-cs-part-of-adr-207-and-adr-203.md |
+| ADR-236 | SAT leaves PWM for continuous when the flame is on and the request stays above the flow for 60 s (replaces the thermo-nova underheat exit) | Proposed | 2026-11-14 | - | ADR-236-sat-leaves-pwm-for-continuous-when-the-flame-is-on-and-the-request-stays-above-the-flow-for-60-s-replaces-the-thermo-nova-underheat-exit.md |
 | ADR-237 | Run the PlatformIO buildfs step in its own build directory so firmware objects survive between builds | Proposed | 2026-11-14 | - | ADR-237-run-the-platformio-buildfs-step-in-its-own-build-directory-so-firmware-objects-survive-between-builds.md |
-| ADR-238 | On the ESP32-S3 the triple-reset WiFi recovery counts reset-button presses and power-ons alike | Proposed | 2026-11-14 | Supersedes ADR-043 | ADR-238-on-the-esp32-s3-the-triple-reset-wifi-recovery-counts-reset-button-presses-and-power-ons-alike.md |
+| ADR-238 | On the ESP32-S3 the triple-reset WiFi recovery counts reset-button presses and power-ons alike | Accepted | 2026-11-14 | Supersedes ADR-043 | ADR-238-on-the-esp32-s3-the-triple-reset-wifi-recovery-counts-reset-button-presses-and-power-ons-alike.md |
+| ADR-239 | The main firmware keeps its RTC_NOINIT records out of the first 32 bytes of RTC slow memory, which the safeboot updater owns | Accepted | 2026-11-14 | - | ADR-239-the-main-firmware-keeps-its-rtc-noinit-records-out-of-the-first-32-bytes-of-rtc-slow-memory-which-the-safeboot-updater-owns.md |
+| ADR-240 | A web connection that is not ESTABLISHED and holds no payload does not count towards the ADR-188 send cap | Accepted | 2026-11-15 | - | ADR-240-a-web-connection-that-is-not-established-and-holds-no-payload-does-not-count-towards-the-adr-188-send-cap.md |
+| ADR-241 | OT-Direct master mode relays the thermostat's writes to the boiler in the next free master slot and returns the boiler's answer (amends ADR-066) | Proposed | 2026-11-15 | - | ADR-241-ot-direct-master-mode-relays-the-thermostat-s-writes-to-the-boiler-in-the-next-free-master-slot-and-returns-the-boiler-s-answer-amends-adr-066.md |
+| ADR-242 | OT-Direct state has one writer: commands from other tasks run on the loop task through an ordered text ring | Proposed | 2026-11-15 | - | ADR-242-ot-direct-state-has-one-writer-commands-from-other-tasks-run-on-the-loop-task-through-an-ordered-text-ring.md |
 <!-- adr-kit-index:end -->

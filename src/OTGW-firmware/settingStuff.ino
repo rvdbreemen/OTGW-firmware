@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : settingsStuff
-**  Version  : v2.0.0-beta.247
+**  Version  : v2.0.0-beta.295
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -342,6 +342,7 @@ bool writeSettings(bool show)
   writeJsonIntKV(file, F("S0COUNTERinterval"), settings.s0.iInterval);
   writeJsonBoolKV(file, F("OTGWcommandenable"), settings.picBoot.bEnable);
   writeJsonStringKV(file, F("OTGWcommands"), settings.picBoot.sCommands);
+  writeJsonBoolKV(file, F("PICtempsensor"), settings.picBoot.bTempSensor);   // TASK-1940, the 1.x key
   writeJsonBoolKV(file, F("GPIOOUTPUTSenabled"), settings.outputs.bEnabled);
   writeJsonIntKV(file, F("GPIOOUTPUTSpin"), settings.outputs.iPin);
   writeJsonIntKV(file, F("GPIOOUTPUTStriggerBit"), settings.outputs.iTriggerBit);
@@ -1024,6 +1025,7 @@ void updateSetting(const char *field, const char *newValue)
     CHANGE_INTERVAL_SEC(timers0counter, settings.s0.iInterval, CATCH_UP_MISSED_TICKS);
   }
   else if (strcasecmp_P(field, PSTR("OTGWcommandenable"))==0)    settings.picBoot.bEnable = EVALBOOLEAN(newValue);
+  else if (strcasecmp_P(field, PSTR("PICtempsensor"))==0)        settings.picBoot.bTempSensor = EVALBOOLEAN(newValue);  // TASK-1940
   else if (strcasecmp_P(field, PSTR("OTGWcommands"))==0)         strlcpy(settings.picBoot.sCommands, newValue, sizeof(settings.picBoot.sCommands));
   else if (strcasecmp_P(field, PSTR("GPIOOUTPUTSenabled")) == 0)
   {

@@ -119,7 +119,7 @@ def main():
         start = platform.index("struct PlatformTcpIdleConnection {") if "struct PlatformTcpIdleConnection {" in platform else platform.index("inline uint16_t platformTcpTxHoldingOnPort(")
         # End at the next block after the TX gate: later shims (TASK-1605 resolver, TASK-1450
         # gateway probe) need IPAddress/lwIP types the fixture does not fake.
-        end = min(platform.index(m, start) for m in ("// TASK-1605: resolve", "// Exception cause")
+        end = min(platform.index(m, start) for m in ("// TASK-1947: the same count", "// TASK-1605: resolve", "// Exception cause")
                   if m in platform[start:])
         (directory / "tcp_gate.inc").write_text(platform[start:end])
         model = source("src/OTGW-firmware/OTGW-firmware.h", args.old_rev)

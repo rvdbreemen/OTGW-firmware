@@ -714,7 +714,9 @@ static void satSendCS(float setpoint, bool force = false) {
 // entry 232. It shares iLastSentCSMs with the 30 s repeat of satCmdResend() (TASK-1924), so together they send at most
 // one repeat per 30 s. OT-Direct does not need this: it skips its own CS expiry while SAT owns MsgID 1 (OTDirect.ino).
 // TASK-1924: while a dropped CS= waits for its retry, the keepalive carries that value, not the older cached one.
-static const uint32_t SAT_PIC_CS_KEEPALIVE_MS = 30000UL;
+// TASK-1924 Part 2: 31 s, like the loop repeat in satCmdResend(). On a PIC board this keepalive runs first in the loop, so at a
+// 30 s control interval a 30 s keepalive fired just before the tick and sent the old CS= (09's bench, beta.242, 29 of 37 changes).
+static const uint32_t SAT_PIC_CS_KEEPALIVE_MS = SAT_CS_REPEAT_MS + SAT_CS_REPEAT_SLACK_MS;
 
 static void satPicCSKeepalive() {
   if (!isPICEnabled() || !state.sat.bLastSentValid) return;
@@ -800,7 +802,10 @@ static void satCmdResend() {
     satSendCS(cs);   // differs from the cache, so it goes out; a new drop restarts the 5 s
     return;
   }
-  if ((uint32_t)(now - state.sat.iLastSentCSMs) < SAT_CS_REPEAT_MS) return;
+  // TASK-1924 Part 2 (09's bench finding on beta.242): at a 30 s control interval the tick itself repeats the CS (its send
+  // counts as due from 29 s), so the loop repeat waits until 31 s and never sends the old value just before a tick brings a
+  // new one; with a longer interval it is the repeat that keeps the CS fresh (largest gap 31 s, inside the ~63 s expiry).
+  if ((uint32_t)(now - state.sat.iLastSentCSMs) < SAT_CS_REPEAT_MS + SAT_CS_REPEAT_SLACK_MS) return;
   satSendCS(satCapRepeatCS(state.sat.fLastSentCS));
 }
 
@@ -940,6 +945,15 @@ static uint32_t _bs_flameOffMs         = 0;
 
 // --- Previous flame state for edge detection ---
 static bool     _sat_prevFlameState = false;
+// TASK-1924 Part 2 (Sergeant D entries 338, 344): millis() of the last CH flame-on edge (a hot-water flame does not count),
+// 0 while the flame is off. Starts the 60 s window in which the continuous CS follows the rising flow.
+static uint32_t _sat_chFlameOnMs = 0;
+static const uint32_t SAT_CONT_STARTUP_MS = 60000UL;   // entry 344: the cycle tracker's 60 s warm-up (cycles/tracker.py:114)
+// TASK-1942: the flame was seen off since SAT became active. A loop pass while SAT is off does not track the flame, so a boiler
+// already burning when SAT is switched on gives a flame "edge" that is no ignition; the continuous start rule and its flood ignore it.
+static bool _sat_flameOffSeen = false;
+static float _sat_contFlameOffHold = 0.0f;   // TASK-1942: the flame-off CS of the continuous start (satContinuousSetpoint), 0 = none
+static float satContinuousSetpoint(float pidOutput, float previousCS);   // TASK-1942: used by the no-return flood above its definition
 
 // --- Timer for control loop (initial value, updated from settings in initSAT) ---
 DECLARE_TIMER_SEC(timerSATControl, settings.sat.iControlInterval, CATCH_UP_MISSED_TICKS);
@@ -950,6 +964,8 @@ static uint32_t _sat_tickMs = 0;
 DECLARE_TIMER_SEC(timerSAT4hStats, 60, SKIP_MISSED_TICKS);
 // --- Timer for the PWM suppression CS refresh (TASK-1268): every 3 s, between control ticks ---
 DECLARE_TIMER_SEC(timerSATSuppress, 3, SKIP_MISSED_TICKS);
+// --- Timer for the continuous CS recompute (TASK-1924 Part 2, entry 337): every 5 s while the flame is on (climate.py:706-710) ---
+DECLARE_TIMER_SEC(timerSATContClamp, 5, SKIP_MISSED_TICKS);
 // --- Timer for the deferred SAT MQTT publish (TASK-1339): retry while the outbox gate skipped topics ---
 DECLARE_TIMER_MS(timerSATPublishRetry, 500, SKIP_MISSED_TICKS);
 // Set at the end of a satPublishMQTT() pass that skipped a topic; only such a pass starts a retry,
@@ -1936,7 +1952,9 @@ static int16_t  _flood_lastStep = -1;
 static bool satNoReturnFloodAllowed()
 {
   if (!satIsEnabled() || !state.sat.bActive || state.sat.bSafetyTripped || _sat_thermalSafeActive) return false;
-  if (state.sat.eControlMode != SAT_MODE_PWM || !state.sat.bPwmFlameRequested) return false;
+  // TASK-1942 (entry 348, open point 1 read as yes): a CH start in continuous mode floods too
+  if (!((state.sat.eControlMode == SAT_MODE_PWM && state.sat.bPwmFlameRequested) ||
+        state.sat.eControlMode == SAT_MODE_CONTINUOUS)) return false;
   if (!settings.sat.bOvershootProtection || (OTcurrentSystemState.SlaveStatus & 0x05)) return false;
   if (!state.sat.bValvesOpen || (state.sat.bSummerActive && settings.sat.bSummerSimmer)) return false;
   if (_sat_requestedSetpoint <= satColdThreshold() || state.sat.fFinalSetpoint <= SAT_MIN_SETPOINT) return false;
@@ -1949,6 +1967,7 @@ static void satNoReturnFloodOnFlameEdge(bool flame, bool dhwFlame)
 {
   _flood_active = false;
   if (!flame || dhwFlame || !satNoReturnTemp() || !satNoReturnFloodAllowed()) return;
+  if (state.sat.eControlMode == SAT_MODE_CONTINUOUS && !_sat_flameOffSeen) return;   // TASK-1942: no ignition, SAT came on mid-burn
   _flood_active   = true;
   _flood_startMs  = millis();
   _flood_lastStep = -1;
@@ -1967,7 +1986,10 @@ static void satNoReturnFloodStep()
     // Hand over to the suppression at once: one CS = flow - fModSupOffset through satSendCS(), so the cache the 30 s repeat repeats
     // holds the suppression value and never the last flood value (the flood re-armed the resend after a hot-water tick had
     // disarmed it, and the 3 s refresh stays out as long as the live DHW bit is set).
-    float cs = satPwmSuppressionSetpoint(satGetMaxSetpoint());
+    // TASK-1942: in continuous mode the start sequence goes on with the follow of satContinuousSetpoint() (entries 344, 347, 348)
+    float cs = (state.sat.eControlMode == SAT_MODE_CONTINUOUS)
+               ? satContinuousSetpoint(_sat_requestedSetpoint, _sat_lastControlCS)
+               : satPwmSuppressionSetpoint(satGetMaxSetpoint());
     const float maxSetpoint = satEffectiveMaxSetpoint();
     if (cs > maxSetpoint) cs = maxSetpoint;
     _pwm_flameOffHoldSetpoint = 0.0f;
@@ -1983,6 +2005,7 @@ static void satNoReturnFloodStep()
   if ((step & 1) == 0) {
     const float cs = satPwmFlameOffHold(satEffectiveMaxSetpoint());
     _pwm_flameOffHoldSetpoint = cs;
+    if (state.sat.eControlMode == SAT_MODE_CONTINUOUS) _sat_contFlameOffHold = cs;   // TASK-1942: the tick in the hold keeps it
     _sat_lastControlCS        = cs;            // the "previous CS" the next tick keeps
     state.sat.fFinalSetpoint  = cs;
     satSendCS(cs, true);                       // TASK-1924: every 2 s, also unchanged (entries 45, 142)
@@ -2538,6 +2561,72 @@ static float satApplyContinuous(float pidOutput, float previousCS)
   }
   const float heldFloor = (minAllowed < previousCS) ? minAllowed : previousCS;
   return (pidOutput > heldFloor) ? pidOutput : heldFloor;
+}
+
+// TASK-1924 Part 2: the continuous CS. For SAT_CONT_STARTUP_MS after a CH flame-on the CS follows the flow without the
+// previous-CS hold: max(request, flow - fModSupOffset) (Robert entry 338, Sergeant D entries 344: 60 s, 347: the suppression
+// offset, 1.0 C, const.py:153; corrects entry 346), so a rising flow cannot pass the CS and trip the boiler hysteresis at
+// start-up (entry 336). Outside that window the entry-112 clamp of satApplyContinuous() with fFlowOffset (unchanged here;
+// its value is the open question Q-346a), whose hold never follows a rising flow at a constant request.
+// The clamp's other bypass cases (flame off, flow invalid) apply in the window too.
+// TASK-1942 (Sergeant D entry 348, "as a fail safe guard"): a heating start in continuous mode runs the PWM start sequence
+// first, with the PWM ON gates (thermo-nova heating_control.py:384-389: hot water, request at or below the cold setpoint,
+// overshoot protection off -> no override): flame off -> the flame-off hold satPwmFlameOffHold() (return + fFlameOffOffset; the
+// flow for a boiler without a return temperature, entry 45), kept for fModSupDelay after the CH flame-on (:392-433); a flame
+// that lit without a recorded hold keeps the previous CS (pending, :430-433); then the follow above. Thermo-nova has this in
+// PWM only (:224-225); in continuous mode with the flame off it sends the request (:476-482): a deliberate deviation.
+static float satContinuousSetpoint(float pidOutput, float previousCS)
+{
+  const bool startRule = settings.sat.bOvershootProtection && !state.sat.bDhwActive && pidOutput > satColdThreshold();
+  if (startRule && !satIsFlameOn()) {
+    // No return temperature yet at boot and not (yet) a no-return boiler: no hold, as the PWM start (it keeps the previous CS)
+    if (satGetReturnTemp() <= 0.0f && !satNoReturnTemp()) { _sat_contFlameOffHold = 0.0f; return satApplyContinuous(pidOutput, previousCS); }
+    _sat_contFlameOffHold = satPwmFlameOffHold(satGetMaxSetpoint());
+    return _sat_contFlameOffHold;
+  }
+  const uint32_t sinceOn = (uint32_t)(millis() - _sat_chFlameOnMs);
+  if (startRule && _sat_chFlameOnMs != 0 && sinceOn < (uint32_t)(settings.sat.fModSupDelay * 1000.0f)) {
+    if (_sat_contFlameOffHold > 0.0f) return satNoReturnTemp() ? satPwmFlameOffHold(satGetMaxSetpoint()) : _sat_contFlameOffHold;
+    return (previousCS > SAT_MIN_SETPOINT) ? previousCS : pidOutput;   // pending: the flame lit without a recorded hold
+  }
+  _sat_contFlameOffHold = 0.0f;
+  if (_sat_chFlameOnMs != 0 && sinceOn < SAT_CONT_STARTUP_MS && satIsFlameOn()) {
+    const float boilerTemp = satGetFlowTemp();
+    if (boilerTemp > 0.0f && boilerTemp <= 100.0f) {
+      const float follow = boilerTemp - settings.sat.fModSupOffset;   // entry 347
+      return (pidOutput > follow) ? pidOutput : follow;
+    }
+  }
+  return satApplyContinuous(pidOutput, previousCS);
+}
+
+// TASK-1924 Part 2 (Sergeant D entry 337): while the flame is on in continuous mode, the CS is recomputed every 5 s from the
+// last tick's requested setpoint, as thermo-nova's 5 s heating loop does (climate.py:706-710; clamp heating_control.py:485-489,
+// previous CS = the last computed one, :454), and goes out through satSendCS() on change. Between ticks the request does
+// not move, so outside the start-up window this changes the CS only when the clamp follows a falling flow or lets go.
+// Gates as the 3 s PWM suppression refresh (satPwmSuppressionRefresh), for the continuous mode.
+static void satContinuousClampRefresh()
+{
+  if (!DUE(timerSATContClamp)) return;
+  if (!satIsEnabled() || !state.sat.bActive || state.sat.bSafetyTripped) return;
+  if (_sat_thermalSafeActive) return;                             // the thermal safe fallback owns CS
+  if (state.sat.eControlMode != SAT_MODE_CONTINUOUS) return;
+  if (_flood_active) return;                                      // TASK-1942: the no-return start-up flood owns CS for its 20 s
+  if (settings.sat.bSimulation && state.sat.bDhwActive) return;
+  if (OTcurrentSystemState.SlaveStatus & 0x05) return;          // fault flag / DHW active: the control tick skips these too
+  if (!state.sat.bValvesOpen || (state.sat.bSummerActive && settings.sat.bSummerSimmer)) return;
+  if (!satIsFlameOn()) return;
+  if (_sat_requestedSetpoint <= satColdThreshold()) return;
+  if (state.sat.fFinalSetpoint <= SAT_MIN_SETPOINT) return;       // last tick commanded heating off
+
+  float cs = satContinuousSetpoint(_sat_requestedSetpoint, _sat_lastControlCS);
+  if (cs < SAT_MIN_SETPOINT) cs = SAT_MIN_SETPOINT;
+  const float maxSetpoint = satEffectiveMaxSetpoint();
+  if (cs > maxSetpoint) cs = maxSetpoint;
+  _sat_lastControlCS = cs;                                        // the "previous CS" of the next recompute and tick
+  state.sat.fFinalSetpoint = cs;                                  // before the command check: SAT simulation reads it too
+  if (!hasOTCommandInterface()) return;
+  satSendCS(cs);                                                  // on change, plus the 30 s repeat (TASK-1924, entries 334, 335)
 }
 
 //=====================================================================
@@ -3713,6 +3802,9 @@ static int satPidStateBuild(char* buf, size_t size, time_t ts)
 
 void satSavePidState()
 {
+  // TASK-1900: a SAT simulation run learns on the simulated room only, so the real PID state on flash stays as it was
+  // (the TASK-1869 rule). This covers every caller: the 5-minute save, satPersistAllToFs, satDisable and the flush.
+  if (settings.sat.bSimulation) return;
   File f = LittleFS.open(FPSTR(SAT_PID_STATE_FILE), "w");
   if (!f) return;
   char buf[256];
@@ -3954,7 +4046,7 @@ static void satLoadEstimatedEnergy()
 // hourly energy timer, the 0.1 kWh estimate boundary, the 5 min PID timer) live in
 // the callers, so nothing here can skip a write. RAM is fresher than the files
 // were: energy is only saved hourly.
-// What it does not cover: /sat_markers.json has no RAM copy (the update server
+// What it does not cover: /sat_markers.json (its RAM copy, TASK-1911, is written by loopSatMarkers(); the update server
 // keeps it on the heap) and /sat/sat_cycles.json is never written by the firmware.
 // TASK-1771: true once initSAT() has loaded the SAT state files into RAM. setup() starts the web
 // server before initSAT(), so a filesystem upload or a reboot request can arrive while RAM still holds
@@ -7387,10 +7479,31 @@ static void satSendMMDuringDhw() {
                          settings.sat.iMaxRelModulation, satGetManufacturerQuirks()));
 }
 
+// TASK-1952: when a SAT simulation run ends, the PID state and the heating-curve recommendation in RAM are the ones
+// the run learned on the simulated room. The files were not written during the run (TASK-1900), so they hold the real
+// state: reload both the way a boot does (satPidReset() then satLoadPidState(), which warm-starts the integral and raw
+// derivative; satHCRLoadState() and a recomputed recommendation). Also right for a unit that booted with simulation on.
+// RAM cost 0, against a 5.7 KB stash of the HCR intra-day ring. Runs every pass, before every early return.
+// --- satSimEndRestore begin
+static void satSimEndRestore()
+{
+  static bool s_wasSim = false;
+  if (settings.sat.bSimulation == s_wasSim) return;
+  s_wasSim = settings.sat.bSimulation;
+  if (s_wasSim) return;   // entering a run: nothing to keep, the files stay untouched
+  satPidReset();
+  satLoadPidState();
+  satHCRLoadState();
+  satHeatingCurveRecommendation();
+  SATDebugTln(F("SAT: simulation ended, real PID state and heating-curve data reloaded"));
+}
+// --- satSimEndRestore end
+
 static void satControlLoopRun()
 {
   satApplyControlStateReset();    // TASK-1414: a reset requested from any task (REST, MQTT, SAT itself) is applied here, once
   satCurveTuneService(millis());  // TASK-1525: starts, stops and rolls the self-tune clock; before every early return
+  satSimEndRestore();             // TASK-1952: the real learned state comes back when a simulation run ends
   // TASK-1574 (commit-on-success): before the enabled gate and every other early return, so a dropped hand-back is repeated
   // also while SAT is switched off (satDisable() then has no later pass of its own).
   satRetryRelease();
@@ -7434,6 +7547,7 @@ static void satControlLoopRun()
     _sat_swSentValid = false;              // TASK-1376: SAT sends the DHW setpoint again when it is back
     if (!satIsEnabled()) state.sat.bOtLinkLost = false;
     if (!satIsEnabled()) state.sat.bOutsideTempMissing = false;   // TASK-1390: a switch-off ends the outside-missing state
+    _sat_flameOffSeen = false;             // TASK-1942: a flame already burning when SAT comes back is no CH start
     return;
   }
 
@@ -7476,12 +7590,15 @@ static void satControlLoopRun()
 
   // Flame edge detection — always process, independent of timer
   bool currentFlame = satIsFlameOn();
+  if (!currentFlame) _sat_flameOffSeen = true;   // TASK-1942
   if (currentFlame != _sat_prevFlameState) {
     if (!currentFlame) state.sat.bModSuppressed = false;   // the suppression is a flame-on phase; the next tick sets it again (entry 267)
     satCycleOnFlameChange(currentFlame);
     satPwmNoteDhwFlameEdge(currentFlame, dhwBitNow);
     satNoReturnFloodOnFlameEdge(currentFlame, dhwBitNow);   // TASK-1371: CH ignition of a boiler without a return temperature
     _sat_prevFlameState = currentFlame;
+    if (currentFlame && !dhwBitNow && _sat_flameOffSeen) { const uint32_t n = millis(); _sat_chFlameOnMs = n ? n : 1; }   // TASK-1924 Part 2, 1942
+    else if (!currentFlame)         _sat_chFlameOnMs = 0;
   }
   satPwmPhaseSample(currentFlame && !dhwBitNow, millis());   // TASK-1880 telemetry: CH flame time of the open PWM ON phase
 
@@ -7502,6 +7619,9 @@ static void satControlLoopRun()
 
   // Refresh the PWM suppression CS between control ticks (TASK-1268)
   satPwmSuppressionRefresh();
+
+  // Recompute the continuous CS every 5 s while the flame is on (TASK-1924 Part 2, entries 337, 338, 344, 346)
+  satContinuousClampRefresh();
 
   // Repeat an unchanged CS every 30 s and retry a dropped one (TASK-1924, entries 334, 335)
   satCmdResend();
@@ -7858,7 +7978,7 @@ static void satControlLoopRun()
     pwmDrivesSetpoint = satPwmDrivesSetpoint(pidOutput);
     pwmOn = state.sat.bPwmFlameRequested;           // the phase that produced this tick's CS
   } else {
-    finalSetpoint = satApplyContinuous(pidOutput, _sat_lastControlCS);   // previous CS: read before this tick overwrites it below
+    finalSetpoint = satContinuousSetpoint(pidOutput, _sat_lastControlCS);   // previous CS: read before this tick overwrites it below (TASK-1924)
   }
 
   // Final clamp (including hard ceiling)

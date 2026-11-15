@@ -219,6 +219,30 @@ Veelgebruikte commando's:
 | `OT=12.0` | Buitentemperatuur doorgeven |
 | `SB=15.0` | Setback-temperatuur |
 
+Op hardware zonder PIC (OT-Direct) beantwoordt de firmware deze commando's zelf, met de tekst van PIC-firmware 6.8, zodat programma's die voor de PIC geschreven zijn dezelfde antwoorden lezen:
+
+| Commando | Antwoord op OT-Direct |
+|----------|-----------------------|
+| `PR=P` | `PR: P=Low power`, `Medium power` of `High power`: het Smart Power-niveau naar de thermostaat |
+| `PR=R` | `PR: R=D` (automatisch, de standaard), of `S`, `C`, `I` na `FT=` |
+| `PR=O` | `PR: O=N` zonder kamersetpoint-override; `T`/`C` en het setpoint bij een `TT=`/`TC=`-override, kleine `t`/`c` zolang de thermostaat hem nog niet heeft overgenomen, `n` zolang een wissen nog onderweg is. Alleen een `CS=`-override geeft `N`, net als de PIC |
+| `PR=C` | `PR: C=240 MHz` |
+| `PR=B` | `PR: B=UU:MM DD-MM-JJJJ`, de bouwtijd van de firmware |
+| `PR=L` | `PR: L=FXOMPC` totdat `LA=`..`LF=` het wijzigen |
+| `SC=9:05/3` | `SC: 09:05/3` (uren met twee cijfers) |
+| `SR=18:1,230` | `SR: 18:1/230`: het opgeslagen antwoord als `<id>:<hoge byte>/<lage byte>`, in welke vorm het argument ook kwam |
+| `FT=X` | `FT: D`: het gekozen model (`C`, `I`, `S` of `D`), niet het argument |
+
+Op OT-Direct leest de firmware de getallen in deze commando's zoals PIC-firmware 6.8 ze leest. De ketel krijgt daardoor dezelfde bytes, en een verkeerde waarde krijgt hetzelfde antwoord:
+
+- Twee decimalen tellen mee en de derde rondt af (`CS=49.72` stuurt 49,72, `OT=9.999` stuurt 10,00); één decimaal is tienden (`RT=25.4` is 25,40). Het antwoord toont de opgeslagen waarde met twee decimalen.
+- `CS=`, `C2=`, `BS=`, `CL=`, `CC=` en `RT=` nemen 0 tot 100: boven 100 is `OR`, een minteken, een lege waarde of tekst is `SE`. `CL=` met tekst wist het koelniveau juist (`CL: -`).
+- `TT=`, `TC=` en `SB=` weigeren een minteken (`SE`); `SB=0` is `SE`. `SB=` blijft tussen 1 en 30.
+- `SW=` en `SH=` antwoorden `BV` buiten de grenzen die de ketel in MsgID 48 en 49 meldt, of 20-80 en 10-90 zolang hij die nog niet gemeld heeft; 0 zet ze terug.
+- `OT=` wist de buitentemperatuur (`OT: -`) bij tekst, bij `OT=-` en bij een waarde van 64 of hoger.
+- `MM=` neemt een heel getal: tekst, `MM=-` of een minteken wist hem (`MM: -`), boven 100 is `OR`.
+- Unknown-DataID-antwoorden schakelen MsgID 0, 1, 3, 14, 17 en 25 nooit uit, net als op de PIC.
+
 Alias: `POST /api/v2/otgw/command` (achterwaartse compatibiliteit)
 
 ---
@@ -582,7 +606,7 @@ Opmerking (TASK-438): `monitor` is nu gekoppeld aan `GW=0` voor parity met PIC-f
 
 ##### GET /api/v2/otdirect/settings
 
-Retourneert de opgeslagen OT-direct-configuratie: modus, noodinstelling (setback) en ventilatie. SAT is de enige temperatuurregelaar op OT-Direct; de voormalige parameters voor verwarmingscurve en PI-kamercompensatie zijn verwijderd.
+Retourneert de opgeslagen OT-direct-configuratie: modus, de thermostaat-timeout en ventilatie. SAT is de enige temperatuurregelaar op OT-Direct; de voormalige parameters voor verwarmingscurve en PI-kamercompensatie zijn verwijderd. Bij verlies van de thermostaat stuurt OT-Direct geen setback-aanvoertemperatuur meer (TASK-1806, zoals de PIC): na `setback_timeout` seconden zonder thermostaatframes stuurt de gateway eigen frames met CV uit, tenzij er een CS= actief is. `setback_temp` en de FS=-noodvlag worden nog opgeslagen en geaccepteerd, maar niet meer gebruikt.
 
 **Antwoord:**
 ```json
@@ -853,7 +877,7 @@ Tenzij anders vermeld zijn alle gepubliceerde onderwerpen retained.
 | `otgw-otdirect/mode` | Bedrijfsmodus (gateway, monitor, bypass, master, loopback) |
 | `otgw-otdirect/bypass` | Bypass-relais actief |
 | `otgw-otdirect/thermostat_connected` | Thermostaatframe ontvangen binnen timeout |
-| `otgw-otdirect/setback_active` | Setback-override actief |
+| `otgw-otdirect/setback_active` | Altijd OFF: OT-Direct heeft geen setback-override meer (TASK-1806) |
 | `otgw-otdirect/schedule_active` | Aantal actieve schema-items |
 | `otgw-otdirect/overrides_active` | Aantal actieve write-overrides |
 | `otgw-otdirect/boiler_connected` | Ketel OT-bus actief |

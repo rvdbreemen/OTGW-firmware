@@ -69,6 +69,7 @@ static bool updateLittleFSStatus(const __FlashStringHelper*) { g_probes++; retur
 static int g_fileFlags = 0;
 static void refreshLittleFSFileFlags() { g_fileFlags++; }   // TASK-1899: file-exists flags for REST
 static void loopDallasLabels() { }                           // TASK-1912: writes only a changed labels copy
+static void loopSatMarkers() { }                             // TASK-1911: writes only a changed markers copy
 @SAFE@
 @FN@
 int main() {

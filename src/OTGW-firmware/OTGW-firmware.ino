@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.ino
-**  Version  : v2.0.0-beta.247
+**  Version  : v2.0.0-beta.295
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -207,11 +207,13 @@ static void appendBootDetectLog()
     }
     oldfh.close();
   }
+  const size_t written = outfh.position();   // bytes written; size() may lag the stdio buffer
   outfh.close();
 
-  // Swap temp -> live (mirrors updateRebootLog()).
-  if (LittleFS.exists(BOOTDETECT_FILE)) LittleFS.remove(BOOTDETECT_FILE);
-  LittleFS.rename(BOOTDETECT_TMP, BOOTDETECT_FILE);
+  // TASK-1916: rename the complete temp file over the live one (no remove first: lfs_rename replaces it).
+  if (!fsCommitTempFile(BOOTDETECT_TMP, BOOTDETECT_FILE, written)) {
+    SetupDebugln(F("*** WARN: bootdetect log: commit failed, previous log kept"));
+  }
 }
 
 // ADR-158: detect a LOLIN S3 Mini Pro in the Classic socket via its on-board
@@ -262,6 +264,8 @@ void setup() {
   captureRebootReason();  // TASK-1447: before any path that can restart (config-portal timeout)
   captureWifiDeadRestarts();  // TASK-1450: same rule, the dead-link restart count
   captureWifiSkipPortal();    // TASK-1455: one-boot skip-portal mark of a WiFi supervisor restart
+  (void)*(volatile uint8_t *)g_rtcSafebootGuard;   // TASK-1918: one reference keeps the guard through --gc-sections
+  platformMarkLoopTask();  // TASK-1761: setup() runs on the loop task (before WiFi starts async_tcp); off-loop OT-Direct commands go via a ring
   bootHeapPhase(PSTR("setup-early"));  // TASK-1339 diagnostics: windowed heap minimum over the boot path
   // TASK-1763 (b): GPIO ISR service now, before startWiFi() and before the first attachInterrupt()
   // (initOTDirect -> OpenTherm::begin): the install runs on the ipc1 stack (platform_esp32.h).
@@ -341,6 +345,7 @@ void setup() {
   loadOtSupportFiles();  // TASK-693 port: warm the in-RAM support bitmaps from prior-boot knowledge
   loadDHWWaterMeter();   // TASK-1123: restore the DHW water total before any OT frame is decoded
   loadDallasLabels();    // TASK-1912: the labels REST serves from RAM, read before the web server starts
+  loadSatMarkers();      // TASK-1911: the markers REST serves from RAM too
 
   // Set hostname ASAP after loading settings.  WiFi.persistent(true) from a
   // previous boot lets the SDK auto-connect before startWiFi() is reached;
@@ -501,8 +506,11 @@ void setup() {
   appendBootDetectLog();
   // TASK-1870: IPC stack low point after the PIC probe, next to the one after full init below,
   // so a bench log shows which boot phase uses the ipc0/ipc1 stacks (ADR-225).
+  // TASK-1870.1: kept in state as well, because this line prints before a telnet client can connect.
+  state.heapdiag.iIpc0StackMinHwDetect = platformIpcStackHighWater("ipc0");
+  state.heapdiag.iIpc1StackMinHwDetect = platformIpcStackHighWater("ipc1");
   SetupDebugf(PSTR("boot: ipc stack free min after hw detect ipc0=%ld ipc1=%ld B\r\n"),
-              (long)platformIpcStackHighWater("ipc0"), (long)platformIpcStackHighWater("ipc1"));
+              (long)state.heapdiag.iIpc0StackMinHwDetect, (long)state.heapdiag.iIpc1StackMinHwDetect);
 #else
   // UART0 was muted at the top of setup() (TASK-1131, TASK-1217).
   detectPIC();
@@ -863,6 +871,10 @@ void doTaskEvery3s(){
   // for, because the code that computes it only ran when a frame arrived.
   // Must stay ABOVE the picSettingsCycleActive early-return below.
   evaluateOTBusLiveness(OTBusLivenessTrigger::Tick);
+
+  // TASK-1940 (1.x TASK-1147): PR=E every 3 minutes when the PIC temperature sensor
+  // setting is on. Above the picSettingsCycleActive early-return, which ends after boot.
+  pollPicTempSensor();
 
   if (!picSettingsCycleActive) return;
   queryNextPICsetting();

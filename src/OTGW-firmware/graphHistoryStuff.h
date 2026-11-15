@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : graphHistoryStuff.h
-**  Version  : v2.0.0-beta.247
+**  Version  : v2.0.0-beta.295
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -40,6 +40,9 @@
 #define GRAPH_HIST_SMALL_SLOTS       126   // ring capacity; 120 emitted = 1 h
 #define GRAPH_HIST_LARGE_INTERVAL_S  120   // PSRAM: one slot per 2 minutes
 #define GRAPH_HIST_LARGE_SLOTS       726   // ring capacity; 720 emitted = 24 h
+// TASK-1937: a weather value older than this is stale for the ring, the same 1 h rule as SAT_OUTSIDE_VALID_MS
+// (SATcontrol.ino, Sergeant D entry 57). tests/test_graph_outside_source.py checks both stay equal.
+#define GRAPH_HIST_WEATHER_VALID_MS  3600000UL
 #define GRAPH_HIST_SCALE       10    // temperatures are stored and sent as value*10
 
 #define GRAPH_HIST_FLAG_FLAME  0x01

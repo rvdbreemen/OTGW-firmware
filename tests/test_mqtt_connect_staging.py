@@ -208,7 +208,11 @@ def program(src: str) -> str:
         drip = d.group(0) if d else ""
     else:
         drip = "static bool dripOutboxWait(uint32_t, uint8_t&) { return false; }\n"
-    return STUBS + stage + "\n" + drip + "\n" + cut_func(src, "static void onMqttConnect(bool sessionPresent) {") + MAIN
+    # TASK-1778: onMqttConnect() subscribes through the real helper block next to it (absent on older code)
+    h = re.search(r"// TASK-1778 begin.*?// TASK-1778 end", src, re.S)
+    helper = h.group(0) + "\n" if h else ""
+    return (STUBS + stage + "\n" + drip + "\n" + helper +
+            cut_func(src, "static void onMqttConnect(bool sessionPresent) {") + MAIN)
 
 
 class MqttConnectStaging(unittest.TestCase):

@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : MQTTstuff
-**  Version  : v2.0.0-beta.247
+**  Version  : v2.0.0-beta.295
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **      Modified version from (c) 2020 Willem Aandewiel
@@ -219,6 +219,7 @@ uint16_t mqttQueueNow() { const size_t n = MQTTclient.queueSize(); return n > 0x
 // onConnect/onDisconnect handlers (defined below) need a forward declaration so
 // they can be wired with onConnect()/onDisconnect() in startMQTT().
 static void onMqttConnect(bool sessionPresent);
+static void mqttRetryPendingSubscribes();   // TASK-1778: defined next to onMqttConnect()
 static void onMqttDisconnect(espMqttClientTypes::DisconnectReason reason);
 static void onMqttMessage(const espMqttClientTypes::MessageProperties& properties,
                           const char* topic, const uint8_t* payload,
@@ -574,7 +575,17 @@ static int findMQTTSetCommandIndex(const char *topicToken)
 // so without this the TCP socket lingers in lwIP and the next boot comes up in a
 // weird half-state (WiFi associated but services non-responsive).
 void doMqttDisconnect() {
-  if (MQTTclient.connected()) MQTTclient.disconnect();
+  if (!MQTTclient.connected()) return;
+  // TASK-1780: with UseInternalTask::NO only loop() sends, and the reboot path restarts without one.
+  // A clean DISCONNECT suppresses the will, so publish the retained "offline" first; disconnect()
+  // queues the DISCONNECT once the outbox is empty. Pump until disconnected, at most 500 ms.
+  MQTTclient.publish(MQTTPubNamespace, 0, true, "offline");
+  MQTTclient.disconnect();
+  const uint32_t t0 = millis();
+  while (!MQTTclient.disconnected() && (millis() - t0) < 500) {
+    MQTTclient.loop();
+    delay(1);
+  }
 }
 
 //===========================================================================================
@@ -997,7 +1008,9 @@ static void handleMQTTcallback(char* topic, byte* payload, unsigned int length, 
               DebugTf(PSTR("MQTT raw command dropped: payload too long (%d >= %u)\r\n"), n, (unsigned)sizeof(otgwcmd));
             } else {
               MQTTDebugf(PSTR(" found command, sending payload [%s]\r\n"), otgwcmd);
-              addCommandToQueue(otgwcmd, strlen(otgwcmd), true);
+              if (addCommandToQueue(otgwcmd, strlen(otgwcmd), true) == CmdQueueResult::Dropped) {   // TASK-1761: no reply topic, so log it
+                DebugTf(PSTR("MQTT command [%s] dropped (refused or queue full)\r\n"), otgwcmd);
+              }
             }
           } else if (pOtType == s_reset) {
             // TASK-669 (port of dev TASK-661): payload validation + rate-limit.
@@ -1035,7 +1048,9 @@ static void handleMQTTcallback(char* topic, byte* payload, unsigned int length, 
               DebugTf(PSTR("MQTT command [%s] dropped: composed command too long (%d >= %u)\r\n"), cmdBuf, n, (unsigned)sizeof(otgwcmd));
             } else {
               MQTTDebugf(PSTR(" found command, sending payload [%s]\r\n"), otgwcmd);
-              addCommandToQueue(otgwcmd, strlen(otgwcmd), true);
+              if (addCommandToQueue(otgwcmd, strlen(otgwcmd), true) == CmdQueueResult::Dropped) {   // TASK-1761: no reply topic, so log it
+                DebugTf(PSTR("MQTT command [%s] dropped (refused or queue full)\r\n"), otgwcmd);
+              }
             }
           }
         } else {
@@ -1605,6 +1620,7 @@ void handleMQTT()
       { // engine already pumped by the unconditional loop() at top of handleMQTT()
         state.mqtt.iLastConnectedMs = millis();  // stamp each confirmed-live tick for offline-duration tracking
         connStageTick();  // TASK-1757: rest of the connect burst, in portions
+        mqttRetryPendingSubscribes();  // TASK-1778: a SUBSCRIBE refused at connect
         // ADR-118: periodically refresh the retained gateway-override topics so HA / dashboards
         // reflect active overrides even when no new override frame arrived this minute.
         if (DUE(timerMQTToverridepublish)) publishActiveOverrides();
@@ -1810,6 +1826,36 @@ bool mqttConnectPaceHold() {
 }
 // --- end connStage -----------------------------------------------------------
 
+// TASK-1778 begin: a SUBSCRIBE that espMqttClient refuses at connect is retried. The library refuses every
+// packet while its largest free block (max of heap and PSRAM) is below EMC_MIN_FREE_MEMORY = 16384 B
+// (espMqttClient Helpers.h, Packets/Packet.cpp), which a board without PSRAM reaches in the connect burst.
+// With a clean session a refused command SUBSCRIBE left every MQTT command dead until the next reconnect.
+static bool     mqttSubCmdPending   = false;   // <namespace>/# not subscribed yet
+static bool     mqttSubHaPending    = false;   // homeassistant/status not subscribed yet
+static uint32_t mqttSubRetryLastMs  = 0;
+
+static bool mqttSubscribeCommandTopic() {
+  char topic[MQTT_TOPIC_MAX_LEN];
+  strlcpy(topic, MQTTSubNamespace, sizeof(topic));
+  strlcat(topic, "/#", sizeof(topic));
+  MQTTDebugTf(PSTR("Subscribe to MQTT: TopicId [%s]\r\n"), topic);
+  const bool ok = MQTTclient.subscribe(topic, 0) != 0;   // packetId 0 == refused / not queued
+  if (ok) MQTTDebugTf(PSTR("MQTT: Subscribed successfully to TopicId [%s]\r\n"), topic);
+  else    MQTTDebugTf(PSTR("MQTT: Subscribe TopicId [%s] FAILED, retried while connected\r\n"), topic);
+  return ok;
+}
+
+// Connected-state loop: at most one attempt per second until both topics are subscribed. A refused attempt
+// costs nothing (the library refuses before it allocates). Cleared on success; set again on every connect.
+static void mqttRetryPendingSubscribes() {
+  if (!mqttSubCmdPending && !mqttSubHaPending) return;
+  if ((uint32_t)(millis() - mqttSubRetryLastMs) < 1000UL) return;
+  mqttSubRetryLastMs = millis();
+  if (mqttSubCmdPending && mqttSubscribeCommandTopic()) mqttSubCmdPending = false;
+  if (mqttSubHaPending && MQTTclient.subscribe("homeassistant/status", 0) != 0) mqttSubHaPending = false;
+}
+// TASK-1778 end
+
 static void onMqttConnect(bool sessionPresent) {
   (void)sessionPresent;
   if (sBootHeapState == BOOTHEAP_RUN) {
@@ -1853,18 +1899,11 @@ static void onMqttConnect(bool sessionPresent) {
   }
   DebugTf(PSTR("[HEAP] post-republish: free=%u max_block=%u\r\n"), platformFreeHeap(), platformMaxFreeBlock());
 
-  //Subscribe to topics
-  char topic[MQTT_TOPIC_MAX_LEN];
-  strlcpy(topic, MQTTSubNamespace, sizeof(topic));
-  strlcat(topic, "/#", sizeof(topic));
-  MQTTDebugTf(PSTR("Subscribe to MQTT: TopicId [%s]\r\n"), topic);
-  if (MQTTclient.subscribe(topic, 0)) {
-    MQTTDebugTf(PSTR("MQTT: Subscribed successfully to TopicId [%s]\r\n"), topic);
-  } else {
-    MQTTDebugTf(PSTR("MQTT: Subscribe TopicId [%s] FAILED! \r\n"), topic);
-    PrintMQTTError();
-  }
-  MQTTclient.subscribe("homeassistant/status", 0);
+  //Subscribe to topics (TASK-1778: a refused one is retried from the connected state)
+  mqttSubRetryLastMs = millis();
+  mqttSubCmdPending = !mqttSubscribeCommandTopic();
+  if (mqttSubCmdPending) PrintMQTTError();
+  mqttSubHaPending = (MQTTclient.subscribe("homeassistant/status", 0) == 0);
   DebugTf(PSTR("[HEAP] post-subscribe: free=%u max_block=%u\r\n"), platformFreeHeap(), platformMaxFreeBlock());
   connProbe(CPROBE_CONN_SUBS);   // TASK-1757 AC3
   connTraceSample();  // TASK-1757
@@ -2498,6 +2537,7 @@ static void queueNonOTDiscoveryIds()
   setMQTTConfigPending(0);                  // climate: thermostat + DHW control
   setMQTTConfigPending(27);                 // number: outside temperature override
   setMQTTConfigPending(OTGWcmddropid);      // 240 TASK-1439 command_dropped + command_retry_exceeded
+  if (picTempSensorHasData()) setMQTTConfigPending(OTGWpictempid);      // 239 PIC temperature reading, first valid PR=E (TASK-1940)
   if (dhwWaterMeterHasData()) setMQTTConfigPending(OTGWdhwmeterid);     // 241 DHW water total, just in time (ADR-182)
   setMQTTConfigPending(OTGWhvacid);         // 242 TASK-942 hvac_mode/hvac_action companions
   setMQTTConfigPending(OTGWotdirectid);     // 243 ADR-124 OTDirect flame metrics
@@ -2566,6 +2606,7 @@ void markAllMQTTConfigPending()
   memset(MQTTautoCfgPendingMap, 0, sizeof(MQTTautoCfgPendingMap));
   for (uint16_t i = 0; i < 256; i++) {
     if (i == OTGWdhwmeterid) continue;   // 241 waits for a MsgID 19 sample: queueNonOTDiscoveryIds() decides (ADR-182)
+    if (i == OTGWpictempid) continue;    // 239 waits for a valid PR=E reading: queueNonOTDiscoveryIds() decides (TASK-1940)
     uint16_t sIdx = readSensorIndex(static_cast<uint8_t>(i));
     uint16_t bIdx = readBinSensorIndex(static_cast<uint8_t>(i));
     if (sIdx != MQTT_HA_INDEX_NONE || bIdx != MQTT_HA_INDEX_NONE) {
@@ -3168,6 +3209,7 @@ static HaDevice deviceForOTId(byte OTid) {
   // Real OT message IDs (DATA_*): the Boiler route, the one they are announced on.
   if (OTid <= 127) return HaDevice::Boiler;
   switch (OTid) {
+    case 239: return HaDevice::Sensors;     // TASK-1940 PIC-attached temperature sensor, with the Dallas sensors
     case 240: return HaDevice::Gateway;     // TASK-1439 dropped-command sensor + binary sensor
     case 241: return HaDevice::Sensors;     // TASK-1123 DHW water total: fixed "sensors_" uniq_id prefix
     case 242: return HaDevice::OtCore;      // TASK-942 hvac_mode/hvac_action companion sensors

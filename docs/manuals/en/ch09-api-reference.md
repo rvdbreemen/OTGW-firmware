@@ -197,7 +197,7 @@ Update one or more settings. Authentication required.
 
 Settings are validated server-side. Invalid values are silently ignored or constrained to safe ranges. Side effects (MQTT reconnect, NTP resync, mDNS restart) are applied within 2 seconds via a deferred-write timer.
 
-**Settings whitelist:** Only known setting names are accepted. The full list includes: `hostname`, `httppasswd`, `ledblink`, `nightlyrestart`, `nightlyrestarthour`, `mqttenable`, `mqttbroker`, `mqttbrokerport`, `mqttuser`, `mqttpasswd`, `mqtttoptopic`, `mqtthaprefix`, `mqttharebootdetection`, `mqttuniqueid`, `mqttotmessage`, `mqttinterval`, `mqttseparatesources`, `ntpenable`, `ntptimezone`, `ntphostname`, `ntpsendtime`, `darktheme`, `gpiosensorsenabled`, `gpiosensorspin`, `gpiosensorsinterval`, `s0counterenabled`, `s0counterpin`, `s0counterpulsekw`, `s0counterinterval`, `gpiooutputsenabled`, `gpiooutputspin`, `gpiooutputstriggerbit`, `otgwcommandenable`, `otgwcommands`, `webhookenable`, `webhookurlon`, `webhookurloff`, `webhooktriggerbit`, `webhookpayload`, `webhookcontenttype`, `satenabled`, `satsystem`, `sattargettemp`, `satcoefficient`, `satinterval`, and many more SAT-related settings.
+**Settings whitelist:** Only known setting names are accepted. The full list includes: `hostname`, `httppasswd`, `ledblink`, `nightlyrestart`, `nightlyrestarthour`, `mqttenable`, `mqttbroker`, `mqttbrokerport`, `mqttuser`, `mqttpasswd`, `mqtttoptopic`, `mqtthaprefix`, `mqttharebootdetection`, `mqttuniqueid`, `mqttotmessage`, `mqttinterval`, `mqttseparatesources`, `ntpenable`, `ntptimezone`, `ntphostname`, `ntpsendtime`, `darktheme`, `gpiosensorsenabled`, `gpiosensorspin`, `gpiosensorsinterval`, `s0counterenabled`, `s0counterpin`, `s0counterpulsekw`, `s0counterinterval`, `gpiooutputsenabled`, `gpiooutputspin`, `gpiooutputstriggerbit`, `otgwcommandenable`, `otgwcommands`, `pictempsensor`, `webhookenable`, `webhookurlon`, `webhookurloff`, `webhooktriggerbit`, `webhookpayload`, `webhookcontenttype`, `satenabled`, `satsystem`, `sattargettemp`, `satcoefficient`, `satinterval`, and many more SAT-related settings.
 
 ---
 
@@ -355,6 +355,30 @@ Common PIC command codes:
 | `GW=1` / `GW=0` | Gateway mode / monitor mode |
 | `PS=1` / `PS=0` | Print Summary mode on / off |
 | `PR=A` | Query PIC banner string |
+
+On hardware without a PIC (OT-Direct) the firmware answers these commands itself, with the text of PIC firmware 6.8, so tools written for the PIC read the same replies:
+
+| Command | Reply on OT-Direct |
+|---------|--------------------|
+| `PR=P` | `PR: P=Low power`, `Medium power` or `High power`: the Smart Power level towards the thermostat |
+| `PR=R` | `PR: R=D` (auto-detect, the default), or `S`, `C`, `I` after `FT=` |
+| `PR=O` | `PR: O=N` without a room setpoint override; `T`/`C` and the setpoint for a `TT=`/`TC=` override, lowercase `t`/`c` until the thermostat accepts it, `n` while a clear is pending. A `CS=` override alone answers `N`, as on the PIC |
+| `PR=C` | `PR: C=240 MHz` |
+| `PR=B` | `PR: B=HH:MM DD-MM-YYYY`, the firmware build time |
+| `PR=L` | `PR: L=FXOMPC` until `LA=`..`LF=` change it |
+| `SC=9:05/3` | `SC: 09:05/3` (two-digit hours) |
+| `SR=18:1,230` | `SR: 18:1/230`: the stored response as `<id>:<high byte>/<low byte>`, whatever form the argument had |
+| `FT=X` | `FT: D`: the selected model (`C`, `I`, `S` or `D`), not the argument |
+
+On OT-Direct the numbers in these commands are read as PIC firmware 6.8 reads them, so the boiler gets the same bytes and a wrong value gets the same answer:
+
+- Two decimals count and the third rounds (`CS=49.72` sends 49.72, `OT=9.999` sends 10.00); one decimal is tenths (`RT=25.4` is 25.40). The reply prints the stored value with two decimals.
+- `CS=`, `C2=`, `BS=`, `CL=`, `CC=` and `RT=` take 0 to 100: above 100 is `OR`, a minus sign, an empty value or text is `SE`. `CL=` with text clears the cooling level instead (`CL: -`).
+- `TT=`, `TC=` and `SB=` refuse a minus sign (`SE`); `SB=0` is `SE`. `SB=` is kept between 1 and 30.
+- `SW=` and `SH=` answer `BV` outside the bounds the boiler reports in MsgID 48 and 49, or 20-80 and 10-90 before it has; 0 resets them.
+- `OT=` clears the outside temperature (`OT: -`) for text, `OT=-` and a value of 64 or more.
+- `MM=` takes a whole number: text, `MM=-` or a minus sign clears it (`MM: -`), above 100 is `OR`.
+- Unknown-DataID answers never switch off MsgID 0, 1, 3, 14, 17 and 25, as on the PIC.
 
 Commands are validated and queued. Responses are processed asynchronously and published to MQTT. The REST endpoint returns `"queued"` immediately without waiting for the PIC response.
 
@@ -695,7 +719,7 @@ Note (TASK-438): `monitor` is now mapped to `GW=0` for parity with PIC firmware 
 
 ##### GET /api/v2/otdirect/settings
 
-Returns the persisted OT-direct configuration settings: mode, fail-safe setback and ventilation. SAT is the only temperature controller on OT-Direct; the former heating curve and PI room compensation parameters are removed.
+Returns the persisted OT-direct configuration settings: mode, the thermostat timeout and ventilation. SAT is the only temperature controller on OT-Direct; the former heating curve and PI room compensation parameters are removed. On a thermostat loss OT-Direct no longer sends a setback flow setpoint (TASK-1806, like the PIC): after `setback_timeout` seconds without thermostat frames the gateway sends its own frames with CH off, unless a CS= is in force. `setback_temp` and the FS= fail-safe flag are still stored and accepted, but no longer used.
 
 **Response:**
 
@@ -1032,7 +1056,7 @@ Published only in OT-Direct mode, on hardware without a PIC. In PIC gateway mode
 | `otgw-otdirect/mode` | `"gateway"` | Current operating mode |
 | `otgw-otdirect/bypass` | `"ON"` / `"OFF"` | Bypass relay active |
 | `otgw-otdirect/thermostat_connected` | `"ON"` / `"OFF"` | Thermostat frame received within timeout |
-| `otgw-otdirect/setback_active` | `"ON"` / `"OFF"` | Setback override engaged |
+| `otgw-otdirect/setback_active` | `"ON"` / `"OFF"` | Always OFF: OT-Direct no longer has a setback override (TASK-1806) |
 | `otgw-otdirect/schedule_active` | `"11"` | Active schedule entry count |
 | `otgw-otdirect/overrides_active` | `"2"` | Active write-override count |
 | `otgw-otdirect/boiler_connected` | `"ON"` / `"OFF"` | Boiler OT bus active |

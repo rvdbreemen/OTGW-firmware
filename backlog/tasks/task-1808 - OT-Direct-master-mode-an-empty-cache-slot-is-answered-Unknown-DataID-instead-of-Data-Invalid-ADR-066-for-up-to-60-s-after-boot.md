@@ -3,10 +3,10 @@ id: TASK-1808
 title: >-
   OT-Direct master mode: an empty cache slot is answered Unknown-DataID instead
   of Data-Invalid (ADR-066), for up to 60 s after boot
-status: In Review
+status: Done
 assignee: []
 created_date: '2026-11-11T06:55:00Z'
-updated_date: '2026-11-14T09:13:00Z'
+updated_date: '2026-11-15T08:40:00Z'
 labels:
   - otdirect
   - review-2026-11-11
@@ -42,4 +42,12 @@ Build beta.239+c169101 (on ff5eb599e): exit 0 after 857 s, Build completed succe
 Rebased onto c5af78410 (TASK-1929, CI/docs only, no src/) as 72193d347: src/ identical to the benched c169101; rebuilt only so the posted zip carries the pushed githash.
 
 Benched as c169101, pushed as 72193d3 (rebase over the docs/CI-only commit c5af78410), no separate zip; covered by the beta.240 post (coordinator decision).
+
+2026-11-15: closed on Robert's A (DM 1571431149795024929, triage question 1/5 = DM 1571283730117562467).
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Closed on Robert's decision A to triage question 1/5 (bot DM 1571283730117562467: close the tasks whose bench/host ACs are green and only a field AC is left, naming it; reopen on a field report). His answer: '1. A' in DM 1571431149795024929 (2026-11-15), reply to the list 1571430657609957510. Open field AC #1 is the MAIN AC of this task (an id without a cached value answered Data-Invalid as ADR-066 states, not Unknown-DataID). It is host-tested and has shipped since beta.250 (BREAKING line in the beta.250 notes); only the check with a real thermostat in master mode is open.
+<!-- SECTION:FINAL_SUMMARY:END -->

@@ -52,7 +52,10 @@ STUBS = r"""
 #define OTDDebugTf(...) do {} while (0)
 static char* dtostrf(double v, int w, int p, char* out) { sprintf(out, "%*.*f", w, p, v); return out; }
 enum { OT_OVERRIDE_NONE = 0, OT_OVERRIDE_TEMPORARY = 1, OT_OVERRIDE_CONSTANT = 2 };
-struct { int mode; uint16_t f88Value; } otRemoteOverride = { OT_OVERRIDE_NONE, 0 };
+struct { int mode; uint16_t f88Value; bool bAccepted; } otRemoteOverride = { OT_OVERRIDE_NONE, 0, false };
+static bool otRemoteOverrideClearPending = false;
+struct { bool tx = false, rx = false; bool txRaised() const { return tx; } bool rxInverted() const { return rx; } } otSlave;
+static char otForceThermostat = 'D';
 #define OT_OVERRIDE_COUNT 4
 struct { bool active; uint8_t msgId; uint16_t overrideValue; } otOverrides[OT_OVERRIDE_COUNT] = {};
 static float otSetbackTemp = 16.0f;
@@ -77,6 +80,28 @@ MAIN = r"""
 int main(int argc, char** argv) {
   // argv[1]: letters to query; argv[2], argv[3]: IT and OH values
   if (argc > 3) { otIgnoreTransitions = (uint8_t)atoi(argv[2]); otOverrideHB = (uint8_t)atoi(argv[3]); }
+  // TASK-1848: further state as key=value arguments; ftmap= and stamp= call the real helpers directly.
+  for (int a = 4; a < argc; a++) {
+    const char* kv = argv[a];
+    if (!strncmp(kv, "tx=", 3))  otSlave.tx = atoi(kv + 3);
+    if (!strncmp(kv, "rx=", 3))  otSlave.rx = atoi(kv + 3);
+    if (!strncmp(kv, "ovr=", 4)) otRemoteOverride.mode = atoi(kv + 4);
+    if (!strncmp(kv, "f88=", 4)) otRemoteOverride.f88Value = (uint16_t)strtoul(kv + 4, nullptr, 0);
+    if (!strncmp(kv, "acc=", 4)) otRemoteOverride.bAccepted = atoi(kv + 4);
+    if (!strncmp(kv, "clr=", 4)) otRemoteOverrideClearPending = atoi(kv + 4);
+    if (!strncmp(kv, "cs=", 3))  { otOverrides[0].active = true; otOverrides[0].msgId = 1;
+                                   otOverrides[0].overrideValue = (uint16_t)strtoul(kv + 3, nullptr, 0); }
+    if (!strncmp(kv, "ft=", 3))  otForceThermostat = kv[3];
+#ifdef HAVE_PR_HELPERS
+    if (!strncmp(kv, "ftmap=", 6)) printf("FT %c\n", otdThermostatModelChar(kv[6]));
+    if (!strncmp(kv, "stamp=", 6)) {
+      char d[16] = {0}; const char* bar = strchr(kv + 6, '|');
+      memcpy(d, kv + 6, (size_t)(bar - (kv + 6))); char out[20];
+      otdPicBuildStamp(d, bar + 1, out, sizeof(out));
+      printf("STAMP %s\n", out);
+    }
+#endif
+  }
   for (const char* p = argv[1]; *p; p++) {
     char value[2] = { *p, 0 };
     printf("Q %c\n", *p);
@@ -109,6 +134,10 @@ def build_source() -> str:
     branch = extract_pr_branch(src)
     # the real version macro the PR=A reply uses (absent in the code before TASK-1797)
     defs = "".join(m.group(0) + "\n" for m in re.finditer(r"^#define OTD_PIC_COMPAT_VERSION .*$", src, re.M))
+    # TASK-1848: the real PR= helpers (absent in the code before TASK-1848)
+    h = re.search(r"// --- otdPrHelpers begin\n(.*?)// --- otdPrHelpers end", src, re.S)
+    if h:
+        defs += "#define HAVE_PR_HELPERS 1\n" + h.group(1)
     fn = ("static void prQuery(const char* value) {\n  const char cmd0 = 'P', cmd1 = 'R';\n  char rspBuf[16];\n"
           "  if (false) {}\n  " + branch + "\n}\n")
     return STUBS + defs + fn + MAIN
@@ -133,8 +162,13 @@ def tearDownModule():
         shutil.rmtree(_tmp, ignore_errors=True)
 
 
-def replies(it=1, oh=0, letters=LETTERS) -> dict:
-    out = subprocess.run([str(_exe), letters, str(it), str(oh)], capture_output=True, text=True, check=True).stdout
+def run_exe(letters, it=1, oh=0, **kv) -> str:
+    args = [str(_exe), letters, str(it), str(oh)] + [f"{k}={v}" for k, v in kv.items()]
+    return subprocess.run(args, capture_output=True, text=True, check=True).stdout
+
+
+def replies(it=1, oh=0, letters=LETTERS, **kv) -> dict:
+    out = run_exe(letters, it, oh, **kv)
     res, cur = {}, None
     for line in out.splitlines():
         if line.startswith("Q "):
@@ -223,6 +257,69 @@ class OTDirectPRReports(unittest.TestCase):
         self.assertRegex(rm["X"], r"^PR: X=\d+\.\d+$", rm["X"])
         banner_ver = rm["A"][len("PR: A=OpenTherm Gateway "):].split()[0]
         self.assertEqual(rm["X"][len("PR: X="):], banner_ver, "PR=X and the PR=A banner must carry the same version")
+
+
+def pic_print_float(f88: int) -> str:
+    """PrintFloat of PIC 6.8 (gateway.asm:2049-2066) for a positive f8.8: a low byte of 0xFF rounds up to the
+    next whole degree, else the hundredths are (low * 100) >> 8, rounded up when bit 7 of the product's low byte
+    is set; printed as "<int>.<2 digits>"."""
+    hi, lo = (f88 >> 8) & 0xFF, f88 & 0xFF
+    if lo == 0xFF:
+        hi, lo = hi + 1, 0
+    prod = lo * 100
+    frac = (prod >> 8) + (1 if prod & 0x80 else 0)
+    return f"{hi}.{frac:02d}"
+
+
+class PicReportTexts(unittest.TestCase):
+    """TASK-1848: PR=P, R, O, C, B and L give the PIC 6.8 text, byte for byte (gateway.asm 6.8 at 770aa45)."""
+
+    def test_P_power_level_follows_the_two_line_levels(self):
+        # PrintPowerlevel gateway.asm:2262-2268, strings :5499-5502 ("Low" runs on into " power")
+        for tx, rx, text in ((0, 0, "Low power"), (0, 1, "Low power"), (1, 0, "Medium power"), (1, 1, "High power")):
+            self.assertEqual(replies(letters="P", tx=tx, rx=rx)["P"], f"PR: P={text}", (tx, rx))
+
+    def test_R_default_is_D_and_follows_FT(self):
+        self.assertEqual(replies(letters="R")["R"], "PR: R=D")          # PrintRemeha :2270-2280, no flags = D
+        for ft in "CIS":
+            self.assertEqual(replies(letters="R", ft=ft)["R"], f"PR: R={ft}")
+
+    def test_R_ft_argument_maps_like_SetTStatModel(self):
+        # SetTStatModel :4705-4727: C, I, S set by hand, anything else is auto-detect (D); R needs a detection
+        out = run_exe("", 1, 0, **{"ftmap": "C"}) + run_exe("", 1, 0, ftmap="I") + run_exe("", 1, 0, ftmap="S") \
+            + run_exe("", 1, 0, ftmap="D") + run_exe("", 1, 0, ftmap="A") + run_exe("", 1, 0, ftmap="R")
+        self.assertEqual(out.split(), ["FT", "C", "FT", "I", "FT", "S", "FT", "D", "FT", "D", "FT", "D"])
+
+    def test_O_none_clearing_pending_and_accepted(self):
+        # PrintOverride :2201-2226
+        self.assertEqual(replies(letters="O")["O"], "PR: O=N")
+        self.assertEqual(replies(letters="O", clr=1)["O"], "PR: O=n")
+        for mode, up in ((1, "T"), (2, "C")):
+            for f88 in (0x1480, 0x14FF, 0x1402, 0x1401, 0x1300, 0x0F33):
+                want = pic_print_float(f88)
+                self.assertEqual(replies(letters="O", ovr=mode, f88=f88, acc=0)["O"], f"PR: O={up.lower()}{want}",
+                                 (mode, hex(f88)))
+                self.assertEqual(replies(letters="O", ovr=mode, f88=f88, acc=1)["O"], f"PR: O={up}{want}",
+                                 (mode, hex(f88)))
+
+    def test_O_a_cs_override_alone_is_not_a_room_setpoint_override(self):
+        # CS= never touches the PIC's override state (SetSetPoint :4095 serves TT/TC only)
+        self.assertEqual(replies(letters="O", cs=0x2D00)["O"], "PR: O=N")
+
+    def test_C_clock_in_the_pic_format(self):
+        self.assertRegex(replies(letters="C")["C"], r"^PR: C=\d+ MHz$")   # SpeedString :5506-5507 "4 MHz"
+
+    def test_B_build_stamp_in_the_pic_format(self):
+        self.assertRegex(replies(letters="B")["B"], r"^PR: B=\d\d:\d\d \d\d-\d\d-\d{4}$")   # build.tcl:83
+        for date, time, want in (("Nov 14 2026", "14:05:33", "14:05 14-11-2026"),
+                                 ("Jan  4 2027", "09:00:01", "09:00 04-01-2027"),
+                                 ("Dec 31 2026", "23:59:59", "23:59 31-12-2026")):
+            out = run_exe("", 1, 0, stamp=f"{date}|{time}")
+            self.assertIn(f"STAMP {want}", out, (date, time))
+
+    def test_L_default_is_the_pic_default(self):
+        src = OTD_INO.read_text(encoding="utf-8")
+        self.assertRegex(src, r'static char\s+otLedFunctions\[7\]\s*=\s*"FXOMPC";')   # :5462-5468
 
 
 class DeviceInfoCompatField(unittest.TestCase):

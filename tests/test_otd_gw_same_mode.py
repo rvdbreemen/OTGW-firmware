@@ -7,7 +7,7 @@ The PIC's SetGatewayMode only switches the comparators and saves the mode (gatew
 
 The real setOTDirectMode() and applyOTDirectMode() are cut from src/OTGW-firmware/OTDirect.ino and compiled with a
 host C++ compiler; resetTransientState() is a counter, the rest is stubbed. OTGW_OTD_INO points at another copy for
-old-vs-fix. What a real mode change keeps (AC2) is Robert's decision and not tested here.
+old-vs-fix. What a real mode change keeps (AC2/AC3) is tested on the real reset in test_otd_mode_change_keeps_state.py.
 Run: python tests/test_otd_gw_same_mode.py
 """
 import os
@@ -47,6 +47,7 @@ static OTDirectMode otCurrentMode = OTD_MODE_GATEWAY;
 static int g_resets = 0, g_settingWrites = 0;
 static char g_lastMode[8] = "";
 static void resetTransientState() { g_resets++; }
+static void otdFlushCmdQueue() {}   // TASK-1839 AC2: the queue flush of a gateway <-> monitor switch
 static void sendWebSocketJSON(const char*) {}
 static bool updateSetting(const char*, const char* v) { g_settingWrites++; strncpy(g_lastMode, v, sizeof(g_lastMode) - 1); return true; }
 struct MockOT { void begin(void (*)(), void (*)(unsigned long, int)) {} void end() {} };
@@ -112,7 +113,9 @@ class GwSameMode(unittest.TestCase):
         self.assertEqual(self.run_gw(2, 2)[:2], (0, 2))
 
     def test_a_real_mode_change_still_applies(self):
-        self.assertEqual(self.run_gw(1, 2)[:2], (1, 2))       # gateway -> monitor resets, as before
+        # TASK-1839 AC2 (Robert's answer A): gateway -> monitor keeps the state now; a switch into master still resets
+        self.assertEqual(self.run_gw(1, 2)[:2], (0, 2))
+        self.assertEqual(self.run_gw(1, 3)[:2], (1, 3))
 
     def test_repeated_gw1_never_resets(self):
         self.assertEqual(self.run_gw(1, 1, 1, 1)[:2], (0, 1))

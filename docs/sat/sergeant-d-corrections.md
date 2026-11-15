@@ -7250,3 +7250,73 @@ Asked by DM (through the coordinator) whether the repeat is 60 s or 30 s, given 
 **Open:** none for TASK-1924 Part 2's open points of entry 338 (period: entry 344; offset: this entry).
 
 **Task:** TASK-1924.
+
+## 347. The start-up following is not flow - 2.0; Sergeant D names flow - 1.0 (Sergeant D, 2026-11-14; corrects entry 346, Q-346a open)
+
+**Source:** #alpha-testing 2026-11-14, Sergeant D, 15:55:54 UTC, reply to our context post https://discord.com/channels/812969634638725140/1514720723980259460/1571152712291192954 : https://discord.com/channels/812969634638725140/1514720723980259460/1571191959073325077 . Our reply with Q-346a, 16:06 UTC: https://discord.com/channels/812969634638725140/1514720723980259460/1571194589082292296
+
+**Quoted:**
+
+> "wait a moment. Flow above request: CS =max(request, min(flow - 1.0, previous CS)) is the correct. Did I decided to be `flow -2.0`? If yes then it is wrong. The suppression mechanism should flow -1."
+
+**Settled (corrects entry 346):** entry 346 (his A on Q-338c, flow_setpoint_offset 2.0 C for the start-up following) is withdrawn by him: "If yes then it is wrong". He did choose A (https://discord.com/channels/812969634638725140/1514720723980259460/1571145597182804060). Interpretation we act on: the start-up following of entries 338/344 uses 1.0 C, not 2.0 C. Entries 338 and 344 (the rule and the 60 s period) stay.
+
+**Conflict with thermo-nova, put to him as Q-346a:** his formula also gives the continuous clamp 1.0 C. thermo-nova has two offsets: `const.py:153` `CONF_MODULATION_SUPPRESSION_OFFSET_CELSIUS: 1.0`, used for the PWM suppression at `heating_control.py:440-441` (CS = flow - 1.0); and `const.py:154` `CONF_FLOW_SETPOINT_OFFSET_CELSIUS: 2.0`, used for the continuous clamp at `heating_control.py:455` and `:485-489`. Firmware matches both: `fModSupOffset = 1.0f` (`SATtypes.h:519`), `fFlowOffset = 2.0f` (`SATtypes.h:533`, used at `SATcontrol.ino:2533`). His statement about the PWM suppression ("should flow -1") agrees with thermo-nova and the firmware. Whether the continuous clamp (entry 112) also moves to 1.0 is not decided: Q-346a, A) start-up following 1.0, clamp stays 2.0; B) both 1.0. Our recommendation A.
+
+**Open:** Q-346a. Until it is answered, TASK-1924 Part 2 is not built with 2.0; the offset of the start-up following is 1.0 on this entry, the clamp offset waits for Q-346a.
+
+**Task:** TASK-1924.
+
+## 348. Q-347a B: a start in continuous mode uses the PWM start too (return + 18 while the flame is off, 20 s hold after flame-on, then flow - 1.0), as a fail-safe guard (Sergeant D, 2026-11-14; answers Q-347a, extends entries 338, 344, 347)
+
+**Source:** #alpha-testing 2026-11-14. His question on the beta.250 note, 17:02:13 UTC: https://discord.com/channels/812969634638725140/1514720723980259460/1571208650310291648 ("during start do we use the CS = return temperature + 18 for 20 seconds rule and then the suppression?") and 17:02:44 UTC https://discord.com/channels/812969634638725140/1514720723980259460/1571208779503247421 ("If not we are risking of a flame out"). Q-347a, 17:08 UTC: https://discord.com/channels/812969634638725140/1514720723980259460/1571210119918788619 . His answer, 17:18:38 UTC: https://discord.com/channels/812969634638725140/1514720723980259460/1571212780491640854
+
+**Quoted:**
+
+> "My answer is B as a fail safe guard ( e.g. sat is in PWM -> reboot -> starts again in suppression )."
+
+**Option B as posted:** "Use the PWM start in continuous mode too: return + 18 before and 20 s after flame-on, then flow - 1.0 until the 60 s are over. New, not in thermo-nova."
+
+**Settled (extends entries 338, 344, 347):** a heating start in continuous mode runs the same start sequence as PWM: while the flame is off, CS = return + flame_off_setpoint_offset (18.0); after flame-on that CS is held for modulation_suppression_delay (20 s); then CS = max(request, flow - 1.0) until 60 s after flame-on (entries 344, 347); then the entry-112 clamp. Interpretation we act on: his example ("sat is in PWM -> reboot -> starts again in suppression") is the reason, a guard against a start in continuous mode after the PWM state was lost; we read it as applying to every continuous heating start, not only after a reboot. If he meant only the reboot case, that is a later correction.
+
+**Compared with thermo-nova:** the start sequence is PWM-only there: `_compute_pwm_control_setpoint` (`heating_control.py:380`, called only in PWM at `:224-225`, guards `:384-389`), flame-off hold `return + 18` at `:392-405` (`const.py:151` `CONF_FLAME_OFF_SETPOINT_OFFSET_CELSIUS: 18.0`), the hold after flame-on for `modulation_suppression_delay_seconds` (`const.py:152`, 20) at `:414-433`, then suppression `flow - 1.0` at `:439-448`. In continuous mode with the flame off thermo-nova sends the request (`:476-482`). So this entry is a deliberate deviation from thermo-nova, decided by Sergeant D. Firmware on origin/dev (beta.250): continuous flame off -> CS = request (`satApplyContinuous`), then `satContinuousSetpoint()` 60 s flow - fModSupOffset; the PWM start lives in the PWM path only.
+
+**Open:** (1) whether the return-less case of entry 45 (no return temperature: flood and flow-based start) applies in continuous mode too; we read it as yes, the same start sequence. (2) Q-346a (the clamp offset) is still open.
+
+**Task:** a new follow-up of TASK-1924 for d3 (filed by the coordinator).
+
+## 349. Q-346a A: the continuous clamp keeps flow_setpoint_offset 2.0; only the start-up following uses 1.0 (Sergeant D, 2026-11-14; answers Q-346a, settles the open point of entry 347)
+
+**Source:** #alpha-testing 2026-11-14. Q-346a: https://discord.com/channels/812969634638725140/1514720723980259460/1571194589082292296 (16:06 UTC), re-asked short in https://discord.com/channels/812969634638725140/1514720723980259460/1571213343509708943 . His answer, 17:23:25 UTC: https://discord.com/channels/812969634638725140/1514720723980259460/1571213985490018415
+
+**Quoted:**
+
+> "Q-346a: A"
+
+**Option A as posted:** "Start-up following uses flow - 1.0 (the suppression offset). The continuous clamp stays at flow - 2.0, as in thermo-nova."
+
+**Settled (settles entry 347's open point):** the entry-112 continuous clamp keeps `flow_setpoint_offset_celsius` 2.0 (thermo-nova `const.py:154`, used at `heating_control.py:455` and `:485-489`; firmware `fFlowOffset` 2.0, `SATtypes.h:533`). The start-up following of entries 338/344/347 (and the start sequence of entry 348) uses the suppression offset 1.0 (`const.py:153`, `heating_control.py:440-441`; firmware `fModSupOffset`, `SATtypes.h:519`). His remark in entry 347 that the clamp is `min(flow - 1.0, previous CS)` is thereby not a change of the clamp. This was our recommendation.
+
+**Checked against the firmware:** beta.250 (TASK-1924 Part 2) already builds exactly this: `satContinuousSetpoint()` uses `fModSupOffset` in the 60 s window, `satApplyContinuous()` keeps `fFlowOffset` (`SATcontrol.ino` on origin/dev 029c3c420). No code change follows from this entry.
+
+**Open:** none for the offsets.
+
+**Task:** TASK-1924.
+
+## 350. Q-342a A: build the entry-342 PWM exit now; watch the testers' captures for toggling (Sergeant D, 2026-11-14; answers Q-342a, confirms entry 342)
+
+**Source:** #alpha-testing 2026-11-14. Q-342a (drafted by d3 from the TASK-1933 simulation, docs/sat/sim-1933/report.md, commit 26a8ebe47): https://discord.com/channels/812969634638725140/1514720723980259460/1571219870551507057 (17:46 UTC). His answer, 17:54:04 UTC: https://discord.com/channels/812969634638725140/1514720723980259460/1571221697703710812
+
+**Quoted:**
+
+> "A"
+
+**Option A as posted:** "Build your rule now, as decided (entry 342). We watch the testers' captures for toggling and come back to you if it shows up."
+
+**Settled (confirms entry 342):** TASK-1933 builds entry 342 unchanged: while PWM is ON, flame on and the request above the boiler (flow) temperature for 60 s switches to continuous; it replaces thermo-nova's underheat exit (flow <= request - 3.0 for 180 s, `heating_control.py:331-356`, `cycles/const.py:11`, `const.py:22`), the saturation exit stays (entry 342). The simulated toggling in 2 of 5 house classes (up to 12.5 PWM re-entries per day, limit 4) is not a reason to wait; it is read as a model artefact (no return delay in `sat_closedloop_sim_1412_19.py:152`). Not our recommendation (we recommended B, a better plant model first).
+
+**Follow-up we committed to:** watch tester captures after the build for PWM re-entries shortly after ignition and report to him if toggling shows up. The two failing simulation classes (hot water, slow ignition) are the ones to look at first.
+
+**Open:** none for the rule.
+
+**Task:** TASK-1933.

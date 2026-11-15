@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v2.0.0-beta.247
+**  Version  : v2.0.0-beta.295
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -1205,6 +1205,36 @@ void pollPicReturnSensor()
   if (!cmdQueueHasPR('E')) addCommandToQueue("PR=E", 4, true);
 }
 
+//===================[ pollPicTempSensor ]=========================
+/*
+  TASK-1940 (port of 1.x TASK-1147): reads the temperature sensor wired to the PIC
+  (PR=E) once every 3 minutes, only when settings.picBoot.bTempSensor is on, only on
+  a PIC Classic (OT-Direct has no PIC to ask). The reply is handled by
+  handlePRresponse(). While the return water poll runs it already asks PR=E every
+  60 s, so no second PR=E is queued. Same burst/drip deferral as queryNextPICsetting();
+  the due check runs last, so a deferred tick fires as soon as the gate clears.
+*/
+void pollPicTempSensor()
+{
+#if HAS_PIC
+  DECLARE_TIMER_SEC(timerPicTempSensor, 180, SKIP_MISSED_TICKS);
+  if (!picTempSensorPollGate(settings.picBoot.bTempSensor,
+                             isPICEnabled() && !isOTDirectEnabled() && isGatewayFirmware(),
+                             isFlashing(), picSensorTretPollActive())) return;
+  if (isStatusBurstActive()) return;
+  if (dripDueWithinMs(500)) return;
+  if (!DUE(timerPicTempSensor)) return;
+  if (!cmdQueueHasPR('E')) addCommandToQueue("PR=E", 4, true);  // forceQueue=true: bypass PR prefix dedup
+#endif
+}
+
+// True once a valid PR=E reading arrived with the setting on; gates the Home Assistant
+// discovery of the reading, so a gateway without a sensor never announces it (ADR-094).
+bool picTempSensorHasData()
+{
+  return state.picSettings.sTempReading[0] != '\0';
+}
+
 //===================[ PIC settings readout control ]=============
 /*
   On-demand PIC settings readout.
@@ -1378,6 +1408,20 @@ static void handlePRresponse(const char* buf, size_t len) {
       picBoardTretMs = millis();
       picBoardTretSeen = true;
       applyFramelessTret(tret);
+    }
+    // TASK-1940 (1.x TASK-1147): the opt-in sensor readout. Only a complete number is
+    // published, on every reading; "-" or garbage clears it, so a missing sensor gives no
+    // topic and no entity. With the setting off the reply is ignored, so a tool on port
+    // 25238 asking PR=E cannot announce the entity.
+    if (settings.picBoot.bTempSensor) {
+      if (res != PIC_SENSOR_E_VALID) {
+        state.picSettings.sTempReading[0] = '\0';
+      } else {
+        const bool firstReading = !picTempSensorHasData();
+        strlcpy(state.picSettings.sTempReading, value, sizeof(state.picSettings.sTempReading));
+        if (firstReading) setMQTTConfigPending(OTGWpictempid);  // announce on first data (ADR-094)
+        sendMQTTDataPic(F("temperature_reading"), state.picSettings.sTempReading);
+      }
     }
     return;
   }
@@ -3191,9 +3235,12 @@ void print_slavememberid(uint16_t& value)
 {
   AddLogf("%s = Slave Config[%s] MemberID code [%3d]", OTlookupitem.label, byte_to_binary(OTdata.valueHB), OTdata.valueLB);
   if (is_value_valid(OTdata, OTlookupitem)){
+    // TASK-1857, TASK-1903 item 1: an OT-Direct loopback answer (bLocalAnswer) or a replayed line (bReplayed) is no
+    // evidence about a real boiler, so it feeds neither the SAT PWM permission nor the source/manufacturer detection.
+    const bool boilerEvidence = !OTdata.bLocalAnswer && !OTdata.bReplayed;
     // SAT PWM permission (TASK-1412.4): only the boiler's own READ-ACK counts, on the PIC path and on OT-Direct alike
     // (OT-Direct feeds its replies through bridgeFrameToParser('B', ...)). HB bit 4 = 1: master low-off not allowed.
-    if (OTdata.rsptype == OTGW_BOILER) satNoteSlaveConfig(OTdata.valueHB);
+    if (OTdata.rsptype == OTGW_BOILER && boilerEvidence) satNoteSlaveConfig(OTdata.valueHB);
     //Build string for SendMQTT
     sendMQTTData(F("slave_configuration"), byte_to_binary(OTdata.valueHB));
     char _msg[15] {0};
@@ -3237,9 +3284,11 @@ void print_slavememberid(uint16_t& value)
     // resolves AUTO to a safe gas-boiler default. OpenTherm has no source-class field
     // (spec v4.2:1606), so cooling-capable is a lossy proxy (heating-only heat pumps do
     // not set it; hybrid is invisible on one OT bus) — never drive control off this bit.
-    state.sat.iDetectedHeatingSource = ((OTdata.valueHB) & 0x04) ? SAT_SRC_HEAT_PUMP : SAT_SRC_GAS_BOILER;
-    // SAT: auto-detect manufacturer from slave MemberID code
-    satDetectManufacturer(OTdata.valueLB);
+    if (boilerEvidence) {
+      state.sat.iDetectedHeatingSource = ((OTdata.valueHB) & 0x04) ? SAT_SRC_HEAT_PUMP : SAT_SRC_GAS_BOILER;
+      // SAT: auto-detect manufacturer from slave MemberID code
+      satDetectManufacturer(OTdata.valueLB);
+    }
     value = OTdata.u16();
   }
 }
@@ -3868,6 +3917,15 @@ CmdQueueResult addCommandToQueue(const char* buf, const int len, const bool forc
 #if HAS_DIRECT_OT
     // On OTGW32, route commands directly to OT-direct handler
     if (isOTDirectEnabled()) {
+      // TASK-1761: from another task (REST, settings: async_tcp) the command waits in the OT-Direct text ring and runs
+      // on the loop task, in order; a full ring is Dropped. On the loop task the older queued commands run first, and
+      // while they must wait for a frame in flight, this one queues behind them.
+      if (!platformOnLoopTask() || otdCmdTextMustWait()) {
+        if (otdCmdTextPush(buf, len, satOwn)) return CmdQueueResult::Queued;
+        OTDebugTf(PSTR("CmdQueue: OT-Direct command [%.*s] dropped, text ring full\r\n"), len, buf);
+        return CmdQueueResult::Dropped;
+      }
+      otdCmdTextDrain();
       // TASK-1593: a command the OT-Direct handler refused (ring full, validation error, SAT-owned CS=) is Dropped, not Sent,
       // so SAT does not cache it as delivered.
       return handleOTDirectCommand(buf, len, satOwn) ? CmdQueueResult::Sent : CmdQueueResult::Dropped;
@@ -4403,8 +4461,15 @@ bool sendPICSerial(const char* buf, int len)
 {
   if (!isPICEnabled()) {
 #if HAS_DIRECT_OT
-    // On OTGW32, route commands through OT-direct command handler
-    handleOTDirectCommand(buf, len);
+    // On OTGW32, route commands through OT-direct command handler (TASK-1761: on the loop task, in order)
+    if (!platformOnLoopTask() || otdCmdTextMustWait()) {
+      if (!otdCmdTextPush(buf, len, false)) {
+        OTDebugTf(PSTR("sendPICSerial: OT-Direct command [%.*s] dropped, text ring full\r\n"), len, buf);
+      }
+    } else {
+      otdCmdTextDrain();
+      handleOTDirectCommand(buf, len);
+    }
 #else
     OTDebugTln(F("sendPICSerial: No PIC detected - command ignored"));
 #endif
@@ -6084,8 +6149,9 @@ void processOT(const char *buf, int len, bool suppressOutput, bool localAnswer, 
       // OTcurrentSystemState.TrSet then holds the R frame (a BS= fake setpoint or an MQTT room_setpoint
       // write; TT=/TC= no longer replace MsgID 16, ADR-223), and a change on the thermostat would not
       // show up there. Same on the PIC and the OT-Direct path, both send the T frame through here.
+      // TASK-1901: not a replayed line (/otgw_simulation.log): with follow-thermostat on it would persist SATtargettemp.
       if (OTdata.id == OT_TrSet && OTdata.rsptype == OTGW_THERMOSTAT && OTdata.type == OT_WRITE_DATA
-          && !OTdata.skipthis) {
+          && !OTdata.skipthis && !OTdata.bReplayed) {
         satOnThermostatSetpoint(roundf(OTdata.f88() * 100.0f) / 100.0f);
       }
 
@@ -6288,7 +6354,9 @@ void processOT(const char *buf, int len, bool suppressOutput, bool localAnswer, 
     // Re-enable PIC functions if boot-time detection missed it (transient startup failure).
     // Not while OT-Direct runs: the PIC UART is closed then, so the line came from the
     // frame replay (a user log with a boot banner), not from a PIC (TASK-1181).
-    if (!state.pic.bAvailable && !isOTDirectEnabled()) {
+    // TASK-1902: not for a replayed banner either: on a unit without a PIC it would re-enable the PIC and
+    // persist a PIC board mode. A banner is not a frame, so the check is processOT()'s own `replayed`.
+    if (!state.pic.bAvailable && !isOTDirectEnabled() && !replayed) {
       state.pic.bAvailable = true;
       state.hw.eMode = HW_MODE_PIC;
       DebugTln(F("PIC detected via banner — PIC functions re-enabled"));
@@ -7543,9 +7611,9 @@ void loadOtSupportFiles() {
   boilerFileDirty     = boilerMigrated;
 }
 
-// Atomic write: <path>.tmp -> remove canonical -> rename. A power loss between
-// the two final steps leaves only one valid file (either the old canonical or
-// the new *.tmp ignored by loadOtSupportFiles); next dirty write recovers.
+// Atomic write: <path>.tmp, then fsCommitTempFile() renames it over the canonical file (TASK-1916).
+// lfs_rename() replaces the destination in one commit, so the canonical file is always the old or
+// the new one; a short temp file is dropped and the old file stays.
 static bool writeOtThermoFile(const char* canonicalPath, const char* tmpPath) {
   File f = LittleFS.open(tmpPath, "w");
   if (!f) return false;
@@ -7555,9 +7623,9 @@ static bool writeOtThermoFile(const char* canonicalPath, const char* tmpPath) {
   f.print(F("],\"sw\":["));
   writeBitmapArrayToJson(f, thermostatSentWrite);
   f.print(F("]}\n"));
+  const size_t written = f.position();   // bytes written (as writeSettings); size() may lag the stdio buffer
   f.close();
-  LittleFS.remove(canonicalPath);  // no-op if absent
-  return LittleFS.rename(tmpPath, canonicalPath);
+  return fsCommitTempFile(tmpPath, canonicalPath, written);
 }
 
 static bool writeOtBoilerFile(const char* canonicalPath, const char* tmpPath) {
@@ -7574,9 +7642,9 @@ static bool writeOtBoilerFile(const char* canonicalPath, const char* tmpPath) {
   f.print(F("],\"uw\":["));
   writeBitmapArrayToJson(f, boilerUnsupportedWrite);
   f.print(F("]}\n"));
+  const size_t written = f.position();   // bytes written (as writeSettings); size() may lag the stdio buffer
   f.close();
-  LittleFS.remove(canonicalPath);
-  return LittleFS.rename(tmpPath, canonicalPath);
+  return fsCommitTempFile(tmpPath, canonicalPath, written);
 }
 
 void saveOtSupportFilesIfDirty() {

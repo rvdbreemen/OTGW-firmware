@@ -75,6 +75,7 @@ static float satGetBaseOffset() { return 27.2f; }
 static float satGetMaxSetpoint() { return 62.0f; }
 static float satEffectiveMaxSetpoint() { return 62.0f; }
 static float satApplyContinuous(float p, float /*previousCS*/) { return 1000.0f + p; }
+static float satContinuousSetpoint(float p, float c) { return satApplyContinuous(p, c); }   // TASK-1924 Part 2: outside the 60 s start-up window
 static uint32_t satGetMinOnTimeSec() { return 180; }
 static uint32_t satGetMinOffTimeSec() { return 0; }   // TASK-1542: gas harness, no minimum OFF (the real getter is tested in test_sat_hp_pwm.py)
 static uint8_t satGetMaxCyclesPerHour() { return g_cph; }

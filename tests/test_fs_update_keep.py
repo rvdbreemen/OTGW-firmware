@@ -150,7 +150,7 @@ class TestKeepList(unittest.TestCase):
         """A rename in a writer must not leave the keep list pointing at a dead name."""
         writers = {
             "/dallas_labels.ini": ("sensors_ext.ino", "dallas_labels.ini"),
-            "/sat_markers.json": ("restAPI.ino", "/sat_markers.json"),
+            "/sat_markers.json": ("satMarkers.ino", "/sat_markers.json"),
             "/reboot_count.txt": ("helperStuff.ino", "/reboot_count.txt"),
             "/reboot_log.txt": ("helperStuff.ino", "/reboot_log.txt"),
         }
@@ -406,13 +406,18 @@ class TestSatWriteBack(unittest.TestCase):
     def test_savers_write_unconditionally(self):
         """The 'due' guards (hourly timer, 0.1 kWh boundary, 5 min PID timer) belong to the
         callers; a guard inside a saver would make the forced write skip."""
+        # TASK-1900: the one allowed extra guard is the SAT simulation guard of the PID and HCR savers. It is not a 'due'
+        # guard: during a simulation run the file on flash holds the real state, which the update server's KEEP_LIST
+        # copy carries over, so the forced write must skip rather than store the simulated state.
+        sim_guarded = {"satSavePidState"}
         for fn in self.SAVERS:
             body = function_body(SATCTL, r"\n(?:static )?void %s\(\)" % fn)
-            ifs = re.findall(r"\bif\s*\(([^)]*)\)", body)
-            self.assertEqual([i.strip() for i in ifs], ["!f"], "%s has a guard besides the open check: %s" % (fn, ifs))
+            ifs = [i.strip() for i in re.findall(r"\bif\s*\(([^)]*)\)", body)]
+            want = ["settings.sat.bSimulation", "!f"] if fn in sim_guarded else ["!f"]
+            self.assertEqual(ifs, want, "%s has a guard besides the open check: %s" % (fn, ifs))
             self.assertRegex(body, r'LittleFS\.open\(.*,\s*"w"\)', fn)
         hcr = function_body(SATCYC, r"\nvoid satHCRSaveState\(\)\s*\n(?=\{)")
-        self.assertEqual([i.strip() for i in re.findall(r"\bif\s*\(([^)]*)\)", hcr)][:1], ["!f"])
+        self.assertEqual([i.strip() for i in re.findall(r"\bif\s*\(([^)]*)\)", hcr)][:2], ["settings.sat.bSimulation", "!f"])
 
     def test_due_guards_stay_in_the_callers(self):
         caller = function_body(SATCTL, r"static void satPersistEnergyIfDue\(\)")

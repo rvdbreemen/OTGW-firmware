@@ -340,6 +340,12 @@
       "no_data": "no data",
       "room_no_reading": "Room temperature: no reading",
       "legend_toggle": "Show / hide",
+      "mark_lost": "live link lost",
+      "mark_back": "live link back",
+      "mark_reboot": "gateway restarted",
+      "mark_tip_lost": "The live connection to the gateway dropped here (a sleeping tab or a Wi-Fi hiccup does the same). Not a restart.",
+      "mark_tip_back": "The live connection to the gateway came back here. Not a restart.",
+      "mark_tip_reboot": "The gateway restarted: its boot counter went up, seen when the live connection came back.",
       "conn_pic_link": "PIC link",
       "conn_ot_interface": "OpenTherm interface",
       "conn_connected": "connected",
@@ -1139,6 +1145,7 @@
         "otdventsetpoint": "Ventilation setpoint",
         "otgwcommandenable": "Run commands at boot",
         "otgwcommands": "Boot commands",
+        "pictempsensor": "PIC temperature sensor",
         "s0counterdebouncetime": "Debounce time",
         "s0counterenabled": "Enable S0 counter",
         "s0counterinterval": "Report interval",
@@ -2576,7 +2583,7 @@
   /*  16 */ { name: "Room Setpoint", spec: "TrSet", type: "f8.8", dir: "Write · thermostat → boiler", unit: "°C", concl: "Thermostat's current room setpoint." },
   /*  17 */ { name: "Relative Modulation Level", spec: "RelModLevel", type: "f8.8", dir: "Read · boiler → thermostat", unit: "%", concl: "Boiler's actual relative modulation level (burner output, %)." },
   /*  18 */ { name: "CH water pressure", spec: "CHPressure", type: "f8.8", dir: "Read · boiler → thermostat", unit: "bar", concl: "Boiler's central-heating water pressure." },
-  /*  19 */ { name: "DHW flow rate", spec: "DHWFlowRate", type: "f8.8", dir: "Read · boiler → thermostat", unit: "l/min", concl: "Domestic-hot-water flow rate through the boiler." },
+  /*  19 */ { name: "DHW flow rate", spec: "DHWFlowRate", type: "f8.8", dir: "Read · boiler → thermostat", unit: "L/min", concl: "Domestic-hot-water flow rate through the boiler." },
   /*  20 */ { name: "Day of Week and Time of Day", spec: "DayTime", type: "special", dir: "Read / Write", unit: "", concl: "Day-of-week and time-of-day clock exchanged between thermostat and boiler." },
   /*  21 */ { name: "Calendar date", spec: "Date", type: "u8/u8", dir: "Read / Write", unit: "", concl: "Calendar month and day." },
   /*  22 */ { name: "Calendar year", spec: "Year", type: "u16", dir: "Read / Write", unit: "", concl: "Calendar year." },
@@ -3200,13 +3207,39 @@
   // green), since this page was opened. A drop counts only after an open socket; failed reconnects in one
   // outage add nothing. The chip #chipMarks hides them (remembered per browser, default on).
   var gMarks = [], gWsUp = false, gWsDown = false, gMarksOn = graphMarksPref();
+  // TASK-1914: the device's boot counter as last seen (null = no baseline yet). A reconnect that finds a higher
+  // count adds a restart mark, so a real restart no longer looks like any other dropped live connection.
+  var gBootSeen = null;
   function noteWsMark(up) {
     var now = Date.now();
-    var n = gMarks.length;
+    var n = gMarks.length, back = up && gWsDown, first = up && !gWsUp && !gWsDown;
     if (up) { if (gWsDown) gMarks.push({ t: now, up: 1 }); gWsDown = false; gWsUp = true; }
     else { if (gWsUp && !gWsDown) { gMarks.push({ t: now, up: 0 }); gWsDown = true; } gWsUp = false; }
     if (gMarks.length > 512) gMarks = gMarks.slice(-256);
     if (gMarks.length !== n && isMonitorVisible('mgraph')) renderGraph();   // the graph otherwise redraws only when data arrives
+    // TASK-1914: the first connect sets the baseline (device/info is cached from startup); a reconnect reads it again
+    // (the cache is 8 s, an outage is longer), one request through the normal device/info path.
+    if (first || back) withDeviceInfo(function (d) { if (d && noteDeviceBoot(d.bootcount, Date.now()) && isMonitorVisible('mgraph')) renderGraph(); });
+  }
+  // TASK-1914: true when a restart mark was added. A count that does not go up (same, missing or lower) adds none.
+  function noteDeviceBoot(count, now) {
+    var c = Number(count);
+    if (!isFinite(c)) return false;
+    if (gBootSeen === null || c <= gBootSeen) { gBootSeen = c; return false; }   // a lower count (counter reset) is the new baseline
+    gBootSeen = c;
+    gMarks.push({ t: now, reboot: 1 });
+    return true;
+  }
+  // TASK-1914: the kind of a mark and how it is drawn. The tooltip says what a dashed line is not: a restart.
+  function graphMarkKind(m) { return m.reboot ? 'reboot' : (m.up ? 'back' : 'lost'); }
+  function graphMarkStyle(kind) {
+    if (kind === 'reboot') return { stroke: '#d29922', dash: '', width: '2', label: 'graph.mark_reboot', tip: 'graph.mark_tip_reboot' };
+    if (kind === 'back') return { stroke: '#3fb950', dash: '5 4', width: '1.5', label: 'graph.mark_back', tip: 'graph.mark_tip_back' };
+    return { stroke: '#f85149', dash: '5 4', width: '1.5', label: 'graph.mark_lost', tip: 'graph.mark_tip_lost' };
+  }
+  // TASK-1914: legend entries for the kinds that are on screen, in a fixed order.
+  function graphMarkLegendKinds(lines) {
+    return ['lost', 'back', 'reboot'].filter(function (k) { return lines.some(function (m) { return m.kind === k; }); });
   }
   function graphMarksPref() {
     try { return localStorage.getItem('otgw-v2-gmarks') !== '0'; } catch (e) { return true; }
@@ -3222,19 +3255,30 @@
     var out = [];
     marks.forEach(function (m) {
       if (m.t < t0 || m.t > t0 + win) return;
-      out.push({ x: C_X0 + (m.t - t0) / win * (C_X1 - C_X0), up: m.up });
+      out.push({ x: C_X0 + (m.t - t0) / win * (C_X1 - C_X0), up: m.up, kind: graphMarkKind(m) });
     });
     return out;
   }
   function renderGraphMarks(t0, win) {
-    var g = document.getElementById('gMarks'); if (!g) return;
+    var g = document.getElementById('gMarks'), lg = document.getElementById('gMarkLegend'); if (!g) return;
     g.textContent = '';
+    if (lg) lg.textContent = '';
     if (!gMarksOn) return;
-    graphMarkLines(gMarks, t0, win).forEach(function (m) {
-      var ln = document.createElementNS('http://www.w3.org/2000/svg', 'line'), x = m.x.toFixed(1);
+    var lines = graphMarkLines(gMarks, t0, win);
+    lines.forEach(function (m) {
+      var st = graphMarkStyle(m.kind), ln = document.createElementNS('http://www.w3.org/2000/svg', 'line'), x = m.x.toFixed(1);
       ln.setAttribute('x1', x); ln.setAttribute('x2', x); ln.setAttribute('y1', GPLOT_TOP); ln.setAttribute('y2', GPLOT_BOT);
-      ln.setAttribute('stroke', m.up ? '#3fb950' : '#f85149'); ln.setAttribute('stroke-width', '1.5'); ln.setAttribute('stroke-dasharray', '5 4');
+      ln.setAttribute('stroke', st.stroke); ln.setAttribute('stroke-width', st.width);
+      if (st.dash) ln.setAttribute('stroke-dasharray', st.dash);
+      var tip = document.createElementNS('http://www.w3.org/2000/svg', 'title'); tip.textContent = t(st.tip); ln.appendChild(tip);
       g.appendChild(ln);
+    });
+    // TASK-1914: a legend line under the graph names the marks that are on screen (and says the dashed ones are no restart)
+    if (lg) graphMarkLegendKinds(lines).forEach(function (k) {
+      var st = graphMarkStyle(k), sp = document.createElement('span'), sw = document.createElement('i');
+      sw.style.background = 'none'; sw.style.borderTop = '2px ' + (st.dash ? 'dashed ' : 'solid ') + st.stroke;
+      sp.appendChild(sw); sp.appendChild(document.createTextNode(t(st.label))); sp.title = t(st.tip);
+      lg.appendChild(sp);
     });
   }
   var gOff = {};
@@ -4108,6 +4152,7 @@
     ntpsendtime:     { cat: 'ntp', label: 'Send time to thermostat' },
     otgwcommandenable: { cat: 'otgw', label: 'Run commands at boot' },
     otgwcommands:    { cat: 'otgw', label: 'Boot commands', hint: 'Semicolon separated, e.g. PS=0;GW=1' },
+    pictempsensor:   { cat: 'otgw', label: 'PIC temperature sensor' },   // TASK-1940; the explanation is the i text (settingsHelp.h)
     gpiosensorsenabled:   { cat: 'sensors', label: 'Enable sensors' },
     gpiosensorspin:       { cat: 'sensors', label: 'GPIO pin' },
     gpiosensorsinterval:  { cat: 'sensors', label: 'Poll interval', hint: 'Seconds' },

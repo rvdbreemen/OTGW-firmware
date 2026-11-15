@@ -388,6 +388,17 @@ class WifiDeadLinkStateMachine(unittest.TestCase):
                 r, _ = self.run_sc("dead", magic=magic, count=count, soft=soft, quiet=True)
                 self.assertEqual(r["RTC"], (MAGIC, 1), "count not restarted from zero")
 
+    def test_old_rtc_layout_after_the_update_restarts_from_zero(self):
+        # TASK-1918: the new firmware keeps its RTC records 0x20 B higher (safeboot guard at 0x50000200). On the
+        # first boot after the update this record (new +0x54) reads the old FS-OTA snapshot's data[0..8): zeros
+        # after a wipe, or the start of settings.ini. Neither may be taken for a dead-link restart count.
+        head = (REPO / "src" / "OTGW-firmware" / "data" / "settings.ini").read_bytes()[:16]
+        for blob in (bytes(16), head):
+            with self.subTest(blob=blob):
+                r, _ = self.run_sc("dead", magic=int.from_bytes(blob[0:4], "little"),
+                                   count=int.from_bytes(blob[4:8], "little"), soft=1, quiet=True)
+                self.assertEqual(r["RTC"], (MAGIC, 1), "count not restarted from zero")
+
     def test_cap_stops_restarts_and_spaces_reconnects(self):
         r, out = self.run_sc("dead_long", magic=MAGIC, count=3, soft=1)
         self.assertIsNone(r["RESTART"], "restarted at the cap")

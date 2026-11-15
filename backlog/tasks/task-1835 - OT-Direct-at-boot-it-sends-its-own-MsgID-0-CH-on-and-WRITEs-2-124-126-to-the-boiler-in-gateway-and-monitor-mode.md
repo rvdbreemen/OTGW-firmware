@@ -3,11 +3,11 @@ id: TASK-1835
 title: >-
   OT-Direct: at boot it sends its own MsgID 0 (CH on) and WRITEs 2, 124, 126 to
   the boiler in gateway and monitor mode
-status: In Review
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-11T23:45:00Z'
-updated_date: '2026-11-13T18:38:00Z'
+updated_date: '2026-11-15T08:40:00Z'
 labels:
   - otdirect
   - parity
@@ -54,4 +54,14 @@ Implemented (lane-1762b, local): OTDirect.ino otdBootHandshake() holds the forme
 Correction to the bench note above (2026-11-12, otgw-firmware-d3): the 2.9 / 3.1 s values and the reading 'the ~12 s blocking boot status request is gone' were a measurement artefact (09: the telnet probe hit the pre-reboot instance; first NEW repeats may also overlap 09's orphan load loop). Clean same-build rerun by 09 on beta.200+f1bb2a0, .61, 05:10-05:12, undisturbed (b200/rerun1835.py; set mode, /ReBoot, 3 s wait, poll telnet and /api/v2/health every 0.1 s), seconds until telnet / REST: master with auto-detect 15.99/15.80, 15.24/15.11, 15.40/15.18; gateway with auto-detect off 14.39/14.53, 14.46/14.62, 14.27/14.03. The consistent ~1 s gap matches the code: the boot status request blocks in OpenTherm::sendRequest() until the 1 s response timeout without a boiler (src/libraries/OpenTherm/src/OpenTherm.cpp:279-291, :457), and the handshake WRITEs only follow a valid reply. Bench reading: indicative, same-build master vs gateway, about 1 s, not frame-level. AC3 (field capture with a thermostat) unchanged.
 
 2026-11-13 delta parity check (TASK-1851, comms, read-only, OT-Direct at origin/dev 479e49391 vs PIC 6.8 gateway.asm; G=gateway.asm, O=OTDirect.ino): partial. No own frames at boot in gateway, monitor or bypass mode (O:1309). Master mode, including an auto-detected boot with no thermostat (the PIC's standalone case), still sends WRITE 2=0x0100, READ 3, WRITE 124 and WRITE 126, which the PIC never sends (G:1822-1842 per the 11-12 REVIEW). Open: whether queued SW-boot/SH-boot frames can leave before the first thermostat frame in gateway mode with auto-detect off (otdOwnFramesAllowed, O:1006-1008); if so AC1 reopens.
+
+AC 3: field AC (Robert C, 2026-11-14, DM 1571276554430976183 via the coordinator, no OT bus on the bench): the boot capture with a thermostat is verified from a tester capture, not on the bench. Status stays In Review until a tester capture covers it.
+
+2026-11-15: closed on Robert's A (DM 1571431149795024929, triage question 1/5 = DM 1571283730117562467).
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Closed on Robert's decision A to triage question 1/5 (bot DM 1571283730117562467: close the tasks whose bench/host ACs are green and only a field AC is left, naming it; reopen on a field report). His answer: '1. A' in DM 1571431149795024929 (2026-11-15), reply to the list 1571430657609957510. Open field AC #3: a bench capture of a boot with a thermostat (first frame to the boiler a T); no thermostat on the bench.
+<!-- SECTION:FINAL_SUMMARY:END -->

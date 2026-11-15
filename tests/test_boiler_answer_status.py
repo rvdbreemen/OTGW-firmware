@@ -131,10 +131,14 @@ class BoilerAnswerRecord(unittest.TestCase):
 class Wiring(unittest.TestCase):
     def test_recorded_in_the_boiler_branch_under_boiler_evidence(self):
         src = CORE.read_text(encoding="utf-8")
-        i = src.find("const bool boilerEvidence = !OTdata.bLocalAnswer && !OTdata.bReplayed;")
-        self.assertGreaterEqual(i, 0)
-        window = src[i:i + 600]
-        self.assertRegex(window, r"if \(boilerEvidence\) recordBoilerAnswer\(OTdata\.id, OTdata\.type, millis\(\)\);")
+        # The guard is defined at more than one site (TASK-1857 added one in print_slavememberid()); the boiler-answer
+        # record must sit right under one of them.
+        defn = "const bool boilerEvidence = !OTdata.bLocalAnswer && !OTdata.bReplayed;"
+        starts = [m.start() for m in re.finditer(re.escape(defn), src)]
+        self.assertTrue(starts, "boilerEvidence definition not found")
+        call = re.compile(r"if \(boilerEvidence\) recordBoilerAnswer\(OTdata\.id, OTdata\.type, millis\(\)\);")
+        self.assertTrue(any(call.search(src[i:i + 600]) for i in starts),
+                        "recordBoilerAnswer() is not guarded by boilerEvidence in the boiler branch")
 
     def test_both_rest_senders_emit_status_and_age(self):
         src = REST.read_text(encoding="utf-8")

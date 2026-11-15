@@ -260,7 +260,8 @@ WIRING = [
 FAUX_IDS = ["OTGWdallasdataid", "OTGWs0dataid", "OTGWheapstatsid", "OTGWpiccontrolsid", "OTGWfwinfoid",
             "OTGWpicinfoid", "OTGWpicsettingsid", "OTGWotdirectid", "OTGWdiag200id", "OTGWsatcoreid",
             "OTGWsatweatherid", "OTGWsatbinaryid", "OTGWsatzoneid", "OTGWhvacid", "OTGWdhwmeterid",
-            "OTGWcmddropid"]   # 240, TASK-1439: queued by queueNonOTDiscoveryIds()
+            "OTGWcmddropid",   # 240, TASK-1439: queued by queueNonOTDiscoveryIds()
+            "OTGWpictempid"]   # 239, TASK-1940: queued by queueNonOTDiscoveryIds() after the first PR=E reading
 
 
 def read(path, rev):
@@ -479,8 +480,10 @@ def build_and_run(label, out_dir, cpp):
 
 
 def run_mutants(root, mutants, exporter, cpp, checks):
-    for mid, what, fname, subs, case, keeps, *rest in mutants:
+    for i, (mid, what, fname, subs, case, keeps, *rest) in enumerate(mutants, 1):
         crash_ok = bool(rest and rest[0])
+        # TASK-1853: a run cut off here ends on this line, not on a mutant's intended FAIL.
+        print(f"-- mutant {i}/{len(mutants)} {mid}: building (its CASE FAIL lines are expected)", flush=True)
         mdir = root / f"mutant_{mid}"
         exporter(mdir)
         mutate(mdir, fname, subs)

@@ -86,7 +86,7 @@ static void frame19(char src, float flowLpm, bool answerOverride = false, bool g
   d.bGatewaySubstituted = gatewaySubstituted ? 1 : 0;
   d.time = (time_t)g_ms;
   OTdata = d;
-  OTlookupitem = OTlookup_t{19, OT_READ, ot_f88, "DHWFlowRate", "DHW flow rate", "l/min", true};
+  OTlookupitem = OTlookup_t{19, OT_READ, ot_f88, "DHWFlowRate", "DHW flow rate", "L/min", true};
   print_f88(OTcurrentSystemState.DHWFlowRate);   // decodeAndPublishOTValue(): case OT_DHWFlowRate
 }
 

@@ -102,21 +102,29 @@ Published at startup, on MQTT (re)connect, every 5 minutes, and when settings ar
 
 | Topic | Value | Description |
 | ----- | ----- | ----------- |
-| `otgw-pic/settings/setpoint_override` | `"20.00"` | Current setpoint override |
+| `otgw-pic/settings/setpoint_override` | `"N"`, `"T20.50"`, `"c19.00"`, `"n"` | Remote room setpoint override (`PR=O`, only `TT=`/`TC=`): `N` none, `T`/`C` temporary/constant and the setpoint, lowercase `t`/`c` while the thermostat has not accepted it yet, `n` while a clear is pending. A `CS=` flow setpoint override is not part of it |
 | `otgw-pic/settings/setback` | `"15.00"` | Setback temperature |
 | `otgw-pic/settings/dhw_override` | `""` | DHW override state |
 | `otgw-pic/settings/gpio` | `"0/1"` | GPIO pin configuration |
 | `otgw-pic/settings/gpio_states` | `"0/0"` | GPIO pin states |
-| `otgw-pic/settings/led` | `"F/X/O/M/P/C"` | LED function assignments |
+| `otgw-pic/settings/led` | `"FXOMPC"` | LED A-F function letters (`PR=L`; `FXOMPC` is the PIC default) |
 | `otgw-pic/settings/tweaks` | `"1/1/1/1"` | Tweak flags |
-| `otgw-pic/settings/temp_sensor` | `"O=19.50"` | Temperature sensor reading |
-| `otgw-pic/settings/smart_power` | `"Low"` | Smart power mode |
-| `otgw-pic/settings/thermostat_detect` | `"I"` | Thermostat detection mode |
-| `otgw-pic/settings/builddate` | `"2023-01-01"` | PIC firmware build date |
-| `otgw-pic/settings/clock_mhz` | `"4"` | PIC clock speed |
+| `otgw-pic/settings/temp_sensor` | `"O"` / `"R"` | Function of the temperature sensor on the PIC (`PR=D`: outside or return water). Not a temperature; the reading is `otgw-pic/temperature_reading` below |
+| `otgw-pic/settings/smart_power` | `"Low power"` / `"Medium power"` / `"High power"` | Smart Power level towards the thermostat (`PR=P`) |
+| `otgw-pic/settings/thermostat_detect` | `"D"` | Thermostat model (`PR=R`): `D` auto-detect, `S` standard, `R` Remeha (detected), `C` Celcia 20, `I` iSense |
+| `otgw-pic/settings/builddate` | `"17:52 12-03-2023"` | PIC firmware build time (`PR=B`, `HH:MM DD-MM-YYYY`) |
+| `otgw-pic/settings/clock_mhz` | `"4 MHz"` | PIC clock speed (`PR=C`) |
 | `otgw-pic/settings/reset_cause` | `"Power-on"` | Last PIC reset cause. An answer that is not plain text (after a PIC firmware update the PIC can answer with the byte `0xFF`) is published as hex, for example `"0xFF"` |
 | `otgw-pic/settings/standalone_interval` | `"0"` | Standalone mode interval |
 | `otgw-pic/settings/voltage_ref` | `"3.3"` | Voltage reference |
+
+### PIC temperature sensor (PIC Classic, opt-in)
+
+The PIC can carry its own temperature sensor. With the setting **PIC temperature sensor** on (off by default; `pictempsensor` in the REST settings, `PICtempsensor` in `settings.ini`) the gateway reads it with `PR=E` every 3 minutes and publishes each valid reading. A PIC without a sensor answers `-`; then nothing is published and Home Assistant gets no entity. OT-Direct boards have no PIC and never publish it. When the sensor's function is return water (`PR=D` answers `R`), the once-a-minute return water readout already asks `PR=E` and its replies serve both.
+
+| Topic | Value | Description |
+| ----- | ----- | ----------- |
+| `otgw-pic/temperature_reading` | `"19.19"` | Temperature of the sensor on the PIC in °C. Home Assistant: sensor `PIC_Temperature_Reading` (temperature, °C) on the Sensors device, announced with the first valid reading |
 
 ### OT Direct (OTGW32)
 
@@ -238,7 +246,7 @@ Published when OpenTherm messages are received. The topic name matches the OpenT
 | `oemdiagnosticcode` | - | OEM diagnostic code |
 | `controlsetpoint2` | C | Control setpoint for CH2 |
 | `roomsetpoint2` | C | Room setpoint for CH2 |
-| `dhw_flowrate` | l/min | DHW flow rate |
+| `dhw_flowrate` | L/min | DHW flow rate |
 | `exhaust_temperature` | C | Exhaust temperature |
 | `boiler_fan_speed` | rpm | Boiler fan speed |
 | `electrical_current_burner_flame` | uA | Burner flame current |
@@ -741,7 +749,7 @@ Published when S0 counter is enabled (`settings.s0.bEnabled`):
 
 ### DHW Water Total (Energy Dashboard)
 
-A cumulative domestic hot water volume, integrated by the gateway from MsgID 19 (DHW flow rate, l/min), so the Home Assistant Energy dashboard can use it as a water source without a helper (ADR-176, TASK-1123). Topic, unit and discovery fields match the 1.x line.
+A cumulative domestic hot water volume, integrated by the gateway from MsgID 19 (DHW flow rate, L/min), so the Home Assistant Energy dashboard can use it as a water source without a helper (ADR-176, TASK-1123). Topic, unit and discovery fields match the 1.x line.
 
 | Topic | Value | Description |
 | ----- | ----- | ----------- |

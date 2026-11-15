@@ -69,6 +69,7 @@ static long random(long a, long) { return a; }
 #include "@TIMERS@"
 // bAutoGains/fK*Manual: pre-TASK-1357 fields at their old defaults, so an old SATpid.ino copy still compiles.
 struct SatSettings { bool bSolarFreezeIntegral = false; bool bFireplaceMode = false; bool bAutoGains = true;
+  bool bSimulation = false;   // TASK-1900: satSavePidState() skips while simulating
   float fKpManual = 5.0f, fKiManual = 0.0005f, fKdManual = 0.0f;
   float fHeatingCurveCoeff = 1.6f, fDeadband = 0.1f, fTargetTemp = 21.0f;
   int iZoneCount = 1; int iZoneTimeoutS = 900; };

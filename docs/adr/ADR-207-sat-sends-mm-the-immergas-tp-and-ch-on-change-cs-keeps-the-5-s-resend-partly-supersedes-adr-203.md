@@ -11,6 +11,7 @@ supersedes: []
 superseded_by: null
 related:
   - "ADR-203"
+  - "ADR-235"
 topics:
   - "sat"
   - "opentherm"
@@ -69,6 +70,11 @@ status_history:
     status: Accepted
     changed_by: Robert van den Breemen
     reason: ADR-207 partly supersedes ADR-203 for MM and CH (Sergeant D entries 237-239); CS keeps ADR-203's 5 s resend
+    changed_via: adr-kit lifecycle
+  - date: 2026-11-14
+    status: Accepted
+    changed_by: "Agent (d3)"
+    reason: Related to ADR-235 (metadata only; the decision is unchanged)
     changed_via: adr-kit lifecycle
 ```
 

@@ -3,9 +3,11 @@ id: TASK-1901
 title: >-
   A replayed thermostat MsgID 16 write must not change the stored SAT target
   (SATtargettemp)
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@claude'
 created_date: '2026-11-13T16:22:00Z'
+updated_date: '2026-11-15T00:25:00Z'
 labels:
   - sat
   - otgw
@@ -23,6 +25,18 @@ Found in d3's read-only analysis for TASK-1895 (workflow wf_a2aa95ff-0f6, trace 
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Host test: a replayed T Write-Data MsgID 16 does not reach satOnThermostatSetpoint() (or leaves SATtargettemp unchanged); red on the current code, green on the fix
-- [ ] #2 A real T MsgID 16 write still reaches it (regression check)
+- [x] #1 Host test: a replayed T Write-Data MsgID 16 does not reach satOnThermostatSetpoint() (or leaves SATtargettemp unchanged); red on the current code, green on the fix
+- [x] #2 A real T MsgID 16 write still reaches it (regression check)
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-14 (92, lane wt-92-webui). Fix: OTGW-Core.ino MsgID 16 feed condition gets && !OTdata.bReplayed. test/host/test_replay_frame_guards.py slices the REAL processOT() blocks from OTGW-Core.ino (banner, PIC-recovery block after the banner, the T MsgID 16 feed) and compiles them with MSVC. --rev HEAD (5ac0a2f52, before the fix): FAIL 4 = replayed banner -> iBoardMode 1, state.pic.bAvailable 1, writeSettings 1; replayed T Write-Data 16 -> satOnThermostatSetpoint called once; every regression check PASS (real banner sets iBoardMode 1 + bAvailable + one write; satNotifyPicRestart still runs for a replayed banner on a PIC board; real T Write-Data 16 reaches SAT once with 20.50). Working tree (fix): 20/20 PASS. Evidence: comms scratchpad t1901/old.txt, new.txt.
+<!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+AC1 tests/test_replay_frame_guards: a replayed T Write-Data MsgID 16 does not reach satOnThermostatSetpoint (old code reached it once: red; fix green). AC2 a real T MsgID 16 still reaches it once with its value (20.50). Shipped in build 2.0.0-beta.271+7ecd150 (lane wt-92-webui, pushed as origin/dev 57781677e; zip post 1571319345743667231, alpha note 1571319448298852516), bench by 09 on .61; the replay itself was not bench-checked (host test only).
+<!-- SECTION:FINAL_SUMMARY:END -->

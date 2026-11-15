@@ -113,7 +113,7 @@ The OTDirect module operates as a cooperative OpenTherm stack layered on the pro
   - Returns early if master busy (`otMasterRequestActive`)
   - Returns early if MI= minimum gap not satisfied
   - Dequeues and sends commands from ring buffer (command queue takes priority)
-  - Round-robins through schedule table (`otScheduleIdx`), skipping disabled entries. While the bus is offline (`!state.otBus.bOnline`) only MsgID 0 is sent, every `OT_OFFLINE_RETRY_MS` (5 s). MsgIDs 70 and 71 poll every 10 s instead of 60 s when the slave reports a ventilation/HRV application (`otIsVentSlave()`):
+  - Round-robins through schedule table (`otScheduleIdx`), skipping disabled entries. While the bus is offline (`!state.otBus.bOnline`) only MsgID 0 is sent, at its normal 800 ms interval (TASK-1802: a boiler gets a frame within the spec's 1.15 s after a failed one, as on the PIC; the old 5 s retry left it 5-6 s without a frame). MsgIDs 70 and 71 poll every 10 s instead of 60 s when the slave reports a ventilation/HRV application (`otIsVentSlave()`):
     - Status (MsgID 0): always ready, uses `buildStatusRequest()` with current flags
     - Read entries: sent on interval with READ_DATA
     - Write entries: sent only if `valueSet=true` (cache populated), uses cached value with WRITE_DATA
@@ -135,6 +135,7 @@ The OTDirect module operates as a cooperative OpenTherm stack layered on the pro
 #### `static void handleMasterModeSlaveFrame(unsigned long frame)`
 - **Purpose**: In master mode (standalone), respond to thermostat as if we ARE the boiler
 - **Behavior**:
+  - While the boiler is offline (`!state.otBus.bOnline`, its last MsgID 0 failed) it only logs the thermostat frame and sends no answer, so the thermostat sees the loss instead of the last cached status (TASK-1807)
   - Extracts msgId and msgType (bits 28-30)
   - If READ_DATA (type 0):
     - Returns cached boiler value via `buildOTResponse(4, msgId, cache)` (READ_ACK)
@@ -167,7 +168,7 @@ The OTDirect module operates as a cooperative OpenTherm stack layered on the pro
 - **Purpose**: Log a request that is about to go to the boiler. An overridden thermostat frame logs the thermostat's original as 'T' and the sent frame as 'R'; an unchanged thermostat frame logs 'T'; everything else logs 'R'
 
 #### `static void otBoilerCacheStore(unsigned long response)`
-- **Purpose**: Store a boiler reply in `otBoilerCache[]`. Data-ids 128-255 are skipped; an UNKNOWN-DATA-ID reply clears the slot (see Boiler Response Cache)
+- **Purpose**: Store a boiler reply in `otBoilerCache[]`. Data-ids 128-255 are skipped; an UNKNOWN-DATA-ID reply clears the slot; a DATA-INVALID reply keeps the previous value (TASK-1925) (see Boiler Response Cache)
 
 #### `bool otDirectBoilerPresent()`
 - **Purpose**: True once the boiler has answered MsgID 3 (`otBoilerCacheValid[3]`), false in loopback mode. Read cross-file by `satBoilerHardwarePresent()` so SAT simulation cannot switch itself off on synthetic traffic (TASK-795, ADR-117)
@@ -332,7 +333,10 @@ The OTDirect module operates as a cooperative OpenTherm stack layered on the pro
 - **Purpose**: Switch operating mode with hardware reconfiguration
 - **Parameters**: `OTD_MODE_BYPASS`, `OTD_MODE_GATEWAY`, `OTD_MODE_MONITOR`, `OTD_MODE_MASTER`, `OTD_MODE_LOOPBACK`
 - **Behavior**:
-  - Calls `resetTransientState()` to clear non-persisted state
+  - A GW= for the mode already running applies nothing (TASK-1839); the setting is still written
+  - A switch between gateway and monitor keeps all command state, as on the PIC, and only flushes the command queue
+    (`otdFlushCmdQueue()`, ADR-223; Robert's decision, TASK-1839). A switch into or out of master, loopback or bypass
+    calls `resetTransientState()` to clear non-persisted state
   - Manages bypass relay: HIGH for bypass, LOW for other modes
   - Conditionally starts/stops slave interface based on mode:
     - Bypass: leaves the slave interface as it was
@@ -342,8 +346,9 @@ The OTDirect module operates as a cooperative OpenTherm stack layered on the pro
   - Persists mode to settings via `updateSetting("OTDmode", ...)`
 
 #### `static void resetTransientState()`
-- **Purpose**: Clear all non-persisted transient state (called on mode change or GW=R reset)
+- **Purpose**: Clear all non-persisted transient state (called on GW=R and on a mode change into or out of master, loopback or bypass; not between gateway and monitor, TASK-1839)
 - **Behavior**:
+  - Clears the boiler value cache (`otBoilerCache[]`, `otBoilerCacheValid[]`) and the MsgID 3 source marker, so `otDirectBoilerPresent()` and `otIsVentSlave()` read only answers given after the reset (TASK-1807)
   - Resets operating mode overrides (MH, MW, M2)
   - Clears DHW push state machine
   - Disables summary mode
@@ -656,7 +661,6 @@ static uint8_t otUnknownCounters[32];     // 128 MsgIDs × 2 bits = 32 bytes
 | OT_TEMP_INTERVAL_MS     | 10 s      | Temperature, modulation, pressure reads |
 | OT_SLOW_INTERVAL_MS     | 60 s      | Config, diagnostics, boundaries, counters |
 | OT_WRITE_INTERVAL_MS    | 15 s      | Periodic writes (keep boiler values alive) |
-| OT_OFFLINE_RETRY_MS     | 5 s       | MsgID 0 probe interval while the bus is offline (everything else skipped) |
 | OT_VENT_FAST_INTERVAL_MS | 10 s     | MsgID 70/71 poll when the slave is a ventilation/HRV unit |
 | OT_CSC2_EXPIRY_MS / OT_SC_EXPIRY_MS | 63.5 s / 63.5 s | CS=/C2= (8 C or more) and SC= overrides expire without a refresh; CS=/C2= below 8 C never expire |
 | OT_DHW_PUSH_TIMEOUT_MS  | 30 s      | DHW push state machine timeout |

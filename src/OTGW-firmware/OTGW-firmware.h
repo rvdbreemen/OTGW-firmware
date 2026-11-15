@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v2.0.0-beta.247
+**  Version  : v2.0.0-beta.295
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -113,6 +113,9 @@ void otdModeSettingChanged();   // TASK-1702: settings path, applied by loopOTDi
 void otdModeSettingCancel();
 void handleOTDirectBridgeStream();
 bool handleOTDirectCommand(const char* buf, int len, bool satOwn = false);   // satOwn: TASK-1575, see addCommandToQueue; false = refused (TASK-1593)
+bool otdCmdTextPush(const char* buf, int len, bool satOwn);   // TASK-1761: a command from another task, run on the loop task
+void otdCmdTextDrain();                                        // TASK-1761: run the queued commands, in order (loop task)
+bool otdCmdTextMustWait();                                     // TASK-1761: queued commands wait for the frame in flight
 void sendOTDirectOverridesJSON();
 bool sendPICSerial(const char* buf, int len);
 bool otDirectBoilerPresent();  // TASK-795 §4.2: real boiler answered MsgID 3 (excludes loopback)
@@ -224,7 +227,17 @@ bool dallasLabelsLock(uint32_t waitMs);
 void dallasLabelsUnlock();
 const char* dallasLabelsJson();
 void dallasLabelsReplaceLocked(const char* json, size_t len);
-void dallasLabelsFileChanged(const char* path);   // FSexplorer uploaded or deleted path
+void dallasLabelsFileChanged(const char* path);
+void loadSatMarkers();              // TASK-1911: RAM copy of /sat_markers.json (restAPI.ino)
+void flushSatMarkers();
+void loopSatMarkers();
+void satMarkersFileChanged(const char* path);     // FSexplorer uploaded or deleted path
+bool satMarkersLock(uint32_t waitMs);              // REST side of the markers copy (satMarkers.ino)
+void satMarkersUnlock();
+const char* satMarkersJsonLocked();
+void satMarkersScanLocked(int& count, int& maxId);
+int  satMarkersAppendLocked(const char* entry, int count);   // 0 ok, 1 full, 2 no room
+bool satMarkersDeleteLocked(int id);   // FSexplorer uploaded or deleted path
 void loopLittleFSStatus();   // TASK-1865: mount check + write probe on the loop task, not in /api/v2/health
 // Longest reboot-log line incl. CRLF and NUL: a core-dump detail line with all 16 backtrace frames the ESP-IDF
 // summary holds is 236 chars ("Core dump: " + task (15) + pc + elf + "bt=" + 16 PCs + "!\r\n"; TASK-1538).
@@ -603,6 +616,10 @@ struct HeapDiagSection {                 // state.heapdiag — cumulative heap-p
   uint32_t iAckLowMin              = 0xFFFFFFFF;
   uint32_t iAckLowFreeBefore       = 0;
   uint32_t iAckLowHits             = 0;
+  // TASK-1870.1: ipc0/ipc1 stack bytes free at the low point, taken right after the hardware detection
+  // in setup(); -1 when not taken (no runtime detection, or the task was not found).
+  int32_t  iIpc0StackMinHwDetect   = -1;
+  int32_t  iIpc1StackMinHwDetect   = -1;
   uint8_t  iAckLowFiles            = 0;  // file streams admitted at that moment
   uint16_t iTcpActivePcbs          = 0; // lwIP active TCP PCB count, sampled 1 Hz from the loop task (platformTcpActivePcbCount)
 };
@@ -1073,6 +1090,13 @@ char        otTopic[OT_TOPIC_LEN];  // Shared MQTT topic scratch for OT print_* 
 char        lastReset[129] = "";
 char        lastResetRaw[16] = "";   // TASK-1904: "0xNN/0xNN", the raw reset code of core 0 / core 1
 bool        g_extWdResetAtBoot = false;   // TASK-1904: the external 0x26 watchdog reset this boot (readExtWatchdogResetFlag())
+// TASK-1918 / ADR-239: the safeboot updater's bootloader load writes 0x20 B at 0x50000200 every time safeboot
+// starts (an app OTA). This guard holds that range, so every RTC_NOINIT record of this firmware starts at or above
+// 0x50000220. It is initialised RTC data (.rtc.data), which the IDF linker script places before .rtc.bss and
+// .rtc_noinit, so its place does not depend on source or LTO order (an RTC_NOINIT guard landed after the static
+// records). The bootloader reloads it on every boot of this firmware; it is padding, never read or written as data.
+// scripts/check_rtc_layout.py, run by build.py on the ELF, fails the build when a record lands below 0x50000220.
+RTC_DATA_ATTR __attribute__((used)) uint8_t g_rtcSafebootGuard[32] = {0x5B};
 uint32_t    MQTTautoConfigMap[8] = { 0 };
 uint32_t    MQTTautoCfgPendingMap[8] = { 0 };  // bitmap for async MQTT discovery drip
 // Deferred settings write timer (Finding #23: coalesce flash writes)
@@ -1171,6 +1195,10 @@ byte      OTGWdhwmeterid     = 241;
 // anchors the otgw-firmware/command_dropped sensor and the
 // otgw-firmware/command_retry_exceeded binary sensor. First free slot below 241.
 byte      OTGWcmddropid      = 240;
+// PIC-attached temperature sensor discovery pseudo-ID (TASK-1940; 1.x TASK-1147 uses 242 there,
+// which is OTGWhvacid here): anchors otgw-pic/temperature_reading. First free slot below 240.
+// Announced on the first valid PR=E reading only, so a gateway without a sensor never shows it.
+byte      OTGWpictempid      = 239;
 // Cumulative DHW water total (TASK-1123), see dhwWaterMeter.ino.
 extern double dhwWaterTotalL;
 void updateDHWWaterMeter(float flowLitresPerMin, uint32_t nowMs);

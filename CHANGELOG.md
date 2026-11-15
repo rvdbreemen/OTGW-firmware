@@ -5,6 +5,80 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Fixed
+- SAT: when a simulation run ends, the real PID state and heating-curve data are reloaded from the filesystem, so SAT does not go on with the values learned on the simulated room (TASK-1952).
+
+## [2.0.0-beta.294] - 2026-11-15
+
+### Added
+- PIC Classic: the temperature sensor wired to the PIC can reach MQTT and Home Assistant, as on the 1.x line (1.x TASK-1147). A new setting, PIC temperature sensor (off by default, `PICtempsensor` in `settings.ini`, `pictempsensor` in the REST settings), makes the gateway read it with `PR=E` every 3 minutes and publish it to `otgw-pic/temperature_reading`, with a Home Assistant temperature sensor PIC_Temperature_Reading on the Sensors device. The entity is announced on the first valid reading only; a PIC without a sensor answers `-`, and then nothing is published. While the return water readout of TASK-1314 runs (sensor function `R`) its once-a-minute `PR=E` serves both, so no second poll is sent. OT-Direct boards read no PIC and never send it (Robert, 2026-11-14; TASK-1940).
+- Monitor > Graph: the dashed live-connection marks get a legend line and a tooltip that say they are the live connection dropping or coming back, not a restart; a real restart of the gateway (its boot counter went up, read from device/info when the live connection returns) is drawn as a solid amber "gateway restarted" mark (TASK-1914).
+- `/api/v2/device/info` reports the IPC task stack low points taken after hardware detection (TASK-1870.1).
+- Tools: `build.py` writes its own build log, child tools included, to `build/logs/build-<time>.log` and copies it to `build/logs/latest.log` (TASK-1894).
+
+### Changed
+- OT-Direct: `PR=` reports use the PIC 6.8 text. `PR=P` reports the real Smart Power level towards the thermostat (`Low power`, `Medium power`, `High power`); `PR=R` reports the `FT=` model (`D` by default); `PR=C` is `240 MHz`, `PR=B` the build time as `HH:MM DD-MM-YYYY`, and the `PR=L` default is `FXOMPC` (Robert, DM 1571191256833331375). `PR=O` covers only the `TT=`/`TC=` room setpoint override, with the lowercase `t`/`c` until the thermostat accepts it and `n` while a clear is pending. An active `CS=` (also the one SAT sends) now reports `N` instead of `C<flow temperature>`, so `otgw-pic/settings/setpoint_override`, the Home Assistant sensor PIC_Setpoint_Override, REST `/api/v2/pic/settings` `setpoint_override` and the web UI PIC panel show "no override" there (Robert, DM 1571191595498340544; TASK-1848).
+- OT-Direct: the replies to `SC=`, `SR=` and `FT=` use the PIC 6.8 text: `SC: 09:05/3` with two-digit hours, `SR: <id>:<high>/<low>` (e.g. `SR: 18:1/230`) whatever form the argument had, and `FT:` the selected model (`C`, `I`, `S` or `D`) instead of the argument (TASK-1849).
+- OT-Direct: the thermostat lost and back events print the PIC 6.8 lines `Thermostat disconnected` and `Thermostat connected`, also to port 25238 (TASK-1850).
+- Web server: the WEB CONN CAP refusal line splits the counted port-80 connections by state and shows the queued bytes; the limit itself is unchanged (TASK-1947).
+- OT-Direct: a switch between gateway and monitor mode keeps the command state (HW, SR=, CS=, UI= and the other overrides) and flushes only the command queue, as on the PIC; a switch into or out of master, loopback or bypass and `GW=R` still clear it (TASK-1839).
+- OT-Direct: on a thermostat loss the gateway no longer writes the 16 C setback temperature as a flow setpoint; its own frames carry CH off unless a `CS=` is in force, like the PIC. `OTDsetbacktemp` and the `FS=` flag are still stored but have no effect, `setback_active` stays false (TASK-1806).
+- SAT continuous mode: a CH flame-on start runs the PWM start sequence first (flame-off hold at return + 18 C, a 20 s hold, then the 60 s follow), as a fail-safe (Sergeant D entry 348, TASK-1942).
+- SAT: PWM ends for continuous when the flame is on and the request stays above the flow for 60 s, instead of the flow at 3 C below the request for 180 s (Sergeant D entries 342, 350, ADR-236, TASK-1933).
+- OT-Direct: `CS=`, `C2=`, `BS=` and `CL=` parse their value as the PIC 6.8 GetPercentArg does: an empty, negative or malformed value is `SE` and above 100.00 is `OR`, where it used to clear (`CS=` with no value) or pass through; `CL=` with a value that is not a number still clears. The stored f8.8 value rounds like the PIC instead of truncating (`CS=49.72` sends 0x31B9, was 0x31B8), and the replies print that stored value as the PIC's PrintSigned does (TASK-1859).
+- OT-Direct: `TT=`, `TC=` and `SB=` parse their value as the PIC 6.8 GetPosFloatArg does: a negative or malformed value is `SE` (a negative `TT=`/`TC=` used to set an override), `SB=0` is `SE` (`SB=` keeps its 1-30 clamp); the stored value rounds like the PIC (`TT=16.1` is 0x101A, was 0x1019) and the reply prints it like the PIC (TASK-1859).
+- OT-Direct: `SW=`, `SH=` and `OT=` parse their value as the PIC 6.8 GetFloatArg does. `SW=`/`SH=` answer `BV` outside the boiler's MsgID 48/49 bounds (20-80 and 10-90 until the boiler reports them), as the PIC; `OT=` clears on any value it cannot parse and on 64.00-127.99 (`OT=99` clears) and answers `OT: -`; the stored values round like the PIC (`OT=9.999` is 10.00, was 0x09FF; `SW=55.7` is 0x37B4). `CC=` parses like `CL=` (TASK-1859).
+
+### Fixed
+- OT-Direct: commands from the REST API and the settings page run on the loop task in arrival order (a text ring, ADR-242 Proposed), so a `GW=R` or mode switch over REST no longer resets the state while a frame is in flight and a `CS=` sent right after it is no longer wiped; a command that does not fit in the ring gets HTTP 503 instead of 202 (TASK-1761).
+- OT-Direct: Unknown-DataID answers never disable MsgIDs 1, 3, 14, 17 and 25 or turn them into alternative slots, as the PIC's MandatoryID (MsgID 0 already was exempt); a later valid answer enables an ID the 3-strike rule disabled, while a `DA=` or `UI=` stays (TASK-1801).
+- OT-Direct `MM=`: a value the PIC cannot parse (`MM=-`, `MM=`, a minus or above 255) clears the maximum modulation override and answers `MM: -`, as the PIC SetMaxModLevel; `MM=-` used to write 0 % to MsgID 14. Characters after the number are `SE` and above 100 is `OR` (TASK-1799).
+- OT-Direct `RT=`: a value with one decimal is tenths, as on the PIC (`RT=25.4` sends 0x1967); it was read as hundredths (TASK-1859).
+- Home Assistant discovery: the DHW flow rate sensor (MsgID 19, `DHWFlowRate`) announces the unit `L/min`; Home Assistant rejected `l/min` for device class `volume_flow_rate` and did not create the sensor (PR #702 by justink0k; TASK-1949).
+- Monitor > Graph: the 24 h history stores the weather outside temperature only while it is fresh (younger than 1 h) and falls back to MsgID 27, instead of repeating the last value after the weather fetch stopped (TASK-1937).
+- MQTT: a SUBSCRIBE that the MQTT library refused during the connect burst (low free block on a board without PSRAM) is retried until it is accepted, so MQTT commands no longer stay dead until the next reconnect (TASK-1778).
+- MQTT: a planned reboot publishes the retained `offline` status and disconnects cleanly before the restart (TASK-1780).
+- REST: `GET /api/v2/settings` advertises the same min/max as the setter clamps for ten SAT settings (a flow offset of 0 was silently stored as 0.5) (TASK-1941).
+- SAT: the help text of Heating curve self-tune states the real cadence: one 0.1 step when 3 counted days agree, so two steps are at least 3 counted days apart; behaviour unchanged (TASK-1792).
+- Web UI: on a phone the language button and the Light/Dark switch have the same height (TASK-1873).
+- Web UI: Home > Mission control follows the light and dark theme instead of keeping a fixed dark palette (TASK-1863).
+- Simulation replay: a replayed thermostat MsgID 16 no longer reaches SAT's follow-thermostat (it could overwrite the stored SAT target), and a replayed PIC banner no longer re-enables the PIC or stores a PIC board mode on a unit without a PIC (TASK-1901, TASK-1902).
+- The DHW flow rate unit reads `L/min` in the OT log, the web UI message table and the MQTT docs too (follow-up of PR #702).
+- OT-Direct loopback and simulation replay: a synthetic or replayed MsgID 3 no longer sets SAT's slave configuration (PWM permission), detected heating source or manufacturer (TASK-1857, TASK-1903).
+- OT-Direct: the persisted HW, SW, SH, IT, OH, UI= list and vent setpoint survive the boot auto-detect switch to master mode; they were restored before the switch and wiped by it (TASK-1944, TASK-1760).
+- OT-Direct: `GW=` with an unsupported value answers `GW: BV` and a value longer than one character `GW: SE`, as the PIC; before, `GW=10` switched to gateway and `GW=RR` ran a full reset (TASK-1946).
+- OT-Direct master mode: after a failed MsgID 0 the boiler gets the next status request within about 1 s instead of 5 to 6 s, inside the OpenTherm 1.15 s master interval (TASK-1802).
+- OT-Direct master mode: a thermostat on the slave port gets no answer while the boiler is offline, instead of the last cached boiler status; `GW=R` and a switch into or out of master, loopback or bypass clear the boiler value cache, so boiler presence and the ventilation detection only count answers given after the switch (TASK-1807).
+- OT-Direct: a boiler Data-Invalid reply never becomes a cached value; the slot keeps its previous value (TASK-1925).
+- SAT simulation no longer saves the PID state or the heating-curve recommendation to the filesystem, so the next boot does not restore values learned on a simulated room (TASK-1900).
+- The OT support files of the thermostat and the boiler and the boot-detect log are written to a temporary file and renamed over the live file without removing it first, so a reset during the write keeps the previous file (TASK-1916).
+- REST `/api/v2/device/info` no longer sends a second closing `}` under load: the heap values it reports are read once per response instead of on every chunk (TASK-1910).
+- SAT calibration markers are served from a RAM copy of `/sat_markers.json`; the file is written on the loop task, so the markers request makes no LittleFS call; a request during a write gets a 503; braces in a label are removed like other unsafe characters (TASK-1911).
+- REST `/api/v2/settings`: a minimum or maximum below 0.01 is printed with 3 decimals instead of as `0`, so `satthermalcoeff` reports its real lower bound (TASK-1941).
+
+## [2.0.0-beta.250] - 2026-11-14
+
+### Added
+- REST `/api/v2/health`: `simulation_active` and `simulation_source`, from loop-task state without a LittleFS call; the web UI SIMULATION badge reads them and the web UI no longer polls `/api/v2/simulate` every 15 s; `/api/v2/simulate` is unchanged (TASK-1915).
+- Reboot log: the boot line carries the raw reset code of both cores (`[rst 0xNN/0xNN]`), and a reset by the external 0x26 watchdog gets its own line; `device/info` adds `resetraw`, `resetrawlabel` and `extwdreset`; a log line may be 160 characters (was 140) and a cut-off line still ends with CRLF (TASK-1904).
+
+### Changed
+- SAT: `CS=` is sent when the 0.1-rounded value changes and an unchanged `CS=` is repeated every 30 s instead of every 5 s; a `CS=` the queue dropped is retried after 5 s with the dropped value; the no-return start-up keeps its 2 s cadence; `MM=`, `TP=` and `CH=` unchanged (ADR-235 Proposed; TASK-1924).
+- SAT: the `CS=` loop repeat and the PIC keepalive wait 31 s after the last accepted `CS=`, so an old value no longer goes out just before a control tick brings a new one (TASK-1924).
+- SAT continuous mode: for 60 s after a CH flame-on edge the control setpoint is at least the flow temperature minus 1.0 °C, recalculated every 5 s; after that the existing flow clamp (offset 2.0 °C), also recalculated every 5 s while the flame is on; a DHW flame-on does not open the window (TASK-1924).
+- WiFi: three resets in a row, by the reset button or a power-on, each within 10 s of boot, clear the stored WiFi credentials and open the setup portal again on the ESP32-S3; software, USB, watchdog and crash resets never count; a power supply that drops out three times that quickly does the same; OLED hint `3x reset/power=config` (ADR-238 Proposed, supersedes ADR-043; TASK-1930).
+- File paths are normalised before the access check (TASK-1934).
+- Build: the `buildfs` step of `build.py` runs in its own `.pio/build-fs`, so the firmware objects survive between builds (TASK-1921).
+
+### Fixed
+- `settings.ini`, the reboot counter and the reboot log survive a reset or panic during a filesystem OTA: an RTC snapshot is restored at boot, and a half-written image is formatted first and the user is asked to upload the filesystem again; a power cut is not covered; `scripts/ota_flash.py` refuses a missing or empty image before the safeboot handover (ADR-233 Proposed; TASK-1774).
+- The RTC records start at 0x50000220, out of the 32 B the safeboot updater overwrites, so the reboot log keeps `[OTA] handover to safeboot`; the build fails when a record lands below 0x50000220 (ADR-239 Proposed; TASK-1918).
+- OT-Direct master mode: a thermostat read of an id without a cached boiler value is answered Data-Invalid instead of Unknown-DataID; Unknown-DataID stays for an id the boiler last answered Unknown-DataID and for ids 128-255 (TASK-1808).
+- The file handler serves existing files when the web UI files are missing; only a missing path gets the upload prompt (TASK-1926).
+- The root route uses an exact matcher, so only `/` itself gets the index page and other paths reach the file handler (TASK-1936).
+- Web UI: the weather-derived outside value is dropped from the Monitor graph when a hidden tab stops the weather poll or the weather answer is invalid, and showing the tab fetches the weather again (TASK-1875).
+- Capture tool: frames that arrive together with the WebSocket upgrade are kept, so the first frames of a capture are no longer lost on a busy PC (TASK-1922).
+
 ## [2.0.0-beta.237] - 2026-11-14
 
 ### Added
@@ -934,7 +1008,9 @@ Legacy release. See git history for details.
 
 Legacy releases. See git history for details.
 
-[Unreleased]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.237...HEAD
+[Unreleased]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.294...HEAD
+[2.0.0-beta.294]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.250...v2.0.0-beta.294
+[2.0.0-beta.250]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.237...v2.0.0-beta.250
 [2.0.0-beta.237]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.224...v2.0.0-beta.237
 [2.0.0-beta.224]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.218...v2.0.0-beta.224
 [2.0.0-beta.218]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.203...v2.0.0-beta.218

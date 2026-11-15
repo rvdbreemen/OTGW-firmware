@@ -7,11 +7,10 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-15T09:35:00Z'
-updated_date: '2026-11-15T09:38:00Z'
+updated_date: '2026-11-15T09:50:00Z'
 labels:
   - research
   - tls
-  - needs-maintainer-ok
 milestone: 2.1.0
 dependencies: []
 priority: medium
@@ -50,3 +49,9 @@ Full proof of concept on branch research/cloud-recording (Robert 2026-11-15). Ne
 4. Bench (bench-tester, not this session): flash the no-PSRAM unit, 20 uploads, heap peak and low-water, 1 h soak (AC 2, 3).
 Out of scope for the PoC: web UI settings, consent dialog, SAT encoding without debug output, token persistence, ADR (an ADR follows only if Robert adopts it; it would amend ADR-003 and ADR-218).
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-15 Robert approved the PoC plan in session ('Ik ben akkoord met het plan voor poc').
+<!-- SECTION:NOTES:END -->

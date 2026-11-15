@@ -44,7 +44,7 @@ In AP fallback mode the device keeps attempting to reconnect to the configured W
 | Method | How |
 |---|---|
 | Web UI | Settings page, click "Reset WiFi" button |
-| Triple-reset detection | Press the hardware reset button 3 times in a row, each press within 10 seconds of the previous (forces the config portal; not a power-cycle, do not hold) |
+| Triple-reset detection | Reset the gateway 3 times in a row, each reset within 10 seconds of the board coming back up: press the reset button or pull the plug (both count, and they may be mixed). Software, USB and watchdog resets do not count. See `docs/guides/WIFI_RECOVERY_TRIPLE_RESET.md` |
 | Telnet debug console | Send the `resetwifi` command on port 23 |
 
 ---

@@ -320,6 +320,16 @@ inline void platformIgnoreDhcpNtp() {
   }
 }
 
+// TASK-1761: which FreeRTOS task runs the Arduino loop. setup() runs on that task and marks it; before the mark
+// only that task runs, so an unmarked handle counts as the loop task. The handle lives in a function-local static
+// of an inline function, so every translation unit shares one copy.
+inline TaskHandle_t& platformLoopTaskRef() { static TaskHandle_t h = nullptr; return h; }
+inline void platformMarkLoopTask() { platformLoopTaskRef() = xTaskGetCurrentTaskHandle(); }
+inline bool platformOnLoopTask() {
+  const TaskHandle_t h = platformLoopTaskRef();
+  return h == nullptr || h == xTaskGetCurrentTaskHandle();
+}
+
 // Heap information
 inline uint32_t platformFreeHeap() {
   return ESP.getFreeHeap();
@@ -516,6 +526,46 @@ inline uint16_t platformTcpTxHoldingOnPort(uint16_t localPort,
   }
   UNLOCK_TCPIP_CORE();
   return count;
+}
+
+// TASK-1947: the same count as platformTcpTxHoldingOnPort(), split by why each connection counts,
+// for the WEB CONN CAP refusal line only. estIdle: ESTABLISHED, empty queues, not a waiter.
+// estData: ESTABLISHED with queued segments. closingData: another state with a payload segment.
+// The other states with only zero-length segments queued, split by state (lwIP queues a FIN and the
+// SYN-ACK of a passive open as a segment with len 0): closingFin = FIN_WAIT_1, CLOSING or LAST_ACK
+// (only the FIN); synRcvd = SYN_RCVD (only the SYN-ACK, no request yet); otherEmpty = any other state.
+// payloadBytes: payload queued in unsent + unacked over all counted connections.
+struct PlatformTcpTxBreakdown {
+  uint16_t estIdle, estData, closingData, closingFin, synRcvd, otherEmpty;
+  uint32_t payloadBytes;
+};
+inline void platformTcpTxBreakdownOnPort(uint16_t localPort,
+                                        const PlatformTcpIdleConnection* idle,
+                                        uint8_t idleCount, PlatformTcpTxBreakdown* out) {
+  *out = PlatformTcpTxBreakdown{0, 0, 0, 0, 0, 0, 0};
+  LOCK_TCPIP_CORE();
+  for (struct tcp_pcb *pcb = tcp_active_pcbs; pcb != nullptr; pcb = pcb->next) {
+    if (pcb->local_port != localPort) continue;
+    if (pcb->unsent != nullptr || pcb->unacked != nullptr) {
+      uint32_t bytes = 0;
+      for (struct tcp_seg *seg = pcb->unsent; seg != nullptr; seg = seg->next) bytes += seg->len;
+      for (struct tcp_seg *seg = pcb->unacked; seg != nullptr; seg = seg->next) bytes += seg->len;
+      out->payloadBytes += bytes;
+      if (pcb->state == ESTABLISHED) out->estData++;
+      else if (bytes != 0) out->closingData++;
+      else if (pcb->state == FIN_WAIT_1 || pcb->state == CLOSING || pcb->state == LAST_ACK) out->closingFin++;
+      else if (pcb->state == SYN_RCVD) out->synRcvd++;
+      else out->otherEmpty++;
+      continue;
+    }
+    if (pcb->state != ESTABLISHED) continue;
+    bool waiting = false;
+    for (uint8_t i = 0; i < idleCount; ++i) {
+      if (pcb == idle[i].pcb && pcb->callback_arg == idle[i].owner) { waiting = true; break; }
+    }
+    if (!waiting) out->estIdle++;
+  }
+  UNLOCK_TCPIP_CORE();
 }
 
 // TASK-1605: resolve a hostname to an IPv4 address without Network/WiFi.hostByName().

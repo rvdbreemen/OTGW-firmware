@@ -1,11 +1,11 @@
 ---
 id: TASK-1845
 title: 'OT-Direct: the DHW push (HW=P) differs from the PIC'
-status: In Review
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-11T23:57:00Z'
-updated_date: '2026-11-12T02:38:00Z'
+updated_date: '2026-11-15T09:09:00Z'
 labels:
   - otdirect
   - parity
@@ -52,4 +52,14 @@ Full scripts/run_tests.py on the integrated HEAD (6841ab5d9, -j 4): 210 files, 2
 Integrated and built: rebased on ac5967ad2, one bump per task (1823 beta.191, 1828 192, 1830 193, 1832 194, 1831 195, 1833 196, 1845 197) + test commit 4cafc97eb; full run_tests.py 208/210 (test_override_reply fixed in 4cafc97eb, test_stream_real_cbuf -j4-only, unrelated); evaluate --quick 93 checks 0 FAIL; build.bat esp32-combo 'Build completed successfully', build/OTGW-firmware-esp32-combo-2.0.0-beta.197+4cafc97-flash.zip (6158.3 KB). Bench requested from 09 via the coordinator.
 
 Bench (otgw-bench-tester 09, .61 loopback, commands via TCP 25238, telnet + MQTT captured; beta.197+4cafc97 vs 190+1a4c0a4): flash OK, githash 4cafc97, health 200. Pushed ac5967ad2..4cafc97eb, zip posted (Discord 1570265549747781763). TASK-1845 PASS for PR=W: HW=P reply 'HW: P', PR=W old 'W=1' -> new 'W=0'. Frame R10631432 because MW/MH/M2 were still held from the 1832 checks: checked against gateway.asm, PIC-like (OperModeData puts operatingmode1 = DHW mode + push bit in HB and operatingmode2 = HC1/HC2 in LB, 3247-3250; SetHotWaterPush does not clear the modes): HB 0x14 = MW 4 + push, LB 0x32 = M2 3/MH 2. The bare 10631000 from a clean state is shown by the host test (exactly dhw-5.stc), not on the bench. AC4 (capture of one boiler-driven push / spoof end) stays open: needs a real boiler or the slave simulator (loopback answers never reach handleMasterResponse).
+
+AC 4: field AC (Robert C, 2026-11-14, DM 1571276554430976183 via the coordinator, no OT bus on the bench): the capture of one DHW push is verified from a tester capture, not on the bench. Status stays In Review until a tester capture covers it.
+
+2026-11-15: closed as field AC on Robert's A (DM 1571431149795024929) after 09's bench check (no bench route).
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Closed on Robert's decision A to triage question 1/5 (bot DM 1571283730117562467; his answer '1. A' in DM 1571431149795024929, 2026-11-15). Before closing, the bench-tester (09) checked whether the open AC can be done on the bench (2026-11-15, from the code at origin/dev 6d6f5b71d): no. The push follows the boiler's answers only in handleMasterResponse() (OTDirect.ino:1913; otdPushOnBoiler99 at :1961 for a SUCCESS answer to 99, :1976 for a genuine DATA_INVALID), which runs only on a real bus answer (:2539). Loopback answers itself in sendMasterRequestAsync() (:1827-1840) before that function and echoes every WRITE as WRITE_ACK (:1653-1656); a replay feeds processOT(), not the OT-Direct master state machine (OTGW-Core.ino:6462). A bench route would need a boiler emulator (TASK-1654) or a second gateway as slave. Open field AC #4 (capture of one push): on the bench only the TX side is visible (beta.298: HW=P -> R10631201, the WRITE 99 frame); the push itself needs a boiler that answers MsgID 99 and MsgID 0.
+<!-- SECTION:FINAL_SUMMARY:END -->

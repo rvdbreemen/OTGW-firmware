@@ -290,6 +290,17 @@ class SkipPortalBoot(unittest.TestCase):
         r, _ = self.boot(magic=0xDEADBEEF, marked=0x12345678, soft=0)
         self.assert_portal(r)
 
+    def test_old_rtc_layout_after_the_update_opens_portal(self):
+        # TASK-1918: the new firmware keeps its RTC records 0x20 B higher (safeboot guard at 0x50000200). On the
+        # first boot after the update this record (new +0x5c) reads the old FS-OTA snapshot's data[8..16):
+        # zeros after a wipe, or settings.ini text. Neither may skip the portal.
+        head = (REPO / "src" / "OTGW-firmware" / "data" / "settings.ini").read_bytes()[:16]
+        for blob in (bytes(16), head):
+            with self.subTest(blob=blob):
+                r, _ = self.boot(magic=int.from_bytes(blob[8:12], "little"),
+                                 marked=int.from_bytes(blob[12:16], "little"))
+                self.assert_portal(r)
+
     def test_wrong_value_with_magic_opens_portal(self):
         r, _ = self.boot(magic=SKIP_MAGIC, marked=7)
         self.assert_portal(r)

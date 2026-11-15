@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : Header file: OTGW-Core.h
-**  Version  : v2.0.0-beta.247
+**  Version  : v2.0.0-beta.295
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -389,7 +389,7 @@ enum OTLibMessageID {
 		{  16, OT_WRITE , ot_f88,        	"TrSet", "Room Setpoint", "°C" , false},
 		{  17, OT_READ  , ot_f88,        	"RelModLevel", "Relative Modulation Level", "%" , true },
 		{  18, OT_READ  , ot_f88,        	"CHPressure", "CH water pressure", "bar" , true },
-		{  19, OT_READ  , ot_f88,        	"DHWFlowRate", "DHW flow rate", "l/min" , true },
+		{  19, OT_READ  , ot_f88,        	"DHWFlowRate", "DHW flow rate", "L/min" , true },
 		{  20, OT_RW    , ot_special,    	"DayTime", "Day of Week and Time of Day", "" , true },
 		{  21, OT_RW    , ot_u8u8,       	"Date", "Calendar date ", "" , true },
 		{  22, OT_RW    , ot_u16,        	"Year", "Calendar year", "" , true },

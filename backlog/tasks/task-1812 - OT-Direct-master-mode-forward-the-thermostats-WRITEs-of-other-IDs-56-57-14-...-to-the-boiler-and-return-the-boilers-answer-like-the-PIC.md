@@ -3,10 +3,11 @@ id: TASK-1812
 title: >-
   OT-Direct master mode: forward the thermostat's WRITEs of other IDs (56, 57,
   14, ...) to the boiler and return the boiler's answer, like the PIC
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-11-11T12:30:00Z'
-updated_date: '2026-11-11T12:31:00Z'
+updated_date: '2026-11-14T23:41:00Z'
 labels:
   - otdirect
   - review-2026-11-11
@@ -36,4 +37,14 @@ Found in the TASK-1795 audit (docs/reviews/2026-11-11_otdirect-pic-parity-audit/
 
 <!-- SECTION:NOTES:BEGIN -->
 The TSet expiry task filed together with this one is TASK-1811.
+
+DESIGN (d3, 2026-11-15, design only, no code; for Robert via the coordinator). /adr-kit:context: no ADR covers thermostat writes in master mode. ADR-066 says the virtual boiler answers 'with cached boiler data' and lists 'instant responses' as a benefit. A forwarded write answered by the boiler changes that contract, so it needs a new ADR (Proposed, amends ADR-066). Side finding: ADR-066 says bEnableSlave defaults to false; the code defaults it to true (OTDirecttypes.h:114).
+
+D1 What is forwarded: in master mode, a thermostat WRITE_DATA of any ID except 1, 16 and 24 goes to the boiler as a WRITE_DATA. 1, 16 and 24 keep today's local WRITE_ACK and write-cache path (TASK-1150, TASK-1811). While SAT owns the setpoint (satOwnsControlSetpoint), the IDs behind the commands SAT refuses from outside (satBlocksExternalCommand: CS=1, C2=8, MM=14; CH/H2 are MsgID 0 bits, TT/TC answer state) keep today's local echo and are not forwarded, so a thermostat cannot change what SAT controls. A user write override for the same ID (SW=56, SH=57, ...) wins as in gateway mode: the frame goes out with the override's data (origin OT_DIRECT_ORIGIN_THERMOSTAT_OVERRIDDEN, buildOverriddenReply), so the thermostat and the scheduled user write do not fight.
+
+D2 Timing (spec v4.2: the slave answers 20-800 ms after the request): the write is a relay in the next free master slot. The pending thermostat frame waits only for a master request already in flight (otMasterRequestActive), then goes out ahead of the command ring and the schedule; scheduleMasterRequest() starts no own frame while one waits. Worst case = the boiler latency of the frame in flight + that of the relay. With boilers answering within the spec's 800 ms that can exceed 800 ms. Then the existing TASK-1798 hold drops the late answer and the thermostat retries (spec 4.5); the boiler still got the value. To make that bound right, the hold deadline (OTD_REPLY_DEADLINE_MS 750) must count from the thermostat frame's arrival, not from the reply's creation (a change for the master path only). Rejected: (a) answering the write locally first and forwarding later (the thermostat would again see an answer the boiler never gave, the defect itself); (b) aborting the own frame in flight (the library cannot cancel a frame on the wire).
+
+D3 Answers: the boiler's reply goes back through replyToThermostat() as in gateway mode: WRITE_ACK with the boiler's data, Data-Invalid (the boilerDataInvalid path), Unknown-DataID; a timeout or corrupt reply gives no answer (the thermostat retries, as behind a PIC). Unknown-DataID counts toward the 3-strike UI= rule as for the gateway's own frames. While the boiler is offline (TASK-1807) nothing is forwarded or answered. D4 READs: unchanged (cache answers, ADR-066). D5 Tests (AC3/AC4): the real handleMasterModeSlaveFrame + the master consumer with a fake bus: a 56 write reaches the boiler with the thermostat's data and the thermostat gets the boiler's WRITE_ACK/DI/UNK; 1/16/24 and the SAT-owned 8/14 keep the local echo; an SW= override replaces the data; a write arriving while an own frame is in flight goes out right after it, ahead of the schedule.
+
+Correction to D2 (spec read in full): the answer window is 20-400 ms, typically 100 ms or less (spec v4.2 :1093-1095), not 800 ms; and a slave that functions as a gateway may exceed it: 'the maximum waiting time does not apply' (:1097-1098). A forwarded write is exactly that case, so the relay is within the spec. ADR-241 Proposed (number reserved by the coordinator), amends ADR-066; 'adr relate' to ADR-066 refused (ADR-066 has no Status History block), so ADR-066 is named in the text only; related to ADR-179. Open question in ADR-241 for Robert: the slot rule and the SAT exclusion of 8/14. bEnableSlave default conflict filed as TASK-1953. No code until Robert accepts.
 <!-- SECTION:NOTES:END -->

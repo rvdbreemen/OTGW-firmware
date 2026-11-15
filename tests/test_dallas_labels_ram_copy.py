@@ -322,7 +322,7 @@ class Wiring(unittest.TestCase):
         fx = blank_comments_and_strings(read(FSX_INO))
         self.assertRegex(fx, r"LittleFS\.remove\(deletePath\)\) \{\s*dallasLabelsFileChanged\(deletePath\);")
         self.assertRegex(fx, r'LittleFS\.remove\(argCompat\("\s*"\)\);\s*dallasLabelsFileChanged\(argCompat\("\s*"\)\);')
-        self.assertRegex(fx, r"dallasLabelsFileChanged\(request->_tempFile\.path\(\)\);\s*request->_tempFile\.close\(\);")
+        self.assertRegex(fx, r"dallasLabelsFileChanged\(request->_tempFile\.path\(\)\);\s*(?:\w+FileChanged\(request->_tempFile\.path\(\)\);\s*)*request->_tempFile\.close\(\);")
 
     def test_loop_flushes_restart_flushes_boot_loads_before_the_web_server(self):
         self.assertIn("loopDallasLabels();", function_body(self.helper, "loopLittleFSStatus"))

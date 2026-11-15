@@ -56,6 +56,11 @@ static uint32_t millis() { return g_ms; }
 static bool g_pic = true;
 static bool isPICEnabled() { return g_pic; }
 static bool isOTDirectEnabled() { return true; }
+// TASK-1761: the host program is the loop task, so the OT-Direct branch runs the handler directly; the ring is empty.
+static bool platformOnLoopTask() { return true; }
+static void otdCmdTextDrain() {}
+static bool otdCmdTextPush(const char*, int, bool) { return false; }
+static bool otdCmdTextMustWait() { return false; }
 static char g_direct[256];
 // TASK-1665: the diagnostic recorder is never started here, so every capture point in the cut-out code is its one-read no-op.
 struct DiagRecStub { bool active = false; void recOtFrame(char, uint32_t) {} void recPicCommand(const char*, size_t) {}

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """TASK-1649 / TASK-1650 host harness: replayed MsgID 27 must not stamp the outside temperature;
-a banner on OT-Direct must not call satNotifyPicRestart().
+a banner on OT-Direct must not call satNotifyPicRestart(); a replayed banner must not re-enable the PIC
+or persist a board mode (TASK-1902); a replayed T MsgID 16 must not reach SAT (TASK-1901).
 
     python test/host/test_replay_frame_guards.py            # working tree
     python test/host/test_replay_frame_guards.py --rev HEAD # any git revision (old code)
@@ -57,7 +58,15 @@ def main():
     (GEN / "replay_guard_outside27_pred.inc").write_text(hdr + pred + "\n", encoding="utf-8")
     (GEN / "replay_guard_outside27.inc").write_text(hdr + stamp + "\n", encoding="utf-8")
     (GEN / "replay_guard_banner.inc").write_text(hdr + slice_banner(lines) + "\n", encoding="utf-8")
-    print(f"== sliced the processOT() MsgID 27 stamp and banner statements ({origin})")
+    # TASK-1902: the PIC-recovery block right after it (sets state.pic.bAvailable and persists iBoardMode).
+    # Searched from the processOT() banner branch on: applyPICBannerInfo() has an earlier block of the same shape.
+    b0 = next(i for i, l in enumerate(lines) if "strstr(buf, OTGW_BANNER)" in l)
+    recovery = slice_block(lines[b0:], r"^\s*if \(!state\.pic\.bAvailable\b")
+    (GEN / "replay_guard_banner_recovery.inc").write_text(hdr + recovery + "\n", encoding="utf-8")
+    # TASK-1901: the thermostat MsgID 16 feed into satOnThermostatSetpoint().
+    trset = slice_block(lines, r"^\s*if \(OTdata\.id == OT_TrSet && OTdata\.rsptype == OTGW_THERMOSTAT")
+    (GEN / "replay_guard_trset.inc").write_text(hdr + trset + "\n", encoding="utf-8")
+    print(f"== sliced the processOT() MsgID 27 stamp, banner, PIC-recovery and MsgID 16 blocks ({origin})")
     exe = GEN / "test_replay_frame_guards.exe"
     if exe.exists():
         exe.unlink()

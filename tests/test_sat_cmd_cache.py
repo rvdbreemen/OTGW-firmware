@@ -82,25 +82,25 @@ int main(int argc, char** argv) {
     printf("[%s]\n", g_sent);
   } else if (mode == 1) {                                  // 5 s resend repeats the last values, not before
     g_ms = start; satResetCmdCache(); tick(40.0f, 80, 1);
-    g_sent[0] = 0; g_ms = start + 29999; satCmdResend(); printf("[%s]\n", g_sent);   // TASK-1924: 30 s repeat, not before
-    g_ms = start + 30000; satCmdResend(); printf("[%s]\n", g_sent);
-    g_sent[0] = 0; g_ms = start + 59999; satCmdResend(); printf("[%s]\n", g_sent);   // 29999 ms after the repeat
-    g_ms = start + 60000; satCmdResend(); printf("[%s]\n", g_sent);
+    g_sent[0] = 0; g_ms = start + 30999; satCmdResend(); printf("[%s]\n", g_sent);   // TASK-1924 Part 2: 31 s repeat, not before
+    g_ms = start + 31000; satCmdResend(); printf("[%s]\n", g_sent);
+    g_sent[0] = 0; g_ms = start + 61999; satCmdResend(); printf("[%s]\n", g_sent);   // 30999 ms after the repeat
+    g_ms = start + 62000; satCmdResend(); printf("[%s]\n", g_sent);
   } else if (mode == 2) {                                  // nothing sent yet: no resend
-    g_ms = start; satResetCmdCache(); g_ms = start + 60000; satCmdResend(); printf("[%s]\n[]\n[]\n[]\n", g_sent);
+    g_ms = start; satResetCmdCache(); g_ms = start + 61000; satCmdResend(); printf("[%s]\n[]\n[]\n[]\n", g_sent);
   } else if (mode == 3) {                                  // the suppression refresh moved CS: the resend repeats that CS
     g_ms = start; satResetCmdCache(); tick(40.0f, 80, 1);
     g_ms = start + 3000; satEnqueueIfChangedCS(37.0f);
-    g_sent[0] = 0; g_ms = start + 33000; satCmdResend(); printf("[%s]\n[]\n[]\n[]\n", g_sent);   // TASK-1924: 30 s after it
+    g_sent[0] = 0; g_ms = start + 34000; satCmdResend(); printf("[%s]\n[]\n[]\n[]\n", g_sent);   // TASK-1924: 31 s after it
   } else if (mode == 4) {                                  // a DHW-ending tick disarms; a later tick that sends re-arms
     g_ms = start; satResetCmdCache(); tick(40.0f, 80, 1);
     @DISARM@                                               // what the DHW branch of the tick does
     g_sent[0] = 0; g_ms = start + 8000; satCmdResend(); printf("[%s]\n", g_sent);
     g_ms = start + 30000; tick(41.0f, 80, 1); g_sent[0] = 0;
-    g_ms = start + 60000; satCmdResend(); printf("[%s]\n[]\n[]\n", g_sent);   // TASK-1924: 30 s after the re-arming tick
+    g_ms = start + 61000; satCmdResend(); printf("[%s]\n[]\n[]\n", g_sent);   // TASK-1924: 31 s after the re-arming tick
   } else if (mode == 5) {                                  // live fault / DHW bits pause the resend
     g_ms = start; satResetCmdCache(); tick(40.0f, 80, 1);
-    g_sent[0] = 0; OTcurrentSystemState.SlaveStatus = 0x04; g_ms = start + 30000; satCmdResend(); printf("[%s]\n", g_sent);
+    g_sent[0] = 0; OTcurrentSystemState.SlaveStatus = 0x04; g_ms = start + 31000; satCmdResend(); printf("[%s]\n", g_sent);
     OTcurrentSystemState.SlaveStatus = 0x01; satCmdResend(); printf("[%s]\n", g_sent);
     OTcurrentSystemState.SlaveStatus = 0x00; satCmdResend(); printf("[%s]\n[]\n", g_sent);
   } else if (mode == 6) {                                  // ADR-203: the 30 s PIC keepalive stays silent while the 5 s resend runs
@@ -122,7 +122,7 @@ int main(int argc, char** argv) {
     g_imm = true; g_ms = start; satResetCmdCache(); tick(40.0f, 100, 1); printf("[%s]\n", g_sent);
     g_sent[0] = 0; g_ms = start + 1000; tick(40.0f, 100, 1); printf("[%s]\n", g_sent);
     g_sent[0] = 0; g_ms = start + 2000; tick(40.0f, 60, 1); printf("[%s]\n", g_sent);
-    g_sent[0] = 0; g_ms = start + 32000; satCmdResend(); printf("[%s]\n", g_sent);   // TASK-1924: 30 s after the last CS
+    g_sent[0] = 0; g_ms = start + 33000; satCmdResend(); printf("[%s]\n", g_sent);   // TASK-1924: 31 s after the last CS
   } else if (mode == 9) {                                  // TASK-1570 entry 239: repair resend of an unchanged MM/CH after 60 s
     g_ms = start; satResetCmdCache(); tick(40.0f, 80, 1);
     g_sent[0] = 0; g_ms = start + 58999; tick(40.0f, 80, 1); printf("[%s]\n", g_sent);   // TASK-1602: due from 60 s minus the 1 s slack
@@ -143,7 +143,7 @@ int main(int argc, char** argv) {
     g_sent[0] = 0; g_ms = start + 5999; satCmdResend(); printf("[%s]\n", g_sent);
     g_ms = start + 6000; satCmdResend(); printf("[%s]\n", g_sent);   // 5 s after the drop
     g_sent[0] = 0; g_ms = start + 11000; satCmdResend(); printf("[%s]\n", g_sent);   // accepted: no further retry
-    g_ms = start + 36000; satCmdResend(); printf("[%s]\n", g_sent);                   // the 30 s repeat of 42.0
+    g_ms = start + 37000; satCmdResend(); printf("[%s]\n", g_sent);                   // the 31 s repeat of 42.0
   } else if (mode == 14) {                                 // TASK-1539: MM to the maximum for a draw; keepalive on, no 5 s resend
     g_ms = start; satResetCmdCache(); tick(40.0f, 0, 1);   // PWM tick: MM=0
     printf("[%s]\n", g_sent); g_sent[0] = 0;
@@ -200,10 +200,30 @@ int main(int argc, char** argv) {
     snprintf(line, sizeof line, "cs=%d", n);
     printf("[%s]\n", line);
     g_ms = start + 61000; g_sent[0] = 0; tick(40.5f, 80, 1); printf("[%s]\n[]\n[]\n", g_sent);   // a change goes out at once
+  } else if (mode == 20) {                                 // TASK-1924 Part 2: 30 s ticks with a new CS each, satControlLoopRun() order
+    int stale = 0, ticks = 0;                              // stale = a repeat that goes out in the pass of a tick bringing a new value
+    for (uint32_t s = 0; s <= 300; s++) {
+      g_ms = start + s * 1000UL + (s ? 4 : 0); g_sent[0] = 0;   // the tick runs a few ms late, as on the bench (09, beta.242)
+      if (s == 0) satResetCmdCache();
+      satPicCSKeepalive(); satCmdResend();
+      bool repeated = g_sent[0] != 0;
+      if (s % 30 == 0) { tick(40.0f + 0.5f * (float)(s / 30), 80, 1); ticks++; if (repeated) stale++; }
+    }
+    printf("[stale=%d ticks=%d]\n[]\n[]\n[]\n", stale, ticks);
+  } else if (mode == 21) {                                 // TASK-1924 Part 2: 60 s control interval, unchanged CS: largest gap
+    uint32_t last = 0, gap = 0; int n = 0;
+    for (uint32_t s = 0; s <= 600; s++) {
+      g_ms = start + s * 1000UL; g_sent[0] = 0;
+      if (s == 0) satResetCmdCache();
+      satPicCSKeepalive(); satCmdResend();
+      if (s % 60 == 0) tick(40.0f, 80, 1);
+      if (strstr(g_sent, "CS=")) { if (n && g_ms - last > gap) gap = g_ms - last; last = g_ms; n++; }
+    }
+    printf("[gap=%lu n=%d]\n[]\n[]\n[]\n", (unsigned long)gap, n);
   } else if (mode == 13) {                                 // a dropped PIC keepalive is tried again on the next pass
     g_ms = start; satResetCmdCache(); tick(40.0f, 80, 1);
-    g_sent[0] = 0; g_ms = start + 30000; g_drop = 1; satPicCSKeepalive(); g_drop = 0; printf("[%s]\n", g_sent);
-    g_ms = start + 30001; satPicCSKeepalive(); printf("[%s]\n", g_sent);
+    g_sent[0] = 0; g_ms = start + 31000; g_drop = 1; satPicCSKeepalive(); g_drop = 0; printf("[%s]\n", g_sent);
+    g_ms = start + 31001; satPicCSKeepalive(); printf("[%s]\n", g_sent);
   }
   return 0;
 }
@@ -302,7 +322,8 @@ class CmdCacheReset(unittest.TestCase):
     def test_pic_keepalive_and_the_repeat_share_one_30s_window(self):
         # TASK-1924: both read iLastSentCSMs and both wait 30 s, so over 120 s there are 4 repeats in all, not 4 + 4. On a PIC
         # board the keepalive runs first in satControlLoopRun(), so it sends them (was: keepalive 0, 5 s resend 24, ADR-203).
-        self.assertEqual(self.run_at(10000, 6)[0], "[keepalive=4 resend=0]")
+        # TASK-1924 Part 2: both wait 31 s now (s31, s62, s93): 3 repeats in 120 s
+        self.assertEqual(self.run_at(10000, 6)[0], "[keepalive=3 resend=0]")
 
     def test_live_fault_and_dhw_bits_pause_the_resend(self):
         a, b, c, _ = self.run_at(10000, 5)
@@ -379,11 +400,11 @@ class CmdCacheReset(unittest.TestCase):
         # keepalive keeps running). Timeline: PWM tick MM=0 at t0; DHW ticks at 30/60/90 s; the draw ends; the next tick regulates.
         a, b, c, _ = self.run_at(10000, 14)
         self.assertEqual(a, "[CS=40.0;MM=0;CH=1;]")
-        # keepalive every 30 s after the last CS (s30, s60, s90, s119 not yet); MM=80 on the first draw tick, not again on the
+        # keepalive 31 s after the last CS (TASK-1924 Part 2: s31, s62, s93; s119 not yet); MM=80 on the first draw tick, not again on the
         # next (30 s old), once more at 60 s old (repair, entry 239); no resend CS in between (it would show at s5, s10 ...)
-        self.assertEqual(b, "[s30:CS=40.0;MM=80; s60:CS=40.0; s90:CS=40.0;MM=80; ]")
+        self.assertEqual(b, "[s30:MM=80; s31:CS=40.0; s62:CS=40.0; s90:MM=80; s93:CS=40.0; ]")
         # after the draw MM=0 differs from the maximum: sent; CH=1 is 120 s old by now, so its repair resend (entry 239) goes too
-        self.assertEqual(c, "[CS=40.0;MM=0;CH=1;]")
+        self.assertEqual(c, "[MM=0;CH=1;]")   # TASK-1924 Part 2: the keepalive at s93 makes the CS 27 s old here, not due
 
     def test_dhw_mm_value_follows_the_non_pwm_rules(self):
         # satComputeMM(pwmMode false): the configured maximum; a heat pump never gets 0; Geminox at least 10; Immergas TP follows
@@ -399,6 +420,17 @@ class CmdCacheReset(unittest.TestCase):
         a, b, _, _ = self.run_at(10000, 19)
         self.assertEqual(a, "[cs=2]")
         self.assertTrue(b.startswith("[CS=40.5;"), b)   # at 61 s MM/CH also get their 60 s repair (entry 239)
+
+    def test_no_stale_repeat_just_before_a_30s_tick(self):
+        # TASK-1924 Part 2 (09's bench on beta.242: the old CS= went out 2-6 ms before the tick that brought the new one, in 29 of
+        # 37 changes): with keepalive and loop repeat at 31 s, nothing repeats in the pass of a 30 s tick. Old code: every tick.
+        self.assertEqual(self.run_at(10000, 20)[0], "[stale=0 ticks=11]")
+
+    def test_largest_gap_at_a_60s_interval_stays_inside_the_pic_expiry(self):
+        # TASK-1924 Part 2: with a 60 s control interval the repeat keeps the CS fresh; the PIC expires a CS= after about 63 s.
+        a = self.run_at(10000, 21)[0]
+        gap = int(a.split("gap=")[1].split()[0])
+        self.assertLessEqual(gap, 31000, a)
 
     def test_dropped_keepalive_is_tried_again_on_the_next_pass(self):
         a, b, _, _ = self.run_at(10000, 13)
@@ -421,9 +453,9 @@ class TickPaths(unittest.TestCase):
     def test_tick_paths_use_always_send_helpers(self):
         for name in ("satSendCS", "satSendMM", "satSendCH"):
             # one definition (+ the resend helper's own call) + four control-tick paths
-            # TASK-1570: the resend calls satSendCS only (MM/CH are on change, entry 237); TASK-1924: twice (retry, 30 s repeat)
+            # TASK-1570: the resend calls satSendCS only (MM/CH are on change, entry 237); TASK-1924: twice (retry, 30 s repeat), Part 2: the 5 s continuous recompute
             # TASK-1539: satSendMM also has the call in satSendMMDuringDhw()
-            self.assertEqual(len(re.findall(r"\b%s\(" % name, self.code)), 1 + 4 + (4 if name == "satSendCS" else 0) + (1 if name == "satSendMM" else 0), name)   # + the start-up flood CS and its hand-over to the suppression (TASK-1371)
+            self.assertEqual(len(re.findall(r"\b%s\(" % name, self.code)), 1 + 4 + (5 if name == "satSendCS" else 0) + (1 if name == "satSendMM" else 0), name)   # + the start-up flood CS and its hand-over to the suppression (TASK-1371)
         for old in ("satEnqueueIfChangedMM", "satEnqueueIfChangedCH"):
             self.assertNotIn(old, self.code)
         # the only change-checked CS callers left: its definition and the suppression refresh

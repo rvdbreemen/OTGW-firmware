@@ -1,19 +1,40 @@
 ---
 id: "ADR-043"
 title: "Reset-Pattern WiFi Recovery Trigger"
-status: "Accepted"
-date: null
+status: "Superseded"
+date: "2026-11-14"
 binding: false
 gate: null
 documents_shipped: false
 verified_in: []
 supersedes: []
-superseded_by: null
+superseded_by: "ADR-238"
 ---
+
+## Status
+
+Superseded by ADR-238, 2026-11-14.
+
 # ADR-043: Reset-Pattern WiFi Recovery Trigger
 
 **Status:** Accepted  
 **Date:** 2026-03-01
+
+## Status History
+
+```yaml
+status_history:
+  - date: 2026-03-01
+    status: Accepted
+    changed_by: "unrecorded (accepted before this record had a status history; date from its Date line)"
+    reason: Original acceptance, reconstructed from the Date line so the supersede transition can be appended
+    changed_via: manual
+  - date: 2026-11-14
+    status: Superseded
+    changed_by: "User: Robert van den Breemen"
+    reason: "Superseded 2026-11-14 by ADR-238 (Robert in session: 'All ADR proposed 233, 238 and 239 should be accepted. So yes.')"
+    changed_via: adr-kit lifecycle
+```
 
 ## Context
 

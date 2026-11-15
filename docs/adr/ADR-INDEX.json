@@ -1310,9 +1310,9 @@
       "id": "ADR-043",
       "title": "Reset-Pattern WiFi Recovery Trigger",
       "path": "ADR-043-reset-pattern-wifi-recovery.md",
-      "format": "unknown",
-      "status": "Accepted",
-      "date": null,
+      "format": "canonical",
+      "status": "Superseded",
+      "date": "2026-11-14",
       "decision_summary": "Implement a triple-reset trigger within a 10-second window to force WiFi recovery mode:",
       "topics": [],
       "aliases": [],
@@ -1334,7 +1334,7 @@
         "documents_shipped": false,
         "verified_in": [],
         "supersedes": [],
-        "superseded_by": null
+        "superseded_by": "ADR-238"
       }
     },
     {
@@ -5823,7 +5823,7 @@
       "path": "ADR-179-name-the-owner-of-the-opentherm-control-setpoint-while-sat-is-enabled.md",
       "format": "canonical",
       "status": "Accepted",
-      "date": "2026-11-07",
+      "date": "2026-11-15",
       "decision_summary": "While SAT is enabled, SAT owns MsgID 1.",
       "topics": [
         "control setpoint ownership",
@@ -7357,7 +7357,7 @@
       "path": "ADR-203-sat-sends-cs-mm-and-ch-on-every-control-update-supersedes-adr-199-decision-4.md",
       "format": "canonical",
       "status": "Accepted",
-      "date": "2026-11-07",
+      "date": "2026-11-14",
       "decision_summary": "While SAT is the active controller, a 5 s resend timer sends the latest CS=, MM= and CH= values again, unchanged valu...",
       "topics": [
         "ch-enable",
@@ -7636,7 +7636,7 @@
       "path": "ADR-207-sat-sends-mm-the-immergas-tp-and-ch-on-change-cs-keeps-the-5-s-resend-partly-supersedes-adr-203.md",
       "format": "canonical",
       "status": "Accepted",
-      "date": "2026-11-02",
+      "date": "2026-11-14",
       "decision_summary": "SAT sends MM=, the Immergas TP=11:12 and CH= to the PIC only when the value changes.",
       "topics": [
         "ch-enable",
@@ -9181,7 +9181,7 @@
       "title": "Keep settings.ini, the reboot counter and the reboot log in an RTC snapshot during a filesystem OTA",
       "path": "ADR-233-keep-settings-ini-the-reboot-counter-and-the-reboot-log-in-an-rtc-snapshot-during-a-filesystem-ota.md",
       "format": "canonical",
-      "status": "Proposed",
+      "status": "Accepted",
       "date": "2026-11-14",
       "decision_summary": "At the start of a filesystem OTA the firmware copies settings.ini, rebootcount.txt and rebootlog.txt, in that order,...",
       "topics": [
@@ -9221,7 +9221,7 @@
         "must_not": [
           "Must not write the snapshot to flash (NVS, LittleFS or a partition) in this decision.",
           "Must not keep a partial settings.ini.",
-          "Must not use RTC FAST memory: CONFIGESPSYSTEMALLOWRTCFASTMEMASHEAP=1 in the pinned libs gives it to the heap in both the main firmware and the safeboot updater.",
+          "Must not use RTC fast memory: CONFIGESPSYSTEMALLOWRTCFASTMEMASHEAP=1 in the pinned libs gives it to the heap in both the main firmware and the safeboot updater.",
           "Must not print the snapshot content (it holds secrets, see Consequences)."
         ],
         "exceptions": [
@@ -9254,9 +9254,9 @@
       "title": "SAT sends CS= on change with a 30 s repeat (supersedes the CS part of ADR-207 and ADR-203)",
       "path": "ADR-235-sat-sends-cs-on-change-with-a-30-s-repeat-supersedes-the-cs-part-of-adr-207-and-adr-203.md",
       "format": "canonical",
-      "status": "Proposed",
-      "date": "2026-11-14",
-      "decision_summary": "SAT sends CS= when the value it sends, rounded to 0.1, changes, and repeats an unchanged CS= every 30 s, timed on raw...",
+      "status": "Accepted",
+      "date": "2026-11-15",
+      "decision_summary": "SAT sends CS= when the value it sends, rounded to 0.1, changes, and repeats an unchanged CS= about every 30 s: the co...",
       "topics": [
         "command-cadence",
         "control-setpoint",
@@ -9277,7 +9277,10 @@
       "symbols": [
         "SAT_CS_REPEAT_MS",
         "SAT_CS_RETRY_MS",
+        "SAT_PIC_CS_KEEPALIVE_MS",
         "satCmdResend",
+        "satContinuousClampRefresh",
+        "satContinuousSetpoint",
         "satPicCSKeepalive",
         "satSendCS"
       ],
@@ -9291,16 +9294,78 @@
         ],
         "must_not": [
           "Repeat an unchanged CS= more often than every 29 s, except in the start-up flood.",
-          "Let the PIC keepalive and the repeat send two repeats in the same 30 s window."
+          "Let the PIC keepalive and the repeat send two repeats in the same window.",
+          "Send a loop repeat or PIC keepalive in the 30 s after the last accepted CS= (it would race the 30 s tick and send the old value just before a new one)."
         ],
         "exceptions": [
           "The no-return start-up flood (TASK-1371) sends every 2 s by design.",
           "satEnqueueIfChangedCS() (the 3 s PWM suppression refresh, entry 23) stays change-checked with its own 5 min staleness window; the 30 s repeat covers it in between."
         ],
         "verification": [
+          "tests/testsatcmdcache.py::CmdCacheReset::testnostalerepeatjustbeforea30stick: 10 stale repeats in 5 min of 30 s ticks on the code before TASK-1924 Part 2, 0 on this decision; a mutant with the keepalive back at 30 s also gives",
+          "testlargestgapata60sintervalstaysinsidethepicexpiry: largest gap at most 31 s.",
+          "tests/testsatcontinuousstartup.py: the real satContinuousSetpoint() and the 5 s refresh structure (gates, ceiling cap before satSendCS(cs)).",
           "tests/testsatcmdcache.py::CmdCacheReset::teststeadystatesendstwocsperminuteandachangeatonce: 60 s of steady state sends 2 CS= on this decision and 13 on the code before it (origin/dev SATcontrol.ino before TASK-1924).",
           "testresendrepeatstheunchangedcsafter30snotbefore, testdroppedsatsendcsisretriedwithitsownvalueafter5s, testpickeepaliveandtherepeatshareone30swindow in the same file; tests/testsatceilingpaths.py (the CS sender inventory, including the f...",
-          "Bench (TASK-1924 AC6): CS= count per minute in steady state and during a warm-up, and no PIC CS expiry over 30 min."
+          "Bench, beta.250 on a Classic with PIC (TASK-1924, 09): at a 30 s interval no old CS= within 1 s before a new value (beta.242: 29 of 37), largest gap 30.10 s; at a 60 s interval largest gap 31.00 s, no PIC expiry; the 5 s recompute steppe..."
+        ]
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
+    },
+    {
+      "id": "ADR-236",
+      "title": "SAT leaves PWM for continuous when the flame is on and the request stays above the flow for 60 s (replaces the thermo-nova underheat exit)",
+      "path": "ADR-236-sat-leaves-pwm-for-continuous-when-the-flame-is-on-and-the-request-stays-above-the-flow-for-60-s-replaces-the-thermo-nova-underheat-exit.md",
+      "format": "canonical",
+      "status": "Proposed",
+      "date": "2026-11-14",
+      "decision_summary": "While SAT is in PWM and the PWM phase is ON, it switches to continuous when the flame is on and the requested setpoin...",
+      "topics": [
+        "control-mode",
+        "pwm",
+        "sat"
+      ],
+      "aliases": [
+        "entry 342 exit",
+        "PWM to continuous",
+        "PWM underheat exit",
+        "Q-342a"
+      ],
+      "components": [
+        "SAT PWM to continuous exit"
+      ],
+      "symbols": [
+        "SAT_UNDERHEAT_SUSTAIN_MS",
+        "satCycleCheckPwmExits"
+      ],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [
+          "Count a tick only with the flame on and the request strictly above the flow (satIsFlameOn() && requestedSetpoint > flowTemp); any other tick clears the timer.",
+          "Fire on the first control tick at least SATUNDERHEATSUSTAINMS (60 000 ms) after the first qualifying tick.",
+          "Keep the PWM ON, hot-water and 300 s guards and the saturation exit as they are."
+        ],
+        "must_not": [
+          "Count a tick with the flame off, or with the flow equal to or above the request.",
+          "Use the 3.0 C margin for this exit (SATUNDERSHOOTMARGINC stays for the cycle classifier only)."
+        ],
+        "exceptions": [
+          "None."
+        ],
+        "verification": [
+          "tests/testsatovershootsustain.py compiles the real satCycleCheckPwmExits(): the exit fires 60 s after the first tick at 30 s and 60 s intervals, a flow 0.5 C below the request counts, a flow equal to the request does not, the flame off n...",
+          "Bench (TASK-1933 AC6, bench-tester): the exit fires as specified in a simulated warm-up, no reboot.",
+          "Field: the testers' captures are watched for PWM re-entries shortly after an ignition (hot water and slow ignition first), as promised to Sergeant D in entry 350."
         ]
       },
       "scope": {
@@ -9381,7 +9446,7 @@
       "title": "On the ESP32-S3 the triple-reset WiFi recovery counts reset-button presses and power-ons alike",
       "path": "ADR-238-on-the-esp32-s3-the-triple-reset-wifi-recovery-counts-reset-button-presses-and-power-ons-alike.md",
       "format": "canonical",
-      "status": "Proposed",
+      "status": "Accepted",
       "date": "2026-11-14",
       "decision_summary": "On the ESP32-S3 a boot counts towards the triple-reset WiFi recovery when it is a reset-button press or a power-on (E...",
       "topics": [
@@ -9407,7 +9472,7 @@
         "must": [
           "Count a boot when espresetreason() is ESPRSTPOWERON or ESPRSTEXT, through the platform shim platformIsResetButtonOrPowerOn(); the firmware calls it only from isPortalResetGesture().",
           "Keep ADR-043's trigger count (3), window (10 s, cleared by loop() when it expires), magic value and the credential wipe before the portal.",
-          "Name the gesture as \"press reset, or pull the plug, three times\" in the user documentation and the OLED hint."
+          "Name the gesture as \"press reset, or pull the plug, three times\" in the user documentation and the OLED (organic light-emitting diode display) hint."
         ],
         "must_not": [
           "Count software resets (OTA, /ReBoot, the WiFi supervisor restart of ADR-211), panics, watchdog resets, ESPRSTBROWNOUT (raw 0x0F, system brown-out) or ESPRSTUSB.",
@@ -9436,6 +9501,259 @@
         "supersedes": [
           "ADR-043"
         ],
+        "superseded_by": null
+      }
+    },
+    {
+      "id": "ADR-239",
+      "title": "The main firmware keeps its RTC_NOINIT records out of the first 32 bytes of RTC slow memory, which the safeboot updater owns",
+      "path": "ADR-239-the-main-firmware-keeps-its-rtc-noinit-records-out-of-the-first-32-bytes-of-rtc-slow-memory-which-the-safeboot-updater-owns.md",
+      "format": "canonical",
+      "status": "Accepted",
+      "date": "2026-11-14",
+      "decision_summary": "The first 32 bytes of RTC slow memory (0x50000200-0x5000021F) belong to the safeboot updater: the main firmware holds...",
+      "topics": [
+        "memory layout",
+        "reboot reason",
+        "RTC memory",
+        "safeboot"
+      ],
+      "aliases": [
+        "RTC_NOINIT placement",
+        "safeboot RTC overlap"
+      ],
+      "components": [
+        "RTC slow memory layout of the main firmware"
+      ],
+      "symbols": [
+        "check_rtc_layout",
+        "g_rtcSafebootGuard"
+      ],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [
+          "Keep grtcSafebootGuard (32 B, RTCDATAATTR, used, referenced once in setup() so --gc-sections keeps it) at 0x50000200, so rtcnoinitstart is exactly 0x50000220.",
+          "Run scripts/checkrtclayout.py on the ELF of every ESP32 build (build.py, collectpioartifacts()) and fail the build when the guard is missing or not at 0x50000200, when rtcnoinitstart is not exactly 0x50000220 (the records keep their addr...",
+          "Validate every RTC record with a magic word (and the snapshot with its CRC32), so the bytes another layout leaves behind are rejected."
+        ],
+        "must_not": [
+          "Place an RTCNOINIT record of the main firmware in 0x50000200-0x5000021F, or add initialised or zeroed RTC data (RTCDATAATTR, RTCBSS) that moves rtcnoinitstart away from 0x50000220.",
+          "Change safeboot's RTC usage without re-checking this range."
+        ],
+        "exceptions": [
+          "None."
+        ],
+        "verification": [
+          "scripts/checkrtclayout.py : red on the beta.243 ELF (grtcRebootReason at 0x50000200), green on the fix build; tests/testrtclayoutcheck.py (synthetic layouts plus the real old ELF).",
+          "Upgrade transition, real code: tests/testrebootreason.py (case 8), tests/testwifiskipportal.py and tests/testwifideadlink.py (old-layout subtests), test/host/testfsotartcsnapshot.py T13 (no format, no restore from an old snapshot read 0x...",
+          "Bench (TASK-1918 AC3): after an app OTA through safeboot the boot shows - [OTA] handover to safeboot."
+        ]
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": true,
+        "gate": "scripts/check_rtc_layout.py (run by build.py on every ESP32 ELF); tests/test_rtc_layout_check.py",
+        "documents_shipped": false,
+        "verified_in": [
+          "src/OTGW-firmware/OTGW-firmware.h:g_rtcSafebootGuard",
+          "scripts/check_rtc_layout.py",
+          "tests/test_rtc_layout_check.py"
+        ],
+        "supersedes": [],
+        "superseded_by": null
+      }
+    },
+    {
+      "id": "ADR-240",
+      "title": "A web connection that is not ESTABLISHED and holds no payload does not count towards the ADR-188 send cap",
+      "path": "ADR-240-a-web-connection-that-is-not-established-and-holds-no-payload-does-not-count-towards-the-adr-188-send-cap.md",
+      "format": "canonical",
+      "status": "Accepted",
+      "date": "2026-11-15",
+      "decision_summary": "A connection on port 80 that is not ESTABLISHED counts towards the ADR-188 cap only while at least one queued segment...",
+      "topics": [
+        "503",
+        "connection cap",
+        "fresh page load",
+        "lwIP",
+        "TCP",
+        "web server"
+      ],
+      "aliases": [
+        "closing-fin",
+        "FIN-only connection",
+        "hd_webconn_503",
+        "syn-rcvd",
+        "WEB CONN CAP",
+        "webConnCapExceeded"
+      ],
+      "components": [
+        "platformTcpTxHoldingOnPort"
+      ],
+      "symbols": [
+        "platformTcpTxBreakdownOnPort",
+        "platformTcpTxHoldingOnPort",
+        "WEB_MAX_TX_CONNECTIONS",
+        "webConnCapExceeded"
+      ],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [
+          "platformTcpTxHoldingOnPort() counts a non-ESTABLISHED connection only when a segment in unsent or unacked has len != 0.",
+          "An ESTABLISHED connection keeps counting as before: with queued segments, or without them unless it is a native file-queue waiter. A request that is being admitted is ESTABLISHED and counts.",
+          "The refusal line keeps the zero-length-only connections apart by state (closing-fin, syn-rcvd, other)."
+        ],
+        "must_not": [
+          "Must not stop counting idle ESTABLISHED connections: a request whose handler has not answered yet is idle at admission, so a storm of new requests would all be admitted and then fill their send queues at once, which is the starvation ADR...",
+          "Must not change WEBMAXTXCONNECTIONS."
+        ],
+        "exceptions": [
+          "None."
+        ],
+        "verification": [
+          "tests/testwebconncapstates.py: compiles the real shim against a stub list of pcbs (lwIP protocol control blocks); a FIN-only FINWAIT1, CLOSING and LASTACK connection, a SYNRCVD connection with only its SYN-ACK and another state with only...",
+          "Bench: 20 fresh loads on .61 with the diagnostic line show 0 refusals caused by zero-length-only connections, and report closing-fin against syn-rcvd (TASK-1947 AC3)."
+        ]
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
+    },
+    {
+      "id": "ADR-241",
+      "title": "OT-Direct master mode relays the thermostat's writes to the boiler in the next free master slot and returns the boiler's answer (amends ADR-066)",
+      "path": "ADR-241-ot-direct-master-mode-relays-the-thermostat-s-writes-to-the-boiler-in-the-next-free-master-slot-and-returns-the-boiler-s-answer-amends-adr-066.md",
+      "format": "canonical",
+      "status": "Proposed",
+      "date": "2026-11-15",
+      "decision_summary": "In master mode a thermostat WRITEDATA of any ID except 1, 16 and 24 is sent to the boiler as a relay in the next free...",
+      "topics": [
+        "master-mode",
+        "opentherm",
+        "otdirect",
+        "pic-parity",
+        "thermostat"
+      ],
+      "aliases": [
+        "forward thermostat WRITE_DATA",
+        "master-mode write relay",
+        "TASK-1812",
+        "virtual boiler writes"
+      ],
+      "components": [
+        "OT-Direct master-mode thermostat write relay"
+      ],
+      "symbols": [
+        "handleMasterModeSlaveFrame",
+        "OTD_REPLY_DEADLINE_MS",
+        "replyToThermostat",
+        "scheduleMasterRequest"
+      ],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [
+          "Send a thermostat WRITEDATA of an ID other than 1, 16 and 24 to the boiler with the thermostat's data, or with the data of an active write override for that ID.",
+          "Return the boiler's reply to the thermostat (WRITEACK, Data-Invalid, Unknown-DataID), never a local echo, for a forwarded write.",
+          "Send the forwarded write before any queued command or scheduled frame, once the frame in flight has ended.",
+          "Keep MsgID 1, 16 and 24 on today's local WRITEACK and write-cache path (TASK-1150, TASK-1811).",
+          "Keep MsgID 1, 8 and 14 on the local echo while SAT owns the setpoint."
+        ],
+        "must_not": [
+          "Answer a forwarded write locally before or instead of the boiler.",
+          "Abort or delay a frame already on the wire.",
+          "Forward or answer anything while the boiler is offline.",
+          "Change the handling of thermostat READs (ADR-066: answered from the cache)."
+        ],
+        "exceptions": [
+          "None."
+        ],
+        "verification": [
+          "Host test on the real handleMasterModeSlaveFrame() and the master-mode consumer with a fake bus and fake time: a MsgID 56 write reaches the boiler with the thermostat's data and the thermostat gets the boiler's WRITEACK, Data-Invalid or...",
+          "Bench where the hardware allows: a thermostat on the slave port of an OTGW32 in master mode with a boiler (or a boiler simulator); none on the current bench, so this is field-only until then."
+        ]
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
+    },
+    {
+      "id": "ADR-242",
+      "title": "OT-Direct state has one writer: commands from other tasks run on the loop task through an ordered text ring",
+      "path": "ADR-242-ot-direct-state-has-one-writer-commands-from-other-tasks-run-on-the-loop-task-through-an-ordered-text-ring.md",
+      "format": "canonical",
+      "status": "Proposed",
+      "date": "2026-11-15",
+      "decision_summary": "Every OT-Direct state change runs on the loop task: addCommandToQueue() and sendPICSerial() hand a command that arriv...",
+      "topics": [
+        "command queue",
+        "concurrency",
+        "freertos tasks",
+        "ot-direct",
+        "rest commands"
+      ],
+      "aliases": [
+        "async_tcp command race",
+        "GW=R race",
+        "loop task single writer",
+        "otdCmdTextRing"
+      ],
+      "components": [
+        "otdCmdTextRing",
+        "platformOnLoopTask"
+      ],
+      "symbols": [
+        "addCommandToQueue",
+        "otdCmdTextDrain",
+        "otdCmdTextPush",
+        "platformMarkLoopTask",
+        "platformOnLoopTask"
+      ],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [
+          "Run handleOTDirectCommand() only on the loop task.",
+          "Keep the arrival order of commands from every task.",
+          "Answer Dropped for a command the ring cannot hold, and report it (REST 503, a log line on the device).",
+          "Run a queued command only with no master request in flight."
+        ],
+        "must_not": [
+          "Call handleOTDirectCommand() or resetTransientState() from asynctcp or any other task.",
+          "Change the PIC path of addCommandToQueue()."
+        ],
+        "exceptions": [
+          "None."
+        ],
+        "verification": [
+          "tests/testotdlooptaskcommands.py: the real ring block and the real OT-Direct branch of addCommandToQueue() compiled with a thread-local platformOnLoopTask(): a burst GW=R, CS=20 from another thread runs on the loop thread in order; a loo..."
+        ]
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": "tests/test_otd_loop_task_commands.py",
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
         "superseded_by": null
       }
     }
@@ -10447,6 +10765,12 @@
       "source": "ADR-043",
       "target": "ADR-036",
       "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-043",
+      "target": "ADR-238",
+      "type": "superseded-by",
       "resolved": true
     },
     {
@@ -14542,6 +14866,12 @@
       "resolved": true
     },
     {
+      "source": "ADR-179",
+      "target": "ADR-241",
+      "type": "related",
+      "resolved": true
+    },
+    {
       "source": "ADR-180",
       "target": "ADR-004",
       "type": "related",
@@ -15310,6 +15640,12 @@
       "resolved": true
     },
     {
+      "source": "ADR-203",
+      "target": "ADR-235",
+      "type": "related",
+      "resolved": true
+    },
+    {
       "source": "ADR-204",
       "target": "ADR-196",
       "type": "related",
@@ -15414,6 +15750,12 @@
     {
       "source": "ADR-207",
       "target": "ADR-203",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-207",
+      "target": "ADR-235",
       "type": "related",
       "resolved": true
     },
@@ -16060,6 +16402,12 @@
       "resolved": true
     },
     {
+      "source": "ADR-236",
+      "target": "ADR-235",
+      "type": "related",
+      "resolved": true
+    },
+    {
       "source": "ADR-237",
       "target": "ADR-083",
       "type": "related",
@@ -16086,6 +16434,66 @@
     {
       "source": "ADR-238",
       "target": "ADR-211",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-239",
+      "target": "ADR-080",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-239",
+      "target": "ADR-191",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-239",
+      "target": "ADR-233",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-240",
+      "target": "ADR-184",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-240",
+      "target": "ADR-188",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-240",
+      "target": "ADR-212",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-241",
+      "target": "ADR-066",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-241",
+      "target": "ADR-179",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-242",
+      "target": "ADR-179",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-242",
+      "target": "ADR-213",
       "type": "related",
       "resolved": true
     }

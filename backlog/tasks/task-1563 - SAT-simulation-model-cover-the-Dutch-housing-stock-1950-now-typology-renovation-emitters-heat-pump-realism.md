@@ -3,11 +3,11 @@ id: TASK-1563
 title: >-
   SAT simulation model: cover the Dutch housing stock 1950-now (typology,
   renovation, emitters, heat-pump realism)
-status: In Progress
+status: To Do
 assignee:
   - '@claude'
 created_date: '2026-11-02T16:51:00Z'
-updated_date: '2026-11-07T11:32:00Z'
+updated_date: '2026-11-14T15:26:00Z'
 labels:
   - sat
 dependencies: []
@@ -58,4 +58,6 @@ Compressor starts in 24.7 h: 5 (4 CH + 1 DHW). CH: each demand = 2:00 min CH mod
 CH run profile: supply 27 to 30.5-31.5 C within about 20 min, return 25-26.4 C at the end, dT 5.2-5.5 K steady; supply never reaches CS 35, so each run ends on time, not on temperature. DHW run: supply 27 to 62 C, tank (MsgID26) 46.1 to 55.7 C. Outdoor 2.0-12.9 C; run length did not change with outdoor temperature. Rooms (his CSVs, 5 min): north 20.7-21.1 C all day; south 20.0 C at 07:10 to 21.7 C at 12:30 (sun), still 21.6 C during the 13:34 run. Check against the heat-pump sim: about 2-4 starts per day predicted for this house type; observed 4 CH starts (3 per day on 1-2 Nov per his summary). The raw capture stays local.
 
 2026-11-07 maarten_41762 (#alpha-testing msg 1568587787454783589) corrects the heat-pump field reference: (a) the OpenTherm control setpoint 35 C is the return-water temperature at which this heat pump pauses, not a supply setpoint; supply is an end result of the refrigerant circuit; runs still end on the Honeywell relay release (return stayed 25-26 C). (b) DHW is switched by Homey through the gateway (HW=0/HW=1) following the lowest energy prices. (c) The equal run lengths at different outdoor temperatures on 6 Nov are coincidence; he has seen longer runs when colder. Use multi-day captures before deriving run length vs weather.
+
+Stale audit 2026-11-14 (coordinator decision): back to To Do. Sergeant D, entry 345: 'make the controller robust and then slowly adding some new features' (controller first).
 <!-- SECTION:NOTES:END -->

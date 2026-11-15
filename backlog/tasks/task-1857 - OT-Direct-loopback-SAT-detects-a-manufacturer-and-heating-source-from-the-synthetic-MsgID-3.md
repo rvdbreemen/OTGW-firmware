@@ -3,10 +3,11 @@ id: TASK-1857
 title: >-
   OT-Direct loopback: SAT detects a manufacturer (and heating source) from the
   synthetic MsgID 3
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@claude'
 created_date: '2026-11-12T03:07:00Z'
-updated_date: '2026-11-12T04:47:00Z'
+updated_date: '2026-11-15T00:25:00Z'
 labels:
   - otdirect
   - sat
@@ -25,12 +26,22 @@ Side finding of TASK-1856 (bench-tester run 2 on .61, beta.197, telnet 03:49:49.
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [x] #1 Decision recorded: loopback answers either leave manufacturer and heating-source detection alone, or deliberately stand in for a bench boiler (documented)
-- [ ] #2 If they leave it alone: a host test feeds a loopback MsgID 3 and a real one through the real decode path; red on the old code (loopback sets iDetectedManufacturer), green on the fix, and the real frame still sets it
-- [ ] #3 Bench on .61 by the bench-tester: loopback boot shows no 'Detected manufacturer' line from synthetic data (or the documented stand-in)
+- [x] #2 If they leave it alone: a host test feeds a loopback MsgID 3 and a real one through the real decode path; red on the old code (loopback sets iDetectedManufacturer), green on the fix, and the real frame still sets it
+- [x] #3 Bench on .61 by the bench-tester: loopback boot shows no 'Detected manufacturer' line from synthetic data (or the documented stand-in)
 <!-- AC:END -->
 
 ## Implementation Notes
 
 <!-- SECTION:NOTES:BEGIN -->
 Decision (coordinator, 2026-11-12, on behalf of the 2.0.0 coordination): loopback frames must not drive detection, neither the manufacturer (satDetectManufacturer) nor state.sat.iDetectedHeatingSource. Same principle as TASK-1856: synthetic answers are not evidence about a real boiler. A bench that needs a fake brand sets it explicitly, not via loopback. So AC1 is settled as 'leave detection alone'; AC2 (red/green host test) and AC3 (bench) remain. Status stays To Do, priority low.
+
+2026-11-14 (92, lane wt-92-webui; TASK-1903 item 1 done in the same change, agreed with d3). New host test test/host/test_slave_config_evidence.py slices the REAL print_slavememberid() from OTGW-Core.ino (MSVC). --rev HEAD (e74bb6ed0, before the fix): FAIL 6 = an OT-Direct loopback B Read-Ack MsgID 3 (bLocalAnswer) and a replayed one (bReplayed) each call satNoteSlaveConfig() once, satDetectManufacturer() once and set iDetectedHeatingSource 2 (heat pump from HB bit 2). Fix (boilerEvidence = !bLocalAnswer && !bReplayed in front of all three): 9/9 PASS, a real boiler Read-Ack still sets all three. Evidence: comms scratchpad t1857/old.txt, new.txt.
+
+AC3 ticked by 09 with the documented stand-in: 09 bench 2026-11-15 on .61 (OTGW32), 2.0.0-beta.271+7ecd150 (OTA app+FS, changed none, bootcount 697->699), headless Chrome over CDP (scratchpad tools/uishot.mjs), screenshots in 09 scratchpad b271/ with IP/hostname scrubbed. A loopback BOOT is not reachable on .61 (otdautodetect on, GW=L is not persisted), so runtime GW=L, which drives the same decode path (print_slavememberid on every MsgID 3). Telnet: 'OTD: mode -> loopback (simulated boiler responses)', then the synthetic 'Boiler B4003000B 3 Read-Ack > SlaveConfigMemberIDcode ... MemberID 11'. /api/v2/sat/status before, during (55 s) and after: slave_memberid 0, manufacturer_detected 18 (Other), heating_source_detected 1, slave_cfg_valid false, unchanged; 0 'Detected manufacturer' lines (weak alone: the SAT debug flag may have been off; the status fields are the evidence). Back to GW=S (PR: M=S). Evidence b271/i6/tel.raw.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+AC1 decision recorded (loopback answers leave detection alone). AC2 tests/test_slave_config_evidence.py (real print_slavememberid()): old code FAIL 6 (loopback and replay set slave config, manufacturer and source), fix 9/9, a real boiler frame still sets all three. AC3 build 2.0.0-beta.271+7ecd150 (lane wt-92-webui, pushed as origin/dev 57781677e; zip post 1571319345743667231, alpha note 1571319448298852516), bench by 09 on .61, stand-in runtime GW=L (loopback is not persisted, otdautodetect on): synthetic MsgID 3 seen, /api/v2/sat/status slave_memberid/manufacturer/source/slave_cfg_valid unchanged, 0 'Detected manufacturer' lines.
+<!-- SECTION:FINAL_SUMMARY:END -->

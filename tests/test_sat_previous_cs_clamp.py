@@ -61,6 +61,9 @@ def build_cpp(src: str) -> str:
     a = src.index("static float satApplyContinuous(")
     b = src.index("//=== Get Room Temperature", a)
     b = src.rindex("//=====", a, b)
+    part2 = src.find("\n// TASK-1924 Part 2: the continuous CS.", a, b)   # its own test: test_sat_continuous_startup.py
+    if part2 != -1:
+        b = part2 + 1
     span = src[a:b]
     call = "satApplyContinuous(req, prev)" if "float previousCS" in span else "satApplyContinuous(req)"
     return STUBS.replace("@SPAN@", span).replace("@CALL@", call)
@@ -146,7 +149,7 @@ class PreviousCsClamp(unittest.TestCase):
 
     def test_f_continuous_reads_previous_before_the_tick_overwrites_it(self):
         loop = self.src[self.src.index("void satControlLoop("):]
-        call = loop.index("finalSetpoint = satApplyContinuous(pidOutput, _sat_lastControlCS);")
+        call = loop.index("finalSetpoint = satContinuousSetpoint(pidOutput, _sat_lastControlCS);")   # TASK-1924 Part 2
         write = loop.index("_sat_lastControlCS = finalSetpoint;")
         self.assertLess(call, write)
 

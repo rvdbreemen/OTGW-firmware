@@ -306,6 +306,9 @@ def build_source(ino_path):
         # TASK-1842: the RT= branch (before C2, so inside the cut) calls the PIC GetPercentArg parser
         (alt.construct(src, r"^static const char\* otdPicPercentF88\([^;{]*\)\s*\{")
          if "// --- otdPicPercentF88 begin" in src else ""),
+        # TASK-1859: the PIC number parsers and the reply printer share one block
+        (re.search(r"// --- otdPicFloat begin\r?\n(.*?)// --- otdPicFloat end", src, re.S).group(1)
+         if "// --- otdPicFloat begin" in src else ""),
         handler,
     ])
     main_prefix = alt.MAIN[:alt.MAIN.index("struct Run {")]   # boiler model, frameOf, boilerTick, resetAll

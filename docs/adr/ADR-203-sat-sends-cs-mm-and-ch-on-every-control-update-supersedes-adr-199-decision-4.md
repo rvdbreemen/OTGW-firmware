@@ -13,6 +13,7 @@ related:
   - "ADR-199"
   - "ADR-207"
   - "ADR-217"
+  - "ADR-235"
 topics:
   - "sat"
   - "opentherm"
@@ -83,6 +84,11 @@ status_history:
     status: Accepted
     changed_by: Robert van den Breemen
     reason: Related to ADR-217
+    changed_via: adr-kit lifecycle
+  - date: 2026-11-14
+    status: Accepted
+    changed_by: "Agent (d3)"
+    reason: Related to ADR-235 (metadata only; the decision is unchanged)
     changed_via: adr-kit lifecycle
 ```
 

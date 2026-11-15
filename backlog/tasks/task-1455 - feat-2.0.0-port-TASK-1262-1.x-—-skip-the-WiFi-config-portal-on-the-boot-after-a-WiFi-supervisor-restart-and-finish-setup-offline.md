@@ -3,11 +3,11 @@ id: TASK-1455
 title: >-
   feat-2.0.0: port TASK-1262 (1.x) — skip the WiFi config portal on the boot
   after a WiFi supervisor restart and finish setup() offline
-status: In Progress
+status: In Review
 assignee:
   - '@claude'
 created_date: '2026-10-29T06:28:00Z'
-updated_date: '2026-11-08T18:14:00Z'
+updated_date: '2026-11-14T15:26:00Z'
 labels:
   - port-from-1.x
   - wifi
@@ -153,4 +153,6 @@ AC5: g_rtcWifiSkipPortal is RTC_NOINIT_ATTR (networkStuff.ino:561); wifiMarkSkip
 2026-11-08 ADR-211 Accepted by Robert in session after the acceptance packet (adr accept --confirm, changed_by Robert van den Breemen). Before acceptance the Proposed text got the bench evidence (Evidence section, AC6 result in Consequences) and acronym expansions for the clarity gate (NVS, SSID, MQTT, NTP, LLMNR); adr-lint --strict incl. clarity PASS. AC9 met. Remaining: AC3 hands-on bench (Robert, later).
 
 2026-11-08 AC4 accepted by Robert on the host tests (relayed by the coordinator, session system32-78): tests/test_wifi_skip_portal.py test_other_software_restart_opens_portal, test_next_boot_without_new_mark_opens_portal and test_mark_is_consumed_at_boot. The bench log run stays out: a REST /ReBoot inside a WiFi outage is deferred until the link returns, so it cannot place a non-supervisor software restart inside the outage. AC3 stays Robert's own hands-on bench.
+
+Stale audit 2026-11-14 (coordinator decision): In Review. Only AC3 is left, Robert's own hands-on bench (a REST /ReBoot inside a WiFi outage is deferred, so the bench-tester cannot place it).
 <!-- SECTION:NOTES:END -->

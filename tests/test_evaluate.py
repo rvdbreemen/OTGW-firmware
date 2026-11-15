@@ -520,7 +520,9 @@ class TestHAOutsideTemperatureRoute(unittest.TestCase):
         self.assertIn("else if (cmd0 == 'O' && cmd1 == 'T')", otdirect)
         self.assertIn('enqueueWriteCommand(27, f88, "OT")', otdirect)
         self.assertIn("OTcurrentSystemState.Toutside = (int16_t)f88 / 256.0f;", otdirect)
-        self.assertIn("dtostrf(OTcurrentSystemState.Toutside, 1, 2, rspBuf);", otdirect)
+        # TASK-1859: the reply prints the stored f8.8 value as the PIC's PrintSigned (otdPicPrintF88)
+        self.assertRegex(otdirect, r"dtostrf\(OTcurrentSystemState\.Toutside, 1, 2, rspBuf\);|"
+                                   r"OTcurrentSystemState\.Toutside = \(int16_t\)f88 / 256\.0f;\s*\n\s*otdPicPrintF88\(f88, rspBuf")
 
 
 class TestProgmemComplianceIntegration(unittest.TestCase):

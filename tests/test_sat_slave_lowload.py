@@ -355,7 +355,9 @@ class SlaveLowLoad(unittest.TestCase):
     def test_decoder_feeds_only_the_boilers_valid_read_ack(self):
         core = CORE_INO.read_text(encoding="utf-8").replace("\r\n", "\n")
         body = re.search(r"void print_slavememberid\(uint16_t& value\)\n\{.*?\n\}", core, re.S).group(0)
-        self.assertRegex(body, re.compile(r"if \(is_value_valid\(OTdata, OTlookupitem\)\)\{.*?if \(OTdata\.rsptype == OTGW_BOILER\) satNoteSlaveConfig\(OTdata\.valueHB\);", re.S))
+        # TASK-1857/TASK-1903: only a real boiler Read-Ack counts, not an OT-Direct loopback answer or a replayed line.
+        self.assertRegex(body, re.compile(r"if \(is_value_valid\(OTdata, OTlookupitem\)\)\{.*?if \(OTdata\.rsptype == OTGW_BOILER && boilerEvidence\) satNoteSlaveConfig\(OTdata\.valueHB\);", re.S))
+        self.assertRegex(body, r"const bool boilerEvidence = !OTdata\.bLocalAnswer && !OTdata\.bReplayed;")
 
     def test_permission_does_not_read_the_heating_source(self):
         # ADR-157: manual gas/HP/hybrid selection stays authoritative; the bit is a permission, not a source detector

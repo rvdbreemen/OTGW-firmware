@@ -1,7 +1,6 @@
 ---
 name: beta-release-2x
 description: Publish a 2.x (ESP32-S3) beta prerelease from dev: set _VERSION_PRERELEASE to beta.N, roll the CHANGELOG, build esp32-combo, OTA bench check, annotated tag, draft-first GitHub prerelease, announce in #beta-testing
-disable-model-invocation: true
 ---
 
 # /beta-release-2x: OTGW-firmware 2.x Beta Prerelease Skill
@@ -62,8 +61,19 @@ nothing builds or publishes for you. `dev` is the GitHub default branch: without
    The release is a docs-only commit on top of the candidate (notes bundling every beta.N
    since the previous public beta, CHANGELOG rollover, README link), tagged and built from
    that commit (the beta.7 model); Phase 1/2 go into that commit.
+   **Who starts it** (Robert 2026-11-14, standing permission: "Ik wil dat je de release van een beta
+   gewoon uitvoert"): the coordinator invokes this skill itself at the slot once the candidate passed
+   its soak; Robert does not have to type it. Stable releases (`/release-2x`, `/release`) keep the
+   per-action yes.
+   **Slot freeze:** from the slot time until "beta.N tag out", no firmware commit lands on `dev`,
+   or the candidate is no longer the firmware at HEAD. Docs pushes are fine until Phase 2. Keep the
+   bench unit untouched as well (the release bench needs it).
 2. Run from the main dev tree, on `dev`: `git rev-parse --abbrev-ref HEAD` prints `dev`.
-3. `git fetch origin && git status -sb`: local `dev` equals `origin/dev`.
+3. `git fetch origin && git status -sb`: local `dev` equals `origin/dev`. When the main tree is
+   behind with local edits that conflict (`.wolf/*`, a peer's task file): save them first
+   (`git diff -- <files> > "$SCRATCH/maintree-local-edits.patch"`), `git checkout -- <files>`,
+   then `git reset --keep origin/dev`. A local commit that `git cherry -v origin/dev dev` marks
+   with `-` is already upstream and may go. Name the patch path in the session report.
 4. **Freeze dev pushes.** Message every live peer session (`ListAgents`) to hold
    pushes and builds until you send "beta.N tag out". A push during the flow moves
    HEAD and forces a rebuild (the githash is in the image).
@@ -95,6 +105,14 @@ from the file at create time.
    ```
 3. CHANGELOG `[Unreleased]` holds every firmware change since the last beta
    (`git log --oneline <prev>..HEAD -- src/`). Fill gaps now.
+   **Every update goes into the notes and the CHANGELOG, not only the highlights** (Robert
+   2026-11-14: "Zorg ervoor dat alle updates in de releasenotes staan. Niet alleen de top 4."):
+   one line per user- or tester-visible change, with its TASK number. Cross-check: the task IDs in
+   `git log --format='%h %s' <prev-tag>..origin/dev -- src/ scripts/ build.py platformio.ini`
+   against the IDs in the new section; every ID that is left out is named in the tracking task
+   with its reason (internal only, CI only, no behaviour change).
+   **Embargo:** a fix under embargo (e.g. TASK-1934 until v1.7.10) gets one neutral line and
+   nothing next to it that hints at the issue (no paths, no example requests, no "security").
 4. README: beta disclaimer and highlights match the build. Docs-only commits may be
    pushed before the freeze.
 5. Optional, for a beta with many changes: `/update-docs-2x --release <semver>-beta.N`
@@ -113,6 +131,10 @@ from the file at create time.
      and stage each listed file (the list uses `data\FSexplorer.html` with a
      backslash on Windows: stage `src/OTGW-firmware/data/FSexplorer.html` by name).
    - beta.N -> beta.N+1: `bin/bump-prerelease.sh` (stages its own files).
+   - **Normal slot release (candidate already at beta.N in `version.h`):** no bump. The release
+     commit is docs-only (notes, CHANGELOG rollover, README, task file) and the tag carries the
+     candidate's number (beta.237, beta.250). Commit as `docs(release): v<semver>-beta.N release
+     notes, CHANGELOG rollover and README (TASK-NNN)`.
 2. Check: `grep -E "PRERELEASE|SEMVER_FULL" src/OTGW-firmware/version.h`.
 3. CHANGELOG: rename `## [Unreleased]` to `## [<semver>-beta.N] - <date>`, add an
    empty `## [Unreleased]` above it, update the link refs at the bottom. This must
@@ -133,6 +155,12 @@ from the file at create time.
    ls -la build | grep "beta.N+<githash>"                               # fresh mtimes
    ```
    Exit 0 alone proves nothing (build.py masks failures).
+   On Windows run `build.bat` by full path from PowerShell (`cmd.exe /c "<repo>uild.bat"`):
+   `./build.sh` in Git Bash can stop at once with "Python 3 not found" (2026-11-14). Kill
+   `llama-server` and keep the 2 s guard running from start to BUILD END; check commit charge
+   first. A build that outlives the 10-minute foreground limit moves to a background shell: keep
+   the session busy until it ends, then check the log, not the exit code. Afterwards restore the
+   build stamp (`git checkout -- src/OTGW-firmware/version.h src/OTGW-firmware/data/version.hash`).
 2. The bench-tester agent (`otgw-bench-tester`, maintainer directive 2026-11-11) does steps 2 to 4;
    request it through the coordinator with the githash and the absolute artifact paths. It saves
    settings, then OTA-flashes a **Classic + S3 Mini** bench unit (the supported public hardware):
@@ -175,6 +203,13 @@ from the file at create time.
    ```
    Sizes must equal `build/`. The flash zip carries the capture tools and flash
    scripts (check with `zipfile`). Anything off: stop and ask, do not publish.
+   **Body limit:** GitHub refuses a body over 125000 characters (HTTP 422 "body is too long"),
+   and the cumulative notes file passes that (beta.250: 163 KB). Then build the body from the file:
+   the header up to and including "What changed since <previous beta>", a short "Earlier changes"
+   section that links the full file at the tag
+   (`https://github.com/rvdbreemen/OTGW-firmware/blob/v<semver>-beta.N/docs/releases/RELEASE_NOTES_<semver>-beta.N.md`),
+   then every section from "SAT is experimental and opt-in" to the end. Check its size
+   (`wc -c`) and that it has no em dash, and pass it with `--notes-file "$SCRATCH/body.md"`.
 
 ### Phase 5: Publish and verify
 
@@ -187,24 +222,45 @@ from the file at create time.
    curl -sL -o "$TMP/dl.zip" "https://github.com/rvdbreemen/OTGW-firmware/releases/download/v<semver>-beta.N/<zip name with + as %2B>"
    sha256sum "$TMP/dl.zip"                                                # equals SHA256SUMS
    ```
-3. Message the peers: "beta.N tag out", dev is free.
+3. Message the peers: "beta.N tag out", dev is free. The bench unit stays on the release build
+   overnight unless the next slot needs a newer candidate soaked on it (the next slot then skips
+   when nothing newer had its hour there).
 
 ### Phase 6: Publish the zip and announce
 
-1. **#alpha-testing zip post** (every tag is published): the post script refuses
-   unless the zip githash is HEAD. If HEAD moved after the tag, post from a temp
-   worktree at the tag:
+1. **#alpha-testing: zip post or note** (every tag is published once, TASK-1809).
+   First look the key up in the machine-wide post ledger:
+   ```bash
+   P="${LOCALAPPDATA:-$HOME/.local/share}/OTGW-capture"
+   grep -x "<semver>-beta.N" "$P/published-tags.txt"; grep -P "\t<semver>-beta.N\t" "$P/published-posts.tsv"
+   ```
+   - **Key found** (the normal case: the release commit is docs-only on top of the
+     candidate, so it carries the candidate's beta.N, and the candidate's developer
+     already posted that zip on the alpha track): do NOT run the post script. It
+     refuses with "prerelease ... was already published", in any phase, before or
+     after the GitHub publish; the refusal comes from this local ledger, not from
+     GitHub (beta.174, beta.224 and beta.237 all hit or skipped it). Instead the
+     coordinator posts a short #alpha-testing note: "beta.N is now the public beta",
+     the release link, and the message id of the earlier zip post from
+     `published-posts.tsv`. The firmware in that zip equals the release build except
+     the githash string (the release commit changes only docs).
+   - **Key not found** (the release commit carries its own bump, e.g. the first beta
+     after the alphas): post the zip as below. The post script refuses unless the zip
+     githash is HEAD. If HEAD moved after the tag, post from a temp worktree at the tag:
    ```bash
    git worktree add --detach ../wt-beta-post <tag-commit>
    OTGW_REPO="$(cd ../wt-beta-post && pwd)" bash scripts/discord-post-build.sh \
      -m "<short note + release link>" "$PWD/build/<flash zip>"
    git worktree remove ../wt-beta-post && git worktree prune
    ```
-   Add the row to `.claude/alpha-build-ledger.local.md`.
+   Add the row to `.claude/alpha-build-ledger.local.md` (for a note: "zip already
+   posted as alpha beta.N" and both message ids).
 2. **#beta-testing announcement** (sent without showing it first under the 12-hour slot rule
    above; show it first only when it announces something new to weigh).
    Channel `914498730001072149`, via `mcp__discord-mcp__send_message` (the webhook
-   only reaches #alpha-testing; if the MCP is down, ask Robert to `/mcp` reconnect).
+   only reaches #alpha-testing). If the MCP is down, post through the Discord REST API with the
+   bot token from the user environment (`DISCORD_TOKEN`, header `User-Agent: DiscordBot (local, 1.0)`,
+   never print the token) and read the message back by its id.
    Under 2000 characters. Content, for testers coming from 1.x:
    - title line with the version, the release link
    - what 2.x is (ESP32-S3, S3 Mini replaces the Wemos, PIC stays, combo zip)
@@ -238,7 +294,10 @@ Assets are immutable after publish; the body is not.
 3. **`--latest=false` is required** on every 2.x beta (dev is the default branch).
 4. **Moving HEAD** (a peer push, a rebase) after the build means the post script refuses that zip: rebuild, or post from a worktree at the tag commit.
 5. **Stale narrative at the tag** is permanent in the tagged tree: finish Phase 1 before Phase 2.
-6. **`bin/bump-prerelease.sh` cannot change the word** (alpha -> beta): use `autoinc-semver.py --prerelease`.
+6. **"prerelease ... was already published"** from the post script means the beta.N key is in the local post ledger (Phase 6.1), not that GitHub refused anything. Moving the post before the publish does not help; post the note instead (TASK-1809).
+7. **`bin/bump-prerelease.sh` cannot change the word** (alpha -> beta): use `autoinc-semver.py --prerelease`.
+8. **Release body over 125000 characters** is refused at draft time: use the trimmed body of Phase 4.4.
+9. **A peer firmware push during the slot** makes the soaked candidate stale: the freeze holds from the slot time, not only from the moment this skill starts.
 
 ## Important rules
 

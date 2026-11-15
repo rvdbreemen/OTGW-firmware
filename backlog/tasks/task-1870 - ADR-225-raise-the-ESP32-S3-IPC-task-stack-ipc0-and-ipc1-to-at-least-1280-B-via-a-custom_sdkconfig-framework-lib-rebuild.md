@@ -3,11 +3,11 @@ id: TASK-1870
 title: >-
   ADR-225: raise the ESP32-S3 IPC task stack (ipc0 and ipc1) to 1280 B by
   linking our own copy of IDF esp_ipc.c
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-12T18:15:00Z'
-updated_date: '2026-11-12T23:05:00Z'
+updated_date: '2026-11-14T15:26:00Z'
 labels:
   - firmware
   - build
@@ -65,3 +65,9 @@ AC3 ticked: gate red without the file (2 failures), green on the fix (10 OK), mu
 
 AC2 ticked LATE: the plan was not posted in #alpha-testing before the build tooling change landed. The coordinator's beta.219 note in #alpha-testing (message 1570575185869017141, 2026-11-13) carries an explicit after-the-fact announcement of the build-tooling plan (our own copy of IDF esp_ipc.c with a 1280 B IPC stack, gates, fallback B); ticked on the coordinator's instruction with that message as the evidence.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+AC1: ADR-225 amended while Proposed (mechanism C, .63 ipc0 88 B, 1 in 9 FS writes) and accepted through the adr-kit gates with Robert's DM 1570489845019840593 / mechanism C DM 1570519798071300168 as the User Decision. AC2: ticked late: the plan was not posted before the change landed; after-the-fact announcement in #alpha-testing 1570575185869017141 (2026-11-13), on the coordinator's instruction. AC3: tests/test_esp_ipc_override_gate.py Ran 10 OK on the fix, FAILED (failures=2) without the file, mutants red. AC4: ELF check PASS on the beta.219 build (stack 0x500, creator in __init_array, ipc_task + literals in IRAM, no archive esp_ipc object); deviation: no firmware.map is kept, so ELF evidence replaces the map line. AC5: bench by otgw-firmware-09 (scratchpad b219f/ and b219/): .61 ipc0/ipc1 404-484/332 B vs 152-232/80-88 on 217/218; 20/20 /ReBoot clean; .63 Classic+PIC ipc0 80-88 -> 340 B, ipc1 88 -> 332 B, 1 full OTA + 10 FS-only OTAs with 0 panics, no settings diff. Shipped in beta.219+4274624 (firmware commit d4f9c627d). Limit: 10 clean writes alone would occur ~31 % at the old rate; the measured +252 B margin is the proof. Closed by comms on the coordinator's decision 2026-11-14 (stale audit).
+<!-- SECTION:FINAL_SUMMARY:END -->

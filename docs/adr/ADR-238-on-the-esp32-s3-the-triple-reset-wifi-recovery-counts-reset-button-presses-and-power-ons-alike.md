@@ -1,7 +1,7 @@
 ---
 id: "ADR-238"
 title: "On the ESP32-S3 the triple-reset WiFi recovery counts reset-button presses and power-ons alike"
-status: "Proposed"
+status: "Accepted"
 date: "2026-11-14"
 binding: false
 gate: null
@@ -13,7 +13,6 @@ verified_in:
 supersedes:
   - "ADR-043"
 superseded_by: null
-format: "canonical"
 topics:
   - "WiFi recovery"
   - "triple reset"
@@ -29,6 +28,7 @@ symbols:
   - "isPortalResetGesture"
   - "shouldForceWifiConfigPortal"
 context_scope: "selective"
+format: "canonical"
 ---
 
 <!-- markdownlint-disable MD025 -->
@@ -37,7 +37,7 @@ context_scope: "selective"
 
 ## Status
 
-Proposed, 2026-11-14.
+Accepted, 2026-11-14.
 
 ## Status History
 
@@ -48,13 +48,23 @@ status_history:
     changed_by: "User: Robert van den Breemen"
     reason: Initial proposal
     changed_via: adr-kit
+  - date: 2026-11-14
+    status: Proposed
+    changed_by: "User: Robert van den Breemen"
+    reason: "Superseded 2026-11-14 by ADR-238 (Robert in session: 'All ADR proposed 233, 238 and 239 should be accepted. So yes.')"
+    changed_via: adr-kit lifecycle
+  - date: 2026-11-14
+    status: Accepted
+    changed_by: "User: Robert van den Breemen"
+    reason: "Accepted 2026-11-14 by Robert in session: 'All ADR proposed 233, 238 and 239 should be accepted. So yes.'"
+    changed_via: adr-kit lifecycle
 ```
 
 ## Context
 
 ADR-043 (Accepted, written for the ESP8266) recovers WiFi with a triple reset: three external resets within a
 10-second window clear the saved WiFi credentials and force the WiFiManager config portal. The count lives in
-persistent storage (`platformRtcWrite`, NVS on the ESP32-S3), slot 96, with a magic value
+persistent storage (`platformRtcWrite`, NVS (non-volatile storage) on the ESP32-S3), slot 96, with a magic value
 (`OTGW-firmware.ino`, `WIFI_PORTAL_RESET_*`).
 
 On the ESP32-S3 the gesture never fires. `shouldForceWifiConfigPortal()` counted a boot only when
@@ -63,7 +73,7 @@ value. The S3 hardware gives the EN pin (the reset button), a power-on, a chip b
 and the same raw reset code, 0x01 (pinned libs `soc/esp32s3/include/soc/reset_reasons.h:38-40`:
 `RESET_REASON_CHIP_POWER_ON`, `_CHIP_BROWN_OUT`, `_CHIP_SUPER_WDT`, all 0x01), which ESP-IDF reports as
 `ESP_RST_POWERON`. Software cannot tell a press of the reset button from a power-on. The bench confirmed the code
-table on two units (TASK-1904: a task watchdog gives raw 0x0c, an RTC watchdog 0x09). A USB reset from a host
+table on two units (TASK-1904: a task watchdog gives raw 0x0c, an RTC (real-time clock) watchdog 0x09). A USB (Universal Serial Bus) reset from a host
 reports `ESP_RST_USB` (TASK-1930 notes, otgw-firmware-09), not a power-on.
 
 A forced portal is destructive: it calls `manageWiFi.resetSettings()` and wipes the stored WiFi credentials
@@ -79,7 +89,7 @@ boots, each within 10 s of the boot before, clear the WiFi credentials and force
 User Decision (Robert, Discord DM 1571125618777522260, 2026-11-14, answer A to TASK-1930's question): count every
 power-on-type boot, accepting that three power interruptions inside the windows also wipe the WiFi. Pulling the
 plug three times is therefore a supported route too, which matters because it is not known whether every Classic
-PCB revision has a reset or config button fitted (Robert, DM 1571125777720672267: "Not sure").
+PCB (printed circuit board) revision has a reset or config button fitted (Robert, DM 1571125777720672267: "Not sure").
 
 ## Decision Contract
 
@@ -89,7 +99,7 @@ PCB revision has a reset or config button fitted (Robert, DM 1571125777720672267
   `platformIsResetButtonOrPowerOn()`; the firmware calls it only from `isPortalResetGesture()`.
 - Keep ADR-043's trigger count (3), window (10 s, cleared by `loop()` when it expires), magic value and the
   credential wipe before the portal.
-- Name the gesture as "press reset, or pull the plug, three times" in the user documentation and the OLED hint.
+- Name the gesture as "press reset, or pull the plug, three times" in the user documentation and the OLED (organic light-emitting diode display) hint.
 
 ### Must Not
 

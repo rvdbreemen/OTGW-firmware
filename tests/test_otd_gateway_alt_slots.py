@@ -208,6 +208,8 @@ static bool g_satEnabled = false, g_ret28Unsupported = false;
 static uint32_t g_invalidFrom = 0;
 static bool satIsEnabled() { return g_satEnabled; }
 static bool isBoilerMsgIdUnsupportedRead(uint8_t id) { return id == 28 && g_ret28Unsupported; }
+// TASK-1761: the sliced head of loopOTDirect() drains the off-loop command ring; nothing is queued here.
+static void otdCmdTextDrain() {}
 // TASK-1702: the sliced mode-apply head of loopOTDirect() needs these; its flag stays false here.
 #ifndef constrain
 #define constrain(v, lo, hi) ((v) < (lo) ? (lo) : ((v) > (hi) ? (hi) : (v)))

@@ -93,7 +93,10 @@ def build_otd_handler() -> str:
     if not new:
         handler = handler.replace("void handleOTDirectCommand(", "void handleOTDirectCommand_old(", 1)
         handler += "static bool handleOTDirectCommand(const char* b, int n, bool s = false) { handleOTDirectCommand_old(b, n, s); return true; }" + nl
-    return OTD_STUBS + nl + ring + nl + enq + nl + handler
+    # TASK-1859: CS= parses with the PIC's GetPercentArg and answers with its PrintSigned (the otdPicFloat block)
+    m = re.search(r"// --- otdPicFloat begin\n(.*?)// --- otdPicFloat end", o, re.S)
+    picfloat = ("#ifndef snprintf_P" + nl + "#define snprintf_P snprintf" + nl + "#endif" + nl + m.group(1)) if m else ""
+    return OTD_STUBS + nl + ring + nl + enq + nl + picfloat + nl + handler
 
 
 SAT_STUBS = r"""

@@ -147,6 +147,8 @@ def build_source():
                                                                          "static void setOTDirectMode(", 1)
     # setOTDirectMode() formats with snprintf_P.
     pre = PRELUDE + "#define snprintf_P snprintf\n" + helpers + "\n"
+    if "otdCmdTextDrain();" in head:   # TASK-1761: the loop head drains the off-loop command ring; empty here
+        pre += "static void otdCmdTextDrain() {}\n"
     code = pre + loop_head + set_mode + "\n" + MAIN.replace("@OTDMODE_BRANCH@", branch).replace("@READ_CANCEL@", read_cancel)
     return code, fixed
 

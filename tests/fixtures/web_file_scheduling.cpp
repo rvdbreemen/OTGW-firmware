@@ -76,6 +76,11 @@ uint32_t millis() { return clockMs; }
 uint32_t platformMaxFreeBlock() { return maxBlock; }
 uint32_t platformFreeHeap() { return freeHeap; }
 #include "tcp_gate.inc"
+// TASK-1947: the refusal-line breakdown shim walks lwIP segments this fixture does not fake; the
+// slice stops before it and this stub stands in (it only feeds a debug line).
+struct PlatformTcpTxBreakdown { uint16_t estIdle, estData, closingData, closingFin, synRcvd, otherEmpty; uint32_t payloadBytes; };
+inline void platformTcpTxBreakdownOnPort(uint16_t, const PlatformTcpIdleConnection*, uint8_t,
+                                         PlatformTcpTxBreakdown* out) { *out = PlatformTcpTxBreakdown{0, 0, 0, 0, 0, 0, 0}; }
 uint16_t webSocketClientCount() { return wsClients; }
 #include "heap_diag.inc"
 struct { HeapDiagSection heapdiag; } state;
@@ -314,6 +319,7 @@ static int strcasecmp_P(const char* a, const char* b) {
 }
 const String& contentType(String& filename) { filename = "text/plain"; return filename; }
 void dallasLabelsFileChanged(const char*) {}   // TASK-1912: handleFile()'s delete tells the labels copy
+void satMarkersFileChanged(const char*) {}     // TASK-1911: and the markers copy
 #include "gzip_pages.inc"
 #endif
 static void reset() {

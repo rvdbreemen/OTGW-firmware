@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : PICtypes.h
-**  Version  : v2.0.0-beta.247
+**  Version  : v2.0.0-beta.295
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -74,9 +74,13 @@ struct PicSettingsSection {    // state.picSettings — settings polled from PIC
   char sResetCause[8]         = "";  // PR=Q: last reset cause ("W"=watchdog, "B"=brownout, "P"=power-on); a non-text answer is stored as hex, e.g. "0xFF" (TASK-1406)
   char sStandaloneInterval[8] = "";  // PR=N: message interval in standalone mode (seconds)
   char sVoltageRef[4]         = "";  // PR=V: voltage reference setting (numeric)
+
+  // --- Measured value (TASK-1940 = 1.x TASK-1147, polled only when settings.picBoot.bTempSensor) ---
+  char sTempReading[8]        = "";  // PR=E: PIC-attached temperature sensor reading in C (e.g. "19.19"); "-" = no sensor, never stored
 };
 
-struct PICBootSection {            // PIC boot-time command injection
+struct PICBootSection {            // PIC boot-time command injection, and the PIC readouts the user opts into
   bool bEnable        = false;
   char sCommands[129] = "";
+  bool bTempSensor    = false;     // TASK-1940 (1.x TASK-1147): read the PIC-attached temperature sensor (PR=E) every 3 min
 };

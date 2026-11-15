@@ -167,7 +167,10 @@ def build_source():
         b = braced(SRC, r"else if \(cmd0 == '%s' && cmd1 == '%s'\) \{" % (c[0], c[1]))
         assert b, c + "= branch not found"
         branches.append(b)
-    helpers = marked(SRC, "otdPersist") or ""
+    helpers = (marked(SRC, "otdPicFloat") or "") + (marked(SRC, "otdPersist") or "")   # TASK-1859: SB= parses like the PIC
+    if "static bool otdPicInBounds(" in SRC:   # TASK-1859: SW=/SH= check the PIC bounds (no boiler cache here: defaults)
+        helpers += ("\nstatic uint16_t otBoilerCache[256]; static bool otBoilerCacheValid[256];\n"
+                    + braced(SRC, r"static bool otdPicInBounds\(uint8_t") + "\n")
     restore = marked(SRC, "otdRestorePersistedCommands")
     fields = {
         "HAS_IT_FIELD": "settings.otd.bIgnoreTransitions" if "bIgnoreTransitions" in struct else "-1",

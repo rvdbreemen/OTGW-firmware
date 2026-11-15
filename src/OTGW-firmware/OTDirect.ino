@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTDirect.ino
-**  Version  : v2.0.0-beta.247
+**  Version  : v2.0.0-beta.295
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -33,7 +33,16 @@
 // OpenTherm interface instances — master talks to boiler, slave listens to thermostat
 // ---------------------------------------------------------------------------
 static OpenTherm otMaster(PIN_OT_MASTER_IN, PIN_OT_MASTER_OUT);
-static OpenTherm otSlave(PIN_OT_SLAVE_IN, PIN_OT_SLAVE_OUT, true);  // true = slave mode
+// TASK-1848: the thermostat side exposes its two Smart Power idle levels for PR=P. The library's own
+// getSmartPowerState() (OpenTherm.cpp:540-544) returns LOW or HIGH and never MEDIUM, so it cannot give the
+// PIC's three levels; the levels are protected members, read here without changing the library.
+class OTDSlaveLine : public OpenTherm {
+public:
+  using OpenTherm::OpenTherm;
+  bool txRaised()   const { return txIdleLevel; }   // PIC TransmitMode: raised idle current to the thermostat
+  bool rxInverted() const { return rxIdleLevel; }   // PIC ReceiveModeT: thermostat line voltage inverted
+};
+static OTDSlaveLine otSlave(PIN_OT_SLAVE_IN, PIN_OT_SLAVE_OUT, true);  // true = slave mode
 
 // ISR handlers — must be free functions for attachInterrupt
 static void IRAM_ATTR masterISR() { otMaster.handleInterrupt(); }
@@ -55,7 +64,6 @@ static void onThermostatMsgID16(uint8_t msgType, uint16_t f88);
 // Master request scheduler — periodic polls and writes to the boiler
 // ---------------------------------------------------------------------------
 static constexpr uint32_t OT_STATUS_INTERVAL_MS   = 800;    // MsgID 0 (status) every 800ms (OT-Thing parity)
-static constexpr uint32_t OT_OFFLINE_RETRY_MS     = 5000;   // When bus is offline: retry MsgID 0 every 5s, skip rest
 static constexpr uint32_t OT_TEMP_INTERVAL_MS     = 10000;  // Temperature reads every 10s
 static constexpr uint32_t OT_SLOW_INTERVAL_MS     = 60000;  // Slow-poll items every 60s
 static constexpr uint32_t OT_WRITE_INTERVAL_MS    = 15000;  // Periodic writes every 15s (keep boiler values alive)
@@ -601,6 +609,23 @@ static uint16_t otdUpperBoundF88(uint8_t boundId, uint8_t fallback) {
   return (uint16_t)((hb ? hb : fallback) << 8);
 }
 
+// TASK-1859: the PIC's SW=/SH= range check (SetHotWaterTemp :4164-4177, SetHeatingTemp :4191-4204, Compare
+// :5227-5232): the integer byte at least the lower bound, and below the upper bound or equal to it with no
+// fraction; unsigned bytes, so a negative value is above any bound below 128. The bounds are the boiler's
+// MsgID 48/49 bytes (HB upper, LB lower, MessageID48/49 :3110-3131), else the PIC defaults (MIN/MAX_DHWSETPOINT
+// 20/80, MIN/MAX_CHSETPOINT 10/90, :262-265). As otdUpperBoundF88(), a cached upper byte of 0 counts as no bound:
+// the cache also holds a Data-Invalid reply, which the PIC ignores.
+static bool otdPicInBounds(uint8_t boundId, uint8_t defMin, uint8_t defMax, uint16_t f88) {
+  uint8_t lo = defMin, hi = defMax;
+  if (otBoilerCacheValid[boundId] && (otBoilerCache[boundId] >> 8) != 0) {
+    hi = (uint8_t)(otBoilerCache[boundId] >> 8);
+    lo = (uint8_t)(otBoilerCache[boundId] & 0xFF);
+  }
+  const uint8_t ip = (uint8_t)(f88 >> 8);
+  if (ip < lo) return false;
+  return ip < hi || (ip == hi && (f88 & 0xFF) == 0);
+}
+
 // Set an override value for a MsgID (activates repeater modification for that ID)
 static void setOverride(uint8_t msgId, uint16_t value) {
   for (uint8_t i = 0; i < OT_OVERRIDE_COUNT; i++) {
@@ -633,10 +658,35 @@ const char* otdPicCompatVersion() { return OTD_PIC_COMPAT_VERSION; }
 static uint8_t otIgnoreTransitions = 1;      // IT= (1=ignore, PIC default)
 static uint8_t otOverrideHB      = 0;        // OH= override high byte flag
 static char    otGpioFunctions[3] = "00";    // GA=/GB= function codes
-static char    otLedFunctions[7]  = "XXXXXX";// LA=-LF= config chars
+static char    otLedFunctions[7]  = "FXOMPC";// LA=-LF= config chars, PIC default (gateway.asm 6.8:5462-5468, TASK-1848)
 static uint8_t otVoltageRef      = 5;        // VR= voltage reference digit
 static char    otTempSensor      = 'O';      // TS= temp sensor function
-static char    otForceThermostat = 'A';      // FT= thermostat detection
+static char    otForceThermostat = 'D';      // FT= thermostat model, as PR=R prints it (D = auto-detect, PIC default)
+
+// --- otdPrHelpers begin
+// TASK-1848: PR=P text of PrintPowerlevel (gateway.asm 6.8:2262-2268, strings :5499-5502): no raised
+// transmit level is Low, raised transmit with a normal receive level is Medium, both is High.
+static const char* otdPowerLevelText(bool txRaised, bool rxInverted) {
+  if (!txRaised) return PSTR("Low power");
+  return rxInverted ? PSTR("High power") : PSTR("Medium power");
+}
+// TASK-1848: the model letter PR=R prints for an FT= argument (SetTStatModel gateway.asm 6.8:4705-4727,
+// PrintRemeha :2270-2280). C, I and S are set by hand; any other letter means auto-detect, printed as D.
+// OT-Direct has no Remeha detection, so R never appears.
+static char otdThermostatModelChar(char c) {
+  return (c == 'C' || c == 'I' || c == 'S') ? c : 'D';
+}
+// TASK-1848: PR=B in the PIC's build stamp format "HH:MM DD-MM-YYYY" (otgw-6.8 tools/build.tcl:83),
+// from the compiler's __DATE__ ("Nov 14 2026", day space-padded) and __TIME__ ("14:05:33").
+static void otdPicBuildStamp(const char* date, const char* time, char* out, size_t n) {
+  static const char months[] = "JanFebMarAprMayJunJulAugSepOctNovDec";
+  int mon = 0;
+  for (int i = 0; i < 12; i++) {
+    if (strncmp(date, months + 3 * i, 3) == 0) { mon = i + 1; break; }
+  }
+  snprintf_P(out, n, PSTR("%.5s %02d-%02d-%.4s"), time, atoi(date + 4), mon, date + 7);
+}
+// --- otdPrHelpers end
 static uint8_t otDHWOverride     = 0xFF;     // HW state: 0='0', 1='1', 0xFF='A' (auto)
 static bool    otDHWBlocking     = false;    // BW= DHW blocking (bit6, not persisted); read by otdRelayedStatusFrame (ADR-229)
 // TASK-1833: CE= and H2= as the PIC's CoolModeOff/CH2ModeOff, clear at reset (gateway.asm 6.8:1178-1188): while a CL= or
@@ -1082,7 +1132,12 @@ static unsigned long buildStatusRequest() {
   // Master mode: CH enable (bit 0) stays on while SAT is enabled, also during its hand-back or before
   // its first CS. Without SAT and without a CS override (an external CS= or a thermostat write on the
   // slave interface) nothing sets a flow setpoint, so bit 0 is off. DHW and the other bits are unchanged.
-  if (IS_MASTER_MODE() && !otdCsOverrideActive() && !satOwnsControlSetpoint()) flags &= (uint8_t)~0x01;
+  // TASK-1806: the same in gateway mode, where the scheduler sends a status of its own only once the thermostat is
+  // gone (otdOwnFramesAllowed; the alternative slots never carry MsgID 0). Like the PIC's standalone status: CH enable
+  // only with a CS= in force (readstatus, gateway.asm 6.6 :2712-2742), not the board default that the 16 C setback
+  // used to pair with a flow setpoint.
+  const bool ownStatusRule = IS_MASTER_MODE() || otCurrentMode == OTD_MODE_GATEWAY;
+  if (ownStatusRule && !otdCsOverrideActive() && !satOwnsControlSetpoint()) flags &= (uint8_t)~0x01;
   return OpenTherm::buildRequest(
     OpenThermMessageType::READ_DATA,
     OpenThermMessageID::Status,
@@ -1224,16 +1279,6 @@ void initOTDirect() {
   otMinIntervalMs   = settings.otd.iMsgInterval;
   if (otSummerMode) otMasterStatusFlags |= 0x20;
 
-  // TASK-584: restore persisted ventilation setpoint to write cache so the
-  // scheduler will re-apply it to the boiler after boot without a new command.
-  if (settings.otd.iVentSetpoint > 0) {
-    uint16_t ventData = (uint16_t)settings.otd.iVentSetpoint;   // TASK-1831: MsgID 71 LB (spec v4.2 MsgID 71)
-    updateWriteCache(71, ventData);
-    setOverride(71, ventData);
-    OTDDebugTf(PSTR("OT-direct: restored vent setpoint %u%% from settings\r\n"),
-               settings.otd.iVentSetpoint);
-  }
-  otdRestorePersistedCommands();   // TASK-1836: HW, SW, SH, IT, OH and the UI= list
 
   {
     const char* modeNames[] = { "bypass", "gateway", "monitor", "master" };
@@ -1313,6 +1358,19 @@ void initOTDirect() {
       OTDDebugTln(F("OT-direct: Thermostat present — staying in gateway mode"));
     }
   }
+
+  // TASK-1944: the persisted command state is restored after the auto-detect, so the full reset of its switch into master
+  // (applyOTDirectMode -> resetTransientState) cannot wipe it again.
+  // TASK-584: restore persisted ventilation setpoint to write cache so the
+  // scheduler will re-apply it to the boiler after boot without a new command.
+  if (settings.otd.iVentSetpoint > 0) {
+    uint16_t ventData = (uint16_t)settings.otd.iVentSetpoint;   // TASK-1831: MsgID 71 LB (spec v4.2 MsgID 71)
+    updateWriteCache(71, ventData);
+    setOverride(71, ventData);
+    OTDDebugTf(PSTR("OT-direct: restored vent setpoint %u%% from settings\r\n"),
+               settings.otd.iVentSetpoint);
+  }
+  otdRestorePersistedCommands();   // TASK-1836: HW, SW, SH, IT, OH and the UI= list
 
   // 10. TASK-1835 (PIC 6.8 parity audit N5): the boot status request and the protocol handshake go out only when the
   //     gateway is the master, i.e. in master mode, also when the auto-detect above just chose it for this boot. In
@@ -1755,6 +1813,9 @@ static void otBoilerCacheStore(unsigned long response) {
     otBoilerCacheValid[id] = false;
     return;
   }
+  // TASK-1925: a DATA-INVALID reply carries no value (spec v4.2 4.3): the slot keeps its previous value, the rule
+  // handleMasterResponse already applies to a real boiler's DATA-INVALID (it never calls this for one).
+  if (OpenTherm::getMessageType(response) == OpenThermMessageType::DATA_INVALID) return;
   otBoilerCache[id] = response & 0xFFFF;
   otBoilerCacheValid[id] = true;
 }
@@ -1805,6 +1866,45 @@ static bool sendMasterRequestAsync(unsigned long request, OTDirectRequestOrigin 
   return otMasterRequestActive;
 }
 
+// TASK-1801: the PIC never blacklists the Data-IDs it needs: MandatoryID (gateway.asm 6.8:3409-3416) unmarks
+// 0 (readstatus :2720), 1 (MessageID1 :2806), 14 (MessageID14 :2967) and 3, 17, 25 (MandatoryWord :2544, :2558,
+// :2566, :3651) on every request, "so even (accidental) manual action cannot blacklist the DataID". (27 only when
+// an external sensor is used as an alternative, :3071-3075; OT-Direct has no such sensor.)
+// otdNoteBoilerAnswer() is the 3-strike rule of handleMasterResponse(): an Unknown-DataID answer counts a strike
+// for a non-mandatory ID and disables its schedule entry at 3; any other answer clears the strikes and enables an
+// entry the strikes disabled again (a relayed success shows the boiler knows the ID).
+// --- otdUnknownStrike begin
+static inline bool otdPicMandatoryId(uint8_t id) {
+  return id == 0 || id == 1 || id == 3 || id == 14 || id == 17 || id == 25;
+}
+
+static void otdNoteBoilerAnswer(uint8_t id, bool unknownDataId) {
+  if (otdPicMandatoryId(id)) return;
+  if (unknownDataId) {
+    incUnknownCount(id);
+    if (getUnknownCount(id) < 3) return;
+    for (uint8_t i = 0; i < OT_SCHEDULE_SIZE; i++) {
+      if (otSchedule[i].msgId == id && !otSchedule[i].disabled) {
+        otSchedule[i].disabled = true;
+        OTDDebugTf(PSTR("OTD: MsgID %u disabled (3x UNKNOWN_DATA_ID)\r\n"), id);
+        break;
+      }
+    }
+  } else {
+    // Only an entry the strikes disabled comes back (counter at 3); DA= and UI= disable on purpose and stay.
+    const bool struck = getUnknownCount(id) >= 3;
+    clearUnknownCount(id);
+    if (!struck || isUnknownId(id)) return;
+    for (uint8_t i = 0; i < OT_SCHEDULE_SIZE; i++) {
+      if (otSchedule[i].msgId == id && otSchedule[i].disabled) {
+        otSchedule[i].disabled = false;
+        OTDDebugTf(PSTR("OTD: MsgID %u enabled again (boiler answered it)\r\n"), id);
+      }
+    }
+  }
+}
+// --- otdUnknownStrike end
+
 // ---------------------------------------------------------------------------
 // handleMasterResponse — process a completed async master request
 // ---------------------------------------------------------------------------
@@ -1851,28 +1951,11 @@ static void handleMasterResponse() {
       flameRatioSet(flameOn);
     }
 
-    // 3-strike auto-blacklist: if boiler responds with UNKNOWN_DATA_ID,
-    // increment 2-bit counter. Disable schedule entry after 3 consecutive unknowns.
-    // MsgID 0 (status) is never disabled — it's mandatory.
+    // 3-strike auto-blacklist (otdNoteBoilerAnswer): 3 Unknown-DataID answers disable a schedule entry, any
+    // other answer enables it again; the PIC's mandatory IDs 0, 1, 3, 14, 17, 25 never count (TASK-1801).
     OpenThermMessageType respType = OpenTherm::getMessageType(response);
     uint8_t respMsgId = (response >> 16) & 0xFF;
-    if (respType == OpenThermMessageType::UNKNOWN_DATA_ID) {
-      if (respMsgId != 0) {
-        incUnknownCount(respMsgId);
-        if (getUnknownCount(respMsgId) >= 3) {
-          for (uint8_t i = 0; i < OT_SCHEDULE_SIZE; i++) {
-            if (otSchedule[i].msgId == respMsgId && !otSchedule[i].disabled) {
-              otSchedule[i].disabled = true;
-              OTDDebugTf(PSTR("OTD: MsgID %u disabled (3x UNKNOWN_DATA_ID)\r\n"), respMsgId);
-              break;
-            }
-          }
-        }
-      }
-    } else if (respMsgId != 0) {
-      // Successful response — reset unknown counter for this MsgID
-      clearUnknownCount(respMsgId);
-    }
+    otdNoteBoilerAnswer(respMsgId, respType == OpenThermMessageType::UNKNOWN_DATA_ID);
 
     // TASK-1845: the DHW push follows the boiler's answers, as the PIC (MessageID99, statusreturn).
     if (respMsgId == 99) otdPushOnBoiler99((uint8_t)respType, (uint16_t)(response & 0xFFFF));
@@ -1944,8 +2027,10 @@ static void scheduleMasterRequest() {
     return;
   }
 
-  // When the bus is offline: only probe MsgID 0 at a slow rate — no point
-  // cycling through the full schedule if nobody is home.
+  // When the bus is offline: only probe MsgID 0, no point cycling through the full schedule if nobody is home.
+  // TASK-1802: at its normal interval, so the boiler sees a frame within the spec's 1.15 s (OT spec v4.2 :1101) after
+  // a failed one, as on the PIC, which retries at the next 1 s tick (gateway.asm 6.6 :1490-1498). A 5 s retry left a
+  // boiler 5-6 s without a frame, and the spec lets it treat 5 s without a valid frame as a short circuit (:1006-1016).
   bool busOffline = !state.otBus.bOnline;
 
   // Round-robin through the schedule table, skipping disabled entries
@@ -1962,8 +2047,7 @@ static void scheduleMasterRequest() {
     // Write entries only fire when a value has been set by a command
     if (entry.isWrite && !entry.valueSet) continue;
 
-    // Offline: use slow retry interval for MsgID 0 to avoid hammering a dead bus
-    uint32_t interval = (busOffline && entry.msgId == 0) ? OT_OFFLINE_RETRY_MS : entry.intervalMs;
+    uint32_t interval = entry.intervalMs;
     // TASK-583: promote MsgID 70 (V/H status) and 71 (V/H setpoint) to fast-poll
     // when the slave configuration (MsgID 3 HB bits 6-7 == 0b11) indicates a
     // ventilation/HRV application.  MsgIDs 72-76 remain in the slow-poll tier.
@@ -2025,6 +2109,7 @@ static bool otdResponseOverrideActive(uint8_t msgId) {
 static bool otdRemoteOverrideHoldsSlot(uint8_t msgId);
 static bool otdIsAltSlot(uint8_t msgId) {
   if (otdRemoteOverrideHoldsSlot(msgId)) return false;
+  if (otdPicMandatoryId(msgId)) return false;   // TASK-1801: MandatoryID, also against a UI= mark
   if (isUnknownId(msgId)) return true;
   return getUnknownCount(msgId) >= 3 && !otdResponseOverrideActive(msgId);
 }
@@ -2441,6 +2526,8 @@ void loopOTDirect() {
     OTDirectMode wanted = otdModeFromSetting(settings.otd.iMode);
     if (wanted != otCurrentMode) applyOTDirectMode(wanted);
   }
+  // TASK-1761: commands from other tasks, in order, between frames.
+  if (!otMasterRequestActive) otdCmdTextDrain();
 
   // Process OpenTherm library state machines (drives ISR-based TX/RX)
   otMaster.process();
@@ -2852,16 +2939,23 @@ static void onThermostatMsgID16(uint8_t msgType, uint16_t f88) {
 }
 
 // ---------------------------------------------------------------------------
-// resetTransientState — clear all transient state (called on GW=R and mode change)
-// Mirrors PIC hardware reset clearing all RAM, except persisted settings.
+// otdFlushCmdQueue — flush the command ring at a mode change or GW=R: a frame queued under the
+// previous mode (a WRITE 16/100 from TT= in master mode) must not reach the boiler after the
+// switch (ADR-223). The consumer applies the flush; frames queued after this point are kept.
+// otCmdQueueHighWater stays: it is a diagnostic peak, not queue content.
 // ---------------------------------------------------------------------------
-static void resetTransientState() {
-  // Flush the command ring: a frame queued under the previous mode (a WRITE 16/100 from TT= in
-  // master mode) must not reach the boiler after the switch (ADR-223). The consumer applies the
-  // flush; frames queued after this point are kept. otCmdQueueHighWater stays: it is a diagnostic
-  // peak, not queue content.
+static void otdFlushCmdQueue() {
   __atomic_store_n(&otCmdFlushHead, otCmdHead, __ATOMIC_RELAXED);
   __atomic_store_n(&otCmdFlushPending, true, __ATOMIC_RELEASE);
+}
+
+// ---------------------------------------------------------------------------
+// resetTransientState — clear all transient state: GW=R, and a mode change into or out of master,
+// loopback or bypass (applyOTDirectMode). Mirrors the PIC's reset clearing all RAM, except
+// persisted settings. A switch between gateway and monitor keeps the state (TASK-1839).
+// ---------------------------------------------------------------------------
+static void resetTransientState() {
+  otdFlushCmdQueue();
   // Operating mode overrides
   otOperModeDHW = 0;
   otOperModeCH1 = 0;
@@ -2927,6 +3021,12 @@ static void resetTransientState() {
   }
   // BS= fake room setpoint — clear on reset
   otFakeRoomSetpoint = 0.0f;
+  // TASK-1807: the boiler value cache holds only answers given after the reset. A synthetic loopback answer or one
+  // from a boiler that has since gone kept otDirectBoilerPresent() and otIsVentSlave() true across GW=R and a switch
+  // into or out of master, loopback or bypass. A gateway <-> monitor switch does not come here (TASK-1839).
+  memset(otBoilerCache, 0, sizeof(otBoilerCache));
+  memset(otBoilerCacheValid, 0, sizeof(otBoilerCacheValid));
+  otdMsgId3FromBoiler = false;
 }
 
 // ---------------------------------------------------------------------------
@@ -2935,7 +3035,16 @@ static void resetTransientState() {
 // boot (TASK-1694). setOTDirectMode() below also persists the mode for user changes.
 // ---------------------------------------------------------------------------
 static void applyOTDirectMode(OTDirectMode newMode) {
-  resetTransientState();  // Clear all transient state on mode change
+  // TASK-1839 (Robert, DM 1570230662743592961, answer A to 1570229987825418384): a real switch between
+  // gateway and monitor keeps all command state, as on the PIC (SetGatewayMode only switches the
+  // comparators, gateway.asm 6.8 :4729-4774); only the queue is flushed (ADR-223). A CS= keeps its
+  // expiry clock (loopOTDirect, every mode). Monitor mode applies none of it (transparent relay, no
+  // own frames). The PIC has no master, loopback or bypass mode; a switch into or out of one of
+  // those still clears the transient state.
+  const bool keep = (otCurrentMode == OTD_MODE_GATEWAY && newMode == OTD_MODE_MONITOR) ||
+                    (otCurrentMode == OTD_MODE_MONITOR && newMode == OTD_MODE_GATEWAY);
+  if (keep) otdFlushCmdQueue();
+  else      resetTransientState();
   otCurrentMode  = newMode;
 
   switch (newMode) {
@@ -3011,12 +3120,27 @@ static void setOTDirectMode(OTDirectMode newMode) {
 // Called once per second from loopOTDirect().
 // ---------------------------------------------------------------------------
 static void checkThermostatTimeout() {
-  if (!otThermostatSeen) return;  // no frame ever received — nothing to time out
-
-  uint32_t elapsed = millis() - otLastThermostatMs;
+  // TASK-1850: the PIC's own lines on loss and return (gateway.asm 6.8 TDisconnect/TConnect), to port 25238 and
+  // processOT() like every PIC line. At boot the thermostat counts as connected (no line), as on the PIC.
+  static uint8_t picLineState = 0;   // 0 boot, 1 connected, 2 disconnected (reported)
+  auto picLine = [](PGM_P text) {
+    char buf[32];
+    strlcpy_P(buf, text, sizeof(buf));
+    const size_t n = strlen(buf);
+    otDirectBridgeWriteLine(buf, n);
+    processOT(buf, (int)n);
+  };
   uint32_t timeoutMs = (uint32_t)settings.otd.iSetbackTimeout * 1000UL;
 
+  if (!otThermostatSeen) {   // no frame ever received: nothing to time out, but the PIC reports it once
+    if (picLineState == 0 && millis() > timeoutMs) { picLineState = 2; picLine(PSTR("Thermostat disconnected")); }
+    return;
+  }
+
+  uint32_t elapsed = millis() - otLastThermostatMs;
+
   if (elapsed > timeoutMs) {
+    if (picLineState != 2) { picLineState = 2; picLine(PSTR("Thermostat disconnected")); }
     // Thermostat disconnected
     if (state.otd.bThermostatConnected) {
       state.otd.bThermostatConnected = false;
@@ -3025,26 +3149,19 @@ static void checkThermostatTimeout() {
               elapsed / 1000UL);
       sendWebSocketJSON("{\"type\":\"status\",\"msg\":\"OTDirect: disconnected\"}");
     }
-    // Engage setback if fail-safe enabled and in gateway mode
-    if (otFailSafeEnabled && otCurrentMode == OTD_MODE_GATEWAY && !otSetbackEngaged) {
-      otSetbackEngaged = true;
-      state.otd.bSetbackActive = true;
-      uint16_t f88 = floatToF88(settings.otd.fSetbackTemp);
-      setOverride(1, f88);        // Override TSet (MsgID 1) to setback temp
-      updateWriteCache(1, f88);   // Keep writing it to boiler
-      char tb[8]; dtostrf(settings.otd.fSetbackTemp, 1, 1, tb);
-      OTDDebugTf(PSTR("OTD: setback engaged — TSet overridden to %s C\r\n"), tb);
-    }
+    // TASK-1806 (Robert 2026-11-11, "Like the PIC"): no setback flow setpoint. The gateway's own frames carry CH off
+    // and no TSet unless a CS= is in force (buildStatusRequest), as the PIC's standalone frames (gateway.asm 6.6
+    // Disconnect :1770-1789, readstatus :2712-2742, MessageID1 :2796-2820).
   } else {
-    state.otd.bThermostatConnected = true;
-    // Release setback when thermostat reconnects
-    if (otSetbackEngaged) {
-      otSetbackEngaged = false;
-      state.otd.bSetbackActive = false;
-      clearWriteOverride(1);      // Release the TSet override and its cached write (TASK-1707)
-      OTDDebugTln(F("OTD: thermostat reconnected, setback released"));
+    if (picLineState == 2) picLine(PSTR("Thermostat connected"));   // independent of the setback
+    picLineState = 1;
+    // The return is reported on the transition, as the setback release did before (it ran on every return in gateway
+    // mode with the default FS on).
+    if (!state.otd.bThermostatConnected) {
+      OTDDebugTln(F("OTD: thermostat reconnected"));
       sendWebSocketJSON("{\"type\":\"status\",\"msg\":\"OTDirect: connected\"}");
     }
+    state.otd.bThermostatConnected = true;
   }
 }
 
@@ -3063,6 +3180,11 @@ static unsigned long buildOTResponse(uint8_t type, uint8_t msgId, uint16_t data)
 }
 
 static void handleMasterModeSlaveFrame(unsigned long frame) {
+  // TASK-1807: while the boiler is offline (its last MsgID 0 failed) the thermostat gets no answer, as from a
+  // boiler that is gone, instead of READ_ACKs with its last cached status (flame on, CH active). The frame is
+  // still logged. Offline ends at the next good MsgID 0, about 1 s later (TASK-1802).
+  if (!state.otBus.bOnline) { bridgeFrameToParser('T', frame); return; }
+
   uint8_t msgId = (frame >> 16) & 0xFF;
   uint8_t msgType = (frame >> 28) & 0x07;
 
@@ -3176,35 +3298,140 @@ static unsigned long applyResponseModifiers(unsigned long response) {
   return response;
 }
 
-// TASK-1842: the PIC's GetPercentArg (gateway.asm GetPosFloat :5114-5117 + GetFloat :5118-5185, GetPercent
-// :5099-5112) as an f8.8 value. An integer part of 0-255 digits, an optional '.' and digits: the first two
-// fraction digits are kept, the third rounds (:5138-5159), further digits are checked but ignored; the hundredths
-// become 1/256 steps rounded UP when not exact (:5169-5178, "the honeywell thermostat always rounds down").
-// No sign other than '+'; above 100.00 is OR. Returns nullptr on success, else the PIC error code.
-// --- otdPicPercentF88 begin
-static const char* otdPicPercentF88(const char* s, uint16_t &out) {
-  if (*s == '+') s++;
+// TASK-1842, TASK-1859: the PIC 6.8 number parsers (gateway.asm, repo 770aa45) as f8.8 values, so a command
+// stores the same two bytes the PIC stores.
+//   GetFloat :5118-5185: an optional '-' or '+', an integer part of 0-255 (GetDecimal :5045-5069: no digit = SE,
+//     above 255 = OR), then only a '.' and digits (anything else SE). The first two fraction digits are kept, the
+//     third rounds (:5138-5159), further digits are checked but ignored. The hundredths become 1/256 steps
+//     (Divide100 :5211-5225, carry into the integer at 100) rounded UP when not exact (:5172-5175, "the honeywell
+//     thermostat always rounds down"). A negative value inverts the integer byte and takes 100 - hundredths, or
+//     adds 1 to the inverted byte when there is no fraction (:5160-5167, :5183-5184). The bytes wrap as on the PIC.
+//   GetPosFloat :5114-5117: a '-' is not a sign, so it reaches GetDecimal and is SE.
+//   GetPercent :5099-5112: GetPosFloat, then above 100.00 is OR. Parse errors and the range error differ for
+//     CL= (SetCoolLevel :4454-4462 clears on a parse error, answers OR on the range error): *parseErr tells them apart.
+// Returns nullptr on success, else the PIC error code.
+// --- otdPicFloat begin
+// uint8_t, not an enum: the Arduino prototype generator puts the prototype above any type declared in this file.
+static constexpr uint8_t OTD_PIC_FLOAT = 0, OTD_PIC_POSFLOAT = 1, OTD_PIC_PERCENT = 2;
+
+static const char* otdPicFloatF88(const char* s, uint8_t kind, uint16_t &out, bool* parseErr = nullptr) {
+  if (parseErr) *parseErr = true;
+  bool neg = false;
+  if (*s == '-' && kind == OTD_PIC_FLOAT) { neg = true; s++; }
+  else if (*s == '+') s++;
   if (*s < '0' || *s > '9') return "SE";
   unsigned ip = 0;
   while (*s >= '0' && *s <= '9') { ip = ip * 10 + (unsigned)(*s - '0'); if (ip > 255) return "OR"; s++; }
   unsigned h = 0;
   if (*s == '.') {
     s++;
-    for (uint8_t n = 0; *s; n++, s++) {
+    for (uint8_t n = 0; *s; s++) {
       if (*s < '0' || *s > '9') return "SE";
-      if (n < 2) h = h * 10 + (unsigned)(*s - '0');
-      else if (n == 2 && *s >= '5') h++;
+      if (n == 0) h = (unsigned)(*s - '0') * 10;       // tenths (Multiply10, :5144-5145)
+      else if (n == 1) h += (unsigned)(*s - '0');      // hundredths
+      else if (n == 2 && *s >= '5') h++;               // the third digit rounds
+      if (n < 3) n++;
     }
   } else if (*s) {
     return "SE";
   }
-  if (h >= 100) { ip++; h -= 100; }                  // Divide100 carry (:5170-5172)
-  if (ip > 100 || (ip == 100 && h > 0)) return "OR";  // GetPercent: above 100.00
-  const unsigned frac = (h * 256u + 99u) / 100u;     // round up when not exact
-  out = (uint16_t)((ip << 8) | frac);
+  uint8_t hi = (uint8_t)ip;
+  if (neg) {
+    hi = (uint8_t)~hi;                                // comf temp
+    if (h == 0) hi++;                                 // GetFloatNegInt
+    else h = 100 - h;
+  }
+  if (h >= 100) { hi++; h -= 100; }                   // Divide100 carry
+  const unsigned frac = (h * 256u + 99u) / 100u;      // round up when not exact
+  if (parseErr) *parseErr = false;
+  if (kind == OTD_PIC_PERCENT && (hi > 100 || (hi == 100 && frac > 0))) return "OR";   // above 100.00
+  out = (uint16_t)((hi << 8) | frac);
   return nullptr;
 }
-// --- otdPicPercentF88 end
+
+static inline const char* otdPicPercentF88(const char* s, uint16_t &out) {
+  return otdPicFloatF88(s, OTD_PIC_PERCENT, out);
+}
+
+// The PIC's CommandFloat reply, PrintSigned :2043-2064: a negative value is negated and gets a '-'; a fraction
+// byte of 0xFF prints as the next integer; else the hundredths are frac * 100 / 256, rounded half up (float2
+// bit 7). Two decimals, no leading zeros on the integer.
+static void otdPicPrintF88(uint16_t f88, char* buf, size_t len) {
+  const bool neg = (f88 & 0x8000u) != 0;
+  if (neg) f88 = (uint16_t)(0u - f88);
+  unsigned hi = f88 >> 8, lo = f88 & 0xFFu;
+  if (lo == 0xFFu) { hi = (hi + 1u) & 0xFFu; lo = 0; }
+  const unsigned p = lo * 100u;
+  const unsigned hund = (p >> 8) + ((p & 0x80u) ? 1u : 0u);
+  snprintf_P(buf, len, PSTR("%s%u.%02u"), neg ? "-" : "", hi, hund);
+}
+// --- otdPicFloat end
+
+// TASK-1761: every OT-Direct state change runs on the loop task. A command from another task (the REST and
+// settings handlers run on async_tcp) is copied into this ring in arrival order and run by otdCmdTextDrain():
+// from loopOTDirect() between frames (no master request in flight, like the TASK-1702 pending mode), and by
+// addCommandToQueue()/sendPICSerial() on the loop task before their own command, so a loop-task command never
+// overtakes an older queued one (otdCmdTextMustWait() makes it queue too while a request is in flight).
+// 8 slots, one kept free to tell full from empty: 7 commands. Several producers: the portMUX guards head and
+// tail; one consumer, the loop task.
+// --- otdCmdTextRing begin
+struct OtdCmdText { uint8_t len; bool satOwn; char text[PIC_CMD_MAX_LEN + 1]; };
+static constexpr uint8_t OTD_CMD_TEXT_SLOTS = 8;
+static OtdCmdText otdCmdText[OTD_CMD_TEXT_SLOTS];
+static uint8_t otdCmdTextHead = 0;   // next slot to write
+static uint8_t otdCmdTextTail = 0;   // next slot to read
+static uint32_t otdCmdTextDropped = 0;
+static portMUX_TYPE otdCmdTextMux = portMUX_INITIALIZER_UNLOCKED;
+
+bool otdCmdTextPush(const char* buf, int len, bool satOwn) {
+  if (buf == nullptr || len <= 0 || len > PIC_CMD_MAX_LEN) return false;
+  bool ok = false;
+  portENTER_CRITICAL(&otdCmdTextMux);
+  const uint8_t next = (uint8_t)((otdCmdTextHead + 1) % OTD_CMD_TEXT_SLOTS);
+  if (next != otdCmdTextTail) {
+    OtdCmdText& e = otdCmdText[otdCmdTextHead];
+    memcpy(e.text, buf, (size_t)len);
+    e.text[len] = '\0';
+    e.len = (uint8_t)len;
+    e.satOwn = satOwn;
+    otdCmdTextHead = next;
+    ok = true;
+  } else {
+    otdCmdTextDropped++;
+  }
+  portEXIT_CRITICAL(&otdCmdTextMux);
+  return ok;
+}
+
+// The pop lives inside the drain: a function with an OtdCmdText parameter would get an Arduino-generated prototype
+// above the struct (test_ino_prototype_hoisting).
+void otdCmdTextDrain() {
+  OtdCmdText c;
+  for (;;) {
+    bool ok = false;
+    portENTER_CRITICAL(&otdCmdTextMux);
+    if (otdCmdTextTail != otdCmdTextHead) {
+      c = otdCmdText[otdCmdTextTail];
+      otdCmdTextTail = (uint8_t)((otdCmdTextTail + 1) % OTD_CMD_TEXT_SLOTS);
+      ok = true;
+    }
+    portEXIT_CRITICAL(&otdCmdTextMux);
+    if (!ok) break;
+    handleOTDirectCommand(c.text, c.len, c.satOwn);   // outside the lock: the handler can take its own locks
+  }
+}
+
+// A queued command (a GW=R or GW= from REST) must not run while a master request is in flight: GW= calls
+// setOTDirectMode() at once, not through the TASK-1702 pending mode. So while commands wait and a request is in
+// flight, a loop-task command queues behind them too (the order stays; it answers Queued instead of Sent/Dropped,
+// as a command to the PIC does). Loop task only.
+bool otdCmdTextMustWait() {
+  portENTER_CRITICAL(&otdCmdTextMux);
+  const bool queued = otdCmdTextHead != otdCmdTextTail;
+  portEXIT_CRITICAL(&otdCmdTextMux);
+  return queued && otMasterRequestActive;
+}
+// --- otdCmdTextRing end
 
 // ---------------------------------------------------------------------------
 // handleOTDirectCommand — translate PIC-style commands to OT frames
@@ -3307,11 +3534,15 @@ bool handleOTDirectCommand(const char* buf, int len, bool satOwn) {
 
   // CS=xx.x — Control setpoint (MsgID 1 = TSet). Value 0 clears override.
   if (cmd0 == 'C' && cmd1 == 'S') {
-    float temp = atof(value);
+    // TASK-1859: parsed as the PIC's GetPercentArg (SetCtrlSetpoint gateway.asm 6.8:4218): SE/OR as on the PIC
+    // (CS= with no value is SE, tests/command-4.stc), same f8.8 (CS=49.72 -> 0x31B9, control-1.stc).
+    uint16_t f88 = 0;
+    const char* err = otdPicFloatF88(value, OTD_PIC_PERCENT, f88);
+    if (err) { otDirectBridgeProcessStatus(err); return false; }
     bool enqueued = true;
     // TASK-1917: release when the f8.8 value is 0, as the PIC does (SetCtrlSetpoint tests the converted bytes,
     // gateway.asm:4218-4226): a CS=0.001 would otherwise be a permanent 0 C override under the below-8 rule.
-    if (floatToF88(temp) == 0) {
+    if (f88 == 0) {
       // CS=0 clears the flow setpoint override only and does not write bit0 (CH enable)
       // of MsgID 0. CH= overrides bit0 only while a CS override is active (gateway.asm:53;
       // pyotgw/pyotgw.py:602-603), so clearing the override hands bit0 back to the board's
@@ -3319,14 +3550,13 @@ bool handleOTDirectCommand(const char* buf, int len, bool satOwn) {
       clearWriteOverride(1);
       otCSLastCommandMs = 0;  // TASK-442: explicit clear, no expiry
     } else {
-      uint16_t f88 = floatToF88(temp);
       enqueued = enqueueWriteCommand(1, f88, "CS");
       if (enqueued) {
         otCSLastCommandMs = otdCsc2ExpiryStamp(f88);  // TASK-442 refresh; TASK-1917: below 8 never expires
       }
     }
     if (enqueued) {
-      dtostrf(temp, 1, 2, rspBuf);
+      otdPicPrintF88(f88, rspBuf, sizeof(rspBuf));
       synthesizeResponse(buf, rspBuf);
     }
   }
@@ -3336,19 +3566,20 @@ bool handleOTDirectCommand(const char* buf, int len, bool satOwn) {
   // boiler; master mode writes MsgID 16 / 100. Ends at TC=0, a replacement TT=/TC=,
   // or the release rule of onThermostatMsgID16.
   //
-  // TASK-500 (1A-M3): "clear" trigger is exact-zero (gateway.asm SetSetPoint
-  // parity). Negative values are NOT treated as clear; they set a TEMPORARY/
-  // CONSTANT override at the negative °C, clamped to -40 °C by the floatToF88
-  // helper (f8.8 lower bound). This is by design, not a bug — matches PIC
-  // behaviour. To clear, send TC=0 (or TT=0).
+  // TASK-500 (1A-M3): "clear" trigger is exact-zero (gateway.asm SetSetPoint parity). TASK-1859: the value is
+  // parsed as the PIC's GetPosFloatArg (SetContSetPoint :4084, SetTempSetPoint :4089), so a negative value is SE
+  // as on the PIC (the TASK-500 note that negatives set an override did not match gateway.asm). TC=16.2 -> 0x1034,
+  // TT=16.1 -> 0x101A (tests/override-1.stc, override-2.stc). To clear, send TC=0 (or TT=0).
   else if (cmd0 == 'T' && cmd1 == 'C') {
-    float temp = atof(value);
-    if (temp == 0.0f) {
+    uint16_t f88 = 0;
+    const char* err = otdPicFloatF88(value, OTD_PIC_POSFLOAT, f88);
+    if (err) { otDirectBridgeProcessStatus(err); return false; }
+    if (f88 == 0) {
       clearRemoteOverride();
     } else {
-      setRemoteOverride(OT_OVERRIDE_CONSTANT, temp);
+      setRemoteOverride(OT_OVERRIDE_CONSTANT, (int16_t)f88 / 256.0f);
     }
-    dtostrf(temp, 1, 2, rspBuf);
+    otdPicPrintF88(f88, rspBuf, sizeof(rspBuf));
     synthesizeResponse(buf, rspBuf);
   }
   // TT=xx.x — Temporary room setpoint override.
@@ -3357,13 +3588,15 @@ bool handleOTDirectCommand(const char* buf, int len, bool satOwn) {
   // boiler; master mode writes MsgID 16 / 100. Ends at TT=0, a replacement TT=/TC=,
   // or the release rule of onThermostatMsgID16.
   else if (cmd0 == 'T' && cmd1 == 'T') {
-    float temp = atof(value);
-    if (temp == 0.0f) {
+    uint16_t f88 = 0;
+    const char* err = otdPicFloatF88(value, OTD_PIC_POSFLOAT, f88);   // TASK-1859: GetPosFloatArg, see TC=
+    if (err) { otDirectBridgeProcessStatus(err); return false; }
+    if (f88 == 0) {
       clearRemoteOverride();
     } else {
-      setRemoteOverride(OT_OVERRIDE_TEMPORARY, temp);
+      setRemoteOverride(OT_OVERRIDE_TEMPORARY, (int16_t)f88 / 256.0f);
     }
-    dtostrf(temp, 1, 2, rspBuf);
+    otdPicPrintF88(f88, rspBuf, sizeof(rspBuf));
     synthesizeResponse(buf, rspBuf);
   }
   // BS=xx.x — Fake boiler room setpoint (MsgID 16 frame interception).
@@ -3373,16 +3606,19 @@ bool handleOTDirectCommand(const char* buf, int len, bool satOwn) {
   // is the thermostat's own request, not a separate WRITE_DATA from the gateway.
   // BS=0 clears the fake and restores the thermostat's original room setpoint.
   else if (cmd0 == 'B' && cmd1 == 'S') {
-    float temp = atof(value);
-    if (temp == 0.0f) {
+    // TASK-1859: parsed as the PIC's GetPercentArg (SetFakeSetpoint gateway.asm 6.8:4289-4298); BS=24.6 -> 0x189A
+    // (control-5.stc).
+    uint16_t f88 = 0;
+    const char* err = otdPicFloatF88(value, OTD_PIC_PERCENT, f88);
+    if (err) { otDirectBridgeProcessStatus(err); return false; }
+    if (f88 == 0) {
       otFakeRoomSetpoint = 0.0f;
       clearWriteOverride(16);   // also an MQTT room_setpoint write
     } else {
-      otFakeRoomSetpoint = temp;
-      uint16_t f88 = floatToF88(temp);
+      otFakeRoomSetpoint = f88 / 256.0f;
       setOverride(16, f88);
     }
-    dtostrf(temp, 1, 2, rspBuf);
+    otdPicPrintF88(f88, rspBuf, sizeof(rspBuf));
     synthesizeResponse(buf, rspBuf);
   }
   // RT=xx.xx — Room temperature for the boiler (MsgID 24 = Tr), PIC 6.8 (gateway.asm SetRoomTemp
@@ -3402,95 +3638,123 @@ bool handleOTDirectCommand(const char* buf, int len, bool satOwn) {
       setOverride(24, f88);
       updateWriteCache(24, f88);
     }
-    dtostrf(f88 / 256.0f, 1, 2, rspBuf);
+    otdPicPrintF88(f88, rspBuf, sizeof(rspBuf));
     synthesizeResponse(buf, rspBuf);
   }
   // C2=xx.x — Control setpoint CH2 (MsgID 8 = TsetCH2). Value 0 clears.
   else if (cmd0 == 'C' && cmd1 == '2') {
-    float temp = atof(value);
+    // TASK-1859: parsed as the PIC's GetPercentArg (SetCtrlSetpt2 gateway.asm 6.8:5272); C2=45.6 -> 45.60 (command-2.stc).
+    uint16_t f88 = 0;
+    const char* err = otdPicFloatF88(value, OTD_PIC_PERCENT, f88);
+    if (err) { otDirectBridgeProcessStatus(err); return false; }
     bool enqueued = true;
-    if (floatToF88(temp) == 0) {   // TASK-1917: release on a zero f8.8 value, as for CS=
+    if (f88 == 0) {   // TASK-1917: release on a zero f8.8 value, as for CS=
       clearWriteOverride(8);
       otC2LastCommandMs = 0;  // TASK-442: explicit clear, no expiry
     } else {
-      uint16_t f88 = floatToF88(temp);
       enqueued = enqueueWriteCommand(8, f88, "C2");
       if (enqueued) {
         otC2LastCommandMs = otdCsc2ExpiryStamp(f88);  // TASK-442 refresh; TASK-1917: below 8 never expires
       }
     }
     if (enqueued) {
-      dtostrf(temp, 1, 2, rspBuf);
+      otdPicPrintF88(f88, rspBuf, sizeof(rspBuf));
       synthesizeResponse(buf, rspBuf);
     }
   }
   // CC=xx.x — Cooling control signal (MsgID 7, 0-100%)
   else if (cmd0 == 'C' && cmd1 == 'C') {
-    uint16_t f88 = floatToF88(atof(value));
+    // TASK-1859: no PIC command; parsed like its MsgID 7 sibling CL= (GetPercentArg), errors answered as SE/OR.
+    uint16_t f88 = 0;
+    const char* err = otdPicFloatF88(value, OTD_PIC_PERCENT, f88);
+    if (err) { otDirectBridgeProcessStatus(err); return false; }
     if (enqueueWriteCommand(7, f88, "CC")) {
-      dtostrf(atof(value), 1, 2, rspBuf);
+      otdPicPrintF88(f88, rspBuf, sizeof(rspBuf));
       synthesizeResponse(buf, rspBuf);
     }
   }
   // SW=xx.x — DHW setpoint (MsgID 56 = TdhwSet). Value 0 clears.
   else if (cmd0 == 'S' && cmd1 == 'W') {
-    float temp = atof(value);
+    // TASK-1859: as the PIC SetHotWaterTemp :4164-4189: GetFloatArg, 0 resets, else BV outside the MsgID 48 bounds.
+    uint16_t f88 = 0;
+    const char* err = otdPicFloatF88(value, OTD_PIC_FLOAT, f88);
+    if (!err && f88 != 0 && !otdPicInBounds(48, 20, 80, f88)) err = "BV";
+    if (err) { otDirectBridgeProcessStatus(err); return false; }
     bool enqueued = true;
-    if (temp == 0.0f) {
+    if (f88 == 0) {
       clearWriteOverride(56);
     } else {
-      uint16_t f88 = floatToF88(temp);
       enqueued = enqueueWriteCommand(56, f88, "SW");
     }
     if (enqueued) {
-      otdPersistFloat(settings.otd.fDhwSetpoint, temp);   // TASK-1836: SaveConfig, re-sent at boot
-      dtostrf(temp, 1, 2, rspBuf);
+      otdPersistFloat(settings.otd.fDhwSetpoint, (int16_t)f88 / 256.0f);   // TASK-1836: SaveConfig, re-sent at boot
+      otdPicPrintF88(f88, rspBuf, sizeof(rspBuf));
       synthesizeResponse(buf, rspBuf);
     }
   }
   // SH=xx.x — Max CH water setpoint (MsgID 57 = MaxTSet). Value 0 clears.
   else if (cmd0 == 'S' && cmd1 == 'H') {
-    float temp = atof(value);
+    // TASK-1859: as the PIC SetHeatingTemp :4191-4216: GetFloatArg, 0 resets, else BV outside the MsgID 49 bounds.
+    uint16_t f88 = 0;
+    const char* err = otdPicFloatF88(value, OTD_PIC_FLOAT, f88);
+    if (!err && f88 != 0 && !otdPicInBounds(49, 10, 90, f88)) err = "BV";
+    if (err) { otDirectBridgeProcessStatus(err); return false; }
     bool enqueued = true;
-    if (temp == 0.0f) {
+    if (f88 == 0) {
       clearWriteOverride(57);
     } else {
-      uint16_t f88 = floatToF88(temp);
       enqueued = enqueueWriteCommand(57, f88, "SH");
     }
     if (enqueued) {
-      otdPersistFloat(settings.otd.fMaxChSetpoint, temp);   // TASK-1836: SaveConfig, re-sent at boot
-      dtostrf(temp, 1, 2, rspBuf);
+      otdPersistFloat(settings.otd.fMaxChSetpoint, (int16_t)f88 / 256.0f);   // TASK-1836: SaveConfig, re-sent at boot
+      otdPicPrintF88(f88, rspBuf, sizeof(rspBuf));
       synthesizeResponse(buf, rspBuf);
     }
   }
   // MM=xx — Max relative modulation level (MsgID 14). Non-numeric clears.
   else if (cmd0 == 'M' && cmd1 == 'M') {
-    if (!isdigit((unsigned char)value[0]) && value[0] != '-') {
+    // TASK-1799: as the PIC SetMaxModLevel (gateway.asm 6.8:4794-4807): GetDecimalArg (:5045-5069); any parse error
+    // (no digit first, MM=- and MM= included, or above 255) clears with the ValueCleared reply "MM: -"; characters
+    // after the number are SE; above 100 is OR; the reply is the stored percentage (PrintByte).
+    const char* p = value;
+    unsigned mm = 0;
+    bool parsed = isdigit((unsigned char)*p) != 0;
+    while (parsed && isdigit((unsigned char)*p)) {
+      mm = mm * 10 + (unsigned)(*p - '0');
+      if (mm > 255) parsed = false;
+      p++;
+    }
+    if (!parsed) {
       clearWriteOverride(14);
-      synthesizeResponse(buf, value);
-    } else {
-      uint16_t f88 = floatToF88(atof(value));
-      if (enqueueWriteCommand(14, f88, "MM")) {
-        snprintf_P(rspBuf, sizeof(rspBuf), PSTR("%d"), atoi(value));
-        synthesizeResponse(buf, rspBuf);
-      }
+      synthesizeResponse(buf, "-");
+    } else if (*p) {
+      otDirectBridgeProcessStatus("SE");
+      return false;
+    } else if (mm > 100) {
+      otDirectBridgeProcessStatus("OR");
+      return false;
+    } else if (enqueueWriteCommand(14, (uint16_t)(mm << 8), "MM")) {
+      snprintf_P(rspBuf, sizeof(rspBuf), PSTR("%u"), mm);
+      synthesizeResponse(buf, rspBuf);
     }
   }
   // OT=xx.x — Outside temperature (MsgID 27 = Toutside). Non-numeric clears.
   else if (cmd0 == 'O' && cmd1 == 'T') {
-    // TASK-1846: a value is a digit, or a '-'/'+' sign followed by a digit (PIC GetFloatArg/GetFloat gateway.asm 6.8 :5118-5129); anything else,
-    // OT=- included, clears as the PIC's ClrOutsideT. Before, OT=- passed as a number and wrote 0.00.
-    const bool signedNum = (value[0] == '-' || value[0] == '+') && isdigit((unsigned char)value[1]);
-    if (!isdigit((unsigned char)value[0]) && !signedNum) {
+    // TASK-1846, TASK-1859: as the PIC SetOutsideT (gateway.asm 6.8:4256-4270): the value is parsed by GetFloatArg;
+    // any parse error clears (ClrOutsideT, OT=- included), and so does a value of 64.00-127.99 (integer byte bit 6
+    // set, bit 7 clear; the OR return is commented out in the PIC), with the ValueCleared reply "OT: -". A positive
+    // integer of 128-255 has bit 7 set and is stored as the PIC stores it (OT=200 is 0xC800, -56.00).
+    // OT=-1.4 -> 0xFE9A (tests/command-7.stc), OT=9.999 -> 10.00, OT=-0.004 -> 0.00 (command-6.stc).
+    uint16_t f88 = 0;
+    const char* err = otdPicFloatF88(value, OTD_PIC_FLOAT, f88);
+    if (err || ((f88 & 0x8000u) == 0 && (f88 & 0x4000u) != 0)) {
       clearWriteOverride(27);
-      synthesizeResponse(buf, value);
+      synthesizeResponse(buf, "-");
     } else {
-      uint16_t f88 = floatToF88(atof(value));
       if (enqueueWriteCommand(27, f88, "OT")) {
         otdPsStoreOutside(f88);   // TASK-1846: the PS=1 line shows the OT= value, as on the PIC
         OTcurrentSystemState.Toutside = (int16_t)f88 / 256.0f;
-        dtostrf(OTcurrentSystemState.Toutside, 1, 2, rspBuf);
+        otdPicPrintF88(f88, rspBuf, sizeof(rspBuf));
         synthesizeResponse(buf, rspBuf);
       }
     }
@@ -3529,7 +3793,8 @@ bool handleOTDirectCommand(const char* buf, int len, bool satOwn) {
       otSCClockData = (uint16_t)(((dow & 0x07) << 5 | (hh & 0x1F)) << 8) | (mm & 0x3F);
       otSCLastCommandMs = millis();
       if (otSCLastCommandMs == 0) otSCLastCommandMs = 1;  // 0 sentinel reserved
-      snprintf_P(rspBuf, sizeof(rspBuf), PSTR("%d:%02d/%d"), hh & 0x1F, mm & 0x3F, dow & 0x07);
+      // TASK-1849: two-digit hours like the PIC (PrintDecimal, gateway.asm 6.8:4374-4388): "SC: 09:05/3"
+      snprintf_P(rspBuf, sizeof(rspBuf), PSTR("%02d:%02d/%d"), hh & 0x1F, mm & 0x3F, dow & 0x07);
       synthesizeResponse(buf, rspBuf);
     }
   }
@@ -3622,18 +3887,22 @@ bool handleOTDirectCommand(const char* buf, int len, bool satOwn) {
   // CL=xx.x — Cooling level (PIC-compatible alias for CC=, MsgID 7)
   else if (cmd0 == 'C' && cmd1 == 'L') {
     // TASK-1833: as the PIC SetCoolLevel (gateway.asm 6.8:4454-4464): a number, 0 included, is held as the
-    // cooling level; only a value that is not a number clears it, with the ValueCleared reply "CL: -".
-    char* end = nullptr;
-    float cl = strtof(value, &end);
+    // cooling level; a value the PIC's GetPercentArg cannot parse clears it, with the ValueCleared reply "CL: -";
+    // above 100.00 is OR (TASK-1859). CL=94.38 -> 0x5E62 (heatpump-2.stc).
+    uint16_t f88 = 0;
+    bool parseErr = false;
+    const char* err = otdPicFloatF88(value, OTD_PIC_PERCENT, f88, &parseErr);
     bool enqueued = true;
-    if (end == value) {
+    if (err && !parseErr) {
+      otDirectBridgeProcessStatus(err);
+      return false;
+    } else if (err) {
       clearWriteOverride(7);
       synthesizeResponse(buf, "-");
     } else {
-      uint16_t f88 = floatToF88(cl);
       enqueued = enqueueWriteCommand(7, f88, "CL");
       if (enqueued) {
-        dtostrf(cl, 1, 2, rspBuf);
+        otdPicPrintF88(f88, rspBuf, sizeof(rspBuf));
         synthesizeResponse(buf, rspBuf);
       }
     }
@@ -3702,6 +3971,11 @@ bool handleOTDirectCommand(const char* buf, int len, bool satOwn) {
     // TASK-438: PIC parity. gateway.asm: GW=0 = monitor, GW=1 = gateway,
     // GW=R = reset. Bypass moved to GW=P (OTDirect-only alias) so PIC
     // tooling sending GW=0 cannot accidentally engage bypass relay.
+    // TASK-1946: one character only (else "GW: SE"), and a value outside 0, 1, R and the OT-Direct extensions
+    // M, 2/S, P, L answers "GW: BV" and changes nothing, as the PIC: SerialCommand prints "GW: " first
+    // (gateway.asm 6.6 :3695-3703), SetGatewayMode checks the length (:4687-4690, SyntaxError), CheckBoolean
+    // accepts 0 and 1 (:4041-4051) and ResetGateway answers BadValue to anything but R (:4734-4738).
+    if (value[0] == '\0' || value[1] != '\0') { synthesizeResponse(buf, "SE"); return false; }
     if (value[0] == '0' || value[0] == 'M') {
       // GW=0 / GW=M — Monitor mode: transparent pass-through.
       setOTDirectMode(OTD_MODE_MONITOR);
@@ -3743,6 +4017,9 @@ bool handleOTDirectCommand(const char* buf, int len, bool satOwn) {
       otMaster.begin(masterISR);
       otSlave.begin(slaveISR, handleSlaveRequest);
       OTDDebugTln(F("OTD: OT interfaces restarted"));
+    } else {
+      synthesizeResponse(buf, "BV");
+      return false;
     }
     rspBuf[0] = value[0]; rspBuf[1] = '\0';
     synthesizeResponse(buf, rspBuf);
@@ -3778,31 +4055,18 @@ bool handleOTDirectCommand(const char* buf, int len, bool satOwn) {
         }
         break;
       case 'O': {
-        // Setpoint override report. TASK-466: TT/TC remote-override state
-        // machine takes precedence — it carries the explicit mode (T or C).
-        // Falls back to CS (boiler control setpoint) if no TT/TC is active
-        // and a CS override is in force.
-        if (otRemoteOverride.mode == OT_OVERRIDE_TEMPORARY) {
-          dtostrf((int16_t)otRemoteOverride.f88Value / 256.0f, 1, 2, rspBuf);
-          snprintf_P(prBuf, sizeof(prBuf), PSTR("PR: O=T%s"), rspBuf);
-        } else if (otRemoteOverride.mode == OT_OVERRIDE_CONSTANT) {
-          dtostrf((int16_t)otRemoteOverride.f88Value / 256.0f, 1, 2, rspBuf);
-          snprintf_P(prBuf, sizeof(prBuf), PSTR("PR: O=C%s"), rspBuf);
+        // TASK-1848: the remote room setpoint override (TT=/TC=) as PrintOverride prints it (gateway.asm
+        // 6.8:2201-2226): N for none, n while a clear still has to reach the thermostat, else T or C and the
+        // setpoint, the letter in lowercase until the thermostat took the override over (OverrideSet,
+        // set at :3016-3018 when its MsgID 16 matches; here bAccepted, ADR-223). CS= is not part of it on
+        // the PIC (SetSetPoint :4095 only serves TT/TC), so a CS= override reports N.
+        if (otRemoteOverride.mode == OT_OVERRIDE_NONE) {
+          snprintf_P(prBuf, sizeof(prBuf), PSTR("PR: O=%c"), otRemoteOverrideClearPending ? 'n' : 'N');
         } else {
-          // No TT/TC: check for a CS (MsgID 1) flow setpoint override.
-          bool csActive = false;
-          uint16_t csVal = 0;
-          for (uint8_t i = 0; i < OT_OVERRIDE_COUNT; i++) {
-            if (otOverrides[i].active && otOverrides[i].msgId == 1) {
-              csActive = true; csVal = otOverrides[i].overrideValue; break;
-            }
-          }
-          if (csActive) {
-            dtostrf((int16_t)csVal / 256.0f, 1, 2, rspBuf);
-            snprintf_P(prBuf, sizeof(prBuf), PSTR("PR: O=C%s"), rspBuf);
-          } else {
-            snprintf_P(prBuf, sizeof(prBuf), PSTR("PR: O=N"));
-          }
+          char letter = (otRemoteOverride.mode == OT_OVERRIDE_TEMPORARY) ? 'T' : 'C';
+          if (!otRemoteOverride.bAccepted) letter = (char)(letter | 0x20);
+          dtostrf((int16_t)otRemoteOverride.f88Value / 256.0f, 1, 2, rspBuf);
+          snprintf_P(prBuf, sizeof(prBuf), PSTR("PR: O=%c%s"), letter, rspBuf);
         }
         otDirectBridgeProcessPRResponse(prBuf);
         break;
@@ -3840,19 +4104,25 @@ bool handleOTDirectCommand(const char* buf, int len, bool satOwn) {
         otDirectBridgeProcessPRResponse(prBuf);
         break;
       case 'P':
-        snprintf_P(prBuf, sizeof(prBuf), PSTR("PR: P=M"));  // medium power (default)
+        // TASK-1848: the Smart Power level towards the thermostat, in the PIC's words.
+        snprintf_P(prBuf, sizeof(prBuf), PSTR("PR: P=%s"),
+                   otdPowerLevelText(otSlave.txRaised(), otSlave.rxInverted()));
         otDirectBridgeProcessPRResponse(prBuf);
         break;
       case 'R':
-        snprintf_P(prBuf, sizeof(prBuf), PSTR("PR: R=I"));  // internal detection
+        snprintf_P(prBuf, sizeof(prBuf), PSTR("PR: R=%c"), otForceThermostat);  // TASK-1848: FT= model, D by default
         otDirectBridgeProcessPRResponse(prBuf);
         break;
-      case 'B':
-        snprintf_P(prBuf, sizeof(prBuf), PSTR("PR: B=%s"), __DATE__);
+      case 'B': {
+        char stamp[20];   // "HH:MM DD-MM-YYYY" is 16 characters, longer than rspBuf
+        otdPicBuildStamp(__DATE__, __TIME__, stamp, sizeof(stamp));   // TASK-1848: PIC format
+        snprintf_P(prBuf, sizeof(prBuf), PSTR("PR: B=%s"), stamp);
         otDirectBridgeProcessPRResponse(prBuf);
         break;
+      }
       case 'C':
-        snprintf_P(prBuf, sizeof(prBuf), PSTR("PR: C=240"));  // ESP32-S3 @ 240MHz
+        // TASK-1848: the PIC's "<n> MHz" (SpeedString gateway.asm 6.8:5506-5507) with the ESP32-S3's clock.
+        snprintf_P(prBuf, sizeof(prBuf), PSTR("PR: C=240 MHz"));
         otDirectBridgeProcessPRResponse(prBuf);
         break;
       case 'Q': {
@@ -4031,7 +4301,10 @@ bool handleOTDirectCommand(const char* buf, int len, bool satOwn) {
     otResponseOverrides[slot].msgId = (uint8_t)msgId;
     otResponseOverrides[slot].value = (uint16_t)dataVal;
     otResponseOverrides[slot].active = true;
-    synthesizeResponse(buf, value);
+    // TASK-1849: the stored value as the PIC prints it (UpdateResponse gateway.asm 6.8:4856-4859):
+    // "<id>:<high byte>/<low byte>", e.g. "SR: 18:1/230", whatever form the argument had.
+    snprintf_P(rspBuf, sizeof(rspBuf), PSTR("%u:%u/%u"), msgId, (dataVal >> 8) & 0xFF, dataVal & 0xFF);
+    synthesizeResponse(buf, rspBuf);
   }
   // CR=MsgID — Clear response override
   else if (cmd0 == 'C' && cmd1 == 'R') {
@@ -4110,9 +4383,17 @@ bool handleOTDirectCommand(const char* buf, int len, bool satOwn) {
 
   // SB=xx.x — Setback temperature (used when thermostat disconnects)
   else if (cmd0 == 'S' && cmd1 == 'B') {
-    otSetbackTemp = constrain(atof(value), 1.0f, 30.0f);
+    // TASK-1859: parsed as the PIC SetSetBack (gateway.asm 6.8:4155-4162): GetPosFloatArg, a zero value is SE;
+    // SB=18.23 -> PR: S=18.23 (tests/gpio-5.stc). Stored and reported only: since TASK-1806 nothing writes the
+    // setback (TASK-1950 decides whether it goes). The 1-30 C clamp it had as the old fail-safe TSet stays, so a
+    // stored value never exceeds what that path once allowed; the reply prints the stored (clamped) value.
+    uint16_t f88 = 0;
+    const char* err = otdPicFloatF88(value, OTD_PIC_POSFLOAT, f88);
+    if (!err && f88 == 0) err = "SE";
+    if (err) { otDirectBridgeProcessStatus(err); return false; }
+    otSetbackTemp = constrain((int16_t)f88 / 256.0f, 1.0f, 30.0f);
     otdPersistFloat(settings.otd.fSetbackTemp, otSetbackTemp);   // TASK-1836: persist (marks dirty)
-    dtostrf(otSetbackTemp, 1, 2, rspBuf);
+    otdPicPrintF88(floatToF88(otSetbackTemp), rspBuf, sizeof(rspBuf));
     synthesizeResponse(buf, rspBuf);
   }
   // IT=0/1 — Ignore transitions
@@ -4244,8 +4525,9 @@ bool handleOTDirectCommand(const char* buf, int len, bool satOwn) {
   }
   // FT=x — Force thermostat detection
   else if (cmd0 == 'F' && cmd1 == 'T') {
-    otForceThermostat = value[0];
-    rspBuf[0] = value[0]; rspBuf[1] = '\0';
+    otForceThermostat = otdThermostatModelChar(value[0]);   // TASK-1848: stored as PR=R prints it
+    // TASK-1849: the reply is the selected model as PrintRemeha prints it (gateway.asm 6.8:4727), not the argument
+    rspBuf[0] = otForceThermostat; rspBuf[1] = '\0';
     synthesizeResponse(buf, rspBuf);
   }
   // DP=x — Debug pointer (no-op, just acknowledge)

@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-29T12:45:00Z'
-updated_date: '2026-11-14T13:05:00Z'
+updated_date: '2026-11-14T13:13:00Z'
 labels:
   - parked
   - on-hold
@@ -103,4 +103,6 @@ Robert 2026-11-03 (interactive): keep ON HOLD; not the moment yet.
 Robert 2026-11-05 (session otgw-firmware-54, AskUserQuestion): stays parked until 2.1.0; labels parked/on-hold stay.
 
 2026-11-14 encoding study for this feature: docs/diagnostics/ot-stream-encoding-study.md (see TASK-1862 notes). Task stays on hold.
+
+2026-11-14 #dev-sat-mqtt (see TASK-1862, owned by Robert's cloud session): Robert to Sergeant D: 'I'm really looking into building an opt in feature to get data from users so you have more to work with.' https://discord.com/channels/812969634638725140/1105556725714649128/1571146379177234436 ; Sergeant D: 'Even with data only from gruijter we made the software even more robust.' https://discord.com/channels/812969634638725140/1105556725714649128/1571146720300105811 (after 'We don't need to be in a hurry', 1571146149442756669). Local per-user field-data archive exists since 2026-11-14 (RvdB/OTGW-field-data, Robert 1571077884976701491).
 <!-- SECTION:NOTES:END -->

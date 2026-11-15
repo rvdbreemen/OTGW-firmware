@@ -3,11 +3,11 @@ id: TASK-1927
 title: >-
   SAT self-tune signal: replay gruijter field captures through the real
   exclusion checks and the proposed options (4, 3, 1)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-14T08:21:00Z'
-updated_date: '2026-11-14T10:20:00Z'
+updated_date: '2026-11-14T15:36:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -25,7 +25,7 @@ Robert, #dev-sat-mqtt 2026-11-14: 'I agree. Let's try and improve this.' (https:
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [x] #1 The real satTuneTickReason() is compiled on the host from src/OTGW-firmware/SATcontrol.ino (no re-implementation) and reproduces the logged SATTUNEH reasons of both transcripts hour by hour
-- [ ] #2 Per run a table: hours counted today and per option (4, 3, 1, and combined), labelled FIELD; the graph CSV runs labelled as replays of the checks without tuner lines
+- [x] #2 Per run a table: hours counted today and per option (4, 3, 1, and combined), labelled FIELD; the graph CSV runs labelled as replays of the checks without tuner lines
 - [x] #3 Inputs the logs do not contain (for example sun elevation, solar-gain state) are named with the substitute used, or the option is reported as not checkable on that run
 - [x] #4 Results posted to Robert in #dev-sat-mqtt with the evidence path; nothing is changed in the firmware
 <!-- AC:END -->
@@ -48,4 +48,12 @@ Follow-up 2 (75 serial replays, out/followup2_summary.txt, followup2_windows.txt
 Q-TUNE2 asked to Sergeant D on Robert's order (1571103627807039599): #dev-sat-mqtt 1571104705197908121; A keep all-clean / B 60 min hour at >=90 % clean / C shorter or lower; recommendation B. His answer becomes an entry before anything is built.
 
 Q-TUNE2 answered B by Sergeant D (#dev-sat-mqtt 1571105869733564439; 'I agree' to Robert 1571105706982121514): recorded as entry 340. A 60 min hour counts at >=90 % clean ticks, excluded ticks out of the mean; shorter windows not adopted. Implementation needs its own task and an ADR amending ADR-205 d2.
+
+AC2 graph-CSV runs (tune-replay 2026-11-14; scratchpad tune-replay/out/gcsv/: gcsv1-5.json, gcsv_summary.txt, gcsv_check.txt; scripts gcsv_replay.py, gcsv_check.py): real tuner blocks of origin/dev, one tick per sample (dhw=dhw_on, chOn=ch, flameOn=flame, relMod=floor(mod), minMod default 5 %, roomLost=empty room); FIELD inputs, SUBSTITUTE sampling (graph.csv 2026-11-09 at 120 s, expected 30/h, 90 % = 27; the other four CSVs at 5-8 s resampled to the 30 s grid, 120/h, 90 % = 108). Closed hours / counted (whole hour) / counted (>=90 %): 11-09 graph 14/0/0 (min_mod 7, flame_off 7); b167 11/0/0; b171 20/0/0; b214 7/0/0; b218 17/0/0. Cross-check vs the transcript replay in hours without sun/not_sat/PWM: both drop 23/23, first reason equal 20/23. NOT an upper bound: the CSVs lack the PWM state, so the 5 gas PWM hours the transcript replay counts (ADR-231) drop here on flame_off/min_mod. Not checkable from CSVs: sun, SAT active, PWM, not_controlling, coeff_changed, signal/phases (no votes).
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+AC1: the real tuner blocks cut from each run's own commit, host-compiled, reproduce reason and counted in 67/67 logged hours over 5 gruijter runs (beta.68/167/171/214/218); diffs only ticks/mean in boot hours. AC2: per-run tables for today's code and options 4/3/1 and combinations (8 counted hours today, options add 0), follow-ups on window length and clean share (only 60 min at >=90-95 % clean is vote-neutral, 10 h), and the graph-CSV runs replayed as checks without tuner lines (0 counted; not an upper bound because PWM state is missing). AC3: substitutes named (held PID error, 60 s room sampling, valves_open=True, CSV resampling, minMod default 5 %); sun/SAT/PWM not checkable on CSVs. AC4: results posted to Robert in #dev-sat-mqtt (1571097840329953301, 1571098345835991202, 1571101634497609743, 1571103069767471156) with evidence paths; no firmware change. Outcome: entries 340/343 (60 min hour at >=90 % clean), implemented under TASK-1932. Evidence: comms scratchpad tune-replay/ (REPORT.md, out/).
+<!-- SECTION:FINAL_SUMMARY:END -->

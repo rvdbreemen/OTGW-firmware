@@ -3,11 +3,11 @@ id: TASK-1774
 title: >-
   Interrupted filesystem OTA (ConnectionResetError) left .63 in safeboot after
   rollback and reset all settings to defaults (beta.166 -> beta.167)
-status: In Review
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-10T05:53:00Z'
-updated_date: '2026-11-14T08:46:00Z'
+updated_date: '2026-11-14T23:20:00Z'
 labels:
   - bug
   - ota
@@ -226,3 +226,9 @@ Related: TASK-1763 (ipc1 overflow, proven), ADR-225 (covers both IPC stacks).
 
 ---
 <!-- COMMENTS:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+AC1 (bench, 09, .61 beta.187): filesystem OTA cut at 314572 B reproduced the loss (settings/bootcount) and the app rollback to safeboot. AC2 (developer): cause (1) a reset during the filesystem write, boot then reads the default or a half-written image; (2) the FS write fell inside the 30 s PENDING_VERIFY window of a fresh app, so the reset rolled the app back. Evidence in the notes (round 1 on .63, code reading). AC3: RTC snapshot of settings.ini/reboot_count.txt/reboot_log.txt with a 'consistent' field and boot-time restore (ADR-233), plus ota_flash.py waits APP_CONFIRM_WAIT 35 s before the FS POST; old-vs-fix on the same abort-probe reproduction by 09 on .63 (probe1774c.old vs fix2+d3a2537, PASS on every step), shipped build beta.238+9eeb372 no-regression PASS. AC4: ota_flash.py detects a unit in safeboot (_require_main_firmware) and authenticates the updater wait; tests/test_ota_flash.py OtaFlashUnitInSafeboot old 3/3 ERROR (JSONDecodeError) vs fix OK.
+<!-- SECTION:FINAL_SUMMARY:END -->

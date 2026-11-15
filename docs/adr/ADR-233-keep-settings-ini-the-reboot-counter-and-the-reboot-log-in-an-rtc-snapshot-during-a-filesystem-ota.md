@@ -1,7 +1,7 @@
 ---
 id: "ADR-233"
 title: "Keep settings.ini, the reboot counter and the reboot log in an RTC snapshot during a filesystem OTA"
-status: "Proposed"
+status: "Accepted"
 date: "2026-11-14"
 binding: false
 gate: null
@@ -37,11 +37,11 @@ format: "canonical"
 
 <!-- markdownlint-disable MD025 -->
 
-# ADR-233 Keep settings.ini, the reboot counter and the reboot log in an RTC snapshot during a filesystem OTA
+# ADR-233 Keep settings.ini, the reboot counter and the reboot log in an RTC (real-time clock) snapshot during a filesystem OTA (over-the-air update)
 
 ## Status
 
-Proposed, 2026-11-14. The RTC survival gate passed on 2026-11-14 (routes R1 and R2, see Evidence); the power-cut
+Accepted, 2026-11-14.
 control R3 has not been run. Acceptance is the maintainer's decision; the implementation has not been written.
 
 **Decision Maker:** Agent (otgw-firmware-ba), proposed for the maintainer's decision; the coordinator asked for
@@ -56,12 +56,17 @@ status_history:
     changed_by: "Agent: otgw-firmware-ba (Claude)"
     reason: Initial proposal from the TASK-1774 plan; gated on the RTC survival probe
     changed_via: adr-kit
+  - date: 2026-11-14
+    status: Accepted
+    changed_by: "User: Robert van den Breemen"
+    reason: "Accepted 2026-11-14 by Robert in session: 'All ADR proposed 233, 238 and 239 should be accepted. So yes.'"
+    changed_via: adr-kit lifecycle
 ```
 
 ## Context
 
 A filesystem OTA (over-the-air update) writes a new LittleFS image over the whole 768 KB `spiffs` partition. The
-runtime files that are not in the image survive it only in RAM: `settings.ini` as the RAM `settings` struct, and
+runtime files that are not in the image survive it only in RAM (random-access memory): `settings.ini` as the RAM `settings` struct, and
 ten other files (KEEP_LIST, TASK-1266/1286) as heap copies. Both are written back after the remount.
 
 The window in which those files exist only in RAM, traced in `OTGW-ModUpdateServer-esp32.h` (origin/dev
@@ -93,12 +98,12 @@ The memory that can carry data across a reset without a flash write is RTC slow 
 that the startup code does not initialise, so it keeps its content across a software, panic or watchdog reset but
 is garbage after power-on). On the ESP32-S3 with the pinned Arduino libs: `memory.ld` `rtc_slow_seg` starts at
 0x50000000 + 512 (`CONFIG_ULP_COPROC_RESERVE_MEM 512`), so the region is 0x50000200-0x50002000, 7680 B. The
-beta.233+6afbade ELF uses 0x64 B of it (`.rtc_noinit` 0x44, `.rtc.force_slow` 0x20). That leaves about 7.5 KB.
+beta.233+6afbade ELF (Executable and Linkable Format) uses 0x64 B of it (`.rtc_noinit` 0x44, `.rtc.force_slow` 0x20). That leaves about 7.5 KB.
 
 The safeboot updater (ADR-191) is a separate binary that runs after an app rollback, often for minutes. Its ELF
-has a LOAD segment of 0x20 B at 0x50000200 (`readelf -l`, the IDF variable `s_sleep_sub_mode_ref_cnt` in
+has a LOAD (loadable segment in readelf) segment of 0x20 B at 0x50000200 (`readelf -l`, the IDF (Espressif IoT Development Framework) variable `s_sleep_sub_mode_ref_cnt` in
 `.rtc.force_slow`), so every safeboot start overwrites 0x50000200-0x5000021F (TASK-1918). It has no other RTC slow
-sections. Whether IDF startup, the PHY or WiFi touch the rest of RTC slow in either binary has not been verified;
+sections. Whether IDF startup, the PHY (WiFi radio physical layer) or WiFi touch the rest of RTC slow in either binary has not been verified;
 the probe in TASK-1774 tests exactly that.
 
 ## Decision
@@ -165,7 +170,7 @@ consistent filesystem; on a half-written one the boot formats anyway and the sna
 
 - Must not write the snapshot to flash (NVS, LittleFS or a partition) in this decision.
 - Must not keep a partial `settings.ini`.
-- Must not use RTC FAST memory: `CONFIG_ESP_SYSTEM_ALLOW_RTC_FAST_MEM_AS_HEAP=1` in the pinned libs gives it to
+- Must not use RTC fast memory: `CONFIG_ESP_SYSTEM_ALLOW_RTC_FAST_MEM_AS_HEAP=1` in the pinned libs gives it to
   the heap in both the main firmware and the safeboot updater.
 - Must not print the snapshot content (it holds secrets, see Consequences).
 
@@ -179,7 +184,7 @@ consistent filesystem; on a half-written one the boot formats anyway and the sna
   `writeSettings()` and `updateRebootCount()` against a LittleFS model with a reset after the image replaced the
   partition. The old code boots on the image's default `settings.ini` with the counter at 1, the fix restores
   both. Further cases: a reset after the restore's own settings write, a settings save after a failed OTA, a
-  refused upload, an oversized `settings.ini`, a damaged CRC, an existing counter. The call order in the upload
+  refused upload, an oversized `settings.ini`, a damaged CRC (cyclic redundancy check), an existing counter. The call order in the upload
   server and in `setup()` is checked on the source text; five mutants are each caught.
 - Bench (otgw-bench-tester): the RTC survival probe through the safeboot route on .63, then a forced reset in the
   middle of a filesystem OTA on .63, old build versus fix, comparing `/api/v2/settings` and the boot count.
@@ -188,7 +193,7 @@ consistent filesystem; on a half-written one the boot formats anyway and the sna
 
 RTC survival probe, a throwaway build `2.0.0-probe1774+370b324` (lane `lane/ba-1774-probe`, never pushed): a
 7168 B seeded pattern with magic and CRC32 in RTC_NOINIT at 0x50000244 (`nm`, 0x1C10 B), the image confirming itself
-only on a telnet key. Run by otgw-bench-tester 09 on .63 (Classic with PIC), 2026-11-14 04:50-04:57; logs in 09's
+only on a telnet key. Run by otgw-bench-tester 09 on .63 (Classic with PIC (Peripheral Interface Controller, the gateway's OpenTherm microcontroller)), 2026-11-14 04:50-04:57; logs in 09's
 scratchpad `b1774\` (`telnet-keys.log`, `r1-info.json`, OTA logs).
 
 - **R1, rollback route: PASS.** Armed (seed 0xb2f06eeb, img=PENDING_VERIFY), panic. The unit booted ota_0 again
@@ -235,7 +240,7 @@ brought the web UI back with the settings unchanged.
   for a later WiFi or safeboot write, which is exactly the data a recovery needs. It also costs a flash write of
   several hundred milliseconds on the AsyncTCP task at upload start. Remains the fallback if the probe shows RTC
   does not survive the safeboot route.
-- **Compress `settings.ini` with the ROM miniz.** `tdefl_compress` and `tinfl_decompress` are in the S3 ROM
+- **Compress `settings.ini` with the ROM (read-only memory) miniz.** `tdefl_compress` and `tinfl_decompress` are in the S3 ROM
   (`esp32s3.rom.ld:73-84`). Rejected for v1: `esp_rom/include/miniz.h` builds with `TDEFL_LESS_MEMORY 1` and
   `MINIZ_NO_MALLOC`, and its constants put the compressor state at about 100 KB of heap (32 KB dictionary, 24 KB
   LZ code buffer, about 31 KB output buffer, hash tables; an estimate from the header, not measured), allocated
@@ -248,7 +253,7 @@ brought the web UI back with the settings unchanged.
   half only, not the settings loss, and changes the web UI update flow. Kept as option D in TASK-1774, only if
   this decision fails its gate.
 - **Do nothing.** Every reset during a filesystem write keeps resetting the settings to defaults, including the
-  WiFi-independent settings such as MQTT and SAT, and the boot counter. Rejected: seen on a bench unit twice.
+  WiFi-independent settings such as MQTT (Message Queuing Telemetry Transport) and SAT (Smart Autotune Thermostat), and the boot counter. Rejected: seen on a bench unit twice.
 
 ## Consequences
 
@@ -273,7 +278,7 @@ brought the web UI back with the settings unchanged.
   partition still holds the half-written image, does not drop the snapshot; the boot formats that image and
   restores the settings from before the OTA, so that later save is lost. Such a save rarely lands at all, because
   the half-written image is usually full.
-- The budget margin is thin: 7.2 KB of about 7.4 KB on the bench units. An install with BLE bind keys and more
+- The budget margin is thin: 7.2 KB of about 7.4 KB on the bench units. An install with BLE (Bluetooth Low Energy) bind keys and more
   SAT settings can push `settings.ini` past 6 KB, and then the counter and log drop out first, and later the
   settings themselves. *Mitigation*: the size is logged at every filesystem OTA; compression is the named
   follow-up.

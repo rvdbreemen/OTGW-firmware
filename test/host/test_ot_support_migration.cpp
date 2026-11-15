@@ -17,8 +17,9 @@
 **  fileFindToken() through saveOtSupportFilesIfDirty().
 **
 **  Test doubles: an in-memory LittleFS whose File offers the calls the slices
-**  make (read, seek, available, print) and commits a "w" file on close(), as
-**  littlefs does; DebugTln is dropped.
+**  make (read, seek, available, print, position, size) and commits a "w" file
+**  on close(), as littlefs does; DebugTln is dropped. fsCommitTempFile() is
+**  sliced verbatim from helperStuff.ino (TASK-1916).
 **
 **  Usage: test_ot_support_migration.exe [dump-dir]
 **    With a dump-dir it writes <dump-dir>/cases.txt, one line per case: the
@@ -64,6 +65,8 @@ class File {
     return (int)n;
   }
   bool seek(size_t pos) { pos_ = pos <= data_.size() ? pos : data_.size(); return true; }
+  size_t position() const { return write_ ? data_.size() : pos_; }
+  size_t size() const { return data_.size(); }
   size_t print(const char* s) { data_ += s; return std::strlen(s); }
   size_t print(const __FlashStringHelper* s) { return print(reinterpret_cast<const char*>(s)); }
   size_t print(char c) { data_ += c; return 1; }
@@ -84,6 +87,7 @@ struct FakeFS {
     return File(this, path, write);
   }
   bool remove(const char* path) { return files.erase(path) != 0; }
+  bool exists(const char* path) const { return files.count(path) != 0; }
   bool rename(const char* from, const char* to) {
     auto it = files.find(from);
     if (it == files.end()) return false;

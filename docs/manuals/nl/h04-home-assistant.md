@@ -236,6 +236,8 @@ Twee pseudo-ID's worden gebruikt om niet-OT-entiteiten aan de bitmap op te hange
 
 Dallas-sensoren hebben een eigen pad (`streamDallasSensorDiscovery`) omdat hun discovery afhankelijk is van het 1-Wire-adres dat pas tijdens runtime bekend wordt; ze worden via `configSensors()` gepubliceerd zodra die adressen beschikbaar zijn.
 
+De PIC-temperatuursensor (OTGW Classic, instelling **PIC temperature sensor**, standaard uit) wordt op dezelfde manier pas aangekondigd als er data is: de sensor `PIC_Temperature_Reading` (state-topic `otgw-pic/temperature_reading`, temperatuur in °C, op het Sensors-apparaat) verschijnt bij de eerste geldige meting. Een PIC zonder sensor antwoordt `-`, dan ontstaat er geen entity. Het is niet de diagnostische entity `PIC_Temp_Sensor`, die laat zien waarvoor de sensor dient (`O` buiten, `R` retourwater).
+
 #### Heap-bescherming
 
 Elke `stream*Discovery`-functie controleert de vrije heap (`STREAM_HEAP_MIN = 4000` bytes) voordat een payload opgebouwd wordt en geeft `false` terug als het geheugen te laag is. De drip-loop probeert het dan later opnieuw, wanneer het geheugen hersteld is. Zo blijft discovery doorlopen bij tijdelijke heap-druk zonder dat het apparaat crasht.

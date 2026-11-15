@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-05T20:34:00Z'
-updated_date: '2026-11-06T15:10:00Z'
+updated_date: '2026-11-14T15:50:00Z'
 labels:
   - diagnostics
 milestone: 2.0.0
@@ -43,4 +43,8 @@ Implement ADR-213 decisions 1-4: versioned 4 KiB-block format (16-byte block hea
 2026-11-06 landing on dev (one commit with TASK-1666, hooks on): test/host/test_diag_recorder.py --mutant RESULT PASS (real F1-F15 pass, guard and bridge mutants fail); evaluate --quick 85/0. Bench .61 lane build beta.103+fe969a5 (no PSRAM): ring 1 block x 4096 B, start costs -5124 B heap (71936 -> 66812), static +128 B RAM / +6156 B flash vs dev. AC2 still open: append cost and the PSRAM board (.63, after its overnight curve ends 2026-11-07 08:00).
 
 2026-11-06 security review finding (commit review): diagRedactSetting copied non-secret free-text values verbatim, so a WebhookPayload template with "token":"..." or key=... reached the ring. Fix: diagRedactBody() over the copied value. Test F10 (two payload cases) FAIL on the old code, PASS on the fix; test_diag_recorder.py --mutant and test_diag_recording_routes.py --mutant RESULT PASS.
+
+Stale audit 2026-11-14 (coordinator decision): AC2 needs a bench on .63 (PSRAM) by 09; the coordinator queues it.
+
+2026-11-14 (09) bench toward AC2 (not ticked: append cost not measured). .63 PSRAM (2.0.0-beta.248+5e8c416): start -> ring 384 x 4 KB = 1 572 864 B; psram_free 2 057 092 -> 451 188 B = 1 605 904 B (ring + 33 040 B incl. the 768 x 6 B repeat caches); internal heap unchanged (46 932 B free, maxblock 31 732). After stop the PSRAM stays reserved by design (allocPsramOnce, reused by the next start, diagRecorderStuff.h:339-343 and 387): psram_free 450 640 B until a reboot. .61 no PSRAM (2.0.0-beta.240+a3dff10): ring 1 x 4 KB; freeheap ~63 020 -> ~57 604 B (~5.4 KB: 4096 ring + 768 B caches + overhead, noise +-250 B), maxblock unchanged 31 732; after stop the heap returns (~61.9 KB, normal drift). Flash, estimated from the beta.248 ELF symbols (xtensa nm): ~6 KB recorder code (diag* t/T, minus the unrelated sendMQTTheapdiag and diag_log_add) and ~587 B data/bss; a lower bound because of LTO inlining. Not measured: the append cost per record (needs on-device timing instrumentation). Fill rate on .63 with its current traffic: the first 4 KB block took more than 3 min, so a full ring takes many hours. Settings diff [] on both units after stop. Evidence: 09 scratchpad b1665/.
 <!-- SECTION:NOTES:END -->

@@ -42,15 +42,15 @@ int main(int argc, char** argv) {
   g_ms = 100000;
   if (mode == 0) {            // resend after the limit was lowered
     g_max = 62; satResetCmdCache(); satSendCS(60.0f); satSendMM(100); satSendCH(1);
-    g_max = 40; g_sent[0] = 0; g_ms += 30000; satCmdResend();   // TASK-1924: the repeat is due after 30 s
+    g_max = 40; g_sent[0] = 0; g_ms += 31000; satCmdResend();   // TASK-1924 Part 2: the repeat is due after 31 s
     printf("%s|%.1f\n", g_sent, state.sat.fLastSentCS);
   } else if (mode == 1) {     // PIC keepalive after the limit was lowered
     g_max = 62; satResetCmdCache(); satSendCS(60.0f);
-    g_max = 40; g_sent[0] = 0; g_ms += 30000; satPicCSKeepalive();
+    g_max = 40; g_sent[0] = 0; g_ms += 31000; satPicCSKeepalive();
     printf("%s|%.1f\n", g_sent, state.sat.fLastSentCS);
   } else if (mode == 2) {     // a CS below the limit is repeated unchanged
     g_max = 40; satResetCmdCache(); satSendCS(35.0f); satSendMM(100); satSendCH(1);
-    g_sent[0] = 0; g_ms += 30000; satCmdResend();   // TASK-1924: the repeat is due after 30 s
+    g_sent[0] = 0; g_ms += 31000; satCmdResend();   // TASK-1924 Part 2: the repeat is due after 31 s
     printf("%s|%.1f\n", g_sent, state.sat.fLastSentCS);
   } else if (mode == 3) {     // thermal-safe fallback CS under a boiler MaxTSet of 40 and of 62
     g_max = 40; float a = satThermalSafeSetpoint();
