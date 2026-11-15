@@ -1,6 +1,6 @@
 # anatomy.md
 
-> Auto-maintained by OpenWolf. Last scanned: 2026-11-14T13:05:42.350Z
+> Auto-maintained by OpenWolf. Last scanned: 2026-11-15T10:54:27.697Z
 > Files: 158 tracked | Anatomy hits: 0 | Misses: 0
 
 ## ../../../../AppData/Local/Temp/
@@ -945,6 +945,7 @@
 
 ## docs/diagnostics/
 
+- `cloud-telemetry-completeness.md` — Cloud telemetry: completeness analysis (TASK-1963, 2026-11-15) (~1809 tok)
 - `ot-stream-encoding-study.md` — Encoding the OT stream for minimal bytes: study (~2136 tok)
 
 ## docs/evidence/
