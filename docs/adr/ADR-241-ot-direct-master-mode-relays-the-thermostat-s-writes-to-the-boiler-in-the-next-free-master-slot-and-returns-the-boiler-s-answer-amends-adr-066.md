@@ -11,6 +11,7 @@ supersedes: []
 superseded_by: null
 related:
   - "ADR-179"
+  - "ADR-243"
 topics:
   - "otdirect"
   - "master-mode"
@@ -57,8 +58,13 @@ status_history:
     changed_via: adr-kit lifecycle
   - date: 2026-11-15
     status: Accepted
+    changed_by: "Robert van den Breemen (decision, DM 1571427398485024889 and 1571427991219867750), recorded by Agent (d3)"
+    reason: "Accepted: decision Robert van den Breemen (DM 1571427398485024889 and 1571427991219867750, answer A), recorded by Agent (d3); all four gates passed"
+    changed_via: adr-kit lifecycle
+  - date: 2026-11-15
+    status: Accepted
     changed_by: "Agent (d3)"
-    reason: Robert decided A by Discord DM 1571427398485024889 and 1571427991219867750; all four gates passed
+    reason: Related to ADR-243
     changed_via: adr-kit lifecycle
 ```
 

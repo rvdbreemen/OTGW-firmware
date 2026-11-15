@@ -246,6 +246,7 @@ One row per Architecture Decision Record. Scope is the Enforcement `path_glob` s
 | ADR-240 | Accepted | - | A connection on port 80 that is not ESTABLISHED counts towards the ADR-188 cap only while at least one queued segment... |
 | ADR-241 | Accepted | - | In master mode a thermostat WRITEDATA of any ID except 1, 16 and 24 is sent to the boiler as a relay in the next free... |
 | ADR-242 | Accepted | - | Every OT-Direct state change runs on the loop task: addCommandToQueue() and sendPICSerial() hand a command that arriv... |
+| ADR-243 | Accepted | - | The default of bEnableSlave is true, as the code already has it: in master mode the slave interface is on unless the... |
 | ADR-244 | Accepted | - | On the PIC serial path, a command that starts with PR= is sent to the PIC also while a simulation is on; every other... |
 | ADR-245 | Accepted | - | On a board with PSRAM the ring holds 5046 slots of 120 s (GRAPHHISTLARGESLOTS), 5040 of them readable: 7 days. |
 | ADR-246 | Accepted | - | When rebootlog.txt does not fit the free part of the RTC snapshot, fsOtaRtcFill() stores the longest prefix of it tha... |
