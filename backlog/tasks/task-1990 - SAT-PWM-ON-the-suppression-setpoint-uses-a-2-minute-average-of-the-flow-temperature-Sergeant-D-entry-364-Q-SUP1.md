@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-15T21:35:00Z'
-updated_date: '2026-11-15T23:04:00Z'
+updated_date: '2026-11-15T23:52:00Z'
 labels:
   - sat
   - sergeant-d
@@ -25,9 +25,9 @@ Sergeant D answered Q-SUP1 with 'A, 2 minutes window' (entry 364, https://discor
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 The average used (window 2 min, which samples, start-up when fewer than 2 min of samples exist, flame-off and DHW handling) is planned with citations and the reading of entry 364 is confirmed or corrected with Sergeant D
-- [ ] #2 During PWM ON the suppression CS is the 2 minute average of the flow minus fModSupOffset; a host test on the real code is red on the old code and green on the fix
-- [ ] #3 The start-up flood (entry 334b/Q-334b, 2 s) and the flow clamp (entries 336-349) keep their own flow source unless the plan says otherwise, with the entries named
+- [x] #1 The average used (window 2 min, which samples, start-up when fewer than 2 min of samples exist, flame-off and DHW handling) is planned with citations and the reading of entry 364 is confirmed or corrected with Sergeant D
+- [x] #2 During PWM ON the suppression CS is the 2 minute average of the flow minus fModSupOffset; a host test on the real code is red on the old code and green on the fix
+- [x] #3 The start-up flood (entry 334b/Q-334b, 2 s) and the flow clamp (entries 336-349) keep their own flow source unless the plan says otherwise, with the entries named
 - [ ] #4 Bench or simulation evidence of the CS during a PWM ON phase
 <!-- AC:END -->
 
@@ -49,4 +49,8 @@ Implemented (session 95, 2026-11-16 00:xx): SATflowAvg.h (ring of 64 (millis, va
 Tests: new tests/test_sat_flow_avg.py compiles SATflowAvg.h + the real satSuppressionFlowTemp() + satPwmSuppressionSetpoint(): 7 passed on the fix; on HEAD (OTGW_SAT_INO = git show HEAD:SATcontrol.ino) 2 fail: a 40->50 step inside the window gives 44.0 on the fix and 49.0 (latest) on HEAD, and the 2 s storage spacing; the window drop-out, pre-ignition exclusion, no-fresh-flow and first-sample cases agree on both (they pin the average's rules). Shared harness change: test_sat_pwm_override.compile_cpp() shims state.otBus.flowAvg to an empty ring of the real header (empty ring = latest flow, so harnesses not about the average keep their behaviour); test_sat_ceiling_paths stubs satSuppressionFlowTemp() with the swept flow; test/host test_boiler_unsupported_origin.cpp and test_local_frame_consumers.cpp include SATflowAvg.h and get SlaveStatus. Sweep: run_tests --changed: 82 SAT files (lowload_contract left out, its delegated files ran directly) and 73 other files green after those fixes; evaluate --quick 88 passed 0 failed.
 
 AC4 evidence (SIMULATION, NOT hardware-verified; no bench per Robert): real MsgID 25 samples of indigo_light's 2026-11-15 heating run 12:52:03-13:09:18 (149 boiler Read-Acks, continuous mode, PIC board) replayed through the real code, CS sampled every 30 s, old (latest) vs new (2 min average): t=90 s 37.70 vs 36.59, 180 s 40.10 vs 38.55, 269 s 40.90 vs 40.39, then within 0.3 K (e.g. 630 s 41.40 vs 41.01, 990 s 40.90 vs 41.10). Open loop: the boiler does not react to the different CS, and that run was continuous mode, not PWM ON; it shows the signal, not the closed-loop effect. Script and output: session 95 scratchpad replay1990.py / replay1990.out. Q-SUP1b (which readings) asked by 92 (78c77ed07); work goes ahead on A.
+
+Smoke 09 on .61 (2026-11-16 00:38-00:51, beta.330+e18d182, sha ino 7c2682c5...576f / fs abe7e48e...c8d7 checked): PASS. OTA app+fs via safeboot EXIT 0; device and /version.hash e18d182; /api/v2/debug/crash githash e18d182, no crash record; bootcount 795 -> 797 (the two OTA restarts), none during the run. settings.ini byte-identical and /api/v2/settings identical before/after. Telnet 1.1 MB, 0 panic|guru|abort|CRITICAL. A master, SAT off: 54 R/min, MQTT connected, freeheap 55188-56772, maxblock 31732. B GW=L loopback, SAT off: 464-466 frames/min, MsgID 25 slave answers 6/min (the samples the ring sees), freeheap 55584-55600 constant. C back to master: 53 R/min, freeheap 55600. hd_min_free_heap 31620 -> 24312 during the run (same-boot watermark: new MsgIDs in loopback, discovery burst; not a trend). Not verified on the bench: the 2 min average itself, any SAT behaviour (no SAT scenarios per Robert). Evidence: 09 scratchpad b1990/. The pushed commit 6836283d3 has src identical to e18d1826e (git diff = 0 lines).
+
+AC1: plan with citations in the plan field; the reading (A: samples since the current flame-on, none during hot water) goes ahead under Robert's directive, the confirmation question Q-SUP1b is with Sergeant D (92, 78c77ed07); a different answer becomes a follow-up. AC2: tests/test_sat_flow_avg.py 7/7 on the fix, 2 red on HEAD (40->50 step: 44.0 vs 49.0; 2 s spacing). AC3: the start-up flood (satPwmFlameOffHold, satNoReturnFlood*, entries 45/151) and the continuous follow/clamp (satContinuousSetpoint, entries 336-349) still read satGetFlowTemp() (code unchanged there; test_sat_no_return_startup 20/20, test_sat_continuous_startup 11/11 green). AC4 stays open: only an open-loop replay of field samples through the real code (simulation, not hardware) exists; the CS in a real PWM ON phase is not benched (no SAT scenarios on the bench per Robert).
 <!-- SECTION:NOTES:END -->
