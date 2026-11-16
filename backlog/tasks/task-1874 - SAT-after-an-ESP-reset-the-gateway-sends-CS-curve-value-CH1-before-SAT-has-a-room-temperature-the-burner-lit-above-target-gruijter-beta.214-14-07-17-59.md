@@ -8,7 +8,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-12T20:56:00Z'
-updated_date: '2026-11-16T15:32:00Z'
+updated_date: '2026-11-16T15:37:00Z'
 labels: []
 milestone: 2.0.0
 dependencies: []
@@ -56,4 +56,6 @@ Pushed 051f323f8..55dd8f015 unchanged (beta.348). Bench 09 on .61 (OT-Direct, SA
 CORRECTION by 09, 2026-11-16 16:30: 09's .63 observations for this task (349 boot: SAT takeover at +61.6 s after a silence, sent to the coordinator and the developer by session message) ran with the SAT software simulator ON (satsimulation true; switched off 16:27:11). REAL: the boot telnet timing of the first SAT command and the SATBOOT lines, which are firmware sequencing. SIMULATOR: any flame/flow follow-up after the takeover. The AC3 smoke in the note above was on .61 with SAT off and is not affected.
 
 2026-11-16 evidence label (coordinator: SAT simulation was on on .63 all day; 09 re-read b349\boot349.raw): the SAT takeover after the 60 s boot silence is REAL firmware sequencing: :714 SATBOOT takeover, :715-717 at 12:08:34.437-.439 'CmdQueue: Insert queue in slot[0]:cmd[CS=37.9]', slot[1] MM=100, slot[2] CH=1 (same in b1942b\boot.raw :707, 15:10:16.699). PIC ACCEPTANCE of CS/MM/CH is NOT evidenced: no 'Confirmed' line for CS, MM or CH in the capture (the 16 'Confirmed' lines are all PR= boot queries, e.g. :815-818 PR=M). Whether they reached the PIC link unconfirmed or the simulator path swallowed them is not known. A sim-off boot capture on .63 would settle it; put to the coordinator (it needs SAT on a bench unit without a boiler).
+
+2026-11-16 16:33 sim-OFF re-check by 09 on .63 (b5aba1c, satsimulation false, SAT enabled, no boiler; one planned /ReBoot 175 -> 176, approved by the coordinator; 09 scratchpad b1874sim0\boot.raw): init 16:33:11.338, first SAT command 16:34:11.321 'SATBOOT phase=silence_end ms=67340' (:697-700) = 60 s silence REAL on a device. Without a boiler reply the path is the hand-back (:701-703 'no valid restored state, boiler handed back (CS=0, CH=1, MM=T)', decide valid=0), and the PIC CONFIRMS each command: CS=0 queued .322 -> 'Confirmed [2]:[CS=0]' .362 (:709-710), CH=1 confirmed .550 (:718-719), MM=T confirmed .615 (:727-728); repeated at 16:34:41 after 30 s without a boiler reply (:947). Not shown on hardware: a takeover WITH control values (valid=1), which needs a boiler reply. Open observation, not analysed: in the sim-on boots (349, b5aba1c) the queued CS/MM/CH got no 'Confirmed' line; the command queue has no simulation gate (no sat.bSimulation in OTGW-Core.ino/helperStuff.ino), so the cause is unknown; out of scope for this task.
 <!-- SECTION:NOTES:END -->
