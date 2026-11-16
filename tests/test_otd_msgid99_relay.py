@@ -71,6 +71,7 @@ static unsigned long otdRelayedStatusFrame(unsigned long f) { return f; }
 static uint16_t otdStatusReplyData(uint16_t t, uint16_t) { return t; }
 static uint32_t g_enq = 0;
 static bool otCmdEnqueue(unsigned long f) { g_enq = (uint32_t)f; return true; }
+static bool otdWriteRefused = false;   // TASK-1804 B3e: set on a refused enqueue (never here: the stub accepts)
 static char g_rsp[32];
 static void synthesizeResponse(const char*, const char* r) { snprintf(g_rsp, sizeof g_rsp, "%s", r); }
 static void otDirectBridgeProcessStatus(const char*) {}

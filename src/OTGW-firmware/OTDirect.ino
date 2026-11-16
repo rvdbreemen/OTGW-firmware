@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTDirect.ino
-**  Version  : v2.0.0-beta.336
+**  Version  : v2.0.0-beta.337
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -4326,7 +4326,7 @@ bool handleOTDirectCommand(const char* buf, int len, bool satOwn) {
     unsigned long frame99 = OpenTherm::buildRequest(
       OpenThermMessageType::WRITE_DATA,
       static_cast<OpenThermMessageID>(99), data99);
-    if (!otCmdEnqueue(frame99)) { OTDDebugTf(PSTR("OTD: queue full, dropped frame %08lX\r\n"), frame99); }
+    if (!otCmdEnqueue(frame99)) { OTDDebugTf(PSTR("OTD: queue full, dropped frame %08lX\r\n"), frame99); otdWriteRefused = true; return false; }   // TASK-1804 B3e: no echo for a dropped frame, as CS=/SW=
     snprintf_P(rspBuf, sizeof(rspBuf), PSTR("%d"), val);
     synthesizeResponse(buf, rspBuf);
   }
@@ -4343,7 +4343,7 @@ bool handleOTDirectCommand(const char* buf, int len, bool satOwn) {
     unsigned long frame99 = OpenTherm::buildRequest(
       OpenThermMessageType::WRITE_DATA,
       static_cast<OpenThermMessageID>(99), data99);
-    if (!otCmdEnqueue(frame99)) { OTDDebugTf(PSTR("OTD: queue full, dropped frame %08lX\r\n"), frame99); }
+    if (!otCmdEnqueue(frame99)) { OTDDebugTf(PSTR("OTD: queue full, dropped frame %08lX\r\n"), frame99); otdWriteRefused = true; return false; }   // TASK-1804 B3e: no echo for a dropped frame, as CS=/SW=
     snprintf_P(rspBuf, sizeof(rspBuf), PSTR("%d"), val);
     synthesizeResponse(buf, rspBuf);
   }
@@ -4360,7 +4360,7 @@ bool handleOTDirectCommand(const char* buf, int len, bool satOwn) {
     unsigned long frame99 = OpenTherm::buildRequest(
       OpenThermMessageType::WRITE_DATA,
       static_cast<OpenThermMessageID>(99), data99);
-    if (!otCmdEnqueue(frame99)) { OTDDebugTf(PSTR("OTD: queue full, dropped frame %08lX\r\n"), frame99); }
+    if (!otCmdEnqueue(frame99)) { OTDDebugTf(PSTR("OTD: queue full, dropped frame %08lX\r\n"), frame99); otdWriteRefused = true; return false; }   // TASK-1804 B3e: no echo for a dropped frame, as CS=/SW=
     snprintf_P(rspBuf, sizeof(rspBuf), PSTR("%d"), val);
     synthesizeResponse(buf, rspBuf);
   }
@@ -4370,7 +4370,7 @@ bool handleOTDirectCommand(const char* buf, int len, bool satOwn) {
     unsigned long frame4 = OpenTherm::buildRequest(
       OpenThermMessageType::WRITE_DATA,
       static_cast<OpenThermMessageID>(4), (uint16_t)code << 8);
-    if (!otCmdEnqueue(frame4)) { OTDDebugTf(PSTR("OTD: queue full, dropped frame %08lX\r\n"), frame4); }
+    if (!otCmdEnqueue(frame4)) { OTDDebugTf(PSTR("OTD: queue full, dropped frame %08lX\r\n"), frame4); otdWriteRefused = true; return false; }   // TASK-1804 B3e: no echo for a dropped frame, as CS=/SW=
     snprintf_P(rspBuf, sizeof(rspBuf), PSTR("%d"), code);
     synthesizeResponse(buf, rspBuf);
   }
@@ -4673,7 +4673,7 @@ bool handleOTDirectCommand(const char* buf, int len, bool satOwn) {
       unsigned long frame = OpenTherm::buildRequest(
         OpenThermMessageType::READ_DATA,
         static_cast<OpenThermMessageID>(msgId), 0);
-      if (!otCmdEnqueue(frame)) { OTDDebugTf(PSTR("OTD: queue full, dropped frame %08lX\r\n"), frame); }
+      if (!otCmdEnqueue(frame)) { OTDDebugTf(PSTR("OTD: queue full, dropped frame %08lX\r\n"), frame); otdWriteRefused = true; return false; }   // TASK-1804 B3e: no echo for a dropped frame, as CS=/SW=
     }
     snprintf_P(rspBuf, sizeof(rspBuf), PSTR("%d"), msgId);
     synthesizeResponse(buf, rspBuf);
@@ -4869,7 +4869,7 @@ bool handleOTDirectCommand(const char* buf, int len, bool satOwn) {
     unsigned long frame = OpenTherm::buildRequest(
       OpenThermMessageType::WRITE_DATA,
       static_cast<OpenThermMessageID>(targetMsgId), 0);
-    if (!otCmdEnqueue(frame)) { OTDDebugTf(PSTR("OTD: queue full, dropped frame %08lX\r\n"), frame); }
+    if (!otCmdEnqueue(frame)) { OTDDebugTf(PSTR("OTD: queue full, dropped frame %08lX\r\n"), frame); otdWriteRefused = true; return false; }   // TASK-1804 B3e: no echo for a dropped frame, as CS=/SW=
     synthesizeResponse(buf, value);
   }
   // MI=nnn — Message interval (minimum gap between OT messages, 100-1275ms)

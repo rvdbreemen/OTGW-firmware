@@ -54,6 +54,7 @@ struct OpenTherm {
 };
 static unsigned long g_frames[16]; static int g_nframes = 0;
 static bool otCmdEnqueue(unsigned long f) { g_frames[g_nframes++] = f; return true; }
+static bool otdWriteRefused = false;   // TASK-1804 B3e: set on a refused enqueue (never here: the stub accepts)
 static void otdPersistHW(char) {}   // TASK-1836: the HW= branch stores HW 0/1/A (not under test here)
 static unsigned long millis() { return 1000; }
 static void otDirectBridgeProcessStatus(const char* s) { printf("STATUS %s\n", s); }

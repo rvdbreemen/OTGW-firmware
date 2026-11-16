@@ -436,6 +436,7 @@ static uint32_t otdLastConvEndMs = 0;
 static bool otCmdQueueEmpty() { return true; }
 static void otCmdApplyPendingFlush() {}
 static bool otCmdEnqueue(unsigned long f) { printf("%lu ENQ %lu\n", (unsigned long)g_ms, f & 0xFFFF); return true; }
+static bool otdWriteRefused = false;   // TASK-1804 B3e: the PM= branch sets it on a refused enqueue (never here)
 static void otDirectBridgeProcessStatus(const char* s) { printf("%lu STATUS %s\n", (unsigned long)g_ms, s); }
 static void synthesizeResponse(char*, const char*) {}
 static bool otMasterRequestActive = false; static uint32_t otLastAnySendMs = 0; static uint32_t otMinIntervalMs = 100; static uint8_t otScheduleIdx = 0;
