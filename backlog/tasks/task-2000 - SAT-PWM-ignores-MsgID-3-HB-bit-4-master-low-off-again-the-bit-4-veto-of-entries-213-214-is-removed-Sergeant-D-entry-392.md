@@ -7,7 +7,7 @@ status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-16T11:08:00Z'
-updated_date: '2026-11-16T16:44:00Z'
+updated_date: '2026-11-16T16:45:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -58,6 +58,8 @@ CORRECTION by 09, 2026-11-16 16:30: the .63 soak above (beta.350, 13:14-14:15) r
 2026-11-16 AC6 field evidence (comms 92): indigo_light's capture 20261116-144953-upload-clean.zip, sent by Sergeant D by DM (msg 1571920739253092412), analysed with /analyze-capture; archived at RvdB/OTGW-field-data/indigo_light/20261116-144953/ (zip sha256 1573a14c...bd84; analysis/ holds the summary, the SAT timeline and charts). Firmware 2.0.0-beta.350+9011c3c, PIC 16F1847, Viessmann Vitodens (MemberID 33), SAT enabled, simulation_enable false / simulation OFF (real boiler), 14:49:54-16:56:34 tester local time, 21939 frames, 0 telnet gaps. PWM entered on the real boiler: telnet 'SAT: Control mode: PWM' at 16:00:58 (flow 67.3 above setpoint 31.0 + 1.5 for 30 s) and 16:17:58; CH flame lit inside a PWM ON phase at 16:18:36; SATTICK mode=2 pwm=1 ticks present. The 'before' half of AC6 (a beta.339 capture) was not made: Sergeant D told indigo 'No, just run beta.350' (#alpha-testing 1571879271532724316). AC6 left for the owner/coordinator to tick or reword.
 
 2026-11-16 (95) AC6 ticked on the coordinator's go (relayed by 92), facts re-checked by 95 in the archive: sat_story.txt:38 '16:00:58 SAT: Control mode: PWM (flow 67.3 stayed above setpoint 31.0 + 1.5 for 30 s)', :42 '16:17:58 PWM ON: pwm_on=361 s', transitions.txt:5 '16:17:58 ... mode=2 pwm=1', further PWM entries 16:30:28/16:35:28/16:39:28; device-state-stop-20261116-165640.txt in the zip: simulation false, simulation_active false (real Vitodens). Deviation from the AC wording: the 'before' capture on beta.339 was not made because Sergeant D told the tester 'No, just run beta.350' (#alpha-testing 1571879271532724316); the old-code red side stays the host test (AC3) and indigo's earlier beta.250 capture, where SAT never entered PWM behind the MsgID 3 veto.
+
+Correction (95, same day): in the AC6 note above, 'indigo's earlier beta.250 capture, where SAT never entered PWM behind the MsgID 3 veto' is NOT verified; I did not re-check that capture for PWM. The old-code red side of this task is the host test (AC3) only.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
