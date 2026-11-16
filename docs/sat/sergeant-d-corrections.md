@@ -7946,3 +7946,19 @@ Robert, 16:18:42 UTC (https://discord.com/channels/812969634638725140/9144987300
 **Settled:** option B: while the tolerance band pauses heating (CH=0, PWM keeps its ON/OFF schedule, entry 384), an ON phase without a flame does not count as a start toward the hourly start limit. Outside a band pause entries 59, 90 and 95 stay as they are (every PWM ON start counts, lit or not, as thermo-nova pwm.py:159-162). New firmware rule; thermo-nova has no band. Scope: not answered; the question recommended this release (the band is in the release scope, entry 386), read as 2.0.0.
 
 **Task:** follow-up of TASK-1887 (owner ba).
+
+## 399. After a tolerance-band stop, SAT should start heating again when the room is below target + 0.1, not target - 0.1 (Sergeant D, 2026-11-16; questions the reading of entry 328; meaning to be confirmed by Q-399a)
+
+**Source:** #dev-sat-mqtt, Sergeant D 2026-11-16 18:37:05 UTC (https://discord.com/channels/812969634638725140/1105556725714649128/1571957298295742607) and 18:39:37 UTC (https://discord.com/channels/812969634638725140/1105556725714649128/1571957937436626967), after the bot's room-vs-setpoint chart of indigo_light's beta.350 capture (https://discord.com/channels/812969634638725140/1105556725714649128/1571956940312023225). Read first-hand by the comms session.
+
+**Quoted:**
+
+> "Sat normally should had started heating earlier. Can you identify tidy why heating didn't start earlier?"
+
+> "normally SAT should had started heating when the room temp was below 20.6"
+
+**Settled (reading, to be confirmed):** with indigo's target 20.5, "below 20.6" is below target + 0.1. That differs from the reading recorded in entry 328 (ours, after Home Assistant's generic thermostat: stop at target + 0.1, start again below target - 0.1), which the firmware follows (TASK-1887; narration "Heating resumes: a room is more than 0.1 below its target", resumed at 16:14:58 in indigo's log; the room fell below 20.6 at about 16:05). Entry 328 is not rewritten; this entry records the conflict. thermo-nova has no band (entry 326).
+
+**Open:** Q-399a (https://discord.com/channels/812969634638725140/1105556725714649128/1571960731983945864): A resume below target + 0.1 / B below target - 0.1 as now / C below the target; our advice A; scope: this release recommended. No code change before his answer.
+
+**Task:** TASK-1887 (owner ba).

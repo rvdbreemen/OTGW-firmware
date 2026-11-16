@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-13T07:25:00Z'
-updated_date: '2026-11-16T17:20:00Z'
+updated_date: '2026-11-16T18:53:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -68,4 +68,6 @@ Entry 398 edge case, OUR interpretation (ba, recorded by comms 92 on 2026-11-16;
 2026-11-16 for ba (comms 92, coordinator's request): the entry 398 case on a REAL boiler, indigo_light beta.350 capture (Vitodens, simulation off; RvdB/OTGW-field-data/indigo_light/20261116-144953/analysis/). 16:00:58 (tester local time) during a band pause (ch=0, room 20.66, target 20.5): satCycleCheckOvershootSwitch fired 'Control mode: PWM (flow 67.3 stayed above setpoint 31.0 + 1.5 for 30 s)'; the flow was boiler water still hot from DHW burns (last DHW flame 15:53:24, so the 300 s DHW guard satDhwGuardActive, SATcycles.ino:1378, had expired), no CH water flowing. The PWM ON phase 16:00:58-16:03:58 had no flame and counted as a start (pwm starts/hr=2 at the CH ignition 16:18:36). The firmware switch rule checks the DHW guard but not whether heating is on; thermo-nova skips the switch when the heater is not ON or the request <= COLD_SETPOINT (heating_control.py:276-282). Question Q-1887c (ba's text) is queued for Sergeant D after Q-2005a and Q-1998b.
 
 2026-11-16 field (indigo_light, Vitodens, beta.350, sim off; OTGW-field-data/indigo_light/20261116-144953/analysis/sat_story.txt, read by ba): band pause 14:53:58 to 16:14:58; inside it, 16:00:58 'Control mode: PWM (flow 67.3 stayed above setpoint 31.0 + 1.5 for 30 s)' and 'PWM ON: pwm_on=180 s pwm_off=1743 s duty=0.09' with CH=0: the flameless ON phase counted as a start (beta.350 predates entry 398), the exact case entry 398 removes. Second observation, NOT decided: the continuous->PWM overshoot switch (TASK-1888, entry 327) evaluated the flow during the band pause (CH=0, flow 67.3, likely hot water or residual heat); whether it should hold during a band pause is a SAT design question for Sergeant D (raised to the coordinator for 92).
+
+2026-11-16 entry 399 (Sergeant D 18:37/18:39 UTC, after indigo's room-vs-setpoint chart): 'normally SAT should had started heating when the room temp was below 20.6' (target 20.5), i.e. resume below target + 0.1, which differs from the entry-328 reading the band implements (resume below target - 0.1; indigo resumed 16:14:58, room below 20.6 from about 16:05). Q-399a asked (A below target + 0.1 / B as now / C below target; our advice A; scope this release). No change before his answer.
 <!-- SECTION:NOTES:END -->
