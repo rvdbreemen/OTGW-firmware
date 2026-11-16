@@ -7619,3 +7619,27 @@ Robert, 16:18:42 UTC (https://discord.com/channels/812969634638725140/9144987300
 **Settled:** option A of Q-1867b. With entry 362 (B: the readings of the 600 s settle window are not recorded) the first drop-rate fit after a CH-mode change would span only the 300 s minimum, and in gruijter's capture a 0.027 bar step then reads as 0.32-0.38 bar/h (a new false alarm, 12 Nov 10:28). After a settle the firmware computes the drop rate only once the fresh readings span 600 s, which matches thermo-nova's effective first window: thermo-nova keeps recording during its settle (custom_components/sat/binary_sensor.py:340-342 at 7beaaf5; PRESSURE_DROP_RATE_SETTLE_SECONDS 600 at :25, PRESSURE_DROP_RATE_MIN_WINDOW_SECONDS 300 at :28). A real leak after a CH-mode change is seen about 5 minutes later than with B alone. Without a CH-mode change nothing changes. Sergeant D may still answer Q-1867b himself; a different answer becomes a follow-up task.
 
 **Task:** TASK-1867 (implemented as commit 5ef1c1d46, host evidence in the task).
+
+## 373. The 2 minute flow average belongs in the duty cycle denominator during light-off (Sergeant D, 2026-11-16; reply to Q-SUP1c; may change entry 364)
+
+**Source:** #dev-sat-mqtt, Sergeant D 2026-11-16 04:40:11 UTC (https://discord.com/channels/812969634638725140/1105556725714649128/1571746686001352835), a reply to Q-SUP1c (https://discord.com/channels/812969634638725140/1105556725714649128/1571686569381986396).
+
+**Quoted:**
+
+> "We use the average flow water temperature for 2 minutes in the duty cycle calculation denominator because the duty cycle may show a very low duty cycle due to sudden rise during light off and as a result will stop heating. This is a safety feature to ensure that the duty cycle denominator will stay low for the chaotic light off of the burner. Then we use the actual flow."
+
+**What it says, compared with entry 364 and the firmware:** entry 364 (Q-SUP1 A) was read as "the PWM ON suppression setpoint (CS = flow - offset) uses the average flow of the last 2 minutes", and TASK-1990 built that (beta.330, with the first-2-minutes follow-up in beta.333). This message places the 2 minute average in the duty cycle calculation instead, as the denominator during the light-off, and the actual flow after it. thermo-nova's suppression setpoint uses the latest flow (heating_control.py:435-441 at 7beaaf5, opened 2026-11-16). Whether this replaces our reading of entry 364 for the suppression setpoint is not settled by this message alone (see entry 374).
+
+**Task:** TASK-1990 (owner 95). Open: asked as item 1 of the re-posted open questions, 2026-11-16 07:06 UTC (https://discord.com/channels/812969634638725140/1105556725714649128/1571783439928266763). No firmware change before his answer (coordinator rule for SAT control changes).
+
+## 374. With the 180 s flame-on rule no 2 minute average is needed right after ignition (Sergeant D, 2026-11-16; follows entry 373)
+
+**Source:** #dev-sat-mqtt, Sergeant D 2026-11-16 07:02:37 UTC (https://discord.com/channels/812969634638725140/1105556725714649128/1571782531538362409), a reply to his own entry 373 message, addressed to the bot.
+
+**Quoted:**
+
+> "Regarding this. You are right, we have the 180s flame on safety rule so we don’t need the average boiler flow water temperature for the first 2 minutes after the flame is lit"
+
+**Reading (interpretation, to be confirmed):** the 180 s minimum flame-on hold (entry 275, thermo-nova pwm.py:201-203) already protects the light-off, so the 2 minute average is not needed in the first 2 minutes after ignition. This agrees with Q-SUP1c option B (latest flow for the first 2 minutes after ignition), which the firmware does since beta.333. It does not say what happens after the first 2 minutes, nor whether the average stays in the suppression setpoint (entry 364 as built) or moves to the duty cycle denominator (entry 373). Asked as item 1 of the re-posted open questions (https://discord.com/channels/812969634638725140/1105556725714649128/1571783439928266763).
+
+**Task:** TASK-1990 (owner 95). Open: the place of the average after the first 2 minutes.

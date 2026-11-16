@@ -4935,6 +4935,32 @@
     "TASK-1867"
    ],
    "confirmed_by_entry": null
+  },
+  {
+   "id": 373,
+   "title": "The 2 minute flow average belongs in the duty cycle denominator during light-off (Sergeant D, 2026-11-16; reply to Q-SUP1c; may change entry 364)",
+   "date": "2026-11-16",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1571746686001352835",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1990"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 374,
+   "title": "With the 180 s flame-on rule no 2 minute average is needed right after ignition (Sergeant D, 2026-11-16; follows entry 373)",
+   "date": "2026-11-16",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1571782531538362409",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1990"
+   ],
+   "confirmed_by_entry": null
   }
  ]
 }
