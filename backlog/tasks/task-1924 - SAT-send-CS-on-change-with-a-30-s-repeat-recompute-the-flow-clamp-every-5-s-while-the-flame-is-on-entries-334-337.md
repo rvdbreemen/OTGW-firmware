@@ -3,11 +3,11 @@ id: TASK-1924
 title: >-
   SAT: send CS= on change with a 30 s repeat, recompute the flow clamp every 5 s
   while the flame is on (entries 334-337)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-14T07:58:00Z'
-updated_date: '2026-11-15T21:12:00Z'
+updated_date: '2026-11-16T08:37:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -27,7 +27,7 @@ Maintainer order by Robert, #alpha-testing 2026-11-14: https://discord.com/chann
 - [x] #1 CS= is sent when the sent value (0.1 resolution) changes, and an unchanged CS= is repeated every 30 s; the 5 s resend of an unchanged CS= is gone (entries 334, 335)
 - [x] #2 While the flame is on and the flow clamp of entry 112 is active, the clamped CS is recomputed every 5 s and sent when it changes (entry 337)
 - [x] #3 MM=, TP= and CH= keep their on-change plus 60 s repair cadence (entries 237, 239); PIC keepalive and the 3 s PWM suppression refresh are consistent with the new CS rule
-- [ ] #4 A new ADR supersedes the CS part of ADR-207 (and ADR-203 where still in force), via adr-kit
+- [x] #4 A new ADR supersedes the CS part of ADR-207 (and ADR-203 where still in force), via adr-kit
 - [x] #5 Host tests call the real sender code and fail on the old code (5 s repeat, no 5 s clamp recompute) and pass on the fix
 - [ ] #6 Bench (bench-tester): CS= count per minute in steady state and during a warm-up, and no PIC CS expiry over 30 min
 <!-- AC:END -->
@@ -56,4 +56,14 @@ PART 2 coded and host-tested (d3, 2026-11-14). (1) satCmdResend loop repeat AND 
 PART 2 shipped: beta.250+baf84d9 pushed to origin/dev (52be60d25..baf84d9f6, with the TASK-1933 docs commits e711f16b9, aa599b541), #alpha-testing post 1571207444875444356. Build: esp32-combo, 2x Successfully created ESP32S3 image, wrapper exit 0, githash = HEAD. Bench 09 on .63 (Classic + PIC, OTA, settings changed: none, bootcount 126 stable): A (30 s interval, 9.5 min) old CS < 1 s before a new value 0 (beta.242: 29/37), largest gap 30.10 s, 0 drops; B (SATinterval 60, 9.5 min) largest gap 31.00 s, no PIC expiry lines, and the 5 s continuous recompute stepped the CS down 0.1 at a time with the falling flow (cs ~ flow - 2.0, e.g. 17:45:11 flow 37.7 -> cs 35.7) = AC2 on hardware; C start-up follow NOT triggered (sim flow 21.8-23.5 below request 31.2-38.2 in the 60 s after flame-on): field-only, host test test_sat_continuous_startup covers it; D no regression (CS=0 on disable, MM/CH 60 s repair, CS on change + 30 s repeat); the 2 s start-up flood was not reached in this sim setup: NOT verified on the bench. AC2: host test (real satContinuousSetpoint, structural refresh gates) + bench B. AC5: Part 1 AC5 test (2 vs 13 CS/min) + Part 2 tests red on HEAD (stale 10 vs 0; start-up 50.0 vs 56.5; refresh structure absent). AC6 left to 09 (bench AC; this run was 2 x 9.5 min, not 30 min continuous). AC4 open: ADR-235 Proposed, acceptance by Robert's DM yes; it does not yet describe Part 2 (31 s, start-up follow), to be added before acceptance. Open follow-up: Q-346a (clamp offset 2.0 vs 1.0).
 
 Q-334b decided 2026-11-15 by the coordinator under Robert's directive (CLI) 'Do not wait for Sergeant D. Finish everything that can be finished.'; Sergeant D may overrule, his answer later becomes a follow-up task; asked in the 18-question batch in #dev-sat-mqtt (item 15, https://discord.com/channels/812969634638725140/1105556725714649128/1571633470696980583): option A, keep the 2 s start-up flood (not on change + 30 s inside the flood).
+
+2026-11-16 (95): AC6 (bench) waived by Robert on host evidence (DM 1571800810931626106 via the coordinator, answer A). AC6 stays unticked as waived. The task stays In Progress: AC4 (a new ADR via adr-kit that supersedes the CS part of ADR-207 / ADR-203) is still open; no such ADR exists in docs/adr (grep 2026-11-16).
+
+Correction (95, 2026-11-16): my note above was wrong, my grep only covered ADR-24x..29x. AC4 is met: ADR-235 'SAT sends CS= on change with a 30 s repeat (supersedes the CS part of ADR-207 and ADR-203)', status Accepted 2026-11-15 (commit 7e0cc5047, Robert's triage).
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+AC1: host test tests/test_sat_cmd_cache.py on the real sender code: steady state 2 CS= per 60 s on the fix vs 13 on the old code (file 29/29 OK fix, 13 FAIL old); shipped beta.242 (cdc9003ac), 09's bench on .63: steady 2.7 CS=/min, largest gap 30.110 s, a setpoint step sent on its own tick. AC2: Part 2 (entries 337/338, Robert B) recomputes the clamped CS every 5 s while the flame is on, host-tested, shipped beta.250 (baf84d9f6). AC3: MM=/TP=/CH= keep on-change + 60 s repair; the keepalive and the 3 s suppression refresh wait 31 s (host test mode 20). AC4: ADR-235 Accepted 2026-11-15 (7e0cc5047) supersedes the CS part of ADR-207 and ADR-203. AC5: the host tests above fail on the old code and pass on the fix. AC6 (bench, 30 min no PIC CS expiry): WAIVED by Robert on host evidence (DM 1571800810931626106); 09's shorter benches of beta.242 and beta.250 on .63 are the hardware evidence that exists. Not verified: a 30 min PIC CS-expiry run.
+<!-- SECTION:FINAL_SUMMARY:END -->
