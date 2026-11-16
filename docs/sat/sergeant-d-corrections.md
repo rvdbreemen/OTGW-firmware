@@ -7934,3 +7934,15 @@ Robert, 16:18:42 UTC (https://discord.com/channels/812969634638725140/9144987300
 **Settled:** option A: the MsgID 3 change (no MsgID 3 gate on PWM, entries 392 and 393) belongs in the next build that goes out and is part of 2.0.0, not 2.1.0.
 
 **Task:** TASK-2000 (owner 95), milestone 2.0.0; pushed as beta.350 (9011c3c48), the candidate of the 2026-11-16 20:00 public beta.
+
+## 398. Q-384a answered B: during a tolerance-band pause a PWM ON phase does not count as a start toward the hourly start limit (Sergeant D, 2026-11-16; amends entries 59, 90 and 95 for band pauses)
+
+**Source:** #dev-sat-mqtt, Sergeant D 2026-11-16 12:31:03 UTC (https://discord.com/channels/812969634638725140/1105556725714649128/1571865185180979331), a reply to Q-384a (https://discord.com/channels/812969634638725140/1105556725714649128/1571858712564465715).
+
+**Quoted:**
+
+> "My answer is B"
+
+**Settled:** option B: while the tolerance band pauses heating (CH=0, PWM keeps its ON/OFF schedule, entry 384), an ON phase without a flame does not count as a start toward the hourly start limit. Outside a band pause entries 59, 90 and 95 stay as they are (every PWM ON start counts, lit or not, as thermo-nova pwm.py:159-162). New firmware rule; thermo-nova has no band. Scope: not answered; the question recommended this release (the band is in the release scope, entry 386), read as 2.0.0.
+
+**Task:** follow-up of TASK-1887 (owner ba).

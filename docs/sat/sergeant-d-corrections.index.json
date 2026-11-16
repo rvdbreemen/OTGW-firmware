@@ -5263,6 +5263,19 @@
     "TASK-2000"
    ],
    "confirmed_by_entry": null
+  },
+  {
+   "id": 398,
+   "title": "Q-384a answered B: during a tolerance-band pause a PWM ON phase does not count as a start toward the hourly start limit (Sergeant D, 2026-11-16; amends entries 59, 90 and 95 for band pauses)",
+   "date": "2026-11-16",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1571865185180979331",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1887"
+   ],
+   "confirmed_by_entry": null
   }
  ]
 }
