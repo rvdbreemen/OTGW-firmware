@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-09T09:29:00Z'
-updated_date: '2026-11-16T14:30:00Z'
+updated_date: '2026-11-16T19:12:00Z'
 labels:
   - otdirect
 milestone: 2.0.0
@@ -51,4 +51,6 @@ Fix (OTDirect.ino): BS= in master mode stores the room value (otdRoom16Cache/Ovr
 Bench 09 on .61 (OTGW32, OT-Direct master, no boiler, SAT off), 2.0.0-beta.353+3a14423, run 2 15:2x (run 1 void: LAN broker down), commands via MQTT, frames from telnet (09 scratchpad b353\run2\): sha256 match, githash 3a14423, settings 'changed: none', bootcount 874 -> 876 (OTA only). (1) BS=19 -> 'R90101300 16 Write-Data TrSet = 19.00' at +1.6 s, overrides [16=4864]; (2) TT=20.5 -> R90101480 at +1.8 s, WRITE 100 = 3 at +2.9 s; (3) TT=0 -> R90101300 at +1.9 s, WRITE 100 = 0 at +3.0 s (beta.341: nothing in 360 s) = old-vs-fix PASS; (4) BS=0 -> no MsgID 16 frame in 90 s, overrides []. The 15 s refresh was not seen on the bench: with no boiler the bus is offline and the scheduler sends only MsgID 0 (OTDirect.ino 'if (busOffline && entry.msgId != 0) continue;', the round-robin after the TASK-1802 comment); queued commands still go out (the queue branch before it). The refresh therefore needs an answering boiler: covered by the host test only (W1: schedule entry valueSet with 0x1300; W5: TT keeps the schedule value), not benched.
 
 AC2 is left for 09 to tick (bench AC, rule: the bench-tester ticks); periodic refresh host-only, as noted above.
+
+Bench 09 on .61, beta.356+4601510 (code of pushed cf29dd198), master mode, SAT off, sim false: BS=19 -> R90101300 at +1.7 s; TT=20.5 -> R90101480 +2.0 s, R10640003 +3.1 s; TT=0 -> R90101300 +1.9 s, R10640000 +3.0 s; BS=0 -> no MsgID 16; identical to 353. Pushed cf29dd198, posted 1571965973295009792; 09 ticks AC2 (periodic refresh host-only).
 <!-- SECTION:NOTES:END -->

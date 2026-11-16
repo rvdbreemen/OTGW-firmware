@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-16T10:48:00Z'
-updated_date: '2026-11-16T15:05:00Z'
+updated_date: '2026-11-16T19:12:00Z'
 labels:
   - bug
   - ot-direct
@@ -46,4 +46,6 @@ pyotgw robustness (local read-only copy other-projects/pyotgw-master/pyotgw/pyot
 Bench 09 on .61 (OTGW32, OT-Direct, no thermostat), 2.0.0-beta.352+e18ccbf, LegacyPort25238Enabled on for the test, 2026-11-16 ~14:2x (09 scratchpad b352\): sha256 match, githash e18ccbf, settings 'changed: none', bootcount only by OTA and the planned reboots, no crash. Raw boot capture: OLD (351+597c163) telnet 'Thermostat disconnected' x1 and bridge 25238 x1; FIX telnet x1 (the processOT line stays), bridge 25238 0 thermostat lines. pyotgw 2.2.3 connect right after /ReBoot (port open 16.7-17.4 s, connect done 18.5-19.3 s): FIX 10/10 OK; on beta.341 this morning 3/5 OK, 2 IndexError at pyotgw.py:778 (+1/1 failed in the heap run). Real thermostat loss/return not benched (no thermostat on .61, no way to simulate): host test only. AC1/AC2 for 09 to tick.
 
 2026-11-16: pyotgw upstream issue opened on Robert's 'Post' (coordinator): https://github.com/mvn23/pyotgw/issues/107 (draft by 95 unchanged, repro inline: issue_cmd PS=1 takes the next queued non-frame line as the status line, process_statusfields_v4 IndexError at pyotgw.py:778; control without the unsolicited line parses).
+
+Bench 09 on .61, beta.356+4601510 (code of pushed cf29dd198), 25238 on for the test then off: telnet 'Thermostat disconnected' x1, bridge 25238 0 thermostat lines (880 B), same as 352. Pushed cf29dd198, posted 1571965973295009792; upstream mvn23/pyotgw#107. 09 ticks AC1/AC2.
 <!-- SECTION:NOTES:END -->

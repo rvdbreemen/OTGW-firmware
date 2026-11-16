@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-16T13:26:00Z'
-updated_date: '2026-11-16T18:21:00Z'
+updated_date: '2026-11-16T19:12:00Z'
 labels:
   - mqtt
   - heap
@@ -51,4 +51,6 @@ AC1 evidence: 09's 16:00 run above (old code = 353: hd_min 31,156 -> 6,484, 26/2
 Gates on the rebased lane (onto origin/dev 1dde4dcda, beta.352-355 for 1665/1999/1751/2004), 2026-11-16 17:14-18:15, foreground in chunks of 8 (scripts/run_tests.py --no-host -j 2): 292 tests/ files, 290 PASS, 2 FAIL that fail identically on origin/dev and are not from this lane: test_adr_governance test_live_index_complete ('ADR-252 (Proposed) is MISSING from docs/adr/README.md', d3) and test_settings_float_roundtrip ('SATpwmswitchmargin: no clamp range found in updateSetting()', after TASK-1942 b95bc21ec). Host harnesses for the touched areas: test_diag_recorder, test_diag_recording_routes, test_mqtt_broker_address, test_mqtt_print_error PASS. evaluate.py --quick: 87 passed, 0 failed. The rest of test/host/ was not run.
 
 Rebase note (95, 19:25): the lane rebase renumbered version.h (beta.352-355) but git merged the source banners cleanly where the renumbered value matched the commit's own bump, so the banners of the four firmware commits lag version.h by one (comment only; the binary takes its version from version.h). Resynced with one extra bump commit on top (bin/bump-prerelease.sh, beta.356): all 54 banners and version.h agree at beta.356. The earlier build d76a5ef is superseded; the bench build is the beta.356 one.
+
+AC3/AC4 bench (09 on .61, OTGW32 no PSRAM, 2.0.0-beta.356+4601510 = code of pushed cf29dd198, 20:00 mark; SAT enabled since 19:41:33, sim off (satsimulation false, sat/status simulation false), 25238 off, no diag recording; 09 scratchpad hour2000\): hd_min_free_heap 29,888 before and 29,888 after the mark = UNCHANGED (old 353, same conditions, 16:00: 31,156 -> 6,484); telnet free-heap prefix 19:59:50-20:00:10 min 59,728 / max 63,308 over 82 lines, no drop; 26 stats/* sends 20:00:00.009-20:00:02.564 (span 2.56 s, gaps 100-104 ms, none under 100 ms); broker 26/26 live and 26 retained on subscribe; mqtt_drops 0, '[drip] slowed' 0; settings.ini byte-identical after. Pushed e267a61fc..cf29dd198; zip beta.356+cf29dd1 posted #alpha-testing 1571965973295009792. 09 ticks AC3/AC4.
 <!-- SECTION:NOTES:END -->

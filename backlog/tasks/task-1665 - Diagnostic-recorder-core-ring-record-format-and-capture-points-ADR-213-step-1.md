@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-05T20:34:00Z'
-updated_date: '2026-11-16T13:55:00Z'
+updated_date: '2026-11-16T19:12:00Z'
 labels:
   - diagnostics
 milestone: 2.0.0
@@ -51,4 +51,6 @@ Stale audit 2026-11-14 (coordinator decision): AC2 needs a bench on .63 (PSRAM) 
 2026-11-16 (95) AC2 instrument for the append cost (09's 2026-11-14 bench measured RAM/flash but not the append cost): DiagEnv gets an optional micros clock (diagRecorderStuff.ino sets micros()); Writer::open() takes t0 before the tryLock, close() adds the cost to appendCount/appendSumUs/appendMaxUs while still under the lock; start() resets them; REST /api/v2/diag/recording/status adds append_count, append_max_us, append_avg_us. Host test F18 (test/host/test_diag_recorder.cpp, real header): 5 appends at 7 us -> count 5, max 7, avg 7; one 40 us append -> max 40, avg (5x7+40)/6; a new start resets to 0; an env without a clock times nothing. test_diag_recorder --mutant RESULT PASS (F1-F18, 3 mutants red as designed), test_diag_recording_routes PASS, test_diag_decode OK, webui diag-recording-controls 3/3, evaluate --quick 0 failed. F18 cannot run on the old header (no micros field): new instrument, red by absence only. Remaining for AC2: build, then 09 reads append_max_us/append_avg_us on .61 (no PSRAM) and .63 (PSRAM) under normal traffic; build slot after d3's 1942, push after the 20:00 tag (coordinator).
 
 Bench 09 on .61 (no PSRAM), 2.0.0-beta.352+e18ccbf (contains the instrument a10a5cdcd), 14:39-14:49, normal traffic, SAT off: start -> recording, psram false, ring_blocks 1 (4096 B); free heap 58,052 before, 52,692 after start (-5.4 KB), 51.6-52.4 KB during, 56,436 after stop (+4.9 KB back), maxfreeblock 31,732 throughout; append count/avg/max: 1 min 71/84/234 us, 5 min 350/80/234 us, 10 min 688/79/247 us; dropped 0; newest_seq 0 (seq counts 4 KB blocks; ~690 short records fit in one block); hd_min_free_heap 19,584 -> 19,260; no crash; settings restored byte-identical. PSRAM board (.63) after the 20:00 tag; AC2 for 09 to tick once both boards are measured.
+
+Pushed with the instrument in cf29dd198 (beta.352 in the lane), zip beta.356+cf29dd1 posted 1571965973295009792. AC2 still needs the PSRAM board (.63) measurement before 09 ticks it.
 <!-- SECTION:NOTES:END -->
