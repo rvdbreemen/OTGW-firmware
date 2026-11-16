@@ -1,6 +1,7 @@
 # Minimal OT log on the device and a daily upload: research and design proposal
 
 Status: proposal for the maintainer (TASK-1862), 2026-11-12. Nothing is implemented. Docs only.
+Design and open decisions rewritten 2026-11-16 for EU hosting, the opt-in dialog, free-only and the encoding study (see "Proposed design").
 Robert rejected the batch-upload transports of question 2 and asked for streaming per log line over HTTPS: see "Streaming per log line".
 
 ## The question
@@ -290,21 +291,155 @@ Too small or not a store: Azure IoT Hub Free, Better Stack Free, EMQX Serverless
 
 ## Proposed design (for discussion)
 
-1. **Phase 1, no cloud, all boards (no conflict):** an opt-in "OT log" switch in onboarding
-   and settings. It reuses the ADR-213 record format with a filter: OT frames (T, B, R, A, E)
-   and SAT ticks only. PSRAM boards keep every frame in the existing ring; boards without
-   PSRAM write the changes-only profile in hourly files on LittleFS, at most 12 to 24 hours
-   (oldest file deleted), with a small write buffer. Download from the web UI, and
-   automatically before a filesystem update.
-2. **Phase 2, upload:** after Robert picks a transport (questions below) and a new ADR
-   amends ADR-213 decision 1: an hourly upload task in the style of the webhook task
-   (ADR-136/137) that posts over plain HTTP to a Worker on `workers.dev`, an R2 bucket in the
-   EU jurisdiction with a 30-day lifecycle, per-device enrolment with a beta invite code, HMAC-signed
-   uploads, and a consent text. Payload encryption if Robert wants the content unreadable in transit.
+Status of this section: rewritten 2026-11-16 (TASK-1862). It replaces the earlier plain-HTTP, R2-based design
+and follows Robert's later requirements: **R1** EU hosting (#dev-sat-mqtt, msg 1570518857121271941), **R2** an
+explicit opt-in dialog, off by default (msgs 1570519191797112963 and 1570520075755323554), streaming over TLS
+allowed (DMs 1570328825353609217 and 1570329291030270033), minimal encoding (2026-11-14), and **free only,
+never pay** (2026-11-14). Sources are the task notes of TASK-1862 and the commits named per claim.
 
-Open questions for Robert, one decision each (sent through the coordinator): where the log
-lives and which frame profile; which transport; daily or hourly; and how this relates to
-TASK-1473.
+### Rules the design must meet
+
+1. **Free, no payment method on the account.** Then every limit is a hard error and nothing can be billed.
+   The firmware drops data quietly on errors (TASK-1471). If a signup asks for a card, that route is out.
+2. **Data stored in the EU (R1).** A service whose free plan cannot be pinned to an EU region does not
+   qualify until that is verified.
+3. **Opt-in dialog (R2).** Off by default. It sits in onboarding and in the settings, names what leaves the
+   gateway (OT frames and SAT ticks with timestamps, a random device id), where it is stored, how long it is
+   kept, and how to have it deleted. Nothing is sent before the user says yes.
+4. **Encrypted in transit.** TLS, so only boards with PSRAM can stream (ADR-218 proof of concept, 2026-11-07:
+   14 of 14 handshakes failed without PSRAM, all succeeded with the allocator redirected to PSRAM). The
+   OT-Direct board and other boards without PSRAM keep the local log only.
+5. **Rule changes needed first.** Outbound TLS needs ADR-218 accepted (it amends ADR-003, which forbids WSS),
+   and an upload by the device itself needs a new ADR that amends ADR-213 decision 1. Ask the coordinator for
+   the next ADR number first (the notes record that ADR-231 is reserved and the next is ADR-232).
+
+### What goes over the line
+
+- **Encoding.** The OT-aware model with an adaptive range coder (`scripts/ot_stream_codec_study.py`, study
+  `docs/diagnostics/ot-stream-encoding-study.md`, commit 3262a496c) needs 0.95 B per frame, 209 KiB per day,
+  with 3,600 s chunks, and 1.10 B per frame with 600 s chunks. Layout B is 3.79 B, layout B with zlib 1.94 B.
+  It is lossless (round trip verified). The result is from a generated 24 h stream calibrated against the
+  real capture (layout B 831 against 848 KiB measured). **Not yet run on the real capture, and not ported to
+  C.** Model state is about 8.7 KB for 34 IDs; 10 to 15 KB for a real ID set is an estimate.
+- **Time resolution.** About 5 of the 7 bits per frame are timing. 4 ms gives 0.68 B per frame and 10 ms
+  0.56 B (study). On PIC boards device time is only good to about 2 ms, so 4 ms is the honest unit there.
+  The choice is made on the measured jitter of the real capture; it is an engineering step, not a decision
+  for Robert.
+- **Batch interval.** Headers decide the wire cost: 77 % overhead at 10 s, 37 % at 60 s, 10 % at 300 s
+  (study, for WebSocket over TLS 1.3). An HTTPS POST per batch adds 150 to 300 B of HTTP headers and is worse
+  at every interval (study). Store in chunks of 10 to 60 minutes, send in batches of 60 to 300 s.
+- **Stream content.** OT frames and the SATTICK control tick (95 per hour, 30 fields, about 38 KiB per day
+  delta-coded, from the task notes; expected smaller in the coder, not measured). Debug text is left out of
+  this phase: it is about 3 KB/s with every module on and would end any free tier (study). Tokenized logging
+  (Pigweed `pw_tokenizer`, Apache-2.0; Trice licence unverified) is a later step.
+
+### Phases
+
+1. **Phase 1, no cloud, all boards, no rule conflict.** An opt-in OT log switch in onboarding and settings.
+   PSRAM boards keep every frame in the ADR-213 ring (about 40 h of every frame plus SAT, task notes). The
+   study changes the earlier LittleFS conclusion: at about 200 KiB per day the roughly 230 KiB of unreserved
+   LittleFS holds about a day of every frame with timing, so boards without PSRAM no longer need the
+   changes-only profile. This assumes the encoder fits those boards; it was not measured. A filesystem update
+   wipes the log (TASK-1524), so the web UI offers a download first.
+2. **Phase 2, stream.** After the decisions below and the two ADRs. A separate task with its own stack, never
+   on async_tcp (ADR-137, ADR-218). On a lost connection the gateway keeps recording and resends from the
+   last acknowledged record with the original timestamps. Per-device enrolment with a beta invite code, a
+   random device id (not the MAC), retention enforced by the backend, a delete path per device.
+
+### Free backends, ranked
+
+All figures are from the task notes (primary pricing pages read 2026-11-12 and 2026-11-14) unless marked
+as derived or estimate. Gateway counts are for beta gateways per free account.
+
+| Rank | Backend | Free and no card | EU (R1) | Capacity | Main con |
+|---|---|---|---|---|---|
+| 1 | **PocketBase on Robert's Synology behind a Cloudflare Tunnel** | Yes: the NAS and the domain exist; Tunnel is on the Cloudflare free plan | By construction, if the NAS is in the EU (his location is not stated in the sources) | Bounded by the NAS disk and line, not by a plan limit; not computed | Pre-1.0; runs on one home NAS |
+| 2 | **Cloudflare Workers Free + Durable Objects (SQLite), no R2** | Yes, no card: "further operations of that type will fail with an error" (DO pricing page) | DO EU jurisdiction on Free **unverified** | About 67 gateways at 60 s batches, about 297 at 300 s (rows written, 100,000 per day; commit 354278bef) | EU unverified; WebSocket client may not fit the app slot |
+| 3 | **Grafana Cloud Free (Loki)** | Yes, no card, 50 GB per month | EU regions exist; choice on Free **unverified** | About 300 gateways (text lines, 10 s batches, by volume) | 14 days retention; text format wastes the encoding |
+| 4 | **Firebase Realtime Database, Spark** | Yes: "No payment method needed" | europe-west1 exists; Spark eligibility not stated | About 117 gateways at 300 s batches with 30-day retention (storage bound, 1 GB); about 100 at 60 s (commit a46708a26) | No Cloud Functions on Spark: cleanup from a host script; behaviour at the limit unverified |
+| 5 | **Firestore, Spark** | Yes | Not stated for Spark | 20,000 writes per day; at one document per 300 s batch (288 per gateway per day) about 69 gateways (derived) | Smallest of the five; Blaze has no hard cap (commit 786a02f20) |
+
+**1. PocketBase on the Synology** (commits 1869fb0bf and 3c30e3926, TASK-1938, `tools/cloud-recorder/pocketbase/`).
+- Pros: no plan limits, retention under Robert's control (nightly cron, default 30 days), per-device accounts
+  with create-only rules and a unique device, stream and sequence number so a resend after a lost reply is
+  safe, admin UI stays on the LAN, only the login and batch paths pass the tunnel, Hyper Backup covers the
+  SQLite file. MIT licence, one Go binary. The collector is already written.
+- Cons: PocketBase is pre-1.0 with no backward-compatibility guarantee, and its GitHub repo was archived on
+  2026-10-26 (development moved to ganigeorgiev.com). It has not run yet: TASK-1938 AC 2 and 3 need a
+  Synology run. Availability follows the NAS and the home line, so a gap means lost data unless the gateway
+  buffer bridges it (about 40 h in the PSRAM ring). The Cloudflare Zero Trust signup must not ask for a
+  payment method (one source says it might; unverified): if it does, this route stops.
+- Consequence for the user: nothing to pay and no third-party analytics company holds the data. Robert hosts
+  testers' heating data himself and is the GDPR controller on his own hardware.
+- The device side posts over HTTPS (TASK-1938 README), one POST per batch, so the cost per batch is higher
+  than on a WebSocket (study).
+
+**2. Cloudflare Free, no R2** (study, commits 354278bef and aa6d9db36). Pros: no card and a hard stop, no
+server at home, scales to about 297 gateways at 300 s. Cons: EU jurisdiction on Free is unverified, which
+could fail R1; R2 reportedly asks for a payment method, so storage stays in the DO's 5 GB SQLite; handler
+times are estimates; a WebSocket client on the device adds flash to an app slot that is about 93 % full
+(ADR-218), not measured. Consequence for the user: if the account hits a limit, uploads fail and nothing is
+billed.
+
+**3. Grafana Cloud Free** (commit a6ac7e775). Pros: simplest device side (HTTPS POST of lines), analysis
+tools included, about 300 gateways. Cons: only 14 days of retention, text lines instead of the 0.95 B
+encoding, one token per tester, EU choice and byte counting unverified. Consequence: a replay needs an
+export within 14 days.
+
+**4 and 5. Firebase RTDB and Firestore on Spark** (commits a46708a26, 786a02f20). Workable for a small beta,
+but the EU region on Spark and the behaviour at the limit are unverified, and RTDB has no cleanup function.
+If a card is ever added, Blaze has no hard cap: budget alerts do not cap spending (notes).
+
+**Dropped** (reason in the notes): anything on Cloudflare R2 (payment method), InfluxDB Cloud (EU not stated),
+AWS IoT Core (free for 12 months only), Azure IoT Hub Free (8,000 messages per day), Better Stack Free (3
+days, too small), EMQX Serverless (too small; HiveMQ Serverless retires 2026-12-31), Google Pub/Sub (billing
+account), Supabase Free (paused after a week of inactivity, EU not stated), self-hosted Supabase (4 GB RAM
+minimum, too heavy for most Synology models). Appwrite was not checked.
+
+**Recommendation:** rank 1 for the beta, with rank 2 as the scalable fallback once its EU jurisdiction on the
+Free plan is verified. This is an estimate, not a measurement: the beta is small enough for one NAS.
+
+## Open questions for Robert
+
+One decision each, one DM each (sent by the coordinator). Each lists its options and what follows.
+
+1. **Which free backend carries the stream?**
+   - A: PocketBase on your Synology behind a Cloudflare Tunnel. Nothing to pay, EU by construction, no plan
+     limit. You host the data and are the controller; gaps when the NAS or line is down.
+   - B: Cloudflare Workers Free with Durable Objects, no R2. About 67 to 297 gateways, no server at home.
+     EU jurisdiction on Free is unverified: if it is not available, this fails your EU rule.
+   - C: Grafana Cloud Free. About 300 gateways, least code. 14 days retention, text only, EU choice on Free
+     unverified.
+   - Recommendation: A. Main risk: the NAS is a single point of failure, and PocketBase is pre-1.0 and its
+     GitHub repo is archived.
+2. **How does this relate to TASK-1473 (cloud recording, parked)?**
+   - A: One feature. TASK-1473 reopens, and the minimal OT stream is its first phase, under one ADR.
+   - B: Keep them separate. TASK-1862 stays the opt-in minimal OT stream, sharing the collector
+     (TASK-1938) and the codec. TASK-1473 stays parked.
+   - Recommendation: B. Main risk: two features drift apart. You parked 1473 four times, and B keeps its
+     larger scope out of the beta.
+3. **Do we accept ADR-218 (outbound TLS on PSRAM boards) and amend ADR-213 decision 1 (the firmware never
+   sends a recording)?**
+   - A: Accept both now, so work can start. If the TLS client does not fit the app slot, the decision was
+     premature.
+   - B: Measure first whether TLS plus the HTTP or WebSocket client fits the app slot (about 93 % full),
+     then accept. Costs a short delay, avoids a rule change for something that cannot ship.
+   - C: Neither. No device upload at all; only the local log, and your own gateways on the LAN posting over
+     plain HTTP to the collector.
+   - Recommendation: B. Main risk: the measurement says it does not fit, and then rank 1 is only reachable
+     through C.
+4. **How often does a gateway send a batch?**
+   - A: Every 60 s. 37 % header overhead, data at most 1 minute late, about 67 gateways on Cloudflare Free.
+   - B: Every 300 s. 10 % overhead, data at most 5 minutes late, about 297 gateways on Cloudflare Free.
+   - Recommendation: B for HTTPS POST to the collector. Main risk: a crash or power cut loses up to 5
+     minutes of data that was still only in RAM.
+5. **How long is the data kept, and what do you promise testers about deletion?**
+   - A: 30 days, deletion on request by device id (the figure the earlier proposal used as an example, not a
+     measured need).
+   - B: 14 days, deletion on request. Smaller privacy surface, less history for replays.
+   - C: 90 days. Better for slow problems, larger surface and more disk.
+   - Recommendation: A. Main risk: a field problem that needs more than 30 days of history; then the tester
+     sends a local download (phase 1).
 
 ## Sources
 
@@ -314,3 +449,5 @@ TASK-1473.
 - Plain-HTTP probes (curl, 2026-11-12): three public `*.workers.dev` Workers 200 over HTTP; `http://workers.dev` 301; `http://script.google.com` 301 to HTTPS.
 - Google: [Free features](https://docs.cloud.google.com/free/docs/free-cloud-features), [Firebase pricing](https://firebase.google.com/pricing), [Apps Script quotas](https://developers.google.com/apps-script/guides/services/quotas). MQTT: [EMQX pricing](https://www.emqx.com/en/pricing), [HiveMQ Cloud docs](https://docs.hivemq.com/hivemq-cloud/introduction.html), [HiveMQ pricing](https://www.hivemq.com/pricing/). Cloudflare R2 [data location](https://developers.cloudflare.com/r2/reference/data-location/).
 - Cloudflare: [Workers limits](https://developers.cloudflare.com/workers/platform/limits/), [Workers pricing](https://developers.cloudflare.com/workers/platform/pricing/), [R2 pricing](https://developers.cloudflare.com/r2/pricing/), [Always Use HTTPS](https://developers.cloudflare.com/ssl/edge-certificates/additional-options/always-use-https/).
+- Encoding: `docs/diagnostics/ot-stream-encoding-study.md`, `scripts/ot_stream_codec_study.py` (commits 3262a496c, 354278bef).
+- Free-only backend research in the TASK-1862 notes (commits aa6d9db36, a46708a26, 786a02f20, 1869fb0bf); PocketBase collector `tools/cloud-recorder/pocketbase/` (TASK-1938, commit 3c30e3926).
