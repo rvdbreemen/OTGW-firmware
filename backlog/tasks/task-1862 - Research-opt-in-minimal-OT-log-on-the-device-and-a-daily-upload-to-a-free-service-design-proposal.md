@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-12T06:32:00Z'
-updated_date: '2026-11-16T08:28:00Z'
+updated_date: '2026-11-16T08:29:00Z'
 labels:
   - diagnostics
   - research
@@ -31,7 +31,7 @@ Related: TASK-1473 (parked cloud recording, 2.1.0), ADR-213 (local recording; de
 - [x] #1 Sizes for 24 h and 7 days measured on a real capture and cross-checked against a second source, per frame profile and time resolution
 - [x] #2 Storage options (LittleFS, PSRAM ring) with budget, reboot/filesystem-update survival, RAM and wear compared
 - [x] #3 Upload options compared (service limits, transport against the no-HTTPS rule, privacy), conflicts with ADR-213, TASK-1473 and ADR-218 named
-- [ ] #4 Design proposal written and the open decisions put to Robert one per DM (via the coordinator)
+- [x] #4 Design proposal written and the open decisions put to Robert one per DM (via the coordinator)
 - [ ] #5 Robert's decisions recorded in this task; follow-up implementation task(s) and any ADR filed from them
 <!-- AC:END -->
 
@@ -67,4 +67,6 @@ Requirements from Robert in #dev-sat-mqtt (2026-11-12, relayed by the coordinato
 2026-11-14 self-hosted Firebase-like on Robert's Synology (Container Manager). PocketBase: MIT, single Go binary with SQLite, REST, auth, realtime, admin UI; pocketbase.io shows v0.42.2; the GitHub repo was archived 2026-10-26 (last GitHub release v0.40.6), development moved to ganigeorgiev.com; pre-1.0, no backward-compatibility guarantee. Retention via cronAdd in pb_hooks (JS, ES5.1+). Supabase self-hosted: 4 GB RAM min, 8 GB recommended, 2 cores, 40 GB SSD, about 13 components: too heavy for most Synology models. Appwrite not checked. Internet exposure for testers' gateways: Synology reverse proxy + Let's Encrypt with port 443 forwarded, or Cloudflare Tunnel (free plan, outbound only, needs a domain on Cloudflare DNS; one source says the Zero Trust dashboard asks for a payment method, unverified). Robert's own gateways on the LAN could post over plain HTTP (no TLS, also no-PSRAM boards). Recommendation: PocketBase in a container, one collection for batches, per-device auth records with create-only rules, nightly retention cron, Synology Hyper Backup for the SQLite file.
 
 2026-11-16 (comms 92, sonnet agent, checked by 92): Proposed design and Open questions of docs/diagnostics/minimal-ot-log-and-upload-proposal.md rewritten for R1 (EU), R2 (opt-in dialog), free-only, the encoding study and a ranked table of five free backends (recommendation: PocketBase on the Synology first, Cloudflare Free without R2 as fallback); 0 em dashes, 0 'OTGW32', evaluate --quick 0 failed; pushed d495e05b6. Five decisions sent to the coordinator to put to Robert one DM each (backend; relation to TASK-1473; ADR-218 + ADR-213 d1; batch interval; retention). Unverified and flagged in the doc: Cloudflare DO EU jurisdiction on Free, Grafana Free EU region, Zero Trust signup payment, TLS fit in the app slot. AC4 is ticked when the DM ids are known.
+
+AC4 (2026-11-16): the five open decisions were handled: Q2 = B, Q3 = B (measure first; ADR-218 accept after the poc.8 TLS-fit bench is a hard stop for Robert), Q4 = B (300 s), decided by the coordinator under Robert's 09:30 rule; Q1 backend and Q5 retention put to Robert as DM 1571804094593765398 and DM 1571804100897669281. Recorded in the proposal under 'Decision status (2026-11-16)'. AC5 waits for his two answers.
 <!-- SECTION:NOTES:END -->

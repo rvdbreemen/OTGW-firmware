@@ -441,6 +441,16 @@ One decision each, one DM each (sent by the coordinator). Each lists its options
    - Recommendation: A. Main risk: a field problem that needs more than 30 days of history; then the tester
      sends a local download (phase 1).
 
+## Decision status (2026-11-16)
+
+Under Robert's rule of 2026-11-16 09:30 (decide technical points yourself with an advisor check; put to him only what is his or a hard stop), the coordinator decided three of the five questions above and put two to Robert:
+
+- **Question 2 (relation to TASK-1473): B, decided by the coordinator.** Separate features: TASK-1862 stays the opt-in minimal OT stream and shares the collector (TASK-1938) and the codec; TASK-1473 stays parked.
+- **Question 3 (ADR-218 and ADR-213 decision 1): B, decided by the coordinator.** Measure first. The cloud recording proof of concept (poc.8, bench on .61) measures the TLS fit; poc.8 is at 98.4 % of the app slot. Accepting ADR-218 is a hard stop and goes to Robert after that measurement.
+- **Question 4 (batch interval): B, decided by the coordinator.** Every 300 s: 10 % header overhead; up to 5 minutes of data lost on a crash is acceptable for diagnostic data.
+- **Question 1 (backend): put to Robert**, Discord DM 1571804094593765398. He hosts the data and is its controller.
+- **Question 5 (retention and deletion promise): put to Robert**, Discord DM 1571804100897669281. It is a promise to testers.
+
 ## Sources
 
 - ADR-213 and `docs/diagnostics/recording-budget-1470.md` (record format, field-run sizes, RAM).
