@@ -111,3 +111,9 @@ static bool picBoardTretAbsent() { return true; }
 static inline struct tm* localtime_r(const time_t* t, struct tm* o) { localtime_s(o, t); return o; }   // STUB: host time zone, wall clock is not under test
 void connProbe(uint8_t) {}              // STUB: MQTT connect diagnostics probe
 uint8_t g_satShadowEpoch = 0;           // STUB: the publish shadow epoch of SATmqttPublish.cpp (that file is not compiled)
+static constexpr uint16_t TRACKED_TIME_UNSEEN = 0xFFFFU;   // the real sentinel of OTGW-Core.ino (TASK-1979 climate publish in SATcontrol)
+static bool hvacHeartbeatDue(uint16_t) { return false; }   // STUB: the MQTT heartbeat timing of OTGW-Core.ino is not modelled (no republish on a timer)
+static uint16_t currentTrackedSeconds() { return (uint16_t)((millis() / 1000UL) % 0xFFFFUL); }   // STUB: same shape as OTGW-Core.ino (seconds, never the 0xFFFF sentinel); no wrap behaviour tested
+void beginStatusBurst() {}                // STUB: MQTT status-burst windowing (ADR-088) not modelled
+void endStatusBurst() {}                  // STUB: idem
+void incrementStatusBurstPublishCount() {}   // STUB: idem, no burst budget
