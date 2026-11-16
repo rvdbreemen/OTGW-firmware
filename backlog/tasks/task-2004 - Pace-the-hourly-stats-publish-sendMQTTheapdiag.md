@@ -11,7 +11,6 @@ labels:
   - heap
 milestone: 2.0.0
 dependencies: []
-priority: medium
 priority: high
 ordinal: 1025000
 ---
@@ -24,12 +23,6 @@ At every wall-clock hour (ADR-086, doTaskMinuteChanged -> if (hourFlag) -> sendM
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Reproduction red on the old code: hd_min drop at hh:00 on a board without PSRAM, plus the count of the 26 stats/* topics that reach the broker
-- [ ] #2 Fix green on the same reproduction: paced, all 26 topics arrive, hd_min stays above ~10 KB
-- [ ] #3 Host test on the real pacer (order, all topics once, respects canPublishMQTT)
-- [ ] #4 Bench on .61 by the bench-tester
-<!-- AC:END -->
-
 - [x] #1 Reproduction red on the old code: hd_min drop at hh:00 on a board without PSRAM, plus the count of the 26 stats/* topics that reach the broker
 - [x] #2 Host test on the real pacer (order, all topics once, respects canPublishMQTT)
 - [ ] #3 Bench on .61 by the bench-tester
