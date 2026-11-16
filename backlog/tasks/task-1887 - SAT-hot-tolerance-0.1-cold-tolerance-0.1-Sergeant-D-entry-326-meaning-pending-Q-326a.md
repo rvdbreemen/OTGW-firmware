@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-13T07:25:00Z'
-updated_date: '2026-11-16T21:26:00Z'
+updated_date: '2026-11-16T22:34:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -30,7 +30,7 @@ Sergeant D decision 2026-11-13 (https://discord.com/channels/812969634638725140/
 - [x] #4 ADR-250 (Proposed via adr-kit) records the decision and amends ADR-199; accepted by Robert before push
 - [x] #5 esp32-combo build and a bench run by the bench-tester (health; the band behaviour is host-proven, no SAT scenario on hardware)
 - [ ] #6 Follow-ups in the post build after the 2.0.0 beta tag, benched on .63: the band narration shows the deciding value (X.XX matches room/target of the same SATTICK), and ON phases that start during a band stop leave starts=/cycles_this_hour unchanged (entry 398; host-proven by test_sat_tolerance_band if .63 does not run PWM)
-- [ ] #7 Entries 401-403 (restart below target + 0.1, 600 s minimum CH-off from the CH-off) on the real control tick: host tests red on the code before and green on the fix; ADR-253 (Proposed, partly supersedes ADR-250) accepted by Robert; build + bench .63 health (band host-proven, field check open)
+- [x] #7 Entries 401-403 (restart below target + 0.1, 600 s minimum CH-off from the CH-off) on the real control tick: host tests red on the code before and green on the fix; ADR-253 (Proposed, partly supersedes ADR-250) accepted by Robert; build + bench .63 health (band host-proven, field check open)
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -79,4 +79,6 @@ Entry 398 edge case, OUR interpretation (ba, recorded by comms 92 on 2026-11-16;
 2026-11-16 entry 403 (Sergeant D 20:02:51 UTC, Q-402a): after a band stop CH stays off for 600 s (10 min), counted from the moment CH actually goes off (after any 180 s burn), then restart below target + 0.1 (entry 401); stop stays at target + 0.1 (entry 402). Scope 2.0.0; HIGH PRIORITY (Sergeant D 19:56, Robert 19:57 to the bot).
 
 2026-11-16 entries 401/402/403 (Sergeant D: restart below target + 0.1; minimum CH-off after a band stop; 10 minutes from the CH-off; Robert: 2.0.0, high priority) implemented in f1ac80943 (beta.359, local): satToleranceDemand() demand above -0.1 (no hold zone), SAT_TOL_MIN_OFF_MS 600000 from the rising edge of _sat_tolBandOff on the tick clock (_sat_tolOffSinceMs), no minimum without a room temperature (our reading, entries 38/46, open question in ADR-253), narration once per pause ('Heating pause minimum 600 s ...', 'Heating resumes: target - room X.XX, below target + 0.1; CH was off N s'). Evidence: test_sat_tolerance_band 26/26; with SATcontrol.ino + SATchEnable.h of beta.358 the 7 new-behaviour tests fail, 19 pass. Seams pwm_override 83 (tick clock declared before the body), max_tset 37, cold_cut_min_burn 8, published_curve 5, zone_aggregation 16, restart_quiet 20, hp_pwm 35, pwm_start_limit 26, mqtt_state 31, narrate_fits 1; LL contract chunks 1-3 green on the lane, chunk 4 green after the tick-clock fix (the LL-020 source check 'tick time read once' caught a second millis() in the band block). ADR-253 written (Proposed), related to ADR-250/ADR-199 via adr relate. Spec updated.
+
+2026-11-16 AC7: band 401-403 pushed 647d87a9d..c6b716d05 (2.0.0-beta.359+c6b716d, src/tests identical to the benched bb4c20c13), posted Discord 1572015962876682383. 09 on .63 (satsimulation false start/end, SAT enabled, active false: ot_link_lost): health PASS (githash, appelfsha256 = .elf, no crash fields, settings byte-identical, 0 loop-stalls, 0 queue-full); free heap ~1.7 KB and hd_min ~2.2 KB lower than 358 on the same unit, flat over the run, not explained by this change (a few statics), noted as unexplained. Band behaviour host-proven (test_sat_tolerance_band 26/26, 7 red on the code before), field check open. ADR-253 Accepted by Robert (2026-11-16 22:58, coordinator session) via adr-kit; Open Question closed as decided by acceptance (entry 405, Q-403a asked). adr-lint keeps the known 'one-directional supersession' finding for partial replacements (as for ADR-207/ADR-203; 16 such findings repo-wide): adr-kit has no partial-supersession form.
 <!-- SECTION:NOTES:END -->

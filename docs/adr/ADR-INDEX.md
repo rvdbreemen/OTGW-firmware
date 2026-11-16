@@ -257,4 +257,4 @@ One row per Architecture Decision Record. Scope is the Enforcement `path_glob` s
 | ADR-250 | Accepted | - | While the tolerance band says stop, the CH-enable bit SAT sends is 0, and nothing else changes: the control setpoint,... |
 | ADR-251 | Accepted | - | MsgID 3 plays no part in SAT PWM: neither HB bit 4 nor the presence of a valid MsgID 3 reply allows, refuses or ends... |
 | ADR-252 | Proposed | - | A heating start enters PWM through satSetControlMode(), and a start gate keeps every PWM to continuous exit quiet unt... |
-| ADR-253 | Proposed | - | The band stops at target + 0.1 and may restart below target + 0.1, and once CH is off for the band it stays off for a... |
+| ADR-253 | Accepted | - | The band stops at target + 0.1 and may restart below target + 0.1, and once CH is off for the band it stays off for a... |

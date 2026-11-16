@@ -10476,7 +10476,7 @@
       "title": "SAT tolerance band restarts below target + 0.1 after a 600 s minimum CH-off (partly supersedes ADR-250)",
       "path": "ADR-253-sat-tolerance-band-restarts-below-target-0-1-after-a-600-s-minimum-ch-off-partly-supersedes-adr-250.md",
       "format": "canonical",
-      "status": "Proposed",
+      "status": "Accepted",
       "date": "2026-11-16",
       "decision_summary": "The band stops at target + 0.1 and may restart below target + 0.1, and once CH is off for the band it stays off for a...",
       "topics": [
@@ -10512,7 +10512,7 @@
         ],
         "must_not": [
           "Must not start the 600 s at the stop decision while the 180 s minimum burn still holds CH on.",
-          "Must not add a setting or a REST or MQTT field for the band times."
+          "Must not add a setting or a REST (HTTP API) or MQTT (message broker) field for the band times."
         ],
         "exceptions": [
           "The thermal safe fallback keeps CH=1, as in ADR-250."

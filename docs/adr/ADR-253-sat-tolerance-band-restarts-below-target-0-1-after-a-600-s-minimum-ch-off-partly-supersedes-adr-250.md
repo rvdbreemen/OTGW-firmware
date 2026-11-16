@@ -1,7 +1,7 @@
 ---
 id: "ADR-253"
 title: "SAT tolerance band restarts below target + 0.1 after a 600 s minimum CH-off (partly supersedes ADR-250)"
-status: "Proposed"
+status: "Accepted"
 date: "2026-11-16"
 binding: false
 gate: null
@@ -42,7 +42,7 @@ format: "canonical"
 
 ## Status
 
-Proposed, 2026-11-16. Guideline-level per ADR-080: the host tests named under Verification check it, it is not wired into evaluate.py. Partly supersedes ADR-250 (the SAT, Smart Autotune Thermostat, tolerance band): its restart threshold (target - 0.1) and its hold zone between the two thresholds are replaced; everything else in ADR-250 (the stop at target + 0.1, CH (central heating) bit only, pulse-width modulation (PWM) stays active, the 180 s minimum burn, eco versus comfort, the entry-398 start count) stays as decided there.
+Accepted, 2026-11-16 (Robert, 22:58 in the coordinator session). Guideline-level per ADR-080: the host tests named under Verification check it, it is not wired into evaluate.py. This ADR replaces ADR-250 (the SAT, Smart Autotune Thermostat, tolerance band) for its restart threshold (target - 0.1) and its hold zone between the two thresholds only; adr-kit has no partial-supersession form, so the front-matter `supersedes` list stays empty and ADR-250 stays Accepted for everything else (the stop at target + 0.1, CH (central heating) bit only, pulse-width modulation (PWM) stays active, the 180 s minimum burn, eco versus comfort, the entry-398 start count) stays as decided there.
 
 ## Status History
 
@@ -62,6 +62,11 @@ status_history:
     status: Proposed
     changed_by: "User: Robert van den Breemen"
     reason: Related to ADR-199
+    changed_via: adr-kit lifecycle
+  - date: 2026-11-16
+    status: Accepted
+    changed_by: "User: Robert van den Breemen"
+    reason: Accepted by Robert, 2026-11-16 22:58 in the coordinator session ('Accept ADR 253'), relayed by the coordinator
     changed_via: adr-kit lifecycle
 ```
 
@@ -138,7 +143,7 @@ The band stops at target + 0.1 and may restart below target + 0.1, and once CH i
 
 ## Open Questions
 
-- [ ] Should the band hold CH off for the rest of the 600 s when the room temperature is lost during a pause? We release it (entries 38/46); not asked yet.
+- [x] Should the band hold CH off for the rest of the 600 s when the room temperature is lost during a pause? Decided by acceptance: released (entries 38/46; recorded as interpretation in entry 405). Robert accepted this ADR on 2026-11-16 at 22:58 in the coordinator session, with this reading named in the accept question. Asked to Sergeant D as Q-403a; if he chooses otherwise, a new ADR follows.
 
 ## Related Decisions
 
@@ -147,6 +152,6 @@ The band stops at target + 0.1 and may restart below target + 0.1, and once CH i
 
 ## References
 
-- `docs/sat/sergeant-d-corrections.md` entries 38, 46, 326, 328, 376, 398, 400, 401, 402, 403.
+- `docs/sat/sergeant-d-corrections.md` entries 38, 46, 326, 328, 376, 398, 400, 401, 402, 403, 405.
 - `src/OTGW-firmware/SATchEnable.h` (`satToleranceDemand`, `SAT_TOL_MIN_OFF_MS`), `src/OTGW-firmware/SATcontrol.ino` (the band block of the control tick).
 - TASK-1887.
