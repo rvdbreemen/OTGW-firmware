@@ -10335,6 +10335,71 @@
         "supersedes": [],
         "superseded_by": null
       }
+    },
+    {
+      "id": "ADR-251",
+      "title": "MsgID 3 plays no part in SAT PWM; the boiler's slave configuration no longer gates the continuous-to-PWM switch (amends ADR-249)",
+      "path": "ADR-251-msgid-3-plays-no-part-in-sat-pwm-the-boiler-s-slave-configuration-no-longer-gates-the-continuous-to-pwm-switch-amends-adr-249.md",
+      "format": "canonical",
+      "status": "Proposed",
+      "date": "2026-11-16",
+      "decision_summary": "MsgID 3 plays no part in SAT PWM: neither HB bit 4 nor the presence of a valid MsgID 3 reply allows, refuses or ends...",
+      "topics": [
+        "master low-off",
+        "msgid 3",
+        "pwm",
+        "pwm permission",
+        "sat",
+        "slave configuration"
+      ],
+      "aliases": [
+        "entry 392",
+        "entry 393",
+        "hb bit 4",
+        "low-off veto",
+        "pwm veto"
+      ],
+      "components": [
+        "satPwmPermitted"
+      ],
+      "symbols": [
+        "bSlaveCfgValid",
+        "bSlaveLowOffDenied",
+        "iPwmVetoReason",
+        "satCycleCheckLowLoadVeto",
+        "satNoteSlaveConfig",
+        "satPwmEntryAllowed",
+        "satPwmPermitted"
+      ],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [
+          "satPwmPermitted() returns true whatever MsgID 3 said or whether it was seen.",
+          "The MsgID 3 reply keeps being recorded through satNoteSlaveConfig() and shown in the SAT status."
+        ],
+        "must_not": [
+          "Must not refuse a PWM entry, or end a running PWM, because of MsgID 3 HB bit 4 or a missing MsgID 3 reply.",
+          "Must not use MsgID 3 as a heating-source detector for PWM (ADR-157 unchanged)."
+        ],
+        "exceptions": [
+          "None."
+        ],
+        "verification": [
+          "tests/testsatslavelowload.py (real satNoteSlaveConfig, satPwmPermitted, satPwmEntryAllowed, satCycleCheckLowLoadVeto, satSetControlMode, satRestoreControlMode, satHandleControlMode): every MsgID 3 state (no reply, bit 4 = 0, bit 4 = 1) r...",
+          "tests/testsatloopintegration.py::tests1pwmreachedwhenboilerreportslowoffnotallowed: the whole SAT loop with the boiler model reporting bit 4 = 1 reaches PWM with its ON and OFF phases on the wire; the code before it never reaches PWM."
+        ]
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
     }
   ],
   "relationships": [
@@ -17257,6 +17322,12 @@
       "resolved": true
     },
     {
+      "source": "ADR-249",
+      "target": "ADR-251",
+      "type": "related",
+      "resolved": true
+    },
+    {
       "source": "ADR-250",
       "target": "ADR-196",
       "type": "related",
@@ -17265,6 +17336,24 @@
     {
       "source": "ADR-250",
       "target": "ADR-199",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-251",
+      "target": "ADR-157",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-251",
+      "target": "ADR-196",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-251",
+      "target": "ADR-249",
       "type": "related",
       "resolved": true
     }

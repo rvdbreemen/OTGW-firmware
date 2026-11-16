@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-16T11:08:00Z'
-updated_date: '2026-11-16T11:18:00Z'
+updated_date: '2026-11-16T11:44:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -24,11 +24,11 @@ Sergeant D entry 392 (2026-11-16, to be recorded verbatim by 92 before the build
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Entry 392 is recorded verbatim in docs/sat/sergeant-d-corrections.md (with link) before the code change
-- [ ] #2 satPwmPermitted() no longer reads MsgID 3 HB bit 4; a valid reply with bit 4 = 1 allows PWM on every entry path, and bit 4 turning 1 no longer leaves PWM; the bit stays recorded and shown
-- [ ] #3 Host test on the real code: a Vitodens-like profile (MsgID 3 HB bit 4 = 1) enters PWM; red on the old code (refused, reason 2), green on the fix; the no-valid-reply case is unchanged until Q-392a
-- [ ] #4 firmware-sat-spec.md and the REST/UI veto text updated; ADR-249's entry-213 citation noted as superseded by entry 392
-- [ ] #5 Part 2 per Q-392a (entry 215): implemented or recorded as kept
+- [x] #1 Entry 392 is recorded verbatim in docs/sat/sergeant-d-corrections.md (with link) before the code change
+- [x] #2 satPwmPermitted() no longer reads MsgID 3 HB bit 4; a valid reply with bit 4 = 1 allows PWM on every entry path, and bit 4 turning 1 no longer leaves PWM; the bit stays recorded and shown
+- [x] #3 Host test on the real code: a Vitodens-like profile (MsgID 3 HB bit 4 = 1) enters PWM; red on the old code (refused, reason 2), green on the fix; the no-valid-reply case is unchanged until Q-392a
+- [x] #4 firmware-sat-spec.md and the REST/UI veto text updated; ADR-249's entry-213 citation noted as superseded by entry 392
+- [x] #5 Part 2 per Q-392a (entry 215): implemented or recorded as kept
 - [ ] #6 Field check by indigo_light on his Vitodens: PWM entered (before capture on beta.339, after capture on the fix)
 <!-- AC:END -->
 
@@ -36,4 +36,12 @@ Sergeant D entry 392 (2026-11-16, to be recorded verbatim by 92 before the build
 
 <!-- SECTION:NOTES:BEGIN -->
 Entry 392 recorded verbatim by 92 (origin 6c9edca6b) before the code; Q-392a asked 11:05:27 UTC (no answer yet). Field test task by the coordinator: TASK-1998 (indigo_light).
+
+2026-11-16 (95) Part 1 AND Part 2 built: entry 393 (Q-392a 'My answer is A', 11:06:48 UTC, origin becbdcc3e) reverses entry 215 too: MsgID 3 plays no part in PWM. Scope line unanswered; read as 2.0.0 (92). Change: satPwmPermitted() returns true (SATcycles.ino); the call points (satPwmEntryAllowed on every entry path, satCycleCheckLowLoadVeto in the loop) stay and never refuse, pwm_veto_reason stays 0; satNoteSlaveConfig still records valid/bit 4 for the status. Comments in SATcycles/SATcontrol/SATtypes now cite 392/393; firmware-sat-spec.md gate section marked REMOVED (former text kept as history); CHANGELOG. Not removed: the now-dead refusal machinery (minimal change in the release week; d3's 1942 also calls satPwmEntryAllowed).
+
+Evidence: tests/test_sat_slave_lowload.py rewritten to entries 392/393 (every MsgID 3 state: no reply, bit 4 = 0, bit 4 = 1 -> PWM on the overshoot switch, fail-safe, restore at once, deferred restore, pwm command, any satSetControlMode caller; running PWM never ended; reason 0; decoder still records the bit): FIX 20/20 OK; OLD (origin SATcycles.ino + SATcontrol.ino via OTGW_SATCYCLES_INO/OTGW_SAT_INO) 16 FAIL (scratchpad t2000-red.txt). Full loop (tests/test_sat_loop_integration.py) Vitodens case: test_s1_pwm_reached_when_boiler_reports_low_off_not_allowed ('lowoff 1' + S1 runs check_s1: PWM, ON and OFF phases on the wire): FIX OK (file 21/21), OLD SATcycles.ino RED "'2' not found in ['1'] : PWM (mode 2) was never reached". Also green: test_sat_overshoot_sustain 83, test_sat_pwm_override 83, test_sat_pwm_start_limit 26, test_sat_no_return_ignition 19, test_sat_requested_vs_transmitted 10, test_sat_restart_quiet 20, test/host/test_slave_config_evidence PASS, test_sat_lowload_contract ll010/ll023/ll018i 3 passed (LL-010 text rewritten to 392/393). evaluate --quick 0 failed. ADR check: no Accepted ADR states the bit-4 rule; ADR-249's clause 'the boiler's MsgID 3 permission comes first (entry 213)' is now vacuous (always permitted) - its citation is superseded by entries 392/393, no new ADR (the gate was never an ADR decision). Open: AC4 partly (REST/UI veto text kept for old firmware readings; the UI shows nothing since reason stays 0), AC6 field (indigo_light, TASK-1998). d3's tests/test_sat_pwm_first_start.py cases (b)/(c)/(h) need adapting on the rebase onto 1942 (d3 note).
+
+AC4 correction to the note above: met. firmware-sat-spec.md updated; pwm_veto_reason / slave_low_off_denied are not in openapi.yaml or docs/api/README.md (grep), so no API doc change; the web UI veto texts (sat_why_pwm_no_reply/denied in v2.js) stay for older firmware that still reports reason 1/2 and are never shown with this firmware (reason stays 0); ADR-249's citation is noted above.
+
+ADR (coordinator's check 2026-11-16): ADR-249's clause 'and the boiler's MsgID 3 permission comes first (entry 213)' sits in its Decision section, so removing the gate amends an Accepted ADR: ADR-251 'MsgID 3 plays no part in SAT PWM ... (amends ADR-249)' created via adr-kit, status Proposed (Robert accepts), related to ADR-249 both ways (adr relate), README entry added (also the missing ADR-234 entry, so tests/test_adr_governance.py is green again: was FAIL on origin for ADR-234).
 <!-- SECTION:NOTES:END -->

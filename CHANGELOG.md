@@ -6,6 +6,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## [Unreleased]
 
 ### Changed
+- SAT: the boiler's slave configuration (MsgID 3) no longer stops PWM. A boiler that reports "master low-off not allowed" (MsgID 3 bit 4, for example a Viessmann Vitodens 100-W) and a gateway that has not seen a MsgID 3 reply yet can both use PWM again, as Sergeant D decided (entries 392 and 393). The bit is still shown in the SAT status (TASK-2000).
 - SAT: after a reboot SAT sends no command at all for the first 60 seconds (no hand-back, no setpoint), as Sergeant D asked (entry 388). After that it steers on the heating curve only until the first room temperature arrives. REST `sat/status` has a new field `pid_curve_only`, and the web UI marks the I term as not applied during that time (TASK-1866, TASK-1874).
 - SAT: during a PWM ON phase the modulation suppression setpoint follows the latest boiler flow temperature again, as thermo-nova does. The 2 minute flow average (introduced in beta.330, public in beta.339) is removed: Sergeant D confirmed that no average is needed, because the 180 s flame-on rule already covers the light-off (entry 383, TASK-1990).
 ### Fixed

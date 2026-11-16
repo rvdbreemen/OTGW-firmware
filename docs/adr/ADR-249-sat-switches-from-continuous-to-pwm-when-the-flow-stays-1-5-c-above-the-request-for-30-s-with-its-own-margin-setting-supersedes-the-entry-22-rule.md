@@ -9,6 +9,8 @@ documents_shipped: false
 verified_in: []
 supersedes: []
 superseded_by: null
+related:
+  - "ADR-251"
 topics:
   - "sat"
   - "pwm"
@@ -55,6 +57,11 @@ status_history:
     status: Accepted
     changed_by: "User: Robert van den Breemen"
     reason: "Maintainer accepted: 'A' (Discord direct message 1571779788178194473, reply to 1571670760131534909, 2026-11-16), incl. the setting PWM switch margin default 1.5, range 0.5-5.0"
+    changed_via: adr-kit lifecycle
+  - date: 2026-11-16
+    status: Accepted
+    changed_by: "User: Robert van den Breemen"
+    reason: Related to ADR-251
     changed_via: adr-kit lifecycle
 ```
 

@@ -998,7 +998,7 @@ static void _cycleTailSample(uint32_t nowMs, float flowTemp)
 //                                              of the PWM UNDERHEAT is SAT_CYCLE_UNDERHEAT_PWM
 // Not gated on a user setting (entry 18; the PWM auto switch setting no longer exists) and without a minimum length, cooldown or cold check, as in thermo-nova;
 // the margin of the OVERSHOOT verdict is 2.0 with >= (entries 15, 37, in the classifier). The enable goes through the same
-// PWM entry gate as every other entry (satPwmEntryAllowed(5), entries 213-215): when the boiler refuses low-off, nothing happens
+// PWM entry gate as every other entry (satPwmEntryAllowed(5); always permitted since entries 392/393): MsgID 3 no longer stops it
 // and the mode stays continuous. The cold cutoff, the hot-water pause and the start limits act in the PWM schedule and the
 // heater-off branch of the next control tick, as they do after the 60 s switch. A mode that is neither PWM nor continuous
 // (OFF) is left alone. The classifier saw the per-sample control setpoint (entry 36), so a switch out of PWM in the middle of
@@ -1299,12 +1299,13 @@ void satCycleSample()
   _cycle_lastSampleMs = now;
 }
 
-//=== Slave low-load permission: OpenTherm MsgID 3 HB bit 4 (TASK-1412.4, Sergeant D entries 213-215) ===
-// OT spec v4.2 (slave configuration flags, ID 3): bit 4 "Master low-off & pump control function" [allowed, not allowed],
-// 1 = not allowed. PWM is the master switching the boiler off between phases, so it is a permission, not a source
-// detector: the manual heating source (ADR-157) is never read here. thermo-nova only shows the bit
-// (coordinator/serial/binary_sensor.py:54) and does not act on it.
-// Entry 215: no PWM until a valid reply; a gateway that never gets one never uses PWM.
+//=== Slave configuration (MsgID 3) and the PWM permission (TASK-1412.4, TASK-2000; Sergeant D entries 392, 393) ===
+// OT spec v4.2 (slave configuration flags, ID 3): bit 4 "Master low-off & pump control function" [allowed, not allowed].
+// Entry 392 ("Don't look at bit 4 at all ... boiler should be able to enter PWM") reverses entries 213 and 214, and entry 393
+// (Q-392a A) reverses entry 215: MsgID 3 plays no part in PWM, as in thermo-nova, which only shows the bit
+// (coordinator/serial/binary_sensor.py:54). The reply is still recorded and shown (REST slave_cfg_valid, slave_low_off_denied).
+// satPwmPermitted() is always true, so the entry paths that ask satPwmEntryAllowed() and the running-PWM check
+// satCycleCheckLowLoadVeto() never refuse; they stay as the call points, and pwm_veto_reason stays 0.
 // Called from the OpenTherm frame decoder for a valid MsgID 3 READ-ACK from the boiler.
 void satNoteSlaveConfig(uint8_t hb)
 {
@@ -1316,14 +1317,14 @@ void satNoteSlaveConfig(uint8_t hb)
 
 bool satPwmPermitted()
 {
-  return state.sat.bSlaveCfgValid && !state.sat.bSlaveLowOffDenied;
+  return true;   // entries 392 and 393: MsgID 3 plays no part in PWM (neither bit 4 nor whether a valid reply was seen)
 }
 
 // Records why and on which path PWM was refused (the REST status and the log show it) and writes one log line when the
 // reason or path changes or 10 minutes have passed since the last line (the overshoot switch asks every 60 s).
 void satPwmNoteRefused(uint8_t path)
 {
-  const uint8_t reason = state.sat.bSlaveCfgValid ? 2 : 1;
+  const uint8_t reason = 1;   // not reached since entries 392/393 (satPwmPermitted() is always true); kept for the REST field
   const uint32_t now = millis();
   const bool fresh = state.sat.iPwmVetoMs == 0 || reason != state.sat.iPwmVetoReason || path != state.sat.iPwmVetoPath ||
                      (uint32_t)(now - state.sat.iPwmVetoMs) >= 600000UL;
@@ -1331,9 +1332,7 @@ void satPwmNoteRefused(uint8_t path)
   state.sat.iPwmVetoPath   = path;
   if (fresh) {
     state.sat.iPwmVetoMs = (now != 0) ? now : 1;
-    satNarratef_P(PSTR("PWM refused (path %u): %s"), (unsigned)path,
-                  (reason == 2) ? "the boiler does not allow master low-off (MsgID 3 HB bit 4 = 1)"
-                                : "no valid MsgID 3 reply from the boiler yet");
+    satNarratef_P(PSTR("PWM refused (path %u): no valid MsgID 3 reply from the boiler yet"), (unsigned)path);
   }
 }
 
@@ -1345,9 +1344,8 @@ bool satPwmEntryAllowed(uint8_t path)
   return false;
 }
 
-// PWM -> continuous when the permission is gone while PWM runs (entry 214: bit 4 turning 1 leaves PWM in that tick and the
-// continuous setpoint goes out, as the underheat exit does; one ON phase may end early). Called once per control tick, before
-// the PWM schedule. Returns true if the mode was switched.
+// PWM -> continuous when the permission is gone while PWM runs. Since entries 392/393 the permission is always there, so this
+// never switches (entry 214 reversed). Called once per control tick, before the PWM schedule. Returns true if the mode was switched.
 bool satCycleCheckLowLoadVeto()
 {
   if (state.sat.eControlMode != SAT_MODE_PWM || satPwmPermitted()) return false;
@@ -1373,7 +1371,7 @@ bool satCycleCheckLowLoadVeto()
 // way (first qualifying tick starts it, no catch-up, entry 109), and the same gates: outside CONTINUOUS, the hot-water guard and
 // a missing flow clear both starts. Each rule is evaluated on its own: the switch margin setting (fPwmSwitchMargin) may be 0.5-5.0 C, so the 3.5 C rule
 // does not depend on the margin check, and a tick below 3.5 C clears only the fail-safe start. Both use entry path 1 for the
-// MsgID 3 permission (entry 213); a refusal clears both starts.
+// MsgID 3 permission (always given since entries 392/393); a refusal would clear both starts.
 bool satCycleCheckOvershootSwitch(float requestedSetpoint, uint32_t tickMs)
 {
   if (state.sat.eControlMode != SAT_MODE_CONTINUOUS || satDhwGuardActive(tickMs)) {
@@ -1405,7 +1403,7 @@ bool satCycleCheckOvershootSwitch(float requestedSetpoint, uint32_t tickMs)
   }
   if (!fireSwitch && !fireFailsafe) return false;
 
-  // The boiler's MsgID 3 permission comes first (entry 213): without it the switch stays in continuous and the starts
+  // The MsgID 3 permission comes first (always given since entries 392/393; entries 213/215 reversed): without it the switch stays in continuous and the starts
   // are cleared, so a permission that returns later starts a fresh 30 s for both rules.
   if (!satPwmEntryAllowed(1)) {
     _sustain_overshootRunning = false;

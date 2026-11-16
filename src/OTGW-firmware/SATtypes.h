@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : SATtypes.h
-**  Version  : v2.0.0-beta.349
+**  Version  : v2.0.0-beta.350
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -226,12 +226,12 @@ struct SATRuntimeSection {         // state.sat — SAT thermostat controller st
   // eControlMode is the actual mode (auto-switch moves it); sat/control_mode reads this back.
   uint8_t iRequestedControlMode  = 0;
   // Slave low-load permission: MsgID 3 (slave configuration) HB bit 4, "master low-off & pump control function"
-  // [allowed, not allowed] (OT spec v4.2). 1 = not allowed. PWM is the master's low-off cycling, so every PWM entry
-  // needs a valid reply with bit 4 = 0 (TASK-1412.4, Sergeant D entries 213-215).
+  // [allowed, not allowed] (OT spec v4.2). 1 = not allowed. Recorded and shown only: since entry 392 (TASK-2000) bit 4
+  // no longer blocks PWM, and entry 393 dropped the valid-reply wait (entry 215): MsgID 3 plays no part in PWM.
   bool     bSlaveCfgValid        = false;  // a valid MsgID 3 reply from the boiler was seen since the restart
   bool     bSlaveLowOffDenied    = false;  // HB bit 4 of the last valid reply
   uint32_t iSlaveCfgChangeMs     = 0;      // millis() when bSlaveCfgValid or bSlaveLowOffDenied last changed
-  uint8_t  iPwmVetoReason        = 0;      // why PWM was last refused: 0 none, 1 no valid reply yet, 2 bit 4 = 1
+  uint8_t  iPwmVetoReason        = 0;      // why PWM was last refused: 0 none, 1 no valid reply yet (2 = bit 4 = 1, no longer set since entry 392)
   uint8_t  iPwmVetoPath          = 0;      // which path asked: 0 other, 1 overshoot switch, 2 restart restore, 3 control_mode command, 4 PWM left while running, 5 end-of-cycle switch
   uint32_t iPwmVetoMs            = 0;      // millis() of the last refusal
   // Modulation control

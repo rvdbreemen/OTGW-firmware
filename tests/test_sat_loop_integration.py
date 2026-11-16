@@ -316,10 +316,10 @@ class SatLoopIntegration(unittest.TestCase):
     def test_s1_steady_low_load_pwm(self):
         check_s1(self, Run(self.exe, S1))
 
-    def test_s1_pwm_not_reached_when_boiler_denies_low_off(self):
-        # control: the same boiler with MsgID 3 HB bit 4 = 1 (master low-off not allowed) never gets PWM
-        r = Run(self.exe, ["lowoff 1"] + S1)
-        self.assertNotIn("2", [x for _, x in r.kind("MODE")])
+    def test_s1_pwm_reached_when_boiler_reports_low_off_not_allowed(self):
+        # TASK-2000, entries 392/393: the same boiler with MsgID 3 HB bit 4 = 1 (master low-off not allowed, as the Vitodens 100-W
+        # of indigo_light reports) still gets PWM, with its ON and OFF phases on the wire (was: never PWM, entry 213)
+        check_s1(self, Run(self.exe, ["lowoff 1"] + S1))
 
     def test_s6_pwm_on_suppression_follows_the_latest_flow(self):
         check_s6(self, Run(self.exe, S1))

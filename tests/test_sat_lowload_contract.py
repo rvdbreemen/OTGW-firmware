@@ -436,9 +436,9 @@ class LowLoadContract(unittest.TestCase):
 
     # LL-010 -------------------------------------------------------------------------------------------------------------
     @ll("LL-010", "contract", "satNoteSlaveConfig, satPwmPermitted, satPwmEntryAllowed, satSetControlMode, satRestoreControlMode, satHandleControlMode, "
-        "satCycleCheckOvershootSwitch, satCycleApplyEndOfCycle, satCycleCheckLowLoadVeto (test_sat_slave_lowload, test_sat_cycle_classifier; entries 213-215, ADR-157)",
-        task="TASK-1412.4: HB4 = 1 and no valid reply block the overshoot switch, the end-of-cycle switch (TASK-1331), the restart restore, the pwm command and any other entry; "
-             "HB4 turning 1 leaves PWM in that tick")
+        "satCycleCheckOvershootSwitch, satCycleApplyEndOfCycle, satCycleCheckLowLoadVeto (test_sat_slave_lowload, test_sat_cycle_classifier; entries 213-215 reversed by 392/393, ADR-157)",
+        task="TASK-2000 (entries 392, 393; was TASK-1412.4): MsgID 3 plays no part in PWM: HB4 = 1 or no valid reply refuses no entry path "
+             "(overshoot switch, end-of-cycle switch, restart restore, pwm command) and never ends a running PWM; the reply is only recorded")
     def test_ll010_hb4_permission_is_consulted_before_low_load_cycling(self):
         self.delegated("LL-010")
 

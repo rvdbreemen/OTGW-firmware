@@ -1895,7 +1895,7 @@ void satPwmReset()
 // sustained-overshoot start, so no path (the control_mode command included) can carry a start from one
 // continuous stint into the next. Firmware choice: thermo-nova has no mode command; it clears the start on
 // the next update while PWM is enabled (heating_control.py:264-266).
-// PWM is entered only with the boiler's MsgID 3 permission (satPwmPermitted(), entries 213-215). The callers check it first
+// PWM is entered only with the boiler's MsgID 3 permission (satPwmPermitted(); always true since entries 392/393, MsgID 3 plays no part). The callers check it first
 // to log their own path; this check is the last line, so no entry path can bypass the veto.
 
 static void satSetControlMode(SATControlMode m)
@@ -6223,7 +6223,7 @@ void initSAT()
     DebugTln(F("SAT: initialized but disabled"));
   }
   // Boot sequence: priority messages PM=3,15,48 (thermo-nova coordinator boot(), opentherm.py:166-172). On a PIC board at every
-  // boot, SAT enabled or not (TASK-1384, entry 261), so MsgID 3 (low-load permission, entry 215) is known before a later runtime
+  // boot, SAT enabled or not (TASK-1384, entry 261), so MsgID 3 (shown in the status; no PWM permission since entry 393) is known before a later runtime
   // SAT enable or MQTT takeover. PIC: PM=3, then 15 and 48 as the boiler answers; OT-Direct (SAT enabled only; it polls these
   // IDs itself): all three directly (TASK-1315). MI=500 is sent by satMiStep() once the manufacturer or the missing return
   // temperature is known (TASK-1371, entry 141).
