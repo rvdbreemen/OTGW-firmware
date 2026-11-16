@@ -7810,3 +7810,15 @@ Robert, 16:18:42 UTC (https://discord.com/channels/812969634638725140/9144987300
 **Settled:** the reasons for entry 385: (1) after a restart SAT continues in PWM; (2) a start into continuous mode gets a short warm-up for the boiler components, which means less thermal stress. Confirms entry 385 (every start in PWM first, the mode chosen after the start sequence). The timing point of entry 385 (what "after the start sequence" means in time) stays open.
 
 **Task:** TASK-1942 (owner d3).
+
+## 388. Q-357a answered with a new option: after a reboot wait 60 s without sending any command, then B (curve only until the first room temperature in the stable release; entry 357 in the next release) (Sergeant D, 2026-11-16)
+
+**Source:** #dev-sat-mqtt, Sergeant D 2026-11-16 09:32:26 UTC (https://discord.com/channels/812969634638725140/1105556725714649128/1571820232077615105), a reply to Q-357a (https://discord.com/channels/812969634638725140/1105556725714649128/1571811801992142890).
+
+**Quoted:**
+
+> "I have an other answer. Wait 60 seconds ( don’t send any commands ) and then B"
+
+**Settled (reading, the answer is short):** after a reboot SAT first waits 60 s and sends no command to the boiler; after that it follows option B of Q-357a: until the first room temperature arrives it controls on the heating curve only (P, I and D left out, the restored integral kept), and the full entry 357 behaviour (curve + P + I + D from the restored state, as thermo-nova pid.py:150-155, climate.py:370-375) goes into the next release (2.1.0). Scope: the 60 s wait and curve-only are for this release (2.0.0 stable), as option B said. Not settled: whether "don't send any commands" also covers commands that are not SAT's own (user REST/MQTT commands, the PIC's own traffic); we read it as SAT's own control commands (CS=, CH=, MM= and the like).
+
+**Task:** TASK-1866 / TASK-1874 (owner 95). Open: the reading of "any commands" above, if the owner needs it settled.

@@ -5132,6 +5132,20 @@
     "TASK-1942"
    ],
    "confirmed_by_entry": null
+  },
+  {
+   "id": 388,
+   "title": "Q-357a answered with a new option: after a reboot wait 60 s without sending any command, then B (curve only until the first room temperature in the stable release; entry 357 in the next release) (Sergeant D, 2026-11-16)",
+   "date": "2026-11-16",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1571820232077615105",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1866",
+    "TASK-1874"
+   ],
+   "confirmed_by_entry": null
   }
  ]
 }
