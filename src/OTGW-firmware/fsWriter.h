@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : fsWriter.h
-**  Version  : v2.0.0-beta.362
+**  Version  : v2.0.0-beta.363
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -20,7 +20,7 @@ enum : uint8_t { FSW_OP_WRITE = 1, FSW_OP_REMOVE = 2 };
 
 static const size_t   FSW_PATH_LEN     = 32;    // the longest path today: "/sat_energy_estimate.json" (25)
 static const size_t   FSW_DATA_LEN     = 256;   // the PID state buffer (satSavePidState)
-static const size_t   FSW_QUEUE_DEPTH  = 6;     // the 5-min PID save and two hourly energy saves never get close
+static const size_t   FSW_QUEUE_DEPTH  = 3;     // one slot per state file (PID, energy, estimated energy); TASK-2007: was 6, ~870 B of heap back
 static const uint32_t FSW_FULL_WAIT_MS = 1000;
 
 struct FsWriteJob {
@@ -36,3 +36,6 @@ bool     fsWriterRemove(const char* path);
 bool     fsWriterDrain(uint32_t timeoutMs);
 uint32_t fsWriterPending();
 void     fsWriterService(const FsWriteJob& job);
+bool     fsWriterStep();                              // one pass of the writer task (TASK-2007)
+bool     fsWriterPauseAndFlush(uint32_t timeoutMs);   // start of a filesystem OTA (TASK-2007)
+void     fsWriterResume();

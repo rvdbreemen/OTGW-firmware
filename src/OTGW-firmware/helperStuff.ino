@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : helperStuff
-**  Version  : v2.0.0-beta.362
+**  Version  : v2.0.0-beta.363
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -1221,10 +1221,13 @@ void logHeapStats() {
     case HEAP_CRITICAL: levelStr = "CRITICAL"; break;
   }
   
-  DebugTf(PSTR("Heap: %u bytes free, %u max block, level=%s, WS_drops=%u, MQTT_drops=%u\r\n"),
+  // TASK-2007: fsw_stack_free = the fswriter task's free stack at its low point (bytes, -1 = no task); its 4096 B
+  // stack is only resized once field values exist. platformIpcStackHighWater() works for any task name.
+  DebugTf(PSTR("Heap: %u bytes free, %u max block, level=%s, WS_drops=%u, MQTT_drops=%u, fsw_stack_free=%ld\r\n"),
           freeHeap, maxBlock, levelStr,
           (uint32_t)state.heapdiag.iWsDropsTotal,
-          (uint32_t)state.heapdiag.iMqttDropsTotal);
+          (uint32_t)state.heapdiag.iMqttDropsTotal,
+          (long)platformIpcStackHighWater("fswriter"));
 }
 
 //===========================================================================================

@@ -26,7 +26,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import test_sat_pwm_override as base  # noqa: E402
 
 FW = base.REPO / "src" / "OTGW-firmware"
-WRITER = FW / "fsWriter.ino"
+WRITER = Path(os.environ.get("OTGW_FSW_INO", FW / "fsWriter.ino"))   # TASK-2007: another copy for old-vs-fix runs
+HEADER = Path(os.environ.get("OTGW_FSW_H", FW / "fsWriter.h"))
 SAT = Path(os.environ.get("OTGW_SAT_INO", FW / "SATcontrol.ino"))
 
 STUBS = r"""
@@ -35,6 +36,7 @@ STUBS = r"""
 #include <cstring>
 #include <cstdarg>
 #include <deque>
+#include <map>
 #include <string>
 #include <vector>
 #define PSTR(s) s
@@ -45,15 +47,20 @@ static void DebugTf(const char* fmt, ...) { char b[256]; va_list a; va_start(a, 
 static bool LittleFSmounted = true;
 struct { struct { bool bFsImageWriting = false; } flash; } state;
 static std::vector<std::string> g_ops;
+// TASK-2007: the file contents, and whether LittleFS.end() has run (a write then lands on a partition the image
+// write is about to replace: counted as a violation).
+static std::map<std::string, std::string> g_files;
+static bool g_fsEnded = false;
+static int  g_afterEnd = 0;
 struct File {
   std::string path; std::string data; bool ok = false;
   explicit operator bool() const { return ok; }
   size_t write(const uint8_t* b, size_t n) { data.append((const char*)b, n); return n; }
-  void close() { g_ops.push_back("W " + path + " " + data); }
+  void close() { g_ops.push_back("W " + path + " " + data); if (g_fsEnded) g_afterEnd++; else g_files[path] = data; }
 };
 struct FS {
   File open(const char* p, const char* mode) { File f; f.ok = (mode[0] == 'w'); f.path = p; return f; }
-  bool remove(const char* p) { g_ops.push_back(std::string("R ") + p); return true; }
+  bool remove(const char* p) { g_ops.push_back(std::string("R ") + p); if (g_fsEnded) g_afterEnd++; else g_files.erase(p); return true; }
 } LittleFS;
 // value-copy queue of fixed depth
 struct Q { std::deque<std::vector<uint8_t>> items; size_t depth, size; };
@@ -62,7 +69,9 @@ typedef void* PlatformTask;
 #define PLATFORM_QUEUE_WAIT_FOREVER 0xFFFFFFFFUL
 enum { PLATFORM_CORE_PROTOCOL = 0, PLATFORM_CORE_APP = 1 };
 static PlatformQueue platformQueueCreate(size_t depth, size_t size) { return new Q{{}, depth, size}; }
+static void (*g_onSend)() = nullptr;   // TASK-2007 F2: runs inside the send, as another task reading at that moment
 static bool platformQueueSend(PlatformQueue q, const void* item) {
+  if (g_onSend) g_onSend();
   if (!q || q->items.size() >= q->depth) return false;
   q->items.emplace_back((const uint8_t*)item, (const uint8_t*)item + q->size); return true;
 }
@@ -77,12 +86,39 @@ static void platformTaskDelay(uint32_t ms) { g_ms += ms; if (g_writerStep) g_wri
 """
 
 MAIN = r"""
-static void writerStep() {   // the writer task body for one job (fsWriterTask in fsWriter.ino)
+#ifdef HAS_STEP
+static void writerStep() { fsWriterStep(); }   // TASK-2007: the real pass of the writer task
+#else
+static void writerStep() {   // code before TASK-2007: the writer task body for one job (fsWriterTask)
   if (::state.flash.bFsImageWriting || !LittleFSmounted) return;
   FsWriteJob job;
   if (!platformQueueReceive(s_fswQueue, &job, PLATFORM_QUEUE_WAIT_FOREVER)) return;
   fsWriterService(job);
   s_fswDone = s_fswDone + 1;
+}
+#endif
+// The start of a filesystem OTA as OTGW-ModUpdateServer-esp32.h runs it (the copy of the files is _keepFiles()).
+static std::map<std::string, std::string> g_kept;
+static void otaStart() {
+#ifdef HAS_STEP
+  fsWriterPauseAndFlush(2000);
+#else
+  fsWriterDrain(2000);
+#endif
+  g_kept = g_files;                       // _keepFiles()
+  g_onSend = nullptr;
+}
+static void otaAfterKeep() {
+  g_fsEnded = true;                       // LittleFS.end(); LittleFSmounted stays true
+  ::state.flash.bFsImageWriting = true;
+#ifdef HAS_STEP
+  fsWriterResume();
+#endif
+}
+static void otaFinish() {                  // image written, remount, restore the copies, image flag off
+  g_files.clear(); g_fsEnded = false;
+  for (auto& kv : g_kept) g_files[kv.first] = kv.second;
+  ::state.flash.bFsImageWriting = false;
 }
 static void dump(const char* tag) {
   printf("%s ops=%zu pending=%u\n", tag, g_ops.size(), (unsigned)fsWriterPending());
@@ -116,6 +152,67 @@ int main(int argc, char** argv) {
     ::state.flash.bFsImageWriting = false;
     printf("drain %d\n", (int)fsWriterDrain(300));
     dump("released");
+  } else if (c == "ota") {
+    // TASK-2007 F1: the loop saves {old}, the OTA start runs, and the loop saves {new} after the files were copied
+    // (the writer task runs concurrently: one pass right after the submit), before LittleFS.end().
+    fsWriterSubmit("/sat_pid_state.json", "{old}", 5);
+    otaStart();
+    fsWriterSubmit("/sat_pid_state.json", "{new}", 5);
+    writerStep();                          // the writer task on the other core takes its next pass
+    otaAfterKeep();
+    for (int i = 0; i < 5; i++) writerStep();   // during the image write
+    printf("after_end_writes %d\n", g_afterEnd);
+    otaFinish();
+    fsWriterDrain(1000);
+    printf("final %s\n", g_files["/sat_pid_state.json"].c_str());
+  } else if (c == "ota_end_gap") {
+    // TASK-2007 F1 (b): the writer task takes a pass between LittleFS.end() and bFsImageWriting = true (two
+    // separate statements at the OTA site); a write there lands on the partition the image is about to replace.
+    fsWriterSubmit("/sat_pid_state.json", "{old}", 5);
+    otaStart();
+    fsWriterSubmit("/sat_pid_state.json", "{new}", 5);
+    g_fsEnded = true;                      // LittleFS.end()
+    writerStep();                          // the writer's pass in the gap
+    ::state.flash.bFsImageWriting = true;
+#ifdef HAS_STEP
+    fsWriterResume();
+#endif
+    printf("after_end_writes %d\n", g_afterEnd);
+    otaFinish();
+    fsWriterDrain(1000);
+    printf("final %s\n", g_files["/sat_pid_state.json"].c_str());
+#ifdef HAS_STEP
+  } else if (c == "flush_waits") {
+    // The writer is inside a job when the pause comes: the flush waits until it is between jobs, then writes.
+    fsWriterSubmit("/a.json", "{1}", 3);
+    s_fswBusy = true;
+    static int left = 3;
+    g_writerStep = [] { if (--left <= 0) s_fswBusy = false; };   // the writer finishes its job after 3 delays
+    printf("flush %d\n", (int)fsWriterPauseAndFlush(2000));
+    printf("waited_ms %u\n", (unsigned)(g_ms - 1000));
+    dump("flushed");
+  } else if (c == "flush_timeout") {
+    // The writer stays busy: the flush gives up after the timeout and leaves the queue as it is.
+    fsWriterSubmit("/a.json", "{1}", 3);
+    s_fswBusy = true;
+    g_writerStep = nullptr;
+    printf("flush %d\n", (int)fsWriterPauseAndFlush(2000));
+    dump("timeout");
+#endif
+  } else if (c == "inflight") {
+    // TASK-2007 F2: another task reads fsWriterPending() while the job is inside the queue send.
+    static unsigned seen = 99;
+    g_onSend = [] { seen = fsWriterPending(); };
+    fsWriterSubmit("/a.json", "{1}", 3);
+    g_onSend = nullptr;
+    printf("pending_during_send %u\n", seen);
+  } else if (c == "big") {
+    // TASK-2007 F3: 300 B does not fit in a job.
+    std::string big(300, 'x');
+    printf("submit %d\n", (int)fsWriterSubmit("/a.json", big.c_str(), big.size()));
+    fsWriterDrain(1000);
+    dump("big");
+    printf("written_len %zu\n", g_files.count("/a.json") ? g_files["/a.json"].size() : (size_t)0);
   }
   return 0;
 }
@@ -128,9 +225,10 @@ class WriterLogic(unittest.TestCase):
         if not WRITER.exists():
             raise AssertionError("fsWriter.ino missing (code before the TASK-1989 fix)")
         cls.tmp = tempfile.TemporaryDirectory()
-        src = WRITER.read_text(encoding="utf-8").replace('#include "fsWriter.h"', (FW / "fsWriter.h").read_text(encoding="utf-8"))
+        src = WRITER.read_text(encoding="utf-8").replace('#include "fsWriter.h"', HEADER.read_text(encoding="utf-8"))
+        cls.has_step = "fsWriterStep" in src   # TASK-2007 code; older code runs the cases through the old task body
         cpp = Path(cls.tmp.name) / "w.cpp"
-        cpp.write_text(STUBS + src + MAIN, encoding="utf-8")
+        cpp.write_text(("#define HAS_STEP 1\n" if cls.has_step else "") + STUBS + src + MAIN, encoding="utf-8")
         cls.exe = base.compile_cpp(cpp, Path(cls.tmp.name) / "w.exe")
 
     @classmethod
@@ -166,6 +264,47 @@ class WriterLogic(unittest.TestCase):
         out = self.run_w("unmounted")
         self.assertIn("submit 0", out)
         self.assertIn("unmounted ops=0 pending=0", out)
+
+    def test_a_save_during_the_ota_start_is_not_lost_and_not_written_after_end(self):
+        # TASK-2007 F1 (d3's review): a save that arrives after the files were copied must not be written into the
+        # partition the image replaces (lost at the restore); it waits for the remount and lands after the copies.
+        out = self.run_w("ota")
+        self.assertIn("after_end_writes 0", out)
+        self.assertIn("final {new}", out, "the newest save is the file after the OTA (old code: the copy {old} wins)")
+
+    def test_no_write_in_the_gap_between_end_and_the_image_flag(self):
+        # TASK-2007 F1 (b): old code writes {new} after LittleFS.end() (and loses it at the restore)
+        out = self.run_w("ota_end_gap")
+        self.assertIn("after_end_writes 0", out, "a write landed after LittleFS.end()")
+        self.assertIn("final {new}", out)
+
+    def test_the_flush_waits_for_a_busy_writer_then_writes(self):
+        if not self.has_step:
+            self.skipTest("fsWriterPauseAndFlush() is TASK-2007 code")
+        out = self.run_w("flush_waits")
+        self.assertIn("flush 1", out)
+        self.assertNotIn("waited_ms 0", out, "the flush did not wait for the busy writer")
+        self.assertIn("flushed ops=1 pending=0", out)
+
+    def test_the_flush_times_out_on_a_writer_that_stays_busy_and_keeps_the_queue(self):
+        # Known limit (kept): after the timeout the OTA logs and goes on; a writer stuck >2 s in one job could then
+        # still be inside open/write at LittleFS.end().
+        if not self.has_step:
+            self.skipTest("fsWriterPauseAndFlush() is TASK-2007 code")
+        out = self.run_w("flush_timeout")
+        self.assertIn("flush 0", out)
+        self.assertIn("timeout ops=0 pending=1", out)
+
+    def test_pending_is_never_zero_while_a_job_is_being_queued(self):
+        # TASK-2007 F2: the count goes up before the send, so a drain on another task cannot return early.
+        self.assertIn("pending_during_send 1", self.run_w("inflight"))
+
+    def test_a_job_over_256_bytes_is_refused_and_logged_not_cut(self):
+        # TASK-2007 F3
+        out = self.run_w("big")
+        self.assertIn("submit 0", out)
+        self.assertTrue(any(l.startswith("LOG [fswriter] /a.json refused: 300 B") for l in out), out)
+        self.assertIn("written_len 0", out)
 
     def test_the_writer_holds_during_a_filesystem_image_write(self):
         out = self.run_w("hold")
@@ -203,9 +342,16 @@ class Wiring(unittest.TestCase):
         r = self.helper[self.helper.index("void doRestart(const char* str) {"):]
         self.assertLess(r.index("fsWriterDrain("), r.index("prepareForReboot();"))
 
-    def test_filesystem_ota_drains_before_it_copies_the_files(self):
-        self.assertLess(self.ota.index("fsWriterDrain("), self.ota.index("_keepFiles();"))
-        self.assertLess(self.ota.index("fsWriterDrain("), self.ota.index("LittleFS.end();", self.ota.index("_keepFiles();")))
+    def test_filesystem_ota_pauses_and_flushes_before_it_copies_the_files(self):
+        # TASK-2007 F1: pause + flush before _keepFiles(), resume only after bFsImageWriting holds the writer.
+        keep = self.ota.index("_keepFiles();")
+        flush = self.ota.index("fsWriterPauseAndFlush(")
+        end = self.ota.index("LittleFS.end();", keep)
+        flag = self.ota.index("::state.flash.bFsImageWriting = true;", end)
+        resume = self.ota.index("fsWriterResume();")
+        self.assertLess(flush, keep)
+        self.assertLess(flag, resume)
+        self.assertNotIn("fsWriterDrain(", self.ota[flush - 400:keep], "the plain drain left a gap before the copy")
 
 
 if __name__ == "__main__":

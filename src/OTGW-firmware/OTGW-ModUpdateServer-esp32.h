@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTGW-ModUpdateServer-esp32.h
-**  Version  : v2.0.0-beta.362
+**  Version  : v2.0.0-beta.363
 **
 **  ESP32 OTA update server — functional equivalent of the ESP8266
 **  OTGW-ModUpdateServer with Nodoshop hardware watchdog feeding.
@@ -658,11 +658,14 @@ private:
       // this write. An upload that starts in setup() before initSAT() unmounts LittleFS below, so an
       // initSAT() during the write reads nothing and holds defaults (bench .61: preset and energy lost).
       _satLoadedAtFsStart = satStateLoaded();
-      fsWriterDrain(2000);   // TASK-1989: queued state writes reach the files before they are copied to the heap
+      // TASK-1989/2007: queued state writes reach the files before they are copied to the heap. The writer stays
+      // paused from here until bFsImageWriting holds it, so no write runs between the copy and LittleFS.end().
+      if (!fsWriterPauseAndFlush(2000)) DebugTln(F("[OTA] fswriter: still busy after 2 s"));
       _keepFiles();   // TASK-1266/1286: the image lacks these files; copy them to the heap, restore after the remount
       fsOtaRtcFill();   // TASK-1774: survives a reset during the write; armed at the first chunk
       LittleFS.end();
       ::state.flash.bFsImageWriting = true;   // TASK-1909: no LittleFS.begin() elsewhere until the remount below
+      fsWriterResume();   // TASK-2007: bFsImageWriting holds the writer from here; queued writes land after the remount
       if (uploadTotal > 0 && uploadTotal > fsSize) {
         strlcpy(_updaterError, "filesystem image too large", sizeof(_updaterError));
         _dropKeptFiles();   // the old filesystem is untouched; the copies are not needed

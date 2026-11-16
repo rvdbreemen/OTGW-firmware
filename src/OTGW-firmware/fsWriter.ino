@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : fsWriter.ino
-**  Version  : v2.0.0-beta.362
+**  Version  : v2.0.0-beta.363
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -17,9 +17,13 @@
 **  queued older write can never land after a newer one). Not queued: the DHW
 **  meter (it verifies by reading back) and settings.ini (large and streamed).
 **
-**  Drain: doRestart() and the start of a filesystem OTA wait until the queue
-**  is empty. While a filesystem image is written or LittleFS is not mounted,
-**  the writer holds the next job. Never drained, so a queued write is lost:
+**  Drain: doRestart() waits until the queue is empty. The start of a
+**  filesystem OTA pauses the writer, waits until it is between jobs and writes
+**  the rest of the queue on the caller (fsWriterPauseAndFlush(), TASK-2007), so
+**  no job runs between the copy of the files and LittleFS.end(); a job queued
+**  after that waits for the remount and lands after the restored copies. While
+**  a filesystem image is written or LittleFS is not mounted, the writer holds
+**  the next job. Never drained, so a queued write is lost:
 **  a watchdog reset, a panic, a brownout or a power cut (the same as a write
 **  that had not started yet on the loop task), and the config-portal timeout
 **  restart in setup(), which runs before anything is queued.
@@ -29,12 +33,19 @@
 */
 
 #include "fsWriter.h"
+#include <atomic>
 
-static PlatformQueue     s_fswQueue     = nullptr;
-// Two counters with one writer each (submitted: the submitting task, done: the writer task), so no lock is
-// needed: pending = submitted - done.
-static volatile uint32_t s_fswSubmitted = 0;
-static volatile uint32_t s_fswDone      = 0;
+static PlatformQueue         s_fswQueue     = nullptr;
+// pending = submitted - done. submitted is counted BEFORE the queue send (and undone when the send fails), so
+// fsWriterPending() never reads 0 while a job is on its way into the queue (TASK-2007 F2). done is written by
+// the writer task, or by the caller of fsWriterPauseAndFlush() while the writer is paused between jobs.
+static std::atomic<uint32_t> s_fswSubmitted{0};
+static std::atomic<uint32_t> s_fswDone{0};
+// TASK-2007 F1: paused is set by the start of a filesystem OTA; busy is set by the writer while it takes and
+// writes a job. Both are sequentially consistent atomics: the writer sets busy and then reads paused, the
+// pauser sets paused and then reads busy, so one of them always sees the other (no job slips past a pause).
+static std::atomic<bool>     s_fswPaused{false};
+static std::atomic<bool>     s_fswBusy{false};
 
 // One job: write data to path ("w", replaces the file) or remove path. Runs on the writer task, or on the
 // caller when there is no queue (before fsWriterBegin(), host tests).
@@ -50,15 +61,25 @@ void fsWriterService(const FsWriteJob& job)
   f.close();
 }
 
+// One pass of the writer task: take the next job and write it, unless the writer is paused, a filesystem image
+// is being written or LittleFS is not mounted (the job then stays in the queue). The queue is read without
+// waiting, so a job is never taken out of the queue while a pause is being set. Returns true when it wrote a job.
+bool fsWriterStep()
+{
+  s_fswBusy = true;
+  if (s_fswPaused || ::state.flash.bFsImageWriting || !LittleFSmounted) { s_fswBusy = false; return false; }
+  FsWriteJob job;
+  if (!platformQueueReceive(s_fswQueue, &job, 0)) { s_fswBusy = false; return false; }
+  fsWriterService(job);
+  s_fswDone++;
+  s_fswBusy = false;
+  return true;
+}
+
 static void fsWriterTask(void*)
 {
-  FsWriteJob job;
   for (;;) {
-    if (!platformQueueReceive(s_fswQueue, &job, PLATFORM_QUEUE_WAIT_FOREVER)) continue;
-    // A filesystem image is being written, or LittleFS is not mounted: hold this job until it is back.
-    while (::state.flash.bFsImageWriting || !LittleFSmounted) platformTaskDelay(50);
-    fsWriterService(job);
-    s_fswDone = s_fswDone + 1;
+    if (!fsWriterStep()) platformTaskDelay(20);   // nothing to write, or held: look again in 20 ms
   }
 }
 
@@ -78,6 +99,32 @@ uint32_t fsWriterPending()
   return s_fswSubmitted - s_fswDone;
 }
 
+// Start of a filesystem OTA (TASK-2007 F1): pause the writer, wait until it is between jobs, then write every
+// queued job on the caller. Returns with the writer paused (false when the writer stayed busy for timeoutMs; the
+// queue is then left as it is). The caller sets state.flash.bFsImageWriting before fsWriterResume(), so the
+// writer keeps holding until the remount.
+bool fsWriterPauseAndFlush(uint32_t timeoutMs)
+{
+  s_fswPaused = true;
+  if (s_fswQueue == nullptr) return true;   // no queue: every write already ran on the caller
+  const uint32_t t0 = millis();
+  while (s_fswBusy) {
+    if ((uint32_t)(millis() - t0) >= timeoutMs) return false;
+    platformTaskDelay(1);
+  }
+  FsWriteJob job;
+  while (platformQueueReceive(s_fswQueue, &job, 0)) {
+    fsWriterService(job);
+    s_fswDone++;
+  }
+  return true;
+}
+
+void fsWriterResume()
+{
+  s_fswPaused = false;
+}
+
 // Wait until every queued job is written, at most timeoutMs. Returns true when the queue is empty.
 bool fsWriterDrain(uint32_t timeoutMs)
 {
@@ -94,18 +141,27 @@ static bool fsWriterQueue(uint8_t op, const char* path, const char* data, size_t
   // LittleFS is not mounted and no image write will bring it back: write nothing, as the direct open() did before
   // (it failed and the save returned). Queueing would only fill the queue behind a writer that waits forever.
   if (!LittleFSmounted && !::state.flash.bFsImageWriting) return false;
+  // TASK-2007 F3: a job that does not fit is refused and logged, never cut (a cut JSON file loads as garbage).
+  if (len > FSW_DATA_LEN || strlen(path) >= FSW_PATH_LEN) {
+    DebugTf(PSTR("[fswriter] %s refused: %u B data, path %u chars (max %u B, %u chars)\r\n"), path, (unsigned)len,
+            (unsigned)strlen(path), (unsigned)FSW_DATA_LEN, (unsigned)(FSW_PATH_LEN - 1));
+    return false;
+  }
   FsWriteJob job;
   job.op = op;
   strlcpy(job.path, path, sizeof(job.path));
-  if (len > sizeof(job.data)) len = sizeof(job.data);
   job.len = (uint16_t)len;
   if (len) memcpy(job.data, data, len);
   if (s_fswQueue == nullptr) { fsWriterService(job); return true; }
-  if (platformQueueSend(s_fswQueue, &job)) { s_fswSubmitted = s_fswSubmitted + 1; return true; }
+  s_fswSubmitted++;   // before the send (TASK-2007 F2)
+  if (platformQueueSend(s_fswQueue, &job)) return true;
+  s_fswSubmitted--;   // not queued: the drain below must not wait for this job
   // Queue full: wait for it to empty, then queue again, so the order holds. Writing on the caller instead would
   // put this newer write before the queued older ones.
   fsWriterDrain(FSW_FULL_WAIT_MS);
-  if (platformQueueSend(s_fswQueue, &job)) { s_fswSubmitted = s_fswSubmitted + 1; return true; }
+  s_fswSubmitted++;
+  if (platformQueueSend(s_fswQueue, &job)) return true;
+  s_fswSubmitted--;
   DebugTf(PSTR("[fswriter] queue still full after %lu ms, %s not written\r\n"), (unsigned long)FSW_FULL_WAIT_MS, path);
   return false;
 }
