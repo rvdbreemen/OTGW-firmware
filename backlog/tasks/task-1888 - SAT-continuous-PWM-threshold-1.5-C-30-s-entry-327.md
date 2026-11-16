@@ -1,11 +1,11 @@
 ---
 id: TASK-1888
 title: SAT continuous->PWM threshold 1.5 C / 30 s (entry 327)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-13T07:28:00Z'
-updated_date: '2026-11-16T07:40:00Z'
+updated_date: '2026-11-16T10:19:00Z'
 labels:
   - sat
   - adr
@@ -26,7 +26,7 @@ Sergeant D decision 2026-11-13 (https://discord.com/channels/812969634638725140/
 - [x] #1 Plan with the thermo-nova citations (heating_control.py:262-300, cycles/const.py:10, const.py:21) and SATcycles.ino:1409-1419, and Sergeant D's OK on the open points (entry-289 fail-safe; fOvershootMargin key and default) before code
 - [x] #2 ADR that supersedes the entry-22 rule (2.0 C / 60 s)
 - [x] #3 Host test on the real code: red on the old rule (2.0 C / 60 s), green on the new rule (1.5 C / 30 s)
-- [ ] #4 Bench test by the bench-tester
+- [x] #4 Bench test by the bench-tester
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -51,4 +51,12 @@ Branch note: the 1888 commits (5dde6269a, 643f4f307) sit on local branch lane/ba
 2026-11-16 ADR-249 ACCEPTED: Robert answered 'A' (Discord DM 1571779788178194473, reply to 1571670760131534909, relayed by the coordinator): accept including the setting 'PWM switch margin' (fPwmSwitchMargin) default 1.5, range 0.5-5.0. Done via adr-kit: open question Q-327c answered with Robert's decision (adr answer), frontmatter lists converted to block style (adr-kit could not normalize inline lists), three acronyms given inline expansions for the strict clarity gate (PID, REST/MQTT/JSON/UI, DM), adr accept --confirm (status history: Accepted, changed_by Robert), Guideline-level per ADR-080 line restored in Status, index + README rebuilt by adr-doctor --fix-index. AC2 ticked. Next: rebase onto origin/dev, build slot (queue after d3), bench by 09 (health + the setting via REST/MQTT/UI, no SAT scenario on hardware), push after its OK.
 
 2026-11-16 Sergeant D entry 379 (Q-327c answered A): a separate 'switch margin' setting, default 1.5 C, range 0.5-5.0, 30 s sustain fixed, the 3.5 C / 30 s fail-safe stays; confirms the implementation and ADR-249 (accepted by Robert earlier the same morning). Build: combo/ba-1888-1983 (with TASK-1983) for 09's bench after 95's slot.
+
+2026-11-16 bench (09, .63 Classic + PIC 6.8, 2.0.0-beta.347+2cb8d28, 11:05-11:12) PASS: OTA added the new key (settings: 152 keys, changed: [satpwmswitchmargin]); GET /api/v2/settings satpwmswitchmargin {value 1.5, type f, min 0.5, max 5}; POST 2.0 -> REST 2.0, settings.ini 'SATpwmswitchmargin': 2.00, /api/v2/sat pwm_switch_margin 2; POST 0.3 -> 0.5 and 6.0 -> 5.0 (clamped in REST, ini and sat JSON alike); back to 1.5; MQTT OTGW/value/<id>/sat/pwm_switch_margin follows on the next SAT publish pass (not on the change itself, the existing pattern for SAT settings); satovershootmargin separate and unchanged (3.0 on .63, its own pre-flash value); the only settings.ini difference is the added line; web UI field in SAT > Curve with label 'PWM switch margin', unit hint, i18n label (checked in the served v2.html, not in a browser). Not benched: the switching behaviour itself (no SAT scenario on hardware per Robert); it rests on the host tests (test_sat_overshoot_sustain 83/83, old 30 FAIL) and the LL contract. Pushed 2cb8d28af, posted Discord 1571831734461530233.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+SAT leaves continuous for PWM when the flow stays at or above request + 1.5 C for 30 s (Sergeant D entry 327, ADR-249 accepted by Robert, DM 1571779788178194473; entry 379 confirms the setting). Shipped in beta.345 (pushed in 2cb8d28af). AC1: plan with the thermo-nova citations; open points settled by entries 359 (keep the 3.5 C / 30 s fail-safe), 360 (a separate value, fOvershootMargin 2.0 stays for the classifier, no migration) and 379. AC2: ADR-249 supersedes the entry-22 rule. AC3: tests/test_sat_overshoot_sustain.py 83/83 on the real satCycleCheckOvershootSwitch(), 30 FAIL on the old code; seams in pwm_override/slave_lowload; LL contract all 18 ids green (LL-004/LL-020b moved to 30 s). AC4: 09 on .63 beta.347: new setting satpwmswitchmargin (default 1.5, clamped to 0.5-5.0) in REST, settings.ini, /api/v2/sat, MQTT and the web UI, satovershootmargin separate; the switching itself is host-proven only (no SAT scenario on hardware).
+<!-- SECTION:FINAL_SUMMARY:END -->
