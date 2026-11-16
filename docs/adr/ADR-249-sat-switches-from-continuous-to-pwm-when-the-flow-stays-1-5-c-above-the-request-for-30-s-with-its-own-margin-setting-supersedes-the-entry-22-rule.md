@@ -1,7 +1,7 @@
 ---
 id: "ADR-249"
 title: "SAT switches from continuous to PWM when the flow stays 1.5 C above the request for 30 s, with its own margin setting (supersedes the entry-22 rule)"
-status: "Proposed"
+status: "Accepted"
 date: "2026-11-16"
 binding: false
 gate: null
@@ -9,12 +9,29 @@ documents_shipped: false
 verified_in: []
 supersedes: []
 superseded_by: null
-format: "canonical"
-topics: ["sat", "pwm", "continuous mode", "overshoot", "mode switch"]
-aliases: ["continuous to PWM threshold", "sustained overshoot switch", "pwm switch margin", "entry 327"]
-components: ["satCycleCheckOvershootSwitch", "fPwmSwitchMargin", "satpwmswitchmargin"]
-symbols: ["satCycleCheckOvershootSwitch", "SAT_OVERSHOOT_SUSTAIN_MS", "SAT_OVERSHOOT_FAILSAFE_DELTA_C", "fPwmSwitchMargin", "fOvershootMargin"]
+topics:
+  - "sat"
+  - "pwm"
+  - "continuous mode"
+  - "overshoot"
+  - "mode switch"
+aliases:
+  - "continuous to PWM threshold"
+  - "sustained overshoot switch"
+  - "pwm switch margin"
+  - "entry 327"
+components:
+  - "satCycleCheckOvershootSwitch"
+  - "fPwmSwitchMargin"
+  - "satpwmswitchmargin"
+symbols:
+  - "satCycleCheckOvershootSwitch"
+  - "SAT_OVERSHOOT_SUSTAIN_MS"
+  - "SAT_OVERSHOOT_FAILSAFE_DELTA_C"
+  - "fPwmSwitchMargin"
+  - "fOvershootMargin"
 context_scope: "selective"
+format: "canonical"
 ---
 
 <!-- markdownlint-disable MD025 -->
@@ -23,7 +40,7 @@ context_scope: "selective"
 
 ## Status
 
-Proposed, 2026-11-16. Guideline-level per ADR-080: the host test named under Verification checks it, it is not wired into evaluate.py.
+Accepted, 2026-11-16. Guideline-level per ADR-080: the host test named under Verification checks it, it is not wired into evaluate.py.
 
 ## Status History
 
@@ -34,6 +51,11 @@ status_history:
     changed_by: "User: Robert van den Breemen"
     reason: Initial proposal
     changed_via: adr-kit
+  - date: 2026-11-16
+    status: Accepted
+    changed_by: "User: Robert van den Breemen"
+    reason: "Maintainer accepted: 'A' (Discord direct message 1571779788178194473, reply to 1571670760131534909, 2026-11-16), incl. the setting PWM switch margin default 1.5, range 0.5-5.0"
+    changed_via: adr-kit lifecycle
 ```
 
 ## Context
@@ -46,7 +68,7 @@ On 2026-11-13 Sergeant D decided a tighter switch: flow - requested >= 1.5 C for
 
 ## Decision
 
-SAT switches from continuous to PWM when flow - requested (PID) setpoint >= `settings.sat.fPwmSwitchMargin` holds for 30 s; the new setting defaults to 1.5 C, allows 0.5 to 5.0 C, and is separate from `fOvershootMargin`, which keeps 2.0 and now only feeds the cycle classifier.
+SAT switches from continuous to PWM when flow - requested setpoint (the output of the proportional-integral-derivative (PID) controller) >= `settings.sat.fPwmSwitchMargin` holds for 30 s; the new setting defaults to 1.5 C, allows 0.5 to 5.0 C, and is separate from `fOvershootMargin`, which keeps 2.0 and now only feeds the cycle classifier.
 
 "A separate value" (entry 360) is read as a user setting, not a constant. Reason: Q-327a option A was argued as "it still catches a big overshoot when a user raises the main margin above 3.5 C"; with a constant there is no user margin, and the fail-safe that entry 359 keeps would never act. The coordinator confirmed this reading on 2026-11-15 under Robert's directive; the confirmation question to Sergeant D is Q-327c (non-blocking, see Open Questions).
 
@@ -59,7 +81,7 @@ Everything else of the switch stays: equality counts (entry 86, Q43 A), the time
 - Compare the flow against requested + `settings.sat.fPwmSwitchMargin` and require 30 s (`SAT_OVERSHOOT_SUSTAIN_MS` = 30000) from the first qualifying tick.
 - Keep the 3.5 C / 30 s fail-safe as a separate timer with the same gates (entry 359).
 - Keep `fOvershootMargin` (2.0) for the cycle classifier only; no migration of stored values (entry 360).
-- Expose the setting as `SATpwmswitchmargin` in settings.ini, `satpwmswitchmargin` in the REST settings, `pwm_switch_margin` on MQTT `sat/` and in the SAT status JSON, range 0.5 to 5.0.
+- Expose the setting as `SATpwmswitchmargin` in settings.ini, `satpwmswitchmargin` in the REST (HTTP API) settings, `pwm_switch_margin` on MQTT (the message-broker protocol) `sat/` and in the SAT status JSON (JavaScript Object Notation), range 0.5 to 5.0.
 
 ### Must Not
 
@@ -91,12 +113,12 @@ Everything else of the switch stays: equality counts (entry 86, Q43 A), the time
 **Negative:**
 
 - With the default switch margin the fail-safe never fires first: both rules have the same gates and the same 30 s, and the switch threshold is lower. It only acts when a user raises the switch margin above 3.5 C. This is what entry 359 keeps it for; it is named here so nobody reads the fail-safe as active at the defaults.
-- One more SAT setting in the settings contract (settings.ini, REST, MQTT, web UI, help, openapi).
+- One more SAT setting in the settings contract (settings.ini, REST, MQTT, web UI (user interface), help, openapi).
 - Earlier switching can mean more PWM cycles on boilers that hover around +1.5 C; testers' captures will show it.
 
 ## Open Questions
 
-- [ ] Q-327c: Sergeant D confirms that "a separate value for the switch" (entry 360) means a user setting with default 1.5 (asked non-blocking by 92 on 2026-11-15, #dev-sat-mqtt message 1571655324086050819, `docs/sat/open-questions.md` Q-327c; the implementation goes ahead under Robert's directive).
+- [x] Q-327c: Sergeant D confirms that "a separate value for the switch" (entry 360) means a user setting with default 1.5 (asked non-blocking by 92 on 2026-11-15, #dev-sat-mqtt message 1571655324086050819, `docs/sat/open-questions.md` Q-327c; the implementation goes ahead under Robert's directive). — **Answered 2026-11-16 by User: Robert van den Breemen:** Robert (maintainer) chose A on 2026-11-16, Discord direct message (DM) 1571779788178194473 in reply to 1571670760131534909: accept with the user setting 'PWM switch margin' fPwmSwitchMargin, default 1.5 C, range 0.5-5.0. That settles the setting-versus-constant reading for the implementation; Sergeant D's own confirmation of Q-327c stays welcome and becomes a follow-up if he differs.
 
 ## Related Decisions
 

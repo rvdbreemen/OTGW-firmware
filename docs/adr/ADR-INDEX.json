@@ -10191,20 +10191,41 @@
       "title": "SAT switches from continuous to PWM when the flow stays 1.5 C above the request for 30 s, with its own margin setting (supersedes the entry-22 rule)",
       "path": "ADR-249-sat-switches-from-continuous-to-pwm-when-the-flow-stays-1-5-c-above-the-request-for-30-s-with-its-own-margin-setting-supersedes-the-entry-22-rule.md",
       "format": "canonical",
-      "status": "Proposed",
+      "status": "Accepted",
       "date": "2026-11-16",
-      "decision_summary": "SAT switches from continuous to PWM when flow - requested (PID) setpoint >= settings.sat.fPwmSwitchMargin holds for 3...",
-      "topics": [],
-      "aliases": [],
-      "components": [],
-      "symbols": [],
+      "decision_summary": "SAT switches from continuous to PWM when flow - requested setpoint (the output of the proportional-integral-derivativ...",
+      "topics": [
+        "continuous mode",
+        "mode switch",
+        "overshoot",
+        "pwm",
+        "sat"
+      ],
+      "aliases": [
+        "continuous to PWM threshold",
+        "entry 327",
+        "pwm switch margin",
+        "sustained overshoot switch"
+      ],
+      "components": [
+        "fPwmSwitchMargin",
+        "satCycleCheckOvershootSwitch",
+        "satpwmswitchmargin"
+      ],
+      "symbols": [
+        "fOvershootMargin",
+        "fPwmSwitchMargin",
+        "SAT_OVERSHOOT_FAILSAFE_DELTA_C",
+        "SAT_OVERSHOOT_SUSTAIN_MS",
+        "satCycleCheckOvershootSwitch"
+      ],
       "context_scope": "selective",
       "decision_contract": {
         "must": [
           "Compare the flow against requested + settings.sat.fPwmSwitchMargin and require 30 s (SATOVERSHOOTSUSTAINMS = 30000) from the first qualifying tick.",
           "Keep the 3.5 C / 30 s fail-safe as a separate timer with the same gates (entry 359).",
           "Keep fOvershootMargin (2.0) for the cycle classifier only; no migration of stored values (entry 360).",
-          "Expose the setting as SATpwmswitchmargin in settings.ini, satpwmswitchmargin in the REST settings, pwmswitchmargin on MQTT sat/ and in the SAT status JSON, range 0.5 to 5.0."
+          "Expose the setting as SATpwmswitchmargin in settings.ini, satpwmswitchmargin in the REST (HTTP API) settings, pwmswitchmargin on MQTT (the message-broker protocol) sat/ and in the SAT status JSON (JavaScript Object Notation), range 0.5 t..."
         ],
         "must_not": [
           "Must not move the switch with fOvershootMargin.",

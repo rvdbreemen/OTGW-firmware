@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-13T07:28:00Z'
-updated_date: '2026-11-16T03:05:00Z'
+updated_date: '2026-11-16T07:15:00Z'
 labels:
   - sat
   - adr
@@ -24,7 +24,7 @@ Sergeant D decision 2026-11-13 (https://discord.com/channels/812969634638725140/
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [x] #1 Plan with the thermo-nova citations (heating_control.py:262-300, cycles/const.py:10, const.py:21) and SATcycles.ino:1409-1419, and Sergeant D's OK on the open points (entry-289 fail-safe; fOvershootMargin key and default) before code
-- [ ] #2 ADR that supersedes the entry-22 rule (2.0 C / 60 s)
+- [x] #2 ADR that supersedes the entry-22 rule (2.0 C / 60 s)
 - [x] #3 Host test on the real code: red on the old rule (2.0 C / 60 s), green on the new rule (1.5 C / 30 s)
 - [ ] #4 Bench test by the bench-tester
 <!-- AC:END -->
@@ -47,4 +47,6 @@ Q-327a and Q-327b decided 2026-11-15 by the coordinator under Robert's directive
 2026-11-16 04:2x test_sat_lowload_contract in foreground chunks (OTGW_LL_ONLY, -j 1; the background run was reaped twice on low memory): LL-001..004 5 pass; LL-010..013 7 pass (242 s); LL-014,015,017 pass, LL-016 unavailable/skip (PH-FIELD, as designed); LL-018 10 pass; LL-019..021 4 pass; LL-022,023 5 pass. Two seams fixed: LL-004 and LL-020b expected the 'o' overshoot switch at 60 s -> 30 s (entry 327). Red/green: LL-004 with OTGW_SATCYCLES_INO=origin/dev SATcycles.ino (SAT_OVERSHOOT_SUSTAIN_MS 60000) FAIL (2 subtests, 10 s and 30 s ticks), on the fix PASS. Verification plan got a dated correction paragraph (TASK-1888); LL-023 doc gate pass after it.
 
 Branch note: the 1888 commits (5dde6269a, 643f4f307) sit on local branch lane/ba-1887 in worktree wt-ba-1956; the name comes from the lane's original task, it is NOT TASK-1887 work. TASK-1887 follows on the same lane; one combined build for 09 after the tlsdyn slot.
+
+2026-11-16 ADR-249 ACCEPTED: Robert answered 'A' (Discord DM 1571779788178194473, reply to 1571670760131534909, relayed by the coordinator): accept including the setting 'PWM switch margin' (fPwmSwitchMargin) default 1.5, range 0.5-5.0. Done via adr-kit: open question Q-327c answered with Robert's decision (adr answer), frontmatter lists converted to block style (adr-kit could not normalize inline lists), three acronyms given inline expansions for the strict clarity gate (PID, REST/MQTT/JSON/UI, DM), adr accept --confirm (status history: Accepted, changed_by Robert), Guideline-level per ADR-080 line restored in Status, index + README rebuilt by adr-doctor --fix-index. AC2 ticked. Next: rebase onto origin/dev, build slot (queue after d3), bench by 09 (health + the setting via REST/MQTT/UI, no SAT scenario on hardware), push after its OK.
 <!-- SECTION:NOTES:END -->
