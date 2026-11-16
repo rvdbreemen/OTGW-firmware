@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@system32-030509'
 created_date: '2026-11-09T19:21:00Z'
-updated_date: '2026-11-14T23:31:00Z'
+updated_date: '2026-11-16T16:33:00Z'
 labels:
   - bug
   - crash
@@ -31,7 +31,7 @@ Candidates (not proven): attachInterrupt / attachInterruptArg in src/libraries/O
 <!-- AC:BEGIN -->
 - [ ] #1 Determine from the decode and code where the GPIO ISR install ran (restart path of the old boot vs setup of the new one) and why heap_caps_malloc in esp_intr_alloc panicked, with evidence
 - [ ] #2 Reproduce or bound it on the bench: repeated /ReBoot cycles (including after a long uptime and a low-heap boot) with serial capture; count panics per N reboots
-- [ ] #3 Fix, or a decision with Robert, with before/after panic counts
+- [x] #3 Fix, or a decision with Robert, with before/after panic counts
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -65,6 +65,10 @@ Not this class (2026-11-10, a4): the coredump in gruijter's upload 20261110-1005
 2026-11-12 02:24-03:15 and 03:54-04:05 load runs (otgw-bench-tester, .61 OTGW32), scratchpad t1763b/loadloop.py. Each cycle: about 10 min of uptime under two headless web UI tabs, a read-only telnet session and device/info polls every 5 s (like the beta.162 two-tab boot), then POST /ReBoot, then a crashlog check with coredump save; COM4 captured with DTR/RTS off. Results: beta.190+1a4c0a4, 5 cycles, 0 panics, minimum hd_min_free_heap per cycle 26876 / 26292 / 22632 / 21576 / 24524 B; beta.197+4cafc97, 1 cycle, 0 panics, hd_min 13732 B (the lowest seen; maxblk >= 26612). COM4: only 'rst:0xc (RTC_SW_CPU_RST)' lines, 0 hits for Guru/panic/abort/Backtrace. The second run was stopped by the host (laptop low on memory), not by the device. Total so far: 30 plain reboots on 187 plus 6 load cycles on 190/197 = 36 reboots, 0 panics. This still does NOT reproduce the beta.162 condition (hd_min 3592 B), so the 1-in-10 is neither confirmed nor excluded for a really low-heap boot. AC2 not ticked; resuming the load loop is the coordinator's call after the 08:00 slot.
 
 2026-11-15 00:19-00:30 (09, AC2 count, partial): 30x POST /ReBoot on .61 (OTGW32, 2.0.0-beta.264+a695744, includes TASK-1870 / ADR-225 IPC stack 1280 B), tools/reboot1763.py: after every boot device/info lastreset and resetraw plus the crashlog summary were read. Result 0/30 panics: 30x lastreset 'Software reset' resetraw 0x0c/0x0c, crashlog available false before and after, no new crash summary; boot back after 18.8-19.9 s; bootcount 667 -> 697. IPC stack minima after the run: hd_ipc0_stack_min 476, hd_ipc1_stack_min 340 (hwdetect 476/340). Not covered: reboots after a long uptime or a low-heap boot, and no USB serial capture (lastreset/resetraw/crashlog would show a panic reset, but the ipc1 backtrace itself needs the crashlog core dump). Beta.162 rate was 1 in 10; 0/30 on 264 gives an upper bound of roughly 10 % at 95 % confidence (rule of three: 3/30), so it does not by itself prove the fix. Evidence: 09 scratchpad r1763/reboots.txt.
+
+2026-11-16 17:08-17:30 (09, AC2/AC3 count WITH serial): 60x POST /ReBoot on .61 (OTGW32, 2.0.0-beta.353+3a14423, contains ADR-225 IPC stack 1280 B), SAT off, satsimulation false, scratchpad t1763/reboot_loop.py, COM4 at 115200 with DTR/RTS off. Result 0/60 panics: serial.log has 60x 'rst:0xc (RTC_SW_CPU_RST)' and 0 hits for Guru/Backtrace/abort()/panic'ed/stack overflow/ipc1; bootcount 882 -> 942, +1 each; crashlog no new summary; lastreset 'Software reset'. IPC stack minima after the run: hd_ipc0_stack_min 484, hd_ipc1_stack_min 332 (beta.162/168 measured 88 B free on ipc1; the coredump overflowed by 52 B). settings.ini byte-identical.
+
+Totals on the fix (ADR-225 builds): 30 (beta.264, no serial) + 60 (beta.353, with serial) = 90 reboots, 0 panics. Rule of three: 95 % upper bound about 3.3 % per reboot, against the 1-in-10 seen on beta.162. Mechanism: ipc1 margin 88 B -> 332-340 B at the deepest point of the GPIO ISR install. AC3 ticked on that before/after. AC2 stays OPEN for the long-uptime and low-heap-boot cases (all 90 reboots started at uptime < 10 min with hd_min ~27 KB). Evidence: 09 scratchpad t1763c/ (results.txt, serial.log, pre.txt, S0/S1.ini).
 <!-- SECTION:NOTES:END -->
 
 ## Comments
