@@ -5354,6 +5354,19 @@
     "TASK-2005"
    ],
    "confirmed_by_entry": null
+  },
+  {
+   "id": 405,
+   "title": "Interpretation (ours, not Sergeant D's words) of entries 402 and 403 when the room temperature is lost during the 600 s minimum CH-off time (2026-11-16; open as Q-403a)",
+   "date": "2026-11-16",
+   "source": "port-team",
+   "kind": "interpretation",
+   "discord_link": null,
+   "supersedes": [],
+   "tasks": [
+    "TASK-1887"
+   ],
+   "confirmed_by_entry": null
   }
  ]
 }

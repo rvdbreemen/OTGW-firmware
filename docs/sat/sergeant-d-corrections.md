@@ -8044,3 +8044,17 @@ Robert, 16:18:42 UTC (https://discord.com/channels/812969634638725140/9144987300
 **Open:** the conversation went on after 20:16 (Robert: continuous at 38 C would modulate low, while PWM switches the setpoint between 55 and 38; Sergeant D: "We are talking about 2-3% modulation instead of 0", "a high PWM means 2220 seconds ON, 180 seconds OFF", then "?" at 20:19:00). If it changes the decision, a later entry records that; this entry is not rewritten.
 
 **Task:** TASK-2005 (owner ba): no code change under this answer.
+
+## 405. Interpretation (ours, not Sergeant D's words) of entries 402 and 403 when the room temperature is lost during the 600 s minimum CH-off time (2026-11-16; open as Q-403a)
+
+**Source:** none from Sergeant D. Written by the comms session for ba (TASK-1887) so that the firmware's reading is on record; Robert (maintainer) accepted ADR-253 with this reading named in it (2026-11-16 22:58 local, coordinator session). This whole entry is our interpretation; it records no words of Sergeant D.
+
+**What the firmware does (ba's beta.359 build, TASK-1887; the band block in SATcontrol.ino holds the 600 s minimum only while the band has a room error, `!isnan(_sat_tolErr)`; not yet on origin/dev when this was written, so no line numbers):** when the room temperature is lost, the band has no input and does not hold CH off, also inside the 600 s minimum of entry 403; heating follows the other rules.
+
+**Why (our reasoning):** entry 38 ("Keep heating on heat curve" when the room temperature is lost or missing) and entry 46 (P, I and D reset to 0 then) let a lost room temperature fall back to the heating curve, never to a stop; a band pause that needs the room temperature cannot be judged without it. thermo-nova has no band (entry 326).
+
+**Changes an earlier entry:** none; it reads entries 402 and 403 together with entries 38 and 46. Entries 402 and 403 are not rewritten.
+
+**Open:** Q-403a (queued, asked after the earlier questions).
+
+**Task:** TASK-1887 (owner ba); ADR-253.
