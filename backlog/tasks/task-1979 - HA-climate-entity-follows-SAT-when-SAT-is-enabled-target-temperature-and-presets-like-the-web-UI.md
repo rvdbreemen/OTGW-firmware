@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-15T15:53:00Z'
-updated_date: '2026-11-16T00:13:00Z'
+updated_date: '2026-11-16T09:40:00Z'
 labels:
   - feature
   - sat
@@ -61,4 +61,6 @@ AC1 evidence: research recorded in this task (options: adapt the existing climat
 Bench (09, .61, build 2.0.0-beta.331+e4dbf70 = this change before the rebase onto beta.330; sha ino c836272b...d983 fs f4494e49...9a07; OTA app+fs EXIT 0, device reports e4dbf70; SAT via satsimulation only, no control behaviour judged; card commands sent as HA's MQTT climate sends them, with mosquitto_pub). Retained discovery homeassistant/climate/otgw-1020BA21B4F8/climate/config matches every field (temp_cmd_t .../sat/climate_target, tpl {{ value }}, stat/curr topics, min 5 max 30, pr_modes without none, preset topics, uniq_id ...-otd_thermostat). 1 PASS SAT on: climate_target 20.00, climate_current 20.00, both retained. 2 PASS card 19.5: climate_target 19.50 same second, /api/v2/sat target 19.5, no TT= in telnet. 3 PASS 16 -> preset sleep; 18 (eco == home) -> eco (first match). 4 PASS preset comfort -> target 21. 5 PASS SAT off: climate_target 0.00 (TrSet 0, no thermostat); card 20.5 -> telnet 'OTD: cmd TT=20.5' + 'enqueueWrite: TT -> MsgID 16 frame 0x90101480' (firmware command path, not bus frames: the sim pauses the bus). 6 PASS SAT on again: both topics back in the same second. 7 PASS homeassistant/status offline->online republishes preset, climate_target, climate_current. 8 PASS heartbeat 299 s. 9 PASS no reboot, no crash record, heap_free 57144, settings restored byte-identical. Evidence: 09 scratchpad b331/ (run.md, bus.log, telnet.raw).
 
 Cosmetic (09 bench, check 5): with SAT off and no thermostat, Tr is NaN so sat/climate_current is not republished and the retained value stays SAT's last room temperature (19.95): the card shows a stale current temperature until a thermostat reports Tr. Not a blocker; left as is. AC4 stays open: the HA card screenshot (Docker down at 3.5 GB free; coordinator: later at >= 6 GB free) and the second board type (Classic) are not benched.
+
+Field check on the OTGW Classic (2026-11-16, indigo_light, #beta-testing https://discord.com/channels/812969634638725140/914498730001072149/1571818031716372491): beta.339, OTGW Classic + S3 Mini, SAT on: Home Assistant thermostat card 'OpenTherm Gateway (OTGW) Thermostat' shows target 20.5 C, room 20.7 C, preset Comfort, state Idle (screenshot, kept locally in the 92 scratchpad indigo-1979/). Covers the Classic + real HA screen part of AC4 as tester evidence; the bench-tester or Robert decides whether it ticks AC4.
 <!-- SECTION:NOTES:END -->

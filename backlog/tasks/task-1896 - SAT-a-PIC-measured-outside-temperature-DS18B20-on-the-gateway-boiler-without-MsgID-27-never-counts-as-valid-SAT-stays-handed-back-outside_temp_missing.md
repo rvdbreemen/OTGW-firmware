@@ -8,7 +8,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-13T09:55:00Z'
-updated_date: '2026-11-16T09:29:00Z'
+updated_date: '2026-11-16T09:40:00Z'
 labels:
   - bug
   - sat
@@ -67,4 +67,6 @@ Bench limit (2026-11-13, 09 via the coordinator, build 2.0.0-beta.226+e86aed9): 
 2026-11-15 AC4 field confirmation (d3 read the message itself): indigo_light in #beta-testing, https://discord.com/channels/812969634638725140/914498730001072149/1571465125280350249 (10:01 UTC). Setup: beta.250+aed38bf, OTGW Classic + LOLIN S3 Mini, PIC 6.8, Viessmann Vitodens 100-W (boiler sends no MsgID 27), DS18B20 on the PIC, SAT on, Open-Meteo off, no external outdoor temperature. sat/status: active true, outside_temp_missing false, external_outdoor_valid false, outside_temp 6.31, heating_curve 33.7, final_setpoint 33.95. On beta.218 SAT stayed inactive with outside_temp_missing true. AC1 waits for his --long-run --sat-trace capture (running since 10:50 local) for the PIC frame type of MsgID 27. Not covered by this report: AC5 (osrc=O and no weather fetch; with Open-Meteo off a fetch is not expected anyway) and TASK-1897 (weather off). New finding in the same message: otgw/label/Toutside reports status data_invalid while SAT uses the value; Robert answered 'Nee gaan we fixen' (msg 1571466554011553823), so that inconsistency is to be fixed (task to be filed by the coordinator or under this task).
 
 2026-11-16 (95) AC1 from indigo_light's capture 2026-11-15 10:50-13:26 (beta.250+aed38bf, PIC gateway 6.8, Vitodens + Honeywell Round; data local, session 95 scratchpad indigo1115/): the PIC reports its DS18B20 outside value as its own R Write-Data 27 (e.g. 10:50:57.940 R 901B0630 = 6.1875 C), and the boiler answers B 601B0000 Data-Invalid; over the capture 3020 R Write-Data 27 and 3014 B Data-Invalid 27, no Read-Ack 27. That is the pair the stamp predicate of abafdcd34 accepts. AC3: host test tests/test_outside_stamp_gateway_frames.py on origin 364f4faf1: Ran 10 OK; against the OTGW-Core.ino before the fix (abafdcd34~1): RED (setUpClass error: the gateway-frame predicate does not exist, plus FAIL test_stamp_written_only_behind_the_predicate). outside_temp_missing clears with only the PIC sensor: the same capture's SAT lines show osrc=O 279 times, and indigo_light's report 1571465125280350249 (beta.250) shows active true, outside_temp_missing false. AC5 (bench Classic with a PIC DS18B20 and a boiler without MsgID 27) stays open: no bench unit has a DS18B20 or a boiler; the field evidence above covers the behaviour.
+
+2026-11-16: indigo_light reports the PIC DS18B20 as SAT outside source working on beta.250 (15 Nov) and beta.339 (https://discord.com/channels/812969634638725140/914498730001072149/1571818031716372491); details under TASK-1897.
 <!-- SECTION:NOTES:END -->

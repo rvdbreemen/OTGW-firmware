@@ -7,7 +7,7 @@ status: In Review
 assignee:
   - '@claude'
 created_date: '2026-11-13T10:07:00Z'
-updated_date: '2026-11-14T21:36:00Z'
+updated_date: '2026-11-16T09:40:00Z'
 labels:
   - bug
   - sat
@@ -44,6 +44,8 @@ AC1 evidence (2026-11-13, wt-95w): tests/test_weather_worker_handoff.py new case
 Bench limit (2026-11-13, 09 via the coordinator, build 2.0.0-beta.226+e86aed9): AC3 cannot be shown on the bench unit .61. OT-Direct loopback never asks MsgID 27, so Toutside is never set and a non-zero value without a fresh stamp cannot be produced there. AC3 stays open as evidence by host test (tests/test_weather_worker_handoff.py C6, red on the old gate, green on the fix) plus field confirmation (indigo_light, AC2). Not shown on a device.
 
 AC 3: field AC (Robert C, 2026-11-14, DM 1571276554430976183 via the coordinator, no OT bus on the bench): the part that needs Toutside non-zero from the OT bus without a fresh MsgID 27 stamp is verified from a tester capture, not on the bench. Status stays In Review until a tester capture covers it.
+
+Field confirmation (2026-11-16, indigo_light, #beta-testing https://discord.com/channels/812969634638725140/914498730001072149/1571818031716372491): 'the PIC DS18B20 as SAT outside source (TASK-1896/1897) was confirmed on my unit on beta.250 on 15 November (active: true, outside_temp_missing: false, outside_temp = Toutside), and still works on beta.339'. Tester statement without a capture; covers AC2 (field, indigo_light) as reported. The beta.339 notes still list it as a known issue; take it out of the next notes.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
