@@ -7080,7 +7080,7 @@
       "path": "ADR-199-sat-cold-state-and-ch-enable-rule-supersedes-adr-195.md",
       "format": "canonical",
       "status": "Accepted",
-      "date": "2026-10-30",
+      "date": "2026-11-16",
       "decision_summary": "While SAT is the active controller, one per-heating-system cold setpoint replaces thermo-nova's COLDSETPOINT 22 at ev...",
       "topics": [
         "ch-enable",
@@ -10456,7 +10456,78 @@
         "verification": [
           "tests/testsatpwmfirststart.py (real SAT sources in the loop harness): 14 tests green on the fix, 8 red on origin/dev 2268516db (cases a, a2, b, c, d, e, f, i), with mutant tests for the flame-off guard, the resume reset and the flow check.",
           "tests/testsatloopintegration.py (21 tests, incl. the no-return flood at a PWM-first start and the boot silence).",
-          "Bench: an OTGW Classic bench unit with SAT on showed SATMODE from=1 to=2, Control mode: PWM (heating start) with duty 1.00 at the heater OFF to ON edge after the boot silence, then the flame; the first PWM to continuous switch came 90 s..."
+          "Bench (simulator on the device, not hardware): an OTGW Classic bench unit with SAT's built-in boiler simulation on showed SATMODE from=1 to=2, Control mode: PWM (heating start) with duty 1.00 at the heater OFF to ON edge after the boot s..."
+        ]
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
+    },
+    {
+      "id": "ADR-253",
+      "title": "SAT tolerance band restarts below target + 0.1 after a 600 s minimum CH-off (partly supersedes ADR-250)",
+      "path": "ADR-253-sat-tolerance-band-restarts-below-target-0-1-after-a-600-s-minimum-ch-off-partly-supersedes-adr-250.md",
+      "format": "canonical",
+      "status": "Proposed",
+      "date": "2026-11-16",
+      "decision_summary": "The band stops at target + 0.1 and may restart below target + 0.1, and once CH is off for the band it stays off for a...",
+      "topics": [
+        "ch enable bit",
+        "minimum off time",
+        "restart threshold",
+        "sat",
+        "tolerance band"
+      ],
+      "aliases": [
+        "10 minute pause",
+        "band restart",
+        "entry 401",
+        "entry 402",
+        "entry 403"
+      ],
+      "components": [
+        "_sat_tolOffSinceMs",
+        "SAT_TOL_MIN_OFF_MS"
+      ],
+      "symbols": [
+        "_sat_tolBandOff",
+        "_sat_tolOffSinceMs",
+        "SAT_TOL_MIN_OFF_MS",
+        "satToleranceDemand"
+      ],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [
+          "Stop at target + 0.1 and allow a restart below target + 0.1 (entries 401, 402).",
+          "Keep CH off for 600 s after it went off for the band, counted from the CH-off (entry 403).",
+          "Never hold CH off for the band when no deciding room temperature is usable."
+        ],
+        "must_not": [
+          "Must not start the 600 s at the stop decision while the 180 s minimum burn still holds CH on.",
+          "Must not add a setting or a REST or MQTT field for the band times."
+        ],
+        "exceptions": [
+          "The thermal safe fallback keeps CH=1, as in ADR-250."
+        ],
+        "verification": [
+          "tests/testsattoleranceband.py on the real SATchEnable.h and the real control-tick segment of satControlLoopRun():",
+          "demand above -0.1 and no hold zone;",
+          "a room back at the target restarts only 600 s after the CH-off;",
+          "a room far below the target still waits for the 600 s;",
+          "the 600 s starts at the CH-off after a 180 s burn, not at the stop decision;",
+          "a room hovering at target + 0.1 restarts at most once per 600 s;",
+          "no room temperature never blocks heating;",
+          "the narration texts and their once-per-pause count;",
+          "the entry-398 start-count tests still pass.",
+          "Old-vs-fix: on the code before this ADR the 7 new-behaviour tests fail and 19 pass; on the fix all 26 pass."
         ]
       },
       "scope": {
@@ -16258,6 +16329,12 @@
       "resolved": true
     },
     {
+      "source": "ADR-199",
+      "target": "ADR-253",
+      "type": "related",
+      "resolved": true
+    },
+    {
       "source": "ADR-200",
       "target": "ADR-022",
       "type": "related",
@@ -17410,6 +17487,12 @@
       "resolved": true
     },
     {
+      "source": "ADR-250",
+      "target": "ADR-253",
+      "type": "related",
+      "resolved": true
+    },
+    {
       "source": "ADR-251",
       "target": "ADR-157",
       "type": "related",
@@ -17448,6 +17531,18 @@
     {
       "source": "ADR-252",
       "target": "ADR-251",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-253",
+      "target": "ADR-199",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-253",
+      "target": "ADR-250",
       "type": "related",
       "resolved": true
     }

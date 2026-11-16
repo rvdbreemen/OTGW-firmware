@@ -9,6 +9,8 @@ documents_shipped: false
 verified_in: []
 supersedes: []
 superseded_by: null
+related:
+  - "ADR-253"
 topics:
   - "sat"
   - "tolerance band"
@@ -62,6 +64,11 @@ status_history:
     status: Accepted
     changed_by: "User: Robert van den Breemen"
     reason: Accepted by Robert, Discord DM 1571883109157310475 (answer A to the accept question for the amended text at 6d221e474)
+    changed_via: adr-kit lifecycle
+  - date: 2026-11-16
+    status: Accepted
+    changed_by: "User: Robert van den Breemen"
+    reason: Related to ADR-253
     changed_via: adr-kit lifecycle
 ```
 
