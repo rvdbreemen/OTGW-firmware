@@ -128,6 +128,7 @@ struct DiagEnv {
   bool     (*lockWait)(uint32_t ms);  // start() and stop() on the loop task: may wait a few ms
   void     (*unlock)();
   bool     hasPsram;                  // platformHasPsram()
+  uint32_t (*micros)() = nullptr;     // TASK-1665 AC2: append-cost clock; nullptr = no measurement
 };
 
 // ---- small helpers ----------------------------------------------------------
@@ -314,6 +315,11 @@ struct DiagRecorder {
   DiagStartResult lastStart = DIAG_START_OK;
   uint32_t  psramMemBytes = 0;              // size of the never-freed PSRAM block, 0 = not allocated
   uint32_t  gen = 0;                        // recording generation, +1 per start(): a download serves only its own recording
+  // TASK-1665 AC2: cost of one append, from the tryLock in Writer::open() to just before the unlock in close(), in us
+  // (env->micros). Records of the current recording only; reset by start().
+  uint32_t  appendCount = 0;
+  uint32_t  appendMaxUs = 0;
+  uint64_t  appendSumUs = 0;
 
   // caches (point into mem)
   uint16_t* otKey = nullptr; uint32_t* otVal = nullptr; uint8_t otBits = 0;
@@ -370,6 +376,7 @@ struct DiagRecorder {
     mqVal = (uint32_t*)c;
     curSeq = 0; used = 0; haveBlock = false; recSeq = 0; lastRecMs = 0; droppedTotal = 0; pendingDrops = 0;
     gen++;                                                  // a download of the previous recording now serves lost blocks
+    appendCount = 0; appendMaxUs = 0; appendSumUs = 0;
     clearCaches();
     lastStart = DIAG_START_OK;
     active = true;
@@ -570,9 +577,11 @@ private:
     uint8_t* p = nullptr;          // write pointer inside the current block
     uint8_t* lastTextLen = nullptr;
     uint32_t now = 0;
+    uint32_t t0us = 0;             // TASK-1665: start of this append (before the tryLock)
 
     bool open(DiagRecorder& rec, size_t room) {
       r = &rec;
+      if (rec.env && rec.env->micros) t0us = rec.env->micros();
       if (!rec.env || !rec.env->tryLock()) { rec.pendingDrops = rec.pendingDrops + 1u; return false; }
       locked = true;
       // A stopped PSRAM ring keeps its data (TASK-1960): `active` under the lock, not `ring`, says whether
@@ -611,7 +620,15 @@ private:
     // The caller clipped the text to 254 bytes and knows the original was longer.
     void markLastTextCut() { if (lastTextLen) *lastTextLen = (uint8_t)DIAG_REC_TEXT_CUT; }
     void finish() { r->used = (uint32_t)(p - r->cur()); r->recSeq++; }
-    void close() { finish(); release(); }
+    void close() {
+      finish();
+      if (r->env->micros) {                                  // TASK-1665 AC2: still under the lock
+        const uint32_t us = r->env->micros() - t0us;
+        r->appendCount++; r->appendSumUs += us;
+        if (us > r->appendMaxUs) r->appendMaxUs = us;
+      }
+      release();
+    }
     void release() { if (locked && r && r->env) r->env->unlock(); locked = false; }
   };
   friend struct Writer;
@@ -770,6 +787,7 @@ static inline size_t diagDownloadFill(DiagRecorder& r, const DiagDownload& d, ui
 struct DiagStatus {
   bool active, hasData, psram, exact;
   uint32_t ringBlocks, ringBytes, oldest, newest, dropped;
+  uint32_t appendCount, appendMaxUs, appendAvgUs;           // TASK-1665 AC2 (0 without a micros clock)
   DiagStartResult lastStart;
 };
 static inline void diagStatusSnapshot(DiagRecorder& r, DiagStatus& s) {
@@ -783,6 +801,9 @@ static inline void diagStatusSnapshot(DiagRecorder& r, DiagStatus& s) {
   s.oldest = s.hasData ? r.oldestSeq() : 0u;
   s.newest = s.hasData ? r.newestSeq() : 0u;
   s.dropped = r.droppedTotal + r.pendingDrops;
+  s.appendCount = r.appendCount;
+  s.appendMaxUs = r.appendMaxUs;
+  s.appendAvgUs = r.appendCount ? (uint32_t)(r.appendSumUs / r.appendCount) : 0u;
   s.lastStart = r.lastStart;
   if (locked) r.env->unlock();
 }

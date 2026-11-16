@@ -5,6 +5,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Added
+- Diagnostic recording: the recording status (`/api/v2/diag/recording/status`) reports what one record costs: `append_count`, `append_max_us` and `append_avg_us` of the current recording (TASK-1665).
+
 ## [2.0.0-beta.351] - 2026-11-16
 
 ### Changed

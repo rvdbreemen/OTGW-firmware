@@ -3671,7 +3671,7 @@ void sendDeviceCoreDump()
 //
 // {"recording":{"state":"recording|stopped|refused","enabled":b,"active":b,"reason":"","psram":b,
 //   "block_size":4096,"ring_blocks":n,"ring_bytes":n,"has_data":b,"oldest_seq":n,"newest_seq":n,
-//   "dropped":n,"exact":b}}
+//   "dropped":n,"exact":b,"append_count":n,"append_max_us":n,"append_avg_us":n}}
 // enabled = the persisted DiagRecordingOn flag (resumes at boot); active = a ring is being written;
 // reason is set when the last start was refused; oldest/newest_seq are 0 while has_data is false;
 // exact is false when the recorder lock was busy and the numbers were read without it.
@@ -3693,6 +3693,9 @@ static void diagEmitStatus(JsonEmit& je)
   je.field(F("oldest_seq"),  s.oldest);
   je.field(F("newest_seq"),  s.newest);
   je.field(F("dropped"),     s.dropped);
+  je.field(F("append_count"),  s.appendCount);    // TASK-1665 AC2: records of this recording that were timed
+  je.field(F("append_max_us"), s.appendMaxUs);    // the slowest append, us (lock wait + encode + copy)
+  je.field(F("append_avg_us"), s.appendAvgUs);
   je.field(F("exact"),       s.exact);
   je.endObject();
 }

@@ -26,6 +26,7 @@ static DiagEnv       diagEnv;
 static PlatformMutex diagRecMutex = nullptr;
 
 static uint32_t diagEnvMillis()  { return millis(); }
+static uint32_t diagEnvMicros()  { return micros(); }   // TASK-1665 AC2: append cost
 static uint32_t diagEnvEpoch()   { const time_t t = time(nullptr); return (t > 946684800) ? (uint32_t)t : 0u; }   // 0 until NTP set the clock
 static uint32_t diagEnvFreeHeap(){ return platformFreeHeap(); }
 static void*    diagEnvAlloc(size_t n)       { return malloc(n); }
@@ -49,6 +50,7 @@ void diagRecorderInit()
   diagEnv.lockWait = diagEnvLockWait;
   diagEnv.unlock = diagEnvUnlock;
   diagEnv.hasPsram = platformHasPsram();
+  diagEnv.micros = diagEnvMicros;
 }
 
 // Manual start (the REST route of TASK-1666 calls this). A refusal is not an error: the status

@@ -25,6 +25,7 @@
 //   F11 text over 254 bytes is cut and flagged
 //   F12 not recording: a capture point takes no lock and writes nothing
 //   F13 dt above 127 ms and above 16383 ms
+//   F18 TASK-1665 AC2: the append cost (env micros) is counted per record: count, max, avg; reset by start(); none without a clock
 //   F17 TASK-1960: a heap stop() that loses the lock leaves no readable ring; the next start() frees it under the lock
 //   F16 TASK-1960: PSRAM stop keeps the recording readable (every block oldest..newest, records intact) until
 //       the next start; a capture point that read `active` before the stop and takes the lock after it
@@ -62,6 +63,8 @@ static void eFreeHeap(void* p) { g_heapFrees++; std::free(p); }
 static void* ePsram(size_t n) { g_psramAllocs++; return g_psramAvail ? std::calloc(1, n) : nullptr; }
 static void (*g_onTry)() = nullptr;                          // F16: runs once inside the next tryLock (a stop() racing a writer)
 static bool eTry() { g_lockTries++; if (g_onTry) { void (*f)() = g_onTry; g_onTry = nullptr; f(); } return !g_lockBusy; }
+static uint32_t g_us = 0, g_usStep = 0;                     // F18: micros() advances g_usStep per call
+static uint32_t eMicros() { g_us += g_usStep; return g_us; }
 static bool g_waitFail = false;                               // F17: lockWait() times out
 static bool eWait(uint32_t) { return !g_waitFail; }
 static void eUnlock() {}
@@ -507,6 +510,33 @@ int main() {
     r.stop();
     ok = ok && g_heapFrees == 2;
     caseResult("F17", ok, why);
+  }
+
+  // F18 --------------------------------------------------------------------
+  {
+    resetDoubles();
+    DiagEnv pm = makeEnv(true); pm.micros = eMicros;
+    DiagRecorder* r = new DiagRecorder();
+    bool ok = r->start(pm) == DIAG_START_OK;
+    g_us = 1000; g_usStep = 7;                               // each append reads micros twice (open, close): 7 us apart
+    for (int i = 0; i < 5; i++) r->recPicCommand("A=1", 3);
+    DiagStatus st; diagStatusSnapshot(*r, st);
+    ok = ok && st.appendCount == 5 && st.appendMaxUs == 7 && st.appendAvgUs == 7;
+    std::string why = "count=" + std::to_string(st.appendCount) + " max=" + std::to_string(st.appendMaxUs) + " avg=" + std::to_string(st.appendAvgUs);
+    g_usStep = 40; r->recPicCommand("B=2", 3); g_usStep = 7;   // one slow append
+    diagStatusSnapshot(*r, st);
+    ok = ok && st.appendCount == 6 && st.appendMaxUs == 40 && st.appendAvgUs == (5 * 7 + 40) / 6;
+    r->stop(); ok = ok && r->start(pm) == DIAG_START_OK;    // a new recording starts its own statistics
+    diagStatusSnapshot(*r, st);
+    ok = ok && st.appendCount == 0 && st.appendMaxUs == 0 && st.appendAvgUs == 0;
+    freePsram(r);
+    DiagRecorder* q = newPsramRecorder(ps);                  // ps has no micros clock: nothing is timed
+    q->recPicCommand("C=3", 3);
+    DiagStatus sq; diagStatusSnapshot(*q, sq);
+    ok = ok && sq.appendCount == 0 && q->recSeq == 1;
+    freePsram(q);
+    g_usStep = 0;
+    caseResult("F18", ok, why);
   }
 
   std::printf("%s\n", g_fail ? "SOME CASES FAILED" : "ALL CASES PASSED");
