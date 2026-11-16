@@ -5102,6 +5102,36 @@
     "TASK-1924"
    ],
    "confirmed_by_entry": null
+  },
+  {
+   "id": 386,
+   "title": "SAT is ready for its initial release once today's open questions are resolved; user validation follows; new items go to the next release (Sergeant D and Robert, 2026-11-16)",
+   "date": "2026-11-16",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1571805911926710303",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1740",
+    "TASK-1887",
+    "TASK-1888",
+    "TASK-1942",
+    "TASK-1990"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 387,
+   "title": "Why every start runs in PWM first (Sergeant D, 2026-11-16; reasons for entry 385)",
+   "date": "2026-11-16",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1571809383388815423",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1942"
+   ],
+   "confirmed_by_entry": null
   }
  ]
 }

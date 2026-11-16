@@ -7781,3 +7781,32 @@ Robert, 16:18:42 UTC (https://discord.com/channels/812969634638725140/9144987300
 **Task:** to be filed by the coordinator (start-sequence owner, a follow-up of TASK-1924 / entry 348).
 
 **Open:** what "after the start sequence" means in time (the end of the 60 s start-up following of entries 344/347, or the end of the first PWM ON phase); to ask if the code comparison does not settle it.
+
+## 386. SAT is ready for its initial release once today's open questions are resolved; user validation follows; new items go to the next release (Sergeant D and Robert, 2026-11-16)
+
+**Source:** #dev-sat-mqtt 2026-11-16. Robert 08:35:32 UTC (https://discord.com/channels/812969634638725140/1105556725714649128/1571805911926710303), 08:36:13 (https://discord.com/channels/812969634638725140/1105556725714649128/1571806086019817545), 08:36:29 (https://discord.com/channels/812969634638725140/1105556725714649128/1571806153007173684); Sergeant D 08:41:16 (https://discord.com/channels/812969634638725140/1105556725714649128/1571807356268843131), 08:43:02 (https://discord.com/channels/812969634638725140/1105556725714649128/1571807799401385986), 08:43:29 (https://discord.com/channels/812969634638725140/1105556725714649128/1571807914547740775); Robert 08:47:36 (https://discord.com/channels/812969634638725140/1105556725714649128/1571808950330986547). After Sergeant D's progress question (08:21:02) and the coordinator's answer (1571803690178711676).
+
+**Quoted:**
+
+> Robert: "Maybe you should define when SAT is ready for release." / "Define it by talking about it in terms the SAT needs to meet. If we wait until 100% field validation it will never happen." / "After initial release we will move to regular updates."
+>
+> Sergeant D: "I strongly believe that after the today’s answers to the open questions we need validation from the users and SAT is ready for a release" / "Moreover the restart issue looks resolved. So I think we can go for the initial release." / "do you agree?"
+>
+> Robert: "I agree with <@821036882946424852> on this. I think we are ready once we resolve today’s open questions from sergant. Mark anything new to the next release."
+
+**Settled:** the SAT release criterion: SAT is ready for its initial release once the decisions of today's open questions (entries 375-385) are implemented; after that, validation comes from users in the field, not from 100 % field validation before release; anything new goes to the next release. Sergeant D considers the restart issue resolved. This is agreement on scope and criterion, not the per-action go for a stable release (that stays a hard stop for Robert, CLAUDE.md).
+
+**Tasks:** TASK-1740 (stable readiness gate: the SAT criterion), TASK-1990 (entry 383), TASK-1887 (entries 376, 378, 384), TASK-1888 (entry 379), TASK-1942 (entry 385). New SAT items from now on: next release.
+
+## 387. Why every start runs in PWM first (Sergeant D, 2026-11-16; reasons for entry 385)
+
+**Source:** #dev-sat-mqtt, Sergeant D 2026-11-16 08:49:19 UTC (https://discord.com/channels/812969634638725140/1105556725714649128/1571809383388815423).
+
+**Quoted:**
+
+> "To day we made a breakthrough decision. The decision is that SAT always starts in PWM and then decides if will stay in PWM or go to continuous operation. This is beneficial for 2 reason
+> 1) after a restart we continue in PWM 2) In continuous mode we give a small warm up time for the boiler components, which means less thermal stress"
+
+**Settled:** the reasons for entry 385: (1) after a restart SAT continues in PWM; (2) a start into continuous mode gets a short warm-up for the boiler components, which means less thermal stress. Confirms entry 385 (every start in PWM first, the mode chosen after the start sequence). The timing point of entry 385 (what "after the start sequence" means in time) stays open.
+
+**Task:** TASK-1942 (owner d3).
