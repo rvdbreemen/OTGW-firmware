@@ -3,11 +3,11 @@ id: TASK-1834
 title: >-
   OT-Direct: a CS=/C2= override expires after 60 s; the PIC keeps it at least
   62.9 s
-status: In Review
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-11T23:43:00Z'
-updated_date: '2026-11-14T03:02:00Z'
+updated_date: '2026-11-16T08:14:00Z'
 labels:
   - otdirect
   - parity
@@ -53,3 +53,9 @@ Part of the PIC 6.8 parity audit, parent TASK-1851.
 
 Bench AC3 by otgw-bench-tester (09), .61 OT-Direct otdmode 3 (master), SAT off, sim off, 2.0.0-beta.234+08f42d6 (OTA, bootcount 621->623, crashlog empty), 2026-11-14, evidence 09 scratchpad b234\ (61-telnet.txt, events.log). Test A 03:40:58-03:55:58: 16x CS=45.5 over REST every 60 s; telnet 16x 'OTD: cmd "CS=45.5"', 0 'CS heartbeat expired' lines in the window; every MsgID 1 write in the window is R90012D80 (TSet 45.50), 16 frames, no other value. Test B: last CS= on the device 03:55:56.924, 'OTD: CS heartbeat expired, clearing MsgID 1 override' 03:57:00.457 = 63.53 s (device clock). C2: C2=40 at 03:57:15.861, MsgID 8 written once (R10082800), 'OTD: C2 heartbeat expired, clearing MsgID 8 override' 03:58:19.587 = 63.73 s. Cleanup CS=0 + C2=0, settings diff none. Limit: .61 has no thermostat (master mode), so 'no thermostat-valued MsgID 1' holds trivially; in this mode MsgID 1 is written once per CS= command (~1.2 s after it), not on a schedule. The bench proves the 60 s refresh never lapses and the 63.5 s expiry, not the gateway-mode substitution against a real thermostat TSet.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Fix 08f42d625 (OT_CSC2_EXPIRY_MS 60000 -> 63500, PIC window from gateway.asm 6.8 Timer 1 and CommandExpiry cited in the notes), shipped in 2.0.0-beta.234 (#alpha-testing 1570996739945537607). AC1: tests/test_otd_csc2_expiry.py on the real constant and the real CS/C2 expiry statements fails on the old code at 61, 62 and 63 s and passes on the fix. AC2: expiry 63.5 s for CS and C2 (bench values 63.53 s and 63.73 s). AC3: bench 09 on .61 (OT-Direct master mode, SAT off, beta.234+08f42d6, bootcount 621->623, crashlog empty; evidence 09 scratchpad b234): CS= every 60 s for 15 min, no thermostat-valued MsgID 1. Not benched: a live thermostat (none on .61), as named in the AC3 note.
+<!-- SECTION:FINAL_SUMMARY:END -->

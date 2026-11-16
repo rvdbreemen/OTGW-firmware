@@ -4,11 +4,11 @@ title: >-
   OT-Direct: the thermostat's own MsgID 99 is not handled like the PIC (READ to
   WRITE while a mode write is pending, its WRITE stored, push bit in the
   READ-ACK)
-status: In Review
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-13T18:48:00Z'
-updated_date: '2026-11-15T10:28:00Z'
+updated_date: '2026-11-16T08:14:00Z'
 labels:
   - otdirect
   - parity
@@ -40,3 +40,9 @@ Bench 09 on .61 (OT-Direct, no boiler, no thermostat), beta.298+bb38dc5 (bench-o
 
 Landed: Pushed origin/dev 2e4ca9c05..3e29faa63; zip beta.301+2b3d9a2 posted (Discord 1571471374038470711); final build exit 0 'Build completed successfully', RAM 130572 B, Flash 2157483 B; sweep 88/88, evaluate --quick 86/0; bench 09 on .61 beta.301+2b3d9a2 PASS (smoke + re-check). Status In Review (convention: field ACs open, see AC list; host-proven).
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Fix afc495f5a (PIC 6.8 MessageID99 :3219-3279 read in full: ID99ReadData, OperModeAck/OperModeData, ID99WriteData with StartDHWPush, ID99ReadAck). AC1-AC3: tests/test_otd_msgid99_relay.py 5/5 on the fix; the 3 AC tests FAIL on c2cd68b16 (READ 99 relayed as WRITE 99 with the gateway mode while an MW/MH/M2/HW=P write is pending; a thermostat WRITE 99 updates the stored mode; the spoofed-push READ-ACK 99 carries the push bit). Landed: origin/dev 2e4ca9c05..3e29faa63, zip beta.301+2b3d9a2 (Discord 1571471374038470711), build exit 0, sweep 88/88, evaluate --quick 86/0; bench 09 on .61 (beta.298 bench build and beta.301) regression PASS for MW=/MH=/M2= and WRITE 99. Not benched: a real thermostat sending its own MsgID 99 (none on the bench); a field check is a follow-up, not an AC.
+<!-- SECTION:FINAL_SUMMARY:END -->
