@@ -5,14 +5,21 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [2.0.0-beta.351] - 2026-11-16
+
 ### Changed
+- SAT: every heating start runs in PWM first, with the first phase ON, also when SAT is set to manual continuous. SAT chooses PWM or continuous only after the flame has burned for 60 s; during those 60 s no switch to continuous happens (Sergeant D entries 385, 387, 389, 391, 394; TASK-1942).
+- SAT: a tolerance band around the room target. At target + 0.1 C SAT sends CH off while PWM keeps its ON/OFF rhythm; a continuous burn still runs at least 180 s first. With zones, eco lets the main room decide and comfort keeps heating while any room is more than 0.1 C below its target (Sergeant D entries 376, 378, 384; TASK-1887).
+- SAT: continuous switches to PWM when the flow stays at or above the request + 1.5 C for 30 s. The margin is a new setting, "PWM switch margin" (`satpwmswitchmargin`, 0.5 to 5.0 C, default 1.5), separate from the overshoot margin; the 3.5 C / 30 s fail-safe stays (Sergeant D entries 327, 379; ADR-249; TASK-1888).
 - SAT: the boiler's slave configuration (MsgID 3) no longer stops PWM. A boiler that reports "master low-off not allowed" (MsgID 3 bit 4, for example a Viessmann Vitodens 100-W) and a gateway that has not seen a MsgID 3 reply yet can both use PWM again, as Sergeant D decided (entries 392 and 393). The bit is still shown in the SAT status (TASK-2000).
 - SAT: after a reboot SAT sends no command at all for the first 60 seconds (no hand-back, no setpoint), as Sergeant D asked (entry 388). After that it steers on the heating curve only until the first room temperature arrives. REST `sat/status` has a new field `pid_curve_only`, and the web UI marks the I term as not applied during that time (TASK-1866, TASK-1874).
 - SAT: during a PWM ON phase the modulation suppression setpoint follows the latest boiler flow temperature again, as thermo-nova does. The 2 minute flow average (introduced in beta.330, public in beta.339) is removed: Sergeant D confirmed that no average is needed, because the 180 s flame-on rule already covers the light-off (entry 383, TASK-1990).
 ### Fixed
+- OT-Direct: `SR=` rewrites the boiler's answer for that Data-ID to the thermostat, as the PIC does, instead of answering the thermostat locally (TASK-1804 A6).
 - PIC: after a boot the PIC settings panel fills within about a minute again. The settings readout no longer waits 4 to 5 minutes for the MQTT discovery run to finish; it now sends its next query right after a discovery step instead of waiting for the next 3-second tick, and stays at least 3 seconds between queries (TASK-1971).
 - Diagnostic recording: on a board with PSRAM, Stop no longer throws the recording away. It stays in memory and downloads in full until the next Start; the status keeps `has_data` true. Boards without PSRAM still free the ring on Stop, as the web UI warns (TASK-1960).
 ### Added
+- REST: `/api/v2/device/info` reports `appelfsha256`, the full ELF sha256 of the running firmware, and the core-dump download carries it as `X-Running-App-Sha256`; the capture tool uses it to say whether a stored core dump belongs to the running build (TASK-1983).
 - SAT: two diagnostic events that change nothing in what SAT sends. *No ignition*: CH asked (a PWM ON phase, or a setpoint above the cold cutoff) for 180 s with the flow below the setpoint and no flame. *Heating failure*: SAT at its maximum (setpoint or PWM duty) for 15 min and the room rose less than 0.5 °C; a slow house can show it on a cold morning. Both show as a warning on the SAT page, in REST `sat/status` (`no_ignition`, `heating_failure`, counters, the last window's room start and end), on MQTT `sat/no_ignition` and `sat/heating_failure` with Home Assistant problem sensors, and as a telnet `SATEVENT` line with the numbers (Robert, DM 1570699094622470167; TASK-1882).
 
 ## [2.0.0-beta.339] - 2026-11-16
