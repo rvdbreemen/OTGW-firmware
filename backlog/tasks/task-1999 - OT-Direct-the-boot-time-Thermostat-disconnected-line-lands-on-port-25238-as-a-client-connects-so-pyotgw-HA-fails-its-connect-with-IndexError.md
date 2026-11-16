@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-16T10:48:00Z'
-updated_date: '2026-11-16T13:55:00Z'
+updated_date: '2026-11-16T15:05:00Z'
 labels:
   - bug
   - ot-direct
@@ -44,4 +44,6 @@ Option B (chosen with the advisor; the coordinator preferred C): the boot-time l
 pyotgw robustness (local read-only copy other-projects/pyotgw-master/pyotgw/pyotgw.py:769-781, version of that snapshot, not checked against current upstream): process_statusfields_v4() splits the line and indexes status_fields[0..13] without checking the field count, so any unsolicited line taken as the PS answer raises IndexError. A length check there would make pyotgw robust against PIC lines too (a real thermostat loss during the handshake still sends one, on a PIC as well). Reported to Robert via the coordinator as a possible upstream issue for mvn23/pyotgw; not filed by us.
 
 Bench 09 on .61 (OTGW32, OT-Direct, no thermostat), 2.0.0-beta.352+e18ccbf, LegacyPort25238Enabled on for the test, 2026-11-16 ~14:2x (09 scratchpad b352\): sha256 match, githash e18ccbf, settings 'changed: none', bootcount only by OTA and the planned reboots, no crash. Raw boot capture: OLD (351+597c163) telnet 'Thermostat disconnected' x1 and bridge 25238 x1; FIX telnet x1 (the processOT line stays), bridge 25238 0 thermostat lines. pyotgw 2.2.3 connect right after /ReBoot (port open 16.7-17.4 s, connect done 18.5-19.3 s): FIX 10/10 OK; on beta.341 this morning 3/5 OK, 2 IndexError at pyotgw.py:778 (+1/1 failed in the heap run). Real thermostat loss/return not benched (no thermostat on .61, no way to simulate): host test only. AC1/AC2 for 09 to tick.
+
+2026-11-16: pyotgw upstream issue opened on Robert's 'Post' (coordinator): https://github.com/mvn23/pyotgw/issues/107 (draft by 95 unchanged, repro inline: issue_cmd PS=1 takes the next queued non-frame line as the status line, process_statusfields_v4 IndexError at pyotgw.py:778; control without the unsolicited line parses).
 <!-- SECTION:NOTES:END -->
