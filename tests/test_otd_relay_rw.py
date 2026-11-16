@@ -40,8 +40,7 @@ def block(name):
 
 
 EXTRA = r"""
-enum OTDirectMode { OTD_MODE_BYPASS = 0, OTD_MODE_GATEWAY = 1 };
-static OTDirectMode otCurrentMode = OTD_MODE_GATEWAY;
+// OTDirectMode and otCurrentMode (gateway) come from test_otd_pic_float.PRE (TASK-1751)
 static unsigned long otdRelayedStatusFrame(unsigned long f) { return f; }
 static uint16_t otdStatusReplyData(uint16_t t, uint16_t) { return t; }
 static bool otdRelayRead99(unsigned long, unsigned long &) { return false; }   // TASK-1906, nothing pending here

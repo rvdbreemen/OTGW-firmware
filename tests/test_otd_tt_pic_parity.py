@@ -287,6 +287,28 @@ int main(int argc, char** argv) {
     command("TT=21.5"); dump16("tt");
     command("TT=0"); dump16("tt0");
   }
+  else if (c.rfind("MW_", 0) == 0) {          // TASK-1751: master mode, what goes on the wire for MsgID 16
+    resetAll(); otCurrentMode = OTD_MODE_MASTER;
+    if (c == "MW_BS") { command("BS=19.0"); dumpQueue("bs"); dump16("bs"); }
+    else if (c == "MW_BTT" || c == "MW_RTT" || c == "MW_NTT") {
+      if (c == "MW_BTT") command("BS=19.0");
+      if (c == "MW_RTT") otdMqttSetRoomSetpoint(19.0f);
+      otCmdTail = otCmdHead;
+      command("TT=21.5"); otCmdTail = otCmdHead;
+      command("TT=0"); dumpQueue("tt0"); dump16("tt0");
+    }
+    else if (c == "MW_B0") {                  // BS= and BS=0 while TT runs: TT keeps the slot, BS waits
+      command("TT=21.5"); otCmdTail = otCmdHead;
+      command("BS=19.0"); dumpQueue("bs"); dump16("bs"); otCmdTail = otCmdHead;
+      command("BS=0"); dumpQueue("bs0"); dump16("bs0"); otCmdTail = otCmdHead;
+      command("TT=0"); dumpQueue("tt0"); dump16("tt0");
+    }
+    else if (c == "MW_RD") {                  // an MQTT room_setpoint while TT runs is stored, written at TT=0
+      command("TT=21.5"); otCmdTail = otCmdHead;
+      otdMqttSetRoomSetpoint(19.0f); dumpQueue("room"); dump16("room"); otCmdTail = otCmdHead;
+      command("TT=0"); dumpQueue("tt0"); dump16("tt0");
+    }
+  }
   else { printf("unknown case %s\n", c.c_str()); return 2; }
   return 0;
 }
@@ -343,7 +365,8 @@ CASES_TT = ["A_TT", "B_TT", "E_TT", "D_TT", "G_TT"]
 CASES_TC = ["A_TC", "B_TC", "E_TC", "D_TC", "G_TC"]
 CASES_H = ["H_TT", "H_TC"]
 CASES_M16 = ["MR", "MB", "MN"]   # TASK-1751
-ALL_CASES = ["P"] + CASES_TT + CASES_TC + CASES_H + ["O_TT", "O_TC", "F", "N", "BS", "MQ", "M"] + CASES_M16
+CASES_MW = ["MW_BS", "MW_BTT", "MW_RTT", "MW_NTT", "MW_B0", "MW_RD"]   # TASK-1751: master-mode MsgID 16 on the wire
+ALL_CASES = ["P"] + CASES_TT + CASES_TC + CASES_H + ["O_TT", "O_TC", "F", "N", "BS", "MQ", "M"] + CASES_M16 + CASES_MW
 RES = {}
 ERR = None
 TMP = None
@@ -367,7 +390,7 @@ def setUpModule():
         if name == "M":
             print("    queue=" + str(r["q"]))
             continue
-        if name in CASES_M16:
+        if name in CASES_M16 or name in CASES_MW:
             print("    slot16=" + str(r["s16"]))
             continue
         print(f"    bw16={len(r['bw16'])} thermo_w16={len(r['tw16'])} bw100={len(r['bw100'])} r16={r['r16']} "
@@ -418,7 +441,7 @@ class Base(unittest.TestCase):
 
 class Precondition(Base):
     def test_00_alternative_slots_exist_and_the_ring_drains(self):
-        for name in [n for n in ALL_CASES if n != "M" and n not in CASES_M16]:
+        for name in [n for n in ALL_CASES if n != "M" and n not in CASES_M16 and n not in CASES_MW]:
             self.assertGreaterEqual(RES[name]["pre"]["altslots"], 3,
                                     f"{name}: MsgID 24 did not become an alternative slot; the ring would never drain")
         p = RES["P"]
@@ -648,12 +671,52 @@ class MasterSlot16Cases(Base):
         self.assertEqual(s["tt0"], (1, 0x1300, 1, 0x1300), f"TT=0 must put the room_setpoint back, got {s['tt0']}")
 
     def test_R2_bs_back_after_tt0(self):
+        # TASK-1751 (wire): in master mode BS= is a written room setpoint (write value + override), like the MQTT one
         s = RES["MB"]["s16"]
-        self.assertEqual(s["before"], (0, 0, 1, 0x1300))
-        self.assertEqual(s["tt0"], (0, 0, 1, 0x1300), f"TT=0 must leave the BS= override, got {s['tt0']}")
+        self.assertEqual(s["before"], (1, 0x1300, 1, 0x1300))
+        self.assertEqual(s["tt0"], (1, 0x1300, 1, 0x1300), f"TT=0 must put the BS= value back, got {s['tt0']}")
 
     def test_R3_nothing_before_tt_clears_as_before(self):
         self.assertEqual(RES["MN"]["s16"]["tt0"], (0, 0, 0, 0))
+
+
+class MasterWire16Cases(Base):
+    """TASK-1751 (bench 09 .61 beta.341: no WRITE 16 for 360 s after TT=0, and none for BS= alone): in master mode there
+    is no thermostat frame to rewrite, so the MsgID 16 slot is written by the gateway. Precedence: TT=/TC= while active,
+    else the BS= / MQTT room_setpoint value. The PIC has no master-mode MsgID 16 at all (its standalone table,
+    gateway.asm 6.6 :1818-1830, has no MsgID 16), so this is the OT-Direct master-mode rule. q = queued (type*1000+id, data)."""
+    def q(self, case, tag):
+        return RES[case]["q"].get(tag, [])
+
+    def w16(self, case, tag):
+        return [d for k, d in self.q(case, tag) if k == 1016]
+
+    def test_W1_bs_alone_writes_msgid16(self):
+        self.assertEqual(self.w16("MW_BS", "bs"), [0x1300], f"BS=19 in master mode must write MsgID 16: {self.q('MW_BS', 'bs')}")
+        self.assertEqual(RES["MW_BS"]["s16"]["bs"][:2], (1, 0x1300), "and keep it in the 15 s schedule")
+
+    def test_W2_tt0_writes_the_bs_value_at_once(self):
+        self.assertEqual(self.w16("MW_BTT", "tt0"), [0x1300], f"TT=0 after BS=19 must write 19.00 at once: {self.q('MW_BTT', 'tt0')}")
+        self.assertIn((1100, 0), self.q("MW_BTT", "tt0"), "the MsgID 100 = 0 clear still goes out")
+
+    def test_W3_tt0_writes_the_mqtt_room_value_at_once(self):
+        self.assertEqual(self.w16("MW_RTT", "tt0"), [0x1300])
+
+    def test_W4_nothing_set_tt0_writes_no_msgid16(self):
+        self.assertEqual(self.w16("MW_NTT", "tt0"), [], "no room value: no MsgID 16 write after TT=0")
+        self.assertEqual(RES["MW_NTT"]["s16"]["tt0"], (0, 0, 0, 0), "and the schedule stops writing it")
+
+    def test_W5_bs_and_bs0_during_tt_leave_tt_writing(self):
+        r = RES["MW_B0"]["s16"]
+        self.assertEqual(self.w16("MW_B0", "bs"), [], "BS= during TT must not write over TT")
+        self.assertEqual(r["bs"][:2], (1, OVR_F88), "the schedule keeps writing the TT value")
+        self.assertEqual(r["bs0"][:2], (1, OVR_F88), "BS=0 during TT must not stop TT's periodic write")
+        self.assertEqual(self.w16("MW_B0", "tt0"), [], "BS was cleared: nothing to write after TT=0")
+
+    def test_W6_mqtt_room_setpoint_during_tt_waits_for_tt0(self):
+        self.assertEqual(self.w16("MW_RD", "room"), [], "the room value must not be written over TT")
+        self.assertEqual(RES["MW_RD"]["s16"]["room"][:2], (1, OVR_F88))
+        self.assertEqual(self.w16("MW_RD", "tt0"), [0x1300], "it is written at TT=0")
 
 
 if __name__ == "__main__":

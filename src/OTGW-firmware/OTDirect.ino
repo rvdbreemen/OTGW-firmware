@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTDirect.ino
-**  Version  : v2.0.0-beta.352
+**  Version  : v2.0.0-beta.353
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -2766,6 +2766,12 @@ void otdMqttSetRoomSetpoint(float tempC) {
   if (!isOTDirectEnabled()) return;
   if (tempC < -40.0f || tempC > 127.0f) return;  // sanity range — drop, don't clamp
   const uint16_t f88 = floatToF88(tempC);
+  // TASK-1751: in master mode a running TT=/TC= keeps the MsgID 16 slot; the room value is stored and written at TT=0.
+  if (otCurrentMode == OTD_MODE_MASTER && otRemoteOverride.mode != OT_OVERRIDE_NONE) {
+    otdRoom16CacheSet = true;  otdRoom16CacheF88 = f88;
+    otdRoom16OvrSet   = true;  otdRoom16OvrF88   = f88;
+    return;
+  }
   if (enqueueWriteCommand(16, f88, "MQTT-room_setpoint")) {   // TASK-1751: kept for TT=0 in master mode
     otdRoom16CacheSet = true;  otdRoom16CacheF88 = f88;
     otdRoom16OvrSet   = true;  otdRoom16OvrF88   = f88;
@@ -3243,9 +3249,14 @@ static void clearRemoteOverride() {
   // Gateway mode: answer state only. A BS= or MQTT room_setpoint override on MsgID 16 stays.
   if (otCurrentMode != OTD_MODE_MASTER) return;
 
-  // TASK-1751: TT=0 clears only what TT= set. A BS= or MQTT room_setpoint value on MsgID 16 goes back into the slot.
+  // TASK-1751: TT=0 clears only what TT= set. A BS= or MQTT room_setpoint value on MsgID 16 goes back into the slot and
+  // is written at once (one WRITE 16, then the 15 s schedule), as TT= itself was: otherwise the boiler keeps the TT value
+  // (bench 09 .61 beta.341: no WRITE 16 for 360 s after TT=0). With no room value the writes stop; OpenTherm has no
+  // clear for MsgID 16, so the boiler keeps the last value it got.
   clearWriteOverride(16);
-  if (otdRoom16CacheSet) updateWriteCache(16, otdRoom16CacheF88);
+  if (otdRoom16CacheSet) {
+    if (!enqueueWriteCommand(16, otdRoom16CacheF88, "TT=0 room")) updateWriteCache(16, otdRoom16CacheF88);   // queue full: the schedule sends it
+  }
   if (otdRoom16OvrSet) setOverride(16, otdRoom16OvrF88);
   clearWriteOverride(100);
   // Push a clearing MsgID 100 = 0 frame so the thermostat's UI flips back to
@@ -4040,15 +4051,25 @@ bool handleOTDirectCommand(const char* buf, int len, bool satOwn) {
     uint16_t f88 = 0;
     const char* err = otdPicFloatF88(value, OTD_PIC_PERCENT, f88);
     if (err) { otDirectBridgeProcessStatus(err); return false; }
+    // TASK-1751 (master mode): there is no thermostat frame to rewrite, so BS= is the room setpoint the gateway writes
+    // itself (periodic MsgID 16, as the MQTT room_setpoint). A running TT=/TC= keeps the slot until TT=0; the BS value
+    // waits and is written then. Gateway mode keeps the PIC's frame rewrite only (gateway.asm 6.6 :3019-3024).
+    const bool master = (otCurrentMode == OTD_MODE_MASTER);
+    const bool ttActive = (otRemoteOverride.mode != OT_OVERRIDE_NONE);
     if (f88 == 0) {
       otFakeRoomSetpoint = 0.0f;
-      clearWriteOverride(16);   // also an MQTT room_setpoint write
       otdRoom16CacheSet = false;   // TASK-1751
       otdRoom16OvrSet   = false;
+      if (!(master && ttActive)) clearWriteOverride(16);   // also an MQTT room_setpoint write; a running TT keeps its slot
     } else {
       otFakeRoomSetpoint = f88 / 256.0f;
-      setOverride(16, f88);
       otdRoom16OvrSet = true;  otdRoom16OvrF88 = f88;   // TASK-1751
+      if (master) {
+        otdRoom16CacheSet = true;  otdRoom16CacheF88 = f88;
+        if (!ttActive) enqueueWriteCommand(16, f88, "BS");   // write cache + one WRITE 16 now
+      } else {
+        setOverride(16, f88);
+      }
     }
     otdPicPrintF88(f88, rspBuf, sizeof(rspBuf));
     synthesizeResponse(buf, rspBuf);

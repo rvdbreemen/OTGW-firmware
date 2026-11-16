@@ -3,11 +3,11 @@ id: TASK-1751
 title: >-
   OT-Direct master mode: TT=0 also clears an MQTT room_setpoint or BS= write on
   MsgID 16
-status: In Review
+status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-09T09:29:00Z'
-updated_date: '2026-11-16T14:31:00Z'
+updated_date: '2026-11-16T13:54:00Z'
 labels:
   - otdirect
 milestone: 2.0.0
@@ -25,6 +25,7 @@ Follow-up of TASK-1733 / ADR-223 (found by the 2026-11-09 correctness review, ot
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [x] #1 TT=0 in master mode leaves an MQTT room_setpoint / BS= value on MsgID 16 untouched (or Robert decides the current behaviour stays, recorded in the notes); host test
+- [ ] #2 Master mode on the wire: BS= alone writes MsgID 16 (once, then the 15 s schedule); TT=0 writes the remaining BS= or MQTT room_setpoint value at once; with nothing left no further WRITE 16; BS= / BS=0 / an MQTT room_setpoint during TT=/TC= leave TT's writes alone; gateway mode unchanged; host test red on the old code, bench by 09 on .61 master mode
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -43,4 +44,7 @@ Landed beta.300: Pushed origin/dev 2e4ca9c05..3e29faa63; zip beta.301+2b3d9a2 po
 Bench 2026-11-16 (otgw-firmware-09), .61 OT-Direct master, 2.0.0-beta.353+3a14423, SAT off, MQTT command topic, frames from telnet processOT. BS=19: R90101300 (TrSet 19.00) at +1.6 s. TT=20.5: R90101480 at +1.8 s, then WRITE 100 R10640003 at +2.9 s. TT=0: R90101300 at +1.9 s (back to the BS value), then WRITE 100 R10640000 at +3.0 s. On 341 nothing was sent in 360 s after TT=0, so this is the old-vs-fix proof. BS=0: no MsgID 16 frame in 90 s, overrides []. Smoke: githash 3a14423, bootcount 874 -> 876 (2 OTA restarts only), settings.ini identical, MQTT connected.
 
 Periodic refresh host-only: each command gave exactly one WRITE 16 with no repeat in 70-120 s. Telnet does print repeated frames (122x R00000000 in the same run). The bus is offline (no boiler) and the scheduler skips everything but MsgID 0 then: origin/dev OTDirect.ino:2299 'if (busOffline && entry.msgId != 0) continue;' (opened by 09, confirmed by 95). The one-shot writes go through the command queue. Evidence: 09 scratchpad b353/run2/ (run.log, telnet.raw).
+2026-11-16 (95) AC1 was ticked on the state only; the wire part is the new AC. Decision (with the advisor, against the PIC first): the PIC has no master-mode MsgID 16 at all (standalone table gateway.asm 6.6 :1818-1830 has no ID 16; BS= only rewrites a thermostat's frames, roomsetptchange :3019-3024), so master-mode TT= writing MsgID 16 is already an OT-Direct extension; the defect is that state and wire disagree (overrides.write {16, 0x1300} while the boiler keeps TT's 20.50). Rule: in master mode one MsgID 16 write slot, TT=/TC= while active, else the BS= / MQTT room_setpoint value; the 15 s schedule sends the value in force. ADR-223 is gateway mode only (its Decision Contract 'TT=0 ... a BS= or MQTT room setpoint ... survives' still holds); ADR-241 and ADR-066 do not state BS= behaviour in master mode, so no ADR change.
+
+Fix (OTDirect.ino): BS= in master mode stores the room value (otdRoom16Cache/Ovr) and, without a running TT/TC, enqueues WRITE 16 (write cache + one frame); BS=0 during TT clears only the room value (TT keeps valueSet); otdMqttSetRoomSetpoint() during TT in master mode only stores; clearRemoteOverride() in master mode enqueues the remaining room value at once (falls back to the schedule cache when the queue is full). Gateway mode unchanged. Tests: tests/test_otd_tt_pic_parity.py new MasterWire16Cases W1-W6 + R2 updated: FIX 52/52 OK; OLD (HEAD e18ccbfe3 OTDirect.ino + OTDirecttypes.h) 6 FAIL (R2, W1 BS alone no write, W2/W3 TT=0 writes nothing, W5 BS=0 during TT stops TT's write, W6 room setpoint written over TT); W4 (nothing set, no write) holds on both. Harness: test_otd_pic_float PRE gets OTDirectMode/otCurrentMode (gateway) and otRemoteOverride stubs (relay_rw now uses them). Full OTD sweep tests/test_otd_*.py (65 files) all OK; evaluate --quick 0 failed. Open: build + bench 09 on .61 master mode (BS=19 -> WRITE 16 0x1300; TT=20.5 -> 0x1480; TT=0 -> WRITE 16 0x1300 at once, then every 15 s).
 <!-- SECTION:NOTES:END -->
