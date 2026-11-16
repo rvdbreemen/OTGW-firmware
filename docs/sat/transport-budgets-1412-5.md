@@ -1,7 +1,11 @@
 # SAT transport delay and budgets (TASK-1412.5 AC3)
 
-Status: **measurement plus proposal for review**. The budgets below are a proposal, not a decision. A change to the
-flow freshness limit N goes back to Sergeant D (entries 218, 241). Nothing here changes firmware.
+Status: **reviewed 2026-11-16**. Coordinator decision under Robert's rule of 2026-11-16 09:30 (decide yourself; budgets are
+measurement thresholds, not control policy): the **Gas boiler (PIC)** column of section 5 is **accepted** as the acceptance
+and diagnostic limits, field-measured on a 12.8 h capture. The **Gas boiler (OT-Direct)** column is **code-derived**, not
+measured; it stays provisional until a field capture with a real boiler measures it (follow-up under TASK-1412.21). The heat
+pump and hybrid columns stay as written: they apply only after a per-installation measurement. A change to the flow freshness
+limit N still goes back to Sergeant D (entries 218, 241). Nothing here changes firmware.
 
 AC3 of TASK-1412.5: "Timestamp traces measure source sample age plus scheduler/queue/wire delay against reviewed
 transport budgets; infeasible fallback is rejected for that profile."
@@ -163,7 +167,7 @@ No capture has OT-Direct against a real boiler. From the code at the worktree HE
 - If the slave is itself a gateway (a heat-pump OT adapter, for example), the spec sets no maximum answer time
   (OT spec v4.2 §4.3.1-4.3.2). Its transport delay cannot be assumed and must be measured per installation.
 
-## 5. Proposed budgets (for review)
+## 5. Budgets (PIC gas accepted 2026-11-16; OT-Direct code-derived; heat pump/hybrid after measurement)
 
 These are **transport** budgets, used as acceptance and diagnostic limits for the bench and field steps
 (TASK-1412.21, .23, .25). They are not new control thresholds. The control rule stays Sergeant D's:
