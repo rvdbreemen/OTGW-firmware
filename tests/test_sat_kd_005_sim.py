@@ -27,6 +27,21 @@ class Kd005(unittest.TestCase):
     def setUpClass(cls):
         s.install()
 
+    @classmethod
+    def tearDownClass(cls):
+        s.uninstall()   # the 1655 module is shared: leave it as it was for the next test in the process
+
+    def test_uninstall_restores_the_1655_module(self):
+        gains, factors = k._gains_with, k.FACTORS
+        s.uninstall()
+        try:
+            self.assertIsNot(k._gains_with, s._gains_abs)
+            self.assertNotEqual(k.FACTORS, tuple(s.KEYS))
+        finally:
+            s.install()
+        self.assertIs(k._gains_with, gains)
+        self.assertEqual(k.FACTORS, factors)
+
     def test_absolute_k_in_the_gain_and_restored(self):
         orig = port.Pid._gains
         for key, kd in {1.0: 12700.8, 0.794: 10080.0}.items():

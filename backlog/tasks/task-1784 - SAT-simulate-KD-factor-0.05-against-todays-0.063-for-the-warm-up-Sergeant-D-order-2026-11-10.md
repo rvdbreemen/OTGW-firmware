@@ -7,7 +7,7 @@ status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-10T18:37:00Z'
-updated_date: '2026-11-10T19:20:00Z'
+updated_date: '2026-11-16T23:33:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -40,6 +40,8 @@ Sergeant D, #dev-sat-mqtt 2026-11-10 19:33 UTC, msg 1569781945460727873 (relayed
 2026-11-10 030509: pushed. Pre-registration alone first: ab340a9f4 (7f8a3b9b1..ab340a9f4; rebased from e9883eb93, content identical, runs.json meta thresholds_commit keeps e9883eb93), then results dfd7befd2, entry 298 9f56e7316, entry 299 a7c67888a. Posted by 97 as a reply to his order with the chart: msg 1569792005486411786 (19:12:59 UTC from the id). AC4 waits for his A/B/C answer as a numbered entry.
 
 2026-11-10 030509: Sergeant D answered 19:14:57 UTC (msg 1569792502163054612): 'Keep A. Probably the low heating curve coefficient is the issue there'. Recorded as entry 300: KD stays 0.063, field data first; his remark points to the coefficient question (entry 298, TASK-1787).
+
+2026-11-17 follow-up (95, coordinator; found by d3): tests/test_sat_kd_warmup_sim_1655.py failed 4 tests with KeyError 0.9 in tools/research/sat/sat_kd_005_sim.py:34 (_gains_abs) when it ran AFTER tests/test_sat_kd_005_sim.py in the same Python process (pytest over both files, alphabetical order), and passed alone or in the other order. Cause, from this task's commit ab340a9f4: install() patches the shared 1655 module (k._gains_with, k.FACTORS) and the 005 test never undid it, so the 1655 run kept the 005 keys {1.0, 0.794} and asked for 0.9. Fix: install() saves the originals once, a new uninstall() restores them, and the 005 test calls it in tearDownClass; a new test checks that uninstall() restores the module. Evidence: pytest 005 then 1655 in one process, old: 4 failed, 3 passed; fix: 8 passed, also in the other order; each file standalone OK. Tools/tests only, no firmware, no bump.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
