@@ -2652,6 +2652,14 @@ def collect_pio_artifacts(project_dir, target, want_firmware=True, want_filesyst
             shutil.copy2(fw_src, fw_dest)
             print_info(f"Copied: firmware.bin -> {fw_dest.name}")
             collected.append(fw_dest)
+            # TASK-1993 (TASK-1955 AC2): log the image against the app0/ota_0 slot; WARN > 95 %, FAIL > 98 %.
+            if "bootloader_offset" in tcfg:
+                slot = read_partition_table(project_dir).get("app0", (0, tcfg.get("app_size", 0)))[1]
+                rc = run_streamed([sys.executable, str(project_dir / "scripts" / "check_app_size.py"),
+                                   str(fw_dest), str(slot)])
+                if rc != 0:
+                    print_error("App size check failed (scripts/check_app_size.py): see the lines above")
+                    sys.exit(1)
 
     # Filesystem binary (from the buildfs step's own build directory, TASK-1921)
     if want_filesystem:
