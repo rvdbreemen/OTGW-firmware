@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-16T13:26:00Z'
-updated_date: '2026-11-16T15:16:00Z'
+updated_date: '2026-11-16T17:15:00Z'
 labels:
   - mqtt
   - heap
@@ -47,4 +47,6 @@ Mechanism, labelled: CONFIRMED from the S3 framework config (D:/DevData/platform
 AC wording (advisor 2026-11-16): hd_min_free_heap is a lifetime watermark (31,156 B already 45 min after boot on 353), so an absolute threshold (~10 KB or ~40 KB) cannot tell old from fix; AC2 is restated as 'unchanged across hh:00' on the same board and SAT setting. Callers checked (untruncated git grep over src/tests/scripts/evaluate.py/docs): sendMQTTheapdiag() has one caller, the hourly block in doTaskMinuteChanged(); evaluate.py's 'sendMQTTheapdiag arithmetic' check reads the body and passes when it holds no char[N] buffer (unchanged).
 
 AC1 evidence: 09's 16:00 run above (old code = 353: hd_min 31,156 -> 6,484, 26/26 topics). AC2 evidence: tests/test_mqtt_stats_pacer.py (slices publishStatU32 + sendMQTTheapdiag + publishStatAt + loopMQTTStatsPacer from MQTTstuff.ino): FIX 6/6 OK; OLD (OTGW_MQTT_REV=HEAD, 3a14423f8-line code) 4 FAIL: 'sendMQTTheapdiag() published 26 topics in one call (burst)', gaps all 0 ms, 26 dropped under CRITICAL instead of waiting, 26 sent despite the mid-round disconnect.
+
+Gates on the rebased lane (onto origin/dev 1dde4dcda, beta.352-355 for 1665/1999/1751/2004), 2026-11-16 17:14-18:15, foreground in chunks of 8 (scripts/run_tests.py --no-host -j 2): 292 tests/ files, 290 PASS, 2 FAIL that fail identically on origin/dev and are not from this lane: test_adr_governance test_live_index_complete ('ADR-252 (Proposed) is MISSING from docs/adr/README.md', d3) and test_settings_float_roundtrip ('SATpwmswitchmargin: no clamp range found in updateSetting()', after TASK-1942 b95bc21ec). Host harnesses for the touched areas: test_diag_recorder, test_diag_recording_routes, test_mqtt_broker_address, test_mqtt_print_error PASS. evaluate.py --quick: 87 passed, 0 failed. The rest of test/host/ was not run.
 <!-- SECTION:NOTES:END -->
