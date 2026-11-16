@@ -54,7 +54,7 @@ static void satNarratef_P(const char *fmt, ...) { (void)fmt; }
 #define SAT_QUIRK_MI_500_BOOT 0x08
 enum { SAT_MODE_OFF = 0, SAT_MODE_CONTINUOUS = 1, SAT_MODE_PWM = 2 };
 typedef int SATControlMode;
-struct SatSettings { float fOvershootMargin=2.0f; bool bEnabled=true, bOvershootProtection=true, bSolarGainEnable=false, bSummerSimmer=false, bSimulation=false;
+struct SatSettings { float fOvershootMargin=2.0f; float fPwmSwitchMargin=1.5f; bool bEnabled=true, bOvershootProtection=true, bSolarGainEnable=false, bSummerSimmer=false, bSimulation=false;
                      int iMaxRelModulation=80; float fModSupDelay=20, fModSupOffset=1, fFlameOffOffset=18, fSolarSetpointOffset=2;
                      int iHeatingMode=0; };
 struct Settings { SatSettings sat; };

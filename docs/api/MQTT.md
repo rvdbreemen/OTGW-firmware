@@ -326,7 +326,7 @@ SAT topics no longer publish on every control cycle. Each topic under `sat/*` us
 | Constant | Value | Used for |
 |---|---|---|
 | `SAT_EPS_TEMP` | 0.05 °C | `setpoint`, `target`, `room_temp`, `outside_temp` |
-| `SAT_EPS_TEMP_COARSE` | 0.1 °C | `heating_curve`, `overshoot_margin`, `max_setpoint`, `requested_setpoint` |
+| `SAT_EPS_TEMP_COARSE` | 0.1 °C | `heating_curve`, `overshoot_margin`, `pwm_switch_margin`, `max_setpoint`, `requested_setpoint` |
 | `SAT_EPS_PID_OUTPUT` | 0.5 °C | `pid_output` (derivative jitter damping) |
 | `SAT_EPS_PID_TERM` | 0.1 °C | `pid_p`, `pid_i`, `pid_d` |
 | `SAT_EPS_ERROR` | 0.05 °C | `error`, `error_mean` |
@@ -367,7 +367,8 @@ These thresholds are tunable; they are guideline-level under ADR-111 and may be 
 | `sat/climate_current` | `"20.8"` | yes | Room temperature on the thermostat card: the temperature SAT regulates on while SAT is enabled, the thermostat room temperature (Tr) while SAT is off (°C). Also published while SAT is off (TASK-1979) |
 | `sat/heating_curve` | `"42.3"` | yes | Heating curve calculated value (°C) |
 | `sat/pid_output` | `"43.1"` | yes | PID output = curve + P + I + D (°C) |
-| `sat/overshoot_margin` | `"2.0"` | yes | Configured overshoot margin (°C) |
+| `sat/overshoot_margin` | `"2.0"` | yes | Configured overshoot margin (°C), for the cycle classification |
+| `sat/pwm_switch_margin` | `"1.5"` | yes | Continuous to PWM when flow - requested setpoint stays at or above this for 30 s (°C, TASK-1888) |
 | `sat/requested_setpoint` | `"43.0"` | no | Requested flow setpoint including the solar offset, clamped to the minimum setpoint and `sat/max_setpoint` (°C) |
 | `sat/max_setpoint` | `"62.0"` | yes | Maximum flow setpoint SAT works with (°C) (TASK-1373): the user's Max flow setpoint (`set/<node>/sat/max_setpoint`) cut into the boiler's MsgID 49 bounds (20 to 80 without them), at most 50 for underfloor, 40 for a heat pump and 65 (the old global ceiling). While the user has not chosen a value: 62 for radiators, 50 for underfloor, 40 for a heat pump. Before TASK-1373 this was the fixed 62 / 45 / 40 table |
 | `sat/modulation_state` | `"OFF"` / `"HOT_WATER"` / `"PWM_OFF"` / `"COLD"` / `"ACTIVE"` | no | Modulation state. `"OFF"` while SAT is not active; `"COLD"` = flow temperature below 22 °C |
@@ -1119,6 +1120,7 @@ These topics update the matching SAT setting directly. Payloads are numeric stri
 | `sat/heating_curve_coeff` | `SATcoefficient` | Heating curve coefficient (state echo: `sat/heating_curve_coeff`; the state topic `sat/heating_curve` is the computed curve value). Renamed from `sat/heating_curve` in TASK-1485, no alias: the old command is ignored. The REST setting `POST /api/v2/sat/settings/heating_curve_coeff` uses the same name since TASK-1496 |
 | `sat/interval` | `SATinterval` | Control loop interval (seconds) |
 | `sat/overshoot_margin` | `SATovershootmargin` | Overshoot margin (°C) |
+| `sat/pwm_switch_margin` | `SATpwmswitchmargin` | PWM switch margin (°C) |
 | `sat/manufacturer` | `SATmanufacturer` | Boiler manufacturer name |
 | `sat/max_modulation` | `SATmaxmodulation` | Max relative modulation % (0 to 100; 100 = no cap). Caps every `MM=` SAT sends. Home Assistant discovers it as the number entity `SAT Max Relative Modulation` (0 to 100, step 1); the SAT page has a slider for it in the Central Heating Settings card (TASK-1514) |
 | `sat/dhw_setpoint` | `SATdhwsetpoint` | DHW setpoint (°C) |
@@ -1329,6 +1331,7 @@ Not every `sat/*` topic has an entity. The audit in [`docs/sat/sat-ha-entity-aud
 | `sat/overshoot_fraction` | % | Raw 0-1 value x 100 |
 | `sat/cycle_phase` | - | Cycle phase |
 | `sat/overshoot_margin` | °C | Overshoot margin |
+| `sat/pwm_switch_margin` | °C | PWM switch margin |
 | `sat/cycles_this_hour` | - | `state_class` `measurement` (rolling-hour count, falls as starts leave the hour) |
 | `sat/pwm_last_cmd_on_s`, `sat/pwm_last_ignition_delay_s`, `sat/pwm_last_flame_on_s` | s | Diagnostic; last closed PWM ON phase (TASK-1880) |
 | `sat/pwm_last_ignited` | - | Diagnostic; 1 lit, 0 never lit (TASK-1880) |

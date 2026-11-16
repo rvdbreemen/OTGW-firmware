@@ -238,10 +238,10 @@ class SlaveLowLoad(unittest.TestCase):
         rows = [dict(kv.split("=") for kv in line.split()) for line in out.strip().splitlines()]
         return rows if len(rows) > 1 else rows[0]
 
-    # QD-3 B (entry 215): no valid reply = no PWM. The permission matrix on the automatic 60 s switch (QD-1 A, entry 213).
+    # QD-3 B (entry 215): no valid reply = no PWM. The permission matrix on the automatic 30 s switch (QD-1 A, entry 213; 30 s since TASK-1888).
     def test_overshoot_switch_needs_a_valid_reply_with_bit4_clear(self):
         allowed = self.run_sc("overshoot", 1, 0)
-        self.assertEqual((allowed["mode"], allowed["ticks"]), ("2", "3"), "control: allowed, switch after 60 s (3rd 30 s tick)")
+        self.assertEqual((allowed["mode"], allowed["ticks"]), ("2", "2"), "control: allowed, switch after 30 s (2nd 30 s tick)")
         denied = self.run_sc("overshoot", 1, 1)
         self.assertEqual((denied["mode"], denied["ticks"]), ("1", "-1"), "bit 4 = 1 must keep SAT continuous")
         unknown = self.run_sc("overshoot", 0, 0)
@@ -336,12 +336,13 @@ class SlaveLowLoad(unittest.TestCase):
         for valid, denied in ((1, 1), (0, 0)):
             self.assertEqual(self.run_sc("veto", valid, denied)["mode"], "1")
 
-    # When bit 4 returns to 0 the entry paths simply work again by their own rules: the automatic switch needs a fresh 60 s.
-    def test_after_bit4_clears_the_automatic_switch_needs_a_fresh_60s(self):
+    # When bit 4 returns to 0 the entry paths simply work again by their own rules: the automatic switch needs a fresh 30 s
+    # (TASK-1888, entry 327; was 60 s).
+    def test_after_bit4_clears_the_automatic_switch_needs_a_fresh_30s(self):
         rows = self.run_sc("rise")
         self.assertEqual(len(rows), 4)
         self.assertEqual((rows[2]["while_denied_ticks"], rows[2]["mode"]), ("-1", "1"), "no switch while bit 4 = 1")
-        self.assertEqual((rows[3]["after_clear_ticks"], rows[3]["mode"]), ("3", "2"), "60 s after the permission is back, not earlier")
+        self.assertEqual((rows[3]["after_clear_ticks"], rows[3]["mode"]), ("2", "2"), "30 s after the permission is back, not earlier")
 
     # The decoder: valid replies set the state, the change time moves only on a change.
     def test_decoder_hook_stores_bit4_and_the_time_of_the_change(self):

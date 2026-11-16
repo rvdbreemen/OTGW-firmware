@@ -1201,6 +1201,7 @@
         "satmultiarea": "Enable multi-area",
         "satmultiareacount": "Area count",
         "satovershootmargin": "Overshoot margin",
+        "satpwmswitchmargin": "PWM switch margin",
         "satovershootprotection": "PWM overshoot protection",
         "satpresetactivity": "Activity preset",
         "satpresetaway": "Away preset",
@@ -4269,6 +4270,7 @@
     // TASK-1281: the explanation of this setting (formerly an inline 'help' block) lives in settings-help.json.
     satexternaltemp:     { cat: 'sat', label: 'Use MQTT/REST as indoor temp source' },
     satovershootmargin:  { cat: 'sat', label: 'Overshoot margin', hint: '°C' },
+    satpwmswitchmargin:  { cat: 'sat', label: 'PWM switch margin', hint: '°C' },
     satboilercapacity:   { cat: 'sat', label: 'Boiler capacity', hint: 'kW' },
     satdhwcapacity:      { cat: 'sat', label: 'DHW capacity', hint: 'kW (0 = boiler capacity)' },
     satthermalcoeff:     { cat: 'sat', label: 'Thermal-drop coefficient' },
@@ -4333,7 +4335,7 @@
     ['Season', ['satsummersimmer', 'satsummerthreshold', 'satsummerminhours', 'satwindowdetect', 'satwindowminsec']]
   ];
   var SAT_L3 = [
-    ['Curve', ['satcoefficient', 'satcurveselftune', 'sattempstep', 'satovershootmargin']],
+    ['Curve', ['satcoefficient', 'satcurveselftune', 'sattempstep', 'satovershootmargin', 'satpwmswitchmargin']],
     ['PWM', ['satovershootprotection', 'satcyclesperhour',
              'satinterval', 'sathpcycle', 'satsolarfreezeint']],
     ['Offsets', ['satflameoffset', 'satflowoffset', 'satvalveoffset', 'satmodsupdelay', 'satmodsupoffset', 'satflushtreshold']],

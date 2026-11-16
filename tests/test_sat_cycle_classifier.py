@@ -137,7 +137,7 @@ static void _dailyRecord(uint32_t, uint32_t, uint32_t, SATCycleClass, float) { g
 """
 
 SETTINGS_REAL = "struct Settings { SATSection sat; };\nstatic Settings settings;\n"
-SETTINGS_STUB = ("struct SatSettingsStub { float fOvershootMargin = 2.0f; bool bPwmAutoSwitch = true; bool bSimulation = false; };\n"
+SETTINGS_STUB = ("struct SatSettingsStub { float fOvershootMargin = 2.0f; float fPwmSwitchMargin = 1.5f; bool bPwmAutoSwitch = true; bool bSimulation = false; };\n"
                  "struct Settings { SatSettingsStub sat; };\nstatic Settings settings;\n")
 
 MAIN = r"""

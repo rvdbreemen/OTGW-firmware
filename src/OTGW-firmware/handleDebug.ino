@@ -96,6 +96,7 @@ static void dumpDebugInfo() {
     Debugf(PSTR("use_external_temp: %s\r\n"), settings.sat.bUseExternalTemp ? "true" : "false");
     Debugf(PSTR("max_rel_mod: %u\r\n"), (unsigned)settings.sat.iMaxRelModulation);
     Debugf(PSTR("overshoot_margin: %.1f\r\n"), settings.sat.fOvershootMargin);
+    Debugf(PSTR("pwm_switch_margin: %.1f\r\n"), settings.sat.fPwmSwitchMargin);   // TASK-1888
     Debugf(PSTR("dhw_setpoint: %.1f\r\n"), settings.sat.fDhwSetpoint);
     Debugf(PSTR("dhw_enabled: %s\r\n"), settings.sat.bDhwEnabled ? "true" : "false");
     Debugf(PSTR("dhw_enable: %s\r\n"), settings.sat.bDhwEnable ? "true" : "false");

@@ -10185,6 +10185,49 @@
         "supersedes": [],
         "superseded_by": null
       }
+    },
+    {
+      "id": "ADR-249",
+      "title": "SAT switches from continuous to PWM when the flow stays 1.5 C above the request for 30 s, with its own margin setting (supersedes the entry-22 rule)",
+      "path": "ADR-249-sat-switches-from-continuous-to-pwm-when-the-flow-stays-1-5-c-above-the-request-for-30-s-with-its-own-margin-setting-supersedes-the-entry-22-rule.md",
+      "format": "canonical",
+      "status": "Proposed",
+      "date": "2026-11-16",
+      "decision_summary": "SAT switches from continuous to PWM when flow - requested (PID) setpoint >= settings.sat.fPwmSwitchMargin holds for 3...",
+      "topics": [],
+      "aliases": [],
+      "components": [],
+      "symbols": [],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [
+          "Compare the flow against requested + settings.sat.fPwmSwitchMargin and require 30 s (SATOVERSHOOTSUSTAINMS = 30000) from the first qualifying tick.",
+          "Keep the 3.5 C / 30 s fail-safe as a separate timer with the same gates (entry 359).",
+          "Keep fOvershootMargin (2.0) for the cycle classifier only; no migration of stored values (entry 360).",
+          "Expose the setting as SATpwmswitchmargin in settings.ini, satpwmswitchmargin in the REST settings, pwmswitchmargin on MQTT sat/ and in the SAT status JSON, range 0.5 to 5.0."
+        ],
+        "must_not": [
+          "Must not move the switch with fOvershootMargin.",
+          "Must not drop the fail-safe while the switch margin is a setting."
+        ],
+        "exceptions": [
+          "None."
+        ],
+        "verification": [
+          "tests/testsatovershootsustain.py compiles the real satCycleCheckOvershootSwitch(): a flow 1.6 C over the request switches 30 s after the first qualifying tick (the code before this ADR never switches), equality at exactly +1.5, the 29 99..."
+        ]
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
     }
   ],
   "relationships": [
@@ -17085,6 +17128,24 @@
     {
       "source": "ADR-248",
       "target": "ADR-179",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-249",
+      "target": "ADR-051",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-249",
+      "target": "ADR-196",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-249",
+      "target": "ADR-236",
       "type": "related",
       "resolved": true
     }

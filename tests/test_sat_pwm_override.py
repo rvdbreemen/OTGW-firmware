@@ -64,7 +64,7 @@ static void satNarratef_P(const char *fmt, ...) {   // SAT log sink: one "N <tex
 #define SAT_QUIRK_IMMERGAS_TP 0x02
 enum { SAT_MODE_OFF = 0, SAT_MODE_CONTINUOUS = 1, SAT_MODE_PWM = 2 };
 typedef int SATControlMode;
-struct SatSettings { @FORCEFIELD@ @AUTOFIELD@ float fOvershootMargin=2.0f; bool bEnabled=true, bOvershootProtection=true, bSolarGainEnable=false, bSummerSimmer=false, bSimulation=false;
+struct SatSettings { @FORCEFIELD@ @AUTOFIELD@ float fOvershootMargin=2.0f; float fPwmSwitchMargin=1.5f; bool bEnabled=true, bOvershootProtection=true, bSolarGainEnable=false, bSummerSimmer=false, bSimulation=false;
                      int iMaxRelModulation=80; float fModSupDelay=20, fModSupOffset=1, fFlameOffOffset=18, fSolarSetpointOffset=2;
                      int iHeatingMode=0; };   // TASK-1440: ECO gate on the zones and the solar offset
 struct Settings { SatSettings sat; };
@@ -869,8 +869,8 @@ class SatPwmOverride(unittest.TestCase):
         r = self.run_sc("swtick", 1)
         self.assertNotEqual(r["mode"], "-1", "no overshoot switch gate in this SATcontrol.ino")
         self.assertEqual(r["mode"], "2", r)
-        self.assertEqual(r["ticks"], "61", r)                       # first qualifying tick starts the timer, 60 s later it fires
-        self.assertEqual(r["continuous_ticks"], "60", r)            # every tick before it still sent the continuous setpoint
+        self.assertEqual(r["ticks"], "31", r)                       # first qualifying tick starts the timer, 30 s later it fires (TASK-1888, entry 327)
+        self.assertEqual(r["continuous_ticks"], "30", r)            # every tick before it still sent the continuous setpoint
         self.assertEqual(r["cont_marker"], "0", "the switch tick sent the continuous setpoint: %r" % r)
         self.assertEqual(r["final"], r["cs"], r)
         self.assertEqual(r["cs"], "48.0", r)                         # PWM ON start: return 30 + flame-off offset 18, not the clamped continuous 62
@@ -935,7 +935,7 @@ class SatPwmOverride(unittest.TestCase):
             with self.subTest(tick_s=step_s):
                 r = self.run_sc("swtick", 1, "x", step_s * 1000)
                 self.assertEqual(r["mode"], "2", r)
-                self.assertEqual(r["ticks"], str(1 + -(-60 // step_s)), r)
+                self.assertEqual(r["ticks"], str(1 + -(-30 // step_s)), r)   # 30 s since TASK-1888 (entry 327)
                 self.assertEqual(r["cont_marker"], "0", "the switch tick sent the continuous setpoint: %r" % r)
                 self.assertEqual(r["final"], r["cs"], r)
                 self.assertEqual(r["ch"], "1", r)

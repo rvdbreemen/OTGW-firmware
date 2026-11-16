@@ -253,3 +253,4 @@ One row per Architecture Decision Record. Scope is the Enforcement `path_glob` s
 | ADR-246 | Accepted | - | When rebootlog.txt does not fit the free part of the RTC snapshot, fsOtaRtcFill() stores the longest prefix of it tha... |
 | ADR-247 | Accepted | - | The two PROGMEM assets of ADR-194 may be stored deflated in firmware flash (coordinator decision for TASK-1955 option... |
 | ADR-248 | Accepted | - | The existing climate.Thermostat entity keeps its uniqid and its discovery payload is fixed; the firmware routes the c... |
+| ADR-249 | Proposed | - | SAT switches from continuous to PWM when flow - requested (PID) setpoint >= settings.sat.fPwmSwitchMargin holds for 3... |

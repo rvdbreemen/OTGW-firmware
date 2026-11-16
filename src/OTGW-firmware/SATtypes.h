@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : SATtypes.h
-**  Version  : v2.0.0-beta.344
+**  Version  : v2.0.0-beta.345
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -537,7 +537,8 @@ struct SATSection {
   uint8_t  iMaxRelModulation  = 100;    // Max relative modulation 0-100% (MM= command)
   int16_t  iPreSatMaxTSet     = 0;      // TASK-1541: boiler MsgID 57 value before SAT's first SH=, kept until SAT's switch-off restores it (0 = nothing pending); not a user setting
   int16_t  iPreSatDhwSet      = 0;      // TASK-1541: same for MsgID 56 / SW=
-  float    fOvershootMargin   = 2.0f;   // Overshoot margin °C (cycle classification + continuous->PWM auto-switch; TASK-1268 lowered it from Python's 3.0)
+  float    fOvershootMargin   = 2.0f;   // Overshoot margin °C for the cycle classification (entry 37; TASK-1268 lowered it from Python's 3.0); not the PWM switch since TASK-1888
+  float    fPwmSwitchMargin   = 1.5f;   // TASK-1888, entries 327/360: continuous->PWM when flow - requested >= this for 30 s (was the overshoot margin and 60 s, entry 22)
   float    fModSupDelay       = 20.0f;  // Modulation suppression delay (seconds)
   float    fModSupOffset      = 1.0f;   // Modulation suppression offset (°C below setpoint)
   float    fDhwSetpoint       = 0.0f;   // DHW setpoint (0=inactive, 30-60°C)

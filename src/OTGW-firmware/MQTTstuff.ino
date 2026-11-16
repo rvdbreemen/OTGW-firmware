@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : MQTTstuff
-**  Version  : v2.0.0-beta.344
+**  Version  : v2.0.0-beta.345
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **      Modified version from (c) 2020 Willem Aandewiel
@@ -717,6 +717,7 @@ static const SatMqttCmdEntry kSatMqttCmds[] PROGMEM = {
 
   // --- Direct setting-key passthrough ---
   { "overshoot_margin",       "SATovershootmargin",   nullptr },
+  { "pwm_switch_margin",      "SATpwmswitchmargin",   nullptr },   // TASK-1888
   { "heating_system",         "SATsystem",            nullptr },
   { "manufacturer",           "SATmanufacturer",      nullptr },
   { "max_modulation",         "SATmaxmodulation",     nullptr },

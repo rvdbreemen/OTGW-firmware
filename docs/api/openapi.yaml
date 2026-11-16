@@ -4363,6 +4363,9 @@ components:
         overshoot_margin:
           type: number
           description: "Allowed overshoot above target before a cycle is classed as overshoot (C)"
+        pwm_switch_margin:
+          type: number
+          description: "Continuous to PWM when flow minus the requested setpoint stays at or above this for 30 s (C, default 1.5, TASK-1888)"
         cycle_count:
           type: integer
           description: "Total boiler cycles counted"
@@ -4804,6 +4807,7 @@ components:
         raw_derivative: 0.0
         coefficient: 1.5
         overshoot_margin: 2.0
+        pwm_switch_margin: 1.5
         cycle_count: 0
         cycles_this_hour: 0
         last_cycle_class: 0
