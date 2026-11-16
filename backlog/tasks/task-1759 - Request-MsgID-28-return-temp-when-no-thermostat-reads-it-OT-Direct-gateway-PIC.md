@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-09T17:08:00Z'
-updated_date: '2026-11-12T04:57:00Z'
+updated_date: '2026-11-16T23:24:00Z'
 labels:
   - sat
   - opentherm
@@ -118,6 +118,8 @@ Check: the BSS delta in the build output (RAM: line) before/after.
 2026-11-12 shipped: origin/dev 6be2fa59b..f1bb2a000, zip 2.0.0-beta.200+f1bb2a0 posted #alpha-testing msg 1570288402668982272. Before the build: full run_tests.py 212/213 (test_stream_real_cbuf under -j 4, exit 0 alone, TASK-1854), evaluate --quick 86/0. Bench by 09 on .61 (old beta.197+4cafc97 vs new): OTA app+fs, githash f1bb2a0, bootcount 420 -> 422, health 200, MQTT, crashlog none, settings 164 unchanged; restored (settings diff 0). Evidence: 09 scratchpad b200/ (OLD-results.txt, NEW-results.txt, check200.py). Part C (beta.200, PM=28 on PIC boards) is host-proven only: .63 was not available before the 08:00 slot. AC3 (PIC capture with boiler + thermostat) and AC4 (SAT tick ret != 0.0 in the field) stay field checks; slot signature 2 question is with Robert (DM msg 1570246426003247188).
 
 2026-11-12 maintainer decision (Robert, Discord DM, first-hand: author number3nl, user 384411356616720384): slot signature question (bot msg 1570246426003247188, 01:18 UTC) answered 'A' at 04:52:41 and 04:53:41 UTC (msgs 1570300278127984641, 1570300530331357285; two answers 'A' to two open questions, both A, the bot's 04:57 summary maps A to the slot signature). Decision: keep both alternative-slot signatures as built (1: T(X) then R(Y); 2: T(X) answered Unknown-DataID by the boiler), for PM=25 and PM=28. SATpm25Poll.h comment updated (comment only, ships with the next build).
+
+2026-11-17 ba (taken over from a4 via the coordinator): checked what landed on origin/dev 0cfcf2548. Part A (OT-Direct gateway: MsgID 28 read in a supported thermostat slot, thermostat answered from the boiler cache, ADR-224, entries 287/290/291) is on origin since b5459f863 (beta.175): otdRetNoteReply / otdRetSlotTaken in OTDirect.ino. Part C (PIC: PM=28 every 30 s while no valid MsgID 28 for 30 s, entry 296) since f1bb2a000 (beta.200): satPm28Decide (SATpm25Poll.h), satPm28PollStep (SATcontrol.ino, called after satPm25PollStep). Host tests on HEAD: test_otd_return_temp_slot 10/10, _source 2/2, test_sat_pm28_poll 7/7, test_sat_pm25_poll 16/16 (run_tests.py). The old-vs-fix evidence is in the notes above (R9 Data-Invalid red before the audit fix, green after). So the code of AC2 and AC3 is done; what stays open is the capture part of AC2/AC3 and AC4 (SATTICK ret != 0.0 on such an installation): field, needs a tjfs capture on a current build. No new code.
 <!-- SECTION:NOTES:END -->
 
 ## Comments

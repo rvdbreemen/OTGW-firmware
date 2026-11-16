@@ -4,10 +4,11 @@ title: >-
   PIC: PM=28/PM=25 only go out in an unsupported (alternative) slot; on PIC
   boards whose thermostat asks only supported IDs the PM priority read never
   runs
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-11-09T21:51:00Z'
-updated_date: '2026-11-15T12:04:00Z'
+updated_date: '2026-11-16T23:24:00Z'
 labels:
   - sat
   - pic
@@ -44,4 +45,6 @@ Not measured on a PIC bench with such a thermostat. Related TASK-1759, TASK-1412
 2026-11-15 (d3) Third reading of other-projects/otgw-6.6/gateway.asm, agrees with the finding: in gateway mode CreateRequest (:2387-2402) calls UnknownMask and goes to SendAltRequest (:2404-2414) only for an ID the boiler is known not to support, or when SendUserMessage is set; SendUserMessage is set only by the standalone table (StandAloneMsg :1801 clears it, UserMsg :1837 sets it). Alternative (:3390) reaches SendPriorityMsg (:3436) through InitCmdLoop (:3394-3396), so PM=<id> (SetPrioMessage :4984-4995, sets prioritymsgid + PriorityMsg only) waits for such a slot. Still source-only: AC1 needs a PIC bench with a thermostat that asks only supported IDs, or a tester capture. No code before AC2.
 
 2026-11-15 Coordinator: AC1 cannot be benched (09 has no thermostat on a PIC unit). AC1 is a field AC: a capture from a PIC user whose thermostat asks only boiler-supported IDs, with PM=25 / PM=28 sent; expected no R frame for 25/28. Left In To Do until such a capture exists; AC2 and AC3 follow it.
+
+2026-11-17 ba: AC2 is settled for MsgID 28 by entry 296 (Sergeant D, 2026-11-10, Settled): on a PIC board whose thermostat asks only supported IDs, MsgID 28 does not come and SAT keeps the flow + offset fallback (entries 135, 149, 151); PM=28 every 30 s stays (TASK-1759 part C). For PM=25 (entry 276, the start-up flood of entries 45/151) the same slot limit applies and no entry decides anything different; read as: PM=25 is tried, and without a free slot SAT keeps its fallback (the same reading as 296); not asked separately. AC3: docs/sat/firmware-sat-spec.md now states the limit under the PIC path (gateway.asm 6.6 CreateRequest :2387-2402, SendAltRequest :2404-2414), with tjfs's thermostat IDs and the OT-Direct contrast (ADR-224); the entries themselves are not rewritten (they never are). AC1 (bench or tester capture) stays open: the bench Classic has no thermostat. No code needed.
 <!-- SECTION:NOTES:END -->
