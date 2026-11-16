@@ -647,6 +647,13 @@ paths:
                         type: string
                       fwversion:
                         type: string
+                      appelfsha256:
+                        type: string
+                        description: >-
+                          SHA256 (lowercase hex, 64 characters) of the running firmware's ELF
+                          (TASK-1983). The core dump endpoint returns the crashing build's prefix
+                          in X-Coredump-App-Sha256, so the two together tell whether a stored dump
+                          is from this build. Empty when the app description has no SHA.
                       platform:
                         type: string
                         description: 'Chip platform ("ESP8266" or "ESP32")'
@@ -1026,6 +1033,15 @@ paths:
               schema:
                 type: string
                 example: '0123456ab'
+            X-Running-App-Sha256:
+              description: >-
+                SHA256 (lowercase hex, 64 characters) of the ELF of the firmware that
+                is running now (TASK-1983). When it starts with X-Coredump-App-Sha256,
+                the dump is from this build; otherwise from an earlier one. Empty when
+                the app description has no SHA.
+              schema:
+                type: string
+                example: '0123456ab89cdef0123456789abcdef0123456789abcdef0123456789abcdef'
           content:
             application/octet-stream:
               schema:

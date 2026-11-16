@@ -34,6 +34,7 @@
 #include <esp_flash.h>
 #include <esp_core_dump.h>       // core-dump summary for the reboot log (platformResetRegisterDump, TASK-1479)
 #include <esp_partition.h>       // coredump partition read (platformCoreDumpRead, TASK-1560)
+#include <esp_app_desc.h>        // running app ELF sha (platformRunningAppSha, TASK-1983)
 #include <hal/usb_serial_jtag_ll.h>  // platformUsbJtagPutc (TASK-1217)
 #include <esp_sntp.h>            // esp_sntp_servermode_dhcp() (platformIgnoreDhcpNtp)
 #include <lwip/priv/tcp_priv.h>  // tcp_active_pcbs (platformTcpActivePcbCount)
@@ -1027,6 +1028,23 @@ inline bool platformCoreDumpAppSha(char* dst, size_t len) {
   }
   dst[n] = '\0';
   return n > 0;
+}
+
+// The running image's ELF SHA256 as lowercase hex (64 digits), read once from the app description
+// (esp_app_get_elf_sha256, esp_app_desc.h) and cached (TASK-1983). The core dump keeps a prefix of the same
+// kind of string for the build that crashed (platformCoreDumpAppSha above), so a reader compares the two on
+// the dump's length: equal means the dump is from this build. Empty when the description has no sha.
+inline const char* platformRunningAppSha() {
+  static char s_sha[65] = "";
+  static bool s_read = false;
+  if (!s_read) {
+    s_read = true;
+    if (esp_app_get_elf_sha256(s_sha, sizeof(s_sha)) <= 1) s_sha[0] = '\0';
+    for (char* p = s_sha; *p; p++) {
+      if (*p >= 'A' && *p <= 'F') *p = (char)(*p + ('a' - 'A'));
+    }
+  }
+  return s_sha;
 }
 
 // platformRestartDHCP() removed in TASK-432 port. Although the ESP32

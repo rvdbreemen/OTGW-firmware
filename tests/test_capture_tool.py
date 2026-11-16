@@ -1319,6 +1319,30 @@ class CoreDumpFetchCase(unittest.TestCase):
         self.assertEqual(oc.coredump_age("", self.crashlog("a1b2c3d4"), self.INFO)[0], "unknown")
         self.assertEqual(oc.coredump_age("A1B2C3D4E", self.crashlog("a1b2c3d4"), None)[0], "latest")   # case-blind
 
+    # TASK-1983: device/info carries the running build's ELF sha (appelfsha256); the dump's prefix says this build or not
+    RUN_SHA = "a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f90"
+
+    def info_with(self, sha):
+        return {"device": dict(self.INFO["device"], appelfsha256=sha)}
+
+    def test_dump_of_this_build(self):
+        _, s = oc.coredump_age("A1B2C3D4E", self.crashlog("a1b2c3d4"), self.info_with(self.RUN_SHA))
+        self.assertIn("dump of this build", s)
+
+    def test_dump_of_an_earlier_build(self):
+        _, s = oc.coredump_age("ffff00001", self.crashlog("", available=False), self.info_with(self.RUN_SHA))
+        self.assertIn("dump of an earlier build", s)
+
+    def test_build_unknown_without_the_running_sha(self):   # firmware before TASK-1983: no appelfsha256 field
+        _, s = oc.coredump_age("a1b2c3d4e", self.crashlog("a1b2c3d4"), self.INFO)
+        self.assertNotIn("build", s.replace("running firmware", ""))
+        self.assertEqual(oc.dump_build("a1b2c3d4e", ""), "")
+        self.assertEqual(oc.dump_build("", self.RUN_SHA), "")
+
+    def test_fetch_line_names_the_build(self):
+        _, line, _ = self.fetch(200, crashlog=self.crashlog("a1b2c3d4"), info=self.info_with(self.RUN_SHA))
+        self.assertIn("dump of this build", line)
+
     def test_skip_flag_and_call_site(self):
         self.assertTrue(oc.build_parser().parse_args(["--skip-coredump"]).skip_coredump)
         self.assertFalse(oc.build_parser().parse_args([]).skip_coredump)

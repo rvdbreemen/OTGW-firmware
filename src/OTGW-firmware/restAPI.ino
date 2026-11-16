@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-beta.345
+**  Version  : v2.0.0-beta.346
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -3236,6 +3236,7 @@ void sendDeviceInfoV2()
     // --- Firmware & build identity ---
     je.field(F("author"), F("Robert van den Breemen"));
     je.field(F("fwversion"), _SEMVER_FULL);
+    je.field(F("appelfsha256"), platformRunningAppSha());   // TASK-1983: constant per boot, so the chunked passes stay equal
     je.field(F("compiled"), snap->compiled);
     // ADR-113 stage 2 (TASK-754): picavailable removed; UI selects on hardware_type.
     if (snap->picEnabled) {
@@ -3651,6 +3652,7 @@ void sendDeviceCoreDump()
   webPushHeader(F("Content-Disposition"), disp);
   webPushHeader(F("Cache-Control"), F("no-store"));
   if (haveSha) webPushHeader(F("X-Coredump-App-Sha256"), appSha);
+  webPushHeader(F("X-Running-App-Sha256"), platformRunningAppSha());   // TASK-1983: same prefix = a dump of this build
 
   AsyncWebServerResponse* resp = currentRequest->beginResponse(
       String(F("application/octet-stream")), dumpSize,

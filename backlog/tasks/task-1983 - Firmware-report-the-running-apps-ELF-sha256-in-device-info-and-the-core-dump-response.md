@@ -3,10 +3,11 @@ id: TASK-1983
 title: >-
   Firmware: report the running app's ELF sha256 in device/info and the core-dump
   response
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-11-15T20:07:00Z'
-updated_date: '2026-11-15T20:10:00Z'
+updated_date: '2026-11-16T04:36:00Z'
 labels:
   - capture
   - coredump

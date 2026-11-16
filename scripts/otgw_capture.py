@@ -2386,6 +2386,17 @@ CRASHLOG_PATH = "/api/v2/device/crashlog"
 DEVICE_INFO_PATH = "/api/v2/device/info"
 
 
+def dump_build(dump_sha, running_sha):
+    """TASK-1983: 'this build' when the running firmware's ELF sha256 (device/info appelfsha256) starts with the dump's
+    stored prefix (X-Coredump-App-Sha256, 9 characters by IDF default), 'an earlier build' when it does not, '' when either
+    is unknown (firmware before TASK-1983 has no appelfsha256)."""
+    dump_sha = (dump_sha or "").lower()
+    running_sha = (running_sha or "").lower()
+    if not dump_sha or not running_sha:
+        return ""
+    return "this build" if running_sha.startswith(dump_sha) else "an earlier build"
+
+
 def coredump_age(dump_sha, crashlog, info):
     """TASK-1972: say whether a stored core dump belongs to the latest crash in the reboot log or is older.
 
@@ -2404,7 +2415,8 @@ def coredump_age(dump_sha, crashlog, info):
     dev = (info or {}).get("device") or {}
     running = dev.get("fwversion") or "?"
     reset = dev.get("lastreset") or "?"
-    tail = f"running firmware {running}, last reset '{reset}'"
+    build = dump_build(dump_sha, dev.get("appelfsha256"))
+    tail = f"running firmware {running}, last reset '{reset}'" + (f"; dump of {build}" if build else "")
     if not dump_sha:
         return "unknown", f"age unknown: the dump carries no app ELF hash ({tail})"
     if crashlog is None:
