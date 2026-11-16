@@ -7,7 +7,6 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-13T07:25:00Z'
-updated_date: '2026-11-16T19:52:00Z'
 updated_date: '2026-11-16T19:53:00Z'
 labels:
   - sat
