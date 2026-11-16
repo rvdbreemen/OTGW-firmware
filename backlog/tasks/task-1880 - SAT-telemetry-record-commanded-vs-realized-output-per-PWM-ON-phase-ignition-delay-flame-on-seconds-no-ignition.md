@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-13T06:13:00Z'
-updated_date: '2026-11-13T20:16:00Z'
+updated_date: '2026-11-16T09:34:00Z'
 labels:
   - sat
   - telemetry
@@ -63,4 +63,6 @@ AC4 (U10) on lane-1880, uncommitted: card 'PWM ON phases: asked vs done' in SAT 
 09's question: cmd_on_s 3600 on a forced PWM entry. Intended. A PWM entry at a duty at or above the maximum is duty range 5 (continuous ON): satPwmBeginOn(flame, boilerTemp, maxMs, 0) with maxMs = 2 x period (SATcontrol.ino range 5, thermo-nova pwm.py:297 on_time_maximum_threshold = 2 x on_time_upper_threshold, pwm.py:55). With a 1800 s period (heat pump / hybrid default) that is 3600 s; with a gas boiler at 3 per hour it would be 2400 s. The record stores the ON time SAT asked at the start, so 3600 is the commanded value, not a bug.
 
 2026-11-13 follow-up (found by 95): test/host/test_dhw_water_meter.py exited 1 on origin/dev because its mutant M6 anchored on the literal 'MQTT_HA_SENSOR_COUNT = 399;' and this task moved the count to 404. Fixed test-only: M6 now reads the live count from MQTTHaDiscovery.cpp (HA_COUNT) and mutates it to count - 1. Red/green: the old test file exits 1 ('mutant anchor must match exactly once ... got 0'), the fixed one gives RESULT: PASS (exit 0). My earlier full-suite runs covered tests/ but not test/host/, which is how this slipped.
+
+2026-11-16 (95) AC3 evidence, PIC side, from the field instead of the bench: gruijter capture 20261114-195039 (beta.250+baf84d9, Classic + PIC, transcript 'simulation: false', archive OTGW-field-data/gruijter/20261114-195039). Script scratchpad pwmphase_vs_flame_ch.py compares each of the 41 SATPWMPHASE records (transcript, phase end - len = start) with the MsgID 0 B-frame status bits in csv/otframes.csv. Counting the flame bit (LB bit 3) alone: 39/41 match (ignited, ign_delay within 15 s, flame_on within 15 s); the 2 misses (ends 03:53:26 and 06:16:26 local next day, len 960 and 2010) both contain a hot-water draw (DHW bit 2 set, CH bit off) and SAT's flame_on excludes that flame. Counting the heating flame only (bit 3 on, bit 2 off): 41/41 match, 89 edges. So the record matches the flame bit as SAT defines it (heating flame). OT-Direct side: 09's .61 bench (one ignited phase that ended 'cut', notes above). Never-lit path: host test AC1 only (no bench or field phase without ignition seen). AC3 is a bench AC: left for 09/the coordinator to tick on this evidence or to ask for a bench run.
 <!-- SECTION:NOTES:END -->
