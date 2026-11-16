@@ -7,7 +7,7 @@ status: In Review
 assignee:
   - '@claude'
 created_date: '2026-11-09T09:29:00Z'
-updated_date: '2026-11-15T10:28:00Z'
+updated_date: '2026-11-16T09:45:00Z'
 labels:
   - otdirect
 milestone: 2.0.0
@@ -37,4 +37,6 @@ CORRECTION to the note above (my error): the PIC DOES have BS=: dispatch gateway
 Implemented (lane-95-next): otdRoom16CacheSet/F88 (MQTT room_setpoint: periodic WRITE 16 value) and otdRoom16OvrSet/F88 (BS= or MQTT room_setpoint: frame override) kept by otdMqttSetRoomSetpoint() and the BS= branch (BS=0 clears both, as clearWriteOverride(16) did), reset in resetTransientState(); clearRemoteOverride() in master mode clears slot 16 and then puts those values back. Gateway mode unchanged (it already returned before touching slot 16). Evidence: tests/test_otd_tt_pic_parity.py MasterSlot16Cases on the real otdMqttSetRoomSetpoint/BS=/TT= code: R1 MQTT 19.0 -> TT=21.5 -> TT=0 leaves (write 0x1300, override 0x1300), R2 BS=19.0 -> TT=0 leaves override 0x1300, R3 nothing before -> slot cleared as before. On HEAD's OTDirect.ino R1 and R2 FAIL, R3 passes. Harness stubs for the new variables added to test_otd_pic_float, test_otd_mode_change_keeps_state, test_otd_mode_switch_queue_reset.
 
 Landed beta.300: Pushed origin/dev 2e4ca9c05..3e29faa63; zip beta.301+2b3d9a2 posted (Discord 1571471374038470711); final build exit 0 'Build completed successfully', RAM 130572 B, Flash 2157483 B; sweep 88/88, evaluate --quick 86/0; bench 09 on .61 beta.301+2b3d9a2 PASS (smoke + re-check). Bench 09 on .61: state level only, the MsgID 16 override 0x1300 stays after TT=0 in master mode; no WRITE 16 frame seen within 75 s (the periodic write interval was not reached in the window). AC1 (TT=0 leaves room_setpoint/BS= untouched) holds on the state and in tests/test_otd_tt_pic_parity.py R1-R3 (R1/R2 FAIL on the old code); the frame on the bus is NOT shown yet -> In Review until a longer master-mode capture shows the WRITE 16 0x1300.
+
+2026-11-16 10:34-10:43 bench 09 on .61 (OTGW32, master mode, no thermostat or boiler), 2.0.0-beta.341+3cb72c3, telnet captured after boot (1708 lines, 464 OT frames), commands over MQTT OTGW/set/<node>/command. BS=19 -> overrides.write {msgid 16, value 4864 = 0x1300}, no MsgID 16 frame in the next 70 s. TT=20.5 -> {16, 5248 = 0x1480} and at once a WRITE 16 frame R90101480 (20.50) 1.9 s after the command. TT=0 -> {16, 4864 = 0x1300}: the BS value is kept (AC1 holds at the state level, as in the beta.301 bench). After TT=0: 0 MsgID 16 frames in 360 s, so the restored 19.00 was not written to the boiler in that window; a boiler would keep the last written TrSet 20.50 until the next MsgID 16 write. BS=0 -> write list empty. Open question for the owner (behaviour, not ticked here): should TT=0 in master mode trigger an immediate WRITE 16 with the kept BS value, and is there a periodic MsgID 16 write in master mode at all (none seen in 70 s with BS alone or 6 min after TT=0)? Evidence: 09 scratchpad closeout/mq2/ (run.log, telnet.raw, bs1751.py).
 <!-- SECTION:NOTES:END -->
