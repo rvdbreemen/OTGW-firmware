@@ -5302,6 +5302,19 @@
     "TASK-1887"
    ],
    "confirmed_by_entry": null
+  },
+  {
+   "id": 401,
+   "title": "Q-399a answered A: after a tolerance-band stop SAT starts heating again when the room is below target + 0.1; both tolerances mean +0.1 (Sergeant D, 2026-11-16; corrects the reading of entry 328, settles entry 399)",
+   "date": "2026-11-16",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1571973628885602405",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1887"
+   ],
+   "confirmed_by_entry": null
   }
  ]
 }

@@ -8,6 +8,7 @@ assignee:
   - '@claude'
 created_date: '2026-11-13T07:25:00Z'
 updated_date: '2026-11-16T19:52:00Z'
+updated_date: '2026-11-16T19:53:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -72,4 +73,5 @@ Entry 398 edge case, OUR interpretation (ba, recorded by comms 92 on 2026-11-16;
 2026-11-16 entry 399 (Sergeant D 18:37/18:39 UTC, after indigo's room-vs-setpoint chart): 'normally SAT should had started heating when the room temp was below 20.6' (target 20.5), i.e. resume below target + 0.1, which differs from the entry-328 reading the band implements (resume below target - 0.1; indigo resumed 16:14:58, room below 20.6 from about 16:05). Q-399a asked (A below target + 0.1 / B as now / C below target; our advice A; scope this release). No change before his answer.
 
 2026-11-16 corrections and review: (1) the band observations of the 349 soak on .63 (12:22/12:39/12:48, room 19.88-19.91, noted earlier as a real room sensor) were SIMULATED: satsimulation was on until 16:27 (09's S0.ini); they show the real code deciding on the filtered value under the simulator, not a real room. (2) d3 second-reader review of the follow-up commit: F4 our reading of the entry-398 edge case is now recorded as entry 400 (interpretation, not his words; pushed 9601c1f60 by 92) and asked as Q-398a; F5 no one-tick lag: the band latch and satPwmCountOnWhenChAllowed() run before satPwmSchedule() in the same tick (checked in the post branch), covered by test_on_phase_that_starts_in_the_resume_tick_counts_once. Citations: the count in thermo-nova is pwm.py:160 (self._current_cycle += 1). (3) .63 with satsimulation off has SAT active=false (ot_link_lost, outside temp null; a real BLE room temperature is present), so AC6 narration value and the 398 count are host-proven (test_sat_tolerance_band 23/23, red on the old code) with the field check open after the 2.0.0 beta (indigo/gruijter captures).
+2026-11-16 entry 401 (Sergeant D 19:41 UTC, Q-399a answered A): heating restarts as soon as the room is below target + 0.1, not target - 0.1; corrects the entry-328 reading the band implements. Stop and restart are now at the same line; Q-401a asked (1571976402285240323): stop line A +0.2 / B +0.3 / C +0.1 with a minimum CH-off time / D no gap; our advice A; scope this release. Implement the restart change together with his Q-401a answer.
 <!-- SECTION:NOTES:END -->

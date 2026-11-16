@@ -7976,3 +7976,17 @@ Robert, 16:18:42 UTC (https://discord.com/channels/812969634638725140/9144987300
 **Open:** Q-398a (queued, asked after Q-2005a and Q-399a).
 
 **Task:** TASK-1887 (owner ba).
+
+## 401. Q-399a answered A: after a tolerance-band stop SAT starts heating again when the room is below target + 0.1; both tolerances mean +0.1 (Sergeant D, 2026-11-16; corrects the reading of entry 328, settles entry 399)
+
+**Source:** #dev-sat-mqtt, Sergeant D 2026-11-16 19:41:58 UTC (https://discord.com/channels/812969634638725140/1105556725714649128/1571973628885602405), a reply to Q-399a (https://discord.com/channels/812969634638725140/1105556725714649128/1571960731983945864); follow-up 19:49:57 UTC (https://discord.com/channels/812969634638725140/1105556725714649128/1571975636095074528): "is it clear now?".
+
+**Quoted:**
+
+> "Ok now I understand what is happening. In a HA generic thermostat the cold tolerance: -0.1 means that the temperature should be 0.1° ABOVE the setpoint, while hot tolerance: 0.1 means the same thing. At the end of the day SAT should start heating when the temperature is 0.1 ABOVE the setpoint"
+
+**Settled:** option A of Q-399a: heating starts again as soon as the room is below target + 0.1 (with indigo's target 20.5: below 20.6), not below target - 0.1. Our reading in entry 328 (start below target - 0.1, after Home Assistant's generic thermostat) is corrected by this entry; entry 328 is not rewritten. Read with entries 376 and 384 (the band stop at target + 0.1 sends CH=0, PWM stays active), the stop and the restart are now at the same line, target + 0.1.
+
+**Interpretation (ours):** he sets no gap between stop and restart. Whether the stop line moves up (a gap) or a pause time is wanted is not in his words; asked as Q-401a. Scope: not answered; Q-399a recommended this release, read as 2.0.0.
+
+**Task:** TASK-1887 (owner ba).
