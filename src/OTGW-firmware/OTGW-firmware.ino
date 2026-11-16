@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.ino
-**  Version  : v2.0.0-beta.353
+**  Version  : v2.0.0-beta.354
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -1226,6 +1226,7 @@ void loop()
       }
     }
     if (minuteChanged())              doTaskMinuteChanged(); //ADR-086: sole minuteChanged() caller; hour/day/year dispatch lives inside
+    loopMQTTStatsPacer();             // TASK-2004: the hourly stats, one per >= 100 ms
     loopMQTTDiscovery();              // async MQTT discovery drip (self-timed, one config per 1 s normal / 10 s slow)
     pollPICsettingsQuery();           // TASK-1971: PR= settings cycle, >= 3 s apart, right after a drip tick when deferred
     connProbe(CPROBE_DISCOVERY);      // TASK-1757 AC3

@@ -6,6 +6,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## [Unreleased]
 
 ### Fixed
+- The hourly `otgw-firmware/stats/*` MQTT topics go out one at a time, at least 100 ms apart, instead of 26 at once. On a board without PSRAM the free heap fell by about 55 KB inside that burst, every hour on the hour. The topics and their values are unchanged (TASK-2004).
 - OT-Direct master mode (no thermostat): the room setpoint now reaches the boiler. `BS=` writes MsgID 16 itself, and after `TT=0` the `BS=` or MQTT room setpoint is written again at once, so the boiler no longer keeps the old TT value. A running TT/TC override is not overwritten by them (TASK-1751).
 - OT-Direct: Home Assistant (pyotgw) no longer fails to connect to port 25238 right after a reboot on a board without a thermostat. The one-time 'Thermostat disconnected' line at boot is no longer sent to port 25238, where it landed in the middle of the connect handshake; a real loss or return of the thermostat is still reported there (TASK-1999).
 

@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : MQTTstuff
-**  Version  : v2.0.0-beta.353
+**  Version  : v2.0.0-beta.354
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **      Modified version from (c) 2020 Willem Aandewiel
@@ -2302,48 +2302,67 @@ void publishBoilerUnsupportedMsgids() {
   sendMQTTData(F("otgw-firmware/boiler/unsupported_msgids"), csv, true);  // retained
 }
 
+// TASK-2004: the 26 hourly stats used to go out back to back from doTaskMinuteChanged(). On a board without PSRAM
+// (bench .61, 2026-11-16) the free heap fell by ~44 KB inside that burst (50,264 -> 6,484 B at 16:00:00, 26/26
+// topics on the broker, no other publish in that second). They now go out one per loop pass, at least
+// STATS_PACE_MS apart, so the broker's ACKs free each send's buffers before the next one. A stat waits while
+// canPublishMQTT() blocks (heap CRITICAL) instead of being dropped. The value is read when it is sent.
+static constexpr uint8_t  STATS_COUNT    = 26;
+static constexpr uint8_t  STATS_IDLE     = 0xFF;
+static constexpr uint32_t STATS_PACE_MS  = 100;
+static uint8_t  statsPaceIdx    = STATS_IDLE;   // next stat to send, STATS_IDLE when no round runs
+static uint32_t statsPaceLastMs = 0;
+
+// Publish stat i (0 .. STATS_COUNT-1); false past the last one.
+static bool publishStatAt(uint8_t i) {
+  switch (i) {
+    case  0: publishStatU32(F("otgw-firmware/stats/ws_drops"), (unsigned long)state.heapdiag.iWsDropsTotal); return true;
+    case  1: publishStatU32(F("otgw-firmware/stats/mqtt_drops"), (unsigned long)state.heapdiag.iMqttDropsTotal); return true;
+    case  2: publishStatU32(F("otgw-firmware/stats/enter_low"), (unsigned long)state.heapdiag.iEnteredLowCount); return true;
+    case  3: publishStatU32(F("otgw-firmware/stats/enter_warning"), (unsigned long)state.heapdiag.iEnteredWarningCount); return true;
+    case  4: publishStatU32(F("otgw-firmware/stats/enter_critical"), (unsigned long)state.heapdiag.iEnteredCriticalCount); return true;
+    case  5: publishStatU32(F("otgw-firmware/stats/drip_burst_skip"), (unsigned long)state.heapdiag.iDripActiveBurstSkipCount); return true;
+    case  6: publishStatU32(F("otgw-firmware/stats/drip_cooldown_skip"), (unsigned long)state.heapdiag.iDripCooldownSkipCount); return true;
+    case  7: publishStatU32(F("otgw-firmware/stats/drip_slowmode"), (unsigned long)state.heapdiag.iDripSlowModeCount); return true;
+    case  8: publishStatU32(F("otgw-firmware/stats/free_heap"), (unsigned long)platformFreeHeap()); return true;
+    case  9: publishStatU32(F("otgw-firmware/stats/max_block"), (unsigned long)platformMaxFreeBlock()); return true;
+    case 10: publishStatU32(F("otgw-firmware/stats/frag_pct"), (unsigned long)getHeapFragmentation()); return true;
+    case 11: publishStatU32(F("otgw-firmware/stats/disc_verify_runs"), (unsigned long)state.discovery.iVerifyRunCount); return true;
+    case 12: publishStatU32(F("otgw-firmware/stats/disc_republish_triggered"), (unsigned long)state.discovery.iRepublishTriggeredCount); return true;
+    case 13: publishStatU32(F("otgw-firmware/stats/disc_last_missing"), (unsigned long)state.discovery.iLastMissingCount); return true;
+    case 14: publishStatU32(F("otgw-firmware/stats/disc_last_orphan"), (unsigned long)state.discovery.iLastOrphanCount); return true;
+    case 15: publishStatU32(F("otgw-firmware/stats/disc_published_topics"), (unsigned long)state.discovery.iPublishedTopicCount); return true;
+    case 16: publishStatU32(F("otgw-firmware/stats/disc_last_verify_epoch"), (unsigned long)state.discovery.iLastVerifyEpoch); return true;
+    case 17: publishStatU32(F("otgw-firmware/stats/disc_last_daily_heal_epoch"), (unsigned long)state.discovery.iLastDailyHealEpoch); return true;
+    case 18: publishStatU32(F("otgw-firmware/stats/min_max_block"), (unsigned long)state.heapdiag.iMinMaxBlock); return true;
+    case 19: publishStatU32(F("otgw-firmware/stats/min_free_heap"), (unsigned long)getMinFreeHeap()); return true;
+    case 20: publishStatU32(F("otgw-firmware/stats/max_loop_gap_ms"), (unsigned long)state.heapdiag.iMaxLoopGapMs); return true;
+    case 21: publishStatU32(F("otgw-firmware/stats/maxblock_lt2k"), (unsigned long)state.heapdiag.aMaxBlockBucket[0]); return true;
+    case 22: publishStatU32(F("otgw-firmware/stats/maxblock_lt4k"), (unsigned long)state.heapdiag.aMaxBlockBucket[1]); return true;
+    case 23: publishStatU32(F("otgw-firmware/stats/maxblock_lt8k"), (unsigned long)state.heapdiag.aMaxBlockBucket[2]); return true;
+    case 24: publishStatU32(F("otgw-firmware/stats/maxblock_lt16k"), (unsigned long)state.heapdiag.aMaxBlockBucket[3]); return true;
+    case 25: publishStatU32(F("otgw-firmware/stats/maxblock_ge16k"), (unsigned long)state.heapdiag.aMaxBlockBucket[4]); return true;
+    default: return false;
+  }
+}
+
+// Hourly entry point (ADR-086, doTaskMinuteChanged): starts a paced round. A round still running is restarted.
 void sendMQTTheapdiag(){
   if (!settings.mqtt.bEnable) return;
   if (!state.mqtt.bConnected) return;
+  statsPaceIdx    = 0;
+  statsPaceLastMs = millis() - STATS_PACE_MS;   // the first stat may go out on this loop pass
+}
 
-  // Heap pressure tier transitions and drop counters
-  publishStatU32(F("otgw-firmware/stats/ws_drops"),              (unsigned long)state.heapdiag.iWsDropsTotal);
-  publishStatU32(F("otgw-firmware/stats/mqtt_drops"),            (unsigned long)state.heapdiag.iMqttDropsTotal);
-  publishStatU32(F("otgw-firmware/stats/enter_low"),             (unsigned long)state.heapdiag.iEnteredLowCount);
-  publishStatU32(F("otgw-firmware/stats/enter_warning"),         (unsigned long)state.heapdiag.iEnteredWarningCount);
-  publishStatU32(F("otgw-firmware/stats/enter_critical"),        (unsigned long)state.heapdiag.iEnteredCriticalCount);
-
-  // Discovery drip throttle counters
-  publishStatU32(F("otgw-firmware/stats/drip_burst_skip"),       (unsigned long)state.heapdiag.iDripActiveBurstSkipCount);
-  publishStatU32(F("otgw-firmware/stats/drip_cooldown_skip"),    (unsigned long)state.heapdiag.iDripCooldownSkipCount);
-  publishStatU32(F("otgw-firmware/stats/drip_slowmode"),         (unsigned long)state.heapdiag.iDripSlowModeCount);
-
-  // Live heap snapshot at publish time
-  publishStatU32(F("otgw-firmware/stats/free_heap"),             (unsigned long)platformFreeHeap());
-  publishStatU32(F("otgw-firmware/stats/max_block"),             (unsigned long)platformMaxFreeBlock());
-  publishStatU32(F("otgw-firmware/stats/frag_pct"),              (unsigned long)getHeapFragmentation());
-
-  // Discovery verification telemetry (ADR-062)
-  publishStatU32(F("otgw-firmware/stats/disc_verify_runs"),         (unsigned long)state.discovery.iVerifyRunCount);
-  publishStatU32(F("otgw-firmware/stats/disc_republish_triggered"), (unsigned long)state.discovery.iRepublishTriggeredCount);
-  publishStatU32(F("otgw-firmware/stats/disc_last_missing"),        (unsigned long)state.discovery.iLastMissingCount);
-  publishStatU32(F("otgw-firmware/stats/disc_last_orphan"),         (unsigned long)state.discovery.iLastOrphanCount);
-  publishStatU32(F("otgw-firmware/stats/disc_published_topics"),    (unsigned long)state.discovery.iPublishedTopicCount);
-  publishStatU32(F("otgw-firmware/stats/disc_last_verify_epoch"),   (unsigned long)state.discovery.iLastVerifyEpoch);
-  // ADR-170: the automatic path is now a drip re-announce, not a verify, so
-  // disc_last_verify_epoch above only advances on a MANUAL verify. This is the
-  // topic that shows the daily auto-heal is alive.
-  publishStatU32(F("otgw-firmware/stats/disc_last_daily_heal_epoch"), (unsigned long)state.discovery.iLastDailyHealEpoch);
-
-  // TASK-934 soak instrumentation: worst-case watermarks + maxBlock histogram
-  publishStatU32(F("otgw-firmware/stats/min_max_block"),   (unsigned long)state.heapdiag.iMinMaxBlock);
-  publishStatU32(F("otgw-firmware/stats/min_free_heap"),   (unsigned long)getMinFreeHeap());
-  publishStatU32(F("otgw-firmware/stats/max_loop_gap_ms"), (unsigned long)state.heapdiag.iMaxLoopGapMs);
-  publishStatU32(F("otgw-firmware/stats/maxblock_lt2k"),   (unsigned long)state.heapdiag.aMaxBlockBucket[0]);
-  publishStatU32(F("otgw-firmware/stats/maxblock_lt4k"),   (unsigned long)state.heapdiag.aMaxBlockBucket[1]);
-  publishStatU32(F("otgw-firmware/stats/maxblock_lt8k"),   (unsigned long)state.heapdiag.aMaxBlockBucket[2]);
-  publishStatU32(F("otgw-firmware/stats/maxblock_lt16k"),  (unsigned long)state.heapdiag.aMaxBlockBucket[3]);
-  publishStatU32(F("otgw-firmware/stats/maxblock_ge16k"),  (unsigned long)state.heapdiag.aMaxBlockBucket[4]);
+// Called every loop pass: sends at most one stat.
+void loopMQTTStatsPacer(){
+  if (statsPaceIdx == STATS_IDLE) return;
+  if (!settings.mqtt.bEnable || !state.mqtt.bConnected) { statsPaceIdx = STATS_IDLE; return; }  // next hour
+  const uint32_t now = millis();
+  if ((uint32_t)(now - statsPaceLastMs) < STATS_PACE_MS) return;
+  if (getHeapHealth() == HEAP_CRITICAL) return;   // wait; canPublishMQTT() would drop it
+  statsPaceLastMs = now;
+  if (!publishStatAt(statsPaceIdx) || ++statsPaceIdx >= STATS_COUNT) statsPaceIdx = STATS_IDLE;
 }
 
 // ADR-084: OT-bus presence values (boiler_connected, thermostat_connected,

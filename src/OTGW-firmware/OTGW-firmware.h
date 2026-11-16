@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v2.0.0-beta.353
+**  Version  : v2.0.0-beta.354
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -303,6 +303,7 @@ struct CmdQueueSnap {
 void cmdQueueSnapshot(CmdQueueSnap* out);
 void triggerPICsettingsReadout();
 void sendMQTTheapdiag();
+void loopMQTTStatsPacer();                       // TASK-2004: one hourly stat per loop pass
 // TASK-692 / TASK-693 port (dev TASK-686 / TASK-688): OT-bus support-map
 // accessors. State lives at file scope in OTGW-Core.ino; MQTT publisher
 // lives in MQTTstuff.ino; LittleFS persistence lives in OTGW-Core.ino.
@@ -570,14 +571,14 @@ struct DiscoverySection {                    // state.discovery — MQTT auto-di
 };
 
 // NOTE: this struct is NOT authoritative for the retained otgw-firmware/stats/*
-// MQTT topics. sendMQTTheapdiag() publishes 25 individual retained topics: 15
+// MQTT topics. The hourly round started by sendMQTTheapdiag() publishes 26 individual retained topics (paced, TASK-2004): 15
 // from this struct (8 cumulative counters + min_max_block + max_loop_gap_ms + 5
 // maxBlock histogram buckets), 4 live values (free_heap / max_block / frag_pct /
-// min_free_heap — the last via getMinFreeHeap(), not stored here), and 6 from
+// min_free_heap — the last via getMinFreeHeap(), not stored here), and 7 from
 // state.discovery (verify_runs / republish_triggered / last_missing /
-// last_orphan / published_topics / last_verify_epoch). Adding a field here does
+// last_orphan / published_topics / last_verify_epoch / last_daily_heal_epoch). Adding a field here does
 // NOT automatically surface on MQTT — add a corresponding
-// publishStatU32(F("otgw-firmware/stats/...")) call in sendMQTTheapdiag().
+// case to publishStatAt() in MQTTstuff.ino and raise STATS_COUNT.
 struct HeapDiagSection {                 // state.heapdiag — cumulative heap-pressure diagnostics (reset on reboot)
   uint32_t iWsDropsTotal            = 0; // lifetime WebSocket messages dropped due to heap pressure
   uint32_t iMqttDropsTotal          = 0; // lifetime MQTT messages dropped due to heap pressure
