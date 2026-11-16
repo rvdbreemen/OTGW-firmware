@@ -8022,3 +8022,25 @@ Robert, 16:18:42 UTC (https://discord.com/channels/812969634638725140/9144987300
 **Settled:** option A of Q-402a with the time changed: after a tolerance-band stop CH stays off for 600 s (10 minutes), counted from the moment CH actually goes off (after any 180 s minimum burn of entry 376), then heating may restart below target + 0.1 (entry 401). This replaces point (i) of the interpretation in entry 402 (300 s) and confirms point (ii) (counted from CH actually off). Scope 2.0.0 (entry 402, Robert); high priority by both. New firmware rule; thermo-nova has no band.
 
 **Task:** TASK-1887 (owner ba), milestone 2.0.0, priority high.
+
+## 404. Q-2005a answered A: the PWM/continuous flip within one burn stays as it is (Sergeant D, 2026-11-16; Robert first preferred B, then followed)
+
+**Source:** #dev-sat-mqtt, Sergeant D 2026-11-16 20:10:27 UTC (https://discord.com/channels/812969634638725140/1105556725714649128/1571980796179390540), a reply to the re-asked Q-2005a (https://discord.com/channels/812969634638725140/1105556725714649128/1571979656603639870; first asked https://discord.com/channels/812969634638725140/1105556725714649128/1571927220631638081); Robert (maintainer) 20:12:57 (https://discord.com/channels/812969634638725140/1105556725714649128/1571981424804765710), 20:13:42 (https://discord.com/channels/812969634638725140/1105556725714649128/1571981612000747642), Sergeant D 20:15:15 (https://discord.com/channels/812969634638725140/1105556725714649128/1571982003828424817), Robert 20:15:36 (https://discord.com/channels/812969634638725140/1105556725714649128/1571982092630229015).
+
+**Quoted:**
+
+> "It means that the requested temperature was at the threshold between continuous and PWM the flipping doesn't affect calculations . Let's keep it as it is. My answer is A" (Sergeant D)
+
+> "Ehhh are you sure. The thermo nova had C. I would recommend B. This would prevent continuous switching where it's not needed." (Robert)
+
+> "This is a hysteresis situation only pendelend between modes because there is no "gap" so every 180s it switches for no good reason." (Robert)
+
+> "There is no issue at this situation at all. I am pretty sure that A is fine" (Sergeant D)
+
+> "Okay. I follow your insight." (Robert)
+
+**Settled:** option A of Q-2005a: no change; the mode may flip between PWM and continuous within one burn when the request sits at the switch threshold (indigo_light's beta.350 capture, TASK-2005). Robert followed Sergeant D's answer.
+
+**Open:** the conversation went on after 20:16 (Robert: continuous at 38 C would modulate low, while PWM switches the setpoint between 55 and 38; Sergeant D: "We are talking about 2-3% modulation instead of 0", "a high PWM means 2220 seconds ON, 180 seconds OFF", then "?" at 20:19:00). If it changes the decision, a later entry records that; this entry is not rewritten.
+
+**Task:** TASK-2005 (owner ba): no code change under this answer.

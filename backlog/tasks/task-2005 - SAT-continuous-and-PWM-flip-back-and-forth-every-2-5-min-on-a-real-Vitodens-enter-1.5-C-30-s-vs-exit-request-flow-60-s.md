@@ -7,7 +7,7 @@ status: To Do
 assignee:
   - '@ba'
 created_date: '2026-11-16T16:35:00Z'
-updated_date: '2026-11-16T19:46:00Z'
+updated_date: '2026-11-16T20:21:00Z'
 labels:
   - sat
   - field
@@ -54,4 +54,6 @@ SEPARATE QUESTION, keep it out of Q-2005a (ba's pointer 2): indigo's 16:00:58 PW
 CORRECTION (95, same evening) to the thermo-nova constant citations in the prep notes above, re-checked by grep: OVERSHOOT_SUSTAIN_SECONDS = 60.0 is const.py:21, UNDERHEAT_SUSTAIN_SECONDS = 180.0 is const.py:22, SATURATION_SUSTAIN_SECONDS = 300.0 is const.py:23; OVERSHOOT_MARGIN_CELSIUS = 3.0 is cycles/const.py:10 and UNDERSHOOT_MARGIN_CELSIUS = -3.0 is cycles/const.py:11 (imported in heating_control.py:21). The notes above wrongly put the margins at const.py:21/22 and the times at const.py:18-20. The task description's citations (const.py:21, :22, cycles/const.py:10) are right for the times and the enter margin.
 
 Citations verified at pin 7beaaf5 via raw.githubusercontent (coordinator, 2026-11-16): heating_control.py:262/:276/:288/:296/:304, cycles/const.py:10-11, const.py:21-22 match. The local copy other-projects/SAT-releases-thermo-nova is at c5211afe, not the pin (coordinator's finding); it is a plain folder inside the other-projects submodule (770aa45b), so 95 could not check its upstream commit locally.
+
+2026-11-16 entry 404: Sergeant D answered Q-2005a A (keep as it is; 'the flipping doesn't affect calculations'); Robert first recommended B, then 'Okay. I follow your insight.' (20:15:36 UTC). No code change under this answer. The discussion continued after 20:16 (CS 55 vs 38, modulation); if the decision changes, a later entry records it. AC1 met by entry 404; AC2/AC3 (fix + field check) not needed under A unless that changes.
 <!-- SECTION:NOTES:END -->

@@ -5341,6 +5341,19 @@
     "TASK-1887"
    ],
    "confirmed_by_entry": null
+  },
+  {
+   "id": 404,
+   "title": "Q-2005a answered A: the PWM/continuous flip within one burn stays as it is (Sergeant D, 2026-11-16; Robert first preferred B, then followed)",
+   "date": "2026-11-16",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1571980796179390540",
+   "supersedes": [],
+   "tasks": [
+    "TASK-2005"
+   ],
+   "confirmed_by_entry": null
   }
  ]
 }
