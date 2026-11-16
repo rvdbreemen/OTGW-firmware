@@ -55,6 +55,9 @@ static bool   _pid_firstOutputPending = true;
 // false a missing room temperature keeps the restored integral and raw derivative (satPidCurveOnly()).
 static bool   _pid_roomSeen           = false;
 bool satPidRoomSeen() { return _pid_roomSeen; }
+// TASK-1866: true while the PID output is the heating curve alone (satPidCurveOnly(): no room temperature since the boot,
+// or it was lost); fPidI may then show the restored integral (entry 115), which is not applied. REST pid_curve_only.
+bool satPidCurveOnlyActive() { return isnan(_pid_lastError); }
 
 // When the PID first saw the current room temperature (TASK-1195). It stands in
 // for HA's last_changed, by which pid.py times the derivative (climate.py:314).
@@ -189,8 +192,11 @@ void satPidReset()
 // loss is a normal one. _pid_lastError = NAN marks "no held error": satPidOutput() then
 // returns the curve alone (never NaN) until the next step stores a real error.
 // Exception (entry 115): while no valid room temperature has been seen since the boot or the last satPidReset(),
-// the integral and raw derivative restored from flash are kept (and shown), and only P and D are 0: the output is
-// the curve, and satSavePidState() does not write (satPidRoomSeen()) so the restored state is not overwritten.
+// the integral and raw derivative restored from flash are kept, and state.sat.fPidI still shows the restored integral,
+// but none of P, I and D is in the output: the output is the curve alone (entries 115, 388 option B; entry 357's
+// curve + P + I + D is for 2.1.0). satPidCurveOnlyActive() marks this (REST pid_curve_only, TASK-1866), so a client
+// can tell the shown I from the applied one. satSavePidState() does not write (satPidRoomSeen()) so the restored
+// state is not overwritten.
 // state.sat.fError reads 0 meanwhile: no NaN reaches the publishers, the persisted state or the statistics.
 float satPidCurveOnly(float heatingCurveValue)
 {

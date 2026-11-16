@@ -4361,6 +4361,9 @@ components:
         pid_d:
           type: number
           description: "Derivative PID term (C)"
+        pid_curve_only:
+          type: boolean
+          description: "True while the PID output is the heating curve alone: no room temperature since the boot, or the room temperature was lost. pid_i then shows the restored integral, but it is not applied (TASK-1866, Sergeant D entry 388)."
         kp:
           type: number
           description: "Active Kp gain"

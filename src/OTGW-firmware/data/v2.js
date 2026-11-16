@@ -1517,6 +1517,7 @@
       "kv_fetch_errors": "Fetch errors",
       "kv_humidity": "Humidity",
       "kv_i_term": "I term",
+      "kv_i_not_applied": "(not applied: curve only until a room temperature)",
       "kv_indoor_sensor": "Indoor sensor",
       "kv_last_blocked_cmd": "Last blocked cmd",
       "kv_last_cycle": "Last cycle",
@@ -7422,7 +7423,7 @@
     satRenderHealth(d);
     satRenderCycles24(d);
     satKv('satPidKv', [
-      [t('tools.kv_p_term'), satFmt(d.pid_p, 2)], [t('tools.kv_i_term'), satFmt(d.pid_i, 2)], [t('tools.kv_d_term'), satFmt(d.pid_d, 2)],
+      [t('tools.kv_p_term'), satFmt(d.pid_p, 2)], [t('tools.kv_i_term'), satFmt(d.pid_i, 2) + (d.pid_curve_only ? ' ' + t('tools.kv_i_not_applied') : '')], [t('tools.kv_d_term'), satFmt(d.pid_d, 2)],
       ['Kp', satFmt(d.kp, 4)], ['Ki', satFmt(d.ki, 4)], ['Kd', satFmt(d.kd, 4)],
       [t('tools.kv_raw_derivative'), satFmt(d.raw_derivative, 4)]
     ]);

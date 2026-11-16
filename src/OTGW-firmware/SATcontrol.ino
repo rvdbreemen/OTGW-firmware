@@ -4277,7 +4277,8 @@ static bool satOtLinkStep()
 // TASK-1482 / TASK-1390, Sergeant D entries 121, 126, 129 (restart) and 56, 57 (outside temperature), with the
 // hand-back of entry 47 and the resume of entry 79. Runs from satControlLoopRun() right after satOtLinkStep(),
 // before every SAT sender; returns true while SAT must send nothing of its own. In time order after a boot:
-//   1. initSAT() sends no SAT command (the boot CS=0 is gone, entry 129).
+//   1. initSAT() sends no SAT command (the boot CS=0 is gone, entry 129), and satBootSilenceStep() keeps SAT silent for
+//      the first 60 s after the boot (entry 388); the steps below start after that.
 //   2. Decide once whether the restored state is valid: the PID state restored (satLoadPidState(), which needs
 //      the clock) and a valid outside temperature (restored or live, < 1 h). While the PID file waits for NTP SAT
 //      sends nothing, at most SAT_BOOT_DECIDE_MS; after that the state counts as not valid.
@@ -4297,6 +4298,25 @@ static bool     _sat_bootDecided      = false;
 static bool     _sat_bootTakeover     = false;   // first pass through the gates after boot still to come
 static bool     _sat_quietHandedBack  = false;   // the boot hand-back is on the bus and SAT sent nothing of its own since
 static uint32_t _sat_bootStartMs      = 0;
+
+// Entry 388 (Sergeant D 2026-11-16, Q-357a: "Wait 60 seconds ( don't send any commands ) and then B"): after a boot SAT sends
+// nothing of its own for 60 s, counted from initSAT(). The gate sits in satControlLoopRun() before satOtLinkStep() and
+// satRestartStep(), so the OpenTherm-loss hand-back, the restart hand-back, the TC= push, the mode logic and every sender wait
+// too. It changes no SAT state: when it opens, satRestartStep() decides the boot as before, and until the first room
+// temperature the output is the heating curve only (satPidCurveOnly(), option B; entry 357's curve + P + I + D is for 2.1.0).
+// Boot only: enabling SAT later is not delayed. thermo-nova has no gateway boot (see above), so this is a firmware rule.
+static const uint32_t SAT_BOOT_SILENCE_MS = 60000UL;
+static bool _sat_bootSilenceDone = false;
+
+static bool satBootSilenceStep()
+{
+  if (_sat_bootSilenceDone) return false;
+  const uint32_t nowMs = millis();
+  if ((uint32_t)(nowMs - _sat_bootStartMs) < SAT_BOOT_SILENCE_MS) return true;
+  _sat_bootSilenceDone = true;
+  SATDebugTf(PSTR("SATBOOT phase=silence_end ms=%lu\r\n"), (unsigned long)nowMs);
+  return false;
+}
 
 static void satRestartNotePidLoad(uint8_t result)
 {
@@ -4676,6 +4696,7 @@ void satSendStatusJSON()
     je.field(F("pid_p"),                snap->st.sat.fPidP);
     je.field(F("pid_i"),                snap->st.sat.fPidI);
     je.field(F("pid_d"),                snap->st.sat.fPidD);
+    je.field(F("pid_curve_only"),       satPidCurveOnlyActive());   // TASK-1866: true = pid_i is shown, not applied
     je.field(F("kp"),                   snap->st.sat.fKp, 6);
     je.field(F("ki"),                   snap->st.sat.fKi, 6);
     je.field(F("kd"),                   snap->st.sat.fKd, 6);
@@ -7775,6 +7796,7 @@ static void satControlLoopRun()
     _sat_followNarrPending = false;
     satNarratef_P(PSTR("Target %.1f taken over from the thermostat (follow thermostat)"), settings.sat.fTargetTemp);
   }
+  if (satBootSilenceStep()) return;   // entry 388: no SAT command in the first 60 s after a boot (TASK-1866/1874)
   if (satOtLinkStep()) return;
 
   // TASK-1482 / TASK-1390: restart and outside-temperature gates (entries 121, 126, 129, 56, 57).

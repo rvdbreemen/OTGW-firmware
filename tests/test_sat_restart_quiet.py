@@ -290,6 +290,10 @@ def build_cpp(src: str) -> str:
     decl = "void satDisable(bool persistPid = true);" if "bool persistPid" in disable else ""
     link = _between(src, "// --- satOtLink begin", "// --- satOtLink end")
     restart = _between(src, "// --- satRestart begin", "// --- satRestart end") if fix else ""
+    # Entry 388 (TASK-1866/1874): the 60 s boot silence runs before every step tested here. This harness tests the steps
+    # after it, so the silence is set to 0 in this copy only; scenario 7 of tests/test_sat_loop_integration.py tests the
+    # real 60 s on the whole loop (and a mutant with 0 s goes red there).
+    restart = restart.replace("static const uint32_t SAT_BOOT_SILENCE_MS = 60000UL;", "static const uint32_t SAT_BOOT_SILENCE_MS = 0UL;")
     s0 = src.index("  // If safety tripped, stay disabled until explicitly re-enabled")
     end = "  if (!DUE(timerSATControl)) return;"
     span = src[s0:src.index(end, s0) + len(end)].replace("return;", "return false;")

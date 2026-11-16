@@ -1086,6 +1086,7 @@ Returns the full SAT runtime state including temperatures, PID terms, cycle data
 | `pid_p` | float | Proportional term |
 | `pid_i` | float | Integral term |
 | `pid_d` | float | Derivative term |
+| `pid_curve_only` | bool | True while the output is the heating curve alone (no room temperature yet, or lost): `pid_i` is shown but not applied (TASK-1866) |
 | `kp` | float | Current Kp gain |
 | `ki` | float | Current Ki gain |
 | `kd` | float | Current Kd gain |

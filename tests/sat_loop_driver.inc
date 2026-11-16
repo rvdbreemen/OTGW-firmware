@@ -22,6 +22,7 @@ struct Boiler {
   bool lowOffDenied = false;                                                // MsgID 3 HB bit 4
 } bo;
 static uint32_t g_nextFlow = 0, g_flowPer = 5000, g_nextRet = 0, g_retPer = 10000, g_nextStatus = 0, g_nextCfg = 0, g_nextTr = 0;
+static bool g_muteTr = false;   // TASK-1866 scenario 8: no room temperature from the thermostat
 static bool g_linkDown = false, g_mute25 = false, g_muteRet = false, g_ret28Unknown = false, g_echoMute = false, g_pmAnswers = true;
 static uint32_t g_pmDelay = 300, g_echoLat = 25, g_dt = 10, g_jit = 0;
 static float g_outside = 8.0f, g_room = 20.0f;
@@ -126,7 +127,7 @@ static void loopOnce() {
     if ((int32_t)(now - g_nextRet) >= 0) { g_nextRet = now + g_retPer; sendFrameFor(28); }
     if ((int32_t)(now - g_nextStatus) >= 0) { g_nextStatus = now + 1000; statusFrame(); frame(17, OT_READ_ACK, bo.relmod); }
     if ((int32_t)(now - g_nextCfg) >= 0) { g_nextCfg = now + 20000; sendFrameFor(3); }
-    if ((int32_t)(now - g_nextTr) >= 0) { g_nextTr = now + 5000; tr(); }
+    if ((int32_t)(now - g_nextTr) >= 0) { g_nextTr = now + 5000; if (!g_muteTr) tr(); }
   }
   g_sent[0] = 0;
   handleCommandQueue();
@@ -144,10 +145,11 @@ static void loopOnce() {
 static void run(uint32_t untilRelMs) { while ((uint32_t)(g_ms - g_t0) < untilRelMs) loopOnce(); }
 
 static void snap(const char* tag) {
-  ev("STATE", "%s mode=%d bActive=%d flame=%d flow=%.1f cs=%.1f relmod=%.0f lastCS=%.1f lastCH=%u lastMM=%u pwmOn=%d otLost=%d outMissing=%d extRefused=%u final=%.1f mod=%d idle=%d flood=%d miSent=%d",
+  ev("STATE", "%s mode=%d bActive=%d flame=%d flow=%.1f cs=%.1f relmod=%.0f lastCS=%.1f lastCH=%u lastMM=%u pwmOn=%d otLost=%d outMissing=%d extRefused=%u final=%.1f mod=%d idle=%d flood=%d miSent=%d curveOnly=%d pidI=%.3f pidOut=%.3f curve=%.3f",
      tag, state.sat.eControlMode, (int)state.sat.bActive, (int)bo.flame, bo.flow, bo.cs, bo.relmod, state.sat.fLastSentCS, (unsigned)state.sat.iLastSentCH,
      (unsigned)state.sat.iLastSentMM, (int)state.sat.bPwmFlameRequested, (int)state.sat.bOtLinkLost, (int)state.sat.bOutsideTempMissing,
-     (unsigned)state.sat.iExtCmdRefused, state.sat.fFinalSetpoint, (int)state.sat.iCurrentModulation, (int)_pwm_idle, (int)_flood_active, (int)_sat_miSent);
+     (unsigned)state.sat.iExtCmdRefused, state.sat.fFinalSetpoint, (int)state.sat.iCurrentModulation, (int)_pwm_idle, (int)_flood_active, (int)_sat_miSent,
+     (int)satPidCurveOnlyActive(), state.sat.fPidI, state.sat.fPidOutput, state.sat.fHeatingCurveValue);
 }
 
 int main() {
@@ -172,6 +174,7 @@ int main() {
     else if (!strcmp(cmd, "jitter")) g_jit = (uint32_t)atoi(a);
     else if (!strcmp(cmd, "link")) g_linkDown = atoi(a) == 0;
     else if (!strcmp(cmd, "mute25")) g_mute25 = atoi(a) != 0;
+    else if (!strcmp(cmd, "mutetr")) g_muteTr = atoi(a) != 0;
     else if (!strcmp(cmd, "muteret")) g_muteRet = atoi(a) != 0;
     else if (!strcmp(cmd, "ret28unknown")) { g_ret28Unknown = atoi(a) != 0; g_unsup28 = g_ret28Unknown; }
     else if (!strcmp(cmd, "pmanswers")) g_pmAnswers = atoi(a) != 0;

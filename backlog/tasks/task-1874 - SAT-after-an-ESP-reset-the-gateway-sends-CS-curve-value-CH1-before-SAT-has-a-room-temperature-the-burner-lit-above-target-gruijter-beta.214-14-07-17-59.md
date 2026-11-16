@@ -4,12 +4,12 @@ title: >-
   SAT: after an ESP reset the gateway sends CS (curve value) + CH=1 before SAT
   has a room temperature; the burner lit above target (gruijter beta.214 14:07,
   17:59)
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-11-12T20:56:00Z'
-updated_date: '2026-11-16T08:57:00Z'
-labels:
-  - waiting-on-sergeant-d
+updated_date: '2026-11-16T10:36:00Z'
+labels: []
 milestone: 2.0.0
 dependencies: []
 ordinal: 948000
@@ -21,6 +21,13 @@ ordinal: 948000
 Source: gruijter (Discord 733401267665109054) capture 20261112-121301-upload.zip on 2.0.0-beta.214+5d03c17 (Classic, PIC 6.8), #alpha-testing https://discord.com/channels/812969634638725140/1514720723980259460/1570536002936905839; analysis posted https://discord.com/channels/812969634638725140/1514720723980259460/1570542193934860348. Evidence (transcript lines, checked first-hand by comms): before the Task-watchdog reset at 14:06:20 SAT's last commands were CS=10.0 MM=100 CH=0 (14:06:17, line 73204; SATTICK cs=10.0 ch=0 line 73207). After the reboot (banner line 73267) at 14:07:05.9 the thermostat sends T10010A00 (TSet 10.0) and status [-D---W--], while the gateway sends R90011D34 (TSet 29.20, line 73339) and R00000300 (CH enable, [CD---W--], line 73370). Flame on 14:07:12 with the room at 19.32 (target 19.0), off 14:08:30 (78 s). SAT's first logged command only at 14:07:30 (CS=29.2 MM=100 CH=1, SATTICK room=nan); 'Room temperature back' 14:08:23. Same at 17:59 (R 10011F67 CS 31.4 at 17:59:09, relight 17:59:20, reboot banner line 216013) and at capture start 12:13 (CS 30.2 + CH on). Telnet was down during boot, so the log does not show who queued that first CS. Code comment to verify against this: SATcontrol.ino:4033-4047 at 5d03c17 (satRestart): initSAT sends no SAT command; valid restored state -> nothing sent, the PIC keeps SAT's last CS for about a minute (entry 129); not valid -> entry-47 hand-back once (CS=0, CH=1, MM=T). Neither branch explains CS 29.2 / 31.4 (the curve value) with CH=1 here. Related: Q-P1 (open with Sergeant D, docs/sat/open-questions.md: what SAT sends after a restart, curve + saved P+I+D as thermo-nova vs curve only vs curve + I; entry 115), TASK-1866 (integral display, different issue), the morning 01:08 reboot on beta.182 (curve-only for 22 s, CS 30.1), TASK-1865 (the watchdog resets). Blocked for the behaviour change on Sergeant D's Q-P1 answer; d3 is checking read-only who sends the first CS.
 <!-- SECTION:DESCRIPTION:END -->
 
+## Acceptance Criteria
+<!-- AC:BEGIN -->
+- [x] #1 After a reboot SAT sends no command of its own (CS, CH, MM, TC, SH, MI, SW, TP) for 60 s, then takes over as before (entry 388)
+- [x] #2 Host test on the real SAT loop: no SAT command in the first 60 s, a CS within 5 s after; a mutant without the silence fails
+- [ ] #3 Bench smoke by the bench-tester WITHOUT SAT (no SAT on hardware without a boiler): githash reported, no extra reboot, the boot PM= chain unchanged, REST sat/status carries pid_curve_only; the 60 s timing itself rests on the host loop scenario 7 + mutant
+<!-- AC:END -->
+
 ## Implementation Notes
 
 <!-- SECTION:NOTES:BEGIN -->
@@ -31,4 +38,12 @@ Source: gruijter (Discord 733401267665109054) capture 20261112-121301-upload.zip
 2026-11-16 (95): moved to milestone 2.1.0 under entry 386 (Robert 08:47:36 UTC, 'Mark anything new to the next release'; scope of the initial SAT release = entries 375-385). Entry 357 (Q-P1 A, 2026-11-15) is outside that scope. Known conflict, deliberately deferred and reported to the coordinator: the firmware is curve-only before the first room temperature after a boot (SATpid.ino:186-213 satPidCurveOnly: P, I, D out of the output, restored integral kept and shown), while entry 357 says curve + P + I + D from the restored state as thermo-nova (pid.py:150-155 loads integral and raw derivative; climate.py:370-375 requested_setpoint = pid.output). Implementing 357 changes the control after a reboot, so it waits for 2.1.0; needs an ack from Robert or Sergeant D that the stable ships curve-only at boot.
 
 2026-11-16 (95), correction on the coordinator's call: the milestone move above is undone. Milestone stays 2.0.0, PENDING Sergeant D's answer: 92 puts it to him as one question, A = fix now for the stable release, B = curve-only at boot accepted for the stable release with entry 357 in 2.1.0. Entry 386 ('the restart issue looks resolved') may mean he considers 357 covered. Nothing is built until he answers.
+
+Implemented per Sergeant D entry 388 (2026-11-16 09:32 UTC, Q-357a: 'Wait 60 seconds ( don't send any commands ) and then B'; reading: SAT's own control commands). Before: satRestartStep() decided at the first pass after boot: not valid -> hand-back CS=0/CH=1/MM=T at once, then takeover (loop harness on the old code: CS=0 at 90 ms, CH=1 170, MM=T 250, CS=28.2 330, ... CS=31.8 55320 ms). Fix: satBootSilenceStep() in satControlLoopRun() BEFORE satOtLinkStep() and satRestartStep(): returns while millis()-_sat_bootStartMs < 60000 (initSAT()), boot only, changes no state; then the existing restart logic runs unchanged. Seam with d3 (TASK-1942 PWM-first) agreed: the gate returns before all mode logic, no satSetControlMode/satPwmReset; _sat_flameOffSeen/_sat_pwmRestore untouched. Note: after the silence the not-valid hand-back and SAT's first CS/MM/CH are queued in the same pass; on the PIC queue the hand-back does not reach the wire (the boiler sees SAT's values at once); on the old code it was on the wire ~240 ms before the takeover. The gateway's own boot PM= chain (PM=3/15/48 from initSAT) still goes out at once: not a SAT control command. Tests: new scenario 7 in tests/test_sat_loop_integration.py (real loop): no CS/CH/MM/TC/SH/MI/SW/TP in [0,60 s), a CS within 5 s after, no PWM during the silence; mutant m7 (silence 0) RED with exactly the old sequence. Scenario 8 + mutant m8 for the curve-only marker (TASK-1866). Whole file Ran 21 OK. Harness updates: test_sat_ot_loss stub satBootSilenceStep(); test_sat_restart_quiet sets the silence to 0 in its cut copy (it tests the steps after it; documented). Restart-related sweep green (30 files: cmd_cache 31, cold_cut 8, command_delivery 22, continuous_startup 11, curve_selftune 104/1 skip, dhw_sw_sync 13, diag_events 12, humidity 7, log_to_csv 8, mqtt_state 31, no_return_ignition 19, no_return_startup 20, ot_loss 24, overshoot_sustain 79, pid_cadence 31, pid_resets 17, pm25 16, pm28 7, push_setpoint 10, pwm_anchors 64, pwm_override 83, pwm_start_limit 26, release_retry 5, restart_quiet 20, room_loss 12, sim_end_restore 6, sim_port_equivalence 4, tuner_convergence 5, ws_event_ring 5; plus pid_integral_cap 5, pid_semantics 23, pid_persist 8); evaluate --quick 87/0.
+
+2026-11-16 (95) INTERPRETATION of entry 388 'don't send any commands', recorded as such: (a) we read it as SAT's own control commands (CS, CH, MM, TC, SH, MI, SW, TP). The gateway's own boot PM= chain (PM=3/15/48, started by initSAT() on every PIC board, SAT on or off, TASK-1315/1384, entry 261) still goes out at once; it reads boiler values and changes nothing on the boiler. Put to Sergeant D by 92 as a queued, non-blocking question (with the scope line). (b) Why the dropped hand-back is no loss: after the silence a not-valid restored state queues the hand-back CS=0/CH=1/MM=T and, in the same pass (boiler reply and outside temperature already present), SAT's takeover queues its own CS/MM/CH; the PIC queue keeps the newest value per command, so the net effect on the wire is SAT's CS/MM/CH and nothing in between. The hand-back exists to give the boiler back while SAT is not in control (entry 47); here SAT is in control in that same pass, so there is nothing to give back. Scenario 7 now also asserts that between 60 and 65 s no release frame (CS=0, MM=T) and no CS at or below 10 reaches the wire: Ran 2 OK (s7 + m7) on the fix. When the takeover cannot follow (no boiler reply or no outside temperature yet), the hand-back is not overwritten and goes out as before (satRestartStep() returns true before the takeover).
+
+Source for 'keeps the newest value per command': addCommandToQueue() returns Replaced when an entry for the same command is already queued and updates it in place (OTGW-Core.ino:3952, :4042), PIC queue. OT-Direct (otdCmdTextRing, ADR-242) not checked for coalescing: there the hand-back may still reach the bus just before SAT's own values, which is what the old code did on every board; harmless either way.
+
+The PM= reading is queued for Sergeant D as Q-388a (docs/sat/open-questions.md, 559a378e3, after Q-385a/b/c); 92 relays the answer and entry number.
 <!-- SECTION:NOTES:END -->

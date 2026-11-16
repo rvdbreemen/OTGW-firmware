@@ -106,6 +106,7 @@ static bool _sat_pm25Unanswered = false;   // TASK-1653: satDisable() resets it
 static void satNoReturnFloodOnFlameEdge(bool, bool) {}
 static void satNoReturnFloodStep() {}
 static bool satRestartStep() { return false; }   // TASK-1482: the restart and outside gates are tested in test_sat_restart_quiet.py
+static bool satBootSilenceStep() { return false; }   // entry 388 (TASK-1866/1874): the 60 s boot silence is tested in test_sat_loop_integration.py scenario 7
 static void satSavePwmEnabled(bool) {}
 static void satPidService(uint32_t) {}   // TASK-1368: the 60 s PID service is not under test here
 static void satSetControlMode(int m) { state.sat.eControlMode = m; }

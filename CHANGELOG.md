@@ -6,6 +6,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## [Unreleased]
 
 ### Changed
+- SAT: after a reboot SAT sends no command at all for the first 60 seconds (no hand-back, no setpoint), as Sergeant D asked (entry 388). After that it steers on the heating curve only until the first room temperature arrives. REST `sat/status` has a new field `pid_curve_only`, and the web UI marks the I term as not applied during that time (TASK-1866, TASK-1874).
 - SAT: during a PWM ON phase the modulation suppression setpoint follows the latest boiler flow temperature again, as thermo-nova does. The 2 minute flow average (introduced in beta.330, public in beta.339) is removed: Sergeant D confirmed that no average is needed, because the 180 s flame-on rule already covers the light-off (entry 383, TASK-1990).
 ### Fixed
 - PIC: after a boot the PIC settings panel fills within about a minute again. The settings readout no longer waits 4 to 5 minutes for the MQTT discovery run to finish; it now sends its next query right after a discovery step instead of waiting for the next 3-second tick, and stays at least 3 seconds between queries (TASK-1971).

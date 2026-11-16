@@ -1373,6 +1373,7 @@
     "kv_fetch_errors": "Abruffehler",
     "kv_humidity": "Luftfeuchte",
     "kv_i_term": "I-Anteil",
+    "kv_i_not_applied": "(nicht angewendet: nur Heizkurve bis eine Raumtemperatur vorliegt)",
     "kv_indoor_sensor": "Innensensor",
     "kv_last_blocked_cmd": "Zuletzt blockierter Befehl",
     "kv_last_cycle": "Letzter Takt",

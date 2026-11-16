@@ -1373,6 +1373,7 @@
     "kv_fetch_errors": "Ophaalfouten",
     "kv_humidity": "Luchtvochtigheid",
     "kv_i_term": "I-term",
+    "kv_i_not_applied": "(niet toegepast: alleen stooklijn tot er een kamertemperatuur is)",
     "kv_indoor_sensor": "Binnensensor",
     "kv_last_blocked_cmd": "Laatst geblokkeerd commando",
     "kv_last_cycle": "Laatste cyclus",

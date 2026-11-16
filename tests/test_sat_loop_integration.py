@@ -275,6 +275,39 @@ def check_s6(tc, r):
     tc.assertEqual(bad, [], "CS= in PWM ON not equal to the latest flow - %.1f: %r" % (OFFSET, bad[:6]))
 
 
+# ---- scenario 7: no SAT command in the first 60 s after a boot (TASK-1866/1874, Sergeant D entry 388) -------------------------------
+S7 = ["run 120000", "snap end"]
+BOOT_SILENCE_MS = 60000
+SAT_CMDS = ("CS=", "CH=", "MM=", "TC=", "SH=", "MI=", "SW=", "TP=")   # SAT's own commands; the boot PM= chain of initSAT() is the gateway's
+
+
+def check_s7(tc, r):
+    early = [(t, x) for t, x in r.tx(0, BOOT_SILENCE_MS) if x.startswith(SAT_CMDS)]
+    tc.assertEqual(early, [], "SAT command(s) in the first 60 s after the boot (entry 388): %r" % early[:8])
+    late = [(t, x) for t, x in r.tx(BOOT_SILENCE_MS, BOOT_SILENCE_MS + 5000) if x.startswith("CS=")]
+    tc.assertTrue(late, "SAT did not take over within 5 s after the 60 s boot silence")
+    # the not-valid hand-back is queued in the same pass as SAT's takeover: on the wire only SAT's own values appear,
+    # no release frame (CS=0, MM=T) is left between the silence and the takeover
+    after = [x for t, x in r.tx(BOOT_SILENCE_MS, BOOT_SILENCE_MS + 5000) if x.startswith(SAT_CMDS)]
+    release = [x for x in after if x in ("CS=0", "CS=0.0", "MM=T")]
+    tc.assertEqual(release, [], "a hand-back frame reached the wire right after the silence: %r" % after)
+    tc.assertTrue(all(float(x[3:]) > 10.05 for x in after if x.startswith("CS=")), "a CS after the silence is not SAT's setpoint: %r" % after)
+    pwm_early = [t for t, x in r.kind("MODE", 0, BOOT_SILENCE_MS) if x == "2"]
+    tc.assertEqual(pwm_early, [], "PWM entered during the boot silence (d3's PWM-first start comes after it)")
+
+
+# ---- scenario 8: curve only until the first room temperature, marked as such (TASK-1866, entries 115 and 388 option B) ---------------
+S8 = ["mutetr 1", "run 180000", "snap curve", "mutetr 0", "run 260000", "snap room"]
+
+
+def check_s8(tc, r):
+    c, _ = r.snap("curve")
+    tc.assertEqual(c["curveOnly"], "1", "no room temperature yet, but pid_curve_only is not set: %r" % c)
+    tc.assertAlmostEqual(float(c["pidOut"]), float(c["curve"]), places=2, msg="curve-only output is not the heating curve: %r" % c)
+    w, _ = r.snap("room")
+    tc.assertEqual(w["curveOnly"], "0", "a room temperature arrived, but pid_curve_only stays set: %r" % w)
+
+
 class SatLoopIntegration(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -290,6 +323,12 @@ class SatLoopIntegration(unittest.TestCase):
 
     def test_s6_pwm_on_suppression_follows_the_latest_flow(self):
         check_s6(self, Run(self.exe, S1))
+
+    def test_s7_no_sat_command_in_the_first_60_s_after_boot(self):
+        check_s7(self, Run(self.exe, S7))
+
+    def test_s8_curve_only_until_the_first_room_temperature_is_marked(self):
+        check_s8(self, Run(self.exe, S8))
 
     def test_s1_jittered_loop_period(self):
         # loop period 10 ms + a seeded 0-40 ms jitter (average ~30 ms); the real DUE() timers must still produce the same behaviour
@@ -344,6 +383,14 @@ class Mutants(unittest.TestCase):
     def test_m6_suppression_not_the_latest_flow(self):
         # TASK-1990: a CS that is not the latest flow minus the offset (here the offset twice) must fail scenario 6
         self.red("m6", mutant("SATcontrol.ino", "  float cs = satGetFlowTemp() - settings.sat.fModSupOffset;", "  float cs = satGetFlowTemp() - 2.0f * settings.sat.fModSupOffset;"), S1, check_s6)
+
+    def test_m7_boot_silence_removed(self):
+        # TASK-1866/1874: without the 60 s silence SAT hands back / takes over at boot and scenario 7 must fail
+        self.red("m7", mutant("SATcontrol.ino", "static const uint32_t SAT_BOOT_SILENCE_MS = 60000UL;", "static const uint32_t SAT_BOOT_SILENCE_MS = 0UL;"), S7, check_s7)
+
+    def test_m8_curve_only_not_marked(self):
+        # TASK-1866: without the marker in satPidCurveOnly() scenario 8 must fail
+        self.red("m8", mutant("SATpid.ino", "bool satPidCurveOnlyActive() { return isnan(_pid_lastError); }", "bool satPidCurveOnlyActive() { return false; }"), S8, check_s8)
 
     def test_m5_handback_every_pass(self):
         self.red("m5", mutant("SATcontrol.ino", "    state.sat.bOtLinkLost = true;          // after satDisable(), which clears it", "    state.sat.bOtLinkLost = false;         // MUTANT"),
