@@ -3,11 +3,11 @@ id: TASK-1751
 title: >-
   OT-Direct master mode: TT=0 also clears an MQTT room_setpoint or BS= write on
   MsgID 16
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-09T09:29:00Z'
-updated_date: '2026-11-16T19:26:00Z'
+updated_date: '2026-11-16T19:33:00Z'
 labels:
   - otdirect
 milestone: 2.0.0
@@ -56,3 +56,9 @@ Bench 09 on .61, beta.356+4601510 (code of pushed cf29dd198), master mode, SAT o
 
 AC2 ticked by 09 (2026-11-16). Bench on the wire, .61 OT-Direct master, SAT off, sim false, on 353+3a14423 (15:20) and 356+4601510 (19:35), identical results. BS=19 -> one R90101300 at +1.6/+1.7 s. TT=20.5 -> R90101480, then WRITE 100 = 3. TT=0 -> R90101300 at once (remaining BS value), then WRITE 100 = 0 (on 341 nothing was sent in 360 s). BS=0 -> no further WRITE 16 in 90 s. Covered by the HOST TEST only, not on this bench: the 15 s refresh schedule (the bus is offline without a boiler; OTDirect.ino:2299 skips everything but MsgID 0); BS=/BS=0/MQTT room_setpoint during TT=/TC=; and gateway mode unchanged. Evidence: 09 scratchpad b353/run2/, b356/bs/.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+OT-Direct master mode: one MsgID 16 write slot, TT=/TC= while active, else the BS= / MQTT room setpoint. AC1: state test (TT=0 leaves the room value). AC2 (09 ticked): host test MasterWire16Cases W1-W6 + R2, fix 52/52, old 6 FAIL; bench .61 on 353 and 356 (= pushed cf29dd198): BS=19 -> R90101300, TT=20.5 -> R90101480 + WRITE 100=3, TT=0 -> R90101300 at once + WRITE 100=0 (old 341: nothing in 360 s), BS=0 -> no MsgID 16. Host-only (09's note): the 15 s schedule refresh (the bench bus is offline, scheduler sends only MsgID 0), BS=/BS=0 during TT=/TC=, gateway mode unchanged. PIC has no master-mode MsgID 16 (gateway.asm 6.6 :1818-1830); ADR-223 is gateway mode only, no ADR change. Pushed cf29dd198, posted 1571965973295009792.
+<!-- SECTION:FINAL_SUMMARY:END -->

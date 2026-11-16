@@ -1,11 +1,11 @@
 ---
 id: TASK-2004
 title: Pace the hourly stats publish (sendMQTTheapdiag)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-16T13:26:00Z'
-updated_date: '2026-11-16T19:25:00Z'
+updated_date: '2026-11-16T19:33:00Z'
 labels:
   - mqtt
   - heap
@@ -56,3 +56,9 @@ AC3/AC4 bench (09 on .61, OTGW32 no PSRAM, 2.0.0-beta.356+4601510 = code of push
 
 AC3/AC4 ticked by 09 (2026-11-16). Bench .61 (OTGW32, no PSRAM), 2.0.0-beta.356+4601510 (code = pushed cf29dd198 per 95). SAT enabled since 19:41:33, sim OFF (settings satsimulation false, sat/status simulation false, active false), 25238 off, no diag recording. 20:00 mark, window 19:59:30-20:00:52: hd_min_free_heap 29,888 -> 29,888 UNCHANGED (old 353 at 16:00, same conditions: 31,156 -> 6,484). Telnet free-heap prefix 19:59:50-20:00:10: min 59,728, max 63,308, no drop. Telnet stats/* sends: 26, 20:00:00.009-20:00:02.564, gaps 100-104 ms. Broker: 26/26 live, 26 distinct, first 20:00:00.937. mqtt_drops 0, '[drip] slowed' 0. Settings byte-identical after SAT off. Evidence: 09 scratchpad hour2000/ (hour.log, telnet.raw, broker.txt, simcheck.txt) and hour1600/ (old).
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+The 26 hourly otgw-firmware/stats/* topics are paced, one per >=100 ms from loopMQTTStatsPacer(), waiting instead of dropping while CRITICAL. AC1: 09 on .61 (no PSRAM, beta.353, SAT on) 16:00: hd_min 31,156 -> 6,484, 26/26 topics, the burst the only publishes in that second. AC2: tests/test_mqtt_stats_pacer.py on the real sliced functions, fix 6/6, old 4 FAIL (26 in one call, 0 ms gaps, 26 dropped under CRITICAL, no stop on disconnect). AC3/AC4 (09 ticked): .61 beta.356+4601510 (= pushed cf29dd198) 20:00 with SAT on and sim off: hd_min 29,888 -> 29,888 unchanged, telnet free heap min 59,728, 26 sends over 2.56 s with 100-104 ms gaps, 26/26 on the broker, mqtt_drops 0. Gates: tests 290/292 (2 fails pre-existing on origin, now fixed there), evaluate 87/0. Pushed e267a61fc..cf29dd198, zip posted 1571965973295009792. Not verified: the exact allocation behind the ~44-57 KB burst (pbuf per small segment is an inference; lwIP config TCP_OVERSIZE_MSS 1 / SND_BUF 5744 confirmed); why the burst was ~12 KB bigger with SAT enabled; boards with PSRAM never showed the dip.
+<!-- SECTION:FINAL_SUMMARY:END -->

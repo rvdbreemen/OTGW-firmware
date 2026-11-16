@@ -3,11 +3,11 @@ id: TASK-1999
 title: >-
   OT-Direct: the boot-time 'Thermostat disconnected' line lands on port 25238 as
   a client connects, so pyotgw (HA) fails its connect with IndexError
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-16T10:48:00Z'
-updated_date: '2026-11-16T19:26:00Z'
+updated_date: '2026-11-16T19:33:00Z'
 labels:
   - bug
   - ot-direct
@@ -51,3 +51,9 @@ Bench 09 on .61, beta.356+4601510 (code of pushed cf29dd198), 25238 on for the t
 
 AC1/AC2 ticked by 09 (2026-11-16). AC1: pyotgw 2.2.3 connect to 25238 right after /ReBoot on .61 (OT-Direct, no thermostat), old code 2.0.0-beta.341+3cb72c3: 2 of 5 failed with IndexError at pyotgw.py:778, plus 1 of 1 in the heap run. Raw bridge on 351+597c163: 'Thermostat disconnected' x1 on the bridge. AC2: fix 352+e18ccbf, same reproduction 10/10 OK (connect done 18.5-19.3 s); raw bridge 0 thermostat lines while telnet still shows the line; again on 356+4601510 (bridge 0). 'Thermostat connected/disconnected' on a REAL thermostat loss and return: HOST TEST ONLY, no thermostat on the bench (accepted by 95). Evidence: 09 scratchpad pyotgw/, b352/ (old351/, new352/, bc/), b356/raw/.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+OT-Direct: the boot-time 'Thermostat disconnected' of a thermostat never seen goes to processOT() only, not to port 25238 (PIC prints it before any client can connect). AC1/AC2 (09 ticked): bench .61, pyotgw 2.2.3 connect after /ReBoot: old 341 3/5 (IndexError pyotgw.py:778), fix 352 10/10; 356 (= pushed cf29dd198): bridge 0 thermostat lines, telnet still shows the line. AC3: tests/test_otd_thermostat_lines.py 6/6 on the fix, 2 FAIL on the old code. Host-only: a real thermostat loss/return (no thermostat on the bench). Upstream: mvn23/pyotgw#107 (length check in process_statusfields_v4). Pushed cf29dd198, posted 1571965973295009792.
+<!-- SECTION:FINAL_SUMMARY:END -->
