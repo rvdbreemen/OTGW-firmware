@@ -1056,6 +1056,7 @@ De onderstaande commando's geven de payload ongewijzigd door aan de genoemde ins
 | Onderwerpsuffix | Instelling |
 |----------------|-----------|
 | `sat/overshoot_margin` | `SATovershootmargin` |
+| `sat/pwm_switch_margin` | `SATpwmswitchmargin` |
 | `sat/heating_system` | `SATsystem` |
 | `sat/manufacturer` | `SATmanufacturer` |
 | `sat/max_modulation` | `SATmaxmodulation` |
