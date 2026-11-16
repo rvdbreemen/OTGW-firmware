@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-15T11:48:00Z'
-updated_date: '2026-11-16T05:19:00Z'
+updated_date: '2026-11-16T07:24:00Z'
 labels:
   - pic
   - bug
@@ -23,9 +23,9 @@ Found by 09 on .63 (beta.306+041400e, 2026-11-15): right after a reboot the PIC 
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 After a boot the PIC settings fill within about 60 s also while the discovery drip runs
+- [x] #1 After a boot the PIC settings fill within about 60 s also while the discovery drip runs
 - [ ] #2 The ADR-088 status-burst window and cooldown stay intact (evaluate gates green); host test or trace on the real scheduling shows the cycle advancing during the drip, red on the old code
-- [ ] #3 Bench: reboot .63, /api/v2/pic/settings 15/15 within 60 s
+- [x] #3 Bench: reboot .63, /api/v2/pic/settings 15/15 within 60 s
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -38,4 +38,6 @@ Cause (code reading, 2026-11-16): doTaskEvery3s (timer3s, 3 s, SKIP_MISSED_TICKS
 
 <!-- SECTION:NOTES:BEGIN -->
 Repro + fix (session 95, 2026-11-16 06:05-06:18): tests/test_pic_settings_cycle_drip.py compiles the real dripDueWithinMs (MQTTstuff.ino), the real PIC readout block (OTGW-Core.ino, picSettingsCycleActive..handlePRresponse) and the real doTaskEvery3s, loop simulated in firmware order (3 s task, drip tick + due time, pollPICsettingsQuery when present), 10 ms steps. Old code (origin/dev e255ab20b): worst phase (drip 300 ms after the 3 s tick) 0 PR= in 60 s -> FAILED (failures=2: 0 != 15, no gaps); phase 700 ms and no-drip complete (the phase lock). Fix: Ran 4 OK (15 within 60 s, >= 3 s apart, none within 500 ms before a drip tick, other phases OK). tests/test_pic_temp_sensor_port.py adjusted (no early return before pollPicTempSensor) 8 OK. Sweep of 25 tests touching doTaskEvery3s/queryNextPICsetting/drip/statusBurst/OTGW-firmware.ino: all OK. evaluate --quick 88 pass 0 fail (ADR-088 gates included). Opus review running.
+
+2026-11-16 bench 09 on .63 (Classic, PIC 6.8), old-vs-fix on the same reproduction: an esptool otadata dump over COM8 (USB reset, lastreset 'USB reset (host)'), then GET /api/v2/pic/settings every 5 s, counting non-empty fields of 15. OLD 2.0.0-beta.339+bd7a133 (08:03:54): REST up 9.4 s, 0/15 at 80 s, first field 228.5 s, 15/15 at 274.9 s. FIX 2.0.0-beta.340+7c12dfd (sha ino de3eb274..006b confirmed by 95; 08:14:30): REST up 9.3 s, fields from the first answer (9.3 s), 15/15 at 54.9 s. MQTT connected in both; bootcount 151 -> 153 (OTA) -> 154 (dump); no crash fields; settings.ini and /api/v2/settings byte-identical to before the flash. SAT is enabled and active on .63 (its standing config), so the drip and SAT ran as in the field. Evidence: 09 scratchpad t1971/ (poll-old339.log, poll-fix340.log, picpoll.py, flash340.log).
 <!-- SECTION:NOTES:END -->
