@@ -7,7 +7,7 @@ status: To Do
 assignee:
   - '@ba'
 created_date: '2026-11-16T16:35:00Z'
-updated_date: '2026-11-16T19:41:00Z'
+updated_date: '2026-11-16T19:46:00Z'
 labels:
   - sat
   - field
@@ -52,4 +52,6 @@ Test data and assertions. indigo's SATTICK lines carry pid=, flow=, flame=, mode
 SEPARATE QUESTION, keep it out of Q-2005a (ba's pointer 2): indigo's 16:00:58 PWM entry happened during a band pause (SATTICK 16:00:28: ch=0, flame=0, flow=67.3, mode=1; 16:00:58 'Control mode: PWM (flow 67.3 stayed above setpoint 31.0 + 1.5 for 30 s)'). The IN rule fired on residual flow with CH off and no flame, which the missing flame check on IN allows; thermo-nova would not (heater ON gate, heating_control.py:276-278). That is the coordinator/92 question for Sergeant D (hold the switch during a band pause?), not part of the ping-pong fix.
 
 CORRECTION (95, same evening) to the thermo-nova constant citations in the prep notes above, re-checked by grep: OVERSHOOT_SUSTAIN_SECONDS = 60.0 is const.py:21, UNDERHEAT_SUSTAIN_SECONDS = 180.0 is const.py:22, SATURATION_SUSTAIN_SECONDS = 300.0 is const.py:23; OVERSHOOT_MARGIN_CELSIUS = 3.0 is cycles/const.py:10 and UNDERSHOOT_MARGIN_CELSIUS = -3.0 is cycles/const.py:11 (imported in heating_control.py:21). The notes above wrongly put the margins at const.py:21/22 and the times at const.py:18-20. The task description's citations (const.py:21, :22, cycles/const.py:10) are right for the times and the enter margin.
+
+Citations verified at pin 7beaaf5 via raw.githubusercontent (coordinator, 2026-11-16): heating_control.py:262/:276/:288/:296/:304, cycles/const.py:10-11, const.py:21-22 match. The local copy other-projects/SAT-releases-thermo-nova is at c5211afe, not the pin (coordinator's finding); it is a plain folder inside the other-projects submodule (770aa45b), so 95 could not check its upstream commit locally.
 <!-- SECTION:NOTES:END -->
