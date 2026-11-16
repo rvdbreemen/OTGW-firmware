@@ -10403,6 +10403,73 @@
         "supersedes": [],
         "superseded_by": null
       }
+    },
+    {
+      "id": "ADR-252",
+      "title": "Every SAT heating start runs in PWM first and no PWM to continuous switch fires within 60 s after the flame lights",
+      "path": "ADR-252-every-sat-heating-start-runs-in-pwm-first-and-no-pwm-to-continuous-switch-fires-within-60-s-after-the-flame-lights.md",
+      "format": "canonical",
+      "status": "Proposed",
+      "date": "2026-11-16",
+      "decision_summary": "A heating start enters PWM through satSetControlMode(), and a start gate keeps every PWM to continuous exit quiet unt...",
+      "topics": [
+        "control mode",
+        "heating start",
+        "pwm",
+        "sat"
+      ],
+      "aliases": [
+        "entry 385",
+        "pwm first",
+        "pwm-first start",
+        "start gate",
+        "start sequence"
+      ],
+      "components": [
+        "satPwmFirstStart",
+        "satStartGateActive"
+      ],
+      "symbols": [
+        "SAT_START_GATE_MS",
+        "satPwmFirstStart",
+        "satRestoreDeferredStep",
+        "satStartGateActive",
+        "satStartGateOpen"
+      ],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [
+          "Enter PWM at every heating start through satSetControlMode(), for every requested control mode.",
+          "Enter it only on a tick with a known flow temperature, with the first PWM phase ON in that tick.",
+          "Keep the max-setpoint, underheat, saturation and end-of-cycle underheat exits quiet until 60 s after the first CH flame-on of the start.",
+          "Leave the mode as it is when SAT takes over while a flame burns.",
+          "Leave PWM on a heater OFF as before (ADR-199)."
+        ],
+        "must_not": [
+          "Put PWM on while the heater is OFF (no PWM at initSAT()).",
+          "Reset the exit timers when the gate ends.",
+          "Wait for a MsgID 3 reply before the PWM entry or the restore (ADR-251)."
+        ],
+        "exceptions": [
+          "The 60 s boot silence of entry 388 comes first: nothing, mode logic included, runs before it ends."
+        ],
+        "verification": [
+          "tests/testsatpwmfirststart.py (real SAT sources in the loop harness): 14 tests green on the fix, 8 red on origin/dev 2268516db (cases a, a2, b, c, d, e, f, i), with mutant tests for the flame-off guard, the resume reset and the flow check.",
+          "tests/testsatloopintegration.py (21 tests, incl. the no-return flood at a PWM-first start and the boot silence).",
+          "Bench: an OTGW Classic bench unit with SAT on showed SATMODE from=1 to=2, Control mode: PWM (heating start) with duty 1.00 at the heater OFF to ON edge after the boot silence, then the flame; the first PWM to continuous switch came 90 s..."
+        ]
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
     }
   ],
   "relationships": [
@@ -17357,6 +17424,30 @@
     {
       "source": "ADR-251",
       "target": "ADR-249",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-252",
+      "target": "ADR-196",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-252",
+      "target": "ADR-199",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-252",
+      "target": "ADR-236",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-252",
+      "target": "ADR-251",
       "type": "related",
       "resolved": true
     }
