@@ -8,7 +8,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-12T20:56:00Z'
-updated_date: '2026-11-16T11:59:00Z'
+updated_date: '2026-11-16T15:28:00Z'
 labels: []
 milestone: 2.0.0
 dependencies: []
@@ -52,4 +52,6 @@ The PM= reading is queued for Sergeant D as Q-388a (docs/sat/open-questions.md, 
 Pushed 051f323f8..55dd8f015 unchanged (beta.348). Bench 09 on .61 (OT-Direct, SAT off, 2026-11-16): githash 55dd8f0, no extra reboot, boot telnet 341 vs 348 both with 0 PM= and 0 SAT command lines, sat/status pid_curve_only false, settings only gained ba's SATpwmswitchmargin; evidence 09 scratchpad b348\. No own post: ba's 349 build covers 348. AC3 for 09 to tick.
 
 2026-11-16: Sergeant D entry 395 (Q-388a 'My answer is A and should be part of this release', 11:36 UTC, msg 1571851528489410632) confirms the interpretation above: the PM=3/15/48 start-up reads may run during the 60 s wait; the wait covers SAT's own control commands only; scope 2.0.0. No code change (beta.348 already does this).
+
+CORRECTION by 09, 2026-11-16 16:30: 09's .63 observations for this task (349 boot: SAT takeover at +61.6 s after a silence, sent to the coordinator and the developer by session message) ran with the SAT software simulator ON (satsimulation true; switched off 16:27:11). REAL: the boot telnet timing of the first SAT command and the SATBOOT lines, which are firmware sequencing. SIMULATOR: any flame/flow follow-up after the takeover. The AC3 smoke in the note above was on .61 with SAT off and is not affected.
 <!-- SECTION:NOTES:END -->

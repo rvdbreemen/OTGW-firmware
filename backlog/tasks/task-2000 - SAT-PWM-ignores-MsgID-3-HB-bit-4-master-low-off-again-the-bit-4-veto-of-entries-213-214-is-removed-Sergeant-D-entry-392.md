@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-16T11:08:00Z'
-updated_date: '2026-11-16T15:27:00Z'
+updated_date: '2026-11-16T15:28:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -52,4 +52,6 @@ Soak 09 on .63 (Classic, PIC 6.8, its standing SAT config, no boiler), beta.350+
 2026-11-16 (95) ADR-251 Accepted by Robert (Discord DM 1571893214372438150, answer A, relayed by the coordinator), set through adr-kit accept (strict lint passed after the SAT/PWM acronyms were expanded at first use and the Status line split); README and ADR-INDEX show Accepted. The task has no separate ADR AC; AC6 (field, indigo_light) stays open.
 
 CORRECTION 2026-11-16 (95, from the coordinator) to the .63 soak note above (fcd3c258c): SAT SIMULATION was on on .63 all day. The flow values (31.1 C), the two PWM entries at 13:28:33 and 13:53:33 and SATTICK mode=2 came from the simulator, not from a boiler; they show the firmware path accepts PWM, not real boiler behaviour. Real device evidence from that run is only the REST value pwm_veto_reason/path 1/1 on beta.349 -> 0/0 on beta.350 (MsgID 3 no longer vetoes), plus the stability numbers. The task's ticked ACs rest on host tests and are unaffected; AC6 (field, indigo_light's Vitodens) is the real-boiler proof and stays open.
+
+CORRECTION by 09, 2026-11-16 16:30: the .63 soak above (beta.350, 13:14-14:15) ran with the SAT SOFTWARE SIMULATOR ON (satsimulation true; .63 has no boiler and no thermostat). 'Its standing SAT config' was the simulator, and 09 did not check the flag. The flag was found by the coordinator's check and switched off at 16:27:11 (only that line changed in settings.ini). REAL, firmware or REST state: githash, bootcount 169 flat, MQTT 60/60, heap 45.7-46.7 KB, no panic/WDT, settings byte-identical, and the REST flags pwm_veto_reason/path 1/1 on 349 -> 0/0 on 350. SIMULATOR, not hardware evidence: the two PWM entries (13:28:33, 13:53:33, 'flow 31.1 stayed above setpoint 29.0 + 1.5 for 30 s'), the flow values and the SATTICK mode=2 counts. The veto lifting is shown; PWM entry against a real boiler is not.
 <!-- SECTION:NOTES:END -->
