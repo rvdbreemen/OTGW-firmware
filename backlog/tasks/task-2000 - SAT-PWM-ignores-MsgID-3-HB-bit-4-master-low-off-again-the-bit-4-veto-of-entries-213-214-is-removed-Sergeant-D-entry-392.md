@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-16T11:08:00Z'
-updated_date: '2026-11-16T15:28:00Z'
+updated_date: '2026-11-16T16:29:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -54,4 +54,6 @@ Soak 09 on .63 (Classic, PIC 6.8, its standing SAT config, no boiler), beta.350+
 CORRECTION 2026-11-16 (95, from the coordinator) to the .63 soak note above (fcd3c258c): SAT SIMULATION was on on .63 all day. The flow values (31.1 C), the two PWM entries at 13:28:33 and 13:53:33 and SATTICK mode=2 came from the simulator, not from a boiler; they show the firmware path accepts PWM, not real boiler behaviour. Real device evidence from that run is only the REST value pwm_veto_reason/path 1/1 on beta.349 -> 0/0 on beta.350 (MsgID 3 no longer vetoes), plus the stability numbers. The task's ticked ACs rest on host tests and are unaffected; AC6 (field, indigo_light's Vitodens) is the real-boiler proof and stays open.
 
 CORRECTION by 09, 2026-11-16 16:30: the .63 soak above (beta.350, 13:14-14:15) ran with the SAT SOFTWARE SIMULATOR ON (satsimulation true; .63 has no boiler and no thermostat). 'Its standing SAT config' was the simulator, and 09 did not check the flag. The flag was found by the coordinator's check and switched off at 16:27:11 (only that line changed in settings.ini). REAL, firmware or REST state: githash, bootcount 169 flat, MQTT 60/60, heap 45.7-46.7 KB, no panic/WDT, settings byte-identical, and the REST flags pwm_veto_reason/path 1/1 on 349 -> 0/0 on 350. SIMULATOR, not hardware evidence: the two PWM entries (13:28:33, 13:53:33, 'flow 31.1 stayed above setpoint 29.0 + 1.5 for 30 s'), the flow values and the SATTICK mode=2 counts. The veto lifting is shown; PWM entry against a real boiler is not.
+
+2026-11-16 AC6 field evidence (comms 92): indigo_light's capture 20261116-144953-upload-clean.zip, sent by Sergeant D by DM (msg 1571920739253092412), analysed with /analyze-capture; archived at RvdB/OTGW-field-data/indigo_light/20261116-144953/ (zip sha256 1573a14c...bd84; analysis/ holds the summary, the SAT timeline and charts). Firmware 2.0.0-beta.350+9011c3c, PIC 16F1847, Viessmann Vitodens (MemberID 33), SAT enabled, simulation_enable false / simulation OFF (real boiler), 14:49:54-16:56:34 tester local time, 21939 frames, 0 telnet gaps. PWM entered on the real boiler: telnet 'SAT: Control mode: PWM' at 16:00:58 (flow 67.3 above setpoint 31.0 + 1.5 for 30 s) and 16:17:58; CH flame lit inside a PWM ON phase at 16:18:36; SATTICK mode=2 pwm=1 ticks present. The 'before' half of AC6 (a beta.339 capture) was not made: Sergeant D told indigo 'No, just run beta.350' (#alpha-testing 1571879271532724316). AC6 left for the owner/coordinator to tick or reword.
 <!-- SECTION:NOTES:END -->
