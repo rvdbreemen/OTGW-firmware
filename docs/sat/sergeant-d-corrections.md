@@ -7962,3 +7962,17 @@ Robert, 16:18:42 UTC (https://discord.com/channels/812969634638725140/9144987300
 **Open:** Q-399a (https://discord.com/channels/812969634638725140/1105556725714649128/1571960731983945864): A resume below target + 0.1 / B below target - 0.1 as now / C below the target; our advice A; scope: this release recommended. No code change before his answer.
 
 **Task:** TASK-1887 (owner ba).
+
+## 400. Interpretation (ours, not Sergeant D's words) of entry 398 for an ON phase that sees CH allowed again (2026-11-16; open as Q-398a)
+
+**Source:** none from Sergeant D. Written by the comms session for ba (TASK-1887) after d3's review finding F4, so that the firmware's reading of an edge case of entry 398 is on record before the code is pushed. This whole entry is our interpretation; it records no words of Sergeant D.
+
+**What the firmware does (ba's post build beta.358, TASK-1887; functions satPwmBeginOn() and satPwmCountOnWhenChAllowed() in SATcontrol.ino; not yet on origin/dev when this was written, so no line numbers):** an ON phase that starts while the band stop holds CH off is not counted (entry 398). If the band allows CH again while that same ON phase still runs, the phase is counted once at that moment. During the 180 s minimum-burn wait (entry 376) CH is still 1, so those phases count as before.
+
+**Why (our reasoning):** entries 59, 90 and 95 count every PWM ON phase in which the burner may start, lit or not; from the moment CH is allowed again the phase is such a phase. thermo-nova counts when the PWM status turns ON, not on a flame edge (pwm.py:160, `self._current_cycle += 1`, after the limit check at pwm.py:156-158); thermo-nova has no band.
+
+**Changes an earlier entry:** none; it reads entry 398 together with entries 59, 90 and 95. Entry 398 is not rewritten.
+
+**Open:** Q-398a (queued, asked after Q-2005a and Q-399a).
+
+**Task:** TASK-1887 (owner ba).

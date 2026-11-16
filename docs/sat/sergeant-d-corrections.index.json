@@ -5289,6 +5289,19 @@
     "TASK-1887"
    ],
    "confirmed_by_entry": null
+  },
+  {
+   "id": 400,
+   "title": "Interpretation (ours, not Sergeant D's words) of entry 398 for an ON phase that sees CH allowed again (2026-11-16; open as Q-398a)",
+   "date": "2026-11-16",
+   "source": "port-team",
+   "kind": "interpretation",
+   "discord_link": null,
+   "supersedes": [],
+   "tasks": [
+    "TASK-1887"
+   ],
+   "confirmed_by_entry": null
   }
  ]
 }
