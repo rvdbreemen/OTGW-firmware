@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : diagRecorderStuff.h
-**  Version  : v2.0.0-beta.343
+**  Version  : v2.0.0-beta.344
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -31,7 +31,7 @@
 **  and also take the lock around the state they change. `active` is a volatile
 **  flag read without the lock by the capture points; it is the cheap no-op
 **  test when no recording runs. A capture point that reads `active` true and
-**  then races with stop() finds `ring == nullptr` under the lock and drops.
+**  then races with stop() finds `active == false` under the lock and drops.
 **
 **  TERMS OF USE: GNU GPLv3. See bottom of file.
 ***************************************************************************
@@ -302,7 +302,7 @@ struct DiagRecorder {
   // --- state under the lock ---
   const DiagEnv* env = nullptr;
   uint8_t*  mem = nullptr;                  // ring blocks, then the caches
-  uint8_t*  ring = nullptr;                 // == mem while recording
+  uint8_t*  ring = nullptr;                 // == mem while recording, and after a stop on PSRAM (data kept)
   bool      memIsPsram = false;
   uint32_t  nBlocks = 0;
   uint32_t  curSeq = 0;                     // block_seq of the block being written
@@ -313,6 +313,7 @@ struct DiagRecorder {
   uint32_t  droppedTotal = 0;               // records dropped over the recording (gap records carry the same counts)
   DiagStartResult lastStart = DIAG_START_OK;
   uint32_t  psramMemBytes = 0;              // size of the never-freed PSRAM block, 0 = not allocated
+  uint32_t  gen = 0;                        // recording generation, +1 per start(): a download serves only its own recording
 
   // caches (point into mem)
   uint16_t* otKey = nullptr; uint32_t* otVal = nullptr; uint8_t otBits = 0;
@@ -334,7 +335,12 @@ struct DiagRecorder {
     const uint8_t mb = psram ? DIAG_REC_PSRAM_MQ_BITS : DIAG_REC_HEAP_MQ_BITS;
     const size_t total = (size_t)blocks * DIAG_REC_BLOCK_SIZE + cacheBytes(ob, mb);
     uint8_t* m = nullptr;
-    if (mem && !memIsPsram) { e.freeHeapBlock(mem); mem = nullptr; ring = nullptr; }   // left by a stop() that lost the lock
+    if (mem && !memIsPsram) {                               // left by a stop() that lost the lock: detach it under the lock,
+      if (!e.lockWait(50)) return lastStart = DIAG_REFUSED_ALLOC;   // so no download filler copies from it while it is freed
+      uint8_t* old = mem; mem = nullptr; ring = nullptr; haveBlock = false; used = 0;
+      e.unlock();
+      e.freeHeapBlock(old);
+    }
     if (psram) {
       if (mem && memIsPsram) {
         m = mem;                                            // allocated by an earlier start, never freed
@@ -363,6 +369,7 @@ struct DiagRecorder {
     mqKey = (uint16_t*)c; c += ((size_t)1 << mb) * sizeof(uint16_t);
     mqVal = (uint32_t*)c;
     curSeq = 0; used = 0; haveBlock = false; recSeq = 0; lastRecMs = 0; droppedTotal = 0; pendingDrops = 0;
+    gen++;                                                  // a download of the previous recording now serves lost blocks
     clearCaches();
     lastStart = DIAG_START_OK;
     active = true;
@@ -377,17 +384,20 @@ struct DiagRecorder {
     return r;
   }
 
-  // Stop on the loop task. A heap ring is freed (no ring stays allocated on a no-PSRAM board);
-  // the PSRAM block stays (ADR-193 pattern) but is no longer written.
+  // Stop on the loop task. A heap ring is freed (no ring stays allocated on a no-PSRAM board).
+  // The PSRAM block stays (ADR-193 pattern) and so does the recording in it: it is no longer
+  // written but stays readable for the download until the next start() (TASK-1960).
   bool stop() {
     if (!active) return true;
     active = false;                                         // capture points stop starting new appends
     if (!env) return true;
     if (!env->lockWait(50)) return false;                   // leave the ring; the next start() frees it
-    uint8_t* toFree = memIsPsram ? nullptr : mem;
-    if (!memIsPsram) mem = nullptr;
-    ring = nullptr; haveBlock = false; used = 0;
-    otKey = nullptr; otVal = nullptr; mqKey = nullptr; mqVal = nullptr;
+    uint8_t* toFree = nullptr;
+    if (!memIsPsram) {
+      toFree = mem; mem = nullptr;
+      ring = nullptr; haveBlock = false; used = 0;
+      otKey = nullptr; otVal = nullptr; mqKey = nullptr; mqVal = nullptr;
+    }
     env->unlock();
     if (toFree) env->freeHeapBlock(toFree);
     return true;
@@ -395,12 +405,15 @@ struct DiagRecorder {
 
   // ---------------------------------------------------------------- reading (for the download, TASK-1666)
   // Call under the same lock the writer uses, or from a context that tolerates a block changing.
-  bool     hasData() const { return ring != nullptr && haveBlock; }
+  // A heap ring holds no recording once stopped, also when that stop() lost the lock and the ring is still allocated
+  // (ADR-213: a heap ring is freed on stop); a stopped PSRAM ring keeps its recording (TASK-1960).
+  bool     readable() const { return ring != nullptr && haveBlock && (memIsPsram || active); }
+  bool     hasData() const { return readable(); }
   uint32_t newestSeq() const { return curSeq; }
   uint32_t oldestSeq() const { return (curSeq + 1u > nBlocks) ? curSeq + 1u - nBlocks : 0u; }
   uint32_t ringBytes() const { return nBlocks * DIAG_REC_BLOCK_SIZE; }
   const uint8_t* block(uint32_t seq) const {
-    if (!ring || !haveBlock || seq > curSeq || seq < oldestSeq()) return nullptr;
+    if (!readable() || seq > curSeq || seq < oldestSeq()) return nullptr;
     return ring + (size_t)(seq % nBlocks) * DIAG_REC_BLOCK_SIZE;
   }
 
@@ -562,6 +575,9 @@ private:
       r = &rec;
       if (!rec.env || !rec.env->tryLock()) { rec.pendingDrops = rec.pendingDrops + 1u; return false; }
       locked = true;
+      // A stopped PSRAM ring keeps its data (TASK-1960): `active` under the lock, not `ring`, says whether
+      // this append still belongs to the recording (a capture point that read `active` before stop()).
+      if (!rec.active) { release(); return false; } // DIAG-GUARD-STOPPED
       if (!rec.ring || room + DIAG_REC_GAP_ROOM > DIAG_REC_BLOCK_SIZE - DIAG_REC_BLOCK_HDR) { release(); return false; }
       now = rec.env->millis();
       const uint32_t drops = rec.pendingDrops;
@@ -645,6 +661,7 @@ private:
 #define DIAG_FILL_TRY_AGAIN       ((size_t)0xFFFFFFFFu)     // == RESPONSE_TRY_AGAIN of the async web server
 
 struct DiagDownload {
+  uint32_t gen = 0;                         // recording generation the range was fixed for (DiagRecorder::gen)
   uint32_t first = 0;                       // first block_seq served
   uint32_t count = 0;                       // blocks served (fixed at request start)
   uint16_t hdrLen = 0;                      // 0 until the header is complete
@@ -654,11 +671,13 @@ struct DiagDownload {
 
 // Fix the range under the recorder lock. since: serve blocks with block_seq > since (hasSince), else
 // from the oldest block. Returns false when the lock is busy (the caller answers 503); a recorder
-// that never ran or is stopped is a valid empty range.
+// that never ran, has no block yet or was stopped on the heap (ring freed) is a valid empty range; a
+// stopped PSRAM ring keeps its range (TASK-1960).
 static inline bool diagDownloadRange(DiagRecorder& r, DiagDownload& d, bool hasSince, uint32_t since) {
   d.first = 0; d.count = 0;
   if (!r.env) return true;                                  // never started
   if (!r.env->tryLock()) return false;
+  d.gen = r.gen;
   if (r.hasData()) {
     const uint32_t oldest = r.oldestSeq(), newest = r.newestSeq();
     uint32_t first = oldest;
@@ -729,7 +748,8 @@ static inline size_t diagDownloadFill(DiagRecorder& r, const DiagDownload& d, ui
   const size_t within = off % DIAG_REC_BLOCK_SIZE;
   size_t n = DIAG_REC_BLOCK_SIZE - within; if (n > maxLen) n = maxLen;
   if (!r.env || !r.env->tryLock()) return DIAG_FILL_TRY_AGAIN;
-  const uint8_t* b = r.block(seq);                          // null: stopped, freed or overwritten since the range was fixed
+  // null: heap ring freed or stopped, overwritten since the range was fixed, or a new recording started since (TASK-1960)
+  const uint8_t* b = (r.gen == d.gen) ? r.block(seq) : nullptr; // DIAG-GUARD-GEN
   if (b) {
     memcpy(buf, b + within, n);
   } else {

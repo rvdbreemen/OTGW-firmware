@@ -18,7 +18,8 @@ from pathlib import Path
 from test_ot_reserved_range import GEN, HERE, REPO, find_vcvars
 
 HEADER = REPO / "src" / "OTGW-firmware" / "diagRecorderStuff.h"
-MUTANTS = [("DIAG-GUARD-HEAP", ["F7", "F9"], "start guard"), ("DIAG-GUARD-BRIDGE", ["F15"], "bridge flag")]
+MUTANTS = [("DIAG-GUARD-HEAP", ["F7", "F9"], "start guard"), ("DIAG-GUARD-BRIDGE", ["F15"], "bridge flag"),
+           ("DIAG-GUARD-STOPPED", ["F16"], "stopped-ring write guard")]
 
 
 def build_and_run(label, inc_dir, out_dir):

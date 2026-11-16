@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-beta.343
+**  Version  : v2.0.0-beta.344
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -3741,7 +3741,8 @@ void sendDiagRecordingControl(bool start)
 // The block range is fixed by diagDownloadRange() before the response starts; the filler copies one
 // chunk per call under the recorder try-lock and asks the server to retry when the lock is busy, so
 // async_tcp never waits. No ring-sized copy exists: only the 640 B header snapshot is on the heap.
-// A recorder that is stopped or empty gives a valid file with block count 0.
+// A recorder that never ran, is empty, or was stopped on a board without PSRAM (heap ring freed) gives a
+// valid file with block count 0. A stopped PSRAM ring keeps its blocks until the next start (TASK-1960).
 void sendDiagRecordingDownload()
 {
   if (!currentRequest || g_responseSent) return;

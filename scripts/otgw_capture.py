@@ -2666,8 +2666,8 @@ class DeviceDataCapture(threading.Thread):
 
 def fetch_diag_recording(cap, http_base, label, since=None, timeout=60):
     """When the device holds a diagnostic recording (ADR-213: status active or has_data), download it as
-    diag-recording-<label>-<time>.bin. Only GETs: the recording is never started or stopped (a stop makes
-    the PSRAM ring unreadable, TASK-1960). since= asks only for the blocks after that block number.
+    diag-recording-<label>-<time>.bin. Only GETs: the recording is never started or stopped (a stop frees a
+    heap ring; a stopped PSRAM ring stays readable, TASK-1960). since= asks only for the blocks after that block number.
     Returns (summary line, newest_seq or None)."""
     with HTTP_SLOT:
         status, body, _err, _ctype = http_get(http_base + DIAG_STATUS_PATH, 10, 65536)
