@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-13T07:28:00Z'
-updated_date: '2026-11-16T03:04:00Z'
+updated_date: '2026-11-16T03:05:00Z'
 labels:
   - sat
   - adr
@@ -45,4 +45,6 @@ Q-327a and Q-327b decided 2026-11-15 by the coordinator under Robert's directive
 2026-11-16 03:15 committed 2c1e14a17 (beta.330), rebased onto origin/dev as 5dde6269a (beta.335): 56 banner-only conflict hunks resolved per hunk by script (version-normalised sides equal -> upstream side), version.h taken from upstream then re-bumped 334->335; non-version diff of the rebased commit equals the original (634/634 lines, empty diff). Not pushed: waits for Robert's answer on the ADR-249 accept (DM 1571670760131534909) and for test_sat_lowload_contract (harness reaped it on low memory during 95's build; rerun after the tlsdyn build). Then build slot + bench (AC4).
 
 2026-11-16 04:2x test_sat_lowload_contract in foreground chunks (OTGW_LL_ONLY, -j 1; the background run was reaped twice on low memory): LL-001..004 5 pass; LL-010..013 7 pass (242 s); LL-014,015,017 pass, LL-016 unavailable/skip (PH-FIELD, as designed); LL-018 10 pass; LL-019..021 4 pass; LL-022,023 5 pass. Two seams fixed: LL-004 and LL-020b expected the 'o' overshoot switch at 60 s -> 30 s (entry 327). Red/green: LL-004 with OTGW_SATCYCLES_INO=origin/dev SATcycles.ino (SAT_OVERSHOOT_SUSTAIN_MS 60000) FAIL (2 subtests, 10 s and 30 s ticks), on the fix PASS. Verification plan got a dated correction paragraph (TASK-1888); LL-023 doc gate pass after it.
+
+Branch note: the 1888 commits (5dde6269a, 643f4f307) sit on local branch lane/ba-1887 in worktree wt-ba-1956; the name comes from the lane's original task, it is NOT TASK-1887 work. TASK-1887 follows on the same lane; one combined build for 09 after the tlsdyn slot.
 <!-- SECTION:NOTES:END -->
