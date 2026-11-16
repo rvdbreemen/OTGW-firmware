@@ -8,7 +8,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-12T20:56:00Z'
-updated_date: '2026-11-16T11:18:00Z'
+updated_date: '2026-11-16T11:59:00Z'
 labels: []
 milestone: 2.0.0
 dependencies: []
@@ -50,4 +50,6 @@ The PM= reading is queued for Sergeant D as Q-388a (docs/sat/open-questions.md, 
 2026-11-16 11:48-11:57 AC3 bench smoke by 09 on .61 (OTGW32, OT-Direct, no boiler), SAT off and no satsimulation (untouched), 2.0.0-beta.348+55dd8f0 (= pushed 55dd8f015; sha ino b28b6ccb..89e5fb matches 95). githash 55dd8f0 reported; bootcount 851 -> 852 (planned reference reboot on 341) -> 854 (2 OTA restarts) -> 855 (planned reboot on 348), no other reboot, crash endpoint only runtime.reboots 855. Boot telnet compared like for like (the same planned /ReBoot on 341 and 348, 60 s captured from port 23 accepting, 15.3/15.2 s after the request): 500/485 lines, 51/51 OT frames, 0 'PM=' lines in both (OT-Direct has no PIC PM= chain), 0 CS=/MM=/CH= and 0 SAT command lines in both; the line kinds match (Ethernet/initWatchDog backlog lines present only in the 341 capture: telnet replay length, not this change, agreed by 95). GET /api/v2/sat/status contains "pid_curve_only": false. settings.ini unchanged except the new SATpwmswitchmargin key from TASK-1888 underneath. The 60 s silence itself is host-proven (AC2), not benched (no SAT on hardware without a boiler). Evidence: 09 scratchpad b348/ (boot341.raw, boot348.raw, flash.log, S0/S1, bootcap.py).
 
 Pushed 051f323f8..55dd8f015 unchanged (beta.348). Bench 09 on .61 (OT-Direct, SAT off, 2026-11-16): githash 55dd8f0, no extra reboot, boot telnet 341 vs 348 both with 0 PM= and 0 SAT command lines, sat/status pid_curve_only false, settings only gained ba's SATpwmswitchmargin; evidence 09 scratchpad b348\. No own post: ba's 349 build covers 348. AC3 for 09 to tick.
+
+2026-11-16: Sergeant D entry 395 (Q-388a 'My answer is A and should be part of this release', 11:36 UTC, msg 1571851528489410632) confirms the interpretation above: the PM=3/15/48 start-up reads may run during the 60 s wait; the wait covers SAT's own control commands only; scope 2.0.0. No code change (beta.348 already does this).
 <!-- SECTION:NOTES:END -->

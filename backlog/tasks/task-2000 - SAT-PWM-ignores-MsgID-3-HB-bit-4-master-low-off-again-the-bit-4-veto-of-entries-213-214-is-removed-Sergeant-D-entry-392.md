@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-16T11:08:00Z'
-updated_date: '2026-11-16T11:44:00Z'
+updated_date: '2026-11-16T11:59:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -44,4 +44,6 @@ Evidence: tests/test_sat_slave_lowload.py rewritten to entries 392/393 (every Ms
 AC4 correction to the note above: met. firmware-sat-spec.md updated; pwm_veto_reason / slave_low_off_denied are not in openapi.yaml or docs/api/README.md (grep), so no API doc change; the web UI veto texts (sat_why_pwm_no_reply/denied in v2.js) stay for older firmware that still reports reason 1/2 and are never shown with this firmware (reason stays 0); ADR-249's citation is noted above.
 
 ADR (coordinator's check 2026-11-16): ADR-249's clause 'and the boiler's MsgID 3 permission comes first (entry 213)' sits in its Decision section, so removing the gate amends an Accepted ADR: ADR-251 'MsgID 3 plays no part in SAT PWM ... (amends ADR-249)' created via adr-kit, status Proposed (Robert accepts), related to ADR-249 both ways (adr relate), README entry added (also the missing ADR-234 entry, so tests/test_adr_governance.py is green again: was FAIL on origin for ADR-234).
+
+Pushed 7613c4317..9011c3c48 unchanged (beta.350). Build exit 0, 6 min, 'Build completed successfully', app size 2143632 B of 2293760 B (93.5 %). Zip posted #alpha-testing msg 1571856532310597724. Smoke 09 on .61 (no SAT): githash 9011c3c, bootcount 855->857 (2 OTA restarts only), settings byte-identical (165 keys), sat/status slave_cfg_valid false, slave_low_off_denied false, pwm_veto_reason 0, pwm_veto_path 0. Before on .63 (beta.349, SAT on): pwm_veto_reason 1, pwm_veto_path 1, control_mode 1 (the veto visible on the old code). .63 gets 350 at ~13:11 for the 20:00 soak (09 compares the same fields). Sergeant D entry 396 (11:41 UTC, msg 1571852828065140818): 'THIS IS TOP PRIORITY for the next release'; Q-396a asks whether that means this release (read as 2.0.0 until he answers). ADR-251 Proposed, acceptance with Robert (coordinator). Open: AC6 field (indigo_light, TASK-1998).
 <!-- SECTION:NOTES:END -->
