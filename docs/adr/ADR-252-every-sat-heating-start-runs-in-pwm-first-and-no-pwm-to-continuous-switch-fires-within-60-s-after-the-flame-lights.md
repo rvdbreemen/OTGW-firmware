@@ -118,8 +118,10 @@ The firmware differs from thermo-nova here on purpose.
 - `tests/test_sat_pwm_first_start.py` (real SAT sources in the loop harness): 14 tests green on the fix, 8 red on origin/dev
   2268516db (cases a, a2, b, c, d, e, f, i), with mutant tests for the flame-off guard, the resume reset and the flow check.
 - `tests/test_sat_loop_integration.py` (21 tests, incl. the no-return flood at a PWM-first start and the boot silence).
-- Bench: an OTGW Classic bench unit with SAT on showed `SATMODE from=1 to=2`, `Control mode: PWM (heating start)` with duty 1.00 at the
-  heater OFF to ON edge after the boot silence, then the flame; the first PWM to continuous switch came 90 s after that flame-on.
+- Bench (simulator on the device, not hardware): an OTGW Classic bench unit with SAT's built-in boiler simulation on showed
+  `SATMODE from=1 to=2`, `Control mode: PWM (heating start)` with duty 1.00 at the heater OFF to ON edge after the boot silence,
+  then the simulated flame; the first PWM to continuous switch came 90 s after that flame-on. The behaviour with a real boiler is
+  not verified.
 
 ## Alternatives Considered
 
@@ -143,8 +145,8 @@ The firmware differs from thermo-nova here on purpose.
 - A start that clearly needs continuous stays in PWM for at least 60 s after the flame lights. Mitigation: the exit timers keep
   counting, so the switch follows on the first tick after the window.
 - Right after a boot the start waits for the first flow reading; until then the entry 348 continuous start runs.
-- The PWM-first start was checked on one OTGW Classic bench unit (mode change, first phase ON, the 60 s rule on the wire); the
-  timing rules are proven by host tests.
+- The PWM-first start was seen only with SAT's boiler simulation on a bench unit, not with a real boiler; the timing rules are proven
+  by host tests. Field captures of the first starts after the release are the hardware check.
 
 ## Open Questions
 
