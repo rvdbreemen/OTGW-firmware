@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-15T21:35:00Z'
-updated_date: '2026-11-16T08:59:00Z'
+updated_date: '2026-11-16T09:19:00Z'
 labels:
   - sat
   - sergeant-d
@@ -61,6 +61,8 @@ Post-push SAT review (opus reviewer on 6836283d3, 2026-11-16 ~01:10): no blockin
 Smoke 09 on .61 (2026-11-16 02:48-03:00, beta.334+1d7483f, sha ino 99ebfb3d / fs addd4cf3 checked): PASS. bootcount 799 -> 801 (the two OTA restarts only), stayed 801; A master SAT off 53-54 R/min, freeheap 55.4-56.7 KB, MQTT ok; B GW=L 463-465 frames/min, MsgID 25 6/min, freeheap 50.7-55.7 KB (one dip recovered); C master 53 R/min; SAT off afterwards, settings.ini byte-identical, REST diff empty; telnet 1.12 MB, 0 panic/guru/abort/CRITICAL/wdt/assert. Not verified on the bench: the SAT change itself (SAT stays off, no SAT scenarios per Robert); host tests only. Pushed e2688b437..1d7483fc1, zip posted to #alpha-testing (1571706796199121112), covering beta.330-334. Evidence: 09 scratchpad b334/.
 
 2026-11-16 09:3x (95) revert per Sergeant D entry 383 (Q-375a '1: A', confirms entry 375, replaces our reading of entry 364): no 2 minute flow average anywhere; the PWM ON suppression setpoint is the latest flow minus fModSupOffset, as thermo-nova heating_control.py:435-441. Removed: SATflowAvg.h, state.otBus.flowAvg, the processOT() sample hook, satSuppressionFlowTemp(); satPwmSuppressionSetpoint() uses satGetFlowTemp() again. Test shims for the average removed (test_sat_pwm_override _flow_avg_shim, test_sat_ceiling_paths stub, two host includes). tests/test_sat_flow_avg.py replaced by tests/test_sat_suppression_latest_flow.py (real satPwmSuppressionSetpoint): FIX 5/5 OK; OLD (beta.341 SATcontrol.ino + SATflowAvg.h via OTGW_SAT_INO/OTGW_FLOWAVG_H) 2 FAIL: step 40->50 after 2 min burning gives 44.0 instead of 49.0, falling 55->45 gives 53.167 instead of 44.0. Also green: test_sat_ceiling_paths 9 OK, test_sat_pwm_override 83 OK, test_sat_loop_integration 15 OK, test_boiler_unsupported_origin PASS, test_local_frame_consumers PASS, evaluate --quick 0 failed. AC2's text (2 minute average) is superseded by entry 383; AC4 becomes the smoke of this build by 09 (SAT behaviour proven on the host).
+
+Pushed ca906b210..8d90c4c8a as fe1531b7f (beta.343), src diff to the benched 873f06b9b = 0. Smoke by 09 on .63 with 2.0.0-beta.344+873f06b (contains this commit): githash reported, no reboot or crash, MQTT connected, heap 46.4 KB, settings byte-identical; no SAT simulation (SAT behaviour proven on the host). AC4 for 09 to tick.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
