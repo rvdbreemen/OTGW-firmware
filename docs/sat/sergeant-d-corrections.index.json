@@ -5328,6 +5328,19 @@
     "TASK-1887"
    ],
    "confirmed_by_entry": null
+  },
+  {
+   "id": 403,
+   "title": "Q-402a answered A with 10 minutes: after a band stop CH stays off for 10 minutes, counted from the moment CH actually goes off; high priority (Sergeant D and Robert, 2026-11-16; settles the interpretation of entry 402)",
+   "date": "2026-11-16",
+   "source": "sergeant-d",
+   "kind": "interpretation",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1571978881894715525",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1887"
+   ],
+   "confirmed_by_entry": null
   }
  ]
 }

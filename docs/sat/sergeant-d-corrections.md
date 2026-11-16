@@ -8006,3 +8006,19 @@ Robert, 16:18:42 UTC (https://discord.com/channels/812969634638725140/9144987300
 **Interpretation (ours, not his words), two points to confirm:** (i) the minimum CH-off time is 300 s (5 minutes), the example given in option C; (ii) it counts from the moment CH actually goes off (after any 180 s minimum burn of entry 376), not from the moment the band decides to stop. Both asked as Q-402a.
 
 **Task:** TASK-1887 (owner ba), milestone 2.0.0.
+
+## 403. Q-402a answered A with 10 minutes: after a band stop CH stays off for 10 minutes, counted from the moment CH actually goes off; high priority (Sergeant D and Robert, 2026-11-16; settles the interpretation of entry 402)
+
+**Source:** #dev-sat-mqtt, Sergeant D 2026-11-16 20:02:51 UTC (https://discord.com/channels/812969634638725140/1105556725714649128/1571978881894715525), a reply to Q-402a (https://discord.com/channels/812969634638725140/1105556725714649128/1571978238220181576). Priority: Sergeant D 19:56:38 UTC (https://discord.com/channels/812969634638725140/1105556725714649128/1571977319332192307) and Robert (maintainer) 19:57:47 UTC (https://discord.com/channels/812969634638725140/1105556725714649128/1571977608277532727), addressed to the bot.
+
+**Quoted:**
+
+> "My answer is A but instead of 5 minutes it should stop for 10 minutes"
+
+> "Actually it is high priority" (Sergeant D)
+
+> "This fix is high priority" (Robert)
+
+**Settled:** option A of Q-402a with the time changed: after a tolerance-band stop CH stays off for 600 s (10 minutes), counted from the moment CH actually goes off (after any 180 s minimum burn of entry 376), then heating may restart below target + 0.1 (entry 401). This replaces point (i) of the interpretation in entry 402 (300 s) and confirms point (ii) (counted from CH actually off). Scope 2.0.0 (entry 402, Robert); high priority by both. New firmware rule; thermo-nova has no band.
+
+**Task:** TASK-1887 (owner ba), milestone 2.0.0, priority high.
