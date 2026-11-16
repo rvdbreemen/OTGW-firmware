@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-16T10:42:00Z'
-updated_date: '2026-11-16T11:06:00Z'
+updated_date: '2026-11-16T14:29:00Z'
 labels:
   - needs-maintainer-ok
   - sat
@@ -37,4 +37,6 @@ Setup (indigo_light): OTGW Classic + LOLIN S3 Mini, PIC 6.8, DS18B20 outside sen
 Open design questions for Sergeant D (one per message, each with the release scope line, after the current queue): Q2: should flow overshoot count as overshoot when the boiler cannot modulate below about 42 C (a third of his cycles look like a problem while the room is fine)? Q3: the Vitodens fires a short DHW burn (dhw_on, flow 60-78 C) after almost every CH burn without a tap (probably keep-warm): does SAT account for it, or does it disturb the cycle statistics and the self-tune? Questions message: https://discord.com/channels/812969634638725140/914498730001072149/1571835155864358953. Milestone 2.1.0 per entry 386 (anything new goes to the next release).
 
 2026-11-16 (#beta-testing): Q3 answered by Sergeant D (entry 390: keep-warm DHW burns do not affect SAT). Q2 clarified by indigo_light (https://discord.com/channels/812969634638725140/914498730001072149/1571841155337814069): it is about the firmware SAT; 4h_overshoot_fraction 33 %, last cycle class overshoot while the room was fine; at minimum modulation the flow stays about 42 C, so every burn ends above the requested 29-40 C. Sergeant D reversed the MsgID 3 bit 4 PWM veto (entry 392): 'Don't look at bit 4 at all ... boiler should be able to enter PWM'; follow-up Q-392a. indigo_light posted the graph CSVs of both runs (https://discord.com/channels/812969634638725140/914498730001072149/1571841667839828008: otgw-graph-20261112-210857.csv HA SAT, otgw-graph-20261115-163915.csv firmware SAT beta.250; not downloaded yet) and will run a long-run capture on beta.339 as the 'before' of the veto change; he offers to test the fix.
+
+2026-11-16 13:25-13:29 UTC #alpha-testing: indigo_light asked whether to long-run before AND after upgrading to beta.350 (1571878962584363120); Sergeant D: 'No, just run beta.350' (1571879271532724316); indigo: 'Will do' (1571879975194333316). The capture this task waits for is therefore a beta.350 long-run.
 <!-- SECTION:NOTES:END -->

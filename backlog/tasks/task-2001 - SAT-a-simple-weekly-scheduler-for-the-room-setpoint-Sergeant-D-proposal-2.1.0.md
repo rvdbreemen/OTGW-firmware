@@ -6,9 +6,8 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-16T12:50:00Z'
-updated_date: '2026-11-16T13:25:00Z'
+updated_date: '2026-11-16T14:29:00Z'
 labels:
-  - needs-maintainer-ok
   - sat
   - feature
 milestone: 2.1.0
@@ -33,4 +32,6 @@ Proposed by Sergeant D for a release after 2.0.0, #dev-sat-mqtt https://discord.
 
 <!-- SECTION:NOTES:BEGIN -->
 Scope by Robert (2026-11-16 13:12 UTC, https://discord.com/channels/812969634638725140/1105556725714649128/1571875517676658750): 'That will be a 2.1.0 release or later.' Milestone 2.1.0 stays; needs-maintainer-ok stays until he gives the go.
+
+2026-11-16 Robert released (DM 1571893376197074975, option A, relayed by the coordinator): planned for 2.1.0; design with Sergeant D after 2.0.0 stable. needs-maintainer-ok removed, milestone 2.1.0 kept.
 <!-- SECTION:NOTES:END -->
