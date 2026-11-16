@@ -3,11 +3,11 @@ id: TASK-1985
 title: >-
   MQTT: the retained <label>/override topic keeps its last value after the
   override ends (HA keeps seeing it)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-15T20:58:00Z'
-updated_date: '2026-11-16T00:07:00Z'
+updated_date: '2026-11-16T02:58:00Z'
 labels:
   - mqtt
   - bug
@@ -26,7 +26,7 @@ Found on the TASK-1812 bench (09, .61, beta.328, 2026-11-15): OTGW/value/<id>/TS
 <!-- AC:BEGIN -->
 - [x] #1 A host test on the real publishActiveOverrides()/store: an override that ends (timeout and explicit clear) produces exactly one empty retained publish on its topic; red on the current code, green on the fix
 - [x] #2 No clear for an override that never was published; no repeated clears
-- [ ] #3 Bench: after CS=40 then CS=0 the broker holds no retained <label>/override (mosquitto_sub -R / retained check)
+- [x] #3 Bench: after CS=40 then CS=0 the broker holds no retained <label>/override (mosquitto_sub -R / retained check)
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -41,4 +41,12 @@ Within ADR-118 (store active while refreshed within OVERRIDE_ACTIVE_TIMEOUT; pub
 2026-11-15 d3: implemented. OTGW-Core.ino recordOTOverride() resets published when a slot takes a new id; publishActiveOverrides() (markers publishActiveOverrides) clears stale entries. tests/test_mqtt_override_retained_clear.py on the real functions + header struct/defines: 4 cases (ends -> one clear and it is the last publish; never published -> no publish; failed clear -> sent again; active -> never cleared). Old code (origin a2bfce174): 2 FAIL (ends, failed-clear), the other 2 pass as expected. Also green: test/host test_override_modlevel PASS, test_dhw_water_meter PASS (both use the store), test_mqtt_* 5 files, evaluate 87/0. Open edge (not fixed, noted): a retained override topic left from before a reboot is never cleared (the store is RAM); and a stale published slot that another id reclaims within the 60 s publish window keeps the old topic.
 
 2026-11-16 gates before commit: test_mqtt_override_retained_clear 4/4 (old 2 FAIL), test_override_modlevel + test_dhw_water_meter PASS, test_mqtt_* 5 files, evaluate 87/0, run_tests --changed vs origin 239/241 (the 2 others re-run alone and green: test/host/test_override_reply.py 4 OK twice; test_sat_lowload_contract 31 passed alone + ll018 10 passed after the B3e harness stub). AC3 (bench) waits for 09. Coordinator 2026-11-15: keep the ADR-118 timeout, no instant clear; the reboot edge is TASK-1991.
+
+2026-11-16 AC3 bench 09 on .61 beta.335+d34a2e8 (b335/): CS=40 -> retained 40.00 republished every 60 s; CS=0 at 03:12:31; fresh subs -W 5 still showed 40.00 up to t+9 min; empty retained publish at 03:21:36 (telnet 'Message []'); t+10..t+12 nothing retained. The clear came ~9 min after CS=0, inside the ADR-118 window, and also removed an older stale 61.30 from the simulation finding. Pushed as beta.336 in origin/dev 1d7483fc1..3e362170f.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+AC1: tests/test_mqtt_override_retained_clear.py on the real recordOTOverride()/publishActiveOverrides(): an ended override gets exactly one empty retained publish (old code 2 FAIL, fix 4/4). AC2: same test: no clear for a never-published entry, a failed clear is retried, an active override is never cleared. AC3: bench 09 .61 b335: topic gone ~9 min after CS=0 (ADR-118 timeout), nothing retained at t+10..12 min. Reboot edge filed as TASK-1991.
+<!-- SECTION:FINAL_SUMMARY:END -->
