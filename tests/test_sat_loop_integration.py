@@ -235,6 +235,46 @@ def check_s5(tc, r):
     tc.assertTrue(r.tx(b, 10 ** 9, "CS="), "SAT did not resume after the boiler replied again")
 
 
+# ---- scenario 6: PWM ON suppression follows the latest flow (TASK-1990, Sergeant D entry 383) --------------------------------------
+HOLD_MS = 20000      # fModSupDelay default (SATtypes.h)
+OFFSET = 1.0         # fModSupOffset default (entry 347)
+
+
+def check_s6(tc, r):
+    """In every PWM ON phase, after the 20 s hold and outside the start-up flood, each CS= on the wire is the latest MsgID 25 flow fed to
+    SAT minus fModSupOffset (rounded to 0.1), as thermo-nova heating_control.py:435-441; no 2 minute average (entry 383)."""
+    phases = r.kind("PWMPHASE")
+    flood = r.kind("FLOOD")
+    flows = [(t, float(x)) for t, x in r.kind("F25")]
+
+    def flood_on(t):
+        st = [x for tt, x in flood if tt <= t]
+        return bool(st) and st[-1] == "1"
+
+    def flows_before(t):
+        return [v for tt, v in flows if tt <= t][-2:]
+
+    checked, bad = 0, []
+    for i, (t_on, x) in enumerate(phases):
+        if x != "ON":
+            continue
+        t_end = next((t for t, y in phases[i + 1:] if y != "ON"), None)
+        if t_end is None:
+            continue
+        for t, cmd in r.tx(t_on + HOLD_MS + 3000, t_end, "CS="):
+            if flood_on(t):
+                continue
+            cs = float(cmd[3:])
+            fl = flows_before(t)
+            if not fl or cs <= 10.05:
+                continue
+            checked += 1
+            if not any(abs(cs - round(f - OFFSET, 1)) <= 0.15 for f in fl):
+                bad.append((t, cs, fl))
+    tc.assertGreaterEqual(checked, 5, "too few suppression CS= in PWM ON phases to judge: %d" % checked)
+    tc.assertEqual(bad, [], "CS= in PWM ON not equal to the latest flow - %.1f: %r" % (OFFSET, bad[:6]))
+
+
 class SatLoopIntegration(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -247,6 +287,9 @@ class SatLoopIntegration(unittest.TestCase):
         # control: the same boiler with MsgID 3 HB bit 4 = 1 (master low-off not allowed) never gets PWM
         r = Run(self.exe, ["lowoff 1"] + S1)
         self.assertNotIn("2", [x for _, x in r.kind("MODE")])
+
+    def test_s6_pwm_on_suppression_follows_the_latest_flow(self):
+        check_s6(self, Run(self.exe, S1))
 
     def test_s1_jittered_loop_period(self):
         # loop period 10 ms + a seeded 0-40 ms jitter (average ~30 ms); the real DUE() timers must still produce the same behaviour
@@ -297,6 +340,10 @@ class Mutants(unittest.TestCase):
     def test_m4_refused_cs_cached_on_enqueue(self):
         self.red("m4", mutant("SATcontrol.ino", "  const CmdQueueResult r = addCommandToQueue(cmd, strlen(cmd), false, 0, true);\n  return r != CmdQueueResult::Dropped;",
                               "  const CmdQueueResult r = addCommandToQueue(cmd, strlen(cmd), false, 0, true);\n  (void)r; return true;"), S4, check_s4)
+
+    def test_m6_suppression_not_the_latest_flow(self):
+        # TASK-1990: a CS that is not the latest flow minus the offset (here the offset twice) must fail scenario 6
+        self.red("m6", mutant("SATcontrol.ino", "  float cs = satGetFlowTemp() - settings.sat.fModSupOffset;", "  float cs = satGetFlowTemp() - 2.0f * settings.sat.fModSupOffset;"), S1, check_s6)
 
     def test_m5_handback_every_pass(self):
         self.red("m5", mutant("SATcontrol.ino", "    state.sat.bOtLinkLost = true;          // after satDisable(), which clears it", "    state.sat.bOtLinkLost = false;         // MUTANT"),

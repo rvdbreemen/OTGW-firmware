@@ -79,7 +79,7 @@ static void boilerGetsCmd(const char* line) {
 }
 static void sendFrameFor(int id) {
   switch (id) {
-    case 25: if (!g_mute25) frame(25, OT_READ_ACK, bo.flow); break;
+    case 25: if (!g_mute25) { ev("F25", "%.2f", bo.flow); frame(25, OT_READ_ACK, bo.flow); } break;   // F25: the flow SAT is fed (TASK-1990 scenario 6)
     case 28: if (g_muteRet) break; if (g_ret28Unknown) frame(28, OT_UNKNOWN_DATA_ID, 0); else frame(28, OT_READ_ACK, bo.ret); break;
     case 3:  frame(3, OT_READ_ACK, 0, bo.lowOffDenied ? 0x10 : 0x00, 7); break;
     case 15: frame(15, OT_READ_ACK, 0, (int)bo.qMax, (int)bo.minModPct); break;

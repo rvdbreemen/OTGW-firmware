@@ -3,11 +3,11 @@ id: TASK-1932
 title: >-
   SAT self-tune: a 60 min hour counts at >=90 % clean ticks, excluded ticks left
   out of the mean (entry 340)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-14T10:22:00Z'
-updated_date: '2026-11-16T04:26:00Z'
+updated_date: '2026-11-16T09:29:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -26,7 +26,7 @@ Maintainer + Sergeant D decision, entry 340: Robert 'Drop it to 90%?' (https://d
 <!-- AC:BEGIN -->
 - [x] #1 Open point of entry 340 settled in the plan with Sergeant D before the build: is 90 % counted against all ticks of the hour or against the expected 120
 - [x] #2 The tuner counts a 60 min hour when at least 90 % of its ticks are clean; excluded ticks do not enter the hour mean or the warm-up/floating counts; boot, coeff_changed and few_ticks markers stay whole-hour
-- [ ] #3 An ADR amending or superseding ADR-205 decision 2, via adr-kit
+- [x] #3 An ADR amending or superseding ADR-205 decision 2, via adr-kit
 - [x] #4 Host test on the real tuner code: red on the old code (hour with 1 excluded tick of 120 not counted), green on the fix; and an hour below 90 % clean stays excluded
 - [x] #5 Replay of the 5 gruijter field runs of TASK-1927 on the fix gives 10 counted hours with the same votes as the replay variant
 <!-- AC:END -->
@@ -54,4 +54,12 @@ Session 95, 2026-11-16 ~03:00, lane-95-1932 (worktree wt-95-1932 on origin/dev):
 AC5 (replay, 92, 2026-11-16 ~05:00): real tuner of 1f796d256 (satTune*/satCurveTune blocks + SATcurveTune.h, read-only via git show) on the 5 gruijter runs counts 10 hours: raise 6, band 4, lower 0 = TASK-1927 followup2 baseline; no hour counted in only one of the two. r1 2/20 (#18 +1.54 raise, 118 clean 2 dhw; #19 +0.40 band), r2 0/17, g167 5/11 (all raise), g214 0/7, g68 3/12 (all band). Every counted hour has 120 ticks, so entry 369 changes nothing on these runs; logged mean = clean-only mean (entry 343). 95 read summary.txt itself: TOTAL counted 10; votes raise 6 band 4 -> MATCH. Output: 92 scratchpad tune-replay/r1932/out/ (r1/r2/g167/g214/g68_1932.json, runlog.txt, summary.txt). Rebase onto origin/dev (92fc8fec7, beta.339): git diff 1f796d256 HEAD on SATcurveTune.h + tuner test = 0 lines, no tune lines in SATcontrol.ino diff, so the replay holds for the rebased commit. Re-run after rebase: test_sat_curve_selftune 102 OK (1 skip), test_sat_loop_integration 15 OK, test_sat_flow_avg OK, evaluate --quick 87 pass 0 fail.
 
 Pushed 3423baa83..92fc8fec7 (beta.339) after 09 smoke PASS on .61 (2026-11-16 05:13-05:22): device 2.0.0-beta.339+92fc8fe, bootcount 809->811 (2 OTA restarts), freeheap 52.3-56.7 KB flat, maxfreeblock 31732, MQTT connected, telnet 2664 lines 0 panic/WDT, settings byte-identical, /api/v2/sat curve_tune block identical to beta.338 with SAT off. Not tested on hardware: the 90 % hour counting itself (needs SAT active); it rests on test CleanShare (red on old code) and the 92 replay (AC5). Zip posted #alpha-testing msg 1571743145467707473. Open: AC3 (ADR-234 acceptance, Robert's yes; coordinator asked by DM).
+
+2026-11-16 (95) AC3: ADR-234 'SAT heating curve self-tune: a 60 min hour counts when at least 90 % of its logged ticks are clean; excluded ticks stay out of the mean (amends ADR-205 decision 2)' exists via adr-kit (docs/adr/ADR-234-*.md, status Proposed, landed with 92fc8fec7). The AC asks for the ADR, not its acceptance; the acceptance stays Robert's separate yes (asked by DM via the coordinator). Done per the close-out triage.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+AC1: entry 340 open point settled with Sergeant D before the build: entries 343 and 369 (B: 108 clean of the expected 120). AC2: 92fc8fec7 (beta.339): an hour counts at >= 90 % clean ticks, excluded ticks stay out of the mean and the warm-up/floating counts, boot/coeff_changed/few_ticks stay whole-hour. AC3: ADR-234 via adr-kit (Proposed; acceptance is Robert's separate yes). AC4: tests/test_sat_curve_selftune.py 102 OK (1 skip) on the fix; CleanShare cases 6 FAIL on the old code (an hour with 1 excluded tick of 120 not counted). AC5: 92's replay of the 5 gruijter runs of TASK-1927 on the fix: MATCH, 10 counted hours (raise 6, band 4) = the replay variant. 09 smoke on .61 PASS (bootcount 809->811, heap flat, settings identical). Not verified: the change on a live boiler (field).
+<!-- SECTION:FINAL_SUMMARY:END -->

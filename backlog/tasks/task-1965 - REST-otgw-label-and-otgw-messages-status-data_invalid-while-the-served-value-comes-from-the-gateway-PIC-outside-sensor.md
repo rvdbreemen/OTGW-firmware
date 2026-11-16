@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-15T10:12:00Z'
-updated_date: '2026-11-15T21:55:00Z'
+updated_date: '2026-11-16T09:29:00Z'
 labels:
   - rest
   - bug
@@ -28,7 +28,7 @@ Beta feedback, reporter indigo_light (Discord 301077214374658048), #beta-testing
 <!-- AC:BEGIN -->
 - [x] #1 The client can tell whether the value is valid and where it comes from: status follows the served value, or a new field source (boiler/gateway); smallest contract change, the choice recorded in the task
 - [x] #2 Host test on the real sendOTValue/sendOTLabel code: boiler DATA_INVALID plus a gateway substitute is red on the old code and green on the fix; the TASK-1871 cases stay green
-- [ ] #3 openapi.yaml and docs/api/README.md updated; evaluate.py --quick no new FAIL; esp32-combo build
+- [x] #3 openapi.yaml and docs/api/README.md updated; evaluate.py --quick no new FAIL; esp32-combo build
 - [ ] #4 Field confirmation by indigo_light
 <!-- AC:END -->
 
@@ -42,4 +42,6 @@ Evidence: tests/test_ot_value_source.py (REAL block sliced by marker + wiring on
 2026-11-15 bench (09 on .63, ffd0a64): the source field is present on otgw/messages and otgw/label; without a PIC outside sensor and without an OT bus it reads none, as expected. The gateway case (PIC DS18B20, boiler without MsgID 27) is the field AC4 with indigo_light.
 
 indigo_light capture 2026-11-15 10:50-13:26 (beta.250+aed38bf, PIC gateway 6.8, Vitodens + Honeywell Round, sent to Robert by DM, kept local in session 95 scratchpad indigo1115/): 28020 frames. The Round never reads MsgID 27 (no T 27 frame at all), so the capture cannot show how the PIC answers 27 to a thermostat; that last check stays open. What it does show: the PIC writes the DS18B20 outside temperature to the boiler itself, R WRITE-DATA 27 3020 times (~19/min, values 6.19-8.8 C), and the boiler answers Data-Invalid every time (B 601B0000); the firmware sent no OT= (no OT= in the telnet command log). Source: PIC 6.6 gateway.asm MessageTable :1820-1830 lists MSG_OUTSIDETEMP among the alternatives, MessageID27 :3050-3067 turns the request into T_WRITE with outside1/outside2 when OutsideTemp is set (6.8 source not in the repo; 6.6 checked).
+
+2026-11-16 (95) AC3: commit 2e49979dc updates docs/api/openapi.yaml (+22 lines, source field with boiler/gateway/thermostat/summary/replay/none, the 'data_invalid with source gateway' example at :1631-1638) and docs/api/README.md (:429-434); on origin since beta.339. evaluate --quick 0 failed today on the 2.0.0-beta.344 lane; esp32-combo build 2.0.0-beta.344+873f06b exit 0, 'Build completed successfully', contains it (09 also benched ffd0a64 on .63: the source field is present). AC4 stays open: field confirmation by indigo_light on beta.339 or later.
 <!-- SECTION:NOTES:END -->

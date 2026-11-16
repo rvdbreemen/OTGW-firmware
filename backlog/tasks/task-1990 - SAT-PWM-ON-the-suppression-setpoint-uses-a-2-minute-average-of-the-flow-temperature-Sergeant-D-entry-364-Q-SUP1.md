@@ -3,11 +3,11 @@ id: TASK-1990
 title: >-
   SAT PWM ON: the suppression setpoint uses a 2 minute average of the flow
   temperature (Sergeant D entry 364, Q-SUP1)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-15T21:35:00Z'
-updated_date: '2026-11-16T09:19:00Z'
+updated_date: '2026-11-16T09:29:00Z'
 labels:
   - sat
   - sergeant-d
@@ -28,7 +28,7 @@ Sergeant D answered Q-SUP1 with 'A, 2 minutes window' (entry 364, https://discor
 - [x] #1 The average used (window 2 min, which samples, start-up when fewer than 2 min of samples exist, flame-off and DHW handling) is planned with citations and the reading of entry 364 is confirmed or corrected with Sergeant D
 - [x] #2 During PWM ON the suppression CS is the 2 minute average of the flow minus fModSupOffset; a host test on the real code is red on the old code and green on the fix
 - [x] #3 The start-up flood (entry 334b/Q-334b, 2 s) and the flow clamp (entries 336-349) keep their own flow source unless the plan says otherwise, with the entries named
-- [ ] #4 Bench or simulation evidence of the CS during a PWM ON phase
+- [x] #4 Bench or simulation evidence of the CS during a PWM ON phase
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -63,10 +63,12 @@ Smoke 09 on .61 (2026-11-16 02:48-03:00, beta.334+1d7483f, sha ino 99ebfb3d / fs
 2026-11-16 09:3x (95) revert per Sergeant D entry 383 (Q-375a '1: A', confirms entry 375, replaces our reading of entry 364): no 2 minute flow average anywhere; the PWM ON suppression setpoint is the latest flow minus fModSupOffset, as thermo-nova heating_control.py:435-441. Removed: SATflowAvg.h, state.otBus.flowAvg, the processOT() sample hook, satSuppressionFlowTemp(); satPwmSuppressionSetpoint() uses satGetFlowTemp() again. Test shims for the average removed (test_sat_pwm_override _flow_avg_shim, test_sat_ceiling_paths stub, two host includes). tests/test_sat_flow_avg.py replaced by tests/test_sat_suppression_latest_flow.py (real satPwmSuppressionSetpoint): FIX 5/5 OK; OLD (beta.341 SATcontrol.ino + SATflowAvg.h via OTGW_SAT_INO/OTGW_FLOWAVG_H) 2 FAIL: step 40->50 after 2 min burning gives 44.0 instead of 49.0, falling 55->45 gives 53.167 instead of 44.0. Also green: test_sat_ceiling_paths 9 OK, test_sat_pwm_override 83 OK, test_sat_loop_integration 15 OK, test_boiler_unsupported_origin PASS, test_local_frame_consumers PASS, evaluate --quick 0 failed. AC2's text (2 minute average) is superseded by entry 383; AC4 becomes the smoke of this build by 09 (SAT behaviour proven on the host).
 
 Pushed ca906b210..8d90c4c8a as fe1531b7f (beta.343), src diff to the benched 873f06b9b = 0. Smoke by 09 on .63 with 2.0.0-beta.344+873f06b (contains this commit): githash reported, no reboot or crash, MQTT connected, heap 46.4 KB, settings byte-identical; no SAT simulation (SAT behaviour proven on the host). AC4 for 09 to tick.
+
+AC4 (simulation, software only per Robert): new scenario 6 in tests/test_sat_loop_integration.py runs the REAL SAT loop (SATcontrol/SATcycles/SATpid whole), the real PIC queue and feed hooks on the boiler model through several PWM ON phases; the driver now logs every MsgID 25 value it feeds (F25). Every CS= on the wire in a PWM ON phase after the 20 s hold and outside the flood equals the latest fed flow - 1.0 (rounded 0.1). Run on fe1531b7f+ (origin 364f4faf1): whole file Ran 17 tests OK (136 s), incl. test_s6 and mutant m6 (offset applied twice) RED with 104 mismatching CS= values, e.g. t=417320 CS=33.0 vs flow 34.91/34.96. Not run: the 2 minute average code in this loop harness (SATflowAvg.h is gone from src); the old-vs-fix proof is tests/test_sat_suppression_latest_flow.py (2 FAIL on beta.341 code).
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
 
 <!-- SECTION:FINAL_SUMMARY:BEGIN -->
-Superseded design, final state per entry 383 (Sergeant D 2026-11-16, Q-375a '1: A'): no 2 minute flow average anywhere; the PWM ON suppression setpoint is the latest flow minus fModSupOffset, as thermo-nova heating_control.py:435-441. AC1: the reading of entry 364 was put to Sergeant D (Q-SUP1b/c/d, Q-375a) and corrected: entries 373, 374, 375, 380, 383. AC2: its text (the 2 minute average) is SUPERSEDED by entry 383; the tick stands for the work done then (beta.330/333). The evidence for the current behaviour is tests/test_sat_suppression_latest_flow.py on the real satPwmSuppressionSetpoint(): 5/5 OK on the revert, 2 FAIL on the beta.341 code (a 40->50 step after two minutes of burning gives 44.0 instead of 49.0; a fall 55->45 gives 53.167 instead of 44.0). AC3: the start-up flood and the flow clamp keep their own flow source (unchanged by the revert; test_sat_ceiling_paths 9 OK, test_sat_pwm_override 83 OK, test_sat_loop_integration 15 OK). AC4: see the bench notes (smoke by 09 on .63, beta.344+873f06b); the SAT behaviour is proven on the host. evaluate --quick 0 failed.
+Superseded design, final state per entry 383 (Sergeant D 2026-11-16, Q-375a '1: A'): no 2 minute flow average anywhere; the PWM ON suppression setpoint is the latest flow minus fModSupOffset, as thermo-nova heating_control.py:435-441. AC1: the reading of entry 364 was put to Sergeant D (Q-SUP1b/c/d, Q-375a) and corrected: entries 373, 374, 375, 380, 383. AC2: its text (the 2 minute average) is SUPERSEDED by entry 383; the tick stands for the work done then (beta.330/333). The evidence for the current behaviour is tests/test_sat_suppression_latest_flow.py on the real satPwmSuppressionSetpoint(): 5/5 OK on the revert, 2 FAIL on the beta.341 code (a 40->50 step after two minutes of burning gives 44.0 instead of 49.0; a fall 55->45 gives 53.167 instead of 44.0). AC3: the start-up flood and the flow clamp keep their own flow source (unchanged by the revert; test_sat_ceiling_paths 9 OK, test_sat_pwm_override 83 OK, test_sat_loop_integration 15 OK). AC4: software simulation on the real code: scenario 6 of tests/test_sat_loop_integration.py (real SAT loop, PIC queue and feed hooks on the boiler model): every CS= in a PWM ON phase after the hold equals the latest fed flow - 1.0; 17/17 OK, mutant m6 red (104 mismatches). Smoke by 09 on .63 with beta.344+873f06b: no regression. evaluate --quick 0 failed.
 <!-- SECTION:FINAL_SUMMARY:END -->
