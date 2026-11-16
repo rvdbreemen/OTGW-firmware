@@ -1,7 +1,7 @@
 # anatomy.md
 
-> Auto-maintained by OpenWolf. Last scanned: 2026-11-15T22:27:38.904Z
-> Files: 168 tracked | Anatomy hits: 0 | Misses: 0
+> Auto-maintained by OpenWolf. Last scanned: 2026-11-16T07:33:23.514Z
+> Files: 170 tracked | Anatomy hits: 0 | Misses: 0
 
 ## ../../../../AppData/Local/Temp/
 
@@ -952,6 +952,7 @@
 
 - `cloud-telemetry-completeness.md` — Cloud telemetry: completeness analysis (TASK-1963, 2026-11-15) (~1879 tok)
 - `cloudrec-bench-job.md` — Bench job: cloud recorder PoC (TASK-1963, TASK-1971, TASK-1972, TASK-1974) (~1136 tok)
+- `cloudrec-bench-quickstart.md` — Cloud recorder PoC: go/no-go bench test, step by step (Windows laptop) (~1318 tok)
 - `ot-stream-encoding-study.md` — Encoding the OT stream for minimal bytes: study (~2136 tok)
 
 ## docs/evidence/
@@ -1021,6 +1022,7 @@
 
 ## tools/cloud-recorder/
 
+- `compare_telnet.py` — Compares a decoded debug.log with a telnet capture of the same gateway (bench check 4, TASK-1963). (~729 tok)
 - `compress_study.py` — Which lossless compression fits the gateway? (TASK-1972) (~1877 tok)
 
 ## tools/cloud-recorder/pocketbase/
