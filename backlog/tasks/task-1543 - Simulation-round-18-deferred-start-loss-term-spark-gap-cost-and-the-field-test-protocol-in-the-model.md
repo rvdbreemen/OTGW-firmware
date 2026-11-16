@@ -6,9 +6,10 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-01T09:39:00Z'
-updated_date: '2026-11-02T04:39:00Z'
+updated_date: '2026-11-16T08:53:00Z'
 labels:
   - simulatie
+milestone: 2.1.0
 dependencies: []
 priority: low
 ordinal: 699000
@@ -30,4 +31,6 @@ Deferred by Robert 2026-11-01, keep as a reminder. From TASK-1527 / entry 192: (
 
 <!-- SECTION:NOTES:BEGIN -->
 Triage 2026-11-02 (beta.5, origin/dev 6c41cc696) in code: no round18. Deferred by Robert.
+
+2026-11-16: moved to milestone 2.1.0. Release scope per entry 386 (Robert 08:47:36 UTC, https://discord.com/channels/812969634638725140/1105556725714649128/1571808950330986547: 'Mark anything new to the next release'): the initial SAT release covers the decisions of entries 375-385; this item is outside that scope. Not built now (coordinator 2026-11-16).
 <!-- SECTION:NOTES:END -->

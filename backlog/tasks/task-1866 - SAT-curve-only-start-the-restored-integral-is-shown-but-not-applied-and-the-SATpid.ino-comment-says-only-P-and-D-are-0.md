@@ -7,10 +7,9 @@ status: To Do
 assignee:
   - '@claude'
 created_date: '2026-11-12T11:54:00Z'
-updated_date: '2026-11-15T10:51:00Z'
+updated_date: '2026-11-16T08:57:00Z'
 labels:
-  - sat
-  - docs
+  - waiting-on-sergeant-d
 milestone: 2.0.0
 dependencies: []
 priority: low
@@ -33,4 +32,8 @@ Found by the second reader of Q-P1 (gruijter capture 2026-11-12, msg https://dis
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-11-15 (d3) picked up in the backlog sweep and put back: both ACs wait for Q-P1, which docs/sat/open-questions.md (origin/dev 341291f2b) still lists as 'asked' 2026-11-12 11:53 UTC with no entry in sergeant-d-corrections.md. AC1 needs the recorded answer; AC2 depends on it too (if Sergeant D wants the restored I applied, the display already matches after that change; if not, the UI must mark I as not applied). No code or comment change before the answer (ADR-196).
+
+2026-11-16 (95): moved to milestone 2.1.0 under entry 386 (Robert 08:47:36 UTC, 'Mark anything new to the next release'; scope of the initial SAT release = entries 375-385). Entry 357 (Q-P1 A, 2026-11-15) is outside that scope. Known conflict, deliberately deferred and reported to the coordinator: the firmware is curve-only before the first room temperature after a boot (SATpid.ino:186-213 satPidCurveOnly: P, I, D out of the output, restored integral kept and shown), while entry 357 says curve + P + I + D from the restored state as thermo-nova (pid.py:150-155 loads integral and raw derivative; climate.py:370-375 requested_setpoint = pid.output). Implementing 357 changes the control after a reboot, so it waits for 2.1.0; needs an ack from Robert or Sergeant D that the stable ships curve-only at boot.
+
+2026-11-16 (95), correction on the coordinator's call: the milestone move above is undone. Milestone stays 2.0.0, PENDING Sergeant D's answer: 92 puts it to him as one question, A = fix now for the stable release, B = curve-only at boot accepted for the stable release with entry 357 in 2.1.0. Entry 386 ('the restart issue looks resolved') may mean he considers 357 covered. Nothing is built until he answers.
 <!-- SECTION:NOTES:END -->

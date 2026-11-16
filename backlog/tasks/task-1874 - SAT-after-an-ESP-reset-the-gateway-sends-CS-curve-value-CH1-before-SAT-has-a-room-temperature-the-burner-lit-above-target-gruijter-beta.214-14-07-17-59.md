@@ -7,10 +7,9 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-12T20:56:00Z'
-updated_date: '2026-11-13T15:47:00Z'
+updated_date: '2026-11-16T08:57:00Z'
 labels:
-  - sat
-  - bug
+  - waiting-on-sergeant-d
 milestone: 2.0.0
 dependencies: []
 ordinal: 948000
@@ -28,4 +27,8 @@ Source: gruijter (Discord 733401267665109054) capture 20261112-121301-upload.zip
 2026-11-12 d3 read-only trace (relayed by the coordinator, not re-checked by comms): the first CS/CH after boot comes from SAT itself, not the PIC. With a valid restored state, satRestartStep() (SATcontrol.ino:4062-4130) sets the boot takeover and makes the control tick due at once (about line 4122, step 5 of the satRestart comment). That tick runs with room=nan, so it is curve-only (entries 38/46) and sends CS = curve (29.2 / 31.4) and CH=1. The comment line 'valid: nothing is sent' (about 4040) contradicts step 5 of the same block. Evidence: the telnet banner shows 'SAT active sp 29.2C' about 2 s after boot, and the R frames match the curve. Open: what cleared the command cache before the 30 s tick (the OT-online edge at SATcontrol.ino:7072-7075 or the PIC banner at OTGW-Core.ino:6213). The behaviour (wait for the room, or keep the last CS/CH) is Sergeant D's Q-P1.
 
 2026-11-13 reproduced on beta.218 (gruijter capture, analysis 1570826381443469447). Raw frames checked by comms in otframes.csv: 04:01:17.488 R id1 WRITE-DATA 30.0 (replacing the thermostat T id1 10.0); 04:01:18.505 R id0 READ-DATA 3 (CH+DHW) while the thermostat sent T id0 2 (DHW only); B status LB 0x0A (flame + CH). Burner 04:01:18-04:01:51 (33 s, flow peak 28.9 per agent), room 17.90 vs target 17.5. SAT had the room temperature at 04:01:41 ("Room temperature back") and then sent CS=10, CH=0. Also after the 08:38 and 11:59 resets the curve CS went out before the room was known (R id1 32.9 at 08:38:37, 29.9 at 11:59:21, per agent); there the thermostat already wanted CH (T id0 3), so no CH was forced. Code path per the analysis agent, NOT opened by comms: room lost -> curve-only tick SATcontrol.ino:7230-7245, made due at once by satRestartStep step 5 :4120-4126.
+
+2026-11-16 (95): moved to milestone 2.1.0 under entry 386 (Robert 08:47:36 UTC, 'Mark anything new to the next release'; scope of the initial SAT release = entries 375-385). Entry 357 (Q-P1 A, 2026-11-15) is outside that scope. Known conflict, deliberately deferred and reported to the coordinator: the firmware is curve-only before the first room temperature after a boot (SATpid.ino:186-213 satPidCurveOnly: P, I, D out of the output, restored integral kept and shown), while entry 357 says curve + P + I + D from the restored state as thermo-nova (pid.py:150-155 loads integral and raw derivative; climate.py:370-375 requested_setpoint = pid.output). Implementing 357 changes the control after a reboot, so it waits for 2.1.0; needs an ack from Robert or Sergeant D that the stable ships curve-only at boot.
+
+2026-11-16 (95), correction on the coordinator's call: the milestone move above is undone. Milestone stays 2.0.0, PENDING Sergeant D's answer: 92 puts it to him as one question, A = fix now for the stable release, B = curve-only at boot accepted for the stable release with entry 357 in 2.1.0. Entry 386 ('the restart issue looks resolved') may mean he considers 357 covered. Nothing is built until he answers.
 <!-- SECTION:NOTES:END -->

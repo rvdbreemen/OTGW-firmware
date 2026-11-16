@@ -7,9 +7,10 @@ status: To Do
 assignee:
   - '@claude'
 created_date: '2026-11-02T16:51:00Z'
-updated_date: '2026-11-14T15:26:00Z'
+updated_date: '2026-11-16T08:53:00Z'
 labels:
   - sat
+milestone: 2.1.0
 dependencies: []
 priority: medium
 ordinal: 708000
@@ -60,4 +61,6 @@ CH run profile: supply 27 to 30.5-31.5 C within about 20 min, return 25-26.4 C a
 2026-11-07 maarten_41762 (#alpha-testing msg 1568587787454783589) corrects the heat-pump field reference: (a) the OpenTherm control setpoint 35 C is the return-water temperature at which this heat pump pauses, not a supply setpoint; supply is an end result of the refrigerant circuit; runs still end on the Honeywell relay release (return stayed 25-26 C). (b) DHW is switched by Homey through the gateway (HW=0/HW=1) following the lowest energy prices. (c) The equal run lengths at different outdoor temperatures on 6 Nov are coincidence; he has seen longer runs when colder. Use multi-day captures before deriving run length vs weather.
 
 Stale audit 2026-11-14 (coordinator decision): back to To Do. Sergeant D, entry 345: 'make the controller robust and then slowly adding some new features' (controller first).
+
+2026-11-16: moved to milestone 2.1.0. Release scope per entry 386 (Robert 08:47:36 UTC, https://discord.com/channels/812969634638725140/1105556725714649128/1571808950330986547: 'Mark anything new to the next release'): the initial SAT release covers the decisions of entries 375-385; this item is outside that scope. Not built now (coordinator 2026-11-16).
 <!-- SECTION:NOTES:END -->
