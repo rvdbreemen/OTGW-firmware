@@ -10296,7 +10296,8 @@
           "Send CH=0 while the band holds heating off, and leave the control setpoint, the PWM mode and its schedule, the PID and the cold cutoff untouched (entries 361, 384).",
           "Let a CH burn run 180 s before a band stop takes effect, in PWM and in continuous mode (entries 275, 376).",
           "Let only the main room decide in eco and any usable room in comfort (entry 378).",
-          "Never block heating when no deciding room temperature is usable."
+          "Never block heating when no deciding room temperature is usable.",
+          "Leave an ON phase that starts during a band stop out of the hourly start count, and count it once if CH is allowed again within that phase (entry 398, plus our reading above)."
         ],
         "must_not": [
           "Must not end PWM or send CS=10 because of the band.",
@@ -10317,6 +10318,8 @@
           "in PWM the mode stays PWM and the on/off schedule keeps toggling during the stop;",
           "a lit PWM phase and a continuous burn both run 180 s first;",
           "the cold cutoff is unchanged.",
+          "the start count (entry 398): flameless ON phases during a band stop leave cyclesthishour unchanged, a phase that starts during a stop and sees CH allowed again counts once, a phase that starts during the 180 s wait counts, and nothing ch...",
+          "the narration names the value the band decided on.",
           "Source checks:",
           "only the main CH command reads the band;",
           "the cold-cutoff threshold has no band code;",

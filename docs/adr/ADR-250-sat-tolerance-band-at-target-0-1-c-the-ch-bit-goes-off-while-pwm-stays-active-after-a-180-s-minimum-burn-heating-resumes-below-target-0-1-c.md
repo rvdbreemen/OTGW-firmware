@@ -81,6 +81,7 @@ While the tolerance band says stop, the CH-enable bit SAT sends is 0, and nothin
 - A stop takes effect only after the running CH burn has lasted 180 s (`satBandWaitsForMinBurn()`): in PWM through the cold cutoff's own rule `satPwmColdCutWaitsForMinBurn()` (entry 275), in continuous mode for a lit CH flame younger than 180 s since its flame-on edge (entry 376). Applying the PWM rule to the band is our reading of entry 376's "the same minimum as a PWM ON phase".
 - `satChEnableDecide()` gets the effective stop (`_sat_tolBandOff`) as one more input after the cold cutoff; it is read only by the main CH command of the control tick. The other CH senders keep their own value: the thermal safe fallback (CH=1, a safety path with no usable room data) and the summer and valves-closed paths (CH=0).
 - The band starts with demand on at boot and when SAT comes back from `satDisable()` (entry 83: the first tick sends a real setpoint).
+- A PWM ON phase that starts while the band stop is in force (`_sat_tolBandOff`) is not counted toward the hourly start limit (entry 398). If the band lets CH on again while that ON phase is still running, the phase is counted once at that moment. This second rule is our reading, recorded in the TASK-1887 notes: from then on the burner may start, and entries 59, 90 and 95 count every ON phase in which it may start, lit or not. The count is never on a flame edge. During the 180 s minimum-burn wait CH is still 1, so ON phases in that wait count as before.
 
 ## Decision Contract
 
@@ -90,6 +91,7 @@ While the tolerance band says stop, the CH-enable bit SAT sends is 0, and nothin
 - Let a CH burn run 180 s before a band stop takes effect, in PWM and in continuous mode (entries 275, 376).
 - Let only the main room decide in eco and any usable room in comfort (entry 378).
 - Never block heating when no deciding room temperature is usable.
+- Leave an ON phase that starts during a band stop out of the hourly start count, and count it once if CH is allowed again within that phase (entry 398, plus our reading above).
 
 ### Must Not
 
@@ -113,6 +115,8 @@ While the tolerance band says stop, the CH-enable bit SAT sends is 0, and nothin
   - in PWM the mode stays PWM and the on/off schedule keeps toggling during the stop;
   - a lit PWM phase and a continuous burn both run 180 s first;
   - the cold cutoff is unchanged.
+  - the start count (entry 398): flameless ON phases during a band stop leave `cycles_this_hour` unchanged, a phase that starts during a stop and sees CH allowed again counts once, a phase that starts during the 180 s wait counts, and nothing changes outside a stop;
+  - the narration names the value the band decided on.
 - Source checks:
   - only the main CH command reads the band;
   - the cold-cutoff threshold has no band code;
@@ -136,13 +140,13 @@ While the tolerance band says stop, the CH-enable bit SAT sends is 0, and nothin
 
 **Negative:**
 
-- During a pause the PWM schedule runs ON phases with CH=0, so with no flame. These still count as starts in the hourly start limit, because entries 59, 90 and 95 count every ON-phase start whether it lights or not. After a long pause the first real restart can wait for the limit window. This follows from entries 59/90 and 384 together; it is asked to Sergeant D as a follow-up (see Open Questions) and not changed here.
+- During a pause the PWM schedule runs ON phases with CH=0, so with no flame. Per entry 398 they do not count toward the hourly start limit, so a long pause does not use up the limit; the cost is one more exception in the start count, which otherwise counts every ON phase (entries 59, 90, 95).
 - The PID keeps running during a pause (entry 361), so its integral term moves down in a warm room and the first setpoint after a pause can be lower than before it.
 - With 0.1 C on either side, a sensor that steps in 0.1 C increments can flip the band at about every sensor step near the edge. The 180 s minimum burn and the PWM rhythm limit how often the boiler actually switches.
 
 ## Open Questions
 
-- [ ] During a band pause the flameless PWM ON phases count as starts in the hourly limit (entries 59, 90, 95). Should they? To be asked to Sergeant D as a follow-up, non-blocking: the code follows the recorded entries.
+- [x] During a band pause, do flameless PWM ON phases count as starts in the hourly limit? Answered by Sergeant D on 2026-11-16 (entry 398, Q-384a): no.
 
 ## Related Decisions
 
@@ -151,7 +155,7 @@ While the tolerance band says stop, the CH-enable bit SAT sends is 0, and nothin
 
 ## References
 
-- `docs/sat/sergeant-d-corrections.md` entries 59, 83, 90, 95, 275, 326, 328, 361, 376, 377, 378, 384.
+- `docs/sat/sergeant-d-corrections.md` entries 28, 59, 83, 90, 95, 275, 326, 328, 361, 376, 377, 378, 384, 398.
 - thermo-nova 7beaaf5: `custom_components/sat/heating_control.py:66-72`, `:229-234`, `pwm.py:201-203`, `climate.py:384-385`.
 - Home Assistant generic thermostat: https://www.home-assistant.io/integrations/generic_thermostat/ (cold_tolerance, hot_tolerance).
 - `src/OTGW-firmware/SATchEnable.h` (`satToleranceMaxError`, `satToleranceDemand`, `satChEnableDecide`), `src/OTGW-firmware/SATcontrol.ino` (`satBandWaitsForMinBurn`, the band latch in the control tick, the reset after `satDisable()`).
