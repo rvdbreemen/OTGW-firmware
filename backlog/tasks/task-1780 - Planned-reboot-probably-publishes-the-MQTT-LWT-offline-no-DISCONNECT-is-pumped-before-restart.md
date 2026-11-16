@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-10T14:30:00Z'
-updated_date: '2026-11-16T16:04:00Z'
+updated_date: '2026-11-16T23:50:00Z'
 labels:
   - mqtt
   - bug
@@ -43,4 +43,6 @@ Bench 09 2026-11-16, .61 (OT-Direct), SAT off, satsimulation false. LAN broker m
 OLD 2.0.0-beta.257+47f0ea3 (before 79c6c7ce0; doMqttDisconnect() was only MQTTclient.disconnect()), /ReBoot 16:58:18: the broker logs NOTHING at the reboot (no DISCONNECT, no socket error). The old session stays half-open until the new boot connects with the same client id: '16:58:36: Client OTGW1020BA21B4F8 [192.168.88.61:56549] disconnected: session taken over.' The availability topic gets 'offline' only at 16:58:36, from the broker's will on the takeover, immediately followed by 'online' (~18 s after the reboot). Confirmed: a planned reboot sends no DISCONNECT, and offline is only signalled late, by the will.
 
 FIX 2.0.0-beta.353+3a14423 (contains 79c6c7ce0), /ReBoot 16:53:29: '16:53:30: Client OTGW1020BA21B4F8 [192.168.88.61:50153] disconnected.' (clean DISCONNECT). The availability topic gets the retained 'offline' at 16:53:30 (the device's own publish, +1 s), then 'online' at 16:53:47 on the reconnect. AC2: broker part and topic part shown; the HA UI (unavailable at once, online at the birth) was NOT observed, so AC2 stays open for the HA leg. Side effect of the downgrade, restored: 257 rewrote settings.ini without the OTDohpicdefault marker, so 353's TASK-1961 migration set OH=1 once (settingStuff.ino:682-686); set back with OH=0, and settings.ini is byte-identical to before. Evidence: 09 scratchpad t1780/ (res-old257.json, res-fix353.json, sub-*.txt) and broker/mosq-lan.log.
+
+SUPPORTING EVIDENCE for AC2(b), NOT the HA observation (09, 2026-11-17 ~01:00). The retained discovery configs of .61 (e.g. homeassistant/sensor/otgw-1020BA21B4F8/boiler_TSet/config, boiler_status_master, boiler_status_slave) set avty_t 'OTGW/value/otgw-1020BA21B4F8' with no custom payloads, so HA uses its MQTT defaults payload_available 'online' / payload_not_available 'offline'. On that exact topic the fix (beta.353+3a14423) published the retained 'offline' at 16:53:30, +1 s after /ReBoot, with the broker logging a clean 'disconnected.', and 'online' at the reconnect at 16:53:47. The old beta.257 got 'offline' only from the will at the session takeover, ~18 s later. Inference: HA marks every .61 entity unavailable at +1 s and available at the reconnect. NOT observed in HA: the HA-rig run is planned for 17 Nov after the 08:00 beta, once commit charge allows and the Docker start is OK'd (coordinator). AC2 stays open.
 <!-- SECTION:NOTES:END -->
