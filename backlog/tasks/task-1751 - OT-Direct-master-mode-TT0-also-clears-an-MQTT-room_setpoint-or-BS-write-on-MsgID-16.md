@@ -7,7 +7,7 @@ status: In Review
 assignee:
   - '@claude'
 created_date: '2026-11-09T09:29:00Z'
-updated_date: '2026-11-16T09:45:00Z'
+updated_date: '2026-11-16T14:31:00Z'
 labels:
   - otdirect
 milestone: 2.0.0
@@ -39,4 +39,8 @@ Implemented (lane-95-next): otdRoom16CacheSet/F88 (MQTT room_setpoint: periodic 
 Landed beta.300: Pushed origin/dev 2e4ca9c05..3e29faa63; zip beta.301+2b3d9a2 posted (Discord 1571471374038470711); final build exit 0 'Build completed successfully', RAM 130572 B, Flash 2157483 B; sweep 88/88, evaluate --quick 86/0; bench 09 on .61 beta.301+2b3d9a2 PASS (smoke + re-check). Bench 09 on .61: state level only, the MsgID 16 override 0x1300 stays after TT=0 in master mode; no WRITE 16 frame seen within 75 s (the periodic write interval was not reached in the window). AC1 (TT=0 leaves room_setpoint/BS= untouched) holds on the state and in tests/test_otd_tt_pic_parity.py R1-R3 (R1/R2 FAIL on the old code); the frame on the bus is NOT shown yet -> In Review until a longer master-mode capture shows the WRITE 16 0x1300.
 
 2026-11-16 10:34-10:43 bench 09 on .61 (OTGW32, master mode, no thermostat or boiler), 2.0.0-beta.341+3cb72c3, telnet captured after boot (1708 lines, 464 OT frames), commands over MQTT OTGW/set/<node>/command. BS=19 -> overrides.write {msgid 16, value 4864 = 0x1300}, no MsgID 16 frame in the next 70 s. TT=20.5 -> {16, 5248 = 0x1480} and at once a WRITE 16 frame R90101480 (20.50) 1.9 s after the command. TT=0 -> {16, 4864 = 0x1300}: the BS value is kept (AC1 holds at the state level, as in the beta.301 bench). After TT=0: 0 MsgID 16 frames in 360 s, so the restored 19.00 was not written to the boiler in that window; a boiler would keep the last written TrSet 20.50 until the next MsgID 16 write. BS=0 -> write list empty. Open question for the owner (behaviour, not ticked here): should TT=0 in master mode trigger an immediate WRITE 16 with the kept BS value, and is there a periodic MsgID 16 write in master mode at all (none seen in 70 s with BS alone or 6 min after TT=0)? Evidence: 09 scratchpad closeout/mq2/ (run.log, telnet.raw, bs1751.py).
+
+Bench 2026-11-16 (otgw-firmware-09), .61 OT-Direct master, 2.0.0-beta.353+3a14423, SAT off, MQTT command topic, frames from telnet processOT. BS=19: R90101300 (TrSet 19.00) at +1.6 s. TT=20.5: R90101480 at +1.8 s, then WRITE 100 R10640003 at +2.9 s. TT=0: R90101300 at +1.9 s (back to the BS value), then WRITE 100 R10640000 at +3.0 s. On 341 nothing was sent in 360 s after TT=0, so this is the old-vs-fix proof. BS=0: no MsgID 16 frame in 90 s, overrides []. Smoke: githash 3a14423, bootcount 874 -> 876 (2 OTA restarts only), settings.ini identical, MQTT connected.
+
+Periodic refresh host-only: each command gave exactly one WRITE 16 with no repeat in 70-120 s. Telnet does print repeated frames (122x R00000000 in the same run). The bus is offline (no boiler) and the scheduler skips everything but MsgID 0 then: origin/dev OTDirect.ino:2299 'if (busOffline && entry.msgId != 0) continue;' (opened by 09, confirmed by 95). The one-shot writes go through the command queue. Evidence: 09 scratchpad b353/run2/ (run.log, telnet.raw).
 <!-- SECTION:NOTES:END -->
