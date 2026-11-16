@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@system32-030509'
 created_date: '2026-11-09T19:21:00Z'
-updated_date: '2026-11-16T16:33:00Z'
+updated_date: '2026-11-16T16:36:00Z'
 labels:
   - bug
   - crash
@@ -29,7 +29,7 @@ Candidates (not proven): attachInterrupt / attachInterruptArg in src/libraries/O
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Determine from the decode and code where the GPIO ISR install ran (restart path of the old boot vs setup of the new one) and why heap_caps_malloc in esp_intr_alloc panicked, with evidence
+- [x] #1 Determine from the decode and code where the GPIO ISR install ran (restart path of the old boot vs setup of the new one) and why heap_caps_malloc in esp_intr_alloc panicked, with evidence
 - [ ] #2 Reproduce or bound it on the bench: repeated /ReBoot cycles (including after a long uptime and a low-heap boot) with serial capture; count panics per N reboots
 - [x] #3 Fix, or a decision with Robert, with before/after panic counts
 <!-- AC:END -->
@@ -69,6 +69,8 @@ Not this class (2026-11-10, a4): the coredump in gruijter's upload 20261110-1005
 2026-11-16 17:08-17:30 (09, AC2/AC3 count WITH serial): 60x POST /ReBoot on .61 (OTGW32, 2.0.0-beta.353+3a14423, contains ADR-225 IPC stack 1280 B), SAT off, satsimulation false, scratchpad t1763/reboot_loop.py, COM4 at 115200 with DTR/RTS off. Result 0/60 panics: serial.log has 60x 'rst:0xc (RTC_SW_CPU_RST)' and 0 hits for Guru/Backtrace/abort()/panic'ed/stack overflow/ipc1; bootcount 882 -> 942, +1 each; crashlog no new summary; lastreset 'Software reset'. IPC stack minima after the run: hd_ipc0_stack_min 484, hd_ipc1_stack_min 332 (beta.162/168 measured 88 B free on ipc1; the coredump overflowed by 52 B). settings.ini byte-identical.
 
 Totals on the fix (ADR-225 builds): 30 (beta.264, no serial) + 60 (beta.353, with serial) = 90 reboots, 0 panics. Rule of three: 95 % upper bound about 3.3 % per reboot, against the 1-in-10 seen on beta.162. Mechanism: ipc1 margin 88 B -> 332-340 B at the deepest point of the GPIO ISR install. AC3 ticked on that before/after. AC2 stays OPEN for the long-uptime and low-heap-boot cases (all 90 reboots started at uptime < 10 min with hd_min ~27 KB). Evidence: 09 scratchpad t1763c/ (results.txt, serial.log, pre.txt, S0/S1.ini).
+
+AC1 ticked by 09 on 2026-11-16 at the coordinator's instruction, on the evidence in comments #1-#3 (code analysis 030509, coredump decode 4c), re-checked by 09 in this session against the saved decode: OTGW-build-archive/coredumps/task-1763-beta162-61/decode.txt (coredump.bin sha256 908d8834773ca65c...). Current thread 'ipc1' (TCB 0x3fcbc338, decode.txt:55/62), exccause 0x41 DebugException, epc6 0x40383bfa (:10/:17). Backtrace :26-41: _frxt_int_enter <- _xt_lowint1 <- vPortExitCriticalSafe / multi_heap_internal_unlock <- multi_heap_malloc(size 8) <- heap_caps_malloc(8, caps 2052) <- esp_intr_alloc_intrstatus_bind(source 16, gpio_intr_service) <- esp_intr_alloc <- gpio_isr_register_on_core_static <- ipc_task. Where: the first GPIO ISR install of the new boot runs through ipc1. Why: a level-1 interrupt frame overran ipc1's 1024 B stack (SP 52 B below the bottom per comment #3); not heap corruption, not OOM.
 <!-- SECTION:NOTES:END -->
 
 ## Comments
