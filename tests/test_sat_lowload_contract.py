@@ -420,9 +420,10 @@ class LowLoadContract(unittest.TestCase):
         task="TASK-1420 (fixed; entries 86, 95, 109); TASK-1412.8 AC2: every supported tick (10 s to 300 s) for all three timers, exact against the contract")
     def test_ll004_underheat_and_saturation_exit_after_60_300_s_from_the_first_qualifying_sample(self):
         # TASK-1933 (Sergeant D entries 342, 350): the underheat exit is "flame on and request above the flow for 60 s" (was 180 s)
+        # TASK-1888 (entry 327, ADR-249): the continuous-to-PWM overshoot switch ("o") needs 30 s (was 60 s)
         rows = []
         for interval in (10, 30, 60, 90, 120, 300):
-            for kind, threshold, mode in (("o", 60, 2), ("u", 60, 1), ("z", 300, 1)):
+            for kind, threshold, mode in (("o", 30, 2), ("u", 60, 1), ("z", 300, 1)):
                 elapsed, t = self.exit_after(interval * 1000, kind)
                 rows.append((interval, kind, threshold, elapsed))
                 with self.subTest(interval_s=interval, condition=kind):
@@ -572,7 +573,7 @@ class LowLoadContract(unittest.TestCase):
     def test_ll020b_exit_timing_with_jitter_and_millis_wrap(self):
         results = []
         for interval in (10, 30, 60, 120):
-            for kind, threshold in (("o", 60), ("u", 60), ("z", 300)):   # TASK-1933: underheat 60 s (entries 342, 350)
+            for kind, threshold in (("o", 30), ("u", 60), ("z", 300)):   # TASK-1933: underheat 60 s (entries 342, 350); TASK-1888: overshoot switch 30 s (entry 327)
                 for jitter in ((0, 7000, 3000, 5000), (0, 25000), (12000,)):
                     for start in (None, 4294967295 - 100000, 4294967295 - int(interval * 1500)):   # the last: the wrap falls inside the timer
                         elapsed, t = self.exit_after(interval * 1000, kind, jitter=jitter, start=start)
