@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-16T00:19:00Z'
-updated_date: '2026-11-16T01:42:00Z'
+updated_date: '2026-11-16T02:19:00Z'
 labels:
   - otdirect
   - bench-finding
@@ -40,4 +40,6 @@ Verified in code (origin a2bfce174 + lane-1804b): (1) otCmdEnqueue() (OTDirect.i
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-11-16 d3: fix on lane-1992 (c9857d1b6, WIP until the gates). tests/test_otd_sim_exit_stale_writes.py on the real ring + otCmdEnqueue + scheduleMasterRequest + otdFlushCmdQueue + clearWriteOverride + otdSimExitFlush, with sendMasterRequestAsync refusing while settings.sat.bSimulation (as satSimulationBlocksBusTx): old code (origin e2688b437) 3 FAIL: the b331 sequence sends 10101480, 10013D4D, 100E6400 (09's three stale frames), a write queued under the simulation goes out after it, a cleared CS still goes out without a simulation; fix 4/4 (the after-simulation write goes out once on both). Harness stubs (otCmdDropPendingWrite / otCmdSkipTombstones / otdSimExitFlush) in test_otd_cool_ch2_defaults, test_otd_gateway_alt_slots (also fixes test_otd_ps1_summary_pic), test_otd_gateway_own_status, test_otd_rt_room_temp, test_otd_vs_msgid71, test_sat_no_return_startup, test/host/test_override_reply.cpp. Gates on lane-1992: test_otd_* all green (three parts), override_reply 41/41 + test_override_reply.py 4 OK, evaluate 88/0, ll018 10 passed, test_evaluate 80 OK. Still open before push: full test_sat_lowload_contract alone; build + bench (AC3, 09 re-runs the b331 sequence).
+
+2026-11-16 03:2x d3: full tests/test_sat_lowload_contract.py alone on lane-1992 (85191c0b2): 34 passed, 1 skipped, 0 failed (682 s). All pre-build gates green. Next: rebase onto origin, build, bench (AC3: 09 re-runs the b331 sequence: satsimulation on, TT=20.5, CS/MM under SAT sim, TT=0, CS=0, MM=T, satsimulation off -> no R frame with a cancelled value).
 <!-- SECTION:NOTES:END -->
