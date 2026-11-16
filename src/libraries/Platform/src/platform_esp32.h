@@ -1030,19 +1030,24 @@ inline bool platformCoreDumpAppSha(char* dst, size_t len) {
   return n > 0;
 }
 
-// The running image's ELF SHA256 as lowercase hex (64 digits), read once from the app description
-// (esp_app_get_elf_sha256, esp_app_desc.h) and cached (TASK-1983). The core dump keeps a prefix of the same
-// kind of string for the build that crashed (platformCoreDumpAppSha above), so a reader compares the two on
-// the dump's length: equal means the dump is from this build. Empty when the description has no sha.
+// The running image's ELF SHA256 as lowercase hex (64 digits), built once from the 32 bytes of the app
+// description (esp_app_get_description()->app_elf_sha256, esp_app_desc.h) and cached (TASK-1983). Not via
+// esp_app_get_elf_sha256(): that helper returns at most CONFIG_APP_RETRIEVE_LEN_ELF_SHA characters (9 here), as
+// seen on .61 with beta.342. The core dump keeps a prefix of the same string for the build that crashed
+// (platformCoreDumpAppSha above), so a reader compares the two on the dump's length: equal means the dump is
+// from this build.
 inline const char* platformRunningAppSha() {
   static char s_sha[65] = "";
   static bool s_read = false;
   if (!s_read) {
     s_read = true;
-    if (esp_app_get_elf_sha256(s_sha, sizeof(s_sha)) <= 1) s_sha[0] = '\0';
-    for (char* p = s_sha; *p; p++) {
-      if (*p >= 'A' && *p <= 'F') *p = (char)(*p + ('a' - 'A'));
+    const esp_app_desc_t* d = esp_app_get_description();
+    static const char kHex[] = "0123456789abcdef";
+    for (size_t i = 0; d != nullptr && i < sizeof(d->app_elf_sha256); i++) {
+      s_sha[2 * i]     = kHex[d->app_elf_sha256[i] >> 4];
+      s_sha[2 * i + 1] = kHex[d->app_elf_sha256[i] & 0x0F];
     }
+    s_sha[(d != nullptr) ? 64 : 0] = '\0';
   }
   return s_sha;
 }
