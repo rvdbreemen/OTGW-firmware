@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-13T07:25:00Z'
-updated_date: '2026-11-16T16:39:00Z'
+updated_date: '2026-11-16T17:20:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -28,6 +28,7 @@ Sergeant D decision 2026-11-13 (https://discord.com/channels/812969634638725140/
 - [x] #3 Seam sweep of the SAT tests that cut the control tick and the LL contract (all 18 ids) green; evaluate.py --quick no new FAIL
 - [x] #4 ADR-250 (Proposed via adr-kit) records the decision and amends ADR-199; accepted by Robert before push
 - [x] #5 esp32-combo build and a bench run by the bench-tester (health; the band behaviour is host-proven, no SAT scenario on hardware)
+- [ ] #6 Follow-ups in the post build after the 2.0.0 beta tag, benched on .63: the band narration shows the deciding value (X.XX matches room/target of the same SATTICK), and ON phases that start during a band stop leave starts=/cycles_this_hour unchanged (entry 398; host-proven by test_sat_tolerance_band if .63 does not run PWM)
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -65,4 +66,6 @@ Entry 398 edge case, OUR interpretation (ba, recorded by comms 92 on 2026-11-16;
 2026-11-16 tests/test_sat_zone_aggregation.py was red on origin/dev since ae8626cff for the same reason as test_sat_published_curve (zone-block slice without the band symbols; reported by d3): same conditional stub; 16/16 on origin HEAD, on 55dd8f015 and on lane/ba-1887n. grep shows no other test slicing that block.
 
 2026-11-16 for ba (comms 92, coordinator's request): the entry 398 case on a REAL boiler, indigo_light beta.350 capture (Vitodens, simulation off; RvdB/OTGW-field-data/indigo_light/20261116-144953/analysis/). 16:00:58 (tester local time) during a band pause (ch=0, room 20.66, target 20.5): satCycleCheckOvershootSwitch fired 'Control mode: PWM (flow 67.3 stayed above setpoint 31.0 + 1.5 for 30 s)'; the flow was boiler water still hot from DHW burns (last DHW flame 15:53:24, so the 300 s DHW guard satDhwGuardActive, SATcycles.ino:1378, had expired), no CH water flowing. The PWM ON phase 16:00:58-16:03:58 had no flame and counted as a start (pwm starts/hr=2 at the CH ignition 16:18:36). The firmware switch rule checks the DHW guard but not whether heating is on; thermo-nova skips the switch when the heater is not ON or the request <= COLD_SETPOINT (heating_control.py:276-282). Question Q-1887c (ba's text) is queued for Sergeant D after Q-2005a and Q-1998b.
+
+2026-11-16 field (indigo_light, Vitodens, beta.350, sim off; OTGW-field-data/indigo_light/20261116-144953/analysis/sat_story.txt, read by ba): band pause 14:53:58 to 16:14:58; inside it, 16:00:58 'Control mode: PWM (flow 67.3 stayed above setpoint 31.0 + 1.5 for 30 s)' and 'PWM ON: pwm_on=180 s pwm_off=1743 s duty=0.09' with CH=0: the flameless ON phase counted as a start (beta.350 predates entry 398), the exact case entry 398 removes. Second observation, NOT decided: the continuous->PWM overshoot switch (TASK-1888, entry 327) evaluated the flow during the band pause (CH=0, flow 67.3, likely hot water or residual heat); whether it should hold during a band pause is a SAT design question for Sergeant D (raised to the coordinator for 92).
 <!-- SECTION:NOTES:END -->
