@@ -7822,3 +7822,27 @@ Robert, 16:18:42 UTC (https://discord.com/channels/812969634638725140/9144987300
 **Settled (reading, the answer is short):** after a reboot SAT first waits 60 s and sends no command to the boiler; after that it follows option B of Q-357a: until the first room temperature arrives it controls on the heating curve only (P, I and D left out, the restored integral kept), and the full entry 357 behaviour (curve + P + I + D from the restored state, as thermo-nova pid.py:150-155, climate.py:370-375) goes into the next release (2.1.0). Scope: the 60 s wait and curve-only are for this release (2.0.0 stable), as option B said. Not settled: whether "don't send any commands" also covers commands that are not SAT's own (user REST/MQTT commands, the PIC's own traffic); we read it as SAT's own control commands (CS=, CH=, MM= and the like).
 
 **Task:** TASK-1866 / TASK-1874 (owner 95). Open: the reading of "any commands" above, if the owner needs it settled.
+
+## 389. Q-385a answered A: the PWM-first start phase ends 60 s after the flame lights (Sergeant D, 2026-11-16; settles the timing point of entry 385)
+
+**Source:** #dev-sat-mqtt, Sergeant D 2026-11-16 10:36:14 UTC (https://discord.com/channels/812969634638725140/1105556725714649128/1571836290377187339), answer to Q-385a (asked https://discord.com/channels/812969634638725140/1105556725714649128/1571821350652215408, re-asked https://discord.com/channels/812969634638725140/1105556725714649128/1571835992330215425).
+
+**Quoted:**
+
+> "Q-385a: A"
+
+**Settled:** option A: every heating start runs in PWM first, and that start phase ends 60 s after the flame lights (the same start-up window as entries 344/347, a small warm up); then SAT chooses PWM or continuous. thermo-nova starts in continuous (pwm.py:63, :89; PWM only enabled on a sustained overshoot, heating_control.py:262 onward), so this deliberately differs (entry 385). Scope: he did not answer the scope line; the question recommended this release (2.0.0) and entry 386 puts the PWM-first start in the release scope, so we read it as 2.0.0.
+
+**Task:** TASK-1942 (owner d3), milestone 2.0.0.
+
+## 390. Keep-warm DHW burns after a CH burn do not affect SAT (Sergeant D to indigo_light, 2026-11-16; TASK-1998 question 3)
+
+**Source:** #beta-testing, Sergeant D 2026-11-16 10:41:11 UTC (https://discord.com/channels/812969634638725140/914498730001072149/1571837534432927905), to indigo_light's question 3 (https://discord.com/channels/812969634638725140/914498730001072149/1571835155864358953).
+
+**Quoted:**
+
+> "Regarding 3 no SAT doesn’t affect from this operation."
+
+**Settled (reading, short answer):** the short DHW burns the Vitodens makes after a CH burn without a tap (keep-warm) do not affect SAT; we read it as: no change needed in SAT's cycle statistics or self-tune for them. Not settled: whether the firmware already leaves those burns out of its statistics the way he expects; to check against the code under TASK-1998 with indigo's capture. Question 2 of TASK-1998 is still open (he asked indigo whether it was about the HA integration or the firmware SAT, https://discord.com/channels/812969634638725140/914498730001072149/1571838397343858723).
+
+**Task:** TASK-1998 (2.1.0).

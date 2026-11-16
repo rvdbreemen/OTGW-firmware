@@ -5146,6 +5146,32 @@
     "TASK-1874"
    ],
    "confirmed_by_entry": null
+  },
+  {
+   "id": 389,
+   "title": "Q-385a answered A: the PWM-first start phase ends 60 s after the flame lights (Sergeant D, 2026-11-16; settles the timing point of entry 385)",
+   "date": "2026-11-16",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1571836290377187339",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1942"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 390,
+   "title": "Keep-warm DHW burns after a CH burn do not affect SAT (Sergeant D to indigo_light, 2026-11-16; TASK-1998 question 3)",
+   "date": "2026-11-16",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/914498730001072149/1571837534432927905",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1998"
+   ],
+   "confirmed_by_entry": null
   }
  ]
 }
