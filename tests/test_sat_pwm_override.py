@@ -481,7 +481,7 @@ def extract_switch_tick(src: str) -> str:
     # TASK-1468: the segment runs up to the modulation step, so it holds the real exits gate in whichever place the source has it
     # (after the apply step on HEAD, between the schedule and the apply step since entry 134); the exits run on the tick clock.
     body = loop[a:loop.index("  // Modulation suppression", ex)] if ex < loop.index("  // Modulation suppression", ov) else loop[a:ex]
-    return ("\n#define HAS_SWITCH_TICK 1\nstatic uint32_t _sat_tickMs = 0; static bool g_swPwmOn = false, g_swDrives = false;\n"
+    return ("\n#define HAS_SWITCH_TICK 1\nstatic bool g_swPwmOn = false, g_swDrives = false;\n"   # _sat_tickMs: declared before the body (build())
             "bool satCycleCheckOvershootSwitch(float requestedSetpoint, uint32_t tickMs);\n"
             "static float tickRunSw(float pidOutput) {\n" + body +
             "\n  g_swPwmOn = pwmOn; g_swDrives = pwmDrivesSetpoint;\n  return state.sat.fFinalSetpoint;\n}\n")
@@ -503,7 +503,9 @@ def extract(src: str) -> str:
     m = re.search(r"^static uint8_t satComputeMM\(.*?^\}\s*$", src, re.S | re.M)
     mm = m.group(0) if m else ""
     tick = extract_tick(src)
-    return start_gate_prelude(src, block + tick) + block + "\n" + mm + "\n" + tick
+    # the tick clock: the TASK-1887 band block and the switch segment read it; declared once here for every user of extract()
+    clock = "static uint32_t _sat_tickMs = 0;\n" if "static uint32_t _sat_tickMs" not in block + tick else ""
+    return clock + start_gate_prelude(src, block + tick) + block + "\n" + mm + "\n" + tick
 
 
 def start_gate_prelude(src: str, body: str) -> str:

@@ -143,11 +143,11 @@ class BandHelper(unittest.TestCase):
     def demand(self, was_on, err):
         return self.run_exe("demand", int(was_on), err) == "1"
 
-    def test_starts_only_strictly_below_target_minus_0_1(self):
-        # entry 328: "start when the sensor goes below target - tolerance"; error = target - room (rounded like satPidError)
-        self.assertFalse(self.demand(False, 0.1))     # room exactly target - 0.1: no start
-        self.assertTrue(self.demand(False, 0.101))
-        self.assertFalse(self.demand(False, 0.0))
+    def test_starts_as_soon_as_the_room_is_below_target_plus_0_1(self):
+        # entry 401: both tolerances mean 0.1 above the target; error = target - room (rounded like satPidError)
+        self.assertFalse(self.demand(False, -0.1))    # room exactly target + 0.1: no start
+        self.assertTrue(self.demand(False, -0.099))
+        self.assertTrue(self.demand(False, 0.0))      # at the target: demand (before entry 401 it waited for target - 0.1)
         self.assertFalse(self.demand(False, -0.5))
 
     def test_stops_at_or_above_target_plus_0_1(self):
@@ -156,10 +156,11 @@ class BandHelper(unittest.TestCase):
         self.assertTrue(self.demand(True, -0.099))
         self.assertTrue(self.demand(True, 0.0))
 
-    def test_inside_the_band_the_previous_state_holds(self):
+    def test_no_hold_zone_the_minimum_off_time_does_the_job(self):
+        # entries 401/402: stop and restart share target + 0.1; the 600 s minimum CH-off (entry 403) replaces the gap
         for err in (0.1, 0.05, 0.0, -0.05, -0.099):
             self.assertTrue(self.demand(True, err), err)
-            self.assertFalse(self.demand(False, err), err)
+            self.assertTrue(self.demand(False, err), err)
 
     def test_no_usable_room_never_blocks_heating(self):
         self.assertTrue(self.demand(False, "nan"))
@@ -218,21 +219,52 @@ class BandLoop(unittest.TestCase):
         for sec in (30, 90, 150):
             self.assertEqual(rows[sec]["ch"], "0", (sec, rows[sec]))
 
-    def test_narration_names_the_value_the_band_decided_on(self):   # 09's bench 2026-11-16: the log alone must show it
-        script = "ev 0 err 0.5\nev 65 err -0.2\nev 125 err 0.25\nrun 200\n"
+    def narr(self, script):
         err = subprocess.run([str(self.exe)], input=script, capture_output=True, text=True, check=True).stderr
-        narr = [l[2:] for l in err.splitlines() if l.startswith("N ")]
+        return [l[2:] for l in err.splitlines() if l.startswith("N ")]
+
+    def test_narration_names_the_value_the_band_decided_on(self):   # 09's bench 2026-11-16: the log alone must show it
+        narr = self.narr("ev 0 err 0.5\nev 65 err -0.2\nev 125 err 0.25\nrun 720\n")
         pause = [l for l in narr if l.startswith("Heating paused")]
+        hold = [l for l in narr if l.startswith("Heating pause minimum")]
         resume = [l for l in narr if l.startswith("Heating resumes")]
         self.assertTrue(pause and "at least 0.20 above their target (band 0.1)" in pause[0], narr)
-        self.assertTrue(resume and "a room is 0.25 below its target (band 0.1)" in resume[0], narr)
+        self.assertTrue(hold and hold[0].startswith("Heating pause minimum 600 s: a room is below target + 0.1"), narr)
+        self.assertTrue(resume and "target - room 0.25, below target + 0.1; CH was off 600 s" in resume[0], narr)
+        self.assertEqual((len(pause), len(hold), len(resume)), (1, 1, 1), narr)
 
-    def test_room_below_target_minus_0_1_resumes(self):
-        rows = self.run_sc([(0, "err", -0.2), (65, "err", 0.2)])
-        self.assertEqual(rows[60]["ch"], "0", rows[60])
-        self.assertEqual(rows[90]["ch"], "1", rows[90])
+    def test_restart_below_target_plus_0_1_after_600s_off(self):   # entries 401, 403
+        rows = self.run_sc([(0, "err", -0.2), (65, "err", 0.0)], dur=700)   # room back at the target, CH off since tick 0
+        for sec in (60, 300, 570):
+            self.assertEqual(rows[sec]["ch"], "0", (sec, rows[sec]))
+        self.assertEqual(rows[600]["ch"], "1", rows[600])
 
-    def test_no_room_temperature_never_blocks_heating(self):
+    def test_room_far_below_target_still_waits_for_the_minimum(self):   # entry 403: the minimum holds whatever the room does
+        rows = self.run_sc([(0, "err", -0.2), (65, "err", 0.5)], dur=700)
+        self.assertEqual({rows[s]["ch"] for s in sorted(rows) if 0 <= s < 600}, {"0"})
+        self.assertEqual(rows[600]["ch"], "1", rows[600])
+        hold = [l for l in self.narr("ev 0 err -0.2\nev 65 err 0.5\nrun 700\n") if l.startswith("Heating pause minimum")]
+        self.assertTrue(hold and "CH stays off 510 s more" in hold[0], hold)   # demand back at tick 90, CH off since tick 0
+
+    def test_minimum_counts_from_the_ch_off_not_from_the_stop_decision(self):   # entry 403: after any 180 s burn
+        # request 55 above the flow 50 keeps the boiler continuous; flame on at 40, stop decided at 65, CH off at 240
+        rows = self.run_sc([(0, "pid", 55), (0, "err", 0.5), (40, "flame", 1), (65, "err", -0.2), (270, "err", 0.2)], dur=900)
+        self.assertEqual(rows[210]["ch"], "1", rows[210])
+        self.assertEqual(rows[240]["ch"], "0", rows[240])
+        self.assertEqual(rows[810]["ch"], "0", rows[810])   # 570 s after the CH-off
+        self.assertEqual(rows[840]["ch"], "1", rows[840])   # 600 s after the CH-off
+
+    def test_a_room_hovering_at_target_plus_0_1_restarts_at_most_once_per_600s(self):   # entries 401-403
+        ev = [(0, "err", 0.5)] + [(s, "err", -0.12 if (s // 30) % 2 else -0.08) for s in range(35, 3600, 30)]
+        rows = self.run_sc(ev, dur=3600)
+        secs = sorted(rows)
+        ons = [s for p, s in zip(secs, secs[1:]) if rows[p]["ch"] == "0" and rows[s]["ch"] == "1"]
+        offs = [s for p, s in zip(secs, secs[1:]) if rows[p]["ch"] == "1" and rows[s]["ch"] == "0"]
+        self.assertGreaterEqual(len(offs), 2, (offs, ons))   # the band does stop and restart
+        for off, on in zip(offs, ons):
+            self.assertGreaterEqual(on - off, 600, (off, on))
+
+    def test_no_room_temperature_never_blocks_heating(self):   # entries 38/46: also not during the entry-403 minimum (ours)
         rows = self.run_sc([(0, "err", -0.2), (65, "errnan", 0)])
         self.assertEqual(rows[60]["ch"], "0", rows[60])
         self.assertEqual(rows[90]["ch"], "1", rows[90])
@@ -259,7 +291,7 @@ class BandLoop(unittest.TestCase):
         self.assertEqual({rows[s]["starts"] for s in sorted(rows) if s >= 60}, {rows[60]["starts"]}, edges)
 
     def test_on_phase_from_a_stop_counts_once_when_ch_is_allowed_again(self):   # entry 398 + our reading (TASK-1887 notes)
-        s0 = self.on_edges(self.run_sc(self.PAUSE, dur=1500), 60)[0]
+        s0 = self.on_edges(self.run_sc(self.PAUSE, dur=1500), 690)[0]   # after the entry-403 minimum (CH off at 60)
         rows = self.run_sc(self.PAUSE + [(s0 + 15, "err", 0.2)], dur=s0 + 120)
         self.assertEqual(rows[s0]["ch"], "0", rows[s0])
         self.assertEqual(rows[s0 + 30]["on"], "1", rows[s0 + 30])        # still the same ON phase
@@ -270,7 +302,7 @@ class BandLoop(unittest.TestCase):
         self.assertEqual({rows[s]["starts"] for s in same}, {str(n + 1)}, same)   # once, not on every tick
 
     def test_on_phase_that_starts_in_the_resume_tick_counts_once(self):   # the band block runs before satPwmSchedule()
-        s0 = self.on_edges(self.run_sc(self.PAUSE, dur=1500), 60)[0]
+        s0 = self.on_edges(self.run_sc(self.PAUSE, dur=1500), 690)[0]   # after the entry-403 minimum (CH off at 60)
         rows = self.run_sc(self.PAUSE + [(s0, "err", 0.2)], dur=s0 + 30)
         self.assertEqual(rows[s0]["on"], "1", rows[s0])
         self.assertEqual(int(rows[s0]["starts"]), int(rows[s0 - 30]["starts"]) + 1, (rows[s0 - 30], rows[s0]))

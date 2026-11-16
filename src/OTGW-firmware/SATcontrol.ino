@@ -464,6 +464,8 @@ static bool _sat_coldCutDeferred = false;
 static float _sat_tolErr = NAN;
 static bool  _sat_tolDemand = true;
 static bool  _sat_tolBandOff = false;
+static uint32_t _sat_tolOffSinceMs = 0;   // entry 402: when CH last went off for the band (tick clock); read while _sat_tolBandOff holds
+static bool  _sat_tolMinNarrated = false; // the entry-402 minimum line is written once per pause
 
 // The cold cutoff in force: latched and not waiting for the minimum burn of a lit ON phase.
 static bool satColdCutActive()
@@ -8262,14 +8264,34 @@ static void satControlLoopRun()
   {
     const bool tolWas = _sat_tolDemand;
     _sat_tolDemand = satToleranceDemand(_sat_tolDemand, _sat_tolErr);
-    if (_sat_tolDemand != tolWas) {
-      // The narration names the value the band decided on: the largest target - room over the deciding rooms (the filtered
-      // room, the same value as the PID error, entry 28), so the log can be checked against the band on its own.
-      if (_sat_tolDemand) satNarratef_P(PSTR("Heating resumes: a room is %.2f below its target (band %.1f)"), _sat_tolErr, SAT_TOL_COLD_C);
-      else                satNarratef_P(PSTR("Heating paused (CH off, PWM stays active): the rooms are at least %.2f above their target (band %.1f)"),
-                                        -_sat_tolErr, SAT_TOL_HOT_C);
+    // The narration names the value the band decided on: the largest target - room over the deciding rooms (the filtered room,
+    // the same value as the PID error, entry 28), so the log can be checked against the band on its own. The lines follow CH
+    // itself (off, held, back on), once each per pause, so a room that hovers at target + 0.1 does not repeat them every tick.
+    const bool wasBandOff = _sat_tolBandOff;
+    bool bandOff = !_sat_tolDemand && !satBandWaitsForMinBurn();
+    // Entries 402/403 (minimum 600 s, counted from the moment CH went off): once CH is off for the band it stays
+    // off for SAT_TOL_MIN_OFF_MS, also when a room falls far below the target in the meantime.
+    const uint32_t tolNowMs = _sat_tickMs;   // the tick clock, read once per tick (TASK-1412.8)
+    const uint32_t offForMs = (uint32_t)(tolNowMs - _sat_tolOffSinceMs);
+    // Without a usable room temperature the band has no input and never blocks heating (entries 38, 46): no minimum then.
+    const bool minHold = wasBandOff && !bandOff && offForMs < SAT_TOL_MIN_OFF_MS && !isnan(_sat_tolErr);
+    if (minHold) bandOff = true;
+    if (bandOff && !wasBandOff) {
+      _sat_tolOffSinceMs = tolNowMs;
+      _sat_tolMinNarrated = false;
+      satNarratef_P(PSTR("Heating paused (CH off, PWM stays active): the rooms are at least %.2f above their target (band %.1f)"),
+                    -_sat_tolErr, SAT_TOL_HOT_C);
     }
-    _sat_tolBandOff = !_sat_tolDemand && !satBandWaitsForMinBurn();
+    _sat_tolBandOff = bandOff;
+    if (minHold && !_sat_tolMinNarrated) {
+      _sat_tolMinNarrated = true;
+      satNarratef_P(PSTR("Heating pause minimum %lu s: a room is below target + %.1f, CH stays off %lu s more"),
+                    (unsigned long)(SAT_TOL_MIN_OFF_MS / 1000UL), SAT_TOL_COLD_C,
+                    (unsigned long)((SAT_TOL_MIN_OFF_MS - offForMs + 999UL) / 1000UL));
+    }
+    if (wasBandOff && !bandOff)
+      satNarratef_P(PSTR("Heating resumes: target - room %.2f, below target + %.1f; CH was off %lu s"), _sat_tolErr, SAT_TOL_COLD_C,
+                    (unsigned long)(offForMs / 1000UL));
     satPwmCountOnWhenChAllowed(_sat_tolBandOff);   // entry 398: an ON phase from the stop counts once CH is allowed again
     if (tolWas && !_sat_tolDemand && !_sat_tolBandOff) satNarrate_P(PSTR("Heating pause waits for the 180 s minimum burn"));
   }

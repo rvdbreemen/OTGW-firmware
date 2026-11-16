@@ -30,7 +30,6 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import test_sat_pwm_override as base  # noqa: E402
 
 TICK_STUBS = r"""
-static uint32_t _sat_tickMs = 0;
 static int g_sentCh = -1; static float g_sentCs = -1; static int g_sentMm = -1;
 static void satSendCS(float cs) { g_sentCs = cs; }
 static void satSendMM(int mm) { g_sentMm = mm; }
