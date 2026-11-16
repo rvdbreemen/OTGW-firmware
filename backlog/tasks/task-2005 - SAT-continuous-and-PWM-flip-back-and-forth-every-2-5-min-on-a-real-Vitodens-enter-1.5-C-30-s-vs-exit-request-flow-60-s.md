@@ -7,7 +7,7 @@ status: To Do
 assignee:
   - '@ba'
 created_date: '2026-11-16T16:35:00Z'
-updated_date: '2026-11-16T19:40:00Z'
+updated_date: '2026-11-16T19:41:00Z'
 labels:
   - sat
   - field
@@ -50,4 +50,6 @@ Thermo-nova citations (opened this session). IN heating_control.py:262-305 _mayb
 Test data and assertions. indigo's SATTICK lines carry pid=, flow=, flame=, mode=, pwm= and dhw= every 30 s (hours/20261116-16.zip telnet.log in the archive, 113 ticks that hour). Raw tester data stays local, so the repo test uses a SYNTHETIC fixture with the same shape (request about 38-41 C, flow lagging in PWM ON and 1.5-4 C over the request in continuous, one unbroken burn), plus an optional case that reads the real ticks from RvdB/OTGW-field-data/indigo_light/20261116-144953 when present and skips otherwise. Assertion: mode switches while the flame burns without a break. Today's code (= A): at least 4 switches in the burn (indigo: 16:19:58, 16:30:28, 16:32:28, 16:35:28, 16:37:28, 16:39:28), so a test that asserts at most one switch per burn is RED now. B: exactly one PWM -> continuous and no continuous -> PWM until the flame-off edge (GREEN for B), and a second burn after flame off may enter PWM again (guards against over-blocking). C: no PWM -> continuous unless flow <= request - 3.0 for 180 s; on the indigo shape PWM holds through the burn (GREEN for C; the assertion is the exit condition, not a count). Caveat for the real-data case: once the replay decides differently from the field run, the recorded flow and pid no longer show what the boiler would have done, so the replay proves the decision rule on the observed inputs, not the boiler's response; the docstring says so.
 
 SEPARATE QUESTION, keep it out of Q-2005a (ba's pointer 2): indigo's 16:00:58 PWM entry happened during a band pause (SATTICK 16:00:28: ch=0, flame=0, flow=67.3, mode=1; 16:00:58 'Control mode: PWM (flow 67.3 stayed above setpoint 31.0 + 1.5 for 30 s)'). The IN rule fired on residual flow with CH off and no flame, which the missing flame check on IN allows; thermo-nova would not (heater ON gate, heating_control.py:276-278). That is the coordinator/92 question for Sergeant D (hold the switch during a band pause?), not part of the ping-pong fix.
+
+CORRECTION (95, same evening) to the thermo-nova constant citations in the prep notes above, re-checked by grep: OVERSHOOT_SUSTAIN_SECONDS = 60.0 is const.py:21, UNDERHEAT_SUSTAIN_SECONDS = 180.0 is const.py:22, SATURATION_SUSTAIN_SECONDS = 300.0 is const.py:23; OVERSHOOT_MARGIN_CELSIUS = 3.0 is cycles/const.py:10 and UNDERSHOOT_MARGIN_CELSIUS = -3.0 is cycles/const.py:11 (imported in heating_control.py:21). The notes above wrongly put the margins at const.py:21/22 and the times at const.py:18-20. The task description's citations (const.py:21, :22, cycles/const.py:10) are right for the times and the enter margin.
 <!-- SECTION:NOTES:END -->
