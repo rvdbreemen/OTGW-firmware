@@ -9281,8 +9281,8 @@
       "context_scope": "selective",
       "decision_contract": {
         "must": [
-          "Count an hour only when no whole-hour marker was set, at least 90 % of the ticks it logged are clean, and a clean tick carried a signal.",
-          "Measure the share against the expected ticks of the hour, or the logged ticks when there are more (entries 340, 343).",
+          "Count an hour only when no whole-hour marker was set, its clean ticks are at least 90 % of the expected ticks of the hour, and a clean tick carried a signal.",
+          "Measure the share against the expected ticks of the hour only, whatever the hour logged (entries 343, 369).",
           "Keep excluded ticks out of the mean and the phase sums that reach the day and the decision.",
           "Keep notsat from the service pass, notcontrolling, coeffchanged, fewticks and noticks as whole-hour markers."
         ],
