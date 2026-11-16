@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTDirect.ino
-**  Version  : v2.0.0-beta.341
+**  Version  : v2.0.0-beta.342
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -755,6 +755,44 @@ struct OTResponseOverride {
   uint16_t value;
 };
 static OTResponseOverride otResponseOverrides[OT_RESPONSE_OVERRIDE_MAX];
+
+// --- otdSrReply begin
+// TASK-1804 A6: SR= rewrites the answer on its way to the thermostat, as on the PIC; it never answers locally. The PIC
+// forwards the request (CreateRequest, gateway.asm 6.6 :2384-2414, no SR lookup) and its response handlers put the SR
+// bytes in (WordResponse/ByteResponse :3612-3643) with the request's own ack type (messageack :2668-2678), whatever the
+// boiler answered. It applies to the Data-IDs whose TreatMessage entry is WordResponse, MandatoryWord or ByteResponse
+// (dispatch table :2537-2664) and to those whose own handler jumps to WordResponse for every answer to the thermostat:
+// MessageID5 :2879, MessageID8 :2922, MessageID48/49 :3094-3111, TSPBufferSize (10 12 88 90 105 107) :3338-3340.
+// ByteResponse (70, 101) keeps the request's high byte ORed with the SR high byte (it clears databyte2 only; databyte1 is
+// the request's byte3, StoreDataBytes :2421-2422). Recorded differences (TASK-1804 notes): MessageID100 calls
+// WordResponse only with an override request or a bad answer (:3272-3283) and is left out; the PIC also takes SR for
+// vendor IDs 128-255 (:2533-2534), which SR= here does not store.
+// bit n = Data-ID n (0-127) gets the SR bytes; tests/test_otd_sr_reply_pic.py recomputes it from gateway.asm
+static const uint32_t otdPicSrIds[4] = {   // const: in flash rodata on the ESP32-S3
+  0xE7EE9528UL,   //   0- 31: 3 5 8 10 12 15 17-19 21-26 29-31
+  0xFCFFFFFFUL,   //  32- 63: 32-55 58-63
+  0x15FFFF7FUL,   //  64- 95: 64-70 72-88 90 92
+  0x9FFFEBE7UL    //  96-127: 96-98 101-105 107 109-124 127
+};
+static bool otdPicSrApplies(uint8_t id) {
+  if (id >= 128) return false;   // SR= stores Data-IDs 1-127 only
+  return (otdPicSrIds[id >> 5] >> (id & 31)) & 1;
+}
+static unsigned long otdSrReply(unsigned long sentReq, unsigned long reply) {
+  const uint8_t id = (uint8_t)((reply >> 16) & 0xFF);
+  if (!otdPicSrApplies(id)) return reply;
+  for (uint8_t i = 0; i < OT_RESPONSE_OVERRIDE_MAX; i++) {
+    if (!otResponseOverrides[i].active || otResponseOverrides[i].msgId != id) continue;
+    uint16_t data = otResponseOverrides[i].value;
+    if (id == 70 || id == 101) data |= (uint16_t)(sentReq & 0xFF00);   // ByteResponse: the request's high byte stays
+    const unsigned long ackType = ((sentReq >> 28) & 0x07) | 0x04;       // messageack: READ -> READ_ACK, WRITE -> WRITE_ACK
+    unsigned long r = (ackType << 28) | ((unsigned long)id << 16) | data;
+    setOTParityBit(r);
+    return r;
+  }
+  return reply;
+}
+// --- otdSrReply end
 
 // UI/KI unknown-ID table
 static constexpr uint8_t OT_UNKNOWN_ID_MAX = 16;
@@ -1838,6 +1876,7 @@ static void replyToThermostat(OTDirectRequestOrigin origin, unsigned long sentRe
     reply = buildOverriddenReply(otLastThermostatRequest, sentReq, boilerResp);
   } else if (otCurrentMode == OTD_MODE_GATEWAY) {
     reply = applyResponseModifiers(boilerResp);
+    reply = otdSrReply(sentReq, reply);   // TASK-1804 A6: SR= on the boiler's answer, as the PIC (not on an overridden request)
     reply = otdRemoteOverrideReply(reply, otRemoteOverride.mode != OT_OVERRIDE_NONE,
                                    otRemoteOverride.f88Value,
                                    otdOverrideFlagsData(otRemoteOverride.mode == OT_OVERRIDE_TEMPORARY,
@@ -1853,6 +1892,8 @@ static void replyToThermostat(OTDirectRequestOrigin origin, unsigned long sentRe
         && ((reply >> 28) & 0x07) == 4) {
       otRemoteOverride.bMsgId9Answered = true;
     }
+  } else if (IS_LOOPBACK_MODE()) {
+    reply = otdSrReply(sentReq, boilerResp);   // TASK-1804 A6: SR= also in loopback (the PIC ID set, as in gateway mode)
   }
   const bool sentNow = otdSendReply(reply);
   if (!sentNow) {
@@ -2832,24 +2873,10 @@ void loopOTDirect() {
       // as on the PIC: Alternative finds no candidate, RestoreRequest/CreateMessage restore the thermostat's frame and
       // SendAltRequest falls into SendDefaultMsg (gateway.asm 6.8 :2404-2414, :3475-3500). The slot with a candidate is
       // taken above (otdAltSlotTaken), and the reply path gives the clock (UI=20) and PIC answers (replyToThermostat).
-      // SR table: respond with stored value directly, don't forward to boiler
+      // TASK-1804 A6: an SR= Data-ID is forwarded like any other; the SR bytes go into the boiler's answer in
+      // replyToThermostat() (otdSrReply), as the PIC. Before, it was answered here at once and never reached the boiler.
       else {
-        bool srHandled = false;
-        for (uint8_t i = 0; i < OT_RESPONSE_OVERRIDE_MAX; i++) {
-          if (otResponseOverrides[i].active && otResponseOverrides[i].msgId == slaveMsgId) {
-            // The request's own type with the response bit (READ -> READ_ACK, WRITE -> WRITE_ACK), as the PIC's
-            // messageack (gateway.asm 6.8 :2676-2679, :3659-3662; spec v4.2 4.3.1); TASK-1804 E5
-            const unsigned long ackType = ((otSlaveFrame >> 28) & 0x07) | 0x04;
-            unsigned long srResp = (ackType << 28) | ((unsigned long)slaveMsgId << 16) | otResponseOverrides[i].value;
-            setOTParityBit(srResp);
-            bridgeFrameToParser('T', otSlaveFrame);
-            bridgeFrameToParser('A', srResp);
-            otdSendReply(srResp);
-            otSlaveFramePending = false;
-            srHandled = true;
-            break;
-          }
-        }
+        const bool srHandled = false;
         // Normal path: apply value overrides and forward to boiler. The
         // thermostat is answered when the boiler replies (replyToThermostat).
         if (!srHandled) {

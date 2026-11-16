@@ -253,7 +253,7 @@ The OTDirect module operates as a cooperative OpenTherm stack layered on the pro
 - `PM=MsgID` - Priority: send immediately on next cycle (or one-shot READ if not in schedule). Data-IDs 0-255; after a table size (10, 12, 88, 90, 105, 107) or a string ID (93-95) the `otdPmChain` block reads every entry or character like the PIC (TASK-1847)
 
 **Category 8: Override Tables**
-- `SR=MsgID:HHHH` - Set response override (gateway answers thermostat with stored value)
+- `SR=MsgID:HHHH` - Set response override: the request still goes to the boiler, and `otdSrReply()` puts the stored value into its answer with the request's own ack type (also over Data-Invalid or Unknown-DataID), as the PIC's WordResponse/ByteResponse. Only the IDs whose PIC dispatch entry is WordResponse, MandatoryWord or ByteResponse, or whose own handler jumps to WordResponse for every answer (5, 8, 48, 49 and the TSP size IDs 10/12/88/90/105/107); MsgID 100 (WordResponse only on some paths) is left out (`otdPicSrIds`, recomputed from gateway.asm by `tests/test_otd_sr_reply_pic.py`); ByteResponse IDs 70 and 101 keep the request's high byte ORed in. Gateway and loopback mode; no answer when the boiler times out (TASK-1804 A6)
 - `CR=MsgID` - Clear response override
 - `UI=MsgID` - Mark as unknown (respond UNKNOWN_DATA_ID to thermostat)
 - `KI=MsgID` - Mark as known again (restore normal forwarding)
