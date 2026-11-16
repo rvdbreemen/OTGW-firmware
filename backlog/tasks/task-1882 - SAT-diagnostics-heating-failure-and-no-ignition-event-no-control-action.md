@@ -1,11 +1,11 @@
 ---
 id: TASK-1882
 title: 'SAT diagnostics: heating-failure and no-ignition event (no control action)'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-13T06:13:00Z'
-updated_date: '2026-11-16T07:55:00Z'
+updated_date: '2026-11-16T08:07:00Z'
 labels:
   - sat
   - diagnostics
@@ -25,7 +25,7 @@ Lesson 3 of docs/sat/vtherm-comparison-2026-11-13.md (TASK-1879). VTherm raises 
 <!-- AC:BEGIN -->
 - [x] #1 Thresholds and the tuner-marking part decided (Robert; Sergeant D for the tuner part) and recorded
 - [x] #2 Host test reproduces both failure patterns: event absent on the old code, raised on the fix; no change in CS/MM/CH output
-- [ ] #3 Event visible in REST, MQTT (flat topic) and the telnet log
+- [x] #3 Event visible in REST, MQTT (flat topic) and the telnet log
 - [x] #4 Web UI (U11): an active heating-failure or no-ignition event shows as a problem badge and an entry in the SAT messages panel (TASK-1884); webui test on a fixture payload
 <!-- AC:END -->
 
@@ -56,3 +56,9 @@ Q-1882a decided 2026-11-15 by directive (weighed by comms on the coordinator's o
 
 2026-11-16 08:21-08:29 bench 09 on .61 (OT-Direct, no thermostat or boiler), d3 stack 2.0.0-beta.341+3cb72c3 (= pushed code of e128c89d9/82f355917; sha ino 83c7f818..7cd9 matches d3), SAT off, curve_self_tune true. OTA app+fs, version.hash 3cb72c3, bootcount 813 -> 815 (2 OTA restarts), steady to the end; no crash fields; heap 52-56 KB; telnet 6647 lines, 0 panic/WDT, 0 SATEVENT, 0 discovery error lines; settings.ini and /api/v2/settings byte-identical to before the flash. REST /api/v2/sat at start and end: no_ignition false, no_ignition_events 0, heating_failure false, heating_failure_events 0, heating_failure_room_start 0, heating_failure_room_end 0, curve_tune.excluded_hours.diag_event present = 0. MQTT fresh subscribe: sat/no_ignition false and sat/heating_failure false, retained; sat/curve_tune/* absent with SAT off (0 topics, as designed). HA discovery: binary_sensor configs 75 -> 77, new homeassistant/binary_sensor/<id>/sat_sat_no_ignition/config and .../sat_sat_heating_failure/config (the sat_sat_ scheme is that of every SAT entity; rename is a separate change). AC3 not ticked by 09: the fields and topics exist and read false on hardware, but no event was raised there (needs a real ignition failure or heating failure); the raised event rests on host evidence (tests/test_sat_diag_events.py). Evidence: 09 scratchpad d3stack/ (run/run.log, sat_mqtt_*.txt, disc_*.txt).
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Pushed as e128c89d9 (2.0.0-beta.341) on origin/dev. AC1: thresholds by Robert (option A, DM 1570699094622470167); the tuner part by Sergeant D entry 358 (Q-1882a A: hours with a no-ignition or heating-failure event are left out of the curve self-tune). AC2: tests/test_sat_diag_events.py on the real satDiagEventsStep() 12/12, 4 FAIL by behaviour on the pre-review code (PWM 120 s ON phases never raised no_ignition; flame, hole and sat_off cases); the step writes no CS/MM/CH (source assertion in the same test); tests/test_sat_curve_selftune.py diag_event exclusion green on the fix, red on a mutant without the diag check (adapted to TASK-1932's 90 % clean share, 900 s / 4 expected ticks), 103 passed. AC3: host: the raised event sets state.sat.bNoIgnition / bHeatingFailure and writes the SATEVENT telnet lines (assertions :148 :179 :186 :191); REST /api/v2/sat reads snap->st.sat.* (SATcontrol.ino :4776-4779, snap->st = state :4624) and MQTT sat/no_ignition, sat/heating_failure read state.sat.* (:5004-5005, retained). Bench 09 on .61 (b341+3cb72c3, SAT off): REST fields present and false, *_events 0, curve_tune.excluded_hours.diag_event 0; MQTT both topics retained false; HA discovery +2 binary sensors (sat_sat_no_ignition, sat_sat_heating_failure, the existing sat_sat_ scheme, kept by Robert 2026-11-16 08:54; pinned by tests/test_sat_health_discovery.py, red on bd7a133c2); 0 SATEVENT lines with SAT off; CS/MM/CH unchanged. NOT shown on hardware: an actual raised event (needs a boiler that does not light or heat; SAT simulation on hardware is not allowed), so a true value over REST/MQTT on a unit is inferred from the direct field reads above, not observed. AC4: webui sat-explain-state / sat-status-pill tests on a fixture payload green. Gates: test_sat_* 102/102 on the stack, lowload 34/1 skip, evaluate 88/0, test_sat_loop_integration 15 passed (caught a real build break: SatDiagIn below the Arduino prototype, fixed). Known limits recorded in the notes: a stale flow reading or the boiler's own anti-cycle wait can raise no_ignition; only ticks after detection are excluded from the self-tune.
+<!-- SECTION:FINAL_SUMMARY:END -->
