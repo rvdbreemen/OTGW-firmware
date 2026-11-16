@@ -3,11 +3,11 @@ id: TASK-1862
 title: >-
   Research: opt-in minimal OT log on the device and a daily upload to a free
   service (design proposal)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-12T06:32:00Z'
-updated_date: '2026-11-16T08:29:00Z'
+updated_date: '2026-11-16T08:31:00Z'
 labels:
   - diagnostics
   - research
@@ -32,7 +32,7 @@ Related: TASK-1473 (parked cloud recording, 2.1.0), ADR-213 (local recording; de
 - [x] #2 Storage options (LittleFS, PSRAM ring) with budget, reboot/filesystem-update survival, RAM and wear compared
 - [x] #3 Upload options compared (service limits, transport against the no-HTTPS rule, privacy), conflicts with ADR-213, TASK-1473 and ADR-218 named
 - [x] #4 Design proposal written and the open decisions put to Robert one per DM (via the coordinator)
-- [ ] #5 Robert's decisions recorded in this task; follow-up implementation task(s) and any ADR filed from them
+- [x] #5 Robert's decisions recorded in this task; follow-up implementation task(s) and any ADR filed from them
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -69,4 +69,12 @@ Requirements from Robert in #dev-sat-mqtt (2026-11-12, relayed by the coordinato
 2026-11-16 (comms 92, sonnet agent, checked by 92): Proposed design and Open questions of docs/diagnostics/minimal-ot-log-and-upload-proposal.md rewritten for R1 (EU), R2 (opt-in dialog), free-only, the encoding study and a ranked table of five free backends (recommendation: PocketBase on the Synology first, Cloudflare Free without R2 as fallback); 0 em dashes, 0 'OTGW32', evaluate --quick 0 failed; pushed d495e05b6. Five decisions sent to the coordinator to put to Robert one DM each (backend; relation to TASK-1473; ADR-218 + ADR-213 d1; batch interval; retention). Unverified and flagged in the doc: Cloudflare DO EU jurisdiction on Free, Grafana Free EU region, Zero Trust signup payment, TLS fit in the app slot. AC4 is ticked when the DM ids are known.
 
 AC4 (2026-11-16): the five open decisions were handled: Q2 = B, Q3 = B (measure first; ADR-218 accept after the poc.8 TLS-fit bench is a hard stop for Robert), Q4 = B (300 s), decided by the coordinator under Robert's 09:30 rule; Q1 backend and Q5 retention put to Robert as DM 1571804094593765398 and DM 1571804100897669281. Recorded in the proposal under 'Decision status (2026-11-16)'. AC5 waits for his two answers.
+
+Robert's decisions (2026-11-16, via the coordinator): Q1 backend = A, PocketBase on his Synology behind a Cloudflare Tunnel (DM 1571804403793530952); Q5 retention = A, 30 days, deletion on request by device id (DM 1571804460928336025). Coordinator decisions: Q2 = B, Q3 = B, Q4 = B (300 s). Follow-up implementation: the existing TASK-1938 (PocketBase collector; its retention cron uses 30 days); ADR: ADR-218 stays Proposed until the poc.8 TLS-fit bench, then its accept goes to Robert (hard stop). No new task filed (Robert's 08:35 directive: new tasks only for new work).
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Design proposal for an opt-in minimal OT log with upload to a free service. AC1-AC3: research and the encoding study (docs/diagnostics/ot-stream-encoding-study.md, 3262a496c, 354278bef) and the free-only backend research (1869fb0bf, 786a02f20, a46708a26, aa6d9db36). AC4: Proposed design and Open questions of docs/diagnostics/minimal-ot-log-and-upload-proposal.md rewritten for R1 EU, R2 opt-in, free-only, the encoding result and a ranked backend table (d495e05b6); five decisions handled (Q2/Q3/Q4 coordinator, Q1/Q5 Robert by DM). AC5: Robert chose PocketBase on his Synology behind a Cloudflare Tunnel and 30 days retention with deletion on request; recorded in the proposal ('Decision status'); follow-up is TASK-1938, ADR-218 accept after the poc.8 TLS-fit measurement. Unverified and named in the doc: Cloudflare DO EU on Free, Grafana EU region, TLS fit in the app slot.
+<!-- SECTION:FINAL_SUMMARY:END -->

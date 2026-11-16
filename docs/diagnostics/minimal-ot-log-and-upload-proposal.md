@@ -448,8 +448,8 @@ Under Robert's rule of 2026-11-16 09:30 (decide technical points yourself with a
 - **Question 2 (relation to TASK-1473): B, decided by the coordinator.** Separate features: TASK-1862 stays the opt-in minimal OT stream and shares the collector (TASK-1938) and the codec; TASK-1473 stays parked.
 - **Question 3 (ADR-218 and ADR-213 decision 1): B, decided by the coordinator.** Measure first. The cloud recording proof of concept (poc.8, bench on .61) measures the TLS fit; poc.8 is at 98.4 % of the app slot. Accepting ADR-218 is a hard stop and goes to Robert after that measurement.
 - **Question 4 (batch interval): B, decided by the coordinator.** Every 300 s: 10 % header overhead; up to 5 minutes of data lost on a crash is acceptable for diagnostic data.
-- **Question 1 (backend): put to Robert**, Discord DM 1571804094593765398. He hosts the data and is its controller.
-- **Question 5 (retention and deletion promise): put to Robert**, Discord DM 1571804100897669281. It is a promise to testers.
+- **Question 1 (backend): A, decided by Robert** (DM 1571804403793530952, asked in DM 1571804094593765398): PocketBase on his Synology behind a Cloudflare Tunnel. He hosts the data and is its controller. The collector is TASK-1938.
+- **Question 5 (retention and deletion promise): A, decided by Robert** (DM 1571804460928336025, asked in DM 1571804100897669281): records are kept 30 days and deleted on request by device id. TASK-1938's retention cron uses 30 days.
 
 ## Sources
 
