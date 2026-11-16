@@ -4,11 +4,11 @@ title: >-
   REST handlers /api/v2/simulate and /device/info call LittleFS.exists on the
   async_tcp task: cross-core flash read, TWDT (gruijter 13-11 04:00:54,
   coredump)
-status: In Review
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-13T15:45:00Z'
-updated_date: '2026-11-15T21:12:00Z'
+updated_date: '2026-11-16T08:38:00Z'
 labels:
   - bug
   - stability
@@ -29,7 +29,7 @@ Found in gruijter's beta.218+2f5ecb4 capture (Discord #alpha-testing https://dis
 - [x] #1 No LittleFS call runs on the async_tcp task for /api/v2/simulate and /api/v2/device/info: existence is cached on the loop task (host test or source test on the real handlers, red on the old code)
 - [x] #2 A gate (evaluate.py check or test) fails on a LittleFS.* call inside a REST handler that runs on async_tcp, red on the old code, green on the fix
 - [x] #3 Bench: polling /api/v2/simulate and /device/info every 1-2 s for at least 2 h during filesystem activity gives no watchdog reset
-- [ ] #4 Field: no TWDT with async_tcp in LittleFS in a long-run capture from a tester
+- [x] #4 Field: no TWDT with async_tcp in LittleFS in a long-run capture from a tester
 - [x] #5 Bench (sim): poll /api/v2/simulate every 9 s while SAT runs through PWM ON/OFF switches (simulation mode), at least 2 h, no watchdog reset
 <!-- AC:END -->
 
@@ -53,4 +53,12 @@ Bench (09, .61, build 2.0.0-beta.228+c071dbb): AC3 PASS, 125 min, 3,736 poll pai
 Rebased onto origin/dev 479334c64 (ba: TASK-1885, TASK-1824, TASK-1895). Diff 746ccd426..479334c64 on restAPI.ino, helperStuff.ino, networkStuff.ino/.h, OTGW-firmware.h/.ino is banner lines only; sensors_ext.ino got only the TASK-1824 Dallas read path (no REST, no LittleFS). So the soak on c071dbb holds for the rebased code. Re-bumped to beta.230 (00a760326). Gates: evaluate --quick RESULT PASS; test_rest_no_littlefs_on_async_tcp, test_rest_fs_flags_loop, test_health_no_fs_flash_ops, test_fs_update_keep, test_dallas_first_reading OK; test/host/test_ot_support_migration PASS. Build 2.0.0-beta.230+5a23184 exit 0, RAM 126116 B, Flash 2140423 B, zip sha256 858a455697501634e6417b86e99401bfc445dfc9bb721d0c1e9ff40a2c7a6a64. Pushed 479334c64..5a23184b8, posted Discord message 1570939034551853158. AC4 (field, gruijter: no TWDT on async_tcp) stays open.
 
 Q-215a decided 2026-11-15 by the coordinator under Robert's directive (CLI) 'Do not wait for Sergeant D. Finish everything that can be finished.'; Sergeant D may overrule, his answer later becomes a follow-up task; asked in the 18-question batch in #dev-sat-mqtt (item 10, https://discord.com/channels/812969634638725140/1105556725714649128/1571633463910727722): option A, keep entry 215 as is (no restore of the MsgID 3 verdict at boot). No code change from this question.
+
+2026-11-16 AC4 (ba) from gruijter's archived long run OTGW-field-data/gruijter/20261114-195039 (beta.250+baf84d9, which contains fix 00a760326: tags v2.0.0-beta.237 and later; Classic + PIC, SAT on): the run starts right after the OTA reboot logged as '2026-11-14 19:50:28 - reboot cause: Software reset (3) [rst 0x0c/0x0c] - [OTA] Rebooting...' and its final device/info reads uptime '1(d)-01:33(H:m)', exactly the wall-clock span to the stop at 2026-11-15 ~21:23, so no reset happened during the 25.5 h. The only watchdog lines in the transcript are the reboot-log history read once at 19:50:39 (older builds: Task watchdog entries 11-11 to 11-13, the newest crash dump elf ffcd6c3e = beta.218); crashlog changed only at that first read. No TWDT, no panic, no reboot during the run. Caveat (not part of the AC wording): the run had 19 REST GET /api/v2/simulate and 11 GET /api/v2/device/info calls, a light load on those handlers (the periodic poll is gone since TASK-1915); the load cover comes from AC3 (2 h, 3,736 poll pairs) and AC5 (2 h sim).
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+/api/v2/simulate and /api/v2/device/info no longer call LittleFS on the async_tcp task (fix 00a760326, beta.230). AC1: file existence is cached on the loop task; tests/test_rest_no_littlefs_on_async_tcp.py red on the old restAPI.ino. AC2: tests/test_rest_fs_flags_loop.py fails on a LittleFS.* call inside an async_tcp REST handler, red on the old code. AC3: 09 on .61, beta.228+c071dbb, 125 min, 3,736 poll pairs, bootcount 612 steady. AC4: gruijter's 25.5 h field run on beta.250 (Classic + PIC): final uptime 1d 01:33 equals the wall-clock span, no TWDT, panic or reboot during the run; light load on these two handlers (19 + 11 calls). AC5: 2 h simulation run with /simulate every 9 s, no watchdog reset.
+<!-- SECTION:FINAL_SUMMARY:END -->

@@ -3,11 +3,11 @@ id: TASK-1524
 title: >-
   Filesystem OTA during a running capture left LittleFS without its image (only
   kept files restored)
-status: To Do
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-10-31T12:49:00Z'
-updated_date: '2026-11-16T08:32:00Z'
+updated_date: '2026-11-16T08:41:00Z'
 labels:
   - alpha
   - bug
@@ -26,7 +26,7 @@ Bench 2026-10-31 13:42, OTGW32 .61 on alpha.569, a long-run capture running (tel
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [x] #1 Reproduce on the bench: filesystem OTA while a capture (telnet + /ws + MQTT + snapshots) runs; record what the device logs during the upload (telnet, crashlog) and whether the image write fails or the upload stalls
-- [ ] #2 Root cause named with evidence (load gate, WS/TCP pressure, timeout in the upload handler, or the kept-file restore path)
+- [x] #2 Root cause named with evidence (load gate, WS/TCP pressure, timeout in the upload handler, or the kept-file restore path)
 - [x] #3 Either fix it (e.g. refuse or pause other clients during filesystem OTA, or keep the old image until the new one is complete) or document the limit for testers; old-vs-fix bench run
 <!-- AC:END -->
 
@@ -46,4 +46,12 @@ AC3 documentation part done (coordinator, 2026-11-14): docs/guides/WIFI_FIRMWARE
 AC2 bench (09, .61, beta.264, 2026-11-15, capture s1780/i4/cap/): filesystem OTA (ota_flash.py --no-app --fs) while otgw_capture.py ran telnet + /ws frame recorder + MQTT + headless browser + 10 s snapshots + crashlog poll: not reproduced (0/1). Upload 00:12:11-00:12:40 exit 0, '[OTA] End: success (786432 bytes)', settings and kept files restored, changed: none; only the expected reboot gaps; bootcount +1, crashlog unchanged, settings diff [], reboot_log intact, web UI 200. The alpha.569 drop did not recur on current code (the ADR-188 cap and the REST/file gates since then are candidate reasons, not proven).
 
 2026-11-16 close-out (ba): AC1 ticked: reproduction attempted and recorded four times on the current code, 0 of 4 failed: .63 Classic beta.79 under a full otgw_capture.py run, three filesystem-only OTAs, all clean (39381a06c); .61 OT-Direct beta.264 under telnet + /ws frame recorder + MQTT + headless browser + 10 s snapshots + crashlog poll, '[OTA] End: success', settings diff empty (b9c66545f). AC3 ticked under its 'document the limit' option: docs/guides/WIFI_FIRMWARE_UPDATE.md section 3 describes the interrupted filesystem step and line 105 tells testers not to run a filesystem update while a capture or another heavy client is connected (f08872f4c); no code fix, so the AC's old-vs-fix bench run does not apply. AC2 NOT met: the end state of the 2026-10-31 report is explained as the designed abort path (_handleUploadAbort() in OTGW-ModUpdateServer-esp32.h formats the partial image and restores the kept files, TASK-1495; research 6b1f1d50a), but what disconnected the upload on 2026-10-31 is not reproduced and not proven (ADR-188 send cap and the REST gate changes since then are plausible, unproven reasons). Closing needs Robert's waiver of AC2 on this evidence; asked via the coordinator.
+
+2026-11-16: AC2 WAIVED by Robert: answer 'A' (Discord DM 1571805763968434319, relayed by the coordinator) = waive AC2 on this evidence and set Done; a new report becomes a new task with a capture.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Filesystem OTA during a running capture: not reproducible on the current code; limit documented; AC2 waived. AC1: four reproduction attempts under a full capture, all clean (0/4): .63 Classic beta.79 three filesystem-only OTAs (39381a06c); .61 OT-Direct beta.264 under telnet + /ws + MQTT + headless browser + 10 s snapshots + crashlog poll, '[OTA] End: success', settings diff empty (b9c66545f). AC2: WAIVED by Robert ('A', DM 1571805763968434319): the reported end state is the designed abort path (_handleUploadAbort() formats the partial image and restores the kept files, TASK-1495; research 6b1f1d50a), but the cause of the 2026-10-31 upload disconnect is not reproduced and not proven. AC3: limit documented (docs/guides/WIFI_FIRMWARE_UPDATE.md section 3: no filesystem update during a capture or another heavy client; f08872f4c); no code fix, so no old-vs-fix run. A new report gets a new task with a capture.
+<!-- SECTION:FINAL_SUMMARY:END -->
