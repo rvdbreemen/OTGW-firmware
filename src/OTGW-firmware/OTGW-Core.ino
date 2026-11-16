@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v2.0.0-beta.339
+**  Version  : v2.0.0-beta.340
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -1239,8 +1239,8 @@ bool picTempSensorHasData()
 /*
   On-demand PIC settings readout.
   Call triggerPICsettingsReadout() to start a full cycle.
-  pollPICsettings() is called from the main loop every iteration;
-  it spaces out PR= commands every 3 seconds when a cycle is active.
+  pollPICsettingsQuery() is called from the main loop every iteration;
+  it spaces out PR= commands at least 3 seconds apart when a cycle is active.
 
   A cycle runs automatically at boot. Subsequent cycles are triggered
   by the REST API (GET /api/v2/pic/settings) or after any command
@@ -1266,8 +1266,9 @@ void triggerPICsettingsReadout() {
 //===================[ queryNextPICsetting ]======================
 /*
   Polls one PIC setting via a PR= command and advances to the next.
-  Called by pollPICsettings() every 3 seconds during an active cycle.
-  A full cycle of 15 settings completes in ~45 seconds.
+  Called by pollPICsettingsQuery() at most once per 3 seconds during an active cycle.
+  A full cycle of 15 settings completes in ~45 seconds. Returns false when it sent
+  nothing (PIC unavailable, flashing, or deferred by a status burst or drip tick).
 
   PR= command reference (Schelte Bron, https://otgw.tclcode.com/firmware.html):
     PR=A and PR=M are handled separately (getpicfwversion / queryOTGWgatewaymode).
@@ -1292,14 +1293,14 @@ void triggerPICsettingsReadout() {
   NG/SE/TO responses are silently ignored (keeps previous cached value).
   Skips all queries when PIC is unavailable, offline, or flashing is in progress.
 */
-void queryNextPICsetting() {
-  if (!isPICEnabled() || !isGatewayFirmware()) return;
-  if (state.flash.bESPactive || state.flash.bPICactive) return;
+bool queryNextPICsetting() {
+  if (!isPICEnabled() || !isGatewayFirmware()) return false;
+  if (state.flash.bESPactive || state.flash.bPICactive) return false;
   // Defer PR= queries during Status-burst fanouts and when a drip tick is imminent.
   // Each PR= response triggers 2 MQTT publishes; landing these inside a burst or
-  // drip window amplifies heap pressure. Deferred queries retry on the next 3s tick.
-  if (isStatusBurstActive()) return;
-  if (dripDueWithinMs(500)) return;
+  // drip window amplifies heap pressure. pollPICsettingsQuery() retries on the next loop pass.
+  if (isStatusBurstActive()) return false;
+  if (dripDueWithinMs(500)) return false;
 
   const uint8_t idx = picSettingsQueryIdx;
   picSettingsQueryIdx++;
@@ -1327,12 +1328,32 @@ void queryNextPICsetting() {
     case 12: letter = 'Q'; break;  // Reset cause
     case 13: letter = 'N'; break;  // Standalone interval
     case 14: letter = 'V'; break;  // Voltage reference
-    default: return;
+    default: return false;
   }
 
   char cmd[5];
   snprintf_P(cmd, sizeof(cmd), PSTR("PR=%c"), letter);
   addCommandToQueue(cmd, 4, true);  // forceQueue=true: bypass PR prefix dedup
+  return true;
+}
+
+//===================[ pollPICsettingsQuery ]=====================
+/*
+  TASK-1971: called from the main loop right after loopMQTTDiscovery(). While a cycle
+  is active it sends the next PR= query once at least 3 s passed since the last one it
+  sent. It used to run from the 3 s task: that timer and the 1 s discovery drip start
+  together at boot and come due in the same loop pass (the 3 s task runs first and sees
+  the drip tick as due), and with SKIP_MISSED_TICKS their phase only drifts by the loop
+  lateness. So the 3 s tick stayed inside the 500 ms drip window, deferred tick after
+  tick, until the phase drifted out or the drip had nothing pending (4-5 min after boot;
+  with the broker down the pending bits never clear). From the loop a deferred query goes
+  out right after the next drip tick.
+*/
+void pollPICsettingsQuery() {
+  static uint32_t lastQueryMs = 0;
+  if (!picSettingsCycleActive) return;
+  if ((uint32_t)(millis() - lastQueryMs) < 3000UL) return;
+  if (queryNextPICsetting()) lastQueryMs = millis();
 }
 
 //===================[ handlePRresponse ]==========================

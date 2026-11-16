@@ -170,7 +170,9 @@ class PollGate(unittest.TestCase):
         self.assertIn("DECLARE_TIMER_SEC(timerPicTempSensor, 180", fn)
         self.assertIn("picSensorTretPollActive()", fn, "no second PR=E while the return water poll runs")
         task3 = braced(read("OTGW-firmware.ino"), r"void doTaskEvery3s\(\)\s*\{")
-        self.assertLess(task3.index("pollPicTempSensor();"), task3.index("if (!picSettingsCycleActive) return;"))
+        # TASK-1971: the PR= settings cycle moved to the loop, so the 3 s task has no early return before the poll
+        self.assertIn("pollPicTempSensor();", task3)
+        self.assertNotIn("return;", task3.split("pollPicTempSensor();")[0])
 
 
 class DiscoveryAndSetting(unittest.TestCase):

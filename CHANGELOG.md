@@ -5,6 +5,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Fixed
+- PIC: after a boot the PIC settings panel fills within about a minute again. The settings readout no longer waits 4 to 5 minutes for the MQTT discovery run to finish; it now sends its next query right after a discovery step instead of waiting for the next 3-second tick, and stays at least 3 seconds between queries (TASK-1971).
+
 ## [2.0.0-beta.339] - 2026-11-16
 
 ### Changed

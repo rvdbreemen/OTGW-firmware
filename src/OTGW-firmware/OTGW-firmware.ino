@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.ino
-**  Version  : v2.0.0-beta.339
+**  Version  : v2.0.0-beta.340
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -879,15 +879,11 @@ void doTaskEvery3s(){
   // frame, which covers a bus that is talking; this covers one that has gone
   // quiet. Without it the 30 s timeout could never fire in the case it exists
   // for, because the code that computes it only ran when a frame arrived.
-  // Must stay ABOVE the picSettingsCycleActive early-return below.
   evaluateOTBusLiveness(OTBusLivenessTrigger::Tick);
 
   // TASK-1940 (1.x TASK-1147): PR=E every 3 minutes when the PIC temperature sensor
-  // setting is on. Above the picSettingsCycleActive early-return, which ends after boot.
+  // setting is on. The PR= settings cycle runs from the loop (pollPICsettingsQuery, TASK-1971).
   pollPicTempSensor();
-
-  if (!picSettingsCycleActive) return;
-  queryNextPICsetting();
 }
 
 
@@ -1231,6 +1227,7 @@ void loop()
     }
     if (minuteChanged())              doTaskMinuteChanged(); //ADR-086: sole minuteChanged() caller; hour/day/year dispatch lives inside
     loopMQTTDiscovery();              // async MQTT discovery drip (self-timed, one config per 1 s normal / 10 s slow)
+    pollPICsettingsQuery();           // TASK-1971: PR= settings cycle, >= 3 s apart, right after a drip tick when deferred
     connProbe(CPROBE_DISCOVERY);      // TASK-1757 AC3
     runTopicCleanupStep();            // ADR-106: drain stale-mode discovery topics after bUseLegacyOtTopics toggle
     evalOutputs();                    // when the bits change, the output gpio bit will follow
