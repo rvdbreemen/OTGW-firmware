@@ -7886,3 +7886,15 @@ Robert, 16:18:42 UTC (https://discord.com/channels/812969634638725140/9144987300
 **Settled:** option A: SAT ignores MsgID 3 for PWM completely. Entry 215 (no PWM until a valid MsgID 3 reply, pwm_veto_reason 1) is reversed, together with entries 213 and 214 (entry 392). PWM is allowed from the start; the firmware gate SATcycles.ino:1302-1336 (TASK-1412.4) goes. Scope: he did not answer the scope line; the question recommended this release (2.0.0), read as 2.0.0.
 
 **Task:** the entry-392 task (owner 95).
+
+## 394. Q-385c answered A: SAT stays in PWM for the whole 60 s start phase; after that the existing rules decide PWM or continuous (Sergeant D, 2026-11-16; completes entries 385, 389, 391)
+
+**Source:** #dev-sat-mqtt, Sergeant D 2026-11-16 11:25:18 UTC (https://discord.com/channels/812969634638725140/1105556725714649128/1571848637493944321), a reply to Q-385c (https://discord.com/channels/812969634638725140/1105556725714649128/1571847461490786317).
+
+**Quoted:**
+
+> "My answer is A. The first 60s we start with PWM and then SAT decides if it will stay on PWM or will go into continuous mode. We have the rules already when to go to PWM or go to continuous"
+
+**Settled:** option A: during the 60 s start phase after flame-on SAT stays in PWM, whatever the normal switch reasons say (request at the maximum setpoint, flame on with the request above the flow for 60 s, no PWM off time left); those checks keep running and after the 60 s the existing rules decide PWM or continuous. thermo-nova has no start phase and leaves PWM at once when the request reaches the maximum (heating_control.py:203-204, opened 2026-11-16), so this deliberately differs. Scope: not answered; read as 2.0.0 (part of the PWM-first start, entry 386).
+
+**Task:** TASK-1942 (owner d3), as built.

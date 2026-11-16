@@ -5213,6 +5213,19 @@
     "TASK-1412.4"
    ],
    "confirmed_by_entry": null
+  },
+  {
+   "id": 394,
+   "title": "Q-385c answered A: SAT stays in PWM for the whole 60 s start phase; after that the existing rules decide PWM or continuous (Sergeant D, 2026-11-16; completes entries 385, 389, 391)",
+   "date": "2026-11-16",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1571848637493944321",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1942"
+   ],
+   "confirmed_by_entry": null
   }
  ]
 }
