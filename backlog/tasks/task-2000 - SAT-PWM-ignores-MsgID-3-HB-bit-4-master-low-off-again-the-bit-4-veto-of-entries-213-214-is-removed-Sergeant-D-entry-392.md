@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-16T11:08:00Z'
-updated_date: '2026-11-16T11:59:00Z'
+updated_date: '2026-11-16T13:17:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -46,4 +46,6 @@ AC4 correction to the note above: met. firmware-sat-spec.md updated; pwm_veto_re
 ADR (coordinator's check 2026-11-16): ADR-249's clause 'and the boiler's MsgID 3 permission comes first (entry 213)' sits in its Decision section, so removing the gate amends an Accepted ADR: ADR-251 'MsgID 3 plays no part in SAT PWM ... (amends ADR-249)' created via adr-kit, status Proposed (Robert accepts), related to ADR-249 both ways (adr relate), README entry added (also the missing ADR-234 entry, so tests/test_adr_governance.py is green again: was FAIL on origin for ADR-234).
 
 Pushed 7613c4317..9011c3c48 unchanged (beta.350). Build exit 0, 6 min, 'Build completed successfully', app size 2143632 B of 2293760 B (93.5 %). Zip posted #alpha-testing msg 1571856532310597724. Smoke 09 on .61 (no SAT): githash 9011c3c, bootcount 855->857 (2 OTA restarts only), settings byte-identical (165 keys), sat/status slave_cfg_valid false, slave_low_off_denied false, pwm_veto_reason 0, pwm_veto_path 0. Before on .63 (beta.349, SAT on): pwm_veto_reason 1, pwm_veto_path 1, control_mode 1 (the veto visible on the old code). .63 gets 350 at ~13:11 for the 20:00 soak (09 compares the same fields). Sergeant D entry 396 (11:41 UTC, msg 1571852828065140818): 'THIS IS TOP PRIORITY for the next release'; Q-396a asks whether that means this release (read as 2.0.0 until he answers). ADR-251 Proposed, acceptance with Robert (coordinator). Open: AC6 field (indigo_light, TASK-1998).
+
+Soak 09 on .63 (Classic, PIC 6.8, its standing SAT config, no boiler), beta.350+9011c3c, 13:14-14:15: PASS (60/60 samples at bootcount 169, MQTT 60/60, heap 45.7-46.7 KB, hd_min flat, no panic/WDT, settings byte-identical). pwm_veto_reason 1 / path 1 on beta.349 -> 0 / 0 throughout on 350. SAT entered PWM twice through the normal switch (13:28:33 'Control mode: PWM (flow 31.1 stayed above setpoint 29.0 + 1.5 for 30 s)', SATMODE 1->2, then back to continuous 13:31:33; 13:53:33 again, back 13:56:33); SATTICK 12 x mode=2. On 349 the same unit stayed in continuous behind the MsgID 3 veto. Boiler response not shown (no boiler). Evidence: 09 scratchpad b350\. AC6 (field, indigo_light on the Vitodens) stays open.
 <!-- SECTION:NOTES:END -->
