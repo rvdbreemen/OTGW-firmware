@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-16T13:26:00Z'
-updated_date: '2026-11-16T19:12:00Z'
+updated_date: '2026-11-16T19:25:00Z'
 labels:
   - mqtt
   - heap
@@ -25,8 +25,8 @@ At every wall-clock hour (ADR-086, doTaskMinuteChanged -> if (hourFlag) -> sendM
 <!-- AC:BEGIN -->
 - [x] #1 Reproduction red on the old code: hd_min drop at hh:00 on a board without PSRAM, plus the count of the 26 stats/* topics that reach the broker
 - [x] #2 Host test on the real pacer (order, all topics once, respects canPublishMQTT)
-- [ ] #3 Bench on .61 by the bench-tester
-- [ ] #4 Fix green on the same reproduction (old vs fix on the same quantity, the old 353 went hd_min_free_heap 31,156 -> 6,484 at 16:00): on .61 with SAT enabled, hd_min_free_heap is unchanged across an hh:00 mark, the telnet free-heap prefix hh:59:50-hh:00:05 shows no drop of tens of KB, and 26/26 stats/* topics reach the broker
+- [x] #3 Bench on .61 by the bench-tester
+- [x] #4 Fix green on the same reproduction (old vs fix on the same quantity, the old 353 went hd_min_free_heap 31,156 -> 6,484 at 16:00): on .61 with SAT enabled, hd_min_free_heap is unchanged across an hh:00 mark, the telnet free-heap prefix hh:59:50-hh:00:05 shows no drop of tens of KB, and 26/26 stats/* topics reach the broker
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -53,4 +53,6 @@ Gates on the rebased lane (onto origin/dev 1dde4dcda, beta.352-355 for 1665/1999
 Rebase note (95, 19:25): the lane rebase renumbered version.h (beta.352-355) but git merged the source banners cleanly where the renumbered value matched the commit's own bump, so the banners of the four firmware commits lag version.h by one (comment only; the binary takes its version from version.h). Resynced with one extra bump commit on top (bin/bump-prerelease.sh, beta.356): all 54 banners and version.h agree at beta.356. The earlier build d76a5ef is superseded; the bench build is the beta.356 one.
 
 AC3/AC4 bench (09 on .61, OTGW32 no PSRAM, 2.0.0-beta.356+4601510 = code of pushed cf29dd198, 20:00 mark; SAT enabled since 19:41:33, sim off (satsimulation false, sat/status simulation false), 25238 off, no diag recording; 09 scratchpad hour2000\): hd_min_free_heap 29,888 before and 29,888 after the mark = UNCHANGED (old 353, same conditions, 16:00: 31,156 -> 6,484); telnet free-heap prefix 19:59:50-20:00:10 min 59,728 / max 63,308 over 82 lines, no drop; 26 stats/* sends 20:00:00.009-20:00:02.564 (span 2.56 s, gaps 100-104 ms, none under 100 ms); broker 26/26 live and 26 retained on subscribe; mqtt_drops 0, '[drip] slowed' 0; settings.ini byte-identical after. Pushed e267a61fc..cf29dd198; zip beta.356+cf29dd1 posted #alpha-testing 1571965973295009792. 09 ticks AC3/AC4.
+
+AC3/AC4 ticked by 09 (2026-11-16). Bench .61 (OTGW32, no PSRAM), 2.0.0-beta.356+4601510 (code = pushed cf29dd198 per 95). SAT enabled since 19:41:33, sim OFF (settings satsimulation false, sat/status simulation false, active false), 25238 off, no diag recording. 20:00 mark, window 19:59:30-20:00:52: hd_min_free_heap 29,888 -> 29,888 UNCHANGED (old 353 at 16:00, same conditions: 31,156 -> 6,484). Telnet free-heap prefix 19:59:50-20:00:10: min 59,728, max 63,308, no drop. Telnet stats/* sends: 26, 20:00:00.009-20:00:02.564, gaps 100-104 ms. Broker: 26/26 live, 26 distinct, first 20:00:00.937. mqtt_drops 0, '[drip] slowed' 0. Settings byte-identical after SAT off. Evidence: 09 scratchpad hour2000/ (hour.log, telnet.raw, broker.txt, simcheck.txt) and hour1600/ (old).
 <!-- SECTION:NOTES:END -->

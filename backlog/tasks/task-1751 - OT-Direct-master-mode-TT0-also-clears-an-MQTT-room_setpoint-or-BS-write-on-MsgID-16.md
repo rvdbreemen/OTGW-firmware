@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-09T09:29:00Z'
-updated_date: '2026-11-16T19:12:00Z'
+updated_date: '2026-11-16T19:26:00Z'
 labels:
   - otdirect
 milestone: 2.0.0
@@ -25,7 +25,7 @@ Follow-up of TASK-1733 / ADR-223 (found by the 2026-11-09 correctness review, ot
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [x] #1 TT=0 in master mode leaves an MQTT room_setpoint / BS= value on MsgID 16 untouched (or Robert decides the current behaviour stays, recorded in the notes); host test
-- [ ] #2 Master mode on the wire: BS= alone writes MsgID 16 (once, then the 15 s schedule); TT=0 writes the remaining BS= or MQTT room_setpoint value at once; with nothing left no further WRITE 16; BS= / BS=0 / an MQTT room_setpoint during TT=/TC= leave TT's writes alone; gateway mode unchanged; host test red on the old code, bench by 09 on .61 master mode
+- [x] #2 Master mode on the wire: BS= alone writes MsgID 16 (once, then the 15 s schedule); TT=0 writes the remaining BS= or MQTT room_setpoint value at once; with nothing left no further WRITE 16; BS= / BS=0 / an MQTT room_setpoint during TT=/TC= leave TT's writes alone; gateway mode unchanged; host test red on the old code, bench by 09 on .61 master mode
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -53,4 +53,6 @@ Bench 09 on .61 (OTGW32, OT-Direct master, no boiler, SAT off), 2.0.0-beta.353+3
 AC2 is left for 09 to tick (bench AC, rule: the bench-tester ticks); periodic refresh host-only, as noted above.
 
 Bench 09 on .61, beta.356+4601510 (code of pushed cf29dd198), master mode, SAT off, sim false: BS=19 -> R90101300 at +1.7 s; TT=20.5 -> R90101480 +2.0 s, R10640003 +3.1 s; TT=0 -> R90101300 +1.9 s, R10640000 +3.0 s; BS=0 -> no MsgID 16; identical to 353. Pushed cf29dd198, posted 1571965973295009792; 09 ticks AC2 (periodic refresh host-only).
+
+AC2 ticked by 09 (2026-11-16). Bench on the wire, .61 OT-Direct master, SAT off, sim false, on 353+3a14423 (15:20) and 356+4601510 (19:35), identical results. BS=19 -> one R90101300 at +1.6/+1.7 s. TT=20.5 -> R90101480, then WRITE 100 = 3. TT=0 -> R90101300 at once (remaining BS value), then WRITE 100 = 0 (on 341 nothing was sent in 360 s). BS=0 -> no further WRITE 16 in 90 s. Covered by the HOST TEST only, not on this bench: the 15 s refresh schedule (the bus is offline without a boiler; OTDirect.ino:2299 skips everything but MsgID 0); BS=/BS=0/MQTT room_setpoint during TT=/TC=; and gateway mode unchanged. Evidence: 09 scratchpad b353/run2/, b356/bs/.
 <!-- SECTION:NOTES:END -->

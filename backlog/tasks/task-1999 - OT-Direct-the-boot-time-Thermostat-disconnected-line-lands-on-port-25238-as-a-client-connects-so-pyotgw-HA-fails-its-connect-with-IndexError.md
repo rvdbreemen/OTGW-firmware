@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-16T10:48:00Z'
-updated_date: '2026-11-16T19:12:00Z'
+updated_date: '2026-11-16T19:26:00Z'
 labels:
   - bug
   - ot-direct
@@ -25,8 +25,8 @@ Found by bench tester 09 on 2026-11-16 (.61, OT-Direct board without a thermosta
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Reproduce: a pyotgw connect to 25238 right after /ReBoot, on an OT-Direct unit without a thermostat, fails (IndexError) on the current code in at least 1 of 5 tries
-- [ ] #2 Fix: the same reproduction succeeds 5/5 (or 10/10); 'Thermostat disconnected' and 'Thermostat connected' still reach the bridge on a real thermostat loss and return (TASK-1850 parity)
+- [x] #1 Reproduce: a pyotgw connect to 25238 right after /ReBoot, on an OT-Direct unit without a thermostat, fails (IndexError) on the current code in at least 1 of 5 tries
+- [x] #2 Fix: the same reproduction succeeds 5/5 (or 10/10); 'Thermostat disconnected' and 'Thermostat connected' still reach the bridge on a real thermostat loss and return (TASK-1850 parity)
 - [x] #3 Host test on the real checkThermostatTimeout() / bridge path: no unsolicited boot-time line while a client handshake can be in progress; red on the old code
 <!-- AC:END -->
 
@@ -48,4 +48,6 @@ Bench 09 on .61 (OTGW32, OT-Direct, no thermostat), 2.0.0-beta.352+e18ccbf, Lega
 2026-11-16: pyotgw upstream issue opened on Robert's 'Post' (coordinator): https://github.com/mvn23/pyotgw/issues/107 (draft by 95 unchanged, repro inline: issue_cmd PS=1 takes the next queued non-frame line as the status line, process_statusfields_v4 IndexError at pyotgw.py:778; control without the unsolicited line parses).
 
 Bench 09 on .61, beta.356+4601510 (code of pushed cf29dd198), 25238 on for the test then off: telnet 'Thermostat disconnected' x1, bridge 25238 0 thermostat lines (880 B), same as 352. Pushed cf29dd198, posted 1571965973295009792; upstream mvn23/pyotgw#107. 09 ticks AC1/AC2.
+
+AC1/AC2 ticked by 09 (2026-11-16). AC1: pyotgw 2.2.3 connect to 25238 right after /ReBoot on .61 (OT-Direct, no thermostat), old code 2.0.0-beta.341+3cb72c3: 2 of 5 failed with IndexError at pyotgw.py:778, plus 1 of 1 in the heap run. Raw bridge on 351+597c163: 'Thermostat disconnected' x1 on the bridge. AC2: fix 352+e18ccbf, same reproduction 10/10 OK (connect done 18.5-19.3 s); raw bridge 0 thermostat lines while telnet still shows the line; again on 356+4601510 (bridge 0). 'Thermostat connected/disconnected' on a REAL thermostat loss and return: HOST TEST ONLY, no thermostat on the bench (accepted by 95). Evidence: 09 scratchpad pyotgw/, b352/ (old351/, new352/, bc/), b356/raw/.
 <!-- SECTION:NOTES:END -->
