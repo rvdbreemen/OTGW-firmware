@@ -246,6 +246,7 @@ static void checkThermostatTimeout() {}
 static void loopFlameRatio() {}
 static void clearWriteOverride(uint8_t) {}
 static void otdZapInvalid(uint8_t) {}   // TASK-1804 A2: tested on the real block in tests/test_otd_zap_invalid.py
+static void otdSimExitFlush() {}   // TASK-1992: tested in tests/test_otd_sim_exit_stale_writes.py
 // Prototypes the Arduino .ino preprocessor generates for the firmware.
 static unsigned long buildOTResponse(uint8_t type, uint8_t msgId, uint16_t data);
 static unsigned long otdRelayedStatusFrame(unsigned long frame);

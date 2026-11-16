@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTDirect.ino
-**  Version  : v2.0.0-beta.337
+**  Version  : v2.0.0-beta.338
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -399,6 +399,25 @@ static void otCmdApplyPendingFlush() {
   if (dSnap <= otCmdQueueDepth()) otCmdTail = snap;
 }
 
+// TASK-1992: a cleared command (CS=0, SW=0, MM=T, TT=0 ...) must not leave its old WRITE in the ring: while the SAT
+// simulation blocks TX the ring kept a stale CS 61.3 / MM 100 / TT 20.5 for minutes and sent them when it ended. The
+// pending entry becomes a tombstone that the consumers drop without sending. No compaction: otdFlushCmdQueue() can run
+// on another task and snapshots otCmdHead, which a moved head would break. Loop task only (ADR-242), as the producer.
+static constexpr uint32_t OTD_CMD_TOMBSTONE = 0xFFFFFFFFUL;
+static void otCmdDropPendingWrite(uint8_t msgId) {
+  for (uint8_t i = otCmdTail; i != otCmdHead; i = (uint8_t)((i + 1) % OT_CMD_QUEUE_SIZE)) {
+    const uint32_t f = otCmdQueue[i];
+    if (f != OTD_CMD_TOMBSTONE && ((f >> 16) & 0xFF) == msgId && ((f >> 28) & 0x07) == 1 /* WRITE_DATA */) {
+      otCmdQueue[i] = OTD_CMD_TOMBSTONE;
+    }
+  }
+}
+static void otCmdSkipTombstones() {
+  while (otCmdTail != otCmdHead && otCmdQueue[otCmdTail] == OTD_CMD_TOMBSTONE) {
+    otCmdTail = (uint8_t)((otCmdTail + 1) % OT_CMD_QUEUE_SIZE);
+  }
+}
+
 // TASK-494: enqueue with coalesce-by-MsgID.
 //
 // If a frame for the SAME OT MsgID is already pending in the queue, replace
@@ -429,7 +448,7 @@ static bool otCmdEnqueue(uint32_t frame) {
   uint8_t i = otCmdTail;
   while (i != otCmdHead) {
     uint8_t existingMsgId = (otCmdQueue[i] >> 16) & 0xFF;
-    if (existingMsgId == newMsgId) {
+    if (otCmdQueue[i] != OTD_CMD_TOMBSTONE && existingMsgId == newMsgId) {
       otCmdQueue[i] = frame;
       OTDDebugTf(PSTR("OTD: queue coalesced MsgID %u -> 0x%08lX\r\n"),
                  (unsigned)newMsgId, (unsigned long)frame);
@@ -2194,6 +2213,7 @@ static void scheduleMasterRequest() {
   // Pending commands from the ring buffer take priority.
   // Peek first — only dequeue after successful async send (Codex P1 fix).
   otCmdApplyPendingFlush();
+  otCmdSkipTombstones();   // TASK-1992
   if (!otCmdQueueEmpty()) {
     uint32_t cmdFrame = otCmdQueue[otCmdTail];
     if (sendMasterRequestAsync(cmdFrame, OT_DIRECT_ORIGIN_GATEWAY)) {
@@ -2352,6 +2372,7 @@ static bool otdAltSlotTaken(unsigned long thermostatFrame) {
   uint8_t idx = OT_SCHEDULE_SIZE;   // OT_SCHEDULE_SIZE: the queued command
   unsigned long request;
   otCmdApplyPendingFlush();
+  otCmdSkipTombstones();   // TASK-1992
   if (!otCmdQueueEmpty()) {
     request = otCmdQueue[otCmdTail];
   } else {
@@ -2847,6 +2868,7 @@ void loopOTDirect() {
 
   // Schedule periodic master requests (non-blocking, skips if bus busy)
   // In monitor mode the gateway must not inject its own frames — transparent pass-through only.
+  otdSimExitFlush();   // TASK-1992
   DECLARE_TIMER_MS(timerOTSchedule, 100, SKIP_MISSED_TICKS);
   if (DUE(timerOTSchedule) && !IS_MONITOR_MODE()) {
     scheduleMasterRequest();
@@ -2906,6 +2928,21 @@ void loopOTDirect() {
                (int)state.otd.bThermostatConnected);
   }
 }
+
+// --- otdSimExitFlush begin
+// TASK-1992: while a simulation blocks TX (satSimulationBlocksBusTx(): SAT simulation or the OTGW simulation) the
+// ring keeps filling; when the block ends, nothing queued under it may reach the real boiler, so the ring is flushed
+// (the same flush as a mode switch). SAT, if still on, sends its current CS= again on its next send (ADR-235).
+static void otdSimExitFlush() {
+  static bool simWasBlocking = false;
+  const bool simBlocking = state.debug.bOTGWSimulation || settings.sat.bSimulation;
+  if (simWasBlocking && !simBlocking) {
+    otdFlushCmdQueue();
+    OTDDebugTln(F("OTD: simulation ended, command queue flushed"));
+  }
+  simWasBlocking = simBlocking;
+}
+// --- otdSimExitFlush end
 
 // ---------------------------------------------------------------------------
 // enqueueWriteCommand — build frame, enqueue, update write cache + override
@@ -3107,6 +3144,7 @@ static bool otdRelayRewriteRead(unsigned long frame, unsigned long &out) {
 // ---------------------------------------------------------------------------
 static void clearWriteOverride(uint8_t msgId) {
   clearOverride(msgId);
+  otCmdDropPendingWrite(msgId);   // TASK-1992: its old value must not go out after the clear
   for (uint8_t i = 0; i < OT_SCHEDULE_SIZE; i++) {
     if (otSchedule[i].isWrite && otSchedule[i].msgId == msgId) {
       otSchedule[i].valueSet = false;

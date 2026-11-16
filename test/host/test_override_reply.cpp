@@ -241,6 +241,8 @@ static void clearWriteOverride(uint8_t) {}
 // its behaviour is tested on the real block in tests/test_otd_zap_invalid.py. Here it is a no-op like
 // clearWriteOverride(), so these cases keep testing the reply path only.
 static void otdZapInvalid(uint8_t) {}
+// TASK-1992: loopOTDirect() calls it; tested on the real block in tests/test_otd_sim_exit_stale_writes.py
+static void otdSimExitFlush() {}
 #ifdef OTD_OLD_CONTROLLER
 static void loopPiCtrl() {}
 static void loopCHHysteresis() {}
