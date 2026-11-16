@@ -109,6 +109,9 @@ def extract(src: str) -> str:
     b = (src.index("  // Task #21: Restore original deadband", a) if "  // Task #21: Restore original deadband" in src
          else src.index("  // --- Solar gain compensation on the requested setpoint", a))   # TASK-1417 removed the restore
     loop = src[a:b]
+    if "_sat_tolErr" in loop:   # TASK-1887: the zone block sets the tolerance-band input; the band is not under test here
+        step += ("\nstatic float _sat_tolErr = 0.0f;\n"
+                 "static float satToleranceMaxError(bool, float e, const float*, const bool*, uint8_t, bool) { return e; }\n")
     return (curve + "\n" + excl + "\n" + usable + "\n" + kp + "\n" + step + "\n"
             "static float tick(float effectiveTarget, float outsideTemp) {\n"
             "  float roomTemp = effectiveTarget - 0.5f;\n" + loop + "\n  return pidOutput;\n}\n")

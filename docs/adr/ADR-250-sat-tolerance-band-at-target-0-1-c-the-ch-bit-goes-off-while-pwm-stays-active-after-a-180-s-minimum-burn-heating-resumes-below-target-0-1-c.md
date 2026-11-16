@@ -1,7 +1,7 @@
 ---
 id: "ADR-250"
 title: "SAT tolerance band: at target + 0.1 C the CH bit goes off while PWM stays active, after a 180 s minimum burn; heating resumes below target - 0.1 C"
-status: "Proposed"
+status: "Accepted"
 date: "2026-11-16"
 binding: false
 gate: null
@@ -9,7 +9,6 @@ documents_shipped: false
 verified_in: []
 supersedes: []
 superseded_by: null
-format: "canonical"
 topics:
   - "sat"
   - "tolerance band"
@@ -39,6 +38,7 @@ symbols:
   - "_sat_tolDemand"
   - "_sat_tolBandOff"
 context_scope: "selective"
+format: "canonical"
 ---
 
 <!-- markdownlint-disable MD025 -->
@@ -47,7 +47,7 @@ context_scope: "selective"
 
 ## Status
 
-Proposed, 2026-11-16. Guideline-level per ADR-080: the host tests named under Verification check it, it is not wired into evaluate.py. Amends ADR-199 (the CH-enable rule gets one more input).
+Accepted, 2026-11-16 (Robert, Discord DM 1571883109157310475). Guideline-level per ADR-080: the host tests named under Verification check it, it is not wired into evaluate.py. Amends ADR-199 (the CH-enable rule gets one more input).
 
 ## Status History
 
@@ -58,6 +58,11 @@ status_history:
     changed_by: "User: Robert van den Breemen"
     reason: Initial proposal
     changed_via: adr-kit
+  - date: 2026-11-16
+    status: Accepted
+    changed_by: "User: Robert van den Breemen"
+    reason: Accepted by Robert, Discord DM 1571883109157310475 (answer A to the accept question for the amended text at 6d221e474)
+    changed_via: adr-kit lifecycle
 ```
 
 ## Context

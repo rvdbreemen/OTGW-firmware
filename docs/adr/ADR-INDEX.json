@@ -10255,7 +10255,7 @@
       "title": "SAT tolerance band: at target + 0.1 C the CH bit goes off while PWM stays active, after a 180 s minimum burn; heating resumes below target - 0.1 C",
       "path": "ADR-250-sat-tolerance-band-at-target-0-1-c-the-ch-bit-goes-off-while-pwm-stays-active-after-a-180-s-minimum-burn-heating-resumes-below-target-0-1-c.md",
       "format": "canonical",
-      "status": "Proposed",
+      "status": "Accepted",
       "date": "2026-11-16",
       "decision_summary": "While the tolerance band says stop, the CH-enable bit SAT sends is 0, and nothing else changes: the control setpoint,...",
       "topics": [

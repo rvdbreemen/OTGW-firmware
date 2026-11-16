@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-13T07:25:00Z'
-updated_date: '2026-11-16T12:39:00Z'
+updated_date: '2026-11-16T13:47:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -26,7 +26,7 @@ Sergeant D decision 2026-11-13 (https://discord.com/channels/812969634638725140/
 - [x] #1 Pure helpers in SATchEnable.h (satToleranceMaxError, satToleranceDemand, satChEnableDecide band input), host-tested: exact boundaries 0.1/-0.1, hold inside the band, NAN never blocks heating, eco (main room only) vs comfort (any usable room) per entry 378, band stop clears only the CH bit
 - [x] #2 Loop-level host test on the real control-tick cut, red on origin/dev and green on the fix: warm room gives CH=0 with a live setpoint and unchanged PID request; PWM stays PWM and its ON/OFF schedule keeps toggling during the stop (entry 384); a lit PWM phase and a continuous burn both run 180 s first (entries 275, 376); resume below target - 0.1; cold cutoff unchanged
 - [x] #3 Seam sweep of the SAT tests that cut the control tick and the LL contract (all 18 ids) green; evaluate.py --quick no new FAIL
-- [ ] #4 ADR-250 (Proposed via adr-kit) records the decision and amends ADR-199; accepted by Robert before push
+- [x] #4 ADR-250 (Proposed via adr-kit) records the decision and amends ADR-199; accepted by Robert before push
 - [x] #5 esp32-combo build and a bench run by the bench-tester (health; the band behaviour is host-proven, no SAT scenario on hardware)
 <!-- AC:END -->
 
@@ -59,4 +59,6 @@ Q-328a decided 2026-11-15 by the coordinator under Robert's directive (CLI) 'Do 
 2026-11-16 follow-up Q-384a (flameless PWM ON phases during a band pause count in the hourly start limit per entries 59/90/95; options A keep, B do not count during a band pause, our advice B; with the 2.0.0-or-2.1.0 scope line) posted to Sergeant D by 92 at 12:05:20 UTC: https://discord.com/channels/812969634638725140/1105556725714649128/1571858712564465715. Non-blocking: the code follows the recorded entries; if he picks B it becomes its own task.
 
 Entry 398 edge case, OUR interpretation (ba, recorded by comms 92 on 2026-11-16; not Sergeant D's words, not an entry): a PWM ON phase that starts during a band pause is not counted. If the band resumes heating (CH=1 again) while that ON phase still runs, the phase is counted once at that moment, because from then on the burner may start, and entries 59/90/95 count every ON phase in which the burner may start, lit or not. The count is at the moment CH is allowed again, not at the flame edge (a flame edge never adds a count: SATcontrol.ino:1287-1291, checked by 92). During the 180 s minimum-burn wait CH is still 1, so phases in that wait count as before. Not asked to Sergeant D (non-blocking); ask him if a field capture shows it matters.
+
+2026-11-16 AC4: ADR-250 Accepted by Robert, Discord DM 1571883109157310475 ('A', reply to the accept question for the amended text at 6d221e474, after the coordinator's notice that a yes covers the amended text). Set via adr-kit accept (status history: changed_by Robert, reason with the DM id); Status line keeps the ADR-080 guideline-level classification; README entry Accepted; lint --strict clean. Same commit: tests/test_sat_published_curve.py was red on origin/dev since ae8626cff (its zone-block slice reached the new _sat_tolErr line without the band symbols; my 1887 seam sweep did not include it, reported by d3): stub added only when the slice contains _sat_tolErr; 5/5 on origin, on the code before 1887 (55dd8f015) and on lane/ba-1887n.
 <!-- SECTION:NOTES:END -->
