@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-13T07:28:00Z'
-updated_date: '2026-11-16T07:15:00Z'
+updated_date: '2026-11-16T07:40:00Z'
 labels:
   - sat
   - adr
@@ -49,4 +49,6 @@ Q-327a and Q-327b decided 2026-11-15 by the coordinator under Robert's directive
 Branch note: the 1888 commits (5dde6269a, 643f4f307) sit on local branch lane/ba-1887 in worktree wt-ba-1956; the name comes from the lane's original task, it is NOT TASK-1887 work. TASK-1887 follows on the same lane; one combined build for 09 after the tlsdyn slot.
 
 2026-11-16 ADR-249 ACCEPTED: Robert answered 'A' (Discord DM 1571779788178194473, reply to 1571670760131534909, relayed by the coordinator): accept including the setting 'PWM switch margin' (fPwmSwitchMargin) default 1.5, range 0.5-5.0. Done via adr-kit: open question Q-327c answered with Robert's decision (adr answer), frontmatter lists converted to block style (adr-kit could not normalize inline lists), three acronyms given inline expansions for the strict clarity gate (PID, REST/MQTT/JSON/UI, DM), adr accept --confirm (status history: Accepted, changed_by Robert), Guideline-level per ADR-080 line restored in Status, index + README rebuilt by adr-doctor --fix-index. AC2 ticked. Next: rebase onto origin/dev, build slot (queue after d3), bench by 09 (health + the setting via REST/MQTT/UI, no SAT scenario on hardware), push after its OK.
+
+2026-11-16 Sergeant D entry 379 (Q-327c answered A): a separate 'switch margin' setting, default 1.5 C, range 0.5-5.0, 30 s sustain fixed, the 3.5 C / 30 s fail-safe stays; confirms the implementation and ADR-249 (accepted by Robert earlier the same morning). Build: combo/ba-1888-1983 (with TASK-1983) for 09's bench after 95's slot.
 <!-- SECTION:NOTES:END -->
