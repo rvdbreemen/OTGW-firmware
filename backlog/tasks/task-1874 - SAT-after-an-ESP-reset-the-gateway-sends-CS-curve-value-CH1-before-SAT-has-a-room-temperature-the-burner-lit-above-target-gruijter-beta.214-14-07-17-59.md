@@ -8,7 +8,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-12T20:56:00Z'
-updated_date: '2026-11-16T10:36:00Z'
+updated_date: '2026-11-16T10:59:00Z'
 labels: []
 milestone: 2.0.0
 dependencies: []
@@ -25,7 +25,7 @@ Source: gruijter (Discord 733401267665109054) capture 20261112-121301-upload.zip
 <!-- AC:BEGIN -->
 - [x] #1 After a reboot SAT sends no command of its own (CS, CH, MM, TC, SH, MI, SW, TP) for 60 s, then takes over as before (entry 388)
 - [x] #2 Host test on the real SAT loop: no SAT command in the first 60 s, a CS within 5 s after; a mutant without the silence fails
-- [ ] #3 Bench smoke by the bench-tester WITHOUT SAT (no SAT on hardware without a boiler): githash reported, no extra reboot, the boot PM= chain unchanged, REST sat/status carries pid_curve_only; the 60 s timing itself rests on the host loop scenario 7 + mutant
+- [x] #3 Bench smoke by the bench-tester WITHOUT SAT (no SAT on hardware without a boiler): githash reported, no extra reboot, the boot PM= chain unchanged, REST sat/status carries pid_curve_only; the 60 s timing itself rests on the host loop scenario 7 + mutant
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -46,4 +46,6 @@ Implemented per Sergeant D entry 388 (2026-11-16 09:32 UTC, Q-357a: 'Wait 60 sec
 Source for 'keeps the newest value per command': addCommandToQueue() returns Replaced when an entry for the same command is already queued and updates it in place (OTGW-Core.ino:3952, :4042), PIC queue. OT-Direct (otdCmdTextRing, ADR-242) not checked for coalescing: there the hand-back may still reach the bus just before SAT's own values, which is what the old code did on every board; harmless either way.
 
 The PM= reading is queued for Sergeant D as Q-388a (docs/sat/open-questions.md, 559a378e3, after Q-385a/b/c); 92 relays the answer and entry number.
+
+2026-11-16 11:48-11:57 AC3 bench smoke by 09 on .61 (OTGW32, OT-Direct, no boiler), SAT off and no satsimulation (untouched), 2.0.0-beta.348+55dd8f0 (= pushed 55dd8f015; sha ino b28b6ccb..89e5fb matches 95). githash 55dd8f0 reported; bootcount 851 -> 852 (planned reference reboot on 341) -> 854 (2 OTA restarts) -> 855 (planned reboot on 348), no other reboot, crash endpoint only runtime.reboots 855. Boot telnet compared like for like (the same planned /ReBoot on 341 and 348, 60 s captured from port 23 accepting, 15.3/15.2 s after the request): 500/485 lines, 51/51 OT frames, 0 'PM=' lines in both (OT-Direct has no PIC PM= chain), 0 CS=/MM=/CH= and 0 SAT command lines in both; the line kinds match (Ethernet/initWatchDog backlog lines present only in the 341 capture: telnet replay length, not this change, agreed by 95). GET /api/v2/sat/status contains "pid_curve_only": false. settings.ini unchanged except the new SATpwmswitchmargin key from TASK-1888 underneath. The 60 s silence itself is host-proven (AC2), not benched (no SAT on hardware without a boiler). Evidence: 09 scratchpad b348/ (boot341.raw, boot348.raw, flash.log, S0/S1, bootcap.py).
 <!-- SECTION:NOTES:END -->
