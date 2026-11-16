@@ -8,7 +8,7 @@ status: In Review
 assignee:
   - '@claude'
 created_date: '2026-11-14T17:23:00Z'
-updated_date: '2026-11-16T15:28:00Z'
+updated_date: '2026-11-16T15:44:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -65,3 +65,9 @@ Bench 09 2026-11-16 on .63 (Classic + ESP32-S3 with PSRAM, PIC 6.8, no boiler, n
 
 2026-11-16 CORRECTION (coordinator, confirmed by 09): SAT's built-in boiler simulation was ON on .63 all day. So every behaviour seen there (the boot takeover with the cold-cutoff latch and the +181 s heater OFF->ON PWM-first start, the PWM-first starts with the first phase ON in the candidate soak, the first PWM->continuous switch 90 s after each simulated flame-on, heater OFF leaving PWM) is the simulator on the device, NOT a real boiler. The candidate soak on b5aba1c stays valid as health/stability evidence (bootcount 175 constant, MQTT 61/61, heap 43.6-45.9 KB, 0 panics). The behaviour with a real boiler is NOT verified; the host tests prove the rules, and field captures of the first starts after the release are the hardware check. ADR-252's verification and consequences text corrected accordingly.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Pushed to origin/dev in dffa71c72..fe5aa63f7 (feat b95bc21ec, 2.0.0-beta.351; src identical to the soaked build b5aba1c). AC1-AC4, AC6: as before (cf7b172c8, tests/test_sat_continuous_startup.py 11/11 on the fix, 3 FAIL on beta.250; ADR-235 updated). AC5 (bench of a continuous start): WAIVED by Robert, option A (DM 1571800810931626106), on the host evidence. AC7 (entry 385, decided in full by Sergeant D: 385/387/389/391/394): every heating start (heater OFF->ON, SAT enable without a flame, boot) enters PWM first once the flow is known, with the first phase ON, and no PWM->continuous switch fires until 60 s after the first CH flame-on (start gate). Host evidence: tests/test_sat_pwm_first_start.py 14/14 on the fix, 8 FAIL on origin/dev 2268516db (a, a2, b, c, d, e, f, i), mutants red (flame-off guard, resume reset, flow check); tests/test_sat_loop_integration.py 21/21 (it found the lost-flood bug of the first version: PWM idled with an unknown flow and the plain request lit the boiler without hold/flood; fixed and pinned by case i); full test_sat_* suite green except origin-reds owned by others (TASK-1887 tolerance-band slices in published_curve/zone_aggregation, ADR-249 pwm_switch_margin in MANUAL.md); lowload 34/1 skip; evaluate 87/0. Bench (09, .63 OTGW Classic + PIC 6.8): candidate soak on b5aba1c 15:20-16:22 PASS as HEALTH evidence (bootcount 175 constant, MQTT 61/61, heap 43.6-45.9 KB, 0 panics); the PWM-first behaviour seen there (+181 s heater ON edge after the cold-cutoff latch, PWM-first with duty 1.00, first switch to continuous 90 s after each flame-on, heater OFF leaving PWM) was SAT's built-in boiler SIMULATION on the device, not a real boiler; with the simulation off the bench has no boiler, so no real heating start was possible. NOT VERIFIED: the PWM-first start with a real boiler (AC7 bench part, open: field capture or a waiver by Robert). Proposed ADR-252 records the decision (Robert accepts). Seams agreed with 95 (entry 388 boot silence, entries 392/393 MsgID 3).
+<!-- SECTION:FINAL_SUMMARY:END -->
