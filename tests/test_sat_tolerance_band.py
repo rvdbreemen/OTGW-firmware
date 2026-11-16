@@ -90,8 +90,8 @@ int main() {
     _sat_tickMs = g_ms; g_sentCh = -1; g_sentCs = -1;
     state.sat.fPidOutput = pid;
     fullTick(pid);
-    printf("T %d ch=%d cs=%.1f mode=%d pid=%.3f on=%d\n", sec, g_sentCh, g_sentCs, state.sat.eControlMode, state.sat.fPidOutput,
-           (int)state.sat.bPwmFlameRequested);
+    printf("T %d ch=%d cs=%.1f mode=%d pid=%.3f on=%d starts=%d\n", sec, g_sentCh, g_sentCs, state.sat.eControlMode,
+           state.sat.fPidOutput, (int)state.sat.bPwmFlameRequested, (int)g_pwmStarts);
   }
   return 0;
 }
@@ -218,6 +218,15 @@ class BandLoop(unittest.TestCase):
         for sec in (30, 90, 150):
             self.assertEqual(rows[sec]["ch"], "0", (sec, rows[sec]))
 
+    def test_narration_names_the_value_the_band_decided_on(self):   # 09's bench 2026-11-16: the log alone must show it
+        script = "ev 0 err 0.5\nev 65 err -0.2\nev 125 err 0.25\nrun 200\n"
+        err = subprocess.run([str(self.exe)], input=script, capture_output=True, text=True, check=True).stderr
+        narr = [l[2:] for l in err.splitlines() if l.startswith("N ")]
+        pause = [l for l in narr if l.startswith("Heating paused")]
+        resume = [l for l in narr if l.startswith("Heating resumes")]
+        self.assertTrue(pause and "at least 0.20 above their target (band 0.1)" in pause[0], narr)
+        self.assertTrue(resume and "a room is 0.25 below its target (band 0.1)" in resume[0], narr)
+
     def test_room_below_target_minus_0_1_resumes(self):
         rows = self.run_sc([(0, "err", -0.2), (65, "err", 0.2)])
         self.assertEqual(rows[60]["ch"], "0", rows[60])
@@ -234,6 +243,44 @@ class BandLoop(unittest.TestCase):
         self.assertTrue(all(rows[s]["mode"] == "2" for s in band), [rows[s] for s in band][:3])   # PWM never ends
         self.assertTrue(all(rows[s]["ch"] == "0" for s in band), [(s, rows[s]["ch"]) for s in band][:5])
         self.assertEqual({rows[s]["on"] for s in band}, {"0", "1"})                                # the ON/OFF schedule keeps toggling
+
+    # --- entry 398: ON phases that start during a band stop leave the hourly start count ---
+    PAUSE = [(0, "err", 0.5), (5, "pwm", 1), (35, "err", -0.2)]
+
+    @staticmethod
+    def on_edges(rows, after):
+        secs = sorted(rows)
+        return [s for p, s in zip(secs, secs[1:]) if s > after and rows[p]["on"] == "0" and rows[s]["on"] == "1"]
+
+    def test_flameless_on_phases_during_a_stop_are_not_counted(self):   # entry 398
+        rows = self.run_sc(self.PAUSE, dur=1500)
+        edges = self.on_edges(rows, 60)
+        self.assertTrue(edges, "no new ON phase during the stop")
+        self.assertEqual({rows[s]["starts"] for s in sorted(rows) if s >= 60}, {rows[60]["starts"]}, edges)
+
+    def test_on_phase_from_a_stop_counts_once_when_ch_is_allowed_again(self):   # entry 398 + our reading (TASK-1887 notes)
+        s0 = self.on_edges(self.run_sc(self.PAUSE, dur=1500), 60)[0]
+        rows = self.run_sc(self.PAUSE + [(s0 + 15, "err", 0.2)], dur=s0 + 120)
+        self.assertEqual(rows[s0]["ch"], "0", rows[s0])
+        self.assertEqual(rows[s0 + 30]["on"], "1", rows[s0 + 30])        # still the same ON phase
+        self.assertEqual(rows[s0 + 30]["ch"], "1", rows[s0 + 30])
+        n = int(rows[s0]["starts"])
+        self.assertEqual(int(rows[s0 + 30]["starts"]), n + 1, (rows[s0], rows[s0 + 30]))
+        same = [s for s in sorted(rows) if s > s0 and all(rows[t]["on"] == "1" for t in sorted(rows) if s0 <= t <= s)]
+        self.assertEqual({rows[s]["starts"] for s in same}, {str(n + 1)}, same)   # once, not on every tick
+
+    def test_on_phase_that_starts_in_the_resume_tick_counts_once(self):   # the band block runs before satPwmSchedule()
+        s0 = self.on_edges(self.run_sc(self.PAUSE, dur=1500), 60)[0]
+        rows = self.run_sc(self.PAUSE + [(s0, "err", 0.2)], dur=s0 + 30)
+        self.assertEqual(rows[s0]["on"], "1", rows[s0])
+        self.assertEqual(int(rows[s0]["starts"]), int(rows[s0 - 30]["starts"]) + 1, (rows[s0 - 30], rows[s0]))
+
+    def test_outside_a_stop_every_on_phase_counts(self):   # entries 59, 90, 95 unchanged
+        rows = self.run_sc([(0, "err", 0.5), (5, "pwm", 1)], dur=1500)
+        edges = self.on_edges(rows, 0)
+        self.assertTrue(edges)
+        for s in edges:
+            self.assertEqual(int(rows[s]["starts"]), int(rows[s - 30]["starts"]) + 1, (s, rows[s - 30], rows[s]))
 
     def test_lit_pwm_phase_burns_180s_before_the_band_stops_it(self):   # entries 275 (PWM) and 376
         rows = self.run_sc([(0, "err", 0.5), (5, "pwm", 1), (40, "flame", 1), (85, "err", -0.2)], dur=300)

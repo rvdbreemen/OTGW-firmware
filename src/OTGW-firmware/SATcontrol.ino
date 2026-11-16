@@ -1266,6 +1266,10 @@ static bool        _pwm_dhwAnchorLate = false;
 // Entry 158: the hold of this ON phase lapsed after a draw without a CH flame. _pwm_flameOnMs is then 0 although the phase had its
 // flame, so a later draw must not read it as "no anchor yet" (entry 211) and hand a relit flame a fresh hold (entry 103 B).
 static bool        _pwm_dhwHoldLapsed = false;
+// TASK-1887 (entry 398): this ON phase started during a tolerance-band stop and is not in the hourly start count yet. If the band
+// lets CH on again within the phase it is counted once then (our reading, TASK-1887 notes: entries 59, 90, 95 count every phase in
+// which the burner may start). Cleared when the phase ends or is cut.
+static bool        _pwm_onUncounted = false;
 static float    _sat_requestedSetpoint      = 0.0f;  // Requested setpoint of the last control tick: PID output after the multi-zone block and the solar offset, clamped (thermo-nova requested_setpoint, climate.py:370-394). state.sat.fPidOutput stays the raw PID output.
 static float    _sat_lastControlCS          = 0.0f;  // Control setpoint of the last control tick or refresh (the "previous CS": PWM keeps it without an override, satApplyContinuous() clamps against it, entry 112, TASK-1381)
 static bool     _sat_thermalSafeActive      = false; // The thermal safe fallback owns CS: the 3 s PWM refresh stays out
@@ -1418,7 +1422,9 @@ static void satPwmBeginOn(bool flame, float boilerTemp, uint32_t onTimeMs, uint3
   _pwm_dhwResumed = false;
   _pwm_dhwAnchorLate = false;
   _pwm_dhwHoldLapsed = false;
-  satCycleRecordPwmStart();
+  // Entry 398: an ON phase that starts during a band stop (CH held at 0) does not count toward the hourly start limit.
+  _pwm_onUncounted = _sat_tolBandOff;
+  if (!_pwm_onUncounted) satCycleRecordPwmStart();
   if (flame) {
     _pwm_waitingForFlame = false;
     _pwm_flameOnMs = _pwm_lastUpdateMs;
@@ -1455,6 +1461,15 @@ static bool satBandWaitsForMinBurn()
 
 // ON->OFF (pwm.py:205-209): the ignition anchor goes with the phase and the off wait is timed from this edge
 // (_last_update, pwm.py:208), whatever the boiler flame did before or since (entries 91, 92).
+// TASK-1887 (entry 398 + our reading, TASK-1887 notes): an ON phase that began during a tolerance-band stop is not in the hourly
+// start count; once CH is allowed again (bandOff false) while that phase still runs, it is counted once.
+static void satPwmCountOnWhenChAllowed(bool bandOff)
+{
+  if (bandOff || !_pwm_onUncounted || !state.sat.bPwmFlameRequested) return;
+  _pwm_onUncounted = false;
+  satCycleRecordPwmStart();
+}
+
 static void satPwmEndOn(uint32_t onTimeMs, uint32_t offTimeMs)
 {
   satPwmNarrateEdge(false, onTimeMs, offTimeMs);
@@ -1465,6 +1480,7 @@ static void satPwmEndOn(uint32_t onTimeMs, uint32_t offTimeMs)
   _pwm_dhwResumed = false;
   _pwm_dhwAnchorLate = false;
   _pwm_dhwHoldLapsed = false;
+  _pwm_onUncounted = false;
   _pwm_lastUpdateMs = millis();
 }
 
@@ -1887,6 +1903,7 @@ void satPwmReset()
 {
   satPwmPhaseClose(SAT_PWM_PHASE_END_CUT, _pwm_lastOnTimeMs, millis());   // TASK-1880 telemetry: an open ON phase was cut
   state.sat.bPwmFlameRequested = false;
+  _pwm_onUncounted            = false;   // TASK-1887: a cut phase leaves nothing to count later
   _pwm_entryPending           = false;
   _pwm_lastUpdateMs           = millis();   // pwm.reset(): _last_update = timestamp() (pwm.py:91)
   _pwm_waitingForFlame        = false;
@@ -8246,11 +8263,14 @@ static void satControlLoopRun()
     const bool tolWas = _sat_tolDemand;
     _sat_tolDemand = satToleranceDemand(_sat_tolDemand, _sat_tolErr);
     if (_sat_tolDemand != tolWas) {
-      if (_sat_tolDemand) satNarratef_P(PSTR("Heating resumes: a room is more than %.1f below its target"), SAT_TOL_COLD_C);
-      else                satNarratef_P(PSTR("Heating paused (CH off, PWM stays active): the rooms are at least %.1f above their target"),
-                                        SAT_TOL_HOT_C);
+      // The narration names the value the band decided on: the largest target - room over the deciding rooms (the filtered
+      // room, the same value as the PID error, entry 28), so the log can be checked against the band on its own.
+      if (_sat_tolDemand) satNarratef_P(PSTR("Heating resumes: a room is %.2f below its target (band %.1f)"), _sat_tolErr, SAT_TOL_COLD_C);
+      else                satNarratef_P(PSTR("Heating paused (CH off, PWM stays active): the rooms are at least %.2f above their target (band %.1f)"),
+                                        -_sat_tolErr, SAT_TOL_HOT_C);
     }
     _sat_tolBandOff = !_sat_tolDemand && !satBandWaitsForMinBurn();
+    satPwmCountOnWhenChAllowed(_sat_tolBandOff);   // entry 398: an ON phase from the stop counts once CH is allowed again
     if (tolWas && !_sat_tolDemand && !_sat_tolBandOff) satNarrate_P(PSTR("Heating pause waits for the 180 s minimum burn"));
   }
 
