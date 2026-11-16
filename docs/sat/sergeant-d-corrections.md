@@ -7741,3 +7741,43 @@ Robert, 16:18:42 UTC (https://discord.com/channels/812969634638725140/9144987300
 **What is recorded:** entry 348 (Q-347a B, 2026-11-14): a heating start in continuous mode runs the same start sequence as PWM, as a fail-safe guard. No entry records that SAT always starts in PWM and only chooses PWM or continuous after the start sequence. Asked back as Q-382a (A: every start in PWM first, the mode is chosen after the start sequence; B: entry 348 as it is; C: other), 07:36 UTC (https://discord.com/channels/812969634638725140/1105556725714649128/1571790943525539842).
 
 **Task:** depends on Q-382a.
+
+## 383. Q-375a answered A: no 2 minute flow average anywhere; the suppression setpoint and the duty cycle use the latest flow, as thermo-nova (Sergeant D, 2026-11-16; confirms entry 375, replaces entry 364 as we read it)
+
+**Source:** #dev-sat-mqtt, Sergeant D 2026-11-16 08:03:06 UTC (https://discord.com/channels/812969634638725140/1105556725714649128/1571797752223113219), item 1 of the three-item check (https://discord.com/channels/812969634638725140/1105556725714649128/1571790943525539842).
+
+**Quoted:**
+
+> "1: A"
+
+**Settled:** option A of item 1 as posted: "Yes, that is it": no 2 minute average anywhere. The PWM ON suppression setpoint and the duty cycle use the latest flow, as thermo-nova (heating_control.py:435-441 at 7beaaf5); the 180 s flame-on rule (entry 275, pwm.py:201-203) covers the light-off. This replaces our reading of entry 364 and the open points of entries 373 and 374.
+
+**Task:** TASK-1990 (owner 95): revert the 2 minute average of beta.330 and beta.333 (public in beta.339) to the latest flow, with an old-vs-fix test.
+
+## 384. Q-377a answered A, meaning "yes, B": a band stop sends CH=0 and PWM stays active (Sergeant D, 2026-11-16; confirms entry 377)
+
+**Source:** #dev-sat-mqtt, 2026-11-16 08:03:06 UTC (same message as entry 383), item 2.
+
+**Quoted:**
+
+> "2: A"
+
+**Settled:** item 2 option A as posted was "Yes, B". So for Q-361a: when the tolerance band stops heating (room at target + 0.1), SAT sends CH=0 and PWM stays active (not disabled), so the burner does not restart within the 20 minute PWM cycle when the room swings around target + 0.1. Not the CS=10 / PWM-ends path we recommended. New firmware rule; thermo-nova has no band.
+
+**Task:** TASK-1887 (owner ba), ADR-250.
+
+## 385. Q-382a answered A: every heating start runs in PWM first, and the choice PWM or continuous comes after the start sequence (Sergeant D, 2026-11-16; answers his own question of entry 382, extends entry 348)
+
+**Source:** #dev-sat-mqtt, 2026-11-16 08:03:06 UTC (same message as entry 383), item 3.
+
+**Quoted:**
+
+> "3: A"
+
+**Settled:** item 3 option A as posted: every heating start runs in PWM first, and SAT chooses PWM or continuous only after the start sequence. Entry 348 (a continuous start uses the PWM start sequence as a fail-safe) is extended: the start is not only the same sequence, it is a PWM start.
+
+**Compared with thermo-nova:** not checked in this session; before building, the owner quotes how thermo-nova picks the control mode at a heating start (heating_control.py at 7beaaf5) and how the firmware does it today, with both citations, as the sat-ground-truth rules require.
+
+**Task:** to be filed by the coordinator (start-sequence owner, a follow-up of TASK-1924 / entry 348).
+
+**Open:** what "after the start sequence" means in time (the end of the 60 s start-up following of entries 344/347, or the end of the first PWM ON phase); to ask if the code comparison does not settle it.

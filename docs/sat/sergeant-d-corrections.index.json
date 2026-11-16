@@ -4975,7 +4975,7 @@
    "tasks": [
     "TASK-1990"
    ],
-   "confirmed_by_entry": null
+   "confirmed_by_entry": 383
   },
   {
    "id": 376,
@@ -5001,7 +5001,7 @@
    "tasks": [
     "TASK-1887"
    ],
-   "confirmed_by_entry": null
+   "confirmed_by_entry": 384
   },
   {
    "id": 378,
@@ -5062,6 +5062,45 @@
    "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1571790225276014673",
    "supersedes": [],
    "tasks": [],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 383,
+   "title": "Q-375a answered A: no 2 minute flow average anywhere; the suppression setpoint and the duty cycle use the latest flow, as thermo-nova (Sergeant D, 2026-11-16; confirms entry 375, replaces entry 364 as we read it)",
+   "date": "2026-11-16",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1571797752223113219",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1990"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 384,
+   "title": "Q-377a answered A, meaning \"yes, B\": a band stop sends CH=0 and PWM stays active (Sergeant D, 2026-11-16; confirms entry 377)",
+   "date": "2026-11-16",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": null,
+   "supersedes": [],
+   "tasks": [
+    "TASK-1887"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 385,
+   "title": "Q-382a answered A: every heating start runs in PWM first, and the choice PWM or continuous comes after the start sequence (Sergeant D, 2026-11-16; answers his own question of entry 382, extends entry 348)",
+   "date": "2026-11-16",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": null,
+   "supersedes": [],
+   "tasks": [
+    "TASK-1924"
+   ],
    "confirmed_by_entry": null
   }
  ]
