@@ -5,7 +5,7 @@ status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-13T07:28:00Z'
-updated_date: '2026-11-16T14:17:00Z'
+updated_date: '2026-11-16T17:19:00Z'
 labels:
   - sat
   - adr
@@ -57,6 +57,8 @@ Branch note: the 1888 commits (5dde6269a, 643f4f307) sit on local branch lane/ba
 2026-11-16 follow-up: docs/MANUAL.md passthrough table lacked sat/pwm_switch_margin -> SATpwmswitchmargin, so tests/test_sat_mqtt_state.py::test_manual_passthrough_table_equals_kSatMqttCmds failed on origin/dev since 2cb8d28af (found in the TASK-1887 seam sweep; the 1888 test set did not include this file). Row added; 31/31 green.
 
 2026-11-16 second docs follow-up: tests/test_manual_sat_commands.py (ch09 EN, h09 NL API tables) also lacked sat/pwm_switch_margin -> SATpwmswitchmargin since 2cb8d28af (found in the full run_tests sweep); rows added, 6/6 green.
+
+2026-11-16 third follow-up: tests/test_settings_float_roundtrip.py was red on origin/dev since 2cb8d28af: its updateSetting() clamp regex ends in \);\s*$ and the SATpwmswitchmargin line carries a trailing '// TASK-1888'. Regex widened to allow a trailing // comment: 42 -> 43 keys found, only SATpwmswitchmargin added (0.5..5.0), the other 42 ranges unchanged; 1 failed -> 2 passed.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
