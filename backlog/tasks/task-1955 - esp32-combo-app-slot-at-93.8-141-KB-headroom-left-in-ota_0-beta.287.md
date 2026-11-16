@@ -1,10 +1,10 @@
 ---
 id: TASK-1955
 title: 'esp32-combo app slot at 93.8 %: 141 KB headroom left in ota_0 (beta.287)'
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-11-15T03:20:00Z'
-updated_date: '2026-11-15T20:29:00Z'
+updated_date: '2026-11-16T08:17:00Z'
 labels:
   - build
   - flash-size
@@ -44,4 +44,12 @@ Implementation (options 1+2, ADR-247) pushed as 2bd950c7c (beta.323): app 2 136 
 AC2: threshold proposal (A WARN 95 % / FAIL 98 %, B WARN only, C nothing, each with its consequence) sent to the coordinator for Robert; the coordinator decided A under Robert's delegation (2026-11-15) and asked for its own task: TASK-1981 (implementation after 20:00 and after TASK-1980).
 
 Correction (session 95): the size guard of AC2 is NOT TASK-1981 (that is the OT-Direct MsgID 25 tier fix); its own task is still to be created, after TASK-1980.
+
+Correction (comms 92, 2026-11-16) of the note above: the size guard of AC2 is TASK-1993, implemented in 1083bc80e (scripts/check_app_size.py, tests/test_app_size_check.py; WARN above 95 %, FAIL above 98 % of app0). Its line in the beta.339 release build (bd7a133c2, 2026-11-16): 'app size: 2139376 B of 2293760 B (93.3 %), free 154384 B'.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+AC1: the app size per beta from the build logs (12 points, beta.1 to beta.323) is the table in the notes (3620dcb0b). AC2: threshold options A/B/C put to Robert, A chosen under his delegation (3ff0ddf7e); implemented as TASK-1993 (1083bc80e: build.py logs the app image against the 2293760 B app0 slot, WARN above 95 %, FAIL above 98 %, tests/test_app_size_check.py red then green); the size reduction itself (ADR-247, d025efe75/2bd950c7c, -22304 B) benched on .61 by 09. Seen in the beta.339 release build log 2026-11-16: 93.3 %, free 154384 B. Closed by comms 92 from the coordinator's verified close-out list.
+<!-- SECTION:FINAL_SUMMARY:END -->
