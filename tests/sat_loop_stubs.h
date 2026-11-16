@@ -88,6 +88,9 @@ struct LittleFSstub {
   bool exists(const char*) { return false; } bool remove(const char*) { return false; }
   bool mkdir(const char*) { return false; } bool rename(const char*, const char*) { return false; }
 } static LittleFS;
+// STUB (TASK-1989): the SAT state saves hand their file to the fsWriter queue; with LittleFS not mounted the real
+// fsWriterSubmit() refuses (fsWriter.ino, the !LittleFSmounted && !bFsImageWriting check), so nothing is persisted.
+static bool fsWriterSubmit(const char*, const char*, size_t) { return false; }
 #define FPSTR(p) (p)   // STUB: PROGMEM and RAM are the same on the host
 // STUB: dtostrf via sprintf (no ESP float-to-string quirks)
 static char* dtostrf(float v, int, int p, char* b) { sprintf(b, "%.*f", p, v); return b; }

@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-15T21:23:00Z'
-updated_date: '2026-11-16T15:10:00Z'
+updated_date: '2026-11-16T20:29:00Z'
 labels:
   - performance
 milestone: 2.0.0
@@ -36,4 +36,6 @@ gruijter beta.250 (Classic with PIC, SAT on), 25.5 h: 92 '[loop-stall]' lines, m
 2026-11-16 bench 09 on .61 (OTGW32, no PSRAM), 2.0.0-beta.351+597c163 (local bench build), 13:05-14:28, SAT enabled without sim: 76 min telnet, exactly one '[loop-stall]' (13:36:59.728, 591 ms, slowest step 5->8 576 ms, between logHeapStats and loopOTDirect: not the file-write step 1->2 of the 342 experiment); no step 1->2 stall, no '[fswriter] queue still full'. BUT SAT stayed active=false (ot_link_lost, no boiler, room null, 0 SATTICK), so satSavePidState/satSaveEnergyState never ran: /sat_pid_state.json kept ts 1794765369, /sat_energy.json kwh 0.000; the reboot check is trivially equal (nothing saved), not evidence. AC3 part 'files survive the fs OTA byte-identical' PASS (sat_pid_state, sat_energy, sat_markers). Health: no crash fields, heap 46.8-50.0 KB; hd_min dip to 2,180 B at the 14:00:00 wall-clock mark = the hourly sendMQTTheapdiag (26 stats/* publishes), not an fs write (the hourly energy save runs on millis() inside the SAT tick, which did not run): own task. AC2 'fix' numbers and AC3 save/reboot parts move to .63 with the post build after the 20:00 tag.
 
 2026-11-16 hour-mark A/B by 09 on .61 (no PSRAM) for the 14:00 heap dip: 14:00 beta.351 (1989 fsWriter) + SAT enabled: hd_min 2,180 B; 15:00 beta.352 (dev, no 1989) + SAT off: no dip, 26/26 stats; 16:00 beta.353 (dev + 1751, no 1989) + SAT enabled: hd_min 31,156 -> 6,484, transient, 26/26 stats. The dip follows 'SAT enabled', not the fsWriter: 1989 is cleared of it. The dip is TASK-2004 (owner 95).
+
+2026-11-16 tests/test_sat_loop_integration.py did not compile with the fsWriter (fsWriterSubmit not stubbed in tests/sat_loop_stubs.h; missed because the full sweep ran on the 1887n tree without 1989 and the post-branch test set left it out). Stub added (refuses, as the real fsWriterSubmit does with LittleFS not mounted); 21/21 on the beta.358 tree. Test-only; firmware src unchanged.
 <!-- SECTION:NOTES:END -->
