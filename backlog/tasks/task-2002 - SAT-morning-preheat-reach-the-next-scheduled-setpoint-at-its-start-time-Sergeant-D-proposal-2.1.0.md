@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-16T12:54:00Z'
+updated_date: '2026-11-16T13:25:00Z'
 labels:
   - needs-maintainer-ok
   - sat
@@ -27,3 +28,9 @@ Proposed by Sergeant D for a release after 2.0.0, #dev-sat-mqtt https://discord.
 - [ ] #2 Robert's go recorded
 - [ ] #3 Implementation with host tests red then green and a field or simulation proof that the room reaches the setpoint at the scheduled time
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Scope by Robert (2026-11-16 13:12 UTC, https://discord.com/channels/812969634638725140/1105556725714649128/1571875517676658750): 'That will be a 2.1.0 release or later.' Milestone 2.1.0 stays; needs-maintainer-ok stays until he gives the go.
+<!-- SECTION:NOTES:END -->
