@@ -8,7 +8,7 @@ status: In Review
 assignee:
   - '@claude'
 created_date: '2026-11-14T17:23:00Z'
-updated_date: '2026-11-15T02:26:00Z'
+updated_date: '2026-11-16T08:20:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -47,4 +47,6 @@ Implemented (d3, 2026-11-14, local, beta.252, not yet built). satContinuousSetpo
 Lane-1924 pushed 2026-11-15: origin/dev 5da0c91df..2f4818aa1. Build esp32-combo 2.0.0-beta.281+fe0e61a OK (build/logs/build-20261115-020302.log, 'Build completed successfully'); 'git diff fe0e61a48 2f4818aa1 -- src/' empty, so the pushed code is the benched code. evaluate.py --quick 0 failed; OTD tests 42 files, host suites, SAT suite per file green on the rebased tree. Bench 09 on .61 with beta.281 (SAT sim): run 1 cs=38.0 = ret 20+18 held, then max(request, flow-1); run 2 flame-off cs tracks ret+18, flame ON -> 20 s hold (56.9), then cs=62.0 = max(request 62, flow-1 43.5). PASS for the start sequence. NOT benchable: 'already burning when SAT goes on = no start' (satDisable sends CS=0, the sim boiler goes off), and the 60 s clamp was not reached (request above flow). Host tests cover both. Version beta.273.
 
 AC5 left OPEN by 09 (09 bench 2026-11-15 02:12-02:57 on .61 (OTGW32, OT-Direct, no boiler, no thermostat), 2.0.0-beta.281+fe0e61a (OTA app+FS, changed none, bootcount 700->702), evidence 09 scratchpad b281/). Verified: continuous start (mode=1 pwm=0) in the SAT simulation, twice: flame off -> CS = return + 18 every tick (e.g. ret 40.0 -> CS 58.0 ... ret 38.9 -> 56.9); 'SAT cycle: flame ON' 02:40:43 -> CS 56.9 held at 02:40:43 and 02:40:53 (20 s), then 02:41:03 CS = max(request 62, flow-1 43.5) = 62. NOT verified: the clamp after 60 s (the request stayed above the flow, so the clamp never acted) and 'no regression on PWM starts' (SAT could not be brought into PWM in the simulation in reasonable time). Also not makeable: 'already burning when SAT is switched on' (satDisable sends CS=0, the sim boiler is off at the next tick). Needs a run that reaches PWM and a request below the flow after ignition (sim tuning or .63/field).
+
+2026-11-16 Robert decided A (DM 1571800810931626106, relayed by the coordinator): AC5 (needs a SAT simulation on hardware) is waived on the host evidence (tests/test_sat_continuous_startup.py 11/11 on the fix, 3 FAIL on beta.250) plus the partial bench 09 beta.281 on .61. The task stays open only for the new AC from Sergeant D entry 385 (Q-382a A: every heating start runs in PWM first; PWM or continuous is chosen after the start sequence). Before code: thermo-nova comparison (read so far: heating_control.py :229-231 disables PWM when the heater is OFF, :262-305 enables PWM only on a sustained overshoot, so thermo-nova starts in continuous; entry 385 differs on purpose) and our start sequence with citations; the open timing point (end of the 60 s start-up following of entries 344/347, or end of the first PWM ON phase) goes to Robert as a question with options, not decided by directive (Robert, CLI 2026-11-16).
 <!-- SECTION:NOTES:END -->
