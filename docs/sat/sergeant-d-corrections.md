@@ -7990,3 +7990,19 @@ Robert, 16:18:42 UTC (https://discord.com/channels/812969634638725140/9144987300
 **Interpretation (ours):** he sets no gap between stop and restart. Whether the stop line moves up (a gap) or a pause time is wanted is not in his words; asked as Q-401a. Scope: not answered; Q-399a recommended this release, read as 2.0.0.
 
 **Task:** TASK-1887 (owner ba).
+
+## 402. Q-401a answered C: the band stop stays at target + 0.1, and after a stop CH stays off for a minimum time before it may restart; part of 2.0.0 (Sergeant D and Robert, 2026-11-16; extends entry 401)
+
+**Source:** #dev-sat-mqtt, Sergeant D 2026-11-16 19:53:58 UTC (https://discord.com/channels/812969634638725140/1105556725714649128/1571976645731164171), a reply to Q-401a (https://discord.com/channels/812969634638725140/1105556725714649128/1571976402285240323); Robert (maintainer) 19:54:45 UTC (https://discord.com/channels/812969634638725140/1105556725714649128/1571976845098876974) on the scope.
+
+**Quoted:**
+
+> "My answer is C"
+
+> "Put this in release 2.0.0" (Robert)
+
+**Settled:** option C of Q-401a: the tolerance band keeps its stop at target + 0.1 (entries 376, 384); after a band stop CH stays off for a minimum time before it may restart; the restart itself is below target + 0.1 (entry 401). Scope: release 2.0.0, by Robert's words. New firmware rule; thermo-nova has no band (entry 326).
+
+**Interpretation (ours, not his words), two points to confirm:** (i) the minimum CH-off time is 300 s (5 minutes), the example given in option C; (ii) it counts from the moment CH actually goes off (after any 180 s minimum burn of entry 376), not from the moment the band decides to stop. Both asked as Q-402a.
+
+**Task:** TASK-1887 (owner ba), milestone 2.0.0.

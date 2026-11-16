@@ -5315,6 +5315,19 @@
     "TASK-1887"
    ],
    "confirmed_by_entry": null
+  },
+  {
+   "id": 402,
+   "title": "Q-401a answered C: the band stop stays at target + 0.1, and after a stop CH stays off for a minimum time before it may restart; part of 2.0.0 (Sergeant D and Robert, 2026-11-16; extends entry 401)",
+   "date": "2026-11-16",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1571976645731164171",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1887"
+   ],
+   "confirmed_by_entry": null
   }
  ]
 }
