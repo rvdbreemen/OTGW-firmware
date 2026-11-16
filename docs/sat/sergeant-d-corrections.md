@@ -8058,3 +8058,19 @@ Robert, 16:18:42 UTC (https://discord.com/channels/812969634638725140/9144987300
 **Open:** Q-403a (queued, asked after the earlier questions).
 
 **Task:** TASK-1887 (owner ba); ADR-253.
+
+## 406. Interpretation (ours, not Sergeant D's words) of entry 403: the 10-minute minimum starts only when the band itself switches CH from 1 to 0 (2026-11-17; open as Q-403b)
+
+**Source:** none from Sergeant D. Written by the comms session for ba (TASK-1887) before ba's fix push for the 08:00 beta candidate. This whole entry is our interpretation; it records no words of Sergeant D.
+
+**Reading:** "counted from the moment CH actually goes off" (entry 403) means the band itself switches CH from 1 to 0. When the band decides to stop while CH is already 0 (at boot, during the cold cutoff, or with the heater off because the request is below the cold setpoint), the band turns nothing off and there is no burn to protect against short cycling, so no 600 s minimum starts: heating may start at once when the rooms fall below target + 0.1 (entry 401).
+
+**Why found:** d3's PWM-first start test (ADR-252: a heater OFF -> ON start must enter PWM before its flame) failed on beta.359: a warm room at boot started the 600 s minimum, and the first real start then waited up to 10 minutes.
+
+**Firmware (ba's TASK-1887 fix, not yet on origin/dev when this was written, so no line numbers):** the band block starts the minimum only when the last CH value SAT sent (`state.sat.iLastSentCH`) was 1.
+
+**Changes an earlier entry:** none; it reads entry 403 (and the interpretation of entry 405). Entry 403 is not rewritten.
+
+**Open:** Q-403b (queued).
+
+**Task:** TASK-1887 (owner ba); ADR-253, ADR-252.

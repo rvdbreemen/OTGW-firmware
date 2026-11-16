@@ -5367,6 +5367,19 @@
     "TASK-1887"
    ],
    "confirmed_by_entry": null
+  },
+  {
+   "id": 406,
+   "title": "Interpretation (ours, not Sergeant D's words) of entry 403: the 10-minute minimum starts only when the band itself switches CH from 1 to 0 (2026-11-17; open as Q-403b)",
+   "date": "2026-11-17",
+   "source": "port-team",
+   "kind": "interpretation",
+   "discord_link": null,
+   "supersedes": [],
+   "tasks": [
+    "TASK-1887"
+   ],
+   "confirmed_by_entry": null
   }
  ]
 }
