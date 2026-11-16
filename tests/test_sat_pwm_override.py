@@ -553,20 +553,7 @@ def extract_cycles() -> str:
             "#define SYNC_SUSTAIN_CLOCK() (_sustain_lastCheckMs = g_ms)\n")
 
 
-def _flow_avg_shim(cpp: Path):
-    """TASK-1990: a cut-out SAT block that now reads the 2 minute flow average (state.otBus.flowAvg, SATflowAvg.h) compiles
-    against the real header and an EMPTY ring of its own. An empty ring makes satSuppressionFlowTemp() return the latest flow,
-    so every harness that is not about the average keeps the behaviour it tests; tests/test_sat_flow_avg.py tests the average."""
-    text = cpp.read_text(encoding="utf-8")
-    if "state.otBus.flowAvg" not in text:
-        return
-    hdr = (REPO / "src" / "OTGW-firmware" / "SATflowAvg.h").as_posix()
-    shim = '#include "%s"\nstatic SatFlowAvg g_flowAvgShim;\n' % hdr
-    cpp.write_text(shim + text.replace("state.otBus.flowAvg", "g_flowAvgShim"), encoding="utf-8")
-
-
 def compile_cpp(cpp: Path, exe: Path):
-    _flow_avg_shim(cpp)
     for cc in ("g++", "clang++"):
         if shutil.which(cc):
             subprocess.run([cc, "-std=c++17", "-o", str(exe), str(cpp)], check=True)

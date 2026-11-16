@@ -149,7 +149,6 @@ static bool platformQueueReceive(PlatformQueue, void* item, uint32_t = 0) {
 // state / settings: only the fields the slices touch.
 #include "SATboilerFeed.h"                         // the real header: SatBoilerFeed, SatFeedEvent, SatShVerdict (no firmware state in it)
 #include "SATpm25Poll.h"                           // the real header: SatPm25Bus, satPm25NoteFrame (TASK-1653, no firmware state in it)
-#include "SATflowAvg.h"                            // the real header: SatFlowAvg, satFlowAvgNote (TASK-1990, no firmware state in it)
 #include "diagRecorderStuff.h"                     // the real header (TASK-1665); the recorder is never started here, so its capture points are the idle no-op
 static DiagRecorder diagRec;
 #include "otbus.inc"                              // the real OTBusState

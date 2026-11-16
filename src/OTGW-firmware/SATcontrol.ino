@@ -1259,29 +1259,13 @@ static float satPwmFlameOffHold(float maxSetpoint)
   return cs;
 }
 
-// Flow temperature the PWM ON suppression subtracts its offset from: the mean of the valid MsgID 25 samples of the last 2 minutes
-// since the current flame-on (Sergeant D entry 364, TASK-1990; thermo-nova takes the latest flow, heating_control.py:435-441).
-// Same validity gate as satGetFlowTemp(): without a fresh flow there is no average either. No sample yet: the latest flow.
-// Start-up (the first 2 minutes after the flame-on): the latest flow, so the CS follows a rising flow and the burner does not go out
-// (entries 151, 336); the average of a window that is still filling would lag it by up to ~10 K. SAT simulation: the latest
-// (simulated) flow, because the ring holds the real boiler's MsgID 25 samples.
-static float satSuppressionFlowTemp()
-{
-  const float latest = satGetFlowTemp();
-  if (latest <= 0.0f) return latest;
-  if (settings.sat.bSimulation) return latest;
-  const uint32_t flameOnMs = satCycleGetFlameOnStartMs();
-  if (flameOnMs == 0 || (uint32_t)(millis() - flameOnMs) < SAT_FLOW_AVG_WINDOW_MS) return latest;
-  float mean = 0.0f;
-  if (satFlowAvgMean(state.otBus.flowAvg, millis(), flameOnMs, &mean) == 0) return latest;
-  return mean;
-}
-
-// Modulation-suppression setpoint of the PWM ON phase after the hold: the 2 minute flow average minus
-// fModSupOffset, clamped to MINIMUM..max. Used by the 30 s control tick, the 3 s refresh and the flood hand-over.
+// Modulation-suppression setpoint of the PWM ON phase after the hold: the latest flow temperature minus fModSupOffset,
+// clamped to MINIMUM..max, as thermo-nova (heating_control.py:435-441). Sergeant D entry 383 (TASK-1990): no 2 minute
+// flow average anywhere; the 180 s flame-on rule (entry 275) covers the light-off. Used by the 30 s control tick, the
+// 3 s refresh and the flood hand-over.
 static float satPwmSuppressionSetpoint(float maxSetpoint)
 {
-  float cs = satSuppressionFlowTemp() - settings.sat.fModSupOffset;
+  float cs = satGetFlowTemp() - settings.sat.fModSupOffset;
   if (cs < SAT_MIN_SETPOINT) cs = SAT_MIN_SETPOINT;
   if (cs > maxSetpoint) cs = maxSetpoint;
   return cs;

@@ -6,12 +6,12 @@ REAL CODE (compiled from src/, nothing re-implemented):
   - SATcontrol.ino, SATcycles.ino, SATpid.ino WHOLE (all of satControlLoop() -> satControlLoopRun() with its 148 callees: boot/restart gate,
     OT-link gate, PID, heating curve, PWM schedule and ON/OFF phases, flood and MI=500, command senders and cache, ownership rule), with
     Arduino-style auto prototypes generated for them (tests/sat_loop_build.py);
-  - the component type headers and the OTGWState / OTGWSettings aggregates (SATtypes.h, OTBustypes.h, SATboilerFeed.h, SATflowAvg.h, ...);
+  - the component type headers and the OTGWState / OTGWSettings aggregates (SATtypes.h, OTBustypes.h, SATboilerFeed.h, ...);
   - safeTimers.h (the firmware's own DUE()/timer implementation, driven by the stub millis());
   - the PIC command queue of OTGW-Core.ino (addCommandToQueue, handleCommandQueue, checkCommandResponse, the PM chain, the ownership
     refusal) and satBlocksExternalCommand() of OTGW-firmware.h;
   - the processOT() text for a boiler frame: the B-frame head (iBoilerLastSeenMs stamp), the MsgID 3 -> satNoteSlaveConfig() branch, the
-    PM-chain acknowledgement line, and the MsgID 25/28 feed hook with the flow average (satFeedNote, satFlowAvgNote).
+    PM-chain acknowledgement line, and the MsgID 25/28 feed hook (satFeedNote).
 STUBBED (tests/sat_loop_stubs.h, tests/sat_loop_stubs/, QUEUE_STUBS in tests/sat_loop_build.py; each says what it does not model):
   Arduino core/millis (a stub clock), FreeRTOS critical sections, JsonEmit/REST, MQTT publish (counted only), SATble/SATweather/SATpressure
   (not compiled; weather = a fixed outside temperature refreshed every pass), LittleFS (every open fails: the PID/state load finds nothing,
