@@ -5250,6 +5250,19 @@
    "supersedes": [],
    "tasks": [],
    "confirmed_by_entry": null
+  },
+  {
+   "id": 397,
+   "title": "Q-396a answered A: \"the next release\" for the MsgID 3 change means the next build that goes out, part of 2.0.0 (Sergeant D, 2026-11-16; settles the scope of entries 392, 393, 396)",
+   "date": "2026-11-16",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1571857108025212940",
+   "supersedes": [],
+   "tasks": [
+    "TASK-2000"
+   ],
+   "confirmed_by_entry": null
   }
  ]
 }

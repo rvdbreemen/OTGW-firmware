@@ -7922,3 +7922,15 @@ Robert, 16:18:42 UTC (https://discord.com/channels/812969634638725140/9144987300
 **Settled:** removing the MsgID 3 PWM gate (entries 392 and 393) is his top priority. **Not settled (asked as Q-396a, 11:49:50 UTC, https://discord.com/channels/812969634638725140/1105556725714649128/1571854811370889278):** whether "the next release" means the next build that goes out (part of 2.0.0) or 2.1.0. Our Q-392a recommended this release; read as 2.0.0 until he answers.
 
 **Task:** the entry-392 task (owner 95).
+
+## 397. Q-396a answered A: "the next release" for the MsgID 3 change means the next build that goes out, part of 2.0.0 (Sergeant D, 2026-11-16; settles the scope of entries 392, 393, 396)
+
+**Source:** #dev-sat-mqtt, Sergeant D 2026-11-16 11:58:58 UTC (https://discord.com/channels/812969634638725140/1105556725714649128/1571857108025212940), a reply to Q-396a (https://discord.com/channels/812969634638725140/1105556725714649128/1571854811370889278).
+
+**Quoted:**
+
+> "My answer is A"
+
+**Settled:** option A: the MsgID 3 change (no MsgID 3 gate on PWM, entries 392 and 393) belongs in the next build that goes out and is part of 2.0.0, not 2.1.0.
+
+**Task:** TASK-2000 (owner 95), milestone 2.0.0; pushed as beta.350 (9011c3c48), the candidate of the 2026-11-16 20:00 public beta.
