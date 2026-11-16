@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-09T09:29:00Z'
-updated_date: '2026-11-16T13:54:00Z'
+updated_date: '2026-11-16T14:30:00Z'
 labels:
   - otdirect
 milestone: 2.0.0
@@ -47,4 +47,8 @@ Periodic refresh host-only: each command gave exactly one WRITE 16 with no repea
 2026-11-16 (95) AC1 was ticked on the state only; the wire part is the new AC. Decision (with the advisor, against the PIC first): the PIC has no master-mode MsgID 16 at all (standalone table gateway.asm 6.6 :1818-1830 has no ID 16; BS= only rewrites a thermostat's frames, roomsetptchange :3019-3024), so master-mode TT= writing MsgID 16 is already an OT-Direct extension; the defect is that state and wire disagree (overrides.write {16, 0x1300} while the boiler keeps TT's 20.50). Rule: in master mode one MsgID 16 write slot, TT=/TC= while active, else the BS= / MQTT room_setpoint value; the 15 s schedule sends the value in force. ADR-223 is gateway mode only (its Decision Contract 'TT=0 ... a BS= or MQTT room setpoint ... survives' still holds); ADR-241 and ADR-066 do not state BS= behaviour in master mode, so no ADR change.
 
 Fix (OTDirect.ino): BS= in master mode stores the room value (otdRoom16Cache/Ovr) and, without a running TT/TC, enqueues WRITE 16 (write cache + one frame); BS=0 during TT clears only the room value (TT keeps valueSet); otdMqttSetRoomSetpoint() during TT in master mode only stores; clearRemoteOverride() in master mode enqueues the remaining room value at once (falls back to the schedule cache when the queue is full). Gateway mode unchanged. Tests: tests/test_otd_tt_pic_parity.py new MasterWire16Cases W1-W6 + R2 updated: FIX 52/52 OK; OLD (HEAD e18ccbfe3 OTDirect.ino + OTDirecttypes.h) 6 FAIL (R2, W1 BS alone no write, W2/W3 TT=0 writes nothing, W5 BS=0 during TT stops TT's write, W6 room setpoint written over TT); W4 (nothing set, no write) holds on both. Harness: test_otd_pic_float PRE gets OTDirectMode/otCurrentMode (gateway) and otRemoteOverride stubs (relay_rw now uses them). Full OTD sweep tests/test_otd_*.py (65 files) all OK; evaluate --quick 0 failed. Open: build + bench 09 on .61 master mode (BS=19 -> WRITE 16 0x1300; TT=20.5 -> 0x1480; TT=0 -> WRITE 16 0x1300 at once, then every 15 s).
+
+Bench 09 on .61 (OTGW32, OT-Direct master, no boiler, SAT off), 2.0.0-beta.353+3a14423, run 2 15:2x (run 1 void: LAN broker down), commands via MQTT, frames from telnet (09 scratchpad b353\run2\): sha256 match, githash 3a14423, settings 'changed: none', bootcount 874 -> 876 (OTA only). (1) BS=19 -> 'R90101300 16 Write-Data TrSet = 19.00' at +1.6 s, overrides [16=4864]; (2) TT=20.5 -> R90101480 at +1.8 s, WRITE 100 = 3 at +2.9 s; (3) TT=0 -> R90101300 at +1.9 s, WRITE 100 = 0 at +3.0 s (beta.341: nothing in 360 s) = old-vs-fix PASS; (4) BS=0 -> no MsgID 16 frame in 90 s, overrides []. The 15 s refresh was not seen on the bench: with no boiler the bus is offline and the scheduler sends only MsgID 0 (OTDirect.ino 'if (busOffline && entry.msgId != 0) continue;', the round-robin after the TASK-1802 comment); queued commands still go out (the queue branch before it). The refresh therefore needs an answering boiler: covered by the host test only (W1: schedule entry valueSet with 0x1300; W5: TT keeps the schedule value), not benched.
+
+AC2 is left for 09 to tick (bench AC, rule: the bench-tester ticks); periodic refresh host-only, as noted above.
 <!-- SECTION:NOTES:END -->
