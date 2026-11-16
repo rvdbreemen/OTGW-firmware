@@ -328,7 +328,9 @@ struct SatS { float fTargetTemp = 20.0f; bool bEnabled = false; bool bUseExterna
 struct Settings { MqttS mqtt; SatS sat; };
 struct MqttT { bool bConnected = true; };
 struct SatT { bool bActive = false, bSafetyTripped = false, bFallbackActive = false, bPushRefused = false, bPm25NoSlot = false,
-  bRoomTempLost = false, bOtLinkLost = false, bOutsideTempMissing = false; int iShVerdict = 0, eControlMode = 0;
+  bRoomTempLost = false, bOtLinkLost = false, bOutsideTempMissing = false,
+  bNoIgnition = false, bHeatingFailure = false;   // TASK-1882 diagnostic events, published by the same pass
+  int iShVerdict = 0, eControlMode = 0;
   uint8_t iRequestedControlMode = 0; SATPreset eActivePreset = SAT_PRESET_NONE; };
 struct StateT { MqttT mqtt; SatT sat; };
 static Settings settings; static StateT state;

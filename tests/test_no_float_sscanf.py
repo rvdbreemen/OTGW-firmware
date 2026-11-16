@@ -90,7 +90,8 @@ class NoFloatScanf(unittest.TestCase):
                         bad.append(f"{p.relative_to(ROOT)}:{line_of(t, m.start())} {lit!r}")
         self.assertEqual(bad, [], "siscanf has no floating point: " + ", ".join(bad))
         if ROOT == REPO:
-            self.assertGreaterEqual(calls, 19, "expected the converted call sites")
+            # 18: TASK-1908 (021b506e8) replaced the SC= siscanf("%d:%d/%d") with a parser that follows the PIC SetClock.
+            self.assertGreaterEqual(calls, 18, "expected the converted call sites")
 
     def test_float_pattern_self_check(self):
         for fmt in ("%f", "%lf", "%5f", "%e", "%g", "%*f"):
