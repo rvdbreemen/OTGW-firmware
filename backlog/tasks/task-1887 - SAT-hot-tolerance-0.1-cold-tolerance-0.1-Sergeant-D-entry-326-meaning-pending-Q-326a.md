@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-13T07:25:00Z'
-updated_date: '2026-11-16T13:47:00Z'
+updated_date: '2026-11-16T14:03:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -61,4 +61,6 @@ Q-328a decided 2026-11-15 by the coordinator under Robert's directive (CLI) 'Do 
 Entry 398 edge case, OUR interpretation (ba, recorded by comms 92 on 2026-11-16; not Sergeant D's words, not an entry): a PWM ON phase that starts during a band pause is not counted. If the band resumes heating (CH=1 again) while that ON phase still runs, the phase is counted once at that moment, because from then on the burner may start, and entries 59/90/95 count every ON phase in which the burner may start, lit or not. The count is at the moment CH is allowed again, not at the flame edge (a flame edge never adds a count: SATcontrol.ino:1287-1291, checked by 92). During the 180 s minimum-burn wait CH is still 1, so phases in that wait count as before. Not asked to Sergeant D (non-blocking); ask him if a field capture shows it matters.
 
 2026-11-16 AC4: ADR-250 Accepted by Robert, Discord DM 1571883109157310475 ('A', reply to the accept question for the amended text at 6d221e474, after the coordinator's notice that a yes covers the amended text). Set via adr-kit accept (status history: changed_by Robert, reason with the DM id); Status line keeps the ADR-080 guideline-level classification; README entry Accepted; lint --strict clean. Same commit: tests/test_sat_published_curve.py was red on origin/dev since ae8626cff (its zone-block slice reached the new _sat_tolErr line without the band symbols; my 1887 seam sweep did not include it, reported by d3): stub added only when the slice contains _sat_tolErr; 5/5 on origin, on the code before 1887 (55dd8f015) and on lane/ba-1887n.
+
+2026-11-16 tests/test_sat_zone_aggregation.py was red on origin/dev since ae8626cff for the same reason as test_sat_published_curve (zone-block slice without the band symbols; reported by d3): same conditional stub; 16/16 on origin HEAD, on 55dd8f015 and on lane/ba-1887n. grep shows no other test slicing that block.
 <!-- SECTION:NOTES:END -->
