@@ -1262,12 +1262,18 @@ static float satPwmFlameOffHold(float maxSetpoint)
 // Flow temperature the PWM ON suppression subtracts its offset from: the mean of the valid MsgID 25 samples of the last 2 minutes
 // since the current flame-on (Sergeant D entry 364, TASK-1990; thermo-nova takes the latest flow, heating_control.py:435-441).
 // Same validity gate as satGetFlowTemp(): without a fresh flow there is no average either. No sample yet: the latest flow.
+// Start-up (the first 2 minutes after the flame-on): the latest flow, so the CS follows a rising flow and the burner does not go out
+// (entries 151, 336); the average of a window that is still filling would lag it by up to ~10 K. SAT simulation: the latest
+// (simulated) flow, because the ring holds the real boiler's MsgID 25 samples.
 static float satSuppressionFlowTemp()
 {
   const float latest = satGetFlowTemp();
   if (latest <= 0.0f) return latest;
+  if (settings.sat.bSimulation) return latest;
+  const uint32_t flameOnMs = satCycleGetFlameOnStartMs();
+  if (flameOnMs == 0 || (uint32_t)(millis() - flameOnMs) < SAT_FLOW_AVG_WINDOW_MS) return latest;
   float mean = 0.0f;
-  if (satFlowAvgMean(state.otBus.flowAvg, millis(), satCycleGetFlameOnStartMs(), &mean) == 0) return latest;
+  if (satFlowAvgMean(state.otBus.flowAvg, millis(), flameOnMs, &mean) == 0) return latest;
   return mean;
 }
 

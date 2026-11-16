@@ -47,11 +47,12 @@ static uint32_t g_now = 0, g_flameOn = 0; static float g_latest = 0;
 static uint32_t millis() { return g_now; }
 static float satGetFlowTemp() { return g_latest; }
 static uint32_t satCycleGetFlameOnStartMs() { return g_flameOn; }
-struct SatSettings { float fModSupOffset = 1.0f; }; struct Settings { SatSettings sat; }; static Settings settings;
+struct SatSettings { float fModSupOffset = 1.0f; bool bSimulation = false; }; struct Settings { SatSettings sat; }; static Settings settings;
 struct OTBusS { SatFlowAvg flowAvg; }; struct State { OTBusS otBus; }; static State state;
 """
 
-# stdin: lines "n <ms> <flow>" (note a sample), "f <ms>" (flame-on), "q <ms> <latest>" (query: prints the CS)
+# stdin: lines "n <ms> <flow>" (note a sample), "f <ms>" (flame-on), "q <ms> <latest>" (query: prints the CS),
+# "s <0|1>" (SAT simulation off/on)
 MAIN = r"""
 int main() {
   char op; unsigned long ms; float v;
@@ -60,6 +61,7 @@ int main() {
     if (op == 'n') { scanf("%f", &v); g_latest = v; satFlowAvgNote(state.otBus.flowAvg, g_now, v); }
     else if (op == 'f') { g_flameOn = (uint32_t)ms; }
     else if (op == 'q') { scanf("%f", &v); g_latest = v; printf("%.3f\n", satPwmSuppressionSetpoint(90.0f)); }
+    else if (op == 's') { settings.sat.bSimulation = (ms != 0); }
   }
   return 0;
 }
@@ -101,14 +103,16 @@ class FlowAverage(unittest.TestCase):
 
     def test_readings_before_the_flame_on_are_left_out(self):
         # OFF phase: standing water reads 63 (indigo_light 2026-11-15); flame on at 100 s; ON readings 42
-        lines = ["n %d 63" % t for t in range(2000, 100000, 2000)] + ["f 100000"] + ["n %d 42" % t for t in range(100000, 140000, 2000)]
-        cs, = self.run_script(lines + ["q 139000 42"])
+        lines = ["n %d 63" % t for t in range(2000, 100000, 2000)] + ["f 100000"] + ["n %d 42" % t for t in range(100000, 222000, 2000)]
+        cs, = self.run_script(lines + ["q 221000 42"])
         self.assertAlmostEqual(cs, 42.0 - OFFSET, places=2, msg="no OFF-phase reading in the ON average")
 
     def test_one_reading_per_two_seconds_at_most(self):
-        # a 60 at 1.0 s and a 20 at 1.5 s: the second is inside the 2 s spacing and is not stored
-        cs, = self.run_script(["f 500", "n 1000 60", "n 1500 20", "q 1600 20"])
-        self.assertAlmostEqual(cs, 60.0 - OFFSET, places=2)
+        # after 2 minutes of burning: 40 every 2 s, then a 100 at 122.0 s and a 0 at 122.5 s; the 0 is inside the 2 s spacing and is
+        # not stored. Window at 123 s: 59 x 40 (4..120 s) + 100 -> mean 41.0 (with the 0 stored it would be 40.33)
+        lines = ["f 1000"] + ["n %d 40" % t for t in range(2000, 122000, 2000)] + ["n 122000 100", "n 122500 0"]
+        cs, = self.run_script(lines + ["q 123000 1"])
+        self.assertAlmostEqual(cs, 41.0 - OFFSET, places=2)
 
     def test_no_fresh_flow_means_no_average(self):
         # the latest flow is not fresh (0): the average is not used either, as before (the minimum setpoint)
@@ -118,6 +122,24 @@ class FlowAverage(unittest.TestCase):
     def test_first_reading_after_ignition(self):
         cs, = self.run_script(["f 500", "n 1000 37", "q 1100 37"])
         self.assertAlmostEqual(cs, 37.0 - OFFSET, places=2)
+
+    def test_start_up_follows_the_latest_flow(self):
+        # entries 151, 336: in the first 2 minutes after the flame-on the CS follows the rising flow (35 -> 55 in 20 s), not a
+        # window that is still filling (that average would be ~45, 10 K below the flow)
+        lines = ["f 1000"] + ["n %d %d" % (1000 + 2000 * i, 35 + 2 * i) for i in range(11)]
+        cs, = self.run_script(lines + ["q 21500 55"])
+        self.assertAlmostEqual(cs, 55.0 - OFFSET, places=2)
+
+    def test_the_average_starts_once_the_burner_ran_two_minutes(self):
+        lines = ["f 1000"] + ["n %d 40" % t for t in range(2000, 62000, 2000)] + ["n %d 50" % t for t in range(62000, 122000, 2000)]
+        before, after = self.run_script(lines + ["q 120000 50", "q 121000 50"])
+        self.assertAlmostEqual(before, 50.0 - OFFSET, places=2, msg="119 s after the flame-on: still the latest flow")
+        self.assertAlmostEqual(after, 45.0 - OFFSET, places=2, msg="120 s after the flame-on: the 2 minute average")
+
+    def test_sat_simulation_uses_the_latest_flow(self):
+        lines = ["s 1", "f 1000"] + ["n %d 40" % t for t in range(2000, 62000, 2000)] + ["n %d 50" % t for t in range(62000, 122000, 2000)]
+        cs, = self.run_script(lines + ["q 121000 50"])
+        self.assertAlmostEqual(cs, 50.0 - OFFSET, places=2, msg="the ring holds the real boiler, the simulation its own flow")
 
 
 class FeedHook(unittest.TestCase):
@@ -129,7 +151,7 @@ class FeedHook(unittest.TestCase):
         hook = core[a:a + 900]
         self.assertIn("OTdata.id == OT_Tboiler && OTdata.masterslave == 1 && !OTdata.skipthis", hook)
         self.assertIn("== SatFeedEvent::Valid", hook)
-        self.assertIn("!(OTcurrentSystemState.SlaveStatus & 0x04)", hook)
+        self.assertIn("(OTcurrentSystemState.SlaveStatus & 0x0C) == 0x08", hook, "flame on (bit 3) and no hot water (bit 2)")
         self.assertIn("satFlowAvgNote(state.otBus.flowAvg, millis(), OTdata.f88())", hook)
 
 
