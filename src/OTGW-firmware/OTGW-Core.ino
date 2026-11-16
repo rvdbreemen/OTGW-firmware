@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v2.0.0-beta.335
+**  Version  : v2.0.0-beta.336
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -2847,7 +2847,10 @@ void recordOTOverride(uint8_t id, uint8_t kind, float value) {
     const uint32_t age = now - otOverrideStore[i].lastSeen;
     if (age >= stalestAge) { stalestAge = age; stalestSlot = i; }
   }
-  if (slot < 0) slot = (freeSlot >= 0) ? freeSlot : stalestSlot;
+  if (slot < 0) {
+    slot = (freeSlot >= 0) ? freeSlot : stalestSlot;
+    otOverrideStore[slot].published = 0;   // TASK-1985: a new id in this slot has no topic yet
+  }
   otOverrideStore[slot].id       = id;
   otOverrideStore[slot].kind     = kind;
   otOverrideStore[slot].value    = value;
@@ -2857,6 +2860,10 @@ void recordOTOverride(uint8_t id, uint8_t kind, float value) {
 // Periodic publisher (called from the MQTT periodic path, NOT from the decode hook).
 // Publishes one retained `<label>/override` topic per active override entry so HA
 // and dashboards reflect the injected value. Canonical topics are untouched.
+// TASK-1985: an entry that goes stale (no override frame for OVERRIDE_ACTIVE_TIMEOUT) gets one empty
+// retained message on its topic, which removes it from the broker, and its slot is freed. Before this
+// the last value stayed retained, so HA kept showing an override that had ended.
+// --- publishActiveOverrides begin
 void publishActiveOverrides() {
   if (!settings.mqtt.bEnable) return;
   const uint32_t now = millis();
@@ -2864,14 +2871,22 @@ void publishActiveOverrides() {
   char val[15];
   for (int i = 0; i < OVERRIDE_STORE_MAX; i++) {
     if (otOverrideStore[i].lastSeen == 0) continue;
-    if ((now - otOverrideStore[i].lastSeen) >= OVERRIDE_ACTIVE_TIMEOUT) continue;
     const char* label = messageIDToString(static_cast<OTLibMessageID>(otOverrideStore[i].id));
     snprintf_P(leaf, sizeof(leaf), PSTR("%s/override"), label);
+    if ((now - otOverrideStore[i].lastSeen) >= OVERRIDE_ACTIVE_TIMEOUT) {
+      // Free the slot only once the clear went out; a failed publish (offline broker) tries again next round.
+      if (!otOverrideStore[i].published || sendMQTTData(leaf, "", /*retain=*/true)) {
+        otOverrideStore[i].lastSeen = 0;
+        otOverrideStore[i].published = 0;
+      }
+      continue;
+    }
     dtostrf(otOverrideStore[i].value, 3, 2, val);
-    sendMQTTData(leaf, val, /*retain=*/true);
+    if (sendMQTTData(leaf, val, /*retain=*/true)) otOverrideStore[i].published = 1;
     feedWatchDog();
   }
 }
+// --- publishActiveOverrides end
 
 //===================[ OT Message Field Formatters ]=========
 

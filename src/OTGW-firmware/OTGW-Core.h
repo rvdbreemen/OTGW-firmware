@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : Header file: OTGW-Core.h
-**  Version  : v2.0.0-beta.335
+**  Version  : v2.0.0-beta.336
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -889,6 +889,7 @@ enum OTOverrideKind : uint8_t {
 struct OTOverrideEntry_t {
   uint8_t  id;        // OpenTherm message id
   uint8_t  kind;      // OTOverrideKind
+  uint8_t  published; // TASK-1985: its retained <label>/override topic was published (cleared once when the entry goes stale)
   float    value;     // captured override value
   uint32_t lastSeen;  // millis() of last capture; active = (millis()-lastSeen) < OVERRIDE_ACTIVE_TIMEOUT
 };
