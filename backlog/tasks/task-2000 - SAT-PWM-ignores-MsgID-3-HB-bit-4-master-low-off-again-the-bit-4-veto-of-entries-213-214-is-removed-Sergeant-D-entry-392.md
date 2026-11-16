@@ -3,11 +3,11 @@ id: TASK-2000
 title: >-
   SAT: PWM ignores MsgID 3 HB bit 4 (master low-off) again; the bit-4 veto of
   entries 213/214 is removed (Sergeant D entry 392)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-16T11:08:00Z'
-updated_date: '2026-11-16T16:29:00Z'
+updated_date: '2026-11-16T16:44:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -29,7 +29,7 @@ Sergeant D entry 392 (2026-11-16, to be recorded verbatim by 92 before the build
 - [x] #3 Host test on the real code: a Vitodens-like profile (MsgID 3 HB bit 4 = 1) enters PWM; red on the old code (refused, reason 2), green on the fix; the no-valid-reply case is unchanged until Q-392a
 - [x] #4 firmware-sat-spec.md and the REST/UI veto text updated; ADR-249's entry-213 citation noted as superseded by entry 392
 - [x] #5 Part 2 per Q-392a (entry 215): implemented or recorded as kept
-- [ ] #6 Field check by indigo_light on his Vitodens: PWM entered (before capture on beta.339, after capture on the fix)
+- [x] #6 Field check by indigo_light on his Vitodens: PWM entered (before capture on beta.339, after capture on the fix)
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -56,4 +56,12 @@ CORRECTION 2026-11-16 (95, from the coordinator) to the .63 soak note above (fcd
 CORRECTION by 09, 2026-11-16 16:30: the .63 soak above (beta.350, 13:14-14:15) ran with the SAT SOFTWARE SIMULATOR ON (satsimulation true; .63 has no boiler and no thermostat). 'Its standing SAT config' was the simulator, and 09 did not check the flag. The flag was found by the coordinator's check and switched off at 16:27:11 (only that line changed in settings.ini). REAL, firmware or REST state: githash, bootcount 169 flat, MQTT 60/60, heap 45.7-46.7 KB, no panic/WDT, settings byte-identical, and the REST flags pwm_veto_reason/path 1/1 on 349 -> 0/0 on 350. SIMULATOR, not hardware evidence: the two PWM entries (13:28:33, 13:53:33, 'flow 31.1 stayed above setpoint 29.0 + 1.5 for 30 s'), the flow values and the SATTICK mode=2 counts. The veto lifting is shown; PWM entry against a real boiler is not.
 
 2026-11-16 AC6 field evidence (comms 92): indigo_light's capture 20261116-144953-upload-clean.zip, sent by Sergeant D by DM (msg 1571920739253092412), analysed with /analyze-capture; archived at RvdB/OTGW-field-data/indigo_light/20261116-144953/ (zip sha256 1573a14c...bd84; analysis/ holds the summary, the SAT timeline and charts). Firmware 2.0.0-beta.350+9011c3c, PIC 16F1847, Viessmann Vitodens (MemberID 33), SAT enabled, simulation_enable false / simulation OFF (real boiler), 14:49:54-16:56:34 tester local time, 21939 frames, 0 telnet gaps. PWM entered on the real boiler: telnet 'SAT: Control mode: PWM' at 16:00:58 (flow 67.3 above setpoint 31.0 + 1.5 for 30 s) and 16:17:58; CH flame lit inside a PWM ON phase at 16:18:36; SATTICK mode=2 pwm=1 ticks present. The 'before' half of AC6 (a beta.339 capture) was not made: Sergeant D told indigo 'No, just run beta.350' (#alpha-testing 1571879271532724316). AC6 left for the owner/coordinator to tick or reword.
+
+2026-11-16 (95) AC6 ticked on the coordinator's go (relayed by 92), facts re-checked by 95 in the archive: sat_story.txt:38 '16:00:58 SAT: Control mode: PWM (flow 67.3 stayed above setpoint 31.0 + 1.5 for 30 s)', :42 '16:17:58 PWM ON: pwm_on=361 s', transitions.txt:5 '16:17:58 ... mode=2 pwm=1', further PWM entries 16:30:28/16:35:28/16:39:28; device-state-stop-20261116-165640.txt in the zip: simulation false, simulation_active false (real Vitodens). Deviation from the AC wording: the 'before' capture on beta.339 was not made because Sergeant D told the tester 'No, just run beta.350' (#alpha-testing 1571879271532724316); the old-code red side stays the host test (AC3) and indigo's earlier beta.250 capture, where SAT never entered PWM behind the MsgID 3 veto.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+MsgID 3 no longer gates SAT PWM (Sergeant D entries 392 and 393, ADR-251 Accepted by Robert, DM 1571893214372438150). AC1: entry 392 recorded verbatim before the code. AC2/AC3: satPwmPermitted() ignores MsgID 3; tests/test_sat_slave_lowload.py Vitodens-like profile enters PWM on the fix, refused (reason 2) on the old code. AC4: firmware-sat-spec and REST/UI veto text updated, ADR-249's entry-213 clause amended by ADR-251. AC5: Q-392a answered A (entry 393), no-valid-reply veto removed too. AC6: field, indigo_light's real Vitodens on beta.350+9011c3c with simulation off: SAT entered PWM at 16:00:58 and later, CH flame lit inside a PWM ON phase at 16:18:36 (archive RvdB/OTGW-field-data/indigo_light/20261116-144953/analysis/); the beta.339 'before' capture was dropped on Sergeant D's instruction. Bench: 09 .61 smoke and .63 soak PASS on 350; the .63 PWM entries were SAT simulation (corrected note), only pwm_veto_reason 1 -> 0 is device evidence there. Not verified: long-term PWM behaviour on the Vitodens beyond this 2 h capture.
+<!-- SECTION:FINAL_SUMMARY:END -->
