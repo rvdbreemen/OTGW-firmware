@@ -7,13 +7,13 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-27T23:40:00Z'
-updated_date: '2026-11-16T15:22:00Z'
+updated_date: '2026-11-16T15:37:00Z'
 labels:
   - epic
   - sat
   - low-load
   - beta.1
-milestone: 2.0.0
+milestone: 2.1.0
 dependencies:
   - TASK-1412.26
 documentation:
@@ -94,6 +94,8 @@ Robert 2026-10-30 (session, coordinator otgw-firmware-b8): WAIVER of the field-v
 Option A (recommended): the epic and its full gate move to 2.1.0, and 2.0.0 takes a reduced slice. In 2.0.0: .24 (field protocol) = the field-run request for the Wed-Fri runs; .25 (field validation) = those runs, evidence per tester (indigo_light Vitodens beta.350 long-run first); epic AC3 is met only for the host LL contract (all ids green per TASK-1888), the bench and field LL rows stay 2.1.0. To 2.1.0: epic AC1 (R01-R42 owner bookkeeping), AC2 (equipment preflight before field), AC4 (PH-PIC/PH-OTD/PH-PROFILE/PH-FIELD per combination), AC5 and .26 (independent evidence review); the 2.0.0 notes keep 'SAT experimental' and make no energy or heat-pump suitability claim, which is AC5's intent. Consequence: the 2.0.0 gate stays TASK-1740 alone and nothing here can block 21 Nov by bookkeeping. Option B: keep the epic at 2.0.0 and have Robert waive ACs 1, 2, 4, 5 and .26 one by one; same outcome, five extra decisions for him. Main risk of A: the bench-simulator and equipment steps slip past 2.0.0 for good; mitigation: .20-.23 already carry 2.1.0.
 
 Conflict to record either way: TASK-1412.4 (Done) 'Honor slave low-load permission across SAT entry and active PWM' is reversed by Sergeant D entries 392 and 393 (MsgID 3 HB bit 4 no longer gates PWM; TASK-2000, beta.350, ADR-251 Accepted). Its R-issue in docs/sat/sat-low-load-remediation-plan-2026-10-28.md should be marked superseded by entries 392/393, not reopened.
+
+2026-11-16 DECIDED by Robert (DM 1571910380756668488, relayed by the coordinator): option A of the proposal above. The epic and its full low-load gate move to milestone 2.1.0. 2.0.0 keeps the reduced slice: TASK-1412.24 = the field-run request, TASK-1412.25 = the Wed-Fri runs (indigo_light's beta.350/351 long-run first), epic AC3 only for the host LL contract. The 2.0.0 stable gate is TASK-1740. This supersedes Robert's 2026-11-04 directive '2.0.0 stable waits until SAT low-load is field-validated (epic closed: 1412.16-26)'; recorded in docs/process/directive-changelog.md. TASK-1412.26 (independent evidence review) moves to 2.1.0 with the epic; the R-issue of TASK-1412.4 is marked superseded by 95 (TASK-2000 owner).
 <!-- SECTION:NOTES:END -->
 
 ## Comments
