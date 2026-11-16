@@ -7898,3 +7898,27 @@ Robert, 16:18:42 UTC (https://discord.com/channels/812969634638725140/9144987300
 **Settled:** option A: during the 60 s start phase after flame-on SAT stays in PWM, whatever the normal switch reasons say (request at the maximum setpoint, flame on with the request above the flow for 60 s, no PWM off time left); those checks keep running and after the 60 s the existing rules decide PWM or continuous. thermo-nova has no start phase and leaves PWM at once when the request reaches the maximum (heating_control.py:203-204, opened 2026-11-16), so this deliberately differs. Scope: not answered; read as 2.0.0 (part of the PWM-first start, entry 386).
 
 **Task:** TASK-1942 (owner d3), as built.
+
+## 395. Q-388a answered A: the gateway's own start-up reads (MsgID 3, 15, 48) may run during the 60 s wait after a reboot; the wait covers SAT's control commands only; this release (Sergeant D, 2026-11-16; completes entry 388)
+
+**Source:** #dev-sat-mqtt, Sergeant D 2026-11-16 11:36:47 UTC (https://discord.com/channels/812969634638725140/1105556725714649128/1571851528489410632), a reply to Q-388a (https://discord.com/channels/812969634638725140/1105556725714649128/1571851165270802533).
+
+**Quoted:**
+
+> "My answer is A and should be part of this release."
+
+**Settled:** option A: after a reboot SAT sends no control command (CS, MM, CH and the like) for 60 s (entry 388); the gateway's own start-up reads of MsgID 3, 15 and 48 run at once, as they change nothing on the boiler. This settles the open reading of entry 388 ("don't send any commands" = SAT's own control commands). Scope: this release (2.0.0), answered.
+
+**Task:** TASK-1874 (owner 95), milestone 2.0.0.
+
+## 396. The MsgID 3 bit 4 change (entries 392, 393) is "TOP PRIORITY for the next release" (Sergeant D, 2026-11-16)
+
+**Source:** #dev-sat-mqtt, Sergeant D 2026-11-16 11:41:57 UTC (https://discord.com/channels/812969634638725140/1105556725714649128/1571852828065140818), linking his #beta-testing message of entry 392 (https://discord.com/channels/812969634638725140/914498730001072149/1571840386287140995).
+
+**Quoted:**
+
+> "THIS IS TOP PRIORITY for the next release"
+
+**Settled:** removing the MsgID 3 PWM gate (entries 392 and 393) is his top priority. **Not settled (asked as Q-396a, 11:49:50 UTC, https://discord.com/channels/812969634638725140/1105556725714649128/1571854811370889278):** whether "the next release" means the next build that goes out (part of 2.0.0) or 2.1.0. Our Q-392a recommended this release; read as 2.0.0 until he answers.
+
+**Task:** the entry-392 task (owner 95).

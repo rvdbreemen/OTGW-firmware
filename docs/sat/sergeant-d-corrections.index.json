@@ -5226,6 +5226,30 @@
     "TASK-1942"
    ],
    "confirmed_by_entry": null
+  },
+  {
+   "id": 395,
+   "title": "Q-388a answered A: the gateway's own start-up reads (MsgID 3, 15, 48) may run during the 60 s wait after a reboot; the wait covers SAT's control commands only; this release (Sergeant D, 2026-11-16; completes entry 388)",
+   "date": "2026-11-16",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1571851528489410632",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1874"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 396,
+   "title": "The MsgID 3 bit 4 change (entries 392, 393) is \"TOP PRIORITY for the next release\" (Sergeant D, 2026-11-16)",
+   "date": "2026-11-16",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1571852828065140818",
+   "supersedes": [],
+   "tasks": [],
+   "confirmed_by_entry": null
   }
  ]
 }
