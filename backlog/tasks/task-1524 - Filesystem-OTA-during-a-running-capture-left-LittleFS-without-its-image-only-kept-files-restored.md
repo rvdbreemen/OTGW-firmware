@@ -7,7 +7,7 @@ status: To Do
 assignee:
   - '@claude'
 created_date: '2026-10-31T12:49:00Z'
-updated_date: '2026-11-14T23:20:00Z'
+updated_date: '2026-11-16T08:32:00Z'
 labels:
   - alpha
   - bug
@@ -25,9 +25,9 @@ Bench 2026-10-31 13:42, OTGW32 .61 on alpha.569, a long-run capture running (tel
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Reproduce on the bench: filesystem OTA while a capture (telnet + /ws + MQTT + snapshots) runs; record what the device logs during the upload (telnet, crashlog) and whether the image write fails or the upload stalls
+- [x] #1 Reproduce on the bench: filesystem OTA while a capture (telnet + /ws + MQTT + snapshots) runs; record what the device logs during the upload (telnet, crashlog) and whether the image write fails or the upload stalls
 - [ ] #2 Root cause named with evidence (load gate, WS/TCP pressure, timeout in the upload handler, or the kept-file restore path)
-- [ ] #3 Either fix it (e.g. refuse or pause other clients during filesystem OTA, or keep the old image until the new one is complete) or document the limit for testers; old-vs-fix bench run
+- [x] #3 Either fix it (e.g. refuse or pause other clients during filesystem OTA, or keep the old image until the new one is complete) or document the limit for testers; old-vs-fix bench run
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -44,4 +44,6 @@ Research 2026-11-14 (read-only, origin/dev 82560d1d5): the reported end state is
 AC3 documentation part done (coordinator, 2026-11-14): docs/guides/WIFI_FIRMWARE_UPDATE.md section 3: the row for an interrupted filesystem step now says what the current code does (half image cleared, settings, reboot counter and reboot log written back, upload page shown; a reset during the write covered by ADR-233; upload again, settings kept) instead of 'settings only live in memory, do not switch off', plus the advice not to run a filesystem update while a capture or another heavy client is connected. AC3 is only partly met: its 'old-vs-fix bench run' part belongs with a fix, if AC2 finds one. AC2 (why the upload dropped) is in 09's brief for the stack build: filesystem OTA on .61 while a capture runs.
 
 AC2 bench (09, .61, beta.264, 2026-11-15, capture s1780/i4/cap/): filesystem OTA (ota_flash.py --no-app --fs) while otgw_capture.py ran telnet + /ws frame recorder + MQTT + headless browser + 10 s snapshots + crashlog poll: not reproduced (0/1). Upload 00:12:11-00:12:40 exit 0, '[OTA] End: success (786432 bytes)', settings and kept files restored, changed: none; only the expected reboot gaps; bootcount +1, crashlog unchanged, settings diff [], reboot_log intact, web UI 200. The alpha.569 drop did not recur on current code (the ADR-188 cap and the REST/file gates since then are candidate reasons, not proven).
+
+2026-11-16 close-out (ba): AC1 ticked: reproduction attempted and recorded four times on the current code, 0 of 4 failed: .63 Classic beta.79 under a full otgw_capture.py run, three filesystem-only OTAs, all clean (39381a06c); .61 OT-Direct beta.264 under telnet + /ws frame recorder + MQTT + headless browser + 10 s snapshots + crashlog poll, '[OTA] End: success', settings diff empty (b9c66545f). AC3 ticked under its 'document the limit' option: docs/guides/WIFI_FIRMWARE_UPDATE.md section 3 describes the interrupted filesystem step and line 105 tells testers not to run a filesystem update while a capture or another heavy client is connected (f08872f4c); no code fix, so the AC's old-vs-fix bench run does not apply. AC2 NOT met: the end state of the 2026-10-31 report is explained as the designed abort path (_handleUploadAbort() in OTGW-ModUpdateServer-esp32.h formats the partial image and restores the kept files, TASK-1495; research 6b1f1d50a), but what disconnected the upload on 2026-10-31 is not reproduced and not proven (ADR-188 send cap and the REST gate changes since then are plausible, unproven reasons). Closing needs Robert's waiver of AC2 on this evidence; asked via the coordinator.
 <!-- SECTION:NOTES:END -->
