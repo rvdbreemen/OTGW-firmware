@@ -10344,7 +10344,7 @@
       "title": "MsgID 3 plays no part in SAT PWM; the boiler's slave configuration no longer gates the continuous-to-PWM switch (amends ADR-249)",
       "path": "ADR-251-msgid-3-plays-no-part-in-sat-pwm-the-boiler-s-slave-configuration-no-longer-gates-the-continuous-to-pwm-switch-amends-adr-249.md",
       "format": "canonical",
-      "status": "Proposed",
+      "status": "Accepted",
       "date": "2026-11-16",
       "decision_summary": "MsgID 3 plays no part in SAT PWM: neither HB bit 4 nor the presence of a valid MsgID 3 reply allows, refuses or ends...",
       "topics": [
@@ -10389,7 +10389,7 @@
         ],
         "verification": [
           "tests/testsatslavelowload.py (real satNoteSlaveConfig, satPwmPermitted, satPwmEntryAllowed, satCycleCheckLowLoadVeto, satSetControlMode, satRestoreControlMode, satHandleControlMode): every MsgID 3 state (no reply, bit 4 = 0, bit 4 = 1) r...",
-          "tests/testsatloopintegration.py::tests1pwmreachedwhenboilerreportslowoffnotallowed: the whole SAT loop with the boiler model reporting bit 4 = 1 reaches PWM with its ON and OFF phases on the wire; the code before it never reaches PWM."
+          "tests/testsatloopintegration.py::tests1pwmreachedwhenboilerreportslowoffnotallowed: the whole SAT loop with the boiler model reporting bit 4 = 1 reaches PWM with its on and off phases on the wire; the code before it never reaches PWM."
         ]
       },
       "scope": {

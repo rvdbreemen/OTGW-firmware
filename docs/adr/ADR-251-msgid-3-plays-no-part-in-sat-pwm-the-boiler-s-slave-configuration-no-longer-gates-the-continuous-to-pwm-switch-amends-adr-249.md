@@ -1,7 +1,7 @@
 ---
 id: "ADR-251"
 title: "MsgID 3 plays no part in SAT PWM; the boiler's slave configuration no longer gates the continuous-to-PWM switch (amends ADR-249)"
-status: "Proposed"
+status: "Accepted"
 date: "2026-11-16"
 binding: false
 gate: null
@@ -44,7 +44,9 @@ format: "canonical"
 
 ## Status
 
-Proposed, 2026-11-16. Amends ADR-249 (its Decision clause "the boiler's MsgID 3 permission comes first (entry 213)"). Guideline-level per ADR-080: the behaviour is checked by host tests, not by an evaluate.py gate.
+Accepted, 2026-11-16.
+
+Amends ADR-249 (its Decision clause "the boiler's MsgID 3 permission comes first (entry 213)"). Guideline-level per ADR-080: the behaviour is checked by host tests, not by an evaluate.py gate.
 
 ## Status History
 
@@ -52,19 +54,24 @@ Proposed, 2026-11-16. Amends ADR-249 (its Decision clause "the boiler's MsgID 3 
 status_history:
   - date: 2026-11-16
     status: Proposed
-    changed_by: "User: Robert van den Breemen"
+    changed_by: "Agent (95)"
     reason: Initial proposal
     changed_via: adr-kit
   - date: 2026-11-16
     status: Proposed
-    changed_by: "User: Robert van den Breemen"
+    changed_by: "Agent (95)"
     reason: Related to ADR-249
+    changed_via: adr-kit lifecycle
+  - date: 2026-11-16
+    status: Accepted
+    changed_by: "Robert van den Breemen (decision, DM 1571893214372438150), recorded by Agent (95)"
+    reason: "Accepted: decision Robert van den Breemen (DM 1571893214372438150, answer A), recorded by Agent (95)"
     changed_via: adr-kit lifecycle
 ```
 
 ## Context
 
-Since TASK-1412.4 (Sergeant D entries 213, 214 and 215, 2026-11-02) every SAT entry into PWM needed the boiler's permission: a valid
+Since TASK-1412.4 (Sergeant D entries 213, 214 and 215, 2026-11-02) every SAT (Smart Autotune Thermostat) entry into PWM (pulse-width modulation: the boiler burns in timed on/off cycles) needed the boiler's permission: a valid
 OpenTherm MsgID 3 (slave configuration) reply with HB bit 4 ("master low-off & pump control function", OT spec v4.2: 1 = not
 allowed) clear, and bit 4 turning 1 ended a running PWM. ADR-249 kept that rule in its Decision section: "the boiler's MsgID 3
 permission comes first (entry 213)". thermo-nova (pinned 7beaaf5) only shows the bit (coordinator/serial/binary_sensor.py:54) and
@@ -109,7 +116,7 @@ comes first (entry 213)"; the rest of ADR-249 stands.
   bit 4 = 0, bit 4 = 1) reaches PWM on every path and a running PWM is not ended. 20/20 on the fix, 16 fail on the code before it
   (`OTGW_SATCYCLES_INO` / `OTGW_SAT_INO`).
 - `tests/test_sat_loop_integration.py::test_s1_pwm_reached_when_boiler_reports_low_off_not_allowed`: the whole SAT loop with the
-  boiler model reporting bit 4 = 1 reaches PWM with its ON and OFF phases on the wire; the code before it never reaches PWM.
+  boiler model reporting bit 4 = 1 reaches PWM with its on and off phases on the wire; the code before it never reaches PWM.
 
 ## Alternatives Considered
 
@@ -145,6 +152,6 @@ comes first (entry 213)"; the rest of ADR-249 stands.
 ## References
 
 - docs/sat/sergeant-d-corrections.md entries 213, 214, 215, 392, 393.
-- src/OTGW-firmware/SATcycles.ino `satPwmPermitted()` (TASK-2000).
+- `src/OTGW-firmware/SATcycles.ino` `satPwmPermitted()` (TASK-2000).
 - thermo-nova 7beaaf5 coordinator/serial/binary_sensor.py:54.
 - TASK-2000, TASK-1412.4, TASK-1998 (field check on the Vitodens 100-W).

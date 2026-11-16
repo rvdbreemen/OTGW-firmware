@@ -255,4 +255,4 @@ One row per Architecture Decision Record. Scope is the Enforcement `path_glob` s
 | ADR-248 | Accepted | - | The existing climate.Thermostat entity keeps its uniqid and its discovery payload is fixed; the firmware routes the c... |
 | ADR-249 | Accepted | - | SAT switches from continuous to PWM when flow - requested setpoint (the output of the proportional-integral-derivativ... |
 | ADR-250 | Accepted | - | While the tolerance band says stop, the CH-enable bit SAT sends is 0, and nothing else changes: the control setpoint,... |
-| ADR-251 | Proposed | - | MsgID 3 plays no part in SAT PWM: neither HB bit 4 nor the presence of a valid MsgID 3 reply allows, refuses or ends... |
+| ADR-251 | Accepted | - | MsgID 3 plays no part in SAT PWM: neither HB bit 4 nor the presence of a valid MsgID 3 reply allows, refuses or ends... |
