@@ -1842,6 +1842,9 @@ static void satPwmSuppressionRefresh()
   if (OTcurrentSystemState.SlaveStatus & 0x05) return;          // fault flag / DHW active: the control tick skips these too
   if (!state.sat.bValvesOpen || (state.sat.bSummerActive && settings.sat.bSummerSimmer)) return;
   if (!satIsFlameOn() || !satPwmHoldElapsed()) return;
+  // No fresh flow temperature: no override, the setpoint stays (thermo-nova heating_control.py:435-437). Without this the
+  // suppression clamped to the minimum and sent CS=10 with CH still on, until the next tick idled PWM (TASK-1412.18.1).
+  if (satGetFlowTemp() <= 0.0f) return;
   if (_sat_requestedSetpoint <= satColdThreshold()) return;
   if (state.sat.fFinalSetpoint <= SAT_MIN_SETPOINT) return;       // last tick commanded heating off
 
