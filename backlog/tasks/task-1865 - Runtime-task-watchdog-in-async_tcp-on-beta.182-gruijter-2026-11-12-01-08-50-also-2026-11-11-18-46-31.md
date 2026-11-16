@@ -4,11 +4,11 @@ title: >-
   loopTask starved into the task watchdog on beta.182: async_tcp stuck in a
   cross-core flash read from /api/v2/health (gruijter 2026-11-12 ~01:08:21, also
   2026-11-11 18:46:31)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-12T11:51:00Z'
-updated_date: '2026-11-13T16:52:00Z'
+updated_date: '2026-11-16T08:27:00Z'
 labels:
   - bug
   - crash
@@ -28,7 +28,7 @@ Found in gruijter's overnight capture (#alpha-testing msg https://discord.com/ch
 <!-- AC:BEGIN -->
 - [x] #1 The core dump coredump-20261111-213113.bin is decoded with the beta.182 .elf (app SHA ebfbbaf5) and the backtrace of the async_tcp watchdog is recorded
 - [x] #2 The backtrace is compared with the current dev code: the cause is named with file:line, or shown to be fixed already by a later commit
-- [ ] #3 Fix with a reproduction red on the old code and green on the fix, or close as fixed with the evidence of the commit that fixed it
+- [x] #3 Fix with a reproduction red on the old code and green on the fix, or close as fixed with the evidence of the commit that fixed it
 - [x] #4 Bench by the bench-tester on .61: the TASK-1763 boot/interrupt load plus /api/v2/health polling, hd_ipc0_stack_min / hd_ipc1_stack_min reported per run (C), no task watchdog; result decides whether ADR-225 (A) goes to Robert
 <!-- AC:END -->
 
@@ -82,4 +82,12 @@ Published (95, 2026-11-12): pushed 22d269e0e..a7676dcc8 to dev; posted 2.0.0-bet
 2026-11-13 double correlation (gruijter beta.218 capture, transcript, checked by comms; Sergeant D asked 1570834690892497138, answered 1570836136136417321): both "Other watchdog" resets without a core dump fell 14-17 s after a regular SAT PWM ON switch (08:38:04 duty 0.79 -> reset 08:38:18; 11:58:50 duty 0.22 -> reset 11:59:07; ticks mode=2 pwm=1) AND 1.5-13 s after a web UI /api/v2/simulate call (08:38:05.563, 11:59:05.572; polled every 15 s). No log lines between the switch and the reset. Not a proven cause either way; the bench should exercise both. See TASK-1899.
 
 2026-11-13 CORRECTION of the earlier "double correlation" note (comms misread the log): the line "SAT PWM: pwm_on=... ON" (SATcontrol.ino:1539 at 2f5ecb4) is printed on every 30 s control tick during a phase; it is NOT the ON switch. The real ON edges are the "PWM ON:" lines (SATcontrol.ino:1231, satPwmBeginOn): 08:36:04 (on=489 s) and 11:58:20 (on=275 s). The two "Other watchdog" resets came ~134 s and ~47 s INTO those ON phases, not 14-17 s after a switch. 19 ON edges that day, 17 without a reset. At an ON edge only CS, MM=0, CH=1 are queued plus a log line; no flash work (SATcontrol.ino:1231-1240, :1666-1690). Reset reason: platform_esp32.h:216 maps ESP_RST_WDT (raw 7) to "Other watchdog" = RTC/super/CPU-level watchdog, not the task watchdog (6) or interrupt watchdog (5); no new core dump (the 04:00:54 dump was still the stored one). Device logged live OT frames until 1.6 s / 2.7 s before reboot (reboot time from uptime). Ranked hypotheses (trace agent, read-only): H1 hardware-level watchdog, trigger unknown; H2 IPC stack overflow (this unit ipc0/ipc1 low points 80/88 B of 1024; beta.219 raised the stack) escalating to H1; H3 external 0x26 watchdog unlikely (loop task fed it every <=100 ms until 1-3 s before reboot; an EN-pin reset would read "Power on", wiring not verified); H4 SAT/PWM, LittleFS or /simulate: no evidence. The /simulate correlation (1.5-13 s before) remains a coincidence candidate only. Bench next: capture the ROM rst:0x.. line on the S3 USB console during such a reset; beta.218 vs beta.219 on a Classic+PIC with two web UIs polling and SAT in PWM. Corrected publicly: 1570843356219703308 (earlier message 1570836136136417321 marked as corrected).
+
+2026-11-16 close-out (ba): AC3 closed under its second clause ('close as fixed with the evidence of the commit that fixed it'). Fixes on origin/dev: 402309bc1 (/api/v2/health does no LittleFS operation on async_tcp; tests/test_health_no_fs_flash_ops.py 4/4 on the fix, 4/4 FAIL on the old code), 00a760326 (TASK-1899: /simulate and device/info no longer call LittleFS on async_tcp) and TASK-1870 Done (ADR-225, IPC task stack raised to 1280 B / 0x500). The original hang (loopTask TWDT while async_tcp waited for ipc0 in a cross-core flash op) was never reproduced on the bench; field confirmation is tracked in TASK-1899 AC4, the dumpless 'Other watchdog' resets in TASK-1904.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+The loopTask watchdog in gruijter's beta.182 dump is explained and closed as fixed. AC1: coredump-20261111-213113.bin decoded with the beta.182 .elf (app SHA ebfbbaf5); correction recorded: the watchdog fired on loopTask (CPU 1), async_tcp spun with the scheduler suspended waiting for ipc0 in spi_flash_op_block_func. AC2: cause traced to LittleFS calls on async_tcp from /api/v2/health plus a too small IPC stack (hypothesis from the TCB layout). AC3: closed as fixed by 402309bc1 (/health without LittleFS on async_tcp; tests/test_health_no_fs_flash_ops.py 4/4 fix, 4/4 FAIL old), 00a760326 (TASK-1899, /simulate and device/info) and TASK-1870 (IPC stack 1280 B, Done). AC4: bench by 09 on .61, beta.217: 38 boots, 0 TWDT, ipc1 80 B constant. Not proven: the original hang was never reproduced; field confirmation stays in TASK-1899 AC4.
+<!-- SECTION:FINAL_SUMMARY:END -->

@@ -1,11 +1,11 @@
 ---
 id: TASK-1703
 title: Firmware update page returns to the web UI by itself after a successful update
-status: In Review
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-07T17:06:00Z'
-updated_date: '2026-11-14T22:10:00Z'
+updated_date: '2026-11-16T08:25:00Z'
 labels:
   - webui
   - field-report
@@ -46,3 +46,9 @@ Pushed origin/dev 8cbdebc3f (TASK-1703 = 8cbdebc3f, beta.133). Bench .61: the se
 
 AC3 bench by 09, 2026-11-14 23:08, .61 (OTGW32) on 2.0.0-beta.257+47f0ea3, real headless Chrome over CDP (scratchpad tools/otaredirect.mjs): GET /update, the release zip OTGW-firmware-esp32-combo-2.0.0-beta.257+47f0ea3-flash.zip into the one-file field (#oneFiles), Update clicked once, no further input. Timeline: t+2 s steps 1-3 green (same version already running, app step skipped), step 4 'Install the web files' 35 % (272.0 KB / 768.2 KB); t+28 s the page navigated by itself to /?_ota=<ts>; t+31 s the v2 web UI was loaded (nav present, footer v2.0.0-beta.257). No click after Update. Device after: bootcount 651 -> 652 (FS only), lastreset Software reset, hash-check fw 47f0ea3 = fs 47f0ea3, settings API diff [], crashlog unchanged. Screenshots: 09 scratchpad b1703/zip/shot-01-before.png, shot-02-update.png (progress), shot-03/04 (web UI after the redirect), log b1703/zip/redirect.log. Side note: a lone .ino.bin in the one-file field leaves Update disabled (the field asks for the release zip; the separate firmware form takes the .ino.bin), so the first try at 23:03 flashed nothing.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+The firmware update page returns to the web UI by itself after a successful update and stays on a failure (fix 8cbdebc3f, beta.133; on origin/dev). AC1: on res.ok the page removes the beforeunload guard, says 'Opening the web UI' and calls redirectToHome(3000) to PAGE_BASE?_ota=...; tests/webui/update-auto-return.test.mjs runs the real update.html script: old page 2 of 4 fail (success did not navigate), fix 4/4. AC2: a failed update keeps the page with its error; a mutant that also redirects on failure fails the test (3 pass, 1 fail). AC3: bench by 09 on .61, beta.257, real headless Chrome, zip one-file update: the page navigated to /?_ota= by itself at t+28 s and the web UI loaded at t+31 s with no click; settings diff empty; screenshots in 09's scratchpad b1703/zip/ (b42924b9b). Out of scope: the safeboot updater's own fixed 20 s reload (safeboot/src/main.cpp:63).
+<!-- SECTION:FINAL_SUMMARY:END -->

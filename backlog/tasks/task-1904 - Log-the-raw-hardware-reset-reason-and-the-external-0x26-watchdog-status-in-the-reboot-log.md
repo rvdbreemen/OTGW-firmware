@@ -3,11 +3,11 @@ id: TASK-1904
 title: >-
   Log the raw hardware reset reason and the external 0x26 watchdog status in the
   reboot log
-status: In Review
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-13T16:52:00Z'
-updated_date: '2026-11-14T21:28:00Z'
+updated_date: '2026-11-16T08:28:00Z'
 labels:
   - bug
   - stability
@@ -27,7 +27,7 @@ From the TASK-1865/1899 trace (gruijter beta.218, 13 Nov): two resets were repor
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [x] #1 reboot_log.txt and /api/v2/device/info carry the raw per-core hardware reset reason code next to the mapped text
-- [ ] #2 On the Classic the 0x26 external-reset indication is persisted to the reboot log
+- [x] #2 On the Classic the 0x26 external-reset indication is persisted to the reboot log
 - [x] #3 Bench: a forced task-watchdog reset and a forced RTC-watchdog reset produce different, correct entries
 <!-- AC:END -->
 
@@ -57,4 +57,12 @@ No-regression bench by 09 on .63, beta.241+0d698c3 (sha256 zip 23ffe9ed...c8a60,
 AC2: not testable: no bench unit with a 0x26 chip; host test E1/MC1 only (coordinator, 2026-11-14: stays In Review on this line, no waiver question).
 
 AC3 ticked by 09 (bench-tester) from its own probe1904c bench (note above): forced task WDT -> reboot log 'Task watchdog (6) [rst 0x0c/0x0c]', device/info resetraw 0x0c/0x0c; forced RTC WDT (stage 0 RESET_SYSTEM) -> 'Other watchdog (7) [rst 0x09/0x09]', resetraw 0x09/0x09, label 'RTC watchdog (digital core)' (ESP32-S3 rom/rtc.h:79 RTCWDT_SYS_RESET = 9). Different and correct on .61 and .63, 2 trials per key per unit; files 09 scratchpad r1904/u61, r1904/u63 (reboot-log readouts: 'Task watchdog (6) [rst 0x0c/0x0c]' and 'Other watchdog (7) [rst 0x09/0x09]' present). AC2 stays open: needs a Classic whose boot telnet shows 'INIT : external 0x26 watchdog present'; .63 reports 'no external 0x26 watchdog responding'.
+
+2026-11-16 close-out (ba): AC2 WAIVED by Robert: answer 'A' (Discord DM 1571800874051706972, relayed by the coordinator) = accept AC2 on the host evidence. Evidence it rests on: test/host/test_reboot_log_reset_raw.py case E1 (0x26 indication persisted to the reboot log) passes on the fix, the old code ff5eb599e fails, mutant MC1 is caught. Not proven on hardware: no bench unit has a 0x26 chip (.63 boot telnet: 'INIT : no external 0x26 watchdog responding', 002d1fbc2).
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+The reboot log and device/info carry the raw hardware reset reason, and the 0x26 external-watchdog indication is logged (fix de960e7b3 + d8842a5d6, bump 0d698c328, beta.241). AC1: reboot_log.txt and /api/v2/device/info show the raw per-core reset code next to the mapped text (933ff81e2). AC2: WAIVED by Robert ('A', DM 1571800874051706972) on host evidence: test/host/test_reboot_log_reset_raw.py E1 passes on the fix, fails on old ff5eb599e, mutant MC1 caught; not proven on hardware, no bench unit has a 0x26 chip. AC3: bench by 09 on .61 and .63: a forced task watchdog gives 'Task watchdog (6) [rst 0x0c/0x0c]', a forced RTC watchdog 'Other watchdog (7) [rst 0x09/0x09]' (8d76010f2). Host harness E1-E4/S1-S5 pass, mutants MC1-MC7 caught.
+<!-- SECTION:FINAL_SUMMARY:END -->
