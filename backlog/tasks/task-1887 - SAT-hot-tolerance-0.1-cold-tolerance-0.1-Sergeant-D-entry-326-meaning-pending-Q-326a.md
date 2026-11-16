@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-13T07:25:00Z'
-updated_date: '2026-11-16T10:37:00Z'
+updated_date: '2026-11-16T11:13:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -27,7 +27,7 @@ Sergeant D decision 2026-11-13 (https://discord.com/channels/812969634638725140/
 - [x] #2 Loop-level host test on the real control-tick cut, red on origin/dev and green on the fix: warm room gives CH=0 with a live setpoint and unchanged PID request; PWM stays PWM and its ON/OFF schedule keeps toggling during the stop (entry 384); a lit PWM phase and a continuous burn both run 180 s first (entries 275, 376); resume below target - 0.1; cold cutoff unchanged
 - [x] #3 Seam sweep of the SAT tests that cut the control tick and the LL contract (all 18 ids) green; evaluate.py --quick no new FAIL
 - [ ] #4 ADR-250 (Proposed via adr-kit) records the decision and amends ADR-199; accepted by Robert before push
-- [ ] #5 esp32-combo build and a bench run by the bench-tester (health; the band behaviour is host-proven, no SAT scenario on hardware)
+- [x] #5 esp32-combo build and a bench run by the bench-tester (health; the band behaviour is host-proven, no SAT scenario on hardware)
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -53,4 +53,6 @@ Tests: tests/test_sat_tolerance_band.py (helper + real tick cut + source checks)
 Q-328a decided 2026-11-15 by the coordinator under Robert's directive (CLI) 'Do not wait for Sergeant D. Finish everything that can be finished.'; Sergeant D may overrule, his answer later becomes a follow-up task; asked in the 18-question batch in #dev-sat-mqtt (item 8, https://discord.com/channels/812969634638725140/1105556725714649128/1571633456381694074): the tolerance band of entry 328 only decides CH on/off; the PID keeps running; the cold cutoff (ADR-199) is unchanged. Unblocked.
 
 2026-11-16 implemented on lane/ba-1887b (rebased onto origin/dev 42980de8f; code commit d37e94aa0, its non-version diff equals the pre-rebase commit, 368 lines, diff 0). Evidence: tests/test_sat_tolerance_band.py 18/18 on the fix (7 helper, 8 loop on the real tick cut, 3 source); with OTGW_SAT_INO = origin/dev SATcontrol.ino 10 of the 11 loop/source tests fail, the one that passes is the cold-cutoff control. Seam sweep, one file at a time, 35 SAT files: all OK after two seam fixes (test_sat_pwm_override: the CH call now passes _sat_tolBandOff; test_sat_max_tset: stubs for the band latch inside its cut). LL contract, foreground chunks OTGW_LL_ONLY: 001-004 5 pass, 010-013 7 pass, 014-017 3 pass + LL-016 skip (as designed), 018 10 pass, 019-023 9 pass. evaluate.py --quick 0 FAIL / 0 WARN. ADR-250 rewritten (Proposed, amends ADR-199), README entry + index. docs/sat/firmware-sat-spec.md step 18 sub-bullet. The first lane (lane/ba-1887, heater-off design, entries 361 only) is superseded and stays local. Open: AC4 (Robert's accept of ADR-250), AC5 (build + bench).
+
+2026-11-16 build + bench: esp32-combo 2.0.0-beta.349+ae8626c (HEAD ae8626cff on 55dd8f015), EXIT=0, app version check OK, RAM 40.0 %, Flash 93.5 %; after the rebase onto 95's 55dd8f015 (which touches SATcontrol.ino/SATchEnable.h) re-ran tolerance_band 18, pwm_override 83, max_tset 37, loop_integration 21, ot_loss 24, restart_quiet 20, narrate_fits 1, all passed. Archive RvdB/OTGW-build-archive/beta349-1887/ (8 files + SHA256SUMS). 09 on .63 (Classic, PIC 6.8, SAT on, no boiler) 12:04-12:10: artifacts 8/8 OK, OTA app+fs OK with 'settings: 152 keys, changed: none' (the band adds no setting), fwversion 2.0.0-beta.349+ae8626c, appelfsha256 = .elf sha256, no crash fields, MQTT connected, heap ~47 KB; none of the three band narration lines in the boot capture (no room at target + 0.1). Band behaviour itself host-proven only (no SAT scenario on hardware). Pushed 55dd8f015..ae8626cff, posted Discord 1571845527916646502. 1 h soak on .63 12:10-13:11 for the 20:00 beta decision. Remaining: AC4 (Robert's accept of ADR-250, asked via the coordinator).
 <!-- SECTION:NOTES:END -->
