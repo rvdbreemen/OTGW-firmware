@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-13T07:25:00Z'
-updated_date: '2026-11-16T12:06:00Z'
+updated_date: '2026-11-16T12:39:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -57,4 +57,6 @@ Q-328a decided 2026-11-15 by the coordinator under Robert's directive (CLI) 'Do 
 2026-11-16 build + bench: esp32-combo 2.0.0-beta.349+ae8626c (HEAD ae8626cff on 55dd8f015), EXIT=0, app version check OK, RAM 40.0 %, Flash 93.5 %; after the rebase onto 95's 55dd8f015 (which touches SATcontrol.ino/SATchEnable.h) re-ran tolerance_band 18, pwm_override 83, max_tset 37, loop_integration 21, ot_loss 24, restart_quiet 20, narrate_fits 1, all passed. Archive RvdB/OTGW-build-archive/beta349-1887/ (8 files + SHA256SUMS). 09 on .63 (Classic, PIC 6.8, SAT on, no boiler) 12:04-12:10: artifacts 8/8 OK, OTA app+fs OK with 'settings: 152 keys, changed: none' (the band adds no setting), fwversion 2.0.0-beta.349+ae8626c, appelfsha256 = .elf sha256, no crash fields, MQTT connected, heap ~47 KB; none of the three band narration lines in the boot capture (no room at target + 0.1). Band behaviour itself host-proven only (no SAT scenario on hardware). Pushed 55dd8f015..ae8626cff, posted Discord 1571845527916646502. 1 h soak on .63 12:10-13:11 for the 20:00 beta decision. Remaining: AC4 (Robert's accept of ADR-250, asked via the coordinator).
 
 2026-11-16 follow-up Q-384a (flameless PWM ON phases during a band pause count in the hourly start limit per entries 59/90/95; options A keep, B do not count during a band pause, our advice B; with the 2.0.0-or-2.1.0 scope line) posted to Sergeant D by 92 at 12:05:20 UTC: https://discord.com/channels/812969634638725140/1105556725714649128/1571858712564465715. Non-blocking: the code follows the recorded entries; if he picks B it becomes its own task.
+
+Entry 398 edge case, OUR interpretation (ba, recorded by comms 92 on 2026-11-16; not Sergeant D's words, not an entry): a PWM ON phase that starts during a band pause is not counted. If the band resumes heating (CH=1 again) while that ON phase still runs, the phase is counted once at that moment, because from then on the burner may start, and entries 59/90/95 count every ON phase in which the burner may start, lit or not. The count is at the moment CH is allowed again, not at the flame edge (a flame edge never adds a count: SATcontrol.ino:1287-1291, checked by 92). During the 180 s minimum-burn wait CH is still 1, so phases in that wait count as before. Not asked to Sergeant D (non-blocking); ask him if a field capture shows it matters.
 <!-- SECTION:NOTES:END -->
