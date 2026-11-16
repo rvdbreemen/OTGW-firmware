@@ -65,6 +65,7 @@ static bool satBlocksExternalCommand(const char*, int) { return false; }
 static void satNoteExternalRefused(const char*, int) {}
 static std::vector<std::string> g_ng, g_synthLog;
 static void otDirectBridgeProcessStatus(const char* s) { g_ng.push_back(s); }
+struct OtdCmdPrefixScope { void set(char, char) {} };   // TASK-1804 B3a: the prefix is tested in test_otd_error_prefix.py
 static char* dtostrf(float v, int, int, char* b) { snprintf(b, 16, "%.2f", v); return b; }
 static void synthesizeResponse(const char* c, const char* v) { g_synthLog.push_back(std::string(c, 2) + ": " + v); }
 // prototypes the Arduino .ino preprocessor generates; the real definitions come from the slices

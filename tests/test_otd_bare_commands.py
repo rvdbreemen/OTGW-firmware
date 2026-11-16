@@ -39,6 +39,8 @@ static bool satOwnsControlSetpoint() { return false; }
 static bool satBlocksExternalCommand(const char*, int) { return false; }
 static void satNoteExternalRefused(const char*, int) {}
 """
+if "struct OtdCmdPrefixScope" in SRC:   # TASK-1804 B3a: the reply prefix is tested in test_otd_error_prefix.py
+    EXTRA += "struct OtdCmdPrefixScope { void set(char, char) {} };\n"
 
 MAIN = r"""
 int main(int argc, char** argv) {
