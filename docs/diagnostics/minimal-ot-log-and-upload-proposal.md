@@ -276,7 +276,7 @@ Too small or not a store: Azure IoT Hub Free, Better Stack Free, EMQX Serverless
    anywhere; it only answers a download request from the LAN." Any upload by the device itself
    (ranking 1, 2 and 4) changes that and needs a new ADR that amends it. A LAN relay (ranking 3) does not.
 2. **TASK-1473** (parked by Robert on 2026-10-30, 11-03, 11-04 and 11-05, milestone 2.1.0)
-   covers continuous cloud recording to Cloudflare R2 EU over outbound TLS on PSRAM boards.
+   covers continuous remote telemetry to Cloudflare R2 EU over outbound TLS on PSRAM boards.
    This proposal overlaps with it. Robert decides whether it reopens 1473, replaces it, or
    stays separate.
 3. **"No HTTPS or WSS"** (core firmware rule, ADR-003): Google and the cloud MQTT brokers need HTTPS or TLS
@@ -412,7 +412,7 @@ One decision each, one DM each (sent by the coordinator). Each lists its options
      unverified.
    - Recommendation: A. Main risk: the NAS is a single point of failure, and PocketBase is pre-1.0 and its
      GitHub repo is archived.
-2. **How does this relate to TASK-1473 (cloud recording, parked)?**
+2. **How does this relate to TASK-1473 (remote telemetry, parked)?**
    - A: One feature. TASK-1473 reopens, and the minimal OT stream is its first phase, under one ADR.
    - B: Keep them separate. TASK-1862 stays the opt-in minimal OT stream, sharing the collector
      (TASK-1938) and the codec. TASK-1473 stays parked.
@@ -446,7 +446,7 @@ One decision each, one DM each (sent by the coordinator). Each lists its options
 Under Robert's rule of 2026-11-16 09:30 (decide technical points yourself with an advisor check; put to him only what is his or a hard stop), the coordinator decided three of the five questions above and put two to Robert:
 
 - **Question 2 (relation to TASK-1473): B, decided by the coordinator.** Separate features: TASK-1862 stays the opt-in minimal OT stream and shares the collector (TASK-1938) and the codec; TASK-1473 stays parked.
-- **Question 3 (ADR-218 and ADR-213 decision 1): B, decided by the coordinator.** Measure first. The cloud recording proof of concept (poc.8, bench on .61) measures the TLS fit; poc.8 is at 98.4 % of the app slot. Accepting ADR-218 is a hard stop and goes to Robert after that measurement.
+- **Question 3 (ADR-218 and ADR-213 decision 1): B, decided by the coordinator.** Measure first. The remote telemetry proof of concept (poc.8, bench on .61) measures the TLS fit; poc.8 is at 98.4 % of the app slot. Accepting ADR-218 is a hard stop and goes to Robert after that measurement.
 - **Question 4 (batch interval): B, decided by the coordinator.** Every 300 s: 10 % header overhead; up to 5 minutes of data lost on a crash is acceptable for diagnostic data.
 - **Question 1 (backend): A, decided by Robert** (DM 1571804403793530952, asked in DM 1571804094593765398): PocketBase on his Synology behind a Cloudflare Tunnel. He hosts the data and is its controller. The collector is TASK-1938.
 - **Question 5 (retention and deletion promise): A, decided by Robert** (DM 1571804460928336025, asked in DM 1571804100897669281): records are kept 30 days and deleted on request by device id. TASK-1938's retention cron uses 30 days.

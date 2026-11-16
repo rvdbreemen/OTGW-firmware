@@ -7,7 +7,7 @@ status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-12T06:32:00Z'
-updated_date: '2026-11-16T08:31:00Z'
+updated_date: '2026-11-16T08:57:00Z'
 labels:
   - diagnostics
   - research
@@ -23,7 +23,7 @@ ordinal: 938000
 <!-- SECTION:DESCRIPTION:BEGIN -->
 Robert, in session 2026-11-12: research and a design proposal for an opt-in minimal OpenTherm log on the device (date + high-resolution timestamp, the OT frame, the most essential SAT events), its size for 24 h and 7 days, and a simple way to upload it once a day to a free service (Cloudflare or similar) where the data is collected. Opt-in, switchable during onboarding or in the settings. His words: 'Maak hier een aparte feature van en geef deze in onderzoek en kom met een ontwerpvoorstel naar de maintainer toe.'
 
-Related: TASK-1473 (parked cloud recording, 2.1.0), ADR-213 (local recording; decision 1: the firmware never sends a recording anywhere), ADR-218 (outbound TLS on PSRAM boards, Proposed, parked), ADR-003. Proposal: docs/diagnostics/minimal-ot-log-and-upload-proposal.md.
+Related: TASK-1473 (parked remote telemetry, 2.1.0), ADR-213 (local recording; decision 1: the firmware never sends a recording anywhere), ADR-218 (outbound TLS on PSRAM boards, Proposed, parked), ADR-003. Proposal: docs/diagnostics/minimal-ot-log-and-upload-proposal.md.
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria
