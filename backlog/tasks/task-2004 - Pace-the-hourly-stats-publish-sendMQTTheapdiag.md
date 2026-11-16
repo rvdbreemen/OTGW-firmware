@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-16T13:26:00Z'
-updated_date: '2026-11-16T17:15:00Z'
+updated_date: '2026-11-16T18:21:00Z'
 labels:
   - mqtt
   - heap
@@ -49,4 +49,6 @@ AC wording (advisor 2026-11-16): hd_min_free_heap is a lifetime watermark (31,15
 AC1 evidence: 09's 16:00 run above (old code = 353: hd_min 31,156 -> 6,484, 26/26 topics). AC2 evidence: tests/test_mqtt_stats_pacer.py (slices publishStatU32 + sendMQTTheapdiag + publishStatAt + loopMQTTStatsPacer from MQTTstuff.ino): FIX 6/6 OK; OLD (OTGW_MQTT_REV=HEAD, 3a14423f8-line code) 4 FAIL: 'sendMQTTheapdiag() published 26 topics in one call (burst)', gaps all 0 ms, 26 dropped under CRITICAL instead of waiting, 26 sent despite the mid-round disconnect.
 
 Gates on the rebased lane (onto origin/dev 1dde4dcda, beta.352-355 for 1665/1999/1751/2004), 2026-11-16 17:14-18:15, foreground in chunks of 8 (scripts/run_tests.py --no-host -j 2): 292 tests/ files, 290 PASS, 2 FAIL that fail identically on origin/dev and are not from this lane: test_adr_governance test_live_index_complete ('ADR-252 (Proposed) is MISSING from docs/adr/README.md', d3) and test_settings_float_roundtrip ('SATpwmswitchmargin: no clamp range found in updateSetting()', after TASK-1942 b95bc21ec). Host harnesses for the touched areas: test_diag_recorder, test_diag_recording_routes, test_mqtt_broker_address, test_mqtt_print_error PASS. evaluate.py --quick: 87 passed, 0 failed. The rest of test/host/ was not run.
+
+Rebase note (95, 19:25): the lane rebase renumbered version.h (beta.352-355) but git merged the source banners cleanly where the renumbered value matched the commit's own bump, so the banners of the four firmware commits lag version.h by one (comment only; the binary takes its version from version.h). Resynced with one extra bump commit on top (bin/bump-prerelease.sh, beta.356): all 54 banners and version.h agree at beta.356. The earlier build d76a5ef is superseded; the bench build is the beta.356 one.
 <!-- SECTION:NOTES:END -->
