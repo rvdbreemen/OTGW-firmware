@@ -1,11 +1,11 @@
 ---
 id: TASK-1666
 title: Diagnostic recording download and status REST routes (ADR-213 step 2)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-05T20:34:00Z'
-updated_date: '2026-11-15T11:34:00Z'
+updated_date: '2026-11-16T07:54:00Z'
 labels:
   - diagnostics
 milestone: 2.0.0
@@ -38,3 +38,9 @@ Stale audit 2026-11-14 (coordinator decision): AC2 needs a bench on .63 (PSRAM) 
 
 2026-11-15 bench 09 on .63 (Classic + S3, PSRAM), beta.294+bcf067a; order status -> download -> size check -> stop (download BEFORE stop, see TASK-1960). (1) Natural recording 10:03:30-12:07 (SAT simulation on, no OT bus): 25 blocks (~12/h), dropped 0. GET /api/v2/diag/recording 102604 B in 1.216 s (84 KB/s), 25 x 4096 + header OK, starts with the OTGWREC magic. Measured alongside: /api/v2/device/info 60x avg 0.109 s, max 0.456 s, all 200. (2) Full ring, SYNTHETIC content: 6600 sequential POSTs of ~250 B bodies (REST capture point) 12:23-12:28, ring wrapped (oldest_seq 31, newest_seq 414 = 384 blocks), dropped 0, exact true. GET 1573068 B in 11.46 s (137 KB/s), 384 x 4096 + header OK. During the download: /api/v2/device/info 20x avg 0.092 s, max 0.428 s, all 200; GET / (v2.html.gz 205 KB) 4x avg 2.04 s, max 2.73 s, all 200, vs baseline after the stop 10x avg 1.43 s, max 1.80 s. So the web UI stays responsive (no refusal, no 5xx); a full page load is ~40 % slower while 1.5 MB streams. The timing covers the size, not a realistic event mix. Settings after both runs: REST diff [] and settings.ini diff empty; bootcount 137 unchanged, no crashlog. Evidence: 09 scratchpad n1666b/end and n1666b/full/end (recording.bin, dl-headers, probe*.txt, status-*.json). The first attempt at 08:32 lost the data through stop-before-download (TASK-1960).
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Closed by comms 92 on the coordinator's order (2026-11-16), from the task's own notes. Commit f202abcd2 (recorder core + routes, with TASK-1665). AC1: test/host/test_diag_recording_routes.py --mutant RESULT PASS (W1-W4, R1-R8; the range mutant fails R1/R6, the since mutant R2). AC2: 09 on .63 (Classic + S3, PSRAM), beta.294+bcf067a, 2026-11-15: full ring 1573068 B in 11.46 s (137 KB/s), device/info during it avg 0.092 s max 0.428 s all 200, GET / avg 2.04 s vs 1.43 s baseline (about 40 % slower, no 5xx); settings and settings.ini unchanged, bootcount unchanged, no crashlog (09 scratchpad n1666b/). Caveat from the notes: the full-ring content was synthetic.
+<!-- SECTION:FINAL_SUMMARY:END -->

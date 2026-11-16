@@ -3,11 +3,11 @@ id: TASK-1937
 title: >-
   Device graph ring keeps the last weather value when the firmware's weather
   fetch stops (bValid never cleared)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-14T14:45:00Z'
-updated_date: '2026-11-14T18:18:00Z'
+updated_date: '2026-11-16T07:54:00Z'
 labels:
   - bug
   - graph
@@ -46,3 +46,9 @@ RED on .61 by 09 (2.0.0-beta.240+a3dff10, old code), 2026-11-14: satweatherenabl
 
 GREEN on .61 by 09 (2.0.0-beta.249+45187f4, sha256 x3 match): last valid fetch about 18:11:23 (W 3.3 C), satweatherenable false 18:11:41. Readout 19:17:09: /api/v2/sat/weather valid still true (unchanged, not part of this fix), age 3941 s; graph/history count 120, interval 30 s: slots 0-108 = 33 (age 3596..356 s), slots 109-119 = null (age 326..26 s). The switch lies between 356 and 326 s; the 1 h window ends at 3941-3600 = 341 s, so the boundary is where the rule puts it. No MsgID 27 on .61, so null. Red (240: 120 x 53, 0 nulls) -> green on the same reproduction. Settings diff [] (deferred settings.ini save a few s later), crashlog byte-identical, bootcount unchanged. AC2 ticked (host red/green + device red/green). Evidence: 09 scratchpad g1937/. Push waits for the beta freeze (public beta 250) and 95's push; then rebase, re-bump (256), warm rebuild, post.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Closed by comms 92 on the coordinator's order (2026-11-16), from the task's own notes. Commit 0f52279e9 (bump 752a2e76e, beta.249). AC1: RED on .61 with the old code: 76 min after the last weather fetch the whole ring held the stale 5.3 C (120 slots, 0 nulls) (bfc13e77c, 09 scratchpad r1937/). AC2: host red/green and GREEN on .61 with beta.249+45187f4: slots older than about 1 h after the last fetch hold the value, the newer ones null, the switch at the rule's boundary (df1fbddcd, 09 scratchpad g1937/); settings, crashlog and bootcount unchanged. Not part of the fix: /api/v2/sat/weather still reports valid true.
+<!-- SECTION:FINAL_SUMMARY:END -->
