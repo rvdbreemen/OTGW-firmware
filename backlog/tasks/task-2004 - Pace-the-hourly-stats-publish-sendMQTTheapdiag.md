@@ -1,10 +1,11 @@
 ---
 id: TASK-2004
 title: Pace the hourly stats publish (sendMQTTheapdiag)
-status: To Do
+status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-16T13:26:00Z'
+updated_date: '2026-11-16T14:17:00Z'
 labels:
   - mqtt
   - heap
@@ -27,3 +28,9 @@ At every wall-clock hour (ADR-086, doTaskMinuteChanged -> if (hourFlag) -> sendM
 - [ ] #3 Host test on the real pacer (order, all topics once, respects canPublishMQTT)
 - [ ] #4 Bench on .61 by the bench-tester
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-16 (95) taken over from ba (coordinator). Status of the reproduction (ba): 14:00 dip to 2,180 B on .61 with ba's 351+597c163 and SAT enabled/inactive; 15:00 on 352 with SAT off: no dip, all 26 topics arrived. 09 runs the 16:00 mark on 353 with SAT enabled (inactive, no sim). Per the bug rule (reproduce, then prove) no code before that result: if 16:00 shows no dip, the 14:00 one is not reproduced and AC1 is open. Planned fix if it reproduces: a table/switch of the 26 stats driven by a cursor, one publish per ~100 ms from the loop (like the discovery drip), skipped while !canPublishMQTT(); flat topics stay (ADR-101); host test on the real pacer (order, every topic once, respects canPublishMQTT).
+<!-- SECTION:NOTES:END -->
