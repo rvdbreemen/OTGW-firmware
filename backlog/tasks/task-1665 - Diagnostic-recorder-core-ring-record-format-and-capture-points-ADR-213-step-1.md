@@ -3,11 +3,11 @@ id: TASK-1665
 title: >-
   Diagnostic recorder core: ring, record format and capture points (ADR-213 step
   1)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-05T20:34:00Z'
-updated_date: '2026-11-16T21:07:00Z'
+updated_date: '2026-11-16T21:13:00Z'
 labels:
   - diagnostics
 milestone: 2.0.0
@@ -56,3 +56,9 @@ Pushed with the instrument in cf29dd198 (beta.352 in the lane), zip beta.356+cf2
 
 AC2 ticked by 09 (2026-11-16): the append cost, the missing part, is now measured on both boards; the RAM/flash cost was recorded earlier (static cost 2026-11-06, PSRAM use 2026-11-14). NO PSRAM, .61 OTGW32, 2.0.0-beta.352+e18ccbf, 14:39-14:49, normal traffic, SAT off: ring 1 x 4096 B in heap; freeheap 58,052 -> 52,692 at start (-5.4 KB), 56,436 after stop; append_count 688 in 10 min (690 at stop), append_avg_us 79, append_max_us 247, dropped 0. PSRAM, .63 Classic, 2.0.0-beta.358+04abbdc (contains 5ca89a057), 21:55-22:06, SAT enabled but inactive, satsimulation false (read 21:55:41): ring 384 x 4096 = 1,572,864 B, psram true; internal freeheap 39,172 -> 39,172 at start, 39,132 after stop (no internal heap cost); append_count 900 in 10 min, append_avg_us 24-26, append_max_us 211 (484 at minute 10), dropped 0, newest_seq 0 -> 1 (block-based seq). Evidence: 09 scratchpad b352/diag/diag.log and d1665psram/diag.log.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Diagnostic recorder records how much one append costs. AC2 (09 ticked, 47606cfe6): no-PSRAM .61 (beta.352): 688 appends in 10 min, avg 79 us, max 247 us, dropped 0, internal heap -5.4 KB while recording and +4.9 KB back after stop; PSRAM .63 (beta.358, 21:55-22:06, sim off): ring 384 x 4 KB = 1.5 MB in PSRAM, internal free heap unchanged (39,172 -> 39,172), 900 appends, avg 24-26 us, max 211 us, dropped 0. The instrument: REST append_count / append_max_us / append_avg_us in the recording status (commit in cf29dd198, beta.352), host test F18 in test/host/test_diag_recorder.cpp. Not verified: the append cost under a heavy OT burst (both runs were normal traffic); newest_seq counts 4 KB blocks, not records (stayed 0 on .61 with one block).
+<!-- SECTION:FINAL_SUMMARY:END -->
