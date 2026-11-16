@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-01T15:47:00Z'
-updated_date: '2026-11-12T22:50:00Z'
+updated_date: '2026-11-16T10:57:00Z'
 labels:
   - beta
   - release
@@ -43,4 +43,6 @@ Triage 2026-11-02 (beta.5, origin/dev 6c41cc696) in code: no: verification only 
 2026-11-11 (comms): capture-tool volunteer call (one volunteer per OS, beta.158 zip, 10-15 min run) posted in #alpha-testing on 2026-11-09 06:28 UTC, msg 1569237211789000751. No direct reply or volunteer to that post as of 2026-11-11 (checked the 68 later #alpha-testing messages via the bot REST API: no message references it, no reactions). Capture uploads that did arrive afterwards, not as replies to the call: tjfs 2026-11-09 (acknowledged in msg 1569333602137935873), thaghostnl 2026-11-10 two uploads on beta.170 (TASK-1786), gruijter 2026-11-10 20261110-100556-upload.zip on beta.167 (TASK-1787). The OS of those runs was not checked here, so this note does not close the per-OS check; macOS still has only the earlier run (#beta-testing 2026-11-08).
 
 2026-11-12 (comms): long-run volunteer cmdr_langers (Discord 695051073886355508), #english-support https://discord.com/channels/812969634638725140/931267109726593116/1570569541678010461: Nodoshop OTGW, PIC 6.8, S3, OLED; Ideal Logic 35 boiler; Wiser HubR 1st Gen thermostat; MQTT to HA via a separate broker; one week on 2.x without issues seen (Nightly Restart on). Asked (msg 1570571315977527407) to update to beta.218, switch Nightly Restart off, run capture --long-run for a day or more and post the zip, and send crashlog + reboot_log.txt on an unexpected restart.
+
+2026-11-16 11:43-11:49 AC3 Windows half, bench 09: the published v2.0.0-beta.339 zip (OTGW-firmware-esp32-combo-2.0.0-beta.339+bd7a133-flash.zip, the release build soaked on .63 this morning) unpacked into a fresh folder and its launcher capture-mqtt-debug.bat run on Windows 11 the way a user runs it (bundled otgw_capture.py; args --device 192.168.88.63 --broker 192.168.88.32 --duration 300 --no-prompt --skip-browser-capture; browser part skipped for low laptop memory) against .63 (Classic, running beta.347). Result: stop reason 'duration elapsed', telnet connected with keepalive, 0 telnet gaps, debug toggles found on and left as found, 799 MQTT messages, 301 OT frames (otframes.log + otgw_simulation.log), crash-log capture normal, post-capture HTTP probes, coredump fetched and labelled OLD (app sha cd720dc0b), device state and 24 h graph history at start and stop, one merged transcript and one upload zip. Transcript: 09 scratchpad t1544/runs/20261116-114354/transcript-20261116-114354-2.0.0-beta.347+2cb8d28-...txt and runs/20261116-114354-upload.zip (local, not for posting: contains the unit's settings). Linux half not run yet: WSL needs 1-2 GB and the laptop was at 2-4 GB free with background processes being reaped. AC4 not run: .63 is on beta.347 as the 20:00 soak candidate (coordinator: skip unless .63 is on 339). AC2 still needs a named macOS tester.
 <!-- SECTION:NOTES:END -->
