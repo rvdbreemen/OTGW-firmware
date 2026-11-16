@@ -7643,3 +7643,101 @@ Robert, 16:18:42 UTC (https://discord.com/channels/812969634638725140/9144987300
 **Reading (interpretation, to be confirmed):** the 180 s minimum flame-on hold (entry 275, thermo-nova pwm.py:201-203) already protects the light-off, so the 2 minute average is not needed in the first 2 minutes after ignition. This agrees with Q-SUP1c option B (latest flow for the first 2 minutes after ignition), which the firmware does since beta.333. It does not say what happens after the first 2 minutes, nor whether the average stays in the suppression setpoint (entry 364 as built) or moves to the duty cycle denominator (entry 373). Asked as item 1 of the re-posted open questions (https://discord.com/channels/812969634638725140/1105556725714649128/1571783439928266763).
 
 **Task:** TASK-1990 (owner 95). Open: the place of the average after the first 2 minutes.
+
+## 375. Q-SUP1d answered A, then reconsidered: no 2 minute flow average in the first 2 minutes, the 180 s flame-on rule covers the light-off (Sergeant D, 2026-11-16; follows entries 373 and 374, changes entry 364)
+
+**Source:** #dev-sat-mqtt, Sergeant D 2026-11-16 07:19:33 UTC (https://discord.com/channels/812969634638725140/1105556725714649128/1571786790547886114), a reply to item 1 of the re-posted open questions (https://discord.com/channels/812969634638725140/1105556725714649128/1571783439928266763).
+
+**Quoted:**
+
+> "Question 1: A, but I reconsidered that and we don’t need to use the average flow temperature as denominator for the first 2 minutes because we have the rule of keeping heating for 180 seconds when the flame is on"
+
+**Settled:** option A of Q-SUP1d: the 2 minute average was meant for the duty cycle denominator only, not for the PWM ON suppression setpoint, which uses the latest flow as thermo-nova (heating_control.py:435-441 at 7beaaf5). Then he drops the average from the denominator too for the first 2 minutes, because the 180 s flame-on hold (entry 275, pwm.py:201-203) already covers the light-off.
+
+**Reading (interpretation, asked to confirm as Q-375a):** no 2 minute average anywhere; the suppression setpoint and the duty cycle use the latest flow, as thermo-nova. This changes entry 364 as we read it: the firmware's 2 minute average in the suppression setpoint (TASK-1990, beta.330 and beta.333, public in beta.339) is not his design.
+
+**Task:** TASK-1990 (owner 95): revert the suppression setpoint to the latest flow once Q-375a is confirmed. Open: Q-375a.
+
+## 376. Q-361c answered B: a continuous burn also runs at least 180 s before the tolerance band stops it (Sergeant D, 2026-11-16)
+
+**Source:** #dev-sat-mqtt, 2026-11-16 07:20:34 UTC (https://discord.com/channels/812969634638725140/1105556725714649128/1571787046379585651), answer to item 2 (Q-361c, blocking at Robert's request).
+
+**Quoted:**
+
+> "Q-361c: B"
+
+**Settled:** option B: in continuous mode a tolerance-band stop (room at target + 0.1) waits until the burn has lasted at least 180 s, the same minimum as a PWM ON phase (entry 275). New firmware rule; thermo-nova's heater-off acts at once (heating_control.py:229-234) and its 180 s hold is PWM-only (pwm.py:201-203).
+
+**Task:** TASK-1887 (owner ba), ADR-250.
+
+## 377. Q-361a: "we keep the PWM active" when the band stops heating (Sergeant D, 2026-11-16; letter missing)
+
+**Source:** #dev-sat-mqtt, 2026-11-16 07:22:48 UTC (https://discord.com/channels/812969634638725140/1105556725714649128/1571787607887716377), answer to item 3 (Q-361a).
+
+**Quoted:**
+
+> "Q-361a:  because we keep the PWM active. Otherwise PWM will restart and start flame again in a shorter interval than 20 minutes when the room temperature swings at +0.1"
+
+**Reading (interpretation, the answer has no letter; asked to confirm as Q-377a):** option B: when the band stops heating, SAT sends CH=0 and PWM stays active (it is not disabled), so the burner does not restart within the 20 minute PWM cycle when the room swings around target + 0.1. Our recommendation was A (CS=10, CH=0, PWM ends); he reasons against ending PWM.
+
+**Task:** TASK-1887 (owner ba). Open: Q-377a.
+
+## 378. Q-361b: with zones, eco means only the main room decides the band, comfort means any usable room keeps heating on (Sergeant D, 2026-11-16)
+
+**Source:** #dev-sat-mqtt, 2026-11-16 07:25:09 UTC (https://discord.com/channels/812969634638725140/1105556725714649128/1571788202480767038), answer to item 4 (Q-361b).
+
+**Quoted:**
+
+> "Q-361b: That’s why we have the eco and comfort options. When the user chooses eco then B. When the user chooses comfort then A"
+
+**Settled:** the zone rule of the tolerance band follows the user's eco/comfort choice: eco = B (only the main room decides; a warm main room stops heating even while a zone is cold), comfort = A (heating stays on while any usable room is more than 0.1 below its own target). thermo-nova has no band (zones raise the requested setpoint, climate.py:381-389). Open: which existing setting carries "eco" and "comfort" here (the preset, or another option); ba to check against the recorded entries before building.
+
+**Task:** TASK-1887 (owner ba).
+
+## 379. Q-327c answered A: a separate "switch margin" setting, default 1.5 C, range 0.5 to 5.0, 30 s sustain fixed (Sergeant D, 2026-11-16; confirms entries 359 and 360 as read)
+
+**Source:** #dev-sat-mqtt, 2026-11-16 07:26:00 UTC (https://discord.com/channels/812969634638725140/1105556725714649128/1571788413139681325), answer to item 5.
+
+**Quoted:**
+
+> "Q-327c: A"
+
+**Settled:** our reading of entry 360 holds: the PWM-to-continuous switch has its own user setting, default 1.5 C, range 0.5-5.0, the 30 s sustain fixed; the 3.5 C / 30 s fail-safe of entry 359 stays and only acts when a user sets the margin above 3.5.
+
+**Task:** TASK-1888 (owner ba).
+
+## 380. Q-SUP1b: not needed, answered by entry 375 (Sergeant D, 2026-11-16)
+
+**Source:** #dev-sat-mqtt, 2026-11-16 07:27:45 UTC (https://discord.com/channels/812969634638725140/1105556725714649128/1571788856745795648), answer to item 6 (written "W-SauP1b").
+
+**Quoted:**
+
+> "W-SauP1b: We don’t need it was answered in Question 1. We have the 180 seconds flame on special rule"
+
+**Settled:** Q-SUP1b (which readings enter the 2 minute average) falls away: with entry 375 there is no 2 minute average.
+
+**Task:** TASK-1990 (owner 95).
+
+## 381. Q-P2 answered A: keep thermo-nova's saturation timing (Sergeant D, 2026-11-16; after seeing the chart)
+
+**Source:** #dev-sat-mqtt, 2026-11-16 07:30:03 UTC (https://discord.com/channels/812969634638725140/1105556725714649128/1571789435236913328), answer to item 7 (the chart: https://discord.com/channels/812969634638725140/1105556725714649128/1571643303240269886).
+
+**Quoted:**
+
+> "Q-P2: A"
+
+**Settled:** the 300 s sustained-saturation timer keeps thermo-nova's timing (heating_control.py:357-371, SATURATION_SUSTAIN_SECONDS 300 at const.py:23), also while the flame is off. This confirms the directive choice A of 2026-11-15 (no firmware change).
+
+**Task:** none (the firmware already does A).
+
+## 382. Sergeant D asks whether every start runs the PWM start-up sequence before the mode is chosen (Sergeant D, 2026-11-16; question, follows entry 381)
+
+**Source:** #dev-sat-mqtt, 2026-11-16 07:33:12 UTC (https://discord.com/channels/812969634638725140/1105556725714649128/1571790225276014673), a reply to his Q-P2 answer.
+
+**Quoted:**
+
+> "regarding Q-P2. Don’t we always start with the PWM mode start up sequence and then decide if we keep PWM or continuous mode? I think we discussed that earlier"
+
+**What is recorded:** entry 348 (Q-347a B, 2026-11-14): a heating start in continuous mode runs the same start sequence as PWM, as a fail-safe guard. No entry records that SAT always starts in PWM and only chooses PWM or continuous after the start sequence. Asked back as Q-382a (A: every start in PWM first, the mode is chosen after the start sequence; B: entry 348 as it is; C: other), 07:36 UTC (https://discord.com/channels/812969634638725140/1105556725714649128/1571790943525539842).
+
+**Task:** depends on Q-382a.

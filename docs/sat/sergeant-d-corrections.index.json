@@ -4775,7 +4775,7 @@
    "tasks": [
     "TASK-1888"
    ],
-   "confirmed_by_entry": null
+   "confirmed_by_entry": 379
   },
   {
    "id": 360,
@@ -4788,7 +4788,7 @@
    "tasks": [
     "TASK-1888"
    ],
-   "confirmed_by_entry": null
+   "confirmed_by_entry": 379
   },
   {
    "id": 361,
@@ -4960,6 +4960,108 @@
    "tasks": [
     "TASK-1990"
    ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 375,
+   "title": "Q-SUP1d answered A, then reconsidered: no 2 minute flow average in the first 2 minutes, the 180 s flame-on rule covers the light-off (Sergeant D, 2026-11-16; follows entries 373 and 374, changes entry 364)",
+   "date": "2026-11-16",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1571786790547886114",
+   "supersedes": [
+    364
+   ],
+   "tasks": [
+    "TASK-1990"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 376,
+   "title": "Q-361c answered B: a continuous burn also runs at least 180 s before the tolerance band stops it (Sergeant D, 2026-11-16)",
+   "date": "2026-11-16",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1571787046379585651",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1887"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 377,
+   "title": "Q-361a: \"we keep the PWM active\" when the band stops heating (Sergeant D, 2026-11-16; letter missing)",
+   "date": "2026-11-16",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1571787607887716377",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1887"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 378,
+   "title": "Q-361b: with zones, eco means only the main room decides the band, comfort means any usable room keeps heating on (Sergeant D, 2026-11-16)",
+   "date": "2026-11-16",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1571788202480767038",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1887"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 379,
+   "title": "Q-327c answered A: a separate \"switch margin\" setting, default 1.5 C, range 0.5 to 5.0, 30 s sustain fixed (Sergeant D, 2026-11-16; confirms entries 359 and 360 as read)",
+   "date": "2026-11-16",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1571788413139681325",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1888"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 380,
+   "title": "Q-SUP1b: not needed, answered by entry 375 (Sergeant D, 2026-11-16)",
+   "date": "2026-11-16",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1571788856745795648",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1990"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 381,
+   "title": "Q-P2 answered A: keep thermo-nova's saturation timing (Sergeant D, 2026-11-16; after seeing the chart)",
+   "date": "2026-11-16",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1571789435236913328",
+   "supersedes": [],
+   "tasks": [],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 382,
+   "title": "Sergeant D asks whether every start runs the PWM start-up sequence before the mode is chosen (Sergeant D, 2026-11-16; question, follows entry 381)",
+   "date": "2026-11-16",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1571790225276014673",
+   "supersedes": [],
+   "tasks": [],
    "confirmed_by_entry": null
   }
  ]
