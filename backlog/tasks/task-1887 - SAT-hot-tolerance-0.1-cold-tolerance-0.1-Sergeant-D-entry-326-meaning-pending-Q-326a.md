@@ -3,10 +3,11 @@ id: TASK-1887
 title: >-
   SAT: hot tolerance 0.1 / cold tolerance -0.1 (Sergeant D entry 326, meaning
   pending Q-326a)
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-11-13T07:25:00Z'
-updated_date: '2026-11-15T21:11:00Z'
+updated_date: '2026-11-16T10:37:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -20,10 +21,36 @@ ordinal: 960000
 Sergeant D decision 2026-11-13 (https://discord.com/channels/812969634638725140/1105556725714649128/1570698600952893454), entry 326. No tolerance setting exists for SAT in the firmware; thermo-nova has no hot/cold tolerance key (only DEADBAND 0.1, const.py:16); HA MQTT climate has no such option. Blocked on Q-326a (asked https://discord.com/channels/812969634638725140/1105556725714649128/1570700362187542539): A hysteresis on heating demand / B PID-self-tune deadband / C HA display only. SAT control change if A or B: plan with citations and Sergeant D's OK before implementation.
 <!-- SECTION:DESCRIPTION:END -->
 
+## Acceptance Criteria
+<!-- AC:BEGIN -->
+- [x] #1 Pure helpers in SATchEnable.h (satToleranceMaxError, satToleranceDemand, satChEnableDecide band input), host-tested: exact boundaries 0.1/-0.1, hold inside the band, NAN never blocks heating, eco (main room only) vs comfort (any usable room) per entry 378, band stop clears only the CH bit
+- [x] #2 Loop-level host test on the real control-tick cut, red on origin/dev and green on the fix: warm room gives CH=0 with a live setpoint and unchanged PID request; PWM stays PWM and its ON/OFF schedule keeps toggling during the stop (entry 384); a lit PWM phase and a continuous burn both run 180 s first (entries 275, 376); resume below target - 0.1; cold cutoff unchanged
+- [x] #3 Seam sweep of the SAT tests that cut the control tick and the LL contract (all 18 ids) green; evaluate.py --quick no new FAIL
+- [ ] #4 ADR-250 (Proposed via adr-kit) records the decision and amends ADR-199; accepted by Robert before push
+- [ ] #5 esp32-combo build and a bench run by the bench-tester (health; the band behaviour is host-proven, no SAT scenario on hardware)
+<!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+Plan (ba, 2026-11-16), built on Sergeant D's recorded answers; no open interpretation left except the follow-up below.
+
+Ground truth checked this session: entries 326 (values 0.1 / -0.1), 328 (HA generic thermostat: stop at target + tol, start below target - tol), 361 (band decides on/off only, PID keeps running, cold cutoff unchanged), 376 (Q-361c B: continuous burn runs >= 180 s before a band stop), 377 + 384 (Q-361a / Q-377a "yes, B": band stop = CH=0, PWM stays active), 378 (Q-361b: eco = main room decides, comfort = any usable room). thermo-nova 7beaaf5 has no band: heater-off acts at once (heating_control.py:229-234), its 180 s hold is PWM-only (pwm.py:201-203), zones only raise the requested setpoint (climate.py:384-385). Firmware: iHeatingMode 0 = COMFORT, 1 = ECO (SATtypes.h:582); the only tick-time CH sender besides the fixed thermal-safe (CH=1), summer and valves-closed (CH=0) paths is the main satChEnableDecide() call; satSendCH() is on change with a repair, so no between-tick CH=1.
+
+Design (lane/ba-1887b, fresh from origin/dev; the first lane's heater-off design is dropped):
+1. SATchEnable.h: satToleranceMaxError(roomValid, roomErr, zoneErr, zoneUse, n, ecoMode), satToleranceDemand(wasOn, err) with SAT_TOL_COLD_C = SAT_TOL_HOT_C = 0.1, satChEnableDecide(..., bandOff = false) returns 0 when bandOff (after the cold cutoff).
+2. SATcontrol.ino: _sat_tolErr in the zone block (eco = iHeatingMode 1); latch + narration next to the cold-cut latch; _sat_tolBandOff = !demand && !satBandWaitsForMinBurn() (PWM: satPwmColdCutWaitsForMinBurn(), entry 275 applied to the band as our reading of 376's 'the same minimum as a PWM ON phase'; continuous: lit CH flame younger than 180 s since satCycleGetFlameOnStartMs()); only the main CH command reads it; reset to demand on after satDisable().
+3. Cold cutoff code unchanged (satColdThreshold/satColdCutActive byte-identical to origin).
+Follow-up for Sergeant D (non-blocking, with Robert's 'this release or next' question): flameless PWM ON phases during a pause count as starts in the hourly limit (entries 59, 90, 95), so the first restart after a long pause can wait for the limit window.
+Tests: tests/test_sat_tolerance_band.py (helper + real tick cut + source checks), seam sweep, LL contract; ADR-250 amends ADR-199; build + bench (health).
+<!-- SECTION:PLAN:END -->
+
 ## Implementation Notes
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-11-13: meaning settled by entry 328 (Q-326a answered A, Sergeant D msg 1570701593073025099): Home Assistant generic-thermostat hysteresis on the heating demand, start below target - 0.1, stop at or above target + 0.1. Open for the plan (entry 328): how the band combines with the PID and the cold cutoff (ADR-199). Plan with citations and Sergeant D's OK before code.
 
 Q-328a decided 2026-11-15 by the coordinator under Robert's directive (CLI) 'Do not wait for Sergeant D. Finish everything that can be finished.'; Sergeant D may overrule, his answer later becomes a follow-up task; asked in the 18-question batch in #dev-sat-mqtt (item 8, https://discord.com/channels/812969634638725140/1105556725714649128/1571633456381694074): the tolerance band of entry 328 only decides CH on/off; the PID keeps running; the cold cutoff (ADR-199) is unchanged. Unblocked.
+
+2026-11-16 implemented on lane/ba-1887b (rebased onto origin/dev 42980de8f; code commit d37e94aa0, its non-version diff equals the pre-rebase commit, 368 lines, diff 0). Evidence: tests/test_sat_tolerance_band.py 18/18 on the fix (7 helper, 8 loop on the real tick cut, 3 source); with OTGW_SAT_INO = origin/dev SATcontrol.ino 10 of the 11 loop/source tests fail, the one that passes is the cold-cutoff control. Seam sweep, one file at a time, 35 SAT files: all OK after two seam fixes (test_sat_pwm_override: the CH call now passes _sat_tolBandOff; test_sat_max_tset: stubs for the band latch inside its cut). LL contract, foreground chunks OTGW_LL_ONLY: 001-004 5 pass, 010-013 7 pass, 014-017 3 pass + LL-016 skip (as designed), 018 10 pass, 019-023 9 pass. evaluate.py --quick 0 FAIL / 0 WARN. ADR-250 rewritten (Proposed, amends ADR-199), README entry + index. docs/sat/firmware-sat-spec.md step 18 sub-bullet. The first lane (lane/ba-1887, heater-off design, entries 361 only) is superseded and stays local. Open: AC4 (Robert's accept of ADR-250), AC5 (build + bench).
 <!-- SECTION:NOTES:END -->

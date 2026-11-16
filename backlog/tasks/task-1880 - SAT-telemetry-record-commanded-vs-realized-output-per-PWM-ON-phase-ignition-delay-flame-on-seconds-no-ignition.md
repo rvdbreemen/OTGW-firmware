@@ -3,11 +3,11 @@ id: TASK-1880
 title: >-
   SAT telemetry: record commanded vs realized output per PWM ON phase (ignition
   delay, flame-on seconds, no-ignition)
-status: Done
+status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-13T06:13:00Z'
-updated_date: '2026-11-16T09:50:00Z'
+updated_date: '2026-11-16T09:34:00Z'
 labels:
   - sat
   - telemetry
@@ -28,7 +28,7 @@ Lesson 1 of docs/sat/vtherm-comparison-2026-11-13.md (TASK-1879). VTherm learns 
 <!-- AC:BEGIN -->
 - [x] #1 Host test reproduces a PWM ON phase without ignition and shows ignited=false with the commanded ON time; red on the old code (field absent), green on the fix
 - [x] #2 REST /api/v2 and MQTT expose the per-phase record and counters; no control behaviour changes (existing SAT host tests unchanged and green)
-- [x] #3 Bench run by otgw-bench-tester on a PIC and an OT-Direct unit shows the record matching the flame bit in a capture
+- [ ] #3 Bench run by otgw-bench-tester on a PIC and an OT-Direct unit shows the record matching the flame bit in a capture
 - [x] #4 Web UI (U10): a PWM phase card in the Technical view shows commanded ON time, ignition delay and ignited yes/no for the last phases; webui test on a fixture payload
 <!-- AC:END -->
 
@@ -65,12 +65,4 @@ AC4 (U10) on lane-1880, uncommitted: card 'PWM ON phases: asked vs done' in SAT 
 2026-11-13 follow-up (found by 95): test/host/test_dhw_water_meter.py exited 1 on origin/dev because its mutant M6 anchored on the literal 'MQTT_HA_SENSOR_COUNT = 399;' and this task moved the count to 404. Fixed test-only: M6 now reads the live count from MQTTHaDiscovery.cpp (HA_COUNT) and mutates it to count - 1. Red/green: the old test file exits 1 ('mutant anchor must match exactly once ... got 0'), the fixed one gives RESULT: PASS (exit 0). My earlier full-suite runs covered tests/ but not test/host/, which is how this slipped.
 
 2026-11-16 (95) AC3 evidence, PIC side, from the field instead of the bench: gruijter capture 20261114-195039 (beta.250+baf84d9, Classic + PIC, transcript 'simulation: false', archive OTGW-field-data/gruijter/20261114-195039). Script scratchpad pwmphase_vs_flame_ch.py compares each of the 41 SATPWMPHASE records (transcript, phase end - len = start) with the MsgID 0 B-frame status bits in csv/otframes.csv. Counting the flame bit (LB bit 3) alone: 39/41 match (ignited, ign_delay within 15 s, flame_on within 15 s); the 2 misses (ends 03:53:26 and 06:16:26 local next day, len 960 and 2010) both contain a hot-water draw (DHW bit 2 set, CH bit off) and SAT's flame_on excludes that flame. Counting the heating flame only (bit 3 on, bit 2 off): 41/41 match, 89 edges. So the record matches the flame bit as SAT defines it (heating flame). OT-Direct side: 09's .61 bench (one ignited phase that ended 'cut', notes above). Never-lit path: host test AC1 only (no bench or field phase without ignition seen). AC3 is a bench AC: left for 09/the coordinator to tick on this evidence or to ask for a bench run.
-
-AC3 ticked on the coordinator's decision (2026-11-16). OT-Direct half from 09 (message 2026-11-16, bench .61 beta.224-era, 2026-11-13, 09 scratchpad b224\dev\61-telnet-pwm.txt): one PWM ON phase 16:59:14-17:02:14, SATPWMPHASE cmd_on=3600 final_on=180 len=180 ignited=1 ign_delay=0 flame_on=180 end=cut; the flame was on from 16:55:35 with no off edge until 17:02:14, so ign_delay 0 and flame_on 180 match. Caveat (09): satsimulation was on and .61 has no boiler, so that flame is the simulated boiler's; one phase only, the ignition path not exercised on OT-Direct.
 <!-- SECTION:NOTES:END -->
-
-## Final Summary
-
-<!-- SECTION:FINAL_SUMMARY:BEGIN -->
-AC1: tests/test_sat_pwm_phase_telemetry.py 6/6 on the real code, red on the old code (field absent); a PWM ON phase without ignition reports ignited=false with the commanded ON time. AC2: REST /api/v2 and MQTT carry the per-phase record and counters (5ddcc6543, beta.224); no control change, the SAT host suites stay green. AC3: PIC half on real hardware: gruijter's field capture 20261114-195039 (beta.250, Classic + PIC), 41/41 SATPWMPHASE records match the heating flame bit (MsgID 0 flame on, DHW off) in ignited, ign_delay and flame_on (39/41 on the raw flame bit; the two others contain a hot-water draw that SAT's flame_on excludes). OT-Direct half: simulated flame + host test, not checked against a real boiler (09's .61 phase with satsimulation on, 1 phase, flame already lit). AC4: tests/webui/sat-pwm-phases.test.mjs 5/5 on a fixture payload. Not verified: OT-Direct against a real boiler, and a never-lit phase on any real boiler (host test only).
-<!-- SECTION:FINAL_SUMMARY:END -->

@@ -1182,7 +1182,8 @@ class ChEnableSource(unittest.TestCase):
         # TASK-1323: CH = 0 on the cold cutoff or the PWM OFF phase driving the CS, else 1
         src = SAT_INO.read_text(encoding="utf-8")
         loop = src[src.index("void satControlLoop"):]
-        self.assertIn("satSendCH(satChEnableDecide(pidOutput, satColdThreshold(), pwmDrivesSetpoint, pwmOn))", loop)   # TASK-1547
+        # TASK-1547; TASK-1887 adds the tolerance-band input (entry 384: a band stop clears only the CH bit)
+        self.assertIn("satSendCH(satChEnableDecide(pidOutput, satColdThreshold(), pwmDrivesSetpoint, pwmOn, _sat_tolBandOff))", loop)
         # TASK-1468 (entry 134): the exits run before the mode is read. An exit that fired has left PWM, so pwmOn and
         # pwmDrivesSetpoint stay false and CH is 1 with the continuous CS; the PWM phase is read only when the tick stays in PWM.
         self.assertLess(loop.index("satCycleCheckPwmExits(pidOutput, _sat_tickMs);"),

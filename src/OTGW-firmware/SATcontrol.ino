@@ -457,6 +457,13 @@ static bool _sat_coldCut = false;
 // TASK-1652 (maintainer decision, entry 275): the latched cutoff waits while a lit PWM ON phase burns its first 180 s
 // (satPwmColdCutWaitsForMinBurn()). Set once per tick right after the latch; the latch itself keeps its hysteresis.
 static bool _sat_coldCutDeferred = false;
+// Tolerance band on the heating demand (TASK-1887, ADR-250; entries 326, 328, 361, 376, 378, 384). _sat_tolErr is the band input
+// (target - room of the deciding rooms, NAN without one), set in the zone block of the tick; _sat_tolDemand the latched demand;
+// _sat_tolBandOff the CH-off in force after the 180 s minimum burn. Demand starts on (entry 83: the first tick after boot or SAT
+// enable sends a real setpoint).
+static float _sat_tolErr = NAN;
+static bool  _sat_tolDemand = true;
+static bool  _sat_tolBandOff = false;
 
 // The cold cutoff in force: latched and not waiting for the minimum burn of a lit ON phase.
 static bool satColdCutActive()
@@ -1413,6 +1420,17 @@ static bool satPwmColdCutWaitsForMinBurn()
   if (!satIsFlameOn() || state.sat.bDhwActive || _pwm_dhwPhase != PwmDhwPhase::None || _pwm_dhwFlameLit) return false;
   if (_pwm_flameOnMs == 0) return _pwm_waitingForFlame || !_pwm_dhwResumed || _pwm_dhwAnchorLate;
   return (millis() - _pwm_flameOnMs) < PWM_IGNITION_TIMEOUT_MS;
+}
+
+// TASK-1887 (entries 275, 376): a tolerance-band stop waits until the running CH burn has lasted 180 s. In PWM the same rule as
+// the cold cutoff (satPwmColdCutWaitsForMinBurn(), entry 275; applying it to the band is our reading of entry 376's "the same
+// minimum as a PWM ON phase"); in continuous mode a lit CH flame (no hot water) younger than 180 s since its flame-on edge
+// (entry 376).
+static bool satBandWaitsForMinBurn()
+{
+  if (state.sat.eControlMode == SAT_MODE_PWM) return satPwmColdCutWaitsForMinBurn();
+  if (!satIsFlameOn() || state.sat.bDhwActive) return false;
+  return (uint32_t)(millis() - satCycleGetFlameOnStartMs()) < PWM_IGNITION_TIMEOUT_MS;
 }
 
 // ON->OFF (pwm.py:205-209): the ignition anchor goes with the phase and the off wait is timed from this edge
@@ -7873,6 +7891,9 @@ static void satControlLoopRun()
   if (state.sat.eControlMode == SAT_MODE_OFF) {
     state.sat.eControlMode = SAT_MODE_CONTINUOUS;
     satCycleSkipAutoSwitch();   // back from satDisable() (switch-off, trip, fallback lift, OT loss): no stale overshoot start (firmware choice, TASK-1367)
+    _sat_tolDemand = true;      // TASK-1887: the band starts with demand on (entry 83: a real setpoint on the first tick)
+    _sat_tolBandOff = false;
+    _sat_tolErr = NAN;
   }
 
   // --- DHW detection (Task #3): skip CH control when DHW is active ---
@@ -8113,6 +8134,10 @@ static void satControlLoopRun()
     pidOutput = satAggregateZoneSetpoint(pidOutput, zoneOut, zoneErr, zoneUse, zoneCount,
                                          satGetColdSetpoint(), settings.sat.fZoneAggregationHeadroom,
                                          settings.sat.iHeatingMode == 1);   // 1 = ECO
+    // TASK-1887 (entry 378): the band input from the PID's own room (filtered) and target; in COMFORT every usable zone counts too,
+    // in ECO (iHeatingMode 1) only the main room.
+    _sat_tolErr = satToleranceMaxError(roomValid, satPidError(effectiveTarget, roomTemp), zoneErr, zoneUse, zoneCount,
+                                       settings.sat.iHeatingMode == 1);
     // Zone diagnostics stay gated at more than one zone: no new retained MQTT traffic for
     // single-room setups (deliberate, TASK-1440).
     if (settings.sat.iZoneCount > 1) satPublishZoneDiagnostics();
@@ -8143,6 +8168,19 @@ static void satControlLoopRun()
   _sat_requestedSetpoint = pidOutput;   // thermo-nova requested_setpoint (climate.py:394), read by the 3 s refresh and the MQTT publish
   // Cold cutoff latch, once per tick before any user reads satColdThreshold() (TASK-1547, entry 199).
   _sat_coldCut = satColdCutoffLatched(pidOutput, satGetColdSetpoint(), _sat_coldCut, SAT_COLD_HYSTERESIS_C);
+  // TASK-1887 tolerance band (ADR-250): the latch from _sat_tolErr (set above), then the 180 s minimum burn (entries 275, 376)
+  // before a stop takes effect. The stop only clears the CH bit below; CS, PWM and the PID keep running (entries 361, 384).
+  {
+    const bool tolWas = _sat_tolDemand;
+    _sat_tolDemand = satToleranceDemand(_sat_tolDemand, _sat_tolErr);
+    if (_sat_tolDemand != tolWas) {
+      if (_sat_tolDemand) satNarratef_P(PSTR("Heating resumes: a room is more than %.1f below its target"), SAT_TOL_COLD_C);
+      else                satNarratef_P(PSTR("Heating paused (CH off, PWM stays active): the rooms are at least %.1f above their target"),
+                                        SAT_TOL_HOT_C);
+    }
+    _sat_tolBandOff = !_sat_tolDemand && !satBandWaitsForMinBurn();
+    if (tolWas && !_sat_tolDemand && !_sat_tolBandOff) satNarrate_P(PSTR("Heating pause waits for the 180 s minimum burn"));
+  }
 
   // AC#2: the request reaches the maximum it is clamped to (satEffectiveMaxSetpoint(), TASK-1591, entry 256):
   // use continuous mode instead of PWM, as thermo-nova requested_setpoint >= maximum_setpoint (heating_control.py:203-204).
@@ -8289,7 +8327,7 @@ static void satControlLoopRun()
     satSendMM(mmTarget);   // TASK-1581: SAT_MM_T at the maximum PWM duty, else the value above
     // CH rule of Sergeant D 2026-10-23 (see satChEnableDecide in SATchEnable.h): CH=0 with CS=10 when the
     // requested setpoint is at or below the cold setpoint or the PWM OFF phase drives the CS, else CH=1.
-    satSendCH(satChEnableDecide(pidOutput, satColdThreshold(), pwmDrivesSetpoint, pwmOn));
+    satSendCH(satChEnableDecide(pidOutput, satColdThreshold(), pwmDrivesSetpoint, pwmOn, _sat_tolBandOff));   // TASK-1887: band
     // Immergas: its TP=11:12 goes with every MM= inside satSendMM() (entry 233, TASK-1537).
     // Push SAT target to thermostat display via TC= command (Task #31)
     if (settings.sat.bPushSetpoint) {

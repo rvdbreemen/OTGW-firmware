@@ -86,6 +86,11 @@ enum { SAT_MODE_CONTINUOUS = 0, SAT_MODE_PWM = 1 };
 static const float SAT_MIN_SETPOINT = 10.0f; static const float SAT_COLD_HYSTERESIS_C = 1.0f;
 static bool _sat_narrAtMax = false, _sat_coldCut = false; static float _sat_requestedSetpoint = 0.0f;
 static bool satColdCutoffLatched(float, float, bool l, float) { return l; }
+// TASK-1887: the tolerance-band latch sits in this cut too (stubbed: demand stays on, no stop)
+static float _sat_tolErr = 0.0f; static bool _sat_tolDemand = true, _sat_tolBandOff = false;
+static bool satToleranceDemand(bool was, float) { return was; }
+static bool satBandWaitsForMinBurn() { return false; }
+static const float SAT_TOL_COLD_C = 0.1f, SAT_TOL_HOT_C = 0.1f;
 static float satGetColdSetpoint() { return 0.0f; }
 static uint8_t g_mode = SAT_MODE_PWM;
 static void satSetControlMode(uint8_t m) { g_mode = m; }

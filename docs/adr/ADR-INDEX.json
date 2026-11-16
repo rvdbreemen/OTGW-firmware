@@ -10249,6 +10249,92 @@
         "supersedes": [],
         "superseded_by": null
       }
+    },
+    {
+      "id": "ADR-250",
+      "title": "SAT tolerance band: at target + 0.1 C the CH bit goes off while PWM stays active, after a 180 s minimum burn; heating resumes below target - 0.1 C",
+      "path": "ADR-250-sat-tolerance-band-at-target-0-1-c-the-ch-bit-goes-off-while-pwm-stays-active-after-a-180-s-minimum-burn-heating-resumes-below-target-0-1-c.md",
+      "format": "canonical",
+      "status": "Proposed",
+      "date": "2026-11-16",
+      "decision_summary": "While the tolerance band says stop, the CH-enable bit SAT sends is 0, and nothing else changes: the control setpoint,...",
+      "topics": [
+        "ch enable bit",
+        "heating demand",
+        "hysteresis",
+        "minimum burn",
+        "sat",
+        "tolerance band"
+      ],
+      "aliases": [
+        "cold tolerance",
+        "entry 326",
+        "entry 384",
+        "generic thermostat tolerance",
+        "hot tolerance"
+      ],
+      "components": [
+        "_sat_tolBandOff",
+        "satBandWaitsForMinBurn",
+        "satToleranceDemand",
+        "satToleranceMaxError"
+      ],
+      "symbols": [
+        "_sat_tolBandOff",
+        "_sat_tolDemand",
+        "_sat_tolErr",
+        "SAT_TOL_COLD_C",
+        "SAT_TOL_HOT_C",
+        "satBandWaitsForMinBurn",
+        "satChEnableDecide",
+        "satToleranceDemand",
+        "satToleranceMaxError"
+      ],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [
+          "Send CH=0 while the band holds heating off, and leave the control setpoint, the PWM mode and its schedule, the PID and the cold cutoff untouched (entries 361, 384).",
+          "Let a CH burn run 180 s before a band stop takes effect, in PWM and in continuous mode (entries 275, 376).",
+          "Let only the main room decide in eco and any usable room in comfort (entry 378).",
+          "Never block heating when no deciding room temperature is usable."
+        ],
+        "must_not": [
+          "Must not end PWM or send CS=10 because of the band.",
+          "Must not add a setting or a REST (HTTP API) or MQTT (message broker) field for the band."
+        ],
+        "exceptions": [
+          "The thermal safe fallback keeps CH=1: it runs when the room data is too old to trust, so the band input is not trustworthy either."
+        ],
+        "verification": [
+          "tests/testsattoleranceband.py. It compiles the real SATchEnable.h helpers and checks:",
+          "the exact boundaries at an error of 0.1 and -0.1, and that the state holds inside the band;",
+          "that a missing room temperature never blocks heating;",
+          "comfort versus eco with a cold zone;",
+          "that a band stop clears only the CH bit.",
+          "It also compiles the real control-tick segment of satControlLoopRun() and checks:",
+          "a warm room sends CH=0 while the setpoint stays real and the PID request is unchanged;",
+          "heating stays off inside the band and resumes below target - 0.1;",
+          "in PWM the mode stays PWM and the on/off schedule keeps toggling during the stop;",
+          "a lit PWM phase and a continuous burn both run 180 s first;",
+          "the cold cutoff is unchanged.",
+          "Source checks:",
+          "only the main CH command reads the band;",
+          "the cold-cutoff threshold has no band code;",
+          "SAT starts with demand on after satDisable().",
+          "Old-vs-fix through OTGWSATINO: on origin/dev before this ADR, 10 of the 11 loop and source tests fail. The one that passes is the cold-cutoff control. On the fix, all 18 pass."
+        ]
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
     }
   ],
   "relationships": [
@@ -17167,6 +17253,18 @@
     {
       "source": "ADR-249",
       "target": "ADR-236",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-250",
+      "target": "ADR-196",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-250",
+      "target": "ADR-199",
       "type": "related",
       "resolved": true
     }

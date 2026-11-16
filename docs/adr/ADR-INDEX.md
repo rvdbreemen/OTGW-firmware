@@ -254,3 +254,4 @@ One row per Architecture Decision Record. Scope is the Enforcement `path_glob` s
 | ADR-247 | Accepted | - | The two PROGMEM assets of ADR-194 may be stored deflated in firmware flash (coordinator decision for TASK-1955 option... |
 | ADR-248 | Accepted | - | The existing climate.Thermostat entity keeps its uniqid and its discovery payload is fixed; the firmware routes the c... |
 | ADR-249 | Accepted | - | SAT switches from continuous to PWM when flow - requested setpoint (the output of the proportional-integral-derivativ... |
+| ADR-250 | Proposed | - | While the tolerance band says stop, the CH-enable bit SAT sends is 0, and nothing else changes: the control setpoint,... |

@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : SATchEnable.h
-**  Version  : v2.0.0-beta.348
+**  Version  : v2.0.0-beta.349
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -16,6 +16,35 @@
 #pragma once
 
 #include <stdint.h>
+#include <math.h>
+
+// Tolerance band on the heating demand (TASK-1887, ADR-250; Sergeant D entries 326, 328, 361, 376, 378, 384). Home Assistant
+// generic-thermostat hysteresis (entry 328): heating stops when the room is at or above target + SAT_TOL_HOT_C and starts again
+// below target - SAT_TOL_COLD_C; inside the band the previous state holds. A stop only clears the CH bit: PWM stays active, the
+// PID and the setpoint keep running (entries 361, 384). Fixed values of entry 326, no setting. thermo-nova has no band.
+static const float SAT_TOL_COLD_C = 0.1f;
+static const float SAT_TOL_HOT_C  = 0.1f;
+
+// The band input: the error (target - room, rounded like satPidError) of the rooms that decide. Entry 378: in ECO only the
+// main room decides; in COMFORT the largest error over the main room and every usable zone, so a cold zone keeps heating on.
+// NAN when no deciding room is usable.
+static inline float satToleranceMaxError(bool roomValid, float roomErr, const float* zoneErr, const bool* zoneUse, uint8_t n,
+                                         bool ecoMode)
+{
+  float m = roomValid ? roomErr : NAN;
+  if (ecoMode) return m;
+  for (uint8_t i = 0; i < n; i++) {
+    if (zoneUse[i] && (isnan(m) || zoneErr[i] > m)) m = zoneErr[i];
+  }
+  return m;
+}
+
+// Latched demand of the band. No usable room temperature (NAN) never blocks heating: the other rules decide.
+static inline bool satToleranceDemand(bool wasOn, float maxErr)
+{
+  if (isnan(maxErr)) return true;
+  return wasOn ? (maxErr > -SAT_TOL_HOT_C) : (maxErr > SAT_TOL_COLD_C);
+}
 
 // Cold cutoff: the requested setpoint (PID output after the solar offset) at or below the per-system
 // cold setpoint (28.2 radiators, 21.0 underfloor) means no heating. thermo-nova uses the same
@@ -53,10 +82,13 @@ static inline bool satColdCutoffLatched(float requestedSetpoint, float coldSetpo
 //                     continuous setpoint: overshoot protection off, DHW active, requested at or
 //                     below cold, no flow temperature)
 //   pwmOn             PWM mode and bPwmFlameRequested, captured right after the PWM step
+//   bandOff           TASK-1887 (entry 384): the tolerance band holds heating off (after the 180 s minimum burn of
+//                     entries 275/376); only the CH bit follows it, the CS and PWM are not touched
 static inline uint8_t satChEnableDecide(float requestedSetpoint, float coldSetpoint,
-                                        bool pwmDrivesSetpoint, bool pwmOn)
+                                        bool pwmDrivesSetpoint, bool pwmOn, bool bandOff = false)
 {
   if (satColdCutoff(requestedSetpoint, coldSetpoint)) return 0;
+  if (bandOff) return 0;
   if (pwmDrivesSetpoint && !pwmOn) return 0;
   return 1;
 }
