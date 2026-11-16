@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-05T20:34:00Z'
-updated_date: '2026-11-16T19:12:00Z'
+updated_date: '2026-11-16T21:07:00Z'
 labels:
   - diagnostics
 milestone: 2.0.0
@@ -26,7 +26,7 @@ Implement ADR-213 decisions 1-4: versioned 4 KiB-block format (16-byte block hea
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [x] #1 Host tests: format round-trip, block-independent decode, refuse-below-5120 B red on an unguarded start and green with the rule, resume record first
-- [ ] #2 Bench .61 (no PSRAM) and a PSRAM board: measured RAM/flash cost and append cost recorded in the task
+- [x] #2 Bench .61 (no PSRAM) and a PSRAM board: measured RAM/flash cost and append cost recorded in the task
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -53,4 +53,6 @@ Stale audit 2026-11-14 (coordinator decision): AC2 needs a bench on .63 (PSRAM) 
 Bench 09 on .61 (no PSRAM), 2.0.0-beta.352+e18ccbf (contains the instrument a10a5cdcd), 14:39-14:49, normal traffic, SAT off: start -> recording, psram false, ring_blocks 1 (4096 B); free heap 58,052 before, 52,692 after start (-5.4 KB), 51.6-52.4 KB during, 56,436 after stop (+4.9 KB back), maxfreeblock 31,732 throughout; append count/avg/max: 1 min 71/84/234 us, 5 min 350/80/234 us, 10 min 688/79/247 us; dropped 0; newest_seq 0 (seq counts 4 KB blocks; ~690 short records fit in one block); hd_min_free_heap 19,584 -> 19,260; no crash; settings restored byte-identical. PSRAM board (.63) after the 20:00 tag; AC2 for 09 to tick once both boards are measured.
 
 Pushed with the instrument in cf29dd198 (beta.352 in the lane), zip beta.356+cf29dd1 posted 1571965973295009792. AC2 still needs the PSRAM board (.63) measurement before 09 ticks it.
+
+AC2 ticked by 09 (2026-11-16): the append cost, the missing part, is now measured on both boards; the RAM/flash cost was recorded earlier (static cost 2026-11-06, PSRAM use 2026-11-14). NO PSRAM, .61 OTGW32, 2.0.0-beta.352+e18ccbf, 14:39-14:49, normal traffic, SAT off: ring 1 x 4096 B in heap; freeheap 58,052 -> 52,692 at start (-5.4 KB), 56,436 after stop; append_count 688 in 10 min (690 at stop), append_avg_us 79, append_max_us 247, dropped 0. PSRAM, .63 Classic, 2.0.0-beta.358+04abbdc (contains 5ca89a057), 21:55-22:06, SAT enabled but inactive, satsimulation false (read 21:55:41): ring 384 x 4096 = 1,572,864 B, psram true; internal freeheap 39,172 -> 39,172 at start, 39,132 after stop (no internal heap cost); append_count 900 in 10 min, append_avg_us 24-26, append_max_us 211 (484 at minute 10), dropped 0, newest_seq 0 -> 1 (block-based seq). Evidence: 09 scratchpad b352/diag/diag.log and d1665psram/diag.log.
 <!-- SECTION:NOTES:END -->
