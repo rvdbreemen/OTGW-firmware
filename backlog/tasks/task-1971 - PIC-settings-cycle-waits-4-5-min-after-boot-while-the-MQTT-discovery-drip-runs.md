@@ -1,11 +1,11 @@
 ---
 id: TASK-1971
 title: PIC settings cycle waits 4-5 min after boot while the MQTT discovery drip runs
-status: In Review
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-15T11:48:00Z'
-updated_date: '2026-11-16T07:31:00Z'
+updated_date: '2026-11-16T07:38:00Z'
 labels:
   - pic
   - bug
@@ -47,5 +47,5 @@ Pushed 56e4250ec..8116b7195 (rebased onto 56e4250ec, src diff vs the benched 7c1
 ## Final Summary
 
 <!-- SECTION:FINAL_SUMMARY:BEGIN -->
-AC1: 09 bench .63, fix 15/15 at 54.9 s after a reset (old 274.9 s). AC2: evaluate.py --quick 88/0 (incl. the ADR-088 burst/cooldown/drip gates); tests/test_pic_settings_cycle_drip.py runs the real dripDueWithinMs, readout block and doTaskEvery3s: fix 5/5, old code 3/5 red (0 PR= in 60 s at phase 0 and 300 ms). AC3 (bench): 09's run above, ticked by 09. Not verified: the 4-5 min drift timing itself (the simulation fixes the phase).
+AC1: 09 bench .63 (Classic, PIC 6.8), same USB-reset reproduction on both builds: OLD beta.339+bd7a133 0/15 PIC fields at 80 s, first field at 228.5 s, 15/15 at 274.9 s; FIX beta.340+7c12dfd fields from the first REST answer (9.3 s), 15/15 at 54.9 s; MQTT connected, no crash fields, settings byte-identical (09 scratchpad t1971/). AC2: evaluate.py --quick 88/0 (incl. the ADR-088 burst/cooldown/drip gates); tests/test_pic_settings_cycle_drip.py runs the real dripDueWithinMs, readout block and doTaskEvery3s: fix 5/5, old code 3/5 red (0 PR= in 60 s at phase 0 and 300 ms). AC3 (bench): the 09 run above, ticked by 09. Not verified: the 4-5 min drift timing itself (the simulation fixes the phase).
 <!-- SECTION:FINAL_SUMMARY:END -->
