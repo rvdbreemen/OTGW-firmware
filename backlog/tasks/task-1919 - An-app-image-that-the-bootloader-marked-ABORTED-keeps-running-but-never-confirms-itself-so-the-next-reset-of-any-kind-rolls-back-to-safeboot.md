@@ -3,11 +3,11 @@ id: TASK-1919
 title: >-
   An app image that the bootloader marked ABORTED keeps running but never
   confirms itself, so the next reset of any kind rolls back to safeboot
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-14T04:02:00Z'
-updated_date: '2026-11-15T19:41:00Z'
+updated_date: '2026-11-16T07:04:00Z'
 labels:
   - bug
   - ota
@@ -29,7 +29,7 @@ Found with the TASK-1774 RTC probe (otgw-bench-tester 09, .63, 2026-11-14 04:50-
 <!-- AC:BEGIN -->
 - [x] #1 otadata dumps in the three states show the mechanism (which entry is active, its state and seq) or refute this reading
 - [x] #2 Robert decides how an ABORTED-running image is handled (options with consequences, put by the coordinator)
-- [ ] #3 If a change is decided: old-vs-fix bench on .63 (panic, ABORTED boot, planned restart: old rolls back, fix per the decision)
+- [x] #3 If a change is decided: old-vs-fix bench on .63 (panic, ABORTED boot, planned restart: old rolls back, fix per the decision)
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -58,4 +58,14 @@ Host: test/host/test_otadata_stale.py compiles the REAL otadataStale block and r
 AC2: decided by the coordinator under Robert's delegation of 2026-11-15 ('Ask me only if you really can't do it yourself. You have my permission.'): a new image that fails before its health gate rolls back to the safeboot updater on the first failure, matching ADR-191; reported to Robert by DM 1571609547100135555 with a revert offer; Robert may still overrule (then revert 0d0606972). AC3: the coordinator accepts .61 as equivalent for the panic case (same esp32-combo image and partition table; the rollback is bootloader and otadata logic, independent of the PIC). Remaining before Done: 09 OTAs a clean beta.327+ on .63 (Classic) for boot plus confirm (part B, no probe), planned 2026-11-16 morning; .63 stays on the public beta overnight. Posted as beta.327+0d06069 (Discord message 1571610902225096879; post build log '✓ App version check ... carries 2.0.0-beta.327+0d06069').
 
 2026-11-15 19:45-19:56 AC3 bench 09 on .61 (OTGW32; never a Classic: the debug/probe images print on UART0). Earlier the same day: ba's first fix 324+c1fa2b2 HUNG early at boot twice (no WiFi, no bootcount, no crashlog; otadata [0] PENDING_VERIFY|[1] NEW then [0] ABORTED|[1] PENDING_VERIFY, then rollback); 324dbg (aaa16db) put the hang between D0 and D1 = inside hasSafeboot() called early in setup(); 324dbg2 (33e7f8a, early lookup + the call after LittleFS.begin) booted through E0..S1 with 'otadata: erased stale sector 1 (...): OK', VALID|VALID after the confirm, no erase on the next boot. A (probe 324probe+a14587c, panics at ~15 s, archive zip sha 7bc93c92...5471): pre [0] seq=1 VALID | [1] seq=1 NEW; OTA via safeboot; ROM console: one probe boot, 'abort() was called at PC 0x420382cf on core 1', the NEXT boot is the updater '[safeboot] app valid 0, rolled back 1' (no second probe boot); telnet 'TASK-1919 probe: abort() before the health gate'; /info app_rolled_back=true; dump [0] seq=1 ABORTED | [1] blank (FF) - the early erase removed the same-seq copy before the crash (the SetupDebugf erase line, OTGW-firmware.ino:346, comes before telnet connects, so the FF sector is the evidence). Old behaviour for contrast (probe1774 on beta.233-era code, 15:21-15:23): the image got a second boot ([0] ABORTED | [1] PENDING_VERIFY) before the rollback. B (clean 324+ba9a2fd, zip d68ac0c6...f74a): upload from safeboot -> 'running 2.0.0-beta.324+ba9a2fd'; B2 (dump while PENDING) deliberately not done: a USB read is a reset and would abort the image (A shows that path); after the confirm (uptime >= 60 s) [0] seq=1 VALID | [1] seq=1 VALID; after the reboot caused by that read still VALID|VALID (no erase); FS ba9a2fd flashed, version.hash ba9a2fd, web UI 200, settings.ini diff empty, bootcount 789; crashlog available = the probe's intentional abort (19:48:24). Evidence: 09 scratchpad t1919/fix324, dbg, dbg2, probe324, fix-ba9a2fd (serial*.log, otadata-*.bin, decode.py).
+
+2026-11-16 06:35-06:40 AC3 part B on .63 (Classic, PIC 6.8), bench 09, on the 08:00 release build 2.0.0-beta.339+bd7a133 (92; sha ino bf311162..bc02, fs f8adb977..04a0, zip 9dd12c53..ce1d; contains 0d0606972). Before: beta.323+0fa19ca, bootcount 147, settings saved. OTA app+fs via safeboot (ota_flash.py): app running bd7a133, fs version.hash bd7a133, bootcount 149 (= +2 OTA restarts), lastreset Software reset. After uptime >= 60 s (06:38:56, app confirmed; no dump while PENDING_VERIFY) esptool --port COM8 read-flash 0xE000 0x2000: [0] seq=1 VALID | [1] seq=1 VALID, both CRC ok (the fix's VALID copy; old code left [1] seq=1 NEW). The esptool reset: back on bd7a133 at 06:39:14, bootcount 150, lastreset 'USB reset (host)', MQTT connected, no crash fields; settings.ini and /api/v2/settings byte-identical to before. Not shown on .63: that the following boot erases nothing (a 2nd dump is another reset; shown on .61 B4). The panic/ABORTED path of AC3 stays the .61 run of 2026-11-15 19:45-19:56, accepted by the coordinator as equivalent. Evidence: 09 scratchpad t1919/c63rel/ (flash.log, otadata-rel-confirmed.bin, esptool-rel.log, S0/S1, crash1.json); decode with t1919/decode.py.
+
+2026-11-16 06:39:48-07:40:20 release soak of beta.339+bd7a133 on .63 (09) after the AC3 dump: bootcount 150 in all 60 samples (baseline = 147 + 2 OTA + 1 dump reset), MQTT 60/60, freeheap 44.3-45.9 KB flat, 0 panic/WDT lines, no crash fields, settings byte-identical; published 08:01:44. 08:03:54 second otadata dump on .63 (the boot after the first dump's reset, release build): [0] seq=1 VALID | [1] seq=1 VALID, CRC ok -> the following boot erased nothing (safebootDropStaleOtadata keeps a same-seq VALID copy), now also shown on the Classic. Evidence: 09 scratchpad t1919/c63rel/ (soak/smoke.log, soak/telnet.raw) and t1971/otadata-old339.bin.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+AC1: otadata dumps on .61 (states REF, A-D, E/G/H) show the mechanism: with one OTA slot esp_rewrite_ota_data() writes the same seq into the other sector, so a failed new image (PENDING_VERIFY -> ABORTED) got a second boot from the NEW copy before safeboot (t1919/, decode.py). AC2: decided by the coordinator under Robert's delegation (2026-11-15, DM 1571609547100135555): a new image that fails before its health gate rolls back to safeboot on the first failure (ADR-191); fix 0d0606972 (beta.327): safebootDropStaleOtadata() erases the stale sector early in setup(), safebootMarkAppValid() writes a VALID copy before the confirm; host test test_otadata_stale.py PASS, mutants MN/MK fail. AC3: old code on .61 (probe1774, 2026-11-15 15:21) got a second boot ([0] ABORTED | [1] PENDING_VERIFY) before rollback; fix on .61 (probe324, 19:45-19:56) rolled back on the first failure ([0] ABORTED | [1] FF), clean image VALID|VALID after the confirm and after the next reboot; Classic .63 (2026-11-16, release build beta.339+bd7a133 containing the fix): after the confirm [0] VALID | [1] VALID, after the next boot still VALID|VALID (no erase), 1 h soak PASS. Not run on the Classic: the panic/probe path (probe images print on UART0 = the PIC link; the coordinator accepted .61, same image and partition table).
+<!-- SECTION:FINAL_SUMMARY:END -->
