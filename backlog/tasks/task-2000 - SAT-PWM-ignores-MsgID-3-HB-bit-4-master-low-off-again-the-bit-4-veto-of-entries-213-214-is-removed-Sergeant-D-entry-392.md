@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-16T11:08:00Z'
-updated_date: '2026-11-16T14:34:00Z'
+updated_date: '2026-11-16T15:27:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -50,4 +50,6 @@ Pushed 7613c4317..9011c3c48 unchanged (beta.350). Build exit 0, 6 min, 'Build co
 Soak 09 on .63 (Classic, PIC 6.8, its standing SAT config, no boiler), beta.350+9011c3c, 13:14-14:15: PASS (60/60 samples at bootcount 169, MQTT 60/60, heap 45.7-46.7 KB, hd_min flat, no panic/WDT, settings byte-identical). pwm_veto_reason 1 / path 1 on beta.349 -> 0 / 0 throughout on 350. SAT entered PWM twice through the normal switch (13:28:33 'Control mode: PWM (flow 31.1 stayed above setpoint 29.0 + 1.5 for 30 s)', SATMODE 1->2, then back to continuous 13:31:33; 13:53:33 again, back 13:56:33); SATTICK 12 x mode=2. On 349 the same unit stayed in continuous behind the MsgID 3 veto. Boiler response not shown (no boiler). Evidence: 09 scratchpad b350\. AC6 (field, indigo_light on the Vitodens) stays open.
 
 2026-11-16 (95) ADR-251 Accepted by Robert (Discord DM 1571893214372438150, answer A, relayed by the coordinator), set through adr-kit accept (strict lint passed after the SAT/PWM acronyms were expanded at first use and the Status line split); README and ADR-INDEX show Accepted. The task has no separate ADR AC; AC6 (field, indigo_light) stays open.
+
+CORRECTION 2026-11-16 (95, from the coordinator) to the .63 soak note above (fcd3c258c): SAT SIMULATION was on on .63 all day. The flow values (31.1 C), the two PWM entries at 13:28:33 and 13:53:33 and SATTICK mode=2 came from the simulator, not from a boiler; they show the firmware path accepts PWM, not real boiler behaviour. Real device evidence from that run is only the REST value pwm_veto_reason/path 1/1 on beta.349 -> 0/0 on beta.350 (MsgID 3 no longer vetoes), plus the stability numbers. The task's ticked ACs rest on host tests and are unaffected; AC6 (field, indigo_light's Vitodens) is the real-boiler proof and stays open.
 <!-- SECTION:NOTES:END -->
