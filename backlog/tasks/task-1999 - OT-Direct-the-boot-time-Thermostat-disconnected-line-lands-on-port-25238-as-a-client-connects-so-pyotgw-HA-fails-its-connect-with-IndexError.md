@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-16T10:48:00Z'
-updated_date: '2026-11-16T12:52:00Z'
+updated_date: '2026-11-16T13:55:00Z'
 labels:
   - bug
   - ot-direct
@@ -42,4 +42,6 @@ Option B (chosen with the advisor; the coordinator preferred C): the boot-time l
 2026-11-16 (95) fix in OTDirect.ino checkThermostatTimeout(): picLine(text, toBridge); the never-seen boot line calls it with toBridge=false. tests/test_otd_thermostat_lines.py: FIX 6/6 OK (never: bridge none, processOT 'Thermostat disconnected'; late: bridge CON;DIS, processOT DIS;CON;DIS); OLD (OTGW_OTD_REV=HEAD = a10a5cdcd, the code before the fix) 2 FAIL (never: bridge 'Thermostat disconnected'; late: bridge DIS;CON;DIS). Also green: test_otd_gateway_alt_slots 12 (1 skip), test_otd_no_setback 4, test_otd_thermostat_loss_time 6, test/host/test_override_reply OK, evaluate --quick 0 failed. AC1/AC2 (pyotgw 2.2.3 connect right after /ReBoot, 5/5 or 10/10, plus a real loss/return on the bridge) are 09's bench on .61; 09's earlier 2/5 failures on beta.341 are the AC1 reproduction if 09 confirms. Open: pyotgw upstream robustness against unsolicited lines (not checked yet; report to Robert).
 
 pyotgw robustness (local read-only copy other-projects/pyotgw-master/pyotgw/pyotgw.py:769-781, version of that snapshot, not checked against current upstream): process_statusfields_v4() splits the line and indexes status_fields[0..13] without checking the field count, so any unsolicited line taken as the PS answer raises IndexError. A length check there would make pyotgw robust against PIC lines too (a real thermostat loss during the handshake still sends one, on a PIC as well). Reported to Robert via the coordinator as a possible upstream issue for mvn23/pyotgw; not filed by us.
+
+Bench 09 on .61 (OTGW32, OT-Direct, no thermostat), 2.0.0-beta.352+e18ccbf, LegacyPort25238Enabled on for the test, 2026-11-16 ~14:2x (09 scratchpad b352\): sha256 match, githash e18ccbf, settings 'changed: none', bootcount only by OTA and the planned reboots, no crash. Raw boot capture: OLD (351+597c163) telnet 'Thermostat disconnected' x1 and bridge 25238 x1; FIX telnet x1 (the processOT line stays), bridge 25238 0 thermostat lines. pyotgw 2.2.3 connect right after /ReBoot (port open 16.7-17.4 s, connect done 18.5-19.3 s): FIX 10/10 OK; on beta.341 this morning 3/5 OK, 2 IndexError at pyotgw.py:778 (+1/1 failed in the heap run). Real thermostat loss/return not benched (no thermostat on .61, no way to simulate): host test only. AC1/AC2 for 09 to tick.
 <!-- SECTION:NOTES:END -->
