@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@system32-030509'
 created_date: '2026-11-09T19:21:00Z'
-updated_date: '2026-11-16T16:36:00Z'
+updated_date: '2026-11-16T23:43:00Z'
 labels:
   - bug
   - crash
@@ -71,6 +71,10 @@ Not this class (2026-11-10, a4): the coredump in gruijter's upload 20261110-1005
 Totals on the fix (ADR-225 builds): 30 (beta.264, no serial) + 60 (beta.353, with serial) = 90 reboots, 0 panics. Rule of three: 95 % upper bound about 3.3 % per reboot, against the 1-in-10 seen on beta.162. Mechanism: ipc1 margin 88 B -> 332-340 B at the deepest point of the GPIO ISR install. AC3 ticked on that before/after. AC2 stays OPEN for the long-uptime and low-heap-boot cases (all 90 reboots started at uptime < 10 min with hd_min ~27 KB). Evidence: 09 scratchpad t1763c/ (results.txt, serial.log, pre.txt, S0/S1.ini).
 
 AC1 ticked by 09 on 2026-11-16 at the coordinator's instruction, on the evidence in comments #1-#3 (code analysis 030509, coredump decode 4c), re-checked by 09 in this session against the saved decode: OTGW-build-archive/coredumps/task-1763-beta162-61/decode.txt (coredump.bin sha256 908d8834773ca65c...). Current thread 'ipc1' (TCB 0x3fcbc338, decode.txt:55/62), exccause 0x41 DebugException, epc6 0x40383bfa (:10/:17). Backtrace :26-41: _frxt_int_enter <- _xt_lowint1 <- vPortExitCriticalSafe / multi_heap_internal_unlock <- multi_heap_malloc(size 8) <- heap_caps_malloc(8, caps 2052) <- esp_intr_alloc_intrstatus_bind(source 16, gpio_intr_service) <- esp_intr_alloc <- gpio_isr_register_on_core_static <- ipc_task. Where: the first GPIO ISR install of the new boot runs through ipc1. Why: a level-1 interrupt frame overran ipc1's 1024 B stack (SP 52 B below the bottom per comment #3); not heap corruption, not OOM.
+
+2026-11-17 00:19-00:41 (09, AC2): 60x POST /ReBoot on .61 (OTGW32, 2.0.0-beta.356+4601510, ADR-225 IPC stack fix), SAT off, satsimulation false, COM4 capture (t1763/reboot_loop.py). Reboot 1 was the LONG-UPTIME case: uptime 2 h 47 min, hd_min_free_heap 16,380 before it. Result 0/60 panics: bootcount 952 -> 1012, +1 each; crashlog no new summary; lastreset 'Software reset'; ipc0/ipc1 stack min after 476/340. Serial: reboots 1-21 each show 'rst:0xc (RTC_SW_CPU_RST)' with 0 Guru/Backtrace/abort/ipc1 hits. After reboot 21 the capture silently got no more data (no read error; probably a stale COM4 handle after USB re-enumeration), so reboots 22-60 are REST-checked only (bootcount, lastreset, crashlog). settings.ini byte-identical.
+
+Bound (exact binomial, 0 failures, 95 %: 1-0.05^(1/n)): 150 reboots on the fix (beta.264: 30, beta.353: 60, beta.356: 60), all REST-checked, 0 panics -> p < 2.0 % per reboot; of those 81 also serial-confirmed (60 + 21) -> p < 3.6 %. Against the 1-in-10 of beta.162, P(0 in 150 | p = 10 %) = 1.4e-7. AC2 stays OPEN for the LOW-HEAP boot only: the beta.162 panic followed a boot with hd_min 3,592 B; the lowest start here was 16,380 B. The long-uptime case (2 h 47 min) is now covered by one reboot. Evidence: 09 scratchpad t1763d/ (results.txt, serial.log, pre.txt, S0/S1.ini).
 <!-- SECTION:NOTES:END -->
 
 ## Comments
