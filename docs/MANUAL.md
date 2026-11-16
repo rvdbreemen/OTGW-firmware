@@ -3224,6 +3224,7 @@ The commands below pass the payload unchanged to the named setting, the same set
 | Topic suffix | Setting |
 |-------------|---------|
 | `sat/overshoot_margin` | `SATovershootmargin` |
+| `sat/pwm_switch_margin` | `SATpwmswitchmargin` |
 | `sat/heating_system` | `SATsystem` |
 | `sat/manufacturer` | `SATmanufacturer` |
 | `sat/max_modulation` | `SATmaxmodulation` |

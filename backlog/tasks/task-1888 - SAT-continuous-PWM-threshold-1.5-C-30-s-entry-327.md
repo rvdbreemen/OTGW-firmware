@@ -5,7 +5,7 @@ status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-13T07:28:00Z'
-updated_date: '2026-11-16T10:19:00Z'
+updated_date: '2026-11-16T13:24:00Z'
 labels:
   - sat
   - adr
@@ -53,6 +53,8 @@ Branch note: the 1888 commits (5dde6269a, 643f4f307) sit on local branch lane/ba
 2026-11-16 Sergeant D entry 379 (Q-327c answered A): a separate 'switch margin' setting, default 1.5 C, range 0.5-5.0, 30 s sustain fixed, the 3.5 C / 30 s fail-safe stays; confirms the implementation and ADR-249 (accepted by Robert earlier the same morning). Build: combo/ba-1888-1983 (with TASK-1983) for 09's bench after 95's slot.
 
 2026-11-16 bench (09, .63 Classic + PIC 6.8, 2.0.0-beta.347+2cb8d28, 11:05-11:12) PASS: OTA added the new key (settings: 152 keys, changed: [satpwmswitchmargin]); GET /api/v2/settings satpwmswitchmargin {value 1.5, type f, min 0.5, max 5}; POST 2.0 -> REST 2.0, settings.ini 'SATpwmswitchmargin': 2.00, /api/v2/sat pwm_switch_margin 2; POST 0.3 -> 0.5 and 6.0 -> 5.0 (clamped in REST, ini and sat JSON alike); back to 1.5; MQTT OTGW/value/<id>/sat/pwm_switch_margin follows on the next SAT publish pass (not on the change itself, the existing pattern for SAT settings); satovershootmargin separate and unchanged (3.0 on .63, its own pre-flash value); the only settings.ini difference is the added line; web UI field in SAT > Curve with label 'PWM switch margin', unit hint, i18n label (checked in the served v2.html, not in a browser). Not benched: the switching behaviour itself (no SAT scenario on hardware per Robert); it rests on the host tests (test_sat_overshoot_sustain 83/83, old 30 FAIL) and the LL contract. Pushed 2cb8d28af, posted Discord 1571831734461530233.
+
+2026-11-16 follow-up: docs/MANUAL.md passthrough table lacked sat/pwm_switch_margin -> SATpwmswitchmargin, so tests/test_sat_mqtt_state.py::test_manual_passthrough_table_equals_kSatMqttCmds failed on origin/dev since 2cb8d28af (found in the TASK-1887 seam sweep; the 1888 test set did not include this file). Row added; 31/31 green.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
