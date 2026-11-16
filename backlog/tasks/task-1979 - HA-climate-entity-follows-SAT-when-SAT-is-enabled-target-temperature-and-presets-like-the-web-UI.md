@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-15T15:53:00Z'
-updated_date: '2026-11-15T21:57:00Z'
+updated_date: '2026-11-16T00:13:00Z'
 labels:
   - feature
   - sat
@@ -27,9 +27,9 @@ Feature request by indigo_light (#beta-testing, https://discord.com/channels/812
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Research: options compared (adapt the existing climate entity while SAT is on vs a separate SAT climate entity), incl. what each means for current HA users (entity id, automations), HA MQTT climate discovery fields (preset_modes, preset_mode_command/state, temperature command to the SAT target), ADR-077/101/140, and SAT preset behaviour cited from thermo-nova (file:line at 7beaaf5) checked against docs/sat/sergeant-d-corrections.md; recommendation decided by Robert
-- [ ] #2 With SAT enabled the HA card's target temperature and preset change SAT's target and preset as the web UI does, and the card shows SAT's state
-- [ ] #3 With SAT disabled the entity behaves as today (TT=)
+- [x] #1 Research: options compared (adapt the existing climate entity while SAT is on vs a separate SAT climate entity), incl. what each means for current HA users (entity id, automations), HA MQTT climate discovery fields (preset_modes, preset_mode_command/state, temperature command to the SAT target), ADR-077/101/140, and SAT preset behaviour cited from thermo-nova (file:line at 7beaaf5) checked against docs/sat/sergeant-d-corrections.md; recommendation decided by Robert
+- [x] #2 With SAT enabled the HA card's target temperature and preset change SAT's target and preset as the web UI does, and the card shows SAT's state
+- [x] #3 With SAT disabled the entity behaves as today (TT=)
 - [ ] #4 Host test on the discovery payload red on the old code, green on the fix; bench on both board types with an HA screenshot
 <!-- AC:END -->
 
@@ -55,4 +55,10 @@ Plan review (advisor, 2026-11-15) and checks, all opened this session: (1) temp_
 Q-1979a decided 2026-11-15 by the coordinator under Robert's directive (CLI) 'Do not wait for Sergeant D. Finish everything that can be finished.'; Sergeant D may overrule, his answer later becomes a follow-up task; asked in the 18-question batch in #dev-sat-mqtt (item 18, https://discord.com/channels/812969634638725140/1105556725714649128/1571633470696980583): option B, keep the entity name 'Thermostat'. Processed into ADR-248 with adr answer (Open Question checked); adr-lint strict passes. ADR-248 accept goes back to Robert via the coordinator.
 
 2026-11-15 23:55 09 bench scope (coordinator, Robert DM 1571643464695943221 answer A: 'a board with SAT switched ON ... no boiler and no SAT control test, only the HA entity'): bench on .61 with beta.330 after the TASK-1966 verdict; satsimulation=true is ONLY the enabler to make SAT active without a boiler (same config as the public beta on .63). No SAT control behaviour is judged in any AC; only the HA climate entity (discovery, card values, TT= vs SAT target routing, republish, heartbeat, health). After the run: satsimulation and satenabled restored, /settings.ini and /api/v2/settings diffed.
+
+AC1 evidence: research recorded in this task (options: adapt the existing climate entity vs a separate SAT entity, discovery per toggle vs fixed) and decided as ADR-248, Accepted by Robert (DM 1571639116955914493).
+
+Bench (09, .61, build 2.0.0-beta.331+e4dbf70 = this change before the rebase onto beta.330; sha ino c836272b...d983 fs f4494e49...9a07; OTA app+fs EXIT 0, device reports e4dbf70; SAT via satsimulation only, no control behaviour judged; card commands sent as HA's MQTT climate sends them, with mosquitto_pub). Retained discovery homeassistant/climate/otgw-1020BA21B4F8/climate/config matches every field (temp_cmd_t .../sat/climate_target, tpl {{ value }}, stat/curr topics, min 5 max 30, pr_modes without none, preset topics, uniq_id ...-otd_thermostat). 1 PASS SAT on: climate_target 20.00, climate_current 20.00, both retained. 2 PASS card 19.5: climate_target 19.50 same second, /api/v2/sat target 19.5, no TT= in telnet. 3 PASS 16 -> preset sleep; 18 (eco == home) -> eco (first match). 4 PASS preset comfort -> target 21. 5 PASS SAT off: climate_target 0.00 (TrSet 0, no thermostat); card 20.5 -> telnet 'OTD: cmd TT=20.5' + 'enqueueWrite: TT -> MsgID 16 frame 0x90101480' (firmware command path, not bus frames: the sim pauses the bus). 6 PASS SAT on again: both topics back in the same second. 7 PASS homeassistant/status offline->online republishes preset, climate_target, climate_current. 8 PASS heartbeat 299 s. 9 PASS no reboot, no crash record, heap_free 57144, settings restored byte-identical. Evidence: 09 scratchpad b331/ (run.md, bus.log, telnet.raw).
+
+Cosmetic (09 bench, check 5): with SAT off and no thermostat, Tr is NaN so sat/climate_current is not republished and the retained value stays SAT's last room temperature (19.95): the card shows a stale current temperature until a thermostat reports Tr. Not a blocker; left as is. AC4 stays open: the HA card screenshot (Docker down at 3.5 GB free; coordinator: later at >= 6 GB free) and the second board type (Classic) are not benched.
 <!-- SECTION:NOTES:END -->

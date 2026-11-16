@@ -3,11 +3,11 @@ id: TASK-1867
 title: >-
   SAT pressure-drop alarm fires on a normal cool-down (gruijter 2026-11-12 07:22
   and 2026-11-11 21:45, beta.182)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-12T12:09:00Z'
-updated_date: '2026-11-15T23:20:00Z'
+updated_date: '2026-11-16T00:14:00Z'
 labels:
   - sat
   - bug
@@ -53,4 +53,12 @@ Implementation (92, impl agent, verified by 92 2026-11-16): satUpdatePressure() 
 Evidence (run by 92): tests/test_sat_pressure_alarm_replay.py PressureAlarmReplayFixed + SyntheticLoss with OTGW_SAT_INO = origin/dev SATcontrol.ino: Ran 5, FAILED (failures=4) (field alarms 01:31/07:22 still fire, assumed-seed 21:45 fires, leak-after-CH timing). Fix, whole file: Ran 9, OK. Alarm onsets: gruijter replay old 01:31:24.99 + 07:22:54.99, B-only adds 10:28:24.99, A none; synthetic 0.5 bar/h leak with a CH change at 120 s: old 840 s, B-only 1140 s, A 1440 s (+600 s vs old, the cost of A); without a CH change 420 s on all. The B-only red: the 10:28:24 assertion fails on the B-only copy (impl agent). run_tests test_sat_pressure_alarm_replay/test_sat_pressure_health/test_sat_ch_signals PASS; evaluate --quick 0 failed. Note: the thermo-nova oracle in test_sat_pressure_health.py now has drop_settle_samples=True (our deliberate deviation, entry 362 + A); False gives thermo-nova as written.
 
 Choice A confirmed by Robert (maintainer): reply 'A' to Q-1867b, 2026-11-15 23:11:14 UTC, https://discord.com/channels/812969634638725140/1105556725714649128/1571663900985000038; recorded as entry 372.
+
+Bench smoke (09, .61, beta.331+e4dbf70, coordinator: smoke only): sat/pressure_alarm false at every publish and in /api/v2/sat at every step incl. a SAT off/on toggle. Limit: no pressure sensor on that bench (pressure 0.00, pressure_health OFF), so this only shows no alarm out of nothing; the alarm logic is proven by the host replay.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+False SAT pressure-drop alarms after a pump stop (gruijter, beta.182) fixed: readings of the 600 s settle window after a CH-mode change are not recorded (entry 362, B) and the first fit after a settle waits for 600 s of fresh readings (choice A, entry 372, Robert). AC1-3: replay of gruijter's MsgID 18 series reproduces the 01:31 and 07:22 alarms on the old code (tests/test_sat_pressure_alarm_replay.py, real host-compiled satUpdatePressure). AC4-6: fix tests FAILED (failures=4) on origin/dev code, Ran 9 OK on the fix; 0.5 bar/h leak after a CH change alarms at 1440 s (old 840 s), without a CH change 420 s on both; evaluate --quick 0 failed. Bench smoke 09 on beta.331+e4dbf70: no alarm (no pressure sensor on that bench). Not verified: a real pressure loss on hardware. Commit 2217f8f3f (beta.332).
+<!-- SECTION:FINAL_SUMMARY:END -->
