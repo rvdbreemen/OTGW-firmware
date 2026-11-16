@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-16T10:42:00Z'
-updated_date: '2026-11-16T16:29:00Z'
+updated_date: '2026-11-16T16:39:00Z'
 labels:
   - needs-maintainer-ok
   - sat
@@ -41,4 +41,6 @@ Open design questions for Sergeant D (one per message, each with the release sco
 2026-11-16 13:25-13:29 UTC #alpha-testing: indigo_light asked whether to long-run before AND after upgrading to beta.350 (1571878962584363120); Sergeant D: 'No, just run beta.350' (1571879271532724316); indigo: 'Will do' (1571879975194333316). The capture this task waits for is therefore a beta.350 long-run.
 
 2026-11-16 indigo_light capture on beta.350 (real Vitodens, SAT on, simulation off), analysed by comms 92; archived at RvdB/OTGW-field-data/indigo_light/20261116-144953/ (zip sha256 1573a14c...bd84; analysis/ holds the summary, the SAT timeline and charts). Findings, facts from the telnet/OT log: (1) PWM now runs (see TASK-2000). (2) Mode ping-pong 16:17-16:39: enter PWM on flow >= request + 1.5 for 30 s (TASK-1888 rule), back to continuous about 2 min later on 'flame on and request above flow for 60 s' (ADR-236 exit), four times; the flame itself burned 1955 s without a break, peak flow 43.6. (3) The first PWM entry at 16:00:58 was triggered by flow 67.3 while no CH flowed: boiler water hot from DHW burns, during a band pause; the PWM ON phase that followed had no flame and counted as a start (starts/hr 2), the entry 398 case. (4) Seven DHW burns of 1-16 s (15:15-15:53, flow 61-73) were logged as SAT cycles #2-#5 and in the 4 h window (n=5, avgOn 87 s); entry 390 says such burns must not affect SAT: whether they change a control decision is not shown by this capture and stays open here. (5) The band worked: CH off at 14:53:58 (room 20.76, target 20.5) with PWM active, resumed 16:14:58. Not known from the log: whether the DHW burns were taps or keep-warm (question for indigo). Report sent to Sergeant D by DM (1571924364050432032) with the overview chart; to Robert via the coordinator.
+
+2026-11-16 Q-1998b queued for Sergeant D (after Q-2005a): do the short DHW burns belong in SAT's cycle statistics and 4 h window (7 burns of 1-16 s logged as SAT cycles #2-#5, window n=5), given entry 390? If he answers they must not count, the fix goes into 2.0.0 (coordinator).
 <!-- SECTION:NOTES:END -->
