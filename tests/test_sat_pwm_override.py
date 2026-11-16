@@ -502,7 +502,25 @@ def extract(src: str) -> str:
     block = src[a:b]
     m = re.search(r"^static uint8_t satComputeMM\(.*?^\}\s*$", src, re.S | re.M)
     mm = m.group(0) if m else ""
-    return block + "\n" + mm + "\n" + extract_tick(src)
+    tick = extract_tick(src)
+    return start_gate_prelude(src, block + tick) + block + "\n" + mm + "\n" + tick
+
+
+def start_gate_prelude(src: str, body: str) -> str:
+    """TASK-1942 (entries 385/387/389/391): the real start gate (its state and satStartGateActive()) sits above the PWM
+    block in SATcontrol.ino; satSetControlMode() and satDisable() clear it, the flame edge anchors it and the PWM exits read
+    it, so a harness that cuts any of those needs it. Returns the gate block when `src` has it and `body` does not, plus a
+    no-op satPwmFirstStart() when `body` calls it without defining it (the heating start has many dependencies;
+    tests/test_sat_pwm_first_start.py runs the real one). Empty on code before TASK-1942."""
+    if "static const uint32_t SAT_START_GATE_MS" not in src or "static const uint32_t SAT_START_GATE_MS" in body:
+        return ""
+    src = src.replace("\r\n", "\n")
+    g0 = src.index("static const uint32_t SAT_START_GATE_MS")
+    g1 = src.index("\n}\n", src.index("static bool satStartGateActive()")) + 3
+    gate = src[g0:g1] + "\n"
+    if "satPwmFirstStart()" in body and "static void satPwmFirstStart()" not in body:
+        gate += "static void satPwmFirstStart() {}\n"
+    return gate
 
 
 def _vcvars():

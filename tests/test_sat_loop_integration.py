@@ -47,13 +47,22 @@ _CACHE = {}
 _TMP = tempfile.TemporaryDirectory()
 
 
+def driver_with_burn():
+    """The shared driver plus one command, `burn`: the burner is lit at the start of the run with CH on (a boiler that was already burning
+    when SAT came on). Added here by text patch; the shared driver file is not edited."""
+    d = B.rd(HERE / "sat_loop_driver.inc")
+    old = "    else return 2;"
+    assert d.count(old) == 1
+    return d.replace(old, '    else if (!strcmp(cmd, "burn")) { bo.flame = true; bo.ch = true; bo.cs = 60.0f; bo.flameChangeMs = g_ms; statusFrame(); }\n' + old)
+
+
 def build(name="base", overrides=None):
     """Compile one variant (cached). Returns the exe path; a compile error raises RuntimeError (never a silent skip)."""
     if name in _CACHE:
         return _CACHE[name]
     d = Path(_TMP.name) / name
     d.mkdir()
-    (d / "t.cpp").write_text(B.assemble(overrides=overrides), encoding="utf-8")
+    (d / "t.cpp").write_text(B.assemble(driver=driver_with_burn(), overrides=overrides), encoding="utf-8")
     rc, out = B.cl_compile(d / "t.cpp", d / "t.exe")
     if rc is None:
         raise unittest.SkipTest("no host C++ compiler (MSVC) found")
@@ -192,7 +201,10 @@ def check_s3b(tc, r):
 
 
 # ---- scenario 4: queue full: a refused CS= is not cached as delivered and is retried --------------------------------------------------
-S4 = (["run 100000", "snap old", "outside 0", "echomute 1"] +
+# Entry 385: a heating start now runs in PWM and leaves it at about 120 s, which moves the CS inside this window. The case is about the queue
+# (a refused CS is not cached and is retried with the same value), not the mode, so SAT comes on while the burner already burns: that is
+# no heating start (the rule tests/test_sat_pwm_first_start.py pins as (g)) and the run stays in continuous, as before entry 385.
+S4 = (["burn", "flow 31", "run 100000", "snap old", "outside 0", "echomute 1"] +
       [x for k in range(1, 31) for x in ("fill 20", "run %d" % (100000 + 2000 * k))] +     # the queue is topped up every 2 s for 60 s
       ["snap full", "echomute 0", "run 330000", "snap drained"])
 
@@ -207,7 +219,9 @@ def check_s4(tc, r):
     tc.assertAlmostEqual(float(full["lastCS"]), old_cs, 1, "a refused CS= was cached as delivered: last-sent CS %s (was %.1f)" % (full["lastCS"], old_cs))
     new = [float(x[3:]) for t, x in r.tx(160500, 330000, "CS=") if abs(float(x[3:]) - old_cs) > 0.05]
     tc.assertTrue(new, "the refused CS= was not retried after the queue drained: " + r.dump(160500, 330000, 40))
-    tc.assertAlmostEqual(new[0], changed[0], 1, "the retry carried %.1f, the refused value was %.1f" % (new[0], changed[0]))
+    # the retry carries what SAT wants now: the LAST refused value (the CS still moves inside the 60 s full window since the start
+    # comes after the entry 388 boot silence; the first refused value can be an earlier step of that move)
+    tc.assertAlmostEqual(new[0], changed[-1], 1, "the retry carried %.1f, the last refused value was %.1f" % (new[0], changed[-1]))
 
 
 def check_ownership(tc, r):
@@ -289,7 +303,10 @@ def check_s7(tc, r):
     # the not-valid hand-back is queued in the same pass as SAT's takeover: on the wire only SAT's own values appear,
     # no release frame (CS=0, MM=T) is left between the silence and the takeover
     after = [x for t, x in r.tx(BOOT_SILENCE_MS, BOOT_SILENCE_MS + 5000) if x.startswith(SAT_CMDS)]
-    release = [x for x in after if x in ("CS=0", "CS=0.0", "MM=T")]
+    # MM=T is also SAT's own value in a PWM ON phase at the maximum duty (TASK-1581, SATcontrol.ino satSendMM), which a cold
+    # PWM-first start reaches at once (TASK-1942, entries 385/389): it is a release only before SAT's first own CS
+    first_cs = next((i for i, x in enumerate(after) if x.startswith("CS=") and float(x[3:]) > 10.05), len(after))
+    release = [x for x in after if x in ("CS=0", "CS=0.0")] + [x for x in after[:first_cs] if x == "MM=T"]
     tc.assertEqual(release, [], "a hand-back frame reached the wire right after the silence: %r" % after)
     tc.assertTrue(all(float(x[3:]) > 10.05 for x in after if x.startswith("CS=")), "a CS after the silence is not SAT's setpoint: %r" % after)
     pwm_early = [t for t, x in r.kind("MODE", 0, BOOT_SILENCE_MS) if x == "2"]

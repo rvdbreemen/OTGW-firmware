@@ -110,6 +110,7 @@ static OTSys OTcurrentSystemState;
 static uint32_t g_ms = 1000000UL; static float g_flow = 50.0f; static float g_cold = 28.2f;
 static uint32_t g_onTimeMs = 0; static bool g_idle = false;
 static float _sat_requestedSetpoint = 0.0f;
+static bool satStartGateActive() { return false; }   // TASK-1942 (entries 385/387): no start gate here; tests/test_sat_pwm_first_start.py runs the real one
 static const float SAT_MIN_SETPOINT = 10.0f;   // SATcontrol.ino:129
 static uint32_t millis() { return g_ms; }
 static float satGetFlowTemp() { return g_flow; }

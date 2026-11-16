@@ -24,7 +24,7 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from test_sat_pwm_override import compile_cpp, extract_cold_cut  # noqa: E402
+from test_sat_pwm_override import compile_cpp, extract_cold_cut, start_gate_prelude  # noqa: E402
 
 SAT_INO = Path(os.environ.get("OTGW_SAT_INO", REPO / "src" / "OTGW-firmware" / "SATcontrol.ino"))
 
@@ -232,6 +232,7 @@ def build_source(src: str) -> str:
         pre = ("static void satNoReturnFloodOnFlameEdge(bool, bool) {}\nstatic void satNoReturnFloodStep() {}\n"
                "static void satMiStep() {}\n")
         flood = ""
+    pre += start_gate_prelude(src, cmd + pwm + flood)   # TASK-1942: the real start gate the PWM block now uses
     return STUBS + pre + cmd + "\n" + pwm + "\n" + flood + "\n" + MAIN
 
 

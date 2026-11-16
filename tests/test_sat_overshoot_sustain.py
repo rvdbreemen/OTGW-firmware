@@ -73,6 +73,7 @@ static bool _sat_followNarrPending = false;
 static bool _sat_narrAtMax = false;
 static bool _sat_narrCold = false;
 static bool _sat_bootBoilerLogged = false;
+static bool satStartGateActive() { return false; }   // TASK-1942: no start gate here; tests/test_sat_pwm_first_start.py runs the real one
 static bool _sat_bootOutsideLogged = false;
 enum SATControlMode { SAT_MODE_OFF = 0, SAT_MODE_CONTINUOUS = 1, SAT_MODE_PWM = 2 };
 struct SatSettings { float fOvershootMargin = 2.0f; float fPwmSwitchMargin = 1.5f; };   // TASK-1888
@@ -763,7 +764,8 @@ class LowLoadEntryCells(unittest.TestCase):
         # The loop cannot be sliced (static, hardware-bound), so this is a source assertion. thermo-nova update():
         # `if requested >= maximum_setpoint: pwm.disable()` precedes `_maybe_enable_pwm_on_sustained_overshoot` (heating_control.py:203-210).
         s = SAT_INO.read_text(encoding="utf-8").replace("\r\n", "\n")
-        a = s.index("if (pidOutput >= maxSetpoint && state.sat.eControlMode == SAT_MODE_PWM) {")
+        # prefix: TASK-1942 (entries 385/389) adds '&& !satStartGateActive()'; the order this test pins is unchanged
+        a = s.index("if (pidOutput >= maxSetpoint && state.sat.eControlMode == SAT_MODE_PWM")
         b = s.index("satCycleCheckOvershootSwitch(pidOutput, _sat_tickMs);")
         self.assertLess(a, b)
 

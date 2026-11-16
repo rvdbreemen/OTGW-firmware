@@ -190,7 +190,11 @@ class ContinuousStartup(unittest.TestCase):
     def test_window_starts_on_a_ch_flame_edge_only_and_closes_when_the_flame_goes_off(self):
         s = self.src
         self.assertIn("static const uint32_t SAT_CONT_STARTUP_MS = 60000UL;", s)   # entry 344
-        self.assertIn("if (currentFlame && !dhwBitNow && _sat_flameOffSeen) { const uint32_t n = millis(); _sat_chFlameOnMs = n ? n : 1; }", s)
+        # TASK-1942 (entries 385/387) made this one statement a block that also anchors the start gate: same edge, same anchor
+        # exactly the anchor statements, then only the start-gate line of TASK-1942, nothing else in the block
+        self.assertRegex(s, r"if \(currentFlame && !dhwBitNow && _sat_flameOffSeen\) \{(?:[ \t]*//[^\n]*)?\s*"
+                            r"const uint32_t n = millis\(\);\s*_sat_chFlameOnMs = n \? n : 1;\s*"
+                            r"if \(_sat_startGate && _sat_startFlameOnMs == 0\) _sat_startFlameOnMs = _sat_chFlameOnMs;[^\n]*\s*\}")
         # TASK-1942: a flame already burning when SAT is switched on is no CH start (no window, no continuous flood)
         self.assertIn("if (!currentFlame) _sat_flameOffSeen = true;", s)
         self.assertIn("_sat_flameOffSeen = false;             // TASK-1942", s)

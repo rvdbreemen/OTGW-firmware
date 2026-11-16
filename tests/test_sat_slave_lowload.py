@@ -217,7 +217,13 @@ def build_source():
         "void satNoteSlaveConfig(uint8_t hb)", "bool satPwmPermitted()", "void satPwmNoteRefused(uint8_t path)",
         "bool satPwmEntryAllowed(uint8_t path)", "bool satCycleCheckLowLoadVeto()"))
     # the old harness sources (before the fix) lack the permission functions: the matching fn() calls return "" then
-    return flags + stubs + EXTRA_STUBS + real + "\n" + handler + "\n" + restore + "\n" + body + "\n" + perm + MAIN
+    gate = ""
+    if "static const uint32_t SAT_START_GATE_MS" in sat:   # TASK-1942: state the cut functions touch; the gate itself is stubbed in sustain.STUBS
+        gate = ("static bool _sat_startGate = false, _sat_startPwmWanted = false, _sat_heaterOn = true;\n"
+                "static uint32_t _sat_startFlameOnMs = 0;\nstatic void satStartGateOpen() {}\n")
+        if "satGetFlowTemp()" in restore and "satGetFlowTemp()" not in stubs + EXTRA_STUBS:
+            gate += "static float satGetFlowTemp() { return 50.0f; }\n"
+    return flags + stubs + EXTRA_STUBS + gate + real + "\n" + handler + "\n" + restore + "\n" + body + "\n" + perm + MAIN
 
 
 class SlaveLowLoad(unittest.TestCase):
@@ -266,11 +272,13 @@ class SlaveLowLoad(unittest.TestCase):
         self.assertEqual((allowed["reason"], allowed["path"]), ("0", "0"), "no refusal when permitted")
 
     def test_restart_restore_of_pwm_ignores_msgid3(self):
-        self.assertEqual(self.run_sc("restore", 1, 0, 1)["mode"], "2", "control: saved PWM comes back when permitted")
-        for valid, denied, why in ((1, 1, "bit 4 = 1"), (0, 0, "no valid reply yet (a fresh restart)")):
+        # TASK-1942 (entries 385/387 reason 1): initSAT() no longer applies the saved PWM while the heater may be OFF; it arms the
+        # deferred restore, which brings PWM back on the first pass with a running heater and a known flow, without waiting for
+        # MsgID 3 (entries 392/393; the deferred_restore cases below pin that). At init: continuous, nothing refused, whatever MsgID 3 says.
+        for valid, denied, why in ((1, 0, "permitted"), (1, 1, "bit 4 = 1"), (0, 0, "no valid reply yet (a fresh restart)")):
             with self.subTest(why=why):
                 r = self.run_sc("restore", valid, denied, 1)
-                self.assertEqual((r["mode"], r["reason"]), ("2", "0"), "entries 392/393: the saved PWM comes back at once: " + why)
+                self.assertEqual((r["mode"], r["reason"]), ("1", "0"), "entries 392/393 + TASK-1942: armed, nothing refused: " + why)
         self.assertEqual(self.run_sc("restore", 1, 1, 0)["reason"], "0", "nothing saved: nothing refused")
 
     # Entries 121 + 213 + 215 together (our reading): the restore waits for the first valid reply after the boot.
@@ -372,7 +380,10 @@ class SlaveLowLoad(unittest.TestCase):
         calls = re.findall(r"satSetControlMode\(SAT_MODE_PWM\)", sat + self.cyc)
         # direct callers: the restore (at init and deferred), the overshoot switch and the end-of-cycle switch (TASK-1331) (the command passes the mode through a ternary, checked below); each asks satPwmEntryAllowed(), and satSetControlMode() checks again
         self.assertEqual(len(calls), 4, calls)
-        for text in (sustain._fn(sat, "static void satRestoreControlMode()"), sustain._fn(self.cyc, "bool satCycleCheckOvershootSwitch(float requestedSetpoint, uint32_t tickMs)"),
+        # TASK-1942: the restore enters PWM in its deferred step (not at init); the heating start satPwmFirstStart() relies on the
+        # last-line check inside satSetControlMode() itself, pinned below
+        self.assertIn("satPwmPermitted()", sustain._fn(sat, "static void satSetControlMode(SATControlMode m)"))
+        for text in (sustain._fn(sat, "static void satRestoreDeferredStep()"), sustain._fn(self.cyc, "bool satCycleCheckOvershootSwitch(float requestedSetpoint, uint32_t tickMs)"),
                      sustain._fn(self.cyc, "static void satCycleApplyEndOfCycle(SATCycleClass cls, bool pwmEnabled)")):
             self.assertIn("satPwmEntryAllowed(", text)
         self.assertIn("satPwmEntryAllowed(3) ? SAT_MODE_PWM", sat)

@@ -130,6 +130,8 @@ static bool satCycleCheckLowLoadVeto() { return false; }
 static void satPwmReset() {}
 static void satCycleSkipAutoSwitch() {}
 static void satDiagEventsReset() {}   // TASK-1882: called by satDisable(); tested in tests/test_sat_diag_events.py
+static bool _sat_heaterOn = true, _sat_startPwmWanted = false, _sat_startGate = false;   /* heater running: the deferred PWM restore may act */ static uint32_t _sat_startFlameOnMs = 0;
+static float satGetFlowTemp() { return 50.0f; }   // TASK-1942: the deferred restore waits for a known flow; known here   // TASK-1942: reset by satDisable(); tested in tests/test_sat_pwm_first_start.py
 static float _sat_lastControlCS = 0, _sat_requestedSetpoint = 0;
 static bool _sat_thermalSafeActive = false, _sat_roomLostActive = false, _sat_fireplaceActive = false;   // TASK-1374: satDisable() resets it
 static int16_t satPreSatPersisted(bool) { return 0; }   // TASK-1541
@@ -221,6 +223,7 @@ int main(int argc, char** argv) {
   if (!strcmp(sc, "pwm_boot")) {       // the next boot: initSAT()'s enabled branch
     state.sat.eControlMode = SAT_MODE_OFF;
     initModeBranch();
+    printf("RESTORE %d\n", (int)_sat_pwmRestore);   // TASK-1942: armed for the deferred step
     printf("MODE %d\n", state.sat.eControlMode);
     return 0;
   }
@@ -462,7 +465,10 @@ class Persistence(unittest.TestCase):
         wd = tempfile.mkdtemp(dir=Harness.dir.name)
         run("pwm_set", workdir=wd)
         _, out = run("pwm_boot", workdir=wd)
-        self.assertIn("MODE 2", out)
+        # TASK-1942 (entries 385/387 reason 1): the saved PWM flag is no longer applied at initSAT() while the heater may be OFF;
+        # it arms the deferred restore, which enters PWM once the heater runs and the flow is known (tests/test_sat_pwm_first_start.py)
+        self.assertIn("RESTORE 1", out)
+        self.assertIn("MODE 1", out)
 
     def test_no_pwm_file_boots_continuous(self):
         _, out = run("pwm_boot")

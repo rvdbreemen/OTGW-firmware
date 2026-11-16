@@ -65,6 +65,7 @@ struct OTSys { float MaxTSet = 0.0f; uint16_t MaxTSetUBMaxTSetLB = 0; };
 static Settings settings; static OTSys OTcurrentSystemState;
 struct SatState { uint8_t iShVerdict = 0; }; struct State { SatState sat; }; static State state;   // TASK-1412.13
 static bool satIsEnabled() { return settings.sat.bEnabled; }
+static bool satStartGateActive() { return false; }   // TASK-1942 (entries 385/387): the at-max block asks it; the gate is tested in test_sat_pwm_first_start.py
 static bool satShCurrent() { return true; }   // TASK-1541: the hand-back restore is tested in test_sat_disable_handback.py
 static void satShNoteBeforeSend(float) {}
 static bool g_hasOT = true;

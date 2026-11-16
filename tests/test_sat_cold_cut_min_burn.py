@@ -123,6 +123,11 @@ def build(workdir: Path):
     for name, stub in (("satCurveTuneNoteNotControlling", "static void satCurveTuneNoteNotControlling(){ }"),):
         if name not in body:
             pre += stub + "\n"
+    # TASK-1942 (entries 385/387): the PWM-first start lives outside this slice. Stubbed as 'no new heating start, no start
+    # gate', so this test keeps judging the cold cutoff hold of TASK-1652 alone; tests/test_sat_pwm_first_start.py runs the real one.
+    if "static bool satStartGateActive" not in body:
+        pre += ("static bool _sat_heaterOn = true; static bool _sat_startGate = false;\n"
+                "static bool satStartGateActive() { return false; }\nstatic void satPwmFirstStart() { }\n")
     cycles = "static uint32_t satPwmLastOffTimeMs() { return _pwm_lastOffTimeMs; }\n" + base.extract_cycles()
     flag = "#define HAS_REQSP 1\n" if "_sat_requestedSetpoint" in body else ""
     stubs = (base.STUBS.replace("@FORCEFIELD@", "").replace("@AUTOFIELD@", "")
@@ -222,7 +227,8 @@ class ColdCutMinBurnSource(unittest.TestCase):
         for marker in ("OTcurrentSystemState.SlaveStatus & 0x01",        # boiler fault: tick skipped
                        "if (!state.sat.bValvesOpen) {",                   # valves closed: heater off
                        "satCycleCheckLowLoadVeto();",                     # boiler withdrew low-off permission
-                       "if (pidOutput >= maxSetpoint && state.sat.eControlMode == SAT_MODE_PWM) {"):
+                       # prefix: TASK-1942 (entries 385/387) adds '&& !satStartGateActive()' to this condition
+                       "if (pidOutput >= maxSetpoint && state.sat.eControlMode == SAT_MODE_PWM"):
             self.assertLess(loop.index(marker), defer, marker)
 
     def test_only_the_cold_cut_helpers_read_the_flag(self):

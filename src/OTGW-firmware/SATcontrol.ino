@@ -962,6 +962,26 @@ static bool _sat_flameOffSeen = false;
 static float _sat_contFlameOffHold = 0.0f;   // TASK-1942: the flame-off CS of the continuous start (satContinuousSetpoint), 0 = none
 static float satContinuousSetpoint(float pidOutput, float previousCS);   // TASK-1942: used by the no-return flood above its definition
 
+// Entries 385 and 387 (Sergeant D, 2026-11-16): every heating start runs in PWM first; PWM or continuous is chosen only after the start
+// sequence, which ends SAT_START_GATE_MS after the first CH flame-on of the start (the 60 s start-up follow of entries 344 and 347).
+// Thermo-nova starts in continuous and reaches PWM only through the overshoot switch (heating_control.py:229-231, :262-305; pwm.py:63,
+// :89): the firmware differs on purpose. Until the gate ends, the PWM -> continuous exits of the sustained rules stay quiet (max setpoint,
+// underheat, saturation, the underheat verdict at flame off); the boiler's MsgID 3 veto (entry 214) is a safety rule and works throughout.
+static const uint32_t SAT_START_GATE_MS = 60000UL;
+static bool     _sat_heaterOn         = false;   // heater state of the last control tick: false = OFF (cold cutoff, valves closed, summer simmer, SAT off)
+static bool     _sat_startGate        = false;   // a start that entered PWM is inside its start sequence
+static uint32_t _sat_startFlameOnMs   = 0;       // millis() of the first CH flame-on of that start, 0 = no flame yet
+static bool     _sat_startPwmWanted   = false;   // a start wanted PWM but the MsgID 3 permission or the flow temperature was unknown: the deferred restore or the next tick enters it
+
+// True from the PWM entry of a start until SAT_START_GATE_MS after its first CH flame-on (or until the mode leaves PWM, which clears the gate).
+static bool satStartGateActive()
+{
+  if (!_sat_startGate) return false;
+  if (state.sat.eControlMode != SAT_MODE_PWM) { _sat_startGate = false; return false; }
+  if (_sat_startFlameOnMs != 0 && (uint32_t)(millis() - _sat_startFlameOnMs) >= SAT_START_GATE_MS) { _sat_startGate = false; return false; }
+  return true;
+}
+
 // --- Timer for control loop (initial value, updated from settings in initSAT) ---
 DECLARE_TIMER_SEC(timerSATControl, settings.sat.iControlInterval, CATCH_UP_MISSED_TICKS);
 // Scheduled time of the control tick that is running (see satControlLoopRun()); the time base of the sustained
@@ -1896,7 +1916,8 @@ void satPwmReset()
 // continuous stint into the next. Firmware choice: thermo-nova has no mode command; it clears the start on
 // the next update while PWM is enabled (heating_control.py:264-266).
 // PWM is entered only with the boiler's MsgID 3 permission (satPwmPermitted(); always true since entries 392/393, MsgID 3 plays no part). The callers check it first
-// to log their own path; this check is the last line, so no entry path can bypass the veto.
+// to log their own path (satPwmFirstStart() relies on this check and is logged as path 0); this check is the last line, so no entry
+// path can bypass the veto.
 
 static void satSetControlMode(SATControlMode m)
 {
@@ -1907,6 +1928,7 @@ static void satSetControlMode(SATControlMode m)
   if (m != state.sat.eControlMode) {
     // TASK-1521: every mode change in one place; the callers narrate their own reason
     SATDebugTf(PSTR("SATMODE from=%d to=%d\r\n"), (int)state.sat.eControlMode, (int)m);
+    _sat_startGate = false;   // entries 385/387: a start sequence belongs to the PWM stint that satPwmFirstStart() opens after this call
     satPwmReset();
     satCycleSkipAutoSwitch();
     // thermo-nova runs pwm.update() in the same update() pass that enables PWM (heating_control.py:206-215),
@@ -1929,13 +1951,16 @@ static void satSetControlMode(SATControlMode m)
 //   _control_setpoint = MINIMUM_SETPOINT, relative modulation = maximum_relative_modulation (:233-234).
 // thermo-nova's control_mode is CONTINUOUS while PWM is not enabled (heating_control.py:148-152). The firmware
 // mirrors that by always leaving PWM mode here (the Force PWM option was removed, Sergeant D 2026-10-23,
-// entry 13). PWM comes back through the overshoot auto-switch: the sustained-overshoot re-enable
-// (heating_control.py:280-304) is mirrored by satCycleCheckOvershootSwitch(); the second re-enable, on_cycle_end() after
-// a continuous cycle classified OVERSHOOT (pwm.py:219-223), by satCycleApplyEndOfCycle() at flame off (TASK-1331). The summer simmer path is a firmware
-// feature without a thermo-nova counterpart and calls this too, as its heater state is OFF (TASK-1362).
-// Sergeant D 2026-10-23, docs/sat/sergeant-d-corrections.md entry 12.
+// entry 13). PWM comes back at the next heating start: satPwmFirstStart() enters it when the heater goes OFF -> ON (entries 385 and
+// 387; a deliberate difference from thermo-nova, which starts in continuous). The overshoot auto-switch still re-enables it during a
+// burn: the sustained-overshoot re-enable (heating_control.py:280-304) is mirrored by satCycleCheckOvershootSwitch(); the second
+// re-enable, on_cycle_end() after a continuous cycle classified OVERSHOOT (pwm.py:219-223), by satCycleApplyEndOfCycle() at flame off
+// (TASK-1331). The summer simmer path is a firmware feature without a thermo-nova counterpart and calls this too, as its heater state is
+// OFF (TASK-1362). Sergeant D 2026-10-23, docs/sat/sergeant-d-corrections.md entry 12.
 static void satPwmDisableOnHeaterOff()
 {
+  _sat_heaterOn = false;                      // the next tick with heat demand is a heating start (entries 385, 387)
+  _sat_startPwmWanted = false;
   if (state.sat.eControlMode == SAT_MODE_PWM) {
     satSetControlMode(SAT_MODE_CONTINUOUS);
     satNarrate_P(PSTR("Control mode: continuous (heating off, PWM ended)"));   // TASK-1521
@@ -3954,7 +3979,9 @@ static void satSavePwmEnabled(bool enabled)
 // (pwm.py:111-114). Entries 213 and 215: only with the boiler's MsgID 3 permission, which a restart has not seen yet.
 // Our reading of 121 + 213 + 215 together: the restore is deferred. SAT starts in continuous and keeps the saved flag
 // (satPwmSaveStep() does not overwrite it); the FIRST valid MsgID 3 reply after the boot decides: bit 4 clear restores PWM
-// once, bit 4 set keeps continuous and the saved flag. Later changes of bit 4 follow the normal entry rules.
+// once (with the heater running, entries 385/387: never PWM while the heater is OFF), bit 4 set keeps continuous and the saved flag.
+// Later changes of bit 4 follow the normal entry rules. Entries 385/387: a boot is a heating start like any other, so a start that
+// finds the permission still unknown arms this same restore (satPwmFirstStart()) and PWM comes on the first valid reply.
 // SAT's boot PM chain sends PM=3, so the PIC asks the boiler for MsgID 3 shortly after the boot (in a field capture the
 // thermostat itself read MsgID 3 only once in 46 minutes, so without PM=3 the permission could stay unknown for long).
 // 0 nothing to restore, 1 waiting for the first valid reply, 2 the reply denied it: continuous, saved flag kept
@@ -3964,23 +3991,65 @@ static void satRestoreControlMode()
 {
   _sat_pwmRestore = 0;
   const bool saved = satLoadPwmEnabled();
-  if (saved && satPwmEntryAllowed(2)) { satSetControlMode(SAT_MODE_PWM); return; }
+  // Entries 385/387 (reason 1: after a restart SAT continues in PWM): the saved flag is restored through the deferred step, which
+  // waits for a running heater and a known flow temperature, never at initSAT() while the heater may be OFF (TASK-1942).
   if (saved) _sat_pwmRestore = 1;
   state.sat.eControlMode = SAT_MODE_CONTINUOUS;
 }
 
-// Control loop, once per pass: the deferred restore (see above).
+// Open the start sequence of a heating start that has just entered PWM (entries 385/387). A flame that already burns (or whose CH
+// flame-on the start already saw in continuous) counts from that moment; otherwise the 60 s count starts with the first CH flame-on.
+static void satStartGateOpen()
+{
+  _sat_startGate = true;
+  _sat_startFlameOnMs = 0;
+  if (satIsFlameOn()) { const uint32_t n = millis(); _sat_startFlameOnMs = (_sat_chFlameOnMs != 0) ? _sat_chFlameOnMs : (n ? n : 1); }
+}
+
+// A heating start (the heater went OFF -> ON in the control tick) enters PWM first (entries 385 and 387; thermo-nova starts in
+// continuous, heating_control.py:229-231). satSetControlMode() applies the MsgID 3 veto: on a refusal the start runs in continuous with the
+// entry 348 start sequence as before. While the permission is still unknown (right after a boot) the start is remembered and the
+// deferred restore enters PWM on the first valid reply. All requested modes (auto, continuous, pwm) start this way: the 'pwm' command
+// itself still acts at once, but a heater OFF ends PWM (ADR-199), so the next start enters it again. Left alone: a mode that is not
+// continuous, and SAT switched on while a flame already burns (no ignition seen: _sat_flameOffSeen is false).
+// Without a flow temperature (right after a boot) PWM would be idle and satApplyPWM() would send the plain request, with no flame-off
+// hold and no start-up flood (heating_control.py:149-150, entry 43): the start then waits in continuous, which runs the entry 348
+// sequence, and the control tick retries until the flow is known (_sat_startPwmWanted). The entry thus always comes on a tick with a flow
+// temperature, so its first schedule step starts the ON phase at once (pwm.py:154-155, entry 43), as the overshoot switch does (entry 88).
+static void satPwmFirstStart()
+{
+  if (state.sat.eControlMode != SAT_MODE_CONTINUOUS || !_sat_flameOffSeen) { _sat_startPwmWanted = false; return; }
+  if (satGetFlowTemp() <= 0.0f) { _sat_startPwmWanted = true; return; }
+  satSetControlMode(SAT_MODE_PWM);
+  if (state.sat.eControlMode == SAT_MODE_PWM) {
+    _sat_startPwmWanted = false;
+    satStartGateOpen();
+    satNarrate_P(PSTR("Control mode: PWM (heating start)"));
+  } else if (!state.sat.bSlaveCfgValid) {
+    _sat_startPwmWanted = true;
+    _sat_pwmRestore = 1;
+  } else {
+    _sat_startPwmWanted = false;   // the boiler denies low-off: the start stays continuous
+  }
+}
+
+// Control loop, once per pass: the deferred restore (see above). It waits in continuous for the first valid MsgID 3 reply and for a
+// running heater (never PWM while the heater is OFF); a start that wanted PWM opens its start sequence on the entry (entries 385/387).
 static void satRestoreDeferredStep()
 {
   if (_sat_pwmRestore == 0) return;
-  if (state.sat.eControlMode != SAT_MODE_CONTINUOUS) { _sat_pwmRestore = 0; return; }   // the mode moved on its own (PWM entered, SAT off)
-  if (_sat_pwmRestore != 1 || !state.sat.bSlaveCfgValid) return;
+  if (state.sat.eControlMode != SAT_MODE_CONTINUOUS) { _sat_pwmRestore = 0; _sat_startPwmWanted = false; return; }   // the mode moved on its own (PWM entered, SAT off)
+  // entries 392/393: MsgID 3 plays no part in PWM, so the restore waits only for a running heater and a known flow (TASK-1942)
+  if (_sat_pwmRestore != 1 || !_sat_heaterOn || satGetFlowTemp() <= 0.0f) return;
   if (satPwmEntryAllowed(2)) {
     satSetControlMode(SAT_MODE_PWM);
     _sat_pwmRestore = 0;
+    if (_sat_startPwmWanted) satStartGateOpen();
+    _sat_startPwmWanted = false;
     satNarrate_P(PSTR("Control mode: PWM (restored after the restart)"));
   } else {
     _sat_pwmRestore = 2;
+    _sat_startPwmWanted = false;
   }
 }
 
@@ -4167,6 +4236,9 @@ void satDisable(bool persistPid)
   state.sat.bOutsideTempMissing = false;   // the outside-temperature gate sets it again after this call (TASK-1390)
   state.sat.bOtLinkLost = false;       // a switch-off ends the OpenTherm-loss state; the loss path sets it again after this call (TASK-1365)
   satDiagEventsReset();                // TASK-1882: and the no-ignition / heating-failure events (defined in the satDiagEvents block)
+  _sat_heaterOn = false;               // entries 385/387: the first tick after a re-enable with heat demand is a heating start
+  _sat_startPwmWanted = false;
+  _sat_flameOffSeen = false;           // a pause (OpenTherm loss, trip, fallback lift) does not track the flame: a boiler burning on resume is no ignition (entries 385/387, TASK-1942)
   satSetControlMode(SAT_MODE_OFF);
   satCycleSkipAutoSwitch();            // no overshoot start survives a switch-off, trip or OT loss (TASK-1367; firmware choice: thermo-nova keeps it, climate.py:544-545 returns before update())
   satPwmReset();                       // also when the mode was not PWM: a safety trip must leave no stale PWM state
@@ -4457,7 +4529,8 @@ void satHandleControlMode(const char* value)
   int prevMode = (int)state.sat.eControlMode;
   int numericVal = atoi(value);
   // While SAT is disabled or tripped the actual mode stays off (sat/mode): the command only
-  // records what was requested (sat/control_mode). The control loop starts continuous on enable.
+  // records what was requested (sat/control_mode). The control loop starts continuous on enable and enters PWM at the first heating
+  // start (entries 385/387, satPwmFirstStart()).
   const bool live = satIsEnabled() && !state.sat.bSafetyTripped;
   if (live) _sat_pwmRestore = 0;   // an explicit mode command ends an open restart restore
   if (strcasecmp_P(value, PSTR("continuous")) == 0 || numericVal == 1) {
@@ -4470,7 +4543,9 @@ void satHandleControlMode(const char* value)
     if (live) satSetControlMode(satPwmEntryAllowed(3) ? SAT_MODE_PWM : SAT_MODE_CONTINUOUS);
   } else if (strcasecmp_P(value, PSTR("auto")) == 0 || numericVal == 0) {
     state.sat.iRequestedControlMode = 0;
-    if (live) satSetControlMode(SAT_MODE_CONTINUOUS); // Start in continuous, auto-switch
+    // Entries 385/387: 'auto' and 'continuous' both start in PWM at the next heating start (satPwmFirstStart()); the command itself
+    // leaves a running burn as it is, in continuous, and the auto-switches decide from there.
+    if (live) satSetControlMode(SAT_MODE_CONTINUOUS);
   }
   SATDebugTf(PSTR("SAT: control mode %d -> %d (value='%s')\r\n"),
              prevMode, (int)state.sat.eControlMode, value);
@@ -5031,8 +5106,8 @@ static void satPublishCoreState()
   publishIfChangedB(F("sat/external_temp_enable"), settings.sat.bUseExternalTemp, s_core_external_temp_enable, true);
 
   // sat/mode is the ACTUAL control mode; sat/control_mode is the one the control_mode command
-  // REQUESTED (auto/continuous/pwm). "auto" is not a mode of its own: it starts continuous and
-  // lets the auto-switch move eControlMode, so it is kept as a separate requested value.
+  // REQUESTED (auto/continuous/pwm). "auto" is not a mode of its own: it leaves the mode as it is (a heating start enters PWM,
+  // entries 385/387) and lets the auto-switches move eControlMode, so it is kept as a separate requested value.
   static const char* const modeNames[] = { "off", "continuous", "pwm" };
   uint8_t modeIdx = (uint8_t)state.sat.eControlMode;
   if (!satIsEnabled() || state.sat.bSafetyTripped) modeIdx = 0;   // disabled or tripped: off, whatever a late command did
@@ -7841,7 +7916,11 @@ static void satControlLoopRun()
     satPwmNoteDhwFlameEdge(currentFlame, dhwBitNow);
     satNoReturnFloodOnFlameEdge(currentFlame, dhwBitNow);   // TASK-1371: CH ignition of a boiler without a return temperature
     _sat_prevFlameState = currentFlame;
-    if (currentFlame && !dhwBitNow && _sat_flameOffSeen) { const uint32_t n = millis(); _sat_chFlameOnMs = n ? n : 1; }   // TASK-1924 Part 2, 1942
+    if (currentFlame && !dhwBitNow && _sat_flameOffSeen) {   // TASK-1924 Part 2, 1942
+      const uint32_t n = millis();
+      _sat_chFlameOnMs = n ? n : 1;
+      if (_sat_startGate && _sat_startFlameOnMs == 0) _sat_startFlameOnMs = _sat_chFlameOnMs;   // entries 385/387: the start sequence runs 60 s from here
+    }
     else if (!currentFlame)         _sat_chFlameOnMs = 0;
   }
   satPwmPhaseSample(currentFlame && !dhwBitNow, millis());   // TASK-1880 telemetry: CH flame time of the open PWM ON phase
@@ -8184,7 +8263,8 @@ static void satControlLoopRun()
 
   // AC#2: the request reaches the maximum it is clamped to (satEffectiveMaxSetpoint(), TASK-1591, entry 256):
   // use continuous mode instead of PWM, as thermo-nova requested_setpoint >= maximum_setpoint (heating_control.py:203-204).
-  if (pidOutput >= maxSetpoint && state.sat.eControlMode == SAT_MODE_PWM) {
+  // Not inside the start sequence of a heating start (entries 385/387): a cold start at the maximum runs in PWM first.
+  if (pidOutput >= maxSetpoint && state.sat.eControlMode == SAT_MODE_PWM && !satStartGateActive()) {
     satSetControlMode(SAT_MODE_CONTINUOUS);
     SATDebugTln(F("SAT: PID at the effective max, switching to continuous mode"));
     satNarrate_P(PSTR("Control mode: continuous (demand at the maximum setpoint)"));   // TASK-1521
@@ -8197,6 +8277,12 @@ static void satControlLoopRun()
   // TASK-1652 (maintainer decision, entry 275): a lit PWM ON phase burns 180 s before the cold cutoff acts. Decided after the
   // maximum-setpoint switch and the low-load veto, which end PWM themselves, and before the first reader of satColdThreshold().
   _sat_coldCutDeferred = _sat_coldCut && satPwmColdCutWaitsForMinBurn();
+
+  // Entries 385/387: the heater going OFF -> ON is a heating start and runs in PWM first (the heater-off branches below clear the flag).
+  if (!satColdCutActive()) {
+    if (!_sat_heaterOn) { _sat_heaterOn = true; satPwmFirstStart(); }
+    else if (_sat_startPwmWanted) satPwmFirstStart();   // a start that waited for the flow temperature or the MsgID 3 reply
+  }
 
   // --- Sustained overshoot: continuous -> PWM (Tasks #42/#43) ---
   // Before the mode is applied, as thermo-nova (heating_control.py:206-215, Sergeant D entry 88, Q47 A): on the
