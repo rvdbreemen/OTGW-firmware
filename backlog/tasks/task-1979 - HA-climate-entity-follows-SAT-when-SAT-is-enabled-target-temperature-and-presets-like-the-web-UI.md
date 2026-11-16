@@ -3,11 +3,11 @@ id: TASK-1979
 title: >-
   HA climate entity follows SAT when SAT is enabled: target temperature and
   presets like the web UI
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-15T15:53:00Z'
-updated_date: '2026-11-16T09:40:00Z'
+updated_date: '2026-11-16T10:18:00Z'
 labels:
   - feature
   - sat
@@ -30,7 +30,7 @@ Feature request by indigo_light (#beta-testing, https://discord.com/channels/812
 - [x] #1 Research: options compared (adapt the existing climate entity while SAT is on vs a separate SAT climate entity), incl. what each means for current HA users (entity id, automations), HA MQTT climate discovery fields (preset_modes, preset_mode_command/state, temperature command to the SAT target), ADR-077/101/140, and SAT preset behaviour cited from thermo-nova (file:line at 7beaaf5) checked against docs/sat/sergeant-d-corrections.md; recommendation decided by Robert
 - [x] #2 With SAT enabled the HA card's target temperature and preset change SAT's target and preset as the web UI does, and the card shows SAT's state
 - [x] #3 With SAT disabled the entity behaves as today (TT=)
-- [ ] #4 Host test on the discovery payload red on the old code, green on the fix; bench on both board types with an HA screenshot
+- [x] #4 Host test on the discovery payload red on the old code, green on the fix; bench on both board types with an HA screenshot
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -63,4 +63,12 @@ Bench (09, .61, build 2.0.0-beta.331+e4dbf70 = this change before the rebase ont
 Cosmetic (09 bench, check 5): with SAT off and no thermostat, Tr is NaN so sat/climate_current is not republished and the retained value stays SAT's last room temperature (19.95): the card shows a stale current temperature until a thermostat reports Tr. Not a blocker; left as is. AC4 stays open: the HA card screenshot (Docker down at 3.5 GB free; coordinator: later at >= 6 GB free) and the second board type (Classic) are not benched.
 
 Field check on the OTGW Classic (2026-11-16, indigo_light, #beta-testing https://discord.com/channels/812969634638725140/914498730001072149/1571818031716372491): beta.339, OTGW Classic + S3 Mini, SAT on: Home Assistant thermostat card 'OpenTherm Gateway (OTGW) Thermostat' shows target 20.5 C, room 20.7 C, preset Comfort, state Idle (screenshot, kept locally in the 92 scratchpad indigo-1979/). Covers the Classic + real HA screen part of AC4 as tester evidence; the bench-tester or Robert decides whether it ticks AC4.
+
+AC4 ticked on the coordinator's call (2026-11-16): host test tests/test_ha_climate_sat_follow.py red on the old code (26 failures + 1 error) and green on the fix (29 OK); bench on the OT-Direct board (09, .61, beta.331+e4dbf70, MQTT side, checks 1-10 PASS); real Home Assistant screenshot on an OTGW Classic + S3 Mini by indigo_light on beta.339 (https://discord.com/channels/812969634638725140/914498730001072149/1571818031716372491: target 20.5 C, room 20.7 C, preset Comfort). Still open, named: an HA screenshot on the OT-Direct board (Docker HA on the bench was down for disk space).
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+The Home Assistant thermostat card follows SAT while SAT is on (ADR-248, Robert). AC1: research and options compared, decided as ADR-248 (DM 1571639116955914493). AC2-AC3: 09's bench on .61 (beta.331+e4dbf70): discovery fields, card target and preset drive SAT, no TT= with SAT on, TT= again with SAT off, republish on HA restart, 299 s heartbeat. AC4: host test red 26+1 on the old code, 29 OK on the fix; real HA screen on an OTGW Classic by indigo_light (beta.339). Commit f598959aa (beta.331), public in beta.339. Not verified: an HA screenshot on the OT-Direct board. Known cosmetic: with SAT off and no thermostat the card keeps SAT's last room temperature.
+<!-- SECTION:FINAL_SUMMARY:END -->
