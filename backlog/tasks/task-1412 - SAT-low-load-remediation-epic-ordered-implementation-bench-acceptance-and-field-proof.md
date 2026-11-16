@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-27T23:40:00Z'
-updated_date: '2026-11-09T20:37:00Z'
+updated_date: '2026-11-16T15:22:00Z'
 labels:
   - epic
   - sat
@@ -88,6 +88,12 @@ stays; the order inside it changes so that this defect is fixed first, with old-
 Robert 2026-10-30 (session, coordinator otgw-firmware-b8): WAIVER of the field-validation order for the first 2.0.0 beta (target Sun 2026-11-01). SAT ships experimental / opt-in (default off); SAT field data may come from named testers who enable it knowingly, before 1412.21/.22 bench and equipment acceptance. The epic stays the route to 'SAT stable'; this waiver covers field-data collection only, not a stable claim.
 
 2026-11-04 Robert (interactive): the official 2.0.0 stable release waits until SAT low-load is field-validated (epic TASK-1412 closed: 1412.16-26), not 'SAT experimental'. Estimate 4-6+ weeks, gated by testers and heating-season data.
+
+2026-11-16 PROPOSAL (comms 92, for the coordinator's decision after 20:00; not decided): how this epic relates to the 2.0.0 stable gate. Facts: the epic was written for the 4 Nov gate (bench simulator, then controlled equipment, then tester field); TASK-1740 (Robert 2026-11-08) replaced that gate for 2.0.0 stable with SAT still experimental, entry 386 makes 'today's answers implemented' the SAT criterion, and Robert set 21 Nov provided the Wed-Fri field runs are clean (DM 1571882395228184719). Children .20-.23 (real-board bench simulator, equipment commissioning) are already milestone 2.1.0; .24, .25, .26 are 2.0.0 and To Do (3, 3 and 4 open ACs); the epic ACs are 0/5.
+
+Option A (recommended): the epic and its full gate move to 2.1.0, and 2.0.0 takes a reduced slice. In 2.0.0: .24 (field protocol) = the field-run request for the Wed-Fri runs; .25 (field validation) = those runs, evidence per tester (indigo_light Vitodens beta.350 long-run first); epic AC3 is met only for the host LL contract (all ids green per TASK-1888), the bench and field LL rows stay 2.1.0. To 2.1.0: epic AC1 (R01-R42 owner bookkeeping), AC2 (equipment preflight before field), AC4 (PH-PIC/PH-OTD/PH-PROFILE/PH-FIELD per combination), AC5 and .26 (independent evidence review); the 2.0.0 notes keep 'SAT experimental' and make no energy or heat-pump suitability claim, which is AC5's intent. Consequence: the 2.0.0 gate stays TASK-1740 alone and nothing here can block 21 Nov by bookkeeping. Option B: keep the epic at 2.0.0 and have Robert waive ACs 1, 2, 4, 5 and .26 one by one; same outcome, five extra decisions for him. Main risk of A: the bench-simulator and equipment steps slip past 2.0.0 for good; mitigation: .20-.23 already carry 2.1.0.
+
+Conflict to record either way: TASK-1412.4 (Done) 'Honor slave low-load permission across SAT entry and active PWM' is reversed by Sergeant D entries 392 and 393 (MsgID 3 HB bit 4 no longer gates PWM; TASK-2000, beta.350, ADR-251 Accepted). Its R-issue in docs/sat/sat-low-load-remediation-plan-2026-10-28.md should be marked superseded by entries 392/393, not reopened.
 <!-- SECTION:NOTES:END -->
 
 ## Comments
