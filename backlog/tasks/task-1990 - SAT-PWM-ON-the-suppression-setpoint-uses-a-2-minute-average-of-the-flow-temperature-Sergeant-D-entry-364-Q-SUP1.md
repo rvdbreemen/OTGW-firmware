@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-15T21:35:00Z'
-updated_date: '2026-11-16T08:21:00Z'
+updated_date: '2026-11-16T08:59:00Z'
 labels:
   - sat
   - sergeant-d
@@ -62,3 +62,9 @@ Smoke 09 on .61 (2026-11-16 02:48-03:00, beta.334+1d7483f, sha ino 99ebfb3d / fs
 
 2026-11-16 09:3x (95) revert per Sergeant D entry 383 (Q-375a '1: A', confirms entry 375, replaces our reading of entry 364): no 2 minute flow average anywhere; the PWM ON suppression setpoint is the latest flow minus fModSupOffset, as thermo-nova heating_control.py:435-441. Removed: SATflowAvg.h, state.otBus.flowAvg, the processOT() sample hook, satSuppressionFlowTemp(); satPwmSuppressionSetpoint() uses satGetFlowTemp() again. Test shims for the average removed (test_sat_pwm_override _flow_avg_shim, test_sat_ceiling_paths stub, two host includes). tests/test_sat_flow_avg.py replaced by tests/test_sat_suppression_latest_flow.py (real satPwmSuppressionSetpoint): FIX 5/5 OK; OLD (beta.341 SATcontrol.ino + SATflowAvg.h via OTGW_SAT_INO/OTGW_FLOWAVG_H) 2 FAIL: step 40->50 after 2 min burning gives 44.0 instead of 49.0, falling 55->45 gives 53.167 instead of 44.0. Also green: test_sat_ceiling_paths 9 OK, test_sat_pwm_override 83 OK, test_sat_loop_integration 15 OK, test_boiler_unsupported_origin PASS, test_local_frame_consumers PASS, evaluate --quick 0 failed. AC2's text (2 minute average) is superseded by entry 383; AC4 becomes the smoke of this build by 09 (SAT behaviour proven on the host).
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Superseded design, final state per entry 383 (Sergeant D 2026-11-16, Q-375a '1: A'): no 2 minute flow average anywhere; the PWM ON suppression setpoint is the latest flow minus fModSupOffset, as thermo-nova heating_control.py:435-441. AC1: the reading of entry 364 was put to Sergeant D (Q-SUP1b/c/d, Q-375a) and corrected: entries 373, 374, 375, 380, 383. AC2: its text (the 2 minute average) is SUPERSEDED by entry 383; the tick stands for the work done then (beta.330/333). The evidence for the current behaviour is tests/test_sat_suppression_latest_flow.py on the real satPwmSuppressionSetpoint(): 5/5 OK on the revert, 2 FAIL on the beta.341 code (a 40->50 step after two minutes of burning gives 44.0 instead of 49.0; a fall 55->45 gives 53.167 instead of 44.0). AC3: the start-up flood and the flow clamp keep their own flow source (unchanged by the revert; test_sat_ceiling_paths 9 OK, test_sat_pwm_override 83 OK, test_sat_loop_integration 15 OK). AC4: see the bench notes (smoke by 09 on .63, beta.344+873f06b); the SAT behaviour is proven on the host. evaluate --quick 0 failed.
+<!-- SECTION:FINAL_SUMMARY:END -->

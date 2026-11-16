@@ -6,7 +6,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## [Unreleased]
 
 ### Changed
-- SAT: during a PWM ON phase the modulation suppression setpoint follows the latest boiler flow temperature again, as thermo-nova does. The 2 minute flow average of beta.330 to beta.339 is removed: Sergeant D confirmed that no average is needed, because the 180 s flame-on rule already covers the light-off (entry 383, TASK-1990).
+- SAT: during a PWM ON phase the modulation suppression setpoint follows the latest boiler flow temperature again, as thermo-nova does. The 2 minute flow average (introduced in beta.330, public in beta.339) is removed: Sergeant D confirmed that no average is needed, because the 180 s flame-on rule already covers the light-off (entry 383, TASK-1990).
 ### Fixed
 - PIC: after a boot the PIC settings panel fills within about a minute again. The settings readout no longer waits 4 to 5 minutes for the MQTT discovery run to finish; it now sends its next query right after a discovery step instead of waiting for the next 3-second tick, and stays at least 3 seconds between queries (TASK-1971).
 - Diagnostic recording: on a board with PSRAM, Stop no longer throws the recording away. It stays in memory and downloads in full until the next Start; the status keeps `has_data` true. Boards without PSRAM still free the ring on Stop, as the web UI warns (TASK-1960).
