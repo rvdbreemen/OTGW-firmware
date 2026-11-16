@@ -5200,6 +5200,19 @@
     "TASK-1998"
    ],
    "confirmed_by_entry": null
+  },
+  {
+   "id": 393,
+   "title": "Q-392a answered A: MsgID 3 plays no part in PWM; PWM is allowed from the start, no wait for a valid MsgID 3 reply (Sergeant D, 2026-11-16; REVERSES entry 215, completes entry 392)",
+   "date": "2026-11-16",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1571843981011329100",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1412.4"
+   ],
+   "confirmed_by_entry": null
   }
  ]
 }

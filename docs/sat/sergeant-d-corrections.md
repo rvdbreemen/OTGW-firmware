@@ -7874,3 +7874,15 @@ Robert, 16:18:42 UTC (https://discord.com/channels/812969634638725140/9144987300
 **Not settled (asked as Q-392a):** whether entry 215 (no PWM until a valid MsgID 3 reply, pwm_veto_reason 1) also goes, and whether this goes into this release (2.0.0) or the next (2.1.0).
 
 **Tasks:** a new task under TASK-1412 (the MsgID 3 permission gate), filed by the coordinator; field test offered by indigo_light (TASK-1998).
+
+## 393. Q-392a answered A: MsgID 3 plays no part in PWM; PWM is allowed from the start, no wait for a valid MsgID 3 reply (Sergeant D, 2026-11-16; REVERSES entry 215, completes entry 392)
+
+**Source:** #dev-sat-mqtt, Sergeant D 2026-11-16 11:06:48 UTC (https://discord.com/channels/812969634638725140/1105556725714649128/1571843981011329100), a reply to Q-392a (https://discord.com/channels/812969634638725140/1105556725714649128/1571843640400289794).
+
+**Quoted:**
+
+> "My answer is A"
+
+**Settled:** option A: SAT ignores MsgID 3 for PWM completely. Entry 215 (no PWM until a valid MsgID 3 reply, pwm_veto_reason 1) is reversed, together with entries 213 and 214 (entry 392). PWM is allowed from the start; the firmware gate SATcycles.ino:1302-1336 (TASK-1412.4) goes. Scope: he did not answer the scope line; the question recommended this release (2.0.0), read as 2.0.0.
+
+**Task:** the entry-392 task (owner 95).
