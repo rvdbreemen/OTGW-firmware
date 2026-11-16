@@ -31,6 +31,7 @@ Sergeant D entry 348 (Q-347a B, 2026-11-14, 'as a fail safe guard (e.g. sat is i
 - [x] #4 Host test on the real satContinuousSetpoint/satPwmFlameOffHold: flame off then flame on, red on beta.250 (flame off -> request), green on the fix
 - [ ] #5 Bench via 09: a continuous start shows return + 18 before ignition, the 20 s hold, then the follow and the clamp; no regression on PWM starts
 - [x] #6 ADR-235 (or the TASK-1924 docs) names the start sequence in continuous mode
+- [ ] #7 Entry 385 (387/389/391/394): every heating start (heater OFF->ON, SAT enable without a flame, boot) enters PWM first once the flow is known, with the first phase ON; no PWM->continuous switch until 60 s after the first CH flame-on of that start; host test red on origin and green on the fix; bench on the PIC unit shows the PWM-first start on the wire
 <!-- AC:END -->
 
 ## Implementation Plan
