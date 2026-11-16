@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-15T09:35:00Z'
-updated_date: '2026-11-15T12:19:00Z'
+updated_date: '2026-11-16T06:06:00Z'
 labels:
   - research
   - tls
@@ -66,4 +66,8 @@ Out of scope for the PoC: web UI settings, consent dialog, SAT encoding without 
 2026-11-15 Robert decision 2 (REST GET): A. Record route id, method, status per request, no body; consecutive identical GET 200s collapse into a per-minute counter; every non-200 recorded individually.
 
 2026-11-15 Robert decision 3 (SAT): A. While cloud recording runs, SATTICK always goes to the SAT section, independent of state.debug.bSAT (SATcontrol.ino:20), not to telnet; SAT behaviour unchanged. Which SAT decisions become SAT_EVENT records is queued as a question for Sergeant D.
+
+2026-11-16 (ba) FACT, measured: the esp32-combo-tlsdyn build is NOT incremental after a stop. Run 1 (00:59-02:21, OTGW_BUILD_JOBS=2) reached ~1,730 compile steps, still in IDF components, stopped for the beta chain. Run 2 (03:07-03:21) rebuilt safeboot fully (86 steps) and was back in NimBLE-Arduino at tlsdyn step 88, the same point as run 1; .pio/build/esp32-combo-tlsdyn stayed at ~270 .o (overwritten, not growing). Cause not verified; fits the note that the pioarduino hybrid compile copies the libs only after a successful link. Plan: one uninterrupted ~100 min slot (coordinator: after the 08:00 release build, ~07:20, nobody else building). Shared core D:\DevData\platformio stayed byte-identical over both runs (33,190 files, manifest 8cf5cafa..., 27 TLS archives) thanks to the process-local PLATFORMIO_CORE_DIR=%USERPROFILE%\.pio-tlsdyn.
+
+2026-11-16 07:05 (ba) CORRECTION of the note above ('NOT incremental'): wrong. Run 1 had finished the pioarduino hybrid IDF compile and copied the libs into C:\Users\rvdbr\.pio-tlsdyn\packages\framework-arduinoespressif32-libs\esp32s3 at 02:15 (sdkconfig mtime), six minutes before I stopped it at 02:21. Run 2 was compiling the firmware/Arduino library objects again (safeboot + env objects), which I misread as the IDF compile starting over. Run 3 (06:42:34-07:04, OTGW_BUILD_JOBS=2, exclusive slot) reused those libs: 364 compile steps, esp32-combo-tlsdyn SUCCESS 00:18:18, EXIT=0. Facts of run 3: RAM 47.9 % (156,804 / 327,680 B), Flash 98.4 % (2,258,171 / 2,293,760 B app slot: 35,589 B left), version stamp 2.0.0-poc.8+5f760b4 in the .ino.bin, tlsdyn libs sdkconfig has CONFIG_MBEDTLS_DYNAMIC_BUFFER=y, DYNAMIC_FREE_CONFIG_DATA=y, DYNAMIC_FREE_CA_CERT=y, SSL_IN_CONTENT_LEN 16384 (and CONFIG_SPIRAM=y as in the stock Arduino libs). Artifacts archived with SHA256SUMS.txt in RvdB/OTGW-build-archive/cloudrec-poc8/ (zip e4b0723caae3a1df..., .ino.bin 08add0d0c97b7436..., .elf b52b637d07e5f6e6...). Shared core D:\DevData\platformio framework-arduinoespressif32-libs byte-identical to the baseline after run 3 (33,190 files, manifest 8cf5cafa..., 27 TLS archives). Lesson: a stopped hybrid build keeps its libs once the copy step has run; check the libs' sdkconfig mtime before calling a run lost. Not done: flashing / bench (09).
 <!-- SECTION:NOTES:END -->
