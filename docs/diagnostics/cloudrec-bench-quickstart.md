@@ -4,8 +4,9 @@ The four checks that decide whether the PoC holds (full list: `cloudrec-bench-jo
 PSRAM, 3 uploads and lossless on real data, 4 soak. Stop at the first FAIL and report it.
 
 You need: the laptop with the repo, Docker Desktop running, Python 3, `cloudflared` (`winget install
-Cloudflare.cloudflared`), an OTGW32 (no PSRAM) on WiFi, and the poc.8 build from `RvdB\OTGW-build-archive\cloudrec-poc8\`
-(`.ino.bin` and `.elf`). Below, `<ip>` is the unit's address and `<archive>` that folder.
+Cloudflare.cloudflared`), an OTGW32 (no PSRAM) on WiFi, and a poc.9 or later build of the branch head: `build.bat --target esp32-combo-tlsdyn`
+(poc.8 and older lack the mbedTLS link wraps and fail check 7). Below, `<ip>` is the unit's address, `<archive>` the
+`build\` folder and `<fw>` the file name stem `OTGW-firmware-esp32-combo-tlsdyn-2.0.0-poc.<N>+<githash>`.
 
 ## 0. The repo on the research branch
 
@@ -19,10 +20,12 @@ git pull --ff-only
 ## 1. ELF check (1 minute): are the dynamic TLS buffers in the build?
 
 ```bat
-"%USERPROFILE%\.pio-tlsdyn\packages\toolchain-xtensa-esp-elf\bin\xtensa-esp-elf-nm.exe" "<archive>\OTGW-firmware-esp32-combo-tlsdyn-2.0.0-poc.8+5f760b4.elf" | findstr /C:"esp_mbedtls_free_buf" /C:"esp_tls_get_client_session"
+"%USERPROFILE%\.pio-tlsdyn\packages\toolchain-xtensa-esp-elf\bin\xtensa-esp-elf-nm.exe" "<archive>\<fw>.elf" | findstr /C:"esp_mbedtls_free_buf" /C:"esp_tls_get_client_session" /C:"__wrap_mbedtls_ssl_setup"
 ```
 
-PASS: two lines, each with ` T `. FAIL (nothing found): the build has the stock mbedTLS; rebuild before going on.
+PASS: three lines, each with ` T `. FAIL: without `esp_mbedtls_free_buf` the build has the stock mbedTLS; without
+`__wrap_mbedtls_ssl_setup` the dynamic-buffer code is compiled in but not linked into the TLS path, and the handshake
+fails without PSRAM (`mbedtls_ssl_setup returned -0x7F00`, the poc.8 result). Rebuild before going on.
 
 ## 2. Collection point on the laptop (10 minutes)
 
@@ -54,7 +57,7 @@ Settings backup, then flash the app only (no filesystem write, the settings stay
 
 ```bat
 curl -o settings-backup.json http://<ip>/api/v2/settings
-python scripts\ota_flash.py --host <ip> --app "<archive>\OTGW-firmware-esp32-combo-tlsdyn-2.0.0-poc.8+5f760b4.ino.bin" --no-fs
+python scripts\ota_flash.py --host <ip> --app "<archive>\<fw>.ino.bin" --no-fs
 ```
 
 Make the opt-in file `cloudrec.cfg` with three lines:
@@ -89,7 +92,7 @@ Leave telnet running. After at least 10 minutes:
 
 ```bat
 cd tools\cloud-recorder
-python decode_all.py http://127.0.0.1:8090 admin@bench.invalid BenchAdmin-123 otgw-<mac> out --image "<archive>\OTGW-firmware-esp32-combo-tlsdyn-2.0.0-poc.8+5f760b4.ino.bin"
+python decode_all.py http://127.0.0.1:8090 admin@bench.invalid BenchAdmin-123 otgw-<mac> out --image "<archive>\<fw>.ino.bin"
 python compare_telnet.py out\debug.log <path>\telnet-capture.txt
 ```
 

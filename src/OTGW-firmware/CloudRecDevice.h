@@ -357,12 +357,16 @@ void cloudRecSatTickf(const char *fmt, ...) {
 
 // ---------------------------------------------------------------- TASK-1473: events (SEC_EVT)
 
-static const size_t CLOUDREC_EV_TEXT_MAX = 480;    // a longer text is cut and the cut counted as a lost item
+// A longer text is cut and the cut counted as a lost item. The event is built on the caller's stack (the WiFi event
+// task, async_tcp, the PIC task...), so it stays small: 256 B per text, a buffer of N bytes per event kind.
+static const size_t CLOUDREC_EV_TEXT_MAX = 256;
+static const size_t CLOUDREC_EV_BIG = 2 * (CLOUDREC_EV_TEXT_MAX + 3) + 8;   // two texts and a few fields
+static const size_t CLOUDREC_EV_SMALL = 48;                                 // numbers only
 
-struct CloudRecEv {
-  uint8_t m[1024];
+template <size_t N = CLOUDREC_EV_BIG> struct CloudRecEvN {
+  uint8_t m[N];
   crec::Buf b;
-  CloudRecEv() { b.init(m, sizeof(m)); }
+  CloudRecEvN() { b.init(m, sizeof(m)); }
   void text(const char *s, size_t n) {
     if (!s) n = 0;
     if (n > CLOUDREC_EV_TEXT_MAX) { n = CLOUDREC_EV_TEXT_MAX; cloudRecLoseItem(); }
@@ -382,6 +386,8 @@ struct CloudRecEv {
     cloudRecAppend(tMs, [&] { return cloudRec.event(tMs, type, m, b.n); });
   }
 };
+typedef CloudRecEvN<> CloudRecEv;
+typedef CloudRecEvN<CLOUDREC_EV_SMALL> CloudRecEvS;
 
 static void cloudRecEvText(uint8_t type, const char *text, size_t n) {
   if (!cloudRecActive) return;
@@ -441,7 +447,7 @@ void cloudRecEvRest(uint8_t route, uint8_t method, int status) {
     __atomic_fetch_add(&cloudRecGets[route], 1u, __ATOMIC_RELAXED);
     return;
   }
-  CloudRecEv e;
+  CloudRecEvS e;
   e.u8(route);
   e.u8(method);
   e.u((uint64_t)(status < 0 ? 0 : status));
@@ -467,14 +473,14 @@ static void cloudRecFlushGets() {
 
 void cloudRecEvWeather(float temperature, float humidity, float wind) {
   if (!cloudRecActive) return;
-  CloudRecEv e;
+  CloudRecEvS e;
   e.f(temperature); e.f(humidity); e.f(wind);
   e.send(crec::EV_WEATHER);
 }
 
 void cloudRecEvBle(uint8_t slot, float temperature, float humidity, uint8_t battery, int8_t rssi) {
   if (!cloudRecActive) return;
-  CloudRecEv e;
+  CloudRecEvS e;
   e.u8(slot); e.f(temperature); e.f(humidity); e.u8(battery); e.z(rssi);
   e.send(crec::EV_BLE);
 }
@@ -491,7 +497,7 @@ void cloudRecEvSetting(const char *field, const char *value) {
 
 void cloudRecEvTimeSync(uint32_t epoch) {
   if (!cloudRecActive) return;
-  CloudRecEv e;
+  CloudRecEvS e;
   e.u(epoch);
   e.send(crec::EV_TIME_SYNC);
 }
@@ -508,35 +514,35 @@ void cloudRecEvDallas(uint8_t index, const char *address, float tempC) {
 
 void cloudRecEvS0(uint32_t pulses, uint32_t total, uint32_t durationMs) {
   if (!cloudRecActive) return;
-  CloudRecEv e;
+  CloudRecEvS e;
   e.u(pulses); e.u(total); e.u(durationMs);
   e.send(crec::EV_S0);
 }
 
 void cloudRecEvNet(uint8_t kind, int8_t rssi, uint32_t ip) {
   if (!cloudRecActive) return;
-  CloudRecEv e;
+  CloudRecEvS e;
   e.u8(kind); e.z(rssi); e.u32le(ip);
   e.send(crec::EV_NET);
 }
 
 void cloudRecEvMqttConn(bool up, uint8_t reason) {
   if (!cloudRecActive) return;
-  CloudRecEv e;
+  CloudRecEvS e;
   e.u8(up ? 1 : 0); e.u8(reason);
   e.send(crec::EV_MQTT_CONN);
 }
 
 void cloudRecEvTelnetKey(char key) {
   if (!cloudRecActive) return;
-  CloudRecEv e;
+  CloudRecEvS e;
   e.u8((uint8_t)key);
   e.send(crec::EV_TELNET_KEY);
 }
 
 void cloudRecEvWebhook(bool on, int status) {
   if (!cloudRecActive) return;
-  CloudRecEv e;
+  CloudRecEvS e;
   e.u8(on ? 1 : 0); e.z(status);
   e.send(crec::EV_WEBHOOK);
 }
@@ -550,7 +556,7 @@ void cloudRecEvFw(uint8_t kind, int result, const char *text) {
 
 void cloudRecEvMode(uint8_t kind, uint32_t value) {
   if (!cloudRecActive) return;
-  CloudRecEv e;
+  CloudRecEvS e;
   e.u8(kind); e.u(value);
   e.send(crec::EV_MODE);
 }
@@ -568,7 +574,7 @@ void cloudRecEvBridge(const char *text, size_t n, bool refused) {
 // Once a minute from the upload task: health, and the GET counts.
 static void cloudRecEvMinute() {
   if (!cloudRecActive) return;
-  CloudRecEv e;
+  CloudRecEvS e;
   e.u(platformFreeHeap()); e.u(platformMaxFreeBlock()); e.u(platformMinFreeHeap());
   e.z(WiFi.isConnected() ? WiFi.RSSI() : 0);
   e.u(millis() / 1000u);

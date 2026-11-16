@@ -34,3 +34,15 @@ def copy_nested_mbedtls(source, target, env):
 
 
 env.AddPostAction("checkprogsize", copy_nested_mbedtls)  # noqa: F821
+
+# TASK-1963 bench 2026-11-16: the dynamic-buffer code was linked but never used. ESP-IDF turns it on with link-time
+# wraps (components/mbedtls/CMakeLists.txt, CONFIG_MBEDTLS_DYNAMIC_BUFFER): every call to these mbedTLS functions goes
+# to the __wrap_ version in libmbedtls_2.a. The Arduino link line does not carry those wraps, so mbedtls_ssl_setup()
+# still allocated the full 16 KB input buffer at once and failed with -0x7F00 (ALLOC_FAILED) on a board without
+# PSRAM whose largest free block was 13.3 KB. Same list as the IDF CMakeLists.
+DYNAMIC_BUFFER_WRAPS = [
+    "mbedtls_ssl_write_client_hello", "mbedtls_ssl_handshake_client_step", "mbedtls_ssl_tls13_handshake_client_step",
+    "mbedtls_ssl_handshake_server_step", "mbedtls_ssl_read", "mbedtls_ssl_write", "mbedtls_ssl_session_reset",
+    "mbedtls_ssl_free", "mbedtls_ssl_setup", "mbedtls_ssl_send_alert_message", "mbedtls_ssl_close_notify",
+]
+env.Append(LINKFLAGS=["-Wl,--wrap=" + f for f in DYNAMIC_BUFFER_WRAPS])  # noqa: F821

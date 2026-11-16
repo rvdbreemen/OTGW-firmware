@@ -3992,5 +3992,25 @@
     "related_bugs": [],
     "occurrences": 1,
     "last_seen": "2026-11-15T15:12:38+00:00"
+  },
+  {
+    "id": "bug-227",
+    "timestamp": "2026-11-16T20:48:52.786635Z",
+    "error_message": "cloudrec bench check 7: mbedtls_ssl_setup returned -0x7F00 (ALLOC_FAILED) on OTGW32 without PSRAM, largest block 13.3 KB",
+    "file": "scripts/tlsdyn_mbedtls_libs.py",
+    "root_cause": "CONFIG_MBEDTLS_DYNAMIC_BUFFER only works through -Wl,--wrap=mbedtls_ssl_* link flags (IDF components/mbedtls/CMakeLists.txt); the pioarduino hybrid compile does not add them to the Arduino link line, so the stock 16 KB buffers were allocated",
+    "fix": "Append the 11 --wrap flags to LINKFLAGS in the extra script; verify __wrap_mbedtls_ssl_setup in nm and in the firmware.map cross-reference for esp_tls_mbedtls.c.o",
+    "tags": [
+      "mbedtls",
+      "tls",
+      "dynamic-buffer",
+      "pioarduino",
+      "linker",
+      "psram",
+      "cloudrec"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-11-16T20:48:52.786635Z"
   }
 ]
