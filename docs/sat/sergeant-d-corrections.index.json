@@ -5172,6 +5172,34 @@
     "TASK-1998"
    ],
    "confirmed_by_entry": null
+  },
+  {
+   "id": 391,
+   "title": "Q-385b answered A: with SAT set to manual continuous, a heating start still goes through PWM first (Sergeant D, 2026-11-16; extends entries 385 and 389)",
+   "date": "2026-11-16",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1571840538456494101",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1942"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 392,
+   "title": "MsgID 3 HB bit 4 must not block PWM: \"Don't look at bit 4 at all\"; the boiler should be able to enter PWM (Sergeant D, 2026-11-16; REVERSES entries 213 and 214, and touches entry 215)",
+   "date": "2026-11-16",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/914498730001072149/1571840386287140995",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1412",
+    "TASK-1412.4",
+    "TASK-1998"
+   ],
+   "confirmed_by_entry": null
   }
  ]
 }

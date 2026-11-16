@@ -7846,3 +7846,31 @@ Robert, 16:18:42 UTC (https://discord.com/channels/812969634638725140/9144987300
 **Settled (reading, short answer):** the short DHW burns the Vitodens makes after a CH burn without a tap (keep-warm) do not affect SAT; we read it as: no change needed in SAT's cycle statistics or self-tune for them. Not settled: whether the firmware already leaves those burns out of its statistics the way he expects; to check against the code under TASK-1998 with indigo's capture. Question 2 of TASK-1998 is still open (he asked indigo whether it was about the HA integration or the firmware SAT, https://discord.com/channels/812969634638725140/914498730001072149/1571838397343858723).
 
 **Task:** TASK-1998 (2.1.0).
+
+## 391. Q-385b answered A: with SAT set to manual continuous, a heating start still goes through PWM first (Sergeant D, 2026-11-16; extends entries 385 and 389)
+
+**Source:** #dev-sat-mqtt, Sergeant D 2026-11-16 10:53:07 UTC (https://discord.com/channels/812969634638725140/1105556725714649128/1571840538456494101), a reply to Q-385b (https://discord.com/channels/812969634638725140/1105556725714649128/1571839959701131339).
+
+**Quoted:**
+
+> "My answer is A"
+
+**Settled:** option A: also with SAT set to manual continuous, every heating start runs the PWM-first start phase (60 s after flame-on, entry 389), for the same thermal-stress reason (entry 387). Scope: not answered; the question recommended this release and entry 386 puts the PWM-first start in scope, so read as 2.0.0.
+
+**Task:** TASK-1942 (owner d3).
+
+## 392. MsgID 3 HB bit 4 must not block PWM: "Don't look at bit 4 at all"; the boiler should be able to enter PWM (Sergeant D, 2026-11-16; REVERSES entries 213 and 214, and touches entry 215)
+
+**Source:** #beta-testing 2026-11-16, Sergeant D 10:52:31 UTC (https://discord.com/channels/812969634638725140/914498730001072149/1571840386287140995), replying to our explanation to indigo_light that pwm_veto_reason 2 is the boiler's MsgID 3 HB bit 4 = 1 blocking PWM per entry 213 (https://discord.com/channels/812969634638725140/914498730001072149/1571839374134485074); and 10:56:39 UTC (https://discord.com/channels/812969634638725140/914498730001072149/1571841428525420626) after indigo_light's pwm_veto_reason 2 / pwm_veto_path 1 / slave_low_off_denied true on his Viessmann Vitodens 100-W.
+
+**Quoted:**
+
+> "1) no this wrong. Don’t look at bit 4 at all. You should not consider MsgID3:HB4. boiler should be able to enter PWM"
+>
+> "Thanks for reporting the veto reason. Probably was a wrong decision from my side"
+
+**Settled:** MsgID 3 HB bit 4 ("master low-off & pump control function", OpenTherm spec v4.2) no longer blocks PWM: entry 213 (bit 4 = 1 blocks every PWM entry path) and entry 214 (bit 4 turning 1 leaves PWM) are reversed. The firmware gate is SATcycles.ino:1302-1336 (TASK-1412.4), which sets pwm_veto_reason 2.
+
+**Not settled (asked as Q-392a):** whether entry 215 (no PWM until a valid MsgID 3 reply, pwm_veto_reason 1) also goes, and whether this goes into this release (2.0.0) or the next (2.1.0).
+
+**Tasks:** a new task under TASK-1412 (the MsgID 3 permission gate), filed by the coordinator; field test offered by indigo_light (TASK-1998).
