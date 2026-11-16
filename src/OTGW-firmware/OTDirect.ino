@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTDirect.ino
-**  Version  : v2.0.0-beta.351
+**  Version  : v2.0.0-beta.352
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -3477,13 +3477,13 @@ static void setOTDirectMode(OTDirectMode newMode) {
 // ---------------------------------------------------------------------------
 static void checkThermostatTimeout() {
   // TASK-1850: the PIC's own lines on loss and return (gateway.asm 6.8 TDisconnect/TConnect), to port 25238 and
-  // processOT() like every PIC line. At boot the thermostat counts as connected (no line), as on the PIC.
+  // processOT() like every PIC line. At boot a present thermostat gets no line, as on the PIC.
   static uint8_t picLineState = 0;   // 0 boot, 1 connected, 2 disconnected (reported)
-  auto picLine = [](PGM_P text) {
+  auto picLine = [](PGM_P text, bool toBridge) {
     char buf[32];
     strlcpy_P(buf, text, sizeof(buf));
     const size_t n = strlen(buf);
-    otDirectBridgeWriteLine(buf, n);
+    if (toBridge) otDirectBridgeWriteLine(buf, n);
     processOT(buf, (int)n);
   };
   // TASK-1802 bug 9 (Robert 2026-11-15: A): the thermostat counts as lost after about 3 s without a frame, so the
@@ -3492,15 +3492,21 @@ static void checkThermostatTimeout() {
   // sees the open line within tens of ms (gateway.asm 6.6 CheckThermostat :1728-1816); OT-Direct has no line sense.
   static constexpr uint32_t timeoutMs = 3000;
 
-  if (!otThermostatSeen) {   // no frame ever received: nothing to time out, but the PIC reports it once
-    if (picLineState == 0 && millis() > timeoutMs) { picLineState = 2; picLine(PSTR("Thermostat disconnected")); }
+  // No frame ever received: nothing to time out, but the PIC reports it once. The PIC does so tens of ms after its own
+  // reset (RAM cleared, so NoThermostat = 0 and the first CheckThermostat on an open line runs Disconnect: gateway.asm
+  // 6.6 :1175-1185, :1741-1773), long before any port 25238 client can exist. Here loopOTDirect() starts after the
+  // network, so the same line would land ~19 s after boot inside a client's connect handshake (pyotgw takes it as the
+  // PS=1 answer, TASK-1999). So this boot line goes to processOT() only (the event, as handlePICStatusToken() makes it
+  // on a PIC), not to the bridge; every later transition goes to both.
+  if (!otThermostatSeen) {
+    if (picLineState == 0 && millis() > timeoutMs) { picLineState = 2; picLine(PSTR("Thermostat disconnected"), false); }
     return;
   }
 
   uint32_t elapsed = millis() - otLastThermostatMs;
 
   if (elapsed >= timeoutMs) {
-    if (picLineState != 2) { picLineState = 2; picLine(PSTR("Thermostat disconnected")); }
+    if (picLineState != 2) { picLineState = 2; picLine(PSTR("Thermostat disconnected"), true); }
     // Thermostat disconnected
     if (state.otd.bThermostatConnected) {
       state.otd.bThermostatConnected = false;
@@ -3515,7 +3521,7 @@ static void checkThermostatTimeout() {
     // and no TSet unless a CS= is in force (buildStatusRequest), as the PIC's standalone frames (gateway.asm 6.6
     // Disconnect :1770-1789, readstatus :2712-2742, MessageID1 :2796-2820).
   } else {
-    if (picLineState == 2) picLine(PSTR("Thermostat connected"));   // independent of the setback
+    if (picLineState == 2) picLine(PSTR("Thermostat connected"), true);   // independent of the setback
     picLineState = 1;
     // The return is reported on the transition, as the setback release did before (it ran on every return in gateway
     // mode with the default FS on).

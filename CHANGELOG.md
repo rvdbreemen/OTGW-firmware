@@ -5,6 +5,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Fixed
+- OT-Direct: Home Assistant (pyotgw) no longer fails to connect to port 25238 right after a reboot on a board without a thermostat. The one-time 'Thermostat disconnected' line at boot is no longer sent to port 25238, where it landed in the middle of the connect handshake; a real loss or return of the thermostat is still reported there (TASK-1999).
+
 ### Added
 - Diagnostic recording: the recording status (`/api/v2/diag/recording/status`) reports what one record costs: `append_count`, `append_max_us` and `append_avg_us` of the current recording (TASK-1665).
 
