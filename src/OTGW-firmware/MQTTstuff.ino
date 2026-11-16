@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : MQTTstuff
-**  Version  : v2.0.0-beta.363
+**  Version  : v2.0.0-beta.364
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **      Modified version from (c) 2020 Willem Aandewiel
@@ -1653,6 +1653,7 @@ void handleMQTT()
       { // engine already pumped by the unconditional loop() at top of handleMQTT()
         state.mqtt.iLastConnectedMs = millis();  // stamp each confirmed-live tick for offline-duration tracking
         connStageTick();  // TASK-1757: rest of the connect burst, in portions
+        staleOverrideClearTick();  // TASK-1991: clear <label>/override topics retained from before a reboot
         mqttRetryPendingSubscribes();  // TASK-1778: a SUBSCRIBE refused at connect
         // ADR-118: periodically refresh the retained gateway-override topics so HA / dashboards
         // reflect active overrides even when no new override frame arrived this minute.
@@ -1799,7 +1800,7 @@ static uint32_t sConnStageMs = 0;   // millis() of connect or of the last portio
 
 static bool     sConnPaceOn = false;  // post-connect pace window for the SAT publish gate (below)
 static uint32_t sConnPaceMs = 0;      // millis() of the CONNACK that opened it
-static void connStageStart() { sConnStage = 1; sConnStageMs = millis(); sConnPaceOn = true; sConnPaceMs = sConnStageMs; }
+static void connStageStart() { sConnStage = 1; sConnStageMs = millis(); sConnPaceOn = true; sConnPaceMs = sConnStageMs; startStaleOverrideClear(); }
 static void connStageReset() { sConnStage = 0; sConnPaceOn = false; }
 
 // True when the next portion may go now.
@@ -1836,6 +1837,19 @@ static void connStageTick() {
   connTraceSample();  // TASK-1757
   sConnStageMs = millis();
   sConnStage = (sConnStage >= 4) ? 0 : (uint8_t)(sConnStage + 1);
+}
+
+// TASK-1991: the sweep started in connStageStart() runs after the four portions, one empty retained message per
+// pass at least 100 ms apart and only while the outbox is shallow (TASK-2004: 26 small retained publishes in one go
+// dipped the free heap ~50 KB on a board without PSRAM). About 40 labels, so the sweep ends a few seconds after connect.
+constexpr uint32_t OVR_CLEAR_GAP_MS = 100;
+static uint32_t sOvrClearMs = 0;
+static void staleOverrideClearTick() {
+  if (sConnStage != 0) return;
+  const uint32_t now = millis();
+  if ((uint32_t)(now - sOvrClearMs) < OVR_CLEAR_GAP_MS) return;
+  if ((uint32_t)MQTTclient.queueSize() > CONN_STAGE_MAX_OUTBOX) return;
+  if (staleOverrideClearStep()) sOvrClearMs = now;
 }
 // Post-connect pace window (TASK-1757, beta.215 probes): right after CONNACK the SAT
 // always-on state set (~14 topics, first pass after a connect) was queued in one

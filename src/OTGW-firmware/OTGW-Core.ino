@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v2.0.0-beta.363
+**  Version  : v2.0.0-beta.364
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -2908,6 +2908,42 @@ void publishActiveOverrides() {
   }
 }
 // --- publishActiveOverrides end
+
+// TASK-1991: the override store is RAM only, so after a reboot it is empty and publishActiveOverrides() never
+// clears a <label>/override topic retained before the reboot: HA kept showing the old value. After every MQTT
+// connect one sweep sends an empty retained message (which removes a retained topic, and is a no-op where none
+// exists) for each label that can carry an override: recordOTOverride() is called from print_f88() only, so the
+// f88 ids of OTmap. A label with an entry in the store is skipped: an active override keeps its topic and
+// publishActiveOverrides() refreshes it within 60 s. One topic per step; the caller paces the steps (about 40 ids).
+// --- staleOverrideClear begin
+static uint16_t s_ovrClearId = 0xFFFF;   // next msg id to look at; 0xFFFF = no sweep running
+
+void startStaleOverrideClear() {
+  s_ovrClearId = 0;
+}
+
+// Sends at most one clear. Returns true while the sweep runs (also when a send failed: the same id is tried again).
+bool staleOverrideClearStep() {
+  if (s_ovrClearId == 0xFFFF) return false;
+  if (!settings.mqtt.bEnable) { s_ovrClearId = 0xFFFF; return false; }
+  while (s_ovrClearId <= OT_MSGID_MAX) {
+    const uint8_t id = (uint8_t)s_ovrClearId;
+    OTlookup_t item;
+    PROGMEM_readAnything(&OTmap[id], item);
+    bool inStore = false;
+    for (int i = 0; i < OVERRIDE_STORE_MAX; i++) {
+      if (otOverrideStore[i].lastSeen != 0 && otOverrideStore[i].id == id) { inStore = true; break; }
+    }
+    if (item.type != ot_f88 || inStore || item.label == nullptr || item.label[0] == '\0') { s_ovrClearId++; continue; }
+    char leaf[64];
+    snprintf_P(leaf, sizeof(leaf), PSTR("%s/override"), item.label);
+    if (sendMQTTData(leaf, "", /*retain=*/true)) s_ovrClearId++;
+    return true;
+  }
+  s_ovrClearId = 0xFFFF;
+  return false;
+}
+// --- staleOverrideClear end
 
 //===================[ OT Message Field Formatters ]=========
 
