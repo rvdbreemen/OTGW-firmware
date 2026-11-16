@@ -7,7 +7,7 @@ status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-16T04:34:00Z'
-updated_date: '2026-11-16T04:58:00Z'
+updated_date: '2026-11-16T07:31:00Z'
 labels:
   - build
   - flash-size
@@ -43,6 +43,8 @@ scripts/check_app_size.py <app.bin> <slot_bytes>: prints 'app size: N B of S B (
 Implementation: scripts/check_app_size.py (size, slot, %, free; WARN > 95 %, FAIL > 98 % exit 1, usage/IO error exit 2); build.py collect_pio_artifacts runs it right after the .ino.bin is copied, for targets with bootloader_offset (esp32 family), slot = read_partition_table()['app0'] (ota_0, 0x230000) with tcfg app_size as fallback, sys.exit(1) on rc != 0 (same pattern as check_rtc_layout.py, ADR-239). No ADR: a post-build check inside the existing pattern; thresholds are TASK-1955's recorded decision (option A). Open source: trivial glue, no search. Evidence: tests/test_app_size_check.py before the script/call existed: Ran 5, FAILED (failures=5); after: Ran 5, OK (94 % pass with numbers, 96 % WARN rc 0, 98.0 % WARN rc 0, 99 % FAIL rc 1, build.py call at source level). Real image: check_app_size.py on beta.339+92fc8fe.ino.bin -> 'app size: 2139376 B of 2293760 B (93.3 %), free 154384 B', rc 0. Other build.py tests green (test_build, _app_version_check, _config_path, _jobs, _lock, _log_tee, _safeboot, _staging, discord_post_build, flash_zip_modes, fs_image_settings_defaults, progmem_assets_deflated, submodule_check); evaluate --quick 88 pass 0 fail.
 
 AC4: real esp32-combo build of d29995f1f (2026-11-16 05:49-05:57, build.bat, exit 0, 'Build completed successfully') prints 'app size: 2139376 B of 2293760 B (93.3 %), free 154384 B [OTGW-firmware-esp32-combo.ino.bin]'; image equal in size to beta.339+92fc8fe (tooling-only change). Second proof: 92's 06:45 release build.
+
+Second proof of the guard on a build by another session: 92's release build of bd7a133c2 (wt-comms build log build-20261116-062153.log line 646) prints the app size line; d3's warm build of 3cb72c3eb (wt-1924\build\build-beta.341+3cb72c3.log line 239, WinError 32 clean warnings, safeboot up to date) prints 'app size: 2140880 B of 2293760 B (93.3 %), free 152880 B', so the warm path runs the check too (coordinator asked 2026-11-16 08:16).
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
