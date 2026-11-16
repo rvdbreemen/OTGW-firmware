@@ -129,6 +129,7 @@ static bool satCycleCheckLowLoadVeto() { return false; }
 
 static void satPwmReset() {}
 static void satCycleSkipAutoSwitch() {}
+static void satDiagEventsReset() {}   // TASK-1882: called by satDisable(); tested in tests/test_sat_diag_events.py
 static float _sat_lastControlCS = 0, _sat_requestedSetpoint = 0;
 static bool _sat_thermalSafeActive = false, _sat_roomLostActive = false, _sat_fireplaceActive = false;   // TASK-1374: satDisable() resets it
 static int16_t satPreSatPersisted(bool) { return 0; }   // TASK-1541

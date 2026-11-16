@@ -108,7 +108,12 @@ def extract_full_tick(src: str) -> str:
         a = loop.index("  // --- Clamp to valid range ---")
     ch = loop.index("satSendCH(satChEnableDecide(", a)
     end = loop.index("\n", ch) + 1
-    return "\nstatic float fullTick(float pidOutput) {\n" + loop[a:end] + "  }\n  return state.sat.fFinalSetpoint;\n}\n"
+    seg = loop[a:end]
+    # TASK-1882: the diagnostic block reads tick locals from before this segment and sends nothing; it has its own
+    # test (tests/test_sat_diag_events.py), so it is left out of this compiled segment
+    seg = re.sub(r"\n  // TASK-1882: diagnostic events from what this tick decided.*?satDiagEventsStep\(d\);\n  \}\n", "\n", seg,
+                 flags=re.S)
+    return "\nstatic float fullTick(float pidOutput) {\n" + seg + "  }\n  return state.sat.fFinalSetpoint;\n}\n"
 
 
 def build(workdir: Path):

@@ -196,6 +196,12 @@ check(!r.whyVis && r.trend === '', `no why-line and no arrow when nothing applie
 r = await show({ pwm_veto_reason: 1, slave_cfg_valid: true });
 check(!r.whyVis && !r.btnVis, `an old PWM refusal is not shown once MsgID 3 answered (got why=${r.whyVis} btn=${r.btnVis})`);
 
+// 6. TASK-1882: the diagnostic events are warnings with their numbers; they open the panel and mark the button.
+r = await show({ no_ignition: true });
+check(/No ignition/.test(r.why || '') && !!r.panelVis && r.btnWarn, `1882 no-ignition warning (got why=${JSON.stringify(r.why)} panel=${r.panelVis} warn=${r.btnWarn})`);
+r = await show({ heating_failure: true, heating_failure_room_start: 19.04, heating_failure_room_end: 19.21 });
+check(/Heating failure/.test(r.why || '') && /19\.0 to 19\.2/.test(r.why || '') && r.btnWarn, `1882 heating-failure warning names the room start/end (got ${JSON.stringify(r.why)})`);
+
 // AC3: every /api path the page requested. API_ALLOWED = the set measured on the code before TASK-1884.
 // Paths are compared from 'api/' on: Git Bash rewrites a leading '/api/...' in an env var into a Windows path.
 const norm = (p) => p.replace(/^.*?(api\/)/, '$1');

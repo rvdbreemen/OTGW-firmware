@@ -947,6 +947,8 @@ In PIC-gatewaymodus wordt alleen `otgw-otdirect/available` gepubliceerd met waar
 | `sat/cycle_class` | nee | Cyclusclassificatie (`good`, `overshoot`, ...) |
 | `sat/safety_tripped` | ja | Veiligheidsuitschakeling actief |
 | `sat/ot_link_lost` | ja | `"true"` zolang SAT 30 s geen ketelantwoord heeft gezien (TASK-1365) |
+| `sat/no_ignition` | ja | `"true"` zolang CV 180 s gevraagd is zonder vlam (TASK-1882, alleen een melding) |
+| `sat/heating_failure` | ja | `"true"` na 15 min op het maximum met een kamerstijging < 0,5 C (TASK-1882, alleen een melding) |
 | `sat/outside_temp_missing` | ja | `"true"` zolang SAT geen buitentemperatuur heeft die jonger is dan 1 uur (TASK-1390) |
 | `sat/pressure` | nee | CV-systeemdruk, glad (bar) |
 | `sat/pressure_alarm` | nee | Druk-alarm actief |

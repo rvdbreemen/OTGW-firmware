@@ -1495,6 +1495,8 @@
       "sat_fb_reason_thermostat_lost": "Thermostat lost",
       "sat_fb_reason_mqtt_lost": "MQTT lost for more than 5 minutes",
       "sat_why_takeover": "SAT took over the boiler: {{reason}}.",
+      "sat_why_no_ignition": "No ignition: SAT asked for heat for 3 minutes, the boiler did not light.",
+      "sat_why_heating_failure": "Heating failure? 15 minutes at the maximum, the room only went from {{start}} to {{end}} °C.",
       "sat_why_pwm_no_reply": "No on/off cycling (PWM) yet: the boiler has not answered the configuration request (MsgID 3).",
       "sat_why_pwm_denied": "No on/off cycling (PWM): the boiler reports that it does not allow it (MsgID 3 bit 4).",
       "sat_why_mod_suppressed": "On/off cycling: modulation is held low during this burner phase.",
@@ -1670,6 +1672,7 @@
       "sat_tune_r_no_floating": "no data at target",
       "sat_tune_r_no_phases": "no room temperature data",
       "sat_tune_r_no_room": "room temperature lost",
+      "sat_tune_r_diag_event": "no ignition or heating failure",
       "sat_tune_r_no_sun": "no sun position",
       "sat_tune_r_no_ticks": "no data",
       "sat_tune_r_no_warmup": "no warm-up data",
@@ -7245,6 +7248,9 @@
   function satWhyReasons(d) {
     var out = [];
     if (d.fallback_active) out.push({ text: t('tools.sat_why_takeover', { reason: satFbReasonText(d.fallback_reason) }), warn: true });
+    // TASK-1882: diagnostic events (no control action)
+    if (d.no_ignition) out.push({ text: t('tools.sat_why_no_ignition'), warn: true });
+    if (d.heating_failure) out.push({ text: t('tools.sat_why_heating_failure', { start: fmt(d.heating_failure_room_start, 1), end: fmt(d.heating_failure_room_end, 1) }), warn: true });
     var veto = d.pwm_veto_reason | 0;
     if (veto === 1 && d.slave_cfg_valid === false) out.push({ text: t('tools.sat_why_pwm_no_reply') });
     else if (veto === 2 && d.slave_low_off_denied) out.push({ text: t('tools.sat_why_pwm_denied') });

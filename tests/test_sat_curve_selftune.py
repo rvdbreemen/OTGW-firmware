@@ -128,6 +128,7 @@ static void tick(const char* spec) {
     else if (!strcmp(p, "flame")) t.flameOn = v != 0; else if (!strcmp(p, "rm")) t.relMod = v;
     else if (!strcmp(p, "mm")) t.minMod = v; else if (!strcmp(p, "sig")) t.signal = v;
     else if (!strcmp(p, "room")) t.roomLost = v != 0;
+    else if (!strcmp(p, "diag")) t.diagEvent = v != 0;   // TASK-1882
 #ifdef SAT_CT_PHASE_SPLIT
     else if (!strcmp(p, "err")) t.error = (float)atof(eq + 1);   // "nan" gives NaN
 #endif
@@ -304,7 +305,7 @@ class Out:
         # TASK-1881: progress records ("P" token and one at the end); excl = per-reason counters of the last record
         self.progress = [kv(l) for l in self.log if l.startswith("PROGRESS ")]
         excl_lines = [l for l in self.log if l.startswith("EXCL ")]
-        n = 12
+        n = len(REASONS)   # one EXCL line per reason (SATT_NONE excluded); was a literal 12 before TASK-1882
         self.excl_all = [{k: v for l in excl_lines[i:i + n] for k, v in kv(l).items()} for i in range(0, len(excl_lines), n)]
         self.excl = {k: int(v) for k, v in self.excl_all[-1].items()} if self.excl_all else {}
 
@@ -655,6 +656,18 @@ class SatCurveSelfTune(unittest.TestCase):
         # TASK-1559, Sergeant D entry 225 (Q-1525a A): an hour with a lost room temperature is not counted, reason no_room
         o = self.run_tokens([tk(sig=0.0, room=1), f"A:{HOUR}"])
         self.assertEqual((o.hours[0]["counted"], o.hours[0]["reason"]), ("0", "no_room"))
+
+    def test_diag_event_hours_are_not_counted(self):
+        # TASK-1882, Sergeant D entry 358 (Q-1882a A): ticks with a no-ignition or heating-failure event are excluded as
+        # diag_event; since TASK-1932 (entry 369) the hour drops only under 90 % clean of the 4 expected ticks (900 s):
+        # 2 clean + 2 diag = 50 %, not counted; a clean hour after it counts
+        o = self.run_tokens(SHARE + [tk(sig=0.5), tk(sig=0.5), tk(sig=0.5, diag=1), tk(sig=0.5, diag=1), f"A:{HOUR}"]
+                            + clean_hour(0.5))
+        self.assertEqual([(h["counted"], h["reason"]) for h in o.hours], [("0", "diag_event"), ("1", "none")])
+
+    def test_dhw_comes_before_the_diag_event(self):
+        o = self.run_tokens([tk(sig=0.0, dhw=1, diag=1), f"A:{HOUR}"])
+        self.assertEqual(o.hours[0]["reason"], "dhw")
 
     def test_room_lost_hour_excluded_then_a_clean_hour_counts(self):
         # TASK-1932 (entry 369): the room-lost hour is 3 of 4 expected ticks (900 s) excluded = 25 % clean: not counted
@@ -1028,7 +1041,7 @@ class CleanShare(unittest.TestCase):
 
 
 REASONS = ["not_sat", "dhw", "no_sun", "sun", "pwm", "flame_off", "min_mod", "coeff_changed", "no_ticks", "not_controlling",
-           "few_ticks", "no_room"]
+           "few_ticks", "no_room", "diag_event"]
 
 
 class ExclusionCounters(unittest.TestCase):
@@ -1183,7 +1196,7 @@ class ProgressWiring(unittest.TestCase):
         names += re.findall(r'default:\s+return PSTR\("(\w+)"\);\s*\}\s*\}\s*// First exclusion', self.src)
         self.assertEqual(sorted(names), sorted(["none"] + REASONS), "SATT_NO_TICKS is the default branch")
         hdr = SAT_HDR.read_text(encoding="utf-8")
-        self.assertRegex(hdr, r"SATT_FEW_TICKS, SATT_NO_ROOM,\s*\n\s*SATT_COUNT")
+        self.assertRegex(hdr, r"SATT_FEW_TICKS, SATT_NO_ROOM,\s*\n\s*SATT_DIAG_EVENT,[^\n]*\n\s*SATT_COUNT")
 
 
 class SourceChecks(unittest.TestCase):
@@ -1240,6 +1253,8 @@ class SourceChecks(unittest.TestCase):
         # boiler fault, thermal-safe fallback, summer simmer, valves closed: each marks before it returns
         self.assertGreaterEqual(self.src.count("satCurveTuneNoteNotControlling();   // TASK-1525"), 4)
         self.assertIn("ti.roomLost = !roomValid;", self.src)
+        # TASK-1882 (entry 358): the active diagnostic events feed the tuner tick
+        self.assertIn("ti.diagEvent = state.sat.bNoIgnition || state.sat.bHeatingFailure;", self.src)
 
     def test_window_file_and_simulation_guards(self):
         self.assertIn('"/sat_tune.json"', self.src)

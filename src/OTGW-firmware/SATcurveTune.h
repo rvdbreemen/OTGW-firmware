@@ -43,6 +43,7 @@
 enum SatTuneReason : uint8_t {
   SATT_NONE = 0, SATT_NOT_SAT, SATT_DHW, SATT_NO_SUN, SATT_SUN, SATT_PWM, SATT_FLAME_OFF, SATT_MIN_MOD,
   SATT_COEFF_CHANGED, SATT_NO_TICKS, SATT_NOT_CONTROLLING, SATT_FEW_TICKS, SATT_NO_ROOM,
+  SATT_DIAG_EVENT,   // TASK-1882 (entry 358): a no-ignition or heating-failure event was active
   SATT_COUNT   // number of reasons, SATT_NONE included (size of the per-reason counters)
 };
 // TASK-1881: per-reason counters of excluded hours (telemetry only, the decision does not read them). The host test sets its
@@ -60,6 +61,7 @@ struct SatTuneTickIn {
   bool  chOn;          // CH enabled (CH=1 sent)
   bool  flameOn;
   bool  roomLost;      // no valid room temperature on this tick (heating on the curve only)
+  bool  diagEvent;     // TASK-1882 (entry 358): a no-ignition or heating-failure event is active (state.sat)
   float relMod;        // MsgID 17 relative modulation, %
   float minMod;        // MsgID 15 low byte, %; 0 = never seen
   float signal;        // curve integral sample, C (ignored for dhw / not-active ticks)

@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : SATtypes.h
-**  Version  : v2.0.0-beta.340
+**  Version  : v2.0.0-beta.341
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -141,6 +141,22 @@ struct SATZoneState {
                                    // Excluded from PID + P75 aggregation while true.
                                    // Mirrors SAT Python PR #172 (area.py returns None
                                    // for state/error/weight when HVACMode.OFF).
+};
+
+// TASK-1882: one control tick's input to satDiagEventsStep() (SATcontrol.ino). In this header, not in the .ino:
+// the Arduino prototype of satDiagEventsStep(const SatDiagIn&) sits above every .ino definition.
+struct SatDiagIn {
+  uint32_t now;          // the tick time
+  uint32_t intervalMs;   // the control tick interval
+  bool chAsked;          // CH=1 goes out this tick
+  bool flame;            // flame on
+  bool flowAboveCs;      // the boiler flow is at or above the CS of this tick
+  bool atMax;            // the requested setpoint is clamped to the maximum, or PWM runs at its maximum duty
+  bool roomValid;
+  float room;            // the room temperature SAT regulates on
+  float cs;              // this tick's CS (for the log line)
+  float maxSetpoint;     // for the log line
+  float duty;            // PWM duty (for the log line)
 };
 
 //====================================================================
@@ -412,6 +428,13 @@ struct SATRuntimeSection {         // state.sat — SAT thermostat controller st
   uint32_t iTCPushMs              = 0;      // millis() of the last TC= push (0 = none since boot/off/adopt), TASK-1343
   bool     bRoomTempLost          = false;  // the control tick sees no valid room temperature: heating on the curve only (TASK-1364)
   bool     bOtLinkLost            = false;  // no boiler reply for 30 s: SAT handed the boiler back once and sends nothing until a reply returns (TASK-1365)
+  // TASK-1882: diagnostic events, no control action (satDiagEventsStep in SATcontrol.ino)
+  bool     bNoIgnition            = false;  // CH asked (PWM ON phase or CS above the cold cutoff) for 180 s, flow below CS, no flame
+  bool     bHeatingFailure        = false;  // SAT at the maximum (setpoint or PWM duty) for 15 min while the room rose < 0.5 C
+  float    fHfRoomStart           = 0.0f;   // last heating-failure window: room at its start
+  float    fHfRoomEnd             = 0.0f;   //   and at its end (the window is 15 min)
+  uint32_t iHfEvents              = 0;      // heating-failure hits since boot (field false-positive rate)
+  uint32_t iNoIgnitionEvents      = 0;      // no-ignition hits since boot
   bool     bOutsideTempMissing    = false;  // no valid outside temperature (none younger than 1 h): SAT handed the boiler back once and sends nothing until one returns (TASK-1390, entries 56, 57)
   bool     bRestoredOutdoorValid  = false;  // fRestoredOutdoor came from the PID state file at boot (entry 126, TASK-1482)
   float    fRestoredOutdoor       = 0.0f;

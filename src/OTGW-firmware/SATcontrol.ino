@@ -4142,6 +4142,7 @@ bool satOwnsControlSetpoint()
 //=== Cleanly disable SAT and release boiler control ===
 // persistPid=false skips the PID file write: satOtLinkStep() passes it when the OpenTherm loss comes before
 // the first room reading, so a restored (or not yet restored) saved PID state stays on flash (entry 115).
+static void satDiagEventsReset();   // TASK-1882: defined in the satDiagEvents block below
 void satDisable(bool persistPid)
 {
   SATDebugTf(PSTR("SAT: satDisable called (safety=%d fallback=%d)\r\n"),
@@ -4163,6 +4164,7 @@ void satDisable(bool persistPid)
   const bool restore = !satIsEnabled() || state.sat.bSafetyTripped;
   state.sat.bOutsideTempMissing = false;   // the outside-temperature gate sets it again after this call (TASK-1390)
   state.sat.bOtLinkLost = false;       // a switch-off ends the OpenTherm-loss state; the loss path sets it again after this call (TASK-1365)
+  satDiagEventsReset();                // TASK-1882: and the no-ignition / heating-failure events (defined in the satDiagEvents block)
   satSetControlMode(SAT_MODE_OFF);
   satCycleSkipAutoSwitch();            // no overshoot start survives a switch-off, trip or OT loss (TASK-1367; firmware choice: thermo-nova keeps it, climate.py:544-545 returns before update())
   satPwmReset();                       // also when the mode was not PWM: a safety trip must leave no stale PWM state
@@ -4771,6 +4773,12 @@ void satSendStatusJSON()
     je.field(F("pm28_unanswered"),      snap->st.sat.iPm28Unanswered);
     je.field(F("room_temp_lost"),       snap->st.sat.bRoomTempLost);
     je.field(F("ot_link_lost"),         snap->st.sat.bOtLinkLost);
+    je.field(F("no_ignition"),          snap->st.sat.bNoIgnition);         // TASK-1882, diagnostic only
+    je.field(F("no_ignition_events"),   snap->st.sat.iNoIgnitionEvents);
+    je.field(F("heating_failure"),      snap->st.sat.bHeatingFailure);     // TASK-1882, diagnostic only
+    je.field(F("heating_failure_events"), snap->st.sat.iHfEvents);
+    je.field(F("heating_failure_room_start"), snap->st.sat.fHfRoomStart);  // the last 15 min window
+    je.field(F("heating_failure_room_end"),   snap->st.sat.fHfRoomEnd);
     je.field(F("outside_temp_missing"), snap->st.sat.bOutsideTempMissing);   // TASK-1390
     je.field(F("fallback_reason"),      (int32_t)snap->st.sat.eFallbackReason);
     je.field(F("max_rel_modulation"),   (int32_t)settings.sat.iMaxRelModulation);
@@ -4977,7 +4985,7 @@ static const char* satSimmerPerception(float indexC) {
 // the ADR-111 heartbeat keeps the retained values fresh. A REST or settings disable therefore
 // reaches the broker on the next loop pass. Shadows are file-scope so satRepublishCoreState()
 // can reset them.
-static SATShadowB s_core_enabled, s_core_active, s_core_safety_tripped, s_core_fallback_active, s_core_push_refused, s_core_sh_rejected, s_core_pm25_no_slot, s_core_room_temp_lost, s_core_ot_link_lost, s_core_outside_temp_missing, s_core_external_temp_enable;
+static SATShadowB s_core_enabled, s_core_active, s_core_safety_tripped, s_core_fallback_active, s_core_push_refused, s_core_sh_rejected, s_core_pm25_no_slot, s_core_room_temp_lost, s_core_ot_link_lost, s_core_no_ignition, s_core_heating_failure, s_core_outside_temp_missing, s_core_external_temp_enable;
 static SATShadowS s_core_mode, s_core_preset, s_core_control_mode;
 
 static void satPublishCoreState()
@@ -4993,6 +5001,8 @@ static void satPublishCoreState()
   publishIfChangedB(F("sat/pm25_no_slot"),     state.sat.bPm25NoSlot,       s_core_pm25_no_slot,     true);   // TASK-1653
   publishIfChangedB(F("sat/room_temp_lost"),   state.sat.bRoomTempLost,     s_core_room_temp_lost,   true);
   publishIfChangedB(F("sat/ot_link_lost"),     state.sat.bOtLinkLost,       s_core_ot_link_lost,     true);
+  publishIfChangedB(F("sat/no_ignition"),      state.sat.bNoIgnition,       s_core_no_ignition,      true);   // TASK-1882
+  publishIfChangedB(F("sat/heating_failure"),  state.sat.bHeatingFailure,   s_core_heating_failure,  true);   // TASK-1882
   publishIfChangedB(F("sat/outside_temp_missing"), state.sat.bOutsideTempMissing, s_core_outside_temp_missing, true);   // TASK-1390
   publishIfChangedB(F("sat/external_temp_enable"), settings.sat.bUseExternalTemp, s_core_external_temp_enable, true);
 
@@ -5022,6 +5032,8 @@ void satRepublishCoreState()
   memset(&s_core_pm25_no_slot, 0, sizeof(s_core_pm25_no_slot));
   memset(&s_core_room_temp_lost, 0, sizeof(s_core_room_temp_lost));
   memset(&s_core_ot_link_lost, 0, sizeof(s_core_ot_link_lost));
+  memset(&s_core_no_ignition, 0, sizeof(s_core_no_ignition));
+  memset(&s_core_heating_failure, 0, sizeof(s_core_heating_failure));
   memset(&s_core_outside_temp_missing, 0, sizeof(s_core_outside_temp_missing));
   memset(&s_core_external_temp_enable, 0, sizeof(s_core_external_temp_enable));
   satClimateBridgeForce();   // TASK-1979 / ADR-248: the HA thermostat card's two scalar topics go out again too
@@ -6499,6 +6511,7 @@ static const char* satTuneReasonName(uint8_t r)
     case SATT_NOT_CONTROLLING: return PSTR("not_controlling");
     case SATT_FEW_TICKS:     return PSTR("few_ticks");
     case SATT_NO_ROOM:       return PSTR("no_room");
+    case SATT_DIAG_EVENT:    return PSTR("diag_event");
     default:                 return PSTR("no_ticks");
   }
 }
@@ -6511,6 +6524,7 @@ static uint8_t satTuneTickReason(const SatTuneTickIn& in)
   const bool pwmGas = in.pwm && in.pwmGas;
   if (!in.satActive)                            return SATT_NOT_SAT;
   if (in.dhw)                                   return SATT_DHW;
+  if (in.diagEvent)                             return SATT_DIAG_EVENT;   // entry 358 (Q-1882a A), TASK-1882
   if (!in.sunValid)                             return SATT_NO_SUN;
   if (in.sunElevation >= SAT_CT_SUN_MAX_DEG)  return SATT_SUN;
   if (in.pwm && !in.pwmGas)                     return SATT_PWM;
@@ -7608,6 +7622,100 @@ static void satSimEndRestore()
 }
 // --- satSimEndRestore end
 
+// TASK-1882: diagnostic events, no control action (Robert A, DM 1570699094622470167; the "high heat" definition is the
+// coordinator's under Robert's delegation, 2026-11-15). Called once per control tick, after the tick has decided its CS,
+// MM and CH; it only sets state.sat flags and logs. A tick that returned early (hot water, boiler fault, valves closed,
+// SAT not in charge) does not reach it: a gap of more than 1.5 tick intervals since the previous call restarts both
+// timers, so a stale start time never fires when the tick resumes.
+//   no ignition: CH asked (PWM ON phase, or CS above the cold cutoff) for 180 s (thermo-nova HEATER_STARTUP_TIMEFRAME,
+//                entry 80) with the flow below CS and no flame. Flow at or above CS is a boiler that rightly stays off.
+//   heating failure: SAT at the maximum (requested setpoint clamped, or PWM at its maximum duty) for 15 min with a valid
+//                room temperature all along, and the room rose < 0.5 C over those 15 min (VTherm, const.py:540-544).
+// --- satDiagEvents begin
+// struct SatDiagIn: SATtypes.h (the Arduino prototype of satDiagEventsStep needs it above the .ino code)
+static constexpr uint32_t SAT_NO_IGNITION_MS     = 180000UL;
+static constexpr uint32_t SAT_HF_WINDOW_MS       = 900000UL;
+static constexpr float    SAT_HF_MIN_RISE_C      = 0.5f;
+static uint32_t _sat_diagLastMs = 0, _sat_hfSinceMs = 0;
+// no ignition: CH-asked time without a flame, added up over PWM ON phases (an OFF phase pauses it, it does not reset it);
+// only a flame, a flow above CS or a SAT switch-off resets it (review of TASK-1882: a reset on every PWM OFF phase made
+// the flag flap once per cycle and could miss the event when the ON phase lasted about 180 s)
+static uint32_t _sat_noIgnAskedMs = 0, _sat_noIgnLastAskMs = 0;
+static float    _sat_hfRoomStart = 0.0f;
+
+// A SAT switch-off or hand-back ends both events, as it ends the OpenTherm-loss and outside-missing states
+// (satDisable(), the disabled path of the control tick): otherwise a retained sat/no_ignition = true and the HA problem
+// sensor stayed set while SAT was off (review of TASK-1882).
+static void satDiagEventsReset()
+{
+  _sat_diagLastMs = 0; _sat_hfSinceMs = 0; _sat_noIgnAskedMs = 0; _sat_noIgnLastAskMs = 0;
+  if (state.sat.bNoIgnition) {
+    state.sat.bNoIgnition = false;
+    DebugTln(F("SATEVENT no_ignition=0 reason=sat_off"));
+  }
+  if (state.sat.bHeatingFailure) {
+    state.sat.bHeatingFailure = false;
+    DebugTln(F("SATEVENT heating_failure=0 reason=sat_off"));
+  }
+}
+
+static void satDiagEventsStep(const SatDiagIn& in)
+{
+  const bool gap = _sat_diagLastMs != 0 && (in.now - _sat_diagLastMs) > in.intervalMs + in.intervalMs / 2;
+  _sat_diagLastMs = in.now;
+  if (gap) _sat_hfSinceMs = 0;
+
+  // no ignition
+  if (in.flame || in.flowAboveCs) {
+    _sat_noIgnAskedMs = 0; _sat_noIgnLastAskMs = 0;
+    if (state.sat.bNoIgnition) {
+      state.sat.bNoIgnition = false;
+      DebugTf(PSTR("SATEVENT no_ignition=0 reason=%s\r\n"), in.flame ? "flame" : "flow_above_cs");
+    }
+  } else if (!in.chAsked) {
+    _sat_noIgnLastAskMs = 0;                       // a PWM OFF phase or no demand: pause, keep the asked time
+  } else {
+    if (_sat_noIgnLastAskMs != 0 && (in.now - _sat_noIgnLastAskMs) <= in.intervalMs + in.intervalMs / 2) {
+      _sat_noIgnAskedMs += in.now - _sat_noIgnLastAskMs;   // a tick after a hole adds nothing
+    }
+    _sat_noIgnLastAskMs = in.now;
+    if (!state.sat.bNoIgnition && _sat_noIgnAskedMs >= SAT_NO_IGNITION_MS) {
+      state.sat.bNoIgnition = true;
+      state.sat.iNoIgnitionEvents++;
+      DebugTf(PSTR("SATEVENT no_ignition=1 asked_s=%lu cs=%.1f duty=%.2f\r\n"),
+              (unsigned long)(_sat_noIgnAskedMs / 1000UL), (double)in.cs, (double)in.duty);
+      satNarratef_P(PSTR("No ignition: CH asked for %lu s with CS %.1f, no flame"),
+                    (unsigned long)(_sat_noIgnAskedMs / 1000UL), (double)in.cs);
+    }
+  }
+
+  // heating failure: back-to-back 15 min windows while SAT stays at the maximum
+  if (!in.atMax || !in.roomValid) {
+    _sat_hfSinceMs = 0;
+    if (state.sat.bHeatingFailure) {
+      state.sat.bHeatingFailure = false;
+      DebugTf(PSTR("SATEVENT heating_failure=0 reason=%s\r\n"), in.atMax ? "room_invalid" : "below_max");
+    }
+    return;
+  }
+  if (_sat_hfSinceMs == 0) { _sat_hfSinceMs = in.now; _sat_hfRoomStart = in.room; return; }
+  if ((in.now - _sat_hfSinceMs) < SAT_HF_WINDOW_MS) return;
+  const float rise = in.room - _sat_hfRoomStart;
+  state.sat.fHfRoomStart = _sat_hfRoomStart;
+  state.sat.fHfRoomEnd   = in.room;
+  const bool fail = rise < SAT_HF_MIN_RISE_C;
+  DebugTf(PSTR("SATEVENT heating_failure=%d room_start=%.2f room_end=%.2f rise=%.2f window_s=%lu cs=%.1f max=%.1f duty=%.2f\r\n"),
+          fail ? 1 : 0, (double)_sat_hfRoomStart, (double)in.room, (double)rise,
+          (unsigned long)((in.now - _sat_hfSinceMs) / 1000UL), (double)in.cs, (double)in.maxSetpoint, (double)in.duty);
+  if (fail && !state.sat.bHeatingFailure) {
+    state.sat.iHfEvents++;
+    satNarratef_P(PSTR("Heating failure? 15 min at the maximum and the room rose only %.2f C"), (double)rise);
+  }
+  state.sat.bHeatingFailure = fail;
+  _sat_hfSinceMs = in.now; _sat_hfRoomStart = in.room;   // next window
+}
+// --- satDiagEvents end
+
 static void satControlLoopRun()
 {
   satApplyControlStateReset();    // TASK-1414: a reset requested from any task (REST, MQTT, SAT itself) is applied here, once
@@ -7656,6 +7764,7 @@ static void satControlLoopRun()
     _sat_swSentValid = false;              // TASK-1376: SAT sends the DHW setpoint again when it is back
     if (!satIsEnabled()) state.sat.bOtLinkLost = false;
     if (!satIsEnabled()) state.sat.bOutsideTempMissing = false;   // TASK-1390: a switch-off ends the outside-missing state
+    if (!satIsEnabled()) satDiagEventsReset();                   // TASK-1882: and both diagnostic events
     _sat_flameOffSeen = false;             // TASK-1942: a flame already burning when SAT comes back is no CH start
     return;
   }
@@ -8144,6 +8253,23 @@ static void satControlLoopRun()
   if (state.sat.bModSuppressed) { if (state.sat.iModSuppressionSinceMs == 0) state.sat.iModSuppressionSinceMs = millis(); }
   else                          state.sat.iModSuppressionSinceMs = 0;
 
+  // TASK-1882: diagnostic events from what this tick decided; reads only, sends nothing
+  {
+    SatDiagIn d;
+    d.now = _sat_tickMs;
+    d.intervalMs = (uint32_t)settings.sat.iControlInterval * 1000UL;
+    d.chAsked = !coldCutoff && satChEnableDecide(pidOutput, satColdThreshold(), pwmDrivesSetpoint, pwmOn);
+    d.flame = satIsFlameOn();
+    d.flowAboveCs = satGetFlowTemp() >= finalSetpoint;
+    d.atMax = atMax || (pwmMode && satPwmAtMaxDuty());
+    d.roomValid = roomValid;
+    d.room = roomTemp;
+    d.cs = finalSetpoint;
+    d.maxSetpoint = maxSetpoint;
+    d.duty = state.sat.fPwmDutyCycle;
+    satDiagEventsStep(d);
+  }
+
   // --- Send CS= and MM= commands to boiler when an OT command interface is available ---
   const uint8_t mmTarget = (!coldCutoff && satPwmAtMaxDuty()) ? SAT_MM_T : state.sat.iCurrentModulation;   // TASK-1581
   char mmTxt[4];
@@ -8189,6 +8315,7 @@ static void satControlLoopRun()
     ti.sunValid = state.sat.bSunElevationValid; ti.sunElevation = state.sat.fSunElevation;
     ti.pwm = pwmMode;
     ti.roomLost = !roomValid;
+    ti.diagEvent = state.sat.bNoIgnition || state.sat.bHeatingFailure;   // TASK-1882: entry 358, the hour is left out
     ti.error = roomValid ? state.sat.fError : NAN;   // ADR-228 phase: the held PID error (target - room) the deadband acts on
     ti.chOn = (state.sat.iLastSentCH != 0); ti.flameOn = satIsFlameOn();
     ti.relMod = (float)satGetActualModulation();   // same source as satIsFlameOn(): the simulated value in SAT simulation

@@ -1168,6 +1168,8 @@ Published every SAT control loop interval (default 30 seconds) when SAT is enabl
 | `sat/cycle_class` | no | `"good"`, `"overshoot"`, `"underheat"`, `"short"` |
 | `sat/safety_tripped` | yes | `"true"` when safety shutdown is active |
 | `sat/ot_link_lost` | yes | `"true"` while SAT has seen no boiler reply for 30 s (TASK-1365) |
+| `sat/no_ignition` | yes | `"true"` while CH is asked for 180 s without flame (TASK-1882, diagnostic only) |
+| `sat/heating_failure` | yes | `"true"` after 15 min at the maximum with a room rise < 0.5 C (TASK-1882, diagnostic only) |
 | `sat/outside_temp_missing` | yes | `"true"` while SAT has no outside temperature younger than 1 hour (TASK-1390) |
 | `sat/pressure` | no | Smoothed system water pressure (bar) |
 | `sat/pressure_alarm` | no | `"true"` when pressure alarm is active |

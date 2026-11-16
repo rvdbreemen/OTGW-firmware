@@ -113,6 +113,7 @@ static void satRestoreDeferredStep() {}   // TASK-1412.4: tested in test_sat_sla
 static void satPwmSaveStep() {}
 static void satPwmReset() {}
 static void satCycleSkipAutoSwitch() {}   // TASK-1367: called by satDisable(); the overshoot timer is not under test here
+static void satDiagEventsReset() {}   // TASK-1882: called by satDisable(); tested in tests/test_sat_diag_events.py
 static float _sat_lastControlCS = 0, _sat_requestedSetpoint = 0;
 static bool _sat_thermalSafeActive = false, _sat_roomLostActive = false, _sat_fireplaceActive = false;   // TASK-1374: satDisable() resets it
 // PID persistence (TASK-1365 AC#4): g_pidFile stands for the saved PID file, g_roomSeen for satPidRoomSeen().

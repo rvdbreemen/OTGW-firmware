@@ -7,6 +7,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Fixed
 - PIC: after a boot the PIC settings panel fills within about a minute again. The settings readout no longer waits 4 to 5 minutes for the MQTT discovery run to finish; it now sends its next query right after a discovery step instead of waiting for the next 3-second tick, and stays at least 3 seconds between queries (TASK-1971).
+### Added
+- SAT: two diagnostic events that change nothing in what SAT sends. *No ignition*: CH asked (a PWM ON phase, or a setpoint above the cold cutoff) for 180 s with the flow below the setpoint and no flame. *Heating failure*: SAT at its maximum (setpoint or PWM duty) for 15 min and the room rose less than 0.5 °C; a slow house can show it on a cold morning. Both show as a warning on the SAT page, in REST `sat/status` (`no_ignition`, `heating_failure`, counters, the last window's room start and end), on MQTT `sat/no_ignition` and `sat/heating_failure` with Home Assistant problem sensors, and as a telnet `SATEVENT` line with the numbers (Robert, DM 1570699094622470167; TASK-1882).
 
 ## [2.0.0-beta.339] - 2026-11-16
 

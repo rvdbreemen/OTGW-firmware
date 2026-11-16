@@ -58,7 +58,7 @@ function render(status) {
 }
 
 const REASONS = ['not_sat', 'dhw', 'no_sun', 'sun', 'pwm', 'flame_off', 'min_mod', 'coeff_changed', 'no_ticks',
-  'not_controlling', 'few_ticks', 'no_room'];
+  'not_controlling', 'few_ticks', 'no_room', 'diag_event'];
 function fixture(over) {
   const excluded_hours = Object.fromEntries(REASONS.map((r) => [r, 0]));
   return Object.assign({
