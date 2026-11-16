@@ -3853,8 +3853,6 @@ void satSavePidState()
   // TASK-1900: a SAT simulation run learns on the simulated room only, so the real PID state on flash stays as it was
   // (the TASK-1869 rule). This covers every caller: the 5-minute save, satPersistAllToFs, satDisable and the flush.
   if (settings.sat.bSimulation) return;
-  File f = LittleFS.open(FPSTR(SAT_PID_STATE_FILE), "w");
-  if (!f) return;
   char buf[256];
   time_t ts = time(nullptr);
   int n = satPidStateBuild(buf, sizeof(buf), ts);
@@ -3863,8 +3861,9 @@ void satSavePidState()
   n = satPidStateAppendOutside(buf, n, sizeof(buf), ts);   // entry 126 (TASK-1482)
   buf[n] = '}';
   buf[n + 1] = '\0';
-  f.print(buf);
-  f.close();
+  // TASK-1989: written by the fsWriter task, not on the loop task (a LittleFS write here was a 250-410 ms stall about
+  // every 6th time); the queue keeps the order of every write of this file.
+  if (!fsWriterSubmit(SAT_PID_STATE_FILE, buf, strlen(buf))) return;
   _pidLastSaveMs = millis();
 }
 
@@ -4069,12 +4068,9 @@ static const uint32_t SAT_ENERGY_SAVE_INTERVAL_MS = 3600000UL; // 1 hour
 
 void satSaveEnergyState()
 {
-  File f = LittleFS.open(FPSTR(SAT_ENERGY_FILE), "w");
-  if (!f) return;
   char buf[64];
   snprintf_P(buf, sizeof(buf), PSTR("{\"kwh\":%.3f}"), state.sat.fEnergyTotal);
-  f.print(buf);
-  f.close();
+  if (!fsWriterSubmit(SAT_ENERGY_FILE, buf, strlen(buf))) return;   // TASK-1989: off the loop task
   _energyLastSaveMs = millis();
   SATDebugTf(PSTR("SAT: energy saved (%.3f kWh)\r\n"), state.sat.fEnergyTotal);
 }
@@ -4102,12 +4098,9 @@ static const char* SAT_EST_ENERGY_FILE PROGMEM = "/sat_energy_estimate.json";
 
 static void satSaveEstimatedEnergy()
 {
-  File f = LittleFS.open(FPSTR(SAT_EST_ENERGY_FILE), "w");
-  if (!f) return;
   char buf[48];
   snprintf_P(buf, sizeof(buf), PSTR("{\"kwh\":%.3f}"), state.sat.fEnergyEstimatedKWh);
-  f.print(buf);
-  f.close();
+  if (!fsWriterSubmit(SAT_EST_ENERGY_FILE, buf, strlen(buf))) return;   // TASK-1989: off the loop task
   state.sat.fEstEnergyLastSavedKWh = state.sat.fEnergyEstimatedKWh;
   SATTraceTf(PSTR("SAT: estimated energy saved (%.3f kWh)\r\n"), state.sat.fEnergyEstimatedKWh);
 }

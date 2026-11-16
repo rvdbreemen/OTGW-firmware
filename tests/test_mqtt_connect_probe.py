@@ -114,7 +114,9 @@ class ConnectProbe(unittest.TestCase):
     def setUpClass(cls):
         cls.tmp = tempfile.TemporaryDirectory()
         cpp = Path(cls.tmp.name) / "probe.cpp"
-        cpp.write_text(STUBS + enum_block() + "\n" + extract() + "\n" + MAIN, encoding="utf-8")
+        watch = INO.with_name("LoopStepWatch.h")   # TASK-1989: connProbe() also feeds the loop step watch
+        inc = '#include "%s"\n' % watch.as_posix() if watch.exists() else ""
+        cpp.write_text(STUBS + inc + enum_block() + "\n" + extract() + "\n" + MAIN, encoding="utf-8")
         cls.exe = base.compile_cpp(cpp, Path(cls.tmp.name) / ("probe" + (".exe" if os.name == "nt" else "")))
         if cls.exe is None:
             raise unittest.SkipTest("no C++ compiler on this host")

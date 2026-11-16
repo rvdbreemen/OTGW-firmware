@@ -116,6 +116,8 @@ static char g_saved[256];
 struct File { bool ok = true; operator bool() const { return ok; } void print(const char* s) { strncpy(g_saved, s, 255); } void close() {} };
 struct FSStub { File open(const char*, const char*) { return File(); } };
 static FSStub LittleFS;
+// TASK-1989: satSavePidState() hands the file to the fsWriter queue; here it writes at once (fsWriter.ino before begin).
+static bool fsWriterSubmit(const char* p, const char* d, size_t) { File f = LittleFS.open(p, "w"); if (!f) return false; f.print(d); f.close(); return true; }
 static uint32_t _pidLastSaveMs = 0;
 static const char* SAT_PID_STATE_FILE = "/x.json";
 static int satPidStateAppendOutside(char*, int n, size_t, time_t) { return n; }   // TASK-1482: tested in test_sat_restart_quiet.py

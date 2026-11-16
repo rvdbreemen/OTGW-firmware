@@ -649,6 +649,8 @@ enum : uint8_t {
   CPROBE_SAT_CORE           // satControlLoop(): after satPublishCoreState()
 };
 void connProbe(uint8_t tag);
+// TASK-1989: the slowest step (between two CPROBE_* call sites) of the loop pass that just ended, read at the next loop top.
+void loopSlowestStep(uint8_t* from, uint8_t* to, uint32_t* ms);
 #define OTGW_CONN_PROBE(tag) connProbe(tag)  // used where host test harnesses cut the code without this header
 
 // end of MQTTstuff.h

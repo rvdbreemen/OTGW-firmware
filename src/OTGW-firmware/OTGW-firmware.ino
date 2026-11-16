@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.ino
-**  Version  : v2.0.0-beta.356
+**  Version  : v2.0.0-beta.357
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -635,6 +635,7 @@ void setup() {
   if (!LittleFSmounted) sendMQTTData(F("otgw-firmware/error"), "LittleFS mount failed - running on defaults", false);
   initS0Count();        // init S0 counter
   initSensors();        // init DS18B20 (after MQ is up!)
+  fsWriterBegin();      // TASK-1989: queued state-file writes off the loop task; before initSAT(), its first saver
   initSAT();            // init SAT thermostat controller
   // Clear the triple-reset portal counter: a successful setup() proves the device is healthy.
   // This prevents USB flash resets or stale RTC data from triggering the portal on next boot.
@@ -1180,7 +1181,14 @@ void loop()
     if (s_lastLoopMs != 0) {
       uint32_t gapMs = nowMs - s_lastLoopMs;
       if (gapMs > state.heapdiag.iMaxLoopGapMs) state.heapdiag.iMaxLoopGapMs = gapMs;
-      if (gapMs > 200) DebugTf(PSTR("[loop-stall] %lu ms gap\r\n"), (unsigned long)gapMs);
+      if (gapMs > 200) {
+        // TASK-1989: name the slowest step between two CPROBE_* probes (tags in MQTTstuff.h) of the stalled pass
+        uint8_t stepFrom = 0, stepTo = 0;
+        uint32_t stepMs = 0;
+        loopSlowestStep(&stepFrom, &stepTo, &stepMs);
+        DebugTf(PSTR("[loop-stall] %lu ms gap, slowest step %u->%u %lu ms\r\n"),
+                (unsigned long)gapMs, (unsigned)stepFrom, (unsigned)stepTo, (unsigned long)stepMs);
+      }
     }
     s_lastLoopMs = nowMs;
   }

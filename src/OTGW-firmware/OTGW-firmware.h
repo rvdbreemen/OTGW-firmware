@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v2.0.0-beta.356
+**  Version  : v2.0.0-beta.357
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -31,6 +31,7 @@ extern AsyncSimpleTelnet<1> debugTelnet;   // defined in networkStuff.ino
 // the settings struct (SATSection) in one file because their defaults and
 // enums are tightly coupled; see SATtypes.h preamble for the rationale.
 #include "SATtypes.h"
+#include "fsWriter.h"           // TASK-1989: queued state-file writes (the update server drains it too)
 #include "SATmqttPublish.h"     // ADR-111: on-change + jittered heartbeat helpers
 #include <boards.h>             // Board-specific pin maps and feature flags (HAS_PIC, HAS_DIRECT_OT)
 // OTDirecttypes.h must follow boards.h because its contents are gated on HAS_DIRECT_OT (ADR-079).

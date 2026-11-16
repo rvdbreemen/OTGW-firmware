@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : MQTTstuff
-**  Version  : v2.0.0-beta.356
+**  Version  : v2.0.0-beta.357
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **      Modified version from (c) 2020 Willem Aandewiel
@@ -15,6 +15,7 @@
 #include <pgmspace.h>
 #include "OTGW-Core.h"              // Core OpenTherm data structures and functions
 #include "MQTTstuff.h"              // Structured discovery data layer (enums, structs, streaming API)
+#include "LoopStepWatch.h"          // TASK-1989: slowest loop step for the [loop-stall] line
 #include "mqttBrokerAddress.h"      // decideMqttBrokerLookup() (TASK-1451)
 #include "mqtt_discovery_verify.h"  // Discovery-verify state machine (TASK-363: separate TU)
 
@@ -1206,7 +1207,15 @@ static void connProbeReset() {
   sConnProbePW = platformHeapWindowMin(); sConnProbePGen = platformHeapWinGen();
 }
 
+// TASK-1989: the slowest step of every loop pass, always on (one millis() per probe); the [loop-stall] line prints it.
+static LoopStepWatch sLoopSteps;
+
+void loopSlowestStep(uint8_t* from, uint8_t* to, uint32_t* ms) {
+  loopStepSlowest(sLoopSteps, millis(), CPROBE_LOOP_TOP, from, to, ms);
+}
+
 void connProbe(uint8_t tag) {
+  loopStepProbe(sLoopSteps, tag, millis(), CPROBE_LOOP_TOP);   // TASK-1989: before the trace gate, so it runs after boot too
   if (!sConnTraceOn) return;
   const uint32_t now = millis();
   const uint32_t freeNow = platformFreeHeap();

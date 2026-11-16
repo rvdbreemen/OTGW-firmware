@@ -1240,6 +1240,22 @@ inline PlatformTask platformTaskCreatePinned(void (*fn)(void *),
   return (ok == pdPASS) ? h : nullptr;
 }
 
+// The same with the core chosen by the caller (TASK-1989 experiment: a writer on the protocol core while the
+// loop runs on the application core). PLATFORM_CORE_PROTOCOL is core 0 (WiFi/BT stack, AsyncTCP's neighbour),
+// PLATFORM_CORE_APP is the loop()'s core. Returns nullptr on creation failure.
+enum : int { PLATFORM_CORE_PROTOCOL = PRO_CPU_NUM, PLATFORM_CORE_APP = APP_CPU_NUM };
+inline PlatformTask platformTaskCreatePinnedCore(void (*fn)(void *),
+                                                 const char *name,
+                                                 uint32_t stackBytes,
+                                                 void *arg,
+                                                 unsigned int priority,
+                                                 int core) {
+  TaskHandle_t h = nullptr;
+  BaseType_t ok = xTaskCreatePinnedToCore(fn, name, stackBytes, arg,
+                                          (UBaseType_t)priority, &h, (BaseType_t)core);
+  return (ok == pdPASS) ? h : nullptr;
+}
+
 // Block the calling task for ms milliseconds. This is the cooperative yield
 // point inside the PIC task loop: it MUST block (vTaskDelay) between drains so
 // it never busy-polls available() and starves the core / trips the TWDT. A 0 ms

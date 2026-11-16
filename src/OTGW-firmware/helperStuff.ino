@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : helperStuff
-**  Version  : v2.0.0-beta.356
+**  Version  : v2.0.0-beta.357
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -854,6 +854,7 @@ void doRestart(const char* str) {
   DebugTf(PSTR("[reboot]   flushSettings: %lums\r\n"), (unsigned long)(millis() - t));
 
   flushDHWWaterMeter();   // TASK-1123: an orderly restart loses no litres of the DHW water total
+  if (!fsWriterDrain(2000)) DebugTln(F("[reboot]   fswriter: queue not empty after 2 s"));   // TASK-1989
 
   prepareForReboot();     // graceful shutdown: MQTT LWT, WS close frames, TCP FINs
   // NOTE: prepareForReboot() called debugTelnet.stop() near its end, so every

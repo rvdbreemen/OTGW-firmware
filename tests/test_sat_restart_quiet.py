@@ -160,6 +160,8 @@ struct FSStub {
   File open(const char* p, const char* mode) { File f; f.fp = fopen(p[0] == '/' ? p + 1 : p, mode[0] == 'w' ? "wb" : "rb"); return f; }
 };
 static FSStub LittleFS;
+// TASK-1989: the SAT savers hand the file to the fsWriter queue; here it writes at once (fsWriter.ino before begin).
+static bool fsWriterSubmit(const char* p, const char* d, size_t) { File f = LittleFS.open(p, "w"); if (!f) return false; f.print(d); f.close(); return true; }
 static uint32_t timerSATControl_due = 31000, timerSATControl_interval = 30000;
 static uint32_t timerSAT4hStats_due = 0, timerSAT4hStats_interval = 60000;
 static uint32_t timerSATPublishRetry_due = 0, timerSATPublishRetry_interval = 500;
