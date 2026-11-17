@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-poc.9
+**  Version  : v2.0.0-poc.10
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -12,6 +12,9 @@
 
 #include <string.h>
 #include <ctype.h>
+#if HAS_CLOUD_REC
+#include <atomic>
+#endif
 
 #define RESTDebugTln(...) ({ if (state.debug.bRestAPI) DebugTln(__VA_ARGS__);    })
 #define RESTDebugln(...)  ({ if (state.debug.bRestAPI) Debugln(__VA_ARGS__);    })
@@ -310,6 +313,8 @@ static bool parseMsgId(const char *token, uint8_t &msgId) {
 
 #define API_MAX_WORDS  8
 #define API_WORD_LEN   32
+
+static void diagCaptureRest(uint8_t routeIdx, const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method);
 
 static void handleHealth(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI);
 static void handleSettings(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI);
@@ -2720,18 +2725,23 @@ bool restRequestWithin(uint32_t ms)
 
 // TASK-1665 (ADR-213): the diagnostic recorder takes non-GET requests only, one record per request that reached
 // its handler. The body is redacted inside diagRecordRestIn().
-static void diagCaptureRest(uint8_t routeIdx, PGM_P segment, HTTPMethod method)
+static void diagCaptureRest(uint8_t routeIdx, const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method)
 {
   if (method != HTTP_POST && method != HTTP_PUT && method != HTTP_PATCH && method != HTTP_DELETE) return;
-#if HAS_CLOUD_REC   // TASK-1473: the cloud recorder, with the same body rule as diagRec
-  {
-    const bool skip = strcasecmp_P(segment, PSTR("settings")) == 0 || diagNameIsSecret(segment, strlen_P(segment));
-    const char* body = (!skip && hasArgCompat(F("plain"))) ? argCompat(F("plain")) : "";
-    cloudRecEvRestIn(routeIdx, (uint8_t)method, body, strlen(body));
-  }
+  const char* segment = words[3];
+  // Both SAT BLE provisioning endpoints can carry a bind key in their body.
+  const bool bleProvisioning = strcmp_P(segment, PSTR("sat")) == 0 && wc > 5 &&
+                               strcasecmp_P(words[4], PSTR("ble")) == 0 &&
+                               (strcasecmp_P(words[5], PSTR("bindkey")) == 0 ||
+                                strcasecmp_P(words[5], PSTR("roster")) == 0);
+  const bool skipBody = bleProvisioning || strcasecmp_P(segment, PSTR("settings")) == 0 ||
+                        diagNameIsSecret(segment, strlen(segment));
+  const char* body = (!skipBody && hasArgCompat(F("plain"))) ? argCompat(F("plain")) : "";
+#if HAS_CLOUD_REC
+  cloudRecEvRestIn(routeIdx, (uint8_t)method, body, strlen(body));
 #endif
   if (!diagRec.active) return;
-  diagRecordRestIn(routeIdx, segment, httpMethodToStr(method), hasArgCompat(F("plain")) ? argCompat(F("plain")) : "");
+  diagRecordRestIn(routeIdx, segment, httpMethodToStr(method), body);
 }
 
 void processAPI(AsyncWebServerRequest *request)
@@ -2842,7 +2852,7 @@ void processAPI(AsyncWebServerRequest *request)
 #endif
               return;
             }
-            diagCaptureRest((uint8_t)i, r.segment, method);
+            diagCaptureRest((uint8_t)i, words, wc, method);
             r.handler(words, wc, method, originalURI);
 #if HAS_CLOUD_REC
             cloudRecEvRest((uint8_t)i, (uint8_t)method, restResponseStatus);   // TASK-1473: GET 200s are counted
@@ -3777,7 +3787,12 @@ void sendDiagRecordingControl(bool start)
 // waits for the ring's lock. ?since=<seq> starts at the first record at or after seq.
 static void sendCloudRecDownload(uint64_t since)
 {
+  // The ring tracks one partially streamed entry. Hold the download slot for
+  // the lifetime of the response, including errors and client disconnects.
+  static std::atomic<bool> downloading{false};
+  if (downloading.exchange(true)) { sendApiBusy(F("recording download already in progress")); return; }
   struct Dl {
+    ~Dl() { downloading.store(false); }
     crec::RingCursor cur;
     uint8_t hdr[200];
     size_t hdrLen = 0, hdrSent = 0;

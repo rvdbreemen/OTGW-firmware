@@ -9,8 +9,20 @@
 # those archives under the names the Arduino link line uses.
 Import("env")  # noqa: F821 (SCons)
 
+import os
 import shutil
 from pathlib import Path
+
+from SCons.Errors import UserError
+
+
+# Fail before either SDK copy action can run, including on direct pio invocations.
+isolated = os.environ.get("OTGW_TLSDYN_PACKAGES")
+platform = env.PioPlatform()  # noqa: F821
+for name in ("framework-arduinoespressif32", "framework-arduinoespressif32-libs"):
+    package = platform.get_package_dir(name)
+    if not isolated or not package or Path(package).resolve().parent != Path(isolated):
+        raise UserError("Build esp32-combo-tlsdyn through build.bat/build.sh to isolate the SDK packages")
 
 NESTED = {
     "mbedtls/mbedtls/library/libmbedtls.a": "libmbedtls_2.a",

@@ -1,6 +1,6 @@
 /*********
 **  Program  : webhook.ino
-**  Version  : v2.0.0-poc.9
+**  Version  : v2.0.0-poc.10
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -39,7 +39,7 @@ static bool isLocalUrl(const char* url, IPAddress& ip, uint16_t& port) {
   }
 
   if (!netResolveUrlHost(url, ip, port)) {
-    DebugTf(PSTR("Webhook: URL rejected (invalid host or port, or DNS lookup failed): %s\r\n"), url);
+    DebugTln(F("Webhook: URL rejected (invalid host or port, or DNS lookup failed)"));
     return false;
   }
   unsigned int o1 = ip[0], o2 = ip[1], o3 = ip[2], o4 = ip[3];
@@ -182,8 +182,8 @@ static bool buildWebhookJob(bool stateOn, WebhookJob& job) {
                                       job.sPayloadExpanded, sizeof(job.sPayloadExpanded),
                                       stateOn);
     if (wasTruncated) {
-      DebugTf(PSTR("Webhook: expanded payload truncated to %u bytes for %s\r\n"),
-              static_cast<unsigned int>(sizeof(job.sPayloadExpanded) - 1), url);
+      DebugTf(PSTR("Webhook: expanded payload truncated to %u bytes\r\n"),
+              static_cast<unsigned int>(sizeof(job.sPayloadExpanded) - 1));
     }
     const char* ct = (settings.webhook.sContentType[0] != '\0')
                      ? settings.webhook.sContentType
@@ -240,14 +240,14 @@ static bool sendWebhookJob(const WebhookJob& job) {
 
   int code;
   if (job.hasPayload) {
-    DebugTf(PSTR("Webhook: POST [%s] payload=%s\r\n"), job.sURL, job.sPayloadExpanded);
+    DebugTf(PSTR("Webhook: POST (state=%s)\r\n"), job.stateOn ? "ON" : "OFF");
     http.addHeader(F("Content-Type"), job.sContentType);
     // HTTPClient::POST(uint8_t*, size_t) takes a non-const pointer but does not
     // modify the buffer; the cast is safe and mirrors the pre-Phase-4 cMsg path.
     code = http.POST(const_cast<uint8_t*>(reinterpret_cast<const uint8_t*>(job.sPayloadExpanded)),
                      strlen(job.sPayloadExpanded));
   } else {
-    DebugTf(PSTR("Webhook: GET  [%s] (state=%s)\r\n"), job.sURL, job.stateOn ? "ON" : "OFF");
+    DebugTf(PSTR("Webhook: GET (state=%s)\r\n"), job.stateOn ? "ON" : "OFF");
     code = http.GET();
   }
   http.end();
@@ -262,8 +262,7 @@ static bool sendWebhookJob(const WebhookJob& job) {
   // ADR-004 compliant: no String from http.errorToString()
   char errBuf[32];
   snprintf_P(errBuf, sizeof(errBuf), PSTR("HTTP error %d"), code);
-  DebugTf(PSTR("Webhook: %s %s failed: %s\r\n"),
-          job.hasPayload ? "POST" : "GET", job.sURL, errBuf);
+  DebugTf(PSTR("Webhook: %s failed: %s\r\n"), job.hasPayload ? "POST" : "GET", errBuf);
   return false;
 }
 

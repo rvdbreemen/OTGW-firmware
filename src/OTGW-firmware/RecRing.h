@@ -41,7 +41,10 @@ struct RecRing {
   uint64_t pinSeq = 0;
   uint32_t pinMs = 0;
 
-  void init(uint8_t *mem, uint32_t size) { m = mem; cap = size; head = used = entries = evicted = 0; }
+  void init(uint8_t *mem, uint32_t size) {
+    m = mem; cap = size; head = used = entries = evicted = 0;
+    pinned = false;
+  }
   bool ready() const { return m != nullptr && cap > RING_HDR; }
 
   uint8_t get(uint32_t off) const { return m[off % cap]; }
@@ -62,9 +65,11 @@ struct RecRing {
   // the oldest entry is pinned by a download in progress (the caller counts the record as lost).
   bool begin(uint8_t fmt, uint32_t len, uint64_t seq, int64_t t0, uint32_t nowMs) {
     if (!ready() || len > 0xFFFF || RING_HDR + len > cap) return false;
-    if (pinned && nowMs - pinMs > PIN_MS) pinned = false;
     while (cap - used < RING_HDR + len && entries) {
-      if (pinned && entrySeq(head) == pinSeq) return false;
+      if (pinned && entrySeq(head) == pinSeq) {
+        if (nowMs - pinMs <= PIN_MS) return false;
+        pinned = false;
+      }
       uint32_t l = entryBytes(head);
       head = (head + l) % cap;
       used -= l;
@@ -118,12 +123,14 @@ struct RingCursor {
 
 inline size_t ringFill(RecRing &r, RingCursor &c, uint8_t *buf, size_t cap, uint32_t nowMs) {
   size_t n = 0;
+  // A stop/reset or expired pin can remove the remainder of a partial entry.
+  // End the file if that happened so later entries cannot become its payload.
+  if (c.sentOfEntry && (!r.pinned || r.pinSeq != c.nextSeq)) return 0;
   r.pinned = false;
   while (n < cap) {
     uint32_t off;
     if (!r.find(c.nextSeq, off)) break;
     uint64_t seq = r.entrySeq(off);
-    if (seq != c.nextSeq) c.sentOfEntry = 0;   // an entry not started yet was dropped: the next one, whole
     uint32_t total = r.entryBytes(off);
     while (n < cap && c.sentOfEntry < total) buf[n++] = r.get(off + c.sentOfEntry++);
     if (c.sentOfEntry < total) {               // part of this entry is out: pin it until the rest follows

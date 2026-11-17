@@ -11,7 +11,8 @@ DROM_BASE = 0x3C000000
 
 class EspImage:
     def __init__(self, path):
-        data = open(path, "rb").read()
+        with open(path, "rb") as image:
+            data = image.read()
         if data[0] != 0xE9:
             raise ValueError(f"{path}: not an ESP application image (magic {data[0]:#x})")
         count, pos = data[1], 24
@@ -20,6 +21,15 @@ class EspImage:
             addr, length = struct.unpack_from("<II", data, pos)
             self.segments.append((addr, data[pos + 8:pos + 8 + length]))
             pos += 8 + length
+
+    @property
+    def build_id(self):
+        # esp_app_desc_t begins the first segment. Its app_elf_sha256
+        # identifies the ELF whose flash addresses are in the debug tokens.
+        desc = self.segments[0][1] if self.segments else b""
+        if len(desc) < 176 or desc[:4] != struct.pack("<I", 0xABCD5432):
+            return None
+        return desc[144:176].hex()
 
     def drom(self):
         return [(a, d) for a, d in self.segments if 0x3C000000 <= a < 0x3E000000]

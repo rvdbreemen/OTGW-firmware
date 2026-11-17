@@ -32,6 +32,7 @@
 
 #include <Stream.h>
 #include "esp_tls.h"
+#include "esp_app_desc.h"
 #include <sys/time.h>
 #include "CloudRecCodec.h"
 #include "CloudRecPolicy.h"
@@ -817,15 +818,27 @@ static crec::Outcome cloudRecUpload(crec::Slot &q, bool &blocked) {
   crec::lzEncode(q.buf, q.len, cnt, cloudRecLz);
   const bool lz = cnt.n < q.len;
   const size_t sendLen = lz ? cnt.n : q.len;
+  // Read the full hash that esptool patches into the image. ESP-IDF's
+  // formatted getter is limited by CONFIG_APP_RETRIEVE_LEN_ELF_SHA.
+  const volatile uint8_t* elfSha = esp_app_get_description()->app_elf_sha256;
+  const char* hex = "0123456789abcdef";
+  char buildId[65];
+  for (size_t i = 0; i < 32; i++) {
+    const uint8_t byte = elfSha[i];
+    buildId[2 * i] = hex[byte >> 4];
+    buildId[2 * i + 1] = hex[byte & 0x0f];
+  }
+  buildId[64] = '\0';
   int st = 200;
   for (int attempt = 0; attempt < 2; attempt++) {
     if (!cloudRecToken[0]) {
       st = cloudRecLogin(c, blocked);
       if (st != 200 || blocked) break;
     }
-    char head[200];
-    int hl = snprintf_P(head, sizeof(head), PSTR("{\"device\":\"%s\",\"stream\":\"mix\",\"seq\":%llu,\"t0\":%lld,\"fmt\":%d,\"payload\":\""),
-                        cloudRecDevId, (unsigned long long)q.seq, (long long)q.t0, lz ? 5 : 4);
+    char head[240];
+    int hl = snprintf_P(head, sizeof(head),
+                        PSTR("{\"device\":\"%s\",\"stream\":\"mix\",\"seq\":%llu,\"t0\":%lld,\"fmt\":%d,\"build_id\":\"%s\",\"payload\":\""),
+                        cloudRecDevId, (unsigned long long)q.seq, (long long)q.t0, lz ? 5 : 4, buildId);
     size_t b64 = 4 * ((sendLen + 2) / 3);
     cloudRecWriteHead(c, "/api/collections/batches/records?fields=id", (size_t)hl + b64 + 2, true);
     c.write((const uint8_t *)head, hl);
@@ -1013,7 +1026,8 @@ void cloudRecLocalStatusRead(CloudRecLocalStatus &st) {
 
 // One chunk of the download (async_tcp): never waits for the lock. DIAG_FILL_TRY_AGAIN when busy, 0 at the end.
 size_t cloudRecLocalFill(crec::RingCursor &c, uint8_t *buf, size_t cap) {
-  if (!cloudRecRingLock || !platformMutexTryLock(cloudRecRingLock)) return DIAG_FILL_TRY_AGAIN;
+  if (!cloudRecRingLock) return 0;
+  if (!platformMutexTryLock(cloudRecRingLock)) return DIAG_FILL_TRY_AGAIN;
   size_t n = cloudRecRing.ready() ? crec::ringFill(cloudRecRing, c, buf, cap, millis()) : 0;
   if (!n) crec::ringFillDone(cloudRecRing);
   platformMutexUnlock(cloudRecRingLock);

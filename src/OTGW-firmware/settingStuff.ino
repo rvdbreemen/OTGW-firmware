@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : settingsStuff
-**  Version  : v2.0.0-poc.9
+**  Version  : v2.0.0-poc.10
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -761,10 +761,10 @@ void readSettings(bool show)
     Debugf(PSTR("GPIO Out. Pin         : %d\r\n"), settings.outputs.iPin);
     Debugf(PSTR("GPIO Out. Trg. Bit    : %d\r\n"), settings.outputs.iTriggerBit);
     Debugf(PSTR("Webhook enabled       : %s\r\n"), CBOOLEAN(settings.webhook.bEnabled));
-    Debugf(PSTR("Webhook URL ON        : %s\r\n"), CSTR(settings.webhook.sURLon));
-    Debugf(PSTR("Webhook URL OFF       : %s\r\n"), CSTR(settings.webhook.sURLoff));
+    Debugf(PSTR("Webhook URL ON set    : %s\r\n"), CBOOLEAN(settings.webhook.sURLon[0] != '\0'));
+    Debugf(PSTR("Webhook URL OFF set   : %s\r\n"), CBOOLEAN(settings.webhook.sURLoff[0] != '\0'));
     Debugf(PSTR("Webhook Trigger Bit   : %d\r\n"), settings.webhook.iTriggerBit);
-    Debugf(PSTR("Webhook Payload       : %s\r\n"), CSTR(settings.webhook.sPayload));
+    Debugf(PSTR("Webhook Payload set   : %s\r\n"), CBOOLEAN(settings.webhook.sPayload[0] != '\0'));
     Debugf(PSTR("Webhook ContentType   : %s\r\n"), CSTR(settings.webhook.sContentType));
 #if defined(HAS_DIRECT_OT) && HAS_DIRECT_OT
     Debugf(PSTR("OTD Mode              : %d\r\n"), settings.otd.iMode);

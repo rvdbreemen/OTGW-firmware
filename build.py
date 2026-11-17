@@ -134,7 +134,8 @@ TARGETS["esp32-combo"] = {
 
 # esp32-combo-tlsdyn (TASK-1963 PoC, branch research/cloud-recording only): the esp32-combo image with the IDF
 # libraries rebuilt for dynamic mbedTLS buffers and the cloud recorder compiled in. Never published.
-TARGETS["esp32-combo-tlsdyn"] = {
+TLS_POC_TARGET = "esp32-combo-tlsdyn"
+TARGETS[TLS_POC_TARGET] = {
     **TARGETS["esp32-combo"],
     "name": "ESP32-S3 Combo TLS-dyn PoC",
     "slug": "esp32-combo-tlsdyn",
@@ -3329,9 +3330,21 @@ def main():
 
     # Resolve target list
     if args.target == "all":
-        target_names = list(TARGETS.keys())
+        target_names = [target for target in TARGETS if target != TLS_POC_TARGET]
     else:
         target_names = [args.target]
+
+    if args.target == TLS_POC_TARGET:
+        if not use_pio:
+            print_error(f"{TLS_POC_TARGET} requires the PlatformIO backend")
+            sys.exit(2)
+        # Hybrid compile overwrites framework packages. Give the PoC a separate
+        # PlatformIO core, including when the caller has set a packages override.
+        core = Path(os.environ.get("PLATFORMIO_CORE_DIR", Path.home() / ".platformio")).resolve()
+        isolated = core.with_name(f"{core.name}-otgw-tlsdyn")
+        os.environ["PLATFORMIO_CORE_DIR"] = str(isolated)
+        os.environ["PLATFORMIO_PACKAGES_DIR"] = str(isolated / "packages")
+        os.environ["OTGW_TLSDYN_PACKAGES"] = str(isolated / "packages")
 
     print_info(f"Target(s): {', '.join(TARGETS[t]['name'] for t in target_names)}")
 

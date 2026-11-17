@@ -49,7 +49,7 @@ def fetch_batches(base, token, device_id, stream, since=None, until=None):
     page, out = 1, []
     while True:
         q = urllib.parse.urlencode({"filter": flt, "sort": "seq", "perPage": 500, "page": page,
-                                    "fields": "seq,t0,fmt,payload", "skipTotal": 1})
+                                    "fields": "seq,t0,fmt,payload,build_id", "skipTotal": 1})
         items = api(base, f"/api/collections/batches/records?{q}", token)["items"]
         out += items
         if len(items) < 500:

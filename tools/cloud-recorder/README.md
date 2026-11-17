@@ -131,6 +131,9 @@ encoder has to write (TASK-1473, on hold). The argument values are generated, so
 
 The gateway records and uploads by itself over HTTPS, also on a board without PSRAM. Built in the env
 `esp32-combo-tlsdyn` (`./build.sh --target esp32-combo-tlsdyn`), never in a normal build.
+The wrapper puts its PlatformIO SDK packages in a separate core directory with an `-otgw-tlsdyn` suffix.
+On a machine that built earlier versions of this experiment using the normal core,
+reinstall the normal Arduino ESP32 framework and SDK libraries before using that core for standard builds.
 
 - **TLS without PSRAM:** the IDF libraries are rebuilt (pioarduino `custom_sdkconfig`) with
   `CONFIG_MBEDTLS_DYNAMIC_BUFFER` and its free options, and DTLS off (Kconfig drops the dynamic buffers while
@@ -150,6 +153,10 @@ The gateway records and uploads by itself over HTTPS, also on a board without PS
   pauses a local recording. `GET /api/v2/diag/recording` gives an `OTGWMIX1` file:
   `python3 decode_all.py --file otgw-recording.bin out/ --image <the .ino.bin>` writes the same four logs.
   Phase 2 (after the bench): the normal build switches and `diagRec` retires.
+- **Cloud export across firmware updates:** the collection point stores the firmware ELF SHA-256 with
+  each new batch. Apply the PocketBase migrations before updating gateways. Pass one `--image` per
+  firmware binary in the retained history; the exporter matches each tagged batch to its image.
+  If the history contains both tagged and older untagged batches, supply the older image with `--legacy-image`.
 - **Events (TASK-1473, ADR-243):** a fifth section (SEC_EVT, 1,408 B) records everything the firmware receives,
   sends or measures besides OT/SATTICK/debug: commands and responses, MQTT, REST (GET 200 counted per route per
   minute), sensors (Dallas, S0, BLE, weather), WiFi, settings, time sync, reboot, telnet keys, webhook, firmware

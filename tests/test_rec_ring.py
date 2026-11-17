@@ -18,6 +18,23 @@ SRC = r'''
 #include <vector>
 #include "@HDR@"
 int main(int, char **argv) {
+  if (strcmp(argv[1], "expire") == 0) {
+    uint8_t mem[48], buf[32];
+    crec::RecRing r;
+    r.init(mem, sizeof(mem));
+    r.begin(4, 16, 1, 0, 0);
+    for (int i = 0; i < 16; i++) r.byte(1);
+    r.commit();
+    crec::RingCursor cur;
+    const size_t partial = crec::ringFill(r, cur, buf, 24, 0);
+    const uint32_t after = crec::RecRing::PIN_MS + 1;
+    if (!r.begin(4, 16, 2, 0, after)) return 1;
+    for (int i = 0; i < 16; i++) r.byte(2);
+    r.commit();
+    const size_t tail = crec::ringFill(r, cur, buf, sizeof(buf), after);
+    printf("%zu %zu\n", partial, tail);
+    return 0;
+  }
   unsigned seed = (unsigned)atoi(argv[1]);
   uint32_t cap = (uint32_t)atoi(argv[2]);
   srand(seed);
@@ -126,6 +143,10 @@ class RecRingTest(unittest.TestCase):
         self.assertGreater(len(got), 50)
         for seq, fmt, payload in got:
             self.assertEqual((fmt, payload), written[seq])
+
+    def test_evicted_partial_entry_ends_stream(self):
+        partial, tail = run("expire", 0)[0]
+        self.assertEqual((int(partial), int(tail)), (24, 0))
 
     def test_small_ring(self):
         self.check(1, 3000)

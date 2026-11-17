@@ -40,6 +40,7 @@ gateway --HTTPS--> Cloudflare edge --tunnel (outbound from the NAS)--> cloudflar
 | `compose.yaml` | Container Manager project: `pocketbase` (built locally) and `cloudflared` |
 | `Dockerfile` | Alpine + the PocketBase release binary, checked against the release's `checksums.txt` |
 | `pb_migrations/1763100000_otgw_recorder.js` | Creates `devices` and `batches`, the rules, the indexes, the trusted proxy header and the rate limits |
+| `pb_migrations/1763100001_batch_build_id.js` | Stores the exact firmware build ID on new batches and preserves older batches |
 | `pb_hooks/retention.pb.js` | Hourly retention cron (30 days, fixed) |
 | `pb_hooks/blocked.pb.js` | 403 `otgw-blocked` for every request of a blocked gateway (required: without it a blocked gateway is not refused) |
 | `test_client.py` | Acts as gateways and checks the rules, blocking and retention (Python 3, standard library only) |

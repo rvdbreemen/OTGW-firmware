@@ -3,14 +3,15 @@
 
     python3 decode_all.py --file otgw-recording.bin <out-dir> --image firmware.bin     (a local download)
     python3 decode_all.py http://<nas>:8090 <superuser-email> <password> <device-uid> <out-dir> \
-        --image firmware.bin [--tz Europe/Amsterdam]
+        --image firmware.bin [--image older-firmware.bin] [--tz Europe/Amsterdam]
 
 Reads the device's "mix" records (fmt 4) in seq order and writes:
   otframes.log  OT frames in the ADR-209 replay layout (host_time, device_time, source, frame)
   sat.log       one SATTICK line per tick: ISO time, tab, the exact SATTICK text
   events.log    one line per event (TASK-1473): ISO time, tab, type, tab, the fields as JSON
   debug.log     the telnet bytes the gateway printed, rebuilt from the address tokens; the format strings
-                and function names are read from --image, the firmware.bin (or .elf) of the build that recorded
+                and function names are read from the firmware.bin matching each batch's build ID.
+                Use --legacy-image if the history contains both tagged and untagged batches.
 Missing records become "#" lines in otframes.log and sat.log and a "### gap" line in debug.log; so does what the
 gateway itself reports as lost (SEC_LOST: items or records it could not record).
 Run it on the LAN: the superuser API is not exposed through the tunnel.
@@ -24,7 +25,7 @@ import esp_image  # noqa: E402
 import export_batches as eb  # noqa: E402
 
 
-def decode_records(records, image, tz, out_dir):
+def decode_records(records, image, tz, out_dir, *, images_by_build=None):
     os.makedirs(out_dir, exist_ok=True)
     counts = {"records": 0, "frames": 0, "ticks": 0, "debug_bytes": 0, "gaps": 0}
     with open(os.path.join(out_dir, "otframes.log"), "w", newline="\n") as fo, \
@@ -63,7 +64,9 @@ def decode_records(records, image, tz, out_dir):
                 counts["ticks"] += 1
             dbg = sec.get(otrec.SEC_DBG_Z)
             dbg = zlib.decompress(dbg) if dbg is not None else sec.get(otrec.SEC_DBG, b"")
-            text = otrec.dbg_decode(r["t0"], dbg, image, tz)
+            build_id = r.get("build_id")
+            batch_image = images_by_build[build_id] if images_by_build is not None and build_id else image
+            text = otrec.dbg_decode(r["t0"], dbg, batch_image, tz)
             for t, typ, fields in otrec.evt_decode(r["t0"], sec.get(otrec.SEC_EVT, b"")):
                 ts = datetime.datetime.fromtimestamp(t / 1000, tz)
                 fe.write(f"{ts.isoformat(timespec='milliseconds')}\t{otrec.EV_NAMES[typ]}\t"
@@ -108,15 +111,19 @@ def main():
     ap.add_argument("device_uid", nargs="?", help="otgw-<12 hex>, the uid the gateway enrolled with")
     ap.add_argument("out_dir", nargs="?")
     ap.add_argument("--file", help="decode a local download (GET /api/v2/diag/recording) instead; then give only out_dir")
-    ap.add_argument("--image", required=True)
+    ap.add_argument("--image", required=True, action="append",
+                    help="firmware.bin for a recording build (repeat for cloud histories spanning builds)")
+    ap.add_argument("--legacy-image", help="firmware.bin for cloud batches without a recorded build ID")
     ap.add_argument("--tz", default="Europe/Amsterdam")
     a = ap.parse_args()
     if a.file:
         out = a.out_dir or a.base                          # with --file the only positional is the output folder
         if not out:
             sys.exit("--file needs an output folder")
+        if len(a.image) != 1 or a.legacy_image:
+            ap.error("--file requires exactly one --image")
         records, hdr = read_mix_file(a.file)
-        c = decode_records(records, esp_image.EspImage(a.image), ZoneInfo(a.tz), out)
+        c = decode_records(records, esp_image.EspImage(a.image[0]), ZoneInfo(a.tz), out)
         print(f"{hdr['uid']} {hdr['firmware']}: {c['records']} records, {c['frames']} OT frames, {c['ticks']} SAT "
               f"ticks, {c.get('events', 0)} events, {c['debug_bytes']} debug bytes, {c['gaps']} gaps -> {out}")
         return
@@ -130,7 +137,22 @@ def main():
     if not found:
         sys.exit(f"device {a.device_uid} not found")
     records = eb.fetch_batches(base, token, found[0]["id"], "mix")
-    c = decode_records(records, esp_image.EspImage(a.image), ZoneInfo(a.tz), a.out_dir)
+    images = [esp_image.EspImage(path) for path in a.image]
+    images_by_build = {image.build_id: image for image in images if image.build_id}
+    build_ids = {r.get("build_id") for r in records if r["fmt"] in (otrec.FMT_MIX_V1, otrec.FMT_MIX_LZ)}
+    missing = sorted(build_ids.difference(images_by_build, {None, ""}))
+    if missing:
+        ap.error("supply a matching --image for each missing build: " + ", ".join(missing))
+    legacy = None
+    if build_ids.intersection({None, ""}):
+        if a.legacy_image:
+            legacy = esp_image.EspImage(a.legacy_image)
+        elif len(images) == 1 and not build_ids.intersection(images_by_build):
+            # Preserve single-image export for histories entirely predating build IDs.
+            legacy = images[0]
+        else:
+            ap.error("supply --legacy-image for batches without a recorded build ID")
+    c = decode_records(records, legacy, ZoneInfo(a.tz), a.out_dir, images_by_build=images_by_build)
     print(f"{c['records']} records, {c['frames']} OT frames, {c['ticks']} SAT ticks, {c['debug_bytes']} debug bytes, "
           f"{c['gaps']} gaps -> {a.out_dir}")
 
