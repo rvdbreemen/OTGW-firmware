@@ -3,11 +3,11 @@ id: TASK-1991
 title: >-
   MQTT: a retained <label>/override topic left from before a reboot is never
   cleared
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-15T22:35:00Z'
-updated_date: '2026-11-17T08:42:00Z'
+updated_date: '2026-11-17T09:25:00Z'
 labels:
   - mqtt
   - bug
@@ -34,4 +34,12 @@ Edge left by TASK-1985 (coordinator 2026-11-15: separate, low). The ADR-118 over
 2026-11-17 (95, coordinator: code + host test now, build with TASK-2007 later; lane wt-95-2007). Fix: OTGW-Core.ino startStaleOverrideClear() / staleOverrideClearStep() (between '--- staleOverrideClear begin/end'): after every MQTT connect one sweep over OTmap sends an empty retained <label>/override (removes a retained topic, a no-op where none exists) for each ot_f88 id, the only ids recordOTOverride() is called for (print_f88()), skipping ids that have an entry in the override store (an active override keeps its topic; publishActiveOverrides() refreshes it within 60 s) and ids without a label; one topic per step, a failed send retries the same id. MQTTstuff.ino: connStageStart() starts the sweep at every connect; staleOverrideClearTick() on MQTT_STATE_IS_CONNECTED runs one step after the four connect portions are done (sConnStage == 0), at least 100 ms apart (OVR_CLEAR_GAP_MS) and only with the outbox at most CONN_STAGE_MAX_OUTBOX (2), so the ~38 f88 labels go out over about 4 s, not as a burst (the TASK-2004 lesson). Host test tests/test_mqtt_override_reboot_clear.py on the real functions with a stub OTmap (TSet/Toutside f88, SConfig flag8) and a stub broker that keeps retained topics: FIX 5/5; OLD (origin OTGW-Core.ino/.h) 2 FAIL: 'TSet/override' still retained 60 s after connect. tests/test_mqtt_connect_staging.py got stubs for the two new functions. All 24 tests that read MQTTstuff.ino PASS; 11 tests on the override/connect functions PASS; evaluate.py --quick 88/0. Not verified: on hardware (build with 2007; bench: put a retained TSet/override on the broker, reboot, check it is gone within a minute and an active OT= override comes back).
 
 Bench 09 on .61 (OTGW32, OT-Direct master, no boiler, sim off), 2.0.0-beta.364+c8bc478, 2026-11-17 run 2 (run 1 void: subscriber failed; 09 scratchpad b364un2\): smoke sha256 match, githash c8bc478, 'changed: none', bootcount 1021 -> 1023 (OTA only). (a) PASS: retained TSet/override = 40.00 set by hand 09:36:21, /ReBoot 09:36:24, reconnect 09:36:42, empty retained clear of TSet/override at 09:36:43.569 (1.5 s after connect). (b) PASS: 38 empty retained <label>/override publishes 09:36:43.569-09:36:47.601 (4.03 s), gaps at the subscriber min 83 / p50 102 / max 361 ms (jitter around the 100 ms firmware gap), not a burst; labels included TSet, Toutside, TrSet, TrOverride, Tboiler, Tret, TdhwSet, MaxTSet, RelModLevel and 29 more. (c) NOT OBSERVABLE on this bench: OT=12.5 at 09:38:24 gave no Toutside/override within 75 s, because recordOTOverride() is fed only from print_f88() and with the bus offline no MsgID 27 frame is exchanged (the OT-Direct scheduler sends only MsgID 0 offline). AC2 rests on the host test case reboot_active (an override in the store is skipped by the sweep and the unchanged TASK-1985 60 s refresh republishes 8.25). No retained test topics left behind.
+
+Pushed with TASK-2007 in ad8dc9cd6..cc60bfd0e (1991 = beta.364, 95cbb9ffb), zip beta.365+cc60bfd posted 1572180595709055009; 1991 code unchanged since 09's 364 bench.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+After every MQTT connect a paced sweep sends one empty retained <label>/override per f88 label (the ids recordOTOverride() records), skipping labels with an entry in the override store, so a topic retained before a reboot disappears and an active override keeps its topic. AC1: host test tests/test_mqtt_override_reboot_clear.py on the real functions, fix 5/5, old code 2 FAIL (TSet/override still retained 60 s after connect); bench 09 .61 beta.364: retained TSet/override set by hand, /ReBoot, cleared 1.5 s after the reconnect; 38 clears spread over 4.03 s (~100 ms apart), no burst. AC2: host test case reboot_active (an override in the store is skipped, the unchanged TASK-1985 60 s refresh republishes the new value); NOT observable on the bench: no bus partner, so no override frame is recorded (OT=12.5 on .61 gave no Toutside/override). Pushed in ad8dc9cd6..cc60bfd0e, posted 1572180595709055009.
+<!-- SECTION:FINAL_SUMMARY:END -->
