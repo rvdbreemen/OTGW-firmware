@@ -5,7 +5,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [2.0.0-beta.360] - 2026-11-17
+
+### Changed
+- SAT: the tolerance band restarts heating as soon as the room is below the target + 0.1 C (was target - 0.1 C), after at least 10 minutes with CH off, counted from the moment the band turns CH off; a band decision while CH was already off starts no pause, and a lost room temperature ends the pause (Sergeant D entries 401-403; entries 405, 406; ADR-253; TASK-1887).
+- SAT: PWM ON phases that start during a band pause no longer count toward the hourly start limit, and the narration names the value that decided a band stop or restart (Sergeant D entry 398; entry 400; TASK-1887).
 ### Fixed
+- SAT: the SAT state files are written by a background writer task instead of on the main loop, so a slow flash write no longer stalls the control loop (TASK-1989).
 - The hourly `otgw-firmware/stats/*` MQTT topics go out one at a time, at least 100 ms apart, instead of 26 at once. On a board without PSRAM the free heap fell by about 55 KB inside that burst, every hour on the hour. The topics and their values are unchanged (TASK-2004).
 - OT-Direct master mode (no thermostat): the room setpoint now reaches the boiler. `BS=` writes MsgID 16 itself, and after `TT=0` the `BS=` or MQTT room setpoint is written again at once, so the boiler no longer keeps the old TT value. A running TT/TC override is not overwritten by them (TASK-1751).
 - OT-Direct: Home Assistant (pyotgw) no longer fails to connect to port 25238 right after a reboot on a board without a thermostat. The one-time 'Thermostat disconnected' line at boot is no longer sent to port 25238, where it landed in the middle of the connect handshake; a real loss or return of the thermostat is still reported there (TASK-1999).
