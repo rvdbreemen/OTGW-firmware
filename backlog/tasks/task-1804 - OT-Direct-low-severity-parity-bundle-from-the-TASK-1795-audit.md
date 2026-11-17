@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-11T06:41:00Z'
-updated_date: '2026-11-16T16:29:00Z'
+updated_date: '2026-11-17T08:58:00Z'
 labels:
   - otdirect
   - review-2026-11-11
@@ -89,4 +89,6 @@ Q-1804a (item A2) decided 2026-11-15 by the coordinator under Robert's directive
 2026-11-16 B3a seam (95): no overlap with TASK-1999 (e18ccbfe3 only moves the boot-time 'Thermostat disconnected' line to processOT). 95 quotes pyotgw 2.2.3 commandprocessor.py: expected reply regex ^{cmd}:\s*([A-Z]{2}|{value}=[^$]+)$ with a 2-letter match mapped to OTGW_ERRS; a bare 'BV' does not match and falls through as an unknown message. So the prefix also lets HA raise the right error on OT-Direct (to verify in pyotgw source myself before citing in the summary).
 
 2026-11-16 B3a implemented (OTDirect.ino: otdCmdPrefix, OtdCmdPrefixScope save/restore, otdIsCmdErrorCode NG/SE/BV/OR/NS/NF, otDirectBridgeProcessStatus writes 'XX: <code>' NUL-terminated for processOT). New tests/test_otd_error_prefix.py compiles the real status block and the real handleOTDirectCommand() header: fix 4/4 OK; old (HEAD copy via OTGW_OTD_INO) 6 subtests FAIL, e.g. 'B[BV]P[BV]' != 'B[CH: BV]P[CH: BV]'. pyotgw check in the source (other-projects/pyotgw-master/pyotgw/commandprocessor.py, same as installed): a bare error token IS handled (:54-58, 'Some errors appear by themselves on one line', raise/retry), and a prefixed one too via the expected-reply match (:66-71, generic pattern ^{cmd}:\s*([^$]+)$ at :128). The [A-Z]{2} regex 95 quoted is only the PR= pattern (:116). So 95's 'bare BV falls through as unknown' does not hold: pyotgw raises the right error either way, as the audit said; B3a is wire parity with the PIC (and makes Core's response branch see OT-Direct errors), not an HA fix.
+
+2026-11-17 B3a DONE and pushed (beta.362, fix commit 088f52571 in 5fedc50e4..d367abf92): OT-Direct command errors after a valid header print 'XX: <code>' like the PIC; header failures stay bare SE. Evidence: tests/test_otd_error_prefix.py 4/4, 6 subtests red on the old code; full test_otd_* suite green; bench 09 .61 01d24c5 and combined 4602739: CH=x -> 'CH: BV', XY=1 -> 'XY: NG', C -> 'SE', CH=1 -> 'CH: 1'. Still open for AC1: ID-99 isUnknownId, A6 review items 2 and 3, bug 8 (record as intended difference).
 <!-- SECTION:NOTES:END -->
