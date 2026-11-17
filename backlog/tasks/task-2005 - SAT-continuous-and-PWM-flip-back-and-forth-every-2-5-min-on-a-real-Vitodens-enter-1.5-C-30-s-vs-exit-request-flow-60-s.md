@@ -3,11 +3,11 @@ id: TASK-2005
 title: >-
   SAT: continuous and PWM flip back and forth every 2-5 min on a real Vitodens
   (enter 1.5 C/30 s vs exit request>flow/60 s)
-status: To Do
+status: In Progress
 assignee:
-  - '@ba'
+  - '@claude'
 created_date: '2026-11-16T16:35:00Z'
-updated_date: '2026-11-16T20:26:00Z'
+updated_date: '2026-11-17T05:33:00Z'
 labels:
   - sat
   - field
@@ -58,4 +58,6 @@ Citations verified at pin 7beaaf5 via raw.githubusercontent (coordinator, 2026-1
 2026-11-16 entry 404: Sergeant D answered Q-2005a A (keep as it is; 'the flipping doesn't affect calculations'); Robert first recommended B, then 'Okay. I follow your insight.' (20:15:36 UTC). No code change under this answer. The discussion continued after 20:16 (CS 55 vs 38, modulation); if the decision changes, a later entry records it. AC1 met by entry 404; AC2/AC3 (fix + field check) not needed under A unless that changes.
 
 2026-11-16 CORRECTION to the description (written by comms 92): 'The control setpoint swings with the mode (e.g. 55.0 in a PWM ON phase, 38.1 in continuous)' is wrong for the flips during the burn. In indigo's capture CS 55.0 was sent only at 16:17:58, the PWM start before ignition (flame-off hold: return + fFlameOffOffset 18 capped at the max setpoint 55, SATcontrol.ino:1280-1287 and :1832-1838). The flips into PWM while the flame burned (16:30:28, 16:35:28, 16:39:28) kept CS 41.4 / 40.9 / 39.7 (previous CS kept, SATcontrol.ino:1842-1846); in continuous the CS equals the request (satApplyContinuous, :2570-2624). Same correction posted to Sergeant D (#dev-sat-mqtt 1571984164662677756). AC1: entry 404 (Q-2005a answered A, 68269ebb4).
+
+2026-11-17 entry 407 (Sergeant D 05:13Z): continuous->PWM at flow - requested >= 2 C for 60 s. Q-407a answered by Robert (maintainer, in session ~06:30, via coordinator): A 2.0 = new default of satpwmswitchmargin, C keep 3.5 C / 30 s fail-safe, release 2.0.0. Interpretation (ours): every save since TASK-1888 wrote SATpwmswitchmargin, so a stored 1.5 is the old default and migrates to 2.0 once (marker key, TASK-1961 pattern); other stored values stay. A deliberate 1.5 cannot be told apart.
 <!-- SECTION:NOTES:END -->

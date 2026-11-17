@@ -5380,6 +5380,20 @@
     "TASK-1887"
    ],
    "confirmed_by_entry": null
+  },
+  {
+   "id": 407,
+   "title": "Continuous to PWM switch: flow - requested >= 2 C for 60 s instead of 1.5 C for 30 s (Sergeant D, 2026-11-17; changes entry 404 and the rule of ADR-249)",
+   "date": "2026-11-17",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1572117476525867152",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1888",
+    "TASK-2005"
+   ],
+   "confirmed_by_entry": null
   }
  ]
 }

@@ -8074,3 +8074,23 @@ Robert, 16:18:42 UTC (https://discord.com/channels/812969634638725140/9144987300
 **Open:** Q-403b (queued).
 
 **Task:** TASK-1887 (owner ba); ADR-253, ADR-252.
+
+## 407. Continuous to PWM switch: flow - requested >= 2 C for 60 s instead of 1.5 C for 30 s (Sergeant D, 2026-11-17; changes entry 404 and the rule of ADR-249)
+
+**Source:** #dev-sat-mqtt, Sergeant D 2026-11-17 05:13 UTC (https://discord.com/channels/812969634638725140/1105556725714649128/1572117476525867152), relayed by the coordinator (TASK-2005, the continuous/PWM ping-pong in indigo's Vitodens capture of 2026-11-16 16:17-16:39).
+
+**Quoted:**
+
+> "you are right we can do a bit better that flipping from continuous to PWM. change the continuous to PWM from boiler temperature -requested temperature >= 1.5 for 30 seconds that it is now to Boiler temperature - requested temperature >= 2 for 60 seconds"
+
+**Settled:** SAT leaves continuous for PWM when the boiler (flow) temperature minus the requested setpoint stays at or above 2 C for 60 s, instead of 1.5 C for 30 s.
+
+**Compared with thermo-nova (7beaaf5):** the overshoot switch waits OVERSHOOT_SUSTAIN_SECONDS = 60.0 (const.py:21, used at heating_control.py:296) at a margin of OVERSHOOT_MARGIN_CELSIUS (+3.0, cycles/const.py:10-11, used at heating_control.py:288). The 60 s now matches thermo-nova; the 2 C stays a firmware value below thermo-nova's 3 C.
+
+**Compared with the firmware:** satCycleCheckOvershootSwitch() (SATcycles.ino ~1393) switches at flow >= requested + settings.sat.fPwmSwitchMargin (default 1.5, setting satpwmswitchmargin, 0.5-5.0, entries 327/360/379, ADR-249) after SAT_OVERSHOOT_SUSTAIN_MS = 30000 (SATcycles.ino:35).
+
+**Changes an earlier entry:** entry 404 (Q-2005a A: keep the flip as it is) is overruled by this change of the thresholds; entries 327/360 (1.5 C / 30 s) and ADR-249's rule are replaced for the threshold and the time. The 3.5 C / 30 s fail-safe of entry 359 is not mentioned.
+
+**Q-407a answered by Robert (maintainer, in session, 2026-11-17 ~06:30, relayed by the coordinator; Robert's call, not Sergeant D's words):** (1) A: 2.0 becomes the new default of the existing setting satpwmswitchmargin; (2) C: the 3.5 C / 30 s fail-safe of entry 359 stays; (3) release 2.0.0. Sergeant D is told by 92 and may object. Our reading (interpretation, TASK-2005): a stored 1.5 is the old default, which every save since TASK-1888 wrote, so it moves to 2.0 once; any other stored value stays.
+
+**Task:** TASK-2005 (owner ba); ADR-249 (to be partly superseded by a new ADR).
