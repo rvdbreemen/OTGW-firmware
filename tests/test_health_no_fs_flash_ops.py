@@ -70,6 +70,9 @@ static int g_fileFlags = 0;
 static void refreshLittleFSFileFlags() { g_fileFlags++; }   // TASK-1899: file-exists flags for REST
 static void loopDallasLabels() { }                           // TASK-1912: writes only a changed labels copy
 static void loopSatMarkers() { }                             // TASK-1911: writes only a changed markers copy
+typedef const char* PGM_P;
+#define PSTR(s) (s)
+static void fsSlowNote(PGM_P, uint32_t) { }                  // TASK-1995: the timing line, tested in test_fs_slow_note.py
 @SAFE@
 @FN@
 int main() {
