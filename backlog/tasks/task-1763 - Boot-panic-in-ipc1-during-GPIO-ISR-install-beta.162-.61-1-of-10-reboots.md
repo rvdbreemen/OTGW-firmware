@@ -1,11 +1,11 @@
 ---
 id: TASK-1763
 title: Boot panic in ipc1 during GPIO ISR install (beta.162, .61, 1 of 10 reboots)
-status: In Progress
+status: Done
 assignee:
   - '@system32-030509'
 created_date: '2026-11-09T19:21:00Z'
-updated_date: '2026-11-16T23:43:00Z'
+updated_date: '2026-11-17T03:37:00Z'
 labels:
   - bug
   - crash
@@ -30,7 +30,7 @@ Candidates (not proven): attachInterrupt / attachInterruptArg in src/libraries/O
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [x] #1 Determine from the decode and code where the GPIO ISR install ran (restart path of the old boot vs setup of the new one) and why heap_caps_malloc in esp_intr_alloc panicked, with evidence
-- [ ] #2 Reproduce or bound it on the bench: repeated /ReBoot cycles (including after a long uptime and a low-heap boot) with serial capture; count panics per N reboots
+- [x] #2 Reproduce or bound it on the bench: repeated /ReBoot cycles (including after a long uptime and a low-heap boot) with serial capture; count panics per N reboots
 - [x] #3 Fix, or a decision with Robert, with before/after panic counts
 <!-- AC:END -->
 
@@ -75,6 +75,8 @@ AC1 ticked by 09 on 2026-11-16 at the coordinator's instruction, on the evidence
 2026-11-17 00:19-00:41 (09, AC2): 60x POST /ReBoot on .61 (OTGW32, 2.0.0-beta.356+4601510, ADR-225 IPC stack fix), SAT off, satsimulation false, COM4 capture (t1763/reboot_loop.py). Reboot 1 was the LONG-UPTIME case: uptime 2 h 47 min, hd_min_free_heap 16,380 before it. Result 0/60 panics: bootcount 952 -> 1012, +1 each; crashlog no new summary; lastreset 'Software reset'; ipc0/ipc1 stack min after 476/340. Serial: reboots 1-21 each show 'rst:0xc (RTC_SW_CPU_RST)' with 0 Guru/Backtrace/abort/ipc1 hits. After reboot 21 the capture silently got no more data (no read error; probably a stale COM4 handle after USB re-enumeration), so reboots 22-60 are REST-checked only (bootcount, lastreset, crashlog). settings.ini byte-identical.
 
 Bound (exact binomial, 0 failures, 95 %: 1-0.05^(1/n)): 150 reboots on the fix (beta.264: 30, beta.353: 60, beta.356: 60), all REST-checked, 0 panics -> p < 2.0 % per reboot; of those 81 also serial-confirmed (60 + 21) -> p < 3.6 %. Against the 1-in-10 of beta.162, P(0 in 150 | p = 10 %) = 1.4e-7. AC2 stays OPEN for the LOW-HEAP boot only: the beta.162 panic followed a boot with hd_min 3,592 B; the lowest start here was 16,380 B. The long-uptime case (2 h 47 min) is now covered by one reboot. Evidence: 09 scratchpad t1763d/ (results.txt, serial.log, pre.txt, S0/S1.ini).
+
+AC2 ticked by 09 (2026-11-17 ~04:40) on Robert's waiver of the low-heap-boot clause (Discord DM 1572091760556122205, answer A, relayed by the coordinator): the bound 0/150 reboots on the IPC stack fix (p < 2.0 % per reboot, exact binomial 95 %; 81 of them serial-confirmed, p < 3.6 %), the long-uptime case covered (2 h 47 min, hd_min 16,380), the low-heap boot (beta.162: hd_min 3,592) not reproduced and waived.
 <!-- SECTION:NOTES:END -->
 
 ## Comments
@@ -188,3 +190,9 @@ Evidence files (local, not committed): scratchpad t1763/bench/ (old-*, old2-*, n
 
 ---
 <!-- COMMENTS:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Boot panic in ipc1 during the first GPIO ISR install (beta.162, 1 in 10 reboots on .61). AC1 cause, proven by the coredump: a level-1 interrupt frame overran ipc1's 1024 B stack inside esp_intr_alloc -> heap_caps_malloc during gpio_isr_register_on_core_static (exccause 0x41 DebugException, SP 52 B below the stack bottom; decode re-checked by 09 in OTGW-build-archive/coredumps/task-1763-beta162-61/decode.txt). Not heap corruption, not OOM. AC3 fix: ADR-225 raises the IPC task stack to 1280 B; the ipc1 minimum free went 88 B -> 332-340 B. AC2 bound: 0 panics in 150 /ReBoot cycles on the fix (beta.264 30, beta.353 60 with serial, beta.356 60 incl. one after 2 h 47 min uptime, 21 with serial) -> p < 2.0 % per reboot (95 %), 81 serial-confirmed -> p < 3.6 %; P(0/150 | 10 %) = 1.4e-7. Low-heap boot clause waived by Robert (DM 1572091760556122205). Not verified: a boot after a hd_min near 3.6 KB. Evidence: 09 scratchpad t1763c/, t1763d/, task notes.
+<!-- SECTION:FINAL_SUMMARY:END -->
