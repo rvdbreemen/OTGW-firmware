@@ -33,7 +33,7 @@ TICK_STUBS = r"""
 static int g_sentCh = -1; static float g_sentCs = -1; static int g_sentMm = -1;
 static void satSendCS(float cs) { g_sentCs = cs; }
 static void satSendMM(int mm) { g_sentMm = mm; }
-static void satSendCH(int ch) { g_sentCh = ch; }
+static void satSendCH(int ch) { g_sentCh = ch; state.sat.iLastSentCH = (uint8_t)ch; }   // as the real satSendCH() records it
 enum { SAT_SRC_GAS_BOILER = 1, SAT_SRC_HEAT_PUMP = 2, SAT_SRC_HYBRID = 3 };
 static uint8_t satGetEffectiveHeatingSource() { return SAT_SRC_GAS_BOILER; }
 static uint8_t satGetManufacturerQuirks() { return 0; }

@@ -8277,7 +8277,10 @@ static void satControlLoopRun()
     const bool minHold = wasBandOff && !bandOff && offForMs < SAT_TOL_MIN_OFF_MS && !isnan(_sat_tolErr);
     if (minHold) bandOff = true;
     if (bandOff && !wasBandOff) {
-      _sat_tolOffSinceMs = tolNowMs;
+      // The minimum counts from the moment the band turns CH off (entry 403). When CH was already off (boot, the cold cutoff,
+      // heater OFF), the band turns nothing off and there is no burn to protect: the minimum counts as already passed
+      // (our reading of entry 403, recorded as an interpretation).
+      _sat_tolOffSinceMs = state.sat.iLastSentCH ? tolNowMs : (uint32_t)(tolNowMs - SAT_TOL_MIN_OFF_MS);
       _sat_tolMinNarrated = false;
       satNarratef_P(PSTR("Heating paused (CH off, PWM stays active): the rooms are at least %.2f above their target (band %.1f)"),
                     -_sat_tolErr, SAT_TOL_HOT_C);

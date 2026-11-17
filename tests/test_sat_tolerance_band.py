@@ -214,10 +214,20 @@ class BandLoop(unittest.TestCase):
             self.assertGreater(float(rows[sec]["cs"]), 10.0, (sec, rows[sec]))      # the setpoint keeps running
             self.assertEqual(float(rows[sec]["pid"]), 45.0, (sec, rows[sec]))        # the PID request is untouched (entry 361)
 
-    def test_inside_the_band_after_a_stop_heating_stays_off(self):
-        rows = self.run_sc([(0, "err", -0.2), (65, "err", 0.05), (125, "err", 0.1)])
-        for sec in (30, 90, 150):
+    # A real burn first (CH=1 from tick 0), then the band stop at tick 60 turns CH off: the entry-403 minimum runs to 660.
+    BURN_THEN_STOP = [(0, "err", 0.5), (35, "err", -0.2)]
+
+    def test_after_a_band_stop_heating_stays_off_for_the_minimum(self):   # entries 402/403
+        rows = self.run_sc(self.BURN_THEN_STOP + [(95, "err", 0.05), (155, "err", 0.1)], dur=700)
+        self.assertEqual(rows[30]["ch"], "1", rows[30])
+        for sec in (60, 90, 150, 630):
             self.assertEqual(rows[sec]["ch"], "0", (sec, rows[sec]))
+        self.assertEqual(rows[660]["ch"], "1", rows[660])
+
+    def test_a_stop_while_ch_is_already_off_starts_no_minimum(self):   # entry 403: nothing to turn off (boot, cold cutoff)
+        rows = self.run_sc([(0, "err", -0.2), (65, "err", 0.2)])
+        self.assertEqual(rows[60]["ch"], "0", rows[60])
+        self.assertEqual(rows[90]["ch"], "1", rows[90])
 
     def narr(self, script):
         err = subprocess.run([str(self.exe)], input=script, capture_output=True, text=True, check=True).stderr
@@ -234,17 +244,17 @@ class BandLoop(unittest.TestCase):
         self.assertEqual((len(pause), len(hold), len(resume)), (1, 1, 1), narr)
 
     def test_restart_below_target_plus_0_1_after_600s_off(self):   # entries 401, 403
-        rows = self.run_sc([(0, "err", -0.2), (65, "err", 0.0)], dur=700)   # room back at the target, CH off since tick 0
-        for sec in (60, 300, 570):
+        rows = self.run_sc(self.BURN_THEN_STOP + [(95, "err", 0.0)], dur=720)   # room back at the target, CH off since tick 60
+        for sec in (60, 330, 630):
             self.assertEqual(rows[sec]["ch"], "0", (sec, rows[sec]))
-        self.assertEqual(rows[600]["ch"], "1", rows[600])
+        self.assertEqual(rows[660]["ch"], "1", rows[660])
 
     def test_room_far_below_target_still_waits_for_the_minimum(self):   # entry 403: the minimum holds whatever the room does
-        rows = self.run_sc([(0, "err", -0.2), (65, "err", 0.5)], dur=700)
-        self.assertEqual({rows[s]["ch"] for s in sorted(rows) if 0 <= s < 600}, {"0"})
-        self.assertEqual(rows[600]["ch"], "1", rows[600])
-        hold = [l for l in self.narr("ev 0 err -0.2\nev 65 err 0.5\nrun 700\n") if l.startswith("Heating pause minimum")]
-        self.assertTrue(hold and "CH stays off 510 s more" in hold[0], hold)   # demand back at tick 90, CH off since tick 0
+        rows = self.run_sc(self.BURN_THEN_STOP + [(95, "err", 0.5)], dur=720)
+        self.assertEqual({rows[s]["ch"] for s in sorted(rows) if 60 <= s < 660}, {"0"})
+        self.assertEqual(rows[660]["ch"], "1", rows[660])
+        hold = [l for l in self.narr("ev 0 err 0.5\nev 35 err -0.2\nev 95 err 0.5\nrun 720\n") if l.startswith("Heating pause minimum")]
+        self.assertTrue(hold and "CH stays off 540 s more" in hold[0], hold)   # demand back at tick 120, CH off since tick 60
 
     def test_minimum_counts_from_the_ch_off_not_from_the_stop_decision(self):   # entry 403: after any 180 s burn
         # request 55 above the flow 50 keeps the boiler continuous; flame on at 40, stop decided at 65, CH off at 240
