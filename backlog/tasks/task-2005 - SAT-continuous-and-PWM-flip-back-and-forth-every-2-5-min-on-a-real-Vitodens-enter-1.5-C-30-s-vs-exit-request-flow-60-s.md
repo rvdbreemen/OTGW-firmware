@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-16T16:35:00Z'
-updated_date: '2026-11-17T05:33:00Z'
+updated_date: '2026-11-17T07:34:00Z'
 labels:
   - sat
   - field
@@ -26,7 +26,7 @@ Field finding from indigo_light's beta.350 capture (real Viessmann Vitodens, SAT
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [x] #1 Sergeant D's answer recorded as an entry (with the release scope)
-- [ ] #2 If a change: host test on the real satCycleCheckOvershootSwitch/exit path that replays the 16:17-16:39 sequence, red on the old code and green on the fix
+- [x] #2 If a change: host test on the real satCycleCheckOvershootSwitch/exit path that replays the 16:17-16:39 sequence, red on the old code and green on the fix
 - [ ] #3 Field check on a real boiler: no mode flip within one burn (or the accepted behaviour, per the entry)
 <!-- AC:END -->
 
@@ -60,4 +60,8 @@ Citations verified at pin 7beaaf5 via raw.githubusercontent (coordinator, 2026-1
 2026-11-16 CORRECTION to the description (written by comms 92): 'The control setpoint swings with the mode (e.g. 55.0 in a PWM ON phase, 38.1 in continuous)' is wrong for the flips during the burn. In indigo's capture CS 55.0 was sent only at 16:17:58, the PWM start before ignition (flame-off hold: return + fFlameOffOffset 18 capped at the max setpoint 55, SATcontrol.ino:1280-1287 and :1832-1838). The flips into PWM while the flame burned (16:30:28, 16:35:28, 16:39:28) kept CS 41.4 / 40.9 / 39.7 (previous CS kept, SATcontrol.ino:1842-1846); in continuous the CS equals the request (satApplyContinuous, :2570-2624). Same correction posted to Sergeant D (#dev-sat-mqtt 1571984164662677756). AC1: entry 404 (Q-2005a answered A, 68269ebb4).
 
 2026-11-17 entry 407 (Sergeant D 05:13Z): continuous->PWM at flow - requested >= 2 C for 60 s. Q-407a answered by Robert (maintainer, in session ~06:30, via coordinator): A 2.0 = new default of satpwmswitchmargin, C keep 3.5 C / 30 s fail-safe, release 2.0.0. Interpretation (ours): every save since TASK-1888 wrote SATpwmswitchmargin, so a stored 1.5 is the old default and migrates to 2.0 once (marker key, TASK-1961 pattern); other stored values stay. A deliberate 1.5 cannot be told apart.
+
+2026-11-17 code: 8ffd2d121 (2.0.0-beta.361) pushed 707e4421b..8ffd2d121, posted Discord 1572151922029371443. SAT_OVERSHOOT_SUSTAIN_MS 60000, fPwmSwitchMargin default 2.0, fail-safe 3.5 C / 30 s on its own timer (unchanged), one-time migration stored 1.5 -> 2.0 with marker SATpwmmargin2 (settingStuff.ino:693). ADR-254 Proposed (partly supersedes ADR-249). Host: test_sat_overshoot_sustain 31 red on origin f4373938a -> 85/85 green; new test_sat_pwm_margin_migration a,b,d red on origin -> 4/4; pins moved to 60 s in LL-004, LL-020b, test_sat_slave_lowload, test_sat_pwm_override; LL contract all ids pass (LL-016 skip); SAT/settings subset (~170 files) green; full 296-file suite NOT run; evaluate --quick 96 checks 0 FAIL. Bench 09 on .61 (OTGW32), satsimulation false: PASS, SHA 8/8, appelfsha256 = .elf, no crash fields, settings diff exactly SATpwmswitchmargin 1.50 -> 2.00 + SATpwmmargin2 true, second reboot unchanged (no second write), REST 2.0; boot migration log line not observable (printed before telnet accepts clients). AC2 gap: the tests are synthetic threshold/timing cases on the real satCycleCheckOvershootSwitch, NOT a replay of the 16:17-16:39 Vitodens sequence; AC2 stays open until that replay exists. AC3 field.
+
+2026-11-17 AC2 replay: tests/test_sat_vitodens_replay_2005.py feeds the recorded SATTICK (pid, flow) ticks of indigo's beta.350 capture (OTGW-field-data/indigo_light/20261116-144953, hours/20261116-16.zip telnet.log) for the three continuous segments 16:19:58-16:30:28, 16:32:28-16:35:28, 16:37:28-16:39:28 through the real satCycleCheckOvershootSwitch with the real SATtypes.h default. Old code (origin before TASK-2005, 1.5/30): switches at 660 s / 210 s / 150 s = exactly the recorded 16:30:28, 16:35:28, 16:39:28 (harness reproduces the field), 3/3 red. Fix 8ffd2d121 (2.0/60): no switch in any segment up to those ticks, 3/3 green. Limit: after each recorded switch the capture shows PWM, so the replay cannot show what continuous would have done later.
 <!-- SECTION:NOTES:END -->
