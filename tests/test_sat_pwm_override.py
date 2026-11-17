@@ -889,8 +889,8 @@ class SatPwmOverride(unittest.TestCase):
         r = self.run_sc("swtick", 1)
         self.assertNotEqual(r["mode"], "-1", "no overshoot switch gate in this SATcontrol.ino")
         self.assertEqual(r["mode"], "2", r)
-        self.assertEqual(r["ticks"], "31", r)                       # first qualifying tick starts the timer, 30 s later it fires (TASK-1888, entry 327)
-        self.assertEqual(r["continuous_ticks"], "30", r)            # every tick before it still sent the continuous setpoint
+        self.assertEqual(r["ticks"], "61", r)                       # first qualifying tick starts the timer, 60 s later it fires (TASK-2005, entry 407)
+        self.assertEqual(r["continuous_ticks"], "60", r)            # every tick before it still sent the continuous setpoint
         self.assertEqual(r["cont_marker"], "0", "the switch tick sent the continuous setpoint: %r" % r)
         self.assertEqual(r["final"], r["cs"], r)
         self.assertEqual(r["cs"], "48.0", r)                         # PWM ON start: return 30 + flame-off offset 18, not the clamped continuous 62
@@ -955,7 +955,7 @@ class SatPwmOverride(unittest.TestCase):
             with self.subTest(tick_s=step_s):
                 r = self.run_sc("swtick", 1, "x", step_s * 1000)
                 self.assertEqual(r["mode"], "2", r)
-                self.assertEqual(r["ticks"], str(1 + -(-30 // step_s)), r)   # 30 s since TASK-1888 (entry 327)
+                self.assertEqual(r["ticks"], str(1 + -(-60 // step_s)), r)   # 60 s since TASK-2005 (entry 407)
                 self.assertEqual(r["cont_marker"], "0", "the switch tick sent the continuous setpoint: %r" % r)
                 self.assertEqual(r["final"], r["cs"], r)
                 self.assertEqual(r["ch"], "1", r)

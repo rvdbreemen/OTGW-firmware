@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : settingsStuff
-**  Version  : v2.0.0-beta.360
+**  Version  : v2.0.0-beta.361
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -280,6 +280,7 @@ static void writeJsonIndexedStringKV(File& file, PGM_P keyBase, unsigned index, 
 }
 
 //=======================================================================
+static constexpr bool kSatPwmMarginMarkerValue = true;   // TASK-2005: the SATpwmmargin2 marker; its presence counts, not its value
 static constexpr bool kOtdOhMarkerValue = true;   // TASK-1961: the OTDohpicdefault marker; its presence counts, not its value
 
 bool writeSettings(bool show)
@@ -375,6 +376,7 @@ bool writeSettings(bool show)
   writeJsonIntKV(file, F("SATpresatdhwset"), settings.sat.iPreSatDhwSet);
   writeJsonFloatKV(file, F("SATovershootmargin"), settings.sat.fOvershootMargin);
   writeJsonFloatKV(file, F("SATpwmswitchmargin"), settings.sat.fPwmSwitchMargin);   // TASK-1888
+  writeJsonBoolKV(file, F("SATpwmmargin2"), kSatPwmMarginMarkerValue);   // TASK-2005: marker, the one-time 1.5 -> 2.0 migration is done
   writeJsonFloatKV(file, F("SATmodsupdelay"), settings.sat.fModSupDelay);
   writeJsonFloatKV(file, F("SATmodsupoffset"), settings.sat.fModSupOffset);
   writeJsonFloatKV(file, F("SATdhwsetpoint"), settings.sat.fDhwSetpoint);
@@ -554,6 +556,7 @@ static bool g_sawLegacyTopicsKey = false;
 static bool g_satCphOutOfSet = false;    // TASK-1375: set when the file carried a SATcyclesperhour other than 3 or 4; the deferred flush then rewrites the snapped value
 static bool g_sawSatFollowKey = false;   // TASK-1259: set when SATfollowthermostat is parsed; its absence means "default to the push-setpoint value"
 static bool g_sawOtdOhMarkerKey = false;   // TASK-1961: set when OTDohpicdefault is parsed; absent = OH not yet migrated to 1
+static bool g_sawSatPwmMarginMarkerKey = false;   // TASK-2005: set when SATpwmmargin2 is parsed; absent = margin not yet migrated
 static bool g_sawOnboardedKey = false;   // TASK-997: set when ui_onboarded is parsed; its absence marks a pre-feature (existing) install
 static bool g_sawBleEnableKey = false;   // TASK-1693: set when SATbleenable is parsed; its absence means no stored BLE choice yet
 // [ble-nopsram-default:begin] TASK-1693
@@ -575,6 +578,7 @@ void readSettings(bool show)
   g_satCphOutOfSet = false;      // TASK-1375: same sentinel pattern for SATcyclesperhour
   g_sawSatFollowKey = false;     // TASK-1259: same sentinel pattern for SATfollowthermostat
   g_sawOtdOhMarkerKey = false;   // TASK-1961: same sentinel pattern for the OH=1 migration marker
+  g_sawSatPwmMarginMarkerKey = false;   // TASK-2005: same sentinel pattern for the switch margin migration
   if (!LittleFS.exists(SETTINGS_FILE))
   {  //create settings file if it does not exist yet.
     DebugTln(F(" .. file not found! --> created file!"));
@@ -686,6 +690,15 @@ void readSettings(bool show)
   }
   // [otd-oh-migrate:end]
 #endif
+  // [sat-pwmmargin-migrate:begin] TASK-2005 (entry 407, Q-407a answered by Robert: 2.0 is the new default). Since TASK-1888
+  // every save wrote SATpwmswitchmargin, so a stored 1.5 is the old default: it becomes 2.0 once. Any other value is a user
+  // choice and stays. The deferred flush writes the marker, so a 1.5 set after this boot stays.
+  if (!g_sawSatPwmMarginMarkerKey) {
+    if (fabsf(settings.sat.fPwmSwitchMargin - 1.5f) < 0.01f) settings.sat.fPwmSwitchMargin = 2.0f;
+    settingsDirty = true;
+    DebugTln(F("[Settings] no SATpwmmargin2 marker: a stored PWM switch margin of 1.5 becomes 2.0 once"));
+  }
+  // [sat-pwmmargin-migrate:end]
   if (!g_sawOnboardedKey) {
     settings.ui.bOnboarded = true;
     settingsDirty = true;              // persist the key so this migration runs once
@@ -1151,6 +1164,7 @@ void updateSetting(const char *field, const char *newValue)
   else if (strcasecmp_P(field, PSTR("SATpresatdhwset")) == 0)    settings.sat.iPreSatDhwSet = constrain(atoi(newValue), 0, 100);
   else if (strcasecmp_P(field, PSTR("SATovershootmargin")) == 0) settings.sat.fOvershootMargin = clampSettingFloat(newValue, settings.sat.fOvershootMargin, 0.5f, 5.0f);
   else if (strcasecmp_P(field, PSTR("SATpwmswitchmargin")) == 0) settings.sat.fPwmSwitchMargin = clampSettingFloat(newValue, settings.sat.fPwmSwitchMargin, 0.5f, 5.0f);   // TASK-1888
+  else if (strcasecmp_P(field, PSTR("SATpwmmargin2")) == 0)      g_sawSatPwmMarginMarkerKey = true;   // TASK-2005: key presence = migration done
   else if (strcasecmp_P(field, PSTR("SATmodsupdelay")) == 0)    settings.sat.fModSupDelay = clampSettingFloat(newValue, settings.sat.fModSupDelay, 0.0f, 120.0f);
   else if (strcasecmp_P(field, PSTR("SATmodsupoffset")) == 0)   settings.sat.fModSupOffset = clampSettingFloat(newValue, settings.sat.fModSupOffset, 0.0f, 5.0f);
   else if (strcasecmp_P(field, PSTR("SATdhwsetpoint")) == 0)    settings.sat.fDhwSetpoint = clampSettingFloat(newValue, settings.sat.fDhwSetpoint, 0.0f, (float)SAT_DHW_SETPOINT_MAX);

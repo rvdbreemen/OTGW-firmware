@@ -247,13 +247,13 @@ class SlaveLowLoad(unittest.TestCase):
         rows = [dict(kv.split("=") for kv in line.split()) for line in out.strip().splitlines()]
         return rows if len(rows) > 1 else rows[0]
 
-    # QD-3 B (entry 215): no valid reply = no PWM. The permission matrix on the automatic 30 s switch (QD-1 A, entry 213; 30 s since TASK-1888).
+    # QD-3 B (entry 215): no valid reply = no PWM. The permission matrix on the automatic 60 s switch (QD-1 A, entry 213; 60 s since TASK-2005, entry 407).
     def test_overshoot_switch_ignores_msgid3(self):
         allowed = self.run_sc("overshoot", 1, 0)
-        self.assertEqual((allowed["mode"], allowed["ticks"]), ("2", "2"), "control: allowed, switch after 30 s (2nd 30 s tick)")
+        self.assertEqual((allowed["mode"], allowed["ticks"]), ("2", "3"), "control: allowed, switch after 60 s (3rd 30 s tick)")
         for valid, denied, why in ((1, 1, "bit 4 = 1 (Vitodens 100-W, entry 392)"), (0, 0, "no valid reply yet (entry 393)")):
             r = self.run_sc("overshoot", valid, denied)
-            self.assertEqual((r["mode"], r["ticks"], r["reason"]), ("2", "2", "0"), why)
+            self.assertEqual((r["mode"], r["ticks"], r["reason"]), ("2", "3", "0"), why)
 
     # TASK-1762: the old input of the case above (flow 55 against 50, 5 K over) now switches through the flame-out fail-safe after
     # 30 s (2nd 30 s tick), and the MsgID 3 permission (entry 213, real satPwmEntryAllowed) blocks it as it blocks the 60 s rule.
@@ -335,12 +335,12 @@ class SlaveLowLoad(unittest.TestCase):
             r = self.run_sc("veto", valid, denied)
             self.assertEqual((r["mode"], r["reason"]), ("2", "0"), "entries 392/393: the running-PWM check never ends PWM")
 
-    # Entry 392: the automatic switch works the same with bit 4 = 1 and = 0 (30 s, TASK-1888, entry 327).
+    # Entry 392: the automatic switch works the same with bit 4 = 1 and = 0 (60 s, TASK-2005, entry 407).
     def test_automatic_switch_ignores_bit4(self):
         rows = self.run_sc("rise")
         self.assertEqual(len(rows), 4)
-        self.assertEqual((rows[2]["while_denied_ticks"], rows[2]["mode"]), ("2", "2"), "bit 4 = 1: the switch fires after 30 s")
-        self.assertEqual((rows[3]["after_clear_ticks"], rows[3]["mode"]), ("2", "2"), "bit 4 = 0: the same 30 s")
+        self.assertEqual((rows[2]["while_denied_ticks"], rows[2]["mode"]), ("3", "2"), "bit 4 = 1: the switch fires after 60 s")
+        self.assertEqual((rows[3]["after_clear_ticks"], rows[3]["mode"]), ("3", "2"), "bit 4 = 0: the same 60 s")
 
     # The decoder: valid replies set the state, the change time moves only on a change.
     def test_decoder_hook_stores_bit4_and_the_time_of_the_change(self):

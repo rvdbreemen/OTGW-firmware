@@ -9,7 +9,8 @@ documents_shipped: false
 verified_in: []
 supersedes: []
 superseded_by: null
-format: "canonical"
+related:
+  - "ADR-254"
 topics:
   - "sat"
   - "pwm"
@@ -31,6 +32,7 @@ symbols:
   - "SAT_START_GATE_MS"
   - "satRestoreDeferredStep"
 context_scope: "selective"
+format: "canonical"
 ---
 
 <!-- markdownlint-disable MD025 -->
@@ -50,6 +52,11 @@ status_history:
     changed_by: "User: Robert van den Breemen"
     reason: Initial proposal
     changed_via: adr-kit
+  - date: 2026-11-17
+    status: Proposed
+    changed_by: "User: Robert van den Breemen"
+    reason: Related to ADR-254
+    changed_via: adr-kit lifecycle
 ```
 
 ## Context

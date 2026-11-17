@@ -11,6 +11,7 @@ supersedes: []
 superseded_by: null
 related:
   - "ADR-249"
+  - "ADR-254"
 topics:
   - "sat"
   - "pwm"
@@ -66,6 +67,11 @@ status_history:
     status: Accepted
     changed_by: "Robert van den Breemen (decision, DM 1571893214372438150), recorded by Agent (95)"
     reason: "Accepted: decision Robert van den Breemen (DM 1571893214372438150, answer A), recorded by Agent (95)"
+    changed_via: adr-kit lifecycle
+  - date: 2026-11-17
+    status: Accepted
+    changed_by: "User: Robert van den Breemen"
+    reason: Related to ADR-254
     changed_via: adr-kit lifecycle
 ```
 

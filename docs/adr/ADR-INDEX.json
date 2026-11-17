@@ -10192,7 +10192,7 @@
       "path": "ADR-249-sat-switches-from-continuous-to-pwm-when-the-flow-stays-1-5-c-above-the-request-for-30-s-with-its-own-margin-setting-supersedes-the-entry-22-rule.md",
       "format": "canonical",
       "status": "Accepted",
-      "date": "2026-11-16",
+      "date": "2026-11-17",
       "decision_summary": "SAT switches from continuous to PWM when flow - requested setpoint (the output of the proportional-integral-derivativ...",
       "topics": [
         "continuous mode",
@@ -10345,7 +10345,7 @@
       "path": "ADR-251-msgid-3-plays-no-part-in-sat-pwm-the-boiler-s-slave-configuration-no-longer-gates-the-continuous-to-pwm-switch-amends-adr-249.md",
       "format": "canonical",
       "status": "Accepted",
-      "date": "2026-11-16",
+      "date": "2026-11-17",
       "decision_summary": "MsgID 3 plays no part in SAT PWM: neither HB bit 4 nor the presence of a valid MsgID 3 reply allows, refuses or ends...",
       "topics": [
         "master low-off",
@@ -10410,7 +10410,7 @@
       "path": "ADR-252-every-sat-heating-start-runs-in-pwm-first-and-no-pwm-to-continuous-switch-fires-within-60-s-after-the-flame-lights.md",
       "format": "canonical",
       "status": "Proposed",
-      "date": "2026-11-16",
+      "date": "2026-11-17",
       "decision_summary": "A heating start enters PWM through satSetControlMode(), and a start gate keeps every PWM to continuous exit quiet unt...",
       "topics": [
         "control mode",
@@ -10528,6 +10528,72 @@
           "the narration texts and their once-per-pause count;",
           "the entry-398 start-count tests still pass.",
           "Old-vs-fix: on the code before this ADR the 7 new-behaviour tests fail and 19 pass; on the fix all 26 pass."
+        ]
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
+    },
+    {
+      "id": "ADR-254",
+      "title": "SAT switches from continuous to PWM when the flow stays 2 C above the request for 60 s, and a stored old default of 1.5 C migrates once (partly supersedes ADR-249)",
+      "path": "ADR-254-sat-switches-from-continuous-to-pwm-when-the-flow-stays-2-c-above-the-request-for-60-s-and-a-stored-old-default-of-1-5-c-migrates-once-partly-supersedes-adr-249.md",
+      "format": "canonical",
+      "status": "Proposed",
+      "date": "2026-11-17",
+      "decision_summary": "SAT switches from continuous to PWM when flow - requested setpoint >= settings.sat.fPwmSwitchMargin (default 2.0) hol...",
+      "topics": [
+        "continuous to pwm switch",
+        "overshoot switch",
+        "pwm switch margin",
+        "sat",
+        "settings migration"
+      ],
+      "aliases": [
+        "2 C for 60 s",
+        "entry 407",
+        "Q-407a",
+        "SATpwmmargin2",
+        "satpwmswitchmargin"
+      ],
+      "components": [
+        "SAT_OVERSHOOT_SUSTAIN_MS",
+        "SATpwmmargin2"
+      ],
+      "symbols": [
+        "fPwmSwitchMargin",
+        "g_sawSatPwmMarginMarkerKey",
+        "kSatPwmMarginMarkerValue",
+        "SAT_OVERSHOOT_SUSTAIN_MS",
+        "satCycleCheckOvershootSwitch"
+      ],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [
+          "The continuous to PWM switch fires on the first control tick at least 60 s after the first qualifying tick (flow - requested >= fPwmSwitchMargin).",
+          "The default of satpwmswitchmargin is 2.0; its range stays 0.5-5.0.",
+          "A settings file without SATpwmmargin2 and with SATpwmswitchmargin 1.5 boots with 2.0 and writes the marker.",
+          "The 3.5 C fail-safe keeps its own 30 s timer."
+        ],
+        "must_not": [
+          "Move a stored margin other than 1.5, or move a 1.5 that is stored together with the marker.",
+          "Share the sustain constant between the switch rule and the fail-safe."
+        ],
+        "exceptions": [
+          "A user who deliberately chose 1.5 before this release is moved to 2.0 once; the stored value cannot tell that choice apart from the old default. Setting 1.5 again afterwards stays."
+        ],
+        "verification": [
+          "python tests/testsatovershootsustain.py: 85 cases on the real satCycleCheckOvershootSwitch(); 31 fail on the code before this ADR (OTGWSATCYCLESINO / OTGWSATTYPESH pointing at origin/dev f4373938a), all pass after it.",
+          "python tests/testsatpwmmarginmigration.py: the real setter, writer and migration lines of settingStuff.ino; cases a, b and d fail on the code before this ADR, all four pass after it.",
+          "python tests/testsatlowloadcontract.py (LL-004, LL-020b) and tests/testsatslavelowload.py, tests/testsatpwmoverride.py pin the 60 s timing."
         ]
       },
       "scope": {
@@ -17475,6 +17541,12 @@
       "resolved": true
     },
     {
+      "source": "ADR-249",
+      "target": "ADR-254",
+      "type": "related",
+      "resolved": true
+    },
+    {
       "source": "ADR-250",
       "target": "ADR-196",
       "type": "related",
@@ -17511,6 +17583,12 @@
       "resolved": true
     },
     {
+      "source": "ADR-251",
+      "target": "ADR-254",
+      "type": "related",
+      "resolved": true
+    },
+    {
       "source": "ADR-252",
       "target": "ADR-196",
       "type": "related",
@@ -17535,6 +17613,12 @@
       "resolved": true
     },
     {
+      "source": "ADR-252",
+      "target": "ADR-254",
+      "type": "related",
+      "resolved": true
+    },
+    {
       "source": "ADR-253",
       "target": "ADR-199",
       "type": "related",
@@ -17543,6 +17627,24 @@
     {
       "source": "ADR-253",
       "target": "ADR-250",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-254",
+      "target": "ADR-249",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-254",
+      "target": "ADR-251",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-254",
+      "target": "ADR-252",
       "type": "related",
       "resolved": true
     }

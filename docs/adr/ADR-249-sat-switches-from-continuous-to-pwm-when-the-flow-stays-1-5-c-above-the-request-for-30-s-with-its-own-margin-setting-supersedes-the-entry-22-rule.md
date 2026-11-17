@@ -11,6 +11,7 @@ supersedes: []
 superseded_by: null
 related:
   - "ADR-251"
+  - "ADR-254"
 topics:
   - "sat"
   - "pwm"
@@ -62,6 +63,11 @@ status_history:
     status: Accepted
     changed_by: "User: Robert van den Breemen"
     reason: Related to ADR-251
+    changed_via: adr-kit lifecycle
+  - date: 2026-11-17
+    status: Accepted
+    changed_by: "User: Robert van den Breemen"
+    reason: Related to ADR-254
     changed_via: adr-kit lifecycle
 ```
 

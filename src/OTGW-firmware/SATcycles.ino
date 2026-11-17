@@ -30,9 +30,9 @@ static const uint8_t  SAT_CYCLE_HISTORY_SIZE       = 16;
 static const uint32_t SAT_CYCLE_MIN_SAMPLES        = 3;       // a cycle with fewer 1 Hz samples is not recorded (tracker.py:98-100, minimum_samples_per_cycle, TASK-1588)
 // The cycle classifier's overshoot margin is settings.sat.fOvershootMargin (default 2.0C; Python OVERSHOOT_MARGIN_CELSIUS is 3.0)
 static const float    SAT_OVERSHOOT_SUSTAIN_SEC     = 60.0f;   // Sustained overshoot (cycle classifier streak)
-// TASK-1888, Sergeant D entry 327 (supersedes entry 22's 2.0 C / 60 s; thermo-nova 3.0 C / 60 s, cycles/const.py:10,
-// const.py:21): continuous -> PWM when flow - requested >= settings.sat.fPwmSwitchMargin (default 1.5, entry 360) for 30 s.
-static const uint32_t SAT_OVERSHOOT_SUSTAIN_MS      = 30000UL;  // Sustained overshoot before PWM switch (satCycleCheckOvershootSwitch)
+// TASK-2005, Sergeant D entry 407 (supersedes entry 327's 1.5 C / 30 s; thermo-nova 3.0 C / 60 s, cycles/const.py:10,
+// const.py:21): continuous -> PWM when flow - requested >= settings.sat.fPwmSwitchMargin (default 2.0, Q-407a) for 60 s.
+static const uint32_t SAT_OVERSHOOT_SUSTAIN_MS      = 60000UL;  // Sustained overshoot before PWM switch (satCycleCheckOvershootSwitch)
 // TASK-1762, Sergeant D entries 288/289, kept by entry 359: flame-out fail-safe beside the switch rule. In continuous mode,
 // flow - requested (PID) setpoint >= 3.5 C for 30 s also switches to PWM. A fixed value from Sergeant D, not a setting; it has no
 // thermo-nova counterpart (deliberate addition on top of the pin, heating_control.py:262-305 has only the one rule). With the
@@ -1363,9 +1363,9 @@ bool satCycleCheckLowLoadVeto()
 // The test uses the requested (PID) setpoint, not the final one: the continuous clamp keeps the final setpoint
 // within a few degrees of the flow, so comparing against it would almost never see an overshoot.
 // flow >= requested + margin counts, equality included (Q43 A; thermo-nova resets only on flow < threshold,
-// :288-291). The margin is settings.sat.fPwmSwitchMargin (default 1.5, entries 327/360; thermo-nova's own is 3.0) and the
-// time 30 s (entry 327; thermo-nova 60 s). The 30 s are tickMs - start (Q46 B), so the switch comes on the first tick at
-// least 30 s after the first qualifying tick (ticks are never closer than one interval; entry 109). A tick outside CONTINUOUS (:264-266), or within the hot-water guard (:268-274),
+// :288-291). The margin is settings.sat.fPwmSwitchMargin (default 2.0, entry 407 and Q-407a; thermo-nova's own is 3.0) and the
+// time 60 s (entry 407, as thermo-nova). The 60 s are tickMs - start (Q46 B), so the switch comes on the first tick at
+// least 60 s after the first qualifying tick (ticks are never closer than one interval; entry 109). A tick outside CONTINUOUS (:264-266), or within the hot-water guard (:268-274),
 // clears the start.
 // TASK-1762 (Sergeant D entries 288/289): a second rule beside it, a fail-safe for flame out. flow - requested >= 3.5 C
 // (SAT_OVERSHOOT_FAILSAFE_DELTA_C, equality included) held for 30 s also switches to PWM. It has its own timer, counted the same
@@ -1405,7 +1405,7 @@ bool satCycleCheckOvershootSwitch(float requestedSetpoint, uint32_t tickMs)
   if (!fireSwitch && !fireFailsafe) return false;
 
   // The MsgID 3 permission comes first (always given since entries 392/393; entries 213/215 reversed): without it the switch stays in continuous and the starts
-  // are cleared, so a permission that returns later starts a fresh 30 s for both rules.
+  // are cleared, so a permission that returns later starts both timers afresh (60 s switch, 30 s fail-safe).
   if (!satPwmEntryAllowed(1)) {
     _sustain_overshootRunning = false;
     _sustain_overshootFailsafeRunning = false;
