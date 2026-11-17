@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : helperStuff
-**  Version  : v2.0.0-beta.367
+**  Version  : v2.0.0-beta.368
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -249,23 +249,40 @@ void refreshLittleFSFileFlags() {
 }
 // --- fsFileFlags end
 
+// TASK-1995: one telnet line when a LittleFS step of the loop takes 100 ms or more, so a [loop-stall] in the
+// background step can be tied to its cause. Diagnostics only: no output below the threshold.
+static void fsSlowNote(PGM_P step, uint32_t t0)
+{
+  const uint32_t dt = millis() - t0;
+  if (dt >= 100) DebugTf(PSTR("[fs-slow] %s %lu ms\r\n"), step, (unsigned long)dt);
+}
+
 void loopLittleFSStatus() {
   DECLARE_TIMER_MIN(fsWriteProbe, 5, SKIP_MISSED_TICKS);
   DECLARE_TIMER_SEC(fsMountCheck, 60, SKIP_MISSED_TICKS);
   DECLARE_TIMER_SEC(fsFileFlags, 10, SKIP_MISSED_TICKS);   // TASK-1899: a new or removed file shows within 10 s
   static bool fsFileFlagsRead = false;                      // the first loop pass reads them at once
+  uint32_t t0 = millis();
   if (DUE(fsWriteProbe)) {
     updateLittleFSStatus(F("/.health"));
+    fsSlowNote(PSTR("write-probe"), t0);
     return;
   }
   if (!fsFileFlagsRead || DUE(fsFileFlags)) {   // two cheap lookups: no own pass, the mount check keeps its rhythm
     fsFileFlagsRead = true;
     refreshLittleFSFileFlags();
+    fsSlowNote(PSTR("file-flags"), t0);
   }
+  t0 = millis();
   loopDallasLabels();   // TASK-1912: write a changed labels copy (cheap when nothing changed)
+  fsSlowNote(PSTR("dallas-labels"), t0);
+  t0 = millis();
   loopSatMarkers();     // TASK-1911: and a changed markers copy
+  fsSlowNote(PSTR("sat-markers"), t0);
   if (DUE(fsMountCheck) && LittleFSmounted) {
+    t0 = millis();
     LittleFSmounted = platformFSInfo(LittleFSinfo);
+    fsSlowNote(PSTR("mount-check"), t0);
   }
 }
 

@@ -648,7 +648,8 @@ enum : uint8_t {
   CPROBE_SAT_RUN,           // satControlLoop(): after satControlLoopRun()
   CPROBE_SAT_CORE,          // satControlLoop(): after satPublishCoreState()
   CPROBE_SAT_PUB_BEGIN,     // satPublishMQTT(): past its gates, before the first topic (TASK-1995)
-  CPROBE_SAT_PUB_END        // satPublishMQTT(): on return (TASK-1995)
+  CPROBE_SAT_PUB_END,       // satPublishMQTT(): on return (TASK-1995)
+  CPROBE_FS_END             // doBackgroundTasks(): after loopLittleFSStatus() (TASK-1995)
 };
 void connProbe(uint8_t tag);
 // TASK-1989: the slowest step (between two CPROBE_* call sites) of the loop pass that just ended, read at the next loop top.

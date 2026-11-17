@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.ino
-**  Version  : v2.0.0-beta.367
+**  Version  : v2.0.0-beta.368
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -1114,6 +1114,7 @@ void doBackgroundTasks()
     emergencyHeapRecovery();
   }
   if (!isFlashing()) loopLittleFSStatus();   // TASK-1865: LittleFS mount check / write probe off async_tcp
+  connProbe(CPROBE_FS_END);   // TASK-1995: splits the background step at the LittleFS check
 
   if (isNetworkUp()) {
     if (state.flash.bESPactive) {
