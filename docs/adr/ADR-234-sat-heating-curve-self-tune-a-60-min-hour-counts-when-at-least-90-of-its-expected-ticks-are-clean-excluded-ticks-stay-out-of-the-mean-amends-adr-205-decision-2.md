@@ -1,8 +1,8 @@
 ---
 id: "ADR-234"
 title: "SAT heating curve self-tune: a 60 min hour counts when at least 90 % of its expected ticks are clean; excluded ticks stay out of the mean (amends ADR-205 decision 2)"
-status: "Proposed"
-date: "2026-11-14"
+status: "Accepted"
+date: "2026-11-17"
 binding: false
 gate: null
 documents_shipped: false
@@ -40,7 +40,7 @@ format: "canonical"
 
 ## Status
 
-Proposed, 2026-11-14.
+Accepted, 2026-11-17.
 
 Amends ADR-205 decision 2 (the clean hour) and entry 174's clean-hour rule. Every other decision of ADR-205, ADR-228 and
 ADR-231 stays in force. Implemented by TASK-1932.
@@ -73,6 +73,11 @@ status_history:
     status: Proposed
     changed_by: "User: Robert van den Breemen"
     reason: Related to ADR-231
+    changed_via: adr-kit lifecycle
+  - date: 2026-11-17
+    status: Accepted
+    changed_by: "Robert van den Breemen (decision, in session 2026-11-16 23:03, relayed by the coordinator session), recorded by Agent (d3)"
+    reason: "Accepted: decision Robert van den Breemen (2026-11-16 23:03, coordinator session), recorded by Agent (d3) after the four verification gates passed"
     changed_via: adr-kit lifecycle
 ```
 

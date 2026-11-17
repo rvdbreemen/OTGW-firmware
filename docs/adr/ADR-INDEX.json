@@ -9254,8 +9254,8 @@
       "title": "SAT heating curve self-tune: a 60 min hour counts when at least 90 % of its expected ticks are clean; excluded ticks stay out of the mean (amends ADR-205 decision 2)",
       "path": "ADR-234-sat-heating-curve-self-tune-a-60-min-hour-counts-when-at-least-90-of-its-expected-ticks-are-clean-excluded-ticks-stay-out-of-the-mean-amends-adr-205-decision-2.md",
       "format": "canonical",
-      "status": "Proposed",
-      "date": "2026-11-14",
+      "status": "Accepted",
+      "date": "2026-11-17",
       "decision_summary": "A tuner hour stays 60 min and counts when no whole-hour marker was set and its clean ticks are at least 90 % of the t...",
       "topics": [
         "clean hour",
@@ -10409,7 +10409,7 @@
       "title": "Every SAT heating start runs in PWM first and no PWM to continuous switch fires within 60 s after the flame lights",
       "path": "ADR-252-every-sat-heating-start-runs-in-pwm-first-and-no-pwm-to-continuous-switch-fires-within-60-s-after-the-flame-lights.md",
       "format": "canonical",
-      "status": "Proposed",
+      "status": "Accepted",
       "date": "2026-11-17",
       "decision_summary": "A heating start enters PWM through satSetControlMode(), and a start gate keeps every PWM to continuous exit quiet unt...",
       "topics": [
@@ -10443,10 +10443,10 @@
           "Enter it only on a tick with a known flow temperature, with the first PWM phase ON in that tick.",
           "Keep the max-setpoint, underheat, saturation and end-of-cycle underheat exits quiet until 60 s after the first CH flame-on of the start.",
           "Leave the mode as it is when SAT takes over while a flame burns.",
-          "Leave PWM on a heater OFF as before (ADR-199)."
+          "Leave PWM on a heater off as before (ADR-199)."
         ],
         "must_not": [
-          "Put PWM on while the heater is OFF (no PWM at initSAT()).",
+          "Put PWM on while the heater is off (no PWM at initSAT()).",
           "Reset the exit timers when the gate ends.",
           "Wait for a MsgID 3 reply before the PWM entry or the restore (ADR-251)."
         ],
@@ -10456,7 +10456,7 @@
         "verification": [
           "tests/testsatpwmfirststart.py (real SAT sources in the loop harness): 14 tests green on the fix, 8 red on origin/dev 2268516db (cases a, a2, b, c, d, e, f, i), with mutant tests for the flame-off guard, the resume reset and the flow check.",
           "tests/testsatloopintegration.py (21 tests, incl. the no-return flood at a PWM-first start and the boot silence).",
-          "Bench (simulator on the device, not hardware): an OTGW Classic bench unit with SAT's built-in boiler simulation on showed SATMODE from=1 to=2, Control mode: PWM (heating start) with duty 1.00 at the heater OFF to ON edge after the boot s..."
+          "Bench (simulator on the device, not hardware): an OTGW (OpenTherm Gateway) Classic bench unit with SAT's built-in boiler simulation on showed SATMODE from=1 to=2, Control mode: PWM (heating start) with duty 1.00 at the heater off to on e..."
         ]
       },
       "scope": {

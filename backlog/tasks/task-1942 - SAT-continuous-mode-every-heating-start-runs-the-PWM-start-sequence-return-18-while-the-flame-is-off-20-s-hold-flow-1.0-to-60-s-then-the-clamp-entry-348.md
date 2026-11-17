@@ -8,7 +8,7 @@ status: In Review
 assignee:
   - '@claude'
 created_date: '2026-11-14T17:23:00Z'
-updated_date: '2026-11-16T16:24:00Z'
+updated_date: '2026-11-17T06:44:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -66,6 +66,8 @@ Bench 09 2026-11-16 on .63 (Classic + ESP32-S3 with PSRAM, PIC 6.8, no boiler, n
 2026-11-16 CORRECTION (coordinator, confirmed by 09): SAT's built-in boiler simulation was ON on .63 all day. So every behaviour seen there (the boot takeover with the cold-cutoff latch and the +181 s heater OFF->ON PWM-first start, the PWM-first starts with the first phase ON in the candidate soak, the first PWM->continuous switch 90 s after each simulated flame-on, heater OFF leaving PWM) is the simulator on the device, NOT a real boiler. The candidate soak on b5aba1c stays valid as health/stability evidence (bootcount 175 constant, MQTT 61/61, heap 43.6-45.9 KB, 0 panics). The behaviour with a real boiler is NOT verified; the host tests prove the rules, and field captures of the first starts after the release are the hardware check. ADR-252's verification and consequences text corrected accordingly.
 
 2026-11-16 ADR-252 README category entry added (origin red in tests/test_adr_governance.py test_live_index_complete, reported by the coordinator); 17/17 passed after the entry.
+
+2026-11-17 ADR 252 Accepted via adr-kit (strict gates passed; decision Robert van den Breemen 2026-11-16 23:03 in session, relayed by the coordinator; recorded by d3). tests/test_adr_governance.py 17 passed.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary

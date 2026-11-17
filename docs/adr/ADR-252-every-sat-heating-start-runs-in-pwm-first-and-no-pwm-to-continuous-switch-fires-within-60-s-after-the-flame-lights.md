@@ -1,8 +1,8 @@
 ---
 id: "ADR-252"
 title: "Every SAT heating start runs in PWM first and no PWM to continuous switch fires within 60 s after the flame lights"
-status: "Proposed"
-date: "2026-11-16"
+status: "Accepted"
+date: "2026-11-17"
 binding: false
 gate: null
 documents_shipped: false
@@ -41,7 +41,7 @@ format: "canonical"
 
 ## Status
 
-Proposed, 2026-11-16.
+Accepted, 2026-11-17.
 
 ## Status History
 
@@ -57,13 +57,18 @@ status_history:
     changed_by: "User: Robert van den Breemen"
     reason: Related to ADR-254
     changed_via: adr-kit lifecycle
+  - date: 2026-11-17
+    status: Accepted
+    changed_by: "Robert van den Breemen (decision, in session 2026-11-16 23:03, relayed by the coordinator session), recorded by Agent (d3)"
+    reason: "Accepted: decision Robert van den Breemen (2026-11-16 23:03, coordinator session), recorded by Agent (d3) after the four verification gates passed"
+    changed_via: adr-kit lifecycle
 ```
 
 ## Context
 
 SAT (Smart Autotune Thermostat) chooses between two control modes: PWM (pulse width modulation: the boiler is switched on and
 off in phases) and continuous (the boiler modulates on a setpoint). Thermo-nova, the SAT code this firmware ports, starts every
-heating start in continuous: after a heater OFF it disables PWM (`heating_control.py:229-231` at commit 7beaaf5), after a boot
+heating start in continuous: after a heater off it disables PWM (`heating_control.py:229-231` at commit 7beaaf5), after a boot
 PWM is off unless a saved state restores it (`pwm.py:63`, `:89`, `:112-114`), and PWM is enabled only on a sustained overshoot
 (`heating_control.py:262-305`). The firmware mirrored that until TASK-1942.
 
@@ -85,7 +90,7 @@ starts would get no PWM warm-up at all.
 A heating start enters PWM through `satSetControlMode()`, and a start gate keeps every PWM to continuous exit quiet until 60 s
 after the first CH flame-on of that start.
 
-- A heating start is the heater going from OFF to ON in the control tick, SAT being switched on while no flame burns, and a boot.
+- A heating start is the heater going from off to on in the control tick, SAT being switched on while no flame burns, and a boot.
   `satPwmFirstStart()` enters PWM for every requested control mode (auto, continuous, pwm).
 - PWM is entered only on a tick with a known flow temperature; until then the continuous start sequence of entry 348 runs. Right
   after a boot the flow is unknown, PWM would idle and the plain request would light the boiler with no flame-off hold and no
@@ -96,7 +101,7 @@ after the first CH flame-on of that start.
 - A flame already burning when SAT takes over is no heating start (the mode stays as it is), also after an OpenTherm loss, a trip or
   a fallback lift: `satDisable()` resets the flame-off flag.
 - A saved PWM flag is restored after a restart through `satRestoreDeferredStep()`, once the heater runs and the flow is known; never at
-  `initSAT()` while the heater may be OFF. It does not wait for MsgID 3 (ADR-251, entries 392/393).
+  `initSAT()` while the heater may be off. It does not wait for MsgID 3 (ADR-251, entries 392/393).
 
 The firmware differs from thermo-nova here on purpose.
 
@@ -108,11 +113,11 @@ The firmware differs from thermo-nova here on purpose.
 - Enter it only on a tick with a known flow temperature, with the first PWM phase ON in that tick.
 - Keep the max-setpoint, underheat, saturation and end-of-cycle underheat exits quiet until 60 s after the first CH flame-on of the start.
 - Leave the mode as it is when SAT takes over while a flame burns.
-- Leave PWM on a heater OFF as before (ADR-199).
+- Leave PWM on a heater off as before (ADR-199).
 
 ### Must Not
 
-- Put PWM on while the heater is OFF (no PWM at `initSAT()`).
+- Put PWM on while the heater is off (no PWM at `initSAT()`).
 - Reset the exit timers when the gate ends.
 - Wait for a MsgID 3 reply before the PWM entry or the restore (ADR-251).
 
@@ -125,8 +130,8 @@ The firmware differs from thermo-nova here on purpose.
 - `tests/test_sat_pwm_first_start.py` (real SAT sources in the loop harness): 14 tests green on the fix, 8 red on origin/dev
   2268516db (cases a, a2, b, c, d, e, f, i), with mutant tests for the flame-off guard, the resume reset and the flow check.
 - `tests/test_sat_loop_integration.py` (21 tests, incl. the no-return flood at a PWM-first start and the boot silence).
-- Bench (simulator on the device, not hardware): an OTGW Classic bench unit with SAT's built-in boiler simulation on showed
-  `SATMODE from=1 to=2`, `Control mode: PWM (heating start)` with duty 1.00 at the heater OFF to ON edge after the boot silence,
+- Bench (simulator on the device, not hardware): an OTGW (OpenTherm Gateway) Classic bench unit with SAT's built-in boiler simulation on showed
+  `SATMODE from=1 to=2`, `Control mode: PWM (heating start)` with duty 1.00 at the heater off to on edge after the boot silence,
   then the simulated flame; the first PWM to continuous switch came 90 s after that flame-on. The behaviour with a real boiler is
   not verified.
 
@@ -157,12 +162,13 @@ The firmware differs from thermo-nova here on purpose.
 
 ## Open Questions
 
-- None. Entries 389, 391 and 394 answered the three open points of entry 385.
+- [x] The three open points of entry 385 (when the start phase ends, whether it also applies with manual continuous, which
+  exits may fire inside it). — **Answered 2026-11-16 by Sergeant D:** entries 389, 391 and 394.
 
 ## Related Decisions
 
 - **ADR-196** (SAT ground truth): Sergeant D's entries rank above the thermo-nova code.
-- **ADR-199** (SAT cold state and CH rule): a heater OFF still leaves PWM.
+- **ADR-199** (SAT cold state and CH rule): a heater off still leaves PWM.
 - **ADR-236** (PWM to continuous after 60 s of underheat, Proposed): that exit is held by the start gate.
 - **ADR-251** (MsgID 3 plays no part in PWM): the PWM-first entry and the restore do not wait for MsgID 3.
 

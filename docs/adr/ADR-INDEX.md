@@ -238,7 +238,7 @@ One row per Architecture Decision Record. Scope is the Enforcement `path_glob` s
 | ADR-231 | Accepted | - | On a gas boiler, a tick in SAT PWM is a warm-up tick of the self-tune, and the PWM-related exclusions do not drop its... |
 | ADR-232 | Accepted | - | Carry 7befe25 as a build-time patch on the registry copy of AsyncTCP 3.4.10, applied by scripts/patchpiolibs.py: |
 | ADR-233 | Accepted | - | At the start of a filesystem OTA the firmware copies settings.ini, rebootcount.txt and rebootlog.txt, in that order,... |
-| ADR-234 | Proposed | `src/OTGW-firmware/SATcurveTune.h` | A tuner hour stays 60 min and counts when no whole-hour marker was set and its clean ticks are at least 90 % of the t... |
+| ADR-234 | Accepted | `src/OTGW-firmware/SATcurveTune.h` | A tuner hour stays 60 min and counts when no whole-hour marker was set and its clean ticks are at least 90 % of the t... |
 | ADR-235 | Accepted | - | SAT sends CS= when the value it sends, rounded to 0.1, changes, and repeats an unchanged CS= about every 30 s: the co... |
 | ADR-236 | Proposed | - | While SAT is in PWM and the PWM phase is ON, it switches to continuous when the flame is on and the requested setpoin... |
 | ADR-237 | Proposed | `build.py` | The buildfs step runs with PLATFORMIOBUILDDIR=.pio/build-fs (piofsbuildroot(), build.py:2488), so .pio/build keeps on... |
@@ -256,6 +256,6 @@ One row per Architecture Decision Record. Scope is the Enforcement `path_glob` s
 | ADR-249 | Accepted | - | SAT switches from continuous to PWM when flow - requested setpoint (the output of the proportional-integral-derivativ... |
 | ADR-250 | Accepted | - | While the tolerance band says stop, the CH-enable bit SAT sends is 0, and nothing else changes: the control setpoint,... |
 | ADR-251 | Accepted | - | MsgID 3 plays no part in SAT PWM: neither HB bit 4 nor the presence of a valid MsgID 3 reply allows, refuses or ends... |
-| ADR-252 | Proposed | - | A heating start enters PWM through satSetControlMode(), and a start gate keeps every PWM to continuous exit quiet unt... |
+| ADR-252 | Accepted | - | A heating start enters PWM through satSetControlMode(), and a start gate keeps every PWM to continuous exit quiet unt... |
 | ADR-253 | Accepted | - | The band stops at target + 0.1 and may restart below target + 0.1, and once CH is off for the band it stays off for a... |
 | ADR-254 | Proposed | - | SAT switches from continuous to PWM when flow - requested setpoint >= settings.sat.fPwmSwitchMargin (default 2.0) hol... |

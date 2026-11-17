@@ -7,7 +7,7 @@ status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-14T10:22:00Z'
-updated_date: '2026-11-16T09:29:00Z'
+updated_date: '2026-11-17T06:44:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -56,6 +56,8 @@ AC5 (replay, 92, 2026-11-16 ~05:00): real tuner of 1f796d256 (satTune*/satCurveT
 Pushed 3423baa83..92fc8fec7 (beta.339) after 09 smoke PASS on .61 (2026-11-16 05:13-05:22): device 2.0.0-beta.339+92fc8fe, bootcount 809->811 (2 OTA restarts), freeheap 52.3-56.7 KB flat, maxfreeblock 31732, MQTT connected, telnet 2664 lines 0 panic/WDT, settings byte-identical, /api/v2/sat curve_tune block identical to beta.338 with SAT off. Not tested on hardware: the 90 % hour counting itself (needs SAT active); it rests on test CleanShare (red on old code) and the 92 replay (AC5). Zip posted #alpha-testing msg 1571743145467707473. Open: AC3 (ADR-234 acceptance, Robert's yes; coordinator asked by DM).
 
 2026-11-16 (95) AC3: ADR-234 'SAT heating curve self-tune: a 60 min hour counts when at least 90 % of its logged ticks are clean; excluded ticks stay out of the mean (amends ADR-205 decision 2)' exists via adr-kit (docs/adr/ADR-234-*.md, status Proposed, landed with 92fc8fec7). The AC asks for the ADR, not its acceptance; the acceptance stays Robert's separate yes (asked by DM via the coordinator). Done per the close-out triage.
+
+2026-11-17 ADR 234 Accepted via adr-kit (strict gates passed; decision Robert van den Breemen 2026-11-16 23:03 in session, relayed by the coordinator; recorded by d3). tests/test_adr_governance.py 17 passed.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
