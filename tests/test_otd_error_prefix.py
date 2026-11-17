@@ -4,8 +4,8 @@
 PIC 6.6 (other-projects/otgw-6.6/gateway.asm): SerialCmdSub answers a command shorter than 4 characters (the CR
 counts) or one whose third character is not '=' with a bare SyntaxError (:3686-3694); after those checks it prints
 the two command letters, ':' and ' ' (:3695-3703) and only then runs the command, whose error code is printed after
-that prefix (:1425-1431). So "CH=x" answers "CH: BV" and "C" answers "SE". pyotgw matches an error reply only in the
-prefixed form. Before the fix OT-Direct printed every code bare ("BV").
+that prefix (:1425-1431). So "CH=x" answers "CH: BV" and "C" answers "SE". This is wire parity with the PIC (pyotgw
+handles both forms, commandprocessor.py:54-58 and :66-71). Before the fix OT-Direct printed every code bare ("BV").
 
 The real code is compiled with a host C++ compiler: otdCmdPrefix, OtdCmdPrefixScope, otdIsCmdErrorCode and
 otDirectBridgeProcessStatus() from src/OTGW-firmware/OTDirect.ino, and the header part of handleOTDirectCommand() up
