@@ -37,6 +37,9 @@ docker run -d --name otgwpb -p 8090:8090 -v "%cd%\pb_migrations:/pb/pb_migration
 docker exec otgwpb /pb/pocketbase superuser upsert admin@bench.invalid "BenchAdmin-123"
 ```
 
+If `otgwpb` is still there from an earlier run, `git pull` first and then `docker restart otgwpb` instead of the
+three commands above: the restart applies new migrations (poc.10 adds `build_id` to `batches`).
+
 In a second window, the tunnel (it gives a Cloudflare certificate, which the firmware checks):
 
 ```bat

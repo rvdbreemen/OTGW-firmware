@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-15T09:35:00Z'
-updated_date: '2026-11-16T20:48:00Z'
+updated_date: '2026-11-17T22:56:00Z'
 labels:
   - research
   - tls
@@ -80,4 +80,6 @@ Step 3: poc.8+5f760b4 (SHA256SUMS OK) app-only OTA at 21:12 (settings kept; poc.
 Restore 21:31: 2.0.0-beta.356+4601510 app+fs back on .61, settings.ini byte-identical to the pre-poc.8 copy, cloudrec.cfg gone (404), heap 56,448 / block 31,732, MQTT connected, SAT off, sim off. Tunnel, PocketBase and the telnet capture stopped by PID. Steps 4-6 (30 min check 7, check 3/4 on real data, 12 h soak) NOT run: they need a working TLS session. For the developer: the TLS context needs more contiguous heap than the 13.3 KB block left on the no-PSRAM board with this build; ELF step 1 showed dynamic TLS buffers present, so the allocation that fails at mbedtls_ssl_setup is worth measuring (the ssl context plus in/out buffers at the negotiated MFL). Evidence (local, not committed): 09 scratchpad cloudrec/run1116/ (telnet-capture.txt, serial-boot.txt, flash logs, S0/S1/S2.ini), cloudrec/pb.log, cloudrec/pb_data/.
 
 2026-11-16 poc.9 fix for bench check 7 FAIL (mbedtls_ssl_setup -0x7F00, heap 23,404 / block 13,300 on .61). Root cause: CONFIG_MBEDTLS_DYNAMIC_BUFFER needs the 11 -Wl,--wrap=mbedtls_ssl_* link flags from components/mbedtls/CMakeLists.txt; the Arduino link line did not carry them, so esp-tls called the stock mbedtls_ssl_setup, which allocates the full 16 KB in/out buffers. Fix: scripts/tlsdyn_mbedtls_libs.py appends the wraps to LINKFLAGS. Evidence (container build poc.9+943fc9b, exit 0, RAM 156,820 B, flash 2,261,783 B): nm shows T __wrap_mbedtls_ssl_setup/read/write; the firmware.map cross-reference lists libesp-tls.a(esp_tls_mbedtls.c.o) and NetworkClientSecure as users of __wrap_mbedtls_ssl_setup/read/write. Also CloudRecDevice.h: numeric events use a 48 B stack buffer (CloudRecEvS) instead of 526 B. Quickstart step 1 now also checks __wrap_mbedtls_ssl_setup. Check 7 still needs a bench rerun on poc.9. Second bench finding to keep open: web server 503 x4 at freeheap 21,112 / maxblock 9,716 on the no-PSRAM unit.
+
+2026-11-17: reviewed Robert's review-fix commit 59c2506f3 (poc.10): wraps kept, host tests test_rec_ring/codec/lz/policy/local_file/build_id all OK in the container. Quickstart: restart an existing PocketBase container so the build_id migration applies. Bench rerun of steps 1-6 should use poc.10 (HEAD of research/cloud-recording).
 <!-- SECTION:NOTES:END -->
