@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTDirect.ino
-**  Version  : v2.0.0-beta.361
+**  Version  : v2.0.0-beta.362
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -1035,8 +1035,35 @@ static void otDirectBridgeWriteLine(const char* line, size_t len) {
   OTGWstream.write('\n');
 }
 
+// TASK-1804 B3a: the PIC prints the command's two letters and ": " as soon as the header checks pass (SerialCmdSub,
+// gateway.asm 6.6 :3695-3703) and the error code after them (:1425-1431), so an error after a valid header reads
+// "CH: BV"; only the header failures stay a bare SE. handleOTDirectCommand() sets this prefix once buf[2] is '='
+// (OtdCmdPrefixScope). This is wire parity with the PIC; pyotgw handles both forms (commandprocessor.py:54-58, :66-71).
+static char otdCmdPrefix[3] = {0, 0, 0};
+
+struct OtdCmdPrefixScope {
+  char saved[3];
+  OtdCmdPrefixScope() { memcpy(saved, otdCmdPrefix, sizeof(saved)); otdCmdPrefix[0] = 0; }
+  void set(char c0, char c1) { otdCmdPrefix[0] = c0; otdCmdPrefix[1] = c1; otdCmdPrefix[2] = 0; }
+  ~OtdCmdPrefixScope() { memcpy(otdCmdPrefix, saved, sizeof(saved)); }
+};
+
+static bool otdIsCmdErrorCode(const char* s) {
+  static const char codes[] PROGMEM = "NGSEBVORNSNF";
+  for (size_t i = 0; i + 1 < sizeof(codes); i += 2) {
+    if (s[0] == (char)pgm_read_byte(&codes[i]) && s[1] == (char)pgm_read_byte(&codes[i + 1])) return true;
+  }
+  return false;
+}
+
 static void otDirectBridgeProcessStatus(const char* status) {
   if (!status) return;
+  if (otdCmdPrefix[0] && otdIsCmdErrorCode(status)) {
+    const char line[7] = { otdCmdPrefix[0], otdCmdPrefix[1], ':', ' ', status[0], status[1], '\0' };   // processOT logs it as a C string
+    otDirectBridgeWriteLine(line, 6);
+    processOT(line, 6);
+    return;
+  }
   otDirectBridgeWriteLine(status, 2);
   processOT(status, 2);
 }
@@ -3945,6 +3972,7 @@ bool handleOTDirectCommand(const char* buf, int len, bool satOwn) {
   // TASK-1804 B3b: the PIC's header checks (SerialCmdSub, gateway.asm 6.6 :3686-3695) answer a too short command or one
   // without '=' as its third character with a bare SE, before the "XX: " prefix; OT-Direct stayed silent. The PIC's
   // length 4 counts the CR, so "XX=" (3 characters here) passes, as TASK-1957 found (command-4.stc).
+  OtdCmdPrefixScope prefixScope;   // TASK-1804 B3a: the header SE stays bare, every later error gets "XX: "
   if (len < 3) { otDirectBridgeProcessStatus("SE"); return false; }
 
   OTDDebugTf(PSTR("OTD: cmd \"%s\" (len=%d)\r\n"), buf, len);
@@ -3952,6 +3980,7 @@ bool handleOTDirectCommand(const char* buf, int len, bool satOwn) {
   char cmd0 = buf[0];
   char cmd1 = buf[1];
   if (buf[2] != '=') { otDirectBridgeProcessStatus("SE"); return false; }
+  prefixScope.set(cmd0, cmd1);
   // TASK-1957: a bare "XX=" reaches the commands whose PIC parser answers it (SE, or the clear of OT=, MM=, CL=);
   // any other bare command stays unanswered, as before.
   if (len == 3 && !otdPicBareValueCmd(cmd0, cmd1)) return false;

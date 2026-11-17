@@ -939,6 +939,7 @@ static float    _thermal_prevRoom     = 0.0f;
 static uint32_t _thermal_prevMs       = 0;
 static bool     _thermal_learning     = false;  // true when flame is off and measuring decay
 static float    _thermal_coeffEma     = 0.05f;  // Running EMA of thermal coefficient
+static bool     _thermal_lastPassControlled = false;  // TASK-2010: the previous pass got past every gate (_sat_tuneGatesPassed)
 static uint32_t _thermal_lastSaveMs   = 0;
 static uint32_t _thermal_totalLearnMs = 0;       // Accumulated learning time
 
@@ -5214,6 +5215,11 @@ void satPublishMQTT()
   if (!satIsEnabled()) return;
 
   SATTraceTln(F("SAT: publishing MQTT state (ADR-111 on-change + heartbeat)"));
+#ifdef OTGW_CONN_PROBE
+  // TASK-1995: a [loop-stall] inside the SAT status burst names this function (step SAT_PUB_BEGIN -> SAT_PUB_END)
+  OTGW_CONN_PROBE(CPROBE_SAT_PUB_BEGIN);
+  struct SatPubEndProbe { ~SatPubEndProbe() { OTGW_CONN_PROBE(CPROBE_SAT_PUB_END); } } satPubEndProbe;
+#endif
 
   // ---------------------------------------------------------------------------
   // ADR-111: per-topic shadows.
@@ -7311,6 +7317,14 @@ static void satUpdateThermalLearning()
     _thermal_learning = false;   // a decay period never spans the switch
   }
 
+  // TASK-2010: learn only while SAT controls the boiler (the previous pass got past every gate); otherwise the decay
+  // period ends, so it never spans a stretch where the flame state was not known.
+  if (!_thermal_lastPassControlled) {
+    if (_thermal_learning) SATDebugTf(PSTR("SAT thermal: learning paused, SAT is not controlling the boiler\r\n"));
+    _thermal_learning = false;
+    return;
+  }
+
   // Learning: only when flame is OFF, room temp valid, outdoor temp valid
   // AC#6: Learning only runs when SAT has valid room temp AND outside temp simultaneously
   if (!flame && roomValid && outdoorValid && !settings.sat.bFireplaceMode) {   // a stove heating the room would corrupt the learned coefficient (TASK-1374)
@@ -7688,6 +7702,7 @@ void satControlLoop()
 {
   satWsEventDrain();              // TASK-1337: SAT lines posted from any task, sent here (loop task)
   satPresetPersistIfChanged();    // TASK-1487: preset state file, written on the loop task
+  _thermal_lastPassControlled = _sat_tuneGatesPassed;   // TASK-2010: the previous pass's gate result, read by this pass's thermal learning
   _sat_tuneGatesPassed = false;
   satControlLoopRun();
 #ifdef OTGW_CONN_PROBE
