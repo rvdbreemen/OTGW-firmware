@@ -214,8 +214,13 @@ Bij ketels met een hoge minimale modulatie (bijv. 30-40% minimum) kan de continu
 
 SAT bewaakt altijd de ketelprestaties via cyclusclassificatie (zie paragraaf 5.11) en wisselt automatisch:
 
-- **Continu naar PWM:** als de aanvoertemperatuur langer dan 60 seconden boven het setpoint + overshoot-marge blijft (ketel kan niet voldoende moduleren).
-- **PWM naar continu:** als de aanvoertemperatuur langer dan 180 seconden meer dan 2 C onder het setpoint blijft (onvoldoende vermogen) of na 300 seconden verzadiging.
+- **Continu naar PWM:** als de aanvoertemperatuur min het gevraagde (PID-)setpoint 60 seconden lang op of boven de schakelmarge blijft (Sergeant D entry 407; ADR-254, Proposed). De marge is de instelling `satpwmswitchmargin` (0,5 tot 5,0 C), standaard 2,0 C; een opgeslagen oude standaardwaarde van 1,5 C wordt eenmalig 2,0 C, een zelf gekozen waarde blijft staan (Robert, Q-407a). Daarnaast schakelt een vangnet als de aanvoer 30 s lang 3,5 C of meer boven het verzoek ligt (entry 359).
+- **PWM naar continu:** in een PWM AAN-fase, als de vlam brandt en het gevraagde setpoint 60 seconden boven de aanvoertemperatuur blijft (entries 339 en 342; ADR-236, Proposed), of na 300 seconden verzadiging (ADR-236: ongewijzigd). Niet in de eerste 60 s van een start (entry 394).
+- Het configuratiebericht van de ketel (MsgID 3, ook "master low-off not allowed") blokkeert PWM niet: PWM mag op elke ketel vanaf de start (entries 392, 393; ADR-251).
+
+**Elke verwarmingsstart begint in PWM.** Bij een start (na een pauze, na het aanzetten van SAT, na een herstart) begint SAT in PWM met de eerste fase AAN, ook als SAT op handmatig continu staat, en kiest pas tussen PWM en continu als de vlam 60 s brandt; in die 60 s schakelt hij niet naar continu (Sergeant D entries 385, 389, 391, 394; ADR-252, Proposed). Een start waarbij de vlam al brandde toen SAT het overnam, blijft zoals hij was.
+
+**Tolerantieband** (Sergeant D entries 376, 377, 384, 401, 402, 403; ADR-253, die ADR-250 deels vervangt): komt de kamer op het doel + 0,1 C, dan zet SAT CH uit terwijl PWM zijn AAN/UIT-ritme houdt; een brand in continu-modus loopt eerst nog minstens 180 s. De verwarming gaat weer aan zodra de kamer onder het doel + 0,1 C komt, maar pas als CH minstens 10 minuten uit is geweest, gerekend vanaf het moment dat de band CH uitzette (entries 402, 403). Onze lezingen, nog te bevestigen door Sergeant D: een band-besluit terwijl CH al uit stond (bijvoorbeeld een warme kamer vlak na een herstart) start geen pauze (entry 406), en een weggevallen kamertemperatuur beeindigt de pauze, zodat de stooklijn het overneemt (entry 405, met entries 38 en 46). PWM AAN-fasen die tijdens een bandpauze beginnen, tellen niet mee als start voor de uurlimiet (entry 398; entry 400 voor een fase waarin CH weer mag). Met zones laat eco de hoofdkamer beslissen en blijft comfort verwarmen zolang een kamer meer dan 0,1 C onder zijn eigen doel zit (entry 378).
 
 | Situatie | Aanbevolen modus |
 |---|---|
@@ -236,7 +241,7 @@ SAT implementeert zes onafhankelijke verdedigingslagen. Bij elke activering van 
 - **Geen automatisch herstel na een veiligheidsafsluiting:** SAT blijft uitgeschakeld totdat de gebruiker het expliciet opnieuw inschakelt. Een verloren OpenTherm-verbinding is geen veiligheidsafsluiting; zie "OpenTherm weg" hieronder.
 - **Onafhankelijke lagen:** een bug in een laag raakt de andere lagen niet.
 
-**Laag 1: Opstart-veiligheid.** Bij elke opstart, herstart of stroomuitval stuurt SAT als eerste handeling `CS=0` naar de PIC. Zo wordt voorkomen dat de ketel onbeperkt op het laatste setpoint blijft draaien terwijl de ESP nog opstart.
+**Laag 1: Opstart.** Na een opstart, herstart of stroomuitval stuurt SAT de eerste 60 s geen stuurcommando (CS, MM, CH); de eigen opstart-uitlezingen van de gateway (MsgID 3, 15 en 48) lopen wel (Sergeant D entries 388 en 395). De vroegere `CS=0` bij het opstarten bestaat niet meer (entry 129); zie "Herstart" hieronder voor wat daarna gebeurt.
 
 **Laag 2: Uitschakel-veiligheid.** Wanneer SAT wordt uitgeschakeld (via instellingen, MQTT of REST API), wordt onmiddellijk `CS=0` gestuurd, de PID wordt gereset en alle toestandsvariabelen worden gewist.
 
@@ -261,7 +266,7 @@ SAT implementeert zes onafhankelijke verdedigingslagen. Bij elke activering van 
 
 **Buitentemperatuur ontbreekt (TASK-1390).** SAT heeft een buitentemperatuur nodig die jonger is dan 1 uur (Sergeant D entries 56, 57 en 126). SAT neemt de eerste geldige van: de externe sensor (MQTT/REST) in de eerste 10 minuten, de eigen sensor van de ketel (MsgID 27, alleen uit een echt ketelantwoord), de weerdienst, de externe sensor tot 1 uur, en de waarde die bij de laatste herstart is bewaard. Is er geen geldige, dan stuurt SAT één keer dezelfde overdracht als bij een verloren OpenTherm-verbinding (`CS=0`, `CH=1`, `MM=T`) en daarna niets meer; zodra er weer een geldige waarde is, gaat SAT vanzelf verder. De toestand is zichtbaar als `sat/outside_temp_missing` via MQTT, als `outside_temp_missing` in `GET /api/v2/sat/status` en als melding op de SAT-pagina.
 
-**Herstart (TASK-1482).** SAT bewaart de laatste geldige buitentemperatuur bij de PID-toestand. Na een herstart binnen het uur, met een PID-toestand van hoogstens 30 minuten oud, stuurt SAT bij het opstarten niets en neemt het binnen enkele seconden na het eerste ketelantwoord weer over (entries 126 en 129); een PIC houdt de laatste setpoint van SAT ongeveer een minuut vast. Anders draagt SAT de ketel één keer over en blijft het stil tot er een ketelantwoord en een geldige buitentemperatuur zijn (entry 121). Ook of PWM aan stond blijft bewaard: SAT start dan weer in PWM, met een nieuwe cyclus.
+**Herstart (TASK-1482).** SAT bewaart de laatste geldige buitentemperatuur bij de PID-toestand. Na een herstart binnen het uur, met een PID-toestand van hoogstens 30 minuten oud, zwijgt SAT de eerste 60 s na het opstarten (entry 388) en neemt het daarna bij zijn eerste regelronde weer over zodra de ketel heeft geantwoord (entries 126 en 129); tot de eerste kamertemperatuur binnenkomt, regelt SAT alleen op de stooklijn (entry 388); een PIC houdt de laatste setpoint van SAT ongeveer een minuut vast. Anders draagt SAT de ketel één keer over en blijft het stil tot er een ketelantwoord en een geldige buitentemperatuur zijn (entry 121). Ook of PWM aan stond blijft bewaard: SAT start dan weer in PWM, met een nieuwe cyclus.
 
 De overdracht reset de PID. Die nullen worden ook op flash opgeslagen, behalve als het verlies komt vóór de eerste kamertemperatuur sinds de boot, of voordat de klok via NTP is gezet. Dan blijft de opgeslagen PID-toestand op flash staan, zodat een ketel die vlak na een boot traag antwoordt de warmstart-toestand niet wist (d06005d7d, entry 115).
 

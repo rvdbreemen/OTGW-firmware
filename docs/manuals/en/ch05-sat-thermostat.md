@@ -175,7 +175,9 @@ Worked examples for a radiator system, coefficient 1.5:
 
 ### 5.6 Control Modes: Continuous and PWM
 
-**Continuous mode (default)**: SAT sends the PID output directly as a flow temperature setpoint. The boiler modulates to reach and hold it. Preferred for modern condensing boilers with good modulation range.
+**Every heating start runs in PWM first.** When heating starts (after a pause, after SAT is switched on, after a restart), SAT begins in PWM with the first phase ON, also when SAT is set to manual continuous, and decides between PWM and continuous only after the flame has burned for 60 s; during those 60 s no switch to continuous happens (Sergeant D entries 385, 389, 391, 394; ADR-252, Proposed). A start where the flame was already burning when SAT took over is left as it was.
+
+**Continuous mode**: SAT sends the PID output directly as a flow temperature setpoint. The boiler modulates to reach and hold it. Preferred for modern condensing boilers with good modulation range.
 
 Continuous mode includes clamp logic: if the PID setpoint drops rapidly but the boiler water is still hot, the minimum setpoint is clamped to `boiler_temp - flow_offset` (default 2 C). This prevents the boiler from stopping and immediately restarting (short cycling).
 
@@ -187,8 +189,11 @@ Continuous mode includes clamp logic: if the PID setpoint drops rapidly but the 
 
 **Auto-switch**: SAT always monitors boiler behavior using cycle classification (see section 5.11) and switches modes automatically:
 
-- Continuous to PWM: when flow temperature stays more than the overshoot margin above the requested (PID) setpoint for 60 seconds (sustained overshoot, indicating the boiler cannot modulate low enough).
-- PWM to continuous: when flow temperature stays more than 2 C below setpoint for 180 seconds (sustained underheat) or after 300 seconds of saturation (boiler at max but room still cold).
+- Continuous to PWM: when the flow temperature minus the requested (PID) setpoint stays at or above the switch margin for 60 seconds (Sergeant D entry 407; ADR-254, Proposed). The margin is the setting `satpwmswitchmargin` (0.5 to 5.0 C), default 2.0 C; a stored old default of 1.5 C moves to 2.0 C once, a value you set yourself stays (Robert, Q-407a). A fail-safe also switches when the flow stays 3.5 C or more above the request for 30 s (entry 359).
+- PWM to continuous: in a PWM ON phase, when the flame is on and the requested setpoint stays above the flow temperature for 60 seconds (entries 339 and 342; ADR-236, Proposed), or after 300 seconds of saturation (ADR-236: unchanged). Not during the first 60 s of a start (entry 394).
+- The boiler's configuration message (MsgID 3, including "master low-off not allowed") does not block PWM: PWM is allowed from the start on every boiler (entries 392, 393; ADR-251).
+
+**Tolerance band** (Sergeant D entries 376, 377, 384, 401, 402, 403; ADR-253, which partly supersedes ADR-250): when the room reaches the target + 0.1 C, SAT sends CH off while PWM keeps its ON/OFF rhythm; a burn in continuous mode still runs at least 180 s first. Heating restarts as soon as the room is below the target + 0.1 C, but only after CH has been off for at least 10 minutes, counted from the moment the band turned CH off (entries 402, 403). Our readings, to be confirmed by Sergeant D: a band decision while CH was already off (for example a warm room right after a restart) starts no pause (entry 406), and a lost room temperature ends the pause so the heating curve takes over (entry 405, with entries 38 and 46). PWM ON phases that start during a band pause do not count as starts toward the hourly limit (entry 398; entry 400 for a phase that sees CH allowed again). With zones, eco lets the main room decide and comfort keeps heating while any room is more than 0.1 C below its own target (entry 378).
 
 | Situation | Recommended mode |
 |---|---|
@@ -209,7 +214,7 @@ SAT implements six independent safety layers. Any single layer tripping sends `C
 - No automatic recovery after a safety trip: SAT stays disabled until the user explicitly re-enables it. A lost OpenTherm link is not a safety trip; see "OpenTherm lost" below.
 - Independent layers: a bug in one layer does not affect the others.
 
-**Layer 1: Boot safety.** At every startup, restart, or power failure, SAT sends `CS=0` before the first control cycle. This prevents the boiler from running indefinitely at the last setpoint while the ESP is still booting.
+**Layer 1: Boot.** After a start-up, restart or power failure SAT sends no control command (CS, MM, CH) for the first 60 s; the gateway's own start-up reads of MsgID 3, 15 and 48 still run (Sergeant D entries 388 and 395). The earlier boot `CS=0` is gone (entry 129); see "Restart" below for what follows.
 
 **Layer 2: Disable safety.** When SAT is turned off (via settings, MQTT, or REST API), `CS=0` is sent immediately, the PID is reset, and all state variables are cleared.
 
@@ -233,7 +238,7 @@ SAT implements six independent safety layers. Any single layer tripping sends `C
 
 **Outside temperature missing (TASK-1390).** SAT needs an outside temperature that is younger than 1 hour (Sergeant D entries 56, 57 and 126). It takes the first valid one of: the external sensor (MQTT/REST) for its first 10 minutes, the boiler's own sensor (MsgID 27, only from a live boiler reply), the weather service, the external sensor up to 1 hour, and the value saved at the last restart. When none is valid SAT sends the same one-time hand-back as for a lost OpenTherm link (`CS=0`, `CH=1`, `MM=T`) and then sends nothing; it resumes by itself as soon as a valid value arrives. The state is visible as `sat/outside_temp_missing` over MQTT, as `outside_temp_missing` in `GET /api/v2/sat/status` and as a hint on the SAT page.
 
-**Restart (TASK-1482).** SAT saves the last valid outside temperature with its PID state. After a restart within the hour, with a PID state that is at most 30 minutes old, SAT sends nothing at boot and takes over within seconds of the first boiler reply (entries 126 and 129); a PIC keeps SAT's last setpoint for about a minute in between. Otherwise SAT hands the boiler back once and stays quiet until it has a boiler reply and a valid outside temperature (entry 121). Whether PWM was on is kept as well: SAT restarts in PWM with a fresh cycle.
+**Restart (TASK-1482).** SAT saves the last valid outside temperature with its PID state. After a restart within the hour, with a PID state that is at most 30 minutes old, SAT stays silent for the first 60 s after the boot (entry 388) and then takes over at its first control pass once the boiler has replied (entries 126 and 129); until the first room temperature arrives it controls on the heating curve only (entry 388); a PIC keeps SAT's last setpoint for about a minute in between. Otherwise SAT hands the boiler back once and stays quiet until it has a boiler reply and a valid outside temperature (entry 121). Whether PWM was on is kept as well: SAT restarts in PWM with a fresh cycle.
 
 The hand-back resets the PID. It also saves the zeros to flash, except when the loss comes before the first room temperature reading since boot, or before the clock is set by NTP. In those cases the saved PID state stays on flash, so a boiler that is slow to answer right after a boot does not wipe the warm-start state (d06005d7d, entry 115).
 
