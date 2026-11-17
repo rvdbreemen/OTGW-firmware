@@ -115,10 +115,20 @@ static void otaAfterKeep() {
   fsWriterResume();
 #endif
 }
-static void otaFinish() {                  // image written, remount, restore the copies, image flag off
-  g_files.clear(); g_fsEnded = false;
-  for (auto& kv : g_kept) g_files[kv.first] = kv.second;
-  ::state.flash.bFsImageWriting = false;
+// The end of a filesystem OTA in the order OTGW-ModUpdateServer-esp32.h runs it: _remountAfterFsWrite() mounts the
+// new image and clears bFsImageWriting, THEN _restoreRuntimeFiles() writes the heap copies back. The writer task
+// takes a pass in between (bench 09, .63, beta.364: remount 09:50:38.338, restore .623).
+static void otaFinish() {
+  g_files.clear(); g_fsEnded = false;     // the new image lacks the state files
+#ifdef HAS_PAUSE
+  fsWriterPause();                         // TASK-2007: held until the copies are back
+#endif
+  ::state.flash.bFsImageWriting = false;  // _remountAfterFsWrite()
+  writerStep();                            // the writer's pass between the remount and the restore
+  for (auto& kv : g_kept) g_files[kv.first] = kv.second;   // _restoreRuntimeFiles(): _restoreKeptFiles()
+#ifdef HAS_PAUSE
+  fsWriterResume();
+#endif
 }
 static void dump(const char* tag) {
   printf("%s ops=%zu pending=%u\n", tag, g_ops.size(), (unsigned)fsWriterPending());
@@ -228,7 +238,8 @@ class WriterLogic(unittest.TestCase):
         src = WRITER.read_text(encoding="utf-8").replace('#include "fsWriter.h"', HEADER.read_text(encoding="utf-8"))
         cls.has_step = "fsWriterStep" in src   # TASK-2007 code; older code runs the cases through the old task body
         cpp = Path(cls.tmp.name) / "w.cpp"
-        cpp.write_text(("#define HAS_STEP 1\n" if cls.has_step else "") + STUBS + src + MAIN, encoding="utf-8")
+        pre = ("#define HAS_STEP 1\n" if cls.has_step else "") + ("#define HAS_PAUSE 1\n" if "void fsWriterPause()" in src else "")
+        cpp.write_text(pre + STUBS + src + MAIN, encoding="utf-8")
         cls.exe = base.compile_cpp(cpp, Path(cls.tmp.name) / "w.exe")
 
     @classmethod
@@ -352,6 +363,21 @@ class Wiring(unittest.TestCase):
         self.assertLess(flush, keep)
         self.assertLess(flag, resume)
         self.assertNotIn("fsWriterDrain(", self.ota[flush - 400:keep], "the plain drain left a gap before the copy")
+
+    def test_the_remount_pauses_the_writer_until_the_restore(self):
+        # TASK-2007 (bench 09, .63, beta.364): the remount clears the image flag before the heap copies are written
+        # back; the writer must stay paused from before that flag drops until after _restoreRuntimeFiles().
+        a = self.ota.index("bool _remountAfterFsWrite(bool partial) {")
+        body = self.ota[a:self.ota.index("\n  }\n", a)]
+        self.assertLess(body.index("fsWriterPause();"), body.index("::state.flash.bFsImageWriting = false;"))
+        calls = [i for i in range(len(self.ota)) if self.ota.startswith("= _remountAfterFsWrite(", i)]
+        self.assertEqual(len(calls), 2, "the end handler and the abort path")
+        for c in calls:
+            restore = self.ota.index("_restoreRuntimeFiles();", c)
+            resume = self.ota.index("fsWriterResume();", c)
+            self.assertLess(restore, resume, "resume only after the restore")
+            nxt = self.ota.find("= _remountAfterFsWrite(", c + 1)
+            self.assertTrue(nxt < 0 or resume < nxt, "each remount has its own resume")
 
 
 if __name__ == "__main__":

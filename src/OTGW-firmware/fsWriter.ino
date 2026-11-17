@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : fsWriter.ino
-**  Version  : v2.0.0-beta.364
+**  Version  : v2.0.0-beta.365
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -21,7 +21,11 @@
 **  filesystem OTA pauses the writer, waits until it is between jobs and writes
 **  the rest of the queue on the caller (fsWriterPauseAndFlush(), TASK-2007), so
 **  no job runs between the copy of the files and LittleFS.end(); a job queued
-**  after that waits for the remount and lands after the restored copies. While
+**  after that is held through the image write. At the remount the writer is
+**  paused again (fsWriterPause()) until the heap copies are restored, so the
+**  held job lands after them instead of being overwritten by them (bench 09,
+**  .63, beta.364: the remount cleared the image flag ~300 ms before the
+**  restore, and the restore overwrote the newer save). While
 **  a filesystem image is written or LittleFS is not mounted, the writer holds
 **  the next job. Never drained, so a queued write is lost:
 **  a watchdog reset, a panic, a brownout or a power cut (the same as a write
@@ -118,6 +122,13 @@ bool fsWriterPauseAndFlush(uint32_t timeoutMs)
     s_fswDone++;
   }
   return true;
+}
+
+// Pause without writing anything (TASK-2007): the remount after a filesystem image, until the restore is done. The
+// writer finishes the job it may be in; it takes no new one until fsWriterResume().
+void fsWriterPause()
+{
+  s_fswPaused = true;
 }
 
 void fsWriterResume()

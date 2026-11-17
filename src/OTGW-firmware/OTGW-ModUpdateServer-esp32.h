@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTGW-ModUpdateServer-esp32.h
-**  Version  : v2.0.0-beta.364
+**  Version  : v2.0.0-beta.365
 **
 **  ESP32 OTA update server — functional equivalent of the ESP8266
 **  OTGW-ModUpdateServer with Nodoshop hardware watchdog feeding.
@@ -665,7 +665,7 @@ private:
       fsOtaRtcFill();   // TASK-1774: survives a reset during the write; armed at the first chunk
       LittleFS.end();
       ::state.flash.bFsImageWriting = true;   // TASK-1909: no LittleFS.begin() elsewhere until the remount below
-      fsWriterResume();   // TASK-2007: bFsImageWriting holds the writer from here; queued writes land after the remount
+      fsWriterResume();   // TASK-2007: bFsImageWriting holds the writer from here; the remount pauses it again until the restore
       if (uploadTotal > 0 && uploadTotal > fsSize) {
         strlcpy(_updaterError, "filesystem image too large", sizeof(_updaterError));
         _dropKeptFiles();   // the old filesystem is untouched; the copies are not needed
@@ -783,6 +783,7 @@ private:
           LittleFSmounted = false;
           if (_serial_output) DebugTln(F("[OTA] Error: LittleFS mount failed"));
         }
+        fsWriterResume();   // TASK-2007: paused by _remountAfterFsWrite(); held saves now land after the restored copies
       }
       if (_serial_output) {
         DebugTln(F("[OTA] Preparing to reboot..."));
@@ -809,6 +810,10 @@ private:
     // partition behind; the restore would then write the new image through that stale state. Drop any
     // such mount so the image just written is the one mounted.
     LittleFS.end();
+    // TASK-2007: clearing the image flag releases the writer, but the heap copies are written back only in
+    // _restoreRuntimeFiles(), later; a save held through the image write would land first and be overwritten
+    // (bench 09, .63, beta.364). The writer stays paused until the caller's fsWriterResume() after the restore.
+    fsWriterPause();
     ::state.flash.bFsImageWriting = false;
     if (partial) {
       if (_serial_output) DebugTln(F("[OTA] Filesystem image incomplete: formatting LittleFS"));
@@ -877,6 +882,7 @@ private:
         _restoreRuntimeFiles();
         if (_uploadWrittenBytes > 0) _markFsUpdateIncomplete();
       }
+      fsWriterResume();   // TASK-2007: paused by _remountAfterFsWrite() until the restore
     }
     _dropKeptFiles();          // no-op after a restore; frees the copies when there was none
     ::state.flash.bESPactive = false;
