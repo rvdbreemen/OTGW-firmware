@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-01T15:47:00Z'
-updated_date: '2026-11-16T10:57:00Z'
+updated_date: '2026-11-17T09:45:00Z'
 labels:
   - beta
   - release
@@ -25,7 +25,7 @@ TASK-1504 AC2 (macOS capture run by a tester) and AC3 (24 h soak on Classic + S3
 <!-- AC:BEGIN -->
 - [x] #1 24 h soak of a beta build on the Classic + S3 Mini without an unexplained reboot; crashlog and reboot_log quoted
 - [ ] #2 Capture run from the release zip on macOS by a named tester, with transcript
-- [ ] #3 Capture runs from the beta zip on Windows and Linux, each with a transcript (TASK-1504 AC2 asked for all three OSes)
+- [x] #3 Capture runs from the beta zip on Windows and Linux, each with a transcript (TASK-1504 AC2 asked for all three OSes)
 - [ ] #4 Update over WiFi with the release zip through the /update page (the path the release notes give users), then device/info shows the new version and settings are kept
 <!-- AC:END -->
 
@@ -45,4 +45,6 @@ Triage 2026-11-02 (beta.5, origin/dev 6c41cc696) in code: no: verification only 
 2026-11-12 (comms): long-run volunteer cmdr_langers (Discord 695051073886355508), #english-support https://discord.com/channels/812969634638725140/931267109726593116/1570569541678010461: Nodoshop OTGW, PIC 6.8, S3, OLED; Ideal Logic 35 boiler; Wiser HubR 1st Gen thermostat; MQTT to HA via a separate broker; one week on 2.x without issues seen (Nightly Restart on). Asked (msg 1570571315977527407) to update to beta.218, switch Nightly Restart off, run capture --long-run for a day or more and post the zip, and send crashlog + reboot_log.txt on an unexpected restart.
 
 2026-11-16 11:43-11:49 AC3 Windows half, bench 09: the published v2.0.0-beta.339 zip (OTGW-firmware-esp32-combo-2.0.0-beta.339+bd7a133-flash.zip, the release build soaked on .63 this morning) unpacked into a fresh folder and its launcher capture-mqtt-debug.bat run on Windows 11 the way a user runs it (bundled otgw_capture.py; args --device 192.168.88.63 --broker 192.168.88.32 --duration 300 --no-prompt --skip-browser-capture; browser part skipped for low laptop memory) against .63 (Classic, running beta.347). Result: stop reason 'duration elapsed', telnet connected with keepalive, 0 telnet gaps, debug toggles found on and left as found, 799 MQTT messages, 301 OT frames (otframes.log + otgw_simulation.log), crash-log capture normal, post-capture HTTP probes, coredump fetched and labelled OLD (app sha cd720dc0b), device state and 24 h graph history at start and stop, one merged transcript and one upload zip. Transcript: 09 scratchpad t1544/runs/20261116-114354/transcript-20261116-114354-2.0.0-beta.347+2cb8d28-...txt and runs/20261116-114354-upload.zip (local, not for posting: contains the unit's settings). Linux half not run yet: WSL needs 1-2 GB and the laptop was at 2-4 GB free with background processes being reaped. AC4 not run: .63 is on beta.347 as the 20:00 soak candidate (coordinator: skip unless .63 is on 339). AC2 still needs a named macOS tester.
+
+2026-11-17 AC3 (95): capture runs with the tools from the PUBLISHED v2.0.0-beta.360 release zip (OTGW-firmware-esp32-combo-2.0.0-beta.360+9665467-flash.zip, downloaded with gh, sha256 6f1b6543a904424590b46230ed8b083a17448790b7d68941f9471e7acb57b259 = SHA256SUMS), read-only against .63 (Classic + S3 Mini, PIC 6.8; the unit ran 2.0.0-beta.365+cc60bfd at the time, 09's 2007 rerun, not 360), broker 192.168.88.32:1883, --duration 300 --skip-browser-capture. WINDOWS: capture-mqtt-debug.bat (launcher found Python 3.14.2 on PATH), 10:31:32-10:36:39: exit 0, stop reason duration elapsed, telnet gaps 0, MQTT 581 messages (merged into the transcript, 'MQTT BROKER STREAM' section), 302 OT frames, device state 36 answered / 5 not on this firmware (404) / 3 failed, core dump fetched (31268 B, an OLD dump of an earlier build, labelled so), upload zip 74,960 B. LINUX: capture-mqtt-debug.sh in WSL Ubuntu (Python 3.12.3, no paho in site-packages: the vendored paho wheel was used), 10:37:40-10:42:42: exit 0, duration elapsed, telnet gaps 0, MQTT 588 messages, 298 frames, same device-state counts, upload zip 74,767 B. Evidence (transcripts in the upload zips + launcher consoles + SHA256SUMS): RvdB/OTGW-field-data/bench-63/20261117-task1544/. Bugs/gaps: none blocking. One cosmetic finding: the 3 'failed' device-state reads are /api/v2/otdirect/status, /settings and /overrides, which answer 503 'No OT-Direct hardware' on a PIC board by design; the summary counts them as failed rather than not applicable (could be counted with the 404s). Not covered: WSL is Linux but not a native Linux desktop (network through WSL NAT); macOS stays AC2 (tester).
 <!-- SECTION:NOTES:END -->

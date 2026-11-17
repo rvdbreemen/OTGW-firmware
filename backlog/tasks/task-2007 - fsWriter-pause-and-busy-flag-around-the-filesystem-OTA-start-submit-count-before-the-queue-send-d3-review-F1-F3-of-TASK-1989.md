@@ -3,11 +3,11 @@ id: TASK-2007
 title: >-
   fsWriter: pause and busy flag around the filesystem-OTA start; submit count
   before the queue send (d3 review F1-F3 of TASK-1989)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-16T19:46:00Z'
-updated_date: '2026-11-17T09:28:00Z'
+updated_date: '2026-11-17T09:31:00Z'
 labels:
   - fs
   - sat
@@ -44,3 +44,9 @@ AC4 bench PASS (09, .63, Classic + PIC, SAT enabled inactive, sim off), 2.0.0-be
 
 AC4 ticked by 09 (2026-11-17), old vs fix on the SAME reproduction on .63 (Classic + ESP32-S3, PIC 6.8, SAT enabled but inactive, satsimulation false): fs-only OTA, POST /api/v2/sat/flush fired during the upload. OLD 2.0.0-beta.364+c8bc478 (09:50): flush at 09:50:37.542 (upload end 37.943), restore of /sat_pid_state.json at 38.623, reboot; after it sat_pid_state.json ts = 1794733218 = the pre-OTA value, so the flushed save was LOST. FIX 2.0.0-beta.365+cc60bfd (10:21): flush at 10:21:06.055 (epoch 1794907266, upload end 06.367), post-remount 06.764, restore 07.037, reboot; after it ts = 1794907266 = exactly the flush epoch, so the held save landed after the restored copy. Both runs: sat_energy.json / sat_energy_estimate.json intact, '[OTA] fswriter: still busy after 2 s' 0 times; fsw_stack_free 1352 (364) and 2948 (365) in the heap line. Evidence: 09 scratchpad b364-63/ and b365/t2007/ (t2007.log, telnet.raw, sat_*-before/after.json).
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+fsWriter hardening (d3's F1-F3 + heap). F1: the FS-OTA start pauses the writer and flushes the queue on the caller (fsWriterPauseAndFlush) before _keepFiles(); resume after bFsImageWriting; and (found by the AC4 bench) the remount pauses it again until _restoreRuntimeFiles() is done, so a held save lands after the restored copy. F2: submit counted before the send. F3: oversize data/path refused + logged. Heap: queue depth 6->3, fsw_stack_free in the heap line. AC1/AC2/AC3: tests/test_fs_writer.py on the real fsWriter.ino, old code 4 FAIL (save lost, write after end, pending 0 during the send, 300 B cut), fix 17/17 incl. the remount-order case (beta.364 writer 2 FAIL) and wiring checks. AC4 (09 ticked): .63 fs-only OTA with POST /api/v2/sat/flush during the upload: beta.364 lost the save (ts 1794733218 kept), beta.365 kept it (ts = flush epoch 1794907266); files intact, no 'still busy', fsw_stack_free 2948 B. Pushed ad8dc9cd6..cc60bfd0e (beta.363-365), posted 1572180595709055009. Not verified: the ms-wide drain-to-flag window on hardware (host test only); the error path that clears the image flag without a remount (~:503) keeps no pause, it has no restore to be overwritten by.
+<!-- SECTION:FINAL_SUMMARY:END -->
