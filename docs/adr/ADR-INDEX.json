@@ -10723,7 +10723,7 @@
     },
     {
       "id": "ADR-259",
-      "title": "SAT halves the PID integral once when the error leaves the deadband and holds it, for the main and the zone PIDs (partly supersedes ADR-197)",
+      "title": "SAT halves the PID integral once when the error leaves the deadband and holds it, for the main and the zone PIDs (amends ADR-197)",
       "path": "ADR-259-sat-halves-the-pid-integral-once-when-the-error-leaves-the-deadband-and-holds-it-for-the-main-and-the-zone-pids-partly-supersedes-adr-197.md",
       "format": "canonical",
       "status": "Proposed",

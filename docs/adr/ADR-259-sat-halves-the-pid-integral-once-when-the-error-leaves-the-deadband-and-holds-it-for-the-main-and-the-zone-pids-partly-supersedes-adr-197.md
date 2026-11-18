@@ -1,6 +1,6 @@
 ---
 id: "ADR-259"
-title: "SAT halves the PID integral once when the error leaves the deadband and holds it, for the main and the zone PIDs (partly supersedes ADR-197)"
+title: "SAT halves the PID integral once when the error leaves the deadband and holds it, for the main and the zone PIDs (amends ADR-197)"
 status: "Proposed"
 date: "2026-11-18"
 binding: false
@@ -39,12 +39,11 @@ format: "canonical"
 
 <!-- markdownlint-disable MD025 -->
 
-# ADR-259 SAT halves the PID integral once when the error leaves the deadband and holds it, for the main and the zone PIDs (partly supersedes ADR-197)
+# ADR-259 SAT halves the PID integral once when the error leaves the deadband and holds it, for the main and the zone PIDs (amends ADR-197)
 
 ## Status
 
-Proposed, 2026-11-18. Guideline-level (ADR-080): verified by the host tests named below, no evaluate.py gate. Partly
-supersedes ADR-197 decision 3 ("Integral, deadband 0.1") and its contract line "Set the integral to 0 outside the
+Proposed, 2026-11-18. Guideline-level (ADR-080): verified by the host tests named below, no evaluate.py gate. Amends ADR-197: it replaces decision 3 ("Integral, deadband 0.1") and its contract line "Set the integral to 0 outside the
 deadband"; the rest of ADR-197 and all of ADR-204 stay.
 
 ## Status History
