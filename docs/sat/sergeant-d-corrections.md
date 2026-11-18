@@ -8132,3 +8132,20 @@ Robert, 16:18:42 UTC (https://discord.com/channels/812969634638725140/9144987300
 **Task:** none.
 
 **Open:** none beyond entry 408's open reading of "until the flame off".
+
+## 410. Q-1887c answered B: the continuous to PWM switch only runs while heating is allowed, as thermo-nova (Sergeant D, 2026-11-18; urgent round, 2.0.0)
+
+**Source:** #dev-sat-mqtt, Sergeant D 2026-11-18 18:46 UTC (https://discord.com/channels/812969634638725140/1105556725714649128/1572684434002677852), a reply to Q-1887c (https://discord.com/channels/812969634638725140/1105556725714649128/1572684144658612278).
+
+**Quoted:**
+> "My answer is B"
+
+**Settled:** option B as posted: during a tolerance-band pause (heating off) the continuous to PWM switch does not fire; it only runs while heating is allowed, as thermo-nova. Background: indigo_light's Vitodens switched at 16:00:58 (2026-11-16) on a flow of 67.3 C from leftover hot-water heat with the flame off and heating off. Scope: 2.0.0.
+
+**Compared with thermo-nova (7beaaf5):** `_maybe_enable_pwm_on_sustained_overshoot` returns without switching (and clears the timer) when the heater is not ON (heating_control.py:276-278) and when the requested setpoint is at or below the cold setpoint (:280-282); it has no flame check, only its docstring says "while flame is active" (:263).
+
+**Compared with the firmware:** the switch rule (SATcycles.ino:1376-1393, satCycleCheckOvershootSwitch, entry 407 thresholds) checks the mode and the hot-water guard only, so it can fire during a band pause; the change adds the "heating allowed" gate (and the cold-setpoint gate) of thermo-nova.
+
+**Task:** TASK-1887 (band) / TASK-2005 (switch rule); implementation by the firmware lane.
+
+**Open:** none.
