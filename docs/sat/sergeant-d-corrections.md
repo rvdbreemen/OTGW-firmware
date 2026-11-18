@@ -8257,3 +8257,22 @@ Robert, 16:18:42 UTC (https://discord.com/channels/812969634638725140/9144987300
 **Task:** TASK-1998 (firmware lane; its milestone says 2.1.0, this answer and Robert's urgent round put it in 2.0.0, the coordinator to confirm).
 
 **Open:** none.
+
+## 417. Q-410a answered A: both continuous to PWM rules, the 2 C / 60 s margin rule and the 3.5 C / 30 s fail-safe, only run while heating is allowed (Sergeant D, 2026-11-18; urgent round, 2.0.0; extends entry 410)
+
+**Source:** #dev-sat-mqtt, Sergeant D 2026-11-18 19:14:15 UTC (https://discord.com/channels/812969634638725140/1105556725714649128/1572691428482621583; unedited after 90 s, read back via the Discord API), a reply to Q-410a (https://discord.com/channels/812969634638725140/1105556725714649128/1572690729862430812).
+
+**Quoted:**
+> "my answer is A"
+
+**Settled:** option A as posted: entry 410's "only while heating is allowed" covers both rules that switch from continuous to PWM: the margin rule (2 C above the request for 60 s, entry 407) and the fail-safe (flow - CS >= 3.5 C for 30 s, entries 288/289, kept in 359). Outside that the fail-safe stays 3.5 C / 30 s. Reason as posted with the question: in a band pause nothing burns, so there is no flame-out to protect against. Scope: 2.0.0.
+
+**Background:** in otgw-dev's replay of indigo_light's 16:00:58 band pause (heating off, flame off, flow 67.3 C from leftover hot-water heat, request 45) the fail-safe switched first, 30 s after the flow rise.
+
+**Compared with thermo-nova (7beaaf5):** thermo-nova has no fail-safe; its switch skips when the heater is not ON (heating_control.py:276-278) and when the request is at or below the cold setpoint (:280-282).
+
+**Compared with the firmware:** both rules live in satCycleCheckOvershootSwitch() (SATcycles.ino:1376-1405 on origin/dev 13c0a4e41, opened this session); otgw-dev's lane for entry 410 gates the call on heating allowed, which covers both rules.
+
+**Task:** TASK-1887 / TASK-2005 (otgw-dev, lane for entry 410).
+
+**Open:** none. Replaces the ledger sweep's draft Q-407b (the interplay of the two rules), which this question covered.

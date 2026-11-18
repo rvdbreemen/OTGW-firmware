@@ -5514,6 +5514,20 @@
     "TASK-1998"
    ],
    "confirmed_by_entry": null
+  },
+  {
+   "id": 417,
+   "title": "Q-410a answered A: both continuous to PWM rules, the 2 C / 60 s margin rule and the 3.5 C / 30 s fail-safe, only run while heating is allowed (Sergeant D, 2026-11-18; urgent round, 2.0.0; extends entry 410)",
+   "date": "2026-11-18",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1572691428482621583",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1887",
+    "TASK-2005"
+   ],
+   "confirmed_by_entry": null
   }
  ]
 }
