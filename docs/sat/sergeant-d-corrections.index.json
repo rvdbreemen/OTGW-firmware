@@ -5432,6 +5432,19 @@
     "TASK-2005"
    ],
    "confirmed_by_entry": null
+  },
+  {
+   "id": 411,
+   "title": "Q-403a answered B: a lost room temperature during the 10-minute band pause does not end the pause; heating stays off until the 10 minutes are over (Sergeant D, 2026-11-18; urgent round, 2.0.0; overrules our interpretation in entry 405)",
+   "date": "2026-11-18",
+   "source": "sergeant-d",
+   "kind": "interpretation",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1572684923469430875",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1887"
+   ],
+   "confirmed_by_entry": null
   }
  ]
 }

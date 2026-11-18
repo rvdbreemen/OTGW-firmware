@@ -8149,3 +8149,22 @@ Robert, 16:18:42 UTC (https://discord.com/channels/812969634638725140/9144987300
 **Task:** TASK-1887 (band) / TASK-2005 (switch rule); implementation by the firmware lane.
 
 **Open:** none.
+
+## 411. Q-403a answered B: a lost room temperature during the 10-minute band pause does not end the pause; heating stays off until the 10 minutes are over (Sergeant D, 2026-11-18; urgent round, 2.0.0; overrules our interpretation in entry 405)
+
+**Source:** #dev-sat-mqtt, Sergeant D 2026-11-18 18:48 UTC (https://discord.com/channels/812969634638725140/1105556725714649128/1572684923469430875), a reply to Q-403a (https://discord.com/channels/812969634638725140/1105556725714649128/1572684758029434976).
+
+**Quoted:**
+> "My answer is B"
+
+**Settled:** option B as posted ("Yes, finish the 10 minutes first"): if the room temperature is lost during the 10-minute pause after a band stop (entries 401-403), heating stays off for the rest of those 10 minutes. After the pause, without a room temperature, heating follows the curve as in entries 38 and 46 (reading: entries 38/46 are not changed, they apply once the pause is over). Scope: 2.0.0.
+
+**Changes an earlier entry:** entry 405 (our interpretation, not Sergeant D's words: a lost room temperature ends the pause so the curve takes over at once) is overruled; the firmware follows entry 405 today and must change.
+
+**Compared with thermo-nova (7beaaf5):** thermo-nova has no tolerance band and no band pause; the band and its 10-minute minimum are Sergeant D's rules (entries 376, 377, 384, 401-403; ADR-253).
+
+**Compared with the firmware:** the band pause currently ends when the room temperature is lost (entry 405 reading, TASK-1887); it must keep CH off until the 600 s minimum has passed, also without a room temperature.
+
+**Task:** TASK-1887 (band; firmware lane), ADR-253 (the ADR text may need an amendment for the lost-room-temperature case).
+
+**Open:** none for the pause itself; the reading that entries 38/46 apply after the pause is ours, to correct if he means otherwise.
