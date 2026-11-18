@@ -8217,3 +8217,20 @@ Robert, 16:18:42 UTC (https://discord.com/channels/812969634638725140/9144987300
 **Task:** TASK-1890 (firmware lane).
 
 **Open:** none.
+
+## 415. Q-1998b answered A on a recommendation we have since corrected; re-asked (Sergeant D, 2026-11-18; urgent round, 2.0.0; not settled)
+
+**Source:** #dev-sat-mqtt, Sergeant D 2026-11-18 19:05:28 UTC (https://discord.com/channels/812969634638725140/1105556725714649128/1572689216310087804; unedited, read back via the Discord API), a reply to Q-1998b (https://discord.com/channels/812969634638725140/1105556725714649128/1572687461681995937).
+
+**Quoted:**
+> "My answer is A"
+
+**What was asked:** A) leave the short hot-water burns (1-16 s after a heating run) out, so they do not enter the 4-hour cycle window, recommended as "matches entry 390 and thermo-nova's hot-water cycle kind"; B) keep counting them as now; C) count them, marked as hot water, so they do not change PWM or overshoot decisions.
+
+**Why this does not settle it:** our recommendation was wrong and missed two facts: thermo-nova keeps every flame cycle in its rolling windows, with no filter on the kind (cycles/history.py:102-128, opened this session), and only marks a mostly hot-water cycle as hot water (cycles/tracker.py:315-316) and a cycle with hot water in its tail as uncertain (cycles/classifier.py:25-26); and Robert's entry 268 counts hot-water burns in the 4 h and 24 h duty. We posted a correction at 19:06:44 UTC (https://discord.com/channels/812969634638725140/1105556725714649128/1572689536444661814), after his answer, and asked a follow-up at 19:07:55 UTC (https://discord.com/channels/812969634638725140/1105556725714649128/1572689832696750193): A) out of the cycle list and the 4-hour cycle window, still counted in the duty (entry 268 stays); B) out of the duty too (changes entry 268, Robert decides); C) count them marked as hot water (thermo-nova).
+
+**Status:** nothing is built on this answer. Only his answer to the follow-up counts; it gets its own entry.
+
+**Task:** TASK-1998.
+
+**Open:** the follow-up above; a B answer goes to Robert because it changes his entry 268.
