@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-18T11:54:00Z'
-updated_date: '2026-11-18T12:25:00Z'
+updated_date: '2026-11-18T12:26:00Z'
 labels:
   - feature
 milestone: 2.0.0
@@ -35,4 +35,6 @@ Asked by Sergeant D in #dev-sat-mqtt 2026-11-18 11:37 UTC (https://discord.com/c
 OPEN QUESTION for Robert (infra choice, coordinator 2026-11-18: put to him when someone picks up B, not before): which host serves the version file over plain HTTP, and who keeps it in sync with each release (by hand, or a step in /beta-release-2x and /release-2x).
 
 Robert in #dev-sat-mqtt 2026-11-18 12:06 UTC (https://discord.com/channels/812969634638725140/1105556725714649128/1572583679895797861), verbatim: "For 2.0.0 we do B and for 2.1.0 a POC for updating from GitHub directly." So option B targets 2.0.0.
+
+2026-11-18 PENDING with Robert (coordinator put it as 1/2): how the version check gets its data. (1) A plain-HTTP host we run that serves the version file; needs hosting and a sync step per release. (2) No host: the web UI in the user's browser asks the GitHub releases API itself (HTTPS is fine in the browser, the gateway stays HTTP-only per ADR-003), with a privacy note (the browser contacts GitHub) and an off-switch. Coordinator recommends 2. Not decided yet.
 <!-- SECTION:NOTES:END -->
