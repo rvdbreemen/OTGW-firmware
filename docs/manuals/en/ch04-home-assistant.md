@@ -312,6 +312,16 @@ Both values are also exposed as two standalone, discoverable Home Assistant sens
 
 A number entity is published for the outside-temperature override, letting HA push a value as if it came from a wired outdoor sensor.
 
+#### Gateway Override Sensors
+
+When the gateway injects a value on the bus (it answers the thermostat itself, or it writes its own value to the boiler instead of the thermostat's), the normal sensor keeps showing what the boiler side reports. A separate read-only sensor shows the injected value (ADR-118):
+
+- One sensor per override-capable MsgID: 1 `TSet`, 8 `TsetCH2`, 9 `TrOverride`, 14 `MaxRelModLevelSetting`, 16 `TrSet`, 39 `TrOverride2`, 56 `TdhwSet`, 57 `MaxTSet`. MsgID 27 (outside temperature) has the number entity above instead.
+- Name `<label> Override`, on the Gateway device, state topic `<pub>/<label>/override`. Unit °C with device class temperature; for MsgID 14 the unit is % (the maximum relative modulation the gateway applies after `MM=`).
+- It is announced like the other OpenTherm sensors, once its MsgID has been seen on the bus.
+- The topic is retained and published again every 60 s while the override is active. After 10 minutes without an override frame the override counts as ended: the firmware sends an empty retained message, which removes the topic from the broker, so the old value is not replayed after a restart of HA.
+- After a reboot the override store is empty, so after the next MQTT connect the firmware removes every `<label>/override` topic that is not active again (TASK-1991).
+
 #### Button Entity (PIC reset)
 
 A `button` entity called `resetgateway` is published under pseudo-ID 244 with `entity_category: config` and `payload_press: "1"`. Pressing it from the HA dashboard hardware-resets the PIC over its reset pin. To avoid storms from misconfigured automations the firmware now requires the exact payload `"1"` and applies a 5-second cooldown between successive resets; any other payload is silently ignored.

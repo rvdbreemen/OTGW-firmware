@@ -326,6 +326,16 @@ Beide waarden worden ook als twee zelfstandige, discoverable Home Assistant-sens
 
 Voor het overschrijven van de buitentemperatuur wordt een number-entiteit gepubliceerd; hiermee kan Home Assistant een waarde pushen alsof die van een bekabelde buitensensor komt.
 
+#### Override-sensoren van de gateway
+
+Als de gateway zelf een waarde op de bus zet (hij antwoordt de thermostaat zelf, of hij schrijft zijn eigen waarde naar de ketel in plaats van die van de thermostaat), blijft de gewone sensor tonen wat de ketelkant meldt. Een aparte sensor, alleen-lezen, toont de waarde die de gateway invoegt (ADR-118):
+
+- Eén sensor per MsgID waarvoor de gateway een override kan zetten: 1 `TSet`, 8 `TsetCH2`, 9 `TrOverride`, 14 `MaxRelModLevelSetting`, 16 `TrSet`, 39 `TrOverride2`, 56 `TdhwSet`, 57 `MaxTSet`. MsgID 27 (buitentemperatuur) heeft in plaats daarvan de number-entiteit hierboven.
+- Naam `<label> Override`, op het Gateway-device, state topic `<pub>/<label>/override`. Eenheid °C met device class temperature; voor MsgID 14 is de eenheid % (de maximale relatieve modulatie die de gateway na `MM=` toepast).
+- Hij wordt aangekondigd zoals de andere OpenTherm-sensoren, zodra zijn MsgID op de bus is gezien.
+- Het topic is retained en wordt elke 60 s opnieuw gepubliceerd zolang de override actief is. Komt er 10 minuten geen override-frame, dan geldt de override als beëindigd: de firmware stuurt een leeg retained bericht, dat het topic van de broker verwijdert, zodat de oude waarde na een herstart van Home Assistant niet terugkomt.
+- Na een herstart is de override-opslag leeg. Na de volgende MQTT-verbinding verwijdert de firmware daarom elk `<label>/override`-topic dat niet opnieuw actief is (TASK-1991).
+
 #### Button-entiteit (PIC reset)
 
 Onder pseudo-ID 244 wordt een `button`-entiteit gepubliceerd met de naam `resetgateway` (`entity_category: config`, `payload_press: "1"`). Een druk vanuit het HA-dashboard reset de PIC hardwarematig via de reset-pin. Om stormen door verkeerd geconfigureerde automatisaties te voorkomen vereist de firmware nu exact de payload `"1"` en geldt er een cooldown van 5 seconden tussen opeenvolgende resets; elke andere payload wordt stil genegeerd.
