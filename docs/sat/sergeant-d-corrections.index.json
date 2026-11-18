@@ -5366,7 +5366,7 @@
    "tasks": [
     "TASK-1887"
    ],
-   "confirmed_by_entry": null
+   "confirmed_by_entry": 411
   },
   {
    "id": 406,
@@ -5379,7 +5379,7 @@
    "tasks": [
     "TASK-1887"
    ],
-   "confirmed_by_entry": null
+   "confirmed_by_entry": 412
   },
   {
    "id": 407,
@@ -5435,11 +5435,24 @@
   },
   {
    "id": 411,
-   "title": "Q-403a answered B: a lost room temperature during the 10-minute band pause does not end the pause; heating stays off until the 10 minutes are over (Sergeant D, 2026-11-18; urgent round, 2.0.0; overrules our interpretation in entry 405)",
+   "title": "Q-403a answered A: a lost room temperature during the 10-minute band pause ends the pause; heating follows the curve at once (Sergeant D, 2026-11-18; urgent round, 2.0.0; confirms our interpretation in entry 405)",
    "date": "2026-11-18",
    "source": "sergeant-d",
    "kind": "interpretation",
    "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1572684923469430875",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1887"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 412,
+   "title": "Q-403b answered A: the 10-minute pause only follows a band stop that actually turns the boiler off (Sergeant D, 2026-11-18; urgent round, 2.0.0; confirms our interpretation in entry 406)",
+   "date": "2026-11-18",
+   "source": "sergeant-d",
+   "kind": "interpretation",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1572685399531331797",
    "supersedes": [],
    "tasks": [
     "TASK-1887"

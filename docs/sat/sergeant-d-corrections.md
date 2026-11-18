@@ -8150,21 +8150,36 @@ Robert, 16:18:42 UTC (https://discord.com/channels/812969634638725140/9144987300
 
 **Open:** none.
 
-## 411. Q-403a answered B: a lost room temperature during the 10-minute band pause does not end the pause; heating stays off until the 10 minutes are over (Sergeant D, 2026-11-18; urgent round, 2.0.0; overrules our interpretation in entry 405)
+## 411. Q-403a answered A: a lost room temperature during the 10-minute band pause ends the pause; heating follows the curve at once (Sergeant D, 2026-11-18; urgent round, 2.0.0; confirms our interpretation in entry 405)
 
-**Source:** #dev-sat-mqtt, Sergeant D 2026-11-18 18:48 UTC (https://discord.com/channels/812969634638725140/1105556725714649128/1572684923469430875), a reply to Q-403a (https://discord.com/channels/812969634638725140/1105556725714649128/1572684758029434976).
+**Source:** #dev-sat-mqtt, Sergeant D 2026-11-18 18:48 UTC (https://discord.com/channels/812969634638725140/1105556725714649128/1572684923469430875), a reply to Q-403a (https://discord.com/channels/812969634638725140/1105556725714649128/1572684758029434976). The message was edited: it first read "My answer is B" (seen by our watcher at 18:48:24) and was changed to the text below at 18:49:12 UTC (edited_timestamp, read back via the Discord API). The edited text is his answer.
 
 **Quoted:**
-> "My answer is B"
+> "My answer is A"
 
-**Settled:** option B as posted ("Yes, finish the 10 minutes first"): if the room temperature is lost during the 10-minute pause after a band stop (entries 401-403), heating stays off for the rest of those 10 minutes. After the pause, without a room temperature, heating follows the curve as in entries 38 and 46 (reading: entries 38/46 are not changed, they apply once the pause is over). Scope: 2.0.0.
+**Settled:** option A as posted ("No, release it at once: without a room temperature heating follows the curve, as in entries 38 and 46"): if the room temperature is lost during the 10-minute pause after a band stop (entries 401-403), the pause ends and heating follows the heating curve at once. Scope: 2.0.0.
 
-**Changes an earlier entry:** entry 405 (our interpretation, not Sergeant D's words: a lost room temperature ends the pause so the curve takes over at once) is overruled; the firmware follows entry 405 today and must change.
+**Confirms an earlier entry:** entry 405 (our interpretation, not his words) is now his decision. The firmware already does this (TASK-1887); no firmware change.
 
 **Compared with thermo-nova (7beaaf5):** thermo-nova has no tolerance band and no band pause; the band and its 10-minute minimum are Sergeant D's rules (entries 376, 377, 384, 401-403; ADR-253).
 
-**Compared with the firmware:** the band pause currently ends when the room temperature is lost (entry 405 reading, TASK-1887); it must keep CH off until the 600 s minimum has passed, also without a room temperature.
+**Task:** TASK-1887 (no change; note the confirmation).
 
-**Task:** TASK-1887 (band; firmware lane), ADR-253 (the ADR text may need an amendment for the lost-room-temperature case).
+**Open:** none.
 
-**Open:** none for the pause itself; the reading that entries 38/46 apply after the pause is ours, to correct if he means otherwise.
+## 412. Q-403b answered A: the 10-minute pause only follows a band stop that actually turns the boiler off (Sergeant D, 2026-11-18; urgent round, 2.0.0; confirms our interpretation in entry 406)
+
+**Source:** #dev-sat-mqtt, Sergeant D 2026-11-18 18:50 UTC (https://discord.com/channels/812969634638725140/1105556725714649128/1572685399531331797, edited 18:50:30 UTC; read back via the Discord API), a reply to Q-403b (https://discord.com/channels/812969634638725140/1105556725714649128/1572685225820160153).
+
+**Quoted:**
+> "My answer is A"
+
+**Settled:** option A as posted: the 10-minute pause starts only when a band stop turns the boiler off (CH 1 -> 0); a band decision while heating was not running (for example right after a restart with a warm room, or while the boiler was off because no heat was asked) starts no pause. Scope: 2.0.0.
+
+**Confirms an earlier entry:** entry 406 (our interpretation) is now his decision. The firmware already does this (TASK-1887); no firmware change.
+
+**Compared with thermo-nova (7beaaf5):** no band in thermo-nova (see entry 411).
+
+**Task:** TASK-1887 (no change; note the confirmation).
+
+**Open:** none.
