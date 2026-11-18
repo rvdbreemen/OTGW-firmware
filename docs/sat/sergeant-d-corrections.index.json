@@ -5407,6 +5407,17 @@
     "TASK-2013"
    ],
    "confirmed_by_entry": null
+  },
+  {
+   "id": 409,
+   "title": "The initial high CS at a PWM ON start is for reliability only and does not affect savings (Sergeant D, 2026-11-18; completes entry 408)",
+   "date": "2026-11-18",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/914498730001072149/1572514884233732117",
+   "supersedes": [],
+   "tasks": [],
+   "confirmed_by_entry": null
   }
  ]
 }

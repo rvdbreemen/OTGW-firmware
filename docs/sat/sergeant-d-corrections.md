@@ -8113,3 +8113,20 @@ Robert, 16:18:42 UTC (https://discord.com/channels/812969634638725140/9144987300
 **Task:** none (no change). Answers the observation in indigo_light's report; related to TASK-2013 only through the same report.
 
 **Open:** the exact meaning of "until the flame off" (see the interpretation above).
+
+## 409. The initial high CS at a PWM ON start is for reliability only and does not affect savings (Sergeant D, 2026-11-18; completes entry 408)
+
+**Source:** #beta-testing, Sergeant D 2026-11-18 07:32 UTC (https://discord.com/channels/812969634638725140/914498730001072149/1572514884233732117), a reply to indigo_light 07:23 UTC ("reliability > savings, makes sense when I think of it", https://discord.com/channels/812969634638725140/914498730001072149/1572512673445183533), in the thread of entry 408.
+
+**Quoted:**
+> "The initial high CS doesn’t affect savings, it is only reliability."
+
+**Settled:** the purpose of the initial high setpoint of entry 408 is reliable ignition; it is not a trade-off against energy savings.
+
+**Compared with thermo-nova (7beaaf5):** the flame-off hold of entry 408 (heating_control.py:392-398, offset default 18.0 at const.py:151) carries no comment on its purpose in the code; the purpose is Sergeant D's statement.
+
+**Compared with the firmware:** nothing changes (entry 408).
+
+**Task:** none.
+
+**Open:** none beyond entry 408's open reading of "until the flame off".
