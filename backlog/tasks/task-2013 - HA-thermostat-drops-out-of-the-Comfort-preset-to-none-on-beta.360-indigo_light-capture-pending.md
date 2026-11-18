@@ -6,13 +6,13 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-18T06:24:00Z'
-updated_date: '2026-11-18T07:24:00Z'
+updated_date: '2026-11-18T07:26:00Z'
 labels:
   - bug
   - needs-info
   - sat
 dependencies: []
-priority: medium
+priority: high
 ordinal: 1031000
 ---
 
