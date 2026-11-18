@@ -4490,6 +4490,9 @@ static bool satRestartStep()
     satResetCmdCache();                    // the next control tick re-sends CS, MM and CH
     DebugTln(F("SAT: outside temperature valid again, SAT resumes"));
     satNarrate_P(PSTR("Outside temperature back: SAT resumes"));
+#ifdef OTGW_SAT_HEAP_TRACE
+    OTGW_SAT_HEAP_TRACE();                 // TASK-2019 diagnostics: heap trace of the passes that follow (MQTTstuff.ino)
+#endif
   }
   if (!_sat_bootOutsideLogged) {           // TASK-1521: boot milestone, first pass with a valid outside temperature
     _sat_bootOutsideLogged = true;
@@ -4501,6 +4504,9 @@ static bool satRestartStep()
     timerSATControl_due = nowMs;           // takeover in this pass, not one control interval after boot
     SATDebugTf(PSTR("SATBOOT phase=takeover ms=%lu since_sat_start_ms=%lu\r\n"), (unsigned long)nowMs,
                (unsigned long)(nowMs - _sat_bootStartMs));
+#ifdef OTGW_SAT_HEAP_TRACE
+    OTGW_SAT_HEAP_TRACE();                 // TASK-2019 diagnostics (a second call while armed does nothing)
+#endif
   }
   return false;
 }

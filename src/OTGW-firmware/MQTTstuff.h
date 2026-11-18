@@ -652,6 +652,10 @@ enum : uint8_t {
   CPROBE_FS_END             // doBackgroundTasks(): after loopLittleFSStatus() (TASK-1995)
 };
 void connProbe(uint8_t tag);
+// TASK-2019 diagnostics: arm the probes for 5 s after the SAT takeover; the tick prints them (loop task only).
+void satTakeoverHeapTraceBegin();
+void satTakeoverHeapTraceTick();
+#define OTGW_SAT_HEAP_TRACE() satTakeoverHeapTraceBegin()  // guarded with #ifdef where host test harnesses cut the code
 // TASK-1989: the slowest step (between two CPROBE_* call sites) of the loop pass that just ended, read at the next loop top.
 void loopSlowestStep(uint8_t* from, uint8_t* to, uint32_t* ms);
 #define OTGW_CONN_PROBE(tag) connProbe(tag)  // used where host test harnesses cut the code without this header

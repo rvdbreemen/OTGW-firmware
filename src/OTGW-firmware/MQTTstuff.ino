@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : MQTTstuff
-**  Version  : v2.0.0-beta.371
+**  Version  : v2.0.0-beta.372
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **      Modified version from (c) 2020 Willem Aandewiel
@@ -1176,6 +1176,10 @@ static bool     sConnTraceOn = false;
 static uint32_t sConnTraceT0 = 0, sConnTraceLastMs = 0, sConnTraceMin = 0xFFFFFFFFu, sConnTraceGen = 0;
 static uint8_t  sConnTracePOutbox = 0, sConnTracePFiles = 0, sConnTracePRest = 0;
 static uint16_t sConnTraceSamples = 0, sConnTraceRestarts = 0;
+// TASK-2019 diagnostics: the same probes, armed for SAT_TRACE_MS after the SAT takeover (satTakeoverHeapTraceBegin()).
+static bool     sSatTraceOn = false, sSatTraceOwnWindow = false;
+static uint32_t sSatTraceT0 = 0;
+static constexpr uint32_t SAT_TRACE_MS = 5000;
 
 static inline uint16_t connTraceCap16(uint32_t v) { return v > 0xFFFFu ? 0xFFFFu : (uint16_t)v; }
 static inline uint8_t  connTraceCap8(uint32_t v)  { return v > 0xFFu ? 0xFFu : (uint8_t)v; }
@@ -1216,7 +1220,7 @@ void loopSlowestStep(uint8_t* from, uint8_t* to, uint32_t* ms) {
 
 void connProbe(uint8_t tag) {
   loopStepProbe(sLoopSteps, tag, millis(), CPROBE_LOOP_TOP);   // TASK-1989: before the trace gate, so it runs after boot too
-  if (!sConnTraceOn) return;
+  if (!sConnTraceOn && !sSatTraceOn) return;
   const uint32_t now = millis();
   const uint32_t freeNow = platformFreeHeap();
   const uint32_t w = platformHeapWindowMin();
@@ -1225,9 +1229,11 @@ void connProbe(uint8_t tag) {
   const uint32_t ref = (gen == sConnProbePGen) ? sConnProbePW : sConnProbePFree;
   const bool fell = (w != 0) && (w + 1024U <= ref);
   const bool slow = (now - sConnProbePMs) >= 20U;
-  if ((fell || slow) && sConnProbeN < 32) {
+  // TASK-2019: the takeover trace keeps drops only, so its 32 slots are not filled by slow passes before the dip
+  const bool keep = sConnTraceOn ? (fell || slow) : fell;
+  if (keep && sConnProbeN < 32) {
     ConnProbeRec &r = sConnProbe[sConnProbeN++];
-    r.tMs = connTraceCap16(now - sConnTraceT0);  r.dtMs = connTraceCap16(now - sConnProbePMs);
+    r.tMs = connTraceCap16(now - (sConnTraceOn ? sConnTraceT0 : sSatTraceT0));  r.dtMs = connTraceCap16(now - sConnProbePMs);
     r.min4 = connTraceCap16(w / 4);              r.free4 = connTraceCap16(freeNow / 4);
     r.pFree4 = connTraceCap16(sConnProbePFree / 4);
     r.maxblk4 = connTraceCap16(platformMaxFreeBlock() / 4);
@@ -1239,17 +1245,60 @@ void connProbe(uint8_t tag) {
   sConnProbePW = w; sConnProbePGen = gen;
 }
 
-static void connProbePrint() {
+static void connProbePrint(PGM_P label) {
   for (uint8_t i = 0; i < sConnProbeN; i++) {
     const ConnProbeRec &r = sConnProbe[i];
-    DebugTf(PSTR("[HEAP] connect-probe t=%u dt=%u at=%u from=%u min=%lu free=%lu pfree=%lu maxblk=%lu outbox=%u ws=%u mqttTx=%u gen=%u\r\n"),
-            r.tMs, r.dtMs, r.tag, r.pTag, (unsigned long)r.min4 * 4, (unsigned long)r.free4 * 4,
+    DebugTf(PSTR("[HEAP] %s t=%u dt=%u at=%u from=%u min=%lu free=%lu pfree=%lu maxblk=%lu outbox=%u ws=%u mqttTx=%u gen=%u\r\n"),
+            label, r.tMs, r.dtMs, r.tag, r.pTag, (unsigned long)r.min4 * 4, (unsigned long)r.free4 * 4,
             (unsigned long)r.pFree4 * 4, (unsigned long)r.maxblk4 * 4, r.outbox, r.ws, r.mqttTxBytes, r.gen);
   }
-  DebugTf(PSTR("[HEAP] connect-probe end kept=%u calls=%u\r\n"), (unsigned)sConnProbeN, (unsigned)sConnProbeCalls);
+  DebugTf(PSTR("[HEAP] %s end kept=%u calls=%u\r\n"), label, (unsigned)sConnProbeN, (unsigned)sConnProbeCalls);
 }
 
+// --- satHeapTrace begin
+// TASK-2019 diagnostics (no behaviour change): on .61 (beta.369) the since-boot heap minimum fell to 1068 B right after
+// the SAT takeover (window minimum 2.5-6.3 KB for 3 s, MQTT outbox 1 packet; a boot without SAT stays near 14-23 KB).
+// For SAT_TRACE_MS after the takeover the connect probes record every drop of 1 KB or more with the step before it
+// (at= / from= are CPROBE_* tags, MQTTstuff.h), then print as '[HEAP] sat-takeover-probe'. Not while the boot connect
+// trace runs (it owns the probes); a connect trace that starts while it runs first ends it (satTakeoverHeapTraceYield()),
+// so the takeover records are printed under their own label and not wiped by the connect trace's reset. It arms at the
+// boot takeover and at every later 'outside temperature valid again'. The trace opens its own heap window when none is
+// open and closes only that one, and only when no burst or boot window needs it. Known limit: once another owner closes
+// the shared window (after boot: the drip tick or a burst end), platformHeapWindowMin() reads 0 and no drop is kept;
+// at boot the boot watch keeps the window open. Loop task only.
+static void satTakeoverHeapTraceFinish() {
+  sSatTraceOn = false;
+  connProbePrint(PSTR("sat-takeover-probe"));
+  DebugTf(PSTR("[HEAP] sat-takeover end min=%lu winMin=%lu free=%lu\r\n"), (unsigned long)platformMinFreeHeap(),
+          (unsigned long)platformHeapWindowMin(), (unsigned long)platformFreeHeap());
+  if (sSatTraceOwnWindow && !sHeapBurstOpen && sBootHeapState != BOOTHEAP_RUN) platformHeapWindowStop();
+  sSatTraceOwnWindow = false;
+}
+
+// The boot connect trace takes the probes over: end a running takeover trace first.
+static void satTakeoverHeapTraceYield() {
+  if (sSatTraceOn) satTakeoverHeapTraceFinish();
+}
+
+void satTakeoverHeapTraceBegin() {
+  if (sConnTraceOn || sSatTraceOn) return;
+  sSatTraceOwnWindow = !platformHeapWindowActive() && platformHeapWindowStart();
+  sSatTraceOn = true;
+  sSatTraceT0 = millis();
+  connProbeReset();
+  DebugTf(PSTR("[HEAP] sat-takeover begin min=%lu free=%lu maxblk=%lu win=%d own=%d\r\n"),
+          (unsigned long)platformMinFreeHeap(), (unsigned long)platformFreeHeap(), (unsigned long)platformMaxFreeBlock(),
+          (int)platformHeapWindowActive(), (int)sSatTraceOwnWindow);
+}
+
+void satTakeoverHeapTraceTick() {
+  if (!sSatTraceOn || (uint32_t)(millis() - sSatTraceT0) < SAT_TRACE_MS) return;
+  satTakeoverHeapTraceFinish();
+}
+// --- satHeapTrace end
+
 static void connTraceBegin() {
+  satTakeoverHeapTraceYield();   // TASK-2019: print the takeover trace before the reset below takes its records
   sConnTraceOn = true;
   sConnTraceN = sConnTraceHead = 0;
   sConnTraceT0 = sConnTraceLastMs = millis();
@@ -1308,7 +1357,7 @@ static void connTraceEnd(uint32_t phaseMin) {
   DebugTf(PSTR("[HEAP] connect-trace end entries=%u samples=%u restarts=%u traceMin=%lu phaseMin=%lu match=%u\r\n"),
           (unsigned)sConnTraceN, (unsigned)sConnTraceSamples, (unsigned)sConnTraceRestarts,
           (unsigned long)tmin, (unsigned long)phaseMin, (tmin == phaseMin) ? 1u : 0u);
-  connProbePrint();  // TASK-1757 AC3
+  connProbePrint(PSTR("connect-probe"));  // TASK-1757 AC3
 }
 
 // Public tick for the loop (OTGW-firmware.ino), next to sampleHeapDip().

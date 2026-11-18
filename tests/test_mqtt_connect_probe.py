@@ -29,20 +29,33 @@ STUBS = r"""
 #include <cstdio>
 #include <cstdint>
 #include <cstring>
+#include <cstdarg>
 #define PSTR(s) s
+typedef const char* PGM_P;
 static uint32_t nowMs = 1000, freeHeap = 60000, winMin = 60000, winGen = 1;
 static uint32_t millis() { return nowMs; }
 static uint32_t platformFreeHeap() { return freeHeap; }
 static uint32_t platformMaxFreeBlock() { return 30000; }
-static uint32_t platformHeapWindowMin() { return winMin; }
+static bool winActive = true;   // TASK-2019: the takeover trace opens a window when none is open
+static uint32_t platformHeapWindowMin() { return winActive ? winMin : 0; }
+static bool platformHeapWindowActive() { return winActive; }
+static bool platformHeapWindowStart() { winActive = true; winGen++; winMin = freeHeap; return true; }
+static void platformHeapWindowStop() { winActive = false; }
+static uint32_t platformMinFreeHeap() { return winMin; }
 static uint32_t platformHeapWinGen() { return winGen; }
 static uint32_t platformTcpTxBytesToRemotePort(uint16_t) { return 0; }
 static uint16_t mqttQueueNow() { return 3; }
 static uint32_t webSocketClientCount() { return 1; }
 struct { struct { uint16_t iBrokerPort = 1883; } mqtt; } settings;
-static void DebugTf(const char*, ...) {}
+static void DebugTf(const char* f, ...) { va_list a; va_start(a, f); vprintf(f, a); va_end(a); }
 static bool sConnTraceOn = false;
 static uint32_t sConnTraceT0 = 1000;
+static bool     sSatTraceOn = false, sSatTraceOwnWindow = false;   // TASK-2019 (declared next to sConnTraceOn)
+static uint32_t sSatTraceT0 = 0;
+static constexpr uint32_t SAT_TRACE_MS = 5000;
+static bool     sHeapBurstOpen = false;
+enum : uint8_t { BOOTHEAP_IDLE = 0, BOOTHEAP_RUN = 1, BOOTHEAP_DONE = 2 };
+static uint8_t  sBootHeapState = BOOTHEAP_DONE;
 static inline uint16_t connTraceCap16(uint32_t v) { return v > 0xFFFFu ? 0xFFFFu : (uint16_t)v; }
 static inline uint8_t  connTraceCap8(uint32_t v)  { return v > 0xFFu ? 0xFFu : (uint8_t)v; }
 """
@@ -61,6 +74,38 @@ int main(int argc, char** argv) {
   const char* mode = argc > 1 ? argv[1] : "";
   if (!strcmp(mode, "off")) {               // trace off: nothing is recorded
     connProbeReset(); step(1, 20000, 20000, CPROBE_SAT); step(300, 20000, 20000, CPROBE_SAT); dump("off"); return 0;
+  }
+  if (!strcmp(mode, "sat")) {                // TASK-2019: armed at the takeover, no window open, slow passes then a drop
+    winActive = false; freeHeap = 50000; winMin = 50000;
+    satTakeoverHeapTraceBegin();
+    step(30, 50000, 50000, CPROBE_LOOP_TOP); step(30, 50000, 50000, CPROBE_SAT_RUN);   // slow, no drop: not kept
+    step(5, 52000, 3000, CPROBE_SAT_CORE);   // the drop: bracketed by SAT_RUN -> SAT_CORE
+    nowMs += 1000; satTakeoverHeapTraceTick();                  // before 5 s: nothing printed
+    printf("|early\n");
+    nowMs += 4000; satTakeoverHeapTraceTick();
+    printf("|win=%d on=%d\n", (int)winActive, (int)sSatTraceOn);
+    step(5, 52000, 1000, CPROBE_SAT_CORE);   // after the end: not recorded
+    dump("after"); return 0;
+  }
+  if (!strcmp(mode, "satconn")) {            // TASK-2019 F1 (review): the boot connect trace starts inside the 5 s
+    winActive = true; freeHeap = 50000; winMin = 50000;
+    satTakeoverHeapTraceBegin();
+    step(5, 52000, 3000, CPROBE_SAT_CORE);   // the takeover drop
+    satTakeoverHeapTraceYield();             // what connTraceBegin() does first
+    printf("|yield on=%d\n", (int)sSatTraceOn);
+    sConnTraceOn = true; connProbeReset();   // the rest of connTraceBegin()
+    step(30, 52000, 3000, CPROBE_LOOP_TOP);
+    nowMs += 5000; satTakeoverHeapTraceTick();   // nothing more under the takeover label
+    printf("|end\n"); return 0;
+  }
+  if (!strcmp(mode, "satbusy")) {            // the boot connect trace owns the probes: no takeover trace
+    sConnTraceOn = true; satTakeoverHeapTraceBegin();
+    printf("|on=%d\n", (int)sSatTraceOn); return 0;
+  }
+  if (!strcmp(mode, "satwin")) {             // a window is already open (burst): the trace leaves it open
+    winActive = true; sHeapBurstOpen = true; satTakeoverHeapTraceBegin();
+    nowMs += 5000; satTakeoverHeapTraceTick();
+    printf("|win=%d\n", (int)winActive); return 0;
   }
   sConnTraceOn = true; connProbeReset();
   if (!strcmp(mode, "drop")) {
@@ -91,15 +136,9 @@ def extract() -> str:
     src = INO.read_text(encoding="utf-8")
     start = src.find("// TASK-1757 AC3 diagnostics: connect-window probes.")
     assert start >= 0, "connect-window probe block not found in MQTTstuff.ino"
-    m = re.search(r"static void connProbePrint\(\) \{", src[start:])
-    assert m, "connProbePrint() not found"
-    i = start + m.end()
-    depth = 1
-    while depth:
-        c = src[i]
-        depth += (c == "{") - (c == "}")
-        i += 1
-    return src[start:i]
+    end = src.find("// --- satHeapTrace end", start)   # TASK-2019: the takeover trace follows connProbePrint()
+    assert end > start, "satHeapTrace block not found in MQTTstuff.ino (code before TASK-2019)"
+    return src[start:end]
 
 
 def enum_block() -> str:
@@ -144,6 +183,40 @@ class ConnectProbe(unittest.TestCase):
 
     def test_nothing_while_the_trace_is_off(self):
         self.assertEqual(self.run_mode("off"), "off n=0")
+
+    def test_takeover_trace_keeps_the_drop_at_the_step_that_took_it(self):
+        # TASK-2019: CPROBE_SAT_RUN = 16, CPROBE_SAT_CORE = 17
+        out = self.run_mode("sat")
+        self.assertIn("[HEAP] sat-takeover begin min=50000 free=50000 maxblk=30000 win=1 own=1", out)
+        early, rest = out.split("|early", 1)
+        self.assertNotIn("sat-takeover-probe", early, "printed before 5 s")
+        self.assertRegex(rest, r"\[HEAP\] sat-takeover-probe t=65 dt=5 at=17 from=16 min=3000 free=52000 ")
+        self.assertIn("[HEAP] sat-takeover-probe end kept=1 calls=3", rest)
+        self.assertIn("|win=0 on=0", rest)                     # its own window closed again
+        self.assertIn("after n=1 ", rest)                     # nothing recorded after the end
+
+    def test_a_connect_trace_that_starts_first_prints_the_takeover_records(self):
+        # TASK-2019 F1 (second reader): the connect trace's reset wiped the takeover drop and its slow pass was
+        # printed under the takeover label. Now the takeover trace ends first, with its own record.
+        out = self.run_mode("satconn")
+        before, after = out.split("|yield on=0", 1)
+        self.assertRegex(before, r"\[HEAP\] sat-takeover-probe t=5 dt=5 at=17 from=0 min=3000 ")
+        self.assertIn("[HEAP] sat-takeover-probe end kept=1", before)
+        self.assertNotIn("sat-takeover", after, "takeover lines after the connect trace took over")
+        src = INO.read_text(encoding="utf-8")
+        body = src[src.index("static void connTraceBegin() {"):]
+        body = body[:body.index("connProbeReset();")]
+        self.assertIn("satTakeoverHeapTraceYield();", body, "connTraceBegin() resets before it ends the takeover trace")
+
+    def test_takeover_trace_not_armed_during_the_boot_connect_trace(self):
+        out = self.run_mode("satbusy")
+        self.assertNotIn("sat-takeover begin", out)
+        self.assertIn("|on=0", out)
+
+    def test_takeover_trace_leaves_a_window_it_did_not_open(self):
+        out = self.run_mode("satwin")
+        self.assertIn("own=0", out)
+        self.assertIn("|win=1", out)
 
     def test_at_most_32_records(self):
         self.assertTrue(self.run_mode("cap").startswith("cap n=32 "))

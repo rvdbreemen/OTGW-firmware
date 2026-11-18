@@ -92,7 +92,10 @@ class StallLine(unittest.TestCase):
         body = self.mqtt[self.mqtt.index("void connProbe(uint8_t tag) {"):]
         body = body[:body.index("\n}\n")]
         self.assertIn("loopStepProbe(", body)
-        self.assertLess(body.index("loopStepProbe("), body.index("if (!sConnTraceOn) return;"))
+        # the trace gate (TASK-2019: the connect trace or the SAT takeover trace) comes after the watch feed
+        gate = re.search(r"if \(!sConnTraceOn[^)]*\) return;", body)
+        self.assertIsNotNone(gate, "trace gate not found in connProbe()")
+        self.assertLess(body.index("loopStepProbe("), gate.start())
 
     def test_stall_line_prints_the_slowest_step(self):
         loop = self.main[self.main.index("void loop()"):]

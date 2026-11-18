@@ -113,6 +113,7 @@ static bool picBoardTretAbsent() { return true; }
 #include <memory>
 static inline struct tm* localtime_r(const time_t* t, struct tm* o) { localtime_s(o, t); return o; }   // STUB: host time zone, wall clock is not under test
 void connProbe(uint8_t) {}              // STUB: MQTT connect diagnostics probe
+void satTakeoverHeapTraceBegin() {}     // STUB: TASK-2019 SAT takeover heap trace (MQTTstuff.ino)
 uint8_t g_satShadowEpoch = 0;           // STUB: the publish shadow epoch of SATmqttPublish.cpp (that file is not compiled)
 static constexpr uint16_t TRACKED_TIME_UNSEEN = 0xFFFFU;   // the real sentinel of OTGW-Core.ino (TASK-1979 climate publish in SATcontrol)
 static bool hvacHeartbeatDue(uint16_t) { return false; }   // STUB: the MQTT heartbeat timing of OTGW-Core.ino is not modelled (no republish on a timer)

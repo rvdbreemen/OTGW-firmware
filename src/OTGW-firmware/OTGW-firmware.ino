@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.ino
-**  Version  : v2.0.0-beta.371
+**  Version  : v2.0.0-beta.372
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -1258,6 +1258,7 @@ void loop()
   connProbe(CPROBE_BG_END);         // TASK-1757 AC3
   sampleHeapDip();                  // TASK-1673: who holds memory at the lowest free heap
   bootHeapConnectTraceTick();       // TASK-1757: connect-window heap trace (boot only, no-op otherwise)
+  satTakeoverHeapTraceTick();       // TASK-2019: prints the SAT takeover heap trace 5 s after it was armed (no-op otherwise)
 
   // TASK-865.5 (ADR-123 Phase-1): consume OT frames produced this iteration.
   // handlePICSerial()/loopOTDirect() ran inside doBackgroundTasks() and enqueued
