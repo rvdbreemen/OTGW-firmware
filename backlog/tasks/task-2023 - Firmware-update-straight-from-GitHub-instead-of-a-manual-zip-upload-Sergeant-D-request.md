@@ -1,14 +1,14 @@
 ---
 id: TASK-2023
 title: >-
-  Firmware update straight from GitHub instead of a manual zip upload (Sergeant
-  D request)
+  Show 'new version available' in the gateway from a version file on a plain
+  HTTP mirror (option B of the GitHub-update request, Robert 2026-11-18)
 status: To Do
 assignee: []
 created_date: '2026-11-18T11:54:00Z'
+updated_date: '2026-11-18T12:19:00Z'
 labels:
   - feature
-  - needs-maintainer-ok
 dependencies: []
 priority: low
 ordinal: 1038000
@@ -25,3 +25,9 @@ Asked by Sergeant D in #dev-sat-mqtt 2026-11-18 11:37 UTC (https://discord.com/c
 - [ ] #1 Robert chose an option (or declined), recorded in this task
 - [ ] #2 If A or B: the design is checked against ADR-003 and the open-source-first rule (existing updaters researched)
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-18 Maintainer decision (Robert, DM 1572585865589428318, relayed by the coordinator), verbatim: "B en neem taak C op voor een latere release 2.1.0". Scope of this task is now option B only: the gateway shows 'new version available' with a link, from a version file on a plain HTTP mirror (no HTTPS on the device, ADR-003). Option C (HTTPS self-update) is filed as its own task for 2.1.0 (see the 2.1.0 task referencing ADR-218).
+<!-- SECTION:NOTES:END -->
