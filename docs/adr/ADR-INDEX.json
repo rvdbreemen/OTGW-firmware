@@ -3128,7 +3128,7 @@
       "path": "ADR-101-flat-per-value-mqtt-topics-over-aggregated-json-payloads.md",
       "format": "canonical",
       "status": "Accepted",
-      "date": "2026-11-15",
+      "date": "2026-11-18",
       "decision_summary": "OTGW-firmware 2.0.0 uses flat per-value MQTT topics.",
       "topics": [],
       "aliases": [],
@@ -3161,7 +3161,7 @@
       "path": "ADR-102-ha-availability-reflects-mqtt-link-not-ot-bus.md",
       "format": "canonical",
       "status": "Accepted",
-      "date": "2026-05-16",
+      "date": "2026-11-18",
       "decision_summary": "HA entity availability MUST reflect only the ESP↔MQTT link.",
       "topics": [],
       "aliases": [],
@@ -4472,7 +4472,7 @@
       "path": "ADR-142-ha-discovery-mark-unavailable-unsupported-msgids.md",
       "format": "canonical",
       "status": "Rejected",
-      "date": "2026-08-25",
+      "date": "2026-11-18",
       "decision_summary": "The firmware publishes HA discovery configs for all OT-map entities as today.",
       "topics": [],
       "aliases": [],
@@ -5497,7 +5497,7 @@
       "path": "ADR-174-republish-on-change-gated-mqtt-state-when-home-assistant-comes-back-online.md",
       "format": "canonical",
       "status": "Accepted",
-      "date": "2026-11-15",
+      "date": "2026-11-18",
       "decision_summary": "Chosen option: Option A, because homeassistant/status is a Home Assistant side contract and the two firmware lines mu...",
       "topics": [
         "availability",
@@ -10607,6 +10607,68 @@
         "supersedes": [],
         "superseded_by": null
       }
+    },
+    {
+      "id": "ADR-255",
+      "title": "The HA simulation switch has a second availability topic and is unavailable while a boiler answers (partly supersedes ADR-102)",
+      "path": "ADR-255-the-ha-simulation-switch-has-a-second-availability-topic-and-is-unavailable-while-a-boiler-answers-partly-supersedes-adr-102.md",
+      "format": "canonical",
+      "status": "Proposed",
+      "date": "2026-11-18",
+      "decision_summary": "User Decision: the HA \"SAT Simulation\" switch gets a second availability topic, sat/simulationavailable, combined wit...",
+      "topics": [
+        "availability list",
+        "home assistant availability",
+        "mqtt discovery",
+        "sat simulation switch"
+      ],
+      "aliases": [
+        "avty_mode all",
+        "sat/simulation_available",
+        "simulation switch bounces back",
+        "TASK-2014"
+      ],
+      "components": [
+        "sat/simulation_available",
+        "streamSatBoolSwitch availSub"
+      ],
+      "symbols": [
+        "satBoilerHardwarePresent",
+        "satPublishCoreState",
+        "streamSatBoolSwitch"
+      ],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [
+          "Keep the base topic owned by the MQTT birth and LWT only (ADR-102); checkadr102otbuslivenesstopic in evaluate.py stays green.",
+          "Publish sat/simulationavailable retained, on change, from a publisher that runs while SAT is off, and re-arm it on a full republish.",
+          "Use the same rule as the web UI switch: unavailable only while a boiler answers and simulation is off.",
+          "Keep the TASK-795 refusal in updateSetting(): the availability is the hint, the refusal is the guard."
+        ],
+        "must_not": [
+          "Must not write anything other than birth/LWT to the base topic.",
+          "Must not give a second availability topic to any other entity without its own ADR.",
+          "Must not hide the switch by withholding or emptying its discovery config."
+        ],
+        "exceptions": [
+          "None."
+        ],
+        "verification": [
+          "A host test that compiles the real satPublishCoreState() / satRepublishCoreState() and the real streamSatSwitchDiscovery() (planned tests/testhasatsimavailability.py, TASK-2014): the topic value for boiler present / absent / simulation o...",
+          "A bench run in HA: with a boiler answering (or REST forceboilerpresent, restAPI.ino), the switch shows unavailable; without, it is available again."
+        ]
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
     }
   ],
   "relationships": [
@@ -12861,6 +12923,12 @@
       "resolved": true
     },
     {
+      "source": "ADR-101",
+      "target": "ADR-255",
+      "type": "related",
+      "resolved": true
+    },
+    {
       "source": "ADR-102",
       "target": "ADR-074",
       "type": "related",
@@ -12881,6 +12949,12 @@
     {
       "source": "ADR-102",
       "target": "ADR-101",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-102",
+      "target": "ADR-255",
       "type": "related",
       "resolved": true
     },
@@ -14637,6 +14711,12 @@
       "resolved": true
     },
     {
+      "source": "ADR-142",
+      "target": "ADR-255",
+      "type": "related",
+      "resolved": true
+    },
+    {
       "source": "ADR-143",
       "target": "ADR-024",
       "type": "related",
@@ -15647,6 +15727,12 @@
     {
       "source": "ADR-174",
       "target": "ADR-248",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-174",
+      "target": "ADR-255",
       "type": "related",
       "resolved": true
     },
@@ -17645,6 +17731,30 @@
     {
       "source": "ADR-254",
       "target": "ADR-252",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-255",
+      "target": "ADR-101",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-255",
+      "target": "ADR-102",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-255",
+      "target": "ADR-142",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-255",
+      "target": "ADR-174",
       "type": "related",
       "resolved": true
     }
