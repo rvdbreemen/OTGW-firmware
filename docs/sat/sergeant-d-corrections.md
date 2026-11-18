@@ -8310,3 +8310,20 @@ Robert, 16:18:42 UTC (https://discord.com/channels/812969634638725140/9144987300
 **Task:** none (no change).
 
 **Open:** none, unless he means something else by light-off.
+
+## 420. Q-1998a answered A: a continuous burn at the boiler minimum still counts as overshoot when the flow stays above the request, as thermo-nova (Sergeant D, 2026-11-18; urgent round, 2.0.0)
+
+**Source:** #dev-sat-mqtt, Sergeant D 2026-11-18 19:24:51 UTC, edited at 19:25:00 UTC (9 s later); the final text is quoted below (https://discord.com/channels/812969634638725140/1105556725714649128/1572694093778124833; read back via the Discord API), a reply to Q-1998a (https://discord.com/channels/812969634638725140/1105556725714649128/1572693548468412418). Our watcher captured the text before the edit as "My answer is A" (without the mention), so the edit only added the mention; the answer is A in both versions.
+
+**Quoted (final text):**
+> "My answer is A"
+
+**Settled:** option A as posted: the overshoot classification stays as thermo-nova also on a boiler that cannot modulate below its minimum (indigo_light's Vitodens, flow about 42 C while SAT asks 29-40 C): a continuous cycle is overshoot when the p90 of flow minus control setpoint is at least the margin, and that verdict switches continuous to PWM at the end of the cycle. No firmware change. Scope: 2.0.0.
+
+**Compared with thermo-nova (7beaaf5):** `_classify_continuous` returns OVERSHOOT when `flow_control_setpoint_error.p90 >= OVERSHOOT_MARGIN_CELSIUS` (cycles/classifier.py:74, opened this session; 3.0 at cycles/const.py:10, the firmware uses 2.0 by entries 15/37); `on_cycle_end` enables PWM after a continuous OVERSHOOT cycle (pwm.py:221-223, opened this session).
+
+**Compared with the firmware:** satCycleApplyEndOfCycle (SATcycles.ino:1006 onward on origin/dev) switches continuous to PWM after an OVERSHOOT cycle, as thermo-nova. The 33 % overshoot fraction indigo_light saw on beta.250 came while PWM was still vetoed; since entries 392/393 the verdict leads to PWM.
+
+**Task:** TASK-1998 (question 2 settled, no change).
+
+**Open:** none.

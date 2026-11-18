@@ -5550,6 +5550,19 @@
    "supersedes": [],
    "tasks": [],
    "confirmed_by_entry": null
+  },
+  {
+   "id": 420,
+   "title": "Q-1998a answered A: a continuous burn at the boiler minimum still counts as overshoot when the flow stays above the request, as thermo-nova (Sergeant D, 2026-11-18; urgent round, 2.0.0)",
+   "date": "2026-11-18",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1572694093778124833",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1998"
+   ],
+   "confirmed_by_entry": null
   }
  ]
 }
