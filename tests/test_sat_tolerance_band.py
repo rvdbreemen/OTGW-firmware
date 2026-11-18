@@ -80,6 +80,7 @@ int main() {
         if (g_flame) g_flameOnStart = g_ms; else g_flameOffStart = g_ms;
         satPwmNoteDhwFlameEdge(g_flame, state.sat.bDhwActive);
       } else if (e.kind == "pid") pid = e.val;
+      else if (e.kind == "flow") g_flow = e.val;   // the MsgID 25 flow the switch rules read (satGetFlowTemp())
       else if (e.kind == "pwm") { state.sat.eControlMode = SAT_MODE_PWM; _pwm_entryPending = true; _pwm_lastUpdateMs = g_ms; }
 #if HAS_TOL
       else if (e.kind == "err") _sat_tolErr = e.val;
@@ -223,6 +224,28 @@ class BandLoop(unittest.TestCase):
         for sec in (60, 90, 150, 630):
             self.assertEqual(rows[sec]["ch"], "0", (sec, rows[sec]))
         self.assertEqual(rows[660]["ch"], "1", rows[660])
+
+    # Entries 410 (Q-1887c B) and 417 (Q-410a A): both continuous -> PWM rules only run while heating is allowed (thermo-nova heating_control.py:276-278).
+    # Replay of indigo_light 2026-11-16 16:00:58: continuous, a band pause (CH off), flame off, residual hot-water heat brings the flow
+    # to 67.3 C. Old code: the 3.5 C fail-safe (entries 288/289) switches to PWM 30 s later, inside the pause. Mode 1 = continuous, 2 = PWM.
+    INDIGO_PAUSE = [(0, "flow", 40.0), (0, "err", 0.5), (35, "err", -0.2), (65, "flow", 67.3)]
+
+    def test_no_switch_to_pwm_during_a_band_pause_on_residual_heat(self):   # entry 410, indigo 16:00:58
+        rows = self.run_sc(self.INDIGO_PAUSE, dur=630)
+        self.assertEqual(rows[60]["ch"], "0", rows[60])
+        for sec in range(60, 631, 30):
+            self.assertEqual(rows[sec]["mode"], "1", (sec, rows[sec]))
+
+    def test_margin_rule_is_skipped_during_a_band_pause_too(self):   # entry 410: flow 48 = request + 3 (margin 2, below the 3.5 fail-safe)
+        rows = self.run_sc([(0, "flow", 40.0), (0, "err", 0.5), (35, "err", -0.2), (65, "flow", 48.0)], dur=630)
+        for sec in range(60, 631, 30):
+            self.assertEqual(rows[sec]["mode"], "1", (sec, rows[sec]))
+
+    def test_switch_runs_again_once_heating_is_allowed(self):   # entry 410: only the pause is gated, not the rule
+        rows = self.run_sc(self.INDIGO_PAUSE + [(640, "err", 0.2)], dur=750)
+        self.assertEqual(rows[660]["ch"], "1", rows[660])
+        self.assertEqual(rows[660]["mode"], "1", rows[660])   # the start counts from the first tick with heating allowed
+        self.assertEqual(rows[690]["mode"], "2", rows[690])   # fail-safe: 30 s later
 
     def test_a_stop_while_ch_is_already_off_starts_no_minimum(self):   # entry 403: nothing to turn off (boot, cold cutoff)
         rows = self.run_sc([(0, "err", -0.2), (65, "err", 0.2)])
