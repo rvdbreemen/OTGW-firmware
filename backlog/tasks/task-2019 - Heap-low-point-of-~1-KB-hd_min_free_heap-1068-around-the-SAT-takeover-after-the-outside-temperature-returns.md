@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@otgw-dev'
 created_date: '2026-11-18T10:04:00Z'
-updated_date: '2026-11-18T12:32:00Z'
+updated_date: '2026-11-18T17:31:00Z'
 labels:
   - heap
   - sat
@@ -56,4 +56,6 @@ Control boot without SAT (09, .61, 370+41a9e44 app-only 11:27:48, satenabled fal
 Control run, SAT off (09, .61, 41a9e44, 62 min): hd_min_free_heap 14,180 from ~11:45 to the end (after 18,220 at +5 min), freeheap 43.7-52.7 k flat; hd_max_loop_gap_ms 481 from the boot phase. So without SAT the since-boot low point settles near 14 KB after about 15 min; the 369 boot with the SAT takeover reached 1068 B.
 
 Diagnostics (lane-2019, 372): satTakeoverHeapTraceBegin() arms the TASK-1757 connect probes for 5 s at the SAT takeover and at 'outside temperature valid again' (SATcontrol.ino), keeping drops of 1 KB or more with the step before it; satTakeoverHeapTraceTick() in loop() prints '[HEAP] sat-takeover-probe ...' plus begin/end lines. No behaviour change. Second reader (otgw-webui) F1 fixed: a boot connect trace that starts inside the 5 s first ends the takeover trace (satTakeoverHeapTraceYield() in connTraceBegin()), so the takeover records are not wiped and not mislabelled; host test red on a mutant without the yield, green on the fix. F2 KNOWN LIMITATION (accepted by the coordinator): once another owner closes the shared heap window after boot (drip tick end, burst end), platformHeapWindowMin() reads 0 and the trace keeps no drop; at boot the boot watch keeps the window open, so 09's repro is covered. Tests: test_mqtt_connect_probe 9/9; sat_loop_stubs.h gets the satTakeoverHeapTraceBegin() stub (the SAT loop harnesses include MQTTstuff.h); test_loop_step_watch matches the extended trace gate. Full suite before F1: 333/337 with exactly those 4 harness failures, all green after the stub and the gate regex.
+
+2026-11-18 bench observation (otgw-bench-tester 09, TASK-2020 AC3 run on .61, 373+9e6636d, 16:26:52-18:28:53): hd_min_free_heap fell 16,868 -> 6,044 between samples 17:43:52 and 17:44:52 (uptime ~78 min); maxblock dipped once to 25,588 at 17:57:52. No telnet line explains it (no [HEAP] burst/boot line, no MQTT reconnect; heap line 17:44:40 shows 52,960 free). One short dip, freeheap flat 45.9-52.8 k, no reboot. 370 arm hd_min was 12,508. Cause unknown, NOT investigated. Evidence: 09 scratchpad b2020\arm373\ (telnet.raw, info.jsonl).
 <!-- SECTION:NOTES:END -->
