@@ -369,7 +369,7 @@ Does the gateway hang or become unreachable after you switched BLE on? See secti
 
 ### 7.12a Recovering a Gateway That Hangs or Becomes Unreachable
 
-**Symptom:** some time after boot the web UI stops answering, MQTT goes quiet and the gateway cannot be reached, often after you changed a setting. The most likely cause on a board without PSRAM is BLE scanning that you switched on after accepting the stability warning (section 5.16, "PSRAM-aware default"): BLE starts at boot (`initSAT()`) and its memory use can starve the web server.
+**Symptom:** some time after boot the web UI stops answering, MQTT goes quiet and the gateway cannot be reached, often after you changed a setting. On firmware before 2.0.0-beta.375 the most likely cause on a board without PSRAM is BLE scanning that you switched on after accepting the stability warning: BLE starts at boot (`initSAT()`) and its memory use can starve the web server. From beta.375 BLE cannot be switched on without PSRAM, and a stored "on" is cleared at boot (section 5.16, "PSRAM-aware default").
 
 **Tip first:** save your settings while the gateway works. Open `http://<ip-of-your-otgw>/api/v2/settings` in a browser and save the page as a file. That gives you a list to re-enter after the steps below.
 

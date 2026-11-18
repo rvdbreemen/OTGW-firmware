@@ -522,7 +522,7 @@ Loopt de gateway vast of wordt hij onbereikbaar nadat u BLE inschakelde? Zie par
 
 ### 7.12a Een gateway herstellen die vastloopt of onbereikbaar wordt
 
-**Symptoom:** enige tijd na het opstarten reageert de webinterface niet meer, MQTT valt stil en de gateway is niet bereikbaar, vaak nadat u een instelling hebt gewijzigd. De meest waarschijnlijke oorzaak op een board zonder PSRAM is BLE-scanning die u hebt ingeschakeld nadat u de stabiliteitswaarschuwing accepteerde (paragraaf 5.16): BLE start bij het opstarten (`initSAT()`) en het geheugengebruik ervan kan de webserver laten verhongeren.
+**Symptoom:** enige tijd na het opstarten reageert de webinterface niet meer, MQTT valt stil en de gateway is niet bereikbaar, vaak nadat u een instelling hebt gewijzigd. Op firmware van vóór 2.0.0-beta.375 is de meest waarschijnlijke oorzaak op een board zonder PSRAM BLE-scanning die u hebt ingeschakeld nadat u de stabiliteitswaarschuwing accepteerde: BLE start bij het opstarten (`initSAT()`) en het geheugengebruik ervan kan de webserver laten verhongeren. Vanaf beta.375 kan BLE zonder PSRAM niet worden ingeschakeld, en een opgeslagen "aan" wordt bij het opstarten gewist (paragraaf 5.16).
 
 **Eerst een tip:** bewaar uw instellingen zolang de gateway werkt. Open `http://<ip-van-uw-otgw>/api/v2/settings` in een browser en sla de pagina op als bestand. Dan hebt u een lijst om na de stappen hieronder opnieuw in te voeren.
 

@@ -1992,9 +1992,9 @@ The radio runs a **continuous scan** from boot (TASK-494). Every format-pass adv
 One combined firmware image ships for all ESP32 boards; `psramFound()` decides at runtime whether BLE actually scans:
 
 - **Boards with PSRAM** (the LOLIN S3 Mini and S3 Mini Pro): BLE runs by default. The extra RAM absorbs the NimBLE stack without destabilising the rest of the firmware.
-- **Boards without PSRAM**: BLE stays dormant even when enabled. The web UI shows a consent dialog that warns about the instability risk of running BLE without PSRAM. Only after you accept (setting `satbleriskack`) does the radio start scanning. If the gateway then hangs or becomes unreachable, section 7.12a shows how to switch BLE off again.
+- **Boards without PSRAM**: BLE cannot be switched on (TASK-2025, ADR-257). Without PSRAM the scanner uses up the memory the gateway needs: on a test unit the heap ran out within about 2 minutes and the gateway stopped answering. The **Enable BLE sensors** switch stays visible but is disabled and greyed out, with the reason as its tooltip, and the BLE card says so. A REST or MQTT request to switch it on is refused (REST answers `409` with `BLE needs PSRAM: not available on this board`), and a stored `on`, for example from settings saved on an older firmware, is switched off at boot and saved as off.
 
-In short, BLE is active when it is enabled AND (the board has PSRAM OR you have acknowledged the risk).
+In short, BLE is active when it is enabled AND the board has PSRAM. Firmware before 2.0.0-beta.375 let you accept a risk warning to run BLE without PSRAM; if such a gateway hangs or becomes unreachable, section 7.12a shows how to recover it.
 
 #### Self-discovering roster (TASK-508)
 
@@ -2019,8 +2019,8 @@ The roster is exposed at:
 
 | Setting | Default | Range | Description |
 |---|---|---|---|
-| `satbleenable` | true | bool | Enable BLE sensor scanning (passive, continuous). No-op on boards without a BLE radio |
-| `satbleriskack` | false | bool | On a board WITHOUT PSRAM, acknowledge the instability risk so BLE may scan. Ignored on PSRAM boards (`psramFound()` gates instead) |
+| `satbleenable` | true | bool | Enable BLE sensor scanning (passive, continuous). No-op on boards without a BLE radio. On a board without PSRAM it is always false: switching it on is refused (REST `409`) and a stored true is cleared at boot (TASK-2025) |
+| `satbleriskack` | false | bool | Kept for settings files from older firmware; it no longer opens BLE on a board without PSRAM (TASK-2025, ADR-257) |
 | `satblemac` | "" | MAC address | Active sensor MAC (set via roster select; empty = auto-select first fresh entry) |
 | `satbleinterval` | 30 | 10-300 s | Publish / state-update cadence (NOT scan rate; scan is continuous) |
 | `satblenameprefix` | "" | up to 23 chars | Name-prefix filter (case-insensitive; empty = off) |
@@ -2810,7 +2810,7 @@ Does the gateway hang or become unreachable after you switched BLE on? See secti
 
 ### 7.12a Recovering a Gateway That Hangs or Becomes Unreachable
 
-**Symptom:** some time after boot the web UI stops answering, MQTT goes quiet and the gateway cannot be reached, often after you changed a setting. The most likely cause on a board without PSRAM is BLE scanning that you switched on after accepting the stability warning (section 5.16, "PSRAM-aware default"): BLE starts at boot (`initSAT()`) and its memory use can starve the web server.
+**Symptom:** some time after boot the web UI stops answering, MQTT goes quiet and the gateway cannot be reached, often after you changed a setting. On firmware before 2.0.0-beta.375 the most likely cause on a board without PSRAM is BLE scanning that you switched on after accepting the stability warning: BLE starts at boot (`initSAT()`) and its memory use can starve the web server. From beta.375 BLE cannot be switched on without PSRAM, and a stored "on" is cleared at boot (section 5.16, "PSRAM-aware default").
 
 **Tip first:** save your settings while the gateway works. Open `http://<ip-of-your-otgw>/api/v2/settings` in a browser and save the page as a file. That gives you a list to re-enter after the steps below.
 
