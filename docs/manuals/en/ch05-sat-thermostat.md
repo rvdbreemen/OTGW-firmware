@@ -479,7 +479,7 @@ The radio runs a **continuous scan** from boot (TASK-494). Every format-pass adv
 One combined firmware image ships for all ESP32 boards; `psramFound()` decides at runtime whether BLE actually scans:
 
 - **Boards with PSRAM** (the LOLIN S3 Mini and S3 Mini Pro): BLE runs by default. The extra RAM absorbs the NimBLE stack without destabilising the rest of the firmware.
-- **Boards without PSRAM**: BLE stays dormant even when enabled. The web UI shows a consent dialog that warns about the instability risk of running BLE without PSRAM. Only after you accept (setting `satbleriskack`) does the radio start scanning.
+- **Boards without PSRAM**: BLE stays dormant even when enabled. The web UI shows a consent dialog that warns about the instability risk of running BLE without PSRAM. Only after you accept (setting `satbleriskack`) does the radio start scanning. If the gateway then hangs or becomes unreachable, section 7.12a shows how to switch BLE off again.
 
 In short, BLE is active when it is enabled AND (the board has PSRAM OR you have acknowledged the risk).
 

@@ -515,7 +515,7 @@ De radio voert sinds 2.0.0 een **continue scan** uit vanaf boot (TASK-494). Elk 
 Er wordt een enkele gecombineerde firmware-image geleverd voor alle ESP32-boards; `psramFound()` bepaalt bij runtime of BLE daadwerkelijk scant:
 
 - **Boards MET PSRAM** (de LOLIN S3 Mini en S3 Mini Pro): BLE draait standaard. Het extra RAM vangt de NimBLE-stack op zonder de rest van de firmware te destabiliseren.
-- **Boards ZONDER PSRAM**: BLE blijft slapend, ook als het is ingeschakeld. De webinterface toont een toestemmingsdialoog die waarschuwt voor het instabiliteitsrisico van BLE zonder PSRAM. Pas nadat u accepteert (instelling `satbleriskack`) start de radio met scannen.
+- **Boards ZONDER PSRAM**: BLE blijft slapend, ook als het is ingeschakeld. De webinterface toont een toestemmingsdialoog die waarschuwt voor het instabiliteitsrisico van BLE zonder PSRAM. Pas nadat u accepteert (instelling `satbleriskack`) start de radio met scannen. Loopt de gateway daarna vast of wordt hij onbereikbaar, dan staat in paragraaf 7.12a hoe u BLE weer uitzet.
 
 Kort gezegd: BLE is actief wanneer het is ingeschakeld EN (het board PSRAM heeft OF u het risico heeft geaccepteerd).
 
