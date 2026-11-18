@@ -3,11 +3,11 @@ id: TASK-1938
 title: >-
   Collection server for diagnostic recordings: PocketBase on Robert's Synology
   behind a Cloudflare Tunnel
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-14T15:21:00Z'
-updated_date: '2026-11-18T22:30:00Z'
+updated_date: '2026-11-18T22:35:00Z'
 labels:
   - diagnostics
   - tooling
@@ -61,4 +61,12 @@ Robert 2026-11-14 (session): he has a domain on Cloudflare and asks for help to 
 2026-11-18 tunnel run. First run through https://telemetry.vandenbreemen.net: 2/11, everything 403. Cause: Cloudflare Browser Integrity Check refuses the default Python-urllib/3.12 User-Agent (error code 1010, at the edge, before the tunnel; /_/ also gave 403 instead of the tunnel's 404). Measured with curl on /api/health: Python-urllib/3.12 403 (1010); curl 200; ESP32HTTPClient 200; no User-Agent (what the firmware sends, CloudRecDevice.h:645/654) 200, and a POST to devices/auth-with-password without UA reaches PocketBase (400 Failed to authenticate). Fix for the test: the getpass wrapper installs a urllib opener with User-Agent otgw-test-client/1.0 (test_client.py itself not changed yet). Second run through the tunnel: checks 1-8 and 11 PASS (admin UI 404 through the tunnel); 9 and 12 FAIL as expected (they log in as superuser; _superusers/auth-with-password gives 404 through the tunnel). With the LAN run (1-9, 12 PASS; 11 FAIL on the LAN by design) every check passes where it applies: AC2 met. Still open: AC3 retention (run inside the NAS, not over SMB); cloudflared replica still reports 2024.12.2 (Container Manager kept the project's own YAML copy); test_client.py UA fix and README corrections (second migration, hostname, cloudflared pin, error 1010).
 
 2026-11-18 AC3 retention on the Synology. Container log (screenshot in session): hourly cron at minute 17 with a 30-day cutoff, e.g. '2026/11/18 22:17:00 otgw retention: deleted 0 batches older than 2026-10-19 22:17:00.002Z' and the same at 21:17 (cutoff exactly 30 days). Test inside the pocketbase container (apk add sqlite; no SQLite over SMB): one batch backdated to 2000-01-01, cron otgwBatchRetention run from the admin UI; afterwards sqlite3 shows batches total 2, older than 2001: 0 (terminal screenshot in session). Robert confirmed the log line 'deleted 1 batches' after the run (his reading of the container log; the agent saw the before/after counts only via his answer A: 3/1 before, 2/0 after). cloudflared now 2026.11.0 on all 4 connections (API read-back: status healthy, ams17/21/08/06), after editing the project YAML in Container Manager (the project keeps its own copy; editing compose.yaml on disk was not picked up by Build).
+
+2026-11-18 Cloudflare configuration rule (Robert: yes): zone ruleset a54be194... phase http_config_settings created (none existed, nothing overwritten), one rule set_config bic=false for (http.host eq "telemetry.vandenbreemen.net"). Red/green with User-Agent Python-urllib/3.12: telemetry /api/health 403 error 1010 before, 200 after; telemetry /_/ 404 after (tunnel catch-all, admin still closed); https://vandenbreemen.net/ still 403 (BIC unchanged elsewhere). Test gateways deleted by Robert in the admin UI. Hyper Backup of pb_data: Robert declined (not part of this task). Lane commit 5286743e5 (test_client UA, cloudflared pin 2026.11.0, README update).
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Collection point live on Robert's Synology (Intel J3455, Container Manager, PocketBase 0.40.6) behind remotely managed tunnel otgw-telemetry (cloudflared 2026.11.0, 4 connections healthy) at https://telemetry.vandenbreemen.net. AC1: container project, migrations, hooks and path rule (written 2026-11-14, now deployed as is). AC2: test_client LAN 10/11 (11 FAIL by design) + tunnel 9/11 (9, 12 FAIL by design: superuser path 404 through the tunnel); every check passes where it applies. AC3: hourly cron at :17 with a 30-day cutoff (log), a batch backdated inside the container was deleted by a Run (count 3/1 -> 2/0, Robert read 'deleted 1 batches'). AC4: README updated with the real steps and pitfalls (Container Manager YAML copy, Cloudflare BIC error 1010 + bic=false rule for the telemetry host, .local on IPv6, retention test inside the container). Not verified: arm64 build.
+<!-- SECTION:FINAL_SUMMARY:END -->
