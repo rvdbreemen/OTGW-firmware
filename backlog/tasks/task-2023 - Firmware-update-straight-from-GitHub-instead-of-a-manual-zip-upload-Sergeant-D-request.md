@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-18T11:54:00Z'
-updated_date: '2026-11-18T12:19:00Z'
+updated_date: '2026-11-18T12:24:00Z'
 labels:
   - feature
 dependencies: []
@@ -30,4 +30,6 @@ Asked by Sergeant D in #dev-sat-mqtt 2026-11-18 11:37 UTC (https://discord.com/c
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-11-18 Maintainer decision (Robert, DM 1572585865589428318, relayed by the coordinator), verbatim: "B en neem taak C op voor een latere release 2.1.0". Scope of this task is now option B only: the gateway shows 'new version available' with a link, from a version file on a plain HTTP mirror (no HTTPS on the device, ADR-003). Option C (HTTPS self-update) is filed as its own task for 2.1.0 (see the 2.1.0 task referencing ADR-218).
+
+OPEN QUESTION for Robert (infra choice, coordinator 2026-11-18: put to him when someone picks up B, not before): which host serves the version file over plain HTTP, and who keeps it in sync with each release (by hand, or a step in /beta-release-2x and /release-2x).
 <!-- SECTION:NOTES:END -->
