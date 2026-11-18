@@ -8183,3 +8183,20 @@ Robert, 16:18:42 UTC (https://discord.com/channels/812969634638725140/9144987300
 **Task:** TASK-1887 (no change; note the confirmation).
 
 **Open:** none.
+
+## 413. Q-398a answered A: a PWM ON phase that started during a band pause counts once as a start when the band allows heating again during that phase (Sergeant D, 2026-11-18; urgent round, 2.0.0)
+
+**Source:** #dev-sat-mqtt, Sergeant D 2026-11-18 18:52 UTC (https://discord.com/channels/812969634638725140/1105556725714649128/1572686045420593193; unedited after 95 s, read back via the Discord API), a reply to Q-398a (https://discord.com/channels/812969634638725140/1105556725714649128/1572685871285669909).
+
+**Quoted:**
+> "my answer is A"
+
+**Settled:** option A as posted: a PWM ON phase that starts during a band pause does not count as a start (entry 398); if the band then allows heating again while that same ON phase is still running, that phase counts once as a start at that moment. Scope: 2.0.0.
+
+**Compared with earlier entries:** consistent with entries 59, 90 and 95 (every ON phase in which the burner may start counts) and entry 398 (a phase in a pause does not count). The firmware already does this (TASK-1887); no firmware change.
+
+**Compared with thermo-nova (7beaaf5):** thermo-nova has no tolerance band and no band pause (see entry 411).
+
+**Task:** TASK-1887 (no change; note the confirmation).
+
+**Open:** none.
