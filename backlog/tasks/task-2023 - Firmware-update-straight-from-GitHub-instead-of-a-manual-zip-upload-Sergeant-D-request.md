@@ -7,7 +7,7 @@ status: To Do
 assignee:
   - '@otgw-webui'
 created_date: '2026-11-18T11:54:00Z'
-updated_date: '2026-11-18T12:53:00Z'
+updated_date: '2026-11-18T12:54:00Z'
 labels:
   - feature
 milestone: 2.0.0
@@ -44,4 +44,6 @@ Robert in #dev-sat-mqtt 2026-11-18 12:06 UTC (https://discord.com/channels/81296
 2026-11-18 PENDING with Robert (coordinator put it as 1/2): how the version check gets its data. (1) A plain-HTTP host we run that serves the version file; needs hosting and a sync step per release. (2) No host: the web UI in the user's browser asks the GitHub releases API itself (HTTPS is fine in the browser, the gateway stays HTTP-only per ADR-003), with a privacy note (the browser contacts GitHub) and an off-switch. Coordinator recommends 2. Not decided yet.
 
 2026-11-18 Robert chose hosting option 2 (DM 1572594516429381716, a reply to 1572588660904296520, relayed by the coordinator), verbatim: "2". Design: no host and no firmware HTTP change; the web UI in the user's browser asks the GitHub releases API (HTTPS in the browser; the gateway itself stays HTTP-only per ADR-003), compares with the running fwversion and shows 'new version available' with a link to the release page; a privacy note in the docs (the browser contacts GitHub) and a setting to switch the check off. Owner: otgw-webui, after their BLE bug (coordinator). ACs rewritten for this design.
+
+2026-11-18 The beta/stable rule in AC3 (beta users are told about newer betas and stable releases; stable users only about stable releases unless they opt in) is decided by the coordinator as a team decision; Robert may overrule (the coordinator has told him).
 <!-- SECTION:NOTES:END -->
