@@ -56,6 +56,9 @@ const OLD_FALLBACK = {
   SAT_GEO_ERR: 'var SAT_GEO_ERR = null;',
   satGeoUsable: 'function satGeoUsable() { return !!navigator.geolocation; }',
   satWireDetectLocation: "function satWireDetectLocation() { var dl = document.getElementById('satDetectLoc'); if (dl) dl.addEventListener('click', satDetectLocation); }",
+  // TASK-2015: the hint moved into satUpdateLocHint (polled); older code has neither function
+  satLocHintKind: 'function satLocHintKind() { return ""; }',
+  satUpdateLocHint: 'function satUpdateLocHint() {}',
 };
 function optional(fn, src, name) {
   try { return fn(src, name); } catch (e) { if (/not found/.test(e.message)) return OLD_FALLBACK[name]; throw e; }
@@ -78,6 +81,9 @@ function load({ secure, geo }) {
     optional(extractFunction, src, 'satGeoUsable'),
     extractFunction(src, 'satDetectLocation'),
     optional(extractFunction, src, 'satWireDetectLocation'),
+    'var satLastData = null, satLastWeather = null;',   // TASK-2015: no SAT status / weather answer yet
+    optional(extractFunction, src, 'satLocHintKind'),
+    optional(extractFunction, src, 'satUpdateLocHint'),
     'return { satGeoUsable, satDetectLocation, satWireDetectLocation };',
   ].join('\n');
   const dom = { satDetectLoc: el(), satLocHint: Object.assign(el(), { hidden: true }), satCoords: el() };

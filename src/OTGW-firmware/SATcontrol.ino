@@ -3391,9 +3391,21 @@ static float satSunElevationDeg(float latDeg, float lonDeg, int64_t utcEpoch)
 // The step with its inputs given, so tests/test_sat_sun_elevation.py compiles it as it is. The staleness rule lives here
 // and not in satUpdateSolarGain(), which returns early (solar gain off, room invalid) before it: an external value older
 // than 1 h that cannot be replaced by a local computation (no NTP time, or latitude and longitude both 0) is invalid.
+// TASK-2015: the one freshness rule for an external (MQTT sat/sun_elevation) value, shared by this step and the SAT
+// status JSON (sun_elevation_source), so the web UI and the controller agree at the 1 h boundary.
+static bool satSunElevationExternalFresh(uint32_t extMs, uint32_t now)
+{
+  return extMs != 0 && (uint32_t)(now - extMs) < 3600000UL;
+}
+// 0 = none, 1 = computed here from latitude/longitude, 2 = external and fresh
+static uint8_t satSunElevationSource(uint32_t extMs, bool valid, bool local, uint32_t now)
+{
+  if (satSunElevationExternalFresh(extMs, now)) return 2;
+  return (valid && local) ? 1 : 0;
+}
 static void satSunElevationStepAt(uint32_t now, bool ntpSet, int64_t epoch)
 {
-  if (state.sat.iSunElevExtMs != 0 && (uint32_t)(now - state.sat.iSunElevExtMs) < 3600000UL) return;   // external wins while fresh
+  if (satSunElevationExternalFresh(state.sat.iSunElevExtMs, now)) return;   // external wins while fresh
   if (!ntpSet || (settings.sat.fWeatherLat == 0.0f && settings.sat.fWeatherLon == 0.0f)) {
     if (state.sat.bSunElevationValid && (uint32_t)(now - state.sat.iSunElevLastMs) > 3600000UL) state.sat.bSunElevationValid = false;
     return;
@@ -4972,6 +4984,14 @@ void satSendStatusJSON()
     je.field(F("last_known_room"),      snap->st.sat.fLastKnownRoom);
     // Solar gain (Task #23)
     je.field(F("solar_gain_active"),    snap->st.sat.bSolarGainActive);
+    // TASK-2015: where the sun elevation comes from (the step's freshness rule), so the web UI asks for a location only
+    // when no fresh sat/sun_elevation arrives from Home Assistant
+    {
+      const uint8_t sunSrc = satSunElevationSource(snap->st.sat.iSunElevExtMs, snap->st.sat.bSunElevationValid,
+                                                   snap->st.sat.bSunElevationLocal, millis());
+      je.field(F("sun_elevation_source"), sunSrc == 2 ? F("external") : (sunSrc == 1 ? F("local") : F("none")));
+      if (sunSrc != 0) je.field(F("sun_elevation"), snap->st.sat.fSunElevation, 1);
+    }
     je.field(F("indoor_rise_rate"),     snap->st.sat.fIndoorRiseRate);
     // Summer simmer (Task #24)
     je.field(F("summer_simmer"),        settings.sat.bSummerSimmer);

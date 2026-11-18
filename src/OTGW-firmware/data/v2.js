@@ -1608,8 +1608,10 @@
       "sat_geo_denied": "Location denied: the browser blocked access",
       "sat_geo_detecting": "Detecting…",
       "sat_geo_error": "Location error",
-      "sat_geo_hint": "Location detection needs HTTPS. Enter Latitude and Longitude under SAT settings > Weather.",
+      "sat_geo_hint": "Location detection needs HTTPS. Enter Latitude and Longitude under SAT settings > Weather, or let Home Assistant publish sat/sun_elevation.",
       "sat_geo_needs_https": "Location detection needs HTTPS",
+      "sat_sun_from_ha": "Sun position from Home Assistant (sat/sun_elevation): {{deg}}°. No location needed.",
+      "sat_sun_ha_weather_loc": "The weather fetch still needs Latitude and Longitude under SAT settings > Weather.",
       "sat_geo_save_failed": "Save failed",
       "sat_geo_timeout": "Location timed out",
       "sat_geo_unavailable": "Location unavailable",
@@ -6931,6 +6933,7 @@
   // across polls (no firmware history endpoint, by design — as in the former classic SAT page).
   var satPollTimer = null;
   var satLastData = null;
+  var satLastWeather = null;   // TASK-2015: the last v2/sat/weather answer, for the location hint
   // TASK-1507: SAT beta notice. One text for the wizard's first step and the SAT page notice.
   var SAT_BETA_HEAD = 'SAT is experimental in this beta and it controls your boiler.';
   var SAT_BETA_BODY = 'We need field data to validate it. Please run the capture tool now and then (scripts/capture-mqtt-debug.bat on Windows, scripts/capture-mqtt-debug.sh on Linux or macOS) and share the transcript in the Discord #alpha-testing channel (discord.gg/zjW3ju7vGQ) or as a GitHub issue (github.com/rvdbreemen/OTGW-firmware/issues).';
@@ -7058,6 +7061,7 @@
         if (d.enabled !== undefined) satEnabledLive = !!d.enabled;   // TASK-1737 (renderSatPage applies the lock)
         syncSatBetaNotice();   // TASK-1507: once per page load
         try { renderSatPage(d); } catch (e) { }
+        try { satUpdateLocHint(); } catch (e) { }   // TASK-2015: the hint follows the sun elevation source
       })
       .catch(function () {
         // Hard failure (device unreachable) at first paint: show the no-data banner
@@ -7605,6 +7609,8 @@
   }
 
   function renderSatWeather(w) {
+    satLastWeather = w || null;
+    satUpdateLocHint();
     if (!w || !w.enabled) { satKv('satWeatherKv', [[t('tools.kv_weather'), t('tools.disabled')]]); txt('satCoords', ''); return; }
     var valid = !!w.valid;
     var mins = (valid && w.age_seconds >= 0) ? Math.floor(w.age_seconds / 60) : null;
@@ -7854,17 +7860,40 @@
   }
 
   // On plain HTTP the Detect location button always fails, so hide it and point
-  // to the manual Latitude/Longitude fields instead (TASK-1257).
+  // to the manual Latitude/Longitude fields instead (TASK-1257). The hint itself follows
+  // the polled status and weather (satUpdateLocHint, TASK-2015).
   function satWireDetectLocation() {
     var dl = document.getElementById('satDetectLoc');
     if (!dl) return;
-    if (satGeoUsable()) { dl.addEventListener('click', satDetectLocation); return; }
-    dl.hidden = true;
+    if (satGeoUsable()) dl.addEventListener('click', satDetectLocation);
+    satUpdateLocHint();
+  }
+
+  // TASK-2015 (Robert, 2026-11-18): not everyone uses Home Assistant, so Latitude/Longitude stays the
+  // default; when HA publishes a fresh sat/sun_elevation (sun_elevation_source "external" in the
+  // SAT status, the firmware's 1 h rule of TASK-1410) the card names that source and asks for no
+  // location, unless the weather fetch is on without a location (the fetch itself needs one).
+  // Returns 'ha', 'ha_weather_loc', 'hint' (ask for a location) or '' (nothing to say).
+  function satLocHintKind(sunSource, weatherOn, hasLocation, geoUsable) {
+    if (sunSource === 'external') return (weatherOn && !hasLocation) ? 'ha_weather_loc' : 'ha';
+    return geoUsable ? '' : 'hint';
+  }
+  function satUpdateLocHint() {
+    var d = satLastData || {}, w = satLastWeather || {};
+    var lat = parseFloat(w.latitude), lon = parseFloat(w.longitude);
+    var hasLoc = !isNaN(lat) && !isNaN(lon) && (lat !== 0 || lon !== 0);
+    var kind = satLocHintKind(d.sun_elevation_source, !!w.enabled, hasLoc, satGeoUsable());
+    var dl = document.getElementById('satDetectLoc');
+    if (dl) dl.hidden = !satGeoUsable() || kind === 'ha';
     var lh = document.getElementById('satLocHint');
-    if (lh) {
-      lh.textContent = t('tools.sat_geo_hint');
-      lh.hidden = false;
-    }
+    if (!lh) return;
+    var deg = (typeof d.sun_elevation === 'number') ? d.sun_elevation.toFixed(1) : '—';
+    var msg = '';
+    if (kind === 'hint') msg = t('tools.sat_geo_hint');
+    else if (kind === 'ha') msg = t('tools.sat_sun_from_ha', { deg: deg });
+    else if (kind === 'ha_weather_loc') msg = t('tools.sat_sun_from_ha', { deg: deg }) + ' ' + t('tools.sat_sun_ha_weather_loc');
+    lh.textContent = msg;
+    lh.hidden = !msg;
   }
 
   // ---------- TASK-990: sensor-discovery toast (PR-649 "OTGW Patterns and Tokens") ----------

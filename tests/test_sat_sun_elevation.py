@@ -126,14 +126,17 @@ static Sett settings; static Stt state;
 // usage: t.exe lat lon  then steps: E:now:elev (external value) | S:now:ntp:epoch (satSunElevationStepAt)
 int main(int argc, char** argv) {
   settings.sat.fWeatherLat = (float)atof(argv[1]); settings.sat.fWeatherLon = (float)atof(argv[2]);
+  unsigned long last = 0;
   for (int i = 3; i < argc; i++) {
     unsigned long now; int ntp; long long ep; float el;
     if (sscanf(argv[i], "E:%lu:%f", &now, &el) == 2) {
       state.sat.fSunElevation = el; state.sat.bSunElevationValid = true; state.sat.iSunElevLastMs = (uint32_t)now;
-      state.sat.iSunElevExtMs = now ? (uint32_t)now : 1; state.sat.bSunElevationLocal = false;
-    } else if (sscanf(argv[i], "S:%lu:%d:%lld", &now, &ntp, &ep) == 3) satSunElevationStepAt((uint32_t)now, ntp != 0, ep);
+      state.sat.iSunElevExtMs = now ? (uint32_t)now : 1; state.sat.bSunElevationLocal = false; last = now;
+    } else if (sscanf(argv[i], "S:%lu:%d:%lld", &now, &ntp, &ep) == 3) { satSunElevationStepAt((uint32_t)now, ntp != 0, ep); last = now; }
   }
-  printf("valid=%d local=%d elev=%.1f\n", (int)state.sat.bSunElevationValid, (int)state.sat.bSunElevationLocal, state.sat.fSunElevation);
+  // TASK-2015: the source the SAT status JSON reports, at the time of the last step
+  const int src = satSunElevationSource(state.sat.iSunElevExtMs, state.sat.bSunElevationValid, state.sat.bSunElevationLocal, (uint32_t)last);
+  printf("valid=%d local=%d elev=%.1f src=%d\n", (int)state.sat.bSunElevationValid, (int)state.sat.bSunElevationLocal, state.sat.fSunElevation, src);
   return 0;
 }
 """
@@ -191,13 +194,39 @@ class SunElevationStep(unittest.TestCase):
 
 
 
+class SunElevationSource(SunElevationStep):
+    """TASK-2015: the status JSON reports the source with the step's own freshness rule (2 external, 1 local, 0 none)."""
+
+    def test_fresh_external_value_is_external_even_with_a_location(self):
+        r = self.run_steps(52.37, 4.90, "E:1000:30.0", f"S:{1000 + self.H - 1}:1:{utc(2026, 6, 21, 12, 0)}")
+        self.assertEqual(r["src"], "2")
+
+    def test_external_value_turns_local_after_one_hour_with_a_location(self):
+        r = self.run_steps(52.37, 4.90, "E:1000:30.0", f"S:{1000 + self.H + 1}:1:{utc(2026, 6, 21, 12, 0)}")
+        self.assertEqual(r["src"], "1")
+
+    def test_no_external_value_and_no_location_is_none(self):
+        self.assertEqual(self.run_steps(0, 0, "S:5000:1:0")["src"], "0")
+
+    def test_stale_external_value_without_a_location_is_none(self):
+        self.assertEqual(self.run_steps(0, 0, "E:1000:30.0", f"S:{1000 + self.H + 1}:0:0")["src"], "0")
+
+
 class SourceChecks(unittest.TestCase):
     def test_external_value_wins_while_fresh(self):
         src = SAT_INO.read_text(encoding="utf-8")
         i = src.find("static void satSunElevationStepAt(")
         self.assertGreater(i, 0)
         body = src[i:src.index("\n}\n", i)]
-        self.assertRegex(body, r"iSunElevExtMs != 0 && \(uint32_t\)\(now - state\.sat\.iSunElevExtMs\) < 3600000UL\) return;")
+        self.assertIn("if (satSunElevationExternalFresh(state.sat.iSunElevExtMs, now)) return;", body)   # TASK-2015: one rule
+        h = src[src.find("static bool satSunElevationExternalFresh("):]
+        self.assertRegex(h[:h.index("\n}\n")], r"extMs != 0 && \(uint32_t\)\(now - extMs\) < 3600000UL")
+
+    def test_status_json_reports_the_source_with_the_same_rule(self):   # TASK-2015
+        src = SAT_INO.read_text(encoding="utf-8")
+        i = src.find('je.field(F("sun_elevation_source")')
+        self.assertGreater(i, 0, "the SAT status JSON has no sun_elevation_source")
+        self.assertIn("satSunElevationSource(snap->st.sat.iSunElevExtMs", src[i - 400:i])
         self.assertIn("satSunElevationStep();", src)
 
 
