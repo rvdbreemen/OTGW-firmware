@@ -3,11 +3,11 @@ id: TASK-2013
 title: >-
   HA thermostat drops out of the Comfort preset to none on beta.360
   (indigo_light), capture pending
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-18T06:24:00Z'
-updated_date: '2026-11-18T09:24:00Z'
+updated_date: '2026-11-18T09:27:00Z'
 labels:
   - bug
   - needs-info
@@ -50,3 +50,9 @@ Reported by indigo_light in #beta-testing 2026-11-17 19:20 UTC (https://discord.
 
 AC4 bench by 09 (2026-11-18, .61 OT-Direct, GW=L loopback boiler, satsimulation off; same steps on both builds: sat/enabled=1, sat/preset=comfort (SATpresetcomfort 21, file SATtargettemp 22), telnet 'q', sat/target=22). OLD 2.0.0-beta.368+c0044a3, 10:06-10:07: comfort -> climate_target 21, sat/target 21; 10:07:08.304 'Read settings', reload 'field[SATtargettemp], newValue[22.00]' with NO no-op skip; same second sat/preset -> none, climate_target 22 (RED). FIX 2.0.0-beta.369+5897780 (githash 5897780, appelfsha256 05150779... = .elf; full OTA, changed none), 10:12-10:14, SAT active (sat/outdoor_temp=8 injected non-retained; without it SAT stayed inactive after the OTA reboot, that run fix369L was also green): comfort -> climate_target 21, sat/target 21; 10:13:53.669 'Read settings', 'newValue[22.00]' + '[Settings] no-op skip' (target left alone); sat/preset stays comfort, climate_target stays 21 (GREEN); 10:14:08 sat/target=22 -> sat/preset none, climate_target 22. A first 368 run without loopback is void: SAT handed the boiler back 56 ms before 'q'. Restored: settings as before the test (diff none, settings.ini identical), GW=2 master. Evidence: 09 scratchpad t2013/ (old368L-*, fix369A-*, fix369L-*).
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+AC1: indigo_light's beta.360 day capture 20261117-092448 shows 3 drops to preset none, each right after the capture tool's 'q' (device 09:24:51.314 start, 09:54:15.919 and 10:02:11.738 after 1 s telnet gaps; device clock about 1.95 s ahead of the host), 0 drops without a preceding 'q'. AC2: otgw_capture.py sends only 'D'; test_i/test_i2 red on the old tool (keys ['1','3','q','D','q','D','1','3']), green on the fix; capture suite 148 OK (commit e5fa0713c). AC3: readSettings() opens a SettingsLoadScope and the SATtargettemp branch leaves a held preset alone while loading; test_sat_preset_persist 13/13, red on the old settingStuff ('0 != 3: a settings reload dropped the active preset'); the reload in the test is a test-side copy of readSettings(), the manual-change case is no-regression (commit fb18812f4, 2.0.0-beta.369). AC4: 09 on .61 with GW=L: 368 drops the preset on 'q', 369+5897780 keeps it (no-op skip) and a manual target 22 still clears it (ticked by 09, 83648a4e9). Published as 2.0.0-beta.369+fb18812, #alpha-testing message 1572542159293513769. Not covered: other setters still run their user-change side effects on a reload ('q' is a debug key).
+<!-- SECTION:FINAL_SUMMARY:END -->

@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-01T15:47:00Z'
-updated_date: '2026-11-18T09:21:00Z'
+updated_date: '2026-11-18T09:25:00Z'
 labels:
   - beta
   - release
@@ -57,4 +57,6 @@ AC4 PASS by 09 (2026-11-18), .63 (Classic + ESP32-S3, PIC 6.8). Pre-state: publi
 2026-11-18 AC2 check (otgw-docs), NOT ticked: indigo_light's macOS capture 20261118-081844-upload-clean.zip (752,500 B, #beta-testing msg 1572521874263515248; facts from 92's read of summary.txt and the transcript): Platform darwin, Python 3.9.6 (/Library/Developer/CommandLineTools/usr/bin/python3), --long-run, device beta.360+9665467, 08:18:44-08:53:21 +01:00 (35 min), stop 'Q key', Finished line present, crash-log/frame recorder/browser capture completed normally, telnet gaps 0, MQTT 3525 messages, OT frames 6492. Two gaps against the AC: (1) the tool ran from a beta.350 zip folder, not the release zip the AC names; (2) script.error.log shows the graph-history CSV failing on Python 3.9 (TypeError write_text newline), fixed in TASK-2016 (tools, not yet in a release zip). macOS version asked (msg 1572527731558580235), not answered yet. Next: once TASK-2016 is in a published beta zip, ask indigo_light once for a 10 min rerun from that zip; tick AC2 on that transcript with the macOS version.
 
 2026-11-18 (from 92): indigo_light's Mac is Apple silicon M4 Pro, system Python 3.9.6 (CommandLineTools); macOS version asked again, not answered yet. 92's behaviour analysis of that run (#beta-testing 1572541155206500372, chart in 92's scratchpad indigomac/charts/indigo-mac-sat.png): the tool ran clean on macOS except the 3.9 CSV bug (TASK-2016, on origin/dev, in the beta.369 alpha zip); heating side one 24.8 min run, PWM/continuous/PWM, CS 43-46 C, flow within about 1 C, room 20.07 -> 20.74 C. AC2 stays open until a rerun from a published release zip with the fix.
+
+2026-11-18 (from 92): macOS version as indigo_light wrote it, verbatim: "27.2.1 (26B131) (Golden Gate)" (#beta-testing 2026-11-18 08:54 UTC, reply to 1572535253250084865). Apple silicon M4 Pro, Python 3.9.6 from Apple's CommandLineTools. Reported by the tester, not checked by us. AC2 still waits for a rerun from a published release zip that carries TASK-2016.
 <!-- SECTION:NOTES:END -->
