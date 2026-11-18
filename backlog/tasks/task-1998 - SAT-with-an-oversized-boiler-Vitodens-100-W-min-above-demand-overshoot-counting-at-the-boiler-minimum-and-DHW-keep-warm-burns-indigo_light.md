@@ -3,15 +3,15 @@ id: TASK-1998
 title: >-
   SAT with an oversized boiler (Vitodens 100-W, min above demand): overshoot
   counting at the boiler minimum and DHW keep-warm burns (indigo_light)
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-11-16T10:42:00Z'
-updated_date: '2026-11-18T12:02:00Z'
+updated_date: '2026-11-18T19:25:00Z'
 labels:
-  - needs-maintainer-ok
   - sat
   - field
-milestone: 2.1.0
+milestone: 2.0.0
 dependencies: []
 ordinal: 1022000
 ---
@@ -26,7 +26,7 @@ Reported by indigo_light (Discord 301077214374658048), #beta-testing https://dis
 <!-- AC:BEGIN -->
 - [x] #1 Long-run capture on beta.339 or newer and the graph CSVs from the reporter received and analysed
 - [ ] #2 Q2 and Q3 put to Sergeant D one per message with the release scope line, answers recorded as entries
-- [ ] #3 Follow-up per his answers: a change with a host test red on the old code and green on the fix, or a recorded works-as-designed
+- [x] #3 Follow-up per his answers: a change with a host test red on the old code and green on the fix, or a recorded works-as-designed
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -45,4 +45,8 @@ Open design questions for Sergeant D (one per message, each with the release sco
 2026-11-16 Q-1998b queued for Sergeant D (after Q-2005a): do the short DHW burns belong in SAT's cycle statistics and 4 h window (7 burns of 1-16 s logged as SAT cycles #2-#5, window n=5), given entry 390? If he answers they must not count, the fix goes into 2.0.0 (coordinator).
 
 2026-11-18 AC1 evidence (comms 92, analyze-capture, posted to indigo with charts): (a) long-run capture on beta.360 (>= 339): 20261117-092448-beta360-day-clean.zip, 09:25-23:00, analysed: room 20.75-21.05 C at target 21.0 from 13:30 to 22:25, 20 continuous<->PWM switches, ~55 C ON-start setpoint (entries 408/409), flow peaks 55-62 C between runs are standing water, boiler reports DHW mode 20-40 s after nearly every CH run (the keep-warm DHW burns of entry 390); post #beta-testing 1572542421840171140. (b) the reporter's graph CSVs (otgw-graph-20261112-210857.csv HA-integration SAT, otgw-graph-20261115-163915.csv OTGW SAT beta.250) analysed side by side; the export's roomSet is MsgID 16 (v2.js:2390), not the SAT target; post 1572543639081717844. Charts: scratchpad indigo1117/charts/indigo-day-sat.png, indigocsv/charts/indigo-compare.png. AC2/AC3 still open (Q-1998b with Sergeant D).
+
+2026-11-18 Robert chose A (DM 1572691723803566232, relayed by the coordinator): TASK-1998 to milestone 2.0.0, released (needs-maintainer-ok removed). Rule: entry 416 (Sergeant D 'my answer is C', twice, 19:07:34 and 19:09:32 UTC; supersedes 415): short DHW burns stay counted as cycles in the cycle list and the 4 h window, marked as hot water, and do not change PWM or overshoot decisions, as thermo-nova (cycles/tracker.py:315-316 kind DOMESTIC_HOT_WATER, cycles/classifier.py:25-26 UNCERTAIN on any hot water in the tail, cycles/history.py:102-128 no kind filter); entry 268 (duty counts every flame) stays. Repro: indigo_light beta.350, 7 DHW burns of 1-16 s counted as ordinary SAT cycles. Lane: lane-410 (wt-410, with entries 410/417).
+
+2026-11-18 AC3 = works as designed per entry 416 (coordinator accepted). Code read on origin/dev 13c0a4e41: (1) counted + kept: a burn of >= SAT_CYCLE_MIN_SAMPLES samples is recorded (SATcycles.ino:800-830) and enters the 4 h window (:1191); duty counts every flame (:493-494, entry 268). (2) marked hot water: kind SAT_CK_DHW at >80 % DHW samples (:792 = tracker.py:315-316), stored per cycle (:805), published as eLastCycleKind (SATcontrol.ino:5381); class UNCERTAIN on DHW in the tail (SATcycles.ino:899 = classifier.py:25-26); indigo's logged burns #2-#5 are class=5 = UNCERTAIN (sat_story.txt). (3) no PWM/overshoot effect: the only control decision on a finished cycle, satCycleApplyEndOfCycle (:1006-1021), acts on OVERSHOOT or UNDERHEAT_PWM only; the 4 h/24 h/EMA overshoot fractions count OVERSHOOT only (:459, :558, :831); the other window stats have no control reader; the live switch has its 300 s DHW guard (:203-206). (4) indigo's three 1 s burns are not cycles at all: min-samples rule (:1114 = tracker.py:98-100, entry 249); entry 416 says 'as thermo-nova' and thermo-nova drops them the same way, so this is consistent (coordinator: no extra question). Regression guard (green, no defect to show red): tests/test_sat_cycle_classifier.py::test_task1998_short_dhw_burn_is_counted_marked_hot_water_and_switches_nothing on the real SATcycles.ino cut: a 16 s DHW burn at flow 73 C in continuous -> count 1, kind DHW, class UNCERTAIN, mode continuous, 0 switches; control subtest: the same burn on the CH bit -> OVERSHOOT, switch to PWM. Run: 10 passed (-k 'task1998 or task1331'). No firmware change, no bump.
 <!-- SECTION:NOTES:END -->

@@ -462,6 +462,10 @@ END_CASES = {
     "E7_mode_off_overshoot": Case([seg(300, 54.0, CH, 0, 0)], "OVERSHOOT", oracle=False),
     "E8_switch_out_of_pwm_mid_burn": Case([seg(100, 60.0, CH, PWM, 1, 30.0), seg(200, 60.0, CH, CONT, 0, 60.0)],
                                           "GOOD", ctrl=30.0, req=60.0, on_time=300, oracle=False),
+    # TASK-1998, entry 416: indigo_light's short hot-water burn (beta.350, 15:44:35, 16 s, flow 70-73 C) in continuous mode.
+    # E9 is that burn on the DHW bit; E9_ch the same burn as a CH burn, so the test shows the flow alone would switch to PWM.
+    "E9_dhw_burn_16s": Case([seg(16, 73.0, DHW)], "UNCERTAIN", oracle=False),
+    "E9_ch_twin_16s": Case([seg(16, 73.0, CH)], "OVERSHOOT", oracle=False),
 }
 
 
@@ -693,6 +697,19 @@ class CycleClassifier(unittest.TestCase):
 
     def test_task1331_pwm_good_cycle_changes_nothing(self):
         self.end_of_cycle("E4_pwm_good", PWM, 0)
+
+    def test_task1998_short_dhw_burn_is_counted_marked_hot_water_and_switches_nothing(self):
+        # Entry 416 (Q-1998b C, as thermo-nova): counted as a cycle, kind DOMESTIC_HOT_WATER (tracker.py:315-316), classified
+        # UNCERTAIN on hot water in the tail (classifier.py:25-26), so the end-of-cycle verdict changes no mode. Works as designed
+        # on the code of 2026-11-18; this guards it. A burn of fewer than SAT_CYCLE_MIN_SAMPLES samples (indigo's 1 s burns) is
+        # not a cycle at all (tracker.py:98-100, entry 249; test_R1_fewer_than_3_samples_is_not_recorded).
+        cls_, kind = self.run_case("E9_dhw_burn_16s", cases=END_CASES)
+        self.assertEqual(self.last_count, 1, "the hot-water burn is counted as a cycle")
+        self.assertEqual(KIND_NAME.get(kind, kind), "DHW", "the burn is marked as hot water")
+        self.assertEqual(CLS_NAME.get(cls_, cls_), "UNCERTAIN")
+        self.assertEqual((self.last_mode, self.last_switches), (CONT, 0), "a hot-water burn must not switch to PWM")
+        with self.subTest("control: the same burn on the CH bit overshoots and switches"):
+            self.end_of_cycle("E9_ch_twin_16s", PWM, 1)
 
     def test_task1331_other_continuous_verdicts_change_nothing(self):
         # continuous UNDERHEAT is not the PWM branch; UNCERTAIN (no CH enable) is neutral too
