@@ -6,11 +6,12 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-18T09:30:00Z'
-updated_date: '2026-11-18T10:21:00Z'
+updated_date: '2026-11-18T10:22:00Z'
 labels:
   - webui
   - sat
   - graph
+  - needs-maintainer-ok
 dependencies: []
 priority: medium
 ordinal: 1034000
