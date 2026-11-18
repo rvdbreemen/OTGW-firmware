@@ -8344,3 +8344,18 @@ Robert, 16:18:42 UTC (https://discord.com/channels/812969634638725140/9144987300
 **Task:** TASK-1887 (no change).
 
 **Open:** none.
+
+## 422. Q-343b answered A: the 90 % clean share of entry 343 is 90 % of the expected ticks for whatever control interval is set (Sergeant D, 2026-11-18; urgent round, scope 2.1.0; confirms our reading in entry 343)
+
+**Source:** #dev-sat-mqtt, Sergeant D 2026-11-18 19:32:18 UTC, edited at 19:32:39 UTC; the final text is quoted below (https://discord.com/channels/812969634638725140/1105556725714649128/1572695969114366083; read back via the Discord API), a reply to Q-343b (https://discord.com/channels/812969634638725140/1105556725714649128/1572695581070069972).
+
+**Quoted (final text):**
+> "My answer is A"
+
+**Settled:** option A as posted: an hour counts for the self-tune when at least 90 % of its expected ticks (hour length / control interval) are clean, at every control interval from 10 to 300 s (settingStuff.ino:1168): 108 of 120 at 30 s, 324 of 360 at 10 s, 36 of 40 at 90 s. Our interpretation in entry 343 is now his decision. The firmware already does this (SATcurveTune.h, SAT_CT_MIN_CLEAN_PCT against the expected ticks, opened this session); no change.
+
+**Compared with thermo-nova (7beaaf5):** no counterpart; thermo-nova has no self-tune (entry 72).
+
+**Task:** TASK-1932 (no change).
+
+**Open:** none. With this answer every question of the urgent round of 2026-11-18 is answered (entries 410-422).

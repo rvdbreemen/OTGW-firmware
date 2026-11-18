@@ -4573,7 +4573,7 @@
    "tasks": [
     "TASK-1932"
    ],
-   "confirmed_by_entry": null
+   "confirmed_by_entry": 422
   },
   {
    "id": 344,
@@ -5574,6 +5574,19 @@
    "supersedes": [],
    "tasks": [
     "TASK-1887"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 422,
+   "title": "Q-343b answered A: the 90 % clean share of entry 343 is 90 % of the expected ticks for whatever control interval is set (Sergeant D, 2026-11-18; urgent round, scope 2.1.0; confirms our reading in entry 343)",
+   "date": "2026-11-18",
+   "source": "sergeant-d",
+   "kind": "interpretation",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1572695969114366083",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1932"
    ],
    "confirmed_by_entry": null
   }
