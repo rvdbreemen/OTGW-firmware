@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : SATtypes.h
-**  Version  : v2.0.0-beta.375
+**  Version  : v2.0.0-beta.376
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -133,6 +133,7 @@ struct SATZoneState {
   float    fSetpoint     = 0.0f;   // Last received zone setpoint (°C)
   float    fPidOutput    = 0.0f;   // Zone PID output (CH setpoint requested by this zone)
   float    fPidIntegral  = 0.0f;   // Zone PID integral accumulator
+  bool     bPidInBand    = true;   // TASK-1890: the previous integral update was inside the deadband
   float    fPrevError    = 0.0f;   // Previous PID error (for derivative)
   uint32_t iLastUpdateMs = 0;      // millis() of last room_temp or setpoint update
   bool     bRoomValid    = false;  // Room temp has been received at least once

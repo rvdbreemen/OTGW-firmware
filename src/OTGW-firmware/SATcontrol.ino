@@ -3619,12 +3619,17 @@ static void satZonePidAdvance(uint8_t idx, float outsideTemp)
   // Integral: only inside deadband (matches SAT Python convention).
   // Symmetric clamp [-curveValue, +curveValue] mirrors primary PID (TASK-588).
   // Negative accumulation is needed when the zone overshoots its setpoint.
+  // TASK-1890 (entries 329 and 333, ADR-259): outside the deadband the integral is halved once when the error leaves
+  // the band and then held, as the main PID (_pidUpdateIntegral()); thermo-nova resets it to 0 (pid.py:187-189, the
+  // zones use the same PID class, area.py:50).
   if (fabsf(error) <= deadband) {
+    z.bPidInBand = true;
     z.fPidIntegral += ki * error * 60.0f;   // SAT_PID_UPDATE_INTERVAL = 60s
     if (z.fPidIntegral < -curveValue) z.fPidIntegral = -curveValue;
     if (z.fPidIntegral >  curveValue) z.fPidIntegral =  curveValue;
   } else {
-    z.fPidIntegral = 0.0f;
+    if (z.bPidInBand) z.fPidIntegral *= 0.5f;
+    z.bPidInBand = false;
   }
   z.fPrevError = error;   // the held error: satZonePidOutput() reads it until the next step (pid.py:100)
 }

@@ -256,7 +256,7 @@ Consequence for the default 30 s interval and a steady room temperature: tick 1 
 
 At the first computed update, the restored values are used as follows:
 
-- **Integral:** zeroed when |error| > deadband (default 0.1 °C); otherwise accumulated on top of the restored value (`SATpid.ino:151-166`, `SATtypes.h:443`).
+- **Integral:** when |error| leaves the deadband (0.1 °C) it is halved once and then held while outside (TASK-1890, ADR-259; thermo-nova zeroes it); otherwise accumulated on top of the restored value (`SATpid.ino:151-166`, `SATtypes.h:443`).
 - **Derivative:** if |error| ≤ deadband, or the temperature has not changed, or the change came within 60 s, the restored raw derivative is kept and used in D (`SATpid.ino:199-219`, `SATpid.ino:299`).
 - **P:** from the live error (`SATpid.ino:297`).
 
@@ -438,7 +438,7 @@ kd = round3(0.063 * 8400 * kp)                           (the rounded kp; factor
 
 ```
 I: if solar gain active and bSolarFreezeIntegral: no change (no reset, no accumulation)   SATpid.ino:157, (corrected 2026-10-24, TASK-1351)
-   else if |error| > fDeadband: integral = 0
+   else if |error| > deadband: integral *= 0.5 once on leaving the band, then held (TASK-1890, ADR-259; was: integral = 0)
    else:
         integral += ki * error * 60            (also when ki is 0: no Ki-near-0 branch, entry 95 Q28b, pid.py:191-192)
         integral = clamp(integral, -curveValue, +curveValue)
@@ -589,7 +589,7 @@ else: min = Tboiler - fFlowOffset                            (fFlowOffset defaul
 2. **No command interface at `initSAT()`.** `CS=0` is sent on the first enabled pass after an interface appears (`SATcontrol.ino:4585-4589`). The `PM=` and `MI=500` commands are not retried (`SATcontrol.ino:3725`).
 3. **NTP not synced at `initSAT()`.** The PID restore is skipped and retried once on the first pass with NTP (`SATcontrol.ino:2028-2032`, `SATcontrol.ino:4515-4519`). If that retry comes after the PID already computed, it overwrites the working integral and raw derivative with the file values (`SATpid.ino:77-78`). Whether that happens depends on how long NTP takes.
 4. **PID file older than 30 minutes.** It is discarded and the PID starts from zero (`SATcontrol.ino:2033-2037`).
-5. **Restored integral.** It survives the first computed update only when |error| ≤ deadband (`SATpid.ino:154-157`).
+5. **Restored integral.** It survives the first computed update when |error| ≤ deadband; outside it is halved once (TASK-1890, ADR-259) (`SATpid.ino:154-157`).
 6. **First ticks after any start.** Until the PID computes, the tick sends `CS=10.0`, `MM=100`, `CH=0`, which commands heating off (E2, E3). With the default interval and a steady room, that lasts two ticks (about 60 s). On PIC boards the `CS=10.0` is then kept alive every 30 s (`SATcontrol.ino:405-414`).
 7. **No room temperature source.** `Tr` starts as NAN (`OTGW-Core.h:79`). Without BLE, external, multi-area or a thermostat `Tr`, SAT heats on the heating curve only (TASK-1364): P, I and D are 0, no trip, no time limit. Before TASK-1364 the 10th invalid tick (about 300 s at 30 s) tripped the safety and sent `CS=0`.
 8. **No outside temperature source.** The OT value starts as 0.0 and is used as 0 °C (`OTGW-Core.h:82`, `SATcontrol.ino:1302`). The weather value is used instead only when it is valid and the OT value is exactly 0.0 (`SATcontrol.ino:1299-1300`).

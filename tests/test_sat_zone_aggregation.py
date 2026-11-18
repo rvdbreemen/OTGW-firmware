@@ -65,7 +65,7 @@ struct SatSettings { float fHeatingCurveCoeff = 1.6f; int iZoneCount = 1; int iZ
 struct Settings { SatSettings sat; };
 struct SatState { float fHeatingCurveValue = 0.0f; };
 struct State { SatState sat; };
-struct SATZoneState { float fRoomTemp = 0, fSetpoint = 0, fPidOutput = 0, fPidIntegral = 0, fPrevError = 0;
+struct SATZoneState { float fRoomTemp = 0, fSetpoint = 0, fPidOutput = 0, fPidIntegral = 0, fPrevError = 0; bool bPidInBand = true;
                       uint32_t iLastUpdateMs = 0; bool bRoomValid = false, bSpValid = false, bOff = false; };
 static Settings settings; static State state; static SATZoneState satZones[SAT_MAX_ZONES];
 static uint32_t millis() { return 1000; }

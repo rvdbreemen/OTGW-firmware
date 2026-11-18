@@ -134,6 +134,8 @@ The PID core also matches: the error, the heating curve formula, the automatic g
     - `PM=25` after every `CS=`: sent by thermo-nova (coordinator/mqtt/opentherm.py:196-197), never by the firmware (area 8, row 9, search). Neither code says why.
     - Boot `PM=3`, `PM=15`, `PM=48`: thermo-nova sends them on every coordinator start (coordinator/mqtt/opentherm.py:166-169). The firmware sends them only when SAT is enabled at boot (`pmChainStart()`, called only from `initSAT()`, SATcontrol.ino:3946-3948). On a PIC board they go out one at a time, because the PIC keeps one pending priority message: the next `PM=` is queued when the boiler answered the pending ID or after 60 s, and an ID that timed out is asked once more; on OT-Direct all three are queued at once (OTGW-Core.ino:3895-3982, TASK-1315). (Corrected 2026-10-24, TASK-1351: before TASK-1315 only `PM=48` survived the queue on a PIC.) (Area 1, rows 2 and 25; area 8, rows 3 and 9.)
 
+16. **The integral outside the deadband (TASK-1890, ADR-259).** thermo-nova sets the integral to 0 when |error| > 0.1 (pid.py:185-189; the rooms use the same PID class, area.py:50). The firmware halves it once when the error leaves the band and holds it while outside; back inside it accumulates from the held value (SATpid.ino `_pidUpdateIntegral()`, SATcontrol.ino `satZonePidAdvance()`). A deliberate deviation: Sergeant D entry 329, Robert's Q-329a B (entry 333); the zones by directive (Q-329b open).
+
 ### Firmware-only additions that act on the boiler
 
 These have no thermo-nova counterpart. They are listed so they can be confirmed, not ranked.

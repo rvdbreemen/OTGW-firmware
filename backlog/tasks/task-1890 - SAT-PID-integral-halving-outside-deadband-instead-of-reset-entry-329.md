@@ -1,10 +1,11 @@
 ---
 id: TASK-1890
 title: SAT PID integral halving outside deadband instead of reset (entry 329)
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@otgw-dev'
 created_date: '2026-11-13T08:09:00Z'
-updated_date: '2026-11-18T14:26:00Z'
+updated_date: '2026-11-18T14:38:00Z'
 labels:
   - sat
   - adr
@@ -27,6 +28,12 @@ Sergeant D 2026-11-13 (https://discord.com/channels/812969634638725140/110555672
 - [ ] #4 Bench test by the bench-tester
 <!-- AC:END -->
 
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+Ground truth checked this session: thermo-nova 7beaaf5 resets the integral to 0 outside the deadband: pid.py:185-189 (_update_integral: if abs(error) > DEADBAND: _integral = 0.0), DEADBAND = 0.1 at const.py:16; the zones use the same PID class (area.py:50). Firmware the same: main PID _pidUpdateIntegral() SATpid.ino:247-256; zone PIDs SATcontrol.ino:3621-3628. Decided: entry 329 (Sergeant D: halve instead of reset) and entry 333 (Q-329a B, Robert, not objected by Sergeant D: halve ONCE when the error leaves the deadband, hold while outside, accumulate from the held value when back inside; a target change still resets fully, SATcontrol.ino:2124 -> satPidResetTerms() SATpid.ino:150-158). Open before code (entry 333 open points 2 and 4): does the rule also apply to the zone PIDs, and does Sergeant D confirm B? One question to him (2.1.0 scope). Implementation once confirmed: (1) SATpid.ino _pidUpdateIntegral(): a static _pid_wasInBand; on the transition inside->outside multiply _pid_integral by 0.5 once, while outside hold it, inside accumulate as today; the solar-gain freeze (TASK-1323) still skips the whole update; satPidResetTerms() resets _pid_wasInBand to inside so a target change starts clean; the halved value is what the 5-min save persists (no file format change). (2) zones the same if he says so (SATzoneState gets a wasInBand flag). (3) ADR superseding the integral-reset rule of ADR-197 (checks ADR-204). (4) Host test on the real _pidUpdateIntegral(): a sequence inside (accumulate) -> outside (one halving, then held over several updates) -> inside (accumulates from the half); red on reset-to-0, green on halving; plus the target-change reset and the solar freeze. Not on otgw-1.x.x (SAT is 2.x only).
+<!-- SECTION:PLAN:END -->
+
 ## Implementation Notes
 
 <!-- SECTION:NOTES:BEGIN -->
@@ -37,4 +44,7 @@ Sergeant D 2026-11-13 (https://discord.com/channels/812969634638725140/110555672
 2026-11-16: moved to milestone 2.1.0. Release scope per entry 386 (Robert 08:47:36 UTC, https://discord.com/channels/812969634638725140/1105556725714649128/1571808950330986547: 'Mark anything new to the next release'): the initial SAT release covers the decisions of entries 375-385; this item is outside that scope. Not built now (coordinator 2026-11-16).
 
 2026-11-18 Q-329b queued for Sergeant D (docs/sat/open-questions.md; comms 92): halving for the main PID only, or for the zones too (entry 333 open point 2; thermo-nova pid.py:186-188 resets to 0, area.py:50 zones use the same PID). Until he answers: option B (main PID and zones) decided by directive (Robert, 15 Nov: decide and proceed, he may overrule), so the work can proceed.
+AC1 status (coordinator 2026-11-18, under Robert's 15 Nov directive: do not wait for Sergeant D, take the recommended option, record it as decided by directive; he may overrule): option B of Q-329b is implemented: halve once on leaving the deadband and hold, for the main PID AND the zone PIDs (thermo-nova zones use the same PID class, area.py:50). Q-329b is queued/posted by 92 and stays open; AC1 reads 'decided by directive, Q-329b open'.
+
+Implemented (lane-1890, uncommitted, not built): main PID _pidUpdateIntegral() (SATpid.ino) with _pid_inBand: on leaving the deadband the integral is halved once, held while outside, accumulates again inside; _pid_inBand set to inside at every reset/restore (satPidReset, satPidResetTerms, satPidRestoreState, the lost-reading reset in satPidCurveOnly). Zones: SATZoneState::bPidInBand, same rule in satZonePidAdvance() (SATcontrol.ino). ADR-204 reset triggers, the solar freeze, the clamp and the persisted file format are unchanged. ADR-259 (Proposed, adr-kit; related to ADR-197 and ADR-204 via adr relate; partly supersedes ADR-197 decision 3). Docs: firmware-sat-spec.md (3 lines), sat-comparison.md item 16. Host tests: test_sat_pid_semantics.py (thermo-nova oracle with the deviation as a parameter) 24/24 on the fix, 5 FAIL on the old SATpid.ino (incl. the new held/re-halve case); test_sat_pid_cadence.py new g3 zone case 32/32 on the fix, FAIL on the old SATcontrol.ino (zone I 0.0387 -> 0.0 at 360 s); also green: published_curve, zone_aggregation, pid_resets, pid_integral_cap (stub struct gets bPidInBand); evaluate 88/0. Known, not from this change: adr-lint --strict reports a one-directional supersession ADR-204 -> ADR-197 on origin too. Not done: the SAT simulation model and the 'Totals per area' count in sat-comparison.md.
 <!-- SECTION:NOTES:END -->

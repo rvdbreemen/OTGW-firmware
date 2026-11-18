@@ -6930,7 +6930,7 @@
       "path": "ADR-197-sat-pid-v3-controller-supersedes-adr-069.md",
       "format": "canonical",
       "status": "Accepted",
-      "date": "2026-10-30",
+      "date": "2026-11-18",
       "decision_summary": "The SAT PID follows thermo-nova pid.py at 7beaaf5 term by term (entry 28), implemented in src/OTGW-firmware/SATpid.in...",
       "topics": [
         "deadband",
@@ -7436,7 +7436,7 @@
       "path": "ADR-204-sat-pid-reset-triggers-supersedes-adr-197-decision-8.md",
       "format": "canonical",
       "status": "Accepted",
-      "date": "2026-10-31",
+      "date": "2026-11-18",
       "decision_summary": "SAT resets exactly the integral and the raw derivative of the main PID, and the integral of every zone PID, on the tr...",
       "topics": [
         "integral",
@@ -10718,6 +10718,69 @@
         "supersedes": [
           "ADR-222"
         ],
+        "superseded_by": null
+      }
+    },
+    {
+      "id": "ADR-259",
+      "title": "SAT halves the PID integral once when the error leaves the deadband and holds it, for the main and the zone PIDs (partly supersedes ADR-197)",
+      "path": "ADR-259-sat-halves-the-pid-integral-once-when-the-error-leaves-the-deadband-and-holds-it-for-the-main-and-the-zone-pids-partly-supersedes-adr-197.md",
+      "format": "canonical",
+      "status": "Proposed",
+      "date": "2026-11-18",
+      "decision_summary": "When the error leaves the 0.1 C deadband the integral is multiplied by 0.5 once and then held while the error stays o...",
+      "topics": [
+        "deadband",
+        "integral",
+        "pid",
+        "sat"
+      ],
+      "aliases": [
+        "entry 329",
+        "entry 333",
+        "halve the integral",
+        "integral halving",
+        "Q-329a",
+        "Q-329b"
+      ],
+      "components": [
+        "_pidUpdateIntegral",
+        "satZonePidAdvance"
+      ],
+      "symbols": [
+        "_pid_inBand",
+        "_pidUpdateIntegral",
+        "bPidInBand",
+        "SAT_PID_DEADBAND",
+        "satZonePidAdvance"
+      ],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [
+          "Halve the integral exactly once per transition from inside to outside the deadband, for the main and every zone PID.",
+          "Hold the integral unchanged while the error stays outside the deadband."
+        ],
+        "must_not": [
+          "Reset the integral to 0 only because the error is outside the deadband.",
+          "Change the reset triggers of ADR-204."
+        ],
+        "exceptions": [
+          "None."
+        ],
+        "verification": [
+          "tests/testsatpidsemantics.py (the REAL SATpid.ino against the thermo-nova oracle with this deviation as a parameter): testoutsidethebandthehalvedintegralisheldandinsideitaccumulatesagain and the boundary, restore and saturation cases; 5...",
+          "tests/testsatpidcadence.py::testg3zoneintegralishalvedonceoutsidethebandandheld (the REAL zone PID); FAIL on the code before this ADR (the zone integral went to 0)."
+        ]
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
         "superseded_by": null
       }
     }
@@ -16418,6 +16481,12 @@
       "resolved": true
     },
     {
+      "source": "ADR-197",
+      "target": "ADR-259",
+      "type": "related",
+      "resolved": true
+    },
+    {
       "source": "ADR-198",
       "target": "ADR-069",
       "type": "related",
@@ -16684,6 +16753,12 @@
     {
       "source": "ADR-204",
       "target": "ADR-205",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-204",
+      "target": "ADR-259",
       "type": "related",
       "resolved": true
     },
@@ -17849,6 +17924,18 @@
       "source": "ADR-257",
       "target": "ADR-222",
       "type": "supersedes",
+      "resolved": true
+    },
+    {
+      "source": "ADR-259",
+      "target": "ADR-197",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-259",
+      "target": "ADR-204",
+      "type": "related",
       "resolved": true
     }
   ]
