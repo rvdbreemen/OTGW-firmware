@@ -5,6 +5,26 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [2.0.0-beta.374] - 2026-11-18
+
+### Changed
+- SAT: continuous to PWM only when flow - request stays >= `satpwmswitchmargin` (default 2.0 C, a stored old default 1.5 migrates once) for 60 s, was 1.5 C / 30 s; the 3.5 C / 30 s fail-safe is unchanged (TASK-2005, Sergeant D entry 407, ADR-254 Proposed).
+- Home Assistant: the SAT Simulation switch is unavailable while a real boiler answers (HA 2021.2+) (TASK-2014, ADR-255).
+- SAT web UI: the weather card uses `sat/sun_elevation` while a value younger than 1 hour is published and then asks for no location (TASK-2015).
+- OT-Direct: command errors read like the PIC's (`CH: BV`); MsgID 99 skip for `MH=`/`MW=`/`M2=`/`HW=P` and `SR=` blacklist like the PIC (TASK-1804).
+
+### Fixed
+- SAT: the thermal drop learning runs only while SAT controls the boiler; reset `SATthermalcoeff` after long runs without a boiler (TASK-2010).
+- SAT: a settings re-read keeps the active preset; the capture tool no longer sends `q` at start or after a reconnect (TASK-2013).
+- MQTT: a gateway-override topic (`<label>/override`) that was retained before a reboot is now cleared within a few seconds after the gateway connects to the broker, so Home Assistant no longer keeps showing an override that ended. An override that is still active is published again within a minute (TASK-1991).
+- SAT state files: a save that arrives while a filesystem update starts is no longer lost, and nothing is written while the filesystem is being replaced. A state file that does not fit is refused with a telnet line instead of being cut, and the write queue uses less memory (TASK-2007).
+- Main loop: the minute LittleFS checks run on the file-writer task, not the loop task (TASK-1995 Step B).
+- Health check: no periodic flash write; an unwritable filesystem shows DEGRADED after the next SAT state-file write, only while SAT is on (TASK-2020).
+- Capture tool: runs on Python 3.9 (macOS built-in) again (TASK-2016); a 503 for absent hardware counts as not on this board (TASK-2012).
+
+### Added
+- Diagnostics: telnet `[fs-slow]` (TASK-1995 Step A) and `[HEAP] sat-takeover-probe` (TASK-2019), no change in behaviour.
+
 ## [2.0.0-beta.360] - 2026-11-17
 
 ### Changed
@@ -12,8 +32,6 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - SAT: PWM ON phases that start during a band pause no longer count toward the hourly start limit, and the narration names the value that decided a band stop or restart (Sergeant D entry 398; entry 400; TASK-1887).
 ### Fixed
 - SAT: the SAT state files are written by a background writer task instead of on the main loop, so a slow flash write no longer stalls the control loop (TASK-1989).
-- MQTT: a gateway-override topic (`<label>/override`) that was retained before a reboot is now cleared within a few seconds after the gateway connects to the broker, so Home Assistant no longer keeps showing an override that ended. An override that is still active is published again within a minute (TASK-1991).
-- SAT state files: a save that arrives while a filesystem update starts is no longer lost, and nothing is written while the filesystem is being replaced. A state file that does not fit is refused with a telnet line instead of being cut, and the write queue uses less memory (TASK-2007).
 - The hourly `otgw-firmware/stats/*` MQTT topics go out one at a time, at least 100 ms apart, instead of 26 at once. On a board without PSRAM the free heap fell by about 55 KB inside that burst, every hour on the hour. The topics and their values are unchanged (TASK-2004).
 - OT-Direct master mode (no thermostat): the room setpoint now reaches the boiler. `BS=` writes MsgID 16 itself, and after `TT=0` the `BS=` or MQTT room setpoint is written again at once, so the boiler no longer keeps the old TT value. A running TT/TC override is not overwritten by them (TASK-1751).
 - OT-Direct: Home Assistant (pyotgw) no longer fails to connect to port 25238 right after a reboot on a board without a thermostat. The one-time 'Thermostat disconnected' line at boot is no longer sent to port 25238, where it landed in the middle of the connect handshake; a real loss or return of the thermostat is still reported there (TASK-1999).
@@ -1102,7 +1120,8 @@ Legacy release. See git history for details.
 
 Legacy releases. See git history for details.
 
-[Unreleased]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.339...HEAD
+[Unreleased]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.374...HEAD
+[2.0.0-beta.374]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.360...v2.0.0-beta.374
 [2.0.0-beta.339]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.323...v2.0.0-beta.339
 [2.0.0-beta.323]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.294...v2.0.0-beta.323
 [2.0.0-beta.294]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.250...v2.0.0-beta.294
