@@ -1,11 +1,11 @@
 ---
 id: TASK-2021
 title: 'docs: update 2.x docs for changes since v2.0.0-beta.360'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-18T10:24:00Z'
-updated_date: '2026-11-18T10:33:00Z'
+updated_date: '2026-11-18T13:39:00Z'
 labels:
   - docs
   - update-docs
@@ -37,4 +37,12 @@ Standalone /update-docs-2x drift pass (coordinator, 2026-11-18), docs-only, one 
 2026-11-18 AC4: change list with sources sent to 92 (BlueFlame) for the 20:00 beta notes.
 
 2026-11-18 92 confirms the 7 items match the 20:00 draft one to one; advised to keep TASK-1995 as a 'Diagnostics (no change in behaviour)' line ([fs-slow], helperStuff.ino:257, >= 100 ms). Task stays In Progress until 370/371 land and are added.
+
+2026-11-18 extended to beta.374 (otgw-docs). 370 (41a9e44ed TASK-1995 Step B) and 373 (9e6636da7 TASK-2020, otgw-dev, not on origin yet; pushed before this): C4 utilities fsWriter section gets the health check on the writer task, no periodic test write (IDF v5.5.1 SPI1 concurrency), read-back after close and /api/v2/health DEGRADED (API docs were updated by 9e6636da7 itself). 371 (62e81bb80 TASK-2015): ch05:324/:714 and h05:360/:769 said the sun elevation comes 'from the weather API'; the code (SATcontrol.ino satSunElevationSource/satSunElevationStepAt) uses sat/sun_elevation pushed over MQTT while younger than 1 h, else a local computation from the weather lat/lon and NTP time: fixed, plus MQTT.md sat/sun_elevation row and openapi sat status sun_elevation_source/sun_elevation (missing). openapi also had stale pwm_switch_margin (30 s, 1.5 -> 60 s, 2.0, TASK-2005) and sim_available ('available on this build' -> false while a boiler answers). 372 (c31ded494 TASK-2019) is diagnostics only, no doc. 374 (TASK-2014) carries its own docs (MQTT.md, ch04/h04). openapi.yaml parses (yaml.safe_load). No em dashes.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Docs pass for v2.0.0-beta.360..374: MQTT.md (pwm_switch_margin 2.0/60 s, stale-override sweep, thermal learning gate, sat/sun_elevation rule), manuals ch07/h07 + ch08/h08 (telnet q, settings.ini), ch05/h05 (sun elevation source), openapi (pwm_switch_margin, sim_available, sun_elevation fields), C4 settings/mqtt/utilities (load scope, override sweep, fsWriter + health). Per-change sources in the notes. Not documented on purpose: diagnostics-only changes (TASK-1995 [fs-slow], TASK-2019). Change list handed to 92 for the 20:00 notes.
+<!-- SECTION:FINAL_SUMMARY:END -->

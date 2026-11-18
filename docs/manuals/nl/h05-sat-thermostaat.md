@@ -357,7 +357,7 @@ Solar gain compensatie detecteert wanneer zonlicht door de ramen de kamer verwar
 **Hoe het werkt:**
 1. SAT volgt de stijgsnelheid van de binnentemperatuur met een EMA (exponentieel voortschrijdend gemiddelde).
 2. Wanneer de stijgsnelheid het ingestelde minimum overschrijdt en de ketelmodulatie laag is (<20%), wordt een solar gain conditie gedetecteerd.
-3. Als zonne-elevatiedata beschikbaar is (via de weather API), controleert SAT ook of de zon boven de minimale elevatie staat.
+3. Als er een zonne-elevatie bekend is, controleert SAT ook of de zon boven de minimale elevatie staat. De bron: `sat/sun_elevation` via MQTT (bijvoorbeeld van de sun-entiteit van Home Assistant), die voorgaat zolang de waarde jonger is dan 1 uur; anders berekent de firmware hem uit de breedte- en lengtegraad van de weerinstellingen en de NTP-tijd. De SAT-weerkaart in de web UI noemt de bron die gebruikt wordt en vraagt geen locatie zolang een gepushte waarde vers is (TASK-2015).
 4. De conditie moet 10 minuten aanhouden voordat activering plaatsvindt (om valse triggers te voorkomen).
 5. Na activering wordt het setpoint verlaagd met `fSolarSetpointOffset` (standaard 2 C).
 6. Wanneer de stijgsnelheid 10 minuten onder de drempel blijft, wordt solar gain gewist.
@@ -766,7 +766,7 @@ De externe temperatuurwaarden vervallen automatisch na respectievelijk 5 minuten
 | Setpoint altijd op minimum (10 C) | SAT actief maar veiligheidslaag getripped | Herstart SAT via webinterface of MQTT. Controleer `sat/safety_tripped`. |
 | SAT-tab niet zichtbaar in webinterface | SAT nog niet ingeschakeld | SAT inschakelen in instellingen. |
 | Drukalarm blijft triggeren | Drukbereik te smal of ketelvulprobleem | Pas `satminpressure`/`satmaxpressure` aan. Controleer de drukmanometer van de ketel. |
-| Solar gain activeert nooit | Stijgsnelheidsdrempel te hoog of zonne-elevatie ontbreekt | Verlaag `satsolarminrise`. Schakel weather API in voor zonne-elevatie. |
+| Solar gain activeert nooit | Stijgsnelheidsdrempel te hoog of zonne-elevatie ontbreekt | Verlaag `satsolarminrise`. Push `sat/sun_elevation` vanuit Home Assistant, of stel de breedte- en lengtegraad van de weerinstellingen in zodat de firmware hem berekent (NTP-tijd nodig). |
 | Zomermodus activeert niet | Drempel te hoog of uren te lang | Verlaag `satsummerthreshold` of `satsummerminhours`. |
 
 ---

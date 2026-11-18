@@ -1062,7 +1062,7 @@ SAT-specific commands are nested under the `sat/` sub-topic. All commands are su
 
 | Topic Suffix | Payload | Description |
 | ------------ | ------- | ----------- |
-| `sat/sun_elevation` | `"32.5"` | Push sun elevation in degrees (from HA sun entity) |
+| `sat/sun_elevation` | `"32.5"` | Push sun elevation in degrees (from HA sun entity). Wins over the value computed from the weather latitude/longitude while younger than 1 hour; REST `sat/status` reports `sun_elevation_source` (TASK-2015) |
 | `sat/solar_min_elevation` | `"12.0"` | Set minimum sun elevation for solar gain activation |
 
 **PV-surplus Boost (TASK-640):**

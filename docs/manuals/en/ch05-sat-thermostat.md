@@ -321,7 +321,7 @@ Solar gain compensation detects when sunlight through windows is heating the roo
 **How it works:**
 1. SAT tracks the indoor temperature rise rate using an EMA (exponential moving average).
 2. When the rise rate exceeds the configured minimum and boiler modulation is low (<20%), a solar gain condition is detected.
-3. If sun elevation data is available (from the weather API), SAT also checks that the sun is above the minimum elevation before triggering.
+3. If a sun elevation is known, SAT also checks that the sun is above the minimum elevation before triggering. Its source: `sat/sun_elevation` pushed over MQTT (for example from the Home Assistant sun entity), which wins while it is younger than 1 hour; otherwise the firmware computes it from the weather latitude and longitude and the NTP time. The SAT weather card in the web UI names the source in use and asks for no location while a pushed value is fresh (TASK-2015).
 4. The condition must be sustained for 10 minutes before activation (to avoid false triggers).
 5. Once active, the flow setpoint is reduced by `fSolarSetpointOffset` (default 2 C).
 6. When the rise rate drops below the threshold for 10 minutes, solar gain is cleared.
@@ -711,7 +711,7 @@ External temperature values expire automatically (5 minutes for indoor, 10 minut
 | SAT tab not visible in web interface | SAT not yet enabled | Enable SAT in settings. |
 | Home Assistant climate entity missing | Auto-discovery disabled or MQTT not connected | Check MQTT connection and HA discovery setting. |
 | Pressure alarm keeps triggering | Pressure band too narrow or boiler filling issue | Adjust `satminpressure`/`satmaxpressure`. Check boiler pressure gauge. |
-| Solar gain never activates | Rise rate threshold too high or sun elevation data missing | Lower `satsolarminrise`. Enable weather API for sun elevation. |
+| Solar gain never activates | Rise rate threshold too high or sun elevation data missing | Lower `satsolarminrise`. Push `sat/sun_elevation` from Home Assistant, or set the weather latitude and longitude so the firmware computes it (NTP time needed). |
 | Summer mode does not activate | Threshold too high or hours too long | Lower `satsummerthreshold` or `satsummerminhours`. |
 
 ---
