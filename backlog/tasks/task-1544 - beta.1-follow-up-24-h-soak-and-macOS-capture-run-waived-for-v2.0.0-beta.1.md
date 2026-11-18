@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-01T15:47:00Z'
-updated_date: '2026-11-17T09:53:00Z'
+updated_date: '2026-11-18T06:26:00Z'
 labels:
   - beta
   - release
@@ -26,7 +26,7 @@ TASK-1504 AC2 (macOS capture run by a tester) and AC3 (24 h soak on Classic + S3
 - [x] #1 24 h soak of a beta build on the Classic + S3 Mini without an unexplained reboot; crashlog and reboot_log quoted
 - [ ] #2 Capture run from the release zip on macOS by a named tester, with transcript
 - [x] #3 Capture runs from the beta zip on Windows and Linux, each with a transcript (TASK-1504 AC2 asked for all three OSes)
-- [ ] #4 Update over WiFi with the release zip through the /update page (the path the release notes give users), then device/info shows the new version and settings are kept
+- [x] #4 Update over WiFi with the release zip through the /update page (the path the release notes give users), then device/info shows the new version and settings are kept
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -51,4 +51,6 @@ Triage 2026-11-02 (beta.5, origin/dev 6c41cc696) in code: no: verification only 
 Status 2026-11-17 (95, ALL STOP): AC3 done and pushed (42e26c101). AC4 request (351 -> 360 via the /update page on .63, settings diff) is with 09 via the coordinator; AC2 macOS draft is with 92. Open follow-up NOT yet filed (task create timed out at the stop): the capture summary counts the three /api/v2/otdirect/* 503 'No OT-Direct hardware' answers on a PIC board as 'failed' instead of not applicable (otgw_capture.py device-state counting); coordinator asked for a small tools-only task with a red/green test.
 
 AC4 bench STATUS by 09 (2026-11-17 ~10:50, stopped at the coordinator's ALL STOP, to be continued). Pre-state is done: .63 (Classic + ESP32-S3, PIC 6.8) OTA'd to the public release 2.0.0-beta.351+3f58242 (ino 0593e580..., the release image) at 10:48:06, 'changed: none'. settings-before.json, S-before.ini and device/info saved (fwversion 2.0.0-beta.351+3f58242, bootcount 199); satsimulation false. Release asset OTGW-firmware-esp32-combo-2.0.0-beta.360+9665467-flash.zip downloaded with gh from release v2.0.0-beta.360: sha256 6f1b6543a904424590b46230ed8b083a17448790b7d68941f9471e7acb57b259 = the expected value. NOT done yet: the browser upload through http://192.168.88.63/update with screenshots, because the Claude-in-Chrome extension was not connected (tabs_context: 'Browser extension is not connected'). Next step: upload the zip through /update in a browser (extension or Playwright), screenshots before/during/after, then compare fwversion 2.0.0-beta.360+9665467, bootcount and settings-after against settings-before. .63 is left stable on 351. Evidence: 09 scratchpad t1544ac4/ (settings-before.json, S-before.ini, info-before.txt, rel/*.zip, flash-to-351.log).
+
+AC4 PASS by 09 (2026-11-18), .63 (Classic + ESP32-S3, PIC 6.8). Pre-state: public release 2.0.0-beta.351+3f58242, bootcount 199, settings-before.json/S-before.ini saved 2026-11-17 10:48. Release asset OTGW-firmware-esp32-combo-2.0.0-beta.360+9665467-flash.zip from release v2.0.0-beta.360 (gh), sha256 6f1b6543a904424590b46230ed8b083a17448790b7d68941f9471e7acb57b259 = expected. Update the way a user does it: real Chrome (headless, driven over CDP because the browser MCPs were not connected; 09 tool otaredirect.mjs), the real http://<ip>/update page, the zip put in its one-file field (#oneFiles), Update clicked 07:16:34. The page's own JS unpacked the zip, went through safeboot and the filesystem step, and at t+93 s navigated to /?_ota=...; at t+96 s the web UI was back by itself, with no further clicks. device/info after: fwversion 2.0.0-beta.360+9665467, bootcount 201 (+2 = the app and filesystem steps), MQTT connected. Settings: 152 keys before and after, none added or removed, 1 value changed: SATthermalcoeff 0.0420 -> 0.0646 (settings.ini: the same single line). That change is NOT from the update: no commit between 3f58242 and 9665467 touches the thermal coefficient (git log -G), and its only runtime writer is the thermal learner (SATcontrol.ino:7371, an hourly save while the flame is off with valid room + outdoor temperatures). .63 has a BLE room sensor and weather, and ran about 20 h on 351 between the pre-state snapshot and the upload; on 360 the uptime was 6 min, under the first hourly save. This cause is inferred from the code, without a log line; a snapshot taken right before the click would have shown it directly. Screenshots: 4 (before, update x2, web UI after) in 09 scratchpad t1544ac4/run/ (redirect.log, shot-01..04). Chrome processes after: 0. Not covered: a desktop Chrome with a human hand; the same JS in headless Chrome.
 <!-- SECTION:NOTES:END -->
