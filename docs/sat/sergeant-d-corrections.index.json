@@ -5499,6 +5499,21 @@
     "TASK-1998"
    ],
    "confirmed_by_entry": null
+  },
+  {
+   "id": 416,
+   "title": "Q-1998b answered C: short hot-water burns are counted as cycles, marked as hot water, and do not change PWM or overshoot decisions, as thermo-nova (Sergeant D, 2026-11-18; urgent round, 2.0.0; supersedes entry 415)",
+   "date": "2026-11-18",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1572689746725969991",
+   "supersedes": [
+    415
+   ],
+   "tasks": [
+    "TASK-1998"
+   ],
+   "confirmed_by_entry": null
   }
  ]
 }

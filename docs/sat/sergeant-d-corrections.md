@@ -8234,3 +8234,26 @@ Robert, 16:18:42 UTC (https://discord.com/channels/812969634638725140/9144987300
 **Task:** TASK-1998.
 
 **Open:** the follow-up above; a B answer goes to Robert because it changes his entry 268.
+
+## 416. Q-1998b answered C: short hot-water burns are counted as cycles, marked as hot water, and do not change PWM or overshoot decisions, as thermo-nova (Sergeant D, 2026-11-18; urgent round, 2.0.0; supersedes entry 415)
+
+**Source:** #dev-sat-mqtt, Sergeant D, two answers, both unedited and read back via the Discord API:
+- 2026-11-18 19:07:34 UTC (https://discord.com/channels/812969634638725140/1105556725714649128/1572689746725969991), a reply to our correction of Q-1998b (https://discord.com/channels/812969634638725140/1105556725714649128/1572689536444661814);
+- 2026-11-18 19:09:32 UTC (https://discord.com/channels/812969634638725140/1105556725714649128/1572690239741501543), a reply to our follow-up (https://discord.com/channels/812969634638725140/1105556725714649128/1572689832696750193).
+
+**Quoted:**
+> "my answer is C"
+
+> "My answer is C"
+
+**Settled:** option C in both messages: the short hot-water burns (1-16 s after a heating run, indigo_light's Vitodens) are counted as cycles and stay in the cycle list and the 4-hour window, marked as hot water, so they do not change PWM or overshoot decisions. Robert's entry 268 stays: every flame counts in the 4 h and 24 h duty, hot-water burns included. Scope: 2.0.0.
+
+**Changes an earlier entry:** supersedes entry 415. His first answer A (19:05:28 UTC) came before our correction and rested on our wrong recommendation; his C after the correction replaces it.
+
+**Compared with thermo-nova (7beaaf5):** every flame cycle enters the rolling windows with no filter on the kind (cycles/history.py:102-128); a cycle with more than 80 % hot-water samples gets the kind DOMESTIC_HOT_WATER (cycles/tracker.py:315-316); a cycle with any hot water in its tail is classified UNCERTAIN (cycles/classifier.py:25-26). All opened this session.
+
+**Compared with the firmware:** in indigo_light's beta.350 capture the firmware logged 7 such burns as ordinary SAT cycles; the change marks them as hot water so the PWM and overshoot decisions leave them out, and keeps them in the duty.
+
+**Task:** TASK-1998 (firmware lane; its milestone says 2.1.0, this answer and Robert's urgent round put it in 2.0.0, the coordinator to confirm).
+
+**Open:** none.
