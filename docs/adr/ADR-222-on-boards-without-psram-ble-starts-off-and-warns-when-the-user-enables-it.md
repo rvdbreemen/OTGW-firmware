@@ -1,15 +1,15 @@
 ---
 id: "ADR-222"
 title: "On boards without PSRAM BLE starts off and warns when the user enables it"
-status: "Accepted"
-date: "2026-11-08"
+status: "Superseded"
+date: "2026-11-18"
 binding: false
 gate: null
 documents_shipped: false
 verified_in: []
 supersedes:
   - "ADR-169"
-superseded_by: null
+superseded_by: "ADR-257"
 related:
   - "ADR-257"
 topics:
@@ -43,7 +43,7 @@ format: "canonical"
 
 ## Status
 
-Accepted, 2026-11-08.
+Superseded by ADR-257, 2026-11-18.
 `tests/test_ble_nopsram_default.py` and `tests/webui/ble-nopsram-warning.test.mjs`.
 
 **Decision Maker:** User: Robert van den Breemen (TASK-1693, 2026-11-08). Proposed by the agent; the
@@ -72,6 +72,11 @@ status_history:
     status: Accepted
     changed_by: Agent (ba)
     reason: Related to ADR-257 (TASK-2025, proposed successor)
+    changed_via: adr-kit lifecycle
+  - date: 2026-11-18
+    status: Superseded
+    changed_by: Robert van den Breemen (decision, DM 1572612342850658579), recorded by Agent (ba)
+    reason: Superseded by ADR-257 (Robert's option A, DM 1572600155788546051; accepted DM 1572612342850658579)
     changed_via: adr-kit lifecycle
 ```
 

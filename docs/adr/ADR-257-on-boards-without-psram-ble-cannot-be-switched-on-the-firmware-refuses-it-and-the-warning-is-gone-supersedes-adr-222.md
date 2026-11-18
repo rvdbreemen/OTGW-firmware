@@ -1,13 +1,14 @@
 ---
 id: "ADR-257"
 title: "On boards without PSRAM BLE cannot be switched on; the firmware refuses it and the warning is gone (supersedes ADR-222)"
-status: "Proposed"
+status: "Accepted"
 date: "2026-11-18"
 binding: false
 gate: null
 documents_shipped: false
 verified_in: []
-supersedes: []
+supersedes:
+  - "ADR-222"
 superseded_by: null
 related:
   - "ADR-169"
@@ -40,7 +41,7 @@ format: "canonical"
 
 ## Status
 
-Proposed, 2026-11-18.
+Accepted, 2026-11-18.
 
 **Decision Maker:** User: Robert van den Breemen (maintainer). Discord direct message 1572600155788546051,
 2026-11-18 13:11:34, reply "A" to question 1572596080632139908 (see Decision).
@@ -64,6 +65,16 @@ status_history:
     changed_by: "User: Robert van den Breemen"
     reason: Related to ADR-222
     changed_via: adr-kit lifecycle
+  - date: 2026-11-18
+    status: Accepted
+    changed_by: Robert van den Breemen (decision, DM 1572612342850658579), recorded by Agent (ba)
+    reason: "Accepted: decision Robert van den Breemen (DM 1572612342850658579, answer 'Ja' to question 1572605854773936209), recorded by Agent (ba); bench PASS by otgw-bench-tester on .61 (beta.375+ff73985)"
+    changed_via: adr-kit lifecycle
+  - date: 2026-11-18
+    status: Accepted
+    changed_by: Robert van den Breemen (decision, DM 1572612342850658579), recorded by Agent (ba)
+    reason: Superseded by ADR-257 (Robert's option A, DM 1572600155788546051; accepted DM 1572612342850658579)
+    changed_via: adr-kit lifecycle
 ```
 
 ## Context
@@ -76,11 +87,11 @@ showed a stability warning when the user switched it on; "Enable anyway" stored 
 public v2.0.0-beta.360).
 
 On 2026-11-18 otgw-bench-tester measured what that acceptance costs on .61 (no PSRAM, beta.370, TASK-2025).
-`SATbleriskack` was already stored true; one REST POST `SATbleenable=true` started the passive scanner (4 sensors in
+`SATbleriskack` was already stored true; one REST (Representational State Transfer, the HTTP API) POST (an HTTP write request) `SATbleenable=true` started the passive scanner (4 sensors in
 range, about 400 advertisements per 30 s), with no web UI open and no diagnostic recording running. From about 2 minutes
 later the heap was starved: free 7 to 13 KB, largest free block 2 to 5 KB, minimum free 520 B (telnet: "free 8992 frag
-44% minFree 804 maxBlk 5108"); the web server answered 503 and then nothing, MQTT dropped 270 packets, and after about
-10 minutes the unit hung completely, without any restart, until a USB reset 13 minutes later. The reboot log shows one
+44% minFree 804 maxBlk 5108"); the web server answered 503 and then nothing, MQTT (Message Queuing Telemetry Transport, the broker link) dropped 270 packets, and after about
+10 minutes the unit hung completely, without any restart, until a USB (Universal Serial Bus) reset 13 minutes later. The reboot log shows one
 boot over the whole episode. A user in the field would need a power cycle, and the unit would hang again whenever BLE is
 on. The warning text of ADR-222 ("the Web UI can become unstable or unreachable under load") understates that.
 

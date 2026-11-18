@@ -6,12 +6,13 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-18T13:06:00Z'
-updated_date: '2026-11-18T13:26:00Z'
+updated_date: '2026-11-18T15:47:00Z'
 labels:
   - heap
   - watchdog
   - bug
   - no-psram
+milestone: 2.0.0
 dependencies: []
 priority: high
 ordinal: 1040000

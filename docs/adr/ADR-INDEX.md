@@ -227,7 +227,7 @@ One row per Architecture Decision Record. Scope is the Enforcement `path_glob` s
 | ADR-219 | Accepted | - | User Decision (Robert, 2026-11-08): the web UI is translated in the browser by a small t(key, params) helper in v2.js... |
 | ADR-220 | Accepted | - | User Decision (Robert, 2026-11-08): the language pack files follow the i18next v4 JSON format, read by the project's... |
 | ADR-221 | Accepted | - | User Decision (Robert, 2026-11-08): the web UI language packs (i18n/ .json, ADR-219/ADR-220) are stored on LittleFS a... |
-| ADR-222 | Accepted | - | User Decision: on a board without PSRAM, BLE is off by default and no dialog appears after boot or when a page opens;... |
+| ADR-222 | Superseded | - | User Decision: on a board without PSRAM, BLE is off by default and no dialog appears after boot or when a page opens;... |
 | ADR-223 | Accepted | - | User Decision: in OT-Direct gateway mode, a TT= or TC= override is answer state only, as on the PIC: the gateway answ... |
 | ADR-224 | Accepted | - | In OT-Direct gateway mode the gateway reads MsgID 28 in the slot of a supported thermostat read, and answers that rea... |
 | ADR-225 | Accepted | - | Add src/OTGW-firmware/espipcstack.c, a copy of IDF components/espsystem/espipc.c at commit 9bb7aa84fe, the IDF inside... |
@@ -260,4 +260,4 @@ One row per Architecture Decision Record. Scope is the Enforcement `path_glob` s
 | ADR-253 | Accepted | - | The band stops at target + 0.1 and may restart below target + 0.1, and once CH is off for the band it stays off for a... |
 | ADR-254 | Proposed | - | SAT switches from continuous to PWM when flow - requested setpoint >= settings.sat.fPwmSwitchMargin (default 2.0) hol... |
 | ADR-255 | Accepted | - | User Decision: the HA "SAT Simulation" switch gets a second availability topic, sat/simulationavailable, combined wit... |
-| ADR-257 | Proposed | - | User Decision: on a board without PSRAM BLE cannot be switched on: the scanner never starts there, every write of SAT... |
+| ADR-257 | Accepted | - | User Decision: on a board without PSRAM BLE cannot be switched on: the scanner never starts there, every write of SAT... |

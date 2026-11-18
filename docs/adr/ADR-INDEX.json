@@ -8538,7 +8538,7 @@
       "title": "On boards without PSRAM BLE starts off and warns when the user enables it",
       "path": "ADR-222-on-boards-without-psram-ble-starts-off-and-warns-when-the-user-enables-it.md",
       "format": "canonical",
-      "status": "Accepted",
+      "status": "Superseded",
       "date": "2026-11-18",
       "decision_summary": "User Decision: on a board without PSRAM, BLE is off by default and no dialog appears after boot or when a page opens;...",
       "topics": [
@@ -8568,25 +8568,10 @@
       ],
       "context_scope": "selective",
       "decision_contract": {
-        "must": [
-          "On a board without PSRAM, apply the BLE-off default to a fresh install before the first writeSettings() and to a settings file without the SATbleenable key.",
-          "Keep a stored SATbleenable value as it is.",
-          "Show the stability warning only after a user action (switching BLE on, or the BLE card button).",
-          "On acceptance store satbleenable before satbleriskack, sequentially."
-        ],
-        "must_not": [
-          "Must not open the BLE warning from a poll, a page load or a boot.",
-          "Must not store satbleenable=true on a no-PSRAM board before the user accepted the warning.",
-          "Must not change the PSRAM-board default or show the warning there.",
-          "Must not change bleActive()'s gate."
-        ],
-        "exceptions": [
-          "None."
-        ],
-        "verification": [
-          "python tests/testblenopsramdefault.py: compiles the real applyBleNoPsramDefault() and checks the readSettings()/updateSetting() wiring; the pre-change settingStuff.ino fails 4/4.",
-          "node --test tests/webui/ble-nopsram-warning.test.mjs: drives the real v2 page; the pre-change page opens the modal on its own and stores BLE before consent (tests 1-3 fail), the change passes 4/4."
-        ]
+        "must": [],
+        "must_not": [],
+        "exceptions": [],
+        "verification": []
       },
       "scope": {
         "path_globs": []
@@ -8599,7 +8584,7 @@
         "supersedes": [
           "ADR-169"
         ],
-        "superseded_by": null
+        "superseded_by": "ADR-257"
       }
     },
     {
@@ -10675,7 +10660,7 @@
       "title": "On boards without PSRAM BLE cannot be switched on; the firmware refuses it and the warning is gone (supersedes ADR-222)",
       "path": "ADR-257-on-boards-without-psram-ble-cannot-be-switched-on-the-firmware-refuses-it-and-the-warning-is-gone-supersedes-adr-222.md",
       "format": "canonical",
-      "status": "Proposed",
+      "status": "Accepted",
       "date": "2026-11-18",
       "decision_summary": "User Decision: on a board without PSRAM BLE cannot be switched on: the scanner never starts there, every write of SAT...",
       "topics": [
@@ -10717,7 +10702,7 @@
         ],
         "verification": [
           "tests/testblenopsramrefuse.py compiles the real bleActive() and bleEnableAllowed(): without PSRAM the gate is false for every enable/ack combination (the old gate fails with \"no PSRAM, enable=1 ack=1 starts BLE\"), and checks the setter,...",
-          "tests/webui/ble-nopsram-warning.test.mjs drives the real v2.html/v2.js: the card note, the red toast with no POST, no warning dialog, and PSRAM boards unchanged (2 of 3 red on origin data/). tests/webui/settings-error-toast.test.mjs cove...",
+          "tests/webui/ble-nopsram-warning.test.mjs drives the real v2.html/v2.js: the switch disabled with the reason as its title, the card note, the red toast with no POST, no warning dialog, and the switch usable on a PSRAM board. tests/webui/s...",
           "tests/testblenopsramdefault.py (ADR-222's default for a fresh install) stays green.",
           "Bench: .61 (no PSRAM) with a stored SATbleenable=true and SATbleriskack=true boots with BLE off, rewrites settings.ini, answers the POST with 409, and keeps its heap; a PSRAM board still runs BLE."
         ]
@@ -10730,7 +10715,9 @@
         "gate": null,
         "documents_shipped": false,
         "verified_in": [],
-        "supersedes": [],
+        "supersedes": [
+          "ADR-222"
+        ],
         "superseded_by": null
       }
     }
@@ -17265,6 +17252,12 @@
       "resolved": true
     },
     {
+      "source": "ADR-222",
+      "target": "ADR-257",
+      "type": "superseded-by",
+      "resolved": true
+    },
+    {
       "source": "ADR-223",
       "target": "ADR-068",
       "type": "related",
@@ -17850,6 +17843,12 @@
       "source": "ADR-257",
       "target": "ADR-222",
       "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-257",
+      "target": "ADR-222",
+      "type": "supersedes",
       "resolved": true
     }
   ]

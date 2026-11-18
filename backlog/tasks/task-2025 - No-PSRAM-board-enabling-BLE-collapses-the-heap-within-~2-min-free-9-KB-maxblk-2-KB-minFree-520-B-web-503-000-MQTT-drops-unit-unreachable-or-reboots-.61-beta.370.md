@@ -8,12 +8,13 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-18T12:51:00Z'
-updated_date: '2026-11-18T14:24:00Z'
+updated_date: '2026-11-18T20:12:00Z'
 labels:
   - ble
   - heap
   - bug
   - no-psram
+milestone: 2.0.0
 dependencies: []
 priority: high
 ordinal: 1039000
@@ -48,4 +49,6 @@ Maintainer decision (Robert, 2026-11-18 13:11:34, Discord DM 1572600155788546051
 Question 1572596080632139908, verbatim as the coordinator relayed it (Dutch, elisions as relayed): "Vraag TASK-2025 (HOOG, ook in publieke 360). Op een board zonder PSRAM vreet BLE de heap op (vrij 9 KB, grootste blok 2 KB) en komt de unit in een herstart-loop; via REST is BLE niet meer uit te zetten, alleen USB helpt. [...] A) Geen BLE op no-PSRAM: firmware weigert het (REST 400 met reden), een opgeslagen true wordt bij boot gewist, UI verbergt de schakelaar met een korte uitleg (Sergeant D stelde dit 7 nov voor). [...] Advies: A." The 'herstart-loop' wording was corrected later in DM 1572601402079973387 (no restart, a hang). The ADR is ADR-257 (ADR-256 is TASK-2018's, already with Robert). Implementation differs from the option text in two details, named in ADR-257 for his accept: REST 409 instead of 400, and the switch stays visible with the note instead of hidden.
 
 Robert, 2026-11-18 14:05:06, DM 1572613627528085586, verbatim: 'Niet verbergen maar disablen. Geen PSRAM dan mag je de schakelaar niet aanraken.' (on the deviations note 1572607116852596767). Implemented in 375: bleLockSwitch() disables the SATbleenable switch without PSRAM (row greyed, the needs-PSRAM note as title), at row build and when the BLE poll first reports psram 0; the save refusal and the firmware 409 stay as defence. ble-nopsram-warning.test.mjs asserts the disabled switch (red on the first 375 build, 0f6055de3) and a usable switch with PSRAM. Test runs: 3/3 when the page starts in ~3 s; two of four repeats hit start-up timeouts (42 s and 70 s per case) while the machine ran at 70 % CPU from other sessions, one case each, not the same case; the assertions themselves never failed. ADR-257 (Proposed) updated with his words; accept ('Ja', DM 1572612342850658579) to run after the Discord post.
+
+2026-11-18 bench PASS on .61 (OT-Direct, psram_found 0) by otgw-bench-tester on 2.0.0-beta.375+ff73985: stored SATbleenable=true cleared at boot and flushed to settings.ini within 10 s, no 'SAT BLE: initialized' over 4 min, runtime refuse line 'SATbleenable=true refused: BLE needs PSRAM on this board (TASK-2025)', REST POST 409 'BLE needs PSRAM: not available on this board', MQTT ble_enable refused, UI switch disabled (programmatic click no change) with the note, 0 JS exceptions, heap 47-51 k free, maxblock 31,732, MQTT_drops 0; settings restored byte-identical. Evidence: 09 scratchpad t2025. Pushed build: 375 rebased onto docs-only origin/dev (src diff ff73985cd..808291b6b empty), built 2.0.0-beta.375+808291b (sha256 ino e707ea99...3b64, littlefs e97938b8...21a4), archive OTGW-build-archive/beta375-808291b, posted Discord 1572704935647256636. ADR-257 Accepted (Robert, DM 1572612342850658579), ADR-222 superseded. Web UI suite: 60/84 files green, load stalls rerun green (poll-spread-hidden and otd-mode-selector stall the same on the 374 data); 24 files run after the push (coordinator's call). Bench ACs are ticked by 09 in its own lane after this push.
 <!-- SECTION:NOTES:END -->
