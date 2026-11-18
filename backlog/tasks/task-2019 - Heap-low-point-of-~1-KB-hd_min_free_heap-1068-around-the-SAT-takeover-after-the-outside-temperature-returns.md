@@ -1,0 +1,57 @@
+---
+id: TASK-2019
+title: >-
+  Heap low point of ~1 KB (hd_min_free_heap 1068) around the SAT takeover after
+  the outside temperature returns
+status: In Progress
+assignee:
+  - '@otgw-dev'
+created_date: '2026-11-18T10:04:00Z'
+updated_date: '2026-11-18T11:33:00Z'
+labels:
+  - heap
+  - sat
+milestone: 2.0.0
+dependencies: []
+priority: high
+ordinal: 1036000
+---
+
+## Description
+
+<!-- SECTION:DESCRIPTION:BEGIN -->
+09 on .61, beta.369 (2026-11-18, TASK-2013 bench: GW=L, SAT on, preset, 'q', outdoor_temp): hd_min_free_heap = 1068 B (368 smoke: 20,900). hd_min is the minimum since boot (platformMinFreeHeap(), restAPI.ino:3178), so the time is not known from it. Boot-window [HEAP] lines: at 10:13:13.564 'SAT: outside temperature valid again, SAT resumes' + 'SATBOOT phase=takeover', then minWin 4236 / 6348 / 2536 at 10:13:14-16 (drip id=1, 1, 14), while free heap read 54.7-55.0 k and maxblk 31,732 at each print: short spikes of ~50 KB. No info.jsonl sample between boot and 10:36, so the 1068 itself is not placed (inferred: takeover window). otgw-docs: the TASK-2013 diff allocates nothing (settingStuff.ino:583, :616-618). Candidates (not verified): the first SAT control pass forced by the takeover (SATcontrol.ino:4486-4491, timerSATControl_due = now) and its full SAT publish overlapping the boot discovery drip in the espMqttClient outbox (SAT_MQTT_OUTBOX_LIMIT 24, SATmqttPublish.h:89; CONN_STAGE_MAX_OUTBOX, MQTTstuff.ino:1851). Read-only so far; no firmware change.
+<!-- SECTION:DESCRIPTION:END -->
+
+## Acceptance Criteria
+<!-- AC:BEGIN -->
+- [ ] #1 The dip is reproduced on the bench and placed in time: reboot, wait for 'outside temperature missing', inject outdoor_temp, sample hd_min every 1-2 s (09's recipe)
+- [ ] #2 The allocation behind the dip is named with file:line and evidence (heap trace, outbox count or a host reproduction)
+- [ ] #3 Fix or a decision recorded; the same repro shows the dip gone (red/green)
+<!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+Hypothesis H1 (from code + 09's lines, NOT measured): on that boot the SAT takeover (SATcontrol.ino:4486-4491, 'since_sat_start_ms=210053') is the FIRST SAT control pass since boot, so its satPublishMQTT() is the first full SAT publish: every SAT topic is first-seen. That is the TASK-1339 path (126 packets, ~82 -> 8.7-14 KB). Since TASK-1339 the helpers stop at SAT_MQTT_OUTBOX_LIMIT = 24 packets (SATmqttPublish.h:89, publishJsonAttrIfChanged() SATmqttPublish.cpp:299-317) and satControlLoopRun() repeats the pass every 500 ms while deferred. The gate counts packets, not bytes: 24 packets with JSON blobs (climAttrBuf[512] SATcontrol.ino:5780, cycles buf[960] SATcycles.ino:1592) plus topic and espMqttClient packet overhead hold up to ~25-30 KB per portion, and the boot discovery drip and the per-OT-ID publishes add their own packets in the same window (drip id=1/1/14 in 09's lines). Three portions at 500 ms fit the three seconds of low minWin (10:13:14-16). H2 (open): a non-MQTT allocation of the first control pass (state-file loads, LittleFS file buffers). H1 predicts outbox= near or above 24 at each minWin drop; H2 predicts a low outbox.
+<!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Read-only so far (otgw-dev, 2026-11-18, origin/dev 83648a4e9). (1) TASK-2013 diff ruled out by otgw-docs: no allocation (settingStuff.ino:583, :616-618), the 'q' reload does less with a held preset. (2) Telnet output ruled out: AsyncSimpleTelnet has a static TX ring per client (AsyncSimpleTelnet.h:165-168), AsyncClient only takes what fits in the TCP send buffer. (3) The takeover itself (SATcontrol.ino:4476-4491) only resets the CS/MM/CH cache, narrates one line and makes the control pass due at once. (4) The first full SAT publish was the TASK-1339 heap killer (126 packets, one malloc each, ~82 KB -> 8.7-14 KB); since then publishIfChanged*() skips a due publish while the outbox holds more than SAT_MQTT_OUTBOX_LIMIT = 24 packets (SATmqttPublish.h:80-89); the gate counts packets, not bytes. The boot discovery drip only adds a portion while the outbox holds at most CONN_STAGE_MAX_OUTBOX = 2 packets (MQTTstuff.ino:1794, :1851). On the code alone neither explains a ~50 KB spike for 3 s; not settled without a measurement.
+
+Next step (needs the bench, after the TASK-1995 run on .61): 09's recipe (reboot, wait for 'outside temperature missing', inject outdoor_temp) with hd_min sampled every 1-2 s, plus the [HEAP] burst/drip lines, which already print outbox= and minWin (MQTTstuff.ino:1449, :1491). The outbox count at the minWin drop separates an MQTT outbox burst (count high) from a non-MQTT allocation (count low). Compare with the same recipe on 368 to answer 'new in 369 or old'.
+
+Host repro plan: compile the REAL publishIfChanged*/publishJsonAttrIfChanged/satOutboxFull path (SATmqttPublish.cpp) with a stub MQTT client that keeps every queued packet (no drain) and counts the bytes espMqttClient would allocate per packet (fixed header + topic + payload). Drive the first full SAT publish (all shadows first-seen) as in the existing SAT MQTT state harness and record the bytes held when the 24-packet gate stops. Red when those bytes exceed a budget (e.g. 16 KB), green after a fix that gates on bytes (or a smaller packet limit during the boot drip). Bench check: 09's recipe with the [HEAP] burst/drip lines (outbox= at each minWin drop) and hd_min every 1-2 s; first, the outbox= values of the three lines 10:13:14-16 already in 09's telnet.raw separate H1 from H2 without a new run.
+
+Design constraint for the fix (coordinator, 2026-11-18): run /adr-kit:context first; a byte-based outbox gate must fit ADR-088 (binding: MQTT status-burst windowing + post-burst cooldown; gates check_status_publishers_wrap_burst, check_status_burst_cooldown_bound, check_drip_consults_deferred in evaluate.py), not bypass it. Also check TASK-1339's design of SAT_MQTT_OUTBOX_LIMIT and ADR-167 (no heap tier gating). No firmware change before the 370 push.
+
+H1 REFUTED (09, fix369A-telnet.raw): outbox=1 at all three dips (10:13:14.455 minWin 4236, :15.462 6348, :16.459 2536), sburst=0, connburst=0, no [HEAP] burst lines in 10:13:13-17; minWin 51,444 before and 50,752 after. Discovery drip ruled out on the code: its only malloc is the transient payload in measureMallocPublish() (MQTTHaDiscovery.cpp:2309, ~900 B, freed after publish). H3 (open): the SAT weather fetch on the webhook task (weatherWorkerPoll(), OTGW-firmware.h:395-396; open-meteo current + 24 h hourly, SATweather.ino:99-106): stream-parsed without malloc (SATweather.ino:114-122), but WiFiClient/HTTPClient/DNS and the lwIP pbufs of the response allocate; size depends on our lwIP TCP window (not looked up). Needs a fetch in those seconds: asked 09 for weather/HTTP lines 10:12:40-10:13:20 and the satweather settings.
+
+H3 REFUTED (09, fix369A-telnet.raw 10:12:40-10:13:20): 0 weather/Weather/open-meteo/HTTP lines while SATweatherenable=true with lat/lon set and interval 900; the outdoor value came from 09's MQTT injection. H1 and H3 out; the allocation is still unnamed. Next (diagnostic firmware, after the 370 push): heap-window samples (platformHeapWindowStart/min, the connect-probe pattern of MQTTstuff.ino:1235-1249) around each step of the first SAT control pass after the takeover (satControlLoopRun, satPublishMQTT, state loads), printed on the loop task; then 09's recipe (reboot, outside missing, inject outdoor_temp) with SAT on. Note: SAT is off on .61 now (restored after TASK-2013).
+
+Control boot without SAT (09, .61, 370+41a9e44 app-only 11:27:48, satenabled false): hd_min_free_heap 42,020 at uptime 0, 23,236 at +1 min, 22,260 at +3 min, 18,220 at +5 min (freeheap 42.6-49.6 k, maxblock 31,732). So a boot WITHOUT a SAT takeover bottoms out around 18-23 KB, the 369 boot WITH the takeover at 1068 B: supports the takeover window as the place of the dip (correlation, one boot per arm, not proof). The setup() phase before telnet connects (11:28:17) is not visible in either.
+
+Control run, SAT off (09, .61, 41a9e44, 62 min): hd_min_free_heap 14,180 from ~11:45 to the end (after 18,220 at +5 min), freeheap 43.7-52.7 k flat; hd_max_loop_gap_ms 481 from the boot phase. So without SAT the since-boot low point settles near 14 KB after about 15 min; the 369 boot with the SAT takeover reached 1068 B.
+<!-- SECTION:NOTES:END -->

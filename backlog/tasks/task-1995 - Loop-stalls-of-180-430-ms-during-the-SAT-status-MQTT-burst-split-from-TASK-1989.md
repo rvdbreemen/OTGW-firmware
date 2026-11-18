@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-16T06:28:00Z'
-updated_date: '2026-11-18T09:53:00Z'
+updated_date: '2026-11-18T11:33:00Z'
 labels:
   - performance
 dependencies: []
@@ -23,7 +23,7 @@ Split from TASK-1989 (out of its scope, coordinator 2026-11-16). In gruijter's b
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 A capture on a build with the slowest-step stall line names the step of the burst stalls
+- [x] #1 A capture on a build with the slowest-step stall line names the step of the burst stalls
 - [ ] #2 Fix with old-vs-fix numbers, or a recorded reason why it stays (bounded, harmless)
 <!-- AC:END -->
 
@@ -55,4 +55,14 @@ Step B host evidence (uncommitted, lane-1995s on e5fa0713c): test_fs_writer 20/2
 Pre-existing, not this lane: test/host/test_override_reply.py fails with 'Get-FileHash' not recognized, on origin as on this lane. It is a test-environment bug: the test calls a PowerShell 5.1 cmdlet from a shell where its module is not on PSModulePath (PS 5.1 started from pwsh 7). Coordinator 2026-11-18: no fix in this lane.
 
 Respin of 370 (2026-11-18, before any push): the first 370 build (ad83affee) logged [fs-slow] from fsHealthService() on the fsWriter task (fsSlowNote -> DebugTf). Two defects: (a) stack, a 320 B buffer plus vsnprintf on a 4096 B task whose low point was already 1340 B free on 369; (b) a race, because _debugBOL() works in static buffers and SimpleTelnet has no lock. Fix: the writer task only stores step and ms in an atomic (fsHealthTimed); the loop task prints it (fsHealthPrintNote, '[fs-slow] <step> <ms> ms (writer)'). Writer stack 4096 -> 5120 B. New host checks: WriterTaskPrintsNothing (no Debug*/telnet/fsSlowNote in fsHealthService, fsHealthTimed, updateLittleFSStatus, fsWriterStep/Service/Task; red on ad83affee with 'fsSlowNote(' x2) and the note case (writer pass prints nothing, the next loop pass prints the line once; red on ad83affee). Fix: test_fs_slow_note 7/7, test_health 9/9, test_fs_writer 20/20, evaluate 89/0.
+
+Bench 2026-11-18, 6144353 (respin 1) on .61, 20.2 min app-only: 0 [loop-stall], 0 interleaved [fs-slow] (28 lines, writer lines tagged '(writer)'), fsw_stack_free min 2332 (stack 5120), probe ticks 165-218 ms with no stall, file-flags 4x 113-136 ms (once at a probe tick, 11:15:16, no stall), mount-check 128-192 ms rising with uptime; hd_max_loop_gap_ms 441 without a stall line (watermark since boot; open point, likely the boot phase, not checked). This did NOT confirm the collision as a red on the bench; ad83aff (same ordering) had file-flags 191-394 ms with 2 stalls at probe ticks. Respin 2 (41a9e44) raises both requests after the loop's FS steps (host test seq RFDMR red / FDMRR green); bench criterion: no file-flags [fs-slow] line at any probe tick.
+
+Bench 41a9e44 (respin 2, .61, app-only from 11:27:48), interim: probe tick 11:32:49 write-probe 138 ms (writer), no file-flags line; probe tick 11:37:49 write-probe 167 ms (writer), file-flags 124 ms on the loop task (a LittleFS lock wait: the 10-s file-flags timer drifts off the 5-min grid under SKIP_MISSED_TICKS, so it fell due two passes after the probe pass, during the writer's mount check, 131 ms), no [loop-stall]. My earlier claim that a collision was 'impossible by construction' after respin 2 was wrong. Coordinator decision 2026-11-18: no respin 3; 41a9e44 is judged on the original PASS (no 5->20 [loop-stall], 0 interleaved lines, stack OK, mounted); the file-flags lock waits stay recorded here with their ms; the busy-skip design moves to TASK-2020; reopen only if the 60-min report shows a real 5->20 stall from a lock wait.
+
+AC1 evidence: 09's capture of 366+717e4c2 on .61 (07:34-08:36, 62 min): the one [loop-stall] '568 ms gap, slowest step 5->20 562 ms' with '[fs-slow] write-probe 558 ms' 7 ms before it; [fs-slow] mount-check 52x 103-179 ms, write-probe 12x 107-558 ms.
+
+Step B pushed: 83648a4e9..41a9e44ed (beta.370), zip post 1572575192373395638. Bench PASS (09, .61, app-only on the 369 FS, 11:28:17-12:30:17, 62 min): 0 [loop-stall], 0 interleaved of 76 [fs-slow] lines (writer lines tagged), fsw_stack_free min 2288 flat from 11:45 (stack 5120), bootcount 1036 throughout, MQTT 62/62, freeheap 43.7-52.7 k flat, LittleFS mounted (63 FS githash reads, 62 mount checks, 0 mount-failed lines). Probe ticks 138-261 ms and one 613 ms (12:17:49) without a stall; file-flags at a tick once (11:37:49, 124 ms, lock wait, below the stall threshold). Same FS comparison: ad83aff 2 stalls in 15.7 min, 6144353 0 in 20 min, 41a9e44 0 in 62 min.
+
+AC2 open: the old-vs-fix pair is not on one FS state. Old code: 366 (old c8bc478 FS) 1 stall in 62 min, 368 (fresh FS) 7 in 10 min; 369 Step A on the 369 FS 0 in 10 min with mount-check only 130-154 ms (09: not a fair before). Fix: 41a9e44 0 in 62 min on the 369 FS. A fair old-vs-fix needs the old code for 60 min on the same FS state, or the coordinator accepts the cross-FS numbers.
 <!-- SECTION:NOTES:END -->
