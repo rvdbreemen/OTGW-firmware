@@ -3,11 +3,11 @@ id: TASK-2015
 title: >-
   SAT web UI: the weather hint asks for latitude/longitude while HA pushes
   sat/sun_elevation (thaghostnl)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-18T06:34:00Z'
-updated_date: '2026-11-18T08:25:00Z'
+updated_date: '2026-11-18T12:15:00Z'
 labels:
   - webui
   - sat
@@ -24,9 +24,9 @@ Reported by thaghostnl in #alpha-testing 2026-11-17 20:35 UTC (https://discord.c
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 With a fresh external sat/sun_elevation the weather card names that source and asks for no location (screenshot)
-- [ ] #2 The latitude/longitude and solar-gain help name sat/sun_elevation as the alternative
-- [ ] #3 Both paths shown with screenshots: without HA the card asks for latitude/longitude; with a fresh sat/sun_elevation from HA it names that source and asks for no location
+- [x] #1 With a fresh external sat/sun_elevation the weather card names that source and asks for no location (screenshot)
+- [x] #2 The latitude/longitude and solar-gain help name sat/sun_elevation as the alternative
+- [x] #3 Both paths shown with screenshots: without HA the card asks for latitude/longitude; with a fresh sat/sun_elevation from HA it names that source and asks for no location
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -51,4 +51,14 @@ Open: TASK-2015 still carries needs-maintainer-ok although Robert's words are in
 2026-11-18 implemented (ba): SATcontrol.ino satSunElevationExternalFresh()/satSunElevationSource() in the satSunElevationStep block, the step and the status emitter share it; status JSON sun_elevation_source (external/local/none) + sun_elevation (when not none) next to solar_gain_active; v2.js satLocHintKind/satUpdateLocHint run on every SAT status and weather answer (thaghost's weather-off case included); help texts satweatherlat/lon, satsolargain, satsolarminelev (was wrong: said MQTT is required); i18n de/el/nl new keys + the pre-existing missing settings.label.satpwmswitchmargin (TASK-1888 left it out, i18n-lang was red on dev). Tests: tests/webui/sat-sun-source-hint.test.mjs 4/4 on the fix, 4/4 red with OTGW_DATA_DIR at origin data/; tests/test_sat_sun_elevation.py 21/21, red on origin SATcontrol.ino (no helper); sat-detect-location harness updated 7/7; i18n-lang 6/6 (was red on dev); v2-undefined-names 2/2; SAT-related webui tests 18 files green; 13 python tests on status JSON/help green; evaluate --quick 95 checks 0 FAIL. Synthetic screenshots (headless Chrome, fake device): task2015-ha-source.png (HA source named, no location ask), task2015-no-ha-asks-location.png (asks lat/lon, names sat/sun_elevation). Translations de/el written by me, not native-reviewed: a translate-skill review is advised.
 
 2026-11-18 translations: de/el lines (sat_geo_hint, sat_sun_from_ha, sat_sun_ha_weather_loc, settings.label.satpwmswitchmargin) are NOT native-reviewed. The translate skill (two adversarial reviews + editor) was judged too heavy for 8 lines; checked by hand against i18n/glossary.md: row 66 weather/location = Wetter/Standort, kairos/topothesia (used), PWM untranslated (row 22). nl written by a Dutch-fluent agent. A translate-skill 'de/el sync' pass is advised later. Version renumbered to 371 at the rebase (370 = otgw-dev TASK-1995 Step B, coordinator).
+
+Known limitation (2026-11-18, no fix for 2.0.0, coordinator): sun_elevation_source=local is only computed inside the SAT control pass (satSunElevationStep, called from satControlLoop SATcontrol.ino:8160, after the boiler-fault skip and the fallback returns). On a unit without an OT link, or while the boiler is offline, /v2/sat/status therefore reports none even when latitude/longitude are set. external does not depend on the pass: satHandleSunElevation (SATcontrol.ino:3334-3347) stamps iSunElevExtMs, and the emitter derives the source from it at emit time. The card is unaffected: satLocHintKind (v2.js:7877-7880) only separates external from the rest. The local value's only consumer is the solar-gain gate inside the control pass.
+
+Bench PASS 2026-11-18 by otgw-bench-tester on .63 (Classic + S3), 2.0.0-beta.371+9073f9b, sha256 app/FS matched: no HA at 52.000/5.000 and at 0/0 the card asks for Latitude/Longitude and names sat/sun_elevation, Detect location hidden on plain HTTP; mosquitto_pub 23.4 on <top>/set/<node>/sat/sun_elevation gave source=external, sun_elevation 23.4 within 0.4 s and the card 'Sun position from Home Assistant (sat/sun_elevation): 23.4°. No location needed.' (plus the weather-fetch line when weather is on without a location); 0 JS exceptions in 4 runs; 4 scrubbed card screenshots in 09's scratchpad t2015/shots. local not benched (needs a live OT link; host test only). .63 restored to beta.360. Posted: Discord message 1572585909080031515 (flash zip 9073f9b).
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+The SAT weather card no longer asks for a location while Home Assistant publishes a fresh sat/sun_elevation. The SAT status JSON carries sun_elevation_source (external/local/none, the firmware's 1 h rule from TASK-1410 via one shared helper) and sun_elevation; v2.js satLocHintKind/satUpdateLocHint follow every status poll. AC1: host web UI test tests/webui/sat-sun-source-hint.test.mjs 4/4 on the fix, 4/4 red on the old data/; screenshot task2015-ha-source.png (synthetic data, session scratchpad shots2015/); bench .63 card-00-HA-23.4.png and card-52-5-HA-23.4.png (09). AC2: settingsHelp.h satsolarminelev, satweatherlat, satweatherlon and satsolargain name Home Assistant (sat/sun_elevation) as the alternative to latitude/longitude; settingsHelpGz.h regenerated; test_progmem_assets_deflated 4/4. AC3: task2015-no-ha-asks-location.png plus bench card-52-5-noHA.png and card-00-noHA.png (no HA, asks for latitude/longitude and names sat/sun_elevation) against the HA screenshots of AC1. Gates on 9073f9b after the rebase on origin/dev 90343abe1: test_sat_sun_elevation 21/21 (red on origin before the fix), i18n-lang 6/6, sat-detect-location 7/7, v2-undefined-names 2/2, evaluate --quick 88 pass 0 FAIL 0 WARN, esp32-combo build EXIT=0 (flash 93.7 %). Not verified on hardware: the local source (needs a live OT link; host test only); known limitation noted: without an OT link the status reports none instead of local, the card is unaffected. de/el translations checked against the glossary, not native-reviewed.
+<!-- SECTION:FINAL_SUMMARY:END -->
