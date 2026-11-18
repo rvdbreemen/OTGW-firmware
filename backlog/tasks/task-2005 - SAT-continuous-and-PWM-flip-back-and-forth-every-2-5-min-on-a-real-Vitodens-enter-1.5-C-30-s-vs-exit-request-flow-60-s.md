@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-16T16:35:00Z'
-updated_date: '2026-11-17T07:34:00Z'
+updated_date: '2026-11-18T09:22:00Z'
 labels:
   - sat
   - field
@@ -64,4 +64,6 @@ Citations verified at pin 7beaaf5 via raw.githubusercontent (coordinator, 2026-1
 2026-11-17 code: 8ffd2d121 (2.0.0-beta.361) pushed 707e4421b..8ffd2d121, posted Discord 1572151922029371443. SAT_OVERSHOOT_SUSTAIN_MS 60000, fPwmSwitchMargin default 2.0, fail-safe 3.5 C / 30 s on its own timer (unchanged), one-time migration stored 1.5 -> 2.0 with marker SATpwmmargin2 (settingStuff.ino:693). ADR-254 Proposed (partly supersedes ADR-249). Host: test_sat_overshoot_sustain 31 red on origin f4373938a -> 85/85 green; new test_sat_pwm_margin_migration a,b,d red on origin -> 4/4; pins moved to 60 s in LL-004, LL-020b, test_sat_slave_lowload, test_sat_pwm_override; LL contract all ids pass (LL-016 skip); SAT/settings subset (~170 files) green; full 296-file suite NOT run; evaluate --quick 96 checks 0 FAIL. Bench 09 on .61 (OTGW32), satsimulation false: PASS, SHA 8/8, appelfsha256 = .elf, no crash fields, settings diff exactly SATpwmswitchmargin 1.50 -> 2.00 + SATpwmmargin2 true, second reboot unchanged (no second write), REST 2.0; boot migration log line not observable (printed before telnet accepts clients). AC2 gap: the tests are synthetic threshold/timing cases on the real satCycleCheckOvershootSwitch, NOT a replay of the 16:17-16:39 Vitodens sequence; AC2 stays open until that replay exists. AC3 field.
 
 2026-11-17 AC2 replay: tests/test_sat_vitodens_replay_2005.py feeds the recorded SATTICK (pid, flow) ticks of indigo's beta.350 capture (OTGW-field-data/indigo_light/20261116-144953, hours/20261116-16.zip telnet.log) for the three continuous segments 16:19:58-16:30:28, 16:32:28-16:35:28, 16:37:28-16:39:28 through the real satCycleCheckOvershootSwitch with the real SATtypes.h default. Old code (origin before TASK-2005, 1.5/30): switches at 660 s / 210 s / 150 s = exactly the recorded 16:30:28, 16:35:28, 16:39:28 (harness reproduces the field), 3/3 red. Fix 8ffd2d121 (2.0/60): no switch in any segment up to those ticks, 3/3 green. Limit: after each recorded switch the capture shows PWM, so the replay cannot show what continuous would have done later.
+
+2026-11-18 field data (comms 92, analyze-capture on indigo_light's beta.360 day run 20261117-092448, 09:25-23:00, Vitodens 100-W): 20 continuous<->PWM switches over the day (SATTICK mode changes), the beta.360 1.5 C / 30 s rule; room 20.75-21.05 C from 13:30 to 22:25 at target 21.0, never above 21.1 (no band stop needed). Baseline for the beta.361 rule (2 C / 60 s): compare with his 24 h run on a newer beta. Flow peaks of 55-62 C between runs are standing water (flame 0, CH 0; drops to ~33 C when the pump runs at 12:56). Posted to him with chart: #beta-testing 1572542421840171140.
 <!-- SECTION:NOTES:END -->
