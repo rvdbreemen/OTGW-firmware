@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v2.0.0-beta.383
+**  Version  : v2.0.0-beta.384
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -393,6 +393,9 @@ uint8_t webFileInFlightNow();
 uint8_t restInFlightNow();
 uint16_t mqttQueueNow();                 // TASK-1679: MQTT outbox entries (heap diagnostics)
 void bootHeapConnectTraceTick();          // TASK-1757: connect-window heap trace (MQTTstuff.ino)
+#if defined(_VERSION_PRERELEASE)
+void heapHoldTick();  // TASK-2026: telnet 'H' bench hook (handleDebug.ino), loop task
+#endif
 void sampleHeapDip();  // TASK-1669: the sender task exists, so it can run the weather fetch (webhook.ino)
 void weatherWorkerPoll();     // TASK-1669: run a requested weather fetch; webhook task only (SATweather.ino)
 bool checkHttpAuth();  // HTTP Basic Auth guard (ADR-056; defined in restAPI.ino)

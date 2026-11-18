@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.ino
-**  Version  : v2.0.0-beta.383
+**  Version  : v2.0.0-beta.384
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -1257,6 +1257,9 @@ void loop()
   doBackgroundTasks();              // run background tasks
   connProbe(CPROBE_BG_END);         // TASK-1757 AC3
   sampleHeapDip();                  // TASK-1673: who holds memory at the lowest free heap
+#if defined(_VERSION_PRERELEASE)
+  heapHoldTick();                   // TASK-2026: the 'H' bench hook (prerelease builds only)
+#endif
   bootHeapConnectTraceTick();       // TASK-1757: connect-window heap trace (boot only, no-op otherwise)
   satTakeoverHeapTraceTick();       // TASK-2019: prints the SAT takeover heap trace 5 s after it was armed (no-op otherwise)
 

@@ -298,6 +298,61 @@ void debugFlagOtgwSimChanged(bool on)
   requestOTGWSimulationEvent(on);   // TASK-1321: telnet and REST run on async_tcp
 }
 
+#if defined(_VERSION_PRERELEASE)
+// --- heapHold begin
+// TASK-2026 bench hook, prerelease builds only: telnet key 'H' starves the heap on purpose, as on .61 (no PSRAM, BLE
+// on): free heap under HEAP_HOLD_FREE_TARGET and the largest block under HEAP_HOLD_MAXBLK_TARGET, never under
+// HEAP_HOLD_FREE_FLOOR. 'H' again releases it; it also releases itself after HEAP_HOLD_MAX_MS, because telnet may not
+// get through to a starved unit, and that is longer than the dead-link recovery (8 + 8 probes of 1 min), so a bench
+// sees the restart first. The key only raises a request (it runs on async_tcp); the loop task takes and frees.
+static std::atomic<uint8_t> s_heapHoldReq{0};
+static void*    s_heapHoldBlk[160];
+static uint16_t s_heapHoldN = 0;
+static uint32_t s_heapHoldSinceMs = 0;
+static constexpr uint32_t HEAP_HOLD_MAX_MS        = 30UL * 60UL * 1000UL;
+static constexpr uint32_t HEAP_HOLD_FREE_TARGET   = 7168;
+static constexpr uint32_t HEAP_HOLD_MAXBLK_TARGET = 4096;
+static constexpr uint32_t HEAP_HOLD_FREE_FLOOR    = 4096;
+
+static void heapHoldRelease(PGM_P why)
+{
+  if (s_heapHoldN == 0) return;
+  for (uint16_t i = 0; i < s_heapHoldN; i++) free(s_heapHoldBlk[i]);
+  const unsigned n = s_heapHoldN;
+  s_heapHoldN = 0;
+  DebugTf(PSTR("heaphold released (%s): %u blocks, free=%u maxblk=%u\r\n"), why, n,
+          (unsigned)platformFreeHeap(), (unsigned)platformMaxFreeBlock());
+}
+
+static void heapHoldTake()
+{
+  const uint16_t cap = (uint16_t)(sizeof(s_heapHoldBlk) / sizeof(s_heapHoldBlk[0]));
+  while (s_heapHoldN < cap) {
+    const uint32_t fr = platformFreeHeap(), mb = platformMaxFreeBlock();
+    if (fr < HEAP_HOLD_FREE_FLOOR) break;
+    if (fr < HEAP_HOLD_FREE_TARGET && mb < HEAP_HOLD_MAXBLK_TARGET) break;
+    const size_t sz = (mb >= 2 * HEAP_HOLD_MAXBLK_TARGET) ? HEAP_HOLD_MAXBLK_TARGET : (mb >= HEAP_HOLD_MAXBLK_TARGET ? 1024 : 512);
+    void* p = malloc(sz);
+    if (!p) break;
+    s_heapHoldBlk[s_heapHoldN++] = p;
+  }
+  s_heapHoldSinceMs = millis();
+  DebugTf(PSTR("heaphold: %u blocks held, free=%u maxblk=%u; 'H' or %u min releases it\r\n"), (unsigned)s_heapHoldN,
+          (unsigned)platformFreeHeap(), (unsigned)platformMaxFreeBlock(), (unsigned)(HEAP_HOLD_MAX_MS / 60000UL));
+}
+
+// Loop task: run a request from the key, and the timer.
+void heapHoldTick()
+{
+  if (s_heapHoldReq.exchange(0)) {
+    if (s_heapHoldN) heapHoldRelease(PSTR("key"));
+    else heapHoldTake();
+  }
+  if (s_heapHoldN && (uint32_t)(millis() - s_heapHoldSinceMs) >= HEAP_HOLD_MAX_MS) heapHoldRelease(PSTR("timer"));
+}
+// --- heapHold end
+#endif
+
 // Dispatch a single keypress from the telnet debug session.
 // Called from onTelnetInput() in networkStuff.ino via the SimpleTelnet
 // onInputReceived callback (line mode off — one char per call).
@@ -437,6 +492,9 @@ void handleDebugChar(char c){
                 break;
             case 'l':
                 settings.bMyDEBUG = !settings.bMyDEBUG;
+#if defined(_VERSION_PRERELEASE)
+                Debugln(F("  H) bench: starve the heap / release it (prerelease builds only)"));
+#endif
                 DebugTf(PSTR("\r\nMyDEBUG: %s\r\n"), CBOOLEAN(settings.bMyDEBUG));
                 break;
             case 'f':
@@ -445,6 +503,12 @@ void handleDebugChar(char c){
             case 'w':
                 weatherFetchOpenMeteoNow();
                 break;
+#if defined(_VERSION_PRERELEASE)
+            case 'H':   // TASK-2026 bench hook: hold or release heap (the loop task does it)
+                s_heapHoldReq = 1;
+                DebugTln(F("heaphold: request queued (H again releases, 30 min releases by itself)"));
+                break;
+#endif
             case 'z':
                 resetHeapWatermark();
                 DebugTln(F("Heap soak diagnostics reset (watermark + histogram + pressure counters; min_free_heap is native, not reset). Use from a healthy heap for accurate tier counts."));
