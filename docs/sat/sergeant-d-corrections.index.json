@@ -5563,6 +5563,19 @@
     "TASK-1998"
    ],
    "confirmed_by_entry": null
+  },
+  {
+   "id": 421,
+   "title": "Q-378a answered A: the eco/comfort choice of the band zone rule (entry 378) is the SAT heating mode setting (Sergeant D, 2026-11-18; urgent round, 2.0.0)",
+   "date": "2026-11-18",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1572694752313483437",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1887"
+   ],
+   "confirmed_by_entry": null
   }
  ]
 }

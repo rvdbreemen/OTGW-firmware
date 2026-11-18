@@ -8327,3 +8327,20 @@ Robert, 16:18:42 UTC (https://discord.com/channels/812969634638725140/9144987300
 **Task:** TASK-1998 (question 2 settled, no change).
 
 **Open:** none.
+
+## 421. Q-378a answered A: the eco/comfort choice of the band zone rule (entry 378) is the SAT heating mode setting (Sergeant D, 2026-11-18; urgent round, 2.0.0)
+
+**Source:** #dev-sat-mqtt, Sergeant D 2026-11-18 19:27:28 UTC (https://discord.com/channels/812969634638725140/1105556725714649128/1572694752313483437; unedited after 90 s, read back via the Discord API), a reply to Q-378a (https://discord.com/channels/812969634638725140/1105556725714649128/1572694565863952485).
+
+**Quoted:**
+> "my answer is A"
+
+**Settled:** option A as posted: "eco" and "comfort" in entry 378 are the SAT heating mode setting (settings.sat.iHeatingMode, published as sat/heating_mode), not the target temperature presets. In eco only the main room decides the band; in comfort any usable room keeps heating on. That is what the firmware does now; no change. Settles the open point of entry 378. Scope: 2.0.0.
+
+**Compared with thermo-nova (7beaaf5):** in ECO heating mode the requested setpoint follows only the primary PID; otherwise the secondary rooms can raise it (climate.py:377-389, opened this session). thermo-nova has no band.
+
+**Compared with the firmware:** the band input uses iHeatingMode == 1 (ECO) to restrict to the main room (SATcontrol.ino:8273-8277 on origin/dev, opened this session).
+
+**Task:** TASK-1887 (no change).
+
+**Open:** none.
