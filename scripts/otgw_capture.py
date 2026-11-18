@@ -2618,7 +2618,10 @@ def fetch_graph_history(cap, http_base, label, timeout=GRAPH_HISTORY_TIMEOUT):
         if csv_text is None:
             lines.append(f"Graph history {variant} ({label}): {len(body)} bytes kept as {name}.json, no usable slots for a CSV")
             continue
-        cap.path(name + ".csv").write_text(csv_text, encoding="utf-8", newline="")
+        # open() instead of Path.write_text(newline=...): that keyword needs Python 3.10, the tool supports 3.9+
+        # (macOS ships 3.9.6). newline="" keeps the CSV's own line endings.
+        with open(cap.path(name + ".csv"), "w", encoding="utf-8", newline="") as f:
+            f.write(csv_text)
         lines.append(f"Graph history {variant} ({label}): {csv_text.count(chr(10))} rows, interval {interval} s -> {name}.csv")
     for line in lines:
         cap.summary(line, echo=False)
