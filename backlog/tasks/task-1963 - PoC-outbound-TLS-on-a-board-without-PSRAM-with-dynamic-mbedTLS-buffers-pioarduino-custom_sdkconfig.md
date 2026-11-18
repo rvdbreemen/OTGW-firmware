@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-15T09:35:00Z'
-updated_date: '2026-11-18T22:35:00Z'
+updated_date: '2026-11-18T22:40:00Z'
 labels:
   - research
   - tls
@@ -84,4 +84,8 @@ Restore 21:31: 2.0.0-beta.356+4601510 app+fs back on .61, settings.ini byte-iden
 2026-11-17: reviewed Robert's review-fix commit 59c2506f3 (poc.10): wraps kept, host tests test_rec_ring/codec/lz/policy/local_file/build_id all OK in the container. Quickstart: restart an existing PocketBase container so the build_id migration applies. Bench rerun of steps 1-6 should use poc.10 (HEAD of research/cloud-recording).
 
 2026-11-18 Robert decision (session): the device-recording PoC runs on the PSRAM version, the OTGW Classic with an ESP32-S3 module (bench unit .63), not on the no-PSRAM OTGW32 (.61). Consequence: AC2/AC3 as written (no-PSRAM unit, dynamic mbedTLS buffers) are no longer the PoC gate; on PSRAM the stock TLS buffers fit (ADR-218). Collection point for the bench: https://telemetry.vandenbreemen.net (TASK-1938, Done). Next: rewrite AC2/AC3 for .63 before the bench request.
+
+2026-11-18 Robert decision (session, verbatim): 'Kern is dat ik alleen TLS kan ondersteunen op PSRAM boards.' and 'EN alleen op die wil ik dat de remote telemetry functie aanbieden.' Meaning: outbound TLS only on boards with PSRAM; the remote telemetry feature is offered only on PSRAM boards (OTGW Classic with an ESP32-S3 module with PSRAM); boards without PSRAM (OTGW32) do not get it. This reverses the 2026-11-15 requirement (TASK-1862) that the stream be secure from the device also on boards without PSRAM, and un-parks ADR-218 (Proposed, parked 2026-11-08: TLS client only on PSRAM boards, detected at runtime). Consequence for this task: the no-PSRAM dynamic-mbedTLS-buffer path (esp32-combo-tlsdyn, custom_sdkconfig hybrid compile) is no longer needed; AC2/AC3 (no-PSRAM bench) are moot; AC4 is answered by this decision. The PoC continues on the PSRAM Classic (.63) against https://telemetry.vandenbreemen.net.
+
+2026-11-18 Robert (session, later the same evening): 'Even toch, ik wil toch de OTGW32 test uitproberen. Om te testen of we het toch werkend kunnen krijgen.' Reading: the offering decision (PSRAM boards only) stands for now; the no-PSRAM run on .61 goes ahead as a feasibility test of the poc.9+ link-wrap fix (check 7). AC2/AC3 stay open for that run. Requested from the coordinator: build slot for esp32-combo-tlsdyn poc.10 (wt-09-cloudrec, src 59c2506f3) after the running wt-2026 build, then a bench by 09 on .61 with cloudrec.cfg host=telemetry.vandenbreemen.net (collection point TASK-1938).
 <!-- SECTION:NOTES:END -->
