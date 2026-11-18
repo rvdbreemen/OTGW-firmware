@@ -7,7 +7,7 @@ status: In Review
 assignee:
   - '@claude'
 created_date: '2026-11-13T10:07:00Z'
-updated_date: '2026-11-18T14:32:00Z'
+updated_date: '2026-11-18T15:39:00Z'
 labels:
   - bug
   - sat
@@ -48,6 +48,8 @@ AC 3: field AC (Robert C, 2026-11-14, DM 1571276554430976183 via the coordinator
 Field confirmation (2026-11-16, indigo_light, #beta-testing https://discord.com/channels/812969634638725140/914498730001072149/1571818031716372491): 'the PIC DS18B20 as SAT outside source (TASK-1896/1897) was confirmed on my unit on beta.250 on 15 November (active: true, outside_temp_missing: false, outside_temp = Toutside), and still works on beta.339'. Tester statement without a capture; covers AC2 (field, indigo_light) as reported. The beta.339 notes still list it as a known issue; take it out of the next notes.
 
 2026-11-18 AC2 ticked (otgw-docs, coordinator decision): the AC asks for the reporter's confirmation, not a capture. indigo_light, #beta-testing 2026-11-16, https://discord.com/channels/812969634638725140/914498730001072149/1571818031716372491, verbatim: 'the PIC DS18B20 as SAT outside source (TASK-1896/1897) was confirmed on my unit on beta.250 on 15 November (active: true, outside_temp_missing: false, outside_temp = Toutside), and still works on beta.339'. AC3 stays open, with Robert (A: accept host test C6, B: wait for a field capture where the sensor is gone > 1 h). Note: indigo_light's 2026-11-15 upload (beta.250) does not cover AC3: since TASK-1896 the gateway's own Write-Data 27 stamps, so the outside source there is OT, not the weather.
+
+2026-11-18 AC3: Robert chose "B", wait for field evidence (Discord DM 1572636407611269142, relayed by the coordinator). Stays In Review until a tester capture shows the stale case (Toutside non-zero, no MsgID 27 stamp younger than 1 h, e.g. the PIC sensor gone for over an hour) with the weather as outside source. 92 posts the capture request.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary

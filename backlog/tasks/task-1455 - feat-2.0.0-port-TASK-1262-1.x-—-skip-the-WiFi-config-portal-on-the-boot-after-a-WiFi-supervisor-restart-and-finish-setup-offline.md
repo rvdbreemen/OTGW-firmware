@@ -3,11 +3,11 @@ id: TASK-1455
 title: >-
   feat-2.0.0: port TASK-1262 (1.x) — skip the WiFi config portal on the boot
   after a WiFi supervisor restart and finish setup() offline
-status: In Review
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-10-29T06:28:00Z'
-updated_date: '2026-11-14T15:26:00Z'
+updated_date: '2026-11-18T15:39:00Z'
 labels:
   - port-from-1.x
   - wifi
@@ -155,4 +155,12 @@ AC5: g_rtcWifiSkipPortal is RTC_NOINIT_ATTR (networkStuff.ino:561); wifiMarkSkip
 2026-11-08 AC4 accepted by Robert on the host tests (relayed by the coordinator, session system32-78): tests/test_wifi_skip_portal.py test_other_software_restart_opens_portal, test_next_boot_without_new_mark_opens_portal and test_mark_is_consumed_at_boot. The bench log run stays out: a REST /ReBoot inside a WiFi outage is deferred until the link returns, so it cannot place a non-supervisor software restart inside the outage. AC3 stays Robert's own hands-on bench.
 
 Stale audit 2026-11-14 (coordinator decision): In Review. Only AC3 is left, Robert's own hands-on bench (a REST /ReBoot inside a WiFi outage is deferred, so the bench-tester cannot place it).
+
+2026-11-18 AC3 waived by maintainer for the 21 Nov stable release: Robert answered "B" (waiver) to the coordinator's A/B question (A: a 10-min hands-on session for 1455 AC3 and 1930 AC3, B: a waiver), Discord DM 1572636126211080274, relayed by the coordinator. AC3 stays unchecked: not passed, waived. No evidence of a power cycle or triple reset opening the portal exists on this build.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+ACs 1, 2, 4-10 done with the evidence in the notes (bench red/green on the supervisor-restart reproduction, host tests test_wifi_skip_portal.py, RTC_NOINIT review, ADR-211 Accepted). AC3 (power cycle, first install and triple reset still open the portal) waived by maintainer for the 21 Nov stable (DM 1572636126211080274, "B"); not verified.
+<!-- SECTION:FINAL_SUMMARY:END -->
