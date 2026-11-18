@@ -10613,7 +10613,7 @@
       "title": "The HA simulation switch has a second availability topic and is unavailable while a boiler answers (partly supersedes ADR-102)",
       "path": "ADR-255-the-ha-simulation-switch-has-a-second-availability-topic-and-is-unavailable-while-a-boiler-answers-partly-supersedes-adr-102.md",
       "format": "canonical",
-      "status": "Proposed",
+      "status": "Accepted",
       "date": "2026-11-18",
       "decision_summary": "User Decision: the HA \"SAT Simulation\" switch gets a second availability topic, sat/simulationavailable, combined wit...",
       "topics": [

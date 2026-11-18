@@ -1,7 +1,7 @@
 ---
 id: "ADR-255"
 title: "The HA simulation switch has a second availability topic and is unavailable while a boiler answers (partly supersedes ADR-102)"
-status: "Proposed"
+status: "Accepted"
 date: "2026-11-18"
 binding: false
 gate: null
@@ -41,7 +41,7 @@ format: "canonical"
 
 ## Status
 
-Proposed, 2026-11-18.
+Accepted, 2026-11-18.
 
 **Decision Maker:** User: Robert van den Breemen (maintainer). Option "A", Discord DM 1572560403387523154 of 2026-11-18, a reply to the coordinator's A/B/C question 1572511441158934619, relayed into TASK-2014.
 
@@ -73,6 +73,11 @@ status_history:
     status: Proposed
     changed_by: "Agent: Claude"
     reason: Related to ADR-101
+    changed_via: adr-kit lifecycle
+  - date: 2026-11-18
+    status: Accepted
+    changed_by: "User: Robert van den Breemen"
+    reason: "Accepted by Robert van den Breemen: 'Ja' (Discord DM 1572585571988283465, a reply to the coordinator's question 1572584347851165819 that names the acceptance of ADR-255); recorded by the agent"
     changed_via: adr-kit lifecycle
 ```
 
