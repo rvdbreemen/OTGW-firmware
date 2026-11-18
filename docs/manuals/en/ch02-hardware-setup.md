@@ -208,6 +208,25 @@ flash_otgw.bat --bin OTGW-firmware-esp32-combo-<version>-merged-full.bin
 ./flash_otgw.sh --bin OTGW-firmware-esp32-combo-<version>-merged-full.bin
 ```
 
+### Release artefact verification
+
+Every GitHub release ships a `SHA256SUMS` file next to the binaries (the `-flash.zip`, `.ino.bin`, `.littlefs.bin`, `-merged-full.bin`, `.elf` and the safeboot image). Each line holds the SHA-256 digest of one file and its name, in the format `sha256sum` reads. A check takes seconds and catches a corrupted or tampered download, or a stale file you had on disk.
+
+**Linux and macOS:** put `SHA256SUMS` in the folder with the files you downloaded and run:
+
+```bash
+sha256sum -c --ignore-missing SHA256SUMS          # Linux
+shasum -a 256 -c --ignore-missing SHA256SUMS      # macOS
+```
+
+`--ignore-missing` skips the files you did not download. Each file you have prints `OK`; a `FAILED` line means: do not flash that file, download it again from the GitHub release page.
+
+**Windows (PowerShell):** print the digest of a file and compare it with its line in `SHA256SUMS`:
+
+```powershell
+Get-FileHash -Algorithm SHA256 OTGW-firmware-esp32-combo-<version>-flash.zip
+```
+
 ### First-Time Setup: Connecting to Wi-Fi
 
 On the first boot after flashing, the device has no saved Wi-Fi credentials. It broadcasts a temporary Wi-Fi access point so you can configure it.

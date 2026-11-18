@@ -529,6 +529,8 @@ De Sensors-kaart biedt drie bedieningselementen:
 - **Clear roster**: wist alle acht slots (een twee-druk-bevestiging voorkomt ongelukken).
 - **Naam-prefix filter**: typ een hoofdletterongevoelige prefix om het roster te beperken op de geadverteerde BLE-naam van de sensor. Standaard filtert dit alleen de weergave. Zet de toggle **restrict roster** aan om het te promoveren tot een ingest-poort: sensoren waarvan de bekende naam niet met de prefix overeenkomt, worden dan volledig uit het roster gehouden. Sensoren met een lege of onbekende naam worden altijd toegelaten.
 
+**Vertrouwen.** BLE-advertisements zijn niet-geauthenticeerde uitzendingen: elke sensor binnen radiobereik die een ondersteund formaat stuurt, komt in het roster terecht, ook die van de buren. SAT gebruikt alleen de geselecteerde sensor. Zolang er geen is geselecteerd en precies één rostersensor in de laatste twee publicatie-intervallen een meting stuurde, wordt die automatisch geselecteerd. Kies in een gebouw met veel BLE-apparaten uw sensor met de hand, of stel een naam-prefix filter in met **restrict roster** aan. De firmware maakt nooit verbinding met een sensor en schrijft er nooit naar.
+
 REST-endpoints voor het roster:
 
 - `GET /api/v2/sat/ble/discovery` -  JSON-dump van alle roster-slots

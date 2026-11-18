@@ -493,6 +493,8 @@ The Sensors card offers three controls:
 - **Clear roster**: wipe all eight slots (a two-press confirm guards against accidents).
 - **Name-prefix filter**: type a case-insensitive prefix to narrow the roster by the sensor's advertised BLE name. By default this only filters the display. Enable the **restrict roster** toggle to promote it to an ingestion gate: sensors whose known name does not match the prefix are then kept out of the roster entirely. Sensors with an empty or unknown name are always admitted.
 
+**Trust.** BLE advertisements are unauthenticated broadcasts: any sensor in radio range that sends a supported format lands in the roster, a neighbour's too. SAT uses only the selected sensor. While none is selected and exactly one roster sensor sent a reading in the last two publish intervals, that one is selected automatically. In a building with many BLE devices, select your sensor by hand, or set a name-prefix filter with **restrict roster** on. The firmware never connects to a sensor and never writes to it.
+
 The roster is exposed at:
 
 - `GET /api/v2/sat/ble/discovery` - JSON dump of all roster slots
