@@ -8293,3 +8293,20 @@ Robert, 16:18:42 UTC (https://discord.com/channels/812969634638725140/9144987300
 **Open:** none.
 
 **Note on entry 416 (correction of our own text, not of his answer):** entry 416 says under "Compared with the firmware" that "the change marks them as hot water". That is wrong: the firmware already does option C, so entry 416 needs no code change. Checked on origin/dev this session: a cycle with more than 80 % hot-water samples gets the kind SAT_CK_DHW (SATcycles.ino:792, the port of tracker.py:315-316); a cycle with hot water in its tail is classed SAT_CYCLE_UNCERTAIN (SATcycles.ino:899, classifier.py:25-26); an UNCERTAIN cycle neither switches continuous to PWM nor PWM to continuous at the end of the cycle (satCycleApplyEndOfCycle, SATcycles.ino:1006 onward). The 7 burns in indigo_light's beta.350 capture were cycles, as entry 416 wants, already marked; the shortest are dropped by the minimum sample count, as in thermo-nova (otgw-dev's reading, not re-checked here).
+
+## 419. Sergeant D corrects his own words in entry 408: "until the flame off" was meant as "until light-off" (Sergeant D, 2026-11-18; consistent with entry 418)
+
+**Source:** #dev-sat-mqtt, Sergeant D 2026-11-18 19:22:35 UTC (https://discord.com/channels/812969634638725140/1105556725714649128/1572693524137254954; unedited, no reply reference, read back via the Discord API), two minutes after his answer A to Q-408a (entry 418).
+
+**Quoted:**
+> "what I said in the morning was wrong, I meant LIGHT-OFF"
+
+**Settled:** his morning message (entry 408, "the initial high setpoint u til the flame off") should have read "until light-off". Interpretation (ours): light-off is the usual boiler term for burner ignition, so the high start setpoint of a PWM ON phase is held until the flame lights. That is the reading he confirmed with A in entry 418; the two agree. No firmware change. Scope: 2.0.0.
+
+**Changes an earlier entry:** corrects the quoted wording of entry 408 (his words, not our reading); entry 408's interpretation and entry 418 stand.
+
+**Compared with thermo-nova (7beaaf5):** the flame-off hold applies while the flame is not active (heating_control.py:392-401); after the flame lights the suppression hold runs (:412 onward). Opened this session.
+
+**Task:** none (no change).
+
+**Open:** none, unless he means something else by light-off.

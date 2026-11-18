@@ -5539,6 +5539,17 @@
    "supersedes": [],
    "tasks": [],
    "confirmed_by_entry": null
+  },
+  {
+   "id": 419,
+   "title": "Sergeant D corrects his own words in entry 408: \"until the flame off\" was meant as \"until light-off\" (Sergeant D, 2026-11-18; consistent with entry 418)",
+   "date": "2026-11-18",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1572693524137254954",
+   "supersedes": [],
+   "tasks": [],
+   "confirmed_by_entry": null
   }
  ]
 }
