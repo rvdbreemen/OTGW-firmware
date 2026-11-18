@@ -3,11 +3,11 @@ id: TASK-2014
 title: >-
   HA: the SAT simulation switch bounces back without a reason while a boiler
   answers (thaghostnl)
-status: Done
+status: In Review
 assignee:
   - '@claude'
 created_date: '2026-11-18T06:27:00Z'
-updated_date: '2026-11-18T17:41:00Z'
+updated_date: '2026-11-18T17:43:00Z'
 labels:
   - ha
   - sat
@@ -43,6 +43,8 @@ Reported by thaghostnl in #alpha-testing 2026-11-17 20:35 UTC (https://discord.c
 AC1 bench by 09 (2026-11-18, .63 Classic + S3, PIC 6.8 gateway, NO boiler; simulation off, no loopback), 2.0.0-beta.374+1d124db (appelfsha256 f6a9be90... = .elf, full OTA, changed none). 'Boiler answers' EMULATED via POST /api/v2/sat/force-boiler (coordinator decision), not a real boiler. Retained homeassistant/switch/otgw-AC276ECE45D8/sat_simulation_enable/config: avty=[{t:OTGW/value/otgw-AC276ECE45D8},{t:.../sat/simulation_available,pl_avail:true,pl_not_avail:false}], avty_mode all, no avty_t; the 14 other SAT switches keep avty_t only. Retained sat/simulation_available 'true' at idle. 14:27:27.5 force-boiler 1 -> 200 force_boiler_present true, same tenth MQTT simulation_available 'false' (switch unavailable in HA); 14:27:39.6 force-boiler 0 -> 'true' again. Side note: ot_link_lost briefly false after force-boiler, true again after ~35 s (the force hook feeds satNotifyBoilerFrameSeen, not the 2014 change); the PIC reported boilerconnected false throughout. Not verified: a real HA instance showing the entity greyed out (broker-side availability topics only). .63 restored to 360. Evidence: 09 scratchpad t2014/.
 
 2026-11-18 pushed and published (otgw-docs, on the coordinator's GO): 1d124dbc5 (2.0.0-beta.374) with a9ff5dcb8 (ADR-255 Accepted) as a fast-forward 9e6636da7..1d124dbc5, remote HEAD confirmed after a fresh fetch; zip OTGW-firmware-esp32-combo-2.0.0-beta.374+1d124db-flash.zip (6431071 bytes) posted to #alpha-testing by scripts/discord-post-build.sh, http 200, message 1572665769706135653. AC2 basis: the host test tests/test_ha_sat_sim_availability.py (red on origin before the fix, green on it) plus 09's bench run with the boiler emulated by force-boiler; a run with a real answering boiler and a real HA instance greying out the entity is a field check (thaghostnl's Remeha), not an AC. The ot_link_lost side effect of force-boiler is a test-hook effect, not part of the 2014 change.
+
+2026-11-18 status In Review (coordinator): AC1 ticked on discovery payload + HA source (mixins AVAILABILITY_ALL); confirmation in a real HA pending: bench rig (09, HA ingress rig, after 375) or field (thaghostnl). AC1 reads 'In HA' and a real HA is available on the bench, so the HA code read counts only as a stand-in until that check.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
