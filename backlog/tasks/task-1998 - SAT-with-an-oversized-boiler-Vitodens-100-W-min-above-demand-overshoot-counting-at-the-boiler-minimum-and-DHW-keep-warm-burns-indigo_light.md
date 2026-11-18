@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-16T10:42:00Z'
-updated_date: '2026-11-16T16:39:00Z'
+updated_date: '2026-11-18T12:02:00Z'
 labels:
   - needs-maintainer-ok
   - sat
@@ -24,7 +24,7 @@ Reported by indigo_light (Discord 301077214374658048), #beta-testing https://dis
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Long-run capture on beta.339 or newer and the graph CSVs from the reporter received and analysed
+- [x] #1 Long-run capture on beta.339 or newer and the graph CSVs from the reporter received and analysed
 - [ ] #2 Q2 and Q3 put to Sergeant D one per message with the release scope line, answers recorded as entries
 - [ ] #3 Follow-up per his answers: a change with a host test red on the old code and green on the fix, or a recorded works-as-designed
 <!-- AC:END -->
@@ -43,4 +43,6 @@ Open design questions for Sergeant D (one per message, each with the release sco
 2026-11-16 indigo_light capture on beta.350 (real Vitodens, SAT on, simulation off), analysed by comms 92; archived at RvdB/OTGW-field-data/indigo_light/20261116-144953/ (zip sha256 1573a14c...bd84; analysis/ holds the summary, the SAT timeline and charts). Findings, facts from the telnet/OT log: (1) PWM now runs (see TASK-2000). (2) Mode ping-pong 16:17-16:39: enter PWM on flow >= request + 1.5 for 30 s (TASK-1888 rule), back to continuous about 2 min later on 'flame on and request above flow for 60 s' (ADR-236 exit), four times; the flame itself burned 1955 s without a break, peak flow 43.6. (3) The first PWM entry at 16:00:58 was triggered by flow 67.3 while no CH flowed: boiler water hot from DHW burns, during a band pause; the PWM ON phase that followed had no flame and counted as a start (starts/hr 2), the entry 398 case. (4) Seven DHW burns of 1-16 s (15:15-15:53, flow 61-73) were logged as SAT cycles #2-#5 and in the 4 h window (n=5, avgOn 87 s); entry 390 says such burns must not affect SAT: whether they change a control decision is not shown by this capture and stays open here. (5) The band worked: CH off at 14:53:58 (room 20.76, target 20.5) with PWM active, resumed 16:14:58. Not known from the log: whether the DHW burns were taps or keep-warm (question for indigo). Report sent to Sergeant D by DM (1571924364050432032) with the overview chart; to Robert via the coordinator.
 
 2026-11-16 Q-1998b queued for Sergeant D (after Q-2005a): do the short DHW burns belong in SAT's cycle statistics and 4 h window (7 burns of 1-16 s logged as SAT cycles #2-#5, window n=5), given entry 390? If he answers they must not count, the fix goes into 2.0.0 (coordinator).
+
+2026-11-18 AC1 evidence (comms 92, analyze-capture, posted to indigo with charts): (a) long-run capture on beta.360 (>= 339): 20261117-092448-beta360-day-clean.zip, 09:25-23:00, analysed: room 20.75-21.05 C at target 21.0 from 13:30 to 22:25, 20 continuous<->PWM switches, ~55 C ON-start setpoint (entries 408/409), flow peaks 55-62 C between runs are standing water, boiler reports DHW mode 20-40 s after nearly every CH run (the keep-warm DHW burns of entry 390); post #beta-testing 1572542421840171140. (b) the reporter's graph CSVs (otgw-graph-20261112-210857.csv HA-integration SAT, otgw-graph-20261115-163915.csv OTGW SAT beta.250) analysed side by side; the export's roomSet is MsgID 16 (v2.js:2390), not the SAT target; post 1572543639081717844. Charts: scratchpad indigo1117/charts/indigo-day-sat.png, indigocsv/charts/indigo-compare.png. AC2/AC3 still open (Q-1998b with Sergeant D).
 <!-- SECTION:NOTES:END -->
