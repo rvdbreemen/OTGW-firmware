@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-27T23:40:00Z'
-updated_date: '2026-11-16T15:37:00Z'
+updated_date: '2026-11-18T22:25:00Z'
 labels:
   - epic
   - sat
@@ -96,6 +96,8 @@ Option A (recommended): the epic and its full gate move to 2.1.0, and 2.0.0 take
 Conflict to record either way: TASK-1412.4 (Done) 'Honor slave low-load permission across SAT entry and active PWM' is reversed by Sergeant D entries 392 and 393 (MsgID 3 HB bit 4 no longer gates PWM; TASK-2000, beta.350, ADR-251 Accepted). Its R-issue in docs/sat/sat-low-load-remediation-plan-2026-10-28.md should be marked superseded by entries 392/393, not reopened.
 
 2026-11-16 DECIDED by Robert (DM 1571910380756668488, relayed by the coordinator): option A of the proposal above. The epic and its full low-load gate move to milestone 2.1.0. 2.0.0 keeps the reduced slice: TASK-1412.24 = the field-run request, TASK-1412.25 = the Wed-Fri runs (indigo_light's beta.350/351 long-run first), epic AC3 only for the host LL contract. The 2.0.0 stable gate is TASK-1740. This supersedes Robert's 2026-11-04 directive '2.0.0 stable waits until SAT low-load is field-validated (epic closed: 1412.16-26)'; recorded in docs/process/directive-changelog.md. TASK-1412.26 (independent evidence review) moves to 2.1.0 with the epic; the R-issue of TASK-1412.4 is marked superseded by 95 (TASK-2000 owner).
+
+2026-11-18 field data point (n=1 per arm, NOT proof yet; comms 92): gruijter, OTGW Classic + S3, Intergas boiler (no MsgID 14/15/28 support), Honeywell Round Connected, beta.356. SAT ON 17 Nov vs SAT OFF (Honeywell) 18 Nov, same clock window. Captures: #alpha-testing 1572708913441276034 (ON) and 1572709052100640932 (OFF); analysis posted 1572721027119841491 / 1572721048552476685 / 1572721058363220090; gas meter CSV 1572738176320016404; result 1572739227655868458. Comfort equal (setpoint >=19 C, 8.9 h each: MAE 0.17 vs 0.18 C, within +/-0.3 C 82 vs 84 %). CH starts per 100 heating degree-hours 11.5 vs 27.8 (0 vs 16 runs < 3 min). Modulation during CH flame mean 10.4 vs 25.7 %. Return during CH flame 31.6 vs 31.1 C (no difference). Gas MEASURED (meter, local 01:00-17:00): 3.029 vs 2.373 m3 = raw +28 % on the colder day (outside mean 5.1 vs 9.8 C, 192.1 vs 122.3 heating degree-hours base 18 C); per 100 degree-hours 1.58 vs 1.94 m3 = SAT about -19 %. Caveats: meter includes hot water (0.50 vs 0.42 h DHW burns), degree-hours ignore sun/wind/gains, the 17 Nov schedule had an extra 18.0 C step at 06:46, one day each. More ON/OFF meter days requested. Work files: comms scratchpad gr1118/work (compare.json, comparison.png).
 <!-- SECTION:NOTES:END -->
 
 ## Comments
