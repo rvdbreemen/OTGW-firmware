@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : settingsStuff
-**  Version  : v2.0.0-beta.374
+**  Version  : v2.0.0-beta.375
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -568,6 +568,15 @@ struct SettingsLoadScope {
 };
 static bool g_sawOnboardedKey = false;   // TASK-997: set when ui_onboarded is parsed; its absence marks a pre-feature (existing) install
 static bool g_sawBleEnableKey = false;   // TASK-1693: set when SATbleenable is parsed; its absence means no stored BLE choice yet
+static bool g_bleRefusedNoPsram = false; // TASK-2025: a request for BLE on was refused on a board without PSRAM
+// [ble-nopsram-refuse:begin] TASK-2025
+// BLE can only be on with PSRAM: without it the scanner exhausts the internal heap (TASK-2025). Every write of
+// SATbleenable goes through this, so the boot parse of settings.ini, REST and MQTT all get the same answer.
+static bool bleEnableAllowed(bool psram, bool want)
+{
+  return want && psram;
+}
+// [ble-nopsram-refuse:end]
 // [ble-nopsram-default:begin] TASK-1693
 // On a board without PSRAM, BLE starts off: no stored choice means off, and the web UI shows the
 // stability warning when the user switches it on (ADR-169 successor). PSRAM boards keep the struct
@@ -585,6 +594,7 @@ void readSettings(bool show)
   g_sawLegacyTopicsKey = false;  // reset per parse; updateSetting() sets it when the key is seen
   g_sawOnboardedKey = false;     // TASK-997: same sentinel pattern for the first-time-setup flag
   g_sawBleEnableKey = false;     // TASK-1693: same sentinel pattern for the BLE default
+  g_bleRefusedNoPsram = false;   // TASK-2025: set by the setter when a stored true is refused (no PSRAM)
   g_satCphOutOfSet = false;      // TASK-1375: same sentinel pattern for SATcyclesperhour
   g_sawSatFollowKey = false;     // TASK-1259: same sentinel pattern for SATfollowthermostat
   g_sawOtdOhMarkerKey = false;   // TASK-1961: same sentinel pattern for the OH=1 migration marker
@@ -687,6 +697,11 @@ void readSettings(bool show)
     applyBleNoPsramDefault(false);
     settingsDirty = true;
     DebugTln(F("[Settings] no SATbleenable key on a board without PSRAM: BLE off by default"));
+  }
+  // TASK-2025: a stored SATbleenable=true on a board without PSRAM was refused by the setter; persist the off once.
+  if (g_bleRefusedNoPsram) {
+    settingsDirty = true;
+    DebugTln(F("[Settings] SATbleenable=true refused: BLE needs PSRAM on this board (TASK-2025)"));
   }
 #if defined(HAS_DIRECT_OT) && HAS_DIRECT_OT
   // [otd-oh-migrate:begin] TASK-1961 (Robert, option B): OH= defaults to 1 like the PIC (gateway.asm 6.8 SavedSettings
@@ -1303,7 +1318,7 @@ void updateSetting(const char *field, const char *newValue)
   // --- BLE temperature sensor settings (Task #20) ---
   // ESP-abstraction Tier 2 (TASK-742): parsed unconditionally so a settings.json
   // written on either platform round-trips; harmless no-op fields on ESP8266.
-  else if (strcasecmp_P(field, PSTR("SATbleenable")) == 0)  { settings.sat.bBleEnable = EVALBOOLEAN(newValue); g_sawBleEnableKey = true; }  // TASK-1693 sentinel
+  else if (strcasecmp_P(field, PSTR("SATbleenable")) == 0)  { g_sawBleEnableKey = true; const bool want = EVALBOOLEAN(newValue); settings.sat.bBleEnable = bleEnableAllowed(psramFound(), want); if (want && !settings.sat.bBleEnable) g_bleRefusedNoPsram = true; }  // TASK-1693 sentinel, TASK-2025 refusal
   else if (strcasecmp_P(field, PSTR("SATbleriskack")) == 0) settings.sat.bBleRiskAck = EVALBOOLEAN(newValue);
   else if (strcasecmp_P(field, PSTR("SATblefailover")) == 0) settings.sat.bBleFailover = EVALBOOLEAN(newValue);
   else if (strcasecmp_P(field, PSTR("SATblemac")) == 0)      strlcpy(settings.sat.sBleMAC, newValue, sizeof(settings.sat.sBleMAC));

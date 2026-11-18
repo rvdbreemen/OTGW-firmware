@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-beta.374
+**  Version  : v2.0.0-beta.375
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -4569,6 +4569,11 @@ void postSettings()
     RESTDebugTf(PSTR("--> field[%s] => newValue[***]\r\n"), field);
   } else {
     RESTDebugTf(PSTR("--> field[%s] => newValue[%s]\r\n"), field, newValue);
+  }
+  // TASK-2025: without PSRAM BLE cannot be switched on (the setter refuses it too); say so instead of a 200.
+  if (strcasecmp_P(field, PSTR("satbleenable")) == 0 && EVALBOOLEAN(newValue) && !psramFound()) {
+    webSend(409, F("application/json"), F("{\"error\":\"BLE needs PSRAM: not available on this board\"}"));
+    return;
   }
   updateSetting(field, newValue);
   // TASK-564: do NOT call flushSettings() synchronously here. The earlier

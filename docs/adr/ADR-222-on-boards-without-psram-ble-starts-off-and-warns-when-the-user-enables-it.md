@@ -10,6 +10,8 @@ verified_in: []
 supersedes:
   - "ADR-169"
 superseded_by: null
+related:
+  - "ADR-257"
 topics:
   - "ble"
   - "psram"
@@ -65,6 +67,11 @@ status_history:
     status: Accepted
     changed_by: "User: Robert van den Breemen"
     reason: "Robert accepted ADR-222 (2026-11-08, TASK-1693): BLE off by default on no-PSRAM boards, warning only on enable; the bleActive() gate and memory rationale of ADR-169 stay"
+    changed_via: adr-kit lifecycle
+  - date: 2026-11-18
+    status: Accepted
+    changed_by: Agent (ba)
+    reason: Related to ADR-257 (TASK-2025, proposed successor)
     changed_via: adr-kit lifecycle
 ```
 

@@ -7,7 +7,7 @@ status: To Do
 assignee:
   - '@claude'
 created_date: '2026-10-29T09:03:00Z'
-updated_date: '2026-11-18T12:13:00Z'
+updated_date: '2026-11-18T12:56:00Z'
 labels:
   - sat
   - diagnostics
@@ -55,4 +55,6 @@ AC mapping. AC1 (Proposed ADR): met and exceeded: ADR-213 Accepted 2026-11-05 (d
 Proposal (for the coordinator): smaller scope, then Done. (1) Tick AC1 and AC2 on the evidence above; for the BLE-on heap gap either accept the TASK-1665 numbers (recommended: BLE has its own no-PSRAM budget rule in ADR-222) or ask 09 for one /api/v2/device/info read on .61 with BLE on and the UI open while a recording runs. (2) Rewrite AC3 as a bench demo: record about 30 min on .63 under a replay, replay the same OT frames on build N and on build N+1 that changes a PIC command or a publish, and run diag_decode.py diff on the two recordings: it must show the changed lines and exit 1 (a same-build pair exits 0). (3) Retitle without 24 h (13.5 h PSRAM ring, ADR-213). Nothing here needs firmware code; AC3 needs a bench slot.
 
 2026-11-18 AC correction (coordinator approved, milestone stays 2.1.0; a correction of an AC impossible by design, not a scope change). Old AC3 asked for 'a recorded day' to replay; ADR-213:155 sizes the PSRAM ring at '1.5 MB | ... | about 13.5 h, about 18 h without repeats' and boards without PSRAM get a 4 KB ring (ADR-213:158), so a 24 h recording cannot exist. AC3 is rewritten as a provable bench demo of the diff between two builds (the old AC's real goal), and '24 h' is dropped from the title. AC1 ticked: ADR-213 status Accepted, 2026-11-05 (docs/adr/ADR-213-*.md:4 and :45, read 2026-11-18). AC2 stays open: one /api/v2/device/info read on .61 (no PSRAM) with BLE on, the web UI open and a recording running is requested from 09 through the coordinator.
+
+2026-11-18: AC2 is blocked by TASK-2025. The requested .61 read (BLE on, web UI open, recording running) collapsed the heap (free 9 KB, maxblk 2 KB, minFree 520 B) and put the unit in a restart loop; the measurement waits for that fix.
 <!-- SECTION:NOTES:END -->

@@ -9,6 +9,8 @@ documents_shipped: false
 verified_in: []
 supersedes: []
 superseded_by: "ADR-222"
+related:
+  - "ADR-257"
 ---
 # ADR-169 PSRAM-Aware BLE Default with a No-PSRAM Instability-Consent Gate
 
@@ -40,6 +42,11 @@ status_history:
     status: Superseded
     changed_by: "User: Robert van den Breemen"
     reason: "Robert accepted ADR-222 (2026-11-08, TASK-1693): BLE off by default on no-PSRAM boards, warning only on enable; the bleActive() gate and memory rationale of ADR-169 stay"
+    changed_via: adr-kit lifecycle
+  - date: 2026-11-18
+    status: Superseded
+    changed_by: Agent (ba)
+    reason: Related to ADR-257 (TASK-2025)
     changed_via: adr-kit lifecycle
 ```
 

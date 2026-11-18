@@ -1693,18 +1693,11 @@
     "values": {
       "save_failed_http": "Save failed (HTTP {{status}})",
       "save_failed": "Save failed",
-      "ble_risk_title": "BLE without PSRAM — instability risk",
-      "ble_risk_text": "This board has no PSRAM. Enabling BLE takes ~64 KB of internal memory that the web server needs, so the Web UI can become unstable or unreachable under load (you may need to reboot). Enable BLE anyway?",
-      "ble_keep_off": "Keep BLE off",
-      "ble_enable_anyway": "Enable anyway (accept risk)",
-      "ble_kept_off": "BLE kept off",
-      "ble_enabled_accepted": "BLE enabled — risk accepted",
+      "ble_needs_psram": "BLE needs PSRAM. This board has none, so BLE stays off: the scanner uses up the memory the gateway needs.",
       "ble_clearing": "Clearing roster…",
       "ble_title": "BLE sensors",
       "ble_slots": "{{used}} / {{max}} slots used",
       "ble_slots_prefix": "{{used}} / {{max}} slots used · prefix \"{{prefix}}\"",
-      "ble_paused": "BLE is paused: this board has no PSRAM, and BLE scanning starts only after you accept the stability warning.",
-      "ble_read_warning": "Read the warning",
       "ble_rescan": "Rescan",
       "ble_scanning": "Scanning…",
       "ble_scanning_toast": "Scanning for BLE sensors…",
@@ -4864,6 +4857,7 @@
       });
     }
     if (satLockedKey(k)) { input.disabled = true; row.style.opacity = '0.55'; row.title = satOffNote(); }   // TASK-1737
+    if (k === 'satbleenable') bleLockSwitch(input, row);   // TASK-2025: no PSRAM, the switch cannot be touched
     row.appendChild(input);
     return row;
   }
@@ -5018,11 +5012,11 @@
     var satEnabling = ('satenabled' in setDirty) && ('' + setDirty.satenabled) === 'true' &&
       !(setData.satenabled && ('' + setData.satenabled.value) === 'true') && satOnbNeeded();
     if (satEnabling) { delete setDirty.satenabled; keys = Object.keys(setDirty); }
-    // TASK-1693: switching BLE on for a board without PSRAM asks first (the stability warning);
-    // the key leaves this save and maybeShowBleConsent() stores it only when the user accepts.
-    var bleEnabling = ('satbleenable' in setDirty) && ('' + setDirty.satbleenable) === 'true' &&
-      bleNeedsRiskAck();
-    if (bleEnabling) { delete setDirty.satbleenable; keys = Object.keys(setDirty); }
+    // TASK-2025: BLE cannot be switched on without PSRAM (the firmware refuses it with 409): the key leaves this
+    // save and a note says why. Before, a warning let the user accept the risk; on .61 the scanner then exhausted
+    // the heap and the unit hung.
+    var bleRefused = ('satbleenable' in setDirty) && ('' + setDirty.satbleenable) === 'true' && bleNoPsram();
+    if (bleRefused) { delete setDirty.satbleenable; keys = Object.keys(setDirty); }
     var bleName = ('satblenameprefix' in setDirty) || ('satblenamefilteringest' in setDirty);
     var chain = Promise.resolve();
     keys.forEach(function (k) {
@@ -5041,12 +5035,12 @@
     chain.then(function () {
       setDirty = {};
       // TASK-1732: only when something was posted. A save that held only a key handed to the SAT
-      // wizard (satenabled) or the BLE warning (satbleenable) stored nothing yet.
+      // wizard (satenabled) or a refused BLE switch (satbleenable, TASK-2025) stored nothing yet.
       if (keys.length) bleToast(t('settings.saved'));
       renderSettings();
       if (bleName) bleAction('rescan');   // TASK-1231: re-apply the name filter (classic parity)
       if (satEnabling) startSatOnboarding('enable');   // TASK-1012: wizard owns the actual enable
-      if (bleEnabling) maybeShowBleConsent();           // TASK-1693: the warning owns the actual enable
+      if (bleRefused) bleToast(t('values.ble_needs_psram'), true, 5000);   // TASK-2025
     }).catch(function () {
       bleToast(t('settings.save_failed'), true, 2500);   // TASK-1254: red error variant
     });
@@ -5074,69 +5068,33 @@
         // clobber a half-typed bindkey / steal focus).
         var changed = !bleData || bleData.populated_slots !== j.populated_slots ||
           JSON.stringify(bleData.sensors || []) !== JSON.stringify(j.sensors || []);
-        var pausedChanged = !bleData || bleBlePaused(bleData) !== bleBlePaused(j);
+        var psramChanged = !bleData || (bleData.psram === 0) !== (j.psram === 0);
         bleData = j;
-        // TASK-1693: no dialog without a user action. A board without PSRAM with BLE on but no
-        // ack (an install from before TASK-1693) keeps BLE paused and shows a hint in the BLE card.
-        if (pausedChanged) changed = true;
+        if (psramChanged) {   // TASK-2025: the BLE card shows the needs-PSRAM note, and the switch locks
+          changed = true;
+          var sw = document.querySelector('#setCols .srow[data-key="satbleenable"] input');
+          if (sw) bleLockSwitch(sw, sw.closest('.srow'));
+        }
         var card = document.getElementById('setcard-ble');
         var typing = card && card.contains(document.activeElement) &&
           /^(INPUT|TEXTAREA)$/.test((document.activeElement || {}).tagName || '');
         if (changed && !typing) renderBleCard();
       }).catch(function () { });
   }
-  // TASK-1693: BLE waits for the warning on this board (no PSRAM, BLE on, not accepted yet).
-  function bleBlePaused(j) { return !!j && j.psram === 0 && !!j.ble_enable && !j.risk_ack; }
-  // TASK-1693: switching BLE on needs the warning first when the board has no PSRAM and the risk
-  // was not accepted yet. PSRAM comes from the BLE roster (loaded with the Sensors page), else
-  // from device/info; an unknown board does not ask.
-  function bleNeedsRiskAck() {
+  // TASK-2025: BLE needs PSRAM. PSRAM comes from the BLE roster (loaded with the Sensors page), else from
+  // device/info; an unknown board is not refused here (the firmware still refuses it).
+  function bleNoPsram() {
     var ps = bleData && typeof bleData.psram === 'number' ? bleData.psram
            : (devInfoCache && devInfoCache.psram_found !== undefined ? +devInfoCache.psram_found : 1);
-    var acked = setData.satbleriskack && ('' + setData.satbleriskack.value) === 'true';
-    return ps === 0 && !acked;
+    return ps === 0;
   }
-  // TASK-995 / TASK-1693: BLE-without-PSRAM stability warning. On a no-PSRAM board BLE takes
-  // ~64 KB of internal DRAM that the async web server needs, so the Web UI can wedge under load.
-  // Shown only on a user action: switching BLE on (saveSettings) or the button in the BLE card.
-  // Accept -> store SATbleenable=true (if not on yet), then SATbleriskack=true, one after the
-  // other (ADR-165). Decline -> nothing new is stored; BLE that was already on is switched off.
-  function maybeShowBleConsent() {
-    if (document.getElementById('bleRiskBackdrop')) return;   // already open
-    var bd = document.createElement('div'); bd.id = 'bleRiskBackdrop'; bd.className = 'sim-backdrop';
-    var m = document.createElement('div'); m.className = 'sim-modal';
-    var h = document.createElement('h3'); h.textContent = '⚠ ' + t('values.ble_risk_title');
-    var p = document.createElement('p');
-    p.textContent = t('values.ble_risk_text');
-    var acts = document.createElement('div'); acts.className = 'acts';
-    var no = document.createElement('button'); no.textContent = t('values.ble_keep_off');
-    var yes = document.createElement('button'); yes.className = 'primary'; yes.textContent = t('values.ble_enable_anyway');
-    function post(name, value, then) {
-      fetch(APIGW + 'v2/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: name, value: value }) })
-        // TASK-1732 review: a failed store says so; the user must not be left without feedback.
-        // The failure handler covers the request only, so an error in then() is not shown as a failed save.
-        .then(function (r) {
-          if (!r.ok) { bleToast(t('values.save_failed_http', { status: r.status }), true, 2500); return false; }
-          return true;
-        }, function () { bleToast(t('values.save_failed'), true, 2500); return false; })
-        .then(function (ok) { if (ok && then) then(); });
-    }
-    function close() { if (bd.parentNode) bd.parentNode.removeChild(bd); }
-    var wasOn = setData.satbleenable && ('' + setData.satbleenable.value) === 'true';
-    function stored(name, value) { if (setData[name]) setData[name].value = value; }
-    no.addEventListener('click', function () {
-      close();
-      if (!wasOn) { bleToast(t('values.ble_kept_off')); return; }
-      post('satbleenable', false, function () { stored('satbleenable', false); bleToast(t('values.ble_kept_off')); renderSettings(); setTimeout(fetchBle, 500); });
-    });
-    yes.addEventListener('click', function () {
-      close();
-      var ack = function () { post('satbleriskack', true, function () { stored('satbleriskack', true); bleToast(t('values.ble_enabled_accepted')); renderSettings(); setTimeout(fetchBle, 800); }); };
-      if (wasOn) ack(); else post('satbleenable', true, function () { stored('satbleenable', true); ack(); });
-    });
-    acts.appendChild(no); acts.appendChild(yes);
-    m.appendChild(h); m.appendChild(p); m.appendChild(acts); bd.appendChild(m);
-    document.body.appendChild(bd);
+  // TASK-2025 (Robert, DM 1572613627528085586: "Niet verbergen maar disablen. Geen PSRAM dan mag je de schakelaar
+  // niet aanraken."): without PSRAM the BLE switch stays visible but disabled, with the reason as its title. Called when
+  // the row is built and again when the BLE poll first tells the board has no PSRAM.
+  function bleLockSwitch(input, row) {
+    if (!input || !bleNoPsram()) return;
+    input.disabled = true;
+    if (row) { row.style.opacity = '0.55'; row.title = t('values.ble_needs_psram'); }
   }
   // TASK-963: continuous detection. The firmware scans passive-continuous (ADR-151),
   // so sensors appear over time; poll the roster while the Sensors category is open
@@ -5182,14 +5140,10 @@
       ? t('values.ble_slots_prefix', { used: bleData.populated_slots || 0, max: bleData.max_slots || 0, prefix: bleData.name_prefix })
       : t('values.ble_slots', { used: bleData.populated_slots || 0, max: bleData.max_slots || 0 });
     card.appendChild(desc);
-    // TASK-1693: BLE is switched on but waits for the stability warning (board without PSRAM,
-    // install from before TASK-1693). A hint with a button, never a dialog on its own.
-    if (bleBlePaused(bleData)) {
+    // TASK-2025: a board without PSRAM cannot run BLE; say so in the card.
+    if (bleData.psram === 0) {
       var hint = document.createElement('div'); hint.className = 'ble-desc';
-      hint.textContent = t('values.ble_paused') + ' ';
-      var accept = document.createElement('button'); accept.className = 'tbtn'; accept.textContent = t('values.ble_read_warning');
-      accept.addEventListener('click', maybeShowBleConsent);
-      hint.appendChild(accept);
+      hint.textContent = t('values.ble_needs_psram');
       card.appendChild(hint);
     }
     var rescan = document.createElement('button'); rescan.className = 'tbtn'; rescan.textContent = '🔄 ' + t('values.ble_rescan');

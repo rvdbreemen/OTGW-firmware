@@ -5340,7 +5340,7 @@
       "path": "ADR-169-psram-aware-ble-default-with-no-psram-consent-gate.md",
       "format": "canonical",
       "status": "Superseded",
-      "date": "2026-11-08",
+      "date": "2026-11-18",
       "decision_summary": "BLE runs by default only on boards where psramFound() is true; on no-PSRAM boards it stays dormant behind a persisted...",
       "topics": [],
       "aliases": [],
@@ -8539,7 +8539,7 @@
       "path": "ADR-222-on-boards-without-psram-ble-starts-off-and-warns-when-the-user-enables-it.md",
       "format": "canonical",
       "status": "Accepted",
-      "date": "2026-11-08",
+      "date": "2026-11-18",
       "decision_summary": "User Decision: on a board without PSRAM, BLE is off by default and no dialog appears after boot or when a page opens;...",
       "topics": [
         "ble",
@@ -10656,6 +10656,70 @@
         "verification": [
           "A host test that compiles the real satPublishCoreState() / satRepublishCoreState() and the real streamSatSwitchDiscovery() (planned tests/testhasatsimavailability.py, TASK-2014): the topic value for boiler present / absent / simulation o...",
           "A bench run in HA: with a boiler answering (or REST forceboilerpresent, restAPI.ino), the switch shows unavailable; without, it is available again."
+        ]
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
+    },
+    {
+      "id": "ADR-257",
+      "title": "On boards without PSRAM BLE cannot be switched on; the firmware refuses it and the warning is gone (supersedes ADR-222)",
+      "path": "ADR-257-on-boards-without-psram-ble-cannot-be-switched-on-the-firmware-refuses-it-and-the-warning-is-gone-supersedes-adr-222.md",
+      "format": "canonical",
+      "status": "Proposed",
+      "date": "2026-11-18",
+      "decision_summary": "User Decision: on a board without PSRAM BLE cannot be switched on: the scanner never starts there, every write of SAT...",
+      "topics": [
+        "ble",
+        "heap",
+        "psram",
+        "settings",
+        "web-ui"
+      ],
+      "aliases": [
+        "BLE needs PSRAM",
+        "bleEnableAllowed",
+        "no BLE without PSRAM"
+      ],
+      "components": [
+        "BLE scanner activation gate (SATble bleActive)",
+        "SATbleenable setter refusal (settingStuff bleEnableAllowed)"
+      ],
+      "symbols": [
+        "bleActive",
+        "bleEnableAllowed",
+        "bleNoPsram",
+        "g_bleRefusedNoPsram"
+      ],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [
+          "Keep the BLE scanner off on a board without PSRAM, whatever SATbleenable and SATbleriskack hold.",
+          "Route every write of SATbleenable through bleEnableAllowed().",
+          "Clear a stored SATbleenable=true on a board without PSRAM once, through the deferred flush.",
+          "Answer a REST request to switch BLE on without PSRAM with 409 and a reason."
+        ],
+        "must_not": [
+          "Offer a way to accept a risk and run BLE on a board without PSRAM.",
+          "Change BLE behaviour or defaults on boards with PSRAM."
+        ],
+        "exceptions": [
+          "None."
+        ],
+        "verification": [
+          "tests/testblenopsramrefuse.py compiles the real bleActive() and bleEnableAllowed(): without PSRAM the gate is false for every enable/ack combination (the old gate fails with \"no PSRAM, enable=1 ack=1 starts BLE\"), and checks the setter,...",
+          "tests/webui/ble-nopsram-warning.test.mjs drives the real v2.html/v2.js: the card note, the red toast with no POST, no warning dialog, and PSRAM boards unchanged (2 of 3 red on origin data/). tests/webui/settings-error-toast.test.mjs cove...",
+          "tests/testblenopsramdefault.py (ADR-222's default for a fresh install) stays green.",
+          "Bench: .61 (no PSRAM) with a stored SATbleenable=true and SATbleriskack=true boots with BLE off, rewrites settings.ini, answers the POST with 409, and keeps its heap; a PSRAM board still runs BLE."
         ]
       },
       "scope": {
@@ -15575,6 +15639,12 @@
       "resolved": true
     },
     {
+      "source": "ADR-169",
+      "target": "ADR-257",
+      "type": "related",
+      "resolved": true
+    },
+    {
       "source": "ADR-170",
       "target": "ADR-062",
       "type": "related",
@@ -17189,6 +17259,12 @@
       "resolved": true
     },
     {
+      "source": "ADR-222",
+      "target": "ADR-257",
+      "type": "related",
+      "resolved": true
+    },
+    {
       "source": "ADR-223",
       "target": "ADR-068",
       "type": "related",
@@ -17755,6 +17831,24 @@
     {
       "source": "ADR-255",
       "target": "ADR-174",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-257",
+      "target": "ADR-169",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-257",
+      "target": "ADR-185",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-257",
+      "target": "ADR-222",
       "type": "related",
       "resolved": true
     }
