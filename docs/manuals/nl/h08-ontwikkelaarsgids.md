@@ -642,7 +642,7 @@ Bij verbinding toont de firmware een banner met de actuele status en alle beschi
 | `s` / `S` | Zet OTGW serieel-simulatie-replay aan/uit |
 | `r` | Herstel WiFi, Telnet, OTGW-stream en MQTT |
 | `F` | Forceer MQTT HA-discovery voor alle bericht-ID's |
-| `q` | Herlees instellingen uit LittleFS |
+| `q` | Leest `settings.ini` opnieuw uit LittleFS (`readSettings(true)`). Waarden uit het bestand gelden niet als wijziging door de gebruiker: een actieve SAT-preset houdt zijn doeltemperatuur (`SettingsLoadScope`, TASK-2013); andere setters voeren hun bijwerkingen nog wel uit |
 | `p` | Reset PIC handmatig |
 | `h` | Toon het volledige help-menu |
 

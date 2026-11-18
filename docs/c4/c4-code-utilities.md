@@ -387,6 +387,16 @@ Note: `timerFlushSettings` (2000 ms, `SKIP_MISSED_TICKS`) is declared by hand as
 
 ---
 
+### Background State-File Writer (fsWriter.ino / fsWriter.h)
+
+Small state-file writes run on their own FreeRTOS task (`"fswriter"`, 4096 B stack, protocol core) instead of the loop task (TASK-1989).
+
+- `fsWriterBegin()`: creates the queue and the task.
+- `fsWriterSubmit(path, data, len)` / `fsWriterRemove(path)`: queue a write or a delete. The queue holds `FSW_QUEUE_DEPTH` (3) jobs of `FsWriteJob` (path up to `FSW_PATH_LEN` 32, data up to `FSW_DATA_LEN` 256). A job that does not fit is refused with a debug line; the submit counter is raised before the send and lowered on a failure (TASK-2007). Callers today: the SAT PID state, energy and estimated-energy files (`SATcontrol.ino`).
+- `fsWriterDrain(timeoutMs)`, `fsWriterPending()`: wait for, or count, queued jobs.
+- `fsWriterStep()`: one pass of the task; it does nothing while paused, while a filesystem image is being written (`bFsImageWriting`) or while LittleFS is not mounted.
+- Filesystem OTA (`OTGW-ModUpdateServer-esp32.h`, TASK-2007): `fsWriterPauseAndFlush(2000)` at the start (wait until the task is idle, then write the queue on the caller), `fsWriterResume()` once `bFsImageWriting` holds the task, `fsWriterPause()` in the remount after the write, and `fsWriterResume()` only after the settings restore. A save held through the update therefore lands after the restore instead of being overwritten by it.
+
 ## Dependencies
 
 ### Internal Dependencies

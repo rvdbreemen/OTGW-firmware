@@ -250,7 +250,7 @@ Two bitmaps of 8 x uint32_t (256 bits, one per OT message ID): `MQTTautoConfigMa
 1. **INIT**: resolve broker, configure client, will and credentials
 2. **TRY_TO_CONNECT**: queue the asynchronous connect
 3. **WAIT_CONNECTION_ATTEMPT**: wait `3 s x attempt` for `onMqttConnect`; retry, up to 5 attempts
-4. **IS_CONNECTED**: periodic override refresh and birth re-assert
+4. **IS_CONNECTED**: periodic override refresh and birth re-assert. After each connect, once the connect burst is done, `staleOverrideClearTick()` (`MQTTstuff.ino`) drives `staleOverrideClearStep()` (`OTGW-Core.ino`): one empty retained `{label}/override` per step for every f8.8 MsgID without an active override, at least 100 ms apart and only while the outbox is shallow, so a topic retained from before a reboot is removed (the override store is RAM only; TASK-1991)
 5. **WAIT_FOR_RECONNECT**: 42 s, then back to INIT (re-resolves DNS)
 6. **ERROR**: invalid broker; waits 42 s, then retries via WAIT_FOR_RECONNECT
 

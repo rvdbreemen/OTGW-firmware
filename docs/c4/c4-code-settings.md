@@ -13,7 +13,7 @@
 ### Core Functions
 
 #### `readSettings(bool show): void`
-- **File**: `settingStuff.ino:504`
+- **File**: `settingStuff.ino:581`
 - **Signature**: `void readSettings(bool show)`
 - **Parameters**:
   - `show` (bool): If true, prints all loaded settings to debug output
@@ -24,6 +24,7 @@
   - Static line buffer (256 bytes; longer lines are skipped), key buffer (64) and value buffer (201, sized for `WebhookPayload`) prevent interference with global `cMsg` used by HTTP handlers
   - Parses JSON KV pairs via `parseJsonKVLine()` helper
   - Calls `updateSetting()` for each field (applies validation, constraints, defaults)
+  - Opens a `SettingsLoadScope` first (RAII, restores the previous value of `g_loadingSettingsFile` on every exit, the recursive call included). While it is open, the `SATtargettemp` branch of `updateSetting()` leaves the target and an active preset or window switch alone: settings.ini holds the user's own target (`satUserTargetTemp()`), which is not a user change. At boot no preset is held yet; `satLoadPresetState()` restores it after `readSettings()` (TASK-2013). The only runtime caller is the telnet `q` key (`handleDebug.ino`)
   - Clears `settingsDirty` and `pendingSideEffects` after load (prevent unwanted service restarts during boot)
   - Post-processing applies defaults for empty values (hostname, MQTT top topic and HA prefix, unique id, NTP timezone/hostname) and trims MQTT user/password
   - One-time migrations, persisted through the deferred flush (never a write inside the load): a file without `MQTTuseLegacyOtTopics` is a 1.x.x upgrade and keeps legacy OT topic names (TASK-648); a file without `ui_onboarded` marks the install as already onboarded (TASK-997); a file without the `OTDohpicdefault` marker gets `OTDoverridehb` = true once, like the PIC default (TASK-1961); `MQTTinterval` 0 with on-change publishing is bumped to `MQTT_DEFAULT_PUBLISH_INTERVAL_SEC` (60, ADR-116)

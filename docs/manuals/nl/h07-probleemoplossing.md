@@ -425,7 +425,7 @@ Druk op elk moment op `h` om het helpmenu te tonen met de huidige apparaatstatus
 | Toets | Actie |
 |---|---|
 | h | Toon helpmenu met huidige status en togglestanden |
-| q | Forceer herinlezen van `settings.json` vanuit flash |
+| q | Leest `settings.ini` opnieuw uit flash. Een actieve SAT-preset en zijn doeltemperatuur blijven staan (TASK-2013) |
 | F | Forceer volledige Home Assistant-discovery voor ALLE message IDs (wist de interne discovery-bitmap en publiceert alles opnieuw) |
 | r | Herverbind WiFi, Telnet, OTGW seriele stream en MQTT |
 | p | Reset de PIC handmatig |

@@ -283,7 +283,7 @@ Press `h` at any time to print the help menu with the current device status and 
 | Key | Action |
 |---|---|
 | h | Show help menu with current status and toggle states |
-| q | Force re-read of `settings.json` from flash |
+| q | Re-read `settings.ini` from flash. An active SAT preset and its target are kept (TASK-2013) |
 | F | Force full Home Assistant discovery for ALL message IDs (clears the internal discovery bitmap and re-publishes everything) |
 | r | Reconnect WiFi, Telnet, OTGW serial stream and MQTT |
 | p | Reset the PIC manually |

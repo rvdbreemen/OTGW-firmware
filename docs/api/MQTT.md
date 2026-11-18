@@ -368,7 +368,7 @@ These thresholds are tunable; they are guideline-level under ADR-111 and may be 
 | `sat/heating_curve` | `"42.3"` | yes | Heating curve calculated value (°C) |
 | `sat/pid_output` | `"43.1"` | yes | PID output = curve + P + I + D (°C) |
 | `sat/overshoot_margin` | `"2.0"` | yes | Configured overshoot margin (°C), for the cycle classification |
-| `sat/pwm_switch_margin` | `"1.5"` | yes | Continuous to PWM when flow - requested setpoint stays at or above this for 30 s (°C, TASK-1888) |
+| `sat/pwm_switch_margin` | `"2.0"` | yes | Continuous to PWM when flow - requested setpoint stays at or above this for 60 s (°C, 0.5-5.0, default 2.0; TASK-1888, TASK-2005, entry 407). A stored old default of 1.5 becomes 2.0 once (Q-407a); a value set by the user stays |
 | `sat/requested_setpoint` | `"43.0"` | no | Requested flow setpoint including the solar offset, clamped to the minimum setpoint and `sat/max_setpoint` (°C) |
 | `sat/max_setpoint` | `"62.0"` | yes | Maximum flow setpoint SAT works with (°C) (TASK-1373): the user's Max flow setpoint (`set/<node>/sat/max_setpoint`) cut into the boiler's MsgID 49 bounds (20 to 80 without them), at most 50 for underfloor, 40 for a heat pump and 65 (the old global ceiling). While the user has not chosen a value: 62 for radiators, 50 for underfloor, 40 for a heat pump. Before TASK-1373 this was the fixed 62 / 45 / 40 table |
 | `sat/modulation_state` | `"OFF"` / `"HOT_WATER"` / `"PWM_OFF"` / `"COLD"` / `"ACTIVE"` | no | Modulation state. `"OFF"` while SAT is not active; `"COLD"` = flow temperature below 22 °C |
@@ -541,6 +541,8 @@ The example values are illustrative, not the defaults.
 | `sat/thermal_coeff` | `"0.05"` | yes | Learned thermal drop coefficient (°C/hr per °C delta) |
 | `sat/thermal_drop_rate` | `"0.03"` | no | Current thermal drop rate sample |
 | `sat/thermal_model_valid` | `"true"` | yes | Whether thermal model has sufficient data |
+
+The coefficient is learned only while SAT controls the boiler, that is while the previous control pass got past every gate. When SAT stops controlling, the decay period that is being measured ends, so a sample never spans a stretch where the flame state was not known (TASK-2010; telnet "SAT thermal: learning paused, SAT is not controlling the boiler").
 
 #### Heating Curve Self-Tune Progress
 
@@ -857,6 +859,8 @@ See `docs/api/MQTT-message-id-echo-audit.md` for the full per-MsgID classificati
 #### Gateway override topics `{TopTopic}/<label>/override` (ADR-118, TASK-1389)
 
 Retained, republished every 60 s while an override is active (not refreshed for 10 minutes = stale). Home Assistant gets one sensor per override-capable MsgID (Gateway device). For `MaxRelModLevelSetting/override` (MsgID 14) the value is the percentage the PIC applies after `MM=`: the substituted write (`R` frame, e.g. `100.00` after `MM=100`), unit `%`, no `device_class` (the other override sensors stay `temperature`, `°C`). The Write-Ack of that write is not used: its data byte is per spec undefined for MsgID 14 (`bSlaveEchoesValue` false). Before TASK-1389 this topic showed `0.00` and was declared as a temperature.
+
+The override store is RAM only, so a reboot forgets every override. After each MQTT connect the firmware therefore sends an empty retained message (which removes a retained topic) to `{label}/override` for every f8.8 MsgID that has no active override in the store, one topic at a time, at least 100 ms apart and only while the outbox is shallow, once the connect burst is done (about 40 topics, a few seconds). An override that is active again keeps its topic and is republished within 60 s. Before TASK-1991 a topic retained from before the reboot stayed, and Home Assistant kept showing the old value (`OTGW-Core.ino` staleOverrideClear, `MQTTstuff.ino` staleOverrideClearTick).
 
 #### Migration note (2.0.0 topic-shape transition)
 
