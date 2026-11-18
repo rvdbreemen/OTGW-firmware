@@ -3161,7 +3161,7 @@
       "path": "ADR-102-ha-availability-reflects-mqtt-link-not-ot-bus.md",
       "format": "canonical",
       "status": "Accepted",
-      "date": "2026-11-18",
+      "date": "2026-05-16",
       "decision_summary": "HA entity availability MUST reflect only the ESP↔MQTT link.",
       "topics": [],
       "aliases": [],

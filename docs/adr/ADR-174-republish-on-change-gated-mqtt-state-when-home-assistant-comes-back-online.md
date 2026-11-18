@@ -67,7 +67,7 @@ status_history:
     changed_via: adr-kit lifecycle
   - date: 2026-11-18
     status: Accepted
-    changed_by: "User: Robert van den Breemen"
+    changed_by: "Agent: Claude"
     reason: Related to ADR-255
     changed_via: adr-kit lifecycle
 ```

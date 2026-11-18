@@ -56,22 +56,22 @@ status_history:
     changed_via: adr-kit
   - date: 2026-11-18
     status: Proposed
-    changed_by: "User: Robert van den Breemen"
+    changed_by: "Agent: Claude"
     reason: Related to ADR-102
     changed_via: adr-kit lifecycle
   - date: 2026-11-18
     status: Proposed
-    changed_by: "User: Robert van den Breemen"
+    changed_by: "Agent: Claude"
     reason: Related to ADR-142
     changed_via: adr-kit lifecycle
   - date: 2026-11-18
     status: Proposed
-    changed_by: "User: Robert van den Breemen"
+    changed_by: "Agent: Claude"
     reason: Related to ADR-174
     changed_via: adr-kit lifecycle
   - date: 2026-11-18
     status: Proposed
-    changed_by: "User: Robert van den Breemen"
+    changed_by: "Agent: Claude"
     reason: Related to ADR-101
     changed_via: adr-kit lifecycle
 ```

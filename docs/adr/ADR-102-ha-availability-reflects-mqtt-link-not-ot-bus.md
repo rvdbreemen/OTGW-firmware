@@ -17,22 +17,6 @@ related:
 ## Status
 
 Accepted. Date: 2026-05-16. Decision Maker: User: Robert van den Breemen (rvdbreemen) — approved via the cross-worktree master plan and the in-session acceptance of the dev sibling ADR-074, which encodes the identical decision.
-## Status History
-
-```yaml
-status_history:
-  - date: 2026-05-16
-    status: Accepted
-    changed_by: unknown
-    reason: "Recovered from the record as it stood before this transition; this ADR predates the status_history convention. The actor was never recorded and is not guessed here. The Status line read: Accepted. Date: 2026-05-16. Decision Maker: User: Robert van den Breemen (rvdbreemen) — approved via the cross-worktree master plan and the in-session acceptance of the dev sibling ADR-074, which encodes the identical decision."
-    changed_via: unrecorded
-  - date: 2026-11-18
-    status: Accepted
-    changed_by: "User: Robert van den Breemen"
-    reason: Related to ADR-255
-    changed_via: adr-kit lifecycle
-```
-
 
 ## Context
 

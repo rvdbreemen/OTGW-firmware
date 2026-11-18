@@ -1,24 +1,8 @@
 ---
-id: "ADR-142"
-title: "HA Discovery — Mark Unsupported MsgID Entities Unavailable via Availability List"
+id: ADR-142
+title: HA Discovery — Mark Unsupported MsgID Entities Unavailable via Availability List
 status: "Rejected"
-date: "2026-06-04"
-binding: false
-gate: null
-documents_shipped: false
-verified_in: []
-supersedes: []
-superseded_by: null
-related:
-  - "ADR-077"
-  - "ADR-080"
-  - "ADR-088"
-  - "ADR-093"
-  - "ADR-102"
-  - "ADR-122"
-  - "ADR-255"
-deciders:
-  - "Robert van den Breemen"
+date: 2026-06-04
 tags:
   - "mqtt"
   - "ha-discovery"
@@ -27,6 +11,22 @@ tags:
   - "boiler"
   - "unsupported-msgid"
   - "observability"
+supersedes: []
+superseded_by: null
+related:
+  - "ADR-077"
+  - "ADR-088"
+  - "ADR-093"
+  - "ADR-102"
+  - "ADR-122"
+  - "ADR-080"
+  - "ADR-255"
+deciders:
+  - "Robert van den Breemen"
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
 ---
 
 # ADR-142: HA Discovery — Mark Unsupported MsgID Entities Unavailable via Availability List
@@ -97,7 +97,7 @@ status_history:
     changed_via: manual
   - date: 2026-11-18
     status: Rejected
-    changed_by: "User: Robert van den Breemen"
+    changed_by: "Agent: Claude"
     reason: Related to ADR-255
     changed_via: adr-kit lifecycle
 ```
