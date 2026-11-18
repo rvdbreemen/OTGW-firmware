@@ -18,7 +18,7 @@ services:
       - "8090:8090"
 
   cloudflared:
-    image: cloudflare/cloudflared:2024.12.2
+    image: cloudflare/cloudflared:2026.11.0
     restart: unless-stopped
     command: tunnel --no-autoupdate run
     environment:

@@ -1,6 +1,7 @@
 # OTGW collection point: PocketBase on a Synology behind a Cloudflare Tunnel
 
-TASK-1938. This is the server side only. The firmware does not send anything yet (TASK-1473 is on hold).
+TASK-1938. This is the server side only. The proof-of-concept firmware that sends to it is TASK-1963 (branch
+`research/cloud-recording`); TASK-1473 (the feature) is on hold.
 The design and the cost comparison are in TASK-1862 and `docs/diagnostics/ot-stream-encoding-study.md`.
 
 ```text
@@ -57,11 +58,12 @@ gateway --HTTPS--> Cloudflare edge --tunnel (outbound from the NAS)--> cloudflar
 
 ### 1. Create the tunnel (Cloudflare dashboard)
 
-1. Zero Trust > **Networks > Tunnels** > **Create a tunnel** > type **Cloudflared**, name `otgw-recorder`.
+1. Zero Trust > **Networks > Tunnels** > **Create a tunnel** > type **Cloudflared**, name `otgw-telemetry`
+   (any name works; Cloudflare assigns the tunnel ID, a UUID).
 2. Under "Install and run a connector", choose **Docker** and copy only the token, the long string after
    `--token`. Do not run the command it shows; the compose project runs the connector.
 3. **Public Hostname** > Add:
-   - Subdomain: `rec`, Domain: your domain (gives for example `rec.<your-domain>`)
+   - Subdomain: `telemetry`, Domain: your domain (gives for example `telemetry.<your-domain>`)
    - Path: `^/api/(collections/(devices/(auth-with-password|auth-refresh|records(/[a-z0-9]{15})?)|batches/records)|health)$`
    - Service: type `HTTP`, URL `pocketbase:8090`
 4. Save. Every other path on that hostname falls through to the tunnel's catch-all and gets a 404.
@@ -69,8 +71,8 @@ gateway --HTTPS--> Cloudflare edge --tunnel (outbound from the NAS)--> cloudflar
 ### 2. Put the files on the NAS
 
 1. In File Station create `/docker/otgw-recorder/`, and in it the folders `pb_data`, `pb_hooks` and `pb_migrations`.
-2. Copy `compose.yaml`, `Dockerfile`, `pb_hooks/retention.pb.js`, `pb_hooks/blocked.pb.js` and `pb_migrations/1763100000_otgw_recorder.js`
-   into the matching places.
+2. Copy `compose.yaml`, `Dockerfile`, both files in `pb_hooks/` and **every** file in `pb_migrations/`
+   (`1763100000_otgw_recorder.js` and `1763100001_batch_build_id.js`) into the matching places.
 3. Create `/docker/otgw-recorder/.env` with one line:
 
    ```text
@@ -84,7 +86,10 @@ gateway --HTTPS--> Cloudflare edge --tunnel (outbound from the NAS)--> cloudflar
 2. Open the `pocketbase` container log. On the first start it applies the migration and prints a link of
    the form `http://0.0.0.0:8090/_/#/pbinstall/...`. Open that link with the NAS's LAN address instead of
    `0.0.0.0` and create the superuser (your admin account).
-3. In Zero Trust > Tunnels, `otgw-recorder` should show **Healthy**.
+3. Without a `.env` yet, stop the `cloudflared` container (it restarts in a loop without a token) and run the
+   LAN test of step 4 first. Then add `.env` and build the project again.
+4. In Zero Trust > Tunnels, the tunnel should show **Healthy** with one replica on the pinned cloudflared version.
+   If the replica reports an older version than `compose.yaml`, see "Pitfalls" below.
 
 ### 4. Test from your laptop
 
@@ -94,19 +99,49 @@ No device records to create: gateways enroll themselves. The test enrolls two ma
 python3 tools/cloud-recorder/pocketbase/test_client.py https://rec.<your-domain> <admin-email> '<admin-password>'
 ```
 
-Checks 1 to 9 and 11 must say PASS. Check 9 logs in as superuser, which only works from the LAN, so run it once
-against `http://<nas>:8090` too. Put the output in TASK-1938 (AC 2), then delete the test gateways in the admin UI.
+Run it twice. Against `http://<nas-ip>:8090` (LAN): checks 1 to 9 and 12 PASS, 11 FAILs by design (the admin UI is
+only closed by the tunnel's path rule). Against `https://telemetry.<your-domain>`: checks 1 to 8 and 11 PASS, 9 and 12
+FAIL by design (they log in as superuser, and that path gives 404 through the tunnel). Together every check passes
+where it applies. Put the output in TASK-1938 (AC 2), then delete the test gateways in the admin UI.
 
 ### 5. Check the retention (AC 3)
 
-The cron runs every hour at minute 17. To test it at once, from the LAN: run the test with
-`--db /docker/otgw-recorder/pb_data/data.db` on the NAS (check 10 backdates one batch to 2000 and runs the
-cron through `POST /api/crons/otgwBatchRetention`). The `pocketbase` log shows
-`otgw retention: deleted N batches older than <cutoff>`.
+The cron runs every hour at minute 17. Do not run `--db` against `data.db` over an SMB share while PocketBase has it
+open: SQLite locking over SMB is not reliable. Test inside the container instead (Container Manager > Container >
+`pocketbase` > Terminal > `sh`):
+
+```sh
+apk add --no-cache sqlite
+sqlite3 /pb/pb_data/data.db "UPDATE batches SET created='2000-01-01 00:00:00.000Z' WHERE id=(SELECT id FROM batches ORDER BY created LIMIT 1); SELECT count(*) FROM batches;"
+```
+
+Then admin UI > Settings > Crons > `otgwBatchRetention` > Run, and count again: one batch fewer. The `pocketbase`
+log shows `otgw retention: deleted 1 batches older than <cutoff>` (cutoff = now minus 30 days). `sqlite` is gone
+again after the next build.
 
 ### 6. Back-up
 
 Add `/docker/otgw-recorder/pb_data` to Hyper Backup. PocketBase keeps everything in that folder (SQLite).
+
+## Pitfalls found on the first Synology run (2026-11-18)
+
+- **Container Manager keeps its own copy of the YAML.** Editing `compose.yaml` on disk after the project exists is
+  not picked up by Build. Change it in the project's YAML editor in Container Manager.
+- **Cloudflare Browser Integrity Check refuses `Python-urllib`** with HTTP 403 and `error code: 1010`, at the edge,
+  before the tunnel (`/_/` then also gives 403 instead of 404). `test_client.py` therefore sends its own
+  `User-Agent`. Measured on `/api/health`: curl, `ESP32HTTPClient` and no User-Agent at all (what the PoC firmware
+  sends) all got 200. To keep a stricter heuristic from ever locking gateways out, the zone has a configuration rule
+  `set_config bic=false` for `http.host eq "telemetry.<your-domain>"` only (Rules > Configuration Rules).
+- **`<nas>.local` can resolve to an IPv6 link-local address** on Windows, where curl and Python hang. Use the NAS's
+  IPv4 address for the LAN test.
+- **cloudflared versions** older than about a year show as "Unsupported" in the dashboard; keep the pin current.
+
+## Run on Robert's Synology (2026-11-18)
+
+DS with an Intel Celeron J3455 (`amd64`), Container Manager, PocketBase 0.40.6, cloudflared 2026.11.0, tunnel
+`otgw-telemetry` with the path rule and a 404 catch-all, `telemetry.vandenbreemen.net` proxied. LAN test 10/11
+(11 by design), tunnel test 9/11 (9 and 12 by design), retention deleted the backdated batch. Details and evidence:
+TASK-1938.
 
 ## Tested locally (2026-11-14)
 
@@ -127,5 +162,4 @@ rules, checks 3 and 9 FAIL, so the test sees those rules.
 Blocked reply (TASK-1972): check 9 now expects 403 with "otgw-blocked" on login, upload (old token), refresh and
 own update; PASS. Without `blocked.pb.js` check 9 FAILs (all 200), so the test sees the hook.
 
-Still to test on the Synology: the tunnel (check 7 and the path rule), the `arm64` build if the NAS is ARM,
-and Container Manager's handling of `compose.yaml`.
+Still untested: the `arm64` build (the first Synology was Intel).

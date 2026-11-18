@@ -28,6 +28,8 @@ def call(method, url, body=None, token=None):
     for _ in range(4):
         req = urllib.request.Request(url, data=data, method=method)
         req.add_header("Content-Type", "application/json")
+        # Cloudflare's Browser Integrity Check refuses the default "Python-urllib/x.y" agent (error code 1010).
+        req.add_header("User-Agent", "otgw-test-client/1.0")
         if token:
             req.add_header("Authorization", token)
         try:
