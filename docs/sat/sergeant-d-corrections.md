@@ -6,6 +6,8 @@ links the Discord message, compares his statement with the pinned thermo-nova co
 (`releases/thermo-nova` @ `7beaaf531ee99dc74a19ac74f3c06ce7f2922cfb`, paths relative to
 `custom_components/sat`) and with the firmware, and names what is still open.
 
+> **Urgent round from 2026-11-18 (Robert, DM 1572680011062968331):** the open SAT questions are put to Sergeant D at once and in order of 2.0.0 impact, without the presence pacing, with follow-ups until each answer is unambiguous; every answer is recorded here before it is implemented, as always. See docs/sat/open-questions.md.
+
 ## 1. PWM duty cycle: the boiler temperature (BT) in the formula (2026-10-22)
 
 **Source:** #alpha-testing, 2026-10-22 13:58 UTC,
