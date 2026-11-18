@@ -3,15 +3,15 @@ id: TASK-2018
 title: >-
   Monitor graph and CSV export: show the SAT target as its own series while SAT
   is enabled
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-11-18T09:30:00Z'
-updated_date: '2026-11-18T10:22:00Z'
+updated_date: '2026-11-18T12:31:00Z'
 labels:
   - webui
   - sat
   - graph
-  - needs-maintainer-ok
 dependencies: []
 priority: medium
 ordinal: 1034000
@@ -41,4 +41,6 @@ Option A cost (exact, slot 14 -> 16 bytes, int16 satTarget): no PSRAM 126 x 14 =
 Option C (SAT target written into roomSet while SAT is on) breaks both: (1) legend and CSV: the series is labelled thermostat setpoint (v2.js:3212, i18n graph.series_room_set) and the CSV header is roomSet (exportCsv v2.js:5884-5888), so a SAT target would be exported and shown under the thermostat's name; test graph-control-setpoint-source.test.mjs:153 pins that label to MsgID 16. (2) the column turns mode-dependent with no marker in the CSV: the slot flags only carry flame/DHW/CH (graphHistoryStuff.h:54-56), so a window that spans a SAT on/off switch mixes two quantities in one column, the exact confusion 92 hit in indigo's CSVs. (3) the thermostat's own setpoint is lost while SAT runs, which the room tile shows on purpose (room-tile-sat-target.test.mjs). (4) live model (MsgID 16, v2.js:2392) and ring would disagree unless both change. Option B (live-only from /v2/sat/status) gives no history after a page reload and adds a poll path for the graph (2-in-flight cap).
 
 Recommendation: A. Cost is small and exact (+252 B internal RAM without PSRAM, +10 KB PSRAM, ~+4-5 KB on the largest response), the column keeps one meaning, CSV and legend stay truthful, and both setpoints stay visible. Main risk: the ring format change touches every test fixture that builds ring JSON and needs the ADR amendment plus Robert's OK; mitigate by adding the column at the end of the emitter so older readers ignore it. C is rejected for semantic overload; B only as a fallback if Robert declines the format change. Label needs-maintainer-ok to be added if A is chosen.
+
+Maintainer decision (Robert, 2026-11-18 12:14:15 UTC, Discord DM 1572585729098383494), verbatim reply: 'A'. It answers the coordinator's question 1572584352477618247, option A verbatim: "A) Eigen kolom in de grafiekhistorie (slot 14 -> 16 B): +252 B intern RAM zonder PSRAM, +10 KB PSRAM, eerlijke lijn + CSV-kolom; vraagt een ADR die 193/245 aanvult." Label needs-maintainer-ok removed. Next: Proposed ADR amending ADR-193/245 (User Decision), then the implementation in lane wt-ba-2018.
 <!-- SECTION:NOTES:END -->

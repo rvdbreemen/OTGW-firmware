@@ -6671,7 +6671,7 @@
       "path": "ADR-193-keep-a-bounded-24-h-monitor-graph-history-on-the-device.md",
       "format": "canonical",
       "status": "Accepted",
-      "date": "2026-11-15",
+      "date": "2026-11-18",
       "decision_summary": "The firmware keeps a ring of 14-byte slots and serves it through an HTTP (Hypertext Transfer Protocol) GET request on...",
       "topics": [
         "graph",
@@ -9926,7 +9926,7 @@
       "path": "ADR-245-on-boards-with-psram-the-monitor-graph-history-keeps-7-days-a-response-holds-at-most-1008-slots-and-a-longer-window-is-thinned-amends-adr-193.md",
       "format": "canonical",
       "status": "Accepted",
-      "date": "2026-11-15",
+      "date": "2026-11-18",
       "decision_summary": "On a board with PSRAM the ring holds 5046 slots of 120 s (GRAPHHISTLARGESLOTS), 5040 of them readable: 7 days.",
       "topics": [
         "graph",
@@ -10641,6 +10641,68 @@
         "verification": [
           "A host test that compiles the real satPublishCoreState() / satRepublishCoreState() and the real streamSatSwitchDiscovery() (planned tests/testhasatsimavailability.py, TASK-2014): the topic value for boiler present / absent / simulation o...",
           "A bench run in HA: with a boiler answering (or REST forceboilerpresent, restAPI.ino), the switch shows unavailable; without, it is available again."
+        ]
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
+    },
+    {
+      "id": "ADR-256",
+      "title": "The Monitor graph history stores the SAT target in its own column; a slot grows from 14 to 16 bytes (amends ADR-193 and ADR-245)",
+      "path": "ADR-256-the-monitor-graph-history-stores-the-sat-target-in-its-own-column-a-slot-grows-from-14-to-16-bytes-amends-adr-193-and-adr-245.md",
+      "format": "canonical",
+      "status": "Proposed",
+      "date": "2026-11-18",
+      "decision_summary": "User Decision: the device history slot gets a seventh int16t temperature column, satTarget, so a slot is 16 bytes; th...",
+      "topics": [
+        "csv-export",
+        "graph",
+        "rest-api",
+        "sat",
+        "web-ui"
+      ],
+      "aliases": [
+        "graph history slot 16 bytes",
+        "SAT target in the graph",
+        "satTarget column"
+      ],
+      "components": [
+        "GET /api/v2/graph/history satTarget column",
+        "Monitor graph device history slot layout (graphHistoryStuff)"
+      ],
+      "symbols": [
+        "GRAPH_HIST_NO_TEMP",
+        "graphHistEmitTempColumn",
+        "GraphHistSlot"
+      ],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [
+          "Keep GraphHistSlot at exactly 16 bytes, with satTarget as the seventh int16t temperature.",
+          "Write GRAPHHISTNOTEMP in satTarget while SAT is not enabled.",
+          "Omit the satTarget array from a response whose window holds no SAT target value, so that body is unchanged.",
+          "Keep the thermostat setpoint column (roomSet) as MsgID 16 only."
+        ],
+        "must_not": [
+          "Write the SAT target into roomSet or any other existing column.",
+          "Change the ring capacities, intervals or the writer margin of ADR-193 and ADR-245.",
+          "Add a REST call for the SAT target to the graph's live path."
+        ],
+        "exceptions": [
+          "None."
+        ],
+        "verification": [
+          "tests/testgraphhistory.py (compiles tests/testgraphhistory.cpp on the real graphHistoryStuff.h): the slot is 16 bytes; a window with SAT values emits satTarget with the right values and grouping; a window without them emits a body byte-i...",
+          "A web UI test in tests/webui/ drives the real data/v2.js: the SAT target series and legend appear with a device history that has satTarget, the CSV export has the column, and a history without it draws no series. It fails on the code bef..."
         ]
       },
       "scope": {
@@ -16301,6 +16363,12 @@
       "resolved": true
     },
     {
+      "source": "ADR-193",
+      "target": "ADR-256",
+      "type": "related",
+      "resolved": true
+    },
+    {
       "source": "ADR-194",
       "target": "ADR-080",
       "type": "related",
@@ -17681,6 +17749,12 @@
       "resolved": true
     },
     {
+      "source": "ADR-245",
+      "target": "ADR-256",
+      "type": "related",
+      "resolved": true
+    },
+    {
       "source": "ADR-246",
       "target": "ADR-233",
       "type": "related",
@@ -17899,6 +17973,24 @@
     {
       "source": "ADR-255",
       "target": "ADR-174",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-256",
+      "target": "ADR-146",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-256",
+      "target": "ADR-193",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-256",
+      "target": "ADR-245",
       "type": "related",
       "resolved": true
     },
