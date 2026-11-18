@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-18T06:27:00Z'
-updated_date: '2026-11-18T12:42:00Z'
+updated_date: '2026-11-18T13:32:00Z'
 labels:
   - ha
   - sat
@@ -25,7 +25,7 @@ Reported by thaghostnl in #alpha-testing 2026-11-17 20:35 UTC (https://discord.c
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 In HA the simulation switch is not offered as usable while a boiler answers, or shows why it refused
+- [x] #1 In HA the simulation switch is not offered as usable while a boiler answers, or shows why it refused
 - [x] #2 Host test or bench evidence on a unit with a boiler
 <!-- AC:END -->
 
@@ -39,4 +39,6 @@ Reported by thaghostnl in #alpha-testing 2026-11-17 20:35 UTC (https://discord.c
 2026-11-18 ADR-255 risk 'older HA' closed with two independent primary sources: (1) HA core git: availability list PR #37418 commit 4b3ad0a1cd is in tag 0.113.0, not 0.112.0; availability_mode PR #44987 commit d60fc0de38 (2021-01-11, files mqtt/mixins.py + abbreviations.py) is in tag 2021.2.0, not 2021.1.0 (GitHub compare); (2) HA 2021.2 release notes, home-assistant.io source/_posts/2021-02-03-release-20212.markdown:1109 'Add availability_mode "all" and "any" to MQTT entities (#44987)'. Switch support: mqtt/switch.py:85 MqttSwitch(MqttEntity), entity.py:688 MqttAvailabilityMixin, :823 AVAILABILITY_ALL; switch.mqtt.markdown documents availability (:29) and availability_mode (:52). The project documents no minimum HA version (tested with 2026.10.4, ch04:563). ADR-255 Risks updated (commit d7a206ea2, local, push freeze until 371).
 
 2026-11-18 plan A implemented per ADR-255 (Accepted, f8bf5e97e) in lane-95-2014a: SATcontrol.ino satPublishCoreState() publishes retained sat/simulation_available = bSimulation || !satBoilerHardwarePresent(), re-armed by satRepublishCoreState(); MQTTHaDiscovery.cpp streamSatBoolSwitch() gets an optional availSub, case 5 (simulation switch) passes /sat/simulation_available and gets avty [LWT, that topic] with avty_mode all; every other switch keeps avty_t. Docs: docs/api/MQTT.md (core-state row, republish list, switch paragraph), ch04/h04 SAT_Simulation row. Evidence: tests/test_ha_sat_sim_availability.py (real core-state functions + the real discovery dispatcher via test/host/test_ha_discovery_json.py): OTGW_SRC_REV=origin/dev FAILED (failures=5 of 6), fix 6/6 OK; tests/test_ha_climate_sat_follow.py 29/29 with the satBoilerHardwarePresent stub; evaluate.py --quick 0 FAIL (88 passed, ADR-102 gate included); run_tests.py --changed 109/109. Open: bump (374, after 373), build, bench in HA (09): switch unavailable with a boiler answering or REST force_boiler_present=1, available again at 0, and sat/simulation_available on the broker.
+
+AC1 bench by 09 (2026-11-18, .63 Classic + S3, PIC 6.8 gateway, NO boiler; simulation off, no loopback), 2.0.0-beta.374+1d124db (appelfsha256 f6a9be90... = .elf, full OTA, changed none). 'Boiler answers' EMULATED via POST /api/v2/sat/force-boiler (coordinator decision), not a real boiler. Retained homeassistant/switch/otgw-AC276ECE45D8/sat_simulation_enable/config: avty=[{t:OTGW/value/otgw-AC276ECE45D8},{t:.../sat/simulation_available,pl_avail:true,pl_not_avail:false}], avty_mode all, no avty_t; the 14 other SAT switches keep avty_t only. Retained sat/simulation_available 'true' at idle. 14:27:27.5 force-boiler 1 -> 200 force_boiler_present true, same tenth MQTT simulation_available 'false' (switch unavailable in HA); 14:27:39.6 force-boiler 0 -> 'true' again. Side note: ot_link_lost briefly false after force-boiler, true again after ~35 s (the force hook feeds satNotifyBoilerFrameSeen, not the 2014 change); the PIC reported boilerconnected false throughout. Not verified: a real HA instance showing the entity greyed out (broker-side availability topics only). .63 restored to 360. Evidence: 09 scratchpad t2014/.
 <!-- SECTION:NOTES:END -->
