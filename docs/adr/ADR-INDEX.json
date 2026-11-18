@@ -10784,6 +10784,67 @@
       }
     },
     {
+      "id": "ADR-258",
+      "title": "A WiFi probe that cannot run for lack of memory counts as dead when the largest free block is under 4 KB",
+      "path": "ADR-258-a-wifi-probe-that-cannot-run-for-lack-of-memory-counts-as-dead-when-the-largest-free-block-is-under-4-kb.md",
+      "format": "canonical",
+      "status": "Accepted",
+      "date": "2026-11-18",
+      "decision_summary": "A probe that cannot run for lack of memory counts as a dead probe, instead of a skip, when the dead-link check is arm...",
+      "topics": [
+        "dead link",
+        "heap",
+        "recovery",
+        "restart",
+        "wifi"
+      ],
+      "aliases": [
+        "heap not healthy skip",
+        "loop alive network dead",
+        "no echo buffer",
+        "starved heap probe"
+      ],
+      "components": [
+        "wifiProbeStarvedDead"
+      ],
+      "symbols": [
+        "handleWifiProbeVerdict",
+        "WIFI_STARVED_MAXBLOCK",
+        "wifiLinkProbeTick",
+        "wifiProbeStarvedDead",
+        "wifiStarvedLogged"
+      ],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [
+          "Count a memory skip as a dead probe only when the check is armed (wifiArmedGateway != 0) and platformMaxFreeBlock() < WIFISTARVEDMAXBLOCK.",
+          "Reach the restart only through the existing supervisor path (handleWifiProbeVerdict()): its 8-probe threshold, the forced reconnect first, the witness rule (MQTT, REST or port 25238 traffic means the LAN (local area network) works) and t..."
+        ],
+        "must_not": [
+          "Restart directly on a heap number alone; ADR-107's recovery actions stay as they are (no restart there).",
+          "Count a memory skip as dead while the largest free block is 4 KB or more (a busy but healthy heap)."
+        ],
+        "exceptions": [
+          "None."
+        ],
+        "verification": [
+          "tests/testwifideadlink.py: the real state machine on the host; scenarios starved (heap LOW, largest block 2 KB, link dead) and starvednopbuf (no echo buffer, largest block 2 KB) end in a forced reconnect and a restart (red on the code be...",
+          "Bench: the prerelease-only telnet key H (handleDebug.ino, heapHoldTick()) starves the heap on purpose; expected telnet lines: 8 x 'counted as dead', 'forcing a reconnect', 8 more, the restart, and its reason in the reboot log."
+        ]
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
+    },
+    {
       "id": "ADR-259",
       "title": "SAT halves the PID integral once when the error leaves the deadband and holds it, for the main and the zone PIDs (amends ADR-197)",
       "path": "ADR-259-sat-halves-the-pid-integral-once-when-the-error-leaves-the-deadband-and-holds-it-for-the-main-and-the-zone-pids-partly-supersedes-adr-197.md",
@@ -18100,6 +18161,30 @@
       "source": "ADR-257",
       "target": "ADR-222",
       "type": "supersedes",
+      "resolved": true
+    },
+    {
+      "source": "ADR-258",
+      "target": "ADR-080",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-258",
+      "target": "ADR-107",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-258",
+      "target": "ADR-167",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-258",
+      "target": "ADR-211",
+      "type": "related",
       "resolved": true
     },
     {

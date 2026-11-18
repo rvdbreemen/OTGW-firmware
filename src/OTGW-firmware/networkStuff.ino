@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : networkStuff.ino
-**  Version  : v2.0.0-beta.382
+**  Version  : v2.0.0-beta.383
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -646,6 +646,7 @@ static bool wifiSkipPortalDecide(bool wifiConnected, bool wifiSaved, bool forceP
 #define WIFI_DEAD_RESTART_CAP          3
 #define WIFI_DEAD_RESTART_CLEAR_MIN   60
 #define WIFI_CAPPED_RECONNECT_MIN     15
+#define WIFI_STARVED_MAXBLOCK       4096   // TASK-2026: a largest free block below this is a starved heap
 #define WIFI_DEAD_RESTART_MAGIC  0x4F544452UL   // "OTDR"
 #define WIFI_IP4_ARGS(a) (unsigned)((a) & 0xFF), (unsigned)(((a) >> 8) & 0xFF), \
                          (unsigned)(((a) >> 16) & 0xFF), (unsigned)(((a) >> 24) & 0xFF)
@@ -666,6 +667,7 @@ static uint8_t  wifiEchoSent            = 0;
 static bool     wifiEchoAllocFailed     = false;
 static uint32_t wifiEchoNextMs          = 0;
 static bool     wifiProbeSkipLogged     = false;  // "probe skipped" logged since the last judged probe
+static bool     wifiStarvedLogged       = false;  // TASK-2026: "counted as dead (heap starved)" logged; quiet until an answer
 static uint32_t wifiArmedGateway        = 0;      // gateway that answered; 0 = not armed
 static uint8_t  wifiDeadProbes          = 0;
 static bool     wifiDeadReconnectDone   = false;  // a forced reconnect ran in this dead streak
@@ -758,6 +760,7 @@ static void handleWifiProbeVerdict(bool gatewayAnswered)
     wifiDeadProbes        = 0;
     wifiDeadReconnectDone = false;
     wifiWitnessLogged     = false;
+    wifiStarvedLogged     = false;
     if (wifiDeadRestarts > 0
         && (uint32_t)(now - wifiLinkAliveSinceMs) >= WIFI_DEAD_RESTART_CLEAR_MIN * 60000UL) {
       DebugTln(F("WiFi: link alive for an hour, dead-link restart count cleared"));
@@ -808,6 +811,27 @@ static void handleWifiProbeVerdict(bool gatewayAnswered)
   doRestart("WiFi: connected but no traffic");
 }
 
+// TASK-2026: a probe that cannot run for lack of memory ('heap not healthy', 'no pcb', 'no echo buffer') is skipped,
+// not counted, so a router-side outage during a busy heap does not count against the link. But when the heap is
+// starved as well (largest free block below WIFI_STARVED_MAXBLOCK) the network cannot work at all, and with the
+// skip the unit stayed unreachable without any recovery (.61, no PSRAM, BLE on, beta.370: 13 min until a USB reset;
+// the loop kept feeding both watchdogs). Then the probe counts as dead and the existing path takes over: 8 in a row,
+// a forced reconnect, then a restart, capped at WIFI_DEAD_RESTART_CAP. Only once the check is armed (a gateway
+// answered since boot). Returns true when the probe was counted.
+static bool wifiProbeStarvedDead(PGM_P why)
+{
+  if (wifiArmedGateway == 0) return false;
+  const uint32_t maxBlock = platformMaxFreeBlock();
+  if (maxBlock >= WIFI_STARVED_MAXBLOCK) return false;
+  if (!wifiStarvedLogged) {
+    wifiStarvedLogged = true;
+    DebugTf(PSTR("WiFi: gateway probe not possible (%s), heap starved (largest block %u B): counted as dead\r\n"),
+            why, (unsigned)maxBlock);
+  }
+  handleWifiProbeVerdict(false);
+  return true;
+}
+
 // Called from loopWifi() while the link is up and the state machine is idle.
 static void wifiLinkProbeTick()
 {
@@ -840,7 +864,7 @@ static void wifiLinkProbeTick()
     const uint8_t replies = platformGatewayProbeEnd();
     wifiProbeOpen = false;
     if (replies == 0 && wifiEchoAllocFailed) {   // heard nothing and could not send everything
-      wifiProbeSkipped(PSTR("no echo buffer"));
+      if (!wifiProbeStarvedDead(PSTR("no echo buffer"))) wifiProbeSkipped(PSTR("no echo buffer"));
       return;
     }
     wifiProbeSkipLogged = false;
@@ -862,10 +886,16 @@ static void wifiLinkProbeTick()
     wifiDeadReconnectDone = false;
     wifiWitnessLogged     = false;
   }
-  if (getHeapHealth() != HEAP_HEALTHY) { wifiProbeSkipped(PSTR("heap not healthy")); return; }
+  if (getHeapHealth() != HEAP_HEALTHY) {   // TASK-2026: counted as dead when the heap is also starved
+    if (!wifiProbeStarvedDead(PSTR("heap not healthy"))) wifiProbeSkipped(PSTR("heap not healthy"));
+    return;
+  }
 
   wifiEchoSeqBase = (uint16_t)(wifiEchoSeqBase + WIFI_PROBE_PINGS);
-  if (!platformGatewayProbeBegin(gateway, wifiEchoSeqBase)) { wifiProbeSkipped(PSTR("no pcb")); return; }
+  if (!platformGatewayProbeBegin(gateway, wifiEchoSeqBase)) {
+    if (!wifiProbeStarvedDead(PSTR("no pcb"))) wifiProbeSkipped(PSTR("no pcb"));
+    return;
+  }
   wifiProbeOpen       = true;
   wifiProbeStartMs    = now;
   wifiProbeTarget     = gateway;
