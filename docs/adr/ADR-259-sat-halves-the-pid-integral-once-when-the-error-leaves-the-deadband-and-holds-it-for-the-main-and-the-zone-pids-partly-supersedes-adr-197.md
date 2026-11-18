@@ -1,7 +1,7 @@
 ---
 id: "ADR-259"
 title: "SAT halves the PID integral once when the error leaves the deadband and holds it, for the main and the zone PIDs (amends ADR-197)"
-status: "Proposed"
+status: "Accepted"
 date: "2026-11-18"
 binding: false
 gate: null
@@ -43,7 +43,7 @@ format: "canonical"
 
 ## Status
 
-Proposed, 2026-11-18. Guideline-level (ADR-080): verified by the host tests named below, no evaluate.py gate. Amends ADR-197: it replaces decision 3 ("Integral, deadband 0.1") and its contract line "Set the integral to 0 outside the
+Accepted, 2026-11-18. Guideline-level (ADR-080): verified by the host tests named below, no evaluate.py gate. Amends ADR-197: it replaces decision 3 ("Integral, deadband 0.1") and its contract line "Set the integral to 0 outside the
 deadband"; the rest of ADR-197 and all of ADR-204 stay.
 
 ## Status History
@@ -64,6 +64,11 @@ status_history:
     status: Proposed
     changed_by: "User: Robert van den Breemen"
     reason: Related to ADR-204
+    changed_via: adr-kit lifecycle
+  - date: 2026-11-18
+    status: Accepted
+    changed_by: "Agent: Claude"
+    reason: "Robert van den Breemen accepted: DM 'Ja' (1572637584843079733) and in the coordinator session 2026-11-18 ~19:20 'Accepteer ADR-259'; scope 'Voor release 2.0.0' (DM 'A' 1572675307033596055)"
     changed_via: adr-kit lifecycle
 ```
 
@@ -122,10 +127,10 @@ PID and to every zone PID.
 
 ### Verification
 
-- `tests/test_sat_pid_semantics.py` (the REAL SATpid.ino against the thermo-nova oracle with this deviation as a
+- `tests/test_sat_pid_semantics.py` (the real SATpid.ino against the thermo-nova oracle with this deviation as a
   parameter): `test_outside_the_band_the_halved_integral_is_held_and_inside_it_accumulates_again` and the boundary,
   restore and saturation cases; 5 FAIL on the code before this ADR.
-- `tests/test_sat_pid_cadence.py::test_g3_zone_integral_is_halved_once_outside_the_band_and_held` (the REAL zone PID);
+- `tests/test_sat_pid_cadence.py::test_g3_zone_integral_is_halved_once_outside_the_band_and_held` (the real zone PID);
   FAIL on the code before this ADR (the zone integral went to 0).
 
 ## Alternatives Considered

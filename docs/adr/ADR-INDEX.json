@@ -10726,7 +10726,7 @@
       "title": "SAT halves the PID integral once when the error leaves the deadband and holds it, for the main and the zone PIDs (amends ADR-197)",
       "path": "ADR-259-sat-halves-the-pid-integral-once-when-the-error-leaves-the-deadband-and-holds-it-for-the-main-and-the-zone-pids-partly-supersedes-adr-197.md",
       "format": "canonical",
-      "status": "Proposed",
+      "status": "Accepted",
       "date": "2026-11-18",
       "decision_summary": "When the error leaves the 0.1 C deadband the integral is multiplied by 0.5 once and then held while the error stays o...",
       "topics": [
@@ -10768,8 +10768,8 @@
           "None."
         ],
         "verification": [
-          "tests/testsatpidsemantics.py (the REAL SATpid.ino against the thermo-nova oracle with this deviation as a parameter): testoutsidethebandthehalvedintegralisheldandinsideitaccumulatesagain and the boundary, restore and saturation cases; 5...",
-          "tests/testsatpidcadence.py::testg3zoneintegralishalvedonceoutsidethebandandheld (the REAL zone PID); FAIL on the code before this ADR (the zone integral went to 0)."
+          "tests/testsatpidsemantics.py (the real SATpid.ino against the thermo-nova oracle with this deviation as a parameter): testoutsidethebandthehalvedintegralisheldandinsideitaccumulatesagain and the boundary, restore and saturation cases; 5...",
+          "tests/testsatpidcadence.py::testg3zoneintegralishalvedonceoutsidethebandandheld (the real zone PID); FAIL on the code before this ADR (the zone integral went to 0)."
         ]
       },
       "scope": {

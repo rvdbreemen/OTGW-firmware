@@ -5,12 +5,13 @@ status: In Progress
 assignee:
   - '@otgw-dev'
 created_date: '2026-11-13T08:09:00Z'
-updated_date: '2026-11-18T14:38:00Z'
+updated_date: '2026-11-18T18:17:00Z'
 labels:
   - sat
   - adr
-milestone: 2.1.0
+milestone: 2.0.0
 dependencies: []
+priority: high
 ordinal: 963000
 ---
 
@@ -47,4 +48,6 @@ Ground truth checked this session: thermo-nova 7beaaf5 resets the integral to 0 
 AC1 status (coordinator 2026-11-18, under Robert's 15 Nov directive: do not wait for Sergeant D, take the recommended option, record it as decided by directive; he may overrule): option B of Q-329b is implemented: halve once on leaving the deadband and hold, for the main PID AND the zone PIDs (thermo-nova zones use the same PID class, area.py:50). Q-329b is queued/posted by 92 and stays open; AC1 reads 'decided by directive, Q-329b open'.
 
 Implemented (lane-1890, uncommitted, not built): main PID _pidUpdateIntegral() (SATpid.ino) with _pid_inBand: on leaving the deadband the integral is halved once, held while outside, accumulates again inside; _pid_inBand set to inside at every reset/restore (satPidReset, satPidResetTerms, satPidRestoreState, the lost-reading reset in satPidCurveOnly). Zones: SATZoneState::bPidInBand, same rule in satZonePidAdvance() (SATcontrol.ino). ADR-204 reset triggers, the solar freeze, the clamp and the persisted file format are unchanged. ADR-259 (Proposed, adr-kit; related to ADR-197 and ADR-204 via adr relate; partly supersedes ADR-197 decision 3). Docs: firmware-sat-spec.md (3 lines), sat-comparison.md item 16. Host tests: test_sat_pid_semantics.py (thermo-nova oracle with the deviation as a parameter) 24/24 on the fix, 5 FAIL on the old SATpid.ino (incl. the new held/re-halve case); test_sat_pid_cadence.py new g3 zone case 32/32 on the fix, FAIL on the old SATcontrol.ino (zone I 0.0387 -> 0.0 at 360 s); also green: published_curve, zone_aggregation, pid_resets, pid_integral_cap (stub struct gets bPidInBand); evaluate 88/0. Known, not from this change: adr-lint --strict reports a one-directional supersession ADR-204 -> ADR-197 on origin too. Not done: the SAT simulation model and the 'Totals per area' count in sat-comparison.md.
+
+2026-11-18 ~19:20 scope and priority (Robert van den Breemen, relayed by the coordinator): 'Geef prioriteit aan taak 1890' (priority high); 'Voor release 2.0.0' in the coordinator session, confirmed by DM 'A' (1572675307033596055, reply to the coordinator's 1890 scope question). Milestone 2.1.0 -> 2.0.0; the earlier hold until release/2.x no longer applies. ADR-259 accepted via adr-kit (Agent: Claude) on 'Accepteer ADR-259' (coordinator session) and DM 'Ja' (1572637584843079733). Lane rebased onto origin/dev 13c0a4e41: fix commit rebumped to beta.375 (banner conflicts resolved to origin, SATtypes.h bPidInBand re-applied and checked hunk by hunk against 49bb78f9a). adr-lint --strict: ADR-259 PASS strictly; repo FAIL count 63 = origin/dev baseline 63 (no new FAIL). Accept rewrote the Status line; the ADR-080 guideline label and the amends text were restored. README: ADR-259 entry Accepted, ADR-197 entry names decision 3 amended by ADR-259 (ADR-197 body untouched).
 <!-- SECTION:NOTES:END -->
