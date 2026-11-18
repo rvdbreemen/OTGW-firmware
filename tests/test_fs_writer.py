@@ -52,14 +52,26 @@ static std::vector<std::string> g_ops;
 static std::map<std::string, std::string> g_files;
 static bool g_fsEnded = false;
 static int  g_afterEnd = 0;
+static bool g_openFail = false, g_shortWrite = false;   // TASK-2020: an open that fails, a write that is cut
+static bool g_commitFail = false;   // TASK-2020 F3: close() does not commit (LittleFS keeps the old copy)
 struct File {
-  std::string path; std::string data; bool ok = false;
+  std::string path; std::string data; bool ok = false; bool rd = false; size_t pos = 0;
+  size_t size() const { return data.size(); }
+  size_t read(uint8_t* b, size_t n) { if (n > data.size() - pos) n = data.size() - pos; memcpy(b, data.data() + pos, n); pos += n; return n; }
   explicit operator bool() const { return ok; }
-  size_t write(const uint8_t* b, size_t n) { data.append((const char*)b, n); return n; }
-  void close() { g_ops.push_back("W " + path + " " + data); if (g_fsEnded) g_afterEnd++; else g_files[path] = data; }
+  size_t write(const uint8_t* b, size_t n) {   // TASK-2020: g_shortWrite takes only half
+    if (g_shortWrite) n /= 2;
+    data.append((const char*)b, n); return n; }
+  void close() {
+    if (rd) return;   // a read-back (TASK-2020)
+    g_ops.push_back("W " + path + " " + data);
+    if (g_fsEnded) g_afterEnd++; else if (!g_commitFail) g_files[path] = data; }
 };
 struct FS {
-  File open(const char* p, const char* mode) { File f; f.ok = (mode[0] == 'w'); f.path = p; return f; }
+  File open(const char* p, const char* mode) {
+    File f; f.path = p;
+    if (mode[0] == 'r') { auto it = g_files.find(p); f.rd = true; f.ok = (it != g_files.end()); if (f.ok) f.data = it->second; return f; }
+    f.ok = (mode[0] == 'w') && !g_openFail; return f; }
   bool remove(const char* p) { g_ops.push_back(std::string("R ") + p); if (g_fsEnded) g_afterEnd++; else g_files.erase(p); return true; }
 } LittleFS;
 // value-copy queue of fixed depth
@@ -249,6 +261,22 @@ int main(int argc, char** argv) {
     writerStep();
     printf("released_runs %d\n", g_healthRuns);
 #endif
+#ifdef HAS_WRITE_FAILED
+  } else if (c == "writefail") {
+    // TASK-2020: a failed open and a short write set the flag; the next complete write clears it
+    g_openFail = true;  fsWriterSubmit("/a.json", "{1}", 3); fsWriterDrain(1000);
+    printf("open_fail %d\n", (int)fsWriterWriteFailed());
+    g_openFail = false; fsWriterSubmit("/a.json", "{2}", 3); fsWriterDrain(1000);
+    printf("ok %d\n", (int)fsWriterWriteFailed());
+    g_shortWrite = true; fsWriterSubmit("/a.json", "{3}", 3); fsWriterDrain(1000);
+    printf("short %d\n", (int)fsWriterWriteFailed());
+    g_shortWrite = false; fsWriterSubmit("/a.json", "{4}", 3); fsWriterDrain(1000);
+    printf("ok2 %d\n", (int)fsWriterWriteFailed());
+    g_commitFail = true; fsWriterSubmit("/a.json", "{5}", 3); fsWriterDrain(1000);   // F3: write() and close() look fine
+    printf("commit_fail %d\n", (int)fsWriterWriteFailed());
+    g_commitFail = false; fsWriterSubmit("/a.json", "{6}", 3); fsWriterDrain(1000);
+    printf("ok3 %d\n", (int)fsWriterWriteFailed());
+#endif
   } else if (c == "big") {
     // TASK-2007 F3: 300 B does not fit in a job.
     std::string big(300, 'x');
@@ -271,7 +299,8 @@ class WriterLogic(unittest.TestCase):
         src = WRITER.read_text(encoding="utf-8").replace('#include "fsWriter.h"', HEADER.read_text(encoding="utf-8"))
         cls.has_step = "fsWriterStep" in src   # TASK-2007 code; older code runs the cases through the old task body
         cpp = Path(cls.tmp.name) / "w.cpp"
-        pre = ("#define HAS_STEP 1\n" if cls.has_step else "") + ("#define HAS_PAUSE 1\n" if "void fsWriterPause()" in src else "")
+        cls.has_write_failed = "fsWriterWriteFailed" in src   # TASK-2020
+        pre = ("#define HAS_STEP 1\n" if cls.has_step else "") + ("#define HAS_WRITE_FAILED 1\n" if cls.has_write_failed else "") + ("#define HAS_PAUSE 1\n" if "void fsWriterPause()" in src else "")
         cpp.write_text(pre + STUBS + src + MAIN, encoding="utf-8")
         cls.exe = base.compile_cpp(cpp, Path(cls.tmp.name) / "w.exe")
 
@@ -342,6 +371,16 @@ class WriterLogic(unittest.TestCase):
     def test_pending_is_never_zero_while_a_job_is_being_queued(self):
         # TASK-2007 F2: the count goes up before the send, so a drain on another task cannot return early.
         self.assertIn("pending_during_send 1", self.run_w("inflight"))
+
+    def test_a_failed_or_short_write_is_reported_and_cleared_by_the_next_write(self):
+        # TASK-2020: the probe no longer writes, so the real writes report a filesystem that stopped writing
+        self.assertTrue(self.has_write_failed, "fsWriterWriteFailed() missing (code before TASK-2020)")
+        out = self.run_w("writefail")
+        keys = ("open_fail", "ok", "short", "ok2", "commit_fail", "ok3")
+        # F3 (second reader): LittleFS commits at close() and the Arduino close() drops the result, so only the
+        # read-back sees a file that still holds the old copy
+        self.assertEqual([l for l in out if l.split()[0] in keys],
+                         ["open_fail 1", "ok 0", "short 1", "ok2 0", "commit_fail 1", "ok3 0"], out)
 
     def test_a_job_over_256_bytes_is_refused_and_logged_not_cut(self):
         # TASK-2007 F3

@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : fsWriter.h
-**  Version  : v2.0.0-beta.372
+**  Version  : v2.0.0-beta.373
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -41,3 +41,4 @@ bool     fsWriterPauseAndFlush(uint32_t timeoutMs);   // start of a filesystem O
 void     fsWriterPause();                             // remount after a filesystem OTA, until the restore (TASK-2007)
 void     fsWriterResume();
 bool     fsWriterRunning();                           // the writer task runs (TASK-1995)
+bool     fsWriterWriteFailed();                       // the last write job failed (open or short write; TASK-2020)

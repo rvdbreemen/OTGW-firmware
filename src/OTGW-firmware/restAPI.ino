@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-beta.372
+**  Version  : v2.0.0-beta.373
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -3551,7 +3551,7 @@ void sendHealth()
     JsonEmit je(*strm);
     je.beginObject();                 // root {
     je.beginObject(F("health"));      // "health":{
-    je.field(F("status"),         LittleFSmounted ? "UP" : "DEGRADED");
+    je.field(F("status"),         (LittleFSmounted && !fsWriterWriteFailed()) ? "UP" : "DEGRADED");   // TASK-2020: a failed write too
     je.field(F("uptime"),         upTime());
     je.field(F("heap"),           platformFreeHeap());
     je.field(F("networkmode"),    networkModeName());

@@ -123,6 +123,7 @@ paths:
                       status:
                         type: string
                         enum: [UP, DEGRADED]
+                        description: DEGRADED when LittleFS is not mounted, or when the last state file written by the file-writer task (SAT state) did not read back as written
                       uptime:
                         type: string
                         example: "2d 3h 45m"

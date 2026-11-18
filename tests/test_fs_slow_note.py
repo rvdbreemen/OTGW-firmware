@@ -104,9 +104,7 @@ class FsSlowNote(unittest.TestCase):
         # only measures them; the loop task prints the note (fsHealthPrintNote(), tested in test_health_no_fs_flash_ops)
         health = braced(HELPER, "bool fsHealthService()")
         self.assertTrue(health, "fsHealthService() not found")
-        for note in ("fsHealthTimed(FS_NOTE_PROBE, t0)", "fsHealthTimed(FS_NOTE_MOUNT, t0)"):
-            with self.subTest(note=note):
-                self.assertIn(note, health)
+        self.assertIn("if (dt >= 100) s_fsHealthNote = dt;", health)   # TASK-2020: the mount check is the only one
         self.assertIn("fsHealthPrintNote();", body)
 
 
@@ -125,7 +123,7 @@ class WriterTaskPrintsNothing(unittest.TestCase):
         self.assertEqual(hits, [], "%s prints on the fsWriter task: %s" % (head, hits))
 
     def test_health_checks_print_nothing(self):
-        for head in ("bool fsHealthService()", "static void fsHealthTimed(", "bool updateLittleFSStatus(const char *probePath)",
+        for head in ("bool fsHealthService()", "bool updateLittleFSStatus(const char *probePath)",
                      "bool updateLittleFSStatus(const __FlashStringHelper *probePath)"):
             with self.subTest(fn=head):
                 self.check(HELPER, head)

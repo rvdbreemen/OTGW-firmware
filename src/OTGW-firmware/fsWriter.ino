@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : fsWriter.ino
-**  Version  : v2.0.0-beta.372
+**  Version  : v2.0.0-beta.373
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -53,6 +53,33 @@ static std::atomic<bool>     s_fswBusy{false};
 
 // One job: write data to path ("w", replaces the file) or remove path. Runs on the writer task, or on the
 // caller when there is no queue (before fsWriterBegin(), host tests).
+// TASK-2020: the result of the last write job. The 5-min write probe is gone, so a filesystem that reads but no longer
+// writes shows here: a failed open, a short write, or a file that does not read back as written sets it; the next
+// complete write clears it. The read-back is needed because LittleFS commits a file at close() and the Arduino
+// close() drops that result (vfs_api.cpp close() ignores fclose(); write() returns the buffered count). Only writes
+// through this writer task report (the SAT state files); with SAT off the next one can be hours away (accepted).
+static std::atomic<bool> s_fswWriteFailed{false};
+
+bool fsWriterWriteFailed()
+{
+  return s_fswWriteFailed;
+}
+
+// The file reads back exactly as the job wrote it: same size, same bytes. In 32-B chunks, on the writer task's stack.
+static bool fsWriterReadsBack(const FsWriteJob& job)
+{
+  File r = LittleFS.open(job.path, "r");
+  if (!r) return false;
+  bool same = (r.size() == job.len);
+  uint8_t chunk[32];
+  for (size_t off = 0; same && off < job.len; off += sizeof(chunk)) {
+    const size_t n = (job.len - off < sizeof(chunk)) ? (job.len - off) : sizeof(chunk);
+    same = (r.read(chunk, n) == n) && (memcmp(chunk, job.data + off, n) == 0);
+  }
+  r.close();
+  return same;
+}
+
 void fsWriterService(const FsWriteJob& job)
 {
   if (job.op == FSW_OP_REMOVE) {
@@ -60,9 +87,10 @@ void fsWriterService(const FsWriteJob& job)
     return;
   }
   File f = LittleFS.open(job.path, "w");
-  if (!f) return;
-  f.write((const uint8_t*)job.data, job.len);
+  if (!f) { s_fswWriteFailed = true; return; }
+  const size_t n = f.write((const uint8_t*)job.data, job.len);
   f.close();
+  s_fswWriteFailed = (n != job.len) || !fsWriterReadsBack(job);
 }
 
 // One pass of the writer task: take the next job and write it, unless the writer is paused, a filesystem image

@@ -65,10 +65,11 @@ static FSInfo LittleFSinfo;
 static bool LittleFSmounted = true;
 static int g_reads = 0, g_probes = 0;
 static uint32_t g_fsDelay = 0;   // TASK-1995: how long a traversal takes (ms)
-static bool platformFSInfo(FSInfo &i) { g_reads++; g_now += g_fsDelay; i.totalBytes = 786432; return true; }
+static bool g_fsOk = true;       // TASK-2020: the read result of platformFSInfo() (the probe only reads now)
+static bool platformFSInfo(FSInfo &i) { g_reads++; g_now += g_fsDelay; i.totalBytes = 786432; return g_fsOk; }
 struct __FlashStringHelper;
 #define F(s) (reinterpret_cast<const __FlashStringHelper*>(s))
-static bool g_probeOk = true;   // TASK-1995: the probe result; a failed probe clears the mount flag, as the real one
+static bool g_probeOk = true;   // the write probe result (TASK-2020: no longer called by the loop checks; probes = writes)
 static bool updateLittleFSStatus(const __FlashStringHelper*) { g_probes++; LittleFSmounted = g_probeOk; return g_probeOk; }
 static bool g_flashing = false, g_running = false;                 // TASK-1995: OTA in progress; the fsWriter task runs
 static bool isFlashing() { return g_flashing; }
@@ -108,9 +109,9 @@ static int health_case(const char* c) {
     int ran = 0; while (fsHealthService()) ran++;  // the writer's passes: one probe, one mount check (coalesced)
     printf("writer ran=%d reads=%d probes=%d\n", ran, g_reads, g_probes);
   } else if (!strcmp(c, "recover")) {
-    g_probeOk = false; minutes(6); fsHealthService();   // the probe fails: unmounted
+    g_probeOk = false; g_fsOk = false; minutes(6); fsHealthService();   // the probe fails: unmounted
     printf("after_fail mounted=%d\n", (int)LittleFSmounted);
-    g_probeOk = true; minutes(5); while (fsHealthService()) { }
+    g_probeOk = true; g_fsOk = true; minutes(5); while (fsHealthService()) { }
     printf("after_next mounted=%d probes=%d reads=%d\n", (int)LittleFSmounted, g_probes, g_reads);
   } else if (!strcmp(c, "flashing")) {
     minutes(6);
@@ -125,7 +126,7 @@ static int health_case(const char* c) {
     for (int s = 0; s < 6 * 60; s++) {
       g_seqN = 0; g_seq[0] = 0;
       g_now += 1000; loopLittleFSStatus();
-      if (s_fsProbeRequest) { printf("probe_pass seq=%s\n", g_seq); break; }
+      if (s_fsMountCheckRequest) { printf("probe_pass seq=%s\n", g_seq); break; }
     }
   } else if (!strcmp(c, "note")) {
     // a slow mount check on the writer: the writer pass prints nothing, the next loop pass prints the note once
@@ -171,6 +172,8 @@ class HealthDoesNoFlashOp(unittest.TestCase):
         self.assertNotIn("platformFSInfo(", body, "sendHealth() still runs a LittleFS traversal on async_tcp")
         self.assertNotIn("updateLittleFSStatus(", body, "sendHealth() still runs the flash write probe on async_tcp")
         self.assertIn("LittleFSmounted", body, "the health answer still reports the mount state")
+        # TASK-2020: the probe only reads, so a failed real write must reach the health status too
+        self.assertIn("fsWriterWriteFailed()", body, "health does not report a failed write")
 
     def test_sendHealth_carries_the_simulation_state_from_loop_task_state(self):
         # TASK-1915: the SIMULATION badge reads health instead of /api/v2/simulate; the same values as
@@ -214,8 +217,9 @@ class LoopCheckTiming(unittest.TestCase):
         self.assertIsNotNone(self.out, "loopLittleFSStatus() not found in helperStuff.ino")
         m = re.search(r"run reads=(\d+) probes=(\d+)", self.out)
         reads, probes = int(m.group(1)), int(m.group(2))
-        self.assertEqual(probes, 3, self.out)                # at 5, 10 and 15 min
-        self.assertIn(reads, (13, 14, 15, 16), self.out)      # every 60 s (no writer task: run inline, as before)
+        # TASK-2020: no flash write in 16 min; one read-only check every 60 s (the 5-min write probe is gone)
+        self.assertEqual(probes, 0, "the loop checks still write: " + self.out)
+        self.assertIn(reads, range(15, 18), self.out)
         # TASK-1899: the REST file flags refresh on the first pass, then every 10 s (96 ticks in 16 min, plus the
         # first pass; a pass the write probe takes skips it, the tick stays due for the next one)
         flags = int(re.search(r"fileflags=(\d+)", self.out).group(1))
@@ -246,12 +250,12 @@ class ProbeOnTheWriterTask(unittest.TestCase):
     def test_the_loop_task_runs_no_traversal_and_no_probe(self):
         out = self.run_case("deferred")
         self.assertIn("loop reads=0 probes=0", out)
-        self.assertIn("writer ran=2 reads=1 probes=1", out)   # requests coalesce: one probe, one mount check
+        self.assertIn("writer ran=1 reads=1 probes=0", out)   # the pending checks coalesce into one read (TASK-2020)
 
     def test_a_failed_probe_is_retried_on_the_writer_and_mounts_again(self):
         out = self.run_case("recover")
         self.assertIn("after_fail mounted=0", out)
-        self.assertIn("after_next mounted=1 probes=2", out)
+        self.assertIn("after_next mounted=1 probes=0", out)   # TASK-2020: recovered by a read, nothing written
 
     def test_a_slow_check_is_measured_on_the_writer_and_printed_by_the_loop_task(self):
         # TASK-1995 respin: the first 370 build printed from fsHealthService() on the writer task (here: nothing at
@@ -268,7 +272,7 @@ class ProbeOnTheWriterTask(unittest.TestCase):
         m = re.search(r"probe_pass seq=(\w+)", self.run_case("order"))
         self.assertIsNotNone(m, "no pass raised the probe request")
         order = m.group(1)
-        self.assertEqual(order.count("R"), 2, "the probe and the mount check both fall due in this pass: " + order)
+        self.assertEqual(order.count("R"), 1, "one check request in this pass (TASK-2020: no probe): " + order)
         self.assertIn("F", order, order)
         last_fs = max(order.rfind(c) for c in "FDM")
         self.assertLess(last_fs, order.index("R"), "a request comes before a loop-side FS step: " + order)
@@ -276,7 +280,7 @@ class ProbeOnTheWriterTask(unittest.TestCase):
     def test_a_request_waits_while_flashing(self):
         out = self.run_case("flashing")
         self.assertIn("during ran=0 probes=0", out)
-        self.assertIn("after ran=1 probes=1", out)
+        self.assertIn("after ran=1 probes=0", out)            # the probe ran after the flash, as a read (TASK-2020)
 
 
 if __name__ == "__main__":

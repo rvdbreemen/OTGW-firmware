@@ -104,7 +104,7 @@ Returns the current health status of the device.
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `status` | string | `"UP"` or `"DEGRADED"` |
+| `status` | string | `"UP"`, or `"DEGRADED"` when LittleFS is not mounted, or when the last state file written by the file-writer task (SAT state) did not read back as written |
 | `uptime` | string | Human-readable uptime |
 | `heap` | integer | Free heap memory in bytes |
 | `networkmode` | string | Active network mode: `"wifi"`, `"ethernet"`, or `"ap"` |
