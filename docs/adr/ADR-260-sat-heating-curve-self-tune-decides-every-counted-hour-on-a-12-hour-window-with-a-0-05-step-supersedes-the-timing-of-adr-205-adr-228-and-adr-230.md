@@ -184,6 +184,8 @@ the code that was reviewed for ADR-228; the header and this ADR say what a "day"
 
 - [ ] Q-1889a: Sergeant D confirms option A (12 counted hours, step 0.05) or chooses B or C (handed to him via the
   comms session on 2026-11-18).
+- [ ] Q-1889b: Sergeant D accepts decisions on the warm-up phase alone when the 12-hour window holds under one hour of
+  floating data (entry 305 as is), or asks for a floating vote first (queued 2026-11-19, after Q-1889a).
 
 ## Related Decisions
 
