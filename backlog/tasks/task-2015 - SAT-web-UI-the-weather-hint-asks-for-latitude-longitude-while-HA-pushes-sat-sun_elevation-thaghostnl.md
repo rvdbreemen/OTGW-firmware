@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-18T06:34:00Z'
-updated_date: '2026-11-18T08:23:00Z'
+updated_date: '2026-11-18T08:25:00Z'
 labels:
   - webui
   - sat
@@ -49,4 +49,6 @@ Open: TASK-2015 still carries needs-maintainer-ok although Robert's words are in
 2026-11-18 needs-maintainer-ok removed: released by Robert's direction, 2026-11-18 (coordinator); his words in the description are the OK for this scope. GO for the plan as written. The freshness rule is shared with the control step (satSunElevationStepAt): no SAT behaviour change, so no Sergeant D question.
 
 2026-11-18 implemented (ba): SATcontrol.ino satSunElevationExternalFresh()/satSunElevationSource() in the satSunElevationStep block, the step and the status emitter share it; status JSON sun_elevation_source (external/local/none) + sun_elevation (when not none) next to solar_gain_active; v2.js satLocHintKind/satUpdateLocHint run on every SAT status and weather answer (thaghost's weather-off case included); help texts satweatherlat/lon, satsolargain, satsolarminelev (was wrong: said MQTT is required); i18n de/el/nl new keys + the pre-existing missing settings.label.satpwmswitchmargin (TASK-1888 left it out, i18n-lang was red on dev). Tests: tests/webui/sat-sun-source-hint.test.mjs 4/4 on the fix, 4/4 red with OTGW_DATA_DIR at origin data/; tests/test_sat_sun_elevation.py 21/21, red on origin SATcontrol.ino (no helper); sat-detect-location harness updated 7/7; i18n-lang 6/6 (was red on dev); v2-undefined-names 2/2; SAT-related webui tests 18 files green; 13 python tests on status JSON/help green; evaluate --quick 95 checks 0 FAIL. Synthetic screenshots (headless Chrome, fake device): task2015-ha-source.png (HA source named, no location ask), task2015-no-ha-asks-location.png (asks lat/lon, names sat/sun_elevation). Translations de/el written by me, not native-reviewed: a translate-skill review is advised.
+
+2026-11-18 translations: de/el lines (sat_geo_hint, sat_sun_from_ha, sat_sun_ha_weather_loc, settings.label.satpwmswitchmargin) are NOT native-reviewed. The translate skill (two adversarial reviews + editor) was judged too heavy for 8 lines; checked by hand against i18n/glossary.md: row 66 weather/location = Wetter/Standort, kairos/topothesia (used), PWM untranslated (row 22). nl written by a Dutch-fluent agent. A translate-skill 'de/el sync' pass is advised later. Version renumbered to 371 at the rebase (370 = otgw-dev TASK-1995 Step B, coordinator).
 <!-- SECTION:NOTES:END -->
