@@ -5394,6 +5394,19 @@
     "TASK-2005"
    ],
    "confirmed_by_entry": null
+  },
+  {
+   "id": 408,
+   "title": "The ~55 C control setpoint at the start of a PWM ON phase is not a bug: it is the initial high setpoint while the flame is still off (Sergeant D, 2026-11-18)",
+   "date": "2026-11-18",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/914498730001072149/1572512379982446665",
+   "supersedes": [],
+   "tasks": [
+    "TASK-2013"
+   ],
+   "confirmed_by_entry": null
   }
  ]
 }

@@ -8094,3 +8094,22 @@ Robert, 16:18:42 UTC (https://discord.com/channels/812969634638725140/9144987300
 **Q-407a answered by Robert (maintainer, in session, 2026-11-17 ~06:30, relayed by the coordinator; Robert's call, not Sergeant D's words):** (1) A: 2.0 becomes the new default of the existing setting satpwmswitchmargin; (2) C: the 3.5 C / 30 s fail-safe of entry 359 stays; (3) release 2.0.0. Sergeant D is told by 92 and may object. Our reading (interpretation, TASK-2005): a stored 1.5 is the old default, which every save since TASK-1888 wrote, so it moves to 2.0 once; any other stored value stays.
 
 **Task:** TASK-2005 (owner ba); ADR-249 (to be partly superseded by a new ADR).
+
+## 408. The ~55 C control setpoint at the start of a PWM ON phase is not a bug: it is the initial high setpoint while the flame is still off (Sergeant D, 2026-11-18)
+
+**Source:** #beta-testing, Sergeant D 2026-11-18 07:22 UTC (https://discord.com/channels/812969634638725140/914498730001072149/1572512379982446665), a reply to indigo_light's beta.360 day-run report (https://discord.com/channels/812969634638725140/914498730001072149/1572510482512875673: "PWM ON phases still sometimes request ~55 °C (12:56, 14:08, 16:59, 19:43)"; Vitodens 100-W, no return temperature).
+
+**Quoted:**
+> "Regarding the CS=55° is not a bug, it is the initial high setpoint u til the flame off"
+
+**Settled:** the ~55 C CS that indigo saw in PWM ON phases is intended behaviour, not a defect; no change.
+
+**Interpretation (ours, not Sergeant D's words):** "until the flame off" is read as the flame-off hold: the high setpoint SAT sends in a PWM ON phase while the flame is not (yet) on, which ends once the flame burns (the hold of entries 45, 149 and 348). On a boiler without a return temperature, such as the Vitodens, that start is flow + 18 (entries 84, 135, 149). If he meant something else by "until the flame off", this reading needs his correction.
+
+**Compared with thermo-nova (7beaaf5):** `_compute_pwm_control_setpoint` (heating_control.py:380) sets, in a PWM ON phase with the flame off, CS = return temperature + `flame_off_setpoint_offset_celsius` (heating_control.py:392-398; default 18.0 at const.py:151), and returns without an override when there is no return temperature (heating_control.py:393-395). The flow + 18 start without a return temperature is Sergeant D's addition (entries 45, 149), not thermo-nova.
+
+**Compared with the firmware:** the PWM ON phase start (CS = return + `satflameoffoffset`, or flow + 18 without a return temperature) is described in manual ch05 5.6 "Overshoot protection" and entries 149/348; this entry changes nothing in it.
+
+**Task:** none (no change). Answers the observation in indigo_light's report; related to TASK-2013 only through the same report.
+
+**Open:** the exact meaning of "until the flame off" (see the interpretation above).
