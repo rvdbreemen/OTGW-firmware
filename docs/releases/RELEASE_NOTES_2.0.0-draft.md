@@ -31,18 +31,18 @@ The web UI is the v2 web UI, the only web UI in 2.0.0. Read "Before you flash", 
 - **Return water temperature every minute** from a wired sensor (PIC firmware 6.6 or later, `TS=R`).
 - **Crash log endpoint.** `GET /api/v2/device/crashlog` for diagnostics. After an ESP32 panic or watchdog reset it holds a `Core dump:` line with the task, the program counter and a short backtrace (TASK-1479). `reboot_log.txt` names every ESP-IDF reset reason, including 0xb (USB reset by the host) (TASK-1438).
 - **Capture tool** with raw OpenTherm frame logging (next section), and an opt-in diagnostic recorder on the device (TASK-1665), with Start, Stop and Download in the web UI (TASK-1700).
-- **SAT, experimental and off by default:** every heating start runs in PWM first, a tolerance band around the room target (restart below the target + 0.1 C after a 10 minute pause), no SAT command in the first minute after a reboot, PWM also on boilers that report "master low-off not allowed", and the Home Assistant thermostat card follows SAT while SAT is on (TASK-1942, TASK-1887, TASK-1874, TASK-2000, TASK-1979).
+- **SAT, opt-in and off by default:** every heating start runs in PWM first, a tolerance band around the room target (restart below the target + 0.1 C after a 10 minute pause), no SAT command in the first minute after a reboot, PWM also on boilers that report "master low-off not allowed", and the Home Assistant thermostat card follows SAT while SAT is on (TASK-1942, TASK-1887, TASK-1874, TASK-2000, TASK-1979).
 - **Relicensed to GNU GPLv3** (was MIT).
 
 ---
 
-## SAT is experimental and opt-in
+## SAT is opt-in and off by default
 
 SAT (Smart Autotune Thermostat) is an embedded heating controller. It is **off by default** and it stays off until you switch it on.
 
 - SAT controls your boiler. When you switch it on, the wizard first shows a step "Before you enable SAT". You must tick a box to continue. Cancel leaves SAT off and changes nothing.
 - While SAT is on, it owns central heating control: `CS=`, `CH=`, `MM=`, `C2=`, `H2=`, `TT=` and `TC=` from MQTT, REST, the boot commands or the serial bridge are refused (TASK-1695; before beta.127 only `CS=` was). `HW=`, `SW=`, `SH=` and every other command still pass.
-- Some SAT decisions are still open (see Known issues). SAT behaviour can change between builds.
+- Known SAT limits are listed under Known issues.
 - **How to report SAT field results:** check the version at `http://<ip>/api/v2/device/info` (`fwversion`); check that `http://<ip>/api/v2/sat/status` shows `"simulation": false`; run the capture tool from the release zip with `--long-run` for at least a night and a morning; note your boiler model, radiators or floor heating and any setting you changed, with the time; stop with `q` and post the `-upload.zip` (see "How to report"). The same steps: https://github.com/rvdbreemen/OTGW-firmware/blob/dev/docs/sat/field-run-recipe-2.0.0.md. SAT is only as good as the field data we get.
 
 Without SAT, the gateway behaves as a transparent OpenTherm gateway, as in 1.x.
@@ -397,9 +397,9 @@ The Windows launcher is tested on our bench, also without Python installed. A te
 
 ## How to report
 
-- Discord: #beta-testing or #alpha-testing, with the capture upload zip. #beta-testing needs the Beta tester role: ask for it in #english-support or #nederlandse-ondersteuning, and until you have it, report there.
 - GitHub: [open an issue](https://github.com/rvdbreemen/OTGW-firmware/issues) and attach the capture files.
-- SAT field results: the steps in "SAT is experimental and opt-in" above, also at https://github.com/rvdbreemen/OTGW-firmware/blob/dev/docs/sat/field-run-recipe-2.0.0.md.
+- Discord: #english-support or #nederlandse-ondersteuning, with the capture upload zip. Beta testers keep using #beta-testing.
+- SAT field results: the steps in "SAT is opt-in and off by default" above, also at https://github.com/rvdbreemen/OTGW-firmware/blob/dev/docs/sat/field-run-recipe-2.0.0.md.
 
 Thank you to everyone who tested the alphas and betas, to gruijter and maarten_41762 for the detailed feedback and the field captures, to tjfs for the OLED, OT-Direct, override, pump symbol, pressure, home dial and update page reports and the captures, to Crash-Evans for pull request #699 and the macOS capture runs, to André Brait for the pull requests (#697 and #698 in beta.118), the code size analysis and the page-load report, and to Sergeant D for the SAT design decisions.
-<!-- Review: "How to report" is copied from the beta notes and points at #beta-testing and #alpha-testing. For a stable release, decide which channels stable users should use (the support channels, a GitHub issue). -->
+<!-- Decided (Robert, 2026-11-18, TASK-2034): SAT is stable from 2.0.0, still opt-in; stable users report through a GitHub issue or the support channels, #beta-testing only for beta testers. -->

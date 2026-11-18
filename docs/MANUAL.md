@@ -64,7 +64,7 @@ The firmware also has an OT-Direct mode, used only on hardware without a PIC. On
 
 Version 2.0.0 is a major platform release. It is the ESP32-S3-only async + FreeRTOS line. Settings files from v1.3.x load without modification.
 
-Releases of 2.0.0 are on the GitHub Releases page: betas are published as GitHub prereleases, the stable 2.0.0 release as a normal release. The established functionality is feature complete; SAT, OTDirect and the new MQTT topic shape (see below) still receive refinement. SAT stays experimental and opt-in, and it is off by default (see Chapter 5).
+Releases of 2.0.0 are on the GitHub Releases page: betas are published as GitHub prereleases, the stable 2.0.0 release as a normal release. The established functionality is feature complete; SAT, OTDirect and the new MQTT topic shape (see below) still receive refinement. SAT is stable from 2.0.0; it stays opt-in and is off by default (see Chapter 5).
 
 **Breaking change in this release.** v2.0.0 changes the default MQTT topic names to a new self-describing scheme (ADR-106). Thirty-seven OT-spec-derived binary sensor topics are renamed to clearer, Home Assistant friendly labels (for example, the legacy `master_ch_enable` becomes `central_heating_enabled`). Users with existing automations pinned to the legacy labels can flip `settings.mqtt.bUseLegacyOtTopics` to `true` and keep the v1.x behaviour. The two modes are mutually exclusive: either the new names or the legacy names publish, never both. The REST API is unchanged from v1.x.
 
@@ -1544,9 +1544,9 @@ The result is weather-compensated heating that keeps room temperatures stable wi
 SAT was inspired by (and ported from) the excellent Home Assistant SAT custom component by Alex Wijnholds (Alexwijn), with design feedback and validation from George Dellas (sergeantd). The firmware embeds the controller directly in the OTGW so the heating loop keeps running even when Home Assistant, MQTT, or WiFi are unavailable.
 
 
-> **SAT is experimental, opt-in and off by default.** SAT takes over your boiler's control setpoint, so it stays off (`satenabled` is false) until you switch it on, and the setup wizard asks you to confirm first. SAT behaviour can still change between builds while the field runs continue.
+> **SAT is opt-in and off by default.** SAT takes over your boiler's control setpoint, so it stays off (`satenabled` is false) until you switch it on, and the setup wizard asks you to confirm first.
 >
-> **Reporting SAT field results.** Field data is what makes SAT better. If you run SAT, please send a capture: (1) check the version at `http://<ip>/api/v2/device/info` (`fwversion`); (2) check that `http://<ip>/api/v2/sat/status` shows `"simulation": false`; (3) start the capture tool from the release zip (`capture-mqtt-debug.bat`, `.sh` or `-macos.sh`) with `--long-run`, for at least a night and a morning; (4) note your boiler model, radiators or floor heating, and any setting you changed with the time; (5) stop with `q` and post the `-upload.zip` in #beta-testing on Discord or attach it to a GitHub issue. The same steps: https://github.com/rvdbreemen/OTGW-firmware/blob/dev/docs/sat/field-run-recipe-2.0.0.md
+> **Reporting SAT field results.** Field data is what makes SAT better. If you run SAT, please send a capture: (1) check the version at `http://<ip>/api/v2/device/info` (`fwversion`); (2) check that `http://<ip>/api/v2/sat/status` shows `"simulation": false`; (3) start the capture tool from the release zip (`capture-mqtt-debug.bat`, `.sh` or `-macos.sh`) with `--long-run`, for at least a night and a morning; (4) note your boiler model, radiators or floor heating, and any setting you changed with the time; (5) stop with `q` and attach the `-upload.zip` to a GitHub issue, or post it in #english-support or #nederlandse-ondersteuning on Discord (beta testers: #beta-testing). The same steps: https://github.com/rvdbreemen/OTGW-firmware/blob/dev/docs/sat/field-run-recipe-2.0.0.md
 
 ---
 
