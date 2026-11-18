@@ -5471,6 +5471,19 @@
     "TASK-1887"
    ],
    "confirmed_by_entry": null
+  },
+  {
+   "id": 414,
+   "title": "Q-329b answered B: the integral halving rule (entry 333) applies to the main PID and to the zone PIDs (Sergeant D, 2026-11-18; urgent round, 2.0.0)",
+   "date": "2026-11-18",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1572686857228124251",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1890"
+   ],
+   "confirmed_by_entry": null
   }
  ]
 }

@@ -8200,3 +8200,20 @@ Robert, 16:18:42 UTC (https://discord.com/channels/812969634638725140/9144987300
 **Task:** TASK-1887 (no change; note the confirmation).
 
 **Open:** none.
+
+## 414. Q-329b answered B: the integral halving rule (entry 333) applies to the main PID and to the zone PIDs (Sergeant D, 2026-11-18; urgent round, 2.0.0)
+
+**Source:** #dev-sat-mqtt, Sergeant D 2026-11-18 18:56 UTC (https://discord.com/channels/812969634638725140/1105556725714649128/1572686857228124251; unedited after 90 s, read back via the Discord API), a reply to Q-329b (https://discord.com/channels/812969634638725140/1105556725714649128/1572686604861181984).
+
+**Quoted:**
+> "My answer is B"
+
+**Settled:** option B as posted: the halving rule chosen by Robert (entry 333: when the room leaves the 0.1 C deadband the integral is halved once and then held, and builds up again from there inside the deadband) applies to the main PID and to every zone PID. Scope: 2.0.0.
+
+**Compared with thermo-nova (7beaaf5):** `PID._update_integral` resets the integral to 0 when `abs(state.error) > DEADBAND` (pid.py:185-189, opened this session); each zone creates the same `PID` class (area.py:50, opened this session), so in thermo-nova main and zones share one rule.
+
+**Compared with the firmware:** TASK-1890 (in the 2.0.0 set) implements the halving rule; the zones must use the same rule as the main PID.
+
+**Task:** TASK-1890 (firmware lane).
+
+**Open:** none.
