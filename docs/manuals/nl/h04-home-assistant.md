@@ -363,7 +363,7 @@ Switches:
 | `SAT_Solar_Gain` | Zon-gain compensatie inschakelen |
 | `SAT_Summer_Simmer` | Summer simmer auto-disable inschakelen |
 | `SAT_Multi_Area` | Multi-area gewogen ruimtetemperatuur inschakelen |
-| `SAT_Simulation` | SAT draaien in simulatiemodus (geen echte ketelregeling) |
+| `SAT_Simulation` | SAT draaien in simulatiemodus (geen echte ketelregeling). Niet beschikbaar zolang een echte ketel antwoordt, want simulatie wordt dan geweigerd; weer beschikbaar als er geen ketel antwoordt of zolang simulatie aan staat (ADR-255, Home Assistant 2021.2 of nieuwer) |
 | `SAT_Window_Detection` | Openraamdetectie inschakelen |
 | `SAT_Overshoot_Protection` | PWM-start en modulatie-onderdrukking (CS-override in de PWM-fasen) |
 | `SAT_Push_Setpoint` | Control-setpoint via TC= naar de ketel pushen |

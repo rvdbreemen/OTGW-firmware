@@ -349,7 +349,7 @@ Switches:
 | `SAT_Solar_Gain` | Enable solar gain compensation |
 | `SAT_Summer_Simmer` | Enable summer simmer index auto-disable |
 | `SAT_Multi_Area` | Enable multi-area weighted room temperature |
-| `SAT_Simulation` | Run SAT in simulation mode (no real boiler control) |
+| `SAT_Simulation` | Run SAT in simulation mode (no real boiler control). Unavailable while a real boiler answers, because simulation is refused then; available again when no boiler answers or while simulation is on (ADR-255, Home Assistant 2021.2 or later) |
 | `SAT_Window_Detection` | Enable window-open detection |
 | `SAT_Overshoot_Protection` | PWM start-up and modulation suppression (CS override in the PWM phases) |
 | `SAT_Push_Setpoint` | Push control setpoint to boiler via TC= |

@@ -324,7 +324,7 @@ static uint8_t g_satShadowEpoch = 0;   // bumped by the real satRepublishCoreSta
 enum SATPreset { SAT_PRESET_NONE = 0, SAT_PRESET_COMFORT = 1 };
 static const char* satGetPresetName(SATPreset p) { return p == SAT_PRESET_COMFORT ? "comfort" : "none"; }
 struct MqttS { bool bEnable = true; };
-struct SatS { float fTargetTemp = 20.0f; bool bEnabled = false; bool bUseExternalTemp = false; };
+struct SatS { float fTargetTemp = 20.0f; bool bEnabled = false; bool bUseExternalTemp = false; bool bSimulation = false; };
 struct Settings { MqttS mqtt; SatS sat; };
 struct MqttT { bool bConnected = true; };
 struct SatT { bool bActive = false, bSafetyTripped = false, bFallbackActive = false, bPushRefused = false, bPm25NoSlot = false,
@@ -339,6 +339,7 @@ static bool g_satOwns = false; static float g_room = NAN;
 static bool satOwnsControlSetpoint() { return g_satOwns; }
 static bool satIsEnabled() { return g_satOwns; }
 static float satGetRoomTemp() { return g_room; }
+static bool satBoilerHardwarePresent() { return false; }   // TASK-2014: sat/simulation_available in the core publisher
 static int g_burstOpen = 0, g_burstWindows = 0, g_burstSends = 0, g_outsideBurst = 0;
 static void beginStatusBurst() { g_burstOpen++; g_burstWindows++; }
 static void endStatusBurst() { g_burstOpen--; }

@@ -3385,7 +3385,8 @@ static bool streamSatBoolSwitch(HaDiscoveryContext &ctx,
                                 PGM_P nameSuffix,
                                 PGM_P cmdSub,
                                 PGM_P statSub,
-                                PGM_P icon)
+                                PGM_P icon,
+                                PGM_P availSub = nullptr)   // ADR-255: second availability topic, "true"/"false"
 {
   if (!mqttIsConnected()) return false;
   if (!canPublishMQTT()) return false;
@@ -3414,7 +3415,17 @@ static bool streamSatBoolSwitch(HaDiscoveryContext &ctx,
   auto compose = [&](MqttJsonWriter &w) -> bool {
     if (!writeJsonOpen(w)) return false;
 
-    if (!writeJsonKV(w, kAvtyT, ctx.mqttPubTopic)) return false;
+    if (availSub) {
+      // ADR-255: available only while both say so: the device LWT (default online/offline) and <pub><availSub>.
+      if (!w.writeProgmem(PSTR("\"avty\":[{\"t\":\""))) return false;
+      if (!w.writeRam(ctx.mqttPubTopic)) return false;
+      if (!w.writeProgmem(PSTR("\"},{\"t\":\""))) return false;
+      if (!w.writeRam(ctx.mqttPubTopic)) return false;
+      if (!w.writeProgmem(availSub)) return false;
+      if (!w.writeProgmem(PSTR("\",\"pl_avail\":\"true\",\"pl_not_avail\":\"false\"}],\"avty_mode\":\"all\""))) return false;
+    } else {
+      if (!writeJsonKV(w, kAvtyT, ctx.mqttPubTopic)) return false;
+    }
     if (!writeJsonComma(w)) return false;
 
     if (!writeDeviceBlock(w, ctx)) return false;
@@ -3514,7 +3525,7 @@ bool streamSatSwitchDiscovery(uint8_t switchIdx,
       published = streamSatBoolSwitch(ctx,
         PSTR("-sat-simulation-enable"),       PSTR("_SAT_Simulation"),
         PSTR("/sat/simulation"),              PSTR("/sat/simulation_enable"),
-        PSTR("mdi:flask"));
+        PSTR("mdi:flask"),                    PSTR("/sat/simulation_available"));   // ADR-255, TASK-2014
       break;
     case 6:
       published = streamSatBoolSwitch(ctx,

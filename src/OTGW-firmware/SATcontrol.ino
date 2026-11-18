@@ -5123,7 +5123,7 @@ static const char* satSimmerPerception(float indexC) {
 // the ADR-111 heartbeat keeps the retained values fresh. A REST or settings disable therefore
 // reaches the broker on the next loop pass. Shadows are file-scope so satRepublishCoreState()
 // can reset them.
-static SATShadowB s_core_enabled, s_core_active, s_core_safety_tripped, s_core_fallback_active, s_core_push_refused, s_core_sh_rejected, s_core_pm25_no_slot, s_core_room_temp_lost, s_core_ot_link_lost, s_core_no_ignition, s_core_heating_failure, s_core_outside_temp_missing, s_core_external_temp_enable;
+static SATShadowB s_core_enabled, s_core_active, s_core_safety_tripped, s_core_fallback_active, s_core_push_refused, s_core_sh_rejected, s_core_pm25_no_slot, s_core_room_temp_lost, s_core_ot_link_lost, s_core_no_ignition, s_core_heating_failure, s_core_outside_temp_missing, s_core_external_temp_enable, s_core_simulation_available;
 static SATShadowS s_core_mode, s_core_preset, s_core_control_mode;
 
 static void satPublishCoreState()
@@ -5143,6 +5143,10 @@ static void satPublishCoreState()
   publishIfChangedB(F("sat/heating_failure"),  state.sat.bHeatingFailure,   s_core_heating_failure,  true);   // TASK-1882
   publishIfChangedB(F("sat/outside_temp_missing"), state.sat.bOutsideTempMissing, s_core_outside_temp_missing, true);   // TASK-1390
   publishIfChangedB(F("sat/external_temp_enable"), settings.sat.bUseExternalTemp, s_core_external_temp_enable, true);
+  // TASK-2014 / ADR-255: second availability topic of the HA simulation switch, the rule of the web UI switch (v2.js
+  // satRenderSim: disabled while REST sim_available is false and simulation is off). Enabling simulation is refused
+  // while a boiler answers (settingStuff.ino, TASK-795); while it is on it stays available so it can be switched off.
+  publishIfChangedB(F("sat/simulation_available"), settings.sat.bSimulation || !satBoilerHardwarePresent(), s_core_simulation_available, true);
 
   // sat/mode is the ACTUAL control mode; sat/control_mode is the one the control_mode command
   // REQUESTED (auto/continuous/pwm). "auto" is not a mode of its own: it leaves the mode as it is (a heating start enters PWM,
@@ -5174,6 +5178,7 @@ void satRepublishCoreState()
   memset(&s_core_heating_failure, 0, sizeof(s_core_heating_failure));
   memset(&s_core_outside_temp_missing, 0, sizeof(s_core_outside_temp_missing));
   memset(&s_core_external_temp_enable, 0, sizeof(s_core_external_temp_enable));
+  memset(&s_core_simulation_available, 0, sizeof(s_core_simulation_available));
   satClimateBridgeForce();   // TASK-1979 / ADR-248: the HA thermostat card's two scalar topics go out again too
   memset(&s_core_mode, 0, sizeof(s_core_mode));
   memset(&s_core_control_mode, 0, sizeof(s_core_control_mode));
