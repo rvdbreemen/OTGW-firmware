@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-16T06:28:00Z'
-updated_date: '2026-11-18T11:33:00Z'
+updated_date: '2026-11-18T12:39:00Z'
 labels:
   - performance
 dependencies: []
@@ -24,7 +24,7 @@ Split from TASK-1989 (out of its scope, coordinator 2026-11-16). In gruijter's b
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [x] #1 A capture on a build with the slowest-step stall line names the step of the burst stalls
-- [ ] #2 Fix with old-vs-fix numbers, or a recorded reason why it stays (bounded, harmless)
+- [x] #2 Fix with old-vs-fix numbers, or a recorded reason why it stays (bounded, harmless)
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -65,4 +65,8 @@ AC1 evidence: 09's capture of 366+717e4c2 on .61 (07:34-08:36, 62 min): the one 
 Step B pushed: 83648a4e9..41a9e44ed (beta.370), zip post 1572575192373395638. Bench PASS (09, .61, app-only on the 369 FS, 11:28:17-12:30:17, 62 min): 0 [loop-stall], 0 interleaved of 76 [fs-slow] lines (writer lines tagged), fsw_stack_free min 2288 flat from 11:45 (stack 5120), bootcount 1036 throughout, MQTT 62/62, freeheap 43.7-52.7 k flat, LittleFS mounted (63 FS githash reads, 62 mount checks, 0 mount-failed lines). Probe ticks 138-261 ms and one 613 ms (12:17:49) without a stall; file-flags at a tick once (11:37:49, 124 ms, lock wait, below the stall threshold). Same FS comparison: ad83aff 2 stalls in 15.7 min, 6144353 0 in 20 min, 41a9e44 0 in 62 min.
 
 AC2 open: the old-vs-fix pair is not on one FS state. Old code: 366 (old c8bc478 FS) 1 stall in 62 min, 368 (fresh FS) 7 in 10 min; 369 Step A on the 369 FS 0 in 10 min with mount-check only 130-154 ms (09: not a fair before). Fix: 41a9e44 0 in 62 min on the 369 FS. A fair old-vs-fix needs the old code for 60 min on the same FS state, or the coordinator accepts the cross-FS numbers.
+
+AC1 bench evidence by 09 (2026-11-18, .61 OT-Direct): the slowest-step stall line names the step of the stalls. 366+717e4c2 (62 min, old c8bc478 FS): 1 stall, 08:10:10 '[loop-stall] 568 ms gap, slowest step 5->20 562 ms', 7 ms after '[fs-slow] write-probe 558 ms'. 368+c0044a3 smoke (10 min, fresh FS): 7 stalls, all '5->20', each right after an [fs-slow] mount-check (188-189 ms) or write-probe (188/586 ms) at the minute FS check. 369+5897780 (62 min): 2 stalls 5->20, at probe ticks (write-probe 190 + mount-check 187; write-probe 561). So step 5->20 = the FS health check (mount-check + write-probe) on the loop task. Evidence: 09 scratchpad b366-61r/, b368-61/, b370/before369/.
+
+AC2 bench evidence by 09 (2026-11-18, .61, app only, SAME 369 FS, 62 min each): OLD 369+5897780 (Step A, probes on the loop task) 12:35-13:37: 2 [loop-stall] 5->20 (13:20:12 206 ms at write-probe 190 + mount-check 187; 13:25:12 573 ms at write-probe 561); mount-check 105-187 ms median 143. FIX 370+41a9e44 (probes in the fsWriter task, print on the loop task) 11:28-12:30: 0 [loop-stall], 0 interleaved [fs-slow] lines (76), mount-check 100-239 median 165, write-probe 138-261 with one 613 ms peak at 12:17:49 WITHOUT a stall; fsw_stack_free 3968 -> min 2288 stable from 11:45; no crash/reboot, MQTT 62/62, FS mounted (checklittlefs read the FS githash 63x, no mount error, retained otgw-firmware/error empty). Same trigger in both (a ~560-610 ms LittleFS write-probe ~45-50 min after boot): a 573 ms stall on the old code, none on the fix, while the fix saw the higher FS times. Intermediate builds: ad83aff (writer printed from core 0) 2 stalls + 2 interleaved lines + fsw min 1312 in 15.7 min; 6144353 0 stalls/0 interleaved in 20 min. Evidence: 09 scratchpad b370/ (before369/, run41a9/, run370/, run6144/, base369/; rep.txt per run).
 <!-- SECTION:NOTES:END -->
