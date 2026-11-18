@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-18T06:24:00Z'
-updated_date: '2026-11-18T09:21:00Z'
+updated_date: '2026-11-18T09:24:00Z'
 labels:
   - bug
   - needs-info
@@ -28,7 +28,7 @@ Reported by indigo_light in #beta-testing 2026-11-17 19:20 UTC (https://discord.
 - [x] #1 The capture shows when and why the preset changed, cited
 - [x] #2 The capture tool never sends 'q' (start or reconnect); its settings dump uses 'D' only; a host test is red on the old tool and green on the fix
 - [x] #3 A settings reload (readSettings at runtime, telnet q) keeps an active preset and its target; a manual target change still clears it; host test red on the old code, green on the fix
-- [ ] #4 Bench (09): preset comfort, then telnet q: sat/preset stays comfort on the fix and drops to none on the old build
+- [x] #4 Bench (09): preset comfort, then telnet q: sat/preset stays comfort on the fix and drops to none on the old build
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -47,4 +47,6 @@ Reported by indigo_light in #beta-testing 2026-11-17 19:20 UTC (https://discord.
 2026-11-18 bench by 09 (otgw-bench-tester) on .61, reported to otgw-docs (AC4 is 09's to tick): first 368 run VOID (no boiler: SAT handed back 56 ms before 'q', which can clear a preset by itself); both counted runs with GW=L (transient loopback boiler, no setting, no satsimulation). Steps: sat/enabled=1; sat/preset=comfort (SATpresetcomfort 21, file SATtargettemp 22); telnet 'q'; sat/target=22. OLD 368+c0044a3: 10:07:08.304 Read settings, field[SATtargettemp] newValue[22.00] without no-op skip, same second sat/preset -> none and climate_target 21 -> 22 (RED). FIX 369+5897780 (appelfsha256 equals the .elf sha256, settings 'changed: none'): 10:13:53.669 Read settings, field[SATtargettemp] newValue[22.00] + '[Settings] no-op skip', sat/preset stays comfort and climate_target 21 for 15 s; then sat/target=22 -> preset none, climate_target 22.00 (GREEN, manual change still clears). Settings restored (165 keys, settings.ini identical to the start). 09's evidence: its scratchpad t2013\ (old368L-*, fix369A-*, fix369L-*, flash369.log, S-*.ini).
 
 2026-11-18 published: rebased on 460199594 and rebuilt, 2.0.0-beta.369+fb18812 (app recompiled, the .ino.bin carries fb18812; safeboot unchanged, it has no githash); pushed 460199594..fb18812f4; #alpha-testing post message 1572542159293513769 (also names TASK-2016 and TASK-2012). The bench ran on 5897780, the same source before the docs-only rebase.
+
+AC4 bench by 09 (2026-11-18, .61 OT-Direct, GW=L loopback boiler, satsimulation off; same steps on both builds: sat/enabled=1, sat/preset=comfort (SATpresetcomfort 21, file SATtargettemp 22), telnet 'q', sat/target=22). OLD 2.0.0-beta.368+c0044a3, 10:06-10:07: comfort -> climate_target 21, sat/target 21; 10:07:08.304 'Read settings', reload 'field[SATtargettemp], newValue[22.00]' with NO no-op skip; same second sat/preset -> none, climate_target 22 (RED). FIX 2.0.0-beta.369+5897780 (githash 5897780, appelfsha256 05150779... = .elf; full OTA, changed none), 10:12-10:14, SAT active (sat/outdoor_temp=8 injected non-retained; without it SAT stayed inactive after the OTA reboot, that run fix369L was also green): comfort -> climate_target 21, sat/target 21; 10:13:53.669 'Read settings', 'newValue[22.00]' + '[Settings] no-op skip' (target left alone); sat/preset stays comfort, climate_target stays 21 (GREEN); 10:14:08 sat/target=22 -> sat/preset none, climate_target 22. A first 368 run without loopback is void: SAT handed the boiler back 56 ms before 'q'. Restored: settings as before the test (diff none, settings.ini identical), GW=2 master. Evidence: 09 scratchpad t2013/ (old368L-*, fix369A-*, fix369L-*).
 <!-- SECTION:NOTES:END -->
