@@ -5406,7 +5406,7 @@
    "tasks": [
     "TASK-2013"
    ],
-   "confirmed_by_entry": null
+   "confirmed_by_entry": 418
   },
   {
    "id": 409,
@@ -5527,6 +5527,17 @@
     "TASK-1887",
     "TASK-2005"
    ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 418,
+   "title": "Q-408a answered A: \"until the flame off\" means the high start setpoint is held while the flame is still off and ends once the flame burns (Sergeant D, 2026-11-18; urgent round, 2.0.0; confirms our reading in entry 408)",
+   "date": "2026-11-18",
+   "source": "sergeant-d",
+   "kind": "interpretation",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1572693022171463741",
+   "supersedes": [],
+   "tasks": [],
    "confirmed_by_entry": null
   }
  ]

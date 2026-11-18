@@ -8276,3 +8276,20 @@ Robert, 16:18:42 UTC (https://discord.com/channels/812969634638725140/9144987300
 **Task:** TASK-1887 / TASK-2005 (otgw-dev, lane for entry 410).
 
 **Open:** none. Replaces the ledger sweep's draft Q-407b (the interplay of the two rules), which this question covered.
+
+## 418. Q-408a answered A: "until the flame off" means the high start setpoint is held while the flame is still off and ends once the flame burns (Sergeant D, 2026-11-18; urgent round, 2.0.0; confirms our reading in entry 408)
+
+**Source:** #dev-sat-mqtt, Sergeant D 2026-11-18 19:20:35 UTC (https://discord.com/channels/812969634638725140/1105556725714649128/1572693022171463741; unedited, read back via the Discord API). It is not a Discord reply; it is the first message after Q-408a (https://discord.com/channels/812969634638725140/1105556725714649128/1572692205670240308), with no other question open, so we read it as the answer to Q-408a (interpretation, ours).
+
+**Quoted:**
+> "my answer is A."
+
+**Settled:** option A as posted: the high setpoint at the start of a PWM ON phase (about 55 C on indigo_light's Vitodens) is held while the flame is still off and ends once the flame burns; then the 20 s hold and the follow (entries 149, 348). On a boiler without a return temperature that start is flow + 18 (entries 45, 149). Our reading in entry 408 is now his decision. No firmware change. Scope: 2.0.0.
+
+**Compared with thermo-nova (7beaaf5):** in a PWM ON phase with the flame off, CS = return + flame-off offset (heating_control.py:392-401, opened this session); without a return temperature it sends no override (:393-395). The flow + 18 start is Sergeant D's addition (entries 45, 149).
+
+**Task:** none (no change).
+
+**Open:** none.
+
+**Note on entry 416 (correction of our own text, not of his answer):** entry 416 says under "Compared with the firmware" that "the change marks them as hot water". That is wrong: the firmware already does option C, so entry 416 needs no code change. Checked on origin/dev this session: a cycle with more than 80 % hot-water samples gets the kind SAT_CK_DHW (SATcycles.ino:792, the port of tracker.py:315-316); a cycle with hot water in its tail is classed SAT_CYCLE_UNCERTAIN (SATcycles.ino:899, classifier.py:25-26); an UNCERTAIN cycle neither switches continuous to PWM nor PWM to continuous at the end of the cycle (satCycleApplyEndOfCycle, SATcycles.ino:1006 onward). The 7 burns in indigo_light's beta.350 capture were cycles, as entry 416 wants, already marked; the shortest are dropped by the minimum sample count, as in thermo-nova (otgw-dev's reading, not re-checked here).
