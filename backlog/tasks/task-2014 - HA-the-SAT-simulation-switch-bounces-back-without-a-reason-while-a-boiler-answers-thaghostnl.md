@@ -3,11 +3,11 @@ id: TASK-2014
 title: >-
   HA: the SAT simulation switch bounces back without a reason while a boiler
   answers (thaghostnl)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-18T06:27:00Z'
-updated_date: '2026-11-18T13:32:00Z'
+updated_date: '2026-11-18T17:41:00Z'
 labels:
   - ha
   - sat
@@ -41,4 +41,12 @@ Reported by thaghostnl in #alpha-testing 2026-11-17 20:35 UTC (https://discord.c
 2026-11-18 plan A implemented per ADR-255 (Accepted, f8bf5e97e) in lane-95-2014a: SATcontrol.ino satPublishCoreState() publishes retained sat/simulation_available = bSimulation || !satBoilerHardwarePresent(), re-armed by satRepublishCoreState(); MQTTHaDiscovery.cpp streamSatBoolSwitch() gets an optional availSub, case 5 (simulation switch) passes /sat/simulation_available and gets avty [LWT, that topic] with avty_mode all; every other switch keeps avty_t. Docs: docs/api/MQTT.md (core-state row, republish list, switch paragraph), ch04/h04 SAT_Simulation row. Evidence: tests/test_ha_sat_sim_availability.py (real core-state functions + the real discovery dispatcher via test/host/test_ha_discovery_json.py): OTGW_SRC_REV=origin/dev FAILED (failures=5 of 6), fix 6/6 OK; tests/test_ha_climate_sat_follow.py 29/29 with the satBoilerHardwarePresent stub; evaluate.py --quick 0 FAIL (88 passed, ADR-102 gate included); run_tests.py --changed 109/109. Open: bump (374, after 373), build, bench in HA (09): switch unavailable with a boiler answering or REST force_boiler_present=1, available again at 0, and sat/simulation_available on the broker.
 
 AC1 bench by 09 (2026-11-18, .63 Classic + S3, PIC 6.8 gateway, NO boiler; simulation off, no loopback), 2.0.0-beta.374+1d124db (appelfsha256 f6a9be90... = .elf, full OTA, changed none). 'Boiler answers' EMULATED via POST /api/v2/sat/force-boiler (coordinator decision), not a real boiler. Retained homeassistant/switch/otgw-AC276ECE45D8/sat_simulation_enable/config: avty=[{t:OTGW/value/otgw-AC276ECE45D8},{t:.../sat/simulation_available,pl_avail:true,pl_not_avail:false}], avty_mode all, no avty_t; the 14 other SAT switches keep avty_t only. Retained sat/simulation_available 'true' at idle. 14:27:27.5 force-boiler 1 -> 200 force_boiler_present true, same tenth MQTT simulation_available 'false' (switch unavailable in HA); 14:27:39.6 force-boiler 0 -> 'true' again. Side note: ot_link_lost briefly false after force-boiler, true again after ~35 s (the force hook feeds satNotifyBoilerFrameSeen, not the 2014 change); the PIC reported boilerconnected false throughout. Not verified: a real HA instance showing the entity greyed out (broker-side availability topics only). .63 restored to 360. Evidence: 09 scratchpad t2014/.
+
+2026-11-18 pushed and published (otgw-docs, on the coordinator's GO): 1d124dbc5 (2.0.0-beta.374) with a9ff5dcb8 (ADR-255 Accepted) as a fast-forward 9e6636da7..1d124dbc5, remote HEAD confirmed after a fresh fetch; zip OTGW-firmware-esp32-combo-2.0.0-beta.374+1d124db-flash.zip (6431071 bytes) posted to #alpha-testing by scripts/discord-post-build.sh, http 200, message 1572665769706135653. AC2 basis: the host test tests/test_ha_sat_sim_availability.py (red on origin before the fix, green on it) plus 09's bench run with the boiler emulated by force-boiler; a run with a real answering boiler and a real HA instance greying out the entity is a field check (thaghostnl's Remeha), not an AC. The ot_link_lost side effect of force-boiler is a test-hook effect, not part of the 2014 change.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+AC1: 09 bench on 2.0.0-beta.374+1d124db (.63): retained discovery of sat_simulation_enable carries avty [device LWT, sat/simulation_available] with avty_mode all and no avty_t, the 14 other SAT switches keep avty_t; sat/simulation_available goes false on force-boiler 1 and true on force-boiler 0 (14:27:27.5 / 14:27:39.6). AC2: tests/test_ha_sat_sim_availability.py, OTGW_SRC_REV=origin/dev red (5 of 6 failed) vs fix 6/6 OK, plus that bench run. Decision: Robert 'A' (DM 1572560403387523154), ADR-255 Accepted. Pushed 1d124dbc5, zip posted (message 1572665769706135653). Not verified: a real boiler answering and a real HA instance showing the entity unavailable (broker-side topics only); field check by the reporter.
+<!-- SECTION:FINAL_SUMMARY:END -->
