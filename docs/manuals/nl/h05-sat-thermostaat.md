@@ -515,9 +515,9 @@ De radio voert sinds 2.0.0 een **continue scan** uit vanaf boot (TASK-494). Elk 
 Er wordt een enkele gecombineerde firmware-image geleverd voor alle ESP32-boards; `psramFound()` bepaalt bij runtime of BLE daadwerkelijk scant:
 
 - **Boards MET PSRAM** (de LOLIN S3 Mini en S3 Mini Pro): BLE draait standaard. Het extra RAM vangt de NimBLE-stack op zonder de rest van de firmware te destabiliseren.
-- **Boards ZONDER PSRAM**: BLE blijft slapend, ook als het is ingeschakeld. De webinterface toont een toestemmingsdialoog die waarschuwt voor het instabiliteitsrisico van BLE zonder PSRAM. Pas nadat u accepteert (instelling `satbleriskack`) start de radio met scannen. Loopt de gateway daarna vast of wordt hij onbereikbaar, dan staat in paragraaf 7.12a hoe u BLE weer uitzet.
+- **Boards ZONDER PSRAM**: BLE kan niet worden ingeschakeld (TASK-2025, ADR-257). Zonder PSRAM gebruikt de scanner het geheugen op dat de gateway nodig heeft: op een testunit was de heap binnen ongeveer 2 minuten op en reageerde de gateway niet meer. De schakelaar **BLE-sensoren inschakelen** blijft zichtbaar maar is uitgeschakeld en grijs, met de reden als tooltip, en de BLE-kaart meldt het. Een REST- of MQTT-verzoek om BLE aan te zetten wordt geweigerd (REST antwoordt `409` met `BLE needs PSRAM: not available on this board`), en een opgeslagen `aan`, bijvoorbeeld uit instellingen van een oudere firmware, wordt bij het opstarten uitgezet en als uit opgeslagen.
 
-Kort gezegd: BLE is actief wanneer het is ingeschakeld EN (het board PSRAM heeft OF u het risico heeft geaccepteerd).
+Kort gezegd: BLE is actief wanneer het is ingeschakeld EN het board PSRAM heeft. Firmware van vóór 2.0.0-beta.375 liet u een risicowaarschuwing accepteren om BLE zonder PSRAM te draaien; loopt zo'n gateway vast of wordt hij onbereikbaar, dan staat in paragraaf 7.12a hoe u hem herstelt.
 
 #### Zelfontdekkende sensor-roster (TASK-508)
 
@@ -542,8 +542,8 @@ REST-endpoints voor het roster:
 
 | Parameter | Standaard | Bereik | Omschrijving |
 |---|---|---|---|
-| `satbleenable` | `true` | bool | BLE-sensor scanning inschakelen (passief, continu). No-op op boards zonder BLE-radio |
-| `satbleriskack` | `false` | bool | Op een board ZONDER PSRAM: het instabiliteitsrisico accepteren zodat BLE mag scannen. Genegeerd op PSRAM-boards (`psramFound()` beslist dan) |
+| `satbleenable` | `true` | bool | BLE-sensor scanning inschakelen (passief, continu). No-op op boards zonder BLE-radio. Op een board zonder PSRAM altijd false: aanzetten wordt geweigerd (REST `409`) en een opgeslagen true wordt bij het opstarten gewist (TASK-2025) |
+| `satbleriskack` | `false` | bool | Blijft bestaan voor instellingenbestanden van oudere firmware; opent BLE niet meer op een board zonder PSRAM (TASK-2025, ADR-257) |
 | `satblemac` | `""` | MAC-adres | Actieve sensor-MAC (via roster select gezet; leeg = eerste verse slot wordt automatisch gekozen) |
 | `satbleinterval` | `30` | 10-300 s | Publish/state-update-cadans (NIET scaninterval; de scan is continu) |
 | `satblenameprefix` | `""` | tot 23 tekens | Naam-prefix filter (hoofdletterongevoelig; leeg = uit) |
