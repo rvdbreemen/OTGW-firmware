@@ -2782,6 +2782,10 @@ SWEEP_EXCLUDED = {
     "/pic": "can start a PIC flash, a download or a file delete",
 }
 SWEEP_BODY_CAP = 262144
+# TASK-2012: restAPI.ino answers the routes of hardware the board lacks with sendApiError(503, ...): "No PIC
+# detected - PIC functions disabled" on an OT-Direct board, "No OT-Direct hardware: ..." on a PIC board. Such a
+# 503 is "not on this board", not a failure; any other 503 (queue full, busy) still counts as failed.
+SWEEP_ABSENT_HW = (b"No PIC detected", b"No OT-Direct hardware")
 SWEEP_TIMEOUT = 15
 # Keys whose values never leave the device in a capture, at any depth of a JSON body: passwords, tokens,
 # webhook URLs and payloads (they can carry tokens), BLE bind keys, and the home location of the weather source.
@@ -2806,7 +2810,7 @@ def sweep_device(cap, http_base, label, hourly_only=False):
     if not hourly_only:
         paths += list(SWEEP_FILES)
     name = f"device-state-{label}-{stamp}.txt"
-    ok = missing = failed = 0
+    ok = missing = absent = failed = 0
     with open(cap.path(name), "w", encoding="utf-8", newline="\n") as out:
         out.write(f"# OTGW device state ({label}), {now_iso()}, {http_base}. Secrets redacted (TASK-1964).\n")
         for path in paths:
@@ -2822,6 +2826,8 @@ def sweep_device(cap, http_base, label, hourly_only=False):
                 ok += 1
             elif status == 404:
                 missing += 1
+            elif status == 503 and any(m in body[:512] for m in SWEEP_ABSENT_HW):
+                absent += 1
             else:
                 failed += 1
             cut = len(body) > SWEEP_BODY_CAP
@@ -2831,7 +2837,7 @@ def sweep_device(cap, http_base, label, hourly_only=False):
             except Exception:
                 shown = redact(text)
             out.write(f"\n### GET {path} -> {status} ({len(body)} bytes, {ctype}){' [truncated]' if cut else ''}\n{shown}\n")
-    line = f"Device state ({label}): {ok} answered, {missing} not on this firmware (404), {failed} failed -> {name}"
+    line = f"Device state ({label}): {ok} answered, {missing} not on this firmware (404), {absent} not on this board (503), {failed} failed -> {name}"
     cap.summary(line, echo=False)
     return line
 

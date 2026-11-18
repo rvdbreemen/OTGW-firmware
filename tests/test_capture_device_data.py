@@ -299,6 +299,31 @@ class SweepCase(DeviceTestBase):
         self.assertIn("[REDACTED]", text)
         self.assertIn("404", line)   # the files the fake device does not serve
 
+    # TASK-2012: restAPI.ino answers the routes of hardware the board does not have with
+    # sendApiError(503, "No OT-Direct hardware: ...") (:542) or "No PIC detected - ..." (:528).
+    # Those are not applicable on that board, not failures; any other 503 still is one.
+    @staticmethod
+    def api_error(status, message):
+        return (status, json.dumps({"error": {"status": status, "message": message}}).encode())
+
+    def test_absent_hardware_503_is_not_applicable(self):
+        r = self.routes()
+        for p, _ in oc.SWEEP_ENDPOINTS:
+            if p.startswith("/api/v2/otdirect/"):
+                r[p] = self.api_error(503, "No OT-Direct hardware: OT-Direct functions disabled")
+        r["/api/v2/pic/settings"] = self.api_error(503, "No PIC detected - PIC functions disabled")
+        line = oc.sweep_device(self.cap, self.device(r).base, "start")
+        self.assertIn("4 not on this board (503)", line)
+        self.assertIn(" 0 failed", line)
+
+    def test_other_503_still_counts_as_failed(self):
+        r = self.routes()
+        r["/api/v2/otdirect/status"] = self.api_error(503, "Command not queued (queue full)")
+        r["/api/v2/sat/markers"] = self.api_error(503, "Markers busy, retry")
+        line = oc.sweep_device(self.cap, self.device(r).base, "start")
+        self.assertIn("0 not on this board (503)", line)
+        self.assertIn(" 2 failed", line)
+
     def test_hourly_sweep_reads_only_the_changing_routes(self):
         d = self.device(self.routes())
         oc.sweep_device(self.cap, d.base, "hourly", hourly_only=True)
