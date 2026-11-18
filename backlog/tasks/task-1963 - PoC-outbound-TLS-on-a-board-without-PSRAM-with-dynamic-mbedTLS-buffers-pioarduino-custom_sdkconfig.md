@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-15T09:35:00Z'
-updated_date: '2026-11-18T22:48:00Z'
+updated_date: '2026-11-18T22:57:00Z'
 labels:
   - research
   - tls
@@ -29,6 +29,7 @@ Robert 2026-11-15 (TASK-1862): the diagnostic stream must be secure from the dev
 - [ ] #2 Bench on the no-PSRAM unit (bench-tester): 20 HTTPS POSTs of a 4 KB mix record to the collection point through the Cloudflare Tunnel succeed with certificate verification; peak heap during the handshake, largest free block and low-water recorded, also with the web UI open
 - [ ] #3 No regression on that unit in a 1 h soak with uploads every 60 s (no reboot, loop gap within normal, MQTT and web UI working); capture transcript
 - [ ] #4 Result and a recommendation (adopt, adopt with limits, or fall back to payload encryption) put to Robert
+- [ ] #5 Bench on the PSRAM Classic (.63, Classic + ESP32-S3 with PSRAM), same poc.10 build, collection point https://telemetry.vandenbreemen.net: uploads with HTTP 200 and certificate verification for 30 min, free internal heap / largest block / PSRAM before and during uploads recorded, also with BLE on and the web UI open; decode_all + compare_telnet lossless; no reboot
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -90,4 +91,6 @@ Restore 21:31: 2.0.0-beta.356+4601510 app+fs back on .61, settings.ini byte-iden
 2026-11-18 Robert (session, later the same evening): 'Even toch, ik wil toch de OTGW32 test uitproberen. Om te testen of we het toch werkend kunnen krijgen.' Reading: the offering decision (PSRAM boards only) stands for now; the no-PSRAM run on .61 goes ahead as a feasibility test of the poc.9+ link-wrap fix (check 7). AC2/AC3 stay open for that run. Requested from the coordinator: build slot for esp32-combo-tlsdyn poc.10 (wt-09-cloudrec, src 59c2506f3) after the running wt-2026 build, then a bench by 09 on .61 with cloudrec.cfg host=telemetry.vandenbreemen.net (collection point TASK-1938).
 
 2026-11-18 ID collision (coordinator): TASK-1963 on dev is a different task (Monitor graph history 7 days on PSRAM boards, ADR-245). This research-branch TASK-1963 must be renumbered before research/cloud-recording ever merges into dev; commit messages on this branch that cite TASK-1963 mean this PoC task.
+
+2026-11-18 Robert (session): 'ik wil de poc op beide devices (classic en otgw32) uitvoeren.' The PoC runs on both: .61 (OTGW32, no PSRAM; feasibility of the dynamic-buffer path) and .63 (Classic + S3 with PSRAM; the board the feature is meant for). Same artifact poc10-1929bd7 (combo image; the tlsdyn env sets CONFIG_SPIRAM=y). New AC for .63 added. Interim .61 result (09, 23:51:47): first attempt FAIL, 'connect to telemetry.vandenbreemen.net:443 failed (heap 16184, block 7156)'; during the ~10 s attempt free heap fell to 1,764 / maxblk 1,140 with HEAP-CRITICAL and 701 MQTT drops; no reboot; baseline before the attempt 16,184 / 7,156 vs 23,404 / 13,300 on poc.8 (11-16). Confirmation attempt at 00:01:47 pending.
 <!-- SECTION:NOTES:END -->
