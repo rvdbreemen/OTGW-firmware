@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@otgw-dev'
 created_date: '2026-11-13T08:09:00Z'
-updated_date: '2026-11-18T19:05:00Z'
+updated_date: '2026-11-18T21:26:00Z'
 labels:
   - sat
   - adr
@@ -26,7 +26,7 @@ Sergeant D 2026-11-13 (https://discord.com/channels/812969634638725140/110555672
 - [ ] #1 Plan with thermo-nova citations (pid.py:185-189, const.py:16) and SATpid.ino:247-250, plus Sergeant D's confirmation (decay per update vs once per crossing), before code
 - [ ] #2 ADR that supersedes the integral-reset rule of ADR-197 (and checks ADR-204)
 - [ ] #3 Host test on the real PID: red on reset-to-0, green on halving
-- [ ] #4 Bench test by the bench-tester
+- [x] #4 Bench test by the bench-tester
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -54,4 +54,6 @@ Implemented (lane-1890, uncommitted, not built): main PID _pidUpdateIntegral() (
 Field-evidence signature (for 92/09 on every tester capture with SAT on, firmware >= the 1890 build): in telnet SATTICK lines (field i=, one PID step per 60 s, SATpid.ino satPidService) or MQTT sat/pid_i, when |room error| = |target - room| goes from <= 0.1 C to > 0.1 C, i drops to exactly half its previous value in that one step and then stays constant (unchanged i= on every following tick) while |error| > 0.1; once |error| <= 0.1 again, i resumes changing from the held value. Old code signature: i= 0.00 on every tick outside the band. Not a halving: an ADR-204 reset (target/preset change, window, SAT off->on, reset_integral) sets i=0. Bench (2026-11-18, agreed with coordinator): regression only on .63 (no boiler = no OT link = satDisable/PID reset, so the halving cannot be shown without sim, excluded by Robert's 15 Nov rule): (1) githash + settings unchanged, (2) 30 min no crash/restart, heap flat, (3) SAT on/off without boiler as on 374, (4) /sat_pid_state.json from 374 restores. Compile check: beta.375+a9bc77b built OK (4x 'Successfully created ESP32S3 image', 'Build completed successfully', 19:43); bench build will be the 376 rebump after ba's 375 lands.
 
 2026-11-18 Q-329b answered by Sergeant D: 'My answer is B' (#dev-sat-mqtt msg 1572686857228124251, verified by the coordinator via REST) = halving for the main PID and the zone PIDs, as implemented. Recorded by 92 as entry 414; it replaces 'zones decided by Robert's directive' as the basis for the zone part. No code change. ADR-259 is already Accepted and therefore immutable (adr-kit): its Context still names the directive; the confirmation lives here and in entry 414. If the ADR text must name it, that is a follow-up amending ADR, not an edit.
+
+Bench (otgw-bench-tester 09, 2026-11-18, .63 Classic+S3 PSRAM, no boiler) on 2.0.0-beta.377+412f888 (d3 stack 376 TASK-1890 + 377 TASK-1887/entries 410-417), REGRESSION ONLY, not feature evidence: (1) OTA app+fs 21:38-21:39, githash 412f888, 'settings: 152 keys, changed: none', bootcount 211->213. (2) 30 min SAT off: bootcount 213 throughout, 37/37 device/info 200, freeheap 37.3k flat after the first 9 min, hd_min 21,328 flat from 21:49, 0 crash/panic, 0 loop-stall. (3) SAT on without boiler: exactly one hand-back at +30 s (SATcontrol.ino:4377), no repeat in 4 min, 0 'Control mode:' lines in the whole capture, SAT off clean ('hand-back already sent'). (4) PID state restore: hand-made sat_pid_state.json i=1.2345 ts=now-60, SAT off, /ReBoot -> /api/v2/sat/status pid_i 1.235 (restored); the telnet line was not captured (client attached to the old boot). Backup file and settings restored, settings.ini diff empty. Evidence: 09 scratchpad b377\. The integral-halving behaviour itself is host-proven (AC3), not exercised on hardware (no boiler, no SAT scenario on bench boards).
 <!-- SECTION:NOTES:END -->
