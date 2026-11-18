@@ -156,7 +156,7 @@ password is stored only with `--save-secrets`. Keys that other tools added
 
 ### What it collects
 
-- **Telnet debug (port 23).** It reconnects with a gap report and a TCP keepalive, and a health-probe watchdog checks a silent link (TASK-1299). On each connection it switches on every debug toggle that is off, and simulator toggles (`SensorSim`, `OTGW-Sim`) are left alone. At stop it restores every toggle to its state at capture start (TASK-1453). The `q` / `D` settings dump is sent only after `Setup finished!` was seen or the uptime is above 0 minutes (TASK-1396).
+- **Telnet debug (port 23).** It reconnects with a gap report and a TCP keepalive, and a health-probe watchdog checks a silent link (TASK-1299). On each connection it switches on every debug toggle that is off, and simulator toggles (`SensorSim`, `OTGW-Sim`) are left alone. At stop it restores every toggle to its state at capture start (TASK-1453). The `D` settings dump is sent only after `Setup finished!` was seen or the uptime is above 0 minutes (TASK-1396), and again after each reconnect. The tool never sends `q`: that key reloads `settings.ini` on the device and overwrites live state, such as an active SAT preset (TASK-2013).
 - **MQTT.** One `topic payload` line per message in `mqtt.log`, the same format as `mosquitto_sub -v` (in long-run mode with time stamp and retain flag, see below).
 - **Browser devtools.** Console, exceptions, log entries and network timing of the device page in `browser.log`. On Windows (job object) and Linux (parent-death signal), the headless browser also dies when the tool is killed.
 - **Crash log.** `/api/v2/device/crashlog` and `/reboot_log.txt`, polled into `crashlog.log`.

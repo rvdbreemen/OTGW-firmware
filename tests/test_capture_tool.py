@@ -447,8 +447,20 @@ class ToolCase(unittest.TestCase):
         dev.send_all("Setup finished!\r\n")
         self.assertTrue(wait_for(lambda: "Settings dump: sent" in self.text(), 10), self.text())
         self.stop()
-        self.assertIn("q", dev.received)
         self.assertIn("D", dev.received)
+        # TASK-2013: 'q' runs readSettings(true) on the device (handleDebug.ino) and re-applies settings.ini over
+        # live state (a preset dropped to none). A capture only reads: it never sends 'q'.
+        self.assertNotIn("q", dev.received, dev.received)
+
+    def test_i2_reconnect_dumps_again_but_never_reloads_settings(self):
+        # TASK-2013: after_connect() re-arms the dump on every reconnect, so the old code sent 'q' each time.
+        dev = FakeDevice()
+        self.start(dev=dev, idle=0, wait_text="Settings dump: sent")
+        dev.reset_connections()
+        self.assertTrue(wait_for(lambda: "Telnet gap:" in self.text(), 15), self.text())
+        self.assertTrue(wait_for(lambda: dev.received.count("D") >= 2, 15), dev.received)
+        self.stop()
+        self.assertEqual(dev.received.count("q"), 0, dev.received)
 
     def test_j_device_info_probe_keeps_heap_fields(self):
         dev = FakeDevice(info_pad=400)  # pushes the heap fields past the 200-character cut

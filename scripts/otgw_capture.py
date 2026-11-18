@@ -874,7 +874,7 @@ class TelnetCapture(threading.Thread):
         # TASK-1453: toggle states from the first banner, and the states now.
         self.initial_toggles = None
         self.current_toggles = {}
-        # TASK-1396: q/D wait until setup() has finished.
+        # TASK-1396: the D dump waits until setup() has finished.
         self.dump_pending = False
         self.dump_waiting_reported = False
         self.setup_seen = False
@@ -1077,7 +1077,7 @@ class TelnetCapture(threading.Thread):
 
     # -- settings dump (TASK-1396) ---------------------------------------------
     def maybe_send_dump(self):
-        """Send q/D once setup() is done: 'Setup finished!' was seen on this
+        """Send D once setup() is done: 'Setup finished!' was seen on this
         connection, or the health endpoint reports an uptime above 0 minutes."""
         if not self.dump_pending:
             return
@@ -1089,12 +1089,13 @@ class TelnetCapture(threading.Thread):
         if not ready:
             if not self.dump_waiting_reported:
                 self.dump_waiting_reported = True
-                self.cap.summary("Settings dump: waiting for 'Setup finished!' (or uptime > 0) before sending q/D.")
+                self.cap.summary("Settings dump: waiting for 'Setup finished!' (or uptime > 0) before sending D.")
             return
         self.dump_pending = False
-        self.send_key_and_drain("q")
+        # TASK-2013: never 'q'. It runs readSettings(true) on the device (handleDebug.ino) and re-applies
+        # settings.ini over live state (an active preset dropped to none). A capture only reads.
         self.send_key_and_drain("D")
-        self.cap.summary("Settings dump: sent 'q' (read settings) + 'D' (dump settings/state)")
+        self.cap.summary("Settings dump: sent 'D' (dump settings/state)")
 
     # -- connection management -----------------------------------------------
     def open_gap(self, why, start=None):
