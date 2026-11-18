@@ -69,6 +69,7 @@ static unsigned long g_now = 1000;
 static unsigned long millis() { return g_now; }
 static bool g_unknown99 = false;
 static bool isUnknownId(uint8_t id) { return id == 99 && g_unknown99; }
+static uint8_t getUnknownCount(uint8_t) { return 0; }   // TASK-1804 ID-99: no strikes here (test_otd_msgid99_relay covers them)
 static uint8_t otMasterStatusFlags = 0x01;
 static uint8_t otDHWOverride = 0xFF;
 static bool otChModeOff = false, otSummerMode = false, otDHWBlocking = false, otCoolingEnable = true, otCH2Enable = true;

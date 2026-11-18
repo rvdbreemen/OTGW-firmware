@@ -70,6 +70,7 @@ static bool otOperModeWrite = false;   // TASK-1906: the PIC's opermodewrite
 static bool otPushManual = false, otPushPending = false, otPushSpoof = false, otPushStarted = false;
 static uint8_t otPushFails = 0;
 static bool isUnknownId(uint8_t) { return false; }
+static uint8_t getUnknownCount(uint8_t) { return 0; }   // TASK-1804 ID-99: no strikes here
 """
 
 MAIN = r"""

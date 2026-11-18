@@ -118,6 +118,7 @@ static unsigned long otSlaveFrame = 0;
 static bool otdMasterRelaysWrite(unsigned long) { return false; }
 static unsigned long buildStatusRequest() { return 0; }
 static bool otdIsAltSlot(uint8_t) { return true; }
+static unsigned long otdSrReply(unsigned long, unsigned long r) { return r; }   // TASK-1804 A6: SR= not under test here (test_otd_sr_alt_slot)
 static uint8_t otdAltScheduleIndex(uint32_t) { return OT_SCHEDULE_SIZE; }
 static void otdNoteThermostatFrame(unsigned long, uint32_t) {}
 static unsigned long buildOTResponse(uint8_t, uint8_t, uint16_t) { return 0; }

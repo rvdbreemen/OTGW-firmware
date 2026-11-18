@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTDirect.ino
-**  Version  : v2.0.0-beta.365
+**  Version  : v2.0.0-beta.367
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -2385,8 +2385,10 @@ static bool otdResponseOverrideActive(uint8_t msgId) {
 }
 
 // A thermostat Data-ID whose slot the gateway may use: one the UI= table marks
-// unknown, or one the boiler answered Unknown-DataID three times in a row and the
-// SR= table does not answer. MsgID 0 is never counted (handleMasterResponse).
+// unknown, or one the boiler answered Unknown-DataID three times in a row, also when SR=
+// holds a value for it (TASK-1804 A6: the PIC blacklists an SR ID like any other, UnknownMask,
+// gateway.asm 6.6 :2397-2399, and still answers SR through SendAltResponse; otdAltSlotTaken does the same).
+// MsgID 0 is never counted (handleMasterResponse).
 // MsgID 9 and 100 are no slot (otdRemoteOverrideHoldsSlot): the thermostat gets READ_ACK
 // from replyToThermostat() (otdRemoteOverrideReply, TASK-1718), not Unknown-DataID.
 static bool otdRemoteOverrideHoldsSlot(uint8_t msgId);
@@ -2394,7 +2396,7 @@ static bool otdIsAltSlot(uint8_t msgId) {
   if (otdRemoteOverrideHoldsSlot(msgId)) return false;
   if (otdPicMandatoryId(msgId)) return false;   // TASK-1801: MandatoryID, also against a UI= mark
   if (isUnknownId(msgId)) return true;
-  return getUnknownCount(msgId) >= 3 && !otdResponseOverrideActive(msgId);
+  return getUnknownCount(msgId) >= 3;
 }
 
 // The schedule entry for an alternative slot: of the entries that may go out, the
@@ -2455,6 +2457,10 @@ static bool otdAltSlotTaken(unsigned long thermostatFrame) {
   // Unknown-DataID with the thermostat's own Data-ID and data bytes, as CreateMessage builds it
   unsigned long unknownResp = buildOTResponse(7, (uint8_t)((thermostatFrame >> 16) & 0xFF),
                                               (uint16_t)(thermostatFrame & 0xFFFF));
+  // TASK-1804 A6: an SR= value still answers the thermostat: SendAltResponse runs TreatMessage on the fake
+  // Unknown-DataID with BoilerResponse cleared (gateway.asm 6.6 :2463-2473), so WordResponse/ByteResponse put the SR
+  // bytes in with the request's ack type, as on the boiler-answer path (replyToThermostat, before the clock answer)
+  unknownResp = otdSrReply(thermostatFrame, unknownResp);
   // TASK-1840: a blacklisted MsgID 20 still gets the PIC's clock answer (TreatMessage runs MessageID20
   // on the fake Unknown-DataID, gateway.asm:2467-2477, :3048-3056)
   unknownResp = otdClockReply(thermostatFrame, unknownResp, otSCLastCommandMs != 0, otSCClockData);
@@ -3086,12 +3092,32 @@ static void otdPushEnd() {   // dhwpushdone / abort: clrf dhwpushflags, bcf manu
   otPushManual = otPushPending = otPushSpoof = otPushStarted = false;
   otPushFails = 0;
 }
+// --- otdPushOperModes begin
+// TASK-1804 ID-99: the PIC's PushOperModes (gateway.asm 6.8 :3281-3288) writes MsgID 99 only when the boiler is not known
+// to reject it. The PIC's unknown map holds both the UI= marks and the three-strike blacklist (UnknownMask :3519-3538), so
+// "known unsupported" is either here. Recorded differences (TASK-1804 notes): PushOperModes calls UnknownMask, which reads
+// byte2 (the last frame's Data-ID), not UnknownMask2 with W = 99, so the PIC's check does not test ID 99; and it sets
+// dhwpushpending, which makes ID99WriteAck (:3233-3237) spoof a DHW push after an MH=/MW=/M2= whose WRITE_ACK carries no
+// push bit. Here the check tests ID 99 and only HW=P starts a push.
+static bool otdId99Unsupported() {
+  return isUnknownId(99) || getUnknownCount(99) >= 3;
+}
+// MH=/MW=/M2=: the nibble is already stored. Returns false only when the ring refused the frame (TASK-1804 B3e: no echo).
+static bool otdPushOperModes() {
+  if (otdId99Unsupported()) return true;   // stored, nothing to send (PushOperModes returns)
+  otOperModeWrite = true;   // TASK-1906: PushOperModes, a thermostat READ 99 carries it too
+  unsigned long frame99 = OpenTherm::buildRequest(OpenThermMessageType::WRITE_DATA, static_cast<OpenThermMessageID>(99),
+                                                  otdOperModeData(otPushManual));   // TASK-1845: the push bit stays while a push runs
+  if (!otCmdEnqueue(frame99)) { OTDDebugTf(PSTR("OTD: queue full, dropped frame %08lX\r\n"), frame99); return false; }
+  return true;
+}
+// --- otdPushOperModes end
 // HW=P: StartDHWPush (gateway.asm:3270-3288). A push in progress is left alone. The HW= state is not touched. When the
 // boiler is known not to support MsgID 99 the gateway spoofs the push at once, else it writes MsgID 99 with the push bit.
 static void otdPushStart() {
   if (otPushManual) return;
   otPushManual = true;
-  if (isUnknownId(99)) { otPushSpoof = true; return; }
+  if (otdId99Unsupported()) { otPushSpoof = true; return; }
   otPushPending = true;
   otOperModeWrite = true;   // TASK-1906: PushOperModes (gateway.asm:3281-3288)
   unsigned long frame99 = OpenTherm::buildRequest(OpenThermMessageType::WRITE_DATA,
@@ -3152,7 +3178,7 @@ static void otdOnThermostatWrite99(uint16_t data) {
   otOperModeCH2 = (uint8_t)((data >> 4) & 0x0F);
   if ((data & 0x1000) && !otPushManual) {          // StartDHWPush; the thermostat's own write carries the push bit
     otPushManual = true;
-    if (isUnknownId(99)) otPushSpoof = true;
+    if (otdId99Unsupported()) otPushSpoof = true;   // TASK-1804 ID-99: UI= mark or three strikes, as the PIC unknown map
     else otPushPending = true;
   }
 }
@@ -4441,13 +4467,7 @@ bool handleOTDirectCommand(const char* buf, int len, bool satOwn) {
     if (const char* err = otdPicDecimalArg(value, val)) { otDirectBridgeProcessStatus(err); return false; }
     if (val > 15) { otDirectBridgeProcessStatus("OR"); return false; }
     otOperModeCH1 = val;
-    // Send MsgID 99 WRITE_DATA
-    uint16_t data99 = otdOperModeData(otPushManual);   // TASK-1845: the push bit stays while a push runs (operatingmode1 bit 4)
-    otOperModeWrite = true;   // TASK-1906: PushOperModes, a thermostat READ 99 carries it too
-    unsigned long frame99 = OpenTherm::buildRequest(
-      OpenThermMessageType::WRITE_DATA,
-      static_cast<OpenThermMessageID>(99), data99);
-    if (!otCmdEnqueue(frame99)) { OTDDebugTf(PSTR("OTD: queue full, dropped frame %08lX\r\n"), frame99); otdWriteRefused = true; return false; }   // TASK-1804 B3e: no echo for a dropped frame, as CS=/SW=
+    if (!otdPushOperModes()) { otdWriteRefused = true; return false; }   // TASK-1804 B3e: no echo for a dropped frame; ID-99: no frame when 99 is unsupported
     snprintf_P(rspBuf, sizeof(rspBuf), PSTR("%d"), val);
     synthesizeResponse(buf, rspBuf);
   }
@@ -4459,12 +4479,7 @@ bool handleOTDirectCommand(const char* buf, int len, bool satOwn) {
     if (const char* err = otdPicDecimalArg(value, val)) { otDirectBridgeProcessStatus(err); return false; }
     if (val > 15) { otDirectBridgeProcessStatus("OR"); return false; }
     otOperModeDHW = val;
-    uint16_t data99 = otdOperModeData(otPushManual);   // TASK-1845: the push bit stays while a push runs (operatingmode1 bit 4)
-    otOperModeWrite = true;   // TASK-1906: PushOperModes, a thermostat READ 99 carries it too
-    unsigned long frame99 = OpenTherm::buildRequest(
-      OpenThermMessageType::WRITE_DATA,
-      static_cast<OpenThermMessageID>(99), data99);
-    if (!otCmdEnqueue(frame99)) { OTDDebugTf(PSTR("OTD: queue full, dropped frame %08lX\r\n"), frame99); otdWriteRefused = true; return false; }   // TASK-1804 B3e: no echo for a dropped frame, as CS=/SW=
+    if (!otdPushOperModes()) { otdWriteRefused = true; return false; }   // TASK-1804 B3e: no echo for a dropped frame; ID-99: no frame when 99 is unsupported
     snprintf_P(rspBuf, sizeof(rspBuf), PSTR("%d"), val);
     synthesizeResponse(buf, rspBuf);
   }
@@ -4476,12 +4491,7 @@ bool handleOTDirectCommand(const char* buf, int len, bool satOwn) {
     if (const char* err = otdPicDecimalArg(value, val)) { otDirectBridgeProcessStatus(err); return false; }
     if (val > 15) { otDirectBridgeProcessStatus("OR"); return false; }
     otOperModeCH2 = val;
-    uint16_t data99 = otdOperModeData(otPushManual);   // TASK-1845: the push bit stays while a push runs (operatingmode1 bit 4)
-    otOperModeWrite = true;   // TASK-1906: PushOperModes, a thermostat READ 99 carries it too
-    unsigned long frame99 = OpenTherm::buildRequest(
-      OpenThermMessageType::WRITE_DATA,
-      static_cast<OpenThermMessageID>(99), data99);
-    if (!otCmdEnqueue(frame99)) { OTDDebugTf(PSTR("OTD: queue full, dropped frame %08lX\r\n"), frame99); otdWriteRefused = true; return false; }   // TASK-1804 B3e: no echo for a dropped frame, as CS=/SW=
+    if (!otdPushOperModes()) { otdWriteRefused = true; return false; }   // TASK-1804 B3e: no echo for a dropped frame; ID-99: no frame when 99 is unsupported
     snprintf_P(rspBuf, sizeof(rspBuf), PSTR("%d"), val);
     synthesizeResponse(buf, rspBuf);
   }

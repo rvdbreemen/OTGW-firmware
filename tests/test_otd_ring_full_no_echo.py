@@ -45,19 +45,32 @@ def branch(start):
 
 
 class RingFullNoEcho(unittest.TestCase):
+    # TASK-1804 ID-99: MH=/MW=/M2= write MsgID 99 through otdPushOperModes(), which returns false only on a refused enqueue
+    @staticmethod
+    def send_check(body):
+        for probe in ("if (!otCmdEnqueue(", "if (!otdPushOperModes())"):
+            if probe in body:
+                return body.index(probe)
+        raise AssertionError("no enqueue check")
+
     def test_a_refused_enqueue_returns_before_the_echo(self):
         for name, start in BRANCHES.items():
             body = branch(start)
-            k = body.index("if (!otCmdEnqueue(")
+            k = self.send_check(body)
             line = body[k:body.index("\n", k)]
             self.assertIn("otdWriteRefused = true; return false;", line, name)
             self.assertLess(k, body.index("synthesizeResponse("), name + ": the check comes before the answer")
 
+    def test_otd_push_oper_modes_returns_false_on_a_refused_enqueue(self):
+        b = SRC[SRC.index("static bool otdPushOperModes() {"):SRC.index("// --- otdPushOperModes end")]
+        k = b.index("if (!otCmdEnqueue(")
+        self.assertIn("return false;", b[k:b.index("\n", k)])
+
     def test_the_operating_mode_nibble_is_still_stored(self):
         # the PIC always stores it (SetOperModeHC1/DHW/HC2); only the echo goes
-        for name in ("MH", "MW", "M2"):
+        for name, nib in (("MH", "otOperModeCH1 = val;"), ("MW", "otOperModeDHW = val;"), ("M2", "otOperModeCH2 = val;")):
             body = branch(BRANCHES[name])
-            self.assertLess(body.index("otOperModeWrite = true;"), body.index("if (!otCmdEnqueue("), name)
+            self.assertLess(body.index(nib), self.send_check(body), name)
 
 
 if __name__ == "__main__":
