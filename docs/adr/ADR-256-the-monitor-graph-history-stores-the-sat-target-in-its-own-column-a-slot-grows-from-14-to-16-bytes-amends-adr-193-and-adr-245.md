@@ -1,7 +1,7 @@
 ---
 id: "ADR-256"
 title: "The Monitor graph history stores the SAT target in its own column; a slot grows from 14 to 16 bytes (amends ADR-193 and ADR-245)"
-status: "Proposed"
+status: "Accepted"
 date: "2026-11-18"
 binding: false
 gate: null
@@ -39,10 +39,12 @@ format: "canonical"
 
 ## Status
 
-Proposed, 2026-11-18.
+Accepted, 2026-11-18.
 
 **Decision Maker:** User: Robert van den Breemen (maintainer). Discord direct message 1572585729098383494,
-2026-11-18 12:14:15 UTC, reply "A" to question 1572584352477618247 (see Decision).
+2026-11-18 12:14:15 UTC (Coordinated Universal Time), reply "A" to question 1572584352477618247 (see Decision). Acceptance and release scope:
+Robert, Discord direct message 1572707835991818413 (2026-11-18): "Ja, maar bouw het voor 2.0.0". This reverses his
+earlier "B" (direct message 1572641412850393190), which had moved the work to 2.1.0.
 
 ## Status History
 
@@ -55,13 +57,18 @@ status_history:
     changed_via: adr-kit
   - date: 2026-11-18
     status: Proposed
-    changed_by: "User: Robert van den Breemen"
+    changed_by: Agent (ba)
     reason: Related to ADR-193
     changed_via: adr-kit lifecycle
   - date: 2026-11-18
     status: Proposed
-    changed_by: "User: Robert van den Breemen"
+    changed_by: Agent (ba)
     reason: Related to ADR-245
+    changed_via: adr-kit lifecycle
+  - date: 2026-11-18
+    status: Accepted
+    changed_by: Robert van den Breemen (decision, DM 1572707835991818413), recorded by Agent (ba)
+    reason: "Accepted: decision Robert van den Breemen (DM 1572707835991818413: 'Ja, maar bouw het voor 2.0.0'), recorded by Agent (ba); measured +12.1 % dense 24 h body (23915 to 26809 B)"
     changed_via: adr-kit lifecycle
 ```
 
@@ -85,15 +92,17 @@ The ring sizes, measured from the code on origin/dev 0e967cb71:
 
 | Board | Ring | 14 B slots | 16 B slots | Difference |
 |---|---|---|---|---|
-| Without PSRAM (static array, internal RAM) | 126 slots of 30 s, 1 h | 1764 B | 2016 B | +252 B |
+| Without PSRAM (static array, internal RAM (random-access memory)) | 126 slots of 30 s, 1 h | 1764 B | 2016 B | +252 B |
 | With PSRAM (`platformPsramAllocOnce`) | 5046 slots of 120 s, 7 d | 70644 B | 80736 B | +10092 B |
 
 The response is the costly part. ADR-245 records that `restSendChunked()` re-runs the whole emitter for every TCP
 (Transmission Control Protocol) send window, so the work per response grows with the square of the body size, on the
 async_tcp task that serves every other web request. A seventh temperature column of 720 slots (24 h at 2 minutes)
 adds about 2.9 to 3.6 KB to a body of about 25 KB: about 12 to 14 % more body and, by the square rule, about 25 to 30 %
-more formatting work. This is an estimate from the value widths ("205," is 4 characters, "null," 5); the
-implementation measures it (Verification).
+more formatting work. That was the estimate from the value widths ("205," is 4 characters, "null," 5). Measured on
+the implementation (`tests/test_graph_history.py`, 2026-11-18, lane rebased onto origin/dev 8b4128dfd): a dense 24 h
+body is 23915 B without the SAT target and 26809 B with it, +12.1 %, and the formatting work by the square rule is
+1.257 times the work without it.
 
 Robert was asked (question 1572584352477618247, item 2 of 3) and chose A. The option text, verbatim: "A) Eigen kolom in
 de grafiekhistorie (slot 14 -> 16 B): +252 B intern RAM zonder PSRAM, +10 KB PSRAM, eerlijke lijn + CSV-kolom; vraagt
@@ -111,7 +120,7 @@ show it as its own series.
 2. **Source.** The sampler writes `settings.sat.fTargetTemp` when `satIsEnabled()`, the value the SAT room tile and
    `target_temp` show; otherwise `GRAPH_HIST_NO_TEMP`. The PV (photovoltaic) surplus boost that `satEffectiveTarget()`
    adds is not included: the column is the target the user set, comparable with the thermostat setpoint.
-3. **Response.** GET `/api/v2/graph/history` emits a `satTarget` array next to the other temperature columns only when
+3. **Response.** GET (the read request) `/api/v2/graph/history` emits a `satTarget` array next to the other temperature columns only when
    at least one slot of the served window has a value. A window in which SAT was never enabled gets the body of
    ADR-193 and ADR-245 byte for byte, so users without SAT pay nothing. The check scans the snapshot's slots, so every
    re-run of the emitter for a send window decides the same way (the byte-identical rule of ADR-193). With
@@ -135,7 +144,7 @@ show it as its own series.
 
 - Write the SAT target into `roomSet` or any other existing column.
 - Change the ring capacities, intervals or the writer margin of ADR-193 and ADR-245.
-- Add a REST call for the SAT target to the graph's live path.
+- Add a REST (Representational State Transfer) call for the SAT target to the graph's live path.
 
 ### Exceptions
 
@@ -157,7 +166,7 @@ show it as its own series.
   series starts empty and the CSV export of an earlier day has no SAT target. Rejected by Robert's choice of A.
 - **C: write the SAT target into the thermostat setpoint column while SAT is on.** No format change, but the column
   and its "thermostat setpoint" legend and CSV header would carry a different quantity depending on the mode, with
-  nothing in the slot to tell which (the flags byte holds only flame, DHW and CH); a window that spans a SAT on/off
+  nothing in the slot to tell which (the flags byte holds only flame, DHW (domestic hot water) and CH (central heating)); a window that spans a SAT on/off
   switch mixes the two, the confusion that started this task. The thermostat's own setpoint would also be lost while
   SAT runs. Rejected.
 - **Do nothing.** The graph keeps showing a setpoint that does not steer the boiler while SAT runs. Rejected.
@@ -174,12 +183,12 @@ show it as its own series.
 **Negative:**
 
 - +252 B of internal RAM (`.bss`) on boards without PSRAM and +10092 B of PSRAM on boards with it.
-- While SAT is enabled, a full 24 h response is an estimated 12 to 14 % larger and about 25 to 30 % more formatting
-  work on async_tcp (to be measured). Mitigation: the column is omitted when the window has no SAT value; TASK-1306
+- While SAT is enabled, a dense 24 h response is 12.1 % larger (23915 B to 26809 B, measured) and about 26 % more
+  formatting work on async_tcp (square rule, 1.257). Mitigation: the column is omitted when the window has no SAT value; TASK-1306
   tracks the response cost.
 - The ring is RAM only, so there is no stored format to migrate; an older page that does not know `satTarget` ignores
   the extra array. A newer page against older firmware sees no `satTarget` and draws no series.
-- Test fixtures that build ring JSON or assert the slot size change with it.
+- Test fixtures that build ring JSON (JavaScript Object Notation) or assert the slot size change with it.
 
 ## Open Questions
 

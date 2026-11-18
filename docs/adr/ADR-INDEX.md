@@ -260,6 +260,6 @@ One row per Architecture Decision Record. Scope is the Enforcement `path_glob` s
 | ADR-253 | Accepted | - | The band stops at target + 0.1 and may restart below target + 0.1, and once CH is off for the band it stays off for a... |
 | ADR-254 | Proposed | - | SAT switches from continuous to PWM when flow - requested setpoint >= settings.sat.fPwmSwitchMargin (default 2.0) hol... |
 | ADR-255 | Accepted | - | User Decision: the HA "SAT Simulation" switch gets a second availability topic, sat/simulationavailable, combined wit... |
-| ADR-256 | Proposed | - | User Decision: the device history slot gets a seventh int16t temperature column, satTarget, so a slot is 16 bytes; th... |
+| ADR-256 | Accepted | - | User Decision: the device history slot gets a seventh int16t temperature column, satTarget, so a slot is 16 bytes; th... |
 | ADR-257 | Accepted | - | User Decision: on a board without PSRAM BLE cannot be switched on: the scanner never starts there, every write of SAT... |
 | ADR-259 | Accepted | - | When the error leaves the 0.1 C deadband the integral is multiplied by 0.5 once and then held while the error stays o... |

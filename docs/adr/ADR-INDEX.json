@@ -10660,7 +10660,7 @@
       "title": "The Monitor graph history stores the SAT target in its own column; a slot grows from 14 to 16 bytes (amends ADR-193 and ADR-245)",
       "path": "ADR-256-the-monitor-graph-history-stores-the-sat-target-in-its-own-column-a-slot-grows-from-14-to-16-bytes-amends-adr-193-and-adr-245.md",
       "format": "canonical",
-      "status": "Proposed",
+      "status": "Accepted",
       "date": "2026-11-18",
       "decision_summary": "User Decision: the device history slot gets a seventh int16t temperature column, satTarget, so a slot is 16 bytes; th...",
       "topics": [
@@ -10695,7 +10695,7 @@
         "must_not": [
           "Write the SAT target into roomSet or any other existing column.",
           "Change the ring capacities, intervals or the writer margin of ADR-193 and ADR-245.",
-          "Add a REST call for the SAT target to the graph's live path."
+          "Add a REST (Representational State Transfer) call for the SAT target to the graph's live path."
         ],
         "exceptions": [
           "None."
