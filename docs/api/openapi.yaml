@@ -286,6 +286,10 @@ paths:
                     type: array
                     description: Outside temperature (weather API when valid, else MsgID 27), value times scale
                     items: {type: integer, nullable: true}
+                  satTarget:
+                    type: array
+                    description: SAT target (target_temp of /api/v2/sat/status) while SAT was enabled, value times scale; only present when the window holds such a value (ADR-256)
+                    items: {type: integer, nullable: true}
                   mod:
                     type: array
                     description: Relative modulation level (MsgID 17), percent

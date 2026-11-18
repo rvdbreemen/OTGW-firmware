@@ -211,6 +211,7 @@
     "series_ret": "Rücklauf",
     "series_ch_set": "Vorlauf-Soll",
     "series_room_set": "Thermostat-Soll",
+    "series_sat_target": "SAT-Ziel",
     "series_room": "Raum",
     "series_outside": "Außen",
     "series_dhw": "WW-Temperatur",

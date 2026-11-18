@@ -54,7 +54,7 @@ function load() {
     ' mod: null, pressure: null, flame: false, ch: false, dhw_on: false, fault: false, fresh: false, wxValid: false };\n' +
     'var samples = [], SAMPLES_MAX = 1800, GSLOT = 5000, GHIST_MAX = 86400000 / GSLOT, gHist = [], gDallas = null, gLastRender = 0;\n' +
     'var GHIST_LIVE_MS = 86400000, GHIST_SPAN_MS = 7 * 86400000, gTrimN = 0;\n' +
-    'var sat = { roomLost: false }, GROOM_STALE_MS = 270000, graphWindowMs = 3600000, csvOut = null;\n' +
+    'var sat = { roomLost: false }, satEnabledLive = null, GROOM_STALE_MS = 270000, graphWindowMs = 3600000, csvOut = null;\n' +
     'function scheduleRender() {}\nfunction isMonitorVisible() { return false; }\nfunction renderGraph() {}\n' +
     'function ts() { return "T"; }\nfunction downloadBlob(blob, name) { csvOut = { blob: blob, name: name }; }\n' +
     extractGser(SRC) + '\n' +

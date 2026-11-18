@@ -332,6 +332,7 @@
       "series_ret": "return",
       "series_ch_set": "control setpoint",
       "series_room_set": "thermostat setpoint",
+      "series_sat_target": "SAT target",
       "series_room": "room",
       "series_outside": "outside",
       "series_dhw": "DHW temperature",
@@ -3202,7 +3203,7 @@
   }
   // [key, label, colour, kind]: t = temperature line (auto-scaled), m = modulation area, l = on/off lane
   var GSER = [['flow', 'boiler', '#f85149', 't'], ['ret', 'return', '#58a6ff', 't'], ['chSet', 'control setpoint', '#8b949e', 't'],
-    ['roomSet', 'thermostat setpoint', '#d29922', 't'], ['room', 'room', '#3fb950', 't'], ['outside', 'outside', '#a371f7', 't'], ['dhw', 'DHW temperature', '#f778ba', 't'],
+    ['roomSet', 'thermostat setpoint', '#d29922', 't'], ['satTarget', 'SAT target', '#e0c341', 't'], ['room', 'room', '#3fb950', 't'], ['outside', 'outside', '#a371f7', 't'], ['dhw', 'DHW temperature', '#f778ba', 't'],
     ['mod', 'modulation', '#00bffe', 'm'], ['flame', 'flame', '#ff7b00', 'l'], ['dhw_on', 'DHW mode', '#2f81f7', 'l'], ['ch', 'boiler CH mode', '#e5534b', 'l']];
   // 'ch' is the boiler's own CH-mode status bit (MsgID 0 slave bit 1; pump overrun keeps it on), not SAT's CH enable (Sergeant D entry 219)
   var GDCOL = ['#56d4dd', '#db61a2', '#7ee787', '#f0883e', '#79c0ff', '#bc8cff'];
@@ -3307,6 +3308,8 @@
       if (++gTrimN >= 60) { gTrimN = 0; gHist = graphTrim(gHist, now); }   // trim once per 5 minutes (TASK-1963)
     }
     ['flow', 'ret', 'chSet', 'roomSet', 'room', 'outside', 'dhw', 'mod'].forEach(function (k) { r[k] = model[k]; });   // dhw: MsgID 26, live only (TASK-1776: not in the device history)
+    // TASK-2018 (ADR-256): the SAT target while SAT is enabled, the firmware's rule for the device history column
+    r.satTarget = (satEnabledLive === true && typeof sat.target === 'number' && !isNaN(sat.target)) ? sat.target : null;
     r.roomX = graphRoomLost(now) ? 1 : 0;   // TASK-1546: a dropout is no reading: the room value is empty (CSV, line break)
     if (r.roomX) r.room = null;
     ['flame', 'dhw_on', 'ch'].forEach(function (k) { if (model[k]) r[k] = 1; });
@@ -3340,6 +3343,7 @@
     // a null room in a slot that has other data is a dropout (the TASK-1546 interruption); a unit that never
     // reported a room temperature has no dropout to show.
     var hasRoom = j.room.some(function (v) { return typeof v === 'number'; });
+    var satCol = Array.isArray(j.satTarget) && j.satTarget.length === n;   // TASK-2018: optional column
     for (var i = 0; i < n; i++) {
       var x = nowMs - age - (n - i) * ivMs, t = x - x % GSLOT;
       while (li < live.length && live[li].t < t) li++;
@@ -3350,6 +3354,10 @@
         r[TCOLS[k]] = (typeof v === 'number') ? v / sc : null;
         if (r[TCOLS[k]] !== null) any = true;
       }
+      // TASK-2018 (ADR-256): satTarget is only in a response whose window held a SAT value; absent means empty
+      var st = satCol ? j.satTarget[i] : null;
+      r.satTarget = (typeof st === 'number') ? st / sc : null;
+      if (r.satTarget !== null) any = true;
       var m = j.mod[i];
       r.mod = (typeof m === 'number') ? m : null;
       r.flame = j.flame[i] ? 1 : 0; r.dhw_on = j.dhw_on[i] ? 1 : 0; r.ch = j.ch[i] ? 1 : 0;
@@ -3413,7 +3421,7 @@
     return [k, dallasLabelFor(a) || a, GDCOL[i % GDCOL.length], 't'];
   }
   // Series labels are translated at render time (the GSER labels are the English defaults).
-  var GSER_LABEL_KEY = { flow: 'graph.series_flow', ret: 'graph.series_ret', chSet: 'graph.series_ch_set', roomSet: 'graph.series_room_set',
+  var GSER_LABEL_KEY = { flow: 'graph.series_flow', ret: 'graph.series_ret', chSet: 'graph.series_ch_set', roomSet: 'graph.series_room_set', satTarget: 'graph.series_sat_target',
     room: 'graph.series_room', outside: 'graph.series_outside', dhw: 'graph.series_dhw', mod: 'graph.series_mod', flame: 'graph.series_flame', dhw_on: 'graph.series_dhw_on', ch: 'graph.series_ch' };
   // TASK-1297: values of the visible series at time tMs. arr is ascending by t. Returns null when no
   // record covers tMs (before the first record, or more than GBREAK_MS past the record's data end).
@@ -3563,7 +3571,7 @@
         el.setAttribute('data-k', k); el.setAttribute('stroke', m[2]); el.setAttribute('stroke-width', kind === 't' ? '1.8' : '1.2');
         el.setAttribute('fill', kind === 'm' ? 'rgba(0,191,254,.18)' : (kind === 'l' ? m[2] : 'none'));
         if (kind === 'l') el.setAttribute('fill-opacity', '.3');
-        if (k === 'chSet' || k === 'roomSet') el.setAttribute('stroke-dasharray', '5 4');
+        if (k === 'chSet' || k === 'roomSet' || k === 'satTarget') el.setAttribute('stroke-dasharray', '5 4');
         g.appendChild(el);
       }
       if (!gOff[k] && c.length) d = kind === 'm' ? graphPath(c, kind, ym, MP.top + MP.h) : graphPath(c, kind, y, GLANE_Y[k]);

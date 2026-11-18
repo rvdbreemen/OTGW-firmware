@@ -211,6 +211,7 @@
     "series_ret": "retour",
     "series_ch_set": "ketel-setpoint",
     "series_room_set": "thermostaat-setpoint",
+    "series_sat_target": "SAT-doel",
     "series_room": "kamer",
     "series_outside": "buiten",
     "series_dhw": "tapwatertemperatuur",

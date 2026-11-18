@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-18T09:30:00Z'
-updated_date: '2026-11-18T20:30:00Z'
+updated_date: '2026-11-18T21:33:00Z'
 labels:
   - webui
   - sat
@@ -54,4 +54,6 @@ WIP 2026-11-18, PARKED (coordinator: the no-PSRAM BLE heap bug comes first). The
 Maintainer decision (Robert, 2026-11-18, Discord DM 1572641412850393190), verbatim reply: 'B' (B = milestone 2.1.0, on the coordinator's question 2.0.0 vs 2.1.0). Milestone set to 2.1.0. The lane wt-ba-2018 stays local until release/2.x is cut for 2.0.0 stable (~21 Nov); the ADR-256 accept can still come and does not change where the code lands.
 
 Maintainer decision (Robert, 2026-11-18, Discord DM 1572707835991818413), verbatim: 'Ja, maar bouw het voor 2.0.0'. ADR-256 Accepted on it; milestone back to 2.0.0. This reverses his earlier 'B' (DM 1572641412850393190), which had moved the task to 2.1.0. The lane now lands on dev like other 2.0.0 work (coordinator): rebased onto origin/dev 8b4128dfd, host tests red/green, evaluate, build after d3's 376/377 build, bench by 09, push. Measured on the rebased tree (tests/test_graph_history.py): dense 24 h body 23915 B without the SAT target, 26809 B with it (+12.1 %), formatting work ratio 1.257.
+
+2026-11-18 rebased onto origin/dev f11764ecb, bump beta.378. Evidence on the rebased tree: tests/test_graph_history.py + tests/test_capture_device_data.py 22 passed (INFO dense 24 h body 23915 B -> 26809 B, +12.1 %, ratio 1.257); web UI graph-sat-target 5/5 on the fix, 0/5 with OTGW_V2_JS at the origin/dev 377 v2.js (red); graph-control-setpoint-source 11/11, graph-dhw-temperature 4/4; python evaluate.py --quick 88 passed, 0 failed, 0 warnings. Next: esp32-combo build, bench by 09.
 <!-- SECTION:NOTES:END -->

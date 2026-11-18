@@ -2499,7 +2499,9 @@ GRAPH_TEMP_COLUMNS = ("flow", "ret", "chSet", "roomSet", "room", "outside")
 GRAPH_JSON_COLUMNS = GRAPH_TEMP_COLUMNS + ("mod", "flame", "dhw_on", "ch")   # what /api/v2/graph/history sends
 # The web UI CSV follows v2.js GSER, which also has the live-only DHW temperature (TASK-1776, MsgID 26): the device
 # history has no such column, so its cell is empty in every history row, as in the web UI export.
-GRAPH_CSV_COLUMNS = GRAPH_TEMP_COLUMNS + ("dhw", "mod", "flame", "dhw_on", "ch")
+# TASK-2018 (ADR-256): satTarget is sent only when the window holds a SAT target; the web UI CSV has it after roomSet.
+GRAPH_OPTIONAL_TEMP_COLUMNS = ("satTarget",)
+GRAPH_CSV_COLUMNS = ("flow", "ret", "chSet", "roomSet", "satTarget", "room", "outside", "dhw", "mod", "flame", "dhw_on", "ch")
 GRAPH_GSLOT_MS = 5000
 GRAPH_HISTORY_BODY_CAP = 2 * 1024 * 1024
 GRAPH_HISTORY_SECONDS = 3600   # long run: one fetch per hour besides start and stop
@@ -2542,6 +2544,11 @@ def graph_history_rows(j, now_ms):
         rec, any_value = {}, False
         for c in GRAPH_TEMP_COLUMNS:
             v = j[c][i]
+            rec[c] = v / sc if isinstance(v, nums) and not isinstance(v, bool) else None
+            any_value = any_value or rec[c] is not None
+        for c in GRAPH_OPTIONAL_TEMP_COLUMNS:   # absent, or of the wrong length, is an empty column (as the web UI)
+            col = j.get(c)
+            v = col[i] if isinstance(col, list) and len(col) == n else None
             rec[c] = v / sc if isinstance(v, nums) and not isinstance(v, bool) else None
             any_value = any_value or rec[c] is not None
         rec["dhw"] = None   # live-only in the web UI, never in the device history
