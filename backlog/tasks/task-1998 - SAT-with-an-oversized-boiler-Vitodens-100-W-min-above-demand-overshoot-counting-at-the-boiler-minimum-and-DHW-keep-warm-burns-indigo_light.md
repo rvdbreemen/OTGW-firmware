@@ -3,11 +3,11 @@ id: TASK-1998
 title: >-
   SAT with an oversized boiler (Vitodens 100-W, min above demand): overshoot
   counting at the boiler minimum and DHW keep-warm burns (indigo_light)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-16T10:42:00Z'
-updated_date: '2026-11-18T19:25:00Z'
+updated_date: '2026-11-18T19:29:00Z'
 labels:
   - sat
   - field
@@ -25,7 +25,7 @@ Reported by indigo_light (Discord 301077214374658048), #beta-testing https://dis
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [x] #1 Long-run capture on beta.339 or newer and the graph CSVs from the reporter received and analysed
-- [ ] #2 Q2 and Q3 put to Sergeant D one per message with the release scope line, answers recorded as entries
+- [x] #2 Q2 and Q3 put to Sergeant D one per message with the release scope line, answers recorded as entries
 - [x] #3 Follow-up per his answers: a change with a host test red on the old code and green on the fix, or a recorded works-as-designed
 <!-- AC:END -->
 
@@ -50,3 +50,9 @@ Open design questions for Sergeant D (one per message, each with the release sco
 
 2026-11-18 AC3 = works as designed per entry 416 (coordinator accepted). Code read on origin/dev 13c0a4e41: (1) counted + kept: a burn of >= SAT_CYCLE_MIN_SAMPLES samples is recorded (SATcycles.ino:800-830) and enters the 4 h window (:1191); duty counts every flame (:493-494, entry 268). (2) marked hot water: kind SAT_CK_DHW at >80 % DHW samples (:792 = tracker.py:315-316), stored per cycle (:805), published as eLastCycleKind (SATcontrol.ino:5381); class UNCERTAIN on DHW in the tail (SATcycles.ino:899 = classifier.py:25-26); indigo's logged burns #2-#5 are class=5 = UNCERTAIN (sat_story.txt). (3) no PWM/overshoot effect: the only control decision on a finished cycle, satCycleApplyEndOfCycle (:1006-1021), acts on OVERSHOOT or UNDERHEAT_PWM only; the 4 h/24 h/EMA overshoot fractions count OVERSHOOT only (:459, :558, :831); the other window stats have no control reader; the live switch has its 300 s DHW guard (:203-206). (4) indigo's three 1 s burns are not cycles at all: min-samples rule (:1114 = tracker.py:98-100, entry 249); entry 416 says 'as thermo-nova' and thermo-nova drops them the same way, so this is consistent (coordinator: no extra question). Regression guard (green, no defect to show red): tests/test_sat_cycle_classifier.py::test_task1998_short_dhw_burn_is_counted_marked_hot_water_and_switches_nothing on the real SATcycles.ino cut: a 16 s DHW burn at flow 73 C in continuous -> count 1, kind DHW, class UNCERTAIN, mode continuous, 0 switches; control subtest: the same burn on the CH bit -> OVERSHOOT, switch to PWM. Run: 10 passed (-k 'task1998 or task1331'). No firmware change, no bump.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Works as designed; no firmware change. AC1: beta.360 long-run capture and the reporter's graph CSVs analysed by comms 92 (notes 2026-11-18, posts 1572542421840171140 / 1572543639081717844). AC2: Q2 = Q-1998a answered A by Sergeant D (entry 420, on origin cfc3cc5c1): a continuous burn at the boiler minimum still counts as overshoot when the flow stays above the request, as thermo-nova classifier.py:74; Q3 = entry 390 and Q-1998b answered C (entry 416): short DHW burns counted, marked hot water, no PWM/overshoot effect, as thermo-nova. AC3: recorded works-as-designed with file:line evidence (notes): kind DHW SATcycles.ino:792, UNCERTAIN on DHW in tail :899, only end-of-cycle decision :1006-1021 ignores UNCERTAIN, overshoot fractions count OVERSHOOT only, duty counts every flame (entry 268), 1 s burns dropped by min-samples :1114 as thermo-nova tracker.py:98-100 (consistent with 416). Regression guard: tests/test_sat_cycle_classifier.py::test_task1998_short_dhw_burn_is_counted_marked_hot_water_and_switches_nothing (16 s DHW burn -> count 1, kind DHW, UNCERTAIN, no switch; CH twin -> OVERSHOOT + PWM), 10 passed. Not verified: nothing on hardware (no change to verify).
+<!-- SECTION:FINAL_SUMMARY:END -->
