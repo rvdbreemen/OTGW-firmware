@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@otgw-dev'
 created_date: '2026-11-13T08:09:00Z'
-updated_date: '2026-11-18T18:44:00Z'
+updated_date: '2026-11-18T19:05:00Z'
 labels:
   - sat
   - adr
@@ -52,4 +52,6 @@ Implemented (lane-1890, uncommitted, not built): main PID _pidUpdateIntegral() (
 2026-11-18 ~19:20 scope and priority (Robert van den Breemen, relayed by the coordinator): 'Geef prioriteit aan taak 1890' (priority high); 'Voor release 2.0.0' in the coordinator session, confirmed by DM 'A' (1572675307033596055, reply to the coordinator's 1890 scope question). Milestone 2.1.0 -> 2.0.0; the earlier hold until release/2.x no longer applies. ADR-259 accepted via adr-kit (Agent: Claude) on 'Accepteer ADR-259' (coordinator session) and DM 'Ja' (1572637584843079733). Lane rebased onto origin/dev 13c0a4e41: fix commit rebumped to beta.375 (banner conflicts resolved to origin, SATtypes.h bPidInBand re-applied and checked hunk by hunk against 49bb78f9a). adr-lint --strict: ADR-259 PASS strictly; repo FAIL count 63 = origin/dev baseline 63 (no new FAIL). Accept rewrote the Status line; the ADR-080 guideline label and the amends text were restored. README: ADR-259 entry Accepted, ADR-197 entry names decision 3 amended by ADR-259 (ADR-197 body untouched).
 
 Field-evidence signature (for 92/09 on every tester capture with SAT on, firmware >= the 1890 build): in telnet SATTICK lines (field i=, one PID step per 60 s, SATpid.ino satPidService) or MQTT sat/pid_i, when |room error| = |target - room| goes from <= 0.1 C to > 0.1 C, i drops to exactly half its previous value in that one step and then stays constant (unchanged i= on every following tick) while |error| > 0.1; once |error| <= 0.1 again, i resumes changing from the held value. Old code signature: i= 0.00 on every tick outside the band. Not a halving: an ADR-204 reset (target/preset change, window, SAT off->on, reset_integral) sets i=0. Bench (2026-11-18, agreed with coordinator): regression only on .63 (no boiler = no OT link = satDisable/PID reset, so the halving cannot be shown without sim, excluded by Robert's 15 Nov rule): (1) githash + settings unchanged, (2) 30 min no crash/restart, heap flat, (3) SAT on/off without boiler as on 374, (4) /sat_pid_state.json from 374 restores. Compile check: beta.375+a9bc77b built OK (4x 'Successfully created ESP32S3 image', 'Build completed successfully', 19:43); bench build will be the 376 rebump after ba's 375 lands.
+
+2026-11-18 Q-329b answered by Sergeant D: 'My answer is B' (#dev-sat-mqtt msg 1572686857228124251, verified by the coordinator via REST) = halving for the main PID and the zone PIDs, as implemented. Recorded by 92 as entry 414; it replaces 'zones decided by Robert's directive' as the basis for the zone part. No code change. ADR-259 is already Accepted and therefore immutable (adr-kit): its Context still names the directive; the confirmation lives here and in entry 414. If the ADR text must name it, that is a follow-up amending ADR, not an edit.
 <!-- SECTION:NOTES:END -->
