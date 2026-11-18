@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : fsWriter.h
-**  Version  : v2.0.0-beta.369
+**  Version  : v2.0.0-beta.370
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -40,3 +40,4 @@ bool     fsWriterStep();                              // one pass of the writer 
 bool     fsWriterPauseAndFlush(uint32_t timeoutMs);   // start of a filesystem OTA (TASK-2007)
 void     fsWriterPause();                             // remount after a filesystem OTA, until the restore (TASK-2007)
 void     fsWriterResume();
+bool     fsWriterRunning();                           // the writer task runs (TASK-1995)

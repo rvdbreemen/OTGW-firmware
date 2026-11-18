@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : helperStuff
-**  Version  : v2.0.0-beta.369
+**  Version  : v2.0.0-beta.370
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -257,17 +257,70 @@ static void fsSlowNote(PGM_P step, uint32_t t0)
   if (dt >= 100) DebugTf(PSTR("[fs-slow] %s %lu ms\r\n"), step, (unsigned long)dt);
 }
 
+// TASK-1995 Step B: the write probe and the mount check run on the fsWriter task (core 0), not on the loop task. In
+// 09's capture on .61 (beta.366) the probe was the one [loop-stall] (558 ms) and the mount check cost 103-179 ms every
+// minute. loopLittleFSStatus() only raises a request; the writer task takes it between two writes (owner-task pattern).
+// --- fsHealth begin
+static std::atomic<bool> s_fsProbeRequest{false};
+static std::atomic<bool> s_fsMountCheckRequest{false};
+// A slow check measured on the writer task: (step << 24) | ms, 0 = none. The loop task prints it: the writer task
+// prints nothing, because _debugBOL() works in static buffers every caller shares (two tasks printing at once mix
+// their lines; the telnet write itself is locked), and the formatting needs stack the writer task does not have.
+enum : uint32_t { FS_NOTE_PROBE = 1, FS_NOTE_MOUNT = 2 };
+static std::atomic<uint32_t> s_fsHealthNote{0};
+
+static void fsHealthTimed(uint32_t step, uint32_t t0)
+{
+  const uint32_t dt = millis() - t0;
+  if (dt >= 100) s_fsHealthNote = (step << 24) | (dt & 0xFFFFFFUL);
+}
+
+// Runs on the writer task (fsWriterStep(), after its pause and image-write checks), or on the loop task when the
+// writer task does not run. Not gated on LittleFSmounted: a failed probe clears it and only the next probe sets it
+// again (TASK-1205). While flashing a request waits. Returns true when it ran a check. No Debug* or telnet output here.
+bool fsHealthService()
+{
+  if (isFlashing()) return false;
+  const uint32_t t0 = millis();
+  if (s_fsProbeRequest.exchange(false)) {
+    updateLittleFSStatus(F("/.health"));
+    fsHealthTimed(FS_NOTE_PROBE, t0);
+    return true;
+  }
+  if (s_fsMountCheckRequest.exchange(false)) {
+    if (LittleFSmounted) {
+      LittleFSmounted = platformFSInfo(LittleFSinfo);
+      fsHealthTimed(FS_NOTE_MOUNT, t0);
+    }
+    return true;
+  }
+  return false;
+}
+
+// On the loop task: print the slow check the writer task measured, in the [fs-slow] format of fsSlowNote().
+static void fsHealthPrintNote()
+{
+  const uint32_t note = s_fsHealthNote.exchange(0);
+  if (note == 0) return;
+  DebugTf(PSTR("[fs-slow] %s %lu ms%s\r\n"), (note >> 24) == FS_NOTE_PROBE ? "write-probe" : "mount-check",
+          (unsigned long)(note & 0xFFFFFFUL), fsWriterRunning() ? " (writer)" : "");
+}
+
+static void fsHealthRequest(std::atomic<bool>& request)
+{
+  request = true;
+  if (!fsWriterRunning()) fsHealthService();   // no writer task: run it here, as before
+}
+// --- fsHealth end
+
 void loopLittleFSStatus() {
   DECLARE_TIMER_MIN(fsWriteProbe, 5, SKIP_MISSED_TICKS);
   DECLARE_TIMER_SEC(fsMountCheck, 60, SKIP_MISSED_TICKS);
   DECLARE_TIMER_SEC(fsFileFlags, 10, SKIP_MISSED_TICKS);   // TASK-1899: a new or removed file shows within 10 s
   static bool fsFileFlagsRead = false;                      // the first loop pass reads them at once
+  fsHealthPrintNote();   // TASK-1995: a slow check the writer task measured
   uint32_t t0 = millis();
-  if (DUE(fsWriteProbe)) {
-    updateLittleFSStatus(F("/.health"));
-    fsSlowNote(PSTR("write-probe"), t0);
-    return;
-  }
+  const bool probeDue = DUE(fsWriteProbe);
   if (!fsFileFlagsRead || DUE(fsFileFlags)) {   // two cheap lookups: no own pass, the mount check keeps its rhythm
     fsFileFlagsRead = true;
     refreshLittleFSFileFlags();
@@ -279,11 +332,11 @@ void loopLittleFSStatus() {
   t0 = millis();
   loopSatMarkers();     // TASK-1911: and a changed markers copy
   fsSlowNote(PSTR("sat-markers"), t0);
-  if (DUE(fsMountCheck) && LittleFSmounted) {
-    t0 = millis();
-    LittleFSmounted = platformFSInfo(LittleFSinfo);
-    fsSlowNote(PSTR("mount-check"), t0);
-  }
+  // TASK-1995: both checks are raised for the fsWriter task only now, after this pass's own LittleFS calls. The timers
+  // start together, so every 5 min the probe, the file flags and the mount check fall due in the same pass; a probe
+  // raised before refreshLittleFSFileFlags() held the LittleFS lock while exists() waited (09, .61, 370: 191-394 ms).
+  if (probeDue) fsHealthRequest(s_fsProbeRequest);
+  if (DUE(fsMountCheck) && LittleFSmounted) fsHealthRequest(s_fsMountCheckRequest);
 }
 
 // PROGMEM overload for updateLittleFSStatus

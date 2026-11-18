@@ -25,6 +25,7 @@ from test_sat_pwm_override import compile_cpp  # noqa: E402
 FW = REPO / "src" / "OTGW-firmware"
 HELPER = Path(os.environ.get("OTGW_HELPER_INO", FW / "helperStuff.ino")).read_text(encoding="utf-8").replace("\r\n", "\n")
 MAIN = Path(os.environ.get("OTGW_MAIN_INO", FW / "OTGW-firmware.ino")).read_text(encoding="utf-8").replace("\r\n", "\n")
+FSW = Path(os.environ.get("OTGW_FSW_INO", FW / "fsWriter.ino")).read_text(encoding="utf-8").replace("\r\n", "\n")
 
 
 def braced(src, head):
@@ -96,9 +97,48 @@ class FsSlowNote(unittest.TestCase):
     def test_every_sub_step_is_timed(self):
         body = braced(HELPER, "void loopLittleFSStatus()")
         self.assertTrue(body, "loopLittleFSStatus() not found")
-        for step in ("write-probe", "file-flags", "dallas-labels", "sat-markers", "mount-check"):
+        for step in ("file-flags", "dallas-labels", "sat-markers"):
             with self.subTest(step=step):
                 self.assertIn('fsSlowNote(PSTR("%s")' % step, body)
+        # TASK-1995 Step B: the write probe and the mount check run in fsHealthService() on the fsWriter task, which
+        # only measures them; the loop task prints the note (fsHealthPrintNote(), tested in test_health_no_fs_flash_ops)
+        health = braced(HELPER, "bool fsHealthService()")
+        self.assertTrue(health, "fsHealthService() not found")
+        for note in ("fsHealthTimed(FS_NOTE_PROBE, t0)", "fsHealthTimed(FS_NOTE_MOUNT, t0)"):
+            with self.subTest(note=note):
+                self.assertIn(note, health)
+        self.assertIn("fsHealthPrintNote();", body)
+
+
+class WriterTaskPrintsNothing(unittest.TestCase):
+    """TASK-1995 Step B respin: no Debug* or telnet output on the fsWriter task. _debugBOL() works in static buffers
+    every caller shares, so a print there mixes its line with the loop task's (the telnet write itself is locked);
+    the formatting (320 B buffer + vsnprintf) also needs stack the 5120 B task cannot spare. Every function the writer task runs is checked; fsSlowNote()
+    counts as output (it calls DebugTf). Red on the first 370 build (ad83affee), which logged from fsHealthService()."""
+
+    PRINT = re.compile(r"\b(Debug\w*|SATDebug\w*|debugTelnet\s*\.\s*\w+|fsSlowNote|Serial\s*\.\s*print\w*)\s*\(")
+
+    def check(self, src, head):
+        body = braced(src, head)
+        self.assertTrue(body, "%s not found" % head)
+        hits = [m.group(0) for m in self.PRINT.finditer(body)]
+        self.assertEqual(hits, [], "%s prints on the fsWriter task: %s" % (head, hits))
+
+    def test_health_checks_print_nothing(self):
+        for head in ("bool fsHealthService()", "static void fsHealthTimed(", "bool updateLittleFSStatus(const char *probePath)",
+                     "bool updateLittleFSStatus(const __FlashStringHelper *probePath)"):
+            with self.subTest(fn=head):
+                self.check(HELPER, head)
+
+    def test_writer_task_path_prints_nothing(self):
+        for head in ("bool fsWriterStep()", "void fsWriterService(const FsWriteJob& job)", "static void fsWriterTask(void*)"):
+            with self.subTest(fn=head):
+                self.check(FSW, head)
+
+    def test_the_matcher_finds_a_print(self):   # the check itself: a DebugTf in a body is found
+        self.assertTrue(self.PRINT.search('  DebugTf(PSTR("x"));'))
+        self.assertTrue(self.PRINT.search('  fsSlowNote(PSTR("write-probe"), t0);'))
+        self.assertFalse(self.PRINT.search('  fsHealthTimed(FS_NOTE_PROBE, t0);'))
 
     def test_fs_end_probe_follows_the_fs_check(self):
         self.assertRegex(MAIN, r"loopLittleFSStatus\(\);[^\n]*\n\s*connProbe\(CPROBE_FS_END\);")

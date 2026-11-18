@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-beta.369
+**  Version  : v2.0.0-beta.370
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -3595,7 +3595,7 @@ void sendHealth()
     // health poll. Same values as sendSimulationStatus(); the file flag is kept by the loop task (TASK-1899).
     je.field(F("simulation_active"), state.debug.bOTGWSimulation);
     je.field(F("simulation_source"), LittleFSsimFilePresent ? "file" : "builtin");
-    je.field(F("littlefsMounted"), LittleFSmounted);
+    je.field(F("littlefsMounted"), LittleFSmounted.load());
     je.endObject();                   // close "health"
     je.endObject();                   // close root
   }

@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTGW-ModUpdateServer-esp32.h
-**  Version  : v2.0.0-beta.369
+**  Version  : v2.0.0-beta.370
 **
 **  ESP32 OTA update server — functional equivalent of the ESP8266
 **  OTGW-ModUpdateServer with Nodoshop hardware watchdog feeding.
@@ -43,6 +43,7 @@
 #include <esp_ota_ops.h>       // esp_ota_get_running/next_update_partition — single-app-slot OTA guard
 #include <esp_partition.h>     // esp_partition_find_first — full LittleFS partition size
 #include <StreamString.h>
+#include <atomic>
 #include <LittleFS.h>
 #include <Preferences.h>       // ADR-191: hostname/password mirror for the safeboot updater
 #include "Wire.h"
@@ -51,7 +52,7 @@
 
 // External declarations (same as the sync variant)
 extern OTGWState state;
-extern bool LittleFSmounted;
+extern std::atomic<bool> LittleFSmounted;
 extern bool updateLittleFSStatus(const char *probePath);
 extern bool updateLittleFSStatus(const __FlashStringHelper *probePath);
 extern bool writeSettings(bool show);

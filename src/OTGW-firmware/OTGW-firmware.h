@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v2.0.0-beta.369
+**  Version  : v2.0.0-beta.370
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -239,7 +239,8 @@ const char* satMarkersJsonLocked();
 void satMarkersScanLocked(int& count, int& maxId);
 int  satMarkersAppendLocked(const char* entry, int count);   // 0 ok, 1 full, 2 no room
 bool satMarkersDeleteLocked(int id);   // FSexplorer uploaded or deleted path
-void loopLittleFSStatus();   // TASK-1865: mount check + write probe on the loop task, not in /api/v2/health
+void loopLittleFSStatus();   // TASK-1865: mount check + write probe off async_tcp; TASK-1995: run by the fsWriter task
+bool fsHealthService();      // TASK-1995: one pending write probe or mount check, on the fsWriter task
 // Longest reboot-log line incl. CRLF and NUL: a core-dump detail line with all 16 backtrace frames the ESP-IDF
 // summary holds is 236 chars ("Core dump: " + task (15) + pc + elf + "bt=" + 16 PCs + "!\r\n"; TASK-1538).
 #define REBOOT_LOG_LINE_MAX 240

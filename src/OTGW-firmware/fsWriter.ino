@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : fsWriter.ino
-**  Version  : v2.0.0-beta.369
+**  Version  : v2.0.0-beta.370
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -71,7 +71,11 @@ void fsWriterService(const FsWriteJob& job)
 bool fsWriterStep()
 {
   s_fswBusy = true;
-  if (s_fswPaused || ::state.flash.bFsImageWriting || !LittleFSmounted) { s_fswBusy = false; return false; }
+  if (s_fswPaused || ::state.flash.bFsImageWriting) { s_fswBusy = false; return false; }
+  // TASK-1995: a pending write probe or mount check first, inside the busy window, so a pause also holds it. Not
+  // behind the mount gate below: after a failed probe only the next probe can set LittleFSmounted again.
+  if (fsHealthService()) { s_fswBusy = false; return true; }
+  if (!LittleFSmounted) { s_fswBusy = false; return false; }
   FsWriteJob job;
   if (!platformQueueReceive(s_fswQueue, &job, 0)) { s_fswBusy = false; return false; }
   fsWriterService(job);
@@ -93,9 +97,14 @@ void fsWriterBegin()
   if (s_fswQueue != nullptr) return;
   s_fswQueue = platformQueueCreate(FSW_QUEUE_DEPTH, sizeof(FsWriteJob));
   if (s_fswQueue == nullptr) return;   // no queue: fsWriterSubmit() writes on the caller, as before
-  if (!platformTaskCreatePinnedCore(fsWriterTask, "fswriter", 4096, nullptr, 1, PLATFORM_CORE_PROTOCOL)) {
+  if (!platformTaskCreatePinnedCore(fsWriterTask, "fswriter", 5120, nullptr, 1, PLATFORM_CORE_PROTOCOL)) {
     s_fswQueue = nullptr;              // no consumer: never leave jobs in a queue nobody reads
   }
+}
+
+bool fsWriterRunning()
+{
+  return s_fswQueue != nullptr;
 }
 
 uint32_t fsWriterPending()

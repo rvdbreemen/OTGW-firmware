@@ -83,6 +83,10 @@ static int g_taskCore = -1;
 static PlatformTask platformTaskCreatePinnedCore(void (*)(void*), const char*, uint32_t, void*, unsigned, int core) { g_taskCore = core; return (PlatformTask)1; }
 static void (*g_writerStep)() = nullptr;   // set in main: one step of the writer task
 static void platformTaskDelay(uint32_t ms) { g_ms += ms; if (g_writerStep) g_writerStep(); }
+// TASK-1995: one pending write probe or mount check (helperStuff.ino, tested in test_health_no_fs_flash_ops.py). The
+// stub serves a raised request and, like a good probe, mounts LittleFS again.
+static int  g_healthReq = 0, g_healthRuns = 0;
+static bool fsHealthService() { if (!g_healthReq) return false; g_healthReq = 0; g_healthRuns++; LittleFSmounted = true; return true; }
 """
 
 MAIN = r"""
@@ -216,6 +220,35 @@ int main(int argc, char** argv) {
     fsWriterSubmit("/a.json", "{1}", 3);
     g_onSend = nullptr;
     printf("pending_during_send %u\n", seen);
+  } else if (c == "health_unmounted") {
+    // TASK-1995: after a failed probe LittleFS reads unmounted; the writer must still run the next probe.
+    LittleFSmounted = false;
+    g_healthReq = 1;
+    writerStep();
+    printf("health_runs %d mounted %d\n", g_healthRuns, (int)LittleFSmounted);
+  } else if (c == "health_first") {
+    // a request goes before a queued write; the write follows on the next pass
+    fsWriterSubmit("/a.json", "{1}", 3);
+    g_healthReq = 1;
+    writerStep();
+    printf("health_runs %d pending %u\n", g_healthRuns, (unsigned)fsWriterPending());
+    writerStep();
+    printf("pending %u\n", (unsigned)fsWriterPending());
+#ifdef HAS_PAUSE
+  } else if (c == "health_held") {
+    // held while paused (a filesystem OTA start) and while the image is written
+    g_healthReq = 1;
+    fsWriterPause();
+    writerStep();
+    printf("paused_runs %d\n", g_healthRuns);
+    fsWriterResume();
+    ::state.flash.bFsImageWriting = true;
+    writerStep();
+    printf("image_runs %d\n", g_healthRuns);
+    ::state.flash.bFsImageWriting = false;
+    writerStep();
+    printf("released_runs %d\n", g_healthRuns);
+#endif
   } else if (c == "big") {
     // TASK-2007 F3: 300 B does not fit in a job.
     std::string big(300, 'x');
@@ -316,6 +349,21 @@ class WriterLogic(unittest.TestCase):
         self.assertIn("submit 0", out)
         self.assertTrue(any(l.startswith("LOG [fswriter] /a.json refused: 300 B") for l in out), out)
         self.assertIn("written_len 0", out)
+
+    def test_the_writer_runs_a_health_check_while_littlefs_reads_unmounted(self):
+        # TASK-1995: the probe moved to the writer task; behind the mount gate a failed probe would never be retried
+        self.assertIn("health_runs 1 mounted 1", self.run_w("health_unmounted"))
+
+    def test_a_health_check_goes_before_a_queued_write_which_follows(self):
+        out = self.run_w("health_first")
+        self.assertIn("health_runs 1 pending 1", out)
+        self.assertIn("pending 0", out)
+
+    def test_a_health_check_is_held_while_paused_and_during_an_image_write(self):
+        if "void fsWriterPause()" not in WRITER.read_text(encoding="utf-8"):
+            self.skipTest("fsWriterPause() is TASK-2007 code")
+        out = self.run_w("health_held")
+        self.assertEqual(out[1:4], ["paused_runs 0", "image_runs 0", "released_runs 1"], out)
 
     def test_the_writer_holds_during_a_filesystem_image_write(self):
         out = self.run_w("hold")
