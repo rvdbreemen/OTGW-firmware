@@ -96,6 +96,7 @@ void satResetControlState();   // the source declares it before satHandlePreset 
 """
 
 MAIN = r"""
+static bool g_loadingSettingsFile = false;   // TASK-2013: readSettings()' load scope; these cases are user changes
 static void upd(const char* field, const char* newValue) {
   if (false) {}
 @ENABLED@

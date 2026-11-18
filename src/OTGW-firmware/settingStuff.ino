@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : settingsStuff
-**  Version  : v2.0.0-beta.368
+**  Version  : v2.0.0-beta.369
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -557,6 +557,15 @@ static bool g_satCphOutOfSet = false;    // TASK-1375: set when the file carried
 static bool g_sawSatFollowKey = false;   // TASK-1259: set when SATfollowthermostat is parsed; its absence means "default to the push-setpoint value"
 static bool g_sawOtdOhMarkerKey = false;   // TASK-1961: set when OTDohpicdefault is parsed; absent = OH not yet migrated to 1
 static bool g_sawSatPwmMarginMarkerKey = false;   // TASK-2005: set when SATpwmmargin2 is parsed; absent = margin not yet migrated
+// TASK-2013: true while readSettings() applies settings.ini. A value loaded from the file is not a user change:
+// SATtargettemp then holds the user's own target (satUserTargetTemp()), so it must not clear a preset that holds the
+// live target. Set and restored by readSettings() only, on every exit path (SettingsLoadScope).
+static bool g_loadingSettingsFile = false;
+struct SettingsLoadScope {
+  const bool prev;
+  SettingsLoadScope() : prev(g_loadingSettingsFile) { g_loadingSettingsFile = true; }
+  ~SettingsLoadScope() { g_loadingSettingsFile = prev; }
+};
 static bool g_sawOnboardedKey = false;   // TASK-997: set when ui_onboarded is parsed; its absence marks a pre-feature (existing) install
 static bool g_sawBleEnableKey = false;   // TASK-1693: set when SATbleenable is parsed; its absence means no stored BLE choice yet
 // [ble-nopsram-default:begin] TASK-1693
@@ -571,6 +580,7 @@ static void applyBleNoPsramDefault(bool psram)
 
 void readSettings(bool show)
 {
+  SettingsLoadScope loadScope;   // TASK-2013: values from the file are not user changes
   DebugTf(PSTR(" %s ..\r\n"), SETTINGS_FILE);
   g_sawLegacyTopicsKey = false;  // reset per parse; updateSetting() sets it when the key is seen
   g_sawOnboardedKey = false;     // TASK-997: same sentinel pattern for the first-time-setup flag
@@ -1135,11 +1145,17 @@ void updateSetting(const char *field, const char *newValue)
     // TASK-1487: a target that really changes clears an active preset or window switch
     // (thermo-nova climate.py:567). An unchanged value, e.g. a settings POST that carries the
     // shown target, keeps them.
-    const float before = settings.sat.fTargetTemp;
-    settings.sat.fTargetTemp = clampSettingFloat(newValue, settings.sat.fTargetTemp, 5.0f, 30.0f);
-    if (fabsf(settings.sat.fTargetTemp - before) >= SAT_TARGET_CHANGE_MIN_C) {
-      satPresetClearForUserTarget();
-      satResetControlState();   // thermo-nova: a target that really changes resets the control state (climate.py:643-660)
+    // TASK-2013: a reload of settings.ini while a preset or window switch holds the target (telnet 'q') carries the
+    // user's own target, which the preset state already keeps; it changes nothing. At boot no preset is held yet:
+    // satLoadPresetState() restores it after readSettings(), like thermo-nova after a restart (climate.py:176-194).
+    const bool heldByPreset = (state.sat.eActivePreset != SAT_PRESET_NONE) || (state.sat.fPreWindowTarget > 0.0f);
+    if (!(g_loadingSettingsFile && heldByPreset)) {
+      const float before = settings.sat.fTargetTemp;
+      settings.sat.fTargetTemp = clampSettingFloat(newValue, settings.sat.fTargetTemp, 5.0f, 30.0f);
+      if (fabsf(settings.sat.fTargetTemp - before) >= SAT_TARGET_CHANGE_MIN_C) {
+        satPresetClearForUserTarget();
+        satResetControlState();   // thermo-nova: a target that really changes resets the control state (climate.py:643-660)
+      }
     }
   }
   else if (strcasecmp_P(field, PSTR("SATcoefficient")) == 0) {

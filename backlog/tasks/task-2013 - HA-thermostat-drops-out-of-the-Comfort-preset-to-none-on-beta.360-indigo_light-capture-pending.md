@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-18T06:24:00Z'
-updated_date: '2026-11-18T07:51:00Z'
+updated_date: '2026-11-18T07:54:00Z'
 labels:
   - bug
   - needs-info
@@ -27,7 +27,7 @@ Reported by indigo_light in #beta-testing 2026-11-17 19:20 UTC (https://discord.
 <!-- AC:BEGIN -->
 - [x] #1 The capture shows when and why the preset changed, cited
 - [x] #2 The capture tool never sends 'q' (start or reconnect); its settings dump uses 'D' only; a host test is red on the old tool and green on the fix
-- [ ] #3 A settings reload (readSettings at runtime, telnet q) keeps an active preset and its target; a manual target change still clears it; host test red on the old code, green on the fix
+- [x] #3 A settings reload (readSettings at runtime, telnet q) keeps an active preset and its target; a manual target change still clears it; host test red on the old code, green on the fix
 - [ ] #4 Bench (09): preset comfort, then telnet q: sat/preset stays comfort on the fix and drops to none on the old build
 <!-- AC:END -->
 
@@ -41,4 +41,6 @@ Reported by indigo_light in #beta-testing 2026-11-17 19:20 UTC (https://discord.
 2026-11-18 AC1 (otgw-docs): indigo_light day capture 20261117-092448 (beta.360, sha256 61d102d58effe099f83e0f235f1e4ba465a73cb86b84a87477c30eee94d2a6fb, #beta-testing msg 1572510559461576726; kept local in RvdB/OTGW-field-data/indigo_light/20261117-092448/, timeline in analysis/task2013-preset-drops.txt). Device clock runs about 1.95 s ahead of the host (same sat/preset publish: 09:31:53.820 device vs 09:31:51.875 host, 09:54:16.212 vs 09:54:14.255). Every preset drop: (1) capture start, device 09:24:51.314 handleDebug(388) Read settings, 09:24:51.398 updateSetting SATtargettemp=21.00, host 09:24:49.711 sat/preset=none; (2) gaps.log 09:54:12-13 telnet read failed then reconnect, device 09:54:15.919 Read settings, host 09:54:14.255 none; (3) gaps.log 10:02:08-09 read failed then reconnect, device 10:02:11.738 Read settings, host 10:02:10.088 none. Counts: 3 Read settings, 3 drops to none, 0 drops without a q before. Comfort was set again by the user at 09:31:51 and 09:55:19; 22:29:59 preset=sleep is a schedule, not a drop. The follow-thermostat hypothesis above does not apply: no drop without a preceding q.
 
 2026-11-18 part 1, tools (otgw-docs): otgw_capture.py maybe_send_dump() sends only 'D' (dumpDebugInfo, handleDebug.ino:10, prints the settings itself); after_connect() re-arms the dump on every reconnect, which is why each reconnect also sent 'q'. scripts/README.md updated. Red/green: tests/test_capture_tool.py test_i (no q at start) and new test_i2 (no q after a reconnect). Old tool: AssertionError, keys received ['1','3','q','D','q','D','1','3']; fix: OK. Full capture suite: 148 OK (2 skipped).
+
+2026-11-18 part 2, firmware (otgw-docs): cause: with a preset active settings.sat.fTargetTemp holds the preset temperature while settings.ini keeps satUserTargetTemp() (settingStuff.ino writer, TASK-1487); readSettings() feeds every line through updateSetting(), so SATtargettemp=21 looked like a user change and ran satPresetClearForUserTarget() and satResetControlState(). Runtime callers of readSettings(): only telnet 'q' (handleDebug.ino:389); at boot the preset is restored afterwards by satLoadPresetState(). Fix: readSettings() opens a SettingsLoadScope (RAII, restores the previous value on every exit, the recursive call included); while it is open and a preset or window switch holds the target, the SATtargettemp branch leaves target and preset alone (if-branch, no early return, so the no-op check and dirty mark at the end of updateSetting() still run). thermo-nova restores preset, pre-custom and target after a restart (climate.py:176-182, :187-194) and clears a preset only on a manual temperature (:567-568); a settings reload has no counterpart there, so no SAT behaviour changes and no Sergeant D entry is touched. Claim: a reload no longer drops a preset; other setters keep their user-change side effects on a reload. Evidence: tests/test_sat_preset_persist.py 4 new cases, 13/13 OK; on origin/dev settingStuff.ino FAILED ('0 != 3: a settings reload dropped the active preset', 'readSettings() does not open the load scope first'). Labels: the reload in the test is a test-side copy of what readSettings() does (scope plus updateSetting()), not the real file loop; test_manual_target_after_a_reload passes on the old code too (no-regression). tests/test_sat_pid_resets.py harness got the flag stub (17/17 OK). evaluate.py --quick 0 FAIL; run_tests --changed 58/59 before the stub, the one failure was that harness compile.
 <!-- SECTION:NOTES:END -->
