@@ -55,6 +55,13 @@ param(
   [ValidateSet('1178', '1177', '1184', '1684')][string]$Suite = '1178'
 )
 
+# TASK-2017: Windows PowerShell 5.1 started from PowerShell 7 (or from a shell that pwsh started) inherits pwsh's
+# PSModulePath. Its 7.x copy of Microsoft.PowerShell.Utility comes first there, 5.1 cannot load it, and Get-FileHash
+# is then "not recognized". Drop PowerShell 7's module paths, so 5.1 resolves its own modules.
+if ($PSVersionTable.PSEdition -eq 'Desktop' -and $env:PSModulePath) {
+  $env:PSModulePath = (($env:PSModulePath -split ';') | Where-Object { $_ -and $_ -notmatch '\\PowerShell\\' }) -join ';'
+}
+
 $ErrorActionPreference = 'Stop'
 $here     = Split-Path -Parent $MyInvocation.MyCommand.Path
 $repo     = (Resolve-Path (Join-Path $here '..\..')).Path
