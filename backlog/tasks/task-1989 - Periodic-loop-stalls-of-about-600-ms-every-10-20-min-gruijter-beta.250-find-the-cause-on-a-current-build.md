@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-15T21:23:00Z'
-updated_date: '2026-11-16T20:29:00Z'
+updated_date: '2026-11-18T11:51:00Z'
 labels:
   - performance
 milestone: 2.0.0
@@ -38,4 +38,6 @@ gruijter beta.250 (Classic with PIC, SAT on), 25.5 h: 92 '[loop-stall]' lines, m
 2026-11-16 hour-mark A/B by 09 on .61 (no PSRAM) for the 14:00 heap dip: 14:00 beta.351 (1989 fsWriter) + SAT enabled: hd_min 2,180 B; 15:00 beta.352 (dev, no 1989) + SAT off: no dip, 26/26 stats; 16:00 beta.353 (dev + 1751, no 1989) + SAT enabled: hd_min 31,156 -> 6,484, transient, 26/26 stats. The dip follows 'SAT enabled', not the fsWriter: 1989 is cleared of it. The dip is TASK-2004 (owner 95).
 
 2026-11-16 tests/test_sat_loop_integration.py did not compile with the fsWriter (fsWriterSubmit not stubbed in tests/sat_loop_stubs.h; missed because the full sweep ran on the 1887n tree without 1989 and the post-branch test set left it out). Stub added (refuses, as the real fsWriterSubmit does with LittleFS not mounted); 21/21 on the beta.358 tree. Test-only; firmware src unchanged.
+
+2026-11-18 overlap check vs TASK-1995 after beta.370 (otgw-docs, read-only; coordinator asked). gruijter's 92 [loop-stall] lines (beta.250) have two loop-task LittleFS causes, now both off the loop task: (1) state-file writes in the timer step (this task's AC1, bench 342: stalls 247-338 ms after every 6th of 40 loop-task writes, 0 for the same writes from a core-0 task), fixed by 3bd8e9112 (fsWriter, TASK-1989); (2) the 5-min write probe and the 60-s mount check in loopLittleFSStatus() (TASK-1995 AC1: [fs-slow] write-probe 558 ms 7 ms before the one 568 ms stall in step 5->20), fixed by 41a9e44ed (TASK-1995 Step B, beta.370: 0 stalls in 62 min on .61). The :x0:30/:x5:30 rhythm in gruijter's capture fits both 5-min timers (satSavePidState 5-min PID timer, SATcontrol.ino:4151; fsWriteProbe DECLARE_TIMER_MIN 5, helperStuff.ino:317), so neither fix alone explains all 92. RECOMMENDATION: narrow, do not close. AC1 holds. AC2 can be ticked on the 342 same-build experiment as the old-vs-fix for the file-write cause (coordinator's call), with 370's 62 min 0-stall bench as joint evidence shared with TASK-1995, not counted twice. AC3 (data integrity of the queued writes on .63 with SAT active: PID file every 5 min, pid_i equal after /ReBoot, sat_*.json byte-identical across a filesystem OTA) is not covered by TASK-1995; TASK-2007's .63 bench showed a save held through a filesystem OTA lands after the restore, which covers part of the last clause only. Field closure for both tasks: one gruijter capture on 370 or later (ask via 92); the expected result is near 0 [loop-stall] where beta.250 had 92 in 25.5 h.
 <!-- SECTION:NOTES:END -->
