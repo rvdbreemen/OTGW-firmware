@@ -5655,6 +5655,21 @@
     "TASK-1656"
    ],
    "confirmed_by_entry": null
+  },
+  {
+   "id": 428,
+   "title": "Q-2005a answered C: per flame-on at most one PWM ON counts (and at most one PWM cycle), against the continuous/PWM flipping (Sergeant D, 2026-11-19)",
+   "date": "2026-11-19",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1572931802069205033",
+   "supersedes": [
+    89
+   ],
+   "tasks": [
+    "TASK-2005"
+   ],
+   "confirmed_by_entry": null
   }
  ]
 }

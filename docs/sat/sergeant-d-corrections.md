@@ -8442,3 +8442,26 @@ Robert, 16:18:42 UTC (https://discord.com/channels/812969634638725140/9144987300
 **Task:** TASK-1656 or its follow-up (owner otgw-dev per the coordinator).
 
 **Open:** none.
+
+## 428. Q-2005a answered C: per flame-on at most one PWM ON counts (and at most one PWM cycle), against the continuous/PWM flipping (Sergeant D, 2026-11-19)
+
+**Source:** #dev-sat-mqtt, Sergeant D 2026-11-19 11:09:25 UTC, edited 11:10:15 UTC (https://discord.com/channels/812969634638725140/1105556725714649128/1572931802069205033; final text read back via the Discord API 90 s after the post), a reply to Q-2005a (https://discord.com/channels/812969634638725140/1105556725714649128/1572930683880345721).
+
+**Quoted (final, edited text):**
+> "My answer is C. When the flame is lit count only 1 PWM ON. Every flame lit should have the most 1 PWM cycle. This way we will overcome the continuous to PWM flipping and at the end we will keep the cycles per hour clean"
+
+(First-seen text ended at "flipping"; the edit added "and at the end we will keep the cycles per hour clean".)
+
+**Settled:** option C (other) of Q-2005a. While one flame burns, only one PWM ON start counts against the cycles-per-hour limit. A further switch from continuous back to PWM during the same burn does not count as a new start. This changes entry 89, which counts the PWM-entry ON with the burner already burning (Q48 A): that start now counts only when it is the first PWM ON of that flame. Entry 59 (only PWM's own ON phases count) stays.
+
+**Interpretation (ours, not yet confirmed):** "Every flame lit should have the most 1 PWM cycle" can be read two ways. (a) Counting only: at most one counted PWM start per flame-on, and the flipping itself stays. (b) Behaviour as well: during one flame-on SAT does not re-enter PWM after it went to continuous, so the flipping stops. His reason ("overcome the continuous to PWM flipping") points to (b). Not acted on until he confirms (follow-up Q-2005b).
+
+**Not settled:** the range-5 question itself (a start from OFF straight into duty range 5 is never held back by the hourly limit, SATcontrol.ino:1697-1712): his answer does not say whether that start should wait; it stays as today (option A) until asked. The release scope (2.0.0 or 2.1.0) was not given.
+
+**Compared with thermo-nova (7beaaf5):** pwm.py:154-160 counts every OFF/IDLE->ON start in _current_cycle, but pwm.py:156 compares with duty_cycle_seconds (780 at the default "00:13:00", const.py:167), so thermo-nova has no effective hourly cap. Per-flame counting has no thermo-nova counterpart; it refines Sergeant D's own limit (entries 31/52/59).
+
+**Firmware today:** every satPwmBeginOn() counts, including a PWM re-entry with the flame burning (SATcontrol.ino:1782-1806, entry 89). Field evidence: indigo_light beta.360, 19 Nov morning, three "cycle limit 3/hr reached" stops filled by re-entries inside burns (TASK-2005 notes).
+
+**Task:** TASK-2005 follow-up (owner per the coordinator).
+
+**Open:** reading (a) or (b), and the release scope: Q-2005b.
