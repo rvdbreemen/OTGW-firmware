@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-12T00:05:00Z'
-updated_date: '2026-11-14T18:29:00Z'
+updated_date: '2026-11-19T22:22:00Z'
 labels:
   - otdirect
   - parity
@@ -49,4 +49,6 @@ Part of the PIC 6.8 parity audit, parent TASK-1851.
 Implemented (local, no build yet: coordinator memory freeze): checkThermostatTimeout() (OTDirect.ino) prints the PIC's 'Thermostat disconnected' / 'Thermostat connected' through otDirectBridgeWriteLine() + processOT() with a local report state (boot counts as connected). Setback logic and WebSocket messages unchanged. tests/test_otd_thermostat_lines.py compiles the real function: FIX 5/5 (present at boot: no line; loss: disconnected once; return without and with setback: disconnected, connected; never seen since boot: disconnected once after the timeout), on both port 25238 and processOT(); OLD (origin/dev) 4 of 5 red (present at boot green, as on the PIC). test_otd_gateway_alt_slots 12 PASS, static_integrity, ino_prototype_hoisting PASS; evaluate 85/0. AC2 ticked. AC1 waits for the build and a bench (thermostat unplug and replug on an OT-Direct unit, lines on port 25238 and as OTGW events). Not compiled on the ESP32 yet (strlcpy_P, PGM_P lambda).
 
 Scope trimmed to the ACs (coordinator, 2026-11-14): title and description no longer promise the power-level lines; those are TASK-1945 (research first, consistent with TASK-1848's fixed 'Low power' answer to PR=P). AC1 bench reach: OT-Direct has no thermostat simulation (loopback simulates the boiler; otThermostatSeen is set only by real thermostat frames, OTDirect.ino:1301/2457), so loss and return need a physical unplug/replug: FIELD/MAINTAINER. Bench-testable without hands: the 'no thermostat since boot' case (one 'Thermostat disconnected' on port 25238 after iSetbackTimeout), on a unit without a thermostat (asked 09 whether .61 has one).
+
+2026-11-19 triage (otgw-dev): AC1 hardware-blocked: OT-Direct has no thermostat simulation (otThermostatSeen is set only by real thermostat frames), so thermostat loss and return need a real thermostat on the OT-Direct bus of a bench unit.
 <!-- SECTION:NOTES:END -->

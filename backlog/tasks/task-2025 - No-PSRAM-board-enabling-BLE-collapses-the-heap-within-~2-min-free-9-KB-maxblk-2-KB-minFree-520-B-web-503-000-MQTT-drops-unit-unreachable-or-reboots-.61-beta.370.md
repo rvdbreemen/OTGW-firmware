@@ -8,7 +8,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-18T12:51:00Z'
-updated_date: '2026-11-18T20:16:00Z'
+updated_date: '2026-11-19T22:22:00Z'
 labels:
   - ble
   - heap
@@ -53,4 +53,6 @@ Robert, 2026-11-18 14:05:06, DM 1572613627528085586, verbatim: 'Niet verbergen m
 2026-11-18 bench PASS on .61 (OT-Direct, psram_found 0) by otgw-bench-tester on 2.0.0-beta.375+ff73985: stored SATbleenable=true cleared at boot and flushed to settings.ini within 10 s, no 'SAT BLE: initialized' over 4 min, runtime refuse line 'SATbleenable=true refused: BLE needs PSRAM on this board (TASK-2025)', REST POST 409 'BLE needs PSRAM: not available on this board', MQTT ble_enable refused, UI switch disabled (programmatic click no change) with the note, 0 JS exceptions, heap 47-51 k free, maxblock 31,732, MQTT_drops 0; settings restored byte-identical. Evidence: 09 scratchpad t2025. Pushed build: 375 rebased onto docs-only origin/dev (src diff ff73985cd..808291b6b empty), built 2.0.0-beta.375+808291b (sha256 ino e707ea99...3b64, littlefs e97938b8...21a4), archive OTGW-build-archive/beta375-808291b, posted Discord 1572704935647256636. ADR-257 Accepted (Robert, DM 1572612342850658579), ADR-222 superseded. Web UI suite: 60/84 files green, load stalls rerun green (poll-spread-hidden and otd-mode-selector stall the same on the 374 data); 24 files run after the push (coordinator's call). Bench ACs are ticked by 09 in its own lane after this push.
 
 Bench ACs ticked by otgw-bench-tester (09), 2026-11-18. AC1: reproduction on .61 (OT-Direct, psram_found 0) on beta.370, settings quoted in the notes above (SATbleriskack true, SATbleenable false -> true by one REST POST, no diag recording, no web UI open), placed in time 13:38:51 OTA, starve from ~13:41, hang 13:50-14:03:10, reboot log bootcount 1038 -> 1039 only at the USB reset. AC3: red = that 370 reproduction; green = the same trigger (stored true and REST/MQTT true) on 375, PASS note above. Benched on ff73985; the pushed build 808291b differs only by the rebase: git diff ff73985cd 808291b6b -- src/ is empty (0 lines, checked by 09), 808291b6b is an ancestor of origin/dev 0a9696733, sha256 ino e707ea992ab68281...c3b64 and littlefs e97938b8f767c40f...fc21a4 match ba's report. AC2 (root cause with file:line and heap evidence) is not a bench AC and stays with the developer.
+
+2026-11-19 triage (otgw-dev): AC2 (root cause with file:line) blocked: since beta.375 BLE cannot be switched on without PSRAM (ADR-222 guard), so the collapse cannot be reproduced on .61 any more without a debug path that bypasses the guard (prerelease-only) or a build with the guard removed. Needs an approach decision first; not a 2.0.0 blocker because the guard prevents the state.
 <!-- SECTION:NOTES:END -->

@@ -3,11 +3,11 @@ id: TASK-2020
 title: >-
   The 5-min LittleFS write probe still stalls the loop task ~200 ms when its
   write needs a flash erase
-status: In Progress
+status: Done
 assignee:
   - '@otgw-dev'
 created_date: '2026-11-18T10:06:00Z'
-updated_date: '2026-11-18T12:41:00Z'
+updated_date: '2026-11-19T22:21:00Z'
 labels:
   - littlefs
   - performance
@@ -26,8 +26,8 @@ Follow-up of TASK-1995 Step B (beta.370). With the probe on the fsWriter task, 0
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [x] #1 The IDF behaviour is confirmed from the IDF documentation or source at our IDF version, quoted with a link
-- [ ] #2 An option is chosen with the bench numbers and the reason recorded
-- [ ] #3 The chosen option is implemented and the bench shows the write-probe stall gone or at the agreed rate
+- [x] #2 An option is chosen with the bench numbers and the reason recorded
+- [x] #3 The chosen option is implemented and the bench shows the write-probe stall gone or at the agreed rate
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -50,4 +50,12 @@ Second reader (otgw-webui) findings: F3 FIXED: LittleFS commits a file at close(
 Host evidence after the review: test_fs_writer 21/21 (open fail 1, ok 0, short 1, ok 0, commit fail 1, ok 0), test_health_no_fs_flash_ops 10/10 (no write by the loop checks in 16 min, 15-17 reads; the check recovers a failed mount by a read; one request per pass after the loop's own FS steps), test_fs_slow_note 7/7. Red: the old helperStuff.ino 4 FAIL, the old fsWriter.ino 1 FAIL, the mutant without the read-back 1 FAIL (commit_fail 0).
 
 TASK-1205 ACs after F5 (probe dropped): AC1 'checks LittleFS without writing on every call (for example a read-only check, or a cached status ...)' holds more strictly: /api/v2/health reads only the cached flags, and the loop's own check is read-only. AC2 'health still reports a failed or unmounted filesystem' holds through two paths: an unmounted FS through the 60-s platformFSInfo() check, which now also runs while LittleFSmounted is false and so also reports the recovery within a minute; a filesystem that no longer writes through fsWriterWriteFailed() (the read-back after the writer's writes), with the latency accepted above. What TASK-1205's design had and this does not: a write test every 5 min independent of SAT; with SAT off the write path is only checked at the next write through the writer task.
+
+2026-11-19 AC2/AC3 closed by otgw-dev on existing evidence (coordinator: tick if the archive has it). AC2: the option was chosen 2026-11-18 by the coordinator ('option A without D', recorded above: the 5-min probe only reads, no write probe), on the bench numbers above (41a9e44, .61, 62 min: write-probe 138-261 ms, one 613 ms, file-flags lock waits 124-394 ms) and otgw-docs' AC1 IDF reading (IDF 5.5.1, CONFIG_SPI_FLASH_AUTO_SUSPEND not set). AC3: the bench-tester's telnet captures on .61 after the change: 20261119-task2026-393 (beta.393+4bb2097, 17:22:14-17:42:06) and 20261119-task2923-394 (beta.394+17c993a, 18:10:21-18:41:42), both in OTGW-field-data/bench-otgw32: 0 '[fs-slow] write-probe' lines and 0 '[loop-stall]' lines; the remaining '[fs-slow] mount-check 169-176 ms (writer)' lines run on the writer task, not the loop. Caveat: both runs contain a heap hold and telnet was dead during the hold, so the covered loop time is the parts outside it (about 20 and 30 min of capture); no dedicated soak was run for this AC.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+The write-probe stall is gone by removing the write probe: the 5-min LittleFS probe only reads (option A without D, coordinator 2026-11-18), and the remaining mount check runs on the fsWriter task. AC1 (otgw-docs): IDF 5.5.1 'Concurrency Constraints for Flash on SPI1' with CONFIG_SPI_FLASH_AUTO_SUSPEND not set in our S3 libs. AC2: option and reason recorded with the 41a9e44 bench numbers. AC3: bench captures on .61, beta.393 and beta.394 (09's archives 20261119-task2026-393 and -task2923-394): 0 write-probe lines, 0 [loop-stall]; mount-check 169-176 ms on the writer. Host: test_fs_writer 21/21, test_health_no_fs_flash_ops 10/10, test_fs_slow_note 7/7. Not done: a dedicated soak only for this AC (the evidence runs also held the heap).
+<!-- SECTION:FINAL_SUMMARY:END -->

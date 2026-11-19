@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-15T10:03:00Z'
-updated_date: '2026-11-16T08:30:00Z'
+updated_date: '2026-11-19T22:22:00Z'
 labels:
   - capture
   - tooling
@@ -46,4 +46,6 @@ OUT, with the reason: settings.ini (passwords in plain text, and readable withou
 2026-11-15 AC6 split by the coordinator: bench part = columns (11, same order, identical) + slot timing, PASS by 09 on .63 with beta.306 and the pushed script (coordinator relay); the value comparison is a field AC (gruijter's first capture, who also exports the CSV by hand). New AC6 ticked from 09's PASS; AC7 open (field).
 
 2026-11-16 close-out (ba), tick fix: 09's .63 PASS on beta.306 (coordinator relay, 2026-11-15) covered the 11 columns in the web UI order and the slot timing, which is the text of AC7, so AC7 is ticked. AC6 (values match a web UI export of the same minute) had been ticked on that same run, but the coordinator's split of 2026-11-15 moved the value comparison to the field (AC8, gruijter's first capture with his own CSV export); no bench run compared values. AC6 is therefore removed as a duplicate of AC8 (its claim was not evidenced), not ticked. Open: AC8 (field).
+
+2026-11-19 triage (otgw-dev): AC7 field-blocked: needs gruijter's first capture next to his hand-exported CSV for the overlapping slots.
 <!-- SECTION:NOTES:END -->
