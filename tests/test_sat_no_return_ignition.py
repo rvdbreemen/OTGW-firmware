@@ -96,6 +96,7 @@ static uint32_t satCycleGetFlameOnStartMs() { return g_flameOnStart; }
 static uint32_t satCycleGetFlameOffStartMs() { return g_flameOffStart; }
 static bool satCycleIsHourLimitReached() { return g_hourLimit; }
 static void satCycleRecordPwmStart() {}
+static bool satCycleCountPwmStartThisFlame(bool) { return true; }   // entry 428 (TASK-2913): tested in tests/test_sat_pwm_start_limit.py
 void satCycleResetSustainGuards() {}
 void satCycleSkipAutoSwitch() {}
 // TASK-1412.4: the slave low-load permission is not under test here (tests/test_sat_slave_lowload.py): PWM is permitted
