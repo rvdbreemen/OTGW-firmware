@@ -50,6 +50,9 @@ def curve(coeff, target, outside, base_offset):
 
 class Pid:
     """SATpid.ino state machine, driven like satControlLoopRun(): service(t) every pass, note_room + output every tick."""
+    # True = the firmware since TASK-1890 (ADR-259): outside the deadband the integral is halved once and held. False = the
+    # rule before it (set to 0, thermo-nova pid.py:187-189); only for reproducing studies whose committed results used it.
+    HALVE_ON_EXIT = True
 
     def __init__(self, coeff, underfloor):
         self.coeff = f32(coeff); self.divisor = f32(4.0) if underfloor else f32(3.0)
@@ -59,6 +62,7 @@ class Pid:
 
     def reset(self, now_ms):
         self.last_error = f32(0.0); self.integral = f32(0.0); self.raw_d = f32(0.0)
+        self.in_band = True   # TASK-1890 / ADR-259: _pid_inBand, set by every reset
         self.last_room = f32(0.0); self.last_deriv_ms = now_ms; self.initialized = False
         self.startup_pending = True; self.first_output_pending = True; self.room_seen = False
         self.kp = self.ki = self.kd = f32(0.0)
@@ -75,8 +79,16 @@ class Pid:
             self.room_seen_val = float(room); self.room_changed_ms = now_ms
 
     def _integral(self, error, cv):
+        # TASK-1890 / ADR-259 (entries 329, 333; firmware _pidUpdateIntegral, SATpid.ino): on leaving the deadband the
+        # integral is halved once and then held while outside; back inside it accumulates from the held value.
+        # thermo-nova sets it to 0 instead (pid.py:187-189).
         if abs(error) > DEADBAND:
-            self.integral = f32(0.0); return
+            if not self.HALVE_ON_EXIT:   # the rule before TASK-1890, for reproducing studies run with it
+                self.integral = f32(0.0); return
+            if self.in_band: self.integral = f32(self.integral * f32(0.5))
+            self.in_band = False
+            return
+        self.in_band = True
         self.integral = f32(self.integral + self.ki * error * PID_INTERVAL)
         if self.integral < -f32(cv): self.integral = -f32(cv)
         if self.integral > f32(cv): self.integral = f32(cv)

@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@otgw-dev'
 created_date: '2026-11-13T08:09:00Z'
-updated_date: '2026-11-18T21:26:00Z'
+updated_date: '2026-11-19T03:58:00Z'
 labels:
   - sat
   - adr
@@ -57,4 +57,6 @@ Field-evidence signature (for 92/09 on every tester capture with SAT on, firmwar
 
 Bench (otgw-bench-tester 09, 2026-11-18, .63 Classic+S3 PSRAM, no boiler) on 2.0.0-beta.377+412f888 (d3 stack 376 TASK-1890 + 377 TASK-1887/entries 410-417), REGRESSION ONLY, not feature evidence: (1) OTA app+fs 21:38-21:39, githash 412f888, 'settings: 152 keys, changed: none', bootcount 211->213. (2) 30 min SAT off: bootcount 213 throughout, 37/37 device/info 200, freeheap 37.3k flat after the first 9 min, hd_min 21,328 flat from 21:49, 0 crash/panic, 0 loop-stall. (3) SAT on without boiler: exactly one hand-back at +30 s (SATcontrol.ino:4377), no repeat in 4 min, 0 'Control mode:' lines in the whole capture, SAT off clean ('hand-back already sent'). (4) PID state restore: hand-made sat_pid_state.json i=1.2345 ts=now-60, SAT off, /ReBoot -> /api/v2/sat/status pid_i 1.235 (restored); the telnet line was not captured (client attached to the old boot). Backup file and settings restored, settings.ini diff empty. Evidence: 09 scratchpad b377\. The integral-halving behaviour itself is host-proven (AC3), not exercised on hardware (no boiler, no SAT scenario on bench boards).
 2026-11-18 bench (09, 377+412f888 on .63, regression only, evidence 09 scratchpad b377\): 4/4 OK. Item 4: hand-made /sat_pid_state.json with I=1.2345, SAT off, reboot -> GET /api/v2/sat/status pid_i 1.235 (restored); the telnet 'SAT: PID state restored' line was not captured (client on the old boot). Side note, not reproduced: the first settings-restore POST right after the filesystem upload returned curl 000 once, the retry gave 200. Pushed 412f88843 (beta.376 + 377), zip post 1572723857679450212. Feature AC stays open for the field signature.
+
+2026-11-19 follow-up (found by ba's full suite before the 08:00 beta): the simulation port tools/research/sat/sat_sim_port.py still set the integral to 0 outside the deadband, so tests/test_sat_sim_port_equivalence.py::test_pid_and_curve_match_the_firmware failed on origin b72c6d6c5 (PID output differs, max 0.402). Bisect by file: passes with SATpid.ino from 95bcfc78e^, fails with 95bcfc78e (this task). Not a firmware regression: the port did not follow ADR-259. Fix: the port halves once and holds (in_band flag, set by reset()), as _pidUpdateIntegral; a class switch Pid.HALVE_ON_EXIT (default True) keeps the old rule for reproducing studies whose committed results were made with it (tests/test_sat_kd_005_sim.py 1655 x09 rows). Evidence: port equivalence 4/4 incl. the mutant check; against the pre-1890 SATpid.ino it now fails (the port follows 1890); the 4 port-user files 18 passed. My miss: the 1890 sweep ran the SAT PID files, not the sim-port tests.
 <!-- SECTION:NOTES:END -->
