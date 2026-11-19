@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-beta.386
+**  Version  : v2.0.0-beta.387
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -4175,6 +4175,9 @@ void sendDeviceSettings()
 #endif
   addBool(F("ui_onboarded"), settings.ui.bOnboarded, "b");
   addBool(F("sat_onboarded"), settings.ui.bSatOnboarded, "b");   // TASK-1012: SAT onboarding wizard persist flag
+  addBool(F("updatecheck"), settings.ui.bUpdateCheck, "b");            // TASK-2023: the browser checks GitHub for a newer release
+  addBool(F("updatecheckasked"), settings.ui.bUpdateCheckAsked, "b");  // TASK-2023: hidden flag, the one-time question was answered
+  addBool(F("updatecheckbeta"), settings.ui.bUpdateCheckBeta, "b");    // TASK-2023: stable builds are also told about betas
   addBool(F("gpiosensorsenabled"), settings.sensors.bEnabled, "b");
   addBool(F("gpiosensorslegacyformat"), settings.sensors.bLegacyFormat, "b");
   addInt(F("gpiosensorspin"), settings.sensors.iPin, "i", 0, SETTING_GPIO_MAX);   // TASK-1686
@@ -4510,6 +4513,7 @@ static const char* const PROGMEM knownSettings[] = {
   "satcyclesperhour", "saterrormon", "satheatingmode", "sathpcycle",
   "satmaxmodulation", "satsensormaxage", "satsolarfreezeint", "satvalveoffset",
   "ui_onboarded",
+  "updatecheck", "updatecheckasked", "updatecheckbeta",   // TASK-2023
   "webhookcontenttype", "webhookenable", "webhookenabled",
   "webhookpayload", "webhooktriggerbit", "webhookurloff", "webhookurlon",
   "wifidns1", "wifidns2", "wifigateway", "wifinoportal", "wifistaticip", "wifisubnet",
