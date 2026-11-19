@@ -186,6 +186,7 @@ Most changes since the first 2.0.0 beta are already described above (Highlights 
 
 ### Web UI and graphs
 
+- The web UI no longer calls SAT experimental; SAT stays opt-in and off by default, and the setup wizard still asks you to confirm before SAT controls the boiler. The heat-pump boiler type is still marked experimental (TASK-2909, beta.390).
 - The Monitor graph and its CSV export show SAT's target temperature as its own dashed line while SAT is on, also in the 24 h history (TASK-2018, beta.378).
 - The SAT messages "boiler handed back" now say "SAT paused", with the reason, in English, Dutch, German and Greek (TASK-2036, beta.382).
 - The SAT weather card uses Home Assistant's sun position (`sat/sun_elevation`) while a value younger than 1 hour is published and then asks for no location; otherwise it asks for latitude and longitude (TASK-2015, beta.371).
@@ -202,6 +203,7 @@ Most changes since the first 2.0.0 beta are already described above (Highlights 
 
 ### REST API
 
+- Fixed a crash when two web requests arrived while memory was nearly exhausted: the "busy" answer itself needed memory and stopped the firmware. With the largest free memory block under 4 KB the gateway now closes that connection without an answer; above it the 503 with `Retry-After` is unchanged (TASK-2910, beta.389).
 - A control command that SAT refuses through `POST /api/v2/otgw/commands` answers 409 "Command refused: SAT is in control of the boiler"; 503 stays for a full queue (TASK-1970).
 - `otgw/messages` and `otgw/label` carry a `source` field (none, boiler, gateway, thermostat, summary, replay) next to the value (TASK-1965).
 - `GET /api/v2/sat/weather/needs-setup` gives its own answer instead of the full weather status (TASK-1969).
@@ -307,6 +309,8 @@ These are design limits of 2.0.0, not bugs.
 - **Port 25238 filters inbound lines while SAT is on** (ADR-217). Text commands that would change central heating control and binary data are dropped, so OTmonitor cannot control the boiler or flash the PIC over that port while SAT is enabled. With SAT off the port is byte-transparent.
 
 ## Known issues
+
+- **Under investigation: once, a bench unit hung after a crash restart** (TASK-2911). It was on WiFi with an address, but did not answer ping, the web UI or telnet for 8 minutes, until a USB reset; the cause is not known. Normal restarts on that unit worked 5 of 5 times. The WiFi self-recovery only starts after the gateway's router answered once since the start, so it does not cover this case. If your gateway is on WiFi but unreachable after a restart, please tell us.
 
 - **The WiFi self-recovery keeps counting a dead link across a short WiFi reconnect while memory is nearly exhausted (TASK-2026).** This is proven in tests on the real code; a test on a device could not create the exact memory state it needs.
 

@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-18T15:22:00Z'
-updated_date: '2026-11-19T11:00:00Z'
+updated_date: '2026-11-19T12:37:00Z'
 labels:
   - docs
 milestone: 2.0.0
@@ -36,4 +36,6 @@ Coordinator request 2026-11-18. Manual text prepared before the firmware lands, 
 2026-11-18 TASK-2025 part split off for the push after 375 (coordinator; ba's review): b0b13c7d4 (ch05/h05 :482/:484/:510) plus the symptom sentence of 7.12a in ch07:372 / h07:525 ('accepting the stability warning' limited to firmware before 2.0.0-beta.375, a stored on is cleared at boot), taken verbatim from 39ae52275, and docs/MANUAL.md rebuilt (TASK-2030 gate). Grep over docs/manuals, docs/api and README for riskack/consent/stability warning: no other old-consent text. The TASK-2026 backstop paragraph (39ae52275 rest, 787150c9c, 61e2e7f43) keeps waiting for the firmware.
 
 2026-11-19 coordinator (Robert DM 1572927618628583465, A): stable notes draft gets a WiFi Changes bullet (ADR-258 beta.383, ADR-261 beta.385, log line beta.388; checked against networkStuff.ino:649, :821-828, :912-919) and the Known issue line verbatim: option C proven on the host only.
+
+2026-11-19 bundled per coordinator GO (origin a755055e5): Changes adds task 2909 (beta.390, web UI) and task 2910 (beta.389, busy-503 closes the connection under 4 KB largest block, restAPI.ino:192-194); Known issues adds task 2911 (hang after a crash boot, under investigation; normal boots 5/5 per coordinator; supervisor arms only after an answering gateway, networkStuff.ino:751/:773).
 <!-- SECTION:NOTES:END -->
