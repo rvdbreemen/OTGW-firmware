@@ -296,7 +296,7 @@ Press `h` at any time to print the help menu with the current device status and 
 | j | Read the current GPIO output state |
 | l | Toggle generic MyDEBUG flag |
 | f | Show the MyDEBUG flag state |
-| H | Prerelease (beta) builds only, for bench tests: hold memory low on purpose (free memory under 7 KB, largest block under 2 KB) to test the automatic recovery of section 7.12a; `H` again releases it, and it releases itself after 30 minutes. Not in stable builds |
+| H | Prerelease (beta) builds only, for bench tests: hold memory low on purpose (free memory under 7 KB, largest block under 2 KB) to test the automatic recovery of section 7.12a; `H` again releases it, and it releases itself after 30 minutes. From beta.397 the `h` menu lists it. Not in stable builds |
 
 The `F` key is useful after a Home Assistant MQTT wipe or topic-prefix change: it forces a complete re-publish of all discovery entries rather than waiting for the next natural trigger.
 

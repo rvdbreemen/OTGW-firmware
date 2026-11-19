@@ -438,7 +438,7 @@ Druk op elk moment op `h` om het helpmenu te tonen met de huidige apparaatstatus
 | j | Lees de huidige GPIO-uitgangstatus |
 | l | Toggle de generieke MyDEBUG-vlag |
 | f | Toon de MyDEBUG-vlagstand |
-| H | Alleen in prerelease-(bèta-)builds, voor benchtests: houdt het geheugen bewust laag (vrij geheugen onder 7 KB, grootste blok onder 2 KB) om het automatische herstel van paragraaf 7.12a te testen; nog eens `H` geeft het vrij, en na 30 minuten gebeurt dat vanzelf. Niet in stabiele builds |
+| H | Alleen in prerelease-(bèta-)builds, voor benchtests: houdt het geheugen bewust laag (vrij geheugen onder 7 KB, grootste blok onder 2 KB) om het automatische herstel van paragraaf 7.12a te testen; nog eens `H` geeft het vrij, en na 30 minuten gebeurt dat vanzelf. Vanaf beta.397 staat hij in het `h`-menu. Niet in stabiele builds |
 
 De `F`-toets is handig na een Home Assistant MQTT-wissing of na een wijziging van het topic-prefix: het forceert een volledige herpublicatie van alle discovery-items in plaats van te wachten op de volgende natuurlijke trigger.
 

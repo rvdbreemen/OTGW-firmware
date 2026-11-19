@@ -35,6 +35,8 @@ De firmware doet zelf geen DHCP-aanroepen: de WiFi SDK regelt DHCP als onderdeel
 
 Beschikbaar in betabuilds (v2.0.0-beta en later). Wanneer WiFi-pogingen uitgeput zijn, schakelt het apparaat over naar AP-fallbackmodus in plaats van eindeloos te herstarten. In productiereleases herstart het apparaat na 10 mislukte pogingen.
 
+Vanaf beta.394 wordt de overstap naar AP-fallback tijdens bedrijf overgeslagen zolang het geheugen kritiek laag is (vrij geheugen onder 8 KB of het grootste vrije blok onder 4 KB), omdat het starten van het access point de gateway dan liet crashen. Het telnet-log toont dan `BETA: AP fallback skipped, heap starved (free ... B, largest block ... B); retrying as release`, en het apparaat gaat verder zoals een productierelease: het blijft proberen en herstart na 10 mislukte pogingen.
+
 Bij opstart, als er credentials opgeslagen zijn maar WiFi niet bereikbaar is, slaan betabuilds de WiFiManager config portal over en gaan direct naar AP-fallback.
 
 - **SSID**: `OTGW-<laatste 3 bytes van het MAC-adres in hoofdletters hex>`, bijvoorbeeld `OTGW-AABBCC`

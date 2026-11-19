@@ -23,6 +23,8 @@ After a successful reconnect, the firmware re-applies the configured hostname fo
 
 Available in beta builds (v2.0.0-beta and later). When WiFi retries are exhausted at runtime, the device switches into AP fallback mode instead of rebooting indefinitely. In production releases the device reboots after 10 failed retries instead.
 
+From beta.394 the runtime switch to AP fallback is skipped while memory is critically low (free memory under 8 KB or the largest free block under 4 KB), because starting the access point then crashed the gateway. The telnet log then shows `BETA: AP fallback skipped, heap starved (free ... B, largest block ... B); retrying as release`, and the device carries on as a production release does: it keeps retrying and reboots after 10 failed retries.
+
 At boot, if credentials are stored but WiFi is unreachable, beta builds also skip the WiFiManager config portal and go straight to AP fallback.
 
 - **SSID**: `OTGW-<last 3 bytes of MAC address in uppercase hex>`, for example `OTGW-AABBCC`
