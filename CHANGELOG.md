@@ -5,6 +5,20 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [2.0.0-beta.392] - 2026-11-19
+
+### Changed
+- SAT: during one flame SAT enters PWM at most once and stays continuous until the flame goes out; the only way back to PWM is the fail-safe, now flow - request >= 3.0 C for 30 s (was 3.5 C); one counted PWM start per flame (TASK-2913, beta.391; entries 428, 429, 430).
+- SAT: PID derivative gain factor 0.05 instead of 0.063 (TASK-2043, beta.386; entries 425, 427).
+- Web UI: SAT is no longer called experimental; it stays opt-in, off by default, with the wizard confirmation (TASK-2909, beta.390).
+- Web UI: optional "new version available" notice from the GitHub releases API, checked in the browser, off until the user agrees, 6 h cache, no cookies or referrer; the gateway makes no outbound request (TASK-2023, beta.387, ADR-262).
+- WiFi: a link probe that cannot run for lack of memory counts as dead when the largest free block is under 4 KB (TASK-2026, beta.383, ADR-258); the dead-link streak is kept across a re-association while the heap is starved, with a log line (TASK-2026, beta.385/388, ADR-261; host-proven only).
+
+### Fixed
+- REST: the busy-503 path closes the connection on a starved heap instead of building a response, which could crash the gateway when two requests arrived at once (TASK-2910, beta.389).
+- Web UI: a connection reset on the overrides poll keeps the injected-override badge, like a busy 503 (TASK-2914, beta.392).
+- Capture tool: the flash zip packs the scripts/ modules otgw_capture.py imports (sat_log_to_csv.py), so the telnet.log CSV conversion works again (TASK-2917).
+
 ## [2.0.0-beta.382] - 2026-11-19
 
 ### Changed
@@ -1134,7 +1148,8 @@ Legacy release. See git history for details.
 
 Legacy releases. See git history for details.
 
-[Unreleased]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.382...HEAD
+[Unreleased]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.392...HEAD
+[2.0.0-beta.392]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.382...v2.0.0-beta.392
 [2.0.0-beta.382]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.374...v2.0.0-beta.382
 [2.0.0-beta.374]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.360...v2.0.0-beta.374
 [2.0.0-beta.339]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.323...v2.0.0-beta.339
