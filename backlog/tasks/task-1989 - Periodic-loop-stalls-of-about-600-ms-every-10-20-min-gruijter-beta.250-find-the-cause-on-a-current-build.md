@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-15T21:23:00Z'
-updated_date: '2026-11-18T11:52:00Z'
+updated_date: '2026-11-19T16:48:00Z'
 labels:
   - performance
 milestone: 2.0.0
@@ -44,4 +44,6 @@ gruijter beta.250 (Classic with PIC, SAT on), 25.5 h: 92 '[loop-stall]' lines, m
 2026-11-18 AC2 ticked (coordinator decision): old vs new for the file-write cause on one build, 09's bench 2026-11-16 on .61, 2.0.0-beta.342+cd59f4e, 08:07-08:18: 40 LittleFS state writes from the loop task gave a '[loop-stall] ... slowest step 1->2' of 247-338 ms after exactly every 6th write; the same 40 writes from a core-0 task gave 0 stalls (AC1 note above). The fix is that core-0 writer, 3bd8e9112. The beta.370 62-min 0-stall bench belongs to TASK-1995 and is not used here.
 
 2026-11-18 AC3 PLAN (coordinator): bench item for 09 (otgw-bench-tester) on .63 (Classic, PIC + room sensor), after the 20:00 slot, on a build of 370 or later. satsimulation only as an enabler so satSavePidState()/satSaveEnergyState() run (as the TASK-1979 rule: no control scenario is tested or claimed). Checks: (a) /sat_pid_state.json is rewritten every 5 min (FS listing mtime or content changes over 15 min); (b) after /ReBoot the integral 'i' in /sat_pid_state.json equals pid_i of GET /api/v2/sat/status just before the reboot (the writer drains before prepareForReboot); (c) a filesystem OTA with the same littlefs image: every sat_*.json is byte-identical before and after (sha256 of the downloaded files; drain before _keepFiles). 09 chooses the setup and ticks AC3. Field close-out for TASK-1989 and TASK-1995 together: one gruijter capture on 370 or later, requested via 92 (expected near 0 [loop-stall] against 92 in 25.5 h on beta.250).
+
+2026-11-19 bench (09) AC3 part (c) only, WITHOUT simulation (the satsimulation exception for (a)/(b) is with Robert): .61 on 2.0.0-beta.393+4bb2097, FS OTA at 17:47 with the same build's littlefs (sha256 51c00cacae2b1fed..., version.hash 931d1cd -> 4bb2097, settings changed none, reboot_log 17:47:18 [OTA] Rebooting). sha256 of the sat files before (17:46:50) vs after (17:47:22): sat_pid_state.json 4f847c67..., sat_energy.json ea70fc43..., sat_energy_estimate.json 2331b565..., sat_markers.json 4f53cda1..., sat/sat_preset.json 8267e70b... all byte-identical; sat/sat_hcr.json differs ONLY in ts (1795084449 = 11:34:09 before, 1795106823 = 17:47:03 after, all data fields 0 in both): it was rewritten during the OTA handover and that write survived the filesystem OTA, which fits a drain before _keepFiles. Limits: no PID running (no boiler, no simulation), so the content is static apart from that ts; this proves unchanged/survives, not a drained pending write with live data. (a) 5-min cadence and (b) i == pid_i after /ReBoot not tested on hardware (need satsimulation=on, awaiting Robert's go). AC3 not ticked. Evidence: 09 scratchpad t1989c/ (before/, after/, before.sha, after.sha).
 <!-- SECTION:NOTES:END -->
