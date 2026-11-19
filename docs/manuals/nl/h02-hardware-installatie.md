@@ -276,7 +276,7 @@ De standaard hostname op 2.0.0 is `OTGW2`, dus het AP heet doorgaans iets als `O
 
 **mDNS-opmerking:** De hostnaam `otgw2.local` werkt op de meeste thuisnetwerken. Op sommige Windows-systemen werkt mDNS alleen als de Bonjour-service actief is. Gebruik bij twijfel het IP-adres van uw router.
 
-> **AP-fallbackmodus (beta)**: Als het geconfigureerde Wi-Fi-netwerk na de initialisatie onbereikbaar wordt, opent het apparaat een fallback-AP genaamd `OTGW-<MAC>` met wachtwoord `otgw1234` en IP `192.168.4.1`, zodat de webinterface bereikbaar blijft.
+> **AP-fallbackmodus (alleen in betabuilds; een stabiele release heeft hem niet)**: Als het geconfigureerde Wi-Fi-netwerk na de initialisatie onbereikbaar wordt, opent het apparaat een fallback-AP genaamd `OTGW-<MAC>` met wachtwoord `otgw1234` en IP `192.168.4.1`, zodat de webinterface bereikbaar blijft.
 
 ---
 
@@ -296,11 +296,22 @@ Als alternatief kunt u een firmwarebinary handmatig uploaden:
 
 **Let op:** Upload altijd de `esp32-combo`-binary. Een 1.x-binary draait niet op de S3. Het uploaden van een verkeerde binary kan het apparaat in een bootloop brengen; in dat geval is serieel herflashen via USB nodig.
 
+#### Van 1.x naar 2.0.0, stap voor stap
+
+1. **Bewaar op de 1.x-unit uw instellingen.** Open de bestandsbeheerder (FSexplorer) en download `settings.ini` en, als u Dallas-sensoren heeft, `dallas_labels.ini`. De MQTT **Unique id** staat in `settings.ini`; houdt u die, dan houdt u uw Home Assistant-entiteiten (zie de opmerkingen hieronder).
+2. **Wissel de module.** Zet de OTGW uit en vervang de Wemos D1 mini door een LOLIN S3 Mini of S3 Mini Pro.
+3. **Flash de S3 via USB** met `flash_otgw` (zie Eerste installatie via flash_otgw).
+4. **Verbind hem met uw WiFi** via zijn access point (zie de eerste WiFi-installatie). WiFi-gegevens staan niet in `settings.ini`, dus deze stap is altijd nodig.
+5. **Zet uw instellingen terug.** Upload het bewaarde `settings.ini` (en `dallas_labels.ini`) in de bestandsbeheerder en herstart de gateway: instellingen worden bij het opstarten gelezen. De hostnaam en de unique id van de 1.x-unit komen met het bestand mee.
+6. **Stel de GPIO-pinnen opnieuw in.** Een GPIO-nummer uit 1.x wijst op de S3 naar een ander gaatje (zie de tabel bij de Dallas-sensoren). Controleer in Settings de Dallas-pin en eventuele S0- en uitgangspinnen.
+7. **Controleer Home Assistant.** Met de oude unique id blijven de oude entiteiten werken. Houdt u een SAT-integratie in Home Assistant, controleer dan het commando-topic en laat die nooit sturen terwijl de firmware-SAT aan staat (zie de opmerkingen hieronder).
+8. **Lees wat er veranderd is.** MQTT, de REST API en de webinterface wijken op punten af van 1.x; zie [docs/BREAKING_CHANGES.md](../../BREAKING_CHANGES.md#200) voordat u op automatiseringen, Node-RED-flows of scripts vertrouwt.
+
 #### Opmerkingen bij upgraden van v1.x
 
 - Overstappen van 1.x naar 2.x betekent de Wemos D1 mini vervangen door een LOLIN S3 Mini of S3 Mini Pro en die via USB flashen (zie Firmware flashen). Terug naar 1.x betekent de Wemos D1 mini terugplaatsen en een 1.x-release flashen; een 1.x-zip draait niet op een S3.
 - Geen settings-migratie nodig. Instellingenbestanden van v1.3.x laden zonder wijziging in v2.0.0.
-- MQTT-topics en de REST API zijn ongewijzigd ten opzichte van v1.x.
+- MQTT-topics, de REST API en de webinterface zijn op punten veranderd ten opzichte van v1.x (bijvoorbeeld: de v2-webinterface vervangt de klassieke webinterface, een nieuwe installatie krijgt de standaardhostnaam `OTGW2` in plaats van `OTGW`, en terwijl de nieuwe firmware-SAT aan staat weigert de gateway verwarmingscommando's via MQTT en REST). Zie de 2.0.0-sectie van [docs/BREAKING_CHANGES.md](../../BREAKING_CHANGES.md#200).
 - Als u upgradet van een versie voor v1.2.0: REST API v0 en v1 endpoints zijn verwijderd in v1.2.0. Alleen `/api/v2/` endpoints zijn beschikbaar. Zie [docs/BREAKING_CHANGES.md](../../BREAKING_CHANGES.md).
 - **SAT zit in de firmware: het oude SAT-component in Home Assistant is niet meer nodig.** In 2.0 is SAT (Smart Autotune Thermostat) in de firmware zelf ingebouwd; het staat standaard uit. Laat de firmware-SAT en een SAT-integratie in Home Assistant (bijvoorbeeld via HACS) nooit tegelijk regelen: zolang de firmware-SAT aan staat, weigert de gateway `CS=`, `CH=`, `MM=`, `C2=`, `H2=`, `TT=` en `TC=` via MQTT en de REST API, dus de integratie kan dan niet sturen. Wilt u de integratie houden, laat dan de firmware-SAT uit.
 - **Houdt u de SAT-integratie in Home Assistant, let dan op het commando-topic.** Een integratie die op de Wemos is ingesteld, blijft na de wissel naar de S3 sturen naar `OTGW/set/otgw-<oud MAC>/command`. De nieuwe gateway krijgt dan niets binnen en de thermostaat regelt zelf verder, terwijl alles in Home Assistant er normaal uitziet. Oplossing: neem de unique id van de Wemos mee (zie hieronder), of verwijder de integratie, wis de oude `otgw-<oud MAC>`-takken (bijvoorbeeld in MQTT Explorer) en voeg de integratie opnieuw toe met het nieuwe apparaat.

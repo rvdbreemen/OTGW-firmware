@@ -262,5 +262,7 @@ One row per Architecture Decision Record. Scope is the Enforcement `path_glob` s
 | ADR-255 | Accepted | - | User Decision: the HA "SAT Simulation" switch gets a second availability topic, sat/simulationavailable, combined wit... |
 | ADR-256 | Accepted | - | User Decision: the device history slot gets a seventh int16t temperature column, satTarget, so a slot is 16 bytes; th... |
 | ADR-257 | Accepted | - | User Decision: on a board without PSRAM BLE cannot be switched on: the scanner never starts there, every write of SAT... |
+| ADR-258 | Accepted | - | A probe that cannot run for lack of memory counts as a dead probe, instead of a skip, when the dead-link check is arm... |
 | ADR-259 | Accepted | - | When the error leaves the 0.1 C deadband the integral is multiplied by 0.5 once and then held while the error stays o... |
 | ADR-260 | Accepted | - | The tuner keeps its hour, its exclusions, its two phases and its agreement rule, and changes three constants: a tuner... |
+| ADR-261 | Proposed | - | While the heap is starved (platformMaxFreeBlock() < WIFISTARVEDMAXBLOCK), wifiLinkProbeOnReconnect() keeps the dead s... |

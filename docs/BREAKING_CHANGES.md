@@ -6,6 +6,21 @@ This document is the cumulative log of breaking changes from **v1.0.0** onwards.
 
 ## 2.0.0
 
+### Coming from 1.x (v1.7.9): what changes
+
+Checked against the last 1.x release, v1.7.9. MQTT on-change publishing, the `resetgateway` payload `"1"` with its 5 s limit, the base-topic rules of ADR-066, and the Home Assistant availability (the birth/LWT pair on the base topic) are the same in v1.7.9 and 2.0.0, so they are not breaking for a 1.x user.
+
+- **Hardware: ESP32-S3 only.** 2.0.0 does not run on the ESP8266 (Wemos D1 mini, NodeMCU). Replace the module with a LOLIN S3 Mini or S3 Mini Pro; the OTGW board and the PIC stay. Going back to 1.x means putting the Wemos back.
+- **First flash over USB.** The S3 is flashed once with `flash_otgw`; after that updates go over WiFi. A 1.x zip does not run on the S3 and a 2.0.0 zip does not run on the ESP8266.
+- **GPIO numbers differ.** A GPIO setting from a 1.x `settings.ini` points to another hole on the S3. Set the Dallas, S0 and output pins again after restoring the settings.
+- **MQTT unique id.** The default unique id is `otgw-` plus the MAC address, and the S3 has another MAC address. Restore the 1.x `settings.ini` (or copy the Unique id) to keep the Home Assistant entities; otherwise Home Assistant creates new ones with a `_2` suffix.
+- **Default hostname `OTGW2`** for a fresh install (1.x: `OTGW`). A restored `settings.ini` keeps its hostname.
+- **Web UI.** The v2 web UI replaces the classic web UI of 1.x (ADR-192); the File Manager stays as the recovery page.
+- **SAT is new and off by default.** While SAT is enabled, the gateway refuses `CS=`, `CH=`, `MM=`, `C2=`, `H2=`, `TT=` and `TC=` from MQTT, REST and the serial bridge (see below). With SAT off, the gateway behaves as in 1.x.
+- **Licence:** GNU GPLv3 (1.x: MIT).
+
+The entries below this one were written during the 2.0.0 alphas and betas. Those about SAT and OT-Direct matter only to users of those builds or of that hardware.
+
 ### Behaviour change: on OT-Direct in gateway mode `TT=` and `TC=` no longer write MsgID 16 and MsgID 100 to the boiler (ADR-223, TASK-1733)
 
 On an OT-Direct board with a thermostat (gateway mode), `TT=` and `TC=` now work like on the PIC: the value is only an answer to the thermostat. The thermostat has to read MsgID 9 (remote override room setpoint) and MsgID 100 (flags) to see it; the gateway writes nothing to the boiler for it and no longer rewrites the thermostat's own MsgID 16. Before, `TT=21.5` put WRITE 16 = 21.5 and a WRITE 100 on the bus every 15 s. The override now ends at `TT=0` / `TC=0`, at a replacement, or by the PIC rule: after the thermostat has read MsgID 9, the 4th differing MsgID 16 frame releases it (the first one, once the thermostat showed the override value). `TC=` is released by the same rule (it ran until `TC=0` before). `TT=0` / `TC=0` no longer clear a `BS=` or MQTT `room_setpoint` write on MsgID 16; use `BS=0` for that. In OT-Direct master mode (no thermostat) `TT=` / `TC=` still write MsgID 16 and MsgID 100.

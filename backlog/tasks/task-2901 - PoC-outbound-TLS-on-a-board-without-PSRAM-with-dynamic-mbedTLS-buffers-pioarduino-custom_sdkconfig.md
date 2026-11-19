@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-15T09:35:00Z'
-updated_date: '2026-11-19T07:41:00Z'
+updated_date: '2026-11-19T08:36:00Z'
 labels:
   - research
   - tls
@@ -121,4 +121,6 @@ poc.13 build (build.bat --target esp32-combo-tlsdyn, 2026-11-19 07:06-07:20, 'Bu
 2026-11-19 poc.13 bench on .63 (09): cloudrec silent; the boot catch shows the only line 'cloudrec: uid enrolled with another secret (delete it on the server); capture paused, next attempt in 1440 min' 4 s after boot. PocketBase: device otgw-ac276ece45d8 last updated 2026-11-19 00:42:51Z (poc.10 enrollment), only batch 00:43:00.843Z, so poc.10's TLS + one upload succeeded 7 s before its panic. Root cause (ours): cloudRecIdentity() compared Preferences::getString()'s return value with 32, but it returns nvs_get_str's length including the NUL (33; Preferences.cpp:476-495), so every boot made and stored a new secret and the server answered 409. Fix poc.15: accept 33 and a 32-character string. Gate tests/test_cloudrec_identity_secret.py compiles the real cloudRecIdentity() with an NVS-semantics Preferences stub: red on 1313798 (same 0, puts 2), green on the fix (same 1, puts 1). The bench needs the server record h9014itix3m471h deleted once (the device's current secret is unknown); that change to Robert's collection point needs his go. Also noted: the probe waits silently for the clock (no log line); a one-time 'waiting for the clock' line would have saved a reboot.
 
 2026-11-19 Robert: no 'Cloud' in the code. Renamed (poc.16): CloudRec* -> RemoteTelemetry* (files, types), cloudRec* -> remoteTelemetry*, HAS_CLOUD_REC/OTGW_CLOUD_REC_POC/CLOUDREC_* -> HAS_REMOTE_TELEMETRY/OTGW_REMOTE_TELEMETRY_POC/REMOTE_TELEMETRY_*, namespace crec -> rtel, tests test_cloudrec_* -> test_remote_telemetry_*, tools/cloud-recorder -> tools/remote-telemetry, docs/diagnostics/cloudrec-bench-* -> telemetry-bench-*. Device-visible: /cloudrec.cfg -> /telemetry.cfg, NVS namespace and FreeRTOS task 'cloudrec' -> 'telemetry', log prefix 'cloudrec:' -> 'telemetry:'. Plain 'Telemetry' was not used: it already names SAT telemetry (TelemetryDecisions, 'Telemetry only'). Kept: weather cloud_cover, Cloudflare, the branch name research/cloud-recording, Accepted ADR-290 (immutable) and task history. New NVS namespace = new secret on the first poc.16 boot, so the .63 bench needs the server record deleted once anyway. Tests: 124 passed (3 pre-existing remote_telemetry_policy failures, unchanged), evaluate --quick 103/0 failed.
+
+2026-11-19 second merge of origin/dev (63a773a4b) into research (poc.17): 60 banner conflicts take dev, ADR index keeps dev's ADR-261 + research ADR-290, no duplicate IDs, OpenTherm pointer = dev 51aa68e. Targeted tests 118 passed, evaluate --quick 103/0 failed.
 <!-- SECTION:NOTES:END -->

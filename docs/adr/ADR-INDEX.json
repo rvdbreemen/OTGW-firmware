@@ -10784,6 +10784,67 @@
       }
     },
     {
+      "id": "ADR-258",
+      "title": "A WiFi probe that cannot run for lack of memory counts as dead when the largest free block is under 4 KB",
+      "path": "ADR-258-a-wifi-probe-that-cannot-run-for-lack-of-memory-counts-as-dead-when-the-largest-free-block-is-under-4-kb.md",
+      "format": "canonical",
+      "status": "Accepted",
+      "date": "2026-11-18",
+      "decision_summary": "A probe that cannot run for lack of memory counts as a dead probe, instead of a skip, when the dead-link check is arm...",
+      "topics": [
+        "dead link",
+        "heap",
+        "recovery",
+        "restart",
+        "wifi"
+      ],
+      "aliases": [
+        "heap not healthy skip",
+        "loop alive network dead",
+        "no echo buffer",
+        "starved heap probe"
+      ],
+      "components": [
+        "wifiProbeStarvedDead"
+      ],
+      "symbols": [
+        "handleWifiProbeVerdict",
+        "WIFI_STARVED_MAXBLOCK",
+        "wifiLinkProbeTick",
+        "wifiProbeStarvedDead",
+        "wifiStarvedLogged"
+      ],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [
+          "Count a memory skip as a dead probe only when the check is armed (wifiArmedGateway != 0) and platformMaxFreeBlock() < WIFISTARVEDMAXBLOCK.",
+          "Reach the restart only through the existing supervisor path (handleWifiProbeVerdict()): its 8-probe threshold, the forced reconnect first, the witness rule (MQTT, REST or port 25238 traffic means the LAN (local area network) works) and t..."
+        ],
+        "must_not": [
+          "Restart directly on a heap number alone; ADR-107's recovery actions stay as they are (no restart there).",
+          "Count a memory skip as dead while the largest free block is 4 KB or more (a busy but healthy heap)."
+        ],
+        "exceptions": [
+          "None."
+        ],
+        "verification": [
+          "tests/testwifideadlink.py: the real state machine on the host; scenarios starved (heap LOW, largest block 2 KB, link dead) and starvednopbuf (no echo buffer, largest block 2 KB) end in a forced reconnect and a restart (red on the code be...",
+          "Bench: the prerelease-only telnet key H (handleDebug.ino, heapHoldTick()) starves the heap on purpose; expected telnet lines: 8 x 'counted as dead', 'forcing a reconnect', 8 more, the restart, and its reason in the reboot log."
+        ]
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
+    },
+    {
       "id": "ADR-259",
       "title": "SAT halves the PID integral once when the error leaves the deadband and holds it, for the main and the zone PIDs (amends ADR-197)",
       "path": "ADR-259-sat-halves-the-pid-integral-once-when-the-error-leaves-the-deadband-and-holds-it-for-the-main-and-the-zone-pids-partly-supersedes-adr-197.md",
@@ -10898,6 +10959,61 @@
           "tests/testsatcurveselftune.py compiles the real tuner blocks of SATcontrol.ino with SATcurveTune.h: a clear signal steps 0.05 after 12 counted hours and not before, a second step needs 12 new counted hours, not-counted hours do not move...",
           "tests/testsattunerconvergence.py: the old constants take no step within 24 counted hours of a clear signal (red), the new constants do (green).",
           "tests/webui/sat-tune-progress.test.mjs drives the real data/v2.js against a status object with windowhours."
+        ]
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
+    },
+    {
+      "id": "ADR-261",
+      "title": "The WiFi dead-link streak continues across a re-association while the heap is starved (amends ADR-258)",
+      "path": "ADR-261-the-wifi-dead-link-streak-continues-across-a-re-association-while-the-heap-is-starved-amends-adr-258.md",
+      "format": "canonical",
+      "status": "Proposed",
+      "date": "2026-11-19",
+      "decision_summary": "While the heap is starved (platformMaxFreeBlock() < WIFISTARVEDMAXBLOCK), wifiLinkProbeOnReconnect() keeps the dead s...",
+      "topics": [
+        "dead-link supervisor",
+        "heap starvation",
+        "watchdog recovery",
+        "wifi"
+      ],
+      "aliases": [
+        "dead streak reset on reconnect",
+        "starved heap re-association"
+      ],
+      "components": [
+        "wifiLinkProbeOnReconnect"
+      ],
+      "symbols": [
+        "WIFI_STARVED_MAXBLOCK",
+        "wifiDeadProbes",
+        "wifiLinkProbeOnReconnect"
+      ],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [
+          "Keep wifiDeadProbes across a re-association only while the largest free block is under WIFISTARVEDMAXBLOCK.",
+          "Keep every other reset of the streak: an answered probe, a wired link, a changed gateway address, and the decision point itself."
+        ],
+        "must_not": [
+          "Must not keep the streak across a re-association when the heap is not starved (a normal reconnect starts a fresh streak, ADR-258 behaviour).",
+          "Must not change the witness rule, the restart cap or the thresholds of ADR-258."
+        ],
+        "exceptions": [
+          "None."
+        ],
+        "verification": [
+          "tests/testwifideadlink.py::WifiDeadLinkStateMachine::teststarvedlinkwithapdropsevery4minstillrecovers runs the real state machine with a starved heap, a dead link and an AP drop every 4 min for 40 min. It fails on the code before this AD..."
         ]
       },
       "scope": {
@@ -18103,6 +18219,36 @@
       "resolved": true
     },
     {
+      "source": "ADR-258",
+      "target": "ADR-080",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-258",
+      "target": "ADR-107",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-258",
+      "target": "ADR-167",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-258",
+      "target": "ADR-211",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-258",
+      "target": "ADR-261",
+      "type": "related",
+      "resolved": true
+    },
+    {
       "source": "ADR-259",
       "target": "ADR-197",
       "type": "related",
@@ -18141,6 +18287,12 @@
     {
       "source": "ADR-260",
       "target": "ADR-234",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-261",
+      "target": "ADR-258",
       "type": "related",
       "resolved": true
     }

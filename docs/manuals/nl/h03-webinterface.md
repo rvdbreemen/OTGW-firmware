@@ -283,9 +283,9 @@ Klik op **Opslaan** onderaan een sectie om de wijzigingen toe te passen. De mees
 
 Om naar een ander Wi-Fi-netwerk over te schakelen, klikt u op **Reset WiFi** en bevestigt u de dialoog. Het apparaat herstart, start een AP met de naam `OTGW-XXXXXX` (waarbij `XXXXXX` afgeleid is van het chip-ID) en opent opnieuw de captive portal, zodat u tegen het nieuwe netwerk kunt authenticeren. Dezelfde actie is beschikbaar onder **FSexplorer > System Actions** via de knop *Reset Wireless*.
 
-#### Wi-Fi-scan (Settings-pagina)
+#### Wi-Fi-scan
 
-Onder de Wi-Fi-sectie staat een Wi-Fi-scanpaneel (TASK-585). Met de knop **Scan** wordt `/api/v2/network/scan` aangeroepen; het resultaat vult een dropdown met gedetecteerde SSID's, signaalsterkte en beveiligingsvlag. Een netwerk uit de dropdown selecteren vult automatisch het SSID-veld, zodat een Reset WiFi-handeling daarna direct aansluit op het gekozen netwerk zonder dat de SSID met de hand getypt hoeft te worden.
+De v2-webinterface heeft geen Wi-Fi-scanpaneel; om van netwerk te wisselen gebruikt u Reset WiFi en het setup-access point (zie hoofdstuk 2). Het REST-endpoint `GET /api/v2/network/scan` geeft nog wel de netwerken in de buurt: de eerste aanroep start de scan en geeft `{"status":"scanning"}`, een latere aanroep geeft `{"status":"ready","networks":[...]}` met per netwerk `ssid`, `rssi`, `channel`, `secured` en `connected`. Tijdens een OTA of een PIC-flash weigert het een scan (restAPI.ino:2419-2423).
 
 #### MQTT sectie
 

@@ -81,6 +81,8 @@ static State state; static Settings settings;
 enum HeapHealthLevel { HEAP_HEALTHY, HEAP_LOW, HEAP_WARNING, HEAP_CRITICAL };
 static HeapHealthLevel g_heap = HEAP_HEALTHY;
 static HeapHealthLevel getHeapHealth() { return g_heap; }
+static uint32_t g_maxBlock = 31732;   // TASK-2026: the largest free block (healthy bench value)
+static uint32_t platformMaxFreeBlock() { return g_maxBlock; }
 
 // ---- fake network -----------------------------------------------------------------------------
 enum { WL_IDLE_STATUS = 0, WL_CONNECTED = 3, WL_DISCONNECTED = 6 };
@@ -220,6 +222,18 @@ int main(int argc, char **argv) {
   } else if (!strcmp(sc, "heap")) {        // AC6: heap not HEALTHY -> no probe, nothing counted
     runFor(5 * 60); g_heap = HEAP_LOW; g_traffic = false; ev("link_dead_heap_low"); runFor(30 * 60);
     printf("HEAPBEGUN|%d\n", g_begun);
+  } else if (!strcmp(sc, "starved")) {     // TASK-2026: heap LOW and starved (largest block 2 KB), link dead
+    runFor(5 * 60); g_heap = HEAP_LOW; g_maxBlock = 2048; g_traffic = false; ev("link_dead_heap_starved"); runFor(30 * 60);
+  } else if (!strcmp(sc, "starved_flap")) {   // TASK-2026 run 3 (.63, 381): starved and dead, but the AP drops the
+    // association every ~4 min (NOT_AUTHED, 7 outages in 30 min) and the unit re-associates within seconds
+    runFor(5 * 60); g_heap = HEAP_LOW; g_maxBlock = 2048; g_traffic = false; ev("link_dead_heap_starved_flapping");
+    for (int i = 0; i < 10; i++) {
+      runFor(4 * 60);
+      ev("ap_drop"); g_wifiStatus = WL_DISCONNECTED; g_connectAt = g_ms + 3000;
+    }
+    runFor(60);
+  } else if (!strcmp(sc, "starved_nopbuf")) {   // TASK-2026: healthy tier, but no echo buffer and a 2 KB largest block
+    runFor(5 * 60); g_pbufFail = true; g_maxBlock = 2048; g_traffic = false; runFor(30 * 60);
   } else if (!strcmp(sc, "nopbuf")) {      // allocation failures are skipped, not counted
     runFor(5 * 60); g_pbufFail = true; g_traffic = false; runFor(30 * 60);
   } else if (!strcmp(sc, "nopcb")) {
@@ -460,6 +474,27 @@ class WifiDeadLinkStateMachine(unittest.TestCase):
                 self.assertIsNone(r["RESTART"])
                 if self.has_fix:
                     self.assertEqual(len(self.logs(r, "probe skipped (%s)" % why)), 1)
+
+    def test_a_starved_heap_counts_as_dead_and_recovers(self):
+        # TASK-2026: .61 (no PSRAM, BLE on) stayed unreachable for 13 min: every probe was skipped ('heap not
+        # healthy' / 'no echo buffer') and nothing else restarts a unit whose loop still runs. With a starved heap
+        # the skipped probe now counts as dead: reconnect after 8, then restart. Red on the code before TASK-2026.
+        for sc in ("starved", "starved_nopbuf"):
+            with self.subTest(sc=sc):
+                r, _ = self.run_sc(sc)
+                self.assertEqual(r["SUM"]["forced"], 1, "no forced reconnect on a starved, dead unit")
+                self.assertIsNotNone(r["RESTART"], "no restart on a starved, dead unit")
+                self.assertEqual(len(self.logs(r, "heap starved (largest block 2048 B): counted as dead")), 1)
+
+    def test_starved_link_with_ap_drops_every_4_min_still_recovers(self):
+        # TASK-2026 run 3 (.63, 381+b06eeff, 2026-11-19): heap starved for 30 min, REST and telnet dead, 14 probes
+        # counted dead, yet no decision point (witness 0, reconnect 0): the AP dropped the association every ~4 min
+        # (wifi_outages 7, NOT_AUTHED) and every re-association reset the dead streak (wifiLinkProbeOnReconnect()),
+        # so 8 in a row never happened. Option C: while the heap is starved the streak continues across a
+        # re-association. Red on the code before it (b0febe073 ran this as expectedFailure).
+        r, _ = self.run_sc("starved_flap")
+        self.assertGreaterEqual(r["SUM"]["forced"] + (1 if r["RESTART"] else 0), 1,
+                                "a starved, unreachable unit whose AP keeps re-associating is never recovered")
 
     def test_ethernet_closes_the_probe_and_disarms(self):
         r, _ = self.run_sc("ethernet")

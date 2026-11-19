@@ -865,7 +865,7 @@ Returns the device-side history of the Monitor > Graph series (TASK-1296): oldes
 
 ##### GET /api/v2/network/scan
 
-Initiates and polls an asynchronous WiFi scan (TASK-585). Used by the Settings page WiFi-picker.
+Initiates and polls an asynchronous WiFi scan (TASK-585). The v2 web UI does not call it.
 
 - First call: starts the scan and returns `{"status":"scanning"}`.
 - Subsequent calls while the scan is in progress: returns `{"status":"scanning"}`.

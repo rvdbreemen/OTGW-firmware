@@ -246,9 +246,9 @@ Next to each setting label is an **i** button. Hover it, focus it with the keybo
 
 To move the gateway to a different Wi-Fi network, click **Reset WiFi** and confirm the prompt. The device reboots, starts an AP named `OTGW-XXXXXX` (where `XXXXXX` is derived from the chip ID), and reopens the captive portal so you can select and authenticate against the new network. The Reset WiFi action is also available under **FSexplorer > System Actions** as the *Reset Wireless* button.
 
-#### Wi-Fi Scan (Settings page)
+#### Wi-Fi Scan
 
-The Settings page also includes a Wi-Fi scan panel that lists nearby networks (TASK-585). Press **Scan** to call `/api/v2/network/scan`; the result populates a dropdown with the detected SSIDs, RSSI, and security flags. Selecting a network from the dropdown fills the SSID field so you can pair the scan with the Reset WiFi flow without typing the SSID by hand.
+The v2 web UI has no Wi-Fi scan panel; to change the network, use Reset WiFi and the setup access point (see Chapter 2). The REST endpoint `GET /api/v2/network/scan` still lists nearby networks: the first call starts the scan and returns `{"status":"scanning"}`, a later call returns `{"status":"ready","networks":[...]}` with `ssid`, `rssi`, `channel`, `secured` and `connected` per network. It refuses a scan during an OTA or PIC flash (restAPI.ino:2419-2423).
 
 #### MQTT
 

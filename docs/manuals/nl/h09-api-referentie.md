@@ -739,7 +739,7 @@ Retourneert de geschiedenis die het apparaat zelf bijhoudt voor de Monitor > Gra
 
 ##### GET /api/v2/network/scan
 
-Start en polt een asynchrone WiFi-scan (TASK-585). Wordt gebruikt door de WiFi-kiezer op de Settings-pagina.
+Start en polt een asynchrone WiFi-scan (TASK-585). De v2-webinterface roept het niet aan.
 
 - Eerste aanroep: start de scan en retourneert `{"status":"scanning"}`.
 - Vervolgaanroepen tijdens de scan: retourneren `{"status":"scanning"}`.

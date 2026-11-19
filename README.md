@@ -81,7 +81,7 @@ Firmware v1.x ran on the ESP8266 module that shipped on earlier NodoShop OTGW bo
 | 1.x through 2.0 | NodeMCU ESP8266 |
 | 2.3 and later | Wemos D1 mini ESP8266 |
 
-The ESP8266 is no longer a 2.0.0 build target. To move an existing OTGW to v2.0.0, swap the Wemos D1 mini ESP8266 for a LOLIN S3 Mini (ESP32-S3) drop-in: it keeps the same OTGW board and PIC co-processor, and the firmware builds for it from the same source tree. Settings files from v1.3.x load without modification.
+The ESP8266 is no longer a 2.0.0 build target. To move an existing OTGW to v2.0.0, swap the Wemos D1 mini ESP8266 for a LOLIN S3 Mini (ESP32-S3) drop-in: it keeps the same OTGW board and PIC co-processor, and the firmware builds for it from the same source tree. Settings files from v1.3.x load without modification. The step-by-step move from 1.x is in Chapter 2 of the manual, "Moving from 1.x to 2.0.0, step by step" ([docs/manuals/en/ch02-hardware-setup.md](docs/manuals/en/ch02-hardware-setup.md#moving-from-1x-to-200-step-by-step)).
 
 This ESP32-S3 plus PIC combination is what the firmware supports.
 
@@ -95,11 +95,11 @@ SAT is an embedded heating controller that runs entirely on the device, a port o
 
 ### What SAT does
 
-SAT combines a **weather-compensated heating curve** with a **PID controller**. The heating curve calculates a base flow setpoint from the outdoor temperature using a configurable coefficient. The PID loop adds a correction on top, based on the difference between actual and target room temperature. The PID gains follow from the heating curve coefficient. A daily **self-tune** (on by default, can be switched off) moves the coefficient by 0.1 when the last 3 days show the curve is clearly too low or too high.
+SAT combines a **weather-compensated heating curve** with a **PID controller**. The heating curve calculates a base flow setpoint from the outdoor temperature using a configurable coefficient. The PID loop adds a correction on top, based on the difference between actual and target room temperature. The PID gains follow from the heating curve coefficient. A **self-tune** (on by default, can be switched off) decides every counted hour on the last 12 counted hours and moves the coefficient by 0.05 when they show the curve is clearly too low or too high; after a step it waits at least 12 counted hours (from 2.0.0-beta.379, ADR-260).
 
 ### Key capabilities
 
-- **Weather compensation**: configurable heating curve coefficient (0.1 to 5.0), a daily self-tune of that coefficient, and a curve recommendation based on error statistics
+- **Weather compensation**: configurable heating curve coefficient (0.1 to 5.0), an hourly self-tune of that coefficient, and a curve recommendation based on error statistics
 - **PID control**: proportional + integral + derivative correction on top of the heating curve
 - **Two control modes**: continuous modulation (direct boiler modulation) and PWM flame cycling (on/off duty cycle)
 - **Heating system types**: radiators, underfloor heating, heat pump
