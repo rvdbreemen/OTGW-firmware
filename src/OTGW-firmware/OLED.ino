@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OLED.ino
-**  Version  : v2.0.0-beta.399
+**  Version  : v2.0.0-beta.400
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -355,8 +355,13 @@ static void drawPageDevice() {
 
   // Firmware version
   oledRow(2);
+  // TASK-2932: a stable build has no _VERSION_PRERELEASE; stringifying it there printed the bare macro name.
+#if defined(_VERSION_PRERELEASE)
   snprintf_P(oledBuf, sizeof(oledBuf), PSTR("FW %d.%d.%d-" OLED_STR(_VERSION_PRERELEASE)),
     _VERSION_MAJOR, _VERSION_MINOR, _VERSION_PATCH);
+#else
+  snprintf_P(oledBuf, sizeof(oledBuf), PSTR("FW %d.%d.%d"), _VERSION_MAJOR, _VERSION_MINOR, _VERSION_PATCH);
+#endif
   oledDisplay.print(oledBuf);
 
   // Hostname (truncated to fit)
