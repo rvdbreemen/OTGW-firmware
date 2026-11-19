@@ -3579,7 +3579,7 @@
         el.setAttribute('data-k', k); el.setAttribute('stroke', m[2]); el.setAttribute('stroke-width', kind === 't' ? '1.8' : '1.2');
         el.setAttribute('fill', kind === 'm' ? 'rgba(0,191,254,.18)' : (kind === 'l' ? m[2] : 'none'));
         if (kind === 'l') el.setAttribute('fill-opacity', '.3');
-        if (k === 'chSet' || k === 'roomSet' || k === 'satTarget') el.setAttribute('stroke-dasharray', '5 4');
+        if (graphSeriesDashed(k)) el.setAttribute('stroke-dasharray', '5 4');
         g.appendChild(el);
       }
       if (!gOff[k] && c.length) d = kind === 'm' ? graphPath(c, kind, ym, MP.top + MP.h) : graphPath(c, kind, y, GLANE_Y[k]);
@@ -3665,6 +3665,8 @@
     svg.addEventListener('pointerleave', graphReadoutLeave);
     svg.addEventListener('pointercancel', graphReadoutHide);   // the browser took over to scroll
   }
+  // The setpoint and target series are drawn dashed (5 4); their legend swatch shows the same dash (TASK-2037).
+  function graphSeriesDashed(k) { return k === 'chSet' || k === 'roomSet' || k === 'satTarget'; }
   // Clickable legend: each series can be hidden (remembered per browser).
   var gLegendSig = '';
   function renderGraphLegend(keys, metas) {
@@ -3674,7 +3676,9 @@
     gLegendSig = sig; lg.textContent = '';
     keys.forEach(function (k, i) {
       var m = metas[i], sp = document.createElement('span'), sw = document.createElement('i');
-      sw.style.background = m[2]; sp.appendChild(sw); sp.appendChild(document.createTextNode(m[1]));
+      if (graphSeriesDashed(k)) { sw.style.background = 'none'; sw.style.borderTop = '2px dashed ' + m[2]; }
+      else sw.style.background = m[2];
+      sp.appendChild(sw); sp.appendChild(document.createTextNode(m[1]));
       sp.style.cursor = 'pointer'; sp.style.opacity = gOff[k] ? '.4' : '1'; sp.title = t('graph.legend_toggle');
       sp.addEventListener('click', function () {
         if (gOff[k]) delete gOff[k]; else gOff[k] = 1;
@@ -5883,7 +5887,9 @@
     for (var i = 0; i < lg.children.length; i++) {
       var sp = lg.children[i], sw = sp.firstChild;
       if (parseFloat(sp.style.opacity) < 1) continue;   // the browser reads '.4' back as '0.4'
-      out.push({ color: (sw && sw.style && sw.style.background) || '#8b949e', label: sp.textContent });
+      // A dashed swatch (dashed series, TASK-2037; dashed marks, TASK-1914) carries its colour in the top border.
+      var st = (sw && sw.style) || {}, bgc = st.background && st.background !== 'none' ? st.background : '';
+      out.push({ color: bgc || st.borderTopColor || '#8b949e', dash: st.borderTopStyle === 'dashed', label: sp.textContent });
     }
     return out;
   }
@@ -5894,7 +5900,7 @@
     entries.forEach(function (e) {
       var need = 14 + 5 + measure(e.label);
       if (x > 6 && x + need > w - 6) { x = 6; row++; }
-      items.push({ x: x, row: row, color: e.color, label: e.label });
+      items.push({ x: x, row: row, color: e.color, dash: !!e.dash, label: e.label });
       x += need + 14;
     });
     return { items: items, height: entries.length ? row * 16 + 26 : 0 };
@@ -5925,7 +5931,9 @@
       ctx.font = lfont; ctx.textBaseline = 'middle';
       lay.items.forEach(function (it) {
         var cy = 5 + it.row * 16 + 8;
-        ctx.fillStyle = it.color; ctx.fillRect(it.x, cy - 1.5, 14, 3);
+        ctx.fillStyle = it.color;
+        if (it.dash) { ctx.fillRect(it.x, cy - 1, 5, 2); ctx.fillRect(it.x + 9, cy - 1, 5, 2); }   // 5 4 dash, like the line
+        else ctx.fillRect(it.x, cy - 1.5, 14, 3);
         ctx.fillStyle = lcol; ctx.fillText(it.label, it.x + 19, cy);
       });
       ctx.drawImage(img, 0, lay.height, W, H);
