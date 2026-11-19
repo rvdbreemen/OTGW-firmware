@@ -224,6 +224,14 @@ int main(int argc, char **argv) {
     printf("HEAPBEGUN|%d\n", g_begun);
   } else if (!strcmp(sc, "starved")) {     // TASK-2026: heap LOW and starved (largest block 2 KB), link dead
     runFor(5 * 60); g_heap = HEAP_LOW; g_maxBlock = 2048; g_traffic = false; ev("link_dead_heap_starved"); runFor(30 * 60);
+  } else if (!strcmp(sc, "starved_flap")) {   // TASK-2026 run 3 (.63, 381): starved and dead, but the AP drops the
+    // association every ~4 min (NOT_AUTHED, 7 outages in 30 min) and the unit re-associates within seconds
+    runFor(5 * 60); g_heap = HEAP_LOW; g_maxBlock = 2048; g_traffic = false; ev("link_dead_heap_starved_flapping");
+    for (int i = 0; i < 10; i++) {
+      runFor(4 * 60);
+      ev("ap_drop"); g_wifiStatus = WL_DISCONNECTED; g_connectAt = g_ms + 3000;
+    }
+    runFor(60);
   } else if (!strcmp(sc, "starved_nopbuf")) {   // TASK-2026: healthy tier, but no echo buffer and a 2 KB largest block
     runFor(5 * 60); g_pbufFail = true; g_maxBlock = 2048; g_traffic = false; runFor(30 * 60);
   } else if (!strcmp(sc, "nopbuf")) {      // allocation failures are skipped, not counted
@@ -477,6 +485,17 @@ class WifiDeadLinkStateMachine(unittest.TestCase):
                 self.assertEqual(r["SUM"]["forced"], 1, "no forced reconnect on a starved, dead unit")
                 self.assertIsNotNone(r["RESTART"], "no restart on a starved, dead unit")
                 self.assertEqual(len(self.logs(r, "heap starved (largest block 2048 B): counted as dead")), 1)
+
+    @unittest.expectedFailure
+    def test_starved_link_with_ap_drops_every_4_min_still_recovers(self):
+        # TASK-2026 run 3 (.63, 381+b06eeff, 2026-11-19): heap starved for 30 min, REST and telnet dead, 14 probes
+        # counted dead, yet no decision point (witness 0, reconnect 0): the AP dropped the association every ~4 min
+        # (wifi_outages 7, NOT_AUTHED) and every re-association resets the dead streak (wifiLinkProbeOnReconnect()),
+        # so 8 in a row never happens. RED on purpose (expectedFailure) until the follow-up Robert chooses (A/B/C,
+        # coordinator DM 2026-11-19); a fix that makes it pass turns this into an unexpected success.
+        r, _ = self.run_sc("starved_flap")
+        self.assertGreaterEqual(r["SUM"]["forced"] + (1 if r["RESTART"] else 0), 1,
+                                "a starved, unreachable unit whose AP keeps re-associating is never recovered")
 
     def test_ethernet_closes_the_probe_and_disarms(self):
         r, _ = self.run_sc("ethernet")
