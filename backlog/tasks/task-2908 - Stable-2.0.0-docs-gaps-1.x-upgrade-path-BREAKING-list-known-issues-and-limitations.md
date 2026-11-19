@@ -3,7 +3,7 @@ id: TASK-2908
 title: >-
   Stable 2.0.0 docs gaps: 1.x upgrade path, BREAKING list, known issues and
   limitations
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-19T07:23:00Z'
@@ -43,3 +43,9 @@ Beta history coverage: 'Changes during the 2.0.0 betas' has 103 bullets; all 112
 
 Extra findings fixed: (1) the v2 web UI has no Wi-Fi scan panel, ch03/h03 and ch09/h09 said it had (v2.js never calls /api/v2/network/scan; commit ce395f868). (2) AP fallback exists only in beta builds (networkStuff.ino:497), ch01/h01, ch02/h02 and ch07/h07 presented it unqualified; h07 also called the config-portal log line 'AP fallback'. (3) The draft 'Compared with the 1.x line' is split into 'Compared with 1.x (v1.7.9)' and 'For users of a 2.0.0 alpha or beta'.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+AC1: ch02/h02 'MQTT topics and the REST API are unchanged from v1.x' replaced; examples checked against tag v1.7.9 with git grep (hostname OTGW vs OTGW2 in OTGW-firmware.h, no SAT and classic UI only in v1.7.9). AC2: ordered 8-step 1.x -> 2.0.0 checklist in ch02/h02 (settings read at boot OTGW-firmware.ino:352, no WiFi keys in settings.ini), README links it. AC3: BREAKING_CHANGES.md 'Coming from 1.x (v1.7.9)', and it names what is NOT breaking for v1.7.9 (on-change, resetgateway, ADR-066, birth/LWT: present in v1.7.9). AC4: Known issues curated, 9 removed with fix commit (merge-base checked on origin/dev) and evidence, 10 reworded, 42 kept; log in notes. AC5: 'Changes during the 2.0.0 betas' 103 lines, coverage script 112 ids in, 0 missing, 12 dropped with reasons; Limitations block (ESP32-S3 only, no HTTPS, BLE needs PSRAM, SAT vs HA SAT integration, port 25238 filter ADR-217). AC6: :202 per the coordinator's decision (A plus the TASK-1371 fact). AC7: build_manual wrote MANUAL.md, test_manual_generated OK, test_manual_sat_commands OK, 0 em dashes/TBD/TODO added. Extra: Wi-Fi scan panel claim removed (ce395f868), AP fallback marked beta-only. Not verified: rendering on GitHub (anchors #200 and #moving-from-1x-to-200-step-by-step follow GitHub's slug rules, not opened in a browser). Merge with TASK-2034 conflicts only in README.md (git merge-tree), resolve per hunk at the RC.
+<!-- SECTION:FINAL_SUMMARY:END -->
