@@ -3,11 +3,11 @@ id: TASK-2026
 title: >-
   No-PSRAM BLE heap starvation: the unit hung 13 min with no watchdog reset or
   heap-emergency restart (.61, beta.370)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-18T13:06:00Z'
-updated_date: '2026-11-19T18:30:00Z'
+updated_date: '2026-11-19T18:33:00Z'
 labels:
   - heap
   - watchdog
@@ -73,3 +73,9 @@ Correction (coordinator, 2026-11-19): 'MQTT OK' was the regression phase; during
 
 2026-11-19 09 (otgw-bench-tester) ticks AC3 on bench evidence, same reproduction (heap hold on .61, MQTT off, no REST/25238 during the hold): RED 391+ebc0cf9 (14:13-14:43): 24 min associated without keys/IP (4-way loop), no supervisor restart, recovered only at the hold release; RED 393+4bb2097: 2x panic in task wifi about 10 s after the DHCP lease (17:25:08, 17:41:18). GREEN 394+17c993a: 2 of 2 holds end in a clean restart 'Software reset - WiFi: too many reconnect failures' (18:24:08, 18:39:08), no panic, coredump unchanged (sha256 fe085ba4...), bootcount 1075 -> 1076 -> 1077. Archives: RvdB/OTGW-field-data/bench-otgw32/20261119-task2026-391, 20261119-task2026-393, 20261119-task2923-394.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Cause (AC1/AC2): under a starved heap the WiFi dead-link supervisor (networkStuff.ino) never forced a reconnect or restart: probes it could not run for lack of memory were skipped, and every AP re-association reset the dead streak (wifiLinkProbeOnReconnect, networkStuff.ino:910-915 at 381), so with the AP dropping every 4-5 min the streak never reached 8; the heap-emergency restart did not fire because getHeapHealth() looks at free heap only (helperStuff.ino:1174-1188) and the starved state held free 4-7 KB with the largest block < 4096. Evidence: 09's run 3 on .63 (381 counters starved_dead 14, witness 0, reconnect 0, wifi_outages 7); tests/test_wifi_deadlink.py starved_flap red, counterfactual green. Fix: ADR-258 (count a probe that cannot run for lack of memory as dead), option C chosen by Robert (DM 1572842729485111327: keep the streak across a re-association while starved, ADR-261 Proposed), shipped host-only in beta.392 on his 'A' (DM 1572927618628583465); B (app-level progress) moved to TASK-2038 (2.1.0). AC3 (ticked by the bench-tester, origin 0e9987563): same heap-hold reproduction on .61: RED 391+ebc0cf9 (30 min held, no restart, supervisor idle 24 min) and 393 (two panics in task wifi = TASK-2923), GREEN 394+17c993a (two holds, clean restarts 18:24:08 and 18:39:08 'WiFi: too many reconnect failures' about 14 min after each take, no panic). Caveat: the 394 recovery runs through the release reconnect-failure path that TASK-2923's guard makes reachable while starved; option C's own log line was never observed (telnet is dead during a hold), so option C's contribution on hardware is not separately shown.
+<!-- SECTION:FINAL_SUMMARY:END -->
