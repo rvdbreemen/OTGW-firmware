@@ -7,7 +7,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-19T09:43:00Z'
-updated_date: '2026-11-19T09:52:00Z'
+updated_date: '2026-11-19T12:32:00Z'
 labels:
   - wifi
 milestone: 2.1.0
@@ -33,4 +33,6 @@ ordinal: 1053000
 
 <!-- SECTION:NOTES:BEGIN -->
 Clue (coordinator, 2026-11-19), with caveats: the 10:24:28 telnet banner, already after the panic reboot ('Up 0(d)-00:00', so < 1 min after boot, without the heap hold), showed free 10304 / maxBlk 3828. The normal reference after the USB reset is freeheap 47172 / maxfreeblock 31732 (09 device/info). So the heap was strikingly low and fragmented right after that boot, which fits the 8-min hang. Caveats: one banner; < 1 min after boot it may be mid-init (WiFi/MQTT setup), a transient state, not a steady one. Next step: a boot log capture on .61 with heap values per setup step.
+
+CORRECTION 2026-11-19 (09, checked by me in OTGW-field-data/bench-otgw32/20261119-task2026-388/telnet.raw): the clue above is WRONG. The banners with free 10680 / 10304, minFree 1392, maxBlk 3828 (telnet.raw lines 84 and 109) say 'Boot : Software reset': they are the 388 boot DURING the heap hold (10:04, 10:09), before the panic. The post-panic boot banner (line 128, 'Boot : Exception/panic') breaks off after 'Net : WiFi' (line 131): there is NO heap value from the boot that hung. My earlier reading tied those values to the 10:24:28 banner; that was a mix-up of lines. Known about the hang boot: associated with a DHCP lease, ping/HTTP/telnet dead ~8 min, no reboot_log line, recovered only by the USB reset at 10:32:47. Reference: 09 ran 5 normal USB-reset boots of .61 on 389 (OTGW-field-data/bench-otgw32/20261119-task2911/): all clean, first ping 5.6-6.0 s, HTTP 200 13.1-13.6 s, telnet 16.1-16.7 s, MQTT 16.3-18.1 s, banner free ~75.2 K / maxBlk 31.7-32.8 K / minFree 60-65 K. So the hang after a panic (n=1) is not reproduced on a normal boot (n=5); there is no heap evidence for or against a heap cause.
 <!-- SECTION:NOTES:END -->
