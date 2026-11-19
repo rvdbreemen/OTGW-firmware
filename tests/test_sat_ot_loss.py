@@ -434,7 +434,8 @@ class SourceGuards(unittest.TestCase):
         self.assertIn("memset(&s_core_ot_link_lost, 0, sizeof(s_core_ot_link_lost));", self.sat)
         self.assertIn('je.field(F("ot_link_lost"),         snap->st.sat.bOtLinkLost);', self.sat)
         d = SRC / "data"
-        self.assertIn("OpenTherm lost: boiler handed back", (d / "v2.html").read_text(encoding="utf-8"))
+        self.assertIn("SAT paused: no OpenTherm connection, the boiler is back under normal control",
+                      (d / "v2.html").read_text(encoding="utf-8"))   # TASK-2036 wording (Robert, option A)
         self.assertIn("d.ot_link_lost", (d / "v2.js").read_text(encoding="utf-8"))
 
     def test_no_enqueue_in_processot(self):
