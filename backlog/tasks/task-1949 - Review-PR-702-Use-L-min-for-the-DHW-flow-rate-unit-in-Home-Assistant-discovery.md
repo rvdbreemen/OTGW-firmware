@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-14T20:51:00Z'
-updated_date: '2026-11-14T22:11:00Z'
+updated_date: '2026-11-19T22:23:00Z'
 labels:
   - github
   - pr
@@ -27,8 +27,8 @@ https://github.com/rvdbreemen/OTGW-firmware/pull/702 by justink0k (fork), base d
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Reviewed against the HA unit list and every consumer of haUnitStr(HaUnit::l_min) (review comment on the PR)
-- [ ] #2 Tests and the esp32-combo build green on the PR head
+- [x] #1 Reviewed against the HA unit list and every consumer of haUnitStr(HaUnit::l_min) (review comment on the PR)
+- [x] #2 Tests and the esp32-combo build green on the PR head
 - [ ] #3 Bench: HA discovery creates the DHW flow rate sensor with unit L/min (HA log shows no unit error)
 - [x] #4 Robert decides on the merge; the author is credited in #alpha-testing
 <!-- AC:END -->
@@ -42,4 +42,8 @@ https://github.com/rvdbreemen/OTGW-firmware/pull/702 by justink0k (fork), base d
 
 2026-11-14 (92): the other 'l/min' strings. docs/api/MQTT.md:249 and :752 -> 'L/min' (wt-comms b18c98996). Robert's 47f0ea37e already fixed test/host/test_dhw_water_discovery.cpp D2 (it expected 'l/min' from the real haUnitStr() and went red after #702). Left for the firmware lane wt-92-webui (needs a bump): OTGW-Core.h:392 OT map unit (log text only: AddLogf in OTGW-Core.ino), v2.js:2580 OTMSG display unit, MQTTstuff.h:127 comment.
 AC3 bench by 09, 2026-11-14, .61 beta.257+47f0ea3 against broker 192.168.88.32: payload part PASS. RED on 252: retained homeassistant/sensor/otgw-1020BA21B4F8/boiler_DHWFlowRate/config had unit_of_measurement l/min. On 257 the config is only re-announced after the first MsgID 19 sample (ADR-182); triggered with 2 min GW=L loopback, then GW=S: the config came live and retained with device_class volume_flow_rate, unit_of_measurement L/min, state_class measurement (GREEN). NOT verified: the Home Assistant side (sensor created, HA log without the unit error): no HA instance is attached to this broker on the bench; the ha-ingress rig needs Docker. AC3 left open for the HA part.
+
+2026-11-19 (ba, triage): origin/dev f5bce220a. git grep 'l/min' over src/ docs/api test/: 0 hits (OTGW-Core.h:392, v2.js OTMSG unit, MQTTstuff.h comments all fixed). python test/host/test_dhw_water_meter.py on f5bce220a: RESULT: PASS rc=0 (D2 expects L/min; mutants incl. MR20-22 caught). PR #702 comment by rvdbreemen verifies against HA UnitOfVolumeFlowRate (AC1). 2cc72d819 is in published tags v2.0.0-beta.294/323/339 (esp32-combo builds); .61 runs 2.0.0-beta.401 (AC2). AC3 HA side still open: no HA instance on the bench broker; needs a tester/HA confirmation that sensor.boiler_DHWFlowRate exists with L/min.
+
+2026-11-19 coordinator plan for AC3: 09 checks the HA side on the HA-ingress rig after the beta, bundled with TASK-1780 as one HA bench item.
 <!-- SECTION:NOTES:END -->

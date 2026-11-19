@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-15T09:22:00Z'
-updated_date: '2026-11-15T12:25:00Z'
+updated_date: '2026-11-19T22:23:00Z'
 labels:
   - graph
   - webui
@@ -46,4 +46,8 @@ Robert's A (DM 1571454228763779093) and A for the serving question + ADR-245 acc
 2026-11-15 bench by 09 on .63 (Classic + S3, PSRAM), 2.0.0-beta.310+4c57d94 (via the coordinator): (a) the 7 days chip appears after the first history response (Graph sub-tab open); (c) the ring costs +58.6 KB PSRAM (estimate 60480 B: matches); (b) GET /api/v2/graph/history?hours=168: HTTP 200, 163 B, 0.08-0.40 s, 0 WEB CONN CAP refusals. The full 7-day body (1008 x 600 s, about 35 KB) only exists after >= 33.6 h of data, so the full-window part of AC4 stays open as a field/overnight check (coordinator decision); its size and shape are covered by the host test (tests/test_graph_history.py: 1008 groups, interval_s 600). AC1-AC3 ticked on the evidence in the earlier notes (ADR-245 Accepted; host test red/green; web UI test red/green). AC4 open: the full-window fetch after 7 days of uptime.
 
 2026-11-15 bench by 09 on .61 (OT-Direct, no PSRAM), beta.310+4c57d94: no 7 days chip (f PASS); the history stays at 30 s slots (h PASS).
+
+2026-11-19 (ba, triage): AC4 full-window part still not evidenceable: .63 uptime 0d 00:11 (fw 2.0.0-poc.27+b11d02e, psram_free 1344968), needs >= 33.6 h uptime on a TASK-1963 build. No code change needed; open item is an uptime soak only.
+
+2026-11-19 coordinator plan for AC4: after the 08:00 beta flash on .63, 09 runs GET /api/v2/graph/history?hours=168 once .63 has >= 34 h uptime (Saturday afternoon): expect about 35 KB, interval_s 600, 0 WEB CONN CAP refusals, plus a screenshot of the 7 d chip.
 <!-- SECTION:NOTES:END -->
