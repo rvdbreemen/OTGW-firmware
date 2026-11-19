@@ -5,7 +5,7 @@ status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-13T08:07:00Z'
-updated_date: '2026-11-19T04:27:00Z'
+updated_date: '2026-11-19T04:40:00Z'
 labels:
   - sat
   - adr
@@ -86,6 +86,8 @@ Bench (otgw-bench-tester 09, 2026-11-19, .63 Classic+S3 PSRAM, no boiler, no sim
 Bench 09 on .63 (d106f55, src-identical to 0f9a906, differing only in the committed copy of the generated gz): REST window_hours/window_hours_needed PASS; v2 file dropped and v3 restore PASS (fixtures); tune card en/nl/de/el + help 12/0.05 PASS; 0 JS errors, keep list, SAT target line PASS. MQTT sat/curve_tune/window_hours NOT OBSERVED on the bench, confirm with SAT active: satcurveselftune=true, but SAT was handed back without a boiler, so the tick publisher satPublishMQTT() was idle (sat/# 220 s: 41 state/flag topics, no sat/curve_recommendation, sat/power, sat/state or curve_tune). 379 does not change any MQTT gate (diff: only the topic rename in the same bCurveSelfTune block). The curve-advice text 'at least 6 hours' is a separate rule (SATcontrol.ino:6134, >=6 hourly samples), not a leftover.
 
 2026-11-19 Q-1889a answered A by Sergeant D (entry 423, 04:07:49 UTC, https://discord.com/channels/812969634638725140/1105556725714649128/1572825703299293265, unedited; recorded by 92, origin 25df1fdb6): the 12-counted-hour rolling window, decided every counted hour, step 0.05, window empties after a step = beta.379 as built, no code change. AC1 ticked on the plan (thermo-nova 7beaaf5 citations, ADR-228/230 timing; pid.py:185-189/const.py:16 belong to TASK-1890's integral halving, as the plan says) plus entry 423. ADR-260 updated (still Proposed; Q-1889a closed, entry 423 cited). Q-1889b (warm-up-only decisions) asked 04:24 UTC; an answer other than A becomes a new task.
+
+2026-11-19 Q-1889b answered A (entry 424, origin aa6dd58df): warm-up-only decisions in the 12-hour window stay, no change. ADR-260 open questions both closed (still Proposed).
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary

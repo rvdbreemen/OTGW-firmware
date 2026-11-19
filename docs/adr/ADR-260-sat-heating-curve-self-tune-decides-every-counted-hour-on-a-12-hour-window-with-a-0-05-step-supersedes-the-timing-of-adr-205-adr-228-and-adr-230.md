@@ -185,8 +185,10 @@ the code that was reviewed for ADR-228; the header and this ADR say what a "day"
 
 - [x] Q-1889a: Sergeant D confirms option A (12 counted hours, step 0.05) or chooses B or C. Answered A on 2026-11-19
   (entry 423): the decision as built in beta.379, no code change.
-- [ ] Q-1889b: Sergeant D accepts decisions on the warm-up phase alone when the 12-hour window holds under one hour of
-  floating data (entry 305 as is), or asks for a floating vote first (queued 2026-11-19, after Q-1889a).
+- [x] Q-1889b: Sergeant D accepts decisions on the warm-up phase alone when the 12-hour window holds under one hour of
+  floating data (entry 305 as is), or asks for a floating vote first. Answered A on 2026-11-19 (entry 424,
+  https://discord.com/channels/812969634638725140/1105556725714649128/1572830405680300035): warm-up-only decisions
+  stay, no code change.
 
 ## Related Decisions
 
@@ -199,7 +201,7 @@ the code that was reviewed for ADR-228; the header and this ADR say what a "day"
 
 ## References
 
-- TASK-1889; Sergeant D corrections entries 72, 329, 340, 358, 367, 422, 423; docs/sat/open-questions.md Q-1889a, Q-1889b.
+- TASK-1889; Sergeant D corrections entries 72, 305, 329, 340, 358, 367, 422, 423, 424; docs/sat/open-questions.md Q-1889a, Q-1889b.
 - `src/OTGW-firmware/SATcurveTune.h` (constants), `src/OTGW-firmware/SATcontrol.ino` (`satTuneCloseDay`, `satTuneFormat`,
   `satTuneParse`, `satTuneRollHour`, the `curve_tune` REST object and MQTT publish).
 - thermo-nova 7beaaf5 (`other-projects/SAT-releases-thermo-nova/custom_components/sat`): `entry_data.py:213`,
