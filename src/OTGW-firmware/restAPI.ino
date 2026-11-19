@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-beta.388
+**  Version  : v2.0.0-beta.389
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -184,7 +184,17 @@ static void sendApiMethodNotAllowed(const __FlashStringHelper* allowedMethods) {
 // Retry-After: 1, like the static-file gate (webServerCompat.h, TASK-960), so a
 // client backs off instead of hammering the gate. A 503 that reports missing
 // hardware or a disconnected MQTT uses sendApiError() and carries no Retry-After.
+// TASK-2910: on a starved heap the 503 itself cannot be built: the response and its header list nodes come
+// from operator new, which aborted the firmware there (.61, beta.388, 2026-11-19, task async_tcp:
+// processAPI -> sendApiBusy -> addHeader). Below REST_BUSY_MIN_MAXBLOCK the connection is closed
+// without a response; the client sees a reset and retries. Same threshold as a starved heap for
+// the WiFi supervisor (WIFI_STARVED_MAXBLOCK, networkStuff.ino).
+static const uint32_t REST_BUSY_MIN_MAXBLOCK = 4096;
 static void sendApiBusy(const __FlashStringHelper* message) {
+  if (platformMaxFreeBlock() < REST_BUSY_MIN_MAXBLOCK) {
+    webAbortCurrentRequest();
+    return;
+  }
   webPushHeader(F("Retry-After"), F("1"));
   sendApiError(503, message);
 }
