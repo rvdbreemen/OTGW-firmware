@@ -5,6 +5,20 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [2.0.0-beta.382] - 2026-11-19
+
+### Changed
+- BLE: on boards without PSRAM BLE can no longer be switched on; a stored "on" is cleared at the first start, the switch is greyed out ("BLE needs PSRAM"), REST answers 409 and MQTT refuses it (TASK-2025, beta.375, ADR-257).
+- SAT: when the room leaves the 0.1 C band the PID integral is halved once and held instead of reset to 0, for the main and the zone PIDs (TASK-1890, beta.376; entries 333, 414).
+- SAT: no continuous to PWM switch while the tolerance band pauses heating; both switch rules only run while heating is allowed (TASK-1887, beta.377; entries 410, 417).
+- Web UI: the Monitor graph, its 24 h history and the CSV show the SAT target as its own series while SAT is enabled; the capture tool writes it (TASK-2018, beta.378, ADR-256).
+- SAT: the heating curve self-tune decides every counted hour on a 12-counted-hour window with a 0.05 step (TASK-1889, beta.379, ADR-260; entries 423, 424). BREAKING: MQTT `sat/curve_tune/window_hours` replaces `sat/curve_tune/days` and `sat/curve_tune/clean_hours_today`; REST `curve_tune.window_hours` and `window_hours_needed` replace `days`, `days_needed`, `clean_hours_today`, `clean_hours_needed` and `hours_today`; saved tuner progress of an older build is dropped once.
+- Web UI: the SAT hand-back hints read "SAT paused: ..." (EN, NL, DE, EL) (TASK-2036, beta.382).
+
+### Fixed
+- SAT: the weather is fetched before the boiler's or Home Assistant's outside temperature turns one hour old, so the sources no longer go stale together and SAT no longer hands the boiler back mid-burn (TASK-2039, beta.380).
+- SAT: an `OT=` outside temperature answered by the PIC with its own A frames now counts as a fresh outside source (TASK-2040, beta.381; entries 330, 331).
+
 ## [2.0.0-beta.374] - 2026-11-18
 
 ### Changed
@@ -1120,7 +1134,8 @@ Legacy release. See git history for details.
 
 Legacy releases. See git history for details.
 
-[Unreleased]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.374...HEAD
+[Unreleased]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.382...HEAD
+[2.0.0-beta.382]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.374...v2.0.0-beta.382
 [2.0.0-beta.374]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.360...v2.0.0-beta.374
 [2.0.0-beta.339]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.323...v2.0.0-beta.339
 [2.0.0-beta.323]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.294...v2.0.0-beta.323
