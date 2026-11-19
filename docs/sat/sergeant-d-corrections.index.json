@@ -5602,6 +5602,19 @@
     "TASK-1889"
    ],
    "confirmed_by_entry": null
+  },
+  {
+   "id": 424,
+   "title": "Q-1889b answered A: with the 12-counted-hour window the warm-up phase may decide alone when the floating phase has less than 1 hour of data, as entry 305 already allows (Sergeant D, 2026-11-19; urgent round, 2.0.0)",
+   "date": "2026-11-19",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1572830405680300035",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1889"
+   ],
+   "confirmed_by_entry": null
   }
  ]
 }

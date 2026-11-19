@@ -8376,3 +8376,18 @@ Robert, 16:18:42 UTC (https://discord.com/channels/812969634638725140/9144987300
 **Task:** TASK-1889 (confirms the build; ADR-260 can cite this entry).
 
 **Open:** Q-1889b (decisions on the warm-up phase alone in the 12-hour window, entry 305) is asked next.
+
+## 424. Q-1889b answered A: with the 12-counted-hour window the warm-up phase may decide alone when the floating phase has less than 1 hour of data, as entry 305 already allows (Sergeant D, 2026-11-19; urgent round, 2.0.0)
+
+**Source:** #dev-sat-mqtt, Sergeant D 2026-11-19 04:26:30 UTC (https://discord.com/channels/812969634638725140/1105556725714649128/1572830405680300035; unedited after 90 s, read back via the Discord API), a reply to Q-1889b (https://discord.com/channels/812969634638725140/1105556725714649128/1572829932617211918; text by ba).
+
+**Quoted:**
+> "my answer is A"
+
+**Settled:** option A as posted: warm-up-only decisions in the 12-counted-hour window (entry 423) are accepted. When the window holds less than 1 hour of floating data, the floating phase does not vote (entries 313/315) and the warm-up phase decides alone, as entry 305 already allows. No change; the window stays 12 counted hours. Background: in the TASK-1889 closed-loop test 1 of 13 decisions in the 60-day raise scenario was warm-up-only, none with the old 3-day window, and the tune converged without a wrong-direction step. Scope: 2.0.0.
+
+**Compared with thermo-nova (7beaaf5):** no counterpart; thermo-nova has no tuner (entry 72).
+
+**Task:** TASK-1889 (no change; confirms the build).
+
+**Open:** none.
