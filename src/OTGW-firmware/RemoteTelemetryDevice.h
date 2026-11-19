@@ -662,9 +662,50 @@ static void remoteTelemetryEvBoot() {
   e.send(rtel::EV_REBOOT);
 }
 
+// TASK-2901: every OT frame captured gets the next sequence number, also one the recorder then cannot hold, so a
+// missing frame shows on the laptop as a hole in the numbers (each record carries its first and last, SEC_FSEQ).
+static uint32_t remoteTelemetryFrameSeq = 0;
+
+// TASK-2901 (Robert 2026-11-19): a capture session starts with a marker in real time, and every local midnight (and
+// every session start) gets a date marker, so the decoder can cut exact day files that run 00:00:00-24:00:00.
+static int remoteTelemetryDateYday = -1, remoteTelemetryDateYear = -1;
+static void remoteTelemetryEvDateIfNew(bool force) {
+  if (!remoteTelemetryActive) return;
+  time_t now = time(nullptr);
+  struct tm lt;
+  localtime_r(&now, &lt);
+  if (!force && lt.tm_yday == remoteTelemetryDateYday && lt.tm_year == remoteTelemetryDateYear) return;
+  remoteTelemetryDateYday = lt.tm_yday;
+  remoteTelemetryDateYear = lt.tm_year;
+  struct tm mid = lt;
+  mid.tm_hour = mid.tm_min = mid.tm_sec = 0;
+  mid.tm_isdst = -1;
+  char date[11];
+  snprintf_P(date, sizeof(date), PSTR("%04d-%02d-%02d"), lt.tm_year + 1900, lt.tm_mon + 1, lt.tm_mday);
+  RemoteTelemetryEv e;
+  e.u((uint64_t)mktime(&mid) * 1000ULL);
+  e.textz(date);
+  e.send(rtel::EV_DATE);
+}
+
+static void remoteTelemetryEvSession() {
+  RemoteTelemetryEv e;
+  e.u((uint64_t)(remoteTelemetryNowUs() / 1000));
+  e.u(remoteTelemetryFrameSeq + 1);
+  e.textz(_VERSION);
+  e.textz(remoteTelemetryUid);
+  e.send(rtel::EV_SESSION);
+  remoteTelemetryEvDateIfNew(true);
+}
+
 void remoteTelemetryOtFrame(char letter, uint32_t frame) {
+  if (!remoteTelemetryActive) return;
   int64_t tMs = remoteTelemetryNowUs() / 1000;
-  remoteTelemetryAppend(tMs, [&] { return remoteTelemetry.otFrame(tMs, letter, frame); });
+  // TASK-2901: a replayed frame carries the replay's ideal dispatch time (otFrameIdealMs, millis()): stamp it with that,
+  // so the decoded download repeats the input file's gaps to the ms (Robert: output identical to the input).
+  if (otFrameIdealMs) tMs -= (int64_t)(uint32_t)(millis() - otFrameIdealMs);
+  const uint32_t seq = ++remoteTelemetryFrameSeq;
+  remoteTelemetryAppend(tMs, [&] { return remoteTelemetry.otFrame(tMs, letter, frame, seq); });
 }
 
 // ---------------------------------------------------------------- upload
@@ -1036,11 +1077,19 @@ static bool remoteTelemetryInitCore() {
   return remoteTelemetryLock && remoteTelemetryTaskStarted;
 }
 
+static const char *remoteTelemetryPauseWhy = nullptr;     // set just before a state change that pauses capture
+
 // Capture runs while local recording is on or the collection point logs, once the clock is set (t0 and seq are epoch based).
 // TASK-2901 poc.22: with the PSRAM queue it also runs before the first login and while the upload backs off, so a
 // transient failure or a skipped attempt costs no data; a full queue still counts its losses (SEC_LOST in the next record).
 static void remoteTelemetryUpdateActive() {
-  const bool queued = remoteTelemetrySlotCount > 1 && (remoteTelemetrySvc == SVC_PROBE || remoteTelemetrySvc == SVC_BACKOFF);
+  // poc.24: ... and only while the queue has room for two more records; when the backend stays unreachable that long,
+  // capture pauses (EV_PAUSE "send queue full") instead of losing records, and resumes with a session marker.
+  int freeSlots = 0;
+  for (int i = 0; i < remoteTelemetrySlotCount; i++) if (remoteTelemetrySlots[i].buf && !remoteTelemetrySlots[i].busy) freeSlots++;
+  const bool roomy = freeSlots >= 2;
+  if (!roomy && remoteTelemetrySvc != SVC_UP && !remoteTelemetryPauseWhy) remoteTelemetryPauseWhy = "send queue full, backend not reachable";
+  const bool queued = remoteTelemetrySlotCount > 1 && roomy && (remoteTelemetrySvc == SVC_PROBE || remoteTelemetrySvc == SVC_BACKOFF);
   bool want = (remoteTelemetryLocalOn || remoteTelemetrySvc == SVC_UP || queued) && time(nullptr) >= 1700000000;
   if (want && !remoteTelemetryActive) {
     if (platformMutexLock(remoteTelemetryLock, 200)) {
@@ -1051,8 +1100,16 @@ static void remoteTelemetryUpdateActive() {
       platformMutexUnlock(remoteTelemetryLock);
       remoteTelemetryActive = true;
       remoteTelemetryEvBoot();                           // TASK-1473: reset reason of this boot, once
+      remoteTelemetryEvSession();                        // TASK-2901: session marker in real time + date marker
     }
   } else if (!want && remoteTelemetryActive) {
+    // TASK-2901 (Robert 2026-11-19: signal back that the recording is paused): the last item before capture stops
+    static const char *const why[] = {"probe", "up", "upload backs off", "uid enrolled with another secret", "upload off"};
+    RemoteTelemetryEv e;
+    e.b(1);
+    e.textz(remoteTelemetryPauseWhy ? remoteTelemetryPauseWhy : why[remoteTelemetrySvc < 5 ? remoteTelemetrySvc : 4]);
+    e.send(rtel::EV_PAUSE);
+    remoteTelemetryPauseWhy = nullptr;
     remoteTelemetryActive = false;
   }
 }
@@ -1129,6 +1186,7 @@ bool remoteTelemetryLocalStop() {
 void remoteTelemetryHealthRead(RemoteTelemetryHealth &h) {   // TASK-2901 poc.21, for /api/v2/health
   h.enabled = remoteTelemetrySvc != SVC_OFF;
   h.svc = (uint8_t)remoteTelemetrySvc;
+  h.capturing = remoteTelemetryActive;
   h.connects = remoteTelemetryConnects;
   h.connectFails = remoteTelemetryConnectFails;
   h.heapSkips = remoteTelemetryHeapSkips;
@@ -1215,15 +1273,22 @@ static void remoteTelemetryWriteConfig() {
   f.close();
 }
 
-static void remoteTelemetryBlocked() {                   // the maintainer blocked this gateway: the opt-in goes off
-  remoteTelemetryPause(false);
-  remoteTelemetryRemote = {rtel::RM_DEFAULT, 0, 0};       // and any central telemetry mode ends with it
+// TASK-2901 (Robert 2026-11-19): the collection point can never turn remote telemetry off. "blocked" is only learnt from
+// the reply to a delivery attempt, and it pauses: capture stops (EV_PAUSE "blocked by the collection point"), the next
+// attempt follows after the longest backoff, and /telemetry.cfg stays as the user set it on the device.
+static void remoteTelemetryBlocked() {
+  remoteTelemetryRemote = {rtel::RM_DEFAULT, 0, 0};       // any central telemetry mode ends with it
   remoteTelemetryApplyRemote();
-  remoteTelemetrySvc = SVC_OFF;                           // no further connection; local recording, if on, goes on
+  remoteTelemetryPauseWhy = "blocked by the collection point";
+  remoteTelemetryPause(true);
+  remoteTelemetryNextProbe = millis() + rtel::BACKOFF_MAX_MS;
+  remoteTelemetrySvc = SVC_UID_TAKEN;                     // the longest wait, no capture; local recording, if on, goes on
   remoteTelemetryUpdateActive();
-  remoteTelemetryCfg.enabled = false;
-  remoteTelemetryCfgWritePending = true;                 // poc.23: written by remoteTelemetryLoop() (this task has a PSRAM stack)
-  DebugTf(PSTR("telemetry: %s is blocked by the collection point; telemetry opt-in turned off\r\n"), remoteTelemetryUid);
+  remoteTelemetryPauseWhy = nullptr;
+  DebugTf(PSTR("telemetry: %s is blocked by the collection point; paused, next attempt in %u min
+
+"), remoteTelemetryUid,
+          (unsigned)(rtel::BACKOFF_MAX_MS / 60000));
 }
 
 // From loop(): flash writes the telemetry task may not do itself (its stack is in PSRAM, poc.23).
@@ -1238,6 +1303,7 @@ static void remoteTelemetryTask(void *) {
   for (;;) {
     platformTaskDelay(500);
     remoteTelemetryUpdateActive();                       // local recording on, or the clock just became valid
+    remoteTelemetryEvDateIfNew(false);                   // TASK-2901: a date marker right after every local midnight
     if (remoteTelemetryActive && millis() - lastClose >= REMOTE_TELEMETRY_INTERVAL_MS) {
       lastClose = millis();
       remoteTelemetryEvMinute();                         // TASK-1473: health and GET counts, then the record closes

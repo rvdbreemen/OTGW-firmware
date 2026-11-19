@@ -382,6 +382,7 @@ inline char dbgConv(const char *&fmt, int *lenMod) {
 
 static const uint8_t SEC_SAT = 2, SEC_DBG = 3, SEC_OT2 = 5;
 static const uint8_t SEC_LOST = 7;
+static const uint8_t SEC_FSEQ = 9;  // TASK-2901: LEB128 first and last frame sequence number of the record's OT frames
 static const uint8_t SEC_EVT = 8;   // TASK-1473: the events section   // TASK-2904: LEB128 items, LEB128 records lost since the previous record
 
 // Writes section `type` with `data` into out. Returns false when it does not fit.
@@ -408,7 +409,7 @@ inline bool mixOtSection(Buf &out, int64_t t0Ms, int64_t firstMs, uint32_t count
 // a new one and appends again.
 // TASK-1473: the events section took 1,408 B: OT needs about 200 B a minute (384 B), SAT up to ~470 (512 B).
 static const size_t REC_OT_BYTES = 384, REC_SAT_BYTES = 512, REC_DBG_BYTES = 1792, REC_EVT_BYTES = 1408;
-static const size_t REC_MAX_BYTES = REC_OT_BYTES + REC_SAT_BYTES + REC_DBG_BYTES + REC_EVT_BYTES + 32;   // + headers
+static const size_t REC_MAX_BYTES = REC_OT_BYTES + REC_SAT_BYTES + REC_DBG_BYTES + REC_EVT_BYTES + 48;   // + headers (TASK-2901: +16 for the SEC_FSEQ section)
 
 // ---------------------------------------------------------------- TASK-1473: the events section (SEC_EVT)
 //
@@ -440,7 +441,10 @@ enum EventType : uint8_t {
   EV_FW = 38,          // kind u8 (FW_*), z result, text
   EV_HEALTH = 39,      // u free heap, u largest block, u minimum free heap, z rssi, u uptime s
   EV_MODE = 40,        // kind u8 (0 sensor simulation, 1 OTGW simulation, 2 central telemetry mode), u value
-  EV_BRIDGE_IN = 41    // refused u8, text: a command line from the port 25238 bridge
+  EV_BRIDGE_IN = 41,   // refused u8, text: a command line from the port 25238 bridge
+  EV_SESSION = 42,     // TASK-2901: u epoch ms, u next frame seq, text firmware, text uid: a capture session starts
+  EV_DATE = 43,        // TASK-2901: u epoch ms of local midnight, text YYYY-MM-DD: at every local midnight and session start
+  EV_PAUSE = 44        // TASK-2901: paused u8 (1), text reason: capture stops here; the next EV_SESSION marks the resume
 };
 enum FwEventKind : uint8_t { FW_PIC_START = 0, FW_PIC_DONE = 1, FW_OTA_START = 2, FW_OTA_END = 3, FW_FILE_UPLOAD = 4,
                              FW_FILE_DELETE = 5 };
@@ -455,6 +459,7 @@ struct Recorder {
   DbgState dbgSt;
   int64_t t0Ms, firstOtMs;
   uint32_t otCount;
+  uint32_t firstSeq = 0, lastSeq = 0;               // TASK-2901: frame sequence numbers of this record's OT frames
   bool open;
 
   void begin(int64_t t0ms) {
@@ -468,11 +473,12 @@ struct Recorder {
   // begin() and written as SEC_LOST at the head of the next closed record, so a gap is never silent.
   uint32_t lostItems = 0, lostRecords = 0;
 
-  bool otFrame(int64_t tMs, char letter, uint32_t frame) {
+  bool otFrame(int64_t tMs, char letter, uint32_t frame, uint32_t seq = 0) {
     int li = otLetterIndex(letter);
     if (li < 0) return true;                         // not an OT frame line: nothing to record
     if (ot.room() < 24) return false;                // worst case of one frame plus the 5 finish bytes
-    if (!otCount) firstOtMs = tMs;
+    if (!otCount) { firstOtMs = tMs; firstSeq = seq; }
+    lastSeq = seq;
     otEncodeFrame(rc, model, tMs - firstOtMs, li, frame);
     otCount++;
     return true;
@@ -515,6 +521,12 @@ struct Recorder {
       lostItems = lostRecords = 0;
     }
     mixOtSection(b, t0Ms, firstOtMs, otCount, ot.p, ot.n);
+    if (otCount && lastSeq) {                        // TASK-2901: the laptop finds missing frames from these
+      uint8_t q[12];
+      Buf qb; qb.init(q, sizeof(q));
+      qb.leb(firstSeq); qb.leb(lastSeq);
+      mixSection(b, SEC_FSEQ, q, qb.n);
+    }
     mixSection(b, SEC_SAT, sat.p, sat.n);
     mixSection(b, SEC_DBG, dbg.p, dbg.n);
     mixSection(b, SEC_EVT, evt.p, evt.n);

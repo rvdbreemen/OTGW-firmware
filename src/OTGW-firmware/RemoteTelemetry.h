@@ -42,6 +42,7 @@ const char *remoteTelemetryUidText();
 struct RemoteTelemetryHealth {
   bool enabled;                      // /telemetry.cfg enabled=1 and remoteTelemetrySetup() started the upload
   uint8_t svc;                       // 0 probe, 1 up, 2 backoff, 3 uid taken, 4 off
+  bool capturing;                    // TASK-2901: the recorder captures now (false = paused)
   uint32_t connects, connectFails, heapSkips, sent, failed, lastStatus;
   uint32_t connHeap, connBlock, connPsram;     // right after the last successful connect
   uint32_t failHeap, failBlock;                // at the last failed connect

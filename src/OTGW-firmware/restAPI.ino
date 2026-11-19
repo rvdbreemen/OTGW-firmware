@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-poc.23
+**  Version  : v2.0.0-poc.24
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -3636,6 +3636,7 @@ void sendHealth()
       je.beginObject(F("remote_telemetry"));
       je.field(F("enabled"), rt.enabled);
       je.field(F("svc"), (uint32_t)rt.svc);
+      je.field(F("capturing"), rt.capturing);
       je.field(F("connects"), rt.connects);
       je.field(F("connect_fails"), rt.connectFails);
       je.field(F("heap_skips"), rt.heapSkips);

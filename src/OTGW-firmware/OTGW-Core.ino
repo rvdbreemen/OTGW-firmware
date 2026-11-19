@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v2.0.0-poc.23
+**  Version  : v2.0.0-poc.24
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -478,9 +478,16 @@ void setupOTConcurrency() {
 // enqueueOTFrame — producer-side. Copy the line (null-terminated), enqueue by
 // value. The ONLY two callers are the frame producers (dispatchOTGWInputLine,
 // bridgeFrameToParser). Returns false on a full queue (diagnostic drop).
+uint32_t otFrameIdealMs = 0;
+
+// TASK-2901: the replay's enqueue with the line's ideal dispatch time; the remote telemetry recorder stamps a replayed
+// frame with it, so the recorded gaps are the file's gaps to the ms (the processing time lags by up to ~100 ms).
+static bool enqueueOTFrameAt(const char *buf, size_t len, uint8_t source, uint32_t idealMs);
+
 bool enqueueOTFrame(const char *buf, size_t len, bool suppressOutput, uint8_t source) {
   if (otFrameQueue == nullptr || buf == nullptr || len == 0) return false;
   OTFrameMsg msg;
+  msg.idealMs = 0;
   if (len > sizeof(msg.line) - 1) len = sizeof(msg.line) - 1;  // clamp (defensive)
   memcpy(msg.line, buf, len);
   msg.line[len] = '\0';                       // processOT's non-OT branches need a terminator
@@ -588,8 +595,10 @@ void drainOTFrameQueue() {
     // processOT() acquires OTStateLock internally (writer side), covering all
     // five processOT call sites uniformly — not just this consumer. Do NOT wrap
     // here too: the lock is non-recursive and would self-deadlock.
+    otFrameIdealMs = msg.idealMs;              // TASK-2901: read by the remote telemetry recorder in processOT()
     processOT(msg.line, msg.len, msg.suppressOutput, msg.source == OTFRAME_SRC_OTDIRECT_LOCAL,
               msg.source == OTFRAME_SRC_REPLAY);
+    otFrameIdealMs = 0;
     feedWatchDog();                            // bound worst-case drain time
   }
 }
@@ -4610,10 +4619,28 @@ bool sendPICSerial(const char* buf, int len)
 // source=REPLAY: the consumer (drainOTFrameQueue) blinks the LED as for a live PIC
 // line and processOT() decodes and publishes the line as usual, but a replayed
 // line is no boiler evidence (TASK-1185).
-static void dispatchOTGWInputLine(const char* buf, size_t len)
+static void dispatchOTGWInputLine(const char* buf, size_t len, uint32_t idealMs)
 {
   if (len == 0) return;
-  enqueueOTFrame(buf, len, false, OTFRAME_SRC_REPLAY);
+  enqueueOTFrameAt(buf, len, OTFRAME_SRC_REPLAY, idealMs);
+}
+
+static bool enqueueOTFrameAt(const char *buf, size_t len, uint8_t source, uint32_t idealMs)
+{
+  if (otFrameQueue == nullptr || buf == nullptr || len == 0) return false;
+  OTFrameMsg msg;
+  if (len > sizeof(msg.line) - 1) len = sizeof(msg.line) - 1;
+  memcpy(msg.line, buf, len);
+  msg.line[len] = '\0';
+  msg.len = (uint16_t)len;
+  msg.suppressOutput = false;
+  msg.source = source;
+  msg.idealMs = idealMs ? idealMs : 1;       // 0 means "no ideal time"
+  if (!platformQueueSend(otFrameQueue, &msg)) {
+    otFrameQueueDrops++;
+    return false;
+  }
+  return true;
 }
 
 // TASK-1294: where the replay reads its lines from. An /otgw_simulation.log on LittleFS
@@ -4781,6 +4808,7 @@ static uint32_t otgwReplayPrevDevMs  = 0;       // device time of the previous t
 static bool     otgwReplayHeld       = false;   // the line buffer holds a line that waits for its time
 static size_t   otgwReplayHeldLen    = 0;
 static uint32_t otgwReplayAnchorMs   = 0;       // ideal dispatch time of the previous line (millis())
+static uint32_t otgwReplayHeldIdealMs = 0;      // TASK-2901: the held line's ideal dispatch time
 
 // "HH:MM:SS" or "HH:MM:SS.f" up to 6 fraction digits -> ms of day. False for any other shape.
 static bool parseReplayDeviceTime(const char* s, size_t n, uint32_t& ms)
@@ -4846,7 +4874,7 @@ static bool otgwReplayDue()
 // "timed" while the replay follows recorded gaps, "fixed" for the fixed interval.
 const char* otgwReplayTimingMode() { return otgwReplayTimed ? "timed" : "fixed"; }
 
-static void emitReplayLine(const char* line, size_t len)
+static void emitReplayLine(const char* line, size_t len, uint32_t idealMs)
 {
   // TASK-1111: the replay synthesises lines and never passes the PIC UART, so
   // it has no raw byte stream to ride on (drainOTRawQueue). Write to the
@@ -4857,7 +4885,7 @@ static void emitReplayLine(const char* line, size_t len)
     OTGWstream.write('\r');
     OTGWstream.write('\n');
   }
-  dispatchOTGWInputLine(line, len);
+  dispatchOTGWInputLine(line, len, idealMs);
 }
 
 // The anchor follows the ideal time, so one late pass does not shift every later line;
@@ -4886,7 +4914,7 @@ static bool replayNextOTGWSimulationLine(File& otgwSimulationFile, char* sReplay
 
   if (otgwReplayHeld) {                   // its time has come (the pump calls us when it is due)
     otgwReplayHeld = false;
-    emitReplayLine(sReplay, otgwReplayHeldLen);
+    emitReplayLine(sReplay, otgwReplayHeldLen, otgwReplayHeldIdealMs);
     replaySetAnchor(state.debug.iOTGWSimulationNextDueMs, now);
     state.debug.iOTGWSimulationNextDueMs = replayStamp(now);   // read the next line on the next pass
     return true;
@@ -4927,13 +4955,17 @@ static bool replayNextOTGWSimulationLine(File& otgwSimulationFile, char* sReplay
     otgwReplayPrevValid = true;
     otgwReplayPrevDevMs = devMs;
     const uint32_t due = otgwReplayAnchorMs + gapMs;
-    if (static_cast<int32_t>(now - due) >= 0) {                  // already due (gap 0 or a late pass)
-      emitReplayLine(sReplay, replayLen);
+    // TASK-2901: the ideal time follows the anchor (as replaySetAnchor does): due, or now when more than 1 s behind
+    const int32_t lagMs = static_cast<int32_t>(now - due);
+    const uint32_t idealMs = (lagMs >= 0 && lagMs >= 1000) ? now : due;
+    if (lagMs >= 0) {                                            // already due (gap 0 or a late pass)
+      emitReplayLine(sReplay, replayLen, idealMs);
       replaySetAnchor(due, now);
       state.debug.iOTGWSimulationNextDueMs = replayStamp(now);
     } else {                                                     // wait; the line stays in the buffer
       otgwReplayHeld = true;
       otgwReplayHeldLen = replayLen;
+      otgwReplayHeldIdealMs = due;
       state.debug.iOTGWSimulationNextDueMs = replayStamp(due);
     }
     return true;
@@ -4941,7 +4973,7 @@ static bool replayNextOTGWSimulationLine(File& otgwSimulationFile, char* sReplay
 
   otgwReplayTimed = false;
   otgwReplayPrevValid = false;
-  emitReplayLine(sReplay, replayLen);
+  emitReplayLine(sReplay, replayLen, now);
   otgwReplayAnchorMs = now;
   state.debug.iOTGWSimulationNextDueMs = now + state.debug.iOTGWSimulationIntervalMs;
   return true;

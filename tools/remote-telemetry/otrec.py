@@ -720,14 +720,24 @@ def lost_counts(sec):
 # ---------------------------------------------------------------- TASK-1473: the events section
 
 SEC_EVT = 8
+SEC_FSEQ = 9   # TASK-2901: LEB128 first and last frame sequence number of the record's OT frames
+
+
+def fseq_decode(data):
+    """(first, last) frame sequence numbers of a record, or None."""
+    if not data:
+        return None
+    a, u = _unleb(data)
+    b, _ = _unleb(data[u:])
+    return a, b
 EV_NAMES = {11: "pic_cmd", 12: "otd_cmd", 13: "response", 14: "mqtt_pub", 16: "mqtt_in", 17: "rest_in",
             18: "weather", 19: "ble", 20: "setting", 21: "reboot", 23: "time_sync", 30: "dallas", 31: "s0",
             32: "net", 33: "mqtt_conn", 34: "rest", 35: "rest_gets", 36: "telnet_key", 37: "webhook", 38: "fw",
-            39: "health", 40: "mode", 41: "bridge_in"}
+            39: "health", 40: "mode", 41: "bridge_in", 42: "session", 43: "date", 44: "pause"}
 # Payload layout per type: t text, b u8, u LEB128, z zigzag LEB128, f float32 LE, i u32 LE, G the REST_GETS list
 EV_LAYOUT = {11: "t", 12: "t", 13: "t", 14: "tt", 16: "tt", 17: "bbt", 18: "fff", 19: "bffbz", 20: "tt",
              21: "utt", 23: "u", 30: "btz", 31: "uuu", 32: "bzi", 33: "bb", 34: "bbu", 35: "G", 36: "b",
-             37: "bz", 38: "bzt", 39: "uuuzu", 40: "bu", 41: "bt"}
+             37: "bz", 38: "bzt", 39: "uuuzu", 40: "bu", 41: "bt", 42: "uutt", 43: "ut", 44: "bt"}
 EV_FIELDS = {11: ("text",), 12: ("text",), 13: ("text",), 14: ("topic", "value"), 16: ("topic", "value"),
              17: ("route", "method", "body"), 18: ("temperature", "humidity", "wind"),
              19: ("slot", "temperature", "humidity", "battery", "rssi"), 20: ("field", "value"),
@@ -735,7 +745,8 @@ EV_FIELDS = {11: ("text",), 12: ("text",), 13: ("text",), 14: ("topic", "value")
              31: ("pulses", "total", "duration_ms"), 32: ("kind", "rssi", "ip_or_reason"), 33: ("up", "reason"),
              34: ("route", "method", "status"), 35: ("counts",), 36: ("key",), 37: ("state", "status"),
              38: ("kind", "result", "text"), 39: ("free_heap", "max_block", "min_free_heap", "rssi", "uptime_s"),
-             40: ("kind", "value"), 41: ("refused", "text")}
+             40: ("kind", "value"), 41: ("refused", "text"),
+             42: ("epoch_ms", "next_frame_seq", "firmware", "uid"), 43: ("midnight_epoch_ms", "date"), 44: ("paused", "reason")}
 
 
 def evt_encode_item(t_ms, prev_ms, typ, values):

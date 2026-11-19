@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : Header file: OTGW-Core.h
-**  Version  : v2.0.0-poc.23
+**  Version  : v2.0.0-poc.24
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -578,7 +578,10 @@ struct OTFrameMsg {
   uint16_t len;                    // payload length (excludes terminator); up to 511
   bool     suppressOutput;         // PIC path: false; OTDirect path: otHideReports
   uint8_t  source;                 // OTFrameSource: who produced this line
+  uint32_t idealMs;                // replay: the line's ideal dispatch time (millis()), 0 = when processed (TASK-2901)
 };
+// TASK-2901: the ideal time of the frame processOT() is decoding now (0 = live frame); set by drainOTFrameQueue().
+extern uint32_t otFrameIdealMs;
 static_assert(std::is_trivially_copyable<OTFrameMsg>::value,
               "OTFrameMsg must be trivially copyable for value-copy FreeRTOS queue");
 

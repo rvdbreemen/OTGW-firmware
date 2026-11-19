@@ -37,6 +37,7 @@ def decode_records(records, image, tz, out_dir, *, images_by_build=None):
             open(os.path.join(out_dir, "events.log"), "w", newline="\n") as fe:
         fo.write(eb.HEADER + "\n")
         prev = None
+        next_fseq = None                              # TASK-2901: the frame sequence number the next record should start with
         for r in records:
             if prev is not None and r["seq"] != prev + 1:
                 note = f"gap: records {prev + 1}..{r['seq'] - 1} missing"
@@ -57,7 +58,36 @@ def decode_records(records, image, tz, out_dir, *, images_by_build=None):
                 fd.write(f"\r\n### {note}\r\n".encode())
                 counts["lost_items"] = counts.get("lost_items", 0) + items
                 counts["lost_records"] = counts.get("lost_records", 0) + recs
-            for t, letter, fr in sec.get(otrec.SEC_OT, []):
+            events = list(otrec.evt_decode(r["t0"], sec.get(otrec.SEC_EVT, b"")))
+            for t, typ, fields in events:            # TASK-2901: session and date markers also in the OT log
+                if typ == 44:
+                    ts = datetime.datetime.fromtimestamp(t / 1000, tz)
+                    fo.write(f"# capture paused {ts.isoformat(timespec='milliseconds')}: {fields['reason']}\n")
+                if typ in (42, 43):
+                    ts = datetime.datetime.fromtimestamp(t / 1000, tz)
+                    what = (f"session start {datetime.datetime.fromtimestamp(fields['epoch_ms'] / 1000, tz).isoformat(timespec='milliseconds')}"
+                            f" firmware {fields['firmware']} uid {fields['uid']} next frame seq {fields['next_frame_seq']}"
+                            if typ == 42 else f"date {fields['date']}")
+                    fo.write(f"# {what}\n")
+                    if typ == 42:
+                        next_fseq = fields["next_frame_seq"]   # a new session: numbering starts here
+            frames = sec.get(otrec.SEC_OT, [])
+            fseq = otrec.fseq_decode(sec.get(otrec.SEC_FSEQ))
+            if fseq and frames:                       # TASK-2901: missing frames from the sequence numbers
+                first, last = fseq
+                if next_fseq is not None and first != next_fseq:
+                    n = first - next_fseq
+                    fo.write(f"# frame gap: {n} frames (seq {next_fseq}..{first - 1}) missing before record {r['seq']}\n"
+                             if n > 0 else f"# frame seq restart: {next_fseq} expected, {first} in record {r['seq']}\n")
+                    counts["frame_gaps"] = counts.get("frame_gaps", 0) + 1
+                    counts["frames_missing"] = counts.get("frames_missing", 0) + max(n, 0)
+                inside = last - first + 1 - len(frames)
+                if inside:
+                    fo.write(f"# frame gap: {inside} frames missing inside record {r['seq']} (seq {first}..{last})\n")
+                    counts["frame_gaps"] = counts.get("frame_gaps", 0) + 1
+                    counts["frames_missing"] = counts.get("frames_missing", 0) + max(inside, 0)
+                next_fseq = last + 1
+            for t, letter, fr in frames:
                 ts = datetime.datetime.fromtimestamp(t / 1000, tz)
                 fo.write(f"{ts.isoformat(timespec='milliseconds')}\t{ts.strftime('%H:%M:%S.%f')}\t{letter}\t{fr:08X}\n")
                 counts["frames"] += 1
@@ -76,7 +106,7 @@ def decode_records(records, image, tz, out_dir, *, images_by_build=None):
                 # (the OT frames, SAT ticks and events of every record are decoded independently of it).
                 text = f"\r\n### debug decode error in record seq {r.get('seq')}: {type(e).__name__}: {e}\r\n".encode()
                 counts["debug_errors"] = counts.get("debug_errors", 0) + 1
-            for t, typ, fields in otrec.evt_decode(r["t0"], sec.get(otrec.SEC_EVT, b"")):
+            for t, typ, fields in events:
                 ts = datetime.datetime.fromtimestamp(t / 1000, tz)
                 fe.write(f"{ts.isoformat(timespec='milliseconds')}\t{otrec.EV_NAMES[typ]}\t"
                          + json.dumps(fields, ensure_ascii=False, separators=(",", ":")) + "\n")
@@ -84,6 +114,34 @@ def decode_records(records, image, tz, out_dir, *, images_by_build=None):
             fd.write(text)
             counts["debug_bytes"] += len(text)
     return counts
+
+
+def write_days(out_dir):
+    """TASK-2901: days/<YYYY-MM-DD>.otframes.log, one file per local calendar day of otframes.log, 00:00:00-24:00:00.
+    The device_time column is already the local time of day; a '#' note goes to the day of the line after it."""
+    src = os.path.join(out_dir, "otframes.log")
+    days = os.path.join(out_dir, "days")
+    os.makedirs(days, exist_ok=True)
+    files, pending, header, n = {}, [], None, 0
+    with open(src, encoding="utf-8") as f:
+        for line in f:
+            if header is None:
+                header = line
+                continue
+            if line.startswith("#"):
+                pending.append(line)
+                continue
+            day = line[:10]
+            if day not in files:
+                files[day] = open(os.path.join(days, f"{day}.otframes.log"), "w", encoding="utf-8", newline="\n")
+                files[day].write(header)
+            files[day].writelines(pending)
+            pending = []
+            files[day].write(line)
+            n += 1
+    for fh in files.values():
+        fh.close()
+    return sorted(files), n
 
 
 def read_mix_file(path):
@@ -124,6 +182,7 @@ def main():
                     help="firmware.bin for a recording build (repeat for histories spanning builds)")
     ap.add_argument("--legacy-image", help="firmware.bin for uploaded batches without a recorded build ID")
     ap.add_argument("--tz", default="Europe/Amsterdam")
+    ap.add_argument("--days", action="store_true", help="also write days/<YYYY-MM-DD>.otframes.log, one per local day")
     ap.add_argument("--token-file", help="a superuser auth token (e.g. a PocketBase impersonate token) instead of the "
                                          "e-mail and password; then give only base device_uid out_dir")
     a = ap.parse_args()
@@ -175,7 +234,11 @@ def main():
     c = decode_records(records, legacy, ZoneInfo(a.tz), a.out_dir, images_by_build=images_by_build)
     print(f"{c['records']} records, {c['frames']} OT frames, {c['ticks']} SAT ticks, {c['debug_bytes']} debug bytes, "
           f"{c['gaps']} gaps, {c.get('debug_errors', 0)} debug decode errors, "
-          f"lost {c.get('lost_items', 0)} items / {c.get('lost_records', 0)} records -> {a.out_dir}")
+          f"lost {c.get('lost_items', 0)} items / {c.get('lost_records', 0)} records, "
+          f"{c.get('frame_gaps', 0)} frame gaps ({c.get('frames_missing', 0)} frames missing by sequence number) -> {a.out_dir}")
+    if a.days:
+        names, n = write_days(a.out_dir)
+        print(f"days: {', '.join(names)} ({n} frames) -> {os.path.join(a.out_dir, 'days')}")
 
 
 if __name__ == "__main__":

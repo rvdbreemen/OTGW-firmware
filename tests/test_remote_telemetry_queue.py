@@ -9,6 +9,7 @@ holds the records meanwhile, and capture goes on before the first login and whil
 
 Structural check on RemoteTelemetryDevice.h (the behaviour is proven on the bench, AC #6). Red on 047d0803d (poc.21).
 poc.23: the task stack and the slot table in PSRAM, and no flash write from the task; red on 0c588f91e (poc.22).
+poc.24: 'blocked' pauses and never turns the opt-in off; a full queue pauses capture (EV_PAUSE); red on c2623c057.
 Run: python tests/test_remote_telemetry_queue.py
 """
 import re
@@ -65,6 +66,21 @@ class Queue(unittest.TestCase):
             self.assertNotIn("LittleFS.open", b)
             self.assertNotIn("Preferences", b)
         self.assertIn("remoteTelemetryWriteConfig();", body("void remoteTelemetryLoop()"))
+
+    def test_blocked_pauses_and_never_turns_the_opt_in_off(self):
+        """poc.24 (Robert 2026-11-19): the collection point can never turn remote telemetry off; 'blocked' pauses."""
+        b = body("static void remoteTelemetryBlocked()")
+        self.assertNotIn("remoteTelemetryCfg.enabled = false", b)
+        self.assertNotIn("remoteTelemetryCfgWritePending = true", b)
+        self.assertNotIn("SVC_OFF", b)
+        self.assertIn("BACKOFF_MAX_MS", b)
+
+    def test_full_queue_pauses_capture_with_a_marker(self):
+        """poc.24: when the backend stays unreachable the capture pauses (EV_PAUSE) instead of losing records."""
+        b = body("static void remoteTelemetryUpdateActive()")
+        self.assertIn("freeSlots >= 2", b)
+        self.assertIn("send queue full", b)
+        self.assertIn("EV_PAUSE", b)
 
     def test_guard_limits(self):
         self.assertEqual(const("REMOTE_TELEMETRY_MIN_FREE"), 12288)
