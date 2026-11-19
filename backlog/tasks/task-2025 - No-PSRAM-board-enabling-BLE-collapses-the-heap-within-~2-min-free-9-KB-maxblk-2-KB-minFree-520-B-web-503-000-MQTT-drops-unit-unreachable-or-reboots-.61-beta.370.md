@@ -4,11 +4,11 @@ title: >-
   No-PSRAM board: enabling BLE starves the heap within ~2 min (free 7-13 KB,
   maxblk 2-5 KB, minFree 520 B), web 503/000, MQTT drops, then the unit hangs
   (.61, beta.370)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-18T12:51:00Z'
-updated_date: '2026-11-19T22:23:00Z'
+updated_date: '2026-11-19T22:38:00Z'
 labels:
   - ble
   - heap
@@ -57,4 +57,12 @@ Bench ACs ticked by otgw-bench-tester (09), 2026-11-18. AC1: reproduction on .61
 2026-11-19 triage (otgw-dev): AC2 (root cause with file:line) blocked: since beta.375 BLE cannot be switched on without PSRAM (ADR-222 guard), so the collapse cannot be reproduced on .61 any more without a debug path that bypasses the guard (prerelease-only) or a build with the guard removed. Needs an approach decision first; not a 2.0.0 blocker because the guard prevents the state.
 
 2026-11-19 APPROACH PROPOSAL for AC2 (otgw-dev, design only, for Robert to choose; nothing built). Situation: since beta.375 the ADR-222 guard keeps BLE off on a board without PSRAM, so the collapse (free 9 KB, maxblk 2 KB, minFree 520 B within ~2 min on .61, beta.370) can no longer happen in the field and can no longer be reproduced without bypassing the guard. AC2 wants the allocation owner with file:line, not the 64 KB estimate. Options: (A) Prerelease-only bench override (a telnet key like H/B, compiled out of stable) that starts NimBLE on a no-PSRAM unit despite the guard, plus a heap trace: heap_caps_get_info(MALLOC_CAP_INTERNAL) before init, after the controller init, after the host init, after the first scan start, then every 10 s, and the largest-block owner via heap_caps_dump/heap tracing if the IDF build has it. Cost: ~1-2 h code + host test + 1 build + a 15-30 min bench by 09 on .61; risk: the unit hangs as on 370 (recovery by USB reset, settings kept), prerelease-only so no user risk. Gives the real file:line. (B) Static estimate from our sdkconfig (CONFIG_BT_NIMBLE_* buffers, controller memory, msys pools) and the IDF memory tables. Cost: ~1 h, no device risk; but it is an estimate, which AC2 explicitly does not accept, so it can only support A or C. (C) Close AC2 for 2.0.0 by waiver: the guard makes the state unreachable (bench-proven on 375), BLE without PSRAM is not a supported 2.0.0 configuration, and the root cause moves to a 2.1.0 task with option A (needed only if BLE without PSRAM should ever be supported). Cost: none now; risk: we never learn the owner if no one asks for no-PSRAM BLE. Recommendation: C for 2.0.0 (the guard removes the user risk; A spends a bench slot and a possible hang the weekend before the stable release) plus a 2.1.0 task for A. Decision: Robert.
+
+2026-11-19 AC2 WAIVED for 2.0.0 by Robert: 'C' (DM 1573102947980542135, reply to the coordinator's TASK-2025 question, relayed by the coordinator): the ADR-222 guard makes the state unreachable (bench-proven on 375), BLE without PSRAM is not a supported 2.0.0 configuration. Root cause hunt moves to TASK-2934 (2.1.0, option A: prerelease bench key + heap trace per init phase). AC2 stays unchecked (waived, not evidenced).
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+No-PSRAM boards can no longer enable BLE (ADR-222, beta.375): a stored 'on' is cleared at boot, REST/MQTT refuse with 'BLE needs PSRAM', the UI greys the switch out. AC1 + AC3 (bench-tester): reproduction on .61 beta.370 placed in time (hang 13:50-14:03:10) and the guard on 375 (no 'SAT BLE: initialized' in 4 min, refusals logged). AC2 (allocation owner with file:line) NOT evidenced: waived by Robert ('C', DM 1573102947980542135) because the guard makes the state unreachable; the hunt is TASK-2934 (2.1.0).
+<!-- SECTION:FINAL_SUMMARY:END -->
