@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-18T13:06:00Z'
-updated_date: '2026-11-19T00:57:00Z'
+updated_date: '2026-11-19T05:28:00Z'
 labels:
   - heap
   - watchdog
@@ -48,4 +48,6 @@ Follow-up of TASK-2025, from otgw-bench-tester on .61 (no PSRAM, beta.370, 2026-
 2026-11-19 option C prepared as a local commit (NOT built; waits for Robert's A/B/C answer): wifiLinkProbeOnReconnect() keeps wifiDeadProbes across a re-association while platformMaxFreeBlock() < WIFI_STARVED_MAXBLOCK (networkStuff.ino). ADR-261 Proposed (amends ADR-258; number from the coordinator, 260 is ba's), with the choice as its open question; README entry, index, ADR-258 related link (the invented status-history line adr relate wrote into the Accepted ADR-258 was removed). Red/green: test_starved_link_with_ap_drops_every_4_min_still_recovers FAILS on the pre-C networkStuff.ino (1 failed, 30 passed) and passes on C; test_wifi_deadlink + test_heaphold_hook 36 passed; evaluate --quick 89/0; adr-lint strict FAIL 63 unchanged (ADR-261 advisory: its open question).
 
 2026-11-19 the supervisor counters (wifi_sv_* in device/info, branch lane-2026-ctr, b06eeff32, built once as 381+b06eeff for run 3) are PARKED: not part of the TASK-2026 push; re-apply on top of option C later if the bench needs them again. Option B (app-level progress, the 'stack alive, app starved' blind spot of the ICMP probe) is filed as TASK-2038 (2.1.0).
+
+2026-11-19 Robert chose option C for 2.0.0 (DM 1572842729485111327, 05:15 UTC, reply to the coordinator's update 1572774626625589432, relayed by the coordinator); B goes to 2.1.0 as TASK-2038. ADR-261 records the choice and stays Proposed (acceptance is a separate yes). Lane rebased onto origin/dev e4eb2cdae and renumbered beta.383 (probe counts dead), beta.384 (H heap-hold hook), beta.385 (streak continues, option C); whole-lane non-banner patch identical to the pre-rebase lane (656 lines), 0 markers added. Gates on the rebased lane: tests/test_wifi_deadlink.py + tests/test_heaphold_hook.py 36 passed; red with origin's networkStuff.ino (OTGW_NETWORK_INO): 2 failed, test_a_starved_heap_counts_as_dead_and_recovers and test_starved_link_with_ap_drops_every_4_min_still_recovers; evaluate.py --quick 89 passed 0 failed; tests/test_adr_governance.py 17 passed (the ADR-261 README entry was lost in the rebase when README.md was taken from origin; restored from 5bf0ff471). Next: esp32-combo build in a slot after the 08:00 beta build, then a bench request.
 <!-- SECTION:NOTES:END -->

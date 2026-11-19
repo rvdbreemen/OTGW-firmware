@@ -39,6 +39,10 @@ Proposed, 2026-11-19. Guideline-level (ADR-080): verified by the host test named
 ADR-258: it adds one rule to the dead-link supervisor; the rest of ADR-258 (a starved probe counts as dead, the witness
 rule, the reconnect-then-restart path and the cap of 3) stays.
 
+User Decision: Robert chose option C for 2.0.0 (Discord DM 1572842729485111327, 2026-11-19 05:15 UTC, a reply to
+the coordinator's update 1572774626625589432; relayed by the coordinator), with option B as the 2.1.0 follow-up
+(TASK-2038). That choice settles the option; acceptance of this ADR is a separate yes from Robert.
+
 ## Status History
 
 ```yaml
@@ -129,7 +133,7 @@ link that really works again is not counted against.
 
 ## Open Questions
 
-- [ ] Robert's choice between A, C (this ADR) and B for 2.0.0 (coordinator DM, 2026-11-19).
+- [x] Robert's choice between A, C (this ADR) and B for 2.0.0: C, B for 2.1.0 (DM 1572842729485111327, 2026-11-19).
 
 ## Related Decisions
 
