@@ -830,7 +830,7 @@
       "onb_step_tuning": "Tuning",
       "onb_step_sources": "Sources health",
       "onb_beta_title": "Before you enable SAT",
-      "onb_beta_ack": "I understand that SAT is experimental and controls my boiler.",
+      "onb_beta_ack": "I understand that SAT takes over control of my boiler.",
       "onb_welcome_title": "Let's tune SAT for your system",
       "onb_welcome_body": "The {{name}} takes over control of your boiler, driving flow temperature from the room. Four short questions set it up.",
       "onb_welcome_note": "SAT stays <b>disabled</b> until you finish, nothing changes on your boiler yet.",
@@ -1571,8 +1571,8 @@
       "sat_age_min_one": "updated {{count}} min ago",
       "sat_age_min_other": "updated {{count}} min ago",
       "sat_age_now": "updated just now",
-      "sat_beta_body": "We need field data to validate it. Please run the capture tool now and then (scripts/capture-mqtt-debug.bat on Windows, scripts/capture-mqtt-debug.sh on Linux or macOS) and share the transcript in the Discord #alpha-testing channel (discord.gg/zjW3ju7vGQ) or as a GitHub issue (github.com/rvdbreemen/OTGW-firmware/issues).",
-      "sat_beta_head": "SAT is experimental in this beta and it controls your boiler.",
+      "sat_beta_body": "Field data helps us improve it. Please run the capture tool now and then (scripts/capture-mqtt-debug.bat on Windows, scripts/capture-mqtt-debug.sh on Linux or macOS) and share the transcript in the Discord #beta-testing channel (discord.gg/zjW3ju7vGQ) or as a GitHub issue (github.com/rvdbreemen/OTGW-firmware/issues).",
+      "sat_beta_head": "SAT controls your boiler. This is a beta firmware.",
       "sat_big_at_target": "At target · idle",
       "sat_big_heating_to": "Heating to {{temp}}",
       "sat_big_off": "SAT is off",
@@ -4065,15 +4065,17 @@
   }
   function fetchOverrides(iface) {
     // On OT-Direct the gateway overrides endpoint is meaningless (no PIC); read the
-    // OT-Direct store instead. Both normalize into ovrRows; errors -> empty, silently, but a busy
-    // 503 (the REST in-flight cap) keeps the rows shown (TASK-1747).
+    // OT-Direct store instead. Both normalize into ovrRows; another error answer -> empty, silently, but a
+    // busy 503 (the REST in-flight cap) keeps the rows shown (TASK-1747). TASK-2914: on a starved heap the
+    // device answers busy by closing the connection without a response (TASK-2910), so a failed request is
+    // tried once more after 400 ms and, if it fails again, also keeps the rows; the next poll decides.
     // Returns the (never-rejecting) promise so callers can chain behind it.
     var otd = (iface === 'OT-Direct');
     var url = APIGW + (otd ? 'v2/otdirect/overrides' : 'v2/otgw/overrides');
     function apply() { updateCnOvr(); scheduleRender(); }   // map badge + Home A badge/marks
-    return fetch(url).then(function (r) { return r.status === 503 ? undefined : (r.ok ? r.json() : null); })
+    return fetchWithRetry(url, undefined, 2).then(function (r) { return r.status === 503 ? undefined : (r.ok ? r.json() : null); })
       .then(function (j) { if (j === undefined) return; ovrRows = otd ? normOtdOvr(j) : normPicOvr(j); apply(); })
-      .catch(function () { ovrRows = []; apply(); });
+      .catch(function () { });
   }
   // On-bus badge in the connection-map SVG (#cnOvr sits on the y=180 shared bus segment).
   function updateCnOvr() {
@@ -6908,8 +6910,8 @@
   var satLastData = null;
   var satLastWeather = null;   // TASK-2015: the last v2/sat/weather answer, for the location hint
   // TASK-1507: SAT beta notice. One text for the wizard's first step and the SAT page notice.
-  var SAT_BETA_HEAD = 'SAT is experimental in this beta and it controls your boiler.';
-  var SAT_BETA_BODY = 'We need field data to validate it. Please run the capture tool now and then (scripts/capture-mqtt-debug.bat on Windows, scripts/capture-mqtt-debug.sh on Linux or macOS) and share the transcript in the Discord #alpha-testing channel (discord.gg/zjW3ju7vGQ) or as a GitHub issue (github.com/rvdbreemen/OTGW-firmware/issues).';
+  var SAT_BETA_HEAD = 'SAT controls your boiler. This is a beta firmware.';
+  var SAT_BETA_BODY = 'Field data helps us improve it. Please run the capture tool now and then (scripts/capture-mqtt-debug.bat on Windows, scripts/capture-mqtt-debug.sh on Linux or macOS) and share the transcript in the Discord #beta-testing channel (discord.gg/zjW3ju7vGQ) or as a GitHub issue (github.com/rvdbreemen/OTGW-firmware/issues).';
   var SAT_BETA_DISMISS_KEY = 'otgw-v2-satbeta-dismissed';
   // A prerelease firmware has a "-alpha.N" / "-beta.N" part after major.minor.patch (+build metadata dropped).
   function isPrereleaseFw(v) {
@@ -8572,8 +8574,9 @@
     if (old && old.parentNode) old.parentNode.removeChild(old);
     if (!tag) return;
     try { if (localStorage.getItem(UPD_DISMISS_KEY) === tag) return; } catch (e) { }
-    var host = document.getElementById('hdrHost');
-    if (!host || !host.parentNode) return;
+    // After the identity group (.hdr-net), not inside it: v2.css hides .hdr-net at <= 480 px (TASK-2918).
+    var grp = updHdrGroup();
+    if (!grp) return;
     var box = document.createElement('span'); box.className = 'hdr-id'; box.id = 'hdrUpd';
     var a = document.createElement('a');
     a.href = UPD_PAGE + encodeURIComponent(tag); a.target = '_blank'; a.rel = 'noopener noreferrer';
@@ -8586,21 +8589,52 @@
       if (box.parentNode) box.parentNode.removeChild(box);
     });
     box.appendChild(a); box.appendChild(x);
-    host.parentNode.insertBefore(box, host.nextSibling);
+    grp.parentNode.insertBefore(box, grp.nextSibling);
+  }
+  function updHdrGroup() {
+    var host = document.getElementById('hdrHost');
+    return (host && host.parentNode && host.parentNode.parentNode) ? host.parentNode : null;
   }
   function updPost(name, value) {
     return fetch(APIGW + 'v2/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: name, value: value }) });
   }
+  // TASK-2918: the one-time question is a header chip right after the identity chips, not a modal: it opens about 30 s
+  // after page load on whatever page is open, so a modal covered what the user was looking at. The text (who is
+  // contacted) and the two buttons sit in a popover that opens only on a click; closing it again is "not now".
   function updAsk() {
-    if (document.getElementById('updBackdrop')) return;
-    var bd = document.createElement('div'); bd.id = 'updBackdrop'; bd.className = 'sim-backdrop';
-    var m = document.createElement('div'); m.className = 'sim-modal';
-    var h = document.createElement('h3'); h.textContent = t('conn.upd_ask_title');
+    if (document.getElementById('updAsk')) return;
+    var POP_STYLE = 'position:absolute;top:calc(100% + 6px);left:0;z-index:60;width:min(380px,calc(100vw - 32px));' +
+      'padding:14px 16px;text-align:left;white-space:normal;font-family:var(--font-sans);font-weight:400;font-size:.9rem;';
+    var grp = updHdrGroup();
+    if (!grp) return;
+    var box = document.createElement('span'); box.className = 'hdr-id'; box.id = 'updAsk';
+    // z-index + opacity:1: .hdr-id has opacity .95, a stacking context that would trap the popover under the next chips.
+    box.setAttribute('style', 'position:relative;z-index:61;opacity:1');
+    var q = document.createElement('button'); q.type = 'button'; q.textContent = t('conn.upd_ask_title');
+    q.setAttribute('aria-expanded', 'false');
+    q.setAttribute('style', 'background:none;border:0;color:inherit;cursor:pointer;padding:0;font:inherit');
+    var pop = document.createElement('div'); pop.id = 'updAskPop'; pop.className = 'sim-modal';
+    pop.setAttribute('style', POP_STYLE + 'display:none');
     var p = document.createElement('p'); p.textContent = t('conn.upd_ask_body');
     var acts = document.createElement('div'); acts.className = 'acts';
-    var no = document.createElement('button'); no.textContent = t('conn.upd_ask_no');
-    var yes = document.createElement('button'); yes.className = 'primary'; yes.textContent = t('conn.upd_ask_yes');
-    function close() { if (bd.parentNode) bd.parentNode.removeChild(bd); }
+    var no = document.createElement('button'); no.type = 'button'; no.textContent = t('conn.upd_ask_no');
+    var yes = document.createElement('button'); yes.type = 'button'; yes.className = 'primary'; yes.textContent = t('conn.upd_ask_yes');
+    var open = false;
+    function show(on) {
+      open = on;
+      pop.setAttribute('style', POP_STYLE + (on ? 'display:block' : 'display:none'));
+      q.setAttribute('aria-expanded', on ? 'true' : 'false');
+      // Keep the open popover inside the screen (on a phone the chip sits mid-row, so left:0 runs off the right edge).
+      // Measure against documentElement.clientWidth, not innerWidth: on a phone the overflowing popover itself widens
+      // the visual viewport (innerWidth 390 -> 533 on .63), so innerWidth no longer says where the screen ends.
+      if (on && pop.getBoundingClientRect && box.getBoundingClientRect) {
+        var de = document.documentElement, vw = (de && de.clientWidth) || (typeof window !== 'undefined' && window.innerWidth) || 0;
+        var bl = box.getBoundingClientRect().left, pw = pop.getBoundingClientRect().width;
+        var left = vw ? Math.round(Math.max(8, Math.min(bl, vw - 8 - pw)) - bl) : 0;
+        if (left) pop.setAttribute('style', POP_STYLE.replace('left:0;', 'left:' + left + 'px;') + 'display:block');
+      }
+    }
+    function close() { if (box.parentNode) box.parentNode.removeChild(box); }
     function answer(on) {
       close();
       // One POST at a time (never a burst, REST backpressure TASK-884); the setting first, the asked flag last.
@@ -8612,10 +8646,12 @@
     }
     no.addEventListener('click', function () { answer(false); });
     yes.addEventListener('click', function () { answer(true); });
-    bd.addEventListener('click', function (e) { if (e.target === bd) close(); });   // not now: asked again on the next visit
+    q.addEventListener('click', function () { show(!open); });   // closing again is "not now": the chip stays
+    pop.addEventListener('keydown', function (e) { if (e && e.key === 'Escape') { show(false); q.focus(); } });
     acts.appendChild(no); acts.appendChild(yes);
-    m.appendChild(h); m.appendChild(p); m.appendChild(acts); bd.appendChild(m);
-    document.body.appendChild(bd);
+    pop.appendChild(p); pop.appendChild(acts);
+    box.appendChild(q); box.appendChild(pop);
+    grp.parentNode.insertBefore(box, grp.nextSibling);
   }
   function maybeUpdateCheck() {
     if (!setData || !setData.updatecheck) return;   // settings not loaded, or a firmware without the setting

@@ -65,7 +65,7 @@ Sinds v2.0.0 bevat de firmware een `boards.h`-header die pin-mappings, feature f
 
 v2.0.0 is een grote platformrelease. Het is de ESP32-S3-only async + FreeRTOS-lijn. Instellingenbestanden van v1.3.x worden automatisch geladen zonder conversie.
 
-Releases van 2.0.0 staan op de GitHub Releases-pagina: beta's verschijnen als GitHub-prerelease, de stabiele 2.0.0 als gewone release. De bestaande functionaliteit is feature-compleet; SAT, OTDirect en de nieuwe MQTT-topicnamen (zie hieronder) worden nog verder verfijnd. SAT blijft experimenteel en opt-in, en staat standaard uit (zie Hoofdstuk 5).
+Releases van 2.0.0 staan op de GitHub Releases-pagina: beta's verschijnen als GitHub-prerelease, de stabiele 2.0.0 als gewone release. De bestaande functionaliteit is feature-compleet; SAT, OTDirect en de nieuwe MQTT-topicnamen (zie hieronder) worden nog verder verfijnd. SAT is stabiel vanaf 2.0.0; het blijft opt-in en staat standaard uit (zie Hoofdstuk 5).
 
 **Breaking change in deze release.** v2.0.0 gebruikt standaard een nieuwe, zelfbeschrijvende set MQTT-topicnamen (ADR-106). Zevenendertig OT-spec-georiënteerde binary_sensor-topics krijgen een duidelijker, Home Assistant-vriendelijk label (bijvoorbeeld: `master_ch_enable` wordt `central_heating_enabled`). Gebruikers met bestaande automations op de oude labels kunnen `settings.mqtt.bUseLegacyOtTopics` op `true` zetten om het v1.x-gedrag te behouden. De twee modi sluiten elkaar uit: of de nieuwe namen, of de oude namen worden gepubliceerd, nooit beide tegelijk. De REST API is ongewijzigd ten opzichte van v1.x.
 

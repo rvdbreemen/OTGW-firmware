@@ -259,6 +259,17 @@ int main(int argc, char** argv) {
     printf("req=%d cs=%.1f count=%u cut=%d onsec=%d offset=%.1f\n", r0, cs0, c0, cut, onSec, settings.sat.fModSupOffset);
     return 0;
   }
+  if (!strcmp(sc, "reentry")) {              // entry 428: a second PWM entry inside the same burn, then a new flame
+    enterWithBurner(100, 120, 40.0f);        // first entry with the burner on: the flame's first counted start
+    const unsigned first = cnt();
+    satSetControlMode(SAT_MODE_CONTINUOUS); g_ms += 60000UL;    // the burn goes continuous, the flame keeps burning
+    satSetControlMode(SAT_MODE_PWM); step();                    // back into PWM inside the same flame
+    const unsigned second = cnt();
+    g_ms += 5000UL; edge(false);             // the flame goes out
+    enterWithBurner(300, 120, 40.0f);        // the next flame enters PWM: its first start counts again
+    printf("first=%u second=%u next=%u\n", first, second, cnt());
+    return 0;
+  }
   if (!strcmp(sc, "entry4")) {               // (e)+(f) entry with the burner on as the 4th start of the hour, then the next OFF->ON
     const int s = pwmCycles(3);
     const unsigned before = cnt();
@@ -419,6 +430,7 @@ FWD = r"""
 bool satCycleIsHourLimitReached();
 uint8_t satCycleGetCyclesThisHour();
 void satCycleRecordPwmStart();
+bool satCycleCountPwmStartThisFlame(bool flameOn);   // entry 428: the real one comes with the cycles cut
 uint32_t satCycleGetFlameOnStartMs();
 uint32_t satCycleGetFlameOffStartMs();
 void satCycleSkipAutoSwitch();
@@ -565,6 +577,14 @@ class SatPwmStartLimit(unittest.TestCase):
         r = self.run_sc("entry", 1500, 1200)    # 20 min of continuous burn
         self.assertEntryKeepsBurning(r)
         self.assertEqual(r["count"], "1", r)
+
+    # Sergeant D entries 428/430 (changes entry 89): at most one counted PWM ON start per flame. A PWM re-entry inside the same
+    # burn does not count; the next flame's first start does. Red on the code before it (every PWM ON counted: 1, 2, 3).
+    def test_one_counted_pwm_start_per_flame(self):
+        r = self.run_sc("reentry")
+        self.assertEqual(r["first"], "1", r)
+        self.assertEqual(r["second"], "1", "a PWM re-entry inside the same flame was counted: %r" % r)
+        self.assertEqual(r["next"], "2", "the next flame's first PWM start was not counted: %r" % r)
 
     # (e) the entry as the 4th start of the hour: still ON, not cut (Sergeant D entry 89, Q48 A)
     def test_e_entry_at_the_limit_is_not_blocked(self):

@@ -5655,6 +5655,47 @@
     "TASK-1656"
    ],
    "confirmed_by_entry": null
+  },
+  {
+   "id": 428,
+   "title": "Q-2005a answered C: per flame-on at most one PWM ON counts (and at most one PWM cycle), against the continuous/PWM flipping (Sergeant D, 2026-11-19)",
+   "date": "2026-11-19",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1572931802069205033",
+   "supersedes": [
+    89
+   ],
+   "tasks": [
+    "TASK-2005"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 429,
+   "title": "Q-2005b answered B: at most one PWM entry per flame, continuous until flame-off; the fail-safe threshold goes from 3.5 to 3.0 C (Sergeant D, 2026-11-19)",
+   "date": "2026-11-19",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1572933709429084271",
+   "supersedes": [],
+   "tasks": [
+    "TASK-2005"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 430,
+   "title": "Scope of entries 428/429: \"top priority for 2.0.0\"; he calls the PWM re-entry counting a bug (Sergeant D, 2026-11-19)",
+   "date": "2026-11-19",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1572933791775850578",
+   "supersedes": [],
+   "tasks": [
+    "TASK-2005"
+   ],
+   "confirmed_by_entry": null
   }
  ]
 }

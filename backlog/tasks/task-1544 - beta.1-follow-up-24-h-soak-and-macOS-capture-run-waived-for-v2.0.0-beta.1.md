@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-01T15:47:00Z'
-updated_date: '2026-11-18T09:25:00Z'
+updated_date: '2026-11-19T13:57:00Z'
 labels:
   - beta
   - release
@@ -24,7 +24,7 @@ TASK-1504 AC2 (macOS capture run by a tester) and AC3 (24 h soak on Classic + S3
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [x] #1 24 h soak of a beta build on the Classic + S3 Mini without an unexplained reboot; crashlog and reboot_log quoted
-- [ ] #2 Capture run from the release zip on macOS by a named tester, with transcript
+- [x] #2 Capture run from the release zip on macOS by a named tester, with transcript
 - [x] #3 Capture runs from the beta zip on Windows and Linux, each with a transcript (TASK-1504 AC2 asked for all three OSes)
 - [x] #4 Update over WiFi with the release zip through the /update page (the path the release notes give users), then device/info shows the new version and settings are kept
 <!-- AC:END -->
@@ -59,4 +59,6 @@ AC4 PASS by 09 (2026-11-18), .63 (Classic + ESP32-S3, PIC 6.8). Pre-state: publi
 2026-11-18 (from 92): indigo_light's Mac is Apple silicon M4 Pro, system Python 3.9.6 (CommandLineTools); macOS version asked again, not answered yet. 92's behaviour analysis of that run (#beta-testing 1572541155206500372, chart in 92's scratchpad indigomac/charts/indigo-mac-sat.png): the tool ran clean on macOS except the 3.9 CSV bug (TASK-2016, on origin/dev, in the beta.369 alpha zip); heating side one 24.8 min run, PWM/continuous/PWM, CS 43-46 C, flow within about 1 C, room 20.07 -> 20.74 C. AC2 stays open until a rerun from a published release zip with the fix.
 
 2026-11-18 (from 92): macOS version as indigo_light wrote it, verbatim: "27.2.1 (26B131) (Golden Gate)" (#beta-testing 2026-11-18 08:54 UTC, reply to 1572535253250084865). Apple silicon M4 Pro, Python 3.9.6 from Apple's CommandLineTools. Reported by the tester, not checked by us. AC2 still waits for a rerun from a published release zip that carries TASK-2016.
+
+2026-11-19 AC2 evidence (comms 92, confirmed from the zip, not only the tester's word): indigo_light ran capture-mqtt-debug-macos.sh from the beta.382 release zip on macOS; upload #beta-testing https://discord.com/channels/812969634638725140/914498730001072149/1572966038965063826, 20261119-091712-upload-clean.zip sha256 6087efcc9efd50c01e368a822a3e8209df5341220a0a185121bf84df82ad1485, archived OTGW-field-data/indigo_light/2026-11-19_2.0.0-beta.382+224e30c/macos-20261119-091712. Transcript transcript-20261119-091712-2.0.0-beta.382+224e30c: 'Python: 3.9.6 (/Library/Developer/CommandLineTools/usr/bin/python3)', 'Platform: darwin'; self-recovery: 'Telnet reconnected after 17548 attempt(s): 2026-11-19T13:56:51+01:00' after the Mac was off the network from 09:32:18, 'MQTT reconnected: 2026-11-19T13:57:23+01:00'. Gap found: 'csv conversion of telnet.log failed ... No module named sat_log_to_csv' (also in the Windows run of 18/11): the flash zip lacks scripts/sat_log_to_csv.py; filed separately.
 <!-- SECTION:NOTES:END -->

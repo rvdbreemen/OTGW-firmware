@@ -37,7 +37,7 @@ import urllib.request
 import zipfile
 from collections import deque
 from concurrent.futures import ThreadPoolExecutor
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -2342,6 +2342,56 @@ class SnapshotCapture(threading.Thread):
             self.cap.summary(f"Device snapshots: {self.rounds} round(s) every {self.interval} s -> {SNAPSHOTS_LOG}")
 
 
+SLEEP_JUMP_SECONDS = 30   # wall clock ahead of the run clock by more than this = the capture machine slept
+SLEEP_POLL_SECONDS = 1.0
+
+
+class SleepWatch(threading.Thread):
+    """TASK-2922: while the capture machine sleeps no code runs, so no stream can notice the outage itself;
+    afterwards the wall clock has moved further than the run clock (time.monotonic; on macOS it stops during
+    sleep). Once a second this compares both and writes a jump above SLEEP_JUMP_SECONDS as one gap of the
+    pseudo stream capture-host (gaps.log, index count, transcript). A wall clock step backwards is ignored."""
+
+    STREAM = "capture-host"
+
+    def __init__(self, cap, wall_fn=None, mono_fn=None, poll=SLEEP_POLL_SECONDS, limit=SLEEP_JUMP_SECONDS):
+        super().__init__(name="sleepwatch", daemon=True)
+        self.cap = cap
+        self.wall_fn = wall_fn or (lambda: datetime.now(timezone.utc).astimezone())
+        self.mono_fn = mono_fn or time.monotonic
+        self.poll = poll
+        self.limit = limit
+        self.last_wall = self.wall_fn()
+        self.last_mono = self.mono_fn()
+        self.count = 0
+
+    def check(self):
+        """Compare the clocks once; returns the seconds of a recorded gap, else 0."""
+        wall, mono = self.wall_fn(), self.mono_fn()
+        ran = mono - self.last_mono
+        lost = (wall - self.last_wall).total_seconds() - ran
+        start = self.last_wall + timedelta(seconds=ran)
+        self.last_wall, self.last_mono = wall, mono
+        if lost <= self.limit:
+            return 0
+        self.count += 1
+        secs = int(round(lost))
+        self.cap.gap(self.STREAM, start, wall,
+                     f"capture machine asleep or suspended: the wall clock moved {secs} s further than the run clock")
+        self.cap.summary(f"Capture machine was asleep for about {secs} s "
+                         f"({start.isoformat(timespec='seconds')} - {wall.isoformat(timespec='seconds')}): "
+                         "nothing was recorded in that time.")
+        return secs
+
+    def run(self):
+        while not self.cap.stopping():
+            try:
+                self.check()
+            except Exception as exc:
+                self.cap.script_error(f"sleepwatch: {type(exc).__name__}: {exc}")
+            self.cap.wait(self.poll)
+
+
 # --------------------------------------------------------------------------- #
 # End of run: HTTP probes, metadata, merged transcript
 # --------------------------------------------------------------------------- #
@@ -3955,6 +4005,10 @@ def main(argv=None):
         snapshots.start()
         workers.append((snapshots, SNAPSHOT_TIMEOUT + 5))
         s(f"Device snapshots started: every {snapshot_seconds} s, {', '.join(SNAPSHOT_PATHS)} -> {SNAPSHOTS_LOG}")
+
+    sleep_watch = SleepWatch(cap)   # TASK-2922
+    sleep_watch.start()
+    workers.append((sleep_watch, 5))
 
     mqtt_capture = None
     mqtt_filters = getattr(args, "mqtt_filters", None) or []

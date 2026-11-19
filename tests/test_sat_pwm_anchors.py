@@ -333,7 +333,9 @@ class SatPwmAnchors(unittest.TestCase):
         base, _ = self.starts(3, 0.5, "burning", [], 1500)
         n, tl = self.starts(3, 0.5, "burning", [(1190, "dhw", 1), (1215, "dhw", 0), (1250, "flame", 0)], 1500)
         self.assertEqual(tl.edges()[0], [0, 1260], tl.dump(1300))
-        self.assertEqual((base, n), (2, 2), f"the delayed ON start must count exactly 1, got base={base} n={n}")
+        # Entry 428: without the draw the flame never goes out, so the ON at 1230 is the same flame and does not count (base 1);
+        # with the draw the flame goes out at 1250, the ON at 1260 belongs to a new flame and counts (n 2).
+        self.assertEqual((base, n), (1, 2), f"entry 428: one count per flame, got base={base} n={n}")
 
     # TASK-1424 (entries 105, 106) ----------------------------------------------------------------------------
     def test_h1_no_on_start_while_the_hot_water_flame_burns(self):
@@ -347,7 +349,7 @@ class SatPwmAnchors(unittest.TestCase):
         # Characterization: a CH-lit flame (no draw) is never held; the OFF wait ends at 1200.
         n, tl = self.starts(3, 0.5, "burning", [], 1500)
         self.assertEqual(tl.edges()[0], [0, 1230], tl.dump(1300))
-        self.assertEqual(n, 2)
+        self.assertEqual(n, 1, "entry 428: the flame burns through the OFF wait, so the ON at 1230 is the same flame: no second count")
 
     def test_h3_range_5_is_held_the_same_way(self):
         # Red on alpha.518 (starts at 30). Duty at the maximum (continuous ON). Draw 0..20 with the flame lit; tick 30

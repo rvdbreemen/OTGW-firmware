@@ -8442,3 +8442,62 @@ Robert, 16:18:42 UTC (https://discord.com/channels/812969634638725140/9144987300
 **Task:** TASK-1656 or its follow-up (owner otgw-dev per the coordinator).
 
 **Open:** none.
+
+## 428. Q-2005a answered C: per flame-on at most one PWM ON counts (and at most one PWM cycle), against the continuous/PWM flipping (Sergeant D, 2026-11-19)
+
+**Source:** #dev-sat-mqtt, Sergeant D 2026-11-19 11:09:25 UTC, edited 11:10:15 UTC (https://discord.com/channels/812969634638725140/1105556725714649128/1572931802069205033; final text read back via the Discord API 90 s after the post), a reply to Q-2005a (https://discord.com/channels/812969634638725140/1105556725714649128/1572930683880345721).
+
+**Quoted (final, edited text):**
+> "My answer is C. When the flame is lit count only 1 PWM ON. Every flame lit should have the most 1 PWM cycle. This way we will overcome the continuous to PWM flipping and at the end we will keep the cycles per hour clean"
+
+(First-seen text ended at "flipping"; the edit added "and at the end we will keep the cycles per hour clean".)
+
+**Settled:** option C (other) of Q-2005a. While one flame burns, only one PWM ON start counts against the cycles-per-hour limit. A further switch from continuous back to PWM during the same burn does not count as a new start. This changes entry 89, which counts the PWM-entry ON with the burner already burning (Q48 A): that start now counts only when it is the first PWM ON of that flame. Entry 59 (only PWM's own ON phases count) stays.
+
+**Interpretation (ours, not yet confirmed):** "Every flame lit should have the most 1 PWM cycle" can be read two ways. (a) Counting only: at most one counted PWM start per flame-on, and the flipping itself stays. (b) Behaviour as well: during one flame-on SAT does not re-enter PWM after it went to continuous, so the flipping stops. His reason ("overcome the continuous to PWM flipping") points to (b). Not acted on until he confirms (follow-up Q-2005b).
+
+**Not settled:** the range-5 question itself (a start from OFF straight into duty range 5 is never held back by the hourly limit, SATcontrol.ino:1697-1712): his answer does not say whether that start should wait; it stays as today (option A) until asked. The release scope (2.0.0 or 2.1.0) was not given.
+
+**Compared with thermo-nova (7beaaf5):** pwm.py:154-160 counts every OFF/IDLE->ON start in _current_cycle, but pwm.py:156 compares with duty_cycle_seconds (780 at the default "00:13:00", const.py:167), so thermo-nova has no effective hourly cap. Per-flame counting has no thermo-nova counterpart; it refines Sergeant D's own limit (entries 31/52/59).
+
+**Firmware today:** every satPwmBeginOn() counts, including a PWM re-entry with the flame burning (SATcontrol.ino:1782-1806, entry 89). Field evidence: indigo_light beta.360, 19 Nov morning, three "cycle limit 3/hr reached" stops filled by re-entries inside burns (TASK-2005 notes).
+
+**Task:** TASK-2005 follow-up (owner per the coordinator).
+
+**Open:** reading (a) or (b), and the release scope: Q-2005b.
+
+## 429. Q-2005b answered B: at most one PWM entry per flame, continuous until flame-off; the fail-safe threshold goes from 3.5 to 3.0 C (Sergeant D, 2026-11-19)
+
+**Source:** #dev-sat-mqtt, Sergeant D 2026-11-19 11:17:00 UTC (https://discord.com/channels/812969634638725140/1105556725714649128/1572933709429084271; not edited 90 s after the post, read back via the Discord API), a reply to Q-2005b (https://discord.com/channels/812969634638725140/1105556725714649128/1572932665831854113).
+
+**Quoted:**
+> "My answer is B. But instead of flow above 3.5 change it to flow above 3."
+
+**Settled:** reading (b) of entry 428. (1) During one flame-on SAT enters PWM at most once. After a switch from PWM to continuous it stays in continuous until the flame goes out; the 2.0 C / 60 s continuous->PWM switch rule (entry 407, SATtypes.h:542 fPwmSwitchMargin) does not fire again in that burn. (2) The only way back to PWM during that burn is the fail-safe, and its threshold changes from flow - requested >= 3.5 C to >= 3.0 C (the 30 s hold of entry 289 is not mentioned and stays). (3) Counting as entry 428: at most one counted PWM ON per flame-on.
+
+**Changes earlier entries:** entry 288/289/359 (fail-safe 3.5 C, SATcycles.ino:41 SAT_OVERSHOOT_FAILSAFE_DELTA_C) -> 3.0 C. Entry 407 (2.0 C / 60 s switch) now applies at most once per flame. Entry 89 as already changed by entry 428.
+
+**Interpretation (ours):** "flow above 3" is read as flow - requested setpoint >= 3.0 C with the existing 30 s hold (entry 289), since the question quoted the fail-safe as "flow 3.5 C above the request for 30 s". "Flame goes out" is the boiler flame bit (MsgID 0 slave status) dropping, as in the firmware's flame-off detection.
+
+**Compared with thermo-nova (7beaaf5):** no counterpart; thermo-nova re-enables PWM from continuous whenever its overshoot rule holds (heating_control.py:262-305), with no per-flame limit and no fail-safe. This is a deliberate refinement on top of the pin.
+
+**Not settled:** the release scope (2.0.0 or 2.1.0) was asked in Q-2005a and Q-2005b and not answered: Q-2005c. The range-5 start question of Q-2005a stays as today.
+
+**Task:** to be created after the scope answer (TASK-2005 follow-up, owner per the coordinator).
+
+**Open:** scope (Q-2005c).
+
+## 430. Scope of entries 428/429: "top priority for 2.0.0"; he calls the PWM re-entry counting a bug (Sergeant D, 2026-11-19)
+
+**Source:** #dev-sat-mqtt, Sergeant D 2026-11-19 11:17:19 UTC (https://discord.com/channels/812969634638725140/1105556725714649128/1572933791775850578; unedited, read back via the Discord API at 11:23 UTC), posted 19 s after his answer to Q-2005b. Also #beta-testing 11:18:17 UTC to indigo_light (https://discord.com/channels/812969634638725140/914498730001072149/1572934036320682047, unedited): "we found a bug! Thanks for your log!!".
+
+**Quoted:**
+> "This is top priority for 2.0.0"
+
+**Settled:** the release scope of entries 428 and 429 is 2.0.0, top priority. He treats the behaviour (PWM re-entries inside one burn using up the 3/hr limit, the indigo_light beta.360 morning) as a bug. This answers Q-2005c before it was asked (it was posted at 11:19 UTC, after this message; closed as answered by this entry).
+
+**Interpretation (ours):** "This" is read as the decision of entries 428/429 (one PWM entry and one counted PWM ON per flame, continuous until flame-off, fail-safe 3.0 C), since it follows his Q-2005b answer directly and has no reply reference.
+
+**Task:** the coordinator assigns the implementation (TASK-2005 follow-up or a new task).
+
+**Open:** none for the decision; implementation and evidence per the task.

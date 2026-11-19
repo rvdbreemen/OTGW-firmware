@@ -270,7 +270,11 @@ def extract_cycles(src: str) -> str:
     win = _grab(r"^void satGetWindow4hStats\(\)\s*\{.*?^\}", src, "satGetWindow4hStats").group(0)   # TASK-1409
     a = _grab(r"^static float _flowPercentile\(", src, "_flowPercentile").start()
     b = _grab(r"^void satCycleSample\(\)\s*\{.*?^\}", src, "satCycleSample").end()
-    return "\n".join(consts) + "\n" + rec + "\n" + "\n".join(globs) + "\n" + guards + "\n" + src[a:b] + "\n" + win + "\n"
+    # Entries 428/429: the per-flame helpers that satCycleOnFlameChange() calls (absent in older copies)
+    burn = "\n".join(m.group(0) for m in re.finditer(
+        r"^(?:void satCycleNoteBurnEnd\(\)|bool satCycleCountPwmStartThisFlame\(bool flameOn\))\s*\{.*?^\}", src, re.S | re.M))
+    return ("\n".join(consts) + "\n" + rec + "\n" + "\n".join(globs) + "\n" + burn + "\n" + guards + "\n" + src[a:b] + "\n"
+            + win + "\n")
 
 
 def idle_return_type(sat_src: str) -> str:

@@ -64,7 +64,7 @@ The firmware also has an OT-Direct mode, used only on hardware without a PIC. On
 
 Version 2.0.0 is a major platform release. It is the ESP32-S3-only async + FreeRTOS line. Settings files from v1.3.x load without modification.
 
-Releases of 2.0.0 are on the GitHub Releases page: betas are published as GitHub prereleases, the stable 2.0.0 release as a normal release. The established functionality is feature complete; SAT, OTDirect and the new MQTT topic shape (see below) still receive refinement. SAT stays experimental and opt-in, and it is off by default (see Chapter 5).
+Releases of 2.0.0 are on the GitHub Releases page: betas are published as GitHub prereleases, the stable 2.0.0 release as a normal release. The established functionality is feature complete; SAT, OTDirect and the new MQTT topic shape (see below) still receive refinement. SAT is stable from 2.0.0; it stays opt-in and is off by default (see Chapter 5).
 
 **Breaking change in this release.** v2.0.0 changes the default MQTT topic names to a new self-describing scheme (ADR-106). Thirty-seven OT-spec-derived binary sensor topics are renamed to clearer, Home Assistant friendly labels (for example, the legacy `master_ch_enable` becomes `central_heating_enabled`). Users with existing automations pinned to the legacy labels can flip `settings.mqtt.bUseLegacyOtTopics` to `true` and keep the v1.x behaviour. The two modes are mutually exclusive: either the new names or the legacy names publish, never both. The REST API is unchanged from v1.x.
 
@@ -759,11 +759,11 @@ The nightly restart causes a brief service interruption of approximately 30 seco
 
 #### Check GitHub for new versions
 
-From firmware 2.0.0-beta.387. The web UI can tell you when a newer firmware is on GitHub. A notice then appears in the header next to the firmware version, with a link to the release page.
+From firmware 2.0.0-beta.387. The web UI can tell you when a newer firmware is on GitHub. A notice then appears in the header next to the firmware version, with a link to the release page. From beta.393 the notice also shows on a phone (a window of 480 px or less).
 
 - Who contacts GitHub: your browser, not the gateway. The gateway stays on your local network and sends nothing to the internet for this.
 - What is sent: your browser asks api.github.com for the list of OTGW-firmware releases, at most every 6 hours. As with any website, GitHub sees your internet IP address. The gateway's address is not sent: the request carries no referrer and no cookies.
-- First use: the web UI asks once whether you want this. Your answer is stored on the gateway and applies to every browser.
+- First use: the web UI asks once whether you want this. From beta.393 the question is a chip "Check for new versions?" in the header, next to the identity chips; a click on it shows the explanation with No and "Yes, check", and closing it without an answer means not now (the chip stays). Before beta.393 the question opened as a dialog over the page. Your answer is stored on the gateway and applies to every browser.
 - Switch it off: Settings > Behavior > "Check GitHub for new versions". When it is off, the browser makes no request to GitHub at all.
 - Betas: a beta firmware is told about newer betas and stable releases. A stable firmware is only told about stable releases, unless you also switch on "Also tell about beta versions".
 - Hide a notice: the × next to it hides that version until a newer one appears.
@@ -1544,9 +1544,9 @@ The result is weather-compensated heating that keeps room temperatures stable wi
 SAT was inspired by (and ported from) the excellent Home Assistant SAT custom component by Alex Wijnholds (Alexwijn), with design feedback and validation from George Dellas (sergeantd). The firmware embeds the controller directly in the OTGW so the heating loop keeps running even when Home Assistant, MQTT, or WiFi are unavailable.
 
 
-> **SAT is experimental, opt-in and off by default.** SAT takes over your boiler's control setpoint, so it stays off (`satenabled` is false) until you switch it on, and the setup wizard asks you to confirm first. SAT behaviour can still change between builds while the field runs continue.
+> **SAT is opt-in and off by default.** SAT takes over your boiler's control setpoint, so it stays off (`satenabled` is false) until you switch it on, and the setup wizard asks you to confirm first.
 >
-> **Reporting SAT field results.** Field data is what makes SAT better. If you run SAT, please send a capture: (1) check the version at `http://<ip>/api/v2/device/info` (`fwversion`); (2) check that `http://<ip>/api/v2/sat/status` shows `"simulation": false`; (3) start the capture tool from the release zip (`capture-mqtt-debug.bat`, `.sh` or `-macos.sh`) with `--long-run`, for at least a night and a morning; (4) note your boiler model, radiators or floor heating, and any setting you changed with the time; (5) stop with `q` and post the `-upload.zip` in #beta-testing on Discord or attach it to a GitHub issue. The same steps: https://github.com/rvdbreemen/OTGW-firmware/blob/dev/docs/sat/field-run-recipe-2.0.0.md
+> **Reporting SAT field results.** Field data is what makes SAT better. If you run SAT, please send a capture: (1) check the version at `http://<ip>/api/v2/device/info` (`fwversion`); (2) check that `http://<ip>/api/v2/sat/status` shows `"simulation": false`; (3) start the capture tool from the release zip (`capture-mqtt-debug.bat`, `.sh` or `-macos.sh`) with `--long-run`, for at least a night and a morning; (4) note your boiler model, radiators or floor heating, and any setting you changed with the time; (5) stop with `q` and attach the `-upload.zip` to a GitHub issue, or post it in #english-support or #nederlandse-ondersteuning on Discord (beta testers: #beta-testing). The same steps: https://github.com/rvdbreemen/OTGW-firmware/blob/dev/docs/sat/field-run-recipe-2.0.0.md
 
 ---
 
@@ -1724,7 +1724,7 @@ Continuous mode includes clamp logic: if the PID setpoint drops rapidly but the 
 
 **Auto-switch**: SAT always monitors boiler behavior using cycle classification (see section 5.11) and switches modes automatically:
 
-- Continuous to PWM: when the flow temperature minus the requested (PID) setpoint stays at or above the switch margin for 60 seconds (Sergeant D entry 407; ADR-254, Proposed). The margin is the setting `satpwmswitchmargin` (0.5 to 5.0 C), default 2.0 C; a stored old default of 1.5 C moves to 2.0 C once, a value you set yourself stays (Robert, Q-407a). A fail-safe also switches when the flow stays 3.5 C or more above the request for 30 s (entry 359).
+- Continuous to PWM: when the flow temperature minus the requested (PID) setpoint stays at or above the switch margin for 60 seconds (Sergeant D entry 407; ADR-254, Proposed). The margin is the setting `satpwmswitchmargin` (0.5 to 5.0 C), default 2.0 C; a stored old default of 1.5 C moves to 2.0 C once, a value you set yourself stays (Robert, Q-407a). From beta.391 this rule switches to PWM at most once per burn (one flame-on): once SAT has gone from PWM back to continuous while the flame burns, it stays in continuous until the flame goes out (Sergeant D entries 429 and 430). Only the fail-safe can still switch to PWM in that burn: the flow stays 3.0 C or more above the request for 30 s (entries 359 and 429; 3.5 C before beta.391). Only the first PWM ON of a burn counts as a start toward the hourly cycle limit; a later PWM ON in the same burn does not (entry 428, which changes entry 89; TASK-2913).
 - PWM to continuous: in a PWM ON phase, when the flame is on and the requested setpoint stays above the flow temperature for 60 seconds (entries 339 and 342; ADR-236, Proposed), or after 300 seconds of saturation (ADR-236: unchanged). Not during the first 60 s of a start (entry 394).
 - The boiler's configuration message (MsgID 3, including "master low-off not allowed") does not block PWM: PWM is allowed from the start on every boiler (entries 392, 393; ADR-251).
 
@@ -2759,6 +2759,7 @@ Press `h` at any time to print the help menu with the current device status and 
 | j | Read the current GPIO output state |
 | l | Toggle generic MyDEBUG flag |
 | f | Show the MyDEBUG flag state |
+| H | Prerelease (beta) builds only, for bench tests: hold memory low on purpose (free memory under 7 KB, largest block under 2 KB) to test the automatic recovery of section 7.12a; `H` again releases it, and it releases itself after 30 minutes. Not in stable builds |
 
 The `F` key is useful after a Home Assistant MQTT wipe or topic-prefix change: it forces a complete re-publish of all discovery entries rather than waiting for the next natural trigger.
 
@@ -2834,12 +2835,14 @@ Does the gateway hang or become unreachable after you switched BLE on? See secti
 
 **Symptom:** some time after boot the web UI stops answering, MQTT goes quiet and the gateway cannot be reached, often after you changed a setting. On firmware before 2.0.0-beta.375 the most likely cause on a board without PSRAM is BLE scanning that you switched on after accepting the stability warning: BLE starts at boot (`initSAT()`) and its memory use can starve the web server. From beta.375 BLE cannot be switched on without PSRAM, and a stored "on" is cleared at boot (section 5.16, "PSRAM-aware default").
 
+**Automatic recovery (from 2.0.0-beta.383).** A gateway on WiFi whose network has stopped working while its memory is nearly exhausted now recovers by itself. Once a minute it pings your router; a ping that cannot be sent for lack of memory counts as a failed check when the largest free memory block is under 4 KB. After 8 failed checks in a row (about 8 minutes) it forces a WiFi reconnect; if the link is still dead 8 checks later it restarts, so about 16 minutes after the network stopped. A short WiFi reconnect while memory stays that low does not start the count again (from beta.385). No action is taken while MQTT, REST or port 25238 traffic arrived in the last minute. The check starts only after your router has answered once since the start (see Known issues in the release notes), and not on a wired connection. After 3 such restarts the gateway only forces a reconnect, at most once per 15 minutes; the count clears after the link has worked for an hour, and on a power-on. In the telnet log (port 23) look for `WiFi: gateway probe not possible (...), heap starved (largest block ... B): counted as dead`, `WiFi: connected but no traffic, forcing a reconnect` and, after the restart, the reason `WiFi: connected but no traffic`. If this happens more than once, collect the crash log and the telnet log and ask for help (section 7.14).
+
 **Tip first:** save your settings while the gateway works. Open `http://<ip-of-your-otgw>/api/v2/settings` in a browser and save the page as a file. That gives you a list to re-enter after the steps below.
 
 Work through these steps in order and stop at the first one that helps:
 
 1. **Power-cycle and switch the setting off in the window after boot.** Remove the power, wait ten seconds, power it again. A reboot from the web UI restarts the ESP only. As soon as the web UI answers, go to Settings, **Sensors**, **BLE sensors** and switch **Enable BLE sensors** off (or undo the setting you changed last), then save. Be quick: on the bench the web UI stopped answering again within about 1 to 2 minutes after a power-cycle. If you do not get in, repeat once, then go to step 2.
-2. **Reset the settings over USB, keeping WiFi.** Connect the gateway to a PC with a USB cable and run, from the unpacked release zip, `flash_otgw.bat --update --fs <OTGW-firmware-...littlefs.bin>` (Windows; `./flash_otgw.sh` for Linux and macOS has no `--update` mode yet, so there go to step 3). This writes only the filesystem image: the WiFi credentials (in NVS) are kept, `settings.ini` goes back to the defaults, and on a board without PSRAM BLE then starts off (a settings file without the BLE key means BLE off). Re-enter your other settings by hand, using the file you saved. Do not use `--migrate` for this: it saves `settings.ini` first and puts it back afterwards, so the setting that caused the hang returns.
+2. **Reset the settings over USB, keeping WiFi.** Connect the gateway to a PC with a USB cable and run, from the unpacked release zip, `flash_otgw.bat --update --fs <OTGW-firmware-...littlefs.bin>` on Windows, or `./flash_otgw.sh --update --fs <OTGW-firmware-...littlefs.bin>` on Linux and macOS. This writes only the filesystem image: the WiFi credentials (in NVS) are kept, `settings.ini` goes back to the defaults, and on a board without PSRAM BLE then starts off (a settings file without the BLE key means BLE off). Re-enter your other settings by hand, using the file you saved. Do not use `--migrate` for this: it saves `settings.ini` first and puts it back afterwards, so the setting that caused the hang returns.
 3. **Factory flash as the last resort.** `flash_otgw.bat` without options erases the whole flash and writes the `-merged-full.bin` image: WiFi credentials and settings are gone, and the gateway starts its WiFi config portal (section 7.13).
 
 If the gateway still hangs with BLE off, or hangs on a board with PSRAM, collect the crash log (section 7.11), and ask for help (section 7.14).

@@ -103,6 +103,7 @@ static uint32_t satCycleGetFlameOnStartMs() { return g_flameOnStart; }
 static uint32_t satCycleGetFlameOffStartMs() { return g_flameOffStart; }
 static bool satCycleIsHourLimitReached() { return g_hourLimit; }
 static void satCycleRecordPwmStart() { g_pwmStarts++; }             // counts the calls (TASK-1421; the ring itself: tests/test_sat_pwm_start_limit.py)
+bool satCycleCountPwmStartThisFlame(bool flameOn);                   // entry 428: the real one comes with the cycles cut below
 static bool g_hasOT = true;
 static bool hasOTCommandInterface() { return g_hasOT; }
 static bool satEnqueueIfChangedCS(float cs) { g_csSent++; g_csLast = cs; return true; }
@@ -208,9 +209,9 @@ int main(int argc, char** argv) {
 #ifdef HAS_SWITCH_TICK
     state.sat.eControlMode = SAT_MODE_CONTINUOUS; state.sat.bPwmFlameRequested = false;
     satPwmReset(); _pwm_effectiveBoilerTemp = 47.2f; g_flameOffStart = g_ms - 600000UL; _pwm_lastUpdateMs = g_ms - 600000UL;
-    // 38 >= 35 + 2: a sustained overshoot below the 3.5 K fail-safe of TASK-1762, so the 60 s rule fires. argv[5] (optional): another
+    // 37.5 >= 35 + 2: a sustained overshoot below the 3.0 K fail-safe (TASK-1762, entry 429), so the 60 s rule fires. argv[5] (optional): another
     // flow, e.g. 45 (the pre-TASK-1762 input, 10 K over): the fail-safe fires after 30 s.
-    g_flow = (argc > 5) ? (float)atof(argv[5]) : 38.0f; setPrev(40.0f);
+    g_flow = (argc > 5) ? (float)atof(argv[5]) : 37.5f; setPrev(40.0f);
     float cs = 0; int ticks = 0; int contBefore = 0;
     for (; ticks < 400; ticks++) {
       g_ms += (argc > 4) ? (uint32_t)strtoul(argv[4], 0, 10) : 1000UL; _sat_tickMs = g_ms;   // argv[4]: tick interval in ms (TASK-1412.8)

@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : webServerCompat.h
-**  Version  : v2.0.0-poc.18
+**  Version  : v2.0.0-poc.19
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -199,6 +199,17 @@ inline void webPushHeader(const __FlashStringHelper* name, const char* value) {
   uint8_t i = g_pendingHeaders.count++;
   strlcpy_P(g_pendingHeaders.name[i], (PGM_P)name, WEB_HEADER_NAME_LEN);
   strlcpy(g_pendingHeaders.value[i], value, WEB_HEADER_VALUE_LEN);
+}
+
+// Close the current request's connection without building a response: for a refusal on a heap
+// too starved to allocate one (a response and its header list nodes come from operator new,
+// which aborts the firmware when it fails). Same two steps as the file-gate error path below:
+// request->abort() marks it, client()->abort() sends the RST while a pcb is still there.
+inline void webAbortCurrentRequest() {
+  g_pendingHeaders.count = 0;
+  if (!currentRequest) return;
+  currentRequest->abort();
+  if (currentRequest->client() && currentRequest->client()->pcb()) currentRequest->client()->abort();
 }
 
 // Drain the pending-header queue onto a response object, then clear it.

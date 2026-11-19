@@ -31,18 +31,18 @@ The web UI is the v2 web UI, the only web UI in 2.0.0. Read "Before you flash", 
 - **Return water temperature every minute** from a wired sensor (PIC firmware 6.6 or later, `TS=R`).
 - **Crash log endpoint.** `GET /api/v2/device/crashlog` for diagnostics. After an ESP32 panic or watchdog reset it holds a `Core dump:` line with the task, the program counter and a short backtrace (TASK-1479). `reboot_log.txt` names every ESP-IDF reset reason, including 0xb (USB reset by the host) (TASK-1438).
 - **Capture tool** with raw OpenTherm frame logging (next section), and an opt-in diagnostic recorder on the device (TASK-1665), with Start, Stop and Download in the web UI (TASK-1700).
-- **SAT, experimental and off by default:** every heating start runs in PWM first, a tolerance band around the room target (restart below the target + 0.1 C after a 10 minute pause), no SAT command in the first minute after a reboot, PWM also on boilers that report "master low-off not allowed", and the Home Assistant thermostat card follows SAT while SAT is on (TASK-1942, TASK-1887, TASK-1874, TASK-2000, TASK-1979).
+- **SAT, opt-in and off by default:** every heating start runs in PWM first, a tolerance band around the room target (restart below the target + 0.1 C after a 10 minute pause), no SAT command in the first minute after a reboot, PWM also on boilers that report "master low-off not allowed", and the Home Assistant thermostat card follows SAT while SAT is on (TASK-1942, TASK-1887, TASK-1874, TASK-2000, TASK-1979).
 - **Relicensed to GNU GPLv3** (was MIT).
 
 ---
 
-## SAT is experimental and opt-in
+## SAT is opt-in and off by default
 
 SAT (Smart Autotune Thermostat) is an embedded heating controller. It is **off by default** and it stays off until you switch it on.
 
 - SAT controls your boiler. When you switch it on, the wizard first shows a step "Before you enable SAT". You must tick a box to continue. Cancel leaves SAT off and changes nothing.
 - While SAT is on, it owns central heating control: `CS=`, `CH=`, `MM=`, `C2=`, `H2=`, `TT=` and `TC=` from MQTT, REST, the boot commands or the serial bridge are refused (TASK-1695; before beta.127 only `CS=` was). `HW=`, `SW=`, `SH=` and every other command still pass.
-- Some SAT decisions are still open (see Known issues). SAT behaviour can change between builds.
+- Known SAT limits are listed under Known issues.
 - **How to report SAT field results:** check the version at `http://<ip>/api/v2/device/info` (`fwversion`); check that `http://<ip>/api/v2/sat/status` shows `"simulation": false`; run the capture tool from the release zip with `--long-run` for at least a night and a morning; note your boiler model, radiators or floor heating and any setting you changed, with the time; stop with `q` and post the `-upload.zip` (see "How to report"). The same steps: https://github.com/rvdbreemen/OTGW-firmware/blob/dev/docs/sat/field-run-recipe-2.0.0.md. SAT is only as good as the field data we get.
 
 Without SAT, the gateway behaves as a transparent OpenTherm gateway, as in 1.x.
@@ -157,7 +157,8 @@ Most changes since the first 2.0.0 beta are already described above (Highlights 
 - With the room outside the 0.1 C band around the target, the PID integral is halved once and then held instead of reset to 0; the same applies to the zone thermostats (TASK-1890, beta.376).
 - SAT no longer switches from continuous to PWM while the tolerance band pauses heating (TASK-1887, beta.377).
 - PWM ON phases that start during a band pause do not count toward the hourly start limit, and the SAT narration names the value that decided a band stop or restart (TASK-1887, beta.358).
-- SAT switches from continuous to PWM when the flow stays at least 2.0 C above its request for 60 s; the "PWM switch margin" setting (0.5 to 5.0 C) is in the web UI, REST and MQTT, and the 3.5 C / 30 s safety switch stays (TASK-1888, beta.345; TASK-2005, beta.361).
+- Fixed: within one burn SAT no longer flips back and forth between continuous and PWM, and those PWM re-entries no longer use up the cycles-per-hour limit. Once a burn has gone from PWM back to continuous, the switch margin no longer moves it to PWM: SAT stays continuous until the flame goes out, and only the safety switch can still take that burn to PWM. Only the first PWM ON of a burn counts toward the hourly limit. The safety switch back to PWM acts at 3.0 C above the request for 30 s instead of 3.5 C (Sergeant D entries 428 to 430, TASK-2913, beta.391).
+- SAT switches from continuous to PWM when the flow stays at least 2.0 C above its request for 60 s; the "PWM switch margin" setting (0.5 to 5.0 C) is in the web UI, REST and MQTT, and the 30 s safety switch stays (3.5 C, from beta.391 3.0 C) (TASK-1888, beta.345; TASK-2005, beta.361).
 - SAT leaves PWM for continuous mode when the flame is on and the request stays above the flow for 60 s (TASK-1933, beta.274).
 - The PWM ON setpoint follows the latest flow temperature, as thermo-nova does (TASK-1990, beta.343, after the 2 minute average of beta.330 and beta.333).
 - SAT raises a diagnostic event when the burner does not light or heating fails, and leaves those hours out of the heating curve self-tune; it takes no control action (TASK-1882, beta.341).
@@ -186,6 +187,8 @@ Most changes since the first 2.0.0 beta are already described above (Highlights 
 
 ### Web UI and graphs
 
+- The one-time question whether to check GitHub for new versions is a chip "Check for new versions?" in the header; it no longer opens as a dialog over the page you are on. A click on it shows the explanation and the No / Yes buttons. The "New version available" notice now also shows on a phone; before beta.393 it was hidden at a width of 480 px or less (TASK-2918, beta.393).
+- The web UI no longer calls SAT experimental; SAT stays opt-in and off by default, and the setup wizard still asks you to confirm before SAT controls the boiler. The heat-pump boiler type is still marked experimental (TASK-2909, beta.390).
 - The Monitor graph and its CSV export show SAT's target temperature as its own dashed line while SAT is on, also in the 24 h history (TASK-2018, beta.378).
 - The SAT messages "boiler handed back" now say "SAT paused", with the reason, in English, Dutch, German and Greek (TASK-2036, beta.382).
 - The SAT weather card uses Home Assistant's sun position (`sat/sun_elevation`) while a value younger than 1 hour is published and then asks for no location; otherwise it asks for latitude and longitude (TASK-2015, beta.371).
@@ -202,6 +205,7 @@ Most changes since the first 2.0.0 beta are already described above (Highlights 
 
 ### REST API
 
+- Fixed a crash when two web requests arrived while memory was nearly exhausted: the "busy" answer itself needed memory and stopped the firmware. With the largest free memory block under 4 KB the gateway now closes that connection without an answer; above it the 503 with `Retry-After` is unchanged (TASK-2910, beta.389).
 - A control command that SAT refuses through `POST /api/v2/otgw/commands` answers 409 "Command refused: SAT is in control of the boiler"; 503 stays for a full queue (TASK-1970).
 - `otgw/messages` and `otgw/label` carry a `source` field (none, boiler, gateway, thermostat, summary, replay) next to the value (TASK-1965).
 - `GET /api/v2/sat/weather/needs-setup` gives its own answer instead of the full weather status (TASK-1969).
@@ -282,6 +286,10 @@ Timing and reliability:
 - On macOS with the built-in Python 3.9 the capture tool writes the graph history CSV again (TASK-2016).
 - The device check no longer counts an OT-Direct route that answers "not on this board" as a failure on an OTGW Classic (TASK-2012).
 
+### WiFi
+
+- A gateway whose network is dead while its memory is nearly exhausted now recovers itself: a WiFi check that cannot run for lack of memory counts as dead when the largest free memory block is under 4 KB, so the forced reconnect and then the restart follow (TASK-2026, ADR-258, beta.383). While memory stays that low, a short WiFi reconnect no longer starts that count again (ADR-261, beta.385; log line from beta.388).
+
 ### Diagnostics
 
 - A stopped diagnostic recording stays readable until the next start on boards with PSRAM (TASK-1960, beta.344).
@@ -303,6 +311,10 @@ These are design limits of 2.0.0, not bugs.
 - **Port 25238 filters inbound lines while SAT is on** (ADR-217). Text commands that would change central heating control and binary data are dropped, so OTmonitor cannot control the boiler or flash the PIC over that port while SAT is enabled. With SAT off the port is byte-transparent.
 
 ## Known issues
+
+- **Under investigation: once, a bench unit hung after a crash restart** (TASK-2911). It was on WiFi with an address, but did not answer ping, the web UI or telnet for 8 minutes, until a USB reset; the cause is not known. Normal restarts on that unit worked 5 of 5 times. The WiFi self-recovery only starts after the gateway's router answered once since the start, so it does not cover this case. If your gateway is on WiFi but unreachable after a restart, please tell us.
+
+- **The WiFi self-recovery keeps counting a dead link across a short WiFi reconnect while memory is nearly exhausted (TASK-2026).** This is proven in tests on the real code; a test on a device could not create the exact memory state it needs.
 
 - **The continuous to PWM switch rule of beta.361 (flow at least 2 C above the request for 60 s) has not run with a real boiler** (TASK-2005). A replay of a tester's Vitodens capture through the real code shows the old rule switching 3 times and the new rule not at all.
 
@@ -397,9 +409,9 @@ The Windows launcher is tested on our bench, also without Python installed. A te
 
 ## How to report
 
-- Discord: #beta-testing or #alpha-testing, with the capture upload zip. #beta-testing needs the Beta tester role: ask for it in #english-support or #nederlandse-ondersteuning, and until you have it, report there.
 - GitHub: [open an issue](https://github.com/rvdbreemen/OTGW-firmware/issues) and attach the capture files.
-- SAT field results: the steps in "SAT is experimental and opt-in" above, also at https://github.com/rvdbreemen/OTGW-firmware/blob/dev/docs/sat/field-run-recipe-2.0.0.md.
+- Discord: #english-support or #nederlandse-ondersteuning, with the capture upload zip. Beta testers keep using #beta-testing.
+- SAT field results: the steps in "SAT is opt-in and off by default" above, also at https://github.com/rvdbreemen/OTGW-firmware/blob/dev/docs/sat/field-run-recipe-2.0.0.md.
 
 Thank you to everyone who tested the alphas and betas, to gruijter and maarten_41762 for the detailed feedback and the field captures, to tjfs for the OLED, OT-Direct, override, pump symbol, pressure, home dial and update page reports and the captures, to Crash-Evans for pull request #699 and the macOS capture runs, to André Brait for the pull requests (#697 and #698 in beta.118), the code size analysis and the page-load report, and to Sergeant D for the SAT design decisions.
-<!-- Review: "How to report" is copied from the beta notes and points at #beta-testing and #alpha-testing. For a stable release, decide which channels stable users should use (the support channels, a GitHub issue). -->
+<!-- Decided (Robert, 2026-11-18, TASK-2034): SAT is stable from 2.0.0, still opt-in; stable users report through a GitHub issue or the support channels, #beta-testing only for beta testers. -->

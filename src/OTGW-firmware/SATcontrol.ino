@@ -1433,7 +1433,8 @@ static void satPwmBeginOn(bool flame, float boilerTemp, uint32_t onTimeMs, uint3
   _pwm_dhwHoldLapsed = false;
   // Entry 398: an ON phase that starts during a band stop (CH held at 0) does not count toward the hourly start limit.
   _pwm_onUncounted = _sat_tolBandOff;
-  if (!_pwm_onUncounted) satCycleRecordPwmStart();
+  // Entry 428: with the flame burning, only the first PWM ON start of that flame counts (a re-entry inside a burn does not).
+  if (!_pwm_onUncounted && satCycleCountPwmStartThisFlame(flame)) satCycleRecordPwmStart();
   if (flame) {
     _pwm_waitingForFlame = false;
     _pwm_flameOnMs = _pwm_lastUpdateMs;
@@ -1476,7 +1477,7 @@ static void satPwmCountOnWhenChAllowed(bool bandOff)
 {
   if (bandOff || !_pwm_onUncounted || !state.sat.bPwmFlameRequested) return;
   _pwm_onUncounted = false;
-  satCycleRecordPwmStart();
+  if (satCycleCountPwmStartThisFlame(satIsFlameOn())) satCycleRecordPwmStart();   // entry 428: once per flame
 }
 
 static void satPwmEndOn(uint32_t onTimeMs, uint32_t offTimeMs)

@@ -95,8 +95,15 @@ ARG_MIGRATE=0
 ARG_HOST=""
 ARG_PASSWORD=""
 ARG_NOBACKUP=0
+ARG_UPDATE=0
+ARG_APP=""
+ARG_FS=""
 # Migration images: slice 1 at 0x0, slice 2 right after NVS (0x9000 + 0x5000).
 MIGRATE_REST_OFFSET="0xE000"
+# TASK-2028: --update offsets, as flash_otgw.bat (partitions_otgw_esp32.csv, ADR-191: safeboot layout).
+APP_OFFSET="0x100000"
+FS_OFFSET="0x330000"
+TOOL_LAYOUT="safeboot"
 
 # ---- Help ------------------------------------------------------------------
 show_help() {
@@ -130,6 +137,16 @@ One-time layout migration (ADR-191, TASK-1223.8):
   --bin <x-migrate-0x0.bin>  With --migrate: pick the board's migration image
                        when several are present (they are board-specific).
 
+Update without erase (keeps the WiFi credentials, TASK-2028):
+  --update             Write the firmware (app) and/or the filesystem (LittleFS)
+                       at app0 ${APP_OFFSET} / spiffs ${FS_OFFSET}, no erase. A
+                       filesystem image resets settings.ini; an app-only update
+                       keeps it. Bare --update picks both release images.
+  --app <fw.bin>       With --update: this firmware image only.
+  --fs <littlefs.bin>  With --update: this filesystem image only.
+                       --update first reads the unit's partition table and
+                       refuses when the unit still needs --migrate.
+
 Other:
   --help, -h           Show this help.
 
@@ -150,6 +167,10 @@ while [ $# -gt 0 ]; do
         --host)     ARG_HOST="$2";  shift 2 ;;
         --password) ARG_PASSWORD="$2"; shift 2 ;;
         --no-backup) ARG_NOBACKUP=1; shift ;;
+        --update)   ARG_UPDATE=1;   shift ;;
+        --factory)  ARG_UPDATE=0;   shift ;;
+        --app)      ARG_APP="$2";   shift 2 ;;
+        --fs)       ARG_FS="$2";    shift 2 ;;
         --help|-h)  show_help; exit 0 ;;
         *) err "Unknown argument: $1"; echo "Run './flash_otgw.sh --help' for usage."; exit 2 ;;
     esac
@@ -190,7 +211,9 @@ echo
 echo "============================================================"
 echo " OTGW Flash Tool ($(uname -s))"
 echo " esptool standalone version: ${ESPTOOL_VERSION}"
-echo " Mode: factory reset (erase flash, write firmware + filesystem)"
+if [ "$ARG_MIGRATE" = "1" ]; then echo " Mode: one-time layout migration (WiFi kept)"
+elif [ "$ARG_UPDATE" = "1" ]; then echo " Mode: update (no erase, WiFi credentials kept)"
+else echo " Mode: factory reset (erase flash, write firmware + filesystem)"; fi
 echo "============================================================"
 echo
 
@@ -363,6 +386,70 @@ migrate_flow() {
     exit 0
 }
 [ "$ARG_MIGRATE" = "1" ] && migrate_flow
+
+# ---- Update without erase (TASK-2028): its own path, then exit --------------
+# The flash_otgw.bat --update flow: explicit --app/--fs win (an explicit image means exactly that image, so a
+# filesystem image lying next to it is not written along: TASK-1160); without either, the release images next to
+# the script or in build/, then the raw .pio outputs. The unit's partition table must be the safeboot layout,
+# otherwise the app would land at the wrong offset and the unit would not boot. No erase and no write at NVS
+# (0x9000), so the WiFi credentials stay.
+update_flow() {
+    local app="" fs="" f
+    if [ -n "$ARG_APP" ]; then [ -f "$ARG_APP" ] || { err "--app file not found: $ARG_APP"; exit 1; }; app="$ARG_APP"; fi
+    if [ -n "$ARG_FS" ];  then [ -f "$ARG_FS" ]  || { err "--fs file not found: $ARG_FS"; exit 1; };  fs="$ARG_FS"; fi
+    if [ -z "$app" ] && [ -z "$fs" ]; then
+        for f in "$SCRIPT_DIR"/OTGW-firmware-*.ino.bin "$SCRIPT_DIR"/build/OTGW-firmware-*.ino.bin "$SCRIPT_DIR"/.pio/build/*/firmware.bin; do
+            [ -f "$f" ] && { app="$f"; break; }
+        done
+        for f in "$SCRIPT_DIR"/OTGW-firmware-*.littlefs.bin "$SCRIPT_DIR"/build/OTGW-firmware-*.littlefs.bin \
+                 "$SCRIPT_DIR"/.pio/build-fs/*/littlefs.bin "$SCRIPT_DIR"/.pio/build/*/littlefs.bin; do
+            [ -f "$f" ] && { fs="$f"; break; }
+        done
+    fi
+    if [ -z "$app" ] && [ -z "$fs" ]; then
+        err "Update mode found neither a firmware nor a filesystem image."
+        echo "        Provide --app <firmware.bin> and/or --fs <littlefs.bin>." >&2
+        exit 1
+    fi
+    [ -n "$app" ] && ok "Firmware: $(basename "$app") -> $APP_OFFSET"
+    [ -n "$fs" ]  && ok "Filesys:  $(basename "$fs") -> $FS_OFFSET"
+
+    local port_args baud pt layout
+    baud="${ARG_BAUD:-921600}"
+    if [ -n "$ARG_PORT" ]; then port_args="--port $ARG_PORT"
+    else port_args="--port-filter vid=0x303A --port-filter pid=0x1001 --port-filter pid=0x4001"; fi
+
+    step "Reading the partition table of the unit"
+    pt="$(mktemp "${TMPDIR:-/tmp}/otgw-pt-XXXXXX")"
+    # shellcheck disable=SC2086
+    "$ESPTOOL_BIN" --chip esp32s3 $port_args --baud "$baud" --before default_reset --after no_reset \
+        read_flash 0x8000 0x1000 "$pt" >/dev/null \
+        || { rm -f "$pt"; err "Could not read the partition table from the unit."; exit 1; }
+    layout="legacy"
+    if LC_ALL=C grep -aq "safeboot" "$pt"; then layout="safeboot"; fi
+    rm -f "$pt"
+    ok "Unit layout: $layout   images: $TOOL_LAYOUT"
+    if [ "$layout" != "$TOOL_LAYOUT" ]; then
+        err "This unit uses the $layout partition layout; these images are for $TOOL_LAYOUT."
+        echo "        Run a one-time migration first:  ./flash_otgw.sh --migrate --host <device ip>" >&2
+        exit 1
+    fi
+
+    local writes=()
+    [ -n "$app" ] && writes+=("$APP_OFFSET" "$app")
+    [ -n "$fs" ]  && writes+=("$FS_OFFSET" "$fs")
+    step "Writing without erase (WiFi credentials kept)"
+    # shellcheck disable=SC2086
+    "$ESPTOOL_BIN" --chip esp32s3 $port_args --baud "$baud" --before default_reset --after hard_reset \
+        write_flash -z "${writes[@]}"
+    echo
+    echo "============================================================"
+    echo " Update done. WiFi credentials kept."
+    [ -n "$fs" ] && echo " The filesystem was replaced: settings.ini is back at defaults."
+    echo "============================================================"
+    exit 0
+}
+[ "$ARG_UPDATE" = "1" ] && update_flow
 
 # ---- Step 3: locate firmware bin -------------------------------------------
 find_bin() {

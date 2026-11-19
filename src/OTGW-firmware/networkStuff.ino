@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : networkStuff.ino
-**  Version  : v2.0.0-poc.18
+**  Version  : v2.0.0-poc.19
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -654,6 +654,17 @@ static bool wifiSkipPortalDecide(bool wifiConnected, bool wifiSaved, bool forceP
 #define WIFI_CAPPED_RECONNECT_MIN     15
 #define WIFI_STARVED_MAXBLOCK       4096   // TASK-2026: a largest free block below this is a starved heap
 #define WIFI_DEAD_RESTART_MAGIC  0x4F544452UL   // "OTDR"
+
+#if defined(_VERSION_PRERELEASE)
+// TASK-2923: starting the beta AP fallback on a starved heap panicked the wifi task (.61, beta.393 with the TASK-2026
+// heap hold: LoadProhibited at NULL+0x2c in ieee80211_hostap_attach, reached from WiFi.mode(WIFI_AP_STA)). The
+// threshold the closed driver needs is not known, so this uses the two limits the firmware already treats as low:
+// HEAP_LOW_THRESHOLD for free heap and WIFI_STARVED_MAXBLOCK for the largest block.
+static bool wifiApFallbackHeapOk(uint32_t freeHeap, uint32_t maxBlock)
+{
+  return freeHeap >= HEAP_LOW_THRESHOLD && maxBlock >= WIFI_STARVED_MAXBLOCK;
+}
+#endif
 #define WIFI_IP4_ARGS(a) (unsigned)((a) & 0xFF), (unsigned)(((a) >> 8) & 0xFF), \
                          (unsigned)(((a) >> 16) & 0xFF), (unsigned)(((a) >> 24) & 0xFF)
 
@@ -918,7 +929,13 @@ static void wifiLinkProbeOnReconnect()
   // TASK-2026 run 3 (.63): under a starved heap the AP dropped the association every ~4 min, and this reset kept the
   // dead streak under 8 for 30 min, so a starved, unreachable unit was never recovered. While the heap is starved
   // (largest free block below WIFI_STARVED_MAXBLOCK) a re-association is part of the symptom: the streak continues.
-  if (platformMaxFreeBlock() >= WIFI_STARVED_MAXBLOCK) wifiDeadProbes = 0;
+  const uint32_t maxBlock = platformMaxFreeBlock();
+  if (maxBlock >= WIFI_STARVED_MAXBLOCK) {
+    wifiDeadProbes = 0;
+  } else if (wifiDeadProbes > 0) {
+    DebugTf(PSTR("WiFi: re-associated while the heap is starved (largest block %u B), dead-link streak kept at %u\r\n"),
+            (unsigned)maxBlock, (unsigned)wifiDeadProbes);
+  }
   wifiLinkAliveSinceMs = millis();
   wifiProbeScheduled   = false;
 }
@@ -991,11 +1008,18 @@ void loopWifi() {
 #if defined(_VERSION_PRERELEASE)
         // BETA: after 2 retries (≈60s) enter AP fallback instead of rebooting. TASK-1645: not with
         // settings.wifi.bNoPortal, which promises no portal and no AP; loopWifi then keeps retrying.
-        if (wifiRetryCount >= 2 && !settings.wifi.bNoPortal) {
+        // TASK-2923: not on a starved heap either; then the release path below (retry, restart after 10).
+        const uint32_t apFree = platformFreeHeap(), apBlock = platformMaxFreeBlock();
+        const bool apHeapOk = wifiApFallbackHeapOk(apFree, apBlock);
+        if (wifiRetryCount >= 2 && !settings.wifi.bNoPortal && apHeapOk) {
           DebugTln(F("BETA: WiFi retries exhausted, entering AP fallback mode"));
           startAPFallback();
           RESTART_TIMER(timerAPRetry);
           wifiState = WIFI_AP_FALLBACK;
+        } else if (wifiRetryCount >= 2 && !settings.wifi.bNoPortal) {
+          DebugTf(PSTR("BETA: AP fallback skipped, heap starved (free %u B, largest block %u B); retrying as release\r\n"),
+                  (unsigned)apFree, (unsigned)apBlock);
+          wifiState = (wifiRetryCount >= 10) ? WIFI_FAILED : WIFI_DISCONNECTED;
         } else {
           wifiState = WIFI_DISCONNECTED;
         }
