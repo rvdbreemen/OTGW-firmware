@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-18T15:22:00Z'
-updated_date: '2026-11-19T16:58:00Z'
+updated_date: '2026-11-19T17:50:00Z'
 labels:
   - docs
 milestone: 2.0.0
@@ -44,4 +44,6 @@ Coordinator request 2026-11-18. Manual text prepared before the firmware lands, 
 2026-11-19 later: coordinator flipped the numbers: heap-hold hook (task 2026) = beta.393, update-check chip + phone notice (task 2918) = beta.394 (popover fix after 09's FAIL at 390 px). CHANGELOG, stable draft and ch03/h03 swapped; build_manual --check exit 0, test_manual_* 10 passed.
 
 2026-11-19 final: ba's ffe5dffeb on origin bumps beta.393 (task 2918, incl. the popover-on-phone fix of an unreleased build, so no user note). Notes set to beta.393 for task 2918; the heap-hold line removed from CHANGELOG [Unreleased] until 5e lands (394 or later). build_manual --check exit 0, test_manual_* 10 passed.
+
+2026-11-19: CHANGELOG [Unreleased] beta.394 from 17c993a1b: Fixed (beta builds only) task 2923 AP-fallback skipped when free < HEAP_LOW_THRESHOLD 8192 (helperStuff.ino:1128) or maxblock < WIFI_STARVED_MAXBLOCK 4096 (networkStuff.ino:649), code under #if defined(_VERSION_PRERELEASE); Diagnostics prerelease-only task 2026 heap-hold hook. No stable draft line: neither is in stable builds.
 <!-- SECTION:NOTES:END -->

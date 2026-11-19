@@ -10,6 +10,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Fixed
 - Web UI: the "New version available" notice (beta.387) was never visible on a phone or in a window 480 px wide or less, because it sat in the header group that is hidden at that width; the notice and the new chip now sit right after that group (TASK-2918, beta.393).
+- WiFi (beta builds only): the beta's own WiFi access point fallback is no longer started while memory is critically low (free memory under 8 KB or the largest free block under 4 KB), because starting it then crashed the gateway; the gateway logs the skip, keeps retrying the saved network and restarts after 10 failed attempts, as a stable build does. Stable builds have no such fallback (TASK-2923, beta.394).
+
+### Diagnostics (prerelease builds only)
+- The telnet heap-hold test hook keeps the memory starved for the whole hold (topped up every 5 s, floor checked every loop pass) and prints its summary at the release and three more times one minute apart; not in stable builds, no effect unless a developer starts it (TASK-2026, beta.394).
 
 ## [2.0.0-beta.392] - 2026-11-19
 
