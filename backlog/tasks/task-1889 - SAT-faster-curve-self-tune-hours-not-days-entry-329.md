@@ -5,7 +5,7 @@ status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-13T08:07:00Z'
-updated_date: '2026-11-19T05:19:00Z'
+updated_date: '2026-11-19T05:48:00Z'
 labels:
   - sat
   - adr
@@ -90,6 +90,8 @@ Bench 09 on .63 (d106f55, src-identical to 0f9a906, differing only in the commit
 2026-11-19 Q-1889b answered A (entry 424, origin aa6dd58df): warm-up-only decisions in the 12-hour window stay, no change. ADR-260 open questions both closed (still Proposed).
 
 2026-11-19 ADR-260 Accepted by Robert (DM 1572842856148766751, 05:15:58 UTC, 'Ja', reply to the coordinator's question 1572834466131480677 naming ADR-260; relayed by the coordinator). Accepted via adr-kit accept --confirm, signed User: Robert van den Breemen; adr-lint strict pass; tests/test_adr_governance.py OK.
+
+2026-11-19 docs/api/MQTT.md: removed the stale sat/curve_tune/clean_hours_today row (ADR-260 removed the topic); grep shows no other days/clean_hours remnants outside release notes, ADRs and the absence test.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
