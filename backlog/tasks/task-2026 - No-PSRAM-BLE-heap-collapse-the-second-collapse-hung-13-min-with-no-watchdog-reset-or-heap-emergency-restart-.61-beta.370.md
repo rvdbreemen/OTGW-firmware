@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-18T13:06:00Z'
-updated_date: '2026-11-19T05:28:00Z'
+updated_date: '2026-11-19T06:57:00Z'
 labels:
   - heap
   - watchdog
@@ -50,4 +50,8 @@ Follow-up of TASK-2025, from otgw-bench-tester on .61 (no PSRAM, beta.370, 2026-
 2026-11-19 the supervisor counters (wifi_sv_* in device/info, branch lane-2026-ctr, b06eeff32, built once as 381+b06eeff for run 3) are PARKED: not part of the TASK-2026 push; re-apply on top of option C later if the bench needs them again. Option B (app-level progress, the 'stack alive, app starved' blind spot of the ICMP probe) is filed as TASK-2038 (2.1.0).
 
 2026-11-19 Robert chose option C for 2.0.0 (DM 1572842729485111327, 05:15 UTC, reply to the coordinator's update 1572774626625589432, relayed by the coordinator); B goes to 2.1.0 as TASK-2038. ADR-261 records the choice and stays Proposed (acceptance is a separate yes). Lane rebased onto origin/dev e4eb2cdae and renumbered beta.383 (probe counts dead), beta.384 (H heap-hold hook), beta.385 (streak continues, option C); whole-lane non-banner patch identical to the pre-rebase lane (656 lines), 0 markers added. Gates on the rebased lane: tests/test_wifi_deadlink.py + tests/test_heaphold_hook.py 36 passed; red with origin's networkStuff.ino (OTGW_NETWORK_INO): 2 failed, test_a_starved_heap_counts_as_dead_and_recovers and test_starved_link_with_ap_drops_every_4_min_still_recovers; evaluate.py --quick 89 passed 0 failed; tests/test_adr_governance.py 17 passed (the ADR-261 README entry was lost in the rebase when README.md was taken from origin; restored from 5bf0ff471). Next: esp32-combo build in a slot after the 08:00 beta build, then a bench request.
+
+2026-11-19 bench .61 on 386+54d46b1 (09, logs 09 scratchpad b386/hold/): regression PASS (31 min, bootcount 1053 = flash+2, 0 panic, MQTT OK). Option C NOT demonstrated: 'H' 07:23 '19 blocks held, free=6920 maxblk=4084', 30 min REST-silent, 7 AP re-associations (GROUP_KEY_UPDATE_TIMEOUT), no :828/:777/:804 line in the short telnet windows, no restart. hd_min_free_heap 336 B after the hold: a bench-made extreme of the H hook (deliberately starved), no crash; not a field measurement. Analysis (ours, from the code): free 6920 < 8192 makes getHeapHealth() not HEALTHY (:889), maxblk 4084 < 4096 so the probe counts as starved-dead (:828 logged once per episode, :777 at probe 1 only); at probe 8 the streak goes to 0 (:781) and the witness wifiLanTrafficSeen() (:702-707) sees MQTT connected -> 'gateway silent but MQTT, REST or port 25238 traffic flows, no action' (:786). So with MQTT up the link is alive by ADR-258 and option C is never reached; the bench lacked run 3's precondition (no witness traffic). Alternative reading (coordinator/09): maxblk briefly >= 4096 -> a real ping answered -> ':757 gateway answers again'. Distinguish via the full telnet.raw. Rerun needed without witness (MQTT off, no REST, no 25238) and with a hold below 2 KB; bench AC for C stays open.
+
+Correction (coordinator, 2026-11-19): 'MQTT OK' was the regression phase; during the hold MQTT went LWT-offline 6x (07:24, 07:25, 07:35, 07:39, 07:44, 07:50) and reconnected in between. The witness path stays plausible (bConnected true at probe 8) but is not certain; 09 greps telnet.raw for the four lines. Decision (coordinator): push 383-386 as no-regression with this bench AC open; then the log line + hold target 2048 B and a witness-free rerun on .61, a hard condition for the weekend release.
 <!-- SECTION:NOTES:END -->
