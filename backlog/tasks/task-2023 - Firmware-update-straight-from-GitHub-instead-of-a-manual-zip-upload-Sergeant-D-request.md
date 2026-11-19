@@ -3,11 +3,11 @@ id: TASK-2023
 title: >-
   Web UI: show 'new version available' from the GitHub releases API, checked in
   the browser (option B, Robert 2026-11-18)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-18T11:54:00Z'
-updated_date: '2026-11-19T08:00:00Z'
+updated_date: '2026-11-19T08:49:00Z'
 labels:
   - feature
 milestone: 2.0.0
@@ -28,7 +28,7 @@ Asked by Sergeant D in #dev-sat-mqtt 2026-11-18 11:37 UTC (https://discord.com/c
 - [x] #2 No firmware HTTP change: the check runs client-side in the web UI against the GitHub releases API; the gateway makes no outbound request (code review + network trace in the browser)
 - [x] #3 The UI compares the latest release with the running fwversion and shows a notice with a link to the release page when it is newer; prerelease (beta) vs stable handled: a 2.x beta user is told about newer betas and stable releases, a stable user only about stable unless they opt in; tests on the real web UI files
 - [x] #4 A setting switches the check off; with it off, no request to GitHub is made (browser network trace)
-- [ ] #5 Privacy note in the manual (EN and NL): the browser contacts GitHub when the check is on, and how to switch it off
+- [x] #5 Privacy note in the manual (EN and NL): the browser contacts GitHub when the check is on, and how to switch it off
 - [x] #6 The check respects the web UI's limit of at most 2 API calls in flight and fails quietly when GitHub is unreachable or rate-limited (screenshot of both states)
 <!-- AC:END -->
 
@@ -126,4 +126,12 @@ Robert in #dev-sat-mqtt 2026-11-18 12:06 UTC (https://discord.com/channels/81296
 2026-11-19 bench 09 on .63, 383+629e1a0 (screenshots 09 scratchpad b383\ui\): (AC4) the question appears after ~30 s with 0 GitHub requests before it; 'No' gives POST updatecheck=false then updatecheckasked=true and no question after a reload; (AC2/AC3) switched on: exactly 1 GET https://api.github.com/repos/rvdbreemen/OTGW-firmware/releases?per_page=30 without Cookie and Referer, all from the browser; a planted cache shows the notice with the release link, the x keeps it hidden after a reload; (AC6) GitHub blocked: no notice, no JS error, failure cached 6 h ({rel:[]}), no retry; 0x 503 from the device; updatecheckasked not shown as a row. AC2 code side: tests/test_update_check_settings.py test_gateway_never_calls_github (no firmware source names api.github.com). Not measured: an outbound capture at the router, and the 2-in-flight limit under load (covered by the queue assertion in update-check-github.test.mjs). '2 connection issues' in the header on the bench = the bench state: the count covers only ws/mqtt/wifi/boiler/therm (v2.js header status), .63 has no boiler and no thermostat; GitHub is not one of them.
 
 2026-11-19 after the bench (09's note d): the one-time question now names api.github.com like the help text, the manual and ADR-262 (upd_ask_body en/nl/de/el); tests/test_update_check_settings.py asserts it in all 4 languages (red on the 629e1a049 texts, green now). A text-only change, not benched; it rides on the renumbered build. Browser web UI tests on 629e1a049: theme-toggle-labels 4/4, settings-reboot-badge 1/1, v2-settings-dirty-survives-refetch 1/1 (after a load stall at 91 % commit); settings-fetch-retry 0/2 as two Chrome stalls at 79 % commit (CDP no reply, 0 GETs), lang-menu and v2-navigation not run yet (guard commit < 80 %).
+
+2026-11-19 AC5: the privacy note is on origin 163bb8fbb (otgw-docs): EN docs/manuals/en/ch03-web-interface.md '#### Check GitHub for new versions', NL docs/manuals/nl/h03-webinterface.md '#### GitHub controleren op nieuwe versies', both 'From firmware 2.0.0-beta.387', with who contacts GitHub, what is sent (no referrer, no cookies), the one-time question, how to switch it off (Settings > Behavior / Instellingen > Gedrag), the beta rule and the x; checked in this session (grep, no TBD-2023 left). Firmware pushed as beta.387 (origin 63a773a4b..850f555bc), zip msg 1572895492637991013. Browser web UI tests on 850f555bc: settings-fetch-retry 2/2, lang-menu 7/7, v2-navigation 1/1 (commit 76 %), with theme-toggle-labels 4/4, settings-reboot-badge 1/1, v2-settings-dirty-survives-refetch 1/1 earlier.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+The web UI shows 'New version available' from the GitHub releases API, checked in the user's browser; the gateway makes no outbound request (ADR-003 kept; ADR-262 Proposed). Robert: option B, browser as data source, default off with a one-time question (DMs 1572585865589428318, 1572594516429381716, 1572847348177047675). Shipped in beta.387 (850f555bc). AC1: Robert's choices (notes). AC2: no firmware network code (tests/test_update_check_settings.py test_gateway_never_calls_github; ADR-262 Enforcement) and bench 09 network trace: all GitHub traffic from the browser. AC3: releases filtered to the running major, semver compare, beta/stable rule; tests/webui/update-check-github.test.mjs 13/13 on the real v2.js (red 0/13 on origin, 3 mutants red); bench: 1 GET without Cookie/Referer, notice + link + dismiss. AC4: device setting updatecheck (+ hidden updatecheckasked, updatecheckbeta), off by default: bench 0 GitHub requests before consent and after 'No'. AC5: manual EN/NL on origin 163bb8fbb. AC6: GitHub request bypasses the ADR-184 queue (test: inFlight 0), bench 0x 503; quiet failure with a 6 h failure cache (test 403/429/network/non-list; bench blocked). Not verified: an outbound capture at the router; 2-in-flight under heavy load; the dialog text api.github.com after the bench (text only, asserted by test).
+<!-- SECTION:FINAL_SUMMARY:END -->
