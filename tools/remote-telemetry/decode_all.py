@@ -172,11 +172,10 @@ def read_mix_file(path):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("base", nargs="?", help="collection point URL (not with --file)")
-    ap.add_argument("admin_email", nargs="?")
-    ap.add_argument("admin_password", nargs="?")
-    ap.add_argument("device_uid", nargs="?", help="otgw-<12 hex>, the uid the gateway enrolled with")
-    ap.add_argument("out_dir", nargs="?")
+    ap.add_argument("args", nargs="*", metavar="ARG",
+                    help="base admin_email admin_password device_uid out_dir (base: collection point URL; device_uid: "
+                         "otgw-<12 hex>; admin_password '-' asks for it); with --token-file: base device_uid out_dir; "
+                         "with --file: out_dir")
     ap.add_argument("--file", help="decode a local download (GET /api/v2/diag/recording) instead; then give only out_dir")
     ap.add_argument("--image", required=True, action="append",
                     help="firmware.bin for a recording build (repeat for histories spanning builds)")
@@ -186,12 +185,11 @@ def main():
     ap.add_argument("--token-file", help="a superuser auth token (e.g. a PocketBase impersonate token) instead of the "
                                          "e-mail and password; then give only base device_uid out_dir")
     a = ap.parse_args()
-    if a.token_file and not a.file:                        # base uid out: shift the positionals into place
-        a.device_uid, a.out_dir, a.admin_email, a.admin_password = a.admin_email, a.admin_password, "-", "-"
+    # The password never shares a variable with a value that is printed (CodeQL py/clear-text-logging).
     if a.file:
-        out = a.out_dir or a.base                          # with --file the only positional is the output folder
-        if not out:
-            sys.exit("--file needs an output folder")
+        if len(a.args) != 1:
+            sys.exit("--file needs exactly one output folder")
+        out = a.args[0]
         if len(a.image) != 1 or a.legacy_image:
             ap.error("--file requires exactly one --image")
         records, hdr = read_mix_file(a.file)
@@ -199,22 +197,26 @@ def main():
         print(f"{hdr['uid']} {hdr['firmware']}: {c['records']} records, {c['frames']} OT frames, {c['ticks']} SAT "
               f"ticks, {c.get('events', 0)} events, {c['debug_bytes']} debug bytes, {c['gaps']} gaps -> {out}")
         return
-    if not (a.base and a.admin_email and a.admin_password and a.device_uid and a.out_dir):
-        sys.exit("give base admin_email admin_password device_uid out_dir, or --file <download> out_dir")
-    base = a.base.rstrip("/")
-    if a.token_file:                                       # read, never printed
-        with open(a.token_file, encoding="utf-8-sig") as f:
+    if a.token_file:
+        if len(a.args) != 3:
+            sys.exit("with --token-file give base device_uid out_dir")
+        base, device_uid, out_dir = a.args
+        with open(a.token_file, encoding="utf-8-sig") as f:   # read, never printed
             token = f.read().strip()
     else:
-        if a.admin_password == "-":                        # ask instead: keeps the password out of the shell history
+        if len(a.args) != 5:
+            sys.exit("give base admin_email admin_password device_uid out_dir, or --file <download> out_dir")
+        base, admin_email, password, device_uid, out_dir = a.args
+        if password == "-":                                # ask instead: keeps the password out of the shell history
             import getpass
-            a.admin_password = getpass.getpass("PocketBase superuser password: ")
-        token = eb.api(base, "/api/collections/_superusers/auth-with-password", None,
-                       {"identity": a.admin_email, "password": a.admin_password})["token"]
-    q = eb.urllib.parse.urlencode({"filter": f'uid="{a.device_uid}"', "fields": "id"})
+            password = getpass.getpass("PocketBase superuser password: ")
+        token = eb.api(base.rstrip("/"), "/api/collections/_superusers/auth-with-password", None,
+                       {"identity": admin_email, "password": password})["token"]
+    base = base.rstrip("/")
+    q = eb.urllib.parse.urlencode({"filter": f'uid="{device_uid}"', "fields": "id"})
     found = eb.api(base, f"/api/collections/devices/records?{q}", token)["items"]
     if not found:
-        sys.exit(f"device {a.device_uid} not found")
+        sys.exit(f"device {device_uid} not found")
     records = eb.fetch_batches(base, token, found[0]["id"], "mix")
     images = [esp_image.EspImage(path) for path in a.image]
     images_by_build = {image.build_id: image for image in images if image.build_id}
@@ -231,14 +233,14 @@ def main():
             legacy = images[0]
         else:
             ap.error("supply --legacy-image for batches without a recorded build ID")
-    c = decode_records(records, legacy, ZoneInfo(a.tz), a.out_dir, images_by_build=images_by_build)
+    c = decode_records(records, legacy, ZoneInfo(a.tz), out_dir, images_by_build=images_by_build)
     print(f"{c['records']} records, {c['frames']} OT frames, {c['ticks']} SAT ticks, {c['debug_bytes']} debug bytes, "
           f"{c['gaps']} gaps, {c.get('debug_errors', 0)} debug decode errors, "
           f"lost {c.get('lost_items', 0)} items / {c.get('lost_records', 0)} records, "
-          f"{c.get('frame_gaps', 0)} frame gaps ({c.get('frames_missing', 0)} frames missing by sequence number) -> {a.out_dir}")
+          f"{c.get('frame_gaps', 0)} frame gaps ({c.get('frames_missing', 0)} frames missing by sequence number) -> {out_dir}")
     if a.days:
-        names, n = write_days(a.out_dir)
-        print(f"days: {', '.join(names)} ({n} frames) -> {os.path.join(a.out_dir, 'days')}")
+        names, n = write_days(out_dir)
+        print(f"days: {', '.join(names)} ({n} frames) -> {os.path.join(out_dir, 'days')}")
 
 
 if __name__ == "__main__":
