@@ -271,11 +271,22 @@ If you have a firmware binary file and want to upload it directly:
 2. Use the file upload area to select your firmware `.bin` file.
 3. The device flashes the binary and reboots.
 
+#### Moving from 1.x to 2.0.0, step by step
+
+1. **On the 1.x unit, save your settings.** Open the File Manager (FSexplorer) and download `settings.ini` and, if you have Dallas sensors, `dallas_labels.ini`. The MQTT **Unique id** is in `settings.ini`; keeping it keeps your Home Assistant entities (see the notes below).
+2. **Swap the module.** Power off the OTGW and replace the Wemos D1 mini with a LOLIN S3 Mini or S3 Mini Pro.
+3. **Flash the S3 over USB** with `flash_otgw` (see First-Time Flashing with flash_otgw).
+4. **Connect it to your WiFi** through its access point (see First-Time Setup: Connecting to Wi-Fi). WiFi credentials are not stored in `settings.ini`, so this step is needed either way.
+5. **Put your settings back.** Upload the saved `settings.ini` (and `dallas_labels.ini`) in the File Manager and restart the gateway: settings are read at boot. The hostname and the unique id of the 1.x unit come with the file.
+6. **Set the GPIO pins again.** A GPIO number from 1.x points to a different hole on the S3 (see the Dallas pin table above). Check the Dallas pin and any S0 or output pin in Settings.
+7. **Check Home Assistant.** With the old unique id the old entities keep working. If you keep a SAT integration in Home Assistant, check its command topic and never let it control while the firmware SAT is on (see the notes below).
+8. **Read what changed.** MQTT, the REST API and the web UI differ from 1.x in places; see [docs/BREAKING_CHANGES.md](../../BREAKING_CHANGES.md#200) before you rely on automations, Node-RED flows or scripts.
+
 #### Notes When Upgrading from v1.x
 
 - Moving from 1.x to 2.x means replacing the Wemos D1 mini with a LOLIN S3 Mini or S3 Mini Pro and flashing it over USB (see Flashing the Firmware). Going back to 1.x means putting the Wemos D1 mini back and flashing a 1.x release; a 1.x zip does not run on an S3.
 - No settings migration is required. Settings files from v1.3.x load without modification in v2.0.0.
-- MQTT topics and the REST API are unchanged from v1.x.
+- MQTT topics, the REST API and the web UI changed in places compared with v1.x (for example the v2 web UI replaces the classic web UI, a fresh install gets the default hostname `OTGW2` instead of `OTGW`, and while the new firmware SAT is on the gateway refuses heating commands from MQTT and REST). See the 2.0.0 section of [docs/BREAKING_CHANGES.md](../../BREAKING_CHANGES.md#200).
 - If you are upgrading from before v1.2.0, be aware that REST API v0 and v1 endpoints were removed in v1.2.0. Only `/api/v2/` endpoints are available. See [docs/BREAKING_CHANGES.md](../../BREAKING_CHANGES.md).
 - **SAT is built into the firmware: the old SAT component in Home Assistant is no longer needed.** In 2.0, SAT (Smart Autotune Thermostat) is part of the firmware itself; it is off by default. Never let the firmware SAT and a SAT integration in Home Assistant (for example from HACS) control at the same time: while the firmware SAT is on, the gateway refuses `CS=`, `CH=`, `MM=`, `C2=`, `H2=`, `TT=` and `TC=` from MQTT and the REST API, so the integration cannot control. If you want to keep the integration, leave the firmware SAT off.
 - **Keeping the Home Assistant SAT integration? Check its command topic.** An integration set up on the Wemos keeps sending to `OTGW/set/otgw-<old MAC>/command` after the swap to the S3. The new gateway then receives nothing and the thermostat keeps controlling, while everything looks normal in Home Assistant. Fix: carry the Wemos unique id over (see below), or remove the integration, delete the old `otgw-<old MAC>` branches (for example in MQTT Explorer) and add the integration again with the new device.

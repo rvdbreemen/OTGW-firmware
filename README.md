@@ -81,7 +81,7 @@ Firmware v1.x ran on the ESP8266 module that shipped on earlier NodoShop OTGW bo
 | 1.x through 2.0 | NodeMCU ESP8266 |
 | 2.3 and later | Wemos D1 mini ESP8266 |
 
-The ESP8266 is no longer a 2.0.0 build target. To move an existing OTGW to v2.0.0, swap the Wemos D1 mini ESP8266 for a LOLIN S3 Mini (ESP32-S3) drop-in: it keeps the same OTGW board and PIC co-processor, and the firmware builds for it from the same source tree. Settings files from v1.3.x load without modification.
+The ESP8266 is no longer a 2.0.0 build target. To move an existing OTGW to v2.0.0, swap the Wemos D1 mini ESP8266 for a LOLIN S3 Mini (ESP32-S3) drop-in: it keeps the same OTGW board and PIC co-processor, and the firmware builds for it from the same source tree. Settings files from v1.3.x load without modification. The step-by-step move from 1.x is in Chapter 2 of the manual, "Moving from 1.x to 2.0.0, step by step" ([docs/manuals/en/ch02-hardware-setup.md](docs/manuals/en/ch02-hardware-setup.md#moving-from-1x-to-200-step-by-step)).
 
 This ESP32-S3 plus PIC combination is what the firmware supports.
 

@@ -137,6 +137,16 @@ The items below follow the CHANGELOG; quoted parts are in quotation marks. Check
 
 ---
 
+## Limitations
+
+These are design limits of 2.0.0, not bugs.
+
+- **ESP32-S3 only.** 2.0.0 runs on the OTGW Classic with a LOLIN S3 Mini or S3 Mini Pro. The ESP8266 (Wemos D1 mini, NodeMCU) stays on 1.x.
+- **No HTTPS.** The web UI, the REST API and the WebSocket use plain HTTP and WS on your local network. Do not expose the gateway to the internet; use a VPN or a reverse proxy if you need remote access.
+- **BLE sensors need a board with PSRAM** (TASK-2025, ADR-257). On a board without PSRAM the BLE scanner does not start and the switch is disabled with "BLE needs PSRAM".
+- **Firmware SAT and a SAT integration in Home Assistant exclude each other.** While the firmware SAT is on, the gateway refuses `CS=`, `CH=`, `MM=`, `C2=`, `H2=`, `TT=` and `TC=` from MQTT and REST, so the integration cannot control (TASK-1695).
+- **Port 25238 filters inbound lines while SAT is on** (ADR-217). Text commands that would change central heating control and binary data are dropped, so OTmonitor cannot control the boiler or flash the PIC over that port while SAT is enabled. With SAT off the port is byte-transparent.
+
 ## Known issues
 
 - **The continuous to PWM switch rule of beta.361 (flow at least 2 C above the request for 60 s) has not run with a real boiler** (TASK-2005). A replay of a tester's Vitodens capture through the real code shows the old rule switching 3 times and the new rule not at all.
@@ -199,7 +209,8 @@ The items below follow the CHANGELOG; quoted parts are in quotation marks. Check
 - **Free memory dips under heavy diagnostic load** (TASK-1528). During long capture runs the lowest free-heap mark fell to between 0.5 and 1.7 KB for a moment, while the free heap stays around 71 KB. No crash was linked to it. Under investigation; the new `hd_dip_*` keys in `device/info` show what held the memory at that moment.
 - **Cycle verdicts may differ from beta.38** (TASK-1584, 1585, 1586, 1588): the classifier now follows thermo-nova more closely. The change is covered by host tests against the thermo-nova reference, not by a long field run.
 - **SAT's flame-out protection (TASK-1762) has not run on a real boiler.** If SAT switches to pulse mode more often than you expect, look for the SAT log line "Control mode: PWM (fail-safe: ...)", and please send a capture.
-- **SAT is still being validated.** A list of open SAT questions is with Sergeant D, the SAT designer; his answers can change SAT behaviour in later builds. The ignition logic for a boiler without a return temperature (TASK-1371) was bench-tested; it has not run on such a boiler in the field.
+- **SAT behaviour is fixed for 2.0.0.** Open SAT questions with Sergeant D, the SAT designer, are for 2.1.0 and later.
+- **The ignition logic for a boiler without a return temperature has not run on such a boiler in the field** (TASK-1371). It was bench-tested.
 - **Heating curve self-tune** (on by default) passed a 4-day run in the bench simulation (TASK-1525): hourly and daily records, and on simulated day 3 the curve was raised one step (the day-based timing of that build; from beta.379 the tuner decides per counted hour, covered by host tests and a closed-loop convergence test, TASK-1889). It has not yet run for days on a real house. Switch it off if you want a fixed coefficient. The phase split of beta.176 (TASK-1796) and the changes of beta.189 and beta.190 (TASK-1815, TASK-1816) are covered by host tests and short bench runs in the SAT simulation; the two-phase decision over several real days is not tested yet.
 - **Pressure alarm:** a pump-head step of about 0.3 bar after the pump stops can still raise it. It is display only and sends no command.
 - **Updating through the Home Assistant panel** completed in 2 of 3 bench runs (one 502 during the upload). Update by IP when you can.
