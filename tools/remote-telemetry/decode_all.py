@@ -5,6 +5,8 @@
     python3 decode_all.py http://<nas>:8090 <superuser-email> <password> <device-uid> <out-dir> \
         --image firmware.bin [--image older-firmware.bin] [--tz Europe/Amsterdam]
     (give - as the password to be asked for it instead, so it stays out of the shell history)
+    python3 decode_all.py http://<nas>:8090 <device-uid> <out-dir> --token-file <file> --image firmware.bin
+    (a superuser token, e.g. a time-limited PocketBase impersonate token, instead of e-mail and password)
 
 Reads the device's "mix" records (fmt 4) in seq order and writes:
   otframes.log  OT frames in the ADR-209 replay layout (host_time, device_time, source, frame)
@@ -116,7 +118,11 @@ def main():
                     help="firmware.bin for a recording build (repeat for histories spanning builds)")
     ap.add_argument("--legacy-image", help="firmware.bin for uploaded batches without a recorded build ID")
     ap.add_argument("--tz", default="Europe/Amsterdam")
+    ap.add_argument("--token-file", help="a superuser auth token (e.g. a PocketBase impersonate token) instead of the "
+                                         "e-mail and password; then give only base device_uid out_dir")
     a = ap.parse_args()
+    if a.token_file and not a.file:                        # base uid out: shift the positionals into place
+        a.device_uid, a.out_dir, a.admin_email, a.admin_password = a.admin_email, a.admin_password, "-", "-"
     if a.file:
         out = a.out_dir or a.base                          # with --file the only positional is the output folder
         if not out:
@@ -130,12 +136,16 @@ def main():
         return
     if not (a.base and a.admin_email and a.admin_password and a.device_uid and a.out_dir):
         sys.exit("give base admin_email admin_password device_uid out_dir, or --file <download> out_dir")
-    if a.admin_password == "-":                            # ask instead: keeps the password out of the shell history
-        import getpass
-        a.admin_password = getpass.getpass("PocketBase superuser password: ")
     base = a.base.rstrip("/")
-    token = eb.api(base, "/api/collections/_superusers/auth-with-password", None,
-                   {"identity": a.admin_email, "password": a.admin_password})["token"]
+    if a.token_file:                                       # read, never printed
+        with open(a.token_file, encoding="utf-8-sig") as f:
+            token = f.read().strip()
+    else:
+        if a.admin_password == "-":                        # ask instead: keeps the password out of the shell history
+            import getpass
+            a.admin_password = getpass.getpass("PocketBase superuser password: ")
+        token = eb.api(base, "/api/collections/_superusers/auth-with-password", None,
+                       {"identity": a.admin_email, "password": a.admin_password})["token"]
     q = eb.urllib.parse.urlencode({"filter": f'uid="{a.device_uid}"', "fields": "id"})
     found = eb.api(base, f"/api/collections/devices/records?{q}", token)["items"]
     if not found:
