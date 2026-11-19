@@ -91,7 +91,7 @@ static void pushHb(uint8_t hb) {
   setperm(1, (hb & 0x10) != 0);          // the old code has no decoder hook: the fields are set directly and stay unread
 #endif
 }
-static float g_osFlow = 53.0f;   // 53 against 50: above request + margin, below the 3.5 K fail-safe (TASK-1762), so the 60 s rule fires;
+static float g_osFlow = 52.5f;   // 52.5 against 50: above request + margin, below the 3.0 K fail-safe (TASK-1762, entry 429), so the 60 s rule fires;
                                  // scenario failsafe uses 55 (the pre-TASK-1762 input): the 30 s fail-safe fires
 static int overshootTicks(uint32_t maxTicks) {   // 30 s ticks, flow above request + margin: returns the tick count at the switch or -1
   state.sat.eControlMode = SAT_MODE_CONTINUOUS; g_flow = g_osFlow;
