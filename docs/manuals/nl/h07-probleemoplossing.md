@@ -438,6 +438,7 @@ Druk op elk moment op `h` om het helpmenu te tonen met de huidige apparaatstatus
 | j | Lees de huidige GPIO-uitgangstatus |
 | l | Toggle de generieke MyDEBUG-vlag |
 | f | Toon de MyDEBUG-vlagstand |
+| H | Alleen in prerelease-(bèta-)builds, voor benchtests: houdt het geheugen bewust laag (vrij geheugen onder 7 KB, grootste blok onder 2 KB) om het automatische herstel van paragraaf 7.12a te testen; nog eens `H` geeft het vrij, en na 30 minuten gebeurt dat vanzelf. Niet in stabiele builds |
 
 De `F`-toets is handig na een Home Assistant MQTT-wissing of na een wijziging van het topic-prefix: het forceert een volledige herpublicatie van alle discovery-items in plaats van te wachten op de volgende natuurlijke trigger.
 
@@ -523,6 +524,8 @@ Loopt de gateway vast of wordt hij onbereikbaar nadat u BLE inschakelde? Zie par
 ### 7.12a Een gateway herstellen die vastloopt of onbereikbaar wordt
 
 **Symptoom:** enige tijd na het opstarten reageert de webinterface niet meer, MQTT valt stil en de gateway is niet bereikbaar, vaak nadat u een instelling hebt gewijzigd. Op firmware van vóór 2.0.0-beta.375 is de meest waarschijnlijke oorzaak op een board zonder PSRAM BLE-scanning die u hebt ingeschakeld nadat u de stabiliteitswaarschuwing accepteerde: BLE start bij het opstarten (`initSAT()`) en het geheugengebruik ervan kan de webserver laten verhongeren. Vanaf beta.375 kan BLE zonder PSRAM niet worden ingeschakeld, en een opgeslagen "aan" wordt bij het opstarten gewist (paragraaf 5.16).
+
+**Automatisch herstel (vanaf 2.0.0-beta.383).** Een gateway op WiFi waarvan het netwerk niet meer werkt terwijl het geheugen bijna op is, herstelt nu zelf. Eens per minuut pingt hij uw router; een ping die niet verstuurd kan worden door geheugengebrek telt als mislukte controle wanneer het grootste vrije geheugenblok kleiner is dan 4 KB. Na 8 mislukte controles op rij (ongeveer 8 minuten) forceert hij een nieuwe WiFi-verbinding; is de verbinding 8 controles later nog dood, dan herstart hij, dus ongeveer 16 minuten nadat het netwerk wegviel. Een korte nieuwe WiFi-verbinding terwijl het geheugen zo laag blijft, zet de telling niet terug (vanaf beta.385). Er gebeurt niets zolang er in de laatste minuut MQTT-, REST- of poort-25238-verkeer binnenkwam. De controle begint pas nadat uw router sinds de start één keer heeft geantwoord (zie Known issues in de release notes), en niet op een bekabelde verbinding. Na 3 van zulke herstarts forceert de gateway alleen nog een nieuwe verbinding, hooguit eens per 15 minuten; de telling wordt gewist nadat de verbinding een uur heeft gewerkt, en bij inschakelen van de voeding. Zoek in het telnet-log (poort 23) naar `WiFi: gateway probe not possible (...), heap starved (largest block ... B): counted as dead`, `WiFi: connected but no traffic, forcing a reconnect` en, na de herstart, de reden `WiFi: connected but no traffic`. Gebeurt dit vaker dan één keer, verzamel dan het crashlog en het telnet-log en vraag om hulp (paragraaf 7.14).
 
 **Eerst een tip:** bewaar uw instellingen zolang de gateway werkt. Open `http://<ip-van-uw-otgw>/api/v2/settings` in een browser en sla de pagina op als bestand. Dan hebt u een lijst om na de stappen hieronder opnieuw in te voeren.
 

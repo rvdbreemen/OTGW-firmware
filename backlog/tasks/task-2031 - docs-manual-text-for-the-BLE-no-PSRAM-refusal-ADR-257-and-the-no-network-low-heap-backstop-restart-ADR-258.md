@@ -3,11 +3,11 @@ id: TASK-2031
 title: >-
   docs: manual text for the BLE no-PSRAM refusal (ADR-257) and the no-network
   low-heap backstop restart (ADR-258)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-18T15:22:00Z'
-updated_date: '2026-11-19T17:50:00Z'
+updated_date: '2026-11-19T18:36:00Z'
 labels:
   - docs
 milestone: 2.0.0
@@ -24,8 +24,8 @@ Coordinator request 2026-11-18. Manual text prepared before the firmware lands, 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [x] #1 ch05/h05 5.16 and the settings rows describe the no-PSRAM refusal as the code does (names checked against ff73985)
-- [ ] #2 7.12a and the telnet key list describe the backstop restart and the H key as d3's code does
-- [ ] #3 Each part pushed only after its firmware commit is on origin/dev
+- [x] #2 7.12a and the telnet key list describe the backstop restart and the H key as d3's code does
+- [x] #3 Each part pushed only after its firmware commit is on origin/dev
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -46,4 +46,12 @@ Coordinator request 2026-11-18. Manual text prepared before the firmware lands, 
 2026-11-19 final: ba's ffe5dffeb on origin bumps beta.393 (task 2918, incl. the popover-on-phone fix of an unreleased build, so no user note). Notes set to beta.393 for task 2918; the heap-hold line removed from CHANGELOG [Unreleased] until 5e lands (394 or later). build_manual --check exit 0, test_manual_* 10 passed.
 
 2026-11-19: CHANGELOG [Unreleased] beta.394 from 17c993a1b: Fixed (beta builds only) task 2923 AP-fallback skipped when free < HEAP_LOW_THRESHOLD 8192 (helperStuff.ino:1128) or maxblock < WIFI_STARVED_MAXBLOCK 4096 (networkStuff.ino:649), code under #if defined(_VERSION_PRERELEASE); Diagnostics prerelease-only task 2026 heap-hold hook. No stable draft line: neither is in stable builds.
+
+2026-11-19 AC2: ch07/h07 7.12a gets 'Automatic recovery (from 2.0.0-beta.383)' and the debug-key tables get an H row (prerelease only). Checked against origin a5630d6fa: networkStuff.ino:639-648 (probe every 60 s, WIFI_PROBE_FAILS_TO_ACT 8, cap 3, clear after 60 min, capped reconnect per 15 min), :784-823 (witness traffic within 60 s = no action; first 8 -> forced reconnect 'WiFi: connected but no traffic, forcing a reconnect' :815; next 8 -> doRestart 'WiFi: connected but no traffic' :822), :832-845 wifiProbeStarvedDead (armed only after a gateway answered, maxblock < 4096, log line :839), :742 wired disarms, :925-930 ADR-261 streak kept. handleDebug.ino:300-320 (FREE_TARGET 7168, MAXBLK_TARGET 2048, FLOOR 4096, MAX 30 min), :584-589 H case under _VERSION_PRERELEASE. Finding (firmware, not docs): the help line 'H) bench: starve the heap...' sits at handleDebug.ino:573-575 inside case 'l' (MyDEBUG toggle), not in the case 'h' menu, so 'h' does not list H and 'l' prints it; reported to the coordinator. Docs therefore do not claim the menu lists H. Gates: build_manual --check exit 0, test_manual_* 10 passed, no em dashes.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+AC1: ch05/h05 5.16 and the settings rows describe the no-PSRAM BLE refusal as ff73985/39ae52275 do (pushed after beta.375 landed). AC2: ch07/h07 7.12a 'Automatic recovery (from 2.0.0-beta.383)' and an H row in both debug-key tables, every number and log line checked against origin (networkStuff.ino:639-648, :784-823, :832-845, :925-930; handleDebug.ino:300-320, :584-589). AC3: each part pushed only after its firmware was on origin (BLE text after 375; this part after 383/385/388 and 394, pushed on 352e086f0). Extra under this task: stable notes draft lines for tasks 2026/2909/2910/2911, CHANGELOG [Unreleased] for 393/394. Gates per push: build_manual --check exit 0, test_manual_* 10 passed. Not verified: the recovery on hardware (host tests and 09's bench of 394 per task 2026); finding handed to d3: the H help line sits in case 'l' (handleDebug.ino:573-575), so the docs do not claim 'h' lists it.
+<!-- SECTION:FINAL_SUMMARY:END -->

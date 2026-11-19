@@ -296,6 +296,7 @@ Press `h` at any time to print the help menu with the current device status and 
 | j | Read the current GPIO output state |
 | l | Toggle generic MyDEBUG flag |
 | f | Show the MyDEBUG flag state |
+| H | Prerelease (beta) builds only, for bench tests: hold memory low on purpose (free memory under 7 KB, largest block under 2 KB) to test the automatic recovery of section 7.12a; `H` again releases it, and it releases itself after 30 minutes. Not in stable builds |
 
 The `F` key is useful after a Home Assistant MQTT wipe or topic-prefix change: it forces a complete re-publish of all discovery entries rather than waiting for the next natural trigger.
 
@@ -370,6 +371,8 @@ Does the gateway hang or become unreachable after you switched BLE on? See secti
 ### 7.12a Recovering a Gateway That Hangs or Becomes Unreachable
 
 **Symptom:** some time after boot the web UI stops answering, MQTT goes quiet and the gateway cannot be reached, often after you changed a setting. On firmware before 2.0.0-beta.375 the most likely cause on a board without PSRAM is BLE scanning that you switched on after accepting the stability warning: BLE starts at boot (`initSAT()`) and its memory use can starve the web server. From beta.375 BLE cannot be switched on without PSRAM, and a stored "on" is cleared at boot (section 5.16, "PSRAM-aware default").
+
+**Automatic recovery (from 2.0.0-beta.383).** A gateway on WiFi whose network has stopped working while its memory is nearly exhausted now recovers by itself. Once a minute it pings your router; a ping that cannot be sent for lack of memory counts as a failed check when the largest free memory block is under 4 KB. After 8 failed checks in a row (about 8 minutes) it forces a WiFi reconnect; if the link is still dead 8 checks later it restarts, so about 16 minutes after the network stopped. A short WiFi reconnect while memory stays that low does not start the count again (from beta.385). No action is taken while MQTT, REST or port 25238 traffic arrived in the last minute. The check starts only after your router has answered once since the start (see Known issues in the release notes), and not on a wired connection. After 3 such restarts the gateway only forces a reconnect, at most once per 15 minutes; the count clears after the link has worked for an hour, and on a power-on. In the telnet log (port 23) look for `WiFi: gateway probe not possible (...), heap starved (largest block ... B): counted as dead`, `WiFi: connected but no traffic, forcing a reconnect` and, after the restart, the reason `WiFi: connected but no traffic`. If this happens more than once, collect the crash log and the telnet log and ask for help (section 7.14).
 
 **Tip first:** save your settings while the gateway works. Open `http://<ip-of-your-otgw>/api/v2/settings` in a browser and save the page as a file. That gives you a list to re-enter after the steps below.
 
