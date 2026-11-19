@@ -84,14 +84,15 @@ inline Slot *slotOldest(Slot *s, int n) {
 //
 // The maintainer sets mode (default | full | full+trace | custom), flags (for custom) and mode_until in the
 // gateway's device record; the gateway reads them from every login and token-refresh reply. The ten log flags of
-// debugFlags.h can be switched this way, never the simulation switches. full = every log flag but sattrace (high
-// volume); full+trace = all ten; custom = the chosen flags; default, an empty mode, or a mode past mode_until = none.
+// debugFlags.h can be switched this way, never the simulation switches. TASK-2901 (Robert 2026-11-20: "default is
+// full mode", "ALLE SAT beslissingen"): default, an empty mode, a mode past mode_until, full and full+trace all mean
+// every log flag, sattrace included; custom = the chosen flags only. The stream holds nothing twice: the decoded OT
+// line of each frame and a SATTICK line stay out of the debug section (RemoteTelemetryDevice.h, remoteTelemetryMute).
 
 static const char *const REMOTE_FLAGS[] = {"otmsg", "restapi", "mqtt", "sensors", "sat", "otdirect", "satble",
                                            "sattrace", "mqttgate", "ntp"};
 static const int REMOTE_FLAG_COUNT = 10;
 static const uint16_t REMOTE_ALL = (1u << REMOTE_FLAG_COUNT) - 1;
-static const uint16_t REMOTE_TRACE = 1u << 7;   // sattrace
 
 enum RemoteMode : uint8_t { RM_DEFAULT, RM_FULL, RM_FULL_TRACE, RM_CUSTOM };
 
@@ -188,13 +189,9 @@ inline RemoteCfg parseRemote(const char *reply) {
 
 // The log flags this mode switches on at nowEpoch.
 inline uint16_t remoteEffective(const RemoteCfg &c, int64_t nowEpoch) {
-  if (c.untilEpoch && nowEpoch >= c.untilEpoch) return 0;
-  switch (c.mode) {
-    case RM_FULL: return (uint16_t)(REMOTE_ALL & ~REMOTE_TRACE);
-    case RM_FULL_TRACE: return REMOTE_ALL;
-    case RM_CUSTOM: return (uint16_t)(c.flags & REMOTE_ALL);
-    default: return 0;
-  }
+  if (c.untilEpoch && nowEpoch >= c.untilEpoch) return REMOTE_ALL;   // back to default, which is full
+  if (c.mode == RM_CUSTOM) return (uint16_t)(c.flags & REMOTE_ALL);
+  return REMOTE_ALL;
 }
 
 }  // namespace rtel

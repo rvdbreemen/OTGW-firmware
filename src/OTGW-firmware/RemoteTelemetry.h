@@ -23,6 +23,7 @@ void remoteTelemetryLoop();                                                     
 void remoteTelemetrySetup();                                                                     // from setup()
 void remoteTelemetryInstallTlsAllocator();   // first line of setup(): mbedTLS blocks to PSRAM when the board has it (TASK-2901)
 void remoteTelemetrySatTickf(const char *fmt, ...);   // a SATTICK line with SAT debug off: recorder only (TASK-2905)
+void remoteTelemetryMute(bool on);   // TASK-2901: this task's debug lines go to telnet only (they repeat recorded data)
 
 // TASK-2907: local recording into a ring of the same records (the /api/v2/diag/recording routes in this env).
 #include "RecRing.h"

@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v2.0.0-poc.27
+**  Version  : v2.0.0-poc.28
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -6483,7 +6483,13 @@ void processOT(const char *buf, int len, bool suppressOutput, bool localAnswer, 
         }
       }
       AddLogln();
+#if HAS_REMOTE_TELEMETRY
+      remoteTelemetryMute(true);    // TASK-2901: telnet only, the recorder already has this frame in its OT section
+#endif
       OTDebugT(skipOTLogTimestamp(ot_log_buffer));
+#if HAS_REMOTE_TELEMETRY
+      remoteTelemetryMute(false);
+#endif
 
       // Send log buffer directly to WebSocket (no JSON, no queue)
       sendLogToWebSocket(ot_log_buffer);

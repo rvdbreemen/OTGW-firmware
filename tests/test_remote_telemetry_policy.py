@@ -134,17 +134,17 @@ class RemoteTelemetryRemoteModeTest(unittest.TestCase):
         self.assertEqual(flags, self.SAT | self.MQTT)
         self.assertEqual(until, calendar.timegm((2030, 1, 2, 3, 4, 5)))   # the date, exact to the second
         self.assertEqual(int(self.row("eff-before")[0]), self.SAT | self.MQTT)
-        self.assertEqual(int(self.row("eff-after")[0]), 0)                # back to default at mode_until
+        self.assertEqual(int(self.row("eff-after")[0]), (1 << 10) - 1)    # back to default (= full) at mode_until
 
     def test_variants(self):
         rows = {int(p[1]): list(map(int, p[2:])) for p in (l.split() for l in OUT) if p[:1] == ["V"]}
         all10 = (1 << 10) - 1
-        self.assertEqual(rows[0], [0, 0, 0, 0])                           # empty mode = default
-        self.assertEqual(rows[1][3], all10 & ~self.TRACE)                 # full: everything but sattrace
+        self.assertEqual(rows[0], [0, 0, 0, all10])                       # empty mode = default = full (TASK-2901)
+        self.assertEqual(rows[1][3], all10)                               # full: all ten, sattrace included (TASK-2901)
         self.assertEqual(rows[2][3], all10)                               # full+trace: all ten, flags ignored
         self.assertEqual(rows[3][3], self.NTP)                            # custom: simulation names never map
-        self.assertEqual(rows[4][3], 0)                                   # default, and long expired
-        self.assertEqual(rows[5][2:], [0, all10 & ~self.TRACE])           # unreadable date: no end, mode holds
+        self.assertEqual(rows[4][3], all10)                               # default, and long expired: full
+        self.assertEqual(rows[5][2:], [0, all10])                         # unreadable date: no end, mode holds
 
 
 @unittest.skipIf(OUT is None, "no C++ compiler")

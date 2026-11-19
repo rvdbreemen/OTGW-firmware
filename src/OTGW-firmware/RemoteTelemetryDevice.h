@@ -229,6 +229,18 @@ static uint32_t remoteTelemetryHeapLow = 0xFFFFFFFFu, remoteTelemetryBlockLow = 
 // session and both record buffers allocated: shows where remoteTelemetryTlsCalloc() put them.
 static uint32_t remoteTelemetryConnHeap = 0, remoteTelemetryConnBlock = 0, remoteTelemetryConnPsram = 0;
 
+// TASK-2901 (Robert 2026-11-20: "geen dubbele informatie"): a debug line that repeats what the stream already holds
+// goes to telnet only. remoteTelemetryMute(true) marks the calling task; its lines skip the recorder until
+// remoteTelemetryMute(false). One slot for the loop task, one for any other task (the telemetry task's own upload line).
+static volatile TaskHandle_t remoteTelemetryMuteTask[2] = {nullptr, nullptr};
+void remoteTelemetryMute(bool on) {
+  remoteTelemetryMuteTask[platformOnLoopTask() ? 0 : 1] = on ? xTaskGetCurrentTaskHandle() : nullptr;
+}
+static inline bool remoteTelemetryMuted() {
+  const TaskHandle_t cur = xTaskGetCurrentTaskHandle();
+  return remoteTelemetryMuteTask[0] == cur || remoteTelemetryMuteTask[1] == cur;
+}
+
 // Pending line prefix (from _debugBOL) and the tee's copy of the current line.
 static bool     recBolPending = false;
 static const char *recBolFn = nullptr;
@@ -339,7 +351,7 @@ void remoteTelemetryTeeFlush() {
 
 size_t RemoteTelemetryTee::write(uint8_t c) {
   debugTelnet.write(c);
-  if (remoteTelemetryActive) {
+  if (remoteTelemetryActive && !remoteTelemetryMuted()) {
     if (recTeeLen < sizeof(recTee)) recTee[recTeeLen++] = (char)c;
     if (c == '\n' || recTeeLen == sizeof(recTee)) remoteTelemetryTeeFlush();
   }
@@ -352,13 +364,13 @@ size_t RemoteTelemetryTee::write(const uint8_t *buf, size_t size) {
 }
 
 void remoteTelemetryBol(const char *fn, int line, int64_t tUs, uint32_t heap, uint32_t block) {
-  if (!remoteTelemetryActive) return;
+  if (!remoteTelemetryActive || remoteTelemetryMuted()) return;
   remoteTelemetryTeeFlush();                               // a partial line before this prefix ends here
   recBolPending = true; recBolFn = fn; recBolLine = line; recBolUs = tUs; recHeap = heap; recBlock = block;
 }
 
 void remoteTelemetryPrintf(const char *fmt, va_list ap, const char *printed, size_t printedLen, bool truncated) {
-  if (!remoteTelemetryActive) return;
+  if (!remoteTelemetryActive || remoteTelemetryMuted()) return;
   remoteTelemetryTeeFlush();                               // text printed after the prefix and before this printf
   if (!platformMutexLock(remoteTelemetryLock, REMOTE_TELEMETRY_LOCK_WAIT_MS)) { remoteTelemetryLoseItem(); recBolPending = false; return; }
   int64_t tUs = recBolPending ? recBolUs : remoteTelemetryNowUs();
@@ -369,6 +381,10 @@ void remoteTelemetryPrintf(const char *fmt, va_list ap, const char *printed, siz
         remoteTelemetryCloseLocked(tUs / 1000);
         if (!remoteTelemetry.satTick(tUs / 1000, fi, printed)) remoteTelemetryLoseItem();
       }
+      // TASK-2901: the tick is in the SAT section (or counted lost): not a second time as a debug line.
+      recBolPending = false;
+      platformMutexUnlock(remoteTelemetryLock);
+      return;
     }
   }
   if (recBolPending && remoteTelemetryInFlash(fmt) && remoteTelemetryInFlash(recBolFn)) {
@@ -996,11 +1012,14 @@ static rtel::Outcome remoteTelemetryUpload(rtel::Slot &q, bool &blocked) {
   remoteTelemetryLastMs = millis() - t;
   rtel::Outcome o = st == 409 ? rtel::OUT_REFUSED : rtel::classify(st);
   if (o == rtel::OUT_OK || (o == rtel::OUT_REFUSED && !blocked && st != 409)) remoteTelemetrySent++; else remoteTelemetryFailed++;
+  // TASK-2901: telnet only; the upload's outcome reaches the collection point as the record itself.
+  remoteTelemetryMute(true);
   DebugTf(PSTR("telemetry: seq %llu %u B (%u B sent) HTTP %d in %u ms; TLS resumed %u full %u, low %u/%u, min %u; conn heap %u/%u psram %u\r\n"),
           (unsigned long long)q.seq, (unsigned)q.len, (unsigned)sendLen, st, (unsigned)remoteTelemetryLastMs,
           (unsigned)remoteTelemetryResumes, (unsigned)remoteTelemetryFullHandshakes, (unsigned)remoteTelemetryHeapLow,
           (unsigned)remoteTelemetryBlockLow, (unsigned)platformMinFreeHeap(), (unsigned)remoteTelemetryConnHeap,
           (unsigned)remoteTelemetryConnBlock, (unsigned)remoteTelemetryConnPsram);
+  remoteTelemetryMute(false);
   return st == 409 ? rtel::OUT_DOWN : o;          // 409 only comes from a login; handled by the probe
 }
 
