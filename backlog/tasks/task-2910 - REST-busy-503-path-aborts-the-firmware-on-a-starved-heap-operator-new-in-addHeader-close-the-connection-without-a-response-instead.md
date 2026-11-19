@@ -3,11 +3,11 @@ id: TASK-2910
 title: >-
   REST busy-503 path aborts the firmware on a starved heap (operator new in
   addHeader); close the connection without a response instead
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-19T09:39:00Z'
-updated_date: '2026-11-19T15:58:00Z'
+updated_date: '2026-11-19T16:20:00Z'
 labels:
   - rest
   - heap
@@ -39,4 +39,12 @@ Panic on .61 (2.0.0-beta.388+7a99f02, 2026-11-19 10:24:05, task async_tcp, elf d
 Rebased onto origin 24679e271 (beta.388 pushed): patch identical; red against origin's restAPI.ino (OTGW_RESTAPI_INO): 1 failed (the starved case), green on the fix: 2 passed. evaluate.py --quick 88 passed 0 failed. Committed as beta.389. Next: esp32-combo build, bench .61 (hold + 2 parallel REST requests), full suite (shared code) during the bench.
 
 2026-11-19 evidence: AC3 evaluate.py --quick 88 passed 0 failed on 931d1cdef; esp32-combo build 2.0.0-beta.389+931d1cd 'Build completed successfully!' (11:28-11:29), pushed 24679e271..931d1cdef, posted #alpha-testing 1572951641324261396; full suite on 931d1cdef 344/344: 339 PASS, 3 capture-tool flakes (TASK-2912, not 389), test_refresh_storm known (TASK-2041), 1 skip run in wt-2026 (PASS). AC4 NOT met as written: under the deep heap hold on .61 no TCP reached the device at all (09: 20/20 connect timeouts, no SYN-ACK), so the starved busy path (< 4096 B) cannot be driven on the bench; the 10:24:05 panic fell in a narrow window (connections accepted right after an AP reconnect, addHeader failing). Coordinator decision A (2026-11-19): the < 4096 branch is proven host-side on the real code (red on origin = the panic path, green on the fix); on hardware 09 showed regression PASS 31 min (bootcount 1061 unchanged, 0 panic, 31/31 200) and the unchanged above-threshold path (5x5 parallel curl -i: 12x 200 / 13x 503 with Retry-After: 1, Connection: close, no panic). The gap stays named: the < 4096 branch itself is not demonstrated on hardware. Observation (not 389): one MQTT disconnect 11:48:08 -> 42 s, explained by the LAN broker supervisor restarting a hung mosquitto (09). Status stays In Progress: AC4 needs either a waiver from Robert or a hardware reproduction (2.1.0 option: a prerelease fault-injection key for the busy path).
+
+2026-11-19 AC4 WAIVED by Robert (DM 1573005843849547881, relayed by the coordinator, reply to the AC4 question): 'Follow your advice A + B separate follow up task for 2.1.0.' A = waiver 'host-proven, hardware unreachable': the < 4096 branch is proven by tests/test_rest_busy_starved_heap.py (red on origin, green on the fix); on .61 under the deep heap hold no TCP connection reached the unit, so the bench cannot reach it. B = TASK-2921 (2.1.0): prerelease-only fault-injection key plus a bench AC for 09. AC4 stays unchecked (waived, not evidenced).
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Fix: sendApiBusy aborts the connection (webAbortCurrentRequest: request->abort + client abort, no allocation) when platformMaxFreeBlock() < 4096 instead of building a 503 with a Retry-After header, the operator new -> terminate panic of the .61 388 dump. AC1+AC2: tests/test_rest_busy_starved_heap.py compiles the real sendApiError/sendApiBusy: red on origin (exit 134 in the webSend stub), green on the fix; above the threshold the 503 + Retry-After path is unchanged. AC3: evaluate.py --quick no new FAIL, esp32-combo build of 389 green; 389 full sweep 339/344 + known flakes; shipped in v2.0.0-beta.392. AC4 NOT evidenced: WAIVED by Robert (DM 1573005843849547881, 2026-11-19, 'Follow your advice A + B separate follow up task for 2.1.0.'): host-proven, unreachable on hardware (no TCP connection under the deep heap hold); hardware proof moves to TASK-2921 (2.1.0).
+<!-- SECTION:FINAL_SUMMARY:END -->
