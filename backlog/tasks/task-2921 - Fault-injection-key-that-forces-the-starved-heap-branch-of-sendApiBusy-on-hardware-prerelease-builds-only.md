@@ -3,9 +3,11 @@ id: TASK-2921
 title: >-
   Fault-injection key that forces the starved-heap branch of sendApiBusy on
   hardware (prerelease builds only)
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-11-19T16:15:00Z'
+updated_date: '2026-11-19T18:34:00Z'
 labels:
   - rest
   - testing
