@@ -25,7 +25,7 @@
 #if !HAS_REMOTE_TELEMETRY
 #define remoteTelemetrySatTickf(fmt, ...)  do {} while (0)
 #endif
-#define SATTickTf(fmt, ...)   DEBUG_GATED(bSAT, DBGREC_SAT, DebugTfX, fmt, ##__VA_ARGS__); else remoteTelemetrySatTickf(fmt, ##__VA_ARGS__)
+#define SATTickTf(fmt, ...)   do { if (state.debug.bSAT) DebugTf(fmt, ##__VA_ARGS__); else remoteTelemetrySatTickf(fmt, ##__VA_ARGS__); } while(0)
 // High-volume SAT trace (per pass, PID detail), key '8', default off (TASK-1521)
 #define SATTraceTf(fmt, ...)  DEBUG_GATED(bSATTrace, DBGREC_SATTRACE, DebugTfX, fmt, ##__VA_ARGS__)
 #define SATTraceTln(s)        DEBUG_GATED(bSATTrace, DBGREC_SATTRACE, DebugTlnX, s)

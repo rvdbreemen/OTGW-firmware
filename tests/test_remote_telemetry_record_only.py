@@ -49,6 +49,11 @@ class RecordOnly(unittest.TestCase):
                     if name not in ("OTDebugFlush", "SATTickTf"):
                         left.append(f"{f}:{n} {name}")
         self.assertEqual(left, [], "family macros that bypass DEBUG_GATED")
+        # SATTickTf keeps its telnet-or-recorder form (the SAT section, not the debug section, takes a tick)
+        self.assertIn("#define SATTickTf(fmt, ...)   do { if (state.debug.bSAT) DebugTf(fmt, ##__VA_ARGS__); "
+                      "else remoteTelemetrySatTickf(fmt, ##__VA_ARGS__); } while(0)", text("SATcontrol.ino"))
+        for f in FAMILY_FILES:
+            self.assertNotRegex(text(f), r"DEBUG_GATED\([^\n]*\);\s*else\b", f"{f}: a gate followed by else")
         self.assertIn("#define OTDebugTf(...)  DEBUG_GATED(bOTmsg, DBGREC_OTMSG, DebugTfX", text("OTGW-Core.ino"))
 
     def test_sinks(self):
