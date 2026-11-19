@@ -40,8 +40,8 @@ All lines below appear in the telnet log that the capture records. "Entry" is th
 
 ## 3. Upload
 
-Stop the capture with `q`, then upload the `...-upload.zip` it writes (otgw_capture.py:147) in #alpha-testing or
-by DM to Robert, with: firmware version, the `simulation: false` line, boiler model, heating type, and the notes
+Stop the capture with `q`, then attach the `...-upload.zip` it writes (otgw_capture.py:147) to a GitHub issue, or post it in
+#english-support or #nederlandse-ondersteuning (beta testers: #beta-testing), or send it by DM to Robert, with: firmware version, the `simulation: false` line, boiler model, heating type, and the notes
 from step 1.4. Raw captures stay private; we only post summaries.
 
 ## 4. Public version (for #alpha-testing, posted by the comms session)

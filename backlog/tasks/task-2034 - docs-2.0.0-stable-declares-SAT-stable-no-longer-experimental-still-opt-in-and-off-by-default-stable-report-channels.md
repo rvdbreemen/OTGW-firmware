@@ -3,11 +3,11 @@ id: TASK-2034
 title: >-
   docs: 2.0.0 stable declares SAT stable (no longer experimental), still opt-in
   and off by default; stable report channels
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-18T17:53:00Z'
-updated_date: '2026-11-18T18:04:00Z'
+updated_date: '2026-11-19T09:15:00Z'
 labels:
   - docs
   - sat
@@ -41,4 +41,14 @@ AC4: web-UI strings reported to ba (otgw-webui) by SendMessage 2026-11-18: v2.js
 Timing (coordinator, 2026-11-18): lands on dev as part of the RC commit set, together with ba's web-UI text task, not on release/2.x after the cut. The coordinator calls the RC moment; until then local. At that moment: rebase onto origin/dev, rerun scripts/build_manual.py and tests/test_manual_generated.py, re-grep 'experiment', then push and set Done.
 
 2026-11-18 Robert 'B voor warmtepomp' (DM 1572672969744851067, relayed by the coordinator): the on/off heat-pump type (3 h cycle, TASK-1542) stays 'experimental'. Stable notes draft :196 'Treat it as experimental' and the web-UI labels '(experimental)' on that appliance type (v2.js :1086/:1748/:4203) stay as they are; only SAT as a whole is declared stable.
+
+2026-11-19: docs/sat/field-run-recipe-2.0.0.md section 3 still sent uploads to #alpha-testing; aligned with ch05 and Robert's A (GitHub issue, #english-support / #nederlandse-ondersteuning, beta testers #beta-testing, or DM). Matches the coordinator's decision B for the UI beta notice (ba, TASK-2909 353d530d0: notice points to #beta-testing).
+
+2026-11-19 rebase onto origin/dev 1a3422e3e for the 20:00 beta (coordinator A, together with ba's UI wording): README.md conflict on the SAT block resolved per hunk, TASK-2034 text taken; its link to RELEASE_NOTES_2.0.0.md (does not exist on dev until the stable release) replaced with Chapter 5 of the manual. TASK-2045 self-tune line and TASK-2908 notes kept (checked). MANUAL.md regenerated after the rebase; build_manual --check matches; test_manual_generated and test_manual_sat_commands OK. grep experiment: only the kept lines ch05:259, h05:286 and draft heat-pump item.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+AC1-AC4 ticked earlier with evidence in the notes. Final state on the rebased lane: README, ch01/h01, ch05/h05 and the 2.0.0 draft call SAT opt-in and off by default, stable from 2.0.0 (Robert's A, DM 2026-11-18); report channels: GitHub issue, #english-support / #nederlandse-ondersteuning, beta testers #beta-testing (draft How to report, ch05 report box, field-run recipe). grep -i experiment over README, manuals, draft and recipe: only the kept lines (ch05:259, h05:286 'early experimental version'; draft heat-pump item, Robert B). build_manual --check matches, test_manual_generated OK, test_manual_sat_commands OK. Not verified: the rendered README on GitHub.
+<!-- SECTION:FINAL_SUMMARY:END -->
