@@ -5,7 +5,7 @@ status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-13T08:07:00Z'
-updated_date: '2026-11-19T04:40:00Z'
+updated_date: '2026-11-19T05:19:00Z'
 labels:
   - sat
   - adr
@@ -88,6 +88,8 @@ Bench 09 on .63 (d106f55, src-identical to 0f9a906, differing only in the commit
 2026-11-19 Q-1889a answered A by Sergeant D (entry 423, 04:07:49 UTC, https://discord.com/channels/812969634638725140/1105556725714649128/1572825703299293265, unedited; recorded by 92, origin 25df1fdb6): the 12-counted-hour rolling window, decided every counted hour, step 0.05, window empties after a step = beta.379 as built, no code change. AC1 ticked on the plan (thermo-nova 7beaaf5 citations, ADR-228/230 timing; pid.py:185-189/const.py:16 belong to TASK-1890's integral halving, as the plan says) plus entry 423. ADR-260 updated (still Proposed; Q-1889a closed, entry 423 cited). Q-1889b (warm-up-only decisions) asked 04:24 UTC; an answer other than A becomes a new task.
 
 2026-11-19 Q-1889b answered A (entry 424, origin aa6dd58df): warm-up-only decisions in the 12-hour window stay, no change. ADR-260 open questions both closed (still Proposed).
+
+2026-11-19 ADR-260 Accepted by Robert (DM 1572842856148766751, 05:15:58 UTC, 'Ja', reply to the coordinator's question 1572834466131480677 naming ADR-260; relayed by the coordinator). Accepted via adr-kit accept --confirm, signed User: Robert van den Breemen; adr-lint strict pass; tests/test_adr_governance.py OK.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary

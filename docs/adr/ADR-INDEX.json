@@ -10851,8 +10851,8 @@
       "title": "SAT heating curve self-tune decides every counted hour on a 12-hour window with a 0.05 step (supersedes the timing of ADR-205, ADR-228 and ADR-230)",
       "path": "ADR-260-sat-heating-curve-self-tune-decides-every-counted-hour-on-a-12-hour-window-with-a-0-05-step-supersedes-the-timing-of-adr-205-adr-228-and-adr-230.md",
       "format": "canonical",
-      "status": "Proposed",
-      "date": "2026-11-18",
+      "status": "Accepted",
+      "date": "2026-11-19",
       "decision_summary": "The tuner keeps its hour, its exclusions, its two phases and its agreement rule, and changes three constants: a tuner...",
       "topics": [
         "heating-curve",

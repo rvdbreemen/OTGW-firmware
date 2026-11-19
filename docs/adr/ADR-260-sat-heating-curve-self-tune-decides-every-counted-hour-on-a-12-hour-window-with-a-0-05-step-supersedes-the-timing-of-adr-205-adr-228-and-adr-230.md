@@ -1,8 +1,8 @@
 ---
 id: "ADR-260"
 title: "SAT heating curve self-tune decides every counted hour on a 12-hour window with a 0.05 step (supersedes the timing of ADR-205, ADR-228 and ADR-230)"
-status: "Proposed"
-date: "2026-11-18"
+status: "Accepted"
+date: "2026-11-19"
 binding: false
 gate: null
 documents_shipped: false
@@ -44,7 +44,7 @@ format: "canonical"
 
 ## Status
 
-Proposed, 2026-11-18.
+Accepted, 2026-11-19.
 
 **Decision Maker:** scope by User: Robert van den Breemen (maintainer), relayed by the coordinator on 2026-11-18:
 "Die snellere self tune (1889) moet wel mee" (TASK-1889 goes into 2.0.0). Behaviour: Sergeant D decided the direction
@@ -76,6 +76,11 @@ status_history:
     status: Proposed
     changed_by: Agent (ba)
     reason: Related to ADR-230
+    changed_via: adr-kit lifecycle
+  - date: 2026-11-19
+    status: Accepted
+    changed_by: "User: Robert van den Breemen (maintainer)"
+    reason: Accepted by Robert, Discord DM 1572842856148766751 (2026-11-19 05:15:58 UTC, 'Ja', a reply to the coordinator's question 1572834466131480677 naming ADR-260); Sergeant D entries 423 and 424 confirm the numbers
     changed_via: adr-kit lifecycle
 ```
 
