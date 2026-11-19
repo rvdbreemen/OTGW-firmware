@@ -14,18 +14,12 @@ import tempfile
 import unittest
 from pathlib import Path
 
+import sys
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from gitbash import find_bash  # noqa: E402
+
 REPO = Path(__file__).resolve().parents[1]
 SCRIPT = Path(os.environ.get("OTGW_POST_BUILD_SH", REPO / "scripts" / "discord-post-build.sh"))
-
-
-def find_bash():
-    # On Windows a bare "bash" can resolve to WSL; prefer Git for Windows' bash.
-    git = shutil.which("git")
-    if git:
-        for cand in (Path(git).parents[1] / "bin" / "bash.exe", Path(git).parent / "bash.exe"):
-            if cand.exists():
-                return str(cand)
-    return shutil.which("bash")
 
 
 BASH = find_bash()
@@ -65,7 +59,7 @@ class DiscordPostBuildRefusals(unittest.TestCase):
     def run_script(self, *args, webhook="/nonexistent/hook.url"):
         env = dict(os.environ, OTGW_REPO=str(self.tmp), OTGW_DISCORD_WEBHOOK_FILE=webhook,
                    OTGW_PUBLISHED_TAGS=str(Path(self.tmp) / "published-tags.txt"))   # never the real list
-        return subprocess.run([BASH, str(SCRIPT), *args], env=env,
+        return subprocess.run([BASH, SCRIPT.as_posix(), *args], env=env,
                               capture_output=True, text=True, timeout=60)
 
     def test_clean_tree_matching_hash_passes(self):

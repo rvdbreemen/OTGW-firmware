@@ -21,6 +21,10 @@ import tempfile
 import unittest
 from pathlib import Path
 
+import sys
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from gitbash import find_bash  # noqa: E402
+
 REPO = Path(__file__).resolve().parents[1]
 DIR = Path(os.environ.get("OTGW_FLASH_DIR", REPO))
 
@@ -51,10 +55,7 @@ AFTER_LOST = AFTER_SAME.replace('"MQTTbroker": "192.168.1.10",\n', "").replace('
 
 
 def bash():
-    for c in (shutil.which("bash"), r"C:\Program Files\Git\bin\bash.exe"):
-        if c and Path(c).exists():
-            return c
-    return None
+    return find_bash()
 
 
 class SettingsCompare(unittest.TestCase):
@@ -75,7 +76,7 @@ class SettingsCompare(unittest.TestCase):
         return r.returncode, r.stdout + r.stderr
 
     def run_sh(self, after, saved="saved.ini"):
-        r = subprocess.run([bash(), str(DIR / "flash_otgw.sh"), "--compare-settings",
+        r = subprocess.run([bash(), (DIR / "flash_otgw.sh").as_posix(), "--compare-settings",
                             (self.tmp / saved).as_posix(), (self.tmp / after).as_posix()],
                            capture_output=True, text=True)
         return r.returncode, r.stdout + r.stderr

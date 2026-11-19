@@ -21,6 +21,12 @@ import tempfile
 import unittest
 from pathlib import Path
 
+import sys
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from gitbash import find_bash  # noqa: E402
+
+BASH = find_bash()
+
 REPO = Path(__file__).resolve().parent.parent
 SCRIPT = Path(os.environ.get("OTGW_POST_SCRIPT", REPO / "scripts" / "discord-post-build.sh"))
 
@@ -32,7 +38,7 @@ def payload_block(text):
     return "\n".join(l for l in lines[start:end + 1] if not l.lstrip().startswith("#"))
 
 
-@unittest.skipUnless(shutil.which("bash"), "bash not on PATH")
+@unittest.skipUnless(BASH, "bash not found")
 class PostPayload(unittest.TestCase):
     def build(self, extra):
         block = payload_block(SCRIPT.read_text(encoding="utf-8"))
@@ -45,7 +51,7 @@ class PostPayload(unittest.TestCase):
         with tempfile.NamedTemporaryFile("w", suffix=".sh", delete=False, encoding="utf-8", newline="\n") as f:
             f.write(prog)
         try:
-            r = subprocess.run([shutil.which("bash"), f.name], capture_output=True, env=env)
+            r = subprocess.run([BASH, Path(f.name).as_posix()], capture_output=True, env=env)
         finally:
             os.unlink(f.name)
         self.assertEqual(r.returncode, 0, r.stderr.decode("utf-8", "replace"))

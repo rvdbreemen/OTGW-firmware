@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@otgw-dev'
 created_date: '2026-11-18T10:04:00Z'
-updated_date: '2026-11-19T04:24:00Z'
+updated_date: '2026-11-19T04:25:00Z'
 labels:
   - heap
   - sat
@@ -62,4 +62,8 @@ Diagnostics (lane-2019, 372): satTakeoverHeapTraceBegin() arms the TASK-1757 con
 Loopback exception (maintainer, 2026-11-18, relayed by the coordinator: Robert's DM 1572707965889159331, reply 'A'): a one-off exception to the 15 Nov no-loopback rule for bench boards. Scope: loopback (GW=L) ONLY on .61, ONLY for this TASK-2019 heap diagnosis (make SAT really take over and capture the 372 sat-takeover heap trace of the passes after it), switched off again afterwards with the settings verified as restored. It does not extend to other tasks, other boards or later runs. .61 state before the run: 2.0.0-beta.375+ff73985 (contains satTakeoverHeapTraceBegin, MQTTstuff.ino:1283), bootcount 1045, satenabled false, satsimulation false, satbleenable false, satweatherenable true, hd_min_free_heap 18,056 at 2 h 51 min uptime.
 
 Starting evidence on current code (otgw-bench-tester 09, 2026-11-19), 2.0.0-beta.382+e562f82 on .61 (OTGW32, no PSRAM, SAT off, no loopback, no simulation), OTA app+fs from 375 at 04:20-04:22 ('settings: 165 keys, changed: none'), 60-min soak 04:22-05:23 with device/info every 60 s: 62/62 HTTP 200, bootcount 1051 throughout (no restart), 0 panic, 2 loop-stalls only right after the boot (04:22:12/13, ~420 ms, step 3->16), freeheap 39.2-44.9k, maxblk 23.5-31.7k, MQTT connected. hd_min_free_heap steps: 30,120 -> 24,356 -> 18,560 -> 15,532 -> 13,748 in the first 5 min (boot), then 13,748 -> 10,660 between 04:47:12 and 04:48:12 (uptime ~25 min) and 10,612 -> 6,444 between 05:02:12 and 05:03:12 (uptime ~40 min); a small step 10,660 -> 10,612 at 04:57-04:58. Telnet in those minutes shows only an [fs-slow] mount-check (123/116 ms, writer) at :11 of the minute and the poller's device/info GET; freeheap stayed 39.8-44.9k. So these dips occur WITHOUT a SAT takeover (SAT off). Same 382 on .63 (PSRAM, SAT enabled, handed back, no boiler): 60 min flat, hd_min 14,980 unchanged. Logs: 09 scratchpad soak382\61 and \63 (telnet.raw, info.jsonl).
+
+2026-11-19 input 09 (FYI, no conclusion): on .61 with 382+e562f82, SAT OFF, no loopback, the low-water mark hd_min_free_heap stepped down twice in the soak: 13748 -> 10660 (04:47:12-04:48:12) and 10612 -> 6444 (05:02:12-05:03:12), ~25 and ~40 min after the 04:22 OTA. Polled freeheap 39.8-44.9k, maxblk 23.5-31.7k the whole time; telnet in those minutes only an [fs-slow] mount-check (123/116 ms, writer) at :11 and 09's device/info GET. Reading (ours): the low-water mark only falls, so these are short transient dips of ~34-38k below the polled level, not a trend, and they occur without a SAT takeover: the 2019 plan must not attribute such dips to the takeover. Logs: 09 scratchpad soak382/61/ (telnet.raw, info.jsonl).
+
+2026-11-19 follow-up 09: the [fs-slow] mount-check runs every minute at :10-:11 on .61 (65 lines in 61 min, 109-146 ms), also in minutes without a step in hd_min (04:42 144 ms, 04:58 146 ms); the poller GET runs every minute at :12. Neither explains the two dips on its own; nothing else distinctive in telnet. Cause of the two transient dips: open, not found in the logs. For 2019: compare the takeover run against this SAT-off baseline (two dips in ~60 min, low-water 13.7k -> 6.4k), not against zero.
 <!-- SECTION:NOTES:END -->
