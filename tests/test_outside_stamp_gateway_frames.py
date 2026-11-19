@@ -114,11 +114,22 @@ class OutsideStampFrames(unittest.TestCase):
         self.assertFalse(self.stamp(B, WRITE_ACK, subst=1))     # boiler echo of the gateway write
         self.assertFalse(self.stamp(B, UNKNOWN, subst=1))       # boiler without MsgID 27
         self.assertFalse(self.stamp(B, DATA_INVALID))
-        # An A frame can be an OT-Direct cache answer (handleMasterModeSlaveFrame) that repeats an old
-        # value, and an answer-override A never writes the canonical Toutside: never a stamp.
+        # An answer-override A replaces a boiler answer (the R write before it stamps): no stamp of its own.
         self.assertFalse(self.stamp(A, READ_ACK, override=1))
-        self.assertFalse(self.stamp(A, READ_ACK))
         self.assertFalse(self.stamp(P, READ_ACK))
+
+    # TASK-2040 (entry 330, marceld beta.361): with OT= the PIC can answer the thermostat's MsgID 27 itself with a
+    # proxy A Read-Ack carrying the gateway's own value, and no R or B appears at all (230 of 230 frames T+A). That A
+    # is the value the gateway puts on the bus: it stamps. Every A that OT-Direct makes (master-mode cache answers
+    # included, handleMasterModeSlaveFrame) is bLocalAnswer (bridgeFrameToParser, OTDirect.ino) and still never stamps.
+    def test_pic_proxy_answer_with_the_gateway_value_stamps(self):
+        self.assertTrue(self.stamp(A, READ_ACK))                   # PIC proxy answer (no B, not local)
+
+    def test_otdirect_answers_and_invalid_answers_do_not_stamp(self):
+        self.assertFalse(self.stamp(A, READ_ACK, local=1))         # OT-Direct answer (cache, master mode)
+        self.assertFalse(self.stamp(A, DATA_INVALID))              # a failed PIC sensor answers Data-Invalid
+        self.assertFalse(self.stamp(A, READ_ACK, replayed=1))
+        self.assertFalse(self.stamp(A, READ_ACK, skip=1))
 
     def test_other_msgid_does_not_stamp(self):
         self.assertFalse(self.stamp(R, WRITE_DATA, msgid=24))

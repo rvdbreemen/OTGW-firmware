@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v2.0.0-beta.380
+**  Version  : v2.0.0-beta.381
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -5235,14 +5235,21 @@ static void stampThermostatRoomTemp()
 //   an OT= value turns the thermostat's Read-Data 27 into a Write-Data 27 with that value (gateway.asm 6.8
 //   MessageID27), and on OT-Direct OT= writes it. This R frame is the one that writes the canonical
 //   Toutside. A failed PIC sensor sends Invalid-Data instead, so a dead sensor ages out.
-// Never a replayed line (TASK-1649) or a parity error, never an A frame (an OT-Direct cache answer can
-// repeat an old value), never a B the gateway made itself (bLocalAnswer: the OT-Direct loopback boiler, TASK-1896 follow-up 1903 item 2;
+// - the PIC's own proxy answer to the thermostat, an A Read-Ack 27 with no B before it (TASK-2040: with OT= the PIC
+//   can answer the thermostat itself and send no R at all).
+// Never a replayed line (TASK-1649) or a parity error, never an A frame OT-Direct made (bLocalAnswer: a cache answer can
+// repeat an old value) and never an answer-override A, never a B the gateway made itself (bLocalAnswer: the OT-Direct loopback boiler, TASK-1896 follow-up 1903 item 2;
 // an R frame is never local, so OT= on OT-Direct still stamps), and never the PS=1 summary, which has no age (ADR-181).
 static bool otFrameIsFreshOutsideTemp(const OpenthermData_t &f)
 {
   if (f.id != 27 || f.skipthis || f.bReplayed || f.bLocalAnswer) return false;
   if (f.rsptype == OTGW_BOILER) return f.type == OT_READ_ACK && !f.bGatewaySubstituted;
   if (f.rsptype == OTGW_REQUEST_BOILER) return f.type == OT_WRITE_DATA;
+  // TASK-2040 (entry 330, marceld beta.361): with OT= the PIC can answer the thermostat's Read-Data 27 itself, a proxy A
+  // Read-Ack with the gateway's own value, with no R or B on the bus at all. Every A that OT-Direct makes is bLocalAnswer
+  // (bridgeFrameToParser(), OTDirect.ino) and was rejected above, so a non-local A here is the PIC's; an answer-override
+  // A replaces a boiler answer after the gateway's R write, which stamps on its own.
+  if (f.rsptype == OTGW_ANSWER_THERMOSTAT) return f.type == OT_READ_ACK && !f.bAnswerOverride;
   return false;
 }
 // --- otOutsideStamp end

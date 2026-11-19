@@ -3,9 +3,11 @@ id: TASK-2040
 title: >-
   SAT: an OT= outside value answered by the PIC with A frames never stamps MsgID
   27, so SAT treats it as stale
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-11-19T01:20:00Z'
+updated_date: '2026-11-19T01:54:00Z'
 labels:
   - sat
   - bug
@@ -23,7 +25,13 @@ Implementation gap against entries 330 (Robert, 2026-11-13) and 331 (Sergeant D 
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Red host test on the real otFrameIsFreshOutsideTemp()/stamp path: marceld's T+A sequence leaves MsgID 27 unstamped on the current code
-- [ ] #2 Fix: the PIC's A answer with the gateway's own outside value stamps MsgID 27 (SAT source O); the OT-Direct cache answer and replayed/parity/PS=1 frames stay excluded; test green
+- [x] #1 Red host test on the real otFrameIsFreshOutsideTemp()/stamp path: marceld's T+A sequence leaves MsgID 27 unstamped on the current code
+- [x] #2 Fix: the PIC's A answer with the gateway's own outside value stamps MsgID 27 (SAT source O); the OT-Direct cache answer and replayed/parity/PS=1 frames stay excluded; test green
 - [ ] #3 Bench or replay: a PIC unit fed with OT= keeps SAT on source O (osrc=O) with no hand-back
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-19 fix (lane-2040, on top of TASK-2039 7a9829718): otFrameIsFreshOutsideTemp() (OTGW-Core.ino) also stamps an A Read-Ack 27 that is not an answer-override (the PIC's proxy answer with its OT=/TS=O value). OT-Direct is unaffected: every A it makes goes through bridgeFrameToParser() -> enqueueOTFrame(..., OTFRAME_SRC_OTDIRECT_LOCAL) (OTDirect.ino:1166-1167, the only enqueue there), so it is bLocalAnswer and rejected first; the master-mode cache answer (handleMasterModeSlaveFrame) included. Same split as the canonical value: a proxy A reaches canonical Toutside, an answer-override A does not (ADR-103, is_value_valid_for_master_topic, OTGW-Core.ino:2042-2044), so SAT's value and stamp now come from the same frame. Red/green: tests/test_outside_stamp_gateway_frames.py test_pic_proxy_answer_with_the_gateway_value_stamps FAILS on the code before (1 failed, 11 passed), passes on the fix; new test_otdirect_answers_and_invalid_answers_do_not_stamp (local A, Data-Invalid, replayed, parity: no stamp); related files 57 passed. Open: why marceld's PIC answers with A and sends no R (gateway.asm 6.6:3053 MandatoryID/AlternativeUsed?); not needed for the fix.
+<!-- SECTION:NOTES:END -->

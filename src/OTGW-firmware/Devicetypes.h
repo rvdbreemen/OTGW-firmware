@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : Devicetypes.h
-**  Version  : v2.0.0-beta.380
+**  Version  : v2.0.0-beta.381
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
