@@ -8486,3 +8486,18 @@ Robert, 16:18:42 UTC (https://discord.com/channels/812969634638725140/9144987300
 **Task:** to be created after the scope answer (TASK-2005 follow-up, owner per the coordinator).
 
 **Open:** scope (Q-2005c).
+
+## 430. Scope of entries 428/429: "top priority for 2.0.0"; he calls the PWM re-entry counting a bug (Sergeant D, 2026-11-19)
+
+**Source:** #dev-sat-mqtt, Sergeant D 2026-11-19 11:17:19 UTC (https://discord.com/channels/812969634638725140/1105556725714649128/1572933791775850578; unedited, read back via the Discord API at 11:23 UTC), posted 19 s after his answer to Q-2005b. Also #beta-testing 11:18:17 UTC to indigo_light (https://discord.com/channels/812969634638725140/914498730001072149/1572934036320682047, unedited): "we found a bug! Thanks for your log!!".
+
+**Quoted:**
+> "This is top priority for 2.0.0"
+
+**Settled:** the release scope of entries 428 and 429 is 2.0.0, top priority. He treats the behaviour (PWM re-entries inside one burn using up the 3/hr limit, the indigo_light beta.360 morning) as a bug. This answers Q-2005c before it was asked (it was posted at 11:19 UTC, after this message; closed as answered by this entry).
+
+**Interpretation (ours):** "This" is read as the decision of entries 428/429 (one PWM entry and one counted PWM ON per flame, continuous until flame-off, fail-safe 3.0 C), since it follows his Q-2005b answer directly and has no reply reference.
+
+**Task:** the coordinator assigns the implementation (TASK-2005 follow-up or a new task).
+
+**Open:** none for the decision; implementation and evidence per the task.
