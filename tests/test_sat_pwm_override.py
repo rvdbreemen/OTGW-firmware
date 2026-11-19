@@ -640,6 +640,7 @@ struct SatState { float fKi = 0.01f; bool bSolarGainActive = false; };
 struct State { SatState sat; };
 static Settings settings; static State state;
 static float _pid_integral = 0;
+static bool  _pid_inBand = true;   // TASK-1890: read by _pidUpdateIntegral() since ADR-259 (unused by older copies)
 """
 PID_MAIN = r"""
 int main(int argc, char** argv) {   // active freezeSetting error integral
@@ -1071,11 +1072,12 @@ class PidIntegralFreeze(unittest.TestCase):
     def test_freeze_setting_off_still_accumulates_during_solar(self):
         self.assertGreater(self.integral(True, False, 0.05, 3.0), 3.0)  # HEAD: frozen whatever the setting
 
-    def test_freeze_setting_off_still_resets_outside_the_deadband(self):
-        self.assertEqual(self.integral(True, False, 1.0, 3.0), 0.0)
+    def test_freeze_setting_off_still_halves_outside_the_deadband(self):
+        # TASK-1890 / ADR-259: outside the deadband the integral is halved once (was: set to 0)
+        self.assertEqual(self.integral(True, False, 1.0, 3.0), 1.5)
 
-    def test_no_solar_resets_outside_and_accumulates_inside(self):
-        self.assertEqual(self.integral(False, True, 1.0, 3.0), 0.0)
+    def test_no_solar_halves_outside_and_accumulates_inside(self):
+        self.assertEqual(self.integral(False, True, 1.0, 3.0), 1.5)   # TASK-1890 / ADR-259 (was 0.0)
         self.assertGreater(self.integral(False, True, 0.05, 3.0), 3.0)
 
 

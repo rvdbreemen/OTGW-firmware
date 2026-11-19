@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@otgw-dev'
 created_date: '2026-11-13T08:09:00Z'
-updated_date: '2026-11-19T03:58:00Z'
+updated_date: '2026-11-19T04:21:00Z'
 labels:
   - sat
   - adr
@@ -59,4 +59,6 @@ Bench (otgw-bench-tester 09, 2026-11-18, .63 Classic+S3 PSRAM, no boiler) on 2.0
 2026-11-18 bench (09, 377+412f888 on .63, regression only, evidence 09 scratchpad b377\): 4/4 OK. Item 4: hand-made /sat_pid_state.json with I=1.2345, SAT off, reboot -> GET /api/v2/sat/status pid_i 1.235 (restored); the telnet 'SAT: PID state restored' line was not captured (client on the old boot). Side note, not reproduced: the first settings-restore POST right after the filesystem upload returned curl 000 once, the retry gave 200. Pushed 412f88843 (beta.376 + 377), zip post 1572723857679450212. Feature AC stays open for the field signature.
 
 2026-11-19 follow-up (found by ba's full suite before the 08:00 beta): the simulation port tools/research/sat/sat_sim_port.py still set the integral to 0 outside the deadband, so tests/test_sat_sim_port_equivalence.py::test_pid_and_curve_match_the_firmware failed on origin b72c6d6c5 (PID output differs, max 0.402). Bisect by file: passes with SATpid.ino from 95bcfc78e^, fails with 95bcfc78e (this task). Not a firmware regression: the port did not follow ADR-259. Fix: the port halves once and holds (in_band flag, set by reset()), as _pidUpdateIntegral; a class switch Pid.HALVE_ON_EXIT (default True) keeps the old rule for reproducing studies whose committed results were made with it (tests/test_sat_kd_005_sim.py 1655 x09 rows). Evidence: port equivalence 4/4 incl. the mutant check; against the pre-1890 SATpid.ino it now fails (the port follows 1890); the 4 port-user files 18 passed. My miss: the 1890 sweep ran the SAT PID files, not the sim-port tests.
+
+2026-11-19 full-suite follow-up: tests/test_sat_pwm_override.py PidIntegralFreeze failed to compile on origin b72c6d6c5 (_pid_inBand undeclared in the harness stubs) and then held the old expectation (integral 0 outside the deadband). Harness stub added; the two tests now expect the halved value 1.5 (renamed ...halves_outside...). 83 passed.
 <!-- SECTION:NOTES:END -->

@@ -14,7 +14,7 @@ enum { OT_READ_ACK = 1, OT_WRITE_DATA = 2, OT_INVALID_DATA = 3 };
 enum { OT_TrSet = 16 };
 enum { HW_MODE_UNKNOWN = 0, HW_MODE_PIC = 1 };
 struct OpenthermData_t { int id; int rsptype; int type; bool skipthis; bool bGatewaySubstituted; bool bReplayed;
-                         bool bLocalAnswer; float value;
+                         bool bLocalAnswer; float value; bool bAnswerOverride;
                          float f88() const { return value; } };
 OpenthermData_t OTdata;
 struct { struct { uint32_t iToutsideBoilerMs; } otBus; struct { bool bAvailable; } pic;
@@ -76,7 +76,11 @@ int main() {
   outside("gateway Write-Data to the boiler stamps", OTGW_REQUEST_BOILER, OT_WRITE_DATA, false, 5000);
   outside("replayed gateway Write-Data leaves the stamp", OTGW_REQUEST_BOILER, OT_WRITE_DATA, true, 111);
   outside("gateway Invalid-Data (failed sensor) leaves the stamp", OTGW_REQUEST_BOILER, OT_INVALID_DATA, false, 111);
-  outside("gateway answer to the thermostat leaves the stamp", OTGW_ANSWER_THERMOSTAT, OT_READ_ACK, false, 111);
+  // TASK-2040 (entry 330): a PIC proxy A Read-Ack carries the gateway's own OT= value and stamps;
+  // an OT-Direct answer (bLocalAnswer) and a replayed A do not.
+  outside("PIC proxy answer to the thermostat stamps (TASK-2040)", OTGW_ANSWER_THERMOSTAT, OT_READ_ACK, false, 5000);
+  outside("OT-Direct answer (bLocalAnswer) leaves the stamp", OTGW_ANSWER_THERMOSTAT, OT_READ_ACK, false, 111, true);
+  outside("replayed answer leaves the stamp", OTGW_ANSWER_THERMOSTAT, OT_READ_ACK, true, 111);
 
   std::printf("TASK-1650 banner and satNotifyPicRestart\n");
   g_otDirect = false; g_restarts = 0; bannerSeen();
