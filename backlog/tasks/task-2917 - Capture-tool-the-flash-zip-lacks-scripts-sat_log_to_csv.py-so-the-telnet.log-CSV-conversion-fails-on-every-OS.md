@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@5e'
 created_date: '2026-11-19T13:57:00Z'
-updated_date: '2026-11-19T14:21:00Z'
+updated_date: '2026-11-19T14:50:00Z'
 labels:
   - bug
   - capture-tool
@@ -25,7 +25,7 @@ otgw_capture.py imports sat_log_to_csv (scripts/otgw_capture.py:250) for the tel
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 build.py packs scripts/sat_log_to_csv.py next to otgw_capture.py in the flash zip (zipfile listing of a fresh build shows it)
+- [x] #1 build.py packs scripts/sat_log_to_csv.py next to otgw_capture.py in the flash zip (zipfile listing of a fresh build shows it)
 - [x] #2 A test fails on the old build.py and passes on the fix (the packed file list contains every module otgw_capture.py imports from scripts/)
 - [ ] #3 A capture run from the new zip writes sattick.csv without the ModuleNotFoundError line in the transcript
 <!-- AC:END -->
@@ -34,4 +34,6 @@ otgw_capture.py imports sat_log_to_csv (scripts/otgw_capture.py:250) for the tel
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-11-19 5e: build.py now reads otgw_capture.py's own imports (ast, _capture_local_modules) and packs every scripts/<name>.py it imports next to it (today: sat_log_to_csv.py); READMEs EN/NL name it. Test tests/test_flash_zip_capture_imports.py calls the real create_distribution_zip() on a temp project with the real scripts/*.py: (a) every local import of otgw_capture.py is in the zip, (b) the zip unpacked into an empty folder runs convert_sat_csv() in an isolated interpreter (-I) on a telnet.log with one SATTICK line and writes sattick.csv. Red on the old build.py: 'flash zip lacks [sat_log_to_csv]' and the field error 'ModuleNotFoundError: No module named sat_log_to_csv'; 3/3 green on the fix. test_flash_zip_modes, test_build, test_capture_tool (one load-flaky run, then OK) green; evaluate --quick 0 FAIL. AC1 (listing of a FRESH build zip) and AC3 (a real capture run from the new zip) are left for the release build / a tester run: not verified here, no build slot.
+
+2026-11-19 AC1 (comms 92, release build of 0f9d85af2 for v2.0.0-beta.392, build.bat EXIT=0, 'Build completed successfully!'): zipfile listing of the FRESH build/OTGW-firmware-esp32-combo-2.0.0-beta.392+0f9d85a-flash.zip (15 files, 15:48:17) shows capture-mqtt-debug.bat, capture-mqtt-debug.sh, capture-mqtt-debug-macos.sh, otgw_capture.py and sat_log_to_csv.py; zip sha256 ee58d31e861c08b198d4bb2ed4e471cd6387c92c9bb40604c82b25b7abf7f48b. AC3 (a real capture run from the new zip) still open: needs a tester run on beta.392.
 <!-- SECTION:NOTES:END -->
