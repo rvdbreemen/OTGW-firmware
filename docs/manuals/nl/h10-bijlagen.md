@@ -279,7 +279,7 @@ Dit is een grote versiesprong met uitgebreide nieuwe functionaliteit:
 - ESP32-S3-lijn: 2.0.0 draait op de Nodoshop OTGW Classic met een LOLIN S3 Mini of S3 Mini Pro in de Wemos D1 mini-voet; de PIC blijft zitten. Eén `esp32-combo`-image detecteert de PIC bij het opstarten. De 1.x-firmware voor de Wemos D1 mini (ESP8266) gaat door als eigen onderhoudslijn
 - SAT (Smart Autotune Thermostat): volledig PID-regelalgoritme met stooklijnadvies, multi-zone, drukbewaking, zomerschemaschakelaar, BLE-sensoren
 - Optioneel OLED-display via SSD1306 op de I2C-header van de OTGW Classic
-- AP-fallback modus (beta builds): tijdelijk access point bij ontbrekend WiFi
+- AP-fallback modus (alle builds vanaf beta.401): tijdelijk access point bij onbereikbaar WiFi (paragraaf 6.1.3)
 - PlatformIO-ondersteuning voor de ESP32-S3-build
 
 **Opgelost:**

@@ -416,7 +416,7 @@ Het veld `otcommandinterface` is een string met de actieve OT-interface: `"PIC"`
 
 Twee velden tonen de status van de bedrade link en hebben alleen betekenis met Ethernet-hardware: `ethernetpresent` (PHY gedetecteerd) en `ethernetlink` (kabel aangesloten en link actief). De OTGW Classic heeft geen Ethernet. Wanneer de actieve netwerkmodus `ethernet` is, retourneert het `ssid`-veld de letterlijke string `"Wired"` en wordt `wifirssi` als `0` gerapporteerd. De runtime kan zonder reboot tussen WiFi en Ethernet failoveren (TASK-581); `networkmode` weerspiegelt het momenteel actieve transport.
 
-Wanneer het apparaat in AP-fallback-modus draait (alleen-prerelease vangnet voor onbereikbare WiFi), is `apfallback: true` aanwezig en bevat `ssid` de AP-SSID.
+Wanneer het apparaat in AP-fallback-modus draait (het vangnet voor onbereikbare WiFi; in alle builds vanaf beta.401, daarvoor alleen in prerelease-builds), is `apfallback: true` aanwezig en bevat `ssid` de AP-SSID.
 
 Aanvullende velden ontsluiten MQTT-discovery-telemetrie (`disc_published_topics`, `disc_pending_ids`, `disc_verify_runs`, `disc_republish_triggered`, `disc_last_missing`, `disc_last_orphan`, `disc_last_outcome`) en REST-handler-timing (`perf_device_info_total_ms`, `perf_settings_total_ms`, `perf_sat_status_total_ms`, …) voor ADR-062- en TASK-361-observability.
 

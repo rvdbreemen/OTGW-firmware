@@ -247,7 +247,7 @@ The default hostname on 2.0.0 is `OTGW2`, so the AP will typically be named some
 
 5. Navigate to `http://otgw2.local/` in your browser to open the web interface. On Windows, the device also responds to `http://otgw2/` via LLMNR.
 
-> **AP Fallback Mode (beta builds only; a stable release does not have it)**: If the configured Wi-Fi network becomes unavailable after initial setup, the device opens a fallback AP named `OTGW-<MAC>` with password `otgw1234` and IP `192.168.4.1`, keeping the web UI accessible.
+> **AP Fallback Mode (all builds from 2.0.0-beta.401; before that beta builds only)**: If the configured Wi-Fi network becomes unavailable after initial setup, or cannot be reached at boot, the device opens a fallback AP named `OTGW-<MAC>` with password `otgw1234` and IP `192.168.4.1`, keeping the web UI accessible.
 
 ### Filesystem Upload (LittleFS)
 

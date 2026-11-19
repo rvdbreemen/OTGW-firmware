@@ -255,7 +255,7 @@ The `otcommandinterface` field is a string identifying the active OT interface: 
 
 Two fields surface the wired-link state, only meaningful with Ethernet hardware: `ethernetpresent` (PHY detected), `ethernetlink` (cable plugged in and link up). The OTGW Classic has no Ethernet. When the active network mode is `ethernet`, the `ssid` field returns the literal string `"Wired"` and `wifirssi` is reported as `0`. The runtime can fail over between WiFi and Ethernet without a reboot (TASK-581); `networkmode` reflects the currently active transport.
 
-When the device is running in AP-fallback mode (a prerelease-only safety net for unreachable WiFi), `apfallback: true` is included and `ssid` carries the AP SSID.
+When the device is running in AP-fallback mode (the safety net for unreachable WiFi; in all builds from beta.401, before that prerelease only), `apfallback: true` is included and `ssid` carries the AP SSID.
 
 Additional fields surface MQTT discovery telemetry (`disc_published_topics`, `disc_pending_ids`, `disc_verify_runs`, `disc_republish_triggered`, `disc_last_missing`, `disc_last_orphan`, `disc_last_outcome`) and REST handler timing (`perf_device_info_total_ms`, `perf_settings_total_ms`, `perf_sat_status_total_ms`, …) for ADR-062 and TASK-361 observability.
 

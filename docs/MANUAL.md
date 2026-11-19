@@ -53,7 +53,7 @@ The firmware also has an OT-Direct mode, used only on hardware without a PIC. On
 - Triple-reset Wi-Fi credential recovery.
 - Optional HTTP Basic Auth for settings and maintenance endpoints.
 - Nightly scheduled restart: configurable automatic reboot (time and day selection) to recover heap fragmentation on long-running devices.
-- AP fallback mode, in beta builds only (a stable release does not have it): the web UI stays reachable even when the home network is unavailable.
+- AP fallback mode (in all builds from 2.0.0-beta.401): the web UI stays reachable even when the home network is unavailable (section 6.1.3).
 
 #### Hardware-Dependent Features
 
@@ -88,7 +88,7 @@ Releases of 2.0.0 are on the GitHub Releases page: betas are published as GitHub
 - **Platform abstraction (boards.h)**: A new `boards.h` header defines pin maps, feature flags (`HAS_PIC`, `HAS_DIRECT_OT`, `HAS_ETH_CAPABLE`, `HAS_OLED_CAPABLE`), and hardware capabilities per board variant. This cleanly separates platform-specific configuration from application logic.
 - **SimpleTelnet**: The telnet debug log now uses SimpleTelnet, a unified multi-client telnet library that replaces the separate TelnetStream and ESPTelnet libraries used in v1.x.
 - **Toolchain**: Time handling has moved to AceTime 4.x, which is core-version independent and brings a smaller, faster time library.
-- **Wi-Fi resilience**: in beta builds, AP fallback mode keeps the web UI reachable when the home network is unavailable (a stable release does not have it). A Wi-Fi signal quality indicator appears in the web UI header. Triple-reset credential recovery wipes saved credentials without a reflash.
+- **Wi-Fi resilience**: AP fallback mode keeps the web UI reachable when the home network is unavailable (all builds from beta.401). A Wi-Fi signal quality indicator appears in the web UI header. Triple-reset credential recovery wipes saved credentials without a reflash.
 - **PlatformIO build**: One `esp32-combo` environment in `platformio.ini`, built through `build.bat` / `./build.sh`.
 
 ### Platform Comparison
@@ -413,7 +413,7 @@ The default hostname on 2.0.0 is `OTGW2`, so the AP will typically be named some
 
 5. Navigate to `http://otgw2.local/` in your browser to open the web interface. On Windows, the device also responds to `http://otgw2/` via LLMNR.
 
-> **AP Fallback Mode (beta builds only; a stable release does not have it)**: If the configured Wi-Fi network becomes unavailable after initial setup, the device opens a fallback AP named `OTGW-<MAC>` with password `otgw1234` and IP `192.168.4.1`, keeping the web UI accessible.
+> **AP Fallback Mode (all builds from 2.0.0-beta.401; before that beta builds only)**: If the configured Wi-Fi network becomes unavailable after initial setup, or cannot be reached at boot, the device opens a fallback AP named `OTGW-<MAC>` with password `otgw1234` and IP `192.168.4.1`, keeping the web UI accessible.
 
 ### Filesystem Upload (LittleFS)
 
@@ -2280,17 +2280,21 @@ When no credentials are stored, the device starts a WiFi access point named afte
 The firmware uses a two-tier reconnection strategy:
 
 1. The ESP SDK's built-in auto-reconnect (`WiFi.setAutoReconnect(true)`) handles short blips (typically under 30 seconds) transparently at the radio level.
-2. For longer outages, the application-level `loopWifi()` state machine takes over. The state machine is fully non-blocking: each call returns in well under a millisecond, so the watchdog, OpenTherm message processing, MQTT keepalives, and the web UI all keep running during reconnection. It retries with a 30-second window per attempt (enough for a full scan, association, and DHCP exchange) and gives up after 10 attempts, rebooting the device (max time before reboot: 300 seconds). In beta builds it enters AP fallback mode after 2 failed retries instead (see section 6.1.3). These timing parameters are codified in ADR-075 (which supersedes the original 5-second/15-retry values from ADR-047) to give `WiFi.begin()` a full association window and avoid cancelling the SDK auto-reconnect mid-flight.
+2. For longer outages, the application-level `loopWifi()` state machine takes over. The state machine is fully non-blocking: each call returns in well under a millisecond, so the watchdog, OpenTherm message processing, MQTT keepalives, and the web UI all keep running during reconnection. It retries with a 30-second window per attempt (enough for a full scan, association, and DHCP exchange) and after 2 failed attempts it enters AP fallback mode (section 6.1.3; all builds from beta.401, before that only beta builds). When the AP fallback is skipped because memory is critically low, it gives up after 10 attempts and reboots the device (max time before reboot: 300 seconds); with the setting `wifinoportal` it keeps retrying without a reboot. These timing parameters are codified in ADR-075 (which supersedes the original 5-second/15-retry values from ADR-047) to give `WiFi.begin()` a full association window and avoid cancelling the SDK auto-reconnect mid-flight.
 
 After a successful reconnect, the firmware re-applies the configured hostname for the next DHCP exchange and restarts Telnet, MQTT, and WebSocket services automatically. It makes no DHCP calls of its own: the WiFi SDK handles DHCP as part of the reconnect.
 
 #### 6.1.3 AP Fallback Mode
 
-Available in beta builds (v2.0.0-beta and later). When WiFi retries are exhausted at runtime, the device switches into AP fallback mode instead of rebooting indefinitely. In production releases the device reboots after 10 failed retries instead.
+Available in all builds from 2.0.0-beta.401 (before that in beta builds only). When the saved WiFi network cannot be reached, the device opens its own access point so the web UI stays reachable:
 
-From beta.394 the runtime switch to AP fallback is skipped while memory is critically low (free memory under 8 KB or the largest free block under 4 KB), because starting the access point then crashed the gateway. The telnet log then shows `BETA: AP fallback skipped, heap starved (free ... B, largest block ... B); retrying as release`, and the device carries on as a production release does: it keeps retrying and reboots after 10 failed retries.
+- **At runtime:** after 2 failed reconnect attempts (about 60 seconds). The telnet log shows `WiFi: retries exhausted, entering AP fallback mode`.
+- **At boot:** when WiFi credentials are saved but the network is unreachable, instead of the config portal. The telnet log shows `WiFi: unavailable at boot, skipping config portal -> AP fallback`. Not on the boot after a WiFi supervisor restart (ADR-211): the device then starts without WiFi and keeps retrying. Without saved credentials, or after a triple reset, the config portal opens as before.
 
-At boot, if credentials are stored but WiFi is unreachable, beta builds also skip the WiFiManager config portal and go straight to AP fallback.
+There is no AP fallback:
+
+- **With the setting `wifinoportal`** ("No setup portal when Wi-Fi is down"): the device keeps retrying the saved network every 30 seconds and does not restart; a triple reset opens the portal.
+- **While memory is critically low** (free memory under 8 KB or the largest free block under 4 KB; from beta.394): starting the access point then crashed the gateway. The telnet log shows `WiFi: AP fallback skipped, heap starved (free ... B, largest block ... B); retrying, restart after 10 attempts`, and after 10 failed attempts the device restarts (`WiFi: too many reconnect failures`).
 
 - **SSID**: `OTGW-<last 3 bytes of MAC address in uppercase hex>`, for example `OTGW-AABBCC`
 - **IP address**: `192.168.4.1`
@@ -2298,7 +2302,7 @@ At boot, if credentials are stored but WiFi is unreachable, beta builds also ski
 - **MQTT**: disabled in fallback mode
 - **OTA update**: available from fallback mode so you can flash a corrected firmware without serial access
 
-In AP fallback mode the device keeps attempting to reconnect to the configured WiFi network every 5 minutes. When WiFi comes back, services (MQTT, Telnet, WebSocket) restart automatically and the AP is torn down.
+In AP fallback mode the device keeps attempting to reconnect to the configured WiFi network every 5 minutes. When WiFi comes back, services (MQTT, Telnet, WebSocket) restart automatically and the AP is torn down. That happens at the next 5-minute check, so the access point can stay open next to the restored connection for up to 5 minutes (TASK-2933).
 
 **How to recover from fallback:**
 1. Connect to the `OTGW-XXXXXX` SSID using password `otgw1234`.
@@ -2599,7 +2603,7 @@ Common MQTT return codes:
 |---|---|---|
 | Weak signal | Check RSSI in web UI header. Below -75 dBm is marginal. | Move router or add an AP closer. |
 | IP address conflict | Another device has the same IP. | Use a DHCP reservation on the router. |
-| AP fallback loop (beta builds only) | Check Telnet log for `BETA: WiFi retries exhausted, entering AP fallback mode`. | Fix SSID/password or triple-reset. |
+| AP fallback loop | Check Telnet log for `WiFi: retries exhausted, entering AP fallback mode` (before beta.401: `BETA: WiFi retries exhausted, ...`). | Fix SSID/password or triple-reset. |
 
 ---
 
@@ -2624,7 +2628,7 @@ Common MQTT return codes:
 1. Confirm the device is on the network: ping `<ip>` or try the IP directly.
 2. mDNS resolution failure: on Windows without Bonjour, try the IP address.
 3. Filesystem not mounted: install the release zip again on the `/update` page, or upload files via `/fsexplorer`.
-4. Device in AP fallback mode (beta builds only): connect to the fallback SSID (`OTGW-XXXXXX`) and browse to `http://192.168.4.1`.
+4. Device in AP fallback mode (section 6.1.3): connect to the fallback SSID (`OTGW-XXXXXX`) and browse to `http://192.168.4.1`.
 
 ---
 
@@ -2699,7 +2703,7 @@ An OTGW Classic with a LOLIN S3 Mini or S3 Mini Pro also uses the LOLIN's on-boa
 | Pixel colour | Meaning |
 |---|---|
 | Red | WiFi not connected. |
-| Purple | An access point is open: the WiFi config portal, or, in beta builds only, the AP fallback when the saved network is unreachable at boot. Connect to it to configure WiFi. |
+| Purple | An access point is open: the WiFi config portal, or the AP fallback when the saved network is unreachable (all builds from beta.401; before that beta builds only). Connect to it to configure WiFi. |
 | Green | WiFi connected. |
 
 `/api/v2/device/info` reports the driven pixel GPIO as `status_pixel_gpio` (`0` when none).
@@ -3993,7 +3997,7 @@ The `otcommandinterface` field is a string identifying the active OT interface: 
 
 Two fields surface the wired-link state, only meaningful with Ethernet hardware: `ethernetpresent` (PHY detected), `ethernetlink` (cable plugged in and link up). The OTGW Classic has no Ethernet. When the active network mode is `ethernet`, the `ssid` field returns the literal string `"Wired"` and `wifirssi` is reported as `0`. The runtime can fail over between WiFi and Ethernet without a reboot (TASK-581); `networkmode` reflects the currently active transport.
 
-When the device is running in AP-fallback mode (a prerelease-only safety net for unreachable WiFi), `apfallback: true` is included and `ssid` carries the AP SSID.
+When the device is running in AP-fallback mode (the safety net for unreachable WiFi; in all builds from beta.401, before that prerelease only), `apfallback: true` is included and `ssid` carries the AP SSID.
 
 Additional fields surface MQTT discovery telemetry (`disc_published_topics`, `disc_pending_ids`, `disc_verify_runs`, `disc_republish_triggered`, `disc_last_missing`, `disc_last_orphan`, `disc_last_outcome`) and REST handler timing (`perf_device_info_total_ms`, `perf_settings_total_ms`, `perf_sat_status_total_ms`, …) for ADR-062 and TASK-361 observability.
 
@@ -5466,7 +5470,7 @@ Version 2.0.0 is a major release. The headline changes are:
 
 **Settings/State architecture (ADR-051).** Over 62 global variables have been replaced by the `OTGWSettings settings` and `OTGWState state` structs. This eliminates naming collisions and makes the persistent-versus-transient boundary explicit.
 
-**AP fallback mode (beta only).** When no saved WiFi is available, the device opens a fallback access point rather than going fully offline. Guarded by `_VERSION_PRERELEASE`.
+**AP fallback mode.** When the saved WiFi network cannot be reached, the device opens a fallback access point rather than going fully offline (section 6.1.3). In all builds from 2.0.0-beta.401; before that guarded by `_VERSION_PRERELEASE`.
 
 **MQTT routing fix.** OTGW "Answer Thermostat" messages (A-prefix frames) are now correctly routed to the boiler source topic rather than the thermostat source topic.
 

@@ -134,7 +134,7 @@ Common MQTT return codes:
 |---|---|---|
 | Weak signal | Check RSSI in web UI header. Below -75 dBm is marginal. | Move router or add an AP closer. |
 | IP address conflict | Another device has the same IP. | Use a DHCP reservation on the router. |
-| AP fallback loop (beta builds only) | Check Telnet log for `BETA: WiFi retries exhausted, entering AP fallback mode`. | Fix SSID/password or triple-reset. |
+| AP fallback loop | Check Telnet log for `WiFi: retries exhausted, entering AP fallback mode` (before beta.401: `BETA: WiFi retries exhausted, ...`). | Fix SSID/password or triple-reset. |
 
 ---
 
@@ -159,7 +159,7 @@ Common MQTT return codes:
 1. Confirm the device is on the network: ping `<ip>` or try the IP directly.
 2. mDNS resolution failure: on Windows without Bonjour, try the IP address.
 3. Filesystem not mounted: install the release zip again on the `/update` page, or upload files via `/fsexplorer`.
-4. Device in AP fallback mode (beta builds only): connect to the fallback SSID (`OTGW-XXXXXX`) and browse to `http://192.168.4.1`.
+4. Device in AP fallback mode (section 6.1.3): connect to the fallback SSID (`OTGW-XXXXXX`) and browse to `http://192.168.4.1`.
 
 ---
 
@@ -234,7 +234,7 @@ An OTGW Classic with a LOLIN S3 Mini or S3 Mini Pro also uses the LOLIN's on-boa
 | Pixel colour | Meaning |
 |---|---|
 | Red | WiFi not connected. |
-| Purple | An access point is open: the WiFi config portal, or, in beta builds only, the AP fallback when the saved network is unreachable at boot. Connect to it to configure WiFi. |
+| Purple | An access point is open: the WiFi config portal, or the AP fallback when the saved network is unreachable (all builds from beta.401; before that beta builds only). Connect to it to configure WiFi. |
 | Green | WiFi connected. |
 
 `/api/v2/device/info` reports the driven pixel GPIO as `status_pixel_gpio` (`0` when none).

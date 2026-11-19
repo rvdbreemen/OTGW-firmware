@@ -23,7 +23,7 @@ Zodra de verbinding is gemaakt, slaat de firmware de gegevens op in flash. Bij i
 De firmware implementeert een tweelaags herstelmechanisme:
 
 - **Laag 1**: De WiFi SDK (`WiFi.setAutoReconnect(true)`) herstelt kortdurende onderbrekingen (typisch binnen 30 seconden) transparant op radioniveau.
-- **Laag 2**: Bij langere uitval neemt de toestandsmachine `loopWifi()` het over. Deze is volledig non-blocking: elke aanroep keert binnen minder dan een milliseconde terug, zodat de watchdog, de OpenTherm-berichtenverwerking, de MQTT-keepalives en de Web UI gewoon blijven draaien tijdens een herverbindingspoging. Per poging krijgt WiFi 30 seconden om scan, associatie en DHCP te voltooien. In productiebuilds herstart het apparaat na 10 mislukte pogingen (maximaal 300 seconden voor de reboot). In betabuilds activeert de firmware na 2 mislukte pogingen de AP-fallbackmodus (zie paragraaf 6.1.3) in plaats van te herstarten. Deze waarden zijn vastgelegd in ADR-075 (vervangt de oorspronkelijke 5 seconden / 15 retries uit ADR-047) om `WiFi.begin()` een volledig associatievenster te geven en te voorkomen dat de SDK auto-reconnect halverwege wordt afgebroken.
+- **Laag 2**: Bij langere uitval neemt de toestandsmachine `loopWifi()` het over. Deze is volledig non-blocking: elke aanroep keert binnen minder dan een milliseconde terug, zodat de watchdog, de OpenTherm-berichtenverwerking, de MQTT-keepalives en de Web UI gewoon blijven draaien tijdens een herverbindingspoging. Per poging krijgt WiFi 30 seconden om scan, associatie en DHCP te voltooien. Na 2 mislukte pogingen activeert de firmware de AP-fallbackmodus (paragraaf 6.1.3; in alle builds vanaf beta.401, daarvoor alleen in betabuilds). Wordt de AP-fallback overgeslagen omdat het geheugen kritiek laag is, dan herstart het apparaat na 10 mislukte pogingen (maximaal 300 seconden voor de reboot); met de instelling `wifinoportal` blijft het proberen zonder herstart. Deze waarden zijn vastgelegd in ADR-075 (vervangt de oorspronkelijke 5 seconden / 15 retries uit ADR-047) om `WiFi.begin()` een volledig associatievenster te geven en te voorkomen dat de SDK auto-reconnect halverwege wordt afgebroken.
 
 Bij herstel van de verbinding:
 - Zet de firmware de geconfigureerde hostnaam opnieuw voor de volgende DHCP-uitwisseling.
@@ -31,13 +31,17 @@ Bij herstel van de verbinding:
 
 De firmware doet zelf geen DHCP-aanroepen: de WiFi SDK regelt DHCP als onderdeel van het herverbinden.
 
-#### 6.1.3 AP-fallbackmodus (beta)
+#### 6.1.3 AP-fallbackmodus
 
-Beschikbaar in betabuilds (v2.0.0-beta en later). Wanneer WiFi-pogingen uitgeput zijn, schakelt het apparaat over naar AP-fallbackmodus in plaats van eindeloos te herstarten. In productiereleases herstart het apparaat na 10 mislukte pogingen.
+Beschikbaar in alle builds vanaf 2.0.0-beta.401 (daarvoor alleen in betabuilds). Als het opgeslagen WiFi-netwerk niet bereikbaar is, opent het apparaat een eigen access point, zodat de webinterface bereikbaar blijft:
 
-Vanaf beta.394 wordt de overstap naar AP-fallback tijdens bedrijf overgeslagen zolang het geheugen kritiek laag is (vrij geheugen onder 8 KB of het grootste vrije blok onder 4 KB), omdat het starten van het access point de gateway dan liet crashen. Het telnet-log toont dan `BETA: AP fallback skipped, heap starved (free ... B, largest block ... B); retrying as release`, en het apparaat gaat verder zoals een productierelease: het blijft proberen en herstart na 10 mislukte pogingen.
+- **Tijdens bedrijf:** na 2 mislukte verbindingspogingen (ongeveer 60 seconden). Het telnet-log toont `WiFi: retries exhausted, entering AP fallback mode`.
+- **Bij het opstarten:** als er WiFi-gegevens opgeslagen zijn maar het netwerk onbereikbaar is, in plaats van het configuratieportaal. Het telnet-log toont `WiFi: unavailable at boot, skipping config portal -> AP fallback`. Niet bij de opstart na een herstart door de WiFi-bewaking (ADR-211): het apparaat start dan zonder WiFi en blijft proberen. Zonder opgeslagen gegevens, of na een drievoudige reset, opent het configuratieportaal zoals voorheen.
 
-Bij opstart, als er credentials opgeslagen zijn maar WiFi niet bereikbaar is, slaan betabuilds de WiFiManager config portal over en gaan direct naar AP-fallback.
+Er is geen AP-fallback:
+
+- **Met de instelling `wifinoportal`** ("No setup portal when Wi-Fi is down"): het apparaat blijft het opgeslagen netwerk elke 30 seconden proberen en herstart niet; een drievoudige reset opent het portaal.
+- **Zolang het geheugen kritiek laag is** (vrij geheugen onder 8 KB of het grootste vrije blok onder 4 KB; vanaf beta.394): het starten van het access point liet de gateway dan crashen. Het telnet-log toont `WiFi: AP fallback skipped, heap starved (free ... B, largest block ... B); retrying, restart after 10 attempts`, en na 10 mislukte pogingen herstart het apparaat (`WiFi: too many reconnect failures`).
 
 - **SSID**: `OTGW-<laatste 3 bytes van het MAC-adres in hoofdletters hex>`, bijvoorbeeld `OTGW-AABBCC`
 - **IP-adres**: `192.168.4.1`
@@ -45,7 +49,7 @@ Bij opstart, als er credentials opgeslagen zijn maar WiFi niet bereikbaar is, sl
 - **MQTT**: uitgeschakeld in fallbackmodus
 - **OTA-update**: beschikbaar vanuit fallbackmodus, zodat u een gecorrigeerde firmware kunt flashen zonder serieel toegang
 
-In AP-fallbackmodus probeert de firmware elke 5 minuten opnieuw verbinding te maken met het geconfigureerde WiFi-netwerk. Zodra WiFi beschikbaar is, worden alle services automatisch hersteld en wordt de AP afgesloten.
+In AP-fallbackmodus probeert de firmware elke 5 minuten opnieuw verbinding te maken met het geconfigureerde WiFi-netwerk. Zodra WiFi beschikbaar is, worden alle services automatisch hersteld en wordt de AP afgesloten. Dat gebeurt bij de volgende controle van 5 minuten, dus het access point kan tot 5 minuten naast de herstelde verbinding open blijven (TASK-2933).
 
 **Herstelstappen:**
 1. Verbind met de SSID `OTGW-XXXXXX` met wachtwoord `otgw1234`.

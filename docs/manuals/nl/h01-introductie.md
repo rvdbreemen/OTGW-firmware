@@ -95,7 +95,7 @@ Releases van 2.0.0 staan op de GitHub Releases-pagina: beta's verschijnen als Gi
 - Platte MQTT-topics per waarde (ADR-101): elke sensor of regelwaarde wordt als platte scalar op zijn eigen topic gepubliceerd. Geen samengestelde JSON-state-topics. Dit is een bewuste keuze die auto-discovery transparant houdt en een eigen HA-component overbodig maakt.
 
 **Netwerk en stabiliteit**
-- AP-fallbackmodus (alleen in betabuilds, een stabiele release heeft hem niet): als Wi-Fi drie keer achter elkaar mislukt, opent het apparaat een accesspoint
+- AP-fallbackmodus (in alle builds vanaf 2.0.0-beta.401): als Wi-Fi twee keer achter elkaar mislukt, opent het apparaat een accesspoint
 - Wi-Fi-signaalniveauindicator in de webinterface (balkjes-icoon)
 - Driedubbele reset-procedure om Wi-Fi-instellingen te wissen zonder serieel
 - Nachtelijke herstart: configureerbare automatische reboot (tijdstip en dagkeuze) om heap-fragmentatie op te lossen bij langlopende apparaten

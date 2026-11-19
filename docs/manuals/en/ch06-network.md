@@ -15,17 +15,21 @@ When no credentials are stored, the device starts a WiFi access point named afte
 The firmware uses a two-tier reconnection strategy:
 
 1. The ESP SDK's built-in auto-reconnect (`WiFi.setAutoReconnect(true)`) handles short blips (typically under 30 seconds) transparently at the radio level.
-2. For longer outages, the application-level `loopWifi()` state machine takes over. The state machine is fully non-blocking: each call returns in well under a millisecond, so the watchdog, OpenTherm message processing, MQTT keepalives, and the web UI all keep running during reconnection. It retries with a 30-second window per attempt (enough for a full scan, association, and DHCP exchange) and gives up after 10 attempts, rebooting the device (max time before reboot: 300 seconds). In beta builds it enters AP fallback mode after 2 failed retries instead (see section 6.1.3). These timing parameters are codified in ADR-075 (which supersedes the original 5-second/15-retry values from ADR-047) to give `WiFi.begin()` a full association window and avoid cancelling the SDK auto-reconnect mid-flight.
+2. For longer outages, the application-level `loopWifi()` state machine takes over. The state machine is fully non-blocking: each call returns in well under a millisecond, so the watchdog, OpenTherm message processing, MQTT keepalives, and the web UI all keep running during reconnection. It retries with a 30-second window per attempt (enough for a full scan, association, and DHCP exchange) and after 2 failed attempts it enters AP fallback mode (section 6.1.3; all builds from beta.401, before that only beta builds). When the AP fallback is skipped because memory is critically low, it gives up after 10 attempts and reboots the device (max time before reboot: 300 seconds); with the setting `wifinoportal` it keeps retrying without a reboot. These timing parameters are codified in ADR-075 (which supersedes the original 5-second/15-retry values from ADR-047) to give `WiFi.begin()` a full association window and avoid cancelling the SDK auto-reconnect mid-flight.
 
 After a successful reconnect, the firmware re-applies the configured hostname for the next DHCP exchange and restarts Telnet, MQTT, and WebSocket services automatically. It makes no DHCP calls of its own: the WiFi SDK handles DHCP as part of the reconnect.
 
 #### 6.1.3 AP Fallback Mode
 
-Available in beta builds (v2.0.0-beta and later). When WiFi retries are exhausted at runtime, the device switches into AP fallback mode instead of rebooting indefinitely. In production releases the device reboots after 10 failed retries instead.
+Available in all builds from 2.0.0-beta.401 (before that in beta builds only). When the saved WiFi network cannot be reached, the device opens its own access point so the web UI stays reachable:
 
-From beta.394 the runtime switch to AP fallback is skipped while memory is critically low (free memory under 8 KB or the largest free block under 4 KB), because starting the access point then crashed the gateway. The telnet log then shows `BETA: AP fallback skipped, heap starved (free ... B, largest block ... B); retrying as release`, and the device carries on as a production release does: it keeps retrying and reboots after 10 failed retries.
+- **At runtime:** after 2 failed reconnect attempts (about 60 seconds). The telnet log shows `WiFi: retries exhausted, entering AP fallback mode`.
+- **At boot:** when WiFi credentials are saved but the network is unreachable, instead of the config portal. The telnet log shows `WiFi: unavailable at boot, skipping config portal -> AP fallback`. Not on the boot after a WiFi supervisor restart (ADR-211): the device then starts without WiFi and keeps retrying. Without saved credentials, or after a triple reset, the config portal opens as before.
 
-At boot, if credentials are stored but WiFi is unreachable, beta builds also skip the WiFiManager config portal and go straight to AP fallback.
+There is no AP fallback:
+
+- **With the setting `wifinoportal`** ("No setup portal when Wi-Fi is down"): the device keeps retrying the saved network every 30 seconds and does not restart; a triple reset opens the portal.
+- **While memory is critically low** (free memory under 8 KB or the largest free block under 4 KB; from beta.394): starting the access point then crashed the gateway. The telnet log shows `WiFi: AP fallback skipped, heap starved (free ... B, largest block ... B); retrying, restart after 10 attempts`, and after 10 failed attempts the device restarts (`WiFi: too many reconnect failures`).
 
 - **SSID**: `OTGW-<last 3 bytes of MAC address in uppercase hex>`, for example `OTGW-AABBCC`
 - **IP address**: `192.168.4.1`
@@ -33,7 +37,7 @@ At boot, if credentials are stored but WiFi is unreachable, beta builds also ski
 - **MQTT**: disabled in fallback mode
 - **OTA update**: available from fallback mode so you can flash a corrected firmware without serial access
 
-In AP fallback mode the device keeps attempting to reconnect to the configured WiFi network every 5 minutes. When WiFi comes back, services (MQTT, Telnet, WebSocket) restart automatically and the AP is torn down.
+In AP fallback mode the device keeps attempting to reconnect to the configured WiFi network every 5 minutes. When WiFi comes back, services (MQTT, Telnet, WebSocket) restart automatically and the AP is torn down. That happens at the next 5-minute check, so the access point can stay open next to the restored connection for up to 5 minutes (TASK-2933).
 
 **How to recover from fallback:**
 1. Connect to the `OTGW-XXXXXX` SSID using password `otgw1234`.

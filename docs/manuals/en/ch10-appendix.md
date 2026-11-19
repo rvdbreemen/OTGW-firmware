@@ -255,7 +255,7 @@ Version 2.0.0 is a major release. The headline changes are:
 
 **Settings/State architecture (ADR-051).** Over 62 global variables have been replaced by the `OTGWSettings settings` and `OTGWState state` structs. This eliminates naming collisions and makes the persistent-versus-transient boundary explicit.
 
-**AP fallback mode (beta only).** When no saved WiFi is available, the device opens a fallback access point rather than going fully offline. Guarded by `_VERSION_PRERELEASE`.
+**AP fallback mode.** When the saved WiFi network cannot be reached, the device opens a fallback access point rather than going fully offline (section 6.1.3). In all builds from 2.0.0-beta.401; before that guarded by `_VERSION_PRERELEASE`.
 
 **MQTT routing fix.** OTGW "Answer Thermostat" messages (A-prefix frames) are now correctly routed to the boiler source topic rather than the thermostat source topic.
 

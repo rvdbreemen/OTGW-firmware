@@ -288,6 +288,7 @@ Timing and reliability:
 
 ### WiFi
 
+- **The WiFi AP fallback is now part of the stable release** (TASK-2931, Robert's decision, beta.401). When the saved WiFi network cannot be reached, after 2 failed attempts (about a minute) or at boot, the gateway opens its own access point `OTGW-<last 3 bytes of the MAC>` (password `otgw1234`, web UI at `http://192.168.4.1`) and retries your network every 5 minutes. There is no AP fallback with the setting `wifinoportal` (the gateway keeps retrying without restarting) or while memory is critically low (it then restarts after 10 failed attempts). Before beta.401 only beta builds had it. See section 6.1.3 of the manual.
 - A gateway whose network is dead while its memory is nearly exhausted now recovers itself: a WiFi check that cannot run for lack of memory counts as dead when the largest free memory block is under 4 KB, so the forced reconnect and then the restart follow (TASK-2026, ADR-258, beta.383). While memory stays that low, a short WiFi reconnect no longer starts that count again (ADR-261, beta.385; log line from beta.388).
 
 ### Diagnostics
