@@ -1220,7 +1220,10 @@ static void cloudRecIdentity() {
   snprintf_P(cloudRecUid, sizeof(cloudRecUid), PSTR("otgw-%02x%02x%02x%02x%02x%02x"), mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
   Preferences prefs;
   if (!prefs.begin("cloudrec", false)) return;
-  if (prefs.getString("secret", cloudRecSecret, sizeof(cloudRecSecret)) != sizeof(cloudRecSecret) - 1) {
+  // TASK-2901: getString() returns nvs_get_str's length, which counts the NUL (33 for the 32-character secret).
+  // The old check against 32 failed on every boot, so each boot replaced the enrolled secret (409 on .63).
+  size_t got = prefs.getString("secret", cloudRecSecret, sizeof(cloudRecSecret));
+  if (got != sizeof(cloudRecSecret) || strlen(cloudRecSecret) != sizeof(cloudRecSecret) - 1) {
     for (size_t i = 0; i < sizeof(cloudRecSecret) - 1; i += 8)
       snprintf_P(cloudRecSecret + i, 9, PSTR("%08lx"), (unsigned long)platformHardwareRandom());
     prefs.putString("secret", cloudRecSecret);

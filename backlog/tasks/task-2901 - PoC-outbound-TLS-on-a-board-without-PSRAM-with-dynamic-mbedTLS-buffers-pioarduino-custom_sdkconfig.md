@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-15T09:35:00Z'
-updated_date: '2026-11-19T06:22:00Z'
+updated_date: '2026-11-19T07:33:00Z'
 labels:
   - research
   - tls
@@ -117,4 +117,6 @@ poc.13: the seq line (CloudRecDevice.h:908) now ends with '; conn heap <internal
 2026-11-19 ~07:25 Robert in the 5e session, standing push go for this branch: "Je mag altijd pushen naar deze branch vanaf hier." Applies to origin/research/cloud-recording from lane-5e-cloudrec, fast-forward only; a coordinator slot is still asked per push. Pushed 1f8231a24..1313798eb (poc.12 + poc.13) after the coordinator's OK.
 
 poc.13 build (build.bat --target esp32-combo-tlsdyn, 2026-11-19 07:06-07:20, 'Build completed successfully!'): OTGW-firmware-esp32-combo-tlsdyn-2.0.0-poc.13+1313798.ino.bin 2,257,264 B in wt-5e-cloudrec/build/; githash 1313798 = pushed head. App flash 2,256,823 / 2,293,760 B (98.4 %, 36.9 KB left, LTO on), static RAM 156,692 B. Against dev beta.386 (wt-2026 build 06:42): flash +105,928 B, static RAM +22,504 B; research is 547 commits behind dev, so this mixes branch divergence with the feature. Static checks on firmware.elf (nm): cloudRecTlsCalloc 1, cloudRecTlsFree 1, mbedtls_platform_set_calloc_free 1; __wrap_mbedtls 0, esp_mbedtls_add_rx_buffer 0, esp_mbedtls_free_rx_buffer 0, esp_tls_get_client_session 0; build log has no otgw-tlsdyn core path. Other mbedTLS users (WiFi supplicant crypto, CONFIG_ESP_WIFI_MBEDTLS_CRYPTO=y; SATble) now get internal RAM for blocks <= 4 KB as with stock, PSRAM for blocks > 4 KB when present; on a board without PSRAM exactly as stock.
+
+2026-11-19 poc.13 bench on .63 (09): cloudrec silent; the boot catch shows the only line 'cloudrec: uid enrolled with another secret (delete it on the server); capture paused, next attempt in 1440 min' 4 s after boot. PocketBase: device otgw-ac276ece45d8 last updated 2026-11-19 00:42:51Z (poc.10 enrollment), only batch 00:43:00.843Z, so poc.10's TLS + one upload succeeded 7 s before its panic. Root cause (ours): cloudRecIdentity() compared Preferences::getString()'s return value with 32, but it returns nvs_get_str's length including the NUL (33; Preferences.cpp:476-495), so every boot made and stored a new secret and the server answered 409. Fix poc.15: accept 33 and a 32-character string. Gate tests/test_cloudrec_identity_secret.py compiles the real cloudRecIdentity() with an NVS-semantics Preferences stub: red on 1313798 (same 0, puts 2), green on the fix (same 1, puts 1). The bench needs the server record h9014itix3m471h deleted once (the device's current secret is unknown); that change to Robert's collection point needs his go. Also noted: the probe waits silently for the clock (no log line); a one-time 'waiting for the clock' line would have saved a reboot.
 <!-- SECTION:NOTES:END -->
