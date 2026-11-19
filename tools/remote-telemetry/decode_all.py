@@ -4,6 +4,7 @@
     python3 decode_all.py --file otgw-recording.bin <out-dir> --image firmware.bin     (a local download)
     python3 decode_all.py http://<nas>:8090 <superuser-email> <password> <device-uid> <out-dir> \
         --image firmware.bin [--image older-firmware.bin] [--tz Europe/Amsterdam]
+    (give - as the password to be asked for it instead, so it stays out of the shell history)
 
 Reads the device's "mix" records (fmt 4) in seq order and writes:
   otframes.log  OT frames in the ADR-209 replay layout (host_time, device_time, source, frame)
@@ -129,6 +130,9 @@ def main():
         return
     if not (a.base and a.admin_email and a.admin_password and a.device_uid and a.out_dir):
         sys.exit("give base admin_email admin_password device_uid out_dir, or --file <download> out_dir")
+    if a.admin_password == "-":                            # ask instead: keeps the password out of the shell history
+        import getpass
+        a.admin_password = getpass.getpass("PocketBase superuser password: ")
     base = a.base.rstrip("/")
     token = eb.api(base, "/api/collections/_superusers/auth-with-password", None,
                    {"identity": a.admin_email, "password": a.admin_password})["token"]

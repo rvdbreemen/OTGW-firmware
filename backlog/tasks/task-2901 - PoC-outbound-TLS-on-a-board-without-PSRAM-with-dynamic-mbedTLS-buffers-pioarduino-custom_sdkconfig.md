@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-15T09:35:00Z'
-updated_date: '2026-11-19T10:54:00Z'
+updated_date: '2026-11-19T17:33:00Z'
 labels:
   - research
   - tls
@@ -138,4 +138,8 @@ AC #6 prep (2026-11-19): replay input cut from the gruijter field capture (OTGW-
 2026-11-19 full suite on research e4fb77fb2 (poc.18): scripts/run_tests.py -j 2, 350 of 351 files before d3's 389 BUILD START: all PASS except tests/test_remote_telemetry_policy.py (the 3 failures that already failed before the dev merges: test_real_reply, test_variants, test_queue; TypeError NoneType not iterable, not investigated yet). Remaining tests/test_refresh_storm.py run alone: run 1 red (3 failures, 533 s), the same file on clean origin/dev 24679e271 green (188 s), run 2 on research green (37 passed, 2 skipped, 215 s): the known load flake (TASK-2041), not a research regression.
 
 2026-11-19 the 3 'known' test_remote_telemetry_policy failures (test_real_reply, test_variants, test_queue; TypeError NoneType not iterable) explained and fixed: the Windows host has no g++, so OUT is None; only RemoteTelemetryPolicyTest had @skipIf(OUT is None), the two classes added later (RemoteMode TASK-2906, Slot) iterated None. Reproduced with PATH=/nonexistent: errors=3 skipped=4 (exact match); fix adds the same skipIf to both classes: no compiler OK (skipped=7), with g++ 7 passed. On Windows these 7 tests now skip instead of error; they run on Linux/CI.
+
+2026-11-19 ~19:00 AC #6 prerequisite: Robert ran delete_device_record.py himself (getpass, own PowerShell window): login 200, record h9014itix3m471h (otgw-ac276ece45d8) uid matched, 1 batch; delete batch 204, delete record 204, record after 404, batches after 0. Bench request for poc.18+e4fb77f on .63 with the replay (replay-gruijter-20261111-0800-60min.log, 9568 frames, sha256 9464952eb70649cc) sent to 09; download by Robert (decode_all on the LAN), then compare_replay/compare_telnet/analyze-capture by 5e.
+
+2026-11-19 AC #6 replay input changed (coordinator chose B: tester data stays local): synthetic, deterministic replay-synthetic-60min.log (9600 frames, 230,400 B, sha256 e9b91b61f6a6eaa2...; generator make_synthetic_replay.py, both in the 5e scratchpad e2e/): T request + B answer every 0.75 s for 60 min, 20 Data-IDs, a made-up 10 min heating cycle, even parity per OT 2.2; ADR-209 3-column format (parser OTGW-Core.ino:4768-4775). compare_replay.py self-test on it: green with lead-in + loop (9600/9600, gap deviation 0.000 s), red with one line dropped (first difference at input frame 4798). The gruijter cut is no longer used. 09 runs it on .63 tonight after ba's 395 smoke.
 <!-- SECTION:NOTES:END -->
