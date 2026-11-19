@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@5e'
 created_date: '2026-11-19T16:47:00Z'
-updated_date: '2026-11-19T16:59:00Z'
+updated_date: '2026-11-19T18:31:00Z'
 labels:
   - wifi
   - heap
@@ -40,4 +40,6 @@ In WIFI_CONNECTING (prerelease) start the AP fallback only when wifiApFallbackHe
 
 <!-- SECTION:NOTES:BEGIN -->
 5e 2026-11-19: host test tests/test_ap_fallback_starved_heap.py compiles the REAL 'case WIFI_CONNECTING:' block of networkStuff.ino (plus wifiApFallbackHeapOk() when present) against stubs and drives 12 failed attempts. RED on 4bb2097ed: 2 failures (test_a_starved_heap_skips_the_ap_and_restarts_as_release, test_low_free_with_a_large_block_is_also_starved: softAP started, ap '1' != '0'); 2 pass (healthy heap starts the AP after 2, bNoPortal retries). GREEN on the fix: 4/4. tests/test_wifi_deadlink.py STATE_STUBS gets platformFreeHeap() (56448, healthy) and HEAP_LOW_THRESHOLD so its harness compiles the new check: test_wifi_deadlink 31 OK, test_wifi_skip_portal 38 OK (incl. the prerelease AP fallback scenarios), test_heaphold_hook 8 OK. Not verified: the real driver behaviour (bench AC3).
+
+2026-11-19 09 (otgw-bench-tester): AC1 and AC3 NOT ticked. Bench .61 394+17c993a, two holds: no panic in task wifi, release path taken, clean restarts 18:24:08 and 18:39:08 'WiFi: too many reconnect failures', coredump unchanged; red reference 393+4bb2097 (2 wifi panics, 17:25:08 and 17:41:18). Both ACs require the skip log line (networkStuff.ino:1014 'BETA: AP fallback skipped, heap starved ...'); that line is not in the evidence because telnet is dead during the hold and the line is not persisted. Behaviour proven, log line not captured. The choice (waiver on the line, a rerun where it becomes visible, or an AC rewrite) is open with Robert via the coordinator. Archive: RvdB/OTGW-field-data/bench-otgw32/20261119-task2923-394.
 <!-- SECTION:NOTES:END -->

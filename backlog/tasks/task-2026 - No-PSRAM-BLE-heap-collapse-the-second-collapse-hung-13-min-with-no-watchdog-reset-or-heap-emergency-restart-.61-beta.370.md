@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-18T13:06:00Z'
-updated_date: '2026-11-19T18:12:00Z'
+updated_date: '2026-11-19T18:30:00Z'
 labels:
   - heap
   - watchdog
@@ -29,7 +29,7 @@ Follow-up of TASK-2025, from otgw-bench-tester on .61 (no PSRAM, beta.370, 2026-
 <!-- AC:BEGIN -->
 - [x] #1 The hang is reproduced or explained from evidence (crash log, core dump, telnet trace up to the hang, emergency-recovery counters), not assumed
 - [x] #2 Named cause with file:line why neither the heap-emergency restart nor the TWDT reset the unit
-- [ ] #3 Fix or recorded decision; the same reproduction shows a self-recovery (red/green)
+- [x] #3 Fix or recorded decision; the same reproduction shows a self-recovery (red/green)
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -70,4 +70,6 @@ Correction (coordinator, 2026-11-19): 'MQTT OK' was the regression phase; during
 5e 2026-11-19 after beta.392: heaphold re-hold lane rebuilt on origin/dev 0e44fd11b from its code-only diff (handleDebug.ino heapHold block, tests/test_heaphold_hook.py), bumped; test_heaphold_hook 8/8 OK, evaluate --quick 89 pass 0 fail. Build waits for the coordinator slot (after ba TASK-2918).
 
 2026-11-19 otgw-dev (task moved from 5e by the coordinator): AC review. AC1 + AC2 ticked: explained from evidence, not assumed: 09's run 3 on .63 (381 counters: starved_dead 14, witness 0, reconnect 0, wifi_outages 7) shows no dead streak ever reached 8 because every re-association reset it (wifiLinkProbeOnReconnect, networkStuff.ino:910-915 at 381), reproduced red by tests/test_wifi_deadlink.py starved_flap and the counterfactual (streak reset removed -> recovers); the heap-emergency restart does not fire because getHeapHealth() looks at free heap only (helperStuff.ino:1174-1188) and the starved state sat at free 4.1-6.9 KB with maxblk < 4096, above the 3072 CRITICAL line most of the time. AC3 bench chain on .61 with the heap-hold hook (archives OTGW-field-data/bench-otgw32): RED 391+ebc0cf9 (14:13-14:43, 30 min held, no restart, bootcount unchanged, the supervisor did nothing for 24 min, recovery only at the hold release); RED 393 (20261119-task2026-393: Exception/panic in task wifi at 17:25:08 and 17:41:18 = the prerelease AP fallback, TASK-2923); GREEN 394+17c993a (20261119-task2923-394: two holds, take 18:10:26 -> clean restart 18:24:08 'WiFi: too many reconnect failures', take 18:25:17 -> clean restart 18:39:08 same reason; no panic; gateway answers ping again 18:40:16). Note on the mechanism: the 394 recovery goes through the release reconnect-failure path that TASK-2923's guard makes reachable while starved, not through option C's kept streak (its log line was never seen; telnet is dead during a hold). Reading, not verified: the 391 hang may have been the prerelease AP fallback taking over instead of the failure count. AC3 left for the bench-tester to tick (bench AC rule); Robert's 'A' (DM 1572927618628583465) covered shipping option C host-only in 392.
+
+2026-11-19 09 (otgw-bench-tester) ticks AC3 on bench evidence, same reproduction (heap hold on .61, MQTT off, no REST/25238 during the hold): RED 391+ebc0cf9 (14:13-14:43): 24 min associated without keys/IP (4-way loop), no supervisor restart, recovered only at the hold release; RED 393+4bb2097: 2x panic in task wifi about 10 s after the DHCP lease (17:25:08, 17:41:18). GREEN 394+17c993a: 2 of 2 holds end in a clean restart 'Software reset - WiFi: too many reconnect failures' (18:24:08, 18:39:08), no panic, coredump unchanged (sha256 fe085ba4...), bootcount 1075 -> 1076 -> 1077. Archives: RvdB/OTGW-field-data/bench-otgw32/20261119-task2026-391, 20261119-task2026-393, 20261119-task2923-394.
 <!-- SECTION:NOTES:END -->
