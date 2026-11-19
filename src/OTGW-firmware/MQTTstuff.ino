@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : MQTTstuff
-**  Version  : v2.0.0-poc.28
+**  Version  : v2.0.0-poc.29
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **      Modified version from (c) 2020 Willem Aandewiel
@@ -27,12 +27,12 @@
 // heap buffer first (~900 B worst case, trivial on the ESP32-S3). The old
 // 128-byte ESP8266-only chunker is gone.
 
-#define MQTTDebugTln(...) ({ if (state.debug.bMQTT) DebugTln(__VA_ARGS__);    })
-#define MQTTDebugln(...)  ({ if (state.debug.bMQTT) Debugln(__VA_ARGS__);    })
-#define MQTTDebugTf(...)  ({ if (state.debug.bMQTT) DebugTf(__VA_ARGS__);    })
-#define MQTTDebugf(...)   ({ if (state.debug.bMQTT) Debugf(__VA_ARGS__);    })
-#define MQTTDebugT(...)   ({ if (state.debug.bMQTT) DebugT(__VA_ARGS__);    })
-#define MQTTDebug(...)    ({ if (state.debug.bMQTT) Debug(__VA_ARGS__);    })
+#define MQTTDebugTln(...) DEBUG_GATED(bMQTT, DBGREC_MQTT, DebugTlnX, __VA_ARGS__)
+#define MQTTDebugln(...)  DEBUG_GATED(bMQTT, DBGREC_MQTT, DebuglnX, __VA_ARGS__)
+#define MQTTDebugTf(...)  DEBUG_GATED(bMQTT, DBGREC_MQTT, DebugTfX, __VA_ARGS__)
+#define MQTTDebugf(...)   DEBUG_GATED(bMQTT, DBGREC_MQTT, DebugfX, __VA_ARGS__)
+#define MQTTDebugT(...)   DEBUG_GATED(bMQTT, DBGREC_MQTT, DebugTX, __VA_ARGS__)
+#define MQTTDebug(...)    DEBUG_GATED(bMQTT, DBGREC_MQTT, DebugX, __VA_ARGS__)
 
 void doAutoConfigure();
 void setMQTTConfigPending(const uint8_t MSGid);

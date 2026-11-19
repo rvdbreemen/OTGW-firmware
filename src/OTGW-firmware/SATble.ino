@@ -30,10 +30,10 @@
 
 // --- Switchable debug-trace macros (telnet key '7' toggles state.debug.bSATBLE) ---
 // Init meldingen blijven ongewrapt zodat boot-time visibility behouden blijft.
-#define SATBLEDebugTln(s)        do { if (state.debug.bSATBLE) DebugTln(s); } while(0)
-#define SATBLEDebugTf(fmt, ...)  do { if (state.debug.bSATBLE) DebugTf(fmt, ##__VA_ARGS__); } while(0)
-#define SATBLEDebugln(s)         do { if (state.debug.bSATBLE) Debugln(s); } while(0)
-#define SATBLEDebugf(fmt, ...)   do { if (state.debug.bSATBLE) Debugf(fmt, ##__VA_ARGS__); } while(0)
+#define SATBLEDebugTln(s)        DEBUG_GATED(bSATBLE, DBGREC_SATBLE, DebugTlnX, s)
+#define SATBLEDebugTf(fmt, ...)  DEBUG_GATED(bSATBLE, DBGREC_SATBLE, DebugTfX, fmt, ##__VA_ARGS__)
+#define SATBLEDebugln(s)         DEBUG_GATED(bSATBLE, DBGREC_SATBLE, DebuglnX, s)
+#define SATBLEDebugf(fmt, ...)   DEBUG_GATED(bSATBLE, DBGREC_SATBLE, DebugfX, fmt, ##__VA_ARGS__)
 
 // --- BLE Sensor Constants ---
 // TASK-508: roster size moved to SATtypes.h (SAT_BLE_MAX_ROSTER = 8) so

@@ -1,7 +1,7 @@
 /* 
  ***************************************************************************  
  **  Program  : s0PulseCount
- **  Version  : v2.0.0-poc.28
+ **  Version  : v2.0.0-poc.29
  **
  **  Copyright (c) 2021-2024 Rob Roos / Robert van Breemen
  **     based on Framework ESP8266 from Willem Aandewiel
@@ -48,7 +48,7 @@
    pinMode(settings.s0.iPin, INPUT_PULLUP);         // Set interrupt pulse counting pin as input (Dig 3 / INT1)
    OTGWs0pulseCount=0;                                 // Make sure pulse count starts at zero
    attachInterrupt(digitalPinToInterrupt(settings.s0.iPin), IRQcounter, FALLING) ;
-   if (state.debug.bSensors) DebugTf(PSTR("*** S0PulseCounter initialized on GPIO[%d] )\r\n"), settings.s0.iPin) ;
+   DEBUG_GATED(bSensors, DBGREC_SENSORS, DebugTfX, PSTR("*** S0PulseCounter initialized on GPIO[%d] )\r\n"), settings.s0.iPin) ;
  } //end SETUP
 
  void sendS0Counters() 
@@ -68,8 +68,8 @@
 
    if (localPulseCount != 0) {
      OTGWs0powerkw = (float)3600000 / (float)settings.s0.iPulsekw / (float)localPulseDuration;
-     if (state.debug.bSensors) DebugTf(PSTR("*** S0PulseCount(%d) S0PulseCountTot(%d)\r\n"), OTGWs0pulseCount, OTGWs0pulseCountTot) ;
-     if (state.debug.bSensors) DebugTf(PSTR("*** S0LastPulsetime(%d) S0Pulsekw:(%4.3f) \r\n"), last_pulse_duration, OTGWs0powerkw) ;
+     DEBUG_GATED(bSensors, DBGREC_SENSORS, DebugTfX, PSTR("*** S0PulseCount(%d) S0PulseCountTot(%d)\r\n"), OTGWs0pulseCount, OTGWs0pulseCountTot) ;
+     DEBUG_GATED(bSensors, DBGREC_SENSORS, DebugTfX, PSTR("*** S0LastPulsetime(%d) S0Pulsekw:(%4.3f) \r\n"), last_pulse_duration, OTGWs0powerkw) ;
      OTGWs0lasttime = now ;
 #if HAS_REMOTE_TELEMETRY
      remoteTelemetryEvS0(localPulseCount, OTGWs0pulseCountTot, localPulseDuration);   // TASK-1473

@@ -31,27 +31,41 @@
 // standalone helper for PROGMEM format strings via vsnprintf_P into a
 // 320-byte stack buffer, then sent via debugTelnet.print().
 // Debug strings that exceed 319 chars are silently truncated -- acceptable.
-void _debugPrintf_P(PGM_P fmt, ...) {
+// TASK-2901 (Robert 2026-11-20, full mode "alleen opnemen"): telnet = false prints nothing on telnet; the line still
+// goes to the remote telemetry recorder. Every Debug macro without the X suffix passes true.
+static void _debugVPrintf(bool telnet, PGM_P fmt, va_list args) {
     char buf[320];   // TASK-1412.5: the SATTICK line (with fc/fage/rc/rage) is up to 284 chars in the worst case, 293 with rsrc (TASK-1590)
-    va_list args;
-    va_start(args, fmt);
 #if HAS_REMOTE_TELEMETRY
     va_list rec;
     va_copy(rec, args);
     int written = vsnprintf_P(buf, sizeof(buf), fmt, args);
-    va_end(args);
-    debugTelnet.print(buf);
+    if (telnet) debugTelnet.print(buf);
     // TASK-2901 PoC: the line as tokens (format address + binary arguments); the printed text is the fallback.
     remoteTelemetryPrintf(fmt, rec, buf, strlen(buf), written >= (int)sizeof(buf));
     va_end(rec);
 #else
     vsnprintf_P(buf, sizeof(buf), fmt, args);
-    va_end(args);
-    debugTelnet.print(buf);
+    if (telnet) debugTelnet.print(buf);
 #endif
 }
 
-void _debugBOL(const char *fn, int line)
+void _debugPrintf_P(PGM_P fmt, ...) {
+    va_list args;
+    va_start(args, fmt);
+    _debugVPrintf(true, fmt, args);
+    va_end(args);
+}
+
+void _debugPrintfX_P(bool telnet, PGM_P fmt, ...) {
+    va_list args;
+    va_start(args, fmt);
+    _debugVPrintf(telnet, fmt, args);
+    va_end(args);
+}
+
+void _debugBOL(const char *fn, int line) { _debugBOLX(fn, line, true); }
+
+void _debugBOLX(const char *fn, int line, bool telnet)
 {
    static char _bol[160];  // Increased size + static for stack reduction
 
@@ -132,7 +146,7 @@ void _debugBOL(const char *fn, int line)
        _bol[sizeof(_bol) - 1] = '\0';
    }
 
-   debugTelnet.print(_bol);
+   if (telnet) debugTelnet.print(_bol);
 #if HAS_REMOTE_TELEMETRY
    // TASK-2901 PoC: the prefix as the recorder sends it (time as printed, heap numbers, function, line).
    remoteTelemetryBol(fn, line, (int64_t)now_sec * 1000000LL + now.tv_usec, cachedHeap, cachedBlock);

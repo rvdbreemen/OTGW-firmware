@@ -91,6 +91,36 @@ struct DebugSection {          // state.debug — Runtime diagnostic output flag
                            Debugf(__VA_ARGS__);                \
                         })
 
+// TASK-2901 (Robert 2026-11-20, full mode "alleen opnemen"): the X sinks take `telnet` first. With telnet false the
+// line goes to the remote telemetry recorder only. DEBUG_GATED() is the gate of a debug category: the user's flag
+// decides what telnet shows; the line is formatted once, also when only the recorder wants it (DEBUG_REC).
+// Bits = the order of rtel::REMOTE_FLAGS (RemoteTelemetryPolicy.h) and of kDebugFlags (debugFlags.h).
+#define DBGREC_OTMSG     (1u << 0)
+#define DBGREC_RESTAPI   (1u << 1)
+#define DBGREC_MQTT      (1u << 2)
+#define DBGREC_SENSORS   (1u << 3)
+#define DBGREC_SAT       (1u << 4)
+#define DBGREC_OTDIRECT  (1u << 5)
+#define DBGREC_SATBLE    (1u << 6)
+#define DBGREC_SATTRACE  (1u << 7)
+#define DBGREC_MQTTGATE  (1u << 8)
+#define DBGREC_NTP       (1u << 9)
+#if HAS_REMOTE_TELEMETRY
+#define DEBUG_REC(bit)        remoteTelemetryRecords(bit)
+#define DebugX(t, ...)        ({ (t) ? remoteTelemetryTee.print(__VA_ARGS__) : remoteTelemetryRecOnly.print(__VA_ARGS__); })
+#define DebuglnX(t, ...)      ({ (t) ? remoteTelemetryTee.println(__VA_ARGS__) : remoteTelemetryRecOnly.println(__VA_ARGS__); })
+#else
+#define DEBUG_REC(bit)        false
+#define DebugX(t, ...)        Debug(__VA_ARGS__)
+#define DebuglnX(t, ...)      Debugln(__VA_ARGS__)
+#endif
+#define DebugfX(t, ...)       ({ _debugPrintfX_P((t), __VA_ARGS__); })
+#define DebugTX(t, ...)       ({ _debugBOLX(__FUNCTION__, __LINE__, (t)); DebugX((t), __VA_ARGS__); })
+#define DebugTlnX(t, ...)     ({ _debugBOLX(__FUNCTION__, __LINE__, (t)); DebuglnX((t), ##__VA_ARGS__); })
+#define DebugTfX(t, ...)      ({ _debugBOLX(__FUNCTION__, __LINE__, (t)); DebugfX((t), __VA_ARGS__); })
+#define DEBUG_GATED(member, bit, sink, ...) \
+  ({ const bool _dbgT = state.debug.member; if (_dbgT || DEBUG_REC(bit)) sink(_dbgT, ##__VA_ARGS__); })
+
 /*---- end macros ---------------------------------------------------------*/
 
 // Forward declarations. Implementations live in debugStuff.ino so that only
@@ -98,5 +128,7 @@ struct DebugSection {          // state.debug — Runtime diagnostic output flag
 // the multi-definition linker-error class when any future standalone .cpp
 // picks up this header.
 void _debugPrintf_P(PGM_P fmt, ...);
+void _debugPrintfX_P(bool telnet, PGM_P fmt, ...);
 void _debugBOL(const char *fn, int line);
+void _debugBOLX(const char *fn, int line, bool telnet);
 void enableDebugForPrerelease();

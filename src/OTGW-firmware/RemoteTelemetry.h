@@ -58,4 +58,14 @@ class RemoteTelemetryTee : public Print {
 };
 extern RemoteTelemetryTee remoteTelemetryTee;
 
+// TASK-2901 (Robert 2026-11-20, full mode "alleen opnemen"): the same line capture without the telnet write, for a
+// debug category the user has off but the recorder records (debugStuff.h DEBUG_GATED).
+class RemoteTelemetryRecOnly : public Print {
+ public:
+  size_t write(uint8_t c) override;
+  size_t write(const uint8_t *buf, size_t size) override;
+};
+extern RemoteTelemetryRecOnly remoteTelemetryRecOnly;
+bool remoteTelemetryRecords(uint16_t bit);   // the recorder captures now and its mode records this DBGREC_ category
+
 #endif

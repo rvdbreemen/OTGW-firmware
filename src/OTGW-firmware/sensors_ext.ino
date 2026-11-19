@@ -1,6 +1,6 @@
 /*
 **  Program  : output_ext.ino
-**  Version  : v2.0.0-poc.28
+**  Version  : v2.0.0-poc.29
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Contributed by Sjorsjuhmaniac
@@ -309,7 +309,7 @@ void initSensors() {
     DebugTf(PSTR("Dallas sensors: GPIO%d is used by the board, choose another pin; sensors not started\r\n"), settings.sensors.iPin);
     return;
   }
-  if (state.debug.bSensors)DebugTf(PSTR("init GPIO Temperature sensors on GPIO%d...\r\n"), settings.sensors.iPin);
+  DEBUG_GATED(bSensors, DBGREC_SENSORS, DebugTfX, PSTR("init GPIO Temperature sensors on GPIO%d...\r\n"), settings.sensors.iPin);
 
   oneWire.begin(settings.sensors.iPin);
 
@@ -327,7 +327,7 @@ void initSensors() {
     DebugTf(PSTR("***ERR More (%d) sensor devices found than allowed(%d) on the bus\r\n"), numberOfDevices, MAXDALLASDEVICES);
     numberOfDevices = MAXDALLASDEVICES ;  // limit to max number of devices
   }
-  if (state.debug.bSensors) DebugTf(PSTR("Sensors: Found %d device(s)\r\n"), numberOfDevices);
+  DEBUG_GATED(bSensors, DBGREC_SENSORS, DebugTfX, PSTR("Sensors: Found %d device(s)\r\n"), numberOfDevices);
    // Loop through each device, check if it is real temp sensor
 
   for (int i = 0; i < numberOfDevices; i++)
@@ -335,7 +335,7 @@ void initSensors() {
     // Search the wire for address
     if (sensors.getAddress(DallasrealDevice[i].addr, i))
     {
-    if (state.debug.bSensors) DebugTf(PSTR("Device address %u device(s)\r\n"), (unsigned int) DallasrealDevice[i].addr);
+    DEBUG_GATED(bSensors, DBGREC_SENSORS, DebugTfX, PSTR("Device address %u device(s)\r\n"), (unsigned int) DallasrealDevice[i].addr);
     DallasrealDevice[i].id = DallasrealDeviceCount ;
     DallasrealDevice[i].tempC = 0 ;
     DallasrealDevice[i].lasttime = 0 ;
@@ -366,13 +366,13 @@ void initSensors() {
 void configSensors() 
 {
 if (settings.mqtt.bEnable) {
-    if (state.debug.bSensors) DebugTf(PSTR("Sensor Device MQ configuration started \r\n"));
+    DEBUG_GATED(bSensors, DBGREC_SENSORS, DebugTfX, PSTR("Sensor Device MQ configuration started \r\n"));
 
     for (int i = 0; i < DallasrealDeviceCount ; i++) 
     {
       // Now configure the MQ interface, it will return immediatly when already configured
       const char * strDeviceAddress = getDallasAddress(DallasrealDevice[i].addr);
-      if (state.debug.bSensors) DebugTf(PSTR("Sensor Device MQ configuration for device no[%d] addr[%s] \r\n"), i, strDeviceAddress);
+      DEBUG_GATED(bSensors, DBGREC_SENSORS, DebugTfX, PSTR("Sensor Device MQ configuration for device no[%d] addr[%s] \r\n"), i, strDeviceAddress);
       sensorAutoConfigure(OTGWdallasdataid, false, strDeviceAddress) ;     // Configure sensor with the Dallas Deviceaddress
     }
     // after last sensor set the ConfigDone flag
@@ -443,7 +443,7 @@ static bool dallasReadingValid(float tempC, bool havePrev, float prevC)
       float tempC = sensors.getTempC(DallasrealDevice[i].addr);
       if (!dallasReadingValid(tempC, DallasrealDevice[i].lasttime != 0, DallasrealDevice[i].tempC)) {
         // Disconnected or read error (Finding #29), or the 85.0 power-on value (TASK-1824): keep the previous value
-        if (state.debug.bSensors) DebugTf(PSTR("Sensor [%s] no valid reading (%.1f), skipping\r\n"), strDeviceAddress, tempC);
+        DEBUG_GATED(bSensors, DBGREC_SENSORS, DebugTfX, PSTR("Sensor [%s] no valid reading (%.1f), skipping\r\n"), strDeviceAddress, tempC);
         continue;
       }
       DallasrealDevice[i].tempC = tempC;

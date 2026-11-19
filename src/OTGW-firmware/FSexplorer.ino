@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program : FSexplorer
-**  Version  : v2.0.0-poc.28
+**  Version  : v2.0.0-poc.29
 **
 **  Mostly stolen from https://www.arduinoforum.de/User-Fips
 **  For more information visit: https://fipsok.de
@@ -344,7 +344,7 @@ void apifirmwarefilelist() {
   // summary line is emitted at the end.
   const unsigned long startMs = millis();
   unsigned int entryCount = 0;
-  if (state.debug.bRestAPI) DebugTf(PSTR("API: apifirmwarefilelist()\r\n"));
+  DEBUG_GATED(bRestAPI, DBGREC_RESTAPI, DebugTfX, PSTR("API: apifirmwarefilelist()\r\n"));
 
   // Heap floor (mirrors processAPI's pre-check at restAPI.ino:2221). This
   // deprecated route is registered directly on the async server, so it bypasses
@@ -361,7 +361,7 @@ void apifirmwarefilelist() {
   File f;
 
   String dirpath = "/" + String(state.pic.sDeviceid);
-  if (state.debug.bRestAPI) DebugTf(PSTR("dirpath=%s\r\n"), dirpath.c_str());
+  DEBUG_GATED(bRestAPI, DBGREC_RESTAPI, DebugTfX, PSTR("dirpath=%s\r\n"), dirpath.c_str());
 
   // ADR-141 revert / TASK-885: streaming JsonEmit replaces the JsonDocument path.
   // Bounded array of hex entries emitted field-by-field directly into the per-
@@ -399,11 +399,11 @@ void apifirmwarefilelist() {
 
           GetVersion(hexfile.c_str(), fwversion, sizeof(fwversion));
 
-          if (state.debug.bRestAPI) DebugTf(PSTR("GetVersion(%s) returned [%s]\r\n"), hexfile.c_str(), fwversion);
+          DEBUG_GATED(bRestAPI, DBGREC_RESTAPI, DebugTfX, PSTR("GetVersion(%s) returned [%s]\r\n"), hexfile.c_str(), fwversion);
           if (fwversion[0] != '\0' && strcmp(fwversion, version) != 0) {
             strlcpy(version, fwversion, sizeof(version));
             if (f = LittleFS.open(verfile, "w")) {
-              if (state.debug.bRestAPI) DebugTf(PSTR("writing %s to %s\r\n"), version, verfile.c_str());
+              DEBUG_GATED(bRestAPI, DBGREC_RESTAPI, DebugTfX, PSTR("writing %s to %s\r\n"), version, verfile.c_str());
               f.print(version);
               f.print('\n');
               f.close();

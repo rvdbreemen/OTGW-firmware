@@ -92,8 +92,11 @@ class NothingTwice(unittest.TestCase):
 
     def test_capture_points_honour_the_mute(self):
         dev = text("RemoteTelemetryDevice.h")
-        self.assertRegex(dev, r"size_t RemoteTelemetryTee::write\(uint8_t c\) \{\s*debugTelnet\.write\(c\);\s*"
+        # the tee and the record-only print share one byte capture (TASK-2901 record-only)
+        self.assertRegex(dev, r"static void remoteTelemetryTeeByte\(uint8_t c\) \{\s*"
                               r"if \(remoteTelemetryActive && !remoteTelemetryMuted\(\)\)")
+        self.assertRegex(dev, r"size_t RemoteTelemetryTee::write\(uint8_t c\) \{\s*debugTelnet\.write\(c\);\s*"
+                              r"remoteTelemetryTeeByte\(c\);")
         self.assertRegex(dev, r"void remoteTelemetryBol\([^)]*\) \{\s*if \(!remoteTelemetryActive \|\| remoteTelemetryMuted\(\)\) return;")
         self.assertRegex(dev, r"void remoteTelemetryPrintf\([^)]*\) \{\s*if \(!remoteTelemetryActive \|\| remoteTelemetryMuted\(\)\) return;")
 

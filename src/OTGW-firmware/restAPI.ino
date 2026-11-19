@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-poc.28
+**  Version  : v2.0.0-poc.29
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -16,12 +16,12 @@
 #include <atomic>
 #endif
 
-#define RESTDebugTln(...) ({ if (state.debug.bRestAPI) DebugTln(__VA_ARGS__);    })
-#define RESTDebugln(...)  ({ if (state.debug.bRestAPI) Debugln(__VA_ARGS__);    })
-#define RESTDebugTf(...)  ({ if (state.debug.bRestAPI) DebugTf(__VA_ARGS__);    })
-#define RESTDebugf(...)   ({ if (state.debug.bRestAPI) Debugf(__VA_ARGS__);    })
-#define RESTDebugT(...)   ({ if (state.debug.bRestAPI) DebugT(__VA_ARGS__);    })
-#define RESTDebug(...)    ({ if (state.debug.bRestAPI) Debug(__VA_ARGS__);    })
+#define RESTDebugTln(...) DEBUG_GATED(bRestAPI, DBGREC_RESTAPI, DebugTlnX, __VA_ARGS__)
+#define RESTDebugln(...)  DEBUG_GATED(bRestAPI, DBGREC_RESTAPI, DebuglnX, __VA_ARGS__)
+#define RESTDebugTf(...)  DEBUG_GATED(bRestAPI, DBGREC_RESTAPI, DebugTfX, __VA_ARGS__)
+#define RESTDebugf(...)   DEBUG_GATED(bRestAPI, DBGREC_RESTAPI, DebugfX, __VA_ARGS__)
+#define RESTDebugT(...)   DEBUG_GATED(bRestAPI, DBGREC_RESTAPI, DebugTX, __VA_ARGS__)
+#define RESTDebug(...)    DEBUG_GATED(bRestAPI, DBGREC_RESTAPI, DebugX, __VA_ARGS__)
 
 // REST API debug: tracks last response status for the access-log line.
 // Set by sendApiError/sendApiOptions; defaults to 200 before each handler.

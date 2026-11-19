@@ -16,12 +16,12 @@
 */
 
 // Per-module conditional debug — toggle with key '5' in telnet debug menu
-#define SATDebugTf(fmt, ...)  do { if (state.debug.bSAT) DebugTf(fmt,  ##__VA_ARGS__); } while(0)
-#define SATDebugTln(s)        do { if (state.debug.bSAT) DebugTln(s);                  } while(0)
-#define SATDebugf(fmt, ...)   do { if (state.debug.bSAT) Debugf(fmt,   ##__VA_ARGS__); } while(0)
+#define SATDebugTf(fmt, ...)  DEBUG_GATED(bSAT, DBGREC_SAT, DebugTfX, fmt,  ##__VA_ARGS__)
+#define SATDebugTln(s)        DEBUG_GATED(bSAT, DBGREC_SAT, DebugTlnX, s)
+#define SATDebugf(fmt, ...)   DEBUG_GATED(bSAT, DBGREC_SAT, DebugfX, fmt,   ##__VA_ARGS__)
 // High-volume SAT trace (per pass, PID detail), key '8', default off (TASK-1521)
-#define SATTraceTf(fmt, ...)  do { if (state.debug.bSATTrace) DebugTf(fmt, ##__VA_ARGS__); } while(0)
-#define SATTraceTln(s)        do { if (state.debug.bSATTrace) DebugTln(s);                 } while(0)
+#define SATTraceTf(fmt, ...)  DEBUG_GATED(bSATTrace, DBGREC_SATTRACE, DebugTfX, fmt, ##__VA_ARGS__)
+#define SATTraceTln(s)        DEBUG_GATED(bSATTrace, DBGREC_SATTRACE, DebugTlnX, s)
 
 // --- Cycle Kind & Phase enums are in OTGW-firmware.h ---
 

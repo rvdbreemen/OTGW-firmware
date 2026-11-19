@@ -17,18 +17,18 @@
 */
 
 // Per-module conditional debug — toggle with key '5' in telnet debug menu
-#define SATDebugTf(fmt, ...)  do { if (state.debug.bSAT) DebugTf(fmt,  ##__VA_ARGS__); } while(0)
-#define SATDebugTln(s)        do { if (state.debug.bSAT) DebugTln(s);                  } while(0)
-#define SATDebugf(fmt, ...)   do { if (state.debug.bSAT) Debugf(fmt,   ##__VA_ARGS__); } while(0)
+#define SATDebugTf(fmt, ...)  DEBUG_GATED(bSAT, DBGREC_SAT, DebugTfX, fmt,  ##__VA_ARGS__)
+#define SATDebugTln(s)        DEBUG_GATED(bSAT, DBGREC_SAT, DebugTlnX, s)
+#define SATDebugf(fmt, ...)   DEBUG_GATED(bSAT, DBGREC_SAT, DebugfX, fmt,   ##__VA_ARGS__)
 // SATTICK lines: to telnet with SAT debug on (as before); with SAT debug off, only to the remote telemetry recorder while it
 // records (TASK-2905, PoC env only). Each argument is evaluated once on either path.
 #if !HAS_REMOTE_TELEMETRY
 #define remoteTelemetrySatTickf(fmt, ...)  do {} while (0)
 #endif
-#define SATTickTf(fmt, ...)   do { if (state.debug.bSAT) DebugTf(fmt, ##__VA_ARGS__); else remoteTelemetrySatTickf(fmt, ##__VA_ARGS__); } while(0)
+#define SATTickTf(fmt, ...)   DEBUG_GATED(bSAT, DBGREC_SAT, DebugTfX, fmt, ##__VA_ARGS__); else remoteTelemetrySatTickf(fmt, ##__VA_ARGS__)
 // High-volume SAT trace (per pass, PID detail), key '8', default off (TASK-1521)
-#define SATTraceTf(fmt, ...)  do { if (state.debug.bSATTrace) DebugTf(fmt, ##__VA_ARGS__); } while(0)
-#define SATTraceTln(s)        do { if (state.debug.bSATTrace) DebugTln(s);                 } while(0)
+#define SATTraceTf(fmt, ...)  DEBUG_GATED(bSATTrace, DBGREC_SATTRACE, DebugTfX, fmt, ##__VA_ARGS__)
+#define SATTraceTln(s)        DEBUG_GATED(bSATTrace, DBGREC_SATTRACE, DebugTlnX, s)
 
 // --- SAT test-observability narration (TASK-815) ---
 // Emits one plain-language line to BOTH sinks so Telnet and the Web UI live-log

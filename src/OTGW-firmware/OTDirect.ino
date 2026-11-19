@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTDirect.ino
-**  Version  : v2.0.0-poc.28
+**  Version  : v2.0.0-poc.29
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -25,9 +25,9 @@
 // ---------------------------------------------------------------------------
 // Per-module conditional debug — toggle with key '6' in telnet debug menu
 // ---------------------------------------------------------------------------
-#define OTDDebugTf(fmt, ...)  do { if (state.debug.bOTDirect) DebugTf(fmt,  ##__VA_ARGS__); } while(0)
-#define OTDDebugTln(s)        do { if (state.debug.bOTDirect) DebugTln(s);                  } while(0)
-#define OTDDebugf(fmt, ...)   do { if (state.debug.bOTDirect) Debugf(fmt,   ##__VA_ARGS__); } while(0)
+#define OTDDebugTf(fmt, ...)  DEBUG_GATED(bOTDirect, DBGREC_OTDIRECT, DebugTfX, fmt,  ##__VA_ARGS__)
+#define OTDDebugTln(s)        DEBUG_GATED(bOTDirect, DBGREC_OTDIRECT, DebugTlnX, s)
+#define OTDDebugf(fmt, ...)   DEBUG_GATED(bOTDirect, DBGREC_OTDIRECT, DebugfX, fmt,   ##__VA_ARGS__)
 
 // ---------------------------------------------------------------------------
 // OpenTherm interface instances — master talks to boiler, slave listens to thermostat

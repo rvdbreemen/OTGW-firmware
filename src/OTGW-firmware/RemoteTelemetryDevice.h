@@ -349,17 +349,33 @@ void remoteTelemetryTeeFlush() {
   platformMutexUnlock(remoteTelemetryLock);
 }
 
-size_t RemoteTelemetryTee::write(uint8_t c) {
-  debugTelnet.write(c);
+static void remoteTelemetryTeeByte(uint8_t c) {
   if (remoteTelemetryActive && !remoteTelemetryMuted()) {
     if (recTeeLen < sizeof(recTee)) recTee[recTeeLen++] = (char)c;
     if (c == '\n' || recTeeLen == sizeof(recTee)) remoteTelemetryTeeFlush();
   }
+}
+
+size_t RemoteTelemetryTee::write(uint8_t c) {
+  debugTelnet.write(c);
+  remoteTelemetryTeeByte(c);
   return 1;
 }
 
 size_t RemoteTelemetryTee::write(const uint8_t *buf, size_t size) {
   for (size_t i = 0; i < size; i++) write(buf[i]);
+  return size;
+}
+
+RemoteTelemetryRecOnly remoteTelemetryRecOnly;
+
+size_t RemoteTelemetryRecOnly::write(uint8_t c) {
+  remoteTelemetryTeeByte(c);
+  return 1;
+}
+
+size_t RemoteTelemetryRecOnly::write(const uint8_t *buf, size_t size) {
+  for (size_t i = 0; i < size; i++) remoteTelemetryTeeByte(buf[i]);
   return size;
 }
 
@@ -789,27 +805,19 @@ static void remoteTelemetryWriteJson(RemoteTelemetryTls &c, const char *method, 
 
 static const uint32_t REMOTE_TELEMETRY_REFRESH_MS = 15UL * 60UL * 1000UL;   // token refresh: picks up a changed mode
 static rtel::RemoteCfg remoteTelemetryRemote = {rtel::RM_DEFAULT, 0, 0};
-static uint16_t remoteTelemetryRemoteApplied = 0;        // the log flags the current mode switches on
-static uint16_t remoteTelemetryRemoteOwned = 0;          // the ones this code switched on (the user had them off)
+// TASK-2901 (Robert 2026-11-20, full mode "alleen opnemen"): the mode sets the categories the recorder records; it
+// never touches state.debug, so telnet shows only what the user switched on. Default = full = all ten.
+static volatile uint16_t remoteTelemetryRecMask = rtel::REMOTE_ALL;
+static uint16_t remoteTelemetryRemoteApplied = rtel::REMOTE_ALL;
 static uint32_t remoteTelemetryLastRefresh = 0;
 
-// Switches the log flags to what the mode asks at this moment. A flag the user had on stays on when the mode ends;
-// a flag this code switched on goes off again. Never a simulation switch (an entry with an onChange action).
+bool remoteTelemetryRecords(uint16_t bit) { return remoteTelemetryActive && (remoteTelemetryRecMask & bit); }
+
+// Sets the recorded categories to what the mode asks at this moment.
 static void remoteTelemetryApplyRemote() {
   uint16_t want = rtel::remoteEffective(remoteTelemetryRemote, (int64_t)time(nullptr));
   if (want == remoteTelemetryRemoteApplied) return;
-  for (int i = 0; i < rtel::REMOTE_FLAG_COUNT; i++) {
-    const DebugFlagDef *d = debugFlagByName(rtel::REMOTE_FLAGS[i]);
-    if (!d || d->onChange) continue;
-    bool &f = state.debug.*(d->member);
-    uint16_t bit = (uint16_t)(1u << i);
-    if (want & bit) {
-      if (!f) { f = true; remoteTelemetryRemoteOwned |= bit; }
-    } else if (remoteTelemetryRemoteOwned & bit) {
-      f = false;
-      remoteTelemetryRemoteOwned &= (uint16_t)~bit;
-    }
-  }
+  remoteTelemetryRecMask = want;
   remoteTelemetryRemoteApplied = want;
   remoteTelemetryEvMode(2, ((uint32_t)remoteTelemetryRemote.mode << 16) | want);   // TASK-1473: mode << 16 | log flags
   DebugTf(PSTR("telemetry: telemetry mode %u, log flags 0x%03x%s\r\n"), (unsigned)remoteTelemetryRemote.mode, (unsigned)want,

@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : networkStuff.ino
-**  Version  : v2.0.0-poc.28
+**  Version  : v2.0.0-poc.29
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -1426,7 +1426,7 @@ void loopNTP()
       time_t prevSync = NtpLastSync;
       bool nowValid = (now > EPOCH_2000_01_01) && (now < EPOCH_2038_01_19);
       NtpLastSync = nowValid ? now : 0;
-      if (state.debug.bNTP) DebugTf(PSTR("[NTP] NEEDSYNC: now=%lu (0x%08lX) valid=%s prevSync=%lu -> NtpLastSync=%lu\r\n"),
+      DEBUG_GATED(bNTP, DBGREC_NTP, DebugTfX, PSTR("[NTP] NEEDSYNC: now=%lu (0x%08lX) valid=%s prevSync=%lu -> NtpLastSync=%lu\r\n"),
               (unsigned long)now, (unsigned long)now,
               nowValid ? "Y" : "N",
               (unsigned long)prevSync, (unsigned long)NtpLastSync);
@@ -1446,7 +1446,7 @@ void loopNTP()
       bool aboveSync  = (now >= NtpLastSync);
       if (aboveEpoch && belowMax && aboveSync) {
         NtpLastSync = now;
-        if (state.debug.bNTP) DebugTf(PSTR("[NTP] SYNC candidate: now=%lu (0x%08lX) -> NtpLastSync updated\r\n"),
+        DEBUG_GATED(bNTP, DBGREC_NTP, DebugTfX, PSTR("[NTP] SYNC candidate: now=%lu (0x%08lX) -> NtpLastSync updated\r\n"),
                 (unsigned long)now, (unsigned long)now);
         TimeZone myTz = timezoneManager.createForZoneName(CSTR(settings.ntp.sTimezone));
         if (myTz.isError()) {
@@ -1455,7 +1455,7 @@ void loopNTP()
           myTz = timezoneManager.createForZoneName(CSTR(settings.ntp.sTimezone));
         } else {
           ZonedDateTime myTime = ZonedDateTime::forUnixSeconds64(now, myTz);
-          if (state.debug.bNTP) DebugTf(PSTR("[NTP] ZonedDateTime: %02d:%02d:%02d %02d-%02d-%04d isError=%s\r\n"),
+          DEBUG_GATED(bNTP, DBGREC_NTP, DebugTfX, PSTR("[NTP] ZonedDateTime: %02d:%02d:%02d %02d-%02d-%04d isError=%s\r\n"),
                   myTime.hour(), myTime.minute(), myTime.second(),
                   myTime.day(), myTime.month(), myTime.year(),
                   myTime.isError() ? "Y" : "N");
@@ -1467,7 +1467,7 @@ void loopNTP()
 #endif
             DebugTln(F("[NTP] Time synced!"));
           } else {
-            if (state.debug.bNTP) DebugTln(F("[NTP] ZonedDateTime error, staying in WAITFORSYNC"));
+            DEBUG_GATED(bNTP, DBGREC_NTP, DebugTlnX, F("[NTP] ZonedDateTime error, staying in WAITFORSYNC"));
           }
         }
       }
@@ -1475,7 +1475,7 @@ void loopNTP()
     }
     case TIME_SYNC:
       if ((now - NtpLastSync) > NTP_RESYNC_TIME) {
-        if (state.debug.bNTP) DebugTf(PSTR("[NTP] Resync needed: now=%lu NtpLastSync=%lu delta=%ld > %d\r\n"),
+        DEBUG_GATED(bNTP, DBGREC_NTP, DebugTfX, PSTR("[NTP] Resync needed: now=%lu NtpLastSync=%lu delta=%ld > %d\r\n"),
                 (unsigned long)now, (unsigned long)NtpLastSync,
                 (long)(now - NtpLastSync), NTP_RESYNC_TIME);
         NtpStatus = TIME_NEEDSYNC;

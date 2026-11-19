@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v2.0.0-poc.28
+**  Version  : v2.0.0-poc.29
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -44,12 +44,12 @@
 #include "PICreturnSensor.h"
 #include "picSettingValue.h"
 
-#define OTDebugTln(...) ({ if (state.debug.bOTmsg) DebugTln(__VA_ARGS__);    })
-#define OTDebugln(...)  ({ if (state.debug.bOTmsg) Debugln(__VA_ARGS__);    })
-#define OTDebugTf(...)  ({ if (state.debug.bOTmsg) DebugTf(__VA_ARGS__);    })
-#define OTDebugf(...)   ({ if (state.debug.bOTmsg) Debugf(__VA_ARGS__);    })
-#define OTDebugT(...)   ({ if (state.debug.bOTmsg) DebugT(__VA_ARGS__);    })
-#define OTDebug(...)    ({ if (state.debug.bOTmsg) Debug(__VA_ARGS__);    })
+#define OTDebugTln(...) DEBUG_GATED(bOTmsg, DBGREC_OTMSG, DebugTlnX, __VA_ARGS__)
+#define OTDebugln(...)  DEBUG_GATED(bOTmsg, DBGREC_OTMSG, DebuglnX, __VA_ARGS__)
+#define OTDebugTf(...)  DEBUG_GATED(bOTmsg, DBGREC_OTMSG, DebugTfX, __VA_ARGS__)
+#define OTDebugf(...)   DEBUG_GATED(bOTmsg, DBGREC_OTMSG, DebugfX, __VA_ARGS__)
+#define OTDebugT(...)   DEBUG_GATED(bOTmsg, DBGREC_OTMSG, DebugTX, __VA_ARGS__)
+#define OTDebug(...)    DEBUG_GATED(bOTmsg, DBGREC_OTMSG, DebugX, __VA_ARGS__)
 #define OTDebugFlush()  ({ if (state.debug.bOTmsg) DebugFlush();    })
 
 // Pin aliases — sourced from boards.h (included via OTGW-firmware.h)
@@ -2078,7 +2078,7 @@ static bool is_msgid_valid_for_master_topic_in_ps_summary(const OTlookup_t &look
 }
 
 // =====================[ MQTT throttle helpers ]==================
-#define CoreMQTTDebugTf(...) ({ if (state.debug.bMQTTGate) DebugTf(__VA_ARGS__); })
+#define CoreMQTTDebugTf(...) DEBUG_GATED(bMQTTGate, DBGREC_MQTTGATE, DebugTfX, __VA_ARGS__)
 
 static char mqttPublishSourceTag(byte masterslave)
 {
@@ -4301,11 +4301,17 @@ void checkCommandResponse(const char *buf, unsigned int len){
     return; //not a valid command response
   }
 
+#if HAS_REMOTE_TELEMETRY
+  remoteTelemetryMute(true);    // TASK-2901: telnet only, the EV_RESPONSE event records the response
+#endif
   OTDebugT(F("CmdQueue: Checking if command is in queue ["));
   for (unsigned int i = 0; i < len; i++) {
     OTDebug((char)buf[i]);
   }
   OTDebugf(PSTR("] (len=%d)\r\n"), len);
+#if HAS_REMOTE_TELEMETRY
+  remoteTelemetryMute(false);
+#endif
 
   char cmd[3]; memset( cmd, 0, sizeof(cmd));
   char value[16]; memset( value, 0, sizeof(value));   // room for the longest TP= echo, "108:255=255"
@@ -4593,11 +4599,17 @@ bool sendPICSerial(const char* buf, int len)
     memcpy(txbuf, buf, n);
     txbuf[n]   = '\r';
     txbuf[n+1] = '\n';
+#if HAS_REMOTE_TELEMETRY
+    remoteTelemetryMute(true);    // TASK-2901: telnet only, the EV_PIC_CMD event below records the command
+#endif
     OTDebugT(F("Sending to Serial ["));
     for (int i = 0; i < len; i++) {
       OTDebug((char)buf[i]);
     }
     OTDebug(F("] (")); OTDebug(len); OTDebug(F(")")); OTDebugln();
+#if HAS_REMOTE_TELEMETRY
+    remoteTelemetryMute(false);
+#endif
 
     if (diagRec.active) diagRec.recPicCommand(buf, (size_t)n);   // TASK-1665: the command as sent (ADR-213)
 
