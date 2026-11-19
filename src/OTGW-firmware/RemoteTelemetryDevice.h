@@ -668,6 +668,7 @@ static uint32_t remoteTelemetryFrameSeq = 0;
 
 // TASK-2901 (Robert 2026-11-19): a capture session starts with a marker in real time, and every local midnight (and
 // every session start) gets a date marker, so the decoder can cut exact day files that run 00:00:00-24:00:00.
+static volatile bool remoteTelemetrySnapshotPending = false;   // TASK-2901: set by the date marker, served by remoteTelemetryLoop()
 static int remoteTelemetryDateYday = -1, remoteTelemetryDateYear = -1;
 static void remoteTelemetryEvDateIfNew(bool force) {
   if (!remoteTelemetryActive) return;
@@ -686,6 +687,7 @@ static void remoteTelemetryEvDateIfNew(bool force) {
   e.u((uint64_t)mktime(&mid) * 1000ULL);
   e.textz(date);
   e.send(rtel::EV_DATE);
+  remoteTelemetrySnapshotPending = true;                   // a settings snapshot with every date marker
 }
 
 static void remoteTelemetryEvSession() {
@@ -1105,10 +1107,26 @@ static void remoteTelemetryUpdateActive() {
   } else if (!want && remoteTelemetryActive) {
     // TASK-2901 (Robert 2026-11-19: signal back that the recording is paused): the last item before capture stops
     static const char *const why[] = {"probe", "up", "upload backs off", "uid enrolled with another secret", "upload off"};
+    // Robert 2026-11-19: a pause empties the send queue (no stale backlog later); what it drops is counted (SEC_LOST),
+    // and one record stays: the pause marker itself, delivered once the collection point takes data again.
+    uint32_t dropped = 0;
+    if (platformMutexLock(remoteTelemetryLock, 200)) {
+      for (int i = 0; i < remoteTelemetrySlotCount; i++) {
+        if (remoteTelemetrySlots[i].busy) { remoteTelemetrySlots[i].busy = false; dropped++; }
+      }
+      remoteTelemetry.lostRecords += dropped;
+      platformMutexUnlock(remoteTelemetryLock);
+    }
     RemoteTelemetryEv e;
     e.b(1);
     e.textz(remoteTelemetryPauseWhy ? remoteTelemetryPauseWhy : why[remoteTelemetrySvc < 5 ? remoteTelemetrySvc : 4]);
     e.send(rtel::EV_PAUSE);
+    if (platformMutexLock(remoteTelemetryLock, 200)) {     // the pause marker closes into the (now empty) queue
+      remoteTelemetryCloseLocked(remoteTelemetryNowUs() / 1000);
+      platformMutexUnlock(remoteTelemetryLock);
+    }
+    DebugTf(PSTR("telemetry: capture paused (%s); send queue emptied, %u records dropped\r\n"),
+            remoteTelemetryPauseWhy ? remoteTelemetryPauseWhy : why[remoteTelemetrySvc < 5 ? remoteTelemetrySvc : 4], (unsigned)dropped);
     remoteTelemetryPauseWhy = nullptr;
     remoteTelemetryActive = false;
   }
@@ -1254,10 +1272,12 @@ static void remoteTelemetryBackoff(const __FlashStringHelper *why, bool maxWait)
   remoteTelemetryPause(true);
   const bool skipped = remoteTelemetryLastSkipped && !maxWait;   // poc.22: low local heap, not a server failure
   remoteTelemetryLastSkipped = false;
-  uint32_t wait = maxWait ? rtel::BACKOFF_MAX_MS
+  // while capture is paused (uid clash, a full send queue) the waits may grow to 60 min, else to 15 min (Robert)
+  const uint32_t cap = (maxWait || !remoteTelemetryActive) ? rtel::BACKOFF_PAUSE_MAX_MS : rtel::BACKOFF_MAX_MS;
+  uint32_t wait = maxWait ? rtel::backoffMs(remoteTelemetryBackoffStep, platformHardwareRandom(), cap)
                 : skipped ? REMOTE_TELEMETRY_SKIP_RETRY_MS
-                          : rtel::backoffMs(remoteTelemetryBackoffStep, platformHardwareRandom());
-  if (!maxWait && !skipped && remoteTelemetryBackoffStep < 255) remoteTelemetryBackoffStep++;
+                          : rtel::backoffMs(remoteTelemetryBackoffStep, platformHardwareRandom(), cap);
+  if (!skipped && remoteTelemetryBackoffStep < 255) remoteTelemetryBackoffStep++;
   remoteTelemetryNextProbe = millis() + wait;
   remoteTelemetrySvc = maxWait ? SVC_UID_TAKEN : SVC_BACKOFF;
   remoteTelemetryUpdateActive();
@@ -1281,18 +1301,60 @@ static void remoteTelemetryBlocked() {
   remoteTelemetryApplyRemote();
   remoteTelemetryPauseWhy = "blocked by the collection point";
   remoteTelemetryPause(true);
-  remoteTelemetryNextProbe = millis() + rtel::BACKOFF_MAX_MS;
-  remoteTelemetrySvc = SVC_UID_TAKEN;                     // the longest wait, no capture; local recording, if on, goes on
+  remoteTelemetryNextProbe = millis() + rtel::backoffMs(remoteTelemetryBackoffStep, platformHardwareRandom(),
+                                                       rtel::BACKOFF_PAUSE_MAX_MS);   // paused: up to 60 min, resumes once lifted
+  if (remoteTelemetryBackoffStep < 255) remoteTelemetryBackoffStep++;
+  remoteTelemetrySvc = SVC_UID_TAKEN;                     // no capture while blocked; local recording, if on, goes on
   remoteTelemetryUpdateActive();
   remoteTelemetryPauseWhy = nullptr;
-  DebugTf(PSTR("telemetry: %s is blocked by the collection point; paused, next attempt in %u min
-
-"), remoteTelemetryUid,
-          (unsigned)(rtel::BACKOFF_MAX_MS / 60000));
+  DebugTf(PSTR("telemetry: %s is blocked by the collection point; paused, next attempt in %u min\r\n"), remoteTelemetryUid,
+          (unsigned)((remoteTelemetryNextProbe - millis()) / 60000));
 }
 
 // From loop(): flash writes the telemetry task may not do itself (its stack is in PSRAM, poc.23).
+// TASK-2901 (Robert 2026-11-19): a full snapshot of the settings once a day (at local midnight) and at every session
+// start; a change between snapshots already goes out as it happens (remoteTelemetryEvSetting from settingStuff.ino).
+// Read on the loop task: the telemetry task has a PSRAM stack and must not touch the flash. Secrets are redacted as
+// for a change (diagRedactSetting). The snapshot sits between EV_SETTING "_snapshot"="begin" and "_snapshot"="end N".
+static void remoteTelemetrySettingsSnapshot() {
+  File f = LittleFS.open(SETTINGS_FILE, "r");
+  if (!f) return;
+  remoteTelemetryEvSetting("_snapshot", "begin");
+  char line[192], key[64], val[REMOTE_TELEMETRY_EV_TEXT_MAX + 1];
+  unsigned n = 0;
+  while (f.available()) {
+    size_t len = f.readBytesUntil('\n', line, sizeof(line) - 1);
+    line[len] = 0;
+    char *k = strchr(line, '"');                           // "key": value,
+    if (!k) continue;
+    char *ke = strchr(k + 1, '"');
+    if (!ke) continue;
+    char *colon = strchr(ke, ':');
+    if (!colon) continue;
+    size_t kl = (size_t)(ke - k - 1);
+    if (kl >= sizeof(key)) kl = sizeof(key) - 1;
+    memcpy(key, k + 1, kl); key[kl] = 0;
+    char *v = colon + 1;
+    while (*v == ' ') v++;
+    size_t vl = strlen(v);
+    while (vl && (v[vl - 1] == ',' || v[vl - 1] == '\r' || v[vl - 1] == ' ')) vl--;
+    if (vl >= 2 && v[0] == '"' && v[vl - 1] == '"') { v++; vl -= 2; }
+    if (vl >= sizeof(val)) vl = sizeof(val) - 1;
+    memcpy(val, v, vl); val[vl] = 0;
+    remoteTelemetryEvSetting(key, val);
+    n++;
+  }
+  f.close();
+  char end[16];
+  snprintf_P(end, sizeof(end), PSTR("end %u"), n);
+  remoteTelemetryEvSetting("_snapshot", end);
+}
+
 void remoteTelemetryLoop() {
+  if (remoteTelemetrySnapshotPending && remoteTelemetryActive) {
+    remoteTelemetrySnapshotPending = false;
+    remoteTelemetrySettingsSnapshot();
+  }
   if (!remoteTelemetryCfgWritePending) return;
   remoteTelemetryCfgWritePending = false;
   remoteTelemetryWriteConfig();

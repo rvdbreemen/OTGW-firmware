@@ -47,7 +47,7 @@ class Queue(unittest.TestCase):
     def test_skip_is_retried_soon_without_a_backoff_step(self):
         b = body("static void remoteTelemetryBackoff(")
         self.assertIn("REMOTE_TELEMETRY_SKIP_RETRY_MS", b)
-        self.assertRegex(b, r"if \(!maxWait && !skipped && remoteTelemetryBackoffStep < 255\)")
+        self.assertRegex(b, r"if \(!skipped && remoteTelemetryBackoffStep < 255\)")
         self.assertLessEqual(const("REMOTE_TELEMETRY_SKIP_RETRY_MS") or 10 ** 9, 60000)
 
     def test_task_stack_and_slot_table_in_psram(self):
@@ -73,7 +73,7 @@ class Queue(unittest.TestCase):
         self.assertNotIn("remoteTelemetryCfg.enabled = false", b)
         self.assertNotIn("remoteTelemetryCfgWritePending = true", b)
         self.assertNotIn("SVC_OFF", b)
-        self.assertIn("BACKOFF_MAX_MS", b)
+        self.assertIn("rtel::BACKOFF_PAUSE_MAX_MS", b)   # paused: spread, up to 60 min, resumes once the block is lifted
 
     def test_full_queue_pauses_capture_with_a_marker(self):
         """poc.24: when the backend stays unreachable the capture pauses (EV_PAUSE) instead of losing records."""

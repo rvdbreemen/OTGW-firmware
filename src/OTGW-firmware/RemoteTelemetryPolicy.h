@@ -18,16 +18,20 @@
 
 namespace rtel {
 
-static const uint32_t BACKOFF_FIRST_MS = 5UL * 60UL * 1000UL;
-static const uint32_t BACKOFF_MAX_MS   = 24UL * 60UL * 60UL * 1000UL;
-static const uint8_t  BACKOFF_STEPS    = 10;   // step 9 and later are capped at 24 h
+// TASK-2901 (Robert 2026-11-19): after a failed delivery the next attempt follows after about a minute, then the wait
+// doubles per failure up to 15 minutes while capture runs, and up to 60 minutes while capture is paused (blocked, uid
+// clash, send queue full). Each wait is spread at random over 50-100 % of its base ("equal jitter"), so gateways that
+// lost the collection point together come back spread out instead of all at once.
+static const uint32_t BACKOFF_FIRST_MS     = 60UL * 1000UL;
+static const uint32_t BACKOFF_MAX_MS       = 15UL * 60UL * 1000UL;   // while capturing
+static const uint32_t BACKOFF_PAUSE_MAX_MS = 60UL * 60UL * 1000UL;   // while paused
+static const uint8_t  BACKOFF_STEPS        = 6;    // 1, 2, 4, 8, 16, 32, 64 min before the cap
 
-// Wait before the next attempt after failure number step + 1. rnd is any 32-bit random value.
-inline uint32_t backoffMs(uint8_t step, uint32_t rnd) {
+// Wait before the next attempt after failure number step + 1, capped at capMs. rnd is any 32-bit random value.
+inline uint32_t backoffMs(uint8_t step, uint32_t rnd, uint32_t capMs = BACKOFF_MAX_MS) {
   uint64_t base = (uint64_t)BACKOFF_FIRST_MS << (step < BACKOFF_STEPS ? step : BACKOFF_STEPS);
-  if (base > BACKOFF_MAX_MS) base = BACKOFF_MAX_MS;
-  uint64_t wait = base + base * (rnd % 2001u) / 10000u;    // + 0 to 20.00 %
-  return wait > BACKOFF_MAX_MS ? BACKOFF_MAX_MS : (uint32_t)wait;
+  if (base > capMs) base = capMs;
+  return (uint32_t)(base / 2 + base / 2 * (rnd % 10001u) / 10000u);   // 50.00 to 100.00 % of base
 }
 
 enum Outcome : uint8_t {
