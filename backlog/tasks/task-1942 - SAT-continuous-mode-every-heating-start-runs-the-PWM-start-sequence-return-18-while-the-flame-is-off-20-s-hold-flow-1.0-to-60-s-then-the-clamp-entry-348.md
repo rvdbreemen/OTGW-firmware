@@ -8,7 +8,7 @@ status: In Review
 assignee:
   - '@claude'
 created_date: '2026-11-14T17:23:00Z'
-updated_date: '2026-11-19T01:06:00Z'
+updated_date: '2026-11-19T01:10:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -70,6 +70,8 @@ Bench 09 2026-11-16 on .63 (Classic + ESP32-S3 with PSRAM, PIC 6.8, no boiler, n
 2026-11-17 ADR 252 Accepted via adr-kit (strict gates passed; decision Robert van den Breemen 2026-11-16 23:03 in session, relayed by the coordinator; recorded by d3). tests/test_adr_governance.py 17 passed.
 
 Second read (otgw-bench-tester 09, 2026-11-19) of the field captures for AC5/AC7, independent of 92's script (own reader on the hour zips, data only; notes in 09 scratchpad t1942\second-read-1942.md). Both captures carry the TASK-1942 change (b95bc21ec before beta.360/361); SAT simulation off. marceld91d (beta.361, Remeha Calenta + Toon, PIC; 44 CH starts): pre-ignition CS = return + 18 within 0.5 C in 34, the others explained (45.0 maximum-setpoint clamp, re-lights inside the ON phase, one telnet gap); flame-off CS held to +16..18 s, CS = flow - 1.0 from +20.0..22.1 s; starts 9/10/11 came from continuous and show 'Control mode: PWM (heating start)' with mode PWM through +60 s. Open question (edge 3, 2026-11-17 10:11:35): a 0.4 s hand-back mid-burn ('no outside temperature younger than 1 h', then 'valid again', osrc O->W) resumed in CONTINUOUS with the flame on until the flame-out fail-safe at +48 s; entries 385/391 do not list a resume with the flame burning as a start. indigo_light (beta.360, Vitodens 100-W, no return; 28 CH starts, all PWM): CS = min(flow + 18, 55) resent every 2 s to +18 s, flow - 1.0 at +20.0 s (entry 149). Frame level (one start): MsgID 1 = 55.0 reaches the boiler only in the thermostat's MsgID-1 slots (~7 s apart), so the entry-45 flood is paced by the thermostat on a PIC board. thermo-nova clamp citation is heating_control.py:398 at 7beaaf5 (not :396). AC5/AC7 not ticked: field data, not the bench.
+
+2026-11-19 comms 92 summary of the second read above: comms 92's marceld and indigo claims hold. Citation fix: the thermo-nova flame-off clamp is heating_control.py:398 at 7beaaf5 (not :396). Frame-level note (indigo edge 2, one start only): on a PIC board the entry-45 2-s CS resend reaches the boiler only in the thermostat's MsgID-1 slots (MsgID 1 WRITE 55.0 at +7.8 and +14.7 s; gateway MsgID-25 reads at +4.2/+11.0/+12.0/+18.0 s), so the flood is paced by the thermostat (~7 s), not every 2 s. Also found: marceld edge 3 (17 Nov 10:11:35) mid-burn outside-temperature hand-back, filed as its own bug task; resume-with-flame question queued as Q-1942a. AC5/AC7 stay open (need a real-boiler bench).
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary

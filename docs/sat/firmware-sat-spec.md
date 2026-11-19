@@ -1695,6 +1695,8 @@ Interaction with the PWM minimum times: the minimum on-time (180 s gas) and the 
 3. After the delay: suppression CS = flow - `fModSupOffset` (the existing path, `heating_control.py:439-448`). The flood hands over at once: the first pass after the delay sends that CS once through `satSendCS()`, so the 5 s resend never repeats the last flood value, and the 3 s refresh gates on the live DHW bit (`SlaveStatus & 0x04`) instead of the stale `bDhwActive` (the control tick refreshes that one only, so it stayed set after a draw).
 4. `MI=500` goes to the PIC once per boot, PIC boards only (entry 141). For the missing return temperature only after `satNoReturnTemp()` has been true for 5 minutes without a break (our implementation choice); the manufacturer quirk (Ideal, Intergas, Nefit) keeps its immediate send, on PIC boards only. Never on OT-Direct (entry 141), no `MI=` reset when SAT turns off.
 
+Field observation (TASK-1942 second read, indigo_light beta.360, one start checked at frame level): on a PIC board the flood's `CS=` reaches the boiler only in the thermostat's MsgID-1 slots, because the PIC substitutes SAT's value when the thermostat writes MsgID 1 (MsgID 1 WRITE 55.0 to the boiler at +7.8 s and +14.7 s; the gateway's MsgID-25 reads at +4.2, +11.0, +12.0 and +18.0 s). So the 2 s cadence above is what SAT queues; what the boiler sees is paced by the thermostat, here about every 7 s.
+
 Evidence class: Sergeant D's design (entry 45 deviates from thermo-nova on purpose). No measurement shows the flood prevents a stalled ignition or that `MI=500` changes anything with a thermostat attached; physical light-off acceptance belongs to TASK-1412.12.
 
 #### 6. Maximum relative modulation (MM)
