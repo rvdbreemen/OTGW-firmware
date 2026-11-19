@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-18T13:06:00Z'
-updated_date: '2026-11-19T00:53:00Z'
+updated_date: '2026-11-19T00:57:00Z'
 labels:
   - heap
   - watchdog
@@ -46,4 +46,6 @@ Follow-up of TASK-2025, from otgw-bench-tester on .61 (no PSRAM, beta.370, 2026-
 2026-11-19 run 3 cause FOUND (09 on .63, 381 counters + device/info): starved_dead 14, witness 0, reconnect 0 = no dead streak ever reached 8; wifi_outages 7 / wifi_disconnect_events 8 (NOT_AUTHED) in ~30 min of hold. Every re-association resets the streak: wifiLinkProbeOnReconnect() sets wifiDeadProbes = 0 (networkStuff.ino:910-915), so with the AP dropping every ~4-5 min under the starved heap, 8 probes in a row (8 min) never happen. Red reproduction: tests/test_wifi_deadlink.py::test_starved_link_with_ap_drops_every_4_min_still_recovers (scenario starved_flap: starved + dead + an AP drop every 4 min for 40 min) -> 0 forced reconnects, no restart; marked expectedFailure until the chosen follow-up. Counterfactual: the same file with only that streak reset removed -> the scenario recovers (unexpected success) and the other 30 scenarios still pass. Separate known limit (coordinator's question): the probe is ICMP echo to the gateway via an lwIP raw pcb (platform_esp32.h:676-705): it proves link + lwIP, not a TCP/app round trip ('stack alive, app starved'). Options A/B/C with Robert (coordinator DM 2026-11-19); C = keep the streak across a reconnect while the heap is starved.
 
 2026-11-19 option C prepared as a local commit (NOT built; waits for Robert's A/B/C answer): wifiLinkProbeOnReconnect() keeps wifiDeadProbes across a re-association while platformMaxFreeBlock() < WIFI_STARVED_MAXBLOCK (networkStuff.ino). ADR-261 Proposed (amends ADR-258; number from the coordinator, 260 is ba's), with the choice as its open question; README entry, index, ADR-258 related link (the invented status-history line adr relate wrote into the Accepted ADR-258 was removed). Red/green: test_starved_link_with_ap_drops_every_4_min_still_recovers FAILS on the pre-C networkStuff.ino (1 failed, 30 passed) and passes on C; test_wifi_deadlink + test_heaphold_hook 36 passed; evaluate --quick 89/0; adr-lint strict FAIL 63 unchanged (ADR-261 advisory: its open question).
+
+2026-11-19 the supervisor counters (wifi_sv_* in device/info, branch lane-2026-ctr, b06eeff32, built once as 381+b06eeff for run 3) are PARKED: not part of the TASK-2026 push; re-apply on top of option C later if the bench needs them again. Option B (app-level progress, the 'stack alive, app starved' blind spot of the ICMP probe) is filed as TASK-2038 (2.1.0).
 <!-- SECTION:NOTES:END -->
