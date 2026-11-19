@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-16T16:35:00Z'
-updated_date: '2026-11-19T08:40:00Z'
+updated_date: '2026-11-19T10:55:00Z'
 labels:
   - sat
   - field
@@ -68,4 +68,6 @@ Citations verified at pin 7beaaf5 via raw.githubusercontent (coordinator, 2026-1
 2026-11-18 field data (comms 92, analyze-capture on indigo_light's beta.360 day run 20261117-092448, 09:25-23:00, Vitodens 100-W): 20 continuous<->PWM switches over the day (SATTICK mode changes), the beta.360 1.5 C / 30 s rule; room 20.75-21.05 C from 13:30 to 22:25 at target 21.0, never above 21.1 (no band stop needed). Baseline for the beta.361 rule (2 C / 60 s): compare with his 24 h run on a newer beta. Flow peaks of 55-62 C between runs are standing water (flame 0, CH 0; drops to ~33 C when the pump runs at 12:56). Posted to him with chart: #beta-testing 1572542421840171140.
 
 2026-11-19 field observation (comms 92; indigo_light 24 h capture on beta.360, 18/11 08:55 - 19/11 08:58, archived OTGW-field-data\indigo_light\2026-11-18_2.0.0-beta.360+9665467\24h-20261118-085549, analysis in its _analysis\; posted #beta-testing 1572893964686856193 / 1572893975646310401). Morning 05:00-08:43, target 20.5, outside 9.0-9.6 C: room mean 20.26, more than 0.1 below target in 91 % of ticks. Each of the three long off phases (06:21-06:42, 07:23-07:59 incl. a hot-water draw, 08:32-08:44) contains 'SAT PWM: cycle limit 3/hr reached, suppressing new cycle' (06:27:11, 07:34:11, 08:42:11) while the room was 0.16-0.35 C below target; the 3 cycles/hour limit is Sergeant D's rule (entries 31/52). Integral 0 in 90 % of the morning ticks (pre-beta.376 reset). The 77 PWM/continuous switches in 24 h are 31 'flow >= setpoint + 1.5 for 30 s' and 29 'request above flow for 60 s', repeating every 1.5-3 min inside single burns (the pre-361 rule this task changed). Description only, no claim about intended behaviour. Coordinator: no Sergeant D question about the cycle limit until indigo's beta.382 run (other switch rules + integral halving) shows whether it still happens.
+
+2026-11-19 (comms 92) cause of the 3 long morning off phases in indigo's beta.360 log, posted to Sergeant D (#beta-testing 1572928108846256240): the hourly start limit (3/hr) was filled by PWM re-entries inside burns. Each continuous->PWM switch with the flame burning logs 'PWM ON' and counts as a start (entry 59 counts PWM's own ON phases; entry 89: an ON at PWM entry with the burner burning counts but is never cut; SATcontrol.ino:1782-1806). 06:27 limit: starts 05:41:40, 05:48:40, 06:04:41 -> ON 06:41:41 (05:41:40 + 60 min). 07:34 limit: starts 06:41:41 + re-entries 06:47:11, 06:52:11, 06:58:41, 07:02:41, 07:07:41 -> ON 07:58:41 (06:58:41 + 60 min). 08:42 limit: 07:58:41 + 08:06:41, 08:12:41, 08:17:41; the start at 08:43:32 (duty 1.00) came right after the settings re-read raised the target to 21.0 while the window still held 4 starts: unexplained, open check (does the re-read reset the hourly start history?). The 2 C/60 s rule since beta.361 should cut the re-entries; verify on indigo's beta.382 run. Evidence: run _analysis\narr_morning.txt, narr_05.txt.
 <!-- SECTION:NOTES:END -->
