@@ -382,6 +382,8 @@ def dbg_decode(t0_ms, data, image, tz):
             out += data[i:i + n]; i += n
             continue
         dt, u = _unleb(data[i:]); i += u
+        if dt >= 1 << 63:      # TASK-2901: an item a few us before the previous one (two tasks at once) arrives as the
+            dt -= 1 << 64      # wrapped unsigned 64-bit difference; read it as the negative delta it is
         t_us += dt
         if kind == DBG_LINE_RAW:
             fn = image.read_cstr(DROM_BASE + int.from_bytes(data[i:i + 3], "little"))
