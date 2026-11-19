@@ -20,6 +20,7 @@ void cloudRecPrintf(const char *fmt, va_list ap, const char *printed, size_t pri
 void cloudRecOtFrame(char letter, uint32_t frame);                                       // processOT()
 void cloudRecTeeFlush();                                                                  // end of a tee line
 void cloudRecSetup();                                                                     // from setup()
+void cloudRecInstallTlsAllocator();   // first line of setup(): mbedTLS blocks above 4 KB to PSRAM (TASK-1963)
 void cloudRecSatTickf(const char *fmt, ...);   // a SATTICK line with SAT debug off: recorder only (TASK-1974)
 
 // TASK-1991: local recording into a ring of the same records (the /api/v2/diag/recording routes in this env).

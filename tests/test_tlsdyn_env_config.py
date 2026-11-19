@@ -1,9 +1,10 @@
-"""TASK-1963: the esp32-combo-tlsdyn env keeps mbedTLS on fixed record buffers allocated through malloc().
+"""TASK-1963: the esp32-combo-tlsdyn env builds on the stock Arduino libraries; mbedTLS gets a PSRAM allocator.
 
-poc.10 used dynamic mbedTLS buffers; on .63 freeing a dynamic RX buffer after the HTTP response hit a heap
-poisoning assert (core dump 2026-11-19). The env must not turn them back on, must route mbedTLS through
-malloc() (so blocks above 4 KB land in PSRAM) instead of internal-only or external-only RAM, and the link must
-not carry IDF's dynamic-buffer --wrap flags. The upload itself only starts on a board with PSRAM.
+poc.10 rebuilt the IDF libraries with dynamic mbedTLS buffers; on .63 freeing a dynamic RX buffer after the HTTP
+response hit a heap poisoning assert (core dump 2026-11-19). From poc.12 the env has no custom_sdkconfig (so no
+hybrid compile and no dynamic buffers), the link carries no --wrap flags, setup() installs the mbedTLS allocator
+as its first statement, the allocator puts only blocks above 4 KB in PSRAM with an internal fallback, and the
+cloud upload starts only on a board with PSRAM.
 """
 import configparser
 import re
@@ -11,31 +12,42 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+FILES = ["platformio.ini", "src/OTGW-firmware/OTGW-firmware.ino", "src/OTGW-firmware/CloudRecDevice.h"]
 
 
-def tlsdyn_sdkconfig(text):
+def env_section(text):
     cp = configparser.ConfigParser(interpolation=None, strict=False, inline_comment_prefixes=(";",))
     cp.read_string(text)
-    lines = cp["env:esp32-combo-tlsdyn"]["custom_sdkconfig"].split("\n")
-    return {k: v for k, v in (l.strip().split("=", 1) for l in lines if "=" in l)}
+    return cp["env:esp32-combo-tlsdyn"]
 
 
-def check(ini, script, device):
+def body(src, signature):
+    start = src.index(signature)
+    return src[start:src.index("\n}\n", start)]
+
+
+def check(ini, main_ino, device):
     errors = []
-    cfg = tlsdyn_sdkconfig(ini)
-    if cfg.get("CONFIG_MBEDTLS_DYNAMIC_BUFFER") == "y":
-        errors.append("CONFIG_MBEDTLS_DYNAMIC_BUFFER is on")
-    if cfg.get("CONFIG_MBEDTLS_DEFAULT_MEM_ALLOC") != "y":
-        errors.append("CONFIG_MBEDTLS_DEFAULT_MEM_ALLOC is not y")
-    if cfg.get("CONFIG_MBEDTLS_EXTERNAL_MEM_ALLOC") == "y":
-        errors.append("CONFIG_MBEDTLS_EXTERNAL_MEM_ALLOC breaks WiFi crypto on a board without PSRAM")
-    if cfg.get("CONFIG_ESP_TLS_CLIENT_SESSION_TICKETS") != "y":
-        errors.append("session tickets dropped")
-    if re.search(r"--wrap=", script):
-        errors.append("the tlsdyn script still adds --wrap link flags")
-    setup = device[device.index("void cloudRecSetup()"):]
-    setup = setup[:setup.index("\n}\n")]
-    if setup.find("platformHasPsram()") < 0 or setup.find("platformHasPsram()") > setup.find("cloudRecInitCore()"):
+    env = env_section(ini)
+    for key in ("custom_sdkconfig", "custom_component_remove"):
+        if key in env:
+            errors.append(f"{key} in the env starts the hybrid IDF rebuild")
+    if "--wrap" in "\n".join(env.values()) or re.search(r"tlsdyn_mbedtls_libs", env.get("extra_scripts", "")):
+        errors.append("the env still adds dynamic-buffer link wraps / the tlsdyn libs script")
+    setup = body(main_ino, "void setup() {")
+    first = [l.strip() for l in setup.splitlines()[1:] if l.strip() and not l.strip().startswith("//")]
+    if first[:2] != ["#if HAS_CLOUD_REC", "cloudRecInstallTlsAllocator();   // TASK-1963: before any mbedTLS user (WiFi crypto, esp-tls)"]:
+        errors.append("setup() does not install the mbedTLS allocator as its first statement")
+    if "mbedtls_platform_set_calloc_free(cloudRecTlsCalloc, cloudRecTlsFree)" not in device:
+        errors.append("cloudRecInstallTlsAllocator() does not install cloudRecTlsCalloc/cloudRecTlsFree")
+    else:
+        alloc = body(device, "static void *cloudRecTlsCalloc(")
+        if not re.search(r"total > CLOUDREC_TLS_PSRAM_MIN\)[\s\S]*MALLOC_CAP_SPIRAM[\s\S]*MALLOC_CAP_INTERNAL", alloc):
+            errors.append("the allocator lacks the >4 KB PSRAM branch with an internal fallback")
+        if "__builtin_mul_overflow" not in alloc:
+            errors.append("the allocator does not check n * size for overflow")
+    setup_rec = body(device, "void cloudRecSetup()")
+    if setup_rec.find("platformHasPsram()") < 0 or setup_rec.find("platformHasPsram()") > setup_rec.find("cloudRecInitCore()"):
         errors.append("cloudRecSetup() starts the upload without checking platformHasPsram() first")
     return errors
 
@@ -45,14 +57,12 @@ def read(p):
 
 
 def test_tlsdyn_env_config():
-    assert check(read("platformio.ini"), read("scripts/tlsdyn_mbedtls_libs.py"),
-                 read("src/OTGW-firmware/CloudRecDevice.h")) == []
+    assert check(*(read(f) for f in FILES)) == []
 
 
 if __name__ == "__main__":
-    # python tests/test_tlsdyn_env_config.py <ini> <script> <CloudRecDevice.h>: check other copies (red run).
-    files = sys.argv[1:] or ["platformio.ini", "scripts/tlsdyn_mbedtls_libs.py", "src/OTGW-firmware/CloudRecDevice.h"]
-    errs = check(*(Path(f).read_text(encoding="utf-8") if Path(f).is_absolute() or Path(f).exists() else read(f)
-                   for f in files))
+    # python tests/test_tlsdyn_env_config.py <platformio.ini> <OTGW-firmware.ino> <CloudRecDevice.h>: red runs.
+    args = sys.argv[1:] or FILES
+    errs = check(*(Path(f).read_text(encoding="utf-8") if Path(f).exists() else read(f) for f in args))
     print("\n".join(errs) or "OK")
     sys.exit(1 if errs else 0)

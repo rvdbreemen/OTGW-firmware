@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.ino
-**  Version  : v2.0.0-poc.11
+**  Version  : v2.0.0-poc.12
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -261,6 +261,9 @@ static void applyResolvedComboPins()
 
 //=====================================================================
 void setup() {
+#if HAS_CLOUD_REC
+  cloudRecInstallTlsAllocator();   // TASK-1963: before any mbedTLS user (WiFi crypto, esp-tls)
+#endif
   captureRebootReason();  // TASK-1447: before any path that can restart (config-portal timeout)
   captureWifiDeadRestarts();  // TASK-1450: same rule, the dead-link restart count
   captureWifiSkipPortal();    // TASK-1455: one-boot skip-portal mark of a WiFi supervisor restart

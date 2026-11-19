@@ -188,6 +188,12 @@ reinstall the normal Arduino ESP32 framework and SDK libraries before using that
   down pauses capture without a backoff step.
 - **Sizes against a normal esp32-combo build:** static RAM +22.0 KB (152,524 vs 130,524 B); app 98.9 % of the
   2240K slot (26 KB left; this env cannot use LTO).
+- **Since poc.12 (2026-11-19, TASK-1963): stock libraries, no hybrid compile.** poc.10's dynamic mbedTLS buffers
+  panicked on .63 when freeing the RX buffer after the HTTP response (heap poisoning assert; likely
+  espressif/esp-idf#14444). The env now links the stock Arduino libraries (esp-tls on mbedTLS, static 16 KB record
+  buffers, no session tickets), and `cloudRecInstallTlsAllocator()` (first line of `setup()`) routes mbedTLS
+  blocks above 4 KB to PSRAM through `mbedtls_platform_set_calloc_free()`. The upload only runs on a board with
+  PSRAM. The notes below describe poc.1 to poc.11.
 - **Fixed 2026-11-15 (TASK-1974): poc.1 to poc.4 did not contain the dynamic mbedTLS buffers.** The hybrid compile
   rebuilt mbedTLS with the env's settings but copied only top-level archives, so the firmware linked the prebuilt
   mbedTLS of the Arduino release (static 16 KB record buffers, no session tickets). `scripts/tlsdyn_mbedtls_libs.py`

@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-15T09:35:00Z'
-updated_date: '2026-11-19T05:34:00Z'
+updated_date: '2026-11-19T05:59:00Z'
 labels:
   - research
   - tls
@@ -109,4 +109,6 @@ Likely cause (not proven, single source): espressif/esp-idf#14444, dynamic mbedT
 Fix (poc.11): tlsdyn env drops CONFIG_MBEDTLS_DYNAMIC_BUFFER and its --wrap link flags; mbedTLS allocates through malloc (CONFIG_MBEDTLS_DEFAULT_MEM_ALLOC=y): with SPIRAM_USE_MALLOC and ALWAYSINTERNAL=4096 the ~16 KB record buffers land in PSRAM, small blocks stay internal. Not EXTERNAL_MEM_ALLOC: the WiFi supplicant uses mbedTLS crypto (CONFIG_ESP_WIFI_MBEDTLS_CRYPTO=y) and must keep working on a board without PSRAM. cloudRecSetup() refuses the cloud upload without PSRAM (Robert's rule). Gate: tests/test_tlsdyn_env_config.py, red on poc.10 (4 errors: dynamic buffer on, DEFAULT_MEM_ALLOC missing, --wrap flags, no PSRAM check) and green on the fix. Cloudrec suite: 3 test_cloudrec_policy failures are pre-existing (same 3 on HEAD without the change). evaluate.py --quick: 99 checks, 0 failed.
 
 Correction to the note above: add_rx_buffer sizes the RX buffer with tx_buffer_len() at esp_mbedtls_dynamic_impl.c:408, not :405.
+
+2026-11-19 approach change to poc.12 (Robert asked about proven stacks). Checked: ESPHome uses mbedTLS through ESP-IDF on ESP32 (esphome.io/components/mqtt, TLS 'Only on ESP32'); Tasmota uses its BearSSL tls_mini for espressif32 and espressif8266 (lib/lib_ssl/tls_mini/library.json), TLS 1.2 with few ciphers and 1-2 KB buffers via MFLN (tasmota.github.io/docs/TLS). Stock Arduino libs (D:/DevData/platformio, Dec 2025, no __wrap/dynamic symbols in libmbedtls_2.a) export mbedtls_platform_set_calloc_free (MBEDTLS_PLATFORM_MEMORY on, no fixed macro, esp_config.h:128-133), keep static IN/OUT 16384 (no ASYMMETRIC), TLS 1.3 off, no session tickets. Chosen: stock esp-tls + our allocator (blocks > 4 KB to PSRAM, else internal, heap_caps_free for all), installed as the first statement of setup(). Dropped: custom_sdkconfig, component removes, the tlsdyn libs script (git rm), the isolated PIO core in build.py. Not chosen: Tasmota tls_mini (extra vendored library, licence unchecked, TLS 1.2 only; no gain with PSRAM). Gate tests/test_tlsdyn_env_config.py rewritten: red on poc.10 (1929bd7, 6 errors) and poc.11 (b60648992, 5 errors), green on poc.12. evaluate --quick 99 checks 0 failed; cloudrec suite unchanged (3 pre-existing policy failures).
 <!-- SECTION:NOTES:END -->

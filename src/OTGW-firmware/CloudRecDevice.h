@@ -21,7 +21,8 @@
 **  every request gets 403 "otgw-blocked"; the gateway then writes enabled=0 to /cloudrec.cfg at once and makes
 **  no further connection: the opt-in is off until the user turns it on again.
 **
-**  Built only in the esp32-combo-tlsdyn env (HAS_CLOUD_REC), whose mbedTLS puts its record buffers in PSRAM.
+**  Built only in the esp32-combo-tlsdyn env (HAS_CLOUD_REC): the stock Arduino libraries (esp-tls on mbedTLS, as
+**  ESPHome uses it), with cloudRecInstallTlsAllocator() putting mbedTLS blocks above 4 KB in PSRAM.
 **  The cloud upload runs only on a board with PSRAM (Robert, 2026-11-18: no PSRAM, no TLS).
 **  A capture point waits at most 10 ms for the recorder; an item or record that is still lost is counted and
 **  reported in the next record (SEC_LOST, TASK-1972), so a gap in the data is never silent.
@@ -33,6 +34,8 @@
 
 #include <Stream.h>
 #include "esp_tls.h"
+#include "esp_heap_caps.h"
+#include "mbedtls/platform.h"
 #include "esp_app_desc.h"
 #include <sys/time.h>
 #include "CloudRecCodec.h"
@@ -47,12 +50,32 @@
 //   ISRG Root X2 69:72:9B:8E:15:A8:6E:FC:17:7A:57:AF:B7:17:1D:FC:64:AD:D2:8C:2F:CA:8C:F1:50:7E:34:45:3C:CB:14:70
 #include "CloudRecRoots.h"
 
-// TASK-1974: the upload connection, on ESP-IDF's esp-tls instead of CloudRecTls, because esp-tls can
-// resume a TLS session from a ticket (CONFIG_ESP_TLS_CLIENT_SESSION_TICKETS in the tlsdyn env): a resumed
-// handshake skips the certificate chain and the key exchange's heavy part. The ticket of the last good connection
-// is kept; a connect with it that fails is retried once with a full handshake. A Stream, so the HTTP code reads
-// and writes it as before.
+// TASK-1963: mbedTLS allocates through this pair from the first line of setup(), for every user (esp-tls here,
+// also the WiFi supplicant's crypto). A block above 4 KB (the two ~16 KB TLS record buffers) comes from PSRAM
+// when the board has it; everything else, and every block on a board without PSRAM, from internal RAM exactly
+// as the stock allocator (esp_mbedtls_mem_calloc, CONFIG_MBEDTLS_INTERNAL_MEM_ALLOC) does. heap_caps_free()
+// frees a block of any heap, so blocks allocated before the switch are freed correctly too.
+// Replaces poc.10's dynamic mbedTLS buffers, whose RX-buffer free panicked on .63 (core dump 2026-11-19).
+static const size_t CLOUDREC_TLS_PSRAM_MIN = 4096;
+static void *cloudRecTlsCalloc(size_t n, size_t size) {
+  size_t total;
+  if (__builtin_mul_overflow(n, size, &total)) return nullptr;
+  if (total > CLOUDREC_TLS_PSRAM_MIN) {
+    void *p = heap_caps_calloc(1, total, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    if (p) return p;
+  }
+  return heap_caps_calloc(1, total, MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+}
+static void cloudRecTlsFree(void *p) { heap_caps_free(p); }
+void cloudRecInstallTlsAllocator() { mbedtls_platform_set_calloc_free(cloudRecTlsCalloc, cloudRecTlsFree); }
+
+// TASK-1974: the upload connection, on ESP-IDF's esp-tls. With CONFIG_ESP_TLS_CLIENT_SESSION_TICKETS (not in
+// the stock Arduino libraries) it resumes a TLS session from the ticket of the last good connection; a connect
+// with it that fails is retried once with a full handshake. Without it every connection is a full handshake.
+// A Stream, so the HTTP code reads and writes it as before.
+#ifdef CONFIG_ESP_TLS_CLIENT_SESSION_TICKETS
 static esp_tls_client_session_t *cloudRecSession = nullptr;
+#endif
 static uint32_t cloudRecResumes = 0, cloudRecFullHandshakes = 0;
 
 class CloudRecTls : public Stream {
@@ -64,24 +87,34 @@ class CloudRecTls : public Stream {
       cfg.cacert_buf = (const unsigned char *)CLOUDREC_ROOTS;
       cfg.cacert_bytes = strlen(CLOUDREC_ROOTS) + 1;
       cfg.timeout_ms = 10000;
+#ifdef CONFIG_ESP_TLS_CLIENT_SESSION_TICKETS
       cfg.client_session = cloudRecSession;
+#endif
       t_ = esp_tls_init();
       if (!t_) return false;
       if (esp_tls_conn_new_sync(host, (int)strlen(host), port, &cfg, t_) == 1) {
-        if (cloudRecSession) cloudRecResumes++; else cloudRecFullHandshakes++;
+#ifdef CONFIG_ESP_TLS_CLIENT_SESSION_TICKETS
+        if (cloudRecSession) { cloudRecResumes++; return true; }
+#endif
+        cloudRecFullHandshakes++;
         return true;
       }
       esp_tls_conn_destroy(t_);
       t_ = nullptr;
+#ifdef CONFIG_ESP_TLS_CLIENT_SESSION_TICKETS
       if (!cloudRecSession) return false;
       esp_tls_free_client_session(cloudRecSession);   // the server would not resume: once more in full
       cloudRecSession = nullptr;
+#else
+      return false;
+#endif
     }
     return false;
   }
   // keep: the exchange went well, so this connection's ticket is the one to resume next time.
   void stop(bool keep = false) {
     if (!t_) return;
+#ifdef CONFIG_ESP_TLS_CLIENT_SESSION_TICKETS
     if (keep) {
       esp_tls_client_session_t *ns = esp_tls_get_client_session(t_);
       if (ns) {
@@ -89,6 +122,9 @@ class CloudRecTls : public Stream {
         cloudRecSession = ns;
       }
     }
+#else
+    (void)keep;
+#endif
     esp_tls_conn_destroy(t_);
     t_ = nullptr;
     rp_ = rn_ = 0;
