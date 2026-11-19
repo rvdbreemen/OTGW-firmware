@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.ino
-**  Version  : v2.0.0-poc.22
+**  Version  : v2.0.0-poc.23
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -1229,6 +1229,9 @@ void loop()
     if (DUE(timer3s))                 doTaskEvery3s();
     if (DUE(timer1s))                 doTaskEvery1s();
     handleCommandQueue();             // TASK-1571: PIC command queue, paced by the PIC's echo (not by a timer)
+#if HAS_REMOTE_TELEMETRY
+    remoteTelemetryLoop();            // TASK-2901 poc.23: flash writes the telemetry task (PSRAM stack) hands over
+#endif
     connProbe(CPROBE_TIMERS);         // TASK-1757 AC3
     if (DUE(timer500ms)) {
       // LED2 fast blink (2x/s) when WiFi is up but no OT traffic for >10s

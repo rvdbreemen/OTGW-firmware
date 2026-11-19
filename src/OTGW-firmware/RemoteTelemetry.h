@@ -19,6 +19,7 @@ void remoteTelemetryBol(const char *fn, int line, int64_t tUs, uint32_t heap, ui
 void remoteTelemetryPrintf(const char *fmt, va_list ap, const char *printed, size_t printedLen, bool truncated);   // _debugPrintf_P
 void remoteTelemetryOtFrame(char letter, uint32_t frame);                                       // processOT()
 void remoteTelemetryTeeFlush();                                                                  // end of a tee line
+void remoteTelemetryLoop();                                                                      // from loop(): deferred flash writes (TASK-2901 poc.23)
 void remoteTelemetrySetup();                                                                     // from setup()
 void remoteTelemetryInstallTlsAllocator();   // first line of setup(): mbedTLS blocks to PSRAM when the board has it (TASK-2901)
 void remoteTelemetrySatTickf(const char *fmt, ...);   // a SATTICK line with SAT debug off: recorder only (TASK-2905)

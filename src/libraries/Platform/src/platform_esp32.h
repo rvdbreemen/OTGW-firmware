@@ -1113,6 +1113,7 @@ inline bool platformSettingsNoopUnchanged(const void *data, size_t len) {
 #include <freertos/FreeRTOS.h>
 #include <freertos/semphr.h>
 #include <freertos/queue.h>
+#include <freertos/idf_additions.h>   // xTaskCreatePinnedToCoreWithCaps (platformTaskCreatePinnedPsramStack, TASK-2901)
 
 using PlatformMutex = SemaphoreHandle_t;
 using PlatformQueue = QueueHandle_t;
@@ -1253,6 +1254,26 @@ inline PlatformTask platformTaskCreatePinnedCore(void (*fn)(void *),
   TaskHandle_t h = nullptr;
   BaseType_t ok = xTaskCreatePinnedToCore(fn, name, stackBytes, arg,
                                           (UBaseType_t)priority, &h, (BaseType_t)core);
+  return (ok == pdPASS) ? h : nullptr;
+}
+
+// TASK-2901 poc.23 (Robert 2026-11-19: BLE and remote telemetry may run from PSRAM): the same as
+// platformTaskCreatePinned(), with the stack in PSRAM when the board has it (CONFIG_FREERTOS_TASK_CREATE_ALLOW_EXT_MEM
+// is on in the prebuilt libs); otherwise, or when that fails, an internal stack as before. A task with a PSRAM stack
+// must not write flash (NVS, LittleFS) itself: the cache is off during a flash write and its stack is unreachable.
+inline PlatformTask platformTaskCreatePinnedPsramStack(void (*fn)(void *),
+                                                       const char *name,
+                                                       uint32_t stackBytes,
+                                                       void *arg,
+                                                       unsigned int priority) {
+  TaskHandle_t h = nullptr;
+  if (psramFound() &&
+      xTaskCreatePinnedToCoreWithCaps(fn, name, stackBytes, arg, (UBaseType_t)priority, &h, APP_CPU_NUM,
+                                      MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT) == pdPASS) {
+    return h;
+  }
+  h = nullptr;
+  BaseType_t ok = xTaskCreatePinnedToCore(fn, name, stackBytes, arg, (UBaseType_t)priority, &h, APP_CPU_NUM);
   return (ok == pdPASS) ? h : nullptr;
 }
 

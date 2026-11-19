@@ -209,8 +209,12 @@ static RemoteTelemetryBufs *remoteTelemetryBufs = nullptr;
 // are one PSRAM block (~4 KB each, ~525 KB in all): a queue that holds about 20 min of records (one per ~11 s under
 // debug load) while the upload backs off, so a transient failure costs no data; it drains oldest first. Without PSRAM
 // only slot 0 exists, as before (TASK-2905 had one PSRAM slot).
+// poc.23: the slot table itself (128 x 32 B = 4 KB) lives in PSRAM too; until remoteTelemetryInitCore() and on a
+// board without PSRAM it is the single static remoteTelemetrySlot0.
 static const int REMOTE_TELEMETRY_SLOTS = 128;
-static rtel::Slot remoteTelemetrySlots[REMOTE_TELEMETRY_SLOTS] = {};
+static rtel::Slot remoteTelemetrySlot0 = {};
+static rtel::Slot *remoteTelemetrySlots = &remoteTelemetrySlot0;
+static int remoteTelemetrySlotCount = 1;
 static uint64_t remoteTelemetrySeqNext = 0;
 static PlatformMutex remoteTelemetryLock = nullptr;
 static volatile bool remoteTelemetryActive = false;
@@ -260,7 +264,7 @@ static void remoteTelemetryCloseLocked(int64_t reopenMs) {
   remoteTelemetry.lostItems += __atomic_exchange_n(&remoteTelemetryLostPending, 0u, __ATOMIC_RELAXED);
   if (remoteTelemetry.open && !remoteTelemetry.empty()) {
     uint64_t seq = remoteTelemetrySeqNext++;
-    rtel::Slot *f = rtel::slotFree(remoteTelemetrySlots, REMOTE_TELEMETRY_SLOTS);
+    rtel::Slot *f = rtel::slotFree(remoteTelemetrySlots, remoteTelemetrySlotCount);
     if (!f) {
       remoteTelemetryDroppedRecords++;                     // every slot still waits to be sent: this record is lost,
       remoteTelemetry.lostRecords++;                       // and the next record says so
@@ -1009,14 +1013,24 @@ static bool remoteTelemetryInitCore() {
   }
   if (!remoteTelemetryLock) {
     remoteTelemetryLock = platformMutexCreate();
-    // TASK-2901 poc.22: the PSRAM queue, one block for slots 1..N-1 (nullptr without PSRAM: slot 0 only)
+    // TASK-2901 poc.22/23: the PSRAM queue (one block for slots 1..N-1) and its slot table, both in PSRAM; without
+    // PSRAM slot 0 only. Before the task starts, so nothing else touches the table while it is swapped.
     uint8_t *q = (uint8_t *)platformPsramAllocOnce((size_t)(REMOTE_TELEMETRY_SLOTS - 1) * rtel::REC_MAX_BYTES);
-    for (int i = 1; q && i < REMOTE_TELEMETRY_SLOTS; i++) remoteTelemetrySlots[i].buf = q + (size_t)(i - 1) * rtel::REC_MAX_BYTES;
+    rtel::Slot *t = q ? (rtel::Slot *)platformPsramAllocOnce(sizeof(rtel::Slot) * REMOTE_TELEMETRY_SLOTS) : nullptr;
+    if (t) {
+      memset(t, 0, sizeof(rtel::Slot) * REMOTE_TELEMETRY_SLOTS);
+      t[0] = remoteTelemetrySlot0;
+      for (int i = 1; i < REMOTE_TELEMETRY_SLOTS; i++) t[i].buf = q + (size_t)(i - 1) * rtel::REC_MAX_BYTES;
+      remoteTelemetrySlots = t;
+      remoteTelemetrySlotCount = REMOTE_TELEMETRY_SLOTS;
+    }
     remoteTelemetry.begin(remoteTelemetryNowUs() / 1000);
     remoteTelemetryIdentity();
   }
   if (!remoteTelemetryTaskStarted) {
-    remoteTelemetryTaskStarted = platformTaskCreatePinned(remoteTelemetryTask, "telemetry", REMOTE_TELEMETRY_TASK_STACK, nullptr, 1);
+    // poc.23: the 10 KB stack in PSRAM (Robert 2026-11-19). The task writes no flash itself: the one config write
+    // (blocked by the collection point) is handed to remoteTelemetryLoop() on the loop task.
+    remoteTelemetryTaskStarted = platformTaskCreatePinnedPsramStack(remoteTelemetryTask, "telemetry", REMOTE_TELEMETRY_TASK_STACK, nullptr, 1);
     if (!remoteTelemetryTaskStarted) DebugTln(F("telemetry: task create failed"));
   }
   return remoteTelemetryLock && remoteTelemetryTaskStarted;
@@ -1026,7 +1040,7 @@ static bool remoteTelemetryInitCore() {
 // TASK-2901 poc.22: with the PSRAM queue it also runs before the first login and while the upload backs off, so a
 // transient failure or a skipped attempt costs no data; a full queue still counts its losses (SEC_LOST in the next record).
 static void remoteTelemetryUpdateActive() {
-  const bool queued = remoteTelemetrySlots[1].buf && (remoteTelemetrySvc == SVC_PROBE || remoteTelemetrySvc == SVC_BACKOFF);
+  const bool queued = remoteTelemetrySlotCount > 1 && (remoteTelemetrySvc == SVC_PROBE || remoteTelemetrySvc == SVC_BACKOFF);
   bool want = (remoteTelemetryLocalOn || remoteTelemetrySvc == SVC_UP || queued) && time(nullptr) >= 1700000000;
   if (want && !remoteTelemetryActive) {
     if (platformMutexLock(remoteTelemetryLock, 200)) {
@@ -1164,7 +1178,7 @@ static void remoteTelemetryPause(bool keep) {
     if (keep || remoteTelemetryLocalOn) {
       remoteTelemetryCloseLocked(remoteTelemetryNowUs() / 1000);
     } else {
-      for (auto &q : remoteTelemetrySlots) q.busy = false;
+      for (int i = 0; i < remoteTelemetrySlotCount; i++) remoteTelemetrySlots[i].busy = false;
       remoteTelemetry.begin(remoteTelemetryNowUs() / 1000);
     }
     platformMutexUnlock(remoteTelemetryLock);
@@ -1193,6 +1207,7 @@ static void remoteTelemetryBackoff(const __FlashStringHelper *why, bool maxWait)
           remoteTelemetryActive ? "capture goes on (queued)" : "capture paused", (unsigned)(wait / 1000));
 }
 
+static volatile bool remoteTelemetryCfgWritePending = false;
 static void remoteTelemetryWriteConfig() {
   File f = LittleFS.open("/telemetry.cfg", "w");
   if (!f) return;
@@ -1207,8 +1222,15 @@ static void remoteTelemetryBlocked() {                   // the maintainer block
   remoteTelemetrySvc = SVC_OFF;                           // no further connection; local recording, if on, goes on
   remoteTelemetryUpdateActive();
   remoteTelemetryCfg.enabled = false;
-  remoteTelemetryWriteConfig();
+  remoteTelemetryCfgWritePending = true;                 // poc.23: written by remoteTelemetryLoop() (this task has a PSRAM stack)
   DebugTf(PSTR("telemetry: %s is blocked by the collection point; telemetry opt-in turned off\r\n"), remoteTelemetryUid);
+}
+
+// From loop(): flash writes the telemetry task may not do itself (its stack is in PSRAM, poc.23).
+void remoteTelemetryLoop() {
+  if (!remoteTelemetryCfgWritePending) return;
+  remoteTelemetryCfgWritePending = false;
+  remoteTelemetryWriteConfig();
 }
 
 static void remoteTelemetryTask(void *) {
@@ -1225,7 +1247,7 @@ static void remoteTelemetryTask(void *) {
       }
     }
     // Every closed record: first the local ring, then the collection point.
-    rtel::Slot *q = rtel::slotOldest(remoteTelemetrySlots, REMOTE_TELEMETRY_SLOTS);
+    rtel::Slot *q = rtel::slotOldest(remoteTelemetrySlots, remoteTelemetrySlotCount);
     if (q) {
       if (remoteTelemetryLocalOn && !q->stored) { remoteTelemetryStoreLocal(*q); q->stored = true; }
       if (remoteTelemetrySvc == SVC_UP && isNetworkUp()) {
@@ -1324,6 +1346,6 @@ void remoteTelemetrySetup() {
   remoteTelemetrySvc = SVC_PROBE;                          // the upload starts after the first login says it may
   remoteTelemetryNextProbe = millis();
   DebugTf(PSTR("telemetry: on, %s:%u as %s, %d send slot(s), heap %u, block %u\r\n"), remoteTelemetryCfg.host,
-          (unsigned)remoteTelemetryCfg.port, remoteTelemetryUid, remoteTelemetrySlots[1].buf ? REMOTE_TELEMETRY_SLOTS : 1, (unsigned)platformFreeHeap(),
+          (unsigned)remoteTelemetryCfg.port, remoteTelemetryUid, remoteTelemetrySlotCount, (unsigned)platformFreeHeap(),
           (unsigned)platformMaxFreeBlock());
 }

@@ -8,6 +8,7 @@ block. poc.22: the guard is 12 KB / 4 KB, a skip is retried in 30 s without a ba
 holds the records meanwhile, and capture goes on before the first login and while the upload backs off.
 
 Structural check on RemoteTelemetryDevice.h (the behaviour is proven on the bench, AC #6). Red on 047d0803d (poc.21).
+poc.23: the task stack and the slot table in PSRAM, and no flash write from the task; red on 0c588f91e (poc.22).
 Run: python tests/test_remote_telemetry_queue.py
 """
 import re
@@ -33,20 +34,37 @@ class Queue(unittest.TestCase):
         n = const("REMOTE_TELEMETRY_SLOTS")
         self.assertIsNotNone(n, "no REMOTE_TELEMETRY_SLOTS: the send queue is still 2 slots")
         self.assertGreaterEqual(n, 64)
-        self.assertIn("rtel::slotFree(remoteTelemetrySlots, REMOTE_TELEMETRY_SLOTS)", SRC)
-        self.assertIn("rtel::slotOldest(remoteTelemetrySlots, REMOTE_TELEMETRY_SLOTS)", SRC)
+        self.assertIn("rtel::slotFree(remoteTelemetrySlots, remoteTelemetrySlotCount)", SRC)
+        self.assertIn("rtel::slotOldest(remoteTelemetrySlots, remoteTelemetrySlotCount)", SRC)
 
     def test_capture_goes_on_while_backing_off(self):
         b = body("static void remoteTelemetryUpdateActive()")
         want = b[:b.index("if (want")]
         self.assertIn("SVC_BACKOFF", want, "capture pauses while the upload backs off: records are lost")
-        self.assertIn("remoteTelemetrySlots[1].buf", want, "capture during backoff must depend on the PSRAM queue")
+        self.assertIn("remoteTelemetrySlotCount > 1", want, "capture during backoff must depend on the PSRAM queue")
 
     def test_skip_is_retried_soon_without_a_backoff_step(self):
         b = body("static void remoteTelemetryBackoff(")
         self.assertIn("REMOTE_TELEMETRY_SKIP_RETRY_MS", b)
         self.assertRegex(b, r"if \(!maxWait && !skipped && remoteTelemetryBackoffStep < 255\)")
         self.assertLessEqual(const("REMOTE_TELEMETRY_SKIP_RETRY_MS") or 10 ** 9, 60000)
+
+    def test_task_stack_and_slot_table_in_psram(self):
+        """poc.23 (Robert 2026-11-19: BLE and remote telemetry may run from PSRAM)."""
+        init = body("static bool remoteTelemetryInitCore()")
+        self.assertIn("platformTaskCreatePinnedPsramStack(remoteTelemetryTask", init)
+        self.assertIn("platformPsramAllocOnce(sizeof(rtel::Slot) * REMOTE_TELEMETRY_SLOTS)", init)
+        self.assertNotRegex(SRC, r"static rtel::Slot remoteTelemetrySlots\[")
+
+    def test_task_writes_no_flash(self):
+        """A PSRAM-stack task must not write flash: the config write goes to remoteTelemetryLoop()."""
+        task = body("static void remoteTelemetryTask(void *)")
+        blocked = body("static void remoteTelemetryBlocked()")
+        for b in (task, blocked):
+            self.assertNotIn("remoteTelemetryWriteConfig()", b)
+            self.assertNotIn("LittleFS.open", b)
+            self.assertNotIn("Preferences", b)
+        self.assertIn("remoteTelemetryWriteConfig();", body("void remoteTelemetryLoop()"))
 
     def test_guard_limits(self):
         self.assertEqual(const("REMOTE_TELEMETRY_MIN_FREE"), 12288)
