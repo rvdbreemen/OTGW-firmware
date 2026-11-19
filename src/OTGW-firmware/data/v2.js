@@ -1020,7 +1020,7 @@
           "title": "S0 Pulse Counter"
         },
         "sat": {
-          "desc": "Standalone Adaptive Thermostat.",
+          "desc": "Smart Autotune Thermostat.",
           "title": "SAT — Smart Thermostat"
         },
         "sensors": {
@@ -4147,7 +4147,7 @@
     { id: 's0',       title: 'S0 Pulse Counter',       icon: '⚡', reboot: false, desc: 'Energy pulse counting.' },
     { id: 'webhook',  title: 'Webhook',                icon: '🪝', reboot: false, desc: 'HTTP callbacks on OT state.' },
     { id: 'behavior', title: 'Behavior',               icon: '🔧', reboot: false, desc: 'LED, theme and restart behaviour.' },
-    { id: 'sat',      title: 'SAT — Smart Thermostat', icon: '🧠', reboot: false, desc: 'Standalone Adaptive Thermostat.' }
+    { id: 'sat',      title: 'SAT — Smart Thermostat', icon: '🧠', reboot: false, desc: 'Smart Autotune Thermostat.' }
   ];
   // lowercase REST key -> { cat, sub?, label, hint?, help? }. Reboot is per-category.
   // hint = short unit line under the label. help = optional longer text that wins over

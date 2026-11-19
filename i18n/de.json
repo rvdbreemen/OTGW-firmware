@@ -899,7 +899,7 @@
         "title": "S0-Impulszähler"
       },
       "sat": {
-        "desc": "Standalone Adaptive Thermostat.",
+        "desc": "Smart Autotune Thermostat.",
         "title": "SAT — Smart Thermostat"
       },
       "sensors": {

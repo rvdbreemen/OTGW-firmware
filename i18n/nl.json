@@ -899,7 +899,7 @@
         "title": "S0-pulsteller"
       },
       "sat": {
-        "desc": "Standalone Adaptive Thermostat.",
+        "desc": "Smart Autotune Thermostat.",
         "title": "SAT — slimme thermostaat"
       },
       "sensors": {

@@ -899,7 +899,7 @@
         "title": "Μετρητής παλμών S0"
       },
       "sat": {
-        "desc": "Αυτόνομος προσαρμοστικός θερμοστάτης.",
+        "desc": "Smart Autotune Thermostat.",
         "title": "SAT — Έξυπνος θερμοστάτης"
       },
       "sensors": {
