@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-15T09:35:00Z'
-updated_date: '2026-11-19T09:52:00Z'
+updated_date: '2026-11-19T10:48:00Z'
 labels:
   - research
   - tls
@@ -134,4 +134,6 @@ AC #6 prep (2026-11-19): replay input cut from the gruijter field capture (OTGW-
 2026-11-19 (session 0d/cloud): tests/test_remote_telemetry_identity_secret.py only compiled with MSVC, so it skipped on Linux and in CI. Added a g++/clang++ fallback. Linux container: green on HEAD (poc.18, not skipped), red on poc.13 (1313798eb, renamed): same 0, puts 2. The 3 test_remote_telemetry_policy failures noted as pre-existing do not occur on Linux (policy OK here), so they are Windows-host specific. evaluate --quick 100 %.
 
 2026-11-19 10:5x: research pushed 0395ea128..e4fb77fb2 (fast-forward, coordinator GO, Robert's standing push go): poc.18, based on dev 1a3422e3e. poc.18 build 10:39-10:45 OK (98.3 %, PoC limit 99 %). PENDING: the full test suite on this head (runs after d3's 388 build); so far only targeted suites ran (118 + 7 passed, evaluate 103/0).
+
+2026-11-19 full suite on research e4fb77fb2 (poc.18): scripts/run_tests.py -j 2, 350 of 351 files before d3's 389 BUILD START: all PASS except tests/test_remote_telemetry_policy.py (the 3 failures that already failed before the dev merges: test_real_reply, test_variants, test_queue; TypeError NoneType not iterable, not investigated yet). Remaining tests/test_refresh_storm.py run alone: run 1 red (3 failures, 533 s), the same file on clean origin/dev 24679e271 green (188 s), run 2 on research green (37 passed, 2 skipped, 215 s): the known load flake (TASK-2041), not a research regression.
 <!-- SECTION:NOTES:END -->
