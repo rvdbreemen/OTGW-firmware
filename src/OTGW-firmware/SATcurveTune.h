@@ -7,12 +7,26 @@
 #pragma once
 #include <stdint.h>
 
-#define SAT_CT_WINDOW_DAYS      3      // counted days the decision looks at (entries 172, 175)
-#define SAT_CT_MIN_CLEAN_HOURS  6      // clean hours a day needs to count (entry 164)
-#define SAT_CT_HOURS_PER_DAY    24
+// TASK-1889 (ADR-260, entries 329 and 367, Q-1889a option A by directive): the tune reacts in hours, not days. A tuner
+// "day" is now a decision block of ONE hour that counts when its hour counts; the window holds the last 12 counted blocks
+// (12 counted hours), every counted hour with a full window is a decision, a change empties the window, and the step is
+// 0.05. The identifiers keep the word "day" for the decision block so the reviewed window code of ADR-228 stays as it is.
+// The #ifndef guards let tests/test_sat_curve_selftune.py compile this same code with the pre-ADR-260 timing (24 h days,
+// 3-day window, 0.1) so its day-based scenarios keep covering the unchanged window logic; the firmware never defines them.
+#ifndef SAT_CT_WINDOW_DAYS
+#define SAT_CT_WINDOW_DAYS      12     // counted decision blocks (= counted hours) the decision looks at (ADR-260)
+#endif
+#ifndef SAT_CT_MIN_CLEAN_HOURS
+#define SAT_CT_MIN_CLEAN_HOURS  1      // counted hours a decision block needs to count (ADR-260; was 6 per 24 h day, entry 164)
+#endif
+#ifndef SAT_CT_HOURS_PER_DAY
+#define SAT_CT_HOURS_PER_DAY    1      // tuner hours per decision block (ADR-260; was 24)
+#endif
 #define SAT_CT_SUN_MAX_DEG      12.0f  // clean hours need the sun below this (entry 161)
 #define SAT_CT_BAND_C           1.0f   // decision threshold, symmetric (entry 165)
-#define SAT_CT_STEP             0.1f   // fixed step (entry 165)
+#ifndef SAT_CT_STEP
+#define SAT_CT_STEP             0.05f  // fixed step (ADR-260; was 0.1, entry 165)
+#endif
 #define SAT_CT_COEFF_MIN        0.1f   // coefficient setting range (settingStuff.ino, ADR-198)
 #define SAT_CT_COEFF_MAX        5.0f
 #define SAT_CT_DEFAULT_MIN_MOD  5.0f   // minimum modulation when MsgID 15 was never seen (entry 174)
@@ -36,7 +50,9 @@
 // entries 313 and 315, Q-1796a B and Q-1796a2 B: 1 hour). The warm-up phase has no such minimum (entry 313 names floating).
 #define SAT_CT_FLOAT_MIN_MS     3600000UL
 #define SAT_CT_PHASE_SPLIT      1      // marks the phase-split tuner (the host test sets SatTuneTickIn.error only with it)
-#define SAT_CT_FILE_VERSION     2      // window file format: 2 = per-phase sums (ADR-228); files without "v":2 are dropped
+#ifndef SAT_CT_FILE_VERSION
+#define SAT_CT_FILE_VERSION     3      // window file format: 3 = one-hour blocks (ADR-260); files without "v":3 are dropped
+#endif
 // An hour with a lost room temperature (signal 0, curve only) is not counted: reason no_room (Sergeant D entry 225,
 // Q-1525a A, TASK-1559).
 
@@ -116,9 +132,7 @@ struct SatTune {
 // TASK-1881: what REST and MQTT show of the tuner, copied by satCurveTuneGetProgress() on the loop task into state.sat.
 struct SatTuneProgress {
   bool     running;           // the tuner clock runs (self-tune on and SAT enabled)
-  uint8_t  days;              // counted days in the window
-  uint8_t  cleanToday;        // clean hours of the current day
-  uint8_t  hoursToday;        // closed hours of the current day
+  uint8_t  days;              // counted decision blocks (= counted hours, ADR-260) in the window: REST/MQTT window_hours
   bool     haveLast;          // a day has closed since the tuner started
   uint32_t lastDay;
   int8_t   lastDecision;      // +1 raise, -1 lower, 0 hold

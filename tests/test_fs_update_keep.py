@@ -88,7 +88,7 @@ EXPECTED_KEEP = {
     "/sat_energy.json": 64,
     "/sat_energy_estimate.json": 48,
     "/sat/sat_hcr.json": 1280,
-    "/sat_tune.json": 384,
+    "/sat_tune.json": 1024,   # TASK-1889 (ADR-260): SAT_CT_FILE_BUF, 12 one-hour blocks
     "/dallas_labels.ini": 2048,
     "/sat_markers.json": 2560,
     "/reboot_count.txt": 16,

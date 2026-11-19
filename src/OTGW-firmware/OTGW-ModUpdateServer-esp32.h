@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTGW-ModUpdateServer-esp32.h
-**  Version  : v2.0.0-beta.378
+**  Version  : v2.0.0-beta.379
 **
 **  ESP32 OTA update server — functional equivalent of the ESP8266
 **  OTGW-ModUpdateServer with Nodoshop hardware watchdog feeding.
@@ -931,14 +931,14 @@ private:
     {"/sat_energy.json",           64},    // satSaveEnergyState() buf[64]
     {"/sat_energy_estimate.json",  48},    // satSaveEstimatedEnergy() buf[48]
     {"/sat/sat_hcr.json",        1280},    // HCR_DAYS (<= 30) medians + at most 96 samples, about 7 B each
-    {"/sat_tune.json",            384},    // SAT_CT_FILE_BUF
+    {"/sat_tune.json",           1024},    // SAT_CT_FILE_BUF (ADR-260: 12 one-hour blocks)
     {"/dallas_labels.ini", 2048},   // the user's Dallas sensor names
     {"/sat_markers.json",  2560},   // at most 20 heating-curve markers of at most 110 B
     {"/reboot_count.txt",    16},   // one decimal number
     {"/reboot_log.txt",    4780},   // REBOOT_LOG_FILE_MAX: 20 lines of at most 239 B (TASK-1931, asserted below)
   };
   static constexpr size_t   KEEP_COUNT        = sizeof(KEEP_LIST) / sizeof(KEEP_LIST[0]);
-  // TASK-1931: all copies together. The maxima add up to 11532 B; each copy is only made while the largest free
+  // TASK-1931: all copies together. The maxima add up to 12172 B; each copy is only made while the largest free
   // block stays KEEP_HEAP_RESERVE above it, so the higher total costs heap only when the files are that large.
   static constexpr size_t   KEEP_TOTAL_MAX    = 12288;
   // A lambda, not a member function: the class is still incomplete here, so a member could not be evaluated.

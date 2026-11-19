@@ -4606,25 +4606,16 @@ components:
             running:
               type: boolean
               description: "The self-tune clock runs (self-tune on and SAT enabled)"
-            days:
+            window_hours:
               type: integer
-              description: "Counted days in the window"
-            days_needed:
+              description: "Counted hours in the self-tune window (ADR-260; replaces days, days_needed, clean_hours_today, clean_hours_needed and hours_today)"
+            window_hours_needed:
               type: integer
-              description: "Counted days a decision needs (3)"
-            clean_hours_today:
-              type: integer
-              description: "Clean hours of the current day"
-            clean_hours_needed:
-              type: integer
-              description: "Clean hours a day needs to count (6)"
-            hours_today:
-              type: integer
-              description: "Closed hours of the current day (0-23)"
+              description: "Counted hours a decision needs (12)"
             last_decision:
               type: string
               enum: [raise, lower, hold, none]
-              description: "Last daily decision; none before the first day closes"
+              description: "Last hourly decision; none before the first hour closes"
             last_reason:
               type: string
               description: "Reason of the last daily record (few_days, day_not_counted, no_phases, inside_band, phases_disagree, phases_agree, at_limit; none before the first day)"
@@ -4900,11 +4891,8 @@ components:
         curve_self_tune: true
         curve_tune:
           running: true
-          days: 2
-          days_needed: 3
-          clean_hours_today: 4
-          clean_hours_needed: 6
-          hours_today: 9
+          window_hours: 5
+          window_hours_needed: 12
           last_decision: hold
           last_reason: few_days
           excluded_hours: { not_sat: 0, dhw: 3, no_sun: 0, sun: 11, pwm: 0, flame_off: 0, min_mod: 0, coeff_changed: 0, no_ticks: 0, not_controlling: 0, few_ticks: 0, no_room: 1, diag_event: 0 }

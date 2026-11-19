@@ -4950,11 +4950,9 @@ void satSendStatusJSON()
       const SatTuneProgress& tp = snap->st.sat.tuneProgress;
       je.beginObject(F("curve_tune"));
       je.field(F("running"),           tp.running);
-      je.field(F("days"),              (uint32_t)tp.days);
-      je.field(F("days_needed"),       (uint32_t)SAT_CT_WINDOW_DAYS);
-      je.field(F("clean_hours_today"), (uint32_t)tp.cleanToday);
-      je.field(F("clean_hours_needed"), (uint32_t)SAT_CT_MIN_CLEAN_HOURS);
-      je.field(F("hours_today"),       (uint32_t)tp.hoursToday);
+      // TASK-1889 (ADR-260): the window counts hours; the old days/days_needed/clean_hours_* /hours_today fields are gone
+      je.field(F("window_hours"),        (uint32_t)tp.days);
+      je.field(F("window_hours_needed"), (uint32_t)SAT_CT_WINDOW_DAYS);
       je.field(F("last_decision"),     !tp.haveLast ? "none" : (tp.lastDecision > 0 ? "raise" : (tp.lastDecision < 0 ? "lower" : "hold")));
       je.field(F("last_reason"),       (const char*)tp.lastReason);
       je.beginObject(F("excluded_hours"));
@@ -5534,13 +5532,13 @@ void satPublishMQTT()
   // self-tune is on; the values change once an hour at most. No discovery entity (MQTT.md, SAT diagnostics without one).
   if (settings.sat.bCurveSelfTune) {
     static SATShadowB s_ct_running;
-    static SATShadowI s_ct_days, s_ct_clean_today;
+    static SATShadowI s_ct_window_hours;
     static SATShadowS s_ct_last_decision, s_ct_last_reason;
     static SATShadowI s_ct_excl[SATT_COUNT];
     const SatTuneProgress& tp = state.sat.tuneProgress;
     publishIfChangedB(F("sat/curve_tune/running"),           tp.running,                s_ct_running,      false);
-    publishIfChangedI(F("sat/curve_tune/days"),              (int32_t)tp.days,          s_ct_days,         false);
-    publishIfChangedI(F("sat/curve_tune/clean_hours_today"), (int32_t)tp.cleanToday,    s_ct_clean_today,  false);
+    // TASK-1889 (ADR-260): counted hours in the window; replaces sat/curve_tune/days and .../clean_hours_today
+    publishIfChangedI(F("sat/curve_tune/window_hours"),      (int32_t)tp.days,          s_ct_window_hours, false);
     publishIfChangedS(F("sat/curve_tune/last_decision"),
                       !tp.haveLast ? "none" : (tp.lastDecision > 0 ? "raise" : (tp.lastDecision < 0 ? "lower" : "hold")),
                       s_ct_last_decision, false);
@@ -6645,8 +6643,9 @@ static void satUpdateSimulation()
 // than what the PID adds on top of the curve. pidRaw is before the PWM override as well, because PWM acts on the
 // control setpoint (finalSetpoint) later in the tick.
 //
-// Clock: an hour is a block of 3600 s on millis() (the tuner's own clock, not the wall clock); a day is 24 consecutive
-// tuner hours. The clock starts when the tuner starts (boot, switch on, SAT enabled); the window lives in RAM only.
+// Clock: an hour is a block of 3600 s on millis() (the tuner's own clock, not the wall clock); a "day" is a decision block
+// of SAT_CT_HOURS_PER_DAY tuner hours, one hour since ADR-260 (TASK-1889), so the decision below runs after every hour.
+// The clock starts when the tuner starts (boot, switch on, SAT enabled); the window is kept in /sat_tune.json.
 
 // --- satCurveTune begin (pure: no settings, no state, no Arduino calls; tests/test_sat_curve_selftune.py compiles it as it is)
 // Constants and types of the tuner: SATcurveTune.h (included from SATtypes.h, ahead of the Arduino prototypes).
@@ -6907,12 +6906,13 @@ static void satTuneCloseDay(SatTune& t, float coeff, uint32_t tickMs, SatTuneDay
 }
 
 // Window file /sat_tune.json (item 4 of the TASK-1525 review, Sergeant D log entry 183): the counted days of the window and the
-// coefficient they belong to, written once a day at the daily decision. Hand-written JSON, version 2 (ADR-228):
-//   {"v":2,"coeff":2.10,"n":1,"c0":24,"s0":36.000,"w0":48,"x0":72.000,"f0":48,"y0":72.000}
-// per day i: c = clean hours, s = sum of their hour means, w/x = warm-up ticks/signal sum, f/y = floating ticks/signal sum.
-// A version-1 file (no "v", sums of both phases mixed) cannot be split and is dropped on restore.
+// coefficient they belong to, written when a counted hour entered the window or a change emptied it. Hand-written JSON,
+// version 3 (ADR-260; same fields as version 2 of ADR-228, each block is now one hour):
+//   {"v":3,"coeff":2.10,"n":1,"c0":1,"s0":1.500,"w0":100,"x0":150.000,"f0":10,"y0":15.000}
+// per block i: c = counted hours (1), s = sum of their hour means, w/x = warm-up ticks/signal sum, f/y = floating ticks/sum.
+// A version-1 or version-2 file (mixed-phase sums, or 24-hour days) is dropped on restore.
 // The partial counters of the current day are not kept: at the daily decision they are zero.
-#define SAT_CT_FILE_BUF 384   // 3 days at the widest values fit with room to spare (host test: round trip at the limits)
+#define SAT_CT_FILE_BUF 1024  // 12 one-hour blocks at the widest values fit with room to spare (ADR-260; host test: round trip at the limits)
 static void satTuneFormat(const SatTune& t, float coeff, char* out, size_t n)
 {
   int pos = snprintf_P(out, n, PSTR("{\"v\":%u,\"coeff\":%.2f,\"n\":%u"), (unsigned)SAT_CT_FILE_VERSION, (double)coeff, (unsigned)t.winDays);
@@ -7035,7 +7035,7 @@ static void satTuneSaveWindow()
 {
   if (settings.sat.bSimulation) return;
   if (_sat_tune.winDays == 0) { satTuneFileRemove(); return; }
-  char buf[SAT_CT_FILE_BUF];
+  static char buf[SAT_CT_FILE_BUF];   // ADR-260: 1 KB, off the loop task stack (loop task only, not re-entered)
   satTuneFormat(_sat_tune, settings.sat.fHeatingCurveCoeff, buf, sizeof(buf));
   satTuneFileWrite(buf);
 }
@@ -7044,7 +7044,7 @@ static void satTuneSaveWindow()
 // current coefficient; otherwise the file is stale and goes.
 static void satTuneRestoreWindow()
 {
-  char buf[SAT_CT_FILE_BUF];
+  static char buf[SAT_CT_FILE_BUF];   // ADR-260: 1 KB, off the loop task stack (loop task only, not re-entered)
   if (!satTuneFileRead(buf, sizeof(buf))) return;
   const uint8_t days = satTuneParse(buf, _sat_tune, settings.sat.fHeatingCurveCoeff);
   SATDebugTf(PSTR("SATTUNER restored=%u coeff=%.2f\r\n"), (unsigned)days, (double)settings.sat.fHeatingCurveCoeff);
@@ -7144,7 +7144,9 @@ static void satTuneRollHour()
   satTuneCloseDay(_sat_tune, oldCoeff, intervalMs, d);
   satTuneLogDay(d);
   _sat_tune.haveLast = true; _sat_tune.lastDay = d.day; _sat_tune.lastDecision = d.decision; _sat_tune.lastReason = d.reason;   // TASK-1881
-  if (d.decision == 0) { satTuneSaveWindow(); return; }
+  // TASK-1889 (ADR-260): a decision block is one hour, so this runs hourly; write the file only when the window changed
+  // (a counted hour entered it), not on every hour.
+  if (d.decision == 0) { if (d.counted) satTuneSaveWindow(); return; }
   satTuneApplyCoeff(d.newCoeff);   // the one settings.ini write: only here, only on a change
   satTuneSaveWindow();
   char o[8], n[8];   // the coefficient is 0.1..5.0 (SAT_CT_COEFF_MIN/MAX): "5.00" at most; 7 keeps the narration line in its buffer
@@ -7152,7 +7154,7 @@ static void satTuneRollHour()
   satTuneCoeffStr(n, sizeof(n), settings.sat.fHeatingCurveCoeff);
   SATDebugTf(PSTR("SATTUNE old=%s new=%s mean3=%.2f wmean3=%.2f fmean3=%.2f\r\n"), o, n, (double)d.mean3,
              (double)d.phMean3[SATP_WARMUP], (double)d.phMean3[SATP_FLOATING]);
-  satNarratef_P(PSTR("Heating curve self-tune: coefficient %s -> %s (3-day warm-up %+.2f C and floating %+.2f C, both %s the curve)"),
+  satNarratef_P(PSTR("Heating curve self-tune: coefficient %s -> %s (window warm-up %+.2f C and floating %+.2f C, both %s the curve)"),
                 o, n, (double)d.phMean3[SATP_WARMUP], (double)d.phMean3[SATP_FLOATING], d.decision > 0 ? PSTR("above") : PSTR("below"));
 }
 
@@ -7206,8 +7208,6 @@ static void satCurveTuneGetProgress(SatTuneProgress& p)
 {
   p.running      = _sat_tuneRunning;
   p.days         = _sat_tuneRunning ? _sat_tune.winDays : 0;
-  p.cleanToday   = _sat_tuneRunning ? _sat_tune.cleanInDay : 0;
-  p.hoursToday   = _sat_tuneRunning ? _sat_tune.hoursInDay : 0;
   p.haveLast     = _sat_tuneRunning && _sat_tune.haveLast;
   p.lastDay      = p.haveLast ? _sat_tune.lastDay : 0;
   p.lastDecision = p.haveLast ? _sat_tune.lastDecision : 0;

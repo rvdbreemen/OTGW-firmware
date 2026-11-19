@@ -14,6 +14,7 @@ related:
   - "ADR-230"
   - "ADR-231"
   - "ADR-234"
+  - "ADR-260"
 topics:
   - "heating curve self-tune"
   - "phase split"
@@ -95,6 +96,11 @@ status_history:
     status: Accepted
     changed_by: "User: Robert van den Breemen"
     reason: Related to ADR-234
+    changed_via: adr-kit lifecycle
+  - date: 2026-11-18
+    status: Accepted
+    changed_by: Agent (ba)
+    reason: Related to ADR-260
     changed_via: adr-kit lifecycle
 ```
 

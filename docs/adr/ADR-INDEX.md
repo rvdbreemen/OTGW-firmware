@@ -263,3 +263,4 @@ One row per Architecture Decision Record. Scope is the Enforcement `path_glob` s
 | ADR-256 | Accepted | - | User Decision: the device history slot gets a seventh int16t temperature column, satTarget, so a slot is 16 bytes; th... |
 | ADR-257 | Accepted | - | User Decision: on a board without PSRAM BLE cannot be switched on: the scanner never starts there, every write of SAT... |
 | ADR-259 | Accepted | - | When the error leaves the 0.1 C deadband the integral is multiplied by 0.5 once and then held while the error stays o... |
+| ADR-260 | Proposed | - | The tuner keeps its hour, its exclusions, its two phases and its agreement rule, and changes three constants: a tuner... |

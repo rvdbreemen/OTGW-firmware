@@ -555,10 +555,10 @@ while a restored window keeps its counted days.
 | Topic | Value | Retained | Description |
 | ----- | ----- | -------- | ----------- |
 | `sat/curve_tune/running` | `"true"` / `"false"` | no | The self-tune clock runs (self-tune on and SAT enabled) |
-| `sat/curve_tune/days` | `"2"` | no | Counted days in the window (3 are needed for a decision) |
+| `sat/curve_tune/window_hours` | `"5"` | no | Counted hours in the window (12 are needed for a decision; ADR-260 replaced `sat/curve_tune/days` and `sat/curve_tune/clean_hours_today`) |
 | `sat/curve_tune/clean_hours_today` | `"4"` | no | Clean hours of the current day (6 are needed for the day to count) |
-| `sat/curve_tune/last_decision` | `"hold"` | no | Last daily decision: `raise`, `lower`, `hold`, or `none` before the first day closes |
-| `sat/curve_tune/last_reason` | `"few_days"` | no | Reason of the last daily record: `few_days`, `day_not_counted`, `no_phases`, `inside_band`, `phases_disagree`, `phases_agree`, `at_limit` (`none` before the first day) |
+| `sat/curve_tune/last_decision` | `"hold"` | no | Last hourly decision: `raise`, `lower`, `hold`, or `none` before the first hour closes |
+| `sat/curve_tune/last_reason` | `"few_days"` | no | Reason of the last hourly record (`day_not_counted` = the hour did not count, `few_days` = fewer than 12 counted hours in the window): `few_days`, `day_not_counted`, `no_phases`, `inside_band`, `phases_disagree`, `phases_agree`, `at_limit` (`none` before the first hour) |
 | `sat/curve_tune/excluded_hours/<reason>` | `"3"` | no | Hours that did not count, per reason (the first reason of each hour), one topic per reason: `not_sat`, `dhw`, `no_sun`, `sun`, `pwm`, `flame_off`, `min_mod`, `coeff_changed`, `no_ticks`, `not_controlling`, `few_ticks`, `no_room`, `diag_event` (a no-ignition or heating-failure event was active, Sergeant D entry 358, TASK-1882) |
 
 #### Solar Gain

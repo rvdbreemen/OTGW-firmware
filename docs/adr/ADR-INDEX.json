@@ -7503,7 +7503,7 @@
       "path": "ADR-205-sat-heating-curve-self-tune-hourly-evaluation-daily-decision-on-the-curve-integral.md",
       "format": "canonical",
       "status": "Accepted",
-      "date": "2026-11-14",
+      "date": "2026-11-18",
       "decision_summary": "SAT gets an on/off self-tune, on by default, that evaluates every clean hour, logs it, and changes the heating curve...",
       "topics": [
         "clean hour",
@@ -8857,7 +8857,7 @@
       "path": "ADR-228-sat-heating-curve-self-tune-splits-the-signal-into-warm-up-and-floating-phases-and-changes-the-coefficient-only-when-both-agree.md",
       "format": "canonical",
       "status": "Accepted",
-      "date": "2026-11-14",
+      "date": "2026-11-18",
       "decision_summary": "Each signal tick of the self-tune is assigned to the warm-up phase (|PID error| > 0.1 C) or the floating phase (|PID...",
       "topics": [
         "deadband",
@@ -8988,7 +8988,7 @@
       "path": "ADR-230-sat-heating-curve-self-tune-the-floating-phase-needs-one-hour-of-data-to-vote-amends-adr-228.md",
       "format": "canonical",
       "status": "Accepted",
-      "date": "2026-11-12",
+      "date": "2026-11-18",
       "decision_summary": "The floating phase votes only when its data in the window is at least 1 hour: its signal ticks over the counted days...",
       "topics": [
         "floating phase minimum",
@@ -10832,6 +10832,72 @@
         "verification": [
           "tests/testsatpidsemantics.py (the real SATpid.ino against the thermo-nova oracle with this deviation as a parameter): testoutsidethebandthehalvedintegralisheldandinsideitaccumulatesagain and the boundary, restore and saturation cases; 5...",
           "tests/testsatpidcadence.py::testg3zoneintegralishalvedonceoutsidethebandandheld (the real zone PID); FAIL on the code before this ADR (the zone integral went to 0)."
+        ]
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
+    },
+    {
+      "id": "ADR-260",
+      "title": "SAT heating curve self-tune decides every counted hour on a 12-hour window with a 0.05 step (supersedes the timing of ADR-205, ADR-228 and ADR-230)",
+      "path": "ADR-260-sat-heating-curve-self-tune-decides-every-counted-hour-on-a-12-hour-window-with-a-0-05-step-supersedes-the-timing-of-adr-205-adr-228-and-adr-230.md",
+      "format": "canonical",
+      "status": "Proposed",
+      "date": "2026-11-18",
+      "decision_summary": "The tuner keeps its hour, its exclusions, its two phases and its agreement rule, and changes three constants: a tuner...",
+      "topics": [
+        "heating-curve",
+        "mqtt",
+        "rest-api",
+        "sat",
+        "self-tune"
+      ],
+      "aliases": [
+        "faster self-tune",
+        "hours not days",
+        "self-tune window hours"
+      ],
+      "components": [
+        "curve_tune telemetry fields window_hours and window_hours_needed",
+        "SAT heating curve self-tune timing (SATcurveTune.h constants, satTuneCloseDay)",
+        "self-tune window file /sat_tune.json version 3"
+      ],
+      "symbols": [
+        "SAT_CT_FILE_VERSION",
+        "SAT_CT_HOURS_PER_DAY",
+        "SAT_CT_MIN_CLEAN_HOURS",
+        "SAT_CT_STEP",
+        "SAT_CT_WINDOW_DAYS",
+        "satTuneCloseDay"
+      ],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [
+          "Keep every per-tick exclusion of ADR-205, ADR-231 and ADR-234, the heating-failure rule of entry 358, the phase split and agreement rule of ADR-228 and the floating minimum of ADR-230 (one hour of floating data in the window).",
+          "Decide on the window of the last 12 counted hours, at each counted hour, with a step of 0.05, and empty the window after a change.",
+          "Write the window file /sattune.json as version 3, and only when the window changed (a counted hour, or a change); a version 1 or 2 file is dropped on restore.",
+          "Publish the window size as REST curvetune.windowhours and curvetune.windowhoursneeded, and MQTT sat/curvetune/windowhours."
+        ],
+        "must_not": [
+          "Reuse the old field names days, daysneeded or the topic sat/curvetune/days with a different unit.",
+          "Change any exclusion or the 90 % clean-hour rule."
+        ],
+        "exceptions": [
+          "None."
+        ],
+        "verification": [
+          "tests/testsatcurveselftune.py compiles the real tuner blocks of SATcontrol.ino with SATcurveTune.h: a clear signal steps 0.05 after 12 counted hours and not before, a second step needs 12 new counted hours, not-counted hours do not move...",
+          "tests/testsattunerconvergence.py: the old constants take no step within 24 counted hours of a clear signal (red), the new constants do (green).",
+          "tests/webui/sat-tune-progress.test.mjs drives the real data/v2.js against a status object with windowhours."
         ]
       },
       "scope": {
@@ -16873,6 +16939,12 @@
       "resolved": true
     },
     {
+      "source": "ADR-205",
+      "target": "ADR-260",
+      "type": "related",
+      "resolved": true
+    },
+    {
       "source": "ADR-206",
       "target": "ADR-051",
       "type": "related",
@@ -17491,6 +17563,12 @@
       "resolved": true
     },
     {
+      "source": "ADR-228",
+      "target": "ADR-260",
+      "type": "related",
+      "resolved": true
+    },
+    {
       "source": "ADR-229",
       "target": "ADR-208",
       "type": "related",
@@ -17517,6 +17595,12 @@
     {
       "source": "ADR-230",
       "target": "ADR-228",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-230",
+      "target": "ADR-260",
       "type": "related",
       "resolved": true
     },
@@ -18027,6 +18111,36 @@
     {
       "source": "ADR-259",
       "target": "ADR-204",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-260",
+      "target": "ADR-205",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-260",
+      "target": "ADR-228",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-260",
+      "target": "ADR-230",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-260",
+      "target": "ADR-231",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-260",
+      "target": "ADR-234",
       "type": "related",
       "resolved": true
     }

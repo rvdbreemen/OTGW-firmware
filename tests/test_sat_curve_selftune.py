@@ -52,8 +52,10 @@ STUBS = r"""
 #define PSTR(x) x
 #define snprintf_P snprintf
 typedef const char* PGM_P;
-static char g_log[400000]; static size_t g_logn = 0;
+// TASK-1889 (ADR-260): a decision record every hour; 4 MB holds 70 simulated days, and a full log stops instead of overrunning
+static char g_log[4000000]; static size_t g_logn = 0;
 static void g_append(const char* prefix, const char* fmt, va_list ap) {
+  if (g_logn + 1024 >= sizeof(g_log)) return;
   g_logn += (size_t)snprintf(g_log + g_logn, sizeof(g_log) - g_logn, "%s", prefix);
   g_logn += (size_t)vsnprintf(g_log + g_logn, sizeof(g_log) - g_logn, fmt, ap);
   if (g_logn > 0 && g_log[g_logn - 1] != '\n') { g_log[g_logn++] = '\n'; g_log[g_logn] = 0; }
@@ -140,8 +142,9 @@ static void tick(const char* spec) {
 static void g_progress() {
   SatTuneProgress p; memset(&p, 0x5a, sizeof(p));   // poison: every field must be written
   satCurveTuneGetProgress(p);
-  g_logf("PROGRESS running=%d days=%u clean_today=%u hours_today=%u have_last=%d last_day=%lu last_decision=%d last_reason=%s",
-         (int)p.running, (unsigned)p.days, (unsigned)p.cleanToday, (unsigned)p.hoursToday, (int)p.haveLast,
+  // TASK-1889 (ADR-260): cleanToday/hoursToday are gone (a one-hour block has no "today")
+  g_logf("PROGRESS running=%d days=%u have_last=%d last_day=%lu last_decision=%d last_reason=%s",
+         (int)p.running, (unsigned)p.days, (int)p.haveLast,
          (unsigned long)p.lastDay, (int)p.lastDecision, p.lastReason);
   for (uint8_t r = SATT_NONE + 1; r < SATT_COUNT; r++) g_logf("EXCL %s=%u", satTuneReasonName(r), (unsigned)p.exclHours[r]);
 }
@@ -231,7 +234,16 @@ def compile_cpp(cpp: Path, exe: Path):
     return None
 
 
-def build(workdir: Path, body: str = None, name: str = "t", prefix: str = ""):
+# TASK-1889 (ADR-260): the firmware decides every counted hour on a 12-hour window with a 0.05 step. The day-based scenarios
+# below were written for the 24-hour day, the 3-day window and the 0.1 step; the window logic itself did not change, only
+# these constants did. build() therefore compiles the real code with the old timing by default (the header's #ifndef
+# guards), and HourWindow at the end compiles it with the firmware's own constants (prefix="") and checks ADR-260.
+LEGACY_TIMING = ("#define SAT_CT_WINDOW_DAYS 3\n#define SAT_CT_MIN_CLEAN_HOURS 6\n#define SAT_CT_HOURS_PER_DAY 24\n"
+                 "#define SAT_CT_STEP 0.1f\n#define SAT_CT_FILE_VERSION 2\n")
+
+
+def build(workdir: Path, body: str = None, name: str = "t", prefix: str = None):
+    prefix = LEGACY_TIMING if prefix is None else prefix
     body = body if body is not None else extract(SAT_INO.read_text(encoding="utf-8"))
     cpp = workdir / f"{name}.cpp"
     cpp.write_text(STUBS + prefix + body + MAIN, encoding="utf-8")
@@ -522,9 +534,9 @@ class SatCurveSelfTune(unittest.TestCase):
         self.assertRegex(daily[2], r"^SATTUNED day=2 clean=24 counted=1 days_in_window=3 mean3=1\.50 decision=raise reason=phases_agree "
                                    r"wmean3=1\.50 wticks3=144 wsay=higher fmean3=1\.50 fticks3=144 fsay=higher fvote=1$")
         self.assertEqual(o.changes, ["SATTUNE old=2.0 new=2.1 mean3=1.50 wmean3=1.50 fmean3=1.50"])
-        self.assertEqual(o.narr, ["NARR Heating curve self-tune: coefficient 2.0 -> 2.1 (3-day warm-up +1.50 C and floating +1.50 C, both above the curve)"])
+        self.assertEqual(o.narr, ["NARR Heating curve self-tune: coefficient 2.0 -> 2.1 (window warm-up +1.50 C and floating +1.50 C, both above the curve)"])
         o = self.run_tokens(day(-1.5) * 3)
-        self.assertEqual(o.narr, ["NARR Heating curve self-tune: coefficient 2.0 -> 1.9 (3-day warm-up -1.50 C and floating -1.50 C, both below the curve)"])
+        self.assertEqual(o.narr, ["NARR Heating curve self-tune: coefficient 2.0 -> 1.9 (window warm-up -1.50 C and floating -1.50 C, both below the curve)"])
 
     def test_hour_record_of_an_excluded_hour_keeps_its_mean(self):
         # TASK-1932 (entry 369): 2 clean + 2 pwm ticks of 4 expected (900 s) = 50 % clean, under 90 %: not counted, so the
@@ -1069,7 +1081,7 @@ class ExclusionCounters(unittest.TestCase):
                 o = self.run_tokens(SHARE + EXCL_PRE.get(ex, []) + day(0.5, clean=18, excl=ex))   # TASK-1932 (entry 369): SHARE
                 self.zero_but(o, **{ex: 6})
                 p = o.progress[-1]
-                self.assertEqual((p["running"], p["days"], p["clean_today"], p["hours_today"]), ("1", "1", "0", "0"))
+                self.assertEqual((p["running"], p["days"]), ("1", "1"))
                 self.assertEqual((p["have_last"], p["last_day"], p["last_decision"], p["last_reason"]),
                                  ("1", "0", "0", "few_days"))
 
@@ -1080,8 +1092,7 @@ class ExclusionCounters(unittest.TestCase):
         o = self.run_tokens(toks)
         self.zero_but(o, few_ticks=1, no_ticks=1, not_controlling=1, no_room=1)
         p = o.progress[-1]
-        self.assertEqual((p["clean_today"], p["hours_today"], p["have_last"], p["last_decision"], p["last_reason"]),
-                         ("1", "5", "0", "0", "none"))
+        self.assertEqual((p["have_last"], p["last_decision"], p["last_reason"]), ("0", "0", "none"))
 
     def test_first_reason_only_one_count_per_hour(self):
         o = self.run_tokens([tk(sig=0.5, dhw=1), tk(sig=0.5, sun=20), tk(sig=0.5, rm=1, mm=0), f"A:{HOUR}"])
@@ -1112,8 +1123,7 @@ class ExclusionCounters(unittest.TestCase):
         o = self.run_tokens(excluded_hour(0.5, "dhw") * 2 + ["tune:0", "S"])
         self.zero_but(o)
         p = o.progress[-1]
-        self.assertEqual((p["running"], p["days"], p["hours_today"], p["have_last"], p["last_reason"]),
-                         ("0", "0", "0", "0", "none"))
+        self.assertEqual((p["running"], p["days"], p["have_last"], p["last_reason"]), ("0", "0", "0", "none"))
 
     def test_counters_do_not_reach_the_decision(self):
         # the daily decision reads none of the new fields
@@ -1179,14 +1189,14 @@ class ProgressWiring(unittest.TestCase):
         self.assertIn("snap->st.sat.tuneProgress", self.src[m.start() - 400:m.start()])
         self.assertNotIn("state.", body)
         self.assertNotIn("_sat_tune", body)
-        for k in ("running", "days", "days_needed", "clean_hours_today", "clean_hours_needed", "hours_today",
+        for k in ("running", "window_hours", "window_hours_needed",   # TASK-1889 (ADR-260)
                   "last_decision", "last_reason", "excluded_hours"):
             self.assertIn(f'F("{k}")', body)
         self.assertIn("for (uint8_t r = SATT_NONE + 1; r < SATT_COUNT; r++) je.field(satTuneReasonName(r), tp.exclHours[r]);",
                       body)
 
     def test_mqtt_flat_topics(self):
-        for t in ("running", "days", "clean_hours_today", "last_decision", "last_reason"):
+        for t in ("running", "window_hours", "last_decision", "last_reason"):   # TASK-1889 (ADR-260)
             self.assertIn(f'F("sat/curve_tune/{t}")', self.src)
         self.assertIn('PSTR("sat/curve_tune/excluded_hours/%s"), satTuneReasonName(r)', self.src)
         self.assertIn("static SATShadowI s_ct_excl[SATT_COUNT];", self.src)
@@ -1287,6 +1297,94 @@ class SourceChecks(unittest.TestCase):
         self.assertIn("SAT_HA_SWITCH_COUNT = 15", (SRC / "MQTTstuff.h").read_text(encoding="utf-8"))
         self.assertIn("sat/curve_self_tune_enable", self.src)
         self.assertIn("satcurveselftune:", (SRC / "data" / "v2.js").read_text(encoding="utf-8"))
+
+
+class HourWindow(unittest.TestCase):
+    """TASK-1889 (ADR-260, entries 329 and 367, Q-1889a A by directive): the real tuner with the FIRMWARE's own constants
+    (prefix="") decides every counted hour on a window of the last 12 counted hours and steps 0.05. Red on the old header
+    (OTGW_SAT_HDR = SATcurveTune.h from before TASK-1889: 3-day window, 24 h days, 0.1 step)."""
+    runs = 0
+
+    @classmethod
+    def setUpClass(cls):
+        cls.tmp = tempfile.TemporaryDirectory()
+        cls.exe = build(Path(cls.tmp.name), name="hw", prefix="")
+        cls.legacy = build(Path(cls.tmp.name), name="hwold")   # the same code with the pre-ADR-260 timing
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.tmp.cleanup()
+
+    def setUp(self):
+        if not self.exe:
+            self.skipTest("no host C++ compiler (g++, clang++ or MSVC)")
+
+    run_tokens = SatCurveSelfTune.run_tokens
+
+    def test_header_timing_is_one_hour_blocks_twelve_wide_step_005(self):
+        hdr = SAT_HDR.read_text(encoding="utf-8")
+        want = {"SAT_CT_WINDOW_DAYS": "12", "SAT_CT_MIN_CLEAN_HOURS": "1", "SAT_CT_HOURS_PER_DAY": "1",
+                "SAT_CT_STEP": "0.05f", "SAT_CT_FILE_VERSION": "3"}
+        for name, val in want.items():
+            self.assertRegex(hdr, rf"#define {name}\s+{re.escape(val)}\b", name)
+
+    def test_twelve_counted_hours_step_005_and_not_before(self):
+        o = self.run_tokens(clean_hour(1.5) * 11)
+        self.assertEqual((o.coeff, o.writes, o.changes), (2.0, 0, []), "no step after 11 counted hours")
+        self.assertEqual(o.days[-1]["reason"], "few_days")
+        o = self.run_tokens(clean_hour(1.5) * 12)
+        self.assertEqual((o.coeff, o.writes), (2.05, 1), "one step of 0.05 at the 12th counted hour")
+        self.assertEqual(o.days[-1]["reason"], "phases_agree")
+        o = self.run_tokens(clean_hour(-1.5) * 12)
+        self.assertEqual((o.coeff, o.writes), (1.95, 1), "and down")
+
+    def test_a_second_step_needs_twelve_new_counted_hours(self):
+        self.assertEqual(self.run_tokens(clean_hour(1.5) * 23).coeff, 2.05)
+        o = self.run_tokens(clean_hour(1.5) * 24)
+        self.assertEqual((o.coeff, o.writes), (2.1, 2), "0.1 takes 24 counted hours")
+
+    def test_hours_that_do_not_count_leave_the_window_as_it_is(self):
+        # int:900 expects 4 ticks: excluded_hour() (3 clean + 1 dhw = 75 %) does not count, clean_hour() does
+        toks = SHARE + clean_hour(1.5) * 11 + excluded_hour(1.5, "dhw") * 5
+        o = self.run_tokens(toks)
+        self.assertEqual(o.coeff, 2.0, "5 not-counted hours fill nothing")
+        self.assertEqual(o.days[-1]["reason"], "day_not_counted")
+        self.assertEqual(self.run_tokens(toks + clean_hour(1.5)).coeff, 2.05, "the 12th counted hour decides")
+
+    def test_window_file_is_written_only_when_a_counted_hour_entered_it(self):
+        o = self.run_tokens(SHARE + excluded_hour(1.5, "dhw") * 3)
+        self.assertEqual(o.fw, 0, "a not-counted hour writes nothing")
+        o = self.run_tokens(SHARE + clean_hour(1.5) * 3)
+        self.assertEqual(o.fw, 3, "one write per counted hour")
+
+    def test_window_survives_a_reboot_as_version_3(self):
+        f = Path(self.tmp.name) / "hw_reboot.json"
+        self.run_tokens(clean_hour(1.5) * 5, file=f)
+        self.assertRegex(f.read_text(), r'^\{"v":3,"coeff":2\.00,"n":5,"c0":1,')
+        o = self.run_tokens(clean_hour(1.5) * 7, file=f)
+        self.assertTrue(any(l.startswith("SATTUNER restored=5") for l in o.log))
+        self.assertEqual(o.coeff, 2.05, "5 restored + 7 new counted hours = 12")
+
+    def test_version_2_window_file_is_dropped(self):
+        f = Path(self.tmp.name) / "hw_v2.json"
+        f.write_text('{"v":2,"coeff":2.00,"n":1,"c0":24,"s0":36.000,"w0":48,"x0":72.000,"f0":48,"y0":72.000}')
+        o = self.run_tokens(clean_hour(1.5), file=f)
+        self.assertTrue(any(l.startswith("SATTUNER restored=0") for l in o.log))
+        self.assertGreaterEqual(o.fr, 1, "the stale file is removed")
+
+    def test_old_timing_takes_no_step_within_24_counted_hours(self):
+        # the before/after of TASK-1889 on the same code: 24 clean hours of a clear signal
+        if not self.legacy:
+            self.skipTest("no host C++ compiler")
+        self.assertEqual(self.run_tokens(clean_hour(1.5) * 24, exe=self.legacy).coeff, 2.0, "old: 3 counted days needed")
+        self.assertEqual(self.run_tokens(clean_hour(1.5) * 24).coeff, 2.1, "new: two steps of 0.05")
+
+    def test_rest_and_mqtt_drop_the_day_fields(self):
+        src = SAT_INO.read_text(encoding="utf-8")
+        for k in ("days", "days_needed", "clean_hours_today", "clean_hours_needed", "hours_today"):
+            self.assertNotIn(f'F("{k}")', src, k)
+        for t in ("days", "clean_hours_today"):
+            self.assertNotIn(f'F("sat/curve_tune/{t}")', src, t)
 
 
 if __name__ == "__main__":

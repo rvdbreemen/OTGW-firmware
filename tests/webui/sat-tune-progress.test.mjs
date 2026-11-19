@@ -1,5 +1,5 @@
 // TASK-1881 (U9) guard: the heating curve card shows the self-tune progress from the sat/status object curve_tune:
-// counted days out of 3, clean hours today out of 6, the last daily record in words, and the hours each reason kept
+// counted hours in the window out of 12 (TASK-1889, ADR-260), the last hourly record in words, and the hours each reason kept
 // out of the window (non-zero only, largest first). Off, or a firmware without curve_tune, shows "off" or nothing.
 //
 // Runs the REAL satRenderTune(), satTuneReasonText() and esc() cut out of data/v2.js by brace matching, with the
@@ -64,7 +64,7 @@ function fixture(over) {
   return Object.assign({
     curve_self_tune: true,
     curve_tune: {
-      running: true, days: 2, days_needed: 3, clean_hours_today: 4, clean_hours_needed: 6, hours_today: 9,
+      running: true, window_hours: 5, window_hours_needed: 12,   // TASK-1889 (ADR-260)
       last_decision: 'hold', last_reason: 'few_days', excluded_hours,
     },
   }, over || {});
@@ -75,13 +75,13 @@ test('the curve card has the progress box, hidden until data arrives', () => {
   assert.match(SRC, /satRenderMaxMod\(d\);\s*\n\s*satRenderTune\(d\);/);
 });
 
-test('progress: counted days, clean hours today, last day in words', () => {
+test('progress: counted hours in the window, last hour in words', () => {
   const r = render(fixture());
   assert.equal(r.hidden, false);
   assert.deepEqual(r.lines, [
     'Self-tune',
-    '2/3 counted days, today 4/6 clean hours',
-    'Last day: held (window not full yet)',
+    '5/12 counted hours in the window',
+    'Last hour: held (window not full yet)',
     'No hours left out',
   ]);
 });
@@ -91,7 +91,7 @@ test('excluded hours: only the non-zero reasons, largest first, in words', () =>
   Object.assign(f.curve_tune.excluded_hours, { dhw: 3, sun: 11, no_room: 1 });
   f.curve_tune.last_decision = 'raise'; f.curve_tune.last_reason = 'phases_agree';
   const r = render(f);
-  assert.equal(r.lines[2], 'Last day: raised (warm-up and at-target agree)');
+  assert.equal(r.lines[2], 'Last hour: raised (warm-up and at-target agree)');
   assert.equal(r.lines[3], 'Hours not counted: sun too high 11 h, hot water 3 h, room temperature lost 1 h');
 });
 
@@ -107,7 +107,7 @@ test('an unknown reason shows its code, an unknown decision counts as no day yet
   f.curve_tune.excluded_hours.new_reason = 2;
   f.curve_tune.last_decision = 'none'; f.curve_tune.last_reason = 'none';
   const r = render(f);
-  assert.equal(r.lines[2], 'No day closed yet');
+  assert.equal(r.lines[2], 'No hour closed yet');
   assert.equal(r.lines[3], 'Hours not counted: new_reason 2 h');
 });
 

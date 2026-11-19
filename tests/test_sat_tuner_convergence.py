@@ -126,7 +126,7 @@ MUTANTS = {
                ("{ target = coeff - SAT_CT_STEP; out.decision = -1; }", "{ target = coeff - 10.0f * SAT_CT_STEP; out.decision = -1; }")],
 }
 
-STEP = 0.1
+STEP = 0.05   # SAT_CT_STEP since ADR-260 (TASK-1889); the tolerance below comes from the band, not the step
 BAND = 1.0
 
 
@@ -240,11 +240,17 @@ class TunerConvergence(unittest.TestCase):
         r = self.run_sim(self.exe, 1.8, 1.0, 60, 0.0, 3.0, "phases")
         decided = [d for d in r.days if d.get("decision") in ("raise", "lower")]
         self.assertTrue(decided, "the tuner never decided")
+        # TASK-1889 (ADR-260): a 12-counted-hour window often holds less than 1 h of floating data, so the floating phase
+        # does not vote there (ADR-230) and the warm-up phase decides alone (entry 305). With the old 3-day window every
+        # decision had a floating vote. Asserted per decision: the ADR-230 threshold decides whether floating votes, and a
+        # change is always "phases_agree" with warm-up data. The share with a floating vote is printed, not pinned.
+        voted = 0
         for d in decided:
             self.assertGreater(int(d["wticks3"]), 0, d)
-            self.assertGreater(int(d["fticks3"]), 60, d)     # > 1 h of floating data at 60 s ticks (ADR-230)
-            self.assertEqual(d["fvote"], "1", d)
+            self.assertEqual(d["fvote"], "1" if int(d["fticks3"]) >= 60 else "0", d)   # 60 ticks of 60 s = 1 h (ADR-230)
             self.assertEqual(d["reason"], "phases_agree", d)
+            voted += d["fvote"] == "1"
+        print(f"  phases: {len(decided)} decisions, {voted} with a floating vote, {len(decided) - voted} on warm-up alone")
 
     def test_each_mutant_fails_the_convergence_predicate(self):
         if self.mutant:

@@ -1655,19 +1655,19 @@
       "sat_system_radiator": "radiator",
       "sat_system_underfloor": "underfloor",
       "sat_takeover": "Takeover (MQTT lost)",
-      "sat_tune_days": "{{days}}/{{need}} counted days, today {{clean}}/{{cleanNeed}} clean hours",
+      "sat_tune_days": "{{days}}/{{need}} counted hours in the window",
       "sat_tune_dec_hold": "held",
       "sat_tune_dec_lower": "lowered",
       "sat_tune_dec_raise": "raised",
       "sat_tune_excl_item": "{{reason}} {{hours}} h",
       "sat_tune_excluded": "Hours not counted: {{list}}",
       "sat_tune_excluded_none": "No hours left out",
-      "sat_tune_last": "Last day: {{decision}} ({{reason}})",
-      "sat_tune_last_none": "No day closed yet",
+      "sat_tune_last": "Last hour: {{decision}} ({{reason}})",
+      "sat_tune_last_none": "No hour closed yet",
       "sat_tune_off": "Self-tune is off",
       "sat_tune_r_at_limit": "coefficient at its limit",
       "sat_tune_r_coeff_changed": "coefficient changed",
-      "sat_tune_r_day_not_counted": "too few clean hours",
+      "sat_tune_r_day_not_counted": "hour not counted",
       "sat_tune_r_dhw": "hot water",
       "sat_tune_r_few_days": "window not full yet",
       "sat_tune_r_few_ticks": "too few samples",
@@ -7066,8 +7066,8 @@
       .catch(function () { });
   }
 
-  // TASK-1881 (U9): heating curve self-tune progress from the status object curve_tune: counted days, clean hours today,
-  // the last daily record and the hours each reason kept out of the window. Hidden on a firmware without curve_tune.
+  // TASK-1881 (U9): heating curve self-tune progress from the status object curve_tune: counted hours in the window
+  // (ADR-260), the last hourly decision record and the hours each reason kept out of the window. Hidden on a firmware without curve_tune.
   function satTuneReasonText(code) {
     var k = 'tools.sat_tune_r_' + code, s = t(k);
     return s === k ? String(code) : s;   // a reason this page does not know yet shows its code
@@ -7081,8 +7081,8 @@
     if (!d.curve_self_tune || !ct.running) {
       box.innerHTML = h + '<div>' + esc(t('tools.sat_tune_off')) + '</div>'; return;
     }
-    h += '<div>' + esc(t('tools.sat_tune_days', { days: ct.days | 0, need: ct.days_needed | 0,
-      clean: ct.clean_hours_today | 0, cleanNeed: ct.clean_hours_needed | 0 })) + '</div>';
+    // TASK-1889 (ADR-260): the window counts hours (window_hours / window_hours_needed)
+    h += '<div>' + esc(t('tools.sat_tune_days', { days: ct.window_hours | 0, need: ct.window_hours_needed | 0 })) + '</div>';
     var dec = ct.last_decision;
     h += '<div>' + esc(dec === 'raise' || dec === 'lower' || dec === 'hold'
       ? t('tools.sat_tune_last', { decision: t('tools.sat_tune_dec_' + dec), reason: satTuneReasonText(ct.last_reason) })
