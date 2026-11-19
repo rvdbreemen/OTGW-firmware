@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@otgw-dev'
 created_date: '2026-11-18T10:04:00Z'
-updated_date: '2026-11-18T20:25:00Z'
+updated_date: '2026-11-19T04:24:00Z'
 labels:
   - heap
   - sat
@@ -60,4 +60,6 @@ Diagnostics (lane-2019, 372): satTakeoverHeapTraceBegin() arms the TASK-1757 con
 2026-11-18 bench observation (otgw-bench-tester 09, TASK-2020 AC3 run on .61, 373+9e6636d, 16:26:52-18:28:53): hd_min_free_heap fell 16,868 -> 6,044 between samples 17:43:52 and 17:44:52 (uptime ~78 min); maxblock dipped once to 25,588 at 17:57:52. No telnet line explains it (no [HEAP] burst/boot line, no MQTT reconnect; heap line 17:44:40 shows 52,960 free). One short dip, freeheap flat 45.9-52.8 k, no reboot. 370 arm hd_min was 12,508. Cause unknown, NOT investigated. Evidence: 09 scratchpad b2020\arm373\ (telnet.raw, info.jsonl).
 
 Loopback exception (maintainer, 2026-11-18, relayed by the coordinator: Robert's DM 1572707965889159331, reply 'A'): a one-off exception to the 15 Nov no-loopback rule for bench boards. Scope: loopback (GW=L) ONLY on .61, ONLY for this TASK-2019 heap diagnosis (make SAT really take over and capture the 372 sat-takeover heap trace of the passes after it), switched off again afterwards with the settings verified as restored. It does not extend to other tasks, other boards or later runs. .61 state before the run: 2.0.0-beta.375+ff73985 (contains satTakeoverHeapTraceBegin, MQTTstuff.ino:1283), bootcount 1045, satenabled false, satsimulation false, satbleenable false, satweatherenable true, hd_min_free_heap 18,056 at 2 h 51 min uptime.
+
+Starting evidence on current code (otgw-bench-tester 09, 2026-11-19), 2.0.0-beta.382+e562f82 on .61 (OTGW32, no PSRAM, SAT off, no loopback, no simulation), OTA app+fs from 375 at 04:20-04:22 ('settings: 165 keys, changed: none'), 60-min soak 04:22-05:23 with device/info every 60 s: 62/62 HTTP 200, bootcount 1051 throughout (no restart), 0 panic, 2 loop-stalls only right after the boot (04:22:12/13, ~420 ms, step 3->16), freeheap 39.2-44.9k, maxblk 23.5-31.7k, MQTT connected. hd_min_free_heap steps: 30,120 -> 24,356 -> 18,560 -> 15,532 -> 13,748 in the first 5 min (boot), then 13,748 -> 10,660 between 04:47:12 and 04:48:12 (uptime ~25 min) and 10,612 -> 6,444 between 05:02:12 and 05:03:12 (uptime ~40 min); a small step 10,660 -> 10,612 at 04:57-04:58. Telnet in those minutes shows only an [fs-slow] mount-check (123/116 ms, writer) at :11 of the minute and the poller's device/info GET; freeheap stayed 39.8-44.9k. So these dips occur WITHOUT a SAT takeover (SAT off). Same 382 on .63 (PSRAM, SAT enabled, handed back, no boiler): 60 min flat, hd_min 14,980 unchanged. Logs: 09 scratchpad soak382\61 and \63 (telnet.raw, info.jsonl).
 <!-- SECTION:NOTES:END -->
