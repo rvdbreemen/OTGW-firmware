@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-19T19:18:00Z'
+updated_date: '2026-11-19T19:44:00Z'
 labels:
   - webui
   - ui
@@ -26,3 +27,9 @@ Found in the read-only UI walk of 396 (7e68542) on .63, 2026-11-19, headless Chr
 - [ ] #1 On a 375 px mobile viewport Advanced > File System has no horizontal page scroll (scrollWidth <= clientWidth) in EN and NL; long file names wrap or the table scrolls inside its own container
 - [ ] #2 Web UI test on the real v2.js with mobile emulation: red on the code before, green after
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Side note (coordinator: no own task): at 375 px the sub-tab strips scroll horizontally but do not bring the active tab into view (Greek UI: the active 'System' tab under Advanced sits off-screen to the right). Seen on the mock and on .61. Same walk on .61 (397, German): Advanced > File System 510 px wide, so the overflow is there in DE too (EN 470, NL 519).
+<!-- SECTION:NOTES:END -->
