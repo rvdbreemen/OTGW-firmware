@@ -414,6 +414,13 @@ paths:
         OT-Direct fields (`otd*`) are left out in PIC mode (board mode 1 or 3, or a
         live PIC); Ethernet fields (`eth*`) appear only when a W5500 was found. A
         POST still accepts these keys in every mode.
+
+        `updatecheck`, `updatecheckasked` and `updatecheckbeta` (booleans, TASK-2023)
+        belong to the web UI's version check: with `updatecheck` on, the browser
+        (not the gateway) asks the GitHub releases API at most every 6 hours and
+        shows a notice when a newer firmware exists. `updatecheckasked` records that
+        the UI's one-time question was answered; `updatecheckbeta` lets a stable
+        firmware also be told about betas. The gateway makes no outbound request.
       operationId: getSettings
       responses:
         '200':

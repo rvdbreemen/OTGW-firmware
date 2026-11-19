@@ -307,6 +307,12 @@
       "mode_unknown": "Unknown",
       "status_title": "{{state}} · {{mode}} mode",
       "hostname_fallback": "device",
+      "upd_new": "New version available: {{ver}}",
+      "upd_dismiss": "Hide until a newer version",
+      "upd_ask_title": "Check for new versions?",
+      "upd_ask_body": "The web UI can show a notice when a newer firmware is on GitHub. For that, your browser asks api.github.com at most every 6 hours; the gateway itself sends nothing. You can change this later in Settings.",
+      "upd_ask_yes": "Yes, check",
+      "upd_ask_no": "No",
       "ip_static": "static",
       "tip_eth": "IP {{ip}} ({{mode}}) · Wired",
       "tip_ap": "IP {{ip}} · AP mode",
@@ -1114,6 +1120,8 @@
         "hostname": "Hostname",
         "httppasswd": "Admin password",
         "ledblink": "Blink LED on OT traffic",
+        "updatecheck": "Check GitHub for new versions",
+        "updatecheckbeta": "Also tell about beta versions",
         "legacyport25238enabled": "Legacy TCP port 25238",
         "mqttbroker": "Broker",
         "mqttbrokerport": "Port",
@@ -4197,6 +4205,8 @@
     ledblink:        { cat: 'behavior', label: 'Blink LED on OT traffic' },
     nightlyrestart:  { cat: 'behavior', label: 'Nightly restart' },
     nightlyrestarthour: { cat: 'behavior', label: 'Restart hour', hint: '0–23' },
+    updatecheck:     { cat: 'behavior', label: 'Check GitHub for new versions' },   // TASK-2023
+    updatecheckbeta: { cat: 'behavior', label: 'Also tell about beta versions' },    // TASK-2023
     // Most-used SAT fields get curated labels; the long tail falls back to the
     // humanised key under the SAT category (Phase 2: port full SAT metadata).
     satenabled:      { cat: 'sat', label: 'SAT enabled' },
@@ -4387,7 +4397,8 @@
   // TASK-1692: darktheme is never read by this UI (the theme comes from the toggle in this
   // browser, else the OS preference, see the v2.html pre-paint script); the key stays in REST
   // and in the settings file.
-  var SET_HIDE_ROW = { sat_onboarded: 1, ui_onboarded: 1, darktheme: 1 };
+  // TASK-2023: updatecheckasked is the one-time question's flag, set by the UI itself.
+  var SET_HIDE_ROW = { sat_onboarded: 1, ui_onboarded: 1, darktheme: 1, updatecheckasked: 1 };
   function humanizeKey(k) {
     var s = k.replace(/^(sat|otd|gpiosensors|gpiooutputs|s0counter|mqtt|wifi|eth|ntp|webhook|ui_|dallas)/, '');
     if (!s) s = k;
@@ -8513,6 +8524,134 @@
     });
   }
 
+  // ---------- TASK-2023 (ADR-262): 'new version available' from the GitHub releases API ----------
+  // The BROWSER asks GitHub; the gateway makes no outbound request (it stays HTTP-only, ADR-003). The request is not
+  // same-origin /api/, so the ADR-184 queue lets it pass and it never takes one of the device's 2 REST slots.
+  // /releases/latest is not usable: it names the 1.x stable line (main), so the list is filtered to the running major.
+  // The answer is cached in this browser for 6 h (GitHub allows 60 unauthenticated requests per hour per IP); a
+  // failure (403/429 rate limit, network, CORS) shows nothing and keeps the cached answer. Device settings: updatecheck
+  // (on/off), updatecheckasked (the one-time question of UI_UPDATE_CHECK_DEFAULT_MODE 1 was answered), updatecheckbeta.
+  var UPD_API = 'https://api.github.com/repos/rvdbreemen/OTGW-firmware/releases?per_page=30';
+  var UPD_PAGE = 'https://github.com/rvdbreemen/OTGW-firmware/releases/tag/';
+  var UPD_CACHE_KEY = 'otgw-upd-cache', UPD_DISMISS_KEY = 'otgw-upd-dismissed';
+  var UPD_MAX_AGE_MS = 6 * 3600 * 1000;
+  function updParse(v) {
+    var m = /^v?(\d+)\.(\d+)\.(\d+)(?:-beta\.(\d+))?$/.exec(('' + (v || '')).trim().split('+')[0]);
+    return m ? { maj: +m[1], min: +m[2], pat: +m[3], beta: m[4] === undefined ? null : +m[4] } : null;
+  }
+  function updCmp(a, b) {   // semver for X.Y.Z[-beta.N]: a stable X.Y.Z ranks above every X.Y.Z-beta.N
+    if (a.maj !== b.maj) return a.maj - b.maj;
+    if (a.min !== b.min) return a.min - b.min;
+    if (a.pat !== b.pat) return a.pat - b.pat;
+    if (a.beta === b.beta) return 0;
+    if (a.beta === null) return 1;
+    if (b.beta === null) return -1;
+    return a.beta - b.beta;
+  }
+  // The newest release tag above the running version, or null. A beta (or alpha) build is told about newer betas and
+  // stable releases; a stable build only about stable releases, unless includeBeta (team decision, TASK-2023 AC3).
+  function updPickNewer(releases, running, includeBeta) {
+    var cur = updParse(running);
+    if (!cur || !Array.isArray(releases)) return null;
+    var wantBeta = !!includeBeta || cur.beta !== null;
+    var best = null, bestTag = null;
+    releases.forEach(function (r) {
+      if (!r || r.draft) return;
+      var tag = '' + (r.tag_name || '');
+      if (!/^v\d+\.\d+\.\d+(-beta\.\d+)?$/.test(tag)) return;
+      var p = updParse(tag);
+      if (!p || p.maj !== cur.maj) return;
+      if ((p.beta !== null || r.prerelease === true) && !wantBeta) return;
+      if (best === null || updCmp(p, best) > 0) { best = p; bestTag = tag; }
+    });
+    return (best && updCmp(best, cur) > 0) ? bestTag : null;
+  }
+  function updFlag(k) { return !!(setData && setData[k] && ('' + setData[k].value) === 'true'); }
+  function updShowNotice(tag) {
+    var old = document.getElementById('hdrUpd');
+    if (old && old.parentNode) old.parentNode.removeChild(old);
+    if (!tag) return;
+    try { if (localStorage.getItem(UPD_DISMISS_KEY) === tag) return; } catch (e) { }
+    var host = document.getElementById('hdrHost');
+    if (!host || !host.parentNode) return;
+    var box = document.createElement('span'); box.className = 'hdr-id'; box.id = 'hdrUpd';
+    var a = document.createElement('a');
+    a.href = UPD_PAGE + encodeURIComponent(tag); a.target = '_blank'; a.rel = 'noopener noreferrer';
+    a.textContent = t('conn.upd_new', { ver: tag });   // the tag passed the vX.Y.Z[-beta.N] filter; text only, never HTML
+    var x = document.createElement('button'); x.type = 'button'; x.textContent = '×';
+    x.title = t('conn.upd_dismiss'); x.setAttribute('aria-label', t('conn.upd_dismiss'));
+    x.setAttribute('style', 'background:none;border:0;color:inherit;cursor:pointer;padding:0 0 0 6px;font:inherit');
+    x.addEventListener('click', function () {
+      try { localStorage.setItem(UPD_DISMISS_KEY, tag); } catch (e) { }
+      if (box.parentNode) box.parentNode.removeChild(box);
+    });
+    box.appendChild(a); box.appendChild(x);
+    host.parentNode.insertBefore(box, host.nextSibling);
+  }
+  function updPost(name, value) {
+    return fetch(APIGW + 'v2/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: name, value: value }) });
+  }
+  function updAsk() {
+    if (document.getElementById('updBackdrop')) return;
+    var bd = document.createElement('div'); bd.id = 'updBackdrop'; bd.className = 'sim-backdrop';
+    var m = document.createElement('div'); m.className = 'sim-modal';
+    var h = document.createElement('h3'); h.textContent = t('conn.upd_ask_title');
+    var p = document.createElement('p'); p.textContent = t('conn.upd_ask_body');
+    var acts = document.createElement('div'); acts.className = 'acts';
+    var no = document.createElement('button'); no.textContent = t('conn.upd_ask_no');
+    var yes = document.createElement('button'); yes.className = 'primary'; yes.textContent = t('conn.upd_ask_yes');
+    function close() { if (bd.parentNode) bd.parentNode.removeChild(bd); }
+    function answer(on) {
+      close();
+      // One POST at a time (never a burst, REST backpressure TASK-884); the setting first, the asked flag last.
+      updPost('updatecheck', on).then(function () { return updPost('updatecheckasked', true); }).then(function () {
+        if (setData.updatecheck) setData.updatecheck.value = on;
+        if (setData.updatecheckasked) setData.updatecheckasked.value = true;
+        if (on) maybeUpdateCheck();
+      }).catch(function () { });
+    }
+    no.addEventListener('click', function () { answer(false); });
+    yes.addEventListener('click', function () { answer(true); });
+    bd.addEventListener('click', function (e) { if (e.target === bd) close(); });   // not now: asked again on the next visit
+    acts.appendChild(no); acts.appendChild(yes);
+    m.appendChild(h); m.appendChild(p); m.appendChild(acts); bd.appendChild(m);
+    document.body.appendChild(bd);
+  }
+  function maybeUpdateCheck() {
+    if (!setData || !setData.updatecheck) return;   // settings not loaded, or a firmware without the setting
+    if (!updFlag('updatecheck')) {
+      // Off: nothing goes to GitHub. Ask once, after the first-time wizard and never over another dialog.
+      if (!updFlag('updatecheckasked') && (!setData.ui_onboarded || updFlag('ui_onboarded')) &&
+          !document.getElementById('onbBack') && !document.getElementById('simBackdrop')) updAsk();
+      return;
+    }
+    if (setData.updatecheckasked && !updFlag('updatecheckasked')) {   // switched on in Settings: never ask afterwards
+      setData.updatecheckasked.value = true;
+      updPost('updatecheckasked', true).catch(function () { });
+    }
+    withDeviceInfo(function (d) {
+      if (!d || !d.fwversion) return;
+      var beta = updFlag('updatecheckbeta');
+      var cache = null;
+      try { cache = JSON.parse(localStorage.getItem(UPD_CACHE_KEY) || 'null'); } catch (e) { cache = null; }
+      var fresh = cache && Array.isArray(cache.rel) && typeof cache.ts === 'number' && (Date.now() - cache.ts) < UPD_MAX_AGE_MS;
+      if (fresh) { updShowNotice(updPickNewer(cache.rel, d.fwversion, beta)); return; }
+      fetch(UPD_API, { cache: 'no-store', credentials: 'omit', referrerPolicy: 'no-referrer', headers: { Accept: 'application/vnd.github+json' } })
+        .then(function (r) { if (!r.ok) throw new Error('http ' + r.status); return r.json(); })
+        .then(function (j) {
+          if (!Array.isArray(j)) throw new Error('not a list');
+          var rel = j.map(function (r) { return { tag_name: r && r.tag_name, draft: !!(r && r.draft), prerelease: !!(r && r.prerelease) }; });
+          try { localStorage.setItem(UPD_CACHE_KEY, JSON.stringify({ ts: Date.now(), rel: rel })); } catch (e) { }
+          updShowNotice(updPickNewer(rel, d.fwversion, beta));
+        })
+        .catch(function () {   // quiet: no notice from the failure itself, and the next try also waits 6 h (no retry loop)
+          var rel = (cache && Array.isArray(cache.rel)) ? cache.rel : [];   // an older cached answer still counts
+          try { localStorage.setItem(UPD_CACHE_KEY, JSON.stringify({ ts: Date.now(), rel: rel })); } catch (e) { }
+          updShowNotice(updPickNewer(rel, d.fwversion, beta));
+        });
+    });
+  }
+
   // ---------- TASK-992: hide the Advanced > PIC sub-tab when no PIC is present ----------
   // OT-Direct boards (OTGW32) have no PIC firmware, so the PIC tab is dead there.
   function applyPicTabVisibility() {
@@ -8655,6 +8794,8 @@
     // TASK-991: on a bench setup (no boiler/thermostat on the bus, PIC board), offer
     // simulation mode once. Delayed past the boot burst so the bus state has settled.
     setTimeout(maybePromptSimulation, 12000);
+    // TASK-2023: the GitHub version check (or its one-time question), well after the boot burst and the sim prompt.
+    setTimeout(maybeUpdateCheck, 30000);
 
     // TASK-984: close the floating override panel on an outside click. The two triggers
     // (#aOvrBadge on Home, #cnOvr on the connection map) stopPropagation on their own

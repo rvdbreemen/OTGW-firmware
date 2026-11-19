@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : fsWriter.ino
-**  Version  : v2.0.0-poc.17
+**  Version  : v2.0.0-poc.18
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **

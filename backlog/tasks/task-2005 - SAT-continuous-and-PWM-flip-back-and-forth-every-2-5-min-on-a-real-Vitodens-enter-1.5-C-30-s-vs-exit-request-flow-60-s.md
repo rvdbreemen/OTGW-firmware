@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-16T16:35:00Z'
-updated_date: '2026-11-18T09:22:00Z'
+updated_date: '2026-11-19T08:40:00Z'
 labels:
   - sat
   - field
@@ -66,4 +66,6 @@ Citations verified at pin 7beaaf5 via raw.githubusercontent (coordinator, 2026-1
 2026-11-17 AC2 replay: tests/test_sat_vitodens_replay_2005.py feeds the recorded SATTICK (pid, flow) ticks of indigo's beta.350 capture (OTGW-field-data/indigo_light/20261116-144953, hours/20261116-16.zip telnet.log) for the three continuous segments 16:19:58-16:30:28, 16:32:28-16:35:28, 16:37:28-16:39:28 through the real satCycleCheckOvershootSwitch with the real SATtypes.h default. Old code (origin before TASK-2005, 1.5/30): switches at 660 s / 210 s / 150 s = exactly the recorded 16:30:28, 16:35:28, 16:39:28 (harness reproduces the field), 3/3 red. Fix 8ffd2d121 (2.0/60): no switch in any segment up to those ticks, 3/3 green. Limit: after each recorded switch the capture shows PWM, so the replay cannot show what continuous would have done later.
 
 2026-11-18 field data (comms 92, analyze-capture on indigo_light's beta.360 day run 20261117-092448, 09:25-23:00, Vitodens 100-W): 20 continuous<->PWM switches over the day (SATTICK mode changes), the beta.360 1.5 C / 30 s rule; room 20.75-21.05 C from 13:30 to 22:25 at target 21.0, never above 21.1 (no band stop needed). Baseline for the beta.361 rule (2 C / 60 s): compare with his 24 h run on a newer beta. Flow peaks of 55-62 C between runs are standing water (flame 0, CH 0; drops to ~33 C when the pump runs at 12:56). Posted to him with chart: #beta-testing 1572542421840171140.
+
+2026-11-19 field observation (comms 92; indigo_light 24 h capture on beta.360, 18/11 08:55 - 19/11 08:58, archived OTGW-field-data\indigo_light\2026-11-18_2.0.0-beta.360+9665467\24h-20261118-085549, analysis in its _analysis\; posted #beta-testing 1572893964686856193 / 1572893975646310401). Morning 05:00-08:43, target 20.5, outside 9.0-9.6 C: room mean 20.26, more than 0.1 below target in 91 % of ticks. Each of the three long off phases (06:21-06:42, 07:23-07:59 incl. a hot-water draw, 08:32-08:44) contains 'SAT PWM: cycle limit 3/hr reached, suppressing new cycle' (06:27:11, 07:34:11, 08:42:11) while the room was 0.16-0.35 C below target; the 3 cycles/hour limit is Sergeant D's rule (entries 31/52). Integral 0 in 90 % of the morning ticks (pre-beta.376 reset). The 77 PWM/continuous switches in 24 h are 31 'flow >= setpoint + 1.5 for 30 s' and 29 'request above flow for 60 s', repeating every 1.5-3 min inside single burns (the pre-361 rule this task changed). Description only, no claim about intended behaviour. Coordinator: no Sergeant D question about the cycle limit until indigo's beta.382 run (other switch rules + integral halving) shows whether it still happens.
 <!-- SECTION:NOTES:END -->

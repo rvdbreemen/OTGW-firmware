@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-15T09:35:00Z'
-updated_date: '2026-11-19T08:36:00Z'
+updated_date: '2026-11-19T09:05:00Z'
 labels:
   - research
   - tls
@@ -123,4 +123,6 @@ poc.13 build (build.bat --target esp32-combo-tlsdyn, 2026-11-19 07:06-07:20, 'Bu
 2026-11-19 Robert: no 'Cloud' in the code. Renamed (poc.16): CloudRec* -> RemoteTelemetry* (files, types), cloudRec* -> remoteTelemetry*, HAS_CLOUD_REC/OTGW_CLOUD_REC_POC/CLOUDREC_* -> HAS_REMOTE_TELEMETRY/OTGW_REMOTE_TELEMETRY_POC/REMOTE_TELEMETRY_*, namespace crec -> rtel, tests test_cloudrec_* -> test_remote_telemetry_*, tools/cloud-recorder -> tools/remote-telemetry, docs/diagnostics/cloudrec-bench-* -> telemetry-bench-*. Device-visible: /cloudrec.cfg -> /telemetry.cfg, NVS namespace and FreeRTOS task 'cloudrec' -> 'telemetry', log prefix 'cloudrec:' -> 'telemetry:'. Plain 'Telemetry' was not used: it already names SAT telemetry (TelemetryDecisions, 'Telemetry only'). Kept: weather cloud_cover, Cloudflare, the branch name research/cloud-recording, Accepted ADR-290 (immutable) and task history. New NVS namespace = new secret on the first poc.16 boot, so the .63 bench needs the server record deleted once anyway. Tests: 124 passed (3 pre-existing remote_telemetry_policy failures, unchanged), evaluate --quick 103/0 failed.
 
 2026-11-19 second merge of origin/dev (63a773a4b) into research (poc.17): 60 banner conflicts take dev, ADR index keeps dev's ADR-261 + research ADR-290, no duplicate IDs, OpenTherm pointer = dev 51aa68e. Targeted tests 118 passed, evaluate --quick 103/0 failed.
+
+2026-11-19 third merge of origin/dev (1a3422e3e, beta.387) into research (poc.18): banner conflicts take dev, ADR index keeps dev's ADR-262 + research ADR-290, no duplicate IDs, submodule pointers = dev.
 <!-- SECTION:NOTES:END -->

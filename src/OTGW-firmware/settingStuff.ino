@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : settingsStuff
-**  Version  : v2.0.0-poc.17
+**  Version  : v2.0.0-poc.18
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -334,6 +334,9 @@ bool writeSettings(bool show)
   writeJsonIntKV(file, F("boardmode"), settings.iBoardMode);  // ADR-127 combo board-mode cache/override
   writeJsonBoolKV(file, F("ui_onboarded"), settings.ui.bOnboarded);
   writeJsonBoolKV(file, F("sat_onboarded"), settings.ui.bSatOnboarded);
+  writeJsonBoolKV(file, F("updatecheck"), settings.ui.bUpdateCheck);              // TASK-2023
+  writeJsonBoolKV(file, F("updatecheckasked"), settings.ui.bUpdateCheckAsked);    // TASK-2023
+  writeJsonBoolKV(file, F("updatecheckbeta"), settings.ui.bUpdateCheckBeta);      // TASK-2023
   writeJsonBoolKV(file, F("GPIOSENSORSenabled"), settings.sensors.bEnabled);
   writeJsonBoolKV(file, F("GPIOSENSORSlegacyformat"), settings.sensors.bLegacyFormat);
   writeJsonIntKV(file, F("GPIOSENSORSpin"), settings.sensors.iPin);
@@ -1019,6 +1022,9 @@ void updateSetting(const char *field, const char *newValue)
   else if (strcasecmp_P(field, PSTR("boardmode"))==0)          { int m = atoi(newValue); settings.iBoardMode = (m >= 0 && m <= 3) ? (uint8_t)m : 0; }  // ADR-127/157
 
   else if (strcasecmp_P(field, PSTR("ui_onboarded"))==0)    { settings.ui.bOnboarded = EVALBOOLEAN(newValue); g_sawOnboardedKey = true; }  // TASK-997: key presence = existing install (see readSettings migration)
+  else if (strcasecmp_P(field, PSTR("updatecheck"))==0)       settings.ui.bUpdateCheck = EVALBOOLEAN(newValue);       // TASK-2023
+  else if (strcasecmp_P(field, PSTR("updatecheckasked"))==0)  settings.ui.bUpdateCheckAsked = EVALBOOLEAN(newValue);  // TASK-2023
+  else if (strcasecmp_P(field, PSTR("updatecheckbeta"))==0)   settings.ui.bUpdateCheckBeta = EVALBOOLEAN(newValue);   // TASK-2023
   else if (strcasecmp_P(field, PSTR("sat_onboarded"))==0)     settings.ui.bSatOnboarded = EVALBOOLEAN(newValue);  // TASK-1012: no g_sawKey migration — defaults false so existing SAT users are prompted once (client gates on satenabled)
 
   else if (strcasecmp_P(field, PSTR("GPIOSENSORSenabled")) == 0)

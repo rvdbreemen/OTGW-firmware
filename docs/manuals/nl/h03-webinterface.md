@@ -316,6 +316,17 @@ De v2-webinterface heeft geen Wi-Fi-scanpaneel; om van netwerk te wisselen gebru
 
 De nachtelijke herstart veroorzaakt een korte onderbreking van ongeveer 30 seconden. De functie is alleen actief wanneer NTP is ingeschakeld en gesynchroniseerd, zodat het apparaat de juiste lokale tijd kent.
 
+#### GitHub controleren op nieuwe versies
+
+Vanaf firmware 2.0.0-beta.387. De web-UI kan melden wanneer er een nieuwere firmware op GitHub staat. Er verschijnt dan een melding in de kopregel naast de firmwareversie, met een link naar de releasepagina.
+
+- Wie vraagt het aan GitHub: je browser, niet de gateway. De gateway blijft op je lokale netwerk en stuurt hiervoor niets naar internet.
+- Wat er wordt verstuurd: je browser vraagt api.github.com hooguit elke 6 uur om de lijst met OTGW-firmware-releases. Zoals bij elke website ziet GitHub je internet-IP-adres. Het adres van de gateway gaat niet mee: het verzoek bevat geen referrer en geen cookies.
+- Eerste keer: de web-UI vraagt één keer of je dit wilt. Je antwoord wordt op de gateway opgeslagen en geldt voor elke browser.
+- Uitzetten: Instellingen > Gedrag > "GitHub controleren op nieuwe versies". Staat het uit, dan doet de browser helemaal geen verzoek naar GitHub.
+- Bèta's: een bètafirmware krijgt nieuwere bèta's en stabiele releases te zien. Een stabiele firmware alleen stabiele releases, tenzij je ook "Ook bètaversies melden" aanzet.
+- Melding verbergen: de × ernaast verbergt die versie tot er een nieuwere is.
+
 #### Apparaat sectie
 
 | Instelling | Omschrijving | Standaard |

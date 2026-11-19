@@ -11027,6 +11027,84 @@
         "supersedes": [],
         "superseded_by": null
       }
+    },
+    {
+      "id": "ADR-262",
+      "title": "The web UI checks the GitHub releases API from the browser for a newer firmware; the gateway makes no outbound request; off by default with a one-time question",
+      "path": "ADR-262-the-web-ui-checks-the-github-releases-api-from-the-browser-for-a-newer-firmware-the-gateway-makes-no-outbound-request-off-by-default-with-a-one-time-question.md",
+      "format": "canonical",
+      "status": "Proposed",
+      "date": "2026-11-19",
+      "decision_summary": "The web UI, running in the user's browser, checks the GitHub releases list for a newer firmware and shows a notice wi...",
+      "topics": [
+        "firmware-update",
+        "privacy",
+        "settings",
+        "web-ui"
+      ],
+      "aliases": [
+        "check GitHub for new versions",
+        "new version available",
+        "update check"
+      ],
+      "components": [
+        "device settings updatecheck, updatecheckasked, updatecheckbeta (UISection, UI_UPDATE_CHECK_DEFAULT_MODE)",
+        "web UI version check (data/v2.js updParse, updCmp, updPickNewer, maybeUpdateCheck, updAsk)"
+      ],
+      "symbols": [
+        "bUpdateCheck",
+        "bUpdateCheckAsked",
+        "bUpdateCheckBeta",
+        "maybeUpdateCheck",
+        "UI_UPDATE_CHECK_DEFAULT_MODE",
+        "updPickNewer"
+      ],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [
+          "Make the GitHub request from the browser only, with credentials: 'omit' and referrerPolicy: 'no-referrer'.",
+          "Make no request to GitHub while updatecheck is off, and none before the user said yes (mode 1).",
+          "Filter releases to the running major version and compare by semantic version, never by list order or /releases/latest.",
+          "Cache answers and failures for 6 h, and fail quietly.",
+          "Render tag and link from the validated tag with textContent."
+        ],
+        "must_not": [
+          "Put any network code in the firmware that contacts GitHub.",
+          "Show or execute any HTML (HyperText Markup Language) or text taken from the GitHub answer other than the tag name.",
+          "Send the GitHub request through the device API queue."
+        ],
+        "exceptions": [
+          "None."
+        ],
+        "verification": [
+          "tests/webui/update-check-github.test.mjs runs the real data/v2.js functions and the ADR-184 queue against a fetch stub, 13 tests:",
+          "the semantic version and major filter, the beta/stable rule and drafts;",
+          "setting off: 0 requests;",
+          "the one-time question, its POST order, and its wait for the wizard;",
+          "one request with credentials: 'omit' and no-referrer, and queue inFlight() 0 during it;",
+          "the link and the 6 h cache;",
+          "dismiss;",
+          "403, 429, network error and non-list answers: quiet, and no retry before 6 h. Red 0/13 on the earlier data/v2.js. Three mutants each turn it red: no major filter, no off switch, no referrer policy.",
+          "tests/testupdatechecksettings.py checks:",
+          "the struct defaults derive from the constant;",
+          "each key is in the settings file, in dispatch, in GET and in the POST whitelist;",
+          "the help texts and the hidden row;",
+          "no firmware source names api.github.com. Red 4/6 on the earlier sources."
+        ]
+      },
+      "scope": {
+        "path_globs": [
+          "src/OTGW-firmware/**/*.ino"
+        ]
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
     }
   ],
   "relationships": [
@@ -18293,6 +18371,30 @@
     {
       "source": "ADR-261",
       "target": "ADR-258",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-262",
+      "target": "ADR-003",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-262",
+      "target": "ADR-184",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-262",
+      "target": "ADR-213",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-262",
+      "target": "ADR-218",
       "type": "related",
       "resolved": true
     }
