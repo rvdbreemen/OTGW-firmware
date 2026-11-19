@@ -1107,26 +1107,18 @@ static void remoteTelemetryUpdateActive() {
   } else if (!want && remoteTelemetryActive) {
     // TASK-2901 (Robert 2026-11-19: signal back that the recording is paused): the last item before capture stops
     static const char *const why[] = {"probe", "up", "upload backs off", "uid enrolled with another secret", "upload off"};
-    // Robert 2026-11-19: a pause empties the send queue (no stale backlog later); what it drops is counted (SEC_LOST),
-    // and one record stays: the pause marker itself, delivered once the collection point takes data again.
-    uint32_t dropped = 0;
-    if (platformMutexLock(remoteTelemetryLock, 200)) {
-      for (int i = 0; i < remoteTelemetrySlotCount; i++) {
-        if (remoteTelemetrySlots[i].busy) { remoteTelemetrySlots[i].busy = false; dropped++; }
-      }
-      remoteTelemetry.lostRecords += dropped;
-      platformMutexUnlock(remoteTelemetryLock);
-    }
+    // Robert 2026-11-19 (final): a pause keeps the send queue as it is; it is delivered oldest first once the
+    // collection point takes data again. The pause marker closes into the queue behind it.
     RemoteTelemetryEv e;
     e.u8(1);
     e.textz(remoteTelemetryPauseWhy ? remoteTelemetryPauseWhy : why[remoteTelemetrySvc < 5 ? remoteTelemetrySvc : 4]);
     e.send(rtel::EV_PAUSE);
-    if (platformMutexLock(remoteTelemetryLock, 200)) {     // the pause marker closes into the (now empty) queue
+    if (platformMutexLock(remoteTelemetryLock, 200)) {     // the pause marker closes into the queue
       remoteTelemetryCloseLocked(remoteTelemetryNowUs() / 1000);
       platformMutexUnlock(remoteTelemetryLock);
     }
-    DebugTf(PSTR("telemetry: capture paused (%s); send queue emptied, %u records dropped\r\n"),
-            remoteTelemetryPauseWhy ? remoteTelemetryPauseWhy : why[remoteTelemetrySvc < 5 ? remoteTelemetrySvc : 4], (unsigned)dropped);
+    DebugTf(PSTR("telemetry: capture paused (%s); the send queue is kept\r\n"),
+            remoteTelemetryPauseWhy ? remoteTelemetryPauseWhy : why[remoteTelemetrySvc < 5 ? remoteTelemetrySvc : 4]);
     remoteTelemetryPauseWhy = nullptr;
     remoteTelemetryActive = false;
   }
@@ -1272,14 +1264,14 @@ static void remoteTelemetryBackoff(const __FlashStringHelper *why, bool maxWait)
   remoteTelemetryPause(true);
   const bool skipped = remoteTelemetryLastSkipped && !maxWait;   // poc.22: low local heap, not a server failure
   remoteTelemetryLastSkipped = false;
-  // while capture is paused (uid clash, a full send queue) the waits may grow to 60 min, else to 15 min (Robert)
-  const uint32_t cap = (maxWait || !remoteTelemetryActive) ? rtel::BACKOFF_PAUSE_MAX_MS : rtel::BACKOFF_MAX_MS;
+  // while capture is paused (a full send queue) the waits may grow to 60 min, else to 15 min (Robert)
+  const uint32_t cap = remoteTelemetryActive ? rtel::BACKOFF_MAX_MS : rtel::BACKOFF_PAUSE_MAX_MS;
   uint32_t wait = maxWait ? rtel::backoffMs(remoteTelemetryBackoffStep, platformHardwareRandom(), cap)
                 : skipped ? REMOTE_TELEMETRY_SKIP_RETRY_MS
                           : rtel::backoffMs(remoteTelemetryBackoffStep, platformHardwareRandom(), cap);
   if (!skipped && remoteTelemetryBackoffStep < 255) remoteTelemetryBackoffStep++;
   remoteTelemetryNextProbe = millis() + wait;
-  remoteTelemetrySvc = maxWait ? SVC_UID_TAKEN : SVC_BACKOFF;
+  remoteTelemetrySvc = SVC_BACKOFF;                       // also a uid clash: capture goes on into the queue until it is full
   remoteTelemetryUpdateActive();
   DebugTf(PSTR("telemetry: %s; %s, next attempt in %u s\r\n"), skipped ? "heap low" : (const char *)why,
           remoteTelemetryActive ? "capture goes on (queued)" : "capture paused", (unsigned)(wait / 1000));
@@ -1294,21 +1286,21 @@ static void remoteTelemetryWriteConfig() {
 }
 
 // TASK-2901 (Robert 2026-11-19): the collection point can never turn remote telemetry off. "blocked" is only learnt from
-// the reply to a delivery attempt, and it pauses: capture stops (EV_PAUSE "blocked by the collection point"), the next
-// attempt follows after the longest backoff, and /telemetry.cfg stays as the user set it on the device.
+// the reply to a delivery attempt and is handled like any delivery that does not get through: capture goes on into the
+// send queue, the next attempt follows after the spread backoff (15 min cap while capturing, 60 min once the full queue
+// paused capture), nothing is thrown away, and /telemetry.cfg stays as the user set it on the device. Once the block is
+// lifted the next attempt logs in, the queue goes out oldest first and capture resumes.
 static void remoteTelemetryBlocked() {
   remoteTelemetryRemote = {rtel::RM_DEFAULT, 0, 0};       // any central telemetry mode ends with it
   remoteTelemetryApplyRemote();
-  remoteTelemetryPauseWhy = "blocked by the collection point";
-  remoteTelemetryPause(true);
-  remoteTelemetryNextProbe = millis() + rtel::backoffMs(remoteTelemetryBackoffStep, platformHardwareRandom(),
-                                                       rtel::BACKOFF_PAUSE_MAX_MS);   // paused: up to 60 min, resumes once lifted
+  remoteTelemetryPause(true);                              // the open record joins the queue
+  const uint32_t cap = remoteTelemetryActive ? rtel::BACKOFF_MAX_MS : rtel::BACKOFF_PAUSE_MAX_MS;
+  remoteTelemetryNextProbe = millis() + rtel::backoffMs(remoteTelemetryBackoffStep, platformHardwareRandom(), cap);
   if (remoteTelemetryBackoffStep < 255) remoteTelemetryBackoffStep++;
-  remoteTelemetrySvc = SVC_UID_TAKEN;                     // no capture while blocked; local recording, if on, goes on
+  remoteTelemetrySvc = SVC_BACKOFF;                       // capture goes on into the queue until it is full
   remoteTelemetryUpdateActive();
-  remoteTelemetryPauseWhy = nullptr;
-  DebugTf(PSTR("telemetry: %s is blocked by the collection point; paused, next attempt in %u min\r\n"), remoteTelemetryUid,
-          (unsigned)((remoteTelemetryNextProbe - millis()) / 60000));
+  DebugTf(PSTR("telemetry: %s is blocked by the collection point; next attempt in %u min, capture %s\r\n"), remoteTelemetryUid,
+          (unsigned)((remoteTelemetryNextProbe - millis()) / 60000), remoteTelemetryActive ? "goes on (queued)" : "paused");
 }
 
 // From loop(): flash writes the telemetry task may not do itself (its stack is in PSRAM, poc.23).
@@ -1360,6 +1352,9 @@ void remoteTelemetryLoop() {
   remoteTelemetryWriteConfig();
 }
 
+static const uint32_t REMOTE_TELEMETRY_UPLOAD_GAP_MS = 2000;   // 30 uploads a minute at most (Robert 2026-11-19)
+static uint32_t remoteTelemetryLastUploadMs = 0;
+
 static void remoteTelemetryTask(void *) {
   uint32_t lastClose = millis();
   for (;;) {
@@ -1378,13 +1373,15 @@ static void remoteTelemetryTask(void *) {
     rtel::Slot *q = rtel::slotOldest(remoteTelemetrySlots, remoteTelemetrySlotCount);
     if (q) {
       if (remoteTelemetryLocalOn && !q->stored) { remoteTelemetryStoreLocal(*q); q->stored = true; }
-      if (remoteTelemetrySvc == SVC_UP && isNetworkUp()) {
+      // TASK-2901 (Robert 2026-11-19): never more than 30 uploads a minute, so a queue that filled during a pause
+      // drips out (one record per 2 s at most) instead of hitting the collection point in one burst.
+      if (remoteTelemetrySvc == SVC_UP && isNetworkUp() && (uint32_t)(millis() - remoteTelemetryLastUploadMs) >= REMOTE_TELEMETRY_UPLOAD_GAP_MS) {
+        remoteTelemetryLastUploadMs = millis();
         bool blocked;
         rtel::Outcome o = remoteTelemetryUpload(*q, blocked);
         if (blocked) remoteTelemetryBlocked();
         else if (o == rtel::OUT_DOWN || o == rtel::OUT_AUTH) {
-          remoteTelemetryBackoff(F("upload failed"), false);
-          if (remoteTelemetryLocalOn) q->busy = false;   // it is in the ring; the collection point gets the records from here on
+          remoteTelemetryBackoff(F("upload failed"), false);   // the record stays queued (Robert: never thrown away)
         } else {
           q->busy = false;                        // stored, or a resend of a stored seq
         }

@@ -9,7 +9,8 @@ holds the records meanwhile, and capture goes on before the first login and whil
 
 Structural check on RemoteTelemetryDevice.h (the behaviour is proven on the bench, AC #6). Red on 047d0803d (poc.21).
 poc.23: the task stack and the slot table in PSRAM, and no flash write from the task; red on 0c588f91e (poc.22).
-poc.24: 'blocked' pauses and never turns the opt-in off; a full queue pauses capture (EV_PAUSE); red on c2623c057.
+poc.24: 'blocked' never turns the opt-in off; a full queue pauses capture (EV_PAUSE); red on c2623c057.
+poc.27: a pause keeps the queue, 'blocked' and a uid clash keep capturing until the queue is full; red on b832b77df.
 Run: python tests/test_remote_telemetry_queue.py
 """
 import re
@@ -59,7 +60,7 @@ class Queue(unittest.TestCase):
 
     def test_task_writes_no_flash(self):
         """A PSRAM-stack task must not write flash: the config write goes to remoteTelemetryLoop()."""
-        task = body("static void remoteTelemetryTask(void *)")
+        task = body("static void remoteTelemetryTask(void *) {")
         blocked = body("static void remoteTelemetryBlocked()")
         for b in (task, blocked):
             self.assertNotIn("remoteTelemetryWriteConfig()", b)
@@ -73,6 +74,8 @@ class Queue(unittest.TestCase):
         self.assertNotIn("remoteTelemetryCfg.enabled = false", b)
         self.assertNotIn("remoteTelemetryCfgWritePending = true", b)
         self.assertNotIn("SVC_OFF", b)
+        self.assertIn("remoteTelemetrySvc = SVC_BACKOFF;", b)   # poc.27: capture goes on into the queue until it is full
+        self.assertNotIn("SVC_UID_TAKEN", b)
         self.assertIn("rtel::BACKOFF_PAUSE_MAX_MS", b)   # paused: spread, up to 60 min, resumes once the block is lifted
 
     def test_full_queue_pauses_capture_with_a_marker(self):
@@ -81,6 +84,17 @@ class Queue(unittest.TestCase):
         self.assertIn("freeSlots >= 2", b)
         self.assertIn("send queue full", b)
         self.assertIn("EV_PAUSE", b)
+        # poc.27 (Robert): a pause keeps the queue; it is delivered once the backend takes data again
+        pause = b[b.index("} else if (!want && remoteTelemetryActive) {"):]
+        self.assertNotIn(".busy = false", pause, "the pause throws the send queue away")
+        self.assertNotIn("lostRecords +=", pause)
+
+    def test_at_most_30_uploads_a_minute(self):
+        """poc.27 (Robert): never more than 30 uploads a minute; a queue filled during a pause drips out."""
+        self.assertGreaterEqual(const("REMOTE_TELEMETRY_UPLOAD_GAP_MS") or 0, 2000)
+        task = body("static void remoteTelemetryTask(void *) {")
+        self.assertIn("(uint32_t)(millis() - remoteTelemetryLastUploadMs) >= REMOTE_TELEMETRY_UPLOAD_GAP_MS", task)
+        self.assertNotIn("if (remoteTelemetryLocalOn) q->busy = false;", task, "a failed upload drops the record")
 
     def test_guard_limits(self):
         self.assertEqual(const("REMOTE_TELEMETRY_MIN_FREE"), 12288)
