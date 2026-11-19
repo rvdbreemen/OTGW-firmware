@@ -302,17 +302,43 @@ void debugFlagOtgwSimChanged(bool on)
 // --- heapHold begin
 // TASK-2026 bench hook, prerelease builds only: telnet key 'H' starves the heap on purpose, as on .61 (no PSRAM, BLE
 // on): free heap under HEAP_HOLD_FREE_TARGET and the largest block under HEAP_HOLD_MAXBLK_TARGET, never under
-// HEAP_HOLD_FREE_FLOOR. 'H' again releases it; it also releases itself after HEAP_HOLD_MAX_MS, because telnet may not
-// get through to a starved unit, and that is longer than the dead-link recovery (8 + 8 probes of 1 min), so a bench
-// sees the restart first. The key only raises a request (it runs on async_tcp); the loop task takes and frees.
+// HEAP_HOLD_FREE_FLOOR. It keeps that state for the whole hold: every HEAP_HOLD_RETAKE_MS the loop task takes more
+// when the heap has recovered (free or largest block back above its target), and on every loop pass it gives the
+// newest blocks back while another consumer has pushed free under the floor. 'H' again releases it; it also releases itself after
+// HEAP_HOLD_MAX_MS, because telnet may not get through to a starved unit, and that is longer than the dead-link
+// recovery (8 + 8 probes of 1 min), so a bench sees the restart first. The key only raises a request (it runs on
+// async_tcp); the loop task takes and frees.
 static std::atomic<uint8_t> s_heapHoldReq{0};
-static void*    s_heapHoldBlk[160];
+static void*    s_heapHoldBlk[256];
 static uint16_t s_heapHoldN = 0;
 static uint32_t s_heapHoldSinceMs = 0;
+static uint32_t s_heapHoldCheckMs = 0;
 static constexpr uint32_t HEAP_HOLD_MAX_MS        = 30UL * 60UL * 1000UL;
-static constexpr uint32_t HEAP_HOLD_FREE_TARGET   = 7168;
+static constexpr uint32_t HEAP_HOLD_RETAKE_MS     = 5000;   // re-hold check interval while held
+static constexpr uint32_t HEAP_HOLD_FREE_TARGET   = 7168;   // under HEAP_LOW_THRESHOLD (8192)
 static constexpr uint32_t HEAP_HOLD_MAXBLK_TARGET = 2048;   // clearly under WIFI_STARVED_MAXBLOCK (4096); 4096 ended at 4084 B
 static constexpr uint32_t HEAP_HOLD_FREE_FLOOR    = 4096;
+// The hook only sees the heap when the loop task runs; other tasks (WiFi, lwIP, async_tcp) can take heap between two
+// passes, so the since-boot low-water mark can go under the floor without the hook doing anything wrong. The summary
+// below tells the two apart: the lowest free the hook itself sampled, next to the low-water mark at take and release.
+// It is printed at the release and again once a minute for HEAP_HOLD_SUMMARY_REPEATS minutes, because telnet is
+// usually unreachable during the hold and reconnects only after it.
+static constexpr uint8_t  HEAP_HOLD_SUMMARY_REPEATS = 3;
+static uint32_t s_heapHoldLowFree = 0;      // lowest free sampled by the hook during the hold
+static uint32_t s_heapHoldMinAtTake = 0;    // since-boot low-water mark when the hold started
+static uint32_t s_heapHoldMinAtRelease = 0;
+static uint32_t s_heapHoldHeldMs = 0;
+static uint16_t s_heapHoldTops = 0, s_heapHoldBacks = 0;   // blocks taken / given back after the first take
+static uint8_t  s_heapHoldSummaryLeft = 0;
+static uint32_t s_heapHoldSummaryMs = 0;
+
+static void heapHoldSummary()
+{
+  DebugTf(PSTR("heaphold summary: held %u s, re-hold +%u -%u blocks, lowest free seen by the hook %u, "
+               "minFree since boot %u (was %u at take)\r\n"),
+          (unsigned)(s_heapHoldHeldMs / 1000UL), (unsigned)s_heapHoldTops, (unsigned)s_heapHoldBacks,
+          (unsigned)s_heapHoldLowFree, (unsigned)s_heapHoldMinAtRelease, (unsigned)s_heapHoldMinAtTake);
+}
 
 static void heapHoldRelease(PGM_P why)
 {
@@ -320,13 +346,20 @@ static void heapHoldRelease(PGM_P why)
   for (uint16_t i = 0; i < s_heapHoldN; i++) free(s_heapHoldBlk[i]);
   const unsigned n = s_heapHoldN;
   s_heapHoldN = 0;
+  s_heapHoldHeldMs = millis() - s_heapHoldSinceMs;
+  s_heapHoldMinAtRelease = platformMinFreeHeap();
   DebugTf(PSTR("heaphold released (%s): %u blocks, free=%u maxblk=%u\r\n"), why, n,
           (unsigned)platformFreeHeap(), (unsigned)platformMaxFreeBlock());
+  heapHoldSummary();
+  s_heapHoldSummaryLeft = HEAP_HOLD_SUMMARY_REPEATS;
+  s_heapHoldSummaryMs = millis();
 }
 
-static void heapHoldTake()
+// Take blocks until free and the largest block are both under target, never past the floor. Returns the blocks taken.
+static uint16_t heapHoldFill()
 {
   const uint16_t cap = (uint16_t)(sizeof(s_heapHoldBlk) / sizeof(s_heapHoldBlk[0]));
+  const uint16_t n0 = s_heapHoldN;
   while (s_heapHoldN < cap) {
     const uint32_t fr = platformFreeHeap(), mb = platformMaxFreeBlock();
     if (fr < HEAP_HOLD_FREE_TARGET && mb < HEAP_HOLD_MAXBLK_TARGET) break;
@@ -336,19 +369,64 @@ static void heapHoldTake()
     if (!p) break;
     s_heapHoldBlk[s_heapHoldN++] = p;
   }
-  s_heapHoldSinceMs = millis();
+  return (uint16_t)(s_heapHoldN - n0);
+}
+
+static void heapHoldTake()
+{
+  s_heapHoldMinAtTake = platformMinFreeHeap();
+  s_heapHoldTops = s_heapHoldBacks = 0;
+  s_heapHoldSummaryLeft = 0;
+  heapHoldFill();
+  s_heapHoldLowFree = platformFreeHeap();
+  s_heapHoldSinceMs = s_heapHoldCheckMs = millis();
   DebugTf(PSTR("heaphold: %u blocks held, free=%u maxblk=%u; 'H' or %u min releases it\r\n"), (unsigned)s_heapHoldN,
           (unsigned)platformFreeHeap(), (unsigned)platformMaxFreeBlock(), (unsigned)(HEAP_HOLD_MAX_MS / 60000UL));
 }
 
-// Loop task: run a request from the key, and the timer.
+static void heapHoldLogRehold(uint16_t took, uint16_t back)
+{
+  DebugTf(PSTR("heaphold re-hold: +%u -%u blocks, %u held, free=%u maxblk=%u\r\n"), (unsigned)took, (unsigned)back,
+          (unsigned)s_heapHoldN, (unsigned)platformFreeHeap(), (unsigned)platformMaxFreeBlock());
+}
+
+// Every loop pass while held: give the newest blocks back while free is under the floor. Returns the blocks given back.
+static uint16_t heapHoldFloor()
+{
+  uint16_t back = 0;
+  uint32_t fr = platformFreeHeap();
+  if (fr < s_heapHoldLowFree) s_heapHoldLowFree = fr;
+  while (s_heapHoldN && fr < HEAP_HOLD_FREE_FLOOR) { free(s_heapHoldBlk[--s_heapHoldN]); back++; fr = platformFreeHeap(); }
+  s_heapHoldBacks = (uint16_t)(s_heapHoldBacks + back);
+  return back;
+}
+
+// Loop task: run a request from the key, the floor (every pass), the top-up (every HEAP_HOLD_RETAKE_MS), the timer,
+// and the summary repeats after a release.
 void heapHoldTick()
 {
   if (s_heapHoldReq.exchange(0)) {
     if (s_heapHoldN) heapHoldRelease(PSTR("key"));
     else heapHoldTake();
   }
-  if (s_heapHoldN && (uint32_t)(millis() - s_heapHoldSinceMs) >= HEAP_HOLD_MAX_MS) heapHoldRelease(PSTR("timer"));
+  const uint32_t now = millis();
+  if (!s_heapHoldN) {
+    if (s_heapHoldSummaryLeft && (uint32_t)(now - s_heapHoldSummaryMs) >= 60000UL) {
+      s_heapHoldSummaryLeft--;
+      s_heapHoldSummaryMs = now;
+      heapHoldSummary();
+    }
+    return;
+  }
+  if ((uint32_t)(now - s_heapHoldSinceMs) >= HEAP_HOLD_MAX_MS) { heapHoldRelease(PSTR("timer")); return; }
+  const uint16_t back = heapHoldFloor();
+  if (back) { heapHoldLogRehold(0, back); return; }
+  if ((uint32_t)(now - s_heapHoldCheckMs) >= HEAP_HOLD_RETAKE_MS) {
+    s_heapHoldCheckMs = now;
+    const uint16_t took = heapHoldFill();
+    s_heapHoldTops = (uint16_t)(s_heapHoldTops + took);
+    if (took) heapHoldLogRehold(took, 0);
+  }
 }
 // --- heapHold end
 #endif

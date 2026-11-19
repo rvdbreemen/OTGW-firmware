@@ -83,6 +83,9 @@ static HeapHealthLevel g_heap = HEAP_HEALTHY;
 static HeapHealthLevel getHeapHealth() { return g_heap; }
 static uint32_t g_maxBlock = 31732;   // TASK-2026: the largest free block (healthy bench value)
 static uint32_t platformMaxFreeBlock() { return g_maxBlock; }
+#define HEAP_LOW_THRESHOLD 8192               // helperStuff.ino; TASK-2923 AP fallback heap check
+static uint32_t g_freeHeap = 56448;   // TASK-2923: free heap (healthy bench value)
+static uint32_t platformFreeHeap() { return g_freeHeap; }
 
 // ---- fake network -----------------------------------------------------------------------------
 enum { WL_IDLE_STATUS = 0, WL_CONNECTED = 3, WL_DISCONNECTED = 6 };

@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-18T13:06:00Z'
-updated_date: '2026-11-19T13:52:00Z'
+updated_date: '2026-11-19T15:57:00Z'
 labels:
   - heap
   - watchdog
@@ -66,4 +66,6 @@ Correction (coordinator, 2026-11-19): 'MQTT OK' was the regression phase; during
 2026-11-19 5e research (coordinator): group-key rekey miss on a starved .61. Report: docs/diagnostics/task-2026-group-rekey-starved-heap.md (IDF 9bb7aa84fe, the 5 cited files byte-identical to local 5.5.1). Finding: every rekey heap allocation visible in source is small (2/2 reply ~113 B os_malloc esp_wpas_glue.c:26; mbedTLS HMAC ctx crypto_mbedtls.c:325; AES unwrap in place, malloc commented out wpa.c:1767-1776; RX copy frame-sized ~200 B, Kconfig:42-52), so the source does NOT show the rekey failing on malloc at free>=4 KB / maxblk~2 KB. Competing causes sit in the closed driver (32-count dynamic RX limit vs lwIP recvmbox 32, 8 static TX + 16 cache, possible internal threshold): not visible in source. No cheap guaranteed reservation found (sdkconfig change needs custom_sdkconfig hybrid build). Bench checks proposed: unstarved baseline, disconnect reason code (16 = GROUP_KEY_UPDATE_TIMEOUT?), free-vs-maxblk hold variants, optional esp_wifi_statis_dump (UART0 caution).
 
 2026-11-19 5e: 391 bench (09, .61) failed the hook criterion: banner minFree 1040 after the hold (15796 before). minFree is the since-boot low-water mark (heap_caps_get_minimum_free_size, platform_esp32.h:374/393), and telnet was dead for the whole hold (tel.log 14:15:10-14:43:30), so no hook line from inside the hold exists: whether the hook or another task (WiFi reconnects, AP-fallback softAP) caused the dip cannot be read from that run. The hook only runs on the loop task, so other tasks can always dip free between two passes. Fix: the floor give-back now runs every loop pass (was every 5 s), and the release prints a summary (lowest free the hook sampled, low-water mark at take and at release, blocks taken/given back) and repeats it once a minute 3 times so it survives the dead telnet. tests/test_heaphold_hook.py 8 tests: 2 new (floor 1 s after a squeeze; summary + 3 repeats) red on ebc0cf98b, 8/8 green. Follow-up for the supervisor gap: TASK-2916.
+
+5e 2026-11-19 after beta.392: heaphold re-hold lane rebuilt on origin/dev 0e44fd11b from its code-only diff (handleDebug.ino heapHold block, tests/test_heaphold_hook.py), bumped; test_heaphold_hook 8/8 OK, evaluate --quick 89 pass 0 fail. Build waits for the coordinator slot (after ba TASK-2918).
 <!-- SECTION:NOTES:END -->
