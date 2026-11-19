@@ -49,8 +49,9 @@ Proposed, 2026-11-18.
 **Decision Maker:** scope by User: Robert van den Breemen (maintainer), relayed by the coordinator on 2026-11-18:
 "Die snellere self tune (1889) moet wel mee" (TASK-1889 goes into 2.0.0). Behaviour: Sergeant D decided the direction
 (corrections entry 329, 2026-11-13: "hours, not days"; entry 367, Q-TUNE1 A: keep the exclusions, only a faster
-window and step). The numbers (12 counted hours, step 0.05) are option A of Q-1889a, taken by directive until Sergeant
-D answers (docs/sat/open-questions.md); acceptance is Robert's.
+window and step). The numbers (12 counted hours, step 0.05) are option A of Q-1889a, first taken by directive and then
+confirmed by Sergeant D on 2026-11-19 (entry 423, "my answer is A",
+https://discord.com/channels/812969634638725140/1105556725714649128/1572825703299293265); acceptance is Robert's.
 
 ## Status History
 
@@ -182,8 +183,8 @@ the code that was reviewed for ADR-228; the header and this ADR say what a "day"
 
 ## Open Questions
 
-- [ ] Q-1889a: Sergeant D confirms option A (12 counted hours, step 0.05) or chooses B or C (handed to him via the
-  comms session on 2026-11-18).
+- [x] Q-1889a: Sergeant D confirms option A (12 counted hours, step 0.05) or chooses B or C. Answered A on 2026-11-19
+  (entry 423): the decision as built in beta.379, no code change.
 - [ ] Q-1889b: Sergeant D accepts decisions on the warm-up phase alone when the 12-hour window holds under one hour of
   floating data (entry 305 as is), or asks for a floating vote first (queued 2026-11-19, after Q-1889a).
 
@@ -198,7 +199,7 @@ the code that was reviewed for ADR-228; the header and this ADR say what a "day"
 
 ## References
 
-- TASK-1889; Sergeant D corrections entries 72, 329, 340, 358, 367, 422; docs/sat/open-questions.md Q-1889a.
+- TASK-1889; Sergeant D corrections entries 72, 329, 340, 358, 367, 422, 423; docs/sat/open-questions.md Q-1889a, Q-1889b.
 - `src/OTGW-firmware/SATcurveTune.h` (constants), `src/OTGW-firmware/SATcontrol.ino` (`satTuneCloseDay`, `satTuneFormat`,
   `satTuneParse`, `satTuneRollHour`, the `curve_tune` REST object and MQTT publish).
 - thermo-nova 7beaaf5 (`other-projects/SAT-releases-thermo-nova/custom_components/sat`): `entry_data.py:213`,

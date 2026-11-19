@@ -1,11 +1,11 @@
 ---
 id: TASK-1889
 title: 'SAT faster curve self-tune: hours not days (entry 329)'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-13T08:07:00Z'
-updated_date: '2026-11-19T02:21:00Z'
+updated_date: '2026-11-19T04:27:00Z'
 labels:
   - sat
   - adr
@@ -23,9 +23,9 @@ Sergeant D 2026-11-13 (https://discord.com/channels/812969634638725140/110555672
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Plan with thermo-nova citations (pid.py:185-189, const.py:16) and the ADR-228/ADR-230 timing, plus Sergeant D's confirmation of the interpretation, before code
-- [ ] #2 ADR that supersedes the ADR-205/ADR-228/ADR-230 timing
-- [ ] #3 Host test on the real tuner: red on the old timing, green on the new (tests/test_sat_tuner_convergence.py as base)
+- [x] #1 Plan with thermo-nova citations (pid.py:185-189, const.py:16) and the ADR-228/ADR-230 timing, plus Sergeant D's confirmation of the interpretation, before code
+- [x] #2 ADR that supersedes the ADR-205/ADR-228/ADR-230 timing
+- [x] #3 Host test on the real tuner: red on the old timing, green on the new (tests/test_sat_tuner_convergence.py as base)
 - [x] #4 Bench test by the bench-tester
 <!-- AC:END -->
 
@@ -84,4 +84,12 @@ Bench (otgw-bench-tester 09, 2026-11-19, .63 Classic+S3 PSRAM, no boiler, no sim
 2026-11-19 beta.379 pushed: origin/dev ee51724f0..0f9a90699 (1816512ac code + 0f9a90699 docs). Zip 2.0.0-beta.379+0f9a906 posted to Discord, msg 1572790895839940630; archive OTGW-build-archive\2.0.0-beta.379+0f9a906.zip. Rebuild cause: the generated settingsHelpGz.h was not committed with the settingsHelp.h change; tests/test_progmem_assets_deflated.py red on 12792bc98 (2 failed), green on 0f9a90699 (4 passed).
 
 Bench 09 on .63 (d106f55, src-identical to 0f9a906, differing only in the committed copy of the generated gz): REST window_hours/window_hours_needed PASS; v2 file dropped and v3 restore PASS (fixtures); tune card en/nl/de/el + help 12/0.05 PASS; 0 JS errors, keep list, SAT target line PASS. MQTT sat/curve_tune/window_hours NOT OBSERVED on the bench, confirm with SAT active: satcurveselftune=true, but SAT was handed back without a boiler, so the tick publisher satPublishMQTT() was idle (sat/# 220 s: 41 state/flag topics, no sat/curve_recommendation, sat/power, sat/state or curve_tune). 379 does not change any MQTT gate (diff: only the topic rename in the same bCurveSelfTune block). The curve-advice text 'at least 6 hours' is a separate rule (SATcontrol.ino:6134, >=6 hourly samples), not a leftover.
+
+2026-11-19 Q-1889a answered A by Sergeant D (entry 423, 04:07:49 UTC, https://discord.com/channels/812969634638725140/1105556725714649128/1572825703299293265, unedited; recorded by 92, origin 25df1fdb6): the 12-counted-hour rolling window, decided every counted hour, step 0.05, window empties after a step = beta.379 as built, no code change. AC1 ticked on the plan (thermo-nova 7beaaf5 citations, ADR-228/230 timing; pid.py:185-189/const.py:16 belong to TASK-1890's integral halving, as the plan says) plus entry 423. ADR-260 updated (still Proposed; Q-1889a closed, entry 423 cited). Q-1889b (warm-up-only decisions) asked 04:24 UTC; an answer other than A becomes a new task.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+The SAT heating curve self-tune decides every counted hour on a 12-counted-hour window with a 0.05 step (ADR-260 Proposed; acceptance is Robert's). Shipped in beta.379 (origin 0f9a90699). AC1: plan in this task (thermo-nova 7beaaf5 has no tuner: entry_data.py:213, const.py:182, heating_curve.py:15/39, pid.py:71; ADR-228/230 timing) + Sergeant D entry 423 (Q-1889a = A). AC2: ADR-260 supersedes the timing of ADR-205/228/230. AC3: tests/test_sat_curve_selftune.py HourWindow red 9/9 on the origin tuner, green 9/9; tuner tests 120 passed 1 skipped; tests/test_sat_tuner_convergence.py converges on the new constants in every scenario, both mutants fail; web UI sat-tune-progress 8/8 (5/3 on the old v2.js). AC4: bench 09 on .63 (REST, window file v2 drop/v3, card in 4 languages, 0 JS errors). Not verified: MQTT sat/curve_tune/window_hours on a unit with SAT active (bench had SAT handed back; field check); an actual 0.05 step in the field. Open: Q-1889b.
+<!-- SECTION:FINAL_SUMMARY:END -->
