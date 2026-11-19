@@ -21,7 +21,8 @@
 **  every request gets 403 "otgw-blocked"; the gateway then writes enabled=0 to /cloudrec.cfg at once and makes
 **  no further connection: the opt-in is off until the user turns it on again.
 **
-**  Built only in the esp32-combo-tlsdyn env (HAS_CLOUD_REC), whose IDF libraries use dynamic mbedTLS buffers.
+**  Built only in the esp32-combo-tlsdyn env (HAS_CLOUD_REC), whose mbedTLS puts its record buffers in PSRAM.
+**  The cloud upload runs only on a board with PSRAM (Robert, 2026-11-18: no PSRAM, no TLS).
 **  A capture point waits at most 10 ms for the recorder; an item or record that is still lost is counted and
 **  reported in the next record (SEC_LOST, TASK-1972), so a gap in the data is never silent.
 **  Not recorded: output that bypasses the Debug* macros (e.g. the telnet banner).
@@ -1188,6 +1189,10 @@ void cloudRecSetup() {
   cloudRecReadConfig();
   if (!cloudRecCfg.enabled || !cloudRecCfg.host[0]) {
     DebugTln(F("cloudrec: cloud upload off (no /cloudrec.cfg with enabled=1); local recording works as before"));
+    return;
+  }
+  if (!platformHasPsram()) {
+    DebugTln(F("cloudrec: cloud upload needs a board with PSRAM; off"));
     return;
   }
   if (!cloudRecInitCore()) return;

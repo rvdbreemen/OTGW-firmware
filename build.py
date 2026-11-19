@@ -133,7 +133,8 @@ TARGETS["esp32-combo"] = {
 }
 
 # esp32-combo-tlsdyn (TASK-1963 PoC, branch research/cloud-recording only): the esp32-combo image with the IDF
-# libraries rebuilt for dynamic mbedTLS buffers and the cloud recorder compiled in. Never published.
+# libraries rebuilt (session tickets, mbedTLS buffers through malloc so they land in PSRAM) and the cloud recorder
+# compiled in. Never published.
 TLS_POC_TARGET = "esp32-combo-tlsdyn"
 TARGETS[TLS_POC_TARGET] = {
     **TARGETS["esp32-combo"],
