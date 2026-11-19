@@ -114,6 +114,9 @@ def unpack_mix(t0, payload):
         i += 1 + used + n
         if typ in (SEC_OT, SEC_OT_V2):
             off, used2 = _unleb(data)
+            if off >= 1 << 63:     # TASK-2901: a replayed frame stamped with its ideal time before the record's t0
+                off -= 1 << 64     # (mixOtSection writes (uint64_t)(firstMs - t0Ms)): exact, nothing lost
+
             out[SEC_OT] = (unpack_ot if typ == SEC_OT else unpack_ot2)(t0 + off, data[used2:])
         else:
             out[typ] = data

@@ -8,8 +8,8 @@
 when its file ends, so the download may hold the input more than once: every complete pass found in the download is
 checked frame by frame (source letter + frame, in order) and its timing against the recorded gaps.
 
-Exit 0 when at least one complete pass matches exactly and its gaps are within --max-gap-ms of the input (TASK-2901:
-Robert, 3 ms), 1 otherwise. --extract writes the first matching pass back in the input's own format (3 or 4 columns,
+Exit 0 when the judged pass (--pass, default the last: the newest run) matches exactly and its gaps are within
+--max-gap-ms of the input (TASK-2901: Robert, 3 ms), 1 otherwise. --extract writes that pass back in the input's own format (3 or 4 columns,
 times shifted so its first frame has the input's first time): byte-identical to the input when the stream is.
 Standard library only.
 """
@@ -75,7 +75,9 @@ def main(argv):
     ap.add_argument("download")
     ap.add_argument("--report")
     ap.add_argument("--max-gap-ms", type=float, default=3.0, help="largest allowed gap deviation (default 3 ms)")
-    ap.add_argument("--extract", help="write the first matching pass in the input's format to this file")
+    ap.add_argument("--extract", help="write the judged pass in the input's format to this file")
+    ap.add_argument("--pass", dest="which", type=int, default=0,
+                    help="the pass to judge and extract, 1-based; default 0 = the last one (the newest run)")
     a = ap.parse_args(argv)
     src, got = frames(a.replay), frames(a.download)
     key_src = [(l, f) for _, l, f in src]
@@ -97,11 +99,12 @@ def main(argv):
             lines.append(f"- pass {k}: download frames {i}..{i + n - 1}: all {n} frames equal and in order; "
                          f"gap deviation max {worst * 1000:.1f} ms ({'within' if within else 'OVER'} {a.max_gap_ms:g} ms), "
                          f"{late} gaps off by more than 1 s")
-            if k == 1:
+            if k == (a.which or len(starts)):
                 ok = within
+                lines.append(f"- judged: pass {k}")
                 if a.extract:
                     extract(a.replay, src, got[i:i + n], a.extract)
-                    lines.append(f"- extracted pass 1 in the input's format: `{a.extract}`")
+                    lines.append(f"- extracted pass {k} in the input's format: `{a.extract}`")
     else:
         # longest prefix match, to show where it breaks
         best, at = 0, -1
