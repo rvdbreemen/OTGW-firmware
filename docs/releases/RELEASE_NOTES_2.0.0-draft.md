@@ -312,6 +312,8 @@ These are design limits of 2.0.0, not bugs.
 
 ## Known issues
 
+- **Most settings help pop-ups are in English in Dutch, German and Greek** (TASK-2927). The rest of the web UI is translated, and every help text falls back to English, so no help is missing. The translation follows in 2.1.0 (Robert's decision, 2026-11-19).
+
 - **Under investigation: once, a bench unit hung after a crash restart** (TASK-2911). It was on WiFi with an address, but did not answer ping, the web UI or telnet for 8 minutes, until a USB reset; the cause is not known. Normal restarts on that unit worked 5 of 5 times. The WiFi self-recovery only starts after the gateway's router answered once since the start, so it does not cover this case. If your gateway is on WiFi but unreachable after a restart, please tell us.
 
 - **The WiFi self-recovery keeps counting a dead link across a short WiFi reconnect while memory is nearly exhausted (TASK-2026).** This is proven in tests on the real code; a test on a device could not create the exact memory state it needs.

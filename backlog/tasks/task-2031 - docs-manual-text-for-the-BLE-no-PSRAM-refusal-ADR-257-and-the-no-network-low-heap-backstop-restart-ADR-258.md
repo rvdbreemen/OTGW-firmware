@@ -7,7 +7,7 @@ status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-18T15:22:00Z'
-updated_date: '2026-11-19T18:36:00Z'
+updated_date: '2026-11-19T19:59:00Z'
 labels:
   - docs
 milestone: 2.0.0
@@ -48,6 +48,8 @@ Coordinator request 2026-11-18. Manual text prepared before the firmware lands, 
 2026-11-19: CHANGELOG [Unreleased] beta.394 from 17c993a1b: Fixed (beta builds only) task 2923 AP-fallback skipped when free < HEAP_LOW_THRESHOLD 8192 (helperStuff.ino:1128) or maxblock < WIFI_STARVED_MAXBLOCK 4096 (networkStuff.ino:649), code under #if defined(_VERSION_PRERELEASE); Diagnostics prerelease-only task 2026 heap-hold hook. No stable draft line: neither is in stable builds.
 
 2026-11-19 AC2: ch07/h07 7.12a gets 'Automatic recovery (from 2.0.0-beta.383)' and the debug-key tables get an H row (prerelease only). Checked against origin a5630d6fa: networkStuff.ino:639-648 (probe every 60 s, WIFI_PROBE_FAILS_TO_ACT 8, cap 3, clear after 60 min, capped reconnect per 15 min), :784-823 (witness traffic within 60 s = no action; first 8 -> forced reconnect 'WiFi: connected but no traffic, forcing a reconnect' :815; next 8 -> doRestart 'WiFi: connected but no traffic' :822), :832-845 wifiProbeStarvedDead (armed only after a gateway answered, maxblock < 4096, log line :839), :742 wired disarms, :925-930 ADR-261 streak kept. handleDebug.ino:300-320 (FREE_TARGET 7168, MAXBLK_TARGET 2048, FLOOR 4096, MAX 30 min), :584-589 H case under _VERSION_PRERELEASE. Finding (firmware, not docs): the help line 'H) bench: starve the heap...' sits at handleDebug.ino:573-575 inside case 'l' (MyDEBUG toggle), not in the case 'h' menu, so 'h' does not list H and 'l' prints it; reported to the coordinator. Docs therefore do not claim the menu lists H. Gates: build_manual --check exit 0, test_manual_* 10 passed, no em dashes.
+
+2026-11-19 (92 relay; Robert A on task 2927, DM 1573063839715557535): stable notes Known issues gets 'Most settings help pop-ups are in English in Dutch, German and Greek', translation in 2.1.0. 'Most' because the task records 59 of 75 help texts as English on the German UI; per-key English fallback (helpFor() v2.js:4437 per task 2927). Local, push in the 08:00 prep slot.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
