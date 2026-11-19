@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-15T09:35:00Z'
-updated_date: '2026-11-19T09:35:00Z'
+updated_date: '2026-11-19T09:38:00Z'
 labels:
   - research
   - tls
@@ -128,4 +128,6 @@ poc.13 build (build.bat --target esp32-combo-tlsdyn, 2026-11-19 07:06-07:20, 'Bu
 2026-11-19 third merge of origin/dev (1a3422e3e, beta.387) into research (poc.18): banner conflicts take dev, ADR index keeps dev's ADR-262 + research ADR-290, no duplicate IDs, submodule pointers = dev.
 
 2026-11-19 poc.18 build failed dev's app-size gate (scripts/check_app_size.py, TASK-1993): 2,254,736 of 2,293,760 B = 98.3 % > 98 %. Mostly stock mbedTLS code we never call (ssl handshake_server_step 5.8 KB, camellia, pkcs12, rsa_private; not removable without an IDF rebuild); our roots 5.4 KB are in flash rodata (0x3c196689), not RAM. Robert chose A: the never-published PoC env fails above 99 %, every other target keeps 98 % (build.py passes 99 only for TLS_POC_TARGET; tests/test_app_size_check.py 7 passed incl. 98.3 % pass at 99 / fail at 98, 99.5 % fail). RISK for a merge into dev: ~7 KB over the 98 % line on today's dev; candidates: an IDF sdkconfig without TLS server/camellia/pkcs12 (needs the hybrid compile again), DER roots (~1.5 KB), dev's own TASK-1955 reductions.
+
+AC #6 prep (2026-11-19): replay input cut from the gruijter field capture (OTGW-field-data/gruijter/2026-11-10_2.0.0-beta.171+a5da56b/otframes.log), 2026-11-11 08:00-09:00, the busiest hour (71 % flame, 21 starts): 9568 frames, 229,632 B in the 3-column replay layout (device_time ms, source, frame), sha256 9464952eb70649cc...; fallback 08:15-08:45 (4716 frames, 113,184 B, sha256 9b126b64854035e5...). Files in the 5e scratchpad e2e/. New tools/remote-telemetry/compare_replay.py checks every complete pass of the input in a decode_all.py otframes.log frame by frame plus the recorded gaps; self-test green on a copy with lead-in/loop (9568/9568, gap deviation 0.000 s), red with one frame dropped (first difference at input frame 4948).
 <!-- SECTION:NOTES:END -->
