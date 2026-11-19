@@ -282,6 +282,10 @@ Timing and reliability:
 - On macOS with the built-in Python 3.9 the capture tool writes the graph history CSV again (TASK-2016).
 - The device check no longer counts an OT-Direct route that answers "not on this board" as a failure on an OTGW Classic (TASK-2012).
 
+### WiFi
+
+- A gateway whose network is dead while its memory is nearly exhausted now recovers itself: a WiFi check that cannot run for lack of memory counts as dead when the largest free memory block is under 4 KB, so the forced reconnect and then the restart follow (TASK-2026, ADR-258, beta.383). While memory stays that low, a short WiFi reconnect no longer starts that count again (ADR-261, beta.385; log line from beta.388).
+
 ### Diagnostics
 
 - A stopped diagnostic recording stays readable until the next start on boards with PSRAM (TASK-1960, beta.344).
@@ -303,6 +307,8 @@ These are design limits of 2.0.0, not bugs.
 - **Port 25238 filters inbound lines while SAT is on** (ADR-217). Text commands that would change central heating control and binary data are dropped, so OTmonitor cannot control the boiler or flash the PIC over that port while SAT is enabled. With SAT off the port is byte-transparent.
 
 ## Known issues
+
+- **The WiFi self-recovery keeps counting a dead link across a short WiFi reconnect while memory is nearly exhausted (TASK-2026).** This is proven in tests on the real code; a test on a device could not create the exact memory state it needs.
 
 - **The continuous to PWM switch rule of beta.361 (flow at least 2 C above the request for 60 s) has not run with a real boiler** (TASK-2005). A replay of a tester's Vitodens capture through the real code shows the old rule switching 3 times and the new rule not at all.
 
