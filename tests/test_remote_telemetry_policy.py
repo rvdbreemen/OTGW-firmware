@@ -115,6 +115,7 @@ class RemoteTelemetryPolicyTest(unittest.TestCase):
         self.assertEqual(got[(400, 0)], 1)
 
 
+@unittest.skipIf(OUT is None, "no C++ compiler")
 class RemoteTelemetryRemoteModeTest(unittest.TestCase):
     """TASK-2906: rtel::parseRemote / remoteEffective on the real header."""
     SAT, MQTT, NTP, TRACE = 1 << 4, 1 << 2, 1 << 9, 1 << 7
@@ -146,6 +147,7 @@ class RemoteTelemetryRemoteModeTest(unittest.TestCase):
         self.assertEqual(rows[5][2:], [0, all10 & ~self.TRACE])           # unreadable date: no end, mode holds
 
 
+@unittest.skipIf(OUT is None, "no C++ compiler")
 class RemoteTelemetrySlotTest(unittest.TestCase):
     def test_queue(self):
         rows = [l.split() for l in OUT if l.startswith("S ")]
