@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-15T09:35:00Z'
-updated_date: '2026-11-19T05:59:00Z'
+updated_date: '2026-11-19T06:04:00Z'
 labels:
   - research
   - tls
@@ -111,4 +111,6 @@ Fix (poc.11): tlsdyn env drops CONFIG_MBEDTLS_DYNAMIC_BUFFER and its --wrap link
 Correction to the note above: add_rx_buffer sizes the RX buffer with tx_buffer_len() at esp_mbedtls_dynamic_impl.c:408, not :405.
 
 2026-11-19 approach change to poc.12 (Robert asked about proven stacks). Checked: ESPHome uses mbedTLS through ESP-IDF on ESP32 (esphome.io/components/mqtt, TLS 'Only on ESP32'); Tasmota uses its BearSSL tls_mini for espressif32 and espressif8266 (lib/lib_ssl/tls_mini/library.json), TLS 1.2 with few ciphers and 1-2 KB buffers via MFLN (tasmota.github.io/docs/TLS). Stock Arduino libs (D:/DevData/platformio, Dec 2025, no __wrap/dynamic symbols in libmbedtls_2.a) export mbedtls_platform_set_calloc_free (MBEDTLS_PLATFORM_MEMORY on, no fixed macro, esp_config.h:128-133), keep static IN/OUT 16384 (no ASYMMETRIC), TLS 1.3 off, no session tickets. Chosen: stock esp-tls + our allocator (blocks > 4 KB to PSRAM, else internal, heap_caps_free for all), installed as the first statement of setup(). Dropped: custom_sdkconfig, component removes, the tlsdyn libs script (git rm), the isolated PIO core in build.py. Not chosen: Tasmota tls_mini (extra vendored library, licence unchecked, TLS 1.2 only; no gain with PSRAM). Gate tests/test_tlsdyn_env_config.py rewritten: red on poc.10 (1929bd7, 6 errors) and poc.11 (b60648992, 5 errors), green on poc.12. evaluate --quick 99 checks 0 failed; cloudrec suite unchanged (3 pre-existing policy failures).
+
+poc.13: the seq line (CloudRecDevice.h:908) now ends with '; conn heap <internal free>/<largest internal block> psram <PSRAM free>', sampled right after connect() with the TLS session and both record buffers allocated, so the bench sees where cloudRecTlsCalloc() put them (a 60 s device/info poll would miss the ~1 s connection). AES DMA with PSRAM record buffers checked in IDF 5.5.1 (same IDF as the stock libs, sdkconfig header): esp_aes_dma_core.c:81-89 accepts PSRAM as DMA-capable via esp_ptr_dma_ext_capable() under CONFIG_SPIRAM, with cache msync (:369); a buffer the DMA cannot reach is copied through internal chunks (:564-576 -> esp_aes_process_dma_ext_ram). Supported, not a blocker. The gate is a config/structure check; the bench is the behavioural proof. Correction: that ESPHome leaves MBEDTLS_DYNAMIC_BUFFER off is inferred from the IDF Kconfig default (n), not found in ESPHome's source.
 <!-- SECTION:NOTES:END -->

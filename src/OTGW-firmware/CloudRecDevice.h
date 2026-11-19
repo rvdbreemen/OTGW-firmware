@@ -200,6 +200,9 @@ static char cloudRecDevId[24] = "";
 static uint32_t cloudRecSent = 0, cloudRecFailed = 0, cloudRecDroppedItems = 0, cloudRecDroppedRecords = 0;
 static uint32_t cloudRecLastStatus = 0, cloudRecLastMs = 0;
 static uint32_t cloudRecHeapLow = 0xFFFFFFFFu, cloudRecBlockLow = 0xFFFFFFFFu;
+// TASK-1963: internal free, largest internal block and PSRAM free right after the last connect, i.e. with the TLS
+// session and both record buffers allocated: shows where cloudRecTlsCalloc() put them.
+static uint32_t cloudRecConnHeap = 0, cloudRecConnBlock = 0, cloudRecConnPsram = 0;
 
 // Pending line prefix (from _debugBOL) and the tee's copy of the current line.
 static bool     recBolPending = false;
@@ -837,6 +840,9 @@ static bool cloudRecConnect(CloudRecTls &c) {
     return false;
   }
   uint32_t heapTls = platformFreeHeap(), blockTls = platformMaxFreeBlock();
+  cloudRecConnHeap = heapTls;
+  cloudRecConnBlock = blockTls;
+  cloudRecConnPsram = (uint32_t)heap_caps_get_free_size(MALLOC_CAP_SPIRAM);
   if (heapTls < cloudRecHeapLow) cloudRecHeapLow = heapTls;
   if (blockTls < cloudRecBlockLow) cloudRecBlockLow = blockTls;
   return true;
@@ -899,10 +905,11 @@ static crec::Outcome cloudRecUpload(crec::Slot &q, bool &blocked) {
   cloudRecLastMs = millis() - t;
   crec::Outcome o = st == 409 ? crec::OUT_REFUSED : crec::classify(st);
   if (o == crec::OUT_OK || (o == crec::OUT_REFUSED && !blocked && st != 409)) cloudRecSent++; else cloudRecFailed++;
-  DebugTf(PSTR("cloudrec: seq %llu %u B (%u B sent) HTTP %d in %u ms; TLS resumed %u full %u, low %u/%u, min %u\r\n"),
+  DebugTf(PSTR("cloudrec: seq %llu %u B (%u B sent) HTTP %d in %u ms; TLS resumed %u full %u, low %u/%u, min %u; conn heap %u/%u psram %u\r\n"),
           (unsigned long long)q.seq, (unsigned)q.len, (unsigned)sendLen, st, (unsigned)cloudRecLastMs,
           (unsigned)cloudRecResumes, (unsigned)cloudRecFullHandshakes, (unsigned)cloudRecHeapLow,
-          (unsigned)cloudRecBlockLow, (unsigned)platformMinFreeHeap());
+          (unsigned)cloudRecBlockLow, (unsigned)platformMinFreeHeap(), (unsigned)cloudRecConnHeap,
+          (unsigned)cloudRecConnBlock, (unsigned)cloudRecConnPsram);
   return st == 409 ? crec::OUT_DOWN : o;          // 409 only comes from a login; handled by the probe
 }
 

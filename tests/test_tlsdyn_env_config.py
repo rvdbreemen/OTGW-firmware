@@ -36,7 +36,7 @@ def check(ini, main_ino, device):
         errors.append("the env still adds dynamic-buffer link wraps / the tlsdyn libs script")
     setup = body(main_ino, "void setup() {")
     first = [l.strip() for l in setup.splitlines()[1:] if l.strip() and not l.strip().startswith("//")]
-    if first[:2] != ["#if HAS_CLOUD_REC", "cloudRecInstallTlsAllocator();   // TASK-1963: before any mbedTLS user (WiFi crypto, esp-tls)"]:
+    if first[:1] != ["#if HAS_CLOUD_REC"] or len(first) < 2 or not first[1].startswith("cloudRecInstallTlsAllocator();"):
         errors.append("setup() does not install the mbedTLS allocator as its first statement")
     if "mbedtls_platform_set_calloc_free(cloudRecTlsCalloc, cloudRecTlsFree)" not in device:
         errors.append("cloudRecInstallTlsAllocator() does not install cloudRecTlsCalloc/cloudRecTlsFree")
