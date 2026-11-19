@@ -5615,6 +5615,33 @@
     "TASK-1889"
    ],
    "confirmed_by_entry": null
+  },
+  {
+   "id": 425,
+   "title": "The Kd factor becomes 0.05 instead of 0.063 (Sergeant D, 2026-11-19; supersedes the factor of entry 279)",
+   "date": "2026-11-19",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1572837659355914303",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1656"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 426,
+   "title": "Q-1942a answered A: after an outside-temperature hand-back SAT continues in the mode it had when it takes over again with the flame burning; no new heating start (Sergeant D, 2026-11-19; urgent round, 2.0.0)",
+   "date": "2026-11-19",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1572837987211812926",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1942",
+    "TASK-2039"
+   ],
+   "confirmed_by_entry": null
   }
  ]
 }

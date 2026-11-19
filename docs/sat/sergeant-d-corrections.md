@@ -8391,3 +8391,39 @@ Robert, 16:18:42 UTC (https://discord.com/channels/812969634638725140/9144987300
 **Task:** TASK-1889 (no change; confirms the build).
 
 **Open:** none.
+
+## 425. The Kd factor becomes 0.05 instead of 0.063 (Sergeant D, 2026-11-19; supersedes the factor of entry 279)
+
+**Source:** #dev-sat-mqtt, Sergeant D 2026-11-19 04:55:19 UTC (https://discord.com/channels/812969634638725140/1105556725714649128/1572837659355914303; unedited after more than 25 minutes, read back via the Discord API), a reply to our answer to his question "what's the kd coefficient that we use now? 0.063?" (his questions 04:27 UTC, 1572830578175254681 and 1572830735851589763; our answer 04:53 UTC, https://discord.com/channels/812969634638725140/1105556725714649128/1572837266982830083: "Yes, 0.063 ... kd = 0.063 x 8400 x kp = 529.2 x kp (SATpid.ino:226-236), 10 % below thermo-nova's 0.07 x 8400 x kp (pid.py:93)").
+
+**Quoted:**
+> "change it to 0.05"
+
+**Settled:** the derivative gain factor becomes 0.05: kd = 0.05 x 8400 x kp = 420 x kp (was 0.063 x 8400 x kp = 529.2 x kp by entry 279). The 8400 s design time of entry 279 and the rest of the PID are unchanged (reading: he changed only the factor he was asked about; to correct if he means more). Release scope: not stated; asked as a follow-up (2.0.0 or 2.1.0).
+
+**Changes an earlier entry:** supersedes the 0.063 factor of entry 279 (Q-1412.16b); entry 279's 8400 s stays.
+
+**Compared with thermo-nova (7beaaf5):** `kd = round(0.07 * 8400 * self.kp, 6)` (pid.py:93, opened this session); 0.05 is about 29 % below thermo-nova's factor, a deliberate deviation by Sergeant D.
+
+**Compared with the firmware:** `SAT_PID_KD_FACTOR = 0.063f` (SATpid.ino:28, used at :236, opened this session on origin/dev); the change sets it to 0.05f and updates the comments at :26-27 and :225-226 and the tests that pin 529.2 x kp.
+
+**Task:** TASK-1656 (the entry-279 factor task) or a follow-up task; owner per the coordinator.
+
+**Open:** release scope (asked).
+
+## 426. Q-1942a answered A: after an outside-temperature hand-back SAT continues in the mode it had when it takes over again with the flame burning; no new heating start (Sergeant D, 2026-11-19; urgent round, 2.0.0)
+
+**Source:** #dev-sat-mqtt, Sergeant D 2026-11-19 04:56:38 UTC (https://discord.com/channels/812969634638725140/1105556725714649128/1572837987211812926; unedited after more than 25 minutes, read back via the Discord API), a reply to Q-1942a (https://discord.com/channels/812969634638725140/1105556725714649128/1572831138085474415).
+
+**Quoted:**
+> "My answer is A"
+
+**Settled:** option A as posted: when SAT takes over again after an outside-temperature hand-back (entries 56/57) while the flame is already burning, it continues in the mode it had; it is not a heating start (no PWM-first, no 60 s start gate of entries 385/391). That is what the firmware does now; no change. Scope: 2.0.0.
+
+**Compared with thermo-nova (7beaaf5):** no hand-back; the control pass is skipped while the outside temperature is None (climate.py:544-545, opened this session), so its state carries on.
+
+**Background:** marceld91d's beta.361 capture (17 Nov 10:11) showed such a resume 0.4 s after a hand-back; that hand-back itself is fixed in beta.380 (TASK-2039).
+
+**Task:** TASK-1942 (no change).
+
+**Open:** none.
