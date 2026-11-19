@@ -475,6 +475,9 @@ void handleDebugChar(char c){
                 Debugln(F("  s/S) Toggle OTGW serial-simulation replay"));
                 Debugln(F("  w) Trigger Open-Meteo weather fetch and dump state"));
                 Debugln(F("  z) Reset heap soak diagnostics (watermark, histogram, counters)"));
+#if defined(_VERSION_PRERELEASE)
+                Debugln(F("  H) bench: starve the heap / release it (prerelease builds only)"));
+#endif
                 Debugln(F("--- GPIO / Misc ---"));
                 Debugln(F("  b) Blink LED 1 (5x)"));
                 Debugln(F("  i) Initialize relay outputs"));
@@ -570,9 +573,6 @@ void handleDebugChar(char c){
                 break;
             case 'l':
                 settings.bMyDEBUG = !settings.bMyDEBUG;
-#if defined(_VERSION_PRERELEASE)
-                Debugln(F("  H) bench: starve the heap / release it (prerelease builds only)"));
-#endif
                 DebugTf(PSTR("\r\nMyDEBUG: %s\r\n"), CBOOLEAN(settings.bMyDEBUG));
                 break;
             case 'f':
