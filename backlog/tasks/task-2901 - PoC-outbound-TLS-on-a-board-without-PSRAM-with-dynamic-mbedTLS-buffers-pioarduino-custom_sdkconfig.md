@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-15T09:35:00Z'
-updated_date: '2026-11-19T21:56:00Z'
+updated_date: '2026-11-19T23:00:00Z'
 labels:
   - research
   - tls
@@ -164,4 +164,6 @@ AC #6 prep (2026-11-19): replay input cut from the gruijter field capture (OTGW-
 2026-11-20 ~00:10 poc.27 (Robert, final buffer rules): a pause no longer empties the send queue (it is kept and delivered oldest first once the backend takes data; the pause marker closes behind it); 'blocked' and a uid clash keep capturing into the queue until it is full (SVC_BACKOFF, not SVC_UID_TAKEN), backoff cap 15 min while capturing, 60 min once paused; a failed upload with local recording on no longer drops the record from the send queue; at most 30 uploads a minute (2 s minimum gap), so a queue filled during a pause drips out (128 records in ~4.3 min). PSRAM capacity answer to Robert: 128 records x <= 4,144 B (~525 KB); measured 18 frames/record, one record per ~11 s with debug on = ~23 min; 256 records ~47 min (debug on), up to ~4.3 h with records closing at 60 s (not measured). Recommended next (poc.28): one PSRAM ring for local recording and remote delivery with an upload cursor (now two copies: queue 525 KB + local ring 1.5 MB). Tests: test_remote_telemetry_queue 9 (red on b832b77df: 3), backoff 4, all telemetry OK; evaluate 103/0 FAIL.
 
 2026-11-19 CodeQL py/clear-text-logging alerts 80/81 on PR #701 (decode_all.py:135/171, high): the --token-file positional shift copied the admin_password slot into out_dir, which is printed. In practice that slot held the output folder, but the flow was real in the code. Fix: one neutral positional list (ARG...) unpacked per mode (--file: out; --token-file: base uid out; else base email password uid out); the password lives only in a local that is never printed. Same command lines as before. Checks: test_remote_telemetry_build_id OK, test_remote_telemetry_local_file OK, each mode's wrong-count error, token-file path with mocks prints 0 records -> out and calls devices with the file token.
+
+2026-11-19 ~00:10 test_remote_telemetry_policy.py red on poc.27 in the Linux container (2 failures: test_schedule_without_jitter, test_jitter_bounds expected the old 5 min / 24 h backoff). Hidden on the Windows host because the file skips without g++. poc.25 replaced that schedule and tests/test_remote_telemetry_backoff.py checks the new one on the real backoffMs() (red on c2623c057). Removed the two superseded tests, their B rows and constants, and pointed the docstring to the backoff test: policy OK (with g++), OK skipped=5 (without), backoff OK. Still stale, needs a firmware bump so left to the next firmware commit: RemoteTelemetryPolicy.h header comment line 8 ('5 min after the first failure ...').
 <!-- SECTION:NOTES:END -->
