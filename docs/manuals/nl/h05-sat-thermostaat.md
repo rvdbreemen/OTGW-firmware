@@ -37,12 +37,11 @@ Bij ketels die niet of slecht moduleren (vast toerental of hoge minimale modulat
 SAT ondersteunt vier systeemtypes: auto-detect, radiatoren, warmtepomp en vloerverwarming. Vloerverwarming gebruikt een lagere aanvoertemperatuur (max 50 C) en een vlakkere verwarmingscurve.
 
 **Ruimtetemperatuurmeting**
-SAT heeft een ruimtetemperatuurmeting nodig. Mogelijke bronnen (in prioriteitsvolgorde):
-1. OpenTherm bericht-ID 24 (als uw thermostaat dit stuurt)
-2. Externe push via MQTT (`sat/indoor_temp`)
-3. Externe push via REST API
-4. Multi-area gewogen gemiddelde (tot 4 zones)
-5. BLE-sensor (alleen ESP32, Xiaomi LYWSD03MMC of BTHome v2)
+SAT heeft een ruimtetemperatuurmeting nodig. SAT gebruikt de eerste bron met een bruikbare waarde, in deze volgorde:
+1. BLE-sensor (Xiaomi LYWSD03MMC of BTHome v2; verouderd na 5 minuten zonder update)
+2. Multi-area gewogen gemiddelde (tot 4 zones; als multi-area aan staat en minstens één zone geldig is)
+3. Externe push via MQTT (`sat/indoor_temp`) of de REST API (alleen met `satexternaltemp` aan; verouderd na `satsensormaxage`, standaard 21600 s = 6 uur)
+4. OpenTherm bericht-ID 24 van uw thermostaat (verouderd na 5 minuten zonder verversing)
 
 ---
 

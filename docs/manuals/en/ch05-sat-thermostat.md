@@ -33,7 +33,7 @@ With SAT, every control loop cycle (default 30 seconds):
 ### 5.2 Prerequisites and Compatibility
 
 - An OpenTherm-compatible boiler. SAT includes a manufacturer table with quirk flags for Atag, Baxi, Ferroli, Geminox, Ideal, Immergas, Intergas, Itho, Nefit, Radiant, Remeha, Sime, Vaillant, Viessmann, Worcester, and others. Auto-detection is the default.
-- A room temperature source (in priority order): OT bus (MsgID 24), external MQTT push, REST API push, multi-area weighted average, or BLE sensor (ESP32 only).
+- A room temperature source. SAT uses the first one that has a usable value, in this order: a BLE sensor (stale after 5 minutes without an update), the multi-area weighted average (when multi-area is on and at least one area is valid), an external push over MQTT (`sat/indoor_temp`) or the REST API (only with `satexternaltemp` on; stale after `satsensormaxage`, default 21600 s = 6 hours), and last the thermostat's room temperature on the OT bus (MsgID 24; stale after 5 minutes without a refresh).
 - An outdoor temperature source: OT bus (MsgID 27), external MQTT push, or the built-in Open-Meteo weather API fetch.
 - You do not need to remove your wall thermostat. SAT intercepts the setpoint; your thermostat's away mode and schedule still work.
 - The OTGW must be in gateway mode (GW=1), not bypass or monitor mode.
