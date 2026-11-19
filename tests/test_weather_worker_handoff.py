@@ -176,6 +176,10 @@ struct { float Toutside = 0.0f; } OTcurrentSystemState;
 // real helper is compiled by tests/test_sat_outside_order.py. Unused by code from before the fix.
 static bool g_otFresh = false;
 static bool satOtOutsideFresh(uint32_t) { return g_otFresh; }
+// TASK-2039: stands in for satOtOutsideFreshAhead() (fresh for at least 10 more minutes); g_otNearExpiry = the stamp
+// is in its last 10 minutes. The real helper is compiled by tests/test_sat_outside_order.py. Unused before TASK-2039.
+static bool g_otNearExpiry = false;
+[[maybe_unused]] static bool satOtOutsideFreshAhead(uint32_t) { return g_otFresh && !g_otNearExpiry; }
 
 enum HeapHealthLevel { HEAP_HEALTHY, HEAP_LOW, HEAP_WARNING, HEAP_CRITICAL };
 static HeapHealthLevel g_heap = HEAP_HEALTHY;
@@ -311,6 +315,12 @@ int main(int argc, char** argv) {
   P("c6_fresh_nonzero_skips", c6(true, 5.0f));        // the boiler answers MsgID 27: SAT uses it
   P("c6_fresh_zero_fetches", c6(true, 0.0f));         // 0.0 ranks below weather in satResolveOutsideTemp()
   P("c6_stale_zero_fetches", c6(false, 0.0f));
+  // ---- C7 TASK-2039 (marceld beta.361): MsgID 27 still fresh but in its last 10 minutes, weather never fetched
+  // (weather_valid false for the whole hour): the fallback must be fetched now, before MsgID 27 expires.
+  g_otNearExpiry = true;
+  P("c7_near_expiry_fetches", c6(true, 5.34f));
+  g_otNearExpiry = false;
+  P("c7_fresh_ahead_still_skips", c6(true, 5.34f));   // the TASK-1897 saving stays while MsgID 27 has > 10 min left
   g_otFresh = false; OTcurrentSystemState.Toutside = 0.0f;
 
   // ---- manual fetch dumps once on consume
@@ -440,6 +450,13 @@ class Compiled(unittest.TestCase):
         self.assertEqual(o["c6_fresh_nonzero_skips"], 0)
         self.assertEqual(o["c6_fresh_zero_fetches"], 1)
         self.assertEqual(o["c6_stale_zero_fetches"], 1)
+
+    def test_c7_weather_prefetched_before_msgid27_expires(self):
+        # TASK-2039 (marceld beta.361, 2026-11-17 10:11:45): MsgID 27 expired with the weather never fetched, so SAT
+        # handed the boiler back mid-burn and resumed 0.4 s later on the first fetch. Red on the code before TASK-2039.
+        o = self.out
+        self.assertEqual(o["c7_near_expiry_fetches"], 1, "no weather fetch in the last 10 min of MsgID 27")
+        self.assertEqual(o["c7_fresh_ahead_still_skips"], 0, "the TASK-1897 API saving is lost")
 
     def test_manual_fetch_dumps_once(self):
         self.assertEqual(self.out["manual_dumps"], 1)

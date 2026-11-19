@@ -2845,6 +2845,18 @@ static bool satOtOutsideFresh(uint32_t nowMs)
          (uint32_t)(nowMs - state.otBus.iToutsideBoilerMs) < SAT_OUTSIDE_VALID_MS;
 }
 
+// The weather fallback is fetched before MsgID 27 runs out (marceld beta.361, 2026-11-17): weatherLoop() skipped every
+// fetch while MsgID 27 was fresh, so the weather value was stale or never fetched when the MsgID 27 stamp reached 1 h,
+// all sources expired together and SAT handed the boiler back mid-burn, to resume 0.4 s later on the first weather
+// fetch. True while the stamp stays fresh for at least SAT_OUTSIDE_PREFETCH_MS more; in that last stretch
+// weatherLoop() fetches as usual, so entry 57's "no fresh value from any source" only holds when no source is fresh.
+static const uint32_t SAT_OUTSIDE_PREFETCH_MS = 600000UL;   // 10 min before MsgID 27 expires
+static bool satOtOutsideFreshAhead(uint32_t nowMs)
+{
+  return state.otBus.iToutsideBoilerMs != 0 &&
+         (uint32_t)(nowMs - state.otBus.iToutsideBoilerMs) < SAT_OUTSIDE_VALID_MS - SAT_OUTSIDE_PREFETCH_MS;
+}
+
 static bool satResolveOutsideTemp(float* out, uint32_t* sampleMs)
 {
   const uint32_t nowMs = millis();

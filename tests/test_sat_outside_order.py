@@ -56,7 +56,11 @@ int main(int argc, char** argv) {
   if (ra >= 0) { state.sat.bRestoredOutdoorValid = true; state.sat.iRestoredOutdoorMs = g_ms - (uint32_t)(ra * 1000); state.sat.fRestoredOutdoor = (float)atof(argv[8]); }
   float v; uint32_t ms;
   bool ok = satResolveOutsideTemp(&v, &ms);
-  printf("%d %.1f\n", (int)ok, v);
+#ifdef HAS_AHEAD
+  printf("%d %.1f %d\n", (int)ok, v, (int)satOtOutsideFreshAhead(g_ms));   // TASK-2039
+#else
+  printf("%d %.1f -1\n", (int)ok, v);
+#endif
   return 0;
 }
 """
@@ -74,7 +78,8 @@ def _setup():
     block = src[i:src.index("// --- satOutside end", i)]
     _dir = tempfile.TemporaryDirectory()
     cpp = Path(_dir.name) / "t.cpp"
-    cpp.write_text(STUBS.replace("@OUTSIDE@", block), encoding="utf-8")
+    flag = "#define HAS_AHEAD 1\n" if "satOtOutsideFreshAhead" in block else ""
+    cpp.write_text(STUBS.replace("@OUTSIDE@", flag + block), encoding="utf-8")
     _exe = compile_cpp(cpp, Path(_dir.name) / "t.exe")
 
 
@@ -88,6 +93,16 @@ def resolve(ext=None, ot=None, wx=None, rest=None):
         a += [str(s[0]), str(s[1])] if s else ["-1", "0"]
     out = subprocess.run([str(_exe)] + a, capture_output=True, text=True, check=True).stdout.split()
     return out[0] == "1", float(out[1])
+
+
+def ahead(ot):
+    """TASK-2039: satOtOutsideFreshAhead() for a MsgID 27 stamp of age ot[0] s; None when the code has no such helper."""
+    _setup()
+    if not _exe:
+        raise unittest.SkipTest("no host C++ compiler")
+    out = subprocess.run([str(_exe), "-1", "0", str(ot[0]), str(ot[1]), "-1", "0", "-1", "0"],
+                         capture_output=True, text=True, check=True).stdout.split()
+    return None if out[2] == "-1" else out[2] == "1"
 
 
 MIN = 60
@@ -120,6 +135,26 @@ class OutsideOrder(unittest.TestCase):
         self.assertEqual(resolve(ext=(HOUR - 1, 3.0))[0], True)
         self.assertEqual(resolve(ext=(HOUR, 3.0))[0], False)
         self.assertEqual(resolve(ext=(11 * MIN, 3.0))[0], True)
+
+
+class OutsidePrefetch(unittest.TestCase):
+    """TASK-2039 (marceld beta.361): weatherLoop() fetches the fallback in the last 10 min of MsgID 27."""
+
+    def test_ahead_holds_until_ten_minutes_before_expiry(self):
+        a = ahead((10, 5.0))
+        if a is None:
+            self.fail("satOtOutsideFreshAhead() missing: the weather fetch stays skipped until MsgID 27 expires")
+        self.assertTrue(a)
+        self.assertTrue(ahead((50 * MIN - 1, 5.0)))
+        self.assertFalse(ahead((50 * MIN, 5.0)))      # the last 10 min: the weather fetch runs
+        self.assertFalse(ahead((HOUR - 1, 5.0)))      # still a fresh source for the resolver ...
+        self.assertEqual(resolve(ot=(HOUR - 1, 5.0)), (True, 5.0))
+
+    def test_hand_back_still_when_no_source_is_fresh(self):
+        # AC1 / entry 57: with every source older than 1 h the resolver reports none (the hand-back follows)
+        self.assertEqual(resolve(ext=(61 * MIN, 3.0), ot=(HOUR, 5.0), wx=(61 * MIN, 7.0), rest=(61 * MIN, 9.0))[0], False)
+        # ... and a fresh weather value in time keeps SAT running when MsgID 27 runs out (the marceld case)
+        self.assertEqual(resolve(ot=(HOUR, 5.0), wx=(9 * MIN, 5.0)), (True, 5.0))
 
 
 if __name__ == "__main__":
