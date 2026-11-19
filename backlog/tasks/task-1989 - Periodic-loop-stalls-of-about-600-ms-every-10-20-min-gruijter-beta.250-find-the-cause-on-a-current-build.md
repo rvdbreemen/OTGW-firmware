@@ -3,10 +3,10 @@ id: TASK-1989
 title: >-
   Periodic loop stalls of about 600 ms every 10-20 min (gruijter beta.250): find
   the cause on a current build
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-11-15T21:23:00Z'
-updated_date: '2026-11-19T18:05:00Z'
+updated_date: '2026-11-19T18:18:00Z'
 labels:
   - performance
 milestone: 2.0.0
@@ -52,4 +52,12 @@ gruijter beta.250 (Classic with PIC, SAT on), 25.5 h: 92 '[loop-stall]' lines, m
 2026-11-19 correction to the field route above (otgw-dev): the stop sweep runs hours after the 04:00 reboot, when /sat_pid_state.json has been rewritten many times, so it cannot check (b). What a field run can give: pid_i in the last 5-min snapshot before the reboot vs the first snapshot after it (the PID restored from the file), equal within the drift of at most 5 min plus the boot gap; and for (a) only 'rewritten' (ts start vs stop sweep), not the 5-min cadence. Partial evidence, not a full AC3.
 
 2026-11-19 checked for the field route (otgw-dev): indigo_light's beta.360 24 h run has a daily GATEWAY restart at ~04:00 (device-state-hourly 03:56:24 uptime 0d-23:56 bootcount 20, 04:56:25 uptime 0d-00:56 bootcount 21, lastreset 'Software reset' both). Not in the firmware (no scheduled reboot found in src), so most likely his own automation. (b) from the field only works if such a restart happens in a run on 392+; without it (b) stays host-proven and only (a) comes from the field.
+
+2026-11-19 AC3 decided by Robert: 'A' (DM 1573038224710832200, relayed by the coordinator, to the question A = close AC3 as host-proven + (c) on hardware / B = keep open for field evidence). AC3 stays UNCHECKED as a waiver for (a)/(b): host-proven only; (c) shown on hardware.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Cause: the ~420-600 ms loop stalls in gruijter's beta.250 capture (92 [loop-stall] lines in 25.5 h) were LittleFS state writes on the loop task. Fix: those writes go through the fsWriter task (fsWriter.ino), off the loop task. AC1 + AC2 (ticked earlier): reproduced and fixed on .61 (09), old vs new on one build, 2026-11-16, 2.0.0-beta.342+cd59f4e: '[loop-stall] N ms gap, slowest step LOOP_TOP->TIMERS' after every 6th of 40 LittleFS writes from the loop task, gone with the writes on fsWriter. AC3 NOT fully evidenced; closed on Robert's 'A' (DM 1573038224710832200): (c) on hardware: 09 on .61, filesystem OTA with the same littlefs image: 5 of 6 sat_*.json byte-identical, sat_hcr.json only a new ts written during the OTA handover, so the files survive the FS OTA (no live pending write at that moment). (a) 5-min rewrite and (b) i == pid_i after /ReBoot: not reachable on the bench, satSavePidState() returns while settings.sat.bSimulation (SATcontrol.ino:3905, TASK-1900 guard; 17 min with SAT simulated = 0 rewrites, which confirms the guard on hardware); host-proven by tests/test_fs_writer.py 21/21 (incl. the flush waiting for a busy writer, a save during the OTA start not lost, drain before prepareForReboot as a source-order check) and test_sat_pid_persist + test_sat_pid_cadence 40/40. Not verified: (a)/(b) at runtime. Extra evidence possible from a 392+ field run that contains a gateway restart (pid_i last snapshot before vs first after the boot).
+<!-- SECTION:FINAL_SUMMARY:END -->
