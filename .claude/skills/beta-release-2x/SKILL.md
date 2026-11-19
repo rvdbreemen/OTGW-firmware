@@ -47,9 +47,9 @@ nothing builds or publishes for you. `dev` is the GitHub default branch: without
 1. **CHECKPOINT 1: the 12-hour slots** (Robert 2026-11-02 evening; replaces that day's daily 08:00 rule and its
    "every beta public" morning rule): at most one public beta per 12 hours, at 08:00 or 20:00 local time. Every firmware task keeps its own
    `2.0.0-beta.N` bump and its #alpha-testing zip (alpha track); only the daily release gets a
-   GitHub prerelease and a #beta-testing post. Candidate: the newest beta.N that ran at least
-   1 h on the bench unit (.63) with MQTT connected, without a restart (bootcount = flash + 2, no
-   crashlog, heap not trending down). Robert 2026-11-03: "Soak terugbrengen naar zinvol minimum. Beta
+   GitHub prerelease and a #beta-testing post. Candidate: origin/dev HEAD at compose time (T-75, see
+   below), published as the release build that ran at least 1 h on the bench unit (.63) with MQTT
+   connected, without a restart (bootcount = flash + 2, no crashlog, heap not trending down). Robert 2026-11-03: "Soak terugbrengen naar zinvol minimum. Beta
    testers zijn er ook om problemen te ontdekken." (was 8 h). 1 h covers boot, the safeboot rollback
    window, WiFi/MQTT connect and the first hourly timers; slow failures are for the field testers.
    No soak waiver: a slot whose candidate has not finished its 1 h soak waits until it has. Every flash
@@ -62,21 +62,41 @@ nothing builds or publishes for you. `dev` is the GitHub default branch: without
    since the previous public beta, CHANGELOG rollover, README link), tagged and built from
    that commit (the beta.7 model); Phase 1/2 go into that commit.
    **Who starts it** (Robert 2026-11-14, standing permission: "Ik wil dat je de release van een beta
-   gewoon uitvoert"): the coordinator invokes this skill itself at the slot once the candidate passed
-   its soak; Robert does not have to type it. Stable releases (`/release-2x`, `/release`) keep the
+   gewoon uitvoert"): the coordinator invokes this skill itself at T-75 (compose + push the release commit), and
+   publishes at T once the release build passed its soak; Robert does not have to type it. Stable releases (`/release-2x`, `/release`) keep the
    per-action yes.
-   **Slot freeze:** from the slot time until "beta.N tag out", no firmware commit lands on `dev`,
-   or the candidate is no longer the firmware at HEAD. Docs pushes are fine until Phase 2. Keep the
-   bench unit untouched as well (the release bench needs it).
+   **Compose shortly before, publish at the slot** (Robert 2026-11-15: "de release kort van
+   tevoren samenstelt. Zodat elke user de nieuwst mogelijke release krijgt. Geen vertraging na de
+   soak van een 1 uur."). The soak runs on the RELEASE BUILD itself, so the soak end is the
+   publish moment. Timeline for slot T (08:00 or 20:00):
+   - all day: the notes draft and the Discord post draft are kept current after every push
+     (one owner, the comms session), so composing takes minutes, not an hour;
+   - **T-75: compose** Phase 1 + 2 on top of origin/dev HEAD at that moment (the newest
+     firmware that passed its own bench), commit and **push the release commit to `dev` at
+     once**. No freeze: the release is that commit, not "HEAD at T". Pushes after it simply land
+     in the next release.
+   - **T-70 to T-62: build** that release commit (Phase 3.1, from a worktree at the commit if
+     the tree moved on).
+   - **T-62: flash** the release build on the bench unit (.63) and run the Phase 3 checks: this
+     flash starts the 1 h soak (soak end = T-2 at the latest).
+   - **T: soak verdict, then at once** tag THE RELEASE COMMIT (not HEAD; `git tag -a ... <commit>`),
+     draft, verify, publish, posts (Phase 4.2-6). No rebuild after the soak: the soaked binary is
+     the published binary (sha256 of the bench artifact = the release asset).
+   If the build or the bench check fails, publish at the earliest time a 1 h soak of the fixed
+   build can finish, not at the next slot; skip the slot only if the fix needs new firmware.
+   **No dev freeze** (Robert 2026-11-15: "Waarom de lange freeze periodes"). Only the bench unit
+   is held, from the flash until the verdict. Phase 4.1's push is the T-75 push above; the
+   "origin/dev must still be the parent" check and the "beta.N tag out" release message to peers
+   fall away.
 2. Run from the main dev tree, on `dev`: `git rev-parse --abbrev-ref HEAD` prints `dev`.
 3. `git fetch origin && git status -sb`: local `dev` equals `origin/dev`. When the main tree is
    behind with local edits that conflict (`.wolf/*`, a peer's task file): save them first
    (`git diff -- <files> > "$SCRATCH/maintree-local-edits.patch"`), `git checkout -- <files>`,
    then `git reset --keep origin/dev`. A local commit that `git cherry -v origin/dev dev` marks
    with `-` is already upstream and may go. Name the patch path in the session report.
-4. **Freeze dev pushes.** Message every live peer session (`ListAgents`) to hold
-   pushes and builds until you send "beta.N tag out". A push during the flow moves
-   HEAD and forces a rebuild (the githash is in the image).
+4. **No push freeze.** Tell the peers the release commit id once it is pushed (T-75), so the
+   comms session knows where the release ends. Later pushes do not touch the release: it is
+   tagged on that commit and built from it (a worktree at the commit when the tree moved on).
 5. Previous public release and previous 2.x beta:
    ```bash
    gh api repos/rvdbreemen/OTGW-firmware/releases/latest --jq .tag_name   # stays the 1.x stable
@@ -114,7 +134,7 @@ from the file at create time.
    **Embargo:** a fix under embargo (e.g. TASK-1934 until v1.7.10) gets one neutral line and
    nothing next to it that hints at the issue (no paths, no example requests, no "security").
 4. README: beta disclaimer and highlights match the build. Docs-only commits may be
-   pushed before the freeze.
+   pushed at any time.
 5. Optional, for a beta with many changes: `/update-docs-2x --release <semver>-beta.N`
    updates the manuals, API and C4 docs and drafts items 1 and 4. It does not commit;
    commit its files with the narrative.
@@ -261,17 +281,33 @@ from the file at create time.
    only reaches #alpha-testing). If the MCP is down, post through the Discord REST API with the
    bot token from the user environment (`DISCORD_TOKEN`, header `User-Agent: DiscordBot (local, 1.0)`,
    never print the token) and read the message back by its id.
-   Under 2000 characters. Content, for testers coming from 1.x:
-   - title line with the version, the release link
+   **Every change since the previous #beta-testing release post** (Robert 2026-11-15: "de
+   releases notes op discord altijd alle wijzigingen sinds laatste discord publicatie laten
+   zien"). Not highlights: the full list. Scope = every beta.N since the previous public beta
+   that was announced in #beta-testing (find that post: read the channel back for the last
+   bot message with a `releases/tag/v2.0.0-beta.` link; a skipped slot means its betas are
+   still unannounced and belong in this post). Source = the "What changed since" section of
+   the notes file plus the CHANGELOG `[<semver>-beta.N]` section; one plain-language line per
+   user- or tester-visible change with its TASK number, grouped by beta.N or by theme;
+   internal-only or CI-only changes may be left out but are counted ("plus N internal
+   changes"). Cross-check: every TASK id in the CHANGELOG section is in the post or in that count.
+   Discord caps a message at 2000 characters: split into numbered parts ("1/3", "2/3", ...),
+   each under 2000, sent in order; part 1 carries the title line and the release link, the
+   last part the disclaimer, before-you-flash and how-to-report blocks.
+   Content, for testers coming from 1.x:
+   - title line with the version, the release link, and "changes since beta.<previous announced>"
    - what 2.x is (ESP32-S3, S3 Mini replaces the Wemos, PIC stays, combo zip)
-   - 4-6 highlights, SAT experimental and off by default
+   - the full change list as above, SAT experimental and off by default
+   - BREAKING changes since the previous announced beta, each on its own line
    - the beta disclaimer: what was not tested, stay on 1.x if you need stability,
      going back to 1.x means the Wemos back in
    - before you flash: save settings, USB first flash for a new S3 Mini
      (`flash_otgw.bat` / `./flash_otgw.sh`, factory mode), `/update` with the zip on
      a 2.0.0 unit, port 25238 opt-in, read Breaking changes + Known issues
    - how to report (here or a GitHub issue, the capture upload zip)
-   After sending, read the channel back and check the text arrived intact.
+   After sending, read the channel back and check the text arrived intact (every part, in order).
+   Record the message ids of all parts in the tracking task; the next release starts its
+   change list from this post.
 
 ### Phase 7: Close out
 
@@ -297,7 +333,7 @@ Assets are immutable after publish; the body is not.
 6. **"prerelease ... was already published"** from the post script means the beta.N key is in the local post ledger (Phase 6.1), not that GitHub refused anything. Moving the post before the publish does not help; post the note instead (TASK-1809).
 7. **`bin/bump-prerelease.sh` cannot change the word** (alpha -> beta): use `autoinc-semver.py --prerelease`.
 8. **Release body over 125000 characters** is refused at draft time: use the trimmed body of Phase 4.4.
-9. **A peer firmware push during the slot** makes the soaked candidate stale: the freeze holds from the slot time, not only from the moment this skill starts.
+9. **Tag the release commit, not HEAD**: with no freeze, HEAD has usually moved on by T. `git tag -a v<semver>-beta.N <release commit>` and check `git rev-parse --short "v<semver>-beta.N^{}"` equals it.
 
 ## Important rules
 

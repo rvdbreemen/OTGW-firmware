@@ -3,11 +3,11 @@ id: TASK-1802
 title: >-
   OT-Direct: one failed MsgID 0 leaves the boiler without frames for 5-6 s;
   thermostat loss leaves it silent for up to 30 s
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-11T06:40:00Z'
-updated_date: '2026-11-15T02:20:00Z'
+updated_date: '2026-11-15T14:20:00Z'
 labels:
   - otdirect
   - review-2026-11-11
@@ -27,9 +27,9 @@ Found in the TASK-1795 audit (docs/reviews/2026-11-11_otdirect-pic-parity-audit/
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [x] #1 After a failed MsgID 0 in master mode the next frame goes out within 1.15 s
-- [ ] #2 The gap between the thermostat's last frame and the gateway's first own frame stays within the spec's 5 s, or the remaining gap is a recorded decision by Robert; both gaps measured in a host test with fake time
-- [ ] #3 Host test against the real code (not a re-implementation): red on the old code, green on the fix
-- [ ] #4 esp32-combo build, evaluate.py --quick, bench check where the hardware allows (name what was not benched)
+- [x] #2 The gap between the thermostat's last frame and the gateway's first own frame stays within the spec's 5 s, or the remaining gap is a recorded decision by Robert; both gaps measured in a host test with fake time
+- [x] #3 Host test against the real code (not a re-implementation): red on the old code, green on the fix
+- [x] #4 esp32-combo build, evaluate.py --quick, bench check where the hardware allows (name what was not benched)
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -42,4 +42,16 @@ AC1/AC3 evidence for Bug 1: new tests/test_otd_offline_retry.py compiles the rea
 Bug 9 (gateway: thermostat lost, no own frame until iSetbackTimeout 30 s) is NOT in this commit. The gap is not only timing: once the gateway sends its own MsgID 0 the CH enable comes from otMasterStatusFlags (board default bit 0 on), so starting own frames early would turn CH on for a thermostat that had it off. The PIC clears HeatDemand and all thermostat state on an open line (gateway.asm 6.6 Disconnect :1770-1789) before it sends StandAloneMsg (:1796). What the boiler gets after the loss is TASK-1806's subject (remove the 16 C setback, like the PIC); Bug 9 goes with 1806. ba's TASK-1850 also edits checkThermostatTimeout.
 
 Lane-1924 pushed 2026-11-15: origin/dev 5da0c91df..2f4818aa1. Build esp32-combo 2.0.0-beta.281+fe0e61a OK (build/logs/build-20261115-020302.log, 'Build completed successfully'); 'git diff fe0e61a48 2f4818aa1 -- src/' empty, so the pushed code is the benched code. evaluate.py --quick 0 failed; OTD tests 42 files, host suites, SAT suite per file green on the rebased tree. Bug 1 shipped in beta.277; bench 09 on .61 with beta.281: master mode without a boiler, only MsgID 0, interval 1.04-1.13 s (median 1.12). PASS for AC1. Bug 9 (AC2) waits for Robert's answer A/B/C.
+
+2026-11-15 Robert decided bug 9 = A: detect thermostat loss after about 3 s (fixed), not the 30 s iSetbackTimeout default. Discord DM 1571431149795024929 (his item 2 'a'), answer to question 1571287312292253820. Plan (d3): implement on lane-1954 after TASK-1954, with a host test red on the old code and green on the fix; it goes in the next build after 'beta tag out'.
+
+2026-11-15 bug 9 implemented (d3, lane-1954, beta.297 placeholder; renumbered at the rebase after 95). checkThermostatTimeout() counts the thermostat as lost after a fixed 3 s without a frame (static constexpr timeoutMs = 3000, '>='); iSetbackTimeout is no longer read (help text now 'Not used', TASK-1950 covers removal). Evidence, tests/test_otd_thermostat_loss_time.py on the real checkThermostatTimeout() and, for the gap, the real scheduleMasterRequest() + otdOwnFramesAllowed() (scheduler harness of test_otd_offline_retry; the prelude's always-true gate stub is replaced by the real gate): FIX loss after 3 s, first own frame 3500 ms after the thermostat's last frame, no own frame while it is there, a thermostat with 2 s gaps never counts as lost. OLD (HEAD before the fix): loss after 31 s, first own frame after 30500 ms -> FAILED 2. AC2: gap 3.5 s < spec 5 s. AC3: red/green on the real code. Neighbours green: test_otd_thermostat_lines 5 OK, test_otd_no_setback 4 OK. evaluate --quick 86/0. AC4 (build, bench) follows with the next build.
+
+2026-11-15 Bench 09 on .61 with beta.297+85bc0dc (1954 + bug 9), gateway mode without a thermostat since boot: 'Thermostat disconnected' about 2.6-3.3 s after boot, once (was 30 s); own MsgID 0 from t+2.6 s about every 1.12 s; health and settings OK. The thermostat-pull timing (a thermostat that disappears) needs a thermostat on the slave port: host test only (3.5 s vs 30.5 s). AC4 is ticked after the final build of lane-1954.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Bug 1 (beta.277) and bug 9 (pushed 2026-11-15 as beta.308, origin/dev 22f4fece5). AC1: master mode without a boiler, only MsgID 0 every 1.04-1.13 s (bench beta.281). AC2/AC3: tests/test_otd_thermostat_loss_time.py on the real checkThermostatTimeout() + scheduleMasterRequest() + otdOwnFramesAllowed(): first own frame after the thermostat's last frame old 30500 ms, fix 3500 ms (< spec 5 s); loss after 31 s -> 3 s. Robert decided bug 9 = A (DM 1571431149795024929). AC4: esp32-combo builds beta.297+85bc0dc and beta.309+ada14c6 exit 0, evaluate --quick 86/0, bench 09 on .61: 'Thermostat disconnected' 2.3-3.3 s after boot (was 30 s), own MsgID 0 about every 1.1 s. Not benched: a thermostat that disappears during operation (no thermostat on the bench): host test only.
+<!-- SECTION:FINAL_SUMMARY:END -->

@@ -4,7 +4,10 @@
 Decisions (docs/sat/sergeant-d-corrections.md): entry 213 (QD-1 A: bit 4 = 1 blocks every PWM entry path: the 60 s overshoot
 switch, PWM restored after a restart, the manual pwm command, the future end-of-cycle switch; SAT stays continuous), entry 214
 (QD-2 A: bit 4 turning 1 while PWM runs leaves PWM in that tick, the continuous setpoint goes out as with the underheat exit),
-entry 215 (QD-3 B: no PWM until a valid MsgID 3 reply) and ADR-157 (the manual heating source stays authoritative; the bit is a
+entry 215 (QD-3 B: no PWM until a valid MsgID 3 reply) and ADR-157.
+TASK-2000 (2026-11-16): entry 392 ("Don't look at bit 4 at all ... boiler should be able to enter PWM") reverses entries 213 and
+214, and entry 393 (Q-392a A) reverses entry 215: MsgID 3 plays no part in PWM. The cases below now expect PWM for every MsgID 3
+state (no reply, bit 4 = 0, bit 4 = 1), no refusal (reason 0), and the reply still recorded (the manual heating source stays authoritative; the bit is a
 permission, not a source detector). OT spec v4.2, slave configuration flags (ID 3), HB bit 4: "Master low-off & pump control
 function [allowed, not allowed]", 1 = not allowed.
 
@@ -214,7 +217,13 @@ def build_source():
         "void satNoteSlaveConfig(uint8_t hb)", "bool satPwmPermitted()", "void satPwmNoteRefused(uint8_t path)",
         "bool satPwmEntryAllowed(uint8_t path)", "bool satCycleCheckLowLoadVeto()"))
     # the old harness sources (before the fix) lack the permission functions: the matching fn() calls return "" then
-    return flags + stubs + EXTRA_STUBS + real + "\n" + handler + "\n" + restore + "\n" + body + "\n" + perm + MAIN
+    gate = ""
+    if "static const uint32_t SAT_START_GATE_MS" in sat:   # TASK-1942: state the cut functions touch; the gate itself is stubbed in sustain.STUBS
+        gate = ("static bool _sat_startGate = false, _sat_startPwmWanted = false, _sat_heaterOn = true;\n"
+                "static uint32_t _sat_startFlameOnMs = 0;\nstatic void satStartGateOpen() {}\n")
+        if "satGetFlowTemp()" in restore and "satGetFlowTemp()" not in stubs + EXTRA_STUBS:
+            gate += "static float satGetFlowTemp() { return 50.0f; }\n"
+    return flags + stubs + EXTRA_STUBS + gate + real + "\n" + handler + "\n" + restore + "\n" + body + "\n" + perm + MAIN
 
 
 class SlaveLowLoad(unittest.TestCase):
@@ -238,76 +247,69 @@ class SlaveLowLoad(unittest.TestCase):
         rows = [dict(kv.split("=") for kv in line.split()) for line in out.strip().splitlines()]
         return rows if len(rows) > 1 else rows[0]
 
-    # QD-3 B (entry 215): no valid reply = no PWM. The permission matrix on the automatic 60 s switch (QD-1 A, entry 213).
-    def test_overshoot_switch_needs_a_valid_reply_with_bit4_clear(self):
+    # QD-3 B (entry 215): no valid reply = no PWM. The permission matrix on the automatic 60 s switch (QD-1 A, entry 213; 60 s since TASK-2005, entry 407).
+    def test_overshoot_switch_ignores_msgid3(self):
         allowed = self.run_sc("overshoot", 1, 0)
         self.assertEqual((allowed["mode"], allowed["ticks"]), ("2", "3"), "control: allowed, switch after 60 s (3rd 30 s tick)")
-        denied = self.run_sc("overshoot", 1, 1)
-        self.assertEqual((denied["mode"], denied["ticks"]), ("1", "-1"), "bit 4 = 1 must keep SAT continuous")
-        unknown = self.run_sc("overshoot", 0, 0)
-        self.assertEqual((unknown["mode"], unknown["ticks"]), ("1", "-1"), "no valid reply must keep SAT continuous")
+        for valid, denied, why in ((1, 1, "bit 4 = 1 (Vitodens 100-W, entry 392)"), (0, 0, "no valid reply yet (entry 393)")):
+            r = self.run_sc("overshoot", valid, denied)
+            self.assertEqual((r["mode"], r["ticks"], r["reason"]), ("2", "3", "0"), why)
 
     # TASK-1762: the old input of the case above (flow 55 against 50, 5 K over) now switches through the flame-out fail-safe after
     # 30 s (2nd 30 s tick), and the MsgID 3 permission (entry 213, real satPwmEntryAllowed) blocks it as it blocks the 60 s rule.
-    def test_failsafe_needs_a_valid_reply_with_bit4_clear(self):
+    def test_failsafe_ignores_msgid3(self):
         allowed = self.run_sc("failsafe", 1, 0)
         self.assertEqual((allowed["mode"], allowed["ticks"]), ("2", "2"), "allowed: the fail-safe switches after 30 s (2nd 30 s tick)")
-        denied = self.run_sc("failsafe", 1, 1)
-        self.assertEqual((denied["mode"], denied["ticks"], denied["reason"], denied["path"]), ("1", "-1", "2", "1"))
-        unknown = self.run_sc("failsafe", 0, 0)
-        self.assertEqual((unknown["mode"], unknown["ticks"]), ("1", "-1"))
+        for valid, denied in ((1, 1), (0, 0)):
+            r = self.run_sc("failsafe", valid, denied)
+            self.assertEqual((r["mode"], r["ticks"], r["reason"], r["path"]), ("2", "2", "0", "0"), "entries 392/393")
 
-    def test_overshoot_refusal_is_traced_with_reason_and_path(self):
-        denied = self.run_sc("overshoot", 1, 1)
-        self.assertEqual((denied["reason"], denied["path"]), ("2", "1"), "reason 2 = bit 4 = 1, path 1 = overshoot switch")
-        unknown = self.run_sc("overshoot", 0, 0)
-        self.assertEqual((unknown["reason"], unknown["path"]), ("1", "1"), "reason 1 = no valid reply yet")
+    def test_overshoot_has_no_refusal_for_any_msgid3_state(self):
+        for valid, denied in ((1, 1), (0, 0)):
+            r = self.run_sc("overshoot", valid, denied)
+            self.assertEqual((r["reason"], r["path"]), ("0", "0"), "entries 392/393: no refusal for any MsgID 3 state")
         allowed = self.run_sc("overshoot", 1, 0)
         self.assertEqual((allowed["reason"], allowed["path"]), ("0", "0"), "no refusal when permitted")
 
-    def test_restart_restore_of_pwm_is_blocked_without_permission(self):
-        self.assertEqual(self.run_sc("restore", 1, 0, 1)["mode"], "2", "control: saved PWM comes back when permitted")
-        for valid, denied, why in ((1, 1, "bit 4 = 1"), (0, 0, "no valid reply yet (a fresh restart)")):
+    def test_restart_restore_of_pwm_ignores_msgid3(self):
+        # TASK-1942 (entries 385/387 reason 1): initSAT() no longer applies the saved PWM while the heater may be OFF; it arms the
+        # deferred restore, which brings PWM back on the first pass with a running heater and a known flow, without waiting for
+        # MsgID 3 (entries 392/393; the deferred_restore cases below pin that). At init: continuous, nothing refused, whatever MsgID 3 says.
+        for valid, denied, why in ((1, 0, "permitted"), (1, 1, "bit 4 = 1"), (0, 0, "no valid reply yet (a fresh restart)")):
             with self.subTest(why=why):
                 r = self.run_sc("restore", valid, denied, 1)
-                self.assertEqual(r["mode"], "1", "restore must stay continuous: " + why)
-                self.assertEqual(r["path"], "2")
+                self.assertEqual((r["mode"], r["reason"]), ("1", "0"), "entries 392/393 + TASK-1942: armed, nothing refused: " + why)
         self.assertEqual(self.run_sc("restore", 1, 1, 0)["reason"], "0", "nothing saved: nothing refused")
 
     # Entries 121 + 213 + 215 together (our reading): the restore waits for the first valid reply after the boot.
+    # Entry 393: the restore no longer waits for a MsgID 3 reply, so PWM is back from the first pass after the restart.
     def test_deferred_restore_first_reply_bit4_clear_restores_pwm(self):
         rows = self.run_sc("deferred", 1, "-", "00")
-        self.assertEqual((rows[0]["mode"], rows[0]["saved"]), ("1", "1"), "no reply yet: continuous, the saved flag is kept")
-        self.assertEqual((rows[1]["mode"], rows[1]["saved"]), ("2", "1"), "first reply, bit 4 clear: PWM is back")
+        self.assertEqual([(r["mode"], r["saved"]) for r in rows], [("2", "1"), ("2", "1")], "PWM is back before any reply")
 
-    def test_deferred_restore_first_reply_bit4_set_keeps_continuous_and_the_flag(self):
+    def test_deferred_restore_bit4_set_restores_pwm(self):
+        # the Vitodens case (entry 392): bit 4 = 1 in every reply, PWM restored all the same, no refusal
         rows = self.run_sc("deferred", 1, "-", "10", "10")
-        for r in rows:
-            self.assertEqual((r["mode"], r["saved"]), ("1", "1"))
-        self.assertEqual((rows[1]["reason"], rows[1]["path"]), ("2", "2"), "refusal traced: bit 4 = 1 on the restore path")
+        self.assertEqual([(r["mode"], r["saved"], r["reason"]) for r in rows], [("2", "1", "0")] * 3)
 
-    def test_deferred_restore_no_reply_keeps_continuous_and_does_not_overwrite_the_flag(self):
+    def test_deferred_restore_no_reply_still_restores_pwm(self):
         rows = self.run_sc("deferred", 1, "-", "-", "-", "-")
-        for r in rows:
-            self.assertEqual((r["mode"], r["saved"]), ("1", "1"))
+        self.assertEqual([(r["mode"], r["saved"]) for r in rows], [("2", "1")] * 4, "entry 393: no MsgID 3 reply needed")
 
     def test_deferred_restore_applies_only_to_the_first_valid_reply(self):
         rows = self.run_sc("deferred", 1, "-", "10", "00", "00")
-        self.assertEqual([r["mode"] for r in rows], ["1", "1", "1", "1"], "a later bit 4 = 0 does not restore: the normal entry rules apply")
+        self.assertEqual([r["mode"] for r in rows], ["2", "2", "2", "2"], "restored at once; later replies change nothing")
 
     def test_nothing_saved_nothing_restored(self):
         rows = self.run_sc("deferred", 0, "-", "00")
         self.assertEqual([(r["mode"], r["saved"]) for r in rows], [("1", "0"), ("1", "0")])
 
-    def test_manual_pwm_command_is_blocked_without_permission(self):
+    def test_manual_pwm_command_ignores_msgid3(self):
         for value in ("pwm", "2"):
             with self.subTest(value=value):
-                self.assertEqual(self.run_sc("command", 1, 0, value)["mode"], "2", "control: permitted")
-                for valid, denied in ((1, 1), (0, 0)):
+                for valid, denied in ((1, 0), (1, 1), (0, 0)):
                     r = self.run_sc("command", valid, denied, value)
-                    self.assertEqual(r["mode"], "1", "the command must not enter PWM (valid=%d denied=%d)" % (valid, denied))
-                    self.assertEqual(r["req"], "2", "the request stays recorded (sat/control_mode)")
-                    self.assertEqual(r["path"], "3")
+                    self.assertEqual((r["mode"], r["req"], r["reason"]), ("2", "2", "0"), "entries 392/393 (valid=%d bit4=%d)" % (valid, denied))
 
     def test_manual_continuous_and_auto_commands_unchanged(self):
         for value, req in (("continuous", "1"), ("auto", "0")):
@@ -317,37 +319,34 @@ class SlaveLowLoad(unittest.TestCase):
                     self.assertEqual((r["mode"], r["req"], r["reason"]), ("1", req, "0"))
 
     # "A veto cannot be bypassed by another entry path" (AC2): any other caller of satSetControlMode(PWM) hits the same check.
-    def test_any_other_caller_of_set_control_mode_is_blocked(self):
-        self.assertEqual(self.run_sc("setmode", 1, 0)["mode"], "2", "control")
-        for valid, denied in ((1, 1), (0, 0)):
-            self.assertEqual(self.run_sc("setmode", valid, denied)["mode"], "1")
+    def test_any_other_caller_of_set_control_mode_enters_pwm(self):
+        for valid, denied in ((1, 0), (1, 1), (0, 0)):
+            self.assertEqual(self.run_sc("setmode", valid, denied)["mode"], "2", "entries 392/393")
 
-    # QD-2 A (entry 214): bit 4 turning 1 while PWM runs leaves PWM in that tick.
-    def test_bit4_rising_during_pwm_leaves_pwm_in_that_tick(self):
+    # Entry 392 reverses entry 214 (QD-2 A): bit 4 turning 1 while PWM runs no longer leaves PWM.
+    def test_bit4_rising_during_pwm_does_not_leave_pwm(self):
         rows = self.run_sc("rise")
-        allowed, denied = rows[0], rows[1]
-        self.assertEqual(allowed["mode"], "2", "permitted PWM keeps running")
-        self.assertEqual(denied["mode"], "1", "bit 4 = 1 must end PWM in the same tick")
-        self.assertEqual((denied["reason"], denied["path"]), ("2", "4"))
+        allowed, bit4 = rows[0], rows[1]
+        self.assertEqual(allowed["mode"], "2", "PWM keeps running")
+        self.assertEqual((bit4["mode"], bit4["reason"], bit4["path"]), ("2", "0", "0"), "bit 4 = 1 must not end PWM")
 
-    def test_veto_exit_does_not_touch_a_running_pwm_with_permission(self):
-        r = self.run_sc("veto", 1, 0)
-        self.assertEqual((r["mode"], r["reason"]), ("2", "0"))
-        for valid, denied in ((1, 1), (0, 0)):
-            self.assertEqual(self.run_sc("veto", valid, denied)["mode"], "1")
+    def test_running_pwm_check_never_ends_pwm(self):
+        for valid, denied in ((1, 0), (1, 1), (0, 0)):
+            r = self.run_sc("veto", valid, denied)
+            self.assertEqual((r["mode"], r["reason"]), ("2", "0"), "entries 392/393: the running-PWM check never ends PWM")
 
-    # When bit 4 returns to 0 the entry paths simply work again by their own rules: the automatic switch needs a fresh 60 s.
-    def test_after_bit4_clears_the_automatic_switch_needs_a_fresh_60s(self):
+    # Entry 392: the automatic switch works the same with bit 4 = 1 and = 0 (60 s, TASK-2005, entry 407).
+    def test_automatic_switch_ignores_bit4(self):
         rows = self.run_sc("rise")
         self.assertEqual(len(rows), 4)
-        self.assertEqual((rows[2]["while_denied_ticks"], rows[2]["mode"]), ("-1", "1"), "no switch while bit 4 = 1")
-        self.assertEqual((rows[3]["after_clear_ticks"], rows[3]["mode"]), ("3", "2"), "60 s after the permission is back, not earlier")
+        self.assertEqual((rows[2]["while_denied_ticks"], rows[2]["mode"]), ("3", "2"), "bit 4 = 1: the switch fires after 60 s")
+        self.assertEqual((rows[3]["after_clear_ticks"], rows[3]["mode"]), ("3", "2"), "bit 4 = 0: the same 60 s")
 
     # The decoder: valid replies set the state, the change time moves only on a change.
     def test_decoder_hook_stores_bit4_and_the_time_of_the_change(self):
         rows = self.run_sc("decode", "00", "00", "10", "10", "EF", "FF")
         self.assertEqual([(r["valid"], r["denied"], r["permitted"]) for r in rows],
-                         [("1", "0", "1"), ("1", "0", "1"), ("1", "1", "0"), ("1", "1", "0"), ("1", "0", "1"), ("1", "1", "0")])
+                         [("1", "0", "1"), ("1", "0", "1"), ("1", "1", "1"), ("1", "1", "1"), ("1", "0", "1"), ("1", "1", "1")])   # recorded, always permitted
         self.assertEqual([r["change"] for r in rows], ["1001000", "1001000", "1003000", "1003000", "1005000", "1006000"])
 
     # --- source-structure checks of what the host cannot run ---
@@ -381,7 +380,10 @@ class SlaveLowLoad(unittest.TestCase):
         calls = re.findall(r"satSetControlMode\(SAT_MODE_PWM\)", sat + self.cyc)
         # direct callers: the restore (at init and deferred), the overshoot switch and the end-of-cycle switch (TASK-1331) (the command passes the mode through a ternary, checked below); each asks satPwmEntryAllowed(), and satSetControlMode() checks again
         self.assertEqual(len(calls), 4, calls)
-        for text in (sustain._fn(sat, "static void satRestoreControlMode()"), sustain._fn(self.cyc, "bool satCycleCheckOvershootSwitch(float requestedSetpoint, uint32_t tickMs)"),
+        # TASK-1942: the restore enters PWM in its deferred step (not at init); the heating start satPwmFirstStart() relies on the
+        # last-line check inside satSetControlMode() itself, pinned below
+        self.assertIn("satPwmPermitted()", sustain._fn(sat, "static void satSetControlMode(SATControlMode m)"))
+        for text in (sustain._fn(sat, "static void satRestoreDeferredStep()"), sustain._fn(self.cyc, "bool satCycleCheckOvershootSwitch(float requestedSetpoint, uint32_t tickMs)"),
                      sustain._fn(self.cyc, "static void satCycleApplyEndOfCycle(SATCycleClass cls, bool pwmEnabled)")):
             self.assertIn("satPwmEntryAllowed(", text)
         self.assertIn("satPwmEntryAllowed(3) ? SAT_MODE_PWM", sat)

@@ -31,7 +31,8 @@ TICK_KEYS = ["room", "raw", "rv", "target", "out", "osrc", "curve", "p", "i", "d
 
 
 def tick_format(src):
-    m = re.search(r'SATDebugTf\(PSTR\("(SATTICK room=[^"]*)\\r\\n"\)', src)
+    # SATTickTf: research/cloud-recording sends SATTICK to the cloud recorder too (TASK-2905)
+    m = re.search(r'SAT(?:Debug|Tick)Tf\(PSTR\("(SATTICK room=[^"]*)\\r\\n"\)', src)
     return m.group(1) if m else None
 
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Compares a decoded debug.log with a telnet capture of the same gateway (bench check 4, TASK-1963).
+"""Compares a decoded debug.log with a telnet capture of the same gateway (bench check 4, TASK-2901).
 
     python3 compare_telnet.py out/debug.log telnet-capture.txt
 

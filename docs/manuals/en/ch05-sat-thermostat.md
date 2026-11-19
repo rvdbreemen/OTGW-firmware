@@ -8,6 +8,11 @@ The result is weather-compensated heating that keeps room temperatures stable wi
 
 SAT was inspired by (and ported from) the excellent Home Assistant SAT custom component by Alex Wijnholds (Alexwijn), with design feedback and validation from George Dellas (sergeantd). The firmware embeds the controller directly in the OTGW so the heating loop keeps running even when Home Assistant, MQTT, or WiFi are unavailable.
 
+
+> **SAT is experimental, opt-in and off by default.** SAT takes over your boiler's control setpoint, so it stays off (`satenabled` is false) until you switch it on, and the setup wizard asks you to confirm first. SAT behaviour can still change between builds while the field runs continue.
+>
+> **Reporting SAT field results.** Field data is what makes SAT better. If you run SAT, please send a capture: (1) check the version at `http://<ip>/api/v2/device/info` (`fwversion`); (2) check that `http://<ip>/api/v2/sat/status` shows `"simulation": false`; (3) start the capture tool from the release zip (`capture-mqtt-debug.bat`, `.sh` or `-macos.sh`) with `--long-run`, for at least a night and a morning; (4) note your boiler model, radiators or floor heating, and any setting you changed with the time; (5) stop with `q` and post the `-upload.zip` in #beta-testing on Discord or attach it to a GitHub issue. The same steps: https://github.com/rvdbreemen/OTGW-firmware/blob/dev/docs/sat/field-run-recipe-2.0.0.md
+
 ---
 
 ### 5.1 What SAT Does
@@ -170,7 +175,9 @@ Worked examples for a radiator system, coefficient 1.5:
 
 ### 5.6 Control Modes: Continuous and PWM
 
-**Continuous mode (default)**: SAT sends the PID output directly as a flow temperature setpoint. The boiler modulates to reach and hold it. Preferred for modern condensing boilers with good modulation range.
+**Every heating start runs in PWM first.** When heating starts (after a pause, after SAT is switched on, after a restart), SAT begins in PWM with the first phase ON, also when SAT is set to manual continuous, and decides between PWM and continuous only after the flame has burned for 60 s; during those 60 s no switch to continuous happens (Sergeant D entries 385, 389, 391, 394; ADR-252, Proposed). A start where the flame was already burning when SAT took over is left as it was.
+
+**Continuous mode**: SAT sends the PID output directly as a flow temperature setpoint. The boiler modulates to reach and hold it. Preferred for modern condensing boilers with good modulation range.
 
 Continuous mode includes clamp logic: if the PID setpoint drops rapidly but the boiler water is still hot, the minimum setpoint is clamped to `boiler_temp - flow_offset` (default 2 C). This prevents the boiler from stopping and immediately restarting (short cycling).
 
@@ -182,8 +189,11 @@ Continuous mode includes clamp logic: if the PID setpoint drops rapidly but the 
 
 **Auto-switch**: SAT always monitors boiler behavior using cycle classification (see section 5.11) and switches modes automatically:
 
-- Continuous to PWM: when flow temperature stays more than the overshoot margin above the requested (PID) setpoint for 60 seconds (sustained overshoot, indicating the boiler cannot modulate low enough).
-- PWM to continuous: when flow temperature stays more than 2 C below setpoint for 180 seconds (sustained underheat) or after 300 seconds of saturation (boiler at max but room still cold).
+- Continuous to PWM: when the flow temperature minus the requested (PID) setpoint stays at or above the switch margin for 60 seconds (Sergeant D entry 407; ADR-254, Proposed). The margin is the setting `satpwmswitchmargin` (0.5 to 5.0 C), default 2.0 C; a stored old default of 1.5 C moves to 2.0 C once, a value you set yourself stays (Robert, Q-407a). A fail-safe also switches when the flow stays 3.5 C or more above the request for 30 s (entry 359).
+- PWM to continuous: in a PWM ON phase, when the flame is on and the requested setpoint stays above the flow temperature for 60 seconds (entries 339 and 342; ADR-236, Proposed), or after 300 seconds of saturation (ADR-236: unchanged). Not during the first 60 s of a start (entry 394).
+- The boiler's configuration message (MsgID 3, including "master low-off not allowed") does not block PWM: PWM is allowed from the start on every boiler (entries 392, 393; ADR-251).
+
+**Tolerance band** (Sergeant D entries 376, 377, 384, 401, 402, 403; ADR-253, which partly supersedes ADR-250): when the room reaches the target + 0.1 C, SAT sends CH off while PWM keeps its ON/OFF rhythm; a burn in continuous mode still runs at least 180 s first. Heating restarts as soon as the room is below the target + 0.1 C, but only after CH has been off for at least 10 minutes, counted from the moment the band turned CH off (entries 402, 403). Our readings, to be confirmed by Sergeant D: a band decision while CH was already off (for example a warm room right after a restart) starts no pause (entry 406), and a lost room temperature ends the pause so the heating curve takes over (entry 405, with entries 38 and 46). PWM ON phases that start during a band pause do not count as starts toward the hourly limit (entry 398; entry 400 for a phase that sees CH allowed again). With zones, eco lets the main room decide and comfort keeps heating while any room is more than 0.1 C below its own target (entry 378).
 
 | Situation | Recommended mode |
 |---|---|
@@ -204,7 +214,7 @@ SAT implements six independent safety layers. Any single layer tripping sends `C
 - No automatic recovery after a safety trip: SAT stays disabled until the user explicitly re-enables it. A lost OpenTherm link is not a safety trip; see "OpenTherm lost" below.
 - Independent layers: a bug in one layer does not affect the others.
 
-**Layer 1: Boot safety.** At every startup, restart, or power failure, SAT sends `CS=0` before the first control cycle. This prevents the boiler from running indefinitely at the last setpoint while the ESP is still booting.
+**Layer 1: Boot.** After a start-up, restart or power failure SAT sends no control command (CS, MM, CH) for the first 60 s; the gateway's own start-up reads of MsgID 3, 15 and 48 still run (Sergeant D entries 388 and 395). The earlier boot `CS=0` is gone (entry 129); see "Restart" below for what follows.
 
 **Layer 2: Disable safety.** When SAT is turned off (via settings, MQTT, or REST API), `CS=0` is sent immediately, the PID is reset, and all state variables are cleared.
 
@@ -224,9 +234,11 @@ SAT implements six independent safety layers. Any single layer tripping sends `C
 
 **OpenTherm lost (TASK-1365).** When SAT has seen no boiler reply for 30 s, the OpenTherm link counts as lost. Any boiler reply counts, a Data-Invalid reply included (maintainer, Q33 A). On entering the loss SAT sends one hand-back, the same as a switch-off: `CS=0`, `CH=1`, `MM=T` (Sergeant D entries 39 and 47). After that it sends nothing to the boiler while the loss lasts. SAT stays enabled and no setting is written. On the first new boiler reply SAT resumes by itself and takes MsgID 1 back; the PID restarts from 0 (entry 79). The state is visible as `sat/ot_link_lost` over MQTT and as `ot_link_lost` in `GET /api/v2/sat/status`.
 
+**No ignition and heating failure (TASK-1882).** Two messages help you spot a boiler problem; neither changes what SAT sends. *No ignition*: SAT asked for heat (a PWM ON phase, or a setpoint above the cold cutoff) for 3 minutes, the boiler flow stayed below the setpoint and no flame came. *Heating failure*: SAT stood at its maximum (setpoint or PWM duty) for 15 minutes and the room rose less than 0.5 °C. A slow, heavy house can show the second one on a cold morning without anything being wrong; the telnet line `SATEVENT heating_failure=...` gives the room at the start and end of each 15-minute window. Both show on the SAT page (warning), in REST `sat/status` (`no_ignition`, `heating_failure`, with counters and the last window's room start and end), over MQTT and as Home Assistant problem sensors.
+
 **Outside temperature missing (TASK-1390).** SAT needs an outside temperature that is younger than 1 hour (Sergeant D entries 56, 57 and 126). It takes the first valid one of: the external sensor (MQTT/REST) for its first 10 minutes, the boiler's own sensor (MsgID 27, only from a live boiler reply), the weather service, the external sensor up to 1 hour, and the value saved at the last restart. When none is valid SAT sends the same one-time hand-back as for a lost OpenTherm link (`CS=0`, `CH=1`, `MM=T`) and then sends nothing; it resumes by itself as soon as a valid value arrives. The state is visible as `sat/outside_temp_missing` over MQTT, as `outside_temp_missing` in `GET /api/v2/sat/status` and as a hint on the SAT page.
 
-**Restart (TASK-1482).** SAT saves the last valid outside temperature with its PID state. After a restart within the hour, with a PID state that is at most 30 minutes old, SAT sends nothing at boot and takes over within seconds of the first boiler reply (entries 126 and 129); a PIC keeps SAT's last setpoint for about a minute in between. Otherwise SAT hands the boiler back once and stays quiet until it has a boiler reply and a valid outside temperature (entry 121). Whether PWM was on is kept as well: SAT restarts in PWM with a fresh cycle.
+**Restart (TASK-1482).** SAT saves the last valid outside temperature with its PID state. After a restart within the hour, with a PID state that is at most 30 minutes old, SAT stays silent for the first 60 s after the boot (entry 388) and then takes over at its first control pass once the boiler has replied (entries 126 and 129); until the first room temperature arrives it controls on the heating curve only (entry 388); a PIC keeps SAT's last setpoint for about a minute in between. Otherwise SAT hands the boiler back once and stays quiet until it has a boiler reply and a valid outside temperature (entry 121). Whether PWM was on is kept as well: SAT restarts in PWM with a fresh cycle.
 
 The hand-back resets the PID. It also saves the zeros to flash, except when the loss comes before the first room temperature reading since boot, or before the clock is set by NTP. In those cases the saved PID state stays on flash, so a boiler that is slow to answer right after a boot does not wipe the warm-start state (d06005d7d, entry 115).
 
@@ -309,7 +321,7 @@ Solar gain compensation detects when sunlight through windows is heating the roo
 **How it works:**
 1. SAT tracks the indoor temperature rise rate using an EMA (exponential moving average).
 2. When the rise rate exceeds the configured minimum and boiler modulation is low (<20%), a solar gain condition is detected.
-3. If sun elevation data is available (from the weather API), SAT also checks that the sun is above the minimum elevation before triggering.
+3. If a sun elevation is known, SAT also checks that the sun is above the minimum elevation before triggering. Its source: `sat/sun_elevation` pushed over MQTT (for example from the Home Assistant sun entity), which wins while it is younger than 1 hour; otherwise the firmware computes it from the weather latitude and longitude and the NTP time. The SAT weather card in the web UI names the source in use and asks for no location while a pushed value is fresh (TASK-2015).
 4. The condition must be sustained for 10 minutes before activation (to avoid false triggers).
 5. Once active, the flow setpoint is reduced by `fSolarSetpointOffset` (default 2 C).
 6. When the rise rate drops below the threshold for 10 minutes, solar gain is cleared.
@@ -467,9 +479,9 @@ The radio runs a **continuous scan** from boot (TASK-494). Every format-pass adv
 One combined firmware image ships for all ESP32 boards; `psramFound()` decides at runtime whether BLE actually scans:
 
 - **Boards with PSRAM** (the LOLIN S3 Mini and S3 Mini Pro): BLE runs by default. The extra RAM absorbs the NimBLE stack without destabilising the rest of the firmware.
-- **Boards without PSRAM**: BLE stays dormant even when enabled. The web UI shows a consent dialog that warns about the instability risk of running BLE without PSRAM. Only after you accept (setting `satbleriskack`) does the radio start scanning.
+- **Boards without PSRAM**: BLE cannot be switched on (TASK-2025, ADR-257). Without PSRAM the scanner uses up the memory the gateway needs: on a test unit the heap ran out within about 2 minutes and the gateway stopped answering. The **Enable BLE sensors** switch stays visible but is disabled and greyed out, with the reason as its tooltip, and the BLE card says so. A REST or MQTT request to switch it on is refused (REST answers `409` with `BLE needs PSRAM: not available on this board`), and a stored `on`, for example from settings saved on an older firmware, is switched off at boot and saved as off.
 
-In short, BLE is active when it is enabled AND (the board has PSRAM OR you have acknowledged the risk).
+In short, BLE is active when it is enabled AND the board has PSRAM. Firmware before 2.0.0-beta.375 let you accept a risk warning to run BLE without PSRAM; if such a gateway hangs or becomes unreachable, section 7.12a shows how to recover it.
 
 #### Self-discovering roster (TASK-508)
 
@@ -480,6 +492,8 @@ The Sensors card offers three controls:
 - **Rescan**: trigger an active-scan name burst so freshly powered sensors announce themselves immediately instead of waiting for the next passive advertisement.
 - **Clear roster**: wipe all eight slots (a two-press confirm guards against accidents).
 - **Name-prefix filter**: type a case-insensitive prefix to narrow the roster by the sensor's advertised BLE name. By default this only filters the display. Enable the **restrict roster** toggle to promote it to an ingestion gate: sensors whose known name does not match the prefix are then kept out of the roster entirely. Sensors with an empty or unknown name are always admitted.
+
+**Trust.** BLE advertisements are unauthenticated broadcasts: any sensor in radio range that sends a supported format lands in the roster, a neighbour's too. SAT uses only the selected sensor. While none is selected and exactly one roster sensor sent a reading in the last two publish intervals, that one is selected automatically. In a building with many BLE devices, select your sensor by hand, or set a name-prefix filter with **restrict roster** on. The firmware never connects to a sensor and never writes to it.
 
 The roster is exposed at:
 
@@ -492,8 +506,8 @@ The roster is exposed at:
 
 | Setting | Default | Range | Description |
 |---|---|---|---|
-| `satbleenable` | true | bool | Enable BLE sensor scanning (passive, continuous). No-op on boards without a BLE radio |
-| `satbleriskack` | false | bool | On a board WITHOUT PSRAM, acknowledge the instability risk so BLE may scan. Ignored on PSRAM boards (`psramFound()` gates instead) |
+| `satbleenable` | true | bool | Enable BLE sensor scanning (passive, continuous). No-op on boards without a BLE radio. On a board without PSRAM it is always false: switching it on is refused (REST `409`) and a stored true is cleared at boot (TASK-2025) |
+| `satbleriskack` | false | bool | Kept for settings files from older firmware; it no longer opens BLE on a board without PSRAM (TASK-2025, ADR-257) |
 | `satblemac` | "" | MAC address | Active sensor MAC (set via roster select; empty = auto-select first fresh entry) |
 | `satbleinterval` | 30 | 10-300 s | Publish / state-update cadence (NOT scan rate; scan is continuous) |
 | `satblenameprefix` | "" | up to 23 chars | Name-prefix filter (case-insensitive; empty = off) |
@@ -596,10 +610,12 @@ A second climate entity (`climate.<hostname>_dhw_control`) exposes DHW setpoint 
 
 **TT= and TC= remote-override semantics (TASK-466, ADR-223)**: When `satpushsetpoint` is enabled, SAT pushes its target to the thermostat display with `TC=`, like the PIC gateway: the value is answer state only. On OT-Direct in gateway mode the thermostat reads it from OpenTherm MsgID 9 (remote override room setpoint) and MsgID 100 (`RemoteOverrideFunction`); nothing is written to the boiler for it and the thermostat's own room setpoint (MsgID 16) passes unchanged. The two commands carry different priorities in MsgID 100:
 
-- `TT=<v>` -  program-priority override (MsgID 100 low byte `0x02`).
-- `TC=<v>` -  manual-priority override (MsgID 100 low byte `0x01`).
+- `TT=<v>` -  manual and program change priority (MsgID 100 low byte `0x03`, the PIC's `b'11'`).
+- `TC=<v>` -  manual change priority only (MsgID 100 low byte `0x01`, the PIC's `b'01'`).
 
-Both end at `TT=0` / `TC=0`, at a replacement `TT=` / `TC=`, or by the release rule of the PIC, which applies to TT and TC alike: counting starts after the thermostat has read MsgID 9 once. A thermostat MsgID 16 within 0.25 C of the override counts as acceptance. Before acceptance the 4th mismatching MsgID 16 frame releases the override; after acceptance the first mismatch releases it. A thermostat that never reads MsgID 9 never releases the override. In OT-Direct master mode (no thermostat) `TT=` / `TC=` write MsgID 16 and MsgID 100 to the boiler. The current override mode is reflected in the `PR=O` report as `O=T<v>` (TT), `O=C<v>` (TC), or `O=N` (none). Multi-channel set commands (MQTT, REST, web UI, serial) are coalesced by MsgID inside the OTDirect command queue (TASK-494): repeated WRITE_DATA for the same MsgID within one OT cycle collapses to a latest-value-wins single frame on the bus.
+With `OH=1` (the default, as on the PIC) the low byte is copied into the high byte, so the thermostat reads `0x0303` or `0x0101`; `OH=0` leaves the high byte 0 (TASK-1750, TASK-1961).
+
+Both end at `TT=0` / `TC=0`, at a replacement `TT=` / `TC=`, or by the release rule of the PIC, which applies to TT and TC alike: counting starts after the thermostat has read MsgID 9 once. A thermostat MsgID 16 within 0.25 C of the override counts as acceptance. Before acceptance the 4th mismatching MsgID 16 frame releases the override; after acceptance the first mismatch releases it. A thermostat that never reads MsgID 9 never releases the override. In OT-Direct master mode (no thermostat) `TT=` / `TC=` write MsgID 16 and MsgID 100 to the boiler; `TT=0` then puts a `BS=` or MQTT `room_setpoint` value back on MsgID 16 instead of clearing it, as the PIC's `TT=0` leaves `BS=` alone (TASK-1751). The current override mode is reflected in the `PR=O` report as `O=T<v>` (TT), `O=C<v>` (TC), or `O=N` (none). Multi-channel set commands (MQTT, REST, web UI, serial) are coalesced by MsgID inside the OTDirect command queue (TASK-494): repeated WRITE_DATA for the same MsgID within one OT cycle collapses to a latest-value-wins single frame on the bus.
 
 **SAT settings entities (Task-81 / Task-284)**: Since 2.0.0, all controllable SAT parameters are exposed as HA entities so the full SAT feature set can be driven from a dashboard without sending raw MQTT messages.
 
@@ -697,7 +713,7 @@ External temperature values expire automatically (5 minutes for indoor, 10 minut
 | SAT tab not visible in web interface | SAT not yet enabled | Enable SAT in settings. |
 | Home Assistant climate entity missing | Auto-discovery disabled or MQTT not connected | Check MQTT connection and HA discovery setting. |
 | Pressure alarm keeps triggering | Pressure band too narrow or boiler filling issue | Adjust `satminpressure`/`satmaxpressure`. Check boiler pressure gauge. |
-| Solar gain never activates | Rise rate threshold too high or sun elevation data missing | Lower `satsolarminrise`. Enable weather API for sun elevation. |
+| Solar gain never activates | Rise rate threshold too high or sun elevation data missing | Lower `satsolarminrise`. Push `sat/sun_elevation` from Home Assistant, or set the weather latitude and longitude so the firmware computes it (NTP time needed). |
 | Summer mode does not activate | Threshold too high or hours too long | Lower `satsummerthreshold` or `satsummerminhours`. |
 
 ---

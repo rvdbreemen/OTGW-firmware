@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : diagRecorderStuff.ino
-**  Version  : v2.0.0-poc.13
+**  Version  : v2.0.0-poc.14
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -26,6 +26,7 @@ static DiagEnv       diagEnv;
 static PlatformMutex diagRecMutex = nullptr;
 
 static uint32_t diagEnvMillis()  { return millis(); }
+static uint32_t diagEnvMicros()  { return micros(); }   // TASK-1665 AC2: append cost
 static uint32_t diagEnvEpoch()   { const time_t t = time(nullptr); return (t > 946684800) ? (uint32_t)t : 0u; }   // 0 until NTP set the clock
 static uint32_t diagEnvFreeHeap(){ return platformFreeHeap(); }
 static void*    diagEnvAlloc(size_t n)       { return malloc(n); }
@@ -49,13 +50,14 @@ void diagRecorderInit()
   diagEnv.lockWait = diagEnvLockWait;
   diagEnv.unlock = diagEnvUnlock;
   diagEnv.hasPsram = platformHasPsram();
+  diagEnv.micros = diagEnvMicros;
 }
 
 // Manual start (the REST route of TASK-1666 calls this). A refusal is not an error: the status
 // reports diagStartReasonText(diagRec.lastStart). Without the lock there is no safe recorder.
 DiagStartResult diagRecorderStart()
 {
-#if HAS_CLOUD_REC   // TASK-1991: one recorder; local recording is the cloud recorder's ring in this env
+#if HAS_CLOUD_REC   // TASK-2907: one recorder; local recording is the cloud recorder's ring in this env
   const DiagStartResult r = (DiagStartResult)cloudRecLocalStart();
   if (r == DIAG_START_OK) updateSetting("DiagRecordingOn", "true");
   return r;
@@ -70,7 +72,7 @@ DiagStartResult diagRecorderStart()
 bool diagRecorderStop()
 {
   updateSetting("DiagRecordingOn", "false");                          // last Setting record of the recording
-#if HAS_CLOUD_REC   // TASK-1991
+#if HAS_CLOUD_REC   // TASK-2907
   return cloudRecLocalStop();
 #endif
   return diagRec.stop();
@@ -81,7 +83,7 @@ bool diagRecorderStop()
 // manual start applies; a refusal leaves the flag set and the reason in diagRec.lastStart.
 void diagRecorderBootResume()
 {
-#if HAS_CLOUD_REC   // TASK-1991: the reboot is the first event (EV_REBOOT) once the recorder captures
+#if HAS_CLOUD_REC   // TASK-2907: the reboot is the first event (EV_REBOOT) once the recorder captures
   if (settings.diag.bRecordingOn) {
     const uint8_t r = cloudRecLocalStart();
     DebugTf(PSTR("Recorder: resume %s%s%s\r\n"), r == DIAG_START_OK ? "started" : "refused", r == DIAG_START_OK ? "" : ": ",

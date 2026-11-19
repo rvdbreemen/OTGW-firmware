@@ -74,6 +74,7 @@ static int g_mode = 'G';
 #define IS_MASTER_MODE() (g_mode == 'S')
 #define IS_LOOPBACK_MODE() (g_mode == 'L')
 static void otDirectBridgeProcessPRResponse(const char* line) { printf("%s\n", line); }
+static void otDirectBridgeProcessStatus(const char* s) { printf("PR: %s\n", s); }   // TASK-1804 B3c: SE / BV
 """
 
 MAIN = r"""

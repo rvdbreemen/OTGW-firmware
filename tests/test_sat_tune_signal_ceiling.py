@@ -58,7 +58,9 @@ class SignalCeiling(unittest.TestCase):
         self.assertEqual(len(defs), 1, f"{var} must be defined once from a function call in the control tick: {defs}")
         self.assertEqual(defs[0], "satEffectiveMaxSetpoint",
                          f"the tuner signal is clamped at {var} = {defs[0]}(), entry 317 wants satEffectiveMaxSetpoint()")
-        self.assertIsNone(re.search(rf"\b{var}\s*(?:[-+*/]?=)(?!=)", body[body.index(f"{var} = {defs[0]}") + 1:]),
+        # (?<![.>]) : a member of another struct with the same name (TASK-1882 `d.maxSetpoint = maxSetpoint;`) is no
+        # reassignment of the local variable
+        self.assertIsNone(re.search(rf"(?<![.>])\b{var}\s*(?:[-+*/]?=)(?!=)", body[body.index(f"{var} = {defs[0]}") + 1:]),
                           f"{var} is reassigned before the clamp")
 
     def test_effective_ceiling_includes_the_boiler_maximum(self):

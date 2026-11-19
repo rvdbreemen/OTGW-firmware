@@ -22,6 +22,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+import otd_pic_decimal_block as opd  # noqa: E402  (TASK-1804 B8/B9)
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
@@ -67,6 +68,9 @@ PRE = r"""
 #define OTDDebugTln(...) do {} while (0)
 #define OTDDebugTf(...) do {} while (0)
 #define constrain(v, lo, hi) ((v) < (lo) ? (lo) : ((v) > (hi) ? (hi) : (v)))   /* Arduino's macro */
+static bool otdOutsideSet = false; static uint16_t otdOutsideF88 = 0;   // TASK-1803 relay state (tests/test_otd_relay_rw.py)
+static bool otdInitSW = false, otdInitSH = false; static uint16_t otdDhwSetF88 = 0, otdMaxChSetF88 = 0;
+static bool otdBoilerAllowsWrite(uint8_t) { return false; }
 static size_t strlcpy(char* d, const char* s, size_t n) { size_t l = strlen(s); if (n) { size_t c = l < n - 1 ? l : n - 1; memcpy(d, s, c); d[c] = 0; } return l; }
 static char* dtostrf(double v, int w, int p, char* out) { sprintf(out, "%*.*f", w, p, v); return out; }
 @SETTINGS_STRUCT@
@@ -133,6 +137,7 @@ int main() {
   step("MI", "MI", "500");
   step("FS", "FS", "0");
   step("IT", "IT", "0");
+  OH_PRESET
   step("OH", "OH", "1");
   step("SW", "SW", "55");
   step("SH", "SH", "70");
@@ -181,6 +186,8 @@ def build_source():
         "HAS_UI_FIELD": "settings.otd.sUnknownIds" if "sUnknownIds" in struct else '"none"',
     }
     defs = "".join("#define %s %s\n" % kv for kv in fields.items())
+    # TASK-1961: OH defaults to 1 now; the OH step starts from a stored 0 so OH=1 is a change that must be stored
+    defs += "#define OH_PRESET %s\n" % ("settings.otd.bOverrideHB = false;" if "bOverrideHB" in struct else "")
     if restore:
         defs += "#define HAS_RESTORE 1\n"
     return (PRE.replace("@SETTINGS_STRUCT@", struct + ";") + defs +
@@ -195,7 +202,7 @@ class Persist(unittest.TestCase):
     def setUpClass(cls):
         with tempfile.TemporaryDirectory() as d:
             cpp = Path(d) / "t.cpp"
-            cpp.write_text(build_source(), encoding="utf-8")
+            cpp.write_text(opd.with_block(build_source()), encoding="utf-8")
             exe = compile_cpp(cpp, Path(d) / ("t.exe" if os.name == "nt" else "t"))
             if exe is None:
                 raise unittest.SkipTest("no host compiler")

@@ -3,11 +3,11 @@ id: TASK-1930
 title: >-
   Pressing the reset button several times no longer forces the WiFi config
   portal on the ESP32-S3: the external-reset counter never counts
-status: In Review
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-14T08:57:00Z'
-updated_date: '2026-11-14T13:02:00Z'
+updated_date: '2026-11-18T15:39:00Z'
 labels:
   - bug
   - wifi
@@ -51,4 +51,12 @@ Build beta.243+c6dc184 (esp32-combo, cold, app 9m42s + FS 28s, max commit charge
 No-regression bench by 09 on .63, beta.243+c6dc184 (sha256 zip acf28941...c9eef, ino e4f624c3...61c13, littlefs e2d8c980...7af40e; OTA app+FS, 'changed: none', githash c6dc184): OK. 3x /ReBoot (Software reset, raw 0x0c/0x0c) and 2x USB reset (ESP_RST_USB '(b)', raw 0x15/0x15 = USB_UART_CHIP_RESET, settles the open raw-code question) each came back on WiFi in 7-9 s and MQTT in 9-12 s: no config portal, WiFi kept. Settings diff [] (API and raw settings.ini), crashlog byte-identical, bootcount +1 per reset. The telnet capture misses early setup lines, so the absence of 'External reset count' lines alone proves little; the evidence is the portal never coming plus the reasons reported (USB, SW), which the gate does not count. 3x power-on/button NOT done (AC3 field/maintainer).
 
 In Review: AC1 and AC2 ticked with evidence; AC3 is FIELD/MAINTAINER (three button presses or plug pulls on a build with the fix, by Robert or in the field). ADR-238 stays Proposed until Robert's in-session yes.
+
+2026-11-18 AC3 waived by maintainer for the 21 Nov stable release: Robert answered "B" (waiver), Discord DM 1572636126211080274, relayed by the coordinator (same question as TASK-1455 AC3). AC3 stays unchecked: not passed, waived; three button presses or plug pulls opening the portal were not observed on a build with the fix.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+AC1 (host reproduction test/host/test_wifi_portal_reset.py, red on the old gate, green on the fix) and AC2 (decision A, ADR-238; 09 no-regression bench on .63 beta.243) done. AC3 (field/maintainer: three resets open the portal, one power cut does not) waived by maintainer for the 21 Nov stable (DM 1572636126211080274, "B"); not verified.
+<!-- SECTION:FINAL_SUMMARY:END -->

@@ -139,7 +139,7 @@ docs/adr/.adr-kit-state.json.lock
 tests/webui/node_modules/
 !tests/webui/package-lock.json
 
-# TASK-1963 PoC: files the pioarduino hybrid compile (esp32-combo-tlsdyn) writes into the project root
+# TASK-2901 PoC: files the pioarduino hybrid compile (esp32-combo-tlsdyn) writes into the project root
 /.dummy/
 /managed_components/
 /sdkconfig.defaults

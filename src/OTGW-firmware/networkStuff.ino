@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : networkStuff.ino
-**  Version  : v2.0.0-poc.13
+**  Version  : v2.0.0-poc.14
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -52,7 +52,7 @@ WebPendingHeaders       g_pendingHeaders{};
 WebRequestBody          g_requestBody{};
 
 FSInfo LittleFSinfo;
-bool   LittleFSmounted = false;
+std::atomic<bool> LittleFSmounted{false};   // TASK-1995: also written by the fsWriter task (write probe, mount check)
 bool   LittleFSsimFilePresent = false;     // TASK-1899: /otgw_simulation.log exists (refreshed on the loop task)
 bool   LittleFSupdateIncomplete = false;   // TASK-1899: FS_UPDATE_INCOMPLETE_FILE exists (refreshed on the loop task)
 

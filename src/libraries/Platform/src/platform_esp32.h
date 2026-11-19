@@ -34,6 +34,7 @@
 #include <esp_flash.h>
 #include <esp_core_dump.h>       // core-dump summary for the reboot log (platformResetRegisterDump, TASK-1479)
 #include <esp_partition.h>       // coredump partition read (platformCoreDumpRead, TASK-1560)
+#include <esp_app_desc.h>        // running app ELF sha (platformRunningAppSha, TASK-1983)
 #include <hal/usb_serial_jtag_ll.h>  // platformUsbJtagPutc (TASK-1217)
 #include <esp_sntp.h>            // esp_sntp_servermode_dhcp() (platformIgnoreDhcpNtp)
 #include <lwip/priv/tcp_priv.h>  // tcp_active_pcbs (platformTcpActivePcbCount)
@@ -516,7 +517,17 @@ inline uint16_t platformTcpTxHoldingOnPort(uint16_t localPort,
   LOCK_TCPIP_CORE();
   for (struct tcp_pcb *pcb = tcp_active_pcbs; pcb != nullptr; pcb = pcb->next) {
     if (pcb->local_port != localPort) continue;
-    if (pcb->unsent != nullptr || pcb->unacked != nullptr) { count++; continue; }
+    if (pcb->unsent != nullptr || pcb->unacked != nullptr) {
+      if (pcb->state == ESTABLISHED) { count++; continue; }
+      // TASK-1947 (ADR-240, Proposed, amends ADR-188): a connection that is not ESTABLISHED counts only
+      // while a segment with payload is queued. A closing one with only its zero-length FIN, or a
+      // half-open SYN_RCVD one with only its zero-length SYN-ACK, holds no send data and no request.
+      bool payload = false;
+      for (struct tcp_seg *seg = pcb->unsent; seg != nullptr && !payload; seg = seg->next) payload = seg->len != 0;
+      for (struct tcp_seg *seg = pcb->unacked; seg != nullptr && !payload; seg = seg->next) payload = seg->len != 0;
+      if (payload) count++;
+      continue;
+    }
     if (pcb->state != ESTABLISHED) continue;
     bool waiting = false;
     for (uint8_t i = 0; i < idleCount; ++i) {
@@ -1019,6 +1030,28 @@ inline bool platformCoreDumpAppSha(char* dst, size_t len) {
   return n > 0;
 }
 
+// The running image's ELF SHA256 as lowercase hex (64 digits), built once from the 32 bytes of the app
+// description (esp_app_get_description()->app_elf_sha256, esp_app_desc.h) and cached (TASK-1983). Not via
+// esp_app_get_elf_sha256(): that helper returns at most CONFIG_APP_RETRIEVE_LEN_ELF_SHA characters (9 here), as
+// seen on .61 with beta.342. The core dump keeps a prefix of the same string for the build that crashed
+// (platformCoreDumpAppSha above), so a reader compares the two on the dump's length: equal means the dump is
+// from this build.
+inline const char* platformRunningAppSha() {
+  static char s_sha[65] = "";
+  static bool s_read = false;
+  if (!s_read) {
+    s_read = true;
+    const esp_app_desc_t* d = esp_app_get_description();
+    static const char kHex[] = "0123456789abcdef";
+    for (size_t i = 0; d != nullptr && i < sizeof(d->app_elf_sha256); i++) {
+      s_sha[2 * i]     = kHex[d->app_elf_sha256[i] >> 4];
+      s_sha[2 * i + 1] = kHex[d->app_elf_sha256[i] & 0x0F];
+    }
+    s_sha[(d != nullptr) ? 64 : 0] = '\0';
+  }
+  return s_sha;
+}
+
 // platformRestartDHCP() removed in TASK-432 port. Although the ESP32
 // esp_netif_dhcpc_stop/start API differs from ESP8266's SDK calls, the
 // underlying ownership-takeover concern still applies: once user code
@@ -1204,6 +1237,22 @@ inline PlatformTask platformTaskCreatePinned(void (*fn)(void *),
   TaskHandle_t h = nullptr;
   BaseType_t ok = xTaskCreatePinnedToCore(fn, name, stackBytes, arg,
                                           (UBaseType_t)priority, &h, APP_CPU_NUM);
+  return (ok == pdPASS) ? h : nullptr;
+}
+
+// The same with the core chosen by the caller (TASK-1989 experiment: a writer on the protocol core while the
+// loop runs on the application core). PLATFORM_CORE_PROTOCOL is core 0 (WiFi/BT stack, AsyncTCP's neighbour),
+// PLATFORM_CORE_APP is the loop()'s core. Returns nullptr on creation failure.
+enum : int { PLATFORM_CORE_PROTOCOL = PRO_CPU_NUM, PLATFORM_CORE_APP = APP_CPU_NUM };
+inline PlatformTask platformTaskCreatePinnedCore(void (*fn)(void *),
+                                                 const char *name,
+                                                 uint32_t stackBytes,
+                                                 void *arg,
+                                                 unsigned int priority,
+                                                 int core) {
+  TaskHandle_t h = nullptr;
+  BaseType_t ok = xTaskCreatePinnedToCore(fn, name, stackBytes, arg,
+                                          (UBaseType_t)priority, &h, (BaseType_t)core);
   return (ok == pdPASS) ? h : nullptr;
 }
 

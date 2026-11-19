@@ -5,8 +5,131 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [2.0.0-beta.382] - 2026-11-19
+
+### Changed
+- BLE: on boards without PSRAM BLE can no longer be switched on; a stored "on" is cleared at the first start, the switch is greyed out ("BLE needs PSRAM"), REST answers 409 and MQTT refuses it (TASK-2025, beta.375, ADR-257).
+- SAT: when the room leaves the 0.1 C band the PID integral is halved once and held instead of reset to 0, for the main and the zone PIDs (TASK-1890, beta.376; entries 333, 414).
+- SAT: no continuous to PWM switch while the tolerance band pauses heating; both switch rules only run while heating is allowed (TASK-1887, beta.377; entries 410, 417).
+- Web UI: the Monitor graph, its 24 h history and the CSV show the SAT target as its own series while SAT is enabled; the capture tool writes it (TASK-2018, beta.378, ADR-256).
+- SAT: the heating curve self-tune decides every counted hour on a 12-counted-hour window with a 0.05 step (TASK-1889, beta.379, ADR-260; entries 423, 424). BREAKING: MQTT `sat/curve_tune/window_hours` replaces `sat/curve_tune/days` and `sat/curve_tune/clean_hours_today`; REST `curve_tune.window_hours` and `window_hours_needed` replace `days`, `days_needed`, `clean_hours_today`, `clean_hours_needed` and `hours_today`; saved tuner progress of an older build is dropped once.
+- Web UI: the SAT hand-back hints read "SAT paused: ..." (EN, NL, DE, EL) (TASK-2036, beta.382).
+
 ### Fixed
+- SAT: the weather is fetched before the boiler's or Home Assistant's outside temperature turns one hour old, so the sources no longer go stale together and SAT no longer hands the boiler back mid-burn (TASK-2039, beta.380).
+- SAT: an `OT=` outside temperature answered by the PIC with its own A frames now counts as a fresh outside source (TASK-2040, beta.381; entries 330, 331).
+
+## [2.0.0-beta.374] - 2026-11-18
+
+### Changed
+- SAT: continuous to PWM only when flow - request stays >= `satpwmswitchmargin` (default 2.0 C, a stored old default 1.5 migrates once) for 60 s, was 1.5 C / 30 s; the 3.5 C / 30 s fail-safe is unchanged (TASK-2005, Sergeant D entry 407, ADR-254 Proposed).
+- Home Assistant: the SAT Simulation switch is unavailable while a real boiler answers (HA 2021.2+) (TASK-2014, ADR-255).
+- SAT web UI: the weather card uses `sat/sun_elevation` while a value younger than 1 hour is published and then asks for no location (TASK-2015).
+- OT-Direct: command errors read like the PIC's (`CH: BV`); MsgID 99 skip for `MH=`/`MW=`/`M2=`/`HW=P` and `SR=` blacklist like the PIC (TASK-1804).
+
+### Fixed
+- SAT: the thermal drop learning runs only while SAT controls the boiler; reset `SATthermalcoeff` after long runs without a boiler (TASK-2010).
+- SAT: a settings re-read keeps the active preset; the capture tool no longer sends `q` at start or after a reconnect (TASK-2013).
+- MQTT: a gateway-override topic (`<label>/override`) that was retained before a reboot is now cleared within a few seconds after the gateway connects to the broker, so Home Assistant no longer keeps showing an override that ended. An override that is still active is published again within a minute (TASK-1991).
+- SAT state files: a save that arrives while a filesystem update starts is no longer lost, and nothing is written while the filesystem is being replaced. A state file that does not fit is refused with a telnet line instead of being cut, and the write queue uses less memory (TASK-2007).
+- Main loop: the minute LittleFS checks run on the file-writer task, not the loop task (TASK-1995 Step B).
+- Health check: no periodic flash write; an unwritable filesystem shows DEGRADED after the next SAT state-file write, only while SAT is on (TASK-2020).
+- Capture tool: runs on Python 3.9 (macOS built-in) again (TASK-2016); a 503 for absent hardware counts as not on this board (TASK-2012).
+
+### Added
+- Diagnostics: telnet `[fs-slow]` (TASK-1995 Step A) and `[HEAP] sat-takeover-probe` (TASK-2019), no change in behaviour.
+
+## [2.0.0-beta.360] - 2026-11-17
+
+### Changed
+- SAT: the tolerance band restarts heating as soon as the room is below the target + 0.1 C (was target - 0.1 C), after at least 10 minutes with CH off, counted from the moment the band turns CH off; a band decision while CH was already off starts no pause, and a lost room temperature ends the pause (Sergeant D entries 401-403; entries 405, 406; ADR-253; TASK-1887).
+- SAT: PWM ON phases that start during a band pause no longer count toward the hourly start limit, and the narration names the value that decided a band stop or restart (Sergeant D entry 398; entry 400; TASK-1887).
+### Fixed
+- SAT: the SAT state files are written by a background writer task instead of on the main loop, so a slow flash write no longer stalls the control loop (TASK-1989).
+- The hourly `otgw-firmware/stats/*` MQTT topics go out one at a time, at least 100 ms apart, instead of 26 at once. On a board without PSRAM the free heap fell by about 55 KB inside that burst, every hour on the hour. The topics and their values are unchanged (TASK-2004).
+- OT-Direct master mode (no thermostat): the room setpoint now reaches the boiler. `BS=` writes MsgID 16 itself, and after `TT=0` the `BS=` or MQTT room setpoint is written again at once, so the boiler no longer keeps the old TT value. A running TT/TC override is not overwritten by them (TASK-1751).
+- OT-Direct: Home Assistant (pyotgw) no longer fails to connect to port 25238 right after a reboot on a board without a thermostat. The one-time 'Thermostat disconnected' line at boot is no longer sent to port 25238, where it landed in the middle of the connect handshake; a real loss or return of the thermostat is still reported there (TASK-1999).
+
+### Added
+- Diagnostic recording: the recording status (`/api/v2/diag/recording/status`) reports what one record costs: `append_count`, `append_max_us` and `append_avg_us` of the current recording (TASK-1665).
+
+## [2.0.0-beta.351] - 2026-11-16
+
+### Changed
+- SAT: every heating start runs in PWM first, with the first phase ON, also when SAT is set to manual continuous. SAT chooses PWM or continuous only after the flame has burned for 60 s; during those 60 s no switch to continuous happens (Sergeant D entries 385, 387, 389, 391, 394; TASK-1942).
+- SAT: a tolerance band around the room target. At target + 0.1 C SAT sends CH off while PWM keeps its ON/OFF rhythm; a continuous burn still runs at least 180 s first. With zones, eco lets the main room decide and comfort keeps heating while any room is more than 0.1 C below its target (Sergeant D entries 376, 378, 384; TASK-1887).
+- SAT: continuous switches to PWM when the flow stays at or above the request + 1.5 C for 30 s. The margin is a new setting, "PWM switch margin" (`satpwmswitchmargin`, 0.5 to 5.0 C, default 1.5), separate from the overshoot margin; the 3.5 C / 30 s fail-safe stays (Sergeant D entries 327, 379; ADR-249; TASK-1888).
+- SAT: the boiler's slave configuration (MsgID 3) no longer stops PWM. A boiler that reports "master low-off not allowed" (MsgID 3 bit 4, for example a Viessmann Vitodens 100-W) and a gateway that has not seen a MsgID 3 reply yet can both use PWM again, as Sergeant D decided (entries 392 and 393). The bit is still shown in the SAT status (TASK-2000).
+- SAT: after a reboot SAT sends no command at all for the first 60 seconds (no hand-back, no setpoint), as Sergeant D asked (entry 388). After that it steers on the heating curve only until the first room temperature arrives. REST `sat/status` has a new field `pid_curve_only`, and the web UI marks the I term as not applied during that time (TASK-1866, TASK-1874).
+- SAT: during a PWM ON phase the modulation suppression setpoint follows the latest boiler flow temperature again, as thermo-nova does. The 2 minute flow average (introduced in beta.330, public in beta.339) is removed: Sergeant D confirmed that no average is needed, because the 180 s flame-on rule already covers the light-off (entry 383, TASK-1990).
+### Fixed
+- OT-Direct: `SR=` rewrites the boiler's answer for that Data-ID to the thermostat, as the PIC does, instead of answering the thermostat locally (TASK-1804 A6).
+- PIC: after a boot the PIC settings panel fills within about a minute again. The settings readout no longer waits 4 to 5 minutes for the MQTT discovery run to finish; it now sends its next query right after a discovery step instead of waiting for the next 3-second tick, and stays at least 3 seconds between queries (TASK-1971).
+- Diagnostic recording: on a board with PSRAM, Stop no longer throws the recording away. It stays in memory and downloads in full until the next Start; the status keeps `has_data` true. Boards without PSRAM still free the ring on Stop, as the web UI warns (TASK-1960).
+### Added
+- REST: `/api/v2/device/info` reports `appelfsha256`, the full ELF sha256 of the running firmware, and the core-dump download carries it as `X-Running-App-Sha256`; the capture tool uses it to say whether a stored core dump belongs to the running build (TASK-1983).
+- SAT: two diagnostic events that change nothing in what SAT sends. *No ignition*: CH asked (a PWM ON phase, or a setpoint above the cold cutoff) for 180 s with the flow below the setpoint and no flame. *Heating failure*: SAT at its maximum (setpoint or PWM duty) for 15 min and the room rose less than 0.5 °C; a slow house can show it on a cold morning. Both show as a warning on the SAT page, in REST `sat/status` (`no_ignition`, `heating_failure`, counters, the last window's room start and end), on MQTT `sat/no_ignition` and `sat/heating_failure` with Home Assistant problem sensors, and as a telnet `SATEVENT` line with the numbers (Robert, DM 1570699094622470167; TASK-1882).
+
+## [2.0.0-beta.339] - 2026-11-16
+
+### Changed
+- SAT: during a PWM ON phase the modulation suppression setpoint is now the average boiler flow temperature of the last 2 minutes minus the suppression offset, instead of the latest flow reading. Only readings taken with the flame on, since the current ignition and outside hot water count, so standing water read before the burner lit does not enter it. In the first 2 minutes after the ignition, while the window fills, the setpoint follows the latest flow, so it keeps up with a rising flow (entries 151, 336); SAT simulation also uses the latest flow. The start-up flood and the continuous mode keep the latest flow. This follows Sergeant D's answer (entry 364) and deliberately differs from thermo-nova, which takes the latest flow (TASK-1990).
+- OT-Direct master mode: a thermostat on the thermostat port that writes a value (any Data-ID except 1, 16 and 24, and 8/14 while SAT owns the setpoint) now has that write sent to the boiler in the next free master slot, and gets the boiler's own answer back (WRITE-ACK, Data-Invalid or Unknown-DataID) instead of a local acknowledgement. Reads stay answered from the boiler cache. The thermostat interface is on by default in master mode (Robert, DM 1571427398485024889; ADR-241, ADR-243; TASK-1812).
+- Home Assistant: the thermostat card follows SAT while SAT is on (TASK-1979, ADR-248). Its target temperature sets SAT's target, it shows SAT's target and the room temperature SAT regulates on, and it offers the SAT presets (comfort, eco, away, sleep, activity, home). With SAT off it works as before (`TT=`, thermostat setpoint and room temperature). The entity and its id stay the same; the lowest target on the card is now 5 C. New MQTT topics: `sat/climate_target` (command and state) and `sat/climate_current`.
+- OT-Direct: the OpenTherm library is pinned to a fork that carries its own fix for the boiler line falling silent without a valid boiler answer (submitted upstream as Phunkafizer/opentherm_library#1); the gateway's own workaround is gone. The fork also brings four newer upstream library changes, among them one that changes how the boiler line is read: the idle-level detection (the line level the gateway takes as idle after 5 ms of a non-idle line) now also runs without Smart Power. `/api/v2/device/info` no longer reports `otdlinestalefixes` and `otdlinetxrestarts`; `otdrequestactive` and `otdcmdringdropped` stay (TASK-1980).
+- SAT: a 60 minute heating-curve self-tune hour counts when at least 90 % of its expected ticks are clean (108 of 120 at 30 s; a gap counts against the hour). Ticks left out for hot water, sun or other per-tick reasons only lower that share and stay out of the hour's mean and phase sums, instead of dropping the whole hour. On five of gruijter's runs this counts 10 hours instead of 8, with the same votes (Sergeant D entries 340 and 343; ADR-234 Proposed; TASK-1932).
+- Capture tool: it records only this gateway's own MQTT topics and its Home Assistant discovery configs, instead of everything on the broker; `--mqtt-all-topics` records everything, with a warning on the console and in the summary (TASK-1988).
+- Capture tool: `summary.txt` and the crash log are in every upload; an upload over 24 MB is packed as `.tar.xz`, and when that is still too big the essentials go first and the rest into `-upload-part2.tar.xz` (TASK-1986).
+- Capture tool: a downloaded core dump is labelled latest, old or unknown against the newest crash in the reboot log, and the summary says so; the graph CSV matches the web UI export again (TASK-1972).
+
+### Fixed
+- OT-Direct: after the SAT simulation (or the OTGW simulation) is turned off, no command that was queued while it ran reaches the real boiler any more, and a cleared value (`CS=0`, `SW=0`, `MM=T`, `TT=0`) no longer goes out afterwards when its old write was still waiting in the queue. Before, the boiler could get a stale control setpoint (61.3 on the bench) right after the simulation ended (TASK-1992).
+- SAT: the pressure-drop alarm no longer fires after a normal pump stop. Pressure readings taken in the 600 s after the CH mode changes are no longer used for the drop rate; the pump-stop step used to fall inside that window and read as a fast drop. After such a change the drop rate waits until the fresh readings span 600 s, so a single step cannot read as a fast drop either (Robert, entry 372). A real pressure loss right after a CH mode change is seen about 10 minutes later than before (TASK-1867, Sergeant D entry 362).
+- SAT: when the boiler flow temperature went stale during a PWM ON phase, the 3-second suppression refresh sent the minimum control setpoint (`CS=10`) while heating stayed on, until the next control tick. It now leaves the setpoint as it is without a flow temperature, as thermo-nova does (TASK-1412.18.1).
+- MQTT: the retained `<label>/override` topic (for example `TSet/override`) is removed from the broker when the override ends, so Home Assistant no longer keeps showing an old override value. The gateway counts an override as ended when no override frame came for 10 minutes (ADR-118), so the topic goes away up to about 11 minutes after the last one (TASK-1985).
+- OT-Direct: when the command queue is full, `MH=`, `MW=`, `M2=`, `RR=`, `RS=` and `PM=` no longer answer as if the command was sent; they get no answer and count as dropped, as `CS=` and `SW=` already did (TASK-1804).
+- OT-Direct: when the boiler answers the gateway's control setpoint (`CS=`, MsgID 1) or DHW setpoint (`SW=`, MsgID 56) with Data-Invalid or Unknown-DataID, the gateway drops that value, as the PIC does: for `CS=` the thermostat's own setpoint goes to the boiler again, for `SW=` the stored value is cleared too. SAT sends `CS=`/`SW=` again on its next send. `SH=` is unchanged (TASK-1804).
+- OT-Direct: once a minute the flow temperature (MsgID 25) was read up to about 19 s apart instead of every 10 s, because the 10 s reads waited behind the 60 s slow-poll burst (since beta.307). The faster reads now go first; a `PM=25` goes out within about one second also during the burst. The OTGW Classic (PIC) was not affected (TASK-1981).
+- OT-Direct now answers more commands as the PIC does (TASK-1804): a too short command or one without `=` gets `SE`; `PR=` with more than one letter is `SE`, an unknown letter `BV` (was no answer), `PR=E` answers `E=-` (no external sensor), `PR=F` stays `BV`; after `GW=R` the PIC's greeting line goes to port 25238; `MH=`, `MW=`, `M2=` read their value like the PIC; `VS=` above 100 is refused instead of capped and `MI=` rounds to 5 ms like the PIC; the thermostat's MsgID 16 is always acknowledged; a `TT=`/`TC=` override is cleared when the thermostat is lost; `SR=` on a thermostat write answers WRITE-ACK; a Data-Invalid answer resets the unsupported-ID count; a new boiler fault reads the fault code (MsgID 5) at once.
+- The `Error 01` counter of the PIC (MQTT, web UI) now counts: the matcher looked for a CR/LF that the serial reader had already removed (TASK-1804).
+- OTA: an image that fails its first boot goes back to the safeboot updater at once. With one OTA slot the second boot record still pointed at the same image, so a failing image was started a second time; the gateway now removes that stale record right after the filesystem mounts (TASK-1919).
+- Filesystem update: the RTC snapshot keeps the reboot log's newest whole lines that fit, instead of the whole log or nothing, so a crash during the write no longer loses the log next to a large `settings.ini`; the keep-list caps come from one source (ADR-246; TASK-1931).
+
+## [2.0.0-beta.323] - 2026-11-15
+
+### Added
+- Monitor > Graph: on a board with PSRAM the gateway keeps 7 days of graph history instead of 24 h (about 70 KB of PSRAM, still RAM only), and the graph gets a 7 days window. `GET /api/v2/graph/history` serves 24 h by default as before; `?hours=N` (1 to 168) asks for another window, and a window of more than 1008 slots is thinned (7 days: 10 minute slots, the newest value per slot, flame/DHW/CH set when any part of the slot had them). The chip shows only on boards with PSRAM. The CSV export covers the window shown (TASK-1963, ADR-245).
+- Monitor > Graph and its CSV export: a DHW temperature line (MsgID 26) from the moment the page opens; the device history does not hold it, so after a reload the earlier part of the window has no DHW line (TASK-1776).
+- Capture tool: `capture-mqtt-debug` also saves the device state (read-only diagnostic REST routes and state files at start and stop, hourly in a long run, secrets redacted, `settings.ini` excluded), the graph history (24 h, plus 7 days where the firmware answers `?hours=168`) as JSON and CSV, and a diagnostic recording the device holds, all into the upload zip; GETs only, one request at a time; `--skip-device-state`, `--skip-graph-history`, `--skip-diag-recording` (TASK-1964).
+- REST: `otgw/messages` and `otgw/label` add a `source` field (none, boiler, gateway, thermostat, summary, replay): where the served value came from (TASK-1965).
+
+### Changed
+- A freshly flashed unit now starts with the normal defaults (MQTT on, new topic names, setup wizard) instead of looking like a 1.x upgrade: the filesystem image no longer contains a default `settings.ini`, so the first boot writes the firmware's own defaults. A filesystem update still puts your own settings back (TASK-1920).
+- Firmware size: the settings help texts and the built-in test replay are stored compressed in the firmware (about 22 KB less flash). The help is sent to the browser compressed; the replay is unpacked in memory only while a built-in test replay runs (ADR-247, TASK-1955).
+- OT-Direct: `OH=` (copy the MsgID 100 override flags into the high byte) is on by default, like the PIC. Every OT-Direct board switches to `OH=1` once at its first boot on this version, whatever it had stored (since beta.203 every settings save stored `OH=0` without anyone choosing it); a marker in `settings.ini` (`OTDohpicdefault`) makes sure it happens once, so an `OH=0` sent afterwards stays. A thermostat that reads MsgID 100 during a `TT=`/`TC=` override then sees the flags in both bytes (Robert, DM 1571441135526875227; TASK-1961).
+- OT-Direct: during a `TT=` override the thermostat's MsgID 100 read is answered with the PIC's flags `0x03` (manual and program change; was `0x02`), `TC=` stays `0x01`, and with `OH=1` the flags are copied into the high byte. In master mode the MsgID 100 write to the boiler carries the same value (Robert, DM 1571426506259963986; TASK-1750).
+- OT-Direct master mode: `TT=0` (or a release of the override) puts a `BS=` or MQTT `room_setpoint` value back on MsgID 16 instead of clearing it, as the PIC's `TT=0` never touches `BS=` (Robert, DM 1571426506259963986; TASK-1751).
+- REST: a control command that SAT refuses answers 409 "Command refused: SAT is in control of the boiler" instead of 503 "queue full"; 503 stays for a full queue (TASK-1970).
+
+### Removed
+- **BREAKING (REST, OT-Direct):** the setback fields that no longer do anything are gone: `setback_active` (device info `otdirect_status`, the flat `state.otd.setback_active` and `otdsetback` fields), `setback_timeout` (`otdirect_settings`, `settings.otd.setback_timeout`) and the `otdsetbacktimeout` setting with its web UI rows. Since TASK-1806 there is no setback, and since TASK-1802 a thermostat counts as lost after a fixed 3 s. An old `settings.ini` with `OTDsetbacktimeout` still loads; the key is ignored and dropped at the next save. `SB=` and `FS=` stay: they are PIC commands, stored and answered like the PIC (`PR=S` unchanged), with no effect on OT-Direct (TASK-1950).
+
+### Fixed
+- OT-Direct: the scheduler waits the OpenTherm master wait time of 100 ms after the end of a conversation before its next own frame; after a late boiler answer the next frame used to follow at once (spec v4.2 :1100; TASK-1954).
+- OT-Direct gateway mode: a lost thermostat counts as lost after about 3 s instead of 30 s, so the boiler gets the gateway's own frames within the spec's 5 s (Robert, DM 1571431149795024929; TASK-1802).
+- OT-Direct: the boiler line no longer falls silent for 36 minutes when the boiler has given no valid answer for 36 minutes (no boiler connected, boiler off). A timer wrap in the OpenTherm library kept the line "busy": no frames went out and commands from the web UI and REST were queued but not run (503 "queue full"). The gateway now keeps that timer current and restarts the line if a transmit stalls; `/api/v2/device/info` reports `otdrequestactive`, `otdlinestalefixes`, `otdlinetxrestarts` and `otdcmdringdropped` (TASK-1966).
+- OT-Direct `SC=`: a time or day the PIC refuses is refused the same way (hours above 23 or minutes above 59 `OR`, a missing `:` or `/` or extra characters `SE`, a day outside 1-7 `BV`) instead of being stored with the bits masked; `SC=12:30` without a day is no longer accepted (TASK-1908).
 - SAT: when a simulation run ends, the real PID state and heating-curve data are reloaded from the filesystem, so SAT does not go on with the values learned on the simulated room (TASK-1952).
+- OT-Direct gateway mode: `OT=`, `SW=` and `SH=` reach the boiler also when the thermostat leaves no free slot, as the PIC: with an `OT=` value set every thermostat read of MsgID 27 goes to the boiler as a write of that value and the thermostat reads the value back; after `SW=`/`SH=` the thermostat's next read of MsgID 56/57 is turned into one write, when the boiler's MsgID 6 allows it (TASK-1803).
+- OT-Direct gateway mode handles the thermostat's own MsgID 99 as the PIC: while an `MW=`/`MH=`/`M2=` or `HW=P` write is pending, a thermostat read of MsgID 99 goes to the boiler as that write; a thermostat write of MsgID 99 sets the stored operating modes (its push bit starts a push); while the gateway runs a push itself, the boiler's MsgID 99 answer to the thermostat carries the push bit (TASK-1906).
+- OT-Direct `PM=`: takes Data-IDs 0-255 (was BV above 127, and above 255 wrapped around) and, as the PIC, reads a whole TSP or fault-history table after its size (10, 12, 88, 90, 105, 107) and every character of a string (93, 94, 95); before, only the first read went out (TASK-1847).
+- OT-Direct: a command without a value (`CS=`, `TT=`, `SW=` ...) answers `SE` like the PIC, and `OT=`, `MM=` and `CL=` without a value clear like the PIC (`XX: -`); they used to get no answer at all. Other commands without a value stay unanswered (TASK-1957).
+- Web UI: the cooling level Clear sends `CL=-`; it sent `CL=0`, which holds a level of 0 (TASK-1958).
+- Web UI: the PIC panel shows a pending (`t`/`c`) or a clearing (`n`) setpoint override as text instead of the raw value such as `t20.50` (TASK-1939).
+- REST: `GET /api/v2/sat/weather/needs-setup` gives its own answer; the route never matched and returned the full weather status (TASK-1969).
+- PIC: during a SAT simulation the `PR=` report commands reach the PIC again, so the PIC settings fill (ADR-244; TASK-1943).
+- Web server: a connection without payload that is not established no longer counts towards the connection cap, so a page load no longer gets 503 answers (TASK-1947).
+- OT-Direct: `PR=M` accepts the mode letters S, L and P (TASK-1951).
 
 ## [2.0.0-beta.294] - 2026-11-15
 
@@ -30,6 +153,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - OT-Direct: `SW=`, `SH=` and `OT=` parse their value as the PIC 6.8 GetFloatArg does. `SW=`/`SH=` answer `BV` outside the boiler's MsgID 48/49 bounds (20-80 and 10-90 until the boiler reports them), as the PIC; `OT=` clears on any value it cannot parse and on 64.00-127.99 (`OT=99` clears) and answers `OT: -`; the stored values round like the PIC (`OT=9.999` is 10.00, was 0x09FF; `SW=55.7` is 0x37B4). `CC=` parses like `CL=` (TASK-1859).
 
 ### Fixed
+- Web UI: a fresh page load no longer gets 503 answers from the web connection cap because of closing or half-open connections. A port-80 connection that is not ESTABLISHED and holds no payload (only its FIN or its SYN-ACK queued) no longer counts towards the cap of 4; ESTABLISHED connections still count, so the storm protection stays (Robert, ADR-240; TASK-1947).
+- OT-Direct: `PR=M` answers with the OT-Direct modes `S` (standalone) and `L` (loopback) now set the gateway mode to on and `P` (bypass) to off, instead of logging `PR=M unexpected value` and leaving the state as it was (Robert, DM 1571428391457005750; TASK-1951).
+- PIC Classic: with the SAT simulation on (a bench without a boiler) the `PR=` report commands reach the PIC again, so `/api/v2/pic/settings`, the gateway mode and the `PR=E` return-water reading fill; every other PIC command stays held back during the simulation (Robert, ADR-244; TASK-1943).
 - OT-Direct: commands from the REST API and the settings page run on the loop task in arrival order (a text ring, ADR-242 Proposed), so a `GW=R` or mode switch over REST no longer resets the state while a frame is in flight and a `CS=` sent right after it is no longer wiped; a command that does not fit in the ring gets HTTP 503 instead of 202 (TASK-1761).
 - OT-Direct: Unknown-DataID answers never disable MsgIDs 1, 3, 14, 17 and 25 or turn them into alternative slots, as the PIC's MandatoryID (MsgID 0 already was exempt); a later valid answer enables an ID the 3-strike rule disabled, while a `DA=` or `UI=` stays (TASK-1801).
 - OT-Direct `MM=`: a value the PIC cannot parse (`MM=-`, `MM=`, a minus or above 255) clears the maximum modulation override and answers `MM: -`, as the PIC SetMaxModLevel; `MM=-` used to write 0 % to MsgID 14. Characters after the number are `SE` and above 100 is `OR` (TASK-1799).
@@ -1008,7 +1134,11 @@ Legacy release. See git history for details.
 
 Legacy releases. See git history for details.
 
-[Unreleased]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.294...HEAD
+[Unreleased]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.382...HEAD
+[2.0.0-beta.382]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.374...v2.0.0-beta.382
+[2.0.0-beta.374]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.360...v2.0.0-beta.374
+[2.0.0-beta.339]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.323...v2.0.0-beta.339
+[2.0.0-beta.323]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.294...v2.0.0-beta.323
 [2.0.0-beta.294]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.250...v2.0.0-beta.294
 [2.0.0-beta.250]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.237...v2.0.0-beta.250
 [2.0.0-beta.237]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.224...v2.0.0-beta.237

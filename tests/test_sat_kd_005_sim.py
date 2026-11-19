@@ -27,6 +27,21 @@ class Kd005(unittest.TestCase):
     def setUpClass(cls):
         s.install()
 
+    @classmethod
+    def tearDownClass(cls):
+        s.uninstall()   # the 1655 module is shared: leave it as it was for the next test in the process
+
+    def test_uninstall_restores_the_1655_module(self):
+        gains, factors = k._gains_with, k.FACTORS
+        s.uninstall()
+        try:
+            self.assertIsNot(k._gains_with, s._gains_abs)
+            self.assertNotEqual(k.FACTORS, tuple(s.KEYS))
+        finally:
+            s.install()
+        self.assertIs(k._gains_with, gains)
+        self.assertEqual(k.FACTORS, factors)
+
     def test_absolute_k_in_the_gain_and_restored(self):
         orig = port.Pid._gains
         for key, kd in {1.0: 12700.8, 0.794: 10080.0}.items():
@@ -40,19 +55,29 @@ class Kd005(unittest.TestCase):
         for f in SCORED:
             self.assertEqual(mine[f], ref[f], f)
 
+    def _run_as_committed(self, *args, **kw):
+        # The committed 1655 x09 rows were produced before TASK-1890 (ADR-259): the integral was set to 0 outside the
+        # deadband. Reproduce them with that rule; the port's default follows the firmware (halve once, hold).
+        saved = port.Pid.HALVE_ON_EXIT
+        port.Pid.HALVE_ON_EXIT = False
+        try:
+            return k.run(*args, **kw)
+        finally:
+            port.Pid.HALVE_ON_EXIT = saved
+
     def test_baseline_reproduces_1655_x09_warmup_row(self):
         ref = next(r for r in committed_x09() if r["kind"] == "warmup" and r["plant_class"] == "3_1983-92/light/rad"
                    and r["outdoor"] == 5.0 and r["d0"] == -4.0)
-        mine = k.run(ref["era"], ref["mass"], ref["emitter"], ref["flow"], ref["pmin_kw"], ref["mm_honoured"],
-                     ref["outdoor"], ref["d0"], factor=1.0)
+        mine = self._run_as_committed(ref["era"], ref["mass"], ref["emitter"], ref["flow"], ref["pmin_kw"],
+                                      ref["mm_honoured"], ref["outdoor"], ref["d0"], factor=1.0)
         self._check(ref, mine)
 
     def test_baseline_reproduces_1655_x09_guard_row(self):
         ref = next(r for r in committed_x09() if r["kind"] == "guard" and r["plant_class"] == "5_2015/heavy/ufh"
                    and r["scenario"] == "gain_step_8")
         fo, fg = k.GUARD_SCENARIOS[ref["scenario"]]
-        mine = k.run(ref["era"], ref["mass"], ref["emitter"], ref["flow"], ref["pmin_kw"], ref["mm_honoured"],
-                     fo, 0.0, factor=1.0, gain=fg)
+        mine = self._run_as_committed(ref["era"], ref["mass"], ref["emitter"], ref["flow"], ref["pmin_kw"],
+                                      ref["mm_honoured"], fo, 0.0, factor=1.0, gain=fg)
         self._check(ref, mine)
 
 

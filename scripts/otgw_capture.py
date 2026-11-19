@@ -874,7 +874,7 @@ class TelnetCapture(threading.Thread):
         # TASK-1453: toggle states from the first banner, and the states now.
         self.initial_toggles = None
         self.current_toggles = {}
-        # TASK-1396: q/D wait until setup() has finished.
+        # TASK-1396: the D dump waits until setup() has finished.
         self.dump_pending = False
         self.dump_waiting_reported = False
         self.setup_seen = False
@@ -1077,7 +1077,7 @@ class TelnetCapture(threading.Thread):
 
     # -- settings dump (TASK-1396) ---------------------------------------------
     def maybe_send_dump(self):
-        """Send q/D once setup() is done: 'Setup finished!' was seen on this
+        """Send D once setup() is done: 'Setup finished!' was seen on this
         connection, or the health endpoint reports an uptime above 0 minutes."""
         if not self.dump_pending:
             return
@@ -1089,12 +1089,13 @@ class TelnetCapture(threading.Thread):
         if not ready:
             if not self.dump_waiting_reported:
                 self.dump_waiting_reported = True
-                self.cap.summary("Settings dump: waiting for 'Setup finished!' (or uptime > 0) before sending q/D.")
+                self.cap.summary("Settings dump: waiting for 'Setup finished!' (or uptime > 0) before sending D.")
             return
         self.dump_pending = False
-        self.send_key_and_drain("q")
+        # TASK-2013: never 'q'. It runs readSettings(true) on the device (handleDebug.ino) and re-applies
+        # settings.ini over live state (an active preset dropped to none). A capture only reads.
         self.send_key_and_drain("D")
-        self.cap.summary("Settings dump: sent 'q' (read settings) + 'D' (dump settings/state)")
+        self.cap.summary("Settings dump: sent 'D' (dump settings/state)")
 
     # -- connection management -----------------------------------------------
     def open_gap(self, why, start=None):
@@ -1296,11 +1297,14 @@ def load_paho():
 class MqttCapture:
     """Subscribes like `mosquitto_sub -v`: one 'topic payload' line per message."""
 
-    def __init__(self, cap, host, port, topic, username, password):
+    def __init__(self, cap, host, port, topics, username, password, keep=None):
         self.cap = cap
         self.host = host
         self.port = port
-        self.topic = topic
+        self.topics = [topics] if isinstance(topics, str) else list(topics)   # TASK-1988: one or more filters
+        self.topic = ", ".join(self.topics)
+        self.keep = keep            # TASK-1988: per-message check before a line is written (None: keep all)
+        self.dropped = 0
         self.username = username
         self.password = password
         self.client = None
@@ -1332,7 +1336,7 @@ class MqttCapture:
             if reason_code.is_failure:
                 self.errline(f"Connection refused: {reason_code}")
                 return
-            c.subscribe(self.topic)
+            c.subscribe([(t, 0) for t in self.topics])
             if not self.connected_once:
                 self.connected_once = True
                 self.cap.summary(f"MQTT connected: {self.host}:{self.port}, subscribed to '{self.topic}'")
@@ -1358,17 +1362,7 @@ class MqttCapture:
             self.errline(f"Connect to {self.host}:{self.port} failed; retrying")
 
         def on_message(c, userdata, msg):
-            self.messages += 1
-            try:
-                payload = msg.payload.decode("utf-8", "replace")
-                if self.cap.store.hourly:
-                    payload = payload.replace("\r", "\\r").replace("\n", "\\n")
-                    stamp = datetime.now().astimezone().isoformat(timespec="milliseconds")
-                    self.log.write(f"{stamp}\t{int(bool(msg.retain))}\t{msg.topic}\t{payload}\n")
-                else:
-                    self.log.write(f"{msg.topic} {payload}\n")
-            except Exception:
-                pass
+            self.handle(msg.topic, msg.payload, msg.retain)
 
         client.on_connect = on_connect
         client.on_disconnect = on_disconnect
@@ -1378,6 +1372,23 @@ class MqttCapture:
         client.connect_async(self.host, self.port, keepalive=60)
         client.loop_start()
         self.client = client
+
+    def handle(self, topic, payload_bytes, retain=False):
+        """One received message: written to mqtt.log unless keep() says it is another device's (TASK-1988)."""
+        if self.keep is not None and not self.keep(topic):
+            self.dropped += 1
+            return
+        self.messages += 1
+        try:
+            payload = payload_bytes.decode("utf-8", "replace")
+            if self.cap.store.hourly:
+                payload = payload.replace("\r", "\\r").replace("\n", "\\n")
+                stamp = datetime.now().astimezone().isoformat(timespec="milliseconds")
+                self.log.write(f"{stamp}\t{int(bool(retain))}\t{topic}\t{payload}\n")
+            else:
+                self.log.write(f"{topic} {payload}\n")
+        except Exception:
+            pass
 
     def stop(self):
         if self.client is not None:
@@ -1396,7 +1407,9 @@ class MqttCapture:
             pass
         if self.gap_start is not None:
             self.cap.summary(f"MQTT gap still open at stop: since {self.gap_start.isoformat(timespec='seconds')} ({self.gap_reason})")
-        self.cap.summary(f"MQTT capture: {self.messages} message(s) written to mqtt.log.")
+        self.cap.summary(f"MQTT capture: {self.messages} message(s) written to mqtt.log."
+                         + (f" {self.dropped} message(s) of other devices on the broker not recorded."
+                            if self.keep is not None else ""))
 
 
 # --------------------------------------------------------------------------- #
@@ -2370,11 +2383,73 @@ COREDUMP_PATH = "/api/v2/device/coredump"
 COREDUMP_MAX_BYTES = 1024 * 1024   # the partition is 64 KB; anything larger is not a core dump
 
 
+CRASHLOG_PATH = "/api/v2/device/crashlog"
+DEVICE_INFO_PATH = "/api/v2/device/info"
+
+
+def dump_build(dump_sha, running_sha):
+    """TASK-1983: 'this build' when the running firmware's ELF sha256 (device/info appelfsha256) starts with the dump's
+    stored prefix (X-Coredump-App-Sha256, 9 characters by IDF default), 'an earlier build' when it does not, '' when either
+    is unknown (firmware before TASK-1983 has no appelfsha256)."""
+    dump_sha = (dump_sha or "").lower()
+    running_sha = (running_sha or "").lower()
+    if not dump_sha or not running_sha:
+        return ""
+    return "this build" if running_sha.startswith(dump_sha) else "an earlier build"
+
+
+def coredump_age(dump_sha, crashlog, info):
+    """TASK-1972: say whether a stored core dump belongs to the latest crash in the reboot log or is older.
+
+    The firmware never erases the core-dump partition: a dump stays until the next crash overwrites it. When it
+    boots after a crash it writes the dump into /reboot_log.txt once, as a 'Core dump: <task> pc=... elf=<8 hex> bt=...'
+    detail line under the reboot-cause line (platform_esp32.h platformResetRegisterDump()), and device/crashlog
+    returns the newest such pair (helperStuff.ino readLatestCrashLog()). The log keeps 20 lines, so after enough
+    reboots, or a filesystem reset, the pair is gone while the dump remains: device/crashlog says available:false
+    and the dump is from an earlier crash (09 on .63, 2026-11-15).
+
+    dump_sha: the X-Coredump-App-Sha256 the dump carries ('' when unknown); crashlog / info: the parsed
+    device/crashlog and device/info answers, or None. Returns (tag, sentence): tag 'latest' when the newest crash in
+    the reboot log names this dump's ELF, 'old' when the log holds no crash or a crash of another ELF, 'unknown'
+    when there is not enough to tell."""
+    log = (crashlog or {}).get("crashlog") or {}
+    dev = (info or {}).get("device") or {}
+    running = dev.get("fwversion") or "?"
+    reset = dev.get("lastreset") or "?"
+    build = dump_build(dump_sha, dev.get("appelfsha256"))
+    tail = f"running firmware {running}, last reset '{reset}'" + (f"; dump of {build}" if build else "")
+    if not dump_sha:
+        return "unknown", f"age unknown: the dump carries no app ELF hash ({tail})"
+    if crashlog is None:
+        return "unknown", f"age unknown: device/crashlog not read ({tail})"
+    details = log.get("details") or ""
+    match = re.search(r"\belf=([0-9a-fA-F]{8})", details)
+    if log.get("available") and match and dump_sha.lower().startswith(match.group(1).lower()):
+        return "latest", (f"the latest crash in the reboot log ('{log.get('summary', '')}') names this dump's ELF "
+                          f"({tail})")
+    if log.get("available") and match:
+        return "old", (f"OLD: the latest crash in the reboot log names ELF {match.group(1)}, not this dump's "
+                       f"{dump_sha[:8]}; the dump is from an earlier crash ({tail})")
+    return "old", (f"OLD: the reboot log holds no crash, so this dump is from an earlier crash that has rolled out "
+                   f"of the 20-line log or a filesystem reset; the partition keeps a dump until the next crash ({tail})")
+
+
+def _get_json(http_base, path, timeout):
+    """GET a small JSON answer; None on any failure (the capture never stops for it)."""
+    try:
+        request = urllib.request.Request(http_base + path, headers={"User-Agent": "OTGW-capture/2"})
+        with urllib.request.urlopen(request, timeout=timeout) as response:
+            return json.loads(response.read(256 * 1024).decode("utf-8", errors="replace"))
+    except Exception:
+        return None
+
+
 def fetch_coredump(cap, http_base, timeout):
-    """One GET of the stored core dump at the end of a capture (TASK-1560, ADR-210). 200: the body is kept as
-    coredump-<run>.bin in the run folder (and goes into the upload zip) and the dump's app ELF SHA256 is logged;
-    404: no dump stored, one line; 401/403: the admin password is set, one line, and no credentials are asked for
-    or sent. Returns the summary line it logged."""
+    """One GET of the stored core dump at the end of a capture (TASK-1560, ADR-210). 200: the body is kept in the
+    run folder (and goes into the upload zip) as coredump-<run>-app-<first 9 hex of its ELF sha256>-<latest|old|
+    unknown>.bin, and the summary says whether it belongs to the latest crash in the reboot log (TASK-1972,
+    coredump_age()); 404: no dump stored, one line; 401/403: the admin password is set, one line, and no
+    credentials are asked for or sent. Returns the summary line it logged."""
     url = http_base + COREDUMP_PATH
     request = urllib.request.Request(url, headers={"User-Agent": "OTGW-capture/2"})
     status, body, sha, err = None, b"", "", None
@@ -2388,9 +2463,14 @@ def fetch_coredump(cap, http_base, timeout):
     except Exception as exc:
         err = f"{type(exc).__name__}: {exc}"
     if status == 200 and 0 < len(body) <= COREDUMP_MAX_BYTES:
-        target = cap.path(f"coredump-{cap.run_path.name}.bin")
+        tag, age = coredump_age(sha, _get_json(http_base, CRASHLOG_PATH, timeout),
+                                _get_json(http_base, DEVICE_INFO_PATH, timeout))
+        app = f"-app-{sha[:9].lower()}" if re.fullmatch(r"[0-9a-fA-F]{9,64}", sha or "") else ""
+        target = cap.path(f"coredump-{cap.run_path.name}{app}-{tag}.bin")
         target.write_bytes(body)
-        line = f"Core dump: {len(body)} bytes -> {target.name}" + (f" (app ELF sha256 {sha}: decode with the .elf whose sha256sum starts with it)" if sha else "")
+        line = (f"Core dump: {len(body)} bytes -> {target.name}"
+                + (f" (app ELF sha256 {sha}: decode with the .elf whose sha256sum starts with it)" if sha else "")
+                + f"; {age}")
     elif status == 200:
         line = f"Core dump: answer of {len(body)} bytes is empty or too large, not kept"
     elif status == 404:
@@ -2402,6 +2482,374 @@ def fetch_coredump(cap, http_base, timeout):
     else:
         line = f"Core dump: HTTP {status}, not fetched"
     cap.summary(line)
+    return line
+
+
+# --------------------------------------------------------------------------- #
+# Device graph history and diagnostic recording (TASK-1964)
+# --------------------------------------------------------------------------- #
+# GET /api/v2/graph/history (ADR-193, graphHistoryStuff.h graphHistEmitJson): interval_s, newest_age_ms,
+# count, scale and one array per column, oldest slot first. Temperatures are value*scale or null, mod is
+# 0..100 or null, the flags are 0/1. The CSV mirrors the web UI export (v2.js exportCsv over the records
+# mergeGraphHistory builds): slot i of n is stamped x = now - newest_age_ms - (n - i) * interval, snapped
+# down to the 5 s GSLOT; a slot without any value or flag is dropped; null is an empty cell.
+GRAPH_HISTORY_PATH = "/api/v2/graph/history"
+GRAPH_HISTORY_VARIANTS = (("24h", ""), ("7d", "?hours=168"))   # 7d: ADR-245 firmware; older firmware ignores it
+GRAPH_TEMP_COLUMNS = ("flow", "ret", "chSet", "roomSet", "room", "outside")
+GRAPH_JSON_COLUMNS = GRAPH_TEMP_COLUMNS + ("mod", "flame", "dhw_on", "ch")   # what /api/v2/graph/history sends
+# The web UI CSV follows v2.js GSER, which also has the live-only DHW temperature (TASK-1776, MsgID 26): the device
+# history has no such column, so its cell is empty in every history row, as in the web UI export.
+# TASK-2018 (ADR-256): satTarget is sent only when the window holds a SAT target; the web UI CSV has it after roomSet.
+GRAPH_OPTIONAL_TEMP_COLUMNS = ("satTarget",)
+GRAPH_CSV_COLUMNS = ("flow", "ret", "chSet", "roomSet", "satTarget", "room", "outside", "dhw", "mod", "flame", "dhw_on", "ch")
+GRAPH_GSLOT_MS = 5000
+GRAPH_HISTORY_BODY_CAP = 2 * 1024 * 1024
+GRAPH_HISTORY_SECONDS = 3600   # long run: one fetch per hour besides start and stop
+GRAPH_HISTORY_TIMEOUT = 20     # the web UI's GHIST_TIMEOUT_MS
+DIAG_STATUS_PATH = "/api/v2/diag/recording/status"
+DIAG_DOWNLOAD_PATH = "/api/v2/diag/recording"
+DIAG_BODY_CAP = 16 * 1024 * 1024
+
+
+def _js_number(v):
+    """The text JavaScript's String(v) gives for the numbers the export holds."""
+    if isinstance(v, float):
+        if v != v or v in (float("inf"), float("-inf")):
+            return ""
+        if v.is_integer():
+            return str(int(v))
+        return repr(v)
+    return str(v)
+
+
+def graph_history_rows(j, now_ms):
+    """The records the web UI's mergeGraphHistory() makes from one response, as (t_ms, {column: value}).
+    Returns None when the response is not usable (the same checks as the web UI)."""
+    if not isinstance(j, dict):
+        return None
+    n, iv, age, sc = j.get("count"), j.get("interval_s"), j.get("newest_age_ms"), j.get("scale")
+    nums = (int, float)
+    if not all(isinstance(x, nums) and not isinstance(x, bool) for x in (n, iv, age, sc)):
+        return None
+    if not (n > 0 and iv > 0 and sc > 0 and age >= 0):
+        return None
+    for c in GRAPH_JSON_COLUMNS:
+        if not isinstance(j.get(c), list) or len(j[c]) != n:
+            return None
+    iv_ms = iv * 1000
+    rows = []
+    for i in range(int(n)):
+        x = now_ms - age - (n - i) * iv_ms
+        t = x - x % GRAPH_GSLOT_MS
+        rec, any_value = {}, False
+        for c in GRAPH_TEMP_COLUMNS:
+            v = j[c][i]
+            rec[c] = v / sc if isinstance(v, nums) and not isinstance(v, bool) else None
+            any_value = any_value or rec[c] is not None
+        for c in GRAPH_OPTIONAL_TEMP_COLUMNS:   # absent, or of the wrong length, is an empty column (as the web UI)
+            col = j.get(c)
+            v = col[i] if isinstance(col, list) and len(col) == n else None
+            rec[c] = v / sc if isinstance(v, nums) and not isinstance(v, bool) else None
+            any_value = any_value or rec[c] is not None
+        rec["dhw"] = None   # live-only in the web UI, never in the device history
+        m = j["mod"][i]
+        rec["mod"] = m if isinstance(m, nums) and not isinstance(m, bool) else None
+        for c in ("flame", "dhw_on", "ch"):
+            rec[c] = 1 if j[c][i] else 0
+        if not any_value and rec["mod"] is None and not (rec["flame"] or rec["dhw_on"] or rec["ch"]):
+            continue   # a pure gap slot: the web UI drops it too
+        if rows and rows[-1][0] == t:
+            rows[-1] = (t, rec)
+        else:
+            rows.append((t, rec))
+    return rows
+
+
+def graph_history_csv(j, now_ms):
+    """The web UI export (epoch_ms plus the fixed columns, LF, no final newline), or None."""
+    rows = graph_history_rows(j, now_ms)
+    if rows is None:
+        return None
+    lines = ["epoch_ms," + ",".join(GRAPH_CSV_COLUMNS)]
+    for t, rec in rows:
+        lines.append(_js_number(int(t)) + "," + ",".join("" if rec[c] is None else _js_number(rec[c])
+                                                           for c in GRAPH_CSV_COLUMNS))
+    return "\n".join(lines)
+
+
+def _timed_get(url, timeout, max_bytes):
+    """GET that also returns the host time in ms at which the response headers arrived (the web UI's
+    tHead, the moment newest_age_ms refers to). Returns (status or None, body, headers_ms, error)."""
+    request = urllib.request.Request(url, headers={"User-Agent": "OTGW-capture/2"})
+    try:
+        with urllib.request.urlopen(request, timeout=timeout) as response:
+            head_ms = int(time.time() * 1000)
+            return response.status, response.read(max_bytes + 1), head_ms, None
+    except urllib.error.HTTPError as exc:
+        return exc.code, b"", None, str(exc)
+    except Exception as exc:
+        return None, b"", None, f"{type(exc).__name__}: {exc}"
+
+
+def fetch_graph_history(cap, http_base, label, timeout=GRAPH_HISTORY_TIMEOUT):
+    """GET both graph history variants once and keep each as graph-history-<variant>-<label>-<time>.json
+    (the body as served) and .csv (the web UI export of it). The 7 d variant is kept only when the firmware
+    answers it with a coarser interval than the 24 h one; an older firmware ignores ?hours=168 and answers
+    the 24 h ring, which is then not stored twice. Every outcome is one summary line; nothing raises."""
+    stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+    lines, base_interval = [], None
+    for variant, query in GRAPH_HISTORY_VARIANTS:
+        with HTTP_SLOT:
+            status, body, head_ms, err = _timed_get(http_base + GRAPH_HISTORY_PATH + query, timeout, GRAPH_HISTORY_BODY_CAP)
+        if status != 200:
+            what = f"HTTP {status}" if status is not None else f"request failed ({err})"
+            lines.append(f"Graph history {variant} ({label}): {what}, not kept")
+            continue
+        if len(body) > GRAPH_HISTORY_BODY_CAP:
+            lines.append(f"Graph history {variant} ({label}): answer above {GRAPH_HISTORY_BODY_CAP} bytes, not kept")
+            continue
+        try:
+            j = json.loads(body.decode("utf-8"))
+        except Exception as exc:
+            lines.append(f"Graph history {variant} ({label}): not JSON ({type(exc).__name__}), not kept")
+            continue
+        interval = j.get("interval_s") if isinstance(j, dict) else None
+        if variant == "24h":
+            base_interval = interval
+        elif base_interval is not None and (not isinstance(interval, (int, float)) or interval <= base_interval):
+            lines.append(f"Graph history {variant} ({label}): not supported by this firmware (interval_s {interval}), not kept")
+            continue
+        csv_text = graph_history_csv(j, head_ms)
+        name = f"graph-history-{variant}-{label}-{stamp}"
+        cap.path(name + ".json").write_bytes(body)
+        if csv_text is None:
+            lines.append(f"Graph history {variant} ({label}): {len(body)} bytes kept as {name}.json, no usable slots for a CSV")
+            continue
+        # open() instead of Path.write_text(newline=...): that keyword needs Python 3.10, the tool supports 3.9+
+        # (macOS ships 3.9.6). newline="" keeps the CSV's own line endings.
+        with open(cap.path(name + ".csv"), "w", encoding="utf-8", newline="") as f:
+            f.write(csv_text)
+        lines.append(f"Graph history {variant} ({label}): {csv_text.count(chr(10))} rows, interval {interval} s -> {name}.csv")
+    for line in lines:
+        cap.summary(line, echo=False)
+    return lines
+
+
+class DeviceDataCapture(threading.Thread):
+    """The start reads (device state, graph history, a diagnostic recording) off the main thread, so the
+    other streams start at once; in a long run (hourly=True) then once per `interval` seconds the changing
+    device state, the graph history and the new recording blocks. main() reads the stop round itself after
+    joining this thread. `diag_since` carries the newest block number already downloaded, so the downloads
+    together hold the whole recording without overlap."""
+
+    def __init__(self, cap, http_base, graph=True, diag=True, state=True, hourly=False, interval=GRAPH_HISTORY_SECONDS):
+        super().__init__(name="device-data", daemon=True)
+        self.cap = cap
+        self.http_base = http_base
+        self.state = state
+        self.graph = graph
+        self.diag = diag
+        self.hourly = hourly
+        self.diag_since = None
+        self.interval = interval
+        self.rounds = 0
+
+    def start_round(self):
+        for enabled, what, call in ((self.state, "Device state", lambda: sweep_device(self.cap, self.http_base, "start")),
+                                    (self.graph, "Graph history", lambda: fetch_graph_history(self.cap, self.http_base, "start")),
+                                    (self.diag, "Diag recording", lambda: fetch_diag_recording(self.cap, self.http_base, "start"))):
+            if not enabled or self.cap.stopping():
+                continue
+            try:
+                result = call()
+                if what == "Diag recording":
+                    self.diag_since = result[1]
+            except Exception as exc:
+                self.cap.script_error(f"{what} at start failed: {type(exc).__name__}: {exc}")
+
+    def run(self):
+        self.start_round()
+        while self.hourly and not self.cap.stopping():
+            self.cap.wait(self.interval)
+            if self.cap.stopping():
+                break
+            try:
+                if self.state:
+                    sweep_device(self.cap, self.http_base, "hourly", hourly_only=True)
+                if self.graph:
+                    fetch_graph_history(self.cap, self.http_base, "hourly")
+                if self.diag:
+                    _line, newest = fetch_diag_recording(self.cap, self.http_base, "hourly", since=self.diag_since)
+                    if newest is not None and (self.diag_since is None or newest > self.diag_since):
+                        self.diag_since = newest
+                self.rounds += 1
+            except Exception as exc:
+                self.cap.script_error(f"device data: {type(exc).__name__}: {exc}")
+
+
+def fetch_diag_recording(cap, http_base, label, since=None, timeout=60):
+    """When the device holds a diagnostic recording (ADR-213: status active or has_data), download it as
+    diag-recording-<label>-<time>.bin. Only GETs: the recording is never started or stopped (a stop frees a
+    heap ring; a stopped PSRAM ring stays readable, TASK-1960). since= asks only for the blocks after that block number.
+    Returns (summary line, newest_seq or None)."""
+    with HTTP_SLOT:
+        status, body, _err, _ctype = http_get(http_base + DIAG_STATUS_PATH, 10, 65536)
+    if status != 200:
+        line = f"Diag recording ({label}): status HTTP {status}" if status is not None else f"Diag recording ({label}): status request failed"
+        cap.summary(line, echo=False)
+        return line, None
+    try:
+        rec = json.loads(body.decode("utf-8")).get("recording", {})
+    except Exception:
+        rec = {}
+    newest = rec.get("newest_seq") if isinstance(rec.get("newest_seq"), int) else None
+    if not (rec.get("active") or rec.get("has_data")):
+        line = f"Diag recording ({label}): none on the device (state {rec.get('state', '?')}), nothing fetched"
+        cap.summary(line, echo=False)
+        return line, newest
+    if since is not None and newest is not None and newest <= since:
+        line = f"Diag recording ({label}): no new blocks since {since}"
+        cap.summary(line, echo=False)
+        return line, newest
+    query = f"?since={since}" if since is not None else ""
+    with HTTP_SLOT:
+        status, data, err, _ctype = http_get(http_base + DIAG_DOWNLOAD_PATH + query, timeout, DIAG_BODY_CAP + 1)
+    if status != 200 or not data or len(data) > DIAG_BODY_CAP:
+        what = f"HTTP {status}" if status is not None else f"request failed ({err})"
+        line = f"Diag recording ({label}): download {what} ({len(data)} bytes), not kept"
+        cap.summary(line, echo=False)
+        return line, newest
+    name = f"diag-recording-{label}-{datetime.now().strftime('%Y%m%d-%H%M%S')}.bin"
+    cap.path(name).write_bytes(data)
+    line = (f"Diag recording ({label}): {len(data)} bytes (state {rec.get('state', '?')}, blocks "
+            f"{rec.get('oldest_seq', '?')}-{newest}{', since ' + str(since) if since is not None else ''}) -> {name}; "
+            f"decode with scripts/diag_decode.py")
+    cap.summary(line, echo=False)
+    return line, newest
+
+
+# Device state sweep (TASK-1964, Robert DM 1571452141237968907: "collect ALL possible data"). Every GET here
+# was checked in the route table (restAPI.ino processAPI and the handlers) to be read-only. The task notes
+# hold the full in/out list with the reasons; tests/test_capture_device_data.py fails when a GET route of
+# restAPI.ino is in neither list. "hourly" marks the ones that change during a run.
+SWEEP_ENDPOINTS = (
+    ("/api/v2/health", True),
+    ("/api/v2/device/info", True),
+    ("/api/v2/device/time", False),
+    ("/api/v2/device/crashlog", False),
+    ("/api/v2/flash/status", False),
+    ("/api/v2/settings", False),
+    ("/api/v2/debug", True),
+    ("/api/v2/debug/flags", False),
+    ("/api/v2/sensors/status", True),
+    ("/api/v2/sensors/labels", False),
+    ("/api/v2/simulate", False),
+    ("/api/v2/discovery", False),
+    ("/api/v2/filesystem/files", False),
+    ("/api/v2/filesystem/hash-check", False),
+    ("/api/v2/pic/flash-status", False),
+    ("/api/v2/pic/settings", False),
+    ("/api/v2/otgw/otmonitor", True),
+    ("/api/v2/otgw/overrides", True),
+    ("/api/v2/otgw/boiler-support", True),
+    ("/api/v2/otgw/ot-support", True),
+    ("/api/v2/otdirect/status", True),
+    ("/api/v2/otdirect/settings", False),
+    ("/api/v2/otdirect/overrides", True),
+    ("/api/v2/sat/status?detail=full", True),
+    ("/api/v2/sat/markers", False),
+    ("/api/v2/sat/sensor-areas", False),
+    ("/api/v2/sat/ble/roster", False),
+    ("/api/v2/sat/ble/discovery", True),
+    ("/api/v2/sat/weather", True),
+    ("/api/v2/diag/recording/status", True),
+)
+# LittleFS files the firmware writes, served by handleFile() as plain GETs. /settings.ini is not here: it
+# holds the passwords in plain text. Fetched at start and stop only.
+SWEEP_FILES = (
+    "/reboot_log.txt", "/reboot_count.txt", "/bootdetect.log", "/dallas_labels.ini", "/ot-boiler.json",
+    "/ot-thermo.json", "/dhw_water.json", "/sat_pid_state.json", "/sat_pwm_state.json", "/sat_tune.json",
+    "/sat_markers.json", "/sat_energy.json", "/sat_energy_estimate.json", "/sat_hcr.json",
+)
+# Routes left out on purpose, with the reason (the task notes carry the same list).
+SWEEP_EXCLUDED = {
+    "/api/v2/pic/update-check": "queues an outbound request to otgw.tclcode.com",
+    "/api/v2/firmware/files": "can write .ver files to LittleFS",
+    "/api/v2/network/scan": "starts a WiFi scan and consumes its result",
+    "/api/v2/otgw/messages/<id>": "one value per request (134 IDs); otmonitor and ot-support hold the same data",
+    "/api/v2/otgw/id/<id>": "alias of otgw/messages/<id>",
+    "/api/v2/otgw/label/<label>": "one value per request; otmonitor holds the same data",
+    "/api/v2/otgw/telegraf": "same body as otgw/otmonitor",
+    "/api/v2/graph/history": "fetched separately (fetch_graph_history)",
+    "/api/v2/diag/recording": "fetched separately (fetch_diag_recording), never start or stop",
+    "/api/v2/device/coredump": "fetched separately at the end (fetch_coredump)",
+    "/api/v2/sat": "same body as sat/status",
+    "/api/v2/sensors": "same body as sensors/status",
+    "/api/v2/webhook": "no GET route",
+    "/api/v2/mqtt": "no GET route (republish command)",
+    "/settings.ini": "passwords in plain text",
+    "/ReBoot": "reboots the gateway",
+    "/ResetWireless": "erases the WiFi settings and reboots",
+    "/pic": "can start a PIC flash, a download or a file delete",
+}
+SWEEP_BODY_CAP = 262144
+# TASK-2012: restAPI.ino answers the routes of hardware the board lacks with sendApiError(503, ...): "No PIC
+# detected - PIC functions disabled" on an OT-Direct board, "No OT-Direct hardware: ..." on a PIC board. Such a
+# 503 is "not on this board", not a failure; any other 503 (queue full, busy) still counts as failed.
+SWEEP_ABSENT_HW = (b"No PIC detected", b"No OT-Direct hardware")
+SWEEP_TIMEOUT = 15
+# Keys whose values never leave the device in a capture, at any depth of a JSON body: passwords, tokens,
+# webhook URLs and payloads (they can carry tokens), BLE bind keys, and the home location of the weather source.
+SWEEP_SECRET_KEY = re.compile(r"(?i)(passw|token|secret|api_?key|bindkey|webhook(url|payload)|latitude|longitude|^lat$|^lon$)")
+
+
+def redact_json(value):
+    """A copy of a parsed JSON body with every value under a secret key replaced by "[REDACTED]"."""
+    if isinstance(value, dict):
+        return {k: ("[REDACTED]" if SWEEP_SECRET_KEY.search(str(k)) else redact_json(v)) for k, v in value.items()}
+    if isinstance(value, list):
+        return [redact_json(v) for v in value]
+    return value
+
+
+def sweep_device(cap, http_base, label, hourly_only=False):
+    """GET every SWEEP_ENDPOINTS route (only the hourly ones when hourly_only) and, unless hourly_only, every
+    SWEEP_FILES file, one request at a time, into device-state-<label>-<time>.txt: one section per request with
+    the status and the body (JSON redacted with redact_json, text with redact). Returns the summary line."""
+    stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+    paths = [p for p, changes in SWEEP_ENDPOINTS if changes or not hourly_only]
+    if not hourly_only:
+        paths += list(SWEEP_FILES)
+    name = f"device-state-{label}-{stamp}.txt"
+    ok = missing = absent = failed = 0
+    with open(cap.path(name), "w", encoding="utf-8", newline="\n") as out:
+        out.write(f"# OTGW device state ({label}), {now_iso()}, {http_base}. Secrets redacted (TASK-1964).\n")
+        for path in paths:
+            if cap.stopping() and hourly_only:
+                break
+            with HTTP_SLOT:
+                status, body, err, ctype = http_get(http_base + path, SWEEP_TIMEOUT, SWEEP_BODY_CAP + 1)
+            if status is None:
+                failed += 1
+                out.write(f"\n### GET {path} -> ERROR {err}\n")
+                continue
+            if status == 200:
+                ok += 1
+            elif status == 404:
+                missing += 1
+            elif status == 503 and any(m in body[:512] for m in SWEEP_ABSENT_HW):
+                absent += 1
+            else:
+                failed += 1
+            cut = len(body) > SWEEP_BODY_CAP
+            text = body[:SWEEP_BODY_CAP].decode("utf-8", "replace")
+            try:
+                shown = json.dumps(redact_json(json.loads(text)), indent=1, ensure_ascii=False)
+            except Exception:
+                shown = redact(text)
+            out.write(f"\n### GET {path} -> {status} ({len(body)} bytes, {ctype}){' [truncated]' if cut else ''}\n{shown}\n")
+    line = f"Device state ({label}): {ok} answered, {missing} not on this firmware (404), {absent} not on this board (503), {failed} failed -> {name}"
+    cap.summary(line, echo=False)
     return line
 
 
@@ -2563,23 +3011,73 @@ def upload_zip_path(run_path):
     return run_path.parent / (run_path.name + UPLOAD_SUFFIX)
 
 
-def build_upload_zip(cap, transcript, hourly):
-    """The one file a tester uploads, next to the run folder. Long run: the transcript, summary, gaps.log, index.csv and
-    every hours/*.zip (these already hold the CSVs). Short run: the transcript, the raw frame files and the CSVs
-    converted from the logs. Written with the same verify-and-flush rules as the hour zips."""
-    items = []
+# TASK-1986: what one Discord attachment may be (the limit testers met; gruijter packed by hand when the zip was too
+# big). A little under 25 MB, so the upload is not refused on a rounding difference.
+UPLOAD_LIMIT_BYTES = 24 * 1000 * 1000
 
-    def add(path, arcname):
+
+def write_tar_xz_verified(target, items):
+    """A .tar.xz of (path, arcname) items, read back and flushed before it is moved into place (as write_zip_verified).
+    xz packs a long telnet transcript several times smaller than the zip's deflate."""
+    import tarfile
+    target = Path(target)
+    tmp = target.with_name(target.name + ".tmp")
+    try:
+        with tarfile.open(tmp, "w:xz", preset=6) as t:
+            for path, arcname in items:
+                t.add(str(path), arcname=arcname, recursive=False)
+        with tarfile.open(tmp, "r:xz") as t:
+            sizes = {m.name: m.size for m in t.getmembers()}
+        for path, arcname in items:
+            if sizes.get(arcname) != Path(path).stat().st_size:
+                raise RuntimeError(f"tar size mismatch for {arcname}")
+        with open(tmp, "r+b") as f:
+            os.fsync(f.fileno())
+        os.replace(tmp, target)
+    except BaseException:
+        try:
+            tmp.unlink()
+        except OSError:
+            pass
+        raise
+
+
+def upload_part2_path(run_path):
+    return run_path.parent / (run_path.name + "-upload-part2.tar.xz")
+
+
+def build_upload_zip(cap, transcript, hourly, limit=UPLOAD_LIMIT_BYTES):
+    """The file a tester uploads, next to the run folder. Long run: the transcript, summary, gaps.log, index.csv and
+    every hours/*.zip (these already hold the CSVs). Short run: the transcript, summary, the raw frame files and the
+    CSVs converted from the logs. Written with the same verify-and-flush rules as the hour zips.
+
+    TASK-1986: the upload has to fit one Discord attachment (`limit`). A zip that is too big is packed as .tar.xz
+    instead; when that is still too big, the transcript, summary.txt, crashlog.log, the core dump and the device state
+    go into the first file and everything else into <run>-upload-part2.tar.xz. Every step is said on the console
+    and in summary.txt. Returns the path of the (first) file to upload."""
+    items, must = [], set()
+
+    def add(path, arcname, required=False):
         if Path(path).is_file():
             items.append((path, arcname))
+            if required:
+                must.add(arcname)
 
-    add(transcript, Path(transcript).name)
-    for path in sorted(cap.run_path.glob("coredump-*.bin")):
-        add(path, path.name)
+    add(transcript, Path(transcript).name, required=True)
+    add(cap.path("summary.txt"), "summary.txt", required=True)
+    add(cap.path("crashlog.log"), "crashlog.log", required=True)
+    for pattern, required in (("coredump-*.bin", True), ("device-state-*.txt", True), ("graph-history-*.json", False),
+                              ("graph-history-*.csv", False), ("diag-recording-*.bin", False)):
+        for path in sorted(cap.run_path.glob(pattern)):
+            add(path, path.name, required)
     csv_dir = cap.run_path / "csv-run.tmp"
+
+    def say(line):
+        cap.summary(line)
+
     try:
         if hourly:
-            for name in ("summary.txt", GAPS_LOG, INDEX_CSV):
+            for name in (GAPS_LOG, INDEX_CSV):
                 add(cap.path(name), name)
             for path in sorted(cap.store.hours_root.glob("*.zip")):
                 add(path, f"hours/{path.name}")
@@ -2590,9 +3088,33 @@ def build_upload_zip(cap, transcript, hourly):
                 add(path, f"csv/{path.name}")
         target = upload_zip_path(cap.run_path)
         write_zip_verified(target, items)
+        size = target.stat().st_size
+        if size <= limit:
+            return target
+        xz = target.with_name(target.name[:-len(".zip")] + ".tar.xz")
+        write_tar_xz_verified(xz, items)
+        xz_size = xz.stat().st_size
+        target.unlink()
+        if xz_size <= limit:
+            say(f"Upload: the zip was {size / 1e6:.1f} MB, more than one Discord attachment ({limit / 1e6:.0f} MB); "
+                f"packed as {xz.name} ({xz_size / 1e6:.1f} MB) instead, with every file.")
+            return xz
+        first = [it for it in items if it[1] in must]
+        rest = [it for it in items if it[1] not in must]
+        write_tar_xz_verified(xz, first)
+        part2 = upload_part2_path(cap.run_path)
+        write_tar_xz_verified(part2, rest)
+        say(f"Upload: one archive would be {xz_size / 1e6:.1f} MB, more than one Discord attachment "
+            f"({limit / 1e6:.0f} MB). {xz.name} ({xz.stat().st_size / 1e6:.1f} MB) holds the transcript, summary, "
+            f"crash log, core dump and device state; {part2.name} ({part2.stat().st_size / 1e6:.1f} MB) holds "
+            f"the rest: {', '.join(a for _, a in rest) or 'nothing'}. Upload both.")
+        for p in (xz, part2):
+            if p.stat().st_size > limit:
+                say(f"Upload: {p.name} is still {p.stat().st_size / 1e6:.1f} MB; share it another way "
+                    "(a cloud link) or ask in the channel.")
+        return xz
     finally:
         shutil.rmtree(csv_dir, ignore_errors=True)
-    return target
 
 
 # --------------------------------------------------------------------------- #
@@ -2876,7 +3398,8 @@ def save_settings(args, persist_password):
         data["DeviceHost"] = args.device
         if args.broker:
             data.update({"BrokerHost": args.broker, "BrokerPort": args.broker_port,
-                         "Topic": args.topic, "Username": args.username or ""})
+                         "Username": args.username or ""})
+            data.pop("Topic", None)   # TASK-1988: the topic filter is never kept; each run derives it from the gateway
         if persist_password and args.password:
             data["MqttPassword"] = args.password
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -2907,7 +3430,7 @@ def ask(prompt, default=""):
 
 ALIASES = {
     "-DeviceHost": "--device", "-BrokerHost": "--broker", "-BrokerPort": "--broker-port",
-    "-Topic": "--topic", "-Username": "--username", "-Password": "--password",
+    "-Topic": "--topic", "-MqttAllTopics": "--mqtt-all-topics", "-Username": "--username", "-Password": "--password",
     "-SaveSecrets": "--save-secrets", "-OutputRoot": "--output-root", "-DurationSeconds": "--duration",
     "-TelnetConnectTimeoutSeconds": "--telnet-connect-timeout-seconds",
     "-TelnetReconnectDelayMilliseconds": "--telnet-reconnect-delay-ms",
@@ -2915,6 +3438,7 @@ ALIASES = {
     "-TelnetIdleCheckSeconds": "--telnet-idle-check-seconds",
     "-SkipBrowserCapture": "--skip-browser-capture", "-BrowserUrl": "--browser-url",
     "-BrowserDebugPort": "--browser-debug-port", "-BrowserPath": "--browser-path", "-Browser": "--browser",
+    "-SkipDeviceState": "--skip-device-state", "-SkipGraphHistory": "--skip-graph-history", "-SkipDiagRecording": "--skip-diag-recording",
     "-SkipHttpProbes": "--skip-http-probes", "-HttpProbeTimeoutSeconds": "--http-probe-timeout-seconds",
     "-SkipCrashlogCapture": "--skip-crashlog-capture", "-CrashlogUrl": "--crashlog-url",
     "-CrashlogPollSeconds": "--crashlog-poll-seconds", "-NoPrompt": "--no-prompt",
@@ -2972,7 +3496,11 @@ def build_parser():
     p.add_argument("--broker", metavar="HOST", help="MQTT broker host; empty = skip the MQTT stream")
     p.add_argument("--broker-port", type=ranged(1, 65535), default=None,
                    help="MQTT broker port (default: the gateway's own setting, else 1883)")
-    p.add_argument("--topic", default="#", help="MQTT topic filter (default '#')")
+    p.add_argument("--mqtt-all-topics", action="store_true",
+                   help="record EVERY topic on the broker ('#'), other devices included; without it the capture "
+                        "records only what this gateway publishes (TASK-1988)")
+    p.add_argument("--topic", default=None,
+                   help="MQTT topic filter, only together with --mqtt-all-topics (default with it: '#')")
     p.add_argument("--username", help="MQTT username (blank = anonymous)")
     p.add_argument("--password", help="MQTT password (prompted when a username is given)")
     p.add_argument("--save-secrets", action="store_true",
@@ -3004,6 +3532,15 @@ def build_parser():
     p.add_argument("--skip-http-probes", action="store_true")
     p.add_argument("--skip-coredump", action="store_true",
                    help="do not fetch the stored core dump (GET /api/v2/device/coredump) at the end of the capture")
+    p.add_argument("--skip-graph-history", action="store_true",
+                   help="do not fetch the device graph history (GET /api/v2/graph/history, kept as JSON and as the "
+                        "web UI CSV) at start, stop and every hour of a long run")
+    p.add_argument("--skip-device-state", action="store_true",
+                   help="do not read the device state (every read-only diagnostic REST GET and the state files the "
+                        "firmware keeps, secrets redacted) at start, stop and, for the changing ones, every hour")
+    p.add_argument("--skip-diag-recording", action="store_true",
+                   help="do not download a diagnostic recording the device holds (GET /api/v2/diag/recording); "
+                        "the tool never starts or stops a recording")
     p.add_argument("--http-probe-timeout-seconds", type=ranged(1, 60), default=10)
     p.add_argument("--skip-frame-capture", action="store_true",
                    help="do not record otframes.log / otgw_simulation.log (raw OpenTherm frames)")
@@ -3024,6 +3561,61 @@ def build_parser():
     return p
 
 
+MQTT_ALL_TOPICS_WARNING = ("WARNING: --mqtt-all-topics records EVERY topic on the broker, so messages of other "
+                           "devices on it (and of other gateways) are in this capture. Check before you share it.")
+
+
+def own_mqtt_topic(topic, gateway):
+    """TASK-1988: True when the firmware of this gateway publishes `topic`. Every publish funnels through
+    mqttPublishRaw() (MQTTstuff.ino); its topics are, checked against the source on 2026-11-15:
+      - <toptopic>/value/<uniqueid> itself (the retained LWT online/offline) and everything below it: values, state,
+        SAT and the SAT BLE state topics (sendMQTTData() prefixes MQTTPubNamespace; the v2 migration clears retained
+        topics under the same namespace);
+      - <haprefix>/<component>/<uniqueid>/.../config: every HA discovery config (MQTTHaDiscovery.cpp, MQTTstuff.ino);
+      - <haprefix>/sensor/<uniqueid>_ble_<mac>_<kind>/config: the SAT BLE sensor configs (MQTTstuff.ino), the one
+        format where the unique id is a prefix inside a level.
+    Never the command topics <toptopic>/set/<uniqueid>/...: other clients publish those."""
+    top, uid, ha = gateway["toptopic"], gateway["uniqueid"], gateway.get("haprefix") or ""
+    ns = f"{top}/value/{uid}"
+    if topic == ns or topic.startswith(ns + "/"):
+        return True
+    if ha and topic.startswith(ha + "/"):
+        rest = topic[len(ha) + 1:].split("/")
+        if len(rest) >= 3 and rest[-1] == "config":
+            return rest[1] == uid or (rest[0] == "sensor" and len(rest) == 3 and rest[1].startswith(uid + "_ble_"))
+    return False
+
+
+def mqtt_topic_filters(gateway, all_topics, topic):
+    """TASK-1988 (Robert, 2026-11-15): by default the capture records only what this gateway publishes
+    (own_mqtt_topic()). Not other devices, not other gateways, not the command topics others publish.
+    --mqtt-all-topics is the deliberate opt-in for '#' (or --topic with it).
+
+    gateway: read_gateway_mqtt()'s dict or None. Returns (filters, keep, warning, note): filters is the list to
+    subscribe to (empty: record no MQTT), keep the per-message check before a line is written (None: keep all),
+    warning is set for the opt-in, note says why the list is empty. Raises ValueError for --topic without
+    --mqtt-all-topics."""
+    if topic and not all_topics:
+        raise ValueError("--topic only works together with --mqtt-all-topics; without it the capture records "
+                         "this gateway's own topics")
+    if all_topics:
+        return [topic or "#"], None, MQTT_ALL_TOPICS_WARNING, None
+    top = (gateway or {}).get("toptopic") or ""
+    uid = (gateway or {}).get("uniqueid") or ""
+    ha = (gateway or {}).get("haprefix") or ""
+    if not top or not uid or any(c in top + uid + ha for c in "#+"):
+        return [], None, None, ("this gateway's MQTT topic prefix or unique id could not be read, so no MQTT is "
+                                "recorded (the capture never falls back to every topic; --mqtt-all-topics does that "
+                                "on purpose)")
+    filters = [f"{top}/value/{uid}/#"]
+    if ha:
+        # the BLE configs carry the unique id inside a level, which no MQTT filter can express: subscribe to the
+        # sensor configs and let own_mqtt_topic() drop every other device's before anything is written
+        filters += [f"{ha}/+/{uid}/#", f"{ha}/sensor/+/config"]
+    gw = {"toptopic": top, "uniqueid": uid, "haprefix": ha}
+    return filters, (lambda t: own_mqtt_topic(t, gw)), None, None
+
+
 def read_gateway_mqtt(device, http_port, timeout=5):
     """Reads the MQTT settings the gateway itself uses from GET /api/v2/settings (TASK-1677), so the
     capture listens on the same broker instead of a typed address. Returns (dict or None, reason).
@@ -3039,7 +3631,12 @@ def read_gateway_mqtt(device, http_port, timeout=5):
         settings = json.loads(body.decode("utf-8", "replace")).get("settings", {})
         value = lambda name: (settings.get(name) or {}).get("value")
         found = {"enable": bool(value("mqttenable")), "broker": str(value("mqttbroker") or "").strip(),
-                 "port": value("mqttbrokerport"), "user": str(value("mqttuser") or "").strip()}
+                 "port": value("mqttbrokerport"), "user": str(value("mqttuser") or "").strip(),
+                 # TASK-1988: what this gateway publishes under (MQTTstuff.ino: <toptopic>/value/<uniqueid>,
+                 # HA discovery <haprefix>/<component>/<uniqueid>/.../config)
+                 "toptopic": str(value("mqtttoptopic") or "").strip(),
+                 "haprefix": str(value("mqtthaprefix") or "").strip(),
+                 "uniqueid": str(value("mqttuniqueid") or "").strip()}
         length = re.fullmatch(r"password=(\d+)", str(value("mqttpasswd") or ""))
         found["password_length"] = int(length.group(1)) if length else None
     except Exception as exc:
@@ -3087,6 +3684,14 @@ def resolve_inputs(args, parser):
 
     # TASK-1677: take the broker from the gateway, so a typo cannot leave the MQTT stream empty.
     gateway, reason = read_gateway_mqtt(args.device, getattr(args, "http_port", 80))
+    # TASK-1988: subscribe only to what this gateway publishes, unless --mqtt-all-topics asks for everything.
+    try:
+        args.mqtt_filters, args.mqtt_keep, args.mqtt_warning, args.mqtt_note = mqtt_topic_filters(
+            gateway, getattr(args, "mqtt_all_topics", False), getattr(args, "topic", None))
+    except ValueError as exc:
+        parser.error(str(exc))
+    if args.mqtt_warning:
+        print(args.mqtt_warning)
     if gateway is not None and gateway["enable"] and gateway["broker"]:
         gw_port = gateway["port"] or 1883
         if broker_given and args.broker.strip() and (args.broker.strip(), args.broker_port or gw_port) != (gateway["broker"], gw_port):
@@ -3244,7 +3849,8 @@ def main(argv=None):
     s(f"TelnetIdleCheckSeconds: {args.telnet_idle_check_seconds}", echo=False)
     s(f"BrokerHost: {args.broker or '(none)'}", echo=False)
     s(f"BrokerPort: {args.broker_port}", echo=False)
-    s(f"Topic: {args.topic}", echo=False)
+    s(f"Topic: {', '.join(getattr(args, 'mqtt_filters', None) or []) or 'none'}"
+      + (" (--mqtt-all-topics)" if getattr(args, "mqtt_all_topics", False) else ""), echo=False)
     s(f"Username supplied: {bool(args.username)}", echo=False)
     s(f"DurationSeconds: {args.duration or 'until manual stop'}", echo=False)
     s(f"SkipBrowserCapture: {args.skip_browser_capture}", echo=False)
@@ -3252,6 +3858,9 @@ def main(argv=None):
     s(f"SkipFrameCapture: {args.skip_frame_capture}", echo=False)
     s(f"SkipHttpProbes: {args.skip_http_probes}", echo=False)
     s(f"SkipCoredump: {args.skip_coredump}", echo=False)
+    s(f"SkipDeviceState: {args.skip_device_state}", echo=False)
+    s(f"SkipGraphHistory: {args.skip_graph_history}", echo=False)
+    s(f"SkipDiagRecording: {args.skip_diag_recording}", echo=False)
     s(f"HttpProbeTimeoutSeconds: {args.http_probe_timeout_seconds}", echo=False)
     s(f"CrashlogPollSeconds: {args.crashlog_poll_seconds}", echo=False)
     snapshot_seconds = args.snapshot_seconds if args.snapshot_seconds is not None else (SNAPSHOT_SECONDS_DEFAULT if long_run else 0)
@@ -3331,6 +3940,16 @@ def main(argv=None):
         workers.append((frames, 10))
         s(f"Frame recorder started: ws://{args.device}:{args.http_port}/ws -> {FRAMES_LOG}, {SIM_LOG} (kept next to the transcript).")
 
+    device_data = None
+    if not (args.skip_graph_history and args.skip_diag_recording and args.skip_device_state):
+        device_data = DeviceDataCapture(cap, http_base, graph=not args.skip_graph_history,
+                                        diag=not args.skip_diag_recording, state=not args.skip_device_state,
+                                        hourly=long_run)
+        device_data.start()
+        workers.append((device_data, GRAPH_HISTORY_TIMEOUT + 65))
+        s("Device data: device state, graph history and diag recording at start and stop"
+          + (", and every hour." if long_run else "."))
+
     if snapshot_seconds:
         snapshots = SnapshotCapture(cap, http_base, snapshot_seconds)
         snapshots.start()
@@ -3338,13 +3957,23 @@ def main(argv=None):
         s(f"Device snapshots started: every {snapshot_seconds} s, {', '.join(SNAPSHOT_PATHS)} -> {SNAPSHOTS_LOG}")
 
     mqtt_capture = None
+    mqtt_filters = getattr(args, "mqtt_filters", None) or []
     if not args.broker:
         s("MQTT capture skipped: no BrokerHost given (telnet, probe and crash log still run).")
+    elif not mqtt_filters:
+        s(f"MQTT capture skipped: {getattr(args, 'mqtt_note', None) or 'no topics to record'}.")
     else:
+        if getattr(args, "mqtt_warning", None):
+            s(args.mqtt_warning)   # TASK-1988: console and summary.txt say other devices are in this capture
         try:
-            mqtt_capture = MqttCapture(cap, args.broker, args.broker_port, args.topic, args.username, args.password)
+            mqtt_capture = MqttCapture(cap, args.broker, args.broker_port, mqtt_filters, args.username, args.password,
+                                       keep=getattr(args, "mqtt_keep", None))
             mqtt_capture.start()
-            s(f"MQTT capture started: paho-mqtt, broker {args.broker}:{args.broker_port}, topic '{args.topic}' (writing mqtt.log).")
+            s(f"MQTT capture started: paho-mqtt, broker {args.broker}:{args.broker_port}, "
+              f"topics {', '.join(mqtt_filters)}"
+              + (" (only what this gateway publishes; the sensor-config subscription also brings other devices' "
+                 "configs to the tool, dropped before writing)" if getattr(args, "mqtt_keep", None) else "")
+              + " (writing mqtt.log).")
         except Exception as exc:
             mqtt_capture = None
             s(f"MQTT capture disabled: {type(exc).__name__}: {exc}")
@@ -3410,6 +4039,23 @@ def main(argv=None):
             s("HTTP probes: failed (see error.txt)", echo=False)
             cap.script_error(f"HTTP probes failed: {type(exc).__name__}: {exc}")
 
+    diag_since = device_data.diag_since if device_data is not None else None
+    if not args.skip_device_state:
+        try:
+            sweep_device(cap, http_base, "stop")
+        except Exception as exc:
+            cap.script_error(f"Device state at stop failed: {type(exc).__name__}: {exc}")
+    if not args.skip_graph_history:
+        try:
+            fetch_graph_history(cap, http_base, "stop")
+        except Exception as exc:
+            cap.script_error(f"Graph history at stop failed: {type(exc).__name__}: {exc}")
+    if not args.skip_diag_recording:
+        try:
+            fetch_diag_recording(cap, http_base, "stop", since=diag_since)
+        except Exception as exc:
+            cap.script_error(f"Diag recording at stop failed: {type(exc).__name__}: {exc}")
+
     if args.skip_coredump:
         s("Core dump: not fetched (--skip-coredump).", echo=False)
     else:
@@ -3461,7 +4107,11 @@ def main(argv=None):
     print(f"Diagnostic capture folder: {run_path}")
     print(f"Merged transcript: {transcript}")
     if upload is not None:
-        print(f"Upload this one file: {upload}", flush=True)
+        part2 = upload_part2_path(run_path)
+        if part2.exists():   # TASK-1986: too big for one Discord attachment
+            print(f"Upload these two files: {upload} and {part2}", flush=True)
+        else:
+            print(f"Upload this one file: {upload}", flush=True)
     signalled = cap.stop_reason in ("Ctrl+C/Ctrl+Break", "terminated (SIGTERM)", "terminal closed (SIGHUP)")
     if upload is None:
         return 1

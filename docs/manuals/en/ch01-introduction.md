@@ -56,7 +56,7 @@ The firmware also has an OT-Direct mode, used only on hardware without a PIC. On
 
 Version 2.0.0 is a major platform release. It is the ESP32-S3-only async + FreeRTOS line. Settings files from v1.3.x load without modification.
 
-Version 2.0.0 is in public beta: releases are published as GitHub prereleases. The established functionality is feature complete, but SAT, OTDirect, and the new MQTT topic shape (see below) still receive refinement. SAT stays experimental and opt-in. Track the GitHub Releases page for the current beta.
+Releases of 2.0.0 are on the GitHub Releases page: betas are published as GitHub prereleases, the stable 2.0.0 release as a normal release. The established functionality is feature complete; SAT, OTDirect and the new MQTT topic shape (see below) still receive refinement. SAT stays experimental and opt-in, and it is off by default (see Chapter 5).
 
 **Breaking change in this release.** v2.0.0 changes the default MQTT topic names to a new self-describing scheme (ADR-106). Thirty-seven OT-spec-derived binary sensor topics are renamed to clearer, Home Assistant friendly labels (for example, the legacy `master_ch_enable` becomes `central_heating_enabled`). Users with existing automations pinned to the legacy labels can flip `settings.mqtt.bUseLegacyOtTopics` to `true` and keep the v1.x behaviour. The two modes are mutually exclusive: either the new names or the legacy names publish, never both. The REST API is unchanged from v1.x.
 

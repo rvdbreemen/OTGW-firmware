@@ -370,6 +370,8 @@ DECLARE_SAT_DISCOVERY_STRINGS(sat_window_open,           "sat/window_open",     
 DECLARE_SAT_DISCOVERY_STRINGS(sat_fallback_active,       "sat/fallback_active",              "SAT_Fallback_Active")
 DECLARE_SAT_DISCOVERY_STRINGS(sat_room_temp_lost,        "sat/room_temp_lost",               "SAT_Room_Temp_Lost")
 DECLARE_SAT_DISCOVERY_STRINGS(sat_ot_link_lost,          "sat/ot_link_lost",                 "SAT_OT_Link_Lost")
+DECLARE_SAT_DISCOVERY_STRINGS(sat_no_ignition,           "sat/no_ignition",                  "SAT_No_Ignition")      // TASK-1882
+DECLARE_SAT_DISCOVERY_STRINGS(sat_heating_failure,       "sat/heating_failure",              "SAT_Heating_Failure")  // TASK-1882
 DECLARE_SAT_DISCOVERY_STRINGS(sat_push_refused,          "sat/push_refused",                 "SAT_Push_Refused")
 DECLARE_SAT_DISCOVERY_STRINGS(sat_sh_rejected,           "sat/sh_rejected",                  "SAT_SH_Rejected")
 DECLARE_SAT_DISCOVERY_STRINGS(sat_requested_setpoint,    "sat/requested_setpoint",           "SAT_Requested_Setpoint")
@@ -1433,13 +1435,13 @@ const MqttHaSensorCfg PROGMEM mqttHaSensors[] = {
     {239, 0x08, ha_lbl_pic_temperature_reading,    ha_name_pic_temperature_reading,    HaDeviceClass::temperature, HaUnit::degC,    HaStateClass::measurement, HaIcon::thermometer,   HaEntityCat::none, true},
 };
 
-// ========== Binary sensor array (73 indexed entries) ==========
-// ADR-105: first 74 rows are indexed via mqttHaBinSensorIndex[] (per-id contiguous).
-// Rows 74..110 are HA-core aliases, NOT contiguous by OT id and NOT covered by
+// ========== Binary sensor array (76 indexed entries) ==========
+// ADR-105: first 76 rows are indexed via mqttHaBinSensorIndex[] (per-id contiguous).
+// Rows 76..112 are HA-core aliases, NOT contiguous by OT id and NOT covered by
 // the index. The discovery dispatcher walks the alias tail separately when
 // settings.mqtt.bPublishHaCoreAliases is on (see MQTTstuff.ino).
-const uint16_t MQTT_HA_BINSENSOR_COUNT         = 111;
-const uint16_t MQTT_HA_BINSENSOR_INDEXED_COUNT = 74;
+const uint16_t MQTT_HA_BINSENSOR_COUNT         = 113;
+const uint16_t MQTT_HA_BINSENSOR_INDEXED_COUNT = 76;
 
 const MqttHaBinSensorCfg PROGMEM mqttHaBinSensors[] = {
 //  {id, flags, label, friendlyName, icon, entityCat, enabledByDefault}
@@ -1530,6 +1532,8 @@ const MqttHaBinSensorCfg PROGMEM mqttHaBinSensors[] = {
     SAT_BIN(254, sat_fallback_active, HaIcon::alert_circle, HaEntityCat::diagnostic, true, ha_bincls_problem, HaBinaryPayload::true_false),
     SAT_BIN(254, sat_room_temp_lost,  HaIcon::alert_circle, HaEntityCat::diagnostic, true, ha_bincls_problem, HaBinaryPayload::true_false),
     SAT_BIN(254, sat_ot_link_lost,    HaIcon::alert_circle, HaEntityCat::diagnostic, true, ha_bincls_problem, HaBinaryPayload::true_false),
+    SAT_BIN(254, sat_no_ignition,     HaIcon::alert_circle, HaEntityCat::diagnostic, true, ha_bincls_problem, HaBinaryPayload::true_false),   // TASK-1882
+    SAT_BIN(254, sat_heating_failure, HaIcon::alert_circle, HaEntityCat::diagnostic, true, ha_bincls_problem, HaBinaryPayload::true_false),   // TASK-1882
     SAT_BIN(254, sat_push_refused,    HaIcon::alert_circle, HaEntityCat::diagnostic, true, ha_bincls_problem, HaBinaryPayload::true_false),
     SAT_BIN(254, sat_sh_rejected,     HaIcon::alert_circle, HaEntityCat::diagnostic, true, ha_bincls_problem, HaBinaryPayload::true_false),   // TASK-1412.13, entry 252
 
@@ -1543,7 +1547,7 @@ const MqttHaBinSensorCfg PROGMEM mqttHaBinSensors[] = {
     {240, 0x00, ha_lbl_cmd_retry_exceeded, ha_name_cmd_retry_exceeded, HaIcon::alert_circle, HaEntityCat::diagnostic, true},
     // --- Pseudo-ID 251: SAT BLE temperature validity (TASK-1462) ---
     // Was a sensor; publishes "true"/"false" (publishIfChangedB), so the payload is true_false.
-    // Last indexed row (index 73): the rows behind it are the HA-core alias tail.
+    // Last indexed row (index 75): the rows behind it are the HA-core alias tail.
     SAT_BIN(251, sat_ble_temp_valid, HaIcon::information_outline, HaEntityCat::diagnostic, true, nullptr, HaBinaryPayload::true_false),
 
     // ---------------------------------------------------------------------------
@@ -2096,21 +2100,21 @@ const uint16_t PROGMEM mqttHaBinSensorIndex[256] = {
     0xFFFF, // id 237
     0xFFFF, // id 238
     0xFFFF, // id 239
-    72,     // id 240, 1 entry (TASK-1439: command_retry_exceeded; last of indexed region)
+    74,     // id 240, 1 entry (TASK-1439: command_retry_exceeded)
     0xFFFF, // id 241
     0xFFFF, // id 242
     0xFFFF, // id 243
-    70,     // id 244, 2 entries (gateway_mode, otgw_connected)
+    72,     // id 244, 2 entries (gateway_mode, otgw_connected)
     0xFFFF, // id 245
     0xFFFF, // id 246
     0xFFFF, // id 247
     0xFFFF, // id 248
     0xFFFF, // id 249
     0xFFFF, // id 250
-    73,     // id 251, 1 entry (TASK-1462: ble_temp_valid, was a sensor)
+    75,     // id 251, 1 entry (TASK-1462: ble_temp_valid, was a sensor)
     0xFFFF, // id 252
     53, // id 253, 1 entry  (TASK-543 weather is_day)
-    54, // id 254, 16 entries (TASK-543 SAT binary primaries; TASK-1490 health, sync, window and fault flags; TASK-1412.13 sh_rejected)
+    54, // id 254, 18 entries (TASK-543 SAT binary primaries; TASK-1490 health, sync, window and fault flags; TASK-1412.13 sh_rejected; TASK-1882 no_ignition, heating_failure)
     0xFFFF // id 255
 };
 
@@ -3123,7 +3127,8 @@ bool streamClimateDiscovery(uint8_t climateIdx,
     if (!w.writeProgmem(PSTR("\"curr_temp_t\":\""))) return false;
     if (!w.writeRam(ctx.mqttPubTopic)) return false;
     if (climateIdx == 0) {
-      if (!w.writeProgmem(PSTR("/Tr\""))) return false;
+      // TASK-1979 / ADR-248: SAT's room temperature while SAT is enabled, Tr while it is off (published by the firmware)
+      if (!w.writeProgmem(PSTR("/sat/climate_current\""))) return false;
     } else {
       if (!w.writeProgmem(PSTR("/Tdhw\""))) return false;
     }
@@ -3133,7 +3138,8 @@ bool streamClimateDiscovery(uint8_t climateIdx,
     if (!w.writeProgmem(PSTR("\"temp_stat_t\":\""))) return false;
     if (!w.writeRam(ctx.mqttPubTopic)) return false;
     if (climateIdx == 0) {
-      if (!w.writeProgmem(PSTR("/TrSet\""))) return false;
+      // TASK-1979 / ADR-248: SAT's target while SAT is enabled, TrSet while it is off (published by the firmware)
+      if (!w.writeProgmem(PSTR("/sat/climate_target\""))) return false;
     } else {
       if (!w.writeProgmem(PSTR("/TdhwSet\""))) return false;
     }
@@ -3142,10 +3148,12 @@ bool streamClimateDiscovery(uint8_t climateIdx,
     // temp_cmd_t + temp_cmd_tpl
     if (!w.writeProgmem(PSTR("\"temp_cmd_t\":\""))) return false;
     if (!w.writeRam(ctx.mqttSubTopic)) return false;
-    if (!w.writeProgmem(PSTR("/command\""))) return false;
+    // TASK-1979 / ADR-248: the thermostat card sends the bare value to sat/climate_target; the firmware routes it
+    // to SAT's target while SAT is enabled and queues TT= otherwise. The DHW card keeps its command topic.
+    if (!w.writeProgmem(climateIdx == 0 ? PSTR("/sat/climate_target\"") : PSTR("/command\""))) return false;
     if (!writeJsonComma(w)) return false;
     if (climateIdx == 0) {
-      if (!writeJsonKV_P(w, PSTR("temp_cmd_tpl"), PSTR("TT={{ value }}"))) return false;
+      if (!writeJsonKV_P(w, PSTR("temp_cmd_tpl"), PSTR("{{ value }}"))) return false;
     } else {
       if (!writeJsonKV_P(w, PSTR("temp_cmd_tpl"), PSTR("SW={{ value }}"))) return false;
     }
@@ -3153,13 +3161,24 @@ bool streamClimateDiscovery(uint8_t climateIdx,
 
     // temp bounds + settings
     if (climateIdx == 0) {
-      if (!w.writeProgmem(PSTR("\"initial\":\"20\",\"min_temp\":\"12\",\"max_temp\":\"30\",\"temp_step\":\"0.5\",\"precision\":0.1"))) return false;  // GH #665: cooling headroom
+      if (!w.writeProgmem(PSTR("\"initial\":\"20\",\"min_temp\":\"5\",\"max_temp\":\"30\",\"temp_step\":\"0.5\",\"precision\":0.1"))) return false;  // GH #665: cooling headroom
     } else {
       if (!w.writeProgmem(PSTR("\"min_temp\":\"40\",\"max_temp\":\"60\",\"temp_step\":\"1\",\"precision\":1"))) return false;
     }
     if (!writeJsonComma(w)) return false;
 
     if (!writeJsonKV_P(w, PSTR("temp_unit"), PSTR("C"))) return false;
+
+    if (climateIdx == 0) {
+      // TASK-1979 / ADR-248: SAT presets on the thermostat card. "none" is not listed (HA refuses it in
+      // preset_modes) and the list goes out together with its command topic (HA requires both).
+      if (!writeJsonComma(w)) return false;
+      if (!w.writeProgmem(PSTR("\"pr_modes\":[\"comfort\",\"eco\",\"away\",\"sleep\",\"activity\",\"home\"],\"pr_mode_cmd_t\":\""))) return false;
+      if (!w.writeRam(ctx.mqttSubTopic)) return false;
+      if (!w.writeProgmem(PSTR("/sat/preset\",\"pr_mode_stat_t\":\""))) return false;
+      if (!w.writeRam(ctx.mqttPubTopic)) return false;
+      if (!w.writeProgmem(PSTR("/sat/preset\""))) return false;
+    }
 
     if (climateIdx == 0) {
       if (!writeJsonComma(w)) return false;
@@ -3366,7 +3385,8 @@ static bool streamSatBoolSwitch(HaDiscoveryContext &ctx,
                                 PGM_P nameSuffix,
                                 PGM_P cmdSub,
                                 PGM_P statSub,
-                                PGM_P icon)
+                                PGM_P icon,
+                                PGM_P availSub = nullptr)   // ADR-255: second availability topic, "true"/"false"
 {
   if (!mqttIsConnected()) return false;
   if (!canPublishMQTT()) return false;
@@ -3395,7 +3415,17 @@ static bool streamSatBoolSwitch(HaDiscoveryContext &ctx,
   auto compose = [&](MqttJsonWriter &w) -> bool {
     if (!writeJsonOpen(w)) return false;
 
-    if (!writeJsonKV(w, kAvtyT, ctx.mqttPubTopic)) return false;
+    if (availSub) {
+      // ADR-255: available only while both say so: the device LWT (default online/offline) and <pub><availSub>.
+      if (!w.writeProgmem(PSTR("\"avty\":[{\"t\":\""))) return false;
+      if (!w.writeRam(ctx.mqttPubTopic)) return false;
+      if (!w.writeProgmem(PSTR("\"},{\"t\":\""))) return false;
+      if (!w.writeRam(ctx.mqttPubTopic)) return false;
+      if (!w.writeProgmem(availSub)) return false;
+      if (!w.writeProgmem(PSTR("\",\"pl_avail\":\"true\",\"pl_not_avail\":\"false\"}],\"avty_mode\":\"all\""))) return false;
+    } else {
+      if (!writeJsonKV(w, kAvtyT, ctx.mqttPubTopic)) return false;
+    }
     if (!writeJsonComma(w)) return false;
 
     if (!writeDeviceBlock(w, ctx)) return false;
@@ -3495,7 +3525,7 @@ bool streamSatSwitchDiscovery(uint8_t switchIdx,
       published = streamSatBoolSwitch(ctx,
         PSTR("-sat-simulation-enable"),       PSTR("_SAT_Simulation"),
         PSTR("/sat/simulation"),              PSTR("/sat/simulation_enable"),
-        PSTR("mdi:flask"));
+        PSTR("mdi:flask"),                    PSTR("/sat/simulation_available"));   // ADR-255, TASK-2014
       break;
     case 6:
       published = streamSatBoolSwitch(ctx,

@@ -34,7 +34,7 @@ RESTAPI = Path(os.environ.get("OTGW_RESTAPI_INO", REPO / "src" / "OTGW-firmware"
 FWH = Path(os.environ.get("OTGW_FIRMWARE_H", REPO / "src" / "OTGW-firmware" / "OTGW-firmware.h"))
 
 BLOCK_START = "#if defined(HAS_DIRECT_OT) && HAS_DIRECT_OT\n  // --- OT-Direct settings"
-OTD_KEYS = 14   # otdmode .. otdventsetpoint, as emitted today on an OT-Direct board
+OTD_KEYS = 13   # otdmode .. otdventsetpoint, as emitted today on an OT-Direct board (TASK-1950 removed otdsetbacktimeout)
 
 STUBS = r"""
 #include <cstdint>

@@ -373,8 +373,8 @@
           <!-- TASK-1884 U3: every active message in one panel; it opens by itself while a warning is active -->
           <div class="sat-msgs" id="satMsgs" hidden>
           <div class="sat-hint" id="satRoomLost" hidden data-i18n="h_mon.sat_room_lost">Room temperature lost: heating on the curve only</div>
-          <div class="sat-hint" id="satOtLost" hidden data-i18n="h_mon.sat_ot_lost">OpenTherm lost: boiler handed back</div>
-          <div class="sat-hint" id="satOutsideMissing" hidden data-i18n="h_mon.sat_outside_missing">No outside temperature for 1 hour: boiler handed back</div>
+          <div class="sat-hint" id="satOtLost" hidden data-i18n="h_mon.sat_ot_lost">SAT paused: no OpenTherm connection, the boiler is back under normal control</div>
+          <div class="sat-hint" id="satOutsideMissing" hidden data-i18n="h_mon.sat_outside_missing">SAT paused: no outside temperature for 1 hour, your thermostat controls the boiler</div>
           <div class="sat-hint" id="satPushRefused" hidden data-i18n="h_mon.sat_push_refused">The thermostat refuses the pushed setpoint (it keeps its own value).</div>
           <div id="satMsgInfo"></div>
           </div>
@@ -589,7 +589,7 @@
     <div class="toolbar">
       <!-- TASK-1828: the window comes from data-win-ms (graphChipWindowMs), so the chip text can be translated -->
       <span class="tchip" data-win-ms="600000" data-i18n="h_mon.graph_win_10m">10 min</span><span class="tchip on" data-win-ms="3600000" data-i18n="h_mon.graph_win_1h">1 hour</span>
-      <span class="tchip" data-win-ms="14400000" data-i18n="h_mon.graph_win_4h">4 h</span><span class="tchip" data-win-ms="86400000" data-i18n="h_mon.graph_win_24h">24 h</span>
+      <span class="tchip" data-win-ms="14400000" data-i18n="h_mon.graph_win_4h">4 h</span><span class="tchip" data-win-ms="86400000" data-i18n="h_mon.graph_win_24h">24 h</span><span class="tchip" data-win-ms="604800000" data-i18n="h_mon.graph_win_7d" data-psram-only hidden>7 days</span>
       <span style="flex:1"></span>
       <button class="tbtn">📷 PNG</button><button class="tbtn">⬇ CSV</button>
       <!-- TASK-971: auto-save the graph as PNG/CSV on an interval. -->

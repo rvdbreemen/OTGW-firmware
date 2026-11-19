@@ -1,9 +1,9 @@
-"""TASK-1963: the esp32-combo-tlsdyn env builds on the stock Arduino libraries; mbedTLS gets a PSRAM allocator.
+"""TASK-2901: the esp32-combo-tlsdyn env builds on the stock Arduino libraries; mbedTLS gets a PSRAM allocator.
 
 poc.10 rebuilt the IDF libraries with dynamic mbedTLS buffers; on .63 freeing a dynamic RX buffer after the HTTP
 response hit a heap poisoning assert (core dump 2026-11-19). From poc.12 the env has no custom_sdkconfig (so no
 hybrid compile and no dynamic buffers), the link carries no --wrap flags, setup() installs the mbedTLS allocator
-as its first statement, the allocator puts only blocks above 4 KB in PSRAM with an internal fallback, and the
+right after the RTC captures, the allocator puts only blocks above 4 KB in PSRAM with an internal fallback, and the
 cloud upload starts only on a board with PSRAM.
 """
 import configparser
@@ -35,9 +35,13 @@ def check(ini, main_ino, device):
     if "--wrap" in "\n".join(env.values()) or re.search(r"tlsdyn_mbedtls_libs", env.get("extra_scripts", "")):
         errors.append("the env still adds dynamic-buffer link wraps / the tlsdyn libs script")
     setup = body(main_ino, "void setup() {")
+    # After the three RTC captures (they must stay first, tests/test_wifi_deadlink.py), before anything that can
+    # touch mbedTLS: the GPIO/ISR setup, WiFi, OT, settings.
     first = [l.strip() for l in setup.splitlines()[1:] if l.strip() and not l.strip().startswith("//")]
-    if first[:1] != ["#if HAS_CLOUD_REC"] or len(first) < 2 or not first[1].startswith("cloudRecInstallTlsAllocator();"):
-        errors.append("setup() does not install the mbedTLS allocator as its first statement")
+    want = ["captureRebootReason();", "captureWifiDeadRestarts();", "captureWifiSkipPortal();", "#if HAS_CLOUD_REC",
+            "cloudRecInstallTlsAllocator();"]
+    if len(first) < 5 or any(not f.startswith(w) for f, w in zip(first, want)):
+        errors.append("setup() does not install the mbedTLS allocator right after the RTC captures")
     if "mbedtls_platform_set_calloc_free(cloudRecTlsCalloc, cloudRecTlsFree)" not in device:
         errors.append("cloudRecInstallTlsAllocator() does not install cloudRecTlsCalloc/cloudRecTlsFree")
     else:

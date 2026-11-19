@@ -57,18 +57,18 @@ static bool _sat_narrCold = false;
 static bool _sat_bootBoilerLogged = false;
 static bool _sat_bootOutsideLogged = false;
 static void satNarratef_P(const char *fmt, ...) {   // SAT log sink: one "N <text>" line on stderr (stdout carries the timeline)
-  char b[96]; va_list ap; va_start(ap, fmt); vsnprintf(b, sizeof(b), fmt, ap); va_end(ap); fprintf(stderr, "N %s\n", b);
+  char b[128]; va_list ap; va_start(ap, fmt); vsnprintf(b, sizeof(b), fmt, ap); va_end(ap); fprintf(stderr, "N %s\n", b);   // 128 = SAT_NARRATE_BUF
 }
 #define SAT_MIN_SETPOINT 10.0f
 #define SAT_QUIRK_MIN_MOD_10 0x01
 #define SAT_QUIRK_IMMERGAS_TP 0x02
 enum { SAT_MODE_OFF = 0, SAT_MODE_CONTINUOUS = 1, SAT_MODE_PWM = 2 };
 typedef int SATControlMode;
-struct SatSettings { @FORCEFIELD@ @AUTOFIELD@ float fOvershootMargin=2.0f; bool bEnabled=true, bOvershootProtection=true, bSolarGainEnable=false, bSummerSimmer=false, bSimulation=false;
+struct SatSettings { @FORCEFIELD@ @AUTOFIELD@ float fOvershootMargin=2.0f; float fPwmSwitchMargin=1.5f; bool bEnabled=true, bOvershootProtection=true, bSolarGainEnable=false, bSummerSimmer=false, bSimulation=false;
                      int iMaxRelModulation=80; float fModSupDelay=20, fModSupOffset=1, fFlameOffOffset=18, fSolarSetpointOffset=2;
                      int iHeatingMode=0; };   // TASK-1440: ECO gate on the zones and the solar offset
 struct Settings { SatSettings sat; };
-struct SatState { int iCurrentModulation=0; unsigned iModSuppressionSinceMs=0; float fFinalSetpoint=0, fPwmDutyCycle=0, fPidOutput=0; bool bModSuppressed=false, bPwmFlameRequested=false, bDhwActive=false,
+struct SatState { uint8_t iLastSentCH=0; int iCurrentModulation=0; unsigned iModSuppressionSinceMs=0; float fFinalSetpoint=0, fPwmDutyCycle=0, fPidOutput=0; bool bModSuppressed=false, bPwmFlameRequested=false, bDhwActive=false,
                   bActive=true, bSafetyTripped=false, bValvesOpen=true, bSummerActive=false, bSolarGainActive=false;
                   int eControlMode=SAT_MODE_PWM; };
 struct State { SatState sat; };
@@ -481,7 +481,7 @@ def extract_switch_tick(src: str) -> str:
     # TASK-1468: the segment runs up to the modulation step, so it holds the real exits gate in whichever place the source has it
     # (after the apply step on HEAD, between the schedule and the apply step since entry 134); the exits run on the tick clock.
     body = loop[a:loop.index("  // Modulation suppression", ex)] if ex < loop.index("  // Modulation suppression", ov) else loop[a:ex]
-    return ("\n#define HAS_SWITCH_TICK 1\nstatic uint32_t _sat_tickMs = 0; static bool g_swPwmOn = false, g_swDrives = false;\n"
+    return ("\n#define HAS_SWITCH_TICK 1\nstatic bool g_swPwmOn = false, g_swDrives = false;\n"   # _sat_tickMs: declared before the body (build())
             "bool satCycleCheckOvershootSwitch(float requestedSetpoint, uint32_t tickMs);\n"
             "static float tickRunSw(float pidOutput) {\n" + body +
             "\n  g_swPwmOn = pwmOn; g_swDrives = pwmDrivesSetpoint;\n  return state.sat.fFinalSetpoint;\n}\n")
@@ -502,7 +502,27 @@ def extract(src: str) -> str:
     block = src[a:b]
     m = re.search(r"^static uint8_t satComputeMM\(.*?^\}\s*$", src, re.S | re.M)
     mm = m.group(0) if m else ""
-    return block + "\n" + mm + "\n" + extract_tick(src)
+    tick = extract_tick(src)
+    # the tick clock: the TASK-1887 band block and the switch segment read it; declared once here for every user of extract()
+    clock = "static uint32_t _sat_tickMs = 0;\n" if "static uint32_t _sat_tickMs" not in block + tick else ""
+    return clock + start_gate_prelude(src, block + tick) + block + "\n" + mm + "\n" + tick
+
+
+def start_gate_prelude(src: str, body: str) -> str:
+    """TASK-1942 (entries 385/387/389/391): the real start gate (its state and satStartGateActive()) sits above the PWM
+    block in SATcontrol.ino; satSetControlMode() and satDisable() clear it, the flame edge anchors it and the PWM exits read
+    it, so a harness that cuts any of those needs it. Returns the gate block when `src` has it and `body` does not, plus a
+    no-op satPwmFirstStart() when `body` calls it without defining it (the heating start has many dependencies;
+    tests/test_sat_pwm_first_start.py runs the real one). Empty on code before TASK-1942."""
+    if "static const uint32_t SAT_START_GATE_MS" not in src or "static const uint32_t SAT_START_GATE_MS" in body:
+        return ""
+    src = src.replace("\r\n", "\n")
+    g0 = src.index("static const uint32_t SAT_START_GATE_MS")
+    g1 = src.index("\n}\n", src.index("static bool satStartGateActive()")) + 3
+    gate = src[g0:g1] + "\n"
+    if "satPwmFirstStart()" in body and "static void satPwmFirstStart()" not in body:
+        gate += "static void satPwmFirstStart() {}\n"
+    return gate
 
 
 def _vcvars():
@@ -620,6 +640,7 @@ struct SatState { float fKi = 0.01f; bool bSolarGainActive = false; };
 struct State { SatState sat; };
 static Settings settings; static State state;
 static float _pid_integral = 0;
+static bool  _pid_inBand = true;   // TASK-1890: read by _pidUpdateIntegral() since ADR-259 (unused by older copies)
 """
 PID_MAIN = r"""
 int main(int argc, char** argv) {   // active freezeSetting error integral
@@ -869,7 +890,7 @@ class SatPwmOverride(unittest.TestCase):
         r = self.run_sc("swtick", 1)
         self.assertNotEqual(r["mode"], "-1", "no overshoot switch gate in this SATcontrol.ino")
         self.assertEqual(r["mode"], "2", r)
-        self.assertEqual(r["ticks"], "61", r)                       # first qualifying tick starts the timer, 60 s later it fires
+        self.assertEqual(r["ticks"], "61", r)                       # first qualifying tick starts the timer, 60 s later it fires (TASK-2005, entry 407)
         self.assertEqual(r["continuous_ticks"], "60", r)            # every tick before it still sent the continuous setpoint
         self.assertEqual(r["cont_marker"], "0", "the switch tick sent the continuous setpoint: %r" % r)
         self.assertEqual(r["final"], r["cs"], r)
@@ -935,7 +956,7 @@ class SatPwmOverride(unittest.TestCase):
             with self.subTest(tick_s=step_s):
                 r = self.run_sc("swtick", 1, "x", step_s * 1000)
                 self.assertEqual(r["mode"], "2", r)
-                self.assertEqual(r["ticks"], str(1 + -(-60 // step_s)), r)
+                self.assertEqual(r["ticks"], str(1 + -(-60 // step_s)), r)   # 60 s since TASK-2005 (entry 407)
                 self.assertEqual(r["cont_marker"], "0", "the switch tick sent the continuous setpoint: %r" % r)
                 self.assertEqual(r["final"], r["cs"], r)
                 self.assertEqual(r["ch"], "1", r)
@@ -1051,11 +1072,12 @@ class PidIntegralFreeze(unittest.TestCase):
     def test_freeze_setting_off_still_accumulates_during_solar(self):
         self.assertGreater(self.integral(True, False, 0.05, 3.0), 3.0)  # HEAD: frozen whatever the setting
 
-    def test_freeze_setting_off_still_resets_outside_the_deadband(self):
-        self.assertEqual(self.integral(True, False, 1.0, 3.0), 0.0)
+    def test_freeze_setting_off_still_halves_outside_the_deadband(self):
+        # TASK-1890 / ADR-259: outside the deadband the integral is halved once (was: set to 0)
+        self.assertEqual(self.integral(True, False, 1.0, 3.0), 1.5)
 
-    def test_no_solar_resets_outside_and_accumulates_inside(self):
-        self.assertEqual(self.integral(False, True, 1.0, 3.0), 0.0)
+    def test_no_solar_halves_outside_and_accumulates_inside(self):
+        self.assertEqual(self.integral(False, True, 1.0, 3.0), 1.5)   # TASK-1890 / ADR-259 (was 0.0)
         self.assertGreater(self.integral(False, True, 0.05, 3.0), 3.0)
 
 
@@ -1182,7 +1204,8 @@ class ChEnableSource(unittest.TestCase):
         # TASK-1323: CH = 0 on the cold cutoff or the PWM OFF phase driving the CS, else 1
         src = SAT_INO.read_text(encoding="utf-8")
         loop = src[src.index("void satControlLoop"):]
-        self.assertIn("satSendCH(satChEnableDecide(pidOutput, satColdThreshold(), pwmDrivesSetpoint, pwmOn))", loop)   # TASK-1547
+        # TASK-1547; TASK-1887 adds the tolerance-band input (entry 384: a band stop clears only the CH bit)
+        self.assertIn("satSendCH(satChEnableDecide(pidOutput, satColdThreshold(), pwmDrivesSetpoint, pwmOn, _sat_tolBandOff))", loop)
         # TASK-1468 (entry 134): the exits run before the mode is read. An exit that fired has left PWM, so pwmOn and
         # pwmDrivesSetpoint stay false and CH is 1 with the continuous CS; the PWM phase is read only when the tick stays in PWM.
         self.assertLess(loop.index("satCycleCheckPwmExits(pidOutput, _sat_tickMs);"),

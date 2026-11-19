@@ -1,6 +1,6 @@
 # OTGW collection point: PocketBase on a Synology behind a Cloudflare Tunnel
 
-TASK-1938. This is the server side only. The proof-of-concept firmware that sends to it is TASK-1963 (branch
+TASK-1938. This is the server side only. The proof-of-concept firmware that sends to it is TASK-2901 (branch
 `research/cloud-recording`); TASK-1473 (the feature) is on hold.
 The design and the cost comparison are in TASK-1862 and `docs/diagnostics/ot-stream-encoding-study.md`.
 
@@ -19,7 +19,7 @@ gateway --HTTPS--> Cloudflare edge --tunnel (outbound from the NAS)--> cloudflar
   `Gateway blocked (otgw-blocked): telemetry opt-in off` (`pb_hooks/blocked.pb.js`). The gateway turns its own
   telemetry opt-in off at its next request (within about a minute) and makes no further connection. Its `label`, `fw`, `board` and `updated`
   (last login) show which gateways log.
-- **Telemetry mode per gateway (TASK-1979):** a new gateway always starts in the default mode. To log more for a
+- **Telemetry mode per gateway (TASK-2906):** a new gateway always starts in the default mode. To log more for a
   while, set on its record: `mode` = `full` (every log flag but `sattrace`), `full+trace` (all ten) or `custom`
   (the ticked `flags`); `mode_until` = when it goes back to default by itself (recommended, so it is never
   forgotten); `mode_note` = why (issue or Discord link, for you only). The gateway picks up a change within 15
@@ -155,11 +155,11 @@ without a token is refused (400). Retention: a batch backdated to 40 days old wa
 
 Debug-size batches (after the payload limit went to 65,536 characters, fresh database): 25 batches of 13,301 B paced just under the limit were all accepted; a burst of 40 got 30 accepted and 10 refused with 429; a payload of 65,600 characters was refused (400) and one of exactly 65,536 accepted.
 
-Enrollment, blocking and fixed retention (TASK-1971, 2026-11-15, fresh local PocketBase 0.40.6): `test_client.py`
+Enrollment, blocking and fixed retention (TASK-2903, 2026-11-15, fresh local PocketBase 0.40.6): `test_client.py`
 checks 1 to 10 PASS (11 fails on the LAN, as it should). Against a mutant migration without the two "blocked"
 rules, checks 3 and 9 FAIL, so the test sees those rules.
 
-Blocked reply (TASK-1972): check 9 now expects 403 with "otgw-blocked" on login, upload (old token), refresh and
+Blocked reply (TASK-2904): check 9 now expects 403 with "otgw-blocked" on login, upload (old token), refresh and
 own update; PASS. Without `blocked.pb.js` check 9 FAILs (all 200), so the test sees the hook.
 
 Still untested: the `arm64` build (the first Synology was Intel).

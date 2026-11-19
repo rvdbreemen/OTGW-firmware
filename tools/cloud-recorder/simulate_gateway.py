@@ -40,7 +40,7 @@ def main():
     base = a.base.rstrip("/")
     login = {"identity": a.uid, "password": a.password}
     st, auth = call(base, "/api/collections/devices/auth-with-password", login)
-    if st == 400:                                       # unknown uid: enroll, as the firmware does (TASK-1971)
+    if st == 400:                                       # unknown uid: enroll, as the firmware does (TASK-2903)
         call(base, "/api/collections/devices/records?fields=id",
              {"uid": a.uid, "password": a.password, "passwordConfirm": a.password})
         st, auth = call(base, "/api/collections/devices/auth-with-password", login)

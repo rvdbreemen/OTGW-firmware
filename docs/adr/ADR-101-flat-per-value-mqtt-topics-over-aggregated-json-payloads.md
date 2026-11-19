@@ -9,12 +9,36 @@ documents_shipped: false
 verified_in: []
 supersedes: []
 superseded_by: null
+related:
+  - "ADR-248"
+  - "ADR-255"
 ---
 # ADR-101: Flat Per-Value MQTT Topics Over Aggregated JSON Payloads
 
 ## Status
 
 Accepted. Date: 2026-05-08.
+## Status History
+
+```yaml
+status_history:
+  - date: 2026-05-08
+    status: Accepted
+    changed_by: unknown
+    reason: "Recovered from the record as it stood before this transition; this ADR predates the status_history convention. The actor was never recorded and is not guessed here. The Status line read: Accepted. Date: 2026-05-08."
+    changed_via: unrecorded
+  - date: 2026-11-15
+    status: Accepted
+    changed_by: "User: Robert van den Breemen"
+    reason: Related to ADR-248
+    changed_via: adr-kit lifecycle
+  - date: 2026-11-18
+    status: Accepted
+    changed_by: "Agent: Claude"
+    reason: Related to ADR-255
+    changed_via: adr-kit lifecycle
+```
+
 
 **Decision Maker:** User: Robert van den Breemen (rvdbreemen) — explicit design choice stated and accepted 2026-05-08.
 

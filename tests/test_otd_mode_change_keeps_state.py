@@ -62,6 +62,7 @@ enum OTRemoteOverrideMode { OT_OVERRIDE_NONE = 0, OT_OVERRIDE_TEMPORARY = 1, OT_
 static OTDirectMode otCurrentMode = OTD_MODE_GATEWAY;
 static uint8_t otCmdHead = 7, otCmdFlushHead = 0; static bool otCmdFlushPending = false;
 static uint8_t otOperModeDHW = 0, otOperModeCH1 = 0, otOperModeCH2 = 0;
+static bool otOperModeWrite = false;   // TASK-1906: the PIC's opermodewrite
 static bool otThermostatSeen = true; static uint32_t otLastThermostatMs = 1234;
 static bool otDHWBlocking = false, otCoolingEnable = true, otCH2Enable = true, otChModeOff = false;
 static uint8_t otMasterStatusFlags = 0x03, otDHWOverride = 0xFF;
@@ -78,6 +79,7 @@ static constexpr uint8_t OT_OVERRIDE_COUNT = sizeof(otOverrides) / sizeof(otOver
 static OTRemoteOverrideState otRemoteOverride = {};
 static bool otRemoteOverrideClearPending = false;
 static bool otSetbackEngaged = false; static float otFakeRoomSetpoint = 0.0f;
+static bool otdRoom16CacheSet = false, otdRoom16OvrSet = false; static uint16_t otdRoom16CacheF88 = 0, otdRoom16OvrF88 = 0;   // TASK-1751
 struct OtdState { int eOverrideMode; uint16_t iOverrideF88; bool bSetbackActive; };
 struct State { OtdState otd; }; static State state = {};
 struct OtdSettings { bool bEnableSlave; bool bSummerMode; };

@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program : FSexplorer
-**  Version  : v2.0.0-poc.13
+**  Version  : v2.0.0-poc.14
 **
 **  Mostly stolen from https://www.arduinoforum.de/User-Fips
 **  For more information visit: https://fipsok.de
@@ -139,19 +139,12 @@ static void sendFSexplorerPage() {
 // filesystem-only update leaves it alone, a firmware update changes it. The body
 // streams straight from flash (webSendPStream, no heap copy). The path is a
 // compile-time constant of the caller, always a plain ASCII URL.
-#include "settingsHelp.h"
+#include "settingsHelpGz.h"   // TASK-1955 (ADR-247): generated from settingsHelp.h, gzipped
 #include "faviconData.h"   // TASK-1696: /favicon.ico from app flash
-static void serveProgmemAsset(const char* path, PGM_P mime, PGM_P body) {
-  char etag[64];
-  snprintf_P(etag, sizeof(etag), PSTR("\"%s-%s\""), _VERSION_GITHASH, path);
-  webPushHeader(F("Cache-Control"), F("no-cache"));
-  webPushHeader(F("ETag"), etag);
-  if (hasHeaderCompat(F("If-None-Match")) &&
-      strcmp(headerCompat(F("If-None-Match")), etag) == 0) {
-    webSendStatus(304);
-    return;
-  }
-  webSendPStream(200, mime, body);
+// TASK-1955 (ADR-247): the asset is a gzip byte array and goes out as is with Content-Encoding: gzip; the
+// browser inflates it. ETag "<githash>-<path>", Cache-Control: no-cache and the 304 are webSendFlashBody's.
+static void serveProgmemAsset(const char* path, PGM_P mime, const uint8_t* gzBody, size_t gzLen) {
+  webSendFlashBody(mime, gzBody, gzLen, path, true);
 }
 
 // Serve the web UI (v2.html.gz). ADR-139: the bespoke chunked
@@ -200,7 +193,7 @@ void startWebserver(){
   server.on("/v2.html",    HTTP_GET, sendIndex);
   // TASK-1281: the settings help texts, fetched by v2.js the first time an info icon is used.
   // TASK-1294: served from the firmware image (settingsHelp.h), not from LittleFS.
-  server.on("/settings-help.json", HTTP_GET, [](AsyncWebServerRequest *r){ webBeginRequest(r); serveProgmemAsset("/settings-help.json", PSTR("application/json"), SETTINGS_HELP_JSON); });
+  server.on("/settings-help.json", HTTP_GET, [](AsyncWebServerRequest *r){ webBeginRequest(r); serveProgmemAsset("/settings-help.json", PSTR("application/json"), SETTINGS_HELP_GZ, SETTINGS_HELP_GZ_LEN); });
   // TASK-1696: the favicon comes from app flash, so a page load opens no LittleFS file for it and
   // takes no web file-gate slot (WEB_FILE_MAX_INFLIGHT); same ETag/no-cache/304 rule as the pages.
   server.on("/favicon.ico", HTTP_GET, [](AsyncWebServerRequest *r){ webBeginRequest(r); webSendFlashBody(PSTR("image/x-icon"), FAVICON_ICO, FAVICON_ICO_LEN, "/favicon.ico", false); });
@@ -473,11 +466,11 @@ void apilistfiles()
     if (!LittleFS.exists(deletePath)) {
       webSend(404, F("text/plain"), F("File not found"));
     } else if (LittleFS.remove(deletePath)) {
+      dallasLabelsFileChanged(deletePath);   // TASK-1912: the labels RAM copy follows the file
+      satMarkersFileChanged(deletePath);     // TASK-1911: the markers RAM copy follows the file
 #if HAS_CLOUD_REC
       cloudRecEvFw(crec_FW_FILE_DELETE, 0, deletePath);   // TASK-1473
 #endif
-      dallasLabelsFileChanged(deletePath);   // TASK-1912: the labels RAM copy follows the file
-      satMarkersFileChanged(deletePath);     // TASK-1911: the markers RAM copy follows the file
       webSend(200, F("text/plain"), F("File deleted"));
     } else {
       webSend(500, F("text/plain"), F("Delete failed"));

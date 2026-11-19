@@ -1,4 +1,4 @@
-# Cloud telemetry: completeness analysis (TASK-1963, 2026-11-15)
+# Cloud telemetry: completeness analysis (TASK-2901, 2026-11-15)
 
 Question (Robert): does the telemetry show all firmware data and events, all incoming and outgoing data, and all
 sensor data from outside the OpenTherm bus?
@@ -95,7 +95,7 @@ Gaps that matter for "everything":
    collapse into a per-minute counter; every other status is its own record.
 3. **SAT: A.** While the cloud recording runs, SATTICK always goes to the SAT section, independent of
    `state.debug.bSAT` (`SATcontrol.ino:20`), and not to telnet. SAT behaviour does not change. Which SAT decisions
-   become `SAT_EVENT` records follows from the firmware's own SAT code (TASK-1970): the recording is telemetry of the firmware, not of thermo-nova (Robert, 2026-11-15), so no Sergeant D question is needed.
+   become `SAT_EVENT` records follows from the firmware's own SAT code (TASK-2902): the recording is telemetry of the firmware, not of thermo-nova (Robert, 2026-11-15), so no Sergeant D question is needed.
 
 ## Not verified in this analysis
 
@@ -138,7 +138,7 @@ Findings:
 
 - **The TLS handshake costs more than the data.** The PoC (`CloudRecDevice.h:313-342`) makes a new TLS connection for
   every record. TLS session resumption (session tickets) or a connection that stays open brings that to well
-  under 1 MB per day; resumption also saves the handshake heap peak. To measure on the bench (TASK-1963).
+  under 1 MB per day; resumption also saves the handshake heap peak. To measure on the bench (TASK-2901).
 - **MQTT publishes are the largest part.** Most of them follow from OT frames. Range-coding the MQTT section like
   the OT section, or recording only the changed values (ADR-213: about -145 KiB per day), makes it smaller; leaving
   out derived publishes loses the build-against-build diff that ADR-213 is for. Not measured.
@@ -166,10 +166,10 @@ payload (mix study: 291 KB/h stored against 301 KB/h sent, headers included). Pa
 
 ## Decisions (Robert, 2026-11-15, second round)
 
-1. SATTICK always to the recorder while it records (A), built in TASK-1974.
+1. SATTICK always to the recorder while it records (A), built in TASK-2905.
 2. **Accepted: the Cloudflare edge can read the payload (C).** The tunnel ends TLS at Cloudflare; no device-side
    encryption is added. Anyone who sets up a collection point on this design should know this.
-3. TLS session resumption (A), TASK-1974.
+3. TLS session resumption (A), TASK-2905.
 4. A second send slot on PSRAM boards only (A); without PSRAM a lost record stays reported in SEC_LOST.
 5. The upload rate limit stays per IP (B).
 6. Bench job: `docs/diagnostics/cloudrec-bench-job.md`.
@@ -179,7 +179,7 @@ payload (mix study: 291 KB/h stored against 301 KB/h sent, headers included). Pa
 
 The cloud record now has an events section (SEC_EVT, `CloudRecCodec.h`); each capture point below sits inside
 `#if HAS_CLOUD_REC` next to the ADR-213 capture point, or where the firmware had none. Decoded by `otrec.evt_decode`
-into `events.log` (`decode_all.py`). Decision record: ADR-243 (Proposed).
+into `events.log` (`decode_all.py`). Decision record: ADR-290 (Proposed).
 
 | # | Source / event | Cloud recorder now |
 |---|---|---|
@@ -198,7 +198,7 @@ into `events.log` (`decode_all.py`). Decision record: ADR-243 (Proposed).
 | 18 | PIC return/temp sensor | ✓ through `pic_cmd` / `response` |
 | 19-20 | BLE, weather | ✓ `ble`, `weather` (float32, exact) |
 | 21-22 | DHW water meter, GPIO outputs | derivable from the OT frames (not recorded separately) |
-| 23 | SAT | ✓ SATTICK always; `SAT_EVENT` list still TASK-1970 |
+| 23 | SAT | ✓ SATTICK always; `SAT_EVENT` list still TASK-2902 |
 | 24 | WiFi up/down | ✓ `net` (RSSI, IP or reason); Ethernet up/down: no event handler in the firmware, not recorded |
 | 25-26 | NTP, reboot | ✓ `time_sync`, `reboot` (reset reason, once per boot) |
 | 27-28 | Heap, health | ✓ `health` every minute (free heap, largest block, minimum, RSSI, uptime); losses in SEC_LOST |

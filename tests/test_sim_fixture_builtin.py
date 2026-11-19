@@ -2,18 +2,19 @@
 """TASK-1294 guard: the built-in OpenTherm replay fixture.
 
 /otgw_simulation.log is no longer a file in the LittleFS image. The fixture is
-compiled into the firmware (otgwSimulationFixture.h, PROGMEM) and the replay in
+compiled into the firmware (otgwSimulationFixtureZ.h, a zlib stream generated from the canonical log by
+scripts/webui_pages.py, TASK-1955 / ADR-247) and the replay in
 OTGW-Core.ino falls back to it when LittleFS holds no /otgw_simulation.log. An
 uploaded file keeps precedence.
 
 What this test checks:
-  1. The header's lines equal the canonical list in
-     tests/fixtures/otgw_simulation.builtin.log (the former data file), in order.
+  1. The header's zlib stream inflates to exactly tests/fixtures/otgw_simulation.builtin.log (the former data
+     file), and OTGW_SIM_FIXTURE_RAW_LEN is its length.
   2. data/otgw_simulation.log is gone from the image sources.
   3. Source level, OTGW-Core.ino: the 'simulation disabled ... not found' path is
      gone; reopenOTGWSimulationFile() prefers the LittleFS file and otherwise
-     selects the built-in source; nextOTGWSimulationByte() reads the PROGMEM
-     fixture with pgm_read_byte(); handlePICSerialSimulation() decides the source
+     selects the built-in source, inflating the fixture first (ROM tinfl); nextOTGWSimulationByte() reads the
+     inflated buffer; the buffer is freed when the replay ends or a file takes over; handlePICSerialSimulation() decides the source
      from the explicit source state (not from File truthiness, which stays false
      for the built-in source).
   4. Source level, restAPI.ino: the /api/v2/simulate JSON always says
@@ -27,11 +28,12 @@ Run: python tests/test_sim_fixture_builtin.py
 """
 import re
 import unittest
+import zlib
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
 FW = REPO / "src" / "OTGW-firmware"
-HEADER = FW / "otgwSimulationFixture.h"
+HEADER = FW / "otgwSimulationFixtureZ.h"
 CORE = FW / "OTGW-Core.ino"
 RESTAPI = FW / "restAPI.ino"
 CANON = REPO / "tests" / "fixtures" / "otgw_simulation.builtin.log"
@@ -59,24 +61,33 @@ def function_body(src, name):
     raise AssertionError("unbalanced braces in %s" % name)
 
 
-def header_lines():
+def header_bytes():
+    """The inflated OTGW_SIM_FIXTURE_Z array of the generated header (TASK-1955)."""
     src = read_text(HEADER)
-    m = re.search(r"OTGW_SIM_FIXTURE\[\]\s*PROGMEM\s*=(.*?);", src, re.S)
+    m = re.search(r"OTGW_SIM_FIXTURE_Z\[\]\s*PROGMEM\s*=\s*\{(.*?)\};", src, re.S)
     if not m:
-        raise AssertionError("OTGW_SIM_FIXTURE not found in the header")
-    lits = re.findall(r'"((?:[^"\\\n]|\\.)*)"', m.group(1))
-    lines = []
-    for lit in lits:
-        if not lit.endswith("\\n"):
-            raise AssertionError("fixture literal does not end in a newline escape: %r" % lit)
-        lines.append(lit[:-2])
-    return lines
+        raise AssertionError("OTGW_SIM_FIXTURE_Z not found in the header")
+    return zlib.decompress(bytes(int(x, 16) for x in re.findall(r"0x([0-9a-f]{2})", m.group(1))))
+
+
+def header_raw_len():
+    m = re.search(r"OTGW_SIM_FIXTURE_RAW_LEN\s*=\s*(\d+);", read_text(HEADER))
+    return int(m.group(1)) if m else None
+
+
+def header_lines():
+    return header_bytes().decode("ascii").splitlines()
 
 
 class FixtureContent(unittest.TestCase):
     def test_header_equals_canonical_list(self):
         canon = CANON.read_bytes().decode("ascii").splitlines()
         self.assertEqual(header_lines(), canon)
+
+    def test_inflated_bytes_are_the_log_byte_for_byte(self):
+        raw = CANON.read_bytes().replace(b"\r\n", b"\n")
+        self.assertEqual(header_bytes(), raw)
+        self.assertEqual(header_raw_len(), len(raw))
 
     def test_canonical_list_is_sane(self):
         canon = CANON.read_bytes().decode("ascii").splitlines()
@@ -107,7 +118,8 @@ class ReplaySourceInCore(unittest.TestCase):
         self.assertNotIn("OTGW simulation disabled: LittleFS not mounted", self.src)
 
     def test_core_includes_the_fixture_header(self):
-        self.assertIn('#include "otgwSimulationFixture.h"', self.src)
+        self.assertIn('#include "otgwSimulationFixtureZ.h"', self.src)
+        self.assertIn('#include <miniz.h>', self.src)
 
     def test_reopen_prefers_the_file_then_falls_back_to_the_builtin_source(self):
         body = function_body(self.src, "reopenOTGWSimulationFile")
@@ -118,11 +130,27 @@ class ReplaySourceInCore(unittest.TestCase):
         self.assertLess(file_at, builtin_at, "the file check must come before the built-in fallback")
         self.assertIn("LittleFSmounted", body)
 
-    def test_builtin_bytes_come_from_progmem(self):
+    def test_builtin_bytes_come_from_the_inflated_buffer(self):
         body = function_body(self.src, "nextOTGWSimulationByte")
-        self.assertIn("pgm_read_byte(OTGW_SIM_FIXTURE", body)
-        self.assertIn("OTGW_SIM_FIXTURE_LEN", body)
+        self.assertIn("otgwFixtureBuf[otgwReplayBuiltinPos++]", body)
+        self.assertIn("OTGW_SIM_FIXTURE_RAW_LEN", body)
+        self.assertIn("!otgwFixtureBuf", body, "a failed inflate must read as the end of the source")
         self.assertIn("return -1", body)
+
+    def test_inflate_uses_the_rom_tinfl_into_one_buffer(self):
+        body = function_body(self.src, "otgwFixtureInflate")
+        self.assertIn("tinfl_decompress(", body)
+        self.assertIn("TINFL_FLAG_PARSE_ZLIB_HEADER", body)
+        self.assertIn("TINFL_FLAG_USING_NON_WRAPPING_OUTPUT_BUF", body)
+        self.assertIn("malloc(OTGW_SIM_FIXTURE_RAW_LEN)", body)
+        self.assertIn("free(dec)", body, "the decompressor state is freed right after the inflate")
+        self.assertIn("otgwFixtureFailed = true", body, "a failure is latched, not retried every pass")
+
+    def test_buffer_is_freed_when_the_replay_ends_or_a_file_takes_over(self):
+        self.assertIn("otgwFixtureFree();", function_body(self.src, "handlePICSerialSimulation"))
+        reopen = function_body(self.src, "reopenOTGWSimulationFile")
+        self.assertIn("otgwFixtureFree();", reopen)
+        self.assertLess(reopen.index("otgwFixtureFree();"), reopen.index("otgwFixtureInflate();"))
 
     def test_reader_uses_the_source_neutral_byte_getter(self):
         body = function_body(self.src, "readOTGWSimulationLine")

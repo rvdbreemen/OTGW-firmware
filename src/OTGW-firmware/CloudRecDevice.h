@@ -3,7 +3,7 @@
 **  Program  : CloudRecDevice.h
 **  (Implementation in a header: the Arduino builder generates prototypes for every .ino function before the
 **  includes, which breaks on the CloudRecTls and crec types. CloudRec.ino only includes this file.)
-**  TASK-1963 proof of concept (branch research/cloud-recording only, never published): the cloud recorder.
+**  TASK-2901 proof of concept (branch research/cloud-recording only, never published): the cloud recorder.
 **
 **  Records the OT frames, the SATTICK lines and the debug output into one mix record (CloudRecCodec.h, 4 KB),
 **  closes it every 60 s or when a section is full, and sends it from its own task as an HTTPS POST to the
@@ -14,10 +14,10 @@
 **      host=rec.example.nl
 **      port=443
 **
-**  TASK-1971: the gateway enrolls itself with its unique id (otgw-<MAC hex>) and a random secret that it keeps
+**  TASK-2903: the gateway enrolls itself with its unique id (otgw-<MAC hex>) and a random secret that it keeps
 **  in NVS (survives a filesystem flash), then logs in with those. Capture runs only while the service answers:
 **  it starts paused, resumes after a successful login, and pauses again when the service is unreachable, with
-**  the backoff of CloudRecPolicy.h before each new attempt. TASK-1972: when the maintainer blocks the gateway,
+**  the backoff of CloudRecPolicy.h before each new attempt. TASK-2904: when the maintainer blocks the gateway,
 **  every request gets 403 "otgw-blocked"; the gateway then writes enabled=0 to /cloudrec.cfg at once and makes
 **  no further connection: the opt-in is off until the user turns it on again.
 **
@@ -25,7 +25,7 @@
 **  ESPHome uses it), with cloudRecInstallTlsAllocator() putting mbedTLS blocks above 4 KB in PSRAM.
 **  The cloud upload runs only on a board with PSRAM (Robert, 2026-11-18: no PSRAM, no TLS).
 **  A capture point waits at most 10 ms for the recorder; an item or record that is still lost is counted and
-**  reported in the next record (SEC_LOST, TASK-1972), so a gap in the data is never silent.
+**  reported in the next record (SEC_LOST, TASK-2904), so a gap in the data is never silent.
 **  Not recorded: output that bypasses the Debug* macros (e.g. the telnet banner).
 ***************************************************************************
 */
@@ -50,7 +50,7 @@
 //   ISRG Root X2 69:72:9B:8E:15:A8:6E:FC:17:7A:57:AF:B7:17:1D:FC:64:AD:D2:8C:2F:CA:8C:F1:50:7E:34:45:3C:CB:14:70
 #include "CloudRecRoots.h"
 
-// TASK-1963: mbedTLS allocates through this pair from the first line of setup(), for every user (esp-tls here,
+// TASK-2901: mbedTLS allocates through this pair from the first line of setup(), for every user (esp-tls here,
 // also the WiFi supplicant's crypto). A block above 4 KB (the two ~16 KB TLS record buffers) comes from PSRAM
 // when the board has it; everything else, and every block on a board without PSRAM, from internal RAM exactly
 // as the stock allocator (esp_mbedtls_mem_calloc, CONFIG_MBEDTLS_INTERNAL_MEM_ALLOC) does. heap_caps_free()
@@ -69,7 +69,7 @@ static void *cloudRecTlsCalloc(size_t n, size_t size) {
 static void cloudRecTlsFree(void *p) { heap_caps_free(p); }
 void cloudRecInstallTlsAllocator() { mbedtls_platform_set_calloc_free(cloudRecTlsCalloc, cloudRecTlsFree); }
 
-// TASK-1974: the upload connection, on ESP-IDF's esp-tls. With CONFIG_ESP_TLS_CLIENT_SESSION_TICKETS (not in
+// TASK-2905: the upload connection, on ESP-IDF's esp-tls. With CONFIG_ESP_TLS_CLIENT_SESSION_TICKETS (not in
 // the stock Arduino libraries) it resumes a TLS session from the ticket of the last good connection; a connect
 // with it that fails is retried once with a full handshake. Without it every connection is a full handshake.
 // A Stream, so the HTTP code reads and writes it as before.
@@ -168,7 +168,7 @@ class CloudRecTls : public Stream {
 
 static const uint32_t CLOUDREC_INTERVAL_MS = 60000;
 static const uint32_t CLOUDREC_TASK_STACK  = 10240;
-static const uint32_t CLOUDREC_LOCK_WAIT_MS = 10;   // a capture point waits this long for the recorder (TASK-1972)
+static const uint32_t CLOUDREC_LOCK_WAIT_MS = 10;   // a capture point waits this long for the recorder (TASK-2904)
 
 struct CloudRecConfig {
   bool enabled = false;
@@ -188,7 +188,7 @@ static bool cloudRecFwSynced = false;             // label/fw/board sent this bo
 static CloudRecConfig cloudRecCfg;
 static crec::Recorder cloudRec;                     // the open record (about 13.5 KB, static: ADR-053)
 static uint8_t  cloudRecSendBuf[crec::REC_MAX_BYTES];
-// Slot 0 is the static buffer; slot 1 exists only on a PSRAM board (allocated in cloudRecSetup, TASK-1974).
+// Slot 0 is the static buffer; slot 1 exists only on a PSRAM board (allocated in cloudRecSetup, TASK-2905).
 static crec::Slot cloudRecSlots[2] = {{cloudRecSendBuf, 0, 0, 0, false, false}, {nullptr, 0, 0, 0, false, false}};
 static uint64_t cloudRecSeqNext = 0;
 static PlatformMutex cloudRecLock = nullptr;
@@ -200,7 +200,7 @@ static char cloudRecDevId[24] = "";
 static uint32_t cloudRecSent = 0, cloudRecFailed = 0, cloudRecDroppedItems = 0, cloudRecDroppedRecords = 0;
 static uint32_t cloudRecLastStatus = 0, cloudRecLastMs = 0;
 static uint32_t cloudRecHeapLow = 0xFFFFFFFFu, cloudRecBlockLow = 0xFFFFFFFFu;
-// TASK-1963: internal free, largest internal block and PSRAM free right after the last connect, i.e. with the TLS
+// TASK-2901: internal free, largest internal block and PSRAM free right after the last connect, i.e. with the TLS
 // session and both record buffers allocated: shows where cloudRecTlsCalloc() put them.
 static uint32_t cloudRecConnHeap = 0, cloudRecConnBlock = 0, cloudRecConnPsram = 0;
 
@@ -478,7 +478,7 @@ void cloudRecEvRestIn(uint8_t route, uint8_t method, const char *body, size_t n)
   e.send(crec::EV_REST_IN);
 }
 
-// GETs answered 200 are counted per route and sent as one EV_REST_GETS item a minute (decision 2 A, TASK-1963).
+// GETs answered 200 are counted per route and sent as one EV_REST_GETS item a minute (decision 2 A, TASK-2901).
 static const uint8_t CLOUDREC_ROUTES_MAX = 96;
 static uint32_t cloudRecGets[CLOUDREC_ROUTES_MAX];
 
@@ -602,7 +602,7 @@ void cloudRecEvMode(uint8_t kind, uint32_t value) {
   e.send(crec::EV_MODE);
 }
 
-// A command line from the port 25238 bridge (ADR decision 1 A, TASK-1963): recorded only while the cloud
+// A command line from the port 25238 bridge (ADR decision 1 A, TASK-2901): recorded only while the cloud
 // recorder logs; refused = dropped by the ADR-217 SAT filter (or another drop reason).
 void cloudRecEvBridge(const char *text, size_t n, bool refused) {
   if (!cloudRecActive) return;
@@ -701,7 +701,7 @@ static void cloudRecWriteJson(CloudRecTls &c, const char *method, const char *pa
 
 static char cloudRecResp[1536];                  // a login or refresh reply: the device record and the token
 
-// ---------------------------------------------------------------- TASK-1979: telemetry mode set centrally
+// ---------------------------------------------------------------- TASK-2906: telemetry mode set centrally
 
 static const uint32_t CLOUDREC_REFRESH_MS = 15UL * 60UL * 1000UL;   // token refresh: picks up a changed mode
 static crec::RemoteCfg cloudRecRemote = {crec::RM_DEFAULT, 0, 0};
@@ -765,7 +765,7 @@ static int cloudRecLogin(CloudRecTls &c, bool &blocked) {
   if (crec::classifyReply(st, cloudRecResp) == crec::OUT_BLOCKED) { blocked = true; return st; }
   if (st != 200) return st;
   if (!cloudRecTakeAuth()) return 0;
-  cloudRecRemote = crec::parseRemote(cloudRecResp);   // TASK-1979: the mode the maintainer set for this gateway
+  cloudRecRemote = crec::parseRemote(cloudRecResp);   // TASK-2906: the mode the maintainer set for this gateway
   cloudRecApplyRemote();
   cloudRecLastRefresh = millis();
   if (!cloudRecFwSynced) {            // keep the register current: label, firmware, board
@@ -779,7 +779,7 @@ static int cloudRecLogin(CloudRecTls &c, bool &blocked) {
   return 200;
 }
 
-// Token refresh on a fresh connection (TASK-1979): a new token, and the device record with its current mode.
+// Token refresh on a fresh connection (TASK-2906): a new token, and the device record with its current mode.
 // Returns the HTTP status; blocked is set on a 403 otgw-blocked.
 static int cloudRecRefresh(bool &blocked) {
   blocked = false;
@@ -798,7 +798,7 @@ static int cloudRecRefresh(bool &blocked) {
 }
 
 // Base64 straight to the TLS client, one byte at a time; used as a crec::Buf sink, so the LZ-coded record never
-// needs its own buffer (TASK-1972).
+// needs its own buffer (TASK-2904).
 struct CloudRecB64 {
   CloudRecTls *c;
   uint8_t q[3];
@@ -854,7 +854,7 @@ static crec::Outcome cloudRecUpload(crec::Slot &q, bool &blocked) {
   uint32_t t = millis();
   CloudRecTls c;
   if (!cloudRecConnect(c)) { cloudRecLastStatus = 0; return crec::OUT_DOWN; }
-  // TASK-1972: send the record LZ-coded (fmt 5) when that is smaller, else as it is (fmt 4). The first pass only
+  // TASK-2904: send the record LZ-coded (fmt 5) when that is smaller, else as it is (fmt 4). The first pass only
   // counts, so Content-Length is known before anything is sent.
   crec::Buf cnt;
   cnt.initSink(cloudRecCountPut, nullptr);
@@ -930,7 +930,7 @@ static int cloudRecProbe(bool &blocked) {
 // Stops capture. keep: the open record joins the send slot (or is counted lost when the slot is taken) and the
 // queued record waits for the service; it is sent first after the next successful login. !keep (blocked): all
 // of it goes.
-// ---------------------------------------------------------------- TASK-1991: the local sink (one recorder, two sinks)
+// ---------------------------------------------------------------- TASK-2907: the local sink (one recorder, two sinks)
 //
 // The same closed records go to a local ring (RecRing.h) while local recording is on, and to the collection point
 // while the cloud logs. Local recording is the ADR-213 switch (settings.diag.bRecordingOn, the /api/v2/diag/recording

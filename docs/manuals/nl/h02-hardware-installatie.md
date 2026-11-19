@@ -83,6 +83,8 @@ De OpenTherm bus is polariteitsonafhankelijk: het maakt niet uit welke draad u o
 
 **Let op:** Gebruik uitsluitend de voor de OTGW bestemde aansluitklemmen. Andere aansluitingen op de ketel (220V, potentiaalvrij) zijn niet bedoeld voor OpenTherm.
 
+**Nieuwe PIC:** een PIC rechtstreeks uit de fabriek start in monitor mode: hij luistert alleen en geeft de bus door, dus commando's als `CS=` of `TT=` doen niets. Stuur een keer `GW=1` (via de commandobalk in de webinterface of poort 25238); de PIC bewaart de modus in zijn EEPROM en houdt hem vast. Een PIC die al met een eerdere OTGW-firmware draaide, houdt de modus die hij heeft.
+
 #### Voeding
 
 De OTGW wordt gevoed via de OpenTherm bus. Een externe voeding is normaal gesproken niet nodig. Als u de OTGW wilt voeden zonder actieve OpenTherm-verbinding (bijv. tijdens testen op een bureau), gebruik dan de USB-aansluiting van de ESP-module.
@@ -228,6 +230,25 @@ flash_otgw.bat --bin OTGW-firmware-esp32-combo-<versie>-merged-full.bin
 ```
 
 ---
+
+### Release-bestanden controleren
+
+Elke GitHub-release levert een bestand `SHA256SUMS` mee naast de binaries (de `-flash.zip`, `.ino.bin`, `.littlefs.bin`, `-merged-full.bin`, `.elf` en de safeboot-image). Elke regel bevat de SHA-256-digest van één bestand en de naam ervan, in het formaat dat `sha256sum` leest. Een controle duurt seconden en vangt een beschadigde of gemanipuleerde download, of een oud bestand dat nog op uw schijf stond.
+
+**Linux en macOS:** zet `SHA256SUMS` in de map met de gedownloade bestanden en voer uit:
+
+```bash
+sha256sum -c --ignore-missing SHA256SUMS          # Linux
+shasum -a 256 -c --ignore-missing SHA256SUMS      # macOS
+```
+
+`--ignore-missing` slaat de bestanden over die u niet hebt gedownload. Elk bestand dat u wel hebt geeft `OK`; een regel `FAILED` betekent: flash dat bestand niet, maar download het opnieuw van de GitHub-releasepagina.
+
+**Windows (PowerShell):** toon de digest van een bestand en vergelijk die met de regel in `SHA256SUMS`:
+
+```powershell
+Get-FileHash -Algorithm SHA256 OTGW-firmware-esp32-combo-<versie>-flash.zip
+```
 
 ### Eerste Wi-Fi-configuratie
 

@@ -66,6 +66,7 @@ static void setOverride(uint8_t, uint16_t) {}
 static void clearWriteOverride(uint8_t) {}
 static void synthesizeResponse(const char*, const char*) {}
 static void otDirectBridgeProcessStatus(const char*) {}
+struct OtdCmdPrefixScope { void set(char, char) {} };   // TASK-1804 B3a: the prefix is tested in test_otd_error_prefix.py
 static char* dtostrf(float v, int, int, char* b) { snprintf(b, 16, "%.2f", v); return b; }
 """
 

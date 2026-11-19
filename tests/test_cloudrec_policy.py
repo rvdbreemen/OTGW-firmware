@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""TASK-1971: the cloud recorder's backoff schedule and status classification (src/OTGW-firmware/CloudRecPolicy.h).
+"""TASK-2903: the cloud recorder's backoff schedule and status classification (src/OTGW-firmware/CloudRecPolicy.h).
 
 The real header is compiled into a small C++ program; nothing is re-implemented here.
   1. Without jitter the waits are 5, 10, 20, ... min, capped at 24 h, and stay at 24 h.
   2. With any random value a wait is 100 to 120 % of its base and never above 24 h; the first wait is 5 to 6 min.
   3. HTTP statuses map to OK / REFUSED / AUTH / DOWN; only a 403 whose body holds "otgw-blocked" is BLOCKED.
   4. The send queue: one slot without PSRAM, two with; a full queue loses the record; the oldest goes first.
-  5. The telemetry mode (TASK-1979): parsed from a real login reply; full / full+trace / custom / default; back to
+  5. The telemetry mode (TASK-2906): parsed from a real login reply; full / full+trace / custom / default; back to
      default at mode_until; the simulation switches can never be set.
 """
 import os, shutil, subprocess, tempfile, unittest
@@ -25,7 +25,7 @@ int main() {
   const int rs[] = {403, 401, 400};
   for (int x : rs) for (int i = 0; i < 3; i++) printf("R %d %d %d\n", x, i, (int)crec::classifyReply(x, bodies[i]));
   printf("R 403 9 %d\n", (int)crec::classifyReply(403, nullptr));
-  // TASK-1979: telemetry mode from a real PocketBase login reply (captured 2026-11-15), and variants.
+  // TASK-2906: telemetry mode from a real PocketBase login reply (captured 2026-11-15), and variants.
   const char *rec = "{\"record\":{\"blocked\":false,\"flags\":[\"sat\",\"mqtt\"],\"id\":\"k6wsnb20w3ns7yi\","
                     "\"mode\":\"custom\",\"mode_note\":\"mode \\\"full\\\" for issue \\\"mode\\\":\\\"full\\\"\","
                     "\"mode_until\":\"2030-01-02 03:04:05.000Z\",\"uid\":\"otgw-859030f1724d\"},\"token\":\"x\"}";
@@ -116,7 +116,7 @@ class CloudRecPolicyTest(unittest.TestCase):
 
 
 class CloudRecRemoteModeTest(unittest.TestCase):
-    """TASK-1979: crec::parseRemote / remoteEffective on the real header."""
+    """TASK-2906: crec::parseRemote / remoteEffective on the real header."""
     SAT, MQTT, NTP, TRACE = 1 << 4, 1 << 2, 1 << 9, 1 << 7
 
     def row(self, *key):

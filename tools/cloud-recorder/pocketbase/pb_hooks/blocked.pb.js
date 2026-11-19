@@ -1,5 +1,5 @@
 /// <reference path="../pb_data/types.d.ts" />
-// TASK-1972: every request of a blocked gateway gets HTTP 403 with a message that holds "otgw-blocked", so the
+// TASK-2904: every request of a blocked gateway gets HTTP 403 with a message that holds "otgw-blocked", so the
 // gateway knows at once that it must turn its telemetry opt-in off and stop connecting. Refused: login, token
 // refresh, an update of its own record, and batch uploads (also with a token from before the block).
 // (Handlers run in their own context, so the message is written out in each.)

@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v2.0.0-poc.13
+**  Version  : v2.0.0-poc.14
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -1239,8 +1239,8 @@ bool picTempSensorHasData()
 /*
   On-demand PIC settings readout.
   Call triggerPICsettingsReadout() to start a full cycle.
-  pollPICsettings() is called from the main loop every iteration;
-  it spaces out PR= commands every 3 seconds when a cycle is active.
+  pollPICsettingsQuery() is called from the main loop every iteration;
+  it spaces out PR= commands at least 3 seconds apart when a cycle is active.
 
   A cycle runs automatically at boot. Subsequent cycles are triggered
   by the REST API (GET /api/v2/pic/settings) or after any command
@@ -1266,8 +1266,9 @@ void triggerPICsettingsReadout() {
 //===================[ queryNextPICsetting ]======================
 /*
   Polls one PIC setting via a PR= command and advances to the next.
-  Called by pollPICsettings() every 3 seconds during an active cycle.
-  A full cycle of 15 settings completes in ~45 seconds.
+  Called by pollPICsettingsQuery() at most once per 3 seconds during an active cycle.
+  A full cycle of 15 settings completes in ~45 seconds. Returns false when it sent
+  nothing (PIC unavailable, flashing, or deferred by a status burst or drip tick).
 
   PR= command reference (Schelte Bron, https://otgw.tclcode.com/firmware.html):
     PR=A and PR=M are handled separately (getpicfwversion / queryOTGWgatewaymode).
@@ -1292,14 +1293,14 @@ void triggerPICsettingsReadout() {
   NG/SE/TO responses are silently ignored (keeps previous cached value).
   Skips all queries when PIC is unavailable, offline, or flashing is in progress.
 */
-void queryNextPICsetting() {
-  if (!isPICEnabled() || !isGatewayFirmware()) return;
-  if (state.flash.bESPactive || state.flash.bPICactive) return;
+bool queryNextPICsetting() {
+  if (!isPICEnabled() || !isGatewayFirmware()) return false;
+  if (state.flash.bESPactive || state.flash.bPICactive) return false;
   // Defer PR= queries during Status-burst fanouts and when a drip tick is imminent.
   // Each PR= response triggers 2 MQTT publishes; landing these inside a burst or
-  // drip window amplifies heap pressure. Deferred queries retry on the next 3s tick.
-  if (isStatusBurstActive()) return;
-  if (dripDueWithinMs(500)) return;
+  // drip window amplifies heap pressure. pollPICsettingsQuery() retries on the next loop pass.
+  if (isStatusBurstActive()) return false;
+  if (dripDueWithinMs(500)) return false;
 
   const uint8_t idx = picSettingsQueryIdx;
   picSettingsQueryIdx++;
@@ -1327,12 +1328,32 @@ void queryNextPICsetting() {
     case 12: letter = 'Q'; break;  // Reset cause
     case 13: letter = 'N'; break;  // Standalone interval
     case 14: letter = 'V'; break;  // Voltage reference
-    default: return;
+    default: return false;
   }
 
   char cmd[5];
   snprintf_P(cmd, sizeof(cmd), PSTR("PR=%c"), letter);
   addCommandToQueue(cmd, 4, true);  // forceQueue=true: bypass PR prefix dedup
+  return true;
+}
+
+//===================[ pollPICsettingsQuery ]=====================
+/*
+  TASK-1971: called from the main loop right after loopMQTTDiscovery(). While a cycle
+  is active it sends the next PR= query once at least 3 s passed since the last one it
+  sent. It used to run from the 3 s task: that timer and the 1 s discovery drip start
+  together at boot and come due in the same loop pass (the 3 s task runs first and sees
+  the drip tick as due), and with SKIP_MISSED_TICKS their phase only drifts by the loop
+  lateness. So the 3 s tick stayed inside the 500 ms drip window, deferred tick after
+  tick, until the phase drifted out or the drip had nothing pending (4-5 min after boot;
+  with the broker down the pending bits never clear). From the loop a deferred query goes
+  out right after the next drip tick.
+*/
+void pollPICsettingsQuery() {
+  static uint32_t lastQueryMs = 0;
+  if (!picSettingsCycleActive) return;
+  if ((uint32_t)(millis() - lastQueryMs) < 3000UL) return;
+  if (queryNextPICsetting()) lastQueryMs = millis();
 }
 
 //===================[ handlePRresponse ]==========================
@@ -1363,15 +1384,19 @@ static void handlePRresponse(const char* buf, size_t len) {
   const char  reg   = payload[0];
   const char* value = payload + 2;
 
-  // --- Gateway mode (register 'M'): "M=G" or "M=M" ---
+  // --- Gateway mode (register 'M'): the PIC answers "M=G" or "M=M" ---
+  // OT-Direct also answers its own modes (OTDirect.ino, PR=M; TASK-1951):
+  // S (standalone master) and L (loopback) generate the frames, so gateway ON;
+  // P (bypass relay, thermostat wired to the boiler) is OFF like M.
   if (reg == 'M') {
     static bool prevGatewayMode = false;
     static bool prevGatewayKnown = false;
     char modeVal = value[0];
     bool isGateway;
-    if (modeVal == 'G' || modeVal == 'g') {
+    if (modeVal == 'G' || modeVal == 'g' || modeVal == 'S' || modeVal == 's' ||
+        modeVal == 'L' || modeVal == 'l') {
       isGateway = true;
-    } else if (modeVal == 'M' || modeVal == 'm') {
+    } else if (modeVal == 'M' || modeVal == 'm' || modeVal == 'P' || modeVal == 'p') {
       isGateway = false;
     } else {
       OTDebugTf(PSTR("handlePRresponse: PR=M unexpected value [%c]\r\n"), modeVal);
@@ -2843,7 +2868,10 @@ void recordOTOverride(uint8_t id, uint8_t kind, float value) {
     const uint32_t age = now - otOverrideStore[i].lastSeen;
     if (age >= stalestAge) { stalestAge = age; stalestSlot = i; }
   }
-  if (slot < 0) slot = (freeSlot >= 0) ? freeSlot : stalestSlot;
+  if (slot < 0) {
+    slot = (freeSlot >= 0) ? freeSlot : stalestSlot;
+    otOverrideStore[slot].published = 0;   // TASK-1985: a new id in this slot has no topic yet
+  }
   otOverrideStore[slot].id       = id;
   otOverrideStore[slot].kind     = kind;
   otOverrideStore[slot].value    = value;
@@ -2853,6 +2881,10 @@ void recordOTOverride(uint8_t id, uint8_t kind, float value) {
 // Periodic publisher (called from the MQTT periodic path, NOT from the decode hook).
 // Publishes one retained `<label>/override` topic per active override entry so HA
 // and dashboards reflect the injected value. Canonical topics are untouched.
+// TASK-1985: an entry that goes stale (no override frame for OVERRIDE_ACTIVE_TIMEOUT) gets one empty
+// retained message on its topic, which removes it from the broker, and its slot is freed. Before this
+// the last value stayed retained, so HA kept showing an override that had ended.
+// --- publishActiveOverrides begin
 void publishActiveOverrides() {
   if (!settings.mqtt.bEnable) return;
   const uint32_t now = millis();
@@ -2860,14 +2892,58 @@ void publishActiveOverrides() {
   char val[15];
   for (int i = 0; i < OVERRIDE_STORE_MAX; i++) {
     if (otOverrideStore[i].lastSeen == 0) continue;
-    if ((now - otOverrideStore[i].lastSeen) >= OVERRIDE_ACTIVE_TIMEOUT) continue;
     const char* label = messageIDToString(static_cast<OTLibMessageID>(otOverrideStore[i].id));
     snprintf_P(leaf, sizeof(leaf), PSTR("%s/override"), label);
+    if ((now - otOverrideStore[i].lastSeen) >= OVERRIDE_ACTIVE_TIMEOUT) {
+      // Free the slot only once the clear went out; a failed publish (offline broker) tries again next round.
+      if (!otOverrideStore[i].published || sendMQTTData(leaf, "", /*retain=*/true)) {
+        otOverrideStore[i].lastSeen = 0;
+        otOverrideStore[i].published = 0;
+      }
+      continue;
+    }
     dtostrf(otOverrideStore[i].value, 3, 2, val);
-    sendMQTTData(leaf, val, /*retain=*/true);
+    if (sendMQTTData(leaf, val, /*retain=*/true)) otOverrideStore[i].published = 1;
     feedWatchDog();
   }
 }
+// --- publishActiveOverrides end
+
+// TASK-1991: the override store is RAM only, so after a reboot it is empty and publishActiveOverrides() never
+// clears a <label>/override topic retained before the reboot: HA kept showing the old value. After every MQTT
+// connect one sweep sends an empty retained message (which removes a retained topic, and is a no-op where none
+// exists) for each label that can carry an override: recordOTOverride() is called from print_f88() only, so the
+// f88 ids of OTmap. A label with an entry in the store is skipped: an active override keeps its topic and
+// publishActiveOverrides() refreshes it within 60 s. One topic per step; the caller paces the steps (about 40 ids).
+// --- staleOverrideClear begin
+static uint16_t s_ovrClearId = 0xFFFF;   // next msg id to look at; 0xFFFF = no sweep running
+
+void startStaleOverrideClear() {
+  s_ovrClearId = 0;
+}
+
+// Sends at most one clear. Returns true while the sweep runs (also when a send failed: the same id is tried again).
+bool staleOverrideClearStep() {
+  if (s_ovrClearId == 0xFFFF) return false;
+  if (!settings.mqtt.bEnable) { s_ovrClearId = 0xFFFF; return false; }
+  while (s_ovrClearId <= OT_MSGID_MAX) {
+    const uint8_t id = (uint8_t)s_ovrClearId;
+    OTlookup_t item;
+    PROGMEM_readAnything(&OTmap[id], item);
+    bool inStore = false;
+    for (int i = 0; i < OVERRIDE_STORE_MAX; i++) {
+      if (otOverrideStore[i].lastSeen != 0 && otOverrideStore[i].id == id) { inStore = true; break; }
+    }
+    if (item.type != ot_f88 || inStore || item.label == nullptr || item.label[0] == '\0') { s_ovrClearId++; continue; }
+    char leaf[64];
+    snprintf_P(leaf, sizeof(leaf), PSTR("%s/override"), item.label);
+    if (sendMQTTData(leaf, "", /*retain=*/true)) s_ovrClearId++;
+    return true;
+  }
+  s_ovrClearId = 0xFFFF;
+  return false;
+}
+// --- staleOverrideClear end
 
 //===================[ OT Message Field Formatters ]=========
 
@@ -4488,7 +4564,11 @@ bool sendPICSerial(const char* buf, int len)
     picCmd[n] = '\0';
     // strip a trailing CR/LF so the trace line stays single-line
     while (n > 0 && (picCmd[n - 1] == '\r' || picCmd[n - 1] == '\n')) picCmd[--n] = '\0';
-    if (satSimulationBlocksBusTx(picCmd, F("pic-serial"))) return false;   // TASK-1580: held back, the queue consumes it
+    // TASK-1943 (ADR-244): PR= only makes the PIC print a setting (6.8 gateway.asm ReportSetting -> PrintSetting), it puts
+    // nothing on the OpenTherm bus and changes no PIC state, so it passes the simulation gate. Without
+    // this, /api/v2/pic/settings stayed empty on a boiler-less bench with the SAT simulation on.
+    const bool printOnly = (strncmp_P(picCmd, PSTR("PR="), 3) == 0);
+    if (!printOnly && satSimulationBlocksBusTx(picCmd, F("pic-serial"))) return false;   // TASK-1580: held back, the queue consumes it
   }
 
   // TASK-865.6: the dedicated PIC task is the sole UART writer. Build the full
@@ -4542,19 +4622,55 @@ static void dispatchOTGWInputLine(const char* buf, size_t len)
 // choice is made at every (re)open: the start of a replay and each wrap-around.
 // Builtin reads go through pgm_read_byte(); the lines are synthesised either way, so
 // the PIC byte stream (ADR-177) is not involved.
-#include "otgwSimulationFixture.h"
+#include "otgwSimulationFixtureZ.h"   // TASK-1955 (ADR-247): generated, a zlib stream
+#include <miniz.h>                    // the ESP32-S3 ROM inflater (tinfl_decompress, esp32s3.rom.ld)
 
 enum class OTGWReplaySource : uint8_t { None, File, Builtin };
-static const size_t OTGW_SIM_FIXTURE_LEN = sizeof(OTGW_SIM_FIXTURE) - 1;
 static OTGWReplaySource otgwReplaySource = OTGWReplaySource::None;
 static size_t           otgwReplayBuiltinPos = 0;
+// --- otgwFixtureInflate begin
+// TASK-1955 (ADR-247): the fixture is inflated once into this buffer when a built-in replay starts and freed when
+// the replay ends or an uploaded file takes over; a wrap-around re-reads the buffer. A failed allocation is logged
+// once per replay and the replay then has no built-in source.
+static uint8_t* otgwFixtureBuf = nullptr;
+static bool     otgwFixtureFailed = false;
+static void otgwFixtureFree() {
+  free(otgwFixtureBuf);
+  otgwFixtureBuf = nullptr;
+  otgwFixtureFailed = false;
+}
+static bool otgwFixtureInflate() {
+  if (otgwFixtureBuf) return true;
+  if (otgwFixtureFailed) return false;
+  uint8_t* out = static_cast<uint8_t*>(malloc(OTGW_SIM_FIXTURE_RAW_LEN));
+  tinfl_decompressor* dec = static_cast<tinfl_decompressor*>(malloc(sizeof(tinfl_decompressor)));
+  bool ok = out && dec;
+  if (ok) {
+    tinfl_init(dec);
+    size_t inLen = OTGW_SIM_FIXTURE_Z_LEN, outLen = OTGW_SIM_FIXTURE_RAW_LEN;
+    const tinfl_status st = tinfl_decompress(dec, OTGW_SIM_FIXTURE_Z, &inLen, out, out, &outLen,
+                                             TINFL_FLAG_PARSE_ZLIB_HEADER | TINFL_FLAG_USING_NON_WRAPPING_OUTPUT_BUF);
+    ok = (st == TINFL_STATUS_DONE) && (outLen == OTGW_SIM_FIXTURE_RAW_LEN);
+  }
+  free(dec);
+  if (!ok) {
+    free(out);
+    otgwFixtureFailed = true;
+    DebugTf(PSTR("OTGW simulation: built-in replay not started, inflating the fixture failed (%u B heap free)\r\n"),
+            (unsigned)ESP.getFreeHeap());
+    return false;
+  }
+  otgwFixtureBuf = out;
+  return true;
+}
+// --- otgwFixtureInflate end
 
 // Next byte of the active replay source, or -1 at its end.
 static int nextOTGWSimulationByte(File& replayFile)
 {
   if (otgwReplaySource == OTGWReplaySource::Builtin) {
-    if (otgwReplayBuiltinPos >= OTGW_SIM_FIXTURE_LEN) return -1;
-    return pgm_read_byte(OTGW_SIM_FIXTURE + otgwReplayBuiltinPos++);
+    if (!otgwFixtureBuf || otgwReplayBuiltinPos >= OTGW_SIM_FIXTURE_RAW_LEN) return -1;
+    return otgwFixtureBuf[otgwReplayBuiltinPos++];
   }
   if (!replayFile.available()) return -1;
   return replayFile.read();
@@ -4641,9 +4757,11 @@ static void reopenOTGWSimulationFile(File& otgwSimulationFile)
     otgwSimulationFile = LittleFS.open(F("/otgw_simulation.log"), "r");
     if (otgwSimulationFile) {
       otgwReplaySource = OTGWReplaySource::File;
+      otgwFixtureFree();   // TASK-1955: an uploaded file took over
       return;
     }
   }
+  otgwFixtureInflate();   // TASK-1955: kept across wrap-arounds; a failure leaves the built-in source empty
   otgwReplaySource = OTGWReplaySource::Builtin;
 }
 
@@ -4790,6 +4908,7 @@ static bool replayNextOTGWSimulationLine(File& otgwSimulationFile, char* sReplay
     // hide the built-in fixture or spin the reopen every loop pass: fall back and wait a tick.
     if (otgwReplaySource == OTGWReplaySource::File) {
       closeOTGWSimulationSource(otgwSimulationFile);
+      otgwFixtureInflate();   // TASK-1955
       otgwReplaySource = OTGWReplaySource::Builtin;
     }
     state.debug.iOTGWSimulationNextDueMs = millis() + state.debug.iOTGWSimulationIntervalMs;
@@ -4838,6 +4957,7 @@ static bool handlePICSerialSimulation(File& otgwSimulationFile,
 {
   if (!state.debug.bOTGWSimulation && otgwSimulationWasEnabled) {
     closeOTGWSimulationSource(otgwSimulationFile);
+    otgwFixtureFree();   // TASK-1955: the replay ended, give the buffer back
     otgwSimulationWasEnabled = false;
     resetOTGWLineBuffers(bytesRead, bytesWrite, discardCurrentReadLine);
   }
@@ -5119,14 +5239,21 @@ static void stampThermostatRoomTemp()
 //   an OT= value turns the thermostat's Read-Data 27 into a Write-Data 27 with that value (gateway.asm 6.8
 //   MessageID27), and on OT-Direct OT= writes it. This R frame is the one that writes the canonical
 //   Toutside. A failed PIC sensor sends Invalid-Data instead, so a dead sensor ages out.
-// Never a replayed line (TASK-1649) or a parity error, never an A frame (an OT-Direct cache answer can
-// repeat an old value), never a B the gateway made itself (bLocalAnswer: the OT-Direct loopback boiler, TASK-1896 follow-up 1903 item 2;
+// - the PIC's own proxy answer to the thermostat, an A Read-Ack 27 with no B before it (TASK-2040: with OT= the PIC
+//   can answer the thermostat itself and send no R at all).
+// Never a replayed line (TASK-1649) or a parity error, never an A frame OT-Direct made (bLocalAnswer: a cache answer can
+// repeat an old value) and never an answer-override A, never a B the gateway made itself (bLocalAnswer: the OT-Direct loopback boiler, TASK-1896 follow-up 1903 item 2;
 // an R frame is never local, so OT= on OT-Direct still stamps), and never the PS=1 summary, which has no age (ADR-181).
 static bool otFrameIsFreshOutsideTemp(const OpenthermData_t &f)
 {
   if (f.id != 27 || f.skipthis || f.bReplayed || f.bLocalAnswer) return false;
   if (f.rsptype == OTGW_BOILER) return f.type == OT_READ_ACK && !f.bGatewaySubstituted;
   if (f.rsptype == OTGW_REQUEST_BOILER) return f.type == OT_WRITE_DATA;
+  // TASK-2040 (entry 330, marceld beta.361): with OT= the PIC can answer the thermostat's Read-Data 27 itself, a proxy A
+  // Read-Ack with the gateway's own value, with no R or B on the bus at all. Every A that OT-Direct makes is bLocalAnswer
+  // (bridgeFrameToParser(), OTDirect.ino) and was rejected above, so a non-local A here is the PIC's; an answer-override
+  // A replaces a boiler answer after the gateway's R write, which stamps on its own.
+  if (f.rsptype == OTGW_ANSWER_THERMOSTAT) return f.type == OT_READ_ACK && !f.bAnswerOverride;
   return false;
 }
 // --- otOutsideStamp end
@@ -5231,6 +5358,7 @@ static bool publishPSSummaryFieldValue(uint8_t msgid, uint8_t valueType, const c
       if (validForMaster) sendMQTTData(label, valueBuf);
       setMsgLastUpdated(msgid, trackedNow);
       if (validForMaster) updatePSSummaryFloatState(msgid, value);
+      if (validForMaster) recordValueSource(msgid, OT_VALSRC_SUMMARY);   // TASK-1965
       return true;
     }
 
@@ -5770,6 +5898,39 @@ const char* boilerAnswerStatus(uint8_t id) {
     default:                  return PSTR("never_seen");
   }
 }
+
+// TASK-1965: which frame wrote the value getOTGWValue() serves for this ID, so a client can tell a
+// boiler value from one the gateway supplies itself (a PIC outside sensor's Write-Data 27, an
+// OT-Direct OT= value, a PIC answer to the thermostat). The status above stays the boiler's last
+// answer: a boiler without MsgID 27 answers Data-Invalid while the gateway serves its own sensor.
+// RAM only, this boot; set where the canonical value is written (ADR-097 store gate).
+static uint8_t otValueSource[OT_MSGID_MAX + 1] = {0};
+
+void recordValueSource(uint8_t id, uint8_t src) {
+  if (id <= OT_MSGID_MAX) otValueSource[id] = src;
+}
+
+// The source of a decoded frame: a B the boiler sent, an A/R the gateway made (or a B it made itself,
+// bLocalAnswer), a T from the thermostat, or a replayed line.
+uint8_t otValueSourceOfFrame(uint8_t rsptype, bool localAnswer, bool replayed) {
+  if (replayed) return OT_VALSRC_REPLAY;
+  if (rsptype == OTGW_BOILER) return localAnswer ? OT_VALSRC_GATEWAY : OT_VALSRC_BOILER;
+  if (rsptype == OTGW_ANSWER_THERMOSTAT || rsptype == OTGW_REQUEST_BOILER) return OT_VALSRC_GATEWAY;
+  if (rsptype == OTGW_THERMOSTAT) return OT_VALSRC_THERMOSTAT;
+  return OT_VALSRC_NONE;
+}
+
+// none / boiler / gateway / thermostat / summary / replay
+const char* valueSourceName(uint8_t id) {
+  switch (id <= OT_MSGID_MAX ? otValueSource[id] : OT_VALSRC_NONE) {
+    case OT_VALSRC_BOILER:     return PSTR("boiler");
+    case OT_VALSRC_GATEWAY:    return PSTR("gateway");
+    case OT_VALSRC_THERMOSTAT: return PSTR("thermostat");
+    case OT_VALSRC_SUMMARY:    return PSTR("summary");
+    case OT_VALSRC_REPLAY:     return PSTR("replay");
+    default:                   return PSTR("none");
+  }
+}
 // end boiler-answer record
 
 //===========================================================================================
@@ -5968,7 +6129,7 @@ void processOT(const char *buf, int len, bool suppressOutput, bool localAnswer, 
     OTdata.value = value;                             // store the value
     if (diagRec.active) diagRec.recOtFrame(buf[0], value);   // TASK-1665: every decoded frame, arrival order (ADR-213)
 #if HAS_CLOUD_REC
-    cloudRecOtFrame(buf[0], value);   // TASK-1963 PoC: the same frames for the cloud recorder
+    cloudRecOtFrame(buf[0], value);   // TASK-2901 PoC: the same frames for the cloud recorder
 #endif
     OTdata.type = (value >> 28) & 0x7;               // byte 1 = take 3 bits that define msg msgType
     OTdata.masterslave = (OTdata.type >> 2) & 0x1;    // MSB from type --> 0 = master and 1 = slave
@@ -6228,6 +6389,9 @@ void processOT(const char *buf, int len, bool suppressOutput, bool localAnswer, 
         const uint32_t preSuccessCount = mqttSendSuccessCount;
         OTPublishGate gate(shouldPublishMQTTForID(OTdata.id, OTdata.masterslave, OTdata.value));
         decodeAndPublishOTValue();
+        // TASK-1965: the same gate the print_* store uses (is_value_valid + ADR-097 master validity).
+        if (is_value_valid(OTdata, OTlookupitem) && is_value_valid_for_master_topic(OTdata, OTlookupitem))
+          recordValueSource(OTdata.id, otValueSourceOfFrame(OTdata.rsptype, OTdata.bLocalAnswer, OTdata.bReplayed));
         if (mqttPendingSlot.pending) {
           if (mqttSendSuccessCount > preSuccessCount) confirmMQTTPublishSlot();
           else {
@@ -6323,7 +6487,7 @@ void processOT(const char *buf, int len, bool suppressOutput, bool localAnswer, 
   // needed by the time any yield can occur. Exception: reportOTGWEvent (below) calls both
   // sendMQTTData AND sendEventToWebSocket; feedWatchDog in the MQTT path can yield between
   // the two calls, so callers of reportOTGWEvent must use a local buffer (see evtBuf below).
-  } else if (strstr_P(buf, PSTR("\r\nError 01"))!= NULL) {
+  } else if (strstr_P(buf, PSTR("Error 01"))!= NULL) {   // TASK-1804: lines arrive without CR/LF (the serial reader cuts at them), so "\r\nError 01" never matched
     char errorBuf[12];
     OTcurrentSystemState.error01++;
     OTDebugTf(PSTR("\r\nError 01 = %d\r\n"),OTcurrentSystemState.error01);

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Acts as gateways against the OTGW collection point and checks its rules (TASK-1938, TASK-1971).
+"""Acts as gateways against the OTGW collection point and checks its rules (TASK-1938, TASK-2903).
 
     python3 test_client.py http://127.0.0.1:8090 <admin-email> <admin-password> [--db pb_data/data.db]
 
@@ -16,7 +16,7 @@ Checks, each printed as PASS or FAIL:
       update all get HTTP 403 with 'otgw-blocked' (pb_hooks/blocked.pb.js)
   10. with --db: a batch made 31 days old is deleted by the retention cron, a fresh one stays
   11. the admin UI is not reachable (only meaningful through the tunnel: expect 404 from its path rule)
-  12. telemetry mode (TASK-1979): a gateway cannot set mode/flags/mode_until/mode_note on enroll or update; after
+  12. telemetry mode (TASK-2906): a gateway cannot set mode/flags/mode_until/mode_note on enroll or update; after
       the maintainer sets them, the gateway's login and token refresh both return them
 Waits out the per-IP rate limits (429). Standard library only.
 """

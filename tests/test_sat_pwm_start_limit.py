@@ -43,7 +43,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import test_sat_cycle_classifier as cls_harness  # noqa: E402  (types + cycles cut)
-from test_sat_pwm_override import compile_cpp, extract_cold_cut  # noqa: E402
+from test_sat_pwm_override import compile_cpp, extract_cold_cut, start_gate_prelude  # noqa: E402
 
 FW = cls_harness.FW
 CYCLES_INO = cls_harness.CYCLES_INO
@@ -440,8 +440,10 @@ def build(wd: Path):
     cpp = wd / "t.cpp"
     # order: the PWM block first (it defines _sat_requestedSetpoint, read by satCycleOnFlameChange), then the ring
     # (called by satCycleOnFlameChange on HEAD), then the cycles cut
+    pwm = extract_pwm(sat)
+    gate = start_gate_prelude(sat, pwm + extract_tick_gate(sat))   # TASK-1942: the real start gate the PWM block and the cycles cut use
     cpp.write_text(cls_harness.PRELUDE + cls_harness.extract_types(types_src, True) + STUBS.replace("@COLDCUT@", extract_cold_cut(sat)) + FWD
-                   + extract_pwm(sat) + ring + cls_harness.extract_cycles(cycles) + tail + MAIN.replace("@@TICK@@", extract_tick_gate(sat)), encoding="utf-8")
+                   + gate + pwm + ring + cls_harness.extract_cycles(cycles) + tail + MAIN.replace("@@TICK@@", extract_tick_gate(sat)), encoding="utf-8")
     return compile_cpp(cpp, wd / "t.exe")
 
 

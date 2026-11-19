@@ -113,6 +113,13 @@ static void reboot() {
   settings.sat.fTargetTemp = stored;             // readSettings()
   satPresetStateApply(buf);                      // initSAT()
 }
+// readSettings() applies each settings.ini line through updateSetting() inside its load scope.
+static void reloadStored(float stored) {
+  char v[16]; snprintf(v, sizeof v, "%.2f", stored);
+  SettingsLoadScope scope;
+  settingTargetTemp(v);
+}
+static void reloadSettings() { reloadStored(storedTarget()); }
 static void show(const char* tag) {
   printf("%s preset=%d target=%.2f stored=%.2f\n", tag, (int)state.sat.eActivePreset,
          settings.sat.fTargetTemp, storedTarget());
@@ -159,6 +166,14 @@ int main(int argc, char** argv) {
   } else if (!strcmp(s, "same")) {
     satHandlePreset("eco");
     settingTargetTemp("18.0"); show("same");
+  } else if (!strcmp(s, "reload")) {       // TASK-2013: telnet 'q' runs readSettings() while a preset is active
+    satHandlePreset("comfort"); show("before");
+    reloadSettings(); show("reload");
+    settingTargetTemp("22"); show("manual");
+  } else if (!strcmp(s, "reload_plain")) {
+    settingTargetTemp("19.0");
+    settings.sat.fTargetTemp = 23.0f;        // RAM differs from what the file holds (19.0)
+    reloadStored(19.0f); show("reload");
   }
   return 0;
 }
@@ -187,6 +202,12 @@ def extract(sat: str, st: str) -> str:
     if not m:
         raise AssertionError("SATtargettemp writer not found in " + str(SETTINGS_INO))
     parts.append("#define STORED_TARGET_EXPR " + m.group(1))
+    # TASK-2013: the load-scope flag readSettings() sets. The old code has none: the same scope with a flag nothing reads.
+    scope = re.search(r"^static bool g_loadingSettingsFile = false;.*?^\};\r?\n", st, re.S | re.M)
+    parts.append(scope.group(0) if scope else
+                 "static bool g_loadingSettingsFile = false;\n"
+                 "struct SettingsLoadScope { const bool prev; SettingsLoadScope() : prev(g_loadingSettingsFile) "
+                 "{ g_loadingSettingsFile = true; } ~SettingsLoadScope() { g_loadingSettingsFile = prev; } };\n")
     # The SATtargettemp branch of updateSetting(): from its `else if` up to the next `else if`.
     b = re.search(r'\n  else if \(strcasecmp_P\(field, PSTR\("SATtargettemp"\)\) == 0\)(.*?)\n  else if', st, re.S)
     if not b:
@@ -306,6 +327,31 @@ class SatPresetPersist(unittest.TestCase):
         self.assertEqual(r["same"][0], self.ECO)
         self.assertAlmostEqual(r["same"][1], 18.0)
         self.assertAlmostEqual(r["same"][2], 20.0)
+
+    # TASK-2013: telnet 'q' runs readSettings(true) at runtime. settings.ini holds the user's own target (20.0), not
+    # comfort's 21.5; the reload must not take it as a manual change that clears the preset.
+    def test_settings_reload_keeps_an_active_preset(self):
+        r = self.run_case("reload")
+        self.assertEqual(r["before"][0], self.COMFORT)
+        self.assertEqual(r["reload"][0], self.COMFORT, msg="a settings reload dropped the active preset")
+        self.assertAlmostEqual(r["reload"][1], 21.5, msg="a settings reload replaced the preset temperature")
+        self.assertAlmostEqual(r["reload"][2], 20.0)
+
+    def test_manual_target_after_a_reload_still_clears_the_preset(self):
+        # The load scope ends with readSettings(): a later manual change is a user change again (climate.py:567).
+        r = self.run_case("reload")
+        self.assertEqual(r["manual"][0], self.NONE)
+        self.assertAlmostEqual(r["manual"][1], 22.0)
+
+    def test_reload_without_a_preset_applies_the_file(self):
+        r = self.run_case("reload_plain")
+        self.assertEqual(r["reload"][0], self.NONE)
+        self.assertAlmostEqual(r["reload"][1], 19.0)
+
+    def test_read_settings_opens_the_load_scope(self):
+        st = SETTINGS_INO.read_text(encoding="utf-8")
+        body = re.search(r"^void readSettings\(bool show\)\s*\{(.*?)^\}", st, re.S | re.M).group(1)
+        self.assertTrue(re.match(r"SettingsLoadScope \w+;", body.lstrip()), "readSettings() does not open the load scope first")
 
 
 if __name__ == "__main__":

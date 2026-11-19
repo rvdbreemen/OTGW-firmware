@@ -71,6 +71,8 @@ struct File {
 };
 struct FS { File open(const char*, const char* mode, bool = false) { File f; f.ok = true; if (mode[0] == 'w') g_writes++; return f; } };
 static FS LittleFS;
+// TASK-1989: satSavePidState() hands the file to the fsWriter queue; here it writes at once, so g_writes still counts it.
+static bool fsWriterSubmit(const char* p, const char* d, size_t) { File f = LittleFS.open(p, "w"); if (!f) return false; f.print(d); f.close(); return true; }
 static uint32_t millis() { return 1000; }
 static char* dtostrf(double v, int, int, char* b) { sprintf(b, "%.2f", v); return b; }
 struct { struct { bool bSimulation = false; } sat; } settings;

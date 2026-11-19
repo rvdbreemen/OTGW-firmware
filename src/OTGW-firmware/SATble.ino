@@ -621,8 +621,11 @@ static SATBLEScanCallbacks _bleScanCallbacks;
 // user has explicitly accepted the no-PSRAM instability risk in the Web UI. On a
 // no-PSRAM board with bBleEnable=true but no risk-ack, BLE stays dormant — the UI
 // shows the stability warning when the user switches BLE on, and a hint in the BLE card (TASK-1693). This replaces the bare bBleEnable check at every gate.
+// TASK-2025 (ADR-257): without PSRAM the scanner never starts, risk-ack or not. On .61 (beta.370) it starved the
+// heap within about 2 minutes (free 7-13 KB, max block 2-5 KB, minFree 520 B) and the unit then hung without a
+// restart. bBleRiskAck is kept as a setting but no longer opens this gate.
 static inline bool bleActive() {
-  return settings.sat.bBleEnable && (psramFound() || settings.sat.bBleRiskAck);
+  return settings.sat.bBleEnable && psramFound();
 }
 
 //=====================================================================

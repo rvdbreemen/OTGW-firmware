@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""TASK-1991: a local download of the one recorder decodes like the cloud records.
+"""TASK-2907: a local download of the one recorder decodes like the cloud records.
 
 Records from the real crec::Recorder (tests/cloudrec_harness.cpp, 30 min of OT frames, SATTICK, debug lines and
 events) go through the real crec::lzEncode into the real crec::RecRing, and the real crec::ringFill reads them out

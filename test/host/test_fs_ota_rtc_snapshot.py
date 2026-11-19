@@ -4,8 +4,8 @@
     python test/host/test_fs_ota_rtc_snapshot.py                        # FIX and mutants
     python test/host/test_fs_ota_rtc_snapshot.py --old-rev 08f42d625    # plus OLD, before the fix
 
-A filesystem OTA erases the LittleFS partition from its first chunk on, and the image it writes ships a
-default settings.ini (src/OTGW-firmware/data/settings.ini, hostname OTGW2). A reset before the restore at
+A filesystem OTA erases the LittleFS partition from its first chunk on; the image it wrote then shipped a
+default settings.ini (until TASK-1920 took it out). A reset before the restore at
 the end booted on that default with a lost counter (.63, 2026-11-10: 16 settings changed, boot count
 178 -> 3). The fix (ADR-233) keeps the three files in an RTC_NOINIT snapshot.
 
@@ -50,7 +50,7 @@ from test_ot_reserved_range import GEN, HERE, REPO, find_vcvars
 FW = "src/OTGW-firmware/"
 UPD, SET, HELP, HDR, INO = (FW + "OTGW-ModUpdateServer-esp32.h", FW + "settingStuff.ino", FW + "helperStuff.ino",
                             FW + "OTGW-firmware.h", FW + "OTGW-firmware.ino")
-RUNTIME = ["T1", "T2", "T3", "T4", "T5", "T6", "T7", "T8", "T9", "T10", "T11", "T12", "T13"]
+RUNTIME = ["T1", "T2", "T3", "T4", "T5", "T6", "T7", "T8", "T9", "T10", "T11", "T12", "T13", "T14"]
 STATIC = ["S1", "S2", "S3", "S4", "S5", "S6", "S7", "S8"]
 OLD_MUST_FAIL = ["T1", "T4", "T6", "T9", "T10", "S1", "S2", "S3", "S4", "S5", "S6", "S7", "S8"]
 
@@ -70,7 +70,10 @@ MUTANTS = [
     ("MB6", "the boot restore does not format a half-written image", UPD,
      [("  if (!g_fsOtaRtc.consistent) {   // the reset came during the image write: that half image takes no write\n",
        "  if (false) {   // the reset came during the image write: that half image takes no write\n")],
-     ["T11", "T12", "T13", "T6", "T9"]),   # T13 through its unshifted control
+     ["T11", "T12", "T13", "T14", "T6", "T9"]),   # T13 through its unshifted control
+    ("MB8", "the reboot log is skipped whole when it does not fit (ADR-233 before ADR-246, TASK-1931)", UPD,
+     [("    if (n > room && i == FS_OTA_RTC_SLOTS - 1) {\n", "    if (false) {\n")],
+     ["T11", "T14"]),
     ("MB7", "Update.end() no longer marks the snapshot consistent", UPD,
      [("      fsOtaRtcMarkConsistent();\n    }\n    if (updateOk) {", "    }\n    if (updateOk) {")],
      ["S7"]),

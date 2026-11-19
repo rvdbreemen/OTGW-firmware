@@ -29,7 +29,7 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from test_sat_pwm_override import compile_cpp  # noqa: E402
+from test_sat_pwm_override import compile_cpp, start_gate_prelude  # noqa: E402
 import test_sat_no_return_ignition as nri  # noqa: E402
 
 FW = REPO / "src" / "OTGW-firmware"
@@ -207,7 +207,8 @@ def build_source():
     main = main.replace("static uint32_t g_nextFlow = 0, g_flowPer = 0, g_nextRet = 0, g_retPer = 0, g_pmAt = 0, g_pmDelay = 300, g_nextTick = 0;",
                         "static uint32_t g_nextFlow = 0, g_flowPer = 0, g_nextRet = 0, g_retPer = 0, g_nextTick = 0;").replace("static int g_pmDue = 0;\n", "")
     stubs = stubs.replace("static uint32_t g_pmAt, g_pmDelay; static int g_pmDue;", "static uint32_t g_pmAt = 0, g_pmDelay = 300, g_base = 1000000; static int g_pmDue = 0;")
-    return feed + "\n" + stubs + "\nstatic void satPwmReset_decl_unused() {}\n" + cmd + "\n" + pwm + "\n" + validity + "\n" + flood + "\n" + main
+    gate = start_gate_prelude(src, cmd + pwm + flood)   # TASK-1942: the real start gate the PWM block now uses
+    return feed + "\n" + stubs + "\nstatic void satPwmReset_decl_unused() {}\n" + gate + cmd + "\n" + pwm + "\n" + validity + "\n" + flood + "\n" + main
 
 
 class NoReturnStartup(unittest.TestCase):
@@ -413,10 +414,12 @@ OTD_STUBS = r"""
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <cctype>
 #define PSTR(x) x
 #define F(x) x
 #define snprintf_P snprintf
 #define OTDDebugTf(...) ((void)0)
+static void otdPmStart(uint8_t) {}   // TASK-1847: the TSP/string chain of PM=; MsgID 25 is not a chain ID
 #define OTDDebugTln(...) ((void)0)
 static uint32_t g_ms = 0;
 static uint32_t millis() { return g_ms; }
@@ -429,13 +432,22 @@ struct State { OTBus otBus; OTD otd; }; static State state;
 enum OTDirectMode { OTD_MODE_GATEWAY = 1 }; static OTDirectMode otCurrentMode = OTD_MODE_GATEWAY;
 static unsigned long buildStatusRequest() { return 0xFFFF0000UL; }
 static bool otIsVentSlave() { return false; }
+static constexpr uint32_t OTD_MWT_MS = 100;   // TASK-1954: MWT floor of the scheduler; never stamped in this harness
+static uint32_t otdLastConvEndMs = 0;
 static bool otCmdQueueEmpty() { return true; }
 static void otCmdApplyPendingFlush() {}
 static bool otCmdEnqueue(unsigned long f) { printf("%lu ENQ %lu\n", (unsigned long)g_ms, f & 0xFFFF); return true; }
+static bool otdWriteRefused = false;   // TASK-1804 B3e: the PM= branch sets it on a refused enqueue (never here)
+static void otCmdSkipTombstones() {}   // TASK-1992: ring tombstones, tested in tests/test_otd_sim_exit_stale_writes.py
 static void otDirectBridgeProcessStatus(const char* s) { printf("%lu STATUS %s\n", (unsigned long)g_ms, s); }
 static void synthesizeResponse(char*, const char*) {}
 static bool otMasterRequestActive = false; static uint32_t otLastAnySendMs = 0; static uint32_t otMinIntervalMs = 100; static uint8_t otScheduleIdx = 0;
 static const uint32_t OT_OFFLINE_RETRY_MS = 30000, OT_VENT_FAST_INTERVAL_MS = 10000, OT_SLOW_INTERVAL_MS = 60000;
+#ifndef IS_MASTER_MODE
+#define IS_MASTER_MODE() (true)
+#endif
+static bool otSlaveFramePending = false; static unsigned long otSlaveFrame = 0;   // TASK-1812: no thermostat write waits
+static bool otdMasterRelaysWrite(unsigned long) { return false; }
 enum { OT_DIRECT_ORIGIN_GATEWAY = 1 };
 static unsigned long otCmdQueue[4]; static uint8_t otCmdTail = 0; static const int OT_CMD_QUEUE_SIZE = 4;
 static uint32_t g_busyUntil = 0;
@@ -532,14 +544,12 @@ class OtDirectPm(unittest.TestCase):
         lat = self.pm25_latencies(False)
         self.assertLessEqual(max(lat), 1150, lat)
 
-    def test_pm25_latency_in_the_slow_poll_burst_is_bounded_but_not_one_interval(self):
-        # Characterization of the CURRENT OT-Direct scheduler (one request per call, round-robin from otScheduleIdx): when all slow-poll
-        # entries come due together (they all start at boot with lastSentMs = 0, so they stay in step), a PM=25 sets lastSentMs = 0 but
-        # waits behind the entries already due. The model has no entry disabled; a boiler that answers Unknown-DataID to many of them
-        # (the entries disable themselves) has a shorter burst. The bench has to measure the real burst (TASK-1412.21).
+    def test_pm25_goes_out_within_a_communication_interval_also_in_the_slow_poll_burst(self):
+        # TASK-1981: the scheduler serves the faster tiers before the 60 s slow-poll tier, so a PM=25 (lastSentMs = 0 on the 10 s
+        # entry) no longer waits behind the slow entries that are due (was up to ~9 s, characterized here before the fix). It goes out
+        # within the spec's 1.15 s master communication interval (OpenTherm v4.2 section 4.3.1), as with the slow tier idle.
         lat = self.pm25_latencies(True)
-        self.assertLessEqual(max(lat), 10000, lat)
-        self.assertGreater(max(lat), 1150, "the scheduler now serves PM=25 inside one interval in the burst: tighten the assertion above")
+        self.assertLessEqual(max(lat), 1150, lat)
 
     def test_without_pm25_the_msgid25_read_is_only_every_10_s_on_ot_direct(self):
         rows = self.sim(["run 120000"])
@@ -553,9 +563,10 @@ class OtDirectPm(unittest.TestCase):
         rows = self.sim(["run 1000", "pm 2"])
         self.assertIn(["1000", "ENQ", "2"], rows)
 
-    def test_pm_out_of_range_is_refused_with_bv(self):
-        rows = self.sim(["pm 200"])
-        self.assertEqual(rows, [["0", "STATUS", "BV"]])
+    def test_pm_takes_0_to_255_like_the_pic(self):
+        # TASK-1847: SetPrioMessage (gateway.asm 6.8:5026-5038) takes any Data-ID of 0-255 (was BV above 127 here)
+        self.assertEqual(self.sim(["pm 200"]), [["0", "ENQ", "200"]])
+        self.assertEqual(self.sim(["pm 256"]), [["0", "STATUS", "OR"]])
 
 
 if __name__ == "__main__":

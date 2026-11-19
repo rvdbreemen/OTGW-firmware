@@ -161,6 +161,7 @@ static struct { struct { bool bOTmessage; bool bEnable; } mqtt; } settings;
 static struct {
   float OpenThermVersionSlave; float OpenThermVersionMaster;          // read by useV4xReservedIdRules()
   uint16_t error01, error02, error03, error04;                        // the non-OT "Error 0x" branches
+  uint16_t SlaveStatus;                                               // processOT() skips the flow average during hot water (TASK-1990)
 } OTcurrentSystemState;
 static uint32_t lastOTmsgMs = 0;
 static char cMsg[128];
@@ -190,6 +191,10 @@ static struct { bool pending; } mqttPendingSlot;
 struct OTPublishGate { explicit OTPublishGate(bool) {} };
 static bool shouldPublishMQTTForID(byte, byte, uint16_t) { return false; }
 static void decodeAndPublishOTValue() {}
+// TASK-1965: the value-source record processOT() makes after decodeAndPublishOTValue(); not observed here.
+static bool is_value_valid_for_master_topic(OpenthermData_t, OTlookup_t) { return false; }
+static uint8_t otValueSourceOfFrame(uint8_t, bool, bool) { return 0; }
+static void recordValueSource(uint8_t, uint8_t) {}
 static void confirmMQTTPublishSlot() {}
 static bool getMQTTConfigDone(uint8_t) { return true; }
 static void setMQTTConfigPending(uint8_t) {}

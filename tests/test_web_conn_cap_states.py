@@ -3,23 +3,22 @@
 
     python tests/test_web_conn_cap_states.py
 
-Characterisation test of the CURRENT counting (no fix yet): platformTcpTxHoldingOnPort() is sliced
-from src/libraries/Platform/src/platform_esp32.h and compiled against a stub tcp_pcb/tcp_seg list.
-webConnCapExceeded() (restAPI.ino) refuses with 503 when held - ws > WEB_MAX_TX_CONNECTIONS (4).
+platformTcpTxHoldingOnPort() is sliced from src/libraries/Platform/src/platform_esp32.h and compiled
+against a stub tcp_pcb/tcp_seg list. webConnCapExceeded() (restAPI.ino) refuses with 503 when
+held - ws > WEB_MAX_TX_CONNECTIONS (4).
 
-What it shows (ADR-188 Decision, by design):
+What it checks (ADR-188, amended by ADR-240 Proposed):
   - an ESTABLISHED connection counts even with empty queues, unless it is a waiter of the native file
     queue: an idle socket the browser opened ahead of a request (speculative preconnect) counts;
-  - a closing connection (FIN_WAIT_1, CLOSING, LAST_ACK) counts while any segment sits in unsent or
-    unacked, also when that segment is only the zero-length FIN;
-  - a half-open passive connection (SYN_RCVD) counts too: lwIP registers it in tcp_active_pcbs and
-    queues its SYN-ACK as a zero-length segment (tcp_listen_input, tcp_enqueue_flags).
-The breakdown keeps those two apart (closing-fin vs syn-rcvd), so the bench can tell them apart.
+  - a connection in another state counts only while a queued segment carries payload. lwIP queues the
+    FIN of a closing connection (FIN_WAIT_1, CLOSING, LAST_ACK) and the SYN-ACK of a half-open passive
+    one (SYN_RCVD; tcp_listen_input, tcp_enqueue_flags) as zero-length segments: those do not count.
+The breakdown names the reason, with closing-fin and syn-rcvd apart, for the bench.
 ESPAsyncWebServer 3.11.2 answers with "Connection: close", so every request is a new socket that then
 closes; a fresh load therefore leaves closing sockets behind for one round trip each.
 
-The scenario rows model a fresh load with 2 requests in flight, the counting the bench must confirm or
-refute (AC2). They are a model, not a measurement.
+The fresh_load row models 09's refusal "6 connections hold TX" (4 ESTABLISHED + 2 zero-length-only);
+it is a model, not a measurement.
 """
 import subprocess
 import sys
@@ -133,11 +132,13 @@ class WebConnCapStates(unittest.TestCase):
     def test_established_counts_without_data_unless_a_queue_waiter(self):
         self.assertEqual((self.n["est_idle"], self.n["est_waiter"], self.n["est_data"]), (1, 0, 1))
 
-    def test_closing_counts_on_a_zero_length_fin(self):
-        self.assertEqual((self.n["fin_wait_1_fin"], self.n["closing_fin"], self.n["last_ack_fin"]), (1, 1, 1))
+    def test_not_established_with_only_zero_length_segments_does_not_count(self):
+        # ADR-240 (Proposed, amends ADR-188): no payload queued, no request received. A closing connection
+        # with only its FIN and a half-open SYN_RCVD one with only its SYN-ACK count 0.
+        self.assertEqual((self.n["fin_wait_1_fin"], self.n["closing_fin"], self.n["last_ack_fin"]), (0, 0, 0))
+        self.assertEqual((self.n["syn_rcvd_synack"], self.n["close_wait_ctl"]), (0, 0))
 
-    def test_half_open_with_only_its_syn_ack_counts(self):
-        self.assertEqual((self.n["syn_rcvd_synack"], self.n["close_wait_ctl"]), (1, 1))
+    def test_closing_with_payload_still_counts(self):
         self.assertEqual(self.n["fin_wait_1_data"], 1)
 
     def test_closing_without_segments_does_not_count(self):
@@ -146,15 +147,16 @@ class WebConnCapStates(unittest.TestCase):
     def test_other_ports_do_not_count(self):
         self.assertEqual(self.n["other_port"], 0)
 
-    def test_modelled_fresh_load_with_2_in_flight_reaches_the_cap(self):
+    def test_modelled_fresh_load_with_2_in_flight_stays_under_the_cap(self):
+        # the model of 09's refusal ("6 connections hold TX" = 4 ESTABLISHED + 2 zero-length-only) counts 4
         held = self.n["fresh_load"]
-        self.assertEqual(held, 6, "matches 09's 'WEB CONN CAP: 6 connections hold TX'")
-        self.assertGreater(held, WEB_MAX_TX_CONNECTIONS)
+        self.assertEqual(held, 4)
+        self.assertLessEqual(held, WEB_MAX_TX_CONNECTIONS)
 
-
-    def test_breakdown_adds_up_to_the_count_in_every_case(self):
+    def test_breakdown_adds_up_to_the_count_plus_the_uncounted_zero_length_only(self):
         for case in CASES:
-            self.assertEqual(sum(self.why[case]), self.n[case], case)
+            idle, data, cdata, cfin, syn, other = self.why[case]
+            self.assertEqual(idle + data + cdata, self.n[case], case)
 
     def test_breakdown_names_the_reason(self):
         # (est-idle, est-data, closing-data, closing-fin, syn-rcvd, other)

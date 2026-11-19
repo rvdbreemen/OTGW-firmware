@@ -23,6 +23,7 @@ class __FlashStringHelper;
 #define strlcpy_P strlcpy
 #define CSTR(x) ((x).c_str())
 #define REBOOT_LOG_LINE_MAX 240
+#define REBOOT_LOG_LINES 20   // TASK-1931: OTGW-firmware.h, the line count updateRebootLog() keeps
 
 static size_t strlcpy(char *d, const char *s, size_t n) {
   size_t l = strlen(s);

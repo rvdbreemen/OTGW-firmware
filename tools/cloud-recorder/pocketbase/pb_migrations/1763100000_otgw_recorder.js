@@ -1,5 +1,5 @@
 /// <reference path="../pb_data/types.d.ts" />
-// OTGW diagnostic collection point (TASK-1938, TASK-1971, TASK-1972). The logic is in collection rules plus two
+// OTGW diagnostic collection point (TASK-1938, TASK-2903, TASK-2904). The logic is in collection rules plus two
 // small hooks: the retention cron (pb_hooks/retention.pb.js) and the blocked reply (pb_hooks/blocked.pb.js).
 //   devices: the register of gateways that log, one auth record each. A gateway enrolls itself on first contact
 //            with its unique id (uid, from the MAC) and a secret it generated; it logs in with uid + secret.
@@ -15,7 +15,7 @@ migrate((app) => {
     listRule: null,
     viewRule: null,
     // Anyone may enroll a new uid (the unique index refuses an existing one); "blocked" may not be sent.
-    // The maintainer's fields (blocked, and the telemetry mode of TASK-1979) may not be sent by a gateway.
+    // The maintainer's fields (blocked, and the telemetry mode of TASK-2906) may not be sent by a gateway.
     createRule: '@request.body.blocked:isset = false && @request.body.verified:isset = false' + OTGW_MODE_FIELDS_UNSET,
     // A gateway may update its own label, firmware and board; not its uid and not "blocked".
     updateRule: 'id = @request.auth.id && @request.body.blocked:isset = false && @request.body.uid:isset = false' +
@@ -30,7 +30,7 @@ migrate((app) => {
       { name: "fw", type: "text", max: 64 },
       { name: "board", type: "text", max: 32 },
       { name: "blocked", type: "bool" },
-      // TASK-1979: telemetry mode, set by the maintainer; empty = default. The gateway reads it at every login and
+      // TASK-2906: telemetry mode, set by the maintainer; empty = default. The gateway reads it at every login and
       // token refresh (every 15 min) and goes back to default by itself after mode_until.
       { name: "mode", type: "select", values: ["default", "full", "full+trace", "custom"], maxSelect: 1 },
       { name: "flags", type: "select", maxSelect: 10,

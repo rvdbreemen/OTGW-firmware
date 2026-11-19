@@ -10,7 +10,7 @@ anything yet: device streaming is TASK-1473, which is on hold.
 | `simulate_gateway.py` | Uploads a generated OT stream the way a gateway would (test tool) |
 | `export_batches.py` | Fetches one gateway's OT batches (superuser, LAN only) and writes an `otframes.log` that the firmware replay reads (ADR-209); missing batches become `#` note lines |
 | `dbg_size_study.py` | Sizes the debug stream (text, address-token, both with zlib) on lines built from the firmware's real format strings |
-| `compress_study.py` | Compares lossless record compressors (zlib, LZSS, order-0/1/2 range coding, LZ-RC) on realistic records (TASK-1972) |
+| `compress_study.py` | Compares lossless record compressors (zlib, LZSS, order-0/1/2 range coding, LZ-RC) on realistic records (TASK-2904) |
 
 ## Round trip (tested 2026-11-14, local PocketBase in Docker)
 
@@ -127,7 +127,7 @@ debug section makes the debug comparison fail.
 Not covered: a real device. The encoders here stand in for the firmware's; the formats are what a device-side
 encoder has to write (TASK-1473, on hold). The argument values are generated, so the sizes are estimates.
 
-## Firmware proof of concept (TASK-1963, branch only, `2.0.0-poc.N`)
+## Firmware proof of concept (TASK-2901, branch only, `2.0.0-poc.N`)
 
 The gateway records and uploads by itself over HTTPS, also on a board without PSRAM. Built in the env
 `esp32-combo-tlsdyn` (`./build.sh --target esp32-combo-tlsdyn`), never in a normal build.
@@ -143,10 +143,10 @@ reinstall the normal Arduino ESP32 framework and SDK libraries before using that
   `Debugln()`, hooks in `_debugBOL` / `_debugPrintf_P`, and `processOT()` next to the ADR-213 recorder.
   OT section v2 (fixed tables, `otrec.unpack_ot2`), mix record every 60 s or when a section is full.
 - **Upload:** own task, HTTPS POST over esp-tls with TLS session resumption (tickets; a failed resumption falls back
-  to a full handshake; TASK-1974) to the collection point, certificate check against GTS Root R1/R4 and
+  to a full handshake; TASK-2905) to the collection point, certificate check against GTS Root R1/R4 and
   ISRG Root X1/X2, `?fields=id`. Off unless `/cloudrec.cfg` on LittleFS has `enabled=1` plus `host` and `port`
   (the opt-in).
-- **One recorder, two sinks (TASK-1991):** the same closed records also go to a local ring (`RecRing.h`: 1.5 MB
+- **One recorder, two sinks (TASK-2907):** the same closed records also go to a local ring (`RecRing.h`: 1.5 MB
   of PSRAM, or 8 KB of heap with the ADR-213 start rule), LZ-coded as sent. Local recording is the existing switch
   (web UI Advanced > Debug, `/api/v2/diag/recording/start|stop`, resumes at boot); in this env it drives this ring
   and `diagRec` stays off. Capture runs while local recording is on or the cloud logs, so a cloud outage no longer
@@ -157,44 +157,44 @@ reinstall the normal Arduino ESP32 framework and SDK libraries before using that
   each new batch. Apply the PocketBase migrations before updating gateways. Pass one `--image` per
   firmware binary in the retained history; the exporter matches each tagged batch to its image.
   If the history contains both tagged and older untagged batches, supply the older image with `--legacy-image`.
-- **Events (TASK-1473, ADR-243):** a fifth section (SEC_EVT, 1,408 B) records everything the firmware receives,
+- **Events (TASK-1473, ADR-290):** a fifth section (SEC_EVT, 1,408 B) records everything the firmware receives,
   sends or measures besides OT/SATTICK/debug: commands and responses, MQTT, REST (GET 200 counted per route per
   minute), sensors (Dallas, S0, BLE, weather), WiFi, settings, time sync, reboot, telnet keys, webhook, firmware
   events, health every minute, mode changes and the port 25238 bridge commands. `decode_all.py` writes them to
   `events.log` (one line per event: time, type, fields as JSON). Every call site is inside `#if HAS_CLOUD_REC`.
-- **Telemetry mode (TASK-1979):** the device record's `mode` / `flags` / `mode_until` (set by the maintainer) switch
+- **Telemetry mode (TASK-2906):** the device record's `mode` / `flags` / `mode_until` (set by the maintainer) switch
   the log flags of `debugFlags.h` from the login and the token refresh every 15 minutes (`crec::parseRemote`,
   `crec::remoteEffective`, `cloudRecApplyRemote`); flags the user had on stay on afterwards.
-- **Send queue (TASK-1974):** one record slot; a second one in PSRAM on PSRAM boards, oldest sent first.
-- **SATTICK (TASK-1974):** with SAT debug off the SATTICK lines go only to the recorder (`SATTickTf` in
+- **Send queue (TASK-2905):** one record slot; a second one in PSRAM on PSRAM boards, oldest sent first.
+- **SATTICK (TASK-2905):** with SAT debug off the SATTICK lines go only to the recorder (`SATTickTf` in
   `SATcontrol.ino`); with SAT debug on they go to telnet and are recorded from there, once.
-- **Compression (TASK-1972):** a closed record goes out LZ-coded (fmt 5: LEB128 raw length + range-coder bytes,
+- **Compression (TASK-2904):** a closed record goes out LZ-coded (fmt 5: LEB128 raw length + range-coder bytes,
   `crec::lzEncode`, reference `otrec.lz_encode`/`lz_decode`) when that is smaller, else as it is (fmt 4). LZ77 over
   the record itself (no window buffer), every decision through the range coder; 3.2 KB of RAM. Two passes: the
   first counts (Content-Length, raw or LZ), the second streams the bytes as base64 to TLS, so there is no second
   record buffer. Measured with `compress_study.py` (random argument values, so on the high side): 72 to 84 % of the
   raw record with light debug, 65 to 81 % with full debug, within 0.5 point of zlib level 9 (whose compressor does
   not fit a board without PSRAM). `tests/test_cloudrec_lz.py`: same bytes as the reference, lossless.
-- **Enrollment and blocking (TASK-1971):** the gateway's uid is `otgw-` + its factory MAC; its secret (128 bits)
+- **Enrollment and blocking (TASK-2903):** the gateway's uid is `otgw-` + its factory MAC; its secret (128 bits)
   is made once and kept in NVS, so a filesystem flash keeps the enrollment. The first login of an unknown uid
-  enrolls it. A 403 reply that holds `otgw-blocked` (TASK-1972, any request) makes the gateway write `enabled=0` to
+  enrolls it. A 403 reply that holds `otgw-blocked` (TASK-2904, any request) makes the gateway write `enabled=0` to
   `/cloudrec.cfg` at once and end its upload task: no further connection, and the opt-in is off until the user
   turns it on again. A uid that is enrolled with another secret (after a full
   flash erase) is retried every 24 h until the maintainer deletes the old record.
-- **Service down (TASK-1971):** capture runs only while the service answers. It starts paused and resumes after a
+- **Service down (TASK-2903):** capture runs only while the service answers. It starts paused and resumes after a
   login that is not blocked. A failed upload or login pauses capture, drops what was not sent, and waits
   5, 10, 20, 40, 80, 160, 320, 640, 1280 min and then 24 h per further failure (each + 0 to 20 % random), back to
   5 min after a success (`CloudRecPolicy.h`, `tests/test_cloudrec_policy.py`). The gateway's own network going
   down pauses capture without a backoff step.
 - **Sizes against a normal esp32-combo build:** static RAM +22.0 KB (152,524 vs 130,524 B); app 98.9 % of the
   2240K slot (26 KB left; this env cannot use LTO).
-- **Since poc.12 (2026-11-19, TASK-1963): stock libraries, no hybrid compile.** poc.10's dynamic mbedTLS buffers
+- **Since poc.12 (2026-11-19, TASK-2901): stock libraries, no hybrid compile.** poc.10's dynamic mbedTLS buffers
   panicked on .63 when freeing the RX buffer after the HTTP response (heap poisoning assert; likely
   espressif/esp-idf#14444). The env now links the stock Arduino libraries (esp-tls on mbedTLS, static 16 KB record
   buffers, no session tickets), and `cloudRecInstallTlsAllocator()` (first line of `setup()`) routes mbedTLS
   blocks above 4 KB to PSRAM through `mbedtls_platform_set_calloc_free()`. The upload only runs on a board with
   PSRAM. The notes below describe poc.1 to poc.11.
-- **Fixed 2026-11-15 (TASK-1974): poc.1 to poc.4 did not contain the dynamic mbedTLS buffers.** The hybrid compile
+- **Fixed 2026-11-15 (TASK-2905): poc.1 to poc.4 did not contain the dynamic mbedTLS buffers.** The hybrid compile
   rebuilt mbedTLS with the env's settings but copied only top-level archives, so the firmware linked the prebuilt
   mbedTLS of the Arduino release (static 16 KB record buffers, no session tickets). `scripts/tlsdyn_mbedtls_libs.py`
   copies the nested archives; from poc.5 the ELF has the dynamic-buffer code (`esp_mbedtls_free_buf`,
@@ -204,4 +204,4 @@ reinstall the normal Arduino ESP32 framework and SDK libraries before using that
   shared `framework-arduinoespressif32-libs` package, so later builds on the same machine use them until that
   package is reinstalled. A line added to `custom_sdkconfig` only takes effect after deleting the generated
   `sdkconfig.esp32-combo-tlsdyn` in the repo root (gitignored): an existing file wins over the new defaults.
-- **Not tested yet:** everything on a device (TLS heap peak, low-water, soak). That is the bench run of TASK-1963.
+- **Not tested yet:** everything on a device (TLS heap peak, low-water, soak). That is the bench run of TASK-2901.

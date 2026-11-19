@@ -101,6 +101,8 @@ def build_source() -> str:
     src = SAT_INO.read_text(encoding="utf-8").replace("\r\n", "\n")
     consts = re.search(r"// --- Thermal Drop Learning Constants.*?\n((?:static const [^\n]*\n)+)", src).group(1)
     statics = re.search(r"(static float\s+_thermal_prevRoom[^\n]*\n(?:static [^\n]*_thermal_[^\n]*\n)+)", src).group(1)
+    # TASK-2010: these harnesses drive the learning itself, as a pass in which SAT controls
+    statics = statics.replace("_thermal_lastPassControlled = false", "_thermal_lastPassControlled = true")
     fn = cut_braced(src, "static void satUpdateThermalLearning()")
     return STUBS + consts + statics + fn + "\n" + MAIN
 

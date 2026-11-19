@@ -169,6 +169,11 @@ static void safebootSyncNvs(const char *, const char *) {}
 #include "defines.inc"
 #include "helper.inc"
 #include "snapshot.inc"
+#ifdef FS_OTA_RTC_MAGIC
+#define FS_OTA_RTC_BUDGET_FOR_TEST sizeof(g_fsOtaRtc.data)   // TASK-1931: the snapshot's real data budget
+#else
+#define FS_OTA_RTC_BUDGET_FOR_TEST 0                         // before TASK-1774: no snapshot at all
+#endif
 
 #ifndef FS_OTA_RTC_MAGIC   // the revision has no snapshot (before the fix): the calls do nothing
 static void fsOtaRtcFill() {}
@@ -360,33 +365,60 @@ int main(int argc, char **argv) {
                   what(r.settingsFile) + ", count " + std::to_string(r.count) + ", log " + std::to_string(r.log.size()) +
                   " B, fs " + (fs.broken ? "still broken" : "writable") + ", formats " + std::to_string(fs.formats));
   }
-  if (c == "T11" || c == "T12") {
+  if (c == "T11" || c == "T12" || c == "T14") {
     // TASK-1904 cross-check of the budget (7424 B of data): T11 the worst case, a 5700 B settings.ini and a
-    // reboot log of 20 full 160 B lines (3200 B): the log does not fit after the settings and is skipped whole,
-    // the settings and the counter still come back. T12 as measured on .63 (settings.ini 5659 B, log 1178 B) plus
-    // the 16 B the raw reset code adds to each of the 20 boot lines: all three fit.
-    const bool worst = (c == "T11");
-    const size_t wantSettings = worst ? 5700 : 5659;
-    const size_t logBytes = worst ? 20 * 160 : 1178 + 20 * 16;
+    // reboot log of 20 full 160 B lines (3200 B, each ending CRLF): the log does not fit after the settings; since
+    // ADR-246 (TASK-1931) its newest whole lines that fit come back (the longest CRLF-terminated prefix), settings
+    // and counter too. T12 as measured on .63 (settings.ini 5659 B, log 1178 B) plus the 16 B the raw reset code
+    // adds to each of the 20 boot lines: all three fit whole. T14 lines of varying length (60 to 239 B) and a cut
+    // that falls inside a line: only whole lines, never the partial one.
+    const bool partial = (c != "T12");
+    const size_t wantSettings = (c == "T12") ? 5659 : 5700;
+    std::string logText;
+    if (c == "T12") {
+      logText = std::string(1178 + 20 * 16, 'L');
+    } else {
+      for (int k = 0; k < 20; k++) {
+        const size_t len = (c == "T11") ? 160 : 60 + (size_t)((k * 37) % 180);   // T14: 60..239 B incl. CRLF
+        std::string line(len - 2, (char)('a' + k));
+        logText += line + "\r\n";
+      }
+    }
     g_ramSettings.clear();
     fs = FsModel();
     writeSettings(false);
     const size_t overhead = fs.files[SET].size();
     unitBefore(wantSettings > overhead ? wantSettings - overhead : 0);
-    fs.files[LOG] = std::string(logBytes, 'L');
+    fs.files[LOG] = logText;
     const size_t settingsSize = g_userFile.size();
     uploadStart(); firstChunk(); imageHalfWritten();
     BootResult r = rebootUnit();
     const bool settingsOk = r.settingsFile == g_userFile && r.count == 42;
-    const bool logBack = r.log.size() == logBytes;
-    const bool ok = worst ? (settingsOk && !logBack) : (settingsOk && logBack);
-    std::string got = "settings.ini " + std::to_string(settingsSize) + " B, log " + std::to_string(logBytes) + " B -> " +
-                      what(r.settingsFile) + ", count " + std::to_string(r.count) + ", log " +
-                      (logBack ? std::string("restored") : r.log == "(missing)" ? std::string("not restored (skipped)")
-                                                                               : std::to_string(r.log.size()) + " B");
+    bool logOk;
+    std::string logWhat;
+    if (!partial) {
+      logOk = r.log == logText;
+      logWhat = logOk ? "restored whole" : std::to_string(r.log.size()) + " B";
+    } else {
+      // The expected prefix: the newest whole lines that fit next to settings.ini and the counter.
+      const size_t room = FS_OTA_RTC_BUDGET_FOR_TEST - settingsSize - std::string("41\r\n").size();
+      size_t want = 0;
+      for (size_t k = 2; k <= logText.size() && k <= room; k++)
+        if (logText[k - 2] == '\r' && logText[k - 1] == '\n') want = k;
+      const std::string expect = logText.substr(0, want);
+      logOk = want > 0 && r.log == expect;
+      logWhat = r.log == "(missing)" ? std::string("not restored (skipped whole)")
+                                     : std::to_string(r.log.size()) + " B (" +
+                                           (r.log == expect ? "the newest whole lines that fit" : "NOT the expected prefix") +
+                                           ", want " + std::to_string(want) + " B of " + std::to_string(logText.size()) + ")";
+    }
+    const bool ok = settingsOk && logOk;
+    std::string got = "settings.ini " + std::to_string(settingsSize) + " B, log " + std::to_string(logText.size()) +
+                      " B -> " + what(r.settingsFile) + ", count " + std::to_string(r.count) + ", log " + logWhat;
     return report(c.c_str(), ok,
-                  worst ? "worst case: the log does not fit after settings.ini and is skipped; settings and counter come back"
-                        : "the .63 sizes with the longer boot lines: settings, counter and log all fit and come back",
+                  c == "T11" ? "worst case: settings and counter come back, plus the log's newest whole lines that fit"
+                  : c == "T14" ? "lines of varying length: only whole lines of the log come back, never a partial one"
+                               : "the .63 sizes with the longer boot lines: settings, counter and log all fit and come back",
                   got);
   }
   if (c == "T13") {

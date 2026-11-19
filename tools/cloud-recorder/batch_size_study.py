@@ -25,7 +25,7 @@ import otrec  # noqa: E402
 import dbg_size_study  # noqa: E402
 
 ADMIN, ADMIN_PW = "admin@test.invalid", "Adm1n-test-pass-123"
-DEV, DEV_PW = "otgw-00000000beef", "gw-test-pass-123456"   # uid (TASK-1971)
+DEV, DEV_PW = "otgw-00000000beef", "gw-test-pass-123456"   # uid (TASK-2903)
 
 
 class Conn:

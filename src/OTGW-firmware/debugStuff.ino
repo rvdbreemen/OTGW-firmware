@@ -41,7 +41,7 @@ void _debugPrintf_P(PGM_P fmt, ...) {
     int written = vsnprintf_P(buf, sizeof(buf), fmt, args);
     va_end(args);
     debugTelnet.print(buf);
-    // TASK-1963 PoC: the line as tokens (format address + binary arguments); the printed text is the fallback.
+    // TASK-2901 PoC: the line as tokens (format address + binary arguments); the printed text is the fallback.
     cloudRecPrintf(fmt, rec, buf, strlen(buf), written >= (int)sizeof(buf));
     va_end(rec);
 #else
@@ -67,7 +67,7 @@ void _debugBOL(const char *fn, int line)
    static time_t lastCachedSec = 0;
    static char cachedPrefix[35] = "";  // "HH:MM:SS" + " ( heap| block) "
 #if HAS_CLOUD_REC
-   static uint32_t cachedHeap = 0, cachedBlock = 0;   // TASK-1963: the numbers in cachedPrefix
+   static uint32_t cachedHeap = 0, cachedBlock = 0;   // TASK-2901: the numbers in cachedPrefix
 #endif
 
    time_t now_sec = time(nullptr);
@@ -134,7 +134,7 @@ void _debugBOL(const char *fn, int line)
 
    debugTelnet.print(_bol);
 #if HAS_CLOUD_REC
-   // TASK-1963 PoC: the prefix as the recorder sends it (time as printed, heap numbers, function, line).
+   // TASK-2901 PoC: the prefix as the recorder sends it (time as printed, heap numbers, function, line).
    cloudRecBol(fn, line, (int64_t)now_sec * 1000000LL + now.tv_usec, cachedHeap, cachedBlock);
 #endif
 }

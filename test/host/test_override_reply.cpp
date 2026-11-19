@@ -192,6 +192,14 @@ static OTDirectMode otdModeFromSetting(int iMode) { return static_cast<OTDirectM
 static void applyOTDirectMode(OTDirectMode) {}
 static void otCmdApplyPendingFlush() {}   // the ring flush itself: tests/test_otd_mode_switch_queue_reset.py
 static void otdCmdTextDrain() {}          // TASK-1761: the off-loop command ring, tests/test_otd_loop_task_commands.py
+static void otdMasterStatus() {}   // TASK-1980: mirrors the in-flight flag to state.otd, not under test here
+static bool otCmdEnqueue(uint32_t) { return true; }   // TASK-1847: the PM= chain's next read (tests/test_otd_pm_chain_tsp.py)
+// TASK-1906: the thermostat's own MsgID 99 (tests/test_otd_msgid99_relay.py); nothing pending here
+static bool otdRelayRead99(unsigned long, unsigned long &) { return false; }
+static bool otdRelayRewriteRead(unsigned long, unsigned long &) { return false; }   // TASK-1803 (tests/test_otd_relay_rw.py)
+static unsigned long otdReply99(unsigned long r) { return r; }
+static void otdOnThermostatWrite99(uint16_t) {}
+static uint16_t otdOperModeData(bool) { return 0; }   // not in otd_slice.inc
 
 static void sendWebSocketJSON(const char*) {}
 static bool satSimulationBlocksBusTx(const char*, const __FlashStringHelper*) { return false; }
@@ -229,6 +237,12 @@ static void updateOTDirectStatus() {}
 static void checkThermostatTimeout() {}
 static void loopFlameRatio() {}
 static void clearWriteOverride(uint8_t) {}
+// TASK-1804 A2: handleMasterResponse() calls otdZapInvalid(), defined further down OTDirect.ino (not in this slice);
+// its behaviour is tested on the real block in tests/test_otd_zap_invalid.py. Here it is a no-op like
+// clearWriteOverride(), so these cases keep testing the reply path only.
+static void otdZapInvalid(uint8_t) {}
+// TASK-1992: loopOTDirect() calls it; tested on the real block in tests/test_otd_sim_exit_stale_writes.py
+static void otdSimExitFlush() {}
 #ifdef OTD_OLD_CONTROLLER
 static void loopPiCtrl() {}
 static void loopCHHysteresis() {}
@@ -861,18 +875,67 @@ int main(int argc, char** argv) {
   {
     resetAll();
     otUnknownIds[0] = 70; otUnknownIdCount = 1;               // UI=70
-    const unsigned long t = otFrame(kReadData, 70, 0), a = otFrame(kUnknownId, 70, 0);
-    thermostatSends(t); loopOTDirect(); loopOTDirect();
-    verdict("C13a", "UI table hit (UI=70): answered UNKNOWN-DATAID at once, nothing to the boiler",
-            {}, { a }, logOf({ { 'T', t }, { 'A', a } }));
+    // TASK-1804 A5: no alternative for the slot, so the PIC forwards the frame unchanged (RestoreRequest ->
+    // SendDefaultMsg, gateway.asm 6.8 :2404-2414, :3475-3500) and relays the boiler's answer
+    const unsigned long t = otFrame(kReadData, 70, 0), b = otFrame(kReadAck, 70, 0x1234);
+    thermostatSends(t); loopOTDirect();
+    otMaster.boilerFrame(b); loopOTDirect(); loopOTDirect();
+    verdict("C13a", "UI table hit (UI=70) with no alternative for the slot: forwarded unchanged, the boiler's answer relayed",
+            { t }, { b }, logOf({ { 'T', t }, { 'B', b } }));
   }
   {
     resetAll();
     otResponseOverrides[0] = OTResponseOverride{ 26, true, 0x3200 };   // SR=26:50.0
-    const unsigned long t = otFrame(kReadData, 26, 0), a = otFrame(kReadAck, 26, 0x3200);
-    thermostatSends(t); loopOTDirect(); loopOTDirect();
-    verdict("C13b", "SR table hit (SR=26): answered READ-ACK(26, 50.0) at once, nothing to the boiler",
-            {}, { a }, logOf({ { 'T', t }, { 'A', a } }));
+    // TASK-1804 A6: forwarded like any other; WordResponse puts the SR bytes into the boiler's answer (gateway.asm 6.6
+    // :2384-2414, :3612-3643)
+    const unsigned long t = otFrame(kReadData, 26, 0), b = otFrame(kReadAck, 26, 0x1234), a = otFrame(kReadAck, 26, 0x3200);
+    thermostatSends(t); loopOTDirect();
+    otMaster.boilerFrame(b); loopOTDirect(); loopOTDirect();
+    verdict("C13b", "SR=26: forwarded, the boiler's READ-ACK goes to the thermostat with the SR bytes (READ-ACK 26, 50.0)",
+            { t }, { a }, logOf({ { 'T', t }, { 'B', b }, { 'A', a } }), "1A:1234");
+  }
+  {
+    // TASK-1804 E5: a WRITE gets WRITE-ACK, the request's own type with the response bit (messageack, gateway.asm 6.8
+    // :2676-2679, :3659-3662; spec v4.2 4.3.1)
+    resetAll();
+    otResponseOverrides[0] = OTResponseOverride{ 26, true, 0x3200 };   // SR=26:50.0
+    // TASK-1804 A6: forwarded; messageack makes the answer the request's own ack type, also over an Unknown-DataID
+    const unsigned long t = otFrame(kWriteData, 26, 0x1000), b = otFrame(kUnknownId, 26, 0), a = otFrame(kWriteAck, 26, 0x3200);
+    thermostatSends(t); loopOTDirect();
+    otMaster.boilerFrame(b); loopOTDirect(); loopOTDirect();
+    verdict("C13c", "SR=26 on a WRITE, boiler Unknown-DataID: the thermostat gets WRITE-ACK(26, 50.0), not READ-ACK",
+            { t }, { a }, logOf({ { 'T', t }, { 'B', b }, { 'A', a } }), "-");
+  }
+  {
+    // TASK-1804 A6: MsgID 14 has its own handler on the PIC (MessageID14), not WordResponse: SR does not apply there
+    resetAll();
+    otResponseOverrides[0] = OTResponseOverride{ 14, true, 0x3200 };
+    const unsigned long t = otFrame(kReadData, 14, 0), b = otFrame(kReadAck, 14, 0x6400);
+    thermostatSends(t); loopOTDirect();
+    otMaster.boilerFrame(b); loopOTDirect(); loopOTDirect();
+    verdict("C13d", "SR=14: MsgID 14 is no WordResponse ID on the PIC, the boiler's answer is relayed unchanged",
+            { t }, { b }, logOf({ { 'T', t }, { 'B', b } }), "0E:6400");
+  }
+  {
+    // TASK-1804 A6: ByteResponse (70): the request's high byte stays, ORed with the SR high byte (gateway.asm :3629-3643)
+    resetAll();
+    otResponseOverrides[0] = OTResponseOverride{ 70, true, 0x0204 };
+    const unsigned long t = otFrame(kReadData, 70, 0x0100), b = otFrame(kReadAck, 70, 0x0102),
+                        a = otFrame(kReadAck, 70, 0x0304);
+    thermostatSends(t); loopOTDirect();
+    otMaster.boilerFrame(b); loopOTDirect(); loopOTDirect();
+    verdict("C13e", "SR=70 (ByteResponse): READ-ACK(70) with high byte 0x01|0x02 = 0x03 and the SR low byte 0x04",
+            { t }, { a }, logOf({ { 'T', t }, { 'B', b }, { 'A', a } }), "46:0102");
+  }
+  {
+    // TASK-1804 A6 review: MessageID48 jumps to WordResponse for every answer (gateway.asm :3090-3099), so SR=48 applies
+    resetAll();
+    otResponseOverrides[0] = OTResponseOverride{ 48, true, 0x4123 };
+    const unsigned long t = otFrame(kReadData, 48, 0), b = otFrame(kReadAck, 48, 0x3C28), a = otFrame(kReadAck, 48, 0x4123);
+    thermostatSends(t); loopOTDirect();
+    otMaster.boilerFrame(b); loopOTDirect(); loopOTDirect();
+    verdict("C13f", "SR=48 (own handler, WordResponse on every answer): READ-ACK(48) with the SR bytes",
+            { t }, { a }, logOf({ { 'T', t }, { 'B', b }, { 'A', a } }), "30:3C28");
   }
 
   // ---- C14-C16 ----------------------------------------------------------------------
@@ -963,6 +1026,16 @@ int main(int argc, char** argv) {
     thermostatSends(t); loopOTDirect(); loopOTDirect();
     verdict("C22", "loopback mode, no override, READ(25): the simulated READ-ACK is relayed unchanged",
             {}, { b }, logOf({ { 'T', t }, { 'B', b } }));
+  }
+  {
+    // TASK-1804 A6: loopback answered SR= before the change and still does, now over the simulated answer
+    resetAll();
+    otCurrentMode = OTD_MODE_LOOPBACK;
+    otResponseOverrides[0] = OTResponseOverride{ 25, true, 0x3200 };
+    const unsigned long t = otFrame(kReadData, 25, 0), b = otFrame(kReadAck, 25, 0x2A80), a = otFrame(kReadAck, 25, 0x3200);
+    thermostatSends(t); loopOTDirect(); loopOTDirect();
+    verdict("C22b", "loopback mode with SR=25: the thermostat gets READ-ACK(25, 50.0)",
+            {}, { a }, logOf({ { 'T', t }, { 'B', b }, { 'A', a } }), "19:2A80");
   }
   {
     OverrideRun r = runOverriddenWrite(1, t30, t40);

@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : CloudRecCodec.h
-**  TASK-1963 PoC (branch research/cloud-recording only): the encoders of the cloud recorder's mix record.
+**  TASK-2901 PoC (branch research/cloud-recording only): the encoders of the cloud recorder's mix record.
 **  Plain C++ with no Arduino dependency, so the host test (tests/test_cloudrec_codec.py) compiles this
 **  same header and checks its output against the Python decoders in tools/cloud-recorder/otrec.py.
 **
@@ -27,7 +27,7 @@ struct Buf {
   size_t cap;
   size_t n;
   bool full;
-  void (*sink)(void *ctx, uint8_t b);   // TASK-1972: when set, bytes go to sink() instead of memory (and are counted)
+  void (*sink)(void *ctx, uint8_t b);   // TASK-2904: when set, bytes go to sink() instead of memory (and are counted)
   void *ctx;
   void init(uint8_t *mem, size_t size) { p = mem; cap = size; n = 0; full = false; sink = nullptr; ctx = nullptr; }
   void initSink(void (*f)(void *, uint8_t), void *c) { p = nullptr; cap = (size_t)-1; n = 0; full = false; sink = f; ctx = c; }
@@ -382,7 +382,7 @@ inline char dbgConv(const char *&fmt, int *lenMod) {
 
 static const uint8_t SEC_SAT = 2, SEC_DBG = 3, SEC_OT2 = 5;
 static const uint8_t SEC_LOST = 7;
-static const uint8_t SEC_EVT = 8;   // TASK-1473: the events section   // TASK-1972: LEB128 items, LEB128 records lost since the previous record
+static const uint8_t SEC_EVT = 8;   // TASK-1473: the events section   // TASK-2904: LEB128 items, LEB128 records lost since the previous record
 
 // Writes section `type` with `data` into out. Returns false when it does not fit.
 inline bool mixSection(Buf &out, uint8_t type, const uint8_t *data, size_t n) {
@@ -560,7 +560,7 @@ TokResult dbgPrintfTokens(Recorder &r, int64_t tUs, uint32_t fmtAddr, uint32_t f
   return full ? TOK_FULL : TOK_NO;
 }
 
-// ---------------------------------------------------------------- TASK-1972: LZ + range coder over a whole record
+// ---------------------------------------------------------------- TASK-2904: LZ + range coder over a whole record
 //
 // A closed record (fmt 4) is sent as fmt 5 when this makes it smaller: LEB128 raw length, CRC-32 (IEEE, little
 // endian) of the raw record, then the range coder's bytes. The decoder refuses a record whose output does not

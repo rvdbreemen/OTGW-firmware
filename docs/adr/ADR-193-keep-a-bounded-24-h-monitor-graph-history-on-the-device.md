@@ -9,6 +9,9 @@ documents_shipped: false
 verified_in: []
 supersedes: []
 superseded_by: null
+related:
+  - "ADR-245"
+  - "ADR-256"
 topics:
   - "web-ui"
   - "v2"
@@ -56,6 +59,16 @@ status_history:
     status: Accepted
     changed_by: Robert van den Breemen
     reason: "Maintainer decision 2026-10-23 (session): accepted"
+    changed_via: adr-kit lifecycle
+  - date: 2026-11-15
+    status: Accepted
+    changed_by: Agent (92)
+    reason: ADR-245 amends ADR-193 (TASK-1963)
+    changed_via: adr-kit lifecycle
+  - date: 2026-11-18
+    status: Accepted
+    changed_by: Agent (ba)
+    reason: Related to ADR-256 (TASK-2018)
     changed_via: adr-kit lifecycle
 ```
 

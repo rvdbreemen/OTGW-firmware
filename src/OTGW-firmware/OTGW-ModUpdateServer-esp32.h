@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTGW-ModUpdateServer-esp32.h
-**  Version  : v2.0.0-poc.13
+**  Version  : v2.0.0-poc.14
 **
 **  ESP32 OTA update server — functional equivalent of the ESP8266
 **  OTGW-ModUpdateServer with Nodoshop hardware watchdog feeding.
@@ -43,6 +43,7 @@
 #include <esp_ota_ops.h>       // esp_ota_get_running/next_update_partition — single-app-slot OTA guard
 #include <esp_partition.h>     // esp_partition_find_first — full LittleFS partition size
 #include <StreamString.h>
+#include <atomic>
 #include <LittleFS.h>
 #include <Preferences.h>       // ADR-191: hostname/password mirror for the safeboot updater
 #include "Wire.h"
@@ -51,7 +52,7 @@
 
 // External declarations (same as the sync variant)
 extern OTGWState state;
-extern bool LittleFSmounted;
+extern std::atomic<bool> LittleFSmounted;
 extern bool updateLittleFSStatus(const char *probePath);
 extern bool updateLittleFSStatus(const __FlashStringHelper *probePath);
 extern bool writeSettings(bool show);
@@ -148,6 +149,88 @@ inline bool safebootHandover() {
   return esp_partition_erase_range(otadata, 0, otadata->size) == ESP_OK;
 }
 
+// --- otadataStale begin (TASK-1919, sliced by test/host/test_otadata_stale.py)
+// With one OTA slot, esp_ota_set_boot_partition() writes the SAME seq into the other otadata sector
+// (esp_ota_ops.c esp_rewrite_ota_data(): (0 + 1) % 1 + i * 1 with the smallest i >= seq), and the safeboot
+// updater calls it twice per update (at its start and in Update.end()): 09's dumps on .61 show
+// [0] seq 1 PENDING_VERIFY | [1] seq 1 NEW on the first boot of a new image. When that image fails, the
+// bootloader marks [0] ABORTED and boots [1], the same image, a second time instead of the safeboot
+// updater (ADR-191 wants the first failure to roll back). The other sector is never useful with one slot:
+// the bootloader boots the active entry, and a valid other entry can only point back at the same ota_0.
+// Which sector to erase, judged as the bootloader judges (bootloader_common_ota_select_valid() and
+// bootloader_common_select_otadata(): highest seq, an equal seq picks sector 0); -1 = erase nothing.
+inline bool otadataEntryValid(uint32_t seq, uint32_t state, bool crcOk) {
+  return seq != UINT32_MAX && state != 3u /* INVALID */ && state != 4u /* ABORTED */ && crcOk;
+}
+inline int otadataStaleSector(const uint32_t seq[2], const uint32_t state[2], const bool valid[2]) {
+  int active = -1;
+  if (valid[0] && valid[1]) active = (seq[0] >= seq[1]) ? 0 : 1;
+  else if (valid[0]) active = 0;
+  else if (valid[1]) active = 1;
+  if (active < 0) return -1;                    // nothing the bootloader boots from here: leave it all
+  const int other = active ^ 1;
+  if (seq[other] == UINT32_MAX && state[other] == UINT32_MAX) return -1;   // already erased: no flash wear
+  // A VALID copy of the active entry is kept: safebootMarkAppValid() writes it before the confirm, so a power
+  // loss during the confirm's own erase-then-write of the active sector still boots this image (95's review).
+  if (valid[other] && state[other] == 2u /* VALID */ && seq[other] == seq[active]) return -1;
+  return other;
+}
+// --- otadataStale end
+
+// In setup() right after the LittleFS mount (not earlier: see the call site), on the safeboot layout: erase
+// the stale other otadata sector, so a failure of this image rolls back to the safeboot updater at once. Writes one line into msg (empty when nothing is done).
+inline void safebootDropStaleOtadata(char *msg, size_t msgSize) {
+  if (msgSize) msg[0] = '\0';
+  if (!hasSafeboot() || esp_ota_get_app_partition_count() != 1) return;
+  const esp_partition_t *od = esp_partition_find_first(ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_DATA_OTA, nullptr);
+  if (od == nullptr || od->size < 2 * od->erase_size) return;
+  esp_ota_select_entry_t e[2];
+  if (esp_partition_read(od, 0, &e[0], sizeof(e[0])) != ESP_OK ||
+      esp_partition_read(od, od->erase_size, &e[1], sizeof(e[1])) != ESP_OK) return;
+  uint32_t seq[2], st[2];
+  bool valid[2];
+  for (int i = 0; i < 2; i++) {
+    seq[i] = e[i].ota_seq;
+    st[i] = e[i].ota_state;
+    const bool crcOk = e[i].crc == esp_rom_crc32_le(UINT32_MAX, reinterpret_cast<const uint8_t *>(&e[i].ota_seq), 4);
+    valid[i] = otadataEntryValid(seq[i], st[i], crcOk);
+  }
+  const int s = otadataStaleSector(seq, st, valid);
+  if (s < 0) return;
+  const esp_err_t err = esp_partition_erase_range(od, s * od->erase_size, od->erase_size);
+  snprintf_P(msg, msgSize, PSTR("otadata: erased stale sector %d (seq %u state %u; active sector %d seq %u state %u): %s"),
+             s, static_cast<unsigned>(seq[s]), static_cast<unsigned>(st[s]), s ^ 1, static_cast<unsigned>(seq[s ^ 1]),
+             static_cast<unsigned>(st[s ^ 1]), err == ESP_OK ? "OK" : "FAILED");
+}
+
+// TASK-1919 (95's review): esp_ota_mark_app_valid_cancel_rollback() rewrites the active otadata sector in place
+// (esp_ota_ops.c rewrite_ota_seq(): erase, then write). Before it, write the other sector as a VALID entry with
+// the same seq: a power loss in that window then boots this (health-checked) image from the copy, instead of
+// finding no valid otadata and starting the safeboot updater. Only on the one-slot safeboot layout, and only
+// when the active entry is the one this image runs from.
+inline void safebootWriteValidCopy() {
+  if (!hasSafeboot() || esp_ota_get_app_partition_count() != 1) return;
+  const esp_partition_t *od = esp_partition_find_first(ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_DATA_OTA, nullptr);
+  if (od == nullptr || od->size < 2 * od->erase_size) return;
+  esp_ota_select_entry_t e[2];
+  if (esp_partition_read(od, 0, &e[0], sizeof(e[0])) != ESP_OK ||
+      esp_partition_read(od, od->erase_size, &e[1], sizeof(e[1])) != ESP_OK) return;
+  uint32_t seq[2], st[2];
+  bool valid[2];
+  for (int i = 0; i < 2; i++) {
+    seq[i] = e[i].ota_seq;
+    st[i] = e[i].ota_state;
+    valid[i] = otadataEntryValid(seq[i], st[i],
+                                 e[i].crc == esp_rom_crc32_le(UINT32_MAX, reinterpret_cast<const uint8_t *>(&e[i].ota_seq), 4));
+  }
+  const int active = (valid[0] && valid[1]) ? (seq[0] >= seq[1] ? 0 : 1) : valid[0] ? 0 : valid[1] ? 1 : -1;
+  if (active < 0 || st[active] != 1u /* PENDING_VERIFY */) return;
+  esp_ota_select_entry_t copy = e[active];
+  copy.ota_state = 2u;   // VALID; the CRC covers ota_seq only, so it stays the same
+  const uint32_t at = (active ^ 1) * od->erase_size;
+  if (esp_partition_erase_range(od, at, od->erase_size) == ESP_OK) esp_partition_write(od, at, &copy, sizeof(copy));
+}
+
 // Bootloader app rollback (ADR-191): a new image starts as PENDING_VERIFY
 // (verifyRollbackLater() in OTGW-firmware.ino) and must confirm itself, or the
 // next reset rolls back to safeboot. Called after the health gate and before any
@@ -157,6 +240,7 @@ inline void safebootMarkAppValid() {
   const esp_partition_t *running = esp_ota_get_running_partition();
   if (running && esp_ota_get_state_partition(running, &st) == ESP_OK &&
       st == ESP_OTA_IMG_PENDING_VERIFY) {
+    safebootWriteValidCopy();   // TASK-1919: the fallback for the in-place rewrite below
     esp_ota_mark_app_valid_cancel_rollback();
   }
 }
@@ -215,7 +299,8 @@ inline void fsOtaRtcWipe() {
 
 inline bool fsOtaRtcArmed() { return g_fsOtaRtc.magic == FS_OTA_RTC_MAGIC; }
 
-// Upload start, while LittleFS is still mounted: copy each file whole, or not at all when it does not fit.
+// Upload start, while LittleFS is still mounted: copy settings.ini and the counter whole, or not at all when they
+// do not fit; the reboot log whole or, when it does not fit, its newest whole lines (ADR-246).
 inline void fsOtaRtcFill() {
   fsOtaRtcWipe();
   if (!LittleFSmounted || !fsOtaRtcPlaced()) return;
@@ -225,7 +310,26 @@ inline void fsOtaRtcFill() {
     if (!f) continue;
     const size_t n = f.size();
     if (n == 0) { f.close(); continue; }
-    if (n > sizeof(g_fsOtaRtc.data) - used) {
+    const size_t room = sizeof(g_fsOtaRtc.data) - used;
+    if (n > room && i == FS_OTA_RTC_SLOTS - 1) {
+      // ADR-246 (TASK-1931): the reboot log is newest-first, so its newest whole lines are a prefix. Keep the
+      // longest prefix that fits and ends with a CRLF, never a partial line; an empty prefix keeps nothing.
+      size_t keep = 0;
+      const size_t got = f.read(g_fsOtaRtc.data + used, room);
+      for (size_t k = got; k >= 2; k--) {
+        if (g_fsOtaRtc.data[used + k - 2] == '\r' && g_fsOtaRtc.data[used + k - 1] == '\n') { keep = k; break; }
+      }
+      memset(g_fsOtaRtc.data + used + keep, 0, room - keep);
+      if (keep > 0) {
+        g_fsOtaRtc.len[i] = static_cast<uint16_t>(keep);
+        used += keep;
+      }
+      DebugTf(PSTR("[OTA] %s (%u B) does not fit the RTC snapshot (%u B free): kept its newest %u B of whole lines\r\n"),
+              kFsOtaRtcPath[i], static_cast<unsigned>(n), static_cast<unsigned>(room), static_cast<unsigned>(keep));
+      f.close();
+      continue;
+    }
+    if (n > room) {
       DebugTf(PSTR("[OTA] %s (%u B) does not fit the RTC snapshot (%u B free): not protected during this filesystem write\r\n"),
               kFsOtaRtcPath[i], static_cast<unsigned>(n), static_cast<unsigned>(sizeof(g_fsOtaRtc.data) - used));
       f.close();
@@ -558,10 +662,14 @@ private:
       // this write. An upload that starts in setup() before initSAT() unmounts LittleFS below, so an
       // initSAT() during the write reads nothing and holds defaults (bench .61: preset and energy lost).
       _satLoadedAtFsStart = satStateLoaded();
+      // TASK-1989/2007: queued state writes reach the files before they are copied to the heap. The writer stays
+      // paused from here until bFsImageWriting holds it, so no write runs between the copy and LittleFS.end().
+      if (!fsWriterPauseAndFlush(2000)) DebugTln(F("[OTA] fswriter: still busy after 2 s"));
       _keepFiles();   // TASK-1266/1286: the image lacks these files; copy them to the heap, restore after the remount
       fsOtaRtcFill();   // TASK-1774: survives a reset during the write; armed at the first chunk
       LittleFS.end();
       ::state.flash.bFsImageWriting = true;   // TASK-1909: no LittleFS.begin() elsewhere until the remount below
+      fsWriterResume();   // TASK-2007: bFsImageWriting holds the writer from here; the remount pauses it again until the restore
       if (uploadTotal > 0 && uploadTotal > fsSize) {
         strlcpy(_updaterError, "filesystem image too large", sizeof(_updaterError));
         _dropKeptFiles();   // the old filesystem is untouched; the copies are not needed
@@ -682,6 +790,7 @@ private:
           LittleFSmounted = false;
           if (_serial_output) DebugTln(F("[OTA] Error: LittleFS mount failed"));
         }
+        fsWriterResume();   // TASK-2007: paused by _remountAfterFsWrite(); held saves now land after the restored copies
       }
       if (_serial_output) {
         DebugTln(F("[OTA] Preparing to reboot..."));
@@ -708,6 +817,10 @@ private:
     // partition behind; the restore would then write the new image through that stale state. Drop any
     // such mount so the image just written is the one mounted.
     LittleFS.end();
+    // TASK-2007: clearing the image flag releases the writer, but the heap copies are written back only in
+    // _restoreRuntimeFiles(), later; a save held through the image write would land first and be overwritten
+    // (bench 09, .63, beta.364). The writer stays paused until the caller's fsWriterResume() after the restore.
+    fsWriterPause();
     ::state.flash.bFsImageWriting = false;
     if (partial) {
       if (_serial_output) DebugTln(F("[OTA] Filesystem image incomplete: formatting LittleFS"));
@@ -776,6 +889,7 @@ private:
         _restoreRuntimeFiles();
         if (_uploadWrittenBytes > 0) _markFsUpdateIncomplete();
       }
+      fsWriterResume();   // TASK-2007: paused by _remountAfterFsWrite() until the restore
     }
     _dropKeptFiles();          // no-op after a restore; frees the copies when there was none
     ::state.flash.bESPactive = false;
@@ -823,14 +937,21 @@ private:
     {"/sat_energy.json",           64},    // satSaveEnergyState() buf[64]
     {"/sat_energy_estimate.json",  48},    // satSaveEstimatedEnergy() buf[48]
     {"/sat/sat_hcr.json",        1280},    // HCR_DAYS (<= 30) medians + at most 96 samples, about 7 B each
-    {"/sat_tune.json",            384},    // SAT_CT_FILE_BUF
+    {"/sat_tune.json",           1024},    // SAT_CT_FILE_BUF (ADR-260: 12 one-hour blocks)
     {"/dallas_labels.ini", 2048},   // the user's Dallas sensor names
     {"/sat_markers.json",  2560},   // at most 20 heating-curve markers of at most 110 B
     {"/reboot_count.txt",    16},   // one decimal number
-    {"/reboot_log.txt",    3072},   // 20 lines of at most 140 B
+    {"/reboot_log.txt",    4780},   // REBOOT_LOG_FILE_MAX: 20 lines of at most 239 B (TASK-1931, asserted below)
   };
   static constexpr size_t   KEEP_COUNT        = sizeof(KEEP_LIST) / sizeof(KEEP_LIST[0]);
-  static constexpr size_t   KEEP_TOTAL_MAX    = 10240;  // all copies together (the maxima add up to 9824)
+  // TASK-1931: all copies together. The maxima add up to 12172 B; each copy is only made while the largest free
+  // block stays KEEP_HEAP_RESERVE above it, so the higher total costs heap only when the files are that large.
+  static constexpr size_t   KEEP_TOTAL_MAX    = 12288;
+  // A lambda, not a member function: the class is still incomplete here, so a member could not be evaluated.
+  static_assert(KEEP_LIST[KEEP_COUNT - 1].maxLen == REBOOT_LOG_FILE_MAX,
+                "KEEP_LIST: the reboot_log.txt cap must follow REBOOT_LOG_FILE_MAX (OTGW-firmware.h)");
+  static_assert([] { size_t s = 0; for (const KeepEntry &e : KEEP_LIST) s += e.maxLen; return s; }() <= KEEP_TOTAL_MAX,
+                "KEEP_LIST: the per-file maxima exceed KEEP_TOTAL_MAX");
   static constexpr uint32_t KEEP_HEAP_RESERVE = 8192;   // largest free block must stay this far above a copy
 
   void _keepFiles() {

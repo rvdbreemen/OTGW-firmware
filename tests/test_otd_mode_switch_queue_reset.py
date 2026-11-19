@@ -74,12 +74,14 @@ static OTResponseOverride otResponseOverrides[OT_RESPONSE_OVERRIDE_MAX];
 static OTRemoteOverrideState otRemoteOverride = { OT_OVERRIDE_NONE, 0, 0, 0, 0, false, 0, false, false };
 static bool otRemoteOverrideClearPending = false;
 static uint8_t otOperModeDHW, otOperModeCH1, otOperModeCH2, otMasterStatusFlags, otDHWOverride, otUnknownIdCount;
+static bool otOperModeWrite = false;   // TASK-1906: the PIC's opermodewrite
 static uint8_t otUnknownCounters[32];
 static DHWPushState otDHWPushState; static uint32_t otDHWPushStartMs, otLastThermostatMs;
 static void otdPushEnd() {}   // TASK-1845: resetTransientState() ends a manual DHW push
 static bool otSummaryMode, otHideReports, otSummaryPending, otThermostatSeen, otDHWBlocking, otCoolingEnable, otCH2Enable,
             otChModeOff, otSetbackEngaged;
 static float otFakeRoomSetpoint;
+static bool otdRoom16CacheSet = false, otdRoom16OvrSet = false; static uint16_t otdRoom16CacheF88 = 0, otdRoom16OvrF88 = 0;   // TASK-1751
 static OTDirectMode otCurrentMode = OTD_MODE_MASTER;
 struct { struct { bool bSummerMode = false; bool bEnableSlave = false; } otd; } settings;
 struct { struct { bool bSetbackActive; bool bThermostatConnected = true; OTRemoteOverrideMode eOverrideMode;
@@ -99,6 +101,7 @@ enum class OpenThermMessageID : uint8_t { Status = 0 };
 struct OpenTherm { static unsigned long buildRequest(OpenThermMessageType, OpenThermMessageID, uint16_t) { return 0; } };
 static constexpr uint32_t OT_OFFLINE_RETRY_MS = 60000;
 static constexpr uint32_t OT_VENT_FAST_INTERVAL_MS = 1000;
+static constexpr uint32_t OT_SLOW_INTERVAL_MS = 60000;   // TASK-1981: the scheduler scans the faster tiers first
 static bool otMasterRequestActive = false;
 static uint32_t otMinIntervalMs = 100;
 static uint32_t otLastAnySendMs = 0;
@@ -107,8 +110,15 @@ static uint32_t g_now = 0;
 static uint32_t millis() { return g_now; }
 static bool otdOwnFramesAllowed(bool, bool) { return true; }
 static bool otIsVentSlave() { return false; }
+static constexpr uint32_t OTD_MWT_MS = 100;   // TASK-1954: MWT floor of the scheduler; never stamped in this harness
+static uint32_t otdLastConvEndMs = 0;
+#define IS_MASTER_MODE() (otCurrentMode == OTD_MODE_MASTER)
+static bool otSlaveFramePending = false;               // TASK-1812: a waiting thermostat write holds the scheduler
+static unsigned long otSlaveFrame = 0;
+static bool otdMasterRelaysWrite(unsigned long) { return false; }
 static unsigned long buildStatusRequest() { return 0; }
 static bool otdIsAltSlot(uint8_t) { return true; }
+static unsigned long otdSrReply(unsigned long, unsigned long r) { return r; }   // TASK-1804 A6: SR= not under test here (test_otd_sr_alt_slot)
 static uint8_t otdAltScheduleIndex(uint32_t) { return OT_SCHEDULE_SIZE; }
 static void otdNoteThermostatFrame(unsigned long, uint32_t) {}
 static unsigned long buildOTResponse(uint8_t, uint8_t, uint16_t) { return 0; }

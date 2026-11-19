@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Summarise an OTGW capture upload (TASK-1676).
 
-Input: an upload .zip / .7z, or a folder that holds one (long-run hours/*.zip or a flat run).
+Input: an upload .zip / .7z / .tar.xz (with its -part2), or a folder that holds one (long-run hours/*.zip or a flat run).
 Output: a Markdown report on stdout and a JSON file with the same facts (--json), so the
 analysis starts from counted facts instead of eyeballed log lines.
 
@@ -62,6 +62,13 @@ def unpack(src, work):
             if not exe:
                 sys.exit("7z archive but no 7-Zip found")
             subprocess.run([exe, "x", "-y", f"-o{out}", str(src)], check=True, stdout=subprocess.DEVNULL)
+        elif src.name.lower().endswith((".tar.xz", ".txz")):
+            # TASK-1986: an upload too big for one Discord attachment is a .tar.xz, with an optional -part2 next to it
+            import tarfile
+            part2 = src.with_name(src.name.replace("-upload.tar.xz", "-upload-part2.tar.xz"))
+            for part in [src] + ([part2] if part2 != src and part2.exists() else []):
+                with tarfile.open(part, "r:xz") as t:
+                    t.extractall(out, filter="data")   # the data filter refuses absolute paths and ../
         else:
             with zipfile.ZipFile(src) as z:
                 z.extractall(out)
@@ -154,6 +161,74 @@ def segments(frames):
     return seg
 
 
+def master_segments(frames):
+    """TASK-1987: master status (T MsgID 0 Read-Data HB) as (start, end, hb) intervals. HB bit 0 = CH enable, the
+    master's own heat request (OpenTherm 2.2 section 5.3.1); the slave's CH-mode bit (LB bit 1) also stays on during
+    the boiler's pump overrun, so it is not a request."""
+    # What the boiler receives: a gateway that rewrites the request (SAT, CH= overrides) sends its own R frame right
+    # after the thermostat's T frame of the same exchange; then the R value counts, otherwise the T value.
+    reqs, pending = [], None
+    for t, src, typ, mid, hb, lb in frames:
+        if mid != 0 or typ != 0 or src not in ("T", "R"):
+            continue
+        if src == "T":
+            if pending is not None:
+                reqs.append(pending)
+            pending = (t, hb)
+        else:
+            if pending is not None and (t - pending[0]).total_seconds() <= 1.5:
+                reqs.append((pending[0], hb))
+                pending = None
+            else:
+                if pending is not None:
+                    reqs.append(pending)
+                    pending = None
+                reqs.append((t, hb))
+    if pending is not None:
+        reqs.append(pending)
+    seg, cur, s0, last = [], None, None, None
+    for t, hb in reqs:
+        last = t
+        if hb != cur:
+            if cur is not None:
+                seg.append((s0, t, cur))
+            cur, s0 = hb, t
+    if cur is not None:
+        seg.append((s0, last, cur))
+    return seg
+
+
+def _overlap(a0, a1, spans):
+    """Seconds of [a0, a1] covered by the (start, end) spans."""
+    return sum(max(0.0, (min(a1, e) - max(a0, s)).total_seconds()) for s, e in spans)
+
+
+def demand_spans(frames, seg=None, mseg=None):
+    """TASK-1987: (start, end, kind) spans without flame: 'demand' = the master asks for CH (master status bit 0),
+    'overrun' = the boiler reports CH mode while the master does not ask (its pump overrun). Pure slave-status
+    capture without master frames: every CH-mode-without-flame span counts as 'demand', as before."""
+    seg = segments(frames) if seg is None else seg
+    mseg = master_segments(frames) if mseg is None else mseg
+    ch_on = [(s, e) for s, e, hb in mseg if hb & 0x01]
+    out = []
+    for s, e, lb in seg:
+        if lb & 0x08:
+            continue
+        if not mseg:
+            if lb & 0x02:
+                out.append((s, e, "demand"))
+            continue
+        # cut [s, e] at the master CH enable edges
+        cuts = sorted({s, e} | {x for a, b in ch_on for x in (a, b) if s < x < e})
+        for a, b in zip(cuts, cuts[1:]):
+            asked = _overlap(a, b, ch_on) > 0
+            if asked:
+                out.append((a, b, "demand"))
+            elif lb & 0x02:
+                out.append((a, b, "overrun"))
+    return out
+
+
 def bits(lb):
     return "+".join(n for b, n in SLAVE_BITS.items() if lb & b) or "idle"
 
@@ -173,6 +248,47 @@ def value_at(ser, t):
         else:
             hi = mid - 1
     return ser[lo][1]
+
+
+def build_runs(frames, seg=None):
+    """Every flame run with its request before ignition and the pump overrun after it (TASK-1987)."""
+    seg = segments(frames) if seg is None else seg
+    sup, ret, tank, out = series(frames, 25), series(frames, 28), series(frames, 26), series(frames, 27)
+    runs = []
+    spans = demand_spans(frames, seg)
+    for s, e, lb in seg:
+        if lb & 0x08:
+            d = (e - s).total_seconds()
+            kind = "DHW" if lb & 0x04 else ("CH" if lb & 0x02 else "flame")
+            if kind == "DHW":   # the master's DHW enable is a standing setting: the slave DHW-mode phase is the request
+                pre = [p for p in seg if p[1] == s and not p[2] & 0x08 and p[2] & 0x04]
+            else:               # TASK-1987: the master CH request right before ignition, not the boiler's overrun
+                pre = []
+                for a, b, k in reversed([x for x in spans if x[1] <= s]):
+                    if k != "demand" or (pre and b != pre[0][0]) or (not pre and b != s):
+                        break
+                    pre.insert(0, (a, b))
+                pre = [(pre[0][0], pre[-1][1])] if pre else []
+            after = [x for x in spans if x[0] >= e and x[2] == "overrun"]
+            overrun = 0
+            t_end = e
+            for a, b, k in after:
+                if a != t_end:
+                    break
+                overrun += (b - a).total_seconds()
+                t_end = b
+            sv = [v for t, v in sup if s <= t <= e]
+            rv = [v for t, v in ret if s <= t <= e]
+            runs.append({"kind": kind, "start": s.isoformat(sep=" ", timespec="seconds"),
+                         "end": e.isoformat(sep=" ", timespec="seconds"), "minutes": round(d / 60, 2),
+                         "demand_without_flame_s": round((pre[0][1] - pre[0][0]).total_seconds()) if pre else 0,
+                         "overrun_after_s": round(overrun),
+                         "supply_end": round(sv[-1], 1) if sv else None, "supply_max": round(max(sv), 1) if sv else None,
+                         "return_end": round(rv[-1], 1) if rv else None,
+                         "outside": round(value_at(out, s), 1) if value_at(out, s) is not None else None,
+                         "tank_start": round(value_at(tank, s), 1) if value_at(tank, s) is not None else None,
+                         "tank_end": round(value_at(tank, e), 1) if value_at(tank, e) is not None else None})
+    return runs
 
 
 def main():
@@ -206,23 +322,7 @@ def main():
     gw = collections.Counter((s, m, hb, lb) for t, s, typ, m, hb, lb in frames if s in ("R", "A"))
 
     seg = segments(frames)
-    sup, ret, tank, out = series(frames, 25), series(frames, 28), series(frames, 26), series(frames, 27)
-    runs = []
-    for s, e, lb in seg:
-        if lb & 0x08:
-            d = (e - s).total_seconds()
-            kind = "DHW" if lb & 0x04 else ("CH" if lb & 0x02 else "flame")
-            pre = [p for p in seg if p[1] == s and not p[2] & 0x08 and p[2] & 0x06]
-            sv = [v for t, v in sup if s <= t <= e]
-            rv = [v for t, v in ret if s <= t <= e]
-            runs.append({"kind": kind, "start": s.isoformat(sep=" ", timespec="seconds"),
-                         "end": e.isoformat(sep=" ", timespec="seconds"), "minutes": round(d / 60, 2),
-                         "demand_without_flame_s": round((pre[0][1] - pre[0][0]).total_seconds()) if pre else 0,
-                         "supply_end": round(sv[-1], 1) if sv else None, "supply_max": round(max(sv), 1) if sv else None,
-                         "return_end": round(rv[-1], 1) if rv else None,
-                         "outside": round(value_at(out, s), 1) if value_at(out, s) is not None else None,
-                         "tank_start": round(value_at(tank, s), 1) if value_at(tank, s) is not None else None,
-                         "tank_end": round(value_at(tank, e), 1) if value_at(tank, e) is not None else None})
+    runs = build_runs(frames, seg)
     flame = [(dt.datetime.fromisoformat(r["start"]), dt.datetime.fromisoformat(r["end"])) for r in runs]
     offs = [(b[0] - a[1]).total_seconds() / 60 for a, b in zip(flame, flame[1:])]
     starts = [(b[0] - a[0]).total_seconds() / 60 for a, b in zip(flame, flame[1:])]
@@ -267,9 +367,12 @@ def main():
     w(f"\nSlave Unknown-DataID: {unknown or 'none'}; fault flags (MsgID 5): {facts['slave_fault_flags'] or 'not read'}\n")
     w(f"Gateway-inserted frames (R = request to slave, A = answer to master): {facts['gateway_frames'] or 'none'}\n\n")
     w("## Burner / compressor runs (slave status bit 3)\n\n")
-    w("| # | kind | start | end | min | demand w/o flame s | supply end/max | return end | outside | tank start->end |\n|---|---|---|---|---|---|---|---|---|---|\n")
+    w("Demand w/o flame: CH = the master's CH request (master status bit 0) before ignition, DHW = the boiler's DHW "
+      "mode before ignition. Overrun after: boiler CH mode with no master request and no flame (pump overrun).\n\n")
+    w("| # | kind | start | end | min | demand w/o flame s | overrun after s | supply end/max | return end | outside | tank start->end |\n|---|---|---|---|---|---|---|---|---|---|---|\n")
     for i, r in enumerate(runs, 1):
         w(f"| {i} | {r['kind']} | {r['start'][5:]} | {r['end'][11:]} | {r['minutes']} | {r['demand_without_flame_s']} | "
+          f"{r['overrun_after_s']} | "
           f"{r['supply_end']}/{r['supply_max']} | {r['return_end']} | {r['outside']} | {r['tank_start']}->{r['tank_end']} |\n")
     w(f"\nStarts per day: {facts['starts_per_day']}; shortest off time: {facts['min_off_minutes']} min; "
       f"start to start: {facts['start_to_start_minutes']}\n\n")

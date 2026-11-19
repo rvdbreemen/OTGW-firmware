@@ -25,6 +25,11 @@
 //   F11 text over 254 bytes is cut and flagged
 //   F12 not recording: a capture point takes no lock and writes nothing
 //   F13 dt above 127 ms and above 16383 ms
+//   F18 TASK-1665 AC2: the append cost (env micros) is counted per record: count, max, avg; reset by start(); none without a clock
+//   F17 TASK-1960: a heap stop() that loses the lock leaves no readable ring; the next start() frees it under the lock
+//   F16 TASK-1960: PSRAM stop keeps the recording readable (every block oldest..newest, records intact) until
+//       the next start; a capture point that read `active` before the stop and takes the lock after it
+//       writes nothing; the next start begins a new recording
 //=======================================================================
 
 #include <cstdio>
@@ -56,8 +61,12 @@ static uint32_t eFree() { return g_free; }
 static void* eAllocHeap(size_t n) { g_heapAllocs++; g_lastAllocSize = (uint32_t)n; return g_failAlloc ? nullptr : std::calloc(1, n); }
 static void eFreeHeap(void* p) { g_heapFrees++; std::free(p); }
 static void* ePsram(size_t n) { g_psramAllocs++; return g_psramAvail ? std::calloc(1, n) : nullptr; }
-static bool eTry() { g_lockTries++; return !g_lockBusy; }
-static bool eWait(uint32_t) { return true; }
+static void (*g_onTry)() = nullptr;                          // F16: runs once inside the next tryLock (a stop() racing a writer)
+static bool eTry() { g_lockTries++; if (g_onTry) { void (*f)() = g_onTry; g_onTry = nullptr; f(); } return !g_lockBusy; }
+static uint32_t g_us = 0, g_usStep = 0;                     // F18: micros() advances g_usStep per call
+static uint32_t eMicros() { g_us += g_usStep; return g_us; }
+static bool g_waitFail = false;                               // F17: lockWait() times out
+static bool eWait(uint32_t) { return !g_waitFail; }
 static void eUnlock() {}
 
 static DiagEnv makeEnv(bool psram) {
@@ -68,7 +77,7 @@ static DiagEnv makeEnv(bool psram) {
 }
 static void resetDoubles() {
   g_ms = 1000; g_epoch = 0; g_free = 60000; g_heapAllocs = g_heapFrees = g_psramAllocs = g_lockTries = 0;
-  g_failAlloc = false; g_lockBusy = false; g_psramAvail = true;
+  g_failAlloc = false; g_lockBusy = false; g_psramAvail = true; g_waitFail = false;
 }
 
 // ---- test decoder: one block, empty caches ----------------------------------
@@ -436,6 +445,98 @@ int main() {
     bool ok = d.err.empty() && d.recs.size() == 2 && d.recs[0] == "OTD SB=1" && d.recs[1] == "MQ " + hex(diagNameId("a"), 4) + " b";
     caseResult("F15", ok, d.err + " n=" + std::to_string(d.recs.size()));
     freePsram(r);
+  }
+
+  // F16 --------------------------------------------------------------------
+  {
+    resetDoubles(); DiagRecorder* r = newPsramRecorder(ps);
+    static DiagRecorder* s_r; s_r = r;
+    for (int i = 0; i < 3000; i++) { g_ms += 7; char c[16]; int n = std::snprintf(c, sizeof c, "PR=%d", i); r->recPicCommand(c, (size_t)n); }
+    const uint32_t oldest = r->oldestSeq(), newest = r->newestSeq(), recs = r->recSeq;
+    bool ok = newest >= 2 && r->hasData();
+    std::string why = "newest=" + std::to_string(newest);
+    ok = ok && r->stop() && !r->active;
+    if (!ok && why.size() < 20) why += " stop";
+    ok = ok && r->hasData() && r->oldestSeq() == oldest && r->newestSeq() == newest;
+    if (!r->hasData()) why += " hasData false after stop";
+    uint32_t decoded = 0;
+    for (uint32_t q = oldest; ok && q <= newest; q++) {
+      const uint8_t* b = r->block(q);
+      if (!b) { ok = false; why += " block " + std::to_string(q) + " null"; break; }
+      Dec d = decodeBlock(b);
+      if (!d.err.empty() || d.seq != q) { ok = false; why += " decode " + d.err; break; }
+      decoded += (uint32_t)d.recs.size();
+    }
+    ok = ok && decoded == recs;
+    DiagStatus st; diagStatusSnapshot(*r, st);
+    ok = ok && !st.active && st.hasData && st.newest == newest && st.ringBlocks == DIAG_REC_PSRAM_BLOCKS;
+    r->recPicCommand("late", 4);                             // after stop: a no-op
+    ok = ok && r->recSeq == recs;
+    // A writer that saw active == true and gets the lock after stop() ran: it must not append.
+    ok = ok && r->start(ps) == DIAG_START_OK;
+    r->recPicCommand("A=1", 3);
+    g_onTry = [] { s_r->stop(); };
+    r->recPicCommand("RACE", 4);
+    const uint8_t* b0 = r->block(0);
+    Dec d1; if (b0) d1 = decodeBlock(b0); else why += " block 0 gone after the racing stop";
+    ok = ok && b0 && d1.recs.size() == 1 && d1.recs[0] == "PIC A=1" && r->hasData();
+    if (d1.recs.size() != 1) why += " race wrote " + std::to_string(d1.recs.size());
+    ok = ok && r->start(ps) == DIAG_START_OK && !r->hasData() && r->recSeq == 0;   // a new start is a new recording
+    caseResult("F16", ok, why);
+    freePsram(r);
+  }
+
+  // F17 --------------------------------------------------------------------
+  {
+    resetDoubles(); g_free = 60000;
+    DiagRecorder r;
+    bool ok = r.start(hp) == DIAG_START_OK;
+    r.recPicCommand("X=1", 3);
+    ok = ok && r.hasData();
+    g_waitFail = true;
+    ok = ok && !r.stop() && !r.active;                       // the stop lost the lock: the ring is still allocated
+    ok = ok && !r.hasData() && r.block(0) == nullptr && g_heapFrees == 0;
+    std::string why = ok ? "" : "after the lost stop: hasData/block still served";
+    DiagStartResult busy = r.start(hp);                     // lock still busy: the leftover ring cannot be freed safely
+    ok = ok && busy != DIAG_START_OK && g_heapFrees == 0 && !r.active;
+    if (!ok && why.empty()) why = "start freed the ring without the lock";
+    g_waitFail = false;
+    ok = ok && r.start(hp) == DIAG_START_OK && g_heapFrees == 1 && r.active && !r.hasData();
+    if (!ok && why.empty()) why = "start after the lock came back";
+    r.recPicCommand("X=2", 3);
+    const uint8_t* b0 = r.block(0);
+    Dec d; if (b0) d = decodeBlock(b0);
+    ok = ok && b0 && d.recs.size() == 1 && d.recs[0] == "PIC X=2";
+    r.stop();
+    ok = ok && g_heapFrees == 2;
+    caseResult("F17", ok, why);
+  }
+
+  // F18 --------------------------------------------------------------------
+  {
+    resetDoubles();
+    DiagEnv pm = makeEnv(true); pm.micros = eMicros;
+    DiagRecorder* r = new DiagRecorder();
+    bool ok = r->start(pm) == DIAG_START_OK;
+    g_us = 1000; g_usStep = 7;                               // each append reads micros twice (open, close): 7 us apart
+    for (int i = 0; i < 5; i++) r->recPicCommand("A=1", 3);
+    DiagStatus st; diagStatusSnapshot(*r, st);
+    ok = ok && st.appendCount == 5 && st.appendMaxUs == 7 && st.appendAvgUs == 7;
+    std::string why = "count=" + std::to_string(st.appendCount) + " max=" + std::to_string(st.appendMaxUs) + " avg=" + std::to_string(st.appendAvgUs);
+    g_usStep = 40; r->recPicCommand("B=2", 3); g_usStep = 7;   // one slow append
+    diagStatusSnapshot(*r, st);
+    ok = ok && st.appendCount == 6 && st.appendMaxUs == 40 && st.appendAvgUs == (5 * 7 + 40) / 6;
+    r->stop(); ok = ok && r->start(pm) == DIAG_START_OK;    // a new recording starts its own statistics
+    diagStatusSnapshot(*r, st);
+    ok = ok && st.appendCount == 0 && st.appendMaxUs == 0 && st.appendAvgUs == 0;
+    freePsram(r);
+    DiagRecorder* q = newPsramRecorder(ps);                  // ps has no micros clock: nothing is timed
+    q->recPicCommand("C=3", 3);
+    DiagStatus sq; diagStatusSnapshot(*q, sq);
+    ok = ok && sq.appendCount == 0 && q->recSeq == 1;
+    freePsram(q);
+    g_usStep = 0;
+    caseResult("F18", ok, why);
   }
 
   std::printf("%s\n", g_fail ? "SOME CASES FAILED" : "ALL CASES PASSED");

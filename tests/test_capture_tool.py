@@ -62,7 +62,8 @@ INITIAL_TOGGLES = [("1", "OTmsg", "0"), ("2", "REST API", "1"), ("3", "MQTT", "0
 class FakeDevice:
     """Telnet + HTTP fake. Toggle state lives on the device and survives reconnects."""
 
-    def __init__(self, toggles=INITIAL_TOGGLES, uptime=5, setup_line=False, info_pad=400):
+    def __init__(self, toggles=INITIAL_TOGGLES, uptime=5, setup_line=False, info_pad=400, mqtt=None):
+        self.mqtt = mqtt            # TASK-1988: {setting: value} served on /api/v2/settings; None = 404 as before
         self.uptime = uptime
         self.health = "ok"          # ok | 503
         self.health_times = []
@@ -104,6 +105,8 @@ class FakeDevice:
                     info = {"device": {"hostname": "fake-otgw", "fwversion": "2.0.0-test", "padding": "x" * dev.info_pad,
                                        "hd_min_free_heap": 12345, "hd_min_max_block": 6789}}
                     self.send_body(200, json.dumps(info).encode())
+                elif self.path == "/api/v2/settings" and dev.mqtt is not None:
+                    self.send_body(200, json.dumps({"settings": {k: {"value": v} for k, v in dev.mqtt.items()}}).encode())
                 else:
                     self.send_body(404, b"{}")
 
@@ -194,9 +197,11 @@ class FakeDevice:
 class FakeBroker:
     """Just enough MQTT 3.1.1: CONNACK, SUBACK, one PUBLISH, PINGRESP."""
 
-    def __init__(self, topic="otgw-firmware/value/test", payload=b"42"):
+    def __init__(self, topic="otgw-firmware/value/test", payload=b"42", extra=()):
         self.topic = topic
         self.payload = payload
+        self.extra = list(extra)    # TASK-1988: more (topic, payload) PUBLISHes after the first, e.g. other devices
+        self.subscribed = []        # the topic filters the client asked for
         self.connects = 0
         self.sock = socket.socket()
         self.sock.bind(("127.0.0.1", 0))
@@ -243,10 +248,18 @@ class FakeBroker:
                     self.connects += 1
                     c.sendall(b"\x20\x02\x00\x00")
                 elif kind == 8:
-                    c.sendall(b"\x90\x03" + body[:2] + b"\x00")
-                    t = self.topic.encode()
-                    var = struct.pack("!H", len(t)) + t + self.payload
-                    c.sendall(bytes([0x30, len(var)]) + var)
+                    filters, i = [], 2
+                    while i + 2 <= len(body):
+                        n = struct.unpack("!H", body[i:i + 2])[0]
+                        filters.append(body[i + 2:i + 2 + n].decode())
+                        i += 2 + n + 1
+                    self.subscribed += filters
+                    codes = b"\x00" * max(1, len(filters))
+                    c.sendall(bytes([0x90, 2 + len(codes)]) + body[:2] + codes)
+                    for topic, payload in [(self.topic, self.payload)] + self.extra:
+                        t = topic.encode()
+                        var = struct.pack("!H", len(t)) + t + payload
+                        c.sendall(bytes([0x30, len(var)]) + var)
                 elif kind == 12:
                     c.sendall(b"\xd0\x00")
                 elif kind == 14:
@@ -285,7 +298,10 @@ class ToolCase(unittest.TestCase):
                 "--telnet-connect-timeout-seconds", "2", "--telnet-reconnect-delay-ms", "250",
                 "--telnet-post-disconnect-delay-ms", "250", "--idle-check-floor", "1",
                 "--telnet-idle-check-seconds", str(idle), "--skip-browser-capture", "--skip-crashlog-capture",
-                "--skip-http-probes"]
+                "--skip-http-probes",
+                # TASK-1964: the device state sweep also GETs /api/v2/health, which these watchdog cases count as
+                # probes; the sweep, graph history and diag recording have their own test_capture_device_data.py.
+                "--skip-device-state", "--skip-graph-history", "--skip-diag-recording"]
         if broker is not None:
             args += ["--broker", "127.0.0.1", "--broker-port", str(broker.port)]
         else:
@@ -431,8 +447,20 @@ class ToolCase(unittest.TestCase):
         dev.send_all("Setup finished!\r\n")
         self.assertTrue(wait_for(lambda: "Settings dump: sent" in self.text(), 10), self.text())
         self.stop()
-        self.assertIn("q", dev.received)
         self.assertIn("D", dev.received)
+        # TASK-2013: 'q' runs readSettings(true) on the device (handleDebug.ino) and re-applies settings.ini over
+        # live state (a preset dropped to none). A capture only reads: it never sends 'q'.
+        self.assertNotIn("q", dev.received, dev.received)
+
+    def test_i2_reconnect_dumps_again_but_never_reloads_settings(self):
+        # TASK-2013: after_connect() re-arms the dump on every reconnect, so the old code sent 'q' each time.
+        dev = FakeDevice()
+        self.start(dev=dev, idle=0, wait_text="Settings dump: sent")
+        dev.reset_connections()
+        self.assertTrue(wait_for(lambda: "Telnet gap:" in self.text(), 15), self.text())
+        self.assertTrue(wait_for(lambda: dev.received.count("D") >= 2, 15), dev.received)
+        self.stop()
+        self.assertEqual(dev.received.count("q"), 0, dev.received)
 
     def test_j_device_info_probe_keeps_heap_fields(self):
         dev = FakeDevice(info_pad=400)  # pushes the heap fields past the 200-character cut
@@ -451,6 +479,32 @@ class ToolCase(unittest.TestCase):
         self.assertIn("hd_min_free_heap", probes)
         self.assertIn("hd_min_max_block", probes)
         self.assertRegex(probes, r"HTTP\s+404 .*/api/v2/sat/status")
+
+    def test_j2_device_state_start_and_stop_land_in_the_upload(self):
+        """TASK-1964: main() reads the device state at start (off the main thread) and at stop, and both files
+        travel in the upload zip; graph history and diag recording answer 404 here and leave one line each."""
+        dev = FakeDevice()
+        self.addCleanup(dev.shutdown)
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        out = Path(tmp.name) / "out"
+        env = dict(os.environ, OTGW_CAPTURE_SETTINGS=str(Path(tmp.name) / "settings.json"))
+        rc = subprocess.run([sys.executable, str(TOOL), "--device", "127.0.0.1", "--telnet-port", str(dev.telnet_port),
+                             "--http-port", str(dev.http_port), "--output-root", str(out), "--broker", "",
+                             "--duration", "3", "--telnet-idle-check-seconds", "0", "--skip-browser-capture",
+                             "--skip-crashlog-capture", "--skip-http-probes"],
+                            stdin=subprocess.DEVNULL, capture_output=True, env=env, timeout=120).returncode
+        self.assertEqual(rc, 0)
+        upload = next(out.glob("*-upload.zip"))
+        with zipfile.ZipFile(upload) as z:
+            names = z.namelist()
+            start = [n for n in names if n.startswith("device-state-start-")]
+            stop = [n for n in names if n.startswith("device-state-stop-")]
+            self.assertEqual((len(start), len(stop)), (1, 1), names)
+            self.assertIn("### GET /api/v2/health -> 200", z.read(start[0]).decode("utf-8"))
+        transcript = next(out.glob("*/transcript-*.txt")).read_text(encoding="utf-8")
+        self.assertIn("Graph history 24h (stop): HTTP 404", transcript)
+        self.assertIn("Diag recording (stop): status HTTP 404", transcript)
 
     # ---- TASK-1453 ------------------------------------------------------
     def test_k_no_broker_skips_mqtt_and_keeps_telnet(self):
@@ -496,14 +550,40 @@ class ToolCase(unittest.TestCase):
         self.assertEqual(self.rc, 0)
 
     # ---- MQTT, CLI, browser ------------------------------------------------
+    FOREIGN = [("zigbee2mqtt/Kitchen plug", b'{"power":12}'), ("otgw-firmware/value/other-gw/Tboiler", b"50"),
+               ("otgw-firmware/set/test/command", b"SW=40")]
+
+    def mqtt_device(self, broker):
+        # TASK-1988: the gateway's own MQTT settings, as /api/v2/settings serves them
+        return FakeDevice(mqtt={"mqttenable": True, "mqttbroker": "127.0.0.1", "mqttbrokerport": broker.port,
+                                "mqtttoptopic": "otgw-firmware", "mqttuniqueid": "test", "mqtthaprefix": "homeassistant"})
+
     def test_o_mqtt_messages_via_vendored_paho(self):
-        broker = FakeBroker()
+        broker = FakeBroker(extra=self.FOREIGN)
         self.addCleanup(broker.shutdown)
-        self.start(broker=broker, idle=0, wait_text="MQTT connected")
+        self.start(broker=broker, idle=0, wait_text="MQTT connected", dev=self.mqtt_device(broker))
         time.sleep(1)
         self.stop()
         mqtt = section(self.transcript(), "MQTT BROKER STREAM (mqtt.log)")
         self.assertIn("otgw-firmware/value/test 42", mqtt)
+        for topic, _ in self.FOREIGN:   # TASK-1988: other devices, other gateways and commands are never written
+            self.assertNotIn(topic, mqtt)
+        self.assertNotIn("#", [f for f in broker.subscribed if f == "#"])
+        self.assertIn("otgw-firmware/value/test/#", broker.subscribed)
+
+    def test_o2_mqtt_all_topics_is_an_opt_in_with_a_warning(self):
+        broker = FakeBroker(extra=self.FOREIGN)
+        self.addCleanup(broker.shutdown)
+        self.start(broker=broker, idle=0, wait_text="MQTT connected", dev=self.mqtt_device(broker),
+                   extra=["--mqtt-all-topics"])
+        time.sleep(1)
+        t = self.stop()
+        mqtt = section(self.transcript(), "MQTT BROKER STREAM (mqtt.log)")
+        for topic, _ in self.FOREIGN:
+            self.assertIn(topic, mqtt)
+        self.assertEqual(broker.subscribed, ["#"])
+        self.assertIn("other devices", section(self.transcript(), "SUMMARY (summary.txt)"))
+        self.assertIn("WARNING: --mqtt-all-topics", self.output + t)   # on the console too
 
     def test_p_powershell_style_arguments(self):
         dev = FakeDevice()
@@ -1123,9 +1203,10 @@ class SatTraceToggleCase(unittest.TestCase):
 class CoreDumpFetchCase(unittest.TestCase):
     DUMP = bytes(range(256)) * 20
 
-    def serve(self, status, sha="a1b2c3d4e", body=None):
+    def serve(self, status, sha="a1b2c3d4e", body=None, crashlog=None, info=None):
         seen = []
         dump = self.DUMP if body is None else body
+        side = {"/api/v2/device/crashlog": crashlog, "/api/v2/device/info": info}   # TASK-1972
 
         class H(BaseHTTPRequestHandler):
             def log_message(self, *a):
@@ -1133,6 +1214,13 @@ class CoreDumpFetchCase(unittest.TestCase):
 
             def do_GET(self):
                 seen.append((self.path, self.headers.get("Authorization")))
+                if self.path in side:   # the two answers coredump_age() reads; 404 when the case gives none
+                    msg = json.dumps(side[self.path]).encode() if side[self.path] is not None else b"{}"
+                    self.send_response(200 if side[self.path] is not None else 404)
+                    self.send_header("Content-Length", str(len(msg)))
+                    self.end_headers()
+                    self.wfile.write(msg)
+                    return
                 self.send_response(status)
                 if status == 200:
                     self.send_header("Content-Type", "application/octet-stream")
@@ -1166,15 +1254,17 @@ class CoreDumpFetchCase(unittest.TestCase):
 
     def test_200_is_kept_with_the_app_sha(self):
         cap, line, seen = self.fetch(200)
-        target = cap.run_path / "coredump-20261104-120000.bin"
+        target = cap.run_path / "coredump-20261104-120000-app-a1b2c3d4e-unknown.bin"
         self.assertEqual(target.read_bytes(), self.DUMP)
         self.assertIn("a1b2c3d4e", line)
-        self.assertEqual(seen, [("/api/v2/device/coredump", None)])   # once, and no credentials sent
+        self.assertEqual(seen[0], ("/api/v2/device/coredump", None))   # the dump once, first
+        self.assertEqual([p for p, _ in seen].count("/api/v2/device/coredump"), 1)
+        self.assertTrue(all(a is None for _, a in seen))                # and no credentials sent anywhere
         self.assertIn(line, (cap.run_path / "summary.txt").read_text(encoding="utf-8"))
 
     def test_200_without_sha_header_still_kept(self):
         cap, line, _ = self.fetch(200, sha="")
-        self.assertEqual((cap.run_path / "coredump-20261104-120000.bin").read_bytes(), self.DUMP)
+        self.assertEqual((cap.run_path / "coredump-20261104-120000-unknown.bin").read_bytes(), self.DUMP)
         self.assertNotIn("sha256", line)
 
     def test_404_logs_one_line_and_keeps_nothing(self):
@@ -1206,9 +1296,64 @@ class CoreDumpFetchCase(unittest.TestCase):
         transcript.write_text("t", encoding="utf-8")
         target = oc.build_upload_zip(cap, transcript, False)
         with zipfile.ZipFile(target) as z:
-            self.assertIn("coredump-20261104-120000.bin", z.namelist())
-            self.assertEqual(z.read("coredump-20261104-120000.bin"), self.DUMP)
+            self.assertIn("coredump-20261104-120000-app-a1b2c3d4e-unknown.bin", z.namelist())
+            self.assertEqual(z.read("coredump-20261104-120000-app-a1b2c3d4e-unknown.bin"), self.DUMP)
         target.unlink()
+
+    # TASK-1972: the dump is labelled with its age. The detail line is the one platformResetRegisterDump()
+    # writes at the boot after the crash: 'Core dump: <task> pc=0x... elf=<8 hex of the dump's ELF> bt=...'.
+    INFO = {"device": {"fwversion": "2.0.0-beta.327+0d06069", "lastreset": "Software reset"}}
+
+    def crashlog(self, elf8, available=True):
+        return {"crashlog": {"available": available,
+                             "summary": "2026-11-15 19:48:24 - reboot cause: Panic" if available else "",
+                             "details": f"Core dump: loopTask pc=0x42001234 elf={elf8} bt=0x42001234" if available else ""}}
+
+    def test_dump_of_the_latest_logged_crash(self):
+        cap, line, _ = self.fetch(200, crashlog=self.crashlog("a1b2c3d4"), info=self.INFO)
+        self.assertTrue((cap.run_path / "coredump-20261104-120000-app-a1b2c3d4e-latest.bin").exists())
+        self.assertIn("latest crash in the reboot log", line)
+        self.assertIn("2.0.0-beta.327+0d06069", line)
+
+    def test_dump_without_a_logged_crash_is_old(self):   # 09 on .63: crashlog available:false, a dump served
+        cap, line, _ = self.fetch(200, crashlog=self.crashlog("", available=False), info=self.INFO)
+        self.assertTrue((cap.run_path / "coredump-20261104-120000-app-a1b2c3d4e-old.bin").exists())
+        self.assertIn("OLD", line)
+        self.assertIn("Software reset", line)
+
+    def test_dump_of_another_elf_than_the_logged_crash_is_old(self):
+        cap, line, _ = self.fetch(200, crashlog=self.crashlog("ffff0000"), info=self.INFO)
+        self.assertTrue((cap.run_path / "coredump-20261104-120000-app-a1b2c3d4e-old.bin").exists())
+        self.assertIn("ffff0000", line)
+
+    def test_age_unknown_without_the_crashlog_or_the_sha(self):
+        self.assertEqual(oc.coredump_age("a1b2c3d4e", None, self.INFO)[0], "unknown")
+        self.assertEqual(oc.coredump_age("", self.crashlog("a1b2c3d4"), self.INFO)[0], "unknown")
+        self.assertEqual(oc.coredump_age("A1B2C3D4E", self.crashlog("a1b2c3d4"), None)[0], "latest")   # case-blind
+
+    # TASK-1983: device/info carries the running build's ELF sha (appelfsha256); the dump's prefix says this build or not
+    RUN_SHA = "a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f90"
+
+    def info_with(self, sha):
+        return {"device": dict(self.INFO["device"], appelfsha256=sha)}
+
+    def test_dump_of_this_build(self):
+        _, s = oc.coredump_age("A1B2C3D4E", self.crashlog("a1b2c3d4"), self.info_with(self.RUN_SHA))
+        self.assertIn("dump of this build", s)
+
+    def test_dump_of_an_earlier_build(self):
+        _, s = oc.coredump_age("ffff00001", self.crashlog("", available=False), self.info_with(self.RUN_SHA))
+        self.assertIn("dump of an earlier build", s)
+
+    def test_build_unknown_without_the_running_sha(self):   # firmware before TASK-1983: no appelfsha256 field
+        _, s = oc.coredump_age("a1b2c3d4e", self.crashlog("a1b2c3d4"), self.INFO)
+        self.assertNotIn("build", s.replace("running firmware", ""))
+        self.assertEqual(oc.dump_build("a1b2c3d4e", ""), "")
+        self.assertEqual(oc.dump_build("", self.RUN_SHA), "")
+
+    def test_fetch_line_names_the_build(self):
+        _, line, _ = self.fetch(200, crashlog=self.crashlog("a1b2c3d4"), info=self.info_with(self.RUN_SHA))
+        self.assertIn("dump of this build", line)
 
     def test_skip_flag_and_call_site(self):
         self.assertTrue(oc.build_parser().parse_args(["--skip-coredump"]).skip_coredump)

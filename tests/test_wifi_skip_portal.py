@@ -294,7 +294,9 @@ class SkipPortalBoot(unittest.TestCase):
         # TASK-1918: the new firmware keeps its RTC records 0x20 B higher (safeboot guard at 0x50000200). On the
         # first boot after the update this record (new +0x5c) reads the old FS-OTA snapshot's data[8..16):
         # zeros after a wipe, or settings.ini text. Neither may skip the portal.
-        head = (REPO / "src" / "OTGW-firmware" / "data" / "settings.ini").read_bytes()[:16]
+        # the first 16 bytes writeSettings() writes (settingStuff.ino: "{\n" then the hostname key); TASK-1920 took the
+        # default settings.ini out of the filesystem image, the firmware writes the file itself
+        head = b'{\n  "hostname": '
         for blob in (bytes(16), head):
             with self.subTest(blob=blob):
                 r, _ = self.boot(magic=int.from_bytes(blob[8:12], "little"),

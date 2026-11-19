@@ -1,4 +1,4 @@
-# Bench job: cloud recorder PoC (TASK-1963, TASK-1971, TASK-1972, TASK-1974, TASK-1979, TASK-1473, TASK-1991)
+# Bench job: cloud recorder PoC (TASK-2901, TASK-2903, TASK-2904, TASK-2905, TASK-2906, TASK-1473, TASK-2907)
 
 For the bench-tester (`otgw-bench-tester`), through the coordinator. Branch `research/cloud-recording`, never on
 `dev`. Build env `esp32-combo-tlsdyn` only; the developer has built it, the bench-tester flashes it (OTA first) and

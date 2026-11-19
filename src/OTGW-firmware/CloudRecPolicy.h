@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : CloudRecPolicy.h
-**  TASK-1971 (branch research/cloud-recording only): when the cloud recorder retries, and what an HTTP
+**  TASK-2903 (branch research/cloud-recording only): when the cloud recorder retries, and what an HTTP
 **  status from the collection point means. No Arduino dependencies, so tests/test_cloudrec_policy.py
 **  compiles this header as it is.
 **
@@ -54,7 +54,7 @@ inline Outcome classifyReply(int status, const char *body) {
   return classify(status);
 }
 
-// The send queue (TASK-1974): one slot on every board, a second one in PSRAM where there is PSRAM. A closed record
+// The send queue (TASK-2905): one slot on every board, a second one in PSRAM where there is PSRAM. A closed record
 // takes a free slot; the upload task always sends the oldest (lowest seq) first, so records arrive in order.
 struct Slot {
   uint8_t *buf;          // nullptr: this slot does not exist on this board
@@ -62,7 +62,7 @@ struct Slot {
   int64_t t0;
   uint64_t seq;
   volatile bool busy;
-  bool stored;           // TASK-1991: already written to the local ring
+  bool stored;           // TASK-2907: already written to the local ring
 };
 
 inline Slot *slotFree(Slot *s, int n) {
@@ -76,7 +76,7 @@ inline Slot *slotOldest(Slot *s, int n) {
   return o;
 }
 
-// ---------------------------------------------------------------- TASK-1979: telemetry mode set centrally
+// ---------------------------------------------------------------- TASK-2906: telemetry mode set centrally
 //
 // The maintainer sets mode (default | full | full+trace | custom), flags (for custom) and mode_until in the
 // gateway's device record; the gateway reads them from every login and token-refresh reply. The ten log flags of

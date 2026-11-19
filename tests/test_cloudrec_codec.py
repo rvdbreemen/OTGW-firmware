@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""TASK-1963: the firmware's cloud recorder encoders (src/OTGW-firmware/CloudRecCodec.h) against the reference
+"""TASK-2901: the firmware's cloud recorder encoders (src/OTGW-firmware/CloudRecCodec.h) against the reference
 decoders and encoders in tools/cloud-recorder/otrec.py.
 
 The real header is compiled with the host C++ compiler into tests/cloudrec_harness.cpp; nothing is

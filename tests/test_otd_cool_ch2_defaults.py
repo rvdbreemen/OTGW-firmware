@@ -59,6 +59,7 @@ struct OpenTherm {
 };
 static unsigned long g_frames[16]; static int g_nframes = 0;
 static bool otCmdEnqueue(unsigned long f) { g_frames[g_nframes++] = f; return true; }
+static void otCmdDropPendingWrite(uint8_t) {}   // TASK-1992: ring tombstone, tested in tests/test_otd_sim_exit_stale_writes.py
 static bool otdWriteRefused = false;
 struct SchedEntry { uint8_t msgId; bool isWrite; uint16_t cachedValue; bool valueSet; };
 static SchedEntry otSchedule[] = { { 7, true, 0, false }, { 8, true, 0, false } };

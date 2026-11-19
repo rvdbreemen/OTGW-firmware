@@ -104,7 +104,7 @@ Returns the current health status of the device.
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `status` | string | `"UP"` or `"DEGRADED"` |
+| `status` | string | `"UP"`, or `"DEGRADED"` when LittleFS is not mounted, or when the last state file written by the file-writer task (SAT state) did not read back as written |
 | `uptime` | string | Human-readable uptime |
 | `heap` | integer | Free heap memory in bytes |
 | `networkmode` | string | Active network mode: `"wifi"`, `"ethernet"`, or `"ap"` |
@@ -188,7 +188,6 @@ Returns comprehensive device information as a flat JSON map. Boolean values are 
     "otdmaster": false,
     "otdstepup": true,
     "otdthermostat": true,
-    "otdsetback": false,
     "otdschedtotal": 12,
     "otdschedactive": 11,
     "otdscheddisabled": 1,
@@ -427,12 +426,12 @@ Retrieve the current value for a single OpenTherm message by its numeric ID.
 
 **Response** `200 OK`:
 ```json
-{"label": "boilertemperature", "value": 45.5, "unit": "\u00b0C", "status": "ack", "last_seen_age_s": 3}
+{"label": "boilertemperature", "value": 45.5, "unit": "\u00b0C", "status": "ack", "last_seen_age_s": 3, "source": "boiler"}
 ```
 
 The `value` field type depends on the message type: `float` for `f88` (fixed-point) types, `integer` for all others.
 
-`status` is the boiler's latest answer for this ID since boot: `never_seen` (no answer yet; `value` is then a default, not a boiler value), `ack` (Read-Ack or Write-Ack), `unknown_dataid` (the boiler does not know the ID) or `data_invalid`. Only genuine boiler answers count, not answers the gateway made itself. `last_seen_age_s` is the number of seconds since that answer, or `-1` when `status` is `never_seen` (TASK-1871). `/api/v2/otgw/label/{label}` returns the same two fields.
+`status` is the boiler's latest answer for this ID since boot: `never_seen` (no answer yet; `value` is then a default, not a boiler value), `ack` (Read-Ack or Write-Ack), `unknown_dataid` (the boiler does not know the ID) or `data_invalid`. Only genuine boiler answers count, not answers the gateway made itself. `last_seen_age_s` is the number of seconds since that answer, or `-1` when `status` is `never_seen` (TASK-1871). `source` says which frame wrote the `value` (TASK-1965): `boiler`, `gateway` (a value the gateway supplies itself, such as a PIC outside sensor's Write-Data 27, an OT-Direct `OT=` value or a PIC answer to the thermostat), `thermostat`, `summary` (PIC PS=1), `replay` or `none`. `status` stays the boiler's own answer, so `status` `data_invalid` with `source` `gateway` is a valid gateway value for an ID the boiler does not support. `/api/v2/otgw/label/{label}` returns the same three fields.
 
 **Error responses**:
 - `400` - Invalid or missing message ID
@@ -479,6 +478,8 @@ If the body is not valid JSON with a `command` field, the raw body text is used 
 **Error responses**:
 - `400` - Missing command, or invalid format (must be `LL=value`)
 - `413` - Command too long
+- `409` - Refused: SAT is enabled and controls the boiler, so an external CV control command (`CS=`, `CH=`, `MM=`, `C2=`, `H2=`, `TT=`, `TC=`) is not sent (ADR-179). It stays refused while SAT is enabled; other commands are not affected (TASK-1970)
+- `503` - Not queued: the command queue or the OT-Direct command ring is full; retry later
 
 #### `POST /api/v2/otgw/command/{cmd}` | `PUT /api/v2/otgw/command/{cmd}`
 
@@ -987,7 +988,7 @@ Quotes and backslashes in SSIDs are replaced with `_` to keep the JSON valid wit
 
 #### `GET /api/v2/graph/history`
 
-The device-side history of the Monitor > Graph series (TASK-1296): oldest first, in columns: up to 120 slots of 30 s (1 hour) on a board without PSRAM, up to 720 slots of 120 s (24 hours) on a board with PSRAM. The v2 UI loads it when the Graph tab opens and merges it into the samples it collects itself, so the chart windows and the CSV export are filled right away. Dallas sensors are not recorded.
+The device-side history of the Monitor > Graph series (TASK-1296): oldest first, in columns: up to 120 slots of 30 s (1 hour) on a board without PSRAM, up to 720 slots of 120 s (24 hours) by default on a board with PSRAM. The v2 UI loads it when the Graph tab opens and merges it into the samples it collects itself, so the chart windows and the CSV export are filled right away. Dallas sensors are not recorded. A board with PSRAM keeps 7 days; `?hours=N` (1 to 168, default 24) asks for another window. A response holds at most 1008 slots, so a longer window comes back thinned: `?hours=168` is 1008 slots of 600 s, each with the newest value of its group and the flame/DHW/CH flags of any slot in it (TASK-1963, ADR-245).
 
 **Authentication**: Not required
 
@@ -1004,6 +1005,7 @@ The device-side history of the Monitor > Graph series (TASK-1296): oldest first,
   "roomSet": [205, 205, 205],
   "room": [198, 199, 199],
   "outside": [-35, -35, -34],
+  "satTarget": [205, 205, 210],
   "mod": [42, 40, null],
   "flame": [1, 1, 0],
   "dhw_on": [0, 0, 0],
@@ -1011,7 +1013,7 @@ The device-side history of the Monitor > Graph series (TASK-1296): oldest first,
 }
 ```
 
-Temperatures are integers: the value times `scale` (655 is 65.5 C). `null` means there is no sample for that slot (the boiler had not reported the value, or the loop was stalled). For `room` it also means a room dropout (TASK-1578): SAT reports `room_temp_lost`, or MsgID 24 has been silent for more than 270 s; the v2 UI draws such slots as the same interruption as the live graph. `flame`, `dhw_on` and `ch` are 1 when the state was active at any moment of the slot. `newest_age_ms` is the age of the END of the newest slot; slot `i` starts at `now - newest_age_ms - (count - i) * interval_s * 1000` and the web UI stamps it with that start, like its own 5-second records. `interval_s` is 30 or 120 accordingly. The history is held in RAM (1.8 KB internal RAM without PSRAM, 10 KB PSRAM with PSRAM) and starts empty after a reboot. The body is about 4 KB (no PSRAM) or 25 KB (PSRAM) when full and is sent in chunks; the endpoint answers `503` with `Retry-After: 1` when the heap is low. Firmware without this endpoint answers `404`.
+Temperatures are integers: the value times `scale` (655 is 65.5 C). `null` means there is no sample for that slot (the boiler had not reported the value, or the loop was stalled). For `room` it also means a room dropout (TASK-1578): SAT reports `room_temp_lost`, or MsgID 24 has been silent for more than 270 s; the v2 UI draws such slots as the same interruption as the live graph. `flame`, `dhw_on` and `ch` are 1 when the state was active at any moment of the slot. `newest_age_ms` is the age of the END of the newest slot; slot `i` starts at `now - newest_age_ms - (count - i) * interval_s * 1000` and the web UI stamps it with that start, like its own 5-second records. `interval_s` is 30 or 120 accordingly. `satTarget` (TASK-2018, ADR-256) is the SAT target while SAT was enabled and `null` otherwise; the array is left out when no slot of the window holds a SAT target, so a client must treat it as optional. The history is held in RAM (2 KB internal RAM without PSRAM, 79 KB PSRAM with PSRAM) and starts empty after a reboot. The body is about 4 KB (no PSRAM) or 24 KB (PSRAM, 27 KB with `satTarget`) when full and is sent in chunks; the endpoint answers `503` with `Retry-After: 1` when the heap is low. Firmware without this endpoint answers `404`.
 
 ---
 
@@ -1085,6 +1087,7 @@ Returns the full SAT runtime state including temperatures, PID terms, cycle data
 | `pid_p` | float | Proportional term |
 | `pid_i` | float | Integral term |
 | `pid_d` | float | Derivative term |
+| `pid_curve_only` | bool | True while the output is the heating curve alone (no room temperature yet, or lost): `pid_i` is shown but not applied (TASK-1866) |
 | `kp` | float | Current Kp gain |
 | `ki` | float | Current Ki gain |
 | `kd` | float | Current Kd gain |
@@ -1327,7 +1330,6 @@ Returns the full OTGW32 OT-direct runtime state.
     "monitor_mode": false,
     "master_mode": false,
     "thermostat_connected": true,
-    "setback_active": false,
     "schedule_total": 12,
     "schedule_active": 11,
     "schedule_disabled": 1,
@@ -1375,7 +1377,6 @@ Returns the persisted OT-direct configuration settings.
   "otdirect_settings": {
     "mode": 1,
     "setback_temp": 15.0,
-    "setback_timeout": 300,
     "vent_enable": false,
     "open_bypass": false,
     "auto_bypass": false,
@@ -1388,8 +1389,7 @@ Returns the persisted OT-direct configuration settings.
 | Field | Type | Description |
 |-------|------|-------------|
 | `mode` | integer | Persisted mode index: 0=bypass, 1=gateway, 2=monitor, 3=master, 4=loopback |
-| `setback_temp` | float | Setback temperature applied when thermostat disconnects (C, range 1-30) |
-| `setback_timeout` | integer | Seconds without a thermostat frame before setback activates |
+| `setback_temp` | float | SB= setback temperature, stored and printed (PR=S) like the PIC; no effect on OT-Direct (C, range 1-30) |
 | `vent_enable` | boolean | Ventilation control enabled (OT MsgID 70 HB bit 0) |
 | `open_bypass` | boolean | Open the ventilation bypass valve (OT MsgID 70 HB bit 2) |
 | `auto_bypass` | boolean | Automatic ventilation bypass valve mode (OT MsgID 70 HB bit 3) |
@@ -1404,7 +1404,7 @@ Update OT-direct settings. Only provided parameters are updated.
 
 **Authentication**: Not required
 
-**Form parameters**: `setbacktemp` (float, 1.0-30.0), `setbacktimeout` (integer, seconds), `ventenable` (bool), `openbypass` (bool), `autobypass` (bool), `freeventenable` (bool), `ventsetpoint` (integer, 0-100). Unknown parameters, including the removed controller parameters, are ignored.
+**Form parameters**: `setbacktemp` (float, 1.0-30.0), `ventenable` (bool), `openbypass` (bool), `autobypass` (bool), `freeventenable` (bool), `ventsetpoint` (integer, 0-100). Unknown parameters, including the removed controller parameters, are ignored.
 
 **Response** `200 OK`: Full `otdirect_status` object.
 
@@ -1462,8 +1462,7 @@ All fields are **read-only** runtime state except where noted.
 | `monitor_mode` | `otdmonitor` | `bMonitorMode` | boolean | read-only | True when engine is in transparent pass-through mode |
 | `master_mode` | `otdmaster` | `bMasterMode` | boolean | read-only | True when OTGW32 is acting as sole OT master with no thermostat |
 | `stepup` | `otdstepup` | `bStepUpEnabled` | boolean | read-only | True when the 24V step-up converter is active |
-| `thermostat_connected` | `otdthermostat` | `bThermostatConnected` | boolean | read-only | True when a thermostat frame has been received within the setback timeout |
-| `setback_active` | `otdsetback` | `bSetbackActive` | boolean | read-only | True when thermostat is disconnected and setback override is engaged |
+| `thermostat_connected` | `otdthermostat` | `bThermostatConnected` | boolean | read-only | True when a thermostat frame has been received within the last 3 s |
 | `schedule_total` | `otdschedtotal` | `iScheduleTotal` | integer | read-only | Total number of OT message IDs in the polling schedule |
 | `schedule_active` | `otdschedactive` | `iScheduleActive` | integer | read-only | Number of schedule entries currently active (not disabled by boiler) |
 | `schedule_disabled` | `otdscheddisabled` | `iScheduleDisabled` | integer | read-only | Number of entries disabled (boiler returned UNKNOWN_DATA_ID three times) |
@@ -1472,7 +1471,7 @@ All fields are **read-only** runtime state except where noted.
 | `ot_online` | _(not in device/info)_ | _(otBus.bOnline)_ | boolean | read-only | True when the OT bus is alive (frames recently received) |
 | `thermostat` | _(not in device/info)_ | _(otBus.bThermostatState)_ | boolean | read-only | True when the thermostat OT bus side is active |
 | `boiler` | _(not in device/info)_ | _(otBus.bBoilerState)_ | boolean | read-only | True when the boiler OT bus side is active |
-| _(not exposed)_ | _(not in device/info)_ | `iLastThermostatMs` | uint32 | internal | `millis()` timestamp of last thermostat frame received; used internally for setback timeout, not exposed via REST |
+| _(not exposed)_ | _(not in device/info)_ | `iLastThermostatMs` | uint32 | internal | `millis()` timestamp of last thermostat frame received; used internally for the 3 s thermostat-loss check, not exposed via REST |
 
 The `otdirectavailable` field in `/api/v2/device/info` is always present (boolean). When `false`, all other `otd*` fields are absent from the response.
 

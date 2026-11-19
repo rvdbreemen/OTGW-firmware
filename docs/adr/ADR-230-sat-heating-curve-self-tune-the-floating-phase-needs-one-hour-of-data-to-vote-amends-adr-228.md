@@ -11,6 +11,7 @@ supersedes: []
 superseded_by: null
 related:
   - "ADR-228"
+  - "ADR-260"
 topics:
   - "heating curve self-tune"
   - "phase split"
@@ -59,6 +60,11 @@ status_history:
     status: Accepted
     changed_by: Robert van den Breemen
     reason: Accepted by Robert van den Breemen, 2026-11-12, in session otgw-firmware-d3 (AskUserQuestion 'Ja, accepteer', after the split); also DM 'A' to the coordinator (msg 1570216668469133343); Sergeant D entries 313, 315; TASK-1816
+    changed_via: adr-kit lifecycle
+  - date: 2026-11-18
+    status: Accepted
+    changed_by: Agent (ba)
+    reason: Related to ADR-260
     changed_via: adr-kit lifecycle
 ```
 

@@ -28,7 +28,8 @@ REST = SRC / "restAPI.ino"
 RANGE_END_MUTANT = ("  if (maxLen == 0 || (index >= d.hdrLen && (!r.hasData() || "
                     "d.first + (uint32_t)((index - d.hdrLen) / DIAG_REC_BLOCK_SIZE) > r.newestSeq()))) return 0;\r\n")
 MUTANTS = [("DIAG-RANGE-END", ["R1", "R6"], "range follows the live ring", RANGE_END_MUTANT),
-           ("DIAG-SINCE", ["R2"], "since= ignored", "")]
+           ("DIAG-SINCE", ["R2"], "since= ignored", ""),
+           ("DIAG-GUARD-GEN", ["R9"], "no recording generation check", "  const uint8_t* b = r.block(seq);\r\n")]
 
 
 def build_and_run(label, inc_dir, out_dir):

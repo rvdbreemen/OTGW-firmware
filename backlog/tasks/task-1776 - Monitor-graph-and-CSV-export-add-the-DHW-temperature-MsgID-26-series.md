@@ -1,11 +1,11 @@
 ---
 id: TASK-1776
 title: 'Monitor graph and CSV export: add the DHW temperature (MsgID 26) series'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-10T09:41:00Z'
-updated_date: '2026-11-15T09:07:00Z'
+updated_date: '2026-11-15T20:28:00Z'
 labels:
   - web-ui
   - feature-request
@@ -23,7 +23,7 @@ Tester request (fegyosz_47807, #alpha-testing 2026-11-10 08:45:41 UTC, https://d
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [x] #1 Robert decided whether the DHW temperature is added (and whether an amending ADR to ADR-193 is needed)
-- [ ] #2 If added: the graph shows a DHW temperature series and the CSV export has a DHW temperature column, shown as a dash when the boiler does not report MsgID 26
+- [x] #2 If added: the graph shows a DHW temperature series and the CSV export has a DHW temperature column, shown as a dash when the boiler does not report MsgID 26
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -36,4 +36,18 @@ Time correction (2026-11-10): the report time above is local CET. From the messa
 2026-11-14 (92): does NOT fit the existing slot, so per Robert's condition it goes back to him. GraphHistSlot (graphHistoryStuff.h:52-62, static_assert ==14 at :63) is full: six int16 temperatures (flow, ret, chSet, roomSet, room, outside) = 12 B + mod uint8 + flags uint8 = 14 B; the flags byte has 3 bits in use, not enough for a temperature. Options for Robert: A) slot 14 -> 16 B with an int16 DHW column, an ADR-193 amendment (superseding ADR via adr-kit): .bss +252 B on boards without PSRAM (1764 -> 2016 B), PSRAM block +1452 B (10164 -> 11616 B), JSON +1 column, full history after a reload; B) a live-only DHW series in the browser from MsgID 26 (v2.js:2380 already decodes it into model.dhw): no firmware/ADR change, the graph and the CSV (exportCsv uses the browser samples, v2.js:5817) show it from page load on, but no backfill after a reload; C) leave it. Recommendation from 92: B now (zero RAM, covers the tester's ask while the page is open), A only if the 24 h history after a reload is wanted, because the 252 B come from the tight internal RAM of the non-PSRAM boards.
 
 2026-11-15 Robert chose B (DM 1571431149795024929, item '3. B', reply to the bot list 1571430657609957510 that names TASK-1776; this replaces his earlier A, 1571279543220576543, on the A/B/C question 1571278995062792276). Option B as posed: 'Live-only DHW series in the browser (MsgID 26 is already decoded): no firmware/ADR change, graph + CSV show it from page load, no backfill after a reload.' So: no change to the device graph history (ADR-193 slot stays 14 B) or its endpoint; the browser keeps the series from the live MsgID 26 values.
+
+2026-11-15 implementation (option B): data/v2.js adds the series dhw to GSER (temperature panel, colour #f778ba, label graph.series_dhw), pushGraphSlot() copies model.dhw (MsgID 26, already decoded by applyFrame) into each live slot; the device history (ADR-193) and its endpoint are unchanged, so device slots have no dhw. The CSV export follows GSER, so it has a dhw column, empty where there is no value; the graph readout shows a dash. Labels: en 'DHW temperature', nl 'tapwatertemperatuur', de 'WW-Temperatur', el 'θερμοκρασία ΖΝΧ'. MANUAL.md graph list updated (live-only, no backfill). Evidence: new tests/webui/graph-dhw-temperature.test.mjs on the real v2.js functions: 4 pass on the fix, 4 fail on the old v2.js (case a: undefined !== 58); 14 graph/i18n web UI test files 94 pass 0 fail; evaluate --quick 92 checks 0 FAIL 0 WARN. Bench screenshot pending.
+
+2026-11-15 bench by 09 on .63, beta.310+4c57d94: the CSV export has the dhw column (d PASS). Graph line seen with the Graph sub-tab open.
+
+Follow-up (session 95, 2026-11-15): the capture tool's graph CSV (scripts/otgw_capture.py graph_history_csv) lacked the dhw column this task added to the web UI export. tests/test_capture_device_data.py did not see it because its v2.js harness cut only mergeGraphHistory(), which since TASK-1963 calls graphTrim() (ReferenceError, red on origin 2c4b462fd). Harness now extracts graphTrim() and reads GHIST_LIVE_MS/GHIST_SPAN_MS from v2.js; with that, the byte-identical test went red on the old tool (header without dhw) and green after adding dhw (always empty: the device history has no DHW value and mergeGraphHistory() leaves it out). Capture tests 18/34/7/51/8/4 passed, test_build 16 OK, test_flash_zip_modes 5 OK.
+
+Update 21:3x: the capture-tool fix described above landed on origin through ba's df031a0c3 (TASK-1972), which is equivalent per hunk; session 95 dropped its own copy b807b7ba3 at the rebase.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+AC1: Robert chose B (DM 1571431149795024929). AC2: the Monitor graph shows a DHW temperature line and the CSV export has a dhw column, empty where there is no value (tests/webui/graph-dhw-temperature.test.mjs 4 pass / 4 fail on the old v2.js; bench .63 beta.310: CSV dhw column present). Live only by design: after a reload the earlier part of the window has no DHW line.
+<!-- SECTION:FINAL_SUMMARY:END -->

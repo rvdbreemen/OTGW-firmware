@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""TASK-1972: the record compressor of the cloud recorder (crec::lzEncode in src/OTGW-firmware/CloudRecCodec.h).
+"""TASK-2904: the record compressor of the cloud recorder (crec::lzEncode in src/OTGW-firmware/CloudRecCodec.h).
 
 The real header is compiled with the host C++ compiler; nothing is re-implemented here.
   1. On records from the cloudrec harness (a 30-minute run with OT, SATTICK and debug lines) and on edge cases

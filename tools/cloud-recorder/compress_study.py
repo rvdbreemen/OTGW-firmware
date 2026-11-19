@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Which lossless compression fits the gateway? (TASK-1972)
+"""Which lossless compression fits the gateway? (TASK-2904)
 
     python3 compress_study.py --image firmware.bin [--minutes 30]
 

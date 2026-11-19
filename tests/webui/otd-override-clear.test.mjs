@@ -100,10 +100,12 @@ test('a room setpoint row names the sources that set MsgID 16 in gateway mode', 
 });
 
 // The clear command per write override, from the OT-Direct command handler (OTDirect.ino):
-// CS=0 / C2=0 / SW=0 / SH=0 clear their MsgID, CL=0 clears 7 (CC= has no clear of its own),
+// CS=0 / C2=0 / SW=0 / SH=0 clear their MsgID, a non-numeric CL= clears 7 (CC= has no clear of its own),
 // a non-numeric MM= clears 14, BS=0 clears 16 (a BS= rewrite and an MQTT room_setpoint write alike).
 // MsgID 100 is no write override any more (ADR-223).
-const CLEARS = { 7: 'CL=0', 8: 'C2=0', 14: 'MM=T', 16: 'BS=0', 56: 'SW=0', 57: 'SH=0' };
+// TASK-1958: CL=0 holds a cooling level of 0 on the PIC (SetCoolLevel, gateway.asm 6.8:4454-4464) and on
+// OT-Direct; only a value that is not a number clears 7 ("CL: -"), so the clear command is CL=-.
+const CLEARS = { 7: 'CL=-', 8: 'C2=0', 14: 'MM=T', 16: 'BS=0', 56: 'SW=0', 57: 'SH=0' };
 const ALL = Object.keys(CLEARS).map((id) => ({ msgid: +id, value: 0x1400 }));
 
 test('every clearable write override sends its own clear command', async () => {

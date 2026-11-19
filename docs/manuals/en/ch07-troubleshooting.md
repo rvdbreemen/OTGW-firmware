@@ -283,7 +283,7 @@ Press `h` at any time to print the help menu with the current device status and 
 | Key | Action |
 |---|---|
 | h | Show help menu with current status and toggle states |
-| q | Force re-read of `settings.json` from flash |
+| q | Re-read `settings.ini` from flash. An active SAT preset and its target are kept (TASK-2013) |
 | F | Force full Home Assistant discovery for ALL message IDs (clears the internal discovery bitmap and re-publishes everything) |
 | r | Reconnect WiFi, Telnet, OTGW serial stream and MQTT |
 | p | Reset the PIC manually |
@@ -363,13 +363,31 @@ The S3 Mini supports BLE (Bluetooth Low Energy) temperature sensor scanning. If 
 2. BLE sensors are polled on a timer-guarded interval. Allow at least one full scan cycle after enabling.
 3. Check the Telnet debug log for BLE scan results.
 
+Does the gateway hang or become unreachable after you switched BLE on? See section 7.12a.
+
+---
+
+### 7.12a Recovering a Gateway That Hangs or Becomes Unreachable
+
+**Symptom:** some time after boot the web UI stops answering, MQTT goes quiet and the gateway cannot be reached, often after you changed a setting. On firmware before 2.0.0-beta.375 the most likely cause on a board without PSRAM is BLE scanning that you switched on after accepting the stability warning: BLE starts at boot (`initSAT()`) and its memory use can starve the web server. From beta.375 BLE cannot be switched on without PSRAM, and a stored "on" is cleared at boot (section 5.16, "PSRAM-aware default").
+
+**Tip first:** save your settings while the gateway works. Open `http://<ip-of-your-otgw>/api/v2/settings` in a browser and save the page as a file. That gives you a list to re-enter after the steps below.
+
+Work through these steps in order and stop at the first one that helps:
+
+1. **Power-cycle and switch the setting off in the window after boot.** Remove the power, wait ten seconds, power it again. A reboot from the web UI restarts the ESP only. As soon as the web UI answers, go to Settings, **Sensors**, **BLE sensors** and switch **Enable BLE sensors** off (or undo the setting you changed last), then save. Be quick: on the bench the web UI stopped answering again within about 1 to 2 minutes after a power-cycle. If you do not get in, repeat once, then go to step 2.
+2. **Reset the settings over USB, keeping WiFi.** Connect the gateway to a PC with a USB cable and run, from the unpacked release zip, `flash_otgw.bat --update --fs <OTGW-firmware-...littlefs.bin>` (Windows; `./flash_otgw.sh` for Linux and macOS has no `--update` mode yet, so there go to step 3). This writes only the filesystem image: the WiFi credentials (in NVS) are kept, `settings.ini` goes back to the defaults, and on a board without PSRAM BLE then starts off (a settings file without the BLE key means BLE off). Re-enter your other settings by hand, using the file you saved. Do not use `--migrate` for this: it saves `settings.ini` first and puts it back afterwards, so the setting that caused the hang returns.
+3. **Factory flash as the last resort.** `flash_otgw.bat` without options erases the whole flash and writes the `-merged-full.bin` image: WiFi credentials and settings are gone, and the gateway starts its WiFi config portal (section 7.13).
+
+If the gateway still hangs with BLE off, or hangs on a board with PSRAM, collect the crash log (section 7.11), and ask for help (section 7.14).
+
 ---
 
 ### 7.13 Factory Reset
 
 **Method 1: Web UI**
 1. Open `http://otgw2.local/fsexplorer`.
-2. Delete the file `/settings.json`.
+2. Delete the file `/settings.ini`.
 3. Reboot the device.
 
 **Method 2: Triple-reset (forces the WiFi config portal)**

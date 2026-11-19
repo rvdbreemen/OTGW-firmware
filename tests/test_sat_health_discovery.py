@@ -45,6 +45,10 @@ BIN = {
     "ot_link_lost":    dict(device_class="problem", entity_category="diagnostic", pl_on="true", pl_off="false"),
     "push_refused":    dict(device_class="problem", entity_category="diagnostic", pl_on="true", pl_off="false"),
     "sh_rejected":     dict(device_class="problem", entity_category="diagnostic", pl_on="true", pl_off="false"),   # TASK-1412.13, entry 252
+    # TASK-1882: the object ids sat_sat_no_ignition / sat_sat_heating_failure follow the sat_sat_<name> scheme of every
+    # SAT row above (published since TASK-543); a rename would break existing HA entities, so the ids are pinned here
+    "no_ignition":     dict(device_class="problem", entity_category="diagnostic", pl_on="true", pl_off="false"),
+    "heating_failure": dict(device_class="problem", entity_category="diagnostic", pl_on="true", pl_off="false"),
 }
 SENSOR = {
     "requested_setpoint": dict(device_class="temperature", unit_of_measurement="°C",

@@ -20,7 +20,15 @@ Field log of the same capture (SAT: PRESSURE ALARM lines, set / cleared):
 Not verifiable from the capture: the device booted ~21:22 on 11 Nov, before the capture starts at 21:31, and the MsgID 18
 reads between boot and 21:34:33 are not in it, so the first run starts with an empty pressure history.
 
-Old-vs-fix: OTGW_SAT_INO=<path to another SATcontrol.ino> replays that copy.
+Old-vs-fix (TASK-1867, Sergeant D entry 362 option B: pressure readings taken in the 600 s settle window after a CH-mode
+change are thrown away, they no longer enter the sample ring):
+  PressureAlarmReplayOldCode   replays the SATcontrol.ino from before the fix (git show OLD_COMMIT:..., a commit on
+                               origin/dev) and asserts the three field alarms REPRODUCE: proof of the defect.
+  PressureAlarmReplayFixed     replays the current SATcontrol.ino and asserts none of the three field alarms fires.
+  SyntheticLoss                a steady real pressure loss still raises the alarm on the fix, with and without a CH-mode
+                               change in front of it.
+OTGW_SAT_INO=<path to another SATcontrol.ino> replaces the file under test of the Fixed and Synthetic classes (point it
+at the old copy to see them go red); OTGW_OLD_SAT_INO replaces the old copy of the OldCode class.
 Print the whole table: OTGW_REPLAY_VERBOSE=1. Run: python tests/test_sat_pressure_alarm_replay.py
 """
 import csv
@@ -91,9 +99,28 @@ def ticks(ev, t0, t1, seed_p=0.0):
     return rows
 
 
-def compile_harness(wd: Path):
+OLD_COMMIT = "d090823f2"   # last SATcontrol.ino commit on origin/dev before the TASK-1867 fix (same satUpdatePressure())
+
+
+def old_source():
+    """SATcontrol.ino from before the fix: OTGW_OLD_SAT_INO, else git show OLD_COMMIT:... (None if git cannot give it)."""
+    env = os.environ.get("OTGW_OLD_SAT_INO")
+    if env:
+        return Path(env).read_text(encoding="utf-8")
+    r = subprocess.run(["git", "show", f"{OLD_COMMIT}:src/OTGW-firmware/SATcontrol.ino"], cwd=base.REPO,
+                       capture_output=True)
+    return r.stdout.decode("utf-8") if r.returncode == 0 and r.stdout else None
+
+
+def compile_harness(wd: Path, ino: Path = None):
     cpp = wd / "t.cpp"
-    cpp.write_text(base.STUBS + base.extract_block() + MAIN, encoding="utf-8")
+    saved = base.SAT_INO
+    try:
+        if ino is not None:
+            base.SAT_INO = ino
+        cpp.write_text(base.STUBS + base.extract_block() + MAIN, encoding="utf-8")
+    finally:
+        base.SAT_INO = saved
     exe = wd / "t.exe"
     for cc in ("g++", "clang++"):
         if shutil.which(cc):
@@ -109,7 +136,21 @@ def compile_harness(wd: Path):
     return None
 
 
-class PressureAlarmReplay(unittest.TestCase):
+def run_exe(exe, rows):
+    """rows: (ms, pressure, statusflags) per control tick -> list of dict(smoothed, drop, suspended, alarm)."""
+    inp = "".join(f"{ms} {p:.5f} {sf}\n" for ms, p, sf in rows)
+    out = subprocess.run([str(exe)], input=inp, capture_output=True, text=True, check=True).stdout
+    res = []
+    for line in out.splitlines():
+        sm, dr, susp, al = line.split()
+        res.append(dict(smoothed=float(sm), drop=float(dr), suspended=susp == "1", alarm=al == "1"))
+    return res
+
+
+class ReplayBase:
+    """Shared helpers of the gruijter replay classes; OLD selects the pre-fix copy of SATcontrol.ino."""
+    OLD = False
+
     @classmethod
     def replay(cls, first_run_seed_p):
         ev = load_fixture()
@@ -117,29 +158,40 @@ class PressureAlarmReplay(unittest.TestCase):
         table = []
         for lo, hi, seed in ((ev[0][0], REBOOT_S, first_run_seed_p), (REBOOT_S, t_end, 0.0)):
             rows = ticks(ev, lo, hi, seed)
-            inp = "".join(f"{int(round((t - lo) * 1000)) + 1000} {p:.5f} {sb}\n" for t, p, sb in rows)
-            out = subprocess.run([str(cls.exe)], input=inp, capture_output=True, text=True, check=True).stdout
-            for (t, p, sb), line in zip(rows, out.splitlines()):
-                sm, dr, susp, al = line.split()
-                table.append(dict(t=t, raw=p, sb=sb, smoothed=float(sm), drop=float(dr),
-                                  suspended=susp == "1", alarm=al == "1"))
+            res = run_exe(cls.exe, [(int(round((t - lo) * 1000)) + 1000, p, sb) for t, p, sb in rows])
+            for (t, p, sb), r in zip(rows, res):
+                table.append(dict(t=t, raw=p, sb=sb, **r))
         return table
 
     @classmethod
     def setUpClass(cls):
         cls.tmp = tempfile.TemporaryDirectory()
-        cls.exe = compile_harness(Path(cls.tmp.name))
+        wd = Path(cls.tmp.name)
+        ino, label = None, str(base.SAT_INO)
+        if cls.OLD:
+            text = old_source()
+            if text is None:
+                cls.exe, cls.table, cls.no_old = None, [], True
+                return
+            ino = wd / "SATcontrol_old.ino"
+            ino.write_text(text, encoding="utf-8")
+            label = f"{OLD_COMMIT}:src/OTGW-firmware/SATcontrol.ino (before the fix)"
+        cls.exe = compile_harness(wd, ino)
         cls.table = []
         if not cls.exe:
             return
-        print(f"\n[under test: {base.SAT_INO}]")
+        print(f"\n[{cls.__name__} under test: {label}]")
         cls.table = cls.replay(0.0)
 
     @classmethod
     def tearDownClass(cls):
         cls.tmp.cleanup()
 
+    no_old = False
+
     def setUp(self):
+        if self.no_old:
+            self.skipTest(f"git cannot give {OLD_COMMIT}:SATcontrol.ino (shallow clone?); set OTGW_OLD_SAT_INO")
         if not self.exe:
             if os.environ.get("OTGW_REQUIRE_HOST_CC"):
                 self.fail("OTGW_REQUIRE_HOST_CC is set but no host C++ compiler was found")
@@ -166,6 +218,11 @@ class PressureAlarmReplay(unittest.TestCase):
         for r in rows:
             print(f"  {hms(r['t'])}  {r['raw']:.3f}   {r['smoothed']:.3f}    {r['drop']:7.3f}      "
                   f"{(r['sb'] >> 1) & 1}      {(r['sb'] >> 3) & 1}      {int(r['suspended'])}        {int(r['alarm'])}")
+
+
+class PressureAlarmReplayOldCode(ReplayBase, unittest.TestCase):
+    """The defect: on the code from before the fix the three field alarms reproduce."""
+    OLD = True
 
     def test_replay_reproduces_the_field_alarms(self):
         eps = self.episodes()
@@ -229,6 +286,98 @@ class PressureAlarmReplay(unittest.TestCase):
             if last_flame is not None:
                 # flame-off to pressure step: a 600 s suspension from flame-off (entry 262) is over before the step
                 self.assertGreater(step["t"] - last_flame, 600)
+
+
+FIELD_ALARMS = (("11 Nov 21:45:44", 21 * 3600 + 45 * 60 + 44.5), ("12 Nov 01:31:24", DAY + 3600 + 31 * 60 + 24.7),
+                ("12 Nov 07:22:54", DAY + 7 * 3600 + 22 * 60 + 54.99))
+
+
+class PressureAlarmReplayFixed(ReplayBase, unittest.TestCase):
+    """The fix: the same replay on the current code raises none of the three field alarms (entry 362)."""
+
+    def test_no_field_alarm_on_the_gruijter_replay(self):
+        eps = self.episodes()
+        print("\n  alarm episodes from the replay: " +
+              (", ".join(f"{hms(a)}-{hms(b) if b else 'open'}" for a, b in eps) or "none"))
+        for name, t in FIELD_ALARMS:
+            near = [a for a, _ in eps if abs(a - t) <= 2 * TICK_S]
+            self.assertFalse(near, f"field alarm {name} still fires in the replay at {[hms(a) for a in near]}")
+        # Choice A (coordinator 2026-11-15): the first fit after a settle needs 600 s of fresh samples. With the 300 s
+        # window (option B only) one 0.027 bar step raised a new alarm at 12 Nov 10:28:24 (drop 0.32-0.38 bar/h).
+        self.assertFalse([a for a, _ in eps if abs(a - (DAY + 10 * 3600 + 28 * 60 + 24.99)) <= 2 * TICK_S],
+                         "the 10:28:24 alarm of the B-only version fires")
+        self.assertEqual(eps, [], "the fix raises no pressure alarm at all in this capture (pressure steady 1.7-2.0 bar)")
+
+    def test_no_first_alarm_with_assumed_pre_capture_pressure(self):
+        table = self.replay(2.0)      # same ASSUMPTION as the OldCode test: 2.0 bar before the first MsgID 18 frame
+        t = FIELD_ALARMS[0][1]
+        near = [a for a, _ in self.episodes(table) if abs(a - t) <= 2 * TICK_S]
+        self.assertFalse(near, f"the 21:45 alarm still fires at {[hms(a) for a in near]}")
+        self.assertEqual(self.episodes(table), [])
+
+    def test_drop_rate_at_the_old_alarm_ticks_is_below_the_limit(self):
+        for name, t in (("01:31", DAY + 3600 + 31 * 60 + 24.99), ("07:22", DAY + 7 * 3600 + 22 * 60 + 54.99)):
+            row = min(self.table, key=lambda r: abs(r["t"] - t))
+            self.assertFalse(row["alarm"], name)
+            self.assertLess(row["drop"], 0.3, f"{name}: drop rate {row['drop']:.3f} bar/h at the old alarm tick")
+
+
+class SyntheticLoss(unittest.TestCase):
+    """A steady real pressure loss (0.5 bar/h) is still alarmed on the fix, with and without a CH-mode change first.
+    Synthetic series through the REAL satUpdatePressure(): 30 s ticks, start 2.2 bar (above the 0.8 bar minimum for
+    the whole run, so only the drop rate can raise the alarm)."""
+    RATE_BAR_H = 0.5
+    START_BAR = 2.2
+    TICKS = 100 * 60 // 30        # 100 minutes
+
+    @classmethod
+    def setUpClass(cls):
+        cls.tmp = tempfile.TemporaryDirectory()
+        cls.exe = compile_harness(Path(cls.tmp.name))
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.tmp.cleanup()
+
+    def setUp(self):
+        if not self.exe:
+            if os.environ.get("OTGW_REQUIRE_HOST_CC"):
+                self.fail("OTGW_REQUIRE_HOST_CC is set but no host C++ compiler was found")
+            self.skipTest("no host C++ compiler (g++, clang++ or MSVC)")
+
+    def run_series(self, ch_off_at_s):
+        """CH-mode bit on until ch_off_at_s (None = unchanged for the whole run), then off. Returns [(t_s, result)]."""
+        rows = []
+        for k in range(self.TICKS):
+            t = k * TICK_S
+            sf = 0x0002 if (ch_off_at_s is None or t < ch_off_at_s) else 0
+            rows.append((1000 + int(t * 1000), self.START_BAR - self.RATE_BAR_H * t / 3600.0, sf))
+        return [(k * TICK_S, r) for k, r in enumerate(run_exe(self.exe, rows))]
+
+    @staticmethod
+    def onset(series):
+        return next((t for t, r in series if r["alarm"]), None)
+
+    def test_steady_loss_without_a_ch_mode_change_alarms(self):
+        series = self.run_series(None)
+        t = self.onset(series)
+        print(f"\n  no CH-mode change: alarm onset at t={t} s")
+        self.assertIsNotNone(t, "a steady loss of 0.5 bar/h must raise the pressure alarm")
+        row = dict(series)[t]
+        self.assertAlmostEqual(row["drop"], self.RATE_BAR_H, delta=0.05)
+        self.assertGreaterEqual(t, 300 + 120 - TICK_S)       # >= 300 s window, then the 120 s confirmation
+
+    def test_steady_loss_after_a_ch_mode_change_alarms_once_the_ring_has_refilled(self):
+        fall = 120.0     # the CH-mode bit falls early (the ring holds < 300 s), the loss goes on unchanged
+        series = self.run_series(fall)
+        t = self.onset(series)
+        print(f"\n  CH-mode bit falls at t={fall:.0f} s: alarm onset at t={t} s")
+        self.assertIsNotNone(t, "the loss continues after the CH-mode change: the alarm must still be raised")
+        # suspension 600 s, ring refills from there, choice A: 600 s of fresh samples for the first rate (B only: 300 s),
+        # 120 s confirmation. Onset on the fix 1440 s; B-only version 1140 s (+300 s later on A); old code 840 s.
+        self.assertGreaterEqual(t, fall + 600 + 600 + 120 - TICK_S)
+        self.assertLessEqual(t, fall + 600 + 600 + 120 + 2 * TICK_S)
+        self.assertAlmostEqual(dict(series)[t]["drop"], self.RATE_BAR_H, delta=0.05)
 
 
 if __name__ == "__main__":

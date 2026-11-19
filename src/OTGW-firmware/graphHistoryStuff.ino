@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : graphHistoryStuff.ino
-**  Version  : v2.0.0-poc.13
+**  Version  : v2.0.0-poc.14
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -59,6 +59,8 @@ void graphHistoryTick()
   s.ret     = graphHistEncTemp(OTcurrentSystemState.Tret,    graphHistSeen(28));
   s.chSet   = graphHistEncTemp(OTcurrentSystemState.TSet,    graphHistSeen(1));
   s.roomSet = graphHistEncTemp(OTcurrentSystemState.TrSet,   graphHistSeen(16));
+  // TASK-2018 (ADR-256): the target SAT regulates to (target_temp of /api/v2/sat/status), only while SAT is enabled.
+  s.satTarget = graphHistEncTemp(settings.sat.fTargetTemp, satIsEnabled());
   // TASK-1578: a slot taken during a room dropout stores no value (same rule as the live graph).
   const uint16_t trAt = getMsgLastUpdated(24);   // 0 = never reported
   s.room    = graphHistEncRoom(OTcurrentSystemState.Tr, trAt != 0, satIsEnabled() && state.sat.bRoomTempLost,
@@ -94,9 +96,17 @@ void sendGraphHistory()
 {
   if (platformMaxFreeBlock() < 8192) { sendApiBusy(F("low heap")); return; }
 
+  // TASK-1963 (ADR-245): ?hours=N (1..168) asks for a longer window than the default 24 h; a window
+  // of more than GRAPH_HIST_MAX_EMIT ring slots comes back thinned (graphHistMakeSnapshot).
+  uint32_t windowS = GRAPH_HIST_DEFAULT_WINDOW_S;
+  if (hasArgCompat("hours")) {
+    const long h = atol(argCompat("hours"));
+    if (h >= 1) windowS = (uint32_t)((h > 168 ? 168 : h) * 3600L);
+  }
+
   auto snap = std::make_shared<GraphHistSnapshot>();
   if (!platformMutexLock(graphHistMutex, 100)) { sendApiBusy(F("history busy")); return; }
-  *snap = graphHistMakeSnapshot(graphHistRing, graphHistClock, millis());
+  *snap = graphHistMakeSnapshot(graphHistRing, graphHistClock, millis(), windowS);
   platformMutexUnlock(graphHistMutex);
 
   webPushHeader(F("Cache-Control"), F("no-cache"));

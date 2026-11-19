@@ -7,13 +7,13 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-27T23:40:00Z'
-updated_date: '2026-11-09T20:37:00Z'
+updated_date: '2026-11-18T22:25:00Z'
 labels:
   - epic
   - sat
   - low-load
   - beta.1
-milestone: 2.0.0
+milestone: 2.1.0
 dependencies:
   - TASK-1412.26
 documentation:
@@ -88,6 +88,16 @@ stays; the order inside it changes so that this defect is fixed first, with old-
 Robert 2026-10-30 (session, coordinator otgw-firmware-b8): WAIVER of the field-validation order for the first 2.0.0 beta (target Sun 2026-11-01). SAT ships experimental / opt-in (default off); SAT field data may come from named testers who enable it knowingly, before 1412.21/.22 bench and equipment acceptance. The epic stays the route to 'SAT stable'; this waiver covers field-data collection only, not a stable claim.
 
 2026-11-04 Robert (interactive): the official 2.0.0 stable release waits until SAT low-load is field-validated (epic TASK-1412 closed: 1412.16-26), not 'SAT experimental'. Estimate 4-6+ weeks, gated by testers and heating-season data.
+
+2026-11-16 PROPOSAL (comms 92, for the coordinator's decision after 20:00; not decided): how this epic relates to the 2.0.0 stable gate. Facts: the epic was written for the 4 Nov gate (bench simulator, then controlled equipment, then tester field); TASK-1740 (Robert 2026-11-08) replaced that gate for 2.0.0 stable with SAT still experimental, entry 386 makes 'today's answers implemented' the SAT criterion, and Robert set 21 Nov provided the Wed-Fri field runs are clean (DM 1571882395228184719). Children .20-.23 (real-board bench simulator, equipment commissioning) are already milestone 2.1.0; .24, .25, .26 are 2.0.0 and To Do (3, 3 and 4 open ACs); the epic ACs are 0/5.
+
+Option A (recommended): the epic and its full gate move to 2.1.0, and 2.0.0 takes a reduced slice. In 2.0.0: .24 (field protocol) = the field-run request for the Wed-Fri runs; .25 (field validation) = those runs, evidence per tester (indigo_light Vitodens beta.350 long-run first); epic AC3 is met only for the host LL contract (all ids green per TASK-1888), the bench and field LL rows stay 2.1.0. To 2.1.0: epic AC1 (R01-R42 owner bookkeeping), AC2 (equipment preflight before field), AC4 (PH-PIC/PH-OTD/PH-PROFILE/PH-FIELD per combination), AC5 and .26 (independent evidence review); the 2.0.0 notes keep 'SAT experimental' and make no energy or heat-pump suitability claim, which is AC5's intent. Consequence: the 2.0.0 gate stays TASK-1740 alone and nothing here can block 21 Nov by bookkeeping. Option B: keep the epic at 2.0.0 and have Robert waive ACs 1, 2, 4, 5 and .26 one by one; same outcome, five extra decisions for him. Main risk of A: the bench-simulator and equipment steps slip past 2.0.0 for good; mitigation: .20-.23 already carry 2.1.0.
+
+Conflict to record either way: TASK-1412.4 (Done) 'Honor slave low-load permission across SAT entry and active PWM' is reversed by Sergeant D entries 392 and 393 (MsgID 3 HB bit 4 no longer gates PWM; TASK-2000, beta.350, ADR-251 Accepted). Its R-issue in docs/sat/sat-low-load-remediation-plan-2026-10-28.md should be marked superseded by entries 392/393, not reopened.
+
+2026-11-16 DECIDED by Robert (DM 1571910380756668488, relayed by the coordinator): option A of the proposal above. The epic and its full low-load gate move to milestone 2.1.0. 2.0.0 keeps the reduced slice: TASK-1412.24 = the field-run request, TASK-1412.25 = the Wed-Fri runs (indigo_light's beta.350/351 long-run first), epic AC3 only for the host LL contract. The 2.0.0 stable gate is TASK-1740. This supersedes Robert's 2026-11-04 directive '2.0.0 stable waits until SAT low-load is field-validated (epic closed: 1412.16-26)'; recorded in docs/process/directive-changelog.md. TASK-1412.26 (independent evidence review) moves to 2.1.0 with the epic; the R-issue of TASK-1412.4 is marked superseded by 95 (TASK-2000 owner).
+
+2026-11-18 field data point (n=1 per arm, NOT proof yet; comms 92): gruijter, OTGW Classic + S3, Intergas boiler (no MsgID 14/15/28 support), Honeywell Round Connected, beta.356. SAT ON 17 Nov vs SAT OFF (Honeywell) 18 Nov, same clock window. Captures: #alpha-testing 1572708913441276034 (ON) and 1572709052100640932 (OFF); analysis posted 1572721027119841491 / 1572721048552476685 / 1572721058363220090; gas meter CSV 1572738176320016404; result 1572739227655868458. Comfort equal (setpoint >=19 C, 8.9 h each: MAE 0.17 vs 0.18 C, within +/-0.3 C 82 vs 84 %). CH starts per 100 heating degree-hours 11.5 vs 27.8 (0 vs 16 runs < 3 min). Modulation during CH flame mean 10.4 vs 25.7 %. Return during CH flame 31.6 vs 31.1 C (no difference). Gas MEASURED (meter, local 01:00-17:00): 3.029 vs 2.373 m3 = raw +28 % on the colder day (outside mean 5.1 vs 9.8 C, 192.1 vs 122.3 heating degree-hours base 18 C); per 100 degree-hours 1.58 vs 1.94 m3 = SAT about -19 %. Caveats: meter includes hot water (0.50 vs 0.42 h DHW burns), degree-hours ignore sun/wind/gains, the 17 Nov schedule had an extra 18.0 C step at 06:46, one day each. More ON/OFF meter days requested. Work files: comms scratchpad gr1118/work (compare.json, comparison.png).
 <!-- SECTION:NOTES:END -->
 
 ## Comments

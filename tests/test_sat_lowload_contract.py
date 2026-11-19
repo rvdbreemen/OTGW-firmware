@@ -175,6 +175,14 @@ DELEGATED = {
                ("test_sat_cycle_classifier", "CycleClassifier", ["test_R2_master_ch_enable_decides_the_kind"]),
                ("test_sat_pressure_health", "SatPressureHealth", ["test_ch_enable_transition_suspends_and_clears", "test_sat_on_off_alone_does_not_suspend",
                 "test_pwm_off_phase_does_not_suspend"])],
+    # TASK-1412.18 / QD-8 A (entry 270): no post-hot-water setpoint hold. The real satApplyContinuous() after a draw keeps the
+    # request level (previous-CS clamp, entry 112), not the boiler temperature; the DHW branch sends no CS and keeps the previous CS.
+    "LL-012b": [("test_sat_post_dhw_traces", "PostDhwTraces",
+                 ["test_first_tick_after_a_draw_keeps_the_pre_draw_cs_when_the_request_did_not_rise",
+                  "test_a_lower_request_after_the_draw_also_keeps_the_previous_cs_until_flow_minus_offset_meets_it",
+                  "test_flame_out_at_the_draw_end_sends_the_request",
+                  "test_the_gap_to_the_supply_temperature_today_versus_the_hold_model",
+                  "test_a_draw_sends_no_cs_and_does_not_move_the_previous_cs"])],
     "LL-013b": [("test_sat_command_delivery", "OtDirectRefusal", None)],
     "LL-013": [("test_sat_cmd_cache", "CmdCacheReset", ["test_dropped_enqueue_is_not_cached_and_sent_again", "test_dropped_satsendcs_is_retried_with_its_own_value_after_5s",
                 "test_dropped_keepalive_is_tried_again_on_the_next_pass", "test_resend_repeats_the_unchanged_cs_after_30s_not_before",
@@ -242,8 +250,8 @@ DELEGATED = {
     "LL-018h": [("test_sat_no_return_ignition", "NoReturnIgnition", ["test_mi500_never_on_ot_direct"]),
                 ("test_pic_pm_chain", "PmChain", ["test_not_armed_on_ot_direct"]),
                 ("test_sat_no_return_startup", "OtDirectPm", ["test_pm25_goes_out_within_a_communication_interval_when_the_slow_poll_tier_is_idle",
-                "test_pm25_latency_in_the_slow_poll_burst_is_bounded_but_not_one_interval", "test_without_pm25_the_msgid25_read_is_only_every_10_s_on_ot_direct",
-                "test_pm_for_an_unscheduled_id_is_a_one_shot_read", "test_pm_out_of_range_is_refused_with_bv"])],
+                "test_pm25_goes_out_within_a_communication_interval_also_in_the_slow_poll_burst", "test_without_pm25_the_msgid25_read_is_only_every_10_s_on_ot_direct",
+                "test_pm_for_an_unscheduled_id_is_a_one_shot_read", "test_pm_takes_0_to_255_like_the_pic"])],
     # LL-019 (TASK-1412.9): the whole phase-anchor and start-count suites run, not a subset: every test of test_sat_pwm_anchors (anchors,
     # ignition wait, relight, DHW interruptions, per-source start counting, millis rollover) and test_sat_pwm_start_limit (limit windows,
     # PWM entry, range 5, flame lag, ring rollover), plus the P / 2P mapper, minimum ON / OFF and range-5 cells of test_sat_hp_pwm.
@@ -412,6 +420,7 @@ class LowLoadContract(unittest.TestCase):
         task="TASK-1420 (fixed; entries 86, 95, 109); TASK-1412.8 AC2: every supported tick (10 s to 300 s) for all three timers, exact against the contract")
     def test_ll004_underheat_and_saturation_exit_after_60_300_s_from_the_first_qualifying_sample(self):
         # TASK-1933 (Sergeant D entries 342, 350): the underheat exit is "flame on and request above the flow for 60 s" (was 180 s)
+        # TASK-2005 (entry 407): the continuous-to-PWM overshoot switch ("o") needs 60 s (30 s under TASK-1888, entry 327)
         rows = []
         for interval in (10, 30, 60, 90, 120, 300):
             for kind, threshold, mode in (("o", 60, 2), ("u", 60, 1), ("z", 300, 1)):
@@ -427,9 +436,9 @@ class LowLoadContract(unittest.TestCase):
 
     # LL-010 -------------------------------------------------------------------------------------------------------------
     @ll("LL-010", "contract", "satNoteSlaveConfig, satPwmPermitted, satPwmEntryAllowed, satSetControlMode, satRestoreControlMode, satHandleControlMode, "
-        "satCycleCheckOvershootSwitch, satCycleApplyEndOfCycle, satCycleCheckLowLoadVeto (test_sat_slave_lowload, test_sat_cycle_classifier; entries 213-215, ADR-157)",
-        task="TASK-1412.4: HB4 = 1 and no valid reply block the overshoot switch, the end-of-cycle switch (TASK-1331), the restart restore, the pwm command and any other entry; "
-             "HB4 turning 1 leaves PWM in that tick")
+        "satCycleCheckOvershootSwitch, satCycleApplyEndOfCycle, satCycleCheckLowLoadVeto (test_sat_slave_lowload, test_sat_cycle_classifier; entries 213-215 reversed by 392/393, ADR-157)",
+        task="TASK-2000 (entries 392, 393; was TASK-1412.4): MsgID 3 plays no part in PWM: HB4 = 1 or no valid reply refuses no entry path "
+             "(overshoot switch, end-of-cycle switch, restart restore, pwm command) and never ends a running PWM; the reply is only recorded")
     def test_ll010_hb4_permission_is_consulted_before_low_load_cycling(self):
         self.delegated("LL-010")
 
@@ -451,10 +460,13 @@ class LowLoadContract(unittest.TestCase):
     def test_ll012_dhw_transitions(self):
         self.delegated("LL-012")
 
-    @ll("LL-012", "open_decision", "none: no one-minute post-hot-water setpoint hold exists (structural)", task="TASK-1412.7", question="QD-8")
-    def test_ll012b_post_dhw_one_minute_setpoint_hold(self):
-        sat = (FW / "SATcontrol.ino").read_text(encoding="utf-8")
-        self.assertRegex(sat, r"(?i)post[- ]?(dhw|hot[- ]?water)[^\n]*hold[^\n]*(60|one minute)", "no post-DHW setpoint hold; QD-8 not asked yet")
+    @ll("LL-012", "contract", "satApplyContinuous after a draw and the DHW branch of the control loop (SATcontrol.ino, via test_sat_post_dhw_traces)",
+        task="TASK-1412.18 (QD-8 answered A, entry 270): no one-minute post-hot-water setpoint hold, as thermo-nova 7beaaf5 "
+             "(const.py:19 DHW_OVERSHOOT_GUARD_SECONDS, heating_control.py:268-274 overshoot timer reset, :380/:385 PWM setpoint path "
+             "skipped during a draw; neither holds the setpoint after a draw)", question="QD-8")
+    def test_ll012b_no_post_dhw_setpoint_hold(self):
+        # Reaches satApplyContinuous() and the DHW branch only: a hold added elsewhere in the control loop is not seen here.
+        self.delegated("LL-012b")
 
     @ll("LL-013", "contract", "satEnqueueOwnCS/satSendCS/satCmdResend/satEnqueueIfChanged* (SATcontrol.ino, via test_sat_cmd_cache)",
         task="TASK-1574 (commit-on-success) and TASK-1412.11 (separate intent / enqueue / transmission / echo events, full queue, interrupted exchange, "
@@ -523,8 +535,11 @@ class LowLoadContract(unittest.TestCase):
     def test_ll018i_runtime_enable_sends_the_boot_pm_chain(self):
         self.delegated("LL-018i")
 
-    @ll("LL-018", "open_decision", "none: a PM=25 on OT-Direct waits behind the entries already due in the schedule (a minute-aligned slow-poll burst delays it by seconds, not by one communication interval); no decision records what OT-Direct must do for PM=",
-        task="TASK-1412.12 finding", question="OTD-PM25 (new, to be asked)")
+    # TASK-1981: OT-Direct transport, not SAT control, so the PIC decides (coordinator rule 2026-11-15): SendPriorityMsg
+    # (gateway.asm 6.6 :3436-3441) is checked before the alternatives list, so the PM= message goes in the next free slot and
+    # repeats until answered (HandleResponse :2431-2434). Since the faster tiers go before the slow-poll burst this holds.
+    @ll("LL-018", "contract", "scheduleMasterRequest() (OTDirect.ino): a PM=25 sets the 10 s entry due; the faster tiers go before the 60 s slow-poll burst",
+        task="TASK-1981")
     def test_ll018j_ot_direct_pm25_goes_out_within_one_communication_interval_in_the_full_schedule(self):
         import test_sat_no_return_startup as nrs
         cls = nrs.OtDirectPm
@@ -532,7 +547,7 @@ class LowLoadContract(unittest.TestCase):
         try:
             if not cls.exe:
                 raise InfrastructureError("no host C++ compiler")
-            lat = cls("test_pm_out_of_range_is_refused_with_bv").pm25_latencies(True)
+            lat = cls("test_pm_takes_0_to_255_like_the_pic").pm25_latencies(True)
         finally:
             cls.tearDownClass()
         self.assertLessEqual(max(lat), 1150, lat)
@@ -558,7 +573,7 @@ class LowLoadContract(unittest.TestCase):
     def test_ll020b_exit_timing_with_jitter_and_millis_wrap(self):
         results = []
         for interval in (10, 30, 60, 120):
-            for kind, threshold in (("o", 60), ("u", 60), ("z", 300)):   # TASK-1933: underheat 60 s (entries 342, 350)
+            for kind, threshold in (("o", 60), ("u", 60), ("z", 300)):   # TASK-1933: underheat 60 s (entries 342, 350); TASK-2005: overshoot switch 60 s (entry 407)
                 for jitter in ((0, 7000, 3000, 5000), (0, 25000), (12000,)):
                     for start in (None, 4294967295 - 100000, 4294967295 - int(interval * 1500)):   # the last: the wrap falls inside the timer
                         elapsed, t = self.exit_after(interval * 1000, kind, jitter=jitter, start=start)

@@ -1,8 +1,9 @@
 // Settings help texts served at /settings-help.json (TASK-1294, from TASK-1281).
 //
-// This header is the source of truth. The JSON is a PROGMEM string in the app slot
-// (ADR-194), not a LittleFS file; FSexplorer.ino streams it from flash with
-// serveProgmemAsset(), without a RAM copy. Size limit 24 KB (TASK-1688).
+// This header is the source of truth, but it is no longer compiled (TASK-1955, ADR-247):
+// scripts/webui_pages.py gzips the JSON below into settingsHelpGz.h, which FSexplorer.ino
+// serves from flash with Content-Encoding: gzip (serveProgmemAsset()). Edit the JSON here;
+// the build regenerates the gzip header. Size limit 24 KB of JSON (TASK-1688).
 // The body below is exactly the JSON document: v2.js fetches it and tests/webui/
 // settings-help.test.mjs parses it out of this raw string. One key per line.
 // A key needs a matching entry in SET_META (v2.js); the test checks both ways.
@@ -85,16 +86,15 @@ static const char SETTINGS_HELP_JSON[] PROGMEM = R"json({
 "otdventsetpoint":"Ventilation setpoint, 0 to 100 %. 0 sends no setpoint.",
 "otdhasbypassrelay":"Tick if a bypass relay is fitted on this board. Bypass mode falls back to Gateway without it.",
 "otdautodetect":"Detect at boot whether a thermostat is connected.",
-"otdsetbacktemp":"Not used: on a thermostat loss the gateway sends CH off, like the PIC. Kept for settings compatibility.",
-"otdsetbacktimeout":"Seconds without thermostat frames before it counts as disconnected; then the gateway sends its own frames, CH off unless a CS= is set. Default 30.",
+"otdsetbacktemp":"SB= setback temperature, stored and printed (PR=S) like the PIC, where it is the AWAY-input setback. No effect on OT-Direct: on a thermostat loss the gateway sends CH off, like the PIC.",
 "otdenableslave":"Keep the thermostat (slave) interface active in Master mode. Default on.",
 "otdsummermode":"Set the summer-mode bit in the master status (SM=). The boiler decides what it does.",
-"otdfailsafe":"Not used: there is no setback on a thermostat loss any more. Kept for settings compatibility.",
+"otdfailsafe":"FS= fail safety, stored and answered like the PIC, where it chooses a monitor-mode start after a watchdog reset. No effect on OT-Direct.",
 "otdmsginterval":"Minimum gap between OpenTherm messages in ms, 100 to 1275. Default 100.",
 "satovershootprotection":"In PWM, SAT overrides the control setpoint (CS) to keep the burner at its lowest level. Default on.",
 "satpushsetpoint":"Send the SAT target to the thermostat display (TC=). The SAT page says so if the thermostat refuses. Default off.",
 "satfollowthermostat":"A setpoint change on the wall thermostat becomes the SAT target. Needs SAT enabled.",
-"satcurveselftune":"Let SAT adjust the curve slope by 0.1 when 3 counted days point the same way (a counted day has at least 6 clean heating hours: sun low, no hot water). It decides once a day; a change starts the count again, so two steps are at least 3 counted days apart. Each step is logged. Default on.",
+"satcurveselftune":"Let SAT adjust the curve slope by 0.05 when the last 12 counted hours point the same way (a counted hour is a clean heating hour: sun low, no hot water). A change starts the count again, so two steps are at least 12 counted hours apart. Each step is logged. Default on.",
 "satfireplace":"Heat on the heating curve only, as with no room sensor. For a room with a stove or AC. Default off.",
 "satmqttfallback":"SAT takes over the boiler when MQTT is lost for over 5 minutes (MQTT must have connected once since boot). Off: the thermostat keeps control.",
 "satwindowdetect":"Use the Activity preset target while a window is reported open (MQTT sat/window).",
@@ -120,7 +120,7 @@ static const char SETTINGS_HELP_JSON[] PROGMEM = R"json({
 "satminpressure":"Low water pressure alarm, in bar, 0 to 3. Default 0.8.",
 "satmaxpressure":"High water pressure alarm, in bar, 1 to 4. Default 2.5.",
 "satmaxpressdrop":"Alarm when the pressure falls faster than this, 0.05 to 2 bar per hour. Default 0.3.",
-"satsolarminelev":"Solar gain counts only above this sun elevation (-10 to 45). Needs a sun elevation over MQTT, else the gate is skipped.",
+"satsolarminelev":"Solar gain counts only above this sun elevation (-10 to 45). The elevation comes from Home Assistant (sat/sun_elevation, used while younger than 1 h) or is computed from Latitude and Longitude; without either the gate is skipped.",
 "satboilerratedkw":"Gas input of your boiler in kW. Turns on the gas input estimate and caps it. 0 = off.",
 "satboilerefficiency":"Efficiency used to estimate gas input from heat output, 0.5 to 1.0. Default 0.92.",
 "satminconsumption":"Boiler gas use in m3/h at minimum modulation, 0 to 8. With the max value it drives sat/consumption; 0 = off.",
@@ -132,7 +132,8 @@ static const char SETTINGS_HELP_JSON[] PROGMEM = R"json({
 "satsolarfreezeint":"Meant to freeze the PID integral during solar gain. The firmware freezes it regardless.",
 "satmaxmodulation":"Highest relative modulation SAT sends to the boiler (MM=), 0 to 100 %. Default 100.",
 "satexternaltemp":"Use an indoor temperature sent to SAT, by MQTT (<prefix>/set/<node>/sat/indoor_temp, e.g. 20.8) or REST (POST /api/v2/sat/externaltemp). Expires after Sensor max age.",
-"satovershootmargin":"Flow above the PID setpoint plus this margin for 60 s switches to PWM. 0.5 to 5 °C, default 2.",
+"satovershootmargin":"A heating cycle whose flow ran this far above its setpoint counts as an overshoot in the cycle statistics. 0.5 to 5 °C, default 2.",
+"satpwmswitchmargin":"Flow above the PID setpoint plus this margin for 60 s switches from continuous to PWM. 0.5 to 5 °C, default 2.0.",
 "satboilercapacity":"Boiler heat output in kW, 1 to 100. Default 24. SAT power = modulation x this.",
 "satdhwcapacity":"Heat output in kW used while hot water runs. 0 uses the boiler capacity.",
 "satthermalcoeff":"Thermal drop coefficient (0.005 to 0.3). Learned by SAT; normally leave it alone.",
@@ -145,10 +146,10 @@ static const char SETTINGS_HELP_JSON[] PROGMEM = R"json({
 "satpresetsync":"Publish the active preset name to the sync topic so other entities can follow it.",
 "satpresetsynctopic":"MQTT topic that receives the preset name when sync is on. Up to 64 characters.",
 "satweatherenable":"Fetch outdoor weather from Open-Meteo (no key needed). Needs latitude and longitude.",
-"satweatherlat":"Latitude of your home in degrees, -90 to 90. Used for the weather fetch.",
-"satweatherlon":"Longitude of your home in degrees, -180 to 180. Used for the weather fetch.",
+"satweatherlat":"Latitude of your home in degrees, -90 to 90. Used for the weather fetch and to compute the sun elevation; not needed for the sun elevation when Home Assistant publishes sat/sun_elevation.",
+"satweatherlon":"Longitude of your home in degrees, -180 to 180. Used for the weather fetch and to compute the sun elevation; not needed for the sun elevation when Home Assistant publishes sat/sun_elevation.",
 "satweatherinterval":"Seconds between weather fetches, 900 to 3600 (Open-Meteo rate limit). Default 900.",
-"satsolargain":"Lower the setpoint while sunshine heats the room (fast rise, low modulation). Default off.",
+"satsolargain":"Lower the setpoint while sunshine heats the room (fast rise, low modulation). Needs the sun elevation: from Home Assistant (sat/sun_elevation) or from Latitude and Longitude. Default off.",
 "satsolarminrise":"Indoor rise in °C per hour that counts as solar heating, 0.1 to 5. Default 0.6.",
 "satsolaroffset":"How far the setpoint drops during solar gain, 0.5 to 10 °C. Default 2.",
 "satsummersimmer":"Switch heating off after enough warm hours outside (see threshold, minimum hours). Default off.",

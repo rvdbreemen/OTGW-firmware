@@ -522,7 +522,9 @@ class TestHAOutsideTemperatureRoute(unittest.TestCase):
         self.assertIn("OTcurrentSystemState.Toutside = (int16_t)f88 / 256.0f;", otdirect)
         # TASK-1859: the reply prints the stored f8.8 value as the PIC's PrintSigned (otdPicPrintF88)
         self.assertRegex(otdirect, r"dtostrf\(OTcurrentSystemState\.Toutside, 1, 2, rspBuf\);|"
-                                   r"OTcurrentSystemState\.Toutside = \(int16_t\)f88 / 256\.0f;\s*\n\s*otdPicPrintF88\(f88, rspBuf")
+                                   # TASK-1965: the value-source record may sit between the store and the reply
+                                   r"OTcurrentSystemState\.Toutside = \(int16_t\)f88 / 256\.0f;\s*\n"
+                                   r"(\s*recordValueSource\(27, OT_VALSRC_GATEWAY\);[^\n]*\n)?\s*otdPicPrintF88\(f88, rspBuf")
 
 
 class TestProgmemComplianceIntegration(unittest.TestCase):

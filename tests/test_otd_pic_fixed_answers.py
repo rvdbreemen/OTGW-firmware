@@ -70,6 +70,11 @@ CASES = [  # name, thermostat request, boiler/slot reply, expected frame for the
     ("s56_ack", frame(0, 56, 0), frame(4, 56, 0x3700), frame(4, 56, 0x3700)),
     ("s57_unknown", frame(0, 57, 0), frame(7, 57, 0), frame(4, 57, 0x5A00)),          # default 90
     ("other", frame(0, 25, 0), frame(4, 25, 0x3200), frame(4, 25, 0x3200)),
+    # TASK-1804 A1: MsgID 16 is always acknowledged (MessageID16 :2984-2987 -> missingdata :2696-2701)
+    ("m16_unknown", frame(1, 16, 0x1500), frame(7, 16, 0), frame(5, 16, 0x1500)),
+    ("m16_invalid", frame(1, 16, 0x1500), frame(6, 16, 0x1500), frame(5, 16, 0x1500)),
+    ("m16_ack", frame(1, 16, 0x1500), frame(5, 16, 0x1500), frame(5, 16, 0x1500)),
+    ("m16_read", frame(0, 16, 0), frame(4, 16, 0x1400), frame(6, 16, 0)),
 ]
 
 MAIN = r"""
@@ -128,6 +133,9 @@ class PicAnswers(unittest.TestCase):
     def test_msgid56_57_unknown_is_acknowledged_with_the_upper_bound(self):
         self.check("s56_unknown", "s56_bound", "s56_write", "s57_unknown")
 
+    def test_msgid16_is_always_acknowledged(self):
+        self.check("m16_unknown", "m16_invalid", "m16_ack", "m16_read")
+
     def test_msgid56_data_invalid_and_ack_pass(self):
         self.check("s56_invalid", "s56_ack", "other")
 
@@ -138,7 +146,8 @@ class CallSites(unittest.TestCase):
         alt = braced(SRC, r"^static bool otdAltSlotTaken\(unsigned long thermostatFrame\) \{")
         self.assertIn("otdPicAnswer(sentReq, reply", reply or "")
         self.assertIn("otdPicAnswer(thermostatFrame, unknownResp", alt or "")      # 3 Unknown strikes: the slot path
-        self.assertRegex(SRC, r"otdPicAnswer\(otSlaveFrame, unknownResp")           # UI= table
+        # TASK-1804 A5: a UI= ID without an alternative is forwarded like the PIC, so no third (local UI=) answer path
+        self.assertNotRegex(SRC, r"otdPicAnswer\(otSlaveFrame, unknownResp")
 
 
 if __name__ == "__main__":

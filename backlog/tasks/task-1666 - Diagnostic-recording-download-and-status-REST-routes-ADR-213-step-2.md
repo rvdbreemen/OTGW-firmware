@@ -1,11 +1,11 @@
 ---
 id: TASK-1666
 title: Diagnostic recording download and status REST routes (ADR-213 step 2)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-05T20:34:00Z'
-updated_date: '2026-11-14T15:50:00Z'
+updated_date: '2026-11-16T07:54:00Z'
 labels:
   - diagnostics
 milestone: 2.0.0
@@ -24,7 +24,7 @@ GET /api/v2/diag/recording?since= as an octet-stream filler with the block range
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [x] #1 Host test of the route wiring and the range-fixed-at-start rule
-- [ ] #2 Bench: 1.5 MB download time and that the web UI stays responsive during it
+- [x] #2 Bench: 1.5 MB download time and that the web UI stays responsive during it
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -35,4 +35,12 @@ GET /api/v2/diag/recording?since= as an octet-stream filler with the block range
 Stale audit 2026-11-14 (coordinator decision): AC2 needs a bench on .63 (PSRAM) by 09; the coordinator queues it.
 
 2026-11-14 (09) toward AC2 (not ticked). The ring on .63 fills too slowly for a 1.5 MB download today (first 4 KB block > 3 min). On a partial ring (8396 B, 2 blocks): 3 downloads, TTFB 25-82 ms, transfer 15-18 ms (446-531 KB/s). Extrapolation to 1 572 864 B gives about 3 s, an ESTIMATE only and an optimistic one: 8 KB fits in a few TCP windows, so it does not show the per-window fill over 384 blocks under the lock; the first download of the day took 1.6 s for 4300 B. Web UI responsiveness during a download not measured yet. Plan (coordinator): an overnight recording on .63 after d3's 1924 part 2 bench, then the real 1.5 MB download time and the web UI check. Evidence: 09 scratchpad b1665/ (dl*.bin, throughput.txt).
+
+2026-11-15 bench 09 on .63 (Classic + S3, PSRAM), beta.294+bcf067a; order status -> download -> size check -> stop (download BEFORE stop, see TASK-1960). (1) Natural recording 10:03:30-12:07 (SAT simulation on, no OT bus): 25 blocks (~12/h), dropped 0. GET /api/v2/diag/recording 102604 B in 1.216 s (84 KB/s), 25 x 4096 + header OK, starts with the OTGWREC magic. Measured alongside: /api/v2/device/info 60x avg 0.109 s, max 0.456 s, all 200. (2) Full ring, SYNTHETIC content: 6600 sequential POSTs of ~250 B bodies (REST capture point) 12:23-12:28, ring wrapped (oldest_seq 31, newest_seq 414 = 384 blocks), dropped 0, exact true. GET 1573068 B in 11.46 s (137 KB/s), 384 x 4096 + header OK. During the download: /api/v2/device/info 20x avg 0.092 s, max 0.428 s, all 200; GET / (v2.html.gz 205 KB) 4x avg 2.04 s, max 2.73 s, all 200, vs baseline after the stop 10x avg 1.43 s, max 1.80 s. So the web UI stays responsive (no refusal, no 5xx); a full page load is ~40 % slower while 1.5 MB streams. The timing covers the size, not a realistic event mix. Settings after both runs: REST diff [] and settings.ini diff empty; bootcount 137 unchanged, no crashlog. Evidence: 09 scratchpad n1666b/end and n1666b/full/end (recording.bin, dl-headers, probe*.txt, status-*.json). The first attempt at 08:32 lost the data through stop-before-download (TASK-1960).
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Closed by comms 92 on the coordinator's order (2026-11-16), from the task's own notes. Commit f202abcd2 (recorder core + routes, with TASK-1665). AC1: test/host/test_diag_recording_routes.py --mutant RESULT PASS (W1-W4, R1-R8; the range mutant fails R1/R6, the since mutant R2). AC2: 09 on .63 (Classic + S3, PSRAM), beta.294+bcf067a, 2026-11-15: full ring 1573068 B in 11.46 s (137 KB/s), device/info during it avg 0.092 s max 0.428 s all 200, GET / avg 2.04 s vs 1.43 s baseline (about 40 % slower, no 5xx); settings and settings.ini unchanged, bootcount unchanged, no crashlog (09 scratchpad n1666b/). Caveat from the notes: the full-ring content was synthetic.
+<!-- SECTION:FINAL_SUMMARY:END -->

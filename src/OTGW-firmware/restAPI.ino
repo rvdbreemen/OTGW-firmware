@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-poc.13
+**  Version  : v2.0.0-poc.14
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -373,6 +373,15 @@ static void handleCommandSubmit(const char* cmdStr) {
     sendApiError(413, F("Command too long"));
     return;
   }
+  // TASK-1970: while SAT is enabled an external CV control command is refused (ADR-179, the same rule
+  // addCommandToQueue() and the OT-Direct handler apply). Refuse it here with its own answer: it stays
+  // refused while SAT controls the boiler, a full queue (503 below) clears by itself. On OT-Direct the
+  // command was queued with 202 and refused later on the loop task, out of the client's sight.
+  if (satOwnsControlSetpoint() && satBlocksExternalCommand(cmdStr, static_cast<int>(cmdLen))) {
+    satNoteExternalRefused(cmdStr, static_cast<int>(cmdLen));
+    sendApiError(409, F("Command refused: SAT is in control of the boiler (disable SAT to send it)"));
+    return;
+  }
   // TASK-1761: a full queue (PIC) or a full OT-Direct text ring is Dropped: say so instead of 202.
   if (addCommandToQueue(cmdStr, static_cast<int>(cmdLen)) == CmdQueueResult::Dropped) {
     sendApiError(503, F("Command not queued (queue full)"));
@@ -569,7 +578,6 @@ static void handleOTDirect(const char words[][API_WORD_LEN], uint8_t wc, HTTPMet
         je.beginObject(F("otdirect_settings")); // "otdirect_settings":{
         je.field(F("mode"),            (int32_t)settings.otd.iMode);
         je.field(F("setback_temp"),    settings.otd.fSetbackTemp);
-        je.field(F("setback_timeout"), (int32_t)settings.otd.iSetbackTimeout);
         // TASK-584: ventilation override persistence
         je.field(F("vent_enable"),      settings.otd.bVentEnable);
         je.field(F("open_bypass"),      settings.otd.bOpenBypass);
@@ -582,7 +590,6 @@ static void handleOTDirect(const char words[][API_WORD_LEN], uint8_t wc, HTTPMet
       restFinalize();
     } else if (method == HTTP_POST || method == HTTP_PUT) {
       if (hasArgCompat("setbacktemp"))    updateSetting("OTDsetbacktemp", argCompat("setbacktemp"));
-      if (hasArgCompat("setbacktimeout")) updateSetting("OTDsetbacktimeout", argCompat("setbacktimeout"));
       // TASK-584: ventilation override persistence settings
       if (hasArgCompat("ventenable"))    updateSetting("OTDventenable", argCompat("ventenable"));
       if (hasArgCompat("openbypass"))    updateSetting("OTDopenbypass", argCompat("openbypass"));
@@ -1534,7 +1541,7 @@ static void handleSAT(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod m
     webSend(200, F("application/json"), F("{\"status\":\"ok\"}"));
   }
   else if (strcasecmp_P(sub, PSTR("weather")) == 0) {
-    if (wc == 5 && strcasecmp_P(words[5], PSTR("needs-setup")) == 0) {
+    if (wc > 5 && strcasecmp_P(words[5], PSTR("needs-setup")) == 0) {   // TASK-1969: six words, words[5] exists only from wc 6
       if (method != HTTP_GET) { sendApiMethodNotAllowed(F("GET")); return; }
       // "Needs setup" means: after startup grace, outside temp still missing
       // AND weather not yet valid. Browser uses this to trigger the wizard.
@@ -1618,6 +1625,8 @@ static void handleSAT(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod m
     // Direct updateSetting() calls
     } else if (strcasecmp_P(settingName, PSTR("overshoot_margin")) == 0) {
       updateSetting("SATovershootmargin", val); handled = true;
+    } else if (strcasecmp_P(settingName, PSTR("pwm_switch_margin")) == 0) {   // TASK-1888
+      updateSetting("SATpwmswitchmargin", val); handled = true;
     } else if (strcasecmp_P(settingName, PSTR("heating_system")) == 0) {
       updateSetting("SATsystem", val); handled = true;
     } else if (strcasecmp_P(settingName, PSTR("manufacturer")) == 0) {
@@ -2251,6 +2260,7 @@ static void handleDebugDump(const char words[][API_WORD_LEN], uint8_t wc, HTTPMe
     je.field(F("settings.sat.use_external_temp"), settings.sat.bUseExternalTemp);
     je.field(F("settings.sat.max_rel_mod"), (uint32_t)settings.sat.iMaxRelModulation);
     je.field(F("settings.sat.overshoot_margin"), settings.sat.fOvershootMargin);
+    je.field(F("settings.sat.pwm_switch_margin"), settings.sat.fPwmSwitchMargin);   // TASK-1888
     je.field(F("settings.sat.overshoot_protection"), settings.sat.bOvershootProtection);
     je.field(F("settings.sat.follow_thermostat"), settings.sat.bFollowThermostat);
     je.field(F("settings.sat.curve_self_tune"), settings.sat.bCurveSelfTune);   // TASK-1525
@@ -2285,7 +2295,6 @@ static void handleDebugDump(const char words[][API_WORD_LEN], uint8_t wc, HTTPMe
     je.field(F("settings.otd.mode"), (uint32_t)settings.otd.iMode);
     je.field(F("settings.otd.auto_detect"), settings.otd.bAutoDetect);
     je.field(F("settings.otd.setback_temp"), settings.otd.fSetbackTemp);
-    je.field(F("settings.otd.setback_timeout"), (uint32_t)settings.otd.iSetbackTimeout);
     je.field(F("settings.otd.enable_slave"), settings.otd.bEnableSlave);
     je.field(F("settings.otd.summer_mode"), settings.otd.bSummerMode);
     je.field(F("settings.otd.fail_safe"), settings.otd.bFailSafe);
@@ -2402,7 +2411,6 @@ static void handleDebugDump(const char words[][API_WORD_LEN], uint8_t wc, HTTPMe
     je.field(F("state.otd.mode"), (int32_t)snap->st.otd.eMode);
     je.field(F("state.otd.master_mode"), snap->st.otd.bMasterMode);
     je.field(F("state.otd.thermostat_connected"), snap->st.otd.bThermostatConnected);
-    je.field(F("state.otd.setback_active"), snap->st.otd.bSetbackActive);
     je.field(F("state.otd.override_mode"), (int32_t)snap->st.otd.eOverrideMode);
     je.field(F("state.otd.override_f88"), (uint32_t)snap->st.otd.iOverrideF88);
 #endif
@@ -2907,6 +2915,8 @@ void sendOTValue(int msgid){
     // TASK-1871: what the boiler answered last for this ID this boot, and how long ago.
     je.field(F("status"), FPSTR(boilerAnswerStatus((uint8_t)msgid)));
     je.field(F("last_seen_age_s"), boilerAnswerAgeS((uint8_t)msgid, millis()));
+    // TASK-1965: where the served value came from; status above is the boiler's last answer only.
+    je.field(F("source"), FPSTR(valueSourceName((uint8_t)msgid)));
     je.endObject();                   // close root
   }
   restFinalize();
@@ -2944,6 +2954,8 @@ void sendOTLabel(const char *msglabel){
     // TASK-1871: what the boiler answered last for this ID this boot, and how long ago.
     je.field(F("status"), FPSTR(boilerAnswerStatus((uint8_t)msgid)));
     je.field(F("last_seen_age_s"), boilerAnswerAgeS((uint8_t)msgid, millis()));
+    // TASK-1965: where the served value came from; status above is the boiler's last answer only.
+    je.field(F("source"), FPSTR(valueSourceName((uint8_t)msgid)));
     je.endObject();                   // close root
   }
   restFinalize();
@@ -3247,6 +3259,7 @@ void sendDeviceInfoV2()
     // --- Firmware & build identity ---
     je.field(F("author"), F("Robert van den Breemen"));
     je.field(F("fwversion"), _SEMVER_FULL);
+    je.field(F("appelfsha256"), platformRunningAppSha());   // TASK-1983: constant per boot, so the chunked passes stay equal
     je.field(F("compiled"), snap->compiled);
     // ADR-113 stage 2 (TASK-754): picavailable removed; UI selects on hardware_type.
     if (snap->picEnabled) {
@@ -3270,11 +3283,13 @@ void sendDeviceInfoV2()
       je.field(F("otdmaster"), snap->st.otd.bMasterMode);
       je.field(F("otdstepup"), snap->st.otd.bStepUpEnabled);
       je.field(F("otdthermostat"), snap->st.otd.bThermostatConnected);
-      je.field(F("otdsetback"), snap->st.otd.bSetbackActive);
       je.field(F("otdschedtotal"), snap->st.otd.iScheduleTotal);
       je.field(F("otdschedactive"), snap->st.otd.iScheduleActive);
       je.field(F("otdscheddisabled"), snap->st.otd.iScheduleDisabled);
       je.field(F("otdoverrides"), snap->st.otd.iOverrideCount);
+      // TASK-1966: boiler line health (a request in flight, commands refused by a full ring)
+      je.field(F("otdrequestactive"), snap->st.otd.bMasterRequestActive);
+      je.field(F("otdcmdringdropped"), snap->st.otd.iCmdRingDropped);
       // TASK-1860: the PIC command set OT-Direct implements (also PR=X and the PR=A banner); absent on a PIC board,
       // where picfwversion is the real PIC's version.
       je.field(F("otdpiccompat"), otdPicCompatVersion());
@@ -3559,7 +3574,7 @@ void sendHealth()
     JsonEmit je(*strm);
     je.beginObject();                 // root {
     je.beginObject(F("health"));      // "health":{
-    je.field(F("status"),         LittleFSmounted ? "UP" : "DEGRADED");
+    je.field(F("status"),         (LittleFSmounted && !fsWriterWriteFailed()) ? "UP" : "DEGRADED");   // TASK-2020: a failed write too
     je.field(F("uptime"),         upTime());
     je.field(F("heap"),           platformFreeHeap());
     je.field(F("networkmode"),    networkModeName());
@@ -3603,7 +3618,7 @@ void sendHealth()
     // health poll. Same values as sendSimulationStatus(); the file flag is kept by the loop task (TASK-1899).
     je.field(F("simulation_active"), state.debug.bOTGWSimulation);
     je.field(F("simulation_source"), LittleFSsimFilePresent ? "file" : "builtin");
-    je.field(F("littlefsMounted"), LittleFSmounted);
+    je.field(F("littlefsMounted"), LittleFSmounted.load());
     je.endObject();                   // close "health"
     je.endObject();                   // close root
   }
@@ -3660,6 +3675,7 @@ void sendDeviceCoreDump()
   webPushHeader(F("Content-Disposition"), disp);
   webPushHeader(F("Cache-Control"), F("no-store"));
   if (haveSha) webPushHeader(F("X-Coredump-App-Sha256"), appSha);
+  webPushHeader(F("X-Running-App-Sha256"), platformRunningAppSha());   // TASK-1983: same prefix = a dump of this build
 
   AsyncWebServerResponse* resp = currentRequest->beginResponse(
       String(F("application/octet-stream")), dumpSize,
@@ -3678,13 +3694,13 @@ void sendDeviceCoreDump()
 //
 // {"recording":{"state":"recording|stopped|refused","enabled":b,"active":b,"reason":"","psram":b,
 //   "block_size":4096,"ring_blocks":n,"ring_bytes":n,"has_data":b,"oldest_seq":n,"newest_seq":n,
-//   "dropped":n,"exact":b}}
+//   "dropped":n,"exact":b,"append_count":n,"append_max_us":n,"append_avg_us":n}}
 // enabled = the persisted DiagRecordingOn flag (resumes at boot); active = a ring is being written;
 // reason is set when the last start was refused; oldest/newest_seq are 0 while has_data is false;
 // exact is false when the recorder lock was busy and the numbers were read without it.
 static void diagEmitStatus(JsonEmit& je)
 {
-#if HAS_CLOUD_REC   // TASK-1991: the same keys, from the one recorder's ring (block = a record, seq = record seq)
+#if HAS_CLOUD_REC   // TASK-2907: the same keys, from the one recorder's ring (block = a record, seq = record seq)
   {
     CloudRecLocalStatus c;
     cloudRecLocalStatusRead(c);
@@ -3727,6 +3743,9 @@ static void diagEmitStatus(JsonEmit& je)
   je.field(F("oldest_seq"),  s.oldest);
   je.field(F("newest_seq"),  s.newest);
   je.field(F("dropped"),     s.dropped);
+  je.field(F("append_count"),  s.appendCount);    // TASK-1665 AC2: records of this recording that were timed
+  je.field(F("append_max_us"), s.appendMaxUs);    // the slowest append, us (lock wait + encode + copy)
+  je.field(F("append_avg_us"), s.appendAvgUs);
   je.field(F("exact"),       s.exact);
   je.endObject();
 }
@@ -3780,9 +3799,8 @@ void sendDiagRecordingControl(bool start)
 // The block range is fixed by diagDownloadRange() before the response starts; the filler copies one
 // chunk per call under the recorder try-lock and asks the server to retry when the lock is busy, so
 // async_tcp never waits. No ring-sized copy exists: only the 640 B header snapshot is on the heap.
-// A recorder that is stopped or empty gives a valid file with block count 0.
 #if HAS_CLOUD_REC
-// TASK-1991: GET /api/v2/diag/recording in this env: the "OTGWMIX1" file of RecRing.h, chunked (its length is not
+// TASK-2907: GET /api/v2/diag/recording in this env: the "OTGWMIX1" file of RecRing.h, chunked (its length is not
 // known up front while records keep arriving). The header first, then the ring's records oldest first; a fill never
 // waits for the ring's lock. ?since=<seq> starts at the first record at or after seq.
 static void sendCloudRecDownload(uint64_t since)
@@ -3836,6 +3854,8 @@ static void sendCloudRecDownload(uint64_t since)
 }
 #endif
 
+// A recorder that never ran, is empty, or was stopped on a board without PSRAM (heap ring freed) gives a
+// valid file with block count 0. A stopped PSRAM ring keeps its blocks until the next start (TASK-1960).
 void sendDiagRecordingDownload()
 {
   if (!currentRequest || g_responseSent) return;
@@ -3965,7 +3985,6 @@ void sendOTDirectStatus()
     je.field(F("master_mode"),  state.otd.bMasterMode);
     // Thermostat connectivity
     je.field(F("thermostat_connected"), state.otd.bThermostatConnected);
-    je.field(F("setback_active"), state.otd.bSetbackActive);
     // Schedule statistics
     je.field(F("schedule_total"),    state.otd.iScheduleTotal);
     je.field(F("schedule_active"),   state.otd.iScheduleActive);
@@ -4331,6 +4350,8 @@ void sendDeviceSettings()
     char tmpBuf[8];
     dtostrf(settings.sat.fOvershootMargin, 1, 1, tmpBuf);
     addNum(F("satovershootmargin"), tmpBuf, "f", 0.5f, 5.0f);
+    dtostrf(settings.sat.fPwmSwitchMargin, 1, 1, tmpBuf);   // TASK-1888
+    addNum(F("satpwmswitchmargin"), tmpBuf, "f", 0.5f, 5.0f);
   }
   // --- SAT Weather settings (Task #50) ---
   addBool(F("satweatherenable"), settings.sat.bWeatherEnable, "b");
@@ -4492,7 +4513,6 @@ void sendDeviceSettings()
       dtostrf(settings.otd.fSetbackTemp, 1, 1, tmpBuf);
       addNum(F("otdsetbacktemp"), tmpBuf, "f", 1, 30);
     }
-    addInt(F("otdsetbacktimeout"), settings.otd.iSetbackTimeout, "i", 5, 255);
     addBool(F("otdenableslave"), settings.otd.bEnableSlave, "b");
     addBool(F("otdsummermode"), settings.otd.bSummerMode, "b");
     addBool(F("otdfailsafe"), settings.otd.bFailSafe, "b");
@@ -4570,7 +4590,7 @@ static const char* const PROGMEM knownSettings[] = {
   "ntpenable", "ntphostname", "ntpsendtime", "ntptimezone",
   "otdautobypass", "otdautodetect", "otdenableslave", "otdfailsafe", "otdfreeventenable",
   "otdhasbypassrelay", "otdmode", "otdmsginterval", "otdopenbypass",
-  "otdsetbacktemp", "otdsetbacktimeout", "otdsummermode",
+  "otdsetbacktemp", "otdsummermode",
   "otdventenable", "otdventsetpoint",
   "otgwcommandenable", "otgwcommands",
   "pictempsensor",  // TASK-1940
@@ -4586,7 +4606,7 @@ static const char* const PROGMEM knownSettings[] = {
   "satmodsupdelay", "satmodsupoffset", "satmqttfallback", "satmultiarea", "satmultiareacount",
   "satovershootmargin", "satovershootprotection", "satpresetactivity", "satpresetaway", "satpresetcomfort", "satpreseteco",
   "satpresethome", "satpresetsleep",  // TASK-1254: activity/home/sleep had GET + dispatch but were POST-blocked
-  "satpresetsync", "satpresetsynctopic", "satpushsetpoint",
+  "satpresetsync", "satpresetsynctopic", "satpushsetpoint", "satpwmswitchmargin",  // TASK-1888
   // TASK-640: PV-surplus setpoint boost settings
   "satpvboostdeltac", "satpvboostenabled", "satpvboostholds",
   "satpvboostmaxdurationmin", "satpvboostmaxindoorc", "satpvboostthresholdw",
@@ -4663,6 +4683,11 @@ void postSettings()
     RESTDebugTf(PSTR("--> field[%s] => newValue[***]\r\n"), field);
   } else {
     RESTDebugTf(PSTR("--> field[%s] => newValue[%s]\r\n"), field, newValue);
+  }
+  // TASK-2025: without PSRAM BLE cannot be switched on (the setter refuses it too); say so instead of a 200.
+  if (strcasecmp_P(field, PSTR("satbleenable")) == 0 && EVALBOOLEAN(newValue) && !psramFound()) {
+    webSend(409, F("application/json"), F("{\"error\":\"BLE needs PSRAM: not available on this board\"}"));
+    return;
   }
   updateSetting(field, newValue);
   // TASK-564: do NOT call flushSettings() synchronously here. The earlier

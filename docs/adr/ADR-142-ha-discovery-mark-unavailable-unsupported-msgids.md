@@ -20,6 +20,7 @@ related:
   - "ADR-102"
   - "ADR-122"
   - "ADR-080"
+  - "ADR-255"
 deciders:
   - "Robert van den Breemen"
 binding: false
@@ -94,6 +95,11 @@ status_history:
     changed_by: "User: Robert van den Breemen"
     reason: Closed as Rejected. Never implemented and not expected to be; the non-standard Deferred status is retired with it.
     changed_via: manual
+  - date: 2026-11-18
+    status: Rejected
+    changed_by: "Agent: Claude"
+    reason: Related to ADR-255
+    changed_via: adr-kit lifecycle
 ```
 
 ## Context

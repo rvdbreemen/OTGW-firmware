@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : MQTTstuff
-**  Version  : v2.0.0-poc.13
+**  Version  : v2.0.0-poc.14
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **      Modified version from (c) 2020 Willem Aandewiel
@@ -15,6 +15,7 @@
 #include <pgmspace.h>
 #include "OTGW-Core.h"              // Core OpenTherm data structures and functions
 #include "MQTTstuff.h"              // Structured discovery data layer (enums, structs, streaming API)
+#include "LoopStepWatch.h"          // TASK-1989: slowest loop step for the [loop-stall] line
 #include "mqttBrokerAddress.h"      // decideMqttBrokerLookup() (TASK-1451)
 #include "mqtt_discovery_verify.h"  // Discovery-verify state machine (TASK-363: separate TU)
 
@@ -629,6 +630,28 @@ bool bHAcycle = false;
 // --- Adapters: wrap bool-returning and no-arg handlers into the uniform
 // void(const char*) signature expected by the dispatch table. ---
 static void _satTargetTempCmd(const char* v)     { satHandleTargetTemp(v); }
+// TASK-1979 / ADR-248: the HA thermostat card's target. While SAT owns the control setpoint (ADR-179) the value is
+// SAT's target (satHandleTargetTemp also selects a matching preset); otherwise it is today's TT= command. The card
+// sends a bare number, so the payload is validated here before TT= is built.
+static void _satClimateTargetCmd(const char* v) {
+  if (!v || !*v) return;
+  if (satOwnsControlSetpoint()) { satHandleTargetTemp(v); return; }
+  char* endp = nullptr;
+  const float t = strtof(v, &endp);
+  if (endp == v || *endp != '\0' || !isfinite(t)) {
+    DebugTf(PSTR("MQTT sat/climate_target ignored, not a number [%s]\r\n"), v);
+    return;
+  }
+  char cmd[24];
+  const int n = snprintf_P(cmd, sizeof(cmd), PSTR("TT=%s"), v);
+  if (n < 0 || (size_t)n >= sizeof(cmd)) {
+    DebugTf(PSTR("MQTT sat/climate_target ignored, payload too long\r\n"));
+    return;
+  }
+  if (addCommandToQueue(cmd, n, true) == CmdQueueResult::Dropped) {
+    DebugTf(PSTR("MQTT sat/climate_target [%s] dropped (refused or queue full)\r\n"), cmd);
+  }
+}
 static void _satExtTempCmd(const char* v)        { satHandleExternalTemp(v); }
 static void _satExtOutdoorCmd(const char* v)     { satHandleExternalOutdoor(v); }
 static void _satPvSurplusCmd(const char* v)      { satHandlePvSurplus(v); }                  // TASK-640
@@ -673,6 +696,7 @@ struct SatMqttCmdEntry {
 static const SatMqttCmdEntry kSatMqttCmds[] PROGMEM = {
   // --- Typed handlers (payload parsing lives in the handler) ---
   { "target",                 nullptr,                _satTargetTempCmd },
+  { "climate_target",         nullptr,                _satClimateTargetCmd },   // TASK-1979 / ADR-248
   { "indoor_temp",            nullptr,                _satExtTempCmd },
   { "outdoor_temp",           nullptr,                _satExtOutdoorCmd },
   // TASK-640: PV-surplus boost. set/<nodeId>/sat/pv_surplus_w (watts),
@@ -694,6 +718,7 @@ static const SatMqttCmdEntry kSatMqttCmds[] PROGMEM = {
 
   // --- Direct setting-key passthrough ---
   { "overshoot_margin",       "SATovershootmargin",   nullptr },
+  { "pwm_switch_margin",      "SATpwmswitchmargin",   nullptr },   // TASK-1888
   { "heating_system",         "SATsystem",            nullptr },
   { "manufacturer",           "SATmanufacturer",      nullptr },
   { "max_modulation",         "SATmaxmodulation",     nullptr },
@@ -1155,6 +1180,10 @@ static bool     sConnTraceOn = false;
 static uint32_t sConnTraceT0 = 0, sConnTraceLastMs = 0, sConnTraceMin = 0xFFFFFFFFu, sConnTraceGen = 0;
 static uint8_t  sConnTracePOutbox = 0, sConnTracePFiles = 0, sConnTracePRest = 0;
 static uint16_t sConnTraceSamples = 0, sConnTraceRestarts = 0;
+// TASK-2019 diagnostics: the same probes, armed for SAT_TRACE_MS after the SAT takeover (satTakeoverHeapTraceBegin()).
+static bool     sSatTraceOn = false, sSatTraceOwnWindow = false;
+static uint32_t sSatTraceT0 = 0;
+static constexpr uint32_t SAT_TRACE_MS = 5000;
 
 static inline uint16_t connTraceCap16(uint32_t v) { return v > 0xFFFFu ? 0xFFFFu : (uint16_t)v; }
 static inline uint8_t  connTraceCap8(uint32_t v)  { return v > 0xFFu ? 0xFFu : (uint8_t)v; }
@@ -1186,8 +1215,16 @@ static void connProbeReset() {
   sConnProbePW = platformHeapWindowMin(); sConnProbePGen = platformHeapWinGen();
 }
 
+// TASK-1989: the slowest step of every loop pass, always on (one millis() per probe); the [loop-stall] line prints it.
+static LoopStepWatch sLoopSteps;
+
+void loopSlowestStep(uint8_t* from, uint8_t* to, uint32_t* ms) {
+  loopStepSlowest(sLoopSteps, millis(), CPROBE_LOOP_TOP, from, to, ms);
+}
+
 void connProbe(uint8_t tag) {
-  if (!sConnTraceOn) return;
+  loopStepProbe(sLoopSteps, tag, millis(), CPROBE_LOOP_TOP);   // TASK-1989: before the trace gate, so it runs after boot too
+  if (!sConnTraceOn && !sSatTraceOn) return;
   const uint32_t now = millis();
   const uint32_t freeNow = platformFreeHeap();
   const uint32_t w = platformHeapWindowMin();
@@ -1196,9 +1233,11 @@ void connProbe(uint8_t tag) {
   const uint32_t ref = (gen == sConnProbePGen) ? sConnProbePW : sConnProbePFree;
   const bool fell = (w != 0) && (w + 1024U <= ref);
   const bool slow = (now - sConnProbePMs) >= 20U;
-  if ((fell || slow) && sConnProbeN < 32) {
+  // TASK-2019: the takeover trace keeps drops only, so its 32 slots are not filled by slow passes before the dip
+  const bool keep = sConnTraceOn ? (fell || slow) : fell;
+  if (keep && sConnProbeN < 32) {
     ConnProbeRec &r = sConnProbe[sConnProbeN++];
-    r.tMs = connTraceCap16(now - sConnTraceT0);  r.dtMs = connTraceCap16(now - sConnProbePMs);
+    r.tMs = connTraceCap16(now - (sConnTraceOn ? sConnTraceT0 : sSatTraceT0));  r.dtMs = connTraceCap16(now - sConnProbePMs);
     r.min4 = connTraceCap16(w / 4);              r.free4 = connTraceCap16(freeNow / 4);
     r.pFree4 = connTraceCap16(sConnProbePFree / 4);
     r.maxblk4 = connTraceCap16(platformMaxFreeBlock() / 4);
@@ -1210,17 +1249,60 @@ void connProbe(uint8_t tag) {
   sConnProbePW = w; sConnProbePGen = gen;
 }
 
-static void connProbePrint() {
+static void connProbePrint(PGM_P label) {
   for (uint8_t i = 0; i < sConnProbeN; i++) {
     const ConnProbeRec &r = sConnProbe[i];
-    DebugTf(PSTR("[HEAP] connect-probe t=%u dt=%u at=%u from=%u min=%lu free=%lu pfree=%lu maxblk=%lu outbox=%u ws=%u mqttTx=%u gen=%u\r\n"),
-            r.tMs, r.dtMs, r.tag, r.pTag, (unsigned long)r.min4 * 4, (unsigned long)r.free4 * 4,
+    DebugTf(PSTR("[HEAP] %s t=%u dt=%u at=%u from=%u min=%lu free=%lu pfree=%lu maxblk=%lu outbox=%u ws=%u mqttTx=%u gen=%u\r\n"),
+            label, r.tMs, r.dtMs, r.tag, r.pTag, (unsigned long)r.min4 * 4, (unsigned long)r.free4 * 4,
             (unsigned long)r.pFree4 * 4, (unsigned long)r.maxblk4 * 4, r.outbox, r.ws, r.mqttTxBytes, r.gen);
   }
-  DebugTf(PSTR("[HEAP] connect-probe end kept=%u calls=%u\r\n"), (unsigned)sConnProbeN, (unsigned)sConnProbeCalls);
+  DebugTf(PSTR("[HEAP] %s end kept=%u calls=%u\r\n"), label, (unsigned)sConnProbeN, (unsigned)sConnProbeCalls);
 }
 
+// --- satHeapTrace begin
+// TASK-2019 diagnostics (no behaviour change): on .61 (beta.369) the since-boot heap minimum fell to 1068 B right after
+// the SAT takeover (window minimum 2.5-6.3 KB for 3 s, MQTT outbox 1 packet; a boot without SAT stays near 14-23 KB).
+// For SAT_TRACE_MS after the takeover the connect probes record every drop of 1 KB or more with the step before it
+// (at= / from= are CPROBE_* tags, MQTTstuff.h), then print as '[HEAP] sat-takeover-probe'. Not while the boot connect
+// trace runs (it owns the probes); a connect trace that starts while it runs first ends it (satTakeoverHeapTraceYield()),
+// so the takeover records are printed under their own label and not wiped by the connect trace's reset. It arms at the
+// boot takeover and at every later 'outside temperature valid again'. The trace opens its own heap window when none is
+// open and closes only that one, and only when no burst or boot window needs it. Known limit: once another owner closes
+// the shared window (after boot: the drip tick or a burst end), platformHeapWindowMin() reads 0 and no drop is kept;
+// at boot the boot watch keeps the window open. Loop task only.
+static void satTakeoverHeapTraceFinish() {
+  sSatTraceOn = false;
+  connProbePrint(PSTR("sat-takeover-probe"));
+  DebugTf(PSTR("[HEAP] sat-takeover end min=%lu winMin=%lu free=%lu\r\n"), (unsigned long)platformMinFreeHeap(),
+          (unsigned long)platformHeapWindowMin(), (unsigned long)platformFreeHeap());
+  if (sSatTraceOwnWindow && !sHeapBurstOpen && sBootHeapState != BOOTHEAP_RUN) platformHeapWindowStop();
+  sSatTraceOwnWindow = false;
+}
+
+// The boot connect trace takes the probes over: end a running takeover trace first.
+static void satTakeoverHeapTraceYield() {
+  if (sSatTraceOn) satTakeoverHeapTraceFinish();
+}
+
+void satTakeoverHeapTraceBegin() {
+  if (sConnTraceOn || sSatTraceOn) return;
+  sSatTraceOwnWindow = !platformHeapWindowActive() && platformHeapWindowStart();
+  sSatTraceOn = true;
+  sSatTraceT0 = millis();
+  connProbeReset();
+  DebugTf(PSTR("[HEAP] sat-takeover begin min=%lu free=%lu maxblk=%lu win=%d own=%d\r\n"),
+          (unsigned long)platformMinFreeHeap(), (unsigned long)platformFreeHeap(), (unsigned long)platformMaxFreeBlock(),
+          (int)platformHeapWindowActive(), (int)sSatTraceOwnWindow);
+}
+
+void satTakeoverHeapTraceTick() {
+  if (!sSatTraceOn || (uint32_t)(millis() - sSatTraceT0) < SAT_TRACE_MS) return;
+  satTakeoverHeapTraceFinish();
+}
+// --- satHeapTrace end
+
 static void connTraceBegin() {
+  satTakeoverHeapTraceYield();   // TASK-2019: print the takeover trace before the reset below takes its records
   sConnTraceOn = true;
   sConnTraceN = sConnTraceHead = 0;
   sConnTraceT0 = sConnTraceLastMs = millis();
@@ -1279,7 +1361,7 @@ static void connTraceEnd(uint32_t phaseMin) {
   DebugTf(PSTR("[HEAP] connect-trace end entries=%u samples=%u restarts=%u traceMin=%lu phaseMin=%lu match=%u\r\n"),
           (unsigned)sConnTraceN, (unsigned)sConnTraceSamples, (unsigned)sConnTraceRestarts,
           (unsigned long)tmin, (unsigned long)phaseMin, (tmin == phaseMin) ? 1u : 0u);
-  connProbePrint();  // TASK-1757 AC3
+  connProbePrint(PSTR("connect-probe"));  // TASK-1757 AC3
 }
 
 // Public tick for the loop (OTGW-firmware.ino), next to sampleHeapDip().
@@ -1624,6 +1706,7 @@ void handleMQTT()
       { // engine already pumped by the unconditional loop() at top of handleMQTT()
         state.mqtt.iLastConnectedMs = millis();  // stamp each confirmed-live tick for offline-duration tracking
         connStageTick();  // TASK-1757: rest of the connect burst, in portions
+        staleOverrideClearTick();  // TASK-1991: clear <label>/override topics retained from before a reboot
         mqttRetryPendingSubscribes();  // TASK-1778: a SUBSCRIBE refused at connect
         // ADR-118: periodically refresh the retained gateway-override topics so HA / dashboards
         // reflect active overrides even when no new override frame arrived this minute.
@@ -1770,7 +1853,7 @@ static uint32_t sConnStageMs = 0;   // millis() of connect or of the last portio
 
 static bool     sConnPaceOn = false;  // post-connect pace window for the SAT publish gate (below)
 static uint32_t sConnPaceMs = 0;      // millis() of the CONNACK that opened it
-static void connStageStart() { sConnStage = 1; sConnStageMs = millis(); sConnPaceOn = true; sConnPaceMs = sConnStageMs; }
+static void connStageStart() { sConnStage = 1; sConnStageMs = millis(); sConnPaceOn = true; sConnPaceMs = sConnStageMs; startStaleOverrideClear(); }
 static void connStageReset() { sConnStage = 0; sConnPaceOn = false; }
 
 // True when the next portion may go now.
@@ -1807,6 +1890,19 @@ static void connStageTick() {
   connTraceSample();  // TASK-1757
   sConnStageMs = millis();
   sConnStage = (sConnStage >= 4) ? 0 : (uint8_t)(sConnStage + 1);
+}
+
+// TASK-1991: the sweep started in connStageStart() runs after the four portions, one empty retained message per
+// pass at least 100 ms apart and only while the outbox is shallow (TASK-2004: 26 small retained publishes in one go
+// dipped the free heap ~50 KB on a board without PSRAM). About 40 labels, so the sweep ends a few seconds after connect.
+constexpr uint32_t OVR_CLEAR_GAP_MS = 100;
+static uint32_t sOvrClearMs = 0;
+static void staleOverrideClearTick() {
+  if (sConnStage != 0) return;
+  const uint32_t now = millis();
+  if ((uint32_t)(now - sOvrClearMs) < OVR_CLEAR_GAP_MS) return;
+  if ((uint32_t)MQTTclient.queueSize() > CONN_STAGE_MAX_OUTBOX) return;
+  if (staleOverrideClearStep()) sOvrClearMs = now;
 }
 // Post-connect pace window (TASK-1757, beta.215 probes): right after CONNACK the SAT
 // always-on state set (~14 topics, first pass after a connect) was queued in one
@@ -2294,48 +2390,67 @@ void publishBoilerUnsupportedMsgids() {
   sendMQTTData(F("otgw-firmware/boiler/unsupported_msgids"), csv, true);  // retained
 }
 
+// TASK-2004: the 26 hourly stats used to go out back to back from doTaskMinuteChanged(). On a board without PSRAM
+// (bench .61, 2026-11-16) the free heap fell by ~44 KB inside that burst (50,264 -> 6,484 B at 16:00:00, 26/26
+// topics on the broker, no other publish in that second). They now go out one per loop pass, at least
+// STATS_PACE_MS apart, so the broker's ACKs free each send's buffers before the next one. A stat waits while
+// canPublishMQTT() blocks (heap CRITICAL) instead of being dropped. The value is read when it is sent.
+static constexpr uint8_t  STATS_COUNT    = 26;
+static constexpr uint8_t  STATS_IDLE     = 0xFF;
+static constexpr uint32_t STATS_PACE_MS  = 100;
+static uint8_t  statsPaceIdx    = STATS_IDLE;   // next stat to send, STATS_IDLE when no round runs
+static uint32_t statsPaceLastMs = 0;
+
+// Publish stat i (0 .. STATS_COUNT-1); false past the last one.
+static bool publishStatAt(uint8_t i) {
+  switch (i) {
+    case  0: publishStatU32(F("otgw-firmware/stats/ws_drops"), (unsigned long)state.heapdiag.iWsDropsTotal); return true;
+    case  1: publishStatU32(F("otgw-firmware/stats/mqtt_drops"), (unsigned long)state.heapdiag.iMqttDropsTotal); return true;
+    case  2: publishStatU32(F("otgw-firmware/stats/enter_low"), (unsigned long)state.heapdiag.iEnteredLowCount); return true;
+    case  3: publishStatU32(F("otgw-firmware/stats/enter_warning"), (unsigned long)state.heapdiag.iEnteredWarningCount); return true;
+    case  4: publishStatU32(F("otgw-firmware/stats/enter_critical"), (unsigned long)state.heapdiag.iEnteredCriticalCount); return true;
+    case  5: publishStatU32(F("otgw-firmware/stats/drip_burst_skip"), (unsigned long)state.heapdiag.iDripActiveBurstSkipCount); return true;
+    case  6: publishStatU32(F("otgw-firmware/stats/drip_cooldown_skip"), (unsigned long)state.heapdiag.iDripCooldownSkipCount); return true;
+    case  7: publishStatU32(F("otgw-firmware/stats/drip_slowmode"), (unsigned long)state.heapdiag.iDripSlowModeCount); return true;
+    case  8: publishStatU32(F("otgw-firmware/stats/free_heap"), (unsigned long)platformFreeHeap()); return true;
+    case  9: publishStatU32(F("otgw-firmware/stats/max_block"), (unsigned long)platformMaxFreeBlock()); return true;
+    case 10: publishStatU32(F("otgw-firmware/stats/frag_pct"), (unsigned long)getHeapFragmentation()); return true;
+    case 11: publishStatU32(F("otgw-firmware/stats/disc_verify_runs"), (unsigned long)state.discovery.iVerifyRunCount); return true;
+    case 12: publishStatU32(F("otgw-firmware/stats/disc_republish_triggered"), (unsigned long)state.discovery.iRepublishTriggeredCount); return true;
+    case 13: publishStatU32(F("otgw-firmware/stats/disc_last_missing"), (unsigned long)state.discovery.iLastMissingCount); return true;
+    case 14: publishStatU32(F("otgw-firmware/stats/disc_last_orphan"), (unsigned long)state.discovery.iLastOrphanCount); return true;
+    case 15: publishStatU32(F("otgw-firmware/stats/disc_published_topics"), (unsigned long)state.discovery.iPublishedTopicCount); return true;
+    case 16: publishStatU32(F("otgw-firmware/stats/disc_last_verify_epoch"), (unsigned long)state.discovery.iLastVerifyEpoch); return true;
+    case 17: publishStatU32(F("otgw-firmware/stats/disc_last_daily_heal_epoch"), (unsigned long)state.discovery.iLastDailyHealEpoch); return true;
+    case 18: publishStatU32(F("otgw-firmware/stats/min_max_block"), (unsigned long)state.heapdiag.iMinMaxBlock); return true;
+    case 19: publishStatU32(F("otgw-firmware/stats/min_free_heap"), (unsigned long)getMinFreeHeap()); return true;
+    case 20: publishStatU32(F("otgw-firmware/stats/max_loop_gap_ms"), (unsigned long)state.heapdiag.iMaxLoopGapMs); return true;
+    case 21: publishStatU32(F("otgw-firmware/stats/maxblock_lt2k"), (unsigned long)state.heapdiag.aMaxBlockBucket[0]); return true;
+    case 22: publishStatU32(F("otgw-firmware/stats/maxblock_lt4k"), (unsigned long)state.heapdiag.aMaxBlockBucket[1]); return true;
+    case 23: publishStatU32(F("otgw-firmware/stats/maxblock_lt8k"), (unsigned long)state.heapdiag.aMaxBlockBucket[2]); return true;
+    case 24: publishStatU32(F("otgw-firmware/stats/maxblock_lt16k"), (unsigned long)state.heapdiag.aMaxBlockBucket[3]); return true;
+    case 25: publishStatU32(F("otgw-firmware/stats/maxblock_ge16k"), (unsigned long)state.heapdiag.aMaxBlockBucket[4]); return true;
+    default: return false;
+  }
+}
+
+// Hourly entry point (ADR-086, doTaskMinuteChanged): starts a paced round. A round still running is restarted.
 void sendMQTTheapdiag(){
   if (!settings.mqtt.bEnable) return;
   if (!state.mqtt.bConnected) return;
+  statsPaceIdx    = 0;
+  statsPaceLastMs = millis() - STATS_PACE_MS;   // the first stat may go out on this loop pass
+}
 
-  // Heap pressure tier transitions and drop counters
-  publishStatU32(F("otgw-firmware/stats/ws_drops"),              (unsigned long)state.heapdiag.iWsDropsTotal);
-  publishStatU32(F("otgw-firmware/stats/mqtt_drops"),            (unsigned long)state.heapdiag.iMqttDropsTotal);
-  publishStatU32(F("otgw-firmware/stats/enter_low"),             (unsigned long)state.heapdiag.iEnteredLowCount);
-  publishStatU32(F("otgw-firmware/stats/enter_warning"),         (unsigned long)state.heapdiag.iEnteredWarningCount);
-  publishStatU32(F("otgw-firmware/stats/enter_critical"),        (unsigned long)state.heapdiag.iEnteredCriticalCount);
-
-  // Discovery drip throttle counters
-  publishStatU32(F("otgw-firmware/stats/drip_burst_skip"),       (unsigned long)state.heapdiag.iDripActiveBurstSkipCount);
-  publishStatU32(F("otgw-firmware/stats/drip_cooldown_skip"),    (unsigned long)state.heapdiag.iDripCooldownSkipCount);
-  publishStatU32(F("otgw-firmware/stats/drip_slowmode"),         (unsigned long)state.heapdiag.iDripSlowModeCount);
-
-  // Live heap snapshot at publish time
-  publishStatU32(F("otgw-firmware/stats/free_heap"),             (unsigned long)platformFreeHeap());
-  publishStatU32(F("otgw-firmware/stats/max_block"),             (unsigned long)platformMaxFreeBlock());
-  publishStatU32(F("otgw-firmware/stats/frag_pct"),              (unsigned long)getHeapFragmentation());
-
-  // Discovery verification telemetry (ADR-062)
-  publishStatU32(F("otgw-firmware/stats/disc_verify_runs"),         (unsigned long)state.discovery.iVerifyRunCount);
-  publishStatU32(F("otgw-firmware/stats/disc_republish_triggered"), (unsigned long)state.discovery.iRepublishTriggeredCount);
-  publishStatU32(F("otgw-firmware/stats/disc_last_missing"),        (unsigned long)state.discovery.iLastMissingCount);
-  publishStatU32(F("otgw-firmware/stats/disc_last_orphan"),         (unsigned long)state.discovery.iLastOrphanCount);
-  publishStatU32(F("otgw-firmware/stats/disc_published_topics"),    (unsigned long)state.discovery.iPublishedTopicCount);
-  publishStatU32(F("otgw-firmware/stats/disc_last_verify_epoch"),   (unsigned long)state.discovery.iLastVerifyEpoch);
-  // ADR-170: the automatic path is now a drip re-announce, not a verify, so
-  // disc_last_verify_epoch above only advances on a MANUAL verify. This is the
-  // topic that shows the daily auto-heal is alive.
-  publishStatU32(F("otgw-firmware/stats/disc_last_daily_heal_epoch"), (unsigned long)state.discovery.iLastDailyHealEpoch);
-
-  // TASK-934 soak instrumentation: worst-case watermarks + maxBlock histogram
-  publishStatU32(F("otgw-firmware/stats/min_max_block"),   (unsigned long)state.heapdiag.iMinMaxBlock);
-  publishStatU32(F("otgw-firmware/stats/min_free_heap"),   (unsigned long)getMinFreeHeap());
-  publishStatU32(F("otgw-firmware/stats/max_loop_gap_ms"), (unsigned long)state.heapdiag.iMaxLoopGapMs);
-  publishStatU32(F("otgw-firmware/stats/maxblock_lt2k"),   (unsigned long)state.heapdiag.aMaxBlockBucket[0]);
-  publishStatU32(F("otgw-firmware/stats/maxblock_lt4k"),   (unsigned long)state.heapdiag.aMaxBlockBucket[1]);
-  publishStatU32(F("otgw-firmware/stats/maxblock_lt8k"),   (unsigned long)state.heapdiag.aMaxBlockBucket[2]);
-  publishStatU32(F("otgw-firmware/stats/maxblock_lt16k"),  (unsigned long)state.heapdiag.aMaxBlockBucket[3]);
-  publishStatU32(F("otgw-firmware/stats/maxblock_ge16k"),  (unsigned long)state.heapdiag.aMaxBlockBucket[4]);
+// Called every loop pass: sends at most one stat.
+void loopMQTTStatsPacer(){
+  if (statsPaceIdx == STATS_IDLE) return;
+  if (!settings.mqtt.bEnable || !state.mqtt.bConnected) { statsPaceIdx = STATS_IDLE; return; }  // next hour
+  const uint32_t now = millis();
+  if ((uint32_t)(now - statsPaceLastMs) < STATS_PACE_MS) return;
+  if (getHeapHealth() == HEAP_CRITICAL) return;   // wait; canPublishMQTT() would drop it
+  statsPaceLastMs = now;
+  if (!publishStatAt(statsPaceIdx) || ++statsPaceIdx >= STATS_COUNT) statsPaceIdx = STATS_IDLE;
 }
 
 // ADR-084: OT-bus presence values (boiler_connected, thermostat_connected,

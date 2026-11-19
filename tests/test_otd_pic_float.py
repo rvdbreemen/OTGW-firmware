@@ -76,8 +76,13 @@ static void updateWriteCache(uint8_t, uint16_t) {}
 static uint32_t otdCsc2ExpiryStamp(uint16_t) { return 1; }
 static uint32_t otCSLastCommandMs = 0, otC2LastCommandMs = 0;
 static float otFakeRoomSetpoint = 0.0f;
+static bool otdRoom16CacheSet = false, otdRoom16OvrSet = false; static uint16_t otdRoom16CacheF88 = 0, otdRoom16OvrF88 = 0;   // TASK-1751
 // TT=/TC=/SB= doubles
-enum OTRemoteOverrideMode { OT_OVERRIDE_TEMPORARY = 1, OT_OVERRIDE_CONSTANT = 2 };
+enum OTRemoteOverrideMode { OT_OVERRIDE_NONE = 0, OT_OVERRIDE_TEMPORARY = 1, OT_OVERRIDE_CONSTANT = 2 };
+// TASK-1751: BS= reads the mode and a running TT=; these cases run in gateway mode with no override (the PIC frame rewrite)
+enum OTDirectMode { OTD_MODE_BYPASS = 0, OTD_MODE_GATEWAY = 1, OTD_MODE_MASTER = 3 };   // as OTDirecttypes.h
+static OTDirectMode otCurrentMode = OTD_MODE_GATEWAY;
+static struct { OTRemoteOverrideMode mode; } otRemoteOverride = { OT_OVERRIDE_NONE };
 static int g_rmode = 0; static float g_rval = 0; static int g_rclear = 0;
 static void setRemoteOverride(OTRemoteOverrideMode m, float c) { g_rmode = (int)m; g_rval = c; }
 static void clearRemoteOverride() { g_rclear++; }
@@ -91,6 +96,9 @@ static float g_dhwPersist = -1, g_chPersist = -1;
 static uint16_t g_psOutside = 0;
 static void otdPsStoreOutside(uint16_t v) { g_psOutside = v; }
 struct { float Toutside = 0; } OTcurrentSystemState;
+// TASK-1965: OT= records that the outside value is the gateway's own (OTGW-firmware.h, OTGW-Core.ino).
+enum : uint8_t { OT_VALSRC_NONE = 0, OT_VALSRC_BOILER, OT_VALSRC_GATEWAY, OT_VALSRC_THERMOSTAT, OT_VALSRC_SUMMARY, OT_VALSRC_REPLAY };
+static void recordValueSource(uint8_t, uint8_t) {}
 static inline uint16_t otdUnused() { return 0; }
 """
 
@@ -139,6 +147,14 @@ int main(int argc, char** argv) {
 }
 """
 
+# TASK-1803: the OT=/SW=/SH= branches keep the relay state of the otdRelayRw block (tests/test_otd_relay_rw.py
+# tests it); kept out of PRE because test_otd_relay_rw.py builds on PRE with the real block.
+RELAY_STUBS = r"""
+static bool otdOutsideSet = false; static uint16_t otdOutsideF88 = 0;
+static bool otdInitSW = false, otdInitSH = false; static uint16_t otdDhwSetF88 = 0, otdMaxChSetF88 = 0;
+static bool otdBoilerAllowsWrite(uint8_t) { return false; }
+"""
+
 _tmp = None
 _exe = None
 
@@ -169,7 +185,7 @@ def setUpModule():
     main = MAIN.replace("@BRANCHES@", branches).replace("g_clr_dummy()", "g_clear")
     _tmp = Path(tempfile.mkdtemp(prefix="otd_pf_"))
     cpp = _tmp / "t.cpp"
-    cpp.write_text(PRE + f88 + "\n" + helpers + main, encoding="utf-8")
+    cpp.write_text(PRE + RELAY_STUBS + f88 + "\n" + helpers + main, encoding="utf-8")
     _exe = compile_cpp(cpp, _tmp / ("t.exe" if os.name == "nt" else "t"))
     if _exe is None:
         raise unittest.SkipTest("no C++ compiler")

@@ -40,11 +40,26 @@ def _gains_abs(key):
     return _gains
 
 
+_SAVED = None
+
+
 def install():
     """Patch the 1655 module: absolute-K gains and the two factor keys. kd_factor.__enter__, run_class and judge
-    read these module globals at call time."""
+    read these module globals at call time. uninstall() puts the originals back: the 1655 module is shared, and a
+    patch left in place made a later 1655 run in the same process fail (KeyError 0.9 in _gains_abs)."""
+    global _SAVED
+    if _SAVED is None:
+        _SAVED = (k._gains_with, k.FACTORS)
     k._gains_with = _gains_abs
     k.FACTORS = tuple(KEYS)
+
+
+def uninstall():
+    """Undo install()."""
+    global _SAVED
+    if _SAVED is not None:
+        k._gains_with, k.FACTORS = _SAVED
+        _SAVED = None
 
 
 def recommend(per_class):

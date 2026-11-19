@@ -75,6 +75,7 @@ class PidPy:
     def __init__(self, coeff=1.6, divisor=3):
         self.coeff, self.divisor = coeff, divisor
         self.integral = 0.0
+        self.in_band = True   # TASK-1890 (entries 329, 333; ADR-259): deliberate deviation, see _update_integral
         self.raw_derivative = 0.0
         self.last_error = None
         self.last_temperature = None
@@ -93,9 +94,14 @@ class PidPy:
         self.last_temperature = current
 
     def _update_integral(self, error, curve):                                          # pid.py:185-192
+        # pid.py:187-189 sets the integral to 0 outside the deadband. Deliberate deviation (entries 329 and 333,
+        # TASK-1890, ADR-259): halved once when the error leaves the band, then held; back inside it accumulates.
         if abs(error) > DEADBAND:
-            self.integral = 0.0
+            if self.in_band:
+                self.integral *= 0.5
+            self.in_band = False
             return
+        self.in_band = True
         self.integral += self.ki(curve) * error * PID_UPDATE_INTERVAL
         self.integral = clamp_to_range(self.integral, curve)
 
@@ -212,11 +218,11 @@ class StartUp(Base):
         self.assertGreater(second["D"], 100.0, "premise: the restored raw derivative gives a large D")
         self.assertAlmostEqual(rows[0][1]["rd"], 0.02, places=6, msg="the start-up step must not drop the restored raw derivative")
 
-    def test_restored_integral_survives_the_startup_step_inside_the_deadband_and_is_reset_outside(self):
+    def test_restored_integral_survives_the_startup_step_inside_the_deadband_and_is_halved_outside(self):
         inside = self.run_script(["R", "RS 0.5 0", "S 20.95 21 40 1000"])[0][1]
         self.assertAlmostEqual(inside["I"], 0.5 + 0.003 * 0.05 * 60, places=5)     # pid.py:191 adds to the restored value
         outside = self.run_script(["R", "RS 0.5 0.02", "S 19 21 40 1000"])[0][1]
-        self.assertEqual(outside["I"], 0.0)                                         # pid.py:187-189
+        self.assertAlmostEqual(outside["I"], 0.25, places=6)                        # halved once (TASK-1890; pid.py:187-189 resets to 0)
         self.assertAlmostEqual(outside["rd"], 0.02, places=6)                       # the derivative step is skipped, raw value held
 
 
@@ -272,7 +278,7 @@ class HeldDerivative(Base):
 class Saturation(Base):
     """clamp_to_range (helpers.py:148-150) at +-curve for the integral (pid.py:192) and +-5 for the derivative (:222-230)."""
 
-    def test_integral_saturates_at_plus_and_minus_curve_and_is_reset_outside_the_deadband(self):
+    def test_integral_saturates_at_plus_and_minus_curve_and_is_halved_outside_the_deadband(self):
         script = ["R"]
         t = 0
         for room in ("20.9", "21.1"):                          # error +0.1 then -0.1: exactly on the deadband edge, inside
@@ -280,7 +286,7 @@ class Saturation(Base):
                 script.append("S %s 21 40 %d" % (room, t))
                 t += 60000
             script.append("MARK")
-        script.append("S 19 21 40 %d" % t)                     # outside: reset
+        script.append("S 19 21 40 %d" % t)                     # outside: halved once (TASK-1890)
         out = subprocess.run([str(self.exe)], input="\n".join(l for l in script if l != "MARK") + "\n", capture_output=True, text=True, check=True).stdout
         steps = [parse(l)[1] for l in out.splitlines()]
         self.assertEqual(len(steps), 10001)
@@ -289,7 +295,7 @@ class Saturation(Base):
         self.assertAlmostEqual(max(s["I"] for s in steps), 40.0, places=3, msg="never above +curve")
         self.assertAlmostEqual(steps[9999]["I"], -40.0, places=3)                # -curve
         self.assertAlmostEqual(min(s["I"] for s in steps), -40.0, places=3, msg="never below -curve")
-        self.assertEqual(steps[10000]["I"], 0.0)
+        self.assertAlmostEqual(steps[10000]["I"], -20.0, places=3)              # -40 halved once (TASK-1890)
         # the same series through the oracle
         pid = PidPy()
         for line in script[1:]:
@@ -299,6 +305,33 @@ class Saturation(Base):
             cur = f32(float(room))
             pid.update(cur, r3(float(target) - cur), int(ms) / 1000.0, float(curve))
         self.assertAlmostEqual(steps[-1]["I"], pid.integral, places=3)
+
+    def test_outside_the_band_the_halved_integral_is_held_and_inside_it_accumulates_again(self):
+        # TASK-1890 (entry 333, Q-329a B): halve once when the error leaves the deadband, hold while outside, accumulate
+        # from the held value when back inside; a second exit halves again. Red on the reset-to-0 code (I would be 0).
+        script, t = ["R"], 0
+        for _ in range(50):                                    # inside, error +0.05: the integral builds up
+            script.append("S 20.95 21 40 %d" % t); t += 60000
+        for _ in range(5):                                     # outside, error +2: halved once, then held
+            script.append("S 19 21 40 %d" % t); t += 60000
+        for _ in range(10):                                    # inside again
+            script.append("S 20.95 21 40 %d" % t); t += 60000
+        script.append("S 19 21 40 %d" % t)                     # outside again: halved a second time
+        out = subprocess.run([str(self.exe)], input="\n".join(script) + "\n", capture_output=True, text=True, check=True).stdout
+        I = [parse(l)[1]["I"] for l in out.splitlines()]
+        built = I[49]
+        self.assertGreater(built, 0.1, "premise: the integral built up inside the band")
+        self.assertAlmostEqual(I[50], built / 2, places=4, msg="not halved on leaving the band")
+        for k in range(51, 55):
+            self.assertAlmostEqual(I[k], I[50], places=6, msg="not held while outside the band")
+        self.assertGreater(I[64], I[50], "does not accumulate from the held value when back inside")
+        self.assertAlmostEqual(I[65], I[64] / 2, places=4, msg="the second exit does not halve again")
+        pid = PidPy()                                          # the same series through the oracle
+        for line in script[1:]:
+            _, room, target, curve, ms = line.split()
+            cur = f32(float(room))
+            pid.update(cur, r3(float(target) - cur), int(ms) / 1000.0, float(curve))
+        self.assertAlmostEqual(I[-1], pid.integral, places=3)
 
     def test_integral_clamp_follows_a_falling_curve(self):
         # the clamp uses the CURRENT curve (pid.py:192): a restored 30 with a curve of 20 becomes 20 on the next inside-deadband step
@@ -329,7 +362,7 @@ class Saturation(Base):
 
 
 class Deadband(Base):
-    """abs(error) > 0.1 resets the integral (pid.py:187), abs(error) <= 0.1 freezes the derivative (:205); error rounded to 3."""
+    """abs(error) > 0.1 leaves the band (pid.py:187 resets; TASK-1890 halves once), abs(error) <= 0.1 freezes the derivative (:205); error rounded to 3."""
 
     def test_boundary_values(self):
         cases = [("20.9", True), ("21.1", True), ("20.899", False), ("21.101", False), ("21.0", True)]
@@ -340,7 +373,7 @@ class Deadband(Base):
                 if inside:
                     self.assertAlmostEqual(i, 1.0 + 0.003 * r3(21.0 - f32(float(room))) * 60, places=5)   # pid.py:191
                 else:
-                    self.assertEqual(i, 0.0)                                                              # pid.py:187-189
+                    self.assertAlmostEqual(i, 0.5, places=6)   # the restored 1 halved once (TASK-1890; pid.py:187-189 gives 0)
 
     def test_float_error_of_exactly_0_1_is_inside(self):
         # 21.0f - 20.9f = 0.1000004 in float32; satPidError rounds to 3 decimals as TemperatureState.error does

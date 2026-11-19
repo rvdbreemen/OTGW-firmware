@@ -616,7 +616,9 @@ void weatherLoop()
   // (SAT only needs weather as a fallback). TASK-1897: the same rule satResolveOutsideTemp() ranks by: MsgID 27 from a
   // stamp younger than 1 h and not 0.0 (satOtOutsideFresh()). A Toutside without a fresh stamp is not used by SAT, so
   // it must not block the weather fallback either.
-  if (satOtOutsideFresh(millis()) && OTcurrentSystemState.Toutside != 0.0f) return;
+  // The skip ends SAT_OUTSIDE_PREFETCH_MS (10 min) before the MsgID 27 stamp expires (satOtOutsideFreshAhead()), so the
+  // weather value is fresh by the time SAT needs it; otherwise every source went stale at once (marceld beta.361).
+  if (satOtOutsideFreshAhead(millis()) && OTcurrentSystemState.Toutside != 0.0f) return;
 
   // TASK-1319: until the first fetch succeeds, try right after the start-up gate
   // instead of waiting for the first poll tick (the poll timer runs from boot, so

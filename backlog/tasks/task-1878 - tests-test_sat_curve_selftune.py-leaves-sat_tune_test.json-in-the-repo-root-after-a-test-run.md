@@ -3,10 +3,11 @@ id: TASK-1878
 title: >-
   tests/test_sat_curve_selftune.py leaves sat_tune_test.json in the repo root
   after a test run
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@claude'
 created_date: '2026-11-12T22:07:00Z'
-updated_date: '2026-11-13T06:58:00Z'
+updated_date: '2026-11-15T10:50:00Z'
 labels:
   - tests
   - tooling
@@ -23,8 +24,8 @@ Found during the TASK-1872 full run (2026-11-12): an untracked sat_tune_test.jso
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 After python scripts/run_tests.py -j 1 test_sat_curve_selftune.py in a clean tree, git status shows no sat_tune_test.json, and the same check on the old code shows the file appearing
-- [ ] #2 test_sat_curve_selftune.py stays green
+- [x] #1 After python scripts/run_tests.py -j 1 test_sat_curve_selftune.py in a clean tree, git status shows no sat_tune_test.json, and the same check on the old code shows the file appearing
+- [x] #2 test_sat_curve_selftune.py stays green
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -32,3 +33,9 @@ Found during the TASK-1872 full run (2026-11-12): an untracked sat_tune_test.jso
 <!-- SECTION:NOTES:BEGIN -->
 2026-11-13 (comms, TASK-1883 run): confirmed again. Running python scripts/run_tests.py --no-host tuner_convergence curve_selftune in wt-comms left sat_tune_test.json in the repo root (removed by hand); same cause tests/test_sat_curve_selftune.py:898-899 (test_removing_one_exclusion_is_caught runs the exe without SATTUNE_FILE and without cwd). The untracked sat_tune_test.json in the main dev tree fits this.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Cause confirmed: ExclusionMutants.test_removing_one_exclusion_is_caught ran the mutant exe without SATTUNE_FILE, so g_tuneFile() fell back to the relative sat_tune_test.json in the runner's cwd (repo root). Fix: that run gets SATTUNE_FILE in the class TemporaryDirectory (tests/test_sat_curve_selftune.py:923-926). AC1: OLD: rm sat_tune_test.json; python scripts/run_tests.py -j 1 test_sat_curve_selftune.py -> PASS 172.1 s (95 tests, skipped=1), git status shows '?? sat_tune_test.json'. FIX: same commands -> PASS 149.2 s, git status shows no sat_tune_test.json. AC2: the test stays green (above). The other tests that import from test_sat_curve_selftune (cold_hysteresis_day, pwm_phase_telemetry, sim_thermal_learning, thermal_sim_persist) use only its compile helper, not the tune-file harness: no same leak. Tests only, no firmware change.
+<!-- SECTION:FINAL_SUMMARY:END -->

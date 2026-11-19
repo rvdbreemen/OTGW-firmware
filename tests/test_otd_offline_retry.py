@@ -80,7 +80,8 @@ int main(int argc, char** argv) {
 def build_source():
     src = OTD_INO.read_text(encoding="utf-8").replace("\r\n", "\n")
     consts = "\n".join(m.group(0) for m in re.finditer(r"static constexpr uint32_t OT_\w+_(?:INTERVAL|RETRY)_MS\s*=\s*\d+;", src)
-                       if "VENT_FAST" not in m.group(0))
+                       if "VENT_FAST" not in m.group(0)
+                       and re.search(r"OT_\w+_MS", m.group(0)).group(0) + " =" not in msq.PRELUDE)   # TASK-1981: no duplicate of a prelude stub
     pre = msq.PRELUDE
     assert STUB_OFFLINE in pre and OLD_SEND in pre
     pre = pre.replace(STUB_OFFLINE, consts).replace(OLD_SEND, NEW_SEND)

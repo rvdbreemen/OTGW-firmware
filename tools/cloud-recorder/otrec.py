@@ -599,7 +599,7 @@ def unpack_ot2(t0, data):
     return [(t0 + t, L, f) for t, L, f in (ot2_decode_frame(d, m) for _ in range(n))]
 
 
-# ---------------------------------------------------------------- TASK-1972: smaller records, lossless
+# ---------------------------------------------------------------- TASK-2904: smaller records, lossless
 
 SEC_LOST = 7          # LEB128 items, LEB128 records the gateway lost since the previous record
 FMT_MIX_LZ = 5        # a fmt-4 payload, LZ + range-coded as a whole (lz_encode); sent only when it is smaller.

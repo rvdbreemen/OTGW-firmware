@@ -12,6 +12,7 @@ supersedes:
 superseded_by: null
 related:
   - "ADR-203"
+  - "ADR-253"
 topics:
   - "sat"
   - "cold-setpoint"
@@ -75,6 +76,11 @@ status_history:
     status: Accepted
     changed_by: "User: Robert van den Breemen"
     reason: Related to ADR-203
+    changed_via: adr-kit lifecycle
+  - date: 2026-11-16
+    status: Accepted
+    changed_by: "User: Robert van den Breemen"
+    reason: Related to ADR-253
     changed_via: adr-kit lifecycle
 ```
 

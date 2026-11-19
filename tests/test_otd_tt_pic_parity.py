@@ -49,10 +49,10 @@ if os.environ.get("OTGW_OTD_TYPES"):
     alt.TYPES_H = Path(os.environ["OTGW_OTD_TYPES"])   # alt.lib_and_types() reads the types header from here
 
 # ADR-223 numbers. EXPECT_TT_FLAGS is a named constant so the TT flags value can change on its own
-# (gateway.asm:4061 uses b'11' for TT; the firmware answers 0x0002 today).
+# (gateway.asm 6.8 SetTempSetPoint :4089-4092 uses b'11' for TT; TASK-1750 moved the firmware from 0x0002 to it).
 OVR_F88 = 0x1580          # TT=21.5 / TC=21.5
 THERMO_F88 = 0x1400       # the thermostat's own room setpoint, 20.0
-EXPECT_TT_FLAGS = 0x0002
+EXPECT_TT_FLAGS = 0x0003   # TASK-1750: b'11' like the PIC (was 0x0002)
 EXPECT_TC_FLAGS = 0x0001
 MATCH_F88 = 0x0040        # 0.25 C, OT_OVERRIDE_HONOR_DELTA_F88 (ADR-223 sub-point 3)
 RELEASE_N = 4             # before acceptance the 4th mismatch releases (gateway.asm:3025-3036)
@@ -65,6 +65,7 @@ static bool satBlocksExternalCommand(const char*, int) { return false; }
 static void satNoteExternalRefused(const char*, int) {}
 static std::vector<std::string> g_ng, g_synthLog;
 static void otDirectBridgeProcessStatus(const char* s) { g_ng.push_back(s); }
+struct OtdCmdPrefixScope { void set(char, char) {} };   // TASK-1804 B3a: the prefix is tested in test_otd_error_prefix.py
 static char* dtostrf(float v, int, int, char* b) { snprintf(b, 16, "%.2f", v); return b; }
 static void synthesizeResponse(const char* c, const char* v) { g_synthLog.push_back(std::string(c, 2) + ": " + v); }
 // prototypes the Arduino .ino preprocessor generates; the real definitions come from the slices
@@ -73,6 +74,7 @@ static void onThermostatMsgID16(uint8_t msgType, uint16_t f88);
 static void clearWriteOverride(uint8_t msgId);
 static void setRemoteOverride(OTRemoteOverrideMode mode, float celsius);
 static void clearRemoteOverride();
+static bool isOTDirectEnabled() { return true; }   // TASK-1751: otdMqttSetRoomSetpoint() is cut from the real code
 """
 
 MAIN2 = r"""
@@ -151,10 +153,10 @@ static void step(uint32_t ms) {
   if (g_pend >= 0) { g_fr[g_pend].active = otRemoteOverride.mode != OT_OVERRIDE_NONE; g_pend = -1; }
 }
 
-static int countAltSlotsOf(int id) {
+static int countAltSlotsOf(int id, int ansType = 7) {
   int n = 0;
   for (size_t i = 0; i + 1 < g_log.size(); i++)
-    if (g_log[i].prefix == 'T' && idOf(g_log[i].frame) == id && g_log[i + 1].prefix == 'A' && typeOf(g_log[i + 1].frame) == 7) n++;
+    if (g_log[i].prefix == 'T' && idOf(g_log[i].frame) == id && g_log[i + 1].prefix == 'A' && typeOf(g_log[i + 1].frame) == ansType) n++;
   return n;
 }
 static int countAltSlots() { return countAltSlotsOf(24); }
@@ -187,7 +189,7 @@ static void report(const char* tag, size_t fromLog, size_t fromSent, size_t from
   printf("READS %d %d\n", g_reads9, g_reads100);
   for (uint8_t i = 0; i < OT_SCHEDULE_SIZE; i++)
     if (otSchedule[i].isWrite && otSchedule[i].msgId == 16) printf("VS16 %d\n", otSchedule[i].valueSet ? 1 : 0);
-  printf("ALT16 %d\n", countAltSlotsOf(16));
+  printf("ALT16 %d\n", countAltSlotsOf(16, 5));   // TASK-1804 A1: the slot answer of MsgID 16 is WRITE_ACK, as the PIC
   printf("END %s\n", mname(otRemoteOverride.mode));
 }
 
@@ -211,6 +213,15 @@ static void dumpQueue(const char* tag) {
     printf("Q %s %u %04X\n", tag, (unsigned)typeOf(otCmdQueue[i]) * 1000 + idOf(otCmdQueue[i]), (unsigned)(otCmdQueue[i] & 0xFFFF));
 }
 
+static void dump16(const char* tag) {   // TASK-1751: the MsgID 16 slot (schedule write value, frame override)
+  int vs = 0; unsigned val = 0, oa = 0, ov = 0;
+  for (uint8_t i = 0; i < OT_SCHEDULE_SIZE; i++)
+    if (otSchedule[i].isWrite && otSchedule[i].msgId == 16) { vs = otSchedule[i].valueSet ? 1 : 0; val = otSchedule[i].cachedValue; }
+  for (uint8_t i = 0; i < OT_OVERRIDE_COUNT; i++)
+    if (otOverrides[i].msgId == 16) { oa = otOverrides[i].active ? 1 : 0; ov = otOverrides[i].overrideValue; }
+  printf("S16 %s %d %04X %u %04X\n", tag, vs, vs ? val : 0, oa, oa ? ov : 0);
+}
+
 static void startOverride(const char* cmd) {
   mark();
   command(cmd);
@@ -227,6 +238,9 @@ int main(int argc, char** argv) {
     step(60000);
     report("P", g_fromLog, g_fromSent, g_fromSlave);
   } else if (c.rfind("A_", 0) == 0) { setupCase(0, 0); startOverride(cmd); step(120000); report("A", g_fromLog, g_fromSent, g_fromSlave); }
+  else if (c.rfind("O_", 0) == 0) {          // TASK-1750: OH=1 copies the MsgID 100 flags into the high byte
+    setupCase(1, 1); otOverrideHB = 1; startOverride(cmd); step(120000); report("O", g_fromLog, g_fromSent, g_fromSlave);   // E setup: echo, override stays
+  }
   else if (c.rfind("B_", 0) == 0) { setupCase(1, 0); startOverride(cmd); step(120000); report("B", g_fromLog, g_fromSent, g_fromSlave); }
   else if (c.rfind("E_", 0) == 0) { setupCase(1, 1); startOverride(cmd); step(120000); report("E", g_fromLog, g_fromSent, g_fromSlave); }
   else if (c.rfind("D_", 0) == 0) { setupCase(1, 2); startOverride(cmd); step(120000); report("D", g_fromLog, g_fromSent, g_fromSlave); }
@@ -266,6 +280,36 @@ int main(int argc, char** argv) {
     otCmdTail = otCmdHead;
     command("TC=21.5"); dumpQueue("TC");
   }
+  else if (c == "MR" || c == "MB" || c == "MN") {   // TASK-1751: master mode TT=0 puts a room_setpoint / BS= back
+    resetAll(); otCurrentMode = OTD_MODE_MASTER;
+    if (c == "MR") otdMqttSetRoomSetpoint(19.0f);   // MQTT room_setpoint: write value + frame override 0x1300
+    if (c == "MB") command("BS=19.0");              // BS=: frame override 0x1300 only
+    dump16("before");
+    command("TT=21.5"); dump16("tt");
+    command("TT=0"); dump16("tt0");
+  }
+  else if (c.rfind("MW_", 0) == 0) {          // TASK-1751: master mode, what goes on the wire for MsgID 16
+    resetAll(); otCurrentMode = OTD_MODE_MASTER;
+    if (c == "MW_BS") { command("BS=19.0"); dumpQueue("bs"); dump16("bs"); }
+    else if (c == "MW_BTT" || c == "MW_RTT" || c == "MW_NTT") {
+      if (c == "MW_BTT") command("BS=19.0");
+      if (c == "MW_RTT") otdMqttSetRoomSetpoint(19.0f);
+      otCmdTail = otCmdHead;
+      command("TT=21.5"); otCmdTail = otCmdHead;
+      command("TT=0"); dumpQueue("tt0"); dump16("tt0");
+    }
+    else if (c == "MW_B0") {                  // BS= and BS=0 while TT runs: TT keeps the slot, BS waits
+      command("TT=21.5"); otCmdTail = otCmdHead;
+      command("BS=19.0"); dumpQueue("bs"); dump16("bs"); otCmdTail = otCmdHead;
+      command("BS=0"); dumpQueue("bs0"); dump16("bs0"); otCmdTail = otCmdHead;
+      command("TT=0"); dumpQueue("tt0"); dump16("tt0");
+    }
+    else if (c == "MW_RD") {                  // an MQTT room_setpoint while TT runs is stored, written at TT=0
+      command("TT=21.5"); otCmdTail = otCmdHead;
+      otdMqttSetRoomSetpoint(19.0f); dumpQueue("room"); dump16("room"); otCmdTail = otCmdHead;
+      command("TT=0"); dumpQueue("tt0"); dump16("tt0");
+    }
+  }
   else { printf("unknown case %s\n", c.c_str()); return 2; }
   return 0;
 }
@@ -303,6 +347,7 @@ def build_source(ino_path):
         alt.construct(src, r"^static void setRemoteOverride\([^;{]*\)\s*\{"),
         alt.construct(src, r"^static void clearRemoteOverride\([^;{]*\)\s*\{"),
         alt.construct(src, r"^static void onThermostatMsgID16\([^;{]*\)\s*\{"),
+        alt.construct(src, r"^void otdMqttSetRoomSetpoint\([^;{]*\)\s*\{"),   # TASK-1751
         # TASK-1842: the RT= branch (before C2, so inside the cut) calls the PIC GetPercentArg parser
         (alt.construct(src, r"^static const char\* otdPicPercentF88\([^;{]*\)\s*\{")
          if "// --- otdPicPercentF88 begin" in src else ""),
@@ -320,7 +365,9 @@ def build_source(ino_path):
 CASES_TT = ["A_TT", "B_TT", "E_TT", "D_TT", "G_TT"]
 CASES_TC = ["A_TC", "B_TC", "E_TC", "D_TC", "G_TC"]
 CASES_H = ["H_TT", "H_TC"]
-ALL_CASES = ["P"] + CASES_TT + CASES_TC + CASES_H + ["F", "N", "BS", "MQ", "M"]
+CASES_M16 = ["MR", "MB", "MN"]   # TASK-1751
+CASES_MW = ["MW_BS", "MW_BTT", "MW_RTT", "MW_NTT", "MW_B0", "MW_RD"]   # TASK-1751: master-mode MsgID 16 on the wire
+ALL_CASES = ["P"] + CASES_TT + CASES_TC + CASES_H + ["O_TT", "O_TC", "F", "N", "BS", "MQ", "M"] + CASES_M16 + CASES_MW
 RES = {}
 ERR = None
 TMP = None
@@ -344,6 +391,9 @@ def setUpModule():
         if name == "M":
             print("    queue=" + str(r["q"]))
             continue
+        if name in CASES_M16 or name in CASES_MW:
+            print("    slot16=" + str(r["s16"]))
+            continue
         print(f"    bw16={len(r['bw16'])} thermo_w16={len(r['tw16'])} bw100={len(r['bw100'])} r16={r['r16']} "
               f"rp9={len(r['rp9'])} rp100={len(r['rp100'])} reads={r['reads']} end={r['end']}")
 
@@ -355,7 +405,7 @@ def tearDownModule():
 
 def parse(out):
     r = {"bw16": [], "bw100": [], "bw14": [], "r16": 0, "rp16": [], "rp9": [], "rp100": [], "tw16": [], "fr": [],
-         "reads": (0, 0), "end": None, "pre": None, "cmd": {}, "vs16": [], "alt16": 0, "q": {}}
+         "reads": (0, 0), "end": None, "pre": None, "cmd": {}, "vs16": [], "alt16": 0, "q": {}, "s16": {}}
     for line in out.splitlines():
         t = line.split()
         if not t:
@@ -372,6 +422,7 @@ def parse(out):
         elif k == "END": r["end"] = t[1]
         elif k == "VS16": r["vs16"].append(int(t[1]))
         elif k == "ALT16": r["alt16"] = int(t[1])
+        elif k == "S16": r["s16"][t[1]] = (int(t[2]), int(t[3], 16), int(t[4]), int(t[5], 16))
         elif k == "Q": r["q"].setdefault(t[1], []).append((int(t[2]), int(t[3], 16)))
         elif k == "PRE": r["pre"] = {a.split("=")[0]: int(a.split("=")[1]) for a in t[1:]}
         elif k == "CMD":
@@ -391,7 +442,7 @@ class Base(unittest.TestCase):
 
 class Precondition(Base):
     def test_00_alternative_slots_exist_and_the_ring_drains(self):
-        for name in [n for n in ALL_CASES if n != "M"]:
+        for name in [n for n in ALL_CASES if n != "M" and n not in CASES_M16 and n not in CASES_MW]:
             self.assertGreaterEqual(RES[name]["pre"]["altslots"], 3,
                                     f"{name}: MsgID 24 did not become an alternative slot; the ring would never drain")
         p = RES["P"]
@@ -520,7 +571,7 @@ class AltSlotCases:
 
     def test_H1_msgid16_is_an_alternative_slot(self):
         r = RES[f"H_{self.KIND}"]
-        self.assertGreaterEqual(r["alt16"], 3, "precondition: the thermostat's WRITE 16 must be answered Unknown-DataID in a slot")
+        self.assertGreaterEqual(r["alt16"], 3, "precondition: the thermostat's WRITE 16 must be answered by the gateway in a slot, WRITE_ACK like the PIC (TASK-1804 A1)")
         self.assertEqual(r["bw16"], [], f"precondition: no WRITE 16 reaches the boiler as a slot request: {hexl(r['bw16'])}")
 
     def test_H2_release_after_4_mismatches_once_msgid9_was_answered(self):
@@ -588,6 +639,85 @@ class MasterModeCases(Base):
     def test_M3_master_mode_tc_writes_trset_and_flags(self):
         q = RES["M"]["q"]
         self.assertEqual(sorted(q["TC"]), sorted([(1016, OVR_F88), (1100, EXPECT_TC_FLAGS)]), f"TC=21.5 in master mode queued {q['TC']}")
+
+
+
+class OverrideHighCases(Base):
+    """TASK-1750: with OH=1 the PIC copies the MsgID 100 flags into the high byte (MessageID100 gateway.asm 6.8
+    :3303-3311, 'btfsc OverrideHigh / movfw byte4 / call setbyte3'); with OH=0 the high byte is 0 (setbyte4 ends in
+    retlw 0)."""
+    def test_O1_tt_flags_in_both_bytes(self):
+        r = RES["O_TT"]
+        self.assertTrue(r["rp100"], "the thermostat's MsgID 100 read must be answered")
+        self.assertEqual({d for _, d, _ in r["rp100"]}, {0x0303}, f"OH=1 TT=21.5 MsgID 100 answers {r['rp100'][:3]}")
+
+    def test_O2_tc_flags_in_both_bytes(self):
+        r = RES["O_TC"]
+        self.assertTrue(r["rp100"])
+        self.assertEqual({d for _, d, _ in r["rp100"]}, {0x0101}, f"OH=1 TC=21.5 MsgID 100 answers {r['rp100'][:3]}")
+
+    def test_O3_oh0_high_byte_zero(self):
+        self.assertEqual({d for _, d, _ in RES["E_TT"]["rp100"]}, {0x0003})
+        self.assertEqual({d for _, d, _ in RES["E_TC"]["rp100"]}, {0x0001})
+
+
+class MasterSlot16Cases(Base):
+    """TASK-1751: in master mode TT=0 clears only what TT= set, like the PIC's TT=0 that never touches the BS= value
+    (ClearSetPoint gateway.asm 6.8:4144-4153 vs SetFakeSetpoint :4289-4298). S16 = (write value set, value,
+    override active, override value)."""
+    def test_R1_mqtt_room_setpoint_back_after_tt0(self):
+        s = RES["MR"]["s16"]
+        self.assertEqual(s["before"], (1, 0x1300, 1, 0x1300))
+        self.assertEqual(s["tt"], (1, OVR_F88, 1, OVR_F88), "TT=21.5 in master mode writes the slot")
+        self.assertEqual(s["tt0"], (1, 0x1300, 1, 0x1300), f"TT=0 must put the room_setpoint back, got {s['tt0']}")
+
+    def test_R2_bs_back_after_tt0(self):
+        # TASK-1751 (wire): in master mode BS= is a written room setpoint (write value + override), like the MQTT one
+        s = RES["MB"]["s16"]
+        self.assertEqual(s["before"], (1, 0x1300, 1, 0x1300))
+        self.assertEqual(s["tt0"], (1, 0x1300, 1, 0x1300), f"TT=0 must put the BS= value back, got {s['tt0']}")
+
+    def test_R3_nothing_before_tt_clears_as_before(self):
+        self.assertEqual(RES["MN"]["s16"]["tt0"], (0, 0, 0, 0))
+
+
+class MasterWire16Cases(Base):
+    """TASK-1751 (bench 09 .61 beta.341: no WRITE 16 for 360 s after TT=0, and none for BS= alone): in master mode there
+    is no thermostat frame to rewrite, so the MsgID 16 slot is written by the gateway. Precedence: TT=/TC= while active,
+    else the BS= / MQTT room_setpoint value. The PIC has no master-mode MsgID 16 at all (its standalone table,
+    gateway.asm 6.6 :1818-1830, has no MsgID 16), so this is the OT-Direct master-mode rule. q = queued (type*1000+id, data)."""
+    def q(self, case, tag):
+        return RES[case]["q"].get(tag, [])
+
+    def w16(self, case, tag):
+        return [d for k, d in self.q(case, tag) if k == 1016]
+
+    def test_W1_bs_alone_writes_msgid16(self):
+        self.assertEqual(self.w16("MW_BS", "bs"), [0x1300], f"BS=19 in master mode must write MsgID 16: {self.q('MW_BS', 'bs')}")
+        self.assertEqual(RES["MW_BS"]["s16"]["bs"][:2], (1, 0x1300), "and keep it in the 15 s schedule")
+
+    def test_W2_tt0_writes_the_bs_value_at_once(self):
+        self.assertEqual(self.w16("MW_BTT", "tt0"), [0x1300], f"TT=0 after BS=19 must write 19.00 at once: {self.q('MW_BTT', 'tt0')}")
+        self.assertIn((1100, 0), self.q("MW_BTT", "tt0"), "the MsgID 100 = 0 clear still goes out")
+
+    def test_W3_tt0_writes_the_mqtt_room_value_at_once(self):
+        self.assertEqual(self.w16("MW_RTT", "tt0"), [0x1300])
+
+    def test_W4_nothing_set_tt0_writes_no_msgid16(self):
+        self.assertEqual(self.w16("MW_NTT", "tt0"), [], "no room value: no MsgID 16 write after TT=0")
+        self.assertEqual(RES["MW_NTT"]["s16"]["tt0"], (0, 0, 0, 0), "and the schedule stops writing it")
+
+    def test_W5_bs_and_bs0_during_tt_leave_tt_writing(self):
+        r = RES["MW_B0"]["s16"]
+        self.assertEqual(self.w16("MW_B0", "bs"), [], "BS= during TT must not write over TT")
+        self.assertEqual(r["bs"][:2], (1, OVR_F88), "the schedule keeps writing the TT value")
+        self.assertEqual(r["bs0"][:2], (1, OVR_F88), "BS=0 during TT must not stop TT's periodic write")
+        self.assertEqual(self.w16("MW_B0", "tt0"), [], "BS was cleared: nothing to write after TT=0")
+
+    def test_W6_mqtt_room_setpoint_during_tt_waits_for_tt0(self):
+        self.assertEqual(self.w16("MW_RD", "room"), [], "the room value must not be written over TT")
+        self.assertEqual(RES["MW_RD"]["s16"]["room"][:2], (1, OVR_F88))
+        self.assertEqual(self.w16("MW_RD", "tt0"), [0x1300], "it is written at TT=0")
 
 
 if __name__ == "__main__":

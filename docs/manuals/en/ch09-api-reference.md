@@ -366,6 +366,7 @@ On hardware without a PIC (OT-Direct) the firmware answers these commands itself
 | `PR=C` | `PR: C=240 MHz` |
 | `PR=B` | `PR: B=HH:MM DD-MM-YYYY`, the firmware build time |
 | `PR=L` | `PR: L=FXOMPC` until `LA=`..`LF=` change it |
+| `PR=T` | `PR: T=11`: ignore transitions (`IT=`) and override high byte (`OH=`), both 1 by default as on the PIC |
 | `SC=9:05/3` | `SC: 09:05/3` (two-digit hours) |
 | `SR=18:1,230` | `SR: 18:1/230`: the stored response as `<id>:<high byte>/<low byte>`, whatever form the argument had |
 | `FT=X` | `FT: D`: the selected model (`C`, `I`, `S` or `D`), not the argument |
@@ -378,7 +379,14 @@ On OT-Direct the numbers in these commands are read as PIC firmware 6.8 reads th
 - `SW=` and `SH=` answer `BV` outside the bounds the boiler reports in MsgID 48 and 49, or 20-80 and 10-90 before it has; 0 resets them.
 - `OT=` clears the outside temperature (`OT: -`) for text, `OT=-` and a value of 64 or more.
 - `MM=` takes a whole number: text, `MM=-` or a minus sign clears it (`MM: -`), above 100 is `OR`.
+- `PM=` takes a Data-ID of 0 to 255. For a table size (10, 12, 88, 90, 105, 107) it then reads every entry of the next ID, and for a string (93, 94, 95) every character, as the PIC does.
 - Unknown-DataID answers never switch off MsgID 0, 1, 3, 14, 17 and 25, as on the PIC.
+- A command without a value (`CS=`, `TT=`, `SW=` ...) answers `SE`; `OT=`, `MM=` and `CL=` without a value clear (`OT: -`), as on the PIC (TASK-1957).
+- `OT=`, `SW=` and `SH=` reach the boiler also when the thermostat leaves no free slot: with an `OT=` value the thermostat's own READ of MsgID 27 goes out as WRITE 27 with that value, and after `SW=` / `SH=` its next READ of MsgID 56 / 57 goes out once as the WRITE, when MsgID 6 allows that write (TASK-1803).
+- While an `MW=`, `MH=`, `M2=` or `HW=P` write is pending, the thermostat's own MsgID 99 is handled as on the PIC (its READ becomes the gateway's WRITE) (TASK-1906).
+- `TT=` answers the thermostat's MsgID 100 read with `0x03` and `TC=` with `0x01`; `OH=1`, the default since TASK-1961 as on the PIC, copies that into the high byte. Every OT-Direct board switches to `OH=1` once on its first boot with this version (marker `OTDohpicdefault` in `settings.ini`); an `OH=0` sent afterwards stays.
+- Master mode: `TT=0` puts a `BS=` or MQTT `room_setpoint` value back on MsgID 16 (TASK-1751).
+- `SC=` takes `HH:MM/D` exactly: hours above 23 and minutes above 59 are `OR`, a missing `:` or `/` or anything after the day is `SE`, a day other than 1-7 is `BV`; a refused value changes nothing (TASK-1908).
 
 Commands are validated and queued. Responses are processed asynchronously and published to MQTT. The REST endpoint returns `"queued"` immediately without waiting for the PIC response.
 
@@ -689,7 +697,6 @@ Returns OTDirect operating mode, schedule counts, thermostat connection status, 
     "monitor_mode": false,
     "master_mode": false,
     "thermostat_connected": true,
-    "setback_active": false,
     "schedule_total": 12,
     "schedule_active": 11,
     "schedule_disabled": 1,
@@ -719,7 +726,7 @@ Note (TASK-438): `monitor` is now mapped to `GW=0` for parity with PIC firmware 
 
 ##### GET /api/v2/otdirect/settings
 
-Returns the persisted OT-direct configuration settings: mode, the thermostat timeout and ventilation. SAT is the only temperature controller on OT-Direct; the former heating curve and PI room compensation parameters are removed. On a thermostat loss OT-Direct no longer sends a setback flow setpoint (TASK-1806, like the PIC): after `setback_timeout` seconds without thermostat frames the gateway sends its own frames with CH off, unless a CS= is in force. `setback_temp` and the FS= fail-safe flag are still stored and accepted, but no longer used.
+Returns the persisted OT-direct configuration settings: mode, the setback temperature and ventilation. SAT is the only temperature controller on OT-Direct; the former heating curve and PI room compensation parameters are removed. On a thermostat loss OT-Direct no longer sends a setback flow setpoint (TASK-1806, like the PIC): after about 3 s without thermostat frames (TASK-1802) the gateway sends its own frames with CH off, unless a CS= is in force. `setback_temp` and the FS= fail-safe flag are still stored and accepted, but no longer used.
 
 **Response:**
 
@@ -728,7 +735,6 @@ Returns the persisted OT-direct configuration settings: mode, the thermostat tim
   "otdirect_settings": {
     "mode": 1,
     "setback_temp": 15.0,
-    "setback_timeout": 300,
     "vent_enable": false,
     "open_bypass": false,
     "auto_bypass": false,
@@ -740,7 +746,7 @@ Returns the persisted OT-direct configuration settings: mode, the thermostat tim
 
 ##### POST /api/v2/otdirect/settings
 
-Update OT-direct settings. Only provided parameters are updated. Accepts form parameters: `setbacktemp`, `setbacktimeout`, `ventenable`, `openbypass`, `autobypass`, `freeventenable`, `ventsetpoint`. Unknown parameters are ignored.
+Update OT-direct settings. Only provided parameters are updated. Accepts form parameters: `setbacktemp`, `ventenable`, `openbypass`, `autobypass`, `freeventenable`, `ventsetpoint`. Unknown parameters are ignored.
 
 ##### GET /api/v2/otdirect/overrides
 
@@ -1056,7 +1062,6 @@ Published only in OT-Direct mode, on hardware without a PIC. In PIC gateway mode
 | `otgw-otdirect/mode` | `"gateway"` | Current operating mode |
 | `otgw-otdirect/bypass` | `"ON"` / `"OFF"` | Bypass relay active |
 | `otgw-otdirect/thermostat_connected` | `"ON"` / `"OFF"` | Thermostat frame received within timeout |
-| `otgw-otdirect/setback_active` | `"ON"` / `"OFF"` | Always OFF: OT-Direct no longer has a setback override (TASK-1806) |
 | `otgw-otdirect/schedule_active` | `"11"` | Active schedule entry count |
 | `otgw-otdirect/overrides_active` | `"2"` | Active write-override count |
 | `otgw-otdirect/boiler_connected` | `"ON"` / `"OFF"` | Boiler OT bus active |
@@ -1148,6 +1153,8 @@ Published every SAT control loop interval (default 30 seconds) when SAT is enabl
 | `sat/active` | yes | `"true"` when SAT is actively controlling |
 | `sat/setpoint` | yes | Final flow temperature setpoint sent to boiler (C) |
 | `sat/target` | yes | Target room temperature (C) |
+| `sat/climate_target` | yes | Target on the Home Assistant thermostat card: SAT's target while SAT is enabled, the thermostat setpoint (TrSet) while SAT is off (°C). Also published while SAT is off (TASK-1979) |
+| `sat/climate_current` | yes | Room temperature on the thermostat card: the temperature SAT regulates on while SAT is enabled, the thermostat room temperature (Tr) while SAT is off (°C). Also published while SAT is off (TASK-1979) |
 | `sat/heating_curve` | yes | Heating curve calculated value (C) |
 | `sat/pid_output` | yes | PID controller output = curve + P + I + D |
 | `sat/error` | no | PID error = target - room temperature (C) |
@@ -1161,6 +1168,8 @@ Published every SAT control loop interval (default 30 seconds) when SAT is enabl
 | `sat/cycle_class` | no | `"good"`, `"overshoot"`, `"underheat"`, `"short"` |
 | `sat/safety_tripped` | yes | `"true"` when safety shutdown is active |
 | `sat/ot_link_lost` | yes | `"true"` while SAT has seen no boiler reply for 30 s (TASK-1365) |
+| `sat/no_ignition` | yes | `"true"` while CH is asked for 180 s without flame (TASK-1882, diagnostic only) |
+| `sat/heating_failure` | yes | `"true"` after 15 min at the maximum with a room rise < 0.5 C (TASK-1882, diagnostic only) |
 | `sat/outside_temp_missing` | yes | `"true"` while SAT has no outside temperature younger than 1 hour (TASK-1390) |
 | `sat/pressure` | no | Smoothed system water pressure (bar) |
 | `sat/pressure_alarm` | no | `"true"` when pressure alarm is active |
@@ -1233,6 +1242,7 @@ Topic: `{TopTopic}/set/{UniqueId}/sat/<command>`. Command names are matched case
 | Topic suffix | Payload | Description |
 |-------------|---------|-------------|
 | `sat/target` | `"21.0"` (5 to 30) | Set target room temperature (°C) |
+| `sat/climate_target` | `"21.5"` (5 to 30) | The Home Assistant thermostat card's target (°C). While SAT is enabled it sets SAT's target like `sat/target` (and selects a preset with the same temperature); while SAT is off it sends `TT=<value>` as before (TASK-1979) |
 | `sat/indoor_temp` | `"20.8"` | Push external room temperature (°C) |
 | `sat/outdoor_temp` | `"7.5"` | Push external outdoor temperature (°C) |
 | `sat/pv_surplus_w` | `"1500"` (0 to 50000) | Push PV surplus power (W) for PV boost |
@@ -1255,6 +1265,7 @@ The commands below pass the payload unchanged to the named setting, the same set
 | Topic suffix | Setting |
 |-------------|---------|
 | `sat/overshoot_margin` | `SATovershootmargin` |
+| `sat/pwm_switch_margin` | `SATpwmswitchmargin` |
 | `sat/heating_system` | `SATsystem` |
 | `sat/manufacturer` | `SATmanufacturer` |
 | `sat/max_modulation` | `SATmaxmodulation` |

@@ -11,14 +11,18 @@
 //   R1  range fixed at request start: blocks opened while the download runs are not sent
 //   R2  since= skips older blocks; since at or past the newest gives an empty range;
 //       since below the oldest starts at the oldest
-//   R3  never started, started without data and stopped recorder: valid header-only file, count 0
+//   R3  never started, started without data and a stopped heap ring: valid header-only file, count 0;
+//       a stopped PSRAM ring still serves its blocks (TASK-1960)
 //   R4  file header fields, firmware strings and the route name list round-trip; an oversize
 //       header is refused
 //   R5  recorder lock busy: the range is refused, the filler answers TRY_AGAIN and writes nothing
 //   R6  a block overwritten after the range was fixed is served as a lost block (seq kept,
 //       first_record_seq 0xFFFFFFFF, rest zero)
-//   R7  status snapshot: state fields, ring size, oldest/newest, drops, refusal reason
+//   R7  status snapshot: state fields, ring size, oldest/newest, drops, refusal reason; after a stop
+//       the PSRAM ring keeps has_data and its size, a heap ring reports none (TASK-1960)
 //   R8  the body is the same bytes for chunk sizes 1, 97, 1460 and 5000
+//   R9  TASK-1960: a Start while a download of the stopped PSRAM ring is half served: the rest is served as lost
+//       blocks, never as blocks of the new recording under the old numbers
 //=======================================================================
 
 #include <cstdio>
@@ -90,6 +94,8 @@ static std::vector<uint8_t> readAll(DiagRecorder& r, const DiagDownload& d, size
 }
 
 static DiagRecorder* g_hookRec = nullptr;
+static DiagEnv* g_hookEnv = nullptr;
+static void hookRestart() { g_hookRec->start(*g_hookEnv); addEvents(*g_hookRec, 3); }   // R9: Start clicked mid-download
 static void hookAppendBlocks() { addEvents(*g_hookRec, g_hookRec->newestSeq() + 4); }
 
 int main() {
@@ -164,11 +170,20 @@ int main() {
     DiagDownload d1; ok = ok && diagDownloadRange(started, d1, false, 0) && d1.count == 0 && buildHeader(started, d1, routes);
     ok = ok && readAll(started, d1, 1460).size() == d1.hdrLen;
     addEvents(started, 2);
-    started.stop();                                              // stopped: ring gone
-    DiagDownload d2; ok = ok && diagDownloadRange(started, d2, false, 0) && d2.count == 0 && buildHeader(started, d2, routes);
+    const uint32_t keptBlocks = started.newestSeq() + 1u;
+    started.stop();                                              // TASK-1960: a stopped PSRAM ring keeps its data
+    DiagDownload d2; ok = ok && diagDownloadRange(started, d2, false, 0) && d2.first == 0 && d2.count == keptBlocks && buildHeader(started, d2, routes);
     std::vector<uint8_t> b2 = readAll(started, d2, 1460);
-    ok = ok && b2.size() == d2.hdrLen && rd32(b2.data() + 20) == 0;
-    if (ok == false && why.empty()) why = "started/stopped";
+    ok = ok && b2.size() == d2.totalBytes() && rd32(b2.data() + 20) == keptBlocks && rd32(b2.data() + d2.hdrLen + 12) != DIAG_REC_LOST_SEQ;
+    if (ok == false && why.empty()) why = "started/stopped psram";
+    DiagRecorder heap;                                           // heap ring: freed on stop, nothing to serve
+    ok = ok && heap.start(hp) == DIAG_START_OK;
+    addEvents(heap, 1);
+    heap.stop();
+    DiagDownload d3; ok = ok && diagDownloadRange(heap, d3, false, 0) && d3.count == 0 && buildHeader(heap, d3, routes);
+    std::vector<uint8_t> b3 = readAll(heap, d3, 1460);
+    ok = ok && b3.size() == d3.hdrLen && rd32(b3.data() + 20) == 0;
+    if (ok == false && why.empty()) why = "started/stopped heap";
     caseResult("R3", ok, why);
     std::free(started.mem);
   }
@@ -254,8 +269,14 @@ int main() {
     ok = ok && !s2.exact && s2.dropped >= 2;
     r->stop();
     DiagStatus s3; diagStatusSnapshot(*r, s3);
-    ok = ok && !s3.active && !s3.hasData && s3.ringBytes == 0;
+    ok = ok && !s3.active && s3.hasData && s3.newest == s1.newest && s3.ringBytes == DIAG_REC_PSRAM_BLOCKS * DIAG_REC_BLOCK_SIZE;
     std::free(r->mem); delete r;
+    DiagRecorder* hr = new DiagRecorder();
+    ok = ok && hr->start(hp) == DIAG_START_OK;
+    addEvents(*hr, 1); hr->stop();
+    DiagStatus s3h; diagStatusSnapshot(*hr, s3h);
+    ok = ok && !s3h.active && !s3h.hasData && s3h.ringBytes == 0;
+    delete hr;
     DiagRecorder* h = new DiagRecorder();
     g_free = 6000;                                                   // below ring + caches + 5120 B
     DiagStartResult st = h->start(hp);
@@ -277,6 +298,29 @@ int main() {
     bool ok = a.size() == d.totalBytes() && a == b && a == c && a == e;
     caseResult("R8", ok, "sizes " + std::to_string(a.size()) + "/" + std::to_string(b.size()) + "/" + std::to_string(c.size()) + "/" + std::to_string(e.size()));
     std::free(r->mem); delete r;
+  }
+
+  // R9 ---------------------------------------------------------------------
+  {
+    g_ev = 0; g_lockBusy = false; g_free = 60000;
+    DiagRecorder* r = new DiagRecorder();
+    bool ok = r->start(ps) == DIAG_START_OK;
+    addEvents(*r, 3);
+    r->stop();                                                       // the stopped recording: blocks 0..3, never wrapped
+    DiagDownload d; ok = ok && diagDownloadRange(*r, d, false, 0) && d.first == 0 && d.count == 4 && buildHeader(*r, d, routes);
+    g_hookRec = r; g_hookEnv = &ps;
+    const size_t mid = d.hdrLen + DIAG_REC_BLOCK_SIZE + 100;         // inside block 1
+    std::vector<uint8_t> b = readAll(*r, d, 1460, nullptr, mid, hookRestart);
+    ok = ok && b.size() == d.totalBytes() && r->active && r->newestSeq() >= 3;
+    std::string why;
+    for (uint32_t q = 2; ok && q < 4; q++) {                         // blocks served after the restart
+      const uint8_t* blk = b.data() + d.hdrLen + (size_t)q * DIAG_REC_BLOCK_SIZE;
+      if (rd32(blk) != q || rd32(blk + 12) != DIAG_REC_LOST_SEQ) { ok = false; why = "block " + std::to_string(q) + " served from the new recording"; }
+    }
+    const uint8_t* b0 = b.data() + d.hdrLen;                         // block 0, served before the restart: the old recording
+    ok = ok && rd32(b0) == 0 && rd32(b0 + 12) == 0;
+    caseResult("R9", ok, why);
+    r->stop(); std::free(r->mem); delete r;
   }
 
   std::printf("%s\n", g_fail ? "SOME CASES FAILED" : "ALL CASES PASSED");

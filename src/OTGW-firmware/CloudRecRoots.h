@@ -1,4 +1,4 @@
-// TASK-1963 PoC: the four roots for cloudrec (see CloudRec.ino for the SHA-256 fingerprints).
+// TASK-2901 PoC: the four roots for cloudrec (see CloudRec.ino for the SHA-256 fingerprints).
 #pragma once
 static const char CLOUDREC_ROOTS[] PROGMEM =
   "-----BEGIN CERTIFICATE-----\n"

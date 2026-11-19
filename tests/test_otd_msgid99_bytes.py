@@ -26,6 +26,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+import otd_pic_decimal_block as opd  # noqa: E402  (TASK-1804 B8/B9)
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
@@ -53,6 +54,7 @@ struct OpenTherm {
 };
 static unsigned long g_frames[16]; static int g_nframes = 0;
 static bool otCmdEnqueue(unsigned long f) { g_frames[g_nframes++] = f; return true; }
+static bool otdWriteRefused = false;   // TASK-1804 B3e: set on a refused enqueue (never here: the stub accepts)
 static void otdPersistHW(char) {}   // TASK-1836: the HW= branch stores HW 0/1/A (not under test here)
 static unsigned long millis() { return 1000; }
 static void otDirectBridgeProcessStatus(const char* s) { printf("STATUS %s\n", s); }
@@ -63,10 +65,12 @@ static unsigned long otDHWPushStartMs = 0;
 static uint8_t otMasterStatusFlags = 0;
 static uint8_t otDHWOverride = 0xFF;
 static uint8_t otOperModeDHW = 0, otOperModeCH1 = 0, otOperModeCH2 = 0;
+static bool otOperModeWrite = false;   // TASK-1906: the PIC's opermodewrite
 // TASK-1845: the push flags and isUnknownId the HW=P path reads (the push functions are cut from the source)
 static bool otPushManual = false, otPushPending = false, otPushSpoof = false, otPushStarted = false;
 static uint8_t otPushFails = 0;
 static bool isUnknownId(uint8_t) { return false; }
+static uint8_t getUnknownCount(uint8_t) { return 0; }   // TASK-1804 ID-99: no strikes here
 """
 
 MAIN = r"""
@@ -126,7 +130,7 @@ def setUpModule():
     global _tmp, _exe
     _tmp = Path(tempfile.mkdtemp(prefix="otd_99_"))
     cpp = _tmp / "otd_99.cpp"
-    cpp.write_text(build_source(), encoding="utf-8")
+    cpp.write_text(opd.with_block(build_source()), encoding="utf-8")
     _exe = compile_cpp(cpp, _tmp / ("otd_99.exe" if os.name == "nt" else "otd_99"))
     if _exe is None:
         raise unittest.SkipTest("no C++ compiler")

@@ -3,11 +3,11 @@ id: TASK-1947
 title: >-
   Web UI fresh load sometimes gets a 503 from the ADR-188 connection cap while
   the browser has at most 2 requests open
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-14T20:18:00Z'
-updated_date: '2026-11-15T07:46:00Z'
+updated_date: '2026-11-15T12:38:00Z'
 labels:
   - webui
   - bug
@@ -26,8 +26,8 @@ Measured by 09 on 2026-11-14 on .63 (Classic+S3, beta.250, idle, no other web cl
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [x] #1 Reproduce a 503 on a fresh load with the WEB CONN CAP telnet line captured (held and ws counts) and the CDP request timeline side by side
-- [ ] #2 Explain which connections the server counts as holding TX at that moment, with evidence
-- [ ] #3 Decide with evidence whether the cap counting or the UI load order needs a change; if a change: fresh loads show 0 webconn 503s over at least 20 loads (red before, green after)
+- [x] #2 Explain which connections the server counts as holding TX at that moment, with evidence
+- [x] #3 Decide with evidence whether the cap counting or the UI load order needs a change; if a change: fresh loads show 0 webconn 503s over at least 20 loads (red before, green after)
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -58,4 +58,18 @@ Fix prepared, NOT for merge until Robert answers the coordinator's DM (A = this 
 2026-11-15 ADR-240 text aligned with the code after 92's review (F1 scope, F2 consistency): title, Context, Decision and Must now all say 'not ESTABLISHED and no payload segment' (closing FIN-only and half-open SYN_RCVD SYN-ACK-only), evidence reworded as zero-length-only until the split bench, Related states ADR-188 stays Accepted; file renamed to ADR-240-a-web-connection-that-is-not-established-and-holds-no-payload-does-not-count-towards-the-adr-188-send-cap.md; adr-doctor index fixed, adr_lint ADVISORY only (open question A/B), test_adr_governance OK.
 
 2026-11-15 decision (Robert, Discord DM, relayed by the coordinator): "A" on the TASK-1947 question (message 1571427079680041031) and "A" again on both corrections (1571427204842266678, 1571427621433118872); verified in the DM history. ADR-240 Accepted through adr-kit (adr accept --confirm, strict lint passed after inline acronym expansions; Decision Maker and DM ids in its Status; README entry and index refreshed; tests/test_adr_governance.py 17/17 OK). Firmware (the A rule in platformTcpTxHoldingOnPort) follows in the next build after the beta slot, then 09's AC3 bench on .61.
+
+2026-11-15 A rebuilt on beta.295 (lane/ba-1947, after ADR-240 Accepted): the three-file diff of cc719fea3 (platform_esp32.h, tests/fixtures/web_file_scheduling.cpp, tests/test_web_conn_cap_states.py) applied unchanged (+/- lines identical to the original). test_web_conn_cap_states.py: FAILED (failures=3) on the beta.294 shim, OK 9/9 on A; test_web_file_scheduling PASS. AC3 bench (20 fresh loads on .61) follows on the next build.
+
+2026-11-15 bench (09 on .61, beta.306+041400e, relayed by the coordinator): AC3 PASS: 20 fresh web UI loads, 0 WEB CONN CAP refusals (hd_webconn_503 delta 0). No refusal happened, so the closing-fin vs syn-rcvd split of the refusal line was not triggered and is not shown by this bench. Pushed: origin/dev 11c5b268a..aa7b7f382 (beta.305 = acc352d2f, src identical to 041400e); posted (message 1571501313064312873). AC3 left for the bench-tester to tick.
+
+2026-11-15 13:09-13:14 bench 09 on .61 (OT-Direct), beta.306+041400e: 20 fresh web UI loads (netload.mjs, headless Chrome, 8 s settle): per load 19 requests (17 API), maxOpenAll 3, maxOpenApi 2, n503 0, failed 0 over all 20; device/info hd_webconn_503 0 before and 0 after (delta 0); telnet captured throughout (261 KB, 337 processAPI lines): 0 'WEB CONN CAP' lines. Because no refusal happened, the refusal-line classification (closing-fin / syn-rcvd / other) was not triggered on the bench. Evidence: 09 scratchpad b306/61/net (netload-*.json, summary), tel1947.raw (local).
+
+2026-11-15 AC2 evidence (ba): the counted connections at a refusal were non-ESTABLISHED port-80 pcbs with only zero-length segments queued, 2 to 5 per refusal in all 36 refusals of 09's beta.264 bench (the closing-fin bucket of the diagnostic line; closing-data always 0, est-data 0-1, est-idle 1-3 incl. the ws client). lwIP (framework-espidf 3.50501) queues exactly two such segments: the FIN of a closing connection (TCP_TCPLEN counts only the flag, tcp_priv.h) and the SYN-ACK of a passive open (tcp_in.c:693/714/735, tcp_out.c:1036). Recorded in ADR-240 Context. Not measured: how the zero-length-only count split between FIN_WAIT_1/CLOSING/LAST_ACK and SYN_RCVD, because on beta.306 no refusal happened in 20 loads, so the split line never fired; the ADR-240 rule covers both.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Fresh web UI loads got 503s from the ADR-188 web connection cap although the browser had at most 2 requests open. AC1: 09 reproduced it (beta.250/.252/.264, 36 refusals in 20 loads with the WEB CONN CAP line and the CDP timeline). AC2: the cap counted non-ESTABLISHED connections holding only a zero-length FIN or SYN-ACK (diagnostic breakdown beta.264, lwIP sources; split between the two not measured, see notes). AC3: Robert chose A (DM 1571427079680041031, corrections confirmed); ADR-240 Accepted; platformTcpTxHoldingOnPort() counts a non-ESTABLISHED connection only with a payload segment; tests/test_web_conn_cap_states.py 3 FAIL on the old shim, 9/9 on A; 09 on .61 with beta.306+041400e: 20 fresh loads, 0 refusals (hd_webconn_503 delta 0). Shipped in origin/dev acc352d2f (beta.305), posted in #alpha-testing (1571501313064312873).
+<!-- SECTION:FINAL_SUMMARY:END -->

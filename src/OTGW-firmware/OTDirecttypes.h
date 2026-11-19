@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTDirecttypes.h
-**  Version  : v2.0.0-poc.13
+**  Version  : v2.0.0-poc.14
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -95,8 +95,9 @@ struct OTDirectSection {       // state.otd — OT-direct (OTGW32) runtime statu
   OTDirectMode eMode         = OTD_MODE_GATEWAY; // current operating mode
   bool     bMasterMode       = false;    // true = standalone master, no thermostat
   bool     bThermostatConnected = false; // thermostat recently seen (within timeout)
-  bool     bSetbackActive    = false;    // thermostat disconnected → setback override engaged
   uint32_t iLastThermostatMs = 0;        // millis() of last thermostat frame received
+  bool     bMasterRequestActive = false; // TASK-1966: a boiler request is in flight (otMasterRequestActive)
+  uint16_t iCmdRingDropped   = 0;        // TASK-1966: commands refused because the TASK-1761 ring was full
   // TASK-466: PIC-style TT=/TC= remote-override mode (none/temporary/constant)
   OTRemoteOverrideMode eOverrideMode = OT_OVERRIDE_NONE;
   uint16_t iOverrideF88      = 0;        // f8.8 value of the active TT/TC override (0 when none)
@@ -109,11 +110,10 @@ struct OTDirectSection {       // state.otd — OT-direct (OTGW32) runtime statu
 struct OTDirectSettingsSection {
   uint8_t  iMode              = 1;     // OTD_MODE_GATEWAY default, persisted across reboot
   bool     bAutoDetect        = true;  // Auto-detect thermostat presence at boot
-  float    fSetbackTemp       = 16.0f; // Setback temp on thermostat disconnect (°C)
-  uint8_t  iSetbackTimeout    = 30;    // Seconds before thermostat considered disconnected
+  float    fSetbackTemp       = 16.0f; // SB= setback temperature, stored and printed (PR=S) like the PIC; no effect on OT-Direct
   bool     bEnableSlave       = true;  // Enable slave interface in master mode
   bool     bSummerMode        = false; // SM= summer mode (bit5 of master status)
-  bool     bFailSafe          = true;  // FS= fail-safe setback on thermostat disconnect
+  bool     bFailSafe          = true;  // FS= stored and answered like the PIC; no effect on OT-Direct (TASK-1950)
   uint16_t iMsgInterval       = 100;   // MI= minimum inter-message gap (ms, 100-1275)
   bool     bHasBypassRelay    = false; // Persisted: bypass relay fitted on this board (user-declared, TASK-933 P2)
   // --- TASK-584: ventilation override persistence ---
@@ -128,7 +128,7 @@ struct OTDirectSettingsSection {
   float    fDhwSetpoint       = 0.0f;  // SW= DHW setpoint (MsgID 56), 0 = none
   float    fMaxChSetpoint     = 0.0f;  // SH= max CH setpoint (MsgID 57), 0 = none
   bool     bIgnoreTransitions = true;  // IT= (PIC default 1)
-  bool     bOverrideHB        = false; // OH= (OT-Direct default 0; the PIC default is TASK-1750)
+  bool     bOverrideHB        = true;  // OH= (PIC default 1, TASK-1961; settings without the OTDohpicdefault marker migrate once)
   char     sUnknownIds[64]    = "";    // UI= list, Data-IDs separated by a space (KI= removes)
 };
 

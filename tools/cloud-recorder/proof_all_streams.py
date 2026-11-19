@@ -206,7 +206,7 @@ def main():
     dev, dev_id = bss.start(a.docker_image, data_dir, a.port)
     sent = 0
     for seq, (t0, payload) in enumerate(records):
-        lz = otrec.lz_encode(payload)                 # as the gateway does (TASK-1972): LZ when that is smaller
+        lz = otrec.lz_encode(payload)                 # as the gateway does (TASK-2904): LZ when that is smaller
         fmt, body = (otrec.FMT_MIX_LZ, lz) if len(lz) < len(payload) else (otrec.FMT_MIX_V1, payload)
         sent += len(body)
         st, r = dev.call("POST", otrec.CREATE_PATH, {"device": dev_id, "stream": "mix", "seq": seq, "t0": t0,

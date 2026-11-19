@@ -14,7 +14,7 @@ from pathlib import Path
 
 DOC = Path(__file__).resolve().parent.parent / "docs" / "sat" / "open-questions.md"
 ROW = re.compile(r"^\| *((?:Q|Conf|QD)[\w.-]*)[^|]*\|")
-STATUS_WORDS = ("queued", "asked", "answered", "dropped")
+STATUS_WORDS = ("queued", "asked", "answered", "dropped", "decided")  # decided: Robert's directive 2026-11-15, not Sergeant D's answer
 
 
 def table_rows(text):

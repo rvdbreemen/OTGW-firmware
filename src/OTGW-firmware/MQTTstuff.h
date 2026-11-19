@@ -646,9 +646,18 @@ enum : uint8_t {
   CPROBE_CONN_BIRTH,        // onMqttConnect(): after the birth
   CPROBE_CONN_SUBS,         // onMqttConnect(): after the two subscribes
   CPROBE_SAT_RUN,           // satControlLoop(): after satControlLoopRun()
-  CPROBE_SAT_CORE           // satControlLoop(): after satPublishCoreState()
+  CPROBE_SAT_CORE,          // satControlLoop(): after satPublishCoreState()
+  CPROBE_SAT_PUB_BEGIN,     // satPublishMQTT(): past its gates, before the first topic (TASK-1995)
+  CPROBE_SAT_PUB_END,       // satPublishMQTT(): on return (TASK-1995)
+  CPROBE_FS_END             // doBackgroundTasks(): after loopLittleFSStatus() (TASK-1995)
 };
 void connProbe(uint8_t tag);
+// TASK-2019 diagnostics: arm the probes for 5 s after the SAT takeover; the tick prints them (loop task only).
+void satTakeoverHeapTraceBegin();
+void satTakeoverHeapTraceTick();
+#define OTGW_SAT_HEAP_TRACE() satTakeoverHeapTraceBegin()  // guarded with #ifdef where host test harnesses cut the code
+// TASK-1989: the slowest step (between two CPROBE_* call sites) of the loop pass that just ended, read at the next loop top.
+void loopSlowestStep(uint8_t* from, uint8_t* to, uint32_t* ms);
 #define OTGW_CONN_PROBE(tag) connProbe(tag)  // used where host test harnesses cut the code without this header
 
 // end of MQTTstuff.h

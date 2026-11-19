@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.ino
-**  Version  : v2.0.0-poc.13
+**  Version  : v2.0.0-poc.14
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -261,12 +261,12 @@ static void applyResolvedComboPins()
 
 //=====================================================================
 void setup() {
-#if HAS_CLOUD_REC
-  cloudRecInstallTlsAllocator();   // TASK-1963: before any mbedTLS user (WiFi crypto, esp-tls)
-#endif
   captureRebootReason();  // TASK-1447: before any path that can restart (config-portal timeout)
   captureWifiDeadRestarts();  // TASK-1450: same rule, the dead-link restart count
   captureWifiSkipPortal();    // TASK-1455: one-boot skip-portal mark of a WiFi supervisor restart
+#if HAS_CLOUD_REC
+  cloudRecInstallTlsAllocator();   // TASK-2901: after the RTC captures, before any mbedTLS user (WiFi crypto, esp-tls)
+#endif
   (void)*(volatile uint8_t *)g_rtcSafebootGuard;   // TASK-1918: one reference keeps the guard through --gc-sections
   platformMarkLoopTask();  // TASK-1761: setup() runs on the loop task (before WiFi starts async_tcp); off-loop OT-Direct commands go via a ring
   bootHeapPhase(PSTR("setup-early"));  // TASK-1339 diagnostics: windowed heap minimum over the boot path
@@ -338,6 +338,16 @@ void setup() {
   setLed(LED2, ON);
 
   LittleFSmounted = LittleFS.begin();
+  // TASK-1919: drop the stale otadata entry, so a failure of this new image from here on rolls back to the
+  // safeboot updater at once. Not earlier: as the first call in setup() it hung the boot inside hasSafeboot()
+  // (esp_ota_get_partition_description(), a flash read; the two partition lookups before it returned), with no
+  // panic and no reset; right after this mount it runs (09's markers on .61, debug builds beta.324dbg and
+  // beta.324dbg2, 2026-11-15). Why the read hangs that early is not known.
+  {
+    char otadataMsg[120];
+    safebootDropStaleOtadata(otadataMsg, sizeof(otadataMsg));
+    if (otadataMsg[0]) SetupDebugf(PSTR("%s\r\n"), otadataMsg);
+  }
   if (!LittleFSmounted) SetupDebugln(F("*** ERROR: LittleFS mount FAILED - running on compile-time defaults ***"));
   if (LittleFSmounted && LittleFS.exists(SETTINGS_TMP_FILE)) LittleFS.remove(SETTINGS_TMP_FILE);   // TASK-1913: a reset mid-save leaves it; it holds secrets, and the web server is not up yet
   fsOtaRtcRestoreAtBoot(LittleFSmounted);   // TASK-1774: a reset during a filesystem OTA; before readSettings()
@@ -614,7 +624,7 @@ void setup() {
   // empty queue until an edge fires, so order vs settings load is immaterial.
   startWebhookTask();
 #if HAS_CLOUD_REC
-  cloudRecSetup();          // TASK-1963 PoC: off unless /cloudrec.cfg enables it
+  cloudRecSetup();          // TASK-2901 PoC: off unless /cloudrec.cfg enables it
 #endif
  // initSensors();        // init DS18B20 (after MQ is up! )
   applyLegacyPinDefaults();   // TASK-1698: 1.x S0/output defaults are board pins on a Classic S3
@@ -631,6 +641,7 @@ void setup() {
   if (!LittleFSmounted) sendMQTTData(F("otgw-firmware/error"), "LittleFS mount failed - running on defaults", false);
   initS0Count();        // init S0 counter
   initSensors();        // init DS18B20 (after MQ is up!)
+  fsWriterBegin();      // TASK-1989: queued state-file writes off the loop task; before initSAT(), its first saver
   initSAT();            // init SAT thermostat controller
   // Clear the triple-reset portal counter: a successful setup() proves the device is healthy.
   // This prevents USB flash resets or stale RTC data from triggering the portal on next boot.
@@ -875,15 +886,11 @@ void doTaskEvery3s(){
   // frame, which covers a bus that is talking; this covers one that has gone
   // quiet. Without it the 30 s timeout could never fire in the case it exists
   // for, because the code that computes it only ran when a frame arrived.
-  // Must stay ABOVE the picSettingsCycleActive early-return below.
   evaluateOTBusLiveness(OTBusLivenessTrigger::Tick);
 
   // TASK-1940 (1.x TASK-1147): PR=E every 3 minutes when the PIC temperature sensor
-  // setting is on. Above the picSettingsCycleActive early-return, which ends after boot.
+  // setting is on. The PR= settings cycle runs from the loop (pollPICsettingsQuery, TASK-1971).
   pollPicTempSensor();
-
-  if (!picSettingsCycleActive) return;
-  queryNextPICsetting();
 }
 
 
@@ -1113,6 +1120,7 @@ void doBackgroundTasks()
     emergencyHeapRecovery();
   }
   if (!isFlashing()) loopLittleFSStatus();   // TASK-1865: LittleFS mount check / write probe off async_tcp
+  connProbe(CPROBE_FS_END);   // TASK-1995: splits the background step at the LittleFS check
 
   if (isNetworkUp()) {
     if (state.flash.bESPactive) {
@@ -1180,7 +1188,14 @@ void loop()
     if (s_lastLoopMs != 0) {
       uint32_t gapMs = nowMs - s_lastLoopMs;
       if (gapMs > state.heapdiag.iMaxLoopGapMs) state.heapdiag.iMaxLoopGapMs = gapMs;
-      if (gapMs > 200) DebugTf(PSTR("[loop-stall] %lu ms gap\r\n"), (unsigned long)gapMs);
+      if (gapMs > 200) {
+        // TASK-1989: name the slowest step between two CPROBE_* probes (tags in MQTTstuff.h) of the stalled pass
+        uint8_t stepFrom = 0, stepTo = 0;
+        uint32_t stepMs = 0;
+        loopSlowestStep(&stepFrom, &stepTo, &stepMs);
+        DebugTf(PSTR("[loop-stall] %lu ms gap, slowest step %u->%u %lu ms\r\n"),
+                (unsigned long)gapMs, (unsigned)stepFrom, (unsigned)stepTo, (unsigned long)stepMs);
+      }
     }
     s_lastLoopMs = nowMs;
   }
@@ -1226,7 +1241,9 @@ void loop()
       }
     }
     if (minuteChanged())              doTaskMinuteChanged(); //ADR-086: sole minuteChanged() caller; hour/day/year dispatch lives inside
+    loopMQTTStatsPacer();             // TASK-2004: the hourly stats, one per >= 100 ms
     loopMQTTDiscovery();              // async MQTT discovery drip (self-timed, one config per 1 s normal / 10 s slow)
+    pollPICsettingsQuery();           // TASK-1971: PR= settings cycle, >= 3 s apart, right after a drip tick when deferred
     connProbe(CPROBE_DISCOVERY);      // TASK-1757 AC3
     runTopicCleanupStep();            // ADR-106: drain stale-mode discovery topics after bUseLegacyOtTopics toggle
     evalOutputs();                    // when the bits change, the output gpio bit will follow
@@ -1247,6 +1264,7 @@ void loop()
   connProbe(CPROBE_BG_END);         // TASK-1757 AC3
   sampleHeapDip();                  // TASK-1673: who holds memory at the lowest free heap
   bootHeapConnectTraceTick();       // TASK-1757: connect-window heap trace (boot only, no-op otherwise)
+  satTakeoverHeapTraceTick();       // TASK-2019: prints the SAT takeover heap trace 5 s after it was armed (no-op otherwise)
 
   // TASK-865.5 (ADR-123 Phase-1): consume OT frames produced this iteration.
   // handlePICSerial()/loopOTDirect() ran inside doBackgroundTasks() and enqueued

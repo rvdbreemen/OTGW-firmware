@@ -3,9 +3,11 @@ id: TASK-1803
 title: >-
   OT-Direct gateway mode: OT=, SW= and SH= reach the boiler only in alternative
   slots; the PIC rewrites the thermostat's own READ 27/56/57
-status: To Do
-assignee: []
+status: In Review
+assignee:
+  - '@claude'
 created_date: '2026-11-11T06:41:00Z'
+updated_date: '2026-11-15T10:28:00Z'
 labels:
   - otdirect
   - review-2026-11-11
@@ -26,6 +28,18 @@ Found in the TASK-1795 audit (docs/reviews/2026-11-11_otdirect-pic-parity-audit/
 <!-- AC:BEGIN -->
 - [ ] #1 With a thermostat in gateway mode, OT= reaches the boiler through the thermostat's own MsgID 27 and the thermostat reads the OT= value
 - [ ] #2 SW= and SH= turn the thermostat's next READ 56/57 into one WRITE, as the PIC (including its MsgID 6 permission gate)
-- [ ] #3 Host test against the real code (not a re-implementation): red on the old code, green on the fix
-- [ ] #4 esp32-combo build, evaluate.py --quick, bench check where the hardware allows (name what was not benched)
+- [x] #3 Host test against the real code (not a re-implementation): red on the old code, green on the fix
+- [x] #4 esp32-combo build, evaluate.py --quick, bench check where the hardware allows (name what was not benched)
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+95 (2026-11-15, lane-95-next): PIC 6.8 (not 6.6) read: MessageID27/UserOutsideTemp gateway.asm:3071-3088 (with OutsideTemp set any request for 27 becomes WRITE with the value, the ack carries the value), MessageID56/57 :3135-3148 / :3171-3184 (READ -> one WRITE while INITSW/INITSH; WRITE always substituted), INITSW/INITSH set by SW=/SH= only when dhwupdate/maxchupdate (MsgID 6 LB bits 0/1, HotWaterTempOK :4181, HeatingTempOK :4208). New '// --- otdRelayRw' block: otdOutsideSet/otdOutsideF88 (OT=, cleared by OT=- and 64+), otdInitSW/otdInitSH with the stored values (set in SW=/SH= when otdBoilerAllowsWrite(MsgID 6 bit)), otdRelayRewriteRead() called from applyOverrides() in gateway mode next to the TASK-1906 hook; buildOverriddenReply() answers a rewritten 27 with the OT= value. A thermostat WRITE 56/57 keeps going through the otOverrides table (already the PIC behaviour). Separate state instead of an otOverrides entry for 27, so OT= does not show as an extra active write override in the web UI. The INITSW flag clears when the rewrite happens (the PIC clears it on the boiler answer; the same unless the frame is lost). Test tests/test_otd_relay_rw.py (real applyOverrides, buildOverriddenReply, OT=/SW=/SH= branches, otdRelayRw block): 3/3; on origin/dev c2cd68b16 the 2 AC tests FAIL (READ 27/56 pass unchanged), the MsgID 6 gate test passes on both. 9 harnesses got stubs. Sweep 53 test_otd_*/sat/pm_chain/hoisting/evaluate + 8 other OTDirect slicers + 3 ps1 harnesses green; evaluate --quick 86/0. AC4 (build + bench) pending: .61 has no thermostat, so the rewrite itself is not benchable there.
+
+Bench 09 on .61 (OT-Direct, no boiler, no thermostat), beta.298+bb38dc5 (bench-only build of lane-95-next on c2cd68b16, 2026-11-15 07:25, exit 0, RAM 130572 B, Flash 2156679 B): regression PASS (OT=7.6 -> WRITE 27 0x079A, OT=- clears, SW=55.7 0x37B4, SH=60). AC4: build exit 0, evaluate --quick 86/0, bench where the hardware allows done; NOT benched (field only): the rewrite of the thermostat's READ 27/56/57 (AC1/AC2) needs a thermostat; host test tests/test_otd_relay_rw.py.
+
+AC review (coordinator rule 2026-11-15): AC1 and AC2 ask for live behaviour with a thermostat; they are proven by tests/test_otd_relay_rw.py only, so they stay open as field ACs. AC3 (host test) and AC4 (build/evaluate/bench where possible, field part named) stay ticked.
+
+Landed: Pushed origin/dev 2e4ca9c05..3e29faa63; zip beta.301+2b3d9a2 posted (Discord 1571471374038470711); final build exit 0 'Build completed successfully', RAM 130572 B, Flash 2157483 B; sweep 88/88, evaluate --quick 86/0; bench 09 on .61 beta.301+2b3d9a2 PASS (smoke + re-check). Status In Review (convention: field ACs open, see AC list; host-proven).
+<!-- SECTION:NOTES:END -->

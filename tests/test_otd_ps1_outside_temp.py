@@ -30,6 +30,9 @@ OTD_INO = Path(os.environ.get("OTGW_OTD_INO", REPO / "src" / "OTGW-firmware" / "
 
 EXTRA = r"""
 static struct { float Toutside; } OTcurrentSystemState;
+// TASK-1965: OT= records that the outside value is the gateway's own (OTGW-firmware.h, OTGW-Core.ino).
+enum : uint8_t { OT_VALSRC_NONE = 0, OT_VALSRC_BOILER, OT_VALSRC_GATEWAY, OT_VALSRC_THERMOSTAT, OT_VALSRC_SUMMARY, OT_VALSRC_REPLAY };
+static void recordValueSource(uint8_t, uint8_t) {}
 static bool clearWriteOverride(uint8_t) { return true; }
 static int g_writes27 = 0;
 static bool enqueueWriteCommand(uint8_t id, uint16_t, const char*) { if (id == 27) g_writes27++; return true; }
@@ -115,6 +118,8 @@ def build(src):
     e = src.index("// ===========================================================================\n// TASK-184")
     parts.append("static void otdPsNoteFrame(char prefix, unsigned long frame);")
     parts.append(ps.cut_block(src, r"^static inline uint16_t floatToF88\(float celsius\)"))
+    if "otdOutsideSet" in src:   # TASK-1803: OT= also keeps the relay state for the thermostat's READ 27
+        parts.append("static bool otdOutsideSet = false; static uint16_t otdOutsideF88 = 0;")
     blk = re.search(r"// --- otdPicFloat begin\r?\n(.*?)// --- otdPicFloat end", src, re.S)
     if blk:   # TASK-1859: OT= parses with the PIC's GetFloatArg and answers with its PrintSigned
         parts.append(blk.group(1))

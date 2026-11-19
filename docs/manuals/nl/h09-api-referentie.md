@@ -229,6 +229,7 @@ Op hardware zonder PIC (OT-Direct) beantwoordt de firmware deze commando's zelf,
 | `PR=C` | `PR: C=240 MHz` |
 | `PR=B` | `PR: B=UU:MM DD-MM-JJJJ`, de bouwtijd van de firmware |
 | `PR=L` | `PR: L=FXOMPC` totdat `LA=`..`LF=` het wijzigen |
+| `PR=T` | `PR: T=11`: overgangen negeren (`IT=`) en override high byte (`OH=`), allebei standaard 1 net als op de PIC |
 | `SC=9:05/3` | `SC: 09:05/3` (uren met twee cijfers) |
 | `SR=18:1,230` | `SR: 18:1/230`: het opgeslagen antwoord als `<id>:<hoge byte>/<lage byte>`, in welke vorm het argument ook kwam |
 | `FT=X` | `FT: D`: het gekozen model (`C`, `I`, `S` of `D`), niet het argument |
@@ -241,7 +242,14 @@ Op OT-Direct leest de firmware de getallen in deze commando's zoals PIC-firmware
 - `SW=` en `SH=` antwoorden `BV` buiten de grenzen die de ketel in MsgID 48 en 49 meldt, of 20-80 en 10-90 zolang hij die nog niet gemeld heeft; 0 zet ze terug.
 - `OT=` wist de buitentemperatuur (`OT: -`) bij tekst, bij `OT=-` en bij een waarde van 64 of hoger.
 - `MM=` neemt een heel getal: tekst, `MM=-` of een minteken wist hem (`MM: -`), boven 100 is `OR`.
+- `PM=` neemt een Data-ID van 0 tot 255. Bij een tabelgrootte (10, 12, 88, 90, 105, 107) leest hij daarna elke entry van het volgende ID, en bij een tekst (93, 94, 95) elk teken, net als de PIC.
 - Unknown-DataID-antwoorden schakelen MsgID 0, 1, 3, 14, 17 en 25 nooit uit, net als op de PIC.
+- Een commando zonder waarde (`CS=`, `TT=`, `SW=` ...) antwoordt `SE`; `OT=`, `MM=` en `CL=` zonder waarde wissen (`OT: -`), net als op de PIC (TASK-1957).
+- `OT=`, `SW=` en `SH=` bereiken de ketel ook als de thermostaat geen vrij slot overlaat: met een `OT=`-waarde gaat de eigen READ van MsgID 27 van de thermostaat als WRITE 27 met die waarde naar de ketel, en na `SW=` / `SH=` gaat zijn volgende READ van MsgID 56 / 57 één keer als de WRITE, als MsgID 6 die schrijfactie toestaat (TASK-1803).
+- Zolang een `MW=`-, `MH=`-, `M2=`- of `HW=P`-schrijfactie wacht, behandelt de gateway de eigen MsgID 99 van de thermostaat zoals de PIC (zijn READ wordt de WRITE van de gateway) (TASK-1906).
+- `TT=` beantwoordt de MsgID 100-read van de thermostaat met `0x03` en `TC=` met `0x01`; `OH=1`, sinds TASK-1961 de standaard net als op de PIC, zet dat ook in de high byte. Elk OT-Direct-board gaat bij de eerste boot met deze versie één keer naar `OH=1` (marker `OTDohpicdefault` in `settings.ini`); een `OH=0` daarna blijft staan.
+- Master mode: `TT=0` zet een `BS=`- of MQTT-`room_setpoint`-waarde terug op MsgID 16 (TASK-1751).
+- `SC=` neemt precies `UU:MM/D`: uren boven 23 en minuten boven 59 zijn `OR`, een ontbrekende `:` of `/` of iets na de dag is `SE`, een dag buiten 1-7 is `BV`; een geweigerde waarde verandert niets (TASK-1908).
 
 Alias: `POST /api/v2/otgw/command` (achterwaartse compatibiliteit)
 
@@ -576,7 +584,6 @@ Retourneert de bedrijfsmodus, schema-tellingen, thermostaatverbindingsstatus, by
     "monitor_mode": false,
     "master_mode": false,
     "thermostat_connected": true,
-    "setback_active": false,
     "schedule_total": 12,
     "schedule_active": 11,
     "schedule_disabled": 1,
@@ -606,7 +613,7 @@ Opmerking (TASK-438): `monitor` is nu gekoppeld aan `GW=0` voor parity met PIC-f
 
 ##### GET /api/v2/otdirect/settings
 
-Retourneert de opgeslagen OT-direct-configuratie: modus, de thermostaat-timeout en ventilatie. SAT is de enige temperatuurregelaar op OT-Direct; de voormalige parameters voor verwarmingscurve en PI-kamercompensatie zijn verwijderd. Bij verlies van de thermostaat stuurt OT-Direct geen setback-aanvoertemperatuur meer (TASK-1806, zoals de PIC): na `setback_timeout` seconden zonder thermostaatframes stuurt de gateway eigen frames met CV uit, tenzij er een CS= actief is. `setback_temp` en de FS=-noodvlag worden nog opgeslagen en geaccepteerd, maar niet meer gebruikt.
+Retourneert de opgeslagen OT-direct-configuratie: modus, de setback-temperatuur en ventilatie. SAT is de enige temperatuurregelaar op OT-Direct; de voormalige parameters voor verwarmingscurve en PI-kamercompensatie zijn verwijderd. Bij verlies van de thermostaat stuurt OT-Direct geen setback-aanvoertemperatuur meer (TASK-1806, zoals de PIC): na ongeveer 3 s zonder thermostaatframes (TASK-1802) stuurt de gateway eigen frames met CV uit, tenzij er een CS= actief is. `setback_temp` en de FS=-noodvlag worden nog opgeslagen en geaccepteerd, maar niet meer gebruikt.
 
 **Antwoord:**
 ```json
@@ -614,7 +621,6 @@ Retourneert de opgeslagen OT-direct-configuratie: modus, de thermostaat-timeout 
   "otdirect_settings": {
     "mode": 1,
     "setback_temp": 15.0,
-    "setback_timeout": 300,
     "vent_enable": false,
     "open_bypass": false,
     "auto_bypass": false,
@@ -626,7 +632,7 @@ Retourneert de opgeslagen OT-direct-configuratie: modus, de thermostaat-timeout 
 
 ##### POST /api/v2/otdirect/settings
 
-OT-direct-instellingen bijwerken. Alleen meegegeven parameters worden gewijzigd. Parameters: `setbacktemp`, `setbacktimeout`, `ventenable`, `openbypass`, `autobypass`, `freeventenable`, `ventsetpoint`. Onbekende parameters worden genegeerd.
+OT-direct-instellingen bijwerken. Alleen meegegeven parameters worden gewijzigd. Parameters: `setbacktemp`, `ventenable`, `openbypass`, `autobypass`, `freeventenable`, `ventsetpoint`. Onbekende parameters worden genegeerd.
 
 ##### GET /api/v2/otdirect/overrides
 
@@ -877,7 +883,6 @@ Tenzij anders vermeld zijn alle gepubliceerde onderwerpen retained.
 | `otgw-otdirect/mode` | Bedrijfsmodus (gateway, monitor, bypass, master, loopback) |
 | `otgw-otdirect/bypass` | Bypass-relais actief |
 | `otgw-otdirect/thermostat_connected` | Thermostaatframe ontvangen binnen timeout |
-| `otgw-otdirect/setback_active` | Altijd OFF: OT-Direct heeft geen setback-override meer (TASK-1806) |
 | `otgw-otdirect/schedule_active` | Aantal actieve schema-items |
 | `otgw-otdirect/overrides_active` | Aantal actieve write-overrides |
 | `otgw-otdirect/boiler_connected` | Ketel OT-bus actief |
@@ -927,6 +932,8 @@ In PIC-gatewaymodus wordt alleen `otgw-otdirect/available` gepubliceerd met waar
 | `sat/active` | ja | Controller actief |
 | `sat/setpoint` | ja | Aanvoertemperatuur setpoint (C) |
 | `sat/target` | ja | Gewenste kamertemperatuur (C) |
+| `sat/climate_target` | ja | Doel op de Home Assistant-thermostaatkaart: SAT's doel met SAT aan, het thermostaat-setpoint (TrSet) met SAT uit (°C). Ook gepubliceerd met SAT uit (TASK-1979) |
+| `sat/climate_current` | ja | Kamertemperatuur op de thermostaatkaart: de temperatuur waarop SAT regelt met SAT aan, de kamertemperatuur van de thermostaat (Tr) met SAT uit (°C). Ook gepubliceerd met SAT uit (TASK-1979) |
 | `sat/heating_curve` | ja | Verwarmingscurve berekende waarde (C) |
 | `sat/pid_output` | ja | PID-output = curve + P + I + D |
 | `sat/error` | nee | PID-fout = doel - kamertemperatuur (C) |
@@ -940,6 +947,8 @@ In PIC-gatewaymodus wordt alleen `otgw-otdirect/available` gepubliceerd met waar
 | `sat/cycle_class` | nee | Cyclusclassificatie (`good`, `overshoot`, ...) |
 | `sat/safety_tripped` | ja | Veiligheidsuitschakeling actief |
 | `sat/ot_link_lost` | ja | `"true"` zolang SAT 30 s geen ketelantwoord heeft gezien (TASK-1365) |
+| `sat/no_ignition` | ja | `"true"` zolang CV 180 s gevraagd is zonder vlam (TASK-1882, alleen een melding) |
+| `sat/heating_failure` | ja | `"true"` na 15 min op het maximum met een kamerstijging < 0,5 C (TASK-1882, alleen een melding) |
 | `sat/outside_temp_missing` | ja | `"true"` zolang SAT geen buitentemperatuur heeft die jonger is dan 1 uur (TASK-1390) |
 | `sat/pressure` | nee | CV-systeemdruk, glad (bar) |
 | `sat/pressure_alarm` | nee | Druk-alarm actief |
@@ -1024,6 +1033,7 @@ Onderwerp: `{TopTopic}/set/{UniqueId}/sat/<commando>`. Commandonamen zijn niet h
 | Onderwerpsuffix | Payload | Beschrijving |
 |----------------|---------|-------------|
 | `sat/target` | `"21.0"` (5 tot 30) | Doeltemperatuur van de kamer instellen (°C) |
+| `sat/climate_target` | `"21.5"` (5 tot 30) | Doeltemperatuur van de Home Assistant-thermostaatkaart (°C). Met SAT aan stelt het SAT's doel in, zoals `sat/target` (en kiest een preset met dezelfde temperatuur); met SAT uit stuurt het `TT=<waarde>`, zoals voorheen (TASK-1979) |
 | `sat/indoor_temp` | `"20.8"` | Externe kamertemperatuur doorgeven (°C) |
 | `sat/outdoor_temp` | `"7.5"` | Externe buitentemperatuur doorgeven (°C) |
 | `sat/pv_surplus_w` | `"1500"` (0 tot 50000) | PV-overschot (W) doorgeven voor PV-boost |
@@ -1046,6 +1056,7 @@ De onderstaande commando's geven de payload ongewijzigd door aan de genoemde ins
 | Onderwerpsuffix | Instelling |
 |----------------|-----------|
 | `sat/overshoot_margin` | `SATovershootmargin` |
+| `sat/pwm_switch_margin` | `SATpwmswitchmargin` |
 | `sat/heating_system` | `SATsystem` |
 | `sat/manufacturer` | `SATmanufacturer` |
 | `sat/max_modulation` | `SATmaxmodulation` |

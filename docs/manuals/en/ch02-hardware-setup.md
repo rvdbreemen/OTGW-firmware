@@ -69,6 +69,8 @@ The OTGW PCB has clearly labelled terminal blocks for the thermostat side (TT) a
 
 > **Important**: Only connect one end of the OpenTherm bus to the OTGW at a time during installation. Follow your boiler manufacturer's instructions for any work on the boiler terminals.
 
+> **New PIC**: a PIC straight from the factory starts in monitor mode: it only listens and passes the bus through, so commands such as `CS=` or `TT=` have no effect. Send `GW=1` once (the command bar of the web UI, or port 25238); the PIC stores the mode in its EEPROM and keeps it. A PIC that ran with an earlier OTGW firmware keeps the mode it has.
+
 #### Power
 
 The OTGW derives operating power from the OpenTherm bus itself when wired to a boiler. No separate power supply is required once the device is in circuit. During initial flashing via USB, power is supplied through the USB cable.
@@ -204,6 +206,25 @@ If you already have a merged-full image, pass it explicitly:
 ```bash
 flash_otgw.bat --bin OTGW-firmware-esp32-combo-<version>-merged-full.bin
 ./flash_otgw.sh --bin OTGW-firmware-esp32-combo-<version>-merged-full.bin
+```
+
+### Release artefact verification
+
+Every GitHub release ships a `SHA256SUMS` file next to the binaries (the `-flash.zip`, `.ino.bin`, `.littlefs.bin`, `-merged-full.bin`, `.elf` and the safeboot image). Each line holds the SHA-256 digest of one file and its name, in the format `sha256sum` reads. A check takes seconds and catches a corrupted or tampered download, or a stale file you had on disk.
+
+**Linux and macOS:** put `SHA256SUMS` in the folder with the files you downloaded and run:
+
+```bash
+sha256sum -c --ignore-missing SHA256SUMS          # Linux
+shasum -a 256 -c --ignore-missing SHA256SUMS      # macOS
+```
+
+`--ignore-missing` skips the files you did not download. Each file you have prints `OK`; a `FAILED` line means: do not flash that file, download it again from the GitHub release page.
+
+**Windows (PowerShell):** print the digest of a file and compare it with its line in `SHA256SUMS`:
+
+```powershell
+Get-FileHash -Algorithm SHA256 OTGW-firmware-esp32-combo-<version>-flash.zip
 ```
 
 ### First-Time Setup: Connecting to Wi-Fi

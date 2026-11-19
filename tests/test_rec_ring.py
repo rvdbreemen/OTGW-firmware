@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""TASK-1991: the local sink of the one recorder (src/OTGW-firmware/RecRing.h), compiled as it is.
+"""TASK-2907: the local sink of the one recorder (src/OTGW-firmware/RecRing.h), compiled as it is.
 
   1. 2,000 entries of random size into a small ring: the ring always holds the newest entries that fit, in
      order, byte for byte; the dropped count is right.

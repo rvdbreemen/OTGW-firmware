@@ -132,8 +132,8 @@ TARGETS["esp32-combo"] = {
     # app slot holds both engines.
 }
 
-# esp32-combo-tlsdyn (TASK-1963 PoC, branch research/cloud-recording only): the esp32-combo image with the
-# cloud recorder compiled in, on the stock libraries (no IDF rebuild since TASK-1963 poc.12). Never published.
+# esp32-combo-tlsdyn (TASK-2901 PoC, branch research/cloud-recording only): the esp32-combo image with the
+# cloud recorder compiled in, on the stock libraries (no IDF rebuild since TASK-2901 poc.12). Never published.
 TLS_POC_TARGET = "esp32-combo-tlsdyn"
 TARGETS[TLS_POC_TARGET] = {
     **TARGETS["esp32-combo"],
@@ -719,6 +719,34 @@ def get_semver(project_dir):
     except (IOError, OSError):
         pass
     return "unknown"
+
+
+def verify_app_version_string(project_dir, semver, target):
+    """TASK-1976: the app image must carry the exact semver this build stamped.
+
+    The artifact names, the zip and /version.hash take the githash from build.py, the app's own version string
+    (device/info fwversion, the MQTT version topic) comes from version.h as it stood when pio compiled
+    OTGW-firmware.ino.cpp. A version.h that changed in between (the beta.318 bench build: a `git checkout --
+    version.h` while the build ran) gave an image named +56fb6db that reported +1233ba9. Returns True when the
+    renamed .ino.bin holds `semver`, or when there is no app image (a filesystem-only build); False otherwise,
+    after naming the version strings the image does hold.
+    """
+    build_dir = Path(project_dir) / "build"
+    images = sorted(build_dir.glob(f"*-{asset_slug(target)}-{semver}.ino.bin"))
+    if not images:
+        return True
+    import re
+    for img in images:
+        data = img.read_bytes()
+        if semver.encode() in data:
+            continue
+        found = sorted({m.decode(errors="replace") for m in
+                        re.findall(rb"\d+\.\d+\.\d+(?:-[0-9A-Za-z.]+)?\+[0-9a-f]{7}", data)})
+        print_error(f"{img.name} does not carry its own version {semver}; it holds: {', '.join(found) or 'none'}")
+        print_error("version.h changed while the build ran (a checkout, stash or bump during the build?): rebuild")
+        return False
+    print_success(f"App version check: {', '.join(i.name for i in images)} carries {semver}")
+    return True
 
 
 def create_build_directory(project_dir):
@@ -2634,6 +2662,14 @@ def collect_pio_artifacts(project_dir, target, want_firmware=True, want_filesyst
             shutil.copy2(fw_src, fw_dest)
             print_info(f"Copied: firmware.bin -> {fw_dest.name}")
             collected.append(fw_dest)
+            # TASK-1993 (TASK-1955 AC2): log the image against the app0/ota_0 slot; WARN > 95 %, FAIL > 98 %.
+            if "bootloader_offset" in tcfg:
+                slot = read_partition_table(project_dir).get("app0", (0, tcfg.get("app_size", 0)))[1]
+                rc = run_streamed([sys.executable, str(project_dir / "scripts" / "check_app_size.py"),
+                                   str(fw_dest), str(slot)])
+                if rc != 0:
+                    print_error("App size check failed (scripts/check_app_size.py): see the lines above")
+                    sys.exit(1)
 
     # Filesystem binary (from the buildfs step's own build directory, TASK-1921)
     if want_filesystem:
@@ -3363,6 +3399,7 @@ def main():
     # TASK-1640: gzip the firmware update pages into their PROGMEM header before any
     # compile (the arduino-cli path does not run the PlatformIO pre-scripts).
     webui_pages.write_update_header(project_dir)
+    webui_pages.write_asset_headers(project_dir)   # TASK-1955 (ADR-247): settings help + replay fixture, deflated
 
     # TASK-1224: stage (and minify) the web assets once for all targets; the
     # filesystem image is built from this copy, data/ stays untouched.
@@ -3422,6 +3459,8 @@ def main():
 
         # Rename artifacts with version
         rename_build_artifacts(project_dir, semver, target)
+        if not verify_app_version_string(project_dir, semver, target):
+            sys.exit(4)
 
         # Create merged binaries if requested
         if args.merged:

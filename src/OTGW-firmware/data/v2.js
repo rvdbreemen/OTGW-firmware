@@ -193,6 +193,9 @@
       "pic_ovr_none": "No override",
       "pic_ovr_temp": "Temporary override to {{temp}} °C",
       "pic_ovr_const": "Constant override to {{temp}} °C",
+      "pic_ovr_temp_pending": "Temporary override to {{temp}} °C (not yet accepted by the thermostat)",
+      "pic_ovr_const_pending": "Constant override to {{temp}} °C (not yet accepted by the thermostat)",
+      "pic_ovr_clearing": "Override being cleared",
       "pic_vref_level": "Level {{level}}",
       "pic_vref_detail": "Level {{level}} (F88: {{f88}} V / F1847: {{f1847}} V)",
       "pic_grp_firmware": "Firmware",
@@ -329,8 +332,10 @@
       "series_ret": "return",
       "series_ch_set": "control setpoint",
       "series_room_set": "thermostat setpoint",
+      "series_sat_target": "SAT target",
       "series_room": "room",
       "series_outside": "outside",
+      "series_dhw": "DHW temperature",
       "series_mod": "modulation",
       "series_flame": "flame",
       "series_dhw_on": "DHW mode",
@@ -372,7 +377,6 @@
       "otd_row_ot_bus": "OT bus",
       "otd_row_thermostat": "Thermostat",
       "otd_row_boiler": "Boiler",
-      "otd_row_setback": "Setback",
       "otd_row_stepup": "Step-up",
       "otd_row_schedule": "Schedule (active / total)",
       "otd_row_overrides": "Active overrides",
@@ -500,6 +504,7 @@
       "graph_win_1h": "1 hour",
       "graph_win_4h": "4 h",
       "graph_win_24h": "24 h",
+      "graph_win_7d": "7 days",
       "graph_marks": "Disconnects",
       "graph_marks_title": "Show where the live connection dropped (red) and came back (green)",
       "log_aria": "Live OpenTherm log",
@@ -558,8 +563,8 @@
       "sat_max_hint": "SAT never sends a flow setpoint above this. Until you move the slider SAT uses 62 °C (50 °C underfloor) and sends nothing to the boiler; a chosen value is also sent to the boiler (SH=). Max relative modulation caps the modulation SAT sends (MM=); 100 % is no cap. Some boilers ignore it.",
       "sat_max_mod": "Max relative modulation",
       "sat_nodata": "SAT status is unavailable on this device.",
-      "sat_ot_lost": "OpenTherm lost: boiler handed back",
-      "sat_outside_missing": "No outside temperature for 1 hour: boiler handed back",
+      "sat_ot_lost": "SAT paused: no OpenTherm connection, the boiler is back under normal control",
+      "sat_outside_missing": "SAT paused: no outside temperature for 1 hour, your thermostat controls the boiler",
       "sat_pid": "PID controller",
       "sat_presets": "Presets",
       "sat_presets_hint": "Pick a preset or set the temperature — SAT works out the boiler.",
@@ -1139,7 +1144,6 @@
         "otdmsginterval": "Message interval",
         "otdopenbypass": "Open bypass now",
         "otdsetbacktemp": "Setback temperature",
-        "otdsetbacktimeout": "Setback timeout",
         "otdsummermode": "Summer mode (CH off)",
         "otdventenable": "Ventilation enabled",
         "otdventsetpoint": "Ventilation setpoint",
@@ -1198,6 +1202,7 @@
         "satmultiarea": "Enable multi-area",
         "satmultiareacount": "Area count",
         "satovershootmargin": "Overshoot margin",
+        "satpwmswitchmargin": "PWM switch margin",
         "satovershootprotection": "PWM overshoot protection",
         "satpresetactivity": "Activity preset",
         "satpresetaway": "Away preset",
@@ -1492,6 +1497,8 @@
       "sat_fb_reason_thermostat_lost": "Thermostat lost",
       "sat_fb_reason_mqtt_lost": "MQTT lost for more than 5 minutes",
       "sat_why_takeover": "SAT took over the boiler: {{reason}}.",
+      "sat_why_no_ignition": "No ignition: SAT asked for heat for 3 minutes, the boiler did not light.",
+      "sat_why_heating_failure": "Heating failure? 15 minutes at the maximum, the room only went from {{start}} to {{end}} °C.",
       "sat_why_pwm_no_reply": "No on/off cycling (PWM) yet: the boiler has not answered the configuration request (MsgID 3).",
       "sat_why_pwm_denied": "No on/off cycling (PWM): the boiler reports that it does not allow it (MsgID 3 bit 4).",
       "sat_why_mod_suppressed": "On/off cycling: modulation is held low during this burner phase.",
@@ -1511,6 +1518,7 @@
       "kv_fetch_errors": "Fetch errors",
       "kv_humidity": "Humidity",
       "kv_i_term": "I term",
+      "kv_i_not_applied": "(not applied: curve only until a room temperature)",
       "kv_indoor_sensor": "Indoor sensor",
       "kv_last_blocked_cmd": "Last blocked cmd",
       "kv_last_cycle": "Last cycle",
@@ -1601,8 +1609,10 @@
       "sat_geo_denied": "Location denied: the browser blocked access",
       "sat_geo_detecting": "Detecting…",
       "sat_geo_error": "Location error",
-      "sat_geo_hint": "Location detection needs HTTPS. Enter Latitude and Longitude under SAT settings > Weather.",
+      "sat_geo_hint": "Location detection needs HTTPS. Enter Latitude and Longitude under SAT settings > Weather, or let Home Assistant publish sat/sun_elevation.",
       "sat_geo_needs_https": "Location detection needs HTTPS",
+      "sat_sun_from_ha": "Sun position from Home Assistant (sat/sun_elevation): {{deg}}°. No location needed.",
+      "sat_sun_ha_weather_loc": "The weather fetch still needs Latitude and Longitude under SAT settings > Weather.",
       "sat_geo_save_failed": "Save failed",
       "sat_geo_timeout": "Location timed out",
       "sat_geo_unavailable": "Location unavailable",
@@ -1645,19 +1655,19 @@
       "sat_system_radiator": "radiator",
       "sat_system_underfloor": "underfloor",
       "sat_takeover": "Takeover (MQTT lost)",
-      "sat_tune_days": "{{days}}/{{need}} counted days, today {{clean}}/{{cleanNeed}} clean hours",
+      "sat_tune_days": "{{days}}/{{need}} counted hours in the window",
       "sat_tune_dec_hold": "held",
       "sat_tune_dec_lower": "lowered",
       "sat_tune_dec_raise": "raised",
       "sat_tune_excl_item": "{{reason}} {{hours}} h",
       "sat_tune_excluded": "Hours not counted: {{list}}",
       "sat_tune_excluded_none": "No hours left out",
-      "sat_tune_last": "Last day: {{decision}} ({{reason}})",
-      "sat_tune_last_none": "No day closed yet",
+      "sat_tune_last": "Last hour: {{decision}} ({{reason}})",
+      "sat_tune_last_none": "No hour closed yet",
       "sat_tune_off": "Self-tune is off",
       "sat_tune_r_at_limit": "coefficient at its limit",
       "sat_tune_r_coeff_changed": "coefficient changed",
-      "sat_tune_r_day_not_counted": "too few clean hours",
+      "sat_tune_r_day_not_counted": "hour not counted",
       "sat_tune_r_dhw": "hot water",
       "sat_tune_r_few_days": "window not full yet",
       "sat_tune_r_few_ticks": "too few samples",
@@ -1667,6 +1677,7 @@
       "sat_tune_r_no_floating": "no data at target",
       "sat_tune_r_no_phases": "no room temperature data",
       "sat_tune_r_no_room": "room temperature lost",
+      "sat_tune_r_diag_event": "no ignition or heating failure",
       "sat_tune_r_no_sun": "no sun position",
       "sat_tune_r_no_ticks": "no data",
       "sat_tune_r_no_warmup": "no warm-up data",
@@ -1683,18 +1694,11 @@
     "values": {
       "save_failed_http": "Save failed (HTTP {{status}})",
       "save_failed": "Save failed",
-      "ble_risk_title": "BLE without PSRAM — instability risk",
-      "ble_risk_text": "This board has no PSRAM. Enabling BLE takes ~64 KB of internal memory that the web server needs, so the Web UI can become unstable or unreachable under load (you may need to reboot). Enable BLE anyway?",
-      "ble_keep_off": "Keep BLE off",
-      "ble_enable_anyway": "Enable anyway (accept risk)",
-      "ble_kept_off": "BLE kept off",
-      "ble_enabled_accepted": "BLE enabled — risk accepted",
+      "ble_needs_psram": "BLE needs PSRAM. This board has none, so BLE stays off: the scanner uses up the memory the gateway needs.",
       "ble_clearing": "Clearing roster…",
       "ble_title": "BLE sensors",
       "ble_slots": "{{used}} / {{max}} slots used",
       "ble_slots_prefix": "{{used}} / {{max}} slots used · prefix \"{{prefix}}\"",
-      "ble_paused": "BLE is paused: this board has no PSRAM, and BLE scanning starts only after you accept the stability warning.",
-      "ble_read_warning": "Read the warning",
       "ble_rescan": "Rescan",
       "ble_scanning": "Scanning…",
       "ble_scanning_toast": "Scanning for BLE sensors…",
@@ -3191,9 +3195,15 @@
   // stamped at the START of its slot (the device reports the age of the slot END).
   // The device does not record Dallas sensors, so those lines still start at page load.
   var GSLOT = 5000, GHIST_MAX = 86400000 / GSLOT, GBREAK_MS = 150000, gHist = [], gDallas = null, gLastRender = 0;
+  // TASK-1963 (ADR-245): the graph keeps device records (h) up to 7 days and live 5 s records up to 24 h, trimmed by
+  // time, not by count: a count limit of 24 h of live slots would cut the 7-day device history away after a day.
+  var GHIST_LIVE_MS = 86400000, GHIST_SPAN_MS = 7 * 86400000, gTrimN = 0;
+  function graphTrim(arr, now) {
+    return arr.filter(function (r) { return r.t >= now - GHIST_SPAN_MS && (r.h || r.t >= now - GHIST_LIVE_MS); });
+  }
   // [key, label, colour, kind]: t = temperature line (auto-scaled), m = modulation area, l = on/off lane
   var GSER = [['flow', 'boiler', '#f85149', 't'], ['ret', 'return', '#58a6ff', 't'], ['chSet', 'control setpoint', '#8b949e', 't'],
-    ['roomSet', 'thermostat setpoint', '#d29922', 't'], ['room', 'room', '#3fb950', 't'], ['outside', 'outside', '#a371f7', 't'],
+    ['roomSet', 'thermostat setpoint', '#d29922', 't'], ['satTarget', 'SAT target', '#e0c341', 't'], ['room', 'room', '#3fb950', 't'], ['outside', 'outside', '#a371f7', 't'], ['dhw', 'DHW temperature', '#f778ba', 't'],
     ['mod', 'modulation', '#00bffe', 'm'], ['flame', 'flame', '#ff7b00', 'l'], ['dhw_on', 'DHW mode', '#2f81f7', 'l'], ['ch', 'boiler CH mode', '#e5534b', 'l']];
   // 'ch' is the boiler's own CH-mode status bit (MsgID 0 slave bit 1; pump overrun keeps it on), not SAT's CH enable (Sergeant D entry 219)
   var GDCOL = ['#56d4dd', '#db61a2', '#7ee787', '#f0883e', '#79c0ff', '#bc8cff'];
@@ -3295,9 +3305,11 @@
     var now = Date.now(), t = now - now % GSLOT, r = gHist[gHist.length - 1];
     if (!r || r.t !== t) {
       r = { t: t, flame: 0, dhw_on: 0, ch: 0 }; gHist.push(r);
-      if (gHist.length > GHIST_MAX + 256) gHist = gHist.slice(-GHIST_MAX);   // trim in batches
+      if (++gTrimN >= 60) { gTrimN = 0; gHist = graphTrim(gHist, now); }   // trim once per 5 minutes (TASK-1963)
     }
-    ['flow', 'ret', 'chSet', 'roomSet', 'room', 'outside', 'mod'].forEach(function (k) { r[k] = model[k]; });
+    ['flow', 'ret', 'chSet', 'roomSet', 'room', 'outside', 'dhw', 'mod'].forEach(function (k) { r[k] = model[k]; });   // dhw: MsgID 26, live only (TASK-1776: not in the device history)
+    // TASK-2018 (ADR-256): the SAT target while SAT is enabled, the firmware's rule for the device history column
+    r.satTarget = (satEnabledLive === true && typeof sat.target === 'number' && !isNaN(sat.target)) ? sat.target : null;
     r.roomX = graphRoomLost(now) ? 1 : 0;   // TASK-1546: a dropout is no reading: the room value is empty (CSV, line break)
     if (r.roomX) r.room = null;
     ['flame', 'dhw_on', 'ch'].forEach(function (k) { if (model[k]) r[k] = 1; });
@@ -3331,6 +3343,7 @@
     // a null room in a slot that has other data is a dropout (the TASK-1546 interruption); a unit that never
     // reported a room temperature has no dropout to show.
     var hasRoom = j.room.some(function (v) { return typeof v === 'number'; });
+    var satCol = Array.isArray(j.satTarget) && j.satTarget.length === n;   // TASK-2018: optional column
     for (var i = 0; i < n; i++) {
       var x = nowMs - age - (n - i) * ivMs, t = x - x % GSLOT;
       while (li < live.length && live[li].t < t) li++;
@@ -3341,6 +3354,10 @@
         r[TCOLS[k]] = (typeof v === 'number') ? v / sc : null;
         if (r[TCOLS[k]] !== null) any = true;
       }
+      // TASK-2018 (ADR-256): satTarget is only in a response whose window held a SAT value; absent means empty
+      var st = satCol ? j.satTarget[i] : null;
+      r.satTarget = (typeof st === 'number') ? st / sc : null;
+      if (r.satTarget !== null) any = true;
       var m = j.mod[i];
       r.mod = (typeof m === 'number') ? m : null;
       r.flame = j.flame[i] ? 1 : 0; r.dhw_on = j.dhw_on[i] ? 1 : 0; r.ch = j.ch[i] ? 1 : 0;
@@ -3354,20 +3371,22 @@
       else if (a < out.length && out[a].t === live[b].t) { a++; }
       else merged.push(live[b++]);
     }
-    return merged.length > GHIST_MAX ? merged.slice(-GHIST_MAX) : merged;
+    return graphTrim(merged, nowMs);   // TASK-1963: by time (7 d device, 24 h live), not by count
   }
   // 'idle' -> 'loading' -> 'done' | 'unavailable' (404 on older firmware, permanent for the page).
   // A failed, empty or unusable load goes back to 'idle'; a 'done' load is repeated when the tab
   // opens and the last one is older than GHIST_RELOAD_MS (the time-based merge makes that safe).
-  var gHistState = 'idle', gHistLoadedAt = 0, GHIST_RELOAD_MS = 600000, GHIST_TIMEOUT_MS = 20000;
+  var gHistState = 'idle', gHistLoadedAt = 0, GHIST_RELOAD_MS = 600000, GHIST_TIMEOUT_MS = 20000, gHistHours = 0;
   function loadGraphHistory() {
     if (gHistState === 'unavailable' || gHistState === 'loading') return;
     if (gHistState === 'done' && Date.now() - gHistLoadedAt < GHIST_RELOAD_MS) return;
     gHistState = 'loading';
+    // TASK-1963 (ADR-245): ask for 7 days only when a window longer than 24 h is shown; the device thins it.
+    var hours = graphWindowMs > 86400000 ? 168 : 0;
     var tHead = 0, ac = (typeof AbortController !== 'undefined') ? new AbortController() : null;
     var timer = ac ? setTimeout(function () { ac.abort(); }, GHIST_TIMEOUT_MS) : 0;
     function finish() { if (timer) clearTimeout(timer); }
-    fetchWithRetry(APIGW + 'v2/graph/history', ac ? { signal: ac.signal } : undefined).then(function (r) {
+    fetchWithRetry(APIGW + 'v2/graph/history' + (hours ? '?hours=' + hours : ''), ac ? { signal: ac.signal } : undefined).then(function (r) {
       tHead = Date.now();   // the device computed newest_age_ms when it handled the request
       if (r.status === 404) { gHistState = 'unavailable'; return null; }
       if (!r.ok) throw new Error('HTTP ' + r.status);
@@ -3375,6 +3394,9 @@
     }).then(function (j) {
       finish();
       if (!j) return;
+      // TASK-1963: the 7-day chip only on a board whose ring holds days (2 min slots or longer: PSRAM).
+      if (typeof j.interval_s === 'number') document.querySelectorAll('#mgraph .tchip[data-psram-only]').forEach(function (c) { c.hidden = !(j.interval_s >= 120); });
+      gHistHours = hours || 24;
       var merged = mergeGraphHistory(gHist, j, tHead);
       if (merged === gHist || !merged.some(function (r) { return r.h; })) { gHistState = 'idle'; return; }
       gHist = merged;
@@ -3399,8 +3421,8 @@
     return [k, dallasLabelFor(a) || a, GDCOL[i % GDCOL.length], 't'];
   }
   // Series labels are translated at render time (the GSER labels are the English defaults).
-  var GSER_LABEL_KEY = { flow: 'graph.series_flow', ret: 'graph.series_ret', chSet: 'graph.series_ch_set', roomSet: 'graph.series_room_set',
-    room: 'graph.series_room', outside: 'graph.series_outside', mod: 'graph.series_mod', flame: 'graph.series_flame', dhw_on: 'graph.series_dhw_on', ch: 'graph.series_ch' };
+  var GSER_LABEL_KEY = { flow: 'graph.series_flow', ret: 'graph.series_ret', chSet: 'graph.series_ch_set', roomSet: 'graph.series_room_set', satTarget: 'graph.series_sat_target',
+    room: 'graph.series_room', outside: 'graph.series_outside', dhw: 'graph.series_dhw', mod: 'graph.series_mod', flame: 'graph.series_flame', dhw_on: 'graph.series_dhw_on', ch: 'graph.series_ch' };
   // TASK-1297: values of the visible series at time tMs. arr is ascending by t. Returns null when no
   // record covers tMs (before the first record, or more than GBREAK_MS past the record's data end).
   // The time is not called t: t() is the translation helper used below (TASK-1768).
@@ -3549,7 +3571,7 @@
         el.setAttribute('data-k', k); el.setAttribute('stroke', m[2]); el.setAttribute('stroke-width', kind === 't' ? '1.8' : '1.2');
         el.setAttribute('fill', kind === 'm' ? 'rgba(0,191,254,.18)' : (kind === 'l' ? m[2] : 'none'));
         if (kind === 'l') el.setAttribute('fill-opacity', '.3');
-        if (k === 'chSet' || k === 'roomSet') el.setAttribute('stroke-dasharray', '5 4');
+        if (k === 'chSet' || k === 'roomSet' || k === 'satTarget') el.setAttribute('stroke-dasharray', '5 4');
         g.appendChild(el);
       }
       if (!gOff[k] && c.length) d = kind === 'm' ? graphPath(c, kind, ym, MP.top + MP.h) : graphPath(c, kind, y, GLANE_Y[k]);
@@ -3845,7 +3867,6 @@
       [t('graph.otd_row_ot_bus'), onoff(s.ot_online, t('graph.otd_online'), t('graph.otd_offline')), s.ot_online],
       [t('graph.otd_row_thermostat'), onoff(s.thermostat_connected, t('graph.otd_connected'), t('graph.otd_none')), s.thermostat_connected],
       [t('graph.otd_row_boiler'), onoff(s.boiler, t('graph.otd_active'), t('graph.otd_idle')), s.boiler],
-      [t('graph.otd_row_setback'), onoff(s.setback_active, t('graph.otd_active'), t('graph.otd_off')), s.setback_active],
       [t('graph.otd_row_stepup'), onoff(s.stepup, t('graph.otd_on'), t('graph.otd_off')), s.stepup],
       [t('graph.otd_row_schedule'), (s.schedule_active || 0) + ' / ' + (s.schedule_total || 0) + (s.schedule_disabled ? ' ' + t('graph.otd_schedule_disabled', { n: s.schedule_disabled }) : ''), null],
       [t('graph.otd_row_overrides'), '' + (s.overrides_active || 0), null]
@@ -3887,7 +3908,9 @@
   // The table holds the ids of otOverrides[] in OTDirect.ino; no other id can be a write override.
   var OTD_WRITE_CMD = {
     1: { cmd: 'CS', what: 'graph.otd_what_cs', clear: 'CS=0', sat: true },
-    7: { cmd: 'CC/CL', what: 'graph.otd_what_cooling', clear: 'CL=0' },   // CL=0 clears 7; CC=0 would write 0
+    // TASK-1958: CL=0 holds a cooling level of 0 (PIC SetCoolLevel, gateway.asm 6.8:4454-4464; OT-Direct the same);
+    // only a value that is not a number clears 7, answered "CL: -". CC= has no clear of its own.
+    7: { cmd: 'CC/CL', what: 'graph.otd_what_cooling', clear: 'CL=-' },
     8: { cmd: 'C2', what: 'graph.otd_what_ch2', clear: 'C2=0', sat: true },
     14: { cmd: 'MM', what: 'graph.otd_what_mm', clear: 'MM=T', sat: true },   // a non-numeric MM= clears
     // 16 is set by BS= and the MQTT room_setpoint route (TT=/TC= only in master mode); BS=0 clears it whatever set it.
@@ -4197,7 +4220,6 @@
     // TASK-935: remaining OT-Direct config keys (were falling back to humanizeKey)
     otdautodetect:       { cat: 'otd', label: 'Auto-detect OT-Direct mode' },
     otdsetbacktemp:      { cat: 'otd', label: 'Setback temperature', hint: '°C' },
-    otdsetbacktimeout:   { cat: 'otd', label: 'Setback timeout', hint: 'Seconds' },   // OTDirect.ino multiplies by 1000 (TASK-1281)
     otdenableslave:      { cat: 'otd', label: 'Enable slave (thermostat) passthrough' },
     otdsummermode:       { cat: 'otd', label: 'Summer mode (CH off)' },
     otdfailsafe:         { cat: 'otd', label: 'Fail-safe on OT bus loss' },
@@ -4252,6 +4274,7 @@
     // TASK-1281: the explanation of this setting (formerly an inline 'help' block) lives in settings-help.json.
     satexternaltemp:     { cat: 'sat', label: 'Use MQTT/REST as indoor temp source' },
     satovershootmargin:  { cat: 'sat', label: 'Overshoot margin', hint: '°C' },
+    satpwmswitchmargin:  { cat: 'sat', label: 'PWM switch margin', hint: '°C' },
     satboilercapacity:   { cat: 'sat', label: 'Boiler capacity', hint: 'kW' },
     satdhwcapacity:      { cat: 'sat', label: 'DHW capacity', hint: 'kW (0 = boiler capacity)' },
     satthermalcoeff:     { cat: 'sat', label: 'Thermal-drop coefficient' },
@@ -4316,7 +4339,7 @@
     ['Season', ['satsummersimmer', 'satsummerthreshold', 'satsummerminhours', 'satwindowdetect', 'satwindowminsec']]
   ];
   var SAT_L3 = [
-    ['Curve', ['satcoefficient', 'satcurveselftune', 'sattempstep', 'satovershootmargin']],
+    ['Curve', ['satcoefficient', 'satcurveselftune', 'sattempstep', 'satovershootmargin', 'satpwmswitchmargin']],
     ['PWM', ['satovershootprotection', 'satcyclesperhour',
              'satinterval', 'sathpcycle', 'satsolarfreezeint']],
     ['Offsets', ['satflameoffset', 'satflowoffset', 'satvalveoffset', 'satmodsupdelay', 'satmodsupoffset', 'satflushtreshold']],
@@ -4842,6 +4865,7 @@
       });
     }
     if (satLockedKey(k)) { input.disabled = true; row.style.opacity = '0.55'; row.title = satOffNote(); }   // TASK-1737
+    if (k === 'satbleenable') bleLockSwitch(input, row);   // TASK-2025: no PSRAM, the switch cannot be touched
     row.appendChild(input);
     return row;
   }
@@ -4996,11 +5020,11 @@
     var satEnabling = ('satenabled' in setDirty) && ('' + setDirty.satenabled) === 'true' &&
       !(setData.satenabled && ('' + setData.satenabled.value) === 'true') && satOnbNeeded();
     if (satEnabling) { delete setDirty.satenabled; keys = Object.keys(setDirty); }
-    // TASK-1693: switching BLE on for a board without PSRAM asks first (the stability warning);
-    // the key leaves this save and maybeShowBleConsent() stores it only when the user accepts.
-    var bleEnabling = ('satbleenable' in setDirty) && ('' + setDirty.satbleenable) === 'true' &&
-      bleNeedsRiskAck();
-    if (bleEnabling) { delete setDirty.satbleenable; keys = Object.keys(setDirty); }
+    // TASK-2025: BLE cannot be switched on without PSRAM (the firmware refuses it with 409): the key leaves this
+    // save and a note says why. Before, a warning let the user accept the risk; on .61 the scanner then exhausted
+    // the heap and the unit hung.
+    var bleRefused = ('satbleenable' in setDirty) && ('' + setDirty.satbleenable) === 'true' && bleNoPsram();
+    if (bleRefused) { delete setDirty.satbleenable; keys = Object.keys(setDirty); }
     var bleName = ('satblenameprefix' in setDirty) || ('satblenamefilteringest' in setDirty);
     var chain = Promise.resolve();
     keys.forEach(function (k) {
@@ -5019,12 +5043,12 @@
     chain.then(function () {
       setDirty = {};
       // TASK-1732: only when something was posted. A save that held only a key handed to the SAT
-      // wizard (satenabled) or the BLE warning (satbleenable) stored nothing yet.
+      // wizard (satenabled) or a refused BLE switch (satbleenable, TASK-2025) stored nothing yet.
       if (keys.length) bleToast(t('settings.saved'));
       renderSettings();
       if (bleName) bleAction('rescan');   // TASK-1231: re-apply the name filter (classic parity)
       if (satEnabling) startSatOnboarding('enable');   // TASK-1012: wizard owns the actual enable
-      if (bleEnabling) maybeShowBleConsent();           // TASK-1693: the warning owns the actual enable
+      if (bleRefused) bleToast(t('values.ble_needs_psram'), true, 5000);   // TASK-2025
     }).catch(function () {
       bleToast(t('settings.save_failed'), true, 2500);   // TASK-1254: red error variant
     });
@@ -5052,69 +5076,33 @@
         // clobber a half-typed bindkey / steal focus).
         var changed = !bleData || bleData.populated_slots !== j.populated_slots ||
           JSON.stringify(bleData.sensors || []) !== JSON.stringify(j.sensors || []);
-        var pausedChanged = !bleData || bleBlePaused(bleData) !== bleBlePaused(j);
+        var psramChanged = !bleData || (bleData.psram === 0) !== (j.psram === 0);
         bleData = j;
-        // TASK-1693: no dialog without a user action. A board without PSRAM with BLE on but no
-        // ack (an install from before TASK-1693) keeps BLE paused and shows a hint in the BLE card.
-        if (pausedChanged) changed = true;
+        if (psramChanged) {   // TASK-2025: the BLE card shows the needs-PSRAM note, and the switch locks
+          changed = true;
+          var sw = document.querySelector('#setCols .srow[data-key="satbleenable"] input');
+          if (sw) bleLockSwitch(sw, sw.closest('.srow'));
+        }
         var card = document.getElementById('setcard-ble');
         var typing = card && card.contains(document.activeElement) &&
           /^(INPUT|TEXTAREA)$/.test((document.activeElement || {}).tagName || '');
         if (changed && !typing) renderBleCard();
       }).catch(function () { });
   }
-  // TASK-1693: BLE waits for the warning on this board (no PSRAM, BLE on, not accepted yet).
-  function bleBlePaused(j) { return !!j && j.psram === 0 && !!j.ble_enable && !j.risk_ack; }
-  // TASK-1693: switching BLE on needs the warning first when the board has no PSRAM and the risk
-  // was not accepted yet. PSRAM comes from the BLE roster (loaded with the Sensors page), else
-  // from device/info; an unknown board does not ask.
-  function bleNeedsRiskAck() {
+  // TASK-2025: BLE needs PSRAM. PSRAM comes from the BLE roster (loaded with the Sensors page), else from
+  // device/info; an unknown board is not refused here (the firmware still refuses it).
+  function bleNoPsram() {
     var ps = bleData && typeof bleData.psram === 'number' ? bleData.psram
            : (devInfoCache && devInfoCache.psram_found !== undefined ? +devInfoCache.psram_found : 1);
-    var acked = setData.satbleriskack && ('' + setData.satbleriskack.value) === 'true';
-    return ps === 0 && !acked;
+    return ps === 0;
   }
-  // TASK-995 / TASK-1693: BLE-without-PSRAM stability warning. On a no-PSRAM board BLE takes
-  // ~64 KB of internal DRAM that the async web server needs, so the Web UI can wedge under load.
-  // Shown only on a user action: switching BLE on (saveSettings) or the button in the BLE card.
-  // Accept -> store SATbleenable=true (if not on yet), then SATbleriskack=true, one after the
-  // other (ADR-165). Decline -> nothing new is stored; BLE that was already on is switched off.
-  function maybeShowBleConsent() {
-    if (document.getElementById('bleRiskBackdrop')) return;   // already open
-    var bd = document.createElement('div'); bd.id = 'bleRiskBackdrop'; bd.className = 'sim-backdrop';
-    var m = document.createElement('div'); m.className = 'sim-modal';
-    var h = document.createElement('h3'); h.textContent = '⚠ ' + t('values.ble_risk_title');
-    var p = document.createElement('p');
-    p.textContent = t('values.ble_risk_text');
-    var acts = document.createElement('div'); acts.className = 'acts';
-    var no = document.createElement('button'); no.textContent = t('values.ble_keep_off');
-    var yes = document.createElement('button'); yes.className = 'primary'; yes.textContent = t('values.ble_enable_anyway');
-    function post(name, value, then) {
-      fetch(APIGW + 'v2/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: name, value: value }) })
-        // TASK-1732 review: a failed store says so; the user must not be left without feedback.
-        // The failure handler covers the request only, so an error in then() is not shown as a failed save.
-        .then(function (r) {
-          if (!r.ok) { bleToast(t('values.save_failed_http', { status: r.status }), true, 2500); return false; }
-          return true;
-        }, function () { bleToast(t('values.save_failed'), true, 2500); return false; })
-        .then(function (ok) { if (ok && then) then(); });
-    }
-    function close() { if (bd.parentNode) bd.parentNode.removeChild(bd); }
-    var wasOn = setData.satbleenable && ('' + setData.satbleenable.value) === 'true';
-    function stored(name, value) { if (setData[name]) setData[name].value = value; }
-    no.addEventListener('click', function () {
-      close();
-      if (!wasOn) { bleToast(t('values.ble_kept_off')); return; }
-      post('satbleenable', false, function () { stored('satbleenable', false); bleToast(t('values.ble_kept_off')); renderSettings(); setTimeout(fetchBle, 500); });
-    });
-    yes.addEventListener('click', function () {
-      close();
-      var ack = function () { post('satbleriskack', true, function () { stored('satbleriskack', true); bleToast(t('values.ble_enabled_accepted')); renderSettings(); setTimeout(fetchBle, 800); }); };
-      if (wasOn) ack(); else post('satbleenable', true, function () { stored('satbleenable', true); ack(); });
-    });
-    acts.appendChild(no); acts.appendChild(yes);
-    m.appendChild(h); m.appendChild(p); m.appendChild(acts); bd.appendChild(m);
-    document.body.appendChild(bd);
+  // TASK-2025 (Robert, DM 1572613627528085586: "Niet verbergen maar disablen. Geen PSRAM dan mag je de schakelaar
+  // niet aanraken."): without PSRAM the BLE switch stays visible but disabled, with the reason as its title. Called when
+  // the row is built and again when the BLE poll first tells the board has no PSRAM.
+  function bleLockSwitch(input, row) {
+    if (!input || !bleNoPsram()) return;
+    input.disabled = true;
+    if (row) { row.style.opacity = '0.55'; row.title = t('values.ble_needs_psram'); }
   }
   // TASK-963: continuous detection. The firmware scans passive-continuous (ADR-151),
   // so sensors appear over time; poll the roster while the Sensors category is open
@@ -5160,14 +5148,10 @@
       ? t('values.ble_slots_prefix', { used: bleData.populated_slots || 0, max: bleData.max_slots || 0, prefix: bleData.name_prefix })
       : t('values.ble_slots', { used: bleData.populated_slots || 0, max: bleData.max_slots || 0 });
     card.appendChild(desc);
-    // TASK-1693: BLE is switched on but waits for the stability warning (board without PSRAM,
-    // install from before TASK-1693). A hint with a button, never a dialog on its own.
-    if (bleBlePaused(bleData)) {
+    // TASK-2025: a board without PSRAM cannot run BLE; say so in the card.
+    if (bleData.psram === 0) {
       var hint = document.createElement('div'); hint.className = 'ble-desc';
-      hint.textContent = t('values.ble_paused') + ' ';
-      var accept = document.createElement('button'); accept.className = 'tbtn'; accept.textContent = t('values.ble_read_warning');
-      accept.addEventListener('click', maybeShowBleConsent);
-      hint.appendChild(accept);
+      hint.textContent = t('values.ble_needs_psram');
       card.appendChild(hint);
     }
     var rescan = document.createElement('button'); rescan.className = 'tbtn'; rescan.textContent = '🔄 ' + t('values.ble_rescan');
@@ -6346,6 +6330,11 @@
         if (v === 'N' || v === '0') return t('adv.pic_ovr_none');
         if (v.length > 1 && v.charAt(0) === 'T') return t('adv.pic_ovr_temp', { temp: v.slice(1) });
         if (v.length > 1 && v.charAt(0) === 'C') return t('adv.pic_ovr_const', { temp: v.slice(1) });
+        // TASK-1939: the PIC (PrintOverride, gateway.asm 6.6:2198-2222) prints t/c in lowercase while the thermostat has
+        // not yet accepted the TT=/TC= override, and n while a cleared override waits to be released.
+        if (v.length > 1 && v.charAt(0) === 't') return t('adv.pic_ovr_temp_pending', { temp: v.slice(1) });
+        if (v.length > 1 && v.charAt(0) === 'c') return t('adv.pic_ovr_const_pending', { temp: v.slice(1) });
+        if (v === 'n') return t('adv.pic_ovr_clearing');
         return v;
       case 'dhw_override': return picCode(v, { '0': 'adv.pic_dhw_0', '1': 'adv.pic_dhw_1', A: 'adv.pic_dhw_a', P: 'adv.pic_dhw_p' });
       case 'gpio': return picLetters(v, ['A', 'B'], function (c) { return picCode(c, PIC_GPIO); });
@@ -6906,6 +6895,7 @@
   // across polls (no firmware history endpoint, by design — as in the former classic SAT page).
   var satPollTimer = null;
   var satLastData = null;
+  var satLastWeather = null;   // TASK-2015: the last v2/sat/weather answer, for the location hint
   // TASK-1507: SAT beta notice. One text for the wizard's first step and the SAT page notice.
   var SAT_BETA_HEAD = 'SAT is experimental in this beta and it controls your boiler.';
   var SAT_BETA_BODY = 'We need field data to validate it. Please run the capture tool now and then (scripts/capture-mqtt-debug.bat on Windows, scripts/capture-mqtt-debug.sh on Linux or macOS) and share the transcript in the Discord #alpha-testing channel (discord.gg/zjW3ju7vGQ) or as a GitHub issue (github.com/rvdbreemen/OTGW-firmware/issues).';
@@ -7033,6 +7023,7 @@
         if (d.enabled !== undefined) satEnabledLive = !!d.enabled;   // TASK-1737 (renderSatPage applies the lock)
         syncSatBetaNotice();   // TASK-1507: once per page load
         try { renderSatPage(d); } catch (e) { }
+        try { satUpdateLocHint(); } catch (e) { }   // TASK-2015: the hint follows the sun elevation source
       })
       .catch(function () {
         // Hard failure (device unreachable) at first paint: show the no-data banner
@@ -7075,8 +7066,8 @@
       .catch(function () { });
   }
 
-  // TASK-1881 (U9): heating curve self-tune progress from the status object curve_tune: counted days, clean hours today,
-  // the last daily record and the hours each reason kept out of the window. Hidden on a firmware without curve_tune.
+  // TASK-1881 (U9): heating curve self-tune progress from the status object curve_tune: counted hours in the window
+  // (ADR-260), the last hourly decision record and the hours each reason kept out of the window. Hidden on a firmware without curve_tune.
   function satTuneReasonText(code) {
     var k = 'tools.sat_tune_r_' + code, s = t(k);
     return s === k ? String(code) : s;   // a reason this page does not know yet shows its code
@@ -7090,8 +7081,8 @@
     if (!d.curve_self_tune || !ct.running) {
       box.innerHTML = h + '<div>' + esc(t('tools.sat_tune_off')) + '</div>'; return;
     }
-    h += '<div>' + esc(t('tools.sat_tune_days', { days: ct.days | 0, need: ct.days_needed | 0,
-      clean: ct.clean_hours_today | 0, cleanNeed: ct.clean_hours_needed | 0 })) + '</div>';
+    // TASK-1889 (ADR-260): the window counts hours (window_hours / window_hours_needed)
+    h += '<div>' + esc(t('tools.sat_tune_days', { days: ct.window_hours | 0, need: ct.window_hours_needed | 0 })) + '</div>';
     var dec = ct.last_decision;
     h += '<div>' + esc(dec === 'raise' || dec === 'lower' || dec === 'hold'
       ? t('tools.sat_tune_last', { decision: t('tools.sat_tune_dec_' + dec), reason: satTuneReasonText(ct.last_reason) })
@@ -7226,6 +7217,9 @@
   function satWhyReasons(d) {
     var out = [];
     if (d.fallback_active) out.push({ text: t('tools.sat_why_takeover', { reason: satFbReasonText(d.fallback_reason) }), warn: true });
+    // TASK-1882: diagnostic events (no control action)
+    if (d.no_ignition) out.push({ text: t('tools.sat_why_no_ignition'), warn: true });
+    if (d.heating_failure) out.push({ text: t('tools.sat_why_heating_failure', { start: fmt(d.heating_failure_room_start, 1), end: fmt(d.heating_failure_room_end, 1) }), warn: true });
     var veto = d.pwm_veto_reason | 0;
     if (veto === 1 && d.slave_cfg_valid === false) out.push({ text: t('tools.sat_why_pwm_no_reply') });
     else if (veto === 2 && d.slave_low_off_denied) out.push({ text: t('tools.sat_why_pwm_denied') });
@@ -7395,7 +7389,7 @@
     satRenderHealth(d);
     satRenderCycles24(d);
     satKv('satPidKv', [
-      [t('tools.kv_p_term'), satFmt(d.pid_p, 2)], [t('tools.kv_i_term'), satFmt(d.pid_i, 2)], [t('tools.kv_d_term'), satFmt(d.pid_d, 2)],
+      [t('tools.kv_p_term'), satFmt(d.pid_p, 2)], [t('tools.kv_i_term'), satFmt(d.pid_i, 2) + (d.pid_curve_only ? ' ' + t('tools.kv_i_not_applied') : '')], [t('tools.kv_d_term'), satFmt(d.pid_d, 2)],
       ['Kp', satFmt(d.kp, 4)], ['Ki', satFmt(d.ki, 4)], ['Kd', satFmt(d.kd, 4)],
       [t('tools.kv_raw_derivative'), satFmt(d.raw_derivative, 4)]
     ]);
@@ -7577,6 +7571,8 @@
   }
 
   function renderSatWeather(w) {
+    satLastWeather = w || null;
+    satUpdateLocHint();
     if (!w || !w.enabled) { satKv('satWeatherKv', [[t('tools.kv_weather'), t('tools.disabled')]]); txt('satCoords', ''); return; }
     var valid = !!w.valid;
     var mins = (valid && w.age_seconds >= 0) ? Math.floor(w.age_seconds / 60) : null;
@@ -7826,17 +7822,40 @@
   }
 
   // On plain HTTP the Detect location button always fails, so hide it and point
-  // to the manual Latitude/Longitude fields instead (TASK-1257).
+  // to the manual Latitude/Longitude fields instead (TASK-1257). The hint itself follows
+  // the polled status and weather (satUpdateLocHint, TASK-2015).
   function satWireDetectLocation() {
     var dl = document.getElementById('satDetectLoc');
     if (!dl) return;
-    if (satGeoUsable()) { dl.addEventListener('click', satDetectLocation); return; }
-    dl.hidden = true;
+    if (satGeoUsable()) dl.addEventListener('click', satDetectLocation);
+    satUpdateLocHint();
+  }
+
+  // TASK-2015 (Robert, 2026-11-18): not everyone uses Home Assistant, so Latitude/Longitude stays the
+  // default; when HA publishes a fresh sat/sun_elevation (sun_elevation_source "external" in the
+  // SAT status, the firmware's 1 h rule of TASK-1410) the card names that source and asks for no
+  // location, unless the weather fetch is on without a location (the fetch itself needs one).
+  // Returns 'ha', 'ha_weather_loc', 'hint' (ask for a location) or '' (nothing to say).
+  function satLocHintKind(sunSource, weatherOn, hasLocation, geoUsable) {
+    if (sunSource === 'external') return (weatherOn && !hasLocation) ? 'ha_weather_loc' : 'ha';
+    return geoUsable ? '' : 'hint';
+  }
+  function satUpdateLocHint() {
+    var d = satLastData || {}, w = satLastWeather || {};
+    var lat = parseFloat(w.latitude), lon = parseFloat(w.longitude);
+    var hasLoc = !isNaN(lat) && !isNaN(lon) && (lat !== 0 || lon !== 0);
+    var kind = satLocHintKind(d.sun_elevation_source, !!w.enabled, hasLoc, satGeoUsable());
+    var dl = document.getElementById('satDetectLoc');
+    if (dl) dl.hidden = !satGeoUsable() || kind === 'ha';
     var lh = document.getElementById('satLocHint');
-    if (lh) {
-      lh.textContent = t('tools.sat_geo_hint');
-      lh.hidden = false;
-    }
+    if (!lh) return;
+    var deg = (typeof d.sun_elevation === 'number') ? d.sun_elevation.toFixed(1) : '—';
+    var msg = '';
+    if (kind === 'hint') msg = t('tools.sat_geo_hint');
+    else if (kind === 'ha') msg = t('tools.sat_sun_from_ha', { deg: deg });
+    else if (kind === 'ha_weather_loc') msg = t('tools.sat_sun_from_ha', { deg: deg }) + ' ' + t('tools.sat_sun_ha_weather_loc');
+    lh.textContent = msg;
+    lh.hidden = !msg;
   }
 
   // ---------- TASK-990: sensor-discovery toast (PR-649 "OTGW Patterns and Tokens") ----------
@@ -8660,6 +8679,7 @@
     document.querySelectorAll('#mgraph .tchip:not([id])').forEach(function (ch) {
       ch.addEventListener('click', function () {
         graphWindowMs = graphChipWindowMs(ch);   // TASK-1828: from data-win-ms, not the (translated) chip text
+        if (graphWindowMs > 86400000 && gHistHours < 168 && gHistState !== 'loading') { gHistState = 'idle'; loadGraphHistory(); }   // TASK-1963
         document.querySelectorAll('#mgraph .tchip:not([id])').forEach(function (x) { x.classList.toggle('on', x === ch); });
         if (isMonitorVisible('mgraph')) renderGraph();
       });

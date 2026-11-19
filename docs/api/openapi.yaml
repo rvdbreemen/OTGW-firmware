@@ -123,6 +123,7 @@ paths:
                       status:
                         type: string
                         enum: [UP, DEGRADED]
+                        description: DEGRADED when LittleFS is not mounted, or when the last state file written by the file-writer task (SAT state) did not read back as written
                       uptime:
                         type: string
                         example: "2d 3h 45m"
@@ -200,11 +201,15 @@ paths:
     get:
       tags:
         - Monitor
-      summary: Monitor graph history (1 hour, or 24 hours with PSRAM)
+      summary: Monitor graph history (1 hour, or up to 7 days with PSRAM)
       description: |
         Returns the device-side history of the Monitor > Graph series (TASK-1296):
         oldest first, in columns. A board without PSRAM serves up to 120 slots of
-        30 s (1 hour); a board with PSRAM serves up to 720 slots of 120 s (24 hours).
+        30 s (1 hour); a board with PSRAM keeps 7 days (5040 slots of 120 s) and serves
+        24 hours (720 slots) by default. `hours` asks for another window, up to 168
+        (7 days); a response holds at most 1008 slots, so a longer window comes back
+        thinned to longer slots (`hours=168`: 1008 slots of 600 s), each with the
+        newest value of its group and the flags of any slot in it (TASK-1963, ADR-245).
         The web UI loads it when the Graph tab opens and merges it into the live
         samples it collects itself. Dallas sensors are not recorded.
 
@@ -221,10 +226,19 @@ paths:
 
         The history lives in RAM and starts empty after a reboot, so `count` grows
         by one slot per `interval_s` until it reaches 120 (no PSRAM, about 1.8 KB
-        of internal RAM, body about 4 KB) or 720 (PSRAM, about 10 KB of PSRAM, body
-        about 25 KB). The body is sent in chunks. Returns 503 with `Retry-After`
+        of internal RAM, body about 4 KB) or the requested window (PSRAM, about 70 KB
+        of PSRAM for 7 days; a 24 h body is about 25 KB, a 7-day body about 35 KB). The body is sent in chunks. Returns 503 with `Retry-After`
         when the heap is low.
       operationId: getGraphHistory
+      parameters:
+        - name: hours
+          in: query
+          required: false
+          description: Window in hours, 1 to 168 (default 24). Capped at what the ring holds.
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 168
       responses:
         '200':
           description: History retrieved successfully
@@ -236,7 +250,7 @@ paths:
                 properties:
                   interval_s:
                     type: integer
-                    description: Seconds between two slots (30 without PSRAM, 120 with PSRAM)
+                    description: Seconds per slot (30 without PSRAM, 120 with PSRAM, longer for a thinned window, 600 for hours=168)
                   newest_age_ms:
                     type: integer
                     description: Age in milliseconds of the END of the newest slot when the response was produced; 0 when there is no slot yet
@@ -271,6 +285,10 @@ paths:
                   outside:
                     type: array
                     description: Outside temperature (weather API when valid, else MsgID 27), value times scale
+                    items: {type: integer, nullable: true}
+                  satTarget:
+                    type: array
+                    description: SAT target (target_temp of /api/v2/sat/status) while SAT was enabled, value times scale; only present when the window holds such a value (ADR-256)
                     items: {type: integer, nullable: true}
                   mod:
                     type: array
@@ -634,6 +652,13 @@ paths:
                         type: string
                       fwversion:
                         type: string
+                      appelfsha256:
+                        type: string
+                        description: >-
+                          SHA256 (lowercase hex, 64 characters) of the running firmware's ELF
+                          (TASK-1983). The core dump endpoint returns the crashing build's prefix
+                          in X-Coredump-App-Sha256, so the two together tell whether a stored dump
+                          is from this build. Empty when the app description has no SHA.
                       platform:
                         type: string
                         description: 'Chip platform ("ESP8266" or "ESP32")'
@@ -1013,6 +1038,15 @@ paths:
               schema:
                 type: string
                 example: '0123456ab'
+            X-Running-App-Sha256:
+              description: >-
+                SHA256 (lowercase hex, 64 characters) of the ELF of the firmware that
+                is running now (TASK-1983). When it starts with X-Coredump-App-Sha256,
+                the dump is from this build; otherwise from an earlier one. Empty when
+                the app description has no SHA.
+              schema:
+                type: string
+                example: '0123456ab89cdef0123456789abcdef0123456789abcdef0123456789abcdef'
           content:
             application/octet-stream:
               schema:
@@ -1606,12 +1640,23 @@ paths:
                   last_seen_age_s:
                     type: integer
                     description: Seconds since that answer; -1 when status is never_seen (same convention as boiler_age_s in /v2/health).
+                  source:
+                    type: string
+                    enum: [none, boiler, gateway, thermostat, summary, replay]
+                    description: |
+                      Which frame wrote the `value` served here (TASK-1965): `boiler` (a boiler answer),
+                      `gateway` (a value the gateway supplies itself: a PIC sensor's Write-Data, an OT-Direct
+                      `OT=` value, a PIC answer to the thermostat), `thermostat` (a thermostat write),
+                      `summary` (the PIC PS=1 summary), `replay` (a replayed line) or `none` (no value this
+                      boot). `status` stays the boiler's own last answer, so `status: data_invalid` with
+                      `source: gateway` is a valid gateway value for an ID the boiler does not support.
               example:
                 label: "boilertemperature"
                 value: 45.5
                 unit: "\u00b0C"
                 status: "ack"
                 last_seen_age_s: 3
+                source: "boiler"
         '400':
           $ref: '#/components/responses/BadRequestJson'
         '405':
@@ -1668,6 +1713,23 @@ paths:
           $ref: '#/components/responses/MethodNotAllowedJson'
         '413':
           description: Command too long
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '409':
+          description: |
+            Refused: SAT is enabled and controls the boiler, so an external CV control command
+            (CS=, CH=, MM=, C2=, H2=, TT=, TC=) is not sent (ADR-179, TASK-1970). It stays refused while
+            SAT is enabled; disable SAT to send it. Other commands (HW=, PR=, GW=, ...) are not affected.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '503':
+          description: |
+            Not queued: the command queue (PIC) or the OT-Direct command ring is full (TASK-1761), or the
+            board has no OT command interface. Retry later.
           content:
             application/json:
               schema:
@@ -2180,7 +2242,6 @@ paths:
                   monitor_mode: false
                   master_mode: false
                   thermostat_connected: true
-                  setback_active: false
                   schedule_total: 12
                   schedule_active: 11
                   schedule_disabled: 1
@@ -2317,12 +2378,8 @@ paths:
                         description: Persisted mode index (0=bypass, 1=gateway, 2=monitor, 3=master, 4=loopback)
                       setback_temp:
                         type: number
-                        description: Setback temperature applied when thermostat disconnects (C, range 1-30)
+                        description: SB= setback temperature, stored and printed (PR=S) like the PIC; no effect on OT-Direct (C, range 1-30)
                         example: 15.0
-                      setback_timeout:
-                        type: integer
-                        description: Seconds without a thermostat frame before setback activates
-                        example: 300
                       vent_enable:
                         type: boolean
                         description: Ventilation control enabled (OT MsgID 70 HB bit 0)
@@ -2342,7 +2399,6 @@ paths:
                 otdirect_settings:
                   mode: 1
                   setback_temp: 15.0
-                  setback_timeout: 300
                   vent_enable: false
                   open_bypass: false
                   auto_bypass: false
@@ -2383,10 +2439,6 @@ paths:
                   type: string
                   description: Setback temperature in C (range 1.0-30.0)
                   example: "15.0"
-                setbacktimeout:
-                  type: string
-                  description: Setback timeout in seconds
-                  example: "300"
                 ventenable:
                   type: string
                   description: Ventilation control enabled (true/false)
@@ -2648,6 +2700,17 @@ paths:
                   value: {}
                   unit:
                     type: string
+                  status:
+                    type: string
+                    enum: [never_seen, ack, unknown_dataid, data_invalid]
+                    description: The boiler's latest answer for this ID since boot, as on /v2/otgw/messages/{id} (TASK-1871).
+                  last_seen_age_s:
+                    type: integer
+                    description: Seconds since that answer; -1 when status is never_seen.
+                  source:
+                    type: string
+                    enum: [none, boiler, gateway, thermostat, summary, replay]
+                    description: Which frame wrote the served value, as on /v2/otgw/messages/{id} (TASK-1965).
         '400':
           $ref: '#/components/responses/BadRequestJson'
         '405':
@@ -4303,6 +4366,9 @@ components:
         pid_d:
           type: number
           description: "Derivative PID term (C)"
+        pid_curve_only:
+          type: boolean
+          description: "True while the PID output is the heating curve alone: no room temperature since the boot, or the room temperature was lost. pid_i then shows the restored integral, but it is not applied (TASK-1866, Sergeant D entry 388)."
         kp:
           type: number
           description: "Active Kp gain"
@@ -4321,6 +4387,9 @@ components:
         overshoot_margin:
           type: number
           description: "Allowed overshoot above target before a cycle is classed as overshoot (C)"
+        pwm_switch_margin:
+          type: number
+          description: "Continuous to PWM when flow minus the requested setpoint stays at or above this for 60 s (C, 0.5-5.0, default 2.0; TASK-1888, TASK-2005). A stored old default of 1.5 becomes 2.0 once"
         cycle_count:
           type: integer
           description: "Total boiler cycles counted"
@@ -4537,25 +4606,16 @@ components:
             running:
               type: boolean
               description: "The self-tune clock runs (self-tune on and SAT enabled)"
-            days:
+            window_hours:
               type: integer
-              description: "Counted days in the window"
-            days_needed:
+              description: "Counted hours in the self-tune window (ADR-260; replaces days, days_needed, clean_hours_today, clean_hours_needed and hours_today)"
+            window_hours_needed:
               type: integer
-              description: "Counted days a decision needs (3)"
-            clean_hours_today:
-              type: integer
-              description: "Clean hours of the current day"
-            clean_hours_needed:
-              type: integer
-              description: "Clean hours a day needs to count (6)"
-            hours_today:
-              type: integer
-              description: "Closed hours of the current day (0-23)"
+              description: "Counted hours a decision needs (12)"
             last_decision:
               type: string
               enum: [raise, lower, hold, none]
-              description: "Last daily decision; none before the first day closes"
+              description: "Last hourly decision; none before the first hour closes"
             last_reason:
               type: string
               description: "Reason of the last daily record (few_days, day_not_counted, no_phases, inside_band, phases_disagree, phases_agree, at_limit; none before the first day)"
@@ -4577,6 +4637,13 @@ components:
                 not_controlling: { type: integer }
                 few_ticks: { type: integer }
                 no_room: { type: integer }
+                diag_event: { type: integer, description: "TASK-1882 (entry 358): a no-ignition or heating-failure event was active" }
+        no_ignition: { type: boolean, description: "TASK-1882, diagnostic only (no control action): CH asked for 180 s of PWM ON / heat demand without a flame and with the flow below CS; cleared by a flame, a flow above CS or a SAT switch-off" }
+        no_ignition_events: { type: integer, description: "No-ignition events since boot" }
+        heating_failure: { type: boolean, description: "TASK-1882, diagnostic only: SAT at its maximum for 15 min while the room rose less than 0.5 C" }
+        heating_failure_events: { type: integer, description: "Heating-failure events since boot" }
+        heating_failure_room_start: { type: number, description: "Room temperature at the start of the last 15 min window, C" }
+        heating_failure_room_end: { type: number, description: "Room temperature at the end of the last 15 min window, C" }
         fireplace_mode:
           type: boolean
           description: "Fireplace mode (default false): SAT heats on the heating curve only with P, I and D at 0, as with a missing room temperature. Settable through POST /api/v2/sat/settings/fireplace_mode."
@@ -4690,7 +4757,14 @@ components:
           description: "Simulation mode active"
         sim_available:
           type: boolean
-          description: "Simulation mode available on this build"
+          description: "false while a real boiler answers (enabling simulation is refused then, TASK-795); the web UI disables its switch while this is false and simulation is off"
+        sun_elevation_source:
+          type: string
+          enum: [external, local, none]
+          description: "Source of the sun elevation SAT uses: external = sat/sun_elevation pushed over MQTT and younger than 1 h, local = computed from the weather latitude/longitude, none = unknown (TASK-2015)"
+        sun_elevation:
+          type: number
+          description: "Sun elevation in degrees; present only when sun_elevation_source is not none (TASK-2015)"
         sensor_max_age:
           type: integer
           description: "Maximum sensor age before stale (s)"
@@ -4755,6 +4829,7 @@ components:
         raw_derivative: 0.0
         coefficient: 1.5
         overshoot_margin: 2.0
+        pwm_switch_margin: 2.0
         cycle_count: 0
         cycles_this_hour: 0
         last_cycle_class: 0
@@ -4816,14 +4891,11 @@ components:
         curve_self_tune: true
         curve_tune:
           running: true
-          days: 2
-          days_needed: 3
-          clean_hours_today: 4
-          clean_hours_needed: 6
-          hours_today: 9
+          window_hours: 5
+          window_hours_needed: 12
           last_decision: hold
           last_reason: few_days
-          excluded_hours: { not_sat: 0, dhw: 3, no_sun: 0, sun: 11, pwm: 0, flame_off: 0, min_mod: 0, coeff_changed: 0, no_ticks: 0, not_controlling: 0, few_ticks: 0, no_room: 1 }
+          excluded_hours: { not_sat: 0, dhw: 3, no_sun: 0, sun: 11, pwm: 0, flame_off: 0, min_mod: 0, coeff_changed: 0, no_ticks: 0, not_controlling: 0, few_ticks: 0, no_room: 1, diag_event: 0 }
         fireplace_mode: false
         flame_off_offset: 0.0
         overshoot_protection: true
@@ -5032,10 +5104,7 @@ components:
               description: True when OTGW32 is the sole OT master (equivalent to `mode == "master"`)
             thermostat_connected:
               type: boolean
-              description: True when a thermostat frame has been received within the configured setback timeout
-            setback_active:
-              type: boolean
-              description: True when thermostat is considered disconnected and the setback temperature override is engaged
+              description: True when a thermostat frame has been received within the last 3 s
             schedule_total:
               type: integer
               description: Total number of OpenTherm Message IDs in the polling schedule

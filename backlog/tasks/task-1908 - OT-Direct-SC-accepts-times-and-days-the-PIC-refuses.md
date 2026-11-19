@@ -1,9 +1,11 @@
 ---
 id: TASK-1908
 title: 'OT-Direct: SC= accepts times and days the PIC refuses'
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@claude'
 created_date: '2026-11-13T18:50:00Z'
+updated_date: '2026-11-16T14:23:00Z'
 labels:
   - otdirect
   - parity
@@ -21,6 +23,21 @@ From the TASK-1851 delta parity check (2026-11-13, verified in both sources). PI
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Host test on the real SC= branch: SC=24:00/1 -> OR, SC=12:60/1 -> OR, SC=12:30 -> SE, SC=12:30/0 -> BV, SC=12:30/3x -> SE, and otSCLastCommandMs stays unchanged in each case; red on the current code, green on the fix
-- [ ] #2 SC=12:30/3 still stores and answers as today (regression)
+- [x] #1 Host test on the real SC= branch: SC=24:00/1 -> OR, SC=12:60/1 -> OR, SC=12:30 -> SE, SC=12:30/0 -> BV, SC=12:30/3x -> SE, and otSCLastCommandMs stays unchanged in each case; red on the current code, green on the fix
+- [x] #2 SC=12:30/3 still stores and answers as today (regression)
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Implemented (lane-95-1908): the SC= branch of handleOTDirectCommand() parses like the PIC SetClock (gateway.asm 6.8:4331-4370): hours GetDecimalArg (:5044-5069: no digit SE, above 255 OR), above 23 OR; ':' else SE; minutes GetDecimal (any error SE), above 59 OR; '/' else SE; the day one character '1'-'7' else BV (also nothing after '/', SetClock's 'subwf INDF1' with the NUL); anything after the day SE; a refused value stores nothing and answers the status. Evidence AC1: new tests/test_otd_sc_clock_pic.py on the real SC= branch: 24:00/1 OR, 12:60/1 OR, 12:30 SE, 12:30/0 BV, 12:30/3x SE, plus 12:30/ BV, 12:30/8 BV, x2:30/3 SE, 12-30/3 SE, 12:/3 SE, 256:00/1 OR, each with data 0000 and stamp 0; FAIL on origin/dev (24:00/1 was stored as 0x3800 and answered '24:00/1'). AC2: 12:30/3 -> '12:30/3' data 0x6C1E stamp set, 9:05/7 -> '09:05/7' 0xE905, 0:00/1 -> '00:00/1' 0x2000. The firmware's own NTP clock sync (networkStuff.ino:1449, 'SC=%d:%02d/%d', day 1-7) stays valid. Harness seams: tests/test_otd_sc_clock.py (wrapper returns bool, status double) and tests/test_otd_reply_texts_pic.py (<cctype>). Sweep 57 OTDirect slicers green, evaluate --quick 86/0. Docs ch09/h09 PIC-parity list + CHANGELOG Fixed line. Bench: SC= is benchable on .61 (REST, no boiler needed).
+2026-11-15 16:00-16:05 bench 09 on .61 (OT-Direct), beta.320+5b9efcc (sha256 ino ec7f313f…): REST commands with telnet 'OTD: cmd' + the event_report text: SC=24:00/1 -> OR ('outside of the allowed range'), SC=12:60/1 -> OR, SC=12:30 -> SE ('unexpected character or was incomplete'), SC=12:30/0 -> BV ('data value that is not allowed'), SC=12:30/3x -> SE, SC=12:30/3 -> 'SC: 12:30/3' (AC2 regression: still answers; the stored value only feeds the thermostat's MsgID 20 answer, not visible on .61 without a thermostat). NOT seen: 'the NTP SC= still lands' - ntpsendtime was off on .61; switched on for 75 s, no SC= on telnet, switched off again (75 s is probably shorter than the send interval; re-check if 95 gives the interval). Settings diff empty afterwards. Evidence: 09 scratchpad b320/sc (telnet.raw local, tel-ntp.raw).
+
+2026-11-16 (ba, coordinator request): tests/test_no_float_sscanf.py::test_siscanf_formats_are_integer_only was red on origin/dev since 021b506e8 ('18 not >= 19'): the SC= siscanf("%d:%d/%d") was deliberately replaced by the SetClock-faithful parser (exactly one siscanf removed, checked in the diff). Floor lowered to 18 with a comment citing this task; 4/4.
+<!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Closed by comms 92 on the coordinator's order (2026-11-16), from the task's own notes. Commit 021b506e8. AC1: host test on the real SC= branch: 24:00/1 and 12:60/1 OR, 12:30 SE, 12:30/0 BV, 12:30/3x SE, data 0000 and stamp 0 each; FAIL on origin/dev before the fix (24:00/1 stored as 0x3800). AC2: 12:30/3, 9:05/7, 0:00/1 still store and answer; bench 09 on .61, beta.320+5b9efcc, 2026-11-15: the same refusals over REST and SC=12:30/3 answers 'SC: 12:30/3'; settings diff empty (09 scratchpad b320/sc). Not seen on the bench: the firmware's own NTP SC= (ntpsendtime was on only 75 s); its format stays valid per networkStuff.ino:1449.
+<!-- SECTION:FINAL_SUMMARY:END -->

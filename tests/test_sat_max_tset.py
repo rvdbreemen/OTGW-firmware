@@ -63,8 +63,9 @@ struct SatSettings { float fMaxTSetUser = 0.0f; float fMaxSetpoint = 65.0f; bool
 struct Settings { SatSettings sat; };
 struct OTSys { float MaxTSet = 0.0f; uint16_t MaxTSetUBMaxTSetLB = 0; };
 static Settings settings; static OTSys OTcurrentSystemState;
-struct SatState { uint8_t iShVerdict = 0; }; struct State { SatState sat; }; static State state;   // TASK-1412.13
+struct SatState { uint8_t iShVerdict = 0; uint8_t iLastSentCH = 0; }; struct State { SatState sat; }; static State state;   // TASK-1412.13
 static bool satIsEnabled() { return settings.sat.bEnabled; }
+static bool satStartGateActive() { return false; }   // TASK-1942 (entries 385/387): the at-max block asks it; the gate is tested in test_sat_pwm_first_start.py
 static bool satShCurrent() { return true; }   // TASK-1541: the hand-back restore is tested in test_sat_disable_handback.py
 static void satShNoteBeforeSend(float) {}
 static bool g_hasOT = true;
@@ -86,6 +87,11 @@ enum { SAT_MODE_CONTINUOUS = 0, SAT_MODE_PWM = 1 };
 static const float SAT_MIN_SETPOINT = 10.0f; static const float SAT_COLD_HYSTERESIS_C = 1.0f;
 static bool _sat_narrAtMax = false, _sat_coldCut = false; static float _sat_requestedSetpoint = 0.0f;
 static bool satColdCutoffLatched(float, float, bool l, float) { return l; }
+// TASK-1887: the tolerance-band latch sits in this cut too (stubbed: demand stays on, no stop)
+static float _sat_tolErr = 0.0f; static bool _sat_tolDemand = true, _sat_tolBandOff = false; static uint32_t _sat_tolOffSinceMs = 0; static bool _sat_tolMinNarrated = false; static const uint32_t SAT_TOL_MIN_OFF_MS = 600000UL; static uint32_t _sat_tickMs = 0; static void satPwmCountOnWhenChAllowed(bool) {}   // TASK-1887 entry 398 (PWM part, not in this cut)
+static bool satToleranceDemand(bool was, float) { return was; }
+static bool satBandWaitsForMinBurn() { return false; }
+static const float SAT_TOL_COLD_C = 0.1f, SAT_TOL_HOT_C = 0.1f;
 static float satGetColdSetpoint() { return 0.0f; }
 static uint8_t g_mode = SAT_MODE_PWM;
 static void satSetControlMode(uint8_t m) { g_mode = m; }

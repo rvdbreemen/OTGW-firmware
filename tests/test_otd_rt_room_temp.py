@@ -59,7 +59,14 @@ PRE = r"""
 enum OTDirectMode { OTD_MODE_BYPASS = 0, OTD_MODE_GATEWAY = 1 };
 static OTDirectMode otCurrentMode = OTD_MODE_GATEWAY;
 static unsigned long otdRelayedStatusFrame(unsigned long f) { return f; }
+static bool otdRelayRead99(unsigned long, unsigned long &) { return false; }   // TASK-1906: MsgID 99 relay, tests/test_otd_msgid99_relay.py
+static bool otdRelayRewriteRead(unsigned long, unsigned long &) { return false; }   // TASK-1803, tests/test_otd_relay_rw.py
+static unsigned long otdReply99(unsigned long r) { return r; }
+static void otdOnThermostatWrite99(uint16_t) {}
+static uint16_t otdOperModeData(bool) { return 0; }
+static bool otPushManual = false;
 static uint16_t otdStatusReplyData(uint16_t t, uint16_t) { return t; }
+static void otCmdDropPendingWrite(uint8_t) {}   // TASK-1992: ring tombstone, tested in tests/test_otd_sim_exit_stale_writes.py
 struct OTScheduleEntry { uint8_t msgId; uint32_t intervalMs; uint32_t lastSentMs; bool disabled; bool isWrite; bool valueSet; uint16_t cachedValue; };
 static constexpr uint8_t OT_SCHEDULE_SIZE = 2;
 static OTScheduleEntry otSchedule[OT_SCHEDULE_SIZE] = { {24, 10000, 0, false, true, false, 0}, {25, 10000, 0, false, false, false, 0} };

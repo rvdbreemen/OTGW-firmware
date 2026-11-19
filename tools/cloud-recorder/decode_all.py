@@ -78,7 +78,7 @@ def decode_records(records, image, tz, out_dir, *, images_by_build=None):
 
 
 def read_mix_file(path):
-    """The records of a local download (TASK-1991, "OTGWMIX1", RecRing.h) in the form fetch_batches returns.
+    """The records of a local download (TASK-2907, "OTGWMIX1", RecRing.h) in the form fetch_batches returns.
     Returns (records, header) with header = {"version", "firmware", "githash", "uid"}."""
     import struct
     data = open(path, "rb").read()

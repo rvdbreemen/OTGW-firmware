@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : settingsStuff
-**  Version  : v2.0.0-poc.13
+**  Version  : v2.0.0-poc.14
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -280,6 +280,9 @@ static void writeJsonIndexedStringKV(File& file, PGM_P keyBase, unsigned index, 
 }
 
 //=======================================================================
+static constexpr bool kSatPwmMarginMarkerValue = true;   // TASK-2005: the SATpwmmargin2 marker; its presence counts, not its value
+static constexpr bool kOtdOhMarkerValue = true;   // TASK-1961: the OTDohpicdefault marker; its presence counts, not its value
+
 bool writeSettings(bool show)
 {
 
@@ -372,6 +375,8 @@ bool writeSettings(bool show)
   writeJsonIntKV(file, F("SATpresatmaxtset"), settings.sat.iPreSatMaxTSet);   // TASK-1541: internal, not in the settings listing
   writeJsonIntKV(file, F("SATpresatdhwset"), settings.sat.iPreSatDhwSet);
   writeJsonFloatKV(file, F("SATovershootmargin"), settings.sat.fOvershootMargin);
+  writeJsonFloatKV(file, F("SATpwmswitchmargin"), settings.sat.fPwmSwitchMargin);   // TASK-1888
+  writeJsonBoolKV(file, F("SATpwmmargin2"), kSatPwmMarginMarkerValue);   // TASK-2005: marker, the one-time 1.5 -> 2.0 migration is done
   writeJsonFloatKV(file, F("SATmodsupdelay"), settings.sat.fModSupDelay);
   writeJsonFloatKV(file, F("SATmodsupoffset"), settings.sat.fModSupOffset);
   writeJsonFloatKV(file, F("SATdhwsetpoint"), settings.sat.fDhwSetpoint);
@@ -476,7 +481,6 @@ bool writeSettings(bool show)
   writeJsonIntKV(file, F("OTDmode"), settings.otd.iMode);
   writeJsonBoolKV(file, F("OTDautodetect"), settings.otd.bAutoDetect);
   writeJsonFloatKV(file, F("OTDsetbacktemp"), settings.otd.fSetbackTemp);
-  writeJsonIntKV(file, F("OTDsetbacktimeout"), settings.otd.iSetbackTimeout);
   writeJsonBoolKV(file, F("OTDenableslave"), settings.otd.bEnableSlave);
   writeJsonBoolKV(file, F("OTDsummermode"), settings.otd.bSummerMode);
   writeJsonBoolKV(file, F("OTDfailsafe"), settings.otd.bFailSafe);
@@ -497,6 +501,7 @@ bool writeSettings(bool show)
   writeJsonFloatKV(file, F("OTDmaxchsetpoint"), settings.otd.fMaxChSetpoint);
   writeJsonBoolKV(file, F("OTDignoretransitions"), settings.otd.bIgnoreTransitions);
   writeJsonBoolKV(file, F("OTDoverridehb"), settings.otd.bOverrideHB);
+  writeJsonBoolKV(file, F("OTDohpicdefault"), kOtdOhMarkerValue);   // TASK-1961: marker, the one-time OH=1 migration is done
   writeJsonStringKV(file, F("OTDunknownids"), settings.otd.sUnknownIds);
 #endif
 #if defined(HAS_ETH_CAPABLE) && HAS_ETH_CAPABLE
@@ -550,8 +555,28 @@ bool writeSettings(bool show)
 static bool g_sawLegacyTopicsKey = false;
 static bool g_satCphOutOfSet = false;    // TASK-1375: set when the file carried a SATcyclesperhour other than 3 or 4; the deferred flush then rewrites the snapped value
 static bool g_sawSatFollowKey = false;   // TASK-1259: set when SATfollowthermostat is parsed; its absence means "default to the push-setpoint value"
+static bool g_sawOtdOhMarkerKey = false;   // TASK-1961: set when OTDohpicdefault is parsed; absent = OH not yet migrated to 1
+static bool g_sawSatPwmMarginMarkerKey = false;   // TASK-2005: set when SATpwmmargin2 is parsed; absent = margin not yet migrated
+// TASK-2013: true while readSettings() applies settings.ini. A value loaded from the file is not a user change:
+// SATtargettemp then holds the user's own target (satUserTargetTemp()), so it must not clear a preset that holds the
+// live target. Set and restored by readSettings() only, on every exit path (SettingsLoadScope).
+static bool g_loadingSettingsFile = false;
+struct SettingsLoadScope {
+  const bool prev;
+  SettingsLoadScope() : prev(g_loadingSettingsFile) { g_loadingSettingsFile = true; }
+  ~SettingsLoadScope() { g_loadingSettingsFile = prev; }
+};
 static bool g_sawOnboardedKey = false;   // TASK-997: set when ui_onboarded is parsed; its absence marks a pre-feature (existing) install
 static bool g_sawBleEnableKey = false;   // TASK-1693: set when SATbleenable is parsed; its absence means no stored BLE choice yet
+static bool g_bleRefusedNoPsram = false; // TASK-2025: a request for BLE on was refused on a board without PSRAM
+// [ble-nopsram-refuse:begin] TASK-2025
+// BLE can only be on with PSRAM: without it the scanner exhausts the internal heap (TASK-2025). Every write of
+// SATbleenable goes through this, so the boot parse of settings.ini, REST and MQTT all get the same answer.
+static bool bleEnableAllowed(bool psram, bool want)
+{
+  return want && psram;
+}
+// [ble-nopsram-refuse:end]
 // [ble-nopsram-default:begin] TASK-1693
 // On a board without PSRAM, BLE starts off: no stored choice means off, and the web UI shows the
 // stability warning when the user switches it on (ADR-169 successor). PSRAM boards keep the struct
@@ -564,12 +589,16 @@ static void applyBleNoPsramDefault(bool psram)
 
 void readSettings(bool show)
 {
+  SettingsLoadScope loadScope;   // TASK-2013: values from the file are not user changes
   DebugTf(PSTR(" %s ..\r\n"), SETTINGS_FILE);
   g_sawLegacyTopicsKey = false;  // reset per parse; updateSetting() sets it when the key is seen
   g_sawOnboardedKey = false;     // TASK-997: same sentinel pattern for the first-time-setup flag
   g_sawBleEnableKey = false;     // TASK-1693: same sentinel pattern for the BLE default
+  g_bleRefusedNoPsram = false;   // TASK-2025: set by the setter when a stored true is refused (no PSRAM)
   g_satCphOutOfSet = false;      // TASK-1375: same sentinel pattern for SATcyclesperhour
   g_sawSatFollowKey = false;     // TASK-1259: same sentinel pattern for SATfollowthermostat
+  g_sawOtdOhMarkerKey = false;   // TASK-1961: same sentinel pattern for the OH=1 migration marker
+  g_sawSatPwmMarginMarkerKey = false;   // TASK-2005: same sentinel pattern for the switch margin migration
   if (!LittleFS.exists(SETTINGS_FILE))
   {  //create settings file if it does not exist yet.
     DebugTln(F(" .. file not found! --> created file!"));
@@ -669,6 +698,32 @@ void readSettings(bool show)
     settingsDirty = true;
     DebugTln(F("[Settings] no SATbleenable key on a board without PSRAM: BLE off by default"));
   }
+  // TASK-2025: a stored SATbleenable=true on a board without PSRAM was refused by the setter; persist the off once.
+  if (g_bleRefusedNoPsram) {
+    settingsDirty = true;
+    DebugTln(F("[Settings] SATbleenable=true refused: BLE needs PSRAM on this board (TASK-2025)"));
+  }
+#if defined(HAS_DIRECT_OT) && HAS_DIRECT_OT
+  // [otd-oh-migrate:begin] TASK-1961 (Robert, option B): OH= defaults to 1 like the PIC (gateway.asm 6.8 SavedSettings
+  // :5459 sets OverrideHigh). A file without the OTDohpicdefault marker was written before this release; it gets OH=1
+  // once, whatever OTDoverridehb it holds (since beta.203 every save wrote that key, so a stored 0 is no user choice).
+  // The deferred flush writes the marker, so an OH=0 set after this boot stays.
+  if (!g_sawOtdOhMarkerKey) {
+    settings.otd.bOverrideHB = true;
+    settingsDirty = true;
+    DebugTln(F("[Settings] no OTDohpicdefault marker: OH= set to 1 once (PIC default)"));
+  }
+  // [otd-oh-migrate:end]
+#endif
+  // [sat-pwmmargin-migrate:begin] TASK-2005 (entry 407, Q-407a answered by Robert: 2.0 is the new default). Since TASK-1888
+  // every save wrote SATpwmswitchmargin, so a stored 1.5 is the old default: it becomes 2.0 once. Any other value is a user
+  // choice and stays. The deferred flush writes the marker, so a 1.5 set after this boot stays.
+  if (!g_sawSatPwmMarginMarkerKey) {
+    if (fabsf(settings.sat.fPwmSwitchMargin - 1.5f) < 0.01f) settings.sat.fPwmSwitchMargin = 2.0f;
+    settingsDirty = true;
+    DebugTln(F("[Settings] no SATpwmmargin2 marker: a stored PWM switch margin of 1.5 becomes 2.0 once"));
+  }
+  // [sat-pwmmargin-migrate:end]
   if (!g_sawOnboardedKey) {
     settings.ui.bOnboarded = true;
     settingsDirty = true;              // persist the key so this migration runs once
@@ -771,7 +826,6 @@ void readSettings(bool show)
     Debugf(PSTR("OTD Auto-detect       : %s\r\n"), CBOOLEAN(settings.otd.bAutoDetect));
     Debugf(PSTR("OTD Setback temp      : "));
     { char tb[8]; dtostrf(settings.otd.fSetbackTemp, 1, 1, tb); Debugf(PSTR("%s\r\n"), tb); }
-    Debugf(PSTR("OTD Setback timeout   : %d\r\n"), settings.otd.iSetbackTimeout);
     Debugf(PSTR("OTD Enable slave      : %s\r\n"), CBOOLEAN(settings.otd.bEnableSlave));
 #endif
   }
@@ -1081,6 +1135,7 @@ void updateSetting(const char *field, const char *newValue)
   else if (strcasecmp_P(field, PSTR("SATenabled")) == 0) {
     bool wasEnabled = settings.sat.bEnabled;
     settings.sat.bEnabled = EVALBOOLEAN(newValue);
+    if (wasEnabled != settings.sat.bEnabled) satClimateBridgeForce();   // TASK-1979 / ADR-248: the HA card's target and temperature topics change meaning
     // TASK-1345: a user switch-off also ends and blocks an MQTT-loss takeover, even when the setting was already off
     if (!settings.sat.bEnabled && state.bSetupComplete) state.sat.bFallbackSuppressed = true;
     // Only disable on actual enabled→disabled transition, and not during boot
@@ -1105,11 +1160,17 @@ void updateSetting(const char *field, const char *newValue)
     // TASK-1487: a target that really changes clears an active preset or window switch
     // (thermo-nova climate.py:567). An unchanged value, e.g. a settings POST that carries the
     // shown target, keeps them.
-    const float before = settings.sat.fTargetTemp;
-    settings.sat.fTargetTemp = clampSettingFloat(newValue, settings.sat.fTargetTemp, 5.0f, 30.0f);
-    if (fabsf(settings.sat.fTargetTemp - before) >= SAT_TARGET_CHANGE_MIN_C) {
-      satPresetClearForUserTarget();
-      satResetControlState();   // thermo-nova: a target that really changes resets the control state (climate.py:643-660)
+    // TASK-2013: a reload of settings.ini while a preset or window switch holds the target (telnet 'q') carries the
+    // user's own target, which the preset state already keeps; it changes nothing. At boot no preset is held yet:
+    // satLoadPresetState() restores it after readSettings(), like thermo-nova after a restart (climate.py:176-194).
+    const bool heldByPreset = (state.sat.eActivePreset != SAT_PRESET_NONE) || (state.sat.fPreWindowTarget > 0.0f);
+    if (!(g_loadingSettingsFile && heldByPreset)) {
+      const float before = settings.sat.fTargetTemp;
+      settings.sat.fTargetTemp = clampSettingFloat(newValue, settings.sat.fTargetTemp, 5.0f, 30.0f);
+      if (fabsf(settings.sat.fTargetTemp - before) >= SAT_TARGET_CHANGE_MIN_C) {
+        satPresetClearForUserTarget();
+        satResetControlState();   // thermo-nova: a target that really changes resets the control state (climate.py:643-660)
+      }
     }
   }
   else if (strcasecmp_P(field, PSTR("SATcoefficient")) == 0) {
@@ -1133,6 +1194,8 @@ void updateSetting(const char *field, const char *newValue)
   else if (strcasecmp_P(field, PSTR("SATpresatmaxtset")) == 0)   settings.sat.iPreSatMaxTSet = constrain(atoi(newValue), 0, 100);   // TASK-1541
   else if (strcasecmp_P(field, PSTR("SATpresatdhwset")) == 0)    settings.sat.iPreSatDhwSet = constrain(atoi(newValue), 0, 100);
   else if (strcasecmp_P(field, PSTR("SATovershootmargin")) == 0) settings.sat.fOvershootMargin = clampSettingFloat(newValue, settings.sat.fOvershootMargin, 0.5f, 5.0f);
+  else if (strcasecmp_P(field, PSTR("SATpwmswitchmargin")) == 0) settings.sat.fPwmSwitchMargin = clampSettingFloat(newValue, settings.sat.fPwmSwitchMargin, 0.5f, 5.0f);   // TASK-1888
+  else if (strcasecmp_P(field, PSTR("SATpwmmargin2")) == 0)      g_sawSatPwmMarginMarkerKey = true;   // TASK-2005: key presence = migration done
   else if (strcasecmp_P(field, PSTR("SATmodsupdelay")) == 0)    settings.sat.fModSupDelay = clampSettingFloat(newValue, settings.sat.fModSupDelay, 0.0f, 120.0f);
   else if (strcasecmp_P(field, PSTR("SATmodsupoffset")) == 0)   settings.sat.fModSupOffset = clampSettingFloat(newValue, settings.sat.fModSupOffset, 0.0f, 5.0f);
   else if (strcasecmp_P(field, PSTR("SATdhwsetpoint")) == 0)    settings.sat.fDhwSetpoint = clampSettingFloat(newValue, settings.sat.fDhwSetpoint, 0.0f, (float)SAT_DHW_SETPOINT_MAX);
@@ -1255,7 +1318,7 @@ void updateSetting(const char *field, const char *newValue)
   // --- BLE temperature sensor settings (Task #20) ---
   // ESP-abstraction Tier 2 (TASK-742): parsed unconditionally so a settings.json
   // written on either platform round-trips; harmless no-op fields on ESP8266.
-  else if (strcasecmp_P(field, PSTR("SATbleenable")) == 0)  { settings.sat.bBleEnable = EVALBOOLEAN(newValue); g_sawBleEnableKey = true; }  // TASK-1693 sentinel
+  else if (strcasecmp_P(field, PSTR("SATbleenable")) == 0)  { g_sawBleEnableKey = true; const bool want = EVALBOOLEAN(newValue); settings.sat.bBleEnable = bleEnableAllowed(psramFound(), want); if (want && !settings.sat.bBleEnable) g_bleRefusedNoPsram = true; }  // TASK-1693 sentinel, TASK-2025 refusal
   else if (strcasecmp_P(field, PSTR("SATbleriskack")) == 0) settings.sat.bBleRiskAck = EVALBOOLEAN(newValue);
   else if (strcasecmp_P(field, PSTR("SATblefailover")) == 0) settings.sat.bBleFailover = EVALBOOLEAN(newValue);
   else if (strcasecmp_P(field, PSTR("SATblemac")) == 0)      strlcpy(settings.sat.sBleMAC, newValue, sizeof(settings.sat.sBleMAC));
@@ -1330,7 +1393,6 @@ void updateSetting(const char *field, const char *newValue)
   }
   else if (strcasecmp_P(field, PSTR("OTDautodetect")) == 0)    settings.otd.bAutoDetect = EVALBOOLEAN(newValue);
   else if (strcasecmp_P(field, PSTR("OTDsetbacktemp")) == 0)    settings.otd.fSetbackTemp = clampSettingFloat(newValue, settings.otd.fSetbackTemp, 1.0f, 30.0f);
-  else if (strcasecmp_P(field, PSTR("OTDsetbacktimeout")) == 0) settings.otd.iSetbackTimeout = constrain(atoi(newValue), 5, 255);
   else if (strcasecmp_P(field, PSTR("OTDenableslave")) == 0)   settings.otd.bEnableSlave = EVALBOOLEAN(newValue);
   else if (strcasecmp_P(field, PSTR("OTDsummermode")) == 0)    settings.otd.bSummerMode = EVALBOOLEAN(newValue);
   else if (strcasecmp_P(field, PSTR("OTDfailsafe")) == 0)      settings.otd.bFailSafe = EVALBOOLEAN(newValue);
@@ -1351,6 +1413,7 @@ void updateSetting(const char *field, const char *newValue)
   else if (strcasecmp_P(field, PSTR("OTDmaxchsetpoint")) == 0)   settings.otd.fMaxChSetpoint = clampSettingFloat(newValue, settings.otd.fMaxChSetpoint, 0.0f, 127.0f);
   else if (strcasecmp_P(field, PSTR("OTDignoretransitions")) == 0) settings.otd.bIgnoreTransitions = EVALBOOLEAN(newValue);
   else if (strcasecmp_P(field, PSTR("OTDoverridehb")) == 0)      settings.otd.bOverrideHB = EVALBOOLEAN(newValue);
+  else if (strcasecmp_P(field, PSTR("OTDohpicdefault")) == 0)    g_sawOtdOhMarkerKey = true;   // TASK-1961: key presence = migrated
   else if (strcasecmp_P(field, PSTR("OTDunknownids")) == 0)      strlcpy(settings.otd.sUnknownIds, newValue, sizeof(settings.otd.sUnknownIds));
 #endif
 #if defined(HAS_ETH_CAPABLE) && HAS_ETH_CAPABLE

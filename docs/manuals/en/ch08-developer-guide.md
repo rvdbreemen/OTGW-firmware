@@ -640,7 +640,7 @@ When you connect, a banner is printed listing all available debug toggle keys. P
 | `s` / `S` | Toggle OTGW serial simulation replay |
 | `r` | Reconnect WiFi, Telnet, OTGW stream, MQTT |
 | `F` | Force MQTT HA discovery for all message IDs |
-| `q` | Force re-read of settings from LittleFS |
+| `q` | Re-read `settings.ini` from LittleFS (`readSettings(true)`). Values from the file are not user changes: an active SAT preset keeps its target (`SettingsLoadScope`, TASK-2013); other setters still run their side effects |
 | `p` | Reset PIC manually |
 | `h` | Print the full debug help menu |
 

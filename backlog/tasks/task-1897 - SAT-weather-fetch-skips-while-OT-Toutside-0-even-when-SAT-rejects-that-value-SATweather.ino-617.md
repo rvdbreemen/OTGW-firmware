@@ -7,7 +7,7 @@ status: In Review
 assignee:
   - '@claude'
 created_date: '2026-11-13T10:07:00Z'
-updated_date: '2026-11-14T21:36:00Z'
+updated_date: '2026-11-18T15:39:00Z'
 labels:
   - bug
   - sat
@@ -26,7 +26,7 @@ Split from TASK-1896 (reporter indigo_light, https://discord.com/channels/812969
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [x] #1 Host test on the real weatherLoop gate: red on the old code (fetch skipped with a gateway-made Toutside and no fresh boiler stamp), green on the fix (fetch requested); still skipped with a fresh boiler MsgID 27
-- [ ] #2 Field confirmation by the reporter after the fix build
+- [x] #2 Field confirmation by the reporter after the fix build
 - [ ] #3 Bench: with Toutside non-zero but no MsgID 27 stamp younger than 1 h (sensor gone, or before the first stamp), /api/v2/sat/weather valid=true after the first fetch and the SAT outside source is the weather (osrc=W)
 <!-- AC:END -->
 
@@ -44,6 +44,12 @@ AC1 evidence (2026-11-13, wt-95w): tests/test_weather_worker_handoff.py new case
 Bench limit (2026-11-13, 09 via the coordinator, build 2.0.0-beta.226+e86aed9): AC3 cannot be shown on the bench unit .61. OT-Direct loopback never asks MsgID 27, so Toutside is never set and a non-zero value without a fresh stamp cannot be produced there. AC3 stays open as evidence by host test (tests/test_weather_worker_handoff.py C6, red on the old gate, green on the fix) plus field confirmation (indigo_light, AC2). Not shown on a device.
 
 AC 3: field AC (Robert C, 2026-11-14, DM 1571276554430976183 via the coordinator, no OT bus on the bench): the part that needs Toutside non-zero from the OT bus without a fresh MsgID 27 stamp is verified from a tester capture, not on the bench. Status stays In Review until a tester capture covers it.
+
+Field confirmation (2026-11-16, indigo_light, #beta-testing https://discord.com/channels/812969634638725140/914498730001072149/1571818031716372491): 'the PIC DS18B20 as SAT outside source (TASK-1896/1897) was confirmed on my unit on beta.250 on 15 November (active: true, outside_temp_missing: false, outside_temp = Toutside), and still works on beta.339'. Tester statement without a capture; covers AC2 (field, indigo_light) as reported. The beta.339 notes still list it as a known issue; take it out of the next notes.
+
+2026-11-18 AC2 ticked (otgw-docs, coordinator decision): the AC asks for the reporter's confirmation, not a capture. indigo_light, #beta-testing 2026-11-16, https://discord.com/channels/812969634638725140/914498730001072149/1571818031716372491, verbatim: 'the PIC DS18B20 as SAT outside source (TASK-1896/1897) was confirmed on my unit on beta.250 on 15 November (active: true, outside_temp_missing: false, outside_temp = Toutside), and still works on beta.339'. AC3 stays open, with Robert (A: accept host test C6, B: wait for a field capture where the sensor is gone > 1 h). Note: indigo_light's 2026-11-15 upload (beta.250) does not cover AC3: since TASK-1896 the gateway's own Write-Data 27 stamps, so the outside source there is OT, not the weather.
+
+2026-11-18 AC3: Robert chose "B", wait for field evidence (Discord DM 1572636407611269142, relayed by the coordinator). Stays In Review until a tester capture shows the stale case (Toutside non-zero, no MsgID 27 stamp younger than 1 h, e.g. the PIC sensor gone for over an hour) with the weather as outside source. 92 posts the capture request.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary

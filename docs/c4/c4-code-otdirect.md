@@ -113,6 +113,7 @@ The OTDirect module operates as a cooperative OpenTherm stack layered on the pro
   - Returns early if master busy (`otMasterRequestActive`)
   - Returns early if MI= minimum gap not satisfied
   - Dequeues and sends commands from ring buffer (command queue takes priority)
+  - Waits for MI= (`otMinIntervalMs`, from the start of the previous send) and for the 100 ms MWT from the end of the previous conversation (`OTD_MWT_MS`, `otdLastConvEndMs` stamped by `handleMasterResponse()`, OT spec v4.2 :1100, TASK-1954)
   - Round-robins through schedule table (`otScheduleIdx`), skipping disabled entries. While the bus is offline (`!state.otBus.bOnline`) only MsgID 0 is sent, at its normal 800 ms interval (TASK-1802: a boiler gets a frame within the spec's 1.15 s after a failed one, as on the PIC; the old 5 s retry left it 5-6 s without a frame). MsgIDs 70 and 71 poll every 10 s instead of 60 s when the slave reports a ventilation/HRV application (`otIsVentSlave()`):
     - Status (MsgID 0): always ready, uses `buildStatusRequest()` with current flags
     - Read entries: sent on interval with READ_DATA
@@ -136,6 +137,7 @@ The OTDirect module operates as a cooperative OpenTherm stack layered on the pro
 - **Purpose**: In master mode (standalone), respond to thermostat as if we ARE the boiler
 - **Behavior**:
   - While the boiler is offline (`!state.otBus.bOnline`, its last MsgID 0 failed) it only logs the thermostat frame and sends no answer, so the thermostat sees the loss instead of the last cached status (TASK-1807)
+  - A thermostat WRITE_DATA of any ID except 1, 16 and 24 (and 8, 14 while SAT owns the setpoint) never reaches this handler: `loopOTDirect()` relays it to the boiler in the next free master slot (after the frame in flight and the 100 ms MWT, `OTD_MWT_MS`) through `applyOverrides()`, ahead of the ring and the schedule, and `handleMasterResponse()` returns the boiler's answer when it belongs to the current thermostat request and comes within `OTD_REPLY_DEADLINE_MS` of the relay's send (`otdMasterRelaysWrite()`, TASK-1812, ADR-241 Proposed)
   - Extracts msgId and msgType (bits 28-30)
   - If READ_DATA (type 0):
     - Returns cached boiler value via `buildOTResponse(4, msgId, cache)` (READ_ACK)
@@ -197,15 +199,15 @@ The OTDirect module operates as a cooperative OpenTherm stack layered on the pro
 
 **Category 1: Setpoint Write Commands** (enqueue + cache + override)
 - `CS=xx.x` - Control setpoint (MsgID 1, TSet). Value 0 clears. While `satOwnsControlSetpoint()` is true an external `CS=` is refused and answered `NG`; SAT's own `CS=` passes on the `satCommandInFlight()` marker (ADR-179, TASK-1150). A `CS=` of 8 C or more expires after 63.5 s without a refresh, unless SAT owns the setpoint (PIC parity, TASK-442, TASK-1834); a `CS=` or `C2=` below 8 C stays until `CS=0`/`C2=0`, as on the PIC (`otdCsc2ExpiryStamp()`, TASK-1917). The release tests the f8.8 value, like the PIC's `SetCtrlSetpoint` (gateway.asm:4218-4226), so a value that converts to 0 (for example `CS=0.001`) releases too.
-- `TT=xx.x` - Temporary thermostat-side room override (ADR-223). Gateway mode: answered to the thermostat only, as MsgID 9 (value) and MsgID 100 (flags, priority bit 0x02), nothing is written to the boiler; released by the PIC rule (see the remote-override state machine below). Master mode: writes MsgID 16 + MsgID 100. Value 0 clears.
-- `TC=xx.x` - Constant thermostat-side room override (ADR-223). Same as `TT=` with MsgID 100 priority bit 0x01; released by the same rule. Value 0 clears.
+- `TT=xx.x` - Temporary thermostat-side room override (ADR-223). Gateway mode: answered to the thermostat only, as MsgID 9 (value) and MsgID 100 (flags `0x03`, manual and program change priority, PIC `b'11'`, TASK-1750), nothing is written to the boiler; released by the PIC rule (see the remote-override state machine below). Master mode: writes MsgID 16 + MsgID 100. Value 0 clears.
+- `TC=xx.x` - Constant thermostat-side room override (ADR-223). Same as `TT=` with MsgID 100 flags `0x01` (manual change priority only); released by the same rule. Value 0 clears.
 - `BS=xx.x` - Fake boiler room setpoint (intercepts thermostat MsgID 16 frame, replaces data bytes before forwarding). Value 0 clears.
 - `C2=xx.x` - Control setpoint CH2 (MsgID 8, TsetCH2)
 - `CC=xx.x` - Cooling control (MsgID 7, 0-100%)
-- `SW=xx.x` - DHW setpoint (MsgID 56, TdhwSet)
-- `SH=xx.x` - Max CH water setpoint (MsgID 57, MaxTSet)
+- `SW=xx.x` - DHW setpoint (MsgID 56, TdhwSet); in gateway mode also carried once on the thermostat's next READ 56 (rewritten to WRITE 56 when MsgID 6 LB bit 0 allows it, `otdRelayRw` block, TASK-1803)
+- `SH=xx.x` - Max CH water setpoint (MsgID 57, MaxTSet); same once-rewrite of the thermostat's READ 57 (MsgID 6 LB bit 1)
 - `MM=xx` - Max relative modulation (MsgID 14)
-- `OT=xx.x` - Outside temperature (MsgID 27, Toutside)
+- `OT=xx.x` - Outside temperature (MsgID 27, Toutside); in gateway mode every thermostat READ 27 goes to the boiler as WRITE 27 with the value and the thermostat gets READ_ACK with it (PIC UserOutsideTemp, TASK-1803)
 - `VS=xx` - Ventilation setpoint (MsgID 71)
 - `SC=HH:MM/DOW` - Time sync (MsgID 20)
 
@@ -222,6 +224,7 @@ The OTDirect module operates as a cooperative OpenTherm stack layered on the pro
 - `MH=x` - Operating mode CH1 (0-15, lower nibble of byte4)
 - `MW=x` - Operating mode DHW (0-15, lower nibble of byte3)
 - `M2=x` - Operating mode CH2 (0-15, upper nibble of byte4)
+- While a mode write (or the `HW=P` push) is pending, the thermostat's own READ 99 is sent as the gateway's WRITE 99 and answered with the READ_ACK the PIC gives (`otdOper99` block, TASK-1906)
 - `RR=x` - Remote request (MsgID 4, one-shot WRITE_DATA)
 
 **Category 4: Gateway Control**
@@ -233,7 +236,7 @@ The OTDirect module operates as a cooperative OpenTherm stack layered on the pro
 - `GW=R` - Full reset (clears transient state, restarts OT interfaces)
 
 **Category 5: PR= Register Queries** (read-only responses)
-- `PR=A` → "OpenTherm Gateway 6.6" (`OTD_PIC_COMPAT_VERSION`, PIC format, TASK-1797); `PR=T` → two digits without separator, e.g. "T=10"
+- `PR=A` → "OpenTherm Gateway 6.8 OTGW32" (`OTD_PIC_COMPAT_VERSION`, PIC format, TASK-1797); `PR=T` → two digits without separator, "T=11" by default (IT=1, OH=1)
 - `PR=M` → Mode char (G gateway, P bypass, M monitor, S master, L loopback)
 - `PR=O` → Override status (N/C value/T value)
 - `PR=S` → Setback temp
@@ -247,22 +250,22 @@ The OTDirect module operates as a cooperative OpenTherm stack layered on the pro
 **Category 7: Schedule Management**
 - `AA=MsgID` - Re-enable disabled schedule entry
 - `DA=MsgID` - Disable schedule entry
-- `PM=MsgID` - Priority: send immediately on next cycle (or one-shot READ if not in schedule)
+- `PM=MsgID` - Priority: send immediately on next cycle (or one-shot READ if not in schedule). Data-IDs 0-255; after a table size (10, 12, 88, 90, 105, 107) or a string ID (93-95) the `otdPmChain` block reads every entry or character like the PIC (TASK-1847)
 
 **Category 8: Override Tables**
-- `SR=MsgID:HHHH` - Set response override (gateway answers thermostat with stored value)
+- `SR=MsgID:HHHH` - Set response override: the request still goes to the boiler, and `otdSrReply()` puts the stored value into its answer with the request's own ack type (also over Data-Invalid or Unknown-DataID), as the PIC's WordResponse/ByteResponse. Only the IDs whose PIC dispatch entry is WordResponse, MandatoryWord or ByteResponse, or whose own handler jumps to WordResponse for every answer (5, 8, 48, 49 and the TSP size IDs 10/12/88/90/105/107); MsgID 100 (WordResponse only on some paths) is left out (`otdPicSrIds`, recomputed from gateway.asm by `tests/test_otd_sr_reply_pic.py`); ByteResponse IDs 70 and 101 keep the request's high byte ORed in. Gateway and loopback mode; no answer when the boiler times out (TASK-1804 A6)
 - `CR=MsgID` - Clear response override
 - `UI=MsgID` - Mark as unknown (respond UNKNOWN_DATA_ID to thermostat)
 - `KI=MsgID` - Mark as known again (restore normal forwarding)
 - `RM=MsgID:HHHH` - Set response modifier (modify boiler→thermostat response data bytes)
 - `CM=MsgID` - Clear response modifier
 
-**Unknown or invalid commands** are answered `NG` through `otDirectBridgeProcessStatus()`.
+**Unknown or invalid commands** are answered `NG` through `otDirectBridgeProcessStatus()`. A bare `XX=` of a command whose PIC parser refuses an empty value answers `SE`; `OT=`, `MM=` and `CL=` clear (`otdPicBareValueCmd`, TASK-1957).
 
 **Category 9: Configuration & State**
 - `SB=xx.x` - Setback temperature (engaged when thermostat times out)
 - `IT=0/1` - Ignore transitions
-- `OH=0/1` - Override high byte
+- `OH=0/1` - Override high byte: copy the MsgID 100 flags into the high byte. Default 1 like the PIC (TASK-1961); a `settings.ini` without the `OTDohpicdefault` marker gets `OH=1` once at boot
 - `RS=HBS/...` - Reset boiler counter (WRITE_DATA with value 0)
 - `MI=nnn` - Message interval (100-1275ms, 10ms units)
 - `FS=0/1` - Fail safety (controls setback on disconnect)
@@ -363,14 +366,12 @@ The OTDirect module operates as a cooperative OpenTherm stack layered on the pro
   - Clears fake room setpoint (BS=)
 
 #### `static void checkThermostatTimeout()`
-- **Purpose**: Detect thermostat disconnect and apply fail-safe setback (called once per second)
+- **Purpose**: Detect thermostat disconnect and reconnect (called once per second)
 - **Behavior**:
-  - Returns if no thermostat frame ever seen
-  - Compares elapsed time since last frame against `settings.otd.iSetbackTimeout`
-  - On timeout:
-    - Sets `state.otd.bThermostatConnected = false`
-    - If fail-safe enabled and in gateway mode: engages setback by overriding MsgID 1 (TSet) to `settings.otd.fSetbackTemp`
-  - On reconnect: disables setback, releases TSet override
+  - If no thermostat frame was ever seen: prints the PIC line "Thermostat disconnected" once (TASK-1850) and returns
+  - Counts the thermostat as lost after 3 s without a frame (a fixed `timeoutMs`, TASK-1802 bug 9; the setting it replaced was removed by TASK-1950)
+  - On loss: sets `state.otd.bThermostatConnected = false`, forgets the thermostat's writes, prints "Thermostat disconnected"; there is no setback (TASK-1806): the gateway's own frames carry CH off unless a CS= is in force
+  - On return: sets `bThermostatConnected = true` and prints "Thermostat connected"
 
 ### Loopback Test Mode
 
@@ -471,15 +472,15 @@ struct OTFrameOverride {
   bool     active;
   uint16_t overrideValue;      // Data to inject into thermostat frame
 };
-static OTFrameOverride otOverrides[] // 7 entries: MsgID 1,7,8,14,16,56,57 (16 = BS= / MQTT room_setpoint rewrite)
+static OTFrameOverride otOverrides[] // 9 entries: MsgID 1,7,8,14,16,24,56,57,71 (16 = BS= / MQTT room_setpoint rewrite)
 ```
 
 **TT=/TC= remote-override state machine (TASK-466, ADR-223, PIC parity)**: in gateway mode the override is answer state only.
-- The thermostat's READ of MsgID 9 gets READ_ACK with the override setpoint, its READ of MsgID 100 READ_ACK with the flags in the low byte (TT `0x02`, TC `0x01`), built by `otdRemoteOverrideReply()` from `replyToThermostat()`. MsgID 9 and 100 are never an alternative slot (`otdRemoteOverrideHoldsSlot()`): without an override the thermostat gets READ_ACK 0.
+- The thermostat's READ of MsgID 9 gets READ_ACK with the override setpoint, its READ of MsgID 100 READ_ACK with the flags (TT `0x03`, TC `0x01`, `otdOverrideFlagsData()`; with `OH=1` also in the high byte), built by `otdRemoteOverrideReply()` from `replyToThermostat()`. MsgID 9 and 100 are never an alternative slot (`otdRemoteOverrideHoldsSlot()`): without an override the thermostat gets READ_ACK 0.
 - Nothing is written to the boiler and the thermostat's WRITE 16 is not rewritten.
 - Release rule (`onThermostatMsgID16()`, gateway.asm `roomsetptdiff`), the same for TT and TC: frames count only after the first MsgID 9 answer (`bMsgId9Answered`); a MsgID 16 within `OT_OVERRIDE_HONOR_DELTA_F88` (0.25 C) sets `bAccepted`; before acceptance the `OT_OVERRIDE_RELEASE_MISMATCHES`-th (4th) mismatch calls `clearRemoteOverride()`, after acceptance the first. `loopOTDirect()` calls it once per received thermostat frame.
 - `clearRemoteOverride()` (TT=0, TC=0, release) clears the override state only; a BS= or MQTT room_setpoint write on MsgID 16 stays, and the first MsgID 9 read afterwards is answered READ_ACK 0 once. `BS=0` clears MsgID 16 whatever set it.
-- Master mode (no thermostat, nobody reads MsgID 9): `setRemoteOverride()` enqueues WRITE 16 (setpoint) and WRITE 100 (flags); `clearRemoteOverride()` clears the MsgID 16 write and enqueues WRITE 100 = 0.
+- Master mode (no thermostat, nobody reads MsgID 9): `setRemoteOverride()` enqueues WRITE 16 (setpoint) and WRITE 100 (flags); `clearRemoteOverride()` clears the MsgID 16 slot, puts a `BS=` or MQTT room_setpoint value back into it (`otdRoom16*`, TASK-1751) and enqueues WRITE 100 = 0.
 
 `otRemoteOverride` holds the mode (`OT_OVERRIDE_NONE`/`TEMPORARY`/`CONSTANT`), the f8.8 value, the timestamps, `mismatchCount`, `bAccepted` and `bMsgId9Answered`.
 
@@ -597,7 +598,12 @@ static uint8_t otUnknownCounters[32];     // 128 MsgIDs × 2 bits = 32 bytes
 - `DebugTln()`, `DebugTf()` - Telnet debug output
 
 ### External Dependencies
-- **OpenTherm.h** (project-pinned library, `/src/libraries/OpenTherm/src/OpenTherm.h`)
+- **OpenTherm.h** (project-pinned library, `/src/libraries/OpenTherm/src/OpenTherm.h`): the submodule points at
+  `rvdbreemen/opentherm_library`, branch `fix-timer-wrap`, commit `51aa68e` (Phunkafizer master `720cee9` plus the
+  timer fixes of upstream PR Phunkafizer/opentherm_library#1: `isReady()` stays usable without a valid answer past
+  2^31 us, `setDelay()` across the `micros()` wrap, `end()` resets the transmit state, a stalled transmit ends with
+  TIMEOUT after 10 ms). Maintainer exception to the no-library-changes rule (Robert, DM 1571553430923911252 and
+  1571560593712746617; TASK-1980). Back to Phunkafizer once the PR is merged there.
   - Classes: `OpenTherm` (master/slave, async/sync modes)
   - Enums: `OpenThermMessageType`, `OpenThermMessageID`, `OpenThermResponseStatus`
   - Methods: `begin()`, `sendRequestAsync()`, `sendResponse()`, `process()`, `getLastResponse()`, `getLastResponseStatus()`, `isReady()`, `handleInterrupt()`, `buildRequest()`, `buildResponse()`, `getMessageType()`, `getDataID()`, `isValidResponse()`, `parity()`
@@ -671,7 +677,7 @@ static uint8_t otUnknownCounters[32];     // 128 MsgIDs × 2 bits = 32 bytes
 ## Known Constraints & Edge Cases
 
 1. **Manchester Encoding**: OT bus operates at ~1kHz; frame transmission takes ~150ms
-2. **Thermostat Timeout**: Configurable via `settings.otd.iSetbackTimeout`; fail-safe applies setback (MsgID 1 override) if enabled
+2. **Thermostat Timeout**: fixed 3 s without a thermostat frame (TASK-1802 bug 9); no setback on a loss (TASK-1806)
 3. **3-Strike Auto-Blacklist**: MsgIDs returning UNKNOWN_DATA_ID ≥3 times are auto-disabled; manual `AA=MsgID` re-enables
 4. **Response vs Request Paths**: Response modifiers (RM=) applied only in gateway mode; repeater overrides (value injection) applied in both gateway and master modes
 5. **Loopback Mode**: Simulation is instant (no timing); useful for testing parser/MQTT without OT hardware

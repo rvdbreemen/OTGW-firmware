@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : RecRing.h
-**  TASK-1991 (branch research/cloud-recording only): the local sink of the one recorder. A byte ring of closed
+**  TASK-2907 (branch research/cloud-recording only): the local sink of the one recorder. A byte ring of closed
 **  records, each stored as it would be sent (fmt 4, or fmt 5 when LZ-coded), so a local download and the cloud
 **  carry the same records and one decoder reads both. No Arduino or platform include: tests/test_rec_ring.py
 **  compiles this header as it is.

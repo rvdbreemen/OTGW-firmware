@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program : networkStuff.h
-**  Version  : v2.0.0-poc.13
+**  Version  : v2.0.0-poc.14
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -28,6 +28,7 @@
 #ifndef NETWORKSTUFF_H
 #define NETWORKSTUFF_H
 
+#include <atomic>
 #include <platform.h>           // Unified ESP8266/ESP32 abstraction layer
 #include "webServerCompat.h"        // ESPAsyncWebServer bridge (TASK-865.9): AsyncWebServer server(80)
 #include "OTGW-ModUpdateServer.h"   // <<special version for Nodoshop Watchdog needed>>
@@ -82,7 +83,7 @@ extern time_t            NtpLastSync;
 // defined in networkStuff.ino. seq10 (WebSocket) and seq11 (OTA) attach to it.
 extern OTGWUpdateServer  httpUpdater;
 extern FSInfo            LittleFSinfo;
-extern bool              LittleFSmounted;
+extern std::atomic<bool> LittleFSmounted;     // TASK-1995: the fsWriter task (core 0) writes it too
 extern bool              LittleFSsimFilePresent;     // TASK-1899: read by /api/v2/simulate (async_tcp)
 extern bool              LittleFSupdateIncomplete;   // TASK-1899: read by /api/v2/device/info (async_tcp)
 #define WM_DEBUG_PORT debugTelnet

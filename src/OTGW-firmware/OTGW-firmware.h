@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v2.0.0-poc.13
+**  Version  : v2.0.0-poc.14
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -31,6 +31,7 @@ extern AsyncSimpleTelnet<1> debugTelnet;   // defined in networkStuff.ino
 // the settings struct (SATSection) in one file because their defaults and
 // enums are tightly coupled; see SATtypes.h preamble for the rationale.
 #include "SATtypes.h"
+#include "fsWriter.h"           // TASK-1989: queued state-file writes (the update server drains it too)
 #include "SATmqttPublish.h"     // ADR-111: on-change + jittered heartbeat helpers
 #include <boards.h>             // Board-specific pin maps and feature flags (HAS_PIC, HAS_DIRECT_OT)
 // OTDirecttypes.h must follow boards.h because its contents are gated on HAS_DIRECT_OT (ADR-079).
@@ -238,10 +239,16 @@ const char* satMarkersJsonLocked();
 void satMarkersScanLocked(int& count, int& maxId);
 int  satMarkersAppendLocked(const char* entry, int count);   // 0 ok, 1 full, 2 no room
 bool satMarkersDeleteLocked(int id);   // FSexplorer uploaded or deleted path
-void loopLittleFSStatus();   // TASK-1865: mount check + write probe on the loop task, not in /api/v2/health
+void loopLittleFSStatus();   // TASK-1865: mount check + write probe off async_tcp; TASK-1995: run by the fsWriter task
+bool fsHealthService();      // TASK-1995: one pending write probe or mount check, on the fsWriter task
 // Longest reboot-log line incl. CRLF and NUL: a core-dump detail line with all 16 backtrace frames the ESP-IDF
 // summary holds is 236 chars ("Core dump: " + task (15) + pc + elf + "bt=" + 16 PCs + "!\r\n"; TASK-1538).
 #define REBOOT_LOG_LINE_MAX 240
+// TASK-1931: the reboot log keeps this many lines (updateRebootLog(), helperStuff.ino), so its worst case is
+// REBOOT_LOG_FILE_MAX: every line at REBOOT_LOG_LINE_MAX - 1 bytes incl. CRLF. The filesystem-OTA keep list
+// (OTGW-ModUpdateServer-esp32.h KEEP_LIST) checks its cap against this at compile time.
+#define REBOOT_LOG_LINES 20
+#define REBOOT_LOG_FILE_MAX (REBOOT_LOG_LINES * (REBOOT_LOG_LINE_MAX - 1))
 bool readLatestCrashLog(char* summary, size_t summarySize, char* details, size_t detailsSize);
 
 //prototype
@@ -298,6 +305,7 @@ struct CmdQueueSnap {
 void cmdQueueSnapshot(CmdQueueSnap* out);
 void triggerPICsettingsReadout();
 void sendMQTTheapdiag();
+void loopMQTTStatsPacer();                       // TASK-2004: one hourly stat per loop pass
 // TASK-692 / TASK-693 port (dev TASK-686 / TASK-688): OT-bus support-map
 // accessors. State lives at file scope in OTGW-Core.ino; MQTT publisher
 // lives in MQTTstuff.ino; LittleFS persistence lives in OTGW-Core.ino.
@@ -313,6 +321,9 @@ void clearBoilerUnsupportedDirty();
 void recordBoilerAnswer(uint8_t id, uint8_t type, uint32_t nowMs);
 int32_t boilerAnswerAgeS(uint8_t id, uint32_t nowMs);   // -1 = not seen this boot
 const char* boilerAnswerStatus(uint8_t id);              // PSTR: never_seen / ack / unknown_dataid / data_invalid
+enum : uint8_t { OT_VALSRC_NONE = 0, OT_VALSRC_BOILER, OT_VALSRC_GATEWAY, OT_VALSRC_THERMOSTAT, OT_VALSRC_SUMMARY, OT_VALSRC_REPLAY };  // TASK-1965
+void recordValueSource(uint8_t id, uint8_t src);           // TASK-1965: which frame wrote the served value
+const char* valueSourceName(uint8_t id);                   // PSTR: none / boiler / gateway / thermostat / summary / replay
 void publishBoilerUnsupportedMsgids();    // MQTT retained CSV ("14W,16W,24R,...")
 void loadOtSupportFiles();                 // read /ot-thermo.json and /ot-boiler.json at boot
 void saveOtSupportFilesIfDirty();          // 15-min debounced atomic write
@@ -477,6 +488,7 @@ void satCurveTuneSetHourS(uint32_t s);    // TASK-1525: simulation-only bench ho
 void satOnThermostatSetpoint(float tr);  // TASK-1259: thermostat MsgID 16 Write-Data (T frame), edge detector for follow-thermostat
 void satClearSafetyTrip();  // TASK-1159: the one place a SAT safety trip is cleared
 void satPublishMQTT();
+void satClimateBridgeForce();  // TASK-1979 / ADR-248: any task; the HA thermostat card's sat/climate_target and sat/climate_current publish again on the next pass
 void satRepublishCoreState();  // TASK-1284: re-arm the enabled/active/mode/... shadows so the next pass re-publishes (ADR-174)
 bool satHandleExternalTemp(const char* value);
 bool satHandleExternalOutdoor(const char* value);
@@ -561,14 +573,14 @@ struct DiscoverySection {                    // state.discovery — MQTT auto-di
 };
 
 // NOTE: this struct is NOT authoritative for the retained otgw-firmware/stats/*
-// MQTT topics. sendMQTTheapdiag() publishes 25 individual retained topics: 15
+// MQTT topics. The hourly round started by sendMQTTheapdiag() publishes 26 individual retained topics (paced, TASK-2004): 15
 // from this struct (8 cumulative counters + min_max_block + max_loop_gap_ms + 5
 // maxBlock histogram buckets), 4 live values (free_heap / max_block / frag_pct /
-// min_free_heap — the last via getMinFreeHeap(), not stored here), and 6 from
+// min_free_heap — the last via getMinFreeHeap(), not stored here), and 7 from
 // state.discovery (verify_runs / republish_triggered / last_missing /
-// last_orphan / published_topics / last_verify_epoch). Adding a field here does
+// last_orphan / published_topics / last_verify_epoch / last_daily_heal_epoch). Adding a field here does
 // NOT automatically surface on MQTT — add a corresponding
-// publishStatU32(F("otgw-firmware/stats/...")) call in sendMQTTheapdiag().
+// case to publishStatAt() in MQTTstuff.ino and raise STATS_COUNT.
 struct HeapDiagSection {                 // state.heapdiag — cumulative heap-pressure diagnostics (reset on reboot)
   uint32_t iWsDropsTotal            = 0; // lifetime WebSocket messages dropped due to heap pressure
   uint32_t iMqttDropsTotal          = 0; // lifetime MQTT messages dropped due to heap pressure

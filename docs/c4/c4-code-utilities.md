@@ -387,6 +387,17 @@ Note: `timerFlushSettings` (2000 ms, `SKIP_MISSED_TICKS`) is declared by hand as
 
 ---
 
+### Background State-File Writer (fsWriter.ino / fsWriter.h)
+
+Small state-file writes run on their own FreeRTOS task (`"fswriter"`, 4096 B stack, protocol core) instead of the loop task (TASK-1989).
+
+- `fsWriterBegin()`: creates the queue and the task.
+- `fsWriterSubmit(path, data, len)` / `fsWriterRemove(path)`: queue a write or a delete. The queue holds `FSW_QUEUE_DEPTH` (3) jobs of `FsWriteJob` (path up to `FSW_PATH_LEN` 32, data up to `FSW_DATA_LEN` 256). A job that does not fit is refused with a debug line; the submit counter is raised before the send and lowered on a failure (TASK-2007). Callers today: the SAT PID state, energy and estimated-energy files (`SATcontrol.ino`).
+- `fsWriterDrain(timeoutMs)`, `fsWriterPending()`: wait for, or count, queued jobs.
+- `fsWriterStep()`: one pass of the task; it does nothing while paused, while a filesystem image is being written (`bFsImageWriting`) or while LittleFS is not mounted.
+- Filesystem OTA (`OTGW-ModUpdateServer-esp32.h`, TASK-2007): `fsWriterPauseAndFlush(2000)` at the start (wait until the task is idle, then write the queue on the caller), `fsWriterResume()` once `bFsImageWriting` holds the task, `fsWriterPause()` in the remount after the write, and `fsWriterResume()` only after the settings restore. A save held through the update therefore lands after the restore instead of being overwritten by it.
+- Filesystem health (TASK-1995 Step B, TASK-2020): the 60-s mount check (`platformFSInfo()`) is raised by the loop task (`fsHealthRequest()`, `helperStuff.ino`) and run by `fsHealthService()` inside `fsWriterStep()`, so its block walk no longer stalls the loop task; it also runs while LittleFS reads as unmounted, so a filesystem that reads again is mounted within a minute. There is no periodic test write any more: a flash write or erase stops the other core too (ESP-IDF v5.5.1 "Concurrency Constraints for Flash on SPI1", auto-suspend off), so the 5-min `/.health` write stalled the loop even from the writer task. Instead `fsWriterService()` reads every file back after `close()` and compares it; a failed open, a short write or a mismatch sets `fsWriterWriteFailed()` until the next good write, and `/api/v2/health` then reports `DEGRADED`. The writer task only carries the SAT state files (`satSavePidState()`, `satSaveEnergyState()`, `satSaveEstEnergyState()`), and with SAT off `satControlLoop()` returns before any periodic save (`SATcontrol.ino:7910-7922`), so this write check only runs while SAT is on.
+
 ## Dependencies
 
 ### Internal Dependencies
