@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-13T08:07:00Z'
-updated_date: '2026-11-18T22:56:00Z'
+updated_date: '2026-11-19T02:21:00Z'
 labels:
   - sat
   - adr
@@ -26,7 +26,7 @@ Sergeant D 2026-11-13 (https://discord.com/channels/812969634638725140/110555672
 - [ ] #1 Plan with thermo-nova citations (pid.py:185-189, const.py:16) and the ADR-228/ADR-230 timing, plus Sergeant D's confirmation of the interpretation, before code
 - [ ] #2 ADR that supersedes the ADR-205/ADR-228/ADR-230 timing
 - [ ] #3 Host test on the real tuner: red on the old timing, green on the new (tests/test_sat_tuner_convergence.py as base)
-- [ ] #4 Bench test by the bench-tester
+- [x] #4 Bench test by the bench-tester
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -78,4 +78,6 @@ Plan TASK-1889 (ba, 2026-11-18). Scope 2.0.0 by Robert (DM 18:28 via the coordin
 2026-11-18 picked up by otgw-webui (ba). Maintainer scope decision (Robert, DM 18:28 via the coordinator), verbatim: 'Die snellere self tune (1889) moet wel mee' -> milestone 2.0.0, priority high. This overrides entry 386 ('new items go to the next release') for this item; scope is the maintainer's call, behaviour stays Sergeant D's. Plan with timeline follows before code.
 
 2026-11-18 implemented option A by directive (coordinator's nod; Q-1889a with Sergeant D via 92). ADR-260 Proposed (adr-kit). Code: SATcurveTune.h SAT_CT_HOURS_PER_DAY 24->1, SAT_CT_MIN_CLEAN_HOURS 6->1, SAT_CT_WINDOW_DAYS 3->12, SAT_CT_STEP 0.1->0.05, SAT_CT_FILE_VERSION 2->3 (#ifndef so the host test can compile the old timing); window file written only on a counted hour, SAT_CT_FILE_BUF 384->1024 (static, off the loop stack; FS-OTA keep list 1024, total 12172 <= 12288); REST curve_tune.window_hours/window_hours_needed replace days/days_needed/clean_hours_today/clean_hours_needed/hours_today; MQTT sat/curve_tune/window_hours replaces days and clean_hours_today (no HA discovery entity); UI card and settings help in hours (en/nl/de/el); openapi.yaml and MQTT.md. Evidence (this session, rebased onto 18bce9597, beta.379): tests/test_sat_curve_selftune.py + test_selftune_help_cadence.py + test_sat_tuner_convergence.py 120 passed 1 skipped; HourWindow 9/9 green, 9/9 red with OTGW_SAT_INO/OTGW_SAT_HDR at origin/dev; convergence on the new constants converges in all scenarios (lower 2.6->1.4: final 1.55, 21 steps, last day 10, tol 0.20; 13 decisions, 12 with a floating vote, 1 on warm-up alone), both mutants still fail; web UI sat-tune-progress 8/8 (5/3 on the origin v2.js), settings-help 29/29, i18n-followups 4/4, i18n-lang 6/6, v2-undefined-names 2/2; test_fs_update_keep 38 OK; test_adr_governance + open_questions 23 passed; evaluate --quick 0 FAIL 0 WARN. Not verified: a step on real hardware (no SAT simulation on bench units; gruijter gives 0 counted hours).
+
+Bench (otgw-bench-tester 09, 2026-11-19, .63 Classic+S3 PSRAM, no boiler, no simulation) on 2.0.0-beta.379+d106f55 (src-identical to the pushed 0f9a906 per ba: only the committed generated settingsHelpGz.h differs). OTA app+fs 'changed: none'. (1) REST curve_tune: window_hours 0 / window_hours_needed 12; days, days_needed, clean_hours_today, clean_hours_needed, hours_today gone. (3) synthetic fixtures (removed afterwards): a v2 /sat_tune.json present before the OTA was dropped at the first restore (file 404, window_hours 0); a v3 file restored to window_hours 1 after a reboot and survived an FS-only OTA byte-identical (keep list). (4) tune card on the SAT page in en/nl/de/el: '1/12 counted hours in the window', 'No hour closed yet', 'No hours left out' (and the translations); settings-help.json satcurveselftune: 0.05 step after 12 counted hours. 'Last hour' needs a decision (not reachable). (5) 0 JS exceptions on Home/Monitor/Settings/Advanced/SAT in 4 languages; Monitor legend still has 'SAT target'. NOT reachable on this bench: (2) MQTT sat/curve_tune/window_hours, because satPublishMQTT runs from the SAT control tick and SAT is handed back without a boiler (no sat/curve_recommendation, sat/power or sat/state either in 220 s, while flag topics came); an actual 0.05 step (host tests). Screenshots: 09 scratchpad b379\ui\tune-card-*.png.
 <!-- SECTION:NOTES:END -->

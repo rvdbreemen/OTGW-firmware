@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-19T01:07:00Z'
-updated_date: '2026-11-19T01:24:00Z'
+updated_date: '2026-11-19T02:21:00Z'
 labels:
   - sat
   - bug
@@ -40,4 +40,6 @@ Field reproduction: marceld91d, beta.361 (Remeha Calenta + Toon), capture 202611
 2026-11-19 side finding queued as Q-2039a (92 -> Sergeant D): should an OT= outside value (HA via set/<node>/outside, MQTTstuff.ino:421/512) count as a fresh SAT source? On marceld the PIC answered MsgID 27 itself (all 230 frames T/A, no B/R; gateway.asm 6.6:3050-3067 UserOutsideTemp), and an A frame never stamps (OTGW-Core.ino:5241-5247, TASK-1896), so SAT ran on the weather. Options A (count as fresh O for 1 h after each OT=), B (unchanged), C (count as E, external, ranking first; thermo-nova uses the user's HA entity first, climate.py:317-343). Our advice C, scope 2.0.0. Not part of this fix.
 
 2026-11-19 correction: Q-2039a is withdrawn. Entries 330 (Robert) and 331 (Sergeant D) already decided that an OT=/TS=O value on MsgID 27 counts at the MsgID-27 rank; I had not checked the ledger before writing the options. marceld's case is an implementation gap against 330: filed as TASK-2040 (2.0.0, high). Option C (rank OT= first as external) is off the table unless Robert wants it.
+
+Regression bench (otgw-bench-tester 09, 2026-11-19, .63, no boiler) on 2.0.0-beta.380+7a98297 (contains 379): OTA app+fs 'changed: none', bootcount 231 for 30 min (no crash, 0 loop-stall), heap flat (hd_min_free_heap 24,464), 'Weather: fetching' (SATweather.ino:393) at 02:53:37 and 03:08:38 with weatherApply, one boot hand-back (:4477) and one OT-link hand-back after 30 s (:4389), no repeats. AC2 NOT ticked: the fix itself (no hand-back at the MsgID 27 expiry) needs a boiler that stamps MsgID 27; replayed frames and OT= A answers do not stamp.
 <!-- SECTION:NOTES:END -->
