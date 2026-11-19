@@ -1118,7 +1118,7 @@ static void remoteTelemetryUpdateActive() {
       platformMutexUnlock(remoteTelemetryLock);
     }
     RemoteTelemetryEv e;
-    e.b(1);
+    e.u8(1);
     e.textz(remoteTelemetryPauseWhy ? remoteTelemetryPauseWhy : why[remoteTelemetrySvc < 5 ? remoteTelemetrySvc : 4]);
     e.send(rtel::EV_PAUSE);
     if (platformMutexLock(remoteTelemetryLock, 200)) {     // the pause marker closes into the (now empty) queue
