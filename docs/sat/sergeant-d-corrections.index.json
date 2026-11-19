@@ -5670,6 +5670,19 @@
     "TASK-2005"
    ],
    "confirmed_by_entry": null
+  },
+  {
+   "id": 429,
+   "title": "Q-2005b answered B: at most one PWM entry per flame, continuous until flame-off; the fail-safe threshold goes from 3.5 to 3.0 C (Sergeant D, 2026-11-19)",
+   "date": "2026-11-19",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1572933709429084271",
+   "supersedes": [],
+   "tasks": [
+    "TASK-2005"
+   ],
+   "confirmed_by_entry": null
   }
  ]
 }

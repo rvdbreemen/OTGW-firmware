@@ -8465,3 +8465,24 @@ Robert, 16:18:42 UTC (https://discord.com/channels/812969634638725140/9144987300
 **Task:** TASK-2005 follow-up (owner per the coordinator).
 
 **Open:** reading (a) or (b), and the release scope: Q-2005b.
+
+## 429. Q-2005b answered B: at most one PWM entry per flame, continuous until flame-off; the fail-safe threshold goes from 3.5 to 3.0 C (Sergeant D, 2026-11-19)
+
+**Source:** #dev-sat-mqtt, Sergeant D 2026-11-19 11:17:00 UTC (https://discord.com/channels/812969634638725140/1105556725714649128/1572933709429084271; not edited 90 s after the post, read back via the Discord API), a reply to Q-2005b (https://discord.com/channels/812969634638725140/1105556725714649128/1572932665831854113).
+
+**Quoted:**
+> "My answer is B. But instead of flow above 3.5 change it to flow above 3."
+
+**Settled:** reading (b) of entry 428. (1) During one flame-on SAT enters PWM at most once. After a switch from PWM to continuous it stays in continuous until the flame goes out; the 2.0 C / 60 s continuous->PWM switch rule (entry 407, SATtypes.h:542 fPwmSwitchMargin) does not fire again in that burn. (2) The only way back to PWM during that burn is the fail-safe, and its threshold changes from flow - requested >= 3.5 C to >= 3.0 C (the 30 s hold of entry 289 is not mentioned and stays). (3) Counting as entry 428: at most one counted PWM ON per flame-on.
+
+**Changes earlier entries:** entry 288/289/359 (fail-safe 3.5 C, SATcycles.ino:41 SAT_OVERSHOOT_FAILSAFE_DELTA_C) -> 3.0 C. Entry 407 (2.0 C / 60 s switch) now applies at most once per flame. Entry 89 as already changed by entry 428.
+
+**Interpretation (ours):** "flow above 3" is read as flow - requested setpoint >= 3.0 C with the existing 30 s hold (entry 289), since the question quoted the fail-safe as "flow 3.5 C above the request for 30 s". "Flame goes out" is the boiler flame bit (MsgID 0 slave status) dropping, as in the firmware's flame-off detection.
+
+**Compared with thermo-nova (7beaaf5):** no counterpart; thermo-nova re-enables PWM from continuous whenever its overshoot rule holds (heating_control.py:262-305), with no per-flame limit and no fail-safe. This is a deliberate refinement on top of the pin.
+
+**Not settled:** the release scope (2.0.0 or 2.1.0) was asked in Q-2005a and Q-2005b and not answered: Q-2005c. The range-5 start question of Q-2005a stays as today.
+
+**Task:** to be created after the scope answer (TASK-2005 follow-up, owner per the coordinator).
+
+**Open:** scope (Q-2005c).
