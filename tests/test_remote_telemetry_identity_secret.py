@@ -71,16 +71,22 @@ def identity_source(text):
 
 
 def run(device_text):
-    """Two boots of the given RemoteTelemetryDevice.h's remoteTelemetryIdentity(); returns the printed fields, None without MSVC."""
+    """Two boots of the given RemoteTelemetryDevice.h's remoteTelemetryIdentity(); returns the printed fields, None
+    without a host compiler (MSVC on Windows, else g++ or clang++)."""
     bat = _vcvars()
-    if not bat:
+    gxx = None if bat else (shutil.which("g++") or shutil.which("clang++"))
+    if not bat and not gxx:
         return None
     work = Path(tempfile.mkdtemp(prefix="crid_"))
     try:
         (work / "main.cpp").write_text(PRELUDE + identity_source(device_text) + MAIN, encoding="utf-8")
         exe = work / "t.exe"
-        cmd = f'call "{bat}" >nul && cl /nologo /std:c++20 /EHsc /Fe:"{exe}" /Fo:"{work}\\\\" "{work / "main.cpp"}"'
-        r = subprocess.run(cmd, shell=True, cwd=work, capture_output=True, text=True)
+        if bat:
+            cmd = f'call "{bat}" >nul && cl /nologo /std:c++20 /EHsc /Fe:"{exe}" /Fo:"{work}\\\\" "{work / "main.cpp"}"'
+            r = subprocess.run(cmd, shell=True, cwd=work, capture_output=True, text=True)
+        else:
+            r = subprocess.run([gxx, "-std=c++20", "-o", str(exe), str(work / "main.cpp")], cwd=work,
+                               capture_output=True, text=True)
         if r.returncode:
             raise AssertionError("host compile failed:\n" + r.stdout[-3000:] + r.stderr[-1000:])
         out = subprocess.run([str(exe)], capture_output=True, text=True, timeout=60).stdout.split()
@@ -93,7 +99,7 @@ class SecretSurvivesReboot(unittest.TestCase):
     def test_second_boot_keeps_the_enrolled_secret(self):
         r = run(DEVICE_H.read_text(encoding="utf-8"))
         if r is None:
-            self.skipTest("no MSVC on this host")
+            self.skipTest("no host C++ compiler")
         self.assertEqual(r["len"], "32")
         self.assertEqual(r["uid"], "otgw-ac276ece45d8")
         self.assertEqual(r["same"], "1", r)
