@@ -5642,6 +5642,19 @@
     "TASK-2039"
    ],
    "confirmed_by_entry": null
+  },
+  {
+   "id": 427,
+   "title": "Q-425a answered A: the Kd factor 0.05 of entry 425 goes into 2.0.0 (Sergeant D, 2026-11-19)",
+   "date": "2026-11-19",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1572849450299293867",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1656"
+   ],
+   "confirmed_by_entry": null
   }
  ]
 }

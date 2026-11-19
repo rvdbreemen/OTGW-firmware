@@ -8427,3 +8427,18 @@ Robert, 16:18:42 UTC (https://discord.com/channels/812969634638725140/9144987300
 **Task:** TASK-1942 (no change).
 
 **Open:** none.
+
+## 427. Q-425a answered A: the Kd factor 0.05 of entry 425 goes into 2.0.0 (Sergeant D, 2026-11-19)
+
+**Source:** #dev-sat-mqtt, Sergeant D 2026-11-19 05:42:11 UTC (https://discord.com/channels/812969634638725140/1105556725714649128/1572849450299293867; unedited after more than 20 minutes, read back via the Discord API), a reply to Q-425a (https://discord.com/channels/812969634638725140/1105556725714649128/1572845020984246325).
+
+**Quoted:**
+> "my answer is A"
+
+**Settled:** option A as posted: the Kd factor 0.05 (entry 425, kd = 0.05 x 8400 x kp = 420 x kp) goes into 2.0.0, in the next alpha build; it is not in the public beta of 2026-11-19 (beta.382, built before this answer).
+
+**Compared with thermo-nova (7beaaf5):** pid.py:93 uses 0.07 (see entry 425).
+
+**Task:** TASK-1656 or its follow-up (owner otgw-dev per the coordinator).
+
+**Open:** none.
