@@ -6,11 +6,10 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-19T19:38:00Z'
-updated_date: '2026-11-19T19:44:00Z'
+updated_date: '2026-11-19T20:02:00Z'
 labels:
   - webui
   - i18n
-  - needs-maintainer-ok
 milestone: 2.1.0
 dependencies: []
 priority: medium
@@ -34,4 +33,6 @@ Found in the read-only UI walk of 397 (7e31bc2) on .61, 2026-11-19, German UI at
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-11-19 (ba): ADR-219 lines that put the settings help in scope (checked by the coordinator): docs/adr/ADR-219 line 67 (User Decision: 'only the web UI (including the settings help) is translated'), line 72 (Scope: 'all visible web UI text and the settings help'), line 117. Coordinator puts the milestone question to Robert by DM: A = 2.1.0 plus a release-note line, B = before Sunday's stable; recommendation A. Label needs-maintainer-ok until his answer.
+
+Maintainer decision (Robert, 2026-11-19 19:54 UTC, Discord DM 1573063839715557535, relayed by the coordinator; the only open question, read as the answer to it), verbatim reply: 'A' (A = milestone 2.1.0 plus a release-note line; the settings help stays English in 2.0.0). Label needs-maintainer-ok removed, milestone stays 2.1.0.
 <!-- SECTION:NOTES:END -->
