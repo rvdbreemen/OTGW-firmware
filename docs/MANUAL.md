@@ -759,11 +759,11 @@ The nightly restart causes a brief service interruption of approximately 30 seco
 
 #### Check GitHub for new versions
 
-From firmware 2.0.0-beta.387. The web UI can tell you when a newer firmware is on GitHub. A notice then appears in the header next to the firmware version, with a link to the release page.
+From firmware 2.0.0-beta.387. The web UI can tell you when a newer firmware is on GitHub. A notice then appears in the header next to the firmware version, with a link to the release page. From beta.393 the notice also shows on a phone (a window of 480 px or less).
 
 - Who contacts GitHub: your browser, not the gateway. The gateway stays on your local network and sends nothing to the internet for this.
 - What is sent: your browser asks api.github.com for the list of OTGW-firmware releases, at most every 6 hours. As with any website, GitHub sees your internet IP address. The gateway's address is not sent: the request carries no referrer and no cookies.
-- First use: the web UI asks once whether you want this. Your answer is stored on the gateway and applies to every browser.
+- First use: the web UI asks once whether you want this. From beta.393 the question is a chip "Check for new versions?" in the header, next to the identity chips; a click on it shows the explanation with No and "Yes, check", and closing it without an answer means not now (the chip stays). Before beta.393 the question opened as a dialog over the page. Your answer is stored on the gateway and applies to every browser.
 - Switch it off: Settings > Behavior > "Check GitHub for new versions". When it is off, the browser makes no request to GitHub at all.
 - Betas: a beta firmware is told about newer betas and stable releases. A stable firmware is only told about stable releases, unless you also switch on "Also tell about beta versions".
 - Hide a notice: the × next to it hides that version until a newer one appears.

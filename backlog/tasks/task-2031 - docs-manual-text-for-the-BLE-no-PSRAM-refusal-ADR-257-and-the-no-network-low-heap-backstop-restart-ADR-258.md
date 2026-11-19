@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-18T15:22:00Z'
-updated_date: '2026-11-19T12:37:00Z'
+updated_date: '2026-11-19T16:58:00Z'
 labels:
   - docs
 milestone: 2.0.0
@@ -38,4 +38,10 @@ Coordinator request 2026-11-18. Manual text prepared before the firmware lands, 
 2026-11-19 coordinator (Robert DM 1572927618628583465, A): stable notes draft gets a WiFi Changes bullet (ADR-258 beta.383, ADR-261 beta.385, log line beta.388; checked against networkStuff.ino:649, :821-828, :912-919) and the Known issue line verbatim: option C proven on the host only.
 
 2026-11-19 bundled per coordinator GO (origin a755055e5): Changes adds task 2909 (beta.390, web UI) and task 2910 (beta.389, busy-503 closes the connection under 4 KB largest block, restAPI.ino:192-194); Known issues adds task 2911 (hang after a crash boot, under investigation; normal boots 5/5 per coordinator; supervisor arms only after an answering gateway, networkStuff.ino:751/:773).
+
+2026-11-19 (coordinator, next beta): CHANGELOG [Unreleased] filled for beta.393 (task 2918: update-check question is a header chip, not a modal; 'New version available' notice visible at <= 480 px) and beta.394 (task 2026 heap-hold hook, prerelease-only diagnostics). Stable draft Web UI bullet and manual ch03/h03 'Check GitHub for new versions' updated. Source: ba's c9b4c35b6 (lane/ba-2023, v2.js updAsk, strings 'Check for new versions?', 'Yes, check', 'No'; update-check-github.test.mjs 14/14, old v2.js 3 fail) and 5e's a02399d3a (lane-5e-heaphold, handleDebug.ino; test_heaphold_hook.py 8/8). Both not on origin at 3fb853b04; beta numbers 393/394 per coordinator, to recheck after they land. Gates: build_manual --check exit 0, test_manual_* 10 passed, no new em dashes.
+
+2026-11-19 later: coordinator flipped the numbers: heap-hold hook (task 2026) = beta.393, update-check chip + phone notice (task 2918) = beta.394 (popover fix after 09's FAIL at 390 px). CHANGELOG, stable draft and ch03/h03 swapped; build_manual --check exit 0, test_manual_* 10 passed.
+
+2026-11-19 final: ba's ffe5dffeb on origin bumps beta.393 (task 2918, incl. the popover-on-phone fix of an unreleased build, so no user note). Notes set to beta.393 for task 2918; the heap-hold line removed from CHANGELOG [Unreleased] until 5e lands (394 or later). build_manual --check exit 0, test_manual_* 10 passed.
 <!-- SECTION:NOTES:END -->

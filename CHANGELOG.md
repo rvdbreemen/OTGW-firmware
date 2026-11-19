@@ -5,6 +5,12 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Changed
+- Web UI: the one-time question whether to check GitHub for new versions (ADR-262) is a header chip "Check for new versions?" instead of a modal that opened over the current page about 30 s after page load; the explanation and No / "Yes, check" open in a popover only on a click, closing it is "not now", and the answers still write `updatecheck` then `updatecheckasked` (TASK-2918, beta.393).
+
+### Fixed
+- Web UI: the "New version available" notice (beta.387) was never visible on a phone or in a window 480 px wide or less, because it sat in the header group that is hidden at that width; the notice and the new chip now sit right after that group (TASK-2918, beta.393).
+
 ## [2.0.0-beta.392] - 2026-11-19
 
 ### Changed

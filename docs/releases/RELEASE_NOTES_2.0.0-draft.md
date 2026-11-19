@@ -187,6 +187,7 @@ Most changes since the first 2.0.0 beta are already described above (Highlights 
 
 ### Web UI and graphs
 
+- The one-time question whether to check GitHub for new versions is a chip "Check for new versions?" in the header; it no longer opens as a dialog over the page you are on. A click on it shows the explanation and the No / Yes buttons. The "New version available" notice now also shows on a phone; before beta.393 it was hidden at a width of 480 px or less (TASK-2918, beta.393).
 - The web UI no longer calls SAT experimental; SAT stays opt-in and off by default, and the setup wizard still asks you to confirm before SAT controls the boiler. The heat-pump boiler type is still marked experimental (TASK-2909, beta.390).
 - The Monitor graph and its CSV export show SAT's target temperature as its own dashed line while SAT is on, also in the 24 h history (TASK-2018, beta.378).
 - The SAT messages "boiler handed back" now say "SAT paused", with the reason, in English, Dutch, German and Greek (TASK-2036, beta.382).
