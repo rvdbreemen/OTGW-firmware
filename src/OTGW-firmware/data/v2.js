@@ -8628,7 +8628,7 @@
       // Measure against documentElement.clientWidth, not innerWidth: on a phone the overflowing popover itself widens
       // the visual viewport (innerWidth 390 -> 533 on .63), so innerWidth no longer says where the screen ends.
       if (on && pop.getBoundingClientRect && box.getBoundingClientRect) {
-        var de = document.documentElement, vw = (de && de.clientWidth) || (typeof innerWidth === 'number' ? innerWidth : 0);
+        var de = document.documentElement, vw = (de && de.clientWidth) || (typeof window !== 'undefined' && window.innerWidth) || 0;
         var bl = box.getBoundingClientRect().left, pw = pop.getBoundingClientRect().width;
         var left = vw ? Math.round(Math.max(8, Math.min(bl, vw - 8 - pw)) - bl) : 0;
         if (left) pop.setAttribute('style', POP_STYLE.replace('left:0;', 'left:' + left + 'px;') + 'display:block');
