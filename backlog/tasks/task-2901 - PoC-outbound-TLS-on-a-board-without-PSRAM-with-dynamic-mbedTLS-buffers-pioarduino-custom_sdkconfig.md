@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-15T09:35:00Z'
-updated_date: '2026-11-19T17:33:00Z'
+updated_date: '2026-11-19T19:06:00Z'
 labels:
   - research
   - tls
@@ -142,4 +142,6 @@ AC #6 prep (2026-11-19): replay input cut from the gruijter field capture (OTGW-
 2026-11-19 ~19:00 AC #6 prerequisite: Robert ran delete_device_record.py himself (getpass, own PowerShell window): login 200, record h9014itix3m471h (otgw-ac276ece45d8) uid matched, 1 batch; delete batch 204, delete record 204, record after 404, batches after 0. Bench request for poc.18+e4fb77f on .63 with the replay (replay-gruijter-20261111-0800-60min.log, 9568 frames, sha256 9464952eb70649cc) sent to 09; download by Robert (decode_all on the LAN), then compare_replay/compare_telnet/analyze-capture by 5e.
 
 2026-11-19 AC #6 replay input changed (coordinator chose B: tester data stays local): synthetic, deterministic replay-synthetic-60min.log (9600 frames, 230,400 B, sha256 e9b91b61f6a6eaa2...; generator make_synthetic_replay.py, both in the 5e scratchpad e2e/): T request + B answer every 0.75 s for 60 min, 20 Data-IDs, a made-up 10 min heating cycle, even parity per OT 2.2; ADR-209 3-column format (parser OTGW-Core.ino:4768-4775). compare_replay.py self-test on it: green with lead-in + loop (9600/9600, gap deviation 0.000 s), red with one line dropped (first difference at input frame 4798). The gruijter cut is no longer used. 09 runs it on .63 tonight after ba's 395 smoke.
+
+2026-11-19 ~21:00 poc.18 RED on .63 (09): hang right after the /telemetry.cfg upload (telemetry not yet running), then an Interrupt watchdog boot loop every ~12 s while the cfg was present, and device/info 503 'low heap' even without the cfg. Root cause (measured on the ELFs, xtensa nm, internal DRAM 0x3FC88000-0x3FD00000): poc.18 holds +25,737 B internal DRAM vs dev beta.394: remoteTelemetry Recorder 15,296, remoteTelemetrySendBuf 4,128, remoteTelemetryLz 3,236, remoteTelemetryResp 1,536 (+ token/gets 784), plus ~10 KB SAT buffers (_win4h 8,640, _daily, _tail_*) that dev no longer holds there. On .63 (BLE on) release 395 had 33,852 B free, so poc.18 sat at ~8 KB. Fix: (1) merge origin/dev 22bfbb835 into research (27a844ae3, poc.19; an earlier attempt that took dev's whole file for banner conflicts was discarded, backup branch backup-5e-cloudrec-badmerge-b55793bca); (2) poc.20: the four big buffers become one RemoteTelemetryBufs block allocated in remoteTelemetryInitCore() (PSRAM first, else internal heap, only when upload or local recording starts). Gate tests/test_remote_telemetry_no_big_statics.py: red on e4fb77fb2 (4 statics), green on the fix. OPEN before any merge to dev: ADR-053 (Accepted) requires large feature buffers to be static globals; this PoC deviates on purpose (PSRAM, feature off by default), so a superseding ADR is needed first.
 <!-- SECTION:NOTES:END -->

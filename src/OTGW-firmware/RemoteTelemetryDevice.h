@@ -38,6 +38,7 @@
 #include "mbedtls/platform.h"
 #include "esp_app_desc.h"
 #include <sys/time.h>
+#include <new>                        // placement new for RemoteTelemetryBufs (TASK-2901 poc.19)
 #include "RemoteTelemetryCodec.h"
 #include "RemoteTelemetryPolicy.h"
 #include "RecRing.h"
@@ -186,10 +187,24 @@ static char remoteTelemetrySecret[33] = "";              // 128 bits, hex, from 
 static bool remoteTelemetryFwSynced = false;             // label/fw/board sent this boot
 
 static RemoteTelemetryConfig remoteTelemetryCfg;
-static rtel::Recorder remoteTelemetry;                     // the open record (about 13.5 KB, static: ADR-053)
-static uint8_t  remoteTelemetrySendBuf[rtel::REC_MAX_BYTES];
-// Slot 0 is the static buffer; slot 1 exists only on a PSRAM board (allocated in remoteTelemetrySetup, TASK-2905).
-static rtel::Slot remoteTelemetrySlots[2] = {{remoteTelemetrySendBuf, 0, 0, 0, false, false}, {nullptr, 0, 0, 0, false, false}};
+// TASK-2901 poc.19: the four large buffers (open record ~13.5 KB, send buffer ~4 KB, LZ work 3.2 KB, reply 1.5 KB) are
+// one block allocated by remoteTelemetryInitCore() when the upload or local recording starts: from PSRAM when the
+// board has it, else from the internal heap. As statics they held ~24 KB of internal DRAM on every boot, also with the
+// feature off; poc.18 left .63 (BLE on) at ~8 KB free and hung it. Every user runs only after remoteTelemetryInitCore()
+// (capture is gated on remoteTelemetryActive, the upload task is started there), so the names below stay valid.
+struct RemoteTelemetryBufs {
+  rtel::Recorder rec;
+  uint8_t        sendBuf[rtel::REC_MAX_BYTES];
+  rtel::LzWork   lz;
+  char           resp[1536];                         // a login or refresh reply: the device record and the token
+};
+static RemoteTelemetryBufs *remoteTelemetryBufs = nullptr;
+#define remoteTelemetry        (remoteTelemetryBufs->rec)
+#define remoteTelemetrySendBuf (remoteTelemetryBufs->sendBuf)
+#define remoteTelemetryLz      (remoteTelemetryBufs->lz)
+#define remoteTelemetryResp    (remoteTelemetryBufs->resp)
+// Slot 0 is the send buffer above (set in remoteTelemetryInitCore); slot 1 exists only on a PSRAM board (TASK-2905).
+static rtel::Slot remoteTelemetrySlots[2] = {{nullptr, 0, 0, 0, false, false}, {nullptr, 0, 0, 0, false, false}};
 static uint64_t remoteTelemetrySeqNext = 0;
 static PlatformMutex remoteTelemetryLock = nullptr;
 static volatile bool remoteTelemetryActive = false;
@@ -699,7 +714,7 @@ static void remoteTelemetryWriteJson(RemoteTelemetryTls &c, const char *method, 
   c.print(body);
 }
 
-static char remoteTelemetryResp[1536];                  // a login or refresh reply: the device record and the token
+// remoteTelemetryResp: in RemoteTelemetryBufs (TASK-2901 poc.19)
 
 // ---------------------------------------------------------------- TASK-2906: telemetry mode set centrally
 
@@ -830,7 +845,7 @@ static void remoteTelemetryB64End(RemoteTelemetryB64 &s) {
 
 static void remoteTelemetryCountPut(void *, uint8_t) {}
 
-static rtel::LzWork remoteTelemetryLz;                    // 3.2 KB, used only by the upload task
+// remoteTelemetryLz (3.2 KB, used only by the upload task): in RemoteTelemetryBufs (TASK-2901 poc.19)
 
 static bool remoteTelemetryConnect(RemoteTelemetryTls &c) {
   c.setTimeout(10000);                              // Stream read timeout, ms
@@ -953,6 +968,16 @@ static void remoteTelemetryIdentity();
 
 // The recorder itself: lock, first record, the second send slot on a PSRAM board, the task. Once.
 static bool remoteTelemetryInitCore() {
+  if (!remoteTelemetryBufs) {                              // TASK-2901 poc.19: PSRAM first, else the internal heap
+    void *p = platformPsramAllocOnce(sizeof(RemoteTelemetryBufs));
+    if (!p) p = heap_caps_malloc(sizeof(RemoteTelemetryBufs), MALLOC_CAP_INTERNAL | MALLOC_CAP_8BIT);
+    if (!p) {
+      DebugTf(PSTR("telemetry: no memory for the %u B buffers; off\r\n"), (unsigned)sizeof(RemoteTelemetryBufs));
+      return false;
+    }
+    remoteTelemetryBufs = new (p) RemoteTelemetryBufs();
+    remoteTelemetrySlots[0].buf = remoteTelemetrySendBuf;
+  }
   if (!remoteTelemetryLock) {
     remoteTelemetryLock = platformMutexCreate();
     remoteTelemetrySlots[1].buf = (uint8_t *)platformPsramAllocOnce(rtel::REC_MAX_BYTES);   // nullptr without PSRAM
