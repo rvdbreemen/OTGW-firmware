@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : networkStuff.ino
-**  Version  : v2.0.0-beta.400
+**  Version  : v2.0.0-beta.401
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -69,7 +69,7 @@ bool   LittleFSupdateIncomplete = false;   // TASK-1899: FS_UPDATE_INCOMPLETE_FI
 // One outage runs from the first disconnect event after a connect until the next
 // connect; the driver repeats the event (e.g. 201 NO_AP_FOUND) while it retries, so
 // those count as events of the same outage. A disconnect that the firmware causes
-// itself (Ethernet takeover, BETA AP retry timeout, dead-link forced reconnect) is
+// itself (Ethernet takeover, AP retry timeout, dead-link forced reconnect) is
 // marked through wifiLinkMarkSelf() right before the call: the drop is recorded with
 // its cause but not counted in iOutages. The mark only applies to a drop that starts
 // while the link is up, and every disconnect or connect event clears it, so it can
@@ -423,11 +423,10 @@ void startWiFi(const char* hostname, int timeOut, bool forcePortal)
   }
   else if (!wifiConnected)
   {
-#if defined(_VERSION_PRERELEASE)
     if (wifiSaved && !forcePortal) {
-      // BETA: credentials stored but WiFi unreachable at boot — enter AP fallback
-      // instead of blocking in the config portal.
-      DebugTln(F("BETA: WiFi unavailable at boot, skipping config portal → AP fallback"));
+      // Credentials stored but WiFi unreachable at boot: enter the AP fallback instead of blocking
+      // in the config portal (TASK-2931: also in stable builds, Robert 2026-11-19).
+      DebugTln(F("WiFi: unavailable at boot, skipping config portal -> AP fallback"));
       startAPFallback();
       // TASK-865.11: the OTA /update route is registered once on the
       // AsyncWebServer in setupFSexplorer() (idempotent, guarded by
@@ -439,7 +438,6 @@ void startWiFi(const char* hostname, int timeOut, bool forcePortal)
       DebugTf(PSTR(" took [%lu] seconds => AP fallback\r\n"), (millis() - lTime) / 1000);
       return;
     }
-#endif
     DebugTln(F("Starting config portal..."));
     if (!manageWiFi.startConfigPortal(thisAP))
     {
@@ -495,11 +493,8 @@ void startWiFi(const char* hostname, int timeOut, bool forcePortal)
 } // startWiFi()
 
 //===========================================================================================
-#if defined(_VERSION_PRERELEASE)
-// *** BETA ONLY — AP fallback ***
-// All code in this block is guarded by _VERSION_PRERELEASE.
-// Production builds (no prerelease tag) will never compile or run this code.
-// WARNING: DO NOT enable in production — remove _VERSION_PRERELEASE tag before release.
+// AP fallback: a SoftAP when the saved WiFi is unreachable, so the web UI stays reachable.
+// TASK-2931 (Robert, DM 1573067183825621095, 2026-11-19): part of prerelease AND stable builds.
 
 static void startAPFallback() {
   // Build SSID: OTGW-<last 3 bytes of MAC, uppercase hex>
@@ -517,7 +512,7 @@ static void startAPFallback() {
   // that has lost STA (no STA, no AP). "otgw123" was 7 chars -> too short (TASK-940).
   WiFi.softAP(apSSID, "otgw1234");
 
-  DebugTf(PSTR("BETA AP: fallback started SSID=[%s] IP=192.168.4.1 pass=otgw1234\r\n"), apSSID);
+  DebugTf(PSTR("WiFi AP: fallback started SSID=[%s] IP=192.168.4.1 pass=otgw1234\r\n"), apSSID);
 }
 
 static void stopAPFallback() {
@@ -526,9 +521,8 @@ static void stopAPFallback() {
   WiFi.mode(WIFI_STA);
   state.net.bAPFallback = false;
   state.net.sAPSSID[0] = '\0';
-  DebugTln(F("BETA AP: fallback stopped, WiFi connected"));
+  DebugTln(F("WiFi AP: fallback stopped, WiFi connected"));
 }
-#endif  // _VERSION_PRERELEASE
 
 //===========================================================================================
 enum WifiState_t {
@@ -537,10 +531,8 @@ enum WifiState_t {
   WIFI_CONNECTING,   // waiting non-blocking for connection
   WIFI_RECONNECTED,  // just came back — restart services
   WIFI_FAILED,       // too many retries — trigger reboot
-#if defined(_VERSION_PRERELEASE)
-  WIFI_AP_FALLBACK,  // BETA: SoftAP active, retry WiFi every 5 min
-  WIFI_AP_RETRY,     // BETA: attempting WiFi reconnect from AP mode
-#endif
+  WIFI_AP_FALLBACK,  // SoftAP active, retry WiFi every 5 min
+  WIFI_AP_RETRY,     // attempting WiFi reconnect from AP mode
 };
 static WifiState_t wifiState = WIFI_IDLE;
 static int wifiRetryCount = 0;
@@ -649,8 +641,7 @@ static bool wifiSkipPortalDecide(bool wifiConnected, bool wifiSaved, bool forceP
 #define WIFI_STARVED_MAXBLOCK       4096   // TASK-2026: a largest free block below this is a starved heap
 #define WIFI_DEAD_RESTART_MAGIC  0x4F544452UL   // "OTDR"
 
-#if defined(_VERSION_PRERELEASE)
-// TASK-2923: starting the beta AP fallback on a starved heap panicked the wifi task (.61, beta.393 with the TASK-2026
+// TASK-2923: starting the AP fallback on a starved heap panicked the wifi task (.61, beta.393 with the TASK-2026
 // heap hold: LoadProhibited at NULL+0x2c in ieee80211_hostap_attach, reached from WiFi.mode(WIFI_AP_STA)). The
 // threshold the closed driver needs is not known, so this uses the two limits the firmware already treats as low:
 // HEAP_LOW_THRESHOLD for free heap and WIFI_STARVED_MAXBLOCK for the largest block.
@@ -658,7 +649,21 @@ static bool wifiApFallbackHeapOk(uint32_t freeHeap, uint32_t maxBlock)
 {
   return freeHeap >= HEAP_LOW_THRESHOLD && maxBlock >= WIFI_STARVED_MAXBLOCK;
 }
-#endif
+
+// TASK-2931: what a failed connect attempt leads to, in prerelease and stable builds alike. After 2 failed
+// attempts (about 60 s) the AP fallback starts, except with wifinoportal (TASK-1645: no portal and no AP; keep
+// retrying, no restart) and on a starved heap (TASK-2923: skip the AP, restart after 10 failed attempts).
+// Returns a WifiState_t as uint8_t: the Arduino prototype generator puts a prototype of every function above the
+// enum, so the enum cannot be the return type here.
+static uint8_t wifiNextStateAfterFailedAttempt(int retryCount, bool noPortal)
+{
+  if (retryCount < 2 || noPortal) return WIFI_DISCONNECTED;
+  const uint32_t apFree = platformFreeHeap(), apBlock = platformMaxFreeBlock();
+  if (wifiApFallbackHeapOk(apFree, apBlock)) return WIFI_AP_FALLBACK;
+  DebugTf(PSTR("WiFi: AP fallback skipped, heap starved (free %u B, largest block %u B); retrying, restart after 10 attempts\r\n"),
+          (unsigned)apFree, (unsigned)apBlock);
+  return (retryCount >= 10) ? WIFI_FAILED : WIFI_DISCONNECTED;
+}
 #define WIFI_IP4_ARGS(a) (unsigned)((a) & 0xFF), (unsigned)(((a) >> 8) & 0xFF), \
                          (unsigned)(((a) >> 16) & 0xFF), (unsigned)(((a) >> 24) & 0xFF)
 
@@ -957,17 +962,15 @@ void loopWifi() {
   // by switchToEthernet() (WIFI_OFF). Do not run the reconnect state machine —
   // it would call WiFi.begin() and resurrect the station, fighting the wired
   // link. loopEthernet() owns the transition back to WiFi on cable removal.
-  // A connected wired link also preempts the BETA AP fallback: WIFI_OFF in
+  // A connected wired link also preempts the AP fallback: WIFI_OFF in
   // switchToEthernet() tears down the softAP, and this early return keeps the
   // AP-retry states dormant while Ethernet is active.
   // The dead-link check is WiFi-only: reset it, so a later switch back starts unarmed.
   if (state.net.eMode == NET_ETHERNET) { wifiLinkProbeReset(); return; }
 #endif
   DECLARE_TIMER_SEC(timerWifiRetry,  30, CATCH_UP_MISSED_TICKS);
-#if defined(_VERSION_PRERELEASE)
   DECLARE_TIMER_SEC(timerAPRetry,   300, CATCH_UP_MISSED_TICKS);  // 5 min between AP→WiFi retries
   DECLARE_TIMER_SEC(timerAPConnWait, 30, CATCH_UP_MISSED_TICKS);  // 30 s to wait for reconnect from AP
-#endif
 
   switch (wifiState) {
     case WIFI_IDLE:
@@ -999,31 +1002,12 @@ void loopWifi() {
       } else if (DUE(timerWifiRetry)) {
         wifiRetryCount++;
         DebugTf(PSTR("WiFi: connect attempt %d failed\r\n"), wifiRetryCount);
-#if defined(_VERSION_PRERELEASE)
-        // BETA: after 2 retries (≈60s) enter AP fallback instead of rebooting. TASK-1645: not with
-        // settings.wifi.bNoPortal, which promises no portal and no AP; loopWifi then keeps retrying.
-        // TASK-2923: not on a starved heap either; then the release path below (retry, restart after 10).
-        const uint32_t apFree = platformFreeHeap(), apBlock = platformMaxFreeBlock();
-        const bool apHeapOk = wifiApFallbackHeapOk(apFree, apBlock);
-        if (wifiRetryCount >= 2 && !settings.wifi.bNoPortal && apHeapOk) {
-          DebugTln(F("BETA: WiFi retries exhausted, entering AP fallback mode"));
+        wifiState = (WifiState_t)wifiNextStateAfterFailedAttempt(wifiRetryCount, settings.wifi.bNoPortal);
+        if (wifiState == WIFI_AP_FALLBACK) {
+          DebugTln(F("WiFi: retries exhausted, entering AP fallback mode"));
           startAPFallback();
           RESTART_TIMER(timerAPRetry);
-          wifiState = WIFI_AP_FALLBACK;
-        } else if (wifiRetryCount >= 2 && !settings.wifi.bNoPortal) {
-          DebugTf(PSTR("BETA: AP fallback skipped, heap starved (free %u B, largest block %u B); retrying as release\r\n"),
-                  (unsigned)apFree, (unsigned)apBlock);
-          wifiState = (wifiRetryCount >= 10) ? WIFI_FAILED : WIFI_DISCONNECTED;
-        } else {
-          wifiState = WIFI_DISCONNECTED;
         }
-#else
-        if (wifiRetryCount >= 10) {
-          wifiState = WIFI_FAILED;
-        } else {
-          wifiState = WIFI_DISCONNECTED;  // retry
-        }
-#endif
       }
       break;
 
@@ -1034,9 +1018,7 @@ void loopWifi() {
       // TASK-432 for why platformRestartDHCP() was removed (it took DHCP
       // ownership away from the SDK and broke setAutoReconnect-driven DHCP
       // on subsequent reassociations).
-#if defined(_VERSION_PRERELEASE)
       stopAPFallback();  // tear down AP if it was active
-#endif
       platformSetHostname(CSTR(settings.sHostname));
       platformWifiDisableSleep();  // re-assert: modem-sleep can reset across reassociation (TASK-817)
       startTelnet();
@@ -1061,11 +1043,10 @@ void loopWifi() {
       doRestart("WiFi: too many reconnect failures");
       break;
 
-#if defined(_VERSION_PRERELEASE)
     case WIFI_AP_FALLBACK:
       // Periodically attempt to reconnect to the configured WiFi network
       if (DUE(timerAPRetry)) {
-        DebugTln(F("BETA AP: 5-min timer — attempting WiFi reconnect"));
+        DebugTln(F("WiFi AP: 5-min timer — attempting WiFi reconnect"));
         platformSetHostname(CSTR(settings.sHostname));
         platformWifiPreferStrongestAp();
         WiFi.begin();  // uses stored credentials
@@ -1076,18 +1057,17 @@ void loopWifi() {
 
     case WIFI_AP_RETRY:
       if (WiFi.status() == WL_CONNECTED) {
-        DebugTln(F("BETA AP: WiFi reconnected from AP mode"));
+        DebugTln(F("WiFi AP: WiFi reconnected from AP mode"));
         wifiState = WIFI_RECONNECTED;
         wifiRetryCount = 0;
       } else if (DUE(timerAPConnWait)) {
-        DebugTln(F("BETA AP: WiFi reconnect timed out, staying in AP fallback"));
+        DebugTln(F("WiFi AP: WiFi reconnect timed out, staying in AP fallback"));
         wifiLinkMarkSelf(WIFI_SELF_AP_RETRY);   // TASK-1446: only applies if the link came up (connect without IP)
         WiFi.disconnect();
         RESTART_TIMER(timerAPRetry);
         wifiState = WIFI_AP_FALLBACK;
       }
       break;
-#endif  // _VERSION_PRERELEASE
   }
 }
 
@@ -1175,11 +1155,9 @@ static void sendTelnetBanner(const char* ip)
       WiFi.SSID().c_str(), wifiRssi, signal_quality_perc_quad(wifiRssi),
       dBmtoQuality(wifiRssi).c_str(), getActiveIP().c_str());
   }
-#if defined(_VERSION_PRERELEASE)
   if (state.net.bAPFallback) {
     _debugPrintf_P(PSTR("         AP-Fallback active: %s\r\n"), state.net.sAPSSID);
   }
-#endif
   printWifiLinkBanner();   // TASK-1446: Link + Drop lines (WiFi station record, also while wired)
   _debugPrintf_P(PSTR("  Heap : free %u  frag %u%%  minFree %u  maxBlk %u  sketchFree %u\r\n"),
     (unsigned)platformFreeHeap(),

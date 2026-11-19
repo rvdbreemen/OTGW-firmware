@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.ino
-**  Version  : v2.0.0-beta.400
+**  Version  : v2.0.0-beta.401
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -395,11 +395,9 @@ void setup() {
   startWiFi(CSTR(settings.sHostname), 240, forceWifiPortal);  // timeout 240 seconds
   bootHeapPhase(PSTR("setup-services"));
 
-#if defined(_VERSION_PRERELEASE)
   if (state.net.bAPFallback) {
-    SetupDebugf(PSTR("BETA: running in AP fallback mode, SSID=[%s]\r\n"), state.net.sAPSSID);
+    SetupDebugf(PSTR("WiFi: running in AP fallback mode, SSID=[%s]\r\n"), state.net.sAPSSID);
   }
-#endif
 
   // ===== Hardware-mode resolution (ADR-127) =====
   // Runs AFTER WiFi configuration (TASK-853): the captive portal on a fresh
@@ -538,10 +536,8 @@ void setup() {
   SetupDebugf(PSTR("Hardware mode: %S\r\n"), (PGM_P)hardwareModeName());
 
   //setup NTP after WiFi; startNTP() restores hostname after configTime()
-#if defined(_VERSION_PRERELEASE)
   if (!state.net.bAPFallback)
-#endif
-  startNTP();
+    startNTP();
   blinkLED(LED1, 3, 100);
   setLed(LED1, OFF);
 
@@ -565,10 +561,8 @@ void setup() {
   setupFSexplorer();
   startWebserver();
   startWebSocket();          // start the WebSocket server for OT log streaming
-#if defined(_VERSION_PRERELEASE)
   if (!state.net.bAPFallback)
-#endif
-  startMQTT();               // start the MQTT after webserver, always.
+    startMQTT();               // start the MQTT after webserver, always.
   bootHeapPhase(PSTR("setup-late"));
 
 #if defined(HAS_ETH_CAPABLE) && HAS_ETH_CAPABLE

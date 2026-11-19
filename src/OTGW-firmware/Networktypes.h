@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : Networktypes.h
-**  Version  : v2.0.0-beta.400
+**  Version  : v2.0.0-beta.401
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -13,7 +13,7 @@
 **    - NetworkSection (state.net — active network transport state)
 **    - EthernetSection (settings.eth — persisted static-IP configuration)
 **
-**  Requires HAS_ETH_CAPABLE / _VERSION_PRERELEASE from boards.h; include
+**  Requires HAS_ETH_CAPABLE from boards.h; include
 **  AFTER boards.h.
 **
 **  TERMS OF USE: GNU GPLv3. See OTGW-firmware.h for the full notice.
@@ -28,9 +28,7 @@
 enum OTGWNetworkMode : uint8_t {
   NET_WIFI        = 0,   // Using WiFi (default)
   NET_ETHERNET    = 1,   // Using wired Ethernet (W5500)
-#if defined(_VERSION_PRERELEASE)
-  NET_AP_FALLBACK = 2,   // BETA ONLY — SoftAP when WiFi unavailable
-#endif
+  NET_AP_FALLBACK = 2,   // SoftAP when the saved WiFi is unavailable (TASK-2931: also in stable builds)
 };
 
 // NetworkSection is always present; Ethernet fields only on capable hardware.
@@ -39,13 +37,9 @@ struct NetworkSection {        // state.net — active network transport state
   OTGWNetworkMode eMode        = NET_WIFI;
   bool bEthernetLink           = false;   // physical link up on W5500
 #endif
-#if defined(_VERSION_PRERELEASE)
-  // *** BETA ONLY — AP fallback flag ***
-  // Guarded by _VERSION_PRERELEASE. If this define is absent (production release),
-  // this field does not exist and AP fallback cannot activate under any circumstance.
+  // AP fallback (TASK-2931: in prerelease and stable builds alike).
   bool bAPFallback             = false;   // true while SoftAP fallback is active
   char sAPSSID[32]             = "";      // SSID of the active fallback AP
-#endif
 };
 
 #if defined(HAS_ETH_CAPABLE) && HAS_ETH_CAPABLE
@@ -79,7 +73,7 @@ struct WifiSection {
 enum WifiSelfCause : uint8_t {   // who caused the last drop
   WIFI_SELF_NONE      = 0,       // the network (a field outage)
   WIFI_SELF_ETHERNET  = 1,       // switchToEthernet(): disconnect + WIFI_OFF
-  WIFI_SELF_AP_RETRY  = 2,       // BETA AP fallback: reconnect attempt timed out
+  WIFI_SELF_AP_RETRY  = 2,       // AP fallback: reconnect attempt timed out
   WIFI_SELF_DEAD_LINK = 3,       // dead-link check: forced reconnect (TASK-1450)
 };
 

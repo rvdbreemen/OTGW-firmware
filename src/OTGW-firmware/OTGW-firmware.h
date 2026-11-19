@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v2.0.0-beta.400
+**  Version  : v2.0.0-beta.401
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -745,9 +745,7 @@ inline bool isNetworkUp() {
 #if defined(HAS_ETH_CAPABLE) && HAS_ETH_CAPABLE
   if (state.net.eMode == NET_ETHERNET) return true;  // Ethernet: link was verified by loopEthernet()
 #endif
-#if defined(_VERSION_PRERELEASE)
-  if (state.net.bAPFallback) return true;  // BETA: SoftAP counts as network-up for web/telnet
-#endif
+  if (state.net.bAPFallback) return true;  // SoftAP counts as network-up for web/telnet
   return (WiFi.status() == WL_CONNECTED);
 }
 

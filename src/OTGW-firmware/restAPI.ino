@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-beta.400
+**  Version  : v2.0.0-beta.401
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -3329,15 +3329,13 @@ void sendDeviceInfoV2()
     je.field(F("eth_current_gateway"), snap->ethGateway);
     je.field(F("eth_current_dns"),     snap->ethDns);
 #endif
-#if defined(_VERSION_PRERELEASE)
-    if (snap->st.net.bAPFallback) {
+    if (snap->st.net.bAPFallback) {   // TASK-2931: AP fallback in prerelease and stable builds
       je.field(F("ssid"), snap->st.net.sAPSSID);
       je.field(F("wifirssi"), 0);
       je.field(F("wifiquality"), 0);
       je.field(F("wifiquality_text"), F("AP Mode"));
       je.field(F("apfallback"), true);
     } else
-#endif
 #if defined(HAS_ETH_CAPABLE) && HAS_ETH_CAPABLE
     if (snap->st.net.eMode == NET_ETHERNET) {
       je.field(F("ssid"), F("Wired"));
@@ -4078,12 +4076,10 @@ void sendDeviceTimeV2()
     je.field(F("internal_maxblk"),(int32_t)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL));
     je.field(F("networkmode"),    networkModeName());
     je.field(F("ipaddress"),      getActiveIP());  // TASK-759: live active-transport IP for the header indicator
-#if defined(_VERSION_PRERELEASE)
-    if (state.net.bAPFallback) {
+    if (state.net.bAPFallback) {   // TASK-2931: AP fallback in prerelease and stable builds
       je.field(F("apfallback"),  true);
       je.field(F("wifiquality"), (int32_t)0);
     } else
-#endif
 #if defined(HAS_ETH_CAPABLE) && HAS_ETH_CAPABLE
     if (state.net.eMode == NET_ETHERNET) {
       je.field(F("wifiquality"), (int32_t)100);

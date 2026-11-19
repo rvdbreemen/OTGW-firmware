@@ -33,8 +33,11 @@ def connecting_case():
 
 
 def helper():
-    m = re.search(r"static bool wifiApFallbackHeapOk\(.*?\n\}\n", SRC, re.S)
-    return m.group(0) if m else ""
+    out = ""
+    for sig in (r"static bool wifiApFallbackHeapOk\(", r"static uint8_t wifiNextStateAfterFailedAttempt\("):
+        m = re.search(sig + r".*?\n\}\n", SRC, re.S)
+        out += m.group(0) if m else ""
+    return out
 
 
 def define(name):
@@ -46,7 +49,7 @@ PRE = r"""
 #include <cstdio>
 #include <cstdint>
 #include <cstring>
-#define _VERSION_PRERELEASE beta.0
+__PRERELEASE__
 #define F(s) (s)
 #define PSTR(s) (s)
 #define DebugTln(s) printf("%s\n", s)
@@ -88,14 +91,16 @@ int main(int argc, char** argv) {
 """
 
 
-class ApFallbackStarvedHeap(unittest.TestCase):
+class _ApFallbackStarvedHeap:
     exe = None
+    PRERELEASE = ""
 
     @classmethod
     def setUpClass(cls):
         cls.tmp = tempfile.TemporaryDirectory()
         cpp = Path(cls.tmp.name) / "a.cpp"
-        code = (PRE.replace("__MAXBLK__", define("WIFI_STARVED_MAXBLOCK") or "4096") + "#include <cstdlib>\n"
+        code = (PRE.replace("__MAXBLK__", define("WIFI_STARVED_MAXBLOCK") or "4096").replace("__PRERELEASE__", cls.PRERELEASE)
+                + "#include <cstdlib>\n"
                 + helper() + MAIN.replace("__CASE__", connecting_case()))
         cpp.write_text(code, encoding="utf-8")
         cls.exe = compile_cpp(cpp, Path(cls.tmp.name) / ("a.exe" if os.name == "nt" else "a"))
@@ -116,7 +121,7 @@ class ApFallbackStarvedHeap(unittest.TestCase):
     def test_a_starved_heap_skips_the_ap_and_restarts_as_release(self):
         rows, out = self.run_c(6000, 1800, 0)
         self.assertEqual(rows[-1]["ap"], "0", "softAP started on a starved heap: " + out)
-        self.assertIn("BETA: AP fallback skipped, heap starved (free 6000 B, largest block 1800 B)", out)
+        self.assertIn("AP fallback skipped, heap starved (free 6000 B, largest block 1800 B)", out)
         self.assertEqual(rows[-1]["state"], "4", "no WIFI_FAILED (clean restart) after 10 attempts: " + out)
         self.assertEqual(rows[-1]["n"], "10", out)
 
@@ -137,6 +142,15 @@ class ApFallbackStarvedHeap(unittest.TestCase):
         self.assertEqual(rows[-1]["state"], "1", "bNoPortal restarted or left WIFI_DISCONNECTED: " + out)
         self.assertEqual(rows[-1]["ap"], "0", out)
         self.assertNotIn("AP fallback skipped", out)
+
+
+class ApFallbackPrerelease(_ApFallbackStarvedHeap, unittest.TestCase):
+    PRERELEASE = "#define _VERSION_PRERELEASE beta.0"
+
+
+class ApFallbackStable(_ApFallbackStarvedHeap, unittest.TestCase):
+    """TASK-2931 (Robert, DM 1573067183825621095): the AP fallback goes into stable; red on d6544e15e here."""
+    PRERELEASE = "// stable build: no _VERSION_PRERELEASE"
 
 
 if __name__ == "__main__":

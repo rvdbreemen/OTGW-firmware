@@ -208,6 +208,9 @@ int main(int argc, char **argv) {
     runFor(5 * 60); ev("link_dead"); g_traffic = false; runFor(75 * 60);
   } else if (!strcmp(sc, "dead_no_dhcp")) {// release vs prerelease: the forced reconnect cannot get an IP back
     runFor(5 * 60); ev("link_dead"); g_traffic = false; g_dhcpWorks = false; runFor(30 * 60);
+  } else if (!strcmp(sc, "dead_no_dhcp_lowfree")) {   // TASK-2931: same, with free heap under HEAP_LOW_THRESHOLD, so the
+    // TASK-2923 guard skips the AP fallback and the failed attempts end in WIFI_FAILED (both builds since TASK-2931)
+    runFor(5 * 60); ev("link_dead"); g_traffic = false; g_dhcpWorks = false; g_freeHeap = 6000; runFor(30 * 60);
   } else if (!strcmp(sc, "dead_from_boot")) {
     g_traffic = false; runFor(30 * 60);
   } else if (!strcmp(sc, "never_icmp")) {  // AC4: a router that never answers ping, link otherwise dead too
@@ -442,16 +445,29 @@ class WifiDeadLinkStateMachine(unittest.TestCase):
         self.assertEqual(len(self.logs(r, "restart count cleared")), 1)
         self.assertEqual(len(self.logs(r, "2 dead-link restart(s)")), 1)
 
-    def test_failed_forced_reconnect_counts_toward_cap_release_build(self):
+    # TASK-2931: the stable build has the AP fallback too, so a failed forced reconnect only reaches WIFI_FAILED (and the
+    # dead-link restart cap) when the AP is skipped: on a low heap (TASK-2923). Both builds behave the same.
+    def test_failed_forced_reconnect_counts_toward_cap_when_the_ap_is_skipped(self):
+        for build in ("pre", "rel"):
+            with self.subTest(build=build):
+                r, _ = self.run_sc("dead_no_dhcp_lowfree", build=build, quiet=True)
+                self.assertEqual(r["SUM"]["forced"], 1)
+                self.assertEqual(r["SUM"]["ap"], 0)
+                self.assertEqual(r["RESTART"][1], "WiFi: too many reconnect failures")
+                self.assertEqual(r["RTC"], (MAGIC, 1))
+
+    def test_failed_forced_reconnect_at_cap_retries_when_the_ap_is_skipped(self):
+        for build in ("pre", "rel"):
+            with self.subTest(build=build):
+                r, _ = self.run_sc("dead_no_dhcp_lowfree", build=build, magic=MAGIC, count=3, soft=1)
+                self.assertIsNone(r["RESTART"])
+                self.assertGreaterEqual(len(self.logs(r, "dead-link restart cap reached, retrying")), 1)
+
+    def test_failed_forced_reconnect_release_build_goes_to_ap_fallback_too(self):
         r, _ = self.run_sc("dead_no_dhcp", build="rel", quiet=True)
         self.assertEqual(r["SUM"]["forced"], 1)
-        self.assertEqual(r["RESTART"][1], "WiFi: too many reconnect failures")
-        self.assertEqual(r["RTC"], (MAGIC, 1))
-
-    def test_failed_forced_reconnect_at_cap_retries_release_build(self):
-        r, _ = self.run_sc("dead_no_dhcp", build="rel", magic=MAGIC, count=3, soft=1)
+        self.assertEqual(r["SUM"]["ap"], 1)
         self.assertIsNone(r["RESTART"])
-        self.assertGreaterEqual(len(self.logs(r, "dead-link restart cap reached, retrying")), 1)
 
     def test_failed_forced_reconnect_prerelease_goes_to_ap_fallback(self):
         r, _ = self.run_sc("dead_no_dhcp", build="pre", quiet=True)
