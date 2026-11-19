@@ -276,7 +276,7 @@ De standaard hostname op 2.0.0 is `OTGW2`, dus het AP heet doorgaans iets als `O
 
 **mDNS-opmerking:** De hostnaam `otgw2.local` werkt op de meeste thuisnetwerken. Op sommige Windows-systemen werkt mDNS alleen als de Bonjour-service actief is. Gebruik bij twijfel het IP-adres van uw router.
 
-> **AP-fallbackmodus (beta)**: Als het geconfigureerde Wi-Fi-netwerk na de initialisatie onbereikbaar wordt, opent het apparaat een fallback-AP genaamd `OTGW-<MAC>` met wachtwoord `otgw1234` en IP `192.168.4.1`, zodat de webinterface bereikbaar blijft.
+> **AP-fallbackmodus (alleen in betabuilds; een stabiele release heeft hem niet)**: Als het geconfigureerde Wi-Fi-netwerk na de initialisatie onbereikbaar wordt, opent het apparaat een fallback-AP genaamd `OTGW-<MAC>` met wachtwoord `otgw1234` en IP `192.168.4.1`, zodat de webinterface bereikbaar blijft.
 
 ---
 

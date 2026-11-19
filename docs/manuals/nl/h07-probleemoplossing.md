@@ -220,7 +220,7 @@ Oplossingen:
 
 Wanneer een statisch IP is ingesteld dat ook door DHCP wordt uitgedeeld, kan een ander apparaat hetzelfde adres krijgen. Schakel over op DHCP of reserveer het adres in uw router.
 
-**AP-fallback activeert onterecht**
+**AP-fallback activeert onterecht (alleen betabuilds)**
 
 Wanneer het WiFi-signaal langdurig wegvalt, probeert de firmware maximaal 10 keer opnieuw te verbinden. Na 10 mislukte pogingen herstart het apparaat zichzelf. Dit is bedoeld als fail-safe, niet als normale werking. Controleer de WiFi-stabilteit als u regelmatige herstarts ziet.
 
@@ -364,7 +364,7 @@ Een OTGW Classic met een LOLIN S3 Mini of S3 Mini Pro toont de WiFi-status ook m
 | Kleur pixel | Betekenis |
 |---|---|
 | Rood | WiFi niet verbonden. |
-| Paars | Er staat een accesspoint open: het WiFi-configuratieportaal, of de AP-fallback als het opgeslagen netwerk bij het opstarten onbereikbaar is. Maak daarmee verbinding om WiFi in te stellen. |
+| Paars | Er staat een accesspoint open: het WiFi-configuratieportaal, of, alleen in betabuilds, de AP-fallback als het opgeslagen netwerk bij het opstarten onbereikbaar is. Maak daarmee verbinding om WiFi in te stellen. |
 | Groen | WiFi verbonden. |
 
 `/api/v2/device/info` meldt de aangestuurde pixel-GPIO als `status_pixel_gpio` (`0` als er geen is).
@@ -616,7 +616,7 @@ Het apparaat heeft de WiFi-verbinding verloren en probeert opnieuw te verbinden.
 Entered config mode SSID: OTGW2-XX:XX:XX:XX:XX:XX
 ```
 
-De AP-fallbackmodus is actief. Verbind met dit SSID om de WiFi-instellingen opnieuw te configureren.
+Het WiFi-configuratieportaal is actief (de melding komt uit `networkStuff.ino:262-265`). Verbind met dit SSID om de WiFi-instellingen opnieuw te configureren.
 
 #### MQTT-problemen
 

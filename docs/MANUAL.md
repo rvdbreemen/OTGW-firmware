@@ -53,7 +53,7 @@ The firmware also has an OT-Direct mode, used only on hardware without a PIC. On
 - Triple-reset Wi-Fi credential recovery.
 - Optional HTTP Basic Auth for settings and maintenance endpoints.
 - Nightly scheduled restart: configurable automatic reboot (time and day selection) to recover heap fragmentation on long-running devices.
-- AP fallback mode (beta): the web UI stays reachable even when the home network is unavailable.
+- AP fallback mode, in beta builds only (a stable release does not have it): the web UI stays reachable even when the home network is unavailable.
 
 #### Hardware-Dependent Features
 
@@ -88,7 +88,7 @@ Releases of 2.0.0 are on the GitHub Releases page: betas are published as GitHub
 - **Platform abstraction (boards.h)**: A new `boards.h` header defines pin maps, feature flags (`HAS_PIC`, `HAS_DIRECT_OT`, `HAS_ETH_CAPABLE`, `HAS_OLED_CAPABLE`), and hardware capabilities per board variant. This cleanly separates platform-specific configuration from application logic.
 - **SimpleTelnet**: The telnet debug log now uses SimpleTelnet, a unified multi-client telnet library that replaces the separate TelnetStream and ESPTelnet libraries used in v1.x.
 - **Toolchain**: Time handling has moved to AceTime 4.x, which is core-version independent and brings a smaller, faster time library.
-- **Wi-Fi resilience**: AP fallback mode keeps the web UI reachable when the home network is unavailable. A Wi-Fi signal quality indicator appears in the web UI header. Triple-reset credential recovery wipes saved credentials without a reflash.
+- **Wi-Fi resilience**: in beta builds, AP fallback mode keeps the web UI reachable when the home network is unavailable (a stable release does not have it). A Wi-Fi signal quality indicator appears in the web UI header. Triple-reset credential recovery wipes saved credentials without a reflash.
 - **PlatformIO build**: One `esp32-combo` environment in `platformio.ini`, built through `build.bat` / `./build.sh`.
 
 ### Platform Comparison
@@ -413,7 +413,7 @@ The default hostname on 2.0.0 is `OTGW2`, so the AP will typically be named some
 
 5. Navigate to `http://otgw2.local/` in your browser to open the web interface. On Windows, the device also responds to `http://otgw2/` via LLMNR.
 
-> **AP Fallback Mode (beta)**: If the configured Wi-Fi network becomes unavailable after initial setup, the device opens a fallback AP named `OTGW-<MAC>` with password `otgw1234` and IP `192.168.4.1`, keeping the web UI accessible.
+> **AP Fallback Mode (beta builds only; a stable release does not have it)**: If the configured Wi-Fi network becomes unavailable after initial setup, the device opens a fallback AP named `OTGW-<MAC>` with password `otgw1234` and IP `192.168.4.1`, keeping the web UI accessible.
 
 ### Filesystem Upload (LittleFS)
 
@@ -2586,7 +2586,7 @@ Common MQTT return codes:
 |---|---|---|
 | Weak signal | Check RSSI in web UI header. Below -75 dBm is marginal. | Move router or add an AP closer. |
 | IP address conflict | Another device has the same IP. | Use a DHCP reservation on the router. |
-| AP fallback loop | Check Telnet log for `entering AP fallback mode`. | Fix SSID/password or triple-reset. |
+| AP fallback loop (beta builds only) | Check Telnet log for `BETA: WiFi retries exhausted, entering AP fallback mode`. | Fix SSID/password or triple-reset. |
 
 ---
 
@@ -2611,7 +2611,7 @@ Common MQTT return codes:
 1. Confirm the device is on the network: ping `<ip>` or try the IP directly.
 2. mDNS resolution failure: on Windows without Bonjour, try the IP address.
 3. Filesystem not mounted: install the release zip again on the `/update` page, or upload files via `/fsexplorer`.
-4. Device in AP fallback mode: connect to the fallback SSID (`OTGW-XXXXXX`) and browse to `http://192.168.4.1`.
+4. Device in AP fallback mode (beta builds only): connect to the fallback SSID (`OTGW-XXXXXX`) and browse to `http://192.168.4.1`.
 
 ---
 
@@ -2686,7 +2686,7 @@ An OTGW Classic with a LOLIN S3 Mini or S3 Mini Pro also uses the LOLIN's on-boa
 | Pixel colour | Meaning |
 |---|---|
 | Red | WiFi not connected. |
-| Purple | An access point is open: the WiFi config portal, or the AP fallback when the saved network is unreachable at boot. Connect to it to configure WiFi. |
+| Purple | An access point is open: the WiFi config portal, or, in beta builds only, the AP fallback when the saved network is unreachable at boot. Connect to it to configure WiFi. |
 | Green | WiFi connected. |
 
 `/api/v2/device/info` reports the driven pixel GPIO as `status_pixel_gpio` (`0` when none).

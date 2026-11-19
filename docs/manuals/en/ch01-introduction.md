@@ -45,7 +45,7 @@ The firmware also has an OT-Direct mode, used only on hardware without a PIC. On
 - Triple-reset Wi-Fi credential recovery.
 - Optional HTTP Basic Auth for settings and maintenance endpoints.
 - Nightly scheduled restart: configurable automatic reboot (time and day selection) to recover heap fragmentation on long-running devices.
-- AP fallback mode (beta): the web UI stays reachable even when the home network is unavailable.
+- AP fallback mode, in beta builds only (a stable release does not have it): the web UI stays reachable even when the home network is unavailable.
 
 #### Hardware-Dependent Features
 
@@ -80,7 +80,7 @@ Releases of 2.0.0 are on the GitHub Releases page: betas are published as GitHub
 - **Platform abstraction (boards.h)**: A new `boards.h` header defines pin maps, feature flags (`HAS_PIC`, `HAS_DIRECT_OT`, `HAS_ETH_CAPABLE`, `HAS_OLED_CAPABLE`), and hardware capabilities per board variant. This cleanly separates platform-specific configuration from application logic.
 - **SimpleTelnet**: The telnet debug log now uses SimpleTelnet, a unified multi-client telnet library that replaces the separate TelnetStream and ESPTelnet libraries used in v1.x.
 - **Toolchain**: Time handling has moved to AceTime 4.x, which is core-version independent and brings a smaller, faster time library.
-- **Wi-Fi resilience**: AP fallback mode keeps the web UI reachable when the home network is unavailable. A Wi-Fi signal quality indicator appears in the web UI header. Triple-reset credential recovery wipes saved credentials without a reflash.
+- **Wi-Fi resilience**: in beta builds, AP fallback mode keeps the web UI reachable when the home network is unavailable (a stable release does not have it). A Wi-Fi signal quality indicator appears in the web UI header. Triple-reset credential recovery wipes saved credentials without a reflash.
 - **PlatformIO build**: One `esp32-combo` environment in `platformio.ini`, built through `build.bat` / `./build.sh`.
 
 ### Platform Comparison
