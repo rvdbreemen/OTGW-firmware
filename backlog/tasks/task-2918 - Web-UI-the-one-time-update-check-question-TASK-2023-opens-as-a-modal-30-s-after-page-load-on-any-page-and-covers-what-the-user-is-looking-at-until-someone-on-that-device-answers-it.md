@@ -4,11 +4,11 @@ title: >-
   Web UI: the one-time update-check question (TASK-2023) opens as a modal 30 s
   after page load on any page and covers what the user is looking at, until
   someone on that device answers it
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-19T14:13:00Z'
-updated_date: '2026-11-19T16:25:00Z'
+updated_date: '2026-11-19T16:58:00Z'
 labels:
   - ui
   - webui
@@ -41,4 +41,12 @@ Implemented option B (data/v2.js updAsk): the question is a header chip 'Check f
 Separate finding (for the next beta's release notes, coordinator 2026-11-19): since TASK-2023 (beta.387) the 'New version available' notice was never visible on a phone or any window <= 480 px wide: it sat inside the .hdr-net identity group, which v2.css hides at that width (@media(max-width:480px){.hdr-net{display:none}}). Fixed in the same commit by placing the notice (and the new chip) right after that group. Plan (coordinator): not in the 20:00 beta of 2026-11-19; for the 08:00 beta: rebase after the 20:00 release, re-bump, build in the coordinator's slot, bench .63 by 09 (updatecheckasked=false, chip after 30 s, no modal, popover inside the viewport at 390 px, No writes both settings).
 
 2026-11-19 bench .63 on beta.393 (fb753d0, never pushed), 09: points 1,2,3,5,6 PASS, point 4 FAIL: at 390x844 mobile emulation the open popover ran L=175 R=533, 143 px past the right edge. Cause (09's measurement, reproduced here): the overflowing popover widens the visual viewport (innerWidth 390 -> 533) and show() clamped against innerWidth. My earlier 390 px screenshot ran with mobile:false, where innerWidth stays 390, so it missed this. Fix: show() places the popover from the chip's left and the popover width against document.documentElement.clientWidth (8 px margin). New test tests/webui/update-ask-chip-phone.test.mjs (real v2.html/v2.js, mobile:true 390x844): red on fb753d0 with {l:175,r:533,iw:533,sw:533}, green on the fix. Rebased onto 5e's 4bb2097ed (393) as beta.394.
+
+Correction to the previous note: the 394 build on 5e's 4bb2097ed (5f5e3db, bench PASS) was not pushed; the coordinator chose to restack because 4bb2097 panicked on .61 under the heap hold. Landed as beta.393 ffe5dffeb directly on 3fb853b04, pushed 2026-11-19. Bench 09 on .63 (ffe5dff, OTA app+fs 17:51): 390x844 mobile popover L=24 R=382, innerWidth 390; desktop popover L=561 R=941 under the chip, no horizontal scroll; chip after ~30 s, no backdrop; No -> updatecheck false/asked true, reload no chip; Yes -> true/true; 0 JS exceptions; 5-min smoke bootcount flash+2, reboot_log only the OTA line, MQTT up, freeheap 34440. Zip posted to Discord (message 1573019487765143743).
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+The one-time update-check question (ADR-262) is a header chip after the identity group instead of a modal over the page; the explanation and No/Yes open in a popover on a click, which stays on screen on phones (clamped to documentElement.clientWidth). The New version available notice is visible again at <= 480 px. AC1: update-check-github.test.mjs new case red on the old v2.js (modal backdrop, no chip), green on the fix; update-ask-chip-phone.test.mjs red on fb753d0 {l:175,r:533,iw:533}, green on the fix. AC2: implemented in beta.393 ffe5dffeb; Yes/No write updatecheck then updatecheckasked; bench 09 on .63 PASS (popover 24..382 at 390 px, no backdrop, 0 JS errors). AC3: update-check-github 14/14, test_update_check_settings OK, evaluate --quick 0 FAIL.
+<!-- SECTION:FINAL_SUMMARY:END -->
