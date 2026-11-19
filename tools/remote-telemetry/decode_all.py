@@ -69,7 +69,13 @@ def decode_records(records, image, tz, out_dir, *, images_by_build=None):
             dbg = zlib.decompress(dbg) if dbg is not None else sec.get(otrec.SEC_DBG, b"")
             build_id = r.get("build_id")
             batch_image = images_by_build[build_id] if images_by_build is not None and build_id else image
-            text = otrec.dbg_decode(r["t0"], dbg, batch_image, tz)
+            try:
+                text = otrec.dbg_decode(r["t0"], dbg, batch_image, tz)
+            except (OSError, OverflowError, ValueError, IndexError) as e:
+                # TASK-2901: one record's debug section that does not decode must not stop the export of the rest
+                # (the OT frames, SAT ticks and events of every record are decoded independently of it).
+                text = f"\r\n### debug decode error in record seq {r.get('seq')}: {type(e).__name__}: {e}\r\n".encode()
+                counts["debug_errors"] = counts.get("debug_errors", 0) + 1
             for t, typ, fields in otrec.evt_decode(r["t0"], sec.get(otrec.SEC_EVT, b"")):
                 ts = datetime.datetime.fromtimestamp(t / 1000, tz)
                 fe.write(f"{ts.isoformat(timespec='milliseconds')}\t{otrec.EV_NAMES[typ]}\t"
@@ -168,7 +174,8 @@ def main():
             ap.error("supply --legacy-image for batches without a recorded build ID")
     c = decode_records(records, legacy, ZoneInfo(a.tz), a.out_dir, images_by_build=images_by_build)
     print(f"{c['records']} records, {c['frames']} OT frames, {c['ticks']} SAT ticks, {c['debug_bytes']} debug bytes, "
-          f"{c['gaps']} gaps -> {a.out_dir}")
+          f"{c['gaps']} gaps, {c.get('debug_errors', 0)} debug decode errors, "
+          f"lost {c.get('lost_items', 0)} items / {c.get('lost_records', 0)} records -> {a.out_dir}")
 
 
 if __name__ == "__main__":
