@@ -3,11 +3,11 @@ id: TASK-2909
 title: >-
   Web UI: from the 2.0.0 RC the UI no longer calls SAT experimental (opt-in, off
   by default and the wizard confirmation stay)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-19T09:00:00Z'
-updated_date: '2026-11-19T09:11:00Z'
+updated_date: '2026-11-19T12:30:00Z'
 labels:
   - webui
   - sat
@@ -25,9 +25,9 @@ Robert, DM 17:48-17:51 2026-11-18 (1572669805515903007, 1572669870414499931, 157
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 No web UI string (v2.js, v2.html, i18n nl/de/el) calls SAT itself experimental; the heat-pump 3 h type labels still do; a test fails on the old texts and passes on the new
-- [ ] #2 The wizard confirmation still asks the user to confirm that SAT controls the boiler, and the beta notice still shows on prerelease builds; key names unchanged
-- [ ] #3 Wording agreed with otgw-docs (TASK-2034) so UI and manual say the same; web UI tests green
+- [x] #1 No web UI string (v2.js, v2.html, i18n nl/de/el) calls SAT itself experimental; the heat-pump 3 h type labels still do; a test fails on the old texts and passes on the new
+- [x] #2 The wizard confirmation still asks the user to confirm that SAT controls the boiler, and the beta notice still shows on prerelease builds; key names unchanged
+- [x] #3 Wording agreed with otgw-docs (TASK-2034) so UI and manual say the same; web UI tests green
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -42,4 +42,12 @@ Wording agreed with otgw-docs (TASK-2034, ch05:12, h05:8, ch01:59/h01:68 'SAT is
 2026-11-19 implemented (lane/ba-2023, uncommitted until RC timing): wording agreed with otgw-docs (95). tests/test_sat_not_experimental.py 5/5 green, red 3/5 on the old texts (the 2 guard checks, boiler named and heat-pump type still experimental, green on both). tests/webui/sat-beta-notice.test.mjs updated (TASK-1507 asserted 'experimental'; now 'beta firmware' and not 'experimental'): 1/1 green, red on the origin v2.js. Static web UI: sat-wizard-tuning-text 1/1, i18n-lang 6/6, i18n-followups 4/4, i18n-no-hardcoded 3/3, v2-undefined-names 2/2. evaluate --quick 88/0.
 
 2026-11-19 coordinator decided B: the beta notice points to #beta-testing (shows on every prerelease build, public betas included; matches the stable docs, Robert's decision A of 2026-11-18). sat_beta_body en/nl/de/el + SAT_BETA_BODY; sat-beta-notice.test.mjs and test_sat_not_experimental.py assert it.
+
+beta.390 2f1b9f48a (on d3 389 931d1cdef): tests 5/5 + sat-beta-notice ALL PASS + i18n-followups 4/4, evaluate 88/0, build EXIT=0. 09 bench .63: UI points 1-4 PASS (notice en/nl with #beta-testing, 0x experiment* on SAT page, wizard en/nl new ack, Cancel closes, heat-pump type keeps (experimental), 0 JS exceptions, 0 writes); 16 min regression running. Push waits for d3 389 push + coordinator go.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Pushed as beta.390 (2f1b9f48a, FF on d3's 389 931d1cdef; zip posted, Discord message 1572951893548728445). AC1: tests/test_sat_not_experimental.py red 3/5 on the old texts, 5/5 on the fix (heat-pump type still experimental in en/nl/de/el); 09 bench .63: 0x experiment* on the SAT page, heat-pump type option keeps (experimental)/(experimenteel). AC2: key names unchanged; 09 bench en/nl: beta notice shows on 390, wizard ack names the boiler, Cancel writes nothing, 0 JS exceptions; sat-beta-notice.test.mjs ALL PASS. AC3: wording agreed with otgw-docs (TASK-2034 on origin 01d69164e, #beta-testing on both sides); i18n-followups 4/4, handback/update-check/progmem OK, evaluate --quick 88/0, build EXIT=0.
+<!-- SECTION:FINAL_SUMMARY:END -->
