@@ -8359,3 +8359,20 @@ Robert, 16:18:42 UTC (https://discord.com/channels/812969634638725140/9144987300
 **Task:** TASK-1932 (no change).
 
 **Open:** none. With this answer every question of the urgent round of 2026-11-18 is answered (entries 410-422).
+
+## 423. Q-1889a answered A: the faster self-tune decides every counted hour on a rolling window of the last 12 counted hours, step 0.05, the window empties after a step (Sergeant D, 2026-11-19; urgent round, 2.0.0)
+
+**Source:** #dev-sat-mqtt, Sergeant D 2026-11-19 04:07:49 UTC (https://discord.com/channels/812969634638725140/1105556725714649128/1572825703299293265; unedited after more than 15 minutes, read back via the Discord API), a reply to Q-1889a (https://discord.com/channels/812969634638725140/1105556725714649128/1572737784555249768; text by ba).
+
+**Quoted:**
+> "my answer is A"
+
+**Settled:** option A as posted: the faster self-tune of entries 329 and 367 decides at every counted hour on a rolling window of the last 12 counted hours and changes the heating curve coefficient by 0.05 per step; after a step the window empties, so at least 12 counted hours lie between two steps, and a change of 0.1 takes at least 24 counted hours. The two-phase agreement, the +/-1.0 C band and the exclusions stay. Scope: 2.0.0.
+
+**Compared with thermo-nova (7beaaf5):** no counterpart; thermo-nova has no tuner (entry 72).
+
+**Compared with the firmware:** beta.379 (TASK-1889, ADR-260 Proposed) already implements option A, taken by directive until this answer (SATcurveTune.h: SAT_CT_HOURS_PER_DAY 1, SAT_CT_MIN_CLEAN_HOURS 1, SAT_CT_WINDOW_DAYS 12, SAT_CT_STEP 0.05); no change needed.
+
+**Task:** TASK-1889 (confirms the build; ADR-260 can cite this entry).
+
+**Open:** Q-1889b (decisions on the warm-up phase alone in the 12-hour window, entry 305) is asked next.

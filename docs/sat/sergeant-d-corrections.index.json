@@ -5589,6 +5589,19 @@
     "TASK-1932"
    ],
    "confirmed_by_entry": null
+  },
+  {
+   "id": 423,
+   "title": "Q-1889a answered A: the faster self-tune decides every counted hour on a rolling window of the last 12 counted hours, step 0.05, the window empties after a step (Sergeant D, 2026-11-19; urgent round, 2.0.0)",
+   "date": "2026-11-19",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1572825703299293265",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1889"
+   ],
+   "confirmed_by_entry": null
   }
  ]
 }
