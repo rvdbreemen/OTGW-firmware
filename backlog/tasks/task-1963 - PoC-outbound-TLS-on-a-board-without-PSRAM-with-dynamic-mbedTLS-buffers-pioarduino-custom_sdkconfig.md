@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-15T09:35:00Z'
-updated_date: '2026-11-18T23:11:00Z'
+updated_date: '2026-11-19T00:59:00Z'
 labels:
   - research
   - tls
@@ -97,4 +97,8 @@ Restore 21:31: 2.0.0-beta.356+4601510 app+fs back on .61, settings.ini byte-iden
 2026-11-19 Robert decision (session, verbatim): 'Nope. Geen PSRAM = Geen TLS mogelijk.' Rule: no TLS on boards without PSRAM, full stop (not a recommendation to weigh). The .61 run is stopped on this decision; .61 is restored to the release build. Measured basis for the record (09, poc.10+1929bd7 on .61): connect failed, free heap 16,184 / block 7,156 before, 1,764 / 1,140 during the ~10 s handshake attempt with HEAP-CRITICAL and 701 MQTT drops, no reboot. Server side measured by 5e: TLS 1.3, ECDSA P-256, chain of 3 certificates ~2.5 KB DER (the certificates are not the large cost). The no-PSRAM path (AC2/AC3) ends here as not feasible; the PoC continues only on the PSRAM Classic (.63, AC5). Aligns with ADR-218 (Proposed: TLS client only on PSRAM boards, detected at runtime).
 
 2026-11-19 .61 final (09, poc.10+1929bd7 app-only, BLE off, SAT off): attempt 1 23:51:47 connect failed (heap 16184, block 7156); during it 3464/2804 then 1764/1140, HEAP-CRITICAL, MQTT dropped 701; boot minWin 532, hd_min_free_heap 608 then 532; no reboot. Attempt 2 (~00:01:47) not observed: telnet down several times 23:49-00:04, device/info HTTP 503 from 23:54, 12x 503 in a row 00:06-00:08:46 (unit overloaded on poc.10). COM4 serial gave no esp-tls/mbedtls code. Restore: cloudrec.cfg deleted (404), /ReBoot 00:09:05, OTA app-only 2.0.0-beta.375+ff73985 at 00:09:21, bootcount 1049, restore_settings 'remaining diff: none, keys 165', settings.ini diff empty, FS untouched. Evidence: 09 scratchpad poc10/ (cap/telnet.raw, info.jsonl, before/, after/). AC2/AC3 not met: no-PSRAM TLS not feasible, closed by Robert's rule (no PSRAM = no TLS).
+
+2026-11-19 .63 PoC (otgw-bench-tester): poc.10+1929bd7 app-only, BLE off, PSRAM 2 MB. Heap before: free 36732 / maxblk 26612 / psram_free 1981156. 01:42:39 /ReBoot to start cloudrec; 01:43:07 Exception/panic (4) in task cloudrec (reboot_log, elf=6be594dc). Backtrace (archive ELF, addr2line): CloudRecDevice.h:121 fill() esp_tls_conn_read -> esp_tls_mbedtls.c:332 -> esp_ssl_tls.c:400 -> esp_mbedtls_dynamic_impl.c:488/50 -> platform.c:54 -> esp_mem.c:38 heap_caps_free -> multi_heap_poisoning.c:279 assert. So the crash is a heap-poisoning assert on freeing a dynamic mbedTLS rx buffer during a read; memory was not short (after panic heap 53796, psram 2046592). No crash loop (bootcount 223 held 14 min), but no cloudrec telnet lines either, so no HTTP 200 evidence. Core dump 32516 B kept outside the repo (bench scratchpad poc63/otgw-coredump-app-6be594dc0.bin). Restored: cloudrec.cfg removed, OTA 381+b06eeff, settings diff none (keys 152), settings.ini diff 0, SAT state files byte-identical, bootcount 224. AC #5 not met: PoC did not produce numbers on .63.
+
+Hypothesis (not verified): CONFIG_MBEDTLS_DYNAMIC_BUFFER rx-release path, enabled only to fit TLS on boards without PSRAM. Under Robert's rule (no PSRAM = no TLS) it is not needed. Proposed next PoC build (needs Robert's go + build slot): tlsdyn without DYNAMIC_BUFFER, mbedTLS buffers in PSRAM (ADR-218 route), then rerun on .63. Still to check: whether the pinned IDF supports DYNAMIC_BUFFER with TLS 1.3.
 <!-- SECTION:NOTES:END -->
