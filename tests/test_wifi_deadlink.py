@@ -486,13 +486,12 @@ class WifiDeadLinkStateMachine(unittest.TestCase):
                 self.assertIsNotNone(r["RESTART"], "no restart on a starved, dead unit")
                 self.assertEqual(len(self.logs(r, "heap starved (largest block 2048 B): counted as dead")), 1)
 
-    @unittest.expectedFailure
     def test_starved_link_with_ap_drops_every_4_min_still_recovers(self):
         # TASK-2026 run 3 (.63, 381+b06eeff, 2026-11-19): heap starved for 30 min, REST and telnet dead, 14 probes
         # counted dead, yet no decision point (witness 0, reconnect 0): the AP dropped the association every ~4 min
-        # (wifi_outages 7, NOT_AUTHED) and every re-association resets the dead streak (wifiLinkProbeOnReconnect()),
-        # so 8 in a row never happens. RED on purpose (expectedFailure) until the follow-up Robert chooses (A/B/C,
-        # coordinator DM 2026-11-19); a fix that makes it pass turns this into an unexpected success.
+        # (wifi_outages 7, NOT_AUTHED) and every re-association reset the dead streak (wifiLinkProbeOnReconnect()),
+        # so 8 in a row never happened. Option C: while the heap is starved the streak continues across a
+        # re-association. Red on the code before it (b0febe073 ran this as expectedFailure).
         r, _ = self.run_sc("starved_flap")
         self.assertGreaterEqual(r["SUM"]["forced"] + (1 if r["RESTART"] else 0), 1,
                                 "a starved, unreachable unit whose AP keeps re-associating is never recovered")
