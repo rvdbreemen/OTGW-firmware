@@ -1,4 +1,4 @@
-"""Cloud export decodes retained debug tokens with the exact firmware image."""
+"""Remote telemetry export decodes retained debug tokens with the exact firmware image."""
 import base64
 from contextlib import redirect_stderr, redirect_stdout
 from io import StringIO
@@ -9,13 +9,13 @@ from tempfile import TemporaryDirectory
 import unittest
 from unittest.mock import patch
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools" / "cloud-recorder"))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools" / "remote-telemetry"))
 import decode_all
 import esp_image
 import otrec
 
 
-class CloudRecBuildIdTest(unittest.TestCase):
+class RemoteTelemetryBuildIdTest(unittest.TestCase):
     def test_export_selects_image_per_batch(self):
         with TemporaryDirectory() as tmp:
             root = Path(tmp)

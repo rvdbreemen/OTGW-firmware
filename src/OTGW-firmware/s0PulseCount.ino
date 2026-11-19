@@ -1,7 +1,7 @@
 /* 
  ***************************************************************************  
  **  Program  : s0PulseCount
- **  Version  : v2.0.0-poc.15
+ **  Version  : v2.0.0-poc.16
  **
  **  Copyright (c) 2021-2024 Rob Roos / Robert van Breemen
  **     based on Framework ESP8266 from Willem Aandewiel
@@ -71,8 +71,8 @@
      if (state.debug.bSensors) DebugTf(PSTR("*** S0PulseCount(%d) S0PulseCountTot(%d)\r\n"), OTGWs0pulseCount, OTGWs0pulseCountTot) ;
      if (state.debug.bSensors) DebugTf(PSTR("*** S0LastPulsetime(%d) S0Pulsekw:(%4.3f) \r\n"), last_pulse_duration, OTGWs0powerkw) ;
      OTGWs0lasttime = now ;
-#if HAS_CLOUD_REC
-     cloudRecEvS0(localPulseCount, OTGWs0pulseCountTot, localPulseDuration);   // TASK-1473
+#if HAS_REMOTE_TELEMETRY
+     remoteTelemetryEvS0(localPulseCount, OTGWs0pulseCountTot, localPulseDuration);   // TASK-1473
 #endif
      if (settings.mqtt.bEnable ) {
        s0sendMQ() ; 

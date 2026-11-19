@@ -323,7 +323,7 @@ class Wiring(unittest.TestCase):
         self.assertRegex(fx, r"LittleFS\.remove\(deletePath\)\) \{\s*dallasLabelsFileChanged\(deletePath\);")
         self.assertRegex(fx, r'LittleFS\.remove\(argCompat\("\s*"\)\);\s*dallasLabelsFileChanged\(argCompat\("\s*"\)\);')
         self.assertRegex(fx, r"dallasLabelsFileChanged\(request->_tempFile\.path\(\)\);\s*(?:\w+FileChanged\(request->_tempFile\.path\(\)\);\s*)*"
-                         r"(?:#if HAS_CLOUD_REC\s*cloudRecEvFw\([^;]*;[^\n]*\s*#endif\s*)?request->_tempFile\.close\(\);")
+                         r"(?:#if HAS_REMOTE_TELEMETRY\s*remoteTelemetryEvFw\([^;]*;[^\n]*\s*#endif\s*)?request->_tempFile\.close\(\);")
 
     def test_loop_flushes_restart_flushes_boot_loads_before_the_web_server(self):
         self.assertIn("loopDallasLabels();", function_body(self.helper, "loopLittleFSStatus"))

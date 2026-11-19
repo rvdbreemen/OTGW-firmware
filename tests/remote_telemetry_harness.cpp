@@ -1,6 +1,6 @@
-// Host harness for src/OTGW-firmware/CloudRecCodec.h (TASK-2901). Compiled by tests/test_cloudrec_codec.py.
+// Host harness for src/OTGW-firmware/RemoteTelemetryCodec.h (TASK-2901). Compiled by tests/test_remote_telemetry_codec.py.
 //
-// Reads events from stdin, one per line, feeds them to the real crec::Recorder (closing a record and opening a
+// Reads events from stdin, one per line, feeds them to the real rtel::Recorder (closing a record and opening a
 // new one when an append does not fit, as the firmware does) and prints every closed record as
 // "REC <t0_ms> <hex payload>". Events:
 //   B <t0_ms>                                          open the first record
@@ -19,9 +19,9 @@
 #include <cstring>
 #include <string>
 #include <vector>
-#include "../src/OTGW-firmware/CloudRecCodec.h"
+#include "../src/OTGW-firmware/RemoteTelemetryCodec.h"
 
-using namespace crec;
+using namespace rtel;
 
 static std::string unhex(const char *h) {
   std::string s;

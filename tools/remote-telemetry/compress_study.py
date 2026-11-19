@@ -33,7 +33,7 @@ import esp_image, otrec, proof_all_streams as pas  # noqa: E402
 
 
 class Rc:
-    """LZMA-style binary range encoder: 12-bit probabilities, shift 4 (as crec::RcEnc)."""
+    """LZMA-style binary range encoder: 12-bit probabilities, shift 4 (as rtel::RcEnc)."""
 
     def __init__(self):
         self.low, self.rng, self.cache, self.csize, self.out = 0, 0xFFFFFFFF, 0, 1, bytearray()

@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-poc.15
+**  Version  : v2.0.0-poc.16
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -12,7 +12,7 @@
 
 #include <string.h>
 #include <ctype.h>
-#if HAS_CLOUD_REC
+#if HAS_REMOTE_TELEMETRY
 #include <atomic>
 #endif
 
@@ -2745,8 +2745,8 @@ static void diagCaptureRest(uint8_t routeIdx, const char words[][API_WORD_LEN], 
   const bool skipBody = bleProvisioning || strcasecmp_P(segment, PSTR("settings")) == 0 ||
                         diagNameIsSecret(segment, strlen(segment));
   const char* body = (!skipBody && hasArgCompat(F("plain"))) ? argCompat(F("plain")) : "";
-#if HAS_CLOUD_REC
-  cloudRecEvRestIn(routeIdx, (uint8_t)method, body, strlen(body));
+#if HAS_REMOTE_TELEMETRY
+  remoteTelemetryEvRestIn(routeIdx, (uint8_t)method, body, strlen(body));
 #endif
   if (!diagRec.active) return;
   diagRecordRestIn(routeIdx, segment, httpMethodToStr(method), body);
@@ -2855,15 +2855,15 @@ void processAPI(AsyncWebServerRequest *request)
             if (!checkApiRateLimit(words, wc, method)) {
               RESTDebugTf(PSTR("REST %s %s => 429 rate-limited %lums\r\n"),
                           httpMethodToStr(method), originalURI, millis() - startMs);
-#if HAS_CLOUD_REC
-              cloudRecEvRest((uint8_t)i, (uint8_t)method, 429);   // TASK-1473
+#if HAS_REMOTE_TELEMETRY
+              remoteTelemetryEvRest((uint8_t)i, (uint8_t)method, 429);   // TASK-1473
 #endif
               return;
             }
             diagCaptureRest((uint8_t)i, words, wc, method);
             r.handler(words, wc, method, originalURI);
-#if HAS_CLOUD_REC
-            cloudRecEvRest((uint8_t)i, (uint8_t)method, restResponseStatus);   // TASK-1473: GET 200s are counted
+#if HAS_REMOTE_TELEMETRY
+            remoteTelemetryEvRest((uint8_t)i, (uint8_t)method, restResponseStatus);   // TASK-1473: GET 200s are counted
 #endif
             RESTDebugTf(PSTR("REST %s %s => %d v2/%S %lums\r\n"), httpMethodToStr(method), originalURI, restResponseStatus, r.segment, millis() - startMs);
             return;
@@ -3700,10 +3700,10 @@ void sendDeviceCoreDump()
 // exact is false when the recorder lock was busy and the numbers were read without it.
 static void diagEmitStatus(JsonEmit& je)
 {
-#if HAS_CLOUD_REC   // TASK-2907: the same keys, from the one recorder's ring (block = a record, seq = record seq)
+#if HAS_REMOTE_TELEMETRY   // TASK-2907: the same keys, from the one recorder's ring (block = a record, seq = record seq)
   {
-    CloudRecLocalStatus c;
-    cloudRecLocalStatusRead(c);
+    RemoteTelemetryLocalStatus c;
+    remoteTelemetryLocalStatusRead(c);
     const bool refused = !c.active && c.lastStart != DIAG_START_OK && c.lastStart != DIAG_START_ALREADY;
     je.beginObject(F("recording"));
     je.field(F("state"),       c.active ? "recording" : (refused ? "refused" : "stopped"));
@@ -3712,7 +3712,7 @@ static void diagEmitStatus(JsonEmit& je)
     je.field(F("reason"),      refused ? diagStartReasonText((DiagStartResult)c.lastStart) : "");
     je.field(F("psram"),       c.psram);
     je.field(F("format"),      "otgwmix1");
-    je.field(F("block_size"),  (uint32_t)crec::REC_MAX_BYTES);
+    je.field(F("block_size"),  (uint32_t)rtel::REC_MAX_BYTES);
     je.field(F("ring_blocks"), c.entries);
     je.field(F("ring_bytes"),  c.capBytes);
     je.field(F("has_data"),    c.hasData);
@@ -3799,11 +3799,11 @@ void sendDiagRecordingControl(bool start)
 // The block range is fixed by diagDownloadRange() before the response starts; the filler copies one
 // chunk per call under the recorder try-lock and asks the server to retry when the lock is busy, so
 // async_tcp never waits. No ring-sized copy exists: only the 640 B header snapshot is on the heap.
-#if HAS_CLOUD_REC
+#if HAS_REMOTE_TELEMETRY
 // TASK-2907: GET /api/v2/diag/recording in this env: the "OTGWMIX1" file of RecRing.h, chunked (its length is not
 // known up front while records keep arriving). The header first, then the ring's records oldest first; a fill never
 // waits for the ring's lock. ?since=<seq> starts at the first record at or after seq.
-static void sendCloudRecDownload(uint64_t since)
+static void sendRemoteTelemetryDownload(uint64_t since)
 {
   // The ring tracks one partially streamed entry. Hold the download slot for
   // the lifetime of the response, including errors and client disconnects.
@@ -3811,7 +3811,7 @@ static void sendCloudRecDownload(uint64_t since)
   if (downloading.exchange(true)) { sendApiBusy(F("recording download already in progress")); return; }
   struct Dl {
     ~Dl() { downloading.store(false); }
-    crec::RingCursor cur;
+    rtel::RingCursor cur;
     uint8_t hdr[200];
     size_t hdrLen = 0, hdrSent = 0;
   };
@@ -3822,7 +3822,7 @@ static void sendCloudRecDownload(uint64_t since)
   memcpy(h, "OTGWMIX1", 8); n = 8;
   h[n++] = 1; h[n++] = 0;                         // version 1
   n += 2;                                         // header length, patched below
-  const char* texts[3] = {_SEMVER_FULL, _VERSION_GITHASH, cloudRecUidText()};
+  const char* texts[3] = {_SEMVER_FULL, _VERSION_GITHASH, remoteTelemetryUidText()};
   for (const char* t : texts) {
     size_t l = strlen(t);
     if (l > 60) l = 60;
@@ -3845,7 +3845,7 @@ static void sendCloudRecDownload(uint64_t since)
           dl->hdrSent += k;
           return k;
         }
-        return cloudRecLocalFill(dl->cur, buf, maxLen);   // DIAG_FILL_TRY_AGAIN when busy, 0 at the end
+        return remoteTelemetryLocalFill(dl->cur, buf, maxLen);   // DIAG_FILL_TRY_AGAIN when busy, 0 at the end
       });
   if (!resp) { sendApiBusy(F("low heap")); return; }
   webApplyHeaders(resp);
@@ -3859,12 +3859,12 @@ static void sendCloudRecDownload(uint64_t since)
 void sendDiagRecordingDownload()
 {
   if (!currentRequest || g_responseSent) return;
-#if HAS_CLOUD_REC
+#if HAS_REMOTE_TELEMETRY
   {
     uint64_t since = 0;
     if (hasArgCompat("since")) since = strtoull(argCompat("since"), nullptr, 10);
     if (platformMaxFreeBlock() < 8192) { sendApiBusy(F("low heap")); return; }
-    sendCloudRecDownload(since);
+    sendRemoteTelemetryDownload(since);
     return;
   }
 #endif

@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTGW-ModUpdateServer-esp32.h
-**  Version  : v2.0.0-poc.15
+**  Version  : v2.0.0-poc.16
 **
 **  ESP32 OTA update server — functional equivalent of the ESP8266
 **  OTGW-ModUpdateServer with Nodoshop hardware watchdog feeding.
@@ -615,8 +615,8 @@ private:
   }
 
   void _handleUploadStart(AsyncWebServerRequest *request, const String &filename) {
-#if HAS_CLOUD_REC
-    cloudRecEvFw(crec_FW_OTA_START, 0, filename.c_str());   // TASK-1473
+#if HAS_REMOTE_TELEMETRY
+    remoteTelemetryEvFw(rtel_FW_OTA_START, 0, filename.c_str());   // TASK-1473
 #endif
     _updaterError[0] = '\0';
     _resetUploadTracking();
@@ -754,8 +754,8 @@ private:
     if (_serial_output) DebugTln(F("[OTA] End: finalizing flash..."));
 
     bool updateOk = Update.end(true);
-#if HAS_CLOUD_REC
-    cloudRecEvFw(crec_FW_OTA_END, updateOk ? (int)totalSize : -1, "");   // TASK-1473
+#if HAS_REMOTE_TELEMETRY
+    remoteTelemetryEvFw(rtel_FW_OTA_END, updateOk ? (int)totalSize : -1, "");   // TASK-1473
 #endif
     // TASK-1774: a complete image is on flash now; a reset from here needs the restore, not a format.
     if (updateOk && _uploadTarget == UploadTarget::Filesystem &&

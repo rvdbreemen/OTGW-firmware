@@ -96,7 +96,7 @@ gateway --HTTPS--> Cloudflare edge --tunnel (outbound from the NAS)--> cloudflar
 No device records to create: gateways enroll themselves. The test enrolls two made-up gateways.
 
 ```bash
-python3 tools/cloud-recorder/pocketbase/test_client.py https://rec.<your-domain> <admin-email> '<admin-password>'
+python3 tools/remote-telemetry/pocketbase/test_client.py https://rec.<your-domain> <admin-email> '<admin-password>'
 ```
 
 Run it twice. Against `http://<nas-ip>:8090` (LAN): checks 1 to 9 and 12 PASS, 11 FAILs by design (the admin UI is

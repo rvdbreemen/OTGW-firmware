@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.ino
-**  Version  : v2.0.0-poc.15
+**  Version  : v2.0.0-poc.16
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -264,8 +264,8 @@ void setup() {
   captureRebootReason();  // TASK-1447: before any path that can restart (config-portal timeout)
   captureWifiDeadRestarts();  // TASK-1450: same rule, the dead-link restart count
   captureWifiSkipPortal();    // TASK-1455: one-boot skip-portal mark of a WiFi supervisor restart
-#if HAS_CLOUD_REC
-  cloudRecInstallTlsAllocator();   // TASK-2901: after the RTC captures, before any mbedTLS user (WiFi crypto, esp-tls)
+#if HAS_REMOTE_TELEMETRY
+  remoteTelemetryInstallTlsAllocator();   // TASK-2901: after the RTC captures, before any mbedTLS user (WiFi crypto, esp-tls)
 #endif
   (void)*(volatile uint8_t *)g_rtcSafebootGuard;   // TASK-1918: one reference keeps the guard through --gc-sections
   platformMarkLoopTask();  // TASK-1761: setup() runs on the loop task (before WiFi starts async_tcp); off-loop OT-Direct commands go via a ring
@@ -623,8 +623,8 @@ void setup() {
   // test endpoint only detect+enqueue. Created once (ADR-044); blocks on an
   // empty queue until an edge fires, so order vs settings load is immaterial.
   startWebhookTask();
-#if HAS_CLOUD_REC
-  cloudRecSetup();          // TASK-2901 PoC: off unless /cloudrec.cfg enables it
+#if HAS_REMOTE_TELEMETRY
+  remoteTelemetrySetup();          // TASK-2901 PoC: off unless /telemetry.cfg enables it
 #endif
  // initSensors();        // init DS18B20 (after MQ is up! )
   applyLegacyPinDefaults();   // TASK-1698: 1.x S0/output defaults are board pins on a Classic S3

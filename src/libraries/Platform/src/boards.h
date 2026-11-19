@@ -325,12 +325,12 @@ typedef uint16_t SAT_RING_IDX_T;
 #define HAS_STATUS_PIXEL 0
 #endif
 
-// HAS_CLOUD_REC: TASK-2901 proof of concept only (branch research/cloud-recording): the cloud recorder with
-// an outbound TLS upload. Set by the esp32-combo-tlsdyn env (-DOTGW_CLOUD_REC_POC=1); 0 in every other build.
-#if defined(OTGW_CLOUD_REC_POC) && OTGW_CLOUD_REC_POC
-#define HAS_CLOUD_REC 1
+// HAS_REMOTE_TELEMETRY: TASK-2901 proof of concept only (branch research/cloud-recording): the remote telemetry recorder with
+// an outbound TLS upload. Set by the esp32-combo-tlsdyn env (-DOTGW_REMOTE_TELEMETRY_POC=1); 0 in every other build.
+#if defined(OTGW_REMOTE_TELEMETRY_POC) && OTGW_REMOTE_TELEMETRY_POC
+#define HAS_REMOTE_TELEMETRY 1
 #else
-#define HAS_CLOUD_REC 0
+#define HAS_REMOTE_TELEMETRY 0
 #endif
 
 /***************************************************************************

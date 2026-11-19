@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTDirect.ino
-**  Version  : v2.0.0-poc.15
+**  Version  : v2.0.0-poc.16
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -1107,8 +1107,8 @@ void handleOTDirectBridgeStream() {
         OTDDebugTf(PSTR("OTDirect bridge: Sending [%s] (%d)\r\n"), sWrite, static_cast<int>(bytes_write));
         if (bytes_write > 0) {
           otDirectBridgeEvent('>', sWrite, bytes_write);
-#if HAS_CLOUD_REC
-          cloudRecEvBridge(sWrite, bytes_write, false);   // TASK-1473: a bridge command line
+#if HAS_REMOTE_TELEMETRY
+          remoteTelemetryEvBridge(sWrite, bytes_write, false);   // TASK-1473: a bridge command line
 #endif
           diagRec.bridgeLine = true;    // TASK-1665: ADR-213 does not record port 25238 bridge traffic
           sendPICSerial(sWrite, static_cast<int>(bytes_write));
@@ -3998,8 +3998,8 @@ static void otdRestorePersistedCommands() {
 bool handleOTDirectCommand(const char* buf, int len, bool satOwn) {
   otdWriteRefused = false;
   if (diagRec.active) diagRec.recOtdCommand(buf, (size_t)len);   // TASK-1665 (ADR-213)
-#if HAS_CLOUD_REC
-  if (!diagRec.bridgeLine) cloudRecEvOtdCmd(buf, (size_t)len);   // TASK-1473: bridge lines go as EV_BRIDGE_IN
+#if HAS_REMOTE_TELEMETRY
+  if (!diagRec.bridgeLine) remoteTelemetryEvOtdCmd(buf, (size_t)len);   // TASK-1473: bridge lines go as EV_BRIDGE_IN
 #endif
   // TASK-1804 B3b: the PIC's header checks (SerialCmdSub, gateway.asm 6.6 :3686-3695) answer a too short command or one
   // without '=' as its third character with a bare SE, before the "XX: " prefix; OT-Direct stayed silent. The PIC's

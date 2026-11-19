@@ -529,8 +529,8 @@ static bool weatherApplyResult()
   state.sat.weather.bValid        = true;
   state.sat.weather.iLastUpdateMs = millis();
   if (diagRec.active) diagRec.recWeather(diagX100(state.sat.weather.fTemperature), diagX100(state.sat.weather.fHumidity), diagX100(state.sat.weather.fWindSpeed));   // TASK-1665 (ADR-213)
-#if HAS_CLOUD_REC
-  cloudRecEvWeather(state.sat.weather.fTemperature, state.sat.weather.fHumidity, state.sat.weather.fWindSpeed);   // TASK-1473
+#if HAS_REMOTE_TELEMETRY
+  remoteTelemetryEvWeather(state.sat.weather.fTemperature, state.sat.weather.fHumidity, state.sat.weather.fWindSpeed);   // TASK-1473
 #endif
 
 #if !HAS_WEATHER_FORECAST

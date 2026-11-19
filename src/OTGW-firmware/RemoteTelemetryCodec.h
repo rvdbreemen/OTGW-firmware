@@ -1,9 +1,9 @@
 /*
 ***************************************************************************
-**  Program  : CloudRecCodec.h
-**  TASK-2901 PoC (branch research/cloud-recording only): the encoders of the cloud recorder's mix record.
-**  Plain C++ with no Arduino dependency, so the host test (tests/test_cloudrec_codec.py) compiles this
-**  same header and checks its output against the Python decoders in tools/cloud-recorder/otrec.py.
+**  Program  : RemoteTelemetryCodec.h
+**  TASK-2901 PoC (branch research/cloud-recording only): the encoders of the remote telemetry recorder's mix record.
+**  Plain C++ with no Arduino dependency, so the host test (tests/test_remote_telemetry_codec.py) compiles this
+**  same header and checks its output against the Python decoders in tools/remote-telemetry/otrec.py.
 **
 **  Formats (otrec.py is the reference):
 **    mix record (fmt 4): sections, each `type u8, LEB128 length, data`
@@ -18,7 +18,7 @@
 #include <stddef.h>
 #include <string.h>
 
-namespace crec {
+namespace rtel {
 
 // ---------------------------------------------------------------- byte buffer with a hard cap
 
@@ -640,4 +640,4 @@ inline void lzEncode(const uint8_t *in, size_t n, Buf &out, LzWork &w) {
   e.finish();
 }
 
-}  // namespace crec
+}  // namespace rtel

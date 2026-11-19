@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""TASK-2901: the firmware's cloud recorder encoders (src/OTGW-firmware/CloudRecCodec.h) against the reference
-decoders and encoders in tools/cloud-recorder/otrec.py.
+"""TASK-2901: the firmware's remote telemetry recorder encoders (src/OTGW-firmware/RemoteTelemetryCodec.h) against the reference
+decoders and encoders in tools/remote-telemetry/otrec.py.
 
-The real header is compiled with the host C++ compiler into tests/cloudrec_harness.cpp; nothing is
+The real header is compiled with the host C++ compiler into tests/remote_telemetry_harness.cpp; nothing is
 re-implemented here. Skipped when no C++ compiler is found.
 
   1. One record: the C sections are byte-identical to otrec's encoders (OT model v2, SAT, debug).
@@ -14,7 +14,7 @@ re-implemented here. Skipped when no C++ compiler is found.
 import datetime, os, random, shutil, struct, subprocess, sys, tempfile, unittest
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, os.path.join(ROOT, "tools", "cloud-recorder"))
+sys.path.insert(0, os.path.join(ROOT, "tools", "remote-telemetry"))
 import otrec  # noqa: E402
 import dbg_size_study  # noqa: E402
 
@@ -73,10 +73,10 @@ class Harness:
         cxx = shutil.which("g++") or shutil.which("c++") or shutil.which("clang++")
         if not cxx:
             return None
-        d = tempfile.mkdtemp(prefix="cloudrec-")
+        d = tempfile.mkdtemp(prefix="telemetry-")
         exe = os.path.join(d, "harness")
         subprocess.run([cxx, "-std=c++17", "-O1", "-Wall", "-Wextra", "-o", exe,
-                        os.path.join(ROOT, "tests", "cloudrec_harness.cpp")], check=True)
+                        os.path.join(ROOT, "tests", "remote_telemetry_harness.cpp")], check=True)
         return exe
 
     @classmethod
@@ -161,7 +161,7 @@ def decode(recs, img):
 
 
 @unittest.skipIf(Harness.build is None, "no build")
-class CloudRecCodecTest(unittest.TestCase):
+class RemoteTelemetryCodecTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         Harness.exe = Harness.build()

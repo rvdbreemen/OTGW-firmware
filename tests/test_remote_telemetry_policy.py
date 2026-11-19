@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""TASK-2903: the cloud recorder's backoff schedule and status classification (src/OTGW-firmware/CloudRecPolicy.h).
+"""TASK-2903: the remote telemetry recorder's backoff schedule and status classification (src/OTGW-firmware/RemoteTelemetryPolicy.h).
 
 The real header is compiled into a small C++ program; nothing is re-implemented here.
   1. Without jitter the waits are 5, 10, 20, ... min, capped at 24 h, and stay at 24 h.
@@ -17,22 +17,22 @@ SRC = r'''
 #include "@HDR@"
 int main() {
   const unsigned rnds[] = {0u, 1u, 2000u, 2001u, 4294967295u, 123456789u};
-  for (int s = 0; s < 16; s++) for (unsigned r : rnds) printf("B %d %u %u\n", s, r, crec::backoffMs((uint8_t)s, r));
+  for (int s = 0; s < 16; s++) for (unsigned r : rnds) printf("B %d %u %u\n", s, r, rtel::backoffMs((uint8_t)s, r));
   const int st[] = {0, 200, 400, 401, 403, 404, 429, 500, 502, 503};
-  for (int x : st) printf("C %d %d\n", x, (int)crec::classify(x));
+  for (int x : st) printf("C %d %d\n", x, (int)rtel::classify(x));
   const char *bodies[] = {"{\"message\":\"Gateway blocked (otgw-blocked): telemetry opt-in off.\",\"status\":403}",
                           "{\"message\":\"The request requires valid record authorization token.\",\"status\":403}", ""};
   const int rs[] = {403, 401, 400};
-  for (int x : rs) for (int i = 0; i < 3; i++) printf("R %d %d %d\n", x, i, (int)crec::classifyReply(x, bodies[i]));
-  printf("R 403 9 %d\n", (int)crec::classifyReply(403, nullptr));
+  for (int x : rs) for (int i = 0; i < 3; i++) printf("R %d %d %d\n", x, i, (int)rtel::classifyReply(x, bodies[i]));
+  printf("R 403 9 %d\n", (int)rtel::classifyReply(403, nullptr));
   // TASK-2906: telemetry mode from a real PocketBase login reply (captured 2026-11-15), and variants.
   const char *rec = "{\"record\":{\"blocked\":false,\"flags\":[\"sat\",\"mqtt\"],\"id\":\"k6wsnb20w3ns7yi\","
                     "\"mode\":\"custom\",\"mode_note\":\"mode \\\"full\\\" for issue \\\"mode\\\":\\\"full\\\"\","
                     "\"mode_until\":\"2030-01-02 03:04:05.000Z\",\"uid\":\"otgw-859030f1724d\"},\"token\":\"x\"}";
-  crec::RemoteCfg c = crec::parseRemote(rec);
+  rtel::RemoteCfg c = rtel::parseRemote(rec);
   printf("M custom %d %u %lld\n", (int)c.mode, (unsigned)c.flags, (long long)c.untilEpoch);
-  printf("M eff-before %u\n", (unsigned)crec::remoteEffective(c, c.untilEpoch - 1));
-  printf("M eff-after %u\n", (unsigned)crec::remoteEffective(c, c.untilEpoch));
+  printf("M eff-before %u\n", (unsigned)rtel::remoteEffective(c, c.untilEpoch - 1));
+  printf("M eff-after %u\n", (unsigned)rtel::remoteEffective(c, c.untilEpoch));
   const char *variants[] = {
       "{\"record\":{\"flags\":[],\"mode\":\"\",\"mode_until\":\"\"}}",
       "{\"record\":{\"flags\":[],\"mode\":\"full\",\"mode_until\":\"\"}}",
@@ -41,26 +41,26 @@ int main() {
       "{\"record\":{\"mode\":\"default\",\"mode_until\":\"2000-01-01 00:00:00.000Z\"}}",
       "{\"record\":{\"flags\":[],\"mode\":\"full\",\"mode_until\":\"garbage\"}}"};
   for (int i = 0; i < 6; i++) {
-    crec::RemoteCfg v = crec::parseRemote(variants[i]);
+    rtel::RemoteCfg v = rtel::parseRemote(variants[i]);
     printf("V %d %d %u %lld %u\n", i, (int)v.mode, (unsigned)v.flags, (long long)v.untilEpoch,
-           (unsigned)crec::remoteEffective(v, 1763200000));
+           (unsigned)rtel::remoteEffective(v, 1763200000));
   }
   static uint8_t b0[4], b1[4];
   for (int two = 0; two < 2; two++) {                      // one slot (no PSRAM) and two slots (PSRAM)
-    crec::Slot q[2] = {{b0, 0, 0, 0, false, false}, {two ? b1 : nullptr, 0, 0, 0, false, false}};
+    rtel::Slot q[2] = {{b0, 0, 0, 0, false, false}, {two ? b1 : nullptr, 0, 0, 0, false, false}};
     uint64_t seq = 10;
     int lost = 0;
     for (int step = 0; step < 6; step++) {                 // close three records, send one, close three more
-      if (step == 3) { crec::Slot *o = crec::slotOldest(q, 2); printf("S %d sent %llu\n", two, (unsigned long long)o->seq); o->busy = false; }
-      crec::Slot *f = crec::slotFree(q, 2);
+      if (step == 3) { rtel::Slot *o = rtel::slotOldest(q, 2); printf("S %d sent %llu\n", two, (unsigned long long)o->seq); o->busy = false; }
+      rtel::Slot *f = rtel::slotFree(q, 2);
       if (!f) { lost++; seq++; continue; }
       f->seq = seq++; f->busy = true;
     }
-    crec::Slot *o = crec::slotOldest(q, 2);
+    rtel::Slot *o = rtel::slotOldest(q, 2);
     printf("S %d lost %d oldest %llu\n", two, lost, (unsigned long long)(o ? o->seq : 0));
   }
 }
-'''.replace("@HDR@", os.path.join(ROOT, "src", "OTGW-firmware", "CloudRecPolicy.h").replace("\\", "/"))
+'''.replace("@HDR@", os.path.join(ROOT, "src", "OTGW-firmware", "RemoteTelemetryPolicy.h").replace("\\", "/"))
 
 MIN = 60000
 H24 = 24 * 60 * MIN
@@ -81,7 +81,7 @@ OUT = run()
 
 
 @unittest.skipIf(OUT is None, "no C++ compiler")
-class CloudRecPolicyTest(unittest.TestCase):
+class RemoteTelemetryPolicyTest(unittest.TestCase):
     def rows(self, k):
         return [list(map(int, l.split()[1:])) for l in OUT if l.startswith(k + " ")]
 
@@ -115,8 +115,8 @@ class CloudRecPolicyTest(unittest.TestCase):
         self.assertEqual(got[(400, 0)], 1)
 
 
-class CloudRecRemoteModeTest(unittest.TestCase):
-    """TASK-2906: crec::parseRemote / remoteEffective on the real header."""
+class RemoteTelemetryRemoteModeTest(unittest.TestCase):
+    """TASK-2906: rtel::parseRemote / remoteEffective on the real header."""
     SAT, MQTT, NTP, TRACE = 1 << 4, 1 << 2, 1 << 9, 1 << 7
 
     def row(self, *key):
@@ -146,7 +146,7 @@ class CloudRecRemoteModeTest(unittest.TestCase):
         self.assertEqual(rows[5][2:], [0, all10 & ~self.TRACE])           # unreadable date: no end, mode holds
 
 
-class CloudRecSlotTest(unittest.TestCase):
+class RemoteTelemetrySlotTest(unittest.TestCase):
     def test_queue(self):
         rows = [l.split() for l in OUT if l.startswith("S ")]
         got = {(r[1], r[2]): r[3:] for r in rows}

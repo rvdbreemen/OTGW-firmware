@@ -3,7 +3,7 @@
 Question (Robert): does the telemetry show all firmware data and events, all incoming and outgoing data, and all
 sensor data from outside the OpenTherm bus?
 
-Answer: **no.** The PoC cloud recorder (`CloudRecDevice.h`) records three things: OT frames, SATTICK lines and the
+Answer: **no.** The PoC cloud recorder (`RemoteTelemetryDevice.h`) records three things: OT frames, SATTICK lines and the
 text of the `Debug*` macros. The existing local recorder `diagRec` (ADR-213, `diagRecorderStuff.h:76-92`) records
 much more as structured events, but it also has gaps: sensors outside the bus, network and connection events,
 telnet input, the webhook, OTA, and SAT decisions. Debug text cannot close those gaps: most of it only prints
@@ -136,7 +136,7 @@ On the line and in storage (no debug text):
 
 Findings:
 
-- **The TLS handshake costs more than the data.** The PoC (`CloudRecDevice.h:313-342`) makes a new TLS connection for
+- **The TLS handshake costs more than the data.** The PoC (`RemoteTelemetryDevice.h:313-342`) makes a new TLS connection for
   every record. TLS session resumption (session tickets) or a connection that stays open brings that to well
   under 1 MB per day; resumption also saves the handshake heap peak. To measure on the bench (TASK-2901).
 - **MQTT publishes are the largest part.** Most of them follow from OT frames. Range-coding the MQTT section like
@@ -172,13 +172,13 @@ payload (mix study: 291 KB/h stored against 301 KB/h sent, headers included). Pa
 3. TLS session resumption (A), TASK-2905.
 4. A second send slot on PSRAM boards only (A); without PSRAM a lost record stays reported in SEC_LOST.
 5. The upload rate limit stays per IP (B).
-6. Bench job: `docs/diagnostics/cloudrec-bench-job.md`.
+6. Bench job: `docs/diagnostics/telemetry-bench-job.md`.
 7. PocketBase does not run on the Synology yet: the migration stays edited in place.
 
 ## Status after TASK-1473 (2026-11-15, 2.0.0-poc.7)
 
-The cloud record now has an events section (SEC_EVT, `CloudRecCodec.h`); each capture point below sits inside
-`#if HAS_CLOUD_REC` next to the ADR-213 capture point, or where the firmware had none. Decoded by `otrec.evt_decode`
+The cloud record now has an events section (SEC_EVT, `RemoteTelemetryCodec.h`); each capture point below sits inside
+`#if HAS_REMOTE_TELEMETRY` next to the ADR-213 capture point, or where the firmware had none. Decoded by `otrec.evt_decode`
 into `events.log` (`decode_all.py`). Decision record: ADR-290 (Proposed).
 
 | # | Source / event | Cloud recorder now |

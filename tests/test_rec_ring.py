@@ -20,18 +20,18 @@ SRC = r'''
 int main(int, char **argv) {
   if (strcmp(argv[1], "expire") == 0) {
     uint8_t mem[48], buf[32];
-    crec::RecRing r;
+    rtel::RecRing r;
     r.init(mem, sizeof(mem));
     r.begin(4, 16, 1, 0, 0);
     for (int i = 0; i < 16; i++) r.byte(1);
     r.commit();
-    crec::RingCursor cur;
-    const size_t partial = crec::ringFill(r, cur, buf, 24, 0);
-    const uint32_t after = crec::RecRing::PIN_MS + 1;
+    rtel::RingCursor cur;
+    const size_t partial = rtel::ringFill(r, cur, buf, 24, 0);
+    const uint32_t after = rtel::RecRing::PIN_MS + 1;
     if (!r.begin(4, 16, 2, 0, after)) return 1;
     for (int i = 0; i < 16; i++) r.byte(2);
     r.commit();
-    const size_t tail = crec::ringFill(r, cur, buf, sizeof(buf), after);
+    const size_t tail = rtel::ringFill(r, cur, buf, sizeof(buf), after);
     printf("%zu %zu\n", partial, tail);
     return 0;
   }
@@ -39,9 +39,9 @@ int main(int, char **argv) {
   uint32_t cap = (uint32_t)atoi(argv[2]);
   srand(seed);
   std::vector<uint8_t> mem(cap);
-  crec::RecRing r;
+  rtel::RecRing r;
   r.init(mem.data(), cap);
-  crec::RingCursor cur;
+  rtel::RingCursor cur;
   uint64_t seq = 100;
   for (int k = 0; k < 2000; k++) {
     uint32_t len = (uint32_t)(rand() % (cap / 3));
@@ -58,7 +58,7 @@ int main(int, char **argv) {
     seq++;
     if (rand() % 3 == 0) {                                   // the download reads a bit
       uint8_t buf[512];
-      size_t n = crec::ringFill(r, cur, buf, 1 + rand() % sizeof(buf), (uint32_t)k);
+      size_t n = rtel::ringFill(r, cur, buf, 1 + rand() % sizeof(buf), (uint32_t)k);
       printf("D ");
       for (size_t i = 0; i < n; i++) printf("%02x", buf[i]);
       printf("\n");

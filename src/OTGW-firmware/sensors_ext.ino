@@ -1,6 +1,6 @@
 /*
 **  Program  : output_ext.ino
-**  Version  : v2.0.0-poc.15
+**  Version  : v2.0.0-poc.16
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Contributed by Sjorsjuhmaniac
@@ -449,8 +449,8 @@ static bool dallasReadingValid(float tempC, bool havePrev, float prevC)
       DallasrealDevice[i].tempC = tempC;
     }
     DallasrealDevice[i].lasttime = now ;
-#if HAS_CLOUD_REC
-    cloudRecEvDallas((uint8_t)i, strDeviceAddress, DallasrealDevice[i].tempC);   // TASK-1473
+#if HAS_REMOTE_TELEMETRY
+    remoteTelemetryEvDallas((uint8_t)i, strDeviceAddress, DallasrealDevice[i].tempC);   // TASK-1473
 #endif
     
     // Debug logging: always show simulated values in telnet for visibility

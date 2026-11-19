@@ -1,8 +1,8 @@
 /*
 ***************************************************************************
-**  Program  : CloudRecPolicy.h
-**  TASK-2903 (branch research/cloud-recording only): when the cloud recorder retries, and what an HTTP
-**  status from the collection point means. No Arduino dependencies, so tests/test_cloudrec_policy.py
+**  Program  : RemoteTelemetryPolicy.h
+**  TASK-2903 (branch research/cloud-recording only): when the remote telemetry recorder retries, and what an HTTP
+**  status from the collection point means. No Arduino dependencies, so tests/test_remote_telemetry_policy.py
 **  compiles this header as it is.
 **
 **  Backoff while the service is unreachable: 5 min after the first failure, doubling per failure, capped at
@@ -16,7 +16,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-namespace crec {
+namespace rtel {
 
 static const uint32_t BACKOFF_FIRST_MS = 5UL * 60UL * 1000UL;
 static const uint32_t BACKOFF_MAX_MS   = 24UL * 60UL * 60UL * 1000UL;
@@ -193,4 +193,4 @@ inline uint16_t remoteEffective(const RemoteCfg &c, int64_t nowEpoch) {
   }
 }
 
-}  // namespace crec
+}  // namespace rtel

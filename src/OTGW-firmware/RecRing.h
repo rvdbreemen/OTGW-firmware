@@ -2,7 +2,7 @@
 ***************************************************************************
 **  Program  : RecRing.h
 **  TASK-2907 (branch research/cloud-recording only): the local sink of the one recorder. A byte ring of closed
-**  records, each stored as it would be sent (fmt 4, or fmt 5 when LZ-coded), so a local download and the cloud
+**  records, each stored as it would be sent (fmt 4, or fmt 5 when LZ-coded), so a local download and the upload
 **  carry the same records and one decoder reads both. No Arduino or platform include: tests/test_rec_ring.py
 **  compiles this header as it is.
 **
@@ -20,7 +20,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-namespace crec {
+namespace rtel {
 
 static const uint32_t RING_HDR = 20;
 static const uint8_t RING_MAGIC = 0xA5;
@@ -147,4 +147,4 @@ inline size_t ringFill(RecRing &r, RingCursor &c, uint8_t *buf, size_t cap, uint
 // The download is over (finished or the client left): release the pin.
 inline void ringFillDone(RecRing &r) { r.pinned = false; }
 
-}  // namespace crec
+}  // namespace rtel

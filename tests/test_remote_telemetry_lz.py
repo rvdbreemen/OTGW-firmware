@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""TASK-2904: the record compressor of the cloud recorder (crec::lzEncode in src/OTGW-firmware/CloudRecCodec.h).
+"""TASK-2904: the record compressor of the remote telemetry recorder (rtel::lzEncode in src/OTGW-firmware/RemoteTelemetryCodec.h).
 
 The real header is compiled with the host C++ compiler; nothing is re-implemented here.
-  1. On records from the cloudrec harness (a 30-minute run with OT, SATTICK and debug lines) and on edge cases
+  1. On records from the remote telemetry harness (a 30-minute run with OT, SATTICK and debug lines) and on edge cases
      (empty, 1-3 bytes, random, long runs, a record of the maximum size), lzEncode gives the same bytes as the
      reference otrec.lz_encode, and otrec.lz_decode gives every record back exactly.
   2. The counting sink (Buf::initSink) counts exactly the bytes the memory form writes.
@@ -14,7 +14,7 @@ The real header is compiled with the host C++ compiler; nothing is re-implemente
 import os, random, shutil, subprocess, sys, tempfile, unittest
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, os.path.join(ROOT, "tools", "cloud-recorder"))
+sys.path.insert(0, os.path.join(ROOT, "tools", "remote-telemetry"))
 sys.path.insert(0, os.path.join(ROOT, "tests"))
 import otrec  # noqa: E402
 
@@ -23,7 +23,7 @@ SRC = r'''
 #include <cstring>
 #include <vector>
 #include "@HDR@"
-static crec::LzWork w;
+static rtel::LzWork w;
 static void noop(void *, uint8_t) {}
 int main() {
   static char line[1 << 16];
@@ -31,16 +31,16 @@ int main() {
     std::vector<uint8_t> in;
     for (char *h = line; h[0] && h[1] && h[0] != '\n'; h += 2) { unsigned v; sscanf(h, "%2x", &v); in.push_back((uint8_t)v); }
     static uint8_t out[16384];
-    crec::Buf b; b.init(out, sizeof out);
-    crec::lzEncode(in.data(), in.size(), b, w);
-    crec::Buf c; c.initSink(noop, nullptr);
-    crec::lzEncode(in.data(), in.size(), c, w);
+    rtel::Buf b; b.init(out, sizeof out);
+    rtel::lzEncode(in.data(), in.size(), b, w);
+    rtel::Buf c; c.initSink(noop, nullptr);
+    rtel::lzEncode(in.data(), in.size(), c, w);
     printf("%zu %d ", c.n, (int)b.full);
     for (size_t i = 0; i < b.n; i++) printf("%02x", out[i]);
     printf("\n");
   }
 }
-'''.replace("@HDR@", os.path.join(ROOT, "src", "OTGW-firmware", "CloudRecCodec.h").replace("\\", "/"))
+'''.replace("@HDR@", os.path.join(ROOT, "src", "OTGW-firmware", "RemoteTelemetryCodec.h").replace("\\", "/"))
 
 
 def build():
@@ -55,7 +55,7 @@ def build():
 
 
 def harness_records():
-    import test_cloudrec_codec as t
+    import test_remote_telemetry_codec as t
     exe = t.Harness.build()
     if not exe:
         return []
@@ -86,7 +86,7 @@ EXE = build()
 
 
 @unittest.skipIf(EXE is None, "no C++ compiler")
-class CloudRecLzTest(unittest.TestCase):
+class RemoteTelemetryLzTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         rnd = random.Random(5)

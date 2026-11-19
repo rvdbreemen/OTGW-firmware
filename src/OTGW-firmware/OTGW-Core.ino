@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v2.0.0-poc.15
+**  Version  : v2.0.0-poc.16
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -4592,8 +4592,8 @@ bool sendPICSerial(const char* buf, int len)
 
     if (diagRec.active) diagRec.recPicCommand(buf, (size_t)n);   // TASK-1665: the command as sent (ADR-213)
 
-#if HAS_CLOUD_REC
-    cloudRecEvPicCmd(buf, (size_t)n);   // TASK-1473
+#if HAS_REMOTE_TELEMETRY
+    remoteTelemetryEvPicCmd(buf, (size_t)n);   // TASK-1473
 #endif
     if (enqueuePICTx(txbuf, n + 2)) {
       sendEventToWebSocket('>', buf, len);
@@ -6128,8 +6128,8 @@ void processOT(const char *buf, int len, bool suppressOutput, bool localAnswer, 
     if (siscanf(bufval, "%8x", &value) != 1) return;    // extract the value, abort on parse failure
     OTdata.value = value;                             // store the value
     if (diagRec.active) diagRec.recOtFrame(buf[0], value);   // TASK-1665: every decoded frame, arrival order (ADR-213)
-#if HAS_CLOUD_REC
-    cloudRecOtFrame(buf[0], value);   // TASK-2901 PoC: the same frames for the cloud recorder
+#if HAS_REMOTE_TELEMETRY
+    remoteTelemetryOtFrame(buf[0], value);   // TASK-2901 PoC: the same frames for the remote telemetry recorder
 #endif
     OTdata.type = (value >> 28) & 0x7;               // byte 1 = take 3 bits that define msg msgType
     OTdata.masterslave = (OTdata.type >> 2) & 0x1;    // MSB from type --> 0 = master and 1 = slave
@@ -6470,8 +6470,8 @@ void processOT(const char *buf, int len, bool suppressOutput, bool localAnswer, 
     } 
   } else if (buf[2]==':') { //seems to be a response to a command, so check to verify if it was
     if (diagRec.active) diagRec.recResponse(buf, (size_t)len);   // TASK-1665: PIC and OT-Direct response lines (ADR-213)
-#if HAS_CLOUD_REC
-    cloudRecEvResponse(buf, (size_t)len);   // TASK-1473
+#if HAS_REMOTE_TELEMETRY
+    remoteTelemetryEvResponse(buf, (size_t)len);   // TASK-1473
 #endif
     checkCommandResponse(buf, len);
     if (buf[0] == 'P' && buf[1] == 'R') {
@@ -6780,8 +6780,8 @@ void handlePICSerial()
             dropReason = PSTR("tx queue full");
           }
           if (dropReason != nullptr) {   // dropped whole: no echo, no ADR-059 override, no readout trigger, no GW=R or PS= handling
-#if HAS_CLOUD_REC
-            cloudRecEvBridge(sWrite, bytes_write, true);   // TASK-1473: a refused bridge command
+#if HAS_REMOTE_TELEMETRY
+            remoteTelemetryEvBridge(sWrite, bytes_write, true);   // TASK-1473: a refused bridge command
 #endif
             bytes_write = 0; rawLen = 0; lineOverflow = false; lineStart = true;
             continue;
@@ -6789,8 +6789,8 @@ void handlePICSerial()
         } else {
           sWrite[bytes_write] = 0;
         }
-#if HAS_CLOUD_REC
-        if (bytes_write > 0) cloudRecEvBridge(sWrite, bytes_write, false);   // TASK-1473: a bridge command line
+#if HAS_REMOTE_TELEMETRY
+        if (bytes_write > 0) remoteTelemetryEvBridge(sWrite, bytes_write, false);   // TASK-1473: a bridge command line
 #endif
         if (state.debug.bOTGWSimulation) {
           OTDebugTf(PSTR("Net2Ser blocked by simulation mode: [%s] (%d)\r\n"), sWrite, bytes_write);
@@ -7062,8 +7062,8 @@ static void jsonEscape(const char *in, char *out, size_t outSize) {
 
 #if HAS_PIC
 void fwupgradedone(OTGWError result, short errors = 0, short retries = 0) {
-#if HAS_CLOUD_REC
-  cloudRecEvFw(crec_FW_PIC_DONE, (int)result, "");   // TASK-1473
+#if HAS_REMOTE_TELEMETRY
+  remoteTelemetryEvFw(rtel_FW_PIC_DONE, (int)result, "");   // TASK-1473
 #endif
   DebugTln(F(""));
   DebugTln(F("=== PIC Upgrade Complete ==="));
@@ -7217,8 +7217,8 @@ static void picProgressLedWrite(int pin, bool on) {
 }
 
 void fwupgradestart(const char *hexfile) {
-#if HAS_CLOUD_REC
-  cloudRecEvFw(crec_FW_PIC_START, 0, hexfile);   // TASK-1473
+#if HAS_REMOTE_TELEMETRY
+  remoteTelemetryEvFw(rtel_FW_PIC_START, 0, hexfile);   // TASK-1473
 #endif
   DebugTln(F("--- fwupgradestart() ---"));
 #ifdef OTGWSERIAL_DEBUG

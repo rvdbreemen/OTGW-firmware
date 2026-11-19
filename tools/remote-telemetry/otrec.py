@@ -425,7 +425,7 @@ def dbg_decode(t0_ms, data, image, tz):
 # ---------------------------------------------------------------- OT model v2 (section type 5): fixed table sizes
 #
 # The same prediction scheme as v1 (scripts/ot_stream_codec_study.py), with every table a fixed size so a
-# device can hold it in a static block (about 9.4 KB) and the C encoder in src/OTGW-firmware/CloudRecCodec.h
+# device can hold it in a static block (about 9.4 KB) and the C encoder in src/OTGW-firmware/RemoteTelemetryCodec.h
 # matches it bit for bit:
 #   let[5][8]     source letter, 3-bit tree, context: previous letter
 #   raw[1]        frame stored raw (bad parity or spare bits set)
@@ -622,7 +622,7 @@ def _lz_hash(d, i):
 def lz_encode(raw):
     """LZ77 over the record itself (no window buffer: the input is the window) with a range coder for every
     decision: match flag (context: was the previous token a match), literal (one 256-node bit tree), length and
-    distance (bit trees). Output: LEB128 raw length + CRC-32 of raw + range-coder bytes. Mirrors crec::lzEncode()
+    distance (bit trees). Output: LEB128 raw length + CRC-32 of raw + range-coder bytes. Mirrors rtel::lzEncode()
     byte for byte."""
     e, m, head, i, n, prev = codec.Enc(), _LzProbs(), [0] * (1 << LZ_HASH_BITS), 0, len(raw), 0
 

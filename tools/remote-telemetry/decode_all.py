@@ -112,8 +112,8 @@ def main():
     ap.add_argument("out_dir", nargs="?")
     ap.add_argument("--file", help="decode a local download (GET /api/v2/diag/recording) instead; then give only out_dir")
     ap.add_argument("--image", required=True, action="append",
-                    help="firmware.bin for a recording build (repeat for cloud histories spanning builds)")
-    ap.add_argument("--legacy-image", help="firmware.bin for cloud batches without a recorded build ID")
+                    help="firmware.bin for a recording build (repeat for histories spanning builds)")
+    ap.add_argument("--legacy-image", help="firmware.bin for uploaded batches without a recorded build ID")
     ap.add_argument("--tz", default="Europe/Amsterdam")
     a = ap.parse_args()
     if a.file:

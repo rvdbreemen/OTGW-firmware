@@ -155,7 +155,7 @@ The handler times are estimates and were not measured: 10 ms per message, 300 ms
 
 ## Debug stream: measured size and the tokenizer choice (2026-11-14)
 
-Measured with `tools/cloud-recorder/dbg_size_study.py` on lines built from the 985 Debug calls with a literal
+Measured with `tools/remote-telemetry/dbg_size_study.py` on lines built from the 985 Debug calls with a literal
 format in `src/OTGW-firmware` (help menu left out) and the real `_debugBOL` prefix. The call-site mix and the
 argument values are generated, so the volume is an estimate; the ratios hold. At about 3 KB/s of telnet text:
 text 104 B per line (7.9 GB per gateway-month), text + zlib 36 B (2.7 GB), address token 16 B (1.2 GB),

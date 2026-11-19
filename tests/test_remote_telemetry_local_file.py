@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""TASK-2907: a local download of the one recorder decodes like the cloud records.
+"""TASK-2907: a local download of the one recorder decodes like the uploaded records.
 
-Records from the real crec::Recorder (tests/cloudrec_harness.cpp, 30 min of OT frames, SATTICK, debug lines and
-events) go through the real crec::lzEncode into the real crec::RecRing, and the real crec::ringFill reads them out
+Records from the real rtel::Recorder (tests/remote_telemetry_harness.cpp, 30 min of OT frames, SATTICK, debug lines and
+events) go through the real rtel::lzEncode into the real rtel::RecRing, and the real rtel::ringFill reads them out
 behind the OTGWMIX1 header, in small chunks, as the download route does. decode_all.read_mix_file() and
 decode_records() must give back every OT frame with its ms time, every SATTICK line and every event, and the
 records must be stored LZ-coded where that is smaller.
@@ -10,20 +10,20 @@ records must be stored LZ-coded where that is smaller.
 import base64, os, shutil, subprocess, sys, tempfile, unittest
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, os.path.join(ROOT, "tools", "cloud-recorder"))
+sys.path.insert(0, os.path.join(ROOT, "tools", "remote-telemetry"))
 sys.path.insert(0, os.path.join(ROOT, "tests"))
 import otrec  # noqa: E402
 import decode_all  # noqa: E402
-import test_cloudrec_codec as tcc  # noqa: E402
+import test_remote_telemetry_codec as tcc  # noqa: E402
 
 SRC = r'''
 #include <cstdio>
 #include <cstring>
 #include <vector>
-#include "@DIR@/CloudRecCodec.h"
+#include "@DIR@/RemoteTelemetryCodec.h"
 #include "@DIR@/RecRing.h"
-static crec::LzWork w;
-static crec::RecRing ring;
+static rtel::LzWork w;
+static rtel::RecRing ring;
 static void noop(void *, uint8_t) {}
 static void put(void *, uint8_t b) { ring.byte(b); }
 int main() {
@@ -36,11 +36,11 @@ int main() {
     if (sscanf(line, "%lld %s", &t0, hex) != 2) continue;
     std::vector<uint8_t> in;
     for (char *h = hex; h[0] && h[1]; h += 2) { unsigned v; sscanf(h, "%2x", &v); in.push_back((uint8_t)v); }
-    crec::Buf c; c.initSink(noop, nullptr);
-    crec::lzEncode(in.data(), in.size(), c, w);
+    rtel::Buf c; c.initSink(noop, nullptr);
+    rtel::lzEncode(in.data(), in.size(), c, w);
     bool lz = c.n < in.size();
     if (!ring.begin(lz ? 5 : 4, (uint32_t)(lz ? c.n : in.size()), seq++, t0, 0)) { fprintf(stderr, "ring full\n"); return 1; }
-    if (lz) { crec::Buf b; b.initSink(put, nullptr); crec::lzEncode(in.data(), in.size(), b, w); }
+    if (lz) { rtel::Buf b; b.initSink(put, nullptr); rtel::lzEncode(in.data(), in.size(), b, w); }
     else for (uint8_t x : in) ring.byte(x);
     ring.commit();
   }
@@ -50,10 +50,10 @@ int main() {
   out.push_back(1); out.push_back(0); out.push_back(0); out.push_back(0);
   for (const char *t : texts) { out.push_back((uint8_t)strlen(t)); for (const char *p = t; *p; p++) out.push_back((uint8_t)*p); }
   out[10] = (uint8_t)out.size(); out[11] = (uint8_t)(out.size() >> 8);
-  crec::RingCursor cur;
+  rtel::RingCursor cur;
   uint8_t buf[700];
   for (int k = 0;; k++) {
-    size_t n = crec::ringFill(ring, cur, buf, 1 + (k * 131) % sizeof(buf), 0);
+    size_t n = rtel::ringFill(ring, cur, buf, 1 + (k * 131) % sizeof(buf), 0);
     if (!n) break;
     out.insert(out.end(), buf, buf + n);
   }
@@ -79,7 +79,7 @@ EXE = build()
 
 @unittest.skipIf(EXE is None, "no C++ compiler")
 class LocalFileTest(unittest.TestCase):
-    def test_download_decodes_like_the_cloud(self):
+    def test_download_decodes_like_the_upload(self):
         tcc.Harness.exe = tcc.Harness.build()
         lines, frames, sat, _, img = tcc.build_events(30, 300)
         # events in the same run

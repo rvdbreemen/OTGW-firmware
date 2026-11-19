@@ -1,11 +1,11 @@
-"""TASK-2901: the cloud recorder's NVS secret survives a reboot.
+"""TASK-2901: the remote telemetry recorder's NVS secret survives a reboot.
 
 Bench .63, 2026-11-19 (poc.13): every boot after the first enrollment got 409 "uid enrolled with another secret"
 and a 24 h backoff. Preferences::getString(key, buf, maxLen) returns nvs_get_str's length INCLUDING the NUL
-(framework-arduinoespressif32 libraries/Preferences/src/Preferences.cpp:476-495), so cloudRecIdentity()'s check
+(framework-arduinoespressif32 libraries/Preferences/src/Preferences.cpp:476-495), so remoteTelemetryIdentity()'s check
 against sizeof(secret) - 1 failed on every boot and a new secret replaced the enrolled one.
 
-The test compiles the REAL cloudRecIdentity() (cut from src/OTGW-firmware/CloudRecDevice.h) against a Preferences
+The test compiles the REAL remoteTelemetryIdentity() (cut from src/OTGW-firmware/RemoteTelemetryDevice.h) against a Preferences
 stub with the same return convention, runs it for two boots and checks the second boot keeps the secret.
 """
 import re
@@ -20,7 +20,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from test_sat_pwm_override import _vcvars  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[1]
-DEVICE_H = ROOT / "src" / "OTGW-firmware" / "CloudRecDevice.h"
+DEVICE_H = ROOT / "src" / "OTGW-firmware" / "RemoteTelemetryDevice.h"
 
 PRELUDE = r"""
 #include <cstdio>
@@ -49,29 +49,29 @@ struct Preferences {
 };
 static void platformGetMacAddress(uint8_t *mac) { const uint8_t m[6] = {0xac, 0x27, 0x6e, 0xce, 0x45, 0xd8}; memcpy(mac, m, 6); }
 static uint32_t platformHardwareRandom() { g_rand = g_rand * 1664525u + 1013904223u; return g_rand; }
-static char cloudRecUid[18] = "";
-static char cloudRecSecret[33] = "";
+static char remoteTelemetryUid[18] = "";
+static char remoteTelemetrySecret[33] = "";
 """
 
 MAIN = r"""
 int main() {
-  cloudRecIdentity();                                   // first boot: no secret yet, one is made and stored
-  std::string first = cloudRecSecret;
-  memset(cloudRecSecret, 0, sizeof(cloudRecSecret));    // reboot: RAM is gone, NVS stays
-  cloudRecIdentity();
-  printf("len %zu same %d puts %d uid %s\n", first.size(), first == cloudRecSecret ? 1 : 0, g_puts, cloudRecUid);
+  remoteTelemetryIdentity();                                   // first boot: no secret yet, one is made and stored
+  std::string first = remoteTelemetrySecret;
+  memset(remoteTelemetrySecret, 0, sizeof(remoteTelemetrySecret));    // reboot: RAM is gone, NVS stays
+  remoteTelemetryIdentity();
+  printf("len %zu same %d puts %d uid %s\n", first.size(), first == remoteTelemetrySecret ? 1 : 0, g_puts, remoteTelemetryUid);
   return 0;
 }
 """
 
 
 def identity_source(text):
-    start = text.index("static void cloudRecIdentity() {")
+    start = text.index("static void remoteTelemetryIdentity() {")
     return text[start:text.index("\n}\n", start) + 3]
 
 
 def run(device_text):
-    """Two boots of the given CloudRecDevice.h's cloudRecIdentity(); returns the printed fields, None without MSVC."""
+    """Two boots of the given RemoteTelemetryDevice.h's remoteTelemetryIdentity(); returns the printed fields, None without MSVC."""
     bat = _vcvars()
     if not bat:
         return None
@@ -101,7 +101,7 @@ class SecretSurvivesReboot(unittest.TestCase):
 
 
 if __name__ == "__main__":
-    # python tests/test_cloudrec_identity_secret.py <CloudRecDevice.h>: run another copy (red run on the old code).
+    # python tests/test_remote_telemetry_identity_secret.py <RemoteTelemetryDevice.h>: run another copy (red run on the old code).
     if len(sys.argv) > 1:
         print(run(Path(sys.argv[1]).read_text(encoding="utf-8")))
     else:

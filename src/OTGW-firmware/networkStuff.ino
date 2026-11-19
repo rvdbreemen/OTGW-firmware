@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : networkStuff.ino
-**  Version  : v2.0.0-poc.15
+**  Version  : v2.0.0-poc.16
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -151,13 +151,13 @@ static void onWifiLinkEvent(arduino_event_t *ev)
   const uint32_t now = millis();
   if (ev->event_id == ARDUINO_EVENT_WIFI_STA_CONNECTED) {
     wifiLinkOnConnected(ev->event_info.wifi_sta_connected.bssid, ev->event_info.wifi_sta_connected.channel, now);
-#if HAS_CLOUD_REC
-    cloudRecEvNet(0, (int8_t)WiFi.RSSI(), (uint32_t)WiFi.localIP());   // TASK-1473
+#if HAS_REMOTE_TELEMETRY
+    remoteTelemetryEvNet(0, (int8_t)WiFi.RSSI(), (uint32_t)WiFi.localIP());   // TASK-1473
 #endif
   } else if (ev->event_id == ARDUINO_EVENT_WIFI_STA_DISCONNECTED) {
     wifiLinkOnDisconnected(ev->event_info.wifi_sta_disconnected.bssid, ev->event_info.wifi_sta_disconnected.reason, now);
-#if HAS_CLOUD_REC
-    cloudRecEvNet(1, (int8_t)ev->event_info.wifi_sta_disconnected.rssi, ev->event_info.wifi_sta_disconnected.reason);   // TASK-1473: ip = reason
+#if HAS_REMOTE_TELEMETRY
+    remoteTelemetryEvNet(1, (int8_t)ev->event_info.wifi_sta_disconnected.rssi, ev->event_info.wifi_sta_disconnected.reason);   // TASK-1473: ip = reason
 #endif
   }
 }
@@ -1405,8 +1405,8 @@ void loopNTP()
           if (!myTime.isError()) {
             NtpStatus = TIME_SYNC;
             if (diagRec.active) diagRec.recTimeSync((uint32_t)now);   // TASK-1665 (ADR-213)
-#if HAS_CLOUD_REC
-            cloudRecEvTimeSync((uint32_t)now);   // TASK-1473
+#if HAS_REMOTE_TELEMETRY
+            remoteTelemetryEvTimeSync((uint32_t)now);   // TASK-1473
 #endif
             DebugTln(F("[NTP] Time synced!"));
           } else {

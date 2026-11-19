@@ -20,12 +20,12 @@
 #define SATDebugTf(fmt, ...)  do { if (state.debug.bSAT) DebugTf(fmt,  ##__VA_ARGS__); } while(0)
 #define SATDebugTln(s)        do { if (state.debug.bSAT) DebugTln(s);                  } while(0)
 #define SATDebugf(fmt, ...)   do { if (state.debug.bSAT) Debugf(fmt,   ##__VA_ARGS__); } while(0)
-// SATTICK lines: to telnet with SAT debug on (as before); with SAT debug off, only to the cloud recorder while it
+// SATTICK lines: to telnet with SAT debug on (as before); with SAT debug off, only to the remote telemetry recorder while it
 // records (TASK-2905, PoC env only). Each argument is evaluated once on either path.
-#if !HAS_CLOUD_REC
-#define cloudRecSatTickf(fmt, ...)  do {} while (0)
+#if !HAS_REMOTE_TELEMETRY
+#define remoteTelemetrySatTickf(fmt, ...)  do {} while (0)
 #endif
-#define SATTickTf(fmt, ...)   do { if (state.debug.bSAT) DebugTf(fmt, ##__VA_ARGS__); else cloudRecSatTickf(fmt, ##__VA_ARGS__); } while(0)
+#define SATTickTf(fmt, ...)   do { if (state.debug.bSAT) DebugTf(fmt, ##__VA_ARGS__); else remoteTelemetrySatTickf(fmt, ##__VA_ARGS__); } while(0)
 // High-volume SAT trace (per pass, PID detail), key '8', default off (TASK-1521)
 #define SATTraceTf(fmt, ...)  do { if (state.debug.bSATTrace) DebugTf(fmt, ##__VA_ARGS__); } while(0)
 #define SATTraceTln(s)        do { if (state.debug.bSATTrace) DebugTln(s);                 } while(0)

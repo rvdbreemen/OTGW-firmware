@@ -836,8 +836,8 @@ void satBLEUpdateState()
     if (firstFreshSlot < 0) firstFreshSlot = i;
     // TASK-1665 (ADR-213): the loop-task side of the reader, slot number only (the MAC never enters the ring)
     if (diagRec.active) diagRec.recBle((uint8_t)i, diagX100(snap.fTemperature), diagX100(snap.fHumidity), snap.iBattery, snap.iRssi);
-#if HAS_CLOUD_REC
-    cloudRecEvBle((uint8_t)i, snap.fTemperature, snap.fHumidity, snap.iBattery, snap.iRssi);   // TASK-1473
+#if HAS_REMOTE_TELEMETRY
+    remoteTelemetryEvBle((uint8_t)i, snap.fTemperature, snap.fHumidity, snap.iBattery, snap.iRssi);   // TASK-1473
 #endif
 
     // TASK-1153: area fan-out. An area maps to exactly one sensor reference, so a

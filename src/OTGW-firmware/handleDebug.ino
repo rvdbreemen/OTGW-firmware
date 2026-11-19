@@ -288,8 +288,8 @@ static void dumpDebugInfo() {
 // keys 'd' and 's' did before. Run by debugFlagWrite() only when the value changes, from telnet or from REST (both async_tcp).
 void debugFlagSensorSimChanged(bool on)
 {
-#if HAS_CLOUD_REC
-  cloudRecEvMode(0, on ? 1 : 0);   // TASK-1473
+#if HAS_REMOTE_TELEMETRY
+  remoteTelemetryEvMode(0, on ? 1 : 0);   // TASK-1473
 #endif
   initSensors();
   if (on) pollSensors();   // immediate sensor data so the panel and graph update right away
@@ -297,8 +297,8 @@ void debugFlagSensorSimChanged(bool on)
 
 void debugFlagOtgwSimChanged(bool on)
 {
-#if HAS_CLOUD_REC
-  cloudRecEvMode(1, on ? 1 : 0);   // TASK-1473
+#if HAS_REMOTE_TELEMETRY
+  remoteTelemetryEvMode(1, on ? 1 : 0);   // TASK-1473
 #endif
   state.debug.iOTGWSimulationNextDueMs = 0;
   requestOTGWSimulationEvent(on);   // TASK-1321: telnet and REST run on async_tcp
@@ -308,8 +308,8 @@ void debugFlagOtgwSimChanged(bool on)
 // Called from onTelnetInput() in networkStuff.ino via the SimpleTelnet
 // onInputReceived callback (line mode off — one char per call).
 void handleDebugChar(char c){
-#if HAS_CLOUD_REC
-        cloudRecEvTelnetKey(c);   // TASK-1473
+#if HAS_REMOTE_TELEMETRY
+        remoteTelemetryEvTelnetKey(c);   // TASK-1473
 #endif
         // The debug flags: one table with the REST API /api/v2/debug/flags (debugFlags.h, TASK-1561). Same text as before.
         if (const DebugFlagDef* f = debugFlagByKey(c)) {

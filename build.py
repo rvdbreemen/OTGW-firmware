@@ -133,7 +133,7 @@ TARGETS["esp32-combo"] = {
 }
 
 # esp32-combo-tlsdyn (TASK-2901 PoC, branch research/cloud-recording only): the esp32-combo image with the
-# cloud recorder compiled in, on the stock libraries (no IDF rebuild since TASK-2901 poc.12). Never published.
+# remote telemetry recorder compiled in, on the stock libraries (no IDF rebuild since TASK-2901 poc.12). Never published.
 TLS_POC_TARGET = "esp32-combo-tlsdyn"
 TARGETS[TLS_POC_TARGET] = {
     **TARGETS["esp32-combo"],

@@ -359,7 +359,7 @@ as derived or estimate. Gateway counts are for beta gateways per free account.
 | 4 | **Firebase Realtime Database, Spark** | Yes: "No payment method needed" | europe-west1 exists; Spark eligibility not stated | About 117 gateways at 300 s batches with 30-day retention (storage bound, 1 GB); about 100 at 60 s (commit a46708a26) | No Cloud Functions on Spark: cleanup from a host script; behaviour at the limit unverified |
 | 5 | **Firestore, Spark** | Yes | Not stated for Spark | 20,000 writes per day; at one document per 300 s batch (288 per gateway per day) about 69 gateways (derived) | Smallest of the five; Blaze has no hard cap (commit 786a02f20) |
 
-**1. PocketBase on the Synology** (commits 1869fb0bf and 3c30e3926, TASK-1938, `tools/cloud-recorder/pocketbase/`).
+**1. PocketBase on the Synology** (commits 1869fb0bf and 3c30e3926, TASK-1938, `tools/remote-telemetry/pocketbase/`).
 - Pros: no plan limits, retention under Robert's control (nightly cron, default 30 days), per-device accounts
   with create-only rules and a unique device, stream and sequence number so a resend after a lost reply is
   safe, admin UI stays on the LAN, only the login and batch paths pass the tunnel, Hyper Backup covers the
@@ -460,4 +460,4 @@ Under Robert's rule of 2026-11-16 09:30 (decide technical points yourself with a
 - Google: [Free features](https://docs.cloud.google.com/free/docs/free-cloud-features), [Firebase pricing](https://firebase.google.com/pricing), [Apps Script quotas](https://developers.google.com/apps-script/guides/services/quotas). MQTT: [EMQX pricing](https://www.emqx.com/en/pricing), [HiveMQ Cloud docs](https://docs.hivemq.com/hivemq-cloud/introduction.html), [HiveMQ pricing](https://www.hivemq.com/pricing/). Cloudflare R2 [data location](https://developers.cloudflare.com/r2/reference/data-location/).
 - Cloudflare: [Workers limits](https://developers.cloudflare.com/workers/platform/limits/), [Workers pricing](https://developers.cloudflare.com/workers/platform/pricing/), [R2 pricing](https://developers.cloudflare.com/r2/pricing/), [Always Use HTTPS](https://developers.cloudflare.com/ssl/edge-certificates/additional-options/always-use-https/).
 - Encoding: `docs/diagnostics/ot-stream-encoding-study.md`, `scripts/ot_stream_codec_study.py` (commits 3262a496c, 354278bef).
-- Free-only backend research in the TASK-1862 notes (commits aa6d9db36, a46708a26, 786a02f20, 1869fb0bf); PocketBase collector `tools/cloud-recorder/pocketbase/` (TASK-1938, commit 3c30e3926).
+- Free-only backend research in the TASK-1862 notes (commits aa6d9db36, a46708a26, 786a02f20, 1869fb0bf); PocketBase collector `tools/remote-telemetry/pocketbase/` (TASK-1938, commit 3c30e3926).

@@ -35,14 +35,14 @@ void _debugPrintf_P(PGM_P fmt, ...) {
     char buf[320];   // TASK-1412.5: the SATTICK line (with fc/fage/rc/rage) is up to 284 chars in the worst case, 293 with rsrc (TASK-1590)
     va_list args;
     va_start(args, fmt);
-#if HAS_CLOUD_REC
+#if HAS_REMOTE_TELEMETRY
     va_list rec;
     va_copy(rec, args);
     int written = vsnprintf_P(buf, sizeof(buf), fmt, args);
     va_end(args);
     debugTelnet.print(buf);
     // TASK-2901 PoC: the line as tokens (format address + binary arguments); the printed text is the fallback.
-    cloudRecPrintf(fmt, rec, buf, strlen(buf), written >= (int)sizeof(buf));
+    remoteTelemetryPrintf(fmt, rec, buf, strlen(buf), written >= (int)sizeof(buf));
     va_end(rec);
 #else
     vsnprintf_P(buf, sizeof(buf), fmt, args);
@@ -66,7 +66,7 @@ void _debugBOL(const char *fn, int line)
    // Pre-formatted prefix avoids repeating integer-to-string work per call.
    static time_t lastCachedSec = 0;
    static char cachedPrefix[35] = "";  // "HH:MM:SS" + " ( heap| block) "
-#if HAS_CLOUD_REC
+#if HAS_REMOTE_TELEMETRY
    static uint32_t cachedHeap = 0, cachedBlock = 0;   // TASK-2901: the numbers in cachedPrefix
 #endif
 
@@ -102,7 +102,7 @@ void _debugBOL(const char *fn, int line)
    // expensive to run on every debug line under high-volume flags.
    if (now_sec != lastCachedSec) {
      ZonedDateTime myTime = ZonedDateTime::forUnixSeconds64(now_sec, cachedTz);
-#if HAS_CLOUD_REC
+#if HAS_REMOTE_TELEMETRY
      cachedHeap  = platformFreeHeap();
      cachedBlock = platformMaxFreeBlock();
      snprintf_P(cachedPrefix, sizeof(cachedPrefix), PSTR("%02d:%02d:%02d.%%06d (%7u|%6u) "),
@@ -133,9 +133,9 @@ void _debugBOL(const char *fn, int line)
    }
 
    debugTelnet.print(_bol);
-#if HAS_CLOUD_REC
+#if HAS_REMOTE_TELEMETRY
    // TASK-2901 PoC: the prefix as the recorder sends it (time as printed, heap numbers, function, line).
-   cloudRecBol(fn, line, (int64_t)now_sec * 1000000LL + now.tv_usec, cachedHeap, cachedBlock);
+   remoteTelemetryBol(fn, line, (int64_t)now_sec * 1000000LL + now.tv_usec, cachedHeap, cachedBlock);
 #endif
 }
 

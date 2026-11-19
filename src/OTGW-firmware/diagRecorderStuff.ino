@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : diagRecorderStuff.ino
-**  Version  : v2.0.0-poc.15
+**  Version  : v2.0.0-poc.16
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -57,8 +57,8 @@ void diagRecorderInit()
 // reports diagStartReasonText(diagRec.lastStart). Without the lock there is no safe recorder.
 DiagStartResult diagRecorderStart()
 {
-#if HAS_CLOUD_REC   // TASK-2907: one recorder; local recording is the cloud recorder's ring in this env
-  const DiagStartResult r = (DiagStartResult)cloudRecLocalStart();
+#if HAS_REMOTE_TELEMETRY   // TASK-2907: one recorder; local recording is the remote telemetry recorder's ring in this env
+  const DiagStartResult r = (DiagStartResult)remoteTelemetryLocalStart();
   if (r == DIAG_START_OK) updateSetting("DiagRecordingOn", "true");
   return r;
 #else
@@ -72,8 +72,8 @@ DiagStartResult diagRecorderStart()
 bool diagRecorderStop()
 {
   updateSetting("DiagRecordingOn", "false");                          // last Setting record of the recording
-#if HAS_CLOUD_REC   // TASK-2907
-  return cloudRecLocalStop();
+#if HAS_REMOTE_TELEMETRY   // TASK-2907
+  return remoteTelemetryLocalStop();
 #endif
   return diagRec.stop();
 }
@@ -83,9 +83,9 @@ bool diagRecorderStop()
 // manual start applies; a refusal leaves the flag set and the reason in diagRec.lastStart.
 void diagRecorderBootResume()
 {
-#if HAS_CLOUD_REC   // TASK-2907: the reboot is the first event (EV_REBOOT) once the recorder captures
+#if HAS_REMOTE_TELEMETRY   // TASK-2907: the reboot is the first event (EV_REBOOT) once the recorder captures
   if (settings.diag.bRecordingOn) {
-    const uint8_t r = cloudRecLocalStart();
+    const uint8_t r = remoteTelemetryLocalStart();
     DebugTf(PSTR("Recorder: resume %s%s%s\r\n"), r == DIAG_START_OK ? "started" : "refused", r == DIAG_START_OK ? "" : ": ",
             diagStartReasonText((DiagStartResult)r));
   }

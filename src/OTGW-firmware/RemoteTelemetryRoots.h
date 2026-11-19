@@ -1,6 +1,6 @@
-// TASK-2901 PoC: the four roots for cloudrec (see CloudRec.ino for the SHA-256 fingerprints).
+// TASK-2901 PoC: the four roots for remote telemetry (see RemoteTelemetry.ino for the SHA-256 fingerprints).
 #pragma once
-static const char CLOUDREC_ROOTS[] PROGMEM =
+static const char REMOTE_TELEMETRY_ROOTS[] PROGMEM =
   "-----BEGIN CERTIFICATE-----\n"
   "MIIFVzCCAz+gAwIBAgINAgPlk28xsBNJiGuiFzANBgkqhkiG9w0BAQwFADBHMQsw\n"
   "CQYDVQQGEwJVUzEiMCAGA1UEChMZR29vZ2xlIFRydXN0IFNlcnZpY2VzIExMQzEU\n"
