@@ -22,14 +22,14 @@ SLOT = 2293760   # ota_0 in partitions_otgw_esp32.csv (0x230000)
 
 
 class AppSizeCheck(unittest.TestCase):
-    def run_check(self, percent):
+    def run_check(self, percent, *extra):
         self.assertTrue(SCRIPT.exists(), "scripts/check_app_size.py is missing")
         size = int(SLOT * percent / 100)
         with tempfile.TemporaryDirectory() as d:
             img = Path(d) / "fake.ino.bin"
             with open(img, "wb") as f:
                 f.truncate(size)
-            r = subprocess.run([sys.executable, str(SCRIPT), str(img), str(SLOT)], capture_output=True, text=True)
+            r = subprocess.run([sys.executable, str(SCRIPT), str(img), str(SLOT)] + list(extra), capture_output=True, text=True)
         return size, r.returncode, r.stdout + r.stderr
 
     def test_94_percent_passes_and_logs_the_numbers(self):
@@ -56,6 +56,19 @@ class AppSizeCheck(unittest.TestCase):
         self.assertEqual(rc, 0, out)
         self.assertIn("WARN", out)
 
+
+    def test_poc_limit_99_passes_98_3_and_fails_99_5(self):
+        # TASK-2901: build.py passes 99 for the PoC env only; the default stays 98.
+        _, rc, out = self.run_check(98.3, "99")
+        self.assertEqual(rc, 0, out)
+        _, rc, out = self.run_check(98.3)
+        self.assertEqual(rc, 1, out)
+        _, rc, out = self.run_check(99.5, "99")
+        self.assertEqual(rc, 1, out)
+
+    def test_build_py_raises_the_limit_only_for_the_poc_target(self):
+        src = BUILD_PY.read_text(encoding="utf-8")
+        self.assertIn('limit = ["99"] if target == TLS_POC_TARGET else []', src)
 
 class BuildPyCallsTheCheck(unittest.TestCase):
     def test_build_py_runs_the_check_on_the_app_image_with_the_ota0_slot(self):

@@ -2665,8 +2665,10 @@ def collect_pio_artifacts(project_dir, target, want_firmware=True, want_filesyst
             # TASK-1993 (TASK-1955 AC2): log the image against the app0/ota_0 slot; WARN > 95 %, FAIL > 98 %.
             if "bootloader_offset" in tcfg:
                 slot = read_partition_table(project_dir).get("app0", (0, tcfg.get("app_size", 0)))[1]
+                # TASK-2901 (Robert 2026-11-19): the never-published PoC env fails above 99 %, every other target at 98 %.
+                limit = ["99"] if target == TLS_POC_TARGET else []
                 rc = run_streamed([sys.executable, str(project_dir / "scripts" / "check_app_size.py"),
-                                   str(fw_dest), str(slot)])
+                                   str(fw_dest), str(slot)] + limit)
                 if rc != 0:
                     print_error("App size check failed (scripts/check_app_size.py): see the lines above")
                     sys.exit(1)

@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-15T09:35:00Z'
-updated_date: '2026-11-19T09:05:00Z'
+updated_date: '2026-11-19T09:35:00Z'
 labels:
   - research
   - tls
@@ -30,6 +30,7 @@ Robert 2026-11-15 (TASK-1862): the diagnostic stream must be secure from the dev
 - [ ] #3 No regression on that unit in a 1 h soak with uploads every 60 s (no reboot, loop gap within normal, MQTT and web UI working); capture transcript
 - [ ] #4 Result and a recommendation (adopt, adopt with limits, or fall back to payload encryption) put to Robert
 - [ ] #5 Bench on the PSRAM Classic (.63, Classic + ESP32-S3 with PSRAM), same poc.10 build, collection point https://telemetry.vandenbreemen.net: uploads with HTTP 200 and certificate verification for 30 min, free internal heap / largest block / PSRAM before and during uploads recorded, also with BLE on and the web UI open; decode_all + compare_telnet lossless; no reboot
+- [ ] #6 End-to-end proof (Robert 2026-11-19): a known field capture is replayed on .63, streamed via remote telemetry to the collection point, downloaded with decode_all.py into OTGW-field-data/bench-63/<date>_<fw>_remote-telemetry/ with an INDEX.md row, its OT frames match the replayed input (lossless, gaps named), and the analyze-capture skill runs on the downloaded folder
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -125,4 +126,6 @@ poc.13 build (build.bat --target esp32-combo-tlsdyn, 2026-11-19 07:06-07:20, 'Bu
 2026-11-19 second merge of origin/dev (63a773a4b) into research (poc.17): 60 banner conflicts take dev, ADR index keeps dev's ADR-261 + research ADR-290, no duplicate IDs, OpenTherm pointer = dev 51aa68e. Targeted tests 118 passed, evaluate --quick 103/0 failed.
 
 2026-11-19 third merge of origin/dev (1a3422e3e, beta.387) into research (poc.18): banner conflicts take dev, ADR index keeps dev's ADR-262 + research ADR-290, no duplicate IDs, submodule pointers = dev.
+
+2026-11-19 poc.18 build failed dev's app-size gate (scripts/check_app_size.py, TASK-1993): 2,254,736 of 2,293,760 B = 98.3 % > 98 %. Mostly stock mbedTLS code we never call (ssl handshake_server_step 5.8 KB, camellia, pkcs12, rsa_private; not removable without an IDF rebuild); our roots 5.4 KB are in flash rodata (0x3c196689), not RAM. Robert chose A: the never-published PoC env fails above 99 %, every other target keeps 98 % (build.py passes 99 only for TLS_POC_TARGET; tests/test_app_size_check.py 7 passed incl. 98.3 % pass at 99 / fail at 98, 99.5 % fail). RISK for a merge into dev: ~7 KB over the 98 % line on today's dev; candidates: an IDF sdkconfig without TLS server/camellia/pkcs12 (needs the hybrid compile again), DER roots (~1.5 KB), dev's own TASK-1955 reductions.
 <!-- SECTION:NOTES:END -->
