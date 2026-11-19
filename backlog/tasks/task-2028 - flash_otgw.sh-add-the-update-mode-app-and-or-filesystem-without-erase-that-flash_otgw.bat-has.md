@@ -4,8 +4,10 @@ title: >-
   flash_otgw.sh: add the --update mode (app and/or filesystem without erase)
   that flash_otgw.bat has
 status: To Do
-assignee: []
+assignee:
+  - '@claude'
 created_date: '2026-11-18T14:02:00Z'
+updated_date: '2026-11-19T01:06:00Z'
 labels:
   - tools
 milestone: 2.0.0
@@ -25,3 +27,9 @@ Found by TASK-2027: the recovery in manual 7.12a (reset settings.ini over USB, k
 - [ ] #2 Host test or a real run on a unit shows WiFi kept
 - [ ] #3 Manual 7.12a step 2 updated to drop the Windows-only note
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-19 picked up by otgw-dev, parked the same night (coordinator: a 2.0.0 high SAT bug comes first). Nothing written yet; lane-2028 in wt-1995 holds only this note.
+<!-- SECTION:NOTES:END -->
