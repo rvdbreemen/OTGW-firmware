@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : fsWriter.h
-**  Version  : v2.0.0-poc.29
+**  Version  : v2.0.0-poc.30
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **

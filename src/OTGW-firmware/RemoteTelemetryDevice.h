@@ -722,7 +722,16 @@ static void remoteTelemetryEvDateIfNew(bool force) {
   remoteTelemetrySnapshotPending = true;                   // a settings snapshot with every date marker
 }
 
+// TASK-2901: one epoch <-> millis() anchor for replayed frames. Their ideal time is a millis() value; converting it
+// through the wall clock on every frame (epoch us / 1000 minus a millis() delta) rounds two clocks apart and came out
+// 1 ms early on half the frames (poc.27 on .63: 3891 of 7680). With one anchor the gaps are the replay's gaps exactly.
+// Taken at the first replayed frame after a session start, and again when it is more than an hour away.
+static bool remoteTelemetryAnchorSet = false;
+static int64_t remoteTelemetryAnchorEpochMs = 0;
+static uint32_t remoteTelemetryAnchorMillis = 0;
+
 static void remoteTelemetryEvSession() {
+  remoteTelemetryAnchorSet = false;          // a new session takes a new anchor at its first replayed frame
   RemoteTelemetryEv e;
   e.u((uint64_t)(remoteTelemetryNowUs() / 1000));
   e.u(remoteTelemetryFrameSeq + 1);
@@ -737,7 +746,17 @@ void remoteTelemetryOtFrame(char letter, uint32_t frame) {
   int64_t tMs = remoteTelemetryNowUs() / 1000;
   // TASK-2901: a replayed frame carries the replay's ideal dispatch time (otFrameIdealMs, millis()): stamp it with that,
   // so the decoded download repeats the input file's gaps to the ms (Robert: output identical to the input).
-  if (otFrameIdealMs) tMs -= (int64_t)(uint32_t)(millis() - otFrameIdealMs);
+  if (otFrameIdealMs) {
+    int32_t d = (int32_t)(otFrameIdealMs - remoteTelemetryAnchorMillis);
+    if (!remoteTelemetryAnchorSet || d > 3600000 || d < -3600000) {
+      const uint32_t m = millis();
+      remoteTelemetryAnchorEpochMs = tMs - (int64_t)(int32_t)(m - otFrameIdealMs);
+      remoteTelemetryAnchorMillis = otFrameIdealMs;
+      remoteTelemetryAnchorSet = true;
+      d = 0;
+    }
+    tMs = remoteTelemetryAnchorEpochMs + d;
+  }
   const uint32_t seq = ++remoteTelemetryFrameSeq;
   remoteTelemetryAppend(tMs, [&] { return remoteTelemetry.otFrame(tMs, letter, frame, seq); });
 }
