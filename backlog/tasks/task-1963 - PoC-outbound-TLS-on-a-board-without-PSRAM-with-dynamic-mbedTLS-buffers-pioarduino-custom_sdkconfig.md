@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-15T09:35:00Z'
-updated_date: '2026-11-19T05:33:00Z'
+updated_date: '2026-11-19T05:34:00Z'
 labels:
   - research
   - tls
@@ -107,4 +107,6 @@ Hypothesis (not verified): CONFIG_MBEDTLS_DYNAMIC_BUFFER rx-release path, enable
 Likely cause (not proven, single source): espressif/esp-idf#14444, dynamic mbedTLS RX buffer sized through tx_buffer_len() with asymmetric IN 16384 / OUT 4096 (our config), heap corruption detected later at the free; closed upstream without a fixed version. IDF here is 5.5.1.251215, add_rx_buffer still uses tx_buffer_len (esp_mbedtls_dynamic_impl.c:405). TLS 1.3 is off in this build (CONFIG_MBEDTLS_SSL_PROTO_TLS1_3 not set), so the TLS 1.3 ticket path in esp_ssl_tls.c is compiled out. The old-build failure is n=1.
 
 Fix (poc.11): tlsdyn env drops CONFIG_MBEDTLS_DYNAMIC_BUFFER and its --wrap link flags; mbedTLS allocates through malloc (CONFIG_MBEDTLS_DEFAULT_MEM_ALLOC=y): with SPIRAM_USE_MALLOC and ALWAYSINTERNAL=4096 the ~16 KB record buffers land in PSRAM, small blocks stay internal. Not EXTERNAL_MEM_ALLOC: the WiFi supplicant uses mbedTLS crypto (CONFIG_ESP_WIFI_MBEDTLS_CRYPTO=y) and must keep working on a board without PSRAM. cloudRecSetup() refuses the cloud upload without PSRAM (Robert's rule). Gate: tests/test_tlsdyn_env_config.py, red on poc.10 (4 errors: dynamic buffer on, DEFAULT_MEM_ALLOC missing, --wrap flags, no PSRAM check) and green on the fix. Cloudrec suite: 3 test_cloudrec_policy failures are pre-existing (same 3 on HEAD without the change). evaluate.py --quick: 99 checks, 0 failed.
+
+Correction to the note above: add_rx_buffer sizes the RX buffer with tx_buffer_len() at esp_mbedtls_dynamic_impl.c:408, not :405.
 <!-- SECTION:NOTES:END -->
