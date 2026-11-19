@@ -2,7 +2,7 @@
 // The gateway makes no outbound request (it stays HTTP-only, ADR-003).
 //
 // Runs the REAL update-check code cut out of data/v2.js by brace matching:
-//   - the UPD_* constants and updParse, updCmp, updPickNewer, updFlag, updShowNotice, updPost, updAsk, maybeUpdateCheck;
+//   - the UPD_* constants and updParse, updCmp, updPickNewer, updFlag, updHdrGroup, updShowNotice, updPost, updAsk, maybeUpdateCheck;
 //   - the page's ADR-184 /api/ queue (the first IIFE of v2.js), wrapped around a native-fetch stub, so the test also
 //     shows that the GitHub request never takes one of the device's 2 REST slots.
 // Built-in English of I18N_EN, against a small DOM stub and a localStorage stub.
@@ -79,7 +79,8 @@ class El {
 }
 function makeDoc() {
   const body = new El('body');
-  const net = new El('span'); body.appendChild(net);
+  const row = new El('div'); body.appendChild(row);   // the header row
+  const net = new El('span'); row.appendChild(net);   // .hdr-net, hidden at <= 480 px
   const host = new El('span'); host.id = 'hdrHost'; net.appendChild(host);
   const hnet = new El('span'); hnet.id = 'hdrNet'; net.appendChild(hnet);
   function walk(n, id) {
@@ -112,7 +113,9 @@ function page({ settings, fw = '2.0.0-beta.382+e562f82', storage = {}, net }) {
   const setData = {};
   Object.entries(settings).forEach(([k, v]) => { setData[k] = { value: v, type: 'b' }; });
   const body = updConstants(SRC) + '\n' +
-    ['updParse', 'updCmp', 'updPickNewer', 'updFlag', 'updShowNotice', 'updPost', 'updAsk', 'maybeUpdateCheck']
+    ['updParse', 'updCmp', 'updPickNewer', 'updFlag', 'updHdrGroup', 'updShowNotice', 'updPost', 'updAsk', 'maybeUpdateCheck']
+      // updHdrGroup arrived with TASK-2918; an older v2.js (OTGW_V2_JS) runs without it, so its red run fails on behaviour.
+      .filter((n) => n !== 'updHdrGroup' || SRC.indexOf('function updHdrGroup(') >= 0)
       .map((n) => extractFunction(SRC, n)).join('\n') +
     '\nreturn { maybeUpdateCheck: maybeUpdateCheck, updPickNewer: updPickNewer };';
   const api = new Function('document', 'localStorage', 'fetch', 'setData', 'withDeviceInfo', 't', 'APIGW', body)(
@@ -123,6 +126,15 @@ const ok = (json) => Promise.resolve({ ok: true, status: 200, json: () => Promis
 const status = (code) => Promise.resolve({ ok: false, status: code, json: () => Promise.resolve({ message: 'rate limit' }), clone() { return { arrayBuffer: () => Promise.resolve(new ArrayBuffer(0)) }; } });
 const gh = (calls) => calls.filter((c) => c.url.indexOf('https://api.github.com/') === 0);
 const notice = (doc) => doc.getElementById('hdrUpd');
+// TASK-2918: the one-time question is a header chip (#updAsk) next to the version chip, not a modal. Its text and
+// buttons sit in a popover (#updAskPop) that opens only when the user clicks the chip.
+const ask = (doc) => doc.getElementById('updAsk');
+function askButtons(doc) {
+  const chip = ask(doc);
+  chip.children[0].click();   // open the popover
+  const pop = doc.getElementById('updAskPop');
+  return pop.children[1].children;   // [No, Yes]
+}
 
 test('updPickNewer: semver, major filter, beta/stable rule, drafts', () => {
   const { api } = page({ settings: { updatecheck: false, updatecheckasked: true }, net: () => ok([]) });
@@ -145,19 +157,17 @@ test('setting off and question answered: no request to GitHub, no dialog', async
   s.api.maybeUpdateCheck(); await flush();
   assert.equal(gh(s.calls).length, 0);
   assert.equal(s.calls.length, 0, 'no request at all');
-  assert.equal(s.doc.getElementById('updBackdrop'), null);
+  assert.equal(ask(s.doc), null);
   assert.equal(notice(s.doc), null);
 });
 
 test('setting off, not asked yet: the one-time question, still no request to GitHub', async () => {
   const s = page({ settings: { updatecheck: false, updatecheckasked: false, ui_onboarded: true }, net: () => ok({}) });
   s.api.maybeUpdateCheck(); await flush();
-  const bd = s.doc.getElementById('updBackdrop');
-  assert.ok(bd, 'the question is shown');
+  assert.ok(ask(s.doc), 'the question is shown');
   assert.equal(gh(s.calls).length, 0, 'no GitHub request before consent');
   // "No": the setting stays off and the asked flag is written, one POST at a time, in this order.
-  const buttons = bd.children[0].children[2].children;
-  buttons[0].click(); await flush();
+  askButtons(s.doc)[0].click(); await flush();
   const posts = s.calls.map((c) => JSON.parse(c.init.body));
   assert.deepEqual(posts, [{ name: 'updatecheck', value: false }, { name: 'updatecheckasked', value: true }]);
   assert.equal(gh(s.calls).length, 0);
@@ -166,14 +176,38 @@ test('setting off, not asked yet: the one-time question, still no request to Git
 test('the question waits for the first-time wizard', async () => {
   const s = page({ settings: { updatecheck: false, updatecheckasked: false, ui_onboarded: false }, net: () => ok({}) });
   s.api.maybeUpdateCheck(); await flush();
-  assert.equal(s.doc.getElementById('updBackdrop'), null);
+  assert.equal(ask(s.doc), null);
+});
+
+test('the question covers nothing: a header chip next to the version, the text only after a click (TASK-2918)', async () => {
+  const s = page({ settings: { updatecheck: false, updatecheckasked: false, ui_onboarded: true }, net: () => ok({}) });
+  s.api.maybeUpdateCheck(); await flush();
+  assert.equal(s.doc.getElementById('updBackdrop'), null, 'no modal backdrop over the page');
+  const chip = ask(s.doc);
+  assert.ok(chip, 'the question is a chip');
+  // After the identity group (#hdrHost's parent, .hdr-net), not inside it: v2.css hides .hdr-net at <= 480 px.
+  const grp = s.doc.getElementById('hdrHost').parentNode;
+  assert.equal(grp.nextSibling, chip, 'the chip sits right after the identity group, outside it (phones hide that group)');
+  assert.equal(chip.children[0].textContent, 'Check for new versions?');
+  const pop = s.doc.getElementById('updAskPop');
+  assert.ok(pop && /display:\s*none/.test(pop.attrs.style || ''), 'the text and buttons are hidden until the chip is clicked');
+  chip.children[0].click();
+  assert.doesNotMatch(pop.attrs.style || '', /display:\s*none/, 'a click opens them');
+  assert.match(pop.children[0].textContent, /api\.github\.com/, 'the popover says who is contacted before the user says yes');
+  chip.children[0].click();
+  assert.match(pop.attrs.style || '', /display:\s*none/, 'a second click closes them again (not now)');
+  assert.ok(ask(s.doc), 'closing is "not now": the chip stays');
+  assert.equal(s.calls.length, 0, 'opening and closing writes nothing');
+  s.api.maybeUpdateCheck(); await flush();
+  assert.equal(s.doc.body.children[0].children.filter((c) => c.id === 'updAsk').length, 1, 'a second check adds no second chip');
+  assert.equal(grp.children.filter((c) => c.id === 'updAsk').length, 0, 'never inside the hidden-on-phones group');
 });
 
 test('"Yes" switches it on and checks at once', async () => {
   const s = page({ settings: { updatecheck: false, updatecheckasked: false, ui_onboarded: true },
     net: (url) => ok(('' + url).indexOf('api.github.com') >= 0 ? GITHUB_LIST : {}) });
   s.api.maybeUpdateCheck(); await flush();
-  s.doc.getElementById('updBackdrop').children[0].children[2].children[1].click(); await flush();
+  askButtons(s.doc)[1].click(); await flush();
   assert.equal(gh(s.calls).length, 1, 'one GitHub request after consent');
   assert.equal(notice(s.doc).children[0].textContent, 'New version available: v2.0.0-beta.390');
 });

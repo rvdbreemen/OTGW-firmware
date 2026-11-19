@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : Uptimetypes.h
-**  Version  : v2.0.0-beta.392
+**  Version  : v2.0.0-beta.393
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
