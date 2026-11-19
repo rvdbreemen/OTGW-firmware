@@ -7,7 +7,7 @@ status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-19T16:47:00Z'
-updated_date: '2026-11-19T18:45:00Z'
+updated_date: '2026-11-19T19:01:00Z'
 labels:
   - wifi
   - heap
@@ -44,6 +44,8 @@ In WIFI_CONNECTING (prerelease) start the AP fallback only when wifiApFallbackHe
 2026-11-19 09 (otgw-bench-tester): AC1 and AC3 NOT ticked. Bench .61 394+17c993a, two holds: no panic in task wifi, release path taken, clean restarts 18:24:08 and 18:39:08 'WiFi: too many reconnect failures', coredump unchanged; red reference 393+4bb2097 (2 wifi panics, 17:25:08 and 17:41:18). Both ACs require the skip log line (networkStuff.ino:1014 'BETA: AP fallback skipped, heap starved ...'); that line is not in the evidence because telnet is dead during the hold and the line is not persisted. Behaviour proven, log line not captured. The choice (waiver on the line, a rerun where it becomes visible, or an AC rewrite) is open with Robert via the coordinator. Archive: RvdB/OTGW-field-data/bench-otgw32/20261119-task2923-394.
 
 2026-11-19 AC1/AC3 decided by Robert: 'A' (DM 1573043917337665547, relayed by the coordinator, reply to the question waiver on the skip log line vs a rerun that makes it visible): the skip log line is waived; AC1 and AC3 are closed on behaviour. Taken over from 5e by otgw-dev (5e is on the remote telemetry PoC only).
+
+2026-11-19 boot-time AP fallback (networkStuff.ino:431, unguarded; otgw-docs audit) assessed by otgw-dev: it cannot meet a starved heap. (1) Every reset, also after a panic (TASK-2911), starts with a re-initialised heap, and startWiFi() runs early in setup() (OTGW-firmware.ino:395), before MQTT (:571), fsWriter/SAT (:638-639) and anything else that could fill it; the heap-hold hook and BLE are runtime state that a reset clears. Measured: the first telnet lines after the two starvation restarts on .61 (394) show free 57596 / largest block 31732 at 18:24:27 and 53732 / 31732 at 18:39:12, far above WIFI_STARVED_MAXBLOCK 4096 and HEAP_LOW_THRESHOLD 8192. (2) After a WiFi supervisor restart (the 'too many reconnect failures' path) ADR-211 skips both the portal and the boot AP fallback anyway (wifiSkipPortalDecide, networkStuff.ino:416). No follow-up task.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
