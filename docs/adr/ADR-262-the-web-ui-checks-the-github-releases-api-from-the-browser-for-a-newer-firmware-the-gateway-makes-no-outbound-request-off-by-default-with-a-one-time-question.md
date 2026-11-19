@@ -1,7 +1,7 @@
 ---
 id: "ADR-262"
 title: "The web UI checks the GitHub releases API from the browser for a newer firmware; the gateway makes no outbound request; off by default with a one-time question"
-status: "Proposed"
+status: "Accepted"
 date: "2026-11-19"
 binding: false
 gate: null
@@ -10,7 +10,6 @@ verified_in: []
 supersedes: []
 superseded_by: null
 related: []
-format: "canonical"
 topics:
   - "web-ui"
   - "firmware-update"
@@ -31,6 +30,7 @@ symbols:
   - "bUpdateCheckAsked"
   - "bUpdateCheckBeta"
 context_scope: "selective"
+format: "canonical"
 ---
 
 <!-- markdownlint-disable MD025 -->
@@ -39,9 +39,9 @@ context_scope: "selective"
 
 ## Status
 
-Proposed, 2026-11-19.
+Accepted, 2026-11-19.
 
-**Decision Maker:** User: Robert van den Breemen (maintainer), by Discord DM relayed by the coordinator:
+**Decision Maker:** User: Robert van den Breemen (maintainer), by Discord direct message (DM) relayed by the coordinator:
 
 - "B en neem taak C op voor een latere release 2.1.0" (DM 1572585865589428318, 2026-11-18). Option B: the gateway shows
   "new version available" with a link.
@@ -60,13 +60,18 @@ status_history:
     changed_by: Agent (ba)
     reason: Initial proposal
     changed_via: adr-kit
+  - date: 2026-11-19
+    status: Accepted
+    changed_by: "Agent: Claude (ba), for User: Robert van den Breemen (maintainer)"
+    reason: "Accepted by Robert, Discord DM 1572896690426486836 (2026-11-19 08:49 UTC, 'A' to the coordinator's question 'ADR-262 (TASK-2023 update check): may it go to Accepted? A) Accepted now'); shipped in beta.387 (850f555bc), TASK-2023 Done"
+    changed_via: adr-kit lifecycle
 ```
 
 ## Context
 
 Sergeant D asked for updates straight from GitHub instead of a manual zip upload (TASK-2023,
 https://discord.com/channels/812969634638725140/1105556725714649128/1572576499674914927). The gateway firmware speaks only
-HTTP, with no TLS (Transport Layer Security) stack (ADR-003). GitHub serves its API and release assets over HTTPS
+HTTP (Hypertext Transfer Protocol), with no TLS (Transport Layer Security) stack (ADR-003). GitHub serves its API and release assets over HTTPS
 (HTTP over TLS) only, so the gateway cannot fetch anything from GitHub itself.
 
 The browser that shows the web UI can do this. A check on 2026-11-19 with
@@ -74,7 +79,7 @@ The browser that shows the web UI can do this. A check on 2026-11-19 with
 gave these response headers:
 
 - `Access-Control-Allow-Origin: *`, so a page from any origin may read the answer (CORS, cross-origin resource sharing).
-- `X-RateLimit-Limit: 60`: unauthenticated callers get 60 requests per hour per IP address.
+- `X-RateLimit-Limit: 60`: unauthenticated callers get 60 requests per hour per IP (Internet Protocol) address.
 
 `/releases/latest` names the newest stable release of the whole repository. That is the 1.x line (branch `main`), and
 every 2.x beta has `latest=false` (`gh release list`). The answer must therefore come from the release list, filtered to
@@ -86,7 +91,7 @@ another origin does not go through that queue (`isApi()` in `data/v2.js`), so it
 
 ## Decision
 
-The web UI, running in the user's browser, checks the GitHub releases list for a newer firmware and shows a notice with a
+The web UI (user interface), running in the user's browser, checks the GitHub releases list for a newer firmware and shows a notice with a
 link to the release page. The gateway only stores three booleans and sends nothing to the internet. The check is off
 until the user says yes to a one-time question.
 
@@ -140,7 +145,7 @@ until the user says yes to a one-time question.
   stub, 13 tests:
   - the semantic version and major filter, the beta/stable rule and drafts;
   - setting off: 0 requests;
-  - the one-time question, its POST order, and its wait for the wizard;
+  - the one-time question, the order of its two settings writes, and its wait for the wizard;
   - one request with `credentials: 'omit'` and `no-referrer`, and queue `inFlight()` 0 during it;
   - the link and the 6 h cache;
   - dismiss;
@@ -150,7 +155,7 @@ until the user says yes to a one-time question.
   policy.
 - `tests/test_update_check_settings.py` checks:
   - the struct defaults derive from the constant;
-  - each key is in the settings file, in dispatch, in GET and in the POST whitelist;
+  - each key is in the settings file, in dispatch, in `GET /api/v2/settings` and in the `POST` whitelist;
   - the help texts and the hidden row;
   - no firmware source names `api.github.com`.
   
@@ -193,7 +198,7 @@ until the user says yes to a one-time question.
 - **ADR-003 (HTTP only, no HTTPS):** kept; the browser, not the gateway, uses HTTPS.
 - **ADR-184 (2 API requests in flight):** kept; the GitHub request is not a device API request.
 - **ADR-213 (opt-in local diagnostic recorder):** the same opt-in, local-first line for anything that leaves the device.
-- **ADR-218 (outbound TLS on boards with PSRAM, Proposed, parked):** the route the 2.1.0 option C (an update straight
+- **ADR-218 (outbound TLS on boards with an external memory chip (PSRAM); Proposed, parked):** the route the 2.1.0 option C (an update straight
   from GitHub on the gateway) would need; this ADR does not depend on it.
 
 ## References

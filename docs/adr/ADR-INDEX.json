@@ -11033,9 +11033,9 @@
       "title": "The web UI checks the GitHub releases API from the browser for a newer firmware; the gateway makes no outbound request; off by default with a one-time question",
       "path": "ADR-262-the-web-ui-checks-the-github-releases-api-from-the-browser-for-a-newer-firmware-the-gateway-makes-no-outbound-request-off-by-default-with-a-one-time-question.md",
       "format": "canonical",
-      "status": "Proposed",
+      "status": "Accepted",
       "date": "2026-11-19",
-      "decision_summary": "The web UI, running in the user's browser, checks the GitHub releases list for a newer firmware and shows a notice wi...",
+      "decision_summary": "The web UI (user interface), running in the user's browser, checks the GitHub releases list for a newer firmware and...",
       "topics": [
         "firmware-update",
         "privacy",
@@ -11080,14 +11080,14 @@
           "tests/webui/update-check-github.test.mjs runs the real data/v2.js functions and the ADR-184 queue against a fetch stub, 13 tests:",
           "the semantic version and major filter, the beta/stable rule and drafts;",
           "setting off: 0 requests;",
-          "the one-time question, its POST order, and its wait for the wizard;",
+          "the one-time question, the order of its two settings writes, and its wait for the wizard;",
           "one request with credentials: 'omit' and no-referrer, and queue inFlight() 0 during it;",
           "the link and the 6 h cache;",
           "dismiss;",
           "403, 429, network error and non-list answers: quiet, and no retry before 6 h. Red 0/13 on the earlier data/v2.js. Three mutants each turn it red: no major filter, no off switch, no referrer policy.",
           "tests/testupdatechecksettings.py checks:",
           "the struct defaults derive from the constant;",
-          "each key is in the settings file, in dispatch, in GET and in the POST whitelist;",
+          "each key is in the settings file, in dispatch, in GET /api/v2/settings and in the POST whitelist;",
           "the help texts and the hidden row;",
           "no firmware source names api.github.com. Red 4/6 on the earlier sources."
         ]

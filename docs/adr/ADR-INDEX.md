@@ -266,4 +266,4 @@ One row per Architecture Decision Record. Scope is the Enforcement `path_glob` s
 | ADR-259 | Accepted | - | When the error leaves the 0.1 C deadband the integral is multiplied by 0.5 once and then held while the error stays o... |
 | ADR-260 | Accepted | - | The tuner keeps its hour, its exclusions, its two phases and its agreement rule, and changes three constants: a tuner... |
 | ADR-261 | Proposed | - | While the heap is starved (platformMaxFreeBlock() < WIFISTARVEDMAXBLOCK), wifiLinkProbeOnReconnect() keeps the dead s... |
-| ADR-262 | Proposed | `src/OTGW-firmware/**/*.ino` | The web UI, running in the user's browser, checks the GitHub releases list for a newer firmware and shows a notice wi... |
+| ADR-262 | Accepted | `src/OTGW-firmware/**/*.ino` | The web UI (user interface), running in the user's browser, checks the GitHub releases list for a newer firmware and... |

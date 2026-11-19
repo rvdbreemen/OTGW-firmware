@@ -7,7 +7,7 @@ status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-18T11:54:00Z'
-updated_date: '2026-11-19T08:49:00Z'
+updated_date: '2026-11-19T08:57:00Z'
 labels:
   - feature
 milestone: 2.0.0
@@ -128,6 +128,8 @@ Robert in #dev-sat-mqtt 2026-11-18 12:06 UTC (https://discord.com/channels/81296
 2026-11-19 after the bench (09's note d): the one-time question now names api.github.com like the help text, the manual and ADR-262 (upd_ask_body en/nl/de/el); tests/test_update_check_settings.py asserts it in all 4 languages (red on the 629e1a049 texts, green now). A text-only change, not benched; it rides on the renumbered build. Browser web UI tests on 629e1a049: theme-toggle-labels 4/4, settings-reboot-badge 1/1, v2-settings-dirty-survives-refetch 1/1 (after a load stall at 91 % commit); settings-fetch-retry 0/2 as two Chrome stalls at 79 % commit (CDP no reply, 0 GETs), lang-menu and v2-navigation not run yet (guard commit < 80 %).
 
 2026-11-19 AC5: the privacy note is on origin 163bb8fbb (otgw-docs): EN docs/manuals/en/ch03-web-interface.md '#### Check GitHub for new versions', NL docs/manuals/nl/h03-webinterface.md '#### GitHub controleren op nieuwe versies', both 'From firmware 2.0.0-beta.387', with who contacts GitHub, what is sent (no referrer, no cookies), the one-time question, how to switch it off (Settings > Behavior / Instellingen > Gedrag), the beta rule and the x; checked in this session (grep, no TBD-2023 left). Firmware pushed as beta.387 (origin 63a773a4b..850f555bc), zip msg 1572895492637991013. Browser web UI tests on 850f555bc: settings-fetch-retry 2/2, lang-menu 7/7, v2-navigation 1/1 (commit 76 %), with theme-toggle-labels 4/4, settings-reboot-badge 1/1, v2-settings-dirty-survives-refetch 1/1 earlier.
+
+2026-11-19 ADR-262 Accepted by Robert (DM 1572896690426486836, 08:49 UTC, 'A' to the coordinator's question naming ADR-262; relayed by the coordinator). adr accept --confirm signed 'Agent: Claude (ba), for User: Robert van den Breemen'; the accept clarity gate first flagged GET, POST and PSRAM (adr-lint gate_clarity), fixed by code spans and 'an external memory chip (PSRAM)'; adr-lint strict pass, test_adr_governance OK.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
