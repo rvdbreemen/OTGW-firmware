@@ -114,7 +114,7 @@ export async function launchChrome(bin, args, opts = { stdio: 'ignore' }) {
   return guardChrome(child, slot);
 }
 
-export async function startPage({ api, asset, beforeScript, width = 1400, height = 1000, page = '/v2.html' } = {}) {
+export async function startPage({ api, asset, beforeScript, width = 1400, height = 1000, page = '/v2.html', apiConnClose = false } = {}) {
   const log = [];
   let PORT = 0;
   const srv = http.createServer((q, s) => {
@@ -126,8 +126,14 @@ export async function startPage({ api, asset, beforeScript, width = 1400, height
       if (p.indexOf('/api/') === 0) {
         log.push(q.method + ' ' + p + u.search + ' ' + body);
         const r = api ? api(q.method, p, u.search, body) : undefined;
+        // A handler may answer { __reset: true } to close the connection without any response, as the
+        // device's busy path does on a starved heap (TASK-2910, webAbortCurrentRequest).
+        if (r && r.__reset) { if (q.socket.resetAndDestroy) q.socket.resetAndDestroy(); else q.socket.destroy(); return; }
         // A handler may answer { __status: 500 } to make the request fail with that HTTP status.
-        s.writeHead((r && r.__status) || 200, { 'content-type': 'application/json' });
+        // apiConnClose: answer /api/ with Connection: close, as the device's async web server does, so the browser
+        // keeps no idle API socket that it would silently resend a reset GET on (TASK-2914).
+        s.writeHead((r && r.__status) || 200, apiConnClose ? { 'content-type': 'application/json', connection: 'close' }
+          : { 'content-type': 'application/json' });
         s.end(JSON.stringify(r === undefined ? {} : r));
         return;
       }

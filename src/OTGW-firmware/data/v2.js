@@ -4065,15 +4065,17 @@
   }
   function fetchOverrides(iface) {
     // On OT-Direct the gateway overrides endpoint is meaningless (no PIC); read the
-    // OT-Direct store instead. Both normalize into ovrRows; errors -> empty, silently, but a busy
-    // 503 (the REST in-flight cap) keeps the rows shown (TASK-1747).
+    // OT-Direct store instead. Both normalize into ovrRows; another error answer -> empty, silently, but a
+    // busy 503 (the REST in-flight cap) keeps the rows shown (TASK-1747). TASK-2914: on a starved heap the
+    // device answers busy by closing the connection without a response (TASK-2910), so a failed request is
+    // tried once more after 400 ms and, if it fails again, also keeps the rows; the next poll decides.
     // Returns the (never-rejecting) promise so callers can chain behind it.
     var otd = (iface === 'OT-Direct');
     var url = APIGW + (otd ? 'v2/otdirect/overrides' : 'v2/otgw/overrides');
     function apply() { updateCnOvr(); scheduleRender(); }   // map badge + Home A badge/marks
-    return fetch(url).then(function (r) { return r.status === 503 ? undefined : (r.ok ? r.json() : null); })
+    return fetchWithRetry(url, undefined, 2).then(function (r) { return r.status === 503 ? undefined : (r.ok ? r.json() : null); })
       .then(function (j) { if (j === undefined) return; ovrRows = otd ? normOtdOvr(j) : normPicOvr(j); apply(); })
-      .catch(function () { ovrRows = []; apply(); });
+      .catch(function () { });
   }
   // On-bus badge in the connection-map SVG (#cnOvr sits on the y=180 shared bus segment).
   function updateCnOvr() {
