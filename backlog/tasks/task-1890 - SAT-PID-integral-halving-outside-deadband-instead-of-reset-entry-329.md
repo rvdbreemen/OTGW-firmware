@@ -1,11 +1,11 @@
 ---
 id: TASK-1890
 title: SAT PID integral halving outside deadband instead of reset (entry 329)
-status: In Progress
+status: Done
 assignee:
   - '@otgw-dev'
 created_date: '2026-11-13T08:09:00Z'
-updated_date: '2026-11-19T04:21:00Z'
+updated_date: '2026-11-19T22:31:00Z'
 labels:
   - sat
   - adr
@@ -23,9 +23,9 @@ Sergeant D 2026-11-13 (https://discord.com/channels/812969634638725140/110555672
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Plan with thermo-nova citations (pid.py:185-189, const.py:16) and SATpid.ino:247-250, plus Sergeant D's confirmation (decay per update vs once per crossing), before code
-- [ ] #2 ADR that supersedes the integral-reset rule of ADR-197 (and checks ADR-204)
-- [ ] #3 Host test on the real PID: red on reset-to-0, green on halving
+- [x] #1 Plan with thermo-nova citations (pid.py:185-189, const.py:16) and SATpid.ino:247-250, plus Sergeant D's confirmation (decay per update vs once per crossing), before code
+- [x] #2 ADR that supersedes the integral-reset rule of ADR-197 (and checks ADR-204)
+- [x] #3 Host test on the real PID: red on reset-to-0, green on halving
 - [x] #4 Bench test by the bench-tester
 <!-- AC:END -->
 
@@ -61,4 +61,12 @@ Bench (otgw-bench-tester 09, 2026-11-18, .63 Classic+S3 PSRAM, no boiler) on 2.0
 2026-11-19 follow-up (found by ba's full suite before the 08:00 beta): the simulation port tools/research/sat/sat_sim_port.py still set the integral to 0 outside the deadband, so tests/test_sat_sim_port_equivalence.py::test_pid_and_curve_match_the_firmware failed on origin b72c6d6c5 (PID output differs, max 0.402). Bisect by file: passes with SATpid.ino from 95bcfc78e^, fails with 95bcfc78e (this task). Not a firmware regression: the port did not follow ADR-259. Fix: the port halves once and holds (in_band flag, set by reset()), as _pidUpdateIntegral; a class switch Pid.HALVE_ON_EXIT (default True) keeps the old rule for reproducing studies whose committed results were made with it (tests/test_sat_kd_005_sim.py 1655 x09 rows). Evidence: port equivalence 4/4 incl. the mutant check; against the pre-1890 SATpid.ino it now fails (the port follows 1890); the 4 port-user files 18 passed. My miss: the 1890 sweep ran the SAT PID files, not the sim-port tests.
 
 2026-11-19 full-suite follow-up: tests/test_sat_pwm_override.py PidIntegralFreeze failed to compile on origin b72c6d6c5 (_pid_inBand undeclared in the harness stubs) and then held the old expectation (integral 0 outside the deadband). Harness stub added; the two tests now expect the halved value 1.5 (renamed ...halves_outside...). 83 passed.
+
+2026-11-19 ACs checked by otgw-dev against the notes and the sources: AC1: thermo-nova 7beaaf5 pid.py:185-189 (_update_integral: abs(error) > DEADBAND -> _integral = 0.0) and const.py:16 (DEADBAND = 0.1) opened this session in other-projects/SAT-releases-thermo-nova; Sergeant D's answer recorded as entry 414 ('My answer is B': main and zone PIDs) on top of Robert's entry 333. AC2: ADR-259 Accepted 2026-11-18 (partly supersedes ADR-197 decision 3, checks ADR-204). AC3: host tests in the notes: thermo-nova oracle 24/24 on the fix, 5 FAIL on the old SATpid.ino; zone case 32/32 on the fix, FAIL on the old SATcontrol.ino; commit 95bcfc78e (beta.376).
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+SAT halves the PID integral once when the room error leaves the 0.1 C deadband and holds it while outside, for the main PID and the zone PIDs; inside the band it accumulates again from the held value (entries 329/333/414, ADR-259 Accepted, partly superseding ADR-197 decision 3). Shipped in beta.376 (95bcfc78e). AC1: thermo-nova citations pid.py:185-189 / const.py:16 (reset to 0, the difference this task makes on purpose) and Sergeant D's 'B' (entry 414). AC2: ADR-259. AC3: host oracle 5 FAIL on the old code -> 24/24, zone case FAIL -> 32/32; follow-ups in the sim port and test_sat_pwm_override fixed on 2026-11-19. AC4: bench regression by the bench-tester on .63 (377+412f888, 4/4 OK, PID state restore pid_i 1.235). Not verified: the halving in a field run (signature in the notes for the field analyses).
+<!-- SECTION:FINAL_SUMMARY:END -->

@@ -4,11 +4,11 @@ title: >-
   SAT: after an ESP reset the gateway sends CS (curve value) + CH=1 before SAT
   has a room temperature; the burner lit above target (gruijter beta.214 14:07,
   17:59)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-12T20:56:00Z'
-updated_date: '2026-11-16T15:37:00Z'
+updated_date: '2026-11-19T22:31:00Z'
 labels: []
 milestone: 2.0.0
 dependencies: []
@@ -59,3 +59,9 @@ CORRECTION by 09, 2026-11-16 16:30: 09's .63 observations for this task (349 boo
 
 2026-11-16 16:33 sim-OFF re-check by 09 on .63 (b5aba1c, satsimulation false, SAT enabled, no boiler; one planned /ReBoot 175 -> 176, approved by the coordinator; 09 scratchpad b1874sim0\boot.raw): init 16:33:11.338, first SAT command 16:34:11.321 'SATBOOT phase=silence_end ms=67340' (:697-700) = 60 s silence REAL on a device. Without a boiler reply the path is the hand-back (:701-703 'no valid restored state, boiler handed back (CS=0, CH=1, MM=T)', decide valid=0), and the PIC CONFIRMS each command: CS=0 queued .322 -> 'Confirmed [2]:[CS=0]' .362 (:709-710), CH=1 confirmed .550 (:718-719), MM=T confirmed .615 (:727-728); repeated at 16:34:41 after 30 s without a boiler reply (:947). Not shown on hardware: a takeover WITH control values (valid=1), which needs a boiler reply. Open observation, not analysed: in the sim-on boots (349, b5aba1c) the queued CS/MM/CH got no 'Confirmed' line; the command queue has no simulation gate (no sat.bSimulation in OTGW-Core.ino/helperStuff.ino), so the cause is unknown; out of scope for this task.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+SAT sends no command of its own (CS, CH, MM, TC, SH, MI, SW, TP) during the first 60 s after a reboot, then takes over as before (entry 388; entry 395, Q-388a 'A': the PM=3/15/48 start-up reads may run during the wait, the wait covers SAT's own control commands only). AC1/AC2: host test on the real SAT loop: no SAT command in the first 60 s, a CS within 5 s after; the mutant without the silence fails. AC3: bench smoke on .63 by the bench-tester with SAT simulation OFF (b5aba1c, satsimulation false, one approved /ReBoot 175 -> 176): init 16:33:11.338, first SAT command 16:34:11.321 'SATBOOT phase=silence_end ms=67340' (60 s after init), no extra reboot, the boot PM= chain unchanged, sat/status carries pid_curve_only. The earlier 349 observation ran with the simulator on and is labelled as such in the notes. Not verified: SAT against a real boiler after a reboot.
+<!-- SECTION:FINAL_SUMMARY:END -->
