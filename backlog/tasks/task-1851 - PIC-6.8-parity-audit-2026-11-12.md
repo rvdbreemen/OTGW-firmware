@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-12T00:08:00Z'
-updated_date: '2026-11-14T15:32:00Z'
+updated_date: '2026-11-19T22:26:00Z'
 labels:
   - otdirect
   - parity
@@ -57,4 +57,6 @@ Child status 2026-11-14 (comms, stale audit): Done 9 (1831, 1832, 1833, 1836, 18
 Correction to the line above: Done is 8, not 9 (1831, 1832, 1833, 1836, 1840, 1842, 1844, 1846); 8 + 4 + 1 + 6 = 19 children incl. 1906-1908.
 
 Assignment of the 6 open children (coordinator 2026-11-14; owners claim them themselves): 95 -> TASK-1848 (PR texts) + TASK-1849 (success/clear replies); ba -> TASK-1850 (thermostat (dis)connected lines) + TASK-1908 (SC= validation), after TASK-1937; d3 -> TASK-1847 (PM TSP/fault history) + TASK-1906 (the thermostat's own MsgID 99), after TASK-1924 Part 2 and TASK-1839.
+
+Triage 2026-11-19 (otgw-docs, coordinator request, origin 511686b28): 17 of 19 children Done (1835, 1845, 1907 Done with a field AC closed on Robert's A, DM 1571431149795024929). Open, not stale: TASK-1847 (d3, In Review) AC2 'PM=93 reads all characters' is a field AC (host-proven, 09 bench PASS beta.301); TASK-1850 (ba, In Progress) AC1 needs a real thermostat loss and return, OT-Direct has no thermostat simulation (otThermostatSeen only from real frames, OTDirect.ino:1301/2457). AC1 of this parent stays open until those two close. The coordinator puts both field ACs to Robert (same pattern as 1845/1907).
 <!-- SECTION:NOTES:END -->

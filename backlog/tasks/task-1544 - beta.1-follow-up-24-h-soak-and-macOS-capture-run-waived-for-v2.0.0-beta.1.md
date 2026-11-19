@@ -1,11 +1,11 @@
 ---
 id: TASK-1544
 title: 'beta.1 follow-up: 24 h soak and macOS capture run (waived for v2.0.0-beta.1)'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-01T15:47:00Z'
-updated_date: '2026-11-19T13:57:00Z'
+updated_date: '2026-11-19T22:26:00Z'
 labels:
   - beta
   - release
@@ -62,3 +62,9 @@ AC4 PASS by 09 (2026-11-18), .63 (Classic + ESP32-S3, PIC 6.8). Pre-state: publi
 
 2026-11-19 AC2 evidence (comms 92, confirmed from the zip, not only the tester's word): indigo_light ran capture-mqtt-debug-macos.sh from the beta.382 release zip on macOS; upload #beta-testing https://discord.com/channels/812969634638725140/914498730001072149/1572966038965063826, 20261119-091712-upload-clean.zip sha256 6087efcc9efd50c01e368a822a3e8209df5341220a0a185121bf84df82ad1485, archived OTGW-field-data/indigo_light/2026-11-19_2.0.0-beta.382+224e30c/macos-20261119-091712. Transcript transcript-20261119-091712-2.0.0-beta.382+224e30c: 'Python: 3.9.6 (/Library/Developer/CommandLineTools/usr/bin/python3)', 'Platform: darwin'; self-recovery: 'Telnet reconnected after 17548 attempt(s): 2026-11-19T13:56:51+01:00' after the Mac was off the network from 09:32:18, 'MQTT reconnected: 2026-11-19T13:57:23+01:00'. Gap found: 'csv conversion of telnet.log failed ... No module named sat_log_to_csv' (also in the Windows run of 18/11): the flash zip lacks scripts/sat_log_to_csv.py; filed separately.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+AC1: 24 h soak on .63 (OTGW Classic + S3 Mini), beta.95+1fbd5cf: 2026-11-06 15:00 uptime 1(d)-00:03, bootcount 148 unchanged since the soak start, mqttconnected true, crashlog available:false, reboot_log newest entries only the beta.95 OTA reboot (2026-11-05 14:56). AC2: macOS capture by indigo_light from the published beta.382 release zip (capture-mqtt-debug-macos.sh), transcript 'Platform: darwin', Python 3.9.6; archived OTGW-field-data/indigo_light/2026-11-19_2.0.0-beta.382+224e30c/macos-20261119-091712/ (20261119-091712-upload-clean.zip, sha256 6087efcc9efd50c01e368a822a3e8209df5341220a0a185121bf84df82ad1485; #beta-testing msg 1572966038965063826); the sat_log_to_csv gap it showed was fixed in TASK-2917. AC3: Windows (capture-mqtt-debug.bat) and Linux runs from the published v2.0.0-beta.360 zip (sha256 6f1b6543... = SHA256SUMS) against .63, 2026-11-17, transcripts per the notes, pushed in 42e26c101. AC4: 09 on .63, 2026-11-18: update from the public beta.351 to the v2.0.0-beta.360 release zip through the real /update page in Chrome, device/info then reported the new version and settings were kept (diff in the notes). Triage 2026-11-19 (otgw-docs, coordinator): sources re-checked, archive path for AC2 exists. Not re-run in this triage: no new soak or capture; the evidence is the recorded runs above.
+<!-- SECTION:FINAL_SUMMARY:END -->
