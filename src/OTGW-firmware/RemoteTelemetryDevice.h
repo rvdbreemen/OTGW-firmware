@@ -52,12 +52,14 @@
 #include "RemoteTelemetryRoots.h"
 
 // TASK-2901: mbedTLS allocates through this pair from the first line of setup(), for every user (esp-tls here,
-// also the WiFi supplicant's crypto). A block above 4 KB (the two ~16 KB TLS record buffers) comes from PSRAM
-// when the board has it; everything else, and every block on a board without PSRAM, from internal RAM exactly
-// as the stock allocator (esp_mbedtls_mem_calloc, CONFIG_MBEDTLS_INTERNAL_MEM_ALLOC) does. heap_caps_free()
-// frees a block of any heap, so blocks allocated before the switch are freed correctly too.
+// also the WiFi supplicant's crypto). On a board with PSRAM every block comes from PSRAM first (what ESP-IDF calls
+// CONFIG_MBEDTLS_EXTERNAL_MEM_ALLOC), with internal RAM as the fallback; on a board without PSRAM the SPIRAM attempt
+// fails and every block comes from internal RAM as with the stock allocator. heap_caps_free() frees a block of any
+// heap, so blocks allocated before the switch are freed correctly too.
+// poc.21: poc.20 still put every block up to 4 KB in internal RAM (parsed roots, the kept peer chain, the TLS
+// context, ECDH/ECDSA bignums); with the 10 KB task stack that starved .63 with BLE on (09, 2026-11-19 20:18-20:29).
 // Replaces poc.10's dynamic mbedTLS buffers, whose RX-buffer free panicked on .63 (core dump 2026-11-19).
-static const size_t REMOTE_TELEMETRY_TLS_PSRAM_MIN = 4096;
+static const size_t REMOTE_TELEMETRY_TLS_PSRAM_MIN = 0;
 static void *remoteTelemetryTlsCalloc(size_t n, size_t size) {
   size_t total;
   if (__builtin_mul_overflow(n, size, &total)) return nullptr;
@@ -847,11 +849,29 @@ static void remoteTelemetryCountPut(void *, uint8_t) {}
 
 // remoteTelemetryLz (3.2 KB, used only by the upload task): in RemoteTelemetryBufs (TASK-2901 poc.19)
 
+// TASK-2901 poc.21: no connection attempt while the internal heap is low, so the upload can never starve the gateway
+// (WiFi, web, MQTT). The limits are PoC values: HEAP_LOW_THRESHOLD x2 for free heap, and a largest block that still
+// leaves lwIP and the WiFi driver their buffers. A skipped attempt counts as a failed one (backoff).
+static const uint32_t REMOTE_TELEMETRY_MIN_FREE  = 16384;
+static const uint32_t REMOTE_TELEMETRY_MIN_BLOCK = 8192;
+static uint32_t remoteTelemetryConnects = 0, remoteTelemetryConnectFails = 0, remoteTelemetryHeapSkips = 0;
+static uint32_t remoteTelemetryFailHeap = 0, remoteTelemetryFailBlock = 0;
+
 static bool remoteTelemetryConnect(RemoteTelemetryTls &c) {
   c.setTimeout(10000);                              // Stream read timeout, ms
+  const uint32_t heap0 = platformFreeHeap(), block0 = platformMaxFreeBlock();
+  if (heap0 < REMOTE_TELEMETRY_MIN_FREE || block0 < REMOTE_TELEMETRY_MIN_BLOCK) {
+    remoteTelemetryHeapSkips++;
+    DebugTf(PSTR("telemetry: heap too low to connect (heap %u, block %u); skipped\r\n"), (unsigned)heap0, (unsigned)block0);
+    return false;
+  }
+  remoteTelemetryConnects++;
   if (!c.connect(remoteTelemetryCfg.host, remoteTelemetryCfg.port)) {
+    remoteTelemetryConnectFails++;
+    remoteTelemetryFailHeap = platformFreeHeap();
+    remoteTelemetryFailBlock = platformMaxFreeBlock();
     DebugTf(PSTR("telemetry: connect to %s:%u failed (heap %u, block %u)\r\n"), remoteTelemetryCfg.host,
-            (unsigned)remoteTelemetryCfg.port, (unsigned)platformFreeHeap(), (unsigned)platformMaxFreeBlock());
+            (unsigned)remoteTelemetryCfg.port, (unsigned)remoteTelemetryFailHeap, (unsigned)remoteTelemetryFailBlock);
     return false;
   }
   uint32_t heapTls = platformFreeHeap(), blockTls = platformMaxFreeBlock();
@@ -1076,6 +1096,22 @@ bool remoteTelemetryLocalStop() {
   if (toFree) free(toFree);
   DebugTln(F("telemetry: local recording off"));
   return true;
+}
+
+void remoteTelemetryHealthRead(RemoteTelemetryHealth &h) {   // TASK-2901 poc.21, for /api/v2/health
+  h.enabled = remoteTelemetrySvc != SVC_OFF;
+  h.svc = (uint8_t)remoteTelemetrySvc;
+  h.connects = remoteTelemetryConnects;
+  h.connectFails = remoteTelemetryConnectFails;
+  h.heapSkips = remoteTelemetryHeapSkips;
+  h.sent = remoteTelemetrySent;
+  h.failed = remoteTelemetryFailed;
+  h.lastStatus = remoteTelemetryLastStatus;
+  h.connHeap = remoteTelemetryConnHeap;
+  h.connBlock = remoteTelemetryConnBlock;
+  h.connPsram = remoteTelemetryConnPsram;
+  h.failHeap = remoteTelemetryFailHeap;
+  h.failBlock = remoteTelemetryFailBlock;
 }
 
 void remoteTelemetryLocalStatusRead(RemoteTelemetryLocalStatus &st) {

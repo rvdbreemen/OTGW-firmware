@@ -20,7 +20,7 @@ void remoteTelemetryPrintf(const char *fmt, va_list ap, const char *printed, siz
 void remoteTelemetryOtFrame(char letter, uint32_t frame);                                       // processOT()
 void remoteTelemetryTeeFlush();                                                                  // end of a tee line
 void remoteTelemetrySetup();                                                                     // from setup()
-void remoteTelemetryInstallTlsAllocator();   // first line of setup(): mbedTLS blocks above 4 KB to PSRAM (TASK-2901)
+void remoteTelemetryInstallTlsAllocator();   // first line of setup(): mbedTLS blocks to PSRAM when the board has it (TASK-2901)
 void remoteTelemetrySatTickf(const char *fmt, ...);   // a SATTICK line with SAT debug off: recorder only (TASK-2905)
 
 // TASK-2907: local recording into a ring of the same records (the /api/v2/diag/recording routes in this env).
@@ -36,6 +36,16 @@ bool remoteTelemetryLocalStop();
 void remoteTelemetryLocalStatusRead(RemoteTelemetryLocalStatus &st);
 size_t remoteTelemetryLocalFill(rtel::RingCursor &c, uint8_t *buf, size_t cap);   // DIAG_FILL_TRY_AGAIN when busy, 0 at the end
 const char *remoteTelemetryUidText();
+
+// TASK-2901 poc.21: the upload state for /api/v2/health, which still answers when telnet and device/info do not.
+struct RemoteTelemetryHealth {
+  bool enabled;                      // /telemetry.cfg enabled=1 and remoteTelemetrySetup() started the upload
+  uint8_t svc;                       // 0 probe, 1 up, 2 backoff, 3 uid taken, 4 off
+  uint32_t connects, connectFails, heapSkips, sent, failed, lastStatus;
+  uint32_t connHeap, connBlock, connPsram;     // right after the last successful connect
+  uint32_t failHeap, failBlock;                // at the last failed connect
+};
+void remoteTelemetryHealthRead(RemoteTelemetryHealth &h);
 
 // Print that writes through to the telnet debug sink and keeps a copy of the current line.
 class RemoteTelemetryTee : public Print {

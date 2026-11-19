@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-poc.20
+**  Version  : v2.0.0-poc.21
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -3629,6 +3629,29 @@ void sendHealth()
     je.field(F("simulation_active"), state.debug.bOTGWSimulation);
     je.field(F("simulation_source"), LittleFSsimFilePresent ? "file" : "builtin");
     je.field(F("littlefsMounted"), LittleFSmounted.load());
+#if HAS_REMOTE_TELEMETRY
+    {   // TASK-2901 poc.21: this poll still answers when telnet and device/info do not
+      RemoteTelemetryHealth rt;
+      remoteTelemetryHealthRead(rt);
+      je.beginObject(F("remote_telemetry"));
+      je.field(F("enabled"), rt.enabled);
+      je.field(F("svc"), (uint32_t)rt.svc);
+      je.field(F("connects"), rt.connects);
+      je.field(F("connect_fails"), rt.connectFails);
+      je.field(F("heap_skips"), rt.heapSkips);
+      je.field(F("sent"), rt.sent);
+      je.field(F("failed"), rt.failed);
+      je.field(F("last_status"), rt.lastStatus);
+      je.field(F("conn_heap"), rt.connHeap);
+      je.field(F("conn_block"), rt.connBlock);
+      je.field(F("conn_psram"), rt.connPsram);
+      je.field(F("fail_heap"), rt.failHeap);
+      je.field(F("fail_block"), rt.failBlock);
+      je.field(F("maxblock"), platformMaxFreeBlock());
+      je.field(F("min_free"), platformMinFreeHeap());
+      je.endObject();
+    }
+#endif
     je.endObject();                   // close "health"
     je.endObject();                   // close root
   }
