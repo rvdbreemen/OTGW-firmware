@@ -477,6 +477,7 @@ void handleDebugChar(char c){
                 Debugln(F("  z) Reset heap soak diagnostics (watermark, histogram, counters)"));
 #if defined(_VERSION_PRERELEASE)
                 Debugln(F("  H) bench: starve the heap / release it (prerelease builds only)"));
+                Debugln(F("  B) bench: REST gate acts as on a starved heap, on/off (prerelease builds only)"));
 #endif
                 Debugln(F("--- GPIO / Misc ---"));
                 Debugln(F("  b) Blink LED 1 (5x)"));
@@ -585,6 +586,10 @@ void handleDebugChar(char c){
             case 'H':   // TASK-2026 bench hook: hold or release heap (the loop task does it)
                 s_heapHoldReq = 1;
                 DebugTln(F("heaphold: request queued (H again releases, 30 min releases by itself)"));
+                break;
+            case 'B':   // TASK-2921 bench hook: REST in-flight cap 1, busy path closes without a response
+                DebugTf(PSTR("REST starved-heap simulation: %s (B toggles, off at boot)\r\n"),
+                        restDebugToggleForceStarved() ? "ON" : "off");
                 break;
 #endif
             case 'z':

@@ -47,6 +47,7 @@ static void webSend(int code, const __FlashStringHelper*, const char* body) {
   printf("SENT %d %s\n", code, body);
 }
 static void webAbortCurrentRequest() { printf("CLOSED without a response\n"); }
+static inline bool restForceStarved() { return false; }   // TASK-2921 bench key: off (its own test covers it)
 """
 
 MAIN = r"""

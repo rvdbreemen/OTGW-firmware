@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-beta.397
+**  Version  : v2.0.0-beta.398
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -45,6 +45,22 @@ static int16_t restResponseStatus = 0;
 #endif
 static uint8_t restInFlight = 0;
 
+// TASK-2921: prerelease bench key 'B' (handleDebug.ino). While it is on, the REST gate acts as on a starved
+// heap: the in-flight cap is 1 and the busy path closes the connection instead of building a 503 (TASK-2910),
+// so that branch runs on a real AsyncWebServer connection without starving the heap. Off at every boot;
+// production builds compile the check to a constant false.
+#if defined(_VERSION_PRERELEASE)
+static std::atomic<bool> s_restForceStarved{false};
+bool restDebugToggleForceStarved() {
+  const bool on = !s_restForceStarved.load();
+  s_restForceStarved.store(on);
+  return on;
+}
+static inline bool restForceStarved() { return s_restForceStarved.load(std::memory_order_relaxed); }
+#else
+static inline bool restForceStarved() { return false; }
+#endif
+
 // Heap-tier-aware concurrency ceiling. The biggest REST response (~8.6 KB settings) needs a
 // contiguous block to buffer; admitting N of them needs ~N x that block. As maxblock falls
 // toward one response's worth, allowing 4 in flight is what fragments the heap below the
@@ -57,6 +73,7 @@ static inline uint8_t restEffectiveInflightCap() {
   // (line 35). Both bypass the heap-tier clamp so 255 measures truly unmitigated
   // behaviour under load, not gated-vs-gated. Shipped default is 2 (ADR-165) -> falls through.
   if (REST_MAX_INFLIGHT <= 1 || REST_MAX_INFLIGHT >= 255) return REST_MAX_INFLIGHT;
+  if (restForceStarved()) return 1;   // TASK-2921 bench key: the starved-heap cap
   const uint32_t mb = platformMaxFreeBlock();
   if (mb < 16000) return 1;
   if (mb < 24000) return (REST_MAX_INFLIGHT < 2) ? REST_MAX_INFLIGHT : 2;
@@ -191,7 +208,7 @@ static void sendApiMethodNotAllowed(const __FlashStringHelper* allowedMethods) {
 // the WiFi supervisor (WIFI_STARVED_MAXBLOCK, networkStuff.ino).
 static const uint32_t REST_BUSY_MIN_MAXBLOCK = 4096;
 static void sendApiBusy(const __FlashStringHelper* message) {
-  if (platformMaxFreeBlock() < REST_BUSY_MIN_MAXBLOCK) {
+  if (restForceStarved() || platformMaxFreeBlock() < REST_BUSY_MIN_MAXBLOCK) {
     webAbortCurrentRequest();
     return;
   }
