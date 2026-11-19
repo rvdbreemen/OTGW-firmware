@@ -205,8 +205,12 @@ static RemoteTelemetryBufs *remoteTelemetryBufs = nullptr;
 #define remoteTelemetrySendBuf (remoteTelemetryBufs->sendBuf)
 #define remoteTelemetryLz      (remoteTelemetryBufs->lz)
 #define remoteTelemetryResp    (remoteTelemetryBufs->resp)
-// Slot 0 is the send buffer above (set in remoteTelemetryInitCore); slot 1 exists only on a PSRAM board (TASK-2905).
-static rtel::Slot remoteTelemetrySlots[2] = {{nullptr, 0, 0, 0, false, false}, {nullptr, 0, 0, 0, false, false}};
+// Slot 0 is the send buffer above (set in remoteTelemetryInitCore). TASK-2901 poc.22: on a PSRAM board slots 1..N-1
+// are one PSRAM block (~4 KB each, ~525 KB in all): a queue that holds about 20 min of records (one per ~11 s under
+// debug load) while the upload backs off, so a transient failure costs no data; it drains oldest first. Without PSRAM
+// only slot 0 exists, as before (TASK-2905 had one PSRAM slot).
+static const int REMOTE_TELEMETRY_SLOTS = 128;
+static rtel::Slot remoteTelemetrySlots[REMOTE_TELEMETRY_SLOTS] = {};
 static uint64_t remoteTelemetrySeqNext = 0;
 static PlatformMutex remoteTelemetryLock = nullptr;
 static volatile bool remoteTelemetryActive = false;
@@ -256,7 +260,7 @@ static void remoteTelemetryCloseLocked(int64_t reopenMs) {
   remoteTelemetry.lostItems += __atomic_exchange_n(&remoteTelemetryLostPending, 0u, __ATOMIC_RELAXED);
   if (remoteTelemetry.open && !remoteTelemetry.empty()) {
     uint64_t seq = remoteTelemetrySeqNext++;
-    rtel::Slot *f = rtel::slotFree(remoteTelemetrySlots, 2);
+    rtel::Slot *f = rtel::slotFree(remoteTelemetrySlots, REMOTE_TELEMETRY_SLOTS);
     if (!f) {
       remoteTelemetryDroppedRecords++;                     // every slot still waits to be sent: this record is lost,
       remoteTelemetry.lostRecords++;                       // and the next record says so
@@ -850,10 +854,14 @@ static void remoteTelemetryCountPut(void *, uint8_t) {}
 // remoteTelemetryLz (3.2 KB, used only by the upload task): in RemoteTelemetryBufs (TASK-2901 poc.19)
 
 // TASK-2901 poc.21: no connection attempt while the internal heap is low, so the upload can never starve the gateway
-// (WiFi, web, MQTT). The limits are PoC values: HEAP_LOW_THRESHOLD x2 for free heap, and a largest block that still
-// leaves lwIP and the WiFi driver their buffers. A skipped attempt counts as a failed one (backoff).
-static const uint32_t REMOTE_TELEMETRY_MIN_FREE  = 16384;
-static const uint32_t REMOTE_TELEMETRY_MIN_BLOCK = 8192;
+// (WiFi, web, MQTT). poc.22 limits: 12 KB free and a 4 KB largest block (WIFI_STARVED_MAXBLOCK, the firmware's own
+// "starved" line). poc.21 used 16 KB / 8 KB, which blocked every upload on .63 under replay load although an upload had
+// just succeeded at 14.4 KB free / 7.7 KB block (09, 2026-11-19 21:08:31). A skipped attempt is retried in 30 s
+// without a backoff step: it is a local condition, not the server's.
+static const uint32_t REMOTE_TELEMETRY_MIN_FREE  = 12288;
+static const uint32_t REMOTE_TELEMETRY_MIN_BLOCK = 4096;
+static const uint32_t REMOTE_TELEMETRY_SKIP_RETRY_MS = 30000;
+static bool remoteTelemetryLastSkipped = false;
 static uint32_t remoteTelemetryConnects = 0, remoteTelemetryConnectFails = 0, remoteTelemetryHeapSkips = 0;
 static uint32_t remoteTelemetryFailHeap = 0, remoteTelemetryFailBlock = 0;
 
@@ -862,6 +870,7 @@ static bool remoteTelemetryConnect(RemoteTelemetryTls &c) {
   const uint32_t heap0 = platformFreeHeap(), block0 = platformMaxFreeBlock();
   if (heap0 < REMOTE_TELEMETRY_MIN_FREE || block0 < REMOTE_TELEMETRY_MIN_BLOCK) {
     remoteTelemetryHeapSkips++;
+    remoteTelemetryLastSkipped = true;
     DebugTf(PSTR("telemetry: heap too low to connect (heap %u, block %u); skipped\r\n"), (unsigned)heap0, (unsigned)block0);
     return false;
   }
@@ -1000,7 +1009,9 @@ static bool remoteTelemetryInitCore() {
   }
   if (!remoteTelemetryLock) {
     remoteTelemetryLock = platformMutexCreate();
-    remoteTelemetrySlots[1].buf = (uint8_t *)platformPsramAllocOnce(rtel::REC_MAX_BYTES);   // nullptr without PSRAM
+    // TASK-2901 poc.22: the PSRAM queue, one block for slots 1..N-1 (nullptr without PSRAM: slot 0 only)
+    uint8_t *q = (uint8_t *)platformPsramAllocOnce((size_t)(REMOTE_TELEMETRY_SLOTS - 1) * rtel::REC_MAX_BYTES);
+    for (int i = 1; q && i < REMOTE_TELEMETRY_SLOTS; i++) remoteTelemetrySlots[i].buf = q + (size_t)(i - 1) * rtel::REC_MAX_BYTES;
     remoteTelemetry.begin(remoteTelemetryNowUs() / 1000);
     remoteTelemetryIdentity();
   }
@@ -1012,8 +1023,11 @@ static bool remoteTelemetryInitCore() {
 }
 
 // Capture runs while local recording is on or the collection point logs, once the clock is set (t0 and seq are epoch based).
+// TASK-2901 poc.22: with the PSRAM queue it also runs before the first login and while the upload backs off, so a
+// transient failure or a skipped attempt costs no data; a full queue still counts its losses (SEC_LOST in the next record).
 static void remoteTelemetryUpdateActive() {
-  bool want = (remoteTelemetryLocalOn || remoteTelemetrySvc == SVC_UP) && time(nullptr) >= 1700000000;
+  const bool queued = remoteTelemetrySlots[1].buf && (remoteTelemetrySvc == SVC_PROBE || remoteTelemetrySvc == SVC_BACKOFF);
+  bool want = (remoteTelemetryLocalOn || remoteTelemetrySvc == SVC_UP || queued) && time(nullptr) >= 1700000000;
   if (want && !remoteTelemetryActive) {
     if (platformMutexLock(remoteTelemetryLock, 200)) {
       timeval tv;
@@ -1166,13 +1180,17 @@ static void remoteTelemetryResume() {
 
 static void remoteTelemetryBackoff(const __FlashStringHelper *why, bool maxWait) {
   remoteTelemetryPause(true);
-  uint32_t wait = maxWait ? rtel::BACKOFF_MAX_MS : rtel::backoffMs(remoteTelemetryBackoffStep, platformHardwareRandom());
-  if (!maxWait && remoteTelemetryBackoffStep < 255) remoteTelemetryBackoffStep++;
+  const bool skipped = remoteTelemetryLastSkipped && !maxWait;   // poc.22: low local heap, not a server failure
+  remoteTelemetryLastSkipped = false;
+  uint32_t wait = maxWait ? rtel::BACKOFF_MAX_MS
+                : skipped ? REMOTE_TELEMETRY_SKIP_RETRY_MS
+                          : rtel::backoffMs(remoteTelemetryBackoffStep, platformHardwareRandom());
+  if (!maxWait && !skipped && remoteTelemetryBackoffStep < 255) remoteTelemetryBackoffStep++;
   remoteTelemetryNextProbe = millis() + wait;
   remoteTelemetrySvc = maxWait ? SVC_UID_TAKEN : SVC_BACKOFF;
   remoteTelemetryUpdateActive();
-  DebugTf(PSTR("telemetry: %s; %s, next attempt in %u min\r\n"), (const char *)why,
-          remoteTelemetryLocalOn ? "local recording goes on" : "capture paused", (unsigned)(wait / 60000));
+  DebugTf(PSTR("telemetry: %s; %s, next attempt in %u s\r\n"), skipped ? "heap low" : (const char *)why,
+          remoteTelemetryActive ? "capture goes on (queued)" : "capture paused", (unsigned)(wait / 1000));
 }
 
 static void remoteTelemetryWriteConfig() {
@@ -1207,7 +1225,7 @@ static void remoteTelemetryTask(void *) {
       }
     }
     // Every closed record: first the local ring, then the collection point.
-    rtel::Slot *q = rtel::slotOldest(remoteTelemetrySlots, 2);
+    rtel::Slot *q = rtel::slotOldest(remoteTelemetrySlots, REMOTE_TELEMETRY_SLOTS);
     if (q) {
       if (remoteTelemetryLocalOn && !q->stored) { remoteTelemetryStoreLocal(*q); q->stored = true; }
       if (remoteTelemetrySvc == SVC_UP && isNetworkUp()) {
@@ -1306,6 +1324,6 @@ void remoteTelemetrySetup() {
   remoteTelemetrySvc = SVC_PROBE;                          // the upload starts after the first login says it may
   remoteTelemetryNextProbe = millis();
   DebugTf(PSTR("telemetry: on, %s:%u as %s, %d send slot(s), heap %u, block %u\r\n"), remoteTelemetryCfg.host,
-          (unsigned)remoteTelemetryCfg.port, remoteTelemetryUid, remoteTelemetrySlots[1].buf ? 2 : 1, (unsigned)platformFreeHeap(),
+          (unsigned)remoteTelemetryCfg.port, remoteTelemetryUid, remoteTelemetrySlots[1].buf ? REMOTE_TELEMETRY_SLOTS : 1, (unsigned)platformFreeHeap(),
           (unsigned)platformMaxFreeBlock());
 }

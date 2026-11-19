@@ -1,0 +1,57 @@
+#!/usr/bin/env python3
+"""TASK-2901 poc.22: a transient upload failure or a skipped attempt costs no data.
+
+09's poc.21 run on .63 (2026-11-19 21:08): the low-heap guard (16 KB free / 8 KB block) skipped an upload under replay
+load; the skip counted as an upload failure, the upload backed off for 5 and then 11 minutes, and capture paused, so
+the replayed frames of that time were never recorded. An upload had succeeded 11 s earlier at 14.4 KB free / 7.7 KB
+block. poc.22: the guard is 12 KB / 4 KB, a skip is retried in 30 s without a backoff step, a 128-record PSRAM queue
+holds the records meanwhile, and capture goes on before the first login and while the upload backs off.
+
+Structural check on RemoteTelemetryDevice.h (the behaviour is proven on the bench, AC #6). Red on 047d0803d (poc.21).
+Run: python tests/test_remote_telemetry_queue.py
+"""
+import re
+import unittest
+from pathlib import Path
+
+SRC = (Path(__file__).resolve().parent.parent / "src" / "OTGW-firmware" / "RemoteTelemetryDevice.h").read_text(
+    encoding="utf-8").replace(chr(13) + chr(10), chr(10))
+
+
+def body(signature):
+    a = SRC.index(signature)
+    return SRC[a:SRC.index("\n}\n", a)]
+
+
+def const(name):
+    m = re.search(r"static const \w+ %s\s*=\s*(\d+)\s*;" % name, SRC)
+    return int(m.group(1)) if m else None
+
+
+class Queue(unittest.TestCase):
+    def test_queue_holds_many_records(self):
+        n = const("REMOTE_TELEMETRY_SLOTS")
+        self.assertIsNotNone(n, "no REMOTE_TELEMETRY_SLOTS: the send queue is still 2 slots")
+        self.assertGreaterEqual(n, 64)
+        self.assertIn("rtel::slotFree(remoteTelemetrySlots, REMOTE_TELEMETRY_SLOTS)", SRC)
+        self.assertIn("rtel::slotOldest(remoteTelemetrySlots, REMOTE_TELEMETRY_SLOTS)", SRC)
+
+    def test_capture_goes_on_while_backing_off(self):
+        b = body("static void remoteTelemetryUpdateActive()")
+        want = b[:b.index("if (want")]
+        self.assertIn("SVC_BACKOFF", want, "capture pauses while the upload backs off: records are lost")
+        self.assertIn("remoteTelemetrySlots[1].buf", want, "capture during backoff must depend on the PSRAM queue")
+
+    def test_skip_is_retried_soon_without_a_backoff_step(self):
+        b = body("static void remoteTelemetryBackoff(")
+        self.assertIn("REMOTE_TELEMETRY_SKIP_RETRY_MS", b)
+        self.assertRegex(b, r"if \(!maxWait && !skipped && remoteTelemetryBackoffStep < 255\)")
+        self.assertLessEqual(const("REMOTE_TELEMETRY_SKIP_RETRY_MS") or 10 ** 9, 60000)
+
+    def test_guard_limits(self):
+        self.assertEqual(const("REMOTE_TELEMETRY_MIN_FREE"), 12288)
+        self.assertEqual(const("REMOTE_TELEMETRY_MIN_BLOCK"), 4096)
+
+
+if __name__ == "__main__":
+    unittest.main(verbosity=2)
