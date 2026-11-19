@@ -112,6 +112,10 @@ class HeapHoldHook(unittest.TestCase):
         self.assertLess(int(held["free"]), 7168, out)
         self.assertGreaterEqual(int(held["free"]), 4096, "went under the floor: " + out)
         self.assertLess(int(held["maxblk"]), 4096, out)
+        # TASK-2026 (388): the target is 2048 B, clearly under WIFI_STARVED_MAXBLOCK (the 386 hold ended at 4084 B on
+        # .61, on the edge). This fake heap keeps its fragments at up to 2 KB in one pool, so it cannot get below 2048
+        # without crossing the floor: the floor wins (test_a_heap_near_the_floor_is_not_taken_further). Whether the real
+        # heap gets under 2048 is read on the bench from the hook's own "heaphold: ... maxblk=" line.
 
     def test_the_key_again_releases_every_block(self):
         r, out = self.run_c("key")

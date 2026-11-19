@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : networkStuff.ino
-**  Version  : v2.0.0-beta.387
+**  Version  : v2.0.0-beta.388
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -912,7 +912,13 @@ static void wifiLinkProbeOnReconnect()
   // TASK-2026 run 3 (.63): under a starved heap the AP dropped the association every ~4 min, and this reset kept the
   // dead streak under 8 for 30 min, so a starved, unreachable unit was never recovered. While the heap is starved
   // (largest free block below WIFI_STARVED_MAXBLOCK) a re-association is part of the symptom: the streak continues.
-  if (platformMaxFreeBlock() >= WIFI_STARVED_MAXBLOCK) wifiDeadProbes = 0;
+  const uint32_t maxBlock = platformMaxFreeBlock();
+  if (maxBlock >= WIFI_STARVED_MAXBLOCK) {
+    wifiDeadProbes = 0;
+  } else if (wifiDeadProbes > 0) {
+    DebugTf(PSTR("WiFi: re-associated while the heap is starved (largest block %u B), dead-link streak kept at %u\r\n"),
+            (unsigned)maxBlock, (unsigned)wifiDeadProbes);
+  }
   wifiLinkAliveSinceMs = millis();
   wifiProbeScheduled   = false;
 }

@@ -495,6 +495,9 @@ class WifiDeadLinkStateMachine(unittest.TestCase):
         r, _ = self.run_sc("starved_flap")
         self.assertGreaterEqual(r["SUM"]["forced"] + (1 if r["RESTART"] else 0), 1,
                                 "a starved, unreachable unit whose AP keeps re-associating is never recovered")
+        # 387: option C logs where it acts, so a bench and a field log can see it (the .61 bench on 386 could not).
+        self.assertGreaterEqual(len(self.logs(r, "re-associated while the heap is starved")), 1,
+                                "option C kept the streak without a log line")
 
     def test_ethernet_closes_the_probe_and_disarms(self):
         r, _ = self.run_sc("ethernet")

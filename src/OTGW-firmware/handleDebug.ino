@@ -311,7 +311,7 @@ static uint16_t s_heapHoldN = 0;
 static uint32_t s_heapHoldSinceMs = 0;
 static constexpr uint32_t HEAP_HOLD_MAX_MS        = 30UL * 60UL * 1000UL;
 static constexpr uint32_t HEAP_HOLD_FREE_TARGET   = 7168;
-static constexpr uint32_t HEAP_HOLD_MAXBLK_TARGET = 4096;
+static constexpr uint32_t HEAP_HOLD_MAXBLK_TARGET = 2048;   // clearly under WIFI_STARVED_MAXBLOCK (4096); 4096 ended at 4084 B
 static constexpr uint32_t HEAP_HOLD_FREE_FLOOR    = 4096;
 
 static void heapHoldRelease(PGM_P why)
@@ -329,9 +329,9 @@ static void heapHoldTake()
   const uint16_t cap = (uint16_t)(sizeof(s_heapHoldBlk) / sizeof(s_heapHoldBlk[0]));
   while (s_heapHoldN < cap) {
     const uint32_t fr = platformFreeHeap(), mb = platformMaxFreeBlock();
-    if (fr < HEAP_HOLD_FREE_FLOOR) break;
     if (fr < HEAP_HOLD_FREE_TARGET && mb < HEAP_HOLD_MAXBLK_TARGET) break;
     const size_t sz = (mb >= 2 * HEAP_HOLD_MAXBLK_TARGET) ? HEAP_HOLD_MAXBLK_TARGET : (mb >= HEAP_HOLD_MAXBLK_TARGET ? 1024 : 512);
+    if (fr < HEAP_HOLD_FREE_FLOOR + sz) break;   // the floor holds after this block too, not only before it
     void* p = malloc(sz);
     if (!p) break;
     s_heapHoldBlk[s_heapHoldN++] = p;
