@@ -830,7 +830,7 @@
       "onb_step_tuning": "Tuning",
       "onb_step_sources": "Sources health",
       "onb_beta_title": "Before you enable SAT",
-      "onb_beta_ack": "I understand that SAT is experimental and controls my boiler.",
+      "onb_beta_ack": "I understand that SAT takes over control of my boiler.",
       "onb_welcome_title": "Let's tune SAT for your system",
       "onb_welcome_body": "The {{name}} takes over control of your boiler, driving flow temperature from the room. Four short questions set it up.",
       "onb_welcome_note": "SAT stays <b>disabled</b> until you finish, nothing changes on your boiler yet.",
@@ -1571,8 +1571,8 @@
       "sat_age_min_one": "updated {{count}} min ago",
       "sat_age_min_other": "updated {{count}} min ago",
       "sat_age_now": "updated just now",
-      "sat_beta_body": "We need field data to validate it. Please run the capture tool now and then (scripts/capture-mqtt-debug.bat on Windows, scripts/capture-mqtt-debug.sh on Linux or macOS) and share the transcript in the Discord #alpha-testing channel (discord.gg/zjW3ju7vGQ) or as a GitHub issue (github.com/rvdbreemen/OTGW-firmware/issues).",
-      "sat_beta_head": "SAT is experimental in this beta and it controls your boiler.",
+      "sat_beta_body": "Field data helps us improve it. Please run the capture tool now and then (scripts/capture-mqtt-debug.bat on Windows, scripts/capture-mqtt-debug.sh on Linux or macOS) and share the transcript in the Discord #beta-testing channel (discord.gg/zjW3ju7vGQ) or as a GitHub issue (github.com/rvdbreemen/OTGW-firmware/issues).",
+      "sat_beta_head": "SAT controls your boiler. This is a beta firmware.",
       "sat_big_at_target": "At target · idle",
       "sat_big_heating_to": "Heating to {{temp}}",
       "sat_big_off": "SAT is off",
@@ -6908,8 +6908,8 @@
   var satLastData = null;
   var satLastWeather = null;   // TASK-2015: the last v2/sat/weather answer, for the location hint
   // TASK-1507: SAT beta notice. One text for the wizard's first step and the SAT page notice.
-  var SAT_BETA_HEAD = 'SAT is experimental in this beta and it controls your boiler.';
-  var SAT_BETA_BODY = 'We need field data to validate it. Please run the capture tool now and then (scripts/capture-mqtt-debug.bat on Windows, scripts/capture-mqtt-debug.sh on Linux or macOS) and share the transcript in the Discord #alpha-testing channel (discord.gg/zjW3ju7vGQ) or as a GitHub issue (github.com/rvdbreemen/OTGW-firmware/issues).';
+  var SAT_BETA_HEAD = 'SAT controls your boiler. This is a beta firmware.';
+  var SAT_BETA_BODY = 'Field data helps us improve it. Please run the capture tool now and then (scripts/capture-mqtt-debug.bat on Windows, scripts/capture-mqtt-debug.sh on Linux or macOS) and share the transcript in the Discord #beta-testing channel (discord.gg/zjW3ju7vGQ) or as a GitHub issue (github.com/rvdbreemen/OTGW-firmware/issues).';
   var SAT_BETA_DISMISS_KEY = 'otgw-v2-satbeta-dismissed';
   // A prerelease firmware has a "-alpha.N" / "-beta.N" part after major.minor.patch (+build metadata dropped).
   function isPrereleaseFw(v) {

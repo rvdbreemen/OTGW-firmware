@@ -1,6 +1,7 @@
 // TASK-1507 guard: the first 2.0.0 beta is opt-in for SAT.
 //   - Enabling SAT (the SAT-page toggle) opens the setup wizard on a beta-notice step first:
-//     experimental, controls the boiler, field data wanted, capture tool + where to share.
+//     beta firmware, controls the boiler, field data wanted, capture tool + where to share.
+//     TASK-2909 (Robert, 2026-11-18): from the 2.0.0 RC the notice no longer calls SAT experimental.
 //     Continue stays disabled until the box is ticked; Cancel closes the wizard, SAT stays off
 //     and nothing is POSTed.
 //   - The SAT page shows the same notice on a prerelease firmware version (-alpha.N / -beta.N)
@@ -210,8 +211,8 @@ const tick = (id) => evalJs(`(function(){var c=document.getElementById('${id}');
 await loadSat('2.0.0-beta.1+abc1234');
 check(await noticeShown(), 'prerelease 2.0.0-beta.1: the SAT page shows the beta notice');
 const nt = await noticeText();
-check(/experimental/i.test(nt) && /boiler/i.test(nt) && /field data/i.test(nt) && /capture/i.test(nt) && /#alpha-testing/.test(nt) && /github\.com\/rvdbreemen\/OTGW-firmware\/issues/.test(nt),
-  'notice names: experimental, boiler, field data, capture tool, Discord #alpha-testing, GitHub issues');
+check(/beta firmware/i.test(nt) && !/experimental/i.test(nt) && /boiler/i.test(nt) && /field data/i.test(nt) && /capture/i.test(nt) && /#beta-testing/.test(nt) && /github\.com\/rvdbreemen\/OTGW-firmware\/issues/.test(nt),
+  'notice names: beta firmware (not experimental), boiler, field data, capture tool, Discord #beta-testing, GitHub issues');
 await shot('after-sat-page-notice-prerelease.png');
 
 // (2) dismiss hides it for the session
@@ -232,7 +233,7 @@ await tick('satEnable');
 let w = null;
 for (let i = 0; i < 50 && !w; i++) { await sleep(100); w = await wizText(); }
 check(typeof w === 'string' && w.indexOf('Before you enable SAT') !== -1, 'enabling SAT opens the wizard on the beta-notice step first');
-check(typeof w === 'string' && /experimental/i.test(w) && /field data/i.test(w) && /#alpha-testing/.test(w), 'beta step states experimental, field data and where to share');
+check(typeof w === 'string' && /beta firmware/i.test(w) && !/experimental/i.test(w) && /field data/i.test(w) && /#beta-testing/.test(w), 'beta step states beta firmware (not experimental), field data and where to share');
 check((await evalJs(`(document.getElementById('satOnbBetaGo')||{}).disabled`)) === true, 'Continue is disabled before the box is ticked');
 await evalJs(`var b=document.querySelector('#satOnbBack [data-sa="beta-ok"]');if(b)b.click()`);
 await sleep(200);
