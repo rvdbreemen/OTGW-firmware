@@ -7,7 +7,7 @@ status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-20T10:29:00Z'
-updated_date: '2026-11-20T10:59:00Z'
+updated_date: '2026-11-20T11:59:00Z'
 labels:
   - webui
   - docs
@@ -37,6 +37,8 @@ Robert 2026-11-20 via the coordinator: the About/Credits screen of the v2 web UI
 2026-11-20 (95): research file C:\Users\rvdbr\AppData\Local\Temp\claude\d9c572fbc7f8e9ee\87fc885c-0e3d-40a7-9313-4a23af8d2bc3\scratchpad\credits\credits-research.md (197 lines). GitHub (gh api --paginate, 2026-11-20): 325 merged PRs, 224 issues (116 distinct authors excl. rvdbreemen/bots), 21 commit contributors; repo has no parent. Discord (REST, 20 readable text channels + active/archived threads, 2021-02-21..2026-11-20): 50,650 messages, 283 human authors, 4 bots excluded; counts only, no message text stored. Credits checked against file headers, library.properties, platformio.ini, README and v2.js:643-652; candidates not on the screen yet: Willem Aandewiel (ESP8266 framework), Ihor Melnyk (OpenTherm lib), Bert Melis (espMqttClient), Jens Fleischer (FSexplorer), PlatformIO library authors, RobR (S0 counter). Unverified GitHub/Discord identity pairs marked as such (STemplar, vampywiz17, Roos-AID/RobR, Alexwijn/alexw47). Open for Robert: mention AI agents (claude account 145 commits) or not; real names that only appear on GitHub profiles.
 
 Robert's decisions 2026-11-20, asked interactively in session 95 and by DM via the coordinator (same outcome): Q1 one neutral line about AI coding assistants, products may be named (DM 1573287971652763792); used as evidenced by commit trailers and repo files: GitHub Copilot (copilot-swe-agent[bot] from 2025-10-18, .github/copilot-instructions.md), Claude Code (Claude co-author trailers from 2026-02-24), OpenAI Codex (AGENTS.md since 940ac49dd, an openai-code-agent co-author trailer). Q2 public names only: handles or Discord display names (DM 1573288075210264688). Q3 short list in the UI, full list in CONTRIBUTORS.md, updated with every public stable release (DM 1573288218370244765): step added to .claude/skills/release-2x/SKILL.md Phase 2 item 3b and docs/process/RELEASE_PROCESS.md documentation checklist. Q4 (interactive, session 95): all four pairs are the same person: Roos-AID = RobR, Alexwijn = alexw47, STemplar = Simon Templar, vampywiz17 = Vamp. CONTRIBUTORS.md draft in wt-95-docs (not committed): 17 code contributors, 54 Discord community members (40+ messages), 21 GitHub issue reporters (2+). Finding for otgw-webui: the current Contributors card (v2.html:797 area) uses real names from GitHub profiles (e.g. Dave Davenport, Robbert Lagerweij, Nicole Koopmans, Rob Roos, Dirk Zwager, Tommy van der Vorst); under Q2 these become handles.
+
+Robert 2026-11-20 (CLI, verbatim, relayed by the coordinator): "Okay, ik wil dat je Willem Aandewiel NIET noemt. Verwijder hem uit de credits." Removed from CONTRIBUTORS.md (the credits line). The copyright and licence headers in the source files stay as they are (licence notices, not credits).
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary

@@ -20,7 +20,6 @@ The firmware builds on the work of:
 - **George Ntellas** (Sergeant D): designed the SAT algorithm.
 - **Alex** (Alexwijn): developed the original [SAT component for Home Assistant](https://github.com/Alexwijn/SAT), which the SAT controller in 2.0 is ported from.
 - **Nodo Shop**: sells the [OpenTherm Gateway kit](https://www.nodo-shop.nl/).
-- **Willem Aandewiel**: the ESP8266 framework the firmware started from.
 - **RobR**: the S0 pulse counter.
 - The libraries in the firmware and their authors: OpenTherm (Ihor Melnyk), espMqttClient (Bert Melis), FSexplorer (Jens Fleischer), AsyncTCP and ESPAsyncWebServer (ESP32Async), NimBLE-Arduino (h2zero), WiFiManager (tzapu), SSD1306Ascii (greiman), OneWire, DallasTemperature, AceCommon, AceSorting and EthernetESP32.
 
