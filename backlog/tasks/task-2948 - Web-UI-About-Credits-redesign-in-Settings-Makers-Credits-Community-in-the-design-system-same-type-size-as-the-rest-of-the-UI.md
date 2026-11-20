@@ -3,11 +3,11 @@ id: TASK-2948
 title: >-
   Web UI: About/Credits redesign in Settings: Makers, Credits, Community in the
   design system, same type size as the rest of the UI
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-20T10:44:00Z'
-updated_date: '2026-11-20T11:58:00Z'
+updated_date: '2026-11-20T14:51:00Z'
 labels:
   - webui
 milestone: 2.0.0
@@ -44,4 +44,12 @@ Evidence 2026-11-20. New test tests/webui/about-cards-typography.test.mjs (real 
 Round 2 (otgw-ux-designer): OK to commit. Dark: hint #a0a8b0 on #2c2c2e 5.79:1, links 5.83:1 (AA). Light (its own mock shot): hint #5e6266 on #fff 6.15:1; links --accent #0288a0 on #fff 4.17:1, under AA 4.5:1: a design-system token finding, filed in its heuristic review, not changed here. Focus ring on the links: by code reading only (v2.css has no outline:none on a; only .cmdbar-in and .satonb-slope remove it), not proven in a browser. Tests after the fixes: about-cards-typography 2/2, footer-copyright 2/2, home-room-follows-sat 7/7; evaluate.py --quick 88 passed, 0 warnings, 0 failed; i18n nl/de/el 0 missing, 0 orphan. Screenshots: OTGW-field-data/webui-screens/2026-11-20_task2948-about/v2/.
 
 2026-11-20 Robert's decision (via the coordinator, verbatim): "Okay, ik wil dat je Willem Aandewiel NIET noemt. Verwijder hem uit de credits." Removed from the About/Credits screen: the Credits row in v2.html and the key about_willem in I18N_EN and nl/de/el. Copyright headers in the source files stay (licence); otgw-docs removes him from CONTRIBUTORS.md. Guards: footer-copyright.test.mjs asserts that neither the Settings markup nor v2.js contains 'Aandewiel' or about_willem (red on the previously staged v2.html/v2.js: 'Willem Aandewiel is not named on the About/Credits screen', green now 2/2); about-cards-typography.test.mjs asserts no card text names him.
+
+2026-11-20 bench by otgw-bench-tester on .63, 2.0.0-beta.403+ce65ac7 app+fs (version.hash ce65ac7, settings changed none, ini diff 0, bootcount only the OTA): 8 combinations (1400/390 x light/dark x EN/NL), headless Chrome GET only: Makers, Credits, Community present; Robert first, AI line as a hint row, © line; 'George Ntellas (Sergeant D)' present; 0 hits for willem/aandewiel; link 'Full list of contributors' to CONTRIBUTORS.md on dev; Credits .shint 11.2 px and names .slbl 13.44 px equal to the other Settings cards; the Code on GitHub / Discord name lists render at 13.44 px on purpose (UX review fix 1); NL headings and roles translated, names not. TASK-2946 polish: SAT on with BLE room_temp 25.35, no MsgID 24: aRoom '25.4°', hasAttribute('title') false, 0 'reports' titles. Files: OTGW-field-data/bench-63/2026-11-20_task2948-credits/ (about-<w>-<theme>-<lang>.png, home-*.png, facts.json, SHA256SUMS).
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+About/Credits at the end of Settings: three .adv-card cards Makers, Credits, Community from the settings row classes (srow/slbl/shint), links var(--accent), translated headings and roles (en, nl, de, el), names per Robert's decisions (public names only, short list from CONTRIBUTORS.md with a link to the full list, one neutral AI line, Willem Aandewiel not named). AC1: about-cards-typography.test.mjs red on origin/dev (56 texts at 16 px), green 2/2; bench .63 shows Credits/names at the Settings sizes 11.2/13.44 px. AC2: three groups in order, translated, evaluate --quick 88 passed 0 warnings 0 failed (drift gate clean). AC3: Robert's decisions recorded in the notes (DM answers via the coordinator and otgw-docs, Willem removal verbatim); footer-copyright asserts no Aandewiel (red on the earlier staged version, green). AC4: screenshots 1400/390 before/after (OTGW-field-data/webui-screens/2026-11-20_task2948-about/ and v2/), bench screenshots 8 combinations on .63; full tests/webui sweep 423 pass, two timing tests timed out at 100 % CPU and passed singly once the load dropped (poll-spread-hidden 5/5, rest-503-keeps-state 3/3). UX review by otgw-ux-designer: OK after two rounds. Not verified: link focus ring (code reading only); light-theme link contrast 4.17:1 is a design-system token finding for a separate task.
+<!-- SECTION:FINAL_SUMMARY:END -->
