@@ -78,7 +78,7 @@ The deferred-write pattern (`settingsDirty` + `timerFlushSettings`) coalesces ra
   - `settings.eth.*` (`HAS_ETH_CAPABLE`) - `bStaticIP`, `sIPaddress[16]`, `sGateway[16]`, `sSubnet[16]`, `sDNS[16]`
 - **Key state fields**:
   - `state.hw.eMode`, `.bOLEDPresent`, `.bClassicPro` (combo only), `.bEthernetPresent` (`HAS_ETH_CAPABLE`)
-  - `state.net.eMode` - `NET_WIFI` or `NET_ETHERNET` (`HAS_ETH_CAPABLE`); prerelease builds add `bAPFallback` and `sAPSSID`
+  - `state.net.eMode` - `NET_WIFI` or `NET_ETHERNET` (`HAS_ETH_CAPABLE`); `bAPFallback` and `sAPSSID` are in every build (TASK-2931)
   - `state.pic.bAvailable`, `.sDeviceid[32]`, `.sType[32]`, `.sFwversion[32]`
   - `state.otBus.bOnline`, `.bPSmode`, `.bGatewayMode`, `.bBoilerState`, `.bThermostatState`
   - `state.mqtt.bConnected`

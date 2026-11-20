@@ -24,7 +24,8 @@ De broncode bevindt zich in `src/OTGW-firmware/`. Elk `.ino`-bestand vormt een l
 | `jsonStuff.ino` | Low-level JSON formatting helpers: `sendJsonMapEntry()`, `sendJsonKVLine()`, streaming map builders |
 | `settingStuff.ino` | Instellingen laden/opslaan (LittleFS JSON), `updateSetting()` validatie, gedebouncede flush, side-effect dispatch |
 | `webSocketStuff.ino` | WebSocket-server poort 81, OT-logstreaming, heap backpressure gate |
-| `helperStuff.ino` | Heap health monitor, `canSendWebSocket()`, `canPublishMQTT()`, LittleFS-statushelpers |
+| `helperStuff.ino` | Heap health monitor, `canSendWebSocket()`, `canPublishMQTT()`, LittleFS-statushelpers (de mountcontrole van 60 s leest alleen; er is geen periodieke schrijftest meer, `helperStuff.ino:279-289`) |
+| `fsWriter.ino` / `fsWriter.h` | Achtergrondtaak voor statusbestanden (SAT-PID- en energiebestanden); leest elk bestand na het schrijven terug (`fsWriter.ino:83-94`) |
 | `OTDirect.ino` | OT-Direct-engine (alleen gebruikt op hardware zonder PIC): OTDirect operating modes, command queue met coalesce-by-MsgID |
 | `SATcontrol.ino` | SAT-regellus, verwarmingscurve, boiler state machine, setpoint-injectie, master enable/disable |
 | `SATpid.ino` | PID v3 implementatie: proportioneel, integraal, derivaat met deadband |
@@ -62,15 +63,15 @@ De browser-SPA bevindt zich in `src/OTGW-firmware/data/`. Deze bestanden worden 
 | Bestand / Map | Doel |
 |--------------|------|
 | `build.bat` / `build.sh` | Bouw-entrypoints: zetten hun eigen Python-venv op en starten dan `build.py` |
-| `build.py` | Bouwscript achter de wrappers: roept PlatformIO intern aan, verpakt firmware- en LittleFS-artefacten, produceert de distributiezip |
-| `flash_otgw.bat` / `flash_otgw.sh` | Flash-entrypoints, meegeleverd in de releasezip: eerste USB-flash, `--update`, `--migrate` |
+| `build.py` | Bouwscript achter de wrappers: roept PlatformIO intern aan, verpakt firmware- en LittleFS-artefacten, produceert de distributiezip (die ook de scriptmodules meepakt die `otgw_capture.py` importeert, `build.py:1224-1235`, `build.py:1308-1310`) |
+| `flash_otgw.bat` / `flash_otgw.sh` | Flash-entrypoints, meegeleverd in de releasezip: eerste USB-flash, `--update` (schrijft de app en/of het filesystem zonder wissen, `--app` / `--fs` kiezen een enkel image; `flash_otgw.sh:141-148`), `--migrate` |
 | `flash_esp.py` | Python-flasher: detecteert de seriële poort, schrijft firmware + filesystem naar de ESP32-S3 |
 | `platformio.ini` | PlatformIO-project: omgevingen `esp32`, `esp32-classic` en `esp32-combo`; `esp32-combo` is het target dat gebouwd en uitgeleverd wordt |
 | `evaluate.py` | Statische codekwaliteitscontrole: PROGMEM-gebruik, onveilige patronen, String-klasse audit |
 | `tools/generate_mqttha_data.py` | Legacy-regenerator voor `MQTTHaDiscovery.cpp` uit een gearchiveerd `mqttha.cfg`-template |
-| `scripts/` | PlatformIO pre-build scripts: versie-injectie, bibliotheekpatching |
+| `scripts/` | PlatformIO pre-build scripts (versie-injectie, bibliotheekpatching) en hulpmiddelen zoals `build_manual.py` |
 | `src/libraries/` | De Platform-bibliotheek en vendored Arduino-bibliotheken |
-| `docs/` | C4-architectuurdocs, ADRs, API-referenties, functiedocumentatie |
+| `docs/` | C4-architectuurdocs, ADRs, API-referenties, functiedocumentatie. `docs/MANUAL.md` wordt gegenereerd uit de Engelse hoofdstukken door `scripts/build_manual.py` (`python scripts/build_manual.py`; `--check` geeft exit 1 als het achterloopt); pas het nooit met de hand aan. `tests/test_manual_generated.py` faalt als het niet actueel is |
 | `other-projects/` | Read-only referentiecodebases (PIC-firmware, OTmonitor, SAT) |
 | `backlog/` | Projecttaakbeheer (Backlog.md) |
 
@@ -644,7 +645,9 @@ Bij verbinding toont de firmware een banner met de actuele status en alle beschi
 | `F` | Forceer MQTT HA-discovery voor alle bericht-ID's |
 | `q` | Leest `settings.ini` opnieuw uit LittleFS (`readSettings(true)`). Waarden uit het bestand gelden niet als wijziging door de gebruiker: een actieve SAT-preset houdt zijn doeltemperatuur (`SettingsLoadScope`, TASK-2013); andere setters voeren hun bijwerkingen nog wel uit |
 | `p` | Reset PIC handmatig |
-| `h` | Toon het volledige help-menu |
+| `H` | Alleen in prerelease-builds: de heap bewust leegtrekken, of weer vrijgeven (benchhaak, TASK-2026; `handleDebug.ino:585-589`). De loop-taak houdt vrije heap onder 7168 B en het grootste blok onder 2048 B vast, nooit onder een ondergrens van 4096 B vrij, en geeft zelf na 30 minuten vrij (`handleDebug.ino:316-320`) |
+| `B` | Alleen in prerelease-builds: schakelt een modus in waarin de REST-gate zich gedraagt als bij een uitgeputte heap: maximaal 1 request tegelijk, en het busy-pad sluit de verbinding zonder antwoord (benchhaak, TASK-2921; `handleDebug.ino:590-593`, `restAPI.ino:48-62`, `restAPI.ino:76`, `restAPI.ino:210-214`). Bij elke boot uit |
+| `h` | Toon het volledige help-menu; in prerelease-builds staan ook `H` en `B` erin (`handleDebug.ino:478-481`) |
 
 De macro's sturen uitvoer naar de `debugTelnet`-instantie (een `SimpleTelnet<1>` op poort 23). Er wordt nooit naar `Serial` geschreven. Modulespecifieke conditionele macro's volgen een per-modulevlag in `state.debug`:
 

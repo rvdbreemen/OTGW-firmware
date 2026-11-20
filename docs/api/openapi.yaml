@@ -22,7 +22,10 @@ info:
     - All error responses return structured JSON: `{"error":{"status":N,"message":"..."}}`
     - A `503` caused by transient pressure (too many concurrent requests, or a heap
       floor) carries `Retry-After: 1`. A `503` that reports missing hardware, a
-      disconnected MQTT or a running PIC flash carries no `Retry-After`.
+      disconnected MQTT or a running PIC flash carries no `Retry-After`. When the
+      largest free heap block is below 4096 bytes the device cannot build that
+      answer and closes the connection without any response (TASK-2910): the
+      client sees a connection reset and should retry like after a `503`.
     - Queued operations return 202 Accepted
     - RESTful resource endpoints: `/otgw/messages/{id}`, `/otgw/commands`, `/otgw/discovery`
     - Consistent CORS headers on all responses
@@ -102,12 +105,11 @@ paths:
         Returns the current health status of the device including uptime,
         heap memory, connectivity status, and filesystem status.
 
-        **Side effect**: Each call writes a small probe file (`/.health`) to LittleFS
-        to verify the filesystem is writable (not just mounted). This incurs a flash
-        write on every request. Do not poll this endpoint at high frequency from
-        external monitoring tools  - use 30-60 second intervals at minimum.
-        The intended use-case is post-OTA boot detection, where polling stops
-        immediately once `status: UP` is received.
+        **No filesystem access**: the handler only reports state the firmware
+        already holds; it reads and writes nothing on LittleFS (TASK-1865). The old
+        `/.health` write probe is gone (TASK-2020). Poll at 30-60 second intervals
+        from external monitoring tools. The intended use-case is post-OTA boot
+        detection, where polling stops immediately once `status: UP` is received.
       operationId: getHealth
       responses:
         '200':
@@ -152,7 +154,7 @@ paths:
                         description: What the next replay reads, /otgw_simulation.log on LittleFS or the built-in fixture (as in /api/v2/simulate)
                       littlefsMounted:
                         type: boolean
-                        description: LittleFS mounted and writable
+                        description: LittleFS is mounted (a read-only check about every 60 s)
         '405':
           $ref: '#/components/responses/MethodNotAllowedJson'
 
@@ -257,8 +259,8 @@ paths:
                   count:
                     type: integer
                     minimum: 0
-                    maximum: 720
-                    description: Number of slots, at most 120 (interval 30 s) or 720 (interval 120 s); every array below has this length
+                    maximum: 1008
+                    description: Number of slots, at most 120 (interval 30 s), 720 (interval 120 s, the 24 h default) or 1008 (a longer window, thinned); every array below has this length
                   scale:
                     type: integer
                     description: Divisor for the temperature columns (10)
@@ -309,7 +311,7 @@ paths:
         '405':
           $ref: '#/components/responses/MethodNotAllowedJson'
         '503':
-          description: Heap too low, or the history was busy; retry after one second
+          description: Heap too low, or the history was busy; retry after one second. When the largest free heap block is below 4096 bytes the connection is closed without any response instead (TASK-2910)
 
   /v2/network/scan:
     get:
@@ -421,6 +423,8 @@ paths:
         shows a notice when a newer firmware exists. `updatecheckasked` records that
         the UI's one-time question was answered; `updatecheckbeta` lets a stable
         firmware also be told about betas. The gateway makes no outbound request.
+        The defaults are `updatecheck` false, `updatecheckbeta` false and
+        `updatecheckasked` false, so the web UI asks once.
       operationId: getSettings
       responses:
         '200':
@@ -451,6 +455,9 @@ paths:
         - `"notthispassword"` keeps the existing stored password unchanged
         - `""` clears the stored password
         - Any other string replaces the stored password
+
+        Posting `SATbleenable` with `true` on a board without PSRAM is refused
+        with HTTP 409 and nothing is stored (TASK-2025).
       operationId: updateSettings
       requestBody:
         required: true
@@ -479,6 +486,12 @@ paths:
           description: Authentication required
         '403':
           description: CSRF protection - invalid origin
+        '409':
+          description: "`SATbleenable` set to true on a board without PSRAM"
+          content:
+            application/json:
+              example:
+                error: "BLE needs PSRAM: not available on this board"
     put:
       security:
         - basicAuth: []
@@ -498,6 +511,8 @@ paths:
           description: Authentication required
         '403':
           description: CSRF protection - invalid origin
+        '409':
+          description: "`SATbleenable` set to true on a board without PSRAM (same body as POST)"
 
   /v2/sensors:
     get:
@@ -4205,6 +4220,10 @@ paths:
         The special no-value command `reset_integral` is also accepted here
         without a body.
 
+        `simulation` set to true is refused with HTTP 409 while a real boiler
+        answers on the bus (TASK-795): the SAT simulation is a bench mode for a
+        unit without a boiler.
+
         See the [SAT section of the MQTT reference](https://github.com/rvdbreemen/OTGW-firmware/blob/dev/docs/api/MQTT.md#sat-smart-autotune-thermostat)
         for the full list of setting names and valid payload formats.
       operationId: setSatSetting
@@ -4234,6 +4253,16 @@ paths:
           $ref: '#/components/responses/BadRequestJson'
         '405':
           $ref: '#/components/responses/MethodNotAllowedJson'
+        '409':
+          description: "`simulation` set to true while a real boiler answers"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+              example:
+                error:
+                  status: 409
+                  message: "simulation unavailable: boiler hardware detected"
 
 components:
   securitySchemes:
@@ -4605,10 +4634,10 @@ components:
           description: "A room setpoint change on the thermostat (MsgID 16 Write-Data) becomes the SAT target and clears an active preset. A value within 0.25 C of the last TC= SAT pushed is the SAT echo and is ignored while push_setpoint is on; with push on a change is adopted only when the previous thermostat value was within 0.25 C of it. Units with no stored value get the push_setpoint value. Settable through POST /api/v2/sat/follow_thermostat."
         curve_self_tune:
           type: boolean
-          description: "Heating curve self-tune (ADR-205, default on). SAT decides once a day from the last 3 counted days of clean heating hours and changes the curve coefficient by 0.1; a change empties that window, so two steps are at least 3 counted days apart. Off keeps the current coefficient. Settable through POST /api/v2/sat/curve_self_tune."
+          description: "Heating curve self-tune (ADR-205, default on). Every counted hour of clean heating enters a window; once the window holds 12 counted hours SAT decides and changes the curve coefficient by 0.05 (ADR-260, was 0.1 on a 3-day window); a change empties that window, so two steps are at least 12 counted hours apart. Off keeps the current coefficient. Settable through POST /api/v2/sat/curve_self_tune."
         curve_tune:
           type: object
-          description: "Heating curve self-tune progress (TASK-1881, telemetry). The counters cover the current window: they start at 0 when it empties (a coefficient change, self-tune switched on, a reboot) and are not stored, so after a reboot they restart at 0 while a restored window keeps its days. Zero and running false while the self-tune is off."
+          description: "Heating curve self-tune progress (TASK-1881, telemetry). The counters cover the current window: they start at 0 when it empties (a coefficient change, self-tune switched on, a reboot) and are not stored, so after a reboot they restart at 0 while a restored window keeps its counted hours. Zero and running false while the self-tune is off."
           properties:
             running:
               type: boolean
@@ -4625,7 +4654,7 @@ components:
               description: "Last hourly decision; none before the first hour closes"
             last_reason:
               type: string
-              description: "Reason of the last daily record (few_days, day_not_counted, no_phases, inside_band, phases_disagree, phases_agree, at_limit; none before the first day)"
+              description: "Reason of the last decision block, one counted hour since ADR-260 (few_days, day_not_counted, no_phases, inside_band, phases_disagree, phases_agree, at_limit; none before the first hour; the names keep their day wording)"
             excluded_hours:
               type: object
               description: "Hours that did not count, per reason (the first reason of each hour)"
@@ -5344,7 +5373,7 @@ x-api-design-notes: |
   - CORS preflight response includes `Access-Control-Max-Age: 86400` (24h cache)
 
   **Polling Recommendations**:
-  - Health endpoint: Poll every 30-60 seconds (each call writes a probe file to LittleFS)
+  - Health endpoint: Poll every 30-60 seconds (a call does no LittleFS access)
   - Flash status: Poll every 1-2 seconds during upgrades
   - OpenTherm data: Poll every 5-10 seconds
   - PIC settings: On-demand only (triggers PR= readout cycle)

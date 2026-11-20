@@ -78,13 +78,15 @@ HTTP status codes follow RFC 7231. Common error codes:
 | 403 | Forbidden: CSRF check failed |
 | 404 | Not Found: unknown endpoint or resource |
 | 405 | Method Not Allowed |
-| 409 | Conflict: action refused due to state (verification already active, marker quota reached) |
+| 409 | Conflict: action refused due to state (verification already active, marker quota reached, SAT simulation while a boiler answers, BLE on a board without PSRAM) |
 | 410 | Gone: deprecated API version (v0, v1) |
 | 413 | Request Entity Too Large: command string too long |
 | 414 | URI Too Long: request URI exceeds the 50-byte parser buffer |
 | 429 | Too Many Requests: cooldown active (e.g. `/api/v2/discovery/republish`) |
 | 500 | Internal Server Error: low heap (< 4 KB), filesystem write failure |
-| 503 | Service Unavailable: MQTT not connected, no OT command interface, PIC flash in progress |
+| 503 | Service Unavailable: MQTT not connected, no OT command interface, PIC flash in progress, or transient pressure (too many concurrent requests, low heap) |
+
+A 503 caused by transient pressure carries `Retry-After: 1`. A 503 for missing hardware, a disconnected MQTT or a running PIC flash does not. When the largest free heap block is below 4096 bytes the gateway cannot even build that answer: it closes the connection without any response, so the client sees a connection reset instead of a 503. Treat a reset like a 503 and retry after a short pause. The v2 web UI does this for its API calls: up to 3 attempts, 400 ms and then 800 ms apart.
 
 ---
 
@@ -98,7 +100,7 @@ The sections below describe the most commonly used endpoints with usage notes an
 
 Returns system health metrics. No authentication required.
 
-**Side effect:** Each call writes a small probe file (`/.health`) to LittleFS to verify the filesystem is writable. Poll at 30-60 second intervals minimum.
+**No filesystem access:** the call only reports state the firmware already holds; it reads and writes nothing on LittleFS (TASK-2020 removed the old `/.health` write probe). Poll at 30-60 second intervals.
 
 **Request:** None
 
@@ -122,7 +124,7 @@ Returns system health metrics. No authentication required.
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `status` | string | `"UP"` or `"DEGRADED"` |
+| `status` | string | `"UP"`, or `"DEGRADED"` when LittleFS is not mounted or the last file written by the file-writer task did not read back as written |
 | `uptime` | string | Human-readable uptime |
 | `heap` | integer | Free heap in bytes |
 | `networkmode` | string | `"wifi"`, `"ethernet"`, or `"ap"` |
@@ -132,7 +134,7 @@ Returns system health metrics. No authentication required.
 | `picavailable` | string | PIC co-processor detected and responding |
 | `simulation_active` | boolean | Simulation mode (OT frame replay) is running |
 | `simulation_source` | string | `file` (`/otgw_simulation.log`) or `builtin`: what the next replay reads |
-| `littlefsMounted` | string | LittleFS filesystem healthy |
+| `littlefsMounted` | string | LittleFS is mounted (read check about every 60 s) |
 
 This endpoint is safe to poll at 30-60 second intervals. Typical use: OTA update completion detection, watchdog integration, Home Assistant availability sensor.
 
@@ -197,7 +199,11 @@ Update one or more settings. Authentication required.
 
 Settings are validated server-side. Invalid values are silently ignored or constrained to safe ranges. Side effects (MQTT reconnect, NTP resync, mDNS restart) are applied within 2 seconds via a deferred-write timer.
 
-**Settings whitelist:** Only known setting names are accepted. The full list includes: `hostname`, `httppasswd`, `ledblink`, `nightlyrestart`, `nightlyrestarthour`, `mqttenable`, `mqttbroker`, `mqttbrokerport`, `mqttuser`, `mqttpasswd`, `mqtttoptopic`, `mqtthaprefix`, `mqttharebootdetection`, `mqttuniqueid`, `mqttotmessage`, `mqttinterval`, `mqttseparatesources`, `ntpenable`, `ntptimezone`, `ntphostname`, `ntpsendtime`, `darktheme`, `gpiosensorsenabled`, `gpiosensorspin`, `gpiosensorsinterval`, `s0counterenabled`, `s0counterpin`, `s0counterpulsekw`, `s0counterinterval`, `gpiooutputsenabled`, `gpiooutputspin`, `gpiooutputstriggerbit`, `otgwcommandenable`, `otgwcommands`, `pictempsensor`, `webhookenable`, `webhookurlon`, `webhookurloff`, `webhooktriggerbit`, `webhookpayload`, `webhookcontenttype`, `satenabled`, `satsystem`, `sattargettemp`, `satcoefficient`, `satinterval`, and many more SAT-related settings.
+**Settings whitelist:** Only known setting names are accepted. The full list includes: `hostname`, `httppasswd`, `ledblink`, `nightlyrestart`, `nightlyrestarthour`, `mqttenable`, `mqttbroker`, `mqttbrokerport`, `mqttuser`, `mqttpasswd`, `mqtttoptopic`, `mqtthaprefix`, `mqttharebootdetection`, `mqttuniqueid`, `mqttotmessage`, `mqttinterval`, `mqttseparatesources`, `ntpenable`, `ntptimezone`, `ntphostname`, `ntpsendtime`, `darktheme`, `gpiosensorsenabled`, `gpiosensorspin`, `gpiosensorsinterval`, `s0counterenabled`, `s0counterpin`, `s0counterpulsekw`, `s0counterinterval`, `gpiooutputsenabled`, `gpiooutputspin`, `gpiooutputstriggerbit`, `otgwcommandenable`, `otgwcommands`, `pictempsensor`, `webhookenable`, `webhookurlon`, `webhookurloff`, `webhooktriggerbit`, `webhookpayload`, `webhookcontenttype`, `satenabled`, `satsystem`, `sattargettemp`, `satcoefficient`, `satinterval`, `updatecheck`, `updatecheckbeta`, `updatecheckasked`, and many more SAT-related settings.
+
+**Update check (TASK-2023):** `updatecheck`, `updatecheckbeta` and `updatecheckasked` are booleans that belong to the web UI's "new version available" notice. With `updatecheck` on, the browser (not the gateway) asks the GitHub releases API at most every 6 hours; the gateway makes no outbound request. `updatecheckbeta` lets a stable firmware also be told about betas. `updatecheckasked` records that the UI's one-time question was answered. The shipped defaults are `updatecheck` off, `updatecheckbeta` off and `updatecheckasked` off, so the web UI asks once.
+
+**BLE needs PSRAM (TASK-2025):** a POST of `SATbleenable` with value `true` on a board without PSRAM is refused with HTTP 409 and the body `{"error":"BLE needs PSRAM: not available on this board"}`. Nothing is stored; a stored `true` on such a board is cleared when the settings load.
 
 ---
 
@@ -550,6 +556,10 @@ Add `?detail=full` for extended diagnostics including synchronization health, pr
 }
 ```
 
+The status also holds a `curve_tune` object with the progress of the heating curve self-tune: `running`, `window_hours`, `window_hours_needed`, `last_decision` (`raise`, `lower`, `hold` or `none`), `last_reason` and `excluded_hours` (hours kept out of the window, per reason).
+
+**BREAKING for REST clients (TASK-1889, ADR-260):** the self-tune now decides every counted hour on a window of `window_hours_needed` (12) hours. The fields `days`, `days_needed`, `clean_hours_today`, `clean_hours_needed` and `hours_today` are removed from `curve_tune`; `window_hours` and `window_hours_needed` replace them. A client that reads the removed fields gets nothing. The matching MQTT topics `sat/curve_tune/days` and `sat/curve_tune/clean_hours_today` are replaced by `sat/curve_tune/window_hours`.
+
 ##### POST /api/v2/sat/target
 
 Set the target room temperature.
@@ -633,7 +643,7 @@ Update a named SAT setting. Authentication required.
 {"status": "ok", "setting": "heating_curve", "value": "1.8"}
 ```
 
-Unknown setting names return HTTP 404. This endpoint mirrors the full MQTT `sat/<setting>` command vocabulary, providing parity between REST and MQTT configuration.
+Unknown setting names return HTTP 404. Setting `simulation` to `true` while a real boiler answers on the bus is refused with HTTP 409 and the body `{"error":{"status":409,"message":"simulation unavailable: boiler hardware detected"}}` (TASK-795); the SAT simulation is a bench mode for a unit without a boiler. This endpoint mirrors the full MQTT `sat/<setting>` command vocabulary, providing parity between REST and MQTT configuration.
 
 ##### GET / POST / DELETE /api/v2/sat/markers
 
@@ -859,7 +869,7 @@ This is the primary diagnostic snapshot used when filing issues; the field set i
 
 ##### GET /api/v2/graph/history
 
-Returns the device-side history of the Monitor > Graph series (TASK-1296): oldest first, as JSON columns `flow`, `ret`, `chSet`, `roomSet`, `room`, `outside`, `mod`, `flame`, `dhw_on` and `ch`, plus `interval_s`, `newest_age_ms`, `count` and `scale`. A board without PSRAM keeps up to 120 slots of 30 s (1 hour); a board with PSRAM keeps up to 720 slots of 120 s (24 hours), and `interval_s` says which. Temperatures are integers, the value times `scale` (10); `null` means there is no sample for that slot. `newest_age_ms` is the age of the END of the newest slot; slot `i` starts at `now - newest_age_ms - (count - i) * interval_s * 1000`. The web UI loads it when the Graph tab opens (again after 10 minutes) and merges it by time into the samples it collects itself, stamping each slot with its start. Dallas sensors are not recorded. The history is held in RAM (1.8 KB internal RAM without PSRAM, 10 KB PSRAM with PSRAM) and starts empty after a reboot. No authentication is needed. HTTP 503 with `Retry-After: 1` when the heap is low.
+Returns the device-side history of the Monitor > Graph series (TASK-1296): oldest first, as JSON columns `flow`, `ret`, `chSet`, `roomSet`, `room`, `outside`, `mod`, `flame`, `dhw_on` and `ch`, plus `interval_s`, `newest_age_ms`, `count` and `scale`. A board without PSRAM serves up to 120 slots of 30 s (1 hour). A board with PSRAM keeps 7 days (5040 slots of 120 s) and serves 24 hours (720 slots) by default; `?hours=N` (1 to 168; a missing or invalid value means 24) asks for another window, capped at what the ring holds. A response holds at most 1008 slots, so a longer window comes back thinned to longer slots (`?hours=168` gives 1008 slots of 600 s), each with the newest value of its group and the flags of any slot in it (TASK-1963, ADR-245). `interval_s` says the slot length. While SAT is enabled the history also has a `satTarget` column, the SAT target (`target_temp` of the SAT status; TASK-2018, ADR-256); the column is left out when no slot of the window holds a SAT target, so a client must treat it as optional. Temperatures are integers, the value times `scale` (10); `null` means there is no sample for that slot. `newest_age_ms` is the age of the END of the newest slot; slot `i` starts at `now - newest_age_ms - (count - i) * interval_s * 1000`. The web UI loads it when the Graph tab opens (again after 10 minutes) and merges it by time into the samples it collects itself, stamping each slot with its start. Dallas sensors are not recorded. The history is held in RAM (2 KB internal RAM without PSRAM, 79 KB PSRAM with PSRAM) and starts empty after a reboot. No authentication is needed. HTTP 503 with `Retry-After: 1` when the heap is low; below 4096 bytes of largest free block the connection is closed without a response (see the error codes above).
 
 #### Network
 

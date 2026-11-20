@@ -123,24 +123,29 @@ Een **cold cutoff** per systeem (COLD_SETPOINT: 28,2 C voor radiatoren, 21,0 C v
 | Parameter | Standaard | Bereik | Omschrijving |
 |---|---|---|---|
 
-De integraalterm gebruikt een **symmetrische clamp** `[-curveValue, +curveValue]` met een harde veiligheidsgrens van `+/-20 C` (alpha.28 / alpha.30). Negatieve accumulatie is nodig bij mild weer zodat de regelaar het flow-setpoint onder de verwarmingscurve kan trekken wanneer de kamer licht boven het doel zit. De PID-integraal en de ruwe-afgeleide-toestand worden bij elke save gepersisteerd en bij de volgende boot **warm gestart** (alpha.32), dus een power cycle leidt niet tot een cold start. `sat/flush` of een expliciete `satdisable` wist de gepersisteerde state.
+De integraalterm gebruikt een **symmetrische clamp** `[-curveValue, +curveValue]` en geen andere absolute bovengrens (de eerdere grens van `+/-20 C` is verwijderd, Sergeant D entry 75). Negatieve accumulatie is nodig bij mild weer zodat de regelaar het flow-setpoint onder de verwarmingscurve kan trekken wanneer de kamer licht boven het doel zit. De PID-integraal en de ruwe-afgeleide-toestand worden bij elke save gepersisteerd en bij de volgende boot **warm gestart** (alpha.32), dus een power cycle leidt niet tot een cold start. `sat/flush` of een expliciete `satdisable` wist de gepersisteerde state.
 
 **PID-timing (TASK-1368).** De integraal en de afgeleide schuiven één keer per 60 s op, met een eigen timer, zoals in thermo-nova (Sergeant D entries 42 en 111). Dat staat los van `satinterval`: elke regeltik berekent de uitvoer opnieuw uit de actuele verwarmingscurve, maar alleen de stap van 60 s verandert de PID-toestand. Vóór TASK-1368 deed elke tik van 30 s een PID-stap, waardoor de integraal twee keer zo snel groeide. De afgeleide is 0 bij de eerste uitvoer na een reset of herstel. Zone-PID's stappen op dezelfde timer. Na een boot blijft de herstelde toestand ongewijzigd tot de eerste geldige kamertemperatuur binnenkomt; die meting doet direct een stap (entry 115). De eerste tik na het inschakelen van SAT stuurt een berekend setpoint, niet het SAT-minimum `CS=10`.
+
+**PID-gains.** SAT berekent de gains opnieuw uit de waarde van de verwarmingscurve: Kp = coefficient x curvewaarde / 3 voor radiatoren (/ 4 voor vloerverwarming), Ki = Kp / 8400, Kd = 0,05 x 8400 x Kp = 420 x Kp, elk afgerond op 3 decimalen. De Kd-factor is vanaf beta.386 0,05; daarvoor was hij 0,063 (Sergeant D entry 425, die de factor van entry 279 vervangt; entry 427 zet hem in 2.0.0). Thermo-nova gebruikt 0,07 (`custom_components/sat/pid.py:93`), dus de lagere factor is een bewuste keuze van Sergeant D.
+
+**Integraal buiten de deadband (TASK-1890).** De integraal loopt alleen op zolang de kamer binnen 0,1 C van het doel zit. Verlaat de fout die band, dan wordt de integraal één keer gehalveerd en daarna vastgehouden zolang de fout buiten de band blijft; binnen de band bouwt hij weer op vanaf de vastgehouden waarde (entries 333 en 414; ADR-259, Proposed). Dit geldt voor de hoofd-PID en voor elke zone-PID. Een wijziging van het doel zet de integraal nog steeds op 0. Thermo-nova zet de integraal op 0 zodra de fout de band verlaat (`custom_components/sat/pid.py:185-189`); het halveren is een bewuste afwijking.
 
 #### Geavanceerde regeling
 
 | Parameter | Standaard | Bereik | Omschrijving |
 |---|---|---|---|
 | `satmaxsetpoint` | `65.0` | 30-80 C | Maximaal toegestaan setpoint (veiligheidsplafond) |
-| `satflameoffoffset` | `0.0` | 0-5 C | Setpoint-offset bij vlam uit (anti-cycling hysterese) |
+| `satflameoffoffset` | 18.0 | 0-30 C | Alleen in de PWM-AAN-fase: zolang de vlam nog niet brandt, is het setpoint de retourtemperatuur + deze offset. Niet in continue modus en niet in de PWM-UIT-fase |
 | `satovershootmargin` | `2.0` | 0.5-5 C | Overshoot-marge: automatisch wisselen van continu naar PWM (aanvoer boven het gevraagde PID-setpoint + marge gedurende 60 s) en cyclusclassificatie. Opgeslagen waarden blijven staan |
 | `satmodsupdelay` | `20.0` | 0-60 s | Modulatie-onderdrukkingsvertraging |
 | `satmodsupoffset` | `1.0` | 0-5 C | Modulatie-onderdrukkingsoffset onder setpoint |
 | `satflowoffset` | `2.0` | 0-10 C | Continue modus: maximale setpoint-daling t.o.v. keteltemperatuur |
 | `satcyclesperhour` | `3` | 3-4 | PWM-cyclusduur voor gasketels en Auto, opgeslagen als cycli per uur: 3 = 20 min, 4 = 15 min. De webinterface toont voor elk apparaattype het veld "PWM-cyclusduur" in minuten; warmtepompen en hybrides slaan het op in `sathpcycle` (seconden: 1800 = 30 min, 2400 = 40 min, 3600 = 60 min alleen voor een warmtepomp) |
 | `satpushsetpoint` | `false` | bool | SAT-doel naar thermostaatdisplay sturen (TC= commando). SAT pusht het kamersetpoint naar de thermostaat bij een doelwijziging (zoals thermo-nova); een thermostaat die de override op afstand weigert houdt zijn eigen setpoint en SAT blijft niet opnieuw pushen |
-| `satfollowthermostat` | aan als `satpushsetpoint` aan staat, anders uit | bool | Een setpointwijziging op de thermostaat wordt het SAT-doel (zie 5.21). Een unit zonder opgeslagen waarde krijgt eenmalig de waarde van `satpushsetpoint`; een opgeslagen waarde wint altijd |
-| `satfireplace` | uit | bool | Openhaardmodus: SAT stookt alleen op de stooklijn, zoals zonder kamertemperatuur (zie 5.21). MQTT `sat/fireplace_mode` |
+| `satfollowthermostat` | aan als `satpushsetpoint` aan staat, anders uit | bool | Een setpointwijziging op de thermostaat wordt het SAT-doel (zie 5.20). Een unit zonder opgeslagen waarde krijgt eenmalig de waarde van `satpushsetpoint`; een opgeslagen waarde wint altijd |
+| `satfireplace` | uit | bool | Openhaardmodus: SAT stookt alleen op de stooklijn, zoals zonder kamertemperatuur (zie 5.20). MQTT `sat/fireplace_mode` |
+| `satcurveselftune` | aan | bool | Zelfafstemming van de verwarmingscurve: SAT mag `satcoefficient` per stap met 0,05 wijzigen (zie 5.10). MQTT `sat/curve_self_tune` |
 
 #### Coefficient kiezen
 
@@ -213,7 +218,7 @@ Bij ketels met een hoge minimale modulatie (bijv. 30-40% minimum) kan de continu
 
 SAT bewaakt altijd de ketelprestaties via cyclusclassificatie (zie paragraaf 5.11) en wisselt automatisch:
 
-- **Continu naar PWM:** als de aanvoertemperatuur min het gevraagde (PID-)setpoint 60 seconden lang op of boven de schakelmarge blijft (Sergeant D entry 407; ADR-254, Proposed). De marge is de instelling `satpwmswitchmargin` (0,5 tot 5,0 C), standaard 2,0 C; een opgeslagen oude standaardwaarde van 1,5 C wordt eenmalig 2,0 C, een zelf gekozen waarde blijft staan (Robert, Q-407a). Vanaf beta.391 schakelt deze regel hooguit één keer per brand (één keer vlam aan) naar PWM: is SAT van PWM terug naar continu gegaan terwijl de vlam brandt, dan blijft het continu tot de vlam uitgaat (Sergeant D entries 429 en 430). Alleen het vangnet kan in die brand nog naar PWM schakelen: de aanvoer ligt 30 s lang 3,0 C of meer boven het verzoek (entries 359 en 429; 3,5 C vóór beta.391). Alleen de eerste PWM AAN van een brand telt als start voor de cycluslimiet per uur; een latere PWM AAN in dezelfde brand telt niet (entry 428, die entry 89 wijzigt; TASK-2913). Vanaf beta.377 werkt geen van beide regels, de schakelmarge noch het vangnet, zolang verwarmen niet is toegestaan, bijvoorbeeld tijdens een pauze van de tolerantieband: restwarmte na warm water schakelt SAT dan niet meer naar PWM terwijl de brander uit is (Sergeant D entries 410 en 417; thermo-nova slaat zijn schakeling over als de verwarming niet aan staat, `heating_control.py:276-282`).
+- **Continu naar PWM:** als de aanvoertemperatuur min het gevraagde (PID-)setpoint 60 seconden lang op of boven de schakelmarge blijft (Sergeant D entry 407; ADR-254, Proposed). De marge is de instelling `satpwmswitchmargin` (0,5 tot 5,0 C), standaard 2,0 C; een opgeslagen oude standaardwaarde van 1,5 C wordt eenmalig 2,0 C, een zelf gekozen waarde blijft staan (Robert, Q-407a). Vanaf beta.391 schakelt deze regel hooguit één keer per brand (één keer vlam aan) naar PWM: is SAT van PWM terug naar continu gegaan terwijl de vlam brandt, dan blijft het continu tot de vlam uitgaat (Sergeant D entries 429 en 430). Alleen het vangnet kan in die brand nog naar PWM schakelen: de aanvoer ligt 30 s lang 3,0 C of meer boven het verzoek (entries 359 en 429; 3,5 C vóór beta.391). Alleen de eerste PWM AAN van een brand telt als start voor de cycluslimiet per uur; een latere PWM AAN in dezelfde brand telt niet (entry 428, die entry 89 wijzigt; TASK-2913). Vanaf beta.377 werkt geen van beide regels, de schakelmarge noch het vangnet, zolang een pauze van de tolerantieband CH uit houdt: restwarmte na warm water schakelt SAT dan niet meer naar PWM terwijl de brander uit is (Sergeant D entries 410 en 417; thermo-nova slaat zijn schakeling over als de verwarming niet aan staat, `heating_control.py:276-282`).
 - **PWM naar continu:** in een PWM AAN-fase, als de vlam brandt en het gevraagde setpoint 60 seconden boven de aanvoertemperatuur blijft (entries 339 en 342; ADR-236, Proposed), of na 300 seconden verzadiging (ADR-236: ongewijzigd). Niet in de eerste 60 s van een start (entry 394).
 - Het configuratiebericht van de ketel (MsgID 3, ook "master low-off not allowed") blokkeert PWM niet: PWM mag op elke ketel vanaf de start (entries 392, 393; ADR-251).
 
@@ -309,6 +314,8 @@ allemaal onder simulatie draaien:
 antwoordt. Wordt er tijdens simulatie tóch een echte ketel gedetecteerd, dan wordt
 simulatie **automatisch uitgeschakeld**, zodat SAT nooit regelt tegen gesimuleerde
 toestand terwijl een echte ketel meeluistert.
+
+Simulatie aanzetten wordt ook geweigerd zolang een echte ketel antwoordt (REST antwoordt `409` met `simulation unavailable: boiler hardware detected`). In Home Assistant staat de simulatieschakelaar op niet beschikbaar zolang een echte ketel antwoordt en simulatie uit staat, zodat hij niet per ongeluk omgezet wordt; hij is weer beschikbaar als er geen ketel antwoordt, en altijd zolang simulatie aan staat, zodat je hem kunt uitzetten (MQTT `sat/simulation_available`, ADR-255; de schakelaar in de webinterface volgt dezelfde regel).
 
 De simulatiemodus is nuttig voor:
 - Testen van Home Assistant-automatiseringen
@@ -407,6 +414,8 @@ SAT verzamelt intra-day foutmonsters (het verschil tussen de ruimtetemperatuur e
 
 De aanbeveling wordt gepubliceerd via MQTT als `sat/curve_recommendation` en getoond in de webinterface. De data overleeft herstarts.
 
+**Zelfafstemming van de verwarmingscurve (TASK-1525, TASK-1889).** Met `satcurveselftune` aan (standaard) kan SAT de coëfficiënt van de verwarmingscurve zelf wijzigen. SAT kijkt hoeveel de PID bovenop de verwarmingscurve moet bijleggen (de PID-uitvoer min de curvewaarde, begrensd op het setpointplafond dat SAT stuurt). Na elk meetellend uur volgt een besluit, op een lopend venster van de laatste 12 meetellende uren (Sergeant D entries 423 en 424; ADR-260, Proposed). Een uur telt mee als minstens 90 % van de verwachte regeltikken schoon is. Tikken met warm water, een zonnehoogte van 12 graden of meer of een onbekende zonnehoogte, een verloren kamertemperatuur of een actieve melding geen ontsteking of verwarmingsfout blijven buiten beschouwing, evenals PWM-tikken bij een warmtepomp of hybride; buiten PWM bij een gasketel vallen ook tikken af met de vlam uit terwijl CH aan staat, of met een modulatie op of onder het ketelminimum. De afstemming is gesplitst in een opwarmfase (kamer meer dan 0,1 C van het doel) en een drijvende fase (binnen 0,1 C). De coëfficiënt verandert met 0,05 alleen als beide fasen een gemiddelde boven +1,0 C (verhogen) of onder -1,0 C (verlagen) hebben in dezelfde richting; een fase zonder data heeft geen veto, en een drijvende fase met minder dan 1 uur data in het venster stemt niet mee, zodat de opwarmfase alleen beslist. Na een stap wordt het venster leeggemaakt, dus twee stappen liggen minstens 12 meetellende uren uit elkaar. Een handmatige wijziging van de coëfficiënt maakt het venster ook leeg. De afstemming wijzigt alleen `satcoefficient`, nooit de PID-termen. In thermo-nova is de coëfficiënt een vaste configuratie-optie (`custom_components/sat/const.py:97`, `entry_data.py:213`); de zelfafstemming is een toevoeging van de firmware.
+
 ---
 
 ### 5.11 Drukbewaking
@@ -485,7 +494,7 @@ Voor woningen met meerdere onafhankelijk geregelde verwarmingszones (bijv. apart
 - **Hoofdruimte**: het ketel-setpoint is de hoogste van de eigen PID-uitvoer van de hoofdruimte en de vraag van de zones. De zones kunnen de vraag van de hoofdruimte alleen verhogen, nooit verlagen.
 - **Overshoot-cap**: als een meetellende zone meer dan 0,3 C boven zijn doel zit, wordt het setpoint begrensd op het koude setpoint plus 10 C, min 4 C per graad dat de zone te warm is. De cap komt nooit onder het koude setpoint en de laagste cap van alle zones geldt. De cap kan het setpoint onder de vraag van de hoofdruimte brengen. Voorbeeld bij radiatoren: een zone die 1 C te warm is, begrenst het setpoint op 34,2 C; een zone die 4 C te warm is, begrenst het op 28,2 C, het koude setpoint (op of onder die waarde zet SAT de centrale verwarming uit).
 - **ECO-verwarmingsmodus**: in ECO worden de zones genegeerd en telt alleen de PID van de hoofdruimte.
-- Elke zone-PID gebruikt een symmetrische integral-clamp `[-curveValue, +curveValue]` zodat een zone die net boven zijn doel zit zijn aandeel van het setpoint onder de verwarmingscurve kan trekken.
+- Elke zone-PID gebruikt een symmetrische integral-clamp `[-curveValue, +curveValue]` zodat een zone die net boven zijn doel zit zijn aandeel van het setpoint onder de verwarmingscurve kan trekken. Buiten zijn deadband van 0,1 C halveert een zone-PID zijn integraal één keer en houdt hem daarna vast, net als de hoofd-PID (zie PID-afstemming; entry 414).
 
 Zones ontvangen hun temperatuur en doel via MQTT. Elke zone, ook zone 1, is een extra kamer naast de hoofdkamer, met een eigen doel en temperatuurinvoer.
 

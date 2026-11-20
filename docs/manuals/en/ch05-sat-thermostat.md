@@ -118,9 +118,13 @@ A per-system **cold cutoff** (COLD_SETPOINT: 28.2 C for radiators, 21.0 C for un
 | Setting | Default | Range | Description |
 |---|---|---|---|
 
-The integral term uses a **symmetric clamp** `[-curveValue, +curveValue]` with a `+/-20 C` hard safety cap (alpha.28 / alpha.30). Negative accumulation is required in mild weather so the controller can nudge the flow setpoint below the heating curve when the room is slightly above target. The PID integral and raw derivative state are persisted on every save and **warm-started** on the next boot (alpha.32), so a power cycle does not reset to a cold start. `sat/flush` or an explicit `satdisable` clears the persisted state.
+The integral term uses a **symmetric clamp** `[-curveValue, +curveValue]` and no other absolute cap (the earlier `+/-20 C` cap was removed, Sergeant D entry 75). Negative accumulation is required in mild weather so the controller can nudge the flow setpoint below the heating curve when the room is slightly above target. The PID integral and raw derivative state are persisted on every save and **warm-started** on the next boot (alpha.32), so a power cycle does not reset to a cold start. `sat/flush` or an explicit `satdisable` clears the persisted state.
 
 **PID timing (TASK-1368).** The integral and derivative advance once every 60 s on their own timer, as in thermo-nova (Sergeant D entries 42 and 111). This is independent of `satinterval`: each control tick recomputes the output from the current heating curve, but only the 60 s step moves the PID state. Before TASK-1368 every 30 s tick stepped the PID, so the integral grew twice as fast. The derivative is 0 on the first output after a reset or restore. Zone PIDs step on the same timer. After a boot the restored state is held unchanged until the first valid room temperature arrives; that reading takes a step at once (entry 115). The first tick after enabling SAT sends a computed setpoint, not the SAT minimum `CS=10`.
+
+**PID gains.** SAT recomputes the gains from the heating curve value: Kp = coefficient x curve value / 3 for radiators (/ 4 for underfloor heating), Ki = Kp / 8400, Kd = 0.05 x 8400 x Kp = 420 x Kp, each rounded to 3 decimals. The Kd factor is 0.05 from beta.386 on; it was 0.063 before (Sergeant D entry 425, which supersedes the factor of entry 279; entry 427 puts it in 2.0.0). Thermo-nova uses 0.07 (`custom_components/sat/pid.py:93`), so the lower factor is a deliberate choice of Sergeant D.
+
+**Integral outside the deadband (TASK-1890).** The integral only accumulates while the room is within 0.1 C of the target. When the error leaves that band, the integral is halved once and then held while the error stays outside; back inside, it builds up again from the held value (entries 333 and 414; ADR-259, Proposed). This applies to the main PID and to every zone PID. A change of the target still resets the integral to 0. Thermo-nova sets the integral to 0 as soon as the error leaves the band (`custom_components/sat/pid.py:185-189`); the halving is a deliberate deviation.
 
 #### Advanced control
 
@@ -136,6 +140,7 @@ The integral term uses a **symmetric clamp** `[-curveValue, +curveValue]` with a
 | `satpushsetpoint` | false | bool | Push SAT target to thermostat display (TC= command). SAT pushes the room setpoint to the thermostat when the target changes (as thermo-nova); a thermostat that rejects the remote override keeps its own setpoint, and SAT does not keep re-pushing |
 | `satfollowthermostat` | on when `satpushsetpoint` is on, else off | bool | A setpoint change on the thermostat becomes the SAT target (see 5.21). A unit with no stored value gets the `satpushsetpoint` value once; a stored value always wins |
 | `satfireplace` | off | bool | Fireplace mode: SAT heats on the heating curve only, as with no room temperature (see 5.21). MQTT `sat/fireplace_mode` |
+| `satcurveselftune` | true | bool | Heating curve self-tune: SAT may change `satcoefficient` by 0.05 per step (see 5.11). MQTT `sat/curve_self_tune` |
 
 #### Choosing the heating curve coefficient
 
@@ -189,7 +194,7 @@ Continuous mode includes clamp logic: if the PID setpoint drops rapidly but the 
 
 **Auto-switch**: SAT always monitors boiler behavior using cycle classification (see section 5.11) and switches modes automatically:
 
-- Continuous to PWM: when the flow temperature minus the requested (PID) setpoint stays at or above the switch margin for 60 seconds (Sergeant D entry 407; ADR-254, Proposed). The margin is the setting `satpwmswitchmargin` (0.5 to 5.0 C), default 2.0 C; a stored old default of 1.5 C moves to 2.0 C once, a value you set yourself stays (Robert, Q-407a). From beta.391 this rule switches to PWM at most once per burn (one flame-on): once SAT has gone from PWM back to continuous while the flame burns, it stays in continuous until the flame goes out (Sergeant D entries 429 and 430). Only the fail-safe can still switch to PWM in that burn: the flow stays 3.0 C or more above the request for 30 s (entries 359 and 429; 3.5 C before beta.391). Only the first PWM ON of a burn counts as a start toward the hourly cycle limit; a later PWM ON in the same burn does not (entry 428, which changes entry 89; TASK-2913). From beta.377 neither rule, the switch margin nor the fail-safe, runs while heating is not allowed, for example during a tolerance-band pause: leftover heat after hot water then no longer switches SAT to PWM with the burner off (Sergeant D entries 410 and 417; thermo-nova skips its switch when the heater is not on, `heating_control.py:276-282`).
+- Continuous to PWM: when the flow temperature minus the requested (PID) setpoint stays at or above the switch margin for 60 seconds (Sergeant D entry 407; ADR-254, Proposed). The margin is the setting `satpwmswitchmargin` (0.5 to 5.0 C), default 2.0 C; a stored old default of 1.5 C moves to 2.0 C once, a value you set yourself stays (Robert, Q-407a). From beta.391 this rule switches to PWM at most once per burn (one flame-on): once SAT has gone from PWM back to continuous while the flame burns, it stays in continuous until the flame goes out (Sergeant D entries 429 and 430). Only the fail-safe can still switch to PWM in that burn: the flow stays 3.0 C or more above the request for 30 s (entries 359 and 429; 3.5 C before beta.391). Only the first PWM ON of a burn counts as a start toward the hourly cycle limit; a later PWM ON in the same burn does not (entry 428, which changes entry 89; TASK-2913). From beta.377 neither rule, the switch margin nor the fail-safe, runs while a tolerance-band pause holds CH off: leftover heat after hot water then no longer switches SAT to PWM with the burner off (Sergeant D entries 410 and 417; thermo-nova skips its switch when the heater is not on, `heating_control.py:276-282`).
 - PWM to continuous: in a PWM ON phase, when the flame is on and the requested setpoint stays above the flow temperature for 60 seconds (entries 339 and 342; ADR-236, Proposed), or after 300 seconds of saturation (ADR-236: unchanged). Not during the first 60 s of a start (entry 394).
 - The boiler's configuration message (MsgID 3, including "master low-off not allowed") does not block PWM: PWM is allowed from the start on every boiler (entries 392, 393; ADR-251).
 
@@ -280,6 +285,8 @@ all run under simulation:
 **Boiler-absence safety:** simulation requires that no real boiler answers the bus. If a
 real boiler is detected while simulation is on, simulation is **automatically disabled**
 so SAT never regulates against synthetic state while a live boiler is listening.
+
+Switching simulation on is also refused while a real boiler answers (REST answers `409` with `simulation unavailable: boiler hardware detected`). In Home Assistant the simulation switch shows as unavailable while a real boiler answers and simulation is off, so it cannot be flipped by mistake; it is available again when no boiler answers, and always while simulation is on, so you can switch it off (MQTT `sat/simulation_available`, ADR-255; the web UI switch follows the same rule).
 
 Useful for testing Home Assistant automations, verifying that the heating curve produces
 logical values, validating the cycle/flame logic, and demonstrations without an active
@@ -372,6 +379,8 @@ SAT collects intra-day error samples (the difference between the room temperatur
 
 The recommendation is published to MQTT as `sat/curve_recommendation` and shown in the web UI. It survives reboots.
 
+**Heating curve self-tune (TASK-1525, TASK-1889).** With `satcurveselftune` on (the default), SAT can change the heating curve coefficient itself. It watches how much the PID has to add on top of the heating curve (the PID output minus the curve value, capped at the setpoint ceiling SAT sends). It decides after every counted hour, on a rolling window of the last 12 counted hours (Sergeant D entries 423 and 424; ADR-260, Proposed). An hour counts when at least 90 % of its expected control ticks are clean. Ticks with hot water, a sun elevation of 12 degrees or more or none known, a lost room temperature, or an active no-ignition or heating-failure message are left out, and so are PWM ticks on a heat pump or hybrid; outside PWM on a gas boiler, ticks with the flame off while CH is on, or with modulation at or below the boiler minimum, are left out too. The tune is split in a warm-up phase (room more than 0.1 C from the target) and a floating phase (within 0.1 C). The coefficient moves by 0.05 only when both phases have a mean beyond +1.0 C (raise) or beyond -1.0 C (lower) in the same direction; a phase without data does not veto, and a floating phase with less than 1 hour of data in the window does not vote, so the warm-up phase decides alone. After a step the window is emptied, so two steps are at least 12 counted hours apart. A manual change of the coefficient also empties the window. The tune changes only `satcoefficient`, never the PID terms. In thermo-nova the coefficient is a fixed configuration option (`custom_components/sat/const.py:97`, `entry_data.py:213`); the self-tune is an addition of the firmware.
+
 ---
 
 ### 5.12 Pressure Monitoring
@@ -450,7 +459,7 @@ For homes with multiple independently controlled heating zones (e.g., separate r
 - **Main room**: the boiler setpoint is the higher of the main room's own PID output and the zone demand. The zones can only raise the demand of the main room, never lower it.
 - **Overshoot cap**: when a counted zone is more than 0.3 C above its target, the setpoint is capped at the cold setpoint plus 10 C, minus 4 C for every degree the zone is too warm. The cap never goes below the cold setpoint, and the lowest cap of all zones applies. The cap can pull the setpoint below the demand of the main room. Example for radiators: a zone 1 C too warm limits the setpoint to 34.2 C; a zone 4 C too warm limits it to 28.2 C, which is the cold setpoint (at or below it SAT switches central heating off).
 - **ECO heating mode**: in ECO the zones are ignored and only the PID of the main room counts.
-- Each zone PID uses a symmetric integral clamp `[-curveValue, +curveValue]` so a zone that is slightly above its target can pull its share of the setpoint below the heating curve.
+- Each zone PID uses a symmetric integral clamp `[-curveValue, +curveValue]` so a zone that is slightly above its target can pull its share of the setpoint below the heating curve. Outside its 0.1 C deadband a zone PID halves its integral once and then holds it, like the main PID (see PID tuning; entry 414).
 
 Zones receive their temperature and target via MQTT. Each zone, zone 1 included, is an extra room next to the main room, with its own target and temperature input.
 

@@ -324,7 +324,7 @@ Beide waarden worden ook als twee zelfstandige, discoverable Home Assistant-sens
 
 #### Number-entiteit
 
-Voor het overschrijven van de buitentemperatuur wordt een number-entiteit gepubliceerd; hiermee kan Home Assistant een waarde pushen alsof die van een bekabelde buitensensor komt.
+Voor het overschrijven van de buitentemperatuur wordt een number-entiteit gepubliceerd; hiermee kan Home Assistant een waarde pushen alsof die van een bekabelde buitensensor komt. De entiteit stuurt `OT=` naar de gateway (commando-topic `<pub>/outside`). Op een board met een PIC telt SAT die waarde als verse buitentemperatuur: de PIC beantwoordt de vraag van de thermostaat naar de buitentemperatuur zelf, en SAT accepteert dat antwoord (TASK-2040, vanaf 2.0.0-beta.381).
 
 #### Override-sensoren van de gateway
 
@@ -369,9 +369,12 @@ Switches:
 | `SAT_Push_Setpoint` | Control-setpoint via TC= naar de ketel pushen |
 | `SAT_Follow_Thermostat` | Een setpointwijziging op de thermostaat wordt het SAT-doel |
 | `SAT_External_Temp` | De MQTT/REST-binnentemperatuur (`sat/indoor_temp`) als ruimtebron gebruiken |
-| `SAT_OVP_Enabled` | Overshoot prevention-kalibratie inschakelen |
+| `SAT_Curve_Self_Tune` | Zelfafstelling van de stooklijn: SAT past de curvehelling met 0,05 aan na getelde uren schone verwarming (standaard aan) |
+| `SAT_Fireplace_Mode` | Haardmodus: SAT stuurt alleen de stooklijnwaarde, P/I/D 0 |
 | `SAT_Preset_Sync` | Climate-preset synchroniseren naar secondaire entiteiten |
 | `SAT_DHW_Enabled` | DHW-regeling binnen SAT inschakelen |
+| `SAT_DHW_Enable` | Hoofdschakelaar voor DHW; wordt alleen aangemeld als de ketel een voorraadvat meldt |
+| `SAT_Enabled` | SAT in- of uitschakelen |
 
 Select:
 
@@ -436,6 +439,7 @@ Topics zonder Home Assistant-entiteit (wel gepubliceerd en retained; te gebruike
 | `sat/enabled` | `true` / `false` | SAT in- of uitschakelen |
 | `sat/indoor_temp` | Getal, bijv. `20.5` | Stuur binnentemperatuur van externe sensor |
 | `sat/outdoor_temp` | Getal, bijv. `5.2` | Stuur buitentemperatuur van externe bron |
+| `sat/sun_elevation` | Getal, bijv. `32.5` | Stuur de zonhoogte in graden (HA-entiteit `sun`). SAT gebruikt die zolang de waarde jonger is dan 1 uur; anders rekent SAT de zonhoogte uit met breedte- en lengtegraad |
 
 ---
 

@@ -24,7 +24,7 @@ A simulation mode (`state.debug.bSensorSim`, telnet key `d`) allows testing with
 - **SAT area routing**: A Dallas address configured in `settings.sat.sSensorArea[0..3]` is passed to `satSetAreaTemp()` on every poll (TASK-587)
 - **S0 pulse counter**: Interrupt-driven pulse counting on a configurable GPIO; configurable debounce (0..1000 ms); `iPulsekw` pulses-per-kW calibration; publishes interval pulse count, lifetime count, last pulse time and instantaneous power (kW) when pulses were seen
 - **GPIO relay output**: Follows one OpenTherm status bit (`iTriggerBit`, 0..15) of `OTcurrentSystemState.Statusflags`; drives the GPIO HIGH when the bit is set (active-HIGH only)
-- **OLED display**: SSD1306 128x64 over I2C at 0x3C, runtime-detected. Five pages cycled by the board button (Network, OT Status, Device, Dashboard, Heating), 5 s refresh, 30 s auto-off, boot splash, plus the WiFi config-portal and (prerelease) AP-fallback "how to connect" screens
+- **OLED display**: SSD1306 128x64 over I2C at 0x3C, runtime-detected. Five pages cycled by the board button (Network, OT Status, Device, Dashboard, Heating), 5 s refresh, 30 s auto-off, boot splash, plus the WiFi config-portal and AP-fallback "how to connect" screens
 - **Sensor simulation mode**: Three synthetic DS18B20 sensors (starting at 30, 35 and 40 degC, random walk within 20..60 degC, update every 10 s)
 - **MQTT auto-discovery for sensors**: Dallas discovery is drained by the discovery loop (`loopMQTTDiscovery()`) calling `configSensors()`, which calls `sensorAutoConfigure()` per detected device; the S0 entries (id 245) are published by the generic discovery drip
 

@@ -264,14 +264,15 @@ The OTGW Classic has no Ethernet. The Ethernet settings in the web UI apply only
 
 #### OLED Display (SSD1306)
 
-A 128x64 SSD1306 I2C OLED display can be connected to the I2C header of the OTGW Classic. The display shows four pages of information cycled by a button press:
+A 128x64 SSD1306 I2C OLED display can be connected to the I2C header of the OTGW Classic. The firmware looks for it at I2C address 0x3C at start-up and skips all display code when none answers. The display shows five pages of information, cycled by a button press (a press on a sleeping display wakes it on page 1; one more press after page 5 turns it off):
 
-1. System status (device name, uptime, firmware version)
-2. Temperatures (room, boiler flow, boiler return, outside)
-3. Network (IP address, SSID or Ethernet status, signal quality)
-4. Boiler status (flame, modulation, CH and DHW setpoints)
+1. Network (WiFi network name or Ethernet, IP address, MQTT broker and status)
+2. OpenTherm status (hardware mode, bus state, flame, temperatures)
+3. Device (firmware version, hostname, uptime, heap). A stable build shows the plain version (`FW 2.0.0`); a prerelease build adds the prerelease tag
+4. Dashboard (key temperatures and flame, CH and DHW state)
+5. Heating (room setpoints and flow temperatures of heating circuit 1 and 2)
 
-The display turns off automatically after a configurable idle timeout. Configure the I2C address, pin assignments, and timeout in Settings under the Hardware section.
+The display turns off after 30 seconds without a button press; this timeout is fixed. While the AP fallback is open (section 6.1.3) the display stays on and shows how to connect.
 
 #### Dallas DS18B20 Temperature Sensors
 
@@ -344,6 +345,8 @@ flash_otgw.bat --port COM5              # Windows
 ```
 
 4. After flashing completes, the device reboots automatically.
+
+To write only the firmware and/or the filesystem over USB, without an erase, use `--update`: `flash_otgw.bat --update` or `./flash_otgw.sh --update` picks the firmware image (`.ino.bin`) and the filesystem image (`.littlefs.bin`) next to the script. `--app <fw.bin>` or `--fs <littlefs.bin>` writes only that one image. Nothing is erased, so the WiFi credentials are kept. A filesystem image resets `settings.ini` to the defaults; an app-only update keeps it. `--update` reads the partition table of the unit first and refuses when the unit needs `--migrate`.
 
 Later updates go over WiFi (see Upgrading from a Previous Version below). A unit on the old partition layout (an early 2.0.0 alpha) needs one `--migrate` run: `flash_otgw.bat --migrate --host <ip>` or `./flash_otgw.sh --migrate --host <ip>`. It saves `settings.ini` over HTTP, writes the new layout with WiFi kept, and restores the settings. Run the script with `--help` for all options.
 
@@ -510,7 +513,9 @@ The Home page offers several layouts through a **View** picker dropdown at the t
 - **At a glance**: a phone-first layout built around a single large room-temperature dial with step buttons.
 - **Mission control**: a live strip chart (flow / return / setpoint / modulation) plus a raw OpenTherm frame ticker.
 
-When the gateway is injecting values onto the OT bus (active gateway overrides), an "injected" badge appears on the Home schematic and on the Connection map; clicking it opens a floating detail panel listing the active overrides.
+The room temperature readouts in all three views (the System schematic, the At a glance dial and chip strip, and the Mission control cells) follow SAT while SAT owns the temperature: they show the room temperature SAT controls on, and the thermostat's own value (MsgID 24) moves into a tooltip on the System and At a glance readouts. While SAT is off, or has no valid room temperature, they show the thermostat's MsgID 24 as before.
+
+When the gateway is injecting values onto the OT bus (active gateway overrides), an "injected" badge appears on the Home schematic and on the Connection map; clicking it opens a floating detail panel listing the active overrides. The badge stays when one refresh of the overrides list fails (for example when the gateway closes the connection on a starved heap); the next refresh decides.
 
 #### Monitor page
 
@@ -519,16 +524,16 @@ The Monitor page has five sub-tabs:
 - **Log**: a live console fed by the WebSocket stream, one OpenTherm frame per line (dense rendering). A toolbar carries Pause, **Clear**, **Download**, a frame filter, and toggle chips for Auto-scroll, Timestamps, **SAT only** (show only SAT narration lines), **Auto-download** (save the log every 15 minutes), and **Stream to file** (append frames straight to a local file in Chrome/Edge). Below the toolbar a command bar sends a raw OTGW command (for example `PS=1`, `TT=20.5`, `GW=1`); the command echoes into the log and the prompt label reflects the live command interface (a `PIC ›` prompt on PIC hardware, `OT ›` on OT-Direct).
 - **Statistics**: a per-message-ID table (msgID, description, direction, interval, count, value) with a search box, followed by an **Active gateway overrides** panel and a **Boiler unsupported messages** panel.
 - **OT Support**: a matrix of all 128 OpenTherm message IDs colour-coded by where each ID was seen (thermostat + boiler, thermostat only, boiler only, or never seen). Click a cell to pin a detail panel with the decoded message.
-- **Graph**: a flow / return / setpoint / modulation chart that opens with the history the gateway has kept (the last hour at 30-second resolution, or the last 24 hours at 2-minute resolution on a board with PSRAM; it is held in the gateway's RAM, so it starts empty after a reboot) and then continues live at 5 seconds; Dallas sensor lines start at page load. A line is drawn with a break where more than 2.5 minutes of data are missing. While the room temperature is not valid (SAT on: SAT reports it lost; otherwise the thermostat has not reported it for 4.5 minutes) the room line stops and a dotted line in another colour (pink) runs along the bottom of the plot, and the CSV export has an empty room value for those samples; the history the gateway itself kept does not show this. It has window chips (10 min, 1 hour, 4 h, 24 h), a time axis on round clock times, one-off **PNG** (with the legend of the visible series, axis labels and time axis, in the current theme) and **CSV** export buttons, and **Auto-PNG** / **Auto-CSV** chips for periodic auto-save. The control setpoint, the thermostat setpoint and the SAT target are drawn as dashed lines; from beta.396 their legend entries show the same dash, on screen and in the PNG. Click a legend entry to hide or show that series; the choice is remembered in your browser.
+- **Graph**: a flow / return / setpoint / modulation chart that opens with the history the gateway has kept (the last hour at 30-second resolution on a board without PSRAM, or the last 7 days at 2-minute resolution on a board with PSRAM; it is held in the gateway's RAM, so it starts empty after a reboot) and then continues live at 5 seconds; Dallas sensor lines start at page load. A line is drawn with a break where more than 2.5 minutes of data are missing. While the room temperature is not valid (SAT on: SAT reports it lost; otherwise the thermostat has not reported it for 4.5 minutes) the room line stops and a dotted line in another colour (pink) runs along the bottom of the plot, and the CSV export has an empty room value for those samples; the history the gateway itself kept does not show this. It has window chips (10 min, 1 hour, 4 h, 24 h, and on a board with PSRAM also 7 days; the 7-day window is fetched from the gateway thinned to one point per 10 minutes, while the live part keeps 5 seconds for up to 24 hours), a time axis on round clock times, one-off **PNG** (with the legend of the visible series, axis labels and time axis, in the current theme) and **CSV** export buttons, and **Auto-PNG** / **Auto-CSV** chips for periodic auto-save. The control setpoint, the thermostat setpoint and the SAT target are drawn as dashed lines; from beta.396 their legend entries show the same dash, on screen and in the PNG. The SAT target is its own series (and its own CSV column) only while SAT is enabled; the gateway history carries it only for a window in which it held a SAT value. Click a legend entry to hide or show that series; the choice is remembered in your browser.
 - **Connection**: an OT-bus and connectivity map. The OT bus is modelled as two separate links (thermostat and boiler), and the map separates **MODE** (a setting, such as gateway or monitor) from **HEALTH** using a five-state vocabulary: Connected, Degraded, Disconnected, Off, and Unknown (ADR-155). Nodes cover thermostat, boiler, OTGW, router (with a Wi-Fi signal-strength icon and dBm), MQTT broker, and this browser. On OT-Direct hardware an **OT-Direct overrides** panel lets you apply or clear stored responses and response modifiers (SR/CR/RM/CM/UI/KI) directly.
 
 #### SAT page
 
-A dedicated Smart Autotune Thermostat page provides the thermostat control surface in three cumulative depth layers: **Thermostat** (simple), **Control** (operational), and **Technical** (the control loop). It is bound to the SAT REST endpoints. For full details of SAT, presets, the heating curve, and diagnostics, see Chapter 5.
+A dedicated Smart Autotune Thermostat page provides the thermostat control surface in three cumulative depth layers: **Thermostat** (simple), **Control** (operational), and **Technical** (the control loop). It is bound to the SAT REST endpoints. Status messages on the page start with "SAT paused" when SAT has handed the boiler back: "SAT paused: no OpenTherm connection, the boiler is back under normal control" and "SAT paused: no outside temperature for 1 hour, your thermostat controls the boiler". On a prerelease (beta) firmware a notice reads "SAT controls your boiler. This is a beta firmware." and asks for capture files; SAT itself is no longer called experimental (the on/off heat-pump appliance type with its 3 hour cycle still is). In the weather card, while Home Assistant publishes a fresh `sat/sun_elevation`, the card names it as the source of the sun position and asks for no location; with the weather fetch on and no latitude and longitude set, it still asks for them for the fetch itself. For full details of SAT, presets, the heating curve, and diagnostics, see Chapter 5.
 
 #### Settings page
 
-The Settings page is driven by the REST API and presents settings with human-readable labels, categories, and hints, plus a search box and a rail of category links. The rail lists the categories with their setting counts (on a narrow screen it scrolls sideways above the cards); the cards of the selected category show on the right, one category at a time, and a search shows every category with a match. A save bar tracks unsaved changes with **Discard** and **Save settings** actions. Additional panels include a **BLE sensor** roster (discovered Bluetooth Low Energy sensors) and, in the Webhook category, a **Send test call** action that fires the real saved ON webhook. Advanced OT-Direct and SAT settings are exposed here as well.
+The Settings page is driven by the REST API and presents settings with human-readable labels, categories, and hints, plus a search box and a rail of category links. The rail lists the categories with their setting counts (on a narrow screen it scrolls sideways above the cards); the cards of the selected category show on the right, one category at a time, and a search shows every category with a match. A save bar tracks unsaved changes with **Discard** and **Save settings** actions. The SAT category is described as "Smart Autotune Thermostat". Additional panels include a **BLE sensor** roster (discovered Bluetooth Low Energy sensors; on a board without PSRAM the **Enable BLE sensors** switch is disabled and the card says "BLE needs PSRAM", because the firmware refuses to switch BLE on there) and, in the Webhook category, a **Send test call** action that fires the real saved ON webhook. Advanced OT-Direct and SAT settings are exposed here as well.
 
 #### Advanced page
 
@@ -763,7 +768,7 @@ From firmware 2.0.0-beta.387. The web UI can tell you when a newer firmware is o
 
 - Who contacts GitHub: your browser, not the gateway. The gateway stays on your local network and sends nothing to the internet for this.
 - What is sent: your browser asks api.github.com for the list of OTGW-firmware releases, at most every 6 hours. As with any website, GitHub sees your internet IP address. The gateway's address is not sent: the request carries no referrer and no cookies.
-- First use: the web UI asks once whether you want this. From beta.393 the question is a chip "Check for new versions?" in the header, next to the identity chips; a click on it shows the explanation with No and "Yes, check", and closing it without an answer means not now (the chip stays). Before beta.393 the question opened as a dialog over the page. Your answer is stored on the gateway and applies to every browser.
+- First use: the check is off until you say yes. The web UI asks once, about 30 seconds after the page loads, and not while the setup wizard or the simulation prompt is open. From beta.393 the question is a chip "Check for new versions?" in the header, next to the identity chips; a click on it shows the explanation with No and "Yes, check", and closing it without an answer means not now (the chip stays). Before beta.393 the question opened as a dialog over the page. Your answer is stored on the gateway and applies to every browser.
 - Switch it off: Settings > Behavior > "Check GitHub for new versions". When it is off, the browser makes no request to GitHub at all.
 - Betas: a beta firmware is told about newer betas and stable releases. A stable firmware is only told about stable releases, unless you also switch on "Also tell about beta versions".
 - Hide a notice: the × next to it hides that version until a newer one appears.
@@ -1241,7 +1246,7 @@ Both values are also exposed as two standalone, discoverable Home Assistant sens
 
 #### Number Entity
 
-A number entity is published for the outside-temperature override, letting HA push a value as if it came from a wired outdoor sensor.
+A number entity is published for the outside-temperature override, letting HA push a value as if it came from a wired outdoor sensor. It sends `OT=` to the gateway (command topic `<pub>/outside`). On a board with a PIC, SAT counts that value as a fresh outside temperature: the PIC answers the thermostat's request for the outside temperature itself, and SAT accepts that answer (TASK-2040, from 2.0.0-beta.381).
 
 #### Gateway Override Sensors
 
@@ -1286,9 +1291,12 @@ Switches:
 | `SAT_Push_Setpoint` | Push control setpoint to boiler via TC= |
 | `SAT_Follow_Thermostat` | A setpoint change on the thermostat becomes the SAT target |
 | `SAT_External_Temp` | Use the MQTT/REST indoor temperature (`sat/indoor_temp`) as the room source |
-| `SAT_OVP_Enabled` | Enable overshoot prevention calibration |
+| `SAT_Curve_Self_Tune` | Heating curve self-tune: SAT adjusts the curve slope by 0.05 after counted hours of clean heating (default on) |
+| `SAT_Fireplace_Mode` | Fireplace mode: SAT sends only the heating curve value, P/I/D 0 |
 | `SAT_Preset_Sync` | Sync climate preset to secondary entities |
 | `SAT_DHW_Enabled` | Enable DHW control interaction with SAT |
+| `SAT_DHW_Enable` | Master DHW enable; announced only when the boiler reports a storage tank |
+| `SAT_Enabled` | Switch SAT on or off |
 
 Select:
 
@@ -1353,6 +1361,7 @@ State-only topics (published and retained, but without a Home Assistant entity; 
 | `sat/enabled` | `true` / `false` | Enable or disable SAT |
 | `sat/indoor_temp` | Float, e.g. `20.5` | Push indoor temperature from external sensor |
 | `sat/outdoor_temp` | Float, e.g. `5.2` | Push outdoor temperature from external source |
+| `sat/sun_elevation` | Float, e.g. `32.5` | Push the sun elevation in degrees (HA `sun` entity). SAT uses it while the value is younger than 1 hour; otherwise it computes it from latitude and longitude |
 
 ---
 
@@ -1653,9 +1662,13 @@ A per-system **cold cutoff** (COLD_SETPOINT: 28.2 C for radiators, 21.0 C for un
 | Setting | Default | Range | Description |
 |---|---|---|---|
 
-The integral term uses a **symmetric clamp** `[-curveValue, +curveValue]` with a `+/-20 C` hard safety cap (alpha.28 / alpha.30). Negative accumulation is required in mild weather so the controller can nudge the flow setpoint below the heating curve when the room is slightly above target. The PID integral and raw derivative state are persisted on every save and **warm-started** on the next boot (alpha.32), so a power cycle does not reset to a cold start. `sat/flush` or an explicit `satdisable` clears the persisted state.
+The integral term uses a **symmetric clamp** `[-curveValue, +curveValue]` and no other absolute cap (the earlier `+/-20 C` cap was removed, Sergeant D entry 75). Negative accumulation is required in mild weather so the controller can nudge the flow setpoint below the heating curve when the room is slightly above target. The PID integral and raw derivative state are persisted on every save and **warm-started** on the next boot (alpha.32), so a power cycle does not reset to a cold start. `sat/flush` or an explicit `satdisable` clears the persisted state.
 
 **PID timing (TASK-1368).** The integral and derivative advance once every 60 s on their own timer, as in thermo-nova (Sergeant D entries 42 and 111). This is independent of `satinterval`: each control tick recomputes the output from the current heating curve, but only the 60 s step moves the PID state. Before TASK-1368 every 30 s tick stepped the PID, so the integral grew twice as fast. The derivative is 0 on the first output after a reset or restore. Zone PIDs step on the same timer. After a boot the restored state is held unchanged until the first valid room temperature arrives; that reading takes a step at once (entry 115). The first tick after enabling SAT sends a computed setpoint, not the SAT minimum `CS=10`.
+
+**PID gains.** SAT recomputes the gains from the heating curve value: Kp = coefficient x curve value / 3 for radiators (/ 4 for underfloor heating), Ki = Kp / 8400, Kd = 0.05 x 8400 x Kp = 420 x Kp, each rounded to 3 decimals. The Kd factor is 0.05 from beta.386 on; it was 0.063 before (Sergeant D entry 425, which supersedes the factor of entry 279; entry 427 puts it in 2.0.0). Thermo-nova uses 0.07 (`custom_components/sat/pid.py:93`), so the lower factor is a deliberate choice of Sergeant D.
+
+**Integral outside the deadband (TASK-1890).** The integral only accumulates while the room is within 0.1 C of the target. When the error leaves that band, the integral is halved once and then held while the error stays outside; back inside, it builds up again from the held value (entries 333 and 414; ADR-259, Proposed). This applies to the main PID and to every zone PID. A change of the target still resets the integral to 0. Thermo-nova sets the integral to 0 as soon as the error leaves the band (`custom_components/sat/pid.py:185-189`); the halving is a deliberate deviation.
 
 #### Advanced control
 
@@ -1671,6 +1684,7 @@ The integral term uses a **symmetric clamp** `[-curveValue, +curveValue]` with a
 | `satpushsetpoint` | false | bool | Push SAT target to thermostat display (TC= command). SAT pushes the room setpoint to the thermostat when the target changes (as thermo-nova); a thermostat that rejects the remote override keeps its own setpoint, and SAT does not keep re-pushing |
 | `satfollowthermostat` | on when `satpushsetpoint` is on, else off | bool | A setpoint change on the thermostat becomes the SAT target (see 5.21). A unit with no stored value gets the `satpushsetpoint` value once; a stored value always wins |
 | `satfireplace` | off | bool | Fireplace mode: SAT heats on the heating curve only, as with no room temperature (see 5.21). MQTT `sat/fireplace_mode` |
+| `satcurveselftune` | true | bool | Heating curve self-tune: SAT may change `satcoefficient` by 0.05 per step (see 5.11). MQTT `sat/curve_self_tune` |
 
 #### Choosing the heating curve coefficient
 
@@ -1724,7 +1738,7 @@ Continuous mode includes clamp logic: if the PID setpoint drops rapidly but the 
 
 **Auto-switch**: SAT always monitors boiler behavior using cycle classification (see section 5.11) and switches modes automatically:
 
-- Continuous to PWM: when the flow temperature minus the requested (PID) setpoint stays at or above the switch margin for 60 seconds (Sergeant D entry 407; ADR-254, Proposed). The margin is the setting `satpwmswitchmargin` (0.5 to 5.0 C), default 2.0 C; a stored old default of 1.5 C moves to 2.0 C once, a value you set yourself stays (Robert, Q-407a). From beta.391 this rule switches to PWM at most once per burn (one flame-on): once SAT has gone from PWM back to continuous while the flame burns, it stays in continuous until the flame goes out (Sergeant D entries 429 and 430). Only the fail-safe can still switch to PWM in that burn: the flow stays 3.0 C or more above the request for 30 s (entries 359 and 429; 3.5 C before beta.391). Only the first PWM ON of a burn counts as a start toward the hourly cycle limit; a later PWM ON in the same burn does not (entry 428, which changes entry 89; TASK-2913). From beta.377 neither rule, the switch margin nor the fail-safe, runs while heating is not allowed, for example during a tolerance-band pause: leftover heat after hot water then no longer switches SAT to PWM with the burner off (Sergeant D entries 410 and 417; thermo-nova skips its switch when the heater is not on, `heating_control.py:276-282`).
+- Continuous to PWM: when the flow temperature minus the requested (PID) setpoint stays at or above the switch margin for 60 seconds (Sergeant D entry 407; ADR-254, Proposed). The margin is the setting `satpwmswitchmargin` (0.5 to 5.0 C), default 2.0 C; a stored old default of 1.5 C moves to 2.0 C once, a value you set yourself stays (Robert, Q-407a). From beta.391 this rule switches to PWM at most once per burn (one flame-on): once SAT has gone from PWM back to continuous while the flame burns, it stays in continuous until the flame goes out (Sergeant D entries 429 and 430). Only the fail-safe can still switch to PWM in that burn: the flow stays 3.0 C or more above the request for 30 s (entries 359 and 429; 3.5 C before beta.391). Only the first PWM ON of a burn counts as a start toward the hourly cycle limit; a later PWM ON in the same burn does not (entry 428, which changes entry 89; TASK-2913). From beta.377 neither rule, the switch margin nor the fail-safe, runs while a tolerance-band pause holds CH off: leftover heat after hot water then no longer switches SAT to PWM with the burner off (Sergeant D entries 410 and 417; thermo-nova skips its switch when the heater is not on, `heating_control.py:276-282`).
 - PWM to continuous: in a PWM ON phase, when the flame is on and the requested setpoint stays above the flow temperature for 60 seconds (entries 339 and 342; ADR-236, Proposed), or after 300 seconds of saturation (ADR-236: unchanged). Not during the first 60 s of a start (entry 394).
 - The boiler's configuration message (MsgID 3, including "master low-off not allowed") does not block PWM: PWM is allowed from the start on every boiler (entries 392, 393; ADR-251).
 
@@ -1815,6 +1829,8 @@ all run under simulation:
 **Boiler-absence safety:** simulation requires that no real boiler answers the bus. If a
 real boiler is detected while simulation is on, simulation is **automatically disabled**
 so SAT never regulates against synthetic state while a live boiler is listening.
+
+Switching simulation on is also refused while a real boiler answers (REST answers `409` with `simulation unavailable: boiler hardware detected`). In Home Assistant the simulation switch shows as unavailable while a real boiler answers and simulation is off, so it cannot be flipped by mistake; it is available again when no boiler answers, and always while simulation is on, so you can switch it off (MQTT `sat/simulation_available`, ADR-255; the web UI switch follows the same rule).
 
 Useful for testing Home Assistant automations, verifying that the heating curve produces
 logical values, validating the cycle/flame logic, and demonstrations without an active
@@ -1907,6 +1923,8 @@ SAT collects intra-day error samples (the difference between the room temperatur
 
 The recommendation is published to MQTT as `sat/curve_recommendation` and shown in the web UI. It survives reboots.
 
+**Heating curve self-tune (TASK-1525, TASK-1889).** With `satcurveselftune` on (the default), SAT can change the heating curve coefficient itself. It watches how much the PID has to add on top of the heating curve (the PID output minus the curve value, capped at the setpoint ceiling SAT sends). It decides after every counted hour, on a rolling window of the last 12 counted hours (Sergeant D entries 423 and 424; ADR-260, Proposed). An hour counts when at least 90 % of its expected control ticks are clean. Ticks with hot water, a sun elevation of 12 degrees or more or none known, a lost room temperature, or an active no-ignition or heating-failure message are left out, and so are PWM ticks on a heat pump or hybrid; outside PWM on a gas boiler, ticks with the flame off while CH is on, or with modulation at or below the boiler minimum, are left out too. The tune is split in a warm-up phase (room more than 0.1 C from the target) and a floating phase (within 0.1 C). The coefficient moves by 0.05 only when both phases have a mean beyond +1.0 C (raise) or beyond -1.0 C (lower) in the same direction; a phase without data does not veto, and a floating phase with less than 1 hour of data in the window does not vote, so the warm-up phase decides alone. After a step the window is emptied, so two steps are at least 12 counted hours apart. A manual change of the coefficient also empties the window. The tune changes only `satcoefficient`, never the PID terms. In thermo-nova the coefficient is a fixed configuration option (`custom_components/sat/const.py:97`, `entry_data.py:213`); the self-tune is an addition of the firmware.
+
 ---
 
 ### 5.12 Pressure Monitoring
@@ -1985,7 +2003,7 @@ For homes with multiple independently controlled heating zones (e.g., separate r
 - **Main room**: the boiler setpoint is the higher of the main room's own PID output and the zone demand. The zones can only raise the demand of the main room, never lower it.
 - **Overshoot cap**: when a counted zone is more than 0.3 C above its target, the setpoint is capped at the cold setpoint plus 10 C, minus 4 C for every degree the zone is too warm. The cap never goes below the cold setpoint, and the lowest cap of all zones applies. The cap can pull the setpoint below the demand of the main room. Example for radiators: a zone 1 C too warm limits the setpoint to 34.2 C; a zone 4 C too warm limits it to 28.2 C, which is the cold setpoint (at or below it SAT switches central heating off).
 - **ECO heating mode**: in ECO the zones are ignored and only the PID of the main room counts.
-- Each zone PID uses a symmetric integral clamp `[-curveValue, +curveValue]` so a zone that is slightly above its target can pull its share of the setpoint below the heating curve.
+- Each zone PID uses a symmetric integral clamp `[-curveValue, +curveValue]` so a zone that is slightly above its target can pull its share of the setpoint below the heating curve. Outside its 0.1 C deadband a zone PID halves its integral once and then holds it, like the main PID (see PID tuning; entry 414).
 
 Zones receive their temperature and target via MQTT. Each zone, zone 1 included, is an extra room next to the main room, with its own target and temperature input.
 
@@ -2284,6 +2302,8 @@ The firmware uses a two-tier reconnection strategy:
 
 After a successful reconnect, the firmware re-applies the configured hostname for the next DHCP exchange and restarts Telnet, MQTT, and WebSocket services automatically. It makes no DHCP calls of its own: the WiFi SDK handles DHCP as part of the reconnect.
 
+**Dead-link check.** A link can stay associated while no traffic passes. While WiFi is up, the firmware pings the router once a minute (3 echo requests). After the router has answered once since the start, a check without any answer counts as dead. 8 dead checks in a row (about 8 minutes) force a reconnect; if the link is still dead 8 checks later, the device restarts. Nothing happens while MQTT, REST or port 25238 traffic arrived in the last minute, and the check is off on a wired connection. A check that cannot run for lack of memory is skipped, but counts as dead when the largest free memory block is under 4 KB. A re-association while memory stays that low continues the streak instead of starting it again. After 3 such restarts the device only forces a reconnect, at most once per 15 minutes. The telnet log lines are listed in section 7.12a.
+
 #### 6.1.3 AP Fallback Mode
 
 Available in all builds from 2.0.0-beta.401 (before that in beta builds only). When the saved WiFi network cannot be reached, the device opens its own access point so the web UI stays reachable:
@@ -2294,7 +2314,7 @@ Available in all builds from 2.0.0-beta.401 (before that in beta builds only). W
 There is no AP fallback:
 
 - **With the setting `wifinoportal`** ("No setup portal when Wi-Fi is down"): the device keeps retrying the saved network every 30 seconds and does not restart; a triple reset opens the portal.
-- **While memory is critically low** (free memory under 8 KB or the largest free block under 4 KB; from beta.394): starting the access point then crashed the gateway. The telnet log shows `WiFi: AP fallback skipped, heap starved (free ... B, largest block ... B); retrying, restart after 10 attempts`, and after 10 failed attempts the device restarts (`WiFi: too many reconnect failures`).
+- **At runtime, while memory is critically low** (free memory under 8 KB or the largest free block under 4 KB; from beta.394; the boot path does not make this check): starting the access point then crashed the gateway. The telnet log shows `WiFi: AP fallback skipped, heap starved (free ... B, largest block ... B); retrying, restart after 10 attempts`, and after 10 failed attempts the device restarts (`WiFi: too many reconnect failures`).
 
 - **SSID**: `OTGW-<last 3 bytes of MAC address in uppercase hex>`, for example `OTGW-AABBCC`
 - **IP address**: `192.168.4.1`
@@ -2556,7 +2576,7 @@ If `pic=0` on every line while `RST`, `RX` and `TX` show 12, 44 and 43, the firm
 
 1. `/bootdetect.log` (download from the FSexplorer).
 2. The output of `/api/v2/device/info`.
-3. A capture with the capture tool from the flash zip (`capture-mqtt-debug.bat` on Windows, `capture-mqtt-debug.sh` on Linux, `capture-mqtt-debug-macos.sh` on macOS). Start it, reboot the gateway from the web UI while it runs, let it run a few minutes, stop with `Q`, and post the upload zip. It shows the per-minute `PR=A` lines and the reboot log; the boot detection itself comes from `/bootdetect.log`.
+3. A capture with the capture tool from the flash zip (`capture-mqtt-debug.bat` on Windows, `capture-mqtt-debug.sh` on Linux, `capture-mqtt-debug-macos.sh` on macOS). Start it, reboot the gateway from the web UI while it runs, let it run a few minutes, stop with `Q`, and post the upload zip. Keep the PC awake while it runs: when the PC sleeps nothing is recorded, and after it wakes the tool writes one `capture-host` gap (start, end and seconds) to `gaps.log`. It shows the per-minute `PR=A` lines and the reboot log; the boot detection itself comes from `/bootdetect.log`.
 4. Side photos of both pin rows of the S3 Mini in the socket.
 5. The firmware version and the board revision printed on the PCB.
 
@@ -2841,7 +2861,7 @@ Does the gateway hang or become unreachable after you switched BLE on? See secti
 
 **Symptom:** some time after boot the web UI stops answering, MQTT goes quiet and the gateway cannot be reached, often after you changed a setting. On firmware before 2.0.0-beta.375 the most likely cause on a board without PSRAM is BLE scanning that you switched on after accepting the stability warning: BLE starts at boot (`initSAT()`) and its memory use can starve the web server. From beta.375 BLE cannot be switched on without PSRAM, and a stored "on" is cleared at boot (section 5.16, "PSRAM-aware default").
 
-**Automatic recovery (from 2.0.0-beta.383).** A gateway on WiFi whose network has stopped working while its memory is nearly exhausted now recovers by itself. Once a minute it pings your router; a ping that cannot be sent for lack of memory counts as a failed check when the largest free memory block is under 4 KB. After 8 failed checks in a row (about 8 minutes) it forces a WiFi reconnect; if the link is still dead 8 checks later it restarts, so about 16 minutes after the network stopped. A short WiFi reconnect while memory stays that low does not start the count again (from beta.385). No action is taken while MQTT, REST or port 25238 traffic arrived in the last minute. The check starts only after your router has answered once since the start (see Known issues in the release notes), and not on a wired connection. After 3 such restarts the gateway only forces a reconnect, at most once per 15 minutes; the count clears after the link has worked for an hour, and on a power-on. In the telnet log (port 23) look for `WiFi: gateway probe not possible (...), heap starved (largest block ... B): counted as dead`, `WiFi: connected but no traffic, forcing a reconnect` and, after the restart, the reason `WiFi: connected but no traffic`. If this happens more than once, collect the crash log and the telnet log and ask for help (section 7.14).
+**Automatic recovery (from 2.0.0-beta.383).** A gateway on WiFi whose network has stopped working while its memory is nearly exhausted now recovers by itself. Once a minute it pings your router; a ping that cannot be sent for lack of memory counts as a failed check when the largest free memory block is under 4 KB. After 8 failed checks in a row (about 8 minutes) it forces a WiFi reconnect; if the link is still dead 8 checks later it restarts, so about 16 minutes after the network stopped. A short WiFi reconnect while memory stays that low does not start the count again (from beta.385). No action is taken while MQTT, REST or port 25238 traffic arrived in the last minute. The check starts only after your router has answered once since the start (see Known issues in the release notes), and not on a wired connection. After 3 such restarts the gateway only forces a reconnect, at most once per 15 minutes; the count clears after the link has worked for an hour, and on a power-on. In the telnet log (port 23) look for `WiFi: gateway probe not possible (...), heap starved (largest block ... B): counted as dead` (logged once, until the router answers again), `WiFi: re-associated while the heap is starved (largest block ... B), dead-link streak kept at ...` (logged from beta.388 whenever the streak is kept across a re-association), `WiFi: connected but no traffic, forcing a reconnect` and, after the restart, the reason `WiFi: connected but no traffic`. If this happens more than once, collect the crash log and the telnet log and ask for help (section 7.14).
 
 **Tip first:** save your settings while the gateway works. Open `http://<ip-of-your-otgw>/api/v2/settings` in a browser and save the page as a file. That gives you a list to re-enter after the steps below.
 
@@ -2909,7 +2929,8 @@ All firmware code lives in `src/OTGW-firmware/` as Arduino `.ino` files plus a s
 | `jsonStuff.ino` | Low-level JSON formatting helpers: `sendJsonMapEntry()`, `sendJsonKVLine()`, streaming map builders |
 | `settingStuff.ino` | Settings load/save (LittleFS JSON), `updateSetting()` validation, debounced flush, side-effect dispatch |
 | `webSocketStuff.ino` | WebSocket server on port 81, OT log streaming, heap backpressure gate |
-| `helperStuff.ino` | Heap health monitor, `canSendWebSocket()`, `canPublishMQTT()`, LittleFS status helpers |
+| `helperStuff.ino` | Heap health monitor, `canSendWebSocket()`, `canPublishMQTT()`, LittleFS status helpers (the 60-s mount check only reads; there is no periodic write probe, `helperStuff.ino:279-289`) |
+| `fsWriter.ino` / `fsWriter.h` | Background state-file writer task (SAT PID and energy files); reads each file back after the write (`fsWriter.ino:83-94`) |
 | `OTDirect.ino` | OT-Direct engine (used only on hardware without a PIC): OTDirect operating modes, command queue coalesce-by-MsgID |
 | `SATcontrol.ino` | SAT control loop, heating curve, boiler state machine, setpoint injection, master enable/disable |
 | `SATpid.ino` | PID v3 implementation: proportional, integral, derivative with deadband |
@@ -2947,14 +2968,14 @@ The browser SPA lives in `src/OTGW-firmware/data/`. These files are flashed to L
 | File / Directory | Purpose |
 |-----------------|---------|
 | `build.bat` / `build.sh` | Build entrypoints: bootstrap their own Python venv, then run `build.py` |
-| `build.py` | Build script behind the wrappers: invokes PlatformIO internally, packages firmware and LittleFS artifacts, produces the distribution zip |
-| `flash_otgw.bat` / `flash_otgw.sh` | Flash entrypoints, shipped in the release zip: first USB flash, `--update`, `--migrate` |
+| `build.py` | Build script behind the wrappers: invokes PlatformIO internally, packages firmware and LittleFS artifacts, produces the distribution zip (which also packs the scripts modules that `otgw_capture.py` imports, `build.py:1224-1235`, `build.py:1308-1310`) |
+| `flash_otgw.bat` / `flash_otgw.sh` | Flash entrypoints, shipped in the release zip: first USB flash, `--update` (writes the app and/or the filesystem without erase, `--app` / `--fs` pick one image; `flash_otgw.sh:141-148`), `--migrate` |
 | `flash_esp.py` | Python flasher: detects port, writes firmware + filesystem to the ESP32-S3 |
 | `platformio.ini` | PlatformIO project: `esp32`, `esp32-classic` and `esp32-combo` environments; `esp32-combo` is the target that is built and shipped |
 | `evaluate.py` | Static code quality checker: PROGMEM usage, unsafe patterns, String class audit |
-| `scripts/` | PlatformIO pre-build scripts: version injection, library patching |
+| `scripts/` | PlatformIO pre-build scripts (version injection, library patching) and tools such as `build_manual.py` |
 | `src/libraries/` | The Platform library and vendored Arduino libraries |
-| `docs/` | C4 architecture docs, ADRs, API references, feature docs |
+| `docs/` | C4 architecture docs, ADRs, API references, feature docs. `docs/MANUAL.md` is generated from the English chapters by `scripts/build_manual.py` (`python scripts/build_manual.py`; `--check` exits 1 when it lags); never edit it by hand. `tests/test_manual_generated.py` fails when it is out of date |
 | `other-projects/` | Read-only reference codebases (PIC firmware, OTmonitor, SAT) |
 | `backlog/` | Project task management (Backlog.md) |
 
@@ -3525,7 +3546,9 @@ When you connect, a banner is printed listing all available debug toggle keys. P
 | `F` | Force MQTT HA discovery for all message IDs |
 | `q` | Re-read `settings.ini` from LittleFS (`readSettings(true)`). Values from the file are not user changes: an active SAT preset keeps its target (`SettingsLoadScope`, TASK-2013); other setters still run their side effects |
 | `p` | Reset PIC manually |
-| `h` | Print the full debug help menu |
+| `H` | Prerelease builds only: starve the heap on purpose, or release it (bench hook, TASK-2026; `handleDebug.ino:585-589`). The loop task takes free heap under 7168 B and the largest block under 2048 B, never under a 4096 B free floor, and releases by itself after 30 minutes (`handleDebug.ino:316-320`) |
+| `B` | Prerelease builds only: toggle a mode in which the REST gate acts as on a starved heap: in-flight cap 1, and the busy path closes the connection without a response (bench hook, TASK-2921; `handleDebug.ino:590-593`, `restAPI.ino:48-62`, `restAPI.ino:76`, `restAPI.ino:210-214`). Off at every boot |
+| `h` | Print the full debug help menu; in prerelease builds it also lists `H` and `B` (`handleDebug.ino:478-481`) |
 
 #### Debug Macros
 
@@ -3820,13 +3843,15 @@ HTTP status codes follow RFC 7231. Common error codes:
 | 403 | Forbidden: CSRF check failed |
 | 404 | Not Found: unknown endpoint or resource |
 | 405 | Method Not Allowed |
-| 409 | Conflict: action refused due to state (verification already active, marker quota reached) |
+| 409 | Conflict: action refused due to state (verification already active, marker quota reached, SAT simulation while a boiler answers, BLE on a board without PSRAM) |
 | 410 | Gone: deprecated API version (v0, v1) |
 | 413 | Request Entity Too Large: command string too long |
 | 414 | URI Too Long: request URI exceeds the 50-byte parser buffer |
 | 429 | Too Many Requests: cooldown active (e.g. `/api/v2/discovery/republish`) |
 | 500 | Internal Server Error: low heap (< 4 KB), filesystem write failure |
-| 503 | Service Unavailable: MQTT not connected, no OT command interface, PIC flash in progress |
+| 503 | Service Unavailable: MQTT not connected, no OT command interface, PIC flash in progress, or transient pressure (too many concurrent requests, low heap) |
+
+A 503 caused by transient pressure carries `Retry-After: 1`. A 503 for missing hardware, a disconnected MQTT or a running PIC flash does not. When the largest free heap block is below 4096 bytes the gateway cannot even build that answer: it closes the connection without any response, so the client sees a connection reset instead of a 503. Treat a reset like a 503 and retry after a short pause. The v2 web UI does this for its API calls: up to 3 attempts, 400 ms and then 800 ms apart.
 
 ---
 
@@ -3840,7 +3865,7 @@ The sections below describe the most commonly used endpoints with usage notes an
 
 Returns system health metrics. No authentication required.
 
-**Side effect:** Each call writes a small probe file (`/.health`) to LittleFS to verify the filesystem is writable. Poll at 30-60 second intervals minimum.
+**No filesystem access:** the call only reports state the firmware already holds; it reads and writes nothing on LittleFS (TASK-2020 removed the old `/.health` write probe). Poll at 30-60 second intervals.
 
 **Request:** None
 
@@ -3864,7 +3889,7 @@ Returns system health metrics. No authentication required.
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `status` | string | `"UP"` or `"DEGRADED"` |
+| `status` | string | `"UP"`, or `"DEGRADED"` when LittleFS is not mounted or the last file written by the file-writer task did not read back as written |
 | `uptime` | string | Human-readable uptime |
 | `heap` | integer | Free heap in bytes |
 | `networkmode` | string | `"wifi"`, `"ethernet"`, or `"ap"` |
@@ -3874,7 +3899,7 @@ Returns system health metrics. No authentication required.
 | `picavailable` | string | PIC co-processor detected and responding |
 | `simulation_active` | boolean | Simulation mode (OT frame replay) is running |
 | `simulation_source` | string | `file` (`/otgw_simulation.log`) or `builtin`: what the next replay reads |
-| `littlefsMounted` | string | LittleFS filesystem healthy |
+| `littlefsMounted` | string | LittleFS is mounted (read check about every 60 s) |
 
 This endpoint is safe to poll at 30-60 second intervals. Typical use: OTA update completion detection, watchdog integration, Home Assistant availability sensor.
 
@@ -3939,7 +3964,11 @@ Update one or more settings. Authentication required.
 
 Settings are validated server-side. Invalid values are silently ignored or constrained to safe ranges. Side effects (MQTT reconnect, NTP resync, mDNS restart) are applied within 2 seconds via a deferred-write timer.
 
-**Settings whitelist:** Only known setting names are accepted. The full list includes: `hostname`, `httppasswd`, `ledblink`, `nightlyrestart`, `nightlyrestarthour`, `mqttenable`, `mqttbroker`, `mqttbrokerport`, `mqttuser`, `mqttpasswd`, `mqtttoptopic`, `mqtthaprefix`, `mqttharebootdetection`, `mqttuniqueid`, `mqttotmessage`, `mqttinterval`, `mqttseparatesources`, `ntpenable`, `ntptimezone`, `ntphostname`, `ntpsendtime`, `darktheme`, `gpiosensorsenabled`, `gpiosensorspin`, `gpiosensorsinterval`, `s0counterenabled`, `s0counterpin`, `s0counterpulsekw`, `s0counterinterval`, `gpiooutputsenabled`, `gpiooutputspin`, `gpiooutputstriggerbit`, `otgwcommandenable`, `otgwcommands`, `pictempsensor`, `webhookenable`, `webhookurlon`, `webhookurloff`, `webhooktriggerbit`, `webhookpayload`, `webhookcontenttype`, `satenabled`, `satsystem`, `sattargettemp`, `satcoefficient`, `satinterval`, and many more SAT-related settings.
+**Settings whitelist:** Only known setting names are accepted. The full list includes: `hostname`, `httppasswd`, `ledblink`, `nightlyrestart`, `nightlyrestarthour`, `mqttenable`, `mqttbroker`, `mqttbrokerport`, `mqttuser`, `mqttpasswd`, `mqtttoptopic`, `mqtthaprefix`, `mqttharebootdetection`, `mqttuniqueid`, `mqttotmessage`, `mqttinterval`, `mqttseparatesources`, `ntpenable`, `ntptimezone`, `ntphostname`, `ntpsendtime`, `darktheme`, `gpiosensorsenabled`, `gpiosensorspin`, `gpiosensorsinterval`, `s0counterenabled`, `s0counterpin`, `s0counterpulsekw`, `s0counterinterval`, `gpiooutputsenabled`, `gpiooutputspin`, `gpiooutputstriggerbit`, `otgwcommandenable`, `otgwcommands`, `pictempsensor`, `webhookenable`, `webhookurlon`, `webhookurloff`, `webhooktriggerbit`, `webhookpayload`, `webhookcontenttype`, `satenabled`, `satsystem`, `sattargettemp`, `satcoefficient`, `satinterval`, `updatecheck`, `updatecheckbeta`, `updatecheckasked`, and many more SAT-related settings.
+
+**Update check (TASK-2023):** `updatecheck`, `updatecheckbeta` and `updatecheckasked` are booleans that belong to the web UI's "new version available" notice. With `updatecheck` on, the browser (not the gateway) asks the GitHub releases API at most every 6 hours; the gateway makes no outbound request. `updatecheckbeta` lets a stable firmware also be told about betas. `updatecheckasked` records that the UI's one-time question was answered. The shipped defaults are `updatecheck` off, `updatecheckbeta` off and `updatecheckasked` off, so the web UI asks once.
+
+**BLE needs PSRAM (TASK-2025):** a POST of `SATbleenable` with value `true` on a board without PSRAM is refused with HTTP 409 and the body `{"error":"BLE needs PSRAM: not available on this board"}`. Nothing is stored; a stored `true` on such a board is cleared when the settings load.
 
 ---
 
@@ -4292,6 +4321,10 @@ Add `?detail=full` for extended diagnostics including synchronization health, pr
 }
 ```
 
+The status also holds a `curve_tune` object with the progress of the heating curve self-tune: `running`, `window_hours`, `window_hours_needed`, `last_decision` (`raise`, `lower`, `hold` or `none`), `last_reason` and `excluded_hours` (hours kept out of the window, per reason).
+
+**BREAKING for REST clients (TASK-1889, ADR-260):** the self-tune now decides every counted hour on a window of `window_hours_needed` (12) hours. The fields `days`, `days_needed`, `clean_hours_today`, `clean_hours_needed` and `hours_today` are removed from `curve_tune`; `window_hours` and `window_hours_needed` replace them. A client that reads the removed fields gets nothing. The matching MQTT topics `sat/curve_tune/days` and `sat/curve_tune/clean_hours_today` are replaced by `sat/curve_tune/window_hours`.
+
 ##### POST /api/v2/sat/target
 
 Set the target room temperature.
@@ -4375,7 +4408,7 @@ Update a named SAT setting. Authentication required.
 {"status": "ok", "setting": "heating_curve", "value": "1.8"}
 ```
 
-Unknown setting names return HTTP 404. This endpoint mirrors the full MQTT `sat/<setting>` command vocabulary, providing parity between REST and MQTT configuration.
+Unknown setting names return HTTP 404. Setting `simulation` to `true` while a real boiler answers on the bus is refused with HTTP 409 and the body `{"error":{"status":409,"message":"simulation unavailable: boiler hardware detected"}}` (TASK-795); the SAT simulation is a bench mode for a unit without a boiler. This endpoint mirrors the full MQTT `sat/<setting>` command vocabulary, providing parity between REST and MQTT configuration.
 
 ##### GET / POST / DELETE /api/v2/sat/markers
 
@@ -4601,7 +4634,7 @@ This is the primary diagnostic snapshot used when filing issues; the field set i
 
 ##### GET /api/v2/graph/history
 
-Returns the device-side history of the Monitor > Graph series (TASK-1296): oldest first, as JSON columns `flow`, `ret`, `chSet`, `roomSet`, `room`, `outside`, `mod`, `flame`, `dhw_on` and `ch`, plus `interval_s`, `newest_age_ms`, `count` and `scale`. A board without PSRAM keeps up to 120 slots of 30 s (1 hour); a board with PSRAM keeps up to 720 slots of 120 s (24 hours), and `interval_s` says which. Temperatures are integers, the value times `scale` (10); `null` means there is no sample for that slot. `newest_age_ms` is the age of the END of the newest slot; slot `i` starts at `now - newest_age_ms - (count - i) * interval_s * 1000`. The web UI loads it when the Graph tab opens (again after 10 minutes) and merges it by time into the samples it collects itself, stamping each slot with its start. Dallas sensors are not recorded. The history is held in RAM (1.8 KB internal RAM without PSRAM, 10 KB PSRAM with PSRAM) and starts empty after a reboot. No authentication is needed. HTTP 503 with `Retry-After: 1` when the heap is low.
+Returns the device-side history of the Monitor > Graph series (TASK-1296): oldest first, as JSON columns `flow`, `ret`, `chSet`, `roomSet`, `room`, `outside`, `mod`, `flame`, `dhw_on` and `ch`, plus `interval_s`, `newest_age_ms`, `count` and `scale`. A board without PSRAM serves up to 120 slots of 30 s (1 hour). A board with PSRAM keeps 7 days (5040 slots of 120 s) and serves 24 hours (720 slots) by default; `?hours=N` (1 to 168; a missing or invalid value means 24) asks for another window, capped at what the ring holds. A response holds at most 1008 slots, so a longer window comes back thinned to longer slots (`?hours=168` gives 1008 slots of 600 s), each with the newest value of its group and the flags of any slot in it (TASK-1963, ADR-245). `interval_s` says the slot length. While SAT is enabled the history also has a `satTarget` column, the SAT target (`target_temp` of the SAT status; TASK-2018, ADR-256); the column is left out when no slot of the window holds a SAT target, so a client must treat it as optional. Temperatures are integers, the value times `scale` (10); `null` means there is no sample for that slot. `newest_age_ms` is the age of the END of the newest slot; slot `i` starts at `now - newest_age_ms - (count - i) * interval_s * 1000`. The web UI loads it when the Graph tab opens (again after 10 minutes) and merges it by time into the samples it collects itself, stamping each slot with its start. Dallas sensors are not recorded. The history is held in RAM (2 KB internal RAM without PSRAM, 79 KB PSRAM with PSRAM) and starts empty after a reboot. No authentication is needed. HTTP 503 with `Retry-After: 1` when the heap is low; below 4096 bytes of largest free block the connection is closed without a response (see the error codes above).
 
 #### Network
 

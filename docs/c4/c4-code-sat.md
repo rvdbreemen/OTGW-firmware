@@ -156,7 +156,7 @@ PID controller with automatic gain calculation, deadband mode, temperature-based
   - Auto-calculates Kp/Ki/Kd from heating curve value
 
 - `_pidUpdateIntegral(float error, float curveValue, bool force): void` (static)
-  - Updates integral term only inside deadband
+  - Accumulates the integral only inside the deadband (`SATpid.ino:270-272`). On the inside-to-outside transition the integral is halved once and then held while outside (`SATpid.ino:261-265`, TASK-1890, ADR-259 Proposed); thermo-nova sets it to 0 there (`pid.py:187-189`), a deliberate deviation. The zone PIDs follow the same rule (`SATcontrol.ino:3644-3645`, `SATZoneState::bPidInBand`)
   - Task #23: skips accumulation if `bSolarGainActive` and `bSolarFreezeIntegral`
 
 - `_pidUpdateDerivative(float roomTemp, float error): void` (static)

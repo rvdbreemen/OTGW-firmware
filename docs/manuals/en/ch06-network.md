@@ -19,6 +19,8 @@ The firmware uses a two-tier reconnection strategy:
 
 After a successful reconnect, the firmware re-applies the configured hostname for the next DHCP exchange and restarts Telnet, MQTT, and WebSocket services automatically. It makes no DHCP calls of its own: the WiFi SDK handles DHCP as part of the reconnect.
 
+**Dead-link check.** A link can stay associated while no traffic passes. While WiFi is up, the firmware pings the router once a minute (3 echo requests). After the router has answered once since the start, a check without any answer counts as dead. 8 dead checks in a row (about 8 minutes) force a reconnect; if the link is still dead 8 checks later, the device restarts. Nothing happens while MQTT, REST or port 25238 traffic arrived in the last minute, and the check is off on a wired connection. A check that cannot run for lack of memory is skipped, but counts as dead when the largest free memory block is under 4 KB. A re-association while memory stays that low continues the streak instead of starting it again. After 3 such restarts the device only forces a reconnect, at most once per 15 minutes. The telnet log lines are listed in section 7.12a.
+
 #### 6.1.3 AP Fallback Mode
 
 Available in all builds from 2.0.0-beta.401 (before that in beta builds only). When the saved WiFi network cannot be reached, the device opens its own access point so the web UI stays reachable:
@@ -29,7 +31,7 @@ Available in all builds from 2.0.0-beta.401 (before that in beta builds only). W
 There is no AP fallback:
 
 - **With the setting `wifinoportal`** ("No setup portal when Wi-Fi is down"): the device keeps retrying the saved network every 30 seconds and does not restart; a triple reset opens the portal.
-- **While memory is critically low** (free memory under 8 KB or the largest free block under 4 KB; from beta.394): starting the access point then crashed the gateway. The telnet log shows `WiFi: AP fallback skipped, heap starved (free ... B, largest block ... B); retrying, restart after 10 attempts`, and after 10 failed attempts the device restarts (`WiFi: too many reconnect failures`).
+- **At runtime, while memory is critically low** (free memory under 8 KB or the largest free block under 4 KB; from beta.394; the boot path does not make this check): starting the access point then crashed the gateway. The telnet log shows `WiFi: AP fallback skipped, heap starved (free ... B, largest block ... B); retrying, restart after 10 attempts`, and after 10 failed attempts the device restarts (`WiFi: too many reconnect failures`).
 
 - **SSID**: `OTGW-<last 3 bytes of MAC address in uppercase hex>`, for example `OTGW-AABBCC`
 - **IP address**: `192.168.4.1`

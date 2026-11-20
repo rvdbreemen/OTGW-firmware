@@ -98,14 +98,15 @@ The OTGW Classic has no Ethernet. The Ethernet settings in the web UI apply only
 
 #### OLED Display (SSD1306)
 
-A 128x64 SSD1306 I2C OLED display can be connected to the I2C header of the OTGW Classic. The display shows four pages of information cycled by a button press:
+A 128x64 SSD1306 I2C OLED display can be connected to the I2C header of the OTGW Classic. The firmware looks for it at I2C address 0x3C at start-up and skips all display code when none answers. The display shows five pages of information, cycled by a button press (a press on a sleeping display wakes it on page 1; one more press after page 5 turns it off):
 
-1. System status (device name, uptime, firmware version)
-2. Temperatures (room, boiler flow, boiler return, outside)
-3. Network (IP address, SSID or Ethernet status, signal quality)
-4. Boiler status (flame, modulation, CH and DHW setpoints)
+1. Network (WiFi network name or Ethernet, IP address, MQTT broker and status)
+2. OpenTherm status (hardware mode, bus state, flame, temperatures)
+3. Device (firmware version, hostname, uptime, heap). A stable build shows the plain version (`FW 2.0.0`); a prerelease build adds the prerelease tag
+4. Dashboard (key temperatures and flame, CH and DHW state)
+5. Heating (room setpoints and flow temperatures of heating circuit 1 and 2)
 
-The display turns off automatically after a configurable idle timeout. Configure the I2C address, pin assignments, and timeout in Settings under the Hardware section.
+The display turns off after 30 seconds without a button press; this timeout is fixed. While the AP fallback is open (section 6.1.3) the display stays on and shows how to connect.
 
 #### Dallas DS18B20 Temperature Sensors
 
@@ -178,6 +179,8 @@ flash_otgw.bat --port COM5              # Windows
 ```
 
 4. After flashing completes, the device reboots automatically.
+
+To write only the firmware and/or the filesystem over USB, without an erase, use `--update`: `flash_otgw.bat --update` or `./flash_otgw.sh --update` picks the firmware image (`.ino.bin`) and the filesystem image (`.littlefs.bin`) next to the script. `--app <fw.bin>` or `--fs <littlefs.bin>` writes only that one image. Nothing is erased, so the WiFi credentials are kept. A filesystem image resets `settings.ini` to the defaults; an app-only update keeps it. `--update` reads the partition table of the unit first and refuses when the unit needs `--migrate`.
 
 Later updates go over WiFi (see Upgrading from a Previous Version below). A unit on the old partition layout (an early 2.0.0 alpha) needs one `--migrate` run: `flash_otgw.bat --migrate --host <ip>` or `./flash_otgw.sh --migrate --host <ip>`. It saves `settings.ini` over HTTP, writes the new layout with WiFi kept, and restores the settings. Run the script with `--help` for all options.
 

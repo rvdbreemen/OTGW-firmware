@@ -26,7 +26,7 @@
   - Direct connect timeout is `timeOut / 2` (minimum 5 s) when credentials are saved
   - If WiFi is already connected with another hostname, only the hostname is updated; the connection is kept
   - A portal timeout restarts the device through `platformRestart()` (the one documented direct restart outside `doRestart()`)
-  - Prerelease builds (`_VERSION_PRERELEASE`): with saved credentials but no WiFi at boot, `startAPFallback()` runs instead of blocking in the portal
+  - With saved credentials but no WiFi at boot, `startAPFallback()` runs instead of blocking in the portal, in prerelease and stable builds alike (`networkStuff.ino:426-430`, TASK-2931). This boot path has no starved-heap check (tracked as TASK-2951); the runtime path below has one
   - No SDK DHCP stop/start calls anywhere (TASK-432): the SDK owns DHCP, only the hostname is re-applied
 
 #### `void resetWiFiSettings(void)`
@@ -46,7 +46,7 @@
   - `WIFI_CONNECTING`: waits non-blocking, 30-second retry window (`timerWifiRetry`)
   - `WIFI_RECONNECTED`: restarts services (`startTelnet()`, `startMQTT()`, `startWebSocket()`), re-asserts `platformWifiDisableSleep()`
   - `WIFI_FAILED`: after 10 failed attempts calls `doRestart("WiFi: too many reconnect failures")`
-  - Prerelease only: `WIFI_AP_FALLBACK` / `WIFI_AP_RETRY`. After 2 failed attempts (about 60 s) the device starts a SoftAP (`OTGW-<last 3 MAC bytes>`, passphrase `otgw1234`, `192.168.4.1`) and retries WiFi every 5 minutes with a 30 s connect wait
+  - `WIFI_AP_FALLBACK` / `WIFI_AP_RETRY`, in prerelease and stable builds alike (TASK-2931). After 2 failed attempts (about 60 s) the device starts a SoftAP (`OTGW-<last 3 MAC bytes>`, passphrase `otgw1234`, `192.168.4.1`) and retries WiFi every 5 minutes with a 30 s connect wait. `wifiNextStateAfterFailedAttempt()` (`networkStuff.ino:654-667`) decides it: no AP with `wifinoportal` (keep retrying, no restart), and no AP on a starved heap (free heap below `HEAP_LOW_THRESHOLD` or largest free block below `WIFI_STARVED_MAXBLOCK` 4096 B, `networkStuff.ino:648-651`, TASK-2923); then it logs "AP fallback skipped", keeps retrying and restarts after 10 failed attempts. This check runs at runtime only
 
 #### `static void configModeCallback(WiFiManager *myWiFiManager)`
 - **Location**: `networkStuff.ino`
@@ -114,8 +114,8 @@ There is no `platformRestartDHCP()` any more: the call sites were removed in TAS
 
 `Networktypes.h` bundles the network transport types (included after `boards.h`):
 
-- `enum OTGWNetworkMode`: `NET_WIFI`, `NET_ETHERNET`, plus prerelease-only `NET_AP_FALLBACK` (guarded by `_VERSION_PRERELEASE`, so production builds cannot enter AP fallback).
-- `struct NetworkSection` (`state.net`): always present. `eMode` and `bEthernetLink` exist only on `HAS_ETH_CAPABLE` builds; `bAPFallback` and `sAPSSID[32]` exist only in prerelease builds.
+- `enum OTGWNetworkMode`: `NET_WIFI`, `NET_ETHERNET`, plus `NET_AP_FALLBACK` (`Networktypes.h:31`, in prerelease and stable builds, TASK-2931).
+- `struct NetworkSection` (`state.net`): always present. `eMode` and `bEthernetLink` exist only on `HAS_ETH_CAPABLE` builds; `bAPFallback` and `sAPSSID[32]` are in prerelease and stable builds (`Networktypes.h:40-42`).
 - `struct EthernetSection` (`settings.eth`, `HAS_ETH_CAPABLE` only): `bStaticIP`, `sIPaddress`, `sGateway`, `sSubnet`, `sDNS` (0.0.0.0 means "use the gateway").
 - `struct WifiSection` (`settings.wifi`): `sStaticIp`, `sSubnet`, `sGateway`, `sDns1`, `sDns2`; empty `sStaticIp` means DHCP.
 
@@ -250,7 +250,7 @@ Feature flags in `platform_esp32.h`: `HAS_LLMNR` = 0, `MDNS_NEEDS_UPDATE` = 0, `
 ### WiFi Auto-Reconnect Architecture (ADR-047)
 
 1. **SDK auto-reconnect** (`WiFi.setAutoReconnect(true)`): handles brief drops transparently.
-2. **`loopWifi()`** (fallback): 30-second retry windows, up to 10 attempts, then `doRestart()`. On success it re-applies the hostname and restarts Telnet, MQTT and WebSocket. In prerelease builds the AP fallback replaces the reboot after 2 attempts.
+2. **`loopWifi()`** (fallback): 30-second retry windows, up to 10 attempts, then `doRestart()`. On success it re-applies the hostname and restarts Telnet, MQTT and WebSocket. The AP fallback replaces the reboot after 2 attempts, in prerelease and stable builds, unless `wifinoportal` is set or the heap is starved (`wifiNextStateAfterFailedAttempt()`, `networkStuff.ino:654-667`).
 
 No application code stops or starts the SDK DHCP client (TASK-432).
 
@@ -356,7 +356,7 @@ graph TB
 
 **Settings read**: `settings.sHostname`, `settings.sHTTPpasswd`, `settings.ntp.bEnable`, `.sTimezone`, `.sHostname`, `.bSendtime`, `settings.wifi.*`, `settings.eth.*`.
 
-**State written**: `state.net.eMode`, `state.net.bEthernetLink`, `state.net.bAPFallback` and `sAPSSID` (prerelease), `state.hw.bEthernetPresent`. Read: `state.otBus.bPSmode`, `state.mqtt.bConnected`, `state.debug.bNTP`.
+**State written**: `state.net.eMode`, `state.net.bEthernetLink`, `state.net.bAPFallback` and `sAPSSID`, `state.hw.bEthernetPresent`. Read: `state.otBus.bPSmode`, `state.mqtt.bConnected`, `state.debug.bNTP`.
 
 ## Technical Constraints & Considerations
 

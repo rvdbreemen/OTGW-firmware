@@ -550,7 +550,7 @@ The coefficient is learned only while SAT controls the boiler, that is while the
 Telemetry of the self-tune (TASK-1881), published only while `curve_self_tune` is on. Values change once an hour at most.
 The counters cover the current window: they start at 0 when the window empties (a manual or a self-tune coefficient
 change, the self-tune switched on, a reboot) and are not stored in `/sat_tune.json`, so after a reboot they restart at 0
-while a restored window keeps its counted days.
+while a restored window keeps its counted hours.
 
 | Topic | Value | Retained | Description |
 | ----- | ----- | -------- | ----------- |
@@ -707,7 +707,7 @@ topics in the table above.
 
 If `bDiscoveryPublished` was set but the publish failed (low heap, MQTT
 not yet connected, broker hiccup), the helper returns `false` and the
-caller retries on the next iBleInterval cycle — discovery is never
+caller retries on the next iBleInterval cycle - discovery is never
 silently dropped (TASK-489 + TASK-493).
 
 #### Value Tables
@@ -815,7 +815,7 @@ When `settings.mqtt.bSeparateSources` is enabled, OpenTherm data is published to
 {TopTopic}/value/{UniqueId}/{label}_boiler      ← when bSeparateSources=true
 ```
 
-All three are sibling leaves. Each is a normal MQTT topic — the canonical no longer has children, which makes topic-browser UX (mosquitto_sub, MQTT Explorer) straightforward and removes the structural ambiguity that the earlier nested shape created.
+All three are sibling leaves. Each is a normal MQTT topic - the canonical no longer has children, which makes topic-browser UX (mosquitto_sub, MQTT Explorer) straightforward and removes the structural ambiguity that the earlier nested shape created.
 
 #### Topic semantics (2.0.0+, ADR-096 worldview model + ADR-097 sibling-suffix shape)
 
@@ -835,7 +835,7 @@ Override behavior is implicit: when the two source topics diverge for the same m
 | `…/value/<id>/TSet_boiler` | `27.37` | What the boiler actually received |
 | `…/value/<id>/TSet` (canonical) | `27.37` | What was actually transmitted (= boiler-side worldview) |
 
-Without override, all three publish the same value. `_thermostat` and `_boiler` always update independently regardless of override state — `_thermostat` keeps showing the thermostat's intent, `_boiler` keeps showing what reaches the boiler.
+Without override, all three publish the same value. `_thermostat` and `_boiler` always update independently regardless of override state - `_thermostat` keeps showing the thermostat's intent, `_boiler` keeps showing what reaches the boiler.
 
 #### Frame-to-topic routing reference
 
@@ -846,7 +846,7 @@ Without override, all three publish the same value. `_thermostat` and `_boiler` 
 | `B` (boiler-response) | S→M | yes (when no A follows) | yes | yes |
 | `A` (gateway-faked answer) | S→M | yes | yes for a proxy A (no B behind it, e.g. MaxTSet/57); no for an answer override, where the genuine B owns it (ADR-103) | same as `_boiler` |
 
-There is no `_gateway` topic — override is visible by comparing `_thermostat` and `_boiler`.
+There is no `_gateway` topic - override is visible by comparing `_thermostat` and `_boiler`.
 
 #### Canonical-topic publish gating (ADR-097, preserved)
 
@@ -867,7 +867,7 @@ The override store is RAM only, so a reboot forgets every override. After each M
 Two changes shipped in successive 2.0.0 alpha builds. Migration guidance:
 
 1. **Worldview routing (ADR-096, alpha.3).** Earlier builds routed `A` (gateway-faked answer) frames to `/boiler` and dropped `T` frames during gateway override. ADR-096 corrected both: `A` now routes to the thermostat topic (where the value actually arrives), and `T` is preserved on the thermostat topic and canonical even when the gateway substitutes a different value to the boiler.
-2. **Sibling-suffix shape (ADR-097, alpha.4+).** Earlier builds used nested children topics (`{label}/thermostat`, `{label}/boiler`). ADR-097 replaces these with siblings (`{label}_thermostat`, `{label}_boiler`) so the canonical topic is a clean leaf without children. Discovery configs are auto-updated on boot — Home Assistant unsubscribes from the old topic and subscribes to the new one in place (verified against `homeassistant/components/mqtt/subscription.py`). The mutual-exclusion rule from ADR-095 is dropped; the canonical entity now stays advertised alongside the two source variants.
+2. **Sibling-suffix shape (ADR-097, alpha.4+).** Earlier builds used nested children topics (`{label}/thermostat`, `{label}/boiler`). ADR-097 replaces these with siblings (`{label}_thermostat`, `{label}_boiler`) so the canonical topic is a clean leaf without children. Discovery configs are auto-updated on boot - Home Assistant unsubscribes from the old topic and subscribes to the new one in place (verified against `homeassistant/components/mqtt/subscription.py`). The mutual-exclusion rule from ADR-095 is dropped; the canonical entity now stays advertised alongside the two source variants.
 
 **Cleanup of stale retained values:** old retained values at the previous nested topics (`{label}/thermostat`, `{label}/boiler`) linger on the broker as orphans because the firmware no longer publishes there. Home Assistant ignores them after discovery refresh (it has unsubscribed). Users with broker access can clear them with:
 
@@ -1101,7 +1101,7 @@ Payloads: `"true"` / `"false"`. Each of these corresponds to one of the auto-dis
 | `sat/push_setpoint` | `SATpushsetpoint` | Enable pushing setpoint changes to boiler |
 | `sat/external_temp` | `SATexternaltemp` | Prefer the MQTT/REST indoor temperature (`sat/indoor_temp`) over the thermostat room temperature. State: `sat/external_temp_enable` |
 | `sat/follow_thermostat` | `SATfollowthermostat` | A room setpoint change on the thermostat (MsgID 16) becomes the SAT target and clears an active preset. Defaults to the push-setpoint value on units with no stored value |
-| `sat/curve_self_tune` | `SATcurveselftune` | Heating curve self-tune on/off (default on): SAT decides once a day from the last 3 counted days of clean heating hours and changes the curve slope by 0.1; a change empties that window, so two steps are at least 3 counted days apart (ADR-205). State: `sat/curve_self_tune_enable` |
+| `sat/curve_self_tune` | `SATcurveselftune` | Heating curve self-tune on/off (default on): SAT decides after every counted hour, once the window holds 12 counted hours of clean heating, and changes the curve slope by 0.05; a change empties that window, so two steps are at least 12 counted hours apart (ADR-205, ADR-260). State: `sat/curve_self_tune_enable` |
 | `sat/fireplace_mode` | `SATfireplace` | Fireplace mode (default off): SAT sends only the heating curve value to the control loop, P/I/D 0, exactly as with a missing room temperature. For a room with a stove or air conditioner. The room temperature stays shown |
 | `sat/preset_sync` | `SATpresetsync` | Enable HA preset-sync subscription |
 | `sat/dhw_enabled` | `SATdhwenabled` | Enable DHW heating |
@@ -1260,8 +1260,8 @@ The firmware emits the following entity categories (`MQTTHaDiscovery.cpp` and th
 | `number` | 1 | `streamNumberDiscovery()` | `Toutside_override` slider |
 | `switch` (SAT, TASK-284) | 15 (`SAT_HA_SWITCH_COUNT`) | `streamSatSwitchDiscovery(idx=0..14)` | See list below; idx 10 (`dhw_enable`) only when the boiler reports a storage tank (MsgID 3 HB3) |
 | `select` (SAT, TASK-284) | 2 (`SAT_HA_SELECT_COUNT`) | `streamSatSelectDiscovery(idx=0..1)` | `sat_heating_system` (options `"0"`..`"3"`), `sat_preset` (TASK-1490) |
-| `button` (PIC control) | 1 | `streamButtonDiscovery()` | `resetgateway` — pseudo-ID 244 |
-| `select` (PIC control) | 8 | `streamSelectDiscovery(idx=0..7)` | `gpioa`/`gpiob` + `leda`–`ledf` — pseudo-ID 244 |
+| `button` (PIC control) | 1 | `streamButtonDiscovery()` | `resetgateway` - pseudo-ID 244 |
+| `select` (PIC control) | 8 | `streamSelectDiscovery(idx=0..7)` | `gpioa`/`gpiob` + `leda`–`ledf` - pseudo-ID 244 |
 | `sensor` (Dallas) | runtime | `streamDallasSensorDiscovery()` via `configSensors()` | Published per detected 1-Wire address |
 
 The SAT switch and select entries piggyback on OT pseudo-ID 0 in the discovery bitmap (they are streamed alongside the climate entities and marked done together with ID 0). The number entity is marked done with OT ID 27.
@@ -1299,9 +1299,9 @@ The `loopMQTTDiscovery()` drip publishes one pending ID per tick: every 2 second
 
 When `settings.mqtt.bSeparateSources` is enabled, discovery entries with source-template placeholders are expanded into two source-variant entities matching the worldview routing model (ADR-096) and topic shape (ADR-097), additive to the always-advertised canonical entity:
 
-- `{entity}` — canonical (boiler-side worldview), always advertised regardless of `bSeparateSources`. ADR-097 dropped ADR-095's mutual-exclusion rule because the canonical and source variants now have non-overlapping `state_topic`s.
-- `{entity}_thermostat` — value the thermostat sees (its sent write or its received read response, including any gateway-faked answer). State topic: `{base}/value/{id}/{label}_thermostat`.
-- `{entity}_boiler` — value the boiler sees (its received write, including any gateway override, or its sent read response). State topic: `{base}/value/{id}/{label}_boiler`.
+- `{entity}` - canonical (boiler-side worldview), always advertised regardless of `bSeparateSources`. ADR-097 dropped ADR-095's mutual-exclusion rule because the canonical and source variants now have non-overlapping `state_topic`s.
+- `{entity}_thermostat` - value the thermostat sees (its sent write or its received read response, including any gateway-faked answer). State topic: `{base}/value/{id}/{label}_thermostat`.
+- `{entity}_boiler` - value the boiler sees (its received write, including any gateway override, or its sent read response). State topic: `{base}/value/{id}/{label}_boiler`.
 
 There is no `{entity}_gateway` variant; gateway override is observable via divergence between the two source-variant topics.
 

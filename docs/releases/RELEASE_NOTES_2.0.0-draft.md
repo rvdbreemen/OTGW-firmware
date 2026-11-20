@@ -6,9 +6,11 @@
 
 <!-- Refreshed 2026-11-17 against dev at beta.361 (TASK-1740 AC4, comms 92): the SAT section and How to report carry the field-result steps; Known issues rebuilt from the beta.360 list (stale items for TASK-1990, TASK-1874 and TASK-1665 dropped) plus TASK-2005; Highlights and BREAKING still need the full pass at release-candidate compose. Still a draft for Robert's review. -->
 
-<!-- Refreshed 2026-11-20 against dev at beta.401 (TASK-1740, 95): beta.383 to beta.401 checked per bump; added TASK-2043 (beta.386), TASK-2023 (beta.387), TASK-2914 (beta.392), TASK-2923 (beta.394), TASK-2037 (beta.396), TASK-2928 (beta.399), TASK-2932 (beta.400); beta.395 fixes the beta.393 chip itself, beta.397 and beta.398 touch prerelease debug keys only (no change in a stable build). New section Remote telemetry (TASK-2937, not on dev yet). Highlight graph history corrected from 24 hours to 7 days (TASK-1963, ADR-245). -->
+<!-- Refreshed 2026-11-20 against dev at beta.401 (TASK-1740, 95): beta.383 to beta.401 checked per bump; added TASK-2043 (beta.386), TASK-2023 (beta.387), TASK-2914 (beta.392), TASK-2923 (beta.394), TASK-2037 (beta.396), TASK-2928 (beta.399), TASK-2932 (beta.400); beta.395 fixes the beta.393 chip itself, beta.397 and beta.398 touch prerelease debug keys only (no change in a stable build). New section Remote telemetry (TASK-2937, not on dev yet). Refreshed again 2026-11-20 for beta.402 (TASK-2946) and the CONTRIBUTORS.md highlight (TASK-2947). Highlight graph history corrected from 24 hours to 7 days (TASK-1963, ADR-245). -->
 
-**Status:** draft, not released. **Branch:** dev. **Compared with:** the 1.x line (latest stable v1.7.9).
+<!-- Review (95, 2026-11-20): stable date moved to Sunday 29 November 2026 (Robert "A", DM 1573294949347233795): the MQTT pacer consolidation and the switch to our espMqttClient fork (rvdbreemen/espMqttClient as the dependency) go into 2.0.0. Both are placeholders below until their bench OK. -->
+
+**Status:** draft, not released. **Planned:** Sunday 29 November 2026. **Branch:** dev. **Compared with:** the 1.x line (latest stable v1.7.9).
 
 ## What 2.0.0 is
 
@@ -35,6 +37,9 @@ The web UI is the v2 web UI, the only web UI in 2.0.0. Read "Before you flash", 
 - **Capture tool** with raw OpenTherm frame logging (next section), and an opt-in diagnostic recorder on the device (TASK-1665), with Start, Stop and Download in the web UI (TASK-1700).
 - **SAT, opt-in and off by default:** every heating start runs in PWM first, a tolerance band around the room target (restart below the target + 0.1 C after a 10 minute pause), no SAT command in the first minute after a reboot, PWM also on boilers that report "master low-off not allowed", and the Home Assistant thermostat card follows SAT while SAT is on (TASK-1942, TASK-1887, TASK-1874, TASK-2000, TASK-1979).
 - **Relicensed to GNU GPLv3** (was MIT).
+- **Credits and contributors.** The About screen in Settings names the people the firmware builds on and the community that tested and helped; the full list is in [CONTRIBUTORS.md](https://github.com/rvdbreemen/OTGW-firmware/blob/dev/CONTRIBUTORS.md) (TASK-2947).
+
+<!-- Review (95, 2026-11-20): the About screen redesign by otgw-webui is not on dev yet; keep the sentence about the About screen only if it lands before the tag. Placeholder: TASK-2019 (beta.403, pace window at the SAT takeover) goes into the SAT section and its known-issue line changes only after the bench OK of 09. -->
 
 ---
 
@@ -130,6 +135,7 @@ The items below changed during the 2.0.0 alphas and betas; most concern SAT, whi
 - **`cycles_this_hour`** (REST, MQTT, SAT page) now counts PWM ON-phase starts only. It reads 0 in continuous mode.
 - **SAT MQTT contract cleanup.** "Home Assistant automations or templates that read these topics need an update":
   - `sat/heating_curve_recommendation` is all lower case: `increase` / `decrease` / `hold` / `insufficient` (was `INCREASE` / `DECREASE` / `HOLD` / `insufficient`). The REST/WS field `heating_curve_recommendation` changes with it. `sat/curve_recommendation` is unchanged.
+  - `sat/curve_tune/days` and `sat/curve_tune/clean_hours_today` are removed; read `sat/curve_tune/window_hours` (counted hours in the 12-hour self-tune window). In the REST SAT status, `curve_tune` has `window_hours` and `window_hours_needed` instead of `days`, `days_needed`, `clean_hours_today`, `clean_hours_needed` and `hours_today` (TASK-1889, beta.379).
   - `sat/ssi` is removed; read `sat/summer_simmer_index` (same value, one decimal). The firmware empties the retained `sat/ssi` topic on every SAT discovery pass.
   - `sat/pressure_health` is ON on a pressure problem (was: ON = healthy), as thermo-nova and the other `*_health` topics.
   - `sat/device_health` is ON while the boiler status has not been evaluated yet since boot, no longer described as "boiler off". The payloads on the wire do not change.
@@ -198,6 +204,9 @@ Most changes since the first 2.0.0 beta are already described above (Highlights 
 
 ### Home Assistant and MQTT
 
+<!-- Placeholder (after bench): MQTT pacer consolidation, one pacer for every MQTT publish path; describe the user-visible effect (publish timing, free memory under bursts) once its task and bench evidence are on dev. -->
+<!-- Placeholder (after bench): espMqttClient now comes from the project's own fork (rvdbreemen/espMqttClient) instead of the vendored upstream copy (ADR-186/ADR-187 context); name the fixes it carries once the dependency change is on dev. -->
+
 - The SAT Simulation switch is shown as unavailable while a real boiler answers, because simulation is refused then; needs Home Assistant 2021.2 or later (TASK-2014, beta.374).
 - A retained `<label>/override` topic is cleared after the next connect, and removed when the override ends (up to about 11 minutes after the last override frame) (TASK-1991, beta.364; TASK-1985, beta.336).
 - The 26 hourly statistics topics go out one per 100 ms, which removes the free-memory dip at the full hour on boards without PSRAM (TASK-2004, beta.355 and beta.356).
@@ -207,6 +216,7 @@ Most changes since the first 2.0.0 beta are already described above (Highlights 
 
 ### Web UI and graphs
 
+- While SAT controls the heating, the room temperature on the Home page is the one SAT regulates on (for example your MQTT or BLE sensor), like the setpoint next to it and the Home Assistant thermostat card; the thermostat's own reading is in the tooltip. With SAT off, or while SAT has no valid room temperature, the page shows the thermostat's reading as before (TASK-2946, beta.402).
 - **New version notice, off until you say yes** (TASK-2023, ADR-262, beta.387). The web UI can tell you when a newer firmware is on GitHub. Your browser asks the GitHub releases API (`api.github.com`), at most every 6 hours, without cookies; the gateway itself makes no outbound request. A stable build looks only for stable releases unless you also ask for betas. It stays off until you answer the one-time question with Yes; you can change it in the settings.
 - The one-time question whether to check GitHub for new versions is a chip "Check for new versions?" in the header; it no longer opens as a dialog over the page you are on. A click on it shows the explanation and the No / Yes buttons. The "New version available" notice now also shows on a phone; before beta.393 it was hidden at a width of 480 px or less (TASK-2918, beta.393).
 - The web UI no longer calls SAT experimental; SAT stays opt-in and off by default, and the setup wizard still asks you to confirm before SAT controls the boiler. The heat-pump boiler type is still marked experimental (TASK-2909, beta.390).
@@ -312,7 +322,7 @@ Timing and reliability:
 
 ### WiFi
 
-- **The WiFi AP fallback is now part of the stable release** (TASK-2931, Robert's decision, beta.401). When the saved WiFi network cannot be reached, after 2 failed attempts (about a minute) or at boot, the gateway opens its own access point `OTGW-<last 3 bytes of the MAC>` (password `otgw1234`, web UI at `http://192.168.4.1`) and retries your network every 5 minutes. There is no AP fallback with the setting `wifinoportal` (the gateway keeps retrying without restarting) or while memory is critically low (it then restarts after 10 failed attempts; TASK-2923, beta.394, after a crash on a starved heap on the bench). Before beta.401 only beta builds had it. See section 6.1.3 of the manual.
+- **The WiFi AP fallback is now part of the stable release** (TASK-2931, Robert's decision, beta.401). When the saved WiFi network cannot be reached, after 2 failed attempts (about a minute) or at boot, the gateway opens its own access point `OTGW-<last 3 bytes of the MAC>` (password `otgw1234`, web UI at `http://192.168.4.1`) and retries your network every 5 minutes. There is no AP fallback with the setting `wifinoportal` (the gateway keeps retrying without restarting) or, at runtime, while memory is critically low (it then restarts after 10 failed attempts; TASK-2923, beta.394, after a crash on a starved heap on the bench). Before beta.401 only beta builds had it. See section 6.1.3 of the manual.
 - A gateway whose network is dead while its memory is nearly exhausted now recovers itself: a WiFi check that cannot run for lack of memory counts as dead when the largest free memory block is under 4 KB, so the forced reconnect and then the restart follow (TASK-2026, ADR-258, beta.383). While memory stays that low, a short WiFi reconnect no longer starts that count again (ADR-261, beta.385; log line from beta.388).
 
 ### Diagnostics

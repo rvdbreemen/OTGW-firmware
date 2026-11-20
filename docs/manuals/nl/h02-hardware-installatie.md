@@ -118,11 +118,17 @@ De OTGW Classic heeft geen Ethernet. De Ethernet-instellingen in de webinterface
 
 #### SSD1306 OLED-display
 
-Een 128x64 pixels OLED-display via I2C biedt lokale statusweergave zonder browser. Het display toont 4 wisselende pagina's met temperaturen, netwerkinformatie en keteltoestand.
+Een 128x64 pixels OLED-display via I2C biedt lokale statusweergave zonder browser. Het display toont vijf pagina's die u met een druk op de knop doorloopt (een druk op een slapend display maakt het wakker op pagina 1; nog een druk na pagina 5 zet het uit):
+
+1. Netwerk (WiFi-netwerknaam of Ethernet, IP-adres, MQTT-broker en status)
+2. OpenTherm-status (hardwaremodus, busstatus, vlam, temperaturen)
+3. Apparaat (firmwareversie, hostnaam, uptime, heap). Een stabiele build toont de kale versie (`FW 2.0.0`); een prerelease-build voegt de prerelease-tag toe
+4. Dashboard (belangrijkste temperaturen en vlam-, CH- en DHW-status)
+5. Verwarming (kamersetpoints en aanvoertemperaturen van verwarmingscircuit 1 en 2)
 
 Aansluiting via de I2C-header van de OTGW Classic. Het display wordt automatisch herkend op I2C-adres 0x3C.
 
-Het display schakelt automatisch uit na een instelbare idle-timeout. Configureer het I2C-adres, de pintoewijzingen en de timeout via Instellingen onder de sectie Hardware.
+Het display schakelt uit na 30 seconden zonder knopdruk; deze timeout staat vast. Zolang de AP-fallback open staat (paragraaf 6.1.3) blijft het display aan en toont het hoe u verbinding maakt.
 
 #### Dallas DS18B20 temperatuursensoren
 
@@ -199,6 +205,8 @@ flash_otgw.bat --port COM3              # Windows
 ```
 
 4. Na het flashen herstart het apparaat automatisch.
+
+Wilt u via USB alleen de firmware en/of het filesystem schrijven, zonder wissen, gebruik dan `--update`: `flash_otgw.bat --update` of `./flash_otgw.sh --update` kiest het firmware-image (`.ino.bin`) en het filesystem-image (`.littlefs.bin`) naast het script. `--app <fw.bin>` of `--fs <littlefs.bin>` schrijft alleen dat ene image. Er wordt niets gewist, dus de WiFi-gegevens blijven bewaard. Een filesystem-image zet `settings.ini` terug naar de standaardwaarden; een update van alleen de app laat het staan. `--update` leest eerst de partitietabel van de unit en weigert als de unit eerst `--migrate` nodig heeft.
 
 Latere updates gaan via WiFi (zie Upgraden van een vorige versie hieronder). Een unit met de oude partitielayout (een vroege 2.0.0-alpha) heeft eenmalig een `--migrate` nodig: `flash_otgw.bat --migrate --host <ip>` of `./flash_otgw.sh --migrate --host <ip>`. Dat bewaart `settings.ini` via HTTP, schrijft de nieuwe layout met behoud van WiFi en zet de instellingen terug. Start het script met `--help` voor alle opties.
 

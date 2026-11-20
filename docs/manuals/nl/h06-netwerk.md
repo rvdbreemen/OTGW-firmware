@@ -31,6 +31,8 @@ Bij herstel van de verbinding:
 
 De firmware doet zelf geen DHCP-aanroepen: de WiFi SDK regelt DHCP als onderdeel van het herverbinden.
 
+**Controle op een dode verbinding.** Een verbinding kan geassocieerd blijven terwijl er geen verkeer doorkomt. Zolang WiFi verbonden is, pingt de firmware de router eens per minuut (3 echoverzoeken). Nadat de router sinds de start één keer heeft geantwoord, telt een controle zonder enig antwoord als dood. 8 dode controles op rij (ongeveer 8 minuten) forceren een nieuwe verbinding; is de verbinding 8 controles later nog dood, dan herstart het apparaat. Er gebeurt niets zolang er in de laatste minuut MQTT-, REST- of poort-25238-verkeer binnenkwam, en op een bekabelde verbinding staat de controle uit. Een controle die door geheugengebrek niet kan draaien, wordt overgeslagen, maar telt als dood wanneer het grootste vrije geheugenblok kleiner is dan 4 KB. Een nieuwe associatie terwijl het geheugen zo laag blijft, zet de reeks niet terug naar nul. Na 3 van zulke herstarts forceert het apparaat alleen nog een nieuwe verbinding, hooguit eens per 15 minuten. De telnet-logregels staan in paragraaf 7.12a.
+
 #### 6.1.3 AP-fallbackmodus
 
 Beschikbaar in alle builds vanaf 2.0.0-beta.401 (daarvoor alleen in betabuilds). Als het opgeslagen WiFi-netwerk niet bereikbaar is, opent het apparaat een eigen access point, zodat de webinterface bereikbaar blijft:
@@ -41,7 +43,7 @@ Beschikbaar in alle builds vanaf 2.0.0-beta.401 (daarvoor alleen in betabuilds).
 Er is geen AP-fallback:
 
 - **Met de instelling `wifinoportal`** ("No setup portal when Wi-Fi is down"): het apparaat blijft het opgeslagen netwerk elke 30 seconden proberen en herstart niet; een drievoudige reset opent het portaal.
-- **Zolang het geheugen kritiek laag is** (vrij geheugen onder 8 KB of het grootste vrije blok onder 4 KB; vanaf beta.394): het starten van het access point liet de gateway dan crashen. Het telnet-log toont `WiFi: AP fallback skipped, heap starved (free ... B, largest block ... B); retrying, restart after 10 attempts`, en na 10 mislukte pogingen herstart het apparaat (`WiFi: too many reconnect failures`).
+- **Tijdens bedrijf, zolang het geheugen kritiek laag is** (vrij geheugen onder 8 KB of het grootste vrije blok onder 4 KB; vanaf beta.394; bij het opstarten wordt dit niet gecontroleerd): het starten van het access point liet de gateway dan crashen. Het telnet-log toont `WiFi: AP fallback skipped, heap starved (free ... B, largest block ... B); retrying, restart after 10 attempts`, en na 10 mislukte pogingen herstart het apparaat (`WiFi: too many reconnect failures`).
 
 - **SSID**: `OTGW-<laatste 3 bytes van het MAC-adres in hoofdletters hex>`, bijvoorbeeld `OTGW-AABBCC`
 - **IP-adres**: `192.168.4.1`

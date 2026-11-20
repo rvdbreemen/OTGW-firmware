@@ -16,12 +16,12 @@ A secondary responsibility is platform abstraction. The Platform library exposes
 ## Software Features
 
 - **WiFi initialization with captive portal**: Attempts saved credentials; falls back to the WiFiManager portal with a MAC-suffixed SSID (`<hostname>-AA:BB:CC:DD:EE:FF`); optional static IP from `settings.wifi.*`; triple-reset clears credentials and forces the portal (ADR-043)
-- **Two-tier WiFi recovery** (ADR-047): SDK auto-reconnect handles momentary blips; the `loopWifi()` state machine catches extended outages (30 s windows, 10 retries, then `doRestart()`). Prerelease builds enter a SoftAP fallback (`OTGW-<MAC3>`) after 2 retries instead
+- **Two-tier WiFi recovery** (ADR-047): SDK auto-reconnect handles momentary blips; the `loopWifi()` state machine catches extended outages (30 s windows, 10 retries, then `doRestart()`). The SoftAP fallback (`OTGW-<MAC3>`, prerelease and stable builds since TASK-2931) starts after 2 retries instead
 - **NTP synchronization**: Configures SNTP through `configTime()`; accepts only times in [2000-01-01, 2038-01-19]; resyncs daily (`NTP_RESYNC_TIME` = 86400 s); ignores DHCP option 42 servers (TASK-1052)
 - **OpenTherm time commands**: Sends `SC=`, `SR=21:` and `SR=22:` to the gateway on NTP sync (PIC or OTDirect), keeping the boiler clock accurate
 - **mDNS hostname resolution**: Registers `<hostname>.local` and an `http` service on port 80. LLMNR is compiled out (`HAS_LLMNR` = 0)
 - **Runtime WiFi<->Ethernet failover** (W5500, TASK-581): Detects the chip at boot through the driver install (`Ethernet.hardwareStatus()`); DHCP with 1 s timeout at boot, 2 s on hot-plug; link polled every 5 s; `switchToEthernet()` powers WiFi off, `switchToWiFi()` restarts it. The mode publish (`otgw-firmware/network/mode`) is deferred until the MQTT client reconnects. Skipped in combo PIC mode (ADR-127)
-- **Per-component types header** (`Networktypes.h`, ADR-079 / ADR-081): `OTGWNetworkMode`, `NetworkSection`, `EthernetSection`, `WifiSection`. `NET_AP_FALLBACK` exists only when `_VERSION_PRERELEASE` is defined
+- **Per-component types header** (`Networktypes.h`, ADR-079 / ADR-081): `OTGWNetworkMode`, `NetworkSection`, `EthernetSection`, `WifiSection`. `NET_AP_FALLBACK` exists in prerelease and stable builds (TASK-2931)
 - **Firmware OTA via the safeboot updater** (ADR-191, 4MB boards): the main firmware never overwrites its own app slot; `POST /safeboot` hands over to a small updater in the factory partition (see Interfaces)
 - **Platform abstraction**: Platform library shims for hostname, MAC, heap, flash, reset info, RTC emulation, FreeRTOS mutex/queue/task wrappers
 - **Telnet debug server**: `AsyncSimpleTelnet<1>` on port 23 (AsyncTCP, non-blocking writes) with a triage banner and single-key debug toggles

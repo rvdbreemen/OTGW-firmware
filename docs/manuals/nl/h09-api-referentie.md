@@ -68,13 +68,15 @@ Veelvoorkomende foutcodes:
 | 403 | Forbidden: CSRF-controle mislukt |
 | 404 | Not Found: onbekend eindpunt of bron |
 | 405 | Method Not Allowed |
-| 409 | Conflict: actie geweigerd vanwege toestand (verificatie al actief, markerquotum bereikt) |
+| 409 | Conflict: actie geweigerd vanwege toestand (verificatie al actief, markerquotum bereikt, SAT-simulatie terwijl een ketel antwoordt, BLE op een bord zonder PSRAM) |
 | 410 | Gone: verouderde API-versie (v0, v1) |
 | 413 | Request Entity Too Large: commando te lang |
 | 414 | URI Too Long: URI overschrijdt de 50-byte parserbuffer |
 | 429 | Too Many Requests: cooldown actief (bijv. `/api/v2/discovery/republish`) |
 | 500 | Internal Server Error: weinig geheugen (< 4 KB), bestandssysteemfout |
-| 503 | Service Unavailable: MQTT niet verbonden, geen OT-interface, PIC-flash bezig |
+| 503 | Service Unavailable: MQTT niet verbonden, geen OT-interface, PIC-flash bezig, of tijdelijke belasting (te veel gelijktijdige verzoeken, weinig geheugen) |
+
+Een 503 door tijdelijke belasting bevat `Retry-After: 1`. Een 503 voor ontbrekende hardware, een verbroken MQTT-verbinding of een lopende PIC-flash heeft die header niet. Is het grootste vrije geheugenblok kleiner dan 4096 bytes, dan kan de gateway dat antwoord niet eens meer opbouwen: hij sluit de verbinding zonder enig antwoord, zodat de client een verbroken verbinding ziet in plaats van een 503. Behandel zo'n verbreking als een 503 en probeer het na een korte pauze opnieuw. De v2-webinterface doet dat voor zijn API-aanroepen: maximaal 3 pogingen, 400 ms en daarna 800 ms uit elkaar.
 
 #### Authenticatie
 
@@ -92,7 +94,7 @@ De onderstaande secties beschrijven de meest gebruikte eindpunten met gebruiksaa
 
 Systeemgezondheid opvragen. Geen authenticatie vereist.
 
-**Neveneffect:** Elke aanroep schrijft een klein testbestand (`/.health`) naar LittleFS om te controleren of het bestandssysteem beschrijfbaar is. Poll met een interval van minimaal 30-60 seconden.
+**Geen bestandssysteemtoegang:** de aanroep meldt alleen wat de firmware al weet; er wordt niets op LittleFS gelezen of geschreven (TASK-2020 verwijderde de oude `/.health`-schrijftest). Poll met een interval van 30-60 seconden.
 
 **Antwoord:**
 ```json
@@ -113,7 +115,7 @@ Systeemgezondheid opvragen. Geen authenticatie vereist.
 
 | Veld | Type | Beschrijving |
 |------|------|-------------|
-| `status` | string | `"UP"` of `"DEGRADED"` |
+| `status` | string | `"UP"`, of `"DEGRADED"` als LittleFS niet gemount is of het laatste bestand dat de file-writer-taak schreef niet terug te lezen was zoals geschreven |
 | `uptime` | string | Uptime in leesbaar formaat |
 | `heap` | int | Vrij heap-geheugen in bytes |
 | `networkmode` | string | `"wifi"`, `"ethernet"` of `"ap"` |
@@ -123,7 +125,7 @@ Systeemgezondheid opvragen. Geen authenticatie vereist.
 | `picavailable` | string | PIC aanwezig en reagerend |
 | `simulation_active` | boolean | Simulatiemodus (afspelen van OT-frames) staat aan |
 | `simulation_source` | string | `file` (`/otgw_simulation.log`) of `builtin`: wat de volgende afspeelronde leest |
-| `littlefsMounted` | string | LittleFS bestandssysteem gezond |
+| `littlefsMounted` | string | LittleFS is gemount (leescontrole ongeveer elke 60 s) |
 
 ---
 
@@ -173,7 +175,11 @@ De firmware valideert elk veld afzonderlijk en coalesceert flash-schrijfbewerkin
 {"status": "ok", "saved": true}
 ```
 
-**Settings whitelist:** Alleen bekende instellingsnamen worden geaccepteerd. De volledige lijst omvat onder andere: `hostname`, `httppasswd`, `ledblink`, `nightlyrestart`, `nightlyrestarthour`, `mqttenable`, `mqttbroker`, `mqttbrokerport`, `mqttuser`, `mqttpasswd`, `mqtttoptopic`, `mqtthaprefix`, `mqttuniqueid`, `mqttotmessage`, `mqttinterval`, `mqttseparatesources`, `ntpenable`, `ntptimezone`, `ntphostname`, `webhookenable`, `webhookurlon`, `webhookurloff`, `webhooktriggerbit`, `webhookpayload`, `webhookcontenttype`, `satenabled`, `satsystem`, `sattargettemp`, `satcoefficient`, `satinterval`, en nog veel meer SAT-gerelateerde instellingen.
+**Settings whitelist:** Alleen bekende instellingsnamen worden geaccepteerd. De volledige lijst omvat onder andere: `hostname`, `httppasswd`, `ledblink`, `nightlyrestart`, `nightlyrestarthour`, `mqttenable`, `mqttbroker`, `mqttbrokerport`, `mqttuser`, `mqttpasswd`, `mqtttoptopic`, `mqtthaprefix`, `mqttuniqueid`, `mqttotmessage`, `mqttinterval`, `mqttseparatesources`, `ntpenable`, `ntptimezone`, `ntphostname`, `webhookenable`, `webhookurlon`, `webhookurloff`, `webhooktriggerbit`, `webhookpayload`, `webhookcontenttype`, `satenabled`, `satsystem`, `sattargettemp`, `satcoefficient`, `satinterval`, `updatecheck`, `updatecheckbeta`, `updatecheckasked`, en nog veel meer SAT-gerelateerde instellingen.
+
+**Updatecontrole (TASK-2023):** `updatecheck`, `updatecheckbeta` en `updatecheckasked` zijn booleans van de melding "nieuwe versie beschikbaar" in de webinterface. Staat `updatecheck` aan, dan vraagt de browser (niet de gateway) hooguit elke 6 uur de GitHub-releases-API om een nieuwere versie; de gateway doet zelf geen uitgaand verzoek. Met `updatecheckbeta` krijgt een stabiele firmware ook bericht over betas. `updatecheckasked` legt vast dat de eenmalige vraag van de webinterface is beantwoord. De standaardwaarden zijn `updatecheck` uit, `updatecheckbeta` uit en `updatecheckasked` uit, zodat de webinterface één keer vraagt.
+
+**BLE heeft PSRAM nodig (TASK-2025):** een POST van `SATbleenable` met waarde `true` op een bord zonder PSRAM wordt geweigerd met HTTP 409 en de body `{"error":"BLE needs PSRAM: not available on this board"}`. Er wordt niets opgeslagen; een opgeslagen `true` op zo'n bord wordt bij het laden van de instellingen gewist.
 
 ---
 
@@ -477,6 +483,10 @@ Voeg `?detail=full` toe voor uitgebreide diagnostiek, waaronder synchronisatie-g
 }
 ```
 
+De status bevat ook een object `curve_tune` met de voortgang van de zelfafstelling van de stooklijn: `running`, `window_hours`, `window_hours_needed`, `last_decision` (`raise`, `lower`, `hold` of `none`), `last_reason` en `excluded_hours` (uren die buiten het venster bleven, per reden).
+
+**BREAKING voor REST-clients (TASK-1889, ADR-260):** de zelfafstelling beslist nu elk geteld uur op een venster van `window_hours_needed` (12) uur. De velden `days`, `days_needed`, `clean_hours_today`, `clean_hours_needed` en `hours_today` zijn uit `curve_tune` verwijderd; `window_hours` en `window_hours_needed` vervangen ze. Een client die de verwijderde velden leest, krijgt niets terug. De bijbehorende MQTT-onderwerpen `sat/curve_tune/days` en `sat/curve_tune/clean_hours_today` zijn vervangen door `sat/curve_tune/window_hours`.
+
 ---
 
 #### POST /api/v2/sat/target
@@ -541,6 +551,8 @@ Buitentemperatuur aanleveren vanuit een externe bron. Overschrijft de OT MsgID 2
 
 Het volledige instellingenvocabulaire bevat onder andere: `heating_curve`, `boiler_capacity`, `deadband`, `max_modulation`, `dhw_setpoint`, `max_setpoint`, `dhw_enabled`, `dhw_enable`, `interval`, `push_setpoint`, `follow_thermostat`, `curve_self_tune`, `flame_off_offset`, `overshoot_protection`, `flow_offset`, `summer_simmer`, `summer_threshold`, `summer_min_hours`, `simulation`, `ble_enable`, `ble_mac`, `ble_interval`, `preset_sync`, `preset_sync_topic`, `multi_area`, `multi_area_count`, `mod_sup_delay`, `mod_sup_offset`, `target_temp_step`, `min_pressure`, `max_pressure`, `max_pressure_drop`, `preset_comfort`, `preset_eco`, `preset_away`, `preset_sleep`, `preset_activity`, `preset_home`, `solar_gain`, `solar_freeze_integral`, `window_detection`, `sensor_max_age`, `error_monitoring`, `cycles_per_hour`, `valve_offset`, `heating_mode`, `heating_system`, `manufacturer`, `control_mode`, `preset`, `reset_integral`. De naam `reset_integral` accepteert geen waarde. Onbekende namen retourneren HTTP 404.
 Het volledige instellingenvocabulaire bevat onder andere: `heating_curve`, `boiler_capacity`, `deadband`, `max_modulation`, `dhw_setpoint`, `max_setpoint`, `dhw_enabled`, `dhw_enable`, `interval`, `push_setpoint`, `follow_thermostat`, `fireplace_mode`, `flame_off_offset`, `overshoot_protection`, `flow_offset`, `summer_simmer`, `summer_threshold`, `summer_min_hours`, `simulation`, `ble_enable`, `ble_mac`, `ble_interval`, `preset_sync`, `preset_sync_topic`, `multi_area`, `multi_area_count`, `mod_sup_delay`, `mod_sup_offset`, `target_temp_step`, `min_pressure`, `max_pressure`, `max_pressure_drop`, `preset_comfort`, `preset_eco`, `preset_away`, `preset_sleep`, `preset_activity`, `preset_home`, `solar_gain`, `solar_freeze_integral`, `window_detection`, `sensor_max_age`, `error_monitoring`, `cycles_per_hour`, `valve_offset`, `heating_mode`, `heating_system`, `manufacturer`, `control_mode`, `preset`, `reset_integral`. De naam `reset_integral` accepteert geen waarde. Onbekende namen retourneren HTTP 404.
+
+De instelling `simulation` op `true` zetten terwijl een echte ketel op de bus antwoordt, wordt geweigerd met HTTP 409 en de body `{"error":{"status":409,"message":"simulation unavailable: boiler hardware detected"}}` (TASK-795); de SAT-simulatie is een testmodus voor een toestel zonder ketel.
 
 ##### GET / POST / DELETE /api/v2/sat/markers
 
@@ -733,7 +745,7 @@ Dit is de primaire diagnostische snapshot bij issue-rapportage; de veldenset is 
 
 ##### GET /api/v2/graph/history
 
-Retourneert de geschiedenis die het apparaat zelf bijhoudt voor de Monitor > Graph-reeksen (TASK-1296): oudste eerst, als JSON-kolommen `flow`, `ret`, `chSet`, `roomSet`, `room`, `outside`, `mod`, `flame`, `dhw_on` en `ch`, plus `interval_s`, `newest_age_ms`, `count` en `scale`. Een bord zonder PSRAM bewaart maximaal 120 slots van 30 s (1 uur); een bord met PSRAM bewaart maximaal 720 slots van 120 s (24 uur), en `interval_s` geeft aan welke van de twee het is. Temperaturen zijn gehele getallen, de waarde maal `scale` (10); `null` betekent dat er voor dat slot geen meting is. `newest_age_ms` is de leeftijd van het EINDE van het nieuwste slot; slot `i` begint op `now - newest_age_ms - (count - i) * interval_s * 1000`. De webinterface laadt de geschiedenis als het Graph-tabblad opent (na 10 minuten opnieuw) en voegt haar op tijd samen met de samples die de browser zelf verzamelt, waarbij elk slot zijn begintijd krijgt. Dallas-sensoren worden niet bijgehouden. De geschiedenis staat in het RAM (1,8 KB intern RAM zonder PSRAM, 10 KB PSRAM met PSRAM) en is na een herstart leeg. Authenticatie is niet nodig. HTTP 503 met `Retry-After: 1` bij te weinig heap.
+Retourneert de geschiedenis die het apparaat zelf bijhoudt voor de Monitor > Graph-reeksen (TASK-1296): oudste eerst, als JSON-kolommen `flow`, `ret`, `chSet`, `roomSet`, `room`, `outside`, `mod`, `flame`, `dhw_on` en `ch`, plus `interval_s`, `newest_age_ms`, `count` en `scale`. Een bord zonder PSRAM levert maximaal 120 slots van 30 s (1 uur). Een bord met PSRAM bewaart 7 dagen (5040 slots van 120 s) en levert standaard 24 uur (720 slots); met `?hours=N` (1 tot 168; een ontbrekende of ongeldige waarde betekent 24) vraag je een ander venster, begrensd door wat de ring bevat. Een antwoord bevat hooguit 1008 slots, dus een langer venster komt uitgedund terug in langere slots (`?hours=168` geeft 1008 slots van 600 s), elk met de nieuwste waarde van zijn groep en de vlaggen van elk slot erin (TASK-1963, ADR-245). `interval_s` geeft de slotlengte. Zolang SAT aan staat bevat de geschiedenis ook een kolom `satTarget`, de SAT-streeftemperatuur (`target_temp` van de SAT-status; TASK-2018, ADR-256); de kolom ontbreekt als geen enkel slot van het venster een SAT-streefwaarde heeft, dus een client moet hem als optioneel behandelen. Temperaturen zijn gehele getallen, de waarde maal `scale` (10); `null` betekent dat er voor dat slot geen meting is. `newest_age_ms` is de leeftijd van het EINDE van het nieuwste slot; slot `i` begint op `now - newest_age_ms - (count - i) * interval_s * 1000`. De webinterface laadt de geschiedenis als het Graph-tabblad opent (na 10 minuten opnieuw) en voegt haar op tijd samen met de samples die de browser zelf verzamelt, waarbij elk slot zijn begintijd krijgt. Dallas-sensoren worden niet bijgehouden. De geschiedenis staat in het RAM (2 KB intern RAM zonder PSRAM, 79 KB PSRAM met PSRAM) en is na een herstart leeg. Authenticatie is niet nodig. HTTP 503 met `Retry-After: 1` bij te weinig heap; onder 4096 bytes grootste vrije blok wordt de verbinding zonder antwoord gesloten (zie de foutcodes hierboven).
 
 #### Netwerk
 

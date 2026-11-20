@@ -310,7 +310,7 @@ Both values are also exposed as two standalone, discoverable Home Assistant sens
 
 #### Number Entity
 
-A number entity is published for the outside-temperature override, letting HA push a value as if it came from a wired outdoor sensor.
+A number entity is published for the outside-temperature override, letting HA push a value as if it came from a wired outdoor sensor. It sends `OT=` to the gateway (command topic `<pub>/outside`). On a board with a PIC, SAT counts that value as a fresh outside temperature: the PIC answers the thermostat's request for the outside temperature itself, and SAT accepts that answer (TASK-2040, from 2.0.0-beta.381).
 
 #### Gateway Override Sensors
 
@@ -355,9 +355,12 @@ Switches:
 | `SAT_Push_Setpoint` | Push control setpoint to boiler via TC= |
 | `SAT_Follow_Thermostat` | A setpoint change on the thermostat becomes the SAT target |
 | `SAT_External_Temp` | Use the MQTT/REST indoor temperature (`sat/indoor_temp`) as the room source |
-| `SAT_OVP_Enabled` | Enable overshoot prevention calibration |
+| `SAT_Curve_Self_Tune` | Heating curve self-tune: SAT adjusts the curve slope by 0.05 after counted hours of clean heating (default on) |
+| `SAT_Fireplace_Mode` | Fireplace mode: SAT sends only the heating curve value, P/I/D 0 |
 | `SAT_Preset_Sync` | Sync climate preset to secondary entities |
 | `SAT_DHW_Enabled` | Enable DHW control interaction with SAT |
+| `SAT_DHW_Enable` | Master DHW enable; announced only when the boiler reports a storage tank |
+| `SAT_Enabled` | Switch SAT on or off |
 
 Select:
 
@@ -422,6 +425,7 @@ State-only topics (published and retained, but without a Home Assistant entity; 
 | `sat/enabled` | `true` / `false` | Enable or disable SAT |
 | `sat/indoor_temp` | Float, e.g. `20.5` | Push indoor temperature from external sensor |
 | `sat/outdoor_temp` | Float, e.g. `5.2` | Push outdoor temperature from external source |
+| `sat/sun_elevation` | Float, e.g. `32.5` | Push the sun elevation in degrees (HA `sun` entity). SAT uses it while the value is younger than 1 hour; otherwise it computes it from latitude and longitude |
 
 ---
 

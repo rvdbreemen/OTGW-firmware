@@ -83,7 +83,7 @@ Returns the current health status of the device.
 
 **Authentication**: Not required
 
-**Side effect**: Each call writes a small probe file (`/.health`) to LittleFS to verify the filesystem is writable. Poll at 30-60 second intervals minimum.
+**No filesystem access**: the call only reports state the firmware already holds; it reads and writes nothing on LittleFS (TASK-2020 removed the old `/.health` write probe). Poll at 30-60 second intervals.
 
 **Response** `200 OK`:
 ```json
@@ -114,7 +114,7 @@ Returns the current health status of the device.
 | `picavailable` | string | `"true"` / `"false"` |
 | `simulation_active` | boolean | OT frame replay (simulation mode) is running |
 | `simulation_source` | string | `"file"` (`/otgw_simulation.log`) or `"builtin"`: what the next replay reads |
-| `littlefsMounted` | string | `"true"` / `"false"` |
+| `littlefsMounted` | string | `"true"` / `"false"`: LittleFS is mounted (read check about every 60 s) |
 
 ---
 
@@ -329,8 +329,11 @@ Update a single device setting.
 - `400` - Invalid JSON, missing name, unknown setting name, or missing value
 - `401` - Authentication required
 - `403` - CSRF protection: invalid origin
+- `409` - `SATbleenable` set to `true` on a board without PSRAM; body `{"error":"BLE needs PSRAM: not available on this board"}`, nothing is stored (TASK-2025)
 
 **Known setting names**: `hostname`, `mqttenable`, `mqttbroker`, `mqttbrokerport`, `mqttuser`, `mqttpasswd`, `mqtttoptopic`, `mqtthaprefix`, `mqttharebootdetection`, `mqttuniqueid`, `mqttotmessage`, `mqttonchangepublishing`, `mqttinterval`, `mqttseparatesources`, `ntpenable`, `ntptimezone`, `ntphostname`, `ntpsendtime`, `ledblink`, `darktheme`, `nightlyrestart`, `nightlyrestarthour`, `telnetenabled`, `wifinoportal`, `ui_onboarded`, `gpiosensorsenabled`, `gpiosensorslegacyformat`, `gpiosensorspin`, `gpiosensorsinterval`, `s0counterenabled`, `s0counterpin`, `s0counterdebouncetime`, `s0counterpulsekw`, `s0counterinterval`, `gpiooutputsenabled`, `gpiooutputspin`, `gpiooutputstriggerbit`, `otgwcommandenable`, `otgwcommands`, `pictempsensor`, `webhookenable`, `webhookurlon`, `webhookurloff`, `webhooktriggerbit`, `webhookpayload`, `webhookcontenttype`, `httppasswd`, `satenabled`, `satsystem`, `sattargettemp`, `satcoefficient`, `satinterval`, `satexternaltemp`, `satpresetcomfort`, `satpreseteco`, `satpresetaway`, `satbleriskack`
+
+**Update check settings** (TASK-2023): `updatecheck`, `updatecheckbeta` and `updatecheckasked` are booleans of the web UI's "new version available" notice. With `updatecheck` on, the browser (not the gateway) asks the GitHub releases API at most every 6 hours; the gateway makes no outbound request. `updatecheckbeta` lets a stable firmware also be told about betas. `updatecheckasked` records that the UI's one-time question was answered. Defaults: all three `false`, so the web UI asks once.
 
 **Nightly restart settings**:
 
@@ -1013,7 +1016,7 @@ The device-side history of the Monitor > Graph series (TASK-1296): oldest first,
 }
 ```
 
-Temperatures are integers: the value times `scale` (655 is 65.5 C). `null` means there is no sample for that slot (the boiler had not reported the value, or the loop was stalled). For `room` it also means a room dropout (TASK-1578): SAT reports `room_temp_lost`, or MsgID 24 has been silent for more than 270 s; the v2 UI draws such slots as the same interruption as the live graph. `flame`, `dhw_on` and `ch` are 1 when the state was active at any moment of the slot. `newest_age_ms` is the age of the END of the newest slot; slot `i` starts at `now - newest_age_ms - (count - i) * interval_s * 1000` and the web UI stamps it with that start, like its own 5-second records. `interval_s` is 30 or 120 accordingly. `satTarget` (TASK-2018, ADR-256) is the SAT target while SAT was enabled and `null` otherwise; the array is left out when no slot of the window holds a SAT target, so a client must treat it as optional. The history is held in RAM (2 KB internal RAM without PSRAM, 79 KB PSRAM with PSRAM) and starts empty after a reboot. The body is about 4 KB (no PSRAM) or 24 KB (PSRAM, 27 KB with `satTarget`) when full and is sent in chunks; the endpoint answers `503` with `Retry-After: 1` when the heap is low. Firmware without this endpoint answers `404`.
+Temperatures are integers: the value times `scale` (655 is 65.5 C). `null` means there is no sample for that slot (the boiler had not reported the value, or the loop was stalled). For `room` it also means a room dropout (TASK-1578): SAT reports `room_temp_lost`, or MsgID 24 has been silent for more than 270 s; the v2 UI draws such slots as the same interruption as the live graph. `flame`, `dhw_on` and `ch` are 1 when the state was active at any moment of the slot. `newest_age_ms` is the age of the END of the newest slot; slot `i` starts at `now - newest_age_ms - (count - i) * interval_s * 1000` and the web UI stamps it with that start, like its own 5-second records. `interval_s` is 30 or 120 accordingly, and longer for a thinned window (600 for `?hours=168`). `satTarget` (TASK-2018, ADR-256) is the SAT target while SAT was enabled and `null` otherwise; the array is left out when no slot of the window holds a SAT target, so a client must treat it as optional. The history is held in RAM (2 KB internal RAM without PSRAM, 79 KB PSRAM with PSRAM) and starts empty after a reboot. The body is about 4 KB (no PSRAM) or 24 KB (PSRAM, 27 KB with `satTarget`) when full and is sent in chunks; the endpoint answers `503` with `Retry-After: 1` when the heap is low. Firmware without this endpoint answers `404`.
 
 ---
 
@@ -1103,6 +1106,11 @@ Returns the full SAT runtime state including temperatures, PID terms, cycle data
 | `external_temp_valid` | boolean | Whether an external indoor sensor is active |
 | `external_outdoor_valid` | boolean | Whether an external outdoor sensor is active |
 | `safety_tripped` | boolean | Whether safety shutdown is active |
+| `sun_elevation_source` | string | Where the sun elevation comes from: `"external"` (`sat/sun_elevation` over MQTT, younger than 1 h), `"local"` (computed from the weather latitude and longitude) or `"none"` (TASK-2015) |
+| `sun_elevation` | float | Sun elevation in degrees; present only when `sun_elevation_source` is not `"none"` |
+| `curve_tune` | object | Heating curve self-tune progress: `running`, `window_hours`, `window_hours_needed` (12), `last_decision` (`"raise"`, `"lower"`, `"hold"`, `"none"`), `last_reason`, `excluded_hours` (hours kept out of the window, per reason) |
+
+**BREAKING (TASK-1889, ADR-260):** the self-tune decides every counted hour on a 12-hour window. The `curve_tune` fields `days`, `days_needed`, `clean_hours_today`, `clean_hours_needed` and `hours_today` are removed; `window_hours` and `window_hours_needed` replace them. The MQTT topics `sat/curve_tune/days` and `sat/curve_tune/clean_hours_today` are replaced by `sat/curve_tune/window_hours`.
 
 **Boiler status values**: 0=Off, 1=Idle, 2=Preheating, 3=At Setpoint, 4=Modulating Up, 5=Modulating Down, 6=Ignition Surge, 7=Stalled Ignition, 8=Anti-Cycling, 9=Pump Starting, 10=Waiting Flame, 11=Overshoot Cooling, 12=Post-Cycle, 13=Heating, 14=Cooling
 
@@ -1608,17 +1616,18 @@ See [OTGW firmware documentation](https://otgw.tclcode.com/firmware.html) for co
 
 ### Recommended Polling Intervals
 
-- **Health checks**: 30-60 seconds minimum -- **each call writes a probe file to LittleFS flash** (see note below)
+- **Health checks**: 30-60 seconds (a call does no LittleFS access)
 - **OpenTherm data**: 5-10 seconds
 - **Flash status (during upgrade)**: 1-2 seconds
 - **Settings**: On-demand only
 - **PIC update check**: On-demand only (makes outbound HTTP request)
 
-> **Health endpoint flash write**: `GET /v2/health` calls `updateLittleFSStatus()` on every
-> request, which writes a small probe file (`/.health`) to LittleFS to verify the filesystem is writable.
-> This is intentional -- it confirms the flash is not just mounted but actively writeable -- but it means
-> each health request incurs a LittleFS write cycle. The designed use-case is post-OTA polling, which stops
-> immediately once `status: UP` is received. Avoid using this endpoint as a high-frequency external monitor.
+> **Health endpoint and the filesystem**: `GET /v2/health` does no LittleFS access (TASK-1865): the
+> handler reports the mount flag that the loop task refreshes with a read-only check about every 60 s.
+> The old `/.health` write probe is gone (TASK-2020), because a flash write stalls the other core too.
+> A filesystem that is mounted but no longer writable shows up as `status: "DEGRADED"` after the next
+> failed write by the file-writer task. The designed use-case is
+> post-OTA polling, which stops immediately once `status: UP` is received.
 
 ### Memory Protection
 
@@ -1628,6 +1637,8 @@ The API enforces a minimum 4KB free heap before processing requests. If heap is 
 ```
 
 This prevents crashes and ensures stable operation.
+
+A `503` for transient pressure (too many concurrent requests, a heap floor) carries `Retry-After: 1`. When the largest free heap block is below 4096 bytes the gateway cannot build even that answer and closes the connection without any response (TASK-2910): the client sees a connection reset instead of a `503`. Treat a reset like a `503` and retry after a short pause. The v2 web UI retries a `503` or a network error up to 3 attempts in total, 400 ms and then 800 ms apart.
 
 ## Examples
 

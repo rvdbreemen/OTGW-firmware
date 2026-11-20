@@ -166,7 +166,7 @@
 - `void loopOLED(void)`
   - **Location**: `OLED.ino:527`
   - **Signature**: Non-blocking OLED main loop, called from `loop()` every pass (inside the `!isFlashing()` block)
-  - **Description**: Returns if no display. Polls the button level (HIGH to LOW edge) with a 300 ms software debounce (`OLED_DEBOUNCE_MS`); there is no ISR (TASK-758). Wake from off goes to page 1; otherwise `oledPage = (oledPage + 1) % OLED_NUM_PAGES` (6, so page 5 wraps to 0 = display off, using `0xAE`/`0xAF` commands). Refreshes the cached WiFi SSID, auto-offs after `OLED_TIMEOUT_MS` (30 s) unless the prerelease AP-fallback screen is active, throttles redraws to `OLED_REFRESH_MS` (5 s), calls `clear()` only on a page change, and dispatches to the page renderer. In prerelease builds (`_VERSION_PRERELEASE`) with `state.net.bAPFallback` it always draws `drawPageConfig()`.
+  - **Description**: Returns if no display. Polls the button level (HIGH to LOW edge) with a 300 ms software debounce (`OLED_DEBOUNCE_MS`); there is no ISR (TASK-758). Wake from off goes to page 1; otherwise `oledPage = (oledPage + 1) % OLED_NUM_PAGES` (6, so page 5 wraps to 0 = display off, using `0xAE`/`0xAF` commands). Refreshes the cached WiFi SSID, auto-offs after `OLED_TIMEOUT_MS` (30 s) unless the AP-fallback screen is active, throttles redraws to `OLED_REFRESH_MS` (5 s), calls `clear()` only on a page change, and dispatches to the page renderer. With `state.net.bAPFallback` (prerelease and stable builds, TASK-2931) it always draws `drawPageConfig()` (`OLED.ino:649-650`).
   - **Dependencies**:
     - `oledPage`, `oledLastActivity`, `oledLastRefresh`, `oledLastRenderedPage`, `oledLastBtnLevel`, `oledLastBtnEdge`
     - the `drawPage*()` renderers
@@ -184,10 +184,10 @@
 
 - `drawPageNetwork()` (`OLED.ino:239`): Page 1. WiFi SSID or "Ethernet" (`HAS_ETH_CAPABLE` and `state.net.eMode == NET_ETHERNET`), IP (`getActiveIP()`), RSSI (WiFi only), MQTT connected/offline, broker name.
 - `drawPageOTStatus()` (`OLED.ino:294`): Page 2. `hardwareModeName()`, OT bus online/offline (`state.otBus.bOnline`), flame and modulation, CH/DHW flags, setpoint and boiler temp. Flame/CH/DHW come from `OTcurrentSystemState.SlaveStatus` bits 3 / 1 / 2.
-- `drawPageDevice()` (`OLED.ino:346`): Page 3. Firmware version (`_VERSION_MAJOR.MINOR.PATCH-<prerelease>`), hostname, uptime (`state.uptime.iSeconds`), `platformFreeHeap()`, `state.uptime.iRebootCount`.
+- `drawPageDevice()` (`OLED.ino:351`): Page 3. Firmware version (`_VERSION_MAJOR.MINOR.PATCH-<prerelease>`; a stable build prints `MAJOR.MINOR.PATCH` without the suffix, `OLED.ino:356-362`, TASK-2932), hostname, uptime (`state.uptime.iSeconds`), `platformFreeHeap()`, `state.uptime.iRebootCount`.
 - `drawPageDashboard()` (`OLED.ino:383`): Page 4. Flame/modulation, CH/DHW, TSet, Tboiler, Tret, Tdhw, CH pressure, Toutside.
 - `drawPageHeating()` (`OLED.ino:433`): Page 5. HC1 (TrSet, Tr, Tboiler as flow, Tret) and HC2 (TrSetCH2, TRoomCH2, TflowCH2).
-- `drawPageConfig()` (`OLED.ino:230`, only when `_VERSION_PRERELEASE` is defined): AP-fallback "WiFi Setup" screen using `state.net.sAPSSID`, a hard-coded password string and `http://192.168.4.1/`.
+- `drawPageConfig()` (`OLED.ino:230`, prerelease and stable builds, TASK-2931): AP-fallback "WiFi Setup" screen using `state.net.sAPSSID`, a hard-coded password string and `http://192.168.4.1/`.
 
 #### Display Characteristics
 
@@ -390,7 +390,7 @@ loopOLED() [every loop() pass]
     +- auto-off after 30 s
     +- every 5 s: clear() on page change, then
          drawPageNetwork / drawPageOTStatus / drawPageDevice / drawPageDashboard / drawPageHeating
-         (or drawPageConfig during prerelease AP fallback)
+         (or drawPageConfig during AP fallback)
     +- I2C writes to SSD1306
 ```
 

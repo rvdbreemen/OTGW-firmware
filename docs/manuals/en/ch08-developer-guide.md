@@ -26,7 +26,8 @@ All firmware code lives in `src/OTGW-firmware/` as Arduino `.ino` files plus a s
 | `jsonStuff.ino` | Low-level JSON formatting helpers: `sendJsonMapEntry()`, `sendJsonKVLine()`, streaming map builders |
 | `settingStuff.ino` | Settings load/save (LittleFS JSON), `updateSetting()` validation, debounced flush, side-effect dispatch |
 | `webSocketStuff.ino` | WebSocket server on port 81, OT log streaming, heap backpressure gate |
-| `helperStuff.ino` | Heap health monitor, `canSendWebSocket()`, `canPublishMQTT()`, LittleFS status helpers |
+| `helperStuff.ino` | Heap health monitor, `canSendWebSocket()`, `canPublishMQTT()`, LittleFS status helpers (the 60-s mount check only reads; there is no periodic write probe, `helperStuff.ino:279-289`) |
+| `fsWriter.ino` / `fsWriter.h` | Background state-file writer task (SAT PID and energy files); reads each file back after the write (`fsWriter.ino:83-94`) |
 | `OTDirect.ino` | OT-Direct engine (used only on hardware without a PIC): OTDirect operating modes, command queue coalesce-by-MsgID |
 | `SATcontrol.ino` | SAT control loop, heating curve, boiler state machine, setpoint injection, master enable/disable |
 | `SATpid.ino` | PID v3 implementation: proportional, integral, derivative with deadband |
@@ -64,14 +65,14 @@ The browser SPA lives in `src/OTGW-firmware/data/`. These files are flashed to L
 | File / Directory | Purpose |
 |-----------------|---------|
 | `build.bat` / `build.sh` | Build entrypoints: bootstrap their own Python venv, then run `build.py` |
-| `build.py` | Build script behind the wrappers: invokes PlatformIO internally, packages firmware and LittleFS artifacts, produces the distribution zip |
-| `flash_otgw.bat` / `flash_otgw.sh` | Flash entrypoints, shipped in the release zip: first USB flash, `--update`, `--migrate` |
+| `build.py` | Build script behind the wrappers: invokes PlatformIO internally, packages firmware and LittleFS artifacts, produces the distribution zip (which also packs the scripts modules that `otgw_capture.py` imports, `build.py:1224-1235`, `build.py:1308-1310`) |
+| `flash_otgw.bat` / `flash_otgw.sh` | Flash entrypoints, shipped in the release zip: first USB flash, `--update` (writes the app and/or the filesystem without erase, `--app` / `--fs` pick one image; `flash_otgw.sh:141-148`), `--migrate` |
 | `flash_esp.py` | Python flasher: detects port, writes firmware + filesystem to the ESP32-S3 |
 | `platformio.ini` | PlatformIO project: `esp32`, `esp32-classic` and `esp32-combo` environments; `esp32-combo` is the target that is built and shipped |
 | `evaluate.py` | Static code quality checker: PROGMEM usage, unsafe patterns, String class audit |
-| `scripts/` | PlatformIO pre-build scripts: version injection, library patching |
+| `scripts/` | PlatformIO pre-build scripts (version injection, library patching) and tools such as `build_manual.py` |
 | `src/libraries/` | The Platform library and vendored Arduino libraries |
-| `docs/` | C4 architecture docs, ADRs, API references, feature docs |
+| `docs/` | C4 architecture docs, ADRs, API references, feature docs. `docs/MANUAL.md` is generated from the English chapters by `scripts/build_manual.py` (`python scripts/build_manual.py`; `--check` exits 1 when it lags); never edit it by hand. `tests/test_manual_generated.py` fails when it is out of date |
 | `other-projects/` | Read-only reference codebases (PIC firmware, OTmonitor, SAT) |
 | `backlog/` | Project task management (Backlog.md) |
 
@@ -642,7 +643,9 @@ When you connect, a banner is printed listing all available debug toggle keys. P
 | `F` | Force MQTT HA discovery for all message IDs |
 | `q` | Re-read `settings.ini` from LittleFS (`readSettings(true)`). Values from the file are not user changes: an active SAT preset keeps its target (`SettingsLoadScope`, TASK-2013); other setters still run their side effects |
 | `p` | Reset PIC manually |
-| `h` | Print the full debug help menu |
+| `H` | Prerelease builds only: starve the heap on purpose, or release it (bench hook, TASK-2026; `handleDebug.ino:585-589`). The loop task takes free heap under 7168 B and the largest block under 2048 B, never under a 4096 B free floor, and releases by itself after 30 minutes (`handleDebug.ino:316-320`) |
+| `B` | Prerelease builds only: toggle a mode in which the REST gate acts as on a starved heap: in-flight cap 1, and the busy path closes the connection without a response (bench hook, TASK-2921; `handleDebug.ino:590-593`, `restAPI.ino:48-62`, `restAPI.ino:76`, `restAPI.ino:210-214`). Off at every boot |
+| `h` | Print the full debug help menu; in prerelease builds it also lists `H` and `B` (`handleDebug.ino:478-481`) |
 
 #### Debug Macros
 
