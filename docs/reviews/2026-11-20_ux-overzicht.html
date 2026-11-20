@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>UX-bevindingen OTGW-firmware 2.0.0 · 20 november 2026</title>
+<style>
+  :root{
+    --bg:#f1f7f8; --panel:#ffffff; --text:#2a2d2f; --muted:#5e6266; --border:#d8dde0;
+    --accent:#016f83; --on-accent:#ffffff; --head:#383838; --head-text:#ffffff; --head-accent:#00bffe;
+    --s4:#b3261e; --s3:#a03f00; --s2:#5c4a00; --s1:#3d5a40;
+    --s4bg:#fde7e5; --s3bg:#ffe9d6; --s2bg:#fff4c2; --s1bg:#e3f1e4;
+    --ok:#2e6b30; --focus:#1e88e5;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#1a1a1a; --panel:#2c2c2e; --text:#e8e8ea; --muted:#a0a8b0; --border:#45474a;
+      --accent:#00bffe; --on-accent:#0d2026; --head:#383838;
+      --s4:#ffb4ab; --s3:#ffb784; --s2:#f0d264; --s1:#a5d6a7;
+      --s4bg:#4a1f1f; --s3bg:#4a2e17; --s2bg:#3f3714; --s1bg:#1f3a22; --ok:#a5d6a7;
+    }
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font:16px/1.55 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+  .skip{position:absolute;left:-9999px}
+  .skip:focus{position:fixed;left:8px;top:8px;z-index:9;background:var(--panel);color:var(--text);padding:8px 12px;border-radius:8px}
+  :focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+  header{background:var(--head);color:var(--head-text);padding:28px 20px 22px}
+  header .in,main{max-width:1080px;margin:0 auto}
+  header h1{margin:0 0 6px;font-size:1.7rem}
+  header p{margin:0;color:#d6d8da}
+  nav.toc{background:var(--head);border-top:1px solid #4a4a4a}
+  nav.toc ul{max-width:1080px;margin:0 auto;padding:0 12px;list-style:none;display:flex;gap:4px;overflow-x:auto}
+  nav.toc a{display:block;padding:11px 12px;color:#ffffff;text-decoration:none;white-space:nowrap;border-bottom:3px solid transparent}
+  nav.toc a:hover{border-bottom-color:var(--head-accent)}
+  main{padding:20px}
+  section{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:18px 20px;margin:0 0 18px}
+  h2{margin:0 0 4px;font-size:1.3rem}
+  h3{margin:18px 0 6px;font-size:1.05rem}
+  .lead{color:var(--muted);margin:0 0 12px}
+  a{color:var(--accent)}
+  .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin:4px 0 0}
+  .stat{border:1px solid var(--border);border-radius:12px;padding:12px 14px}
+  .stat b{display:block;font-size:1.8rem;line-height:1.1}
+  .stat span{color:var(--muted);font-size:.9rem}
+  .tbl{overflow-x:auto}
+  table{border-collapse:collapse;width:100%;font-size:.94rem}
+  th,td{text-align:left;vertical-align:top;padding:8px 10px;border-bottom:1px solid var(--border)}
+  th{font-size:.82rem;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
+  td.id{font-weight:700;white-space:nowrap}
+  .sev{display:inline-block;min-width:2.1em;text-align:center;font-weight:700;border-radius:8px;padding:1px 7px;font-size:.85rem}
+  .sev4{color:var(--s4);background:var(--s4bg)} .sev3{color:var(--s3);background:var(--s3bg)}
+  .sev2{color:var(--s2);background:var(--s2bg)} .sev1{color:var(--s1);background:var(--s1bg)}
+  .task{white-space:nowrap;font-family:ui-monospace,Consolas,monospace;font-size:.86rem}
+  .done{color:var(--ok);font-weight:600}
+  .callout{border-left:4px solid var(--accent);padding:10px 14px;background:color-mix(in srgb,var(--accent) 8%,transparent);border-radius:0 10px 10px 0;margin:12px 0}
+  .callout.warn{border-left-color:var(--s3);background:color-mix(in srgb,var(--s3) 10%,transparent)}
+  ul.tight{margin:6px 0;padding-left:20px} ul.tight li{margin:3px 0}
+  code{font-family:ui-monospace,Consolas,monospace;font-size:.9em}
+  .legend{display:flex;gap:10px;flex-wrap:wrap;font-size:.88rem;color:var(--muted);margin:6px 0 12px}
+  footer{max-width:1080px;margin:0 auto;padding:4px 20px 30px;color:var(--muted);font-size:.88rem}
+</style>
+</head>
+<body>
+<a class="skip" href="#main">Naar de inhoud</a>
+<header>
+  <div class="in">
+    <h1>UX-bevindingen OTGW-firmware 2.0.0</h1>
+    <p>otgw-ux-designer · vrijdag 20 november 2026 · stand origin/dev na 56f49dc78</p>
+  </div>
+</header>
+<nav class="toc" aria-label="Inhoud">
+  <ul>
+    <li><a href="#overzicht">Overzicht</a></li>
+    <li><a href="#besluiten">Open besluiten</a></li>
+    <li><a href="#webui">Web UI</a></li>
+    <li><a href="#specs">Bouwspecs</a></li>
+    <li><a href="#cli">CLI-tools</a></li>
+    <li><a href="#eerste5">Eerste vijf minuten</a></li>
+    <li><a href="#ha">Home Assistant</a></li>
+    <li><a href="#methode">Methode</a></li>
+  </ul>
+</nav>
+
+<main id="main">
+
+<section id="overzicht" aria-labelledby="h-overzicht">
+  <h2 id="h-overzicht">Overzicht</h2>
+  <p class="lead">Vier reviews, zes bouwspecs, alles verdeeld over backlog-taken met eigenaar en acceptatiecriteria. Niets hiervan is een besluit; de coordinator heeft getrieerd, open keuzes staan hieronder.</p>
+  <div class="stats">
+    <div class="stat"><b>44</b><span>bevindingen in 4 reviews</span></div>
+    <div class="stat"><b>6</b><span>bouwspecs (T1, T1b, T2–T5)</span></div>
+    <div class="stat"><b>18</b><span>backlog-taken aangemaakt</span></div>
+    <div class="stat"><b>4</b><span>taken prioriteit high</span></div>
+    <div class="stat"><b>2</b><span>besluiten bij Robert</span></div>
+  </div>
+  <div class="callout warn">
+    <strong>Het zwaarste punt van vandaag:</strong> <code>flash_otgw.bat</code> dubbelklikken doet een factory-flash die WiFi en alle instellingen wist, zonder iets te vragen (C1, <span class="task">TASK-2968</span>, high). Het venster sluit daarna meteen (C2), en na de reset noemt het script een WiFi-netwerk dat niet bestaat (C3).
+  </div>
+  <div class="legend" aria-label="Legenda ernst">
+    <span><span class="sev sev3">3</span> groot</span>
+    <span><span class="sev sev2">2</span> klein</span>
+    <span><span class="sev sev1">1</span> cosmetisch</span>
+    <span>Ernst volgens Nielsen (0–4).</span>
+  </div>
+</section>
+
+<section id="besluiten" aria-labelledby="h-besluiten">
+  <h2 id="h-besluiten">Open besluiten voor Robert</h2>
+  <p class="lead">Via de coordinator, met aanbeveling.</p>
+  <h3>1. Accentkleur in het lichte thema (TASK-2956)</h3>
+  <ul class="tight">
+    <li><strong>A (aanbevolen):</strong> lichte accent overal donkerder, <code>#0288a0</code> → <code>#016f83</code>. Alle 37 accent-regels in één keer goed (5.38:1 op de pagina). Gevolg: decoratief cyaan is in licht ~10 % donkerder. Donker thema blijft gelijk.</li>
+    <li><strong>B:</strong> <code>#0288a0</code> houden voor decoratie, aparte <code>--accent-strong</code> voor tekst. Zelfde ratio's, maar 37 regels met de hand indelen; een verkeerde keuze ziet geen gate.</li>
+  </ul>
+  <h3>2. Landing op GitHub (R1, TASK-2969)</h3>
+  <p>De standaard-branch is <code>dev</code>: een bezoeker ziet "v2.0.0" en een beta-waarschuwing, terwijl "Latest" v1.7.9 is en de releaselijst met zes betas begint. Voorstel: direct onder de titel een keuze "ESP8266 → <code>/releases/latest</code> · ESP32-S3 → lees verder". Alternatief: de standaard-branch aanpassen.</p>
+</section>
+
+<section id="webui" aria-labelledby="h-webui">
+  <h2 id="h-webui">Web UI: heuristische review (F1–F21)</h2>
+  <p class="lead">Home, SAT, Settings en Monitor. Live op .63 (alleen lezen) en in de mock met lege data. Review: <code>docs/reviews/2026-11-20_ux-heuristic-v2-webui/README.md</code>.</p>
+  <div class="tbl"><table>
+    <thead><tr><th scope="col">ID</th><th scope="col">Bevinding</th><th scope="col">Ernst</th><th scope="col">Taak</th></tr></thead>
+    <tbody>
+      <tr><td class="id">F1</td><td>Warn-tekst in licht 1.77:1 (oranje op oranje tint)</td><td><span class="sev sev3">3</span></td><td class="task">TASK-2956</td></tr>
+      <tr><td class="id">F2</td><td>Accent als tekst faalt in drie contexts: 4.17 op wit, 3.86 op de pagina, 2.81 op de donkere header</td><td><span class="sev sev3">3</span></td><td class="task">TASK-2956</td></tr>
+      <tr><td class="id">F16</td><td>Actieve "Dark"-knop: wit op <code>#00bffe</code> = 2.12:1</td><td><span class="sev sev3">3</span></td><td class="task">TASK-2956</td></tr>
+      <tr><td class="id">F3</td><td>SAT-headline "At target · idle" terwijl SAT gepauzeerd is</td><td><span class="sev sev3">3</span></td><td class="task">TASK-2957</td></tr>
+      <tr><td class="id">F19</td><td>Geen skip-link, geen <code>&lt;main&gt;</code>, geen <code>&lt;h1&gt;</code>; hoofdnavigatie is een <code>&lt;div&gt;</code> (WCAG 2.4.1, niveau A)</td><td><span class="sev sev2">2</span></td><td class="task">TASK-2958</td></tr>
+      <tr><td class="id">F18</td><td>Actieve pagina/view niet doorgegeven aan screenreaders; SAT-schakelaar heet "Disabled"</td><td><span class="sev sev2">2</span></td><td class="task">TASK-2958</td></tr>
+      <tr><td class="id">F20</td><td>Met SAT uit zijn 9 knoppen disabled maar zien er klikbaar uit</td><td><span class="sev sev2">2</span></td><td class="task">TASK-2958</td></tr>
+      <tr><td class="id">F17</td><td>SAT-pill en bron-tag halen het contrast niet (2.68 / 2.59)</td><td><span class="sev sev2">2</span></td><td class="task">TASK-2956</td></tr>
+      <tr><td class="id">F4</td><td>Home zegt "everything quiet" zonder ketel</td><td><span class="sev sev2">2</span></td><td class="task">TASK-2959</td></tr>
+      <tr><td class="id">F5</td><td>SAT-beta-banner: muur van vette tekst met scriptpaden</td><td><span class="sev sev2">2</span></td><td class="task">TASK-2959</td></tr>
+      <tr><td class="id">F6</td><td>Simulatiemodal: mislukte POST blijft stil</td><td><span class="sev sev2">2</span></td><td class="task">TASK-2959</td></tr>
+      <tr><td class="id">F7</td><td>Bevroren SAT-waarden zien er live uit</td><td><span class="sev sev2">2</span></td><td class="task">TASK-2957</td></tr>
+      <tr><td class="id">F8</td><td>Afgekapte strips op 390 px zonder scroll-hint</td><td><span class="sev sev2">2</span></td><td class="task">TASK-2960</td></tr>
+      <tr><td class="id">F9</td><td>Settings-rail: labels lopen om, icoon springt</td><td><span class="sev sev2">2</span></td><td class="task">TASK-2960</td></tr>
+      <tr><td class="id">F10</td><td>Helptekst Appliance type: 13 regels in een smalle kolom</td><td><span class="sev sev2">2</span></td><td class="task">TASK-2959</td></tr>
+      <tr><td class="id">F11</td><td>Weerkaart vraagt om HTTPS, dat de firmware niet heeft</td><td><span class="sev sev2">2</span></td><td class="task">TASK-2959</td></tr>
+      <tr><td class="id">F14</td><td>66 fontgroottes onder 12 px (geen WCAG-fout, wel leesbaarheid)</td><td><span class="sev sev2">2</span></td><td class="task">TASK-2961 (2.1.0)</td></tr>
+      <tr><td class="id">F12</td><td>Burner-cycle-kaart spreekt zichzelf tegen bij "Off"</td><td><span class="sev sev1">1</span></td><td class="task">TASK-2957</td></tr>
+      <tr><td class="id">F13</td><td>Grafieken zonder lege of gepauzeerde staat</td><td><span class="sev sev1">1</span></td><td class="task">TASK-2959</td></tr>
+      <tr><td class="id">F15</td><td>BLE-melding in monofont, dekt kaarten af</td><td><span class="sev sev1">1</span></td><td class="task">TASK-2959</td></tr>
+      <tr><td class="id">F21</td><td>Twee focus-ringstijlen (wel zichtbaar, dus 2.4.7 slaagt)</td><td><span class="sev sev1">1</span></td><td class="task">TASK-2958</td></tr>
+    </tbody>
+  </table></div>
+  <div class="callout">
+    <strong>Gevonden tijdens het specificeren:</strong> de Settings-rail bestaat uit <code>&lt;div&gt;</code>'s met een click-handler. Met het toetsenbord kun je geen enkele Settings-categorie openen (WCAG 2.1.1, niveau A). Verplaatst naar <span class="task">TASK-2958</span>, nu prioriteit <strong>high</strong>.
+  </div>
+</section>
+
+<section id="specs" aria-labelledby="h-specs">
+  <h2 id="h-specs">Bouwspecs voor otgw-webui</h2>
+  <p class="lead">Elke spec vervangt de ACs van zijn taak. Map: <code>docs/reviews/2026-11-20_ux-heuristic-v2-webui/</code>.</p>
+  <div class="tbl"><table>
+    <thead><tr><th scope="col">Spec</th><th scope="col">Inhoud</th><th scope="col">Taak</th></tr></thead>
+    <tbody>
+      <tr><td class="id">T1</td><td>Token-tabel: 19 rijen × licht/donker, ratio nu en voorgesteld. Nieuwe tokens <code>--nav-accent</code>, <code>--on-accent</code>, <code>--hot-fill</code>, <code>--on-hot</code>, <code>--pill-off</code>, <code>--hot-text</code>.</td><td class="task">TASK-2956</td></tr>
+      <tr><td class="id">T1b</td><td>Contrast-regressietest: token-paren plus gerenderde scan, kleuren via een canvas genormaliseerd; rood op de oude code, groen op de fix.</td><td class="task">TASK-2956</td></tr>
+      <tr><td class="id">T2</td><td>Tien SAT-weergavetoestanden uit bestaande statusvelden, met de antwoorden van otgw-dev (Q1–Q7) verwerkt: WAITING zonder tijdsbelofte, "at target" volgens de firmwareband (doel + 0,1 °C), "Modulation sent". Getoetst aan Sergeant D-entries 47, 56, 57, 79, 121, 388.</td><td class="task">TASK-2957</td></tr>
+      <tr><td class="id">T3</td><td>Skip-link, landmarks, <code>aria-current</code> op de tab-groepen (geen half tabs-patroon), gedeelde disabled-stijl, één focusring <code>#1e88e5</code> (≥ 3:1 op header en beide thema's).</td><td class="task">TASK-2958</td></tr>
+      <tr><td class="id">T4</td><td>Copy, lege en foutstaten per bevinding; F5-tekst van BlueFlame met link naar de publieke manual-notitie.</td><td class="task">TASK-2959</td></tr>
+      <tr><td class="id">T5</td><td>Fade-hint op vijf horizontale strips, rail-items als button, korte rail-titels.</td><td class="task">TASK-2960</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section id="cli" aria-labelledby="h-cli">
+  <h2 id="h-cli">CLI-tools: capture en flash (C1–C9)</h2>
+  <p class="lead">Alleen gelezen; alleen <code>otgw_capture.py --help</code> gedraaid. Review: <code>docs/reviews/2026-11-20_ux-cli-tools/README.md</code>. Eigenaar: otgw-dev.</p>
+  <div class="tbl"><table>
+    <thead><tr><th scope="col">ID</th><th scope="col">Bevinding</th><th scope="col">Ernst</th><th scope="col">Taak</th></tr></thead>
+    <tbody>
+      <tr><td class="id">C1</td><td>Flash zonder argumenten = factory-wipe, zonder bevestiging</td><td><span class="sev sev3">3</span></td><td class="task">TASK-2968 · high</td></tr>
+      <tr><td class="id">C3</td><td>Na de reset noemen beide flash-tools een niet-bestaand netwerk; echt is <code>OTGW2-A4:CF:12:21:B4:F8</code></td><td><span class="sev sev3">3</span></td><td class="task">TASK-2968 · high</td></tr>
+      <tr><td class="id">C2</td><td>Bij dubbelklikken sluit het venster voordat je de uploadregel of een fout leest</td><td><span class="sev sev3">3</span></td><td class="task">TASK-2965</td></tr>
+      <tr><td class="id">C4</td><td>De 24-uursrun uit het recept kan niet zonder terminal</td><td><span class="sev sev3">3</span></td><td class="task">TASK-2965</td></tr>
+      <tr><td class="id">C5</td><td>esptool-download via PowerShell Bypass (het Defender-patroon van TASK-1711), zonder hash</td><td><span class="sev sev3">3</span></td><td class="task">TASK-2966</td></tr>
+      <tr><td class="id">C6</td><td>"write_flash failed" zonder volgende stap</td><td><span class="sev sev2">2</span></td><td class="task">TASK-2967</td></tr>
+      <tr><td class="id">C7</td><td>Uploadbestand diep weggestopt; voorstel: map openen</td><td><span class="sev sev2">2</span></td><td class="task">TASK-2967</td></tr>
+      <tr><td class="id">C9</td><td>Banner-link wees naar het interne recept</td><td><span class="sev sev2">2</span></td><td class="done">opgelost</td></tr>
+      <tr><td class="id">C8</td><td>Linux-header noemt de WiFi-wipe niet</td><td><span class="sev sev1">1</span></td><td class="task">TASK-2967</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section id="eerste5" aria-labelledby="h-eerste5">
+  <h2 id="h-eerste5">De eerste vijf minuten van een nieuwe gebruiker (R1–R7)</h2>
+  <p class="lead">README op de standaard-branch, de releaselijst en de nieuwste release notes. Overkoepelende taak <span class="task">TASK-2969</span>.</p>
+  <div class="tbl"><table>
+    <thead><tr><th scope="col">ID</th><th scope="col">Bevinding</th><th scope="col">Ernst</th><th scope="col">Eigenaar / stand</th></tr></thead>
+    <tbody>
+      <tr><td class="id">R1</td><td>Landing spreekt 2.0.0-beta, "Latest" is 1.7.9; de ESP8266-meerderheid moet omlopen</td><td><span class="sev sev3">3</span></td><td>Robert (besluit)</td></tr>
+      <tr><td class="id">R2</td><td>Quick Start stap 1 is een factory-wipe zonder hardwarecheck</td><td><span class="sev sev3">3</span></td><td class="done">otgw-docs, gedaan</td></tr>
+      <tr><td class="id">R4</td><td>Release notes openen met ~25 bullets testgeschiedenis; "wat is nieuw" pas op regel 50</td><td><span class="sev sev3">3</span></td><td>BlueFlame + beta-skill</td></tr>
+      <tr><td class="id">R3</td><td>"Enable HA Discovery" bestaat niet in 2.0.0</td><td><span class="sev sev2">2</span></td><td class="done">otgw-docs, gedaan</td></tr>
+      <tr><td class="id">R5</td><td>56 regels SAT vóór de Quick Start</td><td><span class="sev sev2">2</span></td><td class="done">otgw-docs, gedaan</td></tr>
+      <tr><td class="id">R6</td><td>README linkt SAT-gidsen in <code>backlog/docs/</code></td><td><span class="sev sev2">2</span></td><td class="done">otgw-docs, gedaan</td></tr>
+      <tr><td class="id">R7</td><td>Geen voorbeeld-AP-naam; "dashboard toont het log" klopt niet</td><td><span class="sev sev1">1</span></td><td class="done">otgw-docs, gedaan</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section id="ha" aria-labelledby="h-ha">
+  <h2 id="h-ha">Home Assistant: entiteiten zoals de gebruiker ze ziet (H1–H7)</h2>
+  <p class="lead">Uit de discovery-code; er zijn geen HA-screenshots, weergave beschreven volgens HA's documentatie. Overkoepelende taak <span class="task">TASK-2970</span>.</p>
+  <div class="tbl"><table>
+    <thead><tr><th scope="col">ID</th><th scope="col">Bevinding</th><th scope="col">Ernst</th><th scope="col">Taak</th></tr></thead>
+    <tbody>
+      <tr><td class="id">H1</td><td>221 van 405 sensor-rijen in de hoofdlijst, waaronder 38 ruwe byte-helften ("… Value Hb")</td><td><span class="sev sev3">3</span></td><td class="task">TASK-2971</td></tr>
+      <tr><td class="id">H2</td><td>Namen zijn code-labels met hoofdletters ("Max Capacity Min Mod Level HB U8")</td><td><span class="sev sev2">2</span></td><td class="task">TASK-2973 (2.1.0)</td></tr>
+      <tr><td class="id">H3</td><td>Binary sensors zonder device_class: HA toont "On/Off" in plaats van "Problem"</td><td><span class="sev sev2">2</span></td><td class="task">TASK-2971</td></tr>
+      <tr><td class="id">H4</td><td>Dubbele begrippen: drie keer kamertemperatuur, twee keer CV-druk</td><td><span class="sev sev2">2</span></td><td class="task">TASK-2972 (vraag)</td></tr>
+      <tr><td class="id">H5</td><td>BLE-sensoren zonder availability: lege batterij = oude temperatuur blijft staan</td><td><span class="sev sev2">2</span></td><td class="task">TASK-2971</td></tr>
+      <tr><td class="id">H6</td><td><code>docs/api/MQTT.md</code> beschrijft nog vijf devices</td><td><span class="sev sev2">2</span></td><td class="task">TASK-2974</td></tr>
+      <tr><td class="id">H7</td><td>Typo "Ventliation", placeholder-naam, meervoudsfout</td><td><span class="sev sev1">1</span></td><td class="task">TASK-2971</td></tr>
+    </tbody>
+  </table></div>
+  <p>Discovery-wijzigingen raken het HA-contract: otgw-architect checkt eerst of een bestaande ADR dit dekt (AC1 van TASK-2971). Topics en <code>uniq_id</code> blijven gelijk, dus bestaande entity-id's veranderen niet.</p>
+</section>
+
+<section id="methode" aria-labelledby="h-methode">
+  <h2 id="h-methode">Methode en wat niet geverifieerd is</h2>
+  <ul class="tight">
+    <li><strong>Bewijs:</strong> elke bevinding heeft een <code>bestand:regel</code> of een meting. Contrast tweemaal bepaald: in de browser en opnieuw in Python. Screenshots met gemaskeerde of synthetische data, lokaal in <code>OTGW-field-data/webui-screens/2026-11-20_ux-heuristic/</code>, niet in git.</li>
+    <li><strong>Units:</strong> .63 alleen lezend met OK van de bench-tester; .61 niet aangeraakt; niets geflasht of opgeslagen.</li>
+    <li><strong>Correcties onderweg:</strong> de badge bij F3 had wél een aria-label; de tag mat 2.59 en niet 2.13 (scanner las <code>color-mix</code> fout); de F5-link naar het interne recept is vervangen.</li>
+    <li><strong>Niet geverifieerd:</strong> geen screenreader op het gehoor, geen unit met een ketel (alle NB-bevindingen nog live nachecken), geen HA-instantie, geen echte flash- of capture-run, de Advanced-pagina niet bekeken.</li>
+  </ul>
+</section>
+
+</main>
+<footer>
+  Bronbestanden in <code>docs/reviews/</code> op origin/dev. Opgesteld door otgw-ux-designer; besluiten liggen bij de maintainer.
+</footer>
+</body>
+</html>
