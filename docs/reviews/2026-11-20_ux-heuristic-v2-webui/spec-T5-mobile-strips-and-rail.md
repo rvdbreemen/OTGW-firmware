@@ -66,7 +66,7 @@ Add the `-webkit-mask-image` twin for older Safari. `.hscroll` is a new class, s
 - The active item gets `aria-current="true"`, the same pattern as the other view switches in spec T3.
 - Reset the button look in CSS (`border:0; background:none; font:inherit; text-align:left; width:100%`), so nothing changes visually.
 
-If TASK-2960 stays "low", the coordinator may want to move 2.1 into TASK-2958 (accessibility, medium) instead; the spec text works in either task.
+**Moved to TASK-2958** (coordinator decision 2026-11-20; TASK-2958 raised to high): this section is built and accepted there, not in TASK-2960.
 
 ### 2.2 The panel next to the rail
 
@@ -82,7 +82,7 @@ The consistency risk that remains is the grouping, not the data: the same settin
 
 1. At 390 px the five strips of section 1 show the edge fade on the side with hidden content (both themes), the fade follows scrolling, and after a page or view change the active item is in view; screenshots of the main nav and the Settings rail at 390 px before and after.
 2. At 1400 px every rail item keeps icon and label on one line; long titles end in an ellipsis with the full title as `title`; Network shows the reboot dot instead of the text badge; the three short titles are used.
-3. Every rail item is a `<button>`: the Tab walk reaches each category, Enter opens it, and the active one has `aria-current="true"`; a browser test opens a category with the keyboard.
+3. (Moved to TASK-2958: rail items as `<button>`, section 2.1.)
 4. A category with at most 2 cards renders in one column of up to 760 px when no search is active.
 5. Section 3 answers the open question; no change to how the two pages share `setData`.
 6. New classes (`.hscroll`, `.ri-ic`, `.ri-lbl`, `.ri-reboot`, `.set-cards--few`) have selectors; `python evaluate.py --quick` shows no new FAIL; new EN keys go through the i18n sync and `tests/webui/i18n-*.test.mjs` pass.

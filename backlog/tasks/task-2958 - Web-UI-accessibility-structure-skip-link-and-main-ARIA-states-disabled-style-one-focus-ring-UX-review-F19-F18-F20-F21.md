@@ -6,14 +6,14 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-20T14:22:00Z'
-updated_date: '2026-11-20T14:56:00Z'
+updated_date: '2026-11-20T15:09:00Z'
 labels:
   - ux
   - webui
   - a11y
 milestone: 2.0.0
 dependencies: []
-priority: medium
+priority: high
 ordinal: 1092000
 ---
 
@@ -33,10 +33,13 @@ From the TASK-2952 UX review (docs/reviews/2026-11-20_ux-heuristic-v2-webui/READ
 - [ ] #6 One :focus-visible rule with --focus-ring #1e88e5 (>= 3:1 on the header, light and dark pages, per spec T3 section 4) covers buttons, links, summaries and inputs; the Tab walk shows outline-style solid on every stop; the four old ring rules are gone; ADR-091 drift gate green
 - [ ] #7 New EN keys per spec T3; NL and DE through the i18n sync; tests/webui/i18n-*.test.mjs pass
 - [ ] #8 Before/after screenshots of Home, SAT and Settings in both themes show no visual change other than the disabled style, the off hint, the skip link on focus and the focus ring colour
+- [ ] #9 Every Settings rail item is a <button type=button> (today a <div> with a click handler, v2.js:4697-4701): the Tab walk reaches each category, Enter and Space open it, the active one has aria-current=true, no visual change; a browser test opens a category with the keyboard (WCAG 2.1.1 level A; spec T5 section 2.1)
 <!-- AC:END -->
 
 ## Implementation Notes
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-11-20 otgw-ux-designer: spec docs/reviews/2026-11-20_ux-heuristic-v2-webui/spec-T3-a11y-structure.md. ACs replaced by the spec's acceptance list. Change from the review: aria-current on view buttons instead of the ARIA tabs pattern (tabs need roving tabindex + arrow keys; without them role=tab misleads). New finding while specifying: the main nav is a <div class=switcher>; the only <nav> landmark is the Settings rail.
+
+2026-11-20: priority raised to high and the rail-item part added by coordinator decision (moved from TASK-2960): keyboard users cannot reach any Settings category today.
 <!-- SECTION:NOTES:END -->
