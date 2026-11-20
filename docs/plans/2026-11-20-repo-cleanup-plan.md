@@ -25,7 +25,7 @@ The per-row inventories are in [`2026-11-20-repo-cleanup/`](2026-11-20-repo-clea
    - `main`, `dev`, `otgw-1.x.x`, `release/2.x`;
    - `research/cloud-recording` and its local lanes;
    - the standing bench lane `lane-09-bench` (`wt-09-bench`);
-   - every 5e telemetry lane; the `backup-5e-*` snapshots are kept as 5e too (an interpretation, to be confirmed by the coordinator);
+   - every 5e telemetry lane, the `backup-5e-*` snapshots included (confirmed by the coordinator, 2026-11-20; the telemetry agent decides whether they can go);
    - every lane the coordinator holds (the list stays with the coordinator).
 4. **Another session's work is never removed.** A worktree with uncommitted changes, or one owned by another session, goes to its owner through the coordinator.
    - Leftover directories move to `RvdB/OTGW-worktree-leftovers/`. They are never deleted blindly.
@@ -35,7 +35,7 @@ The per-row inventories are in [`2026-11-20-repo-cleanup/`](2026-11-20-repo-clea
 7. **Gates per commit:**
    - `python scripts/run_tests.py` and `python evaluate.py --quick` show no new FAIL;
    - a grep for the old path finds nothing outside CHANGELOG history and the archive;
-   - docs-only commits (`*.md`, `docs/**`, `backlog/**`, `.claude/**`) skip the build, as in the push policy. C3 and C5 touch `Makefile`, `.github/**`, `tools/` and `scripts/`, so they also need an esp32-combo build and a build slot.
+   - docs-only commits (`*.md`, `docs/**`, `backlog/**`, `.claude/**`) skip the build, as in the push policy. C3 and C5 touch `Makefile`, `.github/**`, `tools/` and `scripts/`, so they also need an esp32-combo build and a build slot; the coordinator gives that slot after the 20:00 beta.
 
 ## 2. Findings that need a fix regardless of the cleanup
 
