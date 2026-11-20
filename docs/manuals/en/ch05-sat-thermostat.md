@@ -11,7 +11,7 @@ SAT was inspired by (and ported from) the excellent Home Assistant SAT custom co
 
 > **SAT is opt-in and off by default.** SAT takes over your boiler's control setpoint, so it stays off (`satenabled` is false) until you switch it on, and the setup wizard asks you to confirm first.
 >
-> **Reporting SAT field results.** Field data is what makes SAT better. If you run SAT, please send a capture: (1) check the version at `http://<ip>/api/v2/device/info` (`fwversion`); (2) check that `http://<ip>/api/v2/sat/status` shows `"simulation": false`; (3) start the capture tool from the release zip (`capture-mqtt-debug.bat`, `.sh` or `-macos.sh`) with `--long-run`, for at least a night and a morning; (4) note your boiler model, radiators or floor heating, and any setting you changed with the time; (5) stop with `q` and attach the `-upload.zip` to a GitHub issue, or post it in #english-support or #nederlandse-ondersteuning on Discord (beta testers: #beta-testing). The same steps: https://github.com/rvdbreemen/OTGW-firmware/blob/dev/docs/sat/field-run-recipe-2.0.0.md
+> **Reporting SAT field results.** Field data is what makes SAT better. If you run SAT, please send a capture: (1) check the version at `http://<ip>/api/v2/device/info` (`fwversion`); (2) check that `http://<ip>/api/v2/sat/status` shows `"simulation": false`; (3) start the capture tool from the release zip (`capture-mqtt-debug.bat`, `.sh` or `-macos.sh`) with `--long-run`, for at least a night and a morning; (4) note your boiler model, radiators or floor heating, and any setting you changed with the time; (5) stop with `q` and attach the `-upload.zip` to a GitHub issue, or post it in #english-support or #nederlandse-ondersteuning on Discord (beta testers: #beta-testing).
 
 ---
 

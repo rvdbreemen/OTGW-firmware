@@ -50,7 +50,7 @@ SAT (Smart Autotune Thermostat) is an embedded heating controller. It is **off b
 - SAT controls your boiler. When you switch it on, the wizard first shows a step "Before you enable SAT". You must tick a box to continue. Cancel leaves SAT off and changes nothing.
 - While SAT is on, it owns central heating control: `CS=`, `CH=`, `MM=`, `C2=`, `H2=`, `TT=` and `TC=` from MQTT, REST, the boot commands or the serial bridge are refused (TASK-1695; before beta.127 only `CS=` was). `HW=`, `SW=`, `SH=` and every other command still pass.
 - Known SAT limits are listed under Known issues.
-- **How to report SAT field results:** check the version at `http://<ip>/api/v2/device/info` (`fwversion`); check that `http://<ip>/api/v2/sat/status` shows `"simulation": false`; run the capture tool from the release zip with `--long-run` for at least a night and a morning; note your boiler model, radiators or floor heating and any setting you changed, with the time; stop with `q` and post the `-upload.zip` (see "How to report"). The same steps: https://github.com/rvdbreemen/OTGW-firmware/blob/dev/docs/sat/field-run-recipe-2.0.0.md. SAT is only as good as the field data we get.
+- **How to report SAT field results:** check the version at `http://<ip>/api/v2/device/info` (`fwversion`); check that `http://<ip>/api/v2/sat/status` shows `"simulation": false`; run the capture tool from the release zip with `--long-run` for at least a night and a morning; note your boiler model, radiators or floor heating and any setting you changed, with the time; stop with `q` and post the `-upload.zip` (see "How to report"). SAT is only as good as the field data we get.
 
 Without SAT, the gateway behaves as a transparent OpenTherm gateway, as in 1.x.
 
@@ -455,7 +455,7 @@ The Windows launcher is tested on our bench, also without Python installed. A te
 
 - GitHub: [open an issue](https://github.com/rvdbreemen/OTGW-firmware/issues) and attach the capture files.
 - Discord: #english-support or #nederlandse-ondersteuning, with the capture upload zip. Beta testers keep using #beta-testing.
-- SAT field results: the steps in "SAT is opt-in and off by default" above, also at https://github.com/rvdbreemen/OTGW-firmware/blob/dev/docs/sat/field-run-recipe-2.0.0.md.
+- SAT field results: the steps in "SAT is opt-in and off by default" above.
 
 Thank you to everyone who tested the alphas and betas, to gruijter and maarten_41762 for the detailed feedback and the field captures, to tjfs for the OLED, OT-Direct, override, pump symbol, pressure, home dial and update page reports and the captures, to Crash-Evans for pull request #699 and the macOS capture runs, to André Brait for the pull requests (#697 and #698 in beta.118), the code size analysis and the page-load report, and to Sergeant D for the SAT design decisions.
 <!-- Decided (Robert, 2026-11-18, TASK-2034): SAT is stable from 2.0.0, still opt-in; stable users report through a GitHub issue or the support channels, #beta-testing only for beta testers. -->
