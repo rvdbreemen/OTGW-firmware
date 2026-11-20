@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-20T17:07:00Z'
-updated_date: '2026-11-20T17:19:00Z'
+updated_date: '2026-11-20T17:26:00Z'
 labels:
   - build
   - flash-size
@@ -32,4 +32,6 @@ Umbrella for the 2.1.0 app-image trims, from the flash-consumers measurement of 
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-11-20: lever (1), the compile-time debug level, moved to TASK-2980 (2.0.0, Robert's A1 trim task, together with the stable measurement, DER roots and the debug port as its own feature). Levers (2)-(5) stay here for 2.1.0.
+
+Condition for an mbedTLS trim (otgw-dev, relayed by otgw-poc-dev 2026-11-20): not before the 2.0.0 stable. The WiFi supplicant (WPA2, WPA3-SAE) and the OTA sha256 use mbedTLS, and a hybrid IDF rebuild means a long build in release week. After the stable it is a separate subtask, with its own ADR, measured bytes before and after, and a bench WiFi matrix (WPA2 / WPA3 / mixed) on .61 and .63. Debug gate: it stays inline. Moving the flag check out of line would evaluate the arguments while debug is off. The BOL+printf merge per call site (about 4-8 KB) is already on otgw-poc-dev's lane (-5.5 KB measured), so little is left for the debug-level lever in TASK-2980. Gate change: TASK-2983.
 <!-- SECTION:NOTES:END -->

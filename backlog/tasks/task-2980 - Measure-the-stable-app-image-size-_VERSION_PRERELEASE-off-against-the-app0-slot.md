@@ -9,7 +9,7 @@ assignee:
   - '@otgw-poc-dev'
   - '@otgw-dev'
 created_date: '2026-11-20T17:04:00Z'
-updated_date: '2026-11-20T17:19:00Z'
+updated_date: '2026-11-20T17:26:00Z'
 labels:
   - build
   - flash-size
@@ -31,3 +31,9 @@ Robert, 2026-11-20 (DM 'A1', relayed by the coordinator): the TASK-1993 size gat
 - [ ] #2 DER roots, debug-port feature and compile-time debug level each landed or explicitly dropped, with before/after .ino.bin bytes per item and run_tests + evaluate --quick green
 - [ ] #3 By 2026-11-29 the esp32-combo image with remote telemetry is at or below 98 % of app0 (2,247,884 B), and build.py's temporary 99.5 % gate is returned to 98 %
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+otgw-dev input (2026-11-20, relayed by otgw-poc-dev): the BOL+printf merge per debug call site is already on the telemetry lane (-5.5 KB measured), and the debug gate stays inline, so the compile-time debug level item has less left than first estimated; measure before choosing it. The build.py comment for the temporary 99.5 % gate references this task; the gate change itself is TASK-2983.
+<!-- SECTION:NOTES:END -->
