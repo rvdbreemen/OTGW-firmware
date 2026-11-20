@@ -606,6 +606,7 @@
     "status_standby": "Standby · alles ruhig",
     "setpoint_set": "Soll {{temp}}",
     "setpoint_set_thermostat": "Soll {{target}} (Thermostat {{thermostat}})",
+    "room_sat_tip": "Raumtemperatur, nach der SAT regelt; das Thermostat meldet {{thermostat}}",
     "tag_compressor": "VERDICHTER",
     "tag_modulation": "MODULATION",
     "lcd_fault": "STÖRUNG",

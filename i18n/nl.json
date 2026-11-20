@@ -606,6 +606,7 @@
     "status_standby": "Stand-by · alles rustig",
     "setpoint_set": "ingesteld op {{temp}}",
     "setpoint_set_thermostat": "ingesteld op {{target}} (thermostaat {{thermostat}})",
+    "room_sat_tip": "Kamertemperatuur waarop SAT regelt; de thermostaat meldt {{thermostat}}",
     "tag_compressor": "COMPRESSOR",
     "tag_modulation": "MODULATIE",
     "lcd_fault": "STORING",

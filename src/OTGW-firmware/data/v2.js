@@ -727,6 +727,7 @@
       "status_standby": "Standby · everything quiet",
       "setpoint_set": "set {{temp}}",
       "setpoint_set_thermostat": "set {{target}} (thermostat {{thermostat}})",
+      "room_sat_tip": "Room temperature SAT controls on; the thermostat reports {{thermostat}}",
       "tag_compressor": "COMPRESSOR",
       "tag_modulation": "MODULATION",
       "lcd_fault": "FAULT",
@@ -2957,6 +2958,18 @@
     if (on) el.title = t('home.injected_value_tip');
     else el.removeAttribute('title');
   }
+  // TASK-2946: while SAT owns the temperature the room readouts show the room temperature SAT controls on (sat/status
+  // room_temp: BLE, areas, an external push or MsgID 24, satGetRoomTemp()), as the setpoint beside it and the HA climate
+  // entity (ADR-248) already do; the thermostat's own MsgID 24 goes in the tooltip. SAT off, or SAT without a valid room
+  // temperature: MsgID 24 as before (TASK-1735).
+  function roomFromSat() { return sat.owns === true && !sat.roomLost && typeof sat.room === 'number' && !isNaN(sat.room); }
+  function roomShown() { return roomFromSat() ? sat.room : model.room; }
+  function showRoom(id) {
+    var el = document.getElementById(id); if (!el) return;
+    el.textContent = fmt(roomShown(), 1, '°');
+    if (roomFromSat()) el.setAttribute('title', t('home.room_sat_tip', { thermostat: fmt(model.room, 1, '°') }));
+    else el.removeAttribute('title');
+  }
   function fmt(v, dp, suffix) {
     if (v === null || v === undefined || isNaN(v)) return '—';
     return v.toFixed(dp === undefined ? 1 : dp) + (suffix || '');
@@ -3002,7 +3015,7 @@
     var ovrOut = ovrRows.some(function (o) { return ovrMark(o.id) === 'aOut'; });
     var ovrSet = ovrRows.some(function (o) { return ovrMark(o.id) === 'aRoomSet'; });
     setMark('aOut', fmt(model.outside, 1, '°'), model.outside !== null && ovrOut);
-    txt('aRoom', fmt(model.room, 1, '°'));
+    showRoom('aRoom');
     // TASK-1342: while SAT controls the boiler its target is the setpoint that counts; the
     // thermostat's own setpoint (MsgID 16) is shown second, as the thermostat may refuse a push.
     var satSet = sat.active && sat.target !== null && !isNaN(sat.target);
@@ -3060,7 +3073,7 @@
     // mobile chip strip (≤719px) — same six values as the schematic
     var strip = document.getElementById('aStrip');
     if (strip) {
-      var chips = [[t('home.chip_flow'), fmt(model.flow, 1, '°'), 'var(--hot)'], [t('home.chip_return'), fmt(model.ret, 1, '°'), 'var(--cold)'], [t('home.chip_dhw'), model.dhw === null ? '—' : Math.round(model.dhw) + '°', ''], [t('home.chip_pressure'), fmt(model.pressure, 2, ' bar'), ''], [t('home.chip_room'), fmt(model.room, 1, '°'), ''], [t('home.chip_outside'), fmt(model.outside, 1, '°'), '']];
+      var chips = [[t('home.chip_flow'), fmt(model.flow, 1, '°'), 'var(--hot)'], [t('home.chip_return'), fmt(model.ret, 1, '°'), 'var(--cold)'], [t('home.chip_dhw'), model.dhw === null ? '—' : Math.round(model.dhw) + '°', ''], [t('home.chip_pressure'), fmt(model.pressure, 2, ' bar'), ''], [t('home.chip_room'), fmt(roomShown(), 1, '°'), ''], [t('home.chip_outside'), fmt(model.outside, 1, '°'), '']];
       strip.textContent = '';
       chips.forEach(function (c) {
         var ch = document.createElement('span'); ch.className = 'mchip';
@@ -3089,17 +3102,17 @@
         arc.setAttribute('d', arcPath(120, 120, 100, B_LO, B_LO + (B_HI - B_LO) * f));
       }
     }
-    var tick = document.getElementById('bTick');
+    var tick = document.getElementById('bTick'), room = roomShown();
     if (tick) {
-      if (model.room === null) { tick.setAttribute('x1', 0); tick.setAttribute('y1', 0); tick.setAttribute('x2', 0); tick.setAttribute('y2', 0); }
+      if (room === null) { tick.setAttribute('x1', 0); tick.setAttribute('y1', 0); tick.setAttribute('x2', 0); tick.setAttribute('y2', 0); }
       else {
-        var sf = Math.max(0, Math.min(1, (model.room - B_MIN) / (B_MAX - B_MIN)));
+        var sf = Math.max(0, Math.min(1, (room - B_MIN) / (B_MAX - B_MIN)));
         var deg = B_LO + (B_HI - B_LO) * sf, p1 = polar(120, 120, 88, deg), p2 = polar(120, 120, 108, deg);
         tick.setAttribute('x1', p1[0].toFixed(1)); tick.setAttribute('y1', p1[1].toFixed(1));
         tick.setAttribute('x2', p2[0].toFixed(1)); tick.setAttribute('y2', p2[1].toFixed(1));
       }
     }
-    txt('bRoom', fmt(model.room, 1, '°'));
+    showRoom('bRoom');
     txt('bSet', t('home.target', { temp: model.roomSet === null ? '—' : fmt(model.roomSet, 1, '°') }));
     txt('bFlow', fmt(model.flow, 1, '°'));
     txt('bRet', fmt(model.ret, 1, '°'));
@@ -3153,7 +3166,7 @@
       [t('home.cell_flow'), fmt(model.flow, 1, '°'), 'hot'],
       [t('home.cell_return'), fmt(model.ret, 1, '°'), 'cold'],
       ['ΔT', (model.flow !== null && model.ret !== null) ? fmt(model.flow - model.ret, 1, '°') : '—', ''],
-      [t('home.cell_room'), fmt(model.room, 1, '°'), ''],
+      [t('home.cell_room'), fmt(roomShown(), 1, '°'), ''],
       [t('home.cell_room_set'), fmt(model.roomSet, 1, '°'), ''],
       [t('home.cell_outside'), fmt(model.outside, 1, '°'), ''],
       [t('home.cell_modulation'), model.mod === null ? '—' : Math.round(model.mod) + '%', model.flame ? 'ok' : ''],
@@ -5292,7 +5305,7 @@
   // P9: heat-source control, REST seed, target steppers, conn detail,
   // support hover, graph window/export, settings enum options.
   // ============================================================
-  var sat = { source: 0, detected: 1, target: null, active: false, roomLost: false, tank: false, owns: null };  // owns: SAT enabled or its MQTT-loss fallback (satOwnsControlSetpoint), null until sat/status answered (TASK-1717)  // tank: boiler reports a DHW storage tank (MsgID 3 HB bit 3, TASK-1392); roomLost: SAT is on and has no valid room temperature (TASK-1546); source: 0=auto,1=gas,2=hp,3=hybrid
+  var sat = { source: 0, detected: 1, target: null, room: null, active: false, roomLost: false, tank: false, owns: null };  // owns: SAT enabled or its MQTT-loss fallback (satOwnsControlSetpoint), null until sat/status answered (TASK-1717)  // tank: boiler reports a DHW storage tank (MsgID 3 HB bit 3, TASK-1392); roomLost: SAT is on and has no valid room temperature (TASK-1546); source: 0=auto,1=gas,2=hp,3=hybrid
   function effectiveSource() { return sat.source === 0 ? sat.detected : sat.source; }
   var statsSort = { col: 'id', asc: true };
   function sortStatsCmp(a, b) {
@@ -5718,6 +5731,7 @@
       if (st.heating_source !== undefined) { sat.source = st.heating_source | 0; sat.srcKnown = true; }   // TASK-1837
       if (st.heating_source_detected !== undefined) sat.detected = st.heating_source_detected | 0;
       if (st.target_temp !== undefined) sat.target = parseFloat(st.target_temp);
+      sat.room = (typeof st.room_temp === 'number' && !isNaN(st.room_temp)) ? st.room_temp : null;   // TASK-2946
       if (st.dhw_config_tank !== undefined) sat.tank = !!st.dhw_config_tank;   // TASK-1392
       sat.active = !!st.active;   // TASK-1342: room tile shows SAT's target while SAT controls
       sat.owns = !!(st.enabled || st.fallback_active);   // the rule of satOwnsControlSetpoint()

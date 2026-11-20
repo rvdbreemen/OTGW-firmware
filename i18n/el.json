@@ -606,6 +606,7 @@
     "status_standby": "Αναμονή · όλα ήσυχα",
     "setpoint_set": "στόχος {{temp}}",
     "setpoint_set_thermostat": "στόχος {{target}} (θερμοστάτης {{thermostat}})",
+    "room_sat_tip": "Θερμοκρασία χώρου με την οποία ρυθμίζει το SAT· ο θερμοστάτης αναφέρει {{thermostat}}",
     "tag_compressor": "ΣΥΜΠΙΕΣΤΗΣ",
     "tag_modulation": "ΔΙΑΜΟΡΦΩΣΗ",
     "lcd_fault": "ΣΦΑΛΜΑ",
