@@ -1,11 +1,11 @@
 ---
 id: TASK-2969
 title: 'UX review: the first five minutes of a new user (README and release notes)'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-20T15:37:00Z'
-updated_date: '2026-11-20T15:40:00Z'
+updated_date: '2026-11-20T15:41:00Z'
 labels:
   - ux
   - docs
@@ -25,7 +25,7 @@ Read-only UX review by otgw-ux-designer, suggested by the coordinator: what a ne
 <!-- AC:BEGIN -->
 - [x] #1 Review file lists every finding with heuristic, severity, effort, evidence (file:line or a gh query) and a proposed AC
 - [x] #2 Facts checked against the repo and gh (default branch, latest release, release list, settings names); what was not checked is listed under Not verified
-- [ ] #3 Findings list delivered to the coordinator for triage
+- [x] #3 Findings list delivered to the coordinator for triage
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -33,3 +33,9 @@ Read-only UX review by otgw-ux-designer, suggested by the coordinator: what a ne
 <!-- SECTION:NOTES:BEGIN -->
 2026-11-20: review docs/reviews/2026-11-20_ux-first-five-minutes/README.md, findings R1-R7. Facts: gh repo view (default branch dev, latest release v1.7.9 2026-11-04), gh release list (6 newest are 2.0.0 prereleases), settings names checked against v2.js SET_META and the firmware (no HA discovery on/off key, only mqtthaprefix). Line numbers at origin/dev 335e16db7.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+First-five-minutes UX review in docs/reviews/2026-11-20_ux-first-five-minutes/README.md: 7 findings R1-R7 with severity, effort, evidence and proposed AC. AC1: the review file. AC2: facts from gh repo view (default branch dev, latest release v1.7.9), gh release list (six 2.0.0 prereleases on top) and the settings names in v2.js SET_META and the firmware; badge value, the 1.x README and the backlog/docs guides' currency listed under Not verified. AC3: findings list sent to the coordinator for triage.
+<!-- SECTION:FINAL_SUMMARY:END -->
