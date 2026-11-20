@@ -3,11 +3,11 @@ id: TASK-1965
 title: >-
   REST /otgw/label and /otgw/messages: status data_invalid while the served
   value comes from the gateway (PIC outside sensor)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-15T10:12:00Z'
-updated_date: '2026-11-20T01:20:00Z'
+updated_date: '2026-11-20T10:23:00Z'
 labels:
   - rest
   - bug
@@ -29,7 +29,7 @@ Beta feedback, reporter indigo_light (Discord 301077214374658048), #beta-testing
 - [x] #1 The client can tell whether the value is valid and where it comes from: status follows the served value, or a new field source (boiler/gateway); smallest contract change, the choice recorded in the task
 - [x] #2 Host test on the real sendOTValue/sendOTLabel code: boiler DATA_INVALID plus a gateway substitute is red on the old code and green on the fix; the TASK-1871 cases stay green
 - [x] #3 openapi.yaml and docs/api/README.md updated; evaluate.py --quick no new FAIL; esp32-combo build
-- [ ] #4 Field confirmation by indigo_light
+- [x] #4 Field confirmation by indigo_light
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -48,4 +48,12 @@ indigo_light capture 2026-11-15 10:50-13:26 (beta.250+aed38bf, PIC gateway 6.8, 
 2026-11-20 (ba, coordinator decision): AC4 via a tester ask. 92 posted in #beta-testing, message 1573143895154626665: indigo_light runs GET /api/v2/otgw/label/Toutside on beta.339 or newer; expect status data_invalid + source gateway. Field archive checked first: no upload holds it (the capture sweep excludes otgw/label/*; device-state has no source field).
 
 2026-11-20 milestone 2.0.0 -> 2.1.0 (otgw-docs, coordinator's assignment). Robert DM 2026-11-20 01:15 (1573144814600462457), relayed by the coordinator: "C — field/hardware ACs outside the 2.0.0 scope, to 2.1.0". Status, assignee and ACs unchanged.
+
+2026-11-20 AC4 field confirmation (relayed by 92, BlueFlame): indigo_light, #beta-testing 2026-11-20 08:45 UTC, msg 1573257919783501948 (reply to 1573143895154626665), firmware beta.392, verbatim: GET /api/v2/otgw/label/Toutside -> {"label":"Toutside","value":8.88,"unit":"°C","status":"data_invalid","last_seen_age_s":0,"source":"gateway"}: the boiler answers MsgID 27 DATA_INVALID and the served value is the gateway substitute, exactly the expected status data_invalid + source gateway. Archived: OTGW-field-data/indigo_light/2026-11-19_2.0.0-beta.382+224e30c/macos-20261119-091712/_analysis/tester-answers.txt (checked present, line 1).
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+AC1: status keeps following the boiler's verdict and a new field source (boiler/gateway) tells where the served value comes from (smallest contract change, recorded in the notes). AC2: host test on the real sendOTValue/sendOTLabel code red on the old code, green on the fix; TASK-1871 cases green (notes). AC3: openapi.yaml and docs/api/README.md updated, evaluate --quick no new FAIL, esp32-combo build (notes). AC4: field confirmation by indigo_light on beta.392, 2026-11-20 08:45 UTC, msg 1573257919783501948: Toutside status data_invalid, source gateway; archived in OTGW-field-data (tester-answers.txt).
+<!-- SECTION:FINAL_SUMMARY:END -->
