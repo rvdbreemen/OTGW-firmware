@@ -111,8 +111,7 @@ The v2 web UI has no Wi-Fi scan panel; to change the network, use Reset WiFi and
 | MQTT Password | Broker password |
 | MQTT Top Topic | Prefix for all published topics (default: `OTGW`) |
 | MQTT Unique ID | Device identifier used in topic paths and HA discovery (default: `otgw`) |
-| HA Discovery | Enable/disable Home Assistant MQTT auto-discovery payloads |
-| HA Prefix | Discovery topic prefix (default: `homeassistant`) |
+| HA discovery prefix | Discovery topic prefix (default: `homeassistant`); must match Home Assistant. Discovery itself is always on |
 | Publish Interval | Heartbeat interval in seconds (0 = publish every message as received) |
 | Separate Sources | Also publish per-source sibling topics (`<label>_thermostat`, `<label>_boiler`) next to the canonical topic |
 

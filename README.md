@@ -14,6 +14,45 @@ A prototype ESP32 board that drives OpenTherm directly, without a PIC, also exis
 
 ---
 
+## Quick Start
+
+### 0. Check your hardware
+
+2.0.0 runs on an ESP32-S3: a LOLIN S3 Mini or S3 Mini Pro in the NodoShop OTGW. Does your gateway still have the ESP8266 module (Wemos D1 mini or NodeMCU)? Then swap the module first: see [Migrating from ESP8266 (1.x)](#migrating-from-esp8266-1x). Or stay on the 1.x firmware.
+
+### 1. Flash the firmware
+
+Choose the route that fits your unit:
+
+- **New S3 module, or a clean start:** a factory install over USB. It **erases the flash**, so WiFi settings and all other settings are gone. Unpack the release zip (`OTGW-firmware-<board>-<version>-flash.zip`), connect the unit over USB and run the flash tool from it:
+
+  ```bash
+  flash_otgw.bat            # Windows
+  ./flash_otgw.sh           # Linux/macOS
+  ```
+
+- **Unit already on 2.0.0:** update over WiFi from the web UI with the release zip; your settings stay (save them first anyway: a power cut during the update can still reset them). Units on an older flash layout need one USB migration first. See [docs/guides/WIFI_FIRMWARE_UPDATE.md](docs/guides/WIFI_FIRMWARE_UPDATE.md).
+
+To build from source, see [docs/guides/BUILD.md](docs/guides/BUILD.md).
+
+### 2. Connect to Wi-Fi
+
+On first boot the device creates an access point named `<hostname>-<mac>`, for example `OTGW2-A4:CF:12:21:B4:F8`. Connect to it. A captive portal opens where you enter your home Wi-Fi credentials. On an ESP32 board with a W5500 and an Ethernet cable plugged in, wired Ethernet is used directly and the Wi-Fi setup is optional.
+
+### 3. Open the Web UI
+
+Navigate to `http://<device-ip>/` or `http://otgw2.local/`. **Home** shows the system view with temperatures and boiler status; the live OpenTherm log is under **Monitor > Log**.
+
+### 4. Configure MQTT
+
+Go to **Settings > MQTT**, switch on **Enable MQTT** and fill in your broker details. Home Assistant discovery is always on; the **HA discovery prefix** must match Home Assistant (default `homeassistant`). Click **Save**. Home Assistant discovers the device within seconds.
+
+### 5. Check Home Assistant
+
+Go to **Settings > Devices and Services > MQTT**. The OTGW device appears with its entities already created and ready to use.
+
+---
+
 ## What's New in v2.0.0
 
 Version 2.0.0 is a major platform release. It targets the ESP32-S3 in the traditional OTGW with PIC; the ESP8266 is no longer a 2.0.0 build target. If you are coming from a v1.x ESP8266 build, see [Migrating from ESP8266 (1.x)](#migrating-from-esp8266-1x).
@@ -123,7 +162,7 @@ SAT combines a **weather-compensated heating curve** with a **PID controller**. 
 5. Set an initial heating curve coefficient (start with 1.0 for radiators, 0.6 for underfloor; the curve recommendation and the self-tune guide further tuning).
 6. Save. SAT takes over the flow setpoint immediately. To report how SAT runs in your house, follow "Reporting SAT field results" in Chapter 5 of the manual.
 
-For detailed setup including OPV calibration and Home Assistant automation examples, see the [SAT integration guide](backlog/docs/doc-3%20-%20sat-integration-guide.md).
+For the full setup, see [Enabling SAT](docs/manuals/en/ch05-sat-thermostat.md#53-enabling-sat) and the [Home Assistant integration](docs/manuals/en/ch05-sat-thermostat.md#521-home-assistant-integration) in chapter 5 of the manual.
 
 ### Home Assistant integration
 
@@ -140,39 +179,8 @@ Commands via MQTT or the REST API (`/api/v2/sat/*`) control all SAT parameters a
 | MQTT topics | [docs/api/MQTT.md](docs/api/MQTT.md) |
 | Full SAT topic list | [docs/api/MQTT.md, section SAT](docs/api/MQTT.md#sat-smart-autotune-thermostat) |
 | REST API | [docs/api/openapi.yaml](docs/api/openapi.yaml) |
-| OPV calibration guide | [backlog/docs/doc-2 - sat-opv-calibration.md](backlog/docs/doc-2%20-%20sat-opv-calibration.md) |
-| Preset configuration | [backlog/docs/doc-4 - sat-preset-configuration.md](backlog/docs/doc-4%20-%20sat-preset-configuration.md) |
-
----
-
-## Quick Start
-
-### 1. Flash the firmware
-
-Unpack the release zip (`OTGW-firmware-<board>-<version>-flash.zip`), connect the unit over USB and run the flash tool from it:
-
-```bash
-flash_otgw.bat            # Windows
-./flash_otgw.sh           # Linux/macOS
-```
-
-Without options this is a factory install: it erases the flash and writes firmware and filesystem. Units that already run 2.0.0 are updated over WiFi; units on an older flash layout need one USB migration first. See [docs/guides/WIFI_FIRMWARE_UPDATE.md](docs/guides/WIFI_FIRMWARE_UPDATE.md). To build from source, see [docs/guides/BUILD.md](docs/guides/BUILD.md).
-
-### 2. Connect to Wi-Fi
-
-On first boot the device creates an access point named `<hostname>-<mac>`. Connect to it. A captive portal opens where you enter your home Wi-Fi credentials. On an ESP32 board with a W5500 and an Ethernet cable plugged in, wired Ethernet is used directly and the Wi-Fi setup is optional.
-
-### 3. Open the Web UI
-
-Navigate to `http://<device-ip>/` or `http://otgw2.local/`. The dashboard shows the live OpenTherm log, temperatures, and boiler status.
-
-### 4. Configure MQTT
-
-Go to **Settings** and fill in your MQTT broker details. Enable **HA Discovery**. Click **Save**. Home Assistant discovers the device within seconds.
-
-### 5. Check Home Assistant
-
-Go to **Settings > Devices and Services > MQTT**. The OTGW device appears with its entities already created and ready to use.
+| Overshoot protection and PWM | [Manual 5.6, Control Modes](docs/manuals/en/ch05-sat-thermostat.md#56-control-modes-continuous-and-pwm) |
+| Preset configuration | [Manual 5.4, Preset temperatures](docs/manuals/en/ch05-sat-thermostat.md#preset-temperatures) |
 
 ---
 
@@ -196,7 +204,7 @@ Open `http://<device-ip>/` and go to **Settings**.
 | MQTT Password | Broker password | (your password) |
 | MQTT Top Topic | Prefix for all published topics | `OTGW` |
 | MQTT Unique ID | Identifier for this device in HA | `otgw` |
-| HA Discovery | Enables auto-discovery payloads | checked |
+| HA discovery prefix | Must match the discovery prefix of the HA MQTT integration (discovery itself is always on) | `homeassistant` |
 
 ### Step 2: Verify in Home Assistant
 

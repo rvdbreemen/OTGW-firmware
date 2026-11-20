@@ -113,8 +113,7 @@ De v2-webinterface heeft geen Wi-Fi-scanpaneel; om van netwerk te wisselen gebru
 | Wachtwoord | MQTT-wachtwoord (optioneel) | (leeg) |
 | TopTopic | Bovenste MQTT-topic-namespace | `OTGW` |
 | UniqueID | Uniek apparaat-ID in de topic-structuur | `otgw-{MAC}` |
-| HA Discovery | Home Assistant auto-discovery inschakelen | uitgeschakeld |
-| HA Prefix | Prefix voor auto-discovery topics | `homeassistant` |
+| HA discovery prefix | Prefix voor de discovery-topics; moet gelijk zijn aan die in Home Assistant. Discovery zelf staat altijd aan | `homeassistant` |
 
 #### NTP sectie
 
