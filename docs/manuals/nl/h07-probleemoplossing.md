@@ -222,7 +222,7 @@ Wanneer een statisch IP is ingesteld dat ook door DHCP wordt uitgedeeld, kan een
 
 **AP-fallback activeert onterecht**
 
-Wanneer het WiFi-signaal langdurig wegvalt, probeert de firmware maximaal 10 keer opnieuw te verbinden. Na 10 mislukte pogingen herstart het apparaat zichzelf. Dit is bedoeld als fail-safe, niet als normale werking. Controleer de WiFi-stabilteit als u regelmatige herstarts ziet.
+Wanneer het WiFi-signaal wegvalt, opent het apparaat na 2 mislukte verbindingspogingen zijn AP-fallback (paragraaf 6.1.3; in alle builds vanaf beta.401) en probeert het elke 5 minuten opnieuw het opgeslagen netwerk. Alleen als het geheugen kritiek laag is, wordt de AP-fallback overgeslagen en herstart het apparaat na 10 mislukte pogingen. Dit is bedoeld als vangnet, niet als normale werking. Controleer de WiFi-stabiliteit als u dit regelmatig ziet; met de instelling `wifinoportal` blijft het apparaat proberen zonder AP en zonder herstart.
 
 ---
 
@@ -364,7 +364,7 @@ Een OTGW Classic met een LOLIN S3 Mini of S3 Mini Pro toont de WiFi-status ook m
 | Kleur pixel | Betekenis |
 |---|---|
 | Rood | WiFi niet verbonden. |
-| Paars | Er staat een accesspoint open: het WiFi-configuratieportaal, of de AP-fallback als het opgeslagen netwerk bij het opstarten onbereikbaar is. Maak daarmee verbinding om WiFi in te stellen. |
+| Paars | Er staat een accesspoint open: het WiFi-configuratieportaal, of de AP-fallback als het opgeslagen netwerk onbereikbaar is (in alle builds vanaf beta.401; daarvoor alleen in betabuilds). Maak daarmee verbinding om WiFi in te stellen. |
 | Groen | WiFi verbonden. |
 
 `/api/v2/device/info` meldt de aangestuurde pixel-GPIO als `status_pixel_gpio` (`0` als er geen is).
@@ -425,7 +425,7 @@ Druk op elk moment op `h` om het helpmenu te tonen met de huidige apparaatstatus
 | Toets | Actie |
 |---|---|
 | h | Toon helpmenu met huidige status en togglestanden |
-| q | Forceer herinlezen van `settings.json` vanuit flash |
+| q | Leest `settings.ini` opnieuw uit flash. Een actieve SAT-preset en zijn doeltemperatuur blijven staan (TASK-2013) |
 | F | Forceer volledige Home Assistant-discovery voor ALLE message IDs (wist de interne discovery-bitmap en publiceert alles opnieuw) |
 | r | Herverbind WiFi, Telnet, OTGW seriele stream en MQTT |
 | p | Reset de PIC handmatig |
@@ -438,6 +438,7 @@ Druk op elk moment op `h` om het helpmenu te tonen met de huidige apparaatstatus
 | j | Lees de huidige GPIO-uitgangstatus |
 | l | Toggle de generieke MyDEBUG-vlag |
 | f | Toon de MyDEBUG-vlagstand |
+| H | Alleen in prerelease-(bèta-)builds, voor benchtests: houdt het geheugen bewust laag (vrij geheugen onder 7 KB, grootste blok onder 2 KB) om het automatische herstel van paragraaf 7.12a te testen; nog eens `H` geeft het vrij, en na 30 minuten gebeurt dat vanzelf. Vanaf beta.397 staat hij in het `h`-menu. Niet in stabiele builds |
 
 De `F`-toets is handig na een Home Assistant MQTT-wissing of na een wijziging van het topic-prefix: het forceert een volledige herpublicatie van alle discovery-items in plaats van te wachten op de volgende natuurlijke trigger.
 
@@ -515,6 +516,26 @@ De S3 Mini ondersteunt BLE (Bluetooth Low Energy) temperatuursensor-scanning. Al
 1. Controleer of BLE-scanning is ingeschakeld in Settings.
 2. BLE-sensoren worden gescand op een timer-bewaakt interval. Wacht minstens een volledige scancyclus na het inschakelen.
 3. Bekijk de Telnet-debuglog voor BLE-scanresultaten.
+
+Loopt de gateway vast of wordt hij onbereikbaar nadat u BLE inschakelde? Zie paragraaf 7.12a.
+
+---
+
+### 7.12a Een gateway herstellen die vastloopt of onbereikbaar wordt
+
+**Symptoom:** enige tijd na het opstarten reageert de webinterface niet meer, MQTT valt stil en de gateway is niet bereikbaar, vaak nadat u een instelling hebt gewijzigd. Op firmware van vóór 2.0.0-beta.375 is de meest waarschijnlijke oorzaak op een board zonder PSRAM BLE-scanning die u hebt ingeschakeld nadat u de stabiliteitswaarschuwing accepteerde: BLE start bij het opstarten (`initSAT()`) en het geheugengebruik ervan kan de webserver laten verhongeren. Vanaf beta.375 kan BLE zonder PSRAM niet worden ingeschakeld, en een opgeslagen "aan" wordt bij het opstarten gewist (paragraaf 5.16).
+
+**Automatisch herstel (vanaf 2.0.0-beta.383).** Een gateway op WiFi waarvan het netwerk niet meer werkt terwijl het geheugen bijna op is, herstelt nu zelf. Eens per minuut pingt hij uw router; een ping die niet verstuurd kan worden door geheugengebrek telt als mislukte controle wanneer het grootste vrije geheugenblok kleiner is dan 4 KB. Na 8 mislukte controles op rij (ongeveer 8 minuten) forceert hij een nieuwe WiFi-verbinding; is de verbinding 8 controles later nog dood, dan herstart hij, dus ongeveer 16 minuten nadat het netwerk wegviel. Een korte nieuwe WiFi-verbinding terwijl het geheugen zo laag blijft, zet de telling niet terug (vanaf beta.385). Er gebeurt niets zolang er in de laatste minuut MQTT-, REST- of poort-25238-verkeer binnenkwam. De controle begint pas nadat uw router sinds de start één keer heeft geantwoord (zie Known issues in de release notes), en niet op een bekabelde verbinding. Na 3 van zulke herstarts forceert de gateway alleen nog een nieuwe verbinding, hooguit eens per 15 minuten; de telling wordt gewist nadat de verbinding een uur heeft gewerkt, en bij inschakelen van de voeding. Zoek in het telnet-log (poort 23) naar `WiFi: gateway probe not possible (...), heap starved (largest block ... B): counted as dead`, `WiFi: connected but no traffic, forcing a reconnect` en, na de herstart, de reden `WiFi: connected but no traffic`. Gebeurt dit vaker dan één keer, verzamel dan het crashlog en het telnet-log en vraag om hulp (paragraaf 7.14).
+
+**Eerst een tip:** bewaar uw instellingen zolang de gateway werkt. Open `http://<ip-van-uw-otgw>/api/v2/settings` in een browser en sla de pagina op als bestand. Dan hebt u een lijst om na de stappen hieronder opnieuw in te voeren.
+
+Werk deze stappen op volgorde af en stop bij de eerste die helpt:
+
+1. **Stroom eraf en de instelling uitzetten in het venster na het opstarten.** Haal de stroom eraf, wacht tien seconden en zet hem er weer op. Een herstart vanuit de webinterface herstart alleen de ESP. Zodra de webinterface antwoordt, ga naar Settings, **Sensoren**, **BLE sensors** en zet **BLE-sensoren inschakelen** uit (of draai de instelling terug die u het laatst wijzigde) en sla op. Wees snel: op de testopstelling reageerde de webinterface binnen ongeveer 1 tot 2 minuten na het opnieuw inschakelen weer niet. Lukt het niet, probeer het nog een keer en ga dan naar stap 2.
+2. **De instellingen via USB terugzetten, met behoud van WiFi.** Verbind de gateway met een USB-kabel met een pc en start vanuit de uitgepakte release-zip `flash_otgw.bat --update --fs <OTGW-firmware-...littlefs.bin>` op Windows, of `./flash_otgw.sh --update --fs <OTGW-firmware-...littlefs.bin>` op Linux en macOS. Dit schrijft alleen de filesystem-image: de WiFi-gegevens (in NVS) blijven bewaard, `settings.ini` gaat terug naar de standaardwaarden, en op een board zonder PSRAM start BLE daarna uit (een instellingenbestand zonder de BLE-sleutel betekent BLE uit). Voer uw andere instellingen met de hand opnieuw in, met het bewaarde bestand als lijst. Gebruik hiervoor niet `--migrate`: dat bewaart eerst `settings.ini` en zet het daarna terug, zodat de instelling die het vastlopen veroorzaakte terugkomt.
+3. **Fabrieksflash als laatste redmiddel.** `flash_otgw.bat` zonder opties wist het hele flashgeheugen en schrijft de `-merged-full.bin`-image: WiFi-gegevens en instellingen zijn weg en de gateway start zijn WiFi-configuratieportaal (paragraaf 7.13).
+
+Loopt de gateway met BLE uit nog steeds vast, of loopt hij vast op een board met PSRAM, verzamel dan de crash log (paragraaf 7.11) en vraag om hulp (paragraaf 7.14).
 
 ---
 
@@ -598,7 +619,7 @@ Het apparaat heeft de WiFi-verbinding verloren en probeert opnieuw te verbinden.
 Entered config mode SSID: OTGW2-XX:XX:XX:XX:XX:XX
 ```
 
-De AP-fallbackmodus is actief. Verbind met dit SSID om de WiFi-instellingen opnieuw te configureren.
+Het WiFi-configuratieportaal is actief (de melding komt uit `networkStuff.ino:262-265`). Verbind met dit SSID om de WiFi-instellingen opnieuw te configureren.
 
 #### MQTT-problemen
 

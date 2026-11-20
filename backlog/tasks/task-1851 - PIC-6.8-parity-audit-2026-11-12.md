@@ -1,11 +1,11 @@
 ---
 id: TASK-1851
 title: PIC 6.8 parity audit (2026-11-12)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-12T00:08:00Z'
-updated_date: '2026-11-14T15:32:00Z'
+updated_date: '2026-11-19T22:46:00Z'
 labels:
   - otdirect
   - parity
@@ -42,7 +42,7 @@ Successor of the 6.6 audit (TASK-1795, docs/reviews/2026-11-11_otdirect-pic-pari
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Every listed task is Done, or closed with a recorded reason (decision, duplicate, intentional difference)
+- [x] #1 Every listed task is Done, or closed with a recorded reason (decision, duplicate, intentional difference)
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -57,4 +57,14 @@ Child status 2026-11-14 (comms, stale audit): Done 9 (1831, 1832, 1833, 1836, 18
 Correction to the line above: Done is 8, not 9 (1831, 1832, 1833, 1836, 1840, 1842, 1844, 1846); 8 + 4 + 1 + 6 = 19 children incl. 1906-1908.
 
 Assignment of the 6 open children (coordinator 2026-11-14; owners claim them themselves): 95 -> TASK-1848 (PR texts) + TASK-1849 (success/clear replies); ba -> TASK-1850 (thermostat (dis)connected lines) + TASK-1908 (SC= validation), after TASK-1937; d3 -> TASK-1847 (PM TSP/fault history) + TASK-1906 (the thermostat's own MsgID 99), after TASK-1924 Part 2 and TASK-1839.
+
+Triage 2026-11-19 (otgw-docs, coordinator request, origin 511686b28): 17 of 19 children Done (1835, 1845, 1907 Done with a field AC closed on Robert's A, DM 1571431149795024929). Open, not stale: TASK-1847 (d3, In Review) AC2 'PM=93 reads all characters' is a field AC (host-proven, 09 bench PASS beta.301); TASK-1850 (ba, In Progress) AC1 needs a real thermostat loss and return, OT-Direct has no thermostat simulation (otThermostatSeen only from real frames, OTDirect.ino:1301/2457). AC1 of this parent stays open until those two close. The coordinator puts both field ACs to Robert (same pattern as 1845/1907).
+
+2026-11-19 closed by otgw-dev (coordinator decision B: Robert's 'A', DM 1573103087613124832, named only TASK-1847 and TASK-1850). Children checked on origin 8eede4b50: 17 of 18 Done (1795, 1831-1836, 1839, 1840, 1842, 1844-1850); TASK-1801 stays In Review, closed here with a recorded reason: its AC1/AC2 are field ACs (Robert decision C, 2026-11-15), host-proven by tests/test_otd_mandatory_ids.py, no field evidence yet (needs a boiler that answers Unknown-DataID to 1/3/14/17/25).
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+PIC 6.8 parity audit (2026-11-12): all 18 listed tasks are Done or closed with a recorded reason. Done: TASK-1795, 1831, 1832, 1833, 1834, 1835, 1836, 1839, 1840, 1842, 1844, 1845, 1846, 1847 (AC2 field waiver, Robert 'A', DM 1573103087613124832), 1848, 1849, 1850 (field waiver, same DM; follow-up TASK-2935). Recorded reason: TASK-1801 stays In Review: AC1/AC2 (mandatory IDs 1/3/14/17/25 never blacklisted; a relayed success clears counter and flag) are field ACs under Robert's decision C of 2026-11-15, host-proven by tests/test_otd_mandatory_ids.py, no field evidence yet.
+<!-- SECTION:FINAL_SUMMARY:END -->

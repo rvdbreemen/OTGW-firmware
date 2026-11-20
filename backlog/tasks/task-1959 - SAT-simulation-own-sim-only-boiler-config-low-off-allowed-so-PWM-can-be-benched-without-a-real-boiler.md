@@ -6,10 +6,12 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-15T07:53:00Z'
+updated_date: '2026-11-16T08:53:00Z'
 labels:
   - sat
   - simulation
   - bench
+milestone: 2.1.0
 dependencies: []
 priority: low
 ordinal: 1003000
@@ -34,3 +36,9 @@ Sergeant D entries checked (docs/sat/sergeant-d-corrections.md): entry 213 (bit 
 - [ ] #3 Ending the simulation restores the real slave config state (host test)
 - [ ] #4 The sim path does not write the real slave config cache or the MQTT slave-config topics (code check plus host test)
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-16: moved to milestone 2.1.0. Release scope per entry 386 (Robert 08:47:36 UTC, https://discord.com/channels/812969634638725140/1105556725714649128/1571808950330986547: 'Mark anything new to the next release'): the initial SAT release covers the decisions of entries 375-385; this item is outside that scope. Not built now (coordinator 2026-11-16).
+<!-- SECTION:NOTES:END -->

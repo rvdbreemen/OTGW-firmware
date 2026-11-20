@@ -54,6 +54,7 @@ struct OpenTherm {
 };
 static unsigned long g_frames[16]; static int g_nframes = 0;
 static bool otCmdEnqueue(unsigned long f) { g_frames[g_nframes++] = f; return true; }
+static bool otdWriteRefused = false;   // TASK-1804 B3e: set on a refused enqueue (never here: the stub accepts)
 static void otdPersistHW(char) {}   // TASK-1836: the HW= branch stores HW 0/1/A (not under test here)
 static unsigned long millis() { return 1000; }
 static void otDirectBridgeProcessStatus(const char* s) { printf("STATUS %s\n", s); }
@@ -69,6 +70,7 @@ static bool otOperModeWrite = false;   // TASK-1906: the PIC's opermodewrite
 static bool otPushManual = false, otPushPending = false, otPushSpoof = false, otPushStarted = false;
 static uint8_t otPushFails = 0;
 static bool isUnknownId(uint8_t) { return false; }
+static uint8_t getUnknownCount(uint8_t) { return 0; }   // TASK-1804 ID-99: no strikes here
 """
 
 MAIN = r"""

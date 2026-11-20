@@ -11,6 +11,7 @@ supersedes: []
 superseded_by: null
 related:
   - "ADR-248"
+  - "ADR-255"
 ---
 # ADR-101: Flat Per-Value MQTT Topics Over Aggregated JSON Payloads
 
@@ -30,6 +31,11 @@ status_history:
     status: Accepted
     changed_by: "User: Robert van den Breemen"
     reason: Related to ADR-248
+    changed_via: adr-kit lifecycle
+  - date: 2026-11-18
+    status: Accepted
+    changed_by: "Agent: Claude"
+    reason: Related to ADR-255
     changed_via: adr-kit lifecycle
 ```
 

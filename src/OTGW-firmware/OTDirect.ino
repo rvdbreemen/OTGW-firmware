@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTDirect.ino
-**  Version  : v2.0.0-beta.327
+**  Version  : v2.0.0-beta.401
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -32,33 +32,10 @@
 // ---------------------------------------------------------------------------
 // OpenTherm interface instances — master talks to boiler, slave listens to thermostat
 // ---------------------------------------------------------------------------
-// --- otdMasterLine begin
-// TASK-1966: the library's isReady() (OpenTherm.cpp:134-137) also needs micros() - delayTimestamp < 2^31, and
-// delayTimestamp moves only on a valid answer (:443) or in setDelay() (:390-394). micros() wraps every 71.6 min, so
-// without a valid boiler answer for 35.8 min (no boiler, boiler off, only timeouts) isReady() turns false for the
-// next 35.8 min: no frame goes out, so no answer comes to refresh it, and otMasterRequestActive stays set. The
-// fields are protected, so this subclass keeps them sane without changing the library (as OTDSlaveLine below).
-static constexpr uint32_t OTD_LINE_MAX_DELAY_US = 2000000UL;   // the library's delays are at most 50 ms
-static constexpr uint32_t OTD_LINE_TX_STALL_US  = 500000UL;    // no TX timer tick (every 0.5 ms) for 500 ms; above a flash-write pause, below the 1 s timeout
-class OTDMasterLine : public OpenTherm {
-public:
-  using OpenTherm::OpenTherm;
-  // Every loop pass, after process(). 0 = nothing to report, 1 = a stale delay was cleared, 2 = the transmit
-  // timer stopped mid-frame (the caller restarts the line). A finished delay is pinned to now, so it never ages
-  // past 2^31 us; a delay still running (set at most 50 ms ahead) is left alone.
-  uint8_t keepFresh(uint32_t now) {
-    // Signed: the TX timer ISR rewrites requestTimestamp every tick and may do so just after `now` was sampled
-    // (a few us ahead), which as unsigned would read as a stall (d3's review of TASK-1966).
-    if (txStatus == OpenThermTxStatus::TX_DATA)
-      return (int32_t)(now - requestTimestamp) > (int32_t)OTD_LINE_TX_STALL_US ? 2 : 0;
-    if ((uint32_t)(now - delayTimestamp) < 0x80000000UL) { delayTimestamp = now; return 0; }
-    if ((uint32_t)(delayTimestamp - now) > OTD_LINE_MAX_DELAY_US) { delayTimestamp = now; return 1; }
-    return 0;
-  }
-  void clearTx() { txStatus = OpenThermTxStatus::IDLE; }   // after end()/begin(), which do not reset it
-};
-// --- otdMasterLine end
-static OTDMasterLine otMaster(PIN_OT_MASTER_IN, PIN_OT_MASTER_OUT);
+// TASK-1980: the library itself keeps the boiler line usable without a valid answer (pinned to
+// rvdbreemen/opentherm_library fix-timer-wrap, upstream PR Phunkafizer/opentherm_library#1), so a plain
+// OpenTherm instance is enough.
+static OpenTherm otMaster(PIN_OT_MASTER_IN, PIN_OT_MASTER_OUT);
 // TASK-1848: the thermostat side exposes its two Smart Power idle levels for PR=P. The library's own
 // getSmartPowerState() (OpenTherm.cpp:540-544) returns LOW or HIGH and never MEDIUM, so it cannot give the
 // PIC's three levels; the levels are protected members, read here without changing the library.
@@ -422,6 +399,25 @@ static void otCmdApplyPendingFlush() {
   if (dSnap <= otCmdQueueDepth()) otCmdTail = snap;
 }
 
+// TASK-1992: a cleared command (CS=0, SW=0, MM=T, TT=0 ...) must not leave its old WRITE in the ring: while the SAT
+// simulation blocks TX the ring kept a stale CS 61.3 / MM 100 / TT 20.5 for minutes and sent them when it ended. The
+// pending entry becomes a tombstone that the consumers drop without sending. No compaction: otdFlushCmdQueue() can run
+// on another task and snapshots otCmdHead, which a moved head would break. Loop task only (ADR-242), as the producer.
+static constexpr uint32_t OTD_CMD_TOMBSTONE = 0xFFFFFFFFUL;
+static void otCmdDropPendingWrite(uint8_t msgId) {
+  for (uint8_t i = otCmdTail; i != otCmdHead; i = (uint8_t)((i + 1) % OT_CMD_QUEUE_SIZE)) {
+    const uint32_t f = otCmdQueue[i];
+    if (f != OTD_CMD_TOMBSTONE && ((f >> 16) & 0xFF) == msgId && ((f >> 28) & 0x07) == 1 /* WRITE_DATA */) {
+      otCmdQueue[i] = OTD_CMD_TOMBSTONE;
+    }
+  }
+}
+static void otCmdSkipTombstones() {
+  while (otCmdTail != otCmdHead && otCmdQueue[otCmdTail] == OTD_CMD_TOMBSTONE) {
+    otCmdTail = (uint8_t)((otCmdTail + 1) % OT_CMD_QUEUE_SIZE);
+  }
+}
+
 // TASK-494: enqueue with coalesce-by-MsgID.
 //
 // If a frame for the SAME OT MsgID is already pending in the queue, replace
@@ -452,7 +448,7 @@ static bool otCmdEnqueue(uint32_t frame) {
   uint8_t i = otCmdTail;
   while (i != otCmdHead) {
     uint8_t existingMsgId = (otCmdQueue[i] >> 16) & 0xFF;
-    if (existingMsgId == newMsgId) {
+    if (otCmdQueue[i] != OTD_CMD_TOMBSTONE && existingMsgId == newMsgId) {
       otCmdQueue[i] = frame;
       OTDDebugTf(PSTR("OTD: queue coalesced MsgID %u -> 0x%08lX\r\n"),
                  (unsigned)newMsgId, (unsigned long)frame);
@@ -760,6 +756,44 @@ struct OTResponseOverride {
 };
 static OTResponseOverride otResponseOverrides[OT_RESPONSE_OVERRIDE_MAX];
 
+// --- otdSrReply begin
+// TASK-1804 A6: SR= rewrites the answer on its way to the thermostat, as on the PIC; it never answers locally. The PIC
+// forwards the request (CreateRequest, gateway.asm 6.6 :2384-2414, no SR lookup) and its response handlers put the SR
+// bytes in (WordResponse/ByteResponse :3612-3643) with the request's own ack type (messageack :2668-2678), whatever the
+// boiler answered. It applies to the Data-IDs whose TreatMessage entry is WordResponse, MandatoryWord or ByteResponse
+// (dispatch table :2537-2664) and to those whose own handler jumps to WordResponse for every answer to the thermostat:
+// MessageID5 :2879, MessageID8 :2922, MessageID48/49 :3094-3111, TSPBufferSize (10 12 88 90 105 107) :3338-3340.
+// ByteResponse (70, 101) keeps the request's high byte ORed with the SR high byte (it clears databyte2 only; databyte1 is
+// the request's byte3, StoreDataBytes :2421-2422). Recorded differences (TASK-1804 notes): MessageID100 calls
+// WordResponse only with an override request or a bad answer (:3272-3283) and is left out; the PIC also takes SR for
+// vendor IDs 128-255 (:2533-2534), which SR= here does not store.
+// bit n = Data-ID n (0-127) gets the SR bytes; tests/test_otd_sr_reply_pic.py recomputes it from gateway.asm
+static const uint32_t otdPicSrIds[4] = {   // const: in flash rodata on the ESP32-S3
+  0xE7EE9528UL,   //   0- 31: 3 5 8 10 12 15 17-19 21-26 29-31
+  0xFCFFFFFFUL,   //  32- 63: 32-55 58-63
+  0x15FFFF7FUL,   //  64- 95: 64-70 72-88 90 92
+  0x9FFFEBE7UL    //  96-127: 96-98 101-105 107 109-124 127
+};
+static bool otdPicSrApplies(uint8_t id) {
+  if (id >= 128) return false;   // SR= stores Data-IDs 1-127 only
+  return (otdPicSrIds[id >> 5] >> (id & 31)) & 1;
+}
+static unsigned long otdSrReply(unsigned long sentReq, unsigned long reply) {
+  const uint8_t id = (uint8_t)((reply >> 16) & 0xFF);
+  if (!otdPicSrApplies(id)) return reply;
+  for (uint8_t i = 0; i < OT_RESPONSE_OVERRIDE_MAX; i++) {
+    if (!otResponseOverrides[i].active || otResponseOverrides[i].msgId != id) continue;
+    uint16_t data = otResponseOverrides[i].value;
+    if (id == 70 || id == 101) data |= (uint16_t)(sentReq & 0xFF00);   // ByteResponse: the request's high byte stays
+    const unsigned long ackType = ((sentReq >> 28) & 0x07) | 0x04;       // messageack: READ -> READ_ACK, WRITE -> WRITE_ACK
+    unsigned long r = (ackType << 28) | ((unsigned long)id << 16) | data;
+    setOTParityBit(r);
+    return r;
+  }
+  return reply;
+}
+// --- otdSrReply end
+
 // UI/KI unknown-ID table
 static constexpr uint8_t OT_UNKNOWN_ID_MAX = 16;
 static uint8_t otUnknownIds[OT_UNKNOWN_ID_MAX];
@@ -909,13 +943,22 @@ static unsigned long otLastThermostatRequest = 0;
 // before the alternative-slot, UI= and SR= branches (gateway.asm TreatMessage runs before them),
 // although it may take several loop passes before the frame is forwarded.
 static bool otSlaveFrameNoted = false;
+// TASK-1812 (ADR-241): a master-mode relay of a thermostat write answers only its own request. Every received
+// thermostat frame counts up otdSlaveFrameSeq; the relay keeps the count of its frame and the time it was sent.
+// The relay waits the master wait time like the scheduler: OTD_MWT_MS from otdLastConvEndMs (TASK-1954, declared
+// next to otLastAnySendMs, stamped by handleMasterResponse()).
+static uint32_t otdSlaveFrameSeq = 0;
+static uint32_t otdRelaySeq = 0;
+static uint32_t otdRelaySentMs = 0;
 
 // TASK-1798: an answer to the thermostat goes out once the slave side is ready. The library refuses a
 // slave send for RESPONSE_TIME (50 ms) after a received frame (OpenTherm.cpp:443, sendResponse() returns
 // false while isReady() is false), and the gateway makes some answers itself in the same loop pass
 // (master mode, UI=, SR=, the alternative and MsgID 28 slots). A refused answer is kept here and sent
 // from loopOTDirect() as soon as the gate opens; it is dropped, and logged, when the next thermostat
-// frame arrives or after OTD_REPLY_DEADLINE_MS (the slave must answer within 800 ms, OT spec).
+// frame arrives or after OTD_REPLY_DEADLINE_MS. OT spec v4.2: a slave answers 20-400 ms after the master frame
+// (:1093-1095), a slave that is a gateway waits for the next slave in line and has no maximum (:1097-1098); the 800 ms
+// in the library comment (OpenTherm.cpp:8) is not in v4.2. 750 ms bounds how long a held answer is still useful.
 static constexpr uint32_t OTD_REPLY_DEADLINE_MS = 750;
 static unsigned long otdReplyFrame = 0;
 static uint32_t otdReplySinceMs = 0;
@@ -956,6 +999,7 @@ static void otdReplyService() {
 
 static void handleSlaveRequest(unsigned long request, OpenThermResponseStatus status) {
   otdReplyDrop("next thermostat frame");   // any received frame, also an invalid one, ends the old request
+  otdSlaveFrameSeq++;   // TASK-1812: also an invalid frame starts a new conversation
   if (status == OpenThermResponseStatus::SUCCESS) {
     otSlaveFrame = request;
     otSlaveFramePending = true;
@@ -991,8 +1035,35 @@ static void otDirectBridgeWriteLine(const char* line, size_t len) {
   OTGWstream.write('\n');
 }
 
+// TASK-1804 B3a: the PIC prints the command's two letters and ": " as soon as the header checks pass (SerialCmdSub,
+// gateway.asm 6.6 :3695-3703) and the error code after them (:1425-1431), so an error after a valid header reads
+// "CH: BV"; only the header failures stay a bare SE. handleOTDirectCommand() sets this prefix once buf[2] is '='
+// (OtdCmdPrefixScope). This is wire parity with the PIC; pyotgw handles both forms (commandprocessor.py:54-58, :66-71).
+static char otdCmdPrefix[3] = {0, 0, 0};
+
+struct OtdCmdPrefixScope {
+  char saved[3];
+  OtdCmdPrefixScope() { memcpy(saved, otdCmdPrefix, sizeof(saved)); otdCmdPrefix[0] = 0; }
+  void set(char c0, char c1) { otdCmdPrefix[0] = c0; otdCmdPrefix[1] = c1; otdCmdPrefix[2] = 0; }
+  ~OtdCmdPrefixScope() { memcpy(otdCmdPrefix, saved, sizeof(saved)); }
+};
+
+static bool otdIsCmdErrorCode(const char* s) {
+  static const char codes[] PROGMEM = "NGSEBVORNSNF";
+  for (size_t i = 0; i + 1 < sizeof(codes); i += 2) {
+    if (s[0] == (char)pgm_read_byte(&codes[i]) && s[1] == (char)pgm_read_byte(&codes[i + 1])) return true;
+  }
+  return false;
+}
+
 static void otDirectBridgeProcessStatus(const char* status) {
   if (!status) return;
+  if (otdCmdPrefix[0] && otdIsCmdErrorCode(status)) {
+    const char line[7] = { otdCmdPrefix[0], otdCmdPrefix[1], ':', ' ', status[0], status[1], '\0' };   // processOT logs it as a C string
+    otDirectBridgeWriteLine(line, 6);
+    processOT(line, 6);
+    return;
+  }
   otDirectBridgeWriteLine(status, 2);
   processOT(status, 2);
 }
@@ -1832,6 +1903,7 @@ static void replyToThermostat(OTDirectRequestOrigin origin, unsigned long sentRe
     reply = buildOverriddenReply(otLastThermostatRequest, sentReq, boilerResp);
   } else if (otCurrentMode == OTD_MODE_GATEWAY) {
     reply = applyResponseModifiers(boilerResp);
+    reply = otdSrReply(sentReq, reply);   // TASK-1804 A6: SR= on the boiler's answer, as the PIC (not on an overridden request)
     reply = otdRemoteOverrideReply(reply, otRemoteOverride.mode != OT_OVERRIDE_NONE,
                                    otRemoteOverride.f88Value,
                                    otdOverrideFlagsData(otRemoteOverride.mode == OT_OVERRIDE_TEMPORARY,
@@ -1847,6 +1919,8 @@ static void replyToThermostat(OTDirectRequestOrigin origin, unsigned long sentRe
         && ((reply >> 28) & 0x07) == 4) {
       otRemoteOverride.bMsgId9Answered = true;
     }
+  } else if (IS_LOOPBACK_MODE()) {
+    reply = otdSrReply(sentReq, boilerResp);   // TASK-1804 A6: SR= also in loopback (the PIC ID set, as in gateway mode)
   }
   const bool sentNow = otdSendReply(reply);
   if (!sentNow) {
@@ -2041,6 +2115,9 @@ static uint32_t otdPmOnAnswer(uint8_t id, uint8_t type, uint16_t data) {
 // ---------------------------------------------------------------------------
 static void otdRetNoteReply(OTDirectRequestOrigin origin, unsigned long request, unsigned long response,
                             uint32_t now);   // TASK-1759, otdRetSlot block below
+static void otdZapInvalid(uint8_t msgId);   // TASK-1804 A2, defined after otdPersistFloat()
+
+
 static void handleMasterResponse() {
   unsigned long response = otMaster.getLastResponse();
   OpenThermResponseStatus status = otMaster.getLastResponseStatus();
@@ -2094,6 +2171,7 @@ static void handleMasterResponse() {
     OpenThermMessageType respType = OpenTherm::getMessageType(response);
     uint8_t respMsgId = (response >> 16) & 0xFF;
     otdNoteBoilerAnswer(respMsgId, respType == OpenThermMessageType::UNKNOWN_DATA_ID);
+    if (respType == OpenThermMessageType::UNKNOWN_DATA_ID) otdZapInvalid(respMsgId);   // TASK-1804 A2
 
     // TASK-1845: the DHW push follows the boiler's answers, as the PIC (MessageID99, statusreturn).
     if (respMsgId == 99) otdPushOnBoiler99((uint8_t)respType, (uint16_t)(response & 0xFFFF));
@@ -2113,6 +2191,7 @@ static void handleMasterResponse() {
     // resets the count on any other (HandleResponse / MsgSupported, gateway.asm 6.8 :2440-2455), so Unknown, Unknown,
     // Data-Invalid, Unknown does not blacklist the ID there either.
     otdNoteBoilerAnswer((response >> 16) & 0xFF, false);
+    otdZapInvalid((uint8_t)((response >> 16) & 0xFF));   // TASK-1804 A2
     // TASK-1907: the PIC handles a Data-Invalid answer to MsgID 99 as Unknown-DataID (MessageID99: the Data-Invalid
     // entry is a nop that falls into ID99Unknown, gateway.asm:3227-3230), so a pending HW=P push is spoofed.
     if (((response >> 16) & 0xFF) == 99) otdPushOnBoiler99(6 /* DATA_INVALID */, (uint16_t)(response & 0xFFFF));
@@ -2140,8 +2219,20 @@ static void handleMasterResponse() {
   // A forwarded thermostat frame gets its one reply now. A timeout or a corrupt
   // reply gets none: the thermostat notes the incomplete conversation and
   // retries (OT spec v4.2 section 4.5), as it does behind a PIC gateway.
-  if (status == OpenThermResponseStatus::SUCCESS || boilerDataInvalid) {
+  // TASK-1812 (ADR-241): in master mode a relayed write answers only its own thermostat request (no newer frame
+  // arrived, so a late answer can never reach a later request) and only within OTD_REPLY_DEADLINE_MS of the relay's
+  // send; as a gateway the wait has no spec maximum (v4.2 :1097-1098). Otherwise the thermostat retries (4.5).
+  bool relayCurrent = true;
+  if (IS_MASTER_MODE() && otLastRequestOrigin != OT_DIRECT_ORIGIN_GATEWAY) {
+    relayCurrent = otdRelaySeq == otdSlaveFrameSeq &&
+                   (uint32_t)(millis() - otdRelaySentMs) < OTD_REPLY_DEADLINE_MS;
+    if (!relayCurrent) OTDDebugTln(F("OTD: relayed write answered too late or superseded, no reply to the thermostat"));
+  }
+  if ((status == OpenThermResponseStatus::SUCCESS || boilerDataInvalid) && relayCurrent) {
     replyToThermostat(otLastRequestOrigin, otLastSentRequest, response);
+    if (IS_MASTER_MODE() && otLastRequestOrigin != OT_DIRECT_ORIGIN_GATEWAY && otdReplyPending) {
+      otdReplySinceMs = otdRelaySentMs;   // a held answer keeps the relay's deadline
+    }
   }
 
   // TASK-1954: a received frame (an answer or an invalid one) ends the conversation now; the MWT counts from here.
@@ -2153,11 +2244,28 @@ static void handleMasterResponse() {
 }
 
 // ---------------------------------------------------------------------------
+// TASK-1812 (ADR-241): whether master mode relays this thermostat frame to the boiler. A WRITE_DATA of any ID
+// except 1, 16 and 24 (they keep the local write-cache path, TASK-1150, TASK-1811) goes to the boiler; while SAT
+// owns the setpoint, MsgID 8 and 14 (C2=, MM=, refused from outside by satBlocksExternalCommand) keep the local
+// echo too. Nothing is relayed while the boiler is offline (TASK-1807). Reads stay cache-answered (ADR-066).
+// --- otdMasterRelaysWrite begin
+static bool otdMasterRelaysWrite(unsigned long frame) {
+  if (((frame >> 28) & 0x07) != 1 /* WRITE_DATA */ || !state.otBus.bOnline) return false;
+  const uint8_t id = (frame >> 16) & 0xFF;
+  if (id == 1 || id == 16 || id == 24) return false;
+  if ((id == 8 || id == 14) && satOwnsControlSetpoint()) return false;
+  return true;
+}
+// --- otdMasterRelaysWrite end
+
+// ---------------------------------------------------------------------------
 // scheduleMasterRequest — pick next scheduled message and send async
 // ---------------------------------------------------------------------------
 static void scheduleMasterRequest() {
   // Don't schedule if master is already busy (collision avoidance)
   if (otMasterRequestActive) return;
+  // TASK-1812: a thermostat write waiting for the master port goes first, before the ring and the schedule
+  if (IS_MASTER_MODE() && otSlaveFramePending && otdMasterRelaysWrite(otSlaveFrame)) return;
 
   // TASK-1707: with a thermostat in gateway mode the queue and the schedule go out only in
   // alternative slots (otdAltSlotTaken), never between the thermostat's frames.
@@ -2173,6 +2281,7 @@ static void scheduleMasterRequest() {
   // Pending commands from the ring buffer take priority.
   // Peek first — only dequeue after successful async send (Codex P1 fix).
   otCmdApplyPendingFlush();
+  otCmdSkipTombstones();   // TASK-1992
   if (!otCmdQueueEmpty()) {
     uint32_t cmdFrame = otCmdQueue[otCmdTail];
     if (sendMasterRequestAsync(cmdFrame, OT_DIRECT_ORIGIN_GATEWAY)) {
@@ -2276,8 +2385,10 @@ static bool otdResponseOverrideActive(uint8_t msgId) {
 }
 
 // A thermostat Data-ID whose slot the gateway may use: one the UI= table marks
-// unknown, or one the boiler answered Unknown-DataID three times in a row and the
-// SR= table does not answer. MsgID 0 is never counted (handleMasterResponse).
+// unknown, or one the boiler answered Unknown-DataID three times in a row, also when SR=
+// holds a value for it (TASK-1804 A6: the PIC blacklists an SR ID like any other, UnknownMask,
+// gateway.asm 6.6 :2397-2399, and still answers SR through SendAltResponse; otdAltSlotTaken does the same).
+// MsgID 0 is never counted (handleMasterResponse).
 // MsgID 9 and 100 are no slot (otdRemoteOverrideHoldsSlot): the thermostat gets READ_ACK
 // from replyToThermostat() (otdRemoteOverrideReply, TASK-1718), not Unknown-DataID.
 static bool otdRemoteOverrideHoldsSlot(uint8_t msgId);
@@ -2285,7 +2396,7 @@ static bool otdIsAltSlot(uint8_t msgId) {
   if (otdRemoteOverrideHoldsSlot(msgId)) return false;
   if (otdPicMandatoryId(msgId)) return false;   // TASK-1801: MandatoryID, also against a UI= mark
   if (isUnknownId(msgId)) return true;
-  return getUnknownCount(msgId) >= 3 && !otdResponseOverrideActive(msgId);
+  return getUnknownCount(msgId) >= 3;
 }
 
 // The schedule entry for an alternative slot: of the entries that may go out, the
@@ -2331,6 +2442,7 @@ static bool otdAltSlotTaken(unsigned long thermostatFrame) {
   uint8_t idx = OT_SCHEDULE_SIZE;   // OT_SCHEDULE_SIZE: the queued command
   unsigned long request;
   otCmdApplyPendingFlush();
+  otCmdSkipTombstones();   // TASK-1992
   if (!otCmdQueueEmpty()) {
     request = otCmdQueue[otCmdTail];
   } else {
@@ -2345,6 +2457,10 @@ static bool otdAltSlotTaken(unsigned long thermostatFrame) {
   // Unknown-DataID with the thermostat's own Data-ID and data bytes, as CreateMessage builds it
   unsigned long unknownResp = buildOTResponse(7, (uint8_t)((thermostatFrame >> 16) & 0xFF),
                                               (uint16_t)(thermostatFrame & 0xFFFF));
+  // TASK-1804 A6: an SR= value still answers the thermostat: SendAltResponse runs TreatMessage on the fake
+  // Unknown-DataID with BoilerResponse cleared (gateway.asm 6.6 :2463-2473), so WordResponse/ByteResponse put the SR
+  // bytes in with the request's ack type, as on the boiler-answer path (replyToThermostat, before the clock answer)
+  unknownResp = otdSrReply(thermostatFrame, unknownResp);
   // TASK-1840: a blacklisted MsgID 20 still gets the PIC's clock answer (TreatMessage runs MessageID20
   // on the fake Unknown-DataID, gateway.asm:2467-2477, :3048-3056)
   unknownResp = otdClockReply(thermostatFrame, unknownResp, otSCLastCommandMs != 0, otSCClockData);
@@ -2683,6 +2799,12 @@ void otdMqttSetRoomSetpoint(float tempC) {
   if (!isOTDirectEnabled()) return;
   if (tempC < -40.0f || tempC > 127.0f) return;  // sanity range — drop, don't clamp
   const uint16_t f88 = floatToF88(tempC);
+  // TASK-1751: in master mode a running TT=/TC= keeps the MsgID 16 slot; the room value is stored and written at TT=0.
+  if (otCurrentMode == OTD_MODE_MASTER && otRemoteOverride.mode != OT_OVERRIDE_NONE) {
+    otdRoom16CacheSet = true;  otdRoom16CacheF88 = f88;
+    otdRoom16OvrSet   = true;  otdRoom16OvrF88   = f88;
+    return;
+  }
   if (enqueueWriteCommand(16, f88, "MQTT-room_setpoint")) {   // TASK-1751: kept for TT=0 in master mode
     otdRoom16CacheSet = true;  otdRoom16CacheF88 = f88;
     otdRoom16OvrSet   = true;  otdRoom16OvrF88   = f88;
@@ -2693,26 +2815,12 @@ void otdMqttSetRoomSetpoint(float tempC) {
 // loopOTDirect — called from doBackgroundTasks() on OTGW32 builds
 // Non-blocking: uses async requests, never blocks for OT response.
 // ---------------------------------------------------------------------------
-// --- otdMasterGuard begin
-// TASK-1966: keeps the boiler line usable (OTDMasterLine::keepFresh) and counts what it had to repair; the counts and
-// the in-flight flag go to state.otd for /api/v2/device/info.
-static void otdMasterGuard() {
-  const uint8_t r = otMaster.keepFresh(micros());
-  if (r == 1) {
-    state.otd.iLineStaleFixes++;
-    DebugTf(PSTR("OTD: boiler line delay was stale (no valid boiler answer for 35 min), cleared (#%u)\r\n"),
-            (unsigned)state.otd.iLineStaleFixes);
-  } else if (r == 2) {
-    state.otd.iLineTxRestarts++;
-    DebugTf(PSTR("OTD: boiler line transmit stalled mid-frame, line restarted (#%u)\r\n"),
-            (unsigned)state.otd.iLineTxRestarts);
-    otMaster.end();
-    otMaster.begin(masterISR);
-    otMaster.clearTx();
-  }
+// --- otdMasterStatus begin
+// TASK-1966: the in-flight flag goes to state.otd for /api/v2/device/info (otdrequestactive).
+static void otdMasterStatus() {
   state.otd.bMasterRequestActive = otMasterRequestActive;
 }
-// --- otdMasterGuard end
+// --- otdMasterStatus end
 
 void loopOTDirect() {
   // Apply a pending command-ring flush every pass, also in modes where no consumer runs.
@@ -2730,7 +2838,7 @@ void loopOTDirect() {
 
   // Process OpenTherm library state machines (drives ISR-based TX/RX)
   otMaster.process();
-  otdMasterGuard();    // TASK-1966: before isReady() is asked below
+  otdMasterStatus();
   otSlave.process();
   otdReplyService();   // TASK-1798: a held answer leaves once the slave gate opens
 
@@ -2750,7 +2858,23 @@ void loopOTDirect() {
   // Monitor mode: forward all frames unmodified — skip UI/SR/override tables.
   // Gateway mode: check UI (unknown-ID) and SR (response override) tables first,
   // then apply repeater-mode value overrides before forwarding to boiler.
-  if (otSlaveFramePending && IS_MASTER_MODE()) {
+  if (otSlaveFramePending && IS_MASTER_MODE() && otdMasterRelaysWrite(otSlaveFrame)) {
+    // TASK-1812 (ADR-241): a thermostat write goes to the boiler in the next free master slot, through the
+    // gateway-mode override rule (a user write override replaces the data), and the boiler's answer goes back
+    // through replyToThermostat(). It waits for a frame already in flight and then the MWT (OTD_MWT_MS).
+    if (!otMasterRequestActive && (uint32_t)(millis() - otdLastConvEndMs) >= OTD_MWT_MS) {
+      bool modified = false;
+      unsigned long frameToSend = applyOverrides(otSlaveFrame, modified);
+      otLastThermostatRequest = otSlaveFrame;
+      if (sendMasterRequestAsync(frameToSend,
+            modified ? OT_DIRECT_ORIGIN_THERMOSTAT_OVERRIDDEN : OT_DIRECT_ORIGIN_THERMOSTAT)) {
+        otSlaveFramePending = false;
+        otdRelaySentMs = millis();
+        otdRelaySeq = otdSlaveFrameSeq;
+      }
+    }
+  }
+  else if (otSlaveFramePending && IS_MASTER_MODE()) {
     // Master mode: we are the sole OT master — respond to thermostat ourselves.
     // If a thermostat reconnects while in master mode, we serve it cached data.
     handleMasterModeSlaveFrame(otSlaveFrame);
@@ -2788,24 +2912,10 @@ void loopOTDirect() {
       // as on the PIC: Alternative finds no candidate, RestoreRequest/CreateMessage restore the thermostat's frame and
       // SendAltRequest falls into SendDefaultMsg (gateway.asm 6.8 :2404-2414, :3475-3500). The slot with a candidate is
       // taken above (otdAltSlotTaken), and the reply path gives the clock (UI=20) and PIC answers (replyToThermostat).
-      // SR table: respond with stored value directly, don't forward to boiler
+      // TASK-1804 A6: an SR= Data-ID is forwarded like any other; the SR bytes go into the boiler's answer in
+      // replyToThermostat() (otdSrReply), as the PIC. Before, it was answered here at once and never reached the boiler.
       else {
-        bool srHandled = false;
-        for (uint8_t i = 0; i < OT_RESPONSE_OVERRIDE_MAX; i++) {
-          if (otResponseOverrides[i].active && otResponseOverrides[i].msgId == slaveMsgId) {
-            // The request's own type with the response bit (READ -> READ_ACK, WRITE -> WRITE_ACK), as the PIC's
-            // messageack (gateway.asm 6.8 :2676-2679, :3659-3662; spec v4.2 4.3.1); TASK-1804 E5
-            const unsigned long ackType = ((otSlaveFrame >> 28) & 0x07) | 0x04;
-            unsigned long srResp = (ackType << 28) | ((unsigned long)slaveMsgId << 16) | otResponseOverrides[i].value;
-            setOTParityBit(srResp);
-            bridgeFrameToParser('T', otSlaveFrame);
-            bridgeFrameToParser('A', srResp);
-            otdSendReply(srResp);
-            otSlaveFramePending = false;
-            srHandled = true;
-            break;
-          }
-        }
+        const bool srHandled = false;
         // Normal path: apply value overrides and forward to boiler. The
         // thermostat is answered when the boiler replies (replyToThermostat).
         if (!srHandled) {
@@ -2824,6 +2934,7 @@ void loopOTDirect() {
 
   // Schedule periodic master requests (non-blocking, skips if bus busy)
   // In monitor mode the gateway must not inject its own frames — transparent pass-through only.
+  otdSimExitFlush();   // TASK-1992
   DECLARE_TIMER_MS(timerOTSchedule, 100, SKIP_MISSED_TICKS);
   if (DUE(timerOTSchedule) && !IS_MONITOR_MODE()) {
     scheduleMasterRequest();
@@ -2883,6 +2994,21 @@ void loopOTDirect() {
                (int)state.otd.bThermostatConnected);
   }
 }
+
+// --- otdSimExitFlush begin
+// TASK-1992: while a simulation blocks TX (satSimulationBlocksBusTx(): SAT simulation or the OTGW simulation) the
+// ring keeps filling; when the block ends, nothing queued under it may reach the real boiler, so the ring is flushed
+// (the same flush as a mode switch). SAT, if still on, sends its current CS= again on its next send (ADR-235).
+static void otdSimExitFlush() {
+  static bool simWasBlocking = false;
+  const bool simBlocking = state.debug.bOTGWSimulation || settings.sat.bSimulation;
+  if (simWasBlocking && !simBlocking) {
+    otdFlushCmdQueue();
+    OTDDebugTln(F("OTD: simulation ended, command queue flushed"));
+  }
+  simWasBlocking = simBlocking;
+}
+// --- otdSimExitFlush end
 
 // ---------------------------------------------------------------------------
 // enqueueWriteCommand — build frame, enqueue, update write cache + override
@@ -2966,12 +3092,32 @@ static void otdPushEnd() {   // dhwpushdone / abort: clrf dhwpushflags, bcf manu
   otPushManual = otPushPending = otPushSpoof = otPushStarted = false;
   otPushFails = 0;
 }
+// --- otdPushOperModes begin
+// TASK-1804 ID-99: the PIC's PushOperModes (gateway.asm 6.8 :3281-3288) writes MsgID 99 only when the boiler is not known
+// to reject it. The PIC's unknown map holds both the UI= marks and the three-strike blacklist (UnknownMask :3519-3538), so
+// "known unsupported" is either here. Recorded differences (TASK-1804 notes): PushOperModes calls UnknownMask, which reads
+// byte2 (the last frame's Data-ID), not UnknownMask2 with W = 99, so the PIC's check does not test ID 99; and it sets
+// dhwpushpending, which makes ID99WriteAck (:3233-3237) spoof a DHW push after an MH=/MW=/M2= whose WRITE_ACK carries no
+// push bit. Here the check tests ID 99 and only HW=P starts a push.
+static bool otdId99Unsupported() {
+  return isUnknownId(99) || getUnknownCount(99) >= 3;
+}
+// MH=/MW=/M2=: the nibble is already stored. Returns false only when the ring refused the frame (TASK-1804 B3e: no echo).
+static bool otdPushOperModes() {
+  if (otdId99Unsupported()) return true;   // stored, nothing to send (PushOperModes returns)
+  otOperModeWrite = true;   // TASK-1906: PushOperModes, a thermostat READ 99 carries it too
+  unsigned long frame99 = OpenTherm::buildRequest(OpenThermMessageType::WRITE_DATA, static_cast<OpenThermMessageID>(99),
+                                                  otdOperModeData(otPushManual));   // TASK-1845: the push bit stays while a push runs
+  if (!otCmdEnqueue(frame99)) { OTDDebugTf(PSTR("OTD: queue full, dropped frame %08lX\r\n"), frame99); return false; }
+  return true;
+}
+// --- otdPushOperModes end
 // HW=P: StartDHWPush (gateway.asm:3270-3288). A push in progress is left alone. The HW= state is not touched. When the
 // boiler is known not to support MsgID 99 the gateway spoofs the push at once, else it writes MsgID 99 with the push bit.
 static void otdPushStart() {
   if (otPushManual) return;
   otPushManual = true;
-  if (isUnknownId(99)) { otPushSpoof = true; return; }
+  if (otdId99Unsupported()) { otPushSpoof = true; return; }
   otPushPending = true;
   otOperModeWrite = true;   // TASK-1906: PushOperModes (gateway.asm:3281-3288)
   unsigned long frame99 = OpenTherm::buildRequest(OpenThermMessageType::WRITE_DATA,
@@ -3032,7 +3178,7 @@ static void otdOnThermostatWrite99(uint16_t data) {
   otOperModeCH2 = (uint8_t)((data >> 4) & 0x0F);
   if ((data & 0x1000) && !otPushManual) {          // StartDHWPush; the thermostat's own write carries the push bit
     otPushManual = true;
-    if (isUnknownId(99)) otPushSpoof = true;
+    if (otdId99Unsupported()) otPushSpoof = true;   // TASK-1804 ID-99: UI= mark or three strikes, as the PIC unknown map
     else otPushPending = true;
   }
 }
@@ -3084,6 +3230,7 @@ static bool otdRelayRewriteRead(unsigned long frame, unsigned long &out) {
 // ---------------------------------------------------------------------------
 static void clearWriteOverride(uint8_t msgId) {
   clearOverride(msgId);
+  otCmdDropPendingWrite(msgId);   // TASK-1992: its old value must not go out after the clear
   for (uint8_t i = 0; i < OT_SCHEDULE_SIZE; i++) {
     if (otSchedule[i].isWrite && otSchedule[i].msgId == msgId) {
       otSchedule[i].valueSet = false;
@@ -3155,9 +3302,14 @@ static void clearRemoteOverride() {
   // Gateway mode: answer state only. A BS= or MQTT room_setpoint override on MsgID 16 stays.
   if (otCurrentMode != OTD_MODE_MASTER) return;
 
-  // TASK-1751: TT=0 clears only what TT= set. A BS= or MQTT room_setpoint value on MsgID 16 goes back into the slot.
+  // TASK-1751: TT=0 clears only what TT= set. A BS= or MQTT room_setpoint value on MsgID 16 goes back into the slot and
+  // is written at once (one WRITE 16, then the 15 s schedule), as TT= itself was: otherwise the boiler keeps the TT value
+  // (bench 09 .61 beta.341: no WRITE 16 for 360 s after TT=0). With no room value the writes stop; OpenTherm has no
+  // clear for MsgID 16, so the boiler keeps the last value it got.
   clearWriteOverride(16);
-  if (otdRoom16CacheSet) updateWriteCache(16, otdRoom16CacheF88);
+  if (otdRoom16CacheSet) {
+    if (!enqueueWriteCommand(16, otdRoom16CacheF88, "TT=0 room")) updateWriteCache(16, otdRoom16CacheF88);   // queue full: the schedule sends it
+  }
   if (otdRoom16OvrSet) setOverride(16, otdRoom16OvrF88);
   clearWriteOverride(100);
   // Push a clearing MsgID 100 = 0 frame so the thermostat's UI flips back to
@@ -3389,13 +3541,13 @@ static void setOTDirectMode(OTDirectMode newMode) {
 // ---------------------------------------------------------------------------
 static void checkThermostatTimeout() {
   // TASK-1850: the PIC's own lines on loss and return (gateway.asm 6.8 TDisconnect/TConnect), to port 25238 and
-  // processOT() like every PIC line. At boot the thermostat counts as connected (no line), as on the PIC.
+  // processOT() like every PIC line. At boot a present thermostat gets no line, as on the PIC.
   static uint8_t picLineState = 0;   // 0 boot, 1 connected, 2 disconnected (reported)
-  auto picLine = [](PGM_P text) {
+  auto picLine = [](PGM_P text, bool toBridge) {
     char buf[32];
     strlcpy_P(buf, text, sizeof(buf));
     const size_t n = strlen(buf);
-    otDirectBridgeWriteLine(buf, n);
+    if (toBridge) otDirectBridgeWriteLine(buf, n);
     processOT(buf, (int)n);
   };
   // TASK-1802 bug 9 (Robert 2026-11-15: A): the thermostat counts as lost after about 3 s without a frame, so the
@@ -3404,15 +3556,21 @@ static void checkThermostatTimeout() {
   // sees the open line within tens of ms (gateway.asm 6.6 CheckThermostat :1728-1816); OT-Direct has no line sense.
   static constexpr uint32_t timeoutMs = 3000;
 
-  if (!otThermostatSeen) {   // no frame ever received: nothing to time out, but the PIC reports it once
-    if (picLineState == 0 && millis() > timeoutMs) { picLineState = 2; picLine(PSTR("Thermostat disconnected")); }
+  // No frame ever received: nothing to time out, but the PIC reports it once. The PIC does so tens of ms after its own
+  // reset (RAM cleared, so NoThermostat = 0 and the first CheckThermostat on an open line runs Disconnect: gateway.asm
+  // 6.6 :1175-1185, :1741-1773), long before any port 25238 client can exist. Here loopOTDirect() starts after the
+  // network, so the same line would land ~19 s after boot inside a client's connect handshake (pyotgw takes it as the
+  // PS=1 answer, TASK-1999). So this boot line goes to processOT() only (the event, as handlePICStatusToken() makes it
+  // on a PIC), not to the bridge; every later transition goes to both.
+  if (!otThermostatSeen) {
+    if (picLineState == 0 && millis() > timeoutMs) { picLineState = 2; picLine(PSTR("Thermostat disconnected"), false); }
     return;
   }
 
   uint32_t elapsed = millis() - otLastThermostatMs;
 
   if (elapsed >= timeoutMs) {
-    if (picLineState != 2) { picLineState = 2; picLine(PSTR("Thermostat disconnected")); }
+    if (picLineState != 2) { picLineState = 2; picLine(PSTR("Thermostat disconnected"), true); }
     // Thermostat disconnected
     if (state.otd.bThermostatConnected) {
       state.otd.bThermostatConnected = false;
@@ -3427,7 +3585,7 @@ static void checkThermostatTimeout() {
     // and no TSet unless a CS= is in force (buildStatusRequest), as the PIC's standalone frames (gateway.asm 6.6
     // Disconnect :1770-1789, readstatus :2712-2742, MessageID1 :2796-2820).
   } else {
-    if (picLineState == 2) picLine(PSTR("Thermostat connected"));   // independent of the setback
+    if (picLineState == 2) picLine(PSTR("Thermostat connected"), true);   // independent of the setback
     picLineState = 1;
     // The return is reported on the transition, as the setback release did before (it ran on every return in gateway
     // mode with the default FS on).
@@ -3786,6 +3944,27 @@ static void otdPersistUnknownIds() {
 }
 // --- otdPersist end
 
+// --- otdZapInvalid begin
+// TASK-1804 A2 (Q-1804a = A, decided 2026-11-15 under Robert's directive, docs/sat/open-questions.md): a boiler that answers
+// Data-Invalid or Unknown-DataID to the gateway's control setpoint or DHW setpoint drops that value, as the PIC: for MsgID 1
+// ctrlsetptreturn sets SysCtrlSetpoint, so the thermostat's own setpoint goes to the boiler again (gateway.asm 6.6
+// :2822-2825); for MsgID 56 InvalidHotWater clears dhwsetpoint1/2 and the stored value (:3141-3147). SAT sends CS= and
+// SW= again on its next send (ADR-235). SH= (MsgID 57) stays as it is (entry 252).
+static void otdZapInvalid(uint8_t msgId) {
+  if (msgId == 1 && otdCsOverrideActive()) {
+    clearWriteOverride(1);
+    otCSLastCommandMs = 0;
+    OTDDebugTln(F("OTD: boiler refused CS, control setpoint override dropped"));
+  } else if (msgId == 56 && otdDhwSetF88 != 0) {
+    otdDhwSetF88 = 0;
+    otdInitSW = false;
+    clearWriteOverride(56);
+    otdPersistFloat(settings.otd.fDhwSetpoint, 0.0f);
+    OTDDebugTln(F("OTD: boiler refused SW, DHW setpoint dropped"));
+  }
+}
+// --- otdZapInvalid end
+
 // TASK-1836: apply the stored command state at boot, as the PIC does after a reset. SW/SH are
 // re-sent to the boiler (gateway.asm:1218-1229) through the same write path as the commands;
 // HW=A keeps the boot default; the UI= list marks its Data-IDs unknown again and disables their
@@ -3819,6 +3998,7 @@ bool handleOTDirectCommand(const char* buf, int len, bool satOwn) {
   // TASK-1804 B3b: the PIC's header checks (SerialCmdSub, gateway.asm 6.6 :3686-3695) answer a too short command or one
   // without '=' as its third character with a bare SE, before the "XX: " prefix; OT-Direct stayed silent. The PIC's
   // length 4 counts the CR, so "XX=" (3 characters here) passes, as TASK-1957 found (command-4.stc).
+  OtdCmdPrefixScope prefixScope;   // TASK-1804 B3a: the header SE stays bare, every later error gets "XX: "
   if (len < 3) { otDirectBridgeProcessStatus("SE"); return false; }
 
   OTDDebugTf(PSTR("OTD: cmd \"%s\" (len=%d)\r\n"), buf, len);
@@ -3826,6 +4006,7 @@ bool handleOTDirectCommand(const char* buf, int len, bool satOwn) {
   char cmd0 = buf[0];
   char cmd1 = buf[1];
   if (buf[2] != '=') { otDirectBridgeProcessStatus("SE"); return false; }
+  prefixScope.set(cmd0, cmd1);
   // TASK-1957: a bare "XX=" reaches the commands whose PIC parser answers it (SE, or the clear of OT=, MM=, CL=);
   // any other bare command stays unanswered, as before.
   if (len == 3 && !otdPicBareValueCmd(cmd0, cmd1)) return false;
@@ -3925,15 +4106,25 @@ bool handleOTDirectCommand(const char* buf, int len, bool satOwn) {
     uint16_t f88 = 0;
     const char* err = otdPicFloatF88(value, OTD_PIC_PERCENT, f88);
     if (err) { otDirectBridgeProcessStatus(err); return false; }
+    // TASK-1751 (master mode): there is no thermostat frame to rewrite, so BS= is the room setpoint the gateway writes
+    // itself (periodic MsgID 16, as the MQTT room_setpoint). A running TT=/TC= keeps the slot until TT=0; the BS value
+    // waits and is written then. Gateway mode keeps the PIC's frame rewrite only (gateway.asm 6.6 :3019-3024).
+    const bool master = (otCurrentMode == OTD_MODE_MASTER);
+    const bool ttActive = (otRemoteOverride.mode != OT_OVERRIDE_NONE);
     if (f88 == 0) {
       otFakeRoomSetpoint = 0.0f;
-      clearWriteOverride(16);   // also an MQTT room_setpoint write
       otdRoom16CacheSet = false;   // TASK-1751
       otdRoom16OvrSet   = false;
+      if (!(master && ttActive)) clearWriteOverride(16);   // also an MQTT room_setpoint write; a running TT keeps its slot
     } else {
       otFakeRoomSetpoint = f88 / 256.0f;
-      setOverride(16, f88);
       otdRoom16OvrSet = true;  otdRoom16OvrF88 = f88;   // TASK-1751
+      if (master) {
+        otdRoom16CacheSet = true;  otdRoom16CacheF88 = f88;
+        if (!ttActive) enqueueWriteCommand(16, f88, "BS");   // write cache + one WRITE 16 now
+      } else {
+        setOverride(16, f88);
+      }
     }
     otdPicPrintF88(f88, rspBuf, sizeof(rspBuf));
     synthesizeResponse(buf, rspBuf);
@@ -4276,13 +4467,7 @@ bool handleOTDirectCommand(const char* buf, int len, bool satOwn) {
     if (const char* err = otdPicDecimalArg(value, val)) { otDirectBridgeProcessStatus(err); return false; }
     if (val > 15) { otDirectBridgeProcessStatus("OR"); return false; }
     otOperModeCH1 = val;
-    // Send MsgID 99 WRITE_DATA
-    uint16_t data99 = otdOperModeData(otPushManual);   // TASK-1845: the push bit stays while a push runs (operatingmode1 bit 4)
-    otOperModeWrite = true;   // TASK-1906: PushOperModes, a thermostat READ 99 carries it too
-    unsigned long frame99 = OpenTherm::buildRequest(
-      OpenThermMessageType::WRITE_DATA,
-      static_cast<OpenThermMessageID>(99), data99);
-    if (!otCmdEnqueue(frame99)) { OTDDebugTf(PSTR("OTD: queue full, dropped frame %08lX\r\n"), frame99); }
+    if (!otdPushOperModes()) { otdWriteRefused = true; return false; }   // TASK-1804 B3e: no echo for a dropped frame; ID-99: no frame when 99 is unsupported
     snprintf_P(rspBuf, sizeof(rspBuf), PSTR("%d"), val);
     synthesizeResponse(buf, rspBuf);
   }
@@ -4294,12 +4479,7 @@ bool handleOTDirectCommand(const char* buf, int len, bool satOwn) {
     if (const char* err = otdPicDecimalArg(value, val)) { otDirectBridgeProcessStatus(err); return false; }
     if (val > 15) { otDirectBridgeProcessStatus("OR"); return false; }
     otOperModeDHW = val;
-    uint16_t data99 = otdOperModeData(otPushManual);   // TASK-1845: the push bit stays while a push runs (operatingmode1 bit 4)
-    otOperModeWrite = true;   // TASK-1906: PushOperModes, a thermostat READ 99 carries it too
-    unsigned long frame99 = OpenTherm::buildRequest(
-      OpenThermMessageType::WRITE_DATA,
-      static_cast<OpenThermMessageID>(99), data99);
-    if (!otCmdEnqueue(frame99)) { OTDDebugTf(PSTR("OTD: queue full, dropped frame %08lX\r\n"), frame99); }
+    if (!otdPushOperModes()) { otdWriteRefused = true; return false; }   // TASK-1804 B3e: no echo for a dropped frame; ID-99: no frame when 99 is unsupported
     snprintf_P(rspBuf, sizeof(rspBuf), PSTR("%d"), val);
     synthesizeResponse(buf, rspBuf);
   }
@@ -4311,12 +4491,7 @@ bool handleOTDirectCommand(const char* buf, int len, bool satOwn) {
     if (const char* err = otdPicDecimalArg(value, val)) { otDirectBridgeProcessStatus(err); return false; }
     if (val > 15) { otDirectBridgeProcessStatus("OR"); return false; }
     otOperModeCH2 = val;
-    uint16_t data99 = otdOperModeData(otPushManual);   // TASK-1845: the push bit stays while a push runs (operatingmode1 bit 4)
-    otOperModeWrite = true;   // TASK-1906: PushOperModes, a thermostat READ 99 carries it too
-    unsigned long frame99 = OpenTherm::buildRequest(
-      OpenThermMessageType::WRITE_DATA,
-      static_cast<OpenThermMessageID>(99), data99);
-    if (!otCmdEnqueue(frame99)) { OTDDebugTf(PSTR("OTD: queue full, dropped frame %08lX\r\n"), frame99); }
+    if (!otdPushOperModes()) { otdWriteRefused = true; return false; }   // TASK-1804 B3e: no echo for a dropped frame; ID-99: no frame when 99 is unsupported
     snprintf_P(rspBuf, sizeof(rspBuf), PSTR("%d"), val);
     synthesizeResponse(buf, rspBuf);
   }
@@ -4326,7 +4501,7 @@ bool handleOTDirectCommand(const char* buf, int len, bool satOwn) {
     unsigned long frame4 = OpenTherm::buildRequest(
       OpenThermMessageType::WRITE_DATA,
       static_cast<OpenThermMessageID>(4), (uint16_t)code << 8);
-    if (!otCmdEnqueue(frame4)) { OTDDebugTf(PSTR("OTD: queue full, dropped frame %08lX\r\n"), frame4); }
+    if (!otCmdEnqueue(frame4)) { OTDDebugTf(PSTR("OTD: queue full, dropped frame %08lX\r\n"), frame4); otdWriteRefused = true; return false; }   // TASK-1804 B3e: no echo for a dropped frame, as CS=/SW=
     snprintf_P(rspBuf, sizeof(rspBuf), PSTR("%d"), code);
     synthesizeResponse(buf, rspBuf);
   }
@@ -4629,7 +4804,7 @@ bool handleOTDirectCommand(const char* buf, int len, bool satOwn) {
       unsigned long frame = OpenTherm::buildRequest(
         OpenThermMessageType::READ_DATA,
         static_cast<OpenThermMessageID>(msgId), 0);
-      if (!otCmdEnqueue(frame)) { OTDDebugTf(PSTR("OTD: queue full, dropped frame %08lX\r\n"), frame); }
+      if (!otCmdEnqueue(frame)) { OTDDebugTf(PSTR("OTD: queue full, dropped frame %08lX\r\n"), frame); otdWriteRefused = true; return false; }   // TASK-1804 B3e: no echo for a dropped frame, as CS=/SW=
     }
     snprintf_P(rspBuf, sizeof(rspBuf), PSTR("%d"), msgId);
     synthesizeResponse(buf, rspBuf);
@@ -4825,7 +5000,7 @@ bool handleOTDirectCommand(const char* buf, int len, bool satOwn) {
     unsigned long frame = OpenTherm::buildRequest(
       OpenThermMessageType::WRITE_DATA,
       static_cast<OpenThermMessageID>(targetMsgId), 0);
-    if (!otCmdEnqueue(frame)) { OTDDebugTf(PSTR("OTD: queue full, dropped frame %08lX\r\n"), frame); }
+    if (!otCmdEnqueue(frame)) { OTDDebugTf(PSTR("OTD: queue full, dropped frame %08lX\r\n"), frame); otdWriteRefused = true; return false; }   // TASK-1804 B3e: no echo for a dropped frame, as CS=/SW=
     synthesizeResponse(buf, value);
   }
   // MI=nnn — Message interval (minimum gap between OT messages, 100-1275ms)

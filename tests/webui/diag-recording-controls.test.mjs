@@ -40,7 +40,8 @@ function fakeDevice(refuse, psram = true) {
       return { ok: true, result: 'started', reason: '', recording: rec.recording };
     }
     if (p.endsWith('/v2/diag/recording/stop')) {
-      rec = mk({ state: 'stopped', has_data: true, oldest_seq: 0, newest_seq: 2 });
+      rec = mk(psram ? { state: 'stopped', has_data: true, ring_blocks: 384, ring_bytes: 1572864, oldest_seq: 0, newest_seq: 2 }   // TASK-1960: a stopped PSRAM ring keeps its data
+                    : { state: 'stopped', has_data: true, oldest_seq: 0, newest_seq: 2 });
       return { ok: true, result: 'stopped', reason: '', recording: rec.recording };
     }
     if (p.endsWith('/v2/diag/recording/status')) return rec;

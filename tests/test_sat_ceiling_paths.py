@@ -99,10 +99,14 @@ def build(workdir, sat_text):
     quant = fn(src, "satQuantizeTenths") if "satQuantizeTenths(" in src else ""   # TASK-1738 helper used by satCapRepeatCS
     funcs = fn(src, "satPwmFlameOffHold") + fn(src, "satPwmSuppressionSetpoint") + quant + fn(src, "satCapRepeatCS")
     stubs = mt.STUBS.replace("@CONSTS@", consts).replace("@TYPES@", "")
-    stubs = stubs.replace("struct SatSettings {", "static float g_flameOff = 18, g_modSup = 1;\nstruct SatSettings {")
-    stubs = stubs.replace("struct SatState { uint8_t iShVerdict = 0; };", "struct SatState { uint8_t iShVerdict = 0; float fLastSentCS = 0; };")
+    def sub(text, old, new):   # a stub that drifted must fail here, not compile into a confusing error later
+        if old not in text:
+            raise AssertionError("test_sat_max_tset stub changed, patch target not found: %r" % old)
+        return text.replace(old, new)
+    stubs = sub(stubs, "struct SatSettings {", "static float g_flameOff = 18, g_modSup = 1;\nstruct SatSettings {")
+    stubs = sub(stubs, "struct SatState { uint8_t iShVerdict = 0;", "struct SatState { uint8_t iShVerdict = 0; float fLastSentCS = 0;")
     # settings.sat.fFlameOffOffset / fModSupOffset are plain fields of the real settings: mirror the sweep values into them
-    stubs = stubs.replace("float fMaxTSetUser = 0.0f;", "float fMaxTSetUser = 0.0f; float fFlameOffOffset = 18; float fModSupOffset = 1;")
+    stubs = sub(stubs, "float fMaxTSetUser = 0.0f;", "float fMaxTSetUser = 0.0f; float fFlameOffOffset = 18; float fModSupOffset = 1;")
     funcs = funcs.replace("settings.sat.fFlameOffOffset", "g_flameOff").replace("settings.sat.fModSupOffset", "g_modSup")
     cpp = workdir / "ceiling.cpp"
     cpp.write_text(stubs + EXTRA_STUBS + block + funcs + MAIN, encoding="utf-8")

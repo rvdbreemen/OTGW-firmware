@@ -9,6 +9,9 @@ The PIC 6.8 prints "Thermostat disconnected" when the thermostat is lost and "Th
 at boot; at boot a present thermostat gets no line (its own tests: standalone-1.stc, standalone-2.stc,
 standalone-7.stc). The firmware turns those lines into events (OTGW-Core.ino handlePICStatusToken) and the PIC
 sends them to port 25238. OT-Direct must do the same through otDirectBridgeWriteLine() + processOT().
+TASK-1999: the boot-time line of a thermostat that was never seen goes to processOT() only, not to port 25238: the PIC
+prints it tens of ms after its own reset, before any 25238 client can exist, while OT-Direct reached it ~19 s after boot,
+inside pyotgw's connect handshake (IndexError in process_statusfields_v4). Every later transition goes to both.
 
 checkThermostatTimeout() is sliced from the revision's src/OTGW-firmware/OTDirect.ino (from its comment block to
 the closing brace) and compiled with stubs for what it calls; the stubs record every bridge line and processOT()
@@ -113,6 +116,10 @@ int main(int argc, char **argv) {
     for (int i = 0; i < 20; i++) tick(true);
   } else if (c == "never") {          // no thermostat at all since boot
     for (int i = 0; i < 120; i++) tick(false);
+  } else if (c == "late") {           // TASK-1999: no thermostat at boot, plugged in later, then lost
+    for (int i = 0; i < 30; i++) tick(false);
+    for (int i = 0; i < 20; i++) tick(true);
+    for (int i = 0; i < 10; i++) tick(false);
   }
   report(c.c_str());
   return 0;
@@ -138,7 +145,7 @@ class OtdThermostatLines(unittest.TestCase):
         if exe is None:
             raise unittest.SkipTest("no host C++ compiler")
         cls.rows = {}
-        for case in ("present", "loss", "return", "return_setback", "never"):
+        for case in ("present", "loss", "return", "return_setback", "never", "late"):
             out = subprocess.run([str(exe), case], capture_output=True, text=True, check=True).stdout.strip()
             name, lines, processed = out.split("|")
             cls.rows[name] = ([x for x in lines.split(";") if x], [x for x in processed.split(";") if x])
@@ -165,8 +172,17 @@ class OtdThermostatLines(unittest.TestCase):
     def test_return_prints_connected_with_setback(self):
         self.assertBoth("return_setback", [DIS, CON])
 
-    def test_no_thermostat_since_boot_prints_disconnected_once(self):
-        self.assertBoth("never", [DIS])
+    def test_no_thermostat_since_boot_reports_disconnected_once_but_not_to_the_bridge(self):
+        # TASK-1999: the event reaches processOT() once, port 25238 gets no unsolicited line at boot
+        lines, processed = self.rows["never"]
+        self.assertEqual(lines, [], "never: no boot-time line on port 25238 (it broke the pyotgw connect, TASK-1999)")
+        self.assertEqual(processed, [DIS], "never: the event still reaches processOT() once, as on the PIC")
+
+    def test_thermostat_plugged_in_later_reports_connected_and_a_later_loss_on_the_bridge(self):
+        # TASK-1999: after the silent boot line, the real transitions reach both (TASK-1850 parity)
+        lines, processed = self.rows["late"]
+        self.assertEqual(lines, [CON, DIS], "late: the real connect and the real loss on port 25238")
+        self.assertEqual(processed, [DIS, CON, DIS], "late: boot event, connect, loss in processOT()")
 
 
 if __name__ == "__main__":

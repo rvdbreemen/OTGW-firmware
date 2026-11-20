@@ -137,6 +137,7 @@ The OTDirect module operates as a cooperative OpenTherm stack layered on the pro
 - **Purpose**: In master mode (standalone), respond to thermostat as if we ARE the boiler
 - **Behavior**:
   - While the boiler is offline (`!state.otBus.bOnline`, its last MsgID 0 failed) it only logs the thermostat frame and sends no answer, so the thermostat sees the loss instead of the last cached status (TASK-1807)
+  - A thermostat WRITE_DATA of any ID except 1, 16 and 24 (and 8, 14 while SAT owns the setpoint) never reaches this handler: `loopOTDirect()` relays it to the boiler in the next free master slot (after the frame in flight and the 100 ms MWT, `OTD_MWT_MS`) through `applyOverrides()`, ahead of the ring and the schedule, and `handleMasterResponse()` returns the boiler's answer when it belongs to the current thermostat request and comes within `OTD_REPLY_DEADLINE_MS` of the relay's send (`otdMasterRelaysWrite()`, TASK-1812, ADR-241 Proposed)
   - Extracts msgId and msgType (bits 28-30)
   - If READ_DATA (type 0):
     - Returns cached boiler value via `buildOTResponse(4, msgId, cache)` (READ_ACK)
@@ -252,7 +253,7 @@ The OTDirect module operates as a cooperative OpenTherm stack layered on the pro
 - `PM=MsgID` - Priority: send immediately on next cycle (or one-shot READ if not in schedule). Data-IDs 0-255; after a table size (10, 12, 88, 90, 105, 107) or a string ID (93-95) the `otdPmChain` block reads every entry or character like the PIC (TASK-1847)
 
 **Category 8: Override Tables**
-- `SR=MsgID:HHHH` - Set response override (gateway answers thermostat with stored value)
+- `SR=MsgID:HHHH` - Set response override: the request still goes to the boiler, and `otdSrReply()` puts the stored value into its answer with the request's own ack type (also over Data-Invalid or Unknown-DataID), as the PIC's WordResponse/ByteResponse. Only the IDs whose PIC dispatch entry is WordResponse, MandatoryWord or ByteResponse, or whose own handler jumps to WordResponse for every answer (5, 8, 48, 49 and the TSP size IDs 10/12/88/90/105/107); MsgID 100 (WordResponse only on some paths) is left out (`otdPicSrIds`, recomputed from gateway.asm by `tests/test_otd_sr_reply_pic.py`); ByteResponse IDs 70 and 101 keep the request's high byte ORed in. Gateway and loopback mode; no answer when the boiler times out (TASK-1804 A6)
 - `CR=MsgID` - Clear response override
 - `UI=MsgID` - Mark as unknown (respond UNKNOWN_DATA_ID to thermostat)
 - `KI=MsgID` - Mark as known again (restore normal forwarding)
@@ -597,7 +598,12 @@ static uint8_t otUnknownCounters[32];     // 128 MsgIDs × 2 bits = 32 bytes
 - `DebugTln()`, `DebugTf()` - Telnet debug output
 
 ### External Dependencies
-- **OpenTherm.h** (project-pinned library, `/src/libraries/OpenTherm/src/OpenTherm.h`)
+- **OpenTherm.h** (project-pinned library, `/src/libraries/OpenTherm/src/OpenTherm.h`): the submodule points at
+  `rvdbreemen/opentherm_library`, branch `fix-timer-wrap`, commit `51aa68e` (Phunkafizer master `720cee9` plus the
+  timer fixes of upstream PR Phunkafizer/opentherm_library#1: `isReady()` stays usable without a valid answer past
+  2^31 us, `setDelay()` across the `micros()` wrap, `end()` resets the transmit state, a stalled transmit ends with
+  TIMEOUT after 10 ms). Maintainer exception to the no-library-changes rule (Robert, DM 1571553430923911252 and
+  1571560593712746617; TASK-1980). Back to Phunkafizer once the PR is merged there.
   - Classes: `OpenTherm` (master/slave, async/sync modes)
   - Enums: `OpenThermMessageType`, `OpenThermMessageID`, `OpenThermResponseStatus`
   - Methods: `begin()`, `sendRequestAsync()`, `sendResponse()`, `process()`, `getLastResponse()`, `getLastResponseStatus()`, `isReady()`, `handleInterrupt()`, `buildRequest()`, `buildResponse()`, `getMessageType()`, `getDataID()`, `isValidResponse()`, `parity()`

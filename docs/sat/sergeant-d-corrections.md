@@ -6,6 +6,8 @@ links the Discord message, compares his statement with the pinned thermo-nova co
 (`releases/thermo-nova` @ `7beaaf531ee99dc74a19ac74f3c06ce7f2922cfb`, paths relative to
 `custom_components/sat`) and with the firmware, and names what is still open.
 
+> **Urgent round from 2026-11-18 (Robert, DM 1572680011062968331):** the open SAT questions are put to Sergeant D at once and in order of 2.0.0 impact, without the presence pacing, with follow-ups until each answer is unambiguous; every answer is recorded here before it is implemented, as always. See docs/sat/open-questions.md.
+
 ## 1. PWM duty cycle: the boiler temperature (BT) in the formula (2026-10-22)
 
 **Source:** #alpha-testing, 2026-10-22 13:58 UTC,
@@ -7374,3 +7376,1146 @@ Robert, 16:18:42 UTC (https://discord.com/channels/812969634638725140/9144987300
 **Open:** the meaning of "displayed as `OTGW_Thermostat`" (entry 351). Implementation needs a Proposed ADR (MQTT contract and discovery payload change) before code.
 
 **Task:** TASK-1979.
+
+## 354. Q-PWM1 answered A: PWM cycle length (Sergeant D, 2026-11-15; batch item 1 of 18)
+
+**Source:** #dev-sat-mqtt 2026-11-15, the 18-question batch (item 1: https://discord.com/channels/812969634638725140/1105556725714649128/1571633449331069052), his answer 21:28:08 UTC: https://discord.com/channels/812969634638725140/1105556725714649128/1571637957230862506
+
+**Quoted:**
+
+> "1: A"
+
+**Settled:** A mid-range PWM cycle follows the duty: on/off are recomputed every update, as thermo-nova (pwm.py:135, 1200 s at pwm.py:274-283). It matches the choice taken under Robert's directive (option A).
+
+**Task:** none.
+
+
+## 355. Q-PWM2 answered B: PWM evaluation rate (Sergeant D, 2026-11-15; batch item 2 of 18)
+
+**Source:** #dev-sat-mqtt 2026-11-15, the 18-question batch (item 2: https://discord.com/channels/812969634638725140/1105556725714649128/1571633449331069052), his answer 21:28:08 UTC: https://discord.com/channels/812969634638725140/1105556725714649128/1571637957230862506
+
+**Quoted:**
+
+> "2: B"
+
+**Settled:** The firmware keeps evaluating PWM on the 30 s control tick (SATtypes.h:506, satPwmSchedule() at SATcontrol.ino:8006); the firmware does not move to the 5 s loop that thermo-nova uses (climate.py:707-708). It differs from the choice taken under Robert's directive (option A (weighed by comms)), so that choice is replaced.
+
+**Task:** none: the planned 5 s task is not filed.
+
+
+## 356. Q-P2 answered open: he asks for the graph: Saturation timer while the flame is off (Sergeant D, 2026-11-15; batch item 3 of 18)
+
+**Source:** #dev-sat-mqtt 2026-11-15, the 18-question batch (item 3: https://discord.com/channels/812969634638725140/1105556725714649128/1571633449331069052), his answer 21:28:08 UTC: https://discord.com/channels/812969634638725140/1105556725714649128/1571637957230862506
+
+**Quoted:**
+
+> "3: I need to see the graph"
+
+**Settled:** nothing. Nothing yet: he asks to see the graph before he chooses.
+
+**Task:** Q-P2 stays open; the graph comes from the gruijter analysis (ba).
+
+
+## 357. Q-P1 answered A: PID after a reboot (Sergeant D, 2026-11-15; batch item 4 of 18)
+
+**Source:** #dev-sat-mqtt 2026-11-15, the 18-question batch (item 4: https://discord.com/channels/812969634638725140/1105556725714649128/1571633449331069052), his answer 21:28:08 UTC: https://discord.com/channels/812969634638725140/1105556725714649128/1571637957230862506
+
+**Quoted:**
+
+> "4: A"
+
+**Settled:** After a reboot SAT sends curve + P + I + D from the restored state, as thermo-nova (pid.py:150-155; climate.py:375). Supersedes the curve-only reading of entry 115. It matches the choice taken under Robert's directive (option A).
+
+**Task:** check the firmware against it.
+
+
+## 358. Q-1882a answered A: Self-tune and heating failures (Sergeant D, 2026-11-15; batch item 5 of 18)
+
+**Source:** #dev-sat-mqtt 2026-11-15, the 18-question batch (item 5: https://discord.com/channels/812969634638725140/1105556725714649128/1571633456381694074), his answer 21:28:08 UTC: https://discord.com/channels/812969634638725140/1105556725714649128/1571637957230862506
+
+**Quoted:**
+
+> "5: A"
+
+**Settled:** Hours with a heating-failure or no-ignition event are left out of the heating curve self-tune (firmware rule; thermo-nova has no tuner, entry_data.py:213). It matches the choice taken under Robert's directive (option A (weighed by comms)).
+
+**Task:** TASK-1882.
+
+
+## 359. Q-327a answered A: Overshoot fail-safe (Sergeant D, 2026-11-15; batch item 6 of 18)
+
+**Source:** #dev-sat-mqtt 2026-11-15, the 18-question batch (item 6: https://discord.com/channels/812969634638725140/1105556725714649128/1571633456381694074), his answer 21:28:08 UTC: https://discord.com/channels/812969634638725140/1105556725714649128/1571637957230862506
+
+**Quoted:**
+
+> "6: A"
+
+**Settled:** The 3.5 C / 30 s fail-safe stays next to the 1.5 C / 30 s rule of entry 327. It matches the choice taken under Robert's directive (option A).
+
+**Task:** TASK-1888.
+
+
+## 360. Q-327b answered A: Where the 1.5 C lives (Sergeant D, 2026-11-15; batch item 7 of 18)
+
+**Source:** #dev-sat-mqtt 2026-11-15, the 18-question batch (item 7: https://discord.com/channels/812969634638725140/1105556725714649128/1571633456381694074), his answer 21:28:08 UTC: https://discord.com/channels/812969634638725140/1105556725714649128/1571637957230862506
+
+**Quoted:**
+
+> "7: A"
+
+**Settled:** A separate value for the switch (1.5 C / 30 s); the overshoot margin keeps 2.0 for the classifier (entry 37 unchanged, no migration). It matches the choice taken under Robert's directive (option A).
+
+**Task:** TASK-1888.
+
+
+## 361. Q-328a answered A: Tolerance band (Sergeant D, 2026-11-15; batch item 8 of 18)
+
+**Source:** #dev-sat-mqtt 2026-11-15, the 18-question batch (item 8: https://discord.com/channels/812969634638725140/1105556725714649128/1571633456381694074), his answer 21:28:08 UTC: https://discord.com/channels/812969634638725140/1105556725714649128/1571637957230862506
+
+**Quoted:**
+
+> "8: A"
+
+**Settled:** The tolerance band of entry 328 only decides CH on/off; the PID keeps running; the cold cutoff (ADR-199) is unchanged. It matches the choice taken under Robert's directive (option A).
+
+**Task:** TASK-1887.
+
+
+## 362. Q-1867a answered B: Pressure drop alarm after a pump stop (Sergeant D, 2026-11-15; batch item 9 of 18)
+
+**Source:** #dev-sat-mqtt 2026-11-15, the 18-question batch (item 9: https://discord.com/channels/812969634638725140/1105556725714649128/1571633456381694074), his answer 21:28:08 UTC: https://discord.com/channels/812969634638725140/1105556725714649128/1571637957230862506
+
+**Quoted:**
+
+> "9: B"
+
+**Settled:** The pressure samples recorded during the 600 s settle window are thrown away (thermo-nova binary_sensor.py:25 PRESSURE_DROP_RATE_SETTLE_SECONDS 600). It matches the choice taken under Robert's directive (option B).
+
+**Task:** TASK-1867.
+
+
+## 363. Q-215a answered A: PWM permission after a restart (Sergeant D, 2026-11-15; batch item 10 of 18)
+
+**Source:** #dev-sat-mqtt 2026-11-15, the 18-question batch (item 10: https://discord.com/channels/812969634638725140/1105556725714649128/1571633463910727722), his answer 21:28:08 UTC: https://discord.com/channels/812969634638725140/1105556725714649128/1571637957230862506
+
+**Quoted:**
+
+> "10: A"
+
+**Settled:** Entry 215 stays as it is: after a restart SAT runs continuous until the boiler answers MsgID 3 again. It matches the choice taken under Robert's directive (option A).
+
+**Task:** none (TASK-1899 note).
+
+
+## 364. Q-SUP1 answered A: Average flow for the suppression (Sergeant D, 2026-11-15; batch item 11 of 18)
+
+**Source:** #dev-sat-mqtt 2026-11-15, the 18-question batch (item 11: https://discord.com/channels/812969634638725140/1105556725714649128/1571633463910727722), his answer 21:28:08 UTC: https://discord.com/channels/812969634638725140/1105556725714649128/1571637957230862506
+
+**Quoted:**
+
+> "11: A, 2 minutes window"
+
+**Settled:** During PWM ON the suppression setpoint uses an average flow temperature over a 2 minute window, not the latest value (our reading of "2 minutes window": a moving average of the flow readings of the last 2 minutes; to be confirmed when the task is planned). This is a deviation from thermo-nova, which uses the latest flow (heating_control.py:435-441, coordinator/__init__.py:139, coordinator/mqtt/opentherm.py:107-110). It differs from the choice taken under Robert's directive (option B), so that choice is replaced.
+
+**Task:** new follow-up task (his answer differs from the directive choice B).
+
+
+## 365. Q-LRN1 answered A: PWM ticks lowering the curve (Sergeant D, 2026-11-15; batch item 12 of 18)
+
+**Source:** #dev-sat-mqtt 2026-11-15, the 18-question batch (item 12: https://discord.com/channels/812969634638725140/1105556725714649128/1571633463910727722), his answer 21:28:08 UTC: https://discord.com/channels/812969634638725140/1105556725714649128/1571637957230862506
+
+**Quoted:**
+
+> "12: A"
+
+**Settled:** On a gas boiler PWM ticks may raise and lower the self-tune, as now (entries 304, 316, 318). It matches the choice taken under Robert's directive (option A).
+
+**Task:** none.
+
+
+## 366. Q-LRN2 answered B: Freeze learning under a supervisor (Sergeant D, 2026-11-15; batch item 13 of 18)
+
+**Source:** #dev-sat-mqtt 2026-11-15, the 18-question batch (item 13: https://discord.com/channels/812969634638725140/1105556725714649128/1571633463910727722), his answer 21:28:08 UTC: https://discord.com/channels/812969634638725140/1105556725714649128/1571637957230862506
+
+**Quoted:**
+
+> "13: B"
+
+**Settled:** If a supervisor is ever added, learning keeps running (entry 305). It matches the choice taken under Robert's directive (option B).
+
+**Task:** none.
+
+
+## 367. Q-TUNE1 answered A: Faster self-tune (Sergeant D, 2026-11-15; batch item 14 of 18)
+
+**Source:** #dev-sat-mqtt 2026-11-15, the 18-question batch (item 14: https://discord.com/channels/812969634638725140/1105556725714649128/1571633463910727722), his answer 21:28:08 UTC: https://discord.com/channels/812969634638725140/1105556725714649128/1571637957230862506
+
+**Quoted:**
+
+> "14: A"
+
+**Settled:** Keep the exclusions; only a faster window and step. It matches the choice taken under Robert's directive (option A).
+
+**Task:** none.
+
+
+## 368. Q-334b answered A: Start-up flood rate (Sergeant D, 2026-11-15; batch item 15 of 18)
+
+**Source:** #dev-sat-mqtt 2026-11-15, the 18-question batch (item 15: https://discord.com/channels/812969634638725140/1105556725714649128/1571633470696980583), his answer 21:28:08 UTC: https://discord.com/channels/812969634638725140/1105556725714649128/1571637957230862506
+
+**Quoted:**
+
+> "15: A"
+
+**Settled:** The 2 s start-up flood stays (not on change + 30 s inside the flood). It matches the choice taken under Robert's directive (option A).
+
+**Task:** none (TASK-1924 note).
+
+
+## 369. Q-343a answered B: Self-tune hour with one extra tick (Sergeant D, 2026-11-15; batch item 16 of 18)
+
+**Source:** #dev-sat-mqtt 2026-11-15, the 18-question batch (item 16: https://discord.com/channels/812969634638725140/1105556725714649128/1571633470696980583), his answer 21:28:08 UTC: https://discord.com/channels/812969634638725140/1105556725714649128/1571637957230862506
+
+**Quoted:**
+
+> "16: B"
+
+**Settled:** An hour counts with 108 clean ticks whatever it logged (90 % of the expected 120), not 90 % of what it logged. It differs from the choice taken under Robert's directive (option A), so that choice is replaced.
+
+**Task:** TASK-1932 changes (his answer differs from the directive choice A).
+
+
+## 370. Q-1804a answered A: Boiler refuses SAT's setpoint (boards without a PIC) (Sergeant D, 2026-11-15; batch item 17 of 18)
+
+**Source:** #dev-sat-mqtt 2026-11-15, the 18-question batch (item 17: https://discord.com/channels/812969634638725140/1105556725714649128/1571633470696980583), his answer 21:28:08 UTC: https://discord.com/channels/812969634638725140/1105556725714649128/1571637957230862506
+
+**Quoted:**
+
+> "17: A"
+
+**Settled:** Like the PIC: a Data-Invalid/Unknown-DataID answer to SAT's CS (MsgID 1) or DHW setpoint (MsgID 56) clears them; SAT sets them again on its next send (PIC gateway.asm 6.6 :2822-2825, :3141-3147). SH= stays per entry 252. It matches the choice taken under Robert's directive (option A).
+
+**Task:** TASK-1804 item A2.
+
+
+## 371. Q-1979a answered with an explanation: "OTGW_Thermostat" (Sergeant D, 2026-11-15; batch item 18 of 18)
+
+**Source:** #dev-sat-mqtt 2026-11-15, the 18-question batch (item 18: https://discord.com/channels/812969634638725140/1105556725714649128/1571633470696980583), his answer 21:28:08 UTC: https://discord.com/channels/812969634638725140/1105556725714649128/1571637957230862506
+
+**Quoted:**
+
+> "18: In gateway mode ( without physical thermostat) the OTGW mqtt climate doesn’t have a room temperature and setpoint. Therefore if sat is enabled can use this climate entity. No need for a second mqtt entity"
+
+**Settled:** His explanation of entry 351: in gateway mode without a physical thermostat the OTGW MQTT climate entity has no room temperature and setpoint, so while SAT is enabled SAT can use this climate entity; no second MQTT entity. Read as option B: keep the existing entity (and its name "Thermostat"), as ADR-248 decides.
+
+**Task:** ADR-248 (accept question to Robert).
+
+## 372. Q-1867b answered A by Robert: after a settle the pressure drop rate waits for 600 s of fresh readings (maintainer decision, 2026-11-16; follows entry 362)
+
+**Source:** #dev-sat-mqtt, Robert's reply 2026-11-15 23:11:14 UTC (https://discord.com/channels/812969634638725140/1105556725714649128/1571663900985000038) to the follow-up question Q-1867b (https://discord.com/channels/812969634638725140/1105556725714649128/1571662081084629088), posted under Sergeant D's batch answers.
+
+**Quoted:**
+
+> "A"
+
+**Settled:** option A of Q-1867b. With entry 362 (B: the readings of the 600 s settle window are not recorded) the first drop-rate fit after a CH-mode change would span only the 300 s minimum, and in gruijter's capture a 0.027 bar step then reads as 0.32-0.38 bar/h (a new false alarm, 12 Nov 10:28). After a settle the firmware computes the drop rate only once the fresh readings span 600 s, which matches thermo-nova's effective first window: thermo-nova keeps recording during its settle (custom_components/sat/binary_sensor.py:340-342 at 7beaaf5; PRESSURE_DROP_RATE_SETTLE_SECONDS 600 at :25, PRESSURE_DROP_RATE_MIN_WINDOW_SECONDS 300 at :28). A real leak after a CH-mode change is seen about 5 minutes later than with B alone. Without a CH-mode change nothing changes. Sergeant D may still answer Q-1867b himself; a different answer becomes a follow-up task.
+
+**Task:** TASK-1867 (implemented as commit 5ef1c1d46, host evidence in the task).
+
+## 373. The 2 minute flow average belongs in the duty cycle denominator during light-off (Sergeant D, 2026-11-16; reply to Q-SUP1c; may change entry 364)
+
+**Source:** #dev-sat-mqtt, Sergeant D 2026-11-16 04:40:11 UTC (https://discord.com/channels/812969634638725140/1105556725714649128/1571746686001352835), a reply to Q-SUP1c (https://discord.com/channels/812969634638725140/1105556725714649128/1571686569381986396).
+
+**Quoted:**
+
+> "We use the average flow water temperature for 2 minutes in the duty cycle calculation denominator because the duty cycle may show a very low duty cycle due to sudden rise during light off and as a result will stop heating. This is a safety feature to ensure that the duty cycle denominator will stay low for the chaotic light off of the burner. Then we use the actual flow."
+
+**What it says, compared with entry 364 and the firmware:** entry 364 (Q-SUP1 A) was read as "the PWM ON suppression setpoint (CS = flow - offset) uses the average flow of the last 2 minutes", and TASK-1990 built that (beta.330, with the first-2-minutes follow-up in beta.333). This message places the 2 minute average in the duty cycle calculation instead, as the denominator during the light-off, and the actual flow after it. thermo-nova's suppression setpoint uses the latest flow (heating_control.py:435-441 at 7beaaf5, opened 2026-11-16). Whether this replaces our reading of entry 364 for the suppression setpoint is not settled by this message alone (see entry 374).
+
+**Task:** TASK-1990 (owner 95). Open: asked as item 1 of the re-posted open questions, 2026-11-16 07:06 UTC (https://discord.com/channels/812969634638725140/1105556725714649128/1571783439928266763). No firmware change before his answer (coordinator rule for SAT control changes).
+
+## 374. With the 180 s flame-on rule no 2 minute average is needed right after ignition (Sergeant D, 2026-11-16; follows entry 373)
+
+**Source:** #dev-sat-mqtt, Sergeant D 2026-11-16 07:02:37 UTC (https://discord.com/channels/812969634638725140/1105556725714649128/1571782531538362409), a reply to his own entry 373 message, addressed to the bot.
+
+**Quoted:**
+
+> "Regarding this. You are right, we have the 180s flame on safety rule so we don’t need the average boiler flow water temperature for the first 2 minutes after the flame is lit"
+
+**Reading (interpretation, to be confirmed):** the 180 s minimum flame-on hold (entry 275, thermo-nova pwm.py:201-203) already protects the light-off, so the 2 minute average is not needed in the first 2 minutes after ignition. This agrees with Q-SUP1c option B (latest flow for the first 2 minutes after ignition), which the firmware does since beta.333. It does not say what happens after the first 2 minutes, nor whether the average stays in the suppression setpoint (entry 364 as built) or moves to the duty cycle denominator (entry 373). Asked as item 1 of the re-posted open questions (https://discord.com/channels/812969634638725140/1105556725714649128/1571783439928266763).
+
+**Task:** TASK-1990 (owner 95). Open: the place of the average after the first 2 minutes.
+
+## 375. Q-SUP1d answered A, then reconsidered: no 2 minute flow average in the first 2 minutes, the 180 s flame-on rule covers the light-off (Sergeant D, 2026-11-16; follows entries 373 and 374, changes entry 364)
+
+**Source:** #dev-sat-mqtt, Sergeant D 2026-11-16 07:19:33 UTC (https://discord.com/channels/812969634638725140/1105556725714649128/1571786790547886114), a reply to item 1 of the re-posted open questions (https://discord.com/channels/812969634638725140/1105556725714649128/1571783439928266763).
+
+**Quoted:**
+
+> "Question 1: A, but I reconsidered that and we don’t need to use the average flow temperature as denominator for the first 2 minutes because we have the rule of keeping heating for 180 seconds when the flame is on"
+
+**Settled:** option A of Q-SUP1d: the 2 minute average was meant for the duty cycle denominator only, not for the PWM ON suppression setpoint, which uses the latest flow as thermo-nova (heating_control.py:435-441 at 7beaaf5). Then he drops the average from the denominator too for the first 2 minutes, because the 180 s flame-on hold (entry 275, pwm.py:201-203) already covers the light-off.
+
+**Reading (interpretation, asked to confirm as Q-375a):** no 2 minute average anywhere; the suppression setpoint and the duty cycle use the latest flow, as thermo-nova. This changes entry 364 as we read it: the firmware's 2 minute average in the suppression setpoint (TASK-1990, beta.330 and beta.333, public in beta.339) is not his design.
+
+**Task:** TASK-1990 (owner 95): revert the suppression setpoint to the latest flow once Q-375a is confirmed. Open: Q-375a.
+
+## 376. Q-361c answered B: a continuous burn also runs at least 180 s before the tolerance band stops it (Sergeant D, 2026-11-16)
+
+**Source:** #dev-sat-mqtt, 2026-11-16 07:20:34 UTC (https://discord.com/channels/812969634638725140/1105556725714649128/1571787046379585651), answer to item 2 (Q-361c, blocking at Robert's request).
+
+**Quoted:**
+
+> "Q-361c: B"
+
+**Settled:** option B: in continuous mode a tolerance-band stop (room at target + 0.1) waits until the burn has lasted at least 180 s, the same minimum as a PWM ON phase (entry 275). New firmware rule; thermo-nova's heater-off acts at once (heating_control.py:229-234) and its 180 s hold is PWM-only (pwm.py:201-203).
+
+**Task:** TASK-1887 (owner ba), ADR-250.
+
+## 377. Q-361a: "we keep the PWM active" when the band stops heating (Sergeant D, 2026-11-16; letter missing)
+
+**Source:** #dev-sat-mqtt, 2026-11-16 07:22:48 UTC (https://discord.com/channels/812969634638725140/1105556725714649128/1571787607887716377), answer to item 3 (Q-361a).
+
+**Quoted:**
+
+> "Q-361a:  because we keep the PWM active. Otherwise PWM will restart and start flame again in a shorter interval than 20 minutes when the room temperature swings at +0.1"
+
+**Reading (interpretation, the answer has no letter; asked to confirm as Q-377a):** option B: when the band stops heating, SAT sends CH=0 and PWM stays active (it is not disabled), so the burner does not restart within the 20 minute PWM cycle when the room swings around target + 0.1. Our recommendation was A (CS=10, CH=0, PWM ends); he reasons against ending PWM.
+
+**Task:** TASK-1887 (owner ba). Open: Q-377a.
+
+## 378. Q-361b: with zones, eco means only the main room decides the band, comfort means any usable room keeps heating on (Sergeant D, 2026-11-16)
+
+**Source:** #dev-sat-mqtt, 2026-11-16 07:25:09 UTC (https://discord.com/channels/812969634638725140/1105556725714649128/1571788202480767038), answer to item 4 (Q-361b).
+
+**Quoted:**
+
+> "Q-361b: That’s why we have the eco and comfort options. When the user chooses eco then B. When the user chooses comfort then A"
+
+**Settled:** the zone rule of the tolerance band follows the user's eco/comfort choice: eco = B (only the main room decides; a warm main room stops heating even while a zone is cold), comfort = A (heating stays on while any usable room is more than 0.1 below its own target). thermo-nova has no band (zones raise the requested setpoint, climate.py:381-389). Open: which existing setting carries "eco" and "comfort" here (the preset, or another option); ba to check against the recorded entries before building.
+
+**Task:** TASK-1887 (owner ba).
+
+## 379. Q-327c answered A: a separate "switch margin" setting, default 1.5 C, range 0.5 to 5.0, 30 s sustain fixed (Sergeant D, 2026-11-16; confirms entries 359 and 360 as read)
+
+**Source:** #dev-sat-mqtt, 2026-11-16 07:26:00 UTC (https://discord.com/channels/812969634638725140/1105556725714649128/1571788413139681325), answer to item 5.
+
+**Quoted:**
+
+> "Q-327c: A"
+
+**Settled:** our reading of entry 360 holds: the PWM-to-continuous switch has its own user setting, default 1.5 C, range 0.5-5.0, the 30 s sustain fixed; the 3.5 C / 30 s fail-safe of entry 359 stays and only acts when a user sets the margin above 3.5.
+
+**Task:** TASK-1888 (owner ba).
+
+## 380. Q-SUP1b: not needed, answered by entry 375 (Sergeant D, 2026-11-16)
+
+**Source:** #dev-sat-mqtt, 2026-11-16 07:27:45 UTC (https://discord.com/channels/812969634638725140/1105556725714649128/1571788856745795648), answer to item 6 (written "W-SauP1b").
+
+**Quoted:**
+
+> "W-SauP1b: We don’t need it was answered in Question 1. We have the 180 seconds flame on special rule"
+
+**Settled:** Q-SUP1b (which readings enter the 2 minute average) falls away: with entry 375 there is no 2 minute average.
+
+**Task:** TASK-1990 (owner 95).
+
+## 381. Q-P2 answered A: keep thermo-nova's saturation timing (Sergeant D, 2026-11-16; after seeing the chart)
+
+**Source:** #dev-sat-mqtt, 2026-11-16 07:30:03 UTC (https://discord.com/channels/812969634638725140/1105556725714649128/1571789435236913328), answer to item 7 (the chart: https://discord.com/channels/812969634638725140/1105556725714649128/1571643303240269886).
+
+**Quoted:**
+
+> "Q-P2: A"
+
+**Settled:** the 300 s sustained-saturation timer keeps thermo-nova's timing (heating_control.py:357-371, SATURATION_SUSTAIN_SECONDS 300 at const.py:23), also while the flame is off. This confirms the directive choice A of 2026-11-15 (no firmware change).
+
+**Task:** none (the firmware already does A).
+
+## 382. Sergeant D asks whether every start runs the PWM start-up sequence before the mode is chosen (Sergeant D, 2026-11-16; question, follows entry 381)
+
+**Source:** #dev-sat-mqtt, 2026-11-16 07:33:12 UTC (https://discord.com/channels/812969634638725140/1105556725714649128/1571790225276014673), a reply to his Q-P2 answer.
+
+**Quoted:**
+
+> "regarding Q-P2. Don’t we always start with the PWM mode start up sequence and then decide if we keep PWM or continuous mode? I think we discussed that earlier"
+
+**What is recorded:** entry 348 (Q-347a B, 2026-11-14): a heating start in continuous mode runs the same start sequence as PWM, as a fail-safe guard. No entry records that SAT always starts in PWM and only chooses PWM or continuous after the start sequence. Asked back as Q-382a (A: every start in PWM first, the mode is chosen after the start sequence; B: entry 348 as it is; C: other), 07:36 UTC (https://discord.com/channels/812969634638725140/1105556725714649128/1571790943525539842).
+
+**Task:** depends on Q-382a.
+
+## 383. Q-375a answered A: no 2 minute flow average anywhere; the suppression setpoint and the duty cycle use the latest flow, as thermo-nova (Sergeant D, 2026-11-16; confirms entry 375, replaces entry 364 as we read it)
+
+**Source:** #dev-sat-mqtt, Sergeant D 2026-11-16 08:03:06 UTC (https://discord.com/channels/812969634638725140/1105556725714649128/1571797752223113219), item 1 of the three-item check (https://discord.com/channels/812969634638725140/1105556725714649128/1571790943525539842).
+
+**Quoted:**
+
+> "1: A"
+
+**Settled:** option A of item 1 as posted: "Yes, that is it": no 2 minute average anywhere. The PWM ON suppression setpoint and the duty cycle use the latest flow, as thermo-nova (heating_control.py:435-441 at 7beaaf5); the 180 s flame-on rule (entry 275, pwm.py:201-203) covers the light-off. This replaces our reading of entry 364 and the open points of entries 373 and 374.
+
+**Task:** TASK-1990 (owner 95): revert the 2 minute average of beta.330 and beta.333 (public in beta.339) to the latest flow, with an old-vs-fix test.
+
+## 384. Q-377a answered A, meaning "yes, B": a band stop sends CH=0 and PWM stays active (Sergeant D, 2026-11-16; confirms entry 377)
+
+**Source:** #dev-sat-mqtt, 2026-11-16 08:03:06 UTC (same message as entry 383), item 2.
+
+**Quoted:**
+
+> "2: A"
+
+**Settled:** item 2 option A as posted was "Yes, B". So for Q-361a: when the tolerance band stops heating (room at target + 0.1), SAT sends CH=0 and PWM stays active (not disabled), so the burner does not restart within the 20 minute PWM cycle when the room swings around target + 0.1. Not the CS=10 / PWM-ends path we recommended. New firmware rule; thermo-nova has no band.
+
+**Task:** TASK-1887 (owner ba), ADR-250.
+
+## 385. Q-382a answered A: every heating start runs in PWM first, and the choice PWM or continuous comes after the start sequence (Sergeant D, 2026-11-16; answers his own question of entry 382, extends entry 348)
+
+**Source:** #dev-sat-mqtt, 2026-11-16 08:03:06 UTC (same message as entry 383), item 3.
+
+**Quoted:**
+
+> "3: A"
+
+**Settled:** item 3 option A as posted: every heating start runs in PWM first, and SAT chooses PWM or continuous only after the start sequence. Entry 348 (a continuous start uses the PWM start sequence as a fail-safe) is extended: the start is not only the same sequence, it is a PWM start.
+
+**Compared with thermo-nova:** not checked in this session; before building, the owner quotes how thermo-nova picks the control mode at a heating start (heating_control.py at 7beaaf5) and how the firmware does it today, with both citations, as the sat-ground-truth rules require.
+
+**Task:** to be filed by the coordinator (start-sequence owner, a follow-up of TASK-1924 / entry 348).
+
+**Open:** what "after the start sequence" means in time (the end of the 60 s start-up following of entries 344/347, or the end of the first PWM ON phase); to ask if the code comparison does not settle it.
+
+## 386. SAT is ready for its initial release once today's open questions are resolved; user validation follows; new items go to the next release (Sergeant D and Robert, 2026-11-16)
+
+**Source:** #dev-sat-mqtt 2026-11-16. Robert 08:35:32 UTC (https://discord.com/channels/812969634638725140/1105556725714649128/1571805911926710303), 08:36:13 (https://discord.com/channels/812969634638725140/1105556725714649128/1571806086019817545), 08:36:29 (https://discord.com/channels/812969634638725140/1105556725714649128/1571806153007173684); Sergeant D 08:41:16 (https://discord.com/channels/812969634638725140/1105556725714649128/1571807356268843131), 08:43:02 (https://discord.com/channels/812969634638725140/1105556725714649128/1571807799401385986), 08:43:29 (https://discord.com/channels/812969634638725140/1105556725714649128/1571807914547740775); Robert 08:47:36 (https://discord.com/channels/812969634638725140/1105556725714649128/1571808950330986547). After Sergeant D's progress question (08:21:02) and the coordinator's answer (1571803690178711676).
+
+**Quoted:**
+
+> Robert: "Maybe you should define when SAT is ready for release." / "Define it by talking about it in terms the SAT needs to meet. If we wait until 100% field validation it will never happen." / "After initial release we will move to regular updates."
+>
+> Sergeant D: "I strongly believe that after the today’s answers to the open questions we need validation from the users and SAT is ready for a release" / "Moreover the restart issue looks resolved. So I think we can go for the initial release." / "do you agree?"
+>
+> Robert: "I agree with <@821036882946424852> on this. I think we are ready once we resolve today’s open questions from sergant. Mark anything new to the next release."
+
+**Settled:** the SAT release criterion: SAT is ready for its initial release once the decisions of today's open questions (entries 375-385) are implemented; after that, validation comes from users in the field, not from 100 % field validation before release; anything new goes to the next release. Sergeant D considers the restart issue resolved. This is agreement on scope and criterion, not the per-action go for a stable release (that stays a hard stop for Robert, CLAUDE.md).
+
+**Tasks:** TASK-1740 (stable readiness gate: the SAT criterion), TASK-1990 (entry 383), TASK-1887 (entries 376, 378, 384), TASK-1888 (entry 379), TASK-1942 (entry 385). New SAT items from now on: next release.
+
+## 387. Why every start runs in PWM first (Sergeant D, 2026-11-16; reasons for entry 385)
+
+**Source:** #dev-sat-mqtt, Sergeant D 2026-11-16 08:49:19 UTC (https://discord.com/channels/812969634638725140/1105556725714649128/1571809383388815423).
+
+**Quoted:**
+
+> "To day we made a breakthrough decision. The decision is that SAT always starts in PWM and then decides if will stay in PWM or go to continuous operation. This is beneficial for 2 reason
+> 1) after a restart we continue in PWM 2) In continuous mode we give a small warm up time for the boiler components, which means less thermal stress"
+
+**Settled:** the reasons for entry 385: (1) after a restart SAT continues in PWM; (2) a start into continuous mode gets a short warm-up for the boiler components, which means less thermal stress. Confirms entry 385 (every start in PWM first, the mode chosen after the start sequence). The timing point of entry 385 (what "after the start sequence" means in time) stays open.
+
+**Task:** TASK-1942 (owner d3).
+
+## 388. Q-357a answered with a new option: after a reboot wait 60 s without sending any command, then B (curve only until the first room temperature in the stable release; entry 357 in the next release) (Sergeant D, 2026-11-16)
+
+**Source:** #dev-sat-mqtt, Sergeant D 2026-11-16 09:32:26 UTC (https://discord.com/channels/812969634638725140/1105556725714649128/1571820232077615105), a reply to Q-357a (https://discord.com/channels/812969634638725140/1105556725714649128/1571811801992142890).
+
+**Quoted:**
+
+> "I have an other answer. Wait 60 seconds ( don’t send any commands ) and then B"
+
+**Settled (reading, the answer is short):** after a reboot SAT first waits 60 s and sends no command to the boiler; after that it follows option B of Q-357a: until the first room temperature arrives it controls on the heating curve only (P, I and D left out, the restored integral kept), and the full entry 357 behaviour (curve + P + I + D from the restored state, as thermo-nova pid.py:150-155, climate.py:370-375) goes into the next release (2.1.0). Scope: the 60 s wait and curve-only are for this release (2.0.0 stable), as option B said. Not settled: whether "don't send any commands" also covers commands that are not SAT's own (user REST/MQTT commands, the PIC's own traffic); we read it as SAT's own control commands (CS=, CH=, MM= and the like).
+
+**Task:** TASK-1866 / TASK-1874 (owner 95). Open: the reading of "any commands" above, if the owner needs it settled.
+
+## 389. Q-385a answered A: the PWM-first start phase ends 60 s after the flame lights (Sergeant D, 2026-11-16; settles the timing point of entry 385)
+
+**Source:** #dev-sat-mqtt, Sergeant D 2026-11-16 10:36:14 UTC (https://discord.com/channels/812969634638725140/1105556725714649128/1571836290377187339), answer to Q-385a (asked https://discord.com/channels/812969634638725140/1105556725714649128/1571821350652215408, re-asked https://discord.com/channels/812969634638725140/1105556725714649128/1571835992330215425).
+
+**Quoted:**
+
+> "Q-385a: A"
+
+**Settled:** option A: every heating start runs in PWM first, and that start phase ends 60 s after the flame lights (the same start-up window as entries 344/347, a small warm up); then SAT chooses PWM or continuous. thermo-nova starts in continuous (pwm.py:63, :89; PWM only enabled on a sustained overshoot, heating_control.py:262 onward), so this deliberately differs (entry 385). Scope: he did not answer the scope line; the question recommended this release (2.0.0) and entry 386 puts the PWM-first start in the release scope, so we read it as 2.0.0.
+
+**Task:** TASK-1942 (owner d3), milestone 2.0.0.
+
+## 390. Keep-warm DHW burns after a CH burn do not affect SAT (Sergeant D to indigo_light, 2026-11-16; TASK-1998 question 3)
+
+**Source:** #beta-testing, Sergeant D 2026-11-16 10:41:11 UTC (https://discord.com/channels/812969634638725140/914498730001072149/1571837534432927905), to indigo_light's question 3 (https://discord.com/channels/812969634638725140/914498730001072149/1571835155864358953).
+
+**Quoted:**
+
+> "Regarding 3 no SAT doesn’t affect from this operation."
+
+**Settled (reading, short answer):** the short DHW burns the Vitodens makes after a CH burn without a tap (keep-warm) do not affect SAT; we read it as: no change needed in SAT's cycle statistics or self-tune for them. Not settled: whether the firmware already leaves those burns out of its statistics the way he expects; to check against the code under TASK-1998 with indigo's capture. Question 2 of TASK-1998 is still open (he asked indigo whether it was about the HA integration or the firmware SAT, https://discord.com/channels/812969634638725140/914498730001072149/1571838397343858723).
+
+**Task:** TASK-1998 (2.1.0).
+
+## 391. Q-385b answered A: with SAT set to manual continuous, a heating start still goes through PWM first (Sergeant D, 2026-11-16; extends entries 385 and 389)
+
+**Source:** #dev-sat-mqtt, Sergeant D 2026-11-16 10:53:07 UTC (https://discord.com/channels/812969634638725140/1105556725714649128/1571840538456494101), a reply to Q-385b (https://discord.com/channels/812969634638725140/1105556725714649128/1571839959701131339).
+
+**Quoted:**
+
+> "My answer is A"
+
+**Settled:** option A: also with SAT set to manual continuous, every heating start runs the PWM-first start phase (60 s after flame-on, entry 389), for the same thermal-stress reason (entry 387). Scope: not answered; the question recommended this release and entry 386 puts the PWM-first start in scope, so read as 2.0.0.
+
+**Task:** TASK-1942 (owner d3).
+
+## 392. MsgID 3 HB bit 4 must not block PWM: "Don't look at bit 4 at all"; the boiler should be able to enter PWM (Sergeant D, 2026-11-16; REVERSES entries 213 and 214, and touches entry 215)
+
+**Source:** #beta-testing 2026-11-16, Sergeant D 10:52:31 UTC (https://discord.com/channels/812969634638725140/914498730001072149/1571840386287140995), replying to our explanation to indigo_light that pwm_veto_reason 2 is the boiler's MsgID 3 HB bit 4 = 1 blocking PWM per entry 213 (https://discord.com/channels/812969634638725140/914498730001072149/1571839374134485074); and 10:56:39 UTC (https://discord.com/channels/812969634638725140/914498730001072149/1571841428525420626) after indigo_light's pwm_veto_reason 2 / pwm_veto_path 1 / slave_low_off_denied true on his Viessmann Vitodens 100-W.
+
+**Quoted:**
+
+> "1) no this wrong. Don’t look at bit 4 at all. You should not consider MsgID3:HB4. boiler should be able to enter PWM"
+>
+> "Thanks for reporting the veto reason. Probably was a wrong decision from my side"
+
+**Settled:** MsgID 3 HB bit 4 ("master low-off & pump control function", OpenTherm spec v4.2) no longer blocks PWM: entry 213 (bit 4 = 1 blocks every PWM entry path) and entry 214 (bit 4 turning 1 leaves PWM) are reversed. The firmware gate is SATcycles.ino:1302-1336 (TASK-1412.4), which sets pwm_veto_reason 2.
+
+**Not settled (asked as Q-392a):** whether entry 215 (no PWM until a valid MsgID 3 reply, pwm_veto_reason 1) also goes, and whether this goes into this release (2.0.0) or the next (2.1.0).
+
+**Tasks:** a new task under TASK-1412 (the MsgID 3 permission gate), filed by the coordinator; field test offered by indigo_light (TASK-1998).
+
+## 393. Q-392a answered A: MsgID 3 plays no part in PWM; PWM is allowed from the start, no wait for a valid MsgID 3 reply (Sergeant D, 2026-11-16; REVERSES entry 215, completes entry 392)
+
+**Source:** #dev-sat-mqtt, Sergeant D 2026-11-16 11:06:48 UTC (https://discord.com/channels/812969634638725140/1105556725714649128/1571843981011329100), a reply to Q-392a (https://discord.com/channels/812969634638725140/1105556725714649128/1571843640400289794).
+
+**Quoted:**
+
+> "My answer is A"
+
+**Settled:** option A: SAT ignores MsgID 3 for PWM completely. Entry 215 (no PWM until a valid MsgID 3 reply, pwm_veto_reason 1) is reversed, together with entries 213 and 214 (entry 392). PWM is allowed from the start; the firmware gate SATcycles.ino:1302-1336 (TASK-1412.4) goes. Scope: he did not answer the scope line; the question recommended this release (2.0.0), read as 2.0.0.
+
+**Task:** the entry-392 task (owner 95).
+
+## 394. Q-385c answered A: SAT stays in PWM for the whole 60 s start phase; after that the existing rules decide PWM or continuous (Sergeant D, 2026-11-16; completes entries 385, 389, 391)
+
+**Source:** #dev-sat-mqtt, Sergeant D 2026-11-16 11:25:18 UTC (https://discord.com/channels/812969634638725140/1105556725714649128/1571848637493944321), a reply to Q-385c (https://discord.com/channels/812969634638725140/1105556725714649128/1571847461490786317).
+
+**Quoted:**
+
+> "My answer is A. The first 60s we start with PWM and then SAT decides if it will stay on PWM or will go into continuous mode. We have the rules already when to go to PWM or go to continuous"
+
+**Settled:** option A: during the 60 s start phase after flame-on SAT stays in PWM, whatever the normal switch reasons say (request at the maximum setpoint, flame on with the request above the flow for 60 s, no PWM off time left); those checks keep running and after the 60 s the existing rules decide PWM or continuous. thermo-nova has no start phase and leaves PWM at once when the request reaches the maximum (heating_control.py:203-204, opened 2026-11-16), so this deliberately differs. Scope: not answered; read as 2.0.0 (part of the PWM-first start, entry 386).
+
+**Task:** TASK-1942 (owner d3), as built.
+
+## 395. Q-388a answered A: the gateway's own start-up reads (MsgID 3, 15, 48) may run during the 60 s wait after a reboot; the wait covers SAT's control commands only; this release (Sergeant D, 2026-11-16; completes entry 388)
+
+**Source:** #dev-sat-mqtt, Sergeant D 2026-11-16 11:36:47 UTC (https://discord.com/channels/812969634638725140/1105556725714649128/1571851528489410632), a reply to Q-388a (https://discord.com/channels/812969634638725140/1105556725714649128/1571851165270802533).
+
+**Quoted:**
+
+> "My answer is A and should be part of this release."
+
+**Settled:** option A: after a reboot SAT sends no control command (CS, MM, CH and the like) for 60 s (entry 388); the gateway's own start-up reads of MsgID 3, 15 and 48 run at once, as they change nothing on the boiler. This settles the open reading of entry 388 ("don't send any commands" = SAT's own control commands). Scope: this release (2.0.0), answered.
+
+**Task:** TASK-1874 (owner 95), milestone 2.0.0.
+
+## 396. The MsgID 3 bit 4 change (entries 392, 393) is "TOP PRIORITY for the next release" (Sergeant D, 2026-11-16)
+
+**Source:** #dev-sat-mqtt, Sergeant D 2026-11-16 11:41:57 UTC (https://discord.com/channels/812969634638725140/1105556725714649128/1571852828065140818), linking his #beta-testing message of entry 392 (https://discord.com/channels/812969634638725140/914498730001072149/1571840386287140995).
+
+**Quoted:**
+
+> "THIS IS TOP PRIORITY for the next release"
+
+**Settled:** removing the MsgID 3 PWM gate (entries 392 and 393) is his top priority. **Not settled (asked as Q-396a, 11:49:50 UTC, https://discord.com/channels/812969634638725140/1105556725714649128/1571854811370889278):** whether "the next release" means the next build that goes out (part of 2.0.0) or 2.1.0. Our Q-392a recommended this release; read as 2.0.0 until he answers.
+
+**Task:** the entry-392 task (owner 95).
+
+## 397. Q-396a answered A: "the next release" for the MsgID 3 change means the next build that goes out, part of 2.0.0 (Sergeant D, 2026-11-16; settles the scope of entries 392, 393, 396)
+
+**Source:** #dev-sat-mqtt, Sergeant D 2026-11-16 11:58:58 UTC (https://discord.com/channels/812969634638725140/1105556725714649128/1571857108025212940), a reply to Q-396a (https://discord.com/channels/812969634638725140/1105556725714649128/1571854811370889278).
+
+**Quoted:**
+
+> "My answer is A"
+
+**Settled:** option A: the MsgID 3 change (no MsgID 3 gate on PWM, entries 392 and 393) belongs in the next build that goes out and is part of 2.0.0, not 2.1.0.
+
+**Task:** TASK-2000 (owner 95), milestone 2.0.0; pushed as beta.350 (9011c3c48), the candidate of the 2026-11-16 20:00 public beta.
+
+## 398. Q-384a answered B: during a tolerance-band pause a PWM ON phase does not count as a start toward the hourly start limit (Sergeant D, 2026-11-16; amends entries 59, 90 and 95 for band pauses)
+
+**Source:** #dev-sat-mqtt, Sergeant D 2026-11-16 12:31:03 UTC (https://discord.com/channels/812969634638725140/1105556725714649128/1571865185180979331), a reply to Q-384a (https://discord.com/channels/812969634638725140/1105556725714649128/1571858712564465715).
+
+**Quoted:**
+
+> "My answer is B"
+
+**Settled:** option B: while the tolerance band pauses heating (CH=0, PWM keeps its ON/OFF schedule, entry 384), an ON phase without a flame does not count as a start toward the hourly start limit. Outside a band pause entries 59, 90 and 95 stay as they are (every PWM ON start counts, lit or not, as thermo-nova pwm.py:159-162). New firmware rule; thermo-nova has no band. Scope: not answered; the question recommended this release (the band is in the release scope, entry 386), read as 2.0.0.
+
+**Task:** follow-up of TASK-1887 (owner ba).
+
+## 399. After a tolerance-band stop, SAT should start heating again when the room is below target + 0.1, not target - 0.1 (Sergeant D, 2026-11-16; questions the reading of entry 328; meaning to be confirmed by Q-399a)
+
+**Source:** #dev-sat-mqtt, Sergeant D 2026-11-16 18:37:05 UTC (https://discord.com/channels/812969634638725140/1105556725714649128/1571957298295742607) and 18:39:37 UTC (https://discord.com/channels/812969634638725140/1105556725714649128/1571957937436626967), after the bot's room-vs-setpoint chart of indigo_light's beta.350 capture (https://discord.com/channels/812969634638725140/1105556725714649128/1571956940312023225). Read first-hand by the comms session.
+
+**Quoted:**
+
+> "Sat normally should had started heating earlier. Can you identify tidy why heating didn't start earlier?"
+
+> "normally SAT should had started heating when the room temp was below 20.6"
+
+**Settled (reading, to be confirmed):** with indigo's target 20.5, "below 20.6" is below target + 0.1. That differs from the reading recorded in entry 328 (ours, after Home Assistant's generic thermostat: stop at target + 0.1, start again below target - 0.1), which the firmware follows (TASK-1887; narration "Heating resumes: a room is more than 0.1 below its target", resumed at 16:14:58 in indigo's log; the room fell below 20.6 at about 16:05). Entry 328 is not rewritten; this entry records the conflict. thermo-nova has no band (entry 326).
+
+**Open:** Q-399a (https://discord.com/channels/812969634638725140/1105556725714649128/1571960731983945864): A resume below target + 0.1 / B below target - 0.1 as now / C below the target; our advice A; scope: this release recommended. No code change before his answer.
+
+**Task:** TASK-1887 (owner ba).
+
+## 400. Interpretation (ours, not Sergeant D's words) of entry 398 for an ON phase that sees CH allowed again (2026-11-16; open as Q-398a)
+
+**Source:** none from Sergeant D. Written by the comms session for ba (TASK-1887) after d3's review finding F4, so that the firmware's reading of an edge case of entry 398 is on record before the code is pushed. This whole entry is our interpretation; it records no words of Sergeant D.
+
+**What the firmware does (ba's post build beta.358, TASK-1887; functions satPwmBeginOn() and satPwmCountOnWhenChAllowed() in SATcontrol.ino; not yet on origin/dev when this was written, so no line numbers):** an ON phase that starts while the band stop holds CH off is not counted (entry 398). If the band allows CH again while that same ON phase still runs, the phase is counted once at that moment. During the 180 s minimum-burn wait (entry 376) CH is still 1, so those phases count as before.
+
+**Why (our reasoning):** entries 59, 90 and 95 count every PWM ON phase in which the burner may start, lit or not; from the moment CH is allowed again the phase is such a phase. thermo-nova counts when the PWM status turns ON, not on a flame edge (pwm.py:160, `self._current_cycle += 1`, after the limit check at pwm.py:156-158); thermo-nova has no band.
+
+**Changes an earlier entry:** none; it reads entry 398 together with entries 59, 90 and 95. Entry 398 is not rewritten.
+
+**Open:** Q-398a (queued, asked after Q-2005a and Q-399a).
+
+**Task:** TASK-1887 (owner ba).
+
+## 401. Q-399a answered A: after a tolerance-band stop SAT starts heating again when the room is below target + 0.1; both tolerances mean +0.1 (Sergeant D, 2026-11-16; corrects the reading of entry 328, settles entry 399)
+
+**Source:** #dev-sat-mqtt, Sergeant D 2026-11-16 19:41:58 UTC (https://discord.com/channels/812969634638725140/1105556725714649128/1571973628885602405), a reply to Q-399a (https://discord.com/channels/812969634638725140/1105556725714649128/1571960731983945864); follow-up 19:49:57 UTC (https://discord.com/channels/812969634638725140/1105556725714649128/1571975636095074528): "is it clear now?".
+
+**Quoted:**
+
+> "Ok now I understand what is happening. In a HA generic thermostat the cold tolerance: -0.1 means that the temperature should be 0.1° ABOVE the setpoint, while hot tolerance: 0.1 means the same thing. At the end of the day SAT should start heating when the temperature is 0.1 ABOVE the setpoint"
+
+**Settled:** option A of Q-399a: heating starts again as soon as the room is below target + 0.1 (with indigo's target 20.5: below 20.6), not below target - 0.1. Our reading in entry 328 (start below target - 0.1, after Home Assistant's generic thermostat) is corrected by this entry; entry 328 is not rewritten. Read with entries 376 and 384 (the band stop at target + 0.1 sends CH=0, PWM stays active), the stop and the restart are now at the same line, target + 0.1.
+
+**Interpretation (ours):** he sets no gap between stop and restart. Whether the stop line moves up (a gap) or a pause time is wanted is not in his words; asked as Q-401a. Scope: not answered; Q-399a recommended this release, read as 2.0.0.
+
+**Task:** TASK-1887 (owner ba).
+
+## 402. Q-401a answered C: the band stop stays at target + 0.1, and after a stop CH stays off for a minimum time before it may restart; part of 2.0.0 (Sergeant D and Robert, 2026-11-16; extends entry 401)
+
+**Source:** #dev-sat-mqtt, Sergeant D 2026-11-16 19:53:58 UTC (https://discord.com/channels/812969634638725140/1105556725714649128/1571976645731164171), a reply to Q-401a (https://discord.com/channels/812969634638725140/1105556725714649128/1571976402285240323); Robert (maintainer) 19:54:45 UTC (https://discord.com/channels/812969634638725140/1105556725714649128/1571976845098876974) on the scope.
+
+**Quoted:**
+
+> "My answer is C"
+
+> "Put this in release 2.0.0" (Robert)
+
+**Settled:** option C of Q-401a: the tolerance band keeps its stop at target + 0.1 (entries 376, 384); after a band stop CH stays off for a minimum time before it may restart; the restart itself is below target + 0.1 (entry 401). Scope: release 2.0.0, by Robert's words. New firmware rule; thermo-nova has no band (entry 326).
+
+**Interpretation (ours, not his words), two points to confirm:** (i) the minimum CH-off time is 300 s (5 minutes), the example given in option C; (ii) it counts from the moment CH actually goes off (after any 180 s minimum burn of entry 376), not from the moment the band decides to stop. Both asked as Q-402a.
+
+**Task:** TASK-1887 (owner ba), milestone 2.0.0.
+
+## 403. Q-402a answered A with 10 minutes: after a band stop CH stays off for 10 minutes, counted from the moment CH actually goes off; high priority (Sergeant D and Robert, 2026-11-16; settles the interpretation of entry 402)
+
+**Source:** #dev-sat-mqtt, Sergeant D 2026-11-16 20:02:51 UTC (https://discord.com/channels/812969634638725140/1105556725714649128/1571978881894715525), a reply to Q-402a (https://discord.com/channels/812969634638725140/1105556725714649128/1571978238220181576). Priority: Sergeant D 19:56:38 UTC (https://discord.com/channels/812969634638725140/1105556725714649128/1571977319332192307) and Robert (maintainer) 19:57:47 UTC (https://discord.com/channels/812969634638725140/1105556725714649128/1571977608277532727), addressed to the bot.
+
+**Quoted:**
+
+> "My answer is A but instead of 5 minutes it should stop for 10 minutes"
+
+> "Actually it is high priority" (Sergeant D)
+
+> "This fix is high priority" (Robert)
+
+**Settled:** option A of Q-402a with the time changed: after a tolerance-band stop CH stays off for 600 s (10 minutes), counted from the moment CH actually goes off (after any 180 s minimum burn of entry 376), then heating may restart below target + 0.1 (entry 401). This replaces point (i) of the interpretation in entry 402 (300 s) and confirms point (ii) (counted from CH actually off). Scope 2.0.0 (entry 402, Robert); high priority by both. New firmware rule; thermo-nova has no band.
+
+**Task:** TASK-1887 (owner ba), milestone 2.0.0, priority high.
+
+## 404. Q-2005a answered A: the PWM/continuous flip within one burn stays as it is (Sergeant D, 2026-11-16; Robert first preferred B, then followed)
+
+**Source:** #dev-sat-mqtt, Sergeant D 2026-11-16 20:10:27 UTC (https://discord.com/channels/812969634638725140/1105556725714649128/1571980796179390540), a reply to the re-asked Q-2005a (https://discord.com/channels/812969634638725140/1105556725714649128/1571979656603639870; first asked https://discord.com/channels/812969634638725140/1105556725714649128/1571927220631638081); Robert (maintainer) 20:12:57 (https://discord.com/channels/812969634638725140/1105556725714649128/1571981424804765710), 20:13:42 (https://discord.com/channels/812969634638725140/1105556725714649128/1571981612000747642), Sergeant D 20:15:15 (https://discord.com/channels/812969634638725140/1105556725714649128/1571982003828424817), Robert 20:15:36 (https://discord.com/channels/812969634638725140/1105556725714649128/1571982092630229015).
+
+**Quoted:**
+
+> "It means that the requested temperature was at the threshold between continuous and PWM the flipping doesn't affect calculations . Let's keep it as it is. My answer is A" (Sergeant D)
+
+> "Ehhh are you sure. The thermo nova had C. I would recommend B. This would prevent continuous switching where it's not needed." (Robert)
+
+> "This is a hysteresis situation only pendelend between modes because there is no "gap" so every 180s it switches for no good reason." (Robert)
+
+> "There is no issue at this situation at all. I am pretty sure that A is fine" (Sergeant D)
+
+> "Okay. I follow your insight." (Robert)
+
+**Settled:** option A of Q-2005a: no change; the mode may flip between PWM and continuous within one burn when the request sits at the switch threshold (indigo_light's beta.350 capture, TASK-2005). Robert followed Sergeant D's answer.
+
+**Open:** the conversation went on after 20:16 (Robert: continuous at 38 C would modulate low, while PWM switches the setpoint between 55 and 38; Sergeant D: "We are talking about 2-3% modulation instead of 0", "a high PWM means 2220 seconds ON, 180 seconds OFF", then "?" at 20:19:00). If it changes the decision, a later entry records that; this entry is not rewritten.
+
+**Task:** TASK-2005 (owner ba): no code change under this answer.
+
+## 405. Interpretation (ours, not Sergeant D's words) of entries 402 and 403 when the room temperature is lost during the 600 s minimum CH-off time (2026-11-16; open as Q-403a)
+
+**Source:** none from Sergeant D. Written by the comms session for ba (TASK-1887) so that the firmware's reading is on record; Robert (maintainer) accepted ADR-253 with this reading named in it (2026-11-16 22:58 local, coordinator session). This whole entry is our interpretation; it records no words of Sergeant D.
+
+**What the firmware does (ba's beta.359 build, TASK-1887; the band block in SATcontrol.ino holds the 600 s minimum only while the band has a room error, `!isnan(_sat_tolErr)`; not yet on origin/dev when this was written, so no line numbers):** when the room temperature is lost, the band has no input and does not hold CH off, also inside the 600 s minimum of entry 403; heating follows the other rules.
+
+**Why (our reasoning):** entry 38 ("Keep heating on heat curve" when the room temperature is lost or missing) and entry 46 (P, I and D reset to 0 then) let a lost room temperature fall back to the heating curve, never to a stop; a band pause that needs the room temperature cannot be judged without it. thermo-nova has no band (entry 326).
+
+**Changes an earlier entry:** none; it reads entries 402 and 403 together with entries 38 and 46. Entries 402 and 403 are not rewritten.
+
+**Open:** Q-403a (queued, asked after the earlier questions).
+
+**Task:** TASK-1887 (owner ba); ADR-253.
+
+## 406. Interpretation (ours, not Sergeant D's words) of entry 403: the 10-minute minimum starts only when the band itself switches CH from 1 to 0 (2026-11-17; open as Q-403b)
+
+**Source:** none from Sergeant D. Written by the comms session for ba (TASK-1887) before ba's fix push for the 08:00 beta candidate. This whole entry is our interpretation; it records no words of Sergeant D.
+
+**Reading:** "counted from the moment CH actually goes off" (entry 403) means the band itself switches CH from 1 to 0. When the band decides to stop while CH is already 0 (at boot, during the cold cutoff, or with the heater off because the request is below the cold setpoint), the band turns nothing off and there is no burn to protect against short cycling, so no 600 s minimum starts: heating may start at once when the rooms fall below target + 0.1 (entry 401).
+
+**Why found:** d3's PWM-first start test (ADR-252: a heater OFF -> ON start must enter PWM before its flame) failed on beta.359: a warm room at boot started the 600 s minimum, and the first real start then waited up to 10 minutes.
+
+**Firmware (ba's TASK-1887 fix, not yet on origin/dev when this was written, so no line numbers):** the band block starts the minimum only when the last CH value SAT sent (`state.sat.iLastSentCH`) was 1.
+
+**Changes an earlier entry:** none; it reads entry 403 (and the interpretation of entry 405). Entry 403 is not rewritten.
+
+**Open:** Q-403b (queued).
+
+**Task:** TASK-1887 (owner ba); ADR-253, ADR-252.
+
+## 407. Continuous to PWM switch: flow - requested >= 2 C for 60 s instead of 1.5 C for 30 s (Sergeant D, 2026-11-17; changes entry 404 and the rule of ADR-249)
+
+**Source:** #dev-sat-mqtt, Sergeant D 2026-11-17 05:13 UTC (https://discord.com/channels/812969634638725140/1105556725714649128/1572117476525867152), relayed by the coordinator (TASK-2005, the continuous/PWM ping-pong in indigo's Vitodens capture of 2026-11-16 16:17-16:39).
+
+**Quoted:**
+
+> "you are right we can do a bit better that flipping from continuous to PWM. change the continuous to PWM from boiler temperature -requested temperature >= 1.5 for 30 seconds that it is now to Boiler temperature - requested temperature >= 2 for 60 seconds"
+
+**Settled:** SAT leaves continuous for PWM when the boiler (flow) temperature minus the requested setpoint stays at or above 2 C for 60 s, instead of 1.5 C for 30 s.
+
+**Compared with thermo-nova (7beaaf5):** the overshoot switch waits OVERSHOOT_SUSTAIN_SECONDS = 60.0 (const.py:21, used at heating_control.py:296) at a margin of OVERSHOOT_MARGIN_CELSIUS (+3.0, cycles/const.py:10-11, used at heating_control.py:288). The 60 s now matches thermo-nova; the 2 C stays a firmware value below thermo-nova's 3 C.
+
+**Compared with the firmware:** satCycleCheckOvershootSwitch() (SATcycles.ino ~1393) switches at flow >= requested + settings.sat.fPwmSwitchMargin (default 1.5, setting satpwmswitchmargin, 0.5-5.0, entries 327/360/379, ADR-249) after SAT_OVERSHOOT_SUSTAIN_MS = 30000 (SATcycles.ino:35).
+
+**Changes an earlier entry:** entry 404 (Q-2005a A: keep the flip as it is) is overruled by this change of the thresholds; entries 327/360 (1.5 C / 30 s) and ADR-249's rule are replaced for the threshold and the time. The 3.5 C / 30 s fail-safe of entry 359 is not mentioned.
+
+**Q-407a answered by Robert (maintainer, in session, 2026-11-17 ~06:30, relayed by the coordinator; Robert's call, not Sergeant D's words):** (1) A: 2.0 becomes the new default of the existing setting satpwmswitchmargin; (2) C: the 3.5 C / 30 s fail-safe of entry 359 stays; (3) release 2.0.0. Sergeant D is told by 92 and may object. Our reading (interpretation, TASK-2005): a stored 1.5 is the old default, which every save since TASK-1888 wrote, so it moves to 2.0 once; any other stored value stays.
+
+**Task:** TASK-2005 (owner ba); ADR-249 (to be partly superseded by a new ADR).
+
+## 408. The ~55 C control setpoint at the start of a PWM ON phase is not a bug: it is the initial high setpoint while the flame is still off (Sergeant D, 2026-11-18)
+
+**Source:** #beta-testing, Sergeant D 2026-11-18 07:22 UTC (https://discord.com/channels/812969634638725140/914498730001072149/1572512379982446665), a reply to indigo_light's beta.360 day-run report (https://discord.com/channels/812969634638725140/914498730001072149/1572510482512875673: "PWM ON phases still sometimes request ~55 °C (12:56, 14:08, 16:59, 19:43)"; Vitodens 100-W, no return temperature).
+
+**Quoted:**
+> "Regarding the CS=55° is not a bug, it is the initial high setpoint u til the flame off"
+
+**Settled:** the ~55 C CS that indigo saw in PWM ON phases is intended behaviour, not a defect; no change.
+
+**Interpretation (ours, not Sergeant D's words):** "until the flame off" is read as the flame-off hold: the high setpoint SAT sends in a PWM ON phase while the flame is not (yet) on, which ends once the flame burns (the hold of entries 45, 149 and 348). On a boiler without a return temperature, such as the Vitodens, that start is flow + 18 (entries 84, 135, 149). If he meant something else by "until the flame off", this reading needs his correction.
+
+**Compared with thermo-nova (7beaaf5):** `_compute_pwm_control_setpoint` (heating_control.py:380) sets, in a PWM ON phase with the flame off, CS = return temperature + `flame_off_setpoint_offset_celsius` (heating_control.py:392-398; default 18.0 at const.py:151), and returns without an override when there is no return temperature (heating_control.py:393-395). The flow + 18 start without a return temperature is Sergeant D's addition (entries 45, 149), not thermo-nova.
+
+**Compared with the firmware:** the PWM ON phase start (CS = return + `satflameoffoffset`, or flow + 18 without a return temperature) is described in manual ch05 5.6 "Overshoot protection" and entries 149/348; this entry changes nothing in it.
+
+**Task:** none (no change). Answers the observation in indigo_light's report; related to TASK-2013 only through the same report.
+
+**Open:** the exact meaning of "until the flame off" (see the interpretation above).
+
+## 409. The initial high CS at a PWM ON start is for reliability only and does not affect savings (Sergeant D, 2026-11-18; completes entry 408)
+
+**Source:** #beta-testing, Sergeant D 2026-11-18 07:32 UTC (https://discord.com/channels/812969634638725140/914498730001072149/1572514884233732117), a reply to indigo_light 07:23 UTC ("reliability > savings, makes sense when I think of it", https://discord.com/channels/812969634638725140/914498730001072149/1572512673445183533), in the thread of entry 408.
+
+**Quoted:**
+> "The initial high CS doesn’t affect savings, it is only reliability."
+
+**Settled:** the purpose of the initial high setpoint of entry 408 is reliable ignition; it is not a trade-off against energy savings.
+
+**Compared with thermo-nova (7beaaf5):** the flame-off hold of entry 408 (heating_control.py:392-398, offset default 18.0 at const.py:151) carries no comment on its purpose in the code; the purpose is Sergeant D's statement.
+
+**Compared with the firmware:** nothing changes (entry 408).
+
+**Task:** none.
+
+**Open:** none beyond entry 408's open reading of "until the flame off".
+
+## 410. Q-1887c answered B: the continuous to PWM switch only runs while heating is allowed, as thermo-nova (Sergeant D, 2026-11-18; urgent round, 2.0.0)
+
+**Source:** #dev-sat-mqtt, Sergeant D 2026-11-18 18:46 UTC (https://discord.com/channels/812969634638725140/1105556725714649128/1572684434002677852), a reply to Q-1887c (https://discord.com/channels/812969634638725140/1105556725714649128/1572684144658612278).
+
+**Quoted:**
+> "My answer is B"
+
+**Settled:** option B as posted: during a tolerance-band pause (heating off) the continuous to PWM switch does not fire; it only runs while heating is allowed, as thermo-nova. Background: indigo_light's Vitodens switched at 16:00:58 (2026-11-16) on a flow of 67.3 C from leftover hot-water heat with the flame off and heating off. Scope: 2.0.0.
+
+**Compared with thermo-nova (7beaaf5):** `_maybe_enable_pwm_on_sustained_overshoot` returns without switching (and clears the timer) when the heater is not ON (heating_control.py:276-278) and when the requested setpoint is at or below the cold setpoint (:280-282); it has no flame check, only its docstring says "while flame is active" (:263).
+
+**Compared with the firmware:** the switch rule (SATcycles.ino:1376-1393, satCycleCheckOvershootSwitch, entry 407 thresholds) checks the mode and the hot-water guard only, so it can fire during a band pause; the change adds the "heating allowed" gate (and the cold-setpoint gate) of thermo-nova.
+
+**Task:** TASK-1887 (band) / TASK-2005 (switch rule); implementation by the firmware lane.
+
+**Open:** none.
+
+## 411. Q-403a answered A: a lost room temperature during the 10-minute band pause ends the pause; heating follows the curve at once (Sergeant D, 2026-11-18; urgent round, 2.0.0; confirms our interpretation in entry 405)
+
+**Source:** #dev-sat-mqtt, Sergeant D 2026-11-18 18:48 UTC (https://discord.com/channels/812969634638725140/1105556725714649128/1572684923469430875), a reply to Q-403a (https://discord.com/channels/812969634638725140/1105556725714649128/1572684758029434976). The message was edited: it first read "My answer is B" (seen by our watcher at 18:48:24) and was changed to the text below at 18:49:12 UTC (edited_timestamp, read back via the Discord API). The edited text is his answer.
+
+**Quoted:**
+> "My answer is A"
+
+**Settled:** option A as posted ("No, release it at once: without a room temperature heating follows the curve, as in entries 38 and 46"): if the room temperature is lost during the 10-minute pause after a band stop (entries 401-403), the pause ends and heating follows the heating curve at once. Scope: 2.0.0.
+
+**Confirms an earlier entry:** entry 405 (our interpretation, not his words) is now his decision. The firmware already does this (TASK-1887); no firmware change.
+
+**Compared with thermo-nova (7beaaf5):** thermo-nova has no tolerance band and no band pause; the band and its 10-minute minimum are Sergeant D's rules (entries 376, 377, 384, 401-403; ADR-253).
+
+**Task:** TASK-1887 (no change; note the confirmation).
+
+**Open:** none.
+
+## 412. Q-403b answered A: the 10-minute pause only follows a band stop that actually turns the boiler off (Sergeant D, 2026-11-18; urgent round, 2.0.0; confirms our interpretation in entry 406)
+
+**Source:** #dev-sat-mqtt, Sergeant D 2026-11-18 18:50 UTC (https://discord.com/channels/812969634638725140/1105556725714649128/1572685399531331797, edited 18:50:30 UTC; read back via the Discord API), a reply to Q-403b (https://discord.com/channels/812969634638725140/1105556725714649128/1572685225820160153).
+
+**Quoted:**
+> "My answer is A"
+
+**Settled:** option A as posted: the 10-minute pause starts only when a band stop turns the boiler off (CH 1 -> 0); a band decision while heating was not running (for example right after a restart with a warm room, or while the boiler was off because no heat was asked) starts no pause. Scope: 2.0.0.
+
+**Confirms an earlier entry:** entry 406 (our interpretation) is now his decision. The firmware already does this (TASK-1887); no firmware change.
+
+**Compared with thermo-nova (7beaaf5):** no band in thermo-nova (see entry 411).
+
+**Task:** TASK-1887 (no change; note the confirmation).
+
+**Open:** none.
+
+## 413. Q-398a answered A: a PWM ON phase that started during a band pause counts once as a start when the band allows heating again during that phase (Sergeant D, 2026-11-18; urgent round, 2.0.0)
+
+**Source:** #dev-sat-mqtt, Sergeant D 2026-11-18 18:52 UTC (https://discord.com/channels/812969634638725140/1105556725714649128/1572686045420593193; unedited after 95 s, read back via the Discord API), a reply to Q-398a (https://discord.com/channels/812969634638725140/1105556725714649128/1572685871285669909).
+
+**Quoted:**
+> "my answer is A"
+
+**Settled:** option A as posted: a PWM ON phase that starts during a band pause does not count as a start (entry 398); if the band then allows heating again while that same ON phase is still running, that phase counts once as a start at that moment. Scope: 2.0.0.
+
+**Compared with earlier entries:** consistent with entries 59, 90 and 95 (every ON phase in which the burner may start counts) and entry 398 (a phase in a pause does not count). The firmware already does this (TASK-1887); no firmware change.
+
+**Compared with thermo-nova (7beaaf5):** thermo-nova has no tolerance band and no band pause (see entry 411).
+
+**Task:** TASK-1887 (no change; note the confirmation).
+
+**Open:** none.
+
+## 414. Q-329b answered B: the integral halving rule (entry 333) applies to the main PID and to the zone PIDs (Sergeant D, 2026-11-18; urgent round, 2.0.0)
+
+**Source:** #dev-sat-mqtt, Sergeant D 2026-11-18 18:56 UTC (https://discord.com/channels/812969634638725140/1105556725714649128/1572686857228124251; unedited after 90 s, read back via the Discord API), a reply to Q-329b (https://discord.com/channels/812969634638725140/1105556725714649128/1572686604861181984).
+
+**Quoted:**
+> "My answer is B"
+
+**Settled:** option B as posted: the halving rule chosen by Robert (entry 333: when the room leaves the 0.1 C deadband the integral is halved once and then held, and builds up again from there inside the deadband) applies to the main PID and to every zone PID. Scope: 2.0.0.
+
+**Compared with thermo-nova (7beaaf5):** `PID._update_integral` resets the integral to 0 when `abs(state.error) > DEADBAND` (pid.py:185-189, opened this session); each zone creates the same `PID` class (area.py:50, opened this session), so in thermo-nova main and zones share one rule.
+
+**Compared with the firmware:** TASK-1890 (in the 2.0.0 set) implements the halving rule; the zones must use the same rule as the main PID.
+
+**Task:** TASK-1890 (firmware lane).
+
+**Open:** none.
+
+## 415. Q-1998b answered A on a recommendation we have since corrected; re-asked (Sergeant D, 2026-11-18; urgent round, 2.0.0; not settled)
+
+**Source:** #dev-sat-mqtt, Sergeant D 2026-11-18 19:05:28 UTC (https://discord.com/channels/812969634638725140/1105556725714649128/1572689216310087804; unedited, read back via the Discord API), a reply to Q-1998b (https://discord.com/channels/812969634638725140/1105556725714649128/1572687461681995937).
+
+**Quoted:**
+> "My answer is A"
+
+**What was asked:** A) leave the short hot-water burns (1-16 s after a heating run) out, so they do not enter the 4-hour cycle window, recommended as "matches entry 390 and thermo-nova's hot-water cycle kind"; B) keep counting them as now; C) count them, marked as hot water, so they do not change PWM or overshoot decisions.
+
+**Why this does not settle it:** our recommendation was wrong and missed two facts: thermo-nova keeps every flame cycle in its rolling windows, with no filter on the kind (cycles/history.py:102-128, opened this session), and only marks a mostly hot-water cycle as hot water (cycles/tracker.py:315-316) and a cycle with hot water in its tail as uncertain (cycles/classifier.py:25-26); and Robert's entry 268 counts hot-water burns in the 4 h and 24 h duty. We posted a correction at 19:06:44 UTC (https://discord.com/channels/812969634638725140/1105556725714649128/1572689536444661814), after his answer, and asked a follow-up at 19:07:55 UTC (https://discord.com/channels/812969634638725140/1105556725714649128/1572689832696750193): A) out of the cycle list and the 4-hour cycle window, still counted in the duty (entry 268 stays); B) out of the duty too (changes entry 268, Robert decides); C) count them marked as hot water (thermo-nova).
+
+**Status:** nothing is built on this answer. Only his answer to the follow-up counts; it gets its own entry.
+
+**Task:** TASK-1998.
+
+**Open:** the follow-up above; a B answer goes to Robert because it changes his entry 268.
+
+## 416. Q-1998b answered C: short hot-water burns are counted as cycles, marked as hot water, and do not change PWM or overshoot decisions, as thermo-nova (Sergeant D, 2026-11-18; urgent round, 2.0.0; supersedes entry 415)
+
+**Source:** #dev-sat-mqtt, Sergeant D, two answers, both unedited and read back via the Discord API:
+- 2026-11-18 19:07:34 UTC (https://discord.com/channels/812969634638725140/1105556725714649128/1572689746725969991), a reply to our correction of Q-1998b (https://discord.com/channels/812969634638725140/1105556725714649128/1572689536444661814);
+- 2026-11-18 19:09:32 UTC (https://discord.com/channels/812969634638725140/1105556725714649128/1572690239741501543), a reply to our follow-up (https://discord.com/channels/812969634638725140/1105556725714649128/1572689832696750193).
+
+**Quoted:**
+> "my answer is C"
+
+> "My answer is C"
+
+**Settled:** option C in both messages: the short hot-water burns (1-16 s after a heating run, indigo_light's Vitodens) are counted as cycles and stay in the cycle list and the 4-hour window, marked as hot water, so they do not change PWM or overshoot decisions. Robert's entry 268 stays: every flame counts in the 4 h and 24 h duty, hot-water burns included. Scope: 2.0.0.
+
+**Changes an earlier entry:** supersedes entry 415. His first answer A (19:05:28 UTC) came before our correction and rested on our wrong recommendation; his C after the correction replaces it.
+
+**Compared with thermo-nova (7beaaf5):** every flame cycle enters the rolling windows with no filter on the kind (cycles/history.py:102-128); a cycle with more than 80 % hot-water samples gets the kind DOMESTIC_HOT_WATER (cycles/tracker.py:315-316); a cycle with any hot water in its tail is classified UNCERTAIN (cycles/classifier.py:25-26). All opened this session.
+
+**Compared with the firmware:** in indigo_light's beta.350 capture the firmware logged 7 such burns as ordinary SAT cycles; the change marks them as hot water so the PWM and overshoot decisions leave them out, and keeps them in the duty.
+
+**Task:** TASK-1998 (firmware lane; its milestone says 2.1.0, this answer and Robert's urgent round put it in 2.0.0, the coordinator to confirm).
+
+**Open:** none.
+
+## 417. Q-410a answered A: both continuous to PWM rules, the 2 C / 60 s margin rule and the 3.5 C / 30 s fail-safe, only run while heating is allowed (Sergeant D, 2026-11-18; urgent round, 2.0.0; extends entry 410)
+
+**Source:** #dev-sat-mqtt, Sergeant D 2026-11-18 19:14:15 UTC (https://discord.com/channels/812969634638725140/1105556725714649128/1572691428482621583; unedited after 90 s, read back via the Discord API), a reply to Q-410a (https://discord.com/channels/812969634638725140/1105556725714649128/1572690729862430812).
+
+**Quoted:**
+> "my answer is A"
+
+**Settled:** option A as posted: entry 410's "only while heating is allowed" covers both rules that switch from continuous to PWM: the margin rule (2 C above the request for 60 s, entry 407) and the fail-safe (flow - CS >= 3.5 C for 30 s, entries 288/289, kept in 359). Outside that the fail-safe stays 3.5 C / 30 s. Reason as posted with the question: in a band pause nothing burns, so there is no flame-out to protect against. Scope: 2.0.0.
+
+**Background:** in otgw-dev's replay of indigo_light's 16:00:58 band pause (heating off, flame off, flow 67.3 C from leftover hot-water heat, request 45) the fail-safe switched first, 30 s after the flow rise.
+
+**Compared with thermo-nova (7beaaf5):** thermo-nova has no fail-safe; its switch skips when the heater is not ON (heating_control.py:276-278) and when the request is at or below the cold setpoint (:280-282).
+
+**Compared with the firmware:** both rules live in satCycleCheckOvershootSwitch() (SATcycles.ino:1376-1405 on origin/dev 13c0a4e41, opened this session); otgw-dev's lane for entry 410 gates the call on heating allowed, which covers both rules.
+
+**Task:** TASK-1887 / TASK-2005 (otgw-dev, lane for entry 410).
+
+**Open:** none. Replaces the ledger sweep's draft Q-407b (the interplay of the two rules), which this question covered.
+
+## 418. Q-408a answered A: "until the flame off" means the high start setpoint is held while the flame is still off and ends once the flame burns (Sergeant D, 2026-11-18; urgent round, 2.0.0; confirms our reading in entry 408)
+
+**Source:** #dev-sat-mqtt, Sergeant D 2026-11-18 19:20:35 UTC (https://discord.com/channels/812969634638725140/1105556725714649128/1572693022171463741; unedited, read back via the Discord API). It is not a Discord reply; it is the first message after Q-408a (https://discord.com/channels/812969634638725140/1105556725714649128/1572692205670240308), with no other question open, so we read it as the answer to Q-408a (interpretation, ours).
+
+**Quoted:**
+> "my answer is A."
+
+**Settled:** option A as posted: the high setpoint at the start of a PWM ON phase (about 55 C on indigo_light's Vitodens) is held while the flame is still off and ends once the flame burns; then the 20 s hold and the follow (entries 149, 348). On a boiler without a return temperature that start is flow + 18 (entries 45, 149). Our reading in entry 408 is now his decision. No firmware change. Scope: 2.0.0.
+
+**Compared with thermo-nova (7beaaf5):** in a PWM ON phase with the flame off, CS = return + flame-off offset (heating_control.py:392-401, opened this session); without a return temperature it sends no override (:393-395). The flow + 18 start is Sergeant D's addition (entries 45, 149).
+
+**Task:** none (no change).
+
+**Open:** none.
+
+**Note on entry 416 (correction of our own text, not of his answer):** entry 416 says under "Compared with the firmware" that "the change marks them as hot water". That is wrong: the firmware already does option C, so entry 416 needs no code change. Checked on origin/dev this session: a cycle with more than 80 % hot-water samples gets the kind SAT_CK_DHW (SATcycles.ino:792, the port of tracker.py:315-316); a cycle with hot water in its tail is classed SAT_CYCLE_UNCERTAIN (SATcycles.ino:899, classifier.py:25-26); an UNCERTAIN cycle neither switches continuous to PWM nor PWM to continuous at the end of the cycle (satCycleApplyEndOfCycle, SATcycles.ino:1006 onward). The 7 burns in indigo_light's beta.350 capture were cycles, as entry 416 wants, already marked; the shortest are dropped by the minimum sample count, as in thermo-nova (otgw-dev's reading, not re-checked here).
+
+## 419. Sergeant D corrects his own words in entry 408: "until the flame off" was meant as "until light-off" (Sergeant D, 2026-11-18; consistent with entry 418)
+
+**Source:** #dev-sat-mqtt, Sergeant D 2026-11-18 19:22:35 UTC (https://discord.com/channels/812969634638725140/1105556725714649128/1572693524137254954; unedited, no reply reference, read back via the Discord API), two minutes after his answer A to Q-408a (entry 418).
+
+**Quoted:**
+> "what I said in the morning was wrong, I meant LIGHT-OFF"
+
+**Settled:** his morning message (entry 408, "the initial high setpoint u til the flame off") should have read "until light-off". Interpretation (ours): light-off is the usual boiler term for burner ignition, so the high start setpoint of a PWM ON phase is held until the flame lights. That is the reading he confirmed with A in entry 418; the two agree. No firmware change. Scope: 2.0.0.
+
+**Changes an earlier entry:** corrects the quoted wording of entry 408 (his words, not our reading); entry 408's interpretation and entry 418 stand.
+
+**Compared with thermo-nova (7beaaf5):** the flame-off hold applies while the flame is not active (heating_control.py:392-401); after the flame lights the suppression hold runs (:412 onward). Opened this session.
+
+**Task:** none (no change).
+
+**Open:** none, unless he means something else by light-off.
+
+## 420. Q-1998a answered A: a continuous burn at the boiler minimum still counts as overshoot when the flow stays above the request, as thermo-nova (Sergeant D, 2026-11-18; urgent round, 2.0.0)
+
+**Source:** #dev-sat-mqtt, Sergeant D 2026-11-18 19:24:51 UTC, edited at 19:25:00 UTC (9 s later); the final text is quoted below (https://discord.com/channels/812969634638725140/1105556725714649128/1572694093778124833; read back via the Discord API), a reply to Q-1998a (https://discord.com/channels/812969634638725140/1105556725714649128/1572693548468412418). Our watcher captured the text before the edit as "My answer is A" (without the mention), so the edit only added the mention; the answer is A in both versions.
+
+**Quoted (final text):**
+> "My answer is A"
+
+**Settled:** option A as posted: the overshoot classification stays as thermo-nova also on a boiler that cannot modulate below its minimum (indigo_light's Vitodens, flow about 42 C while SAT asks 29-40 C): a continuous cycle is overshoot when the p90 of flow minus control setpoint is at least the margin, and that verdict switches continuous to PWM at the end of the cycle. No firmware change. Scope: 2.0.0.
+
+**Compared with thermo-nova (7beaaf5):** `_classify_continuous` returns OVERSHOOT when `flow_control_setpoint_error.p90 >= OVERSHOOT_MARGIN_CELSIUS` (cycles/classifier.py:74, opened this session; 3.0 at cycles/const.py:10, the firmware uses 2.0 by entries 15/37); `on_cycle_end` enables PWM after a continuous OVERSHOOT cycle (pwm.py:221-223, opened this session).
+
+**Compared with the firmware:** satCycleApplyEndOfCycle (SATcycles.ino:1006 onward on origin/dev) switches continuous to PWM after an OVERSHOOT cycle, as thermo-nova. The 33 % overshoot fraction indigo_light saw on beta.250 came while PWM was still vetoed; since entries 392/393 the verdict leads to PWM.
+
+**Task:** TASK-1998 (question 2 settled, no change).
+
+**Open:** none.
+
+## 421. Q-378a answered A: the eco/comfort choice of the band zone rule (entry 378) is the SAT heating mode setting (Sergeant D, 2026-11-18; urgent round, 2.0.0)
+
+**Source:** #dev-sat-mqtt, Sergeant D 2026-11-18 19:27:28 UTC (https://discord.com/channels/812969634638725140/1105556725714649128/1572694752313483437; unedited after 90 s, read back via the Discord API), a reply to Q-378a (https://discord.com/channels/812969634638725140/1105556725714649128/1572694565863952485).
+
+**Quoted:**
+> "my answer is A"
+
+**Settled:** option A as posted: "eco" and "comfort" in entry 378 are the SAT heating mode setting (settings.sat.iHeatingMode, published as sat/heating_mode), not the target temperature presets. In eco only the main room decides the band; in comfort any usable room keeps heating on. That is what the firmware does now; no change. Settles the open point of entry 378. Scope: 2.0.0.
+
+**Compared with thermo-nova (7beaaf5):** in ECO heating mode the requested setpoint follows only the primary PID; otherwise the secondary rooms can raise it (climate.py:377-389, opened this session). thermo-nova has no band.
+
+**Compared with the firmware:** the band input uses iHeatingMode == 1 (ECO) to restrict to the main room (SATcontrol.ino:8273-8277 on origin/dev, opened this session).
+
+**Task:** TASK-1887 (no change).
+
+**Open:** none.
+
+## 422. Q-343b answered A: the 90 % clean share of entry 343 is 90 % of the expected ticks for whatever control interval is set (Sergeant D, 2026-11-18; urgent round, scope 2.1.0; confirms our reading in entry 343)
+
+**Source:** #dev-sat-mqtt, Sergeant D 2026-11-18 19:32:18 UTC, edited at 19:32:39 UTC; the final text is quoted below (https://discord.com/channels/812969634638725140/1105556725714649128/1572695969114366083; read back via the Discord API), a reply to Q-343b (https://discord.com/channels/812969634638725140/1105556725714649128/1572695581070069972).
+
+**Quoted (final text):**
+> "My answer is A"
+
+**Settled:** option A as posted: an hour counts for the self-tune when at least 90 % of its expected ticks (hour length / control interval) are clean, at every control interval from 10 to 300 s (settingStuff.ino:1168): 108 of 120 at 30 s, 324 of 360 at 10 s, 36 of 40 at 90 s. Our interpretation in entry 343 is now his decision. The firmware already does this (SATcurveTune.h, SAT_CT_MIN_CLEAN_PCT against the expected ticks, opened this session); no change.
+
+**Compared with thermo-nova (7beaaf5):** no counterpart; thermo-nova has no self-tune (entry 72).
+
+**Task:** TASK-1932 (no change).
+
+**Open:** none. With this answer every question of the urgent round of 2026-11-18 is answered (entries 410-422).
+
+## 423. Q-1889a answered A: the faster self-tune decides every counted hour on a rolling window of the last 12 counted hours, step 0.05, the window empties after a step (Sergeant D, 2026-11-19; urgent round, 2.0.0)
+
+**Source:** #dev-sat-mqtt, Sergeant D 2026-11-19 04:07:49 UTC (https://discord.com/channels/812969634638725140/1105556725714649128/1572825703299293265; unedited after more than 15 minutes, read back via the Discord API), a reply to Q-1889a (https://discord.com/channels/812969634638725140/1105556725714649128/1572737784555249768; text by ba).
+
+**Quoted:**
+> "my answer is A"
+
+**Settled:** option A as posted: the faster self-tune of entries 329 and 367 decides at every counted hour on a rolling window of the last 12 counted hours and changes the heating curve coefficient by 0.05 per step; after a step the window empties, so at least 12 counted hours lie between two steps, and a change of 0.1 takes at least 24 counted hours. The two-phase agreement, the +/-1.0 C band and the exclusions stay. Scope: 2.0.0.
+
+**Compared with thermo-nova (7beaaf5):** no counterpart; thermo-nova has no tuner (entry 72).
+
+**Compared with the firmware:** beta.379 (TASK-1889, ADR-260 Proposed) already implements option A, taken by directive until this answer (SATcurveTune.h: SAT_CT_HOURS_PER_DAY 1, SAT_CT_MIN_CLEAN_HOURS 1, SAT_CT_WINDOW_DAYS 12, SAT_CT_STEP 0.05); no change needed.
+
+**Task:** TASK-1889 (confirms the build; ADR-260 can cite this entry).
+
+**Open:** Q-1889b (decisions on the warm-up phase alone in the 12-hour window, entry 305) is asked next.
+
+## 424. Q-1889b answered A: with the 12-counted-hour window the warm-up phase may decide alone when the floating phase has less than 1 hour of data, as entry 305 already allows (Sergeant D, 2026-11-19; urgent round, 2.0.0)
+
+**Source:** #dev-sat-mqtt, Sergeant D 2026-11-19 04:26:30 UTC (https://discord.com/channels/812969634638725140/1105556725714649128/1572830405680300035; unedited after 90 s, read back via the Discord API), a reply to Q-1889b (https://discord.com/channels/812969634638725140/1105556725714649128/1572829932617211918; text by ba).
+
+**Quoted:**
+> "my answer is A"
+
+**Settled:** option A as posted: warm-up-only decisions in the 12-counted-hour window (entry 423) are accepted. When the window holds less than 1 hour of floating data, the floating phase does not vote (entries 313/315) and the warm-up phase decides alone, as entry 305 already allows. No change; the window stays 12 counted hours. Background: in the TASK-1889 closed-loop test 1 of 13 decisions in the 60-day raise scenario was warm-up-only, none with the old 3-day window, and the tune converged without a wrong-direction step. Scope: 2.0.0.
+
+**Compared with thermo-nova (7beaaf5):** no counterpart; thermo-nova has no tuner (entry 72).
+
+**Task:** TASK-1889 (no change; confirms the build).
+
+**Open:** none.
+
+## 425. The Kd factor becomes 0.05 instead of 0.063 (Sergeant D, 2026-11-19; supersedes the factor of entry 279)
+
+**Source:** #dev-sat-mqtt, Sergeant D 2026-11-19 04:55:19 UTC (https://discord.com/channels/812969634638725140/1105556725714649128/1572837659355914303; unedited after more than 25 minutes, read back via the Discord API), a reply to our answer to his question "what's the kd coefficient that we use now? 0.063?" (his questions 04:27 UTC, 1572830578175254681 and 1572830735851589763; our answer 04:53 UTC, https://discord.com/channels/812969634638725140/1105556725714649128/1572837266982830083: "Yes, 0.063 ... kd = 0.063 x 8400 x kp = 529.2 x kp (SATpid.ino:226-236), 10 % below thermo-nova's 0.07 x 8400 x kp (pid.py:93)").
+
+**Quoted:**
+> "change it to 0.05"
+
+**Settled:** the derivative gain factor becomes 0.05: kd = 0.05 x 8400 x kp = 420 x kp (was 0.063 x 8400 x kp = 529.2 x kp by entry 279). The 8400 s design time of entry 279 and the rest of the PID are unchanged (reading: he changed only the factor he was asked about; to correct if he means more). Release scope: not stated; asked as a follow-up (2.0.0 or 2.1.0).
+
+**Changes an earlier entry:** supersedes the 0.063 factor of entry 279 (Q-1412.16b); entry 279's 8400 s stays.
+
+**Compared with thermo-nova (7beaaf5):** `kd = round(0.07 * 8400 * self.kp, 6)` (pid.py:93, opened this session); 0.05 is about 29 % below thermo-nova's factor, a deliberate deviation by Sergeant D.
+
+**Compared with the firmware:** `SAT_PID_KD_FACTOR = 0.063f` (SATpid.ino:28, used at :236, opened this session on origin/dev); the change sets it to 0.05f and updates the comments at :26-27 and :225-226 and the tests that pin 529.2 x kp.
+
+**Task:** TASK-1656 (the entry-279 factor task) or a follow-up task; owner per the coordinator.
+
+**Open:** release scope (asked).
+
+## 426. Q-1942a answered A: after an outside-temperature hand-back SAT continues in the mode it had when it takes over again with the flame burning; no new heating start (Sergeant D, 2026-11-19; urgent round, 2.0.0)
+
+**Source:** #dev-sat-mqtt, Sergeant D 2026-11-19 04:56:38 UTC (https://discord.com/channels/812969634638725140/1105556725714649128/1572837987211812926; unedited after more than 25 minutes, read back via the Discord API), a reply to Q-1942a (https://discord.com/channels/812969634638725140/1105556725714649128/1572831138085474415).
+
+**Quoted:**
+> "My answer is A"
+
+**Settled:** option A as posted: when SAT takes over again after an outside-temperature hand-back (entries 56/57) while the flame is already burning, it continues in the mode it had; it is not a heating start (no PWM-first, no 60 s start gate of entries 385/391). That is what the firmware does now; no change. Scope: 2.0.0.
+
+**Compared with thermo-nova (7beaaf5):** no hand-back; the control pass is skipped while the outside temperature is None (climate.py:544-545, opened this session), so its state carries on.
+
+**Background:** marceld91d's beta.361 capture (17 Nov 10:11) showed such a resume 0.4 s after a hand-back; that hand-back itself is fixed in beta.380 (TASK-2039).
+
+**Task:** TASK-1942 (no change).
+
+**Open:** none.
+
+## 427. Q-425a answered A: the Kd factor 0.05 of entry 425 goes into 2.0.0 (Sergeant D, 2026-11-19)
+
+**Source:** #dev-sat-mqtt, Sergeant D 2026-11-19 05:42:11 UTC (https://discord.com/channels/812969634638725140/1105556725714649128/1572849450299293867; unedited after more than 20 minutes, read back via the Discord API), a reply to Q-425a (https://discord.com/channels/812969634638725140/1105556725714649128/1572845020984246325).
+
+**Quoted:**
+> "my answer is A"
+
+**Settled:** option A as posted: the Kd factor 0.05 (entry 425, kd = 0.05 x 8400 x kp = 420 x kp) goes into 2.0.0, in the next alpha build; it is not in the public beta of 2026-11-19 (beta.382, built before this answer).
+
+**Compared with thermo-nova (7beaaf5):** pid.py:93 uses 0.07 (see entry 425).
+
+**Task:** TASK-1656 or its follow-up (owner otgw-dev per the coordinator).
+
+**Open:** none.
+
+## 428. Q-2005a answered C: per flame-on at most one PWM ON counts (and at most one PWM cycle), against the continuous/PWM flipping (Sergeant D, 2026-11-19)
+
+**Source:** #dev-sat-mqtt, Sergeant D 2026-11-19 11:09:25 UTC, edited 11:10:15 UTC (https://discord.com/channels/812969634638725140/1105556725714649128/1572931802069205033; final text read back via the Discord API 90 s after the post), a reply to Q-2005a (https://discord.com/channels/812969634638725140/1105556725714649128/1572930683880345721).
+
+**Quoted (final, edited text):**
+> "My answer is C. When the flame is lit count only 1 PWM ON. Every flame lit should have the most 1 PWM cycle. This way we will overcome the continuous to PWM flipping and at the end we will keep the cycles per hour clean"
+
+(First-seen text ended at "flipping"; the edit added "and at the end we will keep the cycles per hour clean".)
+
+**Settled:** option C (other) of Q-2005a. While one flame burns, only one PWM ON start counts against the cycles-per-hour limit. A further switch from continuous back to PWM during the same burn does not count as a new start. This changes entry 89, which counts the PWM-entry ON with the burner already burning (Q48 A): that start now counts only when it is the first PWM ON of that flame. Entry 59 (only PWM's own ON phases count) stays.
+
+**Interpretation (ours, not yet confirmed):** "Every flame lit should have the most 1 PWM cycle" can be read two ways. (a) Counting only: at most one counted PWM start per flame-on, and the flipping itself stays. (b) Behaviour as well: during one flame-on SAT does not re-enter PWM after it went to continuous, so the flipping stops. His reason ("overcome the continuous to PWM flipping") points to (b). Not acted on until he confirms (follow-up Q-2005b).
+
+**Not settled:** the range-5 question itself (a start from OFF straight into duty range 5 is never held back by the hourly limit, SATcontrol.ino:1697-1712): his answer does not say whether that start should wait; it stays as today (option A) until asked. The release scope (2.0.0 or 2.1.0) was not given.
+
+**Compared with thermo-nova (7beaaf5):** pwm.py:154-160 counts every OFF/IDLE->ON start in _current_cycle, but pwm.py:156 compares with duty_cycle_seconds (780 at the default "00:13:00", const.py:167), so thermo-nova has no effective hourly cap. Per-flame counting has no thermo-nova counterpart; it refines Sergeant D's own limit (entries 31/52/59).
+
+**Firmware today:** every satPwmBeginOn() counts, including a PWM re-entry with the flame burning (SATcontrol.ino:1782-1806, entry 89). Field evidence: indigo_light beta.360, 19 Nov morning, three "cycle limit 3/hr reached" stops filled by re-entries inside burns (TASK-2005 notes).
+
+**Task:** TASK-2005 follow-up (owner per the coordinator).
+
+**Open:** reading (a) or (b), and the release scope: Q-2005b.
+
+## 429. Q-2005b answered B: at most one PWM entry per flame, continuous until flame-off; the fail-safe threshold goes from 3.5 to 3.0 C (Sergeant D, 2026-11-19)
+
+**Source:** #dev-sat-mqtt, Sergeant D 2026-11-19 11:17:00 UTC (https://discord.com/channels/812969634638725140/1105556725714649128/1572933709429084271; not edited 90 s after the post, read back via the Discord API), a reply to Q-2005b (https://discord.com/channels/812969634638725140/1105556725714649128/1572932665831854113).
+
+**Quoted:**
+> "My answer is B. But instead of flow above 3.5 change it to flow above 3."
+
+**Settled:** reading (b) of entry 428. (1) During one flame-on SAT enters PWM at most once. After a switch from PWM to continuous it stays in continuous until the flame goes out; the 2.0 C / 60 s continuous->PWM switch rule (entry 407, SATtypes.h:542 fPwmSwitchMargin) does not fire again in that burn. (2) The only way back to PWM during that burn is the fail-safe, and its threshold changes from flow - requested >= 3.5 C to >= 3.0 C (the 30 s hold of entry 289 is not mentioned and stays). (3) Counting as entry 428: at most one counted PWM ON per flame-on.
+
+**Changes earlier entries:** entry 288/289/359 (fail-safe 3.5 C, SATcycles.ino:41 SAT_OVERSHOOT_FAILSAFE_DELTA_C) -> 3.0 C. Entry 407 (2.0 C / 60 s switch) now applies at most once per flame. Entry 89 as already changed by entry 428.
+
+**Interpretation (ours):** "flow above 3" is read as flow - requested setpoint >= 3.0 C with the existing 30 s hold (entry 289), since the question quoted the fail-safe as "flow 3.5 C above the request for 30 s". "Flame goes out" is the boiler flame bit (MsgID 0 slave status) dropping, as in the firmware's flame-off detection.
+
+**Compared with thermo-nova (7beaaf5):** no counterpart; thermo-nova re-enables PWM from continuous whenever its overshoot rule holds (heating_control.py:262-305), with no per-flame limit and no fail-safe. This is a deliberate refinement on top of the pin.
+
+**Not settled:** the release scope (2.0.0 or 2.1.0) was asked in Q-2005a and Q-2005b and not answered: Q-2005c. The range-5 start question of Q-2005a stays as today.
+
+**Task:** to be created after the scope answer (TASK-2005 follow-up, owner per the coordinator).
+
+**Open:** scope (Q-2005c).
+
+## 430. Scope of entries 428/429: "top priority for 2.0.0"; he calls the PWM re-entry counting a bug (Sergeant D, 2026-11-19)
+
+**Source:** #dev-sat-mqtt, Sergeant D 2026-11-19 11:17:19 UTC (https://discord.com/channels/812969634638725140/1105556725714649128/1572933791775850578; unedited, read back via the Discord API at 11:23 UTC), posted 19 s after his answer to Q-2005b. Also #beta-testing 11:18:17 UTC to indigo_light (https://discord.com/channels/812969634638725140/914498730001072149/1572934036320682047, unedited): "we found a bug! Thanks for your log!!".
+
+**Quoted:**
+> "This is top priority for 2.0.0"
+
+**Settled:** the release scope of entries 428 and 429 is 2.0.0, top priority. He treats the behaviour (PWM re-entries inside one burn using up the 3/hr limit, the indigo_light beta.360 morning) as a bug. This answers Q-2005c before it was asked (it was posted at 11:19 UTC, after this message; closed as answered by this entry).
+
+**Interpretation (ours):** "This" is read as the decision of entries 428/429 (one PWM entry and one counted PWM ON per flame, continuous until flame-off, fail-safe 3.0 C), since it follows his Q-2005b answer directly and has no reply reference.
+
+**Task:** the coordinator assigns the implementation (TASK-2005 follow-up or a new task).
+
+**Open:** none for the decision; implementation and evidence per the task.
+
+## 431. Q-1942b answered A: a PWM-first heating start with too little demand for a 180 s burn waits in PWM OFF; no change (Sergeant D, 2026-11-20)
+
+**Source:** #dev-sat-mqtt, Sergeant D 2026-11-20 04:05:45 UTC (https://discord.com/channels/812969634638725140/1105556725714649128/1573187571503333439; unedited when read back via the Discord API at ~08:30 UTC), a reply to part 2 of Q-1942b (https://discord.com/channels/812969634638725140/1105556725714649128/1573152314955530292; part 1 https://discord.com/channels/812969634638725140/1105556725714649128/1573152308655558736). Q-1942b was first queued as Q-1942a, renamed because Q-1942a is entry 426.
+
+**Quoted:**
+> "My answer is A"
+
+**Settled:** option A as posted: keep it. A heating start (PWM-first, entries 385/389) whose calculated ON time is under 180 s waits in PWM OFF until the duty is high enough or the off time has passed; no forced 180 s first ON phase (option B) and no continuous start sequence instead (option C). The Q38 rule (an ON phase only when its ON time is at least 180 s) and the hourly start limit (entries 59, 89) stay as they are. Scope 2.0.0: no code change.
+
+**Compared with thermo-nova (7beaaf5):** the ON/OFF start check is the same: pwm.py:154-155 (HEATER_STARTUP_TIMEFRAME 180, const.py:18), the off wait at pwm.py:179-180. thermo-nova starts in continuous (PWM disabled after reset, pwm.py:63/:89; PWM only on a sustained overshoot, heating_control.py:262); the firmware's PWM-first start is Sergeant D's own rule (entries 385/389), which this answer keeps.
+
+**Field evidence behind the question:** 13 heating starts in two real-boiler logs with satsimulation false (indigo_light Vitodens 24 h, gruijter one day): 8 lit at once; 5 of indigo's began in PWM OFF and waited 13 to 19 min at CS 10, four with an ON time of 0 s (duty 0.04 to 0.06), one at the 3/hr limit (TASK-1942 notes).
+
+**Task:** TASK-1942 (AC7, otgw-dev).
+
+**Open:** none.
+

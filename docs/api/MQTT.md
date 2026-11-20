@@ -315,7 +315,7 @@ SAT topics no longer publish on every control cycle. Each topic under `sat/*` us
 
 **Maximum observation delay:** 11 minutes in the worst case (silent value, first heartbeat not yet due). Retained topics recover immediately from broker memory on reconnect; non-retained topics re-appear within 11 minutes.
 
-**MQTT reconnect:** most SAT shadows are **not** reset on reconnect. Retained topics are already present on the broker. Non-retained topics re-publish within 11 minutes via the scheduled heartbeat. This is an intentional divergence from the OT publish contract (ADR-052), whose trackers are reset on a reconnect after more than 5 minutes offline. Exception: the full republish (`requestMQTTRepublishAll()`) also resets the core-state shadows (`satRepublishCoreState()`, TASK-1284), so `sat/enabled`, `sat/active`, `sat/safety_tripped`, `sat/fallback_active`, `sat/push_refused`, `sat/sh_rejected`, `sat/pm25_no_slot`, `sat/room_temp_lost`, `sat/ot_link_lost`, `sat/outside_temp_missing`, `sat/external_temp_enable`, `sat/mode`, `sat/control_mode` and `sat/preset` publish again on the next pass.
+**MQTT reconnect:** most SAT shadows are **not** reset on reconnect. Retained topics are already present on the broker. Non-retained topics re-publish within 11 minutes via the scheduled heartbeat. This is an intentional divergence from the OT publish contract (ADR-052), whose trackers are reset on a reconnect after more than 5 minutes offline. Exception: the full republish (`requestMQTTRepublishAll()`) also resets the core-state shadows (`satRepublishCoreState()`, TASK-1284), so `sat/enabled`, `sat/active`, `sat/safety_tripped`, `sat/fallback_active`, `sat/push_refused`, `sat/sh_rejected`, `sat/pm25_no_slot`, `sat/room_temp_lost`, `sat/ot_link_lost`, `sat/outside_temp_missing`, `sat/external_temp_enable`, `sat/simulation_available`, `sat/mode`, `sat/control_mode`, `sat/preset`, `sat/climate_target` and `sat/climate_current` publish again on the next pass.
 
 **Home Assistant restart:** the ADR-174 republish resets the OT trackers and the SAT core-state shadows listed above. The other SAT shadows keep their last-published state, so the other non-retained `sat/*` topics (the BLE values included) wait for their next change or heartbeat, up to 11 minutes.
 
@@ -326,7 +326,7 @@ SAT topics no longer publish on every control cycle. Each topic under `sat/*` us
 | Constant | Value | Used for |
 |---|---|---|
 | `SAT_EPS_TEMP` | 0.05 °C | `setpoint`, `target`, `room_temp`, `outside_temp` |
-| `SAT_EPS_TEMP_COARSE` | 0.1 °C | `heating_curve`, `overshoot_margin`, `max_setpoint`, `requested_setpoint` |
+| `SAT_EPS_TEMP_COARSE` | 0.1 °C | `heating_curve`, `overshoot_margin`, `pwm_switch_margin`, `max_setpoint`, `requested_setpoint` |
 | `SAT_EPS_PID_OUTPUT` | 0.5 °C | `pid_output` (derivative jitter damping) |
 | `SAT_EPS_PID_TERM` | 0.1 °C | `pid_p`, `pid_i`, `pid_d` |
 | `SAT_EPS_ERROR` | 0.05 °C | `error`, `error_mean` |
@@ -354,16 +354,22 @@ These thresholds are tunable; they are guideline-level under ADR-111 and may be 
 | `sat/fallback_active` | `"true"` / `"false"` | yes | SAT has taken over because MQTT was lost for more than 5 minutes (opt-in setting `SATmqttfallback`, default off; the takeover lives in state and never changes `sat/enabled` or the saved settings). In practice it reads `"false"` over MQTT: the takeover only runs while MQTT is down and is lifted before the first publish after reconnect. REST `GET /api/v2/sat/status` (`fallback_active`) shows it live |
 | `sat/room_temp_lost` | `"true"` / `"false"` | yes | SAT sees no valid room temperature (no source, stale source, or a value outside -10 to 50 C). SAT keeps heating on the heating curve alone: P, I and D are 0, there is no trip and no time limit. Clears when a valid reading returns, and when SAT is switched off. REST `GET /api/v2/sat/status` (`room_temp_lost`) shows it live |
 | `sat/ot_link_lost` | `"true"` / `"false"` | yes | SAT has seen no boiler reply for 30 s (any B frame counts, Data-Invalid replies included). On entering this state SAT sends once the same hand-back as a switch-off (`CS=0`, `CH=1`, `MM=T`) and then sends nothing to the boiler; SAT stays enabled. Clears, and SAT resumes by itself, on the first boiler reply. Not used in SAT simulation; on a PIC gateway in PS=1 summary mode the state is held as it is (no B lines to judge), on OT-Direct PS=1 is checked normally. Not checked without a command interface (no PIC, not OT-Direct): the interface safety trip applies there. Clears when SAT is switched off, without sending the hand-back again. Decided: the 30 s rule and Data-Invalid counting as a reply (maintainer, Q33 A), the automatic resume (Sergeant D, Q34 A, entry 79). REST `GET /api/v2/sat/status` (`ot_link_lost`) shows it live (TASK-1365) |
-| `sat/outside_temp_missing` | `"true"` / `"false"` | yes | SAT has no valid outside temperature: none younger than 1 hour from the external sensor (MQTT/REST), the boiler (MsgID 27, live Read-Ack only, not the PS=1 summary), the weather service, or the value saved with the PID state at the last restart. On entering this state SAT sends once the same hand-back as a switch-off (`CS=0`, `CH=1`, `MM=T`) and then sends nothing to the boiler; SAT stays enabled. Clears, and SAT resumes by itself, on the first pass with a valid outside temperature. Clears when SAT is switched off. Decided by Sergeant D (entries 56, 57, 126). REST `GET /api/v2/sat/status` (`outside_temp_missing`) shows it live (TASK-1390) |
+| `sat/no_ignition` | `"true"` / `"false"` | yes | CH asked (PWM ON phase, or CS above the cold cutoff) for 180 s with the flow below CS and no flame. Diagnostic only, no control action (TASK-1882). |
+| `sat/heating_failure` | `"true"` / `"false"` | yes | SAT at the maximum (setpoint clamped or PWM at maximum duty) for 15 min and the room rose < 0.5 C. Diagnostic only, no control action; slow houses can trigger it on a cold morning (TASK-1882). |
+| `sat/outside_temp_missing` | `"true"` / `"false"` | yes | SAT has no valid outside temperature: none younger than 1 hour from the external sensor (MQTT/REST), the boiler (MsgID 27, live Read-Ack only, not the PS=1 summary; from beta.381 also the PIC's own Read-Ack to the thermostat with the `OT=` value, TASK-2040), the weather service, or the value saved with the PID state at the last restart. On entering this state SAT sends once the same hand-back as a switch-off (`CS=0`, `CH=1`, `MM=T`) and then sends nothing to the boiler; SAT stays enabled. Clears, and SAT resumes by itself, on the first pass with a valid outside temperature. Clears when SAT is switched off. Decided by Sergeant D (entries 56, 57, 126). REST `GET /api/v2/sat/status` (`outside_temp_missing`) shows it live (TASK-1390) |
+| `sat/simulation_available` | `"true"` / `"false"` | yes | `"false"` while a real boiler answers and simulation is off: enabling simulation is refused then (TASK-795). `"true"` otherwise, also while simulation is on, so it can always be switched off. Same rule as the web UI switch, which is disabled while REST `sim_available` is `false` and simulation is off. Published whether SAT is enabled or not. It is the second availability topic of the HA simulation switch (ADR-255, TASK-2014). Right after boot it reads `"true"` until the first boiler reply is seen |
 | `sat/push_refused` | `"true"` / `"false"` | yes | Push setpoint (`SATpushsetpoint`) is on, a `TC=` was pushed, and the thermostat's own setpoint (MsgID 16) still differs from it by more than 0.25 C five minutes or more later: the thermostat refuses the remote setpoint and keeps its own value. Status only, SAT does not push again. Clears on a new push, push off, SAT off, or when the thermostat setpoint matches. Integrations such as Homey can fall back to their own SAT-to-thermostat sync while it is `"true"`. REST `GET /api/v2/sat/status` (`push_refused`) shows it live |
 | `sat/sh_rejected` | `"true"` / `"false"` | yes | The boiler refused SAT's MsgID 57 write (`SH=`, the Max flow setpoint SAT sends): its answer was Data-Invalid or Unknown-DataID. `"false"` while the answer is Write-Ack or not seen yet (no answer since SAT's last `SH=`; on a PIC board the answer only shows when the thermostat itself writes MsgID 57). Status only, SAT keeps sending `SH=` by its normal rules (on a change and once after a restart). Clears on the next `SH=`, a Write-Ack, or when SAT is switched off. Transient, never stored. REST `GET /api/v2/sat/status` (`sh_write`: `"unknown"`, `"accepted"`, `"rejected"`) shows all three states. TASK-1412.13, Sergeant D entry 252 |
 | `sat/pm25_no_slot` | `"true"` / `"false"` | yes | PIC board in gateway mode only. The thermostat has not read the flow temperature (MsgID 25) for 300 s and the last valid flow sample is at least 20 s old, so SAT wants to ask for it with `PM=25`, but either the PIC showed no alternative slot in the last 120 s (no thermostat request it could replace, so a `PM=25` would never be answered) or SAT's last `PM=25` went unanswered (the PIC priority slot came free after 60 s without a boiler reply). Status only: SAT keeps trying while a slot shows. `"false"` when the thermostat reads MsgID 25 itself, the flow sample is fresh, SAT is off, PS=1, monitor mode, or MsgID 25 is marked unsupported. Transient, never stored. No HA discovery entity. REST `GET /api/v2/sat/status` shows it as `pm25_no_slot` with the counters `pm25_sent`, `pm25_answered`, `pm25_unanswered`. TASK-1653, maintainer decision entry 276 The same status also counts SAT's own `PM=28` for a missing return temperature (MsgID 28 without a valid sample for 30 s, same slot rule, no topic of its own): `pm28_sent`, `pm28_answered`, `pm28_unanswered` (TASK-1759 part C, entry 296). |
 | `sat/active` | `"true"` / `"false"` | yes | Whether SAT controller is actively controlling; `"false"` while disabled or tripped |
 | `sat/setpoint` | `"43.1"` | yes | Final flow temperature setpoint sent to boiler (°C) |
 | `sat/target` | `"21.0"` | yes | Target room temperature (°C) |
+| `sat/climate_target` | `"21.0"` | yes | Target on the Home Assistant thermostat card: SAT's target while SAT is enabled, the thermostat setpoint (TrSet) while SAT is off (°C). Also published while SAT is off (TASK-1979) |
+| `sat/climate_current` | `"20.8"` | yes | Room temperature on the thermostat card: the temperature SAT regulates on while SAT is enabled, the thermostat room temperature (Tr) while SAT is off (°C). Also published while SAT is off (TASK-1979) |
 | `sat/heating_curve` | `"42.3"` | yes | Heating curve calculated value (°C) |
 | `sat/pid_output` | `"43.1"` | yes | PID output = curve + P + I + D (°C) |
-| `sat/overshoot_margin` | `"2.0"` | yes | Configured overshoot margin (°C) |
+| `sat/overshoot_margin` | `"2.0"` | yes | Configured overshoot margin (°C), for the cycle classification |
+| `sat/pwm_switch_margin` | `"2.0"` | yes | Continuous to PWM when flow - requested setpoint stays at or above this for 60 s (°C, 0.5-5.0, default 2.0; TASK-1888, TASK-2005, entry 407). A stored old default of 1.5 becomes 2.0 once (Q-407a); a value set by the user stays |
 | `sat/requested_setpoint` | `"43.0"` | no | Requested flow setpoint including the solar offset, clamped to the minimum setpoint and `sat/max_setpoint` (°C) |
 | `sat/max_setpoint` | `"62.0"` | yes | Maximum flow setpoint SAT works with (°C) (TASK-1373): the user's Max flow setpoint (`set/<node>/sat/max_setpoint`) cut into the boiler's MsgID 49 bounds (20 to 80 without them), at most 50 for underfloor, 40 for a heat pump and 65 (the old global ceiling). While the user has not chosen a value: 62 for radiators, 50 for underfloor, 40 for a heat pump. Before TASK-1373 this was the fixed 62 / 45 / 40 table |
 | `sat/modulation_state` | `"OFF"` / `"HOT_WATER"` / `"PWM_OFF"` / `"COLD"` / `"ACTIVE"` | no | Modulation state. `"OFF"` while SAT is not active; `"COLD"` = flow temperature below 22 °C |
@@ -537,6 +543,8 @@ The example values are illustrative, not the defaults.
 | `sat/thermal_drop_rate` | `"0.03"` | no | Current thermal drop rate sample |
 | `sat/thermal_model_valid` | `"true"` | yes | Whether thermal model has sufficient data |
 
+The coefficient is learned only while SAT controls the boiler, that is while the previous control pass got past every gate. When SAT stops controlling, the decay period that is being measured ends, so a sample never spans a stretch where the flame state was not known (TASK-2010; telnet "SAT thermal: learning paused, SAT is not controlling the boiler").
+
 #### Heating Curve Self-Tune Progress
 
 Telemetry of the self-tune (TASK-1881), published only while `curve_self_tune` is on. Values change once an hour at most.
@@ -547,11 +555,10 @@ while a restored window keeps its counted days.
 | Topic | Value | Retained | Description |
 | ----- | ----- | -------- | ----------- |
 | `sat/curve_tune/running` | `"true"` / `"false"` | no | The self-tune clock runs (self-tune on and SAT enabled) |
-| `sat/curve_tune/days` | `"2"` | no | Counted days in the window (3 are needed for a decision) |
-| `sat/curve_tune/clean_hours_today` | `"4"` | no | Clean hours of the current day (6 are needed for the day to count) |
-| `sat/curve_tune/last_decision` | `"hold"` | no | Last daily decision: `raise`, `lower`, `hold`, or `none` before the first day closes |
-| `sat/curve_tune/last_reason` | `"few_days"` | no | Reason of the last daily record: `few_days`, `day_not_counted`, `no_phases`, `inside_band`, `phases_disagree`, `phases_agree`, `at_limit` (`none` before the first day) |
-| `sat/curve_tune/excluded_hours/<reason>` | `"3"` | no | Hours that did not count, per reason (the first reason of each hour), one topic per reason: `not_sat`, `dhw`, `no_sun`, `sun`, `pwm`, `flame_off`, `min_mod`, `coeff_changed`, `no_ticks`, `not_controlling`, `few_ticks`, `no_room` |
+| `sat/curve_tune/window_hours` | `"5"` | no | Counted hours in the window (12 are needed for a decision; ADR-260 replaced `sat/curve_tune/days` and `sat/curve_tune/clean_hours_today`) |
+| `sat/curve_tune/last_decision` | `"hold"` | no | Last hourly decision: `raise`, `lower`, `hold`, or `none` before the first hour closes |
+| `sat/curve_tune/last_reason` | `"few_days"` | no | Reason of the last hourly record (`day_not_counted` = the hour did not count, `few_days` = fewer than 12 counted hours in the window): `few_days`, `day_not_counted`, `no_phases`, `inside_band`, `phases_disagree`, `phases_agree`, `at_limit` (`none` before the first hour) |
+| `sat/curve_tune/excluded_hours/<reason>` | `"3"` | no | Hours that did not count, per reason (the first reason of each hour), one topic per reason: `not_sat`, `dhw`, `no_sun`, `sun`, `pwm`, `flame_off`, `min_mod`, `coeff_changed`, `no_ticks`, `not_controlling`, `few_ticks`, `no_room`, `diag_event` (a no-ignition or heating-failure event was active, Sergeant D entry 358, TASK-1882) |
 
 #### Solar Gain
 
@@ -853,6 +860,8 @@ See `docs/api/MQTT-message-id-echo-audit.md` for the full per-MsgID classificati
 
 Retained, republished every 60 s while an override is active (not refreshed for 10 minutes = stale). Home Assistant gets one sensor per override-capable MsgID (Gateway device). For `MaxRelModLevelSetting/override` (MsgID 14) the value is the percentage the PIC applies after `MM=`: the substituted write (`R` frame, e.g. `100.00` after `MM=100`), unit `%`, no `device_class` (the other override sensors stay `temperature`, `°C`). The Write-Ack of that write is not used: its data byte is per spec undefined for MsgID 14 (`bSlaveEchoesValue` false). Before TASK-1389 this topic showed `0.00` and was declared as a temperature.
 
+The override store is RAM only, so a reboot forgets every override. After each MQTT connect the firmware therefore sends an empty retained message (which removes a retained topic) to `{label}/override` for every f8.8 MsgID that has no active override in the store, one topic at a time, at least 100 ms apart and only while the outbox is shallow, once the connect burst is done (about 40 topics, a few seconds). An override that is active again keeps its topic and is republished within 60 s. Before TASK-1991 a topic retained from before the reboot stayed, and Home Assistant kept showing the old value (`OTGW-Core.ino` staleOverrideClear, `MQTTstuff.ino` staleOverrideClearTick).
+
 #### Migration note (2.0.0 topic-shape transition)
 
 Two changes shipped in successive 2.0.0 alpha builds. Migration guidance:
@@ -1015,6 +1024,7 @@ SAT-specific commands are nested under the `sat/` sub-topic. All commands are su
 | Topic Suffix | Payload | Description |
 | ------------ | ------- | ----------- |
 | `sat/target` | `"21.5"` | Set SAT target room temperature (5.0-30.0 °C, persisted to flash) |
+| `sat/climate_target` | `"21.5"` | The Home Assistant thermostat card's target (°C). While SAT is enabled it sets SAT's target like `sat/target` (and selects a preset with the same temperature); while SAT is off it sends `TT=<value>` as before (TASK-1979). The thermostat card in Home Assistant sends the bare number here |
 | `sat/indoor_temp` | `"20.8"` | Push external indoor temperature (expires after sensor max age) |
 | `sat/outdoor_temp` | `"8.0"` | Push external outdoor temperature (expires after sensor max age) |
 | `sat/enabled` | `"true"` / `"false"` | Enable or disable SAT controller |
@@ -1051,7 +1061,7 @@ SAT-specific commands are nested under the `sat/` sub-topic. All commands are su
 
 | Topic Suffix | Payload | Description |
 | ------------ | ------- | ----------- |
-| `sat/sun_elevation` | `"32.5"` | Push sun elevation in degrees (from HA sun entity) |
+| `sat/sun_elevation` | `"32.5"` | Push sun elevation in degrees (from HA sun entity). Wins over the value computed from the weather latitude/longitude while younger than 1 hour; REST `sat/status` reports `sun_elevation_source` (TASK-2015) |
 | `sat/solar_min_elevation` | `"12.0"` | Set minimum sun elevation for solar gain activation |
 
 **PV-surplus Boost (TASK-640):**
@@ -1114,6 +1124,7 @@ These topics update the matching SAT setting directly. Payloads are numeric stri
 | `sat/heating_curve_coeff` | `SATcoefficient` | Heating curve coefficient (state echo: `sat/heating_curve_coeff`; the state topic `sat/heating_curve` is the computed curve value). Renamed from `sat/heating_curve` in TASK-1485, no alias: the old command is ignored. The REST setting `POST /api/v2/sat/settings/heating_curve_coeff` uses the same name since TASK-1496 |
 | `sat/interval` | `SATinterval` | Control loop interval (seconds) |
 | `sat/overshoot_margin` | `SATovershootmargin` | Overshoot margin (°C) |
+| `sat/pwm_switch_margin` | `SATpwmswitchmargin` | PWM switch margin (°C) |
 | `sat/manufacturer` | `SATmanufacturer` | Boiler manufacturer name |
 | `sat/max_modulation` | `SATmaxmodulation` | Max relative modulation % (0 to 100; 100 = no cap). Caps every `MM=` SAT sends. Home Assistant discovers it as the number entity `SAT Max Relative Modulation` (0 to 100, step 1); the SAT page has a slider for it in the Central Heating Settings card (TASK-1514) |
 | `sat/dhw_setpoint` | `SATdhwsetpoint` | DHW setpoint (°C) |
@@ -1300,7 +1311,7 @@ SAT entities are announced with the non-OT discovery IDs 251 to 255 (`queueNonOT
 
 Not every `sat/*` topic has an entity. The audit in [`docs/sat/sat-ha-entity-audit.md`](../sat/sat-ha-entity-audit.md) (TASK-1486) lists the 91 published `sat/*` state topics without one, with a decision per topic: add an entity, MQTT-only, or open.
 
-**Thermostat climate entity:** there is no separate SAT climate entity. The thermostat climate entity (`<HaPrefix>/climate/<node>/climate/config`, room temperature from `Tr`, target from `TrSet`) carries `json_attributes_topic` = `sat/climate_attributes`.
+**Thermostat climate entity:** there is no separate SAT climate entity. The thermostat climate entity (`<HaPrefix>/climate/<node>/climate/config`) keeps its unique id and carries `json_attributes_topic` = `sat/climate_attributes`. Since TASK-1979 (ADR-248) it follows SAT while SAT is enabled: the target command goes to `set/<node>/sat/climate_target` (bare value, `{{ value }}`), the target and current temperature come from `sat/climate_target` and `sat/climate_current`, and the presets `comfort`, `eco`, `away`, `sleep`, `activity` and `home` use `set/<node>/sat/preset` and `sat/preset` (`none` is not listed, Home Assistant refuses it). While SAT is off `sat/climate_target` and `sat/climate_current` carry `TrSet` and `Tr`, and the card sends `TT=` as before. The two state topics are forced out again on every SAT enable or disable and on a full republish (Home Assistant online), and are re-sent at least every 300 s when unchanged, like `hvac_mode`. `min_temp` is 5 C. The mode (off/heat/cool) stays read-only; the discovery payload does not change when SAT is switched.
 
 **Sensor entities, SAT control (ID 252):**
 
@@ -1324,6 +1335,7 @@ Not every `sat/*` topic has an entity. The audit in [`docs/sat/sat-ha-entity-aud
 | `sat/overshoot_fraction` | % | Raw 0-1 value x 100 |
 | `sat/cycle_phase` | - | Cycle phase |
 | `sat/overshoot_margin` | °C | Overshoot margin |
+| `sat/pwm_switch_margin` | °C | PWM switch margin |
 | `sat/cycles_this_hour` | - | `state_class` `measurement` (rolling-hour count, falls as starts leave the hour) |
 | `sat/pwm_last_cmd_on_s`, `sat/pwm_last_ignition_delay_s`, `sat/pwm_last_flame_on_s` | s | Diagnostic; last closed PWM ON phase (TASK-1880) |
 | `sat/pwm_last_ignited` | - | Diagnostic; 1 lit, 0 never lit (TASK-1880) |
@@ -1388,7 +1400,7 @@ Not every `sat/*` topic has an entity. The audit in [`docs/sat/sat-ha-entity-aud
 | `sat/pressure_health` | problem, diagnostic | `ON` / `OFF` | ON = pressure problem (TASK-1490, after TASK-1485) |
 | `sat/setpoint_sync`, `sat/modulation_sync`, `sat/ch_sync` | problem, diagnostic | `ON` / `OFF` | ON = the boiler does not follow the commanded value (TASK-1490) |
 | `sat/window_open` | window | `true` / `false` | Window detection state (TASK-1490) |
-| `sat/fallback_active`, `sat/room_temp_lost`, `sat/ot_link_lost`, `sat/push_refused`, `sat/sh_rejected` | problem, diagnostic | `true` / `false` | SAT handed control back, and its causes (TASK-1490, audit section 2) |
+| `sat/fallback_active`, `sat/room_temp_lost`, `sat/ot_link_lost`, `sat/no_ignition`, `sat/heating_failure`, `sat/push_refused`, `sat/sh_rejected` | problem, diagnostic | `true` / `false` | SAT handed control back, and its causes (TASK-1490, audit section 2) |
 | `sat/ble_temp_valid` | none, diagnostic (ID 251) | `true` / `false` | The BLE temperature reading is valid and not stale. Announced as a sensor before TASK-1462; the old `sensor/<node>/sat_sat_ble_temp_valid` config is emptied (retained) by every SAT discovery pass |
 | `sat/weather/is_day` | - | `1` / `0` | Daylight (ID 253) |
 
@@ -1421,6 +1433,8 @@ Each switch publishes its state to `%mqtt_pub_topic%/<state topic>` and takes co
 | `-sat-curve-self-tune-enable` | `sat/curve_self_tune` | `sat/curve_self_tune_enable` | `mdi:auto-fix` |
 | `-sat-fireplace-mode` | `sat/fireplace_mode` | `sat/fireplace_mode` | `mdi:fireplace` |
 | `-sat-enabled` | `sat/enabled` | `sat/enabled` | `mdi:power`; SAT on/off (TASK-1490) |
+
+Every switch is available while the device availability topic (`avty_t`, the LWT) says `online` (ADR-102). The simulation switch (`-sat-simulation-enable`) has a second availability topic instead (ADR-255): `avty` lists the device topic and `%mqtt_pub_topic%/sat/simulation_available` (`pl_avail` `"true"`, `pl_not_avail` `"false"`) with `avty_mode` `all`, so Home Assistant shows it unavailable while a boiler answers and enabling simulation would be refused (TASK-795). Before TASK-2014 the switch jumped back to off instead. Needs Home Assistant 2021.2 or later for `availability_mode`.
 
 **Select entity (TASK-284):**
 

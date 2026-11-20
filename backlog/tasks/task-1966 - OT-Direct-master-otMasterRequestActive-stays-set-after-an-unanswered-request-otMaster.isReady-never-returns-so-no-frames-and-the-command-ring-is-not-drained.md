@@ -4,11 +4,11 @@ title: >-
   OT-Direct master: otMasterRequestActive stays set after an unanswered request;
   otMaster.isReady() never returns, so no frames and the command ring is not
   drained
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-15T10:14:00Z'
-updated_date: '2026-11-15T14:50:00Z'
+updated_date: '2026-11-15T23:38:00Z'
 labels:
   - otdirect
   - bench-finding
@@ -29,7 +29,7 @@ Description: Bench 09, 2026-11-15 ~11:00, .61 (OT-Direct, no boiler, no thermost
 - [x] #1 Reproduce on .61: mode switch gateway->master with commands right after (and/or past a micros() wrap at ~71.6 min uptime); record the time, the trigger, the telnet lines before the stall, and whether device/info uptime/heap still move
 - [x] #2 Cause with evidence: which of rxStatus/txStatus/delayTimestamp keeps isReady() false, and why the text ring empties without running the commands
 - [x] #3 Host test on the real loopOTDirect code with a fake library stuck in TX_DATA: red on the current code (request stays active, ring not drained / 503), green on the fix (recovery within ~1.5 s, log line, commands run again)
-- [ ] #4 Bench on .61: frames and command handling keep running >= 2 h (past at least one micros() wrap) and after the repro sequence
+- [x] #4 Bench on .61: frames and command handling keep running >= 2 h (past at least one micros() wrap) and after the repro sequence
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -48,4 +48,12 @@ Change after self-review (before d3's read): the TX-stall threshold is 500 ms, n
 Review d3 (independent second read of 8d481216b): F1 race fixed. keepFresh() sampled micros() before reading requestTimestamp; the TX timer ISR rewrites requestTimestamp every 0.5 ms tick (OpenTherm.cpp:188), so a tick in between made now - requestTimestamp a few us negative = ~4.29e9 unsigned = a false stall and an end()/begin() mid-frame (d3 estimate: tens per hour; my single-threaded harness could not see it). Now a signed compare. Host case test_5 (requestTimestamp = now + 5 us): FAIL on 8d481216b (unsigned), OK on the fix; the test file is 5/5. d3 also confirmed: 500 ms threshold fine, end()/begin() mid-frame safe (handleMasterResponse then sees NONE, the flag clears), setDelay/smart power not affected, no conflict with TASK-1954.
 
 Host harness: test/host/test_override_reply.cpp slices loopOTDirect() and got an otdMasterGuard() stub (test-only); test/host/test_override_reply.py 4/4 on the lane. test/host sweep on the lane: 30/31 green within 240 s each; test_dhw_water_meter.py (> 10 min) runs separately.
+
+2026-11-16 00:31, 09 bench AC4 PASS on .61 (release 2.0.0-beta.323+0fa19ca, bootcount 795 throughout, boot ~21:48:20). Repro sequence at 21:50:45-21:50:52 (gateway->master, then SW=0/SH=0/OT=-/MM=- right after, all accepted). Passive logger 21:51:48-00:31:14, uptime 112 -> 9678 s (2 h 39 min): 174 samples, R frames per 60 s min 49 / max 50, 0 samples below 49; PR=T answered (HTTP 202 + 'PR: T=10' on telnet) in all 174; otdcmdringdrops 0, stale 0, txrestarts 0; uptime monotonic, no reboot. Past 2^31 us (samples at up 2102/2158/2213 s: 49/49/50 frames) and past the 2^32 us wrap (up 4259/4314/4369 s: 49/49/49). Settings restore check: /settings.ini byte-identical to the pre-run snapshot (5666 B, cmp), /api/v2/settings 164 keys, diff []. Evidence (local, 09 scratchpad n1966/): watch.log, telnet.raw, S0/S1.ini, S0/S1.json. .61 now goes to the TASK-1990 smoke build.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+OT-Direct master line fell silent for 35.8 min every 71.6 min without a valid boiler answer: the OpenTherm library's isReady() compares micros() - delayTimestamp against 2^31 and delayTimestamp only moves on a valid answer (OpenTherm.cpp:136/:443/:457-460). AC1: reproduced on .61, stop 2147.5 s after the last valid frame (prediction 2^31 us, within 2 s), back 35.8 min later. AC2: cause traced to delayTimestamp/isReady() as above; the text ring emptied because commands were dequeued while the line refused requests. AC3: host test on the real code red on the old code, green on the fix (since superseded by TASK-1980, which pins the fixed library and removes the workaround; tests/test_otd_master_line_stale_delay.py now runs the real library, red on pin f7d8254, green on 51aa68e). AC4 (09): beta.302+efd59a3 88 min past both wraps (13:26-14:55, R >= 49/min); and on the public beta.323+0fa19ca after the repro sequence (gateway->master + SW/SH/OT/MM at once), 2 h 39 min, 174 samples, 49-50 R frames per 60 s, PR=T answered every sample, bootcount 795 constant. Upstream: Phunkafizer/opentherm_library#1 (TASK-1977). Not verified: a real boiler that disappears and comes back.
+<!-- SECTION:FINAL_SUMMARY:END -->

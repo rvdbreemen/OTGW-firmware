@@ -128,7 +128,7 @@ class FloatRoundTrip(unittest.TestCase):
             cls.decimals[m.group(1)] = int(tail.group(1)) if (tail and cls.has_decimals) else 2
         # key -> clamp range, from updateSetting()
         cls.rng = {}
-        for m in re.finditer(r'PSTR\("(\w+)"\)\) == 0\)\s+settings\.[\w.\[\]]+ = clampSettingFloat\(newValue,[^,]+,\s*(-?[\d.]+)f?,\s*(.+?)\);\s*$', src, re.M):
+        for m in re.finditer(r'PSTR\("(\w+)"\)\) == 0\)\s+settings\.[\w.\[\]]+ = clampSettingFloat\(newValue,[^,]+,\s*(-?[\d.]+)f?,\s*(.+?)\);\s*(?://.*)?$', src, re.M):   # a trailing // comment is allowed (TASK-1888)
             hi = m.group(3).strip().rstrip("f")
             try:
                 hi = float(hi)

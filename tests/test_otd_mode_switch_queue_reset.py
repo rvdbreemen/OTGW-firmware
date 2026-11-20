@@ -112,8 +112,13 @@ static bool otdOwnFramesAllowed(bool, bool) { return true; }
 static bool otIsVentSlave() { return false; }
 static constexpr uint32_t OTD_MWT_MS = 100;   // TASK-1954: MWT floor of the scheduler; never stamped in this harness
 static uint32_t otdLastConvEndMs = 0;
+#define IS_MASTER_MODE() (otCurrentMode == OTD_MODE_MASTER)
+static bool otSlaveFramePending = false;               // TASK-1812: a waiting thermostat write holds the scheduler
+static unsigned long otSlaveFrame = 0;
+static bool otdMasterRelaysWrite(unsigned long) { return false; }
 static unsigned long buildStatusRequest() { return 0; }
 static bool otdIsAltSlot(uint8_t) { return true; }
+static unsigned long otdSrReply(unsigned long, unsigned long r) { return r; }   // TASK-1804 A6: SR= not under test here (test_otd_sr_alt_slot)
 static uint8_t otdAltScheduleIndex(uint32_t) { return OT_SCHEDULE_SIZE; }
 static void otdNoteThermostatFrame(unsigned long, uint32_t) {}
 static unsigned long buildOTResponse(uint8_t, uint8_t, uint16_t) { return 0; }

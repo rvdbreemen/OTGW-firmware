@@ -3,11 +3,11 @@ id: TASK-1940
 title: >-
   Port TASK-1147 to 2.x: opt-in readout of the PIC-attached temperature sensor
   (PR=E every 3 min) to MQTT, HA and REST, PIC Classic only
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-14T16:07:00Z'
-updated_date: '2026-11-14T22:11:00Z'
+updated_date: '2026-11-16T07:55:00Z'
 labels:
   - pic
   - port
@@ -48,3 +48,9 @@ Port choices: setting in PICBootSection (settings.picBoot.bTempSensor) under the
 
 AC4 bench part ticked by 09 (bench-tester) from its 2026-11-14 bench on .63 (Classic, PIC 6.8 pic16f1847) with beta.254+f12af9f, plus .61 with beta.255/257: setting off (default) 4.5 min telnet 0x PR=E (.63, 18:35:46-18:40:22); setting on at 18:40:37 -> PR=E inserted at 18:40:38.405 and 18:43:38.464 (3 min cadence); no otgw-pic/temperature_reading topic and no PIC_Temperature_Reading discovery in 215 s (.63 has no sensor: 'no entity without a sensor' holds); on OT-Direct (.61, 255) setting on 4 min: 0x PR=E. Settings row 'PIC temperature sensor' under OpenTherm Gateway, i-text only, 0 JS errors (257 smoke, CDP). Build green (95: beta.257 22:39 exit 0) and evaluate are 95's evidence. CAVEAT: on .63 no PIC reply to any PR= is processed at all (TASK-1943), so the 'PR: E=-' reply itself was not seen; 'no entity' is observed, the '-' handling path is covered only by the host test of AC2. Evidence: 09 scratchpad b254/, b255/, b257/.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Closed by comms 92 on the coordinator's order (2026-11-16), from the task's own notes. Commits 3b34a11df (port of 1.x task 1147), 33e7cb71c and 0c40e8dc8 (help text), 95ff27f17 (host harness). AC1-AC3: host tests test_pic_temp_sensor_port 8/8 (7 FAIL on origin/dev before the change), test_otd_reply_texts_pic 4/4, test_otd_sc_clock 8/8, the shared PR=E reply covered; evaluate --quick 86/0. AC4: bench 09 on .63 (Classic, PIC 6.8) beta.254+f12af9f: setting off 0 PR=E in 4.5 min; on: PR=E every 3 min; no topic and no discovery without a sensor (no entity holds); .61 (OT-Direct) 0 PR=E; settings row shown, 0 JS errors (f4bcebab1, 09 scratchpad b254/ b255/ b257/). Caveat: on .63 no PIC PR= reply is processed (TASK-1943), so the 'E=-' reply was not seen on the bench; that path rests on the AC2 host test.
+<!-- SECTION:FINAL_SUMMARY:END -->

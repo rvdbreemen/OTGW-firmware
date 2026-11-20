@@ -307,6 +307,12 @@
       "mode_unknown": "Unknown",
       "status_title": "{{state}} · {{mode}} mode",
       "hostname_fallback": "device",
+      "upd_new": "New version available: {{ver}}",
+      "upd_dismiss": "Hide until a newer version",
+      "upd_ask_title": "Check for new versions?",
+      "upd_ask_body": "The web UI can show a notice when a newer firmware is on GitHub. For that, your browser asks api.github.com at most every 6 hours; the gateway itself sends nothing. You can change this later in Settings.",
+      "upd_ask_yes": "Yes, check",
+      "upd_ask_no": "No",
       "ip_static": "static",
       "tip_eth": "IP {{ip}} ({{mode}}) · Wired",
       "tip_ap": "IP {{ip}} · AP mode",
@@ -332,6 +338,7 @@
       "series_ret": "return",
       "series_ch_set": "control setpoint",
       "series_room_set": "thermostat setpoint",
+      "series_sat_target": "SAT target",
       "series_room": "room",
       "series_outside": "outside",
       "series_dhw": "DHW temperature",
@@ -562,8 +569,8 @@
       "sat_max_hint": "SAT never sends a flow setpoint above this. Until you move the slider SAT uses 62 °C (50 °C underfloor) and sends nothing to the boiler; a chosen value is also sent to the boiler (SH=). Max relative modulation caps the modulation SAT sends (MM=); 100 % is no cap. Some boilers ignore it.",
       "sat_max_mod": "Max relative modulation",
       "sat_nodata": "SAT status is unavailable on this device.",
-      "sat_ot_lost": "OpenTherm lost: boiler handed back",
-      "sat_outside_missing": "No outside temperature for 1 hour: boiler handed back",
+      "sat_ot_lost": "SAT paused: no OpenTherm connection, the boiler is back under normal control",
+      "sat_outside_missing": "SAT paused: no outside temperature for 1 hour, your thermostat controls the boiler",
       "sat_pid": "PID controller",
       "sat_presets": "Presets",
       "sat_presets_hint": "Pick a preset or set the temperature — SAT works out the boiler.",
@@ -823,7 +830,7 @@
       "onb_step_tuning": "Tuning",
       "onb_step_sources": "Sources health",
       "onb_beta_title": "Before you enable SAT",
-      "onb_beta_ack": "I understand that SAT is experimental and controls my boiler.",
+      "onb_beta_ack": "I understand that SAT takes over control of my boiler.",
       "onb_welcome_title": "Let's tune SAT for your system",
       "onb_welcome_body": "The {{name}} takes over control of your boiler, driving flow temperature from the room. Four short questions set it up.",
       "onb_welcome_note": "SAT stays <b>disabled</b> until you finish, nothing changes on your boiler yet.",
@@ -1013,7 +1020,7 @@
           "title": "S0 Pulse Counter"
         },
         "sat": {
-          "desc": "Standalone Adaptive Thermostat.",
+          "desc": "Smart Autotune Thermostat.",
           "title": "SAT — Smart Thermostat"
         },
         "sensors": {
@@ -1113,6 +1120,8 @@
         "hostname": "Hostname",
         "httppasswd": "Admin password",
         "ledblink": "Blink LED on OT traffic",
+        "updatecheck": "Check GitHub for new versions",
+        "updatecheckbeta": "Also tell about beta versions",
         "legacyport25238enabled": "Legacy TCP port 25238",
         "mqttbroker": "Broker",
         "mqttbrokerport": "Port",
@@ -1201,6 +1210,7 @@
         "satmultiarea": "Enable multi-area",
         "satmultiareacount": "Area count",
         "satovershootmargin": "Overshoot margin",
+        "satpwmswitchmargin": "PWM switch margin",
         "satovershootprotection": "PWM overshoot protection",
         "satpresetactivity": "Activity preset",
         "satpresetaway": "Away preset",
@@ -1495,6 +1505,8 @@
       "sat_fb_reason_thermostat_lost": "Thermostat lost",
       "sat_fb_reason_mqtt_lost": "MQTT lost for more than 5 minutes",
       "sat_why_takeover": "SAT took over the boiler: {{reason}}.",
+      "sat_why_no_ignition": "No ignition: SAT asked for heat for 3 minutes, the boiler did not light.",
+      "sat_why_heating_failure": "Heating failure? 15 minutes at the maximum, the room only went from {{start}} to {{end}} °C.",
       "sat_why_pwm_no_reply": "No on/off cycling (PWM) yet: the boiler has not answered the configuration request (MsgID 3).",
       "sat_why_pwm_denied": "No on/off cycling (PWM): the boiler reports that it does not allow it (MsgID 3 bit 4).",
       "sat_why_mod_suppressed": "On/off cycling: modulation is held low during this burner phase.",
@@ -1514,6 +1526,7 @@
       "kv_fetch_errors": "Fetch errors",
       "kv_humidity": "Humidity",
       "kv_i_term": "I term",
+      "kv_i_not_applied": "(not applied: curve only until a room temperature)",
       "kv_indoor_sensor": "Indoor sensor",
       "kv_last_blocked_cmd": "Last blocked cmd",
       "kv_last_cycle": "Last cycle",
@@ -1558,8 +1571,8 @@
       "sat_age_min_one": "updated {{count}} min ago",
       "sat_age_min_other": "updated {{count}} min ago",
       "sat_age_now": "updated just now",
-      "sat_beta_body": "We need field data to validate it. Please run the capture tool now and then (scripts/capture-mqtt-debug.bat on Windows, scripts/capture-mqtt-debug.sh on Linux or macOS) and share the transcript in the Discord #alpha-testing channel (discord.gg/zjW3ju7vGQ) or as a GitHub issue (github.com/rvdbreemen/OTGW-firmware/issues).",
-      "sat_beta_head": "SAT is experimental in this beta and it controls your boiler.",
+      "sat_beta_body": "Field data helps us improve it. Please run the capture tool now and then (scripts/capture-mqtt-debug.bat on Windows, scripts/capture-mqtt-debug.sh on Linux or macOS) and share the transcript in the Discord #beta-testing channel (discord.gg/zjW3ju7vGQ) or as a GitHub issue (github.com/rvdbreemen/OTGW-firmware/issues).",
+      "sat_beta_head": "SAT controls your boiler. This is a beta firmware.",
       "sat_big_at_target": "At target · idle",
       "sat_big_heating_to": "Heating to {{temp}}",
       "sat_big_off": "SAT is off",
@@ -1604,8 +1617,10 @@
       "sat_geo_denied": "Location denied: the browser blocked access",
       "sat_geo_detecting": "Detecting…",
       "sat_geo_error": "Location error",
-      "sat_geo_hint": "Location detection needs HTTPS. Enter Latitude and Longitude under SAT settings > Weather.",
+      "sat_geo_hint": "Location detection needs HTTPS. Enter Latitude and Longitude under SAT settings > Weather, or let Home Assistant publish sat/sun_elevation.",
       "sat_geo_needs_https": "Location detection needs HTTPS",
+      "sat_sun_from_ha": "Sun position from Home Assistant (sat/sun_elevation): {{deg}}°. No location needed.",
+      "sat_sun_ha_weather_loc": "The weather fetch still needs Latitude and Longitude under SAT settings > Weather.",
       "sat_geo_save_failed": "Save failed",
       "sat_geo_timeout": "Location timed out",
       "sat_geo_unavailable": "Location unavailable",
@@ -1648,19 +1663,19 @@
       "sat_system_radiator": "radiator",
       "sat_system_underfloor": "underfloor",
       "sat_takeover": "Takeover (MQTT lost)",
-      "sat_tune_days": "{{days}}/{{need}} counted days, today {{clean}}/{{cleanNeed}} clean hours",
+      "sat_tune_days": "{{days}}/{{need}} counted hours in the window",
       "sat_tune_dec_hold": "held",
       "sat_tune_dec_lower": "lowered",
       "sat_tune_dec_raise": "raised",
       "sat_tune_excl_item": "{{reason}} {{hours}} h",
       "sat_tune_excluded": "Hours not counted: {{list}}",
       "sat_tune_excluded_none": "No hours left out",
-      "sat_tune_last": "Last day: {{decision}} ({{reason}})",
-      "sat_tune_last_none": "No day closed yet",
+      "sat_tune_last": "Last hour: {{decision}} ({{reason}})",
+      "sat_tune_last_none": "No hour closed yet",
       "sat_tune_off": "Self-tune is off",
       "sat_tune_r_at_limit": "coefficient at its limit",
       "sat_tune_r_coeff_changed": "coefficient changed",
-      "sat_tune_r_day_not_counted": "too few clean hours",
+      "sat_tune_r_day_not_counted": "hour not counted",
       "sat_tune_r_dhw": "hot water",
       "sat_tune_r_few_days": "window not full yet",
       "sat_tune_r_few_ticks": "too few samples",
@@ -1670,6 +1685,7 @@
       "sat_tune_r_no_floating": "no data at target",
       "sat_tune_r_no_phases": "no room temperature data",
       "sat_tune_r_no_room": "room temperature lost",
+      "sat_tune_r_diag_event": "no ignition or heating failure",
       "sat_tune_r_no_sun": "no sun position",
       "sat_tune_r_no_ticks": "no data",
       "sat_tune_r_no_warmup": "no warm-up data",
@@ -1686,18 +1702,11 @@
     "values": {
       "save_failed_http": "Save failed (HTTP {{status}})",
       "save_failed": "Save failed",
-      "ble_risk_title": "BLE without PSRAM — instability risk",
-      "ble_risk_text": "This board has no PSRAM. Enabling BLE takes ~64 KB of internal memory that the web server needs, so the Web UI can become unstable or unreachable under load (you may need to reboot). Enable BLE anyway?",
-      "ble_keep_off": "Keep BLE off",
-      "ble_enable_anyway": "Enable anyway (accept risk)",
-      "ble_kept_off": "BLE kept off",
-      "ble_enabled_accepted": "BLE enabled — risk accepted",
+      "ble_needs_psram": "BLE needs PSRAM. This board has none, so BLE stays off: the scanner uses up the memory the gateway needs.",
       "ble_clearing": "Clearing roster…",
       "ble_title": "BLE sensors",
       "ble_slots": "{{used}} / {{max}} slots used",
       "ble_slots_prefix": "{{used}} / {{max}} slots used · prefix \"{{prefix}}\"",
-      "ble_paused": "BLE is paused: this board has no PSRAM, and BLE scanning starts only after you accept the stability warning.",
-      "ble_read_warning": "Read the warning",
       "ble_rescan": "Rescan",
       "ble_scanning": "Scanning…",
       "ble_scanning_toast": "Scanning for BLE sensors…",
@@ -3202,7 +3211,7 @@
   }
   // [key, label, colour, kind]: t = temperature line (auto-scaled), m = modulation area, l = on/off lane
   var GSER = [['flow', 'boiler', '#f85149', 't'], ['ret', 'return', '#58a6ff', 't'], ['chSet', 'control setpoint', '#8b949e', 't'],
-    ['roomSet', 'thermostat setpoint', '#d29922', 't'], ['room', 'room', '#3fb950', 't'], ['outside', 'outside', '#a371f7', 't'], ['dhw', 'DHW temperature', '#f778ba', 't'],
+    ['roomSet', 'thermostat setpoint', '#d29922', 't'], ['satTarget', 'SAT target', '#e0c341', 't'], ['room', 'room', '#3fb950', 't'], ['outside', 'outside', '#a371f7', 't'], ['dhw', 'DHW temperature', '#f778ba', 't'],
     ['mod', 'modulation', '#00bffe', 'm'], ['flame', 'flame', '#ff7b00', 'l'], ['dhw_on', 'DHW mode', '#2f81f7', 'l'], ['ch', 'boiler CH mode', '#e5534b', 'l']];
   // 'ch' is the boiler's own CH-mode status bit (MsgID 0 slave bit 1; pump overrun keeps it on), not SAT's CH enable (Sergeant D entry 219)
   var GDCOL = ['#56d4dd', '#db61a2', '#7ee787', '#f0883e', '#79c0ff', '#bc8cff'];
@@ -3307,6 +3316,8 @@
       if (++gTrimN >= 60) { gTrimN = 0; gHist = graphTrim(gHist, now); }   // trim once per 5 minutes (TASK-1963)
     }
     ['flow', 'ret', 'chSet', 'roomSet', 'room', 'outside', 'dhw', 'mod'].forEach(function (k) { r[k] = model[k]; });   // dhw: MsgID 26, live only (TASK-1776: not in the device history)
+    // TASK-2018 (ADR-256): the SAT target while SAT is enabled, the firmware's rule for the device history column
+    r.satTarget = (satEnabledLive === true && typeof sat.target === 'number' && !isNaN(sat.target)) ? sat.target : null;
     r.roomX = graphRoomLost(now) ? 1 : 0;   // TASK-1546: a dropout is no reading: the room value is empty (CSV, line break)
     if (r.roomX) r.room = null;
     ['flame', 'dhw_on', 'ch'].forEach(function (k) { if (model[k]) r[k] = 1; });
@@ -3340,6 +3351,7 @@
     // a null room in a slot that has other data is a dropout (the TASK-1546 interruption); a unit that never
     // reported a room temperature has no dropout to show.
     var hasRoom = j.room.some(function (v) { return typeof v === 'number'; });
+    var satCol = Array.isArray(j.satTarget) && j.satTarget.length === n;   // TASK-2018: optional column
     for (var i = 0; i < n; i++) {
       var x = nowMs - age - (n - i) * ivMs, t = x - x % GSLOT;
       while (li < live.length && live[li].t < t) li++;
@@ -3350,6 +3362,10 @@
         r[TCOLS[k]] = (typeof v === 'number') ? v / sc : null;
         if (r[TCOLS[k]] !== null) any = true;
       }
+      // TASK-2018 (ADR-256): satTarget is only in a response whose window held a SAT value; absent means empty
+      var st = satCol ? j.satTarget[i] : null;
+      r.satTarget = (typeof st === 'number') ? st / sc : null;
+      if (r.satTarget !== null) any = true;
       var m = j.mod[i];
       r.mod = (typeof m === 'number') ? m : null;
       r.flame = j.flame[i] ? 1 : 0; r.dhw_on = j.dhw_on[i] ? 1 : 0; r.ch = j.ch[i] ? 1 : 0;
@@ -3413,7 +3429,7 @@
     return [k, dallasLabelFor(a) || a, GDCOL[i % GDCOL.length], 't'];
   }
   // Series labels are translated at render time (the GSER labels are the English defaults).
-  var GSER_LABEL_KEY = { flow: 'graph.series_flow', ret: 'graph.series_ret', chSet: 'graph.series_ch_set', roomSet: 'graph.series_room_set',
+  var GSER_LABEL_KEY = { flow: 'graph.series_flow', ret: 'graph.series_ret', chSet: 'graph.series_ch_set', roomSet: 'graph.series_room_set', satTarget: 'graph.series_sat_target',
     room: 'graph.series_room', outside: 'graph.series_outside', dhw: 'graph.series_dhw', mod: 'graph.series_mod', flame: 'graph.series_flame', dhw_on: 'graph.series_dhw_on', ch: 'graph.series_ch' };
   // TASK-1297: values of the visible series at time tMs. arr is ascending by t. Returns null when no
   // record covers tMs (before the first record, or more than GBREAK_MS past the record's data end).
@@ -3563,7 +3579,7 @@
         el.setAttribute('data-k', k); el.setAttribute('stroke', m[2]); el.setAttribute('stroke-width', kind === 't' ? '1.8' : '1.2');
         el.setAttribute('fill', kind === 'm' ? 'rgba(0,191,254,.18)' : (kind === 'l' ? m[2] : 'none'));
         if (kind === 'l') el.setAttribute('fill-opacity', '.3');
-        if (k === 'chSet' || k === 'roomSet') el.setAttribute('stroke-dasharray', '5 4');
+        if (graphSeriesDashed(k)) el.setAttribute('stroke-dasharray', '5 4');
         g.appendChild(el);
       }
       if (!gOff[k] && c.length) d = kind === 'm' ? graphPath(c, kind, ym, MP.top + MP.h) : graphPath(c, kind, y, GLANE_Y[k]);
@@ -3649,6 +3665,8 @@
     svg.addEventListener('pointerleave', graphReadoutLeave);
     svg.addEventListener('pointercancel', graphReadoutHide);   // the browser took over to scroll
   }
+  // The setpoint and target series are drawn dashed (5 4); their legend swatch shows the same dash (TASK-2037).
+  function graphSeriesDashed(k) { return k === 'chSet' || k === 'roomSet' || k === 'satTarget'; }
   // Clickable legend: each series can be hidden (remembered per browser).
   var gLegendSig = '';
   function renderGraphLegend(keys, metas) {
@@ -3658,7 +3676,9 @@
     gLegendSig = sig; lg.textContent = '';
     keys.forEach(function (k, i) {
       var m = metas[i], sp = document.createElement('span'), sw = document.createElement('i');
-      sw.style.background = m[2]; sp.appendChild(sw); sp.appendChild(document.createTextNode(m[1]));
+      if (graphSeriesDashed(k)) { sw.style.background = 'none'; sw.style.borderTop = '2px dashed ' + m[2]; }
+      else sw.style.background = m[2];
+      sp.appendChild(sw); sp.appendChild(document.createTextNode(m[1]));
       sp.style.cursor = 'pointer'; sp.style.opacity = gOff[k] ? '.4' : '1'; sp.title = t('graph.legend_toggle');
       sp.addEventListener('click', function () {
         if (gOff[k]) delete gOff[k]; else gOff[k] = 1;
@@ -4049,15 +4069,17 @@
   }
   function fetchOverrides(iface) {
     // On OT-Direct the gateway overrides endpoint is meaningless (no PIC); read the
-    // OT-Direct store instead. Both normalize into ovrRows; errors -> empty, silently, but a busy
-    // 503 (the REST in-flight cap) keeps the rows shown (TASK-1747).
+    // OT-Direct store instead. Both normalize into ovrRows; another error answer -> empty, silently, but a
+    // busy 503 (the REST in-flight cap) keeps the rows shown (TASK-1747). TASK-2914: on a starved heap the
+    // device answers busy by closing the connection without a response (TASK-2910), so a failed request is
+    // tried once more after 400 ms and, if it fails again, also keeps the rows; the next poll decides.
     // Returns the (never-rejecting) promise so callers can chain behind it.
     var otd = (iface === 'OT-Direct');
     var url = APIGW + (otd ? 'v2/otdirect/overrides' : 'v2/otgw/overrides');
     function apply() { updateCnOvr(); scheduleRender(); }   // map badge + Home A badge/marks
-    return fetch(url).then(function (r) { return r.status === 503 ? undefined : (r.ok ? r.json() : null); })
+    return fetchWithRetry(url, undefined, 2).then(function (r) { return r.status === 503 ? undefined : (r.ok ? r.json() : null); })
       .then(function (j) { if (j === undefined) return; ovrRows = otd ? normOtdOvr(j) : normPicOvr(j); apply(); })
-      .catch(function () { ovrRows = []; apply(); });
+      .catch(function () { });
   }
   // On-bus badge in the connection-map SVG (#cnOvr sits on the y=180 shared bus segment).
   function updateCnOvr() {
@@ -4125,7 +4147,7 @@
     { id: 's0',       title: 'S0 Pulse Counter',       icon: '⚡', reboot: false, desc: 'Energy pulse counting.' },
     { id: 'webhook',  title: 'Webhook',                icon: '🪝', reboot: false, desc: 'HTTP callbacks on OT state.' },
     { id: 'behavior', title: 'Behavior',               icon: '🔧', reboot: false, desc: 'LED, theme and restart behaviour.' },
-    { id: 'sat',      title: 'SAT — Smart Thermostat', icon: '🧠', reboot: false, desc: 'Standalone Adaptive Thermostat.' }
+    { id: 'sat',      title: 'SAT — Smart Thermostat', icon: '🧠', reboot: false, desc: 'Smart Autotune Thermostat.' }
   ];
   // lowercase REST key -> { cat, sub?, label, hint?, help? }. Reboot is per-category.
   // hint = short unit line under the label. help = optional longer text that wins over
@@ -4189,6 +4211,8 @@
     ledblink:        { cat: 'behavior', label: 'Blink LED on OT traffic' },
     nightlyrestart:  { cat: 'behavior', label: 'Nightly restart' },
     nightlyrestarthour: { cat: 'behavior', label: 'Restart hour', hint: '0–23' },
+    updatecheck:     { cat: 'behavior', label: 'Check GitHub for new versions' },   // TASK-2023
+    updatecheckbeta: { cat: 'behavior', label: 'Also tell about beta versions' },    // TASK-2023
     // Most-used SAT fields get curated labels; the long tail falls back to the
     // humanised key under the SAT category (Phase 2: port full SAT metadata).
     satenabled:      { cat: 'sat', label: 'SAT enabled' },
@@ -4266,6 +4290,7 @@
     // TASK-1281: the explanation of this setting (formerly an inline 'help' block) lives in settings-help.json.
     satexternaltemp:     { cat: 'sat', label: 'Use MQTT/REST as indoor temp source' },
     satovershootmargin:  { cat: 'sat', label: 'Overshoot margin', hint: '°C' },
+    satpwmswitchmargin:  { cat: 'sat', label: 'PWM switch margin', hint: '°C' },
     satboilercapacity:   { cat: 'sat', label: 'Boiler capacity', hint: 'kW' },
     satdhwcapacity:      { cat: 'sat', label: 'DHW capacity', hint: 'kW (0 = boiler capacity)' },
     satthermalcoeff:     { cat: 'sat', label: 'Thermal-drop coefficient' },
@@ -4330,7 +4355,7 @@
     ['Season', ['satsummersimmer', 'satsummerthreshold', 'satsummerminhours', 'satwindowdetect', 'satwindowminsec']]
   ];
   var SAT_L3 = [
-    ['Curve', ['satcoefficient', 'satcurveselftune', 'sattempstep', 'satovershootmargin']],
+    ['Curve', ['satcoefficient', 'satcurveselftune', 'sattempstep', 'satovershootmargin', 'satpwmswitchmargin']],
     ['PWM', ['satovershootprotection', 'satcyclesperhour',
              'satinterval', 'sathpcycle', 'satsolarfreezeint']],
     ['Offsets', ['satflameoffset', 'satflowoffset', 'satvalveoffset', 'satmodsupdelay', 'satmodsupoffset', 'satflushtreshold']],
@@ -4378,7 +4403,8 @@
   // TASK-1692: darktheme is never read by this UI (the theme comes from the toggle in this
   // browser, else the OS preference, see the v2.html pre-paint script); the key stays in REST
   // and in the settings file.
-  var SET_HIDE_ROW = { sat_onboarded: 1, ui_onboarded: 1, darktheme: 1 };
+  // TASK-2023: updatecheckasked is the one-time question's flag, set by the UI itself.
+  var SET_HIDE_ROW = { sat_onboarded: 1, ui_onboarded: 1, darktheme: 1, updatecheckasked: 1 };
   function humanizeKey(k) {
     var s = k.replace(/^(sat|otd|gpiosensors|gpiooutputs|s0counter|mqtt|wifi|eth|ntp|webhook|ui_|dallas)/, '');
     if (!s) s = k;
@@ -4856,6 +4882,7 @@
       });
     }
     if (satLockedKey(k)) { input.disabled = true; row.style.opacity = '0.55'; row.title = satOffNote(); }   // TASK-1737
+    if (k === 'satbleenable') bleLockSwitch(input, row);   // TASK-2025: no PSRAM, the switch cannot be touched
     row.appendChild(input);
     return row;
   }
@@ -5010,11 +5037,11 @@
     var satEnabling = ('satenabled' in setDirty) && ('' + setDirty.satenabled) === 'true' &&
       !(setData.satenabled && ('' + setData.satenabled.value) === 'true') && satOnbNeeded();
     if (satEnabling) { delete setDirty.satenabled; keys = Object.keys(setDirty); }
-    // TASK-1693: switching BLE on for a board without PSRAM asks first (the stability warning);
-    // the key leaves this save and maybeShowBleConsent() stores it only when the user accepts.
-    var bleEnabling = ('satbleenable' in setDirty) && ('' + setDirty.satbleenable) === 'true' &&
-      bleNeedsRiskAck();
-    if (bleEnabling) { delete setDirty.satbleenable; keys = Object.keys(setDirty); }
+    // TASK-2025: BLE cannot be switched on without PSRAM (the firmware refuses it with 409): the key leaves this
+    // save and a note says why. Before, a warning let the user accept the risk; on .61 the scanner then exhausted
+    // the heap and the unit hung.
+    var bleRefused = ('satbleenable' in setDirty) && ('' + setDirty.satbleenable) === 'true' && bleNoPsram();
+    if (bleRefused) { delete setDirty.satbleenable; keys = Object.keys(setDirty); }
     var bleName = ('satblenameprefix' in setDirty) || ('satblenamefilteringest' in setDirty);
     var chain = Promise.resolve();
     keys.forEach(function (k) {
@@ -5033,12 +5060,12 @@
     chain.then(function () {
       setDirty = {};
       // TASK-1732: only when something was posted. A save that held only a key handed to the SAT
-      // wizard (satenabled) or the BLE warning (satbleenable) stored nothing yet.
+      // wizard (satenabled) or a refused BLE switch (satbleenable, TASK-2025) stored nothing yet.
       if (keys.length) bleToast(t('settings.saved'));
       renderSettings();
       if (bleName) bleAction('rescan');   // TASK-1231: re-apply the name filter (classic parity)
       if (satEnabling) startSatOnboarding('enable');   // TASK-1012: wizard owns the actual enable
-      if (bleEnabling) maybeShowBleConsent();           // TASK-1693: the warning owns the actual enable
+      if (bleRefused) bleToast(t('values.ble_needs_psram'), true, 5000);   // TASK-2025
     }).catch(function () {
       bleToast(t('settings.save_failed'), true, 2500);   // TASK-1254: red error variant
     });
@@ -5066,69 +5093,33 @@
         // clobber a half-typed bindkey / steal focus).
         var changed = !bleData || bleData.populated_slots !== j.populated_slots ||
           JSON.stringify(bleData.sensors || []) !== JSON.stringify(j.sensors || []);
-        var pausedChanged = !bleData || bleBlePaused(bleData) !== bleBlePaused(j);
+        var psramChanged = !bleData || (bleData.psram === 0) !== (j.psram === 0);
         bleData = j;
-        // TASK-1693: no dialog without a user action. A board without PSRAM with BLE on but no
-        // ack (an install from before TASK-1693) keeps BLE paused and shows a hint in the BLE card.
-        if (pausedChanged) changed = true;
+        if (psramChanged) {   // TASK-2025: the BLE card shows the needs-PSRAM note, and the switch locks
+          changed = true;
+          var sw = document.querySelector('#setCols .srow[data-key="satbleenable"] input');
+          if (sw) bleLockSwitch(sw, sw.closest('.srow'));
+        }
         var card = document.getElementById('setcard-ble');
         var typing = card && card.contains(document.activeElement) &&
           /^(INPUT|TEXTAREA)$/.test((document.activeElement || {}).tagName || '');
         if (changed && !typing) renderBleCard();
       }).catch(function () { });
   }
-  // TASK-1693: BLE waits for the warning on this board (no PSRAM, BLE on, not accepted yet).
-  function bleBlePaused(j) { return !!j && j.psram === 0 && !!j.ble_enable && !j.risk_ack; }
-  // TASK-1693: switching BLE on needs the warning first when the board has no PSRAM and the risk
-  // was not accepted yet. PSRAM comes from the BLE roster (loaded with the Sensors page), else
-  // from device/info; an unknown board does not ask.
-  function bleNeedsRiskAck() {
+  // TASK-2025: BLE needs PSRAM. PSRAM comes from the BLE roster (loaded with the Sensors page), else from
+  // device/info; an unknown board is not refused here (the firmware still refuses it).
+  function bleNoPsram() {
     var ps = bleData && typeof bleData.psram === 'number' ? bleData.psram
            : (devInfoCache && devInfoCache.psram_found !== undefined ? +devInfoCache.psram_found : 1);
-    var acked = setData.satbleriskack && ('' + setData.satbleriskack.value) === 'true';
-    return ps === 0 && !acked;
+    return ps === 0;
   }
-  // TASK-995 / TASK-1693: BLE-without-PSRAM stability warning. On a no-PSRAM board BLE takes
-  // ~64 KB of internal DRAM that the async web server needs, so the Web UI can wedge under load.
-  // Shown only on a user action: switching BLE on (saveSettings) or the button in the BLE card.
-  // Accept -> store SATbleenable=true (if not on yet), then SATbleriskack=true, one after the
-  // other (ADR-165). Decline -> nothing new is stored; BLE that was already on is switched off.
-  function maybeShowBleConsent() {
-    if (document.getElementById('bleRiskBackdrop')) return;   // already open
-    var bd = document.createElement('div'); bd.id = 'bleRiskBackdrop'; bd.className = 'sim-backdrop';
-    var m = document.createElement('div'); m.className = 'sim-modal';
-    var h = document.createElement('h3'); h.textContent = '⚠ ' + t('values.ble_risk_title');
-    var p = document.createElement('p');
-    p.textContent = t('values.ble_risk_text');
-    var acts = document.createElement('div'); acts.className = 'acts';
-    var no = document.createElement('button'); no.textContent = t('values.ble_keep_off');
-    var yes = document.createElement('button'); yes.className = 'primary'; yes.textContent = t('values.ble_enable_anyway');
-    function post(name, value, then) {
-      fetch(APIGW + 'v2/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: name, value: value }) })
-        // TASK-1732 review: a failed store says so; the user must not be left without feedback.
-        // The failure handler covers the request only, so an error in then() is not shown as a failed save.
-        .then(function (r) {
-          if (!r.ok) { bleToast(t('values.save_failed_http', { status: r.status }), true, 2500); return false; }
-          return true;
-        }, function () { bleToast(t('values.save_failed'), true, 2500); return false; })
-        .then(function (ok) { if (ok && then) then(); });
-    }
-    function close() { if (bd.parentNode) bd.parentNode.removeChild(bd); }
-    var wasOn = setData.satbleenable && ('' + setData.satbleenable.value) === 'true';
-    function stored(name, value) { if (setData[name]) setData[name].value = value; }
-    no.addEventListener('click', function () {
-      close();
-      if (!wasOn) { bleToast(t('values.ble_kept_off')); return; }
-      post('satbleenable', false, function () { stored('satbleenable', false); bleToast(t('values.ble_kept_off')); renderSettings(); setTimeout(fetchBle, 500); });
-    });
-    yes.addEventListener('click', function () {
-      close();
-      var ack = function () { post('satbleriskack', true, function () { stored('satbleriskack', true); bleToast(t('values.ble_enabled_accepted')); renderSettings(); setTimeout(fetchBle, 800); }); };
-      if (wasOn) ack(); else post('satbleenable', true, function () { stored('satbleenable', true); ack(); });
-    });
-    acts.appendChild(no); acts.appendChild(yes);
-    m.appendChild(h); m.appendChild(p); m.appendChild(acts); bd.appendChild(m);
-    document.body.appendChild(bd);
+  // TASK-2025 (Robert, DM 1572613627528085586: "Niet verbergen maar disablen. Geen PSRAM dan mag je de schakelaar
+  // niet aanraken."): without PSRAM the BLE switch stays visible but disabled, with the reason as its title. Called when
+  // the row is built and again when the BLE poll first tells the board has no PSRAM.
+  function bleLockSwitch(input, row) {
+    if (!input || !bleNoPsram()) return;
+    input.disabled = true;
+    if (row) { row.style.opacity = '0.55'; row.title = t('values.ble_needs_psram'); }
   }
   // TASK-963: continuous detection. The firmware scans passive-continuous (ADR-151),
   // so sensors appear over time; poll the roster while the Sensors category is open
@@ -5174,14 +5165,10 @@
       ? t('values.ble_slots_prefix', { used: bleData.populated_slots || 0, max: bleData.max_slots || 0, prefix: bleData.name_prefix })
       : t('values.ble_slots', { used: bleData.populated_slots || 0, max: bleData.max_slots || 0 });
     card.appendChild(desc);
-    // TASK-1693: BLE is switched on but waits for the stability warning (board without PSRAM,
-    // install from before TASK-1693). A hint with a button, never a dialog on its own.
-    if (bleBlePaused(bleData)) {
+    // TASK-2025: a board without PSRAM cannot run BLE; say so in the card.
+    if (bleData.psram === 0) {
       var hint = document.createElement('div'); hint.className = 'ble-desc';
-      hint.textContent = t('values.ble_paused') + ' ';
-      var accept = document.createElement('button'); accept.className = 'tbtn'; accept.textContent = t('values.ble_read_warning');
-      accept.addEventListener('click', maybeShowBleConsent);
-      hint.appendChild(accept);
+      hint.textContent = t('values.ble_needs_psram');
       card.appendChild(hint);
     }
     var rescan = document.createElement('button'); rescan.className = 'tbtn'; rescan.textContent = '🔄 ' + t('values.ble_rescan');
@@ -5900,7 +5887,9 @@
     for (var i = 0; i < lg.children.length; i++) {
       var sp = lg.children[i], sw = sp.firstChild;
       if (parseFloat(sp.style.opacity) < 1) continue;   // the browser reads '.4' back as '0.4'
-      out.push({ color: (sw && sw.style && sw.style.background) || '#8b949e', label: sp.textContent });
+      // A dashed swatch (dashed series, TASK-2037; dashed marks, TASK-1914) carries its colour in the top border.
+      var st = (sw && sw.style) || {}, bgc = st.background && st.background !== 'none' ? st.background : '';
+      out.push({ color: bgc || st.borderTopColor || '#8b949e', dash: st.borderTopStyle === 'dashed', label: sp.textContent });
     }
     return out;
   }
@@ -5911,7 +5900,7 @@
     entries.forEach(function (e) {
       var need = 14 + 5 + measure(e.label);
       if (x > 6 && x + need > w - 6) { x = 6; row++; }
-      items.push({ x: x, row: row, color: e.color, label: e.label });
+      items.push({ x: x, row: row, color: e.color, dash: !!e.dash, label: e.label });
       x += need + 14;
     });
     return { items: items, height: entries.length ? row * 16 + 26 : 0 };
@@ -5942,7 +5931,9 @@
       ctx.font = lfont; ctx.textBaseline = 'middle';
       lay.items.forEach(function (it) {
         var cy = 5 + it.row * 16 + 8;
-        ctx.fillStyle = it.color; ctx.fillRect(it.x, cy - 1.5, 14, 3);
+        ctx.fillStyle = it.color;
+        if (it.dash) { ctx.fillRect(it.x, cy - 1, 5, 2); ctx.fillRect(it.x + 9, cy - 1, 5, 2); }   // 5 4 dash, like the line
+        else ctx.fillRect(it.x, cy - 1.5, 14, 3);
         ctx.fillStyle = lcol; ctx.fillText(it.label, it.x + 19, cy);
       });
       ctx.drawImage(img, 0, lay.height, W, H);
@@ -6925,9 +6916,10 @@
   // across polls (no firmware history endpoint, by design — as in the former classic SAT page).
   var satPollTimer = null;
   var satLastData = null;
+  var satLastWeather = null;   // TASK-2015: the last v2/sat/weather answer, for the location hint
   // TASK-1507: SAT beta notice. One text for the wizard's first step and the SAT page notice.
-  var SAT_BETA_HEAD = 'SAT is experimental in this beta and it controls your boiler.';
-  var SAT_BETA_BODY = 'We need field data to validate it. Please run the capture tool now and then (scripts/capture-mqtt-debug.bat on Windows, scripts/capture-mqtt-debug.sh on Linux or macOS) and share the transcript in the Discord #alpha-testing channel (discord.gg/zjW3ju7vGQ) or as a GitHub issue (github.com/rvdbreemen/OTGW-firmware/issues).';
+  var SAT_BETA_HEAD = 'SAT controls your boiler. This is a beta firmware.';
+  var SAT_BETA_BODY = 'Field data helps us improve it. Please run the capture tool now and then (scripts/capture-mqtt-debug.bat on Windows, scripts/capture-mqtt-debug.sh on Linux or macOS) and share the transcript in the Discord #beta-testing channel (discord.gg/zjW3ju7vGQ) or as a GitHub issue (github.com/rvdbreemen/OTGW-firmware/issues).';
   var SAT_BETA_DISMISS_KEY = 'otgw-v2-satbeta-dismissed';
   // A prerelease firmware has a "-alpha.N" / "-beta.N" part after major.minor.patch (+build metadata dropped).
   function isPrereleaseFw(v) {
@@ -7052,6 +7044,7 @@
         if (d.enabled !== undefined) satEnabledLive = !!d.enabled;   // TASK-1737 (renderSatPage applies the lock)
         syncSatBetaNotice();   // TASK-1507: once per page load
         try { renderSatPage(d); } catch (e) { }
+        try { satUpdateLocHint(); } catch (e) { }   // TASK-2015: the hint follows the sun elevation source
       })
       .catch(function () {
         // Hard failure (device unreachable) at first paint: show the no-data banner
@@ -7094,8 +7087,8 @@
       .catch(function () { });
   }
 
-  // TASK-1881 (U9): heating curve self-tune progress from the status object curve_tune: counted days, clean hours today,
-  // the last daily record and the hours each reason kept out of the window. Hidden on a firmware without curve_tune.
+  // TASK-1881 (U9): heating curve self-tune progress from the status object curve_tune: counted hours in the window
+  // (ADR-260), the last hourly decision record and the hours each reason kept out of the window. Hidden on a firmware without curve_tune.
   function satTuneReasonText(code) {
     var k = 'tools.sat_tune_r_' + code, s = t(k);
     return s === k ? String(code) : s;   // a reason this page does not know yet shows its code
@@ -7109,8 +7102,8 @@
     if (!d.curve_self_tune || !ct.running) {
       box.innerHTML = h + '<div>' + esc(t('tools.sat_tune_off')) + '</div>'; return;
     }
-    h += '<div>' + esc(t('tools.sat_tune_days', { days: ct.days | 0, need: ct.days_needed | 0,
-      clean: ct.clean_hours_today | 0, cleanNeed: ct.clean_hours_needed | 0 })) + '</div>';
+    // TASK-1889 (ADR-260): the window counts hours (window_hours / window_hours_needed)
+    h += '<div>' + esc(t('tools.sat_tune_days', { days: ct.window_hours | 0, need: ct.window_hours_needed | 0 })) + '</div>';
     var dec = ct.last_decision;
     h += '<div>' + esc(dec === 'raise' || dec === 'lower' || dec === 'hold'
       ? t('tools.sat_tune_last', { decision: t('tools.sat_tune_dec_' + dec), reason: satTuneReasonText(ct.last_reason) })
@@ -7245,6 +7238,9 @@
   function satWhyReasons(d) {
     var out = [];
     if (d.fallback_active) out.push({ text: t('tools.sat_why_takeover', { reason: satFbReasonText(d.fallback_reason) }), warn: true });
+    // TASK-1882: diagnostic events (no control action)
+    if (d.no_ignition) out.push({ text: t('tools.sat_why_no_ignition'), warn: true });
+    if (d.heating_failure) out.push({ text: t('tools.sat_why_heating_failure', { start: fmt(d.heating_failure_room_start, 1), end: fmt(d.heating_failure_room_end, 1) }), warn: true });
     var veto = d.pwm_veto_reason | 0;
     if (veto === 1 && d.slave_cfg_valid === false) out.push({ text: t('tools.sat_why_pwm_no_reply') });
     else if (veto === 2 && d.slave_low_off_denied) out.push({ text: t('tools.sat_why_pwm_denied') });
@@ -7414,7 +7410,7 @@
     satRenderHealth(d);
     satRenderCycles24(d);
     satKv('satPidKv', [
-      [t('tools.kv_p_term'), satFmt(d.pid_p, 2)], [t('tools.kv_i_term'), satFmt(d.pid_i, 2)], [t('tools.kv_d_term'), satFmt(d.pid_d, 2)],
+      [t('tools.kv_p_term'), satFmt(d.pid_p, 2)], [t('tools.kv_i_term'), satFmt(d.pid_i, 2) + (d.pid_curve_only ? ' ' + t('tools.kv_i_not_applied') : '')], [t('tools.kv_d_term'), satFmt(d.pid_d, 2)],
       ['Kp', satFmt(d.kp, 4)], ['Ki', satFmt(d.ki, 4)], ['Kd', satFmt(d.kd, 4)],
       [t('tools.kv_raw_derivative'), satFmt(d.raw_derivative, 4)]
     ]);
@@ -7596,6 +7592,8 @@
   }
 
   function renderSatWeather(w) {
+    satLastWeather = w || null;
+    satUpdateLocHint();
     if (!w || !w.enabled) { satKv('satWeatherKv', [[t('tools.kv_weather'), t('tools.disabled')]]); txt('satCoords', ''); return; }
     var valid = !!w.valid;
     var mins = (valid && w.age_seconds >= 0) ? Math.floor(w.age_seconds / 60) : null;
@@ -7845,17 +7843,40 @@
   }
 
   // On plain HTTP the Detect location button always fails, so hide it and point
-  // to the manual Latitude/Longitude fields instead (TASK-1257).
+  // to the manual Latitude/Longitude fields instead (TASK-1257). The hint itself follows
+  // the polled status and weather (satUpdateLocHint, TASK-2015).
   function satWireDetectLocation() {
     var dl = document.getElementById('satDetectLoc');
     if (!dl) return;
-    if (satGeoUsable()) { dl.addEventListener('click', satDetectLocation); return; }
-    dl.hidden = true;
+    if (satGeoUsable()) dl.addEventListener('click', satDetectLocation);
+    satUpdateLocHint();
+  }
+
+  // TASK-2015 (Robert, 2026-11-18): not everyone uses Home Assistant, so Latitude/Longitude stays the
+  // default; when HA publishes a fresh sat/sun_elevation (sun_elevation_source "external" in the
+  // SAT status, the firmware's 1 h rule of TASK-1410) the card names that source and asks for no
+  // location, unless the weather fetch is on without a location (the fetch itself needs one).
+  // Returns 'ha', 'ha_weather_loc', 'hint' (ask for a location) or '' (nothing to say).
+  function satLocHintKind(sunSource, weatherOn, hasLocation, geoUsable) {
+    if (sunSource === 'external') return (weatherOn && !hasLocation) ? 'ha_weather_loc' : 'ha';
+    return geoUsable ? '' : 'hint';
+  }
+  function satUpdateLocHint() {
+    var d = satLastData || {}, w = satLastWeather || {};
+    var lat = parseFloat(w.latitude), lon = parseFloat(w.longitude);
+    var hasLoc = !isNaN(lat) && !isNaN(lon) && (lat !== 0 || lon !== 0);
+    var kind = satLocHintKind(d.sun_elevation_source, !!w.enabled, hasLoc, satGeoUsable());
+    var dl = document.getElementById('satDetectLoc');
+    if (dl) dl.hidden = !satGeoUsable() || kind === 'ha';
     var lh = document.getElementById('satLocHint');
-    if (lh) {
-      lh.textContent = t('tools.sat_geo_hint');
-      lh.hidden = false;
-    }
+    if (!lh) return;
+    var deg = (typeof d.sun_elevation === 'number') ? d.sun_elevation.toFixed(1) : '—';
+    var msg = '';
+    if (kind === 'hint') msg = t('tools.sat_geo_hint');
+    else if (kind === 'ha') msg = t('tools.sat_sun_from_ha', { deg: deg });
+    else if (kind === 'ha_weather_loc') msg = t('tools.sat_sun_from_ha', { deg: deg }) + ' ' + t('tools.sat_sun_ha_weather_loc');
+    lh.textContent = msg;
+    lh.hidden = !msg;
   }
 
   // ---------- TASK-990: sensor-discovery toast (PR-649 "OTGW Patterns and Tokens") ----------
@@ -8513,6 +8534,168 @@
     });
   }
 
+  // ---------- TASK-2023 (ADR-262): 'new version available' from the GitHub releases API ----------
+  // The BROWSER asks GitHub; the gateway makes no outbound request (it stays HTTP-only, ADR-003). The request is not
+  // same-origin /api/, so the ADR-184 queue lets it pass and it never takes one of the device's 2 REST slots.
+  // /releases/latest is not usable: it names the 1.x stable line (main), so the list is filtered to the running major.
+  // The answer is cached in this browser for 6 h (GitHub allows 60 unauthenticated requests per hour per IP); a
+  // failure (403/429 rate limit, network, CORS) shows nothing and keeps the cached answer. Device settings: updatecheck
+  // (on/off), updatecheckasked (the one-time question of UI_UPDATE_CHECK_DEFAULT_MODE 1 was answered), updatecheckbeta.
+  var UPD_API = 'https://api.github.com/repos/rvdbreemen/OTGW-firmware/releases?per_page=30';
+  var UPD_PAGE = 'https://github.com/rvdbreemen/OTGW-firmware/releases/tag/';
+  var UPD_CACHE_KEY = 'otgw-upd-cache', UPD_DISMISS_KEY = 'otgw-upd-dismissed';
+  var UPD_MAX_AGE_MS = 6 * 3600 * 1000;
+  function updParse(v) {
+    var m = /^v?(\d+)\.(\d+)\.(\d+)(?:-beta\.(\d+))?$/.exec(('' + (v || '')).trim().split('+')[0]);
+    return m ? { maj: +m[1], min: +m[2], pat: +m[3], beta: m[4] === undefined ? null : +m[4] } : null;
+  }
+  function updCmp(a, b) {   // semver for X.Y.Z[-beta.N]: a stable X.Y.Z ranks above every X.Y.Z-beta.N
+    if (a.maj !== b.maj) return a.maj - b.maj;
+    if (a.min !== b.min) return a.min - b.min;
+    if (a.pat !== b.pat) return a.pat - b.pat;
+    if (a.beta === b.beta) return 0;
+    if (a.beta === null) return 1;
+    if (b.beta === null) return -1;
+    return a.beta - b.beta;
+  }
+  // The newest release tag above the running version, or null. A beta (or alpha) build is told about newer betas and
+  // stable releases; a stable build only about stable releases, unless includeBeta (team decision, TASK-2023 AC3).
+  function updPickNewer(releases, running, includeBeta) {
+    var cur = updParse(running);
+    if (!cur || !Array.isArray(releases)) return null;
+    var wantBeta = !!includeBeta || cur.beta !== null;
+    var best = null, bestTag = null;
+    releases.forEach(function (r) {
+      if (!r || r.draft) return;
+      var tag = '' + (r.tag_name || '');
+      if (!/^v\d+\.\d+\.\d+(-beta\.\d+)?$/.test(tag)) return;
+      var p = updParse(tag);
+      if (!p || p.maj !== cur.maj) return;
+      if ((p.beta !== null || r.prerelease === true) && !wantBeta) return;
+      if (best === null || updCmp(p, best) > 0) { best = p; bestTag = tag; }
+    });
+    return (best && updCmp(best, cur) > 0) ? bestTag : null;
+  }
+  function updFlag(k) { return !!(setData && setData[k] && ('' + setData[k].value) === 'true'); }
+  function updShowNotice(tag) {
+    var old = document.getElementById('hdrUpd');
+    if (old && old.parentNode) old.parentNode.removeChild(old);
+    if (!tag) return;
+    try { if (localStorage.getItem(UPD_DISMISS_KEY) === tag) return; } catch (e) { }
+    // After the identity group (.hdr-net), not inside it: v2.css hides .hdr-net at <= 480 px (TASK-2918).
+    var grp = updHdrGroup();
+    if (!grp) return;
+    var box = document.createElement('span'); box.className = 'hdr-id'; box.id = 'hdrUpd';
+    var a = document.createElement('a');
+    a.href = UPD_PAGE + encodeURIComponent(tag); a.target = '_blank'; a.rel = 'noopener noreferrer';
+    a.textContent = t('conn.upd_new', { ver: tag });   // the tag passed the vX.Y.Z[-beta.N] filter; text only, never HTML
+    var x = document.createElement('button'); x.type = 'button'; x.textContent = '×';
+    x.title = t('conn.upd_dismiss'); x.setAttribute('aria-label', t('conn.upd_dismiss'));
+    x.setAttribute('style', 'background:none;border:0;color:inherit;cursor:pointer;padding:0 0 0 6px;font:inherit');
+    x.addEventListener('click', function () {
+      try { localStorage.setItem(UPD_DISMISS_KEY, tag); } catch (e) { }
+      if (box.parentNode) box.parentNode.removeChild(box);
+    });
+    box.appendChild(a); box.appendChild(x);
+    grp.parentNode.insertBefore(box, grp.nextSibling);
+  }
+  function updHdrGroup() {
+    var host = document.getElementById('hdrHost');
+    return (host && host.parentNode && host.parentNode.parentNode) ? host.parentNode : null;
+  }
+  function updPost(name, value) {
+    return fetch(APIGW + 'v2/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: name, value: value }) });
+  }
+  // TASK-2918: the one-time question is a header chip right after the identity chips, not a modal: it opens about 30 s
+  // after page load on whatever page is open, so a modal covered what the user was looking at. The text (who is
+  // contacted) and the two buttons sit in a popover that opens only on a click; closing it again is "not now".
+  function updAsk() {
+    if (document.getElementById('updAsk')) return;
+    var POP_STYLE = 'position:absolute;top:calc(100% + 6px);left:0;z-index:60;width:min(380px,calc(100vw - 32px));' +
+      'padding:14px 16px;text-align:left;white-space:normal;font-family:var(--font-sans);font-weight:400;font-size:.9rem;';
+    var grp = updHdrGroup();
+    if (!grp) return;
+    var box = document.createElement('span'); box.className = 'hdr-id'; box.id = 'updAsk';
+    // z-index + opacity:1: .hdr-id has opacity .95, a stacking context that would trap the popover under the next chips.
+    box.setAttribute('style', 'position:relative;z-index:61;opacity:1');
+    var q = document.createElement('button'); q.type = 'button'; q.textContent = t('conn.upd_ask_title');
+    q.setAttribute('aria-expanded', 'false');
+    q.setAttribute('style', 'background:none;border:0;color:inherit;cursor:pointer;padding:0;font:inherit');
+    var pop = document.createElement('div'); pop.id = 'updAskPop'; pop.className = 'sim-modal';
+    pop.setAttribute('style', POP_STYLE + 'display:none');
+    var p = document.createElement('p'); p.textContent = t('conn.upd_ask_body');
+    var acts = document.createElement('div'); acts.className = 'acts';
+    var no = document.createElement('button'); no.type = 'button'; no.textContent = t('conn.upd_ask_no');
+    var yes = document.createElement('button'); yes.type = 'button'; yes.className = 'primary'; yes.textContent = t('conn.upd_ask_yes');
+    var open = false;
+    function show(on) {
+      open = on;
+      pop.setAttribute('style', POP_STYLE + (on ? 'display:block' : 'display:none'));
+      q.setAttribute('aria-expanded', on ? 'true' : 'false');
+      // Keep the open popover inside the screen (on a phone the chip sits mid-row, so left:0 runs off the right edge).
+      // Measure against documentElement.clientWidth, not innerWidth: on a phone the overflowing popover itself widens
+      // the visual viewport (innerWidth 390 -> 533 on .63), so innerWidth no longer says where the screen ends.
+      if (on && pop.getBoundingClientRect && box.getBoundingClientRect) {
+        var de = document.documentElement, vw = (de && de.clientWidth) || (typeof window !== 'undefined' && window.innerWidth) || 0;
+        var bl = box.getBoundingClientRect().left, pw = pop.getBoundingClientRect().width;
+        var left = vw ? Math.round(Math.max(8, Math.min(bl, vw - 8 - pw)) - bl) : 0;
+        if (left) pop.setAttribute('style', POP_STYLE.replace('left:0;', 'left:' + left + 'px;') + 'display:block');
+      }
+    }
+    function close() { if (box.parentNode) box.parentNode.removeChild(box); }
+    function answer(on) {
+      close();
+      // One POST at a time (never a burst, REST backpressure TASK-884); the setting first, the asked flag last.
+      updPost('updatecheck', on).then(function () { return updPost('updatecheckasked', true); }).then(function () {
+        if (setData.updatecheck) setData.updatecheck.value = on;
+        if (setData.updatecheckasked) setData.updatecheckasked.value = true;
+        if (on) maybeUpdateCheck();
+      }).catch(function () { });
+    }
+    no.addEventListener('click', function () { answer(false); });
+    yes.addEventListener('click', function () { answer(true); });
+    q.addEventListener('click', function () { show(!open); });   // closing again is "not now": the chip stays
+    pop.addEventListener('keydown', function (e) { if (e && e.key === 'Escape') { show(false); q.focus(); } });
+    acts.appendChild(no); acts.appendChild(yes);
+    pop.appendChild(p); pop.appendChild(acts);
+    box.appendChild(q); box.appendChild(pop);
+    grp.parentNode.insertBefore(box, grp.nextSibling);
+  }
+  function maybeUpdateCheck() {
+    if (!setData || !setData.updatecheck) return;   // settings not loaded, or a firmware without the setting
+    if (!updFlag('updatecheck')) {
+      // Off: nothing goes to GitHub. Ask once, after the first-time wizard and never over another dialog.
+      if (!updFlag('updatecheckasked') && (!setData.ui_onboarded || updFlag('ui_onboarded')) &&
+          !document.getElementById('onbBack') && !document.getElementById('simBackdrop')) updAsk();
+      return;
+    }
+    if (setData.updatecheckasked && !updFlag('updatecheckasked')) {   // switched on in Settings: never ask afterwards
+      setData.updatecheckasked.value = true;
+      updPost('updatecheckasked', true).catch(function () { });
+    }
+    withDeviceInfo(function (d) {
+      if (!d || !d.fwversion) return;
+      var beta = updFlag('updatecheckbeta');
+      var cache = null;
+      try { cache = JSON.parse(localStorage.getItem(UPD_CACHE_KEY) || 'null'); } catch (e) { cache = null; }
+      var fresh = cache && Array.isArray(cache.rel) && typeof cache.ts === 'number' && (Date.now() - cache.ts) < UPD_MAX_AGE_MS;
+      if (fresh) { updShowNotice(updPickNewer(cache.rel, d.fwversion, beta)); return; }
+      fetch(UPD_API, { cache: 'no-store', credentials: 'omit', referrerPolicy: 'no-referrer', headers: { Accept: 'application/vnd.github+json' } })
+        .then(function (r) { if (!r.ok) throw new Error('http ' + r.status); return r.json(); })
+        .then(function (j) {
+          if (!Array.isArray(j)) throw new Error('not a list');
+          var rel = j.map(function (r) { return { tag_name: r && r.tag_name, draft: !!(r && r.draft), prerelease: !!(r && r.prerelease) }; });
+          try { localStorage.setItem(UPD_CACHE_KEY, JSON.stringify({ ts: Date.now(), rel: rel })); } catch (e) { }
+          updShowNotice(updPickNewer(rel, d.fwversion, beta));
+        })
+        .catch(function () {   // quiet: no notice from the failure itself, and the next try also waits 6 h (no retry loop)
+          var rel = (cache && Array.isArray(cache.rel)) ? cache.rel : [];   // an older cached answer still counts
+          try { localStorage.setItem(UPD_CACHE_KEY, JSON.stringify({ ts: Date.now(), rel: rel })); } catch (e) { }
+          updShowNotice(updPickNewer(rel, d.fwversion, beta));
+        });
+    });
+  }
+
   // ---------- TASK-992: hide the Advanced > PIC sub-tab when no PIC is present ----------
   // OT-Direct boards (OTGW32) have no PIC firmware, so the PIC tab is dead there.
   function applyPicTabVisibility() {
@@ -8655,6 +8838,8 @@
     // TASK-991: on a bench setup (no boiler/thermostat on the bus, PIC board), offer
     // simulation mode once. Delayed past the boot burst so the bus state has settled.
     setTimeout(maybePromptSimulation, 12000);
+    // TASK-2023: the GitHub version check (or its one-time question), well after the boot burst and the sim prompt.
+    setTimeout(maybeUpdateCheck, 30000);
 
     // TASK-984: close the floating override panel on an outside click. The two triggers
     // (#aOvrBadge on Home, #cnOvr on the connection map) stopPropagation on their own

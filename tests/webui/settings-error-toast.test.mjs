@@ -78,6 +78,7 @@ function load(statusFor, opts = {}) {
     'function subFor() { return ""; } function labelFor() { return ""; } function curVal() { return ""; }\n' +
     'function satOnbNeeded() { return ' + (opts.onboardingNeeded ? 'true' : 'false') + '; } function renderSettings() {}\n' +
     'var wizardStarted = 0; function bleAction() {} function startSatOnboarding() { wizardStarted++; }\n' +
+    'function bleNoPsram() { return ' + (opts.noPsram ? 'true' : 'false') + '; }\n' +   // TASK-2025
     'function bleNeedsRiskAck() { return false; } function maybeShowBleConsent() {} function satLockedKey() { return false; } var setFetchSeq = 0;\n' +
     extractFunction(src, 'bleToast') + '\n' + extractFunction(src, 'saveSettings') + '\n' +
     'return { save: function (d) { setDirty = d; saveSettings(); }, bleToast: bleToast, wizard: function () { return wizardStarted; } };';
@@ -117,6 +118,23 @@ test('a save that only switches SAT on hands it to the wizard: nothing posted, n
   assert.equal(api.wizard(), 1, 'the SAT wizard starts');
   assert.ok(!(toast.classList.contains('show') && /Settings saved/.test(toast.textContent)),
     'no "Settings saved" toast: ' + toast.textContent);
+});
+
+test('a board without PSRAM: switching BLE on posts nothing and says BLE needs PSRAM (red toast)', async () => {
+  // TASK-2025: the firmware refuses BLE without PSRAM (409); the UI does not post it and explains why.
+  const { api, toast, posted } = load(() => 200, { noPsram: true });
+  api.save({ satbleenable: 'true', hostname: 'otgw' });
+  await settle();
+  assert.deepEqual(posted, ['hostname'], 'satbleenable is not posted: ' + posted);
+  assert.match(toast.textContent, /BLE needs PSRAM/);
+  assert.ok(toast.classList.contains('err'), 'the refusal is a red toast');
+});
+
+test('a board with PSRAM: switching BLE on is posted as usual', async () => {
+  const { api, posted } = load(() => 200, { noPsram: false });
+  api.save({ satbleenable: 'true' });
+  await settle();
+  assert.deepEqual(posted, ['satbleenable']);
 });
 
 test('a new toast cancels the previous toast\'s pending hide timer', () => {

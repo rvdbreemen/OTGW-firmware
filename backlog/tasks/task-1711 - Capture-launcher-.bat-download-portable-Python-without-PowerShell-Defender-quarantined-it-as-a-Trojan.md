@@ -6,7 +6,7 @@ title: >-
 status: In Review
 assignee: []
 created_date: '2026-11-07T20:28:00Z'
-updated_date: '2026-11-14T15:26:00Z'
+updated_date: '2026-11-16T08:34:00Z'
 labels:
   - capture-tool
   - windows
@@ -25,7 +25,7 @@ tjfs (Discord #alpha-testing, 2026-11-07 19:45) got capture-mqtt-debug.bat quara
 - [x] #1 no PowerShell, ExecutionPolicy or WebClient in the launcher
 - [x] #2 download with System32 curl.exe, SHA-256 with certutil -hashfile before tar.exe unpacks
 - [x] #3 a checksum mismatch deletes the zip, unpacks nothing and exits 1
-- [ ] #4 without curl.exe or tar.exe the launcher points to python.org and exits 1
+- [x] #4 without curl.exe or tar.exe the launcher points to python.org and exits 1
 - [ ] #5 the tester's Defender no longer quarantines the launcher
 <!-- AC:END -->
 
@@ -35,4 +35,6 @@ tjfs (Discord #alpha-testing, 2026-11-07 19:45) got capture-mqtt-debug.bat quara
 2026-11-07 evidence. Red first: new tests/test_capture_launcher_bat.py, 4 of 6 failed on the old launcher (a no PowerShell, b curl/certutil/tar, c checksum before unpack, e order); 6/6 OK after. Real runs on Windows 11 (PATH=C:\Windows\System32 only, LOCALAPPDATA and TEMP in a scratch dir): first run downloaded python-3.12.10-embed-amd64.zip, checksum OK, unpacked, ran otgw_capture.py --help, exit 0, 4 s, zip removed; second run used the cache (--discover found 4 gateways, exit 0). Wrong pinned SHA (copy): 'SHA-256 mismatch ... got 4acbed6d...' (the real hash, so the certutil parse is right), zip deleted, nothing unpacked, exit 1. MpCmdRun -Scan (signature 1.463.176.0) finds no threat in the old or the new launcher, so the tester's detection was behavioural or cloud: AC 5 can only be confirmed by the tester. Not tested: the no-curl/tar branch (Windows older than 10 1803), win32 and arm64 downloads (checksums unchanged). test_build TestDistributionZipComplete OK, test_capture_launcher.py OK, evaluate --quick 0 failed.
 
 Stale audit 2026-11-14 (coordinator decision): In Review. Waiting for a tester to confirm AC5 (launcher on a real Windows machine); the no-curl/tar branch and win32/arm64 downloads stay untested.
+
+2026-11-16 AC4 (ba, local simulation on Windows 11, scripts/capture-mqtt-debug.bat from origin/dev 52283d842): the launcher ran under cmd.exe with SystemRoot pointing at a fake folder whose System32 holds only certutil.exe, PATH = an empty folder (no py/python/python3), LOCALAPPDATA and TEMP = empty scratch folders. Result: exit 1, stderr 'Python 3.9 or newer was not found, and this Windows has no curl.exe or tar.exe (Windows 10 1803 or later has both).' + 'Install Python 3.9 or newer from https://www.python.org/downloads/ and run this again.'; no zip downloaded, no Python folder created, otgw_capture.py not started. Variant with curl.exe present but tar.exe absent: the same message, exit 1, no download (the tar check sits before the curl call). AC5 (the reporting tester's Defender no longer quarantines the launcher) can only be confirmed by that tester; MpCmdRun locally found no threat (earlier note).
 <!-- SECTION:NOTES:END -->

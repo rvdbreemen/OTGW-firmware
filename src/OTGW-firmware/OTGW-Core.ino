@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v2.0.0-beta.327
+**  Version  : v2.0.0-beta.401
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -1239,8 +1239,8 @@ bool picTempSensorHasData()
 /*
   On-demand PIC settings readout.
   Call triggerPICsettingsReadout() to start a full cycle.
-  pollPICsettings() is called from the main loop every iteration;
-  it spaces out PR= commands every 3 seconds when a cycle is active.
+  pollPICsettingsQuery() is called from the main loop every iteration;
+  it spaces out PR= commands at least 3 seconds apart when a cycle is active.
 
   A cycle runs automatically at boot. Subsequent cycles are triggered
   by the REST API (GET /api/v2/pic/settings) or after any command
@@ -1266,8 +1266,9 @@ void triggerPICsettingsReadout() {
 //===================[ queryNextPICsetting ]======================
 /*
   Polls one PIC setting via a PR= command and advances to the next.
-  Called by pollPICsettings() every 3 seconds during an active cycle.
-  A full cycle of 15 settings completes in ~45 seconds.
+  Called by pollPICsettingsQuery() at most once per 3 seconds during an active cycle.
+  A full cycle of 15 settings completes in ~45 seconds. Returns false when it sent
+  nothing (PIC unavailable, flashing, or deferred by a status burst or drip tick).
 
   PR= command reference (Schelte Bron, https://otgw.tclcode.com/firmware.html):
     PR=A and PR=M are handled separately (getpicfwversion / queryOTGWgatewaymode).
@@ -1292,14 +1293,14 @@ void triggerPICsettingsReadout() {
   NG/SE/TO responses are silently ignored (keeps previous cached value).
   Skips all queries when PIC is unavailable, offline, or flashing is in progress.
 */
-void queryNextPICsetting() {
-  if (!isPICEnabled() || !isGatewayFirmware()) return;
-  if (state.flash.bESPactive || state.flash.bPICactive) return;
+bool queryNextPICsetting() {
+  if (!isPICEnabled() || !isGatewayFirmware()) return false;
+  if (state.flash.bESPactive || state.flash.bPICactive) return false;
   // Defer PR= queries during Status-burst fanouts and when a drip tick is imminent.
   // Each PR= response triggers 2 MQTT publishes; landing these inside a burst or
-  // drip window amplifies heap pressure. Deferred queries retry on the next 3s tick.
-  if (isStatusBurstActive()) return;
-  if (dripDueWithinMs(500)) return;
+  // drip window amplifies heap pressure. pollPICsettingsQuery() retries on the next loop pass.
+  if (isStatusBurstActive()) return false;
+  if (dripDueWithinMs(500)) return false;
 
   const uint8_t idx = picSettingsQueryIdx;
   picSettingsQueryIdx++;
@@ -1327,12 +1328,32 @@ void queryNextPICsetting() {
     case 12: letter = 'Q'; break;  // Reset cause
     case 13: letter = 'N'; break;  // Standalone interval
     case 14: letter = 'V'; break;  // Voltage reference
-    default: return;
+    default: return false;
   }
 
   char cmd[5];
   snprintf_P(cmd, sizeof(cmd), PSTR("PR=%c"), letter);
   addCommandToQueue(cmd, 4, true);  // forceQueue=true: bypass PR prefix dedup
+  return true;
+}
+
+//===================[ pollPICsettingsQuery ]=====================
+/*
+  TASK-1971: called from the main loop right after loopMQTTDiscovery(). While a cycle
+  is active it sends the next PR= query once at least 3 s passed since the last one it
+  sent. It used to run from the 3 s task: that timer and the 1 s discovery drip start
+  together at boot and come due in the same loop pass (the 3 s task runs first and sees
+  the drip tick as due), and with SKIP_MISSED_TICKS their phase only drifts by the loop
+  lateness. So the 3 s tick stayed inside the 500 ms drip window, deferred tick after
+  tick, until the phase drifted out or the drip had nothing pending (4-5 min after boot;
+  with the broker down the pending bits never clear). From the loop a deferred query goes
+  out right after the next drip tick.
+*/
+void pollPICsettingsQuery() {
+  static uint32_t lastQueryMs = 0;
+  if (!picSettingsCycleActive) return;
+  if ((uint32_t)(millis() - lastQueryMs) < 3000UL) return;
+  if (queryNextPICsetting()) lastQueryMs = millis();
 }
 
 //===================[ handlePRresponse ]==========================
@@ -2847,7 +2868,10 @@ void recordOTOverride(uint8_t id, uint8_t kind, float value) {
     const uint32_t age = now - otOverrideStore[i].lastSeen;
     if (age >= stalestAge) { stalestAge = age; stalestSlot = i; }
   }
-  if (slot < 0) slot = (freeSlot >= 0) ? freeSlot : stalestSlot;
+  if (slot < 0) {
+    slot = (freeSlot >= 0) ? freeSlot : stalestSlot;
+    otOverrideStore[slot].published = 0;   // TASK-1985: a new id in this slot has no topic yet
+  }
   otOverrideStore[slot].id       = id;
   otOverrideStore[slot].kind     = kind;
   otOverrideStore[slot].value    = value;
@@ -2857,6 +2881,10 @@ void recordOTOverride(uint8_t id, uint8_t kind, float value) {
 // Periodic publisher (called from the MQTT periodic path, NOT from the decode hook).
 // Publishes one retained `<label>/override` topic per active override entry so HA
 // and dashboards reflect the injected value. Canonical topics are untouched.
+// TASK-1985: an entry that goes stale (no override frame for OVERRIDE_ACTIVE_TIMEOUT) gets one empty
+// retained message on its topic, which removes it from the broker, and its slot is freed. Before this
+// the last value stayed retained, so HA kept showing an override that had ended.
+// --- publishActiveOverrides begin
 void publishActiveOverrides() {
   if (!settings.mqtt.bEnable) return;
   const uint32_t now = millis();
@@ -2864,14 +2892,58 @@ void publishActiveOverrides() {
   char val[15];
   for (int i = 0; i < OVERRIDE_STORE_MAX; i++) {
     if (otOverrideStore[i].lastSeen == 0) continue;
-    if ((now - otOverrideStore[i].lastSeen) >= OVERRIDE_ACTIVE_TIMEOUT) continue;
     const char* label = messageIDToString(static_cast<OTLibMessageID>(otOverrideStore[i].id));
     snprintf_P(leaf, sizeof(leaf), PSTR("%s/override"), label);
+    if ((now - otOverrideStore[i].lastSeen) >= OVERRIDE_ACTIVE_TIMEOUT) {
+      // Free the slot only once the clear went out; a failed publish (offline broker) tries again next round.
+      if (!otOverrideStore[i].published || sendMQTTData(leaf, "", /*retain=*/true)) {
+        otOverrideStore[i].lastSeen = 0;
+        otOverrideStore[i].published = 0;
+      }
+      continue;
+    }
     dtostrf(otOverrideStore[i].value, 3, 2, val);
-    sendMQTTData(leaf, val, /*retain=*/true);
+    if (sendMQTTData(leaf, val, /*retain=*/true)) otOverrideStore[i].published = 1;
     feedWatchDog();
   }
 }
+// --- publishActiveOverrides end
+
+// TASK-1991: the override store is RAM only, so after a reboot it is empty and publishActiveOverrides() never
+// clears a <label>/override topic retained before the reboot: HA kept showing the old value. After every MQTT
+// connect one sweep sends an empty retained message (which removes a retained topic, and is a no-op where none
+// exists) for each label that can carry an override: recordOTOverride() is called from print_f88() only, so the
+// f88 ids of OTmap. A label with an entry in the store is skipped: an active override keeps its topic and
+// publishActiveOverrides() refreshes it within 60 s. One topic per step; the caller paces the steps (about 40 ids).
+// --- staleOverrideClear begin
+static uint16_t s_ovrClearId = 0xFFFF;   // next msg id to look at; 0xFFFF = no sweep running
+
+void startStaleOverrideClear() {
+  s_ovrClearId = 0;
+}
+
+// Sends at most one clear. Returns true while the sweep runs (also when a send failed: the same id is tried again).
+bool staleOverrideClearStep() {
+  if (s_ovrClearId == 0xFFFF) return false;
+  if (!settings.mqtt.bEnable) { s_ovrClearId = 0xFFFF; return false; }
+  while (s_ovrClearId <= OT_MSGID_MAX) {
+    const uint8_t id = (uint8_t)s_ovrClearId;
+    OTlookup_t item;
+    PROGMEM_readAnything(&OTmap[id], item);
+    bool inStore = false;
+    for (int i = 0; i < OVERRIDE_STORE_MAX; i++) {
+      if (otOverrideStore[i].lastSeen != 0 && otOverrideStore[i].id == id) { inStore = true; break; }
+    }
+    if (item.type != ot_f88 || inStore || item.label == nullptr || item.label[0] == '\0') { s_ovrClearId++; continue; }
+    char leaf[64];
+    snprintf_P(leaf, sizeof(leaf), PSTR("%s/override"), item.label);
+    if (sendMQTTData(leaf, "", /*retain=*/true)) s_ovrClearId++;
+    return true;
+  }
+  s_ovrClearId = 0xFFFF;
+  return false;
+}
+// --- staleOverrideClear end
 
 //===================[ OT Message Field Formatters ]=========
 
@@ -5163,14 +5235,21 @@ static void stampThermostatRoomTemp()
 //   an OT= value turns the thermostat's Read-Data 27 into a Write-Data 27 with that value (gateway.asm 6.8
 //   MessageID27), and on OT-Direct OT= writes it. This R frame is the one that writes the canonical
 //   Toutside. A failed PIC sensor sends Invalid-Data instead, so a dead sensor ages out.
-// Never a replayed line (TASK-1649) or a parity error, never an A frame (an OT-Direct cache answer can
-// repeat an old value), never a B the gateway made itself (bLocalAnswer: the OT-Direct loopback boiler, TASK-1896 follow-up 1903 item 2;
+// - the PIC's own proxy answer to the thermostat, an A Read-Ack 27 with no B before it (TASK-2040: with OT= the PIC
+//   can answer the thermostat itself and send no R at all).
+// Never a replayed line (TASK-1649) or a parity error, never an A frame OT-Direct made (bLocalAnswer: a cache answer can
+// repeat an old value) and never an answer-override A, never a B the gateway made itself (bLocalAnswer: the OT-Direct loopback boiler, TASK-1896 follow-up 1903 item 2;
 // an R frame is never local, so OT= on OT-Direct still stamps), and never the PS=1 summary, which has no age (ADR-181).
 static bool otFrameIsFreshOutsideTemp(const OpenthermData_t &f)
 {
   if (f.id != 27 || f.skipthis || f.bReplayed || f.bLocalAnswer) return false;
   if (f.rsptype == OTGW_BOILER) return f.type == OT_READ_ACK && !f.bGatewaySubstituted;
   if (f.rsptype == OTGW_REQUEST_BOILER) return f.type == OT_WRITE_DATA;
+  // TASK-2040 (entry 330, marceld beta.361): with OT= the PIC can answer the thermostat's Read-Data 27 itself, a proxy A
+  // Read-Ack with the gateway's own value, with no R or B on the bus at all. Every A that OT-Direct makes is bLocalAnswer
+  // (bridgeFrameToParser(), OTDirect.ino) and was rejected above, so a non-local A here is the PIC's; an answer-override
+  // A replaces a boiler answer after the gateway's R write, which stamps on its own.
+  if (f.rsptype == OTGW_ANSWER_THERMOSTAT) return f.type == OT_READ_ACK && !f.bAnswerOverride;
   return false;
 }
 // --- otOutsideStamp end

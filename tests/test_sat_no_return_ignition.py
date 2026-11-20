@@ -24,7 +24,7 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from test_sat_pwm_override import compile_cpp, extract_cold_cut  # noqa: E402
+from test_sat_pwm_override import compile_cpp, extract_cold_cut, start_gate_prelude  # noqa: E402
 
 SAT_INO = Path(os.environ.get("OTGW_SAT_INO", REPO / "src" / "OTGW-firmware" / "SATcontrol.ino"))
 
@@ -54,7 +54,7 @@ static void satNarratef_P(const char *fmt, ...) { (void)fmt; }
 #define SAT_QUIRK_MI_500_BOOT 0x08
 enum { SAT_MODE_OFF = 0, SAT_MODE_CONTINUOUS = 1, SAT_MODE_PWM = 2 };
 typedef int SATControlMode;
-struct SatSettings { float fOvershootMargin=2.0f; bool bEnabled=true, bOvershootProtection=true, bSolarGainEnable=false, bSummerSimmer=false, bSimulation=false;
+struct SatSettings { float fOvershootMargin=2.0f; float fPwmSwitchMargin=1.5f; bool bEnabled=true, bOvershootProtection=true, bSolarGainEnable=false, bSummerSimmer=false, bSimulation=false;
                      int iMaxRelModulation=80; float fModSupDelay=20, fModSupOffset=1, fFlameOffOffset=18, fSolarSetpointOffset=2;
                      int iHeatingMode=0; };
 struct Settings { SatSettings sat; };
@@ -96,6 +96,7 @@ static uint32_t satCycleGetFlameOnStartMs() { return g_flameOnStart; }
 static uint32_t satCycleGetFlameOffStartMs() { return g_flameOffStart; }
 static bool satCycleIsHourLimitReached() { return g_hourLimit; }
 static void satCycleRecordPwmStart() {}
+static bool satCycleCountPwmStartThisFlame(bool) { return true; }   // entry 428 (TASK-2913): tested in tests/test_sat_pwm_start_limit.py
 void satCycleResetSustainGuards() {}
 void satCycleSkipAutoSwitch() {}
 // TASK-1412.4: the slave low-load permission is not under test here (tests/test_sat_slave_lowload.py): PWM is permitted
@@ -232,6 +233,7 @@ def build_source(src: str) -> str:
         pre = ("static void satNoReturnFloodOnFlameEdge(bool, bool) {}\nstatic void satNoReturnFloodStep() {}\n"
                "static void satMiStep() {}\n")
         flood = ""
+    pre += start_gate_prelude(src, cmd + pwm + flood)   # TASK-1942: the real start gate the PWM block now uses
     return STUBS + pre + cmd + "\n" + pwm + "\n" + flood + "\n" + MAIN
 
 

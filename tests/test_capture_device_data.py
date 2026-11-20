@@ -68,18 +68,28 @@ class ConverterCase(unittest.TestCase):
     def test_header_and_rows(self):
         text = oc.graph_history_csv(response(), NOW_MS)
         lines = text.split("\n")
-        self.assertEqual(lines[0], "epoch_ms,flow,ret,chSet,roomSet,room,outside,dhw,mod,flame,dhw_on,ch")
+        self.assertEqual(lines[0], "epoch_ms,flow,ret,chSet,roomSet,satTarget,room,outside,dhw,mod,flame,dhw_on,ch")   # TASK-2018
         self.assertFalse(text.endswith("\n"))
         # slot 1 has no value and no flag: dropped; slot 2 has only dhw_on: kept
         self.assertEqual(len(lines), 1 + 5)
         t0 = NOW_MS - 37000 - 6 * 120000
         t0 -= t0 % 5000
-        self.assertEqual(lines[1], f"{t0},45.2,30.1,50,20.5,19.8,7.3,,34,1,0,1")
+        self.assertEqual(lines[1], f"{t0},45.2,30.1,50,20.5,,19.8,7.3,,34,1,0,1")
         t2 = NOW_MS - 37000 - 4 * 120000
         t2 -= t2 % 5000
-        self.assertEqual(lines[2], f"{t2},,,,,,,,,0,1,0")
-        self.assertTrue(lines[3].endswith(",45.5,30.2,50,20.5,,7.2,,0,0,0,1"))   # room null -> empty cell
-        self.assertTrue(lines[5].endswith(",-0.5,0,10,20.5,19.9,-1.2,,,0,0,0"))
+        self.assertEqual(lines[2], f"{t2},,,,,,,,,,0,1,0")
+        self.assertTrue(lines[3].endswith(",45.5,30.2,50,20.5,,,7.2,,0,0,0,1"))   # room null -> empty cell
+        self.assertTrue(lines[5].endswith(",-0.5,0,10,20.5,,19.9,-1.2,,,0,0,0"))
+
+    def test_sat_target_column_when_the_device_sends_it(self):
+        # TASK-2018 (ADR-256): the satTarget array is only in a response whose window held a SAT target
+        j = dict(response(), satTarget=[210, None, None, 210, 215, None])
+        lines = oc.graph_history_csv(j, NOW_MS).split("\n")
+        self.assertEqual(lines[1].split(",")[5], "21")
+        self.assertTrue(lines[4].split(",")[5] == "21.5", lines[4])
+        self.assertEqual(lines[5].split(",")[5], "")
+        short = dict(response(), satTarget=[210])   # wrong length: an empty column, as the web UI does
+        self.assertEqual(oc.graph_history_csv(short, NOW_MS).split("\n")[1].split(",")[5], "")
 
     def test_slot_times_step_by_the_interval(self):
         rows = oc.graph_history_rows(response(iv=30), NOW_MS)
@@ -298,6 +308,31 @@ class SweepCase(DeviceTestBase):
         self.assertIn('"hostname"', text)
         self.assertIn("[REDACTED]", text)
         self.assertIn("404", line)   # the files the fake device does not serve
+
+    # TASK-2012: restAPI.ino answers the routes of hardware the board does not have with
+    # sendApiError(503, "No OT-Direct hardware: ...") (:542) or "No PIC detected - ..." (:528).
+    # Those are not applicable on that board, not failures; any other 503 still is one.
+    @staticmethod
+    def api_error(status, message):
+        return (status, json.dumps({"error": {"status": status, "message": message}}).encode())
+
+    def test_absent_hardware_503_is_not_applicable(self):
+        r = self.routes()
+        for p, _ in oc.SWEEP_ENDPOINTS:
+            if p.startswith("/api/v2/otdirect/"):
+                r[p] = self.api_error(503, "No OT-Direct hardware: OT-Direct functions disabled")
+        r["/api/v2/pic/settings"] = self.api_error(503, "No PIC detected - PIC functions disabled")
+        line = oc.sweep_device(self.cap, self.device(r).base, "start")
+        self.assertIn("4 not on this board (503)", line)
+        self.assertIn(" 0 failed", line)
+
+    def test_other_503_still_counts_as_failed(self):
+        r = self.routes()
+        r["/api/v2/otdirect/status"] = self.api_error(503, "Command not queued (queue full)")
+        r["/api/v2/sat/markers"] = self.api_error(503, "Markers busy, retry")
+        line = oc.sweep_device(self.cap, self.device(r).base, "start")
+        self.assertIn("0 not on this board (503)", line)
+        self.assertIn(" 2 failed", line)
 
     def test_hourly_sweep_reads_only_the_changing_routes(self):
         d = self.device(self.routes())

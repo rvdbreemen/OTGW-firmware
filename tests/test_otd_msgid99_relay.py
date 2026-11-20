@@ -71,6 +71,7 @@ static unsigned long otdRelayedStatusFrame(unsigned long f) { return f; }
 static uint16_t otdStatusReplyData(uint16_t t, uint16_t) { return t; }
 static uint32_t g_enq = 0;
 static bool otCmdEnqueue(unsigned long f) { g_enq = (uint32_t)f; return true; }
+static bool otdWriteRefused = false;   // TASK-1804 B3e: set on a refused enqueue (never here: the stub accepts)
 static char g_rsp[32];
 static void synthesizeResponse(const char*, const char* r) { snprintf(g_rsp, sizeof g_rsp, "%s", r); }
 static void otDirectBridgeProcessStatus(const char*) {}
@@ -78,6 +79,7 @@ static constexpr uint8_t OT_UNKNOWN_ID_MAX = 8;
 static uint8_t otUnknownIds[OT_UNKNOWN_ID_MAX]; static uint8_t otUnknownIdCount = 0;
 static unsigned long buildOTResponse(uint8_t type, uint8_t msgId, uint16_t data);
 static bool otdRelayRewriteRead(unsigned long, unsigned long &) { return false; }   // TASK-1803, tests/test_otd_relay_rw.py
+static bool otdId99Unsupported();   // TASK-1804 ID-99: defined in the otdPush block, used by the otdOper99 block
 """
 
 MAIN = r"""
@@ -113,6 +115,17 @@ int main(int argc, char** argv) {
     printf("modes=%04X\n", otdOperModeData(false));
     otdOnThermostatWrite99(0x1300);       // push bit
     printf("push=%d pending=%d\n", otPushManual ? 1 : 0, otPushPending ? 1 : 0);
+  } else if (!strcmp(t, "mh_ui99") || !strcmp(t, "mh_strike99") || !strcmp(t, "mh_ok")) {   // TASK-1804 ID-99
+    if (!strcmp(t, "mh_ui99")) otUnknownIds[otUnknownIdCount++] = 99;            // UI=99
+    if (!strcmp(t, "mh_strike99")) otUnknownCounters[99 >> 2] |= (uint8_t)(3 << ((99 & 3) * 2));   // three Unknown-DataID
+    g_enq = 0; g_rsp[0] = 0;
+    const bool ok = cmd("MH", "5");
+    printf("ok=%d enq=%08lX write=%d rsp=%s modes=%04X\n", ok ? 1 : 0, (unsigned long)g_enq, otOperModeWrite ? 1 : 0, g_rsp,
+           otdOperModeData(false));
+  } else if (!strcmp(t, "hwp_strike99")) {   // TASK-1804 ID-99: HW=P with ID 99 struck out three times spoofs at once
+    otUnknownCounters[99 >> 2] |= (uint8_t)(3 << ((99 & 3) * 2));
+    g_enq = 0; otdPushStart();
+    printf("spoof=%d pending=%d enq=%08lX\n", otPushSpoof ? 1 : 0, otPushPending ? 1 : 0, (unsigned long)g_enq);
   } else if (!strcmp(t, "spoof")) {     // the gateway spoofs a push; the boiler's READ_ACK 99 has no push bit
     otUnknownIds[otUnknownIdCount++] = 99; otdPushStart();
     unsigned long r = otdReply99(0x40630200UL);
@@ -128,6 +141,12 @@ _tmp = None
 _exe = None
 
 
+def unknown_counts():
+    """TASK-1804 ID-99: the real three-strike counter (otUnknownCounters + getUnknownCount)."""
+    a = SRC.index("static uint8_t otUnknownCounters[32]")
+    return SRC[a:SRC.index("\n}\n", SRC.index("static uint8_t getUnknownCount(uint8_t msgId) {", a)) + 3]
+
+
 def setUpModule():
     global _tmp, _exe
     table = re.search(r"^struct OTFrameOverride \{.*?^static constexpr uint8_t OT_OVERRIDE_COUNT[^\n]*\n", SRC, re.S | re.M)
@@ -136,7 +155,8 @@ def setUpModule():
     modes = modes[:modes.index("\n}\n", modes.index("static uint16_t otdOperModeData(bool push) {")) + 3]
     oper = block("otdOper99")
     parts = [pushflags, braced(SRC, r"^static inline void setOTParityBit\(unsigned long &frame\) \{"),
-             braced(SRC, r"^static bool isUnknownId\(uint8_t msgId\) \{"), modes,
+             braced(SRC, r"^static bool isUnknownId\(uint8_t msgId\) \{"),
+             unknown_counts(), modes,
              ("#define HAVE_OPER99 1\n" + oper) if oper else "",
              block("otdPush") or "",
              "static unsigned long otdRelayedStatusFrameDummy;",
@@ -159,6 +179,25 @@ def tearDownModule():
 
 def run(t):
     return subprocess.run([str(_exe), t], capture_output=True, text=True, check=True).stdout.splitlines()
+
+
+class MsgId99Unsupported(unittest.TestCase):
+    """TASK-1804 ID-99: PushOperModes (gateway.asm 6.8 :3281-3288) writes MsgID 99 only when the boiler is not known to
+    reject it; the PIC unknown map holds the UI= marks and the three-strike blacklist (UnknownMask :3519-3538). The nibble
+    is stored and echoed either way (SetOperModeHC1 :4424-4436). Old code: MH= always sent the write, and HW=P checked
+    the UI= table only, so mh_ui99, mh_strike99 and hwp_strike99 are red on it."""
+
+    def test_mh_with_99_marked_unknown_stores_and_echoes_without_a_write(self):
+        self.assertEqual(run("mh_ui99"), ["ok=1 enq=00000000 write=0 rsp=5 modes=0005"])
+
+    def test_mh_with_99_struck_out_three_times_stores_and_echoes_without_a_write(self):
+        self.assertEqual(run("mh_strike99"), ["ok=1 enq=00000000 write=0 rsp=5 modes=0005"])
+
+    def test_mh_with_99_supported_writes_99(self):
+        self.assertEqual(run("mh_ok"), ["ok=1 enq=10630005 write=1 rsp=5 modes=0005"])
+
+    def test_hw_p_with_99_struck_out_spoofs_without_a_write(self):
+        self.assertEqual(run("hwp_strike99"), ["spoof=1 pending=0 enq=00000000"])
 
 
 class MsgId99(unittest.TestCase):
@@ -188,9 +227,10 @@ class Wiring(unittest.TestCase):
         self.assertIn("if (slaveMsgId == 99 && ((otSlaveFrame >> 28) & 0x07) == 1) otdOnThermostatWrite99(", loop)
         reply = braced(SRC, r"^static void replyToThermostat\(")
         self.assertIn("reply = otdReply99(reply);", reply)
-        for c in ("H", "W", "2"):
+        for c in ("H", "W", "2"):   # TASK-1804 ID-99: the branches write 99 through otdPushOperModes(), which sets the flag
             b = braced(SRC, r"else if \(cmd0 == 'M' && cmd1 == '%s'\) \{" % c)
-            self.assertIn("otOperModeWrite = true;", b, "M" + c)
+            self.assertIn("if (!otdPushOperModes())", b, "M" + c)
+        self.assertIn("otOperModeWrite = true;", block("otdPushOperModes"))
 
 
 if __name__ == "__main__":

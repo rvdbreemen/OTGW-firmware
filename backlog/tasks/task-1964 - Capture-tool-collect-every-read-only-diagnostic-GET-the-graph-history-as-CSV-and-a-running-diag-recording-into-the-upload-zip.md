@@ -7,11 +7,11 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-15T10:03:00Z'
-updated_date: '2026-11-15T11:57:00Z'
+updated_date: '2026-11-20T01:20:00Z'
 labels:
   - capture
   - tooling
-milestone: 2.0.0
+milestone: 2.1.0
 dependencies: []
 priority: medium
 ordinal: 1004000
@@ -30,9 +30,8 @@ Robert, 2026-11-15 (in session 'Ja', and DM 1571452141237968907: 'collect ALL po
 - [x] #3 With a diag recording active the upload holds the downloaded recording; with none active nothing is fetched; the tool never sends recording start or stop (test checks no POST)
 - [x] #4 Every read-only diagnostic GET of the route table is fetched at start and stop (hourly where it changes) into the upload; the in/out list with reasons is in the task notes; no secret and no side-effect endpoint is fetched (test on the list)
 - [x] #5 No new dependency: stdlib only (ADR-202)
-- [x] #6 Bench (09 on .63): the capture CSV matches a web UI CSV export taken in the same minute for the overlapping slots
-- [ ] #7 Bench (09 on .63): the capture CSV has the same 11 columns in the same order as the web UI export, and the slot timing matches (coordinator split of the former AC6, 2026-11-15)
-- [ ] #8 Field: the values of a capture CSV match the CSV the tester exported by hand for the overlapping slots (first gruijter capture)
+- [x] #6 Bench (09 on .63): the capture CSV has the same 11 columns in the same order as the web UI export, and the slot timing matches (coordinator split of the former AC6, 2026-11-15)
+- [ ] #7 Field: the values of a capture CSV match the CSV the tester exported by hand for the overlapping slots (first gruijter capture)
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -45,4 +44,12 @@ OUT, with the reason: settings.ini (passwords in plain text, and readable withou
 2026-11-15 implementation (scripts/otgw_capture.py, stdlib only): graph_history_rows/graph_history_csv (the web UI mergeGraphHistory + exportCsv rules), fetch_graph_history (24h + 7d, 7d kept only with a coarser interval_s), fetch_diag_recording (status first, GET download, since=, never start/stop), sweep_device + redact_json (SWEEP_ENDPOINTS/SWEEP_FILES/SWEEP_EXCLUDED), DeviceDataCapture thread (start round off the main thread, hourly rounds in long-run mode; pic/settings start+stop only), stop round in main(), upload zip globs, flags --skip-device-state/--skip-graph-history/--skip-diag-recording (+ PowerShell names). Evidence: tests/test_capture_device_data.py 18/18 OK on the fix; the same file against origin's script (temp copy) FAILED (failures=1, errors=15) of its 16 cases at the time; SameAsWebUiCase runs the REAL v2.js mergeGraphHistory + GSER via node and compares the CSV byte for byte on 3 responses: identical. tests/test_capture_tool.py: 3 watchdog cases went red on the first version (the sweep's /api/v2/health GETs count as probes there); those cases now skip the device-data features like they skip http-probes, 52/52 OK (origin script 52/52 OK too); new end-to-end ToolCase.test_j2 (device-state-start and -stop in the upload zip, 404 lines for graph/diag). All 6 capture test files PASS via run_tests (-j 3). Flash zip: OTGW-firmware-esp32-combo-2.0.0-beta.306+041400e-flash.zip already holds otgw_capture.py (build.py:1262 copies scripts/otgw_capture.py), so the next build ships this version.
 
 2026-11-15 AC6 split by the coordinator: bench part = columns (11, same order, identical) + slot timing, PASS by 09 on .63 with beta.306 and the pushed script (coordinator relay); the value comparison is a field AC (gruijter's first capture, who also exports the CSV by hand). New AC6 ticked from 09's PASS; AC7 open (field).
+
+2026-11-16 close-out (ba), tick fix: 09's .63 PASS on beta.306 (coordinator relay, 2026-11-15) covered the 11 columns in the web UI order and the slot timing, which is the text of AC7, so AC7 is ticked. AC6 (values match a web UI export of the same minute) had been ticked on that same run, but the coordinator's split of 2026-11-15 moved the value comparison to the field (AC8, gruijter's first capture with his own CSV export); no bench run compared values. AC6 is therefore removed as a duplicate of AC8 (its claim was not evidenced), not ticked. Open: AC8 (field).
+
+2026-11-19 triage (otgw-dev): AC7 field-blocked: needs gruijter's first capture next to his hand-exported CSV for the overlapping slots.
+
+2026-11-20 (ba, coordinator decision): AC7 via a tester ask. 92 posted in #beta-testing, message 1573143902511431691: gruijter exports Monitor > Graph 24 h CSV during a capture run (beta.392) and sends it with the zip. Field archive checked first: no overlap (newest hand exports 2026-11-13/15, first capture graph-history CSVs 2026-11-16 after reflashes). Supporting bench variant by 09 on .63 after the beta soak; AC7 is ticked only on field data, otherwise it goes to the coordinator's waiver list for Robert.
+
+2026-11-20 milestone 2.0.0 -> 2.1.0 (otgw-docs, coordinator's assignment). Robert DM 2026-11-20 01:15 (1573144814600462457), relayed by the coordinator: "C — field/hardware ACs outside the 2.0.0 scope, to 2.1.0". Status, assignee and ACs unchanged.
 <!-- SECTION:NOTES:END -->

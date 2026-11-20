@@ -227,7 +227,7 @@ One row per Architecture Decision Record. Scope is the Enforcement `path_glob` s
 | ADR-219 | Accepted | - | User Decision (Robert, 2026-11-08): the web UI is translated in the browser by a small t(key, params) helper in v2.js... |
 | ADR-220 | Accepted | - | User Decision (Robert, 2026-11-08): the language pack files follow the i18next v4 JSON format, read by the project's... |
 | ADR-221 | Accepted | - | User Decision (Robert, 2026-11-08): the web UI language packs (i18n/ .json, ADR-219/ADR-220) are stored on LittleFS a... |
-| ADR-222 | Accepted | - | User Decision: on a board without PSRAM, BLE is off by default and no dialog appears after boot or when a page opens;... |
+| ADR-222 | Superseded | - | User Decision: on a board without PSRAM, BLE is off by default and no dialog appears after boot or when a page opens;... |
 | ADR-223 | Accepted | - | User Decision: in OT-Direct gateway mode, a TT= or TC= override is answer state only, as on the PIC: the gateway answ... |
 | ADR-224 | Accepted | - | In OT-Direct gateway mode the gateway reads MsgID 28 in the slot of a supported thermostat read, and answers that rea... |
 | ADR-225 | Accepted | - | Add src/OTGW-firmware/espipcstack.c, a copy of IDF components/espsystem/espipc.c at commit 9bb7aa84fe, the IDF inside... |
@@ -238,16 +238,32 @@ One row per Architecture Decision Record. Scope is the Enforcement `path_glob` s
 | ADR-231 | Accepted | - | On a gas boiler, a tick in SAT PWM is a warm-up tick of the self-tune, and the PWM-related exclusions do not drop its... |
 | ADR-232 | Accepted | - | Carry 7befe25 as a build-time patch on the registry copy of AsyncTCP 3.4.10, applied by scripts/patchpiolibs.py: |
 | ADR-233 | Accepted | - | At the start of a filesystem OTA the firmware copies settings.ini, rebootcount.txt and rebootlog.txt, in that order,... |
+| ADR-234 | Accepted | `src/OTGW-firmware/SATcurveTune.h` | A tuner hour stays 60 min and counts when no whole-hour marker was set and its clean ticks are at least 90 % of the t... |
 | ADR-235 | Accepted | - | SAT sends CS= when the value it sends, rounded to 0.1, changes, and repeats an unchanged CS= about every 30 s: the co... |
 | ADR-236 | Proposed | - | While SAT is in PWM and the PWM phase is ON, it switches to continuous when the flame is on and the requested setpoin... |
 | ADR-237 | Proposed | `build.py` | The buildfs step runs with PLATFORMIOBUILDDIR=.pio/build-fs (piofsbuildroot(), build.py:2488), so .pio/build keeps on... |
 | ADR-238 | Accepted | - | On the ESP32-S3 a boot counts towards the triple-reset WiFi recovery when it is a reset-button press or a power-on (E... |
 | ADR-239 | Accepted | - | The first 32 bytes of RTC slow memory (0x50000200-0x5000021F) belong to the safeboot updater: the main firmware holds... |
 | ADR-240 | Accepted | - | A connection on port 80 that is not ESTABLISHED counts towards the ADR-188 cap only while at least one queued segment... |
-| ADR-241 | Proposed | - | In master mode a thermostat WRITEDATA of any ID except 1, 16 and 24 is sent to the boiler as a relay in the next free... |
+| ADR-241 | Accepted | - | In master mode a thermostat WRITEDATA of any ID except 1, 16 and 24 is sent to the boiler as a relay in the next free... |
 | ADR-242 | Accepted | - | Every OT-Direct state change runs on the loop task: addCommandToQueue() and sendPICSerial() hand a command that arriv... |
+| ADR-243 | Accepted | - | The default of bEnableSlave is true, as the code already has it: in master mode the slave interface is on unless the... |
 | ADR-244 | Accepted | - | On the PIC serial path, a command that starts with PR= is sent to the PIC also while a simulation is on; every other... |
 | ADR-245 | Accepted | - | On a board with PSRAM the ring holds 5046 slots of 120 s (GRAPHHISTLARGESLOTS), 5040 of them readable: 7 days. |
 | ADR-246 | Accepted | - | When rebootlog.txt does not fit the free part of the RTC snapshot, fsOtaRtcFill() stores the longest prefix of it tha... |
 | ADR-247 | Accepted | - | The two PROGMEM assets of ADR-194 may be stored deflated in firmware flash (coordinator decision for TASK-1955 option... |
-| ADR-248 | Proposed | - | The existing climate.Thermostat entity keeps its uniqid and its discovery payload is fixed; the firmware routes the c... |
+| ADR-248 | Accepted | - | The existing climate.Thermostat entity keeps its uniqid and its discovery payload is fixed; the firmware routes the c... |
+| ADR-249 | Accepted | - | SAT switches from continuous to PWM when flow - requested setpoint (the output of the proportional-integral-derivativ... |
+| ADR-250 | Accepted | - | While the tolerance band says stop, the CH-enable bit SAT sends is 0, and nothing else changes: the control setpoint,... |
+| ADR-251 | Accepted | - | MsgID 3 plays no part in SAT PWM: neither HB bit 4 nor the presence of a valid MsgID 3 reply allows, refuses or ends... |
+| ADR-252 | Accepted | - | A heating start enters PWM through satSetControlMode(), and a start gate keeps every PWM to continuous exit quiet unt... |
+| ADR-253 | Accepted | - | The band stops at target + 0.1 and may restart below target + 0.1, and once CH is off for the band it stays off for a... |
+| ADR-254 | Proposed | - | SAT switches from continuous to PWM when flow - requested setpoint >= settings.sat.fPwmSwitchMargin (default 2.0) hol... |
+| ADR-255 | Accepted | - | User Decision: the HA "SAT Simulation" switch gets a second availability topic, sat/simulationavailable, combined wit... |
+| ADR-256 | Accepted | - | User Decision: the device history slot gets a seventh int16t temperature column, satTarget, so a slot is 16 bytes; th... |
+| ADR-257 | Accepted | - | User Decision: on a board without PSRAM BLE cannot be switched on: the scanner never starts there, every write of SAT... |
+| ADR-258 | Accepted | - | A probe that cannot run for lack of memory counts as a dead probe, instead of a skip, when the dead-link check is arm... |
+| ADR-259 | Accepted | - | When the error leaves the 0.1 C deadband the integral is multiplied by 0.5 once and then held while the error stays o... |
+| ADR-260 | Accepted | - | The tuner keeps its hour, its exclusions, its two phases and its agreement rule, and changes three constants: a tuner... |
+| ADR-261 | Proposed | - | While the heap is starved (platformMaxFreeBlock() < WIFISTARVEDMAXBLOCK), wifiLinkProbeOnReconnect() keeps the dead s... |
+| ADR-262 | Accepted | `src/OTGW-firmware/**/*.ino` | The web UI (user interface), running in the user's browser, checks the GitHub releases list for a newer firmware and... |

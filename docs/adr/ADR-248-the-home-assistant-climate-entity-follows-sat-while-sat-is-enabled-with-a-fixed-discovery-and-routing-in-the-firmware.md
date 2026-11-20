@@ -1,7 +1,7 @@
 ---
 id: "ADR-248"
 title: "The Home Assistant climate entity follows SAT while SAT is enabled, with a fixed discovery and routing in the firmware"
-status: "Proposed"
+status: "Accepted"
 date: "2026-11-15"
 binding: false
 gate: null
@@ -44,7 +44,7 @@ format: "canonical"
 
 ## Status
 
-Proposed, 2026-11-15.
+Accepted, 2026-11-15.
 
 **Decision Maker:** User: Robert van den Breemen (maintainer), following Sergeant D's proposal (docs/sat/sergeant-d-corrections.md entries 351, 352, 353).
 
@@ -71,6 +71,11 @@ status_history:
     status: Proposed
     changed_by: "User: Robert van den Breemen"
     reason: Related to ADR-101
+    changed_via: adr-kit lifecycle
+  - date: 2026-11-15
+    status: Accepted
+    changed_by: "User: Robert van den Breemen"
+    reason: Robert accepted (Discord DM 1571639116955914493, 'A' to accept question 1571634712953225340); Sergeant D's answer 18 (entry 371) agrees
     changed_via: adr-kit lifecycle
 ```
 
@@ -181,7 +186,7 @@ so the card is SAT's thermostat while SAT is enabled and today's thermostat card
 
 ## Open Questions
 
-- [ ] What Sergeant D meant by "SAT should be displayed as `OTGW_Thermostat`" (entry 351): the entity's display name, or the gateway taking the thermostat role. Queued as Q-1979a in docs/sat/open-questions.md; this ADR keeps the name "Thermostat" until it is answered.
+- [x] What Sergeant D meant by "SAT should be displayed as `OTGW_Thermostat`" (entry 351): the entity's display name, or the gateway taking the thermostat role. Queued as Q-1979a in docs/sat/open-questions.md; this ADR keeps the name "Thermostat" until it is answered. — **Answered 2026-11-15 by User: Robert van den Breemen:** Keep the name 'Thermostat'. Decided by the coordinator under Robert's directive 2026-11-15 (CLI) 'Do not wait for Sergeant D. Finish everything that can be finished.' (Q-1979a option B, our recommendation); Sergeant D is asked in the same batch and may overrule, which then becomes a follow-up task.
 
 ## Related Decisions
 

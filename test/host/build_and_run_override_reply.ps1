@@ -55,6 +55,13 @@ param(
   [ValidateSet('1178', '1177', '1184', '1684')][string]$Suite = '1178'
 )
 
+# TASK-2017: Windows PowerShell 5.1 started from PowerShell 7 (or from a shell that pwsh started) inherits pwsh's
+# PSModulePath. Its 7.x copy of Microsoft.PowerShell.Utility comes first there, 5.1 cannot load it, and Get-FileHash
+# is then "not recognized". Drop PowerShell 7's module paths, so 5.1 resolves its own modules.
+if ($PSVersionTable.PSEdition -eq 'Desktop' -and $env:PSModulePath) {
+  $env:PSModulePath = (($env:PSModulePath -split ';') | Where-Object { $_ -and $_ -notmatch '\\PowerShell\\' }) -join ';'
+}
+
 $ErrorActionPreference = 'Stop'
 $here     = Split-Path -Parent $MyInvocation.MyCommand.Path
 $repo     = (Resolve-Path (Join-Path $here '..\..')).Path
@@ -113,6 +120,8 @@ $otdAnchors = @(
      EndRegex = '^static unsigned long buildStatusRequest\(\)\s*\{'; EndKind = 'construct' },
   @{ Name = 'otLoopbackData[] .. handleMasterResponse'; Kind = 'range'; Regex = '^static const uint16_t PROGMEM otLoopbackData\[';
      EndRegex = '^static void handleMasterResponse\(\)\s*\{'; EndKind = 'construct' },
+  @{ Name = 'otdMasterRelaysWrite';         Kind = 'range';     Regex = '^// --- otdMasterRelaysWrite begin';
+     EndRegex = '^// --- otdMasterRelaysWrite end'; EndKind = 'line'; Optional = $true },   # TASK-1812: loopOTDirect calls it
   @{ Name = 'PI state, getFlowTemp';        Kind = 'range';     Regex = '^static float\s+otPiIntegState\b';
      EndRegex = '^float getFlowTemp\(\)\s*\{'; EndKind = 'construct'; Optional = $true },   # only in the revisions before TASK-1684
   @{ Name = 'loopOTDirect';                 Kind = 'construct'; Regex = '^void loopOTDirect\(\)\s*\{' },

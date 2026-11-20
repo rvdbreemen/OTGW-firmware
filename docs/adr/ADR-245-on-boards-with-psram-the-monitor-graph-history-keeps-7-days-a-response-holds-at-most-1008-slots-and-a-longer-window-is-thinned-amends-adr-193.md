@@ -11,6 +11,7 @@ supersedes: []
 superseded_by: null
 related:
   - "ADR-193"
+  - "ADR-256"
 topics:
   - "graph"
   - "psram"
@@ -63,6 +64,11 @@ status_history:
     status: Accepted
     changed_by: Robert van den Breemen (maintainer), recorded by Agent (92)
     reason: "Robert chose A, Discord DM 1571457707725168736 on question 1571457301280202873 ('Recommendation: A, and accept ADR-245 with it'); 7-day ring: DM 1571454228763779093"
+    changed_via: adr-kit lifecycle
+  - date: 2026-11-18
+    status: Accepted
+    changed_by: Agent (ba)
+    reason: Related to ADR-256 (TASK-2018)
     changed_via: adr-kit lifecycle
 ```
 

@@ -4,7 +4,7 @@
 [![GitHub release](https://img.shields.io/github/v/release/rvdbreemen/OTGW-firmware?style=flat-square)](https://github.com/rvdbreemen/OTGW-firmware/releases)
 [![License: GPLv3](https://img.shields.io/badge/License-GPLv3-blue.svg?style=flat-square)](LICENSE)
 
-> **Disclaimer: v2.0.0-beta.323 is a beta of the 2.0.0 line.** It is not a stable release. It has had alpha and beta testing on a small group of units, but not yet the long field runs a stable release needs. Expect bugs, save your settings before you flash (a power cut during a filesystem update can still reset them), and read the [beta.323 release notes](https://github.com/rvdbreemen/OTGW-firmware/releases/tag/v2.0.0-beta.323) first, including the known issues.
+> **Disclaimer: v2.0.0-beta.401 is a beta of the 2.0.0 line.** It is not a stable release. It has had alpha and beta testing on a small group of units, but not yet the long field runs a stable release needs. Expect bugs, save your settings before you flash (a power cut during a filesystem update can still reset them), and read the [beta.401 release notes](https://github.com/rvdbreemen/OTGW-firmware/releases/tag/v2.0.0-beta.401) first, including the known issues.
 >
 > If you need a gateway that just works, stay on the 1.x line for now: the [`otgw-1.x.x` branch](https://github.com/rvdbreemen/OTGW-firmware/tree/otgw-1.x.x) and the [published releases](https://github.com/rvdbreemen/OTGW-firmware/releases).
 
@@ -23,14 +23,14 @@ Version 2.0.0 is a major platform release. It targets the ESP32-S3 in the tradit
 - **ESP32-S3 platform**: an asynchronous web server and FreeRTOS on a LOLIN S3 Mini (or S3 Mini Pro) in place of the old Wemos D1 mini. One firmware image (`esp32-combo`) detects the board at boot.
 - **v2 web UI**: the only web UI in 2.0.0. Live value table, graph with history, help text for every setting, SAT page. The File Explorer stays as the recovery page.
 - **Firmware updates over WiFi**: a small safeboot updater sits next to the firmware. If an update fails or a new firmware crashes in its first 30 seconds, the unit returns to safeboot and stays reachable. Units on an older flash layout need one USB migration first.
-- **SAT (Smart Autotune Thermostat), experimental and opt-in**: an embedded heating controller, off by default. See [SAT](#sat-smart-autotune-thermostat).
+- **SAT (Smart Autotune Thermostat), opt-in**: an embedded heating controller, off by default. See [SAT](#sat-smart-autotune-thermostat).
 - **Home Assistant**: MQTT auto-discovery for the OpenTherm values, SAT, sensors and diagnostics, including SAT power, energy and gas estimates for the Energy dashboard.
 - **Works behind a reverse proxy**, including a Home Assistant sidebar panel (ingress). Guide: [docs/guides/REVERSE_PROXY_AND_HA_INGRESS.md](docs/guides/REVERSE_PROXY_AND_HA_INGRESS.md).
 - **BLE room sensors**: Xiaomi LYWSD03MMC sensors (BTHome v2) are read passively over Bluetooth LE and feed SAT and Home Assistant.
 - **Diagnostics**: a capture tool (launchers for Windows and for Linux/macOS) that records telnet, MQTT, the crash log and raw OpenTherm frames in one upload file, and a crash log with core-dump details after a panic.
 - **Relicensed to GNU GPLv3** (was MIT).
 
-**Breaking changes**: 2.0.0 changes MQTT topics, REST fields and settings compared with 1.x. Check your Home Assistant automations, Node-RED flows and scripts against the [breaking changes in the release notes](https://github.com/rvdbreemen/OTGW-firmware/blob/dev/docs/releases/RELEASE_NOTES_2.0.0-beta.323.md#since-the-1x-line) before you upgrade.
+**Breaking changes**: 2.0.0 changes MQTT topics, REST fields and settings compared with 1.x. Check your Home Assistant automations, Node-RED flows and scripts against the [breaking changes in the release notes](https://github.com/rvdbreemen/OTGW-firmware/blob/dev/docs/releases/RELEASE_NOTES_2.0.0-beta.401.md#since-the-1x-line) before you upgrade.
 
 ---
 
@@ -42,7 +42,7 @@ Version 2.0.0 is a major platform release. It targets the ESP32-S3 in the tradit
 - MQTT integration with Home Assistant auto-discovery
 - Web interface: live OT log, real-time graphs, dark/light theme, settings panel
 - REST API v2 with consistent JSON and proper HTTP status codes
-- SAT (Smart Autotune Thermostat): weather-compensated PID heating controller, experimental and opt-in
+- SAT (Smart Autotune Thermostat): weather-compensated PID heating controller, opt-in and off by default
 - DS18B20 Dallas temperature sensors with custom labels (up to 16)
 - S0 pulse-counting energy meter
 - Optional SSD1306 OLED display (128x64, I2C)
@@ -81,7 +81,7 @@ Firmware v1.x ran on the ESP8266 module that shipped on earlier NodoShop OTGW bo
 | 1.x through 2.0 | NodeMCU ESP8266 |
 | 2.3 and later | Wemos D1 mini ESP8266 |
 
-The ESP8266 is no longer a 2.0.0 build target. To move an existing OTGW to v2.0.0, swap the Wemos D1 mini ESP8266 for a LOLIN S3 Mini (ESP32-S3) drop-in: it keeps the same OTGW board and PIC co-processor, and the firmware builds for it from the same source tree. Settings files from v1.3.x load without modification.
+The ESP8266 is no longer a 2.0.0 build target. To move an existing OTGW to v2.0.0, swap the Wemos D1 mini ESP8266 for a LOLIN S3 Mini (ESP32-S3) drop-in: it keeps the same OTGW board and PIC co-processor, and the firmware builds for it from the same source tree. Settings files from v1.3.x load without modification. The step-by-step move from 1.x is in Chapter 2 of the manual, "Moving from 1.x to 2.0.0, step by step" ([docs/manuals/en/ch02-hardware-setup.md](docs/manuals/en/ch02-hardware-setup.md#moving-from-1x-to-200-step-by-step)).
 
 This ESP32-S3 plus PIC combination is what the firmware supports.
 
@@ -89,17 +89,17 @@ This ESP32-S3 plus PIC combination is what the firmware supports.
 
 ## SAT: Smart Autotune Thermostat
 
-> **SAT is experimental and off by default.** When you switch it on, it takes over the control setpoint of your boiler, and other channels can no longer send central heating commands. The setup wizard asks you to confirm that first. SAT behaviour can still change between builds; see the [release notes](https://github.com/rvdbreemen/OTGW-firmware/blob/dev/docs/releases/RELEASE_NOTES_2.0.0-beta.323.md#sat-is-experimental-and-opt-in). Without SAT, the gateway is a transparent OpenTherm gateway, as in 1.x.
+> **SAT is opt-in and off by default.** When you switch it on, it takes over the control setpoint of your boiler, and other channels can no longer send central heating commands. The setup wizard asks you to confirm that first. See Chapter 5 of the manual ([docs/manuals/en/ch05-sat-thermostat.md](docs/manuals/en/ch05-sat-thermostat.md)). Without SAT, the gateway is a transparent OpenTherm gateway, as in 1.x.
 
 SAT is an embedded heating controller that runs entirely on the device, a port of the [SAT Home Assistant integration](https://github.com/Alexwijn/SAT). It replaces the room thermostat's role in controlling the boiler: it computes the boiler flow temperature from the outdoor temperature and the room temperature error, and keeps your home at the target temperature without needing Home Assistant or any external controller in the control loop.
 
 ### What SAT does
 
-SAT combines a **weather-compensated heating curve** with a **PID controller**. The heating curve calculates a base flow setpoint from the outdoor temperature using a configurable coefficient. The PID loop adds a correction on top, based on the difference between actual and target room temperature. The PID gains follow from the heating curve coefficient. A daily **self-tune** (on by default, can be switched off) moves the coefficient by 0.1 when the last 3 days show the curve is clearly too low or too high.
+SAT combines a **weather-compensated heating curve** with a **PID controller**. The heating curve calculates a base flow setpoint from the outdoor temperature using a configurable coefficient. The PID loop adds a correction on top, based on the difference between actual and target room temperature. The PID gains follow from the heating curve coefficient. A **self-tune** (on by default, can be switched off) decides every counted hour on the last 12 counted hours and moves the coefficient by 0.05 when they show the curve is clearly too low or too high; after a step it waits at least 12 counted hours (from 2.0.0-beta.379, ADR-260).
 
 ### Key capabilities
 
-- **Weather compensation**: configurable heating curve coefficient (0.1 to 5.0), a daily self-tune of that coefficient, and a curve recommendation based on error statistics
+- **Weather compensation**: configurable heating curve coefficient (0.1 to 5.0), an hourly self-tune of that coefficient, and a curve recommendation based on error statistics
 - **PID control**: proportional + integral + derivative correction on top of the heating curve
 - **Two control modes**: continuous modulation (direct boiler modulation) and PWM flame cycling (on/off duty cycle)
 - **Heating system types**: radiators, underfloor heating, heat pump
@@ -121,7 +121,7 @@ SAT combines a **weather-compensated heating curve** with a **PID controller**. 
 3. Select your heating system type (radiators / underfloor / heat pump) and set your target room temperature.
 4. Enter your boiler capacity in kW.
 5. Set an initial heating curve coefficient (start with 1.0 for radiators, 0.6 for underfloor; the curve recommendation and the self-tune guide further tuning).
-6. Save. SAT takes over the flow setpoint immediately. Please share a capture log with us if you run SAT: see the release notes, "Capture tool".
+6. Save. SAT takes over the flow setpoint immediately. To report how SAT runs in your house, follow "Reporting SAT field results" in Chapter 5 of the manual.
 
 For detailed setup including OPV calibration and Home Assistant automation examples, see the [SAT integration guide](backlog/docs/doc-3%20-%20sat-integration-guide.md).
 

@@ -28,13 +28,17 @@
 // --- Cycle Constants ---
 static const uint8_t  SAT_CYCLE_HISTORY_SIZE       = 16;
 static const uint32_t SAT_CYCLE_MIN_SAMPLES        = 3;       // a cycle with fewer 1 Hz samples is not recorded (tracker.py:98-100, minimum_samples_per_cycle, TASK-1588)
-// Overshoot margin now read from settings.sat.fOvershootMargin (default 2.0C; Python OVERSHOOT_MARGIN_CELSIUS is 3.0)
+// The cycle classifier's overshoot margin is settings.sat.fOvershootMargin (default 2.0C; Python OVERSHOOT_MARGIN_CELSIUS is 3.0)
 static const float    SAT_OVERSHOOT_SUSTAIN_SEC     = 60.0f;   // Sustained overshoot (cycle classifier streak)
+// TASK-2005, Sergeant D entry 407 (supersedes entry 327's 1.5 C / 30 s; thermo-nova 3.0 C / 60 s, cycles/const.py:10,
+// const.py:21): continuous -> PWM when flow - requested >= settings.sat.fPwmSwitchMargin (default 2.0, Q-407a) for 60 s.
 static const uint32_t SAT_OVERSHOOT_SUSTAIN_MS      = 60000UL;  // Sustained overshoot before PWM switch (satCycleCheckOvershootSwitch)
-// TASK-1762, Sergeant D entries 288/289: flame-out fail-safe beside the 60 s rule. In continuous mode, flow - requested (PID)
-// setpoint >= 3.5 C for 30 s also switches to PWM. A fixed value from Sergeant D, not the overshoot margin setting; it has no
-// thermo-nova counterpart (deliberate addition on top of the pin, heating_control.py:262-305 has only the 60 s rule).
-static const float    SAT_OVERSHOOT_FAILSAFE_DELTA_C = 3.5f;
+// TASK-1762, Sergeant D entries 288/289, kept by entry 359, value 3.0 by entry 429 (TASK-2913) (was 3.5): flame-out fail-safe beside the
+// switch rule. In continuous mode, flow - requested (PID) setpoint >= 3.0 C for 30 s also switches to PWM. A fixed value from
+// Sergeant D, not a setting; it has no thermo-nova counterpart (deliberate addition on top of the pin, heating_control.py:262-305
+// has only the one rule). It fires before the 60 s switch rule on a large overshoot, and it is the only way back to PWM for a
+// flame that already left PWM (entry 429, _cycle_burnLeftPwm).
+static const float    SAT_OVERSHOOT_FAILSAFE_DELTA_C = 3.0f;
 static const uint32_t SAT_OVERSHOOT_FAILSAFE_SUSTAIN_MS = 30000UL;
 static const float    SAT_UNDERSHOOT_MARGIN_C       = 3.0f;    // Below-setpoint margin for underheat (Python UNDERSHOOT_MARGIN_CELSIUS=-3.0)
 // TASK-1933 (Sergeant D entries 339, 342, 350): the PWM -> continuous exit is "flame on and request above the flow for 60 s",
@@ -167,12 +171,39 @@ static const uint32_t SAT_OFF_GAP_UNKNOWN = 0xFFFFFFFFUL;   // offDurationMs of 
 // sustained_runtime() does (helpers.py:51-56; entry 41): the first sample only starts the timer.
 static bool     _sustain_overshootRunning = false;
 static uint32_t _sustain_overshootStartMs = 0;
-static bool     _sustain_overshootFailsafeRunning = false;   // TASK-1762: flow - CS >= 3.5 for 30 s (entries 288/289)
+static bool     _sustain_overshootFailsafeRunning = false;   // TASK-1762: flow - CS >= 3.0 for 30 s (entries 288/289, 429)
 static uint32_t _sustain_overshootFailsafeStartMs = 0;
 static bool     _sustain_underheatRunning = false;
 static uint32_t _sustain_underheatStartMs = 0;
 static bool     _sustain_saturationRunning = false;
 static uint32_t _sustain_saturationStartMs = 0;
+// TASK-2913, Sergeant D entries 428/429/430 (2.0.0, top priority): one flame (boiler flame on until it goes out) enters PWM at most
+// once. After an exit from PWM to continuous with the flame on, the flow-above-request switch (fPwmSwitchMargin, entry
+// 407) does not take that flame back to PWM; only the fail-safe can (SAT_OVERSHOOT_FAILSAFE_DELTA_C). Cleared when the
+// flame goes out (satCycleNoteBurnEnd, called from satCycleOnFlameChange). No thermo-nova counterpart (heating_control.py
+// :262-305 re-enables PWM whenever its overshoot rule holds).
+static bool     _cycle_burnLeftPwm = false;
+static bool     _cycle_burnHoldLogged = false;   // the "switch held for this flame" line, once per flame
+// Entry 428 (changes entry 89): at most one PWM ON start counts per flame. A PWM ON that begins with the flame off is a start
+// attempt and always counts; one that begins with the flame burning (a PWM re-entry inside a burn) counts only when no start
+// was counted for that flame yet (satCycleCountPwmStartThisFlame, called from satPwmBeginOn).
+static bool     _cycle_burnPwmCounted = false;
+
+// Public: the flame went out (satCycleOnFlameChange): the next flame may enter PWM again and its first PWM ON counts.
+void satCycleNoteBurnEnd()
+{
+  _cycle_burnLeftPwm = false;
+  _cycle_burnHoldLogged = false;
+  _cycle_burnPwmCounted = false;
+}
+
+// Public (entry 428): true when this PWM ON start counts toward the hourly limit.
+bool satCycleCountPwmStartThisFlame(bool flameOn)
+{
+  if (flameOn && _cycle_burnPwmCounted) return false;
+  _cycle_burnPwmCounted = true;
+  return true;
+}
 // End of the last draw: the loop pass that saw the boiler DHW-active bit drop, or the tick time of the last control
 // tick with the bit set; only meaningful once a draw has been seen (_sustain_dhwSeen), so the guard is inactive from
 // boot until the first draw.
@@ -994,7 +1025,7 @@ static void _cycleTailSample(uint32_t nowMs, float flowTemp)
 //                                              of the PWM UNDERHEAT is SAT_CYCLE_UNDERHEAT_PWM
 // Not gated on a user setting (entry 18; the PWM auto switch setting no longer exists) and without a minimum length, cooldown or cold check, as in thermo-nova;
 // the margin of the OVERSHOOT verdict is 2.0 with >= (entries 15, 37, in the classifier). The enable goes through the same
-// PWM entry gate as every other entry (satPwmEntryAllowed(5), entries 213-215): when the boiler refuses low-off, nothing happens
+// PWM entry gate as every other entry (satPwmEntryAllowed(5); always permitted since entries 392/393): MsgID 3 no longer stops it
 // and the mode stays continuous. The cold cutoff, the hot-water pause and the start limits act in the PWM schedule and the
 // heater-off branch of the next control tick, as they do after the 60 s switch. A mode that is neither PWM nor continuous
 // (OFF) is left alone. The classifier saw the per-sample control setpoint (entry 36), so a switch out of PWM in the middle of
@@ -1009,6 +1040,7 @@ static void satCycleApplyEndOfCycle(SATCycleClass cls, bool pwmEnabled)
     satNarrate_P(PSTR("Control mode: PWM (the last cycle overshot)"));
   } else if (pwmEnabled && state.sat.eControlMode == SAT_MODE_PWM) {
     if (cls != SAT_CYCLE_UNDERHEAT_PWM) return;
+    if (satStartGateActive()) return;   // entries 385/387: the start sequence of a heating start is not judged
     SATDebugTln(F("SAT: PWM cycle classified underheat, switching to continuous mode"));
     satSetControlMode(SAT_MODE_CONTINUOUS);
     satNarrate_P(PSTR("Control mode: continuous (the last PWM cycle stayed under the setpoint, PWM ended)"));
@@ -1086,6 +1118,7 @@ void satCycleOnFlameChange(bool flameOn)
   else if (!flameOn && _cycle_flameOn) {
     // Flame just turned OFF — complete the cycle
     _cycle_flameOn = false;
+    satCycleNoteBurnEnd();          // entries 428/429: the next flame may enter PWM again, its first PWM ON counts
     _cycle_flameOffStartMs = now;
     _cycle_phase = SAT_CP_COOLDOWN;
     _cycle_phaseStartMs = now;
@@ -1295,12 +1328,13 @@ void satCycleSample()
   _cycle_lastSampleMs = now;
 }
 
-//=== Slave low-load permission: OpenTherm MsgID 3 HB bit 4 (TASK-1412.4, Sergeant D entries 213-215) ===
-// OT spec v4.2 (slave configuration flags, ID 3): bit 4 "Master low-off & pump control function" [allowed, not allowed],
-// 1 = not allowed. PWM is the master switching the boiler off between phases, so it is a permission, not a source
-// detector: the manual heating source (ADR-157) is never read here. thermo-nova only shows the bit
-// (coordinator/serial/binary_sensor.py:54) and does not act on it.
-// Entry 215: no PWM until a valid reply; a gateway that never gets one never uses PWM.
+//=== Slave configuration (MsgID 3) and the PWM permission (TASK-1412.4, TASK-2000; Sergeant D entries 392, 393) ===
+// OT spec v4.2 (slave configuration flags, ID 3): bit 4 "Master low-off & pump control function" [allowed, not allowed].
+// Entry 392 ("Don't look at bit 4 at all ... boiler should be able to enter PWM") reverses entries 213 and 214, and entry 393
+// (Q-392a A) reverses entry 215: MsgID 3 plays no part in PWM, as in thermo-nova, which only shows the bit
+// (coordinator/serial/binary_sensor.py:54). The reply is still recorded and shown (REST slave_cfg_valid, slave_low_off_denied).
+// satPwmPermitted() is always true, so the entry paths that ask satPwmEntryAllowed() and the running-PWM check
+// satCycleCheckLowLoadVeto() never refuse; they stay as the call points, and pwm_veto_reason stays 0.
 // Called from the OpenTherm frame decoder for a valid MsgID 3 READ-ACK from the boiler.
 void satNoteSlaveConfig(uint8_t hb)
 {
@@ -1312,14 +1346,14 @@ void satNoteSlaveConfig(uint8_t hb)
 
 bool satPwmPermitted()
 {
-  return state.sat.bSlaveCfgValid && !state.sat.bSlaveLowOffDenied;
+  return true;   // entries 392 and 393: MsgID 3 plays no part in PWM (neither bit 4 nor whether a valid reply was seen)
 }
 
 // Records why and on which path PWM was refused (the REST status and the log show it) and writes one log line when the
 // reason or path changes or 10 minutes have passed since the last line (the overshoot switch asks every 60 s).
 void satPwmNoteRefused(uint8_t path)
 {
-  const uint8_t reason = state.sat.bSlaveCfgValid ? 2 : 1;
+  const uint8_t reason = 1;   // not reached since entries 392/393 (satPwmPermitted() is always true); kept for the REST field
   const uint32_t now = millis();
   const bool fresh = state.sat.iPwmVetoMs == 0 || reason != state.sat.iPwmVetoReason || path != state.sat.iPwmVetoPath ||
                      (uint32_t)(now - state.sat.iPwmVetoMs) >= 600000UL;
@@ -1327,9 +1361,7 @@ void satPwmNoteRefused(uint8_t path)
   state.sat.iPwmVetoPath   = path;
   if (fresh) {
     state.sat.iPwmVetoMs = (now != 0) ? now : 1;
-    satNarratef_P(PSTR("PWM refused (path %u): %s"), (unsigned)path,
-                  (reason == 2) ? "the boiler does not allow master low-off (MsgID 3 HB bit 4 = 1)"
-                                : "no valid MsgID 3 reply from the boiler yet");
+    satNarratef_P(PSTR("PWM refused (path %u): no valid MsgID 3 reply from the boiler yet"), (unsigned)path);
   }
 }
 
@@ -1341,9 +1373,8 @@ bool satPwmEntryAllowed(uint8_t path)
   return false;
 }
 
-// PWM -> continuous when the permission is gone while PWM runs (entry 214: bit 4 turning 1 leaves PWM in that tick and the
-// continuous setpoint goes out, as the underheat exit does; one ON phase may end early). Called once per control tick, before
-// the PWM schedule. Returns true if the mode was switched.
+// PWM -> continuous when the permission is gone while PWM runs. Since entries 392/393 the permission is always there, so this
+// never switches (entry 214 reversed). Called once per control tick, before the PWM schedule. Returns true if the mode was switched.
 bool satCycleCheckLowLoadVeto()
 {
   if (state.sat.eControlMode != SAT_MODE_PWM || satPwmPermitted()) return false;
@@ -1360,16 +1391,16 @@ bool satCycleCheckLowLoadVeto()
 // The test uses the requested (PID) setpoint, not the final one: the continuous clamp keeps the final setpoint
 // within a few degrees of the flow, so comparing against it would almost never see an overshoot.
 // flow >= requested + margin counts, equality included (Q43 A; thermo-nova resets only on flow < threshold,
-// :288-291). The margin is settings.sat.fOvershootMargin (default 2.0; thermo-nova's own is 3.0).
-// The 60 s are tickMs - start (Q46 B), so the switch comes on the first tick at least 60 s after
-// the first qualifying tick (ticks are never closer than one interval; entry 109). A tick outside CONTINUOUS (:264-266), or within the hot-water guard (:268-274),
+// :288-291). The margin is settings.sat.fPwmSwitchMargin (default 2.0, entry 407 and Q-407a; thermo-nova's own is 3.0) and the
+// time 60 s (entry 407, as thermo-nova). The 60 s are tickMs - start (Q46 B), so the switch comes on the first tick at
+// least 60 s after the first qualifying tick (ticks are never closer than one interval; entry 109). A tick outside CONTINUOUS (:264-266), or within the hot-water guard (:268-274),
 // clears the start.
 // TASK-1762 (Sergeant D entries 288/289): a second rule beside it, a fail-safe for flame out. flow - requested >= 3.5 C
 // (SAT_OVERSHOOT_FAILSAFE_DELTA_C, equality included) held for 30 s also switches to PWM. It has its own timer, counted the same
 // way (first qualifying tick starts it, no catch-up, entry 109), and the same gates: outside CONTINUOUS, the hot-water guard and
-// a missing flow clear both starts. Each rule is evaluated on its own: the margin setting may be 0.5-5.0 C, so the 3.5 C rule
+// a missing flow clear both starts. Each rule is evaluated on its own: the switch margin setting (fPwmSwitchMargin) may be 0.5-5.0 C, so the 3.5 C rule
 // does not depend on the margin check, and a tick below 3.5 C clears only the fail-safe start. Both use entry path 1 for the
-// MsgID 3 permission (entry 213); a refusal clears both starts.
+// MsgID 3 permission (always given since entries 392/393); a refusal would clear both starts.
 bool satCycleCheckOvershootSwitch(float requestedSetpoint, uint32_t tickMs)
 {
   if (state.sat.eControlMode != SAT_MODE_CONTINUOUS || satDhwGuardActive(tickMs)) {
@@ -1386,9 +1417,17 @@ bool satCycleCheckOvershootSwitch(float requestedSetpoint, uint32_t tickMs)
     return false;
   }
 
-  bool fire60 = false;
-  if (flowTemp >= requestedSetpoint + settings.sat.fOvershootMargin) {
-    fire60 = satSustainedFor(_sustain_overshootRunning, _sustain_overshootStartMs, tickMs, SAT_OVERSHOOT_SUSTAIN_MS);
+  bool fireSwitch = false;
+  if (_cycle_burnLeftPwm) {
+    // Entry 429: this flame already left PWM; the switch rule waits for the next flame, only the fail-safe below applies.
+    if (!_cycle_burnHoldLogged && flowTemp >= requestedSetpoint + settings.sat.fPwmSwitchMargin) {
+      _cycle_burnHoldLogged = true;
+      SATDebugTf(PSTR("SAT: flow=%.1f >= sp=%.1f + %.1f, but this flame already left PWM: staying continuous until flame-off (fail-safe %.1f still applies)\r\n"),
+                 flowTemp, requestedSetpoint, settings.sat.fPwmSwitchMargin, SAT_OVERSHOOT_FAILSAFE_DELTA_C);
+    }
+    _sustain_overshootRunning = false;
+  } else if (flowTemp >= requestedSetpoint + settings.sat.fPwmSwitchMargin) {
+    fireSwitch = satSustainedFor(_sustain_overshootRunning, _sustain_overshootStartMs, tickMs, SAT_OVERSHOOT_SUSTAIN_MS);
   } else {
     _sustain_overshootRunning = false;
   }
@@ -1399,22 +1438,22 @@ bool satCycleCheckOvershootSwitch(float requestedSetpoint, uint32_t tickMs)
   } else {
     _sustain_overshootFailsafeRunning = false;
   }
-  if (!fire60 && !fireFailsafe) return false;
+  if (!fireSwitch && !fireFailsafe) return false;
 
-  // The boiler's MsgID 3 permission comes first (entry 213): without it the switch stays in continuous and the starts
-  // are cleared, so a permission that returns later starts a fresh 60 s (and 30 s).
+  // The MsgID 3 permission comes first (always given since entries 392/393; entries 213/215 reversed): without it the switch stays in continuous and the starts
+  // are cleared, so a permission that returns later starts both timers afresh (60 s switch, 30 s fail-safe).
   if (!satPwmEntryAllowed(1)) {
     _sustain_overshootRunning = false;
     _sustain_overshootFailsafeRunning = false;
     return false;
   }
 
-  if (fire60) {
+  if (fireSwitch) {
     SATDebugTf(PSTR("SAT: sustained overshoot for %lus (flow=%.1f >= sp=%.1f + %.1f), switching to PWM mode\r\n"),
                (unsigned long)((uint32_t)(tickMs - _sustain_overshootStartMs) / 1000UL), flowTemp, requestedSetpoint,
-               settings.sat.fOvershootMargin);
+               settings.sat.fPwmSwitchMargin);
     satNarratef_P(PSTR("Control mode: PWM (flow %.1f stayed above setpoint %.1f + %.1f for %lu s)"), flowTemp,
-                  requestedSetpoint, settings.sat.fOvershootMargin,
+                  requestedSetpoint, settings.sat.fPwmSwitchMargin,
                   (unsigned long)(SAT_OVERSHOOT_SUSTAIN_MS / 1000UL));   // TASK-1521
   } else {
     SATDebugTf(PSTR("SAT: flame-out fail-safe for %lus (flow=%.1f - sp=%.1f >= %.1f), switching to PWM mode\r\n"),
@@ -1437,6 +1476,8 @@ bool satCycleCheckOvershootSwitch(float requestedSetpoint, uint32_t tickMs)
 // Underheat (TASK-1933, entries 339, 342, 350; thermo-nova: flow <= requested - 3 for 180 s, :337-347) counts while the flame
 // is on and the requested setpoint is above the flow, and resets otherwise; 60 s from the first qualifying tick (Q44 A). Saturation counts while the last PWM off time is 0, 300 s from the first such tick
 // (:359-362), and is only looked at when underheat did not fire (:217-220, :325-329).
+// Entries 385/387: neither exit fires inside the start sequence of a heating start (satStartGateActive(): the PWM entry of the start until 60 s
+// after its first CH flame-on); the timers keep counting, so a condition that lasted through the sequence fires on the first tick after it.
 bool satCycleCheckPwmExits(float requestedSetpoint, uint32_t tickMs)
 {
   if (state.sat.eControlMode != SAT_MODE_PWM || satDhwGuardActive(tickMs) || !state.sat.bPwmFlameRequested) {
@@ -1451,9 +1492,10 @@ bool satCycleCheckPwmExits(float requestedSetpoint, uint32_t tickMs)
   if (flowTemp <= 0.0f) {
     _sustain_underheatRunning = false;
   } else if (satIsFlameOn() && requestedSetpoint > flowTemp) {
-    if (satSustainedFor(_sustain_underheatRunning, _sustain_underheatStartMs, tickMs, SAT_UNDERHEAT_SUSTAIN_MS)) {
+    if (satSustainedFor(_sustain_underheatRunning, _sustain_underheatStartMs, tickMs, SAT_UNDERHEAT_SUSTAIN_MS) && !satStartGateActive()) {
       SATDebugTf(PSTR("SAT: flame on and request %.1f above flow %.1f for %lus, switching to continuous mode\r\n"),
                  requestedSetpoint, flowTemp, (unsigned long)(SAT_UNDERHEAT_SUSTAIN_MS / 1000UL));
+      _cycle_burnLeftPwm = true;   // entry 429: this flame stays continuous until it goes out (the flame is on here)
       satSetControlMode(SAT_MODE_CONTINUOUS);
       satNarrate_P(PSTR("Control mode: continuous (flow stayed below the setpoint, PWM ended)"));   // TASK-1521
       satCycleResetSustainGuards();
@@ -1465,8 +1507,9 @@ bool satCycleCheckPwmExits(float requestedSetpoint, uint32_t tickMs)
 
   // satPwmLastOffTimeMs() is recorded by satPwmSchedule() earlier in the same control tick.
   if (satPwmLastOffTimeMs() == 0) {
-    if (satSustainedFor(_sustain_saturationRunning, _sustain_saturationStartMs, tickMs, SAT_SATURATION_SUSTAIN_MS)) {
+    if (satSustainedFor(_sustain_saturationRunning, _sustain_saturationStartMs, tickMs, SAT_SATURATION_SUSTAIN_MS) && !satStartGateActive()) {
       SATDebugTln(F("SAT: PWM saturation (off_time=0 sustained), switching to continuous mode"));
+      if (satIsFlameOn()) _cycle_burnLeftPwm = true;   // entry 429: a burning flame stays continuous until it goes out
       satSetControlMode(SAT_MODE_CONTINUOUS);
       satNarrate_P(PSTR("Control mode: continuous (PWM had no off time left)"));   // TASK-1521
       satCycleResetSustainGuards();

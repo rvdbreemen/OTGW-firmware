@@ -72,6 +72,7 @@ static OTScheduleEntry otSchedule[] = { {0, false, 5}, {25, false, 5} };
 static constexpr uint8_t OT_SCHEDULE_SIZE = sizeof(otSchedule) / sizeof(otSchedule[0]);
 static std::vector<uint32_t> g_q;
 static bool otCmdEnqueue(uint32_t f) { g_q.push_back(f); return true; }
+static bool otdWriteRefused = false;   // TASK-1804 B3e: set on a refused enqueue (never here: the stub accepts)
 static char g_rsp[32], g_status[8];
 static void synthesizeResponse(const char*, const char* r) { snprintf(g_rsp, sizeof g_rsp, "%s", r); }
 static void otDirectBridgeProcessStatus(const char* s) { snprintf(g_status, sizeof g_status, "%s", s); }

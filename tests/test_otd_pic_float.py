@@ -78,7 +78,11 @@ static uint32_t otCSLastCommandMs = 0, otC2LastCommandMs = 0;
 static float otFakeRoomSetpoint = 0.0f;
 static bool otdRoom16CacheSet = false, otdRoom16OvrSet = false; static uint16_t otdRoom16CacheF88 = 0, otdRoom16OvrF88 = 0;   // TASK-1751
 // TT=/TC=/SB= doubles
-enum OTRemoteOverrideMode { OT_OVERRIDE_TEMPORARY = 1, OT_OVERRIDE_CONSTANT = 2 };
+enum OTRemoteOverrideMode { OT_OVERRIDE_NONE = 0, OT_OVERRIDE_TEMPORARY = 1, OT_OVERRIDE_CONSTANT = 2 };
+// TASK-1751: BS= reads the mode and a running TT=; these cases run in gateway mode with no override (the PIC frame rewrite)
+enum OTDirectMode { OTD_MODE_BYPASS = 0, OTD_MODE_GATEWAY = 1, OTD_MODE_MASTER = 3 };   // as OTDirecttypes.h
+static OTDirectMode otCurrentMode = OTD_MODE_GATEWAY;
+static struct { OTRemoteOverrideMode mode; } otRemoteOverride = { OT_OVERRIDE_NONE };
 static int g_rmode = 0; static float g_rval = 0; static int g_rclear = 0;
 static void setRemoteOverride(OTRemoteOverrideMode m, float c) { g_rmode = (int)m; g_rval = c; }
 static void clearRemoteOverride() { g_rclear++; }

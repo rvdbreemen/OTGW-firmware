@@ -43,7 +43,8 @@ typedef long long time_t_;
 #define F(x) x
 #define PSTR(x) x
 #define PROGMEM
-#define FPSTR(x) (x)
+class __FlashStringHelper;  // as in the core: FPSTR() yields a typed flash pointer, not a const char*
+#define FPSTR(x) (reinterpret_cast<const __FlashStringHelper*>(x))
 #define snprintf_P snprintf
 #define strlcpy_P(d, s, n) (snprintf((d), (n), "%s", (s)))
 #define SATDebugTf(...) ((void)0)
@@ -70,9 +71,13 @@ struct File {
   void close() { if (fp) fclose(fp); fp = nullptr; }
 };
 struct FSStub {
+  File open(const __FlashStringHelper* p, const char* mode) { return open(reinterpret_cast<const char*>(p), mode); }  // the core takes it via String
   File open(const char* p, const char* mode) { File f; f.fp = fopen(p[0] == '/' ? p + 1 : p, mode[0] == 'w' ? "wb" : "rb"); return f; }
 };
 static FSStub LittleFS;
+// TASK-1989: satSavePidState() hands the file to the fsWriter queue; here it writes at once, as fsWriter.ino does before
+// fsWriterBegin() (its writer task is tested in tests/test_fs_writer.py).
+static bool fsWriterSubmit(const char* p, const char* d, size_t) { File f = LittleFS.open(p, "w"); if (!f) return false; f.print(d); f.close(); return true; }
 static bool _pid_roomSeen = false;
 static bool _pid_firstOutputPending = false;
 @PIDVARS@

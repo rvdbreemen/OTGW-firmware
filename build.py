@@ -1221,6 +1221,20 @@ def _zip_add(zf, arcname, data, mode=0o644, mtime=None):
     zf.writestr(info, data, compresslevel=9)
 
 
+def _capture_local_modules(capture_py):
+    """The scripts/<name>.py files that capture_py imports (top-level absolute imports, anywhere in the file),
+    in name order. TASK-2917."""
+    import ast
+    names = set()
+    for node in ast.walk(ast.parse(capture_py.read_text(encoding="utf-8"))):
+        if isinstance(node, ast.Import):
+            names.update(a.name.split(".")[0] for a in node.names)
+        elif isinstance(node, ast.ImportFrom) and node.module and not node.level:
+            names.add(node.module.split(".")[0])
+    here = capture_py.parent
+    return [here / f"{n}.py" for n in sorted(names) if n != capture_py.stem and (here / f"{n}.py").is_file()]
+
+
 def create_distribution_zip(project_dir, semver, target):
     """Create a per-target distribution zip: one complete package for USB
     flashing, the one-time migration, WiFi updates and capture logs.
@@ -1232,6 +1246,7 @@ def create_distribution_zip(project_dir, semver, target):
         flash_otgw.bat, flash_otgw.sh
         capture-mqtt-debug.bat, capture-mqtt-debug.sh, capture-mqtt-debug-macos.sh
         otgw_capture.py, vendor/paho_mqtt-<ver>-py3-none-any.whl (ADR-202)
+        the scripts/*.py modules otgw_capture.py imports, e.g. sat_log_to_csv.py (TASK-2917)
         README.txt, README_NL.txt
 
     The loose .ino.bin / .littlefs.bin are what /update takes over WiFi, and
@@ -1290,6 +1305,9 @@ def create_distribution_zip(project_dir, semver, target):
     capture_py = scripts_dir / "otgw_capture.py"
     capture_wheels = sorted((scripts_dir / "vendor").glob("paho_mqtt-*-py3-none-any.whl"))
     missing = [p.name for p in [capture_bat, *capture_shs, capture_py] if not p.exists()]
+    # TASK-2917: the modules otgw_capture.py imports from scripts/ (sat_log_to_csv for the telnet.log CSV) ship
+    # next to it, read from its own imports so a new helper cannot be forgotten.
+    capture_mods = _capture_local_modules(capture_py) if capture_py.exists() else []
     if not capture_wheels:
         missing.append("vendor/paho_mqtt-*.whl")
     if missing:
@@ -1351,6 +1369,9 @@ def create_distribution_zip(project_dir, semver, target):
             # it needs no +x), and the MQTT client it imports straight from the
             # wheel (zipimport), so the wheel ships as-is.
             add_file(capture_py)
+            for mod in capture_mods:
+                add_file(mod)
+                print_info(f"  + {mod.name}  (imported by otgw_capture.py)")
             add_file(capture_wheels[0], arcname=f"vendor/{capture_wheels[0].name}")
 
             _zip_add(zf, "README.txt", readme_en)
@@ -1524,7 +1545,8 @@ def _build_readme_en(target, tcfg, merged_full_name, upgrade_bin_name, semver):
         f"      need Python 3.9 or newer; without it the .bat (about 11 MB)\n"
         f"      and the .sh (about 65 MB; needs curl or wget) download a\n"
         f"      portable Python once.\n"
-        f"      Keep otgw_capture.py and the vendor folder next to them.\n"
+        f"      Keep otgw_capture.py, sat_log_to_csv.py and the vendor folder\n"
+        f"      next to them.\n"
         f"\n"
         f"  README.txt        This file (English).\n"
         f"  README_NL.txt     Dutch translation of this file.\n"
@@ -1811,7 +1833,8 @@ def _build_readme_nl(target, tcfg, merged_full_name, upgrade_bin_name, semver):
         f"      nodig; zonder Python halen de .bat (ongeveer 11 MB) en de .sh\n"
         f"      (ongeveer 65 MB; heeft curl of wget nodig) eenmalig een losse\n"
         f"      Python op.\n"
-        f"      Laat otgw_capture.py en de map vendor ernaast staan.\n"
+        f"      Laat otgw_capture.py, sat_log_to_csv.py en de map vendor\n"
+        f"      ernaast staan.\n"
         f"\n"
         f"  README.txt        Engelse versie van dit bestand.\n"
         f"  README_NL.txt     Dit bestand (Nederlands).\n"
@@ -2652,6 +2675,14 @@ def collect_pio_artifacts(project_dir, target, want_firmware=True, want_filesyst
             shutil.copy2(fw_src, fw_dest)
             print_info(f"Copied: firmware.bin -> {fw_dest.name}")
             collected.append(fw_dest)
+            # TASK-1993 (TASK-1955 AC2): log the image against the app0/ota_0 slot; WARN > 95 %, FAIL > 98 %.
+            if "bootloader_offset" in tcfg:
+                slot = read_partition_table(project_dir).get("app0", (0, tcfg.get("app_size", 0)))[1]
+                rc = run_streamed([sys.executable, str(project_dir / "scripts" / "check_app_size.py"),
+                                   str(fw_dest), str(slot)])
+                if rc != 0:
+                    print_error("App size check failed (scripts/check_app_size.py): see the lines above")
+                    sys.exit(1)
 
     # Filesystem binary (from the buildfs step's own build directory, TASK-1921)
     if want_filesystem:

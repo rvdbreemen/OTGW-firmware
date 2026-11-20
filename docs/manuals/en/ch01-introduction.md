@@ -45,7 +45,7 @@ The firmware also has an OT-Direct mode, used only on hardware without a PIC. On
 - Triple-reset Wi-Fi credential recovery.
 - Optional HTTP Basic Auth for settings and maintenance endpoints.
 - Nightly scheduled restart: configurable automatic reboot (time and day selection) to recover heap fragmentation on long-running devices.
-- AP fallback mode (beta): the web UI stays reachable even when the home network is unavailable.
+- AP fallback mode (in all builds from 2.0.0-beta.401): the web UI stays reachable even when the home network is unavailable (section 6.1.3).
 
 #### Hardware-Dependent Features
 
@@ -56,7 +56,7 @@ The firmware also has an OT-Direct mode, used only on hardware without a PIC. On
 
 Version 2.0.0 is a major platform release. It is the ESP32-S3-only async + FreeRTOS line. Settings files from v1.3.x load without modification.
 
-Version 2.0.0 is in public beta: releases are published as GitHub prereleases. The established functionality is feature complete, but SAT, OTDirect, and the new MQTT topic shape (see below) still receive refinement. SAT stays experimental and opt-in. Track the GitHub Releases page for the current beta.
+Releases of 2.0.0 are on the GitHub Releases page: betas are published as GitHub prereleases, the stable 2.0.0 release as a normal release. The established functionality is feature complete; SAT, OTDirect and the new MQTT topic shape (see below) still receive refinement. SAT is stable from 2.0.0; it stays opt-in and is off by default (see Chapter 5).
 
 **Breaking change in this release.** v2.0.0 changes the default MQTT topic names to a new self-describing scheme (ADR-106). Thirty-seven OT-spec-derived binary sensor topics are renamed to clearer, Home Assistant friendly labels (for example, the legacy `master_ch_enable` becomes `central_heating_enabled`). Users with existing automations pinned to the legacy labels can flip `settings.mqtt.bUseLegacyOtTopics` to `true` and keep the v1.x behaviour. The two modes are mutually exclusive: either the new names or the legacy names publish, never both. The REST API is unchanged from v1.x.
 
@@ -80,7 +80,7 @@ Version 2.0.0 is in public beta: releases are published as GitHub prereleases. T
 - **Platform abstraction (boards.h)**: A new `boards.h` header defines pin maps, feature flags (`HAS_PIC`, `HAS_DIRECT_OT`, `HAS_ETH_CAPABLE`, `HAS_OLED_CAPABLE`), and hardware capabilities per board variant. This cleanly separates platform-specific configuration from application logic.
 - **SimpleTelnet**: The telnet debug log now uses SimpleTelnet, a unified multi-client telnet library that replaces the separate TelnetStream and ESPTelnet libraries used in v1.x.
 - **Toolchain**: Time handling has moved to AceTime 4.x, which is core-version independent and brings a smaller, faster time library.
-- **Wi-Fi resilience**: AP fallback mode keeps the web UI reachable when the home network is unavailable. A Wi-Fi signal quality indicator appears in the web UI header. Triple-reset credential recovery wipes saved credentials without a reflash.
+- **Wi-Fi resilience**: AP fallback mode keeps the web UI reachable when the home network is unavailable (all builds from beta.401). A Wi-Fi signal quality indicator appears in the web UI header. Triple-reset credential recovery wipes saved credentials without a reflash.
 - **PlatformIO build**: One `esp32-combo` environment in `platformio.ini`, built through `build.bat` / `./build.sh`.
 
 ### Platform Comparison

@@ -26,11 +26,13 @@ lives here.
 | 2026-10-30 | Per-task cadence: bench-test every firmware task before its zip is published (since 2026-11-11 the bench-tester agent runs that bench test) | `docs/guides/agent-build-and-bench.md`, CLAUDE.md summary |
 | 2026-11-01 | `release/2.x` is the stable 2.x line (TASK-1545) | CLAUDE.md "Git push policy" |
 | 2026-11-14 | Standing permission for 2.x public betas: the coordinator invokes `/beta-release-2x` itself in the 08:00/20:00 slot; stable releases keep the per-action yes (TASK-1948) | AGENT-CORE block (hard-stop exception), `.claude/skills/beta-release-2x/SKILL.md` (model invocation allowed) |
+| 2026-11-16 | 2.0.0 stable gate = TASK-1740 (entry-386 criterion, target Sat 21 Nov if the Wed-Fri field runs are clean); the SAT low-load epic TASK-1412 and its full gate move to 2.1.0, 2.0.0 keeps only TASK-1412.24 (field-run request), TASK-1412.25 (the Wed-Fri runs) and the host LL contract (Robert, DM 1571910380756668488) | TASK-1740, TASK-1412 |
 
 ## Replaced directives
 
 | Date | Old directive | Replaced by | Date replaced |
 |---|---|---|---|
+| 2026-11-04 | 2.0.0 stable waits until SAT low-load is field-validated (epic TASK-1412 closed, TASK-1412.16-26) | 2.0.0 stable gate = TASK-1740; the epic and its full gate go to 2.1.0, 2.0.0 keeps the reduced slice (Robert, DM 1571910380756668488, option A of the TASK-1412 proposal) | 2026-11-16 |
 | before 2026-10-25 | Repeat an unanswered SAT question to Sergeant D every 12 hours | Pace questions to his presence: check hourly, re-ask as soon as he is back | 2026-10-25 |
 | 2026-10-29 | Batch cadence: build and publish after every 4 finished tasks | Per-task cadence: each task bench-tested before its zip is published | 2026-10-30 |
 | TASK-1014 | Flat single-flight rule for web UI API calls (one request in flight) | ADR-165: at most 2 in flight (TASK-1015 load study) | ADR-165 |

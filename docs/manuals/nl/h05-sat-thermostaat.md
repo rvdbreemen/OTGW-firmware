@@ -4,6 +4,11 @@
 
 SAT (Smart Autotune Thermostat) verandert de OpenTherm Gateway van een passieve protocol-brug in een actieve verwarmingscontroller. In plaats van simpelweg de thermostaat de ketel te laten aansturen, berekent SAT zelf de optimale aanvoertemperatuur op basis van de buitentemperatuur, de gewenste ruimtetemperatuur en hoe uw woning daadwerkelijk reageert.
 
+
+> **SAT is opt-in en staat standaard uit.** SAT neemt het regelsetpoint van je ketel over. Daarom blijft het uit (`satenabled` staat op false) tot je het zelf aanzet, en vraagt de installatiewizard eerst om een bevestiging.
+>
+> **SAT-veldresultaten melden.** Met velddata wordt SAT beter. Gebruik je SAT, stuur dan een capture mee: (1) controleer de versie via `http://<ip>/api/v2/device/info` (`fwversion`); (2) controleer dat `http://<ip>/api/v2/sat/status` `"simulation": false` toont; (3) start de capture-tool uit de release-zip (`capture-mqtt-debug.bat`, `.sh` of `-macos.sh`) met `--long-run`, minstens een nacht en een ochtend; (4) noteer je ketelmodel, radiatoren of vloerverwarming, en elke instelling die je wijzigt, met het tijdstip; (5) stop met `q` en voeg de `-upload.zip` toe aan een GitHub-issue, of zet hem in #nederlandse-ondersteuning of #english-support op Discord (betatesters: #beta-testing). Dezelfde stappen: https://github.com/rvdbreemen/OTGW-firmware/blob/dev/docs/sat/field-run-recipe-2.0.0.md
+
 **Hoe het verschil eruitziet in de praktijk:**
 
 Zonder SAT: de wandthermostaat schakelt de ketel volledig aan (maximale temperatuur) totdat het setpoint bereikt is, schakelt dan uit, de kamer koelt af, en de cyclus herhaalt zich. Dit geeft temperatuurschommelingen, onnodig hoge aanvoertemperaturen en veel aan/uit-cycli.
@@ -32,12 +37,11 @@ Bij ketels die niet of slecht moduleren (vast toerental of hoge minimale modulat
 SAT ondersteunt vier systeemtypes: auto-detect, radiatoren, warmtepomp en vloerverwarming. Vloerverwarming gebruikt een lagere aanvoertemperatuur (max 50 C) en een vlakkere verwarmingscurve.
 
 **Ruimtetemperatuurmeting**
-SAT heeft een ruimtetemperatuurmeting nodig. Mogelijke bronnen (in prioriteitsvolgorde):
-1. OpenTherm bericht-ID 24 (als uw thermostaat dit stuurt)
-2. Externe push via MQTT (`sat/indoor_temp`)
-3. Externe push via REST API
-4. Multi-area gewogen gemiddelde (tot 4 zones)
-5. BLE-sensor (alleen ESP32, Xiaomi LYWSD03MMC of BTHome v2)
+SAT heeft een ruimtetemperatuurmeting nodig. SAT gebruikt de eerste bron met een bruikbare waarde, in deze volgorde:
+1. BLE-sensor (Xiaomi LYWSD03MMC of BTHome v2; verouderd na 5 minuten zonder update)
+2. Multi-area gewogen gemiddelde (tot 4 zones; als multi-area aan staat en minstens één zone geldig is)
+3. Externe push via MQTT (`sat/indoor_temp`) of de REST API (alleen met `satexternaltemp` aan; verouderd na `satsensormaxage`, standaard 21600 s = 6 uur)
+4. OpenTherm bericht-ID 24 van uw thermostaat (verouderd na 5 minuten zonder verversing)
 
 ---
 
@@ -209,8 +213,13 @@ Bij ketels met een hoge minimale modulatie (bijv. 30-40% minimum) kan de continu
 
 SAT bewaakt altijd de ketelprestaties via cyclusclassificatie (zie paragraaf 5.11) en wisselt automatisch:
 
-- **Continu naar PWM:** als de aanvoertemperatuur langer dan 60 seconden boven het setpoint + overshoot-marge blijft (ketel kan niet voldoende moduleren).
-- **PWM naar continu:** als de aanvoertemperatuur langer dan 180 seconden meer dan 2 C onder het setpoint blijft (onvoldoende vermogen) of na 300 seconden verzadiging.
+- **Continu naar PWM:** als de aanvoertemperatuur min het gevraagde (PID-)setpoint 60 seconden lang op of boven de schakelmarge blijft (Sergeant D entry 407; ADR-254, Proposed). De marge is de instelling `satpwmswitchmargin` (0,5 tot 5,0 C), standaard 2,0 C; een opgeslagen oude standaardwaarde van 1,5 C wordt eenmalig 2,0 C, een zelf gekozen waarde blijft staan (Robert, Q-407a). Vanaf beta.391 schakelt deze regel hooguit één keer per brand (één keer vlam aan) naar PWM: is SAT van PWM terug naar continu gegaan terwijl de vlam brandt, dan blijft het continu tot de vlam uitgaat (Sergeant D entries 429 en 430). Alleen het vangnet kan in die brand nog naar PWM schakelen: de aanvoer ligt 30 s lang 3,0 C of meer boven het verzoek (entries 359 en 429; 3,5 C vóór beta.391). Alleen de eerste PWM AAN van een brand telt als start voor de cycluslimiet per uur; een latere PWM AAN in dezelfde brand telt niet (entry 428, die entry 89 wijzigt; TASK-2913). Vanaf beta.377 werkt geen van beide regels, de schakelmarge noch het vangnet, zolang verwarmen niet is toegestaan, bijvoorbeeld tijdens een pauze van de tolerantieband: restwarmte na warm water schakelt SAT dan niet meer naar PWM terwijl de brander uit is (Sergeant D entries 410 en 417; thermo-nova slaat zijn schakeling over als de verwarming niet aan staat, `heating_control.py:276-282`).
+- **PWM naar continu:** in een PWM AAN-fase, als de vlam brandt en het gevraagde setpoint 60 seconden boven de aanvoertemperatuur blijft (entries 339 en 342; ADR-236, Proposed), of na 300 seconden verzadiging (ADR-236: ongewijzigd). Niet in de eerste 60 s van een start (entry 394).
+- Het configuratiebericht van de ketel (MsgID 3, ook "master low-off not allowed") blokkeert PWM niet: PWM mag op elke ketel vanaf de start (entries 392, 393; ADR-251).
+
+**Elke verwarmingsstart begint in PWM.** Bij een start (na een pauze, na het aanzetten van SAT, na een herstart) begint SAT in PWM met de eerste fase AAN, ook als SAT op handmatig continu staat, en kiest pas tussen PWM en continu als de vlam 60 s brandt; in die 60 s schakelt hij niet naar continu (Sergeant D entries 385, 389, 391, 394; ADR-252, Proposed). Een start waarbij de vlam al brandde toen SAT het overnam, blijft zoals hij was.
+
+**Tolerantieband** (Sergeant D entries 376, 377, 384, 401, 402, 403; ADR-253, die ADR-250 deels vervangt): komt de kamer op het doel + 0,1 C, dan zet SAT CH uit terwijl PWM zijn AAN/UIT-ritme houdt; een brand in continu-modus loopt eerst nog minstens 180 s. De verwarming gaat weer aan zodra de kamer onder het doel + 0,1 C komt, maar pas als CH minstens 10 minuten uit is geweest, gerekend vanaf het moment dat de band CH uitzette (entries 402, 403). Onze lezingen, nog te bevestigen door Sergeant D: een band-besluit terwijl CH al uit stond (bijvoorbeeld een warme kamer vlak na een herstart) start geen pauze (entry 406), en een weggevallen kamertemperatuur beeindigt de pauze, zodat de stooklijn het overneemt (entry 405, met entries 38 en 46). PWM AAN-fasen die tijdens een bandpauze beginnen, tellen niet mee als start voor de uurlimiet (entry 398; entry 400 voor een fase waarin CH weer mag). Met zones laat eco de hoofdkamer beslissen en blijft comfort verwarmen zolang een kamer meer dan 0,1 C onder zijn eigen doel zit (entry 378).
 
 | Situatie | Aanbevolen modus |
 |---|---|
@@ -231,7 +240,7 @@ SAT implementeert zes onafhankelijke verdedigingslagen. Bij elke activering van 
 - **Geen automatisch herstel na een veiligheidsafsluiting:** SAT blijft uitgeschakeld totdat de gebruiker het expliciet opnieuw inschakelt. Een verloren OpenTherm-verbinding is geen veiligheidsafsluiting; zie "OpenTherm weg" hieronder.
 - **Onafhankelijke lagen:** een bug in een laag raakt de andere lagen niet.
 
-**Laag 1: Opstart-veiligheid.** Bij elke opstart, herstart of stroomuitval stuurt SAT als eerste handeling `CS=0` naar de PIC. Zo wordt voorkomen dat de ketel onbeperkt op het laatste setpoint blijft draaien terwijl de ESP nog opstart.
+**Laag 1: Opstart.** Na een opstart, herstart of stroomuitval stuurt SAT de eerste 60 s geen stuurcommando (CS, MM, CH); de eigen opstart-uitlezingen van de gateway (MsgID 3, 15 en 48) lopen wel (Sergeant D entries 388 en 395). De vroegere `CS=0` bij het opstarten bestaat niet meer (entry 129); zie "Herstart" hieronder voor wat daarna gebeurt.
 
 **Laag 2: Uitschakel-veiligheid.** Wanneer SAT wordt uitgeschakeld (via instellingen, MQTT of REST API), wordt onmiddellijk `CS=0` gestuurd, de PID wordt gereset en alle toestandsvariabelen worden gewist.
 
@@ -250,11 +259,13 @@ SAT implementeert zes onafhankelijke verdedigingslagen. Bij elke activering van 
 3. Herstel via webinterface: SAT-schakelaar uit en opnieuw aan.
 4. Herstel via MQTT: publiceer `true` naar `OTGW/set/{UniqueId}/sat/enabled`.
 
-**OpenTherm weg (TASK-1365).** Als SAT 30 s geen antwoord van de ketel heeft gezien, geldt de OpenTherm-verbinding als verloren. Elk ketelantwoord telt, ook een Data-Invalid-antwoord (maintainer, Q33 A). Bij het begin van het verlies stuurt SAT één keer de overdracht, dezelfde als bij uitschakelen: `CS=0`, `CH=1`, `MM=T` (Sergeant D entries 39 en 47). Daarna stuurt SAT niets meer naar de ketel zolang het verlies duurt. SAT blijft ingeschakeld en er wordt geen instelling geschreven. Bij het eerste nieuwe ketelantwoord gaat SAT vanzelf verder en neemt MsgID 1 terug; de PID begint opnieuw bij 0 (entry 79). De toestand is zichtbaar als `sat/ot_link_lost` via MQTT en als `ot_link_lost` in `GET /api/v2/sat/status`.
+**OpenTherm weg (TASK-1365).** Als SAT 30 s geen antwoord van de ketel heeft gezien, geldt de OpenTherm-verbinding als verloren. Elk ketelantwoord telt, ook een Data-Invalid-antwoord (maintainer, Q33 A). Bij het begin van het verlies stuurt SAT één keer de overdracht, dezelfde als bij uitschakelen: `CS=0`, `CH=1`, `MM=T` (Sergeant D entries 39 en 47). Daarna stuurt SAT niets meer naar de ketel zolang het verlies duurt. SAT blijft ingeschakeld en er wordt geen instelling geschreven. Bij het eerste nieuwe ketelantwoord gaat SAT vanzelf verder en neemt MsgID 1 terug; de PID begint opnieuw bij 0 (entry 79). De toestand is zichtbaar als `sat/ot_link_lost` via MQTT, als `ot_link_lost` in `GET /api/v2/sat/status` en, vanaf beta.382, als de melding "SAT gepauzeerd: geen OpenTherm-verbinding, de ketel regelt weer normaal" op de SAT-pagina.
 
-**Buitentemperatuur ontbreekt (TASK-1390).** SAT heeft een buitentemperatuur nodig die jonger is dan 1 uur (Sergeant D entries 56, 57 en 126). SAT neemt de eerste geldige van: de externe sensor (MQTT/REST) in de eerste 10 minuten, de eigen sensor van de ketel (MsgID 27, alleen uit een echt ketelantwoord), de weerdienst, de externe sensor tot 1 uur, en de waarde die bij de laatste herstart is bewaard. Is er geen geldige, dan stuurt SAT één keer dezelfde overdracht als bij een verloren OpenTherm-verbinding (`CS=0`, `CH=1`, `MM=T`) en daarna niets meer; zodra er weer een geldige waarde is, gaat SAT vanzelf verder. De toestand is zichtbaar als `sat/outside_temp_missing` via MQTT, als `outside_temp_missing` in `GET /api/v2/sat/status` en als melding op de SAT-pagina.
+**Geen ontsteking en verwarmingsfout (TASK-1882).** Twee meldingen helpen een ketelprobleem te zien; geen van beide verandert wat SAT stuurt. *Geen ontsteking*: SAT vroeg 3 minuten om warmte (een PWM-aanfase, of een setpoint boven de koude grens), de aanvoer bleef onder het setpoint en er kwam geen vlam. *Verwarmingsfout*: SAT stond 15 minuten op zijn maximum (setpoint of PWM-duty) en de kamer steeg minder dan 0,5 °C. Een traag, zwaar huis kan de tweede op een koude ochtend geven zonder dat er iets mis is; de telnetregel `SATEVENT heating_failure=...` geeft de kamertemperatuur aan het begin en einde van elk venster van 15 minuten. Beide staan op de SAT-pagina (waarschuwing), in REST `sat/status` (`no_ignition`, `heating_failure`, met tellers en het begin en einde van het laatste venster), via MQTT en als probleemsensoren in Home Assistant.
 
-**Herstart (TASK-1482).** SAT bewaart de laatste geldige buitentemperatuur bij de PID-toestand. Na een herstart binnen het uur, met een PID-toestand van hoogstens 30 minuten oud, stuurt SAT bij het opstarten niets en neemt het binnen enkele seconden na het eerste ketelantwoord weer over (entries 126 en 129); een PIC houdt de laatste setpoint van SAT ongeveer een minuut vast. Anders draagt SAT de ketel één keer over en blijft het stil tot er een ketelantwoord en een geldige buitentemperatuur zijn (entry 121). Ook of PWM aan stond blijft bewaard: SAT start dan weer in PWM, met een nieuwe cyclus.
+**Buitentemperatuur ontbreekt (TASK-1390).** SAT heeft een buitentemperatuur nodig die jonger is dan 1 uur (Sergeant D entries 56, 57 en 126). SAT neemt de eerste geldige van: de externe sensor (MQTT/REST) in de eerste 10 minuten, de eigen sensor van de ketel (MsgID 27, uit een echt ketelantwoord; vanaf beta.381 ook het eigen antwoord van de PIC aan de thermostaat met de waarde die `OT=` heeft gezet), de weerdienst, de externe sensor tot 1 uur, en de waarde die bij de laatste herstart is bewaard. Is er geen geldige, dan stuurt SAT één keer dezelfde overdracht als bij een verloren OpenTherm-verbinding (`CS=0`, `CH=1`, `MM=T`) en daarna niets meer; zodra er weer een geldige waarde is, gaat SAT vanzelf verder. De toestand is zichtbaar als `sat/outside_temp_missing` via MQTT, als `outside_temp_missing` in `GET /api/v2/sat/status` en als melding op de SAT-pagina (vanaf beta.382: "SAT gepauzeerd: al 1 uur geen buitentemperatuur, je thermostaat regelt de ketel"). Zolang de waarde van de ketel vers is, wordt de weerdienst niet opgehaald; vanaf beta.380 begint het ophalen weer 10 minuten voordat die waarde 1 uur oud wordt, zodat de twee bronnen niet tegelijk verlopen (TASK-2039).
+
+**Herstart (TASK-1482).** SAT bewaart de laatste geldige buitentemperatuur bij de PID-toestand. Na een herstart binnen het uur, met een PID-toestand van hoogstens 30 minuten oud, zwijgt SAT de eerste 60 s na het opstarten (entry 388) en neemt het daarna bij zijn eerste regelronde weer over zodra de ketel heeft geantwoord (entries 126 en 129); tot de eerste kamertemperatuur binnenkomt, regelt SAT alleen op de stooklijn (entry 388); een PIC houdt de laatste setpoint van SAT ongeveer een minuut vast. Anders draagt SAT de ketel één keer over en blijft het stil tot er een ketelantwoord en een geldige buitentemperatuur zijn (entry 121). Ook of PWM aan stond blijft bewaard: SAT start dan weer in PWM, met een nieuwe cyclus.
 
 De overdracht reset de PID. Die nullen worden ook op flash opgeslagen, behalve als het verlies komt vóór de eerste kamertemperatuur sinds de boot, of voordat de klok via NTP is gezet. Dan blijft de opgeslagen PID-toestand op flash staan, zodat een ketel die vlak na een boot traag antwoordt de warmstart-toestand niet wist (d06005d7d, entry 115).
 
@@ -345,7 +356,7 @@ Solar gain compensatie detecteert wanneer zonlicht door de ramen de kamer verwar
 **Hoe het werkt:**
 1. SAT volgt de stijgsnelheid van de binnentemperatuur met een EMA (exponentieel voortschrijdend gemiddelde).
 2. Wanneer de stijgsnelheid het ingestelde minimum overschrijdt en de ketelmodulatie laag is (<20%), wordt een solar gain conditie gedetecteerd.
-3. Als zonne-elevatiedata beschikbaar is (via de weather API), controleert SAT ook of de zon boven de minimale elevatie staat.
+3. Als er een zonne-elevatie bekend is, controleert SAT ook of de zon boven de minimale elevatie staat. De bron: `sat/sun_elevation` via MQTT (bijvoorbeeld van de sun-entiteit van Home Assistant), die voorgaat zolang de waarde jonger is dan 1 uur; anders berekent de firmware hem uit de breedte- en lengtegraad van de weerinstellingen en de NTP-tijd. De SAT-weerkaart in de web UI noemt de bron die gebruikt wordt en vraagt geen locatie zolang een gepushte waarde vers is (TASK-2015).
 4. De conditie moet 10 minuten aanhouden voordat activering plaatsvindt (om valse triggers te voorkomen).
 5. Na activering wordt het setpoint verlaagd met `fSolarSetpointOffset` (standaard 2 C).
 6. Wanneer de stijgsnelheid 10 minuten onder de drempel blijft, wordt solar gain gewist.
@@ -503,9 +514,9 @@ De radio voert sinds 2.0.0 een **continue scan** uit vanaf boot (TASK-494). Elk 
 Er wordt een enkele gecombineerde firmware-image geleverd voor alle ESP32-boards; `psramFound()` bepaalt bij runtime of BLE daadwerkelijk scant:
 
 - **Boards MET PSRAM** (de LOLIN S3 Mini en S3 Mini Pro): BLE draait standaard. Het extra RAM vangt de NimBLE-stack op zonder de rest van de firmware te destabiliseren.
-- **Boards ZONDER PSRAM**: BLE blijft slapend, ook als het is ingeschakeld. De webinterface toont een toestemmingsdialoog die waarschuwt voor het instabiliteitsrisico van BLE zonder PSRAM. Pas nadat u accepteert (instelling `satbleriskack`) start de radio met scannen.
+- **Boards ZONDER PSRAM**: BLE kan niet worden ingeschakeld (TASK-2025, ADR-257). Zonder PSRAM gebruikt de scanner het geheugen op dat de gateway nodig heeft: op een testunit was de heap binnen ongeveer 2 minuten op en reageerde de gateway niet meer. De schakelaar **BLE-sensoren inschakelen** blijft zichtbaar maar is uitgeschakeld en grijs, met de reden als tooltip, en de BLE-kaart meldt het. Een REST- of MQTT-verzoek om BLE aan te zetten wordt geweigerd (REST antwoordt `409` met `BLE needs PSRAM: not available on this board`), en een opgeslagen `aan`, bijvoorbeeld uit instellingen van een oudere firmware, wordt bij het opstarten uitgezet en als uit opgeslagen.
 
-Kort gezegd: BLE is actief wanneer het is ingeschakeld EN (het board PSRAM heeft OF u het risico heeft geaccepteerd).
+Kort gezegd: BLE is actief wanneer het is ingeschakeld EN het board PSRAM heeft. Firmware van vóór 2.0.0-beta.375 liet u een risicowaarschuwing accepteren om BLE zonder PSRAM te draaien; loopt zo'n gateway vast of wordt hij onbereikbaar, dan staat in paragraaf 7.12a hoe u hem herstelt.
 
 #### Zelfontdekkende sensor-roster (TASK-508)
 
@@ -516,6 +527,8 @@ De Sensors-kaart biedt drie bedieningselementen:
 - **Rescan**: forceert een active-scan naam-burst zodat net ingeschakelde sensoren zich direct aankondigen in plaats van te wachten op het volgende passieve advertisement.
 - **Clear roster**: wist alle acht slots (een twee-druk-bevestiging voorkomt ongelukken).
 - **Naam-prefix filter**: typ een hoofdletterongevoelige prefix om het roster te beperken op de geadverteerde BLE-naam van de sensor. Standaard filtert dit alleen de weergave. Zet de toggle **restrict roster** aan om het te promoveren tot een ingest-poort: sensoren waarvan de bekende naam niet met de prefix overeenkomt, worden dan volledig uit het roster gehouden. Sensoren met een lege of onbekende naam worden altijd toegelaten.
+
+**Vertrouwen.** BLE-advertisements zijn niet-geauthenticeerde uitzendingen: elke sensor binnen radiobereik die een ondersteund formaat stuurt, komt in het roster terecht, ook die van de buren. SAT gebruikt alleen de geselecteerde sensor. Zolang er geen is geselecteerd en precies één rostersensor in de laatste twee publicatie-intervallen een meting stuurde, wordt die automatisch geselecteerd. Kies in een gebouw met veel BLE-apparaten uw sensor met de hand, of stel een naam-prefix filter in met **restrict roster** aan. De firmware maakt nooit verbinding met een sensor en schrijft er nooit naar.
 
 REST-endpoints voor het roster:
 
@@ -528,8 +541,8 @@ REST-endpoints voor het roster:
 
 | Parameter | Standaard | Bereik | Omschrijving |
 |---|---|---|---|
-| `satbleenable` | `true` | bool | BLE-sensor scanning inschakelen (passief, continu). No-op op boards zonder BLE-radio |
-| `satbleriskack` | `false` | bool | Op een board ZONDER PSRAM: het instabiliteitsrisico accepteren zodat BLE mag scannen. Genegeerd op PSRAM-boards (`psramFound()` beslist dan) |
+| `satbleenable` | `true` | bool | BLE-sensor scanning inschakelen (passief, continu). No-op op boards zonder BLE-radio. Op een board zonder PSRAM altijd false: aanzetten wordt geweigerd (REST `409`) en een opgeslagen true wordt bij het opstarten gewist (TASK-2025) |
+| `satbleriskack` | `false` | bool | Blijft bestaan voor instellingenbestanden van oudere firmware; opent BLE niet meer op een board zonder PSRAM (TASK-2025, ADR-257) |
 | `satblemac` | `""` | MAC-adres | Actieve sensor-MAC (via roster select gezet; leeg = eerste verse slot wordt automatisch gekozen) |
 | `satbleinterval` | `30` | 10-300 s | Publish/state-update-cadans (NIET scaninterval; de scan is continu) |
 | `satblenameprefix` | `""` | tot 23 tekens | Naam-prefix filter (hoofdletterongevoelig; leeg = uit) |
@@ -754,7 +767,7 @@ De externe temperatuurwaarden vervallen automatisch na respectievelijk 5 minuten
 | Setpoint altijd op minimum (10 C) | SAT actief maar veiligheidslaag getripped | Herstart SAT via webinterface of MQTT. Controleer `sat/safety_tripped`. |
 | SAT-tab niet zichtbaar in webinterface | SAT nog niet ingeschakeld | SAT inschakelen in instellingen. |
 | Drukalarm blijft triggeren | Drukbereik te smal of ketelvulprobleem | Pas `satminpressure`/`satmaxpressure` aan. Controleer de drukmanometer van de ketel. |
-| Solar gain activeert nooit | Stijgsnelheidsdrempel te hoog of zonne-elevatie ontbreekt | Verlaag `satsolarminrise`. Schakel weather API in voor zonne-elevatie. |
+| Solar gain activeert nooit | Stijgsnelheidsdrempel te hoog of zonne-elevatie ontbreekt | Verlaag `satsolarminrise`. Push `sat/sun_elevation` vanuit Home Assistant, of stel de breedte- en lengtegraad van de weerinstellingen in zodat de firmware hem berekent (NTP-tijd nodig). |
 | Zomermodus activeert niet | Drempel te hoog of uren te lang | Verlaag `satsummerthreshold` of `satsummerminhours`. |
 
 ---

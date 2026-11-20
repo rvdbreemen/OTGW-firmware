@@ -256,6 +256,12 @@ class SkipPortalBoot(unittest.TestCase):
         out = subprocess.run(args, capture_output=True, text=True, check=True).stdout
         return parse(out), out
 
+    def assert_not_skipped(self, r):
+        # TASK-2931 (Robert, DM 1573067183825621095): the AP fallback is in stable builds too, so a boot that does not
+        # honour the skip mark and has saved credentials starts the AP fallback instead of the config portal, in both builds.
+        self.assertIn("ap_fallback", r["EV"], "the boot did not take the normal path (AP fallback)")
+        self.assertNotIn("portal", r["EV"])
+
     def assert_portal(self, r):
         self.assertIn("portal", r["EV"], "the config portal did not open")
         self.assertIn("RESTART", r, "the portal timeout did not restart")
@@ -283,12 +289,12 @@ class SkipPortalBoot(unittest.TestCase):
     # AC3: power-on (RTC garbage, even garbage that matches) -> portal
     def test_power_on_with_matching_garbage_opens_portal(self):
         r, _ = self.boot(magic=SKIP_MAGIC, marked=1, soft=0)
-        self.assert_portal(r)
+        self.assert_not_skipped(r)
         self.assertEqual(r["RTC"], (0, 0), "the record is not cleared on a power-on")
 
     def test_power_on_with_random_garbage_opens_portal(self):
         r, _ = self.boot(magic=0xDEADBEEF, marked=0x12345678, soft=0)
-        self.assert_portal(r)
+        self.assert_not_skipped(r)
 
     def test_old_rtc_layout_after_the_update_opens_portal(self):
         # TASK-1918: the new firmware keeps its RTC records 0x20 B higher (safeboot guard at 0x50000200). On the
@@ -301,11 +307,11 @@ class SkipPortalBoot(unittest.TestCase):
             with self.subTest(blob=blob):
                 r, _ = self.boot(magic=int.from_bytes(blob[8:12], "little"),
                                  marked=int.from_bytes(blob[12:16], "little"))
-                self.assert_portal(r)
+                self.assert_not_skipped(r)
 
     def test_wrong_value_with_magic_opens_portal(self):
         r, _ = self.boot(magic=SKIP_MAGIC, marked=7)
-        self.assert_portal(r)
+        self.assert_not_skipped(r)
 
     # AC3: first install, no credentials -> portal
     def test_no_saved_credentials_opens_portal(self):
@@ -326,7 +332,7 @@ class SkipPortalBoot(unittest.TestCase):
     # AC4: a software restart that was not a supervisor restart (nightly, settings, REST) -> as before
     def test_other_software_restart_opens_portal(self):
         r, _ = self.boot(magic=0, marked=0, soft=1)
-        self.assert_portal(r)
+        self.assert_not_skipped(r)
 
     # AC4: exactly one boot
     def test_mark_is_consumed_at_boot(self):
@@ -335,14 +341,14 @@ class SkipPortalBoot(unittest.TestCase):
 
     def test_next_boot_without_new_mark_opens_portal(self):
         r, _ = self.boot(mode="nextboot", magic=SKIP_MAGIC, marked=1)
-        self.assert_portal(r)
+        self.assert_not_skipped(r)
 
     def test_second_startwifi_in_same_boot_opens_portal(self):
         r, _ = self.boot(mode="again", magic=SKIP_MAGIC, marked=1)
         self.assertIn("DONE", r)
         self.assertEqual(r["DONE"]["portal"], 0)
-        self.assertEqual(r["EV"].count("portal"), 1, "the telnet re-run of startWiFi() should open the portal")
-        self.assertIn("RESTART", r)
+        self.assertEqual(r["EV"].count("ap_fallback"), 1, "the telnet re-run of startWiFi() should start the AP fallback (TASK-2931)")
+        self.assertNotIn("portal", r["EV"])
 
     # AC7 decision: in a prerelease build the mark also bypasses the boot-time AP fallback
     def test_prerelease_marked_boot_skips_ap_fallback(self):
@@ -382,6 +388,8 @@ static void printSkipMark() { printf("SKIP|0-0\n"); }
 DUMP_ANCHOR = 'static void dumpRtc(const char *tag) {\n  printf("%s|%lu|%lu\\n", tag,'
 EXTRA_SCENARIOS = r"""  } else if (!strcmp(sc, "ap_gone")) {     // TASK-1455: the access point disappears (no association)
     runFor(5 * 60); ev("ap_gone"); g_wifiStatus = WL_DISCONNECTED; g_dhcpWorks = false; runFor(15 * 60);
+  } else if (!strcmp(sc, "ap_gone_lowfree")) {   // TASK-2931: the same on a low heap: the AP fallback is skipped (TASK-2923)
+    g_freeHeap = 6000; runFor(5 * 60); ev("ap_gone"); g_wifiStatus = WL_DISCONNECTED; g_dhcpWorks = false; runFor(15 * 60);
   } else if (!strcmp(sc, "ap_gone_noportal")) {   // TASK-1645: the same with settings.wifi.bNoPortal on
     settings.wifi.bNoPortal = true; runFor(5 * 60); ev("ap_gone"); g_wifiStatus = WL_DISCONNECTED; g_dhcpWorks = false; runFor(15 * 60);
   } else if (!strcmp(sc, "ap_gone_wired")) {   // the same while Ethernet is the active link
@@ -424,7 +432,8 @@ class SkipPortalRestartSites(unittest.TestCase):
         return (int(skip.group(1)), int(skip.group(2))), (restart.group(1).strip() if restart else None)
 
     def test_wifi_failed_restart_marks(self):
-        mark, reason = self.run_sc("ap_gone")
+        # TASK-2931: with the AP fallback in stable too, WIFI_FAILED is reached when the AP is skipped (low heap)
+        mark, reason = self.run_sc("ap_gone_lowfree")
         self.assertEqual(reason, "WiFi: too many reconnect failures")
         self.assertEqual(mark, (SKIP_MAGIC, 1), "WIFI_FAILED restart did not mark the next boot")
 
@@ -435,7 +444,7 @@ class SkipPortalRestartSites(unittest.TestCase):
             self.assertEqual(mark, (SKIP_MAGIC, 1), "%s: dead-link restart did not mark the next boot" % build)
 
     def test_failed_forced_reconnect_restart_marks(self):
-        mark, reason = self.run_sc("dead_no_dhcp")
+        mark, reason = self.run_sc("dead_no_dhcp_lowfree")   # TASK-2931: AP skipped on a low heap
         self.assertEqual(reason, "WiFi: too many reconnect failures")
         self.assertEqual(mark, (SKIP_MAGIC, 1))
 
@@ -561,10 +570,9 @@ class NoPortalSetting(unittest.TestCase):
             self.assertIn("Triple-reset detected", out)
 
     def test_setting_off_unchanged(self):
-        r, _ = self.boot(soft=0, noportal=0)
-        self.assert_portal(r)
-        r, _ = self.boot(soft=0, noportal=0, build="pre")
-        self.assertIn("ap_fallback", r["EV"])
+        for build in ("rel", "pre"):   # TASK-2931: the AP fallback in both builds
+            r, _ = self.boot(soft=0, noportal=0, build=build)
+            self.assertIn("ap_fallback", r["EV"], build)
 
 
 class NoPortalSettingWired(unittest.TestCase):

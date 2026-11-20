@@ -3,11 +3,11 @@ id: TASK-1933
 title: >-
   SAT: replace the PWM underheat exit with Sergeant D's rule (flame on, request
   above flow for 60 s -> continuous), entry 342
-status: In Review
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-14T10:36:00Z'
-updated_date: '2026-11-15T02:26:00Z'
+updated_date: '2026-11-16T08:35:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -47,4 +47,12 @@ Implemented (d3, 2026-11-14, local, placeholder beta.253, not yet built). Sergea
 Lane-1924 pushed 2026-11-15: origin/dev 5da0c91df..2f4818aa1. Build esp32-combo 2.0.0-beta.281+fe0e61a OK (build/logs/build-20261115-020302.log, 'Build completed successfully'); 'git diff fe0e61a48 2f4818aa1 -- src/' empty, so the pushed code is the benched code. evaluate.py --quick 0 failed; OTD tests 42 files, host suites, SAT suite per file green on the rebased tree. Bench 09: NOT reproduced, SAT did not reach PWM in the simulation in 8 min (control_mode 1). Host test only (test_sat_overshoot_sustain, 13 cases red on old); field: watch tester captures (entry 350). AC6 stays open for 09/field. Version beta.274.
 
 AC6 left OPEN by 09 (09 bench 2026-11-15 02:12-02:57 on .61 (OTGW32, OT-Direct, no boiler, no thermostat), 2.0.0-beta.281+fe0e61a (OTA app+FS, changed none, bootcount 700->702), evidence 09 scratchpad b281/): not reproduced. With satsimulation on, SAT stayed in continuous (control_mode 1, pwm none) for 8 min at target 17 (no demand, flame off) and at target 23 (high demand). A PWM phase with flame on and request above flow for 60 s was not reached in the simulation; host test only so far. Needs sim tuning that reaches PWM, or .63/field.
+
+2026-11-16 (95): AC6 waived by Robert on host evidence (DM 1571800810931626106 via the coordinator, answer A: no SAT hardware simulation needed for this AC; SAT simulation runs in software only, earlier directive). AC6 stays unticked as waived.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+AC1: simulation before any firmware change (tools/research/sat/sat_pwm_exit_sim_1933.py, thresholds committed 898e62736 before the runs; 800 runs per variant, e342 variant passes very_low_load, thermal_lag, minimum_power) plus the gruijter field look (91 ignitions, 5 captures, data local). AC2/AC3: reported to Sergeant D; entry 350 (Q-342a A, msg 1571221697703710812) settles 'while PWM is ON' and 'the boiler flow temperature'. AC4: ADR-236 via adr-kit records the deviation from thermo-nova's underheat exit. AC5: host test on the real satCycleCheckPwmExits(): red on the old code (flow 1 C below the request for 60 s did not exit), green on the fix; shipped in beta.281+fe0e61a (origin 5da0c91df..2f4818aa1, src diff to the benched build empty, evaluate --quick 0 failed). AC6 (bench): WAIVED by Robert on host evidence, DM 1571800810931626106; 09's attempt on .61 (beta.281) could not bring SAT into a PWM phase with simulation, so no hardware evidence of the exit exists; the behaviour is proven on the host only. Not verified: the exit on a real boiler (field).
+<!-- SECTION:FINAL_SUMMARY:END -->

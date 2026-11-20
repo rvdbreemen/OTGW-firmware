@@ -3128,7 +3128,7 @@
       "path": "ADR-101-flat-per-value-mqtt-topics-over-aggregated-json-payloads.md",
       "format": "canonical",
       "status": "Accepted",
-      "date": "2026-11-15",
+      "date": "2026-11-18",
       "decision_summary": "OTGW-firmware 2.0.0 uses flat per-value MQTT topics.",
       "topics": [],
       "aliases": [],
@@ -4472,7 +4472,7 @@
       "path": "ADR-142-ha-discovery-mark-unavailable-unsupported-msgids.md",
       "format": "canonical",
       "status": "Rejected",
-      "date": "2026-08-25",
+      "date": "2026-11-18",
       "decision_summary": "The firmware publishes HA discovery configs for all OT-map entities as today.",
       "topics": [],
       "aliases": [],
@@ -5340,7 +5340,7 @@
       "path": "ADR-169-psram-aware-ble-default-with-no-psram-consent-gate.md",
       "format": "canonical",
       "status": "Superseded",
-      "date": "2026-11-08",
+      "date": "2026-11-18",
       "decision_summary": "BLE runs by default only on boards where psramFound() is true; on no-PSRAM boards it stays dormant behind a persisted...",
       "topics": [],
       "aliases": [],
@@ -5497,7 +5497,7 @@
       "path": "ADR-174-republish-on-change-gated-mqtt-state-when-home-assistant-comes-back-online.md",
       "format": "canonical",
       "status": "Accepted",
-      "date": "2026-11-15",
+      "date": "2026-11-18",
       "decision_summary": "Chosen option: Option A, because homeassistant/status is a Home Assistant side contract and the two firmware lines mu...",
       "topics": [
         "availability",
@@ -6671,7 +6671,7 @@
       "path": "ADR-193-keep-a-bounded-24-h-monitor-graph-history-on-the-device.md",
       "format": "canonical",
       "status": "Accepted",
-      "date": "2026-11-15",
+      "date": "2026-11-18",
       "decision_summary": "The firmware keeps a ring of 14-byte slots and serves it through an HTTP (Hypertext Transfer Protocol) GET request on...",
       "topics": [
         "graph",
@@ -6930,7 +6930,7 @@
       "path": "ADR-197-sat-pid-v3-controller-supersedes-adr-069.md",
       "format": "canonical",
       "status": "Accepted",
-      "date": "2026-10-30",
+      "date": "2026-11-18",
       "decision_summary": "The SAT PID follows thermo-nova pid.py at 7beaaf5 term by term (entry 28), implemented in src/OTGW-firmware/SATpid.in...",
       "topics": [
         "deadband",
@@ -7080,7 +7080,7 @@
       "path": "ADR-199-sat-cold-state-and-ch-enable-rule-supersedes-adr-195.md",
       "format": "canonical",
       "status": "Accepted",
-      "date": "2026-10-30",
+      "date": "2026-11-16",
       "decision_summary": "While SAT is the active controller, one per-heating-system cold setpoint replaces thermo-nova's COLDSETPOINT 22 at ev...",
       "topics": [
         "ch-enable",
@@ -7436,7 +7436,7 @@
       "path": "ADR-204-sat-pid-reset-triggers-supersedes-adr-197-decision-8.md",
       "format": "canonical",
       "status": "Accepted",
-      "date": "2026-10-31",
+      "date": "2026-11-18",
       "decision_summary": "SAT resets exactly the integral and the raw derivative of the main PID, and the integral of every zone PID, on the tr...",
       "topics": [
         "integral",
@@ -7503,7 +7503,7 @@
       "path": "ADR-205-sat-heating-curve-self-tune-hourly-evaluation-daily-decision-on-the-curve-integral.md",
       "format": "canonical",
       "status": "Accepted",
-      "date": "2026-11-12",
+      "date": "2026-11-18",
       "decision_summary": "SAT gets an on/off self-tune, on by default, that evaluates every clean hour, logs it, and changes the heating curve...",
       "topics": [
         "clean hour",
@@ -8538,8 +8538,8 @@
       "title": "On boards without PSRAM BLE starts off and warns when the user enables it",
       "path": "ADR-222-on-boards-without-psram-ble-starts-off-and-warns-when-the-user-enables-it.md",
       "format": "canonical",
-      "status": "Accepted",
-      "date": "2026-11-08",
+      "status": "Superseded",
+      "date": "2026-11-18",
       "decision_summary": "User Decision: on a board without PSRAM, BLE is off by default and no dialog appears after boot or when a page opens;...",
       "topics": [
         "ble",
@@ -8568,25 +8568,10 @@
       ],
       "context_scope": "selective",
       "decision_contract": {
-        "must": [
-          "On a board without PSRAM, apply the BLE-off default to a fresh install before the first writeSettings() and to a settings file without the SATbleenable key.",
-          "Keep a stored SATbleenable value as it is.",
-          "Show the stability warning only after a user action (switching BLE on, or the BLE card button).",
-          "On acceptance store satbleenable before satbleriskack, sequentially."
-        ],
-        "must_not": [
-          "Must not open the BLE warning from a poll, a page load or a boot.",
-          "Must not store satbleenable=true on a no-PSRAM board before the user accepted the warning.",
-          "Must not change the PSRAM-board default or show the warning there.",
-          "Must not change bleActive()'s gate."
-        ],
-        "exceptions": [
-          "None."
-        ],
-        "verification": [
-          "python tests/testblenopsramdefault.py: compiles the real applyBleNoPsramDefault() and checks the readSettings()/updateSetting() wiring; the pre-change settingStuff.ino fails 4/4.",
-          "node --test tests/webui/ble-nopsram-warning.test.mjs: drives the real v2 page; the pre-change page opens the modal on its own and stores BLE before consent (tests 1-3 fail), the change passes 4/4."
-        ]
+        "must": [],
+        "must_not": [],
+        "exceptions": [],
+        "verification": []
       },
       "scope": {
         "path_globs": []
@@ -8599,7 +8584,7 @@
         "supersedes": [
           "ADR-169"
         ],
-        "superseded_by": null
+        "superseded_by": "ADR-257"
       }
     },
     {
@@ -8872,7 +8857,7 @@
       "path": "ADR-228-sat-heating-curve-self-tune-splits-the-signal-into-warm-up-and-floating-phases-and-changes-the-coefficient-only-when-both-agree.md",
       "format": "canonical",
       "status": "Accepted",
-      "date": "2026-11-12",
+      "date": "2026-11-18",
       "decision_summary": "Each signal tick of the self-tune is assigned to the warm-up phase (|PID error| > 0.1 C) or the floating phase (|PID...",
       "topics": [
         "deadband",
@@ -9003,7 +8988,7 @@
       "path": "ADR-230-sat-heating-curve-self-tune-the-floating-phase-needs-one-hour-of-data-to-vote-amends-adr-228.md",
       "format": "canonical",
       "status": "Accepted",
-      "date": "2026-11-12",
+      "date": "2026-11-18",
       "decision_summary": "The floating phase votes only when its data in the window is at least 1 hour: its signal ticks over the counted days...",
       "topics": [
         "floating phase minimum",
@@ -9056,7 +9041,7 @@
       "path": "ADR-231-sat-heating-curve-self-tune-pwm-ticks-on-a-gas-boiler-count-for-the-warm-up-phase-hybrid-and-heat-pump-pwm-hours-are-logged-not-used.md",
       "format": "canonical",
       "status": "Accepted",
-      "date": "2026-11-12",
+      "date": "2026-11-14",
       "decision_summary": "On a gas boiler, a tick in SAT PWM is a warm-up tick of the self-tune, and the PWM-related exclusions do not drop its...",
       "topics": [
         "clean hour exclusions",
@@ -9245,6 +9230,70 @@
           "src/OTGW-firmware/OTGW-ModUpdateServer-esp32.h:fsOtaRtcRestoreAtBoot",
           "test/host/test_fs_ota_rtc_snapshot.py"
         ],
+        "supersedes": [],
+        "superseded_by": null
+      }
+    },
+    {
+      "id": "ADR-234",
+      "title": "SAT heating curve self-tune: a 60 min hour counts when at least 90 % of its expected ticks are clean; excluded ticks stay out of the mean (amends ADR-205 decision 2)",
+      "path": "ADR-234-sat-heating-curve-self-tune-a-60-min-hour-counts-when-at-least-90-of-its-expected-ticks-are-clean-excluded-ticks-stay-out-of-the-mean-amends-adr-205-decision-2.md",
+      "format": "canonical",
+      "status": "Accepted",
+      "date": "2026-11-17",
+      "decision_summary": "A tuner hour stays 60 min and counts when no whole-hour marker was set and its clean ticks are at least 90 % of the t...",
+      "topics": [
+        "clean hour",
+        "clean hour exclusions",
+        "clean tick share",
+        "heating curve self-tune"
+      ],
+      "aliases": [
+        "90 percent clean hour",
+        "clean share of an hour",
+        "per-tick exclusions"
+      ],
+      "components": [
+        "self-tune clean-hour rule"
+      ],
+      "symbols": [
+        "SAT_CT_MIN_CLEAN_PCT",
+        "satTuneAddTick",
+        "satTuneCloseHour",
+        "satTuneMarkReason",
+        "satTuneNoteReason"
+      ],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [
+          "Count an hour only when no whole-hour marker was set, its clean ticks are at least 90 % of the expected ticks of the hour, and a clean tick carried a signal.",
+          "Measure the share against the expected ticks of the hour only, whatever the hour logged (entries 343, 369).",
+          "Keep excluded ticks out of the mean and the phase sums that reach the day and the decision.",
+          "Keep notsat from the service pass, notcontrolling, coeffchanged, fewticks and noticks as whole-hour markers."
+        ],
+        "must_not": [
+          "Change the per-tick exclusions themselves, their order, or the phase rule of ADR-228 and ADR-231.",
+          "Shorten the hour or lower the share below 90 % (entry 340, option C rejected).",
+          "Let a tick a per-tick exclusion applies to enter the clean sums."
+        ],
+        "exceptions": [
+          "None."
+        ],
+        "verification": [
+          "tests/testsatcurveselftune.py, class CleanShare (compiles the real tuner blocks): an hour of 120 ticks with 1 excluded tick counts and its mean is the clean-tick mean; 108 of 120 clean counts, 107 does not; 100 logged ticks with 10 exclu...",
+          "The replay of the 5 gruijter runs of TASK-1927 on the fix gives 10 counted hours (base 8) with the same votes and pooled clean means as the share10 replay variant: r1 +0.97 band, g167 +3.19 raise, g68 +0.23 band; every counted hour has 1..."
+        ]
+      },
+      "scope": {
+        "path_globs": [
+          "src/OTGW-firmware/SATcurveTune.h"
+        ]
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
         "supersedes": [],
         "superseded_by": null
       }
@@ -9634,7 +9683,7 @@
       "title": "OT-Direct master mode relays the thermostat's writes to the boiler in the next free master slot and returns the boiler's answer (amends ADR-066)",
       "path": "ADR-241-ot-direct-master-mode-relays-the-thermostat-s-writes-to-the-boiler-in-the-next-free-master-slot-and-returns-the-boiler-s-answer-amends-adr-066.md",
       "format": "canonical",
-      "status": "Proposed",
+      "status": "Accepted",
       "date": "2026-11-15",
       "decision_summary": "In master mode a thermostat WRITEDATA of any ID except 1, 16 and 24 is sent to the boiler as a relay in the next free...",
       "topics": [
@@ -9664,7 +9713,8 @@
         "must": [
           "Send a thermostat WRITEDATA of an ID other than 1, 16 and 24 to the boiler with the thermostat's data, or with the data of an active write override for that ID.",
           "Return the boiler's reply to the thermostat (WRITEACK, Data-Invalid, Unknown-DataID), never a local echo, for a forwarded write.",
-          "Send the forwarded write before any queued command or scheduled frame, once the frame in flight has ended.",
+          "Send the forwarded write before any queued command or scheduled frame, once the frame in flight has ended and the 100 ms MWT after it has passed.",
+          "Return an answer only for the current thermostat request and only within OTDREPLYDEADLINEMS of the relay's send.",
           "Keep MsgID 1, 16 and 24 on today's local WRITEACK and write-cache path (TASK-1150, TASK-1811).",
           "Keep MsgID 1, 8 and 14 on the local echo while SAT owns the setpoint."
         ],
@@ -9678,7 +9728,7 @@
           "None."
         ],
         "verification": [
-          "Host test on the real handleMasterModeSlaveFrame() and the master-mode consumer with a fake bus and fake time: a MsgID 56 write reaches the boiler with the thermostat's data and the thermostat gets the boiler's WRITEACK, Data-Invalid or...",
+          "tests/testotdmasterwriterelay.py on the real otdMasterRelaysWrite(), applyOverrides(), the master-mode relay branch of loopOTDirect(), the reply check of handleMasterResponse() and scheduleMasterRequest(), with a fake bus and fake time:...",
           "Bench where the hardware allows: a thermostat on the slave port of an OTGW32 in master mode with a boiler (or a boiler simulator); none on the current bench, so this is field-only until then."
         ]
       },
@@ -9758,6 +9808,61 @@
       }
     },
     {
+      "id": "ADR-243",
+      "title": "OT-Direct master mode keeps the thermostat interface on by default (bEnableSlave true, amends ADR-066)",
+      "path": "ADR-243-ot-direct-master-mode-keeps-the-thermostat-interface-on-by-default-benableslave-true-amends-adr-066.md",
+      "format": "canonical",
+      "status": "Accepted",
+      "date": "2026-11-15",
+      "decision_summary": "The default of bEnableSlave is true, as the code already has it: in master mode the slave interface is on unless the...",
+      "topics": [
+        "master-mode",
+        "otdirect",
+        "pic-parity",
+        "settings-defaults",
+        "thermostat"
+      ],
+      "aliases": [
+        "bEnableSlave default",
+        "otdenableslave",
+        "TASK-1953"
+      ],
+      "components": [
+        "OT-Direct master-mode slave interface default"
+      ],
+      "symbols": [
+        "bEnableSlave"
+      ],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [
+          "OTDirectSettings::bEnableSlave defaults to true (src/OTGW-firmware/OTDirecttypes.h:114).",
+          "The settings help for otdenableslave states the default as on (src/OTGW-firmware/settingsHelp.h:90).",
+          "A stored OTDenableslave value in the settings file keeps winning over the default."
+        ],
+        "must_not": [
+          "Must not change a stored user value through a migration: there is nothing to migrate, the code is unchanged."
+        ],
+        "exceptions": [
+          "None."
+        ],
+        "verification": [
+          "Source anchors src/OTGW-firmware/OTDirecttypes.h:114 and src/OTGW-firmware/settingsHelp.h:90 agree with this ADR (checked 2026-11-15). Guideline-level per ADR-080: no CI gate, reviewed at PR."
+        ]
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
+    },
+    {
       "id": "ADR-244",
       "title": "A PR= report command passes the SAT simulation gate on the PIC serial path (amends ADR-117)",
       "path": "ADR-244-a-pr-report-command-passes-the-sat-simulation-gate-on-the-pic-serial-path-amends-adr-117.md",
@@ -9821,7 +9926,7 @@
       "path": "ADR-245-on-boards-with-psram-the-monitor-graph-history-keeps-7-days-a-response-holds-at-most-1008-slots-and-a-longer-window-is-thinned-amends-adr-193.md",
       "format": "canonical",
       "status": "Accepted",
-      "date": "2026-11-15",
+      "date": "2026-11-18",
       "decision_summary": "On a board with PSRAM the ring holds 5046 slots of 120 s (GRAPHHISTLARGESLOTS), 5040 of them readable: 7 days.",
       "topics": [
         "graph",
@@ -10004,7 +10109,7 @@
       "title": "The Home Assistant climate entity follows SAT while SAT is enabled, with a fixed discovery and routing in the firmware",
       "path": "ADR-248-the-home-assistant-climate-entity-follows-sat-while-sat-is-enabled-with-a-fixed-discovery-and-routing-in-the-firmware.md",
       "format": "canonical",
-      "status": "Proposed",
+      "status": "Accepted",
       "date": "2026-11-15",
       "decision_summary": "The existing climate.Thermostat entity keeps its uniqid and its discovery payload is fixed; the firmware routes the c...",
       "topics": [
@@ -10056,6 +10161,941 @@
       },
       "scope": {
         "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
+    },
+    {
+      "id": "ADR-249",
+      "title": "SAT switches from continuous to PWM when the flow stays 1.5 C above the request for 30 s, with its own margin setting (supersedes the entry-22 rule)",
+      "path": "ADR-249-sat-switches-from-continuous-to-pwm-when-the-flow-stays-1-5-c-above-the-request-for-30-s-with-its-own-margin-setting-supersedes-the-entry-22-rule.md",
+      "format": "canonical",
+      "status": "Accepted",
+      "date": "2026-11-17",
+      "decision_summary": "SAT switches from continuous to PWM when flow - requested setpoint (the output of the proportional-integral-derivativ...",
+      "topics": [
+        "continuous mode",
+        "mode switch",
+        "overshoot",
+        "pwm",
+        "sat"
+      ],
+      "aliases": [
+        "continuous to PWM threshold",
+        "entry 327",
+        "pwm switch margin",
+        "sustained overshoot switch"
+      ],
+      "components": [
+        "fPwmSwitchMargin",
+        "satCycleCheckOvershootSwitch",
+        "satpwmswitchmargin"
+      ],
+      "symbols": [
+        "fOvershootMargin",
+        "fPwmSwitchMargin",
+        "SAT_OVERSHOOT_FAILSAFE_DELTA_C",
+        "SAT_OVERSHOOT_SUSTAIN_MS",
+        "satCycleCheckOvershootSwitch"
+      ],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [
+          "Compare the flow against requested + settings.sat.fPwmSwitchMargin and require 30 s (SATOVERSHOOTSUSTAINMS = 30000) from the first qualifying tick.",
+          "Keep the 3.5 C / 30 s fail-safe as a separate timer with the same gates (entry 359).",
+          "Keep fOvershootMargin (2.0) for the cycle classifier only; no migration of stored values (entry 360).",
+          "Expose the setting as SATpwmswitchmargin in settings.ini, satpwmswitchmargin in the REST (HTTP API) settings, pwmswitchmargin on MQTT (the message-broker protocol) sat/ and in the SAT status JSON (JavaScript Object Notation), range 0.5 t..."
+        ],
+        "must_not": [
+          "Must not move the switch with fOvershootMargin.",
+          "Must not drop the fail-safe while the switch margin is a setting."
+        ],
+        "exceptions": [
+          "None."
+        ],
+        "verification": [
+          "tests/testsatovershootsustain.py compiles the real satCycleCheckOvershootSwitch(): a flow 1.6 C over the request switches 30 s after the first qualifying tick (the code before this ADR never switches), equality at exactly +1.5, the 29 99..."
+        ]
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
+    },
+    {
+      "id": "ADR-250",
+      "title": "SAT tolerance band: at target + 0.1 C the CH bit goes off while PWM stays active, after a 180 s minimum burn; heating resumes below target - 0.1 C",
+      "path": "ADR-250-sat-tolerance-band-at-target-0-1-c-the-ch-bit-goes-off-while-pwm-stays-active-after-a-180-s-minimum-burn-heating-resumes-below-target-0-1-c.md",
+      "format": "canonical",
+      "status": "Accepted",
+      "date": "2026-11-16",
+      "decision_summary": "While the tolerance band says stop, the CH-enable bit SAT sends is 0, and nothing else changes: the control setpoint,...",
+      "topics": [
+        "ch enable bit",
+        "heating demand",
+        "hysteresis",
+        "minimum burn",
+        "sat",
+        "tolerance band"
+      ],
+      "aliases": [
+        "cold tolerance",
+        "entry 326",
+        "entry 384",
+        "generic thermostat tolerance",
+        "hot tolerance"
+      ],
+      "components": [
+        "_sat_tolBandOff",
+        "satBandWaitsForMinBurn",
+        "satToleranceDemand",
+        "satToleranceMaxError"
+      ],
+      "symbols": [
+        "_sat_tolBandOff",
+        "_sat_tolDemand",
+        "_sat_tolErr",
+        "SAT_TOL_COLD_C",
+        "SAT_TOL_HOT_C",
+        "satBandWaitsForMinBurn",
+        "satChEnableDecide",
+        "satToleranceDemand",
+        "satToleranceMaxError"
+      ],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [
+          "Send CH=0 while the band holds heating off, and leave the control setpoint, the PWM mode and its schedule, the PID and the cold cutoff untouched (entries 361, 384).",
+          "Let a CH burn run 180 s before a band stop takes effect, in PWM and in continuous mode (entries 275, 376).",
+          "Let only the main room decide in eco and any usable room in comfort (entry 378).",
+          "Never block heating when no deciding room temperature is usable.",
+          "Leave an ON phase that starts during a band stop out of the hourly start count, and count it once if CH is allowed again within that phase (entry 398, plus our reading above)."
+        ],
+        "must_not": [
+          "Must not end PWM or send CS=10 because of the band.",
+          "Must not add a setting or a REST (HTTP API) or MQTT (message broker) field for the band."
+        ],
+        "exceptions": [
+          "The thermal safe fallback keeps CH=1: it runs when the room data is too old to trust, so the band input is not trustworthy either."
+        ],
+        "verification": [
+          "tests/testsattoleranceband.py. It compiles the real SATchEnable.h helpers and checks:",
+          "the exact boundaries at an error of 0.1 and -0.1, and that the state holds inside the band;",
+          "that a missing room temperature never blocks heating;",
+          "comfort versus eco with a cold zone;",
+          "that a band stop clears only the CH bit.",
+          "It also compiles the real control-tick segment of satControlLoopRun() and checks:",
+          "a warm room sends CH=0 while the setpoint stays real and the PID request is unchanged;",
+          "heating stays off inside the band and resumes below target - 0.1;",
+          "in PWM the mode stays PWM and the on/off schedule keeps toggling during the stop;",
+          "a lit PWM phase and a continuous burn both run 180 s first;",
+          "the cold cutoff is unchanged.",
+          "the start count (entry 398): flameless ON phases during a band stop leave cyclesthishour unchanged, a phase that starts during a stop and sees CH allowed again counts once, a phase that starts during the 180 s wait counts, and nothing ch...",
+          "the narration names the value the band decided on.",
+          "Source checks:",
+          "only the main CH command reads the band;",
+          "the cold-cutoff threshold has no band code;",
+          "SAT starts with demand on after satDisable().",
+          "Old-vs-fix through OTGWSATINO: on origin/dev before this ADR, 10 of the 11 loop and source tests fail. The one that passes is the cold-cutoff control. On the fix, all 18 pass."
+        ]
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
+    },
+    {
+      "id": "ADR-251",
+      "title": "MsgID 3 plays no part in SAT PWM; the boiler's slave configuration no longer gates the continuous-to-PWM switch (amends ADR-249)",
+      "path": "ADR-251-msgid-3-plays-no-part-in-sat-pwm-the-boiler-s-slave-configuration-no-longer-gates-the-continuous-to-pwm-switch-amends-adr-249.md",
+      "format": "canonical",
+      "status": "Accepted",
+      "date": "2026-11-17",
+      "decision_summary": "MsgID 3 plays no part in SAT PWM: neither HB bit 4 nor the presence of a valid MsgID 3 reply allows, refuses or ends...",
+      "topics": [
+        "master low-off",
+        "msgid 3",
+        "pwm",
+        "pwm permission",
+        "sat",
+        "slave configuration"
+      ],
+      "aliases": [
+        "entry 392",
+        "entry 393",
+        "hb bit 4",
+        "low-off veto",
+        "pwm veto"
+      ],
+      "components": [
+        "satPwmPermitted"
+      ],
+      "symbols": [
+        "bSlaveCfgValid",
+        "bSlaveLowOffDenied",
+        "iPwmVetoReason",
+        "satCycleCheckLowLoadVeto",
+        "satNoteSlaveConfig",
+        "satPwmEntryAllowed",
+        "satPwmPermitted"
+      ],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [
+          "satPwmPermitted() returns true whatever MsgID 3 said or whether it was seen.",
+          "The MsgID 3 reply keeps being recorded through satNoteSlaveConfig() and shown in the SAT status."
+        ],
+        "must_not": [
+          "Must not refuse a PWM entry, or end a running PWM, because of MsgID 3 HB bit 4 or a missing MsgID 3 reply.",
+          "Must not use MsgID 3 as a heating-source detector for PWM (ADR-157 unchanged)."
+        ],
+        "exceptions": [
+          "None."
+        ],
+        "verification": [
+          "tests/testsatslavelowload.py (real satNoteSlaveConfig, satPwmPermitted, satPwmEntryAllowed, satCycleCheckLowLoadVeto, satSetControlMode, satRestoreControlMode, satHandleControlMode): every MsgID 3 state (no reply, bit 4 = 0, bit 4 = 1) r...",
+          "tests/testsatloopintegration.py::tests1pwmreachedwhenboilerreportslowoffnotallowed: the whole SAT loop with the boiler model reporting bit 4 = 1 reaches PWM with its on and off phases on the wire; the code before it never reaches PWM."
+        ]
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
+    },
+    {
+      "id": "ADR-252",
+      "title": "Every SAT heating start runs in PWM first and no PWM to continuous switch fires within 60 s after the flame lights",
+      "path": "ADR-252-every-sat-heating-start-runs-in-pwm-first-and-no-pwm-to-continuous-switch-fires-within-60-s-after-the-flame-lights.md",
+      "format": "canonical",
+      "status": "Accepted",
+      "date": "2026-11-17",
+      "decision_summary": "A heating start enters PWM through satSetControlMode(), and a start gate keeps every PWM to continuous exit quiet unt...",
+      "topics": [
+        "control mode",
+        "heating start",
+        "pwm",
+        "sat"
+      ],
+      "aliases": [
+        "entry 385",
+        "pwm first",
+        "pwm-first start",
+        "start gate",
+        "start sequence"
+      ],
+      "components": [
+        "satPwmFirstStart",
+        "satStartGateActive"
+      ],
+      "symbols": [
+        "SAT_START_GATE_MS",
+        "satPwmFirstStart",
+        "satRestoreDeferredStep",
+        "satStartGateActive",
+        "satStartGateOpen"
+      ],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [
+          "Enter PWM at every heating start through satSetControlMode(), for every requested control mode.",
+          "Enter it only on a tick with a known flow temperature, with the first PWM phase ON in that tick.",
+          "Keep the max-setpoint, underheat, saturation and end-of-cycle underheat exits quiet until 60 s after the first CH flame-on of the start.",
+          "Leave the mode as it is when SAT takes over while a flame burns.",
+          "Leave PWM on a heater off as before (ADR-199)."
+        ],
+        "must_not": [
+          "Put PWM on while the heater is off (no PWM at initSAT()).",
+          "Reset the exit timers when the gate ends.",
+          "Wait for a MsgID 3 reply before the PWM entry or the restore (ADR-251)."
+        ],
+        "exceptions": [
+          "The 60 s boot silence of entry 388 comes first: nothing, mode logic included, runs before it ends."
+        ],
+        "verification": [
+          "tests/testsatpwmfirststart.py (real SAT sources in the loop harness): 14 tests green on the fix, 8 red on origin/dev 2268516db (cases a, a2, b, c, d, e, f, i), with mutant tests for the flame-off guard, the resume reset and the flow check.",
+          "tests/testsatloopintegration.py (21 tests, incl. the no-return flood at a PWM-first start and the boot silence).",
+          "Bench (simulator on the device, not hardware): an OTGW (OpenTherm Gateway) Classic bench unit with SAT's built-in boiler simulation on showed SATMODE from=1 to=2, Control mode: PWM (heating start) with duty 1.00 at the heater off to on e..."
+        ]
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
+    },
+    {
+      "id": "ADR-253",
+      "title": "SAT tolerance band restarts below target + 0.1 after a 600 s minimum CH-off (partly supersedes ADR-250)",
+      "path": "ADR-253-sat-tolerance-band-restarts-below-target-0-1-after-a-600-s-minimum-ch-off-partly-supersedes-adr-250.md",
+      "format": "canonical",
+      "status": "Accepted",
+      "date": "2026-11-16",
+      "decision_summary": "The band stops at target + 0.1 and may restart below target + 0.1, and once CH is off for the band it stays off for a...",
+      "topics": [
+        "ch enable bit",
+        "minimum off time",
+        "restart threshold",
+        "sat",
+        "tolerance band"
+      ],
+      "aliases": [
+        "10 minute pause",
+        "band restart",
+        "entry 401",
+        "entry 402",
+        "entry 403"
+      ],
+      "components": [
+        "_sat_tolOffSinceMs",
+        "SAT_TOL_MIN_OFF_MS"
+      ],
+      "symbols": [
+        "_sat_tolBandOff",
+        "_sat_tolOffSinceMs",
+        "SAT_TOL_MIN_OFF_MS",
+        "satToleranceDemand"
+      ],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [
+          "Stop at target + 0.1 and allow a restart below target + 0.1 (entries 401, 402).",
+          "Keep CH off for 600 s after it went off for the band, counted from the CH-off (entry 403).",
+          "Never hold CH off for the band when no deciding room temperature is usable."
+        ],
+        "must_not": [
+          "Must not start the 600 s at the stop decision while the 180 s minimum burn still holds CH on.",
+          "Must not add a setting or a REST (HTTP API) or MQTT (message broker) field for the band times."
+        ],
+        "exceptions": [
+          "The thermal safe fallback keeps CH=1, as in ADR-250."
+        ],
+        "verification": [
+          "tests/testsattoleranceband.py on the real SATchEnable.h and the real control-tick segment of satControlLoopRun():",
+          "demand above -0.1 and no hold zone;",
+          "a room back at the target restarts only 600 s after the CH-off;",
+          "a room far below the target still waits for the 600 s;",
+          "the 600 s starts at the CH-off after a 180 s burn, not at the stop decision;",
+          "a room hovering at target + 0.1 restarts at most once per 600 s;",
+          "no room temperature never blocks heating;",
+          "the narration texts and their once-per-pause count;",
+          "the entry-398 start-count tests still pass.",
+          "Old-vs-fix: on the code before this ADR the 7 new-behaviour tests fail and 19 pass; on the fix all 26 pass."
+        ]
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
+    },
+    {
+      "id": "ADR-254",
+      "title": "SAT switches from continuous to PWM when the flow stays 2 C above the request for 60 s, and a stored old default of 1.5 C migrates once (partly supersedes ADR-249)",
+      "path": "ADR-254-sat-switches-from-continuous-to-pwm-when-the-flow-stays-2-c-above-the-request-for-60-s-and-a-stored-old-default-of-1-5-c-migrates-once-partly-supersedes-adr-249.md",
+      "format": "canonical",
+      "status": "Proposed",
+      "date": "2026-11-17",
+      "decision_summary": "SAT switches from continuous to PWM when flow - requested setpoint >= settings.sat.fPwmSwitchMargin (default 2.0) hol...",
+      "topics": [
+        "continuous to pwm switch",
+        "overshoot switch",
+        "pwm switch margin",
+        "sat",
+        "settings migration"
+      ],
+      "aliases": [
+        "2 C for 60 s",
+        "entry 407",
+        "Q-407a",
+        "SATpwmmargin2",
+        "satpwmswitchmargin"
+      ],
+      "components": [
+        "SAT_OVERSHOOT_SUSTAIN_MS",
+        "SATpwmmargin2"
+      ],
+      "symbols": [
+        "fPwmSwitchMargin",
+        "g_sawSatPwmMarginMarkerKey",
+        "kSatPwmMarginMarkerValue",
+        "SAT_OVERSHOOT_SUSTAIN_MS",
+        "satCycleCheckOvershootSwitch"
+      ],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [
+          "The continuous to PWM switch fires on the first control tick at least 60 s after the first qualifying tick (flow - requested >= fPwmSwitchMargin).",
+          "The default of satpwmswitchmargin is 2.0; its range stays 0.5-5.0.",
+          "A settings file without SATpwmmargin2 and with SATpwmswitchmargin 1.5 boots with 2.0 and writes the marker.",
+          "The 3.5 C fail-safe keeps its own 30 s timer."
+        ],
+        "must_not": [
+          "Move a stored margin other than 1.5, or move a 1.5 that is stored together with the marker.",
+          "Share the sustain constant between the switch rule and the fail-safe."
+        ],
+        "exceptions": [
+          "A user who deliberately chose 1.5 before this release is moved to 2.0 once; the stored value cannot tell that choice apart from the old default. Setting 1.5 again afterwards stays."
+        ],
+        "verification": [
+          "python tests/testsatovershootsustain.py: 85 cases on the real satCycleCheckOvershootSwitch(); 31 fail on the code before this ADR (OTGWSATCYCLESINO / OTGWSATTYPESH pointing at origin/dev f4373938a), all pass after it.",
+          "python tests/testsatpwmmarginmigration.py: the real setter, writer and migration lines of settingStuff.ino; cases a, b and d fail on the code before this ADR, all four pass after it.",
+          "python tests/testsatlowloadcontract.py (LL-004, LL-020b) and tests/testsatslavelowload.py, tests/testsatpwmoverride.py pin the 60 s timing."
+        ]
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
+    },
+    {
+      "id": "ADR-255",
+      "title": "The HA simulation switch has a second availability topic and is unavailable while a boiler answers (partly supersedes ADR-102)",
+      "path": "ADR-255-the-ha-simulation-switch-has-a-second-availability-topic-and-is-unavailable-while-a-boiler-answers-partly-supersedes-adr-102.md",
+      "format": "canonical",
+      "status": "Accepted",
+      "date": "2026-11-18",
+      "decision_summary": "User Decision: the HA \"SAT Simulation\" switch gets a second availability topic, sat/simulationavailable, combined wit...",
+      "topics": [
+        "availability list",
+        "home assistant availability",
+        "mqtt discovery",
+        "sat simulation switch"
+      ],
+      "aliases": [
+        "avty_mode all",
+        "sat/simulation_available",
+        "simulation switch bounces back",
+        "TASK-2014"
+      ],
+      "components": [
+        "sat/simulation_available",
+        "streamSatBoolSwitch availSub"
+      ],
+      "symbols": [
+        "satBoilerHardwarePresent",
+        "satPublishCoreState",
+        "streamSatBoolSwitch"
+      ],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [
+          "Keep the base topic owned by the MQTT birth and LWT only (ADR-102); checkadr102otbuslivenesstopic in evaluate.py stays green.",
+          "Publish sat/simulationavailable retained, on change, from a publisher that runs while SAT is off, and re-arm it on a full republish.",
+          "Use the same rule as the web UI switch: unavailable only while a boiler answers and simulation is off.",
+          "Keep the TASK-795 refusal in updateSetting(): the availability is the hint, the refusal is the guard."
+        ],
+        "must_not": [
+          "Must not write anything other than birth/LWT to the base topic.",
+          "Must not give a second availability topic to any other entity without its own ADR.",
+          "Must not hide the switch by withholding or emptying its discovery config."
+        ],
+        "exceptions": [
+          "None."
+        ],
+        "verification": [
+          "A host test that compiles the real satPublishCoreState() / satRepublishCoreState() and the real streamSatSwitchDiscovery() (planned tests/testhasatsimavailability.py, TASK-2014): the topic value for boiler present / absent / simulation o...",
+          "A bench run in HA: with a boiler answering (or REST forceboilerpresent, restAPI.ino), the switch shows unavailable; without, it is available again."
+        ]
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
+    },
+    {
+      "id": "ADR-256",
+      "title": "The Monitor graph history stores the SAT target in its own column; a slot grows from 14 to 16 bytes (amends ADR-193 and ADR-245)",
+      "path": "ADR-256-the-monitor-graph-history-stores-the-sat-target-in-its-own-column-a-slot-grows-from-14-to-16-bytes-amends-adr-193-and-adr-245.md",
+      "format": "canonical",
+      "status": "Accepted",
+      "date": "2026-11-18",
+      "decision_summary": "User Decision: the device history slot gets a seventh int16t temperature column, satTarget, so a slot is 16 bytes; th...",
+      "topics": [
+        "csv-export",
+        "graph",
+        "rest-api",
+        "sat",
+        "web-ui"
+      ],
+      "aliases": [
+        "graph history slot 16 bytes",
+        "SAT target in the graph",
+        "satTarget column"
+      ],
+      "components": [
+        "GET /api/v2/graph/history satTarget column",
+        "Monitor graph device history slot layout (graphHistoryStuff)"
+      ],
+      "symbols": [
+        "GRAPH_HIST_NO_TEMP",
+        "graphHistEmitTempColumn",
+        "GraphHistSlot"
+      ],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [
+          "Keep GraphHistSlot at exactly 16 bytes, with satTarget as the seventh int16t temperature.",
+          "Write GRAPHHISTNOTEMP in satTarget while SAT is not enabled.",
+          "Omit the satTarget array from a response whose window holds no SAT target value, so that body is unchanged.",
+          "Keep the thermostat setpoint column (roomSet) as MsgID 16 only."
+        ],
+        "must_not": [
+          "Write the SAT target into roomSet or any other existing column.",
+          "Change the ring capacities, intervals or the writer margin of ADR-193 and ADR-245.",
+          "Add a REST (Representational State Transfer) call for the SAT target to the graph's live path."
+        ],
+        "exceptions": [
+          "None."
+        ],
+        "verification": [
+          "tests/testgraphhistory.py (compiles tests/testgraphhistory.cpp on the real graphHistoryStuff.h): the slot is 16 bytes; a window with SAT values emits satTarget with the right values and grouping; a window without them emits a body byte-i...",
+          "A web UI test in tests/webui/ drives the real data/v2.js: the SAT target series and legend appear with a device history that has satTarget, the CSV export has the column, and a history without it draws no series. It fails on the code bef..."
+        ]
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
+    },
+    {
+      "id": "ADR-257",
+      "title": "On boards without PSRAM BLE cannot be switched on; the firmware refuses it and the warning is gone (supersedes ADR-222)",
+      "path": "ADR-257-on-boards-without-psram-ble-cannot-be-switched-on-the-firmware-refuses-it-and-the-warning-is-gone-supersedes-adr-222.md",
+      "format": "canonical",
+      "status": "Accepted",
+      "date": "2026-11-18",
+      "decision_summary": "User Decision: on a board without PSRAM BLE cannot be switched on: the scanner never starts there, every write of SAT...",
+      "topics": [
+        "ble",
+        "heap",
+        "psram",
+        "settings",
+        "web-ui"
+      ],
+      "aliases": [
+        "BLE needs PSRAM",
+        "bleEnableAllowed",
+        "no BLE without PSRAM"
+      ],
+      "components": [
+        "BLE scanner activation gate (SATble bleActive)",
+        "SATbleenable setter refusal (settingStuff bleEnableAllowed)"
+      ],
+      "symbols": [
+        "bleActive",
+        "bleEnableAllowed",
+        "bleNoPsram",
+        "g_bleRefusedNoPsram"
+      ],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [
+          "Keep the BLE scanner off on a board without PSRAM, whatever SATbleenable and SATbleriskack hold.",
+          "Route every write of SATbleenable through bleEnableAllowed().",
+          "Clear a stored SATbleenable=true on a board without PSRAM once, through the deferred flush.",
+          "Answer a REST request to switch BLE on without PSRAM with 409 and a reason."
+        ],
+        "must_not": [
+          "Offer a way to accept a risk and run BLE on a board without PSRAM.",
+          "Change BLE behaviour or defaults on boards with PSRAM."
+        ],
+        "exceptions": [
+          "None."
+        ],
+        "verification": [
+          "tests/testblenopsramrefuse.py compiles the real bleActive() and bleEnableAllowed(): without PSRAM the gate is false for every enable/ack combination (the old gate fails with \"no PSRAM, enable=1 ack=1 starts BLE\"), and checks the setter,...",
+          "tests/webui/ble-nopsram-warning.test.mjs drives the real v2.html/v2.js: the switch disabled with the reason as its title, the card note, the red toast with no POST, no warning dialog, and the switch usable on a PSRAM board. tests/webui/s...",
+          "tests/testblenopsramdefault.py (ADR-222's default for a fresh install) stays green.",
+          "Bench: .61 (no PSRAM) with a stored SATbleenable=true and SATbleriskack=true boots with BLE off, rewrites settings.ini, answers the POST with 409, and keeps its heap; a PSRAM board still runs BLE."
+        ]
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [
+          "ADR-222"
+        ],
+        "superseded_by": null
+      }
+    },
+    {
+      "id": "ADR-258",
+      "title": "A WiFi probe that cannot run for lack of memory counts as dead when the largest free block is under 4 KB",
+      "path": "ADR-258-a-wifi-probe-that-cannot-run-for-lack-of-memory-counts-as-dead-when-the-largest-free-block-is-under-4-kb.md",
+      "format": "canonical",
+      "status": "Accepted",
+      "date": "2026-11-18",
+      "decision_summary": "A probe that cannot run for lack of memory counts as a dead probe, instead of a skip, when the dead-link check is arm...",
+      "topics": [
+        "dead link",
+        "heap",
+        "recovery",
+        "restart",
+        "wifi"
+      ],
+      "aliases": [
+        "heap not healthy skip",
+        "loop alive network dead",
+        "no echo buffer",
+        "starved heap probe"
+      ],
+      "components": [
+        "wifiProbeStarvedDead"
+      ],
+      "symbols": [
+        "handleWifiProbeVerdict",
+        "WIFI_STARVED_MAXBLOCK",
+        "wifiLinkProbeTick",
+        "wifiProbeStarvedDead",
+        "wifiStarvedLogged"
+      ],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [
+          "Count a memory skip as a dead probe only when the check is armed (wifiArmedGateway != 0) and platformMaxFreeBlock() < WIFISTARVEDMAXBLOCK.",
+          "Reach the restart only through the existing supervisor path (handleWifiProbeVerdict()): its 8-probe threshold, the forced reconnect first, the witness rule (MQTT, REST or port 25238 traffic means the LAN (local area network) works) and t..."
+        ],
+        "must_not": [
+          "Restart directly on a heap number alone; ADR-107's recovery actions stay as they are (no restart there).",
+          "Count a memory skip as dead while the largest free block is 4 KB or more (a busy but healthy heap)."
+        ],
+        "exceptions": [
+          "None."
+        ],
+        "verification": [
+          "tests/testwifideadlink.py: the real state machine on the host; scenarios starved (heap LOW, largest block 2 KB, link dead) and starvednopbuf (no echo buffer, largest block 2 KB) end in a forced reconnect and a restart (red on the code be...",
+          "Bench: the prerelease-only telnet key H (handleDebug.ino, heapHoldTick()) starves the heap on purpose; expected telnet lines: 8 x 'counted as dead', 'forcing a reconnect', 8 more, the restart, and its reason in the reboot log."
+        ]
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
+    },
+    {
+      "id": "ADR-259",
+      "title": "SAT halves the PID integral once when the error leaves the deadband and holds it, for the main and the zone PIDs (amends ADR-197)",
+      "path": "ADR-259-sat-halves-the-pid-integral-once-when-the-error-leaves-the-deadband-and-holds-it-for-the-main-and-the-zone-pids-partly-supersedes-adr-197.md",
+      "format": "canonical",
+      "status": "Accepted",
+      "date": "2026-11-18",
+      "decision_summary": "When the error leaves the 0.1 C deadband the integral is multiplied by 0.5 once and then held while the error stays o...",
+      "topics": [
+        "deadband",
+        "integral",
+        "pid",
+        "sat"
+      ],
+      "aliases": [
+        "entry 329",
+        "entry 333",
+        "halve the integral",
+        "integral halving",
+        "Q-329a",
+        "Q-329b"
+      ],
+      "components": [
+        "_pidUpdateIntegral",
+        "satZonePidAdvance"
+      ],
+      "symbols": [
+        "_pid_inBand",
+        "_pidUpdateIntegral",
+        "bPidInBand",
+        "SAT_PID_DEADBAND",
+        "satZonePidAdvance"
+      ],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [
+          "Halve the integral exactly once per transition from inside to outside the deadband, for the main and every zone PID.",
+          "Hold the integral unchanged while the error stays outside the deadband."
+        ],
+        "must_not": [
+          "Reset the integral to 0 only because the error is outside the deadband.",
+          "Change the reset triggers of ADR-204."
+        ],
+        "exceptions": [
+          "None."
+        ],
+        "verification": [
+          "tests/testsatpidsemantics.py (the real SATpid.ino against the thermo-nova oracle with this deviation as a parameter): testoutsidethebandthehalvedintegralisheldandinsideitaccumulatesagain and the boundary, restore and saturation cases; 5...",
+          "tests/testsatpidcadence.py::testg3zoneintegralishalvedonceoutsidethebandandheld (the real zone PID); FAIL on the code before this ADR (the zone integral went to 0)."
+        ]
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
+    },
+    {
+      "id": "ADR-260",
+      "title": "SAT heating curve self-tune decides every counted hour on a 12-hour window with a 0.05 step (supersedes the timing of ADR-205, ADR-228 and ADR-230)",
+      "path": "ADR-260-sat-heating-curve-self-tune-decides-every-counted-hour-on-a-12-hour-window-with-a-0-05-step-supersedes-the-timing-of-adr-205-adr-228-and-adr-230.md",
+      "format": "canonical",
+      "status": "Accepted",
+      "date": "2026-11-19",
+      "decision_summary": "The tuner keeps its hour, its exclusions, its two phases and its agreement rule, and changes three constants: a tuner...",
+      "topics": [
+        "heating-curve",
+        "mqtt",
+        "rest-api",
+        "sat",
+        "self-tune"
+      ],
+      "aliases": [
+        "faster self-tune",
+        "hours not days",
+        "self-tune window hours"
+      ],
+      "components": [
+        "curve_tune telemetry fields window_hours and window_hours_needed",
+        "SAT heating curve self-tune timing (SATcurveTune.h constants, satTuneCloseDay)",
+        "self-tune window file /sat_tune.json version 3"
+      ],
+      "symbols": [
+        "SAT_CT_FILE_VERSION",
+        "SAT_CT_HOURS_PER_DAY",
+        "SAT_CT_MIN_CLEAN_HOURS",
+        "SAT_CT_STEP",
+        "SAT_CT_WINDOW_DAYS",
+        "satTuneCloseDay"
+      ],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [
+          "Keep every per-tick exclusion of ADR-205, ADR-231 and ADR-234, the heating-failure rule of entry 358, the phase split and agreement rule of ADR-228 and the floating minimum of ADR-230 (one hour of floating data in the window).",
+          "Decide on the window of the last 12 counted hours, at each counted hour, with a step of 0.05, and empty the window after a change.",
+          "Write the window file /sattune.json as version 3, and only when the window changed (a counted hour, or a change); a version 1 or 2 file is dropped on restore.",
+          "Publish the window size as REST curvetune.windowhours and curvetune.windowhoursneeded, and MQTT sat/curvetune/windowhours."
+        ],
+        "must_not": [
+          "Reuse the old field names days, daysneeded or the topic sat/curvetune/days with a different unit.",
+          "Change any exclusion or the 90 % clean-hour rule."
+        ],
+        "exceptions": [
+          "None."
+        ],
+        "verification": [
+          "tests/testsatcurveselftune.py compiles the real tuner blocks of SATcontrol.ino with SATcurveTune.h: a clear signal steps 0.05 after 12 counted hours and not before, a second step needs 12 new counted hours, not-counted hours do not move...",
+          "tests/testsattunerconvergence.py: the old constants take no step within 24 counted hours of a clear signal (red), the new constants do (green).",
+          "tests/webui/sat-tune-progress.test.mjs drives the real data/v2.js against a status object with windowhours."
+        ]
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
+    },
+    {
+      "id": "ADR-261",
+      "title": "The WiFi dead-link streak continues across a re-association while the heap is starved (amends ADR-258)",
+      "path": "ADR-261-the-wifi-dead-link-streak-continues-across-a-re-association-while-the-heap-is-starved-amends-adr-258.md",
+      "format": "canonical",
+      "status": "Proposed",
+      "date": "2026-11-19",
+      "decision_summary": "While the heap is starved (platformMaxFreeBlock() < WIFISTARVEDMAXBLOCK), wifiLinkProbeOnReconnect() keeps the dead s...",
+      "topics": [
+        "dead-link supervisor",
+        "heap starvation",
+        "watchdog recovery",
+        "wifi"
+      ],
+      "aliases": [
+        "dead streak reset on reconnect",
+        "starved heap re-association"
+      ],
+      "components": [
+        "wifiLinkProbeOnReconnect"
+      ],
+      "symbols": [
+        "WIFI_STARVED_MAXBLOCK",
+        "wifiDeadProbes",
+        "wifiLinkProbeOnReconnect"
+      ],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [
+          "Keep wifiDeadProbes across a re-association only while the largest free block is under WIFISTARVEDMAXBLOCK.",
+          "Keep every other reset of the streak: an answered probe, a wired link, a changed gateway address, and the decision point itself."
+        ],
+        "must_not": [
+          "Must not keep the streak across a re-association when the heap is not starved (a normal reconnect starts a fresh streak, ADR-258 behaviour).",
+          "Must not change the witness rule, the restart cap or the thresholds of ADR-258."
+        ],
+        "exceptions": [
+          "None."
+        ],
+        "verification": [
+          "tests/testwifideadlink.py::WifiDeadLinkStateMachine::teststarvedlinkwithapdropsevery4minstillrecovers runs the real state machine with a starved heap, a dead link and an AP drop every 4 min for 40 min. It fails on the code before this AD..."
+        ]
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
+    },
+    {
+      "id": "ADR-262",
+      "title": "The web UI checks the GitHub releases API from the browser for a newer firmware; the gateway makes no outbound request; off by default with a one-time question",
+      "path": "ADR-262-the-web-ui-checks-the-github-releases-api-from-the-browser-for-a-newer-firmware-the-gateway-makes-no-outbound-request-off-by-default-with-a-one-time-question.md",
+      "format": "canonical",
+      "status": "Accepted",
+      "date": "2026-11-19",
+      "decision_summary": "The web UI (user interface), running in the user's browser, checks the GitHub releases list for a newer firmware and...",
+      "topics": [
+        "firmware-update",
+        "privacy",
+        "settings",
+        "web-ui"
+      ],
+      "aliases": [
+        "check GitHub for new versions",
+        "new version available",
+        "update check"
+      ],
+      "components": [
+        "device settings updatecheck, updatecheckasked, updatecheckbeta (UISection, UI_UPDATE_CHECK_DEFAULT_MODE)",
+        "web UI version check (data/v2.js updParse, updCmp, updPickNewer, maybeUpdateCheck, updAsk)"
+      ],
+      "symbols": [
+        "bUpdateCheck",
+        "bUpdateCheckAsked",
+        "bUpdateCheckBeta",
+        "maybeUpdateCheck",
+        "UI_UPDATE_CHECK_DEFAULT_MODE",
+        "updPickNewer"
+      ],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [
+          "Make the GitHub request from the browser only, with credentials: 'omit' and referrerPolicy: 'no-referrer'.",
+          "Make no request to GitHub while updatecheck is off, and none before the user said yes (mode 1).",
+          "Filter releases to the running major version and compare by semantic version, never by list order or /releases/latest.",
+          "Cache answers and failures for 6 h, and fail quietly.",
+          "Render tag and link from the validated tag with textContent."
+        ],
+        "must_not": [
+          "Put any network code in the firmware that contacts GitHub.",
+          "Show or execute any HTML (HyperText Markup Language) or text taken from the GitHub answer other than the tag name.",
+          "Send the GitHub request through the device API queue."
+        ],
+        "exceptions": [
+          "None."
+        ],
+        "verification": [
+          "tests/webui/update-check-github.test.mjs runs the real data/v2.js functions and the ADR-184 queue against a fetch stub, 13 tests:",
+          "the semantic version and major filter, the beta/stable rule and drafts;",
+          "setting off: 0 requests;",
+          "the one-time question, the order of its two settings writes, and its wait for the wizard;",
+          "one request with credentials: 'omit' and no-referrer, and queue inFlight() 0 during it;",
+          "the link and the 6 h cache;",
+          "dismiss;",
+          "403, 429, network error and non-list answers: quiet, and no retry before 6 h. Red 0/13 on the earlier data/v2.js. Three mutants each turn it red: no major filter, no off switch, no referrer policy.",
+          "tests/testupdatechecksettings.py checks:",
+          "the struct defaults derive from the constant;",
+          "each key is in the settings file, in dispatch, in GET /api/v2/settings and in the POST whitelist;",
+          "the help texts and the hidden row;",
+          "no firmware source names api.github.com. Red 4/6 on the earlier sources."
+        ]
+      },
+      "scope": {
+        "path_globs": [
+          "src/OTGW-firmware/**/*.ino"
+        ]
       },
       "metadata": {
         "binding": false,
@@ -12319,6 +13359,12 @@
       "resolved": true
     },
     {
+      "source": "ADR-101",
+      "target": "ADR-255",
+      "type": "related",
+      "resolved": true
+    },
+    {
       "source": "ADR-102",
       "target": "ADR-074",
       "type": "related",
@@ -12339,6 +13385,12 @@
     {
       "source": "ADR-102",
       "target": "ADR-101",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-102",
+      "target": "ADR-255",
       "type": "related",
       "resolved": true
     },
@@ -14095,6 +15147,12 @@
       "resolved": true
     },
     {
+      "source": "ADR-142",
+      "target": "ADR-255",
+      "type": "related",
+      "resolved": true
+    },
+    {
       "source": "ADR-143",
       "target": "ADR-024",
       "type": "related",
@@ -14953,6 +16011,12 @@
       "resolved": true
     },
     {
+      "source": "ADR-169",
+      "target": "ADR-257",
+      "type": "related",
+      "resolved": true
+    },
+    {
       "source": "ADR-170",
       "target": "ADR-062",
       "type": "related",
@@ -15105,6 +16169,12 @@
     {
       "source": "ADR-174",
       "target": "ADR-248",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-174",
+      "target": "ADR-255",
       "type": "related",
       "resolved": true
     },
@@ -15553,6 +16623,12 @@
       "resolved": true
     },
     {
+      "source": "ADR-193",
+      "target": "ADR-256",
+      "type": "related",
+      "resolved": true
+    },
+    {
       "source": "ADR-194",
       "target": "ADR-080",
       "type": "related",
@@ -15733,6 +16809,12 @@
       "resolved": true
     },
     {
+      "source": "ADR-197",
+      "target": "ADR-259",
+      "type": "related",
+      "resolved": true
+    },
+    {
       "source": "ADR-198",
       "target": "ADR-069",
       "type": "related",
@@ -15849,6 +16931,12 @@
     {
       "source": "ADR-199",
       "target": "ADR-203",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-199",
+      "target": "ADR-253",
       "type": "related",
       "resolved": true
     },
@@ -15997,6 +17085,12 @@
       "resolved": true
     },
     {
+      "source": "ADR-204",
+      "target": "ADR-259",
+      "type": "related",
+      "resolved": true
+    },
+    {
       "source": "ADR-205",
       "target": "ADR-196",
       "type": "related",
@@ -16029,6 +17123,18 @@
     {
       "source": "ADR-205",
       "target": "ADR-231",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-205",
+      "target": "ADR-234",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-205",
+      "target": "ADR-260",
       "type": "related",
       "resolved": true
     },
@@ -16549,6 +17655,18 @@
       "resolved": true
     },
     {
+      "source": "ADR-222",
+      "target": "ADR-257",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-222",
+      "target": "ADR-257",
+      "type": "superseded-by",
+      "resolved": true
+    },
+    {
       "source": "ADR-223",
       "target": "ADR-068",
       "type": "related",
@@ -16633,6 +17751,18 @@
       "resolved": true
     },
     {
+      "source": "ADR-228",
+      "target": "ADR-234",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-228",
+      "target": "ADR-260",
+      "type": "related",
+      "resolved": true
+    },
+    {
       "source": "ADR-229",
       "target": "ADR-208",
       "type": "related",
@@ -16663,6 +17793,12 @@
       "resolved": true
     },
     {
+      "source": "ADR-230",
+      "target": "ADR-260",
+      "type": "related",
+      "resolved": true
+    },
+    {
       "source": "ADR-231",
       "target": "ADR-205",
       "type": "related",
@@ -16677,6 +17813,12 @@
     {
       "source": "ADR-231",
       "target": "ADR-230",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-231",
+      "target": "ADR-234",
       "type": "related",
       "resolved": true
     },
@@ -16719,6 +17861,24 @@
     {
       "source": "ADR-233",
       "target": "ADR-191",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-234",
+      "target": "ADR-205",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-234",
+      "target": "ADR-228",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-234",
+      "target": "ADR-231",
       "type": "related",
       "resolved": true
     },
@@ -16819,6 +17979,12 @@
       "resolved": true
     },
     {
+      "source": "ADR-241",
+      "target": "ADR-243",
+      "type": "related",
+      "resolved": true
+    },
+    {
       "source": "ADR-242",
       "target": "ADR-179",
       "type": "related",
@@ -16827,6 +17993,18 @@
     {
       "source": "ADR-242",
       "target": "ADR-213",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-243",
+      "target": "ADR-066",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-243",
+      "target": "ADR-241",
       "type": "related",
       "resolved": true
     },
@@ -16845,6 +18023,12 @@
     {
       "source": "ADR-245",
       "target": "ADR-193",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-245",
+      "target": "ADR-256",
       "type": "related",
       "resolved": true
     },
@@ -16911,6 +18095,306 @@
     {
       "source": "ADR-248",
       "target": "ADR-179",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-249",
+      "target": "ADR-051",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-249",
+      "target": "ADR-196",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-249",
+      "target": "ADR-236",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-249",
+      "target": "ADR-251",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-249",
+      "target": "ADR-254",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-250",
+      "target": "ADR-196",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-250",
+      "target": "ADR-199",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-250",
+      "target": "ADR-253",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-251",
+      "target": "ADR-157",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-251",
+      "target": "ADR-196",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-251",
+      "target": "ADR-249",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-251",
+      "target": "ADR-254",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-252",
+      "target": "ADR-196",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-252",
+      "target": "ADR-199",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-252",
+      "target": "ADR-236",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-252",
+      "target": "ADR-251",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-252",
+      "target": "ADR-254",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-253",
+      "target": "ADR-199",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-253",
+      "target": "ADR-250",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-254",
+      "target": "ADR-249",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-254",
+      "target": "ADR-251",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-254",
+      "target": "ADR-252",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-255",
+      "target": "ADR-101",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-255",
+      "target": "ADR-102",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-255",
+      "target": "ADR-142",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-255",
+      "target": "ADR-174",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-256",
+      "target": "ADR-146",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-256",
+      "target": "ADR-193",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-256",
+      "target": "ADR-245",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-257",
+      "target": "ADR-169",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-257",
+      "target": "ADR-185",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-257",
+      "target": "ADR-222",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-257",
+      "target": "ADR-222",
+      "type": "supersedes",
+      "resolved": true
+    },
+    {
+      "source": "ADR-258",
+      "target": "ADR-080",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-258",
+      "target": "ADR-107",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-258",
+      "target": "ADR-167",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-258",
+      "target": "ADR-211",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-258",
+      "target": "ADR-261",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-259",
+      "target": "ADR-197",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-259",
+      "target": "ADR-204",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-260",
+      "target": "ADR-205",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-260",
+      "target": "ADR-228",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-260",
+      "target": "ADR-230",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-260",
+      "target": "ADR-231",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-260",
+      "target": "ADR-234",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-261",
+      "target": "ADR-258",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-262",
+      "target": "ADR-003",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-262",
+      "target": "ADR-184",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-262",
+      "target": "ADR-213",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-262",
+      "target": "ADR-218",
       "type": "related",
       "resolved": true
     }

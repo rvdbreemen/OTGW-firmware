@@ -416,7 +416,7 @@ Het veld `otcommandinterface` is een string met de actieve OT-interface: `"PIC"`
 
 Twee velden tonen de status van de bedrade link en hebben alleen betekenis met Ethernet-hardware: `ethernetpresent` (PHY gedetecteerd) en `ethernetlink` (kabel aangesloten en link actief). De OTGW Classic heeft geen Ethernet. Wanneer de actieve netwerkmodus `ethernet` is, retourneert het `ssid`-veld de letterlijke string `"Wired"` en wordt `wifirssi` als `0` gerapporteerd. De runtime kan zonder reboot tussen WiFi en Ethernet failoveren (TASK-581); `networkmode` weerspiegelt het momenteel actieve transport.
 
-Wanneer het apparaat in AP-fallback-modus draait (alleen-prerelease vangnet voor onbereikbare WiFi), is `apfallback: true` aanwezig en bevat `ssid` de AP-SSID.
+Wanneer het apparaat in AP-fallback-modus draait (het vangnet voor onbereikbare WiFi; in alle builds vanaf beta.401, daarvoor alleen in prerelease-builds), is `apfallback: true` aanwezig en bevat `ssid` de AP-SSID.
 
 Aanvullende velden ontsluiten MQTT-discovery-telemetrie (`disc_published_topics`, `disc_pending_ids`, `disc_verify_runs`, `disc_republish_triggered`, `disc_last_missing`, `disc_last_orphan`, `disc_last_outcome`) en REST-handler-timing (`perf_device_info_total_ms`, `perf_settings_total_ms`, `perf_sat_status_total_ms`, …) voor ADR-062- en TASK-361-observability.
 
@@ -739,7 +739,7 @@ Retourneert de geschiedenis die het apparaat zelf bijhoudt voor de Monitor > Gra
 
 ##### GET /api/v2/network/scan
 
-Start en polt een asynchrone WiFi-scan (TASK-585). Wordt gebruikt door de WiFi-kiezer op de Settings-pagina.
+Start en polt een asynchrone WiFi-scan (TASK-585). De v2-webinterface roept het niet aan.
 
 - Eerste aanroep: start de scan en retourneert `{"status":"scanning"}`.
 - Vervolgaanroepen tijdens de scan: retourneren `{"status":"scanning"}`.
@@ -932,6 +932,8 @@ In PIC-gatewaymodus wordt alleen `otgw-otdirect/available` gepubliceerd met waar
 | `sat/active` | ja | Controller actief |
 | `sat/setpoint` | ja | Aanvoertemperatuur setpoint (C) |
 | `sat/target` | ja | Gewenste kamertemperatuur (C) |
+| `sat/climate_target` | ja | Doel op de Home Assistant-thermostaatkaart: SAT's doel met SAT aan, het thermostaat-setpoint (TrSet) met SAT uit (°C). Ook gepubliceerd met SAT uit (TASK-1979) |
+| `sat/climate_current` | ja | Kamertemperatuur op de thermostaatkaart: de temperatuur waarop SAT regelt met SAT aan, de kamertemperatuur van de thermostaat (Tr) met SAT uit (°C). Ook gepubliceerd met SAT uit (TASK-1979) |
 | `sat/heating_curve` | ja | Verwarmingscurve berekende waarde (C) |
 | `sat/pid_output` | ja | PID-output = curve + P + I + D |
 | `sat/error` | nee | PID-fout = doel - kamertemperatuur (C) |
@@ -945,6 +947,8 @@ In PIC-gatewaymodus wordt alleen `otgw-otdirect/available` gepubliceerd met waar
 | `sat/cycle_class` | nee | Cyclusclassificatie (`good`, `overshoot`, ...) |
 | `sat/safety_tripped` | ja | Veiligheidsuitschakeling actief |
 | `sat/ot_link_lost` | ja | `"true"` zolang SAT 30 s geen ketelantwoord heeft gezien (TASK-1365) |
+| `sat/no_ignition` | ja | `"true"` zolang CV 180 s gevraagd is zonder vlam (TASK-1882, alleen een melding) |
+| `sat/heating_failure` | ja | `"true"` na 15 min op het maximum met een kamerstijging < 0,5 C (TASK-1882, alleen een melding) |
 | `sat/outside_temp_missing` | ja | `"true"` zolang SAT geen buitentemperatuur heeft die jonger is dan 1 uur (TASK-1390) |
 | `sat/pressure` | nee | CV-systeemdruk, glad (bar) |
 | `sat/pressure_alarm` | nee | Druk-alarm actief |
@@ -1029,6 +1033,7 @@ Onderwerp: `{TopTopic}/set/{UniqueId}/sat/<commando>`. Commandonamen zijn niet h
 | Onderwerpsuffix | Payload | Beschrijving |
 |----------------|---------|-------------|
 | `sat/target` | `"21.0"` (5 tot 30) | Doeltemperatuur van de kamer instellen (°C) |
+| `sat/climate_target` | `"21.5"` (5 tot 30) | Doeltemperatuur van de Home Assistant-thermostaatkaart (°C). Met SAT aan stelt het SAT's doel in, zoals `sat/target` (en kiest een preset met dezelfde temperatuur); met SAT uit stuurt het `TT=<waarde>`, zoals voorheen (TASK-1979) |
 | `sat/indoor_temp` | `"20.8"` | Externe kamertemperatuur doorgeven (°C) |
 | `sat/outdoor_temp` | `"7.5"` | Externe buitentemperatuur doorgeven (°C) |
 | `sat/pv_surplus_w` | `"1500"` (0 tot 50000) | PV-overschot (W) doorgeven voor PV-boost |
@@ -1051,6 +1056,7 @@ De onderstaande commando's geven de payload ongewijzigd door aan de genoemde ins
 | Onderwerpsuffix | Instelling |
 |----------------|-----------|
 | `sat/overshoot_margin` | `SATovershootmargin` |
+| `sat/pwm_switch_margin` | `SATpwmswitchmargin` |
 | `sat/heating_system` | `SATsystem` |
 | `sat/manufacturer` | `SATmanufacturer` |
 | `sat/max_modulation` | `SATmaxmodulation` |

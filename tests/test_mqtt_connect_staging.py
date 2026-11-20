@@ -66,6 +66,8 @@ static void mqttV2MigrationOnConnect() { q(1, 6); }
 static void sendMQTTversioninfo() { q(2, 6); }
 static void publishAllPICsettings() { q(3, 15); }
 static void publishCommandDroppedState() { q(4, 1); }
+static void startStaleOverrideClear() {}                 // TASK-1991: covered by test_mqtt_override_reboot_clear.py
+static bool staleOverrideClearStep() { return false; }
 static void publishBoilerUnsupportedMsgids() { q(5, 1); }
 static void clearBoilerUnsupportedDirty() { dirtyClearedAfterCsv = published[5] > 0 ? 1 : 0; }
 static void requestMQTTRepublishAll() {}

@@ -41,7 +41,10 @@ def gate_class():
     c = alt.LIB_CPP.read_text(encoding="utf-8")
     enums = "".join(alt.construct(h, rf"^enum class {n}\b") + ";\n" for n in ("OpenThermRxStatus", "OpenThermTxStatus"))
     rt = re.search(r"^const uint16_t RESPONSE_TIME = \d+;", c, re.M).group(0)
-    delay = re.search(r"^\s*delayTimestamp = ts \+ RESPONSE_TIME \* 1000UL;", c, re.M).group(0).strip()
+    # TASK-1980: since upstream c6a8dae the line is "newTs + (isSlave ? RESPONSE_TIME : requestDelay)"; received()
+    # provides newTs, isSlave (true: this is the slave side) and requestDelay for that form.
+    delay = re.search(r"^\s*delayTimestamp = (?:ts \+ RESPONSE_TIME|newTs \+ \(isSlave \? RESPONSE_TIME : requestDelay\)) "
+                      r"\* 1000UL;", c, re.M).group(0).strip()
     is_ready = alt.construct(c, r"^bool IRAM_ATTR OpenTherm::isReady\(\)")
     send = alt.construct(c, r"^bool OpenTherm::sendResponse\(unsigned long request\)")
     body = lambda s: s[s.index("{"):]
@@ -59,7 +62,8 @@ public:
   int refused = 0;
   void sendFrame(unsigned long f) { sent.push_back(f); sentAt.push_back(g_now); }
   // the DATA_READY step of OpenTherm::process() for a received thermostat frame
-  void received() { const unsigned long ts = micros(); """ + delay + r""" }
+  void received() { const unsigned long ts = micros(); const unsigned long newTs = ts; const bool isSlave = true;
+    const uint16_t requestDelay = RESPONSE_TIME; (void)newTs; (void)isSlave; (void)requestDelay; """ + delay + r""" }
   bool isReady() """ + body(is_ready) + r"""
   bool sendResponseLib(unsigned long request) """ + body(send) + r"""
   bool sendResponse(unsigned long request) { bool ok = sendResponseLib(request); if (!ok) refused++; return ok; }

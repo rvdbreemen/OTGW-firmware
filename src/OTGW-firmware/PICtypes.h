@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : PICtypes.h
-**  Version  : v2.0.0-beta.327
+**  Version  : v2.0.0-beta.401
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -52,7 +52,7 @@ struct PICSection {            // state.pic — PIC microcontroller identity/sta
 struct PicSettingsSection {    // state.picSettings — settings polled from PIC via PR= commands
   // Source: Schelte Bron's OTGW firmware documentation (https://otgw.tclcode.com/firmware.html)
   // PR=A (About/version) is handled by getpicfwversion(); PR=M (mode) by queryOTGWgatewaymode().
-  // All other PR= reports are polled on-demand by queryNextPICsetting(), one per 3s tick.
+  // All other PR= reports are polled on-demand by queryNextPICsetting(), at most one per 3 s (pollPICsettingsQuery).
 
   // --- Active settings (most useful for HA integration) ---
   char sSetpointOverride[16]  = "";  // PR=O: setpoint override ("T20.5" TT active, "C20.5" TC active, "N" none)

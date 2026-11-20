@@ -210,7 +210,7 @@ static bool satIsEnabled() { return g_satEnabled; }
 static bool isBoilerMsgIdUnsupportedRead(uint8_t id) { return id == 28 && g_ret28Unsupported; }
 // TASK-1761: the sliced head of loopOTDirect() drains the off-loop command ring; nothing is queued here.
 static void otdCmdTextDrain() {}
-static void otdMasterGuard() {}   // TASK-1966: boiler line guard, tests/test_otd_master_line_stale_delay.py
+static void otdMasterStatus() {}   // TASK-1980: mirrors the in-flight flag to state.otd, not under test here
 static bool otdRelayRead99(unsigned long, unsigned long &) { return false; }   // TASK-1906: MsgID 99 relay, tests/test_otd_msgid99_relay.py
 static bool otdRelayRewriteRead(unsigned long, unsigned long &) { return false; }   // TASK-1803, tests/test_otd_relay_rw.py
 static unsigned long otdReply99(unsigned long r) { return r; }
@@ -245,6 +245,8 @@ static void updateOTDirectStatus() {}
 static void checkThermostatTimeout() {}
 static void loopFlameRatio() {}
 static void clearWriteOverride(uint8_t) {}
+static void otdZapInvalid(uint8_t) {}   // TASK-1804 A2: tested on the real block in tests/test_otd_zap_invalid.py
+static void otdSimExitFlush() {}   // TASK-1992: tested in tests/test_otd_sim_exit_stale_writes.py
 // Prototypes the Arduino .ino preprocessor generates for the firmware.
 static unsigned long buildOTResponse(uint8_t type, uint8_t msgId, uint16_t data);
 static unsigned long otdRelayedStatusFrame(unsigned long frame);
@@ -401,6 +403,22 @@ int main() {
     int t9 = 0, ack = 0;
     for (unsigned long a : otSlave.sent) if (idOf(a) == 9) { t9++; if (typeOf(a) == 4 && (a & 0xFFFF) == 0x1400 && !OpenTherm::parity(a)) ack++; }
     printf("T1 t9=%d ack=%d%c", t9, ack, 10); }
+  // SR1/SR2 (TASK-1804 A6 items 2 and 3): SR=127 (a WordResponse ID on the PIC) and a boiler that answers 127 Unknown-DataID.
+  // SR1: after three strikes 127 is blacklisted like any other ID (UnknownMask) and its slots carry the gateway's reads;
+  // SR2: UI=127 as well, so every 127 frame is a slot from the start. In both the thermostat gets READ-ACK(127) with the
+  // SR bytes (SendAltResponse runs TreatMessage on the fake Unknown-DataID, WordResponse). Old code: SR1 never makes 127 a
+  // slot (b127 stays high), SR2 answers the slot with a bare Unknown-DataID (srack 0).
+  for (int sc = 1; sc <= 2; sc++) {
+    resetAll(); buildStream(0x02);
+    otResponseOverrides[0].msgId = 127; otResponseOverrides[0].active = true; otResponseOverrides[0].value = 0x0203;
+    if (sc == 2) { otUnknownIds[0] = 127; otUnknownIdCount = 1; }
+    simulate(true, 360000);
+    int t127 = 0, srack = 0, b127 = 0;
+    for (unsigned long a : otSlave.sent) if (idOf(a) == 127) { t127++; if (typeOf(a) == 4 && (a & 0xFFFF) == 0x0203 && !OpenTherm::parity(a)) srack++; }
+    for (unsigned long q : otMaster.sent) if (idOf(q) == 127) b127++;
+    printf("SR%d t127=%d srack=%d b127=%d%c", sc, t127, srack, b127, 10);
+    otResponseOverrides[0].active = false; otUnknownIdCount = 0;
+  }
   otRemoteOverride.mode = OT_OVERRIDE_NONE; otRemoteOverride.f88Value = 0;
 @T1CLEAR@
   // T2 (TASK-1733, tjfs beta.146): TT=21.5 in gateway mode. tjfs's thermostat never reads MsgID 9 and
@@ -489,6 +507,22 @@ class GatewayAltSlots(unittest.TestCase):
     def setUp(self):
         if self.err:
             self.skipTest(self.err)
+
+    # TASK-1804 A6 item 3: an SR ID the boiler rejects three times becomes a slot like any other (PIC UnknownMask, gateway.asm 6.6
+    # :2397-2399); its later frames carry the gateway's reads, and the thermostat still gets the SR answer.
+    def test_SR1_sr_id_blacklisted_after_three_strikes_and_still_answered(self):
+        r = self.rows["SR1"]
+        self.assertGreater(r["t127"], 10)
+        self.assertEqual(r["srack"], r["t127"], "every 127 answer must be READ-ACK with the SR bytes")
+        self.assertLessEqual(r["b127"], 3, "after three Unknown-DataID the 127 slots carry the gateway's reads")
+
+    # TASK-1804 A6 item 2: UI= and SR= on one ID with an alternative waiting: the PIC answers READ-ACK + SR (SendAltResponse
+    # :2463-2473 runs TreatMessage on the fake Unknown-DataID), not a bare Unknown-DataID.
+    def test_SR2_ui_and_sr_on_one_id_answer_the_sr_value_in_the_slot(self):
+        r = self.rows["SR2"]
+        self.assertGreater(r["t127"], 10)
+        self.assertEqual(r["srack"], r["t127"], "the slot answer must carry the SR value")
+        self.assertEqual(r["b127"], 0, "UI=127: no 127 frame reaches the boiler")
 
     def test_A1_one_boiler_frame_per_thermostat_frame(self):
         r = self.rows["A1"]

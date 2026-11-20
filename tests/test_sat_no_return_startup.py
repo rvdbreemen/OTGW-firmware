@@ -29,7 +29,7 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from test_sat_pwm_override import compile_cpp  # noqa: E402
+from test_sat_pwm_override import compile_cpp, start_gate_prelude  # noqa: E402
 import test_sat_no_return_ignition as nri  # noqa: E402
 
 FW = REPO / "src" / "OTGW-firmware"
@@ -207,7 +207,8 @@ def build_source():
     main = main.replace("static uint32_t g_nextFlow = 0, g_flowPer = 0, g_nextRet = 0, g_retPer = 0, g_pmAt = 0, g_pmDelay = 300, g_nextTick = 0;",
                         "static uint32_t g_nextFlow = 0, g_flowPer = 0, g_nextRet = 0, g_retPer = 0, g_nextTick = 0;").replace("static int g_pmDue = 0;\n", "")
     stubs = stubs.replace("static uint32_t g_pmAt, g_pmDelay; static int g_pmDue;", "static uint32_t g_pmAt = 0, g_pmDelay = 300, g_base = 1000000; static int g_pmDue = 0;")
-    return feed + "\n" + stubs + "\nstatic void satPwmReset_decl_unused() {}\n" + cmd + "\n" + pwm + "\n" + validity + "\n" + flood + "\n" + main
+    gate = start_gate_prelude(src, cmd + pwm + flood)   # TASK-1942: the real start gate the PWM block now uses
+    return feed + "\n" + stubs + "\nstatic void satPwmReset_decl_unused() {}\n" + gate + cmd + "\n" + pwm + "\n" + validity + "\n" + flood + "\n" + main
 
 
 class NoReturnStartup(unittest.TestCase):
@@ -436,10 +437,17 @@ static uint32_t otdLastConvEndMs = 0;
 static bool otCmdQueueEmpty() { return true; }
 static void otCmdApplyPendingFlush() {}
 static bool otCmdEnqueue(unsigned long f) { printf("%lu ENQ %lu\n", (unsigned long)g_ms, f & 0xFFFF); return true; }
+static bool otdWriteRefused = false;   // TASK-1804 B3e: the PM= branch sets it on a refused enqueue (never here)
+static void otCmdSkipTombstones() {}   // TASK-1992: ring tombstones, tested in tests/test_otd_sim_exit_stale_writes.py
 static void otDirectBridgeProcessStatus(const char* s) { printf("%lu STATUS %s\n", (unsigned long)g_ms, s); }
 static void synthesizeResponse(char*, const char*) {}
 static bool otMasterRequestActive = false; static uint32_t otLastAnySendMs = 0; static uint32_t otMinIntervalMs = 100; static uint8_t otScheduleIdx = 0;
 static const uint32_t OT_OFFLINE_RETRY_MS = 30000, OT_VENT_FAST_INTERVAL_MS = 10000, OT_SLOW_INTERVAL_MS = 60000;
+#ifndef IS_MASTER_MODE
+#define IS_MASTER_MODE() (true)
+#endif
+static bool otSlaveFramePending = false; static unsigned long otSlaveFrame = 0;   // TASK-1812: no thermostat write waits
+static bool otdMasterRelaysWrite(unsigned long) { return false; }
 enum { OT_DIRECT_ORIGIN_GATEWAY = 1 };
 static unsigned long otCmdQueue[4]; static uint8_t otCmdTail = 0; static const int OT_CMD_QUEUE_SIZE = 4;
 static uint32_t g_busyUntil = 0;

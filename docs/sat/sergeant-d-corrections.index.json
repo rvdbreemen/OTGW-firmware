@@ -4573,7 +4573,7 @@
    "tasks": [
     "TASK-1932"
    ],
-   "confirmed_by_entry": null
+   "confirmed_by_entry": 422
   },
   {
    "id": 344,
@@ -4704,6 +4704,1009 @@
    "supersedes": [],
    "tasks": [
     "TASK-1979"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 354,
+   "title": "Q-PWM1 answered A: PWM cycle length (Sergeant D, 2026-11-15; batch item 1 of 18)",
+   "date": "2026-11-15",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1571633449331069052",
+   "supersedes": [],
+   "tasks": [],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 355,
+   "title": "Q-PWM2 answered B: PWM evaluation rate (Sergeant D, 2026-11-15; batch item 2 of 18)",
+   "date": "2026-11-15",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1571633449331069052",
+   "supersedes": [],
+   "tasks": [],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 356,
+   "title": "Q-P2 answered open: he asks for the graph: Saturation timer while the flame is off (Sergeant D, 2026-11-15; batch item 3 of 18)",
+   "date": "2026-11-15",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1571633449331069052",
+   "supersedes": [],
+   "tasks": [],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 357,
+   "title": "Q-P1 answered A: PID after a reboot (Sergeant D, 2026-11-15; batch item 4 of 18)",
+   "date": "2026-11-15",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1571633449331069052",
+   "supersedes": [],
+   "tasks": [],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 358,
+   "title": "Q-1882a answered A: Self-tune and heating failures (Sergeant D, 2026-11-15; batch item 5 of 18)",
+   "date": "2026-11-15",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1571633456381694074",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1882"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 359,
+   "title": "Q-327a answered A: Overshoot fail-safe (Sergeant D, 2026-11-15; batch item 6 of 18)",
+   "date": "2026-11-15",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1571633456381694074",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1888"
+   ],
+   "confirmed_by_entry": 379
+  },
+  {
+   "id": 360,
+   "title": "Q-327b answered A: Where the 1.5 C lives (Sergeant D, 2026-11-15; batch item 7 of 18)",
+   "date": "2026-11-15",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1571633456381694074",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1888"
+   ],
+   "confirmed_by_entry": 379
+  },
+  {
+   "id": 361,
+   "title": "Q-328a answered A: Tolerance band (Sergeant D, 2026-11-15; batch item 8 of 18)",
+   "date": "2026-11-15",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1571633456381694074",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1887"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 362,
+   "title": "Q-1867a answered B: Pressure drop alarm after a pump stop (Sergeant D, 2026-11-15; batch item 9 of 18)",
+   "date": "2026-11-15",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1571633456381694074",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1867"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 363,
+   "title": "Q-215a answered A: PWM permission after a restart (Sergeant D, 2026-11-15; batch item 10 of 18)",
+   "date": "2026-11-15",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1571633463910727722",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1899"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 364,
+   "title": "Q-SUP1 answered A: Average flow for the suppression (Sergeant D, 2026-11-15; batch item 11 of 18)",
+   "date": "2026-11-15",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1571633463910727722",
+   "supersedes": [],
+   "tasks": [],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 365,
+   "title": "Q-LRN1 answered A: PWM ticks lowering the curve (Sergeant D, 2026-11-15; batch item 12 of 18)",
+   "date": "2026-11-15",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1571633463910727722",
+   "supersedes": [],
+   "tasks": [],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 366,
+   "title": "Q-LRN2 answered B: Freeze learning under a supervisor (Sergeant D, 2026-11-15; batch item 13 of 18)",
+   "date": "2026-11-15",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1571633463910727722",
+   "supersedes": [],
+   "tasks": [],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 367,
+   "title": "Q-TUNE1 answered A: Faster self-tune (Sergeant D, 2026-11-15; batch item 14 of 18)",
+   "date": "2026-11-15",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1571633463910727722",
+   "supersedes": [],
+   "tasks": [],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 368,
+   "title": "Q-334b answered A: Start-up flood rate (Sergeant D, 2026-11-15; batch item 15 of 18)",
+   "date": "2026-11-15",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1571633470696980583",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1924"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 369,
+   "title": "Q-343a answered B: Self-tune hour with one extra tick (Sergeant D, 2026-11-15; batch item 16 of 18)",
+   "date": "2026-11-15",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1571633470696980583",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1932"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 370,
+   "title": "Q-1804a answered A: Boiler refuses SAT's setpoint (boards without a PIC) (Sergeant D, 2026-11-15; batch item 17 of 18)",
+   "date": "2026-11-15",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1571633470696980583",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1804"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 371,
+   "title": "Q-1979a answered with an explanation: \"OTGW_Thermostat\" (Sergeant D, 2026-11-15; batch item 18 of 18)",
+   "date": "2026-11-15",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1571633470696980583",
+   "supersedes": [],
+   "tasks": [],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 372,
+   "title": "Q-1867b answered A by Robert: after a settle the pressure drop rate waits for 600 s of fresh readings (maintainer decision, 2026-11-16; follows entry 362)",
+   "date": "2026-11-16",
+   "source": "maintainer",
+   "kind": "decision",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1571663900985000038",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1867"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 373,
+   "title": "The 2 minute flow average belongs in the duty cycle denominator during light-off (Sergeant D, 2026-11-16; reply to Q-SUP1c; may change entry 364)",
+   "date": "2026-11-16",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1571746686001352835",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1990"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 374,
+   "title": "With the 180 s flame-on rule no 2 minute average is needed right after ignition (Sergeant D, 2026-11-16; follows entry 373)",
+   "date": "2026-11-16",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1571782531538362409",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1990"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 375,
+   "title": "Q-SUP1d answered A, then reconsidered: no 2 minute flow average in the first 2 minutes, the 180 s flame-on rule covers the light-off (Sergeant D, 2026-11-16; follows entries 373 and 374, changes entry 364)",
+   "date": "2026-11-16",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1571786790547886114",
+   "supersedes": [
+    364
+   ],
+   "tasks": [
+    "TASK-1990"
+   ],
+   "confirmed_by_entry": 383
+  },
+  {
+   "id": 376,
+   "title": "Q-361c answered B: a continuous burn also runs at least 180 s before the tolerance band stops it (Sergeant D, 2026-11-16)",
+   "date": "2026-11-16",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1571787046379585651",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1887"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 377,
+   "title": "Q-361a: \"we keep the PWM active\" when the band stops heating (Sergeant D, 2026-11-16; letter missing)",
+   "date": "2026-11-16",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1571787607887716377",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1887"
+   ],
+   "confirmed_by_entry": 384
+  },
+  {
+   "id": 378,
+   "title": "Q-361b: with zones, eco means only the main room decides the band, comfort means any usable room keeps heating on (Sergeant D, 2026-11-16)",
+   "date": "2026-11-16",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1571788202480767038",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1887"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 379,
+   "title": "Q-327c answered A: a separate \"switch margin\" setting, default 1.5 C, range 0.5 to 5.0, 30 s sustain fixed (Sergeant D, 2026-11-16; confirms entries 359 and 360 as read)",
+   "date": "2026-11-16",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1571788413139681325",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1888"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 380,
+   "title": "Q-SUP1b: not needed, answered by entry 375 (Sergeant D, 2026-11-16)",
+   "date": "2026-11-16",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1571788856745795648",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1990"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 381,
+   "title": "Q-P2 answered A: keep thermo-nova's saturation timing (Sergeant D, 2026-11-16; after seeing the chart)",
+   "date": "2026-11-16",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1571789435236913328",
+   "supersedes": [],
+   "tasks": [],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 382,
+   "title": "Sergeant D asks whether every start runs the PWM start-up sequence before the mode is chosen (Sergeant D, 2026-11-16; question, follows entry 381)",
+   "date": "2026-11-16",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1571790225276014673",
+   "supersedes": [],
+   "tasks": [],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 383,
+   "title": "Q-375a answered A: no 2 minute flow average anywhere; the suppression setpoint and the duty cycle use the latest flow, as thermo-nova (Sergeant D, 2026-11-16; confirms entry 375, replaces entry 364 as we read it)",
+   "date": "2026-11-16",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1571797752223113219",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1990"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 384,
+   "title": "Q-377a answered A, meaning \"yes, B\": a band stop sends CH=0 and PWM stays active (Sergeant D, 2026-11-16; confirms entry 377)",
+   "date": "2026-11-16",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": null,
+   "supersedes": [],
+   "tasks": [
+    "TASK-1887"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 385,
+   "title": "Q-382a answered A: every heating start runs in PWM first, and the choice PWM or continuous comes after the start sequence (Sergeant D, 2026-11-16; answers his own question of entry 382, extends entry 348)",
+   "date": "2026-11-16",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": null,
+   "supersedes": [],
+   "tasks": [
+    "TASK-1924"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 386,
+   "title": "SAT is ready for its initial release once today's open questions are resolved; user validation follows; new items go to the next release (Sergeant D and Robert, 2026-11-16)",
+   "date": "2026-11-16",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1571805911926710303",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1740",
+    "TASK-1887",
+    "TASK-1888",
+    "TASK-1942",
+    "TASK-1990"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 387,
+   "title": "Why every start runs in PWM first (Sergeant D, 2026-11-16; reasons for entry 385)",
+   "date": "2026-11-16",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1571809383388815423",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1942"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 388,
+   "title": "Q-357a answered with a new option: after a reboot wait 60 s without sending any command, then B (curve only until the first room temperature in the stable release; entry 357 in the next release) (Sergeant D, 2026-11-16)",
+   "date": "2026-11-16",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1571820232077615105",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1866",
+    "TASK-1874"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 389,
+   "title": "Q-385a answered A: the PWM-first start phase ends 60 s after the flame lights (Sergeant D, 2026-11-16; settles the timing point of entry 385)",
+   "date": "2026-11-16",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1571836290377187339",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1942"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 390,
+   "title": "Keep-warm DHW burns after a CH burn do not affect SAT (Sergeant D to indigo_light, 2026-11-16; TASK-1998 question 3)",
+   "date": "2026-11-16",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/914498730001072149/1571837534432927905",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1998"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 391,
+   "title": "Q-385b answered A: with SAT set to manual continuous, a heating start still goes through PWM first (Sergeant D, 2026-11-16; extends entries 385 and 389)",
+   "date": "2026-11-16",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1571840538456494101",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1942"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 392,
+   "title": "MsgID 3 HB bit 4 must not block PWM: \"Don't look at bit 4 at all\"; the boiler should be able to enter PWM (Sergeant D, 2026-11-16; REVERSES entries 213 and 214, and touches entry 215)",
+   "date": "2026-11-16",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/914498730001072149/1571840386287140995",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1412",
+    "TASK-1412.4",
+    "TASK-1998"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 393,
+   "title": "Q-392a answered A: MsgID 3 plays no part in PWM; PWM is allowed from the start, no wait for a valid MsgID 3 reply (Sergeant D, 2026-11-16; REVERSES entry 215, completes entry 392)",
+   "date": "2026-11-16",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1571843981011329100",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1412.4"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 394,
+   "title": "Q-385c answered A: SAT stays in PWM for the whole 60 s start phase; after that the existing rules decide PWM or continuous (Sergeant D, 2026-11-16; completes entries 385, 389, 391)",
+   "date": "2026-11-16",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1571848637493944321",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1942"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 395,
+   "title": "Q-388a answered A: the gateway's own start-up reads (MsgID 3, 15, 48) may run during the 60 s wait after a reboot; the wait covers SAT's control commands only; this release (Sergeant D, 2026-11-16; completes entry 388)",
+   "date": "2026-11-16",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1571851528489410632",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1874"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 396,
+   "title": "The MsgID 3 bit 4 change (entries 392, 393) is \"TOP PRIORITY for the next release\" (Sergeant D, 2026-11-16)",
+   "date": "2026-11-16",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1571852828065140818",
+   "supersedes": [],
+   "tasks": [],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 397,
+   "title": "Q-396a answered A: \"the next release\" for the MsgID 3 change means the next build that goes out, part of 2.0.0 (Sergeant D, 2026-11-16; settles the scope of entries 392, 393, 396)",
+   "date": "2026-11-16",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1571857108025212940",
+   "supersedes": [],
+   "tasks": [
+    "TASK-2000"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 398,
+   "title": "Q-384a answered B: during a tolerance-band pause a PWM ON phase does not count as a start toward the hourly start limit (Sergeant D, 2026-11-16; amends entries 59, 90 and 95 for band pauses)",
+   "date": "2026-11-16",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1571865185180979331",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1887"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 399,
+   "title": "After a tolerance-band stop, SAT should start heating again when the room is below target + 0.1, not target - 0.1 (Sergeant D, 2026-11-16; questions the reading of entry 328; meaning to be confirmed by Q-399a)",
+   "date": "2026-11-16",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1571957298295742607",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1887"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 400,
+   "title": "Interpretation (ours, not Sergeant D's words) of entry 398 for an ON phase that sees CH allowed again (2026-11-16; open as Q-398a)",
+   "date": "2026-11-16",
+   "source": "port-team",
+   "kind": "interpretation",
+   "discord_link": null,
+   "supersedes": [],
+   "tasks": [
+    "TASK-1887"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 401,
+   "title": "Q-399a answered A: after a tolerance-band stop SAT starts heating again when the room is below target + 0.1; both tolerances mean +0.1 (Sergeant D, 2026-11-16; corrects the reading of entry 328, settles entry 399)",
+   "date": "2026-11-16",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1571973628885602405",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1887"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 402,
+   "title": "Q-401a answered C: the band stop stays at target + 0.1, and after a stop CH stays off for a minimum time before it may restart; part of 2.0.0 (Sergeant D and Robert, 2026-11-16; extends entry 401)",
+   "date": "2026-11-16",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1571976645731164171",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1887"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 403,
+   "title": "Q-402a answered A with 10 minutes: after a band stop CH stays off for 10 minutes, counted from the moment CH actually goes off; high priority (Sergeant D and Robert, 2026-11-16; settles the interpretation of entry 402)",
+   "date": "2026-11-16",
+   "source": "sergeant-d",
+   "kind": "interpretation",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1571978881894715525",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1887"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 404,
+   "title": "Q-2005a answered A: the PWM/continuous flip within one burn stays as it is (Sergeant D, 2026-11-16; Robert first preferred B, then followed)",
+   "date": "2026-11-16",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1571980796179390540",
+   "supersedes": [],
+   "tasks": [
+    "TASK-2005"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 405,
+   "title": "Interpretation (ours, not Sergeant D's words) of entries 402 and 403 when the room temperature is lost during the 600 s minimum CH-off time (2026-11-16; open as Q-403a)",
+   "date": "2026-11-16",
+   "source": "port-team",
+   "kind": "interpretation",
+   "discord_link": null,
+   "supersedes": [],
+   "tasks": [
+    "TASK-1887"
+   ],
+   "confirmed_by_entry": 411
+  },
+  {
+   "id": 406,
+   "title": "Interpretation (ours, not Sergeant D's words) of entry 403: the 10-minute minimum starts only when the band itself switches CH from 1 to 0 (2026-11-17; open as Q-403b)",
+   "date": "2026-11-17",
+   "source": "port-team",
+   "kind": "interpretation",
+   "discord_link": null,
+   "supersedes": [],
+   "tasks": [
+    "TASK-1887"
+   ],
+   "confirmed_by_entry": 412
+  },
+  {
+   "id": 407,
+   "title": "Continuous to PWM switch: flow - requested >= 2 C for 60 s instead of 1.5 C for 30 s (Sergeant D, 2026-11-17; changes entry 404 and the rule of ADR-249)",
+   "date": "2026-11-17",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1572117476525867152",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1888",
+    "TASK-2005"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 408,
+   "title": "The ~55 C control setpoint at the start of a PWM ON phase is not a bug: it is the initial high setpoint while the flame is still off (Sergeant D, 2026-11-18)",
+   "date": "2026-11-18",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/914498730001072149/1572512379982446665",
+   "supersedes": [],
+   "tasks": [
+    "TASK-2013"
+   ],
+   "confirmed_by_entry": 418
+  },
+  {
+   "id": 409,
+   "title": "The initial high CS at a PWM ON start is for reliability only and does not affect savings (Sergeant D, 2026-11-18; completes entry 408)",
+   "date": "2026-11-18",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/914498730001072149/1572514884233732117",
+   "supersedes": [],
+   "tasks": [],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 410,
+   "title": "Q-1887c answered B: the continuous to PWM switch only runs while heating is allowed, as thermo-nova (Sergeant D, 2026-11-18; urgent round, 2.0.0)",
+   "date": "2026-11-18",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1572684434002677852",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1887",
+    "TASK-2005"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 411,
+   "title": "Q-403a answered A: a lost room temperature during the 10-minute band pause ends the pause; heating follows the curve at once (Sergeant D, 2026-11-18; urgent round, 2.0.0; confirms our interpretation in entry 405)",
+   "date": "2026-11-18",
+   "source": "sergeant-d",
+   "kind": "interpretation",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1572684923469430875",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1887"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 412,
+   "title": "Q-403b answered A: the 10-minute pause only follows a band stop that actually turns the boiler off (Sergeant D, 2026-11-18; urgent round, 2.0.0; confirms our interpretation in entry 406)",
+   "date": "2026-11-18",
+   "source": "sergeant-d",
+   "kind": "interpretation",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1572685399531331797",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1887"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 413,
+   "title": "Q-398a answered A: a PWM ON phase that started during a band pause counts once as a start when the band allows heating again during that phase (Sergeant D, 2026-11-18; urgent round, 2.0.0)",
+   "date": "2026-11-18",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1572686045420593193",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1887"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 414,
+   "title": "Q-329b answered B: the integral halving rule (entry 333) applies to the main PID and to the zone PIDs (Sergeant D, 2026-11-18; urgent round, 2.0.0)",
+   "date": "2026-11-18",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1572686857228124251",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1890"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 415,
+   "title": "Q-1998b answered A on a recommendation we have since corrected; re-asked (Sergeant D, 2026-11-18; urgent round, 2.0.0; not settled)",
+   "date": "2026-11-18",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1572689216310087804",
+   "supersedes": [
+    268
+   ],
+   "tasks": [
+    "TASK-1998"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 416,
+   "title": "Q-1998b answered C: short hot-water burns are counted as cycles, marked as hot water, and do not change PWM or overshoot decisions, as thermo-nova (Sergeant D, 2026-11-18; urgent round, 2.0.0; supersedes entry 415)",
+   "date": "2026-11-18",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1572689746725969991",
+   "supersedes": [
+    415
+   ],
+   "tasks": [
+    "TASK-1998"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 417,
+   "title": "Q-410a answered A: both continuous to PWM rules, the 2 C / 60 s margin rule and the 3.5 C / 30 s fail-safe, only run while heating is allowed (Sergeant D, 2026-11-18; urgent round, 2.0.0; extends entry 410)",
+   "date": "2026-11-18",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1572691428482621583",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1887",
+    "TASK-2005"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 418,
+   "title": "Q-408a answered A: \"until the flame off\" means the high start setpoint is held while the flame is still off and ends once the flame burns (Sergeant D, 2026-11-18; urgent round, 2.0.0; confirms our reading in entry 408)",
+   "date": "2026-11-18",
+   "source": "sergeant-d",
+   "kind": "interpretation",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1572693022171463741",
+   "supersedes": [],
+   "tasks": [],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 419,
+   "title": "Sergeant D corrects his own words in entry 408: \"until the flame off\" was meant as \"until light-off\" (Sergeant D, 2026-11-18; consistent with entry 418)",
+   "date": "2026-11-18",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1572693524137254954",
+   "supersedes": [],
+   "tasks": [],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 420,
+   "title": "Q-1998a answered A: a continuous burn at the boiler minimum still counts as overshoot when the flow stays above the request, as thermo-nova (Sergeant D, 2026-11-18; urgent round, 2.0.0)",
+   "date": "2026-11-18",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1572694093778124833",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1998"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 421,
+   "title": "Q-378a answered A: the eco/comfort choice of the band zone rule (entry 378) is the SAT heating mode setting (Sergeant D, 2026-11-18; urgent round, 2.0.0)",
+   "date": "2026-11-18",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1572694752313483437",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1887"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 422,
+   "title": "Q-343b answered A: the 90 % clean share of entry 343 is 90 % of the expected ticks for whatever control interval is set (Sergeant D, 2026-11-18; urgent round, scope 2.1.0; confirms our reading in entry 343)",
+   "date": "2026-11-18",
+   "source": "sergeant-d",
+   "kind": "interpretation",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1572695969114366083",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1932"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 423,
+   "title": "Q-1889a answered A: the faster self-tune decides every counted hour on a rolling window of the last 12 counted hours, step 0.05, the window empties after a step (Sergeant D, 2026-11-19; urgent round, 2.0.0)",
+   "date": "2026-11-19",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1572825703299293265",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1889"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 424,
+   "title": "Q-1889b answered A: with the 12-counted-hour window the warm-up phase may decide alone when the floating phase has less than 1 hour of data, as entry 305 already allows (Sergeant D, 2026-11-19; urgent round, 2.0.0)",
+   "date": "2026-11-19",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1572830405680300035",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1889"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 425,
+   "title": "The Kd factor becomes 0.05 instead of 0.063 (Sergeant D, 2026-11-19; supersedes the factor of entry 279)",
+   "date": "2026-11-19",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1572837659355914303",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1656"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 426,
+   "title": "Q-1942a answered A: after an outside-temperature hand-back SAT continues in the mode it had when it takes over again with the flame burning; no new heating start (Sergeant D, 2026-11-19; urgent round, 2.0.0)",
+   "date": "2026-11-19",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1572837987211812926",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1942",
+    "TASK-2039"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 427,
+   "title": "Q-425a answered A: the Kd factor 0.05 of entry 425 goes into 2.0.0 (Sergeant D, 2026-11-19)",
+   "date": "2026-11-19",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1572849450299293867",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1656"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 428,
+   "title": "Q-2005a answered C: per flame-on at most one PWM ON counts (and at most one PWM cycle), against the continuous/PWM flipping (Sergeant D, 2026-11-19)",
+   "date": "2026-11-19",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1572931802069205033",
+   "supersedes": [
+    89
+   ],
+   "tasks": [
+    "TASK-2005"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 429,
+   "title": "Q-2005b answered B: at most one PWM entry per flame, continuous until flame-off; the fail-safe threshold goes from 3.5 to 3.0 C (Sergeant D, 2026-11-19)",
+   "date": "2026-11-19",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1572933709429084271",
+   "supersedes": [],
+   "tasks": [
+    "TASK-2005"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 430,
+   "title": "Scope of entries 428/429: \"top priority for 2.0.0\"; he calls the PWM re-entry counting a bug (Sergeant D, 2026-11-19)",
+   "date": "2026-11-19",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1572933791775850578",
+   "supersedes": [],
+   "tasks": [
+    "TASK-2005"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 431,
+   "title": "Q-1942b answered A: a PWM-first heating start with too little demand for a 180 s burn waits in PWM OFF; no change (Sergeant D, 2026-11-20)",
+   "date": "2026-11-20",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1573187571503333439",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1942"
    ],
    "confirmed_by_entry": null
   }

@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-14T15:21:00Z'
-updated_date: '2026-11-14T15:25:00Z'
+updated_date: '2026-11-16T08:31:00Z'
 labels:
   - diagnostics
   - tooling
@@ -36,4 +36,6 @@ Robert 2026-11-14 (session): he has a domain on Cloudflare and asks for help to 
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-11-14 written: tools/cloud-recorder/pocketbase/ (Dockerfile with checksum check, compose.yaml, migration, retention hook, test_client.py, README guide). Reviewed against pocketbase.io docs (js-migrations, js-database, RateLimitRule, TrustedProxyConfig, api-rules: locked rule = 403, failed createRule = 400). Not in the docs as a worked example: authRule, authToken, @request.auth.collectionName. Rate-limit label changed to the documented tag form batches:create. Self-review found and fixed: RETENTION_DAYS=0 fell back to 30 (parseInt || 30). node --check passes on both JS files; test_client sample payload = 916 B codec chunk (786 frames, 300 s). Could not run PocketBase here (binary download refused in this container). AC 2 and 3 need Robert's Synology run.
+
+2026-11-16 (from TASK-1862): Robert chose this collector as the backend (PocketBase on his Synology behind a Cloudflare Tunnel, DM 1571804403793530952) and 30 days retention with deletion on request by device id (DM 1571804460928336025): AC3's 'configured days' default is 30.
 <!-- SECTION:NOTES:END -->

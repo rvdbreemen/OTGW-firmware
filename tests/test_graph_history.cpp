@@ -172,9 +172,9 @@ static bool jsonValue(const std::string& s, size_t& i) {
 }
 
 static void runCommon() {
-  check(sizeof(GraphHistSlot) == 14, "slot is 14 bytes");
-  check(GRAPH_HIST_SMALL_SLOTS * sizeof(GraphHistSlot) == 1764, "small ring is 1764 B");
-  check(GRAPH_HIST_LARGE_SLOTS * sizeof(GraphHistSlot) == 70644, "large ring is 70644 B (TASK-1963)");
+  check(sizeof(GraphHistSlot) == 16, "slot is 16 bytes (TASK-2018, ADR-256: satTarget column)");
+  check(GRAPH_HIST_SMALL_SLOTS * sizeof(GraphHistSlot) == 2016, "small ring is 2016 B (+252 B, ADR-256)");
+  check(GRAPH_HIST_LARGE_SLOTS * sizeof(GraphHistSlot) == 80736, "large ring is 80736 B (+10092 B, ADR-256)");
   check((GRAPH_HIST_SMALL_SLOTS - GRAPH_HIST_MARGIN) * GRAPH_HIST_SMALL_INTERVAL_S == 3600, "small ring emits exactly 1 h");
   check((GRAPH_HIST_LARGE_SLOTS - GRAPH_HIST_MARGIN) * GRAPH_HIST_LARGE_INTERVAL_S == 7 * 24 * 3600, "large ring holds exactly 7 days (TASK-1963)");
 
@@ -467,11 +467,86 @@ static void runSevenDay() {
         "no PSRAM: 120 slots of 30 s whatever the window (unchanged)");
 }
 
+// TASK-2018 (ADR-256): the SAT target column. The sampler writes it only while SAT is enabled; a response carries the
+// satTarget array only when its window holds a SAT value, so a window without SAT keeps the body of ADR-193/245
+// (the exact-JSON check in runConfig() is that guard: its slots have no SAT value).
+static size_t g_bodyOff = 0, g_bodyOn = 0;
+static void runSatTarget() {
+  const uint32_t IV = (uint32_t)GRAPH_HIST_LARGE_INTERVAL_S * 1000UL;
+  check(graphHistEmptySlot().satTarget == GRAPH_HIST_NO_TEMP, "SAT target: an empty slot has no SAT target");
+  {  // two slots, the second with SAT on: column present, after outside, null for the slot without SAT
+    RingBox b(GRAPH_HIST_LARGE_SLOTS, GRAPH_HIST_LARGE_INTERVAL_S);
+    graphHistIntervalsDue(b.r, b.c, 1000);
+    GraphHistSlot a = graphHistEmptySlot(); a.outside = 50;
+    GraphHistSlot s = graphHistEmptySlot(); s.outside = 50; s.satTarget = graphHistEncTemp(20.5f, true);
+    graphHistCommit(b.r, b.c, graphHistIntervalsDue(b.r, b.c, 1000 + IV), a);
+    graphHistCommit(b.r, b.c, graphHistIntervalsDue(b.r, b.c, 1000 + 2 * IV), s);
+    GraphHistSnapshot sn = graphHistMakeSnapshot(b.r, b.c, b.c.lastCommitMs);
+    const std::string json = emit(b.r, sn);
+    std::vector<std::string> col;
+    check(column(json, "satTarget", col) && col.size() == 2 && col[0] == "null" && col[1] == "205",
+          "SAT target: the column holds null, then 205 for the slot with SAT on");
+    check(json.find("\"outside\":[50,50],\"satTarget\":[null,205],\"mod\":") != std::string::npos,
+          "SAT target: the array follows outside and precedes mod");
+    check(jsonValid(json), "SAT target: the body is valid JSON");
+  }
+  {  // SAT values only before the served window: the array is omitted
+    RingBox b(GRAPH_HIST_LARGE_SLOTS, GRAPH_HIST_LARGE_INTERVAL_S);
+    graphHistIntervalsDue(b.r, b.c, 0);
+    for (uint32_t i = 1; i <= 100; i++) {
+      GraphHistSlot v = slotWithFlow(400);
+      if (i <= 50) v.satTarget = 210;   // SAT on during the first 50 slots (100 min), then off
+      graphHistCommit(b.r, b.c, graphHistIntervalsDue(b.r, b.c, i * IV), v);
+    }
+    GraphHistSnapshot h1 = graphHistMakeSnapshot(b.r, b.c, b.c.lastCommitMs, 3600UL);   // the newest 30 slots
+    check(emit(b.r, h1).find("satTarget") == std::string::npos, "SAT target: a window without a SAT value has no array");
+    GraphHistSnapshot all = graphHistMakeSnapshot(b.r, b.c, b.c.lastCommitMs);
+    std::vector<std::string> col;
+    check(column(emit(b.r, all), "satTarget", col) && col.size() == 100 && col.front() == "210" && col.back() == "null",
+          "SAT target: the 24 h window holds the SAT slots and the array runs oldest to newest");
+  }
+  {  // ?hours=168 groups of 5: the newest value of a group that is not empty, as for the other temperatures
+    RingBox b(GRAPH_HIST_LARGE_SLOTS, GRAPH_HIST_LARGE_INTERVAL_S);
+    graphHistIntervalsDue(b.r, b.c, 0);
+    const uint32_t N = GRAPH_HIST_LARGE_SLOTS - GRAPH_HIST_MARGIN;
+    for (uint32_t i = 1; i <= N; i++) {
+      GraphHistSlot v = slotWithFlow(1);
+      if (i % 5 == 2) v.satTarget = (int16_t)(200 + (i / 5) % 50);   // one SAT value per group, not the newest slot
+      graphHistCommit(b.r, b.c, graphHistIntervalsDue(b.r, b.c, i * IV), v);
+    }
+    GraphHistSnapshot w = graphHistMakeSnapshot(b.r, b.c, b.c.lastCommitMs, 168UL * 3600UL);
+    std::vector<std::string> col;
+    check(w.step == 5 && column(emit(b.r, w), "satTarget", col) && col.size() == 1008 &&
+          col.back() == std::to_string(200 + ((N - 3) / 5) % 50),
+          "SAT target: a thinned group shows its newest SAT value (1008 groups)");
+  }
+  {  // body size of a dense 24 h response with and without the column (ADR-256 estimate: +12 to 14 %)
+    RingBox b(GRAPH_HIST_LARGE_SLOTS, GRAPH_HIST_LARGE_INTERVAL_S), s(GRAPH_HIST_LARGE_SLOTS, GRAPH_HIST_LARGE_INTERVAL_S);
+    graphHistIntervalsDue(b.r, b.c, 0); graphHistIntervalsDue(s.r, s.c, 0);
+    for (uint32_t i = 1; i <= 720; i++) {
+      GraphHistSlot v = graphHistEmptySlot();
+      v.flow = 655; v.ret = 301; v.chSet = 700; v.roomSet = 205; v.room = 198; v.outside = -35; v.mod = 42;
+      graphHistCommit(b.r, b.c, graphHistIntervalsDue(b.r, b.c, i * IV), v);
+      v.satTarget = 205;
+      graphHistCommit(s.r, s.c, graphHistIntervalsDue(s.r, s.c, i * IV), v);
+    }
+    const size_t off = emit(b.r, graphHistMakeSnapshot(b.r, b.c, b.c.lastCommitMs)).size();
+    const size_t on  = emit(s.r, graphHistMakeSnapshot(s.r, s.c, s.c.lastCommitMs)).size();
+    g_bodyOff = off; g_bodyOn = on;   // printed at the end of main(): the runner shows the last 4000 chars
+    check(on > off, "SAT target: the column adds bytes only when SAT values are in the window");
+  }
+}
+
 int main() {
   runCommon();
+  runSatTarget();
   runSevenDay();
   runConfig("small 126x30s", GRAPH_HIST_SMALL_SLOTS, GRAPH_HIST_SMALL_INTERVAL_S);
   runConfig("large 5046x120s", GRAPH_HIST_LARGE_SLOTS, GRAPH_HIST_LARGE_INTERVAL_S);
+  if (g_bodyOff) std::cout << "INFO: dense 24 h body without SAT " << g_bodyOff << " B, with SAT " << g_bodyOn
+                           << " B (+" << (double)(g_bodyOn - g_bodyOff) * 100.0 / g_bodyOff
+                           << " %), formatting work ratio (square rule) "
+                           << (double)g_bodyOn * g_bodyOn / ((double)g_bodyOff * g_bodyOff) << "\n";
   std::cout << (g_failures ? "=== FAILED ===\n" : "=== ALL TESTS PASSED ===\n") << "failures=" << g_failures << "\n";
   return g_failures ? 1 : 0;
 }

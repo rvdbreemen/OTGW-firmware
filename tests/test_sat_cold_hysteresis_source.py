@@ -35,9 +35,9 @@ class ColdHysteresisSource(unittest.TestCase):
         upd = [m.start() for m in re.finditer(r"_sat_coldCut = satColdCutoffLatched\(", src)]
         self.assertEqual(len(upd), 1, "the latch must be updated exactly once (control tick)")
         # Inside the tick, the overshoot-switch gate and the cutoff block come after the update.
-        gate = src.find("if (pidOutput > satColdThreshold()) {\n    satCycleCheckOvershootSwitch")
-        if gate < 0:
-            gate = src.find("if (pidOutput > satColdThreshold()) {\r\n    satCycleCheckOvershootSwitch")
+        # Entries 410/417 (TASK-1887) add "&& !_sat_tolBandOff" to the same gate.
+        m = re.search(r"if \(pidOutput > satColdThreshold\(\)(?: && !_sat_tolBandOff)?\) \{\r?\n    satCycleCheckOvershootSwitch", src)
+        gate = m.start() if m else -1
         cut = src.find("const bool coldCutoff = satColdCutActive();")   # TASK-1652: the latch unless a lit ON phase burns its 180 s
         self.assertGreater(gate, upd[0])
         self.assertGreater(cut, upd[0])

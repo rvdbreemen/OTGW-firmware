@@ -1,0 +1,186 @@
+---
+id: "ADR-254"
+title: "SAT switches from continuous to PWM when the flow stays 2 C above the request for 60 s, and a stored old default of 1.5 C migrates once (partly supersedes ADR-249)"
+status: "Proposed"
+date: "2026-11-17"
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes: []
+superseded_by: null
+related:
+  - "ADR-249"
+  - "ADR-251"
+  - "ADR-252"
+topics:
+  - "sat"
+  - "continuous to pwm switch"
+  - "overshoot switch"
+  - "pwm switch margin"
+  - "settings migration"
+aliases:
+  - "entry 407"
+  - "Q-407a"
+  - "2 C for 60 s"
+  - "satpwmswitchmargin"
+  - "SATpwmmargin2"
+components:
+  - "SAT_OVERSHOOT_SUSTAIN_MS"
+  - "SATpwmmargin2"
+symbols:
+  - "satCycleCheckOvershootSwitch"
+  - "SAT_OVERSHOOT_SUSTAIN_MS"
+  - "fPwmSwitchMargin"
+  - "g_sawSatPwmMarginMarkerKey"
+  - "kSatPwmMarginMarkerValue"
+context_scope: "selective"
+format: "canonical"
+---
+
+<!-- markdownlint-disable MD025 -->
+
+# ADR-254 SAT switches from continuous to PWM when the flow stays 2 C above the request for 60 s, and a stored old default of 1.5 C migrates once (partly supersedes ADR-249)
+
+## Status
+
+Proposed, 2026-11-17.
+
+## Status History
+
+```yaml
+status_history:
+  - date: 2026-11-17
+    status: Proposed
+    changed_by: "User: Robert van den Breemen"
+    reason: Initial proposal
+    changed_via: adr-kit
+  - date: 2026-11-17
+    status: Proposed
+    changed_by: "User: Robert van den Breemen"
+    reason: Related to ADR-249
+    changed_via: adr-kit lifecycle
+  - date: 2026-11-17
+    status: Proposed
+    changed_by: "User: Robert van den Breemen"
+    reason: Related to ADR-251
+    changed_via: adr-kit lifecycle
+  - date: 2026-11-17
+    status: Proposed
+    changed_by: "User: Robert van den Breemen"
+    reason: Related to ADR-252
+    changed_via: adr-kit lifecycle
+```
+
+## Context
+
+SAT (Smart Autotune Thermostat) leaves continuous control for PWM (pulse-width modulation of the burner) when the boiler
+flow stays above the PID (proportional-integral-derivative) requested setpoint by a margin for some time. ADR-249 set
+that rule to flow - requested >= 1.5 C (the setting `satpwmswitchmargin`, default 1.5, range 0.5-5.0) for 30 s, beside
+a flame-out fail-safe of 3.5 C for 30 s (entry 359).
+
+On a real Viessmann Vitodens (indigo's capture 2026-11-16 16:17-16:39, TASK-2005) SAT flipped between continuous and
+PWM every 2.5 minutes: the request sat on the 1.5 C threshold and the 30 s rule fired again soon after each PWM to
+continuous exit. Sergeant D decided on 2026-11-17 (entry 407, Discord message 1572117476525867152): "change the
+continuous to PWM from boiler temperature -requested temperature >= 1.5 for 30 seconds that it is now to Boiler
+temperature - requested temperature >= 2 for 60 seconds". Robert (maintainer) answered the follow-up Q-407a in session:
+2.0 becomes the new default of the existing setting (A), the 3.5 C / 30 s fail-safe stays (C), release 2.0.0.
+
+Constraint: `writeSettings()` writes `SATpwmswitchmargin` on every save since TASK-1888
+(`src/OTGW-firmware/settingStuff.ino:378`), so practically every unit that ran a beta since then has 1.5 stored. A new
+struct default alone would only reach fresh installs.
+
+Thermo-nova (pinned commit 7beaaf5) waits OVERSHOOT_SUSTAIN_SECONDS = 60.0 (`const.py:21`, used at
+`heating_control.py:296`) at OVERSHOOT_MARGIN_CELSIUS +3.0 (`cycles/const.py:10-11`, used at `heating_control.py:288`).
+
+## Decision
+
+SAT switches from continuous to PWM when flow - requested setpoint >= `settings.sat.fPwmSwitchMargin` (default 2.0)
+holds for 60 s, the 3.5 C / 30 s fail-safe stays unchanged on its own timer, and a settings file without the marker key
+`SATpwmmargin2` that stores exactly 1.5 gets 2.0 once.
+
+- `SAT_OVERSHOOT_SUSTAIN_MS = 60000UL` (`src/OTGW-firmware/SATcycles.ino:35`), read by `satCycleCheckOvershootSwitch()`
+  (`SATcycles.ino:1376`, threshold at `:1393`). `SAT_OVERSHOOT_FAILSAFE_SUSTAIN_MS` stays 30000 (`SATcycles.ino:42`).
+- `fPwmSwitchMargin = 2.0f` (`src/OTGW-firmware/SATtypes.h:541`).
+- The migration (`settingStuff.ino:693`, block `[sat-pwmmargin-migrate]`) follows the TASK-1961 OH marker pattern: the
+  parse records whether `SATpwmmargin2` was present; without it a stored 1.5 (within 0.01) becomes 2.0 and the deferred
+  flush writes the marker, so the migration runs once. Any other stored value stays.
+- With the defaults a flow at least 3.5 C over the request now switches through the fail-safe after 30 s, 30 s before
+  the switch rule would fire.
+
+## Decision Contract
+
+### Must
+
+- The continuous to PWM switch fires on the first control tick at least 60 s after the first qualifying tick
+  (flow - requested >= `fPwmSwitchMargin`).
+- The default of `satpwmswitchmargin` is 2.0; its range stays 0.5-5.0.
+- A settings file without `SATpwmmargin2` and with `SATpwmswitchmargin` 1.5 boots with 2.0 and writes the marker.
+- The 3.5 C fail-safe keeps its own 30 s timer.
+
+### Must Not
+
+- Move a stored margin other than 1.5, or move a 1.5 that is stored together with the marker.
+- Share the sustain constant between the switch rule and the fail-safe.
+
+### Exceptions
+
+- A user who deliberately chose 1.5 before this release is moved to 2.0 once; the stored value cannot tell that choice
+  apart from the old default. Setting 1.5 again afterwards stays.
+
+### Verification
+
+- `python tests/test_sat_overshoot_sustain.py`: 85 cases on the real `satCycleCheckOvershootSwitch()`; 31 fail on the
+  code before this ADR (`OTGW_SATCYCLES_INO` / `OTGW_SATTYPES_H` pointing at origin/dev f4373938a), all pass after it.
+- `python tests/test_sat_pwm_margin_migration.py`: the real setter, writer and migration lines of `settingStuff.ino`;
+  cases a, b and d fail on the code before this ADR, all four pass after it.
+- `python tests/test_sat_lowload_contract.py` (LL-004, LL-020b) and `tests/test_sat_slave_lowload.py`,
+  `tests/test_sat_pwm_override.py` pin the 60 s timing.
+
+## Alternatives Considered
+
+- **Keep 1.5 C / 30 s (entry 404, "keep as is").** Rejected: Sergeant D overruled his own entry 404 with entry 407
+  after the Vitodens ping-pong.
+- **A fixed 2.0 C without a setting (Q-407a option B).** Rejected by Robert: the setting already exists with a REST,
+  MQTT and web UI contract; moving its default keeps that contract.
+- **Change only the struct default, no migration.** Rejected: every save since TASK-1888 stored 1.5, so the new rule
+  would reach almost no existing unit, including the Vitodens that triggered the change.
+- **Drop the 3.5 C / 30 s fail-safe (Q-407a option D).** Rejected by Robert (C): it keeps a fast exit for a strong
+  overshoot that the 60 s wait would otherwise delay.
+
+## Consequences
+
+**Positive:**
+
+- A request that sits near the old 1.5 C threshold no longer flips the mode every few minutes; the switch needs a
+  larger and longer overshoot.
+- The 60 s wait matches thermo-nova (`const.py:21`).
+- Existing units get the new rule on the first boot of this release, without user action.
+
+**Negative:**
+
+- A moderate overshoot (2.0 to 3.5 C) runs 30 s longer in continuous before PWM takes over. Mitigation: the fail-safe
+  still switches at 3.5 C after 30 s.
+- A deliberate user choice of 1.5 is overwritten once. Mitigation: it is visible in the settings page and can be set
+  again; the marker keeps it from then on.
+- `settings.ini` gains one key (`SATpwmmargin2`); a bench settings diff shows it with the 1.5 to 2.0 change.
+
+## Open Questions
+
+- [ ] Sergeant D is told of Robert's Q-407a answer (by 92) and may object to the 2.0 default or the kept fail-safe.
+
+## Related Decisions
+
+- **ADR-249**: partly superseded: the 1.5 C / 30 s threshold and time of its switch rule are replaced; its own margin
+  setting, the equality rule and the gates stay.
+- **ADR-251**: unchanged: MsgID 3 plays no part in the switch.
+- **ADR-252**: unchanged: the PWM-first start and its 60 s gate on the PWM to continuous exit.
+
+## References
+
+- `docs/sat/sergeant-d-corrections.md` entry 407 (with the Q-407a answer), entries 327, 359, 360, 404.
+- TASK-2005 (indigo's Vitodens capture 2026-11-16).
+- `src/OTGW-firmware/SATcycles.ino:35`, `:42`, `:1376`, `:1393`; `src/OTGW-firmware/SATtypes.h:541`;
+  `src/OTGW-firmware/settingStuff.ino:283`, `:378`, `:693`.
+- `other-projects/SAT-releases-thermo-nova/custom_components/sat/const.py:21`, `cycles/const.py:10-11`,
+  `heating_control.py:288`, `:296` (commit 7beaaf5).

@@ -88,7 +88,7 @@ EXPECTED_KEEP = {
     "/sat_energy.json": 64,
     "/sat_energy_estimate.json": 48,
     "/sat/sat_hcr.json": 1280,
-    "/sat_tune.json": 384,
+    "/sat_tune.json": 1024,   # TASK-1889 (ADR-260): SAT_CT_FILE_BUF, 12 one-hour blocks
     "/dallas_labels.ini": 2048,
     "/sat_markers.json": 2560,
     "/reboot_count.txt": 16,
@@ -99,6 +99,9 @@ TOTAL_MAX = 12288   # TASK-1931
 
 def function_body(src, signature_regex):
     """Text of the brace-balanced block that follows the first match (src has no comments)."""
+    # Character literals such as '}' (satSavePidState closes its JSON with buf[n] = '}') are not braces of the code;
+    # blank them, same length, so the count stays right (TASK-1989 moved the submit check after that line).
+    src = re.sub(r"'(\\.|[^'\\])'", lambda m: "'" + "_" * (len(m.group(0)) - 2) + "'", src)
     m = re.search(signature_regex, src)
     assert m, "function not found: " + signature_regex
     i = src.index("{", m.end())
@@ -417,9 +420,13 @@ class TestSatWriteBack(unittest.TestCase):
         for fn in self.SAVERS:
             body = function_body(SATCTL, r"\n(?:static )?void %s\(\)" % fn)
             ifs = [i.strip() for i in re.findall(r"\bif\s*\(([^)]*)\)", body)]
-            want = ["settings.sat.bSimulation", "!f"] if fn in sim_guarded else ["!f"]
-            self.assertEqual(ifs, want, "%s has a guard besides the open check: %s" % (fn, ifs))
-            self.assertRegex(body, r'LittleFS\.open\(.*,\s*"w"\)', fn)
+            # TASK-1989: these three hand the file to the fsWriter queue; the only check left is whether it was taken
+            # (the submit replaces the open check), so the forced write still never skips on a 'due' guard.
+            submit = "!fsWriterSubmit(%s, buf, strlen(buf" % {"satSavePidState": "SAT_PID_STATE_FILE", "satSaveEnergyState": "SAT_ENERGY_FILE",
+                                                   "satSaveEstimatedEnergy": "SAT_EST_ENERGY_FILE"}[fn]
+            want = ["settings.sat.bSimulation", submit] if fn in sim_guarded else [submit]
+            self.assertEqual(ifs, want, "%s has a guard besides the submit check: %s" % (fn, ifs))
+            self.assertNotRegex(body, r'LittleFS\.open\(', fn)
         hcr = function_body(SATCYC, r"\nvoid satHCRSaveState\(\)\s*\n(?=\{)")
         self.assertEqual([i.strip() for i in re.findall(r"\bif\s*\(([^)]*)\)", hcr)][:2], ["settings.sat.bSimulation", "!f"])
 

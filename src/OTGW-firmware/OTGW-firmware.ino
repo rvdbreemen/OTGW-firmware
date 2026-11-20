@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.ino
-**  Version  : v2.0.0-beta.327
+**  Version  : v2.0.0-beta.401
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -395,11 +395,9 @@ void setup() {
   startWiFi(CSTR(settings.sHostname), 240, forceWifiPortal);  // timeout 240 seconds
   bootHeapPhase(PSTR("setup-services"));
 
-#if defined(_VERSION_PRERELEASE)
   if (state.net.bAPFallback) {
-    SetupDebugf(PSTR("BETA: running in AP fallback mode, SSID=[%s]\r\n"), state.net.sAPSSID);
+    SetupDebugf(PSTR("WiFi: running in AP fallback mode, SSID=[%s]\r\n"), state.net.sAPSSID);
   }
-#endif
 
   // ===== Hardware-mode resolution (ADR-127) =====
   // Runs AFTER WiFi configuration (TASK-853): the captive portal on a fresh
@@ -538,10 +536,8 @@ void setup() {
   SetupDebugf(PSTR("Hardware mode: %S\r\n"), (PGM_P)hardwareModeName());
 
   //setup NTP after WiFi; startNTP() restores hostname after configTime()
-#if defined(_VERSION_PRERELEASE)
   if (!state.net.bAPFallback)
-#endif
-  startNTP();
+    startNTP();
   blinkLED(LED1, 3, 100);
   setLed(LED1, OFF);
 
@@ -565,10 +561,8 @@ void setup() {
   setupFSexplorer();
   startWebserver();
   startWebSocket();          // start the WebSocket server for OT log streaming
-#if defined(_VERSION_PRERELEASE)
   if (!state.net.bAPFallback)
-#endif
-  startMQTT();               // start the MQTT after webserver, always.
+    startMQTT();               // start the MQTT after webserver, always.
   bootHeapPhase(PSTR("setup-late"));
 
 #if defined(HAS_ETH_CAPABLE) && HAS_ETH_CAPABLE
@@ -635,6 +629,7 @@ void setup() {
   if (!LittleFSmounted) sendMQTTData(F("otgw-firmware/error"), "LittleFS mount failed - running on defaults", false);
   initS0Count();        // init S0 counter
   initSensors();        // init DS18B20 (after MQ is up!)
+  fsWriterBegin();      // TASK-1989: queued state-file writes off the loop task; before initSAT(), its first saver
   initSAT();            // init SAT thermostat controller
   // Clear the triple-reset portal counter: a successful setup() proves the device is healthy.
   // This prevents USB flash resets or stale RTC data from triggering the portal on next boot.
@@ -879,15 +874,11 @@ void doTaskEvery3s(){
   // frame, which covers a bus that is talking; this covers one that has gone
   // quiet. Without it the 30 s timeout could never fire in the case it exists
   // for, because the code that computes it only ran when a frame arrived.
-  // Must stay ABOVE the picSettingsCycleActive early-return below.
   evaluateOTBusLiveness(OTBusLivenessTrigger::Tick);
 
   // TASK-1940 (1.x TASK-1147): PR=E every 3 minutes when the PIC temperature sensor
-  // setting is on. Above the picSettingsCycleActive early-return, which ends after boot.
+  // setting is on. The PR= settings cycle runs from the loop (pollPICsettingsQuery, TASK-1971).
   pollPicTempSensor();
-
-  if (!picSettingsCycleActive) return;
-  queryNextPICsetting();
 }
 
 
@@ -1117,6 +1108,7 @@ void doBackgroundTasks()
     emergencyHeapRecovery();
   }
   if (!isFlashing()) loopLittleFSStatus();   // TASK-1865: LittleFS mount check / write probe off async_tcp
+  connProbe(CPROBE_FS_END);   // TASK-1995: splits the background step at the LittleFS check
 
   if (isNetworkUp()) {
     if (state.flash.bESPactive) {
@@ -1184,7 +1176,14 @@ void loop()
     if (s_lastLoopMs != 0) {
       uint32_t gapMs = nowMs - s_lastLoopMs;
       if (gapMs > state.heapdiag.iMaxLoopGapMs) state.heapdiag.iMaxLoopGapMs = gapMs;
-      if (gapMs > 200) DebugTf(PSTR("[loop-stall] %lu ms gap\r\n"), (unsigned long)gapMs);
+      if (gapMs > 200) {
+        // TASK-1989: name the slowest step between two CPROBE_* probes (tags in MQTTstuff.h) of the stalled pass
+        uint8_t stepFrom = 0, stepTo = 0;
+        uint32_t stepMs = 0;
+        loopSlowestStep(&stepFrom, &stepTo, &stepMs);
+        DebugTf(PSTR("[loop-stall] %lu ms gap, slowest step %u->%u %lu ms\r\n"),
+                (unsigned long)gapMs, (unsigned)stepFrom, (unsigned)stepTo, (unsigned long)stepMs);
+      }
     }
     s_lastLoopMs = nowMs;
   }
@@ -1230,7 +1229,9 @@ void loop()
       }
     }
     if (minuteChanged())              doTaskMinuteChanged(); //ADR-086: sole minuteChanged() caller; hour/day/year dispatch lives inside
+    loopMQTTStatsPacer();             // TASK-2004: the hourly stats, one per >= 100 ms
     loopMQTTDiscovery();              // async MQTT discovery drip (self-timed, one config per 1 s normal / 10 s slow)
+    pollPICsettingsQuery();           // TASK-1971: PR= settings cycle, >= 3 s apart, right after a drip tick when deferred
     connProbe(CPROBE_DISCOVERY);      // TASK-1757 AC3
     runTopicCleanupStep();            // ADR-106: drain stale-mode discovery topics after bUseLegacyOtTopics toggle
     evalOutputs();                    // when the bits change, the output gpio bit will follow
@@ -1250,7 +1251,11 @@ void loop()
   doBackgroundTasks();              // run background tasks
   connProbe(CPROBE_BG_END);         // TASK-1757 AC3
   sampleHeapDip();                  // TASK-1673: who holds memory at the lowest free heap
+#if defined(_VERSION_PRERELEASE)
+  heapHoldTick();                   // TASK-2026: the 'H' bench hook (prerelease builds only)
+#endif
   bootHeapConnectTraceTick();       // TASK-1757: connect-window heap trace (boot only, no-op otherwise)
+  satTakeoverHeapTraceTick();       // TASK-2019: prints the SAT takeover heap trace 5 s after it was armed (no-op otherwise)
 
   // TASK-865.5 (ADR-123 Phase-1): consume OT frames produced this iteration.
   // handlePICSerial()/loopOTDirect() ran inside doBackgroundTasks() and enqueued

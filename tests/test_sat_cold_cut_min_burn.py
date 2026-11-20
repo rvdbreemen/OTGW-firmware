@@ -30,11 +30,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import test_sat_pwm_override as base  # noqa: E402
 
 TICK_STUBS = r"""
-static uint32_t _sat_tickMs = 0;
 static int g_sentCh = -1; static float g_sentCs = -1; static int g_sentMm = -1;
 static void satSendCS(float cs) { g_sentCs = cs; }
 static void satSendMM(int mm) { g_sentMm = mm; }
-static void satSendCH(int ch) { g_sentCh = ch; }
+static void satSendCH(int ch) { g_sentCh = ch; state.sat.iLastSentCH = (uint8_t)ch; }   // as the real satSendCH() records it
 enum { SAT_SRC_GAS_BOILER = 1, SAT_SRC_HEAT_PUMP = 2, SAT_SRC_HYBRID = 3 };
 static uint8_t satGetEffectiveHeatingSource() { return SAT_SRC_GAS_BOILER; }
 static uint8_t satGetManufacturerQuirks() { return 0; }
@@ -108,7 +107,12 @@ def extract_full_tick(src: str) -> str:
         a = loop.index("  // --- Clamp to valid range ---")
     ch = loop.index("satSendCH(satChEnableDecide(", a)
     end = loop.index("\n", ch) + 1
-    return "\nstatic float fullTick(float pidOutput) {\n" + loop[a:end] + "  }\n  return state.sat.fFinalSetpoint;\n}\n"
+    seg = loop[a:end]
+    # TASK-1882: the diagnostic block reads tick locals from before this segment and sends nothing; it has its own
+    # test (tests/test_sat_diag_events.py), so it is left out of this compiled segment
+    seg = re.sub(r"\n  // TASK-1882: diagnostic events from what this tick decided.*?satDiagEventsStep\(d\);\n  \}\n", "\n", seg,
+                 flags=re.S)
+    return "\nstatic float fullTick(float pidOutput) {\n" + seg + "  }\n  return state.sat.fFinalSetpoint;\n}\n"
 
 
 def build(workdir: Path):
@@ -118,6 +122,11 @@ def build(workdir: Path):
     for name, stub in (("satCurveTuneNoteNotControlling", "static void satCurveTuneNoteNotControlling(){ }"),):
         if name not in body:
             pre += stub + "\n"
+    # TASK-1942 (entries 385/387): the PWM-first start lives outside this slice. Stubbed as 'no new heating start, no start
+    # gate', so this test keeps judging the cold cutoff hold of TASK-1652 alone; tests/test_sat_pwm_first_start.py runs the real one.
+    if "static bool satStartGateActive" not in body:
+        pre += ("static bool _sat_heaterOn = true; static bool _sat_startGate = false;\n"
+                "static bool satStartGateActive() { return false; }\nstatic void satPwmFirstStart() { }\n")
     cycles = "static uint32_t satPwmLastOffTimeMs() { return _pwm_lastOffTimeMs; }\n" + base.extract_cycles()
     flag = "#define HAS_REQSP 1\n" if "_sat_requestedSetpoint" in body else ""
     stubs = (base.STUBS.replace("@FORCEFIELD@", "").replace("@AUTOFIELD@", "")
@@ -217,7 +226,8 @@ class ColdCutMinBurnSource(unittest.TestCase):
         for marker in ("OTcurrentSystemState.SlaveStatus & 0x01",        # boiler fault: tick skipped
                        "if (!state.sat.bValvesOpen) {",                   # valves closed: heater off
                        "satCycleCheckLowLoadVeto();",                     # boiler withdrew low-off permission
-                       "if (pidOutput >= maxSetpoint && state.sat.eControlMode == SAT_MODE_PWM) {"):
+                       # prefix: TASK-1942 (entries 385/387) adds '&& !satStartGateActive()' to this condition
+                       "if (pidOutput >= maxSetpoint && state.sat.eControlMode == SAT_MODE_PWM"):
             self.assertLess(loop.index(marker), defer, marker)
 
     def test_only_the_cold_cut_helpers_read_the_flag(self):

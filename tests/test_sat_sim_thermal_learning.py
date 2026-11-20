@@ -94,6 +94,8 @@ def build_source():
     sim_consts = "".join(re.findall(r"static const float\s+SAT_SIM_(?:COOL_REF_K|EMITTER_REF_KW)\s*=[^\n]*\n", src))
     assert sim_consts.count("SAT_SIM_") == 2, "sim reference constants not found"
     statics = re.search(r"(static float\s+_thermal_prevRoom[^\n]*\n(?:static [^\n]*_thermal_[^\n]*\n)+)", src).group(1)
+    # TASK-2010: these harnesses drive the learning itself, as a pass in which SAT controls
+    statics = statics.replace("_thermal_lastPassControlled = false", "_thermal_lastPassControlled = true")
     fn = cut_braced(src, "static void satUpdateThermalLearning()")
     room = re.search(r"\n(  state\.sat\.fSimRoomTemp \+= \(settings\.sat\.fSimHeatRate \* emitKw / SAT_SIM_EMITTER_REF_KW\n"
                      r"[^\n]*\* dtMin;)\n", src)

@@ -6,12 +6,12 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-04T05:49:00Z'
-updated_date: '2026-11-05T18:09:00Z'
+updated_date: '2026-11-20T01:18:00Z'
 labels:
   - otdirect
   - field
   - needs-field-data
-milestone: 2.0.0
+milestone: 2.1.0
 dependencies: []
 priority: low
 ordinal: 742000
@@ -35,4 +35,6 @@ TASK-1238 AC1 was waived by Robert 2026-11-04: capture from an OT-Direct user wi
 Robert 2026-11-05 (session otgw-firmware-54, AskUserQuestion): field request, wait. Label needs-field-data marks the wait (TASK-1647 convention). The coordinator posts one request in #alpha-testing for an OT-Direct user with a thermostat in gateway mode; Done when a capture is attached.
 
 2026-11-05 19:15: field request posted in #alpha-testing (lead session) asking an OT-Direct gateway-mode user for a ~30 min capture with a heating demand.
+
+2026-11-20 milestone 2.0.0 -> 2.1.0 (otgw-docs, coordinator's assignment). Robert DM 2026-11-20 01:15 (1573144814600462457), relayed by the coordinator: "C — field/hardware ACs outside the 2.0.0 scope, to 2.1.0". Status, assignee and ACs unchanged.
 <!-- SECTION:NOTES:END -->

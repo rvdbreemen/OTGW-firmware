@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTGW-ModUpdateServer-esp32.h
-**  Version  : v2.0.0-beta.327
+**  Version  : v2.0.0-beta.401
 **
 **  ESP32 OTA update server — functional equivalent of the ESP8266
 **  OTGW-ModUpdateServer with Nodoshop hardware watchdog feeding.
@@ -43,6 +43,7 @@
 #include <esp_ota_ops.h>       // esp_ota_get_running/next_update_partition — single-app-slot OTA guard
 #include <esp_partition.h>     // esp_partition_find_first — full LittleFS partition size
 #include <StreamString.h>
+#include <atomic>
 #include <LittleFS.h>
 #include <Preferences.h>       // ADR-191: hostname/password mirror for the safeboot updater
 #include "Wire.h"
@@ -51,7 +52,7 @@
 
 // External declarations (same as the sync variant)
 extern OTGWState state;
-extern bool LittleFSmounted;
+extern std::atomic<bool> LittleFSmounted;
 extern bool updateLittleFSStatus(const char *probePath);
 extern bool updateLittleFSStatus(const __FlashStringHelper *probePath);
 extern bool writeSettings(bool show);
@@ -658,10 +659,14 @@ private:
       // this write. An upload that starts in setup() before initSAT() unmounts LittleFS below, so an
       // initSAT() during the write reads nothing and holds defaults (bench .61: preset and energy lost).
       _satLoadedAtFsStart = satStateLoaded();
+      // TASK-1989/2007: queued state writes reach the files before they are copied to the heap. The writer stays
+      // paused from here until bFsImageWriting holds it, so no write runs between the copy and LittleFS.end().
+      if (!fsWriterPauseAndFlush(2000)) DebugTln(F("[OTA] fswriter: still busy after 2 s"));
       _keepFiles();   // TASK-1266/1286: the image lacks these files; copy them to the heap, restore after the remount
       fsOtaRtcFill();   // TASK-1774: survives a reset during the write; armed at the first chunk
       LittleFS.end();
       ::state.flash.bFsImageWriting = true;   // TASK-1909: no LittleFS.begin() elsewhere until the remount below
+      fsWriterResume();   // TASK-2007: bFsImageWriting holds the writer from here; the remount pauses it again until the restore
       if (uploadTotal > 0 && uploadTotal > fsSize) {
         strlcpy(_updaterError, "filesystem image too large", sizeof(_updaterError));
         _dropKeptFiles();   // the old filesystem is untouched; the copies are not needed
@@ -779,6 +784,7 @@ private:
           LittleFSmounted = false;
           if (_serial_output) DebugTln(F("[OTA] Error: LittleFS mount failed"));
         }
+        fsWriterResume();   // TASK-2007: paused by _remountAfterFsWrite(); held saves now land after the restored copies
       }
       if (_serial_output) {
         DebugTln(F("[OTA] Preparing to reboot..."));
@@ -805,6 +811,10 @@ private:
     // partition behind; the restore would then write the new image through that stale state. Drop any
     // such mount so the image just written is the one mounted.
     LittleFS.end();
+    // TASK-2007: clearing the image flag releases the writer, but the heap copies are written back only in
+    // _restoreRuntimeFiles(), later; a save held through the image write would land first and be overwritten
+    // (bench 09, .63, beta.364). The writer stays paused until the caller's fsWriterResume() after the restore.
+    fsWriterPause();
     ::state.flash.bFsImageWriting = false;
     if (partial) {
       if (_serial_output) DebugTln(F("[OTA] Filesystem image incomplete: formatting LittleFS"));
@@ -873,6 +883,7 @@ private:
         _restoreRuntimeFiles();
         if (_uploadWrittenBytes > 0) _markFsUpdateIncomplete();
       }
+      fsWriterResume();   // TASK-2007: paused by _remountAfterFsWrite() until the restore
     }
     _dropKeptFiles();          // no-op after a restore; frees the copies when there was none
     ::state.flash.bESPactive = false;
@@ -920,14 +931,14 @@ private:
     {"/sat_energy.json",           64},    // satSaveEnergyState() buf[64]
     {"/sat_energy_estimate.json",  48},    // satSaveEstimatedEnergy() buf[48]
     {"/sat/sat_hcr.json",        1280},    // HCR_DAYS (<= 30) medians + at most 96 samples, about 7 B each
-    {"/sat_tune.json",            384},    // SAT_CT_FILE_BUF
+    {"/sat_tune.json",           1024},    // SAT_CT_FILE_BUF (ADR-260: 12 one-hour blocks)
     {"/dallas_labels.ini", 2048},   // the user's Dallas sensor names
     {"/sat_markers.json",  2560},   // at most 20 heating-curve markers of at most 110 B
     {"/reboot_count.txt",    16},   // one decimal number
     {"/reboot_log.txt",    4780},   // REBOOT_LOG_FILE_MAX: 20 lines of at most 239 B (TASK-1931, asserted below)
   };
   static constexpr size_t   KEEP_COUNT        = sizeof(KEEP_LIST) / sizeof(KEEP_LIST[0]);
-  // TASK-1931: all copies together. The maxima add up to 11532 B; each copy is only made while the largest free
+  // TASK-1931: all copies together. The maxima add up to 12172 B; each copy is only made while the largest free
   // block stays KEEP_HEAP_RESERVE above it, so the higher total costs heap only when the files are that large.
   static constexpr size_t   KEEP_TOTAL_MAX    = 12288;
   // A lambda, not a member function: the class is still incomplete here, so a member could not be evaluated.

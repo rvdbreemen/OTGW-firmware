@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-beta.327
+**  Version  : v2.0.0-beta.401
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -45,6 +45,22 @@ static int16_t restResponseStatus = 0;
 #endif
 static uint8_t restInFlight = 0;
 
+// TASK-2921: prerelease bench key 'B' (handleDebug.ino). While it is on, the REST gate acts as on a starved
+// heap: the in-flight cap is 1 and the busy path closes the connection instead of building a 503 (TASK-2910),
+// so that branch runs on a real AsyncWebServer connection without starving the heap. Off at every boot;
+// production builds compile the check to a constant false.
+#if defined(_VERSION_PRERELEASE)
+static std::atomic<bool> s_restForceStarved{false};
+bool restDebugToggleForceStarved() {
+  const bool on = !s_restForceStarved.load();
+  s_restForceStarved.store(on);
+  return on;
+}
+static inline bool restForceStarved() { return s_restForceStarved.load(std::memory_order_relaxed); }
+#else
+static inline bool restForceStarved() { return false; }
+#endif
+
 // Heap-tier-aware concurrency ceiling. The biggest REST response (~8.6 KB settings) needs a
 // contiguous block to buffer; admitting N of them needs ~N x that block. As maxblock falls
 // toward one response's worth, allowing 4 in flight is what fragments the heap below the
@@ -57,6 +73,7 @@ static inline uint8_t restEffectiveInflightCap() {
   // (line 35). Both bypass the heap-tier clamp so 255 measures truly unmitigated
   // behaviour under load, not gated-vs-gated. Shipped default is 2 (ADR-165) -> falls through.
   if (REST_MAX_INFLIGHT <= 1 || REST_MAX_INFLIGHT >= 255) return REST_MAX_INFLIGHT;
+  if (restForceStarved()) return 1;   // TASK-2921 bench key: the starved-heap cap
   const uint32_t mb = platformMaxFreeBlock();
   if (mb < 16000) return 1;
   if (mb < 24000) return (REST_MAX_INFLIGHT < 2) ? REST_MAX_INFLIGHT : 2;
@@ -184,7 +201,17 @@ static void sendApiMethodNotAllowed(const __FlashStringHelper* allowedMethods) {
 // Retry-After: 1, like the static-file gate (webServerCompat.h, TASK-960), so a
 // client backs off instead of hammering the gate. A 503 that reports missing
 // hardware or a disconnected MQTT uses sendApiError() and carries no Retry-After.
+// TASK-2910: on a starved heap the 503 itself cannot be built: the response and its header list nodes come
+// from operator new, which aborted the firmware there (.61, beta.388, 2026-11-19, task async_tcp:
+// processAPI -> sendApiBusy -> addHeader). Below REST_BUSY_MIN_MAXBLOCK the connection is closed
+// without a response; the client sees a reset and retries. Same threshold as a starved heap for
+// the WiFi supervisor (WIFI_STARVED_MAXBLOCK, networkStuff.ino).
+static const uint32_t REST_BUSY_MIN_MAXBLOCK = 4096;
 static void sendApiBusy(const __FlashStringHelper* message) {
+  if (restForceStarved() || platformMaxFreeBlock() < REST_BUSY_MIN_MAXBLOCK) {
+    webAbortCurrentRequest();
+    return;
+  }
   webPushHeader(F("Retry-After"), F("1"));
   sendApiError(503, message);
 }
@@ -1620,6 +1647,8 @@ static void handleSAT(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod m
     // Direct updateSetting() calls
     } else if (strcasecmp_P(settingName, PSTR("overshoot_margin")) == 0) {
       updateSetting("SATovershootmargin", val); handled = true;
+    } else if (strcasecmp_P(settingName, PSTR("pwm_switch_margin")) == 0) {   // TASK-1888
+      updateSetting("SATpwmswitchmargin", val); handled = true;
     } else if (strcasecmp_P(settingName, PSTR("heating_system")) == 0) {
       updateSetting("SATsystem", val); handled = true;
     } else if (strcasecmp_P(settingName, PSTR("manufacturer")) == 0) {
@@ -2253,6 +2282,7 @@ static void handleDebugDump(const char words[][API_WORD_LEN], uint8_t wc, HTTPMe
     je.field(F("settings.sat.use_external_temp"), settings.sat.bUseExternalTemp);
     je.field(F("settings.sat.max_rel_mod"), (uint32_t)settings.sat.iMaxRelModulation);
     je.field(F("settings.sat.overshoot_margin"), settings.sat.fOvershootMargin);
+    je.field(F("settings.sat.pwm_switch_margin"), settings.sat.fPwmSwitchMargin);   // TASK-1888
     je.field(F("settings.sat.overshoot_protection"), settings.sat.bOvershootProtection);
     je.field(F("settings.sat.follow_thermostat"), settings.sat.bFollowThermostat);
     je.field(F("settings.sat.curve_self_tune"), settings.sat.bCurveSelfTune);   // TASK-1525
@@ -3233,6 +3263,7 @@ void sendDeviceInfoV2()
     // --- Firmware & build identity ---
     je.field(F("author"), F("Robert van den Breemen"));
     je.field(F("fwversion"), _SEMVER_FULL);
+    je.field(F("appelfsha256"), platformRunningAppSha());   // TASK-1983: constant per boot, so the chunked passes stay equal
     je.field(F("compiled"), snap->compiled);
     // ADR-113 stage 2 (TASK-754): picavailable removed; UI selects on hardware_type.
     if (snap->picEnabled) {
@@ -3260,10 +3291,8 @@ void sendDeviceInfoV2()
       je.field(F("otdschedactive"), snap->st.otd.iScheduleActive);
       je.field(F("otdscheddisabled"), snap->st.otd.iScheduleDisabled);
       je.field(F("otdoverrides"), snap->st.otd.iOverrideCount);
-      // TASK-1966: boiler line health (a request in flight, repairs since boot, commands refused by a full ring)
+      // TASK-1966: boiler line health (a request in flight, commands refused by a full ring)
       je.field(F("otdrequestactive"), snap->st.otd.bMasterRequestActive);
-      je.field(F("otdlinestalefixes"), snap->st.otd.iLineStaleFixes);
-      je.field(F("otdlinetxrestarts"), snap->st.otd.iLineTxRestarts);
       je.field(F("otdcmdringdropped"), snap->st.otd.iCmdRingDropped);
       // TASK-1860: the PIC command set OT-Direct implements (also PR=X and the PR=A banner); absent on a PIC board,
       // where picfwversion is the real PIC's version.
@@ -3300,15 +3329,13 @@ void sendDeviceInfoV2()
     je.field(F("eth_current_gateway"), snap->ethGateway);
     je.field(F("eth_current_dns"),     snap->ethDns);
 #endif
-#if defined(_VERSION_PRERELEASE)
-    if (snap->st.net.bAPFallback) {
+    if (snap->st.net.bAPFallback) {   // TASK-2931: AP fallback in prerelease and stable builds
       je.field(F("ssid"), snap->st.net.sAPSSID);
       je.field(F("wifirssi"), 0);
       je.field(F("wifiquality"), 0);
       je.field(F("wifiquality_text"), F("AP Mode"));
       je.field(F("apfallback"), true);
     } else
-#endif
 #if defined(HAS_ETH_CAPABLE) && HAS_ETH_CAPABLE
     if (snap->st.net.eMode == NET_ETHERNET) {
       je.field(F("ssid"), F("Wired"));
@@ -3549,7 +3576,7 @@ void sendHealth()
     JsonEmit je(*strm);
     je.beginObject();                 // root {
     je.beginObject(F("health"));      // "health":{
-    je.field(F("status"),         LittleFSmounted ? "UP" : "DEGRADED");
+    je.field(F("status"),         (LittleFSmounted && !fsWriterWriteFailed()) ? "UP" : "DEGRADED");   // TASK-2020: a failed write too
     je.field(F("uptime"),         upTime());
     je.field(F("heap"),           platformFreeHeap());
     je.field(F("networkmode"),    networkModeName());
@@ -3593,7 +3620,7 @@ void sendHealth()
     // health poll. Same values as sendSimulationStatus(); the file flag is kept by the loop task (TASK-1899).
     je.field(F("simulation_active"), state.debug.bOTGWSimulation);
     je.field(F("simulation_source"), LittleFSsimFilePresent ? "file" : "builtin");
-    je.field(F("littlefsMounted"), LittleFSmounted);
+    je.field(F("littlefsMounted"), LittleFSmounted.load());
     je.endObject();                   // close "health"
     je.endObject();                   // close root
   }
@@ -3650,6 +3677,7 @@ void sendDeviceCoreDump()
   webPushHeader(F("Content-Disposition"), disp);
   webPushHeader(F("Cache-Control"), F("no-store"));
   if (haveSha) webPushHeader(F("X-Coredump-App-Sha256"), appSha);
+  webPushHeader(F("X-Running-App-Sha256"), platformRunningAppSha());   // TASK-1983: same prefix = a dump of this build
 
   AsyncWebServerResponse* resp = currentRequest->beginResponse(
       String(F("application/octet-stream")), dumpSize,
@@ -3668,7 +3696,7 @@ void sendDeviceCoreDump()
 //
 // {"recording":{"state":"recording|stopped|refused","enabled":b,"active":b,"reason":"","psram":b,
 //   "block_size":4096,"ring_blocks":n,"ring_bytes":n,"has_data":b,"oldest_seq":n,"newest_seq":n,
-//   "dropped":n,"exact":b}}
+//   "dropped":n,"exact":b,"append_count":n,"append_max_us":n,"append_avg_us":n}}
 // enabled = the persisted DiagRecordingOn flag (resumes at boot); active = a ring is being written;
 // reason is set when the last start was refused; oldest/newest_seq are 0 while has_data is false;
 // exact is false when the recorder lock was busy and the numbers were read without it.
@@ -3690,6 +3718,9 @@ static void diagEmitStatus(JsonEmit& je)
   je.field(F("oldest_seq"),  s.oldest);
   je.field(F("newest_seq"),  s.newest);
   je.field(F("dropped"),     s.dropped);
+  je.field(F("append_count"),  s.appendCount);    // TASK-1665 AC2: records of this recording that were timed
+  je.field(F("append_max_us"), s.appendMaxUs);    // the slowest append, us (lock wait + encode + copy)
+  je.field(F("append_avg_us"), s.appendAvgUs);
   je.field(F("exact"),       s.exact);
   je.endObject();
 }
@@ -3743,7 +3774,8 @@ void sendDiagRecordingControl(bool start)
 // The block range is fixed by diagDownloadRange() before the response starts; the filler copies one
 // chunk per call under the recorder try-lock and asks the server to retry when the lock is busy, so
 // async_tcp never waits. No ring-sized copy exists: only the 640 B header snapshot is on the heap.
-// A recorder that is stopped or empty gives a valid file with block count 0.
+// A recorder that never ran, is empty, or was stopped on a board without PSRAM (heap ring freed) gives a
+// valid file with block count 0. A stopped PSRAM ring keeps its blocks until the next start (TASK-1960).
 void sendDiagRecordingDownload()
 {
   if (!currentRequest || g_responseSent) return;
@@ -4044,12 +4076,10 @@ void sendDeviceTimeV2()
     je.field(F("internal_maxblk"),(int32_t)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL));
     je.field(F("networkmode"),    networkModeName());
     je.field(F("ipaddress"),      getActiveIP());  // TASK-759: live active-transport IP for the header indicator
-#if defined(_VERSION_PRERELEASE)
-    if (state.net.bAPFallback) {
+    if (state.net.bAPFallback) {   // TASK-2931: AP fallback in prerelease and stable builds
       je.field(F("apfallback"),  true);
       je.field(F("wifiquality"), (int32_t)0);
     } else
-#endif
 #if defined(HAS_ETH_CAPABLE) && HAS_ETH_CAPABLE
     if (state.net.eMode == NET_ETHERNET) {
       je.field(F("wifiquality"), (int32_t)100);
@@ -4168,6 +4198,9 @@ void sendDeviceSettings()
 #endif
   addBool(F("ui_onboarded"), settings.ui.bOnboarded, "b");
   addBool(F("sat_onboarded"), settings.ui.bSatOnboarded, "b");   // TASK-1012: SAT onboarding wizard persist flag
+  addBool(F("updatecheck"), settings.ui.bUpdateCheck, "b");            // TASK-2023: the browser checks GitHub for a newer release
+  addBool(F("updatecheckasked"), settings.ui.bUpdateCheckAsked, "b");  // TASK-2023: hidden flag, the one-time question was answered
+  addBool(F("updatecheckbeta"), settings.ui.bUpdateCheckBeta, "b");    // TASK-2023: stable builds are also told about betas
   addBool(F("gpiosensorsenabled"), settings.sensors.bEnabled, "b");
   addBool(F("gpiosensorslegacyformat"), settings.sensors.bLegacyFormat, "b");
   addInt(F("gpiosensorspin"), settings.sensors.iPin, "i", 0, SETTING_GPIO_MAX);   // TASK-1686
@@ -4229,6 +4262,8 @@ void sendDeviceSettings()
     char tmpBuf[8];
     dtostrf(settings.sat.fOvershootMargin, 1, 1, tmpBuf);
     addNum(F("satovershootmargin"), tmpBuf, "f", 0.5f, 5.0f);
+    dtostrf(settings.sat.fPwmSwitchMargin, 1, 1, tmpBuf);   // TASK-1888
+    addNum(F("satpwmswitchmargin"), tmpBuf, "f", 0.5f, 5.0f);
   }
   // --- SAT Weather settings (Task #50) ---
   addBool(F("satweatherenable"), settings.sat.bWeatherEnable, "b");
@@ -4483,7 +4518,7 @@ static const char* const PROGMEM knownSettings[] = {
   "satmodsupdelay", "satmodsupoffset", "satmqttfallback", "satmultiarea", "satmultiareacount",
   "satovershootmargin", "satovershootprotection", "satpresetactivity", "satpresetaway", "satpresetcomfort", "satpreseteco",
   "satpresethome", "satpresetsleep",  // TASK-1254: activity/home/sleep had GET + dispatch but were POST-blocked
-  "satpresetsync", "satpresetsynctopic", "satpushsetpoint",
+  "satpresetsync", "satpresetsynctopic", "satpushsetpoint", "satpwmswitchmargin",  // TASK-1888
   // TASK-640: PV-surplus setpoint boost settings
   "satpvboostdeltac", "satpvboostenabled", "satpvboostholds",
   "satpvboostmaxdurationmin", "satpvboostmaxindoorc", "satpvboostthresholdw",
@@ -4501,6 +4536,7 @@ static const char* const PROGMEM knownSettings[] = {
   "satcyclesperhour", "saterrormon", "satheatingmode", "sathpcycle",
   "satmaxmodulation", "satsensormaxage", "satsolarfreezeint", "satvalveoffset",
   "ui_onboarded",
+  "updatecheck", "updatecheckasked", "updatecheckbeta",   // TASK-2023
   "webhookcontenttype", "webhookenable", "webhookenabled",
   "webhookpayload", "webhooktriggerbit", "webhookurloff", "webhookurlon",
   "wifidns1", "wifidns2", "wifigateway", "wifinoportal", "wifistaticip", "wifisubnet",
@@ -4560,6 +4596,11 @@ void postSettings()
     RESTDebugTf(PSTR("--> field[%s] => newValue[***]\r\n"), field);
   } else {
     RESTDebugTf(PSTR("--> field[%s] => newValue[%s]\r\n"), field, newValue);
+  }
+  // TASK-2025: without PSRAM BLE cannot be switched on (the setter refuses it too); say so instead of a 200.
+  if (strcasecmp_P(field, PSTR("satbleenable")) == 0 && EVALBOOLEAN(newValue) && !psramFound()) {
+    webSend(409, F("application/json"), F("{\"error\":\"BLE needs PSRAM: not available on this board\"}"));
+    return;
   }
   updateSetting(field, newValue);
   // TASK-564: do NOT call flushSettings() synchronously here. The earlier

@@ -5,7 +5,7 @@ status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-10T09:41:00Z'
-updated_date: '2026-11-15T12:00:00Z'
+updated_date: '2026-11-15T20:28:00Z'
 labels:
   - web-ui
   - feature-request
@@ -40,6 +40,10 @@ Time correction (2026-11-10): the report time above is local CET. From the messa
 2026-11-15 implementation (option B): data/v2.js adds the series dhw to GSER (temperature panel, colour #f778ba, label graph.series_dhw), pushGraphSlot() copies model.dhw (MsgID 26, already decoded by applyFrame) into each live slot; the device history (ADR-193) and its endpoint are unchanged, so device slots have no dhw. The CSV export follows GSER, so it has a dhw column, empty where there is no value; the graph readout shows a dash. Labels: en 'DHW temperature', nl 'tapwatertemperatuur', de 'WW-Temperatur', el 'θερμοκρασία ΖΝΧ'. MANUAL.md graph list updated (live-only, no backfill). Evidence: new tests/webui/graph-dhw-temperature.test.mjs on the real v2.js functions: 4 pass on the fix, 4 fail on the old v2.js (case a: undefined !== 58); 14 graph/i18n web UI test files 94 pass 0 fail; evaluate --quick 92 checks 0 FAIL 0 WARN. Bench screenshot pending.
 
 2026-11-15 bench by 09 on .63, beta.310+4c57d94: the CSV export has the dhw column (d PASS). Graph line seen with the Graph sub-tab open.
+
+Follow-up (session 95, 2026-11-15): the capture tool's graph CSV (scripts/otgw_capture.py graph_history_csv) lacked the dhw column this task added to the web UI export. tests/test_capture_device_data.py did not see it because its v2.js harness cut only mergeGraphHistory(), which since TASK-1963 calls graphTrim() (ReferenceError, red on origin 2c4b462fd). Harness now extracts graphTrim() and reads GHIST_LIVE_MS/GHIST_SPAN_MS from v2.js; with that, the byte-identical test went red on the old tool (header without dhw) and green after adding dhw (always empty: the device history has no DHW value and mergeGraphHistory() leaves it out). Capture tests 18/34/7/51/8/4 passed, test_build 16 OK, test_flash_zip_modes 5 OK.
+
+Update 21:3x: the capture-tool fix described above landed on origin through ba's df031a0c3 (TASK-1972), which is equivalent per hunk; session 95 dropped its own copy b807b7ba3 at the rebase.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary

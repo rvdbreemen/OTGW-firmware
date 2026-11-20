@@ -255,7 +255,7 @@ The `otcommandinterface` field is a string identifying the active OT interface: 
 
 Two fields surface the wired-link state, only meaningful with Ethernet hardware: `ethernetpresent` (PHY detected), `ethernetlink` (cable plugged in and link up). The OTGW Classic has no Ethernet. When the active network mode is `ethernet`, the `ssid` field returns the literal string `"Wired"` and `wifirssi` is reported as `0`. The runtime can fail over between WiFi and Ethernet without a reboot (TASK-581); `networkmode` reflects the currently active transport.
 
-When the device is running in AP-fallback mode (a prerelease-only safety net for unreachable WiFi), `apfallback: true` is included and `ssid` carries the AP SSID.
+When the device is running in AP-fallback mode (the safety net for unreachable WiFi; in all builds from beta.401, before that prerelease only), `apfallback: true` is included and `ssid` carries the AP SSID.
 
 Additional fields surface MQTT discovery telemetry (`disc_published_topics`, `disc_pending_ids`, `disc_verify_runs`, `disc_republish_triggered`, `disc_last_missing`, `disc_last_orphan`, `disc_last_outcome`) and REST handler timing (`perf_device_info_total_ms`, `perf_settings_total_ms`, `perf_sat_status_total_ms`, …) for ADR-062 and TASK-361 observability.
 
@@ -865,7 +865,7 @@ Returns the device-side history of the Monitor > Graph series (TASK-1296): oldes
 
 ##### GET /api/v2/network/scan
 
-Initiates and polls an asynchronous WiFi scan (TASK-585). Used by the Settings page WiFi-picker.
+Initiates and polls an asynchronous WiFi scan (TASK-585). The v2 web UI does not call it.
 
 - First call: starts the scan and returns `{"status":"scanning"}`.
 - Subsequent calls while the scan is in progress: returns `{"status":"scanning"}`.
@@ -1153,6 +1153,8 @@ Published every SAT control loop interval (default 30 seconds) when SAT is enabl
 | `sat/active` | yes | `"true"` when SAT is actively controlling |
 | `sat/setpoint` | yes | Final flow temperature setpoint sent to boiler (C) |
 | `sat/target` | yes | Target room temperature (C) |
+| `sat/climate_target` | yes | Target on the Home Assistant thermostat card: SAT's target while SAT is enabled, the thermostat setpoint (TrSet) while SAT is off (°C). Also published while SAT is off (TASK-1979) |
+| `sat/climate_current` | yes | Room temperature on the thermostat card: the temperature SAT regulates on while SAT is enabled, the thermostat room temperature (Tr) while SAT is off (°C). Also published while SAT is off (TASK-1979) |
 | `sat/heating_curve` | yes | Heating curve calculated value (C) |
 | `sat/pid_output` | yes | PID controller output = curve + P + I + D |
 | `sat/error` | no | PID error = target - room temperature (C) |
@@ -1166,6 +1168,8 @@ Published every SAT control loop interval (default 30 seconds) when SAT is enabl
 | `sat/cycle_class` | no | `"good"`, `"overshoot"`, `"underheat"`, `"short"` |
 | `sat/safety_tripped` | yes | `"true"` when safety shutdown is active |
 | `sat/ot_link_lost` | yes | `"true"` while SAT has seen no boiler reply for 30 s (TASK-1365) |
+| `sat/no_ignition` | yes | `"true"` while CH is asked for 180 s without flame (TASK-1882, diagnostic only) |
+| `sat/heating_failure` | yes | `"true"` after 15 min at the maximum with a room rise < 0.5 C (TASK-1882, diagnostic only) |
 | `sat/outside_temp_missing` | yes | `"true"` while SAT has no outside temperature younger than 1 hour (TASK-1390) |
 | `sat/pressure` | no | Smoothed system water pressure (bar) |
 | `sat/pressure_alarm` | no | `"true"` when pressure alarm is active |
@@ -1238,6 +1242,7 @@ Topic: `{TopTopic}/set/{UniqueId}/sat/<command>`. Command names are matched case
 | Topic suffix | Payload | Description |
 |-------------|---------|-------------|
 | `sat/target` | `"21.0"` (5 to 30) | Set target room temperature (°C) |
+| `sat/climate_target` | `"21.5"` (5 to 30) | The Home Assistant thermostat card's target (°C). While SAT is enabled it sets SAT's target like `sat/target` (and selects a preset with the same temperature); while SAT is off it sends `TT=<value>` as before (TASK-1979) |
 | `sat/indoor_temp` | `"20.8"` | Push external room temperature (°C) |
 | `sat/outdoor_temp` | `"7.5"` | Push external outdoor temperature (°C) |
 | `sat/pv_surplus_w` | `"1500"` (0 to 50000) | Push PV surplus power (W) for PV boost |
@@ -1260,6 +1265,7 @@ The commands below pass the payload unchanged to the named setting, the same set
 | Topic suffix | Setting |
 |-------------|---------|
 | `sat/overshoot_margin` | `SATovershootmargin` |
+| `sat/pwm_switch_margin` | `SATpwmswitchmargin` |
 | `sat/heating_system` | `SATsystem` |
 | `sat/manufacturer` | `SATmanufacturer` |
 | `sat/max_modulation` | `SATmaxmodulation` |

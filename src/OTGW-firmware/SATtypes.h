@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : SATtypes.h
-**  Version  : v2.0.0-beta.327
+**  Version  : v2.0.0-beta.401
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -133,6 +133,7 @@ struct SATZoneState {
   float    fSetpoint     = 0.0f;   // Last received zone setpoint (°C)
   float    fPidOutput    = 0.0f;   // Zone PID output (CH setpoint requested by this zone)
   float    fPidIntegral  = 0.0f;   // Zone PID integral accumulator
+  bool     bPidInBand    = true;   // TASK-1890: the previous integral update was inside the deadband
   float    fPrevError    = 0.0f;   // Previous PID error (for derivative)
   uint32_t iLastUpdateMs = 0;      // millis() of last room_temp or setpoint update
   bool     bRoomValid    = false;  // Room temp has been received at least once
@@ -141,6 +142,22 @@ struct SATZoneState {
                                    // Excluded from PID + P75 aggregation while true.
                                    // Mirrors SAT Python PR #172 (area.py returns None
                                    // for state/error/weight when HVACMode.OFF).
+};
+
+// TASK-1882: one control tick's input to satDiagEventsStep() (SATcontrol.ino). In this header, not in the .ino:
+// the Arduino prototype of satDiagEventsStep(const SatDiagIn&) sits above every .ino definition.
+struct SatDiagIn {
+  uint32_t now;          // the tick time
+  uint32_t intervalMs;   // the control tick interval
+  bool chAsked;          // CH=1 goes out this tick
+  bool flame;            // flame on
+  bool flowAboveCs;      // the boiler flow is at or above the CS of this tick
+  bool atMax;            // the requested setpoint is clamped to the maximum, or PWM runs at its maximum duty
+  bool roomValid;
+  float room;            // the room temperature SAT regulates on
+  float cs;              // this tick's CS (for the log line)
+  float maxSetpoint;     // for the log line
+  float duty;            // PWM duty (for the log line)
 };
 
 //====================================================================
@@ -210,12 +227,12 @@ struct SATRuntimeSection {         // state.sat — SAT thermostat controller st
   // eControlMode is the actual mode (auto-switch moves it); sat/control_mode reads this back.
   uint8_t iRequestedControlMode  = 0;
   // Slave low-load permission: MsgID 3 (slave configuration) HB bit 4, "master low-off & pump control function"
-  // [allowed, not allowed] (OT spec v4.2). 1 = not allowed. PWM is the master's low-off cycling, so every PWM entry
-  // needs a valid reply with bit 4 = 0 (TASK-1412.4, Sergeant D entries 213-215).
+  // [allowed, not allowed] (OT spec v4.2). 1 = not allowed. Recorded and shown only: since entry 392 (TASK-2000) bit 4
+  // no longer blocks PWM, and entry 393 dropped the valid-reply wait (entry 215): MsgID 3 plays no part in PWM.
   bool     bSlaveCfgValid        = false;  // a valid MsgID 3 reply from the boiler was seen since the restart
   bool     bSlaveLowOffDenied    = false;  // HB bit 4 of the last valid reply
   uint32_t iSlaveCfgChangeMs     = 0;      // millis() when bSlaveCfgValid or bSlaveLowOffDenied last changed
-  uint8_t  iPwmVetoReason        = 0;      // why PWM was last refused: 0 none, 1 no valid reply yet, 2 bit 4 = 1
+  uint8_t  iPwmVetoReason        = 0;      // why PWM was last refused: 0 none, 1 no valid reply yet (2 = bit 4 = 1, no longer set since entry 392)
   uint8_t  iPwmVetoPath          = 0;      // which path asked: 0 other, 1 overshoot switch, 2 restart restore, 3 control_mode command, 4 PWM left while running, 5 end-of-cycle switch
   uint32_t iPwmVetoMs            = 0;      // millis() of the last refusal
   // Modulation control
@@ -380,7 +397,7 @@ struct SATRuntimeSection {         // state.sat — SAT thermostat controller st
   // Solar gain (Task #23)
   bool     bSolarGainActive       = false;
   float    fIndoorRiseRate        = 0.0f;  // Current indoor temp rise rate (C/hr)
-  // TASK-1881: heating curve self-tune progress (counted days, last decision, excluded hours per reason), copied on the loop task
+  // TASK-1881: heating curve self-tune progress (counted hours, last decision, excluded hours per reason), copied on the loop task
   SatTuneProgress tuneProgress   = {};
   // Sun elevation (Task #68)
   float    fSunElevation          = 0.0f;  // Current sun elevation (degrees): external MQTT value, else computed (TASK-1410)
@@ -412,6 +429,13 @@ struct SATRuntimeSection {         // state.sat — SAT thermostat controller st
   uint32_t iTCPushMs              = 0;      // millis() of the last TC= push (0 = none since boot/off/adopt), TASK-1343
   bool     bRoomTempLost          = false;  // the control tick sees no valid room temperature: heating on the curve only (TASK-1364)
   bool     bOtLinkLost            = false;  // no boiler reply for 30 s: SAT handed the boiler back once and sends nothing until a reply returns (TASK-1365)
+  // TASK-1882: diagnostic events, no control action (satDiagEventsStep in SATcontrol.ino)
+  bool     bNoIgnition            = false;  // CH asked (PWM ON phase or CS above the cold cutoff) for 180 s, flow below CS, no flame
+  bool     bHeatingFailure        = false;  // SAT at the maximum (setpoint or PWM duty) for 15 min while the room rose < 0.5 C
+  float    fHfRoomStart           = 0.0f;   // last heating-failure window: room at its start
+  float    fHfRoomEnd             = 0.0f;   //   and at its end (the window is 15 min)
+  uint32_t iHfEvents              = 0;      // heating-failure hits since boot (field false-positive rate)
+  uint32_t iNoIgnitionEvents      = 0;      // no-ignition hits since boot
   bool     bOutsideTempMissing    = false;  // no valid outside temperature (none younger than 1 h): SAT handed the boiler back once and sends nothing until one returns (TASK-1390, entries 56, 57)
   bool     bRestoredOutdoorValid  = false;  // fRestoredOutdoor came from the PID state file at boot (entry 126, TASK-1482)
   float    fRestoredOutdoor       = 0.0f;
@@ -514,7 +538,8 @@ struct SATSection {
   uint8_t  iMaxRelModulation  = 100;    // Max relative modulation 0-100% (MM= command)
   int16_t  iPreSatMaxTSet     = 0;      // TASK-1541: boiler MsgID 57 value before SAT's first SH=, kept until SAT's switch-off restores it (0 = nothing pending); not a user setting
   int16_t  iPreSatDhwSet      = 0;      // TASK-1541: same for MsgID 56 / SW=
-  float    fOvershootMargin   = 2.0f;   // Overshoot margin °C (cycle classification + continuous->PWM auto-switch; TASK-1268 lowered it from Python's 3.0)
+  float    fOvershootMargin   = 2.0f;   // Overshoot margin °C for the cycle classification (entry 37; TASK-1268 lowered it from Python's 3.0); not the PWM switch since TASK-1888
+  float    fPwmSwitchMargin   = 2.0f;   // TASK-2005, entry 407 + Q-407a (Robert): continuous->PWM when flow - requested >= this for 60 s (was 1.5 C / 30 s, TASK-1888)
   float    fModSupDelay       = 20.0f;  // Modulation suppression delay (seconds)
   float    fModSupOffset      = 1.0f;   // Modulation suppression offset (°C below setpoint)
   float    fDhwSetpoint       = 0.0f;   // DHW setpoint (0=inactive, 30-60°C)
@@ -523,7 +548,7 @@ struct SATSection {
   bool     bDhwEnable         = true;   // TASK-516: master DHW enable (HW= command). Only acted on when boiler reports MsgID 3 HB3=1 (storage tank). Default true keeps boiler-default DHW enabled.
   bool     bPushSetpoint      = false;  // Push SAT target to thermostat display (TC= command)
   bool     bFollowThermostat  = false;  // A thermostat room setpoint change (MsgID 16) becomes the SAT target (TASK-1259). Units with no stored SATfollowthermostat get bPushSetpoint (readSettings); a stored value wins
-  bool     bCurveSelfTune     = true;   // TASK-1525 (ADR-205, entry 176): the heating curve self-tune may change fHeatingCurveCoeff by 0.1; it decides once a day, and a change empties the 3-counted-day window (SATcontrol.ino satTuneCloseDay), so two changes are at least 3 counted days apart. Default on
+  bool     bCurveSelfTune     = true;   // TASK-1525 (ADR-205, entry 176): the heating curve self-tune may change fHeatingCurveCoeff by 0.05; it decides after every counted hour (ADR-260, TASK-1889), and a change empties the 12-counted-hour window (SATcontrol.ino satTuneCloseDay), so two changes are at least 12 counted hours apart. Default on
   bool     bFireplaceMode     = false;  // TASK-1374 (entry 49): SAT heats on the heating curve only, P/I/D 0, as with a missing room temperature. For a home whose sensor room has its own stove or air conditioner. Default off
   bool     bMqttFallback      = false;  // Opt-in (TASK-1345): SAT takes over (state.sat.bFallbackActive, never settings.sat.bEnabled) once MQTT has been lost for more than 5 minutes. Default off
   float    fFlameOffOffset    = 18.0f;  // Flame-off hold offset above return temp during PWM (Python flame_off_setpoint_offset_celsius=18.0): primes the boiler for fast, clean re-ignition

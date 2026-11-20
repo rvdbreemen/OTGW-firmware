@@ -326,6 +326,16 @@ Beide waarden worden ook als twee zelfstandige, discoverable Home Assistant-sens
 
 Voor het overschrijven van de buitentemperatuur wordt een number-entiteit gepubliceerd; hiermee kan Home Assistant een waarde pushen alsof die van een bekabelde buitensensor komt.
 
+#### Override-sensoren van de gateway
+
+Als de gateway zelf een waarde op de bus zet (hij antwoordt de thermostaat zelf, of hij schrijft zijn eigen waarde naar de ketel in plaats van die van de thermostaat), blijft de gewone sensor tonen wat de ketelkant meldt. Een aparte sensor, alleen-lezen, toont de waarde die de gateway invoegt (ADR-118):
+
+- Eén sensor per MsgID waarvoor de gateway een override kan zetten: 1 `TSet`, 8 `TsetCH2`, 9 `TrOverride`, 14 `MaxRelModLevelSetting`, 16 `TrSet`, 39 `TrOverride2`, 56 `TdhwSet`, 57 `MaxTSet`. MsgID 27 (buitentemperatuur) heeft in plaats daarvan de number-entiteit hierboven.
+- Naam `<label> Override`, op het Gateway-device, state topic `<pub>/<label>/override`. Eenheid °C met device class temperature; voor MsgID 14 is de eenheid % (de maximale relatieve modulatie die de gateway na `MM=` toepast).
+- Hij wordt aangekondigd zoals de andere OpenTherm-sensoren, zodra zijn MsgID op de bus is gezien.
+- Het topic is retained en wordt elke 60 s opnieuw gepubliceerd zolang de override actief is. Komt er 10 minuten geen override-frame, dan geldt de override als beëindigd: de firmware stuurt een leeg retained bericht, dat het topic van de broker verwijdert, zodat de oude waarde na een herstart van Home Assistant niet terugkomt.
+- Na een herstart is de override-opslag leeg. Na de volgende MQTT-verbinding verwijdert de firmware daarom elk `<label>/override`-topic dat niet opnieuw actief is (TASK-1991).
+
 #### Button-entiteit (PIC reset)
 
 Onder pseudo-ID 244 wordt een `button`-entiteit gepubliceerd met de naam `resetgateway` (`entity_category: config`, `payload_press: "1"`). Een druk vanuit het HA-dashboard reset de PIC hardwarematig via de reset-pin. Om stormen door verkeerd geconfigureerde automatisaties te voorkomen vereist de firmware nu exact de payload `"1"` en geldt er een cooldown van 5 seconden tussen opeenvolgende resets; elke andere payload wordt stil genegeerd.
@@ -353,7 +363,7 @@ Switches:
 | `SAT_Solar_Gain` | Zon-gain compensatie inschakelen |
 | `SAT_Summer_Simmer` | Summer simmer auto-disable inschakelen |
 | `SAT_Multi_Area` | Multi-area gewogen ruimtetemperatuur inschakelen |
-| `SAT_Simulation` | SAT draaien in simulatiemodus (geen echte ketelregeling) |
+| `SAT_Simulation` | SAT draaien in simulatiemodus (geen echte ketelregeling). Niet beschikbaar zolang een echte ketel antwoordt, want simulatie wordt dan geweigerd; weer beschikbaar als er geen ketel antwoordt of zolang simulatie aan staat (ADR-255, Home Assistant 2021.2 of nieuwer) |
 | `SAT_Window_Detection` | Openraamdetectie inschakelen |
 | `SAT_Overshoot_Protection` | PWM-start en modulatie-onderdrukking (CS-override in de PWM-fasen) |
 | `SAT_Push_Setpoint` | Control-setpoint via TC= naar de ketel pushen |
@@ -412,6 +422,8 @@ Topics zonder Home Assistant-entiteit (wel gepubliceerd en retained; te gebruike
 | `sat/preset` | Actief preset (`none`, `away`, `eco`, ...) |
 | `sat/fallback_active` | De MQTT-verlies-terugval heeft SAT ingeschakeld. Staat via MQTT altijd op `false`, omdat de terugval alleen draait zolang MQTT weg is; REST `/api/v2/sat/status` toont de live waarde |
 | `sat/ot_link_lost` | `true` zolang SAT 30 s geen ketelantwoord heeft gezien; SAT heeft de ketel één keer overgedragen en gaat vanzelf verder bij het volgende antwoord (zie hoofdstuk 5, veiligheidssysteem) |
+| `sat/no_ignition` | `true` als CV 180 s gevraagd is (PWM-aanfase, of CS boven de koude grens) met de aanvoer onder CS en zonder vlam. Alleen een melding, geen regeling (TASK-1882) |
+| `sat/heating_failure` | `true` als SAT 15 min op het maximum stond (setpoint begrensd of PWM op maximale duty) en de kamer minder dan 0,5 C steeg. Alleen een melding, geen regeling; een traag huis kan hem op een koude ochtend geven (TASK-1882) |
 | `sat/outside_temp_missing` | `true` zolang SAT geen buitentemperatuur heeft die jonger is dan 1 uur; SAT heeft de ketel één keer overgedragen en gaat vanzelf verder zodra er weer een is (zie hoofdstuk 5, veiligheidssysteem) |
 | `sat/simulation` | Simulatiemodus `ON`/`OFF` |
 

@@ -3,11 +3,11 @@ id: TASK-1864
 title: >-
   Heap low-water on beta.214 (3.9-4.6 KB) against about 7 KB on beta.211: rule
   out the TASK-1757 boot race before calling it a regression
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-12T11:01:00Z'
-updated_date: '2026-11-12T21:26:00Z'
+updated_date: '2026-11-16T10:25:00Z'
 labels:
   - heap
   - investigation
@@ -29,9 +29,9 @@ Not yet a regression. hd_min_free_heap is a run-wide watermark since boot, so ea
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Closing run on .61 with beta.218 (TASK-1757 fix) in the 214 scenario: SAT on, satsimulation, no boiler, the Firefox tab, one pyotgw session, 30 min after a /ReBoot; hd_min_free_heap at +60 s and at +30 min, plus device/info free and maxblk every 60 s; close as the TASK-1757 boot race when the +30 min watermark stays at or near the +60 s value, well above 3,072 B, with no reset
+- [x] #1 Closing run on .61 with beta.218 (TASK-1757 fix) in the 214 scenario: SAT on, satsimulation, no boiler, the Firefox tab, one pyotgw session, 30 min after a /ReBoot; hd_min_free_heap at +60 s and at +30 min, plus device/info free and maxblk every 60 s; close as the TASK-1757 boot race when the +30 min watermark stays at or near the +60 s value, well above 3,072 B, with no reset
 - [x] #2 Static review of src/ changes 203..214 per prerelease tag for new allocations, buffers, task stacks and connection handling, recorded in the notes
-- [ ] #3 Only if AC1 shows the watermark falling during steady state well below the +60 s value: bisect over the tags (208, 211, 214) by the bench-tester and name the commit with the measurement; otherwise close as the TASK-1757 boot race with the numbers
+- [x] #3 Only if AC1 shows the watermark falling during steady state well below the +60 s value: bisect over the tags (208, 211, 214) by the bench-tester and name the commit with the measurement; otherwise close as the TASK-1757 boot race with the numbers
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -62,4 +62,12 @@ Correction (coordinator and 09, 2026-11-12): the three 214 values 4,100 / 3,948 
 Proposed closing run instead of AC1's 211-vs-214 comparison (which the correction note already shows does not hold): beta.218 on .61, the 214 scenario (SAT on, satsimulation, no boiler, Firefox tab, one pyotgw session), 30 min after a /ReBoot. Record hd_min_free_heap at +60 s (boot window) and at +30 min, plus device/info free and maxblk every 60 s. Pass to close as the TASK-1757 boot race: the +30 min watermark stays at or near the +60 s value and well above 3,072 B (CRITICAL), with no reset. If the watermark falls during steady state well below the +60 s value, a steady-state cause remains and AC3's bisect applies. Needs a bench slot from 09, no new firmware. AC1 wording should change to this run; that is the coordinator's or Robert's call.
 
 2026-11-12 AC1 reworded by the coordinator's call (measurement detail): the 211-vs-214 comparison is replaced by the beta.218 closing run in the 214 scenario. AC2 stays ticked (95's static review). The coordinator books the run with 09 after the beta and 219's bench.
+
+2026-11-16 10:52-11:23 closing run, bench 09 on .61 (OTGW32, no PSRAM), 2.0.0-beta.341+3cb72c3 (well past beta.218 with the TASK-1757 fix). Scenario adapted, agreed by the coordinator (SAT simulation on hardware is paused, Robert): SAT off, no satsimulation; the Firefox tab replaced by its load (one WebSocket /ws client + two REST pollers on device/info, sat, otdirect/overrides, sat/status, ~2 req/s); one pyotgw 2.2.3 session on 25238 attempted (LegacyPort25238Enabled switched on for the run and back off afterwards) but its connect 15 s after boot failed (IndexError in pyotgw after a late PR= answer, see the pyotgw follow-up), so the pyotgw load was absent. /ReBoot at 10:52 (bootcount 845 -> 846). hd_min_free_heap: +60 s 13,460 B; +10 min 12,828; +20 min 12,792; +29 and +30 min 12,792 (unchanged since +20 min). freeheap 38.9-51.9 KB, maxfreeblock 27.6-31.7 KB, MQTT connected throughout, 1696 WS messages, 3161 REST OK / 1 error, no reset (bootcount 846 to the end), settings.ini and /api/v2/settings byte-identical afterwards. The watermark stays within 668 B of the +60 s value and far above 3,072 B: the beta.214 values were the TASK-1757 boot race, not a steady-state fall. Evidence: 09 scratchpad closeout/heap1864/ (run.log, heap1864.py, S0.*).
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+AC1 (run in an adapted scenario, coordinator-agreed because SAT simulation on hardware is paused): .61 beta.341, SAT off, WS client + REST polling in place of the Firefox tab, 30 min after /ReBoot: hd_min_free_heap 13,460 B at +60 s, 12,792 B at +30 min (flat since +20 min), no reset, far above 3,072 B. AC2: static review 203..214 (c1b45a587). AC3: not needed: the watermark does not fall in steady state, so no bisect; closed as the TASK-1757 boot race. Not covered: the SAT-on/satsimulation part of the original 214 scenario, and the pyotgw load (its connect failed right after boot; separate follow-up).
+<!-- SECTION:FINAL_SUMMARY:END -->

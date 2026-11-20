@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTDirecttypes.h
-**  Version  : v2.0.0-beta.327
+**  Version  : v2.0.0-beta.401
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -97,8 +97,6 @@ struct OTDirectSection {       // state.otd — OT-direct (OTGW32) runtime statu
   bool     bThermostatConnected = false; // thermostat recently seen (within timeout)
   uint32_t iLastThermostatMs = 0;        // millis() of last thermostat frame received
   bool     bMasterRequestActive = false; // TASK-1966: a boiler request is in flight (otMasterRequestActive)
-  uint16_t iLineStaleFixes   = 0;        // TASK-1966: stale boiler line delays cleared since boot
-  uint16_t iLineTxRestarts   = 0;        // TASK-1966: boiler line restarts after a stalled transmit
   uint16_t iCmdRingDropped   = 0;        // TASK-1966: commands refused because the TASK-1761 ring was full
   // TASK-466: PIC-style TT=/TC= remote-override mode (none/temporary/constant)
   OTRemoteOverrideMode eOverrideMode = OT_OVERRIDE_NONE;

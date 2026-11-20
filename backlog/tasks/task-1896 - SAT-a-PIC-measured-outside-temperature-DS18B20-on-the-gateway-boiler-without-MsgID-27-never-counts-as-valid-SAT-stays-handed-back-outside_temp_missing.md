@@ -4,11 +4,11 @@ title: >-
   SAT: a PIC-measured outside temperature (DS18B20 on the gateway, boiler
   without MsgID 27) never counts as valid, SAT stays handed back
   (outside_temp_missing)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-13T09:55:00Z'
-updated_date: '2026-11-15T10:15:00Z'
+updated_date: '2026-11-16T14:33:00Z'
 labels:
   - bug
   - sat
@@ -26,9 +26,9 @@ Report: indigo_light (Discord 301077214374658048), #nederlandse-ondersteuning ht
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Capture from the reporter (or a bench reproduction) shows how the PIC reports the DS18B20 outside value (frame type for MsgID 27)
+- [x] #1 Capture from the reporter (or a bench reproduction) shows how the PIC reports the DS18B20 outside value (frame type for MsgID 27)
 - [x] #2 Sergeant D decides whether a gateway-measured outside value counts as a valid source (recorded as an entry)
-- [ ] #3 If yes: host test red on the old stamp rule, green on the fix; outside_temp_missing clears with only the PIC sensor present
+- [x] #3 If yes: host test red on the old stamp rule, green on the fix; outside_temp_missing clears with only the PIC sensor present
 - [x] #4 Bench or field confirmation
 - [ ] #5 Bench (Classic + PIC): with a PIC DS18B20 (or OT=) value and a boiler without MsgID 27, SAT reports the outside temperature as valid (osrc=O), outside_temp_missing is false, and no weather fetch is started
 <!-- AC:END -->
@@ -65,4 +65,16 @@ Follow-up 1903 item 2 (2026-11-13, wt-95w lane-95-219b, coordinator decision aft
 Bench limit (2026-11-13, 09 via the coordinator, build 2.0.0-beta.226+e86aed9): not demonstrable on the bench unit .61. OT-Direct loopback never asks MsgID 27, and the bench has neither a thermostat nor a boiler that would make the PIC send a Write-Data 27. Evidence stays host tests (tests/test_outside_stamp_gateway_frames.py, test/host/test_replay_frame_guards.py with the --rev origin/dev red run, including the bLocalAnswer follow-up) plus field confirmation by indigo_light. Not shown on a device.
 
 2026-11-15 AC4 field confirmation (d3 read the message itself): indigo_light in #beta-testing, https://discord.com/channels/812969634638725140/914498730001072149/1571465125280350249 (10:01 UTC). Setup: beta.250+aed38bf, OTGW Classic + LOLIN S3 Mini, PIC 6.8, Viessmann Vitodens 100-W (boiler sends no MsgID 27), DS18B20 on the PIC, SAT on, Open-Meteo off, no external outdoor temperature. sat/status: active true, outside_temp_missing false, external_outdoor_valid false, outside_temp 6.31, heating_curve 33.7, final_setpoint 33.95. On beta.218 SAT stayed inactive with outside_temp_missing true. AC1 waits for his --long-run --sat-trace capture (running since 10:50 local) for the PIC frame type of MsgID 27. Not covered by this report: AC5 (osrc=O and no weather fetch; with Open-Meteo off a fetch is not expected anyway) and TASK-1897 (weather off). New finding in the same message: otgw/label/Toutside reports status data_invalid while SAT uses the value; Robert answered 'Nee gaan we fixen' (msg 1571466554011553823), so that inconsistency is to be fixed (task to be filed by the coordinator or under this task).
+
+2026-11-16 (95) AC1 from indigo_light's capture 2026-11-15 10:50-13:26 (beta.250+aed38bf, PIC gateway 6.8, Vitodens + Honeywell Round; data local, session 95 scratchpad indigo1115/): the PIC reports its DS18B20 outside value as its own R Write-Data 27 (e.g. 10:50:57.940 R 901B0630 = 6.1875 C), and the boiler answers B 601B0000 Data-Invalid; over the capture 3020 R Write-Data 27 and 3014 B Data-Invalid 27, no Read-Ack 27. That is the pair the stamp predicate of abafdcd34 accepts. AC3: host test tests/test_outside_stamp_gateway_frames.py on origin 364f4faf1: Ran 10 OK; against the OTGW-Core.ino before the fix (abafdcd34~1): RED (setUpClass error: the gateway-frame predicate does not exist, plus FAIL test_stamp_written_only_behind_the_predicate). outside_temp_missing clears with only the PIC sensor: the same capture's SAT lines show osrc=O 279 times, and indigo_light's report 1571465125280350249 (beta.250) shows active true, outside_temp_missing false. AC5 (bench Classic with a PIC DS18B20 and a boiler without MsgID 27) stays open: no bench unit has a DS18B20 or a boiler; the field evidence above covers the behaviour.
+
+2026-11-16: indigo_light reports the PIC DS18B20 as SAT outside source working on beta.250 (15 Nov) and beta.339 (https://discord.com/channels/812969634638725140/914498730001072149/1571818031716372491); details under TASK-1897.
+
+2026-11-16 (95) AC5 WAIVED by Robert (Discord DM 1571893279447060622, answer A, relayed by the coordinator): the Classic + PIC bench run is replaced by indigo_light's field evidence on beta.250+aed38bf (Classic + S3 Mini, PIC 6.8, Vitodens without MsgID 27, DS18B20 on the PIC): SAT active true, outside_temp_missing false (d3's AC4 note, #beta-testing 1571465125280350249), his capture of 2026-11-15 (PIC R Write-Data 27 with the DS18B20 value, boiler B Data-Invalid) and his report that it still works on beta.339 (1571818031716372491). AC5 stays unchecked as waived.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+A gateway-made outside temperature (PIC DS18B20 or OT=, sent as the gateway's own R Write-Data 27) now counts as a valid SAT outside source. Decision: Robert (entry 330), Sergeant D agrees (entry 331). AC1: indigo_light's capture 2026-11-15 (PIC 6.8, beta.250) shows the PIC's R Write-Data 27 (901B0630 = 6.19 C) with the boiler answering B Data-Invalid. AC2: entries 330/331. AC3: test/host/test_replay_frame_guards.py FAIL on origin/dev before the fix ('gateway Write-Data to the boiler stamps', got 111 want 5000), 9/9 PASS on the fix (1f4d62091); tests/test_outside_stamp_gateway_frames.py red/green; follow-up from TASK-1903: an OT-Direct loopback local answer no longer stamps. AC4: field, indigo_light beta.250 (#beta-testing 1571465125280350249: SAT active, outside_temp_missing false) and beta.339 (1571818031716372491). AC5: WAIVED by Robert (DM 1571893279447060622, answer A) on that field evidence; not benched on a Classic + PIC (the bench has no boiler, and OT-Direct loopback never asks MsgID 27). Not verified: the no-weather-fetch part of AC5 on a bench; known risk (noted 2026-11-13): an OT= value has no age of its own, so a stale OT= keeps the outside stamp fresh until OT=- clears it.
+<!-- SECTION:FINAL_SUMMARY:END -->

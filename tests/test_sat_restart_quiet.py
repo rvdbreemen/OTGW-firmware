@@ -129,6 +129,9 @@ static bool satCycleCheckLowLoadVeto() { return false; }
 
 static void satPwmReset() {}
 static void satCycleSkipAutoSwitch() {}
+static void satDiagEventsReset() {}   // TASK-1882: called by satDisable(); tested in tests/test_sat_diag_events.py
+static bool _sat_heaterOn = true, _sat_startPwmWanted = false, _sat_startGate = false;   /* heater running: the deferred PWM restore may act */ static uint32_t _sat_startFlameOnMs = 0;
+static float satGetFlowTemp() { return 50.0f; }   // TASK-1942: the deferred restore waits for a known flow; known here   // TASK-1942: reset by satDisable(); tested in tests/test_sat_pwm_first_start.py
 static float _sat_lastControlCS = 0, _sat_requestedSetpoint = 0;
 static bool _sat_thermalSafeActive = false, _sat_roomLostActive = false, _sat_fireplaceActive = false;   // TASK-1374: satDisable() resets it
 static int16_t satPreSatPersisted(bool) { return 0; }   // TASK-1541
@@ -157,6 +160,8 @@ struct FSStub {
   File open(const char* p, const char* mode) { File f; f.fp = fopen(p[0] == '/' ? p + 1 : p, mode[0] == 'w' ? "wb" : "rb"); return f; }
 };
 static FSStub LittleFS;
+// TASK-1989: the SAT savers hand the file to the fsWriter queue; here it writes at once (fsWriter.ino before begin).
+static bool fsWriterSubmit(const char* p, const char* d, size_t) { File f = LittleFS.open(p, "w"); if (!f) return false; f.print(d); f.close(); return true; }
 static uint32_t timerSATControl_due = 31000, timerSATControl_interval = 30000;
 static uint32_t timerSAT4hStats_due = 0, timerSAT4hStats_interval = 60000;
 static uint32_t timerSATPublishRetry_due = 0, timerSATPublishRetry_interval = 500;
@@ -220,6 +225,7 @@ int main(int argc, char** argv) {
   if (!strcmp(sc, "pwm_boot")) {       // the next boot: initSAT()'s enabled branch
     state.sat.eControlMode = SAT_MODE_OFF;
     initModeBranch();
+    printf("RESTORE %d\n", (int)_sat_pwmRestore);   // TASK-1942: armed for the deferred step
     printf("MODE %d\n", state.sat.eControlMode);
     return 0;
   }
@@ -289,6 +295,10 @@ def build_cpp(src: str) -> str:
     decl = "void satDisable(bool persistPid = true);" if "bool persistPid" in disable else ""
     link = _between(src, "// --- satOtLink begin", "// --- satOtLink end")
     restart = _between(src, "// --- satRestart begin", "// --- satRestart end") if fix else ""
+    # Entry 388 (TASK-1866/1874): the 60 s boot silence runs before every step tested here. This harness tests the steps
+    # after it, so the silence is set to 0 in this copy only; scenario 7 of tests/test_sat_loop_integration.py tests the
+    # real 60 s on the whole loop (and a mutant with 0 s goes red there).
+    restart = restart.replace("static const uint32_t SAT_BOOT_SILENCE_MS = 60000UL;", "static const uint32_t SAT_BOOT_SILENCE_MS = 0UL;")
     s0 = src.index("  // If safety tripped, stay disabled until explicitly re-enabled")
     end = "  if (!DUE(timerSATControl)) return;"
     span = src[s0:src.index(end, s0) + len(end)].replace("return;", "return false;")
@@ -457,7 +467,10 @@ class Persistence(unittest.TestCase):
         wd = tempfile.mkdtemp(dir=Harness.dir.name)
         run("pwm_set", workdir=wd)
         _, out = run("pwm_boot", workdir=wd)
-        self.assertIn("MODE 2", out)
+        # TASK-1942 (entries 385/387 reason 1): the saved PWM flag is no longer applied at initSAT() while the heater may be OFF;
+        # it arms the deferred restore, which enters PWM once the heater runs and the flow is known (tests/test_sat_pwm_first_start.py)
+        self.assertIn("RESTORE 1", out)
+        self.assertIn("MODE 1", out)
 
     def test_no_pwm_file_boots_continuous(self):
         _, out = run("pwm_boot")

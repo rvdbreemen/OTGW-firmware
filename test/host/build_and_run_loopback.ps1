@@ -37,6 +37,12 @@ param(
   [string]$OldRev = '9bfcd0868^'
 )
 
+# TASK-2017: Windows PowerShell 5.1 started from PowerShell 7 inherits pwsh's PSModulePath; drop pwsh's module paths
+# so Get-FileHash resolves to 5.1's own Microsoft.PowerShell.Utility (see build_and_run_override_reply.ps1).
+if ($PSVersionTable.PSEdition -eq 'Desktop' -and $env:PSModulePath) {
+  $env:PSModulePath = (($env:PSModulePath -split ';') | Where-Object { $_ -and $_ -notmatch '\\PowerShell\\' }) -join ';'
+}
+
 $ErrorActionPreference = 'Stop'
 $here    = Split-Path -Parent $MyInvocation.MyCommand.Path
 $repo    = (Resolve-Path (Join-Path $here '..\..')).Path

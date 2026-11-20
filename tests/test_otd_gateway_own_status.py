@@ -100,9 +100,12 @@ static uint32_t otCmdQueue[OT_CMD_QUEUE_SIZE];
 static uint8_t otCmdHead = 0, otCmdTail = 0;
 static bool otCmdQueueEmpty() { return otCmdHead == otCmdTail; }
 static void otCmdApplyPendingFlush() {}   // the ring flush itself is covered by test_otd_mode_switch_queue_reset.py
+static void otCmdSkipTombstones() {}   // TASK-1992: tested in tests/test_otd_sim_exit_stale_writes.py
 static bool otIsVentSlave() { return false; }
 static constexpr uint32_t OTD_MWT_MS = 100;   // TASK-1954: MWT floor of the scheduler; never stamped in this harness
 static uint32_t otdLastConvEndMs = 0;
+static bool otSlaveFramePending = false; static unsigned long otSlaveFrame = 0;   // TASK-1812: no thermostat write waits
+static bool otdMasterRelaysWrite(unsigned long) { return false; }
 static bool otdCsOverrideActive() { return false; }
 static bool satOwnsControlSetpoint() { return false; }
 static bool otPushSpoof = false;   // TASK-1845: buildStatusRequest() enables DHW while a push is spoofed

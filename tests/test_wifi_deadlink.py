@@ -81,6 +81,11 @@ static State state; static Settings settings;
 enum HeapHealthLevel { HEAP_HEALTHY, HEAP_LOW, HEAP_WARNING, HEAP_CRITICAL };
 static HeapHealthLevel g_heap = HEAP_HEALTHY;
 static HeapHealthLevel getHeapHealth() { return g_heap; }
+static uint32_t g_maxBlock = 31732;   // TASK-2026: the largest free block (healthy bench value)
+static uint32_t platformMaxFreeBlock() { return g_maxBlock; }
+#define HEAP_LOW_THRESHOLD 8192               // helperStuff.ino; TASK-2923 AP fallback heap check
+static uint32_t g_freeHeap = 56448;   // TASK-2923: free heap (healthy bench value)
+static uint32_t platformFreeHeap() { return g_freeHeap; }
 
 // ---- fake network -----------------------------------------------------------------------------
 enum { WL_IDLE_STATUS = 0, WL_CONNECTED = 3, WL_DISCONNECTED = 6 };
@@ -203,6 +208,9 @@ int main(int argc, char **argv) {
     runFor(5 * 60); ev("link_dead"); g_traffic = false; runFor(75 * 60);
   } else if (!strcmp(sc, "dead_no_dhcp")) {// release vs prerelease: the forced reconnect cannot get an IP back
     runFor(5 * 60); ev("link_dead"); g_traffic = false; g_dhcpWorks = false; runFor(30 * 60);
+  } else if (!strcmp(sc, "dead_no_dhcp_lowfree")) {   // TASK-2931: same, with free heap under HEAP_LOW_THRESHOLD, so the
+    // TASK-2923 guard skips the AP fallback and the failed attempts end in WIFI_FAILED (both builds since TASK-2931)
+    runFor(5 * 60); ev("link_dead"); g_traffic = false; g_dhcpWorks = false; g_freeHeap = 6000; runFor(30 * 60);
   } else if (!strcmp(sc, "dead_from_boot")) {
     g_traffic = false; runFor(30 * 60);
   } else if (!strcmp(sc, "never_icmp")) {  // AC4: a router that never answers ping, link otherwise dead too
@@ -220,6 +228,18 @@ int main(int argc, char **argv) {
   } else if (!strcmp(sc, "heap")) {        // AC6: heap not HEALTHY -> no probe, nothing counted
     runFor(5 * 60); g_heap = HEAP_LOW; g_traffic = false; ev("link_dead_heap_low"); runFor(30 * 60);
     printf("HEAPBEGUN|%d\n", g_begun);
+  } else if (!strcmp(sc, "starved")) {     // TASK-2026: heap LOW and starved (largest block 2 KB), link dead
+    runFor(5 * 60); g_heap = HEAP_LOW; g_maxBlock = 2048; g_traffic = false; ev("link_dead_heap_starved"); runFor(30 * 60);
+  } else if (!strcmp(sc, "starved_flap")) {   // TASK-2026 run 3 (.63, 381): starved and dead, but the AP drops the
+    // association every ~4 min (NOT_AUTHED, 7 outages in 30 min) and the unit re-associates within seconds
+    runFor(5 * 60); g_heap = HEAP_LOW; g_maxBlock = 2048; g_traffic = false; ev("link_dead_heap_starved_flapping");
+    for (int i = 0; i < 10; i++) {
+      runFor(4 * 60);
+      ev("ap_drop"); g_wifiStatus = WL_DISCONNECTED; g_connectAt = g_ms + 3000;
+    }
+    runFor(60);
+  } else if (!strcmp(sc, "starved_nopbuf")) {   // TASK-2026: healthy tier, but no echo buffer and a 2 KB largest block
+    runFor(5 * 60); g_pbufFail = true; g_maxBlock = 2048; g_traffic = false; runFor(30 * 60);
   } else if (!strcmp(sc, "nopbuf")) {      // allocation failures are skipped, not counted
     runFor(5 * 60); g_pbufFail = true; g_traffic = false; runFor(30 * 60);
   } else if (!strcmp(sc, "nopcb")) {
@@ -425,16 +445,29 @@ class WifiDeadLinkStateMachine(unittest.TestCase):
         self.assertEqual(len(self.logs(r, "restart count cleared")), 1)
         self.assertEqual(len(self.logs(r, "2 dead-link restart(s)")), 1)
 
-    def test_failed_forced_reconnect_counts_toward_cap_release_build(self):
+    # TASK-2931: the stable build has the AP fallback too, so a failed forced reconnect only reaches WIFI_FAILED (and the
+    # dead-link restart cap) when the AP is skipped: on a low heap (TASK-2923). Both builds behave the same.
+    def test_failed_forced_reconnect_counts_toward_cap_when_the_ap_is_skipped(self):
+        for build in ("pre", "rel"):
+            with self.subTest(build=build):
+                r, _ = self.run_sc("dead_no_dhcp_lowfree", build=build, quiet=True)
+                self.assertEqual(r["SUM"]["forced"], 1)
+                self.assertEqual(r["SUM"]["ap"], 0)
+                self.assertEqual(r["RESTART"][1], "WiFi: too many reconnect failures")
+                self.assertEqual(r["RTC"], (MAGIC, 1))
+
+    def test_failed_forced_reconnect_at_cap_retries_when_the_ap_is_skipped(self):
+        for build in ("pre", "rel"):
+            with self.subTest(build=build):
+                r, _ = self.run_sc("dead_no_dhcp_lowfree", build=build, magic=MAGIC, count=3, soft=1)
+                self.assertIsNone(r["RESTART"])
+                self.assertGreaterEqual(len(self.logs(r, "dead-link restart cap reached, retrying")), 1)
+
+    def test_failed_forced_reconnect_release_build_goes_to_ap_fallback_too(self):
         r, _ = self.run_sc("dead_no_dhcp", build="rel", quiet=True)
         self.assertEqual(r["SUM"]["forced"], 1)
-        self.assertEqual(r["RESTART"][1], "WiFi: too many reconnect failures")
-        self.assertEqual(r["RTC"], (MAGIC, 1))
-
-    def test_failed_forced_reconnect_at_cap_retries_release_build(self):
-        r, _ = self.run_sc("dead_no_dhcp", build="rel", magic=MAGIC, count=3, soft=1)
+        self.assertEqual(r["SUM"]["ap"], 1)
         self.assertIsNone(r["RESTART"])
-        self.assertGreaterEqual(len(self.logs(r, "dead-link restart cap reached, retrying")), 1)
 
     def test_failed_forced_reconnect_prerelease_goes_to_ap_fallback(self):
         r, _ = self.run_sc("dead_no_dhcp", build="pre", quiet=True)
@@ -460,6 +493,30 @@ class WifiDeadLinkStateMachine(unittest.TestCase):
                 self.assertIsNone(r["RESTART"])
                 if self.has_fix:
                     self.assertEqual(len(self.logs(r, "probe skipped (%s)" % why)), 1)
+
+    def test_a_starved_heap_counts_as_dead_and_recovers(self):
+        # TASK-2026: .61 (no PSRAM, BLE on) stayed unreachable for 13 min: every probe was skipped ('heap not
+        # healthy' / 'no echo buffer') and nothing else restarts a unit whose loop still runs. With a starved heap
+        # the skipped probe now counts as dead: reconnect after 8, then restart. Red on the code before TASK-2026.
+        for sc in ("starved", "starved_nopbuf"):
+            with self.subTest(sc=sc):
+                r, _ = self.run_sc(sc)
+                self.assertEqual(r["SUM"]["forced"], 1, "no forced reconnect on a starved, dead unit")
+                self.assertIsNotNone(r["RESTART"], "no restart on a starved, dead unit")
+                self.assertEqual(len(self.logs(r, "heap starved (largest block 2048 B): counted as dead")), 1)
+
+    def test_starved_link_with_ap_drops_every_4_min_still_recovers(self):
+        # TASK-2026 run 3 (.63, 381+b06eeff, 2026-11-19): heap starved for 30 min, REST and telnet dead, 14 probes
+        # counted dead, yet no decision point (witness 0, reconnect 0): the AP dropped the association every ~4 min
+        # (wifi_outages 7, NOT_AUTHED) and every re-association reset the dead streak (wifiLinkProbeOnReconnect()),
+        # so 8 in a row never happened. Option C: while the heap is starved the streak continues across a
+        # re-association. Red on the code before it (b0febe073 ran this as expectedFailure).
+        r, _ = self.run_sc("starved_flap")
+        self.assertGreaterEqual(r["SUM"]["forced"] + (1 if r["RESTART"] else 0), 1,
+                                "a starved, unreachable unit whose AP keeps re-associating is never recovered")
+        # 387: option C logs where it acts, so a bench and a field log can see it (the .61 bench on 386 could not).
+        self.assertGreaterEqual(len(self.logs(r, "re-associated while the heap is starved")), 1,
+                                "option C kept the streak without a log line")
 
     def test_ethernet_closes_the_probe_and_disarms(self):
         r, _ = self.run_sc("ethernet")

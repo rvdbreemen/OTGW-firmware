@@ -270,7 +270,14 @@ Each move is listed in the task notes. `docs/BREAKING_CHANGES.md` and
 1. Changed files of this run = the subagents' reported files plus the cleanup moves.
    Cross-check with `git status --short -- docs/ README.md scripts/docs-scope-2x.sh`;
    a file in git status that is not in the run's list belongs to someone else: leave it.
-2. Checks over the changed files:
+2. When an EN chapter (`docs/manuals/en/ch*.md`) changed, rebuild the single-file manual and
+   add `docs/MANUAL.md` to the run's files. It is generated from the chapters (TASK-2030):
+   never edit it by hand, and `tests/test_manual_generated.py` fails when it lags.
+   ```bash
+   python scripts/build_manual.py
+   python tests/test_manual_generated.py
+   ```
+   Checks over the changed files:
    ```bash
    grep -n "—" <changed files>                        # no em dashes
    grep -n -i "otgw32" README.md docs/releases/RELEASE_NOTES_<version>.md   # release mode: none

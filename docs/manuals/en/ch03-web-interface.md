@@ -45,7 +45,7 @@ The Monitor page has five sub-tabs:
 - **Log**: a live console fed by the WebSocket stream, one OpenTherm frame per line (dense rendering). A toolbar carries Pause, **Clear**, **Download**, a frame filter, and toggle chips for Auto-scroll, Timestamps, **SAT only** (show only SAT narration lines), **Auto-download** (save the log every 15 minutes), and **Stream to file** (append frames straight to a local file in Chrome/Edge). Below the toolbar a command bar sends a raw OTGW command (for example `PS=1`, `TT=20.5`, `GW=1`); the command echoes into the log and the prompt label reflects the live command interface (a `PIC ›` prompt on PIC hardware, `OT ›` on OT-Direct).
 - **Statistics**: a per-message-ID table (msgID, description, direction, interval, count, value) with a search box, followed by an **Active gateway overrides** panel and a **Boiler unsupported messages** panel.
 - **OT Support**: a matrix of all 128 OpenTherm message IDs colour-coded by where each ID was seen (thermostat + boiler, thermostat only, boiler only, or never seen). Click a cell to pin a detail panel with the decoded message.
-- **Graph**: a flow / return / setpoint / modulation chart that opens with the history the gateway has kept (the last hour at 30-second resolution, or the last 24 hours at 2-minute resolution on a board with PSRAM; it is held in the gateway's RAM, so it starts empty after a reboot) and then continues live at 5 seconds; Dallas sensor lines start at page load. A line is drawn with a break where more than 2.5 minutes of data are missing. While the room temperature is not valid (SAT on: SAT reports it lost; otherwise the thermostat has not reported it for 4.5 minutes) the room line stops and a dotted line in another colour (pink) runs along the bottom of the plot, and the CSV export has an empty room value for those samples; the history the gateway itself kept does not show this. It has window chips (10 min, 1 hour, 4 h, 24 h), a time axis on round clock times, one-off **PNG** (with the legend of the visible series, axis labels and time axis, in the current theme) and **CSV** export buttons, and **Auto-PNG** / **Auto-CSV** chips for periodic auto-save.
+- **Graph**: a flow / return / setpoint / modulation chart that opens with the history the gateway has kept (the last hour at 30-second resolution, or the last 24 hours at 2-minute resolution on a board with PSRAM; it is held in the gateway's RAM, so it starts empty after a reboot) and then continues live at 5 seconds; Dallas sensor lines start at page load. A line is drawn with a break where more than 2.5 minutes of data are missing. While the room temperature is not valid (SAT on: SAT reports it lost; otherwise the thermostat has not reported it for 4.5 minutes) the room line stops and a dotted line in another colour (pink) runs along the bottom of the plot, and the CSV export has an empty room value for those samples; the history the gateway itself kept does not show this. It has window chips (10 min, 1 hour, 4 h, 24 h), a time axis on round clock times, one-off **PNG** (with the legend of the visible series, axis labels and time axis, in the current theme) and **CSV** export buttons, and **Auto-PNG** / **Auto-CSV** chips for periodic auto-save. The control setpoint, the thermostat setpoint and the SAT target are drawn as dashed lines; from beta.396 their legend entries show the same dash, on screen and in the PNG. Click a legend entry to hide or show that series; the choice is remembered in your browser.
 - **Connection**: an OT-bus and connectivity map. The OT bus is modelled as two separate links (thermostat and boiler), and the map separates **MODE** (a setting, such as gateway or monitor) from **HEALTH** using a five-state vocabulary: Connected, Degraded, Disconnected, Off, and Unknown (ADR-155). Nodes cover thermostat, boiler, OTGW, router (with a Wi-Fi signal-strength icon and dBm), MQTT broker, and this browser. On OT-Direct hardware an **OT-Direct overrides** panel lets you apply or clear stored responses and response modifiers (SR/CR/RM/CM/UI/KI) directly.
 
 #### SAT page
@@ -246,9 +246,9 @@ Next to each setting label is an **i** button. Hover it, focus it with the keybo
 
 To move the gateway to a different Wi-Fi network, click **Reset WiFi** and confirm the prompt. The device reboots, starts an AP named `OTGW-XXXXXX` (where `XXXXXX` is derived from the chip ID), and reopens the captive portal so you can select and authenticate against the new network. The Reset WiFi action is also available under **FSexplorer > System Actions** as the *Reset Wireless* button.
 
-#### Wi-Fi Scan (Settings page)
+#### Wi-Fi Scan
 
-The Settings page also includes a Wi-Fi scan panel that lists nearby networks (TASK-585). Press **Scan** to call `/api/v2/network/scan`; the result populates a dropdown with the detected SSIDs, RSSI, and security flags. Selecting a network from the dropdown fills the SSID field so you can pair the scan with the Reset WiFi flow without typing the SSID by hand.
+The v2 web UI has no Wi-Fi scan panel; to change the network, use Reset WiFi and the setup access point (see Chapter 2). The REST endpoint `GET /api/v2/network/scan` still lists nearby networks: the first call starts the scan and returns `{"status":"scanning"}`, a later call returns `{"status":"ready","networks":[...]}` with `ssid`, `rssi`, `channel`, `secured` and `connected` per network. It refuses a scan during an OTA or PIC flash (restAPI.ino:2419-2423).
 
 #### MQTT
 
@@ -282,6 +282,17 @@ The firmware sends a clock synchronization command to the boiler PIC when NTP ti
 | Nightly Restart Hour | Local hour (0-23) when the restart runs (default: `4`, meaning 04:00) |
 
 The nightly restart causes a brief service interruption of approximately 30 seconds. It is only active when NTP is enabled and synced, so the device knows the correct local time.
+
+#### Check GitHub for new versions
+
+From firmware 2.0.0-beta.387. The web UI can tell you when a newer firmware is on GitHub. A notice then appears in the header next to the firmware version, with a link to the release page. From beta.393 the notice also shows on a phone (a window of 480 px or less).
+
+- Who contacts GitHub: your browser, not the gateway. The gateway stays on your local network and sends nothing to the internet for this.
+- What is sent: your browser asks api.github.com for the list of OTGW-firmware releases, at most every 6 hours. As with any website, GitHub sees your internet IP address. The gateway's address is not sent: the request carries no referrer and no cookies.
+- First use: the web UI asks once whether you want this. From beta.393 the question is a chip "Check for new versions?" in the header, next to the identity chips; a click on it shows the explanation with No and "Yes, check", and closing it without an answer means not now (the chip stays). Before beta.393 the question opened as a dialog over the page. Your answer is stored on the gateway and applies to every browser.
+- Switch it off: Settings > Behavior > "Check GitHub for new versions". When it is off, the browser makes no request to GitHub at all.
+- Betas: a beta firmware is told about newer betas and stable releases. A stable firmware is only told about stable releases, unless you also switch on "Also tell about beta versions".
+- Hide a notice: the × next to it hides that version until a newer one appears.
 
 #### Device
 

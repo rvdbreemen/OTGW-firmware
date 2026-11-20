@@ -38,8 +38,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from test_sat_pwm_override import compile_cpp  # noqa: E402
 
 SAT_INO = Path(os.environ.get("OTGW_SAT_INO", REPO / "src" / "OTGW-firmware" / "SATcontrol.ino"))
-# Automatic gains are the only mode (TASK-1357): kd = 0.063 * 8400 * kp (entry 279, TASK-1656; pid.py:93 has 0.07), kp = coefficient * curve / 3 (radiators).
-KD_FACTOR = 0.063   # Sergeant D entry 279 (TASK-1656)
+# Automatic gains are the only mode (TASK-1357): kd = 0.05 * 8400 * kp (entry 425; was 0.063, entry 279; pid.py:93 has 0.07), kp = coefficient * curve / 3 (radiators).
+KD_FACTOR = 0.05   # Sergeant D entry 425 (supersedes the 0.063 of entry 279, TASK-1656)
 KD_AT_CURVE_40 = round(KD_FACTOR * 8400.0 * round(1.6 * 40.0 / 3.0, 3), 3)   # the gains are rounded to 3 decimals since TASK-1423 (entry 95, Q28a)
 PID_INO = Path(os.environ.get("OTGW_SATPID_INO", REPO / "src" / "OTGW-firmware" / "SATpid.ino"))
 TIMERS = (REPO / "src" / "OTGW-firmware" / "safeTimers.h").as_posix()
@@ -78,7 +78,7 @@ struct SatState { bool bSolarGainActive = false, bFallbackActive = false, bPvBoo
   uint32_t iLastKnownRoomMs = 0; float fPvBoostAppliedC = 0;
   float fPidP = 0, fPidI = 0, fPidD = 0, fPidOutput = 0, fKp = 0, fKi = 0, fKd = 0, fRawDerivative = 0, fError = 0; };
 struct State { SatState sat; };
-struct SATZoneState { float fRoomTemp = 0, fSetpoint = 0, fPidOutput = 0, fPidIntegral = 0, fPrevError = 0;
+struct SATZoneState { float fRoomTemp = 0, fSetpoint = 0, fPidOutput = 0, fPidIntegral = 0, fPrevError = 0; bool bPidInBand = true;
                       uint32_t iLastUpdateMs = 0; bool bRoomValid = false, bSpValid = false, bOff = false; };
 static Settings settings; static State state; static SATZoneState satZones[SAT_MAX_ZONES];
 static int satGetEffectiveHeatingSystem() { return 1; }   // radiators
@@ -116,6 +116,8 @@ static char g_saved[256];
 struct File { bool ok = true; operator bool() const { return ok; } void print(const char* s) { strncpy(g_saved, s, 255); } void close() {} };
 struct FSStub { File open(const char*, const char*) { return File(); } };
 static FSStub LittleFS;
+// TASK-1989: satSavePidState() hands the file to the fsWriter queue; here it writes at once (fsWriter.ino before begin).
+static bool fsWriterSubmit(const char* p, const char* d, size_t) { File f = LittleFS.open(p, "w"); if (!f) return false; f.print(d); f.close(); return true; }
 static uint32_t _pidLastSaveMs = 0;
 static const char* SAT_PID_STATE_FILE = "/x.json";
 static int satPidStateAppendOutside(char*, int n, size_t, time_t) { return n; }   // TASK-1482: tested in test_sat_restart_quiet.py
@@ -167,6 +169,10 @@ int main(int argc, char** argv) {
     settings.sat.iZoneCount = 2;
     satZones[0].fRoomTemp = 20.95f; satZones[0].fSetpoint = 21.0f; satZones[0].bRoomValid = satZones[0].bSpValid = true;
   }
+  if (!strcmp(sc, "zoneexit")) {                    // TASK-1890: the zone room leaves the deadband and comes back
+    settings.sat.iZoneCount = 2;
+    satZones[0].fRoomTemp = 20.95f; satZones[0].fSetpoint = 21.0f; satZones[0].bRoomValid = satZones[0].bSpValid = true;
+  }
   if (!strcmp(sc, "zone1")) {                       // TASK-1440: zone count 1, zone 1 pushes data
     settings.sat.iZoneCount = 1;
     satZones[0].fRoomTemp = 20.95f; satZones[0].fSetpoint = 21.0f; satZones[0].bRoomValid = satZones[0].bSpValid = true;
@@ -194,6 +200,7 @@ int main(int argc, char** argv) {
     if (!strcmp(sc, "recover") && t == 190) g_roomValid = true;
     if (!strcmp(sc, "reenable") && t == 131) { satPidReset(); }
     if ((!strcmp(sc, "hold") || !strcmp(sc, "holdsave")) && t == 200) g_roomValid = true;
+    if (!strcmp(sc, "zoneexit")) satZones[0].fRoomTemp = (t > 300 && t <= 480) ? 19.0f : 20.95f;   // TASK-1890
     if (!strcmp(sc, "late") && t == 45) satPidRestoreState(0.5f, 0.02f);   // the deferred restore after NTP lands after the first output
     if (!strcmp(sc, "hold") && t == 400) g_roomValid = false;
     if (widen) {
@@ -237,6 +244,10 @@ int main(int argc, char** argv) {
     } else if (!strcmp(sc, "first") || !strcmp(sc, "late")) {
       float out = tickPid(t, g_curveNow);
       printf("t=%d out=%.5f D=%.5f rawD=%.5f kd=%.5f\n", t, out, state.sat.fPidD, state.sat.fRawDerivative, state.sat.fKd);
+    } else if (!strcmp(sc, "zoneexit")) {          // TASK-1890: the zone integral per tick
+      tickPid(t, g_curveNow);
+      tickZone();
+      printf("t=%d zoneI=%.6f\n", t, satZones[0].fPidIntegral);
     } else if (!strcmp(sc, "zone") || !strcmp(sc, "zone1") || !strcmp(sc, "zone1none")) {
       tickPid(t, g_curveNow);
       float zo = tickZone();
@@ -433,6 +444,19 @@ class Cadence(unittest.TestCase):
             ki = (1.6 * curve / 3.0) / 8400.0
             self.assertAlmostEqual(zi[10], ki * 0.05 * 60.0 * steps, delta=1e-4, msg="zone I = steps * ki*error*60")
 
+    def test_g3_zone_integral_is_halved_once_outside_the_band_and_held(self):
+        # TASK-1890 (entries 329, 333, ADR-259): the zone PID follows the main PID rule; thermo-nova and the code before
+        # reset it to 0 outside the deadband (pid.py:187-189, the zones use the same PID class, area.py:50).
+        rows = self.run_sc("zoneexit", 60)
+        zi = {int(r["t"]): float(r["zoneI"]) for r in rows if "zoneI" in r}
+        built = zi[300]
+        self.assertGreater(built, 0.0, "premise: the zone integral built up inside the band")
+        outside = [zi[t] for t in (360, 420, 480)]
+        self.assertAlmostEqual(outside[0], built / 2, places=5, msg="zone integral not halved on leaving the band: %s" % zi)
+        self.assertAlmostEqual(outside[1], outside[0], places=6, msg="zone integral not held outside the band")
+        self.assertAlmostEqual(outside[2], outside[0], places=6, msg="zone integral not held outside the band")
+        self.assertGreater(zi[600], outside[2], "zone integral does not accumulate again from the held value")
+
     def test_g2_zone_count_1_steps_zone_1_and_leaves_an_unconfigured_zone_excluded(self):
         """TASK-1440: the zone block counts a single zone, so zone 1 steps at zone count 1 too.
         A zone that never received data stays excluded (satZoneUsable): integral 0, output 10,
@@ -556,7 +580,7 @@ class Cadence(unittest.TestCase):
 
     def test_m_first_output_with_pid_terms_has_d_zero_then_d(self):
         """Entry 95 Q39b (round 3): the first output that includes the PID terms has D = 0, also when it comes after a restore and
-        a stretch of curve-only outputs; the next output has D = kd * raw derivative (curve 40, coefficient 1.6: kd = 0.063 * 8400 * 1.6 * 40 / 3 = 11289.6, raw 0.02 -> 225.792)."""
+        a stretch of curve-only outputs; the next output has D = kd * raw derivative (curve 40, coefficient 1.6: kd = 0.05 * 8400 * round3(1.6 * 40 / 3) = 8959.86, raw 0.02 -> 179.197)."""
         if self.head:
             self.fail("HEAD has no restore hold")
         rows = {int(r["t"]): r for r in self.run_sc("holdsave", 10)}

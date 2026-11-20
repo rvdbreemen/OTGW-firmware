@@ -65,7 +65,7 @@ Sinds v2.0.0 bevat de firmware een `boards.h`-header die pin-mappings, feature f
 
 v2.0.0 is een grote platformrelease. Het is de ESP32-S3-only async + FreeRTOS-lijn. Instellingenbestanden van v1.3.x worden automatisch geladen zonder conversie.
 
-v2.0.0 is in publieke beta: releases verschijnen als GitHub prereleases. De bestaande functionaliteit is feature-compleet, maar SAT, OTDirect en de nieuwe MQTT-topicnamen (zie hieronder) worden nog verder verfijnd. SAT blijft experimenteel en opt-in. Volg de GitHub Releases-pagina voor de actuele beta.
+Releases van 2.0.0 staan op de GitHub Releases-pagina: beta's verschijnen als GitHub-prerelease, de stabiele 2.0.0 als gewone release. De bestaande functionaliteit is feature-compleet; SAT, OTDirect en de nieuwe MQTT-topicnamen (zie hieronder) worden nog verder verfijnd. SAT is stabiel vanaf 2.0.0; het blijft opt-in en staat standaard uit (zie Hoofdstuk 5).
 
 **Breaking change in deze release.** v2.0.0 gebruikt standaard een nieuwe, zelfbeschrijvende set MQTT-topicnamen (ADR-106). Zevenendertig OT-spec-georiënteerde binary_sensor-topics krijgen een duidelijker, Home Assistant-vriendelijk label (bijvoorbeeld: `master_ch_enable` wordt `central_heating_enabled`). Gebruikers met bestaande automations op de oude labels kunnen `settings.mqtt.bUseLegacyOtTopics` op `true` zetten om het v1.x-gedrag te behouden. De twee modi sluiten elkaar uit: of de nieuwe namen, of de oude namen worden gepubliceerd, nooit beide tegelijk. De REST API is ongewijzigd ten opzichte van v1.x.
 
@@ -95,7 +95,7 @@ v2.0.0 is in publieke beta: releases verschijnen als GitHub prereleases. De best
 - Platte MQTT-topics per waarde (ADR-101): elke sensor of regelwaarde wordt als platte scalar op zijn eigen topic gepubliceerd. Geen samengestelde JSON-state-topics. Dit is een bewuste keuze die auto-discovery transparant houdt en een eigen HA-component overbodig maakt.
 
 **Netwerk en stabiliteit**
-- AP-fallbackmodus: als Wi-Fi drie keer achter elkaar mislukt, opent het apparaat een accesspoint
+- AP-fallbackmodus (in alle builds vanaf 2.0.0-beta.401): als Wi-Fi twee keer achter elkaar mislukt, opent het apparaat een accesspoint
 - Wi-Fi-signaalniveauindicator in de webinterface (balkjes-icoon)
 - Driedubbele reset-procedure om Wi-Fi-instellingen te wissen zonder serieel
 - Nachtelijke herstart: configureerbare automatische reboot (tijdstip en dagkeuze) om heap-fragmentatie op te lossen bij langlopende apparaten

@@ -1,0 +1,56 @@
+name: web UI test Chrome leak check (POSIX)
+
+# TASK-1744: on Linux the web UI test harness must leave no Chrome process behind
+# (tests/webui/lib/page-harness.mjs starts Chrome detached and kills its whole process group).
+# Manual only: run it on a ref and compare the Chrome process count before and after.
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Commit or branch to test"
+        required: true
+        default: "dev"
+
+jobs:
+  chrome-leak:
+    name: Chrome processes before and after the web UI tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout the ref under test
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"   # the harness uses the global WebSocket (Node 22+)
+
+      - name: Show the Chrome binary
+        run: |
+          command -v google-chrome && google-chrome --version
+
+      - name: Run the two affected tests and count Chrome processes
+        shell: bash
+        run: |
+          set -u
+          count() { pgrep -c -f '[c]hrome' || true; }
+          before=$(count)
+          echo "chrome processes before: ${before}"
+          rc=0
+          for t in tests/webui/otd-override-clear.test.mjs tests/webui/graph-room-dropout.test.mjs; do
+            echo "::group::${t}"
+            node --test "${t}" || rc=1
+            echo "::endgroup::"
+          done
+          sleep 5
+          after=$(count)
+          echo "chrome processes after: ${after}"
+          echo "tests exit: ${rc}"
+          pgrep -a -f '[c]hrome' | head -20 || true
+          if [ "${after}" -gt "${before}" ]; then
+            echo "::error::Chrome processes left behind: ${before} before, ${after} after"
+            exit 1
+          fi

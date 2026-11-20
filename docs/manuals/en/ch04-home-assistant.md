@@ -312,6 +312,16 @@ Both values are also exposed as two standalone, discoverable Home Assistant sens
 
 A number entity is published for the outside-temperature override, letting HA push a value as if it came from a wired outdoor sensor.
 
+#### Gateway Override Sensors
+
+When the gateway injects a value on the bus (it answers the thermostat itself, or it writes its own value to the boiler instead of the thermostat's), the normal sensor keeps showing what the boiler side reports. A separate read-only sensor shows the injected value (ADR-118):
+
+- One sensor per override-capable MsgID: 1 `TSet`, 8 `TsetCH2`, 9 `TrOverride`, 14 `MaxRelModLevelSetting`, 16 `TrSet`, 39 `TrOverride2`, 56 `TdhwSet`, 57 `MaxTSet`. MsgID 27 (outside temperature) has the number entity above instead.
+- Name `<label> Override`, on the Gateway device, state topic `<pub>/<label>/override`. Unit °C with device class temperature; for MsgID 14 the unit is % (the maximum relative modulation the gateway applies after `MM=`).
+- It is announced like the other OpenTherm sensors, once its MsgID has been seen on the bus.
+- The topic is retained and published again every 60 s while the override is active. After 10 minutes without an override frame the override counts as ended: the firmware sends an empty retained message, which removes the topic from the broker, so the old value is not replayed after a restart of HA.
+- After a reboot the override store is empty, so after the next MQTT connect the firmware removes every `<label>/override` topic that is not active again (TASK-1991).
+
 #### Button Entity (PIC reset)
 
 A `button` entity called `resetgateway` is published under pseudo-ID 244 with `entity_category: config` and `payload_press: "1"`. Pressing it from the HA dashboard hardware-resets the PIC over its reset pin. To avoid storms from misconfigured automations the firmware now requires the exact payload `"1"` and applies a 5-second cooldown between successive resets; any other payload is silently ignored.
@@ -339,7 +349,7 @@ Switches:
 | `SAT_Solar_Gain` | Enable solar gain compensation |
 | `SAT_Summer_Simmer` | Enable summer simmer index auto-disable |
 | `SAT_Multi_Area` | Enable multi-area weighted room temperature |
-| `SAT_Simulation` | Run SAT in simulation mode (no real boiler control) |
+| `SAT_Simulation` | Run SAT in simulation mode (no real boiler control). Unavailable while a real boiler answers, because simulation is refused then; available again when no boiler answers or while simulation is on (ADR-255, Home Assistant 2021.2 or later) |
 | `SAT_Window_Detection` | Enable window-open detection |
 | `SAT_Overshoot_Protection` | PWM start-up and modulation suppression (CS override in the PWM phases) |
 | `SAT_Push_Setpoint` | Push control setpoint to boiler via TC= |
@@ -398,6 +408,8 @@ State-only topics (published and retained, but without a Home Assistant entity; 
 | `sat/preset` | Active preset (`none`, `away`, `eco`, ...) |
 | `sat/fallback_active` | MQTT-loss fallback switched SAT on. Reads `false` over MQTT, because the fallback only runs while MQTT is down; REST `/api/v2/sat/status` shows it live |
 | `sat/ot_link_lost` | `true` while SAT has seen no boiler reply for 30 s; SAT handed the boiler back once and resumes by itself on the next reply (see chapter 5, Safety System) |
+| `sat/no_ignition` | `true` while cH asked (PWM ON phase, or CS above the cold cutoff) for 180 s with the flow below CS and no flame. Diagnostic only, no control action (TASK-1882) |
+| `sat/heating_failure` | `true` after sAT at the maximum (setpoint clamped or PWM at maximum duty) for 15 min and the room rose < 0.5 C. Diagnostic only, no control action; slow houses can trigger it on a cold morning (TASK-1882) |
 | `sat/outside_temp_missing` | `true` while SAT has no outside temperature younger than 1 hour; SAT handed the boiler back once and resumes by itself when one arrives (see chapter 5, Safety System) |
 | `sat/simulation` | Simulation mode `ON`/`OFF` |
 

@@ -104,7 +104,7 @@ Returns the current health status of the device.
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `status` | string | `"UP"` or `"DEGRADED"` |
+| `status` | string | `"UP"`, or `"DEGRADED"` when LittleFS is not mounted, or when the last state file written by the file-writer task (SAT state) did not read back as written |
 | `uptime` | string | Human-readable uptime |
 | `heap` | integer | Free heap memory in bytes |
 | `networkmode` | string | Active network mode: `"wifi"`, `"ethernet"`, or `"ap"` |
@@ -1005,6 +1005,7 @@ The device-side history of the Monitor > Graph series (TASK-1296): oldest first,
   "roomSet": [205, 205, 205],
   "room": [198, 199, 199],
   "outside": [-35, -35, -34],
+  "satTarget": [205, 205, 210],
   "mod": [42, 40, null],
   "flame": [1, 1, 0],
   "dhw_on": [0, 0, 0],
@@ -1012,7 +1013,7 @@ The device-side history of the Monitor > Graph series (TASK-1296): oldest first,
 }
 ```
 
-Temperatures are integers: the value times `scale` (655 is 65.5 C). `null` means there is no sample for that slot (the boiler had not reported the value, or the loop was stalled). For `room` it also means a room dropout (TASK-1578): SAT reports `room_temp_lost`, or MsgID 24 has been silent for more than 270 s; the v2 UI draws such slots as the same interruption as the live graph. `flame`, `dhw_on` and `ch` are 1 when the state was active at any moment of the slot. `newest_age_ms` is the age of the END of the newest slot; slot `i` starts at `now - newest_age_ms - (count - i) * interval_s * 1000` and the web UI stamps it with that start, like its own 5-second records. `interval_s` is 30 or 120 accordingly. The history is held in RAM (1.8 KB internal RAM without PSRAM, 10 KB PSRAM with PSRAM) and starts empty after a reboot. The body is about 4 KB (no PSRAM) or 25 KB (PSRAM) when full and is sent in chunks; the endpoint answers `503` with `Retry-After: 1` when the heap is low. Firmware without this endpoint answers `404`.
+Temperatures are integers: the value times `scale` (655 is 65.5 C). `null` means there is no sample for that slot (the boiler had not reported the value, or the loop was stalled). For `room` it also means a room dropout (TASK-1578): SAT reports `room_temp_lost`, or MsgID 24 has been silent for more than 270 s; the v2 UI draws such slots as the same interruption as the live graph. `flame`, `dhw_on` and `ch` are 1 when the state was active at any moment of the slot. `newest_age_ms` is the age of the END of the newest slot; slot `i` starts at `now - newest_age_ms - (count - i) * interval_s * 1000` and the web UI stamps it with that start, like its own 5-second records. `interval_s` is 30 or 120 accordingly. `satTarget` (TASK-2018, ADR-256) is the SAT target while SAT was enabled and `null` otherwise; the array is left out when no slot of the window holds a SAT target, so a client must treat it as optional. The history is held in RAM (2 KB internal RAM without PSRAM, 79 KB PSRAM with PSRAM) and starts empty after a reboot. The body is about 4 KB (no PSRAM) or 24 KB (PSRAM, 27 KB with `satTarget`) when full and is sent in chunks; the endpoint answers `503` with `Retry-After: 1` when the heap is low. Firmware without this endpoint answers `404`.
 
 ---
 
@@ -1086,6 +1087,7 @@ Returns the full SAT runtime state including temperatures, PID terms, cycle data
 | `pid_p` | float | Proportional term |
 | `pid_i` | float | Integral term |
 | `pid_d` | float | Derivative term |
+| `pid_curve_only` | bool | True while the output is the heating curve alone (no room temperature yet, or lost): `pid_i` is shown but not applied (TASK-1866) |
 | `kp` | float | Current Kp gain |
 | `ki` | float | Current Ki gain |
 | `kd` | float | Current Kd gain |

@@ -3,11 +3,11 @@ id: TASK-1970
 title: >-
   REST POST /api/v2/otgw/commands answers 503 queue full when SAT refuses the
   command
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-15T11:44:00Z'
-updated_date: '2026-11-15T12:31:00Z'
+updated_date: '2026-11-16T08:24:00Z'
 labels:
   - rest
   - bug
@@ -27,7 +27,7 @@ Found by 09 on .63 (beta.306+041400e, 2026-11-15, TASK-1943 bench): POST /api/v2
 <!-- AC:BEGIN -->
 - [x] #1 A SAT refusal gets its own answer: 409 with a clear message (refused: SAT is in control); 503 stays only for a really full queue
 - [x] #2 Host test on the real REST command path: SAT refusal -> 409, full queue -> 503, accepted -> as today; red on the old code, green on the fix
-- [ ] #3 openapi.yaml and docs/api/README.md describe the 409; evaluate.py --quick no new FAIL; esp32-combo build
+- [x] #3 openapi.yaml and docs/api/README.md describe the 409; evaluate.py --quick no new FAIL; esp32-combo build
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -36,4 +36,12 @@ Found by 09 on .63 (beta.306+041400e, 2026-11-15, TASK-1943 bench): POST /api/v2
 2026-11-15 fix: handleCommandSubmit() (restAPI.ino) checks the ADR-179 rule itself before queuing (satOwnsControlSetpoint() && satBlocksExternalCommand(), the same predicate addCommandToQueue() and the OT-Direct handler use), counts it with satNoteExternalRefused() and answers 409 'Command refused: SAT is in control of the boiler (disable SAT to send it)'; 503 stays for a full queue / ring. Side effect, wanted: on OT-Direct the command used to get 202 and was refused later on the loop task, now the client sees the 409 too. MQTT and the other callers are unchanged. Evidence: tests/test_rest_command_sat_refusal.py compiles the REAL handleCommandSubmit + otgwCommandFormatOk + satBlocksExternalCommand with a queue double that refuses like addCommandToQueue: fix 4/4 OK (CS=/MM= with SAT -> 409, not queued, counted; HW=/PR= with SAT -> 202; CS= without SAT -> 202; full queue -> 503); against origin's sources (OTGW_SRC_DIR) FAILED: 'satcs status=503 queued=1 noted=1 msg=Command not queued (queue full)'. test_rest_command_format, test_sat_command_delivery PASS. Web UI (v2.js sendCmd) shows the firmware's error message, so the 409 text reaches the user. openapi.yaml: 409 and 503 on POST /v2/otgw/commands (503 was undocumented too); docs/api/README.md. evaluate 0 FAIL.
 
 2026-11-15 bench (09 on .63, bench build 2.0.0-beta.304+ffd0a64, relayed by the coordinator): PASS: CS=40 with SAT enabled -> 409 with the message, HW=1 -> 202, SAT off -> CS=40 202. The .61 (OT-Direct) part follows after ~14:56.
+
+2026-11-16 close-out (ba): AC3 evidence: docs/api/openapi.yaml lists '409' and '503' under /v2/otgw/commands, docs/api/README.md:481 describes the 409 (SAT refusal of CV control commands); evaluate.py --quick on origin/dev 52283d842 (contains fix 06f3ca215): 95 checks, 0 FAIL, 0 WARN, health 100 %; esp32-combo bench build 2.0.0-beta.304+ffd0a64 PASS on .63 by 09 (c11aedf4c); the fix ships in v2.0.0-beta.339.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+SAT refusal of an external command now answers 409 instead of 503 'queue full' (fix 06f3ca215, in v2.0.0-beta.339). AC1: handleCommandSubmit() checks the ADR-179 rule (satOwnsControlSetpoint() && satBlocksExternalCommand()) before queuing and answers 409 'refused: SAT is in control'; 503 stays for a really full queue. AC2: tests/test_rest_command_sat_refusal.py 4/4 on the fix, red on the old code ('satcs status=503 ... queue full'). AC3: openapi.yaml (409 + 503 under /v2/otgw/commands) and docs/api/README.md:481; evaluate.py --quick on origin/dev 52283d842: 95 checks, 0 FAIL, 0 WARN; esp32-combo bench build beta.304+ffd0a64, 09 on .63 PASS: CS=40 with SAT on -> 409, HW=1 -> 202, SAT off CS=40 -> 202 (c11aedf4c). Not an AC and not tested: the OT-Direct board (.61) path.
+<!-- SECTION:FINAL_SUMMARY:END -->

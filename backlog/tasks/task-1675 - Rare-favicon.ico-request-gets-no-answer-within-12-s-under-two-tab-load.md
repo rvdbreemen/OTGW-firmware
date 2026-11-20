@@ -1,11 +1,11 @@
 ---
 id: TASK-1675
 title: Rare /favicon.ico request gets no answer within 12 s under two-tab load
-status: In Review
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-06T19:39:00Z'
-updated_date: '2026-11-09T17:10:00Z'
+updated_date: '2026-11-16T07:52:00Z'
 labels:
   - bug
 milestone: 2.0.0
@@ -46,6 +46,10 @@ Draft waiver text for Robert (stable notes, Known issues): 'Rarely (about 1 in 1
 2026-11-09: the AsyncTCP accept side finding is filed as TASK-1746 (unconfirmed crash risk, needs-maintainer-ok).
 
 R1, 2026-11-09 11:09-12:40, .61 beta.162 (with TASK-1528 step b, boots 2/4/6/8/10): the two-tab trace from the first HTTP answer after boot to +120 s, 1496 requests in total. Results: boot 2: 274 ok / 2 fail; boot 4: 303/1; boot 6: 308/0; boot 8: 296/0; boot 10: 312/0. All 3 failures are '/' (175047 B) with status 200 and a connection RESET mid-body (phase d, send path): 83288 B at 11:21:21.9 (boot +8 s), 22976 B at 11:21:32.6 (boot +19 s), 74672 B at 11:36:22.5 (boot +20 s). t_conn 13-31 ms, t_first 74-98 ms. 0 hangs, 0 connect timeouts, 0 favicon failures; worst t_first 0.63 s. Context: in these boots the native heap minimum was 2544 resp. 1368 B (TASK-1528 notes), so the resets coincide with near heap exhaustion in the boot window. Reading per the decision rule: no hang in R1 (the rule reopens on a hang); the mid-body resets are a different symptom (body abort under low heap) and are not covered by the waiver text. Robert/coordinator decide whether this reopens the task or goes into the TASK-1528 heap thread. R2 (end of the RC 24 h soak) still to do. Data local: scratchpad t1528step-b/run-20261109/boot*T-trace.log.
+
+2026-11-16 01:12-01:24, 09 bench on .61 (OT-Direct), beta.331+e4dbf70 (= origin/dev 0a6ffd33e + TASK-1979/1867, no web-server change), uptime 0:17-0:29, bootcount 799: NOT reproduced. Two-tab load (2 threads, each round GET / with Accept-Encoding gzip (205366 B) then GET /favicon.ico (3627 B), fresh connection per request, Connection: close, 12 s timeout), telnet captured alongside. Run 1: 2 x 100 rounds = 400 requests, 0 failures; / median 1486 ms, p99 2108, max 2985; favicon median 74 ms, p99 144, max 174. Run 2: 2 x 250 rounds = 1000 requests, 0 failures; / median 1474 ms, p99 1992, max 3200; favicon median 81 ms, p99 144, max 295. hd_webfile_* counters before/after: queued 0, admitted 0, timeout 0, 503 0, webconn_503 0, weback_abort 0, inflight_hwm 1 -> 2. So 0 of 1400 vs the original 4 of 400 on beta.112. AC1 stays open: no hang to capture on current code; AC2 (beta.109 comparison) not run, it needs a reproduction first. Proposal for the owner: close as not reproducible on 2.0.0-beta.331 unless a field report shows it again. Evidence (local, 09 scratchpad t1675/): twotab.py, r1_results.json, r2/results.json, r1_telnet.raw, r2/telnet.raw, info0/1.txt.
+
+2026-11-16 closed on Robert's decision (DM 1571794242546962504, option A): not reproducible since ADR-216; AC1-AC3 waived. Reopen recipe: run the two-tab load from 09 scratchpad t1675/twotab.py (2 threads; per round GET / with Accept-Encoding gzip, then GET /favicon.ico; fresh connection per request, Connection: close, 12 s timeout) with telnet web debug captured alongside, and read hd_webfile_* / hd_weback_abort from /api/v2/device/info before and after. Conditions not yet covered and worth targeting on a reopen: a deep heap dip (hd_min_free_heap well below 15 KB) and uptime > 24 h (the ack-abort wrap hypothesis). Add a pcap if admin rights for pktmon or a Wireshark host are available. Compare with beta.109 (AC2) only after a reproduction exists.
 <!-- SECTION:NOTES:END -->
 
 ## Comments
@@ -59,3 +63,9 @@ Robert, 2026-11-09: stays open. The boot-time heap drop (1.1-3.6 KB under web lo
 
 ---
 <!-- COMMENTS:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Closed as not reproducible since ADR-216 (the WEB_TCP_SEND_CAP send cap). AC1-AC3 waived by Robert, DM 1571794242546962504 (option A, 2026-11-16). Evidence: seen only on beta.112/113 (no send cap, 4 of 400, about 1 %) and on the PR #697 builds; since the cap 0 failures in 2300 requests: beta.116 900 (TASK-1673 A/B 500 + trace 400), beta.331+e4dbf70 on .61 1400 (2026-11-16 01:12-01:24, favicon p99 144 ms, max 295 ms; hd_webfile timeout/503/weback_abort all 0). Not covered: a run during a deep heap dip and at uptime > 24 h; root cause never observed (no pcap). Reopen recipe in the notes (09 scratchpad t1675/twotab.py).
+<!-- SECTION:FINAL_SUMMARY:END -->

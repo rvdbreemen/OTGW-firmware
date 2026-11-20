@@ -165,6 +165,7 @@ static struct {
 static struct {
   float OpenThermVersionSlave; float OpenThermVersionMaster;          // read by useV4xReservedIdRules()
   uint16_t error01, error02, error03, error04;                        // the non-OT "Error 0x" branches
+  uint16_t SlaveStatus;                                               // processOT() skips the flow average during hot water (TASK-1990)
 } OTcurrentSystemState;
 static uint32_t lastOTmsgMs = 0;
 static char cMsg[128];

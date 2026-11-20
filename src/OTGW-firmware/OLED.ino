@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OLED.ino
-**  Version  : v2.0.0-beta.327
+**  Version  : v2.0.0-beta.401
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -220,9 +220,8 @@ static void drawConfigBody(const char* ssid, const char* pw, const char* url) {
   }
 }
 
-#if defined(_VERSION_PRERELEASE)
 // ---------------------------------------------------------------------------
-// drawPageConfig - WiFi-setup / AP-fallback screen (BETA AP fallback only).
+// drawPageConfig - WiFi-setup / AP-fallback screen (TASK-2931: prerelease and stable builds).
 // Shown as the forced first page while state.net.bAPFallback is active so a
 // freshly-booted, WiFi-less device tells the user how to reach the web UI.
 // SSID comes from state.net.sAPSSID; password and IP mirror startAPFallback()
@@ -232,7 +231,6 @@ static void drawPageConfig() {
   drawConfigHeader();
   drawConfigBody(state.net.sAPSSID, "otgw1234", "http://192.168.4.1/");
 }
-#endif
 
 // ---------------------------------------------------------------------------
 // Page 1: Network status - transport, IP, MQTT
@@ -355,8 +353,13 @@ static void drawPageDevice() {
 
   // Firmware version
   oledRow(2);
+  // TASK-2932: a stable build has no _VERSION_PRERELEASE; stringifying it there printed the bare macro name.
+#if defined(_VERSION_PRERELEASE)
   snprintf_P(oledBuf, sizeof(oledBuf), PSTR("FW %d.%d.%d-" OLED_STR(_VERSION_PRERELEASE)),
     _VERSION_MAJOR, _VERSION_MINOR, _VERSION_PATCH);
+#else
+  snprintf_P(oledBuf, sizeof(oledBuf), PSTR("FW %d.%d.%d"), _VERSION_MAJOR, _VERSION_MINOR, _VERSION_PATCH);
+#endif
   oledDisplay.print(oledBuf);
 
   // Hostname (truncated to fit)
@@ -614,9 +617,7 @@ void loopOLED() {
 
   // Auto-off after timeout. Suppressed during AP fallback: the "how to connect"
   // screen must stay visible for a user who walks up long after boot.
-  bool keepAwake = false;
-#if defined(_VERSION_PRERELEASE)
-  keepAwake = state.net.bAPFallback;
+  bool keepAwake = state.net.bAPFallback;   // TASK-2931: AP fallback also in stable builds
   // If AP fallback engaged while the display was off, wake it so the user sees
   // the "how to connect" screen without having to press the button.
   if (keepAwake && oledPage == 0) {
@@ -624,7 +625,6 @@ void loopOLED() {
     oledDisplay.ssd1306WriteCmd(0xAF);  // DISPLAYON
     oledLastRefresh = 0;                // force immediate redraw
   }
-#endif
   if (!keepAwake && oledPage != 0 && (now - oledLastActivity) >= OLED_TIMEOUT_MS) {
     oledDisplay.ssd1306WriteCmd(0xAE);  // DISPLAYOFF
     oledPage = 0;
@@ -644,14 +644,12 @@ void loopOLED() {
     oledLastRenderedPage = oledPage;
   }
 
-#if defined(_VERSION_PRERELEASE)
-  // While the BETA AP fallback is active there is no usable network/OT data;
+  // While the AP fallback is active there is no usable network/OT data;
   // always show the "how to connect" screen so the user can reach the web UI.
   if (state.net.bAPFallback) {
     drawPageConfig();
     return;
   }
-#endif
 
   switch (oledPage) {
     case 1: drawPageNetwork();   break;

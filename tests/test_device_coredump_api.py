@@ -62,6 +62,28 @@ esp_err_t esp_core_dump_get_summary(esp_core_dump_summary_t *s) {
   return ESP_OK;
 }
 const esp_partition_t* esp_partition_find_first(int t, int st, const char*) { return (t == ESP_PARTITION_TYPE_DATA && st == ESP_PARTITION_SUBTYPE_DATA_COREDUMP) ? &g_part : nullptr; }
+// TASK-1983: the running app's ELF sha. The app description holds all 32 bytes (esp_app_desc.h:35); the IDF helper
+// esp_app_get_elf_sha256() hands out at most CONFIG_APP_RETRIEVE_LEN_ELF_SHA characters (9 in our sdkconfig), whatever
+// buffer it gets: 09 saw "4cc905236" on .61 (beta.342). The stubs model both, so a shim on the helper shows 9 characters.
+static char g_runSha[80] = "FEDCBA9876543210fedcba9876543210FEDCBA9876543210fedcba9876543210";
+static int g_runShaCalls = 0;
+static const size_t CONFIG_APP_RETRIEVE_LEN_ELF_SHA = 9;
+int esp_app_get_elf_sha256(char* dst, size_t size) {
+  g_runShaCalls++;
+  if (size == 0) return 0;
+  size_t n = strlen(g_runSha); if (n > CONFIG_APP_RETRIEVE_LEN_ELF_SHA) n = CONFIG_APP_RETRIEVE_LEN_ELF_SHA;
+  if (n > size - 1) n = size - 1;
+  memcpy(dst, g_runSha, n); dst[n] = 0; return (int)(n + 1);
+}
+struct esp_app_desc_t { uint8_t app_elf_sha256[32]; };
+static esp_app_desc_t g_desc;
+const esp_app_desc_t* esp_app_get_description() {
+  g_runShaCalls++;
+  for (int i = 0; i < 32; i++) {   // the bytes behind the hex in g_runSha
+    unsigned v = 0; sscanf(g_runSha + 2 * i, "%2x", &v); g_desc.app_elf_sha256[i] = (uint8_t)v;
+  }
+  return &g_desc;
+}
 esp_err_t esp_partition_read(const esp_partition_t* p, size_t off, void* dst, size_t len) {
   if (off + len > p->size) return ESP_FAIL;
   memcpy(dst, g_flash.data() + off, len); return ESP_OK;
@@ -118,6 +140,11 @@ int main() {
   g_sumOk = true; g_valid = false;
   ok = platformCoreDumpAppSha(sha, sizeof(sha));
   printf("sha_nodump|%d|%s\n", (int)ok, sha);
+  // TASK-1983: the running app's sha, lowercase, read once and cached (independent of any dump)
+  const char* run1 = platformRunningAppSha();
+  strcpy(g_runSha, "0000000000000000000000000000000000000000000000000000000000000000");
+  const char* run2 = platformRunningAppSha();
+  printf("run_sha|%s|%d|%d\n", run1, (int)(run1 == run2 && strcmp(run1, run2) == 0), g_runShaCalls);
   return 0;
 }
 """
@@ -165,6 +192,14 @@ class CoreDumpSource(unittest.TestCase):
         self.assertIn("otgw-coredump-app-%.9s.bin", h)
         self.assertIn("otgw-coredump.bin", h)   # fallback without a readable summary
         self.assertRegex(h, r'if \(haveSha\) webPushHeader\(F\("X-Coredump-App-Sha256"\), appSha\)')
+
+    def test_running_app_sha_next_to_the_dumps_own(self):
+        # TASK-1983: the capture tool compares the two to date the dump (this build or an earlier one)
+        self.assertRegex(self.handler, r'webPushHeader\(F\("X-Running-App-Sha256"\), platformRunningAppSha\(\)\)')
+
+    def test_device_info_carries_the_running_app_sha(self):
+        info = cut(self.rest, 'je.beginObject(F("device"));', 'je.field(F("compiled")')
+        self.assertIn('je.field(F("appelfsha256"), platformRunningAppSha());', info)
 
     def test_never_allocates_the_dump(self):
         h = self.handler
@@ -225,6 +260,10 @@ class CoreDumpShim(unittest.TestCase):
 
     def test_app_sha_is_bounded_by_the_buffer(self):
         self.assertEqual(self.r["sha_small"], ["1", "a1b2"])
+
+    def test_running_app_sha_is_lowercase_full_and_read_once(self):
+        # TASK-1983: device/info and the dump response carry the running image's own ELF sha256, read once per boot
+        self.assertEqual(self.r["run_sha"], ["fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210", "1", "1"])
 
     def test_app_sha_absent_cases(self):
         for key in ("sha_empty", "sha_nonhex", "sha_nosummary", "sha_nodump"):

@@ -150,12 +150,17 @@ def main():
         tidy(axis)
 
     s_ax = ax["status"]
+    # TASK-1987: without flame, light blue only where the master asks for CH; the boiler's CH mode without a request
+    # (its pump overrun) is grey, not a heat request
+    for d0, d1, k in cs.demand_spans(frames, seg):
+        s_ax.broken_barh([(d0, d1 - d0)], (1.62, 0.76), color=C["blue"] if k == "demand" else C["ink2"],
+                         alpha=0.35 if k == "demand" else 0.18, lw=0)
     for s, e, lb in seg:
         heat, dhw, flame = lb & 0x02, lb & 0x04, lb & 0x08
         if dhw:
             s_ax.broken_barh([(s, e - s)], (0.62, 0.76), color=C["mag"], alpha=1.0 if flame else 0.35, lw=0)
-        elif heat or flame:
-            s_ax.broken_barh([(s, e - s)], (1.62, 0.76), color=C["blue"], alpha=1.0 if flame else 0.35, lw=0)
+        elif flame:
+            s_ax.broken_barh([(s, e - s)], (1.62, 0.76), color=C["blue"], alpha=1.0, lw=0)
         if flame and (e - s).total_seconds() >= 600:
             s_ax.text(s + (e - s) / 2, 2.42 if not dhw else 1.42, f"{(e - s).total_seconds() / 60:.0f} min",
                       ha="center", va="bottom", fontsize=8.5, color=C["ink2"])
@@ -176,7 +181,8 @@ def main():
                       f"({(x1 - x0).total_seconds() / 3600:.1f} h). Numbers mark the moments listed below.",
               transform=s_ax.transAxes, fontsize=9, color=C["ink2"])
     leg = [Patch(color=C["blue"], label="Heating, flame/compressor on"),
-           Patch(color=C["blue"], alpha=0.35, label="Heating demand, no flame"),
+           Patch(color=C["blue"], alpha=0.35, label="Heating requested, no flame"),
+           Patch(color=C["ink2"], alpha=0.18, label="Boiler CH mode only (pump overrun)"),
            Patch(color=C["mag"], label="Hot water, flame/compressor on")]
     if band_labels:
         leg.append(Patch(color=C["orange"], alpha=0.55, label=f"{band_labels[0]} active"))
@@ -235,9 +241,13 @@ def main():
     if not picks:
         return
     fig, zaxs = plt.subplots(1, len(picks), figsize=(6.5 * len(picks), 4.8), squeeze=False)
+    zspans = cs.demand_spans(frames, seg)   # TASK-1987: shade the master's request, not the previous run's overrun
     for zax, p in zip(zaxs[0], picks):
         s, e, lb = runs[p]
-        pre = next((q for q in seg if q[1] == s and not q[2] & 0x08 and q[2] & 0x06), None)
+        if lb & 0x04:   # hot water: the slave DHW-mode phase before ignition
+            pre = next((q for q in seg if q[1] == s and not q[2] & 0x08 and q[2] & 0x04), None)
+        else:
+            pre = next(((d0, d1) for d0, d1, k in zspans if d1 == s and k == "demand"), None)
         a0 = (pre[0] if pre else s) - dt.timedelta(minutes=6)
         a1 = e + dt.timedelta(minutes=15)
         for ser, col, lab in ((sup, C["blue"], "Supply"), (ret, C["orange"], "Return"), (tank, C["aqua"], "Hot-water tank")):
@@ -257,7 +267,7 @@ def main():
         tidy(zax)
     handles, labels = zaxs[0][0].get_legend_handles_labels()
     fig.legend(handles, labels, loc="upper right", frameon=False, fontsize=8.5, ncol=3)
-    fig.text(0.05, 0.015, "Dotted lines: flame/compressor on and off. Light band: demand without flame. "
+    fig.text(0.05, 0.015, "Dotted lines: flame/compressor on and off. Light band: heating or hot water requested, no flame yet. "
                           "Raw OpenTherm readings.", fontsize=8.3, color=C["ink2"])
     fig.subplots_adjust(left=0.06, right=0.99, top=0.84, bottom=0.15, wspace=0.16)
     fig.savefig(out / "capture-runs.png", dpi=130)

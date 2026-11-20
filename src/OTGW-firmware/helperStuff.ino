@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : helperStuff
-**  Version  : v2.0.0-beta.327
+**  Version  : v2.0.0-beta.401
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -237,8 +237,8 @@ bool updateLittleFSStatus(const char *probePath)
 // TASK-1865: the LittleFS mount check and the write probe run here, on the loop task. They used to run in
 // sendHealth() on async_tcp, where every health poll did two full lfs_fs_size() traversals (one cross-core flash
 // read per block) only to refresh LittleFSmounted; a hang in such a flash read starved the loop task on the same core
-// into the task watchdog (core dump beta.182). Mount check every 60 s, the flash write probe every 5 minutes
-// (TASK-1205: a failed probe keeps LittleFSmounted false until the next probe). The caller skips it while flashing.
+// into the task watchdog (core dump beta.182). TASK-2020: one read-only mount check every 60 s, also while LittleFSmounted
+// is false (the TASK-1205 recovery); the 5-min write probe is gone. The caller skips it while flashing.
 // --- fsFileFlags begin
 // TASK-1899: /api/v2/simulate and /api/v2/device/info report whether two files exist. Their handlers run on async_tcp,
 // where LittleFS.exists() is a cross-core flash read; one of them hung there and starved the loop task into the task
@@ -249,24 +249,79 @@ void refreshLittleFSFileFlags() {
 }
 // --- fsFileFlags end
 
+// TASK-1995: one telnet line when a LittleFS step of the loop takes 100 ms or more, so a [loop-stall] in the
+// background step can be tied to its cause. Diagnostics only: no output below the threshold.
+static void fsSlowNote(PGM_P step, uint32_t t0)
+{
+  const uint32_t dt = millis() - t0;
+  if (dt >= 100) DebugTf(PSTR("[fs-slow] %s %lu ms\r\n"), step, (unsigned long)dt);
+}
+
+// TASK-1995 Step B: the mount check runs on the fsWriter task (core 0), not on the loop task. In 09's capture on .61
+// (beta.366) it cost 103-179 ms every minute. loopLittleFSStatus() only raises a request; the writer task takes it
+// between two writes (owner-task pattern).
+// TASK-2020: the check only reads. The 5-min /.health write probe is gone: a flash write or erase over SPI1 stops the
+// other core too (ESP-IDF v5.5.1 'Concurrency Constraints for Flash on SPI1', auto-suspend off), so its erase stalled
+// the loop task whichever task wrote (09, .61, 370+ad83aff: probe 228 ms, stall 217 ms). The 60-s check also runs while
+// LittleFSmounted is false, so a filesystem that reads again is reported mounted again within a minute (the TASK-1205
+// recovery the probe did every 5 min). A filesystem that reads but no longer writes is reported by the writes through
+// the writer task (fsWriterWriteFailed()).
+// --- fsHealth begin
+static std::atomic<bool> s_fsMountCheckRequest{false};
+// A slow check measured on the writer task, in ms (0 = none). The loop task prints it: the writer task prints nothing,
+// because _debugBOL() works in static buffers every caller shares (two tasks printing at once mix their lines; the
+// telnet write itself is locked), and the formatting needs stack the writer task does not have.
+static std::atomic<uint32_t> s_fsHealthNote{0};
+
+// Runs on the writer task (fsWriterStep(), after its pause and image-write checks), or on the loop task when the
+// writer task does not run. While flashing a request waits. Returns true when it ran a check. No Debug* or telnet
+// output here.
+bool fsHealthService()
+{
+  if (isFlashing()) return false;
+  if (!s_fsMountCheckRequest.exchange(false)) return false;
+  const uint32_t t0 = millis();
+  LittleFSmounted = platformFSInfo(LittleFSinfo);
+  const uint32_t dt = millis() - t0;
+  if (dt >= 100) s_fsHealthNote = dt;
+  return true;
+}
+
+// On the loop task: print the slow check the writer task measured, in the [fs-slow] format of fsSlowNote().
+static void fsHealthPrintNote()
+{
+  const uint32_t ms = s_fsHealthNote.exchange(0);
+  if (ms == 0) return;
+  DebugTf(PSTR("[fs-slow] mount-check %lu ms%s\r\n"), (unsigned long)ms, fsWriterRunning() ? " (writer)" : "");
+}
+
+static void fsHealthRequest(std::atomic<bool>& request)
+{
+  request = true;
+  if (!fsWriterRunning()) fsHealthService();   // no writer task: run it here, as before
+}
+// --- fsHealth end
+
 void loopLittleFSStatus() {
-  DECLARE_TIMER_MIN(fsWriteProbe, 5, SKIP_MISSED_TICKS);
   DECLARE_TIMER_SEC(fsMountCheck, 60, SKIP_MISSED_TICKS);
   DECLARE_TIMER_SEC(fsFileFlags, 10, SKIP_MISSED_TICKS);   // TASK-1899: a new or removed file shows within 10 s
   static bool fsFileFlagsRead = false;                      // the first loop pass reads them at once
-  if (DUE(fsWriteProbe)) {
-    updateLittleFSStatus(F("/.health"));
-    return;
-  }
+  fsHealthPrintNote();   // TASK-1995: a slow check the writer task measured
+  uint32_t t0 = millis();
   if (!fsFileFlagsRead || DUE(fsFileFlags)) {   // two cheap lookups: no own pass, the mount check keeps its rhythm
     fsFileFlagsRead = true;
     refreshLittleFSFileFlags();
+    fsSlowNote(PSTR("file-flags"), t0);
   }
+  t0 = millis();
   loopDallasLabels();   // TASK-1912: write a changed labels copy (cheap when nothing changed)
+  fsSlowNote(PSTR("dallas-labels"), t0);
+  t0 = millis();
   loopSatMarkers();     // TASK-1911: and a changed markers copy
-  if (DUE(fsMountCheck) && LittleFSmounted) {
-    LittleFSmounted = platformFSInfo(LittleFSinfo);
-  }
+  fsSlowNote(PSTR("sat-markers"), t0);
+  // TASK-1995: the check is raised for the fsWriter task only now, after this pass's own LittleFS calls, so the writer
+  // does not hold the LittleFS lock while they run in this pass. TASK-2020: also while unmounted (the recovery).
+  if (DUE(fsMountCheck)) fsHealthRequest(s_fsMountCheckRequest);
 }
 
 // PROGMEM overload for updateLittleFSStatus
@@ -854,6 +909,7 @@ void doRestart(const char* str) {
   DebugTf(PSTR("[reboot]   flushSettings: %lums\r\n"), (unsigned long)(millis() - t));
 
   flushDHWWaterMeter();   // TASK-1123: an orderly restart loses no litres of the DHW water total
+  if (!fsWriterDrain(2000)) DebugTln(F("[reboot]   fswriter: queue not empty after 2 s"));   // TASK-1989
 
   prepareForReboot();     // graceful shutdown: MQTT LWT, WS close frames, TCP FINs
   // NOTE: prepareForReboot() called debugTelnet.stop() near its end, so every
@@ -1220,10 +1276,13 @@ void logHeapStats() {
     case HEAP_CRITICAL: levelStr = "CRITICAL"; break;
   }
   
-  DebugTf(PSTR("Heap: %u bytes free, %u max block, level=%s, WS_drops=%u, MQTT_drops=%u\r\n"),
+  // TASK-2007: fsw_stack_free = the fswriter task's free stack at its low point (bytes, -1 = no task); its 4096 B
+  // stack is only resized once field values exist. platformIpcStackHighWater() works for any task name.
+  DebugTf(PSTR("Heap: %u bytes free, %u max block, level=%s, WS_drops=%u, MQTT_drops=%u, fsw_stack_free=%ld\r\n"),
           freeHeap, maxBlock, levelStr,
           (uint32_t)state.heapdiag.iWsDropsTotal,
-          (uint32_t)state.heapdiag.iMqttDropsTotal);
+          (uint32_t)state.heapdiag.iMqttDropsTotal,
+          (long)platformIpcStackHighWater("fswriter"));
 }
 
 //===========================================================================================

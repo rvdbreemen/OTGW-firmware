@@ -23,9 +23,9 @@ static const float SAT_PID_UPDATE_INTERVAL      = 60.0f;   // seconds (pid.py:20
 // Derivative alpha is now adaptive: alpha = dt / (PID_UPDATE_INTERVAL + dt)
 static const float SAT_PID_DERIVATIVE_CAP       = 5.0f;    // Max raw derivative magnitude
 static const float SAT_PID_AGGRESSION_V3        = 8400.0f;
-// Kd factor 0.063: Sergeant D decided it (entry 279, KD -10% for the morning warm-up). Deliberate deviation from
-// thermo-nova pid.py:93, which uses 0.07.
-static const float SAT_PID_KD_FACTOR            = 0.063f;
+// Kd factor 0.05: Sergeant D decided it (entry 425, which supersedes the 0.063 of entry 279). Deliberate deviation
+// from thermo-nova pid.py:93, which uses 0.07.
+static const float SAT_PID_KD_FACTOR            = 0.05f;
 
 // Underfloor divisor=4, radiator divisor=3 for Kp calculation
 static const float SAT_PID_KP_DIVISOR_FLOOR     = 4.0f;
@@ -35,6 +35,7 @@ static const float SAT_PID_KP_DIVISOR_RAD       = 3.0f;
 static float  _pid_lastError          = 0.0f;
 static float  _pid_previousError      = 0.0f;
 static float  _pid_integral           = 0.0f;
+static bool   _pid_inBand             = true;   // TASK-1890: the previous integral update was inside the deadband
 static float  _pid_rawDerivative      = 0.0f;
 static float  _pid_lastRoomTemp       = 0.0f;
 static float  _pid_lastCurveValue     = 0.0f;
@@ -55,6 +56,9 @@ static bool   _pid_firstOutputPending = true;
 // false a missing room temperature keeps the restored integral and raw derivative (satPidCurveOnly()).
 static bool   _pid_roomSeen           = false;
 bool satPidRoomSeen() { return _pid_roomSeen; }
+// TASK-1866: true while the PID output is the heating curve alone (satPidCurveOnly(): no room temperature since the boot,
+// or it was lost); fPidI may then show the restored integral (entry 115), which is not applied. REST pid_curve_only.
+bool satPidCurveOnlyActive() { return isnan(_pid_lastError); }
 
 // When the PID first saw the current room temperature (TASK-1195). It stands in
 // for HA's last_changed, by which pid.py times the derivative (climate.py:314).
@@ -95,6 +99,7 @@ void satPidRestoreState(float integral, float rawDerivative)
 {
   _pid_integral      = integral;
   _pid_rawDerivative = rawDerivative;
+  _pid_inBand        = true;   // TASK-1890: the next update outside the band halves the restored value once
   _pid_firstOutputPending = true;   // a restore landing after the first output still gives D = 0 on the next one (entry 95 Q39b)
   // A restore that lands late overwrites the live integral and raw derivative; it does not wait for a reset.
   state.sat.fPidI    = satPidRound3(integral);
@@ -150,6 +155,7 @@ void satPidRestoreLast(bool errorHeld, float lastError, bool tempHeld, float las
 void satPidResetTerms()
 {
   _pid_integral      = 0.0f;
+  _pid_inBand        = true;   // TASK-1890: a reset starts as if inside the band (halving 0 changes nothing)
   _pid_rawDerivative = 0.0f;
   state.sat.fPidI          = 0.0f;
   state.sat.fPidD          = 0.0f;
@@ -163,6 +169,7 @@ void satPidReset()
   _pid_lastError          = 0.0f;
   _pid_previousError      = 0.0f;
   _pid_integral           = 0.0f;
+  _pid_inBand             = true;   // TASK-1890
   _pid_rawDerivative      = 0.0f;
   _pid_lastRoomTemp       = 0.0f;
   _pid_lastCurveValue     = 0.0f;
@@ -189,8 +196,11 @@ void satPidReset()
 // loss is a normal one. _pid_lastError = NAN marks "no held error": satPidOutput() then
 // returns the curve alone (never NaN) until the next step stores a real error.
 // Exception (entry 115): while no valid room temperature has been seen since the boot or the last satPidReset(),
-// the integral and raw derivative restored from flash are kept (and shown), and only P and D are 0: the output is
-// the curve, and satSavePidState() does not write (satPidRoomSeen()) so the restored state is not overwritten.
+// the integral and raw derivative restored from flash are kept, and state.sat.fPidI still shows the restored integral,
+// but none of P, I and D is in the output: the output is the curve alone (entries 115, 388 option B; entry 357's
+// curve + P + I + D is for 2.1.0). satPidCurveOnlyActive() marks this (REST pid_curve_only, TASK-1866), so a client
+// can tell the shown I from the applied one. satSavePidState() does not write (satPidRoomSeen()) so the restored
+// state is not overwritten.
 // state.sat.fError reads 0 meanwhile: no NaN reaches the publishers, the persisted state or the statistics.
 float satPidCurveOnly(float heatingCurveValue)
 {
@@ -198,6 +208,7 @@ float satPidCurveOnly(float heatingCurveValue)
   if (_pid_roomSeen) {                  // a reading was lost: reset (entries 38, 46)
     _pid_integral      = 0.0f;
     _pid_rawDerivative = 0.0f;
+    _pid_inBand        = true;   // TASK-1890
     state.sat.fPidI = 0.0f;
     state.sat.fRawDerivative = 0.0f;
   }
@@ -212,7 +223,7 @@ float satPidCurveOnly(float heatingCurveValue)
 //=== Auto-Gain Calculation (Version 3) ===
 // Automatic gains from the heating curve (thermo-nova pid.py automatic_gains=True), each rounded to 3 decimals
 // (entry 95, Q28a; pid.py rounds to 6). Ki and Kd derive from the rounded Kp, as pid.py reads self.kp (:82, :93).
-// Kd uses SAT_PID_KD_FACTOR 0.063 (entry 279), not the 0.07 of pid.py:93: kd = 0.063 * 8400 * kp = 529.2 * kp.
+// Kd uses SAT_PID_KD_FACTOR 0.05 (entry 425), not the 0.07 of pid.py:93: kd = 0.05 * 8400 * kp = 420 * kp.
 static void _pidCalculateGains(float curveValue)
 {
   float coeff = settings.sat.fHeatingCurveCoeff;
@@ -244,15 +255,19 @@ static void _pidUpdateIntegral(float error, float curveValue, bool force)
   // pid.py:167-168 skips _update_integral(), whose reset is pid.py:187-189 (7beaaf5).
   if (state.sat.bSolarGainActive && settings.sat.bSolarFreezeIntegral) return;
 
-  // Outside deadband: heating curve takes over, reset integral
+  // Outside the deadband the heating curve takes over. TASK-1890 (entries 329 and 333, ADR-259): the integral is
+  // halved once when the error leaves the band and then held; thermo-nova sets it to 0 here (pid.py:187-189),
+  // a deliberate deviation. Back inside it accumulates from the held value.
   if (fabsf(error) > deadband) {
-    _pid_integral = 0.0f;
+    if (_pid_inBand) _pid_integral *= 0.5f;
+    _pid_inBand = false;
     return;
   }
 
   // Inside deadband: integral acts as compensator. No special case for a Ki of 0 (entry 95, Q28b): pid.py always
   // adds and clamps (pid.py:191-192), so a Ki that rounds to 0 adds nothing and the clamp below still applies.
 
+  _pid_inBand = true;   // TASK-1890: back inside, the next exit halves again
   // Accumulate: Ki * error * PID_UPDATE_INTERVAL (fixed 60s per SAT Python)
   _pid_integral += state.sat.fKi * error * SAT_PID_UPDATE_INTERVAL;
 

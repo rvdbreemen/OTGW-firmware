@@ -3,11 +3,11 @@ id: TASK-1665
 title: >-
   Diagnostic recorder core: ring, record format and capture points (ADR-213 step
   1)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-05T20:34:00Z'
-updated_date: '2026-11-14T15:50:00Z'
+updated_date: '2026-11-16T21:13:00Z'
 labels:
   - diagnostics
 milestone: 2.0.0
@@ -26,7 +26,7 @@ Implement ADR-213 decisions 1-4: versioned 4 KiB-block format (16-byte block hea
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [x] #1 Host tests: format round-trip, block-independent decode, refuse-below-5120 B red on an unguarded start and green with the rule, resume record first
-- [ ] #2 Bench .61 (no PSRAM) and a PSRAM board: measured RAM/flash cost and append cost recorded in the task
+- [x] #2 Bench .61 (no PSRAM) and a PSRAM board: measured RAM/flash cost and append cost recorded in the task
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -47,4 +47,18 @@ Implement ADR-213 decisions 1-4: versioned 4 KiB-block format (16-byte block hea
 Stale audit 2026-11-14 (coordinator decision): AC2 needs a bench on .63 (PSRAM) by 09; the coordinator queues it.
 
 2026-11-14 (09) bench toward AC2 (not ticked: append cost not measured). .63 PSRAM (2.0.0-beta.248+5e8c416): start -> ring 384 x 4 KB = 1 572 864 B; psram_free 2 057 092 -> 451 188 B = 1 605 904 B (ring + 33 040 B incl. the 768 x 6 B repeat caches); internal heap unchanged (46 932 B free, maxblock 31 732). After stop the PSRAM stays reserved by design (allocPsramOnce, reused by the next start, diagRecorderStuff.h:339-343 and 387): psram_free 450 640 B until a reboot. .61 no PSRAM (2.0.0-beta.240+a3dff10): ring 1 x 4 KB; freeheap ~63 020 -> ~57 604 B (~5.4 KB: 4096 ring + 768 B caches + overhead, noise +-250 B), maxblock unchanged 31 732; after stop the heap returns (~61.9 KB, normal drift). Flash, estimated from the beta.248 ELF symbols (xtensa nm): ~6 KB recorder code (diag* t/T, minus the unrelated sendMQTTheapdiag and diag_log_add) and ~587 B data/bss; a lower bound because of LTO inlining. Not measured: the append cost per record (needs on-device timing instrumentation). Fill rate on .63 with its current traffic: the first 4 KB block took more than 3 min, so a full ring takes many hours. Settings diff [] on both units after stop. Evidence: 09 scratchpad b1665/.
+
+2026-11-16 (95) AC2 instrument for the append cost (09's 2026-11-14 bench measured RAM/flash but not the append cost): DiagEnv gets an optional micros clock (diagRecorderStuff.ino sets micros()); Writer::open() takes t0 before the tryLock, close() adds the cost to appendCount/appendSumUs/appendMaxUs while still under the lock; start() resets them; REST /api/v2/diag/recording/status adds append_count, append_max_us, append_avg_us. Host test F18 (test/host/test_diag_recorder.cpp, real header): 5 appends at 7 us -> count 5, max 7, avg 7; one 40 us append -> max 40, avg (5x7+40)/6; a new start resets to 0; an env without a clock times nothing. test_diag_recorder --mutant RESULT PASS (F1-F18, 3 mutants red as designed), test_diag_recording_routes PASS, test_diag_decode OK, webui diag-recording-controls 3/3, evaluate --quick 0 failed. F18 cannot run on the old header (no micros field): new instrument, red by absence only. Remaining for AC2: build, then 09 reads append_max_us/append_avg_us on .61 (no PSRAM) and .63 (PSRAM) under normal traffic; build slot after d3's 1942, push after the 20:00 tag (coordinator).
+
+Bench 09 on .61 (no PSRAM), 2.0.0-beta.352+e18ccbf (contains the instrument a10a5cdcd), 14:39-14:49, normal traffic, SAT off: start -> recording, psram false, ring_blocks 1 (4096 B); free heap 58,052 before, 52,692 after start (-5.4 KB), 51.6-52.4 KB during, 56,436 after stop (+4.9 KB back), maxfreeblock 31,732 throughout; append count/avg/max: 1 min 71/84/234 us, 5 min 350/80/234 us, 10 min 688/79/247 us; dropped 0; newest_seq 0 (seq counts 4 KB blocks; ~690 short records fit in one block); hd_min_free_heap 19,584 -> 19,260; no crash; settings restored byte-identical. PSRAM board (.63) after the 20:00 tag; AC2 for 09 to tick once both boards are measured.
+
+Pushed with the instrument in cf29dd198 (beta.352 in the lane), zip beta.356+cf29dd1 posted 1571965973295009792. AC2 still needs the PSRAM board (.63) measurement before 09 ticks it.
+
+AC2 ticked by 09 (2026-11-16): the append cost, the missing part, is now measured on both boards; the RAM/flash cost was recorded earlier (static cost 2026-11-06, PSRAM use 2026-11-14). NO PSRAM, .61 OTGW32, 2.0.0-beta.352+e18ccbf, 14:39-14:49, normal traffic, SAT off: ring 1 x 4096 B in heap; freeheap 58,052 -> 52,692 at start (-5.4 KB), 56,436 after stop; append_count 688 in 10 min (690 at stop), append_avg_us 79, append_max_us 247, dropped 0. PSRAM, .63 Classic, 2.0.0-beta.358+04abbdc (contains 5ca89a057), 21:55-22:06, SAT enabled but inactive, satsimulation false (read 21:55:41): ring 384 x 4096 = 1,572,864 B, psram true; internal freeheap 39,172 -> 39,172 at start, 39,132 after stop (no internal heap cost); append_count 900 in 10 min, append_avg_us 24-26, append_max_us 211 (484 at minute 10), dropped 0, newest_seq 0 -> 1 (block-based seq). Evidence: 09 scratchpad b352/diag/diag.log and d1665psram/diag.log.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Diagnostic recorder records how much one append costs. AC2 (09 ticked, 47606cfe6): no-PSRAM .61 (beta.352): 688 appends in 10 min, avg 79 us, max 247 us, dropped 0, internal heap -5.4 KB while recording and +4.9 KB back after stop; PSRAM .63 (beta.358, 21:55-22:06, sim off): ring 384 x 4 KB = 1.5 MB in PSRAM, internal free heap unchanged (39,172 -> 39,172), 900 appends, avg 24-26 us, max 211 us, dropped 0. The instrument: REST append_count / append_max_us / append_avg_us in the recording status (commit in cf29dd198, beta.352), host test F18 in test/host/test_diag_recorder.cpp. Not verified: the append cost under a heavy OT burst (both runs were normal traffic); newest_seq counts 4 KB blocks, not records (stayed 0 on .61 with one block).
+<!-- SECTION:FINAL_SUMMARY:END -->

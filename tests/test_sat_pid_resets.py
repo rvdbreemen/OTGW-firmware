@@ -91,10 +91,12 @@ static void satSyncPresetTopic(SATPreset) {}
 static void satClearSafetyTrip() {}
 static int g_disable = 0;
 static void satDisable(bool = true) { g_disable++; }
+static void satClimateBridgeForce() {}   // STUB: TASK-1979 HA climate bridge (SATcontrol.ino), not part of the PID reset path; called by updateSetting("SATenabled")
 void satResetControlState();   // the source declares it before satHandlePreset (defined after satZones there)
 """
 
 MAIN = r"""
+static bool g_loadingSettingsFile = false;   // TASK-2013: readSettings()' load scope; these cases are user changes
 static void upd(const char* field, const char* newValue) {
   if (false) {}
 @ENABLED@
