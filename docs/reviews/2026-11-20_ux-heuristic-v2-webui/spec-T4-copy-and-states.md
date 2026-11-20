@@ -90,21 +90,23 @@ Copy keys: `tools.sat_loop_empty_off`, `tools.sat_loop_empty_paused`, `tools.sat
 
 **Today.** `.discover-bd .s` sets `font-family: var(--font-mono)` (`v2.css:876`), so the hint "View them in Settings › Sensors." is in mono. The stack is fixed at the bottom right (`v2.css:865`) and covers whatever card is under it until it is dismissed.
 
-**New (base, recommended):**
+**New (decided by the coordinator, 2026-11-20: the base only, no auto-collapse, KISS):**
 - `.discover-bd .s` uses the UI font. Mono stays only for real identifiers (a MAC or sensor address) inside the text, as a `<code>` span.
 - The stack keeps `max-width: 340px` and the × to dismiss (unchanged). At 390 px it spans the full width minus 16 px margins.
 
-**Option (coordinator's choice, not in the base):** after 15 s without interaction the card collapses into a chip "{{count}} new sensors ›" at the same corner, which opens Settings › Sensors. The collapse pauses while the card has hover or keyboard focus, because it holds action buttons. This is a new interaction beyond the review's proposal. It solves "covers content", but costs a timer and a second component. The base alone only fixes the font. Keys if chosen: `discover.chip_one` "1 new sensor ›", `discover.chip_other` "{{count}} new sensors ›".
+*Considered and rejected:* auto-collapse into a "N new sensors ›" chip after 15 s. It would fix "covers content", but adds a timer and a second component; the × already dismisses the card.
 
 ## F5. SAT beta banner (copy by BlueFlame)
 
 **Today.** `#satBetaNotice` (`v2.html:355-357`, keys `tools.sat_beta_head` and `tools.sat_beta_body`): a bold paragraph with two script paths, a Discord invite and a GitHub URL. It shows on prerelease versions only (`v2.js:6940`), so 2.0.0 stable removes it.
 
-**Draft for BlueFlame to edit** (one line, normal weight, warn style per TASK-2956):
+**Copy approved by BlueFlame, 2026-11-20** (one line, normal weight, warn style per TASK-2956):
 
-> SAT is new in this beta. Your field data helps us tune it: [how to share a capture].
+> SAT is still being tuned during the beta. A capture of a day with SAT on helps us most: [How to share a capture]
 
-- The link goes to the SAT field-run steps the manual already points to: `docs/sat/field-run-recipe-2.0.0.md` (linked from the "Reporting SAT field results" note in `docs/manuals/en/ch05-sat-thermostat.md`, line 14). Script names and the Discord or GitHub address live in the manual, not in the UI.
+- The link is absolute, because the device does not serve `docs/` and a relative link would 404: `https://github.com/rvdbreemen/OTGW-firmware/blob/dev/docs/sat/field-run-recipe-2.0.0.md`, opened with `target="_blank" rel="noopener"`. The link text is capitalised and no period follows it. Script names and the Discord or GitHub addresses stay in the docs, not in the UI.
+- BlueFlame's reasons: "new in this beta" is no longer true (SAT is in every 2.0.0 beta); "a capture of a day with SAT on" names what the field-run recipe asks for; "experimental" is avoided on purpose (Robert, 2026-11-18: SAT drops that word at 2.0.0 stable).
+- Keys: `tools.sat_beta_head` gets the sentence and a new `tools.sat_beta_link` gets the link label; `tools.sat_beta_body` is no longer shown. NL suggestion from BlueFlame for the i18n sync: "SAT wordt tijdens de beta nog bijgesteld. Een capture van een dag met SAT aan helpt ons het meest: [Zo deel je een capture]".
 - Keep "Dismiss for this session".
 - **Drop this item** if 2.0.0 stable ships before TASK-2959 is built: the banner disappears with the prerelease check.
 
@@ -115,7 +117,7 @@ Copy keys: `tools.sat_loop_empty_off`, `tools.sat_loop_empty_paused`, `tools.sat
 3. **F10:** no settings hint under a label renders longer than 2 lines at 1400 px; Appliance type shows the short line, and its (i) holds the full text from `SET_META.satsource.help`; `settingsHelp.h` unchanged.
 4. **F11:** on an HTTP page the "Detect location" button is hidden and the hint has no "HTTPS"; the link opens SAT settings › Weather with Latitude focused; otgw-docs has the same wording in §5.9 (EN and NL).
 5. **F13:** the control-loop chart shows the overlay and label per the table in each state (the paused, stopped and starting rows after TASK-2957); the heating curve card shows its one-line empty state at 120 px.
-6. **F15:** the discovery card body is in the UI font and spans the width at 390 px; the chip is built only if the coordinator picks the option.
-7. **F5:** the banner is the BlueFlame-approved line with one manual link, or the item is closed as dropped because stable removed the banner.
+6. **F15:** the discovery card body is in the UI font and spans the width at 390 px; no auto-collapse.
+7. **F5:** the banner shows the BlueFlame-approved line with the absolute field-run-recipe link (`target="_blank" rel="noopener"`), or the item is closed as dropped because stable removed the banner.
 8. New strings exist as EN keys; NL and DE are filled through the i18n sync, and the i18n tests (`tests/webui/i18n-*.test.mjs`) pass.
 9. Keys that keep their name but change meaning have re-translated NL and DE values, visible in the sync diff: `tools.sat_geo_hint`, `tools.sat_beta_head` and `tools.sat_beta_body` (if F5 is built), and the `satsource` hint if it is translated.

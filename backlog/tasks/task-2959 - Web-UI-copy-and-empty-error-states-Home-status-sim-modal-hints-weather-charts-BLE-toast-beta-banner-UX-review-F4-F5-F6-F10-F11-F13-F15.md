@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-20T14:26:00Z'
-updated_date: '2026-11-20T14:51:00Z'
+updated_date: '2026-11-20T14:53:00Z'
 labels:
   - ux
   - webui
@@ -29,13 +29,15 @@ From the TASK-2952 UX review (docs/reviews/2026-11-20_ux-heuristic-v2-webui/READ
 - [ ] #3 F10: no settings hint renders longer than 2 lines at 1400 px; Appliance type shows the short line and its (i) holds the full text from SET_META.satsource.help; settingsHelp.h unchanged
 - [ ] #4 F11: on an HTTP page 'Detect location' is hidden and the hint has no 'HTTPS'; the link opens SAT settings › Weather with Latitude focused (the group heading while SAT is off); otgw-docs uses the same wording in manual §5.9 EN and NL
 - [ ] #5 F13: the control-loop chart shows the overlay and label per spec T4 in each state (paused, stopped and starting rows after TASK-2957); the heating curve card shows its one-line empty state at 120 px
-- [ ] #6 F15: the discovery card body is in the UI font and spans the width at 390 px; the collapse chip only if the coordinator picks that option
-- [ ] #7 F5: the SAT beta banner is the BlueFlame-approved line with one link to docs/sat/field-run-recipe-2.0.0.md, or the item is closed as dropped because 2.0.0 stable removed the banner
-- [ ] #8 New EN keys exist; NL and DE filled by the i18n sync, tests/webui/i18n-*.test.mjs pass; keys that change meaning (sat_geo_hint, sat_beta_head/body if built, the satsource hint if translated) get re-translated NL and DE values, visible in the sync diff
+- [ ] #6 New EN keys exist; NL and DE filled by the i18n sync, tests/webui/i18n-*.test.mjs pass; keys that change meaning (sat_geo_hint, sat_beta_head/body if built, the satsource hint if translated) get re-translated NL and DE values, visible in the sync diff
+- [ ] #7 F15: the discovery card body is in the UI font and spans the width at 390 px; no auto-collapse (coordinator decision 2026-11-20, KISS)
+- [ ] #8 F5: the SAT beta banner shows BlueFlame's approved line 'SAT is still being tuned during the beta. A capture of a day with SAT on helps us most: [How to share a capture]' with the absolute link https://github.com/rvdbreemen/OTGW-firmware/blob/dev/docs/sat/field-run-recipe-2.0.0.md (target=_blank rel=noopener), or the item is closed as dropped because stable removed the banner
 <!-- AC:END -->
 
 ## Implementation Notes
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-11-20 otgw-ux-designer: spec docs/reviews/2026-11-20_ux-heuristic-v2-webui/spec-T4-copy-and-states.md (exact copy, states and edge cases per finding). ACs replaced by the spec's acceptance list. Dependency: the F13 paused/stopped/starting rows need TASK-2957's display states; the other rows can land first. F15 collapse chip is an open option for the coordinator. F5 copy drafted, sent to BlueFlame.
+
+2026-11-20: coordinator decided F15 = base only (no auto-collapse). BlueFlame approved the F5 copy (absolute GitHub link, since the device does not serve docs/). Spec T4 updated.
 <!-- SECTION:NOTES:END -->

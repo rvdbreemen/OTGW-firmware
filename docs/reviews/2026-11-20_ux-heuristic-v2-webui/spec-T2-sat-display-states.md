@@ -91,7 +91,7 @@ During a takeover the switch label (`#satEnableLbl`) reads "Off · takeover acti
 | room below target − band, `boiler_status` = `anti_cycling` | Idle · anti-cycling pause |
 | room below target − band, any other idle status | Idle · {{boiler label}} (existing `tools.sat_boiler_*` labels, for example "Post-cycle") |
 
-Proposed band: 0.3 °C, display only. Q4 asks whether the firmware has a deadband value the page should reuse instead.
+Proposed band: 0.3 °C, display only. The firmware's tolerance band (ADR-250, partly superseded by ADR-253, both Accepted) stops CH at target + 0.1 °C and may restart below target + 0.1 °C after at least 600 s off. A display band of 0.1 °C would flip to "room above target" as soon as the room overshoots after a stop, so the display band is wider on purpose. `/v2/sat/status` sends no field for the band state today. Q4 asks whether it should.
 
 ### 3.2 Muted style for live cards
 
@@ -166,7 +166,7 @@ The hint lines `h_mon.sat_ot_lost` and `h_mon.sat_outside_missing` stay in the m
 - **Q1.** Is the PIC-unavailable path (`SATcontrol.ino:8533-8538`, `SAT_MAX_PIC_FAILS`) the only place that sets `bSafetyTripped`? If there are more causes, should the status carry a reason so the sub-line can name it? Until answered, the sub-line stays generic.
 - **Q2.** STARTING = enabled, `!active`, no pause or trip flag. Which gates can hold SAT there: the 60 s boot silence (`:4438-4448`), the boot decide wait (up to `SAT_BOOT_DECIDE_MS` = 60 s), the wait for a first boiler reply (`:4489`)? Any other, and can one of them last longer than about 2 minutes?
 - **Q3.** With no boiler on the bus since boot, does `ot_link_lost` always turn true after 30 s (so the page shows PAUSED_OT, as seen on .63), or can SAT sit in the `iBoilerLastSeenMs == 0` gate without that flag?
-- **Q4.** Is there a SAT deadband or "at target" tolerance in the firmware that the IDLE headline should use instead of a 0.3 °C display band? Display only; no behaviour change asked.
+- **Q4.** The tolerance band (`satToleranceDemand()`, `SATchEnable.h`, ADR-250/253) decides when SAT stops heating at target, but its state is not in `/v2/sat/status`. Should the status carry it (for example `tol_stop: true`), so the IDLE headline can say "room at target" exactly when the band stopped CH, instead of the 0.3 °C display band? Display only; no behaviour change asked.
 - **Q5.** (answered in the code, confirm only) `satDisable()` sets the mode to OFF (`:4285`), `bActive` false and `fFinalSetpoint` 0 (`:4291-4292`), and resets the PID (`satPidReset()`, `:4294`). Can anything set the mode back to non-OFF while `active` stays false?
 - **Q6.** After `satPidReset()`, are `pid_output` and `error` in `/v2/sat/status` 0 while paused, and is `current_modulation` the boiler's reported value (so still live)? The muted style is right either way; the answer decides whether "—" would be more honest than a muted 0 for the PID fields.
 - **Q7.** `satControlLoopRun()` returns early for several gates before the tick (the comment at `_sat_tuneGatesPassed`, `:7973`, names disabled, flashing, MQTT fallback, safety, OT link, restart). During a PIC flash the loop returns early: does `bActive` keep its last value of true, so the page would show HEATING or IDLE while SAT sends nothing? If so, should the status carry a flag for it, or is a flash short enough to ignore?
