@@ -514,6 +514,109 @@ paths:
         '409':
           description: "`SATbleenable` set to true on a board without PSRAM (same body as POST)"
 
+  /v2/diag/recording:
+    get:
+      tags:
+        - Debug
+      summary: Download the on-device diagnostic recording (binary)
+      description: |
+        Streams the diagnostic recording of ADR-213 (TASK-1666) as
+        `application/octet-stream`, file name `otgw-recording.bin`, with
+        `Cache-Control: no-store`. The body is the file header (diagRecorderStuff.h,
+        including the route name table) followed by every recorded block, or only the
+        blocks with a block sequence number above `since`. A recorder that never ran,
+        is empty, or was stopped on a board without PSRAM gives a valid file with
+        block count 0; a stopped PSRAM ring keeps its blocks until the next start
+        (TASK-1960). Open (no authentication), not rate limited; it holds one REST
+        slot until the download ends (restAPI.ino `handleDiag`, `sendDiagRecordingDownload`).
+      operationId: getDiagRecording
+      parameters:
+        - name: since
+          in: query
+          required: false
+          description: Only blocks with a block sequence number above this value.
+          schema:
+            type: integer
+            minimum: 0
+            maximum: 4294967294
+      responses:
+        '200':
+          description: Recording file (header, then blocks).
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        '400':
+          description: '`since` is not a block sequence number (`since must be a block sequence number`).'
+        '405':
+          description: Only GET is allowed.
+        '500':
+          description: The file header did not fit (`recording header too large`).
+        '503':
+          description: Busy (`low heap` below a 8192 B largest free block, or `recorder busy`); `Retry-After`, or a closed connection on a starved heap.
+  /v2/diag/recording/status:
+    get:
+      tags:
+        - Debug
+      summary: Diagnostic recording status
+      description: |
+        `state` is `recording`, `stopped` or `refused` (the last start was refused,
+        `reason` says why). `enabled` is the persisted `DiagRecordingOn` setting (a
+        recording resumes at boot); `active` means a ring is being written.
+        `oldest_seq` and `newest_seq` are 0 while `has_data` is false. `exact` is
+        false when the recorder lock was busy and the numbers were read without it.
+        Open (no authentication).
+      operationId: getDiagRecordingStatus
+      responses:
+        '200':
+          description: Recording status.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DiagRecordingStatus'
+        '405':
+          description: Only GET is allowed.
+  /v2/diag/recording/start:
+    post:
+      tags:
+        - Debug
+      summary: Start the diagnostic recording
+      description: |
+        Starts the recording and sets `DiagRecordingOn`. A refused start is HTTP 200
+        with `ok: false`, `result: refused` and a `reason` (`free heap would drop
+        below 5120 B` or `allocation failed`): a normal answer of the start rule, not
+        a request error. PUT works the same. Mutating method: covered by the central
+        admin authentication check.
+      operationId: startDiagRecording
+      responses:
+        '200':
+          description: '`result` is `started`, `already_running` or `refused`.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DiagRecordingControl'
+        '405':
+          description: Only POST or PUT is allowed.
+  /v2/diag/recording/stop:
+    post:
+      tags:
+        - Debug
+      summary: Stop the diagnostic recording
+      description: |
+        Stops the recording and clears `DiagRecordingOn`. `result` is `stopped`, or
+        `lock_busy` with `ok: false` when the recorder lock was busy. PUT works the
+        same. Mutating method: covered by the central admin authentication check.
+      operationId: stopDiagRecording
+      responses:
+        '200':
+          description: '`result` is `stopped` or `lock_busy`.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DiagRecordingControl'
+        '405':
+          description: Only POST or PUT is allowed.
   /v2/sensors:
     get:
       tags:
@@ -1601,7 +1704,7 @@ paths:
 
         **This alias SHARES one rate-limit budget with `/v2/otgw/otmonitor`**
         (ADR-172). They are served by the same code path and emit the same bytes,
-        so they are one endpoint for quota purposes — requests to either consume
+        so they are one endpoint for quota purposes: requests to either consume
         the same tokens, and alternating between them does not raise the ceiling.
 
         Budget: 1 request per 1.5 s sustained, burst 2. A scrape interval of 10 s
@@ -2905,7 +3008,7 @@ paths:
         - SAT
       summary: Force boiler-present override (TEST/DEBUG hook)
       description: |
-        **Test/debug hook — not for production use.** Asserts that a boiler is
+        **Test/debug hook, not for production use.** Asserts that a boiler is
         present so the SAT availability gate (edge auto-disable, REST 409, MQTT
         enable-reject) can be verified on the bench without real hardware
         (TASK-802). The override is transient: it lives in RAM only and is
@@ -3107,20 +3210,20 @@ paths:
         never perturb a real-boiler installation.
 
         Supported events:
-        - `window_open` — multiplies the room cooling rate for `duration_s`.
+        - `window_open`: multiplies the room cooling rate for `duration_s`.
           `value` = loss multiplier (default 3, clamped 1..20).
-        - `solar_gain` — additive room warming for `duration_s`.
+        - `solar_gain`: additive room warming for `duration_s`.
           `value` = °C/min (default 0.5, clamped 0..5).
-        - `sensor_noise` — adds ± noise to flow/return sensor reads for
+        - `sensor_noise`: adds ± noise to flow/return sensor reads for
           `duration_s` (TASK-799), exercising staleness/EMA paths. `value` =
           amplitude °C (default 0.5, clamped 0..5); `value` 0 turns noise off.
-        - `sensor_dropout` — drops the room sensor (room read returns NAN) for
+        - `sensor_dropout`: drops the room sensor (room read returns NAN) for
           `duration_s` (TASK-799), exercising the ghost-Tr / fallback path.
           `value` 0 with no duration cancels an active dropout.
-        - `dhw_demand` — triggers a DHW draw for `duration_s` (default 120 s,
+        - `dhw_demand`: triggers a DHW draw for `duration_s` (default 120 s,
           TASK-800): forces DHW-active (flame-steal, CH suppressed) so the cycle
           classifier sees DHW/MIXED cycles. `value` 0 + no duration cancels.
-        - `tune_hour` — bench hook for the heating curve self-tune (TASK-1525),
+        - `tune_hour`: bench hook for the heating curve self-tune (TASK-1525),
           runtime only: `value` = tuner hour length in seconds (60..3600; 0 or more
           restores 3600). Restarts the tuner with an empty window. Outside
           simulation the hour is always 3600 s.
@@ -3159,7 +3262,7 @@ paths:
         '405':
           $ref: '#/components/responses/MethodNotAllowedJson'
         '409':
-          description: Simulation inactive — enable satsimulation first
+          description: Simulation inactive, enable satsimulation first
           content:
             application/json:
               schema:
@@ -3772,7 +3875,7 @@ paths:
         returns 404 (`BLE not supported on this build`) on builds without BLE.
 
         **Bindkeys are write-only.** Each slot reports only `has_bindkey`
-        (boolean) — the per-slot bindkey secret is NEVER emitted in the response.
+        (boolean); the per-slot bindkey secret is NEVER emitted in the response.
       operationId: getSatBleRoster
       security:
         - basicAuth: []
@@ -3834,10 +3937,10 @@ paths:
         builds without BLE.
 
         Validation:
-        - `idx` — required integer 0-7 (non-numeric → 400)
-        - `mac` — empty (clears) or a 17-char colon-hex address `AA:BB:CC:DD:EE:FF` (else 400)
-        - `label` — optional free text
-        - `bindkey` — empty (clears) or exactly 32 hex characters (else 400); write-only
+        - `idx`: required integer 0-7 (non-numeric → 400)
+        - `mac`: empty (clears) or a 17-char colon-hex address `AA:BB:CC:DD:EE:FF` (else 400)
+        - `label`: optional free text
+        - `bindkey`: empty (clears) or exactly 32 hex characters (else 400); write-only
       operationId: setSatBleRosterSlot
       requestBody:
         required: true
@@ -4274,6 +4377,38 @@ components:
         HTTP password is configured; with no password set the device accepts the
         request without credentials (trusted-LAN model). Username is "admin".
   schemas:
+    DiagRecording:
+      type: object
+      properties:
+        state: { type: string, enum: [recording, stopped, refused] }
+        enabled: { type: boolean }
+        active: { type: boolean }
+        reason: { type: string }
+        psram: { type: boolean }
+        block_size: { type: integer, example: 4096 }
+        ring_blocks: { type: integer }
+        ring_bytes: { type: integer }
+        has_data: { type: boolean }
+        oldest_seq: { type: integer }
+        newest_seq: { type: integer }
+        dropped: { type: integer }
+        append_count: { type: integer, description: Records of this recording that were timed }
+        append_max_us: { type: integer, description: Slowest append in microseconds }
+        append_avg_us: { type: integer }
+        exact: { type: boolean }
+    DiagRecordingControl:
+      type: object
+      properties:
+        ok: { type: boolean }
+        result: { type: string, enum: [started, already_running, refused, stopped, lock_busy] }
+        reason: { type: string }
+        recording:
+          $ref: '#/components/schemas/DiagRecording'
+    DiagRecordingStatus:
+      type: object
+      properties:
+        recording:
+          $ref: '#/components/schemas/DiagRecording'
     SensorStatus:
       type: object
       description: |
@@ -5233,7 +5368,7 @@ components:
         RateLimit:
           description: |
             Remaining quota and reset hint. IETF `httpapi` Internet-Draft, not a
-            standard as of July 2026 — sent as extra signal only.
+            standard as of July 2026, sent as extra signal only.
           schema:
             type: string
             example: '"poll";r=0;t=2'

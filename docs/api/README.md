@@ -527,9 +527,9 @@ Produced entity categories:
 
 Version 1.4.1 adds three endpoints under `/api/v2/discovery/` that complement the existing unconditional publish at `/api/v2/otgw/discovery`. They cover broker-side retained-state loss, which is invisible to the legacy MQTT reconnect and HA-restart recovery paths. See [ADR-062](../adr/ADR-062-retained-discovery-verification.md) for the mechanism rationale.
 
-- `GET /api/v2/discovery` — returns `verification.*` (active flag, last epoch, last missing and orphan counts), `counters.*` (published topics, pending IDs, verify runs, republishes triggered) and `settings.auto_verify`. Read-only; does not publish anything.
-- `POST /api/v2/discovery/verify` — subscribes to `<haprefix>/+/<nodeId>/#` for 15 seconds, counts retained configs that arrive, and calls `markAllMQTTConfigPending()` only when `received < expected`. Returns `202 Accepted` with `{status, expected, window_ms}` on success, `409` when a verify or drip is already in progress, and `503` when MQTT is down, heap is low, or the verification layer refuses to start.
-- `POST /api/v2/discovery/republish` — unconditionally marks every discovery ID pending in the drip pipeline. Use this only when you already know the broker's retained state is bad, for example after a broker reinstall without persistence. Returns `200 OK` with `{status, count}` or `503` when MQTT is down.
+- `GET /api/v2/discovery`: returns `verification.*` (active flag, last epoch, last missing and orphan counts), `counters.*` (published topics, pending IDs, verify runs, republishes triggered) and `settings.auto_verify`. Read-only; does not publish anything.
+- `POST /api/v2/discovery/verify`: subscribes to `<haprefix>/+/<nodeId>/#` for 15 seconds, counts retained configs that arrive, and calls `markAllMQTTConfigPending()` only when `received < expected`. Returns `202 Accepted` with `{status, expected, window_ms}` on success, `409` when a verify or drip is already in progress, and `503` when MQTT is down, heap is low, or the verification layer refuses to start.
+- `POST /api/v2/discovery/republish`: unconditionally marks every discovery ID pending in the drip pipeline. Use this only when you already know the broker's retained state is bad, for example after a broker reinstall without persistence. Returns `200 OK` with `{status, count}` or `503` when MQTT is down.
 
 For normal troubleshooting prefer the verify endpoint: it only re-announces when something is actually missing and avoids a full flood of ~80 retained messages.
 
@@ -958,6 +958,36 @@ The authoritative key list is `handleDebugDump()` in `src/OTGW-firmware/restAPI.
 
 ---
 
+### Diagnostic recording
+
+The opt-in on-device diagnostic recording of ADR-213 (TASK-1666). Code: `handleDiag()` and `sendDiagRecording*()` in `src/OTGW-firmware/restAPI.ino`.
+
+#### `GET /api/v2/diag/recording`
+
+Downloads the recording as `application/octet-stream` (`otgw-recording.bin`, `Cache-Control: no-store`): the file header with the route name table, then the recorded blocks. `?since=<block_seq>` returns only the blocks with a higher block sequence number. An empty or never-started recorder gives a valid file with block count 0; on a board with PSRAM a stopped recording stays readable until the next start (TASK-1960). Open, not rate limited.
+
+- `400` `since must be a block sequence number`
+- `503` `low heap` (largest free block under 8192 B) or `recorder busy`, with `Retry-After`; on a starved heap the connection closes without a response
+- `500` `recording header too large`
+
+#### `GET /api/v2/diag/recording/status`
+
+```json
+{"recording":{"state":"recording","enabled":true,"active":true,"reason":"","psram":true,
+  "block_size":4096,"ring_blocks":64,"ring_bytes":262144,"has_data":true,"oldest_seq":1,"newest_seq":42,
+  "dropped":0,"append_count":0,"append_max_us":0,"append_avg_us":0,"exact":true}}
+```
+
+`state` is `recording`, `stopped` or `refused`; `enabled` is the persisted `DiagRecordingOn` setting (the recording resumes at boot); `exact` is false when the recorder lock was busy. The numbers in the example are illustrative. Open.
+
+#### `POST /api/v2/diag/recording/start` | `PUT /api/v2/diag/recording/start`
+
+Starts the recording. Answer: `{"ok":true,"result":"started","reason":"","recording":{...}}`. `result` is `started`, `already_running` or `refused`. A refused start is HTTP 200 with `ok: false` and a `reason`: `free heap would drop below 5120 B` or `allocation failed`.
+
+#### `POST /api/v2/diag/recording/stop` | `PUT /api/v2/diag/recording/stop`
+
+Stops the recording. `result` is `stopped`, or `lock_busy` with `ok: false`. Start and stop are mutating methods and pass the admin authentication check.
+
 ### Network
 
 #### `GET /api/v2/network/scan`
@@ -1279,7 +1309,7 @@ Updates one of the four slots (TASK-587). Addresses are validated as 16 hex char
 
 #### `POST /api/v2/sat/force-boiler` | `PUT /api/v2/sat/force-boiler`
 
-**Test/debug hook — not for production use.** Asserts that a boiler is present so the SAT availability gate (edge auto-disable, REST 409, MQTT enable-reject) can be verified on the bench without real hardware (TASK-802). The override is transient: it lives in RAM only and is cleared on reboot.
+**Test/debug hook, not for production use.** Asserts that a boiler is present so the SAT availability gate (edge auto-disable, REST 409, MQTT enable-reject) can be verified on the bench without real hardware (TASK-802). The override is transient: it lives in RAM only and is cleared on reboot.
 
 **Authentication**: Required (when password is configured)
 
@@ -1296,10 +1326,10 @@ Updates one of the four slots (TASK-587). Addresses are validated as 16 hex char
 
 The `/v2/sat/ble/*` family is only mounted on ESP32 builds (TASK-508). On ESP8266 builds these paths return 404.
 
-- `GET /api/v2/sat/ble/discovery` — stream the BLE roster as JSON (slot MAC, label, last temp/humidity, RSSI, selection state).
-- `POST /api/v2/sat/ble/select` — body `{"mac":"AA:BB:CC:DD:EE:FF"}`; promote a roster MAC to the active sensor slot.
-- `POST /api/v2/sat/ble/label` — body `{"mac":"...","label":"Living room"}`; set the persistent label.
-- `POST | PUT | DELETE /api/v2/sat/ble/forget` — body `{"mac":"..."}`; drop the slot and unpublish its HA discovery config.
+- `GET /api/v2/sat/ble/discovery`: stream the BLE roster as JSON (slot MAC, label, last temp/humidity, RSSI, selection state).
+- `POST /api/v2/sat/ble/select`: body `{"mac":"AA:BB:CC:DD:EE:FF"}`; promote a roster MAC to the active sensor slot.
+- `POST /api/v2/sat/ble/label`: body `{"mac":"...","label":"Living room"}`; set the persistent label.
+- `POST | PUT | DELETE /api/v2/sat/ble/forget`: body `{"mac":"..."}`; drop the slot and unpublish its HA discovery config.
 - `POST | PUT /api/v2/sat/ble/bindkey`: body `{"mac":"...","key":"<32 hex>"}`; set the per-sensor encrypted-MiBeacon bindkey. If the MAC is new a roster slot is allocated for it; an empty `key` clears the stored bindkey. The **bindkey is a write-only secret**: validated (empty or exactly 32 hex chars, else `400`), never logged, never echoed back. `507` when the roster is full and no slot can be allocated.
 - `POST | PUT /api/v2/sat/ble/rescan`: no body; trigger an on-demand active-scan burst to refresh advertised names.
 
@@ -1311,7 +1341,7 @@ Structured 8-slot BLE roster CRUD (TASK-935/946), gated on `HAS_SAT_BLE`. On bui
 
 **Authentication**: Required (when password is configured)
 
-- **GET** returns `{"count":int, "name_prefix":string, "name_filter_ingest":bool, "slots":[{"idx":0-7, "mac":string, "label":string, "has_bindkey":bool}, ... 8 entries]}`. The per-slot **bindkey is write-only** — GET emits only `has_bindkey` (bool), never the secret value.
+- **GET** returns `{"count":int, "name_prefix":string, "name_filter_ingest":bool, "slots":[{"idx":0-7, "mac":string, "label":string, "has_bindkey":bool}, ... 8 entries]}`. The per-slot **bindkey is write-only**: GET emits only `has_bindkey` (bool), never the secret value.
 - **PUT** / **POST** write a single slot. Params (query or body): `idx` (required, integer 0-7; non-numeric → `400`), `mac` (optional, empty or 17-char colon-hex `AA:BB:CC:DD:EE:FF` → else `400`), `label` (optional free text), `bindkey` (optional, empty or exactly 32 hex chars, else `400`). At least one of `mac`/`label`/`bindkey` is required (else `400`). Response `200 {"status":"ok","idx":N,"has_bindkey":bool}` (no user text echoed).
 - **DELETE** clears a slot. Param `idx` (required 0-7). Response `200 {"status":"cleared"}`.
 

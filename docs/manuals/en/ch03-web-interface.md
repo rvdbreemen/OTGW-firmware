@@ -54,6 +54,8 @@ The Monitor page has five sub-tabs:
 
 A dedicated Smart Autotune Thermostat page provides the thermostat control surface in three cumulative depth layers: **Thermostat** (simple), **Control** (operational), and **Technical** (the control loop). It is bound to the SAT REST endpoints. Status messages on the page start with "SAT paused" when SAT has handed the boiler back: "SAT paused: no OpenTherm connection, the boiler is back under normal control" and "SAT paused: no outside temperature for 1 hour, your thermostat controls the boiler". On a prerelease (beta) firmware a notice reads "SAT controls your boiler. This is a beta firmware." and asks for capture files; SAT itself is no longer called experimental (the on/off heat-pump appliance type with its 3 hour cycle still is). In the weather card, while Home Assistant publishes a fresh `sat/sun_elevation`, the card names it as the source of the sun position and asks for no location; with the weather fetch on and no latitude and longitude set, it still asks for them for the fetch itself. For full details of SAT, presets, the heating curve, and diagnostics, see Chapter 5.
 
+The **Hot water** card sits in the SAT **Control** view. **Standalone DHW control** switches SAT's own hot-water handling on or off: SAT sends the DHW setpoint to the boiler only while it is on, and the setpoint slider is greyed out while it is off. The slider covers 30-60 °C, narrowed to the boiler's own DHW range when the boiler reports one (MsgID 48); a setpoint below 30 °C shows as **off**. On a boiler with a hot-water tank the card also shows **DHW enable (HW=)**, which sends the gateway's hot-water enable command.
+
 #### Settings page
 
 The Settings page is driven by the REST API and presents settings with human-readable labels, categories, and hints, plus a search box and a rail of category links. The rail lists the categories with their setting counts (on a narrow screen it scrolls sideways above the cards); the cards of the selected category show on the right, one category at a time, and a search shows every category with a match. A save bar tracks unsaved changes with **Discard** and **Save settings** actions. The SAT category is described as "Smart Autotune Thermostat". Additional panels include a **BLE sensor** roster (discovered Bluetooth Low Energy sensors; on a board without PSRAM the **Enable BLE sensors** switch is disabled and the card says "BLE needs PSRAM", because the firmware refuses to switch BLE on there) and, in the Webhook category, a **Send test call** action that fires the real saved ON webhook. Advanced OT-Direct and SAT settings are exposed here as well.
@@ -75,162 +77,9 @@ On a genuinely fresh device the v2 UI shows a first-time-setup onboarding wizard
 
 The v2 UI is designed to be usable on a smartphone. Its assets are served with a `no-cache` policy (ADR-163), so after a filesystem OTA update the browser picks up the new assets immediately without a manual cache clear.
 
-### Navigation
+### The classic UI
 
-The remaining sections of this chapter still describe the removed **classic UI** and have not been rewritten for v2 yet. They are kept for reference; where they differ from what you see, the v2 UI is correct. The classic UI was organized into main tabs, accessible from the navigation bar at the top of the page:
-
-| Tab | Purpose |
-|---|---|
-| **Home** | Live OpenTherm log, real-time temperature graphs, boiler status |
-| **SAT** | Smart thermostat dashboard: temperature cards, presets, heating curve, PID diagnostics |
-| **Settings** | All device configuration: network, MQTT, NTP, hardware, nightly restart, security |
-| **Advanced** | File manager, PIC firmware upgrade, device info, debug tools |
-
-A header bar across the top shows the device name, firmware version, network status indicator (Wi-Fi signal bars or Ethernet icon), heap memory display, and theme toggle button.
-
-### Dashboard (Home Tab)
-
-The Home tab is the primary monitoring view. It has three main areas.
-
-#### OpenTherm Log Viewer
-
-The log viewer displays every OpenTherm message received from the bus in real time, streamed from the device over a WebSocket connection. Each line shows:
-
-- A direction indicator (`>` for messages sent to the boiler, `<` for responses received)
-- The OpenTherm message ID and decoded label (for example, `CH water temperature`)
-- The decoded value with units
-- A timestamp (toggled with the clock icon)
-
-The log viewer includes:
-
-- **Search/filter**: type a message ID number or label keyword to filter the displayed lines.
-- **Auto-scroll**: the log follows new messages automatically. Click anywhere in the log to pause auto-scroll; click the scroll-to-bottom button to resume.
-- **Timestamps**, **Capture mode** (in-memory buffer up to about 1 M lines), and **Stream to file** (live append to a local file in Chrome/Edge).
-- **Download** the current buffer as a text file; **Auto-download** writes a snapshot every 15 minutes.
-- **Command bar**: send one-shot commands (`TT=20.5`, `GW=R`, etc.) directly from the log view and see the response in-line. In PIC gateway mode, these are PIC commands. In OT-Direct mode, the command bar is also available when OT-Direct provides the command interface.
-
-The OpenTherm Monitor panel exposes three sub-tabs:
-
-- **Log**: the live streamed log described above.
-- **Statistics**: a sortable per-message-ID table with hex/decimal ID, direction, description, interval, and last value. Useful for spotting bus traffic patterns at a glance.
-- **Graph**: an ECharts time-series view with a configurable window (10 minutes to 24 hours), one-off **Screenshot** and **Export Data** (CSV) buttons, and matching **Auto-save PNG** / **Auto-save CSV** checkboxes for periodic snapshots.
-
-The browser persists the log buffer to `localStorage` between sessions, so a page refresh does not lose recent data. The buffer is cleared automatically after a firmware or filesystem flash.
-
-> **Simulation mode**: When the firmware is running in simulation mode (no physical OTGW connected), a `SIMULATION` badge appears in the log header. This mode is useful for testing dashboards and automations without hardware.
-
-#### OT-Direct Status Panel (OT-Direct Mode Only)
-
-On hardware without a PIC, in OT-Direct mode, an OT-Direct status panel appears above the OpenTherm log on the Home tab. This panel shows:
-
-- **Mode**: the current OT-Direct operating mode (Bypass, Gateway, Monitor, Master/Standalone, or Loopback Test).
-- **OT Bus**: whether the OpenTherm bus is online, with a status indicator dot.
-- **Thermostat**: whether a thermostat is detected on the bus.
-- **Boiler**: whether the boiler is responding.
-- **Setback / Step-Up**: whether setback or step-up overrides are active.
-- **Schedule**: number of active schedules.
-- **Active Overrides**: count of bus-level overrides currently in effect. Click to expand and see the override list.
-
-The expanded override section lets you apply new overrides directly from the browser. Select an override action (SR, CR, RM, CM, UI, KI), enter the message ID and optional hex value, then click **Apply**. This is an advanced feature intended for diagnostics and testing.
-
-The panel polls `/api/v2/otdirect/status` every 5 seconds while the Home tab is visible.
-
-#### Real-Time Temperature Graph
-
-Below the log viewer, an ECharts temperature graph shows a rolling 24-hour view of:
-
-- Boiler flow temperature (CH water temperature)
-- Return temperature
-- Room temperature (from the thermostat or SAT)
-- Outside temperature (if available). When it comes only from the weather service and the browser tab is hidden, or the weather answer is invalid, the graph shows a gap instead of repeating the last value; a boiler-reported outside temperature (MsgID 27) still fills it (beta.247, TASK-1875).
-- Modulation level (percentage)
-- Flame status
-- DHW (hot water) temperature
-
-Dallas DS18B20 sensors are automatically discovered and added to the graph with dynamically assigned colors. Sensor labels (configured on the Settings page) appear in the graph legend.
-
-The graph synchronizes its color scheme with the active light or dark theme.
-
-#### Boiler Status
-
-A status row at the top of the Home tab shows key boiler readings at a glance: flame on/off, CH setpoint, current flow temperature, room temperature, modulation percentage, and DHW status. These values update in real time as new OpenTherm messages arrive.
-
-### SAT Tab
-
-The SAT (Smart Autotune Thermostat) tab provides a dedicated dashboard for the built-in thermostat functionality. The tab is always visible in the navigation bar. When SAT is disabled, the dashboard shows the current state and an enable toggle.
-
-#### Header and Controls
-
-The SAT header bar contains:
-
-- **Status badge**: shows "Disabled", "Idle", "Heating", or the current SAT state.
-- **Simulation badge**: shown when SAT simulation mode is active.
-- **Enable toggle**: a switch to enable or disable SAT without navigating to settings.
-- **View selector**: choose between Thermostat (simple), Expert, and Diagnostics views. Each view shows progressively more detail.
-- **Settings button**: navigates to the SAT Settings page for full configuration.
-
-#### Temperature Cards
-
-Four temperature cards are always visible across all views:
-
-| Card | Description |
-|---|---|
-| Room Temperature | Current room temperature reading |
-| Target Temperature | Desired setpoint, with +/- buttons to adjust in 0.5 degree steps |
-| Outside Temperature | Outdoor temperature from OT bus or weather service |
-| Boiler Setpoint | Current calculated boiler flow setpoint |
-
-#### Presets and Modes
-
-A row of preset buttons (Activity, Away, Eco, Home, Comfort, Sleep) lets you switch temperature presets with a single click. Below the presets, mode buttons select between Continuous and PWM heating modes. A simulation toggle is also available.
-
-#### Expert and Diagnostics Views
-
-The Expert view adds sections for:
-
-- **Weather data**: outdoor temperature, humidity, wind speed from Open-Meteo (if enabled).
-- **Temperature history chart**: an ECharts graph within the SAT dashboard.
-- **Heating curve (Stooklijn)**: a collapsible chart showing the calculated heating curve.
-- **Control status**: current mode, boiler status, active preset, heating system type, PID output, error, coefficient, deadband, overshoot margin, modulation values, and OVP calibration.
-- **PID controller**: individual P, I, D terms and tuning parameters (Kp, Ki, Kd).
-- **PWM and cycle tracking**: duty cycle, flame status, cycle count, overshoot data.
-- **Smart features**: solar gain, summer mode, thermal learning, simmer index, auto-tune status.
-- **External sensors**: status indicators for indoor and outdoor sensor sources.
-
-The Diagnostics view adds:
-
-- **Health indicators**: colored dots for Device, Cycle, Flame, Pressure, Setpoint Sync, and Modulation Sync health.
-- **Simulation and diagnostics**: simulation mode details, fallback status, OVP phase and value.
-- **Raw data**: collapsible section showing the raw JSON data from the SAT API.
-
-#### SAT Settings Page
-
-Clicking the **Settings** button in the SAT header opens a dedicated SAT Settings page. Settings are organized into collapsible groups: Thermostat, Heating, PID, DHW, Pressure, Smart Features, Safety, Energy, Weather, Sync, and Advanced. Each group has its own **Save** button to persist changes individually.
-
-Two extra panels appear above the generic settings groups on ESP32 builds:
-
-- **BLE Sensors**: lists Bluetooth Low Energy sensors discovered by the firmware (Xiaomi LYWSD03MMC with ATC/pvvx custom firmware, BTHome v2). Each row shows the MAC, an editable name, the freshness of the last advertisement, and **Select** / **Forget** actions. The roster is capped at eight entries and is also exposed over MQTT for Home Assistant. The `SATblemac` field below the panel is read-only context: the active sensor is chosen here rather than typed by hand (TASK-508).
-- **DS18B20 Area Sensor Mapping**: maps each SAT zone area to a discovered DS18B20 sensor via dropdowns. The selected mapping is forwarded to SAT on every poll cycle so a wired sensor can act as the room-temperature source for a specific area.
-
-#### DHW Controls
-
-The **Hot water** card sits in the SAT **Control** view. **Standalone DHW control** switches SAT's own hot-water handling on or off: SAT sends the DHW setpoint to the boiler only while it is on, and the setpoint slider is greyed out while it is off. The slider covers 30-60 °C, narrowed to the boiler's own DHW range when the boiler reports one (MsgID 48); a setpoint below 30 °C shows as **off**. On a boiler with a hot-water tank the card also shows **DHW enable (HW=)**, which sends the gateway's hot-water enable command.
-
-### Network Status Indicator
-
-The header bar shows the current network status using a visual indicator:
-
-- **Wi-Fi signal bars**: shows signal quality from 0 to 4 bars based on RSSI, using a quadratic mapping that reflects actual usability rather than raw dBm values. The bars are visible in both light and dark themes.
-- **AP badge**: displayed when the device is operating in AP or AP fallback mode.
-- **Ethernet indicator**: displayed only with Ethernet hardware, when a wired link is active, replacing the Wi-Fi icon. The OTGW Classic has no Ethernet.
-
-Hovering over the indicator shows the exact SSID and signal quality percentage (Wi-Fi) or IP address (Ethernet).
-
-The network indicator updates automatically via the periodic device time poll (`/api/v2/device/time`) and on initial page load from `/api/v2/device/info`.
-
-### Heap Memory Display
-
-The header bar shows a heap memory indicator displaying the current free heap and largest free block in bytes (for example, `Heap: (12480 / 8192)`). This information is updated with every device time poll and provides a quick way to monitor device memory health without opening the debug console.
+The classic web UI of the 1.x line is no longer shipped in 2.x (ADR-192): 2.0.0 has only the v2 web UI described above. The sections below describe the settings, the update page and the file manager, which the v2 UI also has.
 
 ### Settings Page
 
