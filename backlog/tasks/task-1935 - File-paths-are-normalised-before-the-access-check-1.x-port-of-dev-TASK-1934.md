@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-14T13:16:00Z'
-updated_date: '2026-11-14T16:15:00Z'
+updated_date: '2026-11-20T16:59:00Z'
 labels:
   - 1.x
   - security
@@ -24,7 +24,7 @@ ordinal: 263000
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Host test on the real handleFile() and the real core 2.7.4 littlefs path lookup: red on the old code, green on the fix; plain and authorised requests keep working
+- [x] #1 Host test on the real handleFile() and the real core 2.7.4 littlefs path lookup: red on the old code, green on the fix; plain and authorised requests keep working
 - [ ] #2 Other path-taking routes on 1.x checked; findings filed
 - [ ] #3 Bench by otgw-firmware-09 on .35 (1.x, password set): the probe set from the pre-fix run returns 0 protected bodies without credentials; web UI and authorised reads unchanged; without a password unchanged
 <!-- AC:END -->
@@ -39,4 +39,6 @@ Status 2026-11-14 15:10 (parked): fix 00499860e on lane/ba-1x-1934 (local); 1.x 
 2026-11-14 (09) bench attempt on .35 OTGWCALENTA (Robert's choice A, live: boiler + thermostat connected). Before: 1.7.9+8a42071, bootcount 1083, uptime 1 d 07:26, lastreset 'External System'; settings saved (API 3751 B, raw ini 1732 B). 14:48:50 web OTA the XHR way: curl -H 'Expect:' --limit-rate 100k -F firmware=@fw.bin 'http://192.168.88.35/update?size=781472' (fw.bin = OTGW-firmware-1.8.0-beta.1+488ca5a.ino.bin, 781472 B, sha256 2d0cb944...42dc) -> HTTP 200 in 17.1 s, page text 'Flashing successful! Wait for the OTGW firmware to reboot ...'. After that the unit never came back: from 14:54 HTTP/telnet/25238 time out, ping 0/30 from 14:55 to 15:02. Not on USB, so no remote recovery; waits for a power cycle by Robert. Leading hypothesis (ba, unverified): .35 was serial-flashed on 2026-11-11 and its last boot was an external reset, not a power-on, so the ESP8266 kept the serial-download boot strap and the post-OTA software restart landed in the bootloader. The probe (TASK-1935 AC) has not run yet. After the power cycle: version/githash via / and /api/v1/devinfo, the reboot_log top line + reset reason, then the probe, and v1.7.10 only after ba's GO. Evidence: 09 scratchpad b1935/ (S0.json, S0.ini, info0.json, fw.bin, update-resp.txt).
 
 Post-release step (Robert, DM 1571194518395560029, answer B, relayed by the coordinator 2026-11-14): this task and the 2.x task stay neutral until v1.7.10 is published. Right after the release, edit the GitHub release body of v1.7.10 and the beta.245 alpha note so they describe the issue openly (what it was, only with an admin password set, local network), and update the release notes accordingly. The draft text is kept locally until then.
+
+2026-11-20 (otgw-webui) v1.7.10 published (https://github.com/rvdbreemen/OTGW-firmware/releases/tag/v1.7.10, tag on f392fc471, Latest), fix merged back into otgw-1.x.x (d1aaffc8b). AC1 evidence this session: test/host/test_fileAccessPath.py (real handleFile() against the real littlefs of core 2.7.4): --old-rev v1.7.9 -> OLD 9 of 11 probes return the settings file without credentials, FIX 0 of 11, controls ok, RESULT: PASS; the same test on the merged otgw-1.x.x tree: 0 of 11, PASS. Smoke of v1.7.10 on .68 by otgw-bench-tester OK (OTGW-field-data/bench-1x/2026-11-20_68-v1.7.10). AC3 stays open: .35 (Robert's 1.x unit) has been offline since a web OTA of v1.7.10 at 16:27 (cause unknown, the restart path is unchanged since v1.5.0); the probe set on a unit with a password set has not been run.
 <!-- SECTION:NOTES:END -->
