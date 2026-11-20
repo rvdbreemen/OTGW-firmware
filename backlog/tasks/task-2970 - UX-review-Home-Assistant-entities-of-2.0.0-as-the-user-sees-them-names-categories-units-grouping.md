@@ -3,11 +3,11 @@ id: TASK-2970
 title: >-
   UX review: Home Assistant entities of 2.0.0 as the user sees them (names,
   categories, units, grouping)
-status: Done
+status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-20T15:42:00Z'
-updated_date: '2026-11-20T15:51:00Z'
+updated_date: '2026-11-20T16:00:00Z'
 labels:
   - ux
   - mqtt
@@ -28,12 +28,17 @@ Read-only UX review by otgw-ux-designer, suggested by the coordinator: how the 2
 - [x] #1 Review file lists every finding with heuristic, severity, effort, evidence (file:line) and a proposed AC
 - [x] #2 Entity inventory read from the discovery code (counts per component and category), with what could not be verified read-only listed under Not verified
 - [x] #3 Findings list delivered to the coordinator for triage
+- [ ] #4 TASK-2971 (otgw-dev, 2.0.0): H1, H3, H5, H7 done, after otgw-architect's ADR check
+- [ ] #5 TASK-2972 (otgw-dev, 2.0.0): H4 duplicate-value question answered
+- [ ] #6 TASK-2974 (otgw-docs, 2.0.0): H6 MQTT.md matches the device layout
 <!-- AC:END -->
 
 ## Implementation Notes
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-11-20: review docs/reviews/2026-11-20_ux-ha-entities/README.md, findings H1-H7. Inventory by an Explore agent, key claims re-checked in the code (no has_entity_name/object_id emitted, device name, writeFriendlyName, typo, binary rows without devCls, BLE without availability). Counts from a parse script over mqttHaSensors[] (405 rows; 221 uncategorised and enabled; 92 raw byte halves, 38 of them uncategorised and enabled). No HA screenshots exist; rendering described from HA's documented behaviour. Findings sent to the coordinator.
+
+2026-11-20: umbrella by coordinator decision. Children: TASK-2971 (H1 H3 H5 H7, otgw-dev, 2.0.0, architect ADR check first), TASK-2972 (H4 question only, otgw-dev, 2.0.0), TASK-2973 (H2 curated names, otgw-dev, 2.1.0, not gating this umbrella), TASK-2974 (H6, otgw-docs, 2.0.0).
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
