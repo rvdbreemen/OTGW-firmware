@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-18T14:44:00Z'
-updated_date: '2026-11-18T15:46:00Z'
+updated_date: '2026-11-20T01:13:00Z'
 labels:
   - adr
   - needs-maintainer-ok
@@ -25,7 +25,7 @@ adr-lint --strict on origin/dev c31ded494 reports 16 one-directional and 1 concu
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [x] #1 Every one of the 17 pairs classified full or partial, with file:line
-- [ ] #2 Chosen option recorded (Robert's decision), applied with adr-kit commands only
+- [x] #2 Chosen option recorded (Robert's decision), applied with adr-kit commands only
 - [ ] #3 adr-lint --strict shows no supersession FAIL, or each remaining one is a recorded waiver
 <!-- AC:END -->
 
@@ -81,4 +81,8 @@ A, waiver recorded: the 6 legitimate partial supersedes below keep their target 
 - ADR-250 <- ADR-253 (ADR-253:3,41, partly)
 The waiver ends when the adr-kit release with B is installed here and adr-lint --strict shows no supersession FAIL.
 B: rvdbreemen/adr-kit branch fix/supersession-claim-parsing fdf10bb (local); the PR opens after the full suite on fdf10bb is green; merging is Robert's call.
+
+2026-11-20 AC2 ticked (otgw-docs, coordinator's assignment): the chosen option is recorded above (Robert 'A+B', Discord DM 1572637750618886297, confirmed DM 1572638924659105984); A (waiver for the 6 partial supersedes) needs no ADR edit, so no adr-kit command was required; B is the adr-kit fix fdf10bb, not released yet. AC3 NOT met: adr-lint 0.61.1 --strict on origin/dev b5158b75e (run 2026-11-20 by otgw-docs) still reports 18 supersession FAILs: the 17 classified pairs plus a NEW one, ADR-102 <- ADR-255.
+
+2026-11-20 classification of ADR-102 <- ADR-255 (read-only, otgw-docs): class 3, real PARTIAL supersede; the target correctly stays Accepted. ADR-255:3 and :40 title '(partly supersedes ADR-102)'; :112 'This partly supersedes ADR-102: its rule stays for the base topic and for every other entity; for this one switch, availability also reflects whether the action it offers can succeed.'; :165 Related 'partly superseded for the SAT simulation switch only; the base-topic rule and its gate stay.'; frontmatter ADR-255:10 supersedes [] and ADR-102:4 status Accepted, :11 superseded_by null (consistent). Fix: none in the ADRs; must NOT get 'Superseded by' (would retire ADR-102's base-topic rule). Belongs in the A waiver list as a 7th partial (needs Robert's extension, coordinator is asking) until B is installed. Updated totals: 19 claims, 0 need a Status edit; 11 lint defects, 7 legitimate partial supersedes.
 <!-- SECTION:NOTES:END -->
