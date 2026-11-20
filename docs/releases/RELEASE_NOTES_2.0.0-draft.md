@@ -6,6 +6,8 @@
 
 <!-- Refreshed 2026-11-17 against dev at beta.361 (TASK-1740 AC4, comms 92): the SAT section and How to report carry the field-result steps; Known issues rebuilt from the beta.360 list (stale items for TASK-1990, TASK-1874 and TASK-1665 dropped) plus TASK-2005; Highlights and BREAKING still need the full pass at release-candidate compose. Still a draft for Robert's review. -->
 
+<!-- Refreshed 2026-11-20 against dev at beta.401 (TASK-1740, 95): beta.383 to beta.401 checked per bump; added TASK-2043 (beta.386), TASK-2023 (beta.387), TASK-2914 (beta.392), TASK-2923 (beta.394), TASK-2037 (beta.396), TASK-2928 (beta.399), TASK-2932 (beta.400); beta.395 fixes the beta.393 chip itself, beta.397 and beta.398 touch prerelease debug keys only (no change in a stable build). New section Remote telemetry (TASK-2937, not on dev yet). Highlight graph history corrected from 24 hours to 7 days (TASK-1963, ADR-245). -->
+
 **Status:** draft, not released. **Branch:** dev. **Compared with:** the 1.x line (latest stable v1.7.9).
 
 ## What 2.0.0 is
@@ -25,7 +27,7 @@ The web UI is the v2 web UI, the only web UI in 2.0.0. Read "Before you flash", 
 - **v2 web UI.** The only web UI in 2.0.0. Live value table, help text for every setting (the **i** button), settings rail with card panels, SAT page. Since beta.111 each page is one gzipped file with an ETag.
 - **Web UI in English, Dutch, German and Greek** (TASK-1764). A flag menu at the top right switches the language at once, without a reload, and remembers your choice. On your first visit the web UI follows your browser language if it is one of the four; otherwise it is English. Only the web UI is translated: firmware texts, MQTT, Home Assistant names, the API and telnet stay English.
 - **Firmware updates over WiFi.** A small safeboot updater next to the firmware. If an upload fails or a new firmware crashes in its first 30 seconds, the unit returns to safeboot and stays reachable. One-action update page for the release zip.
-- **Monitor graph with history.** The graph opens with the last hour the gateway kept (24 hours on boards with PSRAM). The control setpoint line shows what the boiler got, also when the thermostat briefly asks something else that the gateway replaces (TASK-1522).
+- **Monitor graph with history.** The graph opens with the last hour the gateway kept (7 days on boards with PSRAM). The control setpoint line shows what the boiler got, also when the thermostat briefly asks something else that the gateway replaces (TASK-1522).
 - **Works behind a reverse proxy**, including a Home Assistant sidebar panel (ingress). Guide: [Reverse proxy and HA ingress](https://github.com/rvdbreemen/OTGW-firmware/blob/dev/docs/guides/REVERSE_PROXY_AND_HA_INGRESS.md).
 - **Home Assistant.** A "Visit" link to the gateway, SAT power and energy sensors for the Energy dashboard, a cumulative hot water total (`dhw_water_total`), and a "Command Dropped" sensor when the PIC never confirms a command.
 - **Return water temperature every minute** from a wired sensor (PIC firmware 6.6 or later, `TS=R`).
@@ -46,6 +48,23 @@ SAT (Smart Autotune Thermostat) is an embedded heating controller. It is **off b
 - **How to report SAT field results:** check the version at `http://<ip>/api/v2/device/info` (`fwversion`); check that `http://<ip>/api/v2/sat/status` shows `"simulation": false`; run the capture tool from the release zip with `--long-run` for at least a night and a morning; note your boiler model, radiators or floor heating and any setting you changed, with the time; stop with `q` and post the `-upload.zip` (see "How to report"). The same steps: https://github.com/rvdbreemen/OTGW-firmware/blob/dev/docs/sat/field-run-recipe-2.0.0.md. SAT is only as good as the field data we get.
 
 Without SAT, the gateway behaves as a transparent OpenTherm gateway, as in 1.x.
+
+---
+
+## Remote telemetry is opt-in and off by default
+
+<!-- Review (95, 2026-11-20): written from ADR-263, the approved onboarding text in v2.js (I18N_EN.rtel) and the TASK-2937 commits ce95a638f and 1a0ea6302 on lane-5e-adr. Those commits are not on dev yet: keep this section only if TASK-2937 lands before the stable tag. To be matched with 92's text. -->
+
+Remote telemetry helps make the firmware better. It is **off by default** and nothing is sent until you turn it on yourself.
+
+- **Where you choose:** the last step of the setup wizard asks; on a gateway that is already set up, a one-time question asks once ("No, keep it off" is the default). You can change it at any time under **Settings > General** ("Send remote telemetry").
+- **What is sent:** OpenTherm messages, the decisions of the SAT control, firmware error messages and your settings. These also include the weather location, the name of your gateway and the room temperature. Passwords and tokens are never sent. Your gateway is recognisable by a device ID, not by your name.
+- **How:** encrypted, via Cloudflare to the maker's NAS, in the Netherlands.
+- **How long:** deleted automatically after 30 days.
+- **What for:** only for improving and validating the firmware.
+- **Off means off:** when you turn it off, the gateway stops sending and drops what it had not sent yet. The choice is stored on the gateway itself, not in `settings.ini`.
+- **Boards with PSRAM only.** Remote telemetry needs a board with PSRAM (ADR-263). On a board without PSRAM the wizard does not offer it and the switch is disabled with "Needs a board with PSRAM".
+- **Status in the header:** while it is on, a badge shows "Telemetry online", "Telemetry paused" or "Telemetry offline". While it is off, there is no badge.
 
 ---
 
@@ -154,6 +173,7 @@ Most changes since the first 2.0.0 beta are already described above (Highlights 
 
 ### SAT
 
+- The derivative gain of the SAT PID is 0.05 x 8400 x Kp (was 0.063 x 8400 x Kp) (Sergeant D entries 425 and 427, TASK-2043, beta.386).
 - With the room outside the 0.1 C band around the target, the PID integral is halved once and then held instead of reset to 0; the same applies to the zone thermostats (TASK-1890, beta.376).
 - SAT no longer switches from continuous to PWM while the tolerance band pauses heating (TASK-1887, beta.377).
 - PWM ON phases that start during a band pause do not count toward the hourly start limit, and the SAT narration names the value that decided a band stop or restart (TASK-1887, beta.358).
@@ -187,8 +207,12 @@ Most changes since the first 2.0.0 beta are already described above (Highlights 
 
 ### Web UI and graphs
 
+- **New version notice, off until you say yes** (TASK-2023, ADR-262, beta.387). The web UI can tell you when a newer firmware is on GitHub. Your browser asks the GitHub releases API (`api.github.com`), at most every 6 hours, without cookies; the gateway itself makes no outbound request. A stable build looks only for stable releases unless you also ask for betas. It stays off until you answer the one-time question with Yes; you can change it in the settings.
 - The one-time question whether to check GitHub for new versions is a chip "Check for new versions?" in the header; it no longer opens as a dialog over the page you are on. A click on it shows the explanation and the No / Yes buttons. The "New version available" notice now also shows on a phone; before beta.393 it was hidden at a width of 480 px or less (TASK-2918, beta.393).
 - The web UI no longer calls SAT experimental; SAT stays opt-in and off by default, and the setup wizard still asks you to confirm before SAT controls the boiler. The heat-pump boiler type is still marked experimental (TASK-2909, beta.390).
+- The Settings SAT category calls SAT the Smart Autotune Thermostat, like the SAT page and the manual, in every language (TASK-2928, beta.399).
+- The dashed lines of the Monitor graph (control setpoint, thermostat setpoint, SAT target) have a dashed legend swatch, on screen and in the PNG export (TASK-2037, beta.396).
+- The injected-override badge no longer disappears when one poll of the overrides fails on a busy gateway; the web UI tries once more and keeps the rows until the next poll (TASK-2914, beta.392).
 - The Monitor graph and its CSV export show SAT's target temperature as its own dashed line while SAT is on, also in the 24 h history (TASK-2018, beta.378).
 - The SAT messages "boiler handed back" now say "SAT paused", with the reason, in English, Dutch, German and Greek (TASK-2036, beta.382).
 - The SAT weather card uses Home Assistant's sun position (`sat/sun_elevation`) while a value younger than 1 hour is published and then asks for no location; otherwise it asks for latitude and longitude (TASK-2015, beta.371).
@@ -288,11 +312,12 @@ Timing and reliability:
 
 ### WiFi
 
-- **The WiFi AP fallback is now part of the stable release** (TASK-2931, Robert's decision, beta.401). When the saved WiFi network cannot be reached, after 2 failed attempts (about a minute) or at boot, the gateway opens its own access point `OTGW-<last 3 bytes of the MAC>` (password `otgw1234`, web UI at `http://192.168.4.1`) and retries your network every 5 minutes. There is no AP fallback with the setting `wifinoportal` (the gateway keeps retrying without restarting) or while memory is critically low (it then restarts after 10 failed attempts). Before beta.401 only beta builds had it. See section 6.1.3 of the manual.
+- **The WiFi AP fallback is now part of the stable release** (TASK-2931, Robert's decision, beta.401). When the saved WiFi network cannot be reached, after 2 failed attempts (about a minute) or at boot, the gateway opens its own access point `OTGW-<last 3 bytes of the MAC>` (password `otgw1234`, web UI at `http://192.168.4.1`) and retries your network every 5 minutes. There is no AP fallback with the setting `wifinoportal` (the gateway keeps retrying without restarting) or while memory is critically low (it then restarts after 10 failed attempts; TASK-2923, beta.394, after a crash on a starved heap on the bench). Before beta.401 only beta builds had it. See section 6.1.3 of the manual.
 - A gateway whose network is dead while its memory is nearly exhausted now recovers itself: a WiFi check that cannot run for lack of memory counts as dead when the largest free memory block is under 4 KB, so the forced reconnect and then the restart follow (TASK-2026, ADR-258, beta.383). While memory stays that low, a short WiFi reconnect no longer starts that count again (ADR-261, beta.385; log line from beta.388).
 
 ### Diagnostics
 
+- On a display, the device page shows the plain version in a stable build (it showed `2.0.0-_VERSION_PRERELEASE` in the production dry run) (TASK-2932, beta.400).
 - A stopped diagnostic recording stays readable until the next start on boards with PSRAM (TASK-1960, beta.344).
 - The gateway reports the full fingerprint of its firmware (`appelfsha256` in `/api/v2/device/info` and next to a core dump) (TASK-1983, beta.346 and beta.347).
 - The telnet line `[fs-slow]` names a filesystem step that took 100 ms or more (TASK-1995, beta.362 and beta.368).
