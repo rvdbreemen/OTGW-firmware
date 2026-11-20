@@ -4,6 +4,11 @@
 [![GitHub release](https://img.shields.io/github/v/release/rvdbreemen/OTGW-firmware?style=flat-square)](https://github.com/rvdbreemen/OTGW-firmware/releases)
 [![License: GPLv3](https://img.shields.io/badge/License-GPLv3-blue.svg?style=flat-square)](LICENSE)
 
+**Which firmware do you need?**
+
+- Your gateway has a **Wemos D1 mini or NodeMCU (ESP8266)**: use the stable 1.x firmware. Take the [latest stable release](https://github.com/rvdbreemen/OTGW-firmware/releases/latest) (currently v1.7.10) and read the [1.x README](https://github.com/rvdbreemen/OTGW-firmware/tree/otgw-1.x.x).
+- Your gateway has a **LOLIN S3 Mini or S3 Mini Pro (ESP32-S3)**, or you want to try 2.0.0 (swap the module first, see [Migrating from ESP8266](#migrating-from-esp8266-1x)): read on. 2.0.0 is in beta.
+
 > **Disclaimer: v2.0.0-beta.401 is a beta of the 2.0.0 line.** It is not a stable release. It has had alpha and beta testing on a small group of units, but not yet the long field runs a stable release needs. Expect bugs, save your settings before you flash (a power cut during a filesystem update can still reset them), and read the [beta.401 release notes](https://github.com/rvdbreemen/OTGW-firmware/releases/tag/v2.0.0-beta.401) first, including the known issues.
 >
 > If you need a gateway that just works, stay on the 1.x line for now: the [`otgw-1.x.x` branch](https://github.com/rvdbreemen/OTGW-firmware/tree/otgw-1.x.x) and the [published releases](https://github.com/rvdbreemen/OTGW-firmware/releases).

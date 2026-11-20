@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-20T15:37:00Z'
-updated_date: '2026-11-20T15:49:00Z'
+updated_date: '2026-11-20T23:51:00Z'
 labels:
   - ux
   - docs
@@ -26,9 +26,9 @@ Read-only UX review by otgw-ux-designer, suggested by the coordinator: what a ne
 - [x] #1 Review file lists every finding with heuristic, severity, effort, evidence (file:line or a gh query) and a proposed AC
 - [x] #2 Facts checked against the repo and gh (default branch, latest release, release list, settings names); what was not checked is listed under Not verified
 - [x] #3 Findings list delivered to the coordinator for triage
-- [ ] #4 otgw-docs: R2, R3, R5, R6 and R7 of the review are fixed in README.md and the manual (each finding's proposed AC met)
+- [x] #4 otgw-docs: R2, R3, R5, R6 and R7 of the review are fixed in README.md and the manual (each finding's proposed AC met)
 - [ ] #5 BlueFlame: R4, the next beta's release notes have the short head (what, who, known issues, what changed, how to update) and the test provenance as an appendix, and the /beta-release-2x template matches
-- [ ] #6 Robert: decision on R1 (default branch dev versus a landing text that sends ESP8266 users to /releases/latest) recorded in this task, and the README follows it
+- [x] #6 Robert: decision on R1 (default branch dev versus a landing text that sends ESP8266 users to /releases/latest) recorded in this task, and the README follows it
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -39,6 +39,8 @@ Read-only UX review by otgw-ux-designer, suggested by the coordinator: what a ne
 2026-11-20: reopened as the umbrella task by coordinator decision. Owners: R2, R3, R5, R6, R7 otgw-docs (passed on by the coordinator); R4 BlueFlame + /beta-release-2x template; R1 to Robert via the coordinator. The review itself (ACs 1-3) is done.
 
 2026-11-20 otgw-docs (95): R2, R3, R5, R6, R7 done in README.md and manual ch03/h03 (MANUAL.md regenerated, test_manual_generated OK). R5: Quick Start moved directly under the intro and beta disclaimer (where R1's firmware choice goes). R2: step 0 hardware check with a link to the ESP8266 migration; step 1 names the erase before the factory command and offers the WiFi update with the release zip for units on 2.0.0. R3: 'Enable HA Discovery' and the 'HA Discovery' rows removed (README step 4 + MQTT table, ch03/h03); checked against v2.js SET_META (only mqtthaprefix) and settingStuff.ino (no discovery on/off): discovery is always on, the prefix must match. R6: no README link into backlog/ (asserted); SAT links go to manual 5.3, 5.21, 5.4 and 5.6 (the manual has no OPV calibration chapter, the backlog doc is from April). R7: example AP name OTGW2-A4:CF:12:21:B4:F8 (_HOSTNAME OTGW2); step 3 names Home and Monitor > Log. R1 and R4 not touched (Robert / BlueFlame).
+
+2026-11-21 otgw-docs (95): AC4 evidence: R2, R3, R5, R6, R7 landed in cffd87b78 (README + manual ch03/h03, MANUAL.md regenerated, test_manual_generated OK; notes above). AC6: Robert chose A for R1 (relayed by the coordinator 2026-11-21): README.md now opens, right under the badges and before the beta disclaimer, with 'Which firmware do you need?': ESP8266 (Wemos D1 mini / NodeMCU) -> https://github.com/rvdbreemen/OTGW-firmware/releases/latest (currently v1.7.10, checked with gh api releases/latest: v1.7.10, 2026-11-20) and the 1.x README on otgw-1.x.x; ESP32-S3 (LOLIN S3 Mini / Pro) or trying 2.0.0 -> read on, with a link to Migrating from ESP8266. The default branch stays dev.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
