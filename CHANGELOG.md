@@ -5,8 +5,15 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [2.0.0-beta.401] - 2026-11-20
+
 ### Changed
 - Web UI: the one-time question whether to check GitHub for new versions (ADR-262) is a header chip "Check for new versions?" instead of a modal that opened over the current page about 30 s after page load; the explanation and No / "Yes, check" open in a popover only on a click, closing it is "not now", and the answers still write `updatecheck` then `updatecheckasked` (TASK-2918, beta.393).
+- Web UI: in the Monitor graph legend, dashed series (control setpoint, thermostat setpoint, SAT target) get a dashed swatch, on screen and in the PNG export (TASK-2037, beta.396).
+- Web UI: the Settings SAT category names SAT the Smart Autotune Thermostat, like the SAT page and the manual (EN, NL, DE, EL) (TASK-2928, beta.399).
+- WiFi: the fallback access point is part of stable builds too (boot fallback, runtime fallback after 2 failed attempts, not with wifinoportal or a starved heap); log lines lose the BETA prefix (TASK-2931, beta.401; Robert's decision).
+- Capture tool: a sleep of the capture computer is recorded as a capture-host gap in gaps.log (TASK-2922).
+- OLED: the device page no longer prints the bare _VERSION_PRERELEASE token in a stable build (TASK-2932, beta.400).
 
 ### Fixed
 - Web UI: the "New version available" notice (beta.387) was never visible on a phone or in a window 480 px wide or less, because it sat in the header group that is hidden at that width; the notice and the new chip now sit right after that group (TASK-2918, beta.393).
@@ -1158,7 +1165,8 @@ Legacy release. See git history for details.
 
 Legacy releases. See git history for details.
 
-[Unreleased]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.392...HEAD
+[Unreleased]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.401...HEAD
+[2.0.0-beta.401]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.392...v2.0.0-beta.401
 [2.0.0-beta.392]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.382...v2.0.0-beta.392
 [2.0.0-beta.382]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.374...v2.0.0-beta.382
 [2.0.0-beta.374]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.360...v2.0.0-beta.374
