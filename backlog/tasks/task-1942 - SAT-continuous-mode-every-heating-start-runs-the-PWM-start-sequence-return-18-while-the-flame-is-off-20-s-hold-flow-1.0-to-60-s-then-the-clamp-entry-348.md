@@ -8,7 +8,7 @@ status: In Review
 assignee:
   - '@claude'
 created_date: '2026-11-14T17:23:00Z'
-updated_date: '2026-11-20T01:39:00Z'
+updated_date: '2026-11-20T01:42:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -29,7 +29,7 @@ Sergeant D entry 348 (Q-347a B, 2026-11-14, 'as a fail safe guard (e.g. sat is i
 - [x] #2 After a CH flame-on the flame-off CS is held for fModSupDelay (20 s); then CS = max(request, flow - fModSupOffset) until 60 s after flame-on; then the entry-112 clamp (entries 344, 347)
 - [x] #3 Gates as the PWM ON start: no override during hot water, with the request at or below the cold threshold, or with overshoot protection off (heating_control.py:384-389)
 - [x] #4 Host test on the real satContinuousSetpoint/satPwmFlameOffHold: flame off then flame on, red on beta.250 (flame off -> request), green on the fix
-- [ ] #5 Bench via 09: a continuous start shows return + 18 before ignition, the 20 s hold, then the follow and the clamp; no regression on PWM starts
+- [x] #5 Bench via 09: a continuous start shows return + 18 before ignition, the 20 s hold, then the follow and the clamp; no regression on PWM starts
 - [x] #6 ADR-235 (or the TASK-1924 docs) names the start sequence in continuous mode
 - [ ] #7 Entry 385 (387/389/391/394): every heating start (heater OFF->ON, SAT enable without a flame, boot) enters PWM first once the flow is known, with the first phase ON; no PWM->continuous switch until 60 s after the first CH flame-on of that start; host test red on origin and green on the fix; bench on the PIC unit shows the PWM-first start on the wire
 <!-- AC:END -->
@@ -82,6 +82,8 @@ GRUIJTER 6 starts: 06:49:23, 07:43:53, 13:54:23, 15:11:53, 18:32:54, 20:19:54. B
 First PWM phase at the start (AC7 'with the first phase ON'): ON at once in 8 of 13 starts: all 6 gruijter, indigo 12:42 and 04:01. OFF first in 5 indigo starts. 09:08 hit the hour start limit ('SAT PWM: cycle limit 3/hr reached, suppressing new cycle'). 14:04, 15:32, 16:55 and 05:27 had pwm_on=0 s at duty 0.04-0.06. Each waited CS=10 for 780-1140 s until the first ON phase. This follows the code's documented rules: the entry ON runs only when the ON time is at least 180 s (SATcontrol.ino:1780-1782, pwm.py:154-155/179-180, entry 43, Q38) and the hour limit is not reached (SATcontrol.ino:1784-1797, entries 59, 89). So it is consistent with the code, not a code defect. But AC7 says 'with the first phase ON' with no such condition, and the user-visible result is a heating start held off for 13-19 min. Whether that is what entries 385/387 intend with a low duty is a SAT question (Sergeant D), not decided here.
 
 NOT verified by this analysis: (a) the entry-112 clamp after 60 s as a distinct value (CS after 60 s is consistent with flow - 1 / request, but the clamp is not isolated); (b) the gates 'request at or below the cold threshold' and 'overshoot protection off' (not exercised in either run); (c) the 20 s hold is read from CS values and command timing, and the flame time comes from the OT frame log, which logs one frame late (otframes header).
+
+2026-11-20 AC5 ticked on the field evidence above, in place of the bench (coordinator's go). 13 starts on two PIC units with a real boiler, satsimulation false, beat the boiler-less .63 bench. Shown: return/flow + 18 before ignition, the 20 s hold, flow - 1 to 60 s; PWM starts unchanged (no mode change within 60 s). Not isolated: the entry-112 clamp value. AC7 stays OPEN: whether a PWM-first heating start may wait in PWM OFF when the ON time is under 180 s or at the hour limit is SAT behaviour. Queued as Q-1942a in docs/sat/open-questions.md, text sent to 92 for #dev-sat-mqtt. AC7 is not reworded by us.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
