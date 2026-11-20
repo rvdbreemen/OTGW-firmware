@@ -1,11 +1,11 @@
 ---
 id: TASK-2969
 title: 'UX review: the first five minutes of a new user (README and release notes)'
-status: Done
+status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-20T15:37:00Z'
-updated_date: '2026-11-20T15:41:00Z'
+updated_date: '2026-11-20T15:42:00Z'
 labels:
   - ux
   - docs
@@ -26,12 +26,17 @@ Read-only UX review by otgw-ux-designer, suggested by the coordinator: what a ne
 - [x] #1 Review file lists every finding with heuristic, severity, effort, evidence (file:line or a gh query) and a proposed AC
 - [x] #2 Facts checked against the repo and gh (default branch, latest release, release list, settings names); what was not checked is listed under Not verified
 - [x] #3 Findings list delivered to the coordinator for triage
+- [ ] #4 otgw-docs: R2, R3, R5, R6 and R7 of the review are fixed in README.md and the manual (each finding's proposed AC met)
+- [ ] #5 BlueFlame: R4, the next beta's release notes have the short head (what, who, known issues, what changed, how to update) and the test provenance as an appendix, and the /beta-release-2x template matches
+- [ ] #6 Robert: decision on R1 (default branch dev versus a landing text that sends ESP8266 users to /releases/latest) recorded in this task, and the README follows it
 <!-- AC:END -->
 
 ## Implementation Notes
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-11-20: review docs/reviews/2026-11-20_ux-first-five-minutes/README.md, findings R1-R7. Facts: gh repo view (default branch dev, latest release v1.7.9 2026-11-04), gh release list (6 newest are 2.0.0 prereleases), settings names checked against v2.js SET_META and the firmware (no HA discovery on/off key, only mqtthaprefix). Line numbers at origin/dev 335e16db7.
+
+2026-11-20: reopened as the umbrella task by coordinator decision. Owners: R2, R3, R5, R6, R7 otgw-docs (passed on by the coordinator); R4 BlueFlame + /beta-release-2x template; R1 to Robert via the coordinator. The review itself (ACs 1-3) is done.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
