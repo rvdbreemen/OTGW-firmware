@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-19T01:07:00Z'
-updated_date: '2026-11-19T02:21:00Z'
+updated_date: '2026-11-20T10:27:00Z'
 labels:
   - sat
   - bug
@@ -43,4 +43,6 @@ Field reproduction: marceld91d, beta.361 (Remeha Calenta + Toon), capture 202611
 
 Regression bench (otgw-bench-tester 09, 2026-11-19, .63, no boiler) on 2.0.0-beta.380+7a98297 (contains 379): OTA app+fs 'changed: none', bootcount 231 for 30 min (no crash, 0 loop-stall), heap flat (hd_min_free_heap 24,464), 'Weather: fetching' (SATweather.ino:393) at 02:53:37 and 03:08:38 with weatherApply, one boot hand-back (:4477) and one OT-link hand-back after 30 s (:4389), no repeats. AC2 NOT ticked: the fix itself (no hand-back at the MsgID 27 expiry) needs a boiler that stamps MsgID 27; replayed frames and OT= A answers do not stamp.
 2026-11-19 bench (09, .63, 380+7a98297, regression only, no boiler): OTA 'changed: none', 30 min no crash/restart (bootcount 231), heap flat (hd_min 24,464), 'Weather: fetching' every 15 min as before (02:53:37, 03:08:38), only the designed boot + 30 s OT-link hand-backs. The feature cannot be benched (no boiler stamping MsgID 27). Pushed 0f9a90699..7a9829718 (beta.380), zip post 1572798573911744674. AC2 stays open for a field capture.
+
+Robert 2026-11-20, interactive in session 95 (otgw-docs), TASK-1740 AC1 waiver round: 'A, else B': otgw-dev builds a replay of an outside source switch through the real code for AC2 once TASK-2019 leaves room; if it does not make it before the release, it ships as a known issue.
 <!-- SECTION:NOTES:END -->

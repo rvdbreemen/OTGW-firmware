@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-14T20:51:00Z'
-updated_date: '2026-11-20T01:13:00Z'
+updated_date: '2026-11-20T10:27:00Z'
 labels:
   - github
   - pr
@@ -48,4 +48,6 @@ AC3 bench by 09, 2026-11-14, .61 beta.257+47f0ea3 against broker 192.168.88.32: 
 2026-11-19 coordinator plan for AC3: 09 checks the HA side on the HA-ingress rig after the beta, bundled with TASK-1780 as one HA bench item.
 
 2026-11-20 09 interim for AC3: retained homeassistant/sensor/otgw-1020BA21B4F8/boiler_DHWFlowRate/config (beta.401+47d08b1, .61) and otgw-AC276ECE45D8 (poc.31+8461936, .63) both carry device_class volume_flow_rate, unit_of_measurement L/min, state_class measurement (OTGW-field-data/bench-otgw32/2026-11-20_task1780-ac2-broker/dhwflow-discovery-retained.txt). HA log check on the HA rig follows after 08:00.
+
+Robert 2026-11-20, interactive in session 95 (otgw-docs), TASK-1740 AC1 waiver round: A: otgw-bench-tester finishes AC3 on the HA-ingress rig (with TASK-1780) before the release; then the known-issue line comes out of the stable notes.
 <!-- SECTION:NOTES:END -->

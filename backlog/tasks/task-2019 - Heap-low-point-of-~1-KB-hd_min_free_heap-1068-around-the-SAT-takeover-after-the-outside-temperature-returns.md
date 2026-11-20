@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@otgw-dev'
 created_date: '2026-11-18T10:04:00Z'
-updated_date: '2026-11-20T01:56:00Z'
+updated_date: '2026-11-20T10:27:00Z'
 labels:
   - heap
   - sat
@@ -72,4 +72,6 @@ Starting evidence on current code (otgw-bench-tester 09, 2026-11-19), 2.0.0-beta
 2026-11-20 code reading for AC2 (hypothesis until takeover 2; analysis only, no fix). Mechanism: the same one TASK-1757 found after CONNACK (MQTTstuff.ino:1903-1911). The SAT set is queued in one pass, then espMqttClient sends the whole outbox in one MQTTclient.loop(), and free heap falls 32-36 KB there. TASK-1757's remedy, the post-connect pace window mqttConnectPaceHold() (outbox <= CONN_STAGE_MAX_OUTBOX 2, largest block >= CONN_STAGE_MIN_BLOCK 20480, MQTTstuff.ino:1843-1844, 1913-1920), opens only in connStageStart() at a connect (:1852). At a SAT takeover ('outside temperature valid again', SATcontrol.ino:4506-4512) nothing opens it. The SAT gate satOutboxFull() (SATmqttPublish.cpp:50-55) then only checks outbox depth <= SAT_MQTT_OUTBOX_LIMIT 24 (SATmqttPublish.h:89), with no largest-block check, so up to 24 packets queue per pass and one loop() flushes them. Why the set is large at resume: satPublishMQTT() is not reached while SAT is handed back, so changed values and due heartbeats pile up. That is our reading of the callers at SATcontrol.ino:7951/8093/8176/8206 and is NOT verified. satRepublishCoreState() (epoch bump, SATcontrol.ino:5205) is not called at a takeover; its only caller is requestMQTTRepublishAll() (OTGW-Core.ino:2207).
 
 ADR-088 check (coordinator's question): satPublishMQTT() (SATcontrol.ino:5254-5869) has no beginStatusBurst()/endStatusBurst(); only satPublishClimateBridge() (:5240/:5251) is wrapped. That is NOT a breach of the binding gate: ADR-088 sub-rule 1 and check_status_publishers_wrap_burst (evaluate.py:1907-1960) cover only publish(Master|Slave)Status*State in OTGW-Core.ino by their own wording. So it is a scope gap, not a violation. It is also not the dip mechanism: the ADR-088 window only makes the discovery drip defer. It does not pace the outbox flush inside MQTTclient.loop(), which is where the probes put the 20-38 KB. Candidate fix direction for after takeover 2, NOT decided: open the existing pace window (or its block check) at a SAT takeover, so the SAT set leaves a few packets per pass as after a connect. Any gate extension to SAT publishers would be an ADR-088 scope change and needs its own decision.
+
+Robert 2026-11-20, interactive in session 95 (otgw-docs), TASK-1740 AC1 waiver round: B with a soak condition: release 2.0.0 with a known issue ONLY if the RC soaks on .61 and .63 (TASK-1740 AC3/AC5) show no restart and no new low point below about 4 KB; otherwise the release waits.
 <!-- SECTION:NOTES:END -->

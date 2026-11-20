@@ -3,10 +3,10 @@ id: TASK-1772
 title: >-
   Classic S3 (.63): intermittent WiFi/HTTP stalls since the beta.166 flash (ping
   loss, multi-second RTT, HTTP 000)
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-11-10T03:29:00Z'
-updated_date: '2026-11-17T04:39:00Z'
+updated_date: '2026-11-20T10:27:00Z'
 labels:
   - bench
   - network
@@ -41,4 +41,12 @@ Gaps vs AC1 (not ticked): no telnet [HEAP]/loop-stall log on .63 (left out on pu
 AC1 capture by 09, 2026-11-17 04:37:19-05:37:33 (released by Robert, DM 1572091562068934717), read-only, side by side. .63 Classic+S3 2.0.0-beta.359+bb4c20c (up 5 h 39 min, CAPsMAN AP '1e verdieping') and .61 OTGW32 2.0.0-beta.356+4601510 (up 3 h 56 min, router radio wlan2), satsimulation false on both. Per unit: ICMP ping 1/s, timed GET /api/v2/device/info every 10 s, raw telnet, router WiFi stats every 5 min. PING .63: 3592 sent, 29 lost (0.81 %, a cluster 04:43:34-04:44:3x), RTT p50 55 / p95 331 / max 684 ms, 483 over 200 ms. PING .61: 3590 sent, 6 lost (0.17 %), p50 64 / p95 135 / max 819 ms, 58 over 200 ms. HTTP: .63 360/360 x 200, p50 146 / p95 451 / max 1003 ms; .61 360/360 x 200, p50 139 / p95 272 / max 2350 ms (one sample at 05:29:24, next to a 2-ping loss at 05:29:22-23). No HTTP 000 and no reboot on either unit. TELNET: .63 1 loop-stall (04:57:53, 587 ms, step 5->8), .61 4 (201-592 ms); 0 '[HEAP]' lines on both in steady state with this build's debug level. ROUTER: .63 rx-signal -75 -> -73 dBm, tx-rate 81 -> 27 Mbps, rx 40.5 Mbps; .61 signal -66 -> -63 dBm, tx 135 -> 120 Mbps, tx-frames-timed-out 0.
 
 Reading (not a verdict; AC2 needs the older-firmware baseline): .63's extra latency and loss line up with a ~10 dB weaker link on a different AP and a falling tx-rate, while the loop-stall rate and the HTTP success are the same on both units. That points to the radio path, not the firmware. The original 'multi-second RTT / HTTP 000' was NOT reproduced in this hour (max RTT 684 ms, 0 HTTP 000). Evidence: 09 scratchpad t1772/ (ping-*.jsonl, info-*.jsonl, telnet-*.raw, router.jsonl, sbs.py).
+
+Robert 2026-11-20, interactive in session 95 (otgw-docs), TASK-1740 AC1 waiver round: C: AC2 (old-firmware baseline) waived; verdict radio path from 09's 2026-11-17 side-by-side evidence (about 10 dB weaker link on another AP, same loop-stall rate and HTTP success on both units). The baseline would take the .63 slot of the 24 h soak. A follow-up only if a tester reports it.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+AC1: 09's side-by-side captures 2026-11-14 and 2026-11-17 (notes). AC2 waived by Robert 2026-11-20 (interactive, session 95): no old-firmware baseline; verdict radio path, not firmware, from the 11-17 evidence. Not verified: a firmware share that only a beta.165 baseline could show.
+<!-- SECTION:FINAL_SUMMARY:END -->

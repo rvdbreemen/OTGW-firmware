@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-19T01:20:00Z'
-updated_date: '2026-11-19T04:21:00Z'
+updated_date: '2026-11-20T10:27:00Z'
 labels:
   - sat
   - bug
@@ -40,4 +40,6 @@ Implementation gap against entries 330 (Robert, 2026-11-13) and 331 (Sergeant D 
 2026-11-19 bench (09, .63, 382+e562f82 which contains 381, regression only, no thermostat): 30 min no restart (bootcount 233), heap flat, OTA 'changed: none'. One 1.1 s loop-stall (step 4->5) came from 09's visit to the Advanced page (deferred PIC update check + firmware/files, 655 ms), not from TASK-2040. The feature (the PIC proxy A 27 with the OT= value stamps MsgID 27) cannot be benched without a thermostat: AC3 = field (marceld on 381+).
 
 2026-11-19 full-suite follow-up: test/host/test_replay_frame_guards.cpp failed on origin b72c6d6c5: its OpenthermData_t stub had no bAnswerOverride (compile error), and its case 'gateway answer to the thermostat leaves the stamp' held the pre-2040 rule. Stub field added (at the end, so the positional initialisers keep working); the case now expects a PIC proxy A to stamp, plus new cases that an OT-Direct (bLocalAnswer) and a replayed A do not. Exit 0.
+
+Robert 2026-11-20, interactive in session 95 (otgw-docs), TASK-1740 AC1 waiver round: A: otgw-bench-tester runs AC3 on .63 (publish OT= over MQTT, watch osrc=O for 30 min, no hand-back) before the release.
 <!-- SECTION:NOTES:END -->
