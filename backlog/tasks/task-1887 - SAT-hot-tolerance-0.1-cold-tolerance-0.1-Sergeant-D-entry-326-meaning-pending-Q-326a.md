@@ -3,11 +3,11 @@ id: TASK-1887
 title: >-
   SAT: hot tolerance 0.1 / cold tolerance -0.1 (Sergeant D entry 326, meaning
   pending Q-326a)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-13T07:25:00Z'
-updated_date: '2026-11-18T21:27:00Z'
+updated_date: '2026-11-20T01:15:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -29,7 +29,7 @@ Sergeant D decision 2026-11-13 (https://discord.com/channels/812969634638725140/
 - [x] #3 Seam sweep of the SAT tests that cut the control tick and the LL contract (all 18 ids) green; evaluate.py --quick no new FAIL
 - [x] #4 ADR-250 (Proposed via adr-kit) records the decision and amends ADR-199; accepted by Robert before push
 - [x] #5 esp32-combo build and a bench run by the bench-tester (health; the band behaviour is host-proven, no SAT scenario on hardware)
-- [ ] #6 Follow-ups in the post build after the 2.0.0 beta tag, benched on .63: the band narration shows the deciding value (X.XX matches room/target of the same SATTICK), and ON phases that start during a band stop leave starts=/cycles_this_hour unchanged (entry 398; host-proven by test_sat_tolerance_band if .63 does not run PWM)
+- [x] #6 Follow-ups in the post build after the 2.0.0 beta tag, benched on .63: the band narration shows the deciding value (X.XX matches room/target of the same SATTICK), and ON phases that start during a band stop leave starts=/cycles_this_hour unchanged (entry 398; host-proven by test_sat_tolerance_band if .63 does not run PWM)
 - [x] #7 Entries 401-403 (restart below target + 0.1, 600 s minimum CH-off from the CH-off) on the real control tick: host tests red on the code before and green on the fix; ADR-253 (Proposed, partly supersedes ADR-250) accepted by Robert; build + bench .63 health (band host-proven, field check open)
 <!-- AC:END -->
 
@@ -91,4 +91,12 @@ Entry 398 edge case, OUR interpretation (ba, recorded by comms 92 on 2026-11-16;
 Field-evidence signature for entries 410/417 (92/09: check every tester capture with SAT on, firmware >= 377): in the SAT narration (telnet), between a line 'Heating paused (CH off, PWM stays active): ...' and the next 'Heating resumes: ...', there is NO 'Control mode: PWM (...)' line (neither the margin rule 'flow ... >= ... + margin for 60 s' nor 'fail-safe: flow ... - setpoint ... >= 3.5 for 30 s'). Positive control in the same capture: after 'Heating resumes', a 'Control mode: PWM' line may appear again (heating allowed). Old-code signature (indigo 2026-11-16 16:00:58): 'Control mode: PWM' inside a pause on residual heat with flame 0. Bench (agreed with the coordinator): the boiler-less .63 run is a regression check only (no crash, no unexpected mode switches with SAT on): without a boiler SAT hits the OT-link loss and satDisable(), so the switch path never runs and 'no switch' would hold for the old code too; it is not evidence for 410.
 
 Bench (otgw-bench-tester 09, 2026-11-18, .63 Classic+S3 PSRAM, no boiler) on 2.0.0-beta.377+412f888 (d3 stack 376 TASK-1890 + 377 TASK-1887/entries 410-417), REGRESSION ONLY, not feature evidence: (1) OTA app+fs 21:38-21:39, githash 412f888, 'settings: 152 keys, changed: none', bootcount 211->213. (2) 30 min SAT off: bootcount 213 throughout, 37/37 device/info 200, freeheap 37.3k flat after the first 9 min, hd_min 21,328 flat from 21:49, 0 crash/panic, 0 loop-stall. (3) SAT on without boiler: exactly one hand-back at +30 s (SATcontrol.ino:4377), no repeat in 4 min, 0 'Control mode:' lines in the whole capture, SAT off clean ('hand-back already sent'). (4) PID state restore: hand-made sat_pid_state.json i=1.2345 ts=now-60, SAT off, /ReBoot -> /api/v2/sat/status pid_i 1.235 (restored); the telnet line was not captured (client attached to the old boot). Backup file and settings restored, settings.ini diff empty. Evidence: 09 scratchpad b377\. AC6 (band narration value and starts= during a band stop) is NOT covered by this run: it needs SAT really controlling, which a no-boiler bench without loopback cannot show; it stays open.
+
+2026-11-20 AC6 host evidence (otgw-dev, coordinator triage): .63 does not run PWM (no boiler; 09's beta.377 run 2026-11-18 above), so AC6 takes its own fallback. Fresh run on origin/dev b5158b75e: python tests/test_sat_tolerance_band.py -v -> 'Ran 30 tests in 20.607s OK'. Covered: test_narration_names_the_value_the_band_decided_on (pause/hold/resume lines carry the deciding error, 0.20 and 0.25, of the same tick input, once each); entry 398: test_flameless_on_phases_during_a_stop_are_not_counted (starts= constant during the stop), test_on_phase_from_a_stop_counts_once_when_ch_is_allowed_again, test_on_phase_that_starts_in_the_resume_tick_counts_once, test_outside_a_stop_every_on_phase_counts. NOT verified: the same on hardware with a real boiler.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Hot/cold tolerance band (entry 326, Q-326a = A, entry 328) with the 600 s minimum CH-off and restart below target + 0.1 (entries 401-403, ADR-253 Accepted; ADR-250 records the band and amends ADR-199). AC1-AC3 and AC7: host tests on the helpers and the real control tick, red before / green on the fix, seam sweep green, evaluate --quick no new FAIL (notes 2026-11-13..16). AC4: ADR-250 accepted by Robert. AC5: esp32-combo build + 09 bench health runs on .63 (beta.359, beta.377: regression only, no boiler). AC6: .63 runs no PWM (no boiler), so the AC's own fallback applies: fresh run 2026-11-20 on origin/dev b5158b75e, tests/test_sat_tolerance_band.py 30/30 OK (narration carries the deciding value; entry 398 start count during a band stop). Q-403a answered A (entry 411, confirms 405). NOT verified: band behaviour with a real boiler on hardware (host-proven only).
+<!-- SECTION:FINAL_SUMMARY:END -->

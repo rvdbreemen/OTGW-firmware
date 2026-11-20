@@ -3,11 +3,11 @@ id: TASK-1803
 title: >-
   OT-Direct gateway mode: OT=, SW= and SH= reach the boiler only in alternative
   slots; the PIC rewrites the thermostat's own READ 27/56/57
-status: In Review
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-11T06:41:00Z'
-updated_date: '2026-11-15T10:28:00Z'
+updated_date: '2026-11-20T01:31:00Z'
 labels:
   - otdirect
   - review-2026-11-11
@@ -26,8 +26,8 @@ Found in the TASK-1795 audit (docs/reviews/2026-11-11_otdirect-pic-parity-audit/
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 With a thermostat in gateway mode, OT= reaches the boiler through the thermostat's own MsgID 27 and the thermostat reads the OT= value
-- [ ] #2 SW= and SH= turn the thermostat's next READ 56/57 into one WRITE, as the PIC (including its MsgID 6 permission gate)
+- [x] #1 With a thermostat in gateway mode, OT= reaches the boiler through the thermostat's own MsgID 27 and the thermostat reads the OT= value
+- [x] #2 SW= and SH= turn the thermostat's next READ 56/57 into one WRITE, as the PIC (including its MsgID 6 permission gate)
 - [x] #3 Host test against the real code (not a re-implementation): red on the old code, green on the fix
 - [x] #4 esp32-combo build, evaluate.py --quick, bench check where the hardware allows (name what was not benched)
 <!-- AC:END -->
@@ -42,4 +42,8 @@ Bench 09 on .61 (OT-Direct, no boiler, no thermostat), beta.298+bb38dc5 (bench-o
 AC review (coordinator rule 2026-11-15): AC1 and AC2 ask for live behaviour with a thermostat; they are proven by tests/test_otd_relay_rw.py only, so they stay open as field ACs. AC3 (host test) and AC4 (build/evaluate/bench where possible, field part named) stay ticked.
 
 Landed: Pushed origin/dev 2e4ca9c05..3e29faa63; zip beta.301+2b3d9a2 posted (Discord 1571471374038470711); final build exit 0 'Build completed successfully', RAM 130572 B, Flash 2157483 B; sweep 88/88, evaluate --quick 86/0; bench 09 on .61 beta.301+2b3d9a2 PASS (smoke + re-check). Status In Review (convention: field ACs open, see AC list; host-proven).
+
+2026-11-20 field archive check (otgw-dev, read-only): tjfs is the only OT-Direct field user. His two beta.161 captures (OTGW-field-data/tjfs/2026-11-09_*) contain no OT=, SW= or SH= command (transcript grep 'cmd "(OT|SW|SH)='). The thermostat does read MsgID 27 (3x) and 57 (2x), none 56, in 20261109-093934. Without a command there is no rewrite to see, so AC1/AC2 have no field evidence; they stay open as field ACs (list for Robert: waiver or 2.1.0).
+
+2026-11-20 field waiver: Robert, Discord DM 1573146152524587149 ('A', reply to the coordinator's question 1573145337458065529, relayed by the coordinator): close with a field waiver and one 2.1.0 follow-up task per field AC. AC1 waived per Robert DM 1573146152524587149, follow-up TASK-2942. AC2 waived per Robert DM 1573146152524587149, follow-up TASK-2943. Ticked as waived, not met in the field: evidence host-only (tests/test_otd_relay_rw.py) plus the .61 regression bench; tjfs's captures have no OT=/SW=/SH= command (note above).
 <!-- SECTION:NOTES:END -->

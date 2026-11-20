@@ -3,11 +3,11 @@ id: TASK-1718
 title: >-
   OT-Direct TT=/TC= never reaches the thermostat: no MsgID 9 (remote room
   setpoint override) answer
-status: In Review
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-08T08:13:00Z'
-updated_date: '2026-11-09T06:14:00Z'
+updated_date: '2026-11-20T01:19:00Z'
 labels:
   - bug
   - otdirect
@@ -48,6 +48,8 @@ Verification: host test red->green; regression: test_otd_ch_override, test_otd_g
 2026-11-08 pushed 4f7fd7742 as beta.142, zip posted #alpha-testing 1568920313243377674, tjfs asked for the field check (1568920439214973040). Bench .61 (OT-Direct mode 3, no thermostat): OTA app+fs, settings 164 changed none, bootcount 146->148, no crashlog; POST /api/v2/otgw/commands TT=20 -> 202 queued; TT=0 -> 202; /api/v2/otdirect/overrides afterwards lists only MsgID 1 and 14 write overrides (no 16/100), so TT is set and cleared. Full suite: test/host/test_override_reply suite 1178 broke on the new replyToThermostat dependency (harness slice lacked otRemoteOverride) and C8b encoded the old pass-through of a boiler Unknown on MsgID 100; harness slice extended and C8b now expects the gateway's READ-ACK 0 (PIC MessageID100 parity): 4/4 OK. Test-only follow-up commit.
 
 2026-11-09 Robert's decision (relayed by the coordinator to system32-78): AC3 (field/bench: thermostat shows the override and raises CH demand) is WAIVED on the host evidence (AC1/AC2 replay tests) and is listed as a known issue in the 2.0.0 stable release notes. The AC stays unticked because it is waived, not met; it closes for real once tjfs confirms in the field.
+
+2026-11-20 close-out (otgw-dev, coordinator triage): Robert's waiver quoted from note 2026-11-09 above: 'AC3 (field/bench: thermostat shows the override and raises CH demand) is WAIVED on the host evidence (AC1/AC2 replay tests) and is listed as a known issue in the 2.0.0 stable release notes.' Recorded in commit 8f1e3f4b4 (2026-11-09 07:14, 'TASK-1718 AC3 waived (known issue) ... (Robert, relayed)'; given before the DM route of 2026-11-12, so no DM id) and as known issue docs/releases/RELEASE_NOTES_2.0.0-draft.md:351. Field archive checked: tjfs beta.161 (OTGW-field-data/tjfs/2026-11-09_2.0.0-beta.161+45dadcf, contains the beta.142 fix), TT=21.5 10:09:47 to TT=0 10:10:40: the thermostat sent no MsgID 9 READ (only MsgID 9 frame in otframes.log: R 00090000 -> B C0090000 at 09:58), so his thermostat cannot evidence AC3. Field part moved to TASK-2938 (2.1.0). AC3 stays unticked (waived, not met).
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary

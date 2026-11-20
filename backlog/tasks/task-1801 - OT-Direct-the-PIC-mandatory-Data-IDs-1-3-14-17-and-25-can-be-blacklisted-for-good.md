@@ -3,11 +3,11 @@ id: TASK-1801
 title: >-
   OT-Direct: the PIC-mandatory Data-IDs 1, 3, 14, 17 and 25 can be blacklisted
   for good
-status: In Review
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-11T06:39:00Z'
-updated_date: '2026-11-15T06:34:00Z'
+updated_date: '2026-11-20T01:31:00Z'
 labels:
   - otdirect
   - review-2026-11-11
@@ -26,8 +26,8 @@ Found in the TASK-1795 audit (docs/reviews/2026-11-11_otdirect-pic-parity-audit/
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Unknown-DataID answers to 1, 3, 14, 17 and 25 never disable these IDs or turn them into alternative slots, as the PIC's MandatoryID
-- [ ] #2 A relayed success of an ID clears both its counter and its disabled flag
+- [x] #1 Unknown-DataID answers to 1, 3, 14, 17 and 25 never disable these IDs or turn them into alternative slots, as the PIC's MandatoryID
+- [x] #2 A relayed success of an ID clears both its counter and its disabled flag
 - [x] #3 Host test against the real code (not a re-implementation): red on the old code, green on the fix
 - [x] #4 esp32-combo build, evaluate.py --quick, bench check where the hardware allows (name what was not benched)
 <!-- AC:END -->
@@ -42,6 +42,8 @@ PIC 6.8 parity audit 2026-11-12 (docs/reviews/2026-11-12_pic68-otdirect-parity-a
 95 (2026-11-15, lane-95-1859): PIC 6.8 ground truth MandatoryID gateway.asm 6.8:3409-3416 (unmarks on every request, also a manual mark), call sites 0 readstatus :2720, 1 MessageID1 :2806, 14 MessageID14 :2967, 3/17/25 MandatoryWord :2544/:2558/:2566/:3651; 27 only with an external sensor as alternative (:3071-3075), not applicable on OT-Direct. Fix: '// --- otdUnknownStrike' block (otdPicMandatoryId, otdNoteBoilerAnswer) above handleMasterResponse(), which now calls it; otdIsAltSlot() returns false for a mandatory ID (also against a UI= mark). AC2: a non-Unknown answer clears the counter and enables the schedule entry again, but only when the strikes disabled it (counter at 3) and the ID has no UI= mark, so a user DA= or UI= is not undone (both also set disabled, OTDirect.ino DA= ~4087, UI= ~4211, otdRestoreUnknownIds ~3385). Relayed thermostat requests go through sendMasterRequestAsync(..., OT_DIRECT_ORIGIN_THERMOSTAT), so their answers reach handleMasterResponse() too. AC3: tests/test_otd_mandatory_ids.py (real counters, isUnknownId, block, otdIsAltSlot; on the old revision the inline block of handleMasterResponse is cut and wrapped as is): 5/5 green; on origin/dev 84944a95e 3 FAIL (mandatory IDs disabled + alt after 3 strikes, UI=14 made 14 an alternative, success left 5 disabled), the 2 guard tests pass on both. Block placed above handleMasterResponse so test_otd_master_empty_slot's counter slice stays unchanged. Sweep: 38 test_otd_* + sat_command_delivery + prototype_hoisting + test_evaluate + host local_frame_consumers + boiler_unsupported_origin exit 0; ps1 unknown_counters and loopback PASS; evaluate --quick 86/0. AC4 with the 1859 build.
 
 AC review (coordinator rule 2026-11-15, Robert's decision C: ACs that need a real boiler/thermostat become field ACs): AC1 and AC2 ask for live bus behaviour and were ticked on the host test only. Field: needs a boiler that answers Unknown-DataID (to 1/3/14/17/25 and to a non-mandatory ID); host-proven by tests/test_otd_mandatory_ids.py (5/5, 3 FAIL on the code before). Status In Review until a field capture shows it.
+
+2026-11-20 field waiver: Robert, Discord DM 1573146152524587149 ('A', reply to the coordinator's question 1573145337458065529, relayed by the coordinator): close with a field waiver and one 2.1.0 follow-up task per field AC. AC1 waived per Robert DM 1573146152524587149, follow-up TASK-2940. AC2 waived per Robert DM 1573146152524587149, follow-up TASK-2941. Both ticked as waived, not as met in the field: the evidence stays host-only (tests/test_otd_mandatory_ids.py 5/5, 3 FAIL on the old code).
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary

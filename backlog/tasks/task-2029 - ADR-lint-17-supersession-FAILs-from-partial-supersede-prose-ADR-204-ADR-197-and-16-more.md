@@ -3,13 +3,12 @@ id: TASK-2029
 title: >-
   ADR lint: 17 supersession FAILs from partial-supersede prose (ADR-204 ->
   ADR-197 and 16 more)
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-11-18T14:44:00Z'
-updated_date: '2026-11-20T01:13:00Z'
+updated_date: '2026-11-20T01:25:00Z'
 labels:
   - adr
-  - needs-maintainer-ok
 milestone: 2.0.0
 dependencies: []
 priority: low
@@ -26,7 +25,7 @@ adr-lint --strict on origin/dev c31ded494 reports 16 one-directional and 1 concu
 <!-- AC:BEGIN -->
 - [x] #1 Every one of the 17 pairs classified full or partial, with file:line
 - [x] #2 Chosen option recorded (Robert's decision), applied with adr-kit commands only
-- [ ] #3 adr-lint --strict shows no supersession FAIL, or each remaining one is a recorded waiver
+- [x] #3 adr-lint --strict shows no supersession FAIL, or each remaining one is a recorded waiver
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -85,4 +84,14 @@ B: rvdbreemen/adr-kit branch fix/supersession-claim-parsing fdf10bb (local); the
 2026-11-20 AC2 ticked (otgw-docs, coordinator's assignment): the chosen option is recorded above (Robert 'A+B', Discord DM 1572637750618886297, confirmed DM 1572638924659105984); A (waiver for the 6 partial supersedes) needs no ADR edit, so no adr-kit command was required; B is the adr-kit fix fdf10bb, not released yet. AC3 NOT met: adr-lint 0.61.1 --strict on origin/dev b5158b75e (run 2026-11-20 by otgw-docs) still reports 18 supersession FAILs: the 17 classified pairs plus a NEW one, ADR-102 <- ADR-255.
 
 2026-11-20 classification of ADR-102 <- ADR-255 (read-only, otgw-docs): class 3, real PARTIAL supersede; the target correctly stays Accepted. ADR-255:3 and :40 title '(partly supersedes ADR-102)'; :112 'This partly supersedes ADR-102: its rule stays for the base topic and for every other entity; for this one switch, availability also reflects whether the action it offers can succeed.'; :165 Related 'partly superseded for the SAT simulation switch only; the base-topic rule and its gate stay.'; frontmatter ADR-255:10 supersedes [] and ADR-102:4 status Accepted, :11 superseded_by null (consistent). Fix: none in the ADRs; must NOT get 'Superseded by' (would retire ADR-102's base-topic rule). Belongs in the A waiver list as a 7th partial (needs Robert's extension, coordinator is asking) until B is installed. Updated totals: 19 claims, 0 need a Status edit; 11 lint defects, 7 legitimate partial supersedes.
+
+2026-11-20 decision (Robert, Discord DM 1573144344087498908, 'A then B', reply to the coordinator's TASK-2029 question; relayed by the coordinator): A = waiver now for all remaining supersession FAILs: the 7 legitimate partial supersedes (the 6 listed above + ADR-102 <- ADR-255, classified by otgw-docs in 724c20f70) and the 11 lint defects (classes 1, 2 and 4 above, incl. ADR-098 -> 'ADR-097'); then B = the adr-kit fix fdf10bb, follow-up TASK-2939 (2.1.0), which ends this waiver.
+
+2026-11-20 AC3 evidence (otgw-dev): fresh adr-lint 0.61.1 --strict docs/adr/ on origin/dev b67cb9b42, exit 1, 19 'supersession' FAIL lines = 18 pairs (ADR-082 concurrent prints twice): 004<-070, 005<-133, 014<-083, 026<-139, 045<-046, 048<-136, 051<-079, 055<-057, 077<-106, 097<-098, 141<-146, 197<-204, 199<-203, 203<-207, 139<-215, 250<-253, 102<-255, 082 by 123+128. Every one is in the classification above and under Robert's waiver: the 7 partials and the 11 lint defects. No unclassified FAIL. (139/215 in the 2026-11-18 list = 139<-215 here.) ADR-098 does not block AC3: its FAIL is a class 2 lint defect covered by the waiver. A wording proposal for its 'ADR-097' reference went to the coordinator separately; ADR-098 is Accepted and immutable, so no ADR edit.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+AC1: all 19 claims classified with file:line (11 lint defects, 7 legitimate partial supersedes, 0 need a Status edit; notes 2026-11-18 and 2026-11-20). AC2: Robert 'A+B' (DM 1572637750618886297, confirmed 1572638924659105984), extended 'A then B' (DM 1573144344087498908). A needs no ADR edit, so no adr-kit command was required. AC3: adr-lint 0.61.1 --strict on b67cb9b42 shows 18 supersession pairs, each a recorded waiver per Robert's DM 1573144344087498908. B, the adr-kit fdf10bb release that ends the waiver, is TASK-2939 (2.1.0). Not done: the lint still exits 1 on these pairs until TASK-2939.
+<!-- SECTION:FINAL_SUMMARY:END -->
