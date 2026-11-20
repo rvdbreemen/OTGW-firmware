@@ -8501,3 +8501,21 @@ Robert, 16:18:42 UTC (https://discord.com/channels/812969634638725140/9144987300
 **Task:** the coordinator assigns the implementation (TASK-2005 follow-up or a new task).
 
 **Open:** none for the decision; implementation and evidence per the task.
+
+## 431. Q-1942b answered A: a PWM-first heating start with too little demand for a 180 s burn waits in PWM OFF; no change (Sergeant D, 2026-11-20)
+
+**Source:** #dev-sat-mqtt, Sergeant D 2026-11-20 04:05:45 UTC (https://discord.com/channels/812969634638725140/1105556725714649128/1573187571503333439; unedited when read back via the Discord API at ~08:30 UTC), a reply to part 2 of Q-1942b (https://discord.com/channels/812969634638725140/1105556725714649128/1573152314955530292; part 1 https://discord.com/channels/812969634638725140/1105556725714649128/1573152308655558736). Q-1942b was first queued as Q-1942a, renamed because Q-1942a is entry 426.
+
+**Quoted:**
+> "My answer is A"
+
+**Settled:** option A as posted: keep it. A heating start (PWM-first, entries 385/389) whose calculated ON time is under 180 s waits in PWM OFF until the duty is high enough or the off time has passed; no forced 180 s first ON phase (option B) and no continuous start sequence instead (option C). The Q38 rule (an ON phase only when its ON time is at least 180 s) and the hourly start limit (entries 59, 89) stay as they are. Scope 2.0.0: no code change.
+
+**Compared with thermo-nova (7beaaf5):** the ON/OFF start check is the same: pwm.py:154-155 (HEATER_STARTUP_TIMEFRAME 180, const.py:18), the off wait at pwm.py:179-180. thermo-nova starts in continuous (PWM disabled after reset, pwm.py:63/:89; PWM only on a sustained overshoot, heating_control.py:262); the firmware's PWM-first start is Sergeant D's own rule (entries 385/389), which this answer keeps.
+
+**Field evidence behind the question:** 13 heating starts in two real-boiler logs with satsimulation false (indigo_light Vitodens 24 h, gruijter one day): 8 lit at once; 5 of indigo's began in PWM OFF and waited 13 to 19 min at CS 10, four with an ON time of 0 s (duty 0.04 to 0.06), one at the 3/hr limit (TASK-1942 notes).
+
+**Task:** TASK-1942 (AC7, otgw-dev).
+
+**Open:** none.
+

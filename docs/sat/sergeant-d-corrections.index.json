@@ -5696,6 +5696,19 @@
     "TASK-2005"
    ],
    "confirmed_by_entry": null
+  },
+  {
+   "id": 431,
+   "title": "Q-1942b answered A: a PWM-first heating start with too little demand for a 180 s burn waits in PWM OFF; no change (Sergeant D, 2026-11-20)",
+   "date": "2026-11-20",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1573187571503333439",
+   "supersedes": [],
+   "tasks": [
+    "TASK-1942"
+   ],
+   "confirmed_by_entry": null
   }
  ]
 }
