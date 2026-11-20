@@ -153,3 +153,23 @@ About a quarter of the image, roughly 510 K, is in our hands. The 140 K of headr
   - The exact split of the 467 K without a source line between WiFi, BT and other code. It is all prebuilt and not changeable either way.
   - Whether the sync `WebServer` is linked only because of WiFiManager.
   - How much of "about 134 K ours" is debug and telnet output, as opposed to protocol text that has to stay.
+
+## 7. Step 2: the TASK-1955 thresholds refreshed, with a forecast
+
+**Rates.** The fast rate is +3,392 B/day, from beta.323 to beta.401 (5 days). The slow rate is +1,334 B/day, net from beta.1 to beta.401 (19 days). The starting point is beta.401 on 2026-11-20 at 2,153,776 B. The dates are linear extrapolations, not promises.
+
+| threshold | image size | still to grow | date at the fast rate | date at the slow rate |
+|---|---|---|---|---|
+| WARN 95 % (TASK-1993, `build.py`) | 2,179,072 | 25,296 | 2026-11-27 | 2026-12-08 |
+| parked option 3 (pack `mqttHaSensors`) at 96 KB free | 2,195,456 | 41,680 | 2026-12-02 | 2026-12-21 |
+| parked option 4 (async portal instead of WiFiManager) at 64 KB free | 2,228,224 | 74,448 | 2026-12-11 | 2027-01-14 |
+| FAIL 98 % (`build.py` stops the build) | 2,247,884 | 94,108 | 2026-12-17 | 2027-01-29 |
+
+**Release target.**
+
+- FAIL comes 2026-12-17 at the earliest, well after the 2.0.0 stable target of 2026-11-29. The budget does not block 2.0.0, and no trim is needed for it.
+- At the fast rate, WARN can fire just before the stable release. That is only a log line in the build; it is not a gate.
+- The trims belong to 2.1.0.
+- The order stays the one in TASK-1955: option 3 at 96 KB free, option 4 at 64 KB free or for a feature over 40 KB, option 5 only alongside other work.
+
+**One addition for 2.1.0.** Our string literals are about 134 KB. Of those, the telnet and debug formats are the cheapest bytes that only we control. A compile-time debug level would remove them for a release build and keep them for a debug build. It needs one measurement first: how many of the 134 KB are debug text and how many are protocol text that has to stay. That is the third "not verified" item in section 6.

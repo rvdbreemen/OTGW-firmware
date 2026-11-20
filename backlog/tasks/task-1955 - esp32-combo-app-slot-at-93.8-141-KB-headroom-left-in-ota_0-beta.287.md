@@ -4,7 +4,7 @@ title: 'esp32-combo app slot at 93.8 %: 141 KB headroom left in ota_0 (beta.287)
 status: Done
 assignee: []
 created_date: '2026-11-15T03:20:00Z'
-updated_date: '2026-11-20T15:27:00Z'
+updated_date: '2026-11-20T15:29:00Z'
 labels:
   - build
   - flash-size
@@ -48,6 +48,8 @@ Correction (session 95): the size guard of AC2 is NOT TASK-1981 (that is the OT-
 Correction (comms 92, 2026-11-16) of the note above: the size guard of AC2 is TASK-1993, implemented in 1083bc80e (scripts/check_app_size.py, tests/test_app_size_check.py; WARN above 95 %, FAIL above 98 % of app0). Its line in the beta.339 release build (bd7a133c2, 2026-11-16): 'app size: 2139376 B of 2293760 B (93.3 %), free 154384 B'.
 
 Follow-up 2026-11-20 (otgw-architect, flash-budget step 1): docs/research/2026-11-20-flash-budget-step1-measurement.md. beta.401 app 2,153,776 B of 2,293,760 (93.9 %), 139,984 B free: none of the parked triggers (96 KB / 64 KB) is reached. New: the merged string pool (250,641 B, listed in the map under libesp_driver_gpio.a gpio.c.obj) splits into ~95.6 KB from prebuilt archives and ~154 KB from LTO code, of which ~134 KB is ours (heuristic). Trend over all 35 releases: +3.4 KB/day since beta.323, +1.3 KB/day net since beta.1.
+
+Step 2 (2026-11-20): forecast in section 7 of the step-1 report. WARN 95 % on 2026-11-27 (fast, +3.4 KB/day) to 2026-12-08 (slow, +1.3 KB/day); FAIL 98 % on 2026-12-17 to 2027-01-29. FAIL comes after the 2.0.0 stable (2026-11-29), so 2.0.0 needs no trim; trims go to 2.1.0 in the existing 1955 order. Candidate for 2.1.0: a compile-time debug level for our ~134 KB of literals, after measuring the debug versus protocol share.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
