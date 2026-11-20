@@ -4,7 +4,7 @@ title: 'esp32-combo app slot at 93.8 %: 141 KB headroom left in ota_0 (beta.287)
 status: Done
 assignee: []
 created_date: '2026-11-15T03:20:00Z'
-updated_date: '2026-11-16T08:17:00Z'
+updated_date: '2026-11-20T15:27:00Z'
 labels:
   - build
   - flash-size
@@ -46,6 +46,8 @@ AC2: threshold proposal (A WARN 95 % / FAIL 98 %, B WARN only, C nothing, each w
 Correction (session 95): the size guard of AC2 is NOT TASK-1981 (that is the OT-Direct MsgID 25 tier fix); its own task is still to be created, after TASK-1980.
 
 Correction (comms 92, 2026-11-16) of the note above: the size guard of AC2 is TASK-1993, implemented in 1083bc80e (scripts/check_app_size.py, tests/test_app_size_check.py; WARN above 95 %, FAIL above 98 % of app0). Its line in the beta.339 release build (bd7a133c2, 2026-11-16): 'app size: 2139376 B of 2293760 B (93.3 %), free 154384 B'.
+
+Follow-up 2026-11-20 (otgw-architect, flash-budget step 1): docs/research/2026-11-20-flash-budget-step1-measurement.md. beta.401 app 2,153,776 B of 2,293,760 (93.9 %), 139,984 B free: none of the parked triggers (96 KB / 64 KB) is reached. New: the merged string pool (250,641 B, listed in the map under libesp_driver_gpio.a gpio.c.obj) splits into ~95.6 KB from prebuilt archives and ~154 KB from LTO code, of which ~134 KB is ours (heuristic). Trend over all 35 releases: +3.4 KB/day since beta.323, +1.3 KB/day net since beta.1.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
