@@ -27,6 +27,7 @@ lives here.
 | 2026-11-01 | `release/2.x` is the stable 2.x line (TASK-1545) | CLAUDE.md "Git push policy" |
 | 2026-11-14 | Standing permission for 2.x public betas: the coordinator invokes `/beta-release-2x` itself in the 08:00/20:00 slot; stable releases keep the per-action yes (TASK-1948) | AGENT-CORE block (hard-stop exception), `.claude/skills/beta-release-2x/SKILL.md` (model invocation allowed) |
 | 2026-11-16 | 2.0.0 stable gate = TASK-1740 (entry-386 criterion, target Sat 21 Nov if the Wed-Fri field runs are clean); the SAT low-load epic TASK-1412 and its full gate move to 2.1.0, 2.0.0 keeps only TASK-1412.24 (field-run request), TASK-1412.25 (the Wed-Fri runs) and the host LL contract (Robert, DM 1571910380756668488) | TASK-1740, TASK-1412 |
+| 2026-11-20 | Explain the number, and sequence verifiable units (from the pstack principles) | CLAUDE.md and AGENTS.md "Design Principles" |
 
 ## Replaced directives
 
