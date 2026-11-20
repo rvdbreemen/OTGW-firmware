@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-20T14:17:00Z'
-updated_date: '2026-11-20T15:20:00Z'
+updated_date: '2026-11-20T15:23:00Z'
 labels:
   - ux
   - webui
@@ -41,4 +41,6 @@ From the TASK-2952 UX review (docs/reviews/2026-11-20_ux-heuristic-v2-webui/READ
 2026-11-20 otgw-ux-designer: spec docs/reviews/2026-11-20_ux-heuristic-v2-webui/spec-T2-sat-display-states.md (display states, copy EN, edge cases, Q1-Q7 for otgw-dev). ACs replaced by the spec's acceptance list. Correction to review F3: the messages badge already has aria-label 'Messages: N' (v2.js:7293); only visible text is missing.
 
 2026-11-20 otgw-ux-designer: otgw-dev answered Q1-Q7 (relayed by the coordinator); spec T2 updated: STARTING became WAITING (unbounded gates, no time promise) with a boiler-link-down variant; IDLE uses the firmware band (target + 0.1); not-live values show '—'; current_modulation is the MM SAT sends, so the row is 'Modulation sent'; the burner cycle card ignores control_mode while not active. Follow-up proposal for otgw-dev (not in this task): a wait_reason field in /v2/sat/status.
+
+Suggestion (not in this task, no separate task yet, coordinator 2026-11-20): a wait_reason field in /v2/sat/status (boot_silence, ntp, no_interface, no_boiler, mqtt_fallback, flashing) so the WAITING state can name its reason; owner otgw-dev if picked up.
 <!-- SECTION:NOTES:END -->

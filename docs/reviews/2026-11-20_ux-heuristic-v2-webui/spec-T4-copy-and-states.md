@@ -104,7 +104,7 @@ Copy keys: `tools.sat_loop_empty_off`, `tools.sat_loop_empty_paused`, `tools.sat
 
 > SAT is still being tuned during the beta. A capture of a day with SAT on helps us most: [How to share a capture]
 
-- The link is absolute, because the device does not serve `docs/` and a relative link would 404: `https://github.com/rvdbreemen/OTGW-firmware/blob/dev/docs/sat/field-run-recipe-2.0.0.md`, opened with `target="_blank" rel="noopener"`. The link text is capitalised and no period follows it. Script names and the Discord or GitHub addresses stay in the docs, not in the UI.
+- The link goes to the public "Reporting SAT field results" note in the manual, not to the internal field-run recipe (coordinator decision 2026-11-20: an internal document never sits behind a user link). Absolute, because the device does not serve `docs/` and a relative link would 404: EN `https://github.com/rvdbreemen/OTGW-firmware/blob/dev/docs/manuals/en/ch05-sat-thermostat.md#overview`; the NL pack links the same note in `docs/manuals/nl/h05-sat-thermostaat.md` (anchor `#wat-doet-sat`). Opened with `target="_blank" rel="noopener"`. The link text is capitalised and no period follows it. Script names and the Discord or GitHub addresses stay in the docs, not in the UI.
 - BlueFlame's reasons: "new in this beta" is no longer true (SAT is in every 2.0.0 beta); "a capture of a day with SAT on" names what the field-run recipe asks for; "experimental" is avoided on purpose (Robert, 2026-11-18: SAT drops that word at 2.0.0 stable).
 - Keys: `tools.sat_beta_head` gets the sentence and a new `tools.sat_beta_link` gets the link label; `tools.sat_beta_body` is no longer shown. NL suggestion from BlueFlame for the i18n sync: "SAT wordt tijdens de beta nog bijgesteld. Een capture van een dag met SAT aan helpt ons het meest: [Zo deel je een capture]".
 - Keep "Dismiss for this session".
@@ -118,6 +118,6 @@ Copy keys: `tools.sat_loop_empty_off`, `tools.sat_loop_empty_paused`, `tools.sat
 4. **F11:** on an HTTP page the "Detect location" button is hidden and the hint has no "HTTPS"; the link opens SAT settings › Weather with Latitude focused; otgw-docs has the same wording in §5.9 (EN and NL).
 5. **F13:** the control-loop chart shows the overlay and label per the table in each state (the paused, stopped and waiting rows after TASK-2957); the heating curve card shows its one-line empty state at 120 px.
 6. **F15:** the discovery card body is in the UI font and spans the width at 390 px; no auto-collapse.
-7. **F5:** the banner shows the BlueFlame-approved line with the absolute field-run-recipe link (`target="_blank" rel="noopener"`), or the item is closed as dropped because stable removed the banner.
+7. **F5:** the banner shows the BlueFlame-approved line with the absolute link to the manual note "Reporting SAT field results" (EN ch05 `#overview`, NL h05 `#wat-doet-sat`) (`target="_blank" rel="noopener"`), or the item is closed as dropped because stable removed the banner.
 8. New strings exist as EN keys; NL and DE are filled through the i18n sync, and the i18n tests (`tests/webui/i18n-*.test.mjs`) pass.
 9. Keys that keep their name but change meaning have re-translated NL and DE values, visible in the sync diff: `tools.sat_geo_hint`, `tools.sat_beta_head` and `tools.sat_beta_body` (if F5 is built), and the `satsource` hint if it is translated.
