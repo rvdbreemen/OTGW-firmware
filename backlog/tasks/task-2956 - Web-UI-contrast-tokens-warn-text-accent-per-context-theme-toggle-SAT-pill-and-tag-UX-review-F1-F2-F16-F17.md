@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-20T14:10:00Z'
-updated_date: '2026-11-20T15:02:00Z'
+updated_date: '2026-11-20T15:05:00Z'
 labels:
   - ux
   - webui
@@ -31,10 +31,15 @@ From the TASK-2952 UX review (docs/reviews/2026-11-20_ux-heuristic-v2-webui/READ
 - [ ] #4 v2.css:68 (.lang-menu li a.active color #0d2026) is replaced by --on-accent with no visual change
 - [ ] #5 python evaluate.py --quick shows no new FAIL (ADR-091 class drift included) and the full tests/webui suite passes, sat-chart-actual-flow.test.mjs included
 - [ ] #6 Before/after screenshots of Home, SAT Control and Settings in light and dark show only the intended colour changes
+- [ ] #7 tests/webui/contrast-tokens.test.mjs exists per docs/reviews/2026-11-20_ux-heuristic-v2-webui/spec-T1b-contrast-regression-test.md: layer A checks every row of spec T1 section 2 (undefined token = explicit failure), layer B scans the rendered pages, themes and state fixtures; colours normalised through a canvas (color-mix safe)
+- [ ] #8 The contrast test is red on the pre-TASK-2956 data (output with the failing rows in the task notes), green on the change, and a scratch copy with --status-warn-text #9c5700 fails on row D2b
+- [ ] #9 The contrast test runs in python scripts/run_tests.py --webui and is not on the flaky list
 <!-- AC:END -->
 
 ## Implementation Notes
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-11-20 otgw-ux-designer: spec docs/reviews/2026-11-20_ux-heuristic-v2-webui/spec-T1-contrast-tokens.md (token table per context with measured ratios, ADR-091 consequence). New beyond the review: SAT pill Heating fails in both themes (3.10 light, 2.83 dark), dark tag 3.91. Correction: the light tag measures 2.59, not 2.13 (color-mix background misread by the scan). ADR-091 gate checks class drift only, not token values. Open for the maintainer via the coordinator: change light --accent (recommended) or add --accent-strong.
+
+2026-11-20: spec docs/reviews/2026-11-20_ux-heuristic-v2-webui/spec-T1b-contrast-regression-test.md added (contrast regression test, requested by the coordinator); 3 ACs added.
 <!-- SECTION:NOTES:END -->
