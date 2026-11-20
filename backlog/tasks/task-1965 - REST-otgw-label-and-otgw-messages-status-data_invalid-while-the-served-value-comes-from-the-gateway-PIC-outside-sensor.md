@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-15T10:12:00Z'
-updated_date: '2026-11-16T09:29:00Z'
+updated_date: '2026-11-20T01:12:00Z'
 labels:
   - rest
   - bug
@@ -44,4 +44,6 @@ Evidence: tests/test_ot_value_source.py (REAL block sliced by marker + wiring on
 indigo_light capture 2026-11-15 10:50-13:26 (beta.250+aed38bf, PIC gateway 6.8, Vitodens + Honeywell Round, sent to Robert by DM, kept local in session 95 scratchpad indigo1115/): 28020 frames. The Round never reads MsgID 27 (no T 27 frame at all), so the capture cannot show how the PIC answers 27 to a thermostat; that last check stays open. What it does show: the PIC writes the DS18B20 outside temperature to the boiler itself, R WRITE-DATA 27 3020 times (~19/min, values 6.19-8.8 C), and the boiler answers Data-Invalid every time (B 601B0000); the firmware sent no OT= (no OT= in the telnet command log). Source: PIC 6.6 gateway.asm MessageTable :1820-1830 lists MSG_OUTSIDETEMP among the alternatives, MessageID27 :3050-3067 turns the request into T_WRITE with outside1/outside2 when OutsideTemp is set (6.8 source not in the repo; 6.6 checked).
 
 2026-11-16 (95) AC3: commit 2e49979dc updates docs/api/openapi.yaml (+22 lines, source field with boiler/gateway/thermostat/summary/replay/none, the 'data_invalid with source gateway' example at :1631-1638) and docs/api/README.md (:429-434); on origin since beta.339. evaluate --quick 0 failed today on the 2.0.0-beta.344 lane; esp32-combo build 2.0.0-beta.344+873f06b exit 0, 'Build completed successfully', contains it (09 also benched ffd0a64 on .63: the source field is present). AC4 stays open: field confirmation by indigo_light on beta.339 or later.
+
+2026-11-20 (ba, coordinator decision): AC4 via a tester ask. 92 posted in #beta-testing, message 1573143895154626665: indigo_light runs GET /api/v2/otgw/label/Toutside on beta.339 or newer; expect status data_invalid + source gateway. Field archive checked first: no upload holds it (the capture sweep excludes otgw/label/*; device-state has no source field).
 <!-- SECTION:NOTES:END -->
