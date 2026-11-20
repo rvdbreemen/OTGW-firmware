@@ -533,7 +533,38 @@ void apilistfiles()
 
 
 //=====================================================================================
-bool handleFile(String&& path) 
+// TASK-1935 (port of dev TASK-1934): the request path in normal form: repeated '/'
+// collapsed, "." dropped, ".." resolved. handleFile() uses this one path for its access
+// check and for the file it opens, so both always name the same file. Returns false for
+// ".." above the root or a result that does not fit.
+static bool fsCanonicalPath(const char *in, char *out, size_t cap) {
+  if (cap < 2) return false;
+  size_t len = 0;
+  out[len++] = '/';
+  const char *p = in;
+  while (*p) {
+    while (*p == '/') p++;
+    if (!*p) break;
+    const char *seg = p;
+    while (*p && *p != '/') p++;
+    const size_t n = (size_t)(p - seg);
+    if (n == 1 && seg[0] == '.') continue;
+    if (n == 2 && seg[0] == '.' && seg[1] == '.') {
+      if (len == 1) return false;                        // above the root
+      while (len > 1 && out[len - 1] != '/') len--;      // drop the last segment
+      if (len > 1) len--;                                // and the '/' before it
+      continue;
+    }
+    if (len > 1) { if (len + 1 >= cap) return false; out[len++] = '/'; }
+    if (len + n >= cap) return false;
+    memcpy(out + len, seg, n);
+    len += n;
+  }
+  out[len] = '\0';
+  return true;
+}
+
+bool handleFile(String&& path)
 {
   if (httpServer.hasArg("delete")) 
   {
@@ -544,16 +575,19 @@ bool handleFile(String&& path)
     return true;
   }
   if (!LittleFS.exists("/FSexplorer.html")) httpServer.send_P(200, PSTR("text/html; charset=UTF-8"), Helper); //Upload the FSexplorer.html
-  if (path.endsWith("/")) path += F("index.html");
+  // TASK-1935: every check below and the file read itself use the normalised path.
+  {
+    const bool dirRequest = path.endsWith("/");
+    char canon[96];
+    if (!fsCanonicalPath(path.c_str(), canon, sizeof(canon))) return false;   // 404
+    path = canon;
+    if (dirRequest) path += (path.length() == 1) ? F("index.html") : F("/index.html");
+  }
   // ADR-056 sec.1: settings.ini holds httppasswd + MQTTpasswd in cleartext, so this read
   // path is inside the protected boundary, not the unprotected read carve-out. Compare
   // BEFORE contentType() below, which rewrites `path` in place into the MIME string.
   {
-    // Collapse a leading "//" run first: LittleFS resolves "//settings.ini" to the same
-    // file, so a plain compare against "/settings.ini" would leave that alias as an
-    // unauthenticated bypass (verified on device).
     const char *sp = path.c_str();
-    while (sp[0] == '/' && sp[1] == '/') sp++;
     if (strcasecmp_P(sp, PSTR(SETTINGS_FILE)) == 0 && !checkHttpAuth()) {
       return true;  // 401/403 already sent; returning false would make onNotFound double-send a 404
     }
