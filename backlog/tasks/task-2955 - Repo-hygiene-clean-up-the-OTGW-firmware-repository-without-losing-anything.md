@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-20T14:05:00Z'
-updated_date: '2026-11-20T14:35:00Z'
+updated_date: '2026-11-20T14:39:00Z'
 labels:
   - repo-hygiene
 milestone: 2.0.0
@@ -21,9 +21,15 @@ Epic. Robert, 2026-11-20 (CLI, verbatim): 'Kan je het repo van OTGW-firmware kri
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Plan file docs/plans/2026-11-20-repo-cleanup-plan.md lists per item: current path/branch, target, action (keep/move/archive/delete), evidence, risk, owner
+- [x] #1 Plan file docs/plans/2026-11-20-repo-cleanup-plan.md lists per item: current path/branch, target, action (keep/move/archive/delete), evidence, risk, owner
 - [ ] #2 Branches: every deleted branch was landed in dev (or otgw-1.x.x) and in a published tag, or has an archive/<name> tag at its tip; git ls-remote shows the tag before the branch delete
 - [ ] #3 Layout and 1.x moves: every moved path has its references updated (grep shows no stale path), published release-note links still resolve (kept or stub), python scripts/run_tests.py and python evaluate.py --quick show no new FAIL
 - [ ] #4 .gitignore covers every artifact class found; git ls-files shows none of them tracked
 - [ ] #5 No force-push, no history rewrite; HARD-keep branches (main, dev, otgw-1.x.x, release/2.x, research/cloud-recording, wt-09-bench, 5e telemetry lanes, and every lane the coordinator holds) untouched
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Phase 1 done 2026-11-20 (otgw-architect): plan docs/plans/2026-11-20-repo-cleanup-plan.md merges three read-only inventories (branches/worktrees/tags; layout outside docs/ + 1.x + .gitignore; docs/** + root *.md by otgw-docs, 1685 files). Phase 2 = commits C1-C8 in order, after the 20:00 beta; decisions D1-D7 go to Robert through the coordinator. AC1 evidence: the plan lists per item the path/branch, target, action, evidence, risk and owner.
+<!-- SECTION:NOTES:END -->
