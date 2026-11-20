@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-20T14:26:00Z'
+updated_date: '2026-11-20T14:51:00Z'
 labels:
   - ux
   - webui
@@ -23,11 +24,18 @@ From the TASK-2952 UX review (docs/reviews/2026-11-20_ux-heuristic-v2-webui/READ
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 With no boiler detected Home shows 'No boiler connected' with a link to Connection, never 'everything quiet'; with no status data yet it shows a neutral 'Waiting for data'
-- [ ] #2 Browser test: the sim enable POST answered with HTTP 500 keeps the modal open with an error and a retry; HTTP 200 closes it and shows the toast
-- [ ] #3 No settings hint is longer than one line under its label at 1400 px; longer help sits in the (i) popover
-- [ ] #4 The weather card no longer mentions HTTPS and links to the latitude and longitude fields; the manual uses the same wording (otgw-docs)
-- [ ] #5 With no data points both SAT charts show a one-line empty-state message and no 'live' label
-- [ ] #6 The BLE toast body uses the UI font and does not cover card content at 1400 px or 390 px
-- [ ] #7 The SAT beta banner is one normal-weight sentence with one manual link (copy by BlueFlame), or the item is dropped because 2.0.0 stable removed the banner
+- [ ] #1 F4: Home shows 'Waiting for data from the gateway…' until the first successful /api/v2/otgw/otmonitor answer, 'No boiler connected' with a working 'Check connection ›' while boilerOk is false, and 'everything quiet' only with the boiler link up; the header reads 'checking…' until the first health answer; a browser test covers the four cases
+- [ ] #2 F6: a browser test answers the sim enable POST with HTTP 500 (modal stays open, error line names 'HTTP 500', button 'Try again'), with a network error (reason 'no answer from the gateway') and with HTTP 200 (modal closes, toast shows); pending disables both buttons
+- [ ] #3 F10: no settings hint renders longer than 2 lines at 1400 px; Appliance type shows the short line and its (i) holds the full text from SET_META.satsource.help; settingsHelp.h unchanged
+- [ ] #4 F11: on an HTTP page 'Detect location' is hidden and the hint has no 'HTTPS'; the link opens SAT settings › Weather with Latitude focused (the group heading while SAT is off); otgw-docs uses the same wording in manual §5.9 EN and NL
+- [ ] #5 F13: the control-loop chart shows the overlay and label per spec T4 in each state (paused, stopped and starting rows after TASK-2957); the heating curve card shows its one-line empty state at 120 px
+- [ ] #6 F15: the discovery card body is in the UI font and spans the width at 390 px; the collapse chip only if the coordinator picks that option
+- [ ] #7 F5: the SAT beta banner is the BlueFlame-approved line with one link to docs/sat/field-run-recipe-2.0.0.md, or the item is closed as dropped because 2.0.0 stable removed the banner
+- [ ] #8 New EN keys exist; NL and DE filled by the i18n sync, tests/webui/i18n-*.test.mjs pass; keys that change meaning (sat_geo_hint, sat_beta_head/body if built, the satsource hint if translated) get re-translated NL and DE values, visible in the sync diff
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-20 otgw-ux-designer: spec docs/reviews/2026-11-20_ux-heuristic-v2-webui/spec-T4-copy-and-states.md (exact copy, states and edge cases per finding). ACs replaced by the spec's acceptance list. Dependency: the F13 paused/stopped/starting rows need TASK-2957's display states; the other rows can land first. F15 collapse chip is an open option for the coordinator. F5 copy drafted, sent to BlueFlame.
+<!-- SECTION:NOTES:END -->

@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-20T14:17:00Z'
+updated_date: '2026-11-20T14:50:00Z'
 labels:
   - ux
   - webui
@@ -24,10 +25,18 @@ From the TASK-2952 UX review (docs/reviews/2026-11-20_ux-heuristic-v2-webui/READ
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 otgw-dev has recorded in this task which SAT states exist and when the UI shows paused (no SAT control behaviour changed)
-- [ ] #2 With SAT enabled and no OpenTherm connection, the headline, header chip and sub-line all say paused; no 'At target' or 'idle'
-- [ ] #3 The red status badge has visible text or an accessible name naming the problem
-- [ ] #4 While SAT is paused, the Control status card title carries '(paused)' and its values use the muted style
-- [ ] #5 The burner-cycle Off state shows only 'SAT is not actively controlling.'; PWM and continuous keep the second sentence
-- [ ] #6 A browser test drives the paused state and checks headline, chip, sub-line and the paused card
+- [ ] #1 otgw-dev's answers to Q1-Q4, Q6, Q7 and the Q5 confirmation of docs/reviews/2026-11-20_ux-heuristic-v2-webui/spec-T2-sat-display-states.md section 6 are in the notes; where an answer changes a condition in section 2 the spec is updated first
+- [ ] #2 Each of the 10 display states of spec T2 section 2 renders the pill, headline, sub-line and card treatment of section 3, checked by a browser test with one status object per state; during TAKEOVER the switch label reads 'Off · takeover active'
+- [ ] #3 With enabled true, ot_link_lost true and boiler_status idle (the .63 case) the headline never shows 'At target' or 'idle'
+- [ ] #4 The IDLE headline follows spec T2 section 3.1; with room 25.5 and target 19.8 it reads 'Idle · room above target'
+- [ ] #5 The messages badge shows visible text ('1 message' / 'N messages') and keeps its aria-label
+- [ ] #6 The Burner cycle Off sub-line is 'SAT is not actively controlling.'
+- [ ] #7 New EN keys exist; NL and DE are filled by the i18n sync and tests/webui/i18n-*.test.mjs pass; sat_big_safety, sat_big_at_target and sat_cycle_sub_off keep their key names and get re-translated NL and DE values, visible in the sync diff
+- [ ] #8 No change outside src/OTGW-firmware/data/ and its tests
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-20 otgw-ux-designer: spec docs/reviews/2026-11-20_ux-heuristic-v2-webui/spec-T2-sat-display-states.md (display states, copy EN, edge cases, Q1-Q7 for otgw-dev). ACs replaced by the spec's acceptance list. Correction to review F3: the messages badge already has aria-label 'Messages: N' (v2.js:7293); only visible text is missing.
+<!-- SECTION:NOTES:END -->
