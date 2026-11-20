@@ -11296,8 +11296,76 @@
           "A half-accepted packet continues on the next call and is counted once.",
           "A host test checks that ClientSync::connect() sets TCPNODELAY only when EMCTCPNODELAY is 1: the stub records the socket option.",
           "Bench A/B (TASK-2949.5) on .61 and .63, at three events: the TASK-2019 takeover, a republish-all and a boot discovery burst.",
-          "Measured: the largest drop inside one loop() (probe at=13 from=12), SAT publish latency and command round-trip time.",
-          "Pass: under 10 KB per loop() with the chosen variant, and no command round-trip above 250 ms."
+          "Measured: the largest drop inside one loop() (probe at=13 from=12), SAT publish latency, and the latency of each small publish.",
+          "The small-publish latency is measured explicitly, because Nagle plus the broker's delayed ACK can add about 40-200 ms per small publish (coordinator, 2026-11-20). Two measurements:",
+          "the command echo: a Home Assistant set/ command to the gateway, until its state comes back on the broker;",
+          "the keepalive: PINGREQ to PINGRESP.",
+          "Pass: under 10 KB per loop() with the chosen variant, a command echo under 250 ms at p95, and no PINGRESP or keepalive timeout over the soak."
+        ]
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
+    },
+    {
+      "id": "ADR-268",
+      "title": "Retire diagRec: the remote telemetry recorder's local ring becomes the one local diagnostic recorder",
+      "path": "ADR-268-retire-diagrec-the-remote-telemetry-recorder-s-local-ring-becomes-the-one-local-diagnostic-recorder.md",
+      "format": "canonical",
+      "status": "Proposed",
+      "date": "2026-11-20",
+      "decision_summary": "The firmware keeps one local diagnostic recorder: the local ring of the remote telemetry recorder.",
+      "topics": [
+        "diagnostics",
+        "flash-size",
+        "recorder",
+        "remote-telemetry"
+      ],
+      "aliases": [
+        "DiagRecorder removal",
+        "local recording from the telemetry ring",
+        "one recorder, two sinks",
+        "retire diagRec"
+      ],
+      "components": [
+        "Local diagnostic recording (the recorder's local ring and the /api/v2/diag/recording* routes)"
+      ],
+      "symbols": [
+        "diagRec",
+        "DiagRecorder",
+        "HAS_REMOTE_TELEMETRY",
+        "RecRing",
+        "remoteTelemetryLocalFill",
+        "remoteTelemetryLocalStart"
+      ],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [
+          "Remove DiagRecorder / diagRec only in the commit (or in the same pull of commits) that makes the remote telemetry recorder's local sink part of the normal build.",
+          "Keep the /api/v2/diag/recording paths and status keys working on every build that has a recorder.",
+          "Make otgwcapture.py read the new download format, or skip a recording it cannot decode, in the same change.",
+          "Keep ADR-213's redaction of secrets in what the new recorder stores (ADR-290 / lane ADR-218: \"secrets never leave the gateway\")."
+        ],
+        "must_not": [
+          "Must not ship a release in which neither diagRec nor the recorder's local sink is present, unless Robert has explicitly chosen that.",
+          "Must not keep the gate above 98 % after 2026-11-29 because of this change: that end date belongs to Robert's A1 decision (TASK-2980)."
+        ],
+        "exceptions": [
+          "None."
+        ],
+        "verification": [
+          "The host test tests/testrecring.py on the lane compiles RecRing.h as it is.",
+          "A capture-tool test reads a fixture download in the \"OTGWMIX1\" format and skips an unknown one without aborting.",
+          "A build check: DiagRecorder symbols are absent from the normal-build ELF (nm), and the build log shows the freed bytes.",
+          "Bench: a tester capture with otgwcapture.py on .61 (no PSRAM, 8 KB ring) and .63 (PSRAM) contains a decodable recording."
         ]
       },
       "scope": {
@@ -18723,6 +18791,42 @@
       "target": "ADR-265",
       "type": "related",
       "resolved": true
+    },
+    {
+      "source": "ADR-268",
+      "target": "ADR-030",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-268",
+      "target": "ADR-191",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-268",
+      "target": "ADR-213",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-268",
+      "target": "ADR-214",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-268",
+      "target": "ADR-218",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-268",
+      "target": "ADR-263",
+      "type": "related",
+      "resolved": false
     }
   ]
 }

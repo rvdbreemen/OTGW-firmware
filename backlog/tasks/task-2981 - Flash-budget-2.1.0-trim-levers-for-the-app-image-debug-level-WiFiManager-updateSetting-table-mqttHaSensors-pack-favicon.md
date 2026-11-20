@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-20T17:07:00Z'
-updated_date: '2026-11-20T17:13:00Z'
+updated_date: '2026-11-20T17:19:00Z'
 labels:
   - build
   - flash-size
@@ -27,3 +27,9 @@ Umbrella for the 2.1.0 app-image trims, from the flash-consumers measurement of 
 - [ ] #1 Each lever picked becomes a subtask with a before/after .ino.bin size on the same commit base and its own tests
 - [ ] #2 The sum of the landed trims and the new headroom recorded against the TASK-1993 thresholds (WARN 95 %, FAIL 98 %)
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-20: lever (1), the compile-time debug level, moved to TASK-2980 (2.0.0, Robert's A1 trim task, together with the stable measurement, DER roots and the debug port as its own feature). Levers (2)-(5) stay here for 2.1.0.
+<!-- SECTION:NOTES:END -->

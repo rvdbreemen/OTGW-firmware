@@ -1,29 +1,33 @@
 ---
 id: TASK-2980
 title: >-
-  Measure the stable app image size (_VERSION_PRERELEASE off) against the app0
-  slot
+  2.0.0 flash trim before 29 Nov: measure the stable image, DER roots, debug
+  port as its own feature, compile-time debug level (linked to the temporary
+  99.5 % size gate)
 status: To Do
-assignee: []
+assignee:
+  - '@otgw-poc-dev'
+  - '@otgw-dev'
 created_date: '2026-11-20T17:04:00Z'
-updated_date: '2026-11-20T17:13:00Z'
+updated_date: '2026-11-20T17:19:00Z'
 labels:
   - build
   - flash-size
 milestone: 2.0.0
 dependencies: []
-priority: low
+priority: high
 ordinal: 1112000
 ---
 
 ## Description
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
-Follow-up of TASK-1955 and the flash-consumers measurement of beta.404 (architect, 2026-11-20). The 93.9 % app-slot figure (2,153,776 of 2,293,760 B) is a prerelease build. A stable build comments out _VERSION_PRERELEASE, which drops the prerelease-only code (guards in OLED.ino, handleDebug.ino, restAPI.ino, OTGW-firmware.ino). Measure the stable image once so the budget for the 2.0.0 stable is known, not guessed (guess 1-5 KB smaller). Build only through build.bat / ./build.sh in a throwaway worktree; nothing is committed or published.
+Robert, 2026-11-20 (DM 'A1', relayed by the coordinator): the TASK-1993 size gate is temporarily raised to 99.5 % until 2026-11-29, so remote telemetry (recorder + TLS, about 113 KB; lane 1a0ea63 at 2,266,576 B = 98.8 %) can enter 2.0.0; this task brings the image back under 98 % (2,247,884 B) by the end date. Needed: about 18.7 KB below the lane figure, minus what the diagRec removal (ADR-268, about 4-9 KB, otgw-poc-dev) frees. Items, each measured before/after on the same commit base: (1) measure the stable image (_VERSION_PRERELEASE off drops prerelease-only code; guess 1-5 KB); (2) the 4 PEM roots (about 5.9 KB text) as DER (about 1.6 KB; estimate from otgw-poc-dev); (3) the debug port as its own feature that a release build can leave out (scope to define in the plan); (4) a compile-time debug level for our telnet/debug literals (part of about 134 KB of our string pool; measure the debug share first). The other levers stay in TASK-2981 (2.1.0). Builds only through build.bat / ./build.sh.
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Stable-configuration esp32-combo image built from the current dev HEAD with _VERSION_PRERELEASE commented out; its .ino.bin size and the TASK-1993 build-log line (percent of app0) recorded with the githash
-- [ ] #2 Difference against the prerelease build of the same commit stated in bytes; TASK-1955 notes updated with the stable headroom
+- [ ] #1 Stable-image size measured and recorded (githash, .ino.bin bytes, TASK-1993 build-log percentage), difference against the prerelease build of the same commit stated
+- [ ] #2 DER roots, debug-port feature and compile-time debug level each landed or explicitly dropped, with before/after .ino.bin bytes per item and run_tests + evaluate --quick green
+- [ ] #3 By 2026-11-29 the esp32-combo image with remote telemetry is at or below 98 % of app0 (2,247,884 B), and build.py's temporary 99.5 % gate is returned to 98 %
 <!-- AC:END -->
