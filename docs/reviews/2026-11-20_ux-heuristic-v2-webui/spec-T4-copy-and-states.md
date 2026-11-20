@@ -74,17 +74,17 @@ otgw-webui lists the other settings whose hint renders longer than 2 lines at 14
 |---|---|---|
 | SAT off | No control data: SAT is off. | "off" |
 | paused or stopped (spec T2) | No new control data: SAT is paused. | "paused" / "stopped" |
-| starting (spec T2) | Waiting for the first control step… | "starting" |
+| waiting (spec T2) | No control data yet: SAT is waiting to take over. | "waiting" |
 | SAT on, fewer than 2 points | Collecting data… | hidden |
 | SAT on, 2 or more points | (no overlay) | "live" |
 
-**Dependency:** the paused, stopped and starting rows need the display-state derivation of spec T2 (TASK-2957), which waits on otgw-dev's answers. The off, collecting and live rows and the heating-curve empty state can land first.
+**Dependency:** the paused, stopped and waiting rows need the display-state derivation of spec T2 (TASK-2957); otgw-dev answered its questions on 2026-11-20. The off, collecting and live rows and the heating-curve empty state can land first.
 
 Points collected before a pause stay drawn; the overlay then sits in the top-left corner instead of the centre, so it does not hide them.
 
 **Heating curve** (`#satCurveBig`, `satDrawCurve()`): today the SVG is emptied when `coefficient` or `target_temp` is null, which leaves a blank card of about 400 px. New: the card shows one line, "The heating curve appears once SAT knows its coefficient and target.", and keeps its height at 120 px instead of 400.
 
-Copy keys: `tools.sat_loop_empty_off`, `tools.sat_loop_empty_paused`, `tools.sat_loop_empty_starting`, `tools.sat_loop_collecting`, `tools.sat_curve_empty`.
+Copy keys: `tools.sat_loop_empty_off`, `tools.sat_loop_empty_paused`, `tools.sat_loop_empty_waiting`, `tools.sat_loop_collecting`, `tools.sat_curve_empty`.
 
 ## F15. BLE discovery card
 
@@ -116,7 +116,7 @@ Copy keys: `tools.sat_loop_empty_off`, `tools.sat_loop_empty_paused`, `tools.sat
 2. **F6:** a browser test answers the enable POST with HTTP 500 (the modal stays open, the error line names "HTTP 500", the button reads "Try again"), with a network error (the reason reads "no answer from the gateway") and with HTTP 200 (the modal closes and the toast shows). Pending disables both buttons.
 3. **F10:** no settings hint under a label renders longer than 2 lines at 1400 px; Appliance type shows the short line, and its (i) holds the full text from `SET_META.satsource.help`; `settingsHelp.h` unchanged.
 4. **F11:** on an HTTP page the "Detect location" button is hidden and the hint has no "HTTPS"; the link opens SAT settings › Weather with Latitude focused; otgw-docs has the same wording in §5.9 (EN and NL).
-5. **F13:** the control-loop chart shows the overlay and label per the table in each state (the paused, stopped and starting rows after TASK-2957); the heating curve card shows its one-line empty state at 120 px.
+5. **F13:** the control-loop chart shows the overlay and label per the table in each state (the paused, stopped and waiting rows after TASK-2957); the heating curve card shows its one-line empty state at 120 px.
 6. **F15:** the discovery card body is in the UI font and spans the width at 390 px; no auto-collapse.
 7. **F5:** the banner shows the BlueFlame-approved line with the absolute field-run-recipe link (`target="_blank" rel="noopener"`), or the item is closed as dropped because stable removed the banner.
 8. New strings exist as EN keys; NL and DE are filled through the i18n sync, and the i18n tests (`tests/webui/i18n-*.test.mjs`) pass.

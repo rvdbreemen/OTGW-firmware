@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-20T14:26:00Z'
-updated_date: '2026-11-20T14:53:00Z'
+updated_date: '2026-11-20T15:21:00Z'
 labels:
   - ux
   - webui
@@ -28,10 +28,10 @@ From the TASK-2952 UX review (docs/reviews/2026-11-20_ux-heuristic-v2-webui/READ
 - [ ] #2 F6: a browser test answers the sim enable POST with HTTP 500 (modal stays open, error line names 'HTTP 500', button 'Try again'), with a network error (reason 'no answer from the gateway') and with HTTP 200 (modal closes, toast shows); pending disables both buttons
 - [ ] #3 F10: no settings hint renders longer than 2 lines at 1400 px; Appliance type shows the short line and its (i) holds the full text from SET_META.satsource.help; settingsHelp.h unchanged
 - [ ] #4 F11: on an HTTP page 'Detect location' is hidden and the hint has no 'HTTPS'; the link opens SAT settings › Weather with Latitude focused (the group heading while SAT is off); otgw-docs uses the same wording in manual §5.9 EN and NL
-- [ ] #5 F13: the control-loop chart shows the overlay and label per spec T4 in each state (paused, stopped and starting rows after TASK-2957); the heating curve card shows its one-line empty state at 120 px
-- [ ] #6 New EN keys exist; NL and DE filled by the i18n sync, tests/webui/i18n-*.test.mjs pass; keys that change meaning (sat_geo_hint, sat_beta_head/body if built, the satsource hint if translated) get re-translated NL and DE values, visible in the sync diff
-- [ ] #7 F15: the discovery card body is in the UI font and spans the width at 390 px; no auto-collapse (coordinator decision 2026-11-20, KISS)
-- [ ] #8 F5: the SAT beta banner shows BlueFlame's approved line 'SAT is still being tuned during the beta. A capture of a day with SAT on helps us most: [How to share a capture]' with the absolute link https://github.com/rvdbreemen/OTGW-firmware/blob/dev/docs/sat/field-run-recipe-2.0.0.md (target=_blank rel=noopener), or the item is closed as dropped because stable removed the banner
+- [ ] #5 New EN keys exist; NL and DE filled by the i18n sync, tests/webui/i18n-*.test.mjs pass; keys that change meaning (sat_geo_hint, sat_beta_head/body if built, the satsource hint if translated) get re-translated NL and DE values, visible in the sync diff
+- [ ] #6 F15: the discovery card body is in the UI font and spans the width at 390 px; no auto-collapse (coordinator decision 2026-11-20, KISS)
+- [ ] #7 F5: the SAT beta banner shows BlueFlame's approved line 'SAT is still being tuned during the beta. A capture of a day with SAT on helps us most: [How to share a capture]' with the absolute link https://github.com/rvdbreemen/OTGW-firmware/blob/dev/docs/sat/field-run-recipe-2.0.0.md (target=_blank rel=noopener), or the item is closed as dropped because stable removed the banner
+- [ ] #8 F13: the control-loop chart shows the overlay and label per spec T4 in each state (paused, stopped and waiting rows after TASK-2957); the heating curve card shows its one-line empty state at 120 px
 <!-- AC:END -->
 
 ## Implementation Notes
