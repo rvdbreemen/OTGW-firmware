@@ -198,6 +198,10 @@
     "tip_wifi": "IP {{ip}} ({{mode}}) · WLAN {{ssid}}"
   },
   "core": {
+    "skip_to_content": "Zum Inhalt springen",
+    "nav_main": "Hauptmenü",
+    "nav_settings_sections": "Einstellungsbereiche",
+    "sat_switch_name": "SAT",
     "theme_to_light": "Zum hellen Design wechseln",
     "theme_to_dark": "Zum dunklen Design wechseln",
     "theme_light": "Hell",
@@ -1346,6 +1350,7 @@
     "sd_hint": "Aus der Tabelle der OpenTherm-Spezifikation, dem Busverkehr dieser Sitzung und dem Verlauf der unterstützten Nachrichten, den das Gateway über Neustarts hinweg speichert."
   },
   "tools": {
+    "sat_dial_off_hint": "SAT ist aus: oben rechts einschalten, um die Zieltemperatur zu ändern.",
     "active": "Aktiv",
     "cmd_enter": "Befehl eingeben",
     "cmd_sent": "Gesendet: {{cmd}}",

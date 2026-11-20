@@ -198,6 +198,10 @@
     "tip_wifi": "IP {{ip}} ({{mode}}) · Wi-Fi {{ssid}}"
   },
   "core": {
+    "skip_to_content": "Naar de inhoud",
+    "nav_main": "Hoofdmenu",
+    "nav_settings_sections": "Instellingen-onderdelen",
+    "sat_switch_name": "SAT",
     "theme_to_light": "Overschakelen naar licht thema",
     "theme_to_dark": "Overschakelen naar donker thema",
     "theme_light": "Licht",
@@ -1346,6 +1350,7 @@
     "sd_hint": "Uit de tabel van de OpenTherm-specificatie, het busverkeer van deze sessie en de ondersteuningsgeschiedenis die de gateway over herstarts heen bewaart."
   },
   "tools": {
+    "sat_dial_off_hint": "SAT staat uit: zet het aan (rechtsboven) om de doeltemperatuur te wijzigen.",
     "active": "Actief",
     "cmd_enter": "Voer een commando in",
     "cmd_sent": "Verstuurd: {{cmd}}",

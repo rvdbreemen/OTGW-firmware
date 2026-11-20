@@ -144,7 +144,8 @@ test('v2.css styles the icon (>= 24 px hit area, visible focus ring) and the pop
   assert.ok(sinfo, '.sinfo rule missing');
   const w = sinfo[1].match(/width:(\d+)px/), h = sinfo[1].match(/height:(\d+)px/);
   assert.ok(w && +w[1] >= 24 && h && +h[1] >= 24, '.sinfo must be at least 24x24 px');
-  assert.match(css, /\.sinfo:focus-visible\{[^}]*outline:/, 'visible focus ring missing');
+  // TASK-2958: the ring comes from the one design-system :focus-visible rule; .sinfo only keeps its offset
+  assert.match(css, /(^|[\s}]):focus-visible\{[^}]*outline:2px solid var\(--focus-ring\)/m, 'visible focus ring missing');
   const pop = css.match(/#shelp\{([^}]*)\}/);
   assert.ok(pop, '#shelp rule missing');
   assert.match(pop[1], /max-width:min\(320px,calc\(100vw - 16px\)\)/, 'popover must be max 320 px and never wider than the viewport minus 16 px');

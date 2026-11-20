@@ -22,10 +22,12 @@
 </script>
 </head>
 <body>
+<!-- TASK-2958 (spec T3 section 1): first Tab stop; moves focus into <main id="main"> -->
+<a class="skip-link" href="#main" data-i18n="core.skip_to_content">Skip to content</a>
 
 
 <div class="headerrow">
-  <span class="big">OTGW firmware <span class="sub">· v2</span></span>
+  <h1 class="big">OTGW firmware <span class="sub">· v2</span></h1>
   <!-- TASK-983: firmware-authentic identity chips (hostname·version + IP·Wi-Fi bars).
        Filled once from /api/v2/device/info at startup; the Wi-Fi bars + dBm refresh
        live from the /api/v2/health poll (fetchConn). -->
@@ -59,18 +61,19 @@
   </div>
 </div>
 <div class="fs-banner" id="fsMismatch" role="alert" hidden></div>
-<div class="switcher">
-  <button class="seg active" data-page="home"><b data-i18n="nav.home">Home</b><small data-i18n="h_home.nav_home_sub">opening page</small></button>
+<nav class="switcher" aria-label="Main" data-i18n-aria-label="core.nav_main">
+  <button class="seg active" data-page="home" aria-current="page"><b data-i18n="nav.home">Home</b><small data-i18n="h_home.nav_home_sub">opening page</small></button>
   <button class="seg" data-page="sat"><b data-i18n="nav.sat">SAT</b><small data-i18n="h_home.nav_sat_sub">thermostat · control · technical</small></button>
   <button class="seg" data-page="monitor"><b data-i18n="nav.monitor">Monitor</b><small data-i18n="h_home.nav_monitor_sub">log · stats · support · graph · connection</small></button>
   <button class="seg" data-page="settings"><b data-i18n="nav.settings">Settings</b><small data-i18n="h_home.nav_settings_sub">grouped &amp; scannable</small></button>
   <button class="seg" data-page="advanced"><b data-i18n="nav.advanced">Advanced</b><small data-i18n="h_home.nav_advanced_sub">pic · debug · files · system</small></button>
   <button class="seg hidden" data-page="diagnose"><b data-i18n="h_home.nav_diagnose">Diagnose</b><small data-i18n="h_home.nav_diagnose_sub">PIC test menu</small></button>
-</div>
-<div class="wrap">
+</nav>
+<main class="wrap" id="main" tabindex="-1">
 
 <!-- ════════════════ PAGE: HOME ════════════════ -->
 <div id="page-home" class="page active">
+  <h2 class="sr-only" data-i18n="nav.home">Home</h2>
 <div class="viewpick" id="viewPick">
   <button type="button" class="viewpick-btn" id="viewPickBtn" aria-haspopup="true" aria-expanded="false" title="Choose home view" data-i18n-title="h_home.viewpick_title">
     <svg width="15" height="15" viewBox="0 0 15 15" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><rect x="1" y="1" width="5.5" height="5.5" rx="1"/><rect x="8.5" y="1" width="5.5" height="5.5" rx="1"/><rect x="1" y="8.5" width="5.5" height="5.5" rx="1"/><rect x="8.5" y="8.5" width="5.5" height="5.5" rx="1"/></svg>
@@ -336,10 +339,11 @@
      mode,settings/<name>}. History accumulates client-side (no history endpoint,
      by design — as in the former classic SAT page). -->
 <div id="page-sat" class="page">
+  <h2 class="sr-only" data-i18n="nav.sat">SAT</h2>
   <div class="sat-head">
     <div class="sat-title">SAT · Smart Autotune Thermostat <span class="sat-pill off" id="satPill">…</span></div>
     <button id="satRerunSetup" class="fs-btn" style="margin-left:auto" data-i18n="h_mon.sat_rerun_setup">Re-run setup</button>
-    <label class="sat-switch" style="margin-left:12px"><span id="satEnableLbl">Enabled</span><input type="checkbox" class="sw" id="satEnable"></label>
+    <label class="sat-switch" style="margin-left:12px"><span id="satEnableLbl" aria-hidden="true">Enabled</span><input type="checkbox" class="sw" id="satEnable" aria-label="SAT" data-i18n-aria-label="core.sat_switch_name"></label>
   </div>
 
   <div class="sat-views">
@@ -365,6 +369,7 @@
         <div class="sat-dial-card">
           <svg viewBox="0 0 240 240" id="satDial" aria-label="Room thermostat" data-i18n-aria-label="h_mon.sat_dial_aria"></svg>
           <div class="sat-steps"><button class="stepbtn" id="satDown" aria-label="lower target" data-i18n-aria-label="h_mon.sat_lower">−</button><button class="stepbtn" id="satUp" aria-label="raise target" data-i18n-aria-label="h_mon.sat_raise">+</button></div>
+          <div class="sat-hint" id="satDialOffHint" hidden data-i18n="tools.sat_dial_off_hint">SAT is off: switch it on (top right) to change the target.</div>   <!-- TASK-2958: next to the dial, not in the message panel -->
         </div>
         <div class="sat-side">
           <div class="sat-status-row"><div class="sat-status-big" id="satStatusBig">—</div>
@@ -481,6 +486,7 @@
 
 <!-- ════════════════ PAGE: MONITOR ════════════════ -->
 <div id="page-monitor" class="page">
+  <h2 class="sr-only" data-i18n="nav.monitor">Monitor</h2>
 
   <div class="subtabs">
     <button class="subtab active" data-tab="mlog" data-i18n="h_mon.tab_log">Log</button>
@@ -759,11 +765,12 @@
 
 <!-- ════════════════ PAGE: SETTINGS ════════════════ -->
 <div id="page-settings" class="page">
+  <h2 class="sr-only" data-i18n="nav.settings">Settings</h2>
 
   <input class="set-search" id="setSearch" placeholder="Search settings… (e.g. broker, ntp, pin)" data-i18n-placeholder="h_set.search_ph">
 
   <div class="set-layout">
-    <nav class="set-rail" id="setRail"></nav>
+    <nav class="set-rail" id="setRail" aria-label="Settings sections" data-i18n-aria-label="core.nav_settings_sections"></nav>
     <div>
       <div class="set-cols" id="setCols"></div>
       <div class="savebar" id="saveBar">
@@ -812,6 +819,7 @@
 <!-- Top-level Advanced page: the power-user screens that used to live under
      Monitor > Debug. Four sub-tabs; data is fetched on tab-open (not page init). -->
 <div id="page-advanced" class="page">
+  <h2 class="sr-only" data-i18n="nav.advanced">Advanced</h2>
 
   <div class="subtabs" id="advTabs">
     <button class="subtab active" data-adv="pic" data-i18n="h_set.tab_pic">PIC firmware</button>
@@ -919,6 +927,7 @@
      picfwtype "diagnose". A board without a PIC never sends that field at all,
      so this is a firmware-type test, not a hardware mode. -->
 <div id="page-diagnose" class="page">
+  <h2 class="sr-only" data-i18n="h_home.nav_diagnose">Diagnose</h2>
   <div class="card">
     <h4><span data-i18n="h_set.diag_title">PIC diagnose</span> <span class="sub" data-i18n="h_set.diag_sub">interactive test menu on the PIC serial line</span></h4>
 
@@ -953,7 +962,7 @@
   </div>
 </div><!-- /page-diagnose -->
 
-</div>
+</main>
 <div class="toast" id="toast" role="status" aria-live="polite" data-i18n="h_set.toast_saved">Settings saved</div>
 <!-- TASK-984: floating override-detail panel (fixed position). Opened by #aOvrBadge (Home) and #cnOvr (Monitor map). -->
 <div class="ovr-panel" id="ovrPanel"></div>

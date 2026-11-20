@@ -319,6 +319,10 @@
       "tip_wifi": "IP {{ip}} ({{mode}}) · Wi-Fi {{ssid}}"
     },
     "core": {
+      "skip_to_content": "Skip to content",
+      "nav_main": "Main",
+      "nav_settings_sections": "Settings sections",
+      "sat_switch_name": "SAT",
       "theme_to_light": "Switch to light theme",
       "theme_to_dark": "Switch to dark theme",
       "theme_light": "Light",
@@ -1467,6 +1471,7 @@
       "sd_hint": "From the OpenTherm spec table, your bus traffic this session and the support history the gateway keeps across reboots."
     },
     "tools": {
+      "sat_dial_off_hint": "SAT is off: switch it on (top right) to change the target.",
       "active": "Active",
       "cmd_enter": "Enter a command",
       "cmd_sent": "Sent: {{cmd}}",
@@ -1991,9 +1996,12 @@
 
   // ---------- page navigation ----------
   // opts.tab: the caller picks the Monitor tab itself (shown, not stored, no stored-tab restore).
+  // TASK-2958 (spec T3 section 2): the active item of a group carries aria-current; the others have none.
+  function setAriaCurrent(el, on, val) { if (on) el.setAttribute('aria-current', val); else el.removeAttribute('aria-current'); }
   function showPage(p, opts) {
     document.querySelectorAll('.seg').forEach(function (s) {
       s.classList.toggle('active', s.dataset.page === p);
+      setAriaCurrent(s, s.dataset.page === p, 'page');   // TASK-2958
     });
     ['home', 'sat', 'monitor', 'settings', 'advanced', 'diagnose'].forEach(function (k) {
       var el = document.getElementById('page-' + k);
@@ -2052,6 +2060,7 @@
   function showTab(t, fromUser) {
     document.querySelectorAll('#page-monitor .subtab').forEach(function (s) {
       s.classList.toggle('active', s.dataset.tab === t);
+      setAriaCurrent(s, s.dataset.tab === t, 'true');   // TASK-2958
     });
     // TASK-1312: only a tab the user clicked is remembered; one opened from code is shown, not stored.
     if (fromUser) { try { localStorage.setItem('otgw-v2-montab', t); } catch (e) { } }
@@ -2084,6 +2093,7 @@
   function showAdvTab(k) {
     document.querySelectorAll('#advTabs .subtab').forEach(function (s) {
       s.classList.toggle('active', s.dataset.adv === k);
+      setAriaCurrent(s, s.dataset.adv === k, 'true');   // TASK-2958
     });
     ['pic', 'debug', 'files', 'system'].forEach(function (x) {
       var el = document.getElementById('adv-' + x);
@@ -4702,7 +4712,7 @@
       var n = catShown(c.id);
       if (!n) return;
       if (!firstNonEmpty) firstNonEmpty = c.id;
-      var ri = document.createElement('div'); ri.className = 'rail-item';
+      var ri = document.createElement('button'); ri.type = 'button'; ri.className = 'rail-item';   // TASK-2958: keyboard reachable (WCAG 2.1.1)
       ri.appendChild(document.createTextNode(c.icon + ' ' + catTitle(c) + ' '));
       if (c.reboot) ri.appendChild(rebootBadge());
       var cnt = document.createElement('span'); cnt.className = 'cnt'; cnt.textContent = n; ri.appendChild(cnt);
@@ -4718,7 +4728,7 @@
       var active = setActiveCat && catShown(setActiveCat) ? setActiveCat : firstNonEmpty;
       setActiveCat = active;
       showCats = active ? [active] : [];
-      var act = rail.querySelector('.rail-item[data-cat="' + active + '"]'); if (act) act.classList.add('active');
+      var act = rail.querySelector('.rail-item[data-cat="' + active + '"]'); if (act) { act.classList.add('active'); act.setAttribute('aria-current', 'true'); }
     }
     showCats.forEach(function (id) {
       var c = catById(id); if (!c) return;
@@ -4795,6 +4805,7 @@
     SAT_LOCK_IDS.forEach(function (id) { var e = document.getElementById(id); if (e) e.disabled = off; });
     if (off) SAT_LOCK_RENDERED.forEach(function (id) { var e = document.getElementById(id); if (e) e.disabled = true; });
     document.querySelectorAll('#satPresets .sat-preset').forEach(function (b) { b.disabled = off; });
+    var offHint = document.getElementById('satDialOffHint'); if (offHint) offHint.hidden = !off;   // TASK-2958: why the dial does nothing
     if (satLockShown !== off) { satLockShown = off; if (setData) renderSatSettings(); }
   }
   function renderSatSettings() {
@@ -7701,7 +7712,7 @@
 
   function satShowView(v) {
     if (['simple', 'control', 'technical'].indexOf(v) === -1) v = 'simple';
-    document.querySelectorAll('.satview-btn').forEach(function (b) { b.classList.toggle('active', b.dataset.sv === v); });
+    document.querySelectorAll('.satview-btn').forEach(function (b) { b.classList.toggle('active', b.dataset.sv === v); setAriaCurrent(b, b.dataset.sv === v, 'true'); });   // TASK-2958
     var body = document.getElementById('satBody'); var cls = 'sv-' + v; if (body) body.className = cls;
     try { localStorage.setItem('otgw-v2-satview', v); } catch (e) { }
     // Redraw charts: a layer that was display:none has no layout, so its SVG must
