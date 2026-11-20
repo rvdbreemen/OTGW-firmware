@@ -141,8 +141,11 @@ void MqttClient::_checkOutbox() {
   - A half-accepted packet continues on the next call and is counted once.
 - A host test checks that `ClientSync::connect()` sets `TCP_NODELAY` only when `EMC_TCP_NODELAY` is 1: the stub records the socket option.
 - Bench A/B (TASK-2949.5) on .61 and .63, at three events: the TASK-2019 takeover, a republish-all and a boot discovery burst.
-  - Measured: the largest drop inside one `loop()` (probe `at=13 from=12`), SAT publish latency and command round-trip time.
-  - Pass: under 10 KB per `loop()` with the chosen variant, and no command round-trip above 250 ms.
+  - Measured: the largest drop inside one `loop()` (probe `at=13 from=12`), SAT publish latency, and the latency of each small publish.
+  - The small-publish latency is measured explicitly, because Nagle plus the broker's delayed ACK can add about 40-200 ms per small publish (coordinator, 2026-11-20). Two measurements:
+    - the command echo: a Home Assistant `set/` command to the gateway, until its state comes back on the broker;
+    - the keepalive: PINGREQ to PINGRESP.
+  - Pass: under 10 KB per `loop()` with the chosen variant, a command echo under 250 ms at p95, and no PINGRESP or keepalive timeout over the soak.
 
 ## Alternatives Considered
 
