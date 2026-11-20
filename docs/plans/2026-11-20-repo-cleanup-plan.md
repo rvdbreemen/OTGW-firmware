@@ -44,9 +44,9 @@ The per-row inventories are in [`2026-11-20-repo-cleanup/`](2026-11-20-repo-clea
 | F1 | `docs/archive/mqttha.cfg` has merge-conflict markers committed at lines 4-8 | read in this session; `docs/MANUAL.md` cites the file (via the EN chapters) | otgw-docs |
 | F2 | `/flash` skill runs `python build.py` and `python flash_esp.py` | `.claude/skills/flash/SKILL.md:17-20`, read in this session; breaks two hard rules: build through `build.bat`/`build.sh` only, and only the bench-tester flashes | coordinator |
 | F3 | 8 files are tracked although `.gitignore` ignores them | `git ls-files -ci --exclude-standard`, run in this session | see C2 |
-| F4 | Dangling paths in agent and doc files | `.github/copilot-instructions.md` (BUILD.md, EVALUATION.md, FLASH_GUIDE.md, two moved review dirs); `AGENTS.md:97` (`src/OTGW-firmware/platform.h`, outside the AGENT-CORE block, so only AGENTS.md changes); MANUAL EN chapters (`hardware/PINOUT.md`, `tools/generate_mqttha_*.py`); `docs/api/WEBSOCKET_FLOW.md:569-570` | otgw-docs |
+| F4 | Dangling paths in agent and doc files | `.github/copilot-instructions.md` (BUILD.md, EVALUATION.md, FLASH_GUIDE.md, two moved review dirs); `AGENTS.md:97` (`src/OTGW-firmware/platform.h`, outside the AGENT-CORE block, so only AGENTS.md changes); MANUAL EN chapters (`tools/generate_mqttha_*.py`). The `PINOUT.md` link is not dangling: `build_manual.py` rebases it to `docs/hardware/PINOUT.md`, which exists (otgw-docs, 2026-11-20).; `docs/api/WEBSOCKET_FLOW.md:569-570` | otgw-docs |
 | F5 | `docs/adr/README.md:1071` says `.github/skills/adr/` does not exist, but it does, and 4 Copilot files point at it | layout audit | coordinator (decision D4) |
-| F6 | Two TASK-1719 evidence PNGs, a "before" and an "after", are byte-identical | same sha256, checked by both audits | owner of TASK-1719: check which screenshot is missing |
+| F6 | Two TASK-1719 evidence PNGs, a "before" and an "after", are byte-identical | same sha256, checked by both audits | owner of TASK-1719: check which screenshot is missing. otgw-webui did not do TASK-1719; the coordinator asks otgw-bench-tester |
 | F7 | The local `dev` in the main tree is 328 commits behind origin/dev, and its tree is dirty (`.wolf` files, one task file, the `other-projects` pointer) | branch audit | coordinator (main-tree owner) |
 | F8 | `graphify-out/` was built on `.` on 2026-07-26; 668 src commits have landed since | `GRAPH_REPORT.md:1` | otgw-dev: `graphify update src` (not part of the cleanup) |
 
@@ -131,12 +131,12 @@ Risk: low for the deletes (no workflow or script on dev uses them; evaluate.py g
 ### C6: docs moves (otgw-docs; one commit per numbered item)
 
 1. **One plans folder.** `docs/plan/*` (8 files), the root `plan/` file and `docs/process/ps1-lean-translator-refactor-plan.md` go to `docs/plans/`.
-2. **The existing `docs/archive/` stays as it is.** It holds 2.x archives too: ADR-077 cites `docs/archive/mqttha.cfg` (a 2.x snapshot, not on otgw-1.x.x) and ADR-065 cites `docs/archive/mqttha-generator/`. F1 is fixed in place. New 1.x material from this plan goes under a new `docs/archive/1.x/`. No ADR cites a path under `docs/fixes/` or `docs/images/` (`git grep` of docs/adr, this session).
+2. **The existing `docs/archive/` stays as it is.** It holds 2.x archives too: ADR-077 cites `docs/archive/mqttha.cfg` (a 2.x snapshot, not on otgw-1.x.x) and ADR-065 cites `docs/archive/mqttha-generator/`. F1 is fixed in place. New 1.x material from this plan goes under a new `docs/archive/1.x/`. No ADR cites a path under `docs/fixes/` or `docs/images/` (`git grep` of docs/adr, this session). ADR-020:504 names `docs/wemosd1mini-pinout-ds18b20.png`, a path that has not existed for a long time; the move changes nothing there (otgw-docs).
 3. **1.x UI screenshots.** `docs/images/` holds 21 screenshots from 2021; 20 have no inbound link, and all are on otgw-1.x.x. They move to `docs/archive/1.x/images/`, and the one link is updated.
 4. **1.x fix write-ups.** `docs/fixes/` moves to `docs/archive/1.x/fixes/`. `README.md:319` links one of them: update it. `CHANGELOG.md:1051` links one too, but CHANGELOG history is not edited, so that file keeps a stub (rule 5).
 5. **Classic-UI feature pages.** `docs/features/TEMPERATURE_SENSOR_*` move to `docs/archive/1.x/features/`.
 6. **The v0/v1 API examples.** `example-api/` (v0/v1 return 410 Gone on 2.x) moves to `docs/archive/1.x/example-api/`, with a stub README at `example-api/` because ADR-019 cites it. The link at `README.md:245` is updated.
-7. **One audit.** `docs/api/MQTT-message-id-echo-audit.md` moves to `docs/audits/`.
+7. **One audit.** `docs/api/MQTT-message-id-echo-audit.md` moves to `docs/audits/`, with a stub at the old path. ADR-097 (:65, :129) cites it, and two src comments do too (MQTTstuff.ino:2551, OTGW-Core.ino:2036). Those comments stay as they are, because changing them would need a prerelease bump (otgw-docs, 2026-11-20).
 8. **Code inside docs/.** `docs/opentherm specification/member-ids/opentherm_public_crawler.py` and `docs/sat/research/heat-loss-id/heat_loss_id.py` move to `tools/research/`. otgw-dev does this one, with its references.
 
 ### C7: dangling-path fixes (otgw-docs, one commit)
