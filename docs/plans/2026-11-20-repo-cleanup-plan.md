@@ -182,6 +182,8 @@ The layout audit counted 23 because it also searched README.md, CHANGELOG.md and
 
 ## 6. Decisions for Robert (through the coordinator)
 
+**Decided 2026-11-20:** Robert answered "A" (Discord DM 1573349163083505787): every recommendation below, as listed. F2 is tracked separately as TASK-2962.
+
 | # | question | options and consequences | recommendation |
 |---|---|---|---|
 | D1 | Where do the per-branch `archive/<name>` tags go? (The one `archive/pre-cleanup-2026-11-20` tag on the dev tip goes to GitHub in every option: it only marks a dev commit that is public already.) | A: the per-branch tags go only to the NAS `backup` remote and stay local. The public tag list stays clean; GitHub has no copy of those 13 branch tips. B: push them to GitHub too. Off-site twice, but 13 more public tags. | **A.** The NAS remote already holds the off-site branch copies. Folding the 27 old snapshot tags into `archive/*` at the same time is optional. |
