@@ -3,10 +3,11 @@ id: TASK-2958
 title: >-
   Web UI accessibility structure: skip link and main, ARIA states, disabled
   style, one focus ring (UX review F19 F18 F20 F21)
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-11-20T14:22:00Z'
-updated_date: '2026-11-20T15:09:00Z'
+updated_date: '2026-11-20T16:00:00Z'
 labels:
   - ux
   - webui
@@ -42,4 +43,6 @@ From the TASK-2952 UX review (docs/reviews/2026-11-20_ux-heuristic-v2-webui/READ
 2026-11-20 otgw-ux-designer: spec docs/reviews/2026-11-20_ux-heuristic-v2-webui/spec-T3-a11y-structure.md. ACs replaced by the spec's acceptance list. Change from the review: aria-current on view buttons instead of the ARIA tabs pattern (tabs need roving tabindex + arrow keys; without them role=tab misleads). New finding while specifying: the main nav is a <div class=switcher>; the only <nav> landmark is the Settings rail.
 
 2026-11-20: priority raised to high and the rail-item part added by coordinator decision (moved from TASK-2960): keyboard users cannot reach any Settings category today.
+
+2026-11-20 otgw-webui claimed; builds spec T3 sections 1-4 plus spec T5 section 2.1 (rail items as <button>).
 <!-- SECTION:NOTES:END -->
