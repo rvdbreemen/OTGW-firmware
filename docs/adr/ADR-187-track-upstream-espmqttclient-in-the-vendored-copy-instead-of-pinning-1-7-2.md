@@ -9,6 +9,8 @@ documents_shipped: false
 verified_in: []
 supersedes: []
 superseded_by: null
+related:
+  - "ADR-264"
 topics:
   - "mqtt"
   - "espmqttclient"
@@ -30,7 +32,7 @@ format: "canonical"
 
 ## Status
 
-Accepted, 2026-10-05.
+Accepted, 2026-10-05. Partly superseded by ADR-264 (2026-11-20): the copy now comes from our fork tag, not upstream `main`; the bench-on-update rule stands.
 
 ## Status History
 

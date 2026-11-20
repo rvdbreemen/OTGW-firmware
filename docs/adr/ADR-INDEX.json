@@ -11105,6 +11105,212 @@
         "supersedes": [],
         "superseded_by": null
       }
+    },
+    {
+      "id": "ADR-264",
+      "title": "Take espMqttClient from our fork as a vendored copy of a pinned fork tag (partly supersedes ADR-187, amends ADR-186)",
+      "path": "ADR-264-take-espmqttclient-from-our-fork-as-a-vendored-copy-of-a-pinned-fork-tag-partly-supersedes-adr-187-amends-adr-186.md",
+      "format": "canonical",
+      "status": "Accepted",
+      "date": "2026-11-20",
+      "decision_summary": "espMqttClient comes from our fork.",
+      "topics": [
+        "dependency-source",
+        "espmqttclient",
+        "mqtt",
+        "vendored-library"
+      ],
+      "aliases": [
+        "espMqttClient fork",
+        "rvdbreemen/espMqttClient",
+        "vendored from fork tag"
+      ],
+      "components": [
+        "espMqttClient provenance file (OTGW-PROVENANCE.md)",
+        "vendored espMqttClient from fork tag (src/libraries/espMqttClient)"
+      ],
+      "symbols": [
+        "ClientSync::write",
+        "EMC_CONNECT_TIMEOUT_MS"
+      ],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [
+          "The copy equals the fork tag named in OTGW-PROVENANCE.md (hash test green).",
+          "Each fork change is its own commit, with a code comment naming its ADR or task.",
+          "Every update of the copy repeats the ADR-187 slow-broker bench (TASK-1213, tc netem 500 ms) and an esp32-combo build."
+        ],
+        "must_not": [
+          "Must not edit src/libraries/espMqttClient in place.",
+          "Must not fetch the library over the network at build time.",
+          "Must not change espMqttClient's threading model (ADR-131, ADR-186)."
+        ],
+        "exceptions": [
+          "None."
+        ],
+        "verification": [
+          "tests/testespmqttclientprovenance.py (TASK-2949.4) passes on the synced copy and fails after a one-byte edit of any file under src/libraries/espMqttClient/src.",
+          "diff -r of the v1.7.3-otgw.1 tag's src/ against today's copy shows only comment text (TASK-2949.2)."
+        ]
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
+    },
+    {
+      "id": "ADR-265",
+      "title": "Pace every deferrable MQTT bulk publisher through one shared pacer that limits packets per flush",
+      "path": "ADR-265-pace-every-deferrable-mqtt-bulk-publisher-through-one-shared-pacer-that-limits-packets-per-flush.md",
+      "format": "canonical",
+      "status": "Proposed",
+      "date": "2026-11-20",
+      "decision_summary": "Every deferrable MQTT bulk publisher asks one shared pacer, mqttPaceAllows() in MQTTstuff.ino, before it publishes.",
+      "topics": [
+        "backpressure",
+        "burst-pacing",
+        "heap",
+        "mqtt"
+      ],
+      "aliases": [
+        "MQTT burst pacing",
+        "MQTT pacer",
+        "outbox pacing",
+        "publish admission gate"
+      ],
+      "components": [
+        "MQTT bulk-publisher pacer",
+        "mqttPaceAllows (MQTTstuff.ino)"
+      ],
+      "symbols": [
+        "connStageReady",
+        "dripOutboxWait",
+        "loopMQTTStatsPacer",
+        "mqttConnectPaceHold",
+        "mqttPaceAllows",
+        "satOutboxFull",
+        "staleOverrideClearTick"
+      ],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [
+          "Every deferrable bulk producer calls mqttPaceAllows() before a publish and keeps its shadow or pending bit when the answer is no:",
+          "SAT shadow helpers in SATmqttPublish.cpp",
+          "loopMQTTDiscovery()",
+          "connStageTick()",
+          "staleOverrideClearTick()",
+          "publishAllPICsettings()",
+          "loopMQTTStatsPacer()",
+          "MQTTPACEMAXOUTBOX, MQTTPACEMINBLOCK and MQTTPACEMAXWAITMS are defined once, next to mqttPaceAllows(). The library cap value MQTTMAXPACKETSPERLOOP (ADR-266) is set in the same place.",
+          "Every paced producer has a liveness bound: after MQTTPACEMAXWAITMS without a yes, it publishes anyway.",
+          "The pacer runs on the loop task only, like espMqttClient itself. A request from another task sets a flag that the loop task consumes, as queueMQTTRepublishAll() does (OTGW-Core.ino:2217)."
+        ],
+        "must_not": [
+          "Must not hold or drop a per-frame processOT() publish or a status fan-out. Those stay under ADR-088.",
+          "Must not compare MQTTclient.queueSize() or mqttOutboxDepth() against a threshold outside the pacer.",
+          "Must not patch the vendored espMqttClient beyond what ADR-186 allows.",
+          "Must not bring back heap-tier gating. ADR-167 stays: the pacer reads the largest free block as a send condition, not as a tier."
+        ],
+        "exceptions": [
+          "None."
+        ],
+        "verification": [
+          "A host test compiles the real mqttPaceAllows() and the real SATmqttPublish.cpp, then drives a first-seen SAT set of at least 140 topics. It counts the packets queued per pass. It must go red on the code before this ADR (up to 24 or 25 pe...",
+          "An evaluate.py gate fails when queueSize() or mqttOutboxDepth() is compared against a number outside mqttPaceAllows().",
+          "Bench: the TASK-2019 takeover recipe and the TASK-1757 W/C/B boot recipe on .61. No [HEAP] sat-takeover-probe or connect-probe drop of 10 KB or more at at=13 from=12. Old-vs-new numbers go in the task."
+        ]
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
+    },
+    {
+      "id": "ADR-266",
+      "title": "Bound the lwIP segments one espMqttClient loop creates, with Nagle on the MQTT socket and a per-loop PUBLISH cap as backstop",
+      "path": "ADR-266-bound-the-lwip-segments-one-espmqttclient-loop-creates-with-nagle-on-the-mqtt-socket-and-a-per-loop-publish-cap-as-backstop.md",
+      "format": "canonical",
+      "status": "Proposed",
+      "date": "2026-11-20",
+      "decision_summary": "The decision has two parts.",
+      "topics": [
+        "burst-pacing",
+        "espmqttclient",
+        "heap",
+        "lwip",
+        "mqtt"
+      ],
+      "aliases": [
+        "EMC_TCP_NODELAY",
+        "max packets per loop",
+        "MQTT segment cost",
+        "Nagle on MQTT socket",
+        "setMaxPacketsPerLoop"
+      ],
+      "components": [
+        "EMC_MAX_PACKETS_PER_LOOP / MqttClient::setMaxPacketsPerLoop (fork)",
+        "EMC_TCP_NODELAY (fork Config.h)"
+      ],
+      "symbols": [
+        "ClientSync::connect",
+        "EMC_MAX_PACKETS_PER_LOOP",
+        "EMC_TCP_NODELAY",
+        "MqttClient::_checkOutbox",
+        "setMaxPacketsPerLoop"
+      ],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [
+          "Both knobs default to upstream behaviour (EMCTCPNODELAY 1, EMCMAXPACKETSPERLOOP 0), so the fork commits can go upstream unchanged.",
+          "The firmware sets its values in one place (platformio.ini build flags or the MQTT setup in MQTTstuff.ino), with a comment citing this ADR and the bench numbers.",
+          "Only PUBLISH packets count towards the cap.",
+          "Fault 5, the outbox grows under the cap. The firmware never queues PUBLISH faster than the cap drains. Deferrable producers are held by the ADR-265 outbox gate. The event-driven producers stay at about 1 OT frame per second and at most 9...",
+          "Fault 6, control packets starve behind the cap. A control packet queued behind k PUBLISH packets leaves within ceil(k / n) + 1 loop() calls, well inside the 60 s keepalive (MQTTstuff.ino:1612).",
+          "Each change is a separate fork commit, marked with a comment naming this ADR (ADR-264 process)."
+        ],
+        "must_not": [
+          "Must not drop or reorder packets. The outbox stays first-in-first-out.",
+          "Must not block the loop task: the non-blocking write of ADR-186 stays."
+        ],
+        "exceptions": [
+          "None."
+        ],
+        "verification": [
+          "A host test compiles the real MqttClient.cpp with a stub transport:",
+          "40 PUBLISH: n = 0 sends 40 in one loop(), n = 8 sends 8. Red on the code before the cap.",
+          "Fault 6: a PINGREQ and a PUBACK queued behind 40 PUBLISH at n = 8 leave within 6 calls.",
+          "A half-accepted packet continues on the next call and is counted once.",
+          "A host test checks that ClientSync::connect() sets TCPNODELAY only when EMCTCPNODELAY is 1: the stub records the socket option.",
+          "Bench A/B (TASK-2949.5) on .61 and .63, at three events: the TASK-2019 takeover, a republish-all and a boot discovery burst.",
+          "Measured: the largest drop inside one loop() (probe at=13 from=12), SAT publish latency and command round-trip time.",
+          "Pass: under 10 KB per loop() with the chosen variant, and no command round-trip above 250 ms."
+        ]
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
     }
   ],
   "relationships": [
@@ -16353,6 +16559,12 @@
       "resolved": true
     },
     {
+      "source": "ADR-186",
+      "target": "ADR-264",
+      "type": "related",
+      "resolved": true
+    },
+    {
       "source": "ADR-187",
       "target": "ADR-131",
       "type": "related",
@@ -16361,6 +16573,12 @@
     {
       "source": "ADR-187",
       "target": "ADR-186",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-187",
+      "target": "ADR-264",
       "type": "related",
       "resolved": true
     },
@@ -18395,6 +18613,114 @@
     {
       "source": "ADR-262",
       "target": "ADR-218",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-264",
+      "target": "ADR-186",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-264",
+      "target": "ADR-187",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-264",
+      "target": "ADR-232",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-264",
+      "target": "ADR-265",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-264",
+      "target": "ADR-266",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-265",
+      "target": "ADR-088",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-265",
+      "target": "ADR-090",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-265",
+      "target": "ADR-131",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-265",
+      "target": "ADR-167",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-265",
+      "target": "ADR-186",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-265",
+      "target": "ADR-187",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-265",
+      "target": "ADR-216",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-265",
+      "target": "ADR-266",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-266",
+      "target": "ADR-131",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-266",
+      "target": "ADR-186",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-266",
+      "target": "ADR-216",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-266",
+      "target": "ADR-264",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-266",
+      "target": "ADR-265",
       "type": "related",
       "resolved": true
     }
