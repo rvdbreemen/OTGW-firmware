@@ -204,6 +204,7 @@ Run through every item below before creating the GitHub release.
 - [ ] `RELEASE_GITHUB_<version>.md` exists **in root** and is ready to paste
 - [ ] Previous release notes have been moved to `docs/releases/` (only the current version remains in root)
 - [ ] `docs/BREAKING_CHANGES.md` has a section for this version
+- [ ] `CONTRIBUTORS.md` is updated for this release: new contributors added, counts refreshed, names as people use them in public (every public stable release, Robert 2026-11-20, TASK-2947)
 - [ ] `README.md` "Current version" line is updated with the new version and links to the root release notes
 - [ ] `README.md` version history table includes the new version with correct link
 

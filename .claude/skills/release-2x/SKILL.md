@@ -100,6 +100,7 @@ Each push to `release/2.x` happens only inside this flow after checkpoint 1.
 2. CHANGELOG: on release/2.x rename `## [Unreleased]` to `## [<v>] - <date>`, add an
    empty `[Unreleased]` and the link refs. The beta sections stay below it.
 3. README: no beta disclaimer, highlights for `<v>`.
+3b. `CONTRIBUTORS.md`: refresh the counts and add new contributors since the previous public stable release (GitHub merged PRs, commits and issues; Discord activity), names as people use them in public; update the short list on the web UI About screen to match. Robert's decision 2026-11-20: every public stable release (TASK-2947).
 4. `/update-docs-2x --release <v>` in `../wt-release-2x` for the manuals, API docs,
    C4 docs, `BREAKING_CHANGES.md` and the notes draft. It does not commit and skips
    cleanup; its files are part of this checkpoint and of the Phase 7 cherry-pick.
