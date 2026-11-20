@@ -176,7 +176,7 @@ Absolute `blob/dev` links in the 94 published GitHub release bodies and in `docs
 - `docs/sat/field-run-recipe-2.0.0.md`;
 - the release notes of beta.62, 77, 105, 118, 130, 144, 158, 162, 167, 170, 174, 203, 218 and 250.
 
-The layout audit counted 23. Before C6, the two lists are reconciled, and the union is kept. None of the moves in C6 touches any target on either list.
+The layout audit counted 23 because it also searched README.md, CHANGELOG.md and the rest of docs/. Its 4 extra targets are linked only from repo files, not from release notes: `docs/api/MQTT.md` (from openapi.yaml), `docs/manuals/en/ch07-troubleshooting.md` and `docs/manuals/nl/h07-probleemoplossing.md` (from a wiki draft), and `docs/releases/RELEASE_NOTES_2.0.0-beta.401.md` (from README.md). Reconciled: the union of 23 stays at its path. The 4 extras are not hard pins (their links can be updated), but no move in C6 touches them either.
 
 `blob/main` links point at the 1.x line and do not constrain dev.
 
