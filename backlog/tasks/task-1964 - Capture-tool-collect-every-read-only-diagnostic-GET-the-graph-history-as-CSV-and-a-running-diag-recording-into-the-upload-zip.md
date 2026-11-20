@@ -7,11 +7,11 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-15T10:03:00Z'
-updated_date: '2026-11-20T01:12:00Z'
+updated_date: '2026-11-20T01:20:00Z'
 labels:
   - capture
   - tooling
-milestone: 2.0.0
+milestone: 2.1.0
 dependencies: []
 priority: medium
 ordinal: 1004000
@@ -50,4 +50,6 @@ OUT, with the reason: settings.ini (passwords in plain text, and readable withou
 2026-11-19 triage (otgw-dev): AC7 field-blocked: needs gruijter's first capture next to his hand-exported CSV for the overlapping slots.
 
 2026-11-20 (ba, coordinator decision): AC7 via a tester ask. 92 posted in #beta-testing, message 1573143902511431691: gruijter exports Monitor > Graph 24 h CSV during a capture run (beta.392) and sends it with the zip. Field archive checked first: no overlap (newest hand exports 2026-11-13/15, first capture graph-history CSVs 2026-11-16 after reflashes). Supporting bench variant by 09 on .63 after the beta soak; AC7 is ticked only on field data, otherwise it goes to the coordinator's waiver list for Robert.
+
+2026-11-20 milestone 2.0.0 -> 2.1.0 (otgw-docs, coordinator's assignment). Robert DM 2026-11-20 01:15 (1573144814600462457), relayed by the coordinator: "C — field/hardware ACs outside the 2.0.0 scope, to 2.1.0". Status, assignee and ACs unchanged.
 <!-- SECTION:NOTES:END -->

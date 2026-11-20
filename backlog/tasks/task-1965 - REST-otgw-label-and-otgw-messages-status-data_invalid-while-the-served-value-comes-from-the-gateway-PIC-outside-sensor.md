@@ -7,12 +7,12 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-15T10:12:00Z'
-updated_date: '2026-11-20T01:12:00Z'
+updated_date: '2026-11-20T01:20:00Z'
 labels:
   - rest
   - bug
   - beta-feedback
-milestone: 2.0.0
+milestone: 2.1.0
 dependencies: []
 priority: medium
 ordinal: 1005000
@@ -46,4 +46,6 @@ indigo_light capture 2026-11-15 10:50-13:26 (beta.250+aed38bf, PIC gateway 6.8, 
 2026-11-16 (95) AC3: commit 2e49979dc updates docs/api/openapi.yaml (+22 lines, source field with boiler/gateway/thermostat/summary/replay/none, the 'data_invalid with source gateway' example at :1631-1638) and docs/api/README.md (:429-434); on origin since beta.339. evaluate --quick 0 failed today on the 2.0.0-beta.344 lane; esp32-combo build 2.0.0-beta.344+873f06b exit 0, 'Build completed successfully', contains it (09 also benched ffd0a64 on .63: the source field is present). AC4 stays open: field confirmation by indigo_light on beta.339 or later.
 
 2026-11-20 (ba, coordinator decision): AC4 via a tester ask. 92 posted in #beta-testing, message 1573143895154626665: indigo_light runs GET /api/v2/otgw/label/Toutside on beta.339 or newer; expect status data_invalid + source gateway. Field archive checked first: no upload holds it (the capture sweep excludes otgw/label/*; device-state has no source field).
+
+2026-11-20 milestone 2.0.0 -> 2.1.0 (otgw-docs, coordinator's assignment). Robert DM 2026-11-20 01:15 (1573144814600462457), relayed by the coordinator: "C — field/hardware ACs outside the 2.0.0 scope, to 2.1.0". Status, assignee and ACs unchanged.
 <!-- SECTION:NOTES:END -->

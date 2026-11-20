@@ -6,10 +6,11 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-12T06:02:00Z'
+updated_date: '2026-11-20T01:19:00Z'
 labels:
   - otdirect
   - parity
-milestone: 2.0.0
+milestone: 2.1.0
 dependencies: []
 priority: low
 ordinal: 937000
@@ -27,3 +28,9 @@ Split out of TASK-1844 (PIC 6.8 parity N10). The PIC always acknowledges the the
 - [ ] #2 Decision recorded (PIC answer with Smart Power, answer without it, or keep the boiler's answer) with the reason
 - [ ] #3 If changed: host test on the real reply path with the PIC frame of thermostat-3.stc; red on the old code
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-20 milestone 2.0.0 -> 2.1.0 (otgw-docs, coordinator's assignment). Robert DM 2026-11-20 01:15 (1573144814600462457), relayed by the coordinator: "C — field/hardware ACs outside the 2.0.0 scope, to 2.1.0". Status, assignee and ACs unchanged.
+<!-- SECTION:NOTES:END -->
