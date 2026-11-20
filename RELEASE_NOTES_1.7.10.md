@@ -1,6 +1,6 @@
 # OTGW-firmware v1.7.10 Release Notes
 
-**Release date:** TBD
+**Release date:** 2026-11-20
 **Previous release:** v1.7.9
 **Platform:** ESP8266 (1.x maintenance line)
 **Compare:** [v1.7.9...v1.7.10](https://github.com/rvdbreemen/OTGW-firmware/compare/v1.7.9...v1.7.10)

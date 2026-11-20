@@ -8,7 +8,7 @@ For full release notes per version, see the matching `RELEASE_NOTES_<version>.md
 
 ## [Unreleased]
 
-## [1.7.10] - TBD
+## [1.7.10] - 2026-11-20
 
 ### Fixed
 

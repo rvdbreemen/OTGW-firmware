@@ -4,9 +4,20 @@
 
 This repository contains the **ESP8266 firmware for the NodoShop OpenTherm Gateway (OTGW)**. It runs on the ESP8266 "devkit" that is part of the NodoShop OTGW and turns the gateway into a standalone network device.
 
-> ⚠️ **This is the 1.x maintenance branch (`otgw-1.x.x`).** The latest stable 1.x release is [v1.7.9](https://github.com/rvdbreemen/OTGW-firmware/releases/tag/v1.7.9): a new option to force WiFi 802.11g, for routers where the gateway joins but gets no network. If your gateway has an admin password set and still runs v1.7.4 or earlier, upgrade: those versions served `settings.ini`, which holds that password in cleartext, without authentication.
+> ⚠️ **This is the 1.x maintenance branch (`otgw-1.x.x`).** The latest stable 1.x release is [v1.7.10](https://github.com/rvdbreemen/OTGW-firmware/releases/tag/v1.7.10): a maintenance release with one fix in the web file handler. If your gateway has an admin password set and still runs v1.7.4 or earlier, upgrade: those versions served `settings.ini`, which holds that password in cleartext, without authentication.
 
-## What's New in v1.7.9
+## What's New in v1.7.10
+
+v1.7.10 is a maintenance release for the 1.x (ESP8266) line. No breaking changes versus v1.7.9.
+
+- **File paths are normalised before the access check.** The web server brings every requested file path into one normal form before it decides whether the admin password is needed, and opens exactly that path. Without an admin password nothing changes. (TASK-1935)
+
+Flash **both** firmware and filesystem. Settings are preserved.
+
+Full release notes: [RELEASE_NOTES_1.7.10.md](RELEASE_NOTES_1.7.10.md)
+Breaking changes: [docs/BREAKING_CHANGES.md](docs/BREAKING_CHANGES.md)
+
+## What was new in v1.7.9
 
 v1.7.9 is a small release for the 1.x (ESP8266) line. No breaking changes versus v1.7.8.
 
@@ -208,14 +219,21 @@ v1.5.0 is the first stable release of the `1.5.x` long-term-support line on **Ar
 Full release notes: [RELEASE_NOTES_1.5.0.md](docs/releases/RELEASE_NOTES_1.5.0.md)  
 Breaking changes: [docs/BREAKING_CHANGES.md](docs/BREAKING_CHANGES.md)
 
-## Latest stable release: v1.7.9
+## Latest stable release: v1.7.10
 
-`v1.7.9` is the current stable release on `main`. It adds an option to force WiFi 802.11g, for routers where the gateway joins in 802.11n but gets no network. No breaking changes.
+`v1.7.10` is the current stable release on `main`. A maintenance release: file paths are normalised before the access check. No breaking changes.
+
+Full release notes: [RELEASE_NOTES_1.7.10.md](RELEASE_NOTES_1.7.10.md)
+Download: [GitHub Releases](https://github.com/rvdbreemen/OTGW-firmware/releases/tag/v1.7.10)
+
+## Previous stable release: v1.7.9
+
+`v1.7.9` adds an option to force WiFi 802.11g, for routers where the gateway joins in 802.11n but gets no network. No breaking changes.
 
 Full release notes: [RELEASE_NOTES_1.7.9.md](RELEASE_NOTES_1.7.9.md)
 Download: [GitHub Releases](https://github.com/rvdbreemen/OTGW-firmware/releases/tag/v1.7.9)
 
-## Previous stable release: v1.7.8
+## Older stable release: v1.7.8
 
 `v1.7.8` recovers by itself from a WiFi link without traffic, a failed broker name lookup and an access point outage, keeps the radio awake and the router's ARP entry fresh, reports dropped and refused PIC commands, records why the gateway went down, and works behind a reverse proxy. No breaking changes.
 
