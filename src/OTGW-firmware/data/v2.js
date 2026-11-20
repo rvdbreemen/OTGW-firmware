@@ -640,21 +640,29 @@
     "h_set": {
       "discard": "Discard",
       "save": "Save settings",
-      "about_title": "About",
-      "about_by": "This is an independent open-source project by",
       "about_credits": "Credits",
-      "about_schelte": "designed the",
+      "about_schelte": "Designed the",
       "about_schelte2": "and its PIC firmware.",
-      "about_george": "designed the SAT algorithm.",
-      "about_alex": "developed the original",
+      "about_george": "Designed the SAT algorithm.",
+      "about_alex": "Developed the original",
       "about_alex_link": "SAT component for Home Assistant",
       "about_alex2": ", which the SAT controller in 2.0 is ported from.",
-      "about_kit": "The kit is sold by",
-      "contrib_title": "Contributors",
+      "contrib_title": "Community",
       "contrib_sub": "Thank you to everyone who built, tested and supported this firmware over the years. Most contributions first.",
-      "contrib_code": "Code (GitHub)",
-      "contrib_community": "Community (Discord)",
+      "contrib_code": "Code on GitHub",
+      "contrib_community": "Discord",
       "contrib_more": "And everyone in the community who reports issues, tests betas and helps others.",
+      "about_makers": "Makers",
+      "about_maker_role": "Author and maintainer of this independent open-source firmware.",
+      "about_ai_role": "Built with help from AI coding assistants (GitHub Copilot, Claude Code, OpenAI Codex) under Robert's direction and review.",
+      "about_nodo": "Sells the",
+      "about_nodo_link": "OpenTherm Gateway kit",
+      "about_ihor": "Wrote the OpenTherm library used for OT-Direct.",
+      "about_bert": "Wrote espMqttClient, the MQTT client.",
+      "about_jens": "Wrote FSexplorer, the file explorer.",
+      "about_robr": "Wrote the S0 pulse counter.",
+      "about_libs": "And the authors of the open-source libraries the firmware is built on, among them AsyncTCP, ESPAsyncWebServer, NimBLE-Arduino, WiFiManager, SSD1306Ascii, OneWire, DallasTemperature, AceSorting and EthernetESP32.",
+      "contrib_full": "Full list of contributors",
       "search_ph": "Search settings… (e.g. broker, ntp, pin)",
       "unsaved_suffix_one": "unsaved change",
       "unsaved_suffix_other": "unsaved changes",
@@ -2960,14 +2968,14 @@
   }
   // TASK-2946: while SAT owns the temperature the room readouts show the room temperature SAT controls on (sat/status
   // room_temp: BLE, areas, an external push or MsgID 24, satGetRoomTemp()), as the setpoint beside it and the HA climate
-  // entity (ADR-248) already do; the thermostat's own MsgID 24 goes in the tooltip. SAT off, or SAT without a valid room
+  // entity (ADR-248) already do; the thermostat's own MsgID 24, when there is one, goes in the tooltip. SAT off, or SAT without a valid room
   // temperature: MsgID 24 as before (TASK-1735).
   function roomFromSat() { return sat.owns === true && !sat.roomLost && typeof sat.room === 'number' && !isNaN(sat.room); }
   function roomShown() { return roomFromSat() ? sat.room : model.room; }
   function showRoom(id) {
     var el = document.getElementById(id); if (!el) return;
     el.textContent = fmt(roomShown(), 1, '°');
-    if (roomFromSat()) el.setAttribute('title', t('home.room_sat_tip', { thermostat: fmt(model.room, 1, '°') }));
+    if (roomFromSat() && model.room !== null) el.setAttribute('title', t('home.room_sat_tip', { thermostat: fmt(model.room, 1, '°') }));
     else el.removeAttribute('title');
   }
   function fmt(v, dp, suffix) {

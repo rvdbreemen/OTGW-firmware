@@ -20,7 +20,8 @@ test('no page footer; the copyright line sits in the Settings About card', () =>
   const set = HTML.slice(HTML.indexOf('<div id="page-settings"'), HTML.indexOf('</div><!-- /page-settings -->'));
   const about = /<div class="adv-card" id="setAbout"[\s\S]*?id="setContrib"/.exec(set);
   assert.ok(about, 'About card in Settings');
-  assert.match(about[0], /independent open-source project by<\/span> <span data-i18n-skip>Robert van den Breemen<\/span>/);
+  // TASK-2948: Makers card, Robert first with his role (the 'independent open-source project by' sentence became the role line)
+  assert.match(about[0], /<b data-i18n-skip>Robert van den Breemen<\/b><span class="shint" data-i18n="h_set.about_maker_role">/);
   assert.match(about[0], /© 2021-2026 Robert van den Breemen/);
   const order = ['Robert van den Breemen', 'Schelte Bron', 'George Ntellas', 'Alex (Alexwijn)', 'Nodo Shop']
     .map((n) => about[0].indexOf(n));
@@ -31,7 +32,9 @@ test('no page footer; the copyright line sits in the Settings About card', () =>
   assert.match(about[0], /href="https:\/\/www\.nodo-shop\.nl\/"/);
   const contrib = set.indexOf('id="setContrib"');
   assert.ok(contrib > set.indexOf('id="setAbout"'), 'Contributors card after the About card');
-  assert.match(set.slice(contrib), /Code \(GitHub\)[\s\S]*Dave Davenport[\s\S]*Community \(Discord\)[\s\S]*Qball/);
+  // TASK-2948, Robert 2026-11-20: "ik wil dat je Willem Aandewiel NIET noemt. Verwijder hem uit de credits."
+  assert.doesNotMatch(set + SRC, /Aandewiel|about_willem/, 'Willem Aandewiel is not named on the About/Credits screen');
+  assert.match(set.slice(contrib), /Code on GitHub[\s\S]*DaveDavenport[\s\S]*Discord<\/b>[\s\S]*Qball/);
 });
 
 test('the old footer text and its translation key are gone', () => {

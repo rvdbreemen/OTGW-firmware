@@ -660,6 +660,7 @@ html[data-theme="dark"]{--accent:var(--brand-cyan);--nav:#383838;--tile-off:#545
   .fw-badge.hidden{display:none}
   .adv-card{background:var(--panel);border:1px solid var(--border);border-radius:14px;box-shadow:var(--shadow);padding:16px 18px;margin:0 0 14px}
   .adv-card h4{margin:0 0 12px;font-size:.95rem}
+  #page-settings .adv-card a{color:var(--accent)}   /* TASK-2948: About/Credits links in the accent, not the browser default */
   .pic-head{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;
     background:var(--panel);border:1px solid var(--border);border-radius:14px;box-shadow:var(--shadow);padding:14px 16px;margin-bottom:12px}
   .pic-head>div{display:flex;flex-direction:column;gap:3px}

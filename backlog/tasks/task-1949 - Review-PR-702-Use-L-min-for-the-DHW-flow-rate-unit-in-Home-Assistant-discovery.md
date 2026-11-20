@@ -3,11 +3,11 @@ id: TASK-1949
 title: >-
   Review PR #702: Use L/min for the DHW flow rate unit in Home Assistant
   discovery
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-14T20:51:00Z'
-updated_date: '2026-11-20T10:59:00Z'
+updated_date: '2026-11-20T11:28:00Z'
 labels:
   - github
   - pr
@@ -53,3 +53,9 @@ Robert 2026-11-20, interactive in session 95 (otgw-docs), TASK-1740 AC1 waiver r
 
 2026-11-20 bench (09, otgw-bench-tester), AC3 evidence: rig HA (setup_rig.py, bench broker 192.168.88.32). Entity sensor.opentherm_gateway_marvin_otgw32_water_flow_rate_in_dhw_circuit (unique_id otgw-1020BA21B4F8-otd_DHWFlowRate, discovery published by .61 401+47d08b1, retained config origin sw 2.0.0-beta.401+47d08b1): unit_of_measurement L/min, device_class volume_flow_rate, state_class measurement, state 0.00. HA error_log: 1 line total (custom integration 'ingress' warning), 0 lines with mqtt/unit_of_measurement. Files: OTGW-field-data/bench-63/2026-11-20_ha-1780-1949/ (ha1780.log, ha_error_log.txt), OTGW-field-data/bench-otgw32/2026-11-20_task1780-ac2-broker/dhwflow-discovery-retained.txt. No HA screenshots (REST/registry + error_log as evidence, coordinator OK). .63 has no DHW flow entity (no retained config for it on the broker).
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+PR #702 (HA discovery unit l/min -> L/min for the DHW flow rate). AC1: reviewed against HA's UnitOfVolumeFlowRate list (PR comment by rvdbreemen); every haUnitStr(HaUnit::l_min) consumer checked, git grep 'l/min' over src/, docs/api and test/ 0 hits. AC2: python test/host/test_dhw_water_meter.py RESULT: PASS rc=0; commit 2cc72d819 shipped in beta.294, beta.323 and beta.339 (esp32-combo builds). AC3: bench by 09 on the HA rig 2026-11-20: .61 (beta.401+47d08b1) entity water_flow_rate_in_dhw_circuit created with unit_of_measurement L/min, device_class volume_flow_rate, state_class measurement; HA error_log 0 lines about mqtt/unit_of_measurement (files OTGW-field-data/bench-63/2026-11-20_ha-1780-1949/, notes in c673e878d); retained configs for .61 and .63 also carry L/min (dhwflow-discovery-retained.txt). AC4: merged with Robert's OK, author credited in #alpha-testing (earlier notes).
+<!-- SECTION:FINAL_SUMMARY:END -->

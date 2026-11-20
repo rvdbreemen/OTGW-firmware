@@ -7,7 +7,7 @@ status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-20T08:30:00Z'
-updated_date: '2026-11-20T10:46:00Z'
+updated_date: '2026-11-20T11:01:00Z'
 labels:
   - webui
   - sat
@@ -40,6 +40,8 @@ Field report will_85903, #beta-testing 2026-11-20 06:44 (screenshots): SAT uses 
 Evidence. New test tests/webui/home-room-follows-sat.test.mjs (real v2.html/v2.js, one Chrome, 5 page loads; thermostat 19.8, SAT room_temp 21.3). Red on origin/dev f18206e62 data (OTGW_DATA_DIR): 4 fail of 6 (SAT on: aRoom actual '19.8°' expected '21.3°'; takeover same; tick [22,74.6] equal on and off), the SAT-off and null/lost guards pass on both, as intended. Green on the fix: 6/6, 26 s. Full tests/webui sweep, one file at a time, timeout 180, commit charge 54 %: 91 files rc 0, pass 420 fail 0 (ha-discovery-golden prints its usual SKIP for block A, LEGACY_DUMP not set); home-dial-sat-only (TASK-1735) green. i18n audit: nl/de/el 1619 keys, 0 missing, 0 orphan. evaluate.py --quick: 88 passed, 0 failed. AC4 open: bench screenshot by 09 with SAT on and an external room temperature.
 
 2026-11-20 AC4 bench by 09 on .63, beta.402+b885f3d (Robert A, DM 1573285721786159155, satsimulation one-off), files OTGW-field-data/bench-63/2026-11-20_task2946-room/. .63 has no thermostat: no MsgID 24 at all (otmonitor has no roomtemperature). SAT on (satsimulation off): sat/status room_temp 24.84 (BLE sensor, satbleenable true; the external push could not be staged: simulation overrides it, BLE outranks it in satGetRoomTemp()) -> design a aRoom '24.9°' and design b bRoom '24.9°' (screenshots sat-on-design-a/b.png, sat-on-dom.json). The old code would show '—' here (MsgID 24 absent), so the device shows the fix working with a real SAT source. The v2.js logic reads sat/status room_temp only and does not care which source satGetRoomTemp() chose, so BLE instead of an external push exercises the same path. SAT off: aRoom/bRoom '—' (MsgID 24 absent), no tooltip. Settings restored, ini diff 0. The DOM dump shows title '' because it read the .title property, which SVG text elements do not have (undefined); a host repro of the same situation (room_temp 24.84, no MsgID 24) reads getAttribute('title') = 'Room temperature SAT controls on; the thermostat reports —' and .title = undefined. The both-values case (SAT room and MsgID 24 present, tooltip naming the thermostat value) is covered by the host test (AC1), not by the bench. Follow-up polish: no tooltip when MsgID 24 is absent ('reports —' says nothing).
+
+2026-11-20 follow-up polish (rides in the TASK-2948 commit): no tooltip when MsgID 24 is absent (SAT on, no thermostat on the bus, as on bench .63): 'the thermostat reports —' said nothing. showRoom() sets the title only when model.room is not null. Test home-room-follows-sat.test.mjs gets a noTr case (SAT on, otmonitor without roomtemperature: aRoom/bRoom '21.3°', title null).
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary

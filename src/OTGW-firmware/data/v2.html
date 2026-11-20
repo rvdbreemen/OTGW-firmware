@@ -773,29 +773,38 @@
       </div>
     </div>
   </div>
-  <!-- TASK-1893 (Robert 2026-11-13): the copyright line left the page footer. Two cards at the end of Settings:
-       About (as on the project site) and Contributors (most contributions first). Names are not translated. -->
+  <!-- TASK-2948 (Robert 2026-11-20): About in three cards, Makers, Credits and Community, built from the settings row
+       classes (srow/slbl/shint) so the text has the same size as every other Settings card (the TASK-1893 cards used bare
+       <p> at the 16 px body size). Names are not translated. Robert's choices: one neutral line on the AI coding
+       assistants naming the products the git history shows; public names only; a short list here and the full list in
+       CONTRIBUTORS.md. Upstream names from TASK-2947 (code headers, library.properties, README credits). -->
   <div class="adv-card" id="setAbout" style="margin-top:14px">
-    <h4 data-i18n="h_set.about_title">About</h4>
-    <p><span data-i18n="h_set.about_by">This is an independent open-source project by</span> <span data-i18n-skip>Robert van den Breemen</span>.</p>
-    <p><b data-i18n="h_set.about_credits">Credits</b></p>
-    <p><b data-i18n-skip>Schelte Bron</b>: <span data-i18n="h_set.about_schelte">designed the</span> <a href="https://otgw.tclcode.com/" target="_blank" rel="noopener" data-i18n-skip>OpenTherm Gateway</a> <span data-i18n="h_set.about_schelte2">and its PIC firmware.</span></p>
-    <p><b data-i18n-skip>George Ntellas</b>: <span data-i18n="h_set.about_george">designed the SAT algorithm.</span></p>
-    <p><b data-i18n-skip>Alex (Alexwijn)</b>: <span data-i18n="h_set.about_alex">developed the original</span> <a href="https://github.com/Alexwijn/SAT" target="_blank" rel="noopener" data-i18n="h_set.about_alex_link">SAT component for Home Assistant</a><span data-i18n="h_set.about_alex2">, which the SAT controller in 2.0 is ported from.</span></p>
-    <p><span data-i18n="h_set.about_kit">The kit is sold by</span> <a href="https://www.nodo-shop.nl/" target="_blank" rel="noopener" data-i18n-skip>Nodo Shop</a>.</p>
-    <p data-i18n-skip>© 2021-2026 Robert van den Breemen · GPL-3.0</p>
+    <h4 data-i18n="h_set.about_makers">Makers</h4>
+    <div class="srow"><span class="slbl"><b data-i18n-skip>Robert van den Breemen</b><span class="shint" data-i18n="h_set.about_maker_role">Author and maintainer of this independent open-source firmware.</span></span></div>
+    <div class="srow"><span class="slbl"><span class="shint" data-i18n="h_set.about_ai_role">Built with help from AI coding assistants (GitHub Copilot, Claude Code, OpenAI Codex) under Robert's direction and review.</span></span></div>
+    <div class="srow"><span class="slbl"><span class="shint" data-i18n-skip>© 2021-2026 Robert van den Breemen · GPL-3.0</span></span></div>
   </div>
-  <!-- Contributors, most contributions first. Code: commits on dev, main and otgw-1.x.x (git shortlog, bots and AI agents
-       left out, aliases merged). Community: Discord messages in the OTGW server since 2021 (all channels the bot can read,
-       bots and deleted accounts left out). Counted 2026-11-13; Robert van den Breemen leads both lists and is named above. -->
+  <div class="adv-card" id="setCredits">
+    <h4 data-i18n="h_set.about_credits">Credits</h4>
+    <div class="srow"><span class="slbl"><b data-i18n-skip>Schelte Bron</b><span class="shint"><span data-i18n="h_set.about_schelte">Designed the</span> <a href="https://otgw.tclcode.com/" target="_blank" rel="noopener" data-i18n-skip>OpenTherm Gateway</a> <span data-i18n="h_set.about_schelte2">and its PIC firmware.</span></span></span></div>
+    <div class="srow"><span class="slbl"><b data-i18n-skip>George Ntellas (Sergeant D)</b><span class="shint" data-i18n="h_set.about_george">Designed the SAT algorithm.</span></span></div>
+    <div class="srow"><span class="slbl"><b data-i18n-skip>Alex (Alexwijn)</b><span class="shint"><span data-i18n="h_set.about_alex">Developed the original</span> <a href="https://github.com/Alexwijn/SAT" target="_blank" rel="noopener" data-i18n="h_set.about_alex_link">SAT component for Home Assistant</a><span data-i18n="h_set.about_alex2">, which the SAT controller in 2.0 is ported from.</span></span></span></div>
+    <div class="srow"><span class="slbl"><b data-i18n-skip>Nodo Shop</b><span class="shint"><span data-i18n="h_set.about_nodo">Sells the</span> <a href="https://www.nodo-shop.nl/" target="_blank" rel="noopener" data-i18n="h_set.about_nodo_link">OpenTherm Gateway kit</a>.</span></span></div>
+    <div class="srow"><span class="slbl"><b data-i18n-skip>Ihor Melnyk</b><span class="shint" data-i18n="h_set.about_ihor">Wrote the OpenTherm library used for OT-Direct.</span></span></div>
+    <div class="srow"><span class="slbl"><b data-i18n-skip>Bert Melis</b><span class="shint" data-i18n="h_set.about_bert">Wrote espMqttClient, the MQTT client.</span></span></div>
+    <div class="srow"><span class="slbl"><b data-i18n-skip>Jens Fleischer</b><span class="shint" data-i18n="h_set.about_jens">Wrote FSexplorer, the file explorer.</span></span></div>
+    <div class="srow"><span class="slbl"><b data-i18n-skip>RobR</b><span class="shint" data-i18n="h_set.about_robr">Wrote the S0 pulse counter.</span></span></div>
+    <div class="srow"><span class="slbl"><span class="shint" data-i18n="h_set.about_libs">And the authors of the open-source libraries the firmware is built on, among them AsyncTCP, ESPAsyncWebServer, NimBLE-Arduino, WiFiManager, SSD1306Ascii, OneWire, DallasTemperature, AceSorting and EthernetESP32.</span></span></div>
+  </div>
+  <!-- Community, most contributions first. Code: commits on dev, main and otgw-1.x.x (git shortlog, bots and AI agents
+       left out, aliases merged). Discord: messages in the OTGW server since 2021 (bots and deleted accounts left out).
+       Short list from CONTRIBUTORS.md (counted 2026-11-20, public names only, one entry per person); the full list is CONTRIBUTORS.md, refreshed at every stable release. -->
   <div class="adv-card" id="setContrib">
-    <h4 data-i18n="h_set.contrib_title">Contributors</h4>
-    <p data-i18n="h_set.contrib_sub">Thank you to everyone who built, tested and supported this firmware over the years. Most contributions first.</p>
-    <p><b data-i18n="h_set.contrib_code">Code (GitHub)</b></p>
-    <p data-i18n-skip>Dave Davenport, sjorsjuhmaniac, Robbert Lagerweij (rlagerweij), tjfsteele, Rob Roos, Nicole Koopmans, Andre Brait, Ben Hählen, GeorgeZ83, Crash-Evans, STemplar, Dirk Zwager, Halim (hgokduman), Martinvdm, Tommy van der Vorst, mcc05, proditaki</p>
-    <p><b data-i18n="h_set.contrib_community">Community (Discord)</b></p>
-    <p data-i18n-skip>Qball, Richard_HA, fuzzyduck, sergeantd, sjorsjuhmaniac, Schelte Bron (.otgw), proditaki, Bas, RobR, TechJunky, Daballiemo, tjfs, Alexw, Dayton, kapryk85, (DSRT) John H., pzzy8127, GeorgeZ83, Simon Templar, gruijter, WitteTonnie, crashevans, NLJ, DeKemp, Tomas Salfischberger</p>
-    <p data-i18n="h_set.contrib_more">And everyone in the community who reports issues, tests betas and helps others.</p>
+    <h4 data-i18n="h_set.contrib_title">Community</h4>
+    <div class="srow"><span class="slbl"><span class="shint" data-i18n="h_set.contrib_sub">Thank you to everyone who built, tested and supported this firmware over the years. Most contributions first.</span></span></div>
+    <div class="srow"><span class="slbl"><b data-i18n="h_set.contrib_code">Code on GitHub</b><span style="display:block;font-weight:400" data-i18n-skip>DaveDavenport, rlagerweij, DutchessNicole, GeorgeZ83, Roos-AID (RobR), Crash-Evans, STemplar, sjorsjuhmaniac, andrebrait, brhahlen, Martinvdm, hgokduman, justink0k, mcc05, pixelspark, proditaki, tjfsteele</span></span></div>
+    <div class="srow"><span class="slbl"><b data-i18n="h_set.contrib_community">Discord</b><span style="display:block;font-weight:400" data-i18n-skip>Qball, Richard_HA, fuzzyduck, Bas, TechJunky, Daballiemo, Dayton, kapryk85, (DSRT) John H., pzzy8127, gruijter, WitteTonnie, NLJ, DeKemp, Tomas Salfischberger, marcelveldt, beEnry, Indigolight, Deebugzz, Pim_85</span></span></div>
+    <div class="srow"><span class="slbl"><span class="shint"><span data-i18n="h_set.contrib_more">And everyone in the community who reports issues, tests betas and helps others.</span> <a href="https://github.com/rvdbreemen/OTGW-firmware/blob/dev/CONTRIBUTORS.md" target="_blank" rel="noopener" data-i18n="h_set.contrib_full">Full list of contributors</a></span></span></div>
   </div>
 </div><!-- /page-settings -->
 

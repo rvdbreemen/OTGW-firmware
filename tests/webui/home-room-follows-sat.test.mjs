@@ -19,21 +19,22 @@ const CASES = {
   off: Object.assign({}, ON, { enabled: false, active: false }),
   nullRoom: Object.assign({}, ON, { room_temp: null }),
   lost: Object.assign({}, ON, { room_temp_lost: true }),
+  noTr: ON,   // SAT on, but no thermostat on the bus: no MsgID 24 (bench .63)
 };
 
 // Thermostat (MsgID 24) 19.8; SAT's room temperature (an external push) 21.3.
 test('Home room readouts follow SAT while SAT owns the temperature', async (t) => {
-  let satBody = ON;
+  let satBody = ON, withTr = true;
   const h = await startPage({ api: (m, p) => {
     if (p.endsWith('/v2/sat/status')) return { sat: satBody };
-    if (p.endsWith('/v2/otgw/otmonitor')) return { otmonitor: {
+    if (p.endsWith('/v2/otgw/otmonitor')) return { otmonitor: !withTr ? {} : {
       roomtemperature: { value: 19.8, unit: '°C', epoch: 100 }, roomsetpoint: { value: 20.0, unit: '°C', epoch: 100 } } };
     return undefined;
   } });
   const R = {};
   try {
     for (const [name, body] of Object.entries(CASES)) {
-      satBody = body;
+      satBody = body; withTr = name !== 'noTr';
       const asked = h.log.filter((l) => l.startsWith('GET /api/v2/sat/status')).length;
       if (name !== 'on') await h.send('Page.navigate', { url: `http://127.0.0.1:${h.PORT}/v2.html` });
       assert.ok(await h.until(`!!document.querySelector('.vp-item[data-design="b"]') && document.getElementById('aRoom').textContent !== '—'`, 30000), `${name}: page loaded, room filled`);
@@ -71,6 +72,10 @@ test('Home room readouts follow SAT while SAT owns the temperature', async (t) =
   await t.test('SAT on without a valid room temperature: MsgID 24, no stale SAT value', () => {
     assert.deepEqual(R.nullRoom.a, ['19.8°', null], 'room_temp null');
     assert.deepEqual(R.lost.a, ['19.8°', null], 'room_temp_lost');
+  });
+  await t.test('SAT on without a thermostat (no MsgID 24): SAT room temperature, no tooltip', () => {
+    assert.deepEqual(R.noTr.a, ['21.3°', null], 'design a: value, and no "reports —" tooltip');
+    assert.deepEqual(R.noTr.b, ['21.3°', null], 'design b');
   });
   await t.test('the dial tick sits at the shown room temperature', () => {
     assert.notDeepEqual(R.on.tick, R.off.tick, `the tick moves with the value shown (${R.on.tick} vs ${R.off.tick})`);
