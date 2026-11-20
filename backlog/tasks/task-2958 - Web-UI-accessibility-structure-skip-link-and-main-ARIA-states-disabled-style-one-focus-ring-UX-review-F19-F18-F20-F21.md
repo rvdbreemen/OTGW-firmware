@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-20T14:22:00Z'
+updated_date: '2026-11-20T14:56:00Z'
 labels:
   - ux
   - webui
@@ -24,10 +25,18 @@ From the TASK-2952 UX review (docs/reviews/2026-11-20_ux-heuristic-v2-webui/READ
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 The first Tab on any page focuses a visible 'Skip to content' link that moves focus into <main>; each page has exactly one <main> and one <h1>
-- [ ] #2 The active main-nav button has aria-current=page; the active SAT view tab has aria-selected=true and the others false
-- [ ] #3 The SAT switch's accessible name is 'SAT' in both states
-- [ ] #4 Every disabled button renders with one shared disabled style and cursor:not-allowed; with SAT off the dial card shows a one-line hint how to enable SAT
-- [ ] #5 One :focus-visible rule covers buttons, links, summaries and inputs, in a colour >= 3:1 against both the header and the page
-- [ ] #6 A browser test reads the ARIA attributes after a page and view change, and the Tab-walk script shows the skip link first and the same ring style on every stop
+- [ ] #1 The first Tab on any page focuses a visible 'Skip to content' link; Enter moves focus into <main id=main>; the Tab-walk script shows it as stop 1
+- [ ] #2 Exactly one <h1> (product name), one <main>, the page switcher is <nav aria-label=Main>, the Settings rail nav is labelled 'Settings sections', and each .page starts with a visually hidden <h2> with the page name
+- [ ] #3 After every page or view change exactly one .seg has aria-current=page and exactly one button per group (SAT views, Monitor tabs, Advanced tabs) has aria-current=true; a browser test checks all four groups
+- [ ] #4 #satEnable's accessible name is 'SAT' in both states and #satEnableLbl is aria-hidden
+- [ ] #5 With SAT off every disabled button (dial -/+, presets, Detect location) renders with opacity .5 and cursor not-allowed via one shared button:disabled rule, and the dial card shows the off hint; screenshots light and dark
+- [ ] #6 One :focus-visible rule with --focus-ring #1e88e5 (>= 3:1 on the header, light and dark pages, per spec T3 section 4) covers buttons, links, summaries and inputs; the Tab walk shows outline-style solid on every stop; the four old ring rules are gone; ADR-091 drift gate green
+- [ ] #7 New EN keys per spec T3; NL and DE through the i18n sync; tests/webui/i18n-*.test.mjs pass
+- [ ] #8 Before/after screenshots of Home, SAT and Settings in both themes show no visual change other than the disabled style, the off hint, the skip link on focus and the focus ring colour
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-20 otgw-ux-designer: spec docs/reviews/2026-11-20_ux-heuristic-v2-webui/spec-T3-a11y-structure.md. ACs replaced by the spec's acceptance list. Change from the review: aria-current on view buttons instead of the ARIA tabs pattern (tabs need roving tabindex + arrow keys; without them role=tab misleads). New finding while specifying: the main nav is a <div class=switcher>; the only <nav> landmark is the Settings rail.
+<!-- SECTION:NOTES:END -->
