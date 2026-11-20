@@ -4,11 +4,11 @@ title: >-
   SAT continuous mode: every heating start runs the PWM start sequence (return +
   18 while the flame is off, 20 s hold, flow - 1.0 to 60 s, then the clamp)
   (entry 348)
-status: In Review
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-14T17:23:00Z'
-updated_date: '2026-11-20T01:44:00Z'
+updated_date: '2026-11-20T08:41:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -31,7 +31,7 @@ Sergeant D entry 348 (Q-347a B, 2026-11-14, 'as a fail safe guard (e.g. sat is i
 - [x] #4 Host test on the real satContinuousSetpoint/satPwmFlameOffHold: flame off then flame on, red on beta.250 (flame off -> request), green on the fix
 - [x] #5 Bench via 09: a continuous start shows return + 18 before ignition, the 20 s hold, then the follow and the clamp; no regression on PWM starts
 - [x] #6 ADR-235 (or the TASK-1924 docs) names the start sequence in continuous mode
-- [ ] #7 Entry 385 (387/389/391/394): every heating start (heater OFF->ON, SAT enable without a flame, boot) enters PWM first once the flow is known, with the first phase ON; no PWM->continuous switch until 60 s after the first CH flame-on of that start; host test red on origin and green on the fix; bench on the PIC unit shows the PWM-first start on the wire
+- [x] #7 Entry 385 (387/389/391/394): every heating start (heater OFF->ON, SAT enable without a flame, boot) enters PWM first once the flow is known, with the first phase ON; no PWM->continuous switch until 60 s after the first CH flame-on of that start; host test red on origin and green on the fix; bench on the PIC unit shows the PWM-first start on the wire
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -86,10 +86,12 @@ NOT verified by this analysis: (a) the entry-112 clamp after 60 s as a distinct 
 2026-11-20 AC5 ticked on the field evidence above, in place of the bench (coordinator's go). 13 starts on two PIC units with a real boiler, satsimulation false, beat the boiler-less .63 bench. Shown: return/flow + 18 before ignition, the 20 s hold, flow - 1 to 60 s; PWM starts unchanged (no mode change within 60 s). Not isolated: the entry-112 clamp value. AC7 stays OPEN: whether a PWM-first heating start may wait in PWM OFF when the ON time is under 180 s or at the hour limit is SAT behaviour. Queued as Q-1942a in docs/sat/open-questions.md, text sent to 92 for #dev-sat-mqtt. AC7 is not reworded by us.
 
 2026-11-20 correction: the question queued above as 'Q-1942a' is Q-1942b. Q-1942a was already used (asked 2026-11-19, answered A = entry 426, the outside-temperature hand-back). Spotted by 92 before posting; renamed in docs/sat/open-questions.md.
+
+2026-11-20 AC7 closed on entry 431 (Sergeant D, Q-1942b answered A, #dev-sat-mqtt 2026-11-20 04:05:45 UTC, msg 1573187571503333439, unedited on read-back; recorded by 92). A PWM-first heating start whose ON time is under 180 s (or that is at the hour start limit) waits in PWM OFF. No B/C. Q38 (entry 80) and the hour limit (entries 59, 89) stay, scope 2.0.0, no code change. AC7's 'with the first phase ON' therefore reads as: the first phase is ON when the PWM ON rule allows it (ON time >= 180 s, hour limit not reached; SATcontrol.ino:1780-1797, pwm.py:154-155/179-180). Evidence: host tests red on origin / green on the fix (notes 2026-11-16, test_sat_pwm_first_start, test_sat_loop_integration). The PWM-first start on the wire is shown in the field on two PIC units with a real boiler, satsimulation false (13 starts, analysis notes 2026-11-20): first phase ON in 8/13 starts, and the 5 OFF starts are exactly the cases entry 431 keeps. This field evidence replaces the PIC bench part, which a boiler-less bench could not show.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
 
 <!-- SECTION:FINAL_SUMMARY:BEGIN -->
-Pushed to origin/dev in dffa71c72..fe5aa63f7 (feat b95bc21ec, 2.0.0-beta.351; src identical to the soaked build b5aba1c). AC1-AC4, AC6: as before (cf7b172c8, tests/test_sat_continuous_startup.py 11/11 on the fix, 3 FAIL on beta.250; ADR-235 updated). AC5 (bench of a continuous start): WAIVED by Robert, option A (DM 1571800810931626106), on the host evidence. AC7 (entry 385, decided in full by Sergeant D: 385/387/389/391/394): every heating start (heater OFF->ON, SAT enable without a flame, boot) enters PWM first once the flow is known, with the first phase ON, and no PWM->continuous switch fires until 60 s after the first CH flame-on (start gate). Host evidence: tests/test_sat_pwm_first_start.py 14/14 on the fix, 8 FAIL on origin/dev 2268516db (a, a2, b, c, d, e, f, i), mutants red (flame-off guard, resume reset, flow check); tests/test_sat_loop_integration.py 21/21 (it found the lost-flood bug of the first version: PWM idled with an unknown flow and the plain request lit the boiler without hold/flood; fixed and pinned by case i); full test_sat_* suite green except origin-reds owned by others (TASK-1887 tolerance-band slices in published_curve/zone_aggregation, ADR-249 pwm_switch_margin in MANUAL.md); lowload 34/1 skip; evaluate 87/0. Bench (09, .63 OTGW Classic + PIC 6.8): candidate soak on b5aba1c 15:20-16:22 PASS as HEALTH evidence (bootcount 175 constant, MQTT 61/61, heap 43.6-45.9 KB, 0 panics); the PWM-first behaviour seen there (+181 s heater ON edge after the cold-cutoff latch, PWM-first with duty 1.00, first switch to continuous 90 s after each flame-on, heater OFF leaving PWM) was SAT's built-in boiler SIMULATION on the device, not a real boiler; with the simulation off the bench has no boiler, so no real heating start was possible. NOT VERIFIED: the PWM-first start with a real boiler (AC7 bench part, open: field capture or a waiver by Robert). Proposed ADR-252 records the decision (Robert accepts). Seams agreed with 95 (entry 388 boot silence, entries 392/393 MsgID 3).
+Every SAT heating start runs the PWM start sequence, PWM first (entries 348, 385/387/389/391/394; ADR-235, ADR-252). AC1-AC4, AC6: host tests on the real satContinuousSetpoint/satPwmFlameOffHold/start gate, red on beta.250 / origin and green on the fix; docs/ADR updated (notes 2026-11-15/16). AC5: field evidence instead of the bench (coordinator's go). 13 heating starts on two PIC units with a real boiler, satsimulation false (indigo beta.360 24 h, gruijter beta.356): return/flow + 18 before ignition, the 20 s hold, flow - 1 to 60 s, the hot-water gate, no mode change within 60 s. AC7: PWM-first on the wire in the same 13 starts. The first phase was ON where the ON rule allows it; low-duty/hour-limit starts wait in PWM OFF, as Sergeant D confirmed (entry 431, Q-1942b A). Not verified: the entry-112 clamp value as a distinct number; the gates 'request <= cold threshold' and 'overshoot protection off' on hardware (host-only). Analysis: OTGW-field-data/<run>/_analysis/task1942-starts/.
 <!-- SECTION:FINAL_SUMMARY:END -->
