@@ -347,7 +347,8 @@ These are design limits of 2.0.0, not bugs.
 - **The continuous to PWM switch rule of beta.361 (flow at least 2 C above the request for 60 s) has not run with a real boiler** (TASK-2005). A replay of a tester's Vitodens capture through the real code shows the old rule switching 3 times and the new rule not at all.
 - **The one-switch-per-burn rule of beta.391 has not run with a real boiler** (TASK-2913). Within one burn SAT should no longer flip between continuous and PWM; no field capture on beta.391 or later shows this yet.
 - **The derivative gain factor 0.05 of beta.386 has not run with a real boiler** (TASK-2043). How the warm-up behaves with it is still to be seen in a field capture.
-- **The fixes for an outside temperature source switch have not been confirmed on a bench or replay** (TASK-2039, beta.380; TASK-2040, beta.381). SAT should not hand the boiler back when the outside temperature source changes or when Home Assistant sends it with `OT=`.
+- **The fix for an outside temperature source switch has not been confirmed on a bench or replay yet** (TASK-2039, beta.380). SAT should not hand the boiler back mid-burn when the outside temperature source changes.
+- **An outside temperature that Home Assistant sends with `OT=` counts for SAT, but this rests on host tests only** (TASK-2040, beta.381). It needs a thermostat and a boiler on the bus to show it on a real unit; a field capture on beta.401 or later is welcome.
 - **On a bench unit the lowest free memory once fell to about 1 KB around the moment SAT takes over** (TASK-2019, beta.369). The cause is not named yet.
 - **The Home Assistant unit fix "L/min" for the DHW flow rate has not been checked on the bench in Home Assistant** (TASK-1949). If your DHW flow sensor does not appear, please report it.
 

@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-19T01:20:00Z'
-updated_date: '2026-11-20T10:27:00Z'
+updated_date: '2026-11-20T10:38:00Z'
 labels:
   - sat
   - bug
@@ -42,4 +42,6 @@ Implementation gap against entries 330 (Robert, 2026-11-13) and 331 (Sergeant D 
 2026-11-19 full-suite follow-up: test/host/test_replay_frame_guards.cpp failed on origin b72c6d6c5: its OpenthermData_t stub had no bAnswerOverride (compile error), and its case 'gateway answer to the thermostat leaves the stamp' held the pre-2040 rule. Stub field added (at the end, so the positional initialisers keep working); the case now expects a PIC proxy A to stamp, plus new cases that an OT-Direct (bLocalAnswer) and a replayed A do not. Exit 0.
 
 Robert 2026-11-20, interactive in session 95 (otgw-docs), TASK-1740 AC1 waiver round: A: otgw-bench-tester runs AC3 on .63 (publish OT= over MQTT, watch osrc=O for 30 min, no hand-back) before the release.
+
+Robert 2026-11-20, DM 1573285823598567455 (reply to 1573285584942665870), relayed by the coordinator: B, which supersedes this morning's A (session 95): known issue in the stable notes, with the host tests of AC1/AC2 as evidence; marceld's capture on beta.401 or later as a follow-up. Reason: OT= on .63 cannot be shown without a thermostat and a boiler on the bus.
 <!-- SECTION:NOTES:END -->
