@@ -235,6 +235,17 @@ from the file at create time.
 
 1. A draft's URL is `releases/tag/untagged-<id>`. Publish with:
    `gh release edit untagged-<id> --draft=false --prerelease --latest=false --tag v<semver>-beta.N`
+   **Every edit of a draft (body, assets) gives it a NEW `untagged-<id>` URL**, and the API then
+   reports `tag_name` as that untagged name; the old URL returns "release not found" (beta.401,
+   2026-11-20). After any edit, publish by release id instead, which also sets tag and target
+   explicitly:
+   ```bash
+   RID=$(gh api repos/rvdbreemen/OTGW-firmware/releases --jq '.[] | select(.draft and .name|startswith("v<semver>-beta.N")) | .id')
+   gh api -X PATCH repos/rvdbreemen/OTGW-firmware/releases/$RID -f tag_name=v<semver>-beta.N \
+     -f target_commitish=<release-commit-sha> -F draft=false -F prerelease=true -f make_latest=false
+   ```
+   When you correct a phrase in the body, check it occurs once: the cumulative notes repeat older
+   disclaimer lines, and a global replace also rewrites the history of earlier betas.
 2. Verify:
    ```bash
    gh release view v<semver>-beta.N --json isDraft,isPrerelease,tagName --jq .
