@@ -10,7 +10,7 @@ This plan merges three read-only inventories made on origin/dev `4a9bc3c7b`..`55
 - the layout outside `docs/`, 1.x material and `.gitignore` (otgw-architect sub-agent);
 - `docs/**` and the root `*.md` files, 1685 files, one row each (otgw-docs).
 
-The per-row inventories stay with their authors as working files. This plan carries the decisions, the order and the owners. Phase 2 re-checks each row against origin/dev at the moment it is executed.
+The per-row inventories are in [`2026-11-20-repo-cleanup/`](2026-11-20-repo-cleanup/) (branches-audit.md, layout-audit.md, docs-inventory.md); each row carries its evidence, risk and owner. This plan carries the decisions, the order, the owners and a risk per class. Phase 2 re-checks each row against origin/dev at the moment it is executed.
 
 ## 1. Ground rules for phase 2
 
@@ -25,7 +25,7 @@ The per-row inventories stay with their authors as working files. This plan carr
    - `main`, `dev`, `otgw-1.x.x`, `release/2.x`;
    - `research/cloud-recording` and its local lanes;
    - the standing bench lane `lane-09-bench` (`wt-09-bench`);
-   - every 5e telemetry lane, including the `backup-5e-*` snapshots;
+   - every 5e telemetry lane; the `backup-5e-*` snapshots are kept as 5e too (an interpretation, to be confirmed by the coordinator);
    - every lane the coordinator holds (the list stays with the coordinator).
 4. **Another session's work is never removed.** A worktree with uncommitted changes, or one owned by another session, goes to its owner through the coordinator.
    - Leftover directories move to `RvdB/OTGW-worktree-leftovers/`. They are never deleted blindly.
@@ -35,7 +35,7 @@ The per-row inventories stay with their authors as working files. This plan carr
 7. **Gates per commit:**
    - `python scripts/run_tests.py` and `python evaluate.py --quick` show no new FAIL;
    - a grep for the old path finds nothing outside CHANGELOG history and the archive;
-   - docs-only commits skip the build, as in the push policy.
+   - docs-only commits (`*.md`, `docs/**`, `backlog/**`, `.claude/**`) skip the build, as in the push policy. C3 and C5 touch `Makefile`, `.github/**`, `tools/` and `scripts/`, so they also need an esp32-combo build and a build slot.
 
 ## 2. Findings that need a fix regardless of the cleanup
 
@@ -54,7 +54,9 @@ The per-row inventories stay with their authors as working files. This plan carr
 
 ### C1: branches and worktrees (coordinator)
 
-- **Delete (27 local branches), landed in dev and in v2.0.0-beta.401.** Evidence: `git cherry` shows 0 ahead or patch-equivalent; where it does not, `git range-diff` shows only banner lines.
+Risk: low for the delete list (every commit is on dev and in a published tag); low for the archive list (the tag keeps the tip); the owner-must-decide rows carry the real risk and are never acted on without their owner.
+
+- **Delete (26 local branches), landed in dev and in v2.0.0-beta.401.** Evidence: `git cherry` shows 0 ahead or patch-equivalent; where it does not, `git range-diff` shows only banner lines.
   - ci-combo-only, fix/ba-2918-iw, lane-1882, lane-1890, lane-1890-pre-rebase2, lane-1995n, lane-2019n, lane-2026, lane-2026-pre-rebase;
   - lane-2028, lane-2040, lane-2920, lane-2921, lane-2921b, lane-2922b, lane-2923, lane-2924, lane-apstable, lane-busy503, lane-docs-1119;
   - lane-review, lane-simport, lane-wxprefetch, lane-wxprefetch-pre, lane/ba-1889, push-397.
@@ -85,6 +87,8 @@ The per-row inventories stay with their authors as working files. This plan carr
 
 ### C2: tracked-but-ignored and accidentally committed files (otgw-dev, one commit)
 
+Risk: low; none of these files is read by the build, the tests or the gates (layout audit, section d), and the archive tag keeps them.
+
 | path | action | why |
 |---|---|---|
 | `.codex` (empty, root) | delete | accidental, in 731edc96d; it also blocks a `.codex/` directory |
@@ -95,6 +99,8 @@ The per-row inventories stay with their authors as working files. This plan carr
 | `plan/feature-openweathermap-onboarding-1.md` | move to `docs/plans/` (see C6) | the root `/plan/` is ignored |
 
 ### C3: ESP8266 build and tool leftovers on dev (otgw-dev; all of them exist on otgw-1.x.x)
+
+Risk: low for the deletes (no workflow or script on dev uses them; evaluate.py gives INFO only); medium for the `/flash` stub (a user typing `/flash` gets the redirect instead of a flash, which is the intent).
 
 | path | action | references fixed in the same commit |
 |---|---|---|
@@ -125,7 +131,7 @@ The per-row inventories stay with their authors as working files. This plan carr
 ### C6: docs moves (otgw-docs; one commit per numbered item)
 
 1. **One plans folder.** `docs/plan/*` (8 files), the root `plan/` file and `docs/process/ps1-lean-translator-refactor-plan.md` go to `docs/plans/`.
-2. **One archive root for 1.x.** `docs/archive/*` goes to `docs/archive/1.x/`, after F1 is fixed. `docs/archive/` keeps a short README pointing to `1.x/`.
+2. **The existing `docs/archive/` stays as it is.** It holds 2.x archives too: ADR-077 cites `docs/archive/mqttha.cfg` (a 2.x snapshot, not on otgw-1.x.x) and ADR-065 cites `docs/archive/mqttha-generator/`. F1 is fixed in place. New 1.x material from this plan goes under a new `docs/archive/1.x/`. No ADR cites a path under `docs/fixes/` or `docs/images/` (`git grep` of docs/adr, this session).
 3. **1.x UI screenshots.** `docs/images/` holds 21 screenshots from 2021; 20 have no inbound link, and all are on otgw-1.x.x. They move to `docs/archive/1.x/images/`, and the one link is updated.
 4. **1.x fix write-ups.** `docs/fixes/` moves to `docs/archive/1.x/fixes/`. `README.md:319` links one of them: update it. `CHANGELOG.md:1051` links one too, but CHANGELOG history is not edited, so that file keeps a stub (rule 5).
 5. **Classic-UI feature pages.** `docs/features/TEMPERATURE_SENSOR_*` move to `docs/archive/1.x/features/`.
@@ -178,7 +184,7 @@ The layout audit counted 23. Before C6, the two lists are reconciled, and the un
 
 | # | question | options and consequences | recommendation |
 |---|---|---|---|
-| D1 | Where do the `archive/*` tags go? | A: only to the NAS `backup` remote and local. The public tag list stays clean; GitHub has no copy. B: push them to GitHub too. Off-site twice, but about 15 extra public tags. | **A.** The NAS remote already holds the off-site branch copies, and the one `archive/pre-cleanup-2026-11-20` tag on dev is enough on GitHub for files. Fold the 27 old snapshot tags into `archive/*` at the same time (optional). |
+| D1 | Where do the per-branch `archive/<name>` tags go? (The one `archive/pre-cleanup-2026-11-20` tag on the dev tip goes to GitHub in every option: it only marks a dev commit that is public already.) | A: the per-branch tags go only to the NAS `backup` remote and stay local. The public tag list stays clean; GitHub has no copy of those 13 branch tips. B: push them to GitHub too. Off-site twice, but 13 more public tags. | **A.** The NAS remote already holds the off-site branch copies. Folding the 27 old snapshot tags into `archive/*` at the same time is optional. |
 | D2 | Delete the GitHub branch `task1757-staged-connect` (kept off dev on 2026-11-10)? | A: archive tag, then delete. One less stale branch on GitHub. B: keep it. | **A**, if the TASK-1757 notes on dev already carry what it found. |
 | D3 | SAT simulation output in `docs/sat/sim-*`: 900 files, 712 without an inbound link | A: keep as is. Nothing changes, but it is half the docs tree. B: move it to the field-data archive outside the repo. git history keeps it and the repo becomes lighter to read, but links from task notes break. C: `docs/archive/sat-sim/`. Tidier, but the size stays. | **A for 2.0.0.** History already keeps it, and moving 900 files is churn just before the stable release. Revisit after 2.0.0. |
 | D4 | Copilot assets: 17 generic skills (9.3 MB; the OOXML schemas are stored three times), `.github/skills/adr/` and 13 generic agents | A: delete the generic skills from dev, and keep `adr/` and the agents but fix `docs/adr/README.md:1071` to say `adr/` exists. B: keep everything. C: delete everything not referenced. | **A.** All of it is on 1.x and upstream. The generic skills are unrelated to this firmware; the ADR skill is still referenced. |
