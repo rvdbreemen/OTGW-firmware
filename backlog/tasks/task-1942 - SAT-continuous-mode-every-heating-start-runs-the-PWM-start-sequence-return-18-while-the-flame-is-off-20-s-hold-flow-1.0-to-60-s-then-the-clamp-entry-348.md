@@ -8,7 +8,7 @@ status: In Review
 assignee:
   - '@claude'
 created_date: '2026-11-14T17:23:00Z'
-updated_date: '2026-11-20T01:42:00Z'
+updated_date: '2026-11-20T01:44:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -84,6 +84,8 @@ First PWM phase at the start (AC7 'with the first phase ON'): ON at once in 8 of
 NOT verified by this analysis: (a) the entry-112 clamp after 60 s as a distinct value (CS after 60 s is consistent with flow - 1 / request, but the clamp is not isolated); (b) the gates 'request at or below the cold threshold' and 'overshoot protection off' (not exercised in either run); (c) the 20 s hold is read from CS values and command timing, and the flame time comes from the OT frame log, which logs one frame late (otframes header).
 
 2026-11-20 AC5 ticked on the field evidence above, in place of the bench (coordinator's go). 13 starts on two PIC units with a real boiler, satsimulation false, beat the boiler-less .63 bench. Shown: return/flow + 18 before ignition, the 20 s hold, flow - 1 to 60 s; PWM starts unchanged (no mode change within 60 s). Not isolated: the entry-112 clamp value. AC7 stays OPEN: whether a PWM-first heating start may wait in PWM OFF when the ON time is under 180 s or at the hour limit is SAT behaviour. Queued as Q-1942a in docs/sat/open-questions.md, text sent to 92 for #dev-sat-mqtt. AC7 is not reworded by us.
+
+2026-11-20 correction: the question queued above as 'Q-1942a' is Q-1942b. Q-1942a was already used (asked 2026-11-19, answered A = entry 426, the outside-temperature hand-back). Spotted by 92 before posting; renamed in docs/sat/open-questions.md.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
