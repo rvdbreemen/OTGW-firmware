@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-20T14:10:00Z'
+updated_date: '2026-11-20T15:02:00Z'
 labels:
   - ux
   - webui
@@ -24,10 +25,16 @@ From the TASK-2952 UX review (docs/reviews/2026-11-20_ux-heuristic-v2-webui/READ
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Every text that uses the warn colour (all 6 color:var(--zone-warn) rules) measures >= 4.5:1 against its rendered background in light and dark
-- [ ] #2 Accent text on a light surface (links, active SAT view tab and sub-label) measures >= 4.5:1 on #fff and on #f1f7f8
-- [ ] #3 The active main-nav item on the dark header measures >= 4.5:1 in light and in dark
-- [ ] #4 Text on an accent fill (active theme button, both themes) measures >= 4.5:1
-- [ ] #5 SAT Off pill and SAT->BOILER tag measure >= 4.5:1 in light and dark, checked by pixel sampling on a screenshot
-- [ ] #6 mock-contrast.mjs reports 0 FAIL lines in light and dark on Home, SAT (3 views) and Settings, and the ADR-091 drift gate is green
+- [ ] #1 The tokens of spec T1 section 3 exist with the given values: --accent light #016f83, new --nav-accent, --on-accent, --hot-fill, --on-hot, --pill-off, --hot-text, and --status-warn-text light #8a4b00 used by the 6 warn-text rules (or, if the maintainer picks the alternative, --accent-strong on every text and text-bearing fill rule)
+- [ ] #2 Every row of spec T1 section 2 measures at least its Proposal ratio, checked with mock-contrast.mjs in light and dark and by pixel sampling for the composite backgrounds (D1, D2b, D3, D4, F1, F2); 0 FAIL lines in both themes on Home, SAT (3 views) and Settings
+- [ ] #3 The SAT pill is checked in heating, idle and off in both themes (heating needs a status fixture with a firing boiler_status)
+- [ ] #4 v2.css:68 (.lang-menu li a.active color #0d2026) is replaced by --on-accent with no visual change
+- [ ] #5 python evaluate.py --quick shows no new FAIL (ADR-091 class drift included) and the full tests/webui suite passes, sat-chart-actual-flow.test.mjs included
+- [ ] #6 Before/after screenshots of Home, SAT Control and Settings in light and dark show only the intended colour changes
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-20 otgw-ux-designer: spec docs/reviews/2026-11-20_ux-heuristic-v2-webui/spec-T1-contrast-tokens.md (token table per context with measured ratios, ADR-091 consequence). New beyond the review: SAT pill Heating fails in both themes (3.10 light, 2.83 dark), dark tag 3.91. Correction: the light tag measures 2.59, not 2.13 (color-mix background misread by the scan). ADR-091 gate checks class drift only, not token values. Open for the maintainer via the coordinator: change light --accent (recommended) or add --accent-strong.
+<!-- SECTION:NOTES:END -->
