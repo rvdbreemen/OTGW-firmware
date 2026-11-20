@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-10T14:30:00Z'
-updated_date: '2026-11-20T01:12:00Z'
+updated_date: '2026-11-20T10:59:00Z'
 labels:
   - mqtt
   - bug
@@ -26,7 +26,7 @@ Side finding of the TASK-1757 analysis (2026-11-10), INFERENCE from code, not ob
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [x] #1 Reproduce first with a broker log (mosquitto verbose) during a /ReBoot: does the broker log a client DISCONNECT or a socket error + will publish? Record the log in this task
-- [ ] #2 If confirmed: before the restart publish 'offline' retained on the availability topic, then disconnect() and pump MQTTclient.loop() until disconnected() or 500 ms (bounded); the same broker log shows the retained 'offline' and a clean DISCONNECT, and HA shows the gateway unavailable at once and online again at the birth; if not confirmed, close as not reproducible with the log
+- [x] #2 If confirmed: before the restart publish 'offline' retained on the availability topic, then disconnect() and pump MQTTclient.loop() until disconnected() or 500 ms (bounded); the same broker log shows the retained 'offline' and a clean DISCONNECT, and HA shows the gateway unavailable at once and online again at the birth; if not confirmed, close as not reproducible with the log
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -47,4 +47,6 @@ FIX 2.0.0-beta.353+3a14423 (contains 79c6c7ce0), /ReBoot 16:53:29: '16:53:30: Cl
 SUPPORTING EVIDENCE for AC2(b), NOT the HA observation (09, 2026-11-17 ~01:00). The retained discovery configs of .61 (e.g. homeassistant/sensor/otgw-1020BA21B4F8/boiler_TSet/config, boiler_status_master, boiler_status_slave) set avty_t 'OTGW/value/otgw-1020BA21B4F8' with no custom payloads, so HA uses its MQTT defaults payload_available 'online' / payload_not_available 'offline'. On that exact topic the fix (beta.353+3a14423) published the retained 'offline' at 16:53:30, +1 s after /ReBoot, with the broker logging a clean 'disconnected.', and 'online' at the reconnect at 16:53:47. The old beta.257 got 'offline' only from the will at the session takeover, ~18 s later. Inference: HA marks every .61 entity unavailable at +1 s and available at the reconnect. NOT observed in HA: the HA-rig run is planned for 17 Nov after the 08:00 beta, once commit charge allows and the Docker start is OK'd (coordinator). AC2 stays open.
 
 2026-11-20 02:08 bench 09 on .61 (beta.401), AC2 firmware side: REST /ReBoot 02:08:05.737 -> retained 'offline' on OTGW/value/otgw-1020BA21B4F8 at 02:08:06.823 (before the restart) -> boot 02:08:22 -> 'online' birth 02:08:24.483. HA side (entity unavailable/available + HA log) still open, after 08:00 on the HA rig. Evidence: OTGW-field-data/bench-otgw32/2026-11-20_task1780-ac2-broker/avail.log
+
+2026-11-20 bench (09, otgw-bench-tester), AC2 evidence. Broker side, .61 401+47d08b1, mosquitto_sub on OTGW/value/otgw-1020BA21B4F8: REST /ReBoot 02:08:05.737 -> 'offline' 02:08:06.823 (1.09 s after the request, before the restart) -> boot 02:08:22 -> 'online' birth 02:08:24.483 (OTGW-field-data/bench-otgw32/2026-11-20_task1780-ac2-broker/avail.log). HA side, rig HA (setup_rig.py), .63 beta.402+b885f3d, entities scoped by unique_id otgw-AC276ECE45D8-*: /ReBoot 11:52:46.214 -> status_master/status_slave/outside_temperature/binary_sensor 'unavailable' at t+0.7 s, back at t+10.7 s (same in a first run at 11:48: t+0.7 s / t+10.8 s); HA error_log 0 mqtt lines (OTGW-field-data/bench-63/2026-11-20_ha-1780-1949/ha1780.log, ha_error_log.txt). No HA screenshots: REST/entity-registry + error_log are the evidence (coordinator: sufficient, no rerun).
 <!-- SECTION:NOTES:END -->

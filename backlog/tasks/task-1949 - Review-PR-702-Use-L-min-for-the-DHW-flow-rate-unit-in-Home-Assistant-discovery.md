@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-14T20:51:00Z'
-updated_date: '2026-11-20T10:27:00Z'
+updated_date: '2026-11-20T10:59:00Z'
 labels:
   - github
   - pr
@@ -29,7 +29,7 @@ https://github.com/rvdbreemen/OTGW-firmware/pull/702 by justink0k (fork), base d
 <!-- AC:BEGIN -->
 - [x] #1 Reviewed against the HA unit list and every consumer of haUnitStr(HaUnit::l_min) (review comment on the PR)
 - [x] #2 Tests and the esp32-combo build green on the PR head
-- [ ] #3 Bench: HA discovery creates the DHW flow rate sensor with unit L/min (HA log shows no unit error)
+- [x] #3 Bench: HA discovery creates the DHW flow rate sensor with unit L/min (HA log shows no unit error)
 - [x] #4 Robert decides on the merge; the author is credited in #alpha-testing
 <!-- AC:END -->
 
@@ -50,4 +50,6 @@ AC3 bench by 09, 2026-11-14, .61 beta.257+47f0ea3 against broker 192.168.88.32: 
 2026-11-20 09 interim for AC3: retained homeassistant/sensor/otgw-1020BA21B4F8/boiler_DHWFlowRate/config (beta.401+47d08b1, .61) and otgw-AC276ECE45D8 (poc.31+8461936, .63) both carry device_class volume_flow_rate, unit_of_measurement L/min, state_class measurement (OTGW-field-data/bench-otgw32/2026-11-20_task1780-ac2-broker/dhwflow-discovery-retained.txt). HA log check on the HA rig follows after 08:00.
 
 Robert 2026-11-20, interactive in session 95 (otgw-docs), TASK-1740 AC1 waiver round: A: otgw-bench-tester finishes AC3 on the HA-ingress rig (with TASK-1780) before the release; then the known-issue line comes out of the stable notes.
+
+2026-11-20 bench (09, otgw-bench-tester), AC3 evidence: rig HA (setup_rig.py, bench broker 192.168.88.32). Entity sensor.opentherm_gateway_marvin_otgw32_water_flow_rate_in_dhw_circuit (unique_id otgw-1020BA21B4F8-otd_DHWFlowRate, discovery published by .61 401+47d08b1, retained config origin sw 2.0.0-beta.401+47d08b1): unit_of_measurement L/min, device_class volume_flow_rate, state_class measurement, state 0.00. HA error_log: 1 line total (custom integration 'ingress' warning), 0 lines with mqtt/unit_of_measurement. Files: OTGW-field-data/bench-63/2026-11-20_ha-1780-1949/ (ha1780.log, ha_error_log.txt), OTGW-field-data/bench-otgw32/2026-11-20_task1780-ac2-broker/dhwflow-discovery-retained.txt. No HA screenshots (REST/registry + error_log as evidence, coordinator OK). .63 has no DHW flow entity (no retained config for it on the broker).
 <!-- SECTION:NOTES:END -->
