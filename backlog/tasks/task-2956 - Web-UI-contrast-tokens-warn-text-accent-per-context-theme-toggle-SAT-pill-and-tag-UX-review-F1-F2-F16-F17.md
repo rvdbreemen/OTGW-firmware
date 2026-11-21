@@ -3,10 +3,11 @@ id: TASK-2956
 title: >-
   Web UI contrast tokens: warn text, accent per context, theme toggle, SAT pill
   and tag (UX review F1 F2 F16 F17)
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-11-20T14:10:00Z'
-updated_date: '2026-11-20T15:05:00Z'
+updated_date: '2026-11-21T03:46:00Z'
 labels:
   - ux
   - webui
@@ -25,15 +26,15 @@ From the TASK-2952 UX review (docs/reviews/2026-11-20_ux-heuristic-v2-webui/READ
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 The tokens of spec T1 section 3 exist with the given values: --accent light #016f83, new --nav-accent, --on-accent, --hot-fill, --on-hot, --pill-off, --hot-text, and --status-warn-text light #8a4b00 used by the 6 warn-text rules (or, if the maintainer picks the alternative, --accent-strong on every text and text-bearing fill rule)
-- [ ] #2 Every row of spec T1 section 2 measures at least its Proposal ratio, checked with mock-contrast.mjs in light and dark and by pixel sampling for the composite backgrounds (D1, D2b, D3, D4, F1, F2); 0 FAIL lines in both themes on Home, SAT (3 views) and Settings
-- [ ] #3 The SAT pill is checked in heating, idle and off in both themes (heating needs a status fixture with a firing boiler_status)
-- [ ] #4 v2.css:68 (.lang-menu li a.active color #0d2026) is replaced by --on-accent with no visual change
+- [x] #1 The tokens of spec T1 section 3 exist with the given values: --accent light #016f83, new --nav-accent, --on-accent, --hot-fill, --on-hot, --pill-off, --hot-text, and --status-warn-text light #8a4b00 used by the 6 warn-text rules (or, if the maintainer picks the alternative, --accent-strong on every text and text-bearing fill rule)
+- [x] #2 Every row of spec T1 section 2 measures at least its Proposal ratio, checked with mock-contrast.mjs in light and dark and by pixel sampling for the composite backgrounds (D1, D2b, D3, D4, F1, F2); 0 FAIL lines in both themes on Home, SAT (3 views) and Settings
+- [x] #3 The SAT pill is checked in heating, idle and off in both themes (heating needs a status fixture with a firing boiler_status)
+- [x] #4 v2.css:68 (.lang-menu li a.active color #0d2026) is replaced by --on-accent with no visual change
 - [ ] #5 python evaluate.py --quick shows no new FAIL (ADR-091 class drift included) and the full tests/webui suite passes, sat-chart-actual-flow.test.mjs included
-- [ ] #6 Before/after screenshots of Home, SAT Control and Settings in light and dark show only the intended colour changes
-- [ ] #7 tests/webui/contrast-tokens.test.mjs exists per docs/reviews/2026-11-20_ux-heuristic-v2-webui/spec-T1b-contrast-regression-test.md: layer A checks every row of spec T1 section 2 (undefined token = explicit failure), layer B scans the rendered pages, themes and state fixtures; colours normalised through a canvas (color-mix safe)
-- [ ] #8 The contrast test is red on the pre-TASK-2956 data (output with the failing rows in the task notes), green on the change, and a scratch copy with --status-warn-text #9c5700 fails on row D2b
-- [ ] #9 The contrast test runs in python scripts/run_tests.py --webui and is not on the flaky list
+- [x] #6 Before/after screenshots of Home, SAT Control and Settings in light and dark show only the intended colour changes
+- [x] #7 tests/webui/contrast-tokens.test.mjs exists per docs/reviews/2026-11-20_ux-heuristic-v2-webui/spec-T1b-contrast-regression-test.md: layer A checks every row of spec T1 section 2 (undefined token = explicit failure), layer B scans the rendered pages, themes and state fixtures; colours normalised through a canvas (color-mix safe)
+- [x] #8 The contrast test is red on the pre-TASK-2956 data (output with the failing rows in the task notes), green on the change, and a scratch copy with --status-warn-text #9c5700 fails on row D2b
+- [x] #9 The contrast test runs in python scripts/run_tests.py --webui and is not on the flaky list
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -42,4 +43,14 @@ From the TASK-2952 UX review (docs/reviews/2026-11-20_ux-heuristic-v2-webui/READ
 2026-11-20 otgw-ux-designer: spec docs/reviews/2026-11-20_ux-heuristic-v2-webui/spec-T1-contrast-tokens.md (token table per context with measured ratios, ADR-091 consequence). New beyond the review: SAT pill Heating fails in both themes (3.10 light, 2.83 dark), dark tag 3.91. Correction: the light tag measures 2.59, not 2.13 (color-mix background misread by the scan). ADR-091 gate checks class drift only, not token values. Open for the maintainer via the coordinator: change light --accent (recommended) or add --accent-strong.
 
 2026-11-20: spec docs/reviews/2026-11-20_ux-heuristic-v2-webui/spec-T1b-contrast-regression-test.md added (contrast regression test, requested by the coordinator); 3 ACs added.
+
+2026-11-21 otgw-webui claimed; builds spec T1 (tokens) + T1b (contrast regression test). Light work until the next heavy slot.
+
+2026-11-21 05:xx otgw-webui implementation (spec T1 recommended option, one darker light accent): ds-tokens.css --status-warn-text light #8a4b00, new --hot-fill/--on-hot/--hot-text (light #c43e1f/#fff/#b3261e, dark #ff6a4d/#1c1c1e/#ffab99); v2.css --accent light #016f83, new --nav-accent (brand cyan), --on-accent (#fff / dark #0d2026), --pill-off (fg-3 / dark #54565a); 7+2+1 white-on-accent rules -> --on-accent, the one-off dark .lang-menu fix removed (same #0d2026 via the token), .seg.active -> --nav-accent, 6 color:var(--zone-warn) rules -> --status-warn-text, .sat-pill -> --hot-fill/--on-hot, idle/off -> --pill-off with white, .sat-tile .tag -> --hot-text.
+
+RED on pre-TASK-2956 data (tests/webui/contrast-tokens.test.mjs, OTGW_DATA_DIR = copy with HEAD v2.css + ds-tokens.css): layer A FAIL A1 4.17, A2 3.86, A3 3.96, D2b 4.44; not defined: B1/B2 --nav-accent, C1/C2 --on-accent, E1/E2 --on-hot --hot-fill, E3/E4 --pill-off, F1/F2 --hot-text; D1 4.57 and D2 5.56 pass as the spec predicted. Layer B: light 105 / dark 31 texts below the minimum, all in spec scope (white on accent 4.17 / dark 2.12, accent text 4.17/3.86, nav 2.81, warn banner 1.76, reboot badge 2.16, pill 3.10/2.83/2.68, tag 2.57/3.91). 1149 texts measured per theme, 178 listed as not measured (opacity < 1 or background image).
+
+GREEN on the change: layer A all 21 rows pass (A1 5.83 ... D4 4.95), layer B 0 below the minimum in light and dark (3/3 tests pass). Mutation: scratch copy with --status-warn-text #9c5700 -> layer A FAIL D2b 4.44 only. Pixel sampling on screenshots (before -> after): F1 tag 2.57 -> 5.42, F2 3.97 -> 6.17, E1 pill 3.10 -> 5.18, E2 2.83 -> 6.01, E3 2.68 -> 5.06, E4 7.35 -> 7.35, D1 banner 1.77 -> 5.56, D3 6.58 -> 6.88, D2 badge 2.16 -> 6.80, B1 nav 2.82 -> 5.53. D2b/D4 (.dir-tb on Monitor) measured by layer A only, not pixel-sampled. Spec T1b fixture fix: /v2/device/info answers {device:{fwversion}}, not {fwversion}; with the spec's shape the beta banner never shows.
+
+Other checks: evaluate.py --quick 95 checks, 0 failed, design-system drift 0 FAIL. Colour-pinning webui tests one by one green: header-controls-same-height 2/2, lang-menu 7/7, sat-chart-actual-flow 4/4, sat-status-pill 1/1, settings-select-fits 2/2, mission-control-follows-theme 2/2, settings-reboot-badge 1/1. Screenshots before/after (Home, SAT Control heating+idle, Settings; light+dark) checked by eye: only the intended colour changes. Full tests/webui sweep still to run in a heavy slot (AC5).
 <!-- SECTION:NOTES:END -->

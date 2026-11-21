@@ -13,7 +13,10 @@
   --text:var(--fg-2);
   --muted:var(--fg-4);
   --border:var(--border-1);
-  --accent:var(--accent-primary);
+  --accent:#016f83;          /* TASK-2956: darker than --accent-primary #0288a0 so accent text and white on accent pass 4.5:1 */
+  --nav-accent:var(--brand-cyan);   /* TASK-2956: active main-nav item on the #383838 header, both themes */
+  --on-accent:#ffffff;       /* TASK-2956: text on an accent fill */
+  --pill-off:var(--fg-3);    /* TASK-2956: SAT pill idle/off fill behind white text */
   --needle:var(--fg-1);
   --shadow:var(--shadow-panel);
 }
@@ -22,7 +25,7 @@
    to #383838 (mockup dark header — header/seg text is already #e8e8ea, readable on
    grey) and the "off"-state LED dims to #54565a (mockup off-grey) instead of the
    bright --status-neutral. Light theme unchanged. */
-html[data-theme="dark"]{--accent:var(--brand-cyan);--nav:#383838;--tile-off:#54565a}
+html[data-theme="dark"]{--accent:var(--brand-cyan);--nav:#383838;--tile-off:#54565a;--on-accent:#0d2026;--pill-off:#54565a}
 
 *{box-sizing:border-box}
   html,body{font-feature-settings:"tnum" 1;font-variant-numeric:tabular-nums}
@@ -49,7 +52,7 @@ html[data-theme="dark"]{--accent:var(--brand-cyan);--nav:#383838;--tile-off:#545
   .theme-switch button{display:inline-flex;align-items:center;gap:6px;padding:5px 9px;border-radius:7px;border:0;background:transparent;
     color:inherit;opacity:.8;font-family:inherit;font-size:.85rem;line-height:1.2;cursor:pointer;user-select:none;min-height:34px}
   .theme-switch button:hover{opacity:1;background:rgba(255,255,255,.12)}
-  .theme-switch button[aria-pressed="true"],.theme-switch button[aria-pressed="true"]:hover{background:var(--accent);color:#fff;opacity:1}
+  .theme-switch button[aria-pressed="true"],.theme-switch button[aria-pressed="true"]:hover{background:var(--accent);color:var(--on-accent);opacity:1}
   .theme-switch .lbl{white-space:nowrap}
   @media (max-width:1100px){.theme-switch .lbl{display:none}}
   /* TASK-1764: language dropdown in the header (same shape as the OTGW site's .lang-menu). The flags are
@@ -72,8 +75,7 @@ html[data-theme="dark"]{--accent:var(--brand-cyan);--nav:#383838;--tile-off:#545
     color:var(--text);text-decoration:none;font-weight:600;font-size:.95rem}
   .lang-menu li a:hover{background:var(--panel-2)}
   .lang-menu li a:focus-visible{outline-offset:-2px}   /* TASK-2958: colour from the one :focus-visible rule */
-  .lang-menu li a.active{background:var(--accent);color:#fff}
-  html[data-theme="dark"] .lang-menu li a.active{color:#0d2026}   /* white on the dark-theme cyan is below 4.5:1 */
+  .lang-menu li a.active{background:var(--accent);color:var(--on-accent)}
   .lang-menu li .code{margin-left:auto;font-size:.78rem;opacity:.7;font-weight:700}
   @media(max-width:420px){.lang-menu summary .code{display:none}}
   /* on a phone the summary sits mid-row: anchor the list to the header row so it stays on screen */
@@ -120,7 +122,7 @@ html[data-theme="dark"]{--accent:var(--brand-cyan);--nav:#383838;--tile-off:#545
   .seg b{font-size:.9rem;font-weight:600}
   .seg small{display:none}   /* 1a: no subtitle — sub-views are the .subtabs row */
   .seg:hover{color:#fff}
-  .seg.active{border-bottom-color:var(--accent);color:var(--accent)}
+  .seg.active{border-bottom-color:var(--nav-accent);color:var(--nav-accent)}
   .seg.active b{font-weight:700}
   .seg.hidden{display:none}  /* TASK-1128: Diagnose appears only on a diagnose PIC */
 
@@ -182,7 +184,7 @@ html[data-theme="dark"]{--accent:var(--brand-cyan);--nav:#383838;--tile-off:#545
   .mod-tag{fill:var(--muted);font-size:9px;letter-spacing:.14em;text-anchor:middle;font-weight:700}
   /* TASK-1837: appliance type as a label (not a switch) */
   .appl-tags{display:inline-flex;gap:4px;margin-left:auto}
-  .appl-tag{display:inline-flex;align-items:center;gap:4px;border:1px solid var(--accent);background:var(--accent);color:#fff;
+  .appl-tag{display:inline-flex;align-items:center;gap:4px;border:1px solid var(--accent);background:var(--accent);color:var(--on-accent);
     border-radius:8px;padding:6px 10px;font-size:.74rem;font-weight:700;font-family:var(--font-sans)}
   .appl-tag[hidden]{display:none}
   @keyframes flick{
@@ -290,7 +292,7 @@ html[data-theme="dark"]{--accent:var(--brand-cyan);--nav:#383838;--tile-off:#545
   .mc-cell .lbl{font-family:var(--font-mono);font-size:.64rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
   .mc-cell .val{font-family:var(--font-mono);font-size:1.3rem;font-weight:700;margin-top:2px}
   .mc-cell .val.hot{color:var(--hot)} .mc-cell .val.cold{color:var(--cold)}
-  .mc-cell .val.ok{color:var(--zone-ok)} .mc-cell .val.warn{color:var(--zone-warn)} .mc-cell .val.alert{color:var(--zone-alert)}
+  .mc-cell .val.ok{color:var(--zone-ok)} .mc-cell .val.warn{color:var(--status-warn-text)} .mc-cell .val.alert{color:var(--zone-alert)}
   .ticker{background:var(--panel);border:1px solid var(--border);border-radius:10px;margin-top:12px;
     height:138px;overflow-y:auto;padding:8px 10px;font-family:var(--font-mono);font-size:.72rem;line-height:1.5}
   .ticker .t{color:var(--accent)} .ticker .b{color:var(--zone-ok)} .ticker .ts{color:var(--muted)}
@@ -356,7 +358,7 @@ html[data-theme="dark"]{--accent:var(--brand-cyan);--nav:#383838;--tile-off:#545
   .cmdbar-prompt{font-family:var(--font-mono);font-size:.8rem;color:#79f2c0;font-weight:700;flex:0 0 auto}
   .cmdbar-in{flex:1;min-width:0;background:none;border:0;outline:none;color:#e8e8ea;font-family:var(--font-mono);font-size:.8rem;padding:6px 2px}
   .cmdbar-in::placeholder{color:#566069}
-  .cmdbar-send{flex:0 0 auto;border:0;background:var(--accent);color:#fff;border-radius:8px;padding:8px 16px;font-size:.8rem;font-weight:700;cursor:pointer;font-family:var(--font-sans);min-height:36px}
+  .cmdbar-send{flex:0 0 auto;border:0;background:var(--accent);color:var(--on-accent);border-radius:8px;padding:8px 16px;font-size:.8rem;font-weight:700;cursor:pointer;font-family:var(--font-sans);min-height:36px}
   .cmdbar-send:hover{filter:brightness(1.08)}
   .statfoot{display:flex;gap:16px;font-size:.76rem;color:var(--muted);padding:8px 4px 0;flex-wrap:wrap}
   table.stats{width:100%;border-collapse:collapse;background:var(--panel);border-radius:12px;
@@ -374,7 +376,7 @@ html[data-theme="dark"]{--accent:var(--brand-cyan);--nav:#383838;--tile-off:#545
   .dirbadge{font-size:.7rem;font-weight:700;border-radius:6px;padding:3px 8px;white-space:nowrap}
   .dir-t{background:color-mix(in srgb,var(--accent) 18%,transparent);color:var(--accent)}
   .dir-b{background:color-mix(in srgb,var(--zone-ok) 18%,transparent);color:var(--zone-ok)}
-  .dir-tb{background:color-mix(in srgb,var(--zone-warn) 20%,transparent);color:var(--zone-warn)}
+  .dir-tb{background:color-mix(in srgb,var(--zone-warn) 20%,transparent);color:var(--status-warn-text)}
   .statval{font-family:var(--font-mono);font-weight:700}
   .matrix{display:grid;grid-template-columns:repeat(16,1fr);gap:5px;background:var(--panel);
     border:1px solid var(--border);border-radius:12px;padding:14px;box-shadow:var(--shadow)}
@@ -484,7 +486,7 @@ html[data-theme="dark"]{--accent:var(--brand-cyan);--nav:#383838;--tile-off:#545
   .ble-val{font-family:var(--font-mono);font-size:.8rem;color:var(--muted);margin-left:auto}
   .set-group h3{margin:0 0 4px;font-size:.95rem;display:flex;align-items:center;gap:8px}
   .set-group .gdesc{font-size:.76rem;color:var(--muted);margin:0 0 10px}
-  .badge-reboot{font-size:.62rem;font-weight:700;color:var(--zone-warn);
+  .badge-reboot{font-size:.62rem;font-weight:700;color:var(--status-warn-text);
     border:1px solid var(--zone-warn);border-radius:8px;padding:2px 7px;letter-spacing:.04em;
     cursor:default;user-select:none}
   .srow{display:flex;align-items:center;gap:10px;padding:8px 0;border-top:1px solid var(--border)}
@@ -497,7 +499,7 @@ html[data-theme="dark"]{--accent:var(--brand-cyan);--nav:#383838;--tile-off:#545
   /* A select grows to its longest option: translated options (nl/de/el) are longer than English (TASK-1768).
      The label keeps at least 38% of the row; the phone layout below gives every field the full width. */
   .srow select{width:auto;min-width:46%;max-width:62%}
-  .srow.dirty .slbl::before{content:'●';color:var(--zone-warn);margin-right:6px;font-size:.7rem}
+  .srow.dirty .slbl::before{content:'●';color:var(--status-warn-text);margin-right:6px;font-size:.7rem}
   /* TASK-1281: info icon after a setting label + the shared help popover (#shelp, built by v2.js) */
   .sinfo{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;margin:0 0 0 2px;padding:0;border:0;border-radius:50%;background:transparent;color:var(--muted);cursor:pointer;vertical-align:middle}
   .sinfo::before{content:'i';display:flex;align-items:center;justify-content:center;width:15px;height:15px;border:1.5px solid currentColor;border-radius:50%;font:700 .62rem/1 var(--font-sans)}
@@ -525,7 +527,7 @@ html[data-theme="dark"]{--accent:var(--brand-cyan);--nav:#383838;--tile-off:#545
     box-shadow:0 4px 18px rgba(0,0,0,.18);padding:10px 16px;margin-top:8px}
   .savebar.show{display:flex}
   .savebar .msg{font-size:.86rem;flex:1}
-  .savebar .save{background:var(--accent);color:#fff;border:0;border-radius:10px;
+  .savebar .save{background:var(--accent);color:var(--on-accent);border:0;border-radius:10px;
     padding:10px 22px;font-weight:700;cursor:pointer;min-height:44px}
   .savebar .discard{background:none;border:1px solid var(--border);color:var(--muted);
     border-radius:10px;padding:10px 16px;cursor:pointer;min-height:44px}
@@ -589,7 +591,7 @@ html[data-theme="dark"]{--accent:var(--brand-cyan);--nav:#383838;--tile-off:#545
   /* TASK-984: override-injection visibility — Home A badge + on-bus map badge + floating panel.
      Panel is read-only: the ADR-118 store carries {id,kind,value,age} only (no orig value / Clear). */
   .ovr-badge{border:1.5px solid var(--zone-warn);background:color-mix(in srgb,var(--zone-warn) 16%,var(--panel));
-    color:var(--zone-warn);border-radius:20px;padding:5px 12px;font-size:.76rem;font-weight:700;cursor:pointer;
+    color:var(--status-warn-text);border-radius:20px;padding:5px 12px;font-size:.76rem;font-weight:700;cursor:pointer;
     font-family:var(--font-sans);min-height:32px;display:inline-flex;align-items:center;gap:5px;white-space:nowrap}
   .ovr-badge.hidden{display:none}
   .ovr-panel{position:fixed;top:128px;right:14px;width:300px;background:var(--panel);
@@ -677,7 +679,7 @@ html[data-theme="dark"]{--accent:var(--brand-cyan);--nav:#383838;--tile-off:#545
   .pic-head b{font-family:var(--font-mono);font-size:1.05rem}
   .pic-banner{border-radius:10px;padding:10px 14px;font-size:.84rem;font-weight:700;margin-bottom:12px}
   .pic-banner.warn{background:color-mix(in srgb,var(--zone-warn) 16%,transparent);
-    border:1px solid color-mix(in srgb,var(--zone-warn) 50%,transparent);color:var(--zone-warn)}
+    border:1px solid color-mix(in srgb,var(--zone-warn) 50%,transparent);color:var(--status-warn-text)}
   .pic-banner.ok{background:color-mix(in srgb,var(--zone-ok) 14%,transparent);
     border:1px solid color-mix(in srgb,var(--zone-ok) 45%,transparent);color:var(--zone-ok)}
   .pictable{background:var(--panel);border:1px solid var(--border);border-radius:12px;overflow:hidden;box-shadow:var(--shadow)}
@@ -759,7 +761,7 @@ html[data-theme="dark"]{--accent:var(--brand-cyan);--nav:#383838;--tile-off:#545
     font-family:var(--font-sans);transition:transform .15s,box-shadow .15s}
   .fs-btn:hover{transform:translateY(-2px);box-shadow:0 4px 10px rgba(0,0,0,.15)}
   .fs-btn:disabled{opacity:.5;cursor:not-allowed;transform:none;box-shadow:none}
-  .fs-btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+  .fs-btn.primary{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
   .fs-btn.danger{border-color:color-mix(in srgb,var(--zone-alert) 55%,var(--border));color:var(--zone-alert)}
   .fs-btn.danger:hover{background:color-mix(in srgb,var(--zone-alert) 12%,transparent)}
 
@@ -770,8 +772,8 @@ html[data-theme="dark"]{--accent:var(--brand-cyan);--nav:#383838;--tile-off:#545
   .sat-switch{display:inline-flex;align-items:center;gap:9px;font-size:.85rem;font-weight:700;color:var(--text);cursor:pointer;user-select:none}
   .sat-head{display:flex;align-items:center;gap:12px;margin:2px 2px 12px;flex-wrap:wrap}
   .sat-title{font-size:1.05rem;font-weight:700;display:flex;align-items:center;gap:10px}
-  .sat-pill{font-size:.7rem;font-weight:700;color:#fff;background:var(--hot);border-radius:10px;padding:3px 10px}
-  .sat-pill.idle{background:var(--tile-off)} .sat-pill.off{background:var(--tile-off)}
+  .sat-pill{font-size:.7rem;font-weight:700;color:var(--on-hot);background:var(--hot-fill);border-radius:10px;padding:3px 10px}
+  .sat-pill.idle,.sat-pill.off{background:var(--pill-off);color:#fff}
   /* TASK-999: SAT depth-level nav (Thermostat/Control/Technical) as 1a underlined
      text tabs — the same second-tier pattern as .subtabs, keeping the small hint. */
   .sat-views{display:flex;gap:2px;margin-bottom:16px;overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;
@@ -802,7 +804,7 @@ html[data-theme="dark"]{--accent:var(--brand-cyan);--nav:#383838;--tile-off:#545
   .sat-presets{display:flex;flex-wrap:wrap;gap:7px}
   .sat-preset{border:1px solid var(--border);background:var(--panel-2);color:var(--text);border-radius:20px;
     padding:8px 14px;font-size:.8rem;cursor:pointer;min-height:38px;font-family:var(--font-sans)}
-  .sat-preset.active{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:700}
+  .sat-preset.active{background:var(--accent);border-color:var(--accent);color:var(--on-accent);font-weight:700}
   .sat-hint{font-size:.78rem;color:var(--muted);margin-top:12px}
   /* TASK-1884: why-line, messages button/panel, room trend arrow */
   .sat-status-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
@@ -811,7 +813,7 @@ html[data-theme="dark"]{--accent:var(--brand-cyan);--nav:#383838;--tile-off:#545
     padding:3px 10px;font-size:.78rem;cursor:pointer;min-height:28px;font-family:var(--font-sans);display:inline-flex;align-items:center;gap:4px}
   .sat-msg-btn[hidden]{display:none}
   .sat-msg-ico{display:inline-flex;width:16px;height:16px;border-radius:50%;align-items:center;justify-content:center;
-    font-size:.7rem;font-weight:700;color:#fff;background:var(--accent)}
+    font-size:.7rem;font-weight:700;color:var(--on-accent);background:var(--accent)}
   .sat-msg-btn.warn .sat-msg-ico{background:var(--zone-alert)}
   .sat-msgs{border-left:3px solid var(--border);padding-left:10px;margin-top:8px}
   .sat-msgs .sat-hint{margin-top:6px}
@@ -832,7 +834,7 @@ html[data-theme="dark"]{--accent:var(--brand-cyan);--nav:#383838;--tile-off:#545
   .sat-tile .v{font-size:1.7rem;font-weight:700;margin-top:4px}
   .sat-tile .v.hot{color:var(--hot)}
   .sat-tile .sub{font-size:.7rem;color:var(--muted);margin-top:2px}
-  .sat-tile .tag{font-size:.56rem;background:color-mix(in srgb,var(--hot) 16%,transparent);color:var(--hot);border-radius:6px;padding:1px 6px;letter-spacing:0}
+  .sat-tile .tag{font-size:.56rem;background:color-mix(in srgb,var(--hot) 16%,transparent);color:var(--hot-text);border-radius:6px;padding:1px 6px;letter-spacing:0}
   .sat-row2{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:14px}
   .sat-row2.sat-row-2up{grid-template-columns:1fr 1fr}
   .sat-row2.sat-row-1up{grid-template-columns:1fr}
@@ -887,7 +889,7 @@ html[data-theme="dark"]{--accent:var(--brand-cyan);--nav:#383838;--tile-off:#545
   .discover-act{margin-top:9px;display:flex;gap:8px;flex-wrap:wrap}
   .discover-act button{font-size:12.5px;border-radius:9px;padding:8px 13px;cursor:pointer;border:1px solid var(--border);
     background:var(--panel-2);color:var(--text);min-height:38px;font-family:inherit}
-  .discover-act .primary{background:var(--accent);color:#fff;border:0;font-weight:700}
+  .discover-act .primary{background:var(--accent);color:var(--on-accent);border:0;font-weight:700}
   .discover-x{cursor:pointer;color:var(--muted);font-size:18px;line-height:1;padding:0 2px;background:none;border:0}
 
   /* TASK-991: bench-mode -> simulation prompt. When the gateway sees no boiler or
@@ -899,4 +901,4 @@ html[data-theme="dark"]{--accent:var(--brand-cyan);--nav:#383838;--tile-off:#545
   .sim-modal p{margin:0 0 16px;font-size:.9rem;color:var(--muted);line-height:1.5}
   .sim-modal .acts{display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap}
   .sim-modal button{font-size:.88rem;border-radius:9px;padding:9px 15px;cursor:pointer;border:1px solid var(--border);background:var(--panel-2);color:var(--text);min-height:40px;font-family:inherit}
-  .sim-modal .primary{background:var(--accent);color:#fff;border:0;font-weight:700}
+  .sim-modal .primary{background:var(--accent);color:var(--on-accent);border:0;font-weight:700}
