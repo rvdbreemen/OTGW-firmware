@@ -3,11 +3,11 @@ id: TASK-2957
 title: >-
   SAT page paused-state honesty: one status, paused markers, burner-cycle Off
   text (UX review F3 F7 F12)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-20T14:17:00Z'
-updated_date: '2026-11-21T14:10:00Z'
+updated_date: '2026-11-21T16:11:00Z'
 labels:
   - ux
   - webui
@@ -26,14 +26,14 @@ From the TASK-2952 UX review (docs/reviews/2026-11-20_ux-heuristic-v2-webui/READ
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 otgw-dev's answers Q1-Q7 are applied as in spec T2 section 6 (the builder checks the cited lines still match origin/dev)
-- [ ] #2 Each display state of spec T2 section 2 (OFF, STOPPED, PAUSED_OT, PAUSED_OUTSIDE, TAKEOVER, WAITING plus its boiler-link-down variant, WINDOW, SUMMER, HEATING, IDLE) renders the pill, headline, sub-line and card treatment of section 3, checked by a browser test with one status object per state; during TAKEOVER the switch label reads 'Off · takeover active'
-- [ ] #3 With enabled true, ot_link_lost true and boiler_status idle (the .63 case) the headline never shows 'At target' or 'idle'
-- [ ] #4 The IDLE headline follows spec T2 section 3.1 (band at target + 0.1, 'above target' from + 1.0): room 25.5 / target 19.8 reads 'Idle · room above target', room 20.0 / target 19.8 'Idle · room at target'
-- [ ] #5 While active is false Control status shows '—' for P, I, D, PID output, Error and Modulation; the Modulation row is labelled 'Modulation sent'; the Burner cycle card shows '—' in STOPPED, PAUSED_OT, PAUSED_OUTSIDE and WAITING even with control_mode 1 or 2
-- [ ] #6 The messages badge shows visible text ('1 message' / 'N messages') and keeps its aria-label; the Burner cycle Off sub-line is 'SAT is not actively controlling.'
-- [ ] #7 New EN keys exist, NL and DE through the i18n sync, tests/webui/i18n-*.test.mjs pass; sat_big_safety, sat_big_at_target, sat_cycle_sub_off and kv_modulation keep their names and get re-translated NL and DE values, visible in the sync diff
-- [ ] #8 No change outside src/OTGW-firmware/data/ and its tests
+- [x] #1 otgw-dev's answers Q1-Q7 are applied as in spec T2 section 6 (the builder checks the cited lines still match origin/dev)
+- [x] #2 Each display state of spec T2 section 2 (OFF, STOPPED, PAUSED_OT, PAUSED_OUTSIDE, TAKEOVER, WAITING plus its boiler-link-down variant, WINDOW, SUMMER, HEATING, IDLE) renders the pill, headline, sub-line and card treatment of section 3, checked by a browser test with one status object per state; during TAKEOVER the switch label reads 'Off · takeover active'
+- [x] #3 With enabled true, ot_link_lost true and boiler_status idle (the .63 case) the headline never shows 'At target' or 'idle'
+- [x] #4 The IDLE headline follows spec T2 section 3.1 (band at target + 0.1, 'above target' from + 1.0): room 25.5 / target 19.8 reads 'Idle · room above target', room 20.0 / target 19.8 'Idle · room at target'
+- [x] #5 While active is false Control status shows '—' for P, I, D, PID output, Error and Modulation; the Modulation row is labelled 'Modulation sent'; the Burner cycle card shows '—' in STOPPED, PAUSED_OT, PAUSED_OUTSIDE and WAITING even with control_mode 1 or 2
+- [x] #6 The messages badge shows visible text ('1 message' / 'N messages') and keeps its aria-label; the Burner cycle Off sub-line is 'SAT is not actively controlling.'
+- [x] #7 New EN keys exist, NL and DE through the i18n sync, tests/webui/i18n-*.test.mjs pass; sat_big_safety, sat_big_at_target, sat_cycle_sub_off and kv_modulation keep their names and get re-translated NL and DE values, visible in the sync diff
+- [x] #8 No change outside src/OTGW-firmware/data/ and its tests
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -51,3 +51,9 @@ Suggestion (not in this task, no separate task yet, coordinator 2026-11-20): a w
 
 2026-11-21 ux critique P1 (otgw-ux-designer): 'Check connection ›' called showPage('monitor') without a tab, so Monitor restored its last tab (Log hides the map). Now showPage('monitor', {tab:'mconn'}). New case in sat-display-states: red on 8a5a226b6 (tab mlog), green now (file 5/0). NAS full sweep on 9d3056538 (otgw-bench-tester): 91/101 first pass, 6 of 10 green on rerun; contrast-tokens, inline-accent-contrast, harness-stall, poll-spread-hidden red only by CDP evaluate/timing timeouts on the NAS (no assertion), all green locally single-file.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+SAT page display states per spec T2. AC1: otgw-dev's Q1-Q7 applied; cited firmware lines checked on origin/dev (bActive SATcontrol.ino:8045, bSafetyTripped :8536, SAT_MAX_PIC_FAILS :148). AC2-AC6: tests/webui/sat-display-states.test.mjs (one status object per state incl. the WAITING boiler-link-down variant and TAKEOVER 'Off · takeover active'; .63 case; IDLE band; dashes and 'Modulation sent'; badge text): RED 0/3 on the old code, GREEN 5/5 (incl. the 'Set up a source' and 'Check connection' navigation cases, both red on their previous versions). AC7: EN keys plus NL/DE/EL written by hand per i18n/glossary.md (no review workflow), i18n-lang/lang-menu/i18n-no-hardcoded green. AC8: changes are in src/OTGW-firmware/data/, i18n/*.json (the web UI language packs) and tests/webui only. Bench: beta.413+da42aca on .61 PASS for the reachable states (PAUSED_OUTSIDE, dashes, badge, warn pill 5.36/5.90); NAS rerun green. Pushed in 69d78536f (beta.412); alpha post 1573724385611878560. Follow-up: TASK-3012.
+<!-- SECTION:FINAL_SUMMARY:END -->
