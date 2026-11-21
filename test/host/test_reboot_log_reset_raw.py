@@ -129,7 +129,10 @@ def static_cases(src):
     plat = src[PLAT]
     lm = re.search(r"platformResetRawLabel\(unsigned code\) \{(.*?)\n\}", plat, re.S)
     labelled = {int(v, 16): t for v, t in re.findall(r"case (0x[0-9A-Fa-f]+): return \"([^\"]*)\"", lm.group(1))} if lm else {}
-    if codes is None:
+    if codes is None and os.name != "nt":
+        # TASK-3020: off Windows (the NAS) the pinned PlatformIO libs are not installed: S4 cannot run there
+        s4, got4 = None, "skipped: the pinned libs' reset_reasons.h is not installed on this host"
+    elif codes is None:
         s4, got4 = False, "reset_reasons.h of the pinned libs not found (harness error)"
     else:
         missing = sorted({v for v in codes.values()} - set(labelled))
@@ -144,7 +147,7 @@ def static_cases(src):
                f"function {'found' if m else 'missing'}, Wire.begin before it at {i_wire}"),
         "S3": ("pass" if s3 else "FAIL", "device/info carries resetraw, resetrawlabel and extwdreset",
                "all three" if s3 else "missing"),
-        "S4": ("pass" if s4 else "FAIL", "every raw S3 reset code has a label; 0x01 is marked not distinguishable", got4),
+        "S4": ("skip" if s4 is None else "pass" if s4 else "FAIL", "every raw S3 reset code has a label; 0x01 is marked not distinguishable", got4),
         "S5": ("pass" if s5 else "FAIL", "g_extWdResetAtBoot is defined once, in OTGW-firmware.h (ADR-044; setup() uses it)",
                "defined in OTGW-firmware.h only" if s5 else "missing in OTGW-firmware.h or defined in an .ino"),
     }
@@ -221,7 +224,8 @@ def main():
         ok &= good
     if a.old_rev:
         got = run_variant(f"OLD {a.old_rev}", GEN / "rstraw_old", sources(a.old_rev), not a.quiet)
-        missing = [c for c in OLD_MUST_FAIL if c not in got]
+        missing = [c for c in OLD_MUST_FAIL if c not in got and not (c == "S4" and reset_reason_codes()[0] is None
+                                                                     and os.name != "nt")]   # TASK-3020: S4 skipped
         print(f"OLD {a.old_rev}: fails {','.join(got) or 'nothing'}"
               f"{'' if not missing else ' -- expected also ' + ','.join(missing)}")
         ok &= not missing

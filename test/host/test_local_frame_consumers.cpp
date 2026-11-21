@@ -67,6 +67,8 @@
 #include <initializer_list>
 #include <string>
 #include <type_traits>
+#include <cmath>
+using std::isnan; using std::isfinite; using std::isinf; using std::roundf;   // TASK-3020: g++/musl
 
 #ifndef MODEL
 #define MODEL 1

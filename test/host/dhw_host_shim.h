@@ -30,7 +30,12 @@ class __FlashStringHelper;                                 // pointer-only, as o
 #define strstr_P strstr
 #define strlen_P strlen
 #define strcmp_P strcmp
+#if defined(_MSC_VER)
 #define strcasecmp_P _stricmp
+#else   // TASK-3020: g++/musl
+#include <strings.h>
+#define strcasecmp_P strcasecmp
+#endif
 #define memcpy_P memcpy
 #define pgm_read_word(p) (*(const uint16_t*)(p))
 #define pgm_read_byte(p) (*(const uint8_t*)(p))

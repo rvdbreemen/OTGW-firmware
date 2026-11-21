@@ -12,6 +12,7 @@ Exit code: 0 when run 1 passes and run 2 fails (or both SKIP without a firmware 
 1 otherwise, 2 harness error.
 """
 import os
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -22,6 +23,11 @@ EXE = HERE / "generated" / "test_stream_real_cbuf.exe"
 
 
 def main():
+    if not shutil.which("powershell") and not shutil.which("pwsh"):
+        # TASK-3020: the build script is PowerShell + MSVC; on the NAS (Linux) the test is skipped like a missing
+        # PlatformIO core (the script itself prints SKIP for that).
+        print("SKIP: needs PowerShell and MSVC (build_and_run_stream_real_cbuf.ps1)")
+        return 0
     r = subprocess.run(["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", str(PS1)],
                        capture_output=True, text=True, errors="replace")
     print(r.stdout[-4000:], r.stderr[-2000:], sep="")

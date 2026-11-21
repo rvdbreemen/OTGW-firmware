@@ -48,6 +48,8 @@
 */
 #include "SATtypes.h"
 #include <algorithm>
+#include <cmath>
+using std::isnan; using std::isfinite; using std::isinf; using std::roundf;   // TASK-3020: g++/musl
 #include <cstdarg>
 #include <vector>
 

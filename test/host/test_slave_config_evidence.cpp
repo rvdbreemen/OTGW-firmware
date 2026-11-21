@@ -22,7 +22,17 @@ static void AddLogf(const char*, ...) {}
 static const char* byte_to_binary(uint8_t) { return "00000000"; }
 static void sendMQTTData(const char*, const char*) {}
 static bool is_value_valid(const OpenthermData_t&, const decltype(OTlookupitem)&) { return true; }
+#if defined(_MSC_VER)
 static char* utoa(unsigned v, char* buf, int radix) { return _itoa((int)v, buf, radix); }
+#else   // TASK-3020: no _itoa outside MSVC
+static char* utoa(unsigned v, char* buf, int radix) {
+  char t[34]; int n = 0;
+  do { unsigned d = v % (unsigned)radix; t[n++] = (char)(d < 10 ? '0' + d : 'a' + d - 10); v /= (unsigned)radix; } while (v);
+  for (int i = 0; i < n; i++) buf[i] = t[n - 1 - i];
+  buf[n] = 0;
+  return buf;
+}
+#endif
 static int g_slaveCfg = 0, g_manuf = 0;
 static void satNoteSlaveConfig(uint8_t) { g_slaveCfg++; }
 static void satDetectManufacturer(uint8_t) { g_manuf++; }
