@@ -141,19 +141,9 @@ Key patterns it flags:
 - `strcpy`/`sprintf` without bounds (should use `strlcpy`/`snprintf_P`)
 - `strncmp_P`/`strstr_P` on binary data (use `memcmp_P`)
 
-#### tools/generate_mqttha_data.py (legacy regenerator)
+#### MQTTHaDiscovery.cpp (no generator)
 
-The MQTT Home Assistant auto-discovery metadata lives in compiled form as `src/OTGW-firmware/MQTTHaDiscovery.cpp`. That file is the **source of truth** and is checked into the repository. It contains structured PROGMEM arrays for sensors, binary sensors, climate, and number entities, keyed by OT message ID.
-
-The text template `mqttha.cfg` that originally generated this file has been archived to `docs/archive/mqttha.cfg` and is no longer part of the build. If you need to regenerate `MQTTHaDiscovery.cpp` from an updated template, restore `mqttha.cfg` to `src/OTGW-firmware/data/mqttha.cfg` and run:
-
-```bash
-python tools/generate_mqttha_data.py
-```
-
-For normal development, edit `MQTTHaDiscovery.cpp` directly and keep it consistent with the streaming discovery consumer in `MQTTstuff.ino`. The legacy generators `tools/generate_mqttha_progmem.py` and `tools/generate_mqttha_readable.py` are retained for reference but are superseded by `generate_mqttha_data.py`.
-
-The generated file is deliberately placed in its own `.cpp` translation unit to avoid the Xtensa single-TU section/relocation explosion that occurs when large PROGMEM data is placed in the main sketch.
+The MQTT Home Assistant auto-discovery metadata lives in `src/OTGW-firmware/MQTTHaDiscovery.cpp`, the hand-written source of truth (ADR-077). Edit it directly and keep it consistent with the streaming discovery consumer in `MQTTstuff.ino`. The old generator scripts (`tools/generate_mqttha_*.py`) were removed in TASK-285; the text template they read is archived as `docs/archive/mqttha.cfg` and the pipeline is described in `docs/archive/mqttha-generator/README.md`.
 
 ---
 

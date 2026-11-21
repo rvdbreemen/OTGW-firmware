@@ -566,9 +566,9 @@ Send keepalives       ────────→ Reset watchdog
 - **ADR-025:** Safari WebSocket Connection Management - Browser compatibility
 
 ### Documentation
-- **Browser Compatibility:** `docs/reviews/2026-01-26_browser-compatibility-review/`
-- **WebSocket Visual Guide:** `docs/reviews/2026-01-26_browser-compatibility-review/WEBSOCKET_VISUAL_GUIDE.md`
-- **Heap Optimization:** `docs/reviews/2026-01-17_dev-rc4-analysis/HEAP_OPTIMIZATION_SUMMARY.md`
+- **Browser Compatibility:** `docs/reviews/archive/2026-Q1/2026-01-26_browser-compatibility-review/`
+- **WebSocket Visual Guide:** `docs/reviews/archive/2026-Q1/2026-01-26_browser-compatibility-review/WEBSOCKET_VISUAL_GUIDE.md`
+- **Heap Optimization:** `docs/reviews/archive/2026-Q1/2026-01-17_dev-rc4-analysis/HEAP_OPTIMIZATION_SUMMARY.md`
 
 ### External Resources
 - **WebSocket Library:** https://github.com/Links2004/arduinoWebSockets

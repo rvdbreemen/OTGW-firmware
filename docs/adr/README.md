@@ -1071,7 +1071,7 @@ When an architectural decision changes:
 
 ## ADR Skill
 
-ADR maintenance in this repository is driven by the **adr-kit** plugin (skill: `/adr-kit:adr`, subagent: `adr-generator`). The plugin lives in the Claude Code plugin cache (`~/.claude/plugins/cache/rvdbreemen-adr-kit/`) and is configured per project via `.adr-kit.json` in the repo root. There is no in-tree skill copy at `.github/skills/adr/`; that earlier GitHub Copilot skill location is deprecated and any links pointing there should be replaced with this section.
+ADR maintenance in this repository is driven by the **adr-kit** plugin (skill: `/adr-kit:adr`, subagent: `adr-generator`). The plugin lives in the Claude Code plugin cache (`~/.claude/plugins/cache/rvdbreemen-adr-kit/`) and is configured per project via `.adr-kit.json` in the repo root. The GitHub Copilot ADR skill in `.github/skills/adr/` stays for Copilot users (Robert, D4, 2026-11-20); for Claude Code the adr-kit plugin is the authority and this section describes it.
 
 The ADR skill helps you:
 

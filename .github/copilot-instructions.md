@@ -331,7 +331,7 @@ When making decisions for refactors, feature additions, or bug fixes, always rev
 - String operations cause heap fragmentation
 - Memory exhaustion leads to crashes and watchdog resets
 
-**Reference**: See `docs/reviews/2026-02-01_memory-management-bug-fix/BUG_FIX_ASSESSMENT.md` for detailed analysis of a real bug caused by violating these rules.
+**Reference**: See `docs/reviews/archive/2026-Q1/2026-02-01_memory-management-bug-fix/BUG_FIX_ASSESSMENT.md` for detailed analysis of a real bug caused by violating these rules.
 
 ### Binary Data Handling (CRITICAL - Prevents Exception Crashes)
 
@@ -586,7 +586,7 @@ Before implementing or modifying frontend features, verify browser support:
 - **Evaluate code quality**: `python evaluate.py`
   - Quick check: `python evaluate.py --quick`
   - Generate report: `python evaluate.py --report`
-  - See [EVALUATION.md](../docs/EVALUATION.md) for evaluation framework details
+  - See [EVALUATION.md](../docs/process/EVALUATION.md) for evaluation framework details
 - **Build artifacts**: Located in `build/` directory with versioned filenames
 - **CI/CD**: Uses GitHub Actions with the same Makefile
 - **Always test on actual hardware when possible** (device behavior can differ from simulation)
@@ -623,8 +623,8 @@ Before implementing or modifying frontend features, verify browser support:
 ## Documentation
 
 - User-facing documentation lives in the wiki: https://github.com/rvdbreemen/OTGW-firmware/wiki
-- Build instructions: `docs/BUILD.md`
-- Flash instructions: `docs/FLASH_GUIDE.md`
+- Build instructions: `docs/guides/BUILD.md`
+- Flash instructions: `docs/guides/FLASH_GUIDE.md`
 - Update README.md for significant feature changes
 - Keep release notes format consistent (see README.md)
 - **OpenTherm Protocol**:
@@ -650,7 +650,7 @@ Store all review and analysis documentation in:
 docs/reviews/YYYY-MM-DD_<review-name>/
 ```
 
-Example: `docs/reviews/2026-01-17_dev-rc4-analysis/`
+Example: `docs/reviews/archive/2026-Q1/2026-01-17_dev-rc4-analysis/`
 
 ### Required Metadata Header
 
@@ -762,7 +762,7 @@ docs/reviews/
 
 ### Tools and References
 
-- Use evaluation framework: `python evaluate.py` (see docs/EVALUATION.md)
+- Use evaluation framework: `python evaluate.py` (see docs/process/EVALUATION.md)
 - Follow coding standards documented in this file
 - Reference previous reviews for consistency
 - Link to related PRs and commits in documentation
@@ -843,7 +843,7 @@ Comprehensive code quality analysis tool:
   - Verifies header guards in .h files
   - Validates build system health
 - **Exit codes**: Non-zero if any FAIL results (CI/CD integration)
-- See [docs/EVALUATION.md](../docs/EVALUATION.md) for detailed documentation
+- See [docs/process/EVALUATION.md](../docs/process/EVALUATION.md) for detailed documentation
 
 <!-- BACKLOG.MD GUIDELINES START -->
 # Instructions for the usage of Backlog.md CLI Tool

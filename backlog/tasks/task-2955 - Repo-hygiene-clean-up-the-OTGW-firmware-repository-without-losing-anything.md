@@ -52,4 +52,6 @@ Plan corrections from otgw-docs' dry run (2026-11-20): C6.7 keeps a stub (ADR-09
 2026-11-21 phase 2 C6.6 (otgw-docs): v0/v1 API examples: example-api/ moves to docs/archive/1.x/example-api/ (stub README for ADR-019)
 
 2026-11-21 phase 2 C6.7 (otgw-docs): one audit: the MQTT MsgID echo audit moves to docs/audits/ (stub kept for ADR-097)
+
+2026-11-21 phase 2 C7 (otgw-docs): dangling paths (F4) in copilot-instructions, AGENTS.md, WEBSOCKET_FLOW and manual ch08/h08; docs/adr/README.md on the Copilot ADR skill (F5, D4)
 <!-- SECTION:NOTES:END -->

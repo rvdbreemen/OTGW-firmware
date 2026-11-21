@@ -68,7 +68,6 @@ De browser-SPA bevindt zich in `src/OTGW-firmware/data/`. Deze bestanden worden 
 | `flash_esp.py` | Python-flasher: detecteert de seriële poort, schrijft firmware + filesystem naar de ESP32-S3 |
 | `platformio.ini` | PlatformIO-project: omgevingen `esp32`, `esp32-classic` en `esp32-combo`; `esp32-combo` is het target dat gebouwd en uitgeleverd wordt |
 | `evaluate.py` | Statische codekwaliteitscontrole: PROGMEM-gebruik, onveilige patronen, String-klasse audit |
-| `tools/generate_mqttha_data.py` | Legacy-regenerator voor `MQTTHaDiscovery.cpp` uit een gearchiveerd `mqttha.cfg`-template |
 | `scripts/` | PlatformIO pre-build scripts (versie-injectie, bibliotheekpatching) en hulpmiddelen zoals `build_manual.py` |
 | `src/libraries/` | De Platform-bibliotheek en vendored Arduino-bibliotheken |
 | `docs/` | C4-architectuurdocs, ADRs, API-referenties, functiedocumentatie. `docs/MANUAL.md` wordt gegenereerd uit de Engelse hoofdstukken door `scripts/build_manual.py` (`python scripts/build_manual.py`; `--check` geeft exit 1 als het achterloopt); pas het nooit met de hand aan. `tests/test_manual_generated.py` faalt als het niet actueel is |
@@ -140,19 +139,9 @@ Belangrijkste patronen die worden gemarkeerd:
 - `strcpy`/`sprintf` zonder grenzen (moet `strlcpy`/`snprintf_P` zijn)
 - `strncmp_P`/`strstr_P` op binaire data (gebruik `memcmp_P`)
 
-#### tools/generate_mqttha_data.py (legacy-regenerator)
+#### MQTTHaDiscovery.cpp (geen generator)
 
-De MQTT Home Assistant auto-discovery-metadata bevindt zich in gecompileerde vorm als `src/OTGW-firmware/MQTTHaDiscovery.cpp`. Dat bestand is de **source of truth** en is in de repository opgenomen. Het bevat gestructureerde PROGMEM-arrays voor sensors, binary sensors, climate en number entities, geindexeerd op OT-message-ID.
-
-Het teksttemplate `mqttha.cfg` dat dit bestand oorspronkelijk genereerde is gearchiveerd naar `docs/archive/mqttha.cfg` en maakt geen deel meer uit van de build. Mocht je `MQTTHaDiscovery.cpp` uit een bijgewerkt template willen regenereren, herstel dan `mqttha.cfg` naar `src/OTGW-firmware/data/mqttha.cfg` en voer uit:
-
-```bash
-python tools/generate_mqttha_data.py
-```
-
-Voor normaal ontwikkelwerk pas je `MQTTHaDiscovery.cpp` rechtstreeks aan en houd je het consistent met de streaming-discovery-consumer in `MQTTstuff.ino`. De legacy-generators `tools/generate_mqttha_progmem.py` en `tools/generate_mqttha_readable.py` zijn behouden als referentie maar worden vervangen door `generate_mqttha_data.py`.
-
-Het gegenereerde bestand is bewust in een eigen `.cpp` translation unit geplaatst om de Xtensa single-TU section/relocation-explosie te voorkomen die optreedt wanneer grote PROGMEM-data in de hoofd-sketch wordt geplaatst.
+De MQTT Home Assistant-auto-discoverymetadata staat in `src/OTGW-firmware/MQTTHaDiscovery.cpp`, de met de hand geschreven bron (ADR-077). Pas dat bestand rechtstreeks aan en houd het consistent met de streaming-discovery-consumer in `MQTTstuff.ino`. De oude generatorscripts (`tools/generate_mqttha_*.py`) zijn in TASK-285 verwijderd; het teksttemplate dat ze lazen staat gearchiveerd als `docs/archive/mqttha.cfg`, en de pijplijn staat beschreven in `docs/archive/mqttha-generator/README.md`.
 
 ---
 

@@ -96,7 +96,7 @@ Do not add HTTPS or WSS support in firmware. This project targets trusted LAN de
 
 ### ESP Platform Abstraction
 
-The 2.0.0 branch carries an explicit platform abstraction. **No `#if(def) ESP8266`, `#if(def) ESP32`, `#if(def) ARDUINO_ARCH_ESP*`, or `#if(def) BOARD_NODOSHOP_ESP*` may appear outside the allowlisted abstraction files.** The allowlist is: `src/OTGW-firmware/platform.h`, `platform_esp8266.h`, `platform_esp32.h`, `boards.h`, and the `OTGW-ModUpdateServer{.h,-esp32.h,-impl.h}` trio.
+The 2.0.0 branch carries an explicit platform abstraction. **No `#if(def) ESP8266`, `#if(def) ESP32`, `#if(def) ARDUINO_ARCH_ESP*`, or `#if(def) BOARD_NODOSHOP_ESP*` may appear outside the allowlisted abstraction files.** The allowlist is: `src/libraries/Platform/src/platform.h`, `platform_esp8266.h`, `platform_esp32.h`, `boards.h`, and the `OTGW-ModUpdateServer{.h,-esp32.h,-impl.h}` trio.
 
 Application code must instead:
 
