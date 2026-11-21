@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-beta.415
+**  Version  : v2.0.0-beta.416
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -1651,6 +1651,8 @@ static void handleSAT(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod m
       updateSetting("SATpwmswitchmargin", val); handled = true;
     } else if (strcasecmp_P(settingName, PSTR("heating_system")) == 0) {
       updateSetting("SATsystem", val); handled = true;
+    } else if (strcasecmp_P(settingName, PSTR("room_source")) == 0) {   // TASK-3011: auto/thermostat/external/ble/areas or 0..4
+      updateSetting("SATroomsource", val); handled = true;
     } else if (strcasecmp_P(settingName, PSTR("manufacturer")) == 0) {
       updateSetting("SATmanufacturer", val); handled = true;
     } else if (strcasecmp_P(settingName, PSTR("max_modulation")) == 0) {
@@ -4225,6 +4227,7 @@ void sendDeviceSettings()
   // --- SAT settings ---
   addBool(F("satenabled"), settings.sat.bEnabled, "b");
   addInt(F("satsystem"), settings.sat.iHeatingSystem, "i", 0, 2);  // 0=auto,1=radiators,2=underfloor
+  addInt(F("satroomsource"), settings.sat.iRoomSource, "i", 0, SAT_ROOMSRC_MAX);  // TASK-3011: 0 auto,1 thermostat,2 external,3 ble,4 areas
   addInt(F("satsource"), settings.sat.iHeatingSource, "i", 0, 3);  // 0=auto,1=gas_boiler,2=heat_pump,3=hybrid (TASK-891.8)
   addInt(F("sathpcycle"), settings.sat.iHpCycleSeconds, "i", 1800, 10800);  // heat-pump PWM cycle length: 1800=2/hr, 2400=1.5/hr, 3600=1/hr (TASK-1557) or 10800=3 h (experimental on/off heat pump, TASK-1542); the setter snaps to one of the four
   addInt(F("satmanufacturer"), settings.sat.iManufacturer, "i", 0, SAT_MFR_COUNT - 1);
@@ -4526,7 +4529,7 @@ static const char* const PROGMEM knownSettings[] = {
   "satsimcoolrate", "satsimheatrate", "satsimulation",
   "satsolargain", "satsolarminelev", "satsolarminrise", "satsolaroffset", "satsource",
   "satsummerminhours", "satsummersimmer", "satsummerthreshold",
-  "satsystem", "sattargettemp", "sattempstep", "satthermalcoeff", "satthermalcomfort",
+  "satsystem", "satroomsource", "sattargettemp", "sattempstep", "satthermalcoeff", "satthermalcomfort",
   "satweatherenable", "satweatherinterval", "satweatherlat", "satweatherlon",
   "satwindowdetect", "satwindowminsec", "satzonecount", "satzoneheadroom", "satzonetimeout",
   // TASK-933 P2: SAT keys that already had GET + dispatch but were missing from the

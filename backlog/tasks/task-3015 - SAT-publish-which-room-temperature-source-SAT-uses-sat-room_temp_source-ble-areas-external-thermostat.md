@@ -3,10 +3,11 @@ id: TASK-3015
 title: >-
   SAT: publish which room temperature source SAT uses (sat/room_temp_source: ble
   / areas / external / thermostat)
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-11-21T16:21:00Z'
-updated_date: '2026-11-21T16:38:00Z'
+updated_date: '2026-11-21T17:05:00Z'
 labels:
   - sat
   - mqtt
@@ -33,4 +34,8 @@ gruijter, #alpha-testing msg 1573734878216855563 (2026-11-21): MQTT clients cann
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-11-21: released by Robert in #alpha-testing (msg 1573739250422386720, reply to our TASK-3015 notice): implement as suggested (sat/room_temp_source with values ble / areas / external / thermostat). Design input from gruijter on TASK-3011 (source-order command + retained state) belongs to the same design.
+
+2026-11-21 (otgw-dev, same change as TASK-3011): satGetRoomTemp() records its source in _sat_roomSrc at every return (S/B/A/E/T/F/N); satRoomSourceName() gives simulation / ble / areas / external / thermostat / estimate / none. Published retained on sat/room_temp_source (publishIfChangedS, next to sat/room_temp) and in /api/v2/sat/status as room_temp_source (snapshotted right after the resolve). Checked by tests/test_sat_ble_pin_only.py (every return records a source; topic + REST field present). Not yet: HA discovery entity for it, bench check on a device.
+
+2026-11-21 (otgw-dev, coordinator decision 4 = yes): HA diagnostic sensor entity SAT_Room_Temp_Source on sat/room_temp_source (id 252 row, HaEntityCat::diagnostic, flat topic per ADR-101); MQTT_HA_SENSOR_COUNT 405 -> 406 and mqttHaSensorIndex recomputed (6 entries after the insert shift). Discovery tests 9 files PASS (test_sat_energy_discovery, test_ble_discovery_1462, test_sat_health_discovery and others; the first run failed 3 files on the stale index before the recompute). test_sat_ble_pin_only checks the entity row.
 <!-- SECTION:NOTES:END -->

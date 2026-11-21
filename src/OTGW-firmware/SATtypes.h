@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : SATtypes.h
-**  Version  : v2.0.0-beta.415
+**  Version  : v2.0.0-beta.416
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -509,6 +509,15 @@ static inline SATCycleClass satReportedLastCycleClass(const SATRuntimeSection& s
 // SATSection sBleMac/sBleLabel below and SATble.ino _bleRuntime[].
 #define SAT_BLE_MAX_ROSTER 8
 
+// TASK-3011 (Robert, follow-up A): the primary room temperature source (SATroomsource). auto = the fixed order
+// pinned BLE > areas > external > thermostat; another value puts that source first, the rest follow in the auto order.
+static const uint8_t SAT_ROOMSRC_AUTO       = 0;
+static const uint8_t SAT_ROOMSRC_THERMOSTAT = 1;
+static const uint8_t SAT_ROOMSRC_EXTERNAL   = 2;
+static const uint8_t SAT_ROOMSRC_BLE        = 3;
+static const uint8_t SAT_ROOMSRC_AREAS      = 4;
+static const uint8_t SAT_ROOMSRC_MAX        = 4;
+
 // TASK-1279: SAT DHW setpoint range. A setpoint below SAT_DHW_SETPOINT_MIN means
 // inactive (SAT sends no SW=); the settings clamp caps it at SAT_DHW_SETPOINT_MAX.
 #define SAT_DHW_SETPOINT_MIN 30
@@ -636,8 +645,10 @@ struct SATSection {
   // ESP8266 — matches the already-unconditional remainder of SATSection.
   bool     bBleEnable         = true;          // TASK-975: BLE sensors scan by default on boards with PSRAM. Without PSRAM a fresh install starts with BLE off (TASK-1693, applyBleNoPsramDefault()). Existing installs keep their persisted value.
   bool     bBleRiskAck        = false;         // TASK-995: on a NO-PSRAM board, BLE only actually scans once the user has accepted the instability risk (PSRAM boards ignore this — psramFound() gates instead). See bleActive() in SATble.ino.
-  bool     bBleFailover       = true;          // TASK-762: when the pinned sensor (sBleMAC) goes stale, fall back to another fresh roster sensor (roster order)
-  char     sBleMAC[18]        = "";            // Bind to specific sensor MAC (empty = accept all)
+  bool     bBleFailover       = false;         // TASK-762, TASK-3011: when the pinned sensor (sBleMAC) goes stale, fall back to a fresh sensor the user assigned to an area. Default off (Robert, Q2 A)
+  uint8_t  iRoomSource        = 0;             // TASK-3011: SAT_ROOMSRC_* primary room temperature source, default auto (0)
+  bool     bBlePinNotice      = false;         // TASK-3011 (Q3 C): the pin was kept by the upgrade migration and the user has not confirmed it yet: SAT page + log show "SAT uses BLE sensor <name>: confirm or change". Internal, cleared by any SATblemac write.
+  char     sBleMAC[18]        = "";            // The BLE sensor that drives SAT (TASK-3011: empty = no BLE sensor drives SAT)
   uint16_t iBleInterval       = 30;            // Publish/state-update cadence (sec, 10-300). NOT scan rate: TASK-494 made the BLE scan continuous to match OT-Thing.
   // TASK-895: BLE name picker + name-prefix filter. sBleNamePrefix narrows the
   // roster by advertised BLE name (empty = off, admit all = current behaviour).

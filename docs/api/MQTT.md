@@ -1257,7 +1257,7 @@ The firmware emits the following entity categories (`MQTTHaDiscovery.cpp` and th
 
 | Component | Count | Source | Notes |
 |-----------|-------|--------|-------|
-| `sensor` | 405 (`MQTT_HA_SENSOR_COUNT`) | PROGMEM table `mqttHaSensors[]` (indexed via `mqttHaSensorIndex[256]`) | Covers all OT numeric fields, status decoding, RBP, VH, solar, SAT sensor fan-out |
+| `sensor` | 406 (`MQTT_HA_SENSOR_COUNT`) | PROGMEM table `mqttHaSensors[]` (indexed via `mqttHaSensorIndex[256]`) | Covers all OT numeric fields, status decoding, RBP, VH, solar, SAT sensor fan-out |
 | `binary_sensor` | 113 (`MQTT_HA_BINSENSOR_COUNT`) | PROGMEM table `mqttHaBinSensors[]` (first 76 rows indexed via `mqttHaBinSensorIndex[256]`) | Master/slave status bits, ASF flags, SAT health binaries. 37 of these rows have HA-core-style alias siblings (ADR-106); the discovery streamer publishes exactly one of the two name sets depending on `settings.mqtt.bUseLegacyOtTopics`. |
 | `climate` | 2 | `streamClimateDiscovery(idx=0/1)` | 0 = Thermostat, 1 = DHW Control |
 | `number` | 1 | `streamNumberDiscovery()` | `Toutside_override` slider |

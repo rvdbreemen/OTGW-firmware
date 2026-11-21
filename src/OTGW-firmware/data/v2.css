@@ -812,6 +812,9 @@ html[data-theme="dark"]{--accent:var(--brand-cyan);--nav:#383838;--tile-off:#545
   /* TASK-2957 (spec T2 section 3): the state sub-line and the muted live cards */
   .sat-state-sub{font-size:.85rem;font-weight:400;color:var(--muted);margin-top:6px}
   .sat-state-sub[hidden]{display:none}
+  .sat-ble-pin{font-size:.85rem;margin-top:8px;padding:8px 10px;border-radius:10px;background:var(--status-warn-bg);color:var(--status-warn-text)}
+  .sat-ble-pin[hidden]{display:none}
+  .sat-ble-pin .sat-link{color:inherit;font-weight:700}
   .card.is-stale .kv-v,.card.is-stale .sat-status-big{color:var(--muted)}
   .sat-card-state{font-weight:400;color:var(--muted)}
   /* TASK-2959 F13: empty and paused chart notes */

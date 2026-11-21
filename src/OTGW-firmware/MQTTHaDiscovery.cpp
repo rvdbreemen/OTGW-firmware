@@ -369,6 +369,7 @@ DECLARE_SAT_DISCOVERY_STRINGS(sat_ch_sync,               "sat/ch_sync",         
 DECLARE_SAT_DISCOVERY_STRINGS(sat_window_open,           "sat/window_open",                  "SAT_Window_Open")
 DECLARE_SAT_DISCOVERY_STRINGS(sat_fallback_active,       "sat/fallback_active",              "SAT_Fallback_Active")
 DECLARE_SAT_DISCOVERY_STRINGS(sat_room_temp_lost,        "sat/room_temp_lost",               "SAT_Room_Temp_Lost")
+DECLARE_SAT_DISCOVERY_STRINGS(sat_room_temp_source,      "sat/room_temp_source",             "SAT_Room_Temp_Source")   // TASK-3015
 DECLARE_SAT_DISCOVERY_STRINGS(sat_ot_link_lost,          "sat/ot_link_lost",                 "SAT_OT_Link_Lost")
 DECLARE_SAT_DISCOVERY_STRINGS(sat_no_ignition,           "sat/no_ignition",                  "SAT_No_Ignition")      // TASK-1882
 DECLARE_SAT_DISCOVERY_STRINGS(sat_heating_failure,       "sat/heating_failure",              "SAT_Heating_Failure")  // TASK-1882
@@ -866,7 +867,7 @@ const char ha_name_alias_ventilation_system_type[]                           PRO
 const char ha_name_alias_ventilation_speed_control_type[]                    PROGMEM = "Ventilation_speed_control_type";
 const char ha_name_alias_solar_storage_fault[]                               PROGMEM = "Solar_storage_fault";
 // ========== Sensor array (400 entries) ==========
-const uint16_t MQTT_HA_SENSOR_COUNT = 405;  // +1 PIC temperature_reading (faux id 239, TASK-1940), +5 SAT PWM ON-phase telemetry (id 252, TASK-1880), +4 SAT requested_setpoint/curve recommendation/manufacturer/pressure_drop_rate (id 254, TASK-1490), +2 SAT CH/DHW gas consumption (id 252, TASK-1506), +1 dhw_water_total (faux id 241, TASK-1123), +3 SAT power/energy (id 252, TASK-1276), +1 command_dropped (faux id 240, TASK-1439)
+const uint16_t MQTT_HA_SENSOR_COUNT = 406;  // +1 SAT room_temp_source (id 252, TASK-3015), +1 PIC temperature_reading (faux id 239, TASK-1940), +5 SAT PWM ON-phase telemetry (id 252, TASK-1880), +4 SAT requested_setpoint/curve recommendation/manufacturer/pressure_drop_rate (id 254, TASK-1490), +2 SAT CH/DHW gas consumption (id 252, TASK-1506), +1 dhw_water_total (faux id 241, TASK-1123), +3 SAT power/energy (id 252, TASK-1276), +1 command_dropped (faux id 240, TASK-1439)
 
 const MqttHaSensorCfg PROGMEM mqttHaSensors[] = {
 //  {id, flags, label, friendlyName, deviceClass, unit, stateClass, icon, entityCat, enabledByDefault}
@@ -1370,6 +1371,8 @@ const MqttHaSensorCfg PROGMEM mqttHaSensors[] = {
     {252, 0x00, ha_lbl_sat_duty_ratio,             ha_name_sat_duty_ratio,             HaDeviceClass::none,        HaUnit::percent, HaStateClass::measurement,      HaIcon::percent_outline, HaEntityCat::none, true, ha_tpl_sat_ratio_percent, nullptr},
     {252, 0x00, ha_lbl_sat_overshoot_fraction,     ha_name_sat_overshoot_fraction,     HaDeviceClass::none,        HaUnit::percent, HaStateClass::measurement,      HaIcon::percent_outline, HaEntityCat::none, true, ha_tpl_sat_ratio_percent, nullptr},
     {252, 0x00, ha_lbl_sat_cycle_phase,            ha_name_sat_cycle_phase,            HaDeviceClass::none,        HaUnit::none,    HaStateClass::none,             HaIcon::history,         HaEntityCat::none, true, nullptr,                 nullptr},
+    // TASK-3015: which room temperature source SAT uses (ble, areas, external, thermostat, simulation, estimate, none)
+    {252, 0x00, ha_lbl_sat_room_temp_source,       ha_name_sat_room_temp_source,       HaDeviceClass::none,        HaUnit::none,    HaStateClass::none,             HaIcon::thermometer,     HaEntityCat::diagnostic, true, nullptr,                 nullptr},
     {252, 0x00, ha_lbl_sat_overshoot_margin,       ha_name_sat_overshoot_margin,       HaDeviceClass::temperature, HaUnit::degC,    HaStateClass::measurement,      HaIcon::thermometer,     HaEntityCat::none, true, nullptr,                 nullptr},
     // measurement, not total_increasing: the value counts starts in the rolling hour and falls as
     // starts leave it, which HA would read as a meter reset on every drop (TASK-1463).
@@ -1840,10 +1843,10 @@ const uint16_t PROGMEM mqttHaSensorIndex[256] = {
     0xFFFF, // id 236
     0xFFFF, // id 237
     0xFFFF, // id 238
-    404, // id 239, 1 entry (TASK-1940: OTGWpictempid PIC temperature_reading)
-    403, // id 240, 1 entry (TASK-1439: OTGWcmddropid command_dropped)
-    402, // id 241, 1 entry (TASK-1123: OTGWdhwmeterid dhw_water_total)
-    400, // id 242, 2 entries (TASK-942: OTGWhvacid hvac_mode/hvac_action companion sensors)
+    405, // id 239, 1 entry (TASK-1940: OTGWpictempid PIC temperature_reading)
+    404, // id 240, 1 entry (TASK-1439: OTGWcmddropid command_dropped)
+    403, // id 241, 1 entry (TASK-1123: OTGWdhwmeterid dhw_water_total)
+    401, // id 242, 2 entries (TASK-942: OTGWhvacid hvac_mode/hvac_action companion sensors)
     332, // id 243, 2 entries (ADR-124: OTDirect flame metrics, split out of 251)
     0xFFFF, // id 244
     284, // id 245, 4 entries
@@ -1853,9 +1856,9 @@ const uint16_t PROGMEM mqttHaSensorIndex[256] = {
     313, // id 249, 4 entries (TASK-541 PIC info; ADR-113 stage 2 removed picavailable)
     317, // id 250, 15 entries (TASK-541 PIC settings)
     334, // id 251, 4 entries (TASK-541 SAT diagnostics; flame metrics moved to 243 per ADR-124)
-    338, // id 252, 42 entries (TASK-543 SAT control/PID/cycle/stats; TASK-1276 power/energy; TASK-1506 CH/DHW gas consumption; TASK-1880 PWM phase telemetry)
-    380, // id 253, 15 entries (TASK-543 SAT BLE/pressure/weather)
-    395, // id 254, 5 entries (TASK-543 SAT flame status; TASK-1490 requested_setpoint, curve recommendation, manufacturer, pressure_drop_rate)
+    338, // id 252, 43 entries (TASK-3015 room_temp_source; TASK-543 SAT control/PID/cycle/stats; TASK-1276 power/energy; TASK-1506 CH/DHW gas consumption; TASK-1880 PWM phase telemetry)
+    381, // id 253, 15 entries (TASK-543 SAT BLE/pressure/weather)
+    396, // id 254, 5 entries (TASK-543 SAT flame status; TASK-1490 requested_setpoint, curve recommendation, manufacturer, pressure_drop_rate)
     0xFFFF // id 255
 };
 

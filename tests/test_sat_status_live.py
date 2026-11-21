@@ -71,6 +71,8 @@ static bool g_flowFresh = false, g_retFresh = false;
 static SatFeedClass satFlowFeedClass() { return g_flowFresh ? SatFeedClass::Valid : SatFeedClass::Stale; }
 static bool satFeedClassIsFresh(SatFeedClass c) { return c == SatFeedClass::Valid; }
 static bool satReturnFresh() { return g_retFresh; }
+// TASK-3011: the source satGetRoomTemp() recorded; each scenario sets the one it would record (SATcontrol.ino).
+static char _sat_roomSrc = 'N';
 """
 
 MAIN = r"""
@@ -81,24 +83,25 @@ int main(int argc, char** argv) {
   const uint32_t now = (uint32_t)strtoul(argv[3], 0, 10);
   OTcurrentSystemState.Tboiler = 47.5f; OTcurrentSystemState.Tret = 38.0f;
   if (!strcmp(sc, "boiler")) {            // real boiler: fresh flow and return, thermostat Tr 90 s old
-    g_flowFresh = g_retFresh = true; OTcurrentSystemState.Tr = 20.5f; state.otBus.iTrThermostatMs = now - 90000UL;
+    g_flowFresh = g_retFresh = true; OTcurrentSystemState.Tr = 20.5f; state.otBus.iTrThermostatMs = now - 90000UL; _sat_roomSrc = 'T';
   } else if (!strcmp(sc, "noflow")) {     // flow stale, return absent, Tr fed by TR= (no thermostat stamp)
-    OTcurrentSystemState.Tr = 20.5f;
+    OTcurrentSystemState.Tr = 20.5f; _sat_roomSrc = 'T';
   } else if (!strcmp(sc, "ble")) {
     settings.sat.bBleEnable = true; state.sat.bBleTempValid = true; state.sat.iBleTempLastMs = now - 42000UL;
-    OTcurrentSystemState.Tr = 20.5f; state.otBus.iTrThermostatMs = now - 5000UL;
+    OTcurrentSystemState.Tr = 20.5f; state.otBus.iTrThermostatMs = now - 5000UL; _sat_roomSrc = 'B';
   } else if (!strcmp(sc, "areas")) {      // oldest contributing area wins; area 2 has weight 0 and does not count
     settings.sat.bMultiArea = true; settings.sat.iMultiAreaCount = 3; settings.sat.fAreaWeight[2] = 0.0f;
     state.sat.bAreaValid[0] = state.sat.bAreaValid[1] = state.sat.bAreaValid[2] = true;
     state.sat.iAreaLastMs[0] = now - 30000UL; state.sat.iAreaLastMs[1] = now - 120000UL; state.sat.iAreaLastMs[2] = now - 290000UL;
+    _sat_roomSrc = 'A';
   } else if (!strcmp(sc, "external")) {
-    settings.sat.bUseExternalTemp = true; state.sat.bExternalTempValid = true; state.sat.iExternalTempLastMs = now - 600000UL;
+    settings.sat.bUseExternalTemp = true; state.sat.bExternalTempValid = true; state.sat.iExternalTempLastMs = now - 600000UL; _sat_roomSrc = 'E';
   } else if (!strcmp(sc, "fallback")) {   // the thermal estimate: no age
-    state.sat.bFallbackActive = true; OTcurrentSystemState.Tr = 99.0f; state.otBus.iTrThermostatMs = now - 1000UL;
+    state.sat.bFallbackActive = true; OTcurrentSystemState.Tr = 99.0f; state.otBus.iTrThermostatMs = now - 1000UL; _sat_roomSrc = 'F';
   } else if (!strcmp(sc, "sim")) {
-    settings.sat.bSimulation = true; state.sat.fSimFlowTemp = 55.25f; state.sat.fSimReturnTemp = 44.0f;
+    settings.sat.bSimulation = true; state.sat.fSimFlowTemp = 55.25f; state.sat.fSimReturnTemp = 44.0f; _sat_roomSrc = 'S';
   } else if (!strcmp(sc, "wrap")) {       // millis wrapped between the stamp and now
-    g_flowFresh = true; OTcurrentSystemState.Tr = 20.5f; state.otBus.iTrThermostatMs = 0xFFFFF000u;
+    g_flowFresh = true; OTcurrentSystemState.Tr = 20.5f; state.otBus.iTrThermostatMs = 0xFFFFF000u; _sat_roomSrc = 'T';
   }
   SatStatusLive l;
   uint32_t ms = 0;
@@ -211,14 +214,15 @@ class Wiring(unittest.TestCase):
         for k in ("\"room_temp\"", "\"outside_temp\"", "\"current_modulation\"", "\"sim_flow_temp\""):
             self.assertIn(k, b)
 
-    def test_room_age_mirror_follows_satGetRoomTemp_source_order(self):
-        order = ["bSimulation", "bBleTempValid", "bMultiArea", "bUseExternalTemp", "bFallbackActive"]
-        def positions(text):
-            return [text.index(k) for k in order]
+    # TASK-3011: the source order is a setting now, so the age no longer mirrors it: it reads the source satGetRoomTemp()
+    # recorded (_sat_roomSrc), with a case for every source it can record.
+    def test_room_age_follows_the_source_satGetRoomTemp_recorded(self):
         real = self.body("static float satGetRoomTemp()")
         mirror = self.body("static bool satRoomTempSampleMs(")
-        self.assertEqual(sorted(positions(real)), positions(real))
-        self.assertEqual(sorted(positions(mirror)), positions(mirror))
+        self.assertIn("switch (_sat_roomSrc)", mirror)
+        for c in "SBAET":
+            self.assertIn("case '%s':" % c, mirror, "no age case for source %s" % c)
+        self.assertIn("satTryRoomSource(", real)
 
 
 if __name__ == "__main__":

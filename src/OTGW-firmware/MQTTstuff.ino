@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : MQTTstuff
-**  Version  : v2.0.0-beta.415
+**  Version  : v2.0.0-beta.416
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **      Modified version from (c) 2020 Willem Aandewiel
@@ -720,6 +720,7 @@ static const SatMqttCmdEntry kSatMqttCmds[] PROGMEM = {
   { "overshoot_margin",       "SATovershootmargin",   nullptr },
   { "pwm_switch_margin",      "SATpwmswitchmargin",   nullptr },   // TASK-1888
   { "heating_system",         "SATsystem",            nullptr },
+  { "room_source",            "SATroomsource",        nullptr },   // TASK-3011: set/<node>/sat/room_source auto|thermostat|external|ble|areas
   { "manufacturer",           "SATmanufacturer",      nullptr },
   { "max_modulation",         "SATmaxmodulation",     nullptr },
   { "dhw_setpoint",           "SATdhwsetpoint",       nullptr },

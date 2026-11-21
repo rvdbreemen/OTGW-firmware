@@ -6860,8 +6860,8 @@
       "title": "SAT behaviour ground truth: Sergeant D's recorded decisions, then pinned thermo-nova, then specs, then firmware",
       "path": "ADR-196-sat-behaviour-ground-truth-sergeant-d-s-recorded-decisions-then-pinned-thermo-nova-then-specs-then-firmware.md",
       "format": "canonical",
-      "status": "Accepted",
-      "date": "2026-10-24",
+      "status": "Superseded",
+      "date": "2026-11-21",
       "decision_summary": "For every statement or change about SAT behaviour the sources rank in this order, and a higher source wins over a low...",
       "topics": [
         "documentation-process",
@@ -6890,27 +6890,10 @@
       "symbols": [],
       "context_scope": "selective",
       "decision_contract": {
-        "must": [
-          "Read docs/sat/decisions/sergeant-d-corrections.md before writing a SAT ADR, plan, review or SAT-control change, and cite the matching entry numbers or state \"no entry covers this topic\".",
-          "Cite thermo-nova as file:line at commit 7beaaf531ee99dc74a19ac74f3c06ce7f2922cfb, opened in the current session.",
-          "Record a new correction or decision by Sergeant D as a new numbered entry (date, verbatim quote, Discord link, thermo-nova and firmware comparison, task, what stays open), marking a short reply that we interpreted as an interpretation.",
-          "Report a conflict between an entry and the thermo-nova code to Sergeant D with both citations.",
-          "Move the pinned commit only in a dedicated commit that re-diffs docs/sat/thermo-nova-spec.md."
-        ],
-        "must_not": [
-          "Treat the firmware, firmware-sat-spec.md or sat-comparison.md as the authority for SAT behaviour.",
-          "Rewrite an existing corrections entry or the spec documents silently.",
-          "Fill a gap with plausible behaviour; write \"not found in the code\" and ask Sergeant D.",
-          "Update the local thermo-nova copy without moving the pin as above."
-        ],
-        "exceptions": [
-          "Firmware-only features with no thermo-nova counterpart, where Sergeant D defers to the maintainer (entry 2, follow-thermostat with push setpoint), are decided by the maintainer and recorded in the same corrections entry."
-        ],
-        "verification": [
-          "python tests/testsatgroundtruthblock.py: keeps the SAT ground-truth block identical in CLAUDE.md and AGENTS.md, pins the commit, and requires the corrections file to exist. It guards the rule's text, not compliance.",
-          "Review: the reviewer reads the corrections file and treats an unmentioned conflict with an entry as a finding (CLAUDE.md block; .claude/skills/implement-next-task/SKILL.md lines 87, 102 and 158).",
-          "/adr-kit:context \"SAT ground truth\" surfaces this ADR."
-        ]
+        "must": [],
+        "must_not": [],
+        "exceptions": [],
+        "verification": []
       },
       "scope": {
         "path_globs": []
@@ -6921,7 +6904,7 @@
         "documents_shipped": false,
         "verified_in": [],
         "supersedes": [],
-        "superseded_by": null
+        "superseded_by": "ADR-292"
       }
     },
     {
@@ -11482,7 +11465,7 @@
       "title": "The Monitor graph history stores the room SAT regulates on in its own column; a slot grows from 16 to 18 bytes (amends ADR-256)",
       "path": "ADR-291-the-monitor-graph-history-stores-the-room-sat-regulates-on-in-its-own-column-a-slot-grows-from-16-to-18-bytes-amends-adr-256.md",
       "format": "canonical",
-      "status": "Proposed",
+      "status": "Accepted",
       "date": "2026-11-21",
       "decision_summary": "The device history slot gets an eighth int16t temperature column, satRoom, so a slot is 18 bytes.",
       "topics": [
@@ -11547,10 +11530,10 @@
     },
     {
       "id": "ADR-292",
-      "title": "SAT ground truth: our implementation and the recorded decisions are leading, Alex Wijn's SAT is a reference (proposed successor to ADR-196)",
+      "title": "SAT ground truth: our implementation and the recorded decisions are leading, Alex Wijn's SAT is a reference (supersedes ADR-196)",
       "path": "ADR-292-sat-ground-truth-our-implementation-and-the-recorded-decisions-are-leading-alex-wijn-s-sat-is-a-reference-supersedes-adr-196.md",
       "format": "canonical",
-      "status": "Proposed",
+      "status": "Accepted",
       "date": "2026-11-21",
       "decision_summary": "For every statement or change about SAT behaviour the sources rank in this order, and a higher source wins over a low...",
       "topics": [
@@ -11607,6 +11590,73 @@
           "python tests/testsatgroundtruthblock.py: keeps the block identical in .claude/rules/sat-ground-truth.md and AGENTS.md and checks the new ranking's text (for example \"our implementation is leading\", \"Reference, not leading\", other-project...",
           "Review: the reviewer reads the corrections file and treats an unmentioned conflict with an entry as a finding.",
           "/adr-kit:context \"SAT ground truth\" surfaces this ADR."
+        ]
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [
+          "ADR-196"
+        ],
+        "superseded_by": null
+      }
+    },
+    {
+      "id": "ADR-293",
+      "title": "SAT regulates on one primary room temperature source with a fixed fallback order, and BLE feeds SAT only from the pinned sensor",
+      "path": "ADR-293-sat-regulates-on-one-primary-room-temperature-source-with-a-fixed-fallback-order-and-ble-feeds-sat-only-from-the-pinned-sensor.md",
+      "format": "canonical",
+      "status": "Proposed",
+      "date": "2026-11-21",
+      "decision_summary": "SAT regulates on one primary room temperature source chosen by the setting SATroomsource, with a fixed fallback order...",
+      "topics": [
+        "ble",
+        "mqtt",
+        "room temperature source",
+        "sat"
+      ],
+      "aliases": [
+        "BLE pin only",
+        "room_source",
+        "room_temp_source",
+        "SATroomsource"
+      ],
+      "components": [
+        "satBLEUpdateState",
+        "satGetRoomTemp",
+        "SATroomsource"
+      ],
+      "symbols": [
+        "_sat_roomSrc",
+        "bBlePinNotice",
+        "SAT_ROOMSRC_AUTO",
+        "satRoomSourceParse",
+        "satTryRoomSource"
+      ],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [
+          "SATroomsource default is auto, and auto gives today's order with BLE only when pinned.",
+          "A primary without a fresh value falls back along the auto order, then the thermostat, then heating curve only.",
+          "BLE drives SAT only from the pinned MAC, or with bBleFailover from a sensor assigned to an area.",
+          "Every return of satGetRoomTemp() records its source; sat/roomtempsource and roomtempages use that record."
+        ],
+        "must_not": [
+          "Pin a BLE sensor without a user action (no auto-select).",
+          "Fail over to a roster sensor the user did not assign.",
+          "Clear bBlePinNotice while settings.ini is being loaded."
+        ],
+        "exceptions": [
+          "None."
+        ],
+        "verification": [
+          "tests/testsatblepinonly.py: compiles the real satBLEUpdateState(), the [sat-blepinonly-migrate] block and satGetRoomTemp() with its helpers; BLE cases, migration cases and 7 primary-source cases. Red on origin/dev (10 failures) and on th...",
+          "tests/testsatstatuslive.py (room age follows the recorded source), tests/testsatenergydiscovery.py (sensor table and index)."
         ]
       },
       "scope": {
@@ -17288,6 +17338,12 @@
       "resolved": true
     },
     {
+      "source": "ADR-196",
+      "target": "ADR-292",
+      "type": "superseded-by",
+      "resolved": true
+    },
+    {
       "source": "ADR-197",
       "target": "ADR-069",
       "type": "related",
@@ -19215,6 +19271,12 @@
     },
     {
       "source": "ADR-292",
+      "target": "ADR-196",
+      "type": "supersedes",
+      "resolved": true
+    },
+    {
+      "source": "ADR-292",
       "target": "ADR-197",
       "type": "related",
       "resolved": true
@@ -19234,6 +19296,24 @@
     {
       "source": "ADR-292",
       "target": "ADR-253",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-293",
+      "target": "ADR-101",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-293",
+      "target": "ADR-199",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-293",
+      "target": "ADR-292",
       "type": "related",
       "resolved": true
     }

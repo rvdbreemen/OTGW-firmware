@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : settingsStuff
-**  Version  : v2.0.0-beta.415
+**  Version  : v2.0.0-beta.416
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -280,6 +280,7 @@ static void writeJsonIndexedStringKV(File& file, PGM_P keyBase, unsigned index, 
 }
 
 //=======================================================================
+static constexpr bool kSatBlePinOnlyMarkerValue = true;   // TASK-3011: the SATblepinonly marker; its presence counts, not its value
 static constexpr bool kSatPwmMarginMarkerValue = true;   // TASK-2005: the SATpwmmargin2 marker; its presence counts, not its value
 static constexpr bool kOtdOhMarkerValue = true;   // TASK-1961: the OTDohpicdefault marker; its presence counts, not its value
 
@@ -461,6 +462,9 @@ bool writeSettings(bool show)
   writeJsonBoolKV(file, F("SATbleenable"), settings.sat.bBleEnable);
   writeJsonBoolKV(file, F("SATbleriskack"), settings.sat.bBleRiskAck);
   writeJsonBoolKV(file, F("SATblefailover"), settings.sat.bBleFailover);
+  writeJsonBoolKV(file, F("SATblepinonly"), kSatBlePinOnlyMarkerValue);   // TASK-3011: marker, the one-time BLE pin/failover migration is done
+  writeJsonBoolKV(file, F("SATblepinnotice"), settings.sat.bBlePinNotice); // TASK-3011: internal, not in the settings listing
+  writeJsonIntKV(file, F("SATroomsource"), settings.sat.iRoomSource);        // TASK-3011: 0 auto, 1 thermostat, 2 external, 3 ble, 4 areas
   writeJsonStringKV(file, F("SATblemac"), settings.sat.sBleMAC);
   writeJsonIntKV(file, F("SATbleinterval"), settings.sat.iBleInterval);
   // TASK-895: name-prefix filter + ingestion toggle. The prefix is user text;
@@ -559,6 +563,7 @@ static bool g_sawLegacyTopicsKey = false;
 static bool g_satCphOutOfSet = false;    // TASK-1375: set when the file carried a SATcyclesperhour other than 3 or 4; the deferred flush then rewrites the snapped value
 static bool g_sawSatFollowKey = false;   // TASK-1259: set when SATfollowthermostat is parsed; its absence means "default to the push-setpoint value"
 static bool g_sawOtdOhMarkerKey = false;   // TASK-1961: set when OTDohpicdefault is parsed; absent = OH not yet migrated to 1
+static bool g_sawSatBlePinOnlyMarkerKey = false;   // TASK-3011: set when SATblepinonly is parsed; absent = BLE pin/failover not yet migrated
 static bool g_sawSatPwmMarginMarkerKey = false;   // TASK-2005: set when SATpwmmargin2 is parsed; absent = margin not yet migrated
 // TASK-2013: true while readSettings() applies settings.ini. A value loaded from the file is not a user change:
 // SATtargettemp then holds the user's own target (satUserTargetTemp()), so it must not clear a preset that holds the
@@ -602,6 +607,7 @@ void readSettings(bool show)
   g_sawSatFollowKey = false;     // TASK-1259: same sentinel pattern for SATfollowthermostat
   g_sawOtdOhMarkerKey = false;   // TASK-1961: same sentinel pattern for the OH=1 migration marker
   g_sawSatPwmMarginMarkerKey = false;   // TASK-2005: same sentinel pattern for the switch margin migration
+  g_sawSatBlePinOnlyMarkerKey = false;  // TASK-3011: same sentinel pattern for the BLE pin/failover migration
   if (!LittleFS.exists(SETTINGS_FILE))
   {  //create settings file if it does not exist yet.
     DebugTln(F(" .. file not found! --> created file!"));
@@ -727,6 +733,18 @@ void readSettings(bool show)
     DebugTln(F("[Settings] no SATpwmmargin2 marker: a stored PWM switch margin of 1.5 becomes 2.0 once"));
   }
   // [sat-pwmmargin-migrate:end]
+  // [sat-blepinonly-migrate:begin] TASK-3011 (entry 451, Robert Q2 A and Q3 C). BLE now feeds SAT only from a pinned sensor.
+  // A stored pin may have been set by the removed auto-select (TASK-508) or by the user; the firmware cannot tell them apart,
+  // so every stored pin stays (it keeps driving SAT) and is flagged once for confirmation. A stored bBleFailover=true (the
+  // old default, which could switch to an unchosen sensor) is reset once to off.
+  if (!g_sawSatBlePinOnlyMarkerKey) {
+    settings.sat.bBleFailover = false;
+    settings.sat.bBlePinNotice = (settings.sat.sBleMAC[0] != '\0');
+    settingsDirty = true;
+    DebugTf(PSTR("[Settings] no SATblepinonly marker: BLE failover off; stored BLE pin '%s' %s\r\n"),
+            settings.sat.sBleMAC, settings.sat.bBlePinNotice ? "kept, needs confirmation" : "none");
+  }
+  // [sat-blepinonly-migrate:end]
   if (!g_sawOnboardedKey) {
     settings.ui.bOnboarded = true;
     settingsDirty = true;              // persist the key so this migration runs once
@@ -1327,7 +1345,12 @@ void updateSetting(const char *field, const char *newValue)
   else if (strcasecmp_P(field, PSTR("SATbleenable")) == 0)  { g_sawBleEnableKey = true; const bool want = EVALBOOLEAN(newValue); settings.sat.bBleEnable = bleEnableAllowed(psramFound(), want); if (want && !settings.sat.bBleEnable) g_bleRefusedNoPsram = true; }  // TASK-1693 sentinel, TASK-2025 refusal
   else if (strcasecmp_P(field, PSTR("SATbleriskack")) == 0) settings.sat.bBleRiskAck = EVALBOOLEAN(newValue);
   else if (strcasecmp_P(field, PSTR("SATblefailover")) == 0) settings.sat.bBleFailover = EVALBOOLEAN(newValue);
-  else if (strcasecmp_P(field, PSTR("SATblemac")) == 0)      strlcpy(settings.sat.sBleMAC, newValue, sizeof(settings.sat.sBleMAC));
+  else if (strcasecmp_P(field, PSTR("SATblepinonly")) == 0)  g_sawSatBlePinOnlyMarkerKey = true;   // TASK-3011: key presence = migration done
+  else if (strcasecmp_P(field, PSTR("SATblepinnotice")) == 0) settings.sat.bBlePinNotice = EVALBOOLEAN(newValue);   // TASK-3011: internal
+  else if (strcasecmp_P(field, PSTR("SATroomsource")) == 0)  settings.sat.iRoomSource = satRoomSourceParse(newValue, settings.sat.iRoomSource);   // TASK-3011
+  else if (strcasecmp_P(field, PSTR("SATblemac")) == 0) {    strlcpy(settings.sat.sBleMAC, newValue, sizeof(settings.sat.sBleMAC));
+    if (!g_loadingSettingsFile) settings.sat.bBlePinNotice = false;   // TASK-3011: a user write (same or other MAC, or clear) confirms the pin
+  }
   else if (strcasecmp_P(field, PSTR("SATbleinterval")) == 0) settings.sat.iBleInterval = constrain(atoi(newValue), 10, 300);
   // TASK-895: name-prefix filter + ingestion toggle. Exact-match keys placed
   // before the SATblemacN/SATblelabelN prefix branches below; "SATblename..."

@@ -1102,6 +1102,7 @@
         "satmanufacturer": "Auto detects from the boiler; choose Immergas explicitly to enable its TP=11:12 modulation command",
         "satsource": "Heat source: auto (gas boiler), gas boiler, heat pump or hybrid. Sets cycle timing; heat pumps never get modulation 0. On/off heat pump, 3 h cycle (experimental): Experimental. Only for on/off heat pumps with a large thermal mass (underfloor heating or a buffer tank). Long runs of up to 3 hours."
       },
+      "room_source_off": "This source is not enabled; SAT uses the next source in the auto order.",
       "hint": {
         "c_below_30_off_30_60": "°C (below 30 = off, 30-60)",
         "connected_ssid_read_only": "Connected SSID (read-only)",
@@ -1264,6 +1265,7 @@
         "satsensorarea1": "Sensor 2",
         "satsensorarea2": "Sensor 3",
         "satsensorarea3": "Sensor 4",
+        "satroomsource": "Room temperature source",
         "satsensormaxage": "Sensor max age",
         "satsimcoolrate": "Cool rate",
         "satsimheatrate": "Heat rate",
@@ -1574,6 +1576,17 @@
       "sat_loop_collecting": "Collecting data…",
       "sat_curve_empty": "The heating curve appears once SAT knows its coefficient and target.",
       "sat_trend_rate": "{{rate}} °C per hour",
+      "sat_room_src": "Source: {{src}}",
+      "sat_room_src_ble": "BLE sensor",
+      "sat_room_src_areas": "averaged room sensors",
+      "sat_room_src_external": "MQTT/REST sensor",
+      "sat_room_src_thermostat": "thermostat",
+      "sat_room_src_simulation": "simulation",
+      "sat_room_src_estimate": "estimate",
+      "sat_room_src_none": "none",
+      "sat_ble_pin": "SAT uses BLE sensor {{name}} for the room temperature. Confirm it, or choose another sensor.",
+      "sat_ble_pin_confirm": "Confirm",
+      "sat_ble_pin_change": "Change",
       "sat_curve_rec_insufficient": "Curve advice: not enough data yet (at least 6 hours of control).",
       "sat_curve_rec_increase": "Curve advice: the room stayed below target on average; a higher curve may help.",
       "sat_curve_rec_decrease": "Curve advice: the room stayed above target on average; a lower curve may help.",
@@ -1812,6 +1825,10 @@
       "trigger_tstat_dhwblock": "Thermostat: DHW blocking",
       "trigger_tstat_bit7": "Thermostat: bit 7 (reserved)",
       "enum_auto": "Auto",
+      "enum_room_thermostat": "Thermostat",
+      "enum_room_external": "MQTT/REST sensor",
+      "enum_room_ble": "BLE sensor",
+      "enum_room_areas": "Averaged room sensors",
       "enum_gas_boiler": "Gas Boiler",
       "enum_heat_pump": "Heat Pump",
       "enum_hybrid": "Hybrid",
@@ -4383,6 +4400,7 @@
     // (now POST-able).
     satcyclesperhour:    { cat: 'sat', label: 'PWM cycle length', hint: 'Minutes' },   // TASK-1550: gas / Auto; stored as cycles per hour
     satvalveoffset:      { cat: 'sat', label: 'Valve offset', hint: '°C' },
+    satroomsource:       { cat: 'sat', label: 'Room temperature source' },   // TASK-3011: 0 auto, 1 thermostat, 2 external, 3 ble, 4 areas
     satsensormaxage:     { cat: 'sat', label: 'Sensor max age', hint: 'Seconds' },
     saterrormon:         { cat: 'sat', label: 'Error monitoring' },
     satsolarfreezeint:   { cat: 'sat', label: 'Solar freeze integral' },
@@ -4452,7 +4470,7 @@
     ['System', ['satsystem', 'satsource', 'satheatingmode', 'satpushsetpoint', 'satfollowthermostat', 'satfireplace', 'satmqttfallback']],
     ['Presets', ['satpresetcomfort', 'satpreseteco', 'satpresetaway', 'satpresetsleep', 'satpresetactivity',
                  'satpresethome', 'satpresetsync', 'satpresetsynctopic']],
-    ['Indoor temperature', ['satexternaltemp', 'satsensormaxage']],
+    ['Indoor temperature', ['satroomsource', 'satexternaltemp', 'satsensormaxage']],
     // TASK-3014: two groups side by side (gruijter, Robert approved); keys unchanged, labels numbered 1-4
     ['Averaged room sensors', ['satmultiarea', 'satmultiareacount', 'satsensorarea0', 'satareaweight0', 'satsensorarea1', 'satareaweight1',
                                'satsensorarea2', 'satareaweight2', 'satsensorarea3', 'satareaweight3']],
@@ -4533,11 +4551,22 @@
     return 'system';
   }
   function labelFor(k) { return (SET_META[k] && SET_META[k].label) ? setT('settings.label.' + k, SET_META[k].label) : humanizeKey(k); }
+  // TASK-3011 (coordinator): the chosen primary room source is not switched on, so the firmware falls through to
+  // the next source in the auto order. 2 external = satexternaltemp, 3 ble = BLE on with a pinned MAC, 4 areas = satmultiarea.
+  function satRoomSourceOff() {
+    function on(k) { return !!setData[k] && (curVal(k) === 'true' || curVal(k) === '1'); }
+    var src = setData.satroomsource ? (curVal('satroomsource') | 0) : 0;
+    if (src === 2) return !on('satexternaltemp');
+    if (src === 3) return !(setData.satbleenable ? on('satbleenable') : true) || !(setData.satblemac && curVal('satblemac'));
+    if (src === 4) return !on('satmultiarea');
+    return false;
+  }
   function hintFor(k) {
     // TASK-2959 F10 (option B, coordinator 2026-11-21): entry 204 (sergeant-d-corrections.md:5470) says
     // "the experimental type always shows" its warning, so the warning stays inline while that type is
     // chosen; for every other appliance type a short line, the full text in the (i).
     if (k === 'satsource' && !satHpLongCycle()) return setT('settings.hint.satsource_short', 'The (i) explains each type.');
+    if (k === 'satroomsource') return satRoomSourceOff() ? t('settings.room_source_off') : '';   // TASK-3011
     var h = SET_META[k] && SET_META[k].hint;
     return (h && !HINT_UNIT_RE.test(h)) ? setT(hintKey(k, h), h) : h;
   }
@@ -5119,7 +5148,7 @@
     else setDirty[k] = val;
     if (row) row.classList.toggle('dirty', fieldDirty(k));
     updateSaveBar();
-    if (k === 'satsource') renderSatSettings();   // TASK-1529: swap the PWM card's cycle setting at once
+    if (k === 'satsource' || k === 'satroomsource' || k === 'satexternaltemp' || k === 'satmultiarea') renderSatSettings();   // TASK-1529; TASK-3011 room-source hint
   }
   function updateSaveBar() {
     var n = Object.keys(setDirty).length;
@@ -5479,6 +5508,8 @@
     [12, enumLabel('values.trigger_tstat_ch2')], [13, enumLabel('values.trigger_tstat_summer')], [14, enumLabel('values.trigger_tstat_dhwblock')], [15, enumLabel('values.trigger_tstat_bit7')]];
   var OTD_SERVICE_MODES = { 0: 1, 4: 1 };   // TASK-1716: OT-Direct bypass and loopback, not offered in the selector
   var ENUM_OPTS = {
+    satroomsource: [[0, enumLabel('values.enum_auto')], [1, enumLabel('values.enum_room_thermostat')], [2, enumLabel('values.enum_room_external')],
+      [3, enumLabel('values.enum_room_ble')], [4, enumLabel('values.enum_room_areas')]],   // TASK-3011
     satsource: [[0, enumLabel('values.enum_auto')], [1, enumLabel('values.enum_gas_boiler')], [2, enumLabel('values.enum_heat_pump')], [3, enumLabel('values.enum_hybrid')], [4, enumLabel('values.enum_onoff_hp')]],
     satsystem: [[0, enumLabel('values.enum_auto')], [1, enumLabel('values.enum_radiators')], [2, enumLabel('values.enum_underfloor')]],
     sathpcycle: [[1800, enumLabel('values.enum_min_default', { minutes: 30 })], [2400, enumLabel('values.enum_min', { minutes: 40 })], [3600, enumLabel('values.enum_min_hp_only', { minutes: 60 })]],   // TASK-1550: minutes, stored in seconds
@@ -7491,6 +7522,42 @@
   }
   // TASK-1884 U4: room trend from indoor_rise_rate (°C/h, EMA). The firmware computes it only while
   // solar-gain detection is on and sends 0 otherwise, so a small value shows no arrow.
+  // TASK-3011: where SAT's room temperature comes from (room_temp_source, the firmware's resolve).
+  var SAT_ROOM_SRC = { ble: 1, areas: 1, external: 1, thermostat: 1, simulation: 1, estimate: 1, none: 1 };
+  function satRenderRoomSource(d) {
+    var e = document.getElementById('satRoomSrc'); if (!e) return;
+    var s = d.room_temp_source;
+    e.hidden = !SAT_ROOM_SRC[s];
+    e.textContent = SAT_ROOM_SRC[s] ? t('tools.sat_room_src', { src: t('tools.sat_room_src_' + s) }) : '';
+  }
+  // TASK-3011 (Robert Q3 C): the upgrade kept a BLE pin the user never chose; ask once to confirm or change it.
+  // Confirm writes the same MAC (any ble_mac write clears the notice in the firmware); Change opens Settings > Sensors.
+  var satBlePinPending = false;
+  function satBleNameFor(mac) {
+    var list = (bleData && bleData.sensors) || [];
+    for (var i = 0; i < list.length; i++) if (list[i] && list[i].mac === mac && list[i].name) return list[i].name + ' (' + mac + ')';
+    return mac;
+  }
+  function satRenderBlePin(d) {
+    var box = document.getElementById('satBlePin'); if (!box) return;
+    var show = !!(d.ble_pin_notice && d.ble_mac) && !satBlePinPending;
+    box.hidden = !show;
+    if (!show) return;
+    var sig = d.ble_mac + '|' + i18nLang;
+    if (box.getAttribute('data-sig') === sig) return;   // rebuild only on a change, so a focused button keeps its focus
+    box.setAttribute('data-sig', sig);
+    box.textContent = '';
+    var p = document.createElement('span'); p.textContent = t('tools.sat_ble_pin', { name: satBleNameFor(d.ble_mac) });
+    var ok = document.createElement('button'); ok.type = 'button'; ok.className = 'sat-link'; ok.textContent = t('tools.sat_ble_pin_confirm');
+    var ch = document.createElement('button'); ch.type = 'button'; ch.className = 'sat-link'; ch.textContent = t('tools.sat_ble_pin_change');
+    var mac = d.ble_mac;
+    ok.addEventListener('click', function () {
+      satBlePinPending = true; box.hidden = true;
+      satPost('settings/ble_mac', mac).catch(function () { satBlePinPending = false; box.removeAttribute('data-sig'); if (satLastData) satRenderBlePin(satLastData); });
+    });
+    ch.addEventListener('click', function () { goToSensorRoster(); });
+    box.appendChild(p); box.appendChild(document.createTextNode(' ')); box.appendChild(ok); box.appendChild(document.createTextNode(' ')); box.appendChild(ch);
+  }
   function satRenderRoomTrend(d) {
     var e = document.getElementById('satRoomTrend'); if (!e) return;
     var r = satNum(d.indoor_rise_rate), room = satNum(d.room_temp);
@@ -7605,6 +7672,8 @@
     satRenderRoomTrend(d);
     satRenderAge('satOutAge', d.outside_temp_age_s);   // TASK-1885 (U8): how old the reading is, in plain minutes
     satRenderAge('satRoomAge', d.room_temp_age_s);
+    satRenderRoomSource(d);   // TASK-3011
+    satRenderBlePin(d);
     txt('satTargetT', satFmt(d.target_temp, 1, '°'));
     satRenderDhw(d);
     satRenderMaxTSet(d);

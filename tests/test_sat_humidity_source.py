@@ -52,7 +52,8 @@ STUBS = r"""
 #define SATDebugTf(...) ((void)0)
 #define SATDebugTln(x) ((void)0)
 struct SatSettings { bool bSimulation=false, bBleEnable=false, bMultiArea=false, bUseExternalTemp=false, bThermalComfort=true;
-                     int iMultiAreaCount=0; uint16_t iHumidityTimeoutS=1800; uint32_t iSensorMaxAgeS=21600; };
+                     int iMultiAreaCount=0; uint16_t iHumidityTimeoutS=1800; uint32_t iSensorMaxAgeS=21600;
+                     uint8_t iRoomSource=0; };   // TASK-3011: primary room source, 0 = auto
 struct Settings { SatSettings sat; };
 struct Weather { bool bValid=false; float fHumidity=0; uint32_t iLastUpdateMs=0; };
 struct SatState { bool bBleTempValid=false, bExternalTempValid=false, bFallbackActive=false, bHumidityValid=false;
@@ -63,6 +64,9 @@ struct State { SatState sat; OtBusState otBus; };
 struct OTSys { float Tr = 24.0f; }; static OTSys OTcurrentSystemState;
 static Settings settings; static State state;
 static const uint32_t SAT_STALE_TEMP_BLE_MS = 300000UL, SAT_STALE_TEMP_MS = 300000UL;
+// TASK-3011: the real satRoomTempValid() (SATcontrol.ino) is above the cut; same rule: not NaN, -10..50 C.
+static bool satRoomTempValid(float v) { return !std::isnan(v) && v >= -10.0f && v <= 50.0f; }
+static const uint8_t SAT_ROOMSRC_AUTO = 0, SAT_ROOMSRC_THERMOSTAT = 1, SAT_ROOMSRC_EXTERNAL = 2, SAT_ROOMSRC_BLE = 3, SAT_ROOMSRC_AREAS = 4, SAT_ROOMSRC_MAX = 4;   // TASK-3011 (SATtypes.h)
 static uint32_t g_ms = 1000;
 static uint32_t millis() { return g_ms; }
 static float satGetWeightedRoomTemp() { return NAN; }

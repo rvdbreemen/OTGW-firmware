@@ -376,6 +376,7 @@
             <button type="button" class="sat-msg-btn" id="satMsgBtn" hidden aria-expanded="false" aria-controls="satMsgs"><span class="sat-msg-ico" id="satMsgIco">i</span> <span id="satMsgCount">0</span></button></div>
           <div class="sat-state-sub" id="satStateSub" aria-live="polite" hidden></div>
           <div class="sat-why" id="satWhy" hidden></div>
+          <div class="sat-ble-pin" id="satBlePin" role="status" hidden></div>
           <!-- TASK-1884 U3: every active message in one panel; it opens by itself while a warning is active -->
           <div class="sat-msgs" id="satMsgs" hidden>
           <div class="sat-hint" id="satRoomLost" hidden data-i18n="h_mon.sat_room_lost">Room temperature lost: heating on the curve only</div>
@@ -426,7 +427,7 @@
       <div class="sat-tiles4">
         <div class="sat-tile"><div class="l" data-i18n="h_mon.sat_tile_outside">Outside</div><div class="v" id="satOut">—</div><div class="sub" id="satOutAge" hidden></div></div>
         <div class="sat-tile"><div class="l"><span data-i18n="h_mon.sat_tile_setpoint">Boiler setpoint</span> <span class="tag" data-i18n="h_mon.sat_tile_setpoint_tag">SAT → boiler</span></div><div class="v hot" id="satFlowSet">—</div></div>
-        <div class="sat-tile"><div class="l" data-i18n="h_mon.sat_tile_room">Room</div><div class="v"><span id="satRoom">—</span><span class="sat-trend" id="satRoomTrend"></span></div><div class="sub" id="satRoomAge" hidden></div></div>
+        <div class="sat-tile"><div class="l" data-i18n="h_mon.sat_tile_room">Room</div><div class="v"><span id="satRoom">—</span><span class="sat-trend" id="satRoomTrend"></span></div><div class="sub" id="satRoomAge" hidden></div><div class="sub" id="satRoomSrc" hidden></div></div>
         <div class="sat-tile is-target"><div class="l" data-i18n="h_mon.sat_tile_target">Target</div><div class="v" id="satTargetT">—</div></div>
       </div>
       <div class="card sat-curve-hero"><h4><span data-i18n="h_mon.sat_curve_title">Heating curve</span> <span class="sub" id="satCurveLbl"></span></h4>

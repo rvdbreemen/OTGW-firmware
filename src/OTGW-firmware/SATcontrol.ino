@@ -2756,6 +2756,79 @@ static bool satHumidityFresh(uint32_t nowMs)
          (uint32_t)(nowMs - state.sat.iHumidityLastMs) <= ((uint32_t)settings.sat.iHumidityTimeoutS * 1000UL);
 }
 
+// TASK-3015: which source the last satGetRoomTemp() used: S simulation, B BLE (pinned sensor), A areas (weighted average),
+// E external (MQTT/REST), T thermostat (MsgID 24, also its Summer Simmer value), F fallback estimate, N none. Same pattern as
+// _sat_outsideSrc: the loop task and the REST snapshot both call the resolver, the last call wins (one byte, no tearing).
+static char _sat_roomSrc = 'N';
+
+const char* satRoomSourceName()
+{
+  switch (_sat_roomSrc) {
+    case 'S': return "simulation";
+    case 'B': return "ble";
+    case 'A': return "areas";
+    case 'E': return "external";
+    case 'T': return "thermostat";
+    case 'F': return "estimate";
+    default:  return "none";
+  }
+}
+
+// TASK-3011: the thermostat's room temperature (MsgID 24), NaN when it never arrived or went stale.
+// TASK-522: OTcurrentSystemState.Tr is NAN until a MsgID 24 arrives (OTDirect / master configs without a thermostat keep it
+// NAN). TASK-1157: Tr never expires on its own, so once the thermostat has reported it, a reading it has not refreshed within
+// SAT_STALE_TEMP_MS counts as never observed (room lost, curve only, TASK-1364). A Tr that never came from a thermostat
+// (a TR= feed) keeps its previous behaviour.
+static float satThermostatRoomTemp()
+{
+  float tr = OTcurrentSystemState.Tr;
+  if (state.otBus.iTrThermostatMs != 0 &&
+      (millis() - state.otBus.iTrThermostatMs) > SAT_STALE_TEMP_MS) {
+    tr = NAN;
+  }
+  return tr;
+}
+
+// TASK-3011: one non-thermostat room source; true with *out set (and _sat_roomSrc) when it has a valid value now.
+// BLE (Task #20, TASK-742: inert without a BLE radio): only the pinned sensor reaches bBleTempValid (TASK-3011); stale after 5 min.
+// Areas (Task #25): the weighted average, NaN when no area is valid. External (MQTT/REST): stale after iSensorMaxAgeS
+// (default 6 h, Python CONF_SENSOR_MAX_VALUE_AGE).
+static bool satTryRoomSource(uint8_t src, float* out)
+{
+  switch (src) {
+    case SAT_ROOMSRC_BLE:
+      if (!settings.sat.bBleEnable || !state.sat.bBleTempValid) return false;
+      if ((millis() - state.sat.iBleTempLastMs) > SAT_STALE_TEMP_BLE_MS) {
+        state.sat.bBleTempValid = false;
+        SATDebugTln(F("SAT: BLE temp stale, falling back to next source"));
+        return false;
+      }
+      _sat_roomSrc = 'B';
+      *out = state.sat.fBleTemp;  // BLE has 0.01C precision
+      return true;
+    case SAT_ROOMSRC_AREAS: {
+      if (!settings.sat.bMultiArea || settings.sat.iMultiAreaCount == 0) return false;
+      const float weighted = satGetWeightedRoomTemp();
+      if (isnan(weighted)) return false;
+      _sat_roomSrc = 'A';
+      *out = weighted;
+      return true;
+    }
+    case SAT_ROOMSRC_EXTERNAL:
+      if (!settings.sat.bUseExternalTemp || !state.sat.bExternalTempValid) return false;
+      if ((millis() - state.sat.iExternalTempLastMs) > ((uint32_t)settings.sat.iSensorMaxAgeS * 1000UL)) {
+        state.sat.bExternalTempValid = false;
+        SATDebugTln(F("SAT: external indoor temp stale, falling back to the next source"));
+        return false;
+      }
+      _sat_roomSrc = 'E';
+      *out = state.sat.fExternalTemp;
+      return true;
+    default:
+      return false;
+  }
+}
+
 static float satGetRoomTemp()
 {
   // Simulation mode overrides all other sources
@@ -2764,61 +2837,37 @@ static float satGetRoomTemp()
     // ghost-Tr / fallback path (TASK-521/522) exercises under simulation.
     if (state.sat.iSimDropoutExpiryMs != 0 &&
         (int32_t)(millis() - state.sat.iSimDropoutExpiryMs) < 0) {
+      _sat_roomSrc = 'N';
       return NAN;
     }
+    _sat_roomSrc = 'S';
     return state.sat.fSimRoomTemp;
   }
-  // BLE sensor has highest priority when available (Task #20). TASK-742: no
-  // longer #ifdef'd — on ESP8266 bBleEnable/bBleTempValid stay false (no BLE
-  // radio), so this block is naturally inert.
-  // Temperature source priority: BLE > MQTT external > OT bus MsgID 24
-  if (settings.sat.bBleEnable && state.sat.bBleTempValid) {
-    // Check staleness: if no update for 5 min, fall back to next source
-    if ((millis() - state.sat.iBleTempLastMs) > SAT_STALE_TEMP_BLE_MS) {
-      state.sat.bBleTempValid = false;
-      SATDebugTln(F("SAT: BLE temp stale, falling back to next source"));
-    } else {
-      return state.sat.fBleTemp;  // BLE has 0.01C precision
+  // TASK-3011 (Robert, follow-up A): the primary room source (SATroomsource) goes first; the other sources follow in the
+  // auto order (pinned BLE > areas > external), the thermostat (MsgID 24) last, then the heating curve only (NaN).
+  // auto = that order unchanged. A primary thermostat with a fresh reading skips the other sources.
+  const uint8_t primary = settings.sat.iRoomSource;
+  const bool thermostatFirst = (primary == SAT_ROOMSRC_THERMOSTAT) && satRoomTempValid(satThermostatRoomTemp());
+  if (!thermostatFirst) {
+    float v;
+    if (primary != SAT_ROOMSRC_AUTO && primary != SAT_ROOMSRC_THERMOSTAT && satTryRoomSource(primary, &v)) return v;
+    static const uint8_t kAutoOrder[3] = { SAT_ROOMSRC_BLE, SAT_ROOMSRC_AREAS, SAT_ROOMSRC_EXTERNAL };
+    for (uint8_t k = 0; k < 3; k++) {
+      if (kAutoOrder[k] != primary && satTryRoomSource(kAutoOrder[k], &v)) return v;
     }
   }
-  // Multi-area weighted average (Task #25) — takes priority when enabled and valid
-  if (settings.sat.bMultiArea && settings.sat.iMultiAreaCount > 0) {
-    float weighted = satGetWeightedRoomTemp();
-    if (!isnan(weighted)) return weighted;
-    // No valid areas: fall through to single-sensor logic
-  }
-  if (settings.sat.bUseExternalTemp && state.sat.bExternalTempValid) {
-    // Check staleness — use settings.sat.iSensorMaxAgeS (default 6h, Python CONF_SENSOR_MAX_VALUE_AGE)
-    if ((millis() - state.sat.iExternalTempLastMs) > ((uint32_t)settings.sat.iSensorMaxAgeS * 1000UL)) {
-      state.sat.bExternalTempValid = false;
-      SATDebugTln(F("SAT: external indoor temp stale, falling back to OT bus"));
-    } else {
-      return state.sat.fExternalTemp;
-    }
-  }
-  // TASK-522: ghost-Tr detection now uses the upstream NAN-init contract.
-  // OTcurrentSystemState.Tr is NAN until a MsgID 24 arrives. In OTDirect / master configs
-  // without a thermostat, Tr stays NAN forever — isnan() distinguishes "never observed"
-  // from a real reading without the static-bool bookkeeping that TASK-521 introduced.
-  float otRoom = OTcurrentSystemState.Tr;  // OT message ID 24
-  // TASK-1157: Tr never expires on its own, so a thermostat that went quiet left SAT
-  // regulating on its last reading indefinitely. Once the thermostat has reported Tr,
-  // a reading it has not refreshed within SAT_STALE_TEMP_MS counts as never observed,
-  // which makes the room temperature count as lost (curve only, TASK-1364). A Tr that never
-  // came from a thermostat (e.g. a TR= feed) keeps its previous behaviour.
-  if (state.otBus.iTrThermostatMs != 0 &&
-      (millis() - state.otBus.iTrThermostatMs) > SAT_STALE_TEMP_MS) {
-    otRoom = NAN;
-  }
+  float otRoom = satThermostatRoomTemp();  // OT message ID 24, NaN when never seen or stale
   const bool trGhost = isnan(otRoom);
 
   // Task #21: If in fallback mode and OT room temp is invalid, use thermal estimation
   if (state.sat.bFallbackActive && (otRoom < -10.0f || otRoom > 50.0f)) {
     if (state.sat.iLastKnownRoomMs > 0) {
       float outside = satGetOutsideTemp();
+      _sat_roomSrc = 'F';
       return satEstimateRoomTemp(outside);
     }
     // No last-known data either -- nothing valid to return.
+    _sat_roomSrc = 'N';
     return NAN;
   }
 
@@ -2835,6 +2884,7 @@ static float satGetRoomTemp()
       float ssi = satCalcSimmerIndex(otRoom, state.sat.fHumidity);
       SATTraceTf(PSTR("SAT: thermal_comfort: raw=%.1f SSI=%.1f H=%.0f%%\r\n"),
               otRoom, ssi, state.sat.fHumidity);
+      _sat_roomSrc = 'T';
       return ssi;
     }
     SATTraceTln(F("SAT: thermal_comfort: no fresh indoor humidity, using raw room temp"));
@@ -2843,9 +2893,37 @@ static float satGetRoomTemp()
   // TASK-521: ghost-Tr final guard. If no other source returned, and Tr has never been
   // observed as non-zero, return NAN so the control loop treats the room temperature as lost
   // (curve only) instead of driving the PID against a bogus 0.0 reading.
-  if (trGhost) return NAN;
+  if (trGhost) { _sat_roomSrc = 'N'; return NAN; }
 
+  _sat_roomSrc = 'T';
   return otRoom;
+}
+
+// TASK-3011: SATroomsource as a name (MQTT state sat/room_source, REST) and back. A number 0..4 or a name is accepted;
+// anything else keeps the current value.
+const char* satPrimaryRoomSourceName(uint8_t src)
+{
+  switch (src) {
+    case SAT_ROOMSRC_THERMOSTAT: return "thermostat";
+    case SAT_ROOMSRC_EXTERNAL:   return "external";
+    case SAT_ROOMSRC_BLE:        return "ble";
+    case SAT_ROOMSRC_AREAS:      return "areas";
+    default:                     return "auto";
+  }
+}
+
+uint8_t satRoomSourceParse(const char* v, uint8_t current)
+{
+  if (v == nullptr) return current;
+  while (*v == ' ') v++;
+  if (*v >= '0' && *v <= '9') {
+    const int n = atoi(v);
+    return (n >= 0 && n <= SAT_ROOMSRC_MAX) ? (uint8_t)n : current;
+  }
+  for (uint8_t i = 0; i <= SAT_ROOMSRC_MAX; i++) {
+    if (strcasecmp(v, satPrimaryRoomSourceName(i)) == 0) return i;
+  }
+  return current;
 }
 
 // --- satOutside begin
@@ -4706,35 +4784,38 @@ static float satStatusReturnTemp()
   return satReturnFresh() ? OTcurrentSystemState.Tret : NAN;
 }
 
-// When the room temperature that satGetRoomTemp() just returned was measured. The same sources in the same order as
-// satGetRoomTemp(); this reads only (satGetRoomTemp() already cleared a stale BLE, area or external flag). The age of
-// a multi-area average is that of its oldest area. false: no age known (no reading, the fallback estimate, or a Tr
+// When the room temperature that satGetRoomTemp() just returned was measured. TASK-3011: read from the source that call
+// recorded (_sat_roomSrc), so the age follows the primary room source setting without repeating the source order. The age
+// of a multi-area average is that of its oldest area. false: no age known (no reading, the fallback estimate, or a Tr
 // that did not come from a thermostat frame, e.g. a TR= feed).
 static bool satRoomTempSampleMs(float roomTemp, uint32_t nowMs, uint32_t* sampleMs)
 {
   if (isnan(roomTemp)) return false;
-  if (settings.sat.bSimulation) { *sampleMs = nowMs; return true; }
-  if (settings.sat.bBleEnable && state.sat.bBleTempValid) { *sampleMs = state.sat.iBleTempLastMs; return true; }
-  if (settings.sat.bMultiArea && settings.sat.iMultiAreaCount > 0) {
-    uint8_t count = settings.sat.iMultiAreaCount;
-    if (count > SAT_MAX_AREAS) count = SAT_MAX_AREAS;
-    bool any = false;
-    uint32_t oldestAge = 0;
-    for (uint8_t i = 0; i < count; i++) {
-      if (!state.sat.bAreaValid[i] || settings.sat.fAreaWeight[i] <= 0.0f) continue;
-      const uint32_t age = (uint32_t)(nowMs - state.sat.iAreaLastMs[i]);
-      if (!any || age > oldestAge) oldestAge = age;
-      any = true;
+  switch (_sat_roomSrc) {
+    case 'S': *sampleMs = nowMs; return true;
+    case 'B': *sampleMs = state.sat.iBleTempLastMs; return true;
+    case 'A': {
+      uint8_t count = settings.sat.iMultiAreaCount;
+      if (count > SAT_MAX_AREAS) count = SAT_MAX_AREAS;
+      bool any = false;
+      uint32_t oldestAge = 0;
+      for (uint8_t i = 0; i < count; i++) {
+        if (!state.sat.bAreaValid[i] || settings.sat.fAreaWeight[i] <= 0.0f) continue;
+        const uint32_t age = (uint32_t)(nowMs - state.sat.iAreaLastMs[i]);
+        if (!any || age > oldestAge) oldestAge = age;
+        any = true;
+      }
+      if (!any) return false;
+      *sampleMs = nowMs - oldestAge;
+      return true;
     }
-    if (any) { *sampleMs = nowMs - oldestAge; return true; }
+    case 'E': *sampleMs = state.sat.iExternalTempLastMs; return true;
+    case 'T':
+      if (state.otBus.iTrThermostatMs == 0) return false;
+      *sampleMs = state.otBus.iTrThermostatMs;
+      return true;
+    default:  return false;   // 'F' the thermal estimate, 'N' none
   }
-  if (settings.sat.bUseExternalTemp && state.sat.bExternalTempValid) { *sampleMs = state.sat.iExternalTempLastMs; return true; }
-  float otRoom = OTcurrentSystemState.Tr;
-  if (state.otBus.iTrThermostatMs != 0 && (uint32_t)(nowMs - state.otBus.iTrThermostatMs) > SAT_STALE_TEMP_MS) otRoom = NAN;
-  if (state.sat.bFallbackActive && (otRoom < -10.0f || otRoom > 50.0f)) return false;   // the thermal estimate
-  if (state.otBus.iTrThermostatMs == 0) return false;
-  *sampleMs = state.otBus.iTrThermostatMs;
-  return true;
 }
 
 // Plain parameters, not the struct: the Arduino builder hoists a prototype of every function above the struct.
@@ -4763,6 +4844,7 @@ struct SatStatusSnap {
   float    otToutside;                // OTcurrentSystemState.Toutside
   uint16_t otSlaveConfigMemberIDcode; // OTcurrentSystemState.SlaveConfigMemberIDcode
   float    roomTemp;
+  const char* roomSrc;     // TASK-3015: satRoomSourceName() of that same resolve
   float    outsideTemp;
   float    maxSetpoint;
   bool     boilerHwPresent;
@@ -4802,6 +4884,7 @@ void satSendStatusJSON()
   snap->st            = state;                          // en-bloc freeze of all state.*
   satGetBoilerStatusName(snap->boilerStatus, sizeof(snap->boilerStatus));
   snap->roomTemp      = satGetRoomTemp();
+  snap->roomSrc       = satRoomSourceName();   // TASK-3015: right after the resolve it describes
   {
     // TASK-1885: the sample times come from the same resolve, right after it (satResolveOutsideTemp() is what
     // satGetOutsideTemp() calls).
@@ -4849,6 +4932,7 @@ void satSendStatusJSON()
     je.field(F("boiler_status"),       snap->boilerStatus);
     je.field(F("target_temp"),          settings.sat.fTargetTemp);
     je.field(F("room_temp"),            snap->roomTemp);
+    je.field(F("room_temp_source"),     snap->roomSrc);     // TASK-3015
     // TASK-886 review M1: distinguish "no reading" from a real 0 °C. room_temp
     // already arrives as NaN->null when no thermostat exists; mirror that for the
     // other two no-source-prone tiles so the UI shows "--" instead of a misleading
@@ -4966,6 +5050,7 @@ void satSendStatusJSON()
     satEmitStatusLive(je, snap->live.flowTemp, snap->live.returnTemp, snap->live.flameOn, snap->live.roomAgeS,
                       snap->live.outsideAgeS);   // TASK-1885: flow_temp, return_temp, flame_on, room/outside_temp_age_s
     je.field(F("heating_system"),      (int32_t)settings.sat.iHeatingSystem);
+    je.field(F("room_source"),         satPrimaryRoomSourceName(settings.sat.iRoomSource));   // TASK-3011
     je.field(F("heating_source"),          (int32_t)settings.sat.iHeatingSource);
     je.field(F("heating_source_detected"), (int32_t)snap->st.sat.iDetectedHeatingSource);
     je.field(F("manufacturer"),         snap->manufacturer);
@@ -5173,6 +5258,7 @@ static const char* satSimmerPerception(float indexC) {
 // can reset them.
 static SATShadowB s_core_enabled, s_core_active, s_core_safety_tripped, s_core_fallback_active, s_core_push_refused, s_core_sh_rejected, s_core_pm25_no_slot, s_core_room_temp_lost, s_core_ot_link_lost, s_core_no_ignition, s_core_heating_failure, s_core_outside_temp_missing, s_core_external_temp_enable, s_core_simulation_available;
 static SATShadowS s_core_mode, s_core_preset, s_core_control_mode;
+static SATShadowS s_core_room_source;   // TASK-3011: the SATroomsource setting, retained for MQTT clients (entries 452/454)
 
 static void satPublishCoreState()
 {
@@ -5207,6 +5293,9 @@ static void satPublishCoreState()
   uint8_t reqIdx = state.sat.iRequestedControlMode;
   publishIfChangedS(F("sat/control_mode"), reqNames[reqIdx < 3 ? reqIdx : 0], s_core_control_mode, true);
   publishIfChangedS(F("sat/preset"), satGetPresetName(state.sat.eActivePreset), s_core_preset, true);
+  // TASK-3011: the primary room source setting (the state of the MQTT command sat/room_source). In the core set so the
+  // retained value is on the broker after every boot and reconnect, also while SAT is off or not yet controlling.
+  publishIfChangedS(F("sat/room_source"), satPrimaryRoomSourceName(settings.sat.iRoomSource), s_core_room_source, true);
 }
 
 // requestMQTTRepublishAll() (MQTT reconnect after a long outage, Home Assistant back online,
@@ -5224,6 +5313,7 @@ void satRepublishCoreState()
   memset(&s_core_ot_link_lost, 0, sizeof(s_core_ot_link_lost));
   memset(&s_core_no_ignition, 0, sizeof(s_core_no_ignition));
   memset(&s_core_heating_failure, 0, sizeof(s_core_heating_failure));
+  memset(&s_core_room_source, 0, sizeof(s_core_room_source));   // TASK-3011
   memset(&s_core_outside_temp_missing, 0, sizeof(s_core_outside_temp_missing));
   memset(&s_core_external_temp_enable, 0, sizeof(s_core_external_temp_enable));
   memset(&s_core_simulation_available, 0, sizeof(s_core_simulation_available));
@@ -5308,6 +5398,7 @@ void satPublishMQTT()
   // ---------------------------------------------------------------------------
   static SATShadowS s_boiler_status, s_cycle_class, s_cycle_phase;
   static SATShadowS s_flame_status, s_manufacturer, s_heating_curve_rec;
+  static SATShadowS s_room_temp_source;   // TASK-3015
   static SATShadowS s_curve_recommendation, s_modulation_state, s_pwm_state;
   static SATShadowS s_summer_simmer_perception, s_heating_mode;
   static SATShadowF s_setpoint, s_heating_curve, s_pid_output, s_target;
@@ -5474,6 +5565,8 @@ void satPublishMQTT()
   publishIfChangedF(F("sat/pwm_switch_margin"), settings.sat.fPwmSwitchMargin, s_pwm_switch_margin, SAT_EPS_TEMP_COARSE, 1, true);   // TASK-1888
 
   publishIfChangedF(F("sat/room_temp"),    satGetRoomTemp(),    s_room_temp,    SAT_EPS_TEMP, 1, false);
+  // TASK-3015: the source of that value (ble, areas, external, thermostat, simulation, estimate, none), retained for MQTT clients.
+  publishIfChangedS(F("sat/room_temp_source"), satRoomSourceName(), s_room_temp_source, true);
   publishIfChangedF(F("sat/outside_temp"), satGetOutsideTemp(), s_outside_temp, SAT_EPS_TEMP, 1, false);
 
   publishIfChangedF(F("sat/kp"), state.sat.fKp, s_kp, SAT_EPS_KP, 4, false);

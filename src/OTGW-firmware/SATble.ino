@@ -768,35 +768,8 @@ void satBLELoop()
   // Runs before auto-select so a mismatched neighbour can never be auto-picked.
   satBLEPruneByNameFilter();
 
-  // TASK-508: auto-select-if-only-one. Trigger when no MAC is selected
-  // (sBleMAC empty) AND exactly one roster slot has produced a sample
-  // within the last 2 × iBleInterval seconds. After promotion the filter
-  // is non-empty, so this gate fires zero times forever after — single-shot
-  // by construction. Runs on the loop task, so the updateSetting() flash
-  // path is safe (BLE host task can't race against settings flush here).
-  if (settings.sat.sBleMAC[0] == '\0') {
-    const uint32_t freshMs = 2u * (uint32_t)settings.sat.iBleInterval * 1000u;
-    const uint32_t now = millis();
-    int seenIdx = -1;
-    int seenCount = 0;
-    for (int i = 0; i < SAT_BLE_MAX_ROSTER; i++) {
-      if (settings.sat.sBleMac[i][0] == '\0') continue;
-      BLERuntime snap;
-      portENTER_CRITICAL(&_bleSensorsMux);
-      snap = _bleRuntime[i];
-      portEXIT_CRITICAL(&_bleSensorsMux);
-      if (snap.iLastSeenMs && (now - snap.iLastSeenMs) <= freshMs) {
-        seenIdx = i;
-        seenCount++;
-      }
-    }
-    if (seenCount == 1) {
-      DebugTf(PSTR("SAT BLE: auto-select slot=%d mac=%s (only one fresh sensor)\r\n"),
-              seenIdx, settings.sat.sBleMac[seenIdx]);
-      updateSetting("SATblemac", settings.sat.sBleMac[seenIdx]);
-    }
-  }
-
+  // TASK-3011 (entry 451): no auto-select. TASK-508 pinned the only fresh sensor by itself, which could be a neighbour's;
+  // BLE now feeds SAT only from a sensor the user pinned.
   satBLEUpdateState();
 }
 
@@ -809,7 +782,7 @@ void satBLEUpdateState()
   uint8_t sensorCount = 0;
   bool havePin = (settings.sat.sBleMAC[0] != '\0');
   int pinnedSlot = -1;      // fresh roster slot whose MAC matches the pin
-  int firstFreshSlot = -1;  // first fresh roster slot (roster order)
+  int firstFreshChosenSlot = -1;  // TASK-3011: first fresh slot the user assigned to an area (the only failover target)
 
   for (int i = 0; i < SAT_BLE_MAX_ROSTER; i++) {
     // TASK-508: roster-occupied test reads settings (loop-task only writer
@@ -833,7 +806,6 @@ void satBLEUpdateState()
     if ((now - snap.iLastSeenMs) > BLE_STALE_MS) continue;
 
     sensorCount++;
-    if (firstFreshSlot < 0) firstFreshSlot = i;
     // TASK-1665 (ADR-213): the loop-task side of the reader, slot number only (the MAC never enters the ring)
     if (diagRec.active) diagRec.recBle((uint8_t)i, diagX100(snap.fTemperature), diagX100(snap.fHumidity), snap.iBattery, snap.iRssi);
 
@@ -845,6 +817,7 @@ void satBLEUpdateState()
         if (settings.sat.sSensorArea[areaIdx][0] == '\0') continue;
         if (strcasecmp(settings.sat.sSensorArea[areaIdx], settings.sat.sBleMac[i]) == 0) {
           satSetAreaTemp(areaIdx, snap.fTemperature);
+          if (firstFreshChosenSlot < 0) firstFreshChosenSlot = i;   // TASK-3011: a sensor the user assigned to an area
         }
       }
     }
@@ -856,20 +829,26 @@ void satBLEUpdateState()
 
   state.sat.iBleSensorCount = sensorCount;
 
-  // TASK-762: pick which fresh slot drives SAT.
-  //  - no pin set:            first fresh slot in roster order (unchanged).
+  // TASK-762, TASK-3011 (entry 451 and Robert's Q2/Q3 answers): pick which fresh slot drives SAT. Only a sensor the user
+  // chose drives it, never a roster sensor that merely advertises nearby (it could be a neighbour's).
+  //  - no pin set:            none (BLE is shown and published, it does not drive SAT).
   //  - pin set and fresh:     the pinned slot (auto-recovery from failover).
-  //  - pin set but stale:     first fresh slot if failover enabled, else none
-  //                           (strict pin -> SAT loses BLE input as before).
+  //  - pin set but stale:     with bBleFailover (default off), the first fresh sensor the user assigned to an area
+  //                           (sSensorArea); else none, and satGetRoomTemp() falls back to the next source.
   int chosen = -1;
   bool failover = false;
-  if (!havePin) {
-    chosen = firstFreshSlot;
-  } else if (pinnedSlot >= 0) {
+  if (havePin && pinnedSlot >= 0) {
     chosen = pinnedSlot;
-  } else if (settings.sat.bBleFailover && firstFreshSlot >= 0) {
-    chosen = firstFreshSlot;
+  } else if (havePin && settings.sat.bBleFailover && firstFreshChosenSlot >= 0) {
+    chosen = firstFreshChosenSlot;
     failover = true;
+  }
+
+  // TASK-3011 (Q3 C): once per boot, the SAT log names the kept pin until the user confirms or changes it.
+  static bool s_pinNoticeLogged = false;
+  if (settings.sat.bBlePinNotice && havePin && !s_pinNoticeLogged) {
+    s_pinNoticeLogged = true;
+    satNarratef_P(PSTR("SAT uses BLE sensor %s: confirm or change it on the SAT page"), settings.sat.sBleMAC);
   }
 
   if (chosen < 0) {
@@ -1014,6 +993,9 @@ void satBLESendStatusJSON(JsonEmit& je, const SATRuntimeSection& sat, bool bleFa
 {
   je.field(F("ble_enable"),          settings.sat.bBleEnable);
   je.field(F("ble_failover"),        settings.sat.bBleFailover);
+  // TASK-3011 (Q3 C): the upgrade kept a stored pin; the SAT page asks "SAT uses BLE sensor <name>: confirm or change"
+  // until the user writes ble_mac (the same MAC confirms it).
+  je.field(F("ble_pin_notice"),      settings.sat.bBlePinNotice);
   je.field(F("ble_failover_active"), bleFailoverActive);
   je.field(F("ble_temp_valid"),      sat.bBleTempValid);
   if (sat.bBleTempValid) {

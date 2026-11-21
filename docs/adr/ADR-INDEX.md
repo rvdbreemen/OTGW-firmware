@@ -201,7 +201,7 @@ One row per Architecture Decision Record. Scope is the Enforcement `path_glob` s
 | ADR-193 | Accepted | - | The firmware keeps a ring of 14-byte slots and serves it through an HTTP (Hypertext Transfer Protocol) GET request on... |
 | ADR-194 | Accepted | - | Static text assets that users never need to upload may be compiled into the firmware image and served or read from PR... |
 | ADR-195 | Superseded | - | While SAT is the active controller, one per-heating-system cold setpoint stands in for thermo-nova's COLDSETPOINT 22... |
-| ADR-196 | Accepted | - | For every statement or change about SAT behaviour the sources rank in this order, and a higher source wins over a low... |
+| ADR-196 | Superseded | - | For every statement or change about SAT behaviour the sources rank in this order, and a higher source wins over a low... |
 | ADR-197 | Accepted | - | The SAT PID follows thermo-nova pid.py at 7beaaf5 term by term (entry 28), implemented in src/OTGW-firmware/SATpid.in... |
 | ADR-198 | Accepted | - | SAT keeps thermo-nova's convex heating curve with one user coefficient, default 2.0, and a base offset chosen by the... |
 | ADR-199 | Accepted | - | While SAT is the active controller, one per-heating-system cold setpoint replaces thermo-nova's COLDSETPOINT 22 at ev... |
@@ -273,5 +273,6 @@ One row per Architecture Decision Record. Scope is the Enforcement `path_glob` s
 | ADR-266 | Proposed | - | Nagle on for the MQTT socket. |
 | ADR-268 | Proposed | - | The firmware keeps one local diagnostic recorder: the local ring of the remote telemetry recorder. |
 | ADR-290 | Superseded | - | Outbound TLS client only, for this one upload. |
-| ADR-291 | Proposed | - | The device history slot gets an eighth int16t temperature column, satRoom, so a slot is 18 bytes. |
-| ADR-292 | Proposed | - | For every statement or change about SAT behaviour the sources rank in this order, and a higher source wins over a low... |
+| ADR-291 | Accepted | - | The device history slot gets an eighth int16t temperature column, satRoom, so a slot is 18 bytes. |
+| ADR-292 | Accepted | - | For every statement or change about SAT behaviour the sources rank in this order, and a higher source wins over a low... |
+| ADR-293 | Proposed | - | SAT regulates on one primary room temperature source chosen by the setting SATroomsource, with a fixed fallback order... |
