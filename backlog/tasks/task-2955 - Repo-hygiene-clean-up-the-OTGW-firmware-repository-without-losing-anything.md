@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-20T14:05:00Z'
-updated_date: '2026-11-21T00:23:00Z'
+updated_date: '2026-11-21T00:24:00Z'
 labels:
   - repo-hygiene
 milestone: 2.0.0
@@ -40,4 +40,6 @@ Plan corrections from otgw-docs' dry run (2026-11-20): C6.7 keeps a stub (ADR-09
 2026-11-21 phase 2 C4 (otgw-docs): remove the duplicate .full-review-archive-20260421-085044 (3 files blob-identical to .full-review/archive/, state.json moved there)
 
 2026-11-21 phase 2 C6.1 (otgw-docs): one plans folder: docs/plan/*, plan/ and the ps1 translator plan move to docs/plans/
+
+2026-11-21 phase 2 C6.2 (otgw-docs): F1: remove the committed merge-conflict markers from docs/archive/mqttha.cfg (keep the v2.0.0-beta snapshot side)
 <!-- SECTION:NOTES:END -->
