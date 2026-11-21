@@ -181,6 +181,21 @@ Rules:
   broker 192.168.88.32, .63: the Home Assistant broker): name the broker in every A/B comparison across
   that date, a different broker means different ACK timing.
 
+**Browser checks run on the NAS too** (Robert, 2026-11-21: no headless Chrome against the units on the
+laptop). The image `otgw-bench-chromium:alpine3.21` (pinned: alpine 3.21 by digest, chromium 136.0.7103.113-r0, nodejs 22.23.5-r0; built from
+`scripts/nas-bench/chromium/Dockerfile` in `/volume1/docker/otgw-bench/chromium/`) runs one CDP script per run:
+
+```sh
+ssh terradisk 'sh /volume1/docker/otgw-bench/bin/uicheck.sh <run> <unit-ip> ui/<script>.mjs'
+# output: runs/<run>/facts.json, screenshots, console.log, chromium.log
+```
+
+Scripts live in `scripts/nas-bench/ui/` and deploy to `bin/ui/`; `ui/task2982.mjs` is the pattern (raw CDP
+over Node's built-in WebSocket, no Playwright). On the NAS kernel (4.4) Chromium hangs at start with its
+zygote: keep `--no-zygote --in-process-gpu --no-sandbox`. The start takes about 35 s, so wait up to 90 s for
+the DevTools endpoint. For Enter on a button send a real keypress (`text: "\r"` in `Input.dispatchKeyEvent`);
+a keyDown without text does not activate it. Scrub IP, hostname and MAC from the DOM before each screenshot.
+
 Copy a finished run into the evidence folder with its checksums:
 
 ```sh
