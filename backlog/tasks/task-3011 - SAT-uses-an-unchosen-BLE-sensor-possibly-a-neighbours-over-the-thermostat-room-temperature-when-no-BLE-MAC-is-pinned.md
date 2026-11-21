@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-21T15:38:00Z'
-updated_date: '2026-11-21T19:35:00Z'
+updated_date: '2026-11-21T20:04:00Z'
 labels:
   - sat
   - ble
@@ -83,4 +83,6 @@ Scope after the answers: SATcontrol.ino (satGetRoomTemp + source enum), SATble.i
 2026-11-21 otgw-webui add-on (coordinator): when the chosen 'Room temperature source' is not switched on, a one-line hint under the select reads 'This source is not enabled; SAT uses the next source in the auto order.' (external = satexternaltemp off; BLE = BLE off or no pinned MAC; averaged room sensors = satmultiarea off; auto/thermostat never). The SAT settings re-render when satroomsource, satexternaltemp or satmultiarea change. EN/NL/DE/EL. New case in sat-ble-pin-room-source.test.mjs (7 setting combinations): red on 4874e795b (no hint for external off), green; file 5/0 twice (the Confirm case now waits for the POST, it raced once). sat-areas-zones-groups 2/0, i18n tests green, evaluate --quick 0 failed. Commit on top of otgw-dev's combined 4874e795b for his cherry-pick.
 
 2026-11-21 (otgw-dev): re-check by 09 with SAT running PASS. Gap fixed: sat/room_source moved from satPublishMQTT() (runs only inside SAT's control tick, so after a boot it was absent during the 60 s boot silence and whenever SAT was not controlling) to the always-on core set satPublishCoreState() (every loop pass, enabled or not), retained, first-seen on the first pass after a boot, its shadow reset by satRepublishCoreState() on reconnect / HA online. sat/room_temp_source stays in satPublishMQTT() (a measurement: first SAT tick, on change, heartbeat). Test: test_sat_ble_pin_only test_room_source_state_is_in_the_core_set, red on the previous code, 21 OK on the fix; 11 MQTT/REST/discovery files PASS.
+
+2026-11-21 final check (otgw-bench-tester, beta.416+5076410 on .61): PASS githash 5076410, no restart beyond flash/own reboot, crashlog none; retained sat/room_source cleared on the broker, after a reboot a subscriber started ~35 s later received 'auto' as first message; MQTT set thermostat -> retained 'thermostat' within 5 s; UI hint shown for external+satexternaltemp off, BLE+no pin, areas+satmultiarea off, hidden for external+on and auto (screenshots OTGW-field-data/bench-otgw32/2026-11-21_task3011-5076410/ui3011b-61/). Settings restored; settings.ini differs only by the migration keys.
 <!-- SECTION:NOTES:END -->
