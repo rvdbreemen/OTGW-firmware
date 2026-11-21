@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-21T17:16:00Z'
+updated_date: '2026-11-21T17:22:00Z'
 labels:
   - sat
   - mqtt
@@ -28,3 +29,9 @@ gruijter, #alpha-testing msg 1573748508622721095 (2026-11-21), three requests: (
 - [ ] #1 Robert decides which of the three go in
 - [ ] #2 Per the decision: zone diagnostics publish from zone_count >= 1; zone_count state topic (retained or heartbeat per ADR-111); web UI zone status rows; host test on the real publisher red before / green after; screenshots for the UI
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-21 gruijter follow-up (msg 1573750283282940076): the docs say every zone, zone 1 included, is an extra room next to the main room, yet iZoneCount defaults to 1 (SATtypes.h:614 comment: '1-4, default 1 = single-zone') and diagnostics need > 1, which looks like a leftover of '1 = main room only'. Suggests default zone_count 0 (no extra rooms) and zone topics from 1 zone. Verified: the code comment and the docs disagree on what zone_count = 1 means; the design must settle the meaning first (and migrate stored 1s accordingly).
+<!-- SECTION:NOTES:END -->
