@@ -8519,3 +8519,22 @@ Robert, 16:18:42 UTC (https://discord.com/channels/812969634638725140/9144987300
 
 **Open:** none.
 
+
+## 432. Q-2005d answered A by Robert (interpretation): after the 3.0 C fail-safe has switched back to PWM inside a burn, SAT stays in PWM until flame-off (maintainer, 2026-11-21; Sergeant D's own answer still open)
+
+**Source:** #dev-sat-mqtt, Robert (maintainer) 2026-11-21 00:18:18 UTC (https://discord.com/channels/812969634638725140/1105556725714649128/1573492720310296793; unedited when read back via the Discord API at ~02:45 UTC). Posted 24 minutes after Q-2005d (https://discord.com/channels/812969634638725140/1105556725714649128/1573486782635577375), without a reply reference. Confirmation asked in-channel at 02:47 UTC (https://discord.com/channels/812969634638725140/1105556725714649128/1573512754386698291).
+
+**Quoted:**
+> "A"
+
+**Interpretation (ours, not yet confirmed):** read as the maintainer's answer A to Q-2005d, the only open question in the channel at that moment: once the fail-safe (flow - requested >= 3.0 C for 30 s, entry 429) has put SAT back in PWM during a burn, neither PWM -> continuous exit fires again until the flame goes out. At most one fail-safe switch per flame. Like entry 372 (Q-1867b answered by Robert), this is the maintainer's decision; Sergeant D designed SAT and his own answer to Q-2005d is still asked, so Q-2005d stays open in open-questions.md until he answers or Robert confirms that his answer settles it.
+
+**Settled (if confirmed):** option A of Q-2005d. It narrows entry 429 (2): the fail-safe stays the only way back to PWM in a burn, and after that way is taken the burn ends in PWM.
+
+**Compared with thermo-nova (7beaaf5):** no counterpart. thermo-nova re-enables PWM whenever flow stays 3.0 C above the request for 60 s with the flame on (heating_control.py:262-305), any number of times per flame, and its exits (heating_control.py:307-376: underheat -3.0 C for 180 s, saturation 300 s) work again right after; option B was that behaviour (checked against the pin by otgw-architect and by 92 on 2026-11-21).
+
+**Firmware today:** the underheat exit (SATcycles.ino:1494-1500) and the saturation exit (:1509-1517) do not read the entry-429 flag, so after a fail-safe re-entry (:1434-1439) they can fire again (code path named by otgw-dev). Field evidence: indigo_light beta.392 19 Nov, one 26 min flame with 4 switches; gruijter beta.401 20 Nov, three flames each PWM -> continuous -> fail-safe PWM.
+
+**Task:** TASK-2005 follow-up for otgw-dev (implementation prepared, built only after Robert's requested analysis of minimal switching, 2026-11-21 01:32 UTC).
+
+**Open:** Robert's confirmation of the reading; Sergeant D's answer to Q-2005d.
