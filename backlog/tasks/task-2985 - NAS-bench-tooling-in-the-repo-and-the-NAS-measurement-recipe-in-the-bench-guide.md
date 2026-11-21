@@ -7,7 +7,7 @@ status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-21T00:19:00Z'
-updated_date: '2026-11-21T00:21:00Z'
+updated_date: '2026-11-21T05:01:00Z'
 labels: []
 milestone: 2.0.0
 dependencies: []
@@ -32,6 +32,8 @@ Robert 2026-11-21: all OTGW measurements (telnet loggers, REST pollers, MQTT sub
 
 <!-- SECTION:NOTES:BEGIN -->
 Evidence 2026-11-21 01:4x: sha256 NAS vs scripts/nas-bench equal for all four (bench.sh 366d31ee, tellog.py c0cfeadc, poll.py 90e04039, satcount.py aa8f70d5). ssh terradisk bench.sh list and status ran, status exit 0; five stale t2019 runs whose jobs had ended moved pids -> pids.stopped so status lists only live runs (now none). Docs-only plus scripts outside src/: no firmware bump.
+
+2026-11-21 05:xx: added scripts/nas-bench/mqttrtt.py (command round trip set -> state on one MQTT connection, time.monotonic(), plus PINGREQ->PINGRESP), equal to the NAS copy; used for the TASK-2949.5 round-trip A/B (120/120 answered, p50 111-115 ms both arms). Guide section extended.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary

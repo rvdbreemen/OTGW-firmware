@@ -206,6 +206,12 @@ ssh terradisk 'cd /volume1/docker/otgw-bench/runs && tar cf - <run>' | tar xf - 
 `scripts/nas-bench/satcount.py <mqtt.log> <uid> <nth_set>` counts the unique `OTGW/value/<uid>/sat/*` topics in
 an `mqtt.log` after the N-th `set/<uid>/sat/outdoor_temp`.
 
+`scripts/nas-bench/mqttrtt.py <broker> <uid> <out.jsonl> [n] [gap_s]` measures the command round trip on the NAS:
+one MQTT connection publishes `OTGW/set/<uid>/sat/target` (alternating 20.5 / 20.0) and waits for
+`sat/climate_target` to carry that value, both timestamps from the same `time.monotonic()`, plus PINGREQ ->
+PINGRESP to the broker. It prints p50/p95/max. It needs SAT enabled on the unit and changes its target, so put the
+target back afterwards. Do not time a command with `docker run mosquitto_pub`: the container start adds about a minute.
+
 ## SAT simulation: thermal-learning test (TASK-1891)
 
 The SAT simulation defaults (`satsimcoolrate` 0.1, `satsimheatrate` 0.5) make the house about 6x faster than a real
