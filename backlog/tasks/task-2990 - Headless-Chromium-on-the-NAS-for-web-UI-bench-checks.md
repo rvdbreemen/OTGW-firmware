@@ -5,7 +5,7 @@ status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-21T02:06:00Z'
-updated_date: '2026-11-21T02:16:00Z'
+updated_date: '2026-11-21T05:01:00Z'
 labels: []
 milestone: 2.0.0
 dependencies: []
@@ -30,6 +30,8 @@ Robert 2026-11-21: browser/CDP checks against bench units also run on the NAS, n
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-11-21: Robert OK for the download (alpine:3.21 + chromium + nodejs). Image built on the NAS, pinned (alpine digest bc214871..., chromium 136.0.7103.113-r0, nodejs 22.23.5-r0, font-noto 24.7.1-r0, font-dejavu 2.37-r5), 837 MB. Chromium hangs at start with its zygote on the NAS kernel 4.4.302; --single-process starts but the DevTools endpoint is flaky; --no-zygote --in-process-gpu works: DevTools up after ~35 s, CDP WebSocket opens (raw node test 'WS OPEN'). uicheck.sh t2982-ui-63 192.168.88.63 ui/task2982.mjs: exit 0, facts.json + 2 screenshots (TASK-2982 checks 2-4). sha256 repo = NAS for Dockerfile, uicheck.sh, ui/task2982.mjs.
+
+2026-11-21: second script ui/task2991.mjs (rail keeps focus after Enter/Space, #setSearch keeps focus while filtering, TASK-2982 regression), deployed to bin/ui/, runs after the 08:00 beta soak.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
