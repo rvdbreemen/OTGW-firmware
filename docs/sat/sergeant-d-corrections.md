@@ -8679,3 +8679,56 @@ Robert, 16:18:42 UTC (https://discord.com/channels/812969634638725140/9144987300
 **Task:** TASK-2992 restored from the archive, built in the same lane as TASK-2993.
 
 **Open:** Robert's OK on entry 64 (TASK-2993) and on his guards (TASK-2987/2989). Observation, not a decision: his remark "long burns at low modulation" describes the intended effect; whether the 1.03 rule limits heat when a room really needs more (the request stays clearly above what the boiler delivers at low modulation) is to be checked in the next field runs.
+
+## 441. Robert's OK: the live-flow duty (entries 437/438/440) goes into 2.0.0; this reverses his entry-64 choice to keep thermo-nova 7beaaf5's held BT (Robert, maintainer decision, 2026-11-21)
+
+**Source:** Discord DM from Robert to the bot, 2026-11-21 07:05:10 UTC (message 1573595110879395942, DM channel 1570160296146899116), a reply to the coordinator's DM 1573540998448021638 (03:30:09 UTC); both unedited when read back via the Discord API.
+
+**Quoted:**
+> "A"
+
+**The question it answers (DM 1573540998448021638, verbatim in part):** "Sergeant D decided (entry 437) that the SAT PWM duty is ALWAYS (request - 27.2) / (live flow - 27.2), so with the live flow and not with the BT held after 180 s. That reverses your entry-64 choice ("stick to thermo-nova 7beaaf5" instead of Alex's develop behaviour). [...] A) OK, build it for 2.0.0 (recommended: it fixes the root cause; 2987/2989 stay as a safety net; replay + NAS bench before push). B) No, keep 7beaaf5 for 2.0.0, live flow for 2.1.0."
+
+**Settled:** the duty fix of entries 437 (live flow), 438 (30 s start-up filter) and 440 (MM=T only above raw duty 1.03) is built for 2.0.0. This is a maintainer decision that reverses Robert's earlier choice recorded under entry 64 (keep thermo-nova's held BT, pwm.py:144-149 at 7beaaf5). TASK-2993's AC "Robert's OK" is met by this entry.
+
+**Interpretation (ours):** option A as asked also said "2987/2989 stay as a safety net". Fifteen seconds later Robert answered the separate guard question with A (entry 442): guards to the 2.1.0 backlog. We read 442 as the decision on the guards and this entry as the OK for the duty fix only.
+
+**Compared with thermo-nova (7beaaf5):** thermo-nova holds BT after 180 s (pwm.py:144-149) and uses it in the duty (pwm.py:229-239); with this decision the firmware deliberately differs there.
+
+**Task:** TASK-2993 (live-flow duty + 30 s filter) and TASK-2992 (1.03 rule), one lane.
+
+**Open:** Q-438b (live flow in the PWM OFF phase, Sergeant D).
+
+## 442. Robert follows Sergeant D: for 2.0.0 only the duty fix; his guards TASK-2987 (latch after fail-safe) and TASK-2989 (1.5 C margin) go to the 2.1.0 backlog (Robert, maintainer decision, 2026-11-21; resolves the conflict between entry 439 and entries 433/435)
+
+**Source:** Discord DM from Robert to the bot, 2026-11-21 07:05:25 UTC (message 1573595175458963567, DM channel 1570160296146899116), a reply to the coordinator's DM 1573542823507140729 (03:37:24 UTC); both unedited when read back via the Discord API.
+
+**Quoted:**
+> "A"
+
+**The question it answers (DM 1573542823507140729, verbatim in part):** "Sergeant D chose A (entry 439): for 2.0.0 ONLY the duty fix (437/438), and drop your two guards (your A on Q-2005d = latch after fail-safe, TASK-2987; your B on Q-2005e = 1.5 C margin, TASK-2989). That conflicts with your entries 433/435 [...] A) Follow Sergeant D: duty fix only, guards to the 2.1.0 backlog. Consequence: if the duty fix does not cover a case, the toggling comes back until the next field data. B) Keep the guards in 2.0.0 next to the duty fix (recommended [...])."
+
+**Settled:** 2.0.0 gets the duty fix of entries 437/438/440 (with entry 441) and not the guards of entries 433 (TASK-2987) and 435 (TASK-2989). Both tasks move to the 2.1.0 backlog; their built code (beta.406+6e1eacf, not pushed) is not pushed to dev for 2.0.0. Entry 439 stands on this point; entries 433 and 435 no longer apply to 2.0.0.
+
+**Note:** this answer came 15 s after the one in entry 441, whose option A text said the guards "stay as a safety net". This later, specific answer decides the guards (see entry 441, interpretation).
+
+**Compared with thermo-nova (7beaaf5):** neither guard exists in thermo-nova; its underheat exit uses -3.0 C for 180 s (heating_control.py:337-347).
+
+**Task:** TASK-2987 and TASK-2989 to milestone 2.1.0; TASK-2993/2992 go on.
+
+**Open:** none for 2.0.0 on this point; the risk Robert accepted (toggling comes back in a case the duty fix does not cover) is watched in the next field runs.
+
+## 443. The start-up filter of entry 438 stays 30 s, one control tick after ignition (Sergeant D, 2026-11-21; answers Q-438a)
+
+**Source:** #dev-sat-mqtt, Sergeant D 2026-11-21 07:05:22 UTC (https://discord.com/channels/812969634638725140/1105556725714649128/1573595162956005468), a reply to Q-438a (https://discord.com/channels/812969634638725140/1105556725714649128/1573556104623956019) and its addendum (https://discord.com/channels/812969634638725140/1105556725714649128/1573559870295248967); unedited when read back via the Discord API more than 90 s later.
+
+**Quoted:**
+> "My answer is A"
+
+**Settled:** option A of Q-438a: keep the 30 s window of entry 438 (SAT_PWM_BT_FILTER_MS 30000, the duty uses the filtered value while elapsed <= 30 s, lane d3-duty2993 @1693b644b SATcontrol.ino:1290/1661). With 30 s ticks this covers one tick after ignition. Accepted cost, as stated in the addendum: a light-off dip that recovers can give one tick in range 5 (no OFF time) without MM=T; a dip that stays ends at MM=T in every window.
+
+**Compared with thermo-nova (7beaaf5):** the window comparison is inclusive like pwm.py:148 ("<="); thermo-nova holds the EMA for 180 s instead (pwm.py:144-149), which entry 437 replaced.
+
+**Task:** TASK-2993 (no change: it already builds 30 s).
+
+**Open:** Q-438b (live flow in the PWM OFF phase).

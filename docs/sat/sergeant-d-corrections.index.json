@@ -5830,6 +5830,48 @@
     "TASK-2993"
    ],
    "confirmed_by_entry": null
+  },
+  {
+   "id": 441,
+   "title": "Robert's OK: the live-flow duty (entries 437/438/440) goes into 2.0.0; this reverses his entry-64 choice to keep thermo-nova 7beaaf5's held BT (Robert, maintainer decision, 2026-11-21)",
+   "date": "2026-11-21",
+   "source": "maintainer",
+   "kind": "decision",
+   "discord_link": null,
+   "supersedes": [],
+   "tasks": [
+    "TASK-2992",
+    "TASK-2993"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 442,
+   "title": "Robert follows Sergeant D: for 2.0.0 only the duty fix; his guards TASK-2987 (latch after fail-safe) and TASK-2989 (1.5 C margin) go to the 2.1.0 backlog (Robert, maintainer decision, 2026-11-21; resolves the conflict between entry 439 and entries 433/435)",
+   "date": "2026-11-21",
+   "source": "maintainer",
+   "kind": "decision",
+   "discord_link": null,
+   "supersedes": [],
+   "tasks": [
+    "TASK-2987",
+    "TASK-2989",
+    "TASK-2993"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 443,
+   "title": "The start-up filter of entry 438 stays 30 s, one control tick after ignition (Sergeant D, 2026-11-21; answers Q-438a)",
+   "date": "2026-11-21",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1573595162956005468",
+   "supersedes": [],
+   "tasks": [
+    "TASK-2993"
+   ],
+   "confirmed_by_entry": null
   }
  ]
 }

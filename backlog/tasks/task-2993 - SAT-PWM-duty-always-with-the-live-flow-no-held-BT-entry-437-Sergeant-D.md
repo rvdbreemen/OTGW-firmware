@@ -5,7 +5,7 @@ status: To Do
 assignee:
   - '@otgw-dev'
 created_date: '2026-11-21T03:28:00Z'
-updated_date: '2026-11-21T03:36:00Z'
+updated_date: '2026-11-21T07:08:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -35,4 +35,6 @@ Sergeant D, entry 437 (#dev-sat-mqtt 2026-11-21 03:25 UTC, msg 15735397191475529
 2026-11-21: Sergeant D answered B (entry 438): keep the start-up EMA for the first 30 s after ignition, then the live flow until the next ignition. Waiting only for Robert's OK on reversing entry 64.
 
 2026-11-21 03:34 UTC: Sergeant D entry 439: this duty fix is the only SAT change for 2.0.0 from this thread; afterwards the next field runs are checked for remaining switching. Still waiting for Robert's OK on reversing entry 64.
+
+2026-11-21 (92): Robert's OK for 2.0.0 recorded as entry 441 (DM 1573595110879395942, 'A', reverses entry 64). Q-438a answered A (entry 443): the 30 s start-up filter stays. Q-438b (live flow in the OFF phase) asked 07:07 UTC, msg 1573595715278602335; open.
 <!-- SECTION:NOTES:END -->
