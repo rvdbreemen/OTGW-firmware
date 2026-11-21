@@ -5746,6 +5746,22 @@
    "supersedes": [],
    "tasks": [],
    "confirmed_by_entry": null
+  },
+  {
+   "id": 435,
+   "title": "Q-2005e answered B by Robert: the entry-342 PWM -> continuous exit gets a margin, request at least 1.5 C above the flow for 60 s (maintainer, 2026-11-21; Sergeant D's own answer still open)",
+   "date": "2026-11-21",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1573516234194944044",
+   "supersedes": [
+    342
+   ],
+   "tasks": [
+    "TASK-2987",
+    "TASK-2989"
+   ],
+   "confirmed_by_entry": null
   }
  ]
 }

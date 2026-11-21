@@ -8563,3 +8563,22 @@ Robert, 16:18:42 UTC (https://discord.com/channels/812969634638725140/9144987300
 **Task:** none.
 
 **Open:** none.
+
+## 435. Q-2005e answered B by Robert: the entry-342 PWM -> continuous exit gets a margin, request at least 1.5 C above the flow for 60 s (maintainer, 2026-11-21; Sergeant D's own answer still open)
+
+**Source:** #dev-sat-mqtt, Robert (maintainer) 2026-11-21 01:51:44 UTC (https://discord.com/channels/812969634638725140/1105556725714649128/1573516234194944044), a reply to Q-2005e (https://discord.com/channels/812969634638725140/1105556725714649128/1573515653229453376); unedited when read back via the Discord API about 100 s after the post.
+
+**Quoted:**
+> "B"
+
+**Settled (maintainer):** option B of Q-2005e. The PWM -> continuous exit of entry 342 (flame on, PWM ON phase) fires only when the requested setpoint is at least X C above the flow for 60 s, instead of above it by any amount (0 C). This changes entry 342 (and its confirmation in entry 350): the 60 s and the other conditions stay, the margin is added.
+
+**Interpretation (ours):** X = 1.5 C, the value Q-2005e suggested; option B left the exact value to Sergeant D and Robert gave no other value. The margin must stay above the PWM ON suppression offset (fModSupOffset, 1.0 C default). Like entries 372 and 432/433 this is the maintainer's decision; Sergeant D designed SAT and his own answer to Q-2005e is still asked, so Q-2005e stays open in open-questions.md.
+
+**Compared with thermo-nova (7beaaf5):** thermo-nova's underheat exit needs flow <= request - 3.0 C for 180 s (heating_control.py:337-347, cycles/const.py:11, const.py:22); its PWM ON suppression is CS = flow - 1.0 (heating_control.py:438-441, const.py:153), as in the firmware (SATcontrol.ino:1300-1306). B keeps Sergeant D's 60 s rule and gives it a margin between the suppression offset and thermo-nova's 3.0 C.
+
+**Field evidence:** gruijter beta.401 20 Nov (three long flames, exits at request - flow 0.1, 0.8, 1.0 C) and indigo_light beta.392 19 Nov (exit at 0.9 C); replay of the recorded flows: a 1.5 C margin would not have fired in any of the four flames (analysis posted 2026-11-21, msgs 1573515307388244040 / 1573515310277984268). Open beside it: the PWM duty reaching 1.00 soon after ignition (otgw-dev checking), which can make the saturation exit fire instead.
+
+**Task:** TASK-2989 (otgw-dev), beside TASK-2987.
+
+**Open:** Sergeant D's own answer to Q-2005e; whether 1.5 C is the value (and whether it becomes a setting like fPwmSwitchMargin).
