@@ -54,6 +54,8 @@ MIN_TIMEOUT = {
     "test_sat_lowload_contract.py": 1200,
     # TASK-1853: about 40 serial MSVC mutant builds; 1500 s alone to RESULT: PASS (d3, 2026-11-12).
     "test_dhw_water_meter.py": 1800,
+    # TASK-3020: the tuner convergence simulations ran past 900 s on the NAS (g++, -j 2), 33 s on the laptop (MSVC).
+    "test_sat_tuner_convergence.py": 2400,
 }
 
 # Words too generic to link a changed file to a test by name.

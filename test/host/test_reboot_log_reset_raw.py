@@ -217,6 +217,9 @@ def main():
     print(f"FIX: {'PASS' if not failed else 'FAIL ' + ','.join(failed)}")
     ok &= not failed
     for mid, what, path, subs, expect in MUTANTS:
+        if "S4" in expect and reset_reason_codes()[0] is None and os.name != "nt":
+            print(f"{mid} ({what}): skipped: S4 needs the pinned libs' reset_reasons.h (TASK-3020)")
+            continue
         got = run_variant(mid, GEN / f"rstraw_{mid.lower()}", mutate(fix, path, subs, mid), False)
         good = got == sorted(expect)
         print(f"{mid} ({what}): fails {','.join(got) or 'nothing'}, expected {','.join(sorted(expect))}: "

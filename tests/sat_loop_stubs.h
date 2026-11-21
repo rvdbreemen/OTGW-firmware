@@ -111,7 +111,9 @@ static bool picBoardTretAbsent() { return true; }
 // STUB: EVALBOOLEAN is the firmware macro verbatim (OTGW-firmware.h)
 #define EVALBOOLEAN(x) (strcasecmp(x,"true")==0||strcasecmp(x,"on")==0||strcasecmp(x,"1")==0)
 #include <memory>
+#if defined(_MSC_VER)   // TASK-3020: POSIX hosts (g++/musl on the NAS) have localtime_r already
 static inline struct tm* localtime_r(const time_t* t, struct tm* o) { localtime_s(o, t); return o; }   // STUB: host time zone, wall clock is not under test
+#endif
 void connProbe(uint8_t) {}              // STUB: MQTT connect diagnostics probe
 void satTakeoverHeapTraceBegin() {}     // STUB: TASK-2019 SAT takeover heap trace (MQTTstuff.ino)
 uint8_t g_satShadowEpoch = 0;           // STUB: the publish shadow epoch of SATmqttPublish.cpp (that file is not compiled)

@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-21T18:10:00Z'
-updated_date: '2026-11-21T21:27:00Z'
+updated_date: '2026-11-21T22:00:00Z'
 labels:
   - tests
 milestone: 2.0.0
@@ -45,4 +45,6 @@ Correction to the note above: test_sat_lowload_contract was NOT OK on MSVC in th
 2026-11-21 coordinator (Robert removed SAT-releases-thermo-nova on purpose, ADR-292/TASK-3013; parity tests get repointed at SAT-develop later): option 2: test_sat_lowload_contract.delegated_results() counts the parity classes' 'SAT-releases-thermo-nova is not checked out' skip as a skip, not a failure, with a comment pointing to ADR-292/TASK-3013. Laptop worktree without the folder: lowload OK (skipped=1), LL-021 reported as pass (its other delegated suite, test_sat_cycle_classifier, runs). Note: LL-021 then rests on the cycle classifier alone until the repoint.
 
 2026-11-21 NAS run batch 3 (09, 0bcc64967, --host-gxx; OTGW-field-data/bench-nas/2026-11-21_suite-gxx-0bcc649/): 358 files, 345 passed, 11 failed, 1 timeout; 5 of those already addressed by 1c/1d. Batch 3b for the 7 new test/host ones: roundf/isnan unqualified in sliced firmware code (core.inc, sat_pid_slice.inc) -> <cmath> + using std::... in test_boiler_unsupported_origin.cpp, test_local_frame_consumers.cpp, test_sat_pid_derivative.cpp; dhw_host_shim.h _stricmp -> strcasecmp off MSVC; test_slave_config_evidence.cpp _itoa -> a portable utoa off MSVC; test_reboot_log_reset_raw S4 needs the pinned PlatformIO libs (absent on the NAS) -> explicit 'skip' with reason off Windows, and S4 left out of the old-code must-fail list there; test_stream_real_cbuf is a PowerShell+MSVC script -> SKIP without PowerShell, the same way it already skips without a firmware build. MSVC single files: boiler_unsupported_origin, local_frame_consumers, sat_pid_derivative, slave_config_evidence, dhw_water_meter, reboot_log_reset_raw: PASS; stream_real_cbuf: unchanged (SKIP, no firmware build in this worktree); under WSL it prints the new SKIP.
+
+2026-11-21 deciding NAS run on c5238004e (09, --host-gxx, OTGW-field-data/bench-nas/2026-11-21_suite-gxx-c5238004e/): 358 files, 351 passed, 4 failed, 1 timeout, 2 skipped. Batch 3c: tests/sat_loop_stubs.h defined localtime_r over the MSVC-only localtime_s on every compiler -> only under _MSC_VER (POSIX has localtime_r) [loop_integration, pwm_first_start, thermal_learning_gate]; test_reboot_log_reset_raw mutant MC4 expects S4, which is a skip without the pinned libs -> MC4 skipped there too; test_sat_tuner_convergence gets a 2400 s per-file timeout in run_tests.py MIN_TIMEOUT (past 900 s on the NAS even with -O2; 33 s on the laptop). MSVC: thermal_learning_gate OK, reboot_log_reset_raw PASS.
 <!-- SECTION:NOTES:END -->
