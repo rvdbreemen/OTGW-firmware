@@ -11107,6 +11107,61 @@
       }
     },
     {
+      "id": "ADR-263",
+      "title": "BLE and remote telemetry buffers may be allocated once from PSRAM at init (partly supersedes ADR-053)",
+      "path": "ADR-263-ble-and-remote-telemetry-buffers-may-be-allocated-once-from-psram-at-init-partly-supersedes-adr-053.md",
+      "format": "canonical",
+      "status": "Accepted",
+      "date": "2026-11-20",
+      "decision_summary": "On a board with PSRAM, buffers of BLE and remote telemetry may be allocated from PSRAM once, at init, and are never f...",
+      "topics": [
+        "ble",
+        "memory",
+        "psram",
+        "remote-telemetry",
+        "static-buffers"
+      ],
+      "aliases": [
+        "allocate once from PSRAM",
+        "PSRAM buffers"
+      ],
+      "components": [
+        "PSRAM buffer allocation rule for BLE and remote telemetry"
+      ],
+      "symbols": [],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [
+          "Allocate once, at init or at the first enable, through one helper (platformPsramAllocOnce() or heapcapsmalloc(..., MALLOCCAPSPIRAM) behind the Platform library), and keep the pointer for the life of the boot.",
+          "Name each buffer and its size in one place (a struct or named constants) so the cost stays readable, as ADR-053 asks of globals.",
+          "Decide PSRAM at run time (platformHasPsram()); without PSRAM either fall back to a bounded internal allocation that leaves the ADR-030 heap reserve free, or keep the feature off with a reason in the log and the UI.",
+          "Let NimBLE allocate its host memory from PSRAM (CONFIGBTNIMBLEMEMALLOCMODEEXTERNAL), set where the project already sets NimBLE options (the sdkconfig.h wrapper of ADR-185); BLE runs only on boards with PSRAM (ADR-257)."
+        ],
+        "must_not": [
+          "Free and re-allocate these buffers during a boot (no allocation churn).",
+          "Put buffers of other features in PSRAM under this ADR.",
+          "Keep a large static array for these two features in internal RAM."
+        ],
+        "exceptions": [
+          "None."
+        ],
+        "verification": [
+          "tests/testremotetelemetrynobigstatics.py (no large statics in the remote telemetry sources) and tests/testremotetelemetryqueue.py (task stack and slot table from PSRAM); on the bench, /api/v2/health heap and PSRAM numbers stay flat over..."
+        ]
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
+    },
+    {
       "id": "ADR-264",
       "title": "Take espMqttClient from our fork as a vendored copy of a pinned fork tag (partly supersedes ADR-187, amends ADR-186)",
       "path": "ADR-264-take-espmqttclient-from-our-fork-as-a-vendored-copy-of-a-pinned-fork-tag-partly-supersedes-adr-187-amends-adr-186.md",
@@ -11378,6 +11433,56 @@
         "verified_in": [],
         "supersedes": [],
         "superseded_by": null
+      }
+    },
+    {
+      "id": "ADR-290",
+      "title": "Opt-in cloud telemetry from the gateway: outbound TLS to a self-hosted collection point, one compressed record a minute, bridge commands included",
+      "path": "ADR-290-opt-in-cloud-telemetry-from-the-gateway.md",
+      "format": "canonical",
+      "status": "Superseded",
+      "date": "2026-11-20",
+      "decision_summary": "Outbound TLS client only, for this one upload.",
+      "topics": [
+        "compression",
+        "diagnostics",
+        "privacy",
+        "recording",
+        "telemetry",
+        "tls"
+      ],
+      "aliases": [
+        "cloud recorder",
+        "cloud telemetry",
+        "TASK-1473"
+      ],
+      "components": [
+        "cloud recorder (CloudRec*.h)",
+        "PocketBase collection point (tools/cloud-recorder/pocketbase)"
+      ],
+      "symbols": [
+        "cloudRecEvBridge",
+        "cloudRecSetup",
+        "crec::lzEncode",
+        "crec::Recorder"
+      ],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [],
+        "must_not": [],
+        "exceptions": [],
+        "verification": []
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": "ADR-218"
       }
     }
   ],
@@ -18827,6 +18932,84 @@
       "target": "ADR-263",
       "type": "related",
       "resolved": false
+    },
+    {
+      "source": "ADR-218",
+      "target": "ADR-290",
+      "type": "supersedes",
+      "resolved": true
+    },
+    {
+      "source": "ADR-263",
+      "target": "ADR-030",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-263",
+      "target": "ADR-053",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-263",
+      "target": "ADR-185",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-263",
+      "target": "ADR-218",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-263",
+      "target": "ADR-257",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-290",
+      "target": "ADR-003",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-290",
+      "target": "ADR-080",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-290",
+      "target": "ADR-177",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-290",
+      "target": "ADR-213",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-290",
+      "target": "ADR-217",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-290",
+      "target": "ADR-218",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-290",
+      "target": "ADR-218",
+      "type": "superseded-by",
+      "resolved": true
     }
   ]
 }
