@@ -329,7 +329,7 @@ Live monitoring, sensor values, and the WebSocket stream remain open without aut
 - **Do not flash PIC firmware over Wi-Fi using OTmonitor.** This can brick the PIC microcontroller. Use the built-in PIC firmware upgrade feature in the web UI instead.
 - **Dallas GPIO default changed in v1.0.0 (1.x, ESP8266)**: The default pin moved from GPIO 13 (D7) to GPIO 10 (SD3). If upgrading a 1.x unit from a version before v1.0.0, verify your wiring or change the setting back to 13.
 - **REST API v0/v1 removed in v1.2.0**: Only `/api/v2/` endpoints remain. See the [REST API reference](docs/api/README.md).
-- **MQTT topic corrections in v1.2.0**: A few spelling fixes changed topic names (`eletric_production` to `electric_production`, etc.). Delete orphaned Home Assistant entities and let discovery recreate them. Details: [breaking changes](docs/fixes/opentherm-v42-mqtt-breaking-changes.md).
+- **MQTT topic corrections in v1.2.0**: A few spelling fixes changed topic names (`eletric_production` to `electric_production`, etc.). Delete orphaned Home Assistant entities and let discovery recreate them. Details: [breaking changes](docs/archive/1.x/fixes/opentherm-v42-mqtt-breaking-changes.md).
 - **ESP32 OTDirect note**: When OTDirect is active, the PIC UART is bypassed. Do not attempt PIC firmware upgrades while OTDirect is the active OpenTherm path.
 
 ---
