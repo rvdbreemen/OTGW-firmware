@@ -5786,6 +5786,19 @@
     "TASK-2993"
    ],
    "confirmed_by_entry": null
+  },
+  {
+   "id": 438,
+   "title": "Entry 437 follow-up answered B: keep the start-up filter for the first 30 s after ignition, then the live flow (Sergeant D, 2026-11-21)",
+   "date": "2026-11-21",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1573540980651720797",
+   "supersedes": [],
+   "tasks": [
+    "TASK-2993"
+   ],
+   "confirmed_by_entry": null
   }
  ]
 }

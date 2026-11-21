@@ -5,6 +5,7 @@ status: To Do
 assignee:
   - '@otgw-dev'
 created_date: '2026-11-21T03:28:00Z'
+updated_date: '2026-11-21T03:31:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -27,3 +28,9 @@ Sergeant D, entry 437 (#dev-sat-mqtt 2026-11-21 03:25 UTC, msg 15735397191475529
 - [ ] #4 Replay of indigo_light 19 Nov 21:27-21:33 gives live-flow duties of about 101 % then about 47 %, no range 5 after 21:28:30, no MM=T, no saturation exit; replay reports the remaining switches with TASK-2987 + 2989
 - [ ] #5 Bench via the NAS (replay or simulation) before the push
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-21: Sergeant D answered B (entry 438): keep the start-up EMA for the first 30 s after ignition, then the live flow until the next ignition. Waiting only for Robert's OK on reversing entry 64.
+<!-- SECTION:NOTES:END -->

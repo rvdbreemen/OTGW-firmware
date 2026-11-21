@@ -8622,3 +8622,22 @@ Robert, 16:18:42 UTC (https://discord.com/channels/812969634638725140/9144987300
 **Open:** whether "ALWAYS" also drops the start-up filter (EMA 0.3/0.7 for the first 180 s): asked as a follow-up (https://discord.com/channels/812969634638725140/1105556725714649128/1573540311874142270), recommendation B (keep a 30 s filter, entry 1; flow 38.7 -> 32.3 C within 30 s after indigo's ignition at 21:23:09); Robert's OK for reversing entry 64; release scope (read as 2.0.0, the toggling fix).
 
 **Task:** TASK-2993 (otgw-dev, 2.0.0, high), implementation after Robert's OK and the filter answer.
+
+## 438. Entry 437 follow-up answered B: keep the start-up filter for the first 30 s after ignition, then the live flow (Sergeant D, 2026-11-21)
+
+**Source:** #dev-sat-mqtt, Sergeant D 2026-11-21 03:30:04 UTC (https://discord.com/channels/812969634638725140/1105556725714649128/1573540980651720797), a reply to our follow-up (https://discord.com/channels/812969634638725140/1105556725714649128/1573540311874142270); unedited when read back via the Discord API about 2 min after the post.
+
+**Quoted:**
+> "My answer is B"
+
+**Settled:** option B as posted: "Keep the start-up filter for the first seconds after ignition (your entry 1 said 30 s), then the live flow." The PWM duty uses an EMA of the flow for the first 30 s after ignition and the live flow after that, until the next ignition; the base + 1 floor stays only against division by zero. This matches his own words in entry 1 ("for the first 30 seconds of flame ON of each ON cycle we use the filtered value and then we use the raw BT value").
+
+**Interpretation (ours):** the filter itself stays as it is (EMA 0.3 new / 0.7 old, pwm.py:149, SATcontrol.ino:1669-1675); only its window changes from 180 s to 30 s, and the value is no longer held after it. "Ignition" means each ignition the PWM code already reseeds on (pwm.py:186-193, SATcontrol.ino:1680-1686).
+
+**Changes earlier entries:** entry 437 (open point "start-up filter" settled); entry 1 as resolved on 2026-10-22 (180 s window, held) is replaced by his original entry-1 words: 30 s window, then raw.
+
+**Compared with thermo-nova (7beaaf5):** HEATER_STARTUP_TIMEFRAME 180 s and the held value (const.py:18, pwm.py:144-149) are not followed; a deliberate deviation (ground truth #1).
+
+**Task:** TASK-2993.
+
+**Open:** Robert's OK for reversing entry 64 (asked, https://discord.com/channels/812969634638725140/1105556725714649128/1573540314436730942).
