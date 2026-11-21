@@ -6,10 +6,10 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-21T16:14:00Z'
+updated_date: '2026-11-21T16:48:00Z'
 labels:
   - webui
   - sat
-  - needs-maintainer-ok
 milestone: 2.0.0
 dependencies: []
 priority: low
@@ -28,3 +28,9 @@ gruijter, #alpha-testing msg 1573733241079468133 (2026-11-21): 'multi-area' vs '
 - [ ] #2 Web UI groups and labels changed as decided; settings keys, MQTT and REST unchanged; screenshots before/after
 - [ ] #3 Docs/help text use the same names
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-21: Robert agrees with gruijter's suggestion (#alpha-testing msg 1573741601946345514) and asks for a design proposal to approve before implementation. Next: a short design proposal (names, two groups side by side with one-line explanations, areas numbered 1-4, before/after mock) to Robert; no code before his OK.
+<!-- SECTION:NOTES:END -->
