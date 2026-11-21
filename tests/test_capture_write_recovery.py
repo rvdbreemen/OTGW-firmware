@@ -197,5 +197,23 @@ class SilentStream(unittest.TestCase):
         self.assertEqual((self.cap.errors, self.cap.summaries), ([], []))
 
 
+class MqttCsv(unittest.TestCase):
+    """TASK-3006 AC #3: a short-run mqtt.log ("topic payload" lines) gave 0 csv rows, so csv/mqtt.csv was dropped and
+    the upload had no MQTT file while the summary reported 143483 messages."""
+
+    def test_i_short_run_lines_become_rows(self):
+        with tempfile.TemporaryDirectory() as d:
+            src, dst = Path(d) / "mqtt.log", Path(d) / "mqtt.csv"
+            src.write_text("OTGW/value/otgw-x/boilertemp 42.50\n"
+                           "### capture: mqtt reconnected after 12 s gap (broker)\n"
+                           "OTGW/value/otgw-x/status {\"a\": 1, \"b\": \"x y\"}\n"
+                           "2026-11-20T08:00:00.000+01:00\t1\tOTGW/value/otgw-x/flame\tON\n", encoding="utf-8")
+            self.assertEqual(oc.convert_mqtt_csv(src, dst), 3)
+            rows = dst.read_text(encoding="utf-8").splitlines()
+            self.assertEqual(rows[1], ",,OTGW/value/otgw-x/boilertemp,42.50")
+            self.assertIn("x y", rows[2], "the payload keeps its spaces")
+            self.assertTrue(rows[3].endswith("\t".join([]) + "OTGW/value/otgw-x/flame,ON"), rows[3])
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -226,7 +226,9 @@ def convert_otframes_csv(src, dst):
 
 
 def convert_mqtt_csv(src, dst):
-    """mqtt.log (long-run format: host_time TAB retain TAB topic TAB payload) -> mqtt.csv. Returns the row count."""
+    """mqtt.log -> mqtt.csv. Returns the row count. Long-run lines are host_time TAB retain TAB topic TAB payload;
+    short-run lines are "topic payload" (TASK-3006: they gave 0 rows and the csv was dropped from the upload), and
+    become rows with an empty host_time and retain."""
     rows = 0
     with open(src, "r", encoding="utf-8", errors="replace") as f, \
             open(dst, "w", encoding="utf-8", newline="") as out:
@@ -235,11 +237,16 @@ def convert_mqtt_csv(src, dst):
         for line in f:
             if line.startswith("#"):
                 continue
-            parts = line.rstrip("\r\n").split("\t", 3)
-            if len(parts) != 4 or parts[1] not in ("0", "1"):
+            text = line.rstrip("\r\n")
+            parts = text.split("\t", 3)
+            if len(parts) == 4 and parts[1] in ("0", "1"):
+                writer.writerow(parts)
+                rows += 1
                 continue
-            writer.writerow(parts)
-            rows += 1
+            topic, sep, payload = text.partition(" ")
+            if sep and topic and "\t" not in topic:
+                writer.writerow(("", "", topic, payload))
+                rows += 1
     return rows
 
 
@@ -3226,6 +3233,15 @@ def build_upload_zip(cap, transcript, hourly, limit=UPLOAD_LIMIT_BYTES):
                 add(cap.path(name), name)
             for path in convert_logs_to_csv(cap.run_path, csv_dir, cap.script_error):
                 add(path, f"csv/{path.name}")
+            # TASK-3006: say where the MQTT messages are; a short-run upload carries them in the transcript and in
+            # csv/mqtt.csv, not as a separate mqtt.log.
+            if cap.path("mqtt.log").is_file():
+                if any(a == "csv/mqtt.csv" for _, a in items):
+                    say("Upload: MQTT messages are in the transcript (MQTT BROKER STREAM) and in csv/mqtt.csv; "
+                        "mqtt.log itself is not added on a short run.")
+                else:
+                    say("Upload: WARNING: mqtt.log held no MQTT line, so there is no csv/mqtt.csv; see the MQTT "
+                        "capture line above for how many messages were received and written.")
         target = upload_zip_path(cap.run_path)
         write_zip_verified(target, items)
         size = target.stat().st_size
