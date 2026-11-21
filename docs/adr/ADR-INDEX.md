@@ -273,3 +273,4 @@ One row per Architecture Decision Record. Scope is the Enforcement `path_glob` s
 | ADR-266 | Proposed | - | Nagle on for the MQTT socket. |
 | ADR-268 | Proposed | - | The firmware keeps one local diagnostic recorder: the local ring of the remote telemetry recorder. |
 | ADR-290 | Superseded | - | Outbound TLS client only, for this one upload. |
+| ADR-291 | Proposed | - | The device history slot gets an eighth int16t temperature column, satRoom, so a slot is 18 bytes. |

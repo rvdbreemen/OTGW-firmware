@@ -11476,6 +11476,74 @@
         "supersedes": [],
         "superseded_by": "ADR-218"
       }
+    },
+    {
+      "id": "ADR-291",
+      "title": "The Monitor graph history stores the room SAT regulates on in its own column; a slot grows from 16 to 18 bytes (amends ADR-256)",
+      "path": "ADR-291-the-monitor-graph-history-stores-the-room-sat-regulates-on-in-its-own-column-a-slot-grows-from-16-to-18-bytes-amends-adr-256.md",
+      "format": "canonical",
+      "status": "Proposed",
+      "date": "2026-11-21",
+      "decision_summary": "The device history slot gets an eighth int16t temperature column, satRoom, so a slot is 18 bytes.",
+      "topics": [
+        "graph-history",
+        "sat",
+        "web-ui"
+      ],
+      "aliases": [
+        "SAT room in the graph history",
+        "satRoom column",
+        "TASK-3007"
+      ],
+      "components": [
+        "GraphHistSlot satRoom column"
+      ],
+      "symbols": [
+        "GRAPH_HIST_NO_TEMP",
+        "graphHistEmitJson",
+        "GraphHistSlot",
+        "satRoom"
+      ],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [
+          "Keep GraphHistSlot at exactly 18 bytes, with satRoom as the eighth int16t temperature.",
+          "Write GRAPHHISTNOTEMP in satRoom while SAT is not enabled, and while SAT's room is lost.",
+          "Omit the satRoom array from a response whose window holds no SAT room value, so that body is unchanged.",
+          "Keep the room column as MsgID 24 only."
+        ],
+        "must_not": [
+          "Write SAT's room into room or any other existing column (option (a) rejected).",
+          "Change the ring capacities, intervals or the writer margin of ADR-193 and ADR-245.",
+          "Add a REST call for SAT's room to the graph's live path."
+        ],
+        "exceptions": [
+          "None."
+        ],
+        "verification": [
+          "tests/testgraphhistory.py compiles tests/testgraphhistory.cpp on the real graphHistoryStuff.h. It checks:",
+          "the slot is 18 bytes;",
+          "a window with SAT room values emits satRoom with the right values and grouping;",
+          "a lost SAT room stores \"no value\";",
+          "a window without values emits a body byte-identical to the code before this ADR.",
+          "A web UI test in tests/webui/ drives the real data/v2.js:",
+          "the SAT room series and legend appear with a device history that has satRoom;",
+          "the CSV export has the column;",
+          "a history without it draws no series.",
+          "Field: a capture from will85903 (or another tester with satexternaltemp=true) shows satRoom matching SAT's room in the SATTICK lines."
+        ]
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
     }
   ],
   "relationships": [
@@ -19025,6 +19093,30 @@
       "source": "ADR-290",
       "target": "ADR-218",
       "type": "superseded-by",
+      "resolved": true
+    },
+    {
+      "source": "ADR-291",
+      "target": "ADR-193",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-291",
+      "target": "ADR-245",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-291",
+      "target": "ADR-248",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-291",
+      "target": "ADR-256",
+      "type": "related",
       "resolved": true
     }
   ]
