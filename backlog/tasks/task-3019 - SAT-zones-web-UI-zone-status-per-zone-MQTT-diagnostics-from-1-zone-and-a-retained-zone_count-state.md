@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-21T17:16:00Z'
-updated_date: '2026-11-21T18:41:00Z'
+updated_date: '2026-11-21T18:44:00Z'
 labels:
   - sat
   - mqtt
@@ -35,4 +35,6 @@ gruijter, #alpha-testing msg 1573748508622721095 (2026-11-21), three requests: (
 2026-11-21 gruijter follow-up (msg 1573750283282940076): the docs say every zone, zone 1 included, is an extra room next to the main room, yet iZoneCount defaults to 1 (SATtypes.h:614 comment: '1-4, default 1 = single-zone') and diagnostics need > 1, which looks like a leftover of '1 = main room only'. Suggests default zone_count 0 (no extra rooms) and zone topics from 1 zone. Verified: the code comment and the docs disagree on what zone_count = 1 means; the design must settle the meaning first (and migrate stored 1s accordingly).
 
 2026-11-21: released by Robert in #alpha-testing (msg 1573770202410123305, reply to our zone_count note): fix as suggested, i.e. gruijter's suggestion: zone_count counts extra rooms only (default 0 = no extra rooms, matching the docs), zone diagnostics publish from 1 zone, plus the zone_count state topic and web UI zone status of the first note. Migration of stored zone_count = 1 (old meaning 'main room only') is for the plan to state.
+
+2026-11-21: Robert confirmed the zone_count meaning (DM check answered A) and timing after Wednesday 25 Nov; recorded as entry 459 in the private SAT decision register. Open per entry 459: exact migration mapping of stored values (check how the code counts the main room first).
 <!-- SECTION:NOTES:END -->
