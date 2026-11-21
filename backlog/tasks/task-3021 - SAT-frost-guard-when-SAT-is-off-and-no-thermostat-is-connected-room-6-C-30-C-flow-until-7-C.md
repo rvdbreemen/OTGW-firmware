@@ -7,7 +7,7 @@ status: To Do
 assignee:
   - '@claude'
 created_date: '2026-11-21T18:47:00Z'
-updated_date: '2026-11-21T18:51:00Z'
+updated_date: '2026-11-21T18:52:00Z'
 labels:
   - sat
   - safety
@@ -42,3 +42,9 @@ Plan (otgw-dev, 2026-11-21; code after TASK-3011 lands). Entry 460 (Q-456a = B).
 5. Visibility: one telnet/debug line on enter and exit ('OTD: frost guard on, room X <= 6.0, CH on with 30 C' / 'off, room X >= 7.0'); no new MQTT/REST contract in this task (YAGNI; say if Robert wants one).
 6. Tests (AC4): host test that compiles the real otdFrostGuardStep() and the real buildStatusRequest() bit-0 rule: room 5.0 no thermostat -> bit 0 on + TSet 30 (red on today's code: bit 0 off), 6.5 stays on, 7.0 off, NaN -> off, thermostat connected -> unchanged, CS override active -> override wins, SAT owning CS -> unchanged. Bench/sim by 09 on OT-Direct master mode with the room fed over MQTT (sat indoor temp) at 5.0 / 7.5.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-21 (coordinator review of the plan, otgw-dev): approved with two changes. (a) Known limit, to be stated in the ADR text too: PIC (Classic) boards are out of scope. Finding (code reading only, not bench-verified): the PIC's own standalone MsgID 0 sets CH enable only while a CS= is in force (otgw-6.6 gateway.asm readstatus :2712-2745, the SysCtrlSetpoint / HeatDemand mask on bit 0; the firmware reads it the same way in OTDirect.ino:1259-1264, TASK-1806). So a Classic with SAT off and no thermostat also has CH off and no frost protection; this task does not change that. (b) Visibility: a safety action that heats must be visible, so besides the debug line one status field frost_guard_active (bool) in /api/v2/sat/status; no new MQTT topic or HA discovery.
+<!-- SECTION:NOTES:END -->
