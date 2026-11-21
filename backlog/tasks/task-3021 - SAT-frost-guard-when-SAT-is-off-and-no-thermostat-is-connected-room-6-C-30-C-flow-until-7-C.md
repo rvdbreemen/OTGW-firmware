@@ -7,7 +7,7 @@ status: To Do
 assignee:
   - '@claude'
 created_date: '2026-11-21T18:47:00Z'
-updated_date: '2026-11-21T18:52:00Z'
+updated_date: '2026-11-21T18:55:00Z'
 labels:
   - sat
   - safety
@@ -47,4 +47,6 @@ Plan (otgw-dev, 2026-11-21; code after TASK-3011 lands). Entry 460 (Q-456a = B).
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-11-21 (coordinator review of the plan, otgw-dev): approved with two changes. (a) Known limit, to be stated in the ADR text too: PIC (Classic) boards are out of scope. Finding (code reading only, not bench-verified): the PIC's own standalone MsgID 0 sets CH enable only while a CS= is in force (otgw-6.6 gateway.asm readstatus :2712-2745, the SysCtrlSetpoint / HeatDemand mask on bit 0; the firmware reads it the same way in OTDirect.ino:1259-1264, TASK-1806). So a Classic with SAT off and no thermostat also has CH off and no frost protection; this task does not change that. (b) Visibility: a safety action that heats must be visible, so besides the debug line one status field frost_guard_active (bool) in /api/v2/sat/status; no new MQTT topic or HA discovery.
+
+2026-11-21 (Robert, DM 1573773591164485663, option B): the frost guard also covers the Classic/PIC in 2.0.0. Plan update (otgw-dev): the shared rule stays otgw-agnostic (otdFrostGuardStep -> rename to a board-neutral satFrostGuardStep in SATcontrol.ino, same 6.0/7.0 hysteresis, no room temperature -> off, SAT not owning CS, a user CS= keeps priority, status field frost_guard_active). Two outputs: (1) OT-Direct: as planned (bit 0 kept + own MsgID 1 = 30.0). (2) PIC: on entry the ESP sends CS=30 and CH=1 through addCommandToQueue() (the only PIC command path, firmware rule); on release at 7.0 it sends CS=0 and CH back to the value before entry (the PIC then sends its own standalone status again: CH enable off without a CS, gateway.asm readstatus :2712-2745); the guard re-sends CS=30 periodically like SAT's CS repeat (ADR-235 30 s) so a PIC reset does not drop it. New piece of work found: the firmware has no 'thermostat seen' state for PIC boards (the PIC lines 'Thermostat connected/disconnected' are only recognised as markers, OTGW-Core.ino:5757-5786). Plan: derive it from the thermostat's own frames (a 'T' frame within the last 60 s, the PIC's own disconnect timeout order of magnitude) and/or those PIC lines; host-tested. A 'user CS=' on PIC: the guard only acts while no CS= override of another source is known (SAT off; the command path marks a user CS=; to be located in the command handler, otherwise documented as a limit). Bench: OT-Direct master (OTGW32) and a Classic+S3 unit; .63 is in its soak until Sunday ~17:00, so the Classic bench after that or on another Classic unit of 09's.
 <!-- SECTION:NOTES:END -->
