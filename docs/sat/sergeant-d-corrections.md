@@ -8732,3 +8732,22 @@ Robert, 16:18:42 UTC (https://discord.com/channels/812969634638725140/9144987300
 **Task:** TASK-2993 (no change: it already builds 30 s).
 
 **Open:** Q-438b (live flow in the PWM OFF phase).
+
+## 444. The live-flow duty (entry 437) applies only in the PWM ON phase; in the OFF phase the duty keeps the last ON value (Sergeant D, 2026-11-21; answers Q-438b, narrows entry 437)
+
+**Source:** #dev-sat-mqtt, Sergeant D 2026-11-21 07:10:48 UTC (https://discord.com/channels/812969634638725140/1105556725714649128/1573596529984544881), a reply to Q-438b (https://discord.com/channels/812969634638725140/1105556725714649128/1573595715278602335); unedited when read back via the Discord API more than 90 s later.
+
+**Quoted:**
+> "my answer is B"
+
+**Settled:** option B of Q-438b: the duty (request - base) / (live flow - base) of entry 437 uses the live flow only while the PWM phase is ON. In the OFF phase the duty does not follow the cooling flow; it keeps the value of the last ON tick, so the OFF time is not shortened by the cooling water. This narrows entry 437's "ALWAYS"; the 30 s start-up filter (entries 438/443) and the 1.03 rule (entry 440) are unchanged.
+
+**Why (as posted with the question):** in otgw-dev's closed-loop toy model on the real PWM block (lane d3-duty2993 @1693b644b, first-order flow, hourly start limit off, not a house model), the live flow in the OFF phase gave about one start per hour more than the cycles/h setting with fast cooling (3 cph: 3.0 -> 4.0; 4 cph: 4.0 -> 5.0), and no difference with slow cooling; "ON only" kept 3.0 and 3.5. The firmware today computes the duty every tick, OFF included (SATcontrol.ino:1660-1662 in that lane).
+
+**Interpretation (ours):** "the last ON value" is the duty computed on the last tick of the ON phase, held until the next ON phase starts. Whether that held value is the duty or the flow used in its denominator gives the same result while the request does not change; when the request changes during OFF, holding the flow (and recomputing with the new request) is the reading closest to "keep the last ON flow". This is an implementation detail for otgw-dev to confirm with a test, not a new behaviour choice; if it turns out to matter, it goes back to Sergeant D.
+
+**Compared with thermo-nova (7beaaf5):** thermo-nova computes the duty every update (pwm.py:136, 229-239) with its held BT (pwm.py:144-149), so its OFF phase never followed the live flow either; this answer keeps that property for the OFF phase.
+
+**Task:** TASK-2993 (live-flow duty in ON only).
+
+**Open:** none for this question.

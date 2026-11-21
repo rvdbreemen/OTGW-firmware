@@ -5872,6 +5872,19 @@
     "TASK-2993"
    ],
    "confirmed_by_entry": null
+  },
+  {
+   "id": 444,
+   "title": "The live-flow duty (entry 437) applies only in the PWM ON phase; in the OFF phase the duty keeps the last ON value (Sergeant D, 2026-11-21; answers Q-438b, narrows entry 437)",
+   "date": "2026-11-21",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1573596529984544881",
+   "supersedes": [],
+   "tasks": [
+    "TASK-2993"
+   ],
+   "confirmed_by_entry": null
   }
  ]
 }
