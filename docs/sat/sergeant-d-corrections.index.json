@@ -5762,6 +5762,17 @@
     "TASK-2989"
    ],
    "confirmed_by_entry": null
+  },
+  {
+   "id": 436,
+   "title": "MM=T only when the duty is above 1.03 (Sergeant D, 2026-11-21; amends entries 242/243; reading to be confirmed)",
+   "date": "2026-11-21",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1573536221601210410",
+   "supersedes": [],
+   "tasks": [],
+   "confirmed_by_entry": null
   }
  ]
 }

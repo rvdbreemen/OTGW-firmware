@@ -8582,3 +8582,22 @@ Robert, 16:18:42 UTC (https://discord.com/channels/812969634638725140/9144987300
 **Task:** TASK-2989 (otgw-dev), beside TASK-2987.
 
 **Open:** Sergeant D's own answer to Q-2005e; whether 1.5 C is the value (and whether it becomes a setting like fPwmSwitchMargin).
+
+## 436. MM=T only when the duty is above 1.03 (Sergeant D, 2026-11-21; amends entries 242/243; reading to be confirmed)
+
+**Source:** #dev-sat-mqtt, Sergeant D 2026-11-21 (https://discord.com/channels/812969634638725140/1105556725714649128/1573536221601210410), edited at 03:11:32 UTC; final text read back via the Discord API. It answers the chart thread on indigo_light's 19 Nov flame (msgs 1573528792889303151, 1573534978858418290, 1573535623095259208), not a numbered question.
+
+**Quoted (final, edited text):**
+> "then we need to release the MM only when duty cycle is above 1.03. Now ask me the ope questions one at a time"
+
+**Settled:** SAT hands the maximum relative modulation back to the thermostat (MM=T, entries 242/243) only when the duty is above 1.03, no longer whenever the PWM duty is in range 5.
+
+**Interpretation (ours, not yet confirmed):** "duty cycle" is read as the raw duty (request - base) / (BT - base) (SATcontrol.ino:1648, as thermo-nova pwm.py:229-239), before the [0, 1] cap; today MM=T is sent at range 5, which starts at dutyMax = 1 - (minOn/period)/2 = 0.90 at 4 cycles per hour (SATcontrol.ino:1690-1699, entry 242). A raw duty above 1.03 means the request lies clearly above what the held boiler temperature BT can deliver. Field case: indigo_light 19 Nov 21:27:30, duty 0.97 at request 31.97 (BT about 32.1, computed), MM=T sent, boiler modulation up to 55 %, flow 31.9 -> 41.5 C; under this reading no MM=T would have been sent. Open for the code: whether the raw duty is still available where MM=T is decided (it is capped at :1650-1651); if not, the duty path needs a change, not only the threshold (otgw-dev checks).
+
+**Changes earlier entries:** 242/243 (MM=T at the maximum PWM duty, range 5): the trigger becomes duty > 1.03.
+
+**Compared with thermo-nova (7beaaf5):** no counterpart; thermo-nova has no MM=T (its PWM sets relative modulation OFF), so entries 242/243 and this threshold are refinements on top of the pin.
+
+**Task:** new otgw-dev task (2.0.0, high, sat), implementation only after his confirmation of the reading.
+
+**Open:** confirmation of the reading (raw duty before the cap); release scope (not stated; read as part of the 2.0.0 toggling fix until he says otherwise).
