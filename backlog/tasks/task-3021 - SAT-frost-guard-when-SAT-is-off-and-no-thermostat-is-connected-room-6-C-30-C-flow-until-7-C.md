@@ -4,8 +4,10 @@ title: >-
   SAT: frost guard when SAT is off and no thermostat is connected (room <= 6 C
   -> 30 C flow until 7 C)
 status: To Do
-assignee: []
+assignee:
+  - '@claude'
 created_date: '2026-11-21T18:47:00Z'
+updated_date: '2026-11-21T18:51:00Z'
 labels:
   - sat
   - safety
@@ -28,3 +30,15 @@ Decision: entry 460 in the private SAT register (Robert, 2026-11-21, Q-456a = B)
 - [ ] #3 No room temperature known -> no frost demand
 - [ ] #4 Host test on the real code: red on the old code (no demand at 5 C), green on the fix; bench or simulation check on OT-Direct master mode
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+Plan (otgw-dev, 2026-11-21; code after TASK-3011 lands). Entry 460 (Q-456a = B). Reference only (ADR-292): ba515c8 demand_control.py:610-622 (_update_frost_protection: on at room <= threshold, off at >= threshold + 1.0, no room temperature -> off), :815-828 (HVAC off + frost -> demand with setpoint max(minimum_setpoint, 30)), const.py:31-32.
+1. Where: OT-Direct only (src/OTGW-firmware/OTDirect.ino), the gateway's own status/TSet. Condition 'no thermostat detected' = !state.otd.bThermostatConnected (set/cleared by the thermostat timeout, OTDirect.ino:3565-3600), in master mode, and in gateway mode once the thermostat is gone (the same case otdOwnFramesAllowed() lets the gateway send its own frames). Plus SAT not owning the setpoint (!satOwnsControlSetpoint()) and no external CS= override in force (!otdCsOverrideActive(): a user CS= keeps priority). PIC boards (Classic) are out of scope: the PIC itself sends the standalone frames.
+2. Rule: a pure helper otdFrostGuardStep(bool active, float room) between // --- otdFrostGuard begin/end markers (testable like otdOwnFramesAllowed): room NaN -> false; room <= 6.0 -> true; room >= 7.0 -> false; else keep. Constants OTD_FROST_ON_C 6.0 and OTD_FROST_OFF_C 7.0 (fixed for now; Q-460a 'fixed or setting' is queued to Sergeant D, a setting is a small follow-up). Evaluated once per status build on the loop task.
+3. Room temperature: the SAT room resolver (satGetRoomTemp(), after TASK-3011 the primary-source order; without a thermostat MsgID 24 is NaN, so external MQTT/REST, pinned BLE or areas), through a non-static getter in SATcontrol.ino. None known -> no action (AC3).
+4. Effect while active: buildStatusRequest() keeps CH enable (bit 0) on (today it clears it at OTDirect.ino:1265-1266 when there is no CS override and SAT does not own the setpoint), and the gateway's MsgID 1 WRITE carries 30.0 C (the TSet path the CS override uses; locate in the master scheduler, frost value only when the override is not active). On exit: back to CH off and no TSet, as today.
+5. Visibility: one telnet/debug line on enter and exit ('OTD: frost guard on, room X <= 6.0, CH on with 30 C' / 'off, room X >= 7.0'); no new MQTT/REST contract in this task (YAGNI; say if Robert wants one).
+6. Tests (AC4): host test that compiles the real otdFrostGuardStep() and the real buildStatusRequest() bit-0 rule: room 5.0 no thermostat -> bit 0 on + TSet 30 (red on today's code: bit 0 off), 6.5 stays on, 7.0 off, NaN -> off, thermostat connected -> unchanged, CS override active -> override wins, SAT owning CS -> unchanged. Bench/sim by 09 on OT-Direct master mode with the room fed over MQTT (sat indoor temp) at 5.0 / 7.5.
+<!-- SECTION:PLAN:END -->
