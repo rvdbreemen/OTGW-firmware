@@ -42,4 +42,6 @@ Plan corrections from otgw-docs' dry run (2026-11-20): C6.7 keeps a stub (ADR-09
 2026-11-21 phase 2 C6.1 (otgw-docs): one plans folder: docs/plan/*, plan/ and the ps1 translator plan move to docs/plans/
 
 2026-11-21 phase 2 C6.2 (otgw-docs): F1: remove the committed merge-conflict markers from docs/archive/mqttha.cfg (keep the v2.0.0-beta snapshot side)
+
+2026-11-21 phase 2 C6.3 (otgw-docs): 1.x UI screenshots: docs/images/ moves to docs/archive/1.x/images/
 <!-- SECTION:NOTES:END -->
