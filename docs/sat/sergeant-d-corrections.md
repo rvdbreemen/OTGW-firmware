@@ -8553,3 +8553,13 @@ Robert, 16:18:42 UTC (https://discord.com/channels/812969634638725140/9144987300
 **Task:** TASK-2005 follow-up for otgw-dev (implementation of A; built after Robert's requested analysis of minimal switching is reviewed).
 
 **Open:** Sergeant D's own answer to Q-2005d (Q-2005d stays asked).
+
+## 434. Erratum (ours) to entries 432 and 433: the UTC times of the confirmation exchange (2026-11-21)
+
+**Source:** the Discord message IDs themselves (snowflake timestamps), read by 92 on 2026-11-21. No new decision.
+
+**Correction:** entries 432 and 433 gave local times (UTC+1) labelled as UTC. The correct UTC times are: confirmation question asked 01:37:55 UTC (https://discord.com/channels/812969634638725140/1105556725714649128/1573512754386698291; entry 432 said 02:47 UTC, and its read-back of Robert's "A" was at about 01:37 UTC, not 02:45); Robert's "Yes" 01:43:01 UTC (https://discord.com/channels/812969634638725140/1105556725714649128/1573514041194717198; entry 433 said ~02:52 UTC). Robert's "A" (00:18:18 UTC) and the content of both entries are unchanged.
+
+**Task:** none.
+
+**Open:** none.

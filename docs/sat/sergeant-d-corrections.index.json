@@ -5735,6 +5735,17 @@
     "TASK-2005"
    ],
    "confirmed_by_entry": null
+  },
+  {
+   "id": 434,
+   "title": "Erratum (ours) to entries 432 and 433: the UTC times of the confirmation exchange (2026-11-21)",
+   "date": "2026-11-21",
+   "source": "unknown",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1573512754386698291",
+   "supersedes": [],
+   "tasks": [],
+   "confirmed_by_entry": null
   }
  ]
 }
