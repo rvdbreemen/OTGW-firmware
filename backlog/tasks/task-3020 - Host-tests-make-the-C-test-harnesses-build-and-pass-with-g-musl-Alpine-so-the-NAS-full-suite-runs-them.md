@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-21T18:10:00Z'
-updated_date: '2026-11-21T22:00:00Z'
+updated_date: '2026-11-21T22:59:00Z'
 labels:
   - tests
 milestone: 2.0.0
@@ -27,6 +27,7 @@ Robert 2026-11-21 (via coordinator, 'port now', overrides the 25 Nov deferral fo
 - [ ] #1 Every C++ host test file that fails on g++/musl at 2f26146ce builds and passes there, or is listed with the reason it cannot (e.g. needs a src change)
 - [ ] #2 The same files still pass with MSVC on the laptop (spot check per batch, single files)
 - [ ] #3 A NAS full-suite run via otgw-bench-tester shows the before/after count of failing files
+- [ ] #4 test_sat_tuner_convergence finishes within its timeout on the NAS (g++); today it is the one known NAS timeout: > 2400 s there vs 33 s with MSVC on the laptop; a timing probe (slow vs stuck) decides the fix; until then --host-gxx stays opt-in
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -47,4 +48,6 @@ Correction to the note above: test_sat_lowload_contract was NOT OK on MSVC in th
 2026-11-21 NAS run batch 3 (09, 0bcc64967, --host-gxx; OTGW-field-data/bench-nas/2026-11-21_suite-gxx-0bcc649/): 358 files, 345 passed, 11 failed, 1 timeout; 5 of those already addressed by 1c/1d. Batch 3b for the 7 new test/host ones: roundf/isnan unqualified in sliced firmware code (core.inc, sat_pid_slice.inc) -> <cmath> + using std::... in test_boiler_unsupported_origin.cpp, test_local_frame_consumers.cpp, test_sat_pid_derivative.cpp; dhw_host_shim.h _stricmp -> strcasecmp off MSVC; test_slave_config_evidence.cpp _itoa -> a portable utoa off MSVC; test_reboot_log_reset_raw S4 needs the pinned PlatformIO libs (absent on the NAS) -> explicit 'skip' with reason off Windows, and S4 left out of the old-code must-fail list there; test_stream_real_cbuf is a PowerShell+MSVC script -> SKIP without PowerShell, the same way it already skips without a firmware build. MSVC single files: boiler_unsupported_origin, local_frame_consumers, sat_pid_derivative, slave_config_evidence, dhw_water_meter, reboot_log_reset_raw: PASS; stream_real_cbuf: unchanged (SKIP, no firmware build in this worktree); under WSL it prints the new SKIP.
 
 2026-11-21 deciding NAS run on c5238004e (09, --host-gxx, OTGW-field-data/bench-nas/2026-11-21_suite-gxx-c5238004e/): 358 files, 351 passed, 4 failed, 1 timeout, 2 skipped. Batch 3c: tests/sat_loop_stubs.h defined localtime_r over the MSVC-only localtime_s on every compiler -> only under _MSC_VER (POSIX has localtime_r) [loop_integration, pwm_first_start, thermal_learning_gate]; test_reboot_log_reset_raw mutant MC4 expects S4, which is a skip without the pinned libs -> MC4 skipped there too; test_sat_tuner_convergence gets a 2400 s per-file timeout in run_tests.py MIN_TIMEOUT (past 900 s on the NAS even with -O2; 33 s on the laptop). MSVC: thermal_learning_gate OK, reboot_log_reset_raw PASS.
+
+2026-11-22 NAS run on 5b04d2bd5 (09, --host-gxx, all 358 files incl. test/host; OTGW-field-data/bench-nas/2026-11-21_suite-gxx-5b04d2bd5/): 355 passed, 0 FAILED, 1 TIMEOUT, 2 skipped. The one known NAS timeout: test_sat_tuner_convergence (test_one_sided_disturbance, cut off at 2400 s; 33 s with MSVC on the laptop) -> new AC #4. Pushed with the coordinator's slot: batches 1-3c (tests/, test/host/, scripts/run_tests.py, tooling only; no src/); --host-gxx stays opt-in until AC #4 holds.
 <!-- SECTION:NOTES:END -->
