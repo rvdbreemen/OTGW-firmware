@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-20T14:05:00Z'
-updated_date: '2026-11-21T00:25:00Z'
+updated_date: '2026-11-21T00:26:00Z'
 labels:
   - repo-hygiene
 milestone: 2.0.0
@@ -50,4 +50,6 @@ Plan corrections from otgw-docs' dry run (2026-11-20): C6.7 keeps a stub (ADR-09
 2026-11-21 phase 2 C6.5 (otgw-docs): classic-UI feature pages: docs/features/TEMPERATURE_SENSOR_* move to docs/archive/1.x/features/
 
 2026-11-21 phase 2 C6.6 (otgw-docs): v0/v1 API examples: example-api/ moves to docs/archive/1.x/example-api/ (stub README for ADR-019)
+
+2026-11-21 phase 2 C6.7 (otgw-docs): one audit: the MQTT MsgID echo audit moves to docs/audits/ (stub kept for ADR-097)
 <!-- SECTION:NOTES:END -->

@@ -854,7 +854,7 @@ The canonical topic `{TopTopic}/value/{UniqueId}/{label}` does not receive Write
 
 For MsgIDs where the slave does store and echo the value (most R/W parameters, Class 5 remote boiler parameters such as `MaxTSet` 57 and `TdhwSet` 56, Class 6 transparent slave parameters, R/W counters), the `_boiler` topic continues to publish the slave's stored value, including clamped or modified variants distinct from the master's request.
 
-See `docs/api/MQTT-message-id-echo-audit.md` for the full per-MsgID classification with spec-citation rationale.
+See `docs/audits/MQTT-message-id-echo-audit.md` for the full per-MsgID classification with spec-citation rationale.
 
 #### Gateway override topics `{TopTopic}/<label>/override` (ADR-118, TASK-1389)
 
