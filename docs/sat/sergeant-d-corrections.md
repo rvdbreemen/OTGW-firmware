@@ -8832,3 +8832,13 @@ Robert, 16:18:42 UTC (https://discord.com/channels/812969634638725140/9144987300
 **Settled:** nothing changes in the ground-truth order yet: the pin stays 7beaaf5 until Robert decides to move it (sat-ground-truth rule: move the pin only on purpose, in one commit that re-diffs docs/sat/thermo-nova-spec.md).
 
 **Open:** whether to move the pin to 5.0.0 (Robert); the 140-commit diff since the pin is not reviewed.
+
+## 450. Correction of our entry 448: ADR-236 is Proposed, not Accepted, so D means rewriting ADR-236, not superseding it (our correction, 2026-11-21; changes entry 448)
+
+**Source:** our own check after a remark by the architect, relayed by the coordinator (2026-11-21). docs/adr/ADR-236-*.md frontmatter: status "Proposed", date 2026-11-14.
+
+**Corrects:** entry 448, Interpretation, said "D needs a new ADR that supersedes ADR-236 (Accepted)". ADR-236 was never accepted. Under the adr-kit lifecycle a Proposed ADR is revised in place (or rejected and replaced) instead of being superseded, so entry 448's decision (option D, thermo-nova's underheat exit 3 C / 180 s) is implemented by rewriting ADR-236 to the new rule. The decision itself is unchanged; only the ADR route differs. The open-questions row of Q-342b ("D would supersede ADR-236") carries the same wording and is read with this correction. Our public Q-342b text said "replaces your entry-342 rule as written in our ADR-236" without a status, so nothing needs to be corrected towards Sergeant D.
+
+**Task:** the D implementation (otgw-dev) and the ADR-236 rewrite (architect), dispatched by the coordinator.
+
+**Open:** none.

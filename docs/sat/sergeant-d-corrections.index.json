@@ -5951,6 +5951,17 @@
    "supersedes": [],
    "tasks": [],
    "confirmed_by_entry": null
+  },
+  {
+   "id": 450,
+   "title": "Correction of our entry 448: ADR-236 is Proposed, not Accepted, so D means rewriting ADR-236, not superseding it (our correction, 2026-11-21; changes entry 448)",
+   "date": "2026-11-21",
+   "source": "unknown",
+   "kind": "correction",
+   "discord_link": null,
+   "supersedes": [],
+   "tasks": [],
+   "confirmed_by_entry": null
   }
  ]
 }
