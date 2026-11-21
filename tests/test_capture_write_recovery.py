@@ -113,5 +113,89 @@ class Counters(unittest.TestCase):
         self.assertTrue(any("1 message(s) received, 0 written" in l and "NOT written" in l for l in cap.lines), cap.lines)
 
 
+class SilentStream(unittest.TestCase):
+    """TASK-3006 AC #2: a stream that writes nothing for N minutes is reported (TOOL ERRORS when it goes silent,
+    gaps.log and summary.txt when it recovers or at stop) instead of the run going on silently."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.t = [datetime(2026, 11, 20, 8, 4, 32).astimezone()]
+        clock = lambda: self.t[0]   # noqa: E731
+        test = self
+
+        class Cap:
+            store = oc.SegmentStore(Path(test.tmp.name), hourly=True, now_fn=clock, background=False)
+            errors, summaries, gaps = [], [], []
+
+            def script_error(self, line):
+                self.errors.append(line)
+
+            def summary(self, line):
+                self.summaries.append(line)
+
+            def gap(self, stream, start, end, reason):
+                self.gaps.append((stream, start, end, reason))
+
+        self.cap = Cap()
+        self.watch = oc.StreamWatch(self.cap, ["telnet.log", "otframes.log"], 600, now_fn=clock)
+
+    def tearDown(self):
+        self.cap.store.close()
+        self.tmp.cleanup()
+
+    def advance(self, minutes):
+        from datetime import timedelta
+        self.t[0] = self.t[0] + timedelta(minutes=minutes)
+
+    def test_e_silence_is_reported_and_closed_on_recovery(self):
+        self.cap.store.write("telnet.log", "x\n")
+        self.cap.store.write("otframes.log", "y\n")
+        self.advance(9)
+        self.cap.store.write("otframes.log", "y\n")       # frames keep coming, telnet goes quiet
+        self.watch.check()
+        self.assertEqual(self.cap.errors, [], "9 min is not yet silent")
+        self.advance(2)
+        self.watch.check()
+        self.assertEqual(len(self.cap.errors), 1)
+        self.assertIn("telnet.log has written nothing since", self.cap.errors[0])
+        self.watch.check()
+        self.assertEqual(len(self.cap.errors), 1, "reported once, not every check")
+        self.advance(60)
+        self.cap.store.write("telnet.log", "back\n")
+        self.watch.check()
+        self.assertEqual([g[0] for g in self.cap.gaps], ["telnet.log"])
+        self.assertTrue(any(l.startswith("WARNING: telnet.log wrote nothing") and "recovered" in l
+                            for l in self.cap.summaries), self.cap.summaries)
+
+    def test_f_still_silent_at_stop_goes_into_the_summary(self):
+        self.cap.store.write("otframes.log", "y\n")
+        self.advance(30 * 60)                               # the 30 h of will_85903, in minutes
+        self.watch.check()
+        self.watch.close()
+        self.assertTrue(any("otframes.log wrote nothing" in l and "still silent at stop" in l
+                            for l in self.cap.summaries), self.cap.summaries)
+        self.assertEqual(self.cap.gaps[0][0], "otframes.log")
+
+    def test_h_store_with_the_default_naive_clock(self):
+        # The real tool builds the store with datetime.now (naive); the first version of the watch crashed the whole
+        # run on "can't subtract offset-naive and offset-aware datetimes" (tests/test_capture_tool.py, 21 failures).
+        from datetime import timedelta
+        with tempfile.TemporaryDirectory() as d:
+            store = oc.SegmentStore(Path(d), hourly=False)
+            store.write("telnet.log", "x\n")
+            self.cap.store = store
+            later = datetime.now().astimezone() + timedelta(minutes=11)
+            watch = oc.StreamWatch(self.cap, ["telnet.log"], 600, now_fn=lambda: later)
+            watch.check()
+            store.close()
+        self.assertTrue(any("telnet.log has written nothing" in e for e in self.cap.errors), self.cap.errors)
+
+    def test_g_a_stream_that_never_wrote_is_not_watched(self):
+        self.advance(60)
+        self.watch.check()
+        self.watch.close()
+        self.assertEqual((self.cap.errors, self.cap.summaries), ([], []))
+
+
 if __name__ == "__main__":
     unittest.main()

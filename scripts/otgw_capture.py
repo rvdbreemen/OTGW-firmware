@@ -132,6 +132,7 @@ SNAPSHOTS_LOG = "snapshots.log"
 SNAPSHOTS_HEADER = ("# OTGW device snapshots (TASK-1523). Columns, tab separated: host_time (ISO-8601, ms, local time) | "
                     "request path | HTTP status or ERROR | body on one line (secrets redacted) or the error text.\n")
 GAPS_LOG = "gaps.log"
+STREAM_WATCH_CHECK_SECONDS = 30   # TASK-3006: how often the stream watch looks
 INDEX_CSV = "index.csv"
 INDEX_COLUMNS = ("hour", "stream", "lines", "bytes", "first_ts", "last_ts", "gaps")
 MQTT_HOURLY_HEADER = ("# OTGW MQTT stream (TASK-1523). Columns, tab separated: host_time (ISO-8601, ms, local time) | "
@@ -353,6 +354,7 @@ class SegmentStore:
         self._packers = []
         self._retry_at = None
         self._write_errors = 0
+        self._last_ok = {}     # TASK-3006: stream -> aware datetime of its last successful write
         self._closed = False
         self._packed = set()   # hours whose zip exists: never packed again, only their leftover directory is deleted
 
@@ -470,6 +472,7 @@ class SegmentStore:
                     self._write_failed(exc)
                     self._drop_handle_locked(stream)
                     continue
+                self._last_ok[stream] = now if now.tzinfo else now.astimezone()   # aware, as StreamWatch compares
                 if self.hourly:
                     stat = self._stat_locked(stream)
                     stat["lines"] += text.count("\n")
@@ -479,6 +482,11 @@ class SegmentStore:
         if jobs:
             self._dispatch(jobs)
         return ok
+
+    def last_ok(self, stream):
+        """When `stream` was last written successfully (None: never)."""
+        with self._lock:
+            return self._last_ok.get(stream)
 
     def note_gap(self, stream):
         if not self.hourly:
@@ -673,6 +681,58 @@ class StreamWriter:
 
     def flush(self):
         pass
+
+
+class StreamWatch:
+    """TASK-3006: report a stream that has written nothing for `silent_seconds`.
+
+    will_85903's 31 h run: telnet.log and otframes.log stopped at 08:04 on day one while the run went on for 30 more
+    hours and the summary said nothing. A watched stream that wrote at least once and then stays silent (the source
+    sends nothing, or every write fails) is reported once in the TOOL ERRORS when it goes silent; when it writes
+    again, or at stop, the silence goes into gaps.log (long run) and a WARNING line into summary.txt."""
+
+    def __init__(self, cap, streams, silent_seconds, now_fn=None):
+        self.cap = cap
+        self.streams = list(streams)
+        self.silent = silent_seconds
+        self.now_fn = now_fn or (lambda: datetime.now().astimezone())
+        self._since = {}   # stream -> last write before the silence
+
+    def check(self):
+        if self.silent <= 0:
+            return
+        try:
+            self._check()
+        except Exception as exc:   # the watch reports; it never stops the capture
+            self.cap.script_error(f"stream watch: check failed: {type(exc).__name__}: {exc}")
+
+    def _check(self):
+        now = self.now_fn()
+        for stream in self.streams:
+            last = self.cap.store.last_ok(stream)
+            if last is None:
+                continue
+            since = self._since.get(stream)
+            if since is None:
+                if (now - last).total_seconds() >= self.silent:
+                    self._since[stream] = last
+                    self.cap.script_error(f"stream watch: {stream} has written nothing since "
+                                          f"{last.isoformat(timespec='seconds')} ({int(self.silent // 60)} min)")
+            elif last > since:
+                self._report(stream, since, last, "recovered")
+                del self._since[stream]
+
+    def close(self):
+        now = self.now_fn()
+        for stream, since in list(self._since.items()):
+            self._report(stream, since, now, "still silent at stop")
+        self._since = {}
+
+    def _report(self, stream, start, end, how):
+        minutes = int((end - start).total_seconds() // 60)
+        self.cap.gap(stream, start, end, f"silent: nothing written ({how})")
+        self.cap.summary(f"WARNING: {stream} wrote nothing from {start.isoformat(timespec='seconds')} to "
+                         f"{end.isoformat(timespec='seconds')} ({minutes} min, {how}).")
 
 
 class DiskGuard:
@@ -3549,6 +3609,7 @@ ALIASES = {
     "-TelnetReconnectDelayMilliseconds": "--telnet-reconnect-delay-ms",
     "-TelnetPostDisconnectDelayMilliseconds": "--telnet-post-disconnect-delay-ms",
     "-TelnetIdleCheckSeconds": "--telnet-idle-check-seconds",
+    "-StreamSilentMinutes": "--stream-silent-minutes",
     "-SkipBrowserCapture": "--skip-browser-capture", "-BrowserUrl": "--browser-url",
     "-BrowserDebugPort": "--browser-debug-port", "-BrowserPath": "--browser-path", "-Browser": "--browser",
     "-SkipDeviceState": "--skip-device-state", "-SkipGraphHistory": "--skip-graph-history", "-SkipDiagRecording": "--skip-diag-recording",
@@ -3635,6 +3696,8 @@ def build_parser():
     p.add_argument("--telnet-post-disconnect-delay-ms", type=ranged(250, 60000), default=1000)
     p.add_argument("--telnet-idle-check-seconds", type=ranged(1, 3600, allow_zero=True), default=60,
                    help="health-probe a silent telnet link after N s (0 = off)")
+    p.add_argument("--stream-silent-minutes", type=ranged(1, 1440, allow_zero=True), default=10,
+                   help="report telnet.log, otframes.log or mqtt.log when it wrote nothing for N min (0 = off)")
     p.add_argument("--skip-browser-capture", action="store_true")
     p.add_argument("--browser-url")
     p.add_argument("--browser-debug-port", type=ranged(1, 65535), default=9222)
@@ -4107,9 +4170,12 @@ def main(argv=None):
     print(f"Capturing into {run_path}")
     print("Press Q to stop cleanly (Ctrl+C also stops).", flush=True)
 
+    watched = ["telnet.log"] + ([] if args.skip_frame_capture else [FRAMES_LOG]) + (["mqtt.log"] if mqtt_capture else [])
+    stream_watch = StreamWatch(cap, watched, args.stream_silent_minutes * 60)
     keys = KeyReader()
     started = time.monotonic()
     next_disk_check = started + DISK_CHECK_SECONDS
+    next_watch = started + STREAM_WATCH_CHECK_SECONDS
     try:
         while not cap.stopping():
             if args.duration and time.monotonic() - started >= args.duration:
@@ -4121,6 +4187,9 @@ def main(argv=None):
                     next_disk_check = time.monotonic() + DISK_CHECK_SECONDS
                     if not disk_guard.check(cap):
                         break
+            if time.monotonic() >= next_watch:
+                next_watch = time.monotonic() + STREAM_WATCH_CHECK_SECONDS
+                stream_watch.check()
             key = keys.key()
             if key in ("q", "Q"):
                 cap.request_stop("Q key")
@@ -4133,6 +4202,8 @@ def main(argv=None):
         cap.request_stop("capture shutdown")
 
     print()
+    stream_watch.check()
+    stream_watch.close()
     s(f"Capture stop reason: {cap.stop_reason}")
     s(f"Stopping: {now_iso()}", echo=False)
     if mqtt_capture:
