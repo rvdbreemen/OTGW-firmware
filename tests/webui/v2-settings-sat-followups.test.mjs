@@ -379,8 +379,10 @@ await evalJs(`(function(){ var sel = document.querySelector('#satSetL2 .srow[dat
 // the 3-hour cycle is fixed (no cycle field)
 const hint = await evalJs(`(function(){ var r = document.querySelector('#satSetL2 .srow[data-key="satsource"]'); var o = r && r.querySelector('option[value="4"]');
   return { opt: o ? o.textContent : null, hint: r ? r.textContent : '' }; })()`);
-check(!!hint && /experimental/i.test(hint.opt || '') && /Only for on\/off heat pumps with a large thermal mass \(underfloor heating or a buffer tank\)\. Long runs of up to 3 hours\./.test(hint.hint),
-  `appliance list offers the experimental 3 h type with the entry-204 warning (${JSON.stringify(hint && hint.opt)})`);
+// TASK-2959 F10 (option B): the entry-204 warning shows inline while the experimental type is chosen (checked below);
+// with another type the row shows the short line.
+check(!!hint && /experimental/i.test(hint.opt || '') && /The \(i\) explains each type/.test(hint.hint),
+  `appliance list offers the experimental 3 h type; another type shows the short hint (${JSON.stringify(hint && hint.opt)})`);
 const rad = await evalJs(`(function(){ var asked = []; window.confirm = function (m) { asked.push(m); return false; };
   var sel = document.querySelector('#satSetL2 .srow[data-key="satsource"] select'); var before = sel.value; sel.value = '4'; sel.dispatchEvent(new Event('change', { bubbles: true }));
   return { asked: asked, kept: sel.value === before }; })()`);
@@ -390,6 +392,9 @@ await evalJs(`(function(){ window.confirm = function () { return true; }; var se
 const hpl = await until(`(function(){ var r = ${pwmCard}; var s = document.querySelector('#satSetL2 .srow[data-key="satsource"] select'); return s && s.value === '4' && r.cph !== undefined ? r : null; })()`, 3000);
 await shotPwm('pwm-card-onoff-heatpump-3h.png');
 check(!!hpl && !hpl.hp && !hpl.cph, `experimental type selected: it stays selected after the re-render and no cycle field is shown (${JSON.stringify(hpl)})`);
+const warn204 = await evalJs(`(document.querySelector('#satSetL2 .srow[data-key="satsource"]') || {}).textContent || ''`);
+check(/Only for on\/off heat pumps with a large thermal mass \(underfloor heating or a buffer tank\)\. Long runs of up to 3 hours\./.test(warn204),
+  `experimental type selected: the entry-204 warning shows inline (${JSON.stringify(warn204.slice(0, 80))})`);
 const nSave = log.length;
 await evalJs(`document.getElementById('satBtnSave').click()`);
 for (let i = 0; i < 40 && !log.slice(nSave).some((l) => l.startsWith('POST /api/v2/settings') && /sathpcycle/.test(l)); i++) await sleep(150);

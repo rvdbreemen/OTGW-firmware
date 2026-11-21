@@ -24,6 +24,8 @@ async function home(satStatus, shotName) {
     api: (m, p) => {
       if (p.endsWith('/v2/otgw/otmonitor')) return OTMON;
       if (p.endsWith('/v2/sat/status')) return satStatus;
+      // TASK-2959 F4: Home waits for the first health answer before it reads the boiler link
+      if (p.endsWith('/v2/health')) return { health: { otcommandinterface: 'PIC', boilerconnected: true, thermostatconnected: true, boiler_age_s: 1, thermostat_age_s: 1 } };
       return undefined;
     },
   });

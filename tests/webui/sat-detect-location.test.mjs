@@ -64,12 +64,19 @@ function optional(fn, src, name) {
   try { return fn(src, name); } catch (e) { if (/not found/.test(e.message)) return OLD_FALLBACK[name]; throw e; }
 }
 
+// TASK-2959 F11: the hint now holds a link button, so the stub keeps attributes and appended text.
 function el() {
   return {
-    hidden: false, textContent: '', listeners: {},
+    hidden: false, textContent: '', listeners: {}, attrs: {},
     addEventListener(ev, fn) { this.listeners[ev] = fn; },
+    getAttribute(k) { return k in this.attrs ? this.attrs[k] : null; },
+    setAttribute(k, v) { this.attrs[k] = '' + v; },
+    removeAttribute(k) { delete this.attrs[k]; },
+    appendChild(c) { this.textContent += c.textContent; return c; },
   };
 }
+const docStub = (dom) => ({ getElementById: (id) => dom[id] || null, createElement: () => el(),
+  createTextNode: (s) => ({ textContent: s }) });
 
 // Build the functions against a stubbed browser. secure: window.isSecureContext;
 // geo: navigator.geolocation stub (or undefined).
@@ -89,13 +96,13 @@ function load({ secure, geo }) {
   const dom = { satDetectLoc: el(), satLocHint: Object.assign(el(), { hidden: true }), satCoords: el() };
   const posts = [];
   const fetchStub = async (url, opts) => { posts.push(JSON.parse(opts.body)); return { ok: true, status: 200 }; };
-  const make = new Function('window', 'navigator', 'document', 'txt', 'fetch', 'APIGW', 'setTimeout', 'fetchSatPageWeather', 't', 'setT', body);
+  const make = new Function('window', 'navigator', 'document', 'txt', 'fetch', 'APIGW', 'setTimeout', 'fetchSatPageWeather', 't', 'setT', 'i18nLang', 'satOpenWeatherSettings', body);
   const fns = make(
     { isSecureContext: secure },
     { geolocation: geo },
-    { getElementById: (id) => dom[id] || null },
+    docStub(dom),
     (id, t) => { if (dom[id]) dom[id].textContent = t; },
-    fetchStub, '/api/', () => 0, () => {}, t, setT);
+    fetchStub, '/api/', () => 0, () => {}, t, setT, 'en', () => {});
   return { fns, dom, posts };
 }
 
@@ -108,8 +115,9 @@ test('insecure context (plain HTTP): button hidden, hint names the manual fields
   assert.equal(dom.satDetectLoc.hidden, true, 'button must be hidden on plain HTTP');
   assert.equal(dom.satDetectLoc.listeners.click, undefined, 'no click handler on a button that cannot work');
   assert.equal(dom.satLocHint.hidden, false, 'hint must be shown');
-  assert.match(dom.satLocHint.textContent, /HTTPS/);
-  assert.match(dom.satLocHint.textContent, /Latitude and Longitude under SAT settings > Weather/);
+  // TASK-2959 F11: no HTTPS dead end; the hint points to the manual fields through a link.
+  assert.doesNotMatch(dom.satLocHint.textContent, /HTTPS/);
+  assert.match(dom.satLocHint.textContent, /Latitude and Longitude under SAT settings › Weather/);
 });
 
 test('geolocation API missing: same hint, button hidden', () => {

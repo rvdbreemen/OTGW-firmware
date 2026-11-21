@@ -813,6 +813,13 @@ html[data-theme="dark"]{--accent:var(--brand-cyan);--nav:#383838;--tile-off:#545
   .sat-state-sub[hidden]{display:none}
   .card.is-stale .kv-v,.card.is-stale .sat-status-big{color:var(--muted)}
   .sat-card-state{font-weight:400;color:var(--muted)}
+  /* TASK-2959 F13: empty and paused chart notes */
+  .sat-hist-wrap{position:relative}
+  .sat-chart-empty{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;
+    color:var(--muted);font-size:.9rem;padding:12px;pointer-events:none}
+  .sat-chart-empty.corner{inset:auto auto auto 0;top:0;justify-content:flex-start;background:var(--panel);border-radius:8px;padding:4px 8px}
+  .sat-chart-empty[hidden],.sat-curve-empty[hidden]{display:none}
+  .sat-curve-empty{min-height:120px;display:flex;align-items:center;justify-content:center;text-align:center;color:var(--muted);font-size:.9rem;padding:12px}
   /* TASK-1884: why-line, messages button/panel, room trend arrow */
   .sat-status-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
   .sat-why{font-size:.85rem;color:var(--text);margin-top:6px}
@@ -892,7 +899,10 @@ html[data-theme="dark"]{--accent:var(--brand-cyan);--nav:#383838;--tile-off:#545
   .discover-card.dallas .discover-ic{background:var(--hot);box-shadow:0 0 8px var(--hot)}
   .discover-bd{flex:1;min-width:0}
   .discover-bd .t{font-weight:700;font-size:13.5px;color:var(--fg-1)}
-  .discover-bd .s{font-size:11.5px;color:var(--muted);font-family:var(--font-mono);margin-top:2px;line-height:1.5;word-break:break-word}
+  /* TASK-2959 F15 (spec T4): the hint is in the UI font; only a real identifier (MAC, 1-Wire address) is mono */
+  .discover-bd .s{font-size:11.5px;color:var(--muted);margin-top:2px;line-height:1.5;word-break:break-word}
+  .discover-bd .s code{font-family:var(--font-mono);font-size:inherit}
+  @media(max-width:480px){.discover-stack{left:16px;right:16px;max-width:none}}
   .discover-act{margin-top:9px;display:flex;gap:8px;flex-wrap:wrap}
   .discover-act button{font-size:12.5px;border-radius:9px;padding:8px 13px;cursor:pointer;border:1px solid var(--border);
     background:var(--panel-2);color:var(--text);min-height:38px;font-family:inherit}
@@ -907,5 +917,10 @@ html[data-theme="dark"]{--accent:var(--brand-cyan);--nav:#383838;--tile-off:#545
   .sim-modal h3{margin:0 0 8px;font-size:1.05rem;color:var(--fg-1);display:flex;align-items:center;gap:8px}
   .sim-modal p{margin:0 0 16px;font-size:.9rem;color:var(--muted);line-height:1.5}
   .sim-modal .acts{display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap}
+  .sim-modal .sim-err{color:var(--hot-text);margin-top:-6px}
+  .sim-modal .sim-err[hidden]{display:none}
+  .sim-modal .sim-err-link{color:var(--accent);white-space:nowrap}
+  .sim-modal .sim-err-link[hidden]{display:none}
+  .sim-modal button:disabled{opacity:.6;cursor:default}
   .sim-modal button{font-size:.88rem;border-radius:9px;padding:9px 15px;cursor:pointer;border:1px solid var(--border);background:var(--panel-2);color:var(--text);min-height:40px;font-family:inherit}
   .sim-modal .primary{background:var(--accent);color:var(--on-accent);border:0;font-weight:700}

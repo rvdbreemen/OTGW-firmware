@@ -737,6 +737,9 @@
       "status_idle_flame": "Heating idle · pump running, flame off",
       "status_idle_compressor": "Heating idle · pump running, compressor off",
       "status_standby": "Standby · everything quiet",
+      "status_waiting": "Waiting for data from the gateway…",
+      "status_no_boiler": "No boiler connected",
+      "status_check_conn": "Check connection ›",
       "setpoint_set": "set {{temp}}",
       "setpoint_set_thermostat": "set {{target}} (thermostat {{thermostat}})",
       "room_sat_tip": "Room temperature SAT controls on; the thermostat reports {{thermostat}}",
@@ -901,6 +904,13 @@
       "sim_body": "This gateway sees no boiler or thermostat on the OpenTherm bus — looks like a bench setup. Run in simulation mode to preview live-like data?",
       "sim_enable": "Enable simulation",
       "sim_enabled": "Simulation enabled",
+      "sim_enabling": "Enabling…",
+      "sim_retry": "Try again",
+      "sim_failed": "Could not enable simulation ({{reason}}).",
+      "sim_open_setting": "Open the simulation setting",
+      "sim_close": "Close",
+      "sim_reason_http": "HTTP {{status}}",
+      "sim_reason_net": "no answer from the gateway",
       "log_resume": "Resume",
       "log_pause": "Pause",
       "stream_title": "Save every frame: downloads the new frames as a file every 5 minutes and when you switch it off"
@@ -1083,6 +1093,11 @@
       "help_loading": "Loading…",
       "help_none": "No help text for this setting.",
       "help_unavailable": "Help not available.",
+      "help": {
+        "satboilerratedkw": "kW gas input. Enables the gas estimate and caps it (0 = off)",
+        "satmanufacturer": "Auto detects from the boiler; choose Immergas explicitly to enable its TP=11:12 modulation command",
+        "satsource": "Heat source: auto (gas boiler), gas boiler, heat pump or hybrid. Sets cycle timing; heat pumps never get modulation 0. On/off heat pump, 3 h cycle (experimental): Experimental. Only for on/off heat pumps with a large thermal mass (underfloor heating or a buffer tank). Long runs of up to 3 hours."
+      },
       "hint": {
         "c_below_30_off_30_60": "°C (below 30 = off, 30-60)",
         "connected_ssid_read_only": "Connected SSID (read-only)",
@@ -1100,10 +1115,11 @@
         "optional": "Optional",
         "otgwcommands": "Semicolon separated, e.g. PS=0;GW=1",
         "protects_settings_advanced": "Protects Settings / Advanced",
-        "satboilerratedkw": "kW gas input. Enables the gas estimate and caps it (0 = off)",
-        "satmanufacturer": "Auto detects from the boiler; choose Immergas explicitly to enable its TP=11:12 modulation command",
+        "satboilerratedkw": "kW gas input (0 = off). See (i) for details.",
+        "see_i_for_details": "See (i) for details.",
         "satmaxsetpoint": "°C (0 = not chosen, default 62 / 50 underfloor)",
         "satsource": "On/off heat pump, 3 h cycle (experimental): Experimental. Only for on/off heat pumps with a large thermal mass (underfloor heating or a buffer tank). Long runs of up to 3 hours.",
+        "satsource_short": "The (i) explains each type.",
         "seconds": "Seconds",
         "tcp_port_23_no_login": "TCP port 23, no login",
         "wifinoportal": "Keeps retrying; triple reset opens the portal"
@@ -1548,6 +1564,11 @@
       "sat_loop_state_waiting": "waiting",
       "sat_loop_state_stopped": "stopped",
       "sat_loop_state_off": "off",
+      "sat_loop_empty_off": "No control data: SAT is off.",
+      "sat_loop_empty_paused": "No new control data: SAT is paused.",
+      "sat_loop_empty_waiting": "No control data yet: SAT is waiting to take over.",
+      "sat_loop_collecting": "Collecting data…",
+      "sat_curve_empty": "The heating curve appears once SAT knows its coefficient and target.",
       "sat_trend_rate": "{{rate}} °C per hour",
       "sat_curve_rec_insufficient": "Curve advice: not enough data yet (at least 6 hours of control).",
       "sat_curve_rec_increase": "Curve advice: the room stayed below target on average; a higher curve may help.",
@@ -1659,7 +1680,8 @@
       "sat_geo_denied": "Location denied: the browser blocked access",
       "sat_geo_detecting": "Detecting…",
       "sat_geo_error": "Location error",
-      "sat_geo_hint": "Location detection needs HTTPS. Enter Latitude and Longitude under SAT settings > Weather, or let Home Assistant publish sat/sun_elevation.",
+      "sat_geo_hint": "Enter your Latitude and Longitude under {{link}}, or let Home Assistant publish sat/sun_elevation.",
+      "sat_geo_link": "SAT settings › Weather",
       "sat_geo_needs_https": "Location detection needs HTTPS",
       "sat_sun_from_ha": "Sun position from Home Assistant (sat/sun_elevation): {{deg}}°. No location needed.",
       "sat_sun_ha_weather_loc": "The weather fetch still needs Latitude and Longitude under SAT settings > Weather.",
@@ -2244,6 +2266,7 @@
              get exp() { return t('conn.api_exp'); } }
   };
   var connRssi = null;
+  var healthSeen = false;   // TASK-2959 F4: the header says "checking…" until the first /v2/health answer
   var simActive = false;   // TASK-982: device/info otgwsimulation, cached via withDeviceInfo
   // TASK-983: header network chip — static identity from the one-shot device/info
   // snapshot; the Wi-Fi bars + dBm refresh live from connRssi (the /health poll).
@@ -2261,7 +2284,7 @@
     });
     var cls = worst === 'down' ? 'down' : (worst === 'warn' ? 'warn' : '');
     var label = worst === 'down' ? t('conn.issues', { count: issues }) :
-                (worst === 'warn' ? t('conn.degraded', { count: issues }) : t('conn.all_ok'));
+                (worst === 'warn' ? t('conn.degraded', { count: issues }) : (healthSeen ? t('conn.all_ok') : t('graph.conn_checking')));
     strip.textContent = '';   // rebuild with DOM nodes (textContent — no HTML injection)
     var btn = document.createElement('button');
     btn.className = 'connsum' + (cls ? ' ' + cls : '');
@@ -2496,6 +2519,7 @@
     if (d.charAt(0) === '{' || d.charAt(0) === '[') return; // JSON status, not a frame
     var raw = rawFromLine(d);
     if (raw) {
+      if (!wsLastFrameMs) scheduleRender();   // TASK-2959 F4: the first frame ends Home's waiting line
       wsLastFrameMs = Date.now();   // TASK-1223.14: PS=1 detection measures socket silence
       applyFrame(raw);
       pushTicker(d);                // mission-control raw-frame ticker (concept C)
@@ -3033,8 +3057,17 @@
   }
 
   // Plain-language status line (mockup hero headline): load + action, appliance-aware.
+  // TASK-2959 F4 (spec T4): no healthy words without a healthy bus. Waiting until the first
+  // OpenTherm data, then the boiler link of the connection panel (CONN.boiler from /v2/health).
+  // Data counts from the first otmonitor answer or the first OpenTherm frame on the socket; the boiler
+  // link is only known after the first /v2/health answer, so the waiting line holds until both are in.
+  function statusWaiting() { return (!otmonLastOkMs && !wsLastFrameMs) || !healthSeen; }
+  function statusNoBoiler() { return !statusWaiting() && !model.fault && CONN.boiler.s === 'st-down'; }
+  function renderStatusLink(id) { var b = document.getElementById(id); if (b) b.hidden = !statusNoBoiler(); }
   function statusSentence(isHP) {
+    if (statusWaiting()) return t('home.status_waiting');
     if (model.fault) return t('home.status_fault');
+    if (statusNoBoiler()) return t('home.status_no_boiler');
     // TASK-1392: a heat pump (or any appliance with a DHW storage tank) sends the flow to the tank
     // through a 3-way valve; "tap open" would be wrong there.
     if (model.dhw_on) return (isHP || sat.tank) ? t('home.status_dhw_charging') : t('home.status_dhw_running');
@@ -3112,7 +3145,7 @@
       var deg = Math.max(0, Math.min(4, model.pressure)) / 4 * 180;
       needle.setAttribute('transform', 'rotate(' + deg.toFixed(1) + ',150,322)');
     }
-    txt('aStatusTxt', statusSentence(isHP));
+    txt('aStatusTxt', statusSentence(isHP)); renderStatusLink('aStatusLink');
     var aStatus = document.getElementById('aStatus');
     if (aStatus) aStatus.classList.toggle('heating', model.flame);
     // first tile relabels to Compressor in heat-pump mode; tile values uppercase.
@@ -3181,7 +3214,7 @@
     var st = document.getElementById('bStatus'); if (st) st.classList.toggle('heating', model.flame);
     // mockup reuses the rich status sentence here (surfaces fault + modulation),
     // not a reduced 4-state string that hides a boiler fault in Concept B.
-    txt('bStatusTxt', statusSentence(effectiveSource() === 2));
+    txt('bStatusTxt', statusSentence(effectiveSource() === 2)); renderStatusLink('bStatusLink');
   }
 
   // Concept C — mission control: live strip chart + metric cells + frame ticker.
@@ -3817,6 +3850,7 @@
     fetch(APIGW + 'v2/health').then(function (r) { return r.ok ? r.json() : null; }).then(function (j) {
       if (!j || !j.health) return;
       var h = j.health;
+      healthSeen = true;
       applySimBadge(h);
       connRssi = (typeof h.wifirssi === 'number' && h.wifirssi !== 0) ? h.wifirssi : null;
       var iface = h.otcommandinterface || '';
@@ -3882,6 +3916,7 @@
       CONN.ws.detail = wsUp ? t('graph.conn_ws_streaming') : t('graph.conn_ws_reconnecting');
       CONN.api.s = 'st-ok';
       renderConnMap(); renderConnStrip(); renderConnDetail();
+      scheduleRender();   // TASK-2959 F4: the Home status line reads the boiler link
       renderHdrNet();   // TASK-983: refresh Wi-Fi bars + dBm tooltip from the live RSSI
       // TASK-984: refresh the injected-override count/list (source by interface); TASK-1223.16:
       // on OT-Direct the status read follows. TASK-1747: one request at a time, so one tab never
@@ -4281,12 +4316,12 @@
     // humanised key under the SAT category (Phase 2: port full SAT metadata).
     satenabled:      { cat: 'sat', label: 'SAT enabled' },
     satsystem:       { cat: 'sat', label: 'Heating system' },
-    satsource:       { cat: 'sat', label: 'Appliance type', hint: 'On/off heat pump, 3 h cycle (experimental): Experimental. Only for on/off heat pumps with a large thermal mass (underfloor heating or a buffer tank). Long runs of up to 3 hours.' },
+    satsource:       { cat: 'sat', label: 'Appliance type', hint: 'On/off heat pump, 3 h cycle (experimental): Experimental. Only for on/off heat pumps with a large thermal mass (underfloor heating or a buffer tank). Long runs of up to 3 hours.', help: 'Heat source: auto (gas boiler), gas boiler, heat pump or hybrid. Sets cycle timing; heat pumps never get modulation 0. On/off heat pump, 3 h cycle (experimental): Experimental. Only for on/off heat pumps with a large thermal mass (underfloor heating or a buffer tank). Long runs of up to 3 hours.' },
     sattargettemp:   { cat: 'sat', label: 'Target temperature', hint: '°C' },
     sattempstep:     { cat: 'sat', label: 'Setpoint step', hint: '°C' },
     satcoefficient:  { cat: 'sat', label: 'Heating curve slope' },
     satheatingmode:  { cat: 'sat', label: 'Heating mode' },
-    satmanufacturer: { cat: 'sat', label: 'Manufacturer', hint: 'Auto detects from the boiler; choose Immergas explicitly to enable its TP=11:12 modulation command' },
+    satmanufacturer: { cat: 'sat', label: 'Manufacturer', hint: 'See (i) for details.', help: 'Auto detects from the boiler; choose Immergas explicitly to enable its TP=11:12 modulation command' },
     satinterval:     { cat: 'sat', label: 'Update interval', hint: 'Seconds' },
     sathpcycle:      { cat: 'sat', label: 'PWM cycle length', hint: 'Minutes' },   // TASK-1550: one field for every appliance type, see helpFor()
     otdmode:         { cat: 'otd', label: 'OT-Direct mode' },
@@ -4335,7 +4370,7 @@
     satmaxpressure:      { cat: 'sat', label: 'Max pressure', hint: 'bar' },
     satmaxpressdrop:     { cat: 'sat', label: 'Max pressure drop', hint: 'bar/hr' },
     satsolarminelev:     { cat: 'sat', label: 'Solar min elevation', hint: '°' },
-    satboilerratedkw:    { cat: 'sat', label: 'Boiler rated input', hint: 'kW gas input. Enables the gas estimate and caps it (0 = off)' },
+    satboilerratedkw:    { cat: 'sat', label: 'Boiler rated input', hint: 'kW gas input (0 = off). See (i) for details.', help: 'kW gas input. Enables the gas estimate and caps it (0 = off)' },
     satboilerefficiency: { cat: 'sat', label: 'Boiler efficiency', hint: 'fraction 0.5–1.0' },
     satminconsumption:   { cat: 'sat', label: 'Gas use at min modulation', hint: 'm³/h (0 = off)' },
     satmaxconsumption:   { cat: 'sat', label: 'Gas use at max modulation', hint: 'm³/h (0 = off)' },
@@ -4491,6 +4526,10 @@
   }
   function labelFor(k) { return (SET_META[k] && SET_META[k].label) ? setT('settings.label.' + k, SET_META[k].label) : humanizeKey(k); }
   function hintFor(k) {
+    // TASK-2959 F10 (option B, coordinator 2026-11-21): entry 204 (sergeant-d-corrections.md:5470) says
+    // "the experimental type always shows" its warning, so the warning stays inline while that type is
+    // chosen; for every other appliance type a short line, the full text in the (i).
+    if (k === 'satsource' && !satHpLongCycle()) return setT('settings.hint.satsource_short', 'The (i) explains each type.');
     var h = SET_META[k] && SET_META[k].hint;
     return (h && !HINT_UNIT_RE.test(h)) ? setT(hintKey(k, h), h) : h;
   }
@@ -4501,7 +4540,7 @@
   function helpFor(k) {
     var m = SET_META[k];
     if (k === 'sathpcycle' || k === 'satcyclesperhour') return satPwmHelp();   // TASK-1550
-    if (m && m.help) return m.help;
+    if (m && m.help) return setT('settings.help.' + k, m.help);   // TASK-2959 F10: translated like the hints
     return (SETTINGS_HELP && typeof SETTINGS_HELP[k] === 'string') ? SETTINGS_HELP[k] : '';
   }
   // One GET for the whole file. The promise is kept after a success; after a failure
@@ -5460,7 +5499,7 @@
   // evaluate.py::check_poll_window_coupling reads this value: the otmonitor window in
   // restAPI.ino (gApiRateLimitBudgets) must stay at 50-90% of it.
   var OTMON_POLL_MS = 2000;
-  var otmonInflight = false, otmonPauseUntil = 0, otmonData = null, otmonLastOkMs = 0;
+  var otmonInflight = false, otmonPauseUntil = 0, otmonData = null, otmonLastOkMs = 0, otmonSeedRetryAt = 0;
   function retryAfterMs(r, dflt) {
     // 429 body is problem+json with retry_after (s); Retry-After is not CORS-readable.
     return r.json().then(function (j) {
@@ -5477,8 +5516,10 @@
     }).then(function (j) {
       otmonInflight = false;
       var o = j && j.otmonitor; if (!o || typeof o !== 'object') return;
+      var first = !otmonLastOkMs;
       otmonData = o; otmonLastOkMs = Date.now();
       applyOtmonToModel(o);
+      if (first) scheduleRender();   // TASK-2959 F4: the waiting line goes away on the first answer
       if (isMonitorVisible('mvalues')) renderValues();
     }).catch(function () { otmonInflight = false; });
   }
@@ -5506,7 +5547,11 @@
   function otmonTick() {
     if (document.hidden) return;
     var vis = isMonitorVisible('mvalues');
-    if (vis || psMode) fetchOtmonitor();
+    // TASK-2959 F4: a failed first seed is retried every 10 s until the first answer, also while the
+    // socket is open (the 20 s fallback only re-seeds a closed socket), so Home cannot wait forever.
+    var reseed = !otmonLastOkMs && !wsLastFrameMs && Date.now() >= otmonSeedRetryAt;
+    if (reseed) otmonSeedRetryAt = Date.now() + 10000;
+    if (vis || psMode || reseed) fetchOtmonitor();
     if (vis) renderValues();   // keeps the age column and "Updated" chip moving between answers
   }
 
@@ -7088,16 +7133,18 @@
   function satBoilerLinkDown() { return CONN.boiler.s === 'st-down'; }
   // The SAT settings live on the SAT page (TASK-1211): Control view, group Weather. Latitude gets
   // the focus; while SAT is off its fields are locked, so the group heading gets it instead.
-  function satOpenWeatherSettings() {
+  function satOpenWeatherSettings() { satOpenSetting('satweatherlat', 'control'); }
+  // Opens a SAT setting on the SAT page in a view that shows it (control = L2, technical = L2 + L3).
+  function satOpenSetting(key, view) {
     showPage('sat');
-    var body = document.getElementById('satBody');
-    if (!body || body.className === 'sv-simple') satShowView('control');
-    var row = document.querySelector('#satSetL2 .srow[data-key="satweatherlat"]');
+    var body = document.getElementById('satBody'), cur = body ? body.className.replace('sv-', '') : 'simple';
+    if (cur === 'simple' || (view === 'technical' && cur !== 'technical')) satShowView(view);
+    var row = document.querySelector('#satSetL2 .srow[data-key="' + key + '"], #satSetL3 .srow[data-key="' + key + '"]');
     var input = row && row.querySelector('input, select');
     var target = (input && !input.disabled) ? input : null;
     if (!target) {
       var grp = row ? row.closest('.set-group') : null;
-      target = grp ? grp.querySelector('h3') : document.getElementById('satSetL2');
+      target = grp ? grp.querySelector('h3') : document.getElementById(view === 'technical' ? 'satSetL3' : 'satSetL2');
       if (target) target.setAttribute('tabindex', '-1');
     }
     if (target) { if (target.scrollIntoView) target.scrollIntoView({ block: 'center' }); target.focus(); }
@@ -7541,7 +7588,7 @@
     satRenderPresets(d);
 
     // L2 — history + tiles + dhw + burner cycle + curve + control status
-    satHistPush(d); satDrawHistory();
+    satHistPush(d); satDrawHistory(); satRenderHistEmpty(state);
     txt('satOut', satFmt(d.outside_temp, 1, '°'));
     txt('satFlowSet', satFmt(d.final_setpoint, 1, '°'));
     txt('satRoom', satFmt(d.room_temp, 1, '°'));
@@ -7651,6 +7698,20 @@
     el.textContent = m < 1 ? t('tools.sat_age_now') : t('tools.sat_age_min', { count: m });
   }
 
+  // TASK-2959 F13 (spec T4): the control-loop chart says why it is empty or no longer moving. Points
+  // drawn before a pause stay; the note then sits in the top-left corner instead of the centre.
+  function satRenderHistEmpty(state) {
+    var box = document.getElementById('satHistEmpty'); if (!box) return;
+    var n = satHist.set.length, why = SAT_STALE_STATES[state], key = '';
+    if (state === 'off') key = 'sat_loop_empty_off';
+    else if (why === 'waiting') key = 'sat_loop_empty_waiting';
+    else if (why) key = 'sat_loop_empty_paused';
+    else if (n < 2) key = 'sat_loop_collecting';
+    box.textContent = key ? t('tools.' + key) : '';
+    box.hidden = !key;
+    box.classList.toggle('corner', !!key && n >= 2);
+    var live = document.getElementById('satLoopState'); if (live) live.hidden = (key === 'sat_loop_collecting');
+  }
   function satHistPush(d) {
     satHist.set.push(satNum(d.final_setpoint));
     satHist.flow.push(satNum(d.flow_temp));
@@ -7785,7 +7846,11 @@
     var svg = document.getElementById('satCurveBig'); if (!svg) return;
     var coeff = satNum(d.coefficient), target = satNum(d.target_temp), system = d.heating_system | 0,
       outside = satNum(d.outside_temp), setp = satNum(d.final_setpoint);
-    if (coeff === null || target === null) { svg.innerHTML = ''; return; }
+    // TASK-2959 F13: one line at 120 px instead of an empty 400 px card.
+    var empty = document.getElementById('satCurveEmpty'), none = (coeff === null || target === null);
+    if (empty) { empty.hidden = !none; empty.textContent = none ? t('tools.sat_curve_empty') : ''; }
+    svg.style.display = none ? 'none' : '';
+    if (none) { svg.innerHTML = ''; return; }
     var xmin = -15, xmax = 25, ymin = 20, ymax = 85;
     function X(o) { return 50 + (o - xmin) / (xmax - xmin) * 530; }
     function Y(f) { return 270 - (Math.max(ymin, Math.min(ymax, f)) - ymin) / (ymax - ymin) * 240; }
@@ -7900,6 +7965,9 @@
       b.addEventListener('click', function () { satShowView(b.dataset.sv); });
     });
     // TASK-1311: the SAT chart shows the loop (target, PID); the boiler history lives on Monitor > Graph.
+    ['aStatusLink', 'bStatusLink'].forEach(function (id) {   // TASK-2959 F4
+      var b = document.getElementById(id); if (b) b.addEventListener('click', function () { showPage('monitor', { tab: 'mconn' }); });
+    });
     var histLink = document.getElementById('satHistMonitorLink');
     if (histLink) histLink.addEventListener('click', function () { showPage('monitor', { tab: 'mgraph' }); });
     var sv = 'simple'; try { sv = localStorage.getItem('otgw-v2-satview') || 'simple'; } catch (e) { }
@@ -8037,8 +8105,21 @@
     if (!lh) return;
     var deg = (typeof d.sun_elevation === 'number') ? d.sun_elevation.toFixed(1) : '—';
     var msg = '';
-    if (kind === 'hint') msg = t('tools.sat_geo_hint');
-    else if (kind === 'ha') msg = t('tools.sat_sun_from_ha', { deg: deg });
+    if (kind === 'hint') {
+      // TASK-2959 F11 (spec T4): no HTTPS dead end; the words "SAT settings › Weather" open that group.
+      var sig = 'hint|' + i18nLang;
+      if (lh.getAttribute('data-sig') !== sig) {
+        lh.setAttribute('data-sig', sig); lh.textContent = '';
+        var parts = t('tools.sat_geo_hint').split('{{link}}');
+        var a = document.createElement('button'); a.type = 'button'; a.className = 'sat-link';
+        a.textContent = t('tools.sat_geo_link'); a.addEventListener('click', satOpenWeatherSettings);
+        lh.appendChild(document.createTextNode(parts[0])); lh.appendChild(a); lh.appendChild(document.createTextNode(parts[1] || ''));
+      }
+      lh.hidden = false;
+      return;
+    }
+    lh.removeAttribute('data-sig');
+    if (kind === 'ha') msg = t('tools.sat_sun_from_ha', { deg: deg });
     else if (kind === 'ha_weather_loc') msg = t('tools.sat_sun_from_ha', { deg: deg }) + ' ' + t('tools.sat_sun_ha_weather_loc');
     lh.textContent = msg;
     lh.hidden = !msg;
@@ -8081,6 +8162,15 @@
   }
   // o = { id, bus:'ble'|'dallas', title, sub }. Bus-agnostic so BLE and 1-Wire
   // (Dallas) both surface through the same card, colour-coded by CSS (.ble/.dallas).
+  // TASK-2959 F15: MAC and 1-Wire addresses inside a discovery hint render as <code>, the rest as text.
+  function discoverSub(el, text) {
+    el.textContent = '';
+    String(text == null ? '' : text).split(/((?:[0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}|28-[0-9A-Fa-f]{12})/).forEach(function (part, i) {
+      if (!part) return;
+      if (i % 2) { var c = document.createElement('code'); c.textContent = part; el.appendChild(c); }
+      else el.appendChild(document.createTextNode(part));
+    });
+  }
   function showDiscoverCard(o) {
     var id = o.id; if (!id) return;
     var stack = getDiscoverStack();
@@ -8092,7 +8182,7 @@
     var ic = document.createElement('span'); ic.className = 'discover-ic';
     var bd = document.createElement('div'); bd.className = 'discover-bd';
     var tt = document.createElement('div'); tt.className = 't'; tt.textContent = o.title;
-    var ss = document.createElement('div'); ss.className = 's'; ss.textContent = o.sub;
+    var ss = document.createElement('div'); ss.className = 's'; discoverSub(ss, o.sub);
     var act = document.createElement('div'); act.className = 'discover-act';
     var assign = document.createElement('button'); assign.className = 'primary'; assign.textContent = t('sat.discover_assign');
     assign.addEventListener('click', function () {
@@ -8150,7 +8240,7 @@
     }
     var tEl = card.querySelector('.t'), sEl = card.querySelector('.s');
     if (tEl) tEl.textContent = t('sat.discover_ble_new', { count: macs.length });
-    if (sEl) sEl.textContent = (macs.length === 1) ? bleDiscoverPending[macs[0]] : t('sat.discover_ble_view_hint');
+    if (sEl) discoverSub(sEl, (macs.length === 1) ? bleDiscoverPending[macs[0]] : t('sat.discover_ble_view_hint'));
     if (bleDiscoverTimer) clearTimeout(bleDiscoverTimer);
     bleDiscoverTimer = setTimeout(bleDiscoverDismiss, 15000);
   }
@@ -8670,23 +8760,60 @@
     if (document.getElementById('simBackdrop')) return;
     var bd = document.createElement('div'); bd.id = 'simBackdrop'; bd.className = 'sim-backdrop';
     var m = document.createElement('div'); m.className = 'sim-modal';
-    var h = document.createElement('h3'); h.textContent = '⚙ ' + t('sat.sim_title');
+    m.setAttribute('role', 'dialog'); m.setAttribute('aria-modal', 'true'); m.setAttribute('aria-labelledby', 'simTitle'); m.tabIndex = -1;
+    var h = document.createElement('h3'); h.id = 'simTitle'; h.textContent = '⚙ ' + t('sat.sim_title');
     var p = document.createElement('p'); p.textContent = t('sat.sim_body');
+    // TASK-2959 F6 (spec T4): wait for the answer; a failure keeps the modal open and says why.
+    var err = document.createElement('p'); err.className = 'sim-err'; err.setAttribute('role', 'alert'); err.hidden = true;
+    var errMsg = document.createElement('span');
+    var link = document.createElement('button'); link.type = 'button'; link.className = 'sat-link sim-err-link'; link.hidden = true;
+    link.textContent = t('sat.sim_open_setting');
+    err.appendChild(errMsg); err.appendChild(document.createTextNode(' ')); err.appendChild(link);
+    var closeOnYes = false;   // a 409 with a reason cannot succeed on a retry: the primary button closes
     var acts = document.createElement('div'); acts.className = 'acts';
     var no = document.createElement('button'); no.textContent = t('sat.not_now');
     var yes = document.createElement('button'); yes.className = 'primary'; yes.textContent = t('sat.sim_enable');
+    var pending = false;
     function closeSim() { try { localStorage.setItem('otgw-sim-prompted', '1'); } catch (e) { } if (bd.parentNode) bd.parentNode.removeChild(bd); }
-    no.addEventListener('click', closeSim);
+    function setPending(on) {
+      pending = on; yes.disabled = on; no.disabled = on;
+      if (on) { yes.setAttribute('aria-busy', 'true'); yes.textContent = t('sat.sim_enabling'); err.hidden = true; m.focus(); }   // keep focus inside the dialog
+      else yes.removeAttribute('aria-busy');
+    }
+    function fail(reason, final) {
+      setPending(false); closeOnYes = !!final;
+      yes.textContent = final ? t('sat.sim_close') : t('sat.sim_retry');
+      errMsg.textContent = t('sat.sim_failed', { reason: reason }); link.hidden = false; err.hidden = false;
+      yes.focus();
+    }
+    link.addEventListener('click', function () { closeSim(); satOpenSetting('satsimulation', 'technical'); });
+    no.addEventListener('click', function () { if (!pending) closeSim(); });
+    m.addEventListener('keydown', function (e) { if (e.key === 'Escape' && !pending) closeSim(); });
     yes.addEventListener('click', function () {
-      fetch(APIGW + 'v2/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'simulation', value: true }) })
-        .then(function (r) { if (r.ok && typeof bleToast === 'function') bleToast(t('sat.sim_enabled')); })
-        .catch(function () { });
-      closeSim();
+      if (pending) return;
+      if (closeOnYes) { closeSim(); return; }
+      setPending(true);
+      var ctl = (typeof AbortController === 'function') ? new AbortController() : null;
+      var timer = ctl ? setTimeout(function () { ctl.abort(); }, 15000) : 0;
+      fetch(APIGW + 'v2/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'simulation', value: true }), signal: ctl ? ctl.signal : undefined })
+        .then(function (r) {
+          clearTimeout(timer);
+          if (!r.ok) {
+            var st = r.status;
+            r.json().then(function (j) { return j && j.error && j.error.message; }, function () { return ''; })
+              .then(function (msg) { fail(msg || t('sat.sim_reason_http', { status: st }), st === 409 && !!msg); });
+            return;
+          }
+          pending = false; closeSim();
+          if (typeof bleToast === 'function') bleToast(t('sat.sim_enabled'));
+        })
+        .catch(function () { clearTimeout(timer); fail(t('sat.sim_reason_net')); });
     });
-    bd.addEventListener('click', function (e) { if (e.target === bd) closeSim(); });
+    bd.addEventListener('click', function (e) { if (e.target === bd && !pending) closeSim(); });
     acts.appendChild(no); acts.appendChild(yes);
-    m.appendChild(h); m.appendChild(p); m.appendChild(acts); bd.appendChild(m);
+    m.appendChild(h); m.appendChild(p); m.appendChild(err); m.appendChild(acts); bd.appendChild(m);
     document.body.appendChild(bd);
+    yes.focus();
   }
   function maybePromptSimulation() {
     try { if (localStorage.getItem('otgw-sim-prompted') === '1') return; } catch (e) { }

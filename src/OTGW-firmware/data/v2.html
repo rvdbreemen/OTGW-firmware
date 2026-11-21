@@ -89,7 +89,7 @@
 <!-- ============ DESIGN A — SYSTEM VIEW ============ -->
 <section id="design-a" class="design active">
   <div class="schemcard">
-    <div class="statusline" id="aStatus"><span class="dot"></span><span id="aStatusTxt">—</span>
+    <div class="statusline" id="aStatus"><span class="dot"></span><span id="aStatusTxt">—</span> <button type="button" class="sat-link" id="aStatusLink" hidden data-i18n="home.status_check_conn">Check connection ›</button>
       <!-- TASK-1837: the appliance type as a label (Boiler, Heat pump, both for hybrid); set in Settings, not here -->
       <span class="appl-tags" id="applTags">
         <span class="appl-tag" data-appl="gas" hidden>🔥 <span data-i18n="h_home.appl_boiler">Boiler</span></span>
@@ -260,7 +260,7 @@
 <section id="design-b" class="design">
   <div class="glance">
 
-    <div class="g-status" id="bStatus"><span class="dot"></span><span id="bStatusTxt">—</span></div>
+    <div class="g-status" id="bStatus"><span class="dot"></span><span id="bStatusTxt">—</span> <button type="button" class="sat-link" id="bStatusLink" hidden data-i18n="home.status_check_conn">Check connection ›</button></div>
 
     <div class="hero">
       <svg viewBox="0 0 240 240" aria-label="Room temperature dial" data-i18n-aria-label="h_home.dial_aria">
@@ -374,7 +374,7 @@
         <div class="sat-side">
           <div class="sat-status-row"><div class="sat-status-big" id="satStatusBig">—</div>
             <button type="button" class="sat-msg-btn" id="satMsgBtn" hidden aria-expanded="false" aria-controls="satMsgs"><span class="sat-msg-ico" id="satMsgIco">i</span> <span id="satMsgCount">0</span></button></div>
-          <div class="sat-state-sub" id="satStateSub" hidden></div>
+          <div class="sat-state-sub" id="satStateSub" aria-live="polite" hidden></div>
           <div class="sat-why" id="satWhy" hidden></div>
           <!-- TASK-1884 U3: every active message in one panel; it opens by itself while a warning is active -->
           <div class="sat-msgs" id="satMsgs" hidden>
@@ -390,7 +390,8 @@
         </div>
       </div>
       <div class="card"><h4><span data-i18n="h_mon.sat_loop_title">SAT control loop</span> <span class="sub" id="satLoopState" data-i18n-skip>live</span></h4>
-        <svg viewBox="0 0 780 320" id="satHistChart" style="width:100%;height:auto;display:block"></svg><!-- TASK-1841: drawPanelChart -->
+        <div class="sat-hist-wrap"><svg viewBox="0 0 780 320" id="satHistChart" style="width:100%;height:auto;display:block"></svg><!-- TASK-1841: drawPanelChart -->
+          <div class="sat-chart-empty" id="satHistEmpty" hidden></div></div>
         <div class="legend" id="satHistLegend"></div>
         <div class="sat-hint"><span data-i18n="h_mon.sat_hist_hint">SAT target and PID output since this page was opened. Full boiler history:</span> <button type="button" class="sat-link" id="satHistMonitorLink" data-i18n="h_mon.sat_hist_link">Monitor &rsaquo; Graph</button></div></div>
       <!-- Closed by default; the open state is stored only on a click on the summary (wireSat, concept rule 4) -->
@@ -431,6 +432,7 @@
       <div class="card sat-curve-hero"><h4><span data-i18n="h_mon.sat_curve_title">Heating curve</span> <span class="sub" id="satCurveLbl"></span></h4>
         <div class="curve-wrap">
           <svg viewBox="0 0 600 300" id="satCurveBig"></svg>
+          <div class="sat-curve-empty" id="satCurveEmpty" hidden></div>
           <div class="curve-side">
             <div class="curve-legend" id="satCurveLegend"></div>
             <div class="sat-hint" id="satCurveRec"></div>

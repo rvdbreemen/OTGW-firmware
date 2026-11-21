@@ -90,7 +90,7 @@ test('no HA, plain HTTP: the card asks for Latitude/Longitude and names sat/sun_
   const h = await startPage({ api: device(st), beforeScript: NO_GEO + FAST });
   try {
     await openWeatherCard(h);
-    assert.ok(await h.until(hintHas('Enter Latitude and Longitude'), 10000), 'hint is: ' + (await h.evalJs(HINT)));
+    assert.ok(await h.until(hintHas('Enter your Latitude and Longitude'), 10000), 'hint is: ' + (await h.evalJs(HINT)));
     assert.ok((await h.evalJs(HINT)).indexOf('sat/sun_elevation') >= 0, 'the alternative is named');
     await shot(h, 'task2015-no-ha-asks-location.png');
   } finally { await h.close(); }
@@ -103,6 +103,6 @@ test('the hint follows the polled status: HA stops, the location ask comes back'
     await openWeatherCard(h);
     assert.ok(await h.until(hintHas('Home Assistant'), 10000), 'hint is: ' + (await h.evalJs(HINT)));
     st.source = 'none';   // the firmware's 1 h rule ran out
-    assert.ok(await h.until(hintHas('Enter Latitude and Longitude'), 10000), 'hint is: ' + (await h.evalJs(HINT)));
+    assert.ok(await h.until(hintHas('Enter your Latitude and Longitude'), 10000), 'hint is: ' + (await h.evalJs(HINT)));
   } finally { await h.close(); }
 });
