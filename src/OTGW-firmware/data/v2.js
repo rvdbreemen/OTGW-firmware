@@ -8137,7 +8137,7 @@
     back.setAttribute('style', 'position:fixed;inset:0;z-index:200;background:var(--bg);display:flex;flex-direction:column;overflow:auto');
     document.body.appendChild(back);
     var CARD = 'background:var(--panel);border:1px solid var(--border);border-radius:16px;box-shadow:0 8px 26px rgba(0,0,0,.32);padding:28px 26px';
-    var PRIM = 'background:var(--accent);border:0;color:#04222c;font-weight:700;font-size:14px;border-radius:11px;padding:12px 26px;cursor:pointer;min-height:46px';
+    var PRIM = 'background:var(--accent);border:0;color:var(--on-accent);font-weight:700;font-size:14px;border-radius:11px;padding:12px 26px;cursor:pointer;min-height:46px';
     var GHOST = 'background:none;border:1px solid var(--border);color:var(--text);font-weight:600;font-size:13.5px;border-radius:10px;padding:11px 18px;cursor:pointer;min-height:44px';
     var IN = 'width:100%;border:1px solid var(--border);background:var(--bg);color:var(--text);border-radius:8px;padding:10px 12px;font:400 13.5px inherit';
     var LBL = 'font-weight:600;font-size:11.5px;color:var(--muted);display:block;margin-bottom:5px';
@@ -8238,7 +8238,7 @@
           '<button data-act="finish" style="margin-left:auto;' + PRIM + '">' + (st.mqtt ? satH('sat.setup_finish') : satH('sat.setup_skip_finish')) + '</button></div></div>';
       } else if (st.screen === 'done') {
         h += '<div style="' + CARD + ';text-align:center">' +
-          '<div style="width:54px;height:54px;border-radius:50%;background:var(--accent);display:flex;align-items:center;justify-content:center;margin:0 auto 18px;font-weight:700;font-size:24px;color:#04222c">✓</div>' +
+          '<div style="width:54px;height:54px;border-radius:50%;background:var(--accent);display:flex;align-items:center;justify-content:center;margin:0 auto 18px;font-weight:700;font-size:24px;color:var(--on-accent)">✓</div>' +
           '<h1 style="font-weight:700;font-size:24px;color:var(--text);margin:0 0 6px">' + satH('sat.setup_done_title') + '</h1>' +
           '<p style="font:400 13px/1.6 inherit;color:var(--muted);margin:0 auto 20px;max-width:400px">' + satH('sat.setup_done_body') + '</p>' +
           '<div style="text-align:left;background:var(--bg);border:1px solid var(--border);border-radius:12px;padding:6px 16px;margin:0 0 20px">' +
@@ -8308,7 +8308,7 @@
     document.body.appendChild(back);
 
     var CARD = 'background:var(--panel);border:1px solid var(--border);border-radius:16px;box-shadow:0 8px 26px rgba(0,0,0,.32)';
-    var PRIM = 'margin-left:auto;background:var(--accent);border:0;color:#04222c;font-weight:700;font-size:13.5px;border-radius:10px;padding:11px 24px;cursor:pointer;min-height:44px';
+    var PRIM = 'margin-left:auto;background:var(--accent);border:0;color:var(--on-accent);font-weight:700;font-size:13.5px;border-radius:10px;padding:11px 24px;cursor:pointer;min-height:44px';
     var GHOST = 'background:none;border:1px solid var(--border);color:var(--text);font-weight:600;font-size:13.5px;border-radius:10px;padding:11px 18px;cursor:pointer;min-height:44px';
     var MONO = 'font-family:ui-monospace,SFMono-Regular,Menlo,monospace';
     function esc(s) { return ('' + (s == null ? '' : s)).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;'); }
@@ -8418,7 +8418,7 @@
           '<p style="font:400 13.5px/1.65 inherit;color:var(--muted);margin:0 auto 8px;max-width:440px">' + satH('sat.onb_welcome_body', null, { name: '<b style="color:var(--text)">Smart Autotune Thermostat</b>' }) + '</p>' +
           '<div style="display:inline-flex;align-items:center;gap:8px;margin:6px auto 22px;padding:8px 14px;background:var(--bg);border:1px solid var(--border);border-radius:10px"><span style="width:9px;height:9px;border-radius:50%;background:var(--zone-warn);box-shadow:0 0 7px var(--zone-warn);flex:0 0 auto"></span><span style="font-weight:500;font-size:12px;color:var(--text)">' + satH('sat.onb_welcome_note') + '</span></div>' +
           '<div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap"><button data-sa="notnow" style="' + GHOST + '">' + satH('sat.not_now') + '</button>' +
-          '<button data-sa="begin" style="background:var(--accent);border:0;color:#04222c;font-weight:700;font-size:15px;border-radius:11px;padding:13px 30px;cursor:pointer;min-height:48px">' + satH('sat.get_started') + '</button></div></div>';
+          '<button data-sa="begin" style="background:var(--accent);border:0;color:var(--on-accent);font-weight:700;font-size:15px;border-radius:11px;padding:13px 30px;cursor:pointer;min-height:48px">' + satH('sat.get_started') + '</button></div></div>';
       } else if (st.screen === 'system') {
         function sysCard(k, title, desc) {
           return '<button data-sa="sys-' + k + '" style="' + optCard(st.system === k) + '"><span style="' + dot(st.system === k) + '"></span>' +
@@ -8483,7 +8483,7 @@
         var sysL = { radiators: satH('sat.onb_sys_radiators'), underfloor: satH('sat.onb_sys_underfloor'), hp: satH('sat.heat_pump') }[st.system];
         var mfrL = (typeof ENUM_OPTS !== 'undefined' && ENUM_OPTS.satmanufacturer ? (ENUM_OPTS.satmanufacturer.filter(function (o) { return ('' + o[0]) === ('' + st.mfr); })[0] || [0, t('sat.auto')])[1] : t('sat.auto'));
         var tuneL = st.tuning === 'auto' ? satH('sat.onb_tune_auto_label') : satH('sat.onb_tune_manual_label', { slope: st.slope.toFixed(1) });
-        h += '<div style="' + CARD + ';padding:30px 28px;text-align:center"><div style="width:54px;height:54px;border-radius:50%;background:var(--accent);display:flex;align-items:center;justify-content:center;margin:0 auto 18px;font-weight:700;font-size:24px;color:#04222c">✓</div>' +
+        h += '<div style="' + CARD + ';padding:30px 28px;text-align:center"><div style="width:54px;height:54px;border-radius:50%;background:var(--accent);display:flex;align-items:center;justify-content:center;margin:0 auto 18px;font-weight:700;font-size:24px;color:var(--on-accent)">✓</div>' +
           '<h1 style="font-weight:700;font-size:24px;color:var(--text);margin:0 0 6px">' + satH('sat.onb_done_title') + '</h1>' +
           '<p style="font:400 13px/1.6 inherit;color:var(--muted);margin:0 auto 20px;max-width:420px">' + satH('sat.onb_done_body') + '</p>' +
           '<div style="text-align:left;background:var(--bg);border:1px solid var(--border);border-radius:12px;padding:6px 16px;margin:0 0 20px">' +
@@ -8492,7 +8492,7 @@
           '<div style="display:flex;align-items:center;padding:11px 0"><span style="font-weight:500;font-size:12.5px;color:var(--muted)">' + satH('sat.onb_step_tuning') + '</span><span style="margin-left:auto;font-weight:600;font-size:12.5px;color:var(--text)">' + tuneL + '</span></div></div>' +
           '<p style="font:400 11px/1.6 inherit;color:var(--muted);margin:0 0 20px;text-align:left">' + satH('sat.onb_written', null, { keys: '<span style="' + MONO + '">satenabled=on · sat_onboarded=on</span>' }) + '</p>' +
           '<div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap"><button data-sa="restart" style="' + GHOST + '">' + satH('sat.onb_run_again') + '</button>' +
-          '<button data-sa="go" style="background:var(--accent);border:0;color:#04222c;font-weight:700;font-size:15px;border-radius:11px;padding:13px 28px;cursor:pointer;min-height:48px">' + satH('sat.onb_open_dashboard') + '</button></div></div>';
+          '<button data-sa="go" style="background:var(--accent);border:0;color:var(--on-accent);font-weight:700;font-size:15px;border-radius:11px;padding:13px 28px;cursor:pointer;min-height:48px">' + satH('sat.onb_open_dashboard') + '</button></div></div>';
       }
       h += '</div></div>';
       back.innerHTML = h;
