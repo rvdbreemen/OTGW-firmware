@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-21T14:56:00Z'
+updated_date: '2026-11-21T16:05:00Z'
 labels:
   - tooling
 dependencies: []
@@ -24,3 +25,9 @@ Follow-up of TASK-3006 (otgw-dev analysis, will_85903 20 Nov): 08:04-13:18 both 
 - [ ] #1 A telnet or frame stream silent for N min while the health probe is OK is reconnected once, with a gap marker
 - [ ] #2 A test on the real tool (fake device that keeps the socket open but sends nothing) fails on the old code and passes
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-21: deferred to 2026-11-25 (token budget, Robert via coordinator). Commits stay as they are, no builds, no new work until then. The .63 25 h soak of 464a188 runs unattended; 09 reads only the end result. The capture e2e runs by 09 on .61 may finish; their results get read on 25 Nov.
+<!-- SECTION:NOTES:END -->
