@@ -7,6 +7,7 @@ status: To Do
 assignee:
   - '@otgw-dev'
 created_date: '2026-11-21T01:55:00Z'
+updated_date: '2026-11-21T01:57:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -28,4 +29,11 @@ Robert (maintainer) answered Q-2005e with B (entry 435, #dev-sat-mqtt 2026-11-21
 - [ ] #3 The margin stays above fModSupOffset; constant or setting (like fPwmSwitchMargin) decided with the coordinator and documented
 - [ ] #4 Replay of the gruijter 20 Nov and indigo_light 19 Nov sattick data through the new rule shows no underheat exit in the four flames
 - [ ] #5 Bench via the NAS (replay or simulation) before the push
+- [ ] #6 The replay with A+B (TASK-2987 + this task) reports how many saturation exits (off time 0 for 300 s) remain in the four flames, because duty reaches 1.00 when BT (seeded at ignition, EMA for 180 s, then held; SATcontrol.ino:1648/1669-1686, as thermo-nova pwm.py:144-149, 186-193, 229-239) stays at or below the request
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-21 coordinator decision (relayed by 92): the margin is a CONSTANT 1.5 C for 2.0.0, one named constant next to the existing exit constants (SATtypes.h / SATcycles.ino), no new setting. Reasons: 8 days to stable; a setting adds UI, REST, HA discovery, settings migration and tests; YAGNI until a field case needs another value; Sergeant D can still change the value. Deliberately not symmetric with fPwmSwitchMargin (which is a setting). This settles AC #3.
+<!-- SECTION:NOTES:END -->
