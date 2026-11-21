@@ -8798,3 +8798,24 @@ Robert, 16:18:42 UTC (https://discord.com/channels/812969634638725140/9144987300
 **Task:** TASK-2993 (no change).
 
 **Open:** none.
+
+## 448. Q-342b answered D: SAT leaves PWM for continuous only when the flow is at least 3 C under the request for 180 s, thermo-nova's own underheat exit (Sergeant D, 2026-11-21; replaces entry 342, reconsiders entries 350 and 439)
+
+**Source:** #dev-sat-mqtt, Sergeant D 2026-11-21 14:22:37 UTC (https://discord.com/channels/812969634638725140/1105556725714649128/1573705200592752795), a reply to Q-342b (https://discord.com/channels/812969634638725140/1105556725714649128/1573703896008892611, evidence part 1573703904909328416); unedited when read back via the Discord API more than 90 s later.
+
+**Quoted:**
+> "My answer is D"
+
+**Settled:** option D of Q-342b. The PWM -> continuous exit of entry 342 (flame on and request above the flow for 60 s, ADR-236) is replaced by thermo-nova's underheat exit: leave PWM only when the flow is at least 3.0 C under the request (UNDERSHOOT_MARGIN_CELSIUS = -3.0, cycles/const.py:11) for 180 s (UNDERHEAT_SUSTAIN_SECONDS = 180.0, const.py:22), as in heating_control.py:337-347 at 7beaaf5. Minimum power in PWM (heating_control.py:139-140, :517-518, const.py:37) and the setpoint flow - 1 (heating_control.py:435-448) stay as they are; they are thermo-nova too.
+
+**Why (as posted):** indigo_light's Vitodens 100-W (beta.392, 21 Nov) looped 3-4 times per night burn: after a fail-safe SAT sends maximum modulation 0, the boiler drops to 0 % within seconds of the MsgID 14 override landing, the flow falls 8-13 C, the 60 s rule switches to continuous, continuous overshoots, the fail-safe returns to PWM. Real-code replays (otgw-dev, OTGW-field-data/indigo_light/2026-11-21_2.0.0-beta.392/_replay/REPORT.md; marceld91d/.../_replay/switch5_out.txt): per night burn A 4 / B 3-4 / C 1 / D 0 rounds; marceld91d A and C 2 switches, B moves the exit to 09:10:40, D none. Replay limit: the recorded flow is forced, so the room effect of staying in PWM is not shown.
+
+**Changes earlier entries:** entry 342 (his 60 s rule) is replaced; entry 350 (build 342 and watch for toggling) is closed by this field evidence; entry 439 (duty fix first, field runs after) led here. The guards of entries 433 (latch, TASK-2987) and 435 (margin, TASK-2989) are not chosen.
+
+**Interpretation (ours):** D replaces the exit rule only; the start gate of entries 385/387 (no exit within 60 s after the flame lights) becomes moot under a 180 s condition but stays in the code unless he says otherwise. D needs a new ADR that supersedes ADR-236 (Accepted). Release target 2.0.0 (asked as 2.0.0).
+
+**Compared with thermo-nova (7beaaf5):** identical to heating_control.py:337-347 with cycles/const.py:11 and const.py:22.
+
+**Task:** to be filed for otgw-dev (implementation + ADR superseding ADR-236); TASK-2987 and TASK-2989 stay on 2.1.0.
+
+**Open:** Robert's entry 445 sequenced "the guards" after the public duty fix; whether this switch-rule change goes out as the next separate change is the coordinator's/Robert's scheduling.

@@ -5926,6 +5926,20 @@
     "TASK-2993"
    ],
    "confirmed_by_entry": null
+  },
+  {
+   "id": 448,
+   "title": "Q-342b answered D: SAT leaves PWM for continuous only when the flow is at least 3 C under the request for 180 s, thermo-nova's own underheat exit (Sergeant D, 2026-11-21; replaces entry 342, reconsiders entries 350 and 439)",
+   "date": "2026-11-21",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1573705200592752795",
+   "supersedes": [],
+   "tasks": [
+    "TASK-2987",
+    "TASK-2989"
+   ],
+   "confirmed_by_entry": null
   }
  ]
 }
