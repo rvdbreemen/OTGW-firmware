@@ -324,7 +324,8 @@ static uint8_t g_satShadowEpoch = 0;   // bumped by the real satRepublishCoreSta
 enum SATPreset { SAT_PRESET_NONE = 0, SAT_PRESET_COMFORT = 1 };
 static const char* satGetPresetName(SATPreset p) { return p == SAT_PRESET_COMFORT ? "comfort" : "none"; }
 struct MqttS { bool bEnable = true; };
-struct SatS { float fTargetTemp = 20.0f; bool bEnabled = false; bool bUseExternalTemp = false; bool bSimulation = false; };
+struct SatS { float fTargetTemp = 20.0f; bool bEnabled = false; bool bUseExternalTemp = false; bool bSimulation = false; uint8_t iRoomSource = 0; };
+static const char* satPrimaryRoomSourceName(uint8_t) { return "auto"; }   // TASK-3011: sat/room_source in the core set
 struct Settings { MqttS mqtt; SatS sat; };
 struct MqttT { bool bConnected = true; };
 struct SatT { bool bActive = false, bSafetyTripped = false, bFallbackActive = false, bPushRefused = false, bPm25NoSlot = false,

@@ -55,7 +55,8 @@ static uint8_t g_satShadowEpoch = 0;
 enum SATPreset { SAT_PRESET_NONE = 0 };
 static const char* satGetPresetName(SATPreset) { return "none"; }
 struct MqttS { bool bEnable = true; };
-struct SatS { bool bEnabled = false, bUseExternalTemp = false, bSimulation = false; };
+struct SatS { bool bEnabled = false, bUseExternalTemp = false, bSimulation = false; uint8_t iRoomSource = 0; };
+static const char* satPrimaryRoomSourceName(uint8_t) { return "auto"; }   // TASK-3011: sat/room_source in the core set
 struct Settings { MqttS mqtt; SatS sat; };
 struct MqttT { bool bConnected = true; };
 struct SatT { bool bActive = false, bSafetyTripped = false, bFallbackActive = false, bPushRefused = false, bPm25NoSlot = false,
