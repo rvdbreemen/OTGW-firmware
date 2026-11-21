@@ -2020,7 +2020,11 @@
       var mtab = null;
       document.querySelectorAll('#page-monitor .subtab').forEach(function (s) { if ((want || mt) && s.dataset.tab === (want || mt)) mtab = s; });
       if (mtab) showTab(mtab.dataset.tab);
-      else if (isMonitorLogVisible()) renderLog();
+      else {
+        // TASK-2982: no stored tab; the tab marked active in the markup is the current one
+        document.querySelectorAll('#page-monitor .subtab').forEach(function (s) { setAriaCurrent(s, s.classList.contains('active'), 'true'); });
+        if (isMonitorLogVisible()) renderLog();
+      }
     }
     if (p === 'settings') fetchSettings();
     if (p === 'sat') satPageStart();

@@ -44,6 +44,9 @@ test('accessibility structure: skip link, landmarks, aria-current, SAT switch, d
     for (let i = 0; i < 150 && !h.log.some((l) => l.startsWith('GET /api/v2/sat/status')); i++) await h.sleep(100);
     await sleep(800);
 
+    // TASK-2982: initial state, before any click: each group has exactly one aria-current
+    R.init = await h.evalJs(`(function(){ function n(sel, val) { return [].slice.call(document.querySelectorAll(sel)).filter(function (b) { return b.getAttribute('aria-current') === val; }).map(function (b) { return b.dataset.page || b.dataset.sv || b.dataset.tab || b.dataset.adv; }); }
+      return { seg: n('.seg', 'page'), sv: n('.satview-btn', 'true'), mon: n('#page-monitor .subtab', 'true'), adv: n('#advTabs .subtab', 'true') }; })()`);
     // 1 + 2: structure and the skip link (fresh page, nothing focused yet)
     R.struct = await h.evalJs(`(function(){
       var pages = [].slice.call(document.querySelectorAll('.page'));
@@ -101,6 +104,19 @@ test('accessibility structure: skip link, landmarks, aria-current, SAT switch, d
     await key(h, ' ');
     R.afterSpace = await h.evalJs(`(function(){ var a = document.querySelector('#setRail .rail-item.active'); return a ? a.dataset.cat : null; })()`);
     R.cats = cats;
+    // TASK-2982 D3: keyboard only: Tab from one rail button reaches the next, Enter opens it, Space opens the next one
+    await h.evalJs(`document.querySelector('#setRail .rail-item[data-cat="${cats[0]}"]').focus()`);
+    await key(h, 'Tab');
+    R.tabReach = await h.evalJs(`document.activeElement && document.activeElement.dataset ? document.activeElement.dataset.cat : null`);
+    await key(h, 'Enter');
+    R.tabEnter = await h.evalJs(`(function(){ var a = document.querySelector('#setRail .rail-item.active'); return a ? a.dataset.cat : null; })()`);
+    if (cats.length > 2) {
+      await h.evalJs(`document.querySelector('#setRail .rail-item[data-cat="${cats[1]}"]').focus()`);
+      await key(h, 'Tab'); await key(h, ' ');
+      R.tabSpace = await h.evalJs(`(function(){ var a = document.querySelector('#setRail .rail-item.active'); return a ? a.dataset.cat : null; })()`);
+    }
+    // TASK-2982 D2: the main nav ring sits inside the button, so .switcher's overflow does not clip it
+    R.segRing = await h.evalJs(`(function(){ var s = document.querySelector('.seg[data-page="home"]'); s.focus({ focusVisible: true }); var c = getComputedStyle(s); return { style: c.outlineStyle, offset: c.outlineOffset }; })()`);
     assert.deepEqual(h.exceptions, []);
   } finally { await h.close(); }
 
@@ -125,6 +141,10 @@ test('accessibility structure: skip link, landmarks, aria-current, SAT switch, d
     assert.equal(R.ring.color, 'rgb(30, 136, 229)', JSON.stringify(R.ring));
     assert.equal(R.ring.width, '2px');
   });
+  await t.test('aria-current: one per group on the first page open, before any click (TASK-2982)', () => {
+    assert.equal(R.init.seg.length, 1, `main nav (${R.init.seg})`);
+    assert.deepEqual(R.init.sv, ['simple'], 'SAT views'); assert.deepEqual(R.init.mon, ['mlog'], 'Monitor tabs'); assert.deepEqual(R.init.adv, ['pic'], 'Advanced tabs');
+  });
   await t.test('aria-current: one per group after page and view changes', () => {
     assert.deepEqual(R.curSat.seg, ['sat']); assert.equal(R.curSat.segOther, 0);
     assert.deepEqual(R.curSat.sv, ['control']);
@@ -144,5 +164,29 @@ test('accessibility structure: skip link, landmarks, aria-current, SAT switch, d
     assert.ok(R.rail.length > 1 && R.rail.every((r) => r.tag === 'BUTTON' && r.type === 'button'), JSON.stringify(R.rail));
     assert.deepEqual(R.afterEnter, { cat: R.cats[1], cur: 'true' }, 'Enter opens the focused category');
     assert.equal(R.afterSpace, R.cats[0], 'Space opens the focused category');
+    assert.equal(R.tabReach, R.cats[1], 'Tab moves from one rail button to the next');
+    assert.equal(R.tabEnter, R.cats[1], 'Enter on the Tab-reached button opens it');
+    if (R.cats.length > 2) assert.equal(R.tabSpace, R.cats[2], 'Space on the Tab-reached button opens it');
+  });
+  await t.test('the main nav focus ring is drawn inside the button (outline-offset -2px), not clipped (TASK-2982 D2)', () => {
+    assert.deepEqual(R.segRing, { style: 'solid', offset: '-2px' });
   });
 });
+
+// TASK-2982 D1: a Monitor tab restored from localStorage on page entry carries aria-current, and the default Log otherwise
+for (const stored of [null, 'mvalues']) {
+  test(`Monitor entry: aria-current on the ${stored || 'default (Log)'} tab before any tab click`, async () => {
+    const before = stored ? `try{localStorage.setItem('otgw-v2-montab',${JSON.stringify(stored)})}catch(e){}` : '';
+    const h = await startPage({ api, beforeScript: before });
+    try {
+      assert.ok(await h.until(`!!document.querySelector('.seg[data-page="monitor"]')`, 30000), 'page loaded');
+      await sleep(600);
+      await h.evalJs(`document.querySelector('.seg[data-page="monitor"]').click()`); await sleep(600);
+      const cur = await h.evalJs(`[].slice.call(document.querySelectorAll('#page-monitor .subtab')).filter(function (b) { return b.getAttribute('aria-current') === 'true'; }).map(function (b) { return b.dataset.tab; })`);
+      const act = await h.evalJs(`(document.querySelector('#page-monitor .subtab.active') || {dataset:{}}).dataset.tab`);
+      assert.deepEqual(cur, [act], `aria-current follows the active tab (${cur} vs ${act})`);
+      if (stored) assert.equal(act, stored, 'the stored tab is restored');
+      assert.deepEqual(h.exceptions, []);
+    } finally { await h.close(); }
+  });
+}

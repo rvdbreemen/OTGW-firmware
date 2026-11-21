@@ -41,6 +41,7 @@ html[data-theme="dark"]{--accent:var(--brand-cyan);--nav:#383838;--tile-off:#545
   .skip-link:focus{position:fixed;left:8px;top:8px;z-index:1000;background:var(--panel);color:var(--text);border:1px solid var(--border);
     border-radius:9px;padding:8px 14px;font-weight:700;text-decoration:none;box-shadow:var(--shadow)}
   main.wrap:focus{outline:none}
+  .seg:focus-visible{outline-offset:-2px}   /* TASK-2982: .switcher scrolls (overflow-x:auto) and would clip an outside ring */
   button:disabled{opacity:.5;cursor:not-allowed;box-shadow:none;transform:none}
   .headerrow .sub{font-weight:400;opacity:.9;font-size:.8rem}
   /* TASK-1830: Light/Dark segmented switch, as the OTGW site's .switch */
