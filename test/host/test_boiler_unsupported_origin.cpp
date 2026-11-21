@@ -89,7 +89,12 @@ class __FlashStringHelper;                        // incomplete: pointer-only, a
 #define F(s) ((const __FlashStringHelper*)(s))
 #define snprintf_P snprintf
 #define strstr_P strstr
+#ifdef _MSC_VER
 #define strcasecmp_P _stricmp
+#else
+#include <strings.h>
+#define strcasecmp_P strcasecmp
+#endif
 #define memcpy_P memcpy
 #define PROGMEM_readAnything(src, dest) memcpy_P(&(dest), (src), sizeof(dest))   // helperStuff.h
 #define HAS_PIC 0                                  // the PIC task's RX-error report is not modelled

@@ -23,7 +23,7 @@ import subprocess
 import sys
 
 from test_boiler_unsupported_origin import CORE, cut
-from test_ot_reserved_range import GEN, HERE, find_vcvars
+from test_ot_reserved_range import GEN, HERE, host_cxx_build
 from test_pic_banner_dispatch import read
 
 HELPER = "src/OTGW-firmware/helperStuff.ino"
@@ -86,16 +86,9 @@ def build_and_run(label, out_dir):
     exe = out_dir / "test_ot_support_migration.exe"
     if exe.exists():
         exe.unlink()
-    bat = out_dir / "_compile.bat"
-    fwd = str(out_dir).replace("\\", "/")
-    bat.write_text("@echo off\r\n"
-                   f"call \"{find_vcvars()}\" >nul 2>nul\r\n"
-                   f"cl /nologo /EHsc /W3 /std:c++17 /Od /utf-8 /D_CRT_SECURE_NO_WARNINGS "
-                   f"/Fo:\"{fwd}/\" /Fe:\"{exe}\" \"{HERE / 'test_ot_support_migration.cpp'}\" "
-                   f"/I\"{out_dir}\"\r\n", encoding="ascii")
-    c = subprocess.run(["cmd.exe", "/c", str(bat)], capture_output=True, text=True, errors="replace")
-    if c.returncode != 0 or not exe.exists():
-        print(c.stdout[-4000:], c.stderr[-2000:])
+    ok, out_ = host_cxx_build([HERE / 'test_ot_support_migration.cpp'], exe, includes=[out_dir], workdir=out_dir)
+    if not ok:
+        print(out_[-4000:])
         print(f"COMPILATION FAILED ({label})")
         sys.exit(2)
     r = subprocess.run([str(exe), str(out_dir)], capture_output=True, text=True)

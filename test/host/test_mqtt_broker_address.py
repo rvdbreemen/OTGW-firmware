@@ -18,7 +18,7 @@ import re
 import subprocess
 import sys
 
-from test_ot_reserved_range import GEN, HERE, find_vcvars
+from test_ot_reserved_range import GEN, HERE, host_cxx_build
 from test_pic_banner_dispatch import read
 
 INO = "src/OTGW-firmware/MQTTstuff.ino"
@@ -51,16 +51,9 @@ def build_and_run(label, out_dir):
     exe = out_dir / "test_mqtt_broker_address.exe"
     if exe.exists():
         exe.unlink()
-    bat = out_dir / "_compile.bat"
-    fwd = str(out_dir).replace("\\", "/")
-    bat.write_text("@echo off\r\n"
-                   f"call \"{find_vcvars()}\" >nul 2>nul\r\n"
-                   f"cl /nologo /EHsc /W3 /std:c++17 /utf-8 /D_CRT_SECURE_NO_WARNINGS "
-                   f"/Fo:\"{fwd}/\" /Fe:\"{exe}\" \"{HERE / 'test_mqtt_broker_address.cpp'}\" "
-                   f"/I\"{out_dir}\" /I\"{REPO_SRC}\"\r\n", encoding="ascii")
-    c = subprocess.run(["cmd.exe", "/c", str(bat)], capture_output=True, text=True, errors="replace")
-    if c.returncode != 0 or not exe.exists():
-        print(c.stdout[-3000:], c.stderr[-2000:])
+    ok, out_ = host_cxx_build([HERE / 'test_mqtt_broker_address.cpp'], exe, includes=[out_dir, REPO_SRC], workdir=out_dir)
+    if not ok:
+        print(out_[-3000:])
         print(f"COMPILATION FAILED ({label})")
         sys.exit(2)
     r = subprocess.run([str(exe)], capture_output=True, text=True, errors="replace")

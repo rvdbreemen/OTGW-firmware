@@ -120,16 +120,9 @@ def main():
     exe = GEN / "test_ot_reserved_range.exe"
     if exe.exists():
         exe.unlink()
-    bat = GEN / "_compile_ot_reserved_range.bat"
-    gen_fwd = str(GEN).replace("\\", "/")
-    bat.write_text("@echo off\r\n"
-                   f"call \"{find_vcvars()}\" >nul 2>nul\r\n"
-                   f"cl /nologo /EHsc /W3 /std:c++17 /D_CRT_SECURE_NO_WARNINGS "
-                   f"/Fo:\"{gen_fwd}/\" /Fe:\"{exe}\" \"{HERE / 'test_ot_reserved_range.cpp'}\" /I\"{HERE}\"\r\n",
-                   encoding="ascii")
-    c = subprocess.run(["cmd.exe", "/c", str(bat)], capture_output=True, text=True, errors="replace")
-    if c.returncode != 0 or not exe.exists():
-        print(c.stdout[-3000:], c.stderr[-2000:])
+    ok, out = host_cxx_build([HERE / "test_ot_reserved_range.cpp"], exe, includes=[HERE], workdir=GEN)
+    if not ok:
+        print(out[-5000:])
         print("COMPILATION FAILED")
         return 2
     r = subprocess.run([str(exe)], capture_output=True, text=True)

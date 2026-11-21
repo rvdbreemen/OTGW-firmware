@@ -25,6 +25,7 @@ class __FlashStringHelper;
 #define REBOOT_LOG_LINE_MAX 240
 #define REBOOT_LOG_LINES 20   // TASK-1931: OTGW-firmware.h, the line count updateRebootLog() keeps
 
+#define strlcpy otgw_test_strlcpy   // musl declares strlcpy; keep the harness copy under its own name
 static size_t strlcpy(char *d, const char *s, size_t n) {
   size_t l = strlen(s);
   if (n) { size_t c = l < n - 1 ? l : n - 1; memcpy(d, s, c); d[c] = 0; }

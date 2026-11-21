@@ -41,7 +41,7 @@ import re
 import subprocess
 import sys
 
-from test_ot_reserved_range import GEN, HERE, REPO, find_vcvars, slice_by_anchor
+from test_ot_reserved_range import GEN, HERE, REPO, host_cxx_build, slice_by_anchor
 
 FW = "src/OTGW-firmware/"
 PID_INO, CONTROL_INO, TYPES_H = FW + "SATpid.ino", FW + "SATcontrol.ino", FW + "SATtypes.h"
@@ -137,16 +137,9 @@ def build_and_run(side, d):
     exe = d / "test_sat_pid_derivative.exe"
     if exe.exists():
         exe.unlink()
-    bat = d / "_compile.bat"
-    fwd = str(d).replace("\\", "/")
-    bat.write_text("@echo off\r\n"
-                   f"call \"{find_vcvars()}\" >nul 2>nul\r\n"
-                   f"cl /nologo /EHsc /W3 /std:c++17 /D_CRT_SECURE_NO_WARNINGS "
-                   f"/Fo:\"{fwd}/\" /Fe:\"{exe}\" \"{HERE / 'test_sat_pid_derivative.cpp'}\" "
-                   f"/I\"{d}\" /I\"{HERE / 'sat_pid_shim'}\"\r\n", encoding="ascii")
-    c = subprocess.run(["cmd.exe", "/c", str(bat)], capture_output=True, text=True, errors="replace")
-    if c.returncode != 0 or not exe.exists():
-        print(c.stdout[-3000:], c.stderr[-2000:])
+    ok, out_ = host_cxx_build([HERE / 'test_sat_pid_derivative.cpp'], exe, includes=[d, HERE / 'sat_pid_shim'], workdir=d)
+    if not ok:
+        print(out_[-3000:])
         print(f"COMPILATION FAILED ({side})")
         return None
     r = subprocess.run([str(exe)], capture_output=True, text=True, errors="replace")

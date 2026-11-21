@@ -14,7 +14,7 @@ import re
 import subprocess
 import sys
 
-from test_ot_reserved_range import GEN, HERE, SOURCE, find_vcvars, read_source
+from test_ot_reserved_range import GEN, HERE, SOURCE, host_cxx_build, read_source
 
 
 def slice_block(lines, anchor_rx, brace_from_anchor_line=True):
@@ -70,16 +70,9 @@ def main():
     exe = GEN / "test_replay_frame_guards.exe"
     if exe.exists():
         exe.unlink()
-    bat = GEN / "_compile_replay_frame_guards.bat"
-    gen_fwd = str(GEN).replace("\\", "/")
-    bat.write_text("@echo off\r\n"
-                   f"call \"{find_vcvars()}\" >nul 2>nul\r\n"
-                   f"cl /nologo /EHsc /W3 /std:c++17 /utf-8 /D_CRT_SECURE_NO_WARNINGS "
-                   f"/Fo:\"{gen_fwd}/\" /Fe:\"{exe}\" \"{HERE / 'test_replay_frame_guards.cpp'}\" /I\"{HERE}\"\r\n",
-                   encoding="ascii")
-    c = subprocess.run(["cmd.exe", "/c", str(bat)], capture_output=True, text=True, errors="replace")
-    if c.returncode != 0 or not exe.exists():
-        print(c.stdout[-3000:], c.stderr[-2000:])
+    ok, out_ = host_cxx_build([HERE / 'test_replay_frame_guards.cpp'], exe, includes=[HERE], workdir=GEN)
+    if not ok:
+        print(out_[-3000:])
         print("COMPILATION FAILED")
         return 2
     r = subprocess.run([str(exe)], capture_output=True, text=True)

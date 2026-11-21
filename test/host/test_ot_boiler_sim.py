@@ -22,7 +22,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from test_ot_reserved_range import GEN, REPO, find_vcvars  # noqa: E402
+from test_ot_reserved_range import GEN, REPO, host_cxx_build  # noqa: E402
 
 SIM = REPO / "tools" / "bench" / "ot-boiler-sim"
 DATA = SIM / "data"
@@ -49,16 +49,9 @@ def build():
     exe = out / "sim_driver.exe"
     if exe.exists():
         exe.unlink()
-    bat = out / "_compile.bat"
-    fwd = str(out).replace("\\", "/")
-    bat.write_text("@echo off\r\n"
-                   f"call \"{find_vcvars()}\" >nul 2>nul\r\n"
-                   f"cl /nologo /EHsc /W4 /std:c++17 /utf-8 /D_CRT_SECURE_NO_WARNINGS "
-                   f"/Fo:\"{fwd}/\" /Fe:\"{exe}\" \"{SIM / 'host' / 'sim_driver.cpp'}\" \"{SIM / 'src' / 'boiler_sim.cpp'}\"\r\n",
-                   encoding="ascii")
-    c = subprocess.run(["cmd.exe", "/c", str(bat)], capture_output=True, text=True, errors="replace")
-    if c.returncode != 0 or not exe.exists():
-        print(c.stdout[-3000:], c.stderr[-2000:])
+    ok, out_ = host_cxx_build([SIM / 'host' / 'sim_driver.cpp', SIM / 'src' / 'boiler_sim.cpp'], exe, workdir=out)
+    if not ok:
+        print(out_[-3000:])
         print("COMPILATION FAILED")
         sys.exit(2)
     return exe

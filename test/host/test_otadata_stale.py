@@ -33,7 +33,7 @@ import re
 import subprocess
 import sys
 
-from test_ot_reserved_range import GEN, HERE, REPO, find_vcvars
+from test_ot_reserved_range import GEN, HERE, REPO, host_cxx_build
 
 UPD = REPO / "src" / "OTGW-firmware" / "OTGW-ModUpdateServer-esp32.h"
 INO = REPO / "src" / "OTGW-firmware" / "OTGW-firmware.ino"
@@ -101,14 +101,9 @@ def build_and_run(label, code):
     (d / "t.cpp").write_text(DRIVER.replace("CALLS", calls), encoding="utf-8")
     exe = d / "t.exe"
     exe.unlink(missing_ok=True)
-    bat = d / "_compile.bat"
-    bat.write_text("@echo off\r\n"
-                   f"call \"{find_vcvars()}\" >nul 2>nul\r\n"
-                   f"cl /nologo /EHsc /W3 /std:c++17 /Fo:\"{d}\\\\\" /Fe:\"{exe}\" \"{d / 't.cpp'}\" /I\"{d}\"\r\n",
-                   encoding="ascii")
-    c = subprocess.run(["cmd.exe", "/c", str(bat)], capture_output=True, text=True, errors="replace")
-    if c.returncode != 0 or not exe.exists():
-        print(c.stdout[-3000:], c.stderr[-1000:])
+    ok, out_ = host_cxx_build([d / 't.cpp'], exe, includes=[d], workdir=d)
+    if not ok:
+        print(out_[-3000:])
         print(f"COMPILATION FAILED ({label})")
         sys.exit(2)
     out = subprocess.run([str(exe)], capture_output=True, text=True).stdout

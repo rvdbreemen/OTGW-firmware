@@ -29,7 +29,7 @@ import re
 import subprocess
 import sys
 
-from test_ot_reserved_range import GEN, HERE, REPO, find_vcvars
+from test_ot_reserved_range import GEN, HERE, REPO, host_cxx_build
 
 INO = "src/OTGW-firmware/OTGW-firmware.ino"
 PLAT = "src/libraries/Platform/src/platform_esp32.h"
@@ -68,15 +68,9 @@ def build(out):
     exe = out / "test_wifi_portal_reset.exe"
     if exe.exists():
         exe.unlink()
-    bat = out / "_compile.bat"
-    fwd = str(out).replace("\\", "/")
-    bat.write_text("@echo off\r\n"
-                   f"call \"{find_vcvars()}\" >nul 2>nul\r\n"
-                   f"cl /nologo /EHsc /W3 /std:c++17 /utf-8 /D_CRT_SECURE_NO_WARNINGS /Fo:\"{fwd}/\" /Fe:\"{exe}\" "
-                   f"\"{HERE / 'test_wifi_portal_reset.cpp'}\" /I\"{out}\"\r\n", encoding="ascii")
-    c = subprocess.run(["cmd.exe", "/c", str(bat)], capture_output=True, text=True, errors="replace")
-    if c.returncode != 0 or not exe.exists():
-        print(c.stdout[-4000:], c.stderr[-2000:])
+    ok, out_ = host_cxx_build([HERE / 'test_wifi_portal_reset.cpp'], exe, includes=[out], workdir=out)
+    if not ok:
+        print(out_[-4000:])
         print("COMPILATION FAILED")
         sys.exit(2)
     return exe

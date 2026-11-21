@@ -42,7 +42,7 @@ import sys
 
 from test_boiler_unsupported_origin import (CORE, CORE_SLICES, OTBUS_SLICES, OTD, OTD_SLICES, TYPES,
                                             WORKTREE_ONLY, cut)
-from test_ot_reserved_range import GEN, HERE, REPO, find_vcvars
+from test_ot_reserved_range import GEN, HERE, REPO, host_cxx_build
 from test_pic_banner_dispatch import read
 
 FW_H = "src/OTGW-firmware/OTGW-firmware.h"
@@ -141,16 +141,9 @@ def build_and_run(label, out_dir, model):
     exe = out_dir / "test_local_frame_consumers.exe"
     if exe.exists():
         exe.unlink()
-    bat = out_dir / "_compile.bat"
-    fwd = str(out_dir).replace("\\", "/")
-    bat.write_text("@echo off\r\n"
-                   f"call \"{find_vcvars()}\" >nul 2>nul\r\n"
-                   f"cl /nologo /EHsc /W3 /std:c++17 /Od /utf-8 /D_CRT_SECURE_NO_WARNINGS /DMODEL={MODELS[model]} "
-                   f"/Fo:\"{fwd}/\" /Fe:\"{exe}\" \"{HERE / 'test_local_frame_consumers.cpp'}\" "
-                   f"/I\"{out_dir}\" /I\"{REPO / 'src' / 'OTGW-firmware'}\"\r\n", encoding="ascii")
-    c = subprocess.run(["cmd.exe", "/c", str(bat)], capture_output=True, text=True, errors="replace")
-    if c.returncode != 0 or not exe.exists():
-        print(c.stdout[-4000:], c.stderr[-2000:])
+    ok, out_ = host_cxx_build([HERE / 'test_local_frame_consumers.cpp'], exe, includes=[out_dir, REPO / 'src' / 'OTGW-firmware'], defines=[f"MODEL={MODELS[model]}"], workdir=out_dir)
+    if not ok:
+        print(out_[-4000:])
         print(f"COMPILATION FAILED ({label})")
         sys.exit(2)
     r = subprocess.run([str(exe), str(out_dir)], capture_output=True, text=True)

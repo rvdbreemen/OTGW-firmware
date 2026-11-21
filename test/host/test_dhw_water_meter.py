@@ -52,6 +52,7 @@ Exit code: 0 PASS, 1 FAIL, 2 harness error. A slice or compile failure is a harn
 error, never a reproduction.
 """
 import argparse
+import os
 import re
 import shutil
 import subprocess
@@ -59,7 +60,7 @@ import sys
 from pathlib import Path
 
 from test_ot_reserved_range import ANCHORS as RESERVED_ANCHORS
-from test_ot_reserved_range import GEN, HERE, REPO, find_vcvars, slice_by_anchor
+from test_ot_reserved_range import GEN, HERE, REPO, find_vcvars, host_cxx_build, slice_by_anchor
 from test_pic_banner_dispatch import slice_range
 
 FW = "src/OTGW-firmware/"
@@ -493,6 +494,15 @@ def build_and_run(label, out_dir, cpp):
     exe = out_dir / (Path(cpp).stem + ".exe")
     if exe.exists():
         exe.unlink()
+    if os.name != "nt":   # TASK-3020: g++/clang++ (the NAS suite); the cached vcvars path below is Windows-only
+        ok, out_ = host_cxx_build([HERE / cpp], exe, includes=[out_dir, HERE], workdir=out_dir)
+        if not ok:
+            print(out_[-6000:])
+            print(f"COMPILATION FAILED ({label})")
+            sys.exit(2)
+        r = subprocess.run([str(exe)], capture_output=True, text=True)
+        cases = dict(re.findall(r"^CASE (\S+) (pass|FAIL)\b", r.stdout, re.M))
+        return r.returncode, r.stdout, cases
     fwd = str(out_dir).replace("\\", "/")
     # Same compiler and flags as before, without paying for vcvars on every build.
     env, cl = vc_env()

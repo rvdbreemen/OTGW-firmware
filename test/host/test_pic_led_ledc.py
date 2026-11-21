@@ -20,7 +20,7 @@ import re
 import subprocess
 import sys
 
-from test_ot_reserved_range import GEN, HERE, REPO, find_vcvars, slice_by_anchor
+from test_ot_reserved_range import GEN, HERE, REPO, host_cxx_build, slice_by_anchor
 
 INO = "src/OTGW-firmware/OTGW-firmware.ino"
 CORE = "src/OTGW-firmware/OTGW-Core.ino"
@@ -61,16 +61,9 @@ def build_and_run(label, out, plain):
     exe = out / ("test_pic_led_plain.exe" if plain else "test_pic_led_ledc.exe")
     if exe.exists():
         exe.unlink()
-    bat = out / ("_compile_plain.bat" if plain else "_compile_ledc.bat")
-    fwd = str(out).replace("\\", "/")
-    bat.write_text("@echo off\r\n"
-                   f"call \"{find_vcvars()}\" >nul 2>nul\r\n"
-                   f"cl /nologo /EHsc /W3 /std:c++17 /utf-8 /D_CRT_SECURE_NO_WARNINGS {'/DPLAIN_GPIO ' if plain else ''}"
-                   f"/Fo:\"{fwd}/{exe.stem}.obj\" /Fe:\"{exe}\" \"{HERE / 'test_pic_led_ledc.cpp'}\" /I\"{out}\"\r\n",
-                   encoding="ascii")
-    c = subprocess.run(["cmd.exe", "/c", str(bat)], capture_output=True, text=True, errors="replace")
-    if c.returncode != 0 or not exe.exists():
-        print(c.stdout[-3000:], c.stderr[-2000:])
+    ok, out_ = host_cxx_build([HERE / 'test_pic_led_ledc.cpp'], exe, includes=[out], defines=["PLAIN_GPIO"] if plain else [], workdir=out)
+    if not ok:
+        print(out_[-3000:])
         print(f"COMPILATION FAILED ({label})")
         sys.exit(2)
     r = subprocess.run([str(exe)], capture_output=True, text=True)

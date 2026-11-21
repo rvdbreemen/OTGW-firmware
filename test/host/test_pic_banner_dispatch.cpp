@@ -27,6 +27,7 @@
 #define OTDebugTf(...) ((void)0)
 typedef unsigned char byte;
 
+#define strlcpy otgw_test_strlcpy   // musl declares strlcpy; keep the harness copy under its own name
 static size_t strlcpy(char* dst, const char* src, size_t size) {
   size_t n = std::strlen(src);
   if (size) { size_t c = n < size - 1 ? n : size - 1; std::memcpy(dst, src, c); dst[c] = '\0'; }

@@ -48,7 +48,7 @@ import re
 import subprocess
 import sys
 
-from test_ot_reserved_range import GEN, HERE, REPO, find_vcvars
+from test_ot_reserved_range import GEN, HERE, REPO, host_cxx_build
 
 FW = "src/OTGW-firmware/"
 FSX, FW_INO, TIMERS = FW + "FSexplorer.ino", FW + "OTGW-firmware.ino", FW + "safeTimers.h"
@@ -164,16 +164,9 @@ def build(label, out_dir):
     exe = out_dir / "test_webserver_listener_retry.exe"
     if exe.exists():
         exe.unlink()
-    bat = out_dir / "_compile.bat"
-    fwd = str(out_dir).replace("\\", "/")
-    bat.write_text("@echo off\r\n"
-                   f"call \"{find_vcvars()}\" >nul 2>nul\r\n"
-                   f"cl /nologo /EHsc /W3 /std:c++17 /utf-8 /D_CRT_SECURE_NO_WARNINGS "
-                   f"/Fo:\"{fwd}/\" /Fe:\"{exe}\" \"{HERE / 'test_webserver_listener_retry.cpp'}\" /I\"{out_dir}\"\r\n",
-                   encoding="ascii")
-    c = subprocess.run(["cmd.exe", "/c", str(bat)], capture_output=True, text=True, errors="replace")
-    if c.returncode != 0 or not exe.exists():
-        print(c.stdout[-4000:], c.stderr[-2000:])
+    ok, out_ = host_cxx_build([HERE / 'test_webserver_listener_retry.cpp'], exe, includes=[out_dir], workdir=out_dir)
+    if not ok:
+        print(out_[-4000:])
         print(f"COMPILATION FAILED ({label})")
         sys.exit(2)
     return exe

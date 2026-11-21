@@ -18,6 +18,7 @@ import argparse
 import concurrent.futures as cf
 import os
 import re
+import shutil
 import subprocess
 import sys
 import time
@@ -186,6 +187,8 @@ def main():
                     help="only tests affected by git diff REF (default origin/dev) + untracked")
     ap.add_argument("--webui", action="store_true", help="also run node --test tests/webui/*.test.mjs")
     ap.add_argument("--no-host", action="store_true", help="leave out the test/host/test_*.py harnesses")
+    ap.add_argument("--host-gxx", action="store_true",
+                    help="also run the test/host harnesses on a non-Windows host with g++/clang++ (TASK-3020)")
     ap.add_argument("--list", action="store_true", help="print the selection, do not run")
     ap.add_argument("pattern", nargs="*", help="optional substrings to restrict test file names")
     a = ap.parse_args()
@@ -199,10 +202,15 @@ def main():
 
     py_tests = sorted(TESTS.glob("test_*.py"))
     if not a.no_host:
-        if os.name == "nt":
+        # TASK-3020: the test/host harnesses build with g++/clang++ too (host_cxx_build); on a non-Windows host they
+        # run with --host-gxx or OTGW_HOST_GXX=1 until the NAS run is green for all of them, then this becomes default.
+        host_gxx = a.host_gxx or os.environ.get("OTGW_HOST_GXX") == "1"
+        if os.name == "nt" or (host_gxx and (shutil.which("g++") or shutil.which("clang++"))):
             py_tests += sorted(HOST.glob("test_*.py"))
+        elif host_gxx:
+            print("note: --host-gxx given but no g++/clang++ found; test/host harnesses left out", file=sys.stderr)
         else:
-            print("note: test/host harnesses need MSVC (Windows); left out", file=sys.stderr)
+            print("note: test/host harnesses left out on this host (use --host-gxx to run them with g++)", file=sys.stderr)
     mjs_tests = sorted(WEBUI.glob("*.test.mjs")) if a.webui else []
     if a.pattern:
         py_tests = [t for t in py_tests if any(p in t.name for p in a.pattern)]

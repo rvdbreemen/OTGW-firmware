@@ -29,6 +29,7 @@
 #define PSTR(x) x
 #define F(x) x
 #define CSTR(x) (x)
+#define strlcpy otgw_test_strlcpy   // musl declares strlcpy; keep the harness copy under its own name
 static size_t strlcpy(char *dst, const char *src, size_t n) {
   size_t l = strlen(src);
   if (n) { size_t c = l >= n ? n - 1 : l; memcpy(dst, src, c); dst[c] = 0; }

@@ -20,7 +20,7 @@ import re
 import subprocess
 import sys
 
-from test_ot_reserved_range import GEN, HERE, REPO, find_vcvars
+from test_ot_reserved_range import GEN, HERE, REPO, host_cxx_build
 
 SRC = REPO / "src" / "OTGW-firmware"
 HEADER = SRC / "diagRecorderStuff.h"
@@ -37,16 +37,9 @@ def build_and_run(label, inc_dir, out_dir):
     exe = out_dir / "test_diag_recording_routes.exe"
     if exe.exists():
         exe.unlink()
-    bat = out_dir / "_compile.bat"
-    fwd = str(out_dir).replace("\\", "/")
-    bat.write_text("@echo off\r\n"
-                   f"call \"{find_vcvars()}\" >nul 2>nul\r\n"
-                   f"cl /nologo /EHsc /W3 /std:c++17 /utf-8 /D_CRT_SECURE_NO_WARNINGS "
-                   f"/Fo:\"{fwd}/\" /Fe:\"{exe}\" \"{HERE / 'test_diag_recording_routes.cpp'}\" /I\"{inc_dir}\"\r\n",
-                   encoding="ascii")
-    c = subprocess.run(["cmd.exe", "/c", str(bat)], capture_output=True, text=True, errors="replace")
-    if c.returncode != 0 or not exe.exists():
-        print(c.stdout[-4000:], c.stderr[-2000:])
+    ok, out_ = host_cxx_build([HERE / 'test_diag_recording_routes.cpp'], exe, includes=[inc_dir], workdir=out_dir)
+    if not ok:
+        print(out_[-4000:])
         print(f"COMPILATION FAILED ({label})")
         sys.exit(2)
     r = subprocess.run([str(exe)], capture_output=True, text=True, errors="replace", timeout=300)

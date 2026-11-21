@@ -29,6 +29,7 @@ class __FlashStringHelper;
 #define F(s) (reinterpret_cast<const __FlashStringHelper*>(s))
 #define PSTR(s) (s)
 #define CCONOFF(x) (x ? "ON" : "OFF")
+#define strlcpy otgw_test_strlcpy   // musl declares strlcpy; keep the harness copy under its own name
 static inline size_t strlcpy(char* d, const char* s, size_t n) {
   size_t l = std::strlen(s);
   if (n) { size_t c = l < n - 1 ? l : n - 1; std::memcpy(d, s, c); d[c] = '\0'; }
