@@ -5,7 +5,7 @@ status: To Do
 assignee:
   - '@otgw-dev'
 created_date: '2026-11-21T03:12:00Z'
-updated_date: '2026-11-21T03:14:00Z'
+updated_date: '2026-11-21T03:36:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -33,4 +33,6 @@ Sergeant D, entry 436 (#dev-sat-mqtt 2026-11-21, msg 1573536221601210410): relea
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-11-21 otgw-dev read-only check (relayed by 92): (1) the raw duty is not available today; SATcontrol.ino:1648 clamps to [0,1] right away (:1649-1650) and fPwmDutyCycle and the range check (:1698) see only the clamped value, so > 1.03 needs a raw variable before the clamp (small change); MQTT/UI duty stays capped at 1.00. (2) Replay with back-computed BT (indigo BT 32.12 after the 180 s window): raw duty 0.97 at 21:27:30 and 21:28:00, 1.09 at 21:28:30, then 1.18/1.29/1.35, so MM=T comes 60 s later (21:28:30), not never: with BT held at the ignition flow the raw duty passes 1.03 as soon as the request rises ~0.2 C (threshold pid > 32.27). gruijter 20/11: the three MM=T moments have raw <= 1.02, so no MM=T at all (rougher, inside the EMA window). (3) Entry 436 changes only MM: range 5 at the clamped 0.90 still gives off time 0, so the indigo 21:32:30 saturation exit still fires on the recorded trajectory. Points for confirming the reading with Sergeant D: a) duty = unclamped value? b) MM only, or also range 5 'off time 0' at 0.90? c) with BT stuck, 1.03 delays but does not stop the release.
+
+2026-11-21 03:34 UTC: CANCELLED by Sergeant D (entry 439, msg 1573542104532000799): build only the duty fix (entries 437/438, TASK-2993); the 1.03 rule (entry 436) is dropped. Do not implement. Coordinator to close/archive.
 <!-- SECTION:NOTES:END -->

@@ -8641,3 +8641,22 @@ Robert, 16:18:42 UTC (https://discord.com/channels/812969634638725140/9144987300
 **Task:** TASK-2993.
 
 **Open:** Robert's OK for reversing entry 64 (asked, https://discord.com/channels/812969634638725140/1105556725714649128/1573540314436730942).
+
+## 439. Consolidated question answered A: build only the duty fix (entries 437/438) for 2.0.0; drop Q-2005d/e/f and the 1.03 rule (entry 436), then check the next field runs (Sergeant D, 2026-11-21; conflicts with Robert's entries 433/435, put to Robert)
+
+**Source:** #dev-sat-mqtt, Sergeant D 2026-11-21 03:34:32 UTC (https://discord.com/channels/812969634638725140/1105556725714649128/1573542104532000799), without a reply reference, about one minute after our consolidated question (https://discord.com/channels/812969634638725140/1105556725714649128/1573541819591954484), which replaced Q-2005d, Q-2005e and Q-2005f after he said "the real issue here is the duty cycle calculation" (https://discord.com/channels/812969634638725140/1105556725714649128/1573541734674075680); unedited when read back via the Discord API.
+
+**Quoted:**
+> "My answer is A"
+
+**Settled (Sergeant D):** option A as posted: "Build only the duty fix (437/438) for 2.0.0. Drop Q-2005d/e/f and the 1.03 rule (436), then check the next field runs to see if any switching is left." Our recommendation was B (duty fix plus Robert's two guards); he chose A.
+
+**Interpretation (ours):** "My answer is A" answers the consolidated question, the only question open to him at that moment. Entry 436 (MM=T above 1.03) is withdrawn by him; MM=T stays at range 5 (entries 242/243) as before, now with the live-flow duty.
+
+**Conflict:** Robert (maintainer) chose A for Q-2005d (entries 432/433, TASK-2987) and B for Q-2005e (entry 435, TASK-2989). Sergeant D now drops both questions. Not resolved silently: put to Robert in-channel; TASK-2987 and TASK-2989 are held (no build) until he answers. TASK-2992 (entry 436) is cancelled by this answer. Q-2005d/e/f are closed as dropped by Sergeant D in open-questions.md.
+
+**Compared with thermo-nova (7beaaf5):** no new deviation beyond entries 437/438.
+
+**Task:** TASK-2993 (duty fix); TASK-2992 cancelled; TASK-2987 / TASK-2989 on hold pending Robert.
+
+**Open:** Robert's call on keeping or dropping his two guards; the next field runs with the duty fix.

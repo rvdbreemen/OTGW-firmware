@@ -7,6 +7,7 @@ status: To Do
 assignee:
   - '@otgw-dev'
 created_date: '2026-11-21T01:44:00Z'
+updated_date: '2026-11-21T03:36:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -28,3 +29,9 @@ Robert (maintainer) answered Q-2005d with A (entry 432, confirmed in entry 433, 
 - [ ] #3 Flame-off clears the state: the next flame can leave PWM again
 - [ ] #4 Bench via the NAS (replay or simulation, per the NAS recipe) shows at most one fail-safe switch per flame
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-21 03:34 UTC: ON HOLD. Sergeant D (entry 439) chose to build only the duty fix (TASK-2993) and drop Q-2005d/e/f, which conflicts with Robert's decision behind this task. Put to Robert in #dev-sat-mqtt (msg 1573542401606426685). Do not build until Robert answers.
+<!-- SECTION:NOTES:END -->

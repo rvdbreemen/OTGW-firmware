@@ -5799,6 +5799,22 @@
     "TASK-2993"
    ],
    "confirmed_by_entry": null
+  },
+  {
+   "id": 439,
+   "title": "Consolidated question answered A: build only the duty fix (entries 437/438) for 2.0.0; drop Q-2005d/e/f and the 1.03 rule (entry 436), then check the next field runs (Sergeant D, 2026-11-21; conflicts with Robert's entries 433/435, put to Robert)",
+   "date": "2026-11-21",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1573542104532000799",
+   "supersedes": [],
+   "tasks": [
+    "TASK-2987",
+    "TASK-2989",
+    "TASK-2992",
+    "TASK-2993"
+   ],
+   "confirmed_by_entry": null
   }
  ]
 }

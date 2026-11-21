@@ -7,7 +7,7 @@ status: To Do
 assignee:
   - '@otgw-dev'
 created_date: '2026-11-21T01:55:00Z'
-updated_date: '2026-11-21T01:57:00Z'
+updated_date: '2026-11-21T03:36:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -36,4 +36,6 @@ Robert (maintainer) answered Q-2005e with B (entry 435, #dev-sat-mqtt 2026-11-21
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-11-21 coordinator decision (relayed by 92): the margin is a CONSTANT 1.5 C for 2.0.0, one named constant next to the existing exit constants (SATtypes.h / SATcycles.ino), no new setting. Reasons: 8 days to stable; a setting adds UI, REST, HA discovery, settings migration and tests; YAGNI until a field case needs another value; Sergeant D can still change the value. Deliberately not symmetric with fPwmSwitchMargin (which is a setting). This settles AC #3.
+
+2026-11-21 03:34 UTC: ON HOLD. Sergeant D (entry 439) chose to build only the duty fix (TASK-2993) and drop Q-2005d/e/f, which conflicts with Robert's decision behind this task. Put to Robert in #dev-sat-mqtt (msg 1573542401606426685). Do not build until Robert answers.
 <!-- SECTION:NOTES:END -->
