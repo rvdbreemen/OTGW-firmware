@@ -7,7 +7,7 @@ status: To Do
 assignee:
   - '@otgw-dev'
 created_date: '2026-11-21T01:55:00Z'
-updated_date: '2026-11-21T07:25:00Z'
+updated_date: '2026-11-21T13:59:00Z'
 labels:
   - sat
 milestone: 2.1.0
@@ -30,6 +30,9 @@ Robert (maintainer) answered Q-2005e with B (entry 435, #dev-sat-mqtt 2026-11-21
 - [ ] #4 Replay of the gruijter 20 Nov and indigo_light 19 Nov sattick data through the new rule shows no underheat exit in the four flames
 - [ ] #5 Bench via the NAS (replay or simulation) before the push
 - [ ] #6 The replay with A+B (TASK-2987 + this task) reports how many saturation exits (off time 0 for 300 s) remain in the four flames, because duty reaches 1.00 when BT (seeded at ignition, EMA for 180 s, then held; SATcontrol.ino:1648/1669-1686, as thermo-nova pwm.py:144-149, 186-193, 229-239) stays at or below the request
+- [ ] #7 Replay or field check on a build >= beta.410 (live-flow duty, TASK-2993): the saturation exit (off time 0 for 300 s) does not fire while the flow is above the request; a firing there is a new finding (otgw-architect 2026-11-21)
+- [ ] #8 The ADR-236 amendment states the two steps: shortfall 0-1.5 C -> only the saturation exit (300 s at off time 0); shortfall >= 1.5 C -> the underheat exit (60 s), so the 0-1.5 C band is not read as a gap
+- [ ] #9 Stale comments fixed in the implementation commit: SATcycles.ino fail-safe comment 3.5 C -> 3.0 C (entry 429) and SATcontrol.ino exit comment 180 s -> 60 s
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -43,4 +46,6 @@ Parked by Robert's A 2026-11-21 (DM 1573595175458963567, reply to 15735428235071
 2026-11-21 (92): Robert chose A (entry 442, DM 1573595175458963567): follow Sergeant D, the duty fix only for 2.0.0; this guard moves to the 2.1.0 backlog. The built code (beta.406+6e1eacf) is not pushed for 2.0.0.
 
 2026-11-21 (92): entry 445 (Robert, #dev-sat-mqtt 07:23 UTC): one change at a time. First the duty fix (TASK-2993/2992) goes out in a public release, then these guards are the next change, in their own build. Release line (2.0.0 or 2.1.0) still open.
+
+2026-11-21 (otgw-dev): three ACs added at otgw-architect's request (second reading of the duty-saturation finding): on dev since bce9496a5 (beta.410) the ON-phase duty uses the live flow, so duty 1.00 = request >= live flow and the saturation exit means a real shortfall; the earlier finding 'the margin alone does not prevent the saturation exit' applies to the beta.392/401 captures. Lane lane/d3-sat2987 (6e1eacf30) must be rebased onto current dev first.
 <!-- SECTION:NOTES:END -->

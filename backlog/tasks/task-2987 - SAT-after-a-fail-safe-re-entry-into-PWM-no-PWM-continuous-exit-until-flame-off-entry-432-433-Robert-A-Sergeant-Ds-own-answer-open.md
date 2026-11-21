@@ -7,7 +7,7 @@ status: To Do
 assignee:
   - '@otgw-dev'
 created_date: '2026-11-21T01:44:00Z'
-updated_date: '2026-11-21T07:25:00Z'
+updated_date: '2026-11-21T13:59:00Z'
 labels:
   - sat
 milestone: 2.1.0
@@ -39,4 +39,6 @@ Parked by Robert's A 2026-11-21 (DM 1573595175458963567, reply to 15735428235071
 2026-11-21 (92): Robert chose A (entry 442, DM 1573595175458963567): follow Sergeant D, the duty fix only for 2.0.0; this guard moves to the 2.1.0 backlog. The built code (beta.406+6e1eacf) is not pushed for 2.0.0.
 
 2026-11-21 (92): entry 445 (Robert, #dev-sat-mqtt 07:23 UTC): one change at a time. First the duty fix (TASK-2993/2992) goes out in a public release, then these guards are the next change, in their own build. Release line (2.0.0 or 2.1.0) still open.
+
+2026-11-21 (otgw-dev): see TASK-2989 notes/ACs of today (architect's second reading: on >= beta.410 the saturation exit is a real-shortfall exit; ADR-236 amendment two-step; stale comments). Both guards ride the same lane lane/d3-sat2987 (6e1eacf30), rebase onto dev before implementing for 2.1.0.
 <!-- SECTION:NOTES:END -->
