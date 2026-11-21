@@ -5815,6 +5815,21 @@
     "TASK-2993"
    ],
    "confirmed_by_entry": null
+  },
+  {
+   "id": 440,
+   "title": "The 1.03 rule (entry 436) stays next to the live-flow duty: MM=T only when the raw duty is above 1.03 (Sergeant D, 2026-11-21; amends entry 439 on entry 436)",
+   "date": "2026-11-21",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1573546640378171483",
+   "supersedes": [],
+   "tasks": [
+    "TASK-2987",
+    "TASK-2992",
+    "TASK-2993"
+   ],
+   "confirmed_by_entry": null
   }
  ]
 }

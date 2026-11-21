@@ -8660,3 +8660,22 @@ Robert, 16:18:42 UTC (https://discord.com/channels/812969634638725140/9144987300
 **Task:** TASK-2993 (duty fix); TASK-2992 cancelled; TASK-2987 / TASK-2989 on hold pending Robert.
 
 **Open:** Robert's call on keeping or dropping his two guards; the next field runs with the duty fix.
+
+## 440. The 1.03 rule (entry 436) stays next to the live-flow duty: MM=T only when the raw duty is above 1.03 (Sergeant D, 2026-11-21; amends entry 439 on entry 436)
+
+**Source:** #dev-sat-mqtt, Sergeant D 2026-11-21 03:52:34 UTC (https://discord.com/channels/812969634638725140/1105556725714649128/1573546640378171483), a reply to our question "I read your last message as choosing A (keep the 1.03 rule next to the duty fix). Correct?" (https://discord.com/channels/812969634638725140/1105556725714649128/1573544808650248223); unedited when read back via the Discord API. His preceding message (https://discord.com/channels/812969634638725140/1105556725714649128/1573544409994104845): "also since we do not release the MM the duty cycle will stay high and the boiler will have some nice long burns at low modulation now."
+
+**Quoted:**
+> "yes A"
+
+**Settled:** option A of the question in https://discord.com/channels/812969634638725140/1105556725714649128/1573543905624981634: build the duty fix (entries 437/438) plus the 1.03 rule of entry 436. MM=T (entries 242/243) is sent only when the raw duty (request - base) / (live flow - base), before the [0, 1] cap, is above 1.03, no longer at range 5 (dutyMax 0.90). This reverses the "drop the 1.03 rule" part of entry 439; the rest of entry 439 stands (Q-2005d/e/f dropped, Robert asked about his guards).
+
+**Why it came back:** replay of indigo_light's 19 Nov flame through the real duty code with the fix (otgw-dev, harness reproduces the old logged duty within 0.01): with the live-flow duty alone, MM=T would flip on at 21:25:00 (duty 0.93), off at 21:26:00 (0.86), on at 21:26:30 to 21:28:00, because the flow hangs 0.3-0.7 C above the request during warm-up and the denominator is small (4.3-4.7 C); with the 1.03 rule no MM=T at all in that flame (highest raw duty 1.015). A replay on the recorded flow, not a simulation.
+
+**Interpretation (ours):** entry 436's reading (raw duty before the cap) is confirmed by this choice, since the question showed the raw values; the base is the heating-system base offset (entry 437).
+
+**Compared with thermo-nova (7beaaf5):** no counterpart (thermo-nova has no MM=T).
+
+**Task:** TASK-2992 restored from the archive, built in the same lane as TASK-2993.
+
+**Open:** Robert's OK on entry 64 (TASK-2993) and on his guards (TASK-2987/2989). Observation, not a decision: his remark "long burns at low modulation" describes the intended effect; whether the 1.03 rule limits heat when a room really needs more (the request stays clearly above what the boiler delivers at low modulation) is to be checked in the next field runs.
