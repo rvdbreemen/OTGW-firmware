@@ -3,11 +3,11 @@ id: TASK-2956
 title: >-
   Web UI contrast tokens: warn text, accent per context, theme toggle, SAT pill
   and tag (UX review F1 F2 F16 F17)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-20T14:10:00Z'
-updated_date: '2026-11-21T06:27:00Z'
+updated_date: '2026-11-21T07:31:00Z'
 labels:
   - ux
   - webui
@@ -55,4 +55,12 @@ GREEN on the change: layer A all 21 rows pass (A1 5.83 ... D4 4.95), layer B 0 b
 Other checks: evaluate.py --quick 95 checks, 0 failed, design-system drift 0 FAIL. Colour-pinning webui tests one by one green: header-controls-same-height 2/2, lang-menu 7/7, sat-chart-actual-flow 4/4, sat-status-pill 1/1, settings-select-fits 2/2, mission-control-follows-theme 2/2, settings-reboot-badge 1/1. Screenshots before/after (Home, SAT Control heating+idle, Settings; light+dark) checked by eye: only the intended colour changes. Full tests/webui sweep still to run in a heavy slot (AC5).
 
 2026-11-21 07:01-07:26 (heavy slot from coordinator): rebased alone onto origin/dev d61678eef as 9c731ca26 (lane/ba-2956), beta.408; diff be15333dc..9c731ca26 -- src tests = only the TASK-2991 lines (v2.js 3, a11y-structure test 10) + build stamps. Full webui sweep, one file per node --test: files=93 pass 438 fail 0 (07:01-07:15). build.bat esp32-combo SUCCESS 00:06:54, zip OTGW-firmware-esp32-combo-2.0.0-beta.408+9c731ca-flash.zip sha256 1e851edd16da22b14403b439b8b3976767c0a2503e9e794cf6b0aa5dff493a0c, 13 files in OTGW-build-artifacts-safe/beta.408+9c731ca/, log OTGW-build-artifacts-safe/build-2956-408.log. Bench pending (otgw-bench-tester, .63 after 2991).
+
+2026-11-21 bench and push: bench on 9c731ca (.61, otgw-bench-tester) PASS 22/22. Combined image beta.408+717a7fc (with TASK-2991) smoke on .63 PASS 3/3: fwversion/version.hash 717a7fc, ini diff 0, rail focus Enter/Space, #satPill light 5.18 / dark 6.01, full 22-pair set 0 FAIL (evidence OTGW-field-data/bench-63/2026-11-21_beta408-717a7fc-smoke/). Pushed b4880a0d6..0c2a8a1bf (git diff 717a7fc40 0c2a8a1bf -- src/ = 0 lines). Rebuilt from 0c2a8a1bf, posted OTGW-firmware-esp32-combo-2.0.0-beta.408+0c2a8a1-flash.zip to #alpha-testing, message 1573601587723640945, covering beta.407 + beta.408.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Contrast tokens per context (spec T1) in ds-tokens.css/v2.css plus a regression test tests/webui/contrast-tokens.test.mjs (spec T1b). AC1/4: tokens and the 10 on-accent rules in commit 7ca749a41. AC2/3/6: layer A + layer B 0 FAIL in light and dark on Home, SAT x3 views x heating/idle/off, Settings; pixel samples before/after (pill E1 3.10->5.18, E2 2.83->6.01, E3 2.68->5.06, tag light 2.57->5.42, banner D1 1.77->5.56, badge D2 2.16->6.80, nav B1 2.82->5.53); screenshots in OTGW-build-artifacts-safe/evidence-TASK-2956/. AC5: evaluate --quick 95 checks 0 failed; full webui sweep files=93 pass 438 fail 0. AC7/8: test red on old data (A1 4.17, A2 3.86, A3 3.96, D2b 4.44, 10 tokens missing), green on the fix, #9c5700 mutation fails only D2b. AC9: in the --webui sweep, not flaky. Bench: .61 22/22 PASS, combined smoke on .63 3/3 PASS. Pushed in 0c2a8a1bf (beta.408); alpha post 1573601587723640945.
+<!-- SECTION:FINAL_SUMMARY:END -->
