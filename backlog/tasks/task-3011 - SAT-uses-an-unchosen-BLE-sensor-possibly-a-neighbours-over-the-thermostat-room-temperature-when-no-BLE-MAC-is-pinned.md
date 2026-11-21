@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-21T15:38:00Z'
-updated_date: '2026-11-21T16:41:00Z'
+updated_date: '2026-11-21T16:45:00Z'
 labels:
   - sat
   - ble
@@ -59,4 +59,12 @@ Scope after the answers: SATcontrol.ino (satGetRoomTemp + source enum), SATble.i
 2026-11-21 tester input (gruijter, msg 1573738963787714691, not a decision): make the source order MQTT-accessible, a command plus a retained state (e.g. sat/room_temp_sources = areas,external,thermostat), and the active source as its own topic (sat/room_temp_source, see TASK-3015). Design input for the open part of entry 451.
 
 2026-11-21: Robert chose gruijter's MQTT design (msg 1573739569545871583), recorded as entry 452 in the private register: source order via MQTT command + retained state, active source on its own topic (TASK-3015). Final topic names per ADR-101/111 in the plan.
+
+2026-11-21 (coordinator): Robert approved gruijter's MQTT design for the source order (private entry 452) and released TASK-3015 (same change as 3011) and TASK-3016 (separate, later). Coordinator's reading: Q1 = B (ordered list, MQTT command + retained state sat/room_temp_sources, active source sat/room_temp_source). That reading is an interpretation, not a quoted choice; the implementation plan follows it unless Robert corrects it. Design consequences of B to settle in the ADR: allowed tokens (ble, areas, external, thermostat), validation (unknown or duplicate token -> reject and keep the old list), thermostat always implied last if left out (so SAT never runs on the curve only while MsgID 24 is valid), web UI field for the list, and the same list in settings.ini/REST. Q2 (failover) and Q3 (migration) still open; no code until answered.
+
+2026-11-21 (coordinator, correction): Robert answered 'A' to the Q1 DM (one primary-source setting + fixed fallback primary -> thermostat -> curve only). That conflicts with the coordinator's earlier B reading of entry 452 (previous note); the coordinator asked Robert to settle it, recommending A with an MQTT command that sets that one value (plus sat/room_temp_source from TASK-3015). Q1 is therefore open again until Robert confirms; the B design consequences in the previous note apply only if he picks B. No code.
+
+2026-11-21 (coordinator, Robert DM): Q2 = A. A stale primary source falls back to the next source (ON by default). BLE sensor-to-sensor failover OFF by default, and when used only to sensors the user chose (never to an unchosen roster sensor). Implies: bBleFailover default false plus a one-time reset of persisted true (details with Q3). Still open: Q1 list vs single setting (clarifying DM), Q3 migration. No code.
+
+2026-11-21 (coordinator, Robert): Q1 settled = A. One primary room-source setting with the fixed fallback (primary -> next source -> thermostat -> curve only, per Q2 A). No ordered list: gruijter's MQTT command + retained state is only the interface that sets/reports that one value (for Homey), plus sat/room_temp_source (TASK-3015) for the active source. Q2 = A. Q3 (migration, recommendation C) with Robert. Code starts after Q3: 3011 + 3015 in one change, ADR via adr-kit (Proposed).
 <!-- SECTION:NOTES:END -->
