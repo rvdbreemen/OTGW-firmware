@@ -5,6 +5,17 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [2.0.0-beta.410] - 2026-11-21
+
+### Changed
+- SAT: the PWM duty cycle, (requested setpoint - base) / (flow - base), uses the live flow temperature during the PWM ON phase instead of a boiler temperature held from 180 s after ignition; only the first 30 s after ignition use the smoothed flow (EMA 0.3/0.7), including the tick 30 s after ignition with 1 s slack for tick jitter. In the PWM OFF phase the flow of the last ON tick is frozen and the duty is recomputed with the current request, so a cooling flow does not shorten the pause. MM=T (full modulation) is sent only when the raw duty is above 1.03, no longer as soon as the duty reaches the top range. Reverses the entry-64 choice to keep thermo-nova's held temperature, with Robert's OK (Sergeant D's entries 436 to 447; TASK-2993, TASK-2992, beta.410).
+- Web UI: contrast tokens per context in light and dark theme (accent, active main-nav item, text on accent fills, warning text, SAT pill, "SAT -> boiler" tag), with a contrast regression test over every visible text (TASK-2956, beta.408); the wizard buttons and the injected-values chip pass contrast again, with a gate on inline accent styles (TASK-2998, beta.409).
+- Capture and flash tools: `capture-mqtt-debug.bat` and `flash_otgw.bat` keep their window open after a double-click ("Press any key to close this window.", exit code kept); the interactive capture asks how long to record (until Q, 24 h, 3 days), saved as the next default (TASK-2965).
+
+### Fixed
+- SAT: the switching between continuous and PWM within one burn that came from the held boiler temperature: during warm-up the duty hit the top range and asked for full modulation while the flow was already above the request (indigo_light, 19 November; TASK-2993, beta.410).
+- Web UI: after Enter or Space on a Settings rail button the keyboard focus stays on that button instead of falling back to the page body (TASK-2991, beta.407).
+
 ## [2.0.0-beta.405] - 2026-11-21
 
 ### Changed
@@ -1172,7 +1183,8 @@ Legacy release. See git history for details.
 
 Legacy releases. See git history for details.
 
-[Unreleased]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.405...HEAD
+[Unreleased]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.410...HEAD
+[2.0.0-beta.410]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.405...v2.0.0-beta.410
 [2.0.0-beta.405]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.401...v2.0.0-beta.405
 [2.0.0-beta.401]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.392...v2.0.0-beta.401
 [2.0.0-beta.392]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.382...v2.0.0-beta.392
