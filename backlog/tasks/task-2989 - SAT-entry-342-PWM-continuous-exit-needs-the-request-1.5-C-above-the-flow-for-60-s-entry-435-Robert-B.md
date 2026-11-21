@@ -7,7 +7,7 @@ status: To Do
 assignee:
   - '@otgw-dev'
 created_date: '2026-11-21T01:55:00Z'
-updated_date: '2026-11-21T13:59:00Z'
+updated_date: '2026-11-21T14:11:00Z'
 labels:
   - sat
 milestone: 2.1.0
@@ -33,6 +33,7 @@ Robert (maintainer) answered Q-2005e with B (entry 435, #dev-sat-mqtt 2026-11-21
 - [ ] #7 Replay or field check on a build >= beta.410 (live-flow duty, TASK-2993): the saturation exit (off time 0 for 300 s) does not fire while the flow is above the request; a firing there is a new finding (otgw-architect 2026-11-21)
 - [ ] #8 The ADR-236 amendment states the two steps: shortfall 0-1.5 C -> only the saturation exit (300 s at off time 0); shortfall >= 1.5 C -> the underheat exit (60 s), so the 0-1.5 C band is not read as a gap
 - [ ] #9 Stale comments fixed in the implementation commit: SATcycles.ino fail-safe comment 3.5 C -> 3.0 C (entry 429) and SATcontrol.ino exit comment 180 s -> 60 s
+- [ ] #10 Two more stale comments in SATcontrol.ino (otgw-docs reviewer, dev 8c929eee2): :1284-1285 PWM_IGNITION_TIMEOUT_MS (180 s) is no longer 'the start-up EMA window' (that is SAT_PWM_BT_FILTER_MS 30 s + 1 s slack); :1296-1297 MM=T flip wording: state it as in entry 440 (on 21:25:00 at 0.93, off 21:26:00 at 0.86, on 21:26:30-21:28:00; the 0.94 is a TASK-2993 replay tick at 21:25:30, not in the entry). Comment-only, so in the same commit as the next firmware change of this lane (bump)
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -48,4 +49,6 @@ Parked by Robert's A 2026-11-21 (DM 1573595175458963567, reply to 15735428235071
 2026-11-21 (92): entry 445 (Robert, #dev-sat-mqtt 07:23 UTC): one change at a time. First the duty fix (TASK-2993/2992) goes out in a public release, then these guards are the next change, in their own build. Release line (2.0.0 or 2.1.0) still open.
 
 2026-11-21 (otgw-dev): three ACs added at otgw-architect's request (second reading of the duty-saturation finding): on dev since bce9496a5 (beta.410) the ON-phase duty uses the live flow, so duty 1.00 = request >= live flow and the saturation exit means a real shortfall; the earlier finding 'the margin alone does not prevent the saturation exit' applies to the beta.392/401 captures. Lane lane/d3-sat2987 (6e1eacf30) must be rebased onto current dev first.
+
+2026-11-21 (otgw-dev): coordinator relayed two stale comments found by otgw-docs' reviewer; checked on dev 8c929eee2: the 180 s 'start-up EMA window' wording is stale (TASK-2993); the 0.86-0.94 range is from the TASK-2993 replay (21:25:30 gave 0.94) while entry 440 names 0.93 on / 0.86 off, so the comment is reworded to the entry's numbers.
 <!-- SECTION:NOTES:END -->
