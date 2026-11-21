@@ -8751,3 +8751,18 @@ Robert, 16:18:42 UTC (https://discord.com/channels/812969634638725140/9144987300
 **Task:** TASK-2993 (live-flow duty in ON only).
 
 **Open:** none for this question.
+
+## 445. One change at a time: first the duty fix in a public release, then the guards as the next change (Robert, maintainer decision, 2026-11-21; refines entry 442)
+
+**Source:** #dev-sat-mqtt, Robert 2026-11-21 07:23:21 UTC (https://discord.com/channels/812969634638725140/1105556725714649128/1573599688475545601), after our answer to his question "Why not add the guards to this release?" (https://discord.com/channels/812969634638725140/1105556725714649128/1573597907465281678); unedited when read back via the Discord API more than 90 s later.
+
+**Quoted:**
+> "First change sat behaviour. Hold the guard change. First do a public release. And then next do guard. One thing at a time in a situation as this. So we can proof the effect."
+
+**Settled:** the order of the two SAT changes. First the duty fix (entries 437/438/440/443/444, TASK-2993/2992) goes out in a public beta on its own; the guards (TASK-2987, TASK-2989) are held until then. After that public release, the guards are the next change, in their own build, so the effect of each change can be proven from field data separately.
+
+**Interpretation (ours):** this refines entry 442 ("guards to the 2.1.0 backlog"): the guards are not dropped but sequenced after the duty fix's public release. He does not say whether the guard release falls before the 2.0.0 stable (29 Nov) or in 2.1.0; we read it as "the next change once the duty fix has shown its effect", with the release line still open. TASK-2989 still changes Sergeant D's entry-342 rule, so Sergeant D is asked before it is built into a release.
+
+**Task:** TASK-2993/2992 first (public beta, 21 Nov 20:00 if bench passes); TASK-2987/2989 held, next in line after that release.
+
+**Open:** the release line for the guards (2.0.0 before stable, or 2.1.0); Sergeant D's view on TASK-2989 changing entry 342.

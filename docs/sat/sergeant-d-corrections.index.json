@@ -5885,6 +5885,21 @@
     "TASK-2993"
    ],
    "confirmed_by_entry": null
+  },
+  {
+   "id": 445,
+   "title": "One change at a time: first the duty fix in a public release, then the guards as the next change (Robert, maintainer decision, 2026-11-21; refines entry 442)",
+   "date": "2026-11-21",
+   "source": "maintainer",
+   "kind": "decision",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1573599688475545601",
+   "supersedes": [],
+   "tasks": [
+    "TASK-2987",
+    "TASK-2989",
+    "TASK-2993"
+   ],
+   "confirmed_by_entry": null
   }
  ]
 }
