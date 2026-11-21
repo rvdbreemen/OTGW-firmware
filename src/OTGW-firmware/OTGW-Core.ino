@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v2.0.0-beta.410
+**  Version  : v2.0.0-beta.411
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -5833,6 +5833,7 @@ static uint8_t boilerAckedWrite[32]         = {0};
 static uint8_t thermostatSentRead[32]       = {0};
 static uint8_t thermostatSentWrite[32]      = {0};
 static bool boilerUnsupportedDirty = false;  // MQTT CSV republish gate (1-min cadence)
+static uint8_t otSupportListsDirty = 0;      // TASK-3000: OT_SUPPORT_LIST_* bits, MQTT republish gate (1-min cadence)
 static bool boilerUnknown28ThisBoot = false; // a boiler frame of this boot said Unknown-DataID for MsgID 28 (TASK-1371)
 bool boilerMsgId28UnknownConfirmed() { return boilerUnknown28ThisBoot; }
 static bool boilerFileDirty        = false;  // /ot-boiler.json   write gate (15-min cadence)
@@ -5857,6 +5858,9 @@ bool isThermostatMsgIdSentWrite(uint8_t id) {
   return (thermostatSentWrite[id >> 3] & (uint8_t)(1u << (id & 7))) != 0;
 }
 bool getBoilerUnsupportedDirty()   { return boilerUnsupportedDirty; }
+uint8_t getOtSupportListsDirty()   { return otSupportListsDirty; }
+void clearOtSupportListsDirty(uint8_t bits) { otSupportListsDirty &= (uint8_t)~bits; }
+void markOtSupportListsDirty(uint8_t bits)  { otSupportListsDirty |= bits; }   // a refused publish: the minute tick retries
 void clearBoilerUnsupportedDirty() { boilerUnsupportedDirty = false; }
 
 // TASK-1871: per-ID last boiler answer of this boot, for GET /api/v2/otgw/messages/<id>.
@@ -6230,12 +6234,14 @@ void processOT(const char *buf, int len, bool suppressOutput, bool localAnswer, 
             if (fromThermostat && (thermostatSentWrite[idx] & mask) == 0) {
               thermostatSentWrite[idx] |= mask;
               thermostatFileDirty = true;
+              otSupportListsDirty |= OT_SUPPORT_LIST_THERMOSTAT;   // TASK-3000
             }
           } else if (OTdata.type == OT_READ_DATA) {
             boilerLastMasterWasWrite[idx] &= ~mask;
             if (fromThermostat && (thermostatSentRead[idx] & mask) == 0) {
               thermostatSentRead[idx] |= mask;
               thermostatFileDirty = true;
+              otSupportListsDirty |= OT_SUPPORT_LIST_THERMOSTAT;   // TASK-3000
             }
           }
         } else if (OTdata.rsptype == OTGW_BOILER) {
@@ -6260,6 +6266,7 @@ void processOT(const char *buf, int len, bool suppressOutput, bool localAnswer, 
             if (boilerEvidence && (boilerAckedRead[idx] & mask) == 0) {
               boilerAckedRead[idx] |= mask;
               boilerFileDirty = true;
+              otSupportListsDirty |= OT_SUPPORT_LIST_BOILER;       // TASK-3000
             }
             // A real answer retracts an earlier "unsupported" verdict. Without
             // this the bitmap is a one-way latch that is persisted and reloaded
@@ -6280,6 +6287,7 @@ void processOT(const char *buf, int len, bool suppressOutput, bool localAnswer, 
             if (boilerEvidence && (boilerAckedWrite[idx] & mask) == 0) {
               boilerAckedWrite[idx] |= mask;
               boilerFileDirty = true;
+              otSupportListsDirty |= OT_SUPPORT_LIST_BOILER;       // TASK-3000
             }
             // Same stricter rule as the read side above: only a genuine B.
             if (OTdata.rsptype == OTGW_BOILER && boilerEvidence && (boilerUnsupportedWrite[idx] & mask) != 0) {

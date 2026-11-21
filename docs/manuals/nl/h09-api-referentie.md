@@ -875,6 +875,9 @@ Tenzij anders vermeld zijn alle gepubliceerde onderwerpen retained.
 | `otgw-firmware/hardware_type` | Hardware-slug (`otgw-classic` op de OTGW Classic) |
 | `otgw-firmware/hardware_mode` | Hardwaremodus (`pic` of `otdirect`) |
 | `otgw-firmware/network_mode` | Netwerkmodus (`wifi`, `ethernet` of `ap`) |
+| `otgw-firmware/boiler/unsupported_msgids` | MsgIDs waarop de ketel Unknown-DataID antwoordde, als `<id>R` (lezen) en `<id>W` (schrijven), bijvoorbeeld `14W,24R` (retained) |
+| `otgw-firmware/boiler/supported_msgids` | MsgIDs die de ketel bevestigde, bijvoorbeeld `0R,3R,25R,1W,16W`: de kolommen `blAR`/`blAW` van `GET /api/v2/otgw/ot-support` (retained, binnen een minuut na een nieuwe MsgID bijgewerkt en bij elke MQTT-connect opnieuw verstuurd; verschijnt zodra er een MsgID bekend is, nooit als lege lijst) |
+| `otgw-firmware/thermostat/sent_msgids` | MsgIDs die de thermostaat stuurde als lezen (`<id>R`) of schrijven (`<id>W`): de kolommen `tsR`/`tsW` van `GET /api/v2/otgw/ot-support` (retained, zelfde regel) |
 
 **PIC Gateway-info**:
 

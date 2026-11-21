@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.ino
-**  Version  : v2.0.0-beta.410
+**  Version  : v2.0.0-beta.411
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -987,6 +987,8 @@ void doTaskMinuteChanged(){
     publishBoilerUnsupportedMsgids();
     clearBoilerUnsupportedDirty();
   }
+  // TASK-3000: the same for the boiler/supported_msgids and thermostat/sent_msgids lists, only the one that changed.
+  if (const uint8_t lists = getOtSupportListsDirty()) clearOtSupportListsDirty(publishOtSupportMsgidLists(lists));
 
   // Hourly consumers. New hourly tasks extend THIS block, never add a second
   // hourChanged() call elsewhere.

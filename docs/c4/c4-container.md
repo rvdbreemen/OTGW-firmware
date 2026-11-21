@@ -481,6 +481,7 @@ Names are the self-describing set by default (ADR-106); `settings.mqtt.bUseLegac
 | `otgw-firmware/network/mode` | `wifi` / `ethernet` (Ethernet boards, retained) |
 | `otgw-firmware/stats/*` | Hourly heap, drop and discovery counters (retained) |
 | `otgw-firmware/boiler/unsupported_msgids` | CSV of Unknown-Data-Id responses (retained) |
+| `otgw-firmware/boiler/supported_msgids`, `otgw-firmware/thermostat/sent_msgids` | CSV of boiler-acked and thermostat-sent MsgIDs, as `GET /api/v2/otgw/ot-support` (retained, never empty; TASK-3000) |
 | `otgw-pic/version`, `deviceid`, `firmwaretype`, `designer`, `gateway_mode`, `settings/*` | PIC information (PIC boards) |
 | `dhw_water_total` | DHW water total in litres (ADR-176) |
 

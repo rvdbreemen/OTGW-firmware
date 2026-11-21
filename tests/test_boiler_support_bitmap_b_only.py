@@ -42,6 +42,8 @@ static OTd OTdata;
 static uint8_t boilerUnsupportedRead[32], boilerUnsupportedWrite[32], boilerAckedRead[32], boilerAckedWrite[32];
 static uint8_t boilerLastMasterWasWrite[32], thermostatSentRead[32], thermostatSentWrite[32];
 static bool boilerUnsupportedDirty, boilerFileDirty, thermostatFileDirty, boilerUnknown28ThisBoot;
+enum : uint8_t { OT_SUPPORT_LIST_BOILER = 1, OT_SUPPORT_LIST_THERMOSTAT = 2 };   // TASK-3000 (unused by older code)
+static uint8_t otSupportListsDirty;
 static bool bit(const uint8_t* b, int id) { return (b[id >> 3] >> (id & 7)) & 1; }
 // TASK-1871: the real branch also records the last boiler answer per ID; the stub keeps it.
 static uint32_t millis() { return 1000; }

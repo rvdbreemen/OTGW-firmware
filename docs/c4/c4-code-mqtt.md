@@ -119,6 +119,7 @@ Per-value helpers (all return false when MQTT is disabled, `mqttPublishAllowed` 
 - `void sendMQTTstateinformation()`: `boiler_connected`, `thermostat_connected`, `otgw_connected` (ADR-084: only under the generic value namespace; the `otgw-pic/*` and `otgw-otdirect/*` duplicates are gone) and `otgw-pic/gateway_mode` once known. Called from `do5minevent()`.
 - `void sendMQTTheapdiag()`: hourly, retained `otgw-firmware/stats/*` topics (drops, tier entries, drip counters, heap snapshot, discovery verify telemetry including `disc_last_daily_heal_epoch`, soak watermarks and maxblock histogram)
 - `void publishBoilerUnsupportedMsgids()`: retained CSV `otgw-firmware/boiler/unsupported_msgids` (for example `14W,24R`)
+- `uint8_t publishOtSupportMsgidLists(uint8_t lists)`: retained CSVs `otgw-firmware/boiler/supported_msgids` and `otgw-firmware/thermostat/sent_msgids` (TASK-3000); an empty list is not published; returns the `OT_SUPPORT_LIST_*` bits it finished, so the minute tick (`getOtSupportListsDirty()`) and connect stage 5 clear only those
 - `void sendDHWWaterTotal()` / `void publishDHWWaterMeter()`: DHW water total (ADR-176, ADR-182). Topic `dhw_water_total`, litres with one decimal, not retained. `publishDHWWaterMeter()` runs every 60 s from `doTaskEvery60s()`, stays silent until `dhwWaterMeterHasData()` (a MsgID 19 sample this boot), and queues faux ID 241 (`OTGWdhwmeterid`) while its done bit is unset.
 - Network mode: `Ethernet.ino` publishes retained `otgw-firmware/network/mode` (`ethernet` or `wifi`) on transport switches.
 

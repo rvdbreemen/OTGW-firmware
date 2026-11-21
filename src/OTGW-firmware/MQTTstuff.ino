@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : MQTTstuff
-**  Version  : v2.0.0-beta.410
+**  Version  : v2.0.0-beta.411
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **      Modified version from (c) 2020 Willem Aandewiel
@@ -1833,7 +1833,7 @@ void PrintMQTTError(){
 // boot connect trace (beta.171) showed the heap fall 30-50 KB in the 50-150 ms
 // in which they were sent, and with a browser loading the UI at the same time
 // that reached 2.9 KB, below CRITICAL. onMqttConnect now sends only the birth
-// and the two command subscriptions; connStageTick() sends the rest in four
+// and the two command subscriptions; connStageTick() sends the rest in five
 // portions. A portion goes only when the previous one has left the outbox, the
 // largest block is clear of espMqttClient's 16 KB refusal floor, and the
 // previous portion is CONN_STAGE_GAP_MS old; after CONN_STAGE_MAX_WAIT_MS it
@@ -1844,7 +1844,7 @@ constexpr uint32_t CONN_STAGE_MAX_OUTBOX   = 2;        // packets still queued f
 constexpr uint32_t CONN_STAGE_MIN_BLOCK    = 20480U;   // bytes; espMqttClient refuses below 16 KB
 constexpr uint32_t CONN_STAGE_GAP_MS       = 200;      // a send dip lasted 50-150 ms in the trace
 constexpr uint32_t CONN_STAGE_MAX_WAIT_MS  = 5000;     // then send anyway
-static uint8_t  sConnStage   = 0;   // 0 = idle, 1..4 = next portion to send
+static uint8_t  sConnStage   = 0;   // 0 = idle, 1..5 = next portion to send
 static uint32_t sConnStageMs = 0;   // millis() of connect or of the last portion
 
 static bool     sConnPaceOn = false;  // post-connect pace window for the SAT publish gate (below)
@@ -1876,19 +1876,28 @@ static void connStageTick() {
     case 3:
       publishAllPICsettings();
       break;
-    default:
+    case 4:
       publishCommandDroppedState();      // TASK-1439: replaces a retained ON left from before a reboot
       publishBoilerUnsupportedMsgids();  // TASK-692 port: republish the retained CSV after every reconnect
       clearBoilerUnsupportedDirty();
       break;
+    default: {
+      // TASK-3000: the two support lists (up to a few hundred bytes each) in a portion of their own, after the outbox drained.
+      // A list this portion could not send (heap, a forced portion under the 16 KB floor) is marked for the minute tick.
+      const uint8_t all  = OT_SUPPORT_LIST_BOILER | OT_SUPPORT_LIST_THERMOSTAT;
+      const uint8_t done = publishOtSupportMsgidLists(all);
+      clearOtSupportListsDirty(done);
+      markOtSupportListsDirty((uint8_t)(all & ~done));
+      break;
+    }
   }
   DebugTf(PSTR("[HEAP] connect stage %u: free=%u max_block=%u\r\n"), (unsigned)sConnStage, platformFreeHeap(), platformMaxFreeBlock());
   connTraceSample();  // TASK-1757
   sConnStageMs = millis();
-  sConnStage = (sConnStage >= 4) ? 0 : (uint8_t)(sConnStage + 1);
+  sConnStage = (sConnStage >= 5) ? 0 : (uint8_t)(sConnStage + 1);
 }
 
-// TASK-1991: the sweep started in connStageStart() runs after the four portions, one empty retained message per
+// TASK-1991: the sweep started in connStageStart() runs after the five portions, one empty retained message per
 // pass at least 100 ms apart and only while the outbox is shallow (TASK-2004: 26 small retained publishes in one go
 // dipped the free heap ~50 KB on a board without PSRAM). About 40 labels, so the sweep ends a few seconds after connect.
 constexpr uint32_t OVR_CLEAR_GAP_MS = 100;
@@ -2372,6 +2381,45 @@ void publishBoilerUnsupportedMsgids() {
     pos += (size_t)n;
   }
   sendMQTTData(F("otgw-firmware/boiler/unsupported_msgids"), csv, true);  // retained
+}
+
+// TASK-3000 (gruijter, Robert released it): the rest of GET /api/v2/otgw/ot-support as retained CSV, same shape as
+// unsupported_msgids: "<id>R" for every read MsgID, then "<id>W" for every write MsgID.
+//   otgw-firmware/boiler/supported_msgids  - the boiler acknowledged it (blAR / blAW)
+//   otgw-firmware/thermostat/sent_msgids   - the thermostat sent it (tsR / tsW)
+// These bitmaps only grow, so an empty list means "not known yet" and is not published: a retained list on the broker
+// is never replaced by "" (TASK-1781 lesson). The buffer is sized from the bit count (at most "255R," per entry), so
+// a long list is never cut; it is freed right after espMqttClient copied it into its outbox.
+static bool publishMsgidCsv(const __FlashStringHelper* topic, bool (*isRead)(uint8_t), bool (*isWrite)(uint8_t)) {
+  size_t n = 0;
+  for (int i = 0; i <= 255; i++) n += (size_t)isRead((uint8_t)i) + (size_t)isWrite((uint8_t)i);
+  if (n == 0) return true;   // nothing known yet: keep what the broker retains
+  const size_t cap = n * 5 + 1;
+  char* csv = (char*)malloc(cap);
+  if (!csv) return false;   // retried at the next minute tick (the dirty bit stays)
+  size_t pos = 0;
+  for (uint8_t pass = 0; pass < 2; pass++) {
+    for (int i = 0; i <= 255; i++) {
+      if (!(pass == 0 ? isRead : isWrite)((uint8_t)i)) continue;
+      const int w = snprintf_P(csv + pos, cap - pos, PSTR("%s%d%c"), pos == 0 ? "" : ",", i, pass == 0 ? 'R' : 'W');
+      if (w > 0) pos += (size_t)w;
+    }
+  }
+  const bool ok = sendMQTTData(topic, csv, true);  // retained
+  free(csv);
+  return ok;
+}
+
+uint8_t publishOtSupportMsgidLists(uint8_t lists) {
+  if (!settings.mqtt.bEnable || !state.mqtt.bConnected) return 0;
+  uint8_t done = 0;
+  if ((lists & OT_SUPPORT_LIST_BOILER) &&
+      publishMsgidCsv(F("otgw-firmware/boiler/supported_msgids"), isBoilerMsgIdAckedRead, isBoilerMsgIdAckedWrite))
+    done |= OT_SUPPORT_LIST_BOILER;
+  if ((lists & OT_SUPPORT_LIST_THERMOSTAT) &&
+      publishMsgidCsv(F("otgw-firmware/thermostat/sent_msgids"), isThermostatMsgIdSentRead, isThermostatMsgIdSentWrite))
+    done |= OT_SUPPORT_LIST_THERMOSTAT;
+  return done;
 }
 
 // TASK-2004: the 26 hourly stats used to go out back to back from doTaskMinuteChanged(). On a board without PSRAM

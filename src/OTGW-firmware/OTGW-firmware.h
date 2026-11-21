@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v2.0.0-beta.410
+**  Version  : v2.0.0-beta.411
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -317,6 +317,11 @@ bool isThermostatMsgIdSentRead(uint8_t id);
 bool isThermostatMsgIdSentWrite(uint8_t id);
 bool getBoilerUnsupportedDirty();
 void clearBoilerUnsupportedDirty();
+// TASK-3000: which of the two support lists changed since its last MQTT publish.
+enum : uint8_t { OT_SUPPORT_LIST_BOILER = 1, OT_SUPPORT_LIST_THERMOSTAT = 2 };
+uint8_t getOtSupportListsDirty();
+void clearOtSupportListsDirty(uint8_t bits);
+void markOtSupportListsDirty(uint8_t bits);
 // TASK-1871: last boiler answer per ID this boot (RAM only), for GET /api/v2/otgw/messages/<id>.
 void recordBoilerAnswer(uint8_t id, uint8_t type, uint32_t nowMs);
 int32_t boilerAnswerAgeS(uint8_t id, uint32_t nowMs);   // -1 = not seen this boot
@@ -325,6 +330,7 @@ enum : uint8_t { OT_VALSRC_NONE = 0, OT_VALSRC_BOILER, OT_VALSRC_GATEWAY, OT_VAL
 void recordValueSource(uint8_t id, uint8_t src);           // TASK-1965: which frame wrote the served value
 const char* valueSourceName(uint8_t id);                   // PSTR: none / boiler / gateway / thermostat / summary / replay
 void publishBoilerUnsupportedMsgids();    // MQTT retained CSV ("14W,16W,24R,...")
+uint8_t publishOtSupportMsgidLists(uint8_t lists);   // TASK-3000: boiler/supported_msgids, thermostat/sent_msgids; returns the lists done
 void loadOtSupportFiles();                 // read /ot-thermo.json and /ot-boiler.json at boot
 void saveOtSupportFilesIfDirty();          // 15-min debounced atomic write
 void saveOtSupportFilesForced();           // TASK-1286: write both now (filesystem update write-back)

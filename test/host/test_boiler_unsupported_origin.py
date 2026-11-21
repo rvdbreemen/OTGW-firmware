@@ -51,6 +51,7 @@ CORE_H = "src/OTGW-firmware/OTGW-Core.h"
 CORE = "src/OTGW-firmware/OTGW-Core.ino"
 OTD_TYPES = "src/OTGW-firmware/OTDirecttypes.h"
 OTD = "src/OTGW-firmware/OTDirect.ino"
+FW_H = "src/OTGW-firmware/OTGW-firmware.h"
 
 # (file, start anchor, end anchor or None), in source order per output file.
 # Without an end anchor the slice is the construct that starts on the anchor
@@ -69,6 +70,8 @@ TYPES = [
     (CORE_H, r"^struct OTStateLock \{", None),
     (CORE_H, r"^enum OTGW_response_type\b", None),
     (CORE_H, r"^struct OpenthermData_t \{", None),
+    # TASK-3000: the support-list bits the bitmap block sets; optional, an older revision has none.
+    (FW_H, r"^enum : uint8_t \{ OT_SUPPORT_LIST_BOILER", r"^enum : uint8_t \{ OT_SUPPORT_LIST_BOILER", True),
 ]
 CORE_SLICES = [
     (CORE, r"^OpenthermData_t OTdata, delayedOTdata, tmpOTdata;", None),

@@ -6,7 +6,7 @@ onMqttConnect() were transmitted in one go; with a browser loading the UI at the
 dripOutboxWait() out of src/OTGW-firmware/MQTTstuff.ino, compiles them on the host with stubs that
 count queued packets, and checks:
   1. onMqttConnect() queues only the birth and the two command subscriptions (3 packets);
-  2. the rest follows in four portions, each only after the previous one left the outbox, the gap
+  2. the rest follows in five portions, each only after the previous one left the outbox, the gap
      passed and the largest block is clear of espMqttClient's 16 KB floor;
   3. a stuck outbox or low heap delays a portion, but after the max wait it goes anyway;
   4. a disconnect stops the portions and a new connect starts them again from the first;
@@ -70,6 +70,13 @@ static void startStaleOverrideClear() {}                 // TASK-1991: covered b
 static bool staleOverrideClearStep() { return false; }
 static void publishBoilerUnsupportedMsgids() { q(5, 1); }
 static void clearBoilerUnsupportedDirty() { dirtyClearedAfterCsv = published[5] > 0 ? 1 : 0; }
+enum : uint8_t { OT_SUPPORT_LIST_BOILER = 1, OT_SUPPORT_LIST_THERMOSTAT = 2 };   // TASK-3000
+static int listsCleared = -1;
+static int listsOk = 1;
+static uint8_t publishOtSupportMsgidLists(uint8_t lists) { q(6, 2); return listsOk ? lists : 0; }
+static void clearOtSupportListsDirty(uint8_t bits) { listsCleared = bits; }
+static int listsMarked = -1;
+static void markOtSupportListsDirty(uint8_t bits) { listsMarked = bits; }
 static void requestMQTTRepublishAll() {}
 static void clearMQTTConfigDone() {}
 static void clearMQTTConfigPending() {}
@@ -103,6 +110,13 @@ int main(int argc, char** argv) {
     printf("c=%d", queued);
     for (int i = 0; i < 60; i++) { nowMs += 50; sent = queued; int before = queued; tick(); if (queued != before) printf(" t%u=%d", nowMs - 1000, queued - before); }
     printf(" total=%d dirty=%d\n", queued, dirtyClearedAfterCsv);
+    return 0;
+  }
+  if (!strcmp(mode, "listsfail")) {          // TASK-3000: stage 5 could not send the lists: they are marked for the minute tick
+    listsOk = 0;
+    onMqttConnect(false);
+    for (int i = 0; i < 60; i++) { nowMs += 50; sent = queued; tick(); }
+    printf("cleared=%d marked=%d\n", listsCleared, listsMarked);
     return 0;
   }
   if (!strcmp(mode, "stuck")) {              // outbox never drains, heap low: portions wait the max, then go
@@ -252,24 +266,28 @@ class MqttConnectStaging(unittest.TestCase):
         r = self.run_mode("flow")
         self.assertEqual(int(r["c"]), 3)
         portions = [int(v) for k, v in r.items() if k[0] == "t" and k[1:].isdigit()]
-        self.assertEqual(portions, [6, 6, 15, 2], r)        # migration, version, PIC settings, dropped + CSV
-        self.assertEqual(int(r["total"]), 32)
+        self.assertEqual(portions, [6, 6, 15, 2, 2], r)     # migration, version, PIC settings, dropped + CSV, support lists (TASK-3000)
+        self.assertEqual(int(r["total"]), 34)
         self.assertEqual(r["dirty"], "1", "unsupported_msgids published before its dirty flag clears")
+
+    def test_support_lists_refused_at_connect_are_marked_for_the_minute_tick(self):
+        r = self.run_mode("listsfail")
+        self.assertEqual((r["cleared"], r["marked"]), ("0", "3"), r)   # TASK-3000 review finding: no silent loss
 
     def test_portions_keep_the_gap(self):
         r = self.run_mode("gap")
-        self.assertEqual(int(r["portions"]), 4)
+        self.assertEqual(int(r["portions"]), 5)
         self.assertGreaterEqual(int(r["mingap"]), 200)
 
     def test_stuck_outbox_and_low_heap_delay_but_never_drop(self):
         r = self.run_mode("stuck")
         self.assertGreaterEqual(int(r["first"]), 5000)
-        self.assertEqual(int(r["total"]), 32)
+        self.assertEqual(int(r["total"]), 34)
 
     def test_disconnect_stops_and_reconnect_restarts(self):
         r = self.run_mode("reconnect")
         self.assertEqual(int(r["whiledown"]), 0)
-        self.assertEqual((int(r["migr"]), int(r["ver"]), int(r["pic"]), int(r["total"])), (6, 6, 15, 32), r)
+        self.assertEqual((int(r["migr"]), int(r["ver"]), int(r["pic"]), int(r["total"])), (6, 6, 15, 34), r)
 
     def test_drip_waits_at_most_five_ticks_on_a_deep_outbox(self):
         r = self.run_mode("drip")

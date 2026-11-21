@@ -1048,6 +1048,9 @@ Published at startup, on reconnect, and every 5 minutes.
 | `otgw-firmware/hardware_type` | `"otgw-classic"` | Hardware-type slug (`otgw-classic` on the OTGW Classic) |
 | `otgw-firmware/hardware_mode` | `"pic"` | Active hardware mode (`pic` or `otdirect`) |
 | `otgw-firmware/network_mode` | `"wifi"` | Network mode (`wifi`, `ethernet`, or `ap`) |
+| `otgw-firmware/boiler/unsupported_msgids` | `"14W,24R,26R"` | MsgIDs the boiler answered with Unknown-DataID: `<id>R` for a read, `<id>W` for a write (retained; republished at every connect, also empty) |
+| `otgw-firmware/boiler/supported_msgids` | `"0R,3R,5R,25R,1W,16W"` | MsgIDs the boiler acknowledged (read ack `<id>R`, write ack `<id>W`); the `blAR`/`blAW` columns of `GET /api/v2/otgw/ot-support`. Retained, updated within a minute of a new MsgID and republished at every MQTT connect; published once at least one MsgID is known, never as an empty list |
+| `otgw-firmware/thermostat/sent_msgids` | `"0R,3R,17R,1W,16W,24W"` | MsgIDs the thermostat sent as read (`<id>R`) or write (`<id>W`); the `tsR`/`tsW` columns of `GET /api/v2/otgw/ot-support`. Retained, same update rule as `supported_msgids` |
 
 ##### PIC Gateway Status
 
