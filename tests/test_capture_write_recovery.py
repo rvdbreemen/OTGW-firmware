@@ -197,6 +197,84 @@ class SilentStream(unittest.TestCase):
         self.assertEqual((self.cap.errors, self.cap.summaries), ([], []))
 
 
+class HostSleep(unittest.TestCase):
+    """TASK-3006 (will_85903 thinks he closed his laptop lid): SleepWatch only saw a sleep when the wall clock ran
+    ahead of time.monotonic (macOS). Where the run clock keeps counting through the suspend, both jump together and
+    the old check saw nothing; now a 1 s loop that did not run for 10 min is a sleep too."""
+
+    class Cap:
+        def __init__(self):
+            self.gaps, self.summaries = [], []
+
+        def gap(self, stream, start, end, reason):
+            self.gaps.append((stream, start, end, reason))
+
+        def summary(self, line):
+            self.summaries.append(line)
+
+    def setUp(self):
+        from datetime import timezone
+        self.wall = [datetime(2026, 11, 20, 8, 4, 32, tzinfo=timezone.utc)]
+        self.mono = [1000.0]
+        self.cap = self.Cap()
+        self.watch = oc.SleepWatch(self.cap, wall_fn=lambda: self.wall[0], mono_fn=lambda: self.mono[0])
+
+    def tick(self, run_s, wall_s):
+        from datetime import timedelta
+        self.mono[0] += run_s
+        self.wall[0] += timedelta(seconds=wall_s)
+
+    def test_j_both_clocks_jump_together_is_a_sleep(self):
+        self.tick(600, 600)                       # 10 min lid closed, run clock counted through it
+        self.assertGreater(self.watch.check(), 500)
+        self.assertEqual(self.cap.gaps[0][0], "capture-host")
+        self.assertTrue(any("asleep" in l for l in self.cap.summaries), self.cap.summaries)
+
+    def test_k_a_normal_second_is_not_a_sleep(self):
+        for _ in range(5):
+            self.tick(1.0, 1.0)
+            self.assertEqual(self.watch.check(), 0)
+        self.assertEqual(self.cap.gaps, [])
+
+
+class KeepAwakeCase(unittest.TestCase):
+    def test_l_windows_holds_and_releases(self):
+        calls = []
+
+        class K32:
+            def SetThreadExecutionState(self, flags):
+                calls.append(flags)
+                return 0x80000000
+
+        k = oc.KeepAwake(platform_name="win32", kernel32=K32())
+        self.assertIn("Keep awake: on", k.acquire())
+        k.release()
+        self.assertEqual(calls, [0x80000001, 0x80000000])
+
+    def test_m_macos_caffeinate_watches_this_process(self):
+        started = []
+
+        class Proc:
+            terminated = False
+
+            def terminate(self):
+                Proc.terminated = True
+
+        def popen(args, **kw):
+            started.append(args)
+            return Proc()
+
+        k = oc.KeepAwake(platform_name="darwin", popen=popen, which=lambda name: "/usr/bin/" + name)
+        self.assertIn("caffeinate", k.acquire())
+        self.assertEqual(started[0][:3], ["caffeinate", "-i", "-w"])
+        k.release()
+        self.assertTrue(Proc.terminated)
+
+    def test_n_no_tool_says_so(self):
+        k = oc.KeepAwake(platform_name="linux", which=lambda name: None)
+        self.assertIn("NOT available", k.acquire())
+
+
 class MqttCsv(unittest.TestCase):
     """TASK-3006 AC #3: a short-run mqtt.log ("topic payload" lines) gave 0 csv rows, so csv/mqtt.csv was dropped and
     the upload had no MQTT file while the summary reported 143483 messages."""

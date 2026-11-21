@@ -2443,6 +2443,58 @@ SLEEP_JUMP_SECONDS = 30   # wall clock ahead of the run clock by more than this 
 SLEEP_POLL_SECONDS = 1.0
 
 
+class KeepAwake:
+    """TASK-3006 (will_85903, 20 Nov: the recording stopped, probably when the laptop lid closed): ask the OS not to
+    sleep while the capture runs, and let go at stop. Windows: SetThreadExecutionState(ES_CONTINUOUS |
+    ES_SYSTEM_REQUIRED) on the main thread. macOS: caffeinate -i -w <pid>. Linux: systemd-inhibit around a sleep
+    that ends with this process. Elsewhere, or when that fails, the run says so. A closed laptop lid can still sleep
+    the machine by the power settings; the notice says that too."""
+
+    ES_CONTINUOUS, ES_SYSTEM_REQUIRED = 0x80000000, 0x00000001
+
+    def __init__(self, platform_name=None, popen=None, which=None, kernel32=None):
+        self.platform = platform_name or sys.platform
+        self.popen = popen or subprocess.Popen
+        self.which = which or shutil.which
+        self.kernel32 = kernel32
+        self.proc = None
+        self.held = False
+        self.how = ""
+
+    def acquire(self):
+        try:
+            if self.platform.startswith("win"):
+                k32 = self.kernel32 or ctypes.windll.kernel32
+                self.held = bool(k32.SetThreadExecutionState(self.ES_CONTINUOUS | self.ES_SYSTEM_REQUIRED))
+                self.how = "Windows SetThreadExecutionState"
+            elif self.platform == "darwin" and self.which("caffeinate"):
+                self.proc = self.popen(["caffeinate", "-i", "-w", str(os.getpid())],
+                                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                self.held, self.how = True, "caffeinate"
+            elif self.platform.startswith("linux") and self.which("systemd-inhibit"):
+                self.proc = self.popen(["systemd-inhibit", "--what=sleep:idle", "--who=otgw_capture",
+                                        "--why=recording an OTGW capture", "--mode=block", "sleep", "infinity"],
+                                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                self.held, self.how = True, "systemd-inhibit"
+        except Exception as exc:
+            self.held, self.how = False, f"failed: {type(exc).__name__}: {exc}"
+        if self.held:
+            return (f"Keep awake: on ({self.how}) while recording. A closed laptop lid can still put the machine "
+                    "to sleep; keep the lid open or set the lid action to 'do nothing' for the run.")
+        return ("Keep awake: NOT available on this machine" + (f" ({self.how})" if self.how else "")
+                + ". Make sure it does not sleep during the run (power settings, lid open).")
+
+    def release(self):
+        try:
+            if self.platform.startswith("win") and self.held:
+                (self.kernel32 or ctypes.windll.kernel32).SetThreadExecutionState(self.ES_CONTINUOUS)
+            if self.proc is not None:
+                self.proc.terminate()
+        except Exception:
+            pass
+        self.held, self.proc = False, None
+
+
 class SleepWatch(threading.Thread):
     """TASK-2922: while the capture machine sleeps no code runs, so no stream can notice the outage itself;
     afterwards the wall clock has moved further than the run clock (time.monotonic; on macOS it stops during
@@ -2463,11 +2515,19 @@ class SleepWatch(threading.Thread):
         self.count = 0
 
     def check(self):
-        """Compare the clocks once; returns the seconds of a recorded gap, else 0."""
+        """Compare the clocks once; returns the seconds of a recorded gap, else 0.
+
+        TASK-3006: two signs of a sleep. On macOS time.monotonic stops, so the wall clock runs ahead of it. Where the
+        run clock keeps counting through a suspend (Windows may), both clocks jump together; then this loop, which
+        should run every `poll` seconds, simply did not run for that long. Either one above `limit` is a sleep."""
         wall, mono = self.wall_fn(), self.mono_fn()
         ran = mono - self.last_mono
-        lost = (wall - self.last_wall).total_seconds() - ran
-        start = self.last_wall + timedelta(seconds=ran)
+        ahead = (wall - self.last_wall).total_seconds() - ran      # run clock stopped (macOS)
+        stalled = ran - self.poll                                  # run clock went on, this loop did not run
+        if ahead >= stalled:
+            lost, start = ahead, self.last_wall + timedelta(seconds=ran)
+        else:
+            lost, start = stalled, self.last_wall + timedelta(seconds=self.poll)
         self.last_wall, self.last_mono = wall, mono
         if lost <= self.limit:
             return 0
@@ -4150,6 +4210,8 @@ def main(argv=None):
         workers.append((snapshots, SNAPSHOT_TIMEOUT + 5))
         s(f"Device snapshots started: every {snapshot_seconds} s, {', '.join(SNAPSHOT_PATHS)} -> {SNAPSHOTS_LOG}")
 
+    keep_awake = KeepAwake()        # TASK-3006
+    s(keep_awake.acquire())
     sleep_watch = SleepWatch(cap)   # TASK-2922
     sleep_watch.start()
     workers.append((sleep_watch, 5))
@@ -4218,6 +4280,7 @@ def main(argv=None):
         cap.request_stop("capture shutdown")
 
     print()
+    keep_awake.release()
     stream_watch.check()
     stream_watch.close()
     s(f"Capture stop reason: {cap.stop_reason}")
