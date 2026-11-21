@@ -240,7 +240,7 @@ One row per Architecture Decision Record. Scope is the Enforcement `path_glob` s
 | ADR-233 | Accepted | - | At the start of a filesystem OTA the firmware copies settings.ini, rebootcount.txt and rebootlog.txt, in that order,... |
 | ADR-234 | Accepted | `src/OTGW-firmware/SATcurveTune.h` | A tuner hour stays 60 min and counts when no whole-hour marker was set and its clean ticks are at least 90 % of the t... |
 | ADR-235 | Accepted | - | SAT sends CS= when the value it sends, rounded to 0.1, changes, and repeats an unchanged CS= about every 30 s: the co... |
-| ADR-236 | Proposed | - | While SAT is in PWM and the PWM phase is ON, it switches to continuous only when, with the flame on, the flow is at o... |
+| ADR-236 | Proposed | - | While SAT is in PWM and the PWM phase is ON, and there is heating demand, it switches to continuous only when the flo... |
 | ADR-237 | Proposed | `build.py` | The buildfs step runs with PLATFORMIOBUILDDIR=.pio/build-fs (piofsbuildroot(), build.py:2488), so .pio/build keeps on... |
 | ADR-238 | Accepted | - | On the ESP32-S3 a boot counts towards the triple-reset WiFi recovery when it is a reset-button press or a power-on (E... |
 | ADR-239 | Accepted | - | The first 32 bytes of RTC slow memory (0x50000200-0x5000021F) belong to the safeboot updater: the main firmware holds... |

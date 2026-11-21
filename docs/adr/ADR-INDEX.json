@@ -9378,7 +9378,7 @@
       "format": "canonical",
       "status": "Proposed",
       "date": "2026-11-14",
-      "decision_summary": "While SAT is in PWM and the PWM phase is ON, it switches to continuous only when, with the flame on, the flow is at o...",
+      "decision_summary": "While SAT is in PWM and the PWM phase is ON, and there is heating demand, it switches to continuous only when the flo...",
       "topics": [
         "control-mode",
         "pwm",
@@ -9402,12 +9402,13 @@
       "context_scope": "selective",
       "decision_contract": {
         "must": [
-          "What counts. A tick counts only with the flame on and flowTemp <= requestedSetpoint - SATUNDERSHOOTMARGINC (3.0 C, SATcycles.ino:43). Any other tick clears the timer.",
+          "What counts. A tick counts only in the PWM ON phase, with heating demand (request above the cold setpoint, ADR-199) and flowTemp <= requestedSetpoint - SATUNDERSHOOTMARGINC (3.0 C, SATcycles.ino:43). The flame state is not part of the co...",
           "When it fires. On the first control tick at least 180 s (SATUNDERHEATSUSTAINMS = 180,000 ms) after the first qualifying tick.",
           "What stays as it is: the PWM ON, hot-water and 300 s guards, the saturation exit and the ADR-252 start gate."
         ],
         "must_not": [
-          "Count a tick with the flame off, or with the flow above request - 3.0 C.",
+          "Count a tick without heating demand, in the PWM OFF phase, or with the flow above request - 3.0 C.",
+          "Add a flame condition that thermo-nova does not have. If one is wanted, it goes to Sergeant D first.",
           "Bring back the entry-342 60 s rule, or a margin or latch variant of it (Q-342b options B and C, TASK-2987 and TASK-2989 stay 2.1.0 per entry 448)."
         ],
         "exceptions": [
@@ -9417,7 +9418,8 @@
           "Host test. tests/testsatovershootsustain.py compiles the real satCycleCheckPwmExits():",
           "the exit fires 180 s after the first tick at a flow 3.0 C below the request (equality counts, as heatingcontrol.py:338 returns only when flow > threshold);",
           "a flow 2.9 C below never fires;",
-          "the flame off never counts. The cases fail on the entry-342 code; a mutant with a 60 s hold fails the 180 s case.",
+          "no heating demand (request at or below the cold setpoint) never counts;",
+          "the flame bit does not change the outcome. The cases fail on the entry-342 code; a mutant with a 60 s hold fails the 180 s case.",
           "Replay. switch5.py on the indigolight and marceld captures gives 0 PWM to continuous exits in the loop windows (replay/REPORT.md, column \"thermo-nova 3 C / 180 s\").",
           "Field. The next captures from indigolight and marceld are checked for PWM to continuous exits inside one burn."
         ]
@@ -11338,7 +11340,7 @@
         "must_not": [
           "Must not drop or reorder packets. The outbox stays first-in-first-out.",
           "Must not block the loop task: the non-blocking write of ADR-186 stays.",
-          "Must not add the per-loop PUBLISH cap without a new ADR and a measurement that shows the need."
+          "If Robert chooses option 1(a): must not add the per-loop PUBLISH cap later without a new ADR and a measurement that shows the need."
         ],
         "exceptions": [
           "None."

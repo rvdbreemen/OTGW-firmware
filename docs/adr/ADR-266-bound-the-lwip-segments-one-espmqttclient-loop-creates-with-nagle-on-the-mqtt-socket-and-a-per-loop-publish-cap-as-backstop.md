@@ -36,9 +36,13 @@ context_scope: "selective"
 
 ## Status
 
-Proposed, 2026-11-20. Rewritten 2026-11-21 after the TASK-2949.5 bench: the per-loop PUBLISH cap of the first version is not adopted (Open Question 1). Acceptance is Robert's, together with his AC2 choice (Open Question 5).
+Proposed, 2026-11-20. Rewritten 2026-11-21 after the TASK-2949.5 bench. The architect recommends Nagle alone, without the per-loop PUBLISH cap of the first version. Whether the cap is dropped is Robert's decision (Open Question 1), as is the AC2 choice (Open Question 5).
 
-**Decision Maker:** User: Robert van den Breemen asked on 2026-11-20 for a per-loop cap in our fork, for 2.0.0. Which mechanism to use is the agent's recommendation, weighed below.
+**Decision Maker:** User: Robert van den Breemen.
+
+- **What he asked for.** On 2026-11-20 he asked for a per-loop packet cap in our fork, for 2.0.0 (ADR-264 context: the cap "is conditional on a measurement").
+- **What the bench showed.** Nagle alone takes the broker socket's send-queue high-water mark to 2-3 segments on both boards.
+- **The recommendation.** The architect, with otgw-dev's agreement, recommends adopting Nagle and not the cap. Dropping the cap he asked for is put to him as an explicit choice; this ADR does not decide it.
 
 ## Status History
 
@@ -75,7 +79,7 @@ Our fork is the library source (ADR-264), so the socket option and the flush loo
 - **What lwIP does then.** It sends the first small packet at once. Later writes go into the segment that is still unsent, up to one MSS, until the broker's ACK comes back.
 - **The effect.** A burst of small SAT packets becomes 2-3 segments instead of 16.
 
-**The per-loop PUBLISH cap of the first version (`EMC_MAX_PACKETS_PER_LOOP`, `setMaxPacketsPerLoop`) is not adopted.**
+**Recommended, pending Robert's choice (Open Question 1): the per-loop PUBLISH cap of the first version (`EMC_MAX_PACKETS_PER_LOOP`, `setMaxPacketsPerLoop`) is not adopted.**
 
 - With Nagle alone, the broker socket's send-queue high-water mark is 2-3 segments on both boards (measured below).
 - The cap would only bound bursts of large packets, and the bench did not show a failure that needs it (YAGNI).
@@ -95,7 +99,7 @@ Our fork is the library source (ADR-264), so the socket option and the flush loo
 | PINGREQ to PINGRESP (broker log) | under 1 s | under 1 s, no disconnect | 5 of 6 boots, .61 |
 
 - **Echo spread.** The 221 ms p95 boot occurs once in each arm, so it is not bound to Nagle. One sample of 120 reached 251.4 ms (the max, Nagle arm).
-- **Soak.** 60 min on .61 with Nagle on: no restart, MQTT connected throughout, heap flat. `hd_min` went once to 8,228 B at 14:48, cause not visible (no probe record at that moment).
+- **Soak.** 60 min on .61 with Nagle on: no restart, MQTT connected throughout, heap flat. `hd_min` went once to 8,228 B at 14:48, cause not visible (no probe record at that moment). That minimum belongs to the build under test (bootcount 1166, beta.410+eedf081); an earlier 1,188 B row in the same `info.jsonl` is from the previous firmware.
 - **Evidence paths** (each with SHA256SUMS), all under `OTGW-field-data`:
   - `bench-otgw32/2026-11-21_task2949-5-heapab/`;
   - `bench-otgw32/2026-11-21_task2949-5-rtt/`;
@@ -128,7 +132,7 @@ Our fork is the library source (ADR-264), so the socket option and the flush loo
 
 - Must not drop or reorder packets. The outbox stays first-in-first-out.
 - Must not block the loop task: the non-blocking write of ADR-186 stays.
-- Must not add the per-loop PUBLISH cap without a new ADR and a measurement that shows the need.
+- If Robert chooses option 1(a): must not add the per-loop PUBLISH cap later without a new ADR and a measurement that shows the need.
 
 ### Exceptions
 
@@ -141,7 +145,7 @@ Our fork is the library source (ADR-264), so the socket option and the flush loo
 
 ## Alternatives Considered
 
-- **A. Per-loop PUBLISH cap, alone or as a backstop.** It bounds about n x 1.5 KB per pass, for every packet type, but small packets still pay one segment each. Not adopted: with Nagle alone the send-queue high-water mark is 2-3 on both boards (TASK-2949.5), so a backstop has no measured failure to stop (YAGNI). The cap variants were not benched.
+- **A. Per-loop PUBLISH cap, alone or as a backstop.** It bounds about n x 1.5 KB per pass, for every packet type, but small packets still pay one segment each. Recommended not to adopt (Robert decides, Open Question 1): with Nagle alone the send-queue high-water mark is 2-3 on both boards (TASK-2949.5), so a backstop has no measured failure to stop (YAGNI). The cap variants were not benched.
 - **B. Coalescing in the library through a staging buffer.** Copy several packets into one buffer of about one MSS and issue one `send()`. It has the same effect as Nagle, without the ACK wait, but it is new code on the hot path. Partial writes then span packet boundaries, and the buffer needs about 1.4 KB more RAM. `EMC_TX_BUFFER_SIZE` (1,440) exists, but it only serves chunked payload callbacks (`Packets/Packet.cpp:430`, `:438`), not coalescing. Not chosen: Nagle gets the same segment saving from code lwIP already has.
 - **B2. `MSG_MORE` on every `send()` except the last of a pass.** With `TF_NODELAY`, lwIP still pushes each write out at once, so the merge into the unsent segment probably does not happen. This is not verified in Espressif's lwIP. Not chosen.
 - **C. Do nothing in the library; ADR-265 pacer only.** The event-driven publishers stay unbounded and the 16-segment worst case remains. Not chosen.
@@ -165,13 +169,15 @@ Our fork is the library source (ADR-264), so the socket option and the flush loo
 
 ## Open Questions
 
-- [x] 1. The bench A/B picks the variant and the values: Nagle only, cap only (4 or 8), or both. — **Answered 2026-11-21 by Agent: Claude (otgw-architect), from the TASK-2949.5 bench, with otgw-dev's agreement:** Nagle only. The cap is not adopted, and the cap variants were not benched (see Decision).
+- [ ] 1. Robert's choice on the variant. The bench measured Nagle alone against today; the cap variants were not benched. The options:
+  - (a) Nagle only, the cap he asked for on 2026-11-20 dropped (architect's recommendation, otgw-dev agrees);
+  - (b) Nagle plus the cap as a backstop, which needs the cap built and benched first.
 - [x] 2. Where do the extra 4-8 KB go in runs 2#2 and 4? — **Answered 2026-11-21 by Agent: Claude (otgw-architect):** not part of this decision. With Nagle on, the largest drops are outside the MQTT loop, and they are followed up in TASK-3005.
 - [x] 3. With Nagle on, are command round-trip and SAT publish latency still acceptable: under 250 ms, and with no keepalive or PUBACK stall? — **Answered 2026-11-21 by Agent: Claude (otgw-architect), from TASK-2949.5:**
   - the command echo p95 was under 250 ms on 6 of 6 boots, with no arm-bound difference;
   - PINGRESP was under 1 s, with no disconnects (broker log);
   - device-side PINGREQ timing has no firmware counter, so it was measured broker-side only.
-- [x] 4. The upstream PR text, after the bench, checked by the coordinator and Robert before it opens. — **Answered 2026-11-21 by Agent: Claude (otgw-architect):** a follow-up of the ADR-264 fork process, not part of this decision. It now covers one knob (`EMC_TCP_NODELAY`).
+- [ ] 4. The upstream PR text, after the bench, checked by the coordinator and Robert before it opens. It covers `EMC_TCP_NODELAY`, plus the cap if Robert chooses 1(b).
 - [ ] 5. Acceptance by the maintainer, together with his AC2 choice:
   - (a) accept this ADR on what Nagle demonstrably does, with the per-loop allocation of `satPublishMQTT` and `satControlLoopRun` handled in TASK-3005 / ADR-265;
   - (b) hold it until TASK-3005 has landed.

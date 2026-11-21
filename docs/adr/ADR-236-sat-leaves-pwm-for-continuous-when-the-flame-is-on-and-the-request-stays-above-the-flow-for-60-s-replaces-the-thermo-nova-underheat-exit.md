@@ -56,7 +56,7 @@ SAT (Smart Autotune Thermostat) runs the boiler either continuously or in PWM (p
 
 **The thermo-nova reference, pinned at 7beaaf5.** It leaves PWM for continuous on a sustained underheat (`custom_components/sat/heating_control.py:331-354`). The conditions:
 
-- the PWM status is ON and the flame is on;
+- the PWM status is ON, and there is heating demand (`demand.heater_state == HeaterState.ON`, `heating_control.py:317`). `HeaterState.ON` is a property of the demand, not of the flame: HEAT mode, valves open and the request above `COLD_SETPOINT` (`heating_control.py:65-72`). There is no flame check;
 - the flow is at or below the request plus `UNDERSHOOT_MARGIN_CELSIUS` (-3.0, `cycles/const.py:11`), compared at `heating_control.py:337`;
 - that holds for `UNDERHEAT_SUSTAIN_SECONDS` (180, `const.py:22`), checked at `heating_control.py:345`;
 - not during hot water, and not within 300 s after it.
@@ -87,12 +87,13 @@ With those results Sergeant D chose option D of Q-342b (entry 448).
 
 ## Decision
 
-While SAT is in PWM and the PWM phase is ON, it switches to continuous only when, with the flame on, the flow is at or below the request minus 3.0 C for 180 s: thermo-nova's own underheat exit (`heating_control.py:331-354`).
+While SAT is in PWM and the PWM phase is ON, and there is heating demand, it switches to continuous only when the flow is at or below the request minus 3.0 C for 180 s: thermo-nova's own underheat exit (`heating_control.py:331-354`).
 
-- **What it replaces.** The entry-342 rule (request above the flow for 60 s) is gone.
+- **What it replaces.** The entry-342 rule (request above the flow for 60 s) is gone, and so is its "flame on" condition. Entry 448 settles the rule as identical to `heating_control.py:337-347`, and that code checks heating demand, not the flame (`heating_control.py:65-72`, `:317`).
 - **The gates of thermo-nova stay:**
   - not during hot water or the 300 s after it;
   - not in the PWM OFF phase;
+  - not without heating demand, including a request at or below the cold setpoint (`heating_control.py:317`; the firmware's counterpart is the per-heating-system cold setpoint of ADR-199);
   - a missing flow temperature clears the timer.
 - **Saturation exit.** It is unchanged: 300 s without off time, with the live-flow duty since beta.410, entries 437 and 444.
 - **The start gate of ADR-252 stays in the code.** It keeps every PWM to continuous exit quiet until 60 s after the first CH flame-on. With a 180 s hold it can no longer change the outcome of this exit (entry 448, our interpretation), but it still guards the other exits.
@@ -102,13 +103,14 @@ While SAT is in PWM and the PWM phase is ON, it switches to continuous only when
 
 ### Must
 
-- **What counts.** A tick counts only with the flame on and `flowTemp <= requestedSetpoint - SAT_UNDERSHOOT_MARGIN_C` (3.0 C, `SATcycles.ino:43`). Any other tick clears the timer.
+- **What counts.** A tick counts only in the PWM ON phase, with heating demand (request above the cold setpoint, ADR-199) and `flowTemp <= requestedSetpoint - SAT_UNDERSHOOT_MARGIN_C` (3.0 C, `SATcycles.ino:43`). The flame state is not part of the condition. Any other tick clears the timer.
 - **When it fires.** On the first control tick at least 180 s (`SAT_UNDERHEAT_SUSTAIN_MS` = 180,000 ms) after the first qualifying tick.
 - **What stays as it is:** the PWM ON, hot-water and 300 s guards, the saturation exit and the ADR-252 start gate.
 
 ### Must Not
 
-- Count a tick with the flame off, or with the flow above request - 3.0 C.
+- Count a tick without heating demand, in the PWM OFF phase, or with the flow above request - 3.0 C.
+- Add a flame condition that thermo-nova does not have. If one is wanted, it goes to Sergeant D first.
 - Bring back the entry-342 60 s rule, or a margin or latch variant of it (Q-342b options B and C, TASK-2987 and TASK-2989 stay 2.1.0 per entry 448).
 
 ### Exceptions
@@ -120,7 +122,8 @@ While SAT is in PWM and the PWM phase is ON, it switches to continuous only when
 - **Host test.** `tests/test_sat_overshoot_sustain.py` compiles the real `satCycleCheckPwmExits()`:
   - the exit fires 180 s after the first tick at a flow 3.0 C below the request (equality counts, as `heating_control.py:338` returns only when flow > threshold);
   - a flow 2.9 C below never fires;
-  - the flame off never counts.
+  - no heating demand (request at or below the cold setpoint) never counts;
+  - the flame bit does not change the outcome.
 
   The cases fail on the entry-342 code; a mutant with a 60 s hold fails the 180 s case.
 - **Replay.** `switch5.py` on the indigo_light and marceld captures gives 0 PWM to continuous exits in the loop windows (`_replay/REPORT.md`, column "thermo-nova 3 C / 180 s").
