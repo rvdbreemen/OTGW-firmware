@@ -5,6 +5,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Added
+- MQTT: two retained topics with the OpenTherm support table that `GET /api/v2/otgw/ot-support` shows, in the format of `boiler/unsupported_msgids` (`<id>R` per read MsgID, then `<id>W` per write MsgID): `otgw-firmware/boiler/supported_msgids` (the MsgIDs the boiler acknowledged) and `otgw-firmware/thermostat/sent_msgids` (the MsgIDs the thermostat sent). Published at connect and within a minute of a change; an empty list is not published (TASK-3000, beta.411).
+
 ## [2.0.0-beta.410] - 2026-11-21
 
 ### Changed
