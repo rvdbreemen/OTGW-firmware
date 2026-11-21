@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-21T16:41:00Z'
-updated_date: '2026-11-21T19:54:00Z'
+updated_date: '2026-11-21T23:58:00Z'
 labels:
   - tooling
   - bug
@@ -55,4 +55,6 @@ Bench check 2026-11-21 17:45 (otgw-bench-tester), .61 beta.413+da42aca, no refla
 2026-11-21 bench (otgw-bench-tester, beta.416+0bac665 on .61): no restart, crashlog none; fresh client 218 frames/20 s. (A) paused reader: run 2 ws_drops 0 -> 30 within 20 s then flat, run 1 stayed 0. Reading (accepted by the coordinator): a reader that stops ACKing is closed by the library itself through AsyncTCP's ack timeout -> AsyncWebSocketClient::_onTimeout() -> AsyncClient::close() (ESPAsyncWebServer AsyncWebSocket.cpp:274-277, :551-561); afterwards count() (WS_CONNECTED only, :1037-1042) is 0, so nothing is sent or counted; run 1's timeout came before the queue reached 32. Part (a) counts while a connected client's queue is full, as claimed. The slow-but-alive client of the e2e capture (TCP kept alive, WS queue full) stays with TASK-3022. (C) web UI watchdog closed after 150 s and reopened 5 s later in the NAS Chromium tab: accepted (hidden-tab timer throttling: 90 s silence + up to ~60 s); a visible tab is expected at ~90-95 s (not benched). (D) heap low-water 524 B / 503 low heap under that load -> TASK-3024 (high). Evidence OTGW-field-data/bench-otgw32/2026-11-21_task3017-0bac665/.
 
 2026-11-21 (otgw-webui, measured on b03c188ea's v2.js, headless Chrome with a fake socket that opens and stays silent): visible tab -> watchdog close() after 92.1 s (90 s + up to one 5 s tick), then the 5 s scheduleReconnect. Hidden/background tab up to ~150 s because of Chrome's intensive timer throttling (setInterval about once a minute), as on 09's bench. Both heal the socket; no code change.
+
+Bench AC3 2026-11-22 (otgw-bench-tester): FAILED, not ticked. .61 beta.417+56dd422 (zip 72f0e04c, githash 56dd422), 3 h capture 21:55:25-00:56 with capture tool 7503290 on the NAS (/ws frame recorder + stream watch, MQTT direct, device snapshots), NAS info poller every 30 s. The stall recurred: 1552 frames, then 'WARNING: otframes.log wrote nothing from 2026-11-21T22:00:32+01:00 to 2026-11-22T00:55:28+01:00 (174 min)', stream watch fired 22:11:00; MQTT 17222 received = 17222 written; no restart (bootcount 1180, uptime 3h03). Timeline: telnet reconnected after 8 attempts 21:59:11; hd_ws_drops 0 -> 232 at 21:59:33, 233 at 22:00:33, then flat at 233 for 2 h 55 min while the client got nothing; hd_min_free_heap 4788 (boot) -> 1028 (21:59:33) -> 200 (22:02:33) -> 172 (23:59:40), freeheap 38-46 KB. The ws_drops counter catches the burst at the stall start but not the ongoing silence. Evidence: OTGW-field-data/bench-otgw32/2026-11-21_task3017-ac3-56dd422/ (cap3017ac3-61, info3017ac3-61, state-after/). .61 kept on 56dd422 untouched for a live look (coordinator).
 <!-- SECTION:NOTES:END -->
