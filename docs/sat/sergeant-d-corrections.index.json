@@ -5721,6 +5721,19 @@
    "tasks": [
     "TASK-2005"
    ],
+   "confirmed_by_entry": 433
+  },
+  {
+   "id": 433,
+   "title": "Robert confirms entry 432: his \"A\" is the answer to Q-2005d (maintainer, 2026-11-21; Sergeant D's own answer still open)",
+   "date": "2026-11-21",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1573514041194717198",
+   "supersedes": [],
+   "tasks": [
+    "TASK-2005"
+   ],
    "confirmed_by_entry": null
   }
  ]

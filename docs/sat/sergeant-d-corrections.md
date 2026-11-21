@@ -8538,3 +8538,18 @@ Robert, 16:18:42 UTC (https://discord.com/channels/812969634638725140/9144987300
 **Task:** TASK-2005 follow-up for otgw-dev (implementation prepared, built only after Robert's requested analysis of minimal switching, 2026-11-21 01:32 UTC).
 
 **Open:** Robert's confirmation of the reading; Sergeant D's answer to Q-2005d.
+
+## 433. Robert confirms entry 432: his "A" is the answer to Q-2005d (maintainer, 2026-11-21; Sergeant D's own answer still open)
+
+**Source:** #dev-sat-mqtt, Robert (maintainer) 2026-11-21 ~02:52 UTC (https://discord.com/channels/812969634638725140/1105556725714649128/1573514041194717198), a reply to the confirmation question (https://discord.com/channels/812969634638725140/1105556725714649128/1573512754386698291: "is your "A" here the answer to Q-2005d (after the fail-safe, stay in PWM until flame-off)?").
+
+**Quoted:**
+> "Yes"
+
+**Settled:** the interpretation of entry 432 is confirmed by the maintainer. After the 3.0 C fail-safe has switched back to PWM inside a burn, SAT stays in PWM until flame-off (Q-2005d option A). Entry 432 is not rewritten; this entry confirms it.
+
+**Compared with thermo-nova (7beaaf5):** as entry 432: no counterpart (heating_control.py:262-305 re-enables PWM any number of times per flame; its exits :307-376 work again right after).
+
+**Task:** TASK-2005 follow-up for otgw-dev (implementation of A; built after Robert's requested analysis of minimal switching is reviewed).
+
+**Open:** Sergeant D's own answer to Q-2005d (Q-2005d stays asked).
