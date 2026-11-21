@@ -1,13 +1,13 @@
 ---
 id: "ADR-292"
-title: "SAT ground truth: our implementation and the recorded decisions are leading, Alex Wijn's SAT is a reference (proposed successor to ADR-196)"
-status: "Proposed"
+title: "SAT ground truth: our implementation and the recorded decisions are leading, Alex Wijn's SAT is a reference (supersedes ADR-196)"
+status: "Accepted"
 date: "2026-11-21"
 binding: false
 gate: null
 documents_shipped: false
 verified_in: []
-supersedes: []
+supersedes: ["ADR-196"]
 superseded_by: null
 topics:
   - "sat"
@@ -68,6 +68,11 @@ status_history:
     status: Proposed
     changed_by: "Agent: Claude"
     reason: Initial proposal, from the maintainer directive of 2026-11-21 (TASK-3013 named in the test docstring and the directive changelog)
+    changed_via: adr-kit
+  - date: 2026-11-21
+    status: Accepted
+    changed_by: "User: Robert van den Breemen"
+    reason: Accepted by the maintainer in the coordinator session (AskUserQuestion, 2026-11-21); supersedes ADR-196
     changed_via: adr-kit
 ```
 
@@ -303,7 +308,7 @@ cannot read from a diff.
   but this one is only in the rule block and the directive changelog).
 - [ ] Robert: the parity tests and `scripts/inspect_sat_reference.py` (point at
   `other-projects/SAT-develop/`, at a 7beaaf5 checkout, or retire).
-- [ ] Robert: accept this ADR; on acceptance write `supersedes: ["ADR-196"]`
+- [x] Robert: accept this ADR (accepted 2026-11-21); on acceptance write `supersedes: ["ADR-196"]`
   here, mark ADR-196 Superseded by ADR-292 and add the README note.
 
 ## Related Decisions

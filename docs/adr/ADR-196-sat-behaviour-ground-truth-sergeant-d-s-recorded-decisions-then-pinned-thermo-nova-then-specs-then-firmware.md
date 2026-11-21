@@ -1,14 +1,14 @@
 ---
 id: "ADR-196"
 title: "SAT behaviour ground truth: Sergeant D's recorded decisions, then pinned thermo-nova, then specs, then firmware"
-status: "Accepted"
+status: "Superseded"
 date: "2026-10-24"
 binding: false
 gate: null
 documents_shipped: false
 verified_in: []
 supersedes: []
-superseded_by: null
+superseded_by: "ADR-292"
 topics:
   - "sat"
   - "governance"
@@ -61,6 +61,11 @@ status_history:
     changed_by: "User: Robert van den Breemen"
     reason: Accepted decision after all four verification gates passed
     changed_via: adr-kit lifecycle
+  - date: 2026-11-21
+    status: Superseded
+    changed_by: "User: Robert van den Breemen"
+    reason: Superseded by ADR-292 (our implementation and the recorded decisions are leading; Alex Wijn's SAT is a reference)
+    changed_via: adr-kit
 ```
 
 ## Context
