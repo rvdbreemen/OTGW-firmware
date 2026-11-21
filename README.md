@@ -255,7 +255,7 @@ automation:
           payload: "{{ states('sensor.outdoor_temperature') }}"
 ```
 
-More examples: [Outside Temperature Override](example-api/outside_temperature_override_examples.md) | [Hot Water Control](example-api/hotwater_examples.md)
+More examples: [Outside Temperature Override](docs/archive/1.x/example-api/outside_temperature_override_examples.md) | [Hot Water Control](docs/archive/1.x/example-api/hotwater_examples.md)
 
 ### Alternative: built-in HA OpenTherm Gateway integration
 
