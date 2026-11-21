@@ -5,7 +5,7 @@ status: To Do
 assignee:
   - '@otgw-dev'
 created_date: '2026-11-21T03:28:00Z'
-updated_date: '2026-11-21T07:55:00Z'
+updated_date: '2026-11-21T08:37:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -45,4 +45,6 @@ Sergeant D, entry 437 (#dev-sat-mqtt 2026-11-21 03:25 UTC, msg 15735397191475529
 2026-11-21 (92): Q-444a answered (entry 446, msg 1573605458000879747): 'during the PWM OFF we keep the last PWM ON boiler flow temperature ... we freeze the flow temperature'. Read as A = as built (frozen flow, duty recomputed with the current request). No code change needed.
 
 2026-11-21 (92): entry 447: Sergeant D confirmed explicitly (msg 1573607198859460671): during PWM OFF the request stays active and may change the OFF duty; only the flow is frozen. That matches the build.
+
+2026-11-21 (92): otgw-dev found on the .61 bench that the +30 s tick lands at +30003 / +30023 ms (firmware tick jitter), so a strict 30 s window would miss that tick about half the time. 1 s slack added: an implementation of entry 443 (one tick after ignition, incl. the +30 s tick), not a behaviour change; no question to Sergeant D. Requested test: tick at +30.02 s filtered, +60 s live.
 <!-- SECTION:NOTES:END -->
