@@ -3,11 +3,11 @@ id: TASK-3011
 title: >-
   SAT uses an unchosen BLE sensor (possibly a neighbour's) over the thermostat
   room temperature when no BLE MAC is pinned
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-21T15:38:00Z'
-updated_date: '2026-11-21T20:04:00Z'
+updated_date: '2026-11-21T20:44:00Z'
 labels:
   - sat
   - ble
@@ -86,3 +86,9 @@ Scope after the answers: SATcontrol.ino (satGetRoomTemp + source enum), SATble.i
 
 2026-11-21 final check (otgw-bench-tester, beta.416+5076410 on .61): PASS githash 5076410, no restart beyond flash/own reboot, crashlog none; retained sat/room_source cleared on the broker, after a reboot a subscriber started ~35 s later received 'auto' as first message; MQTT set thermostat -> retained 'thermostat' within 5 s; UI hint shown for external+satexternaltemp off, BLE+no pin, areas+satmultiarea off, hidden for external+on and auto (screenshots OTGW-field-data/bench-otgw32/2026-11-21_task3011-5076410/ui3011b-61/). Settings restored; settings.ini differs only by the migration keys.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+BLE feeds SAT only from the pinned sensor (no-pin path and the TASK-508 auto-select removed; failover default off, only to an area-assigned sensor); one-time migration SATblepinonly keeps a stored pin with a confirm notice (ble_pin_notice, Confirm = re-POST ble_mac); primary room source SATroomsource (default auto = today's order, explicit primary first, stale -> auto order -> curve only; the primary only orders enabled sources) over REST, MQTT set/<node>/sat/room_source and retained sat/room_source in the core set; web UI select, hint, room-tile source, banner (otgw-webui). ADR-293 Accepted by Robert. Evidence: tests/test_sat_ble_pin_only.py 21 OK (red on origin/dev: 10 BLE/migration fails, 3 primary-source fails on part 1, core-set case red before its fix), tests/webui/sat-ble-pin-room-source.test.mjs 5/5, 25 related test files PASS, evaluate 0 FAIL; bench by otgw-bench-tester on .61: combined 4874e79 PASS, re-check with SAT running PASS, final 5076410 PASS (retained room_source after reboot, UI hint 5 cases). Pushed c3d3f637c (beta.416), zip posted #alpha-testing message 1573792391176130572. Not verified: a real BLE sensor in range (OTGW32 has BLE off; the pin path was tested with a synthetic MAC and host tests).
+<!-- SECTION:FINAL_SUMMARY:END -->

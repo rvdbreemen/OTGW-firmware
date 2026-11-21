@@ -1596,7 +1596,7 @@ The firmware publishes heap-pressure and discovery counters as 26 individual ret
 
 | Metric topic suffix | Type | Kind | Meaning |
 | ------------------- | ---- | ---- | ------- |
-| `ws_drops` | uint32 | session counter | WebSocket messages dropped due to heap pressure since boot. |
+| `ws_drops` | uint32 | session counter | WebSocket messages dropped since boot: refused while the heap is CRITICAL, or not queued for every connected client because a client's send queue was full (TASK-3017). A climbing value with clients connected points at a client that stopped reading. |
 | `mqtt_drops` | uint32 | session counter | MQTT messages dropped due to heap pressure since boot. |
 | `enter_low` | uint32 | session counter | Transitions into the `HEAP_LOW` tier (from `HEALTHY`). |
 | `enter_warning` | uint32 | session counter | Transitions into the `HEAP_WARNING` tier. |

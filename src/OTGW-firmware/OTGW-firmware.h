@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v2.0.0-beta.416
+**  Version  : v2.0.0-beta.417
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -595,7 +595,7 @@ struct DiscoverySection {                    // state.discovery — MQTT auto-di
 // NOT automatically surface on MQTT — add a corresponding
 // case to publishStatAt() in MQTTstuff.ino and raise STATS_COUNT.
 struct HeapDiagSection {                 // state.heapdiag — cumulative heap-pressure diagnostics (reset on reboot)
-  uint32_t iWsDropsTotal            = 0; // lifetime WebSocket messages dropped due to heap pressure
+  uint32_t iWsDropsTotal            = 0; // lifetime WebSocket messages dropped: refused at heap CRITICAL, or not queued for every client (a full client queue, TASK-3017)
   uint32_t iMqttDropsTotal          = 0; // lifetime MQTT messages dropped due to heap pressure
   uint32_t iEnteredLowCount         = 0; // transitions into HEAP_LOW tier (from HEALTHY)
   uint32_t iEnteredWarningCount     = 0; // transitions into HEAP_WARNING tier

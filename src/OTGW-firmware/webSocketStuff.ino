@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : webSocketStuff.ino
-**  Version  : v2.0.0-beta.416
+**  Version  : v2.0.0-beta.417
 **
 **  Copyright (c) 2021-2025 Robert van den Breemen
 **
@@ -286,6 +286,16 @@ char wsSafeBuf[OT_LOG_BUFFER_SIZE];
 // bytes of two lines mixed in one buffer.
 static volatile bool wsSafeBufBusy = false;
 
+// TASK-3017: textAll() reports per message whether every connected client queued it. A client whose queue is full
+// (WS_MAX_QUEUED_MESSAGES, ESPAsyncWebServer AsyncWebSocketClient::_queueMessage()) gets the message silently
+// discarded; such a client keeps its socket and receives nothing. Count every message that did not reach every client
+// in ws_drops, so a stalled client is visible instead of a drop counter that stays 0.
+// --- wsNoteSendStatus begin
+static void wsNoteSendStatus(AsyncWebSocket::SendStatus st) {
+  if (st != AsyncWebSocket::ENQUEUED) state.heapdiag.iWsDropsTotal++;
+}
+// --- wsNoteSendStatus end
+
 void sendLogToWebSocket(const char* logMessage) {
   if (hasWebSocketClients() && logMessage != nullptr && canSendWebSocket()) {
     // Chrome closes the socket on a text frame that is not valid UTF-8 (TASK-1300):
@@ -293,12 +303,12 @@ void sendLogToWebSocket(const char* logMessage) {
     // character. Sanitise a copy at this transport boundary, so the PIC bytes stay
     // verbatim on serial, telnet, port 25238 and the raw diagnose path (ADR-177).
     if (wsUtf8Valid(logMessage)) {
-      otLogWs.textAll(logMessage);
+      wsNoteSendStatus(otLogWs.textAll(logMessage));
     } else {
       if (wsSafeBufBusy) return;
       wsSafeBufBusy = true;
       wsUtf8Sanitize(logMessage, wsSafeBuf, sizeof(wsSafeBuf));
-      otLogWs.textAll(wsSafeBuf);
+      wsNoteSendStatus(otLogWs.textAll(wsSafeBuf));
       wsSafeBufBusy = false;
     }
   }

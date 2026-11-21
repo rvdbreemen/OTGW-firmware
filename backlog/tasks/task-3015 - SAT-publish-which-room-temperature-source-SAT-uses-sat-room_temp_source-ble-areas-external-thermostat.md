@@ -3,11 +3,11 @@ id: TASK-3015
 title: >-
   SAT: publish which room temperature source SAT uses (sat/room_temp_source: ble
   / areas / external / thermostat)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-21T16:21:00Z'
-updated_date: '2026-11-21T17:05:00Z'
+updated_date: '2026-11-21T20:44:00Z'
 labels:
   - sat
   - mqtt
@@ -39,3 +39,9 @@ gruijter, #alpha-testing msg 1573734878216855563 (2026-11-21): MQTT clients cann
 
 2026-11-21 (otgw-dev, coordinator decision 4 = yes): HA diagnostic sensor entity SAT_Room_Temp_Source on sat/room_temp_source (id 252 row, HaEntityCat::diagnostic, flat topic per ADR-101); MQTT_HA_SENSOR_COUNT 405 -> 406 and mqttHaSensorIndex recomputed (6 entries after the insert shift). Discovery tests 9 files PASS (test_sat_energy_discovery, test_ble_discovery_1462, test_sat_health_discovery and others; the first run failed 3 files on the stale index before the recompute). test_sat_ble_pin_only checks the entity row.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+sat/room_temp_source (retained; ble, areas, external, thermostat, simulation, estimate, none), status field room_temp_source and one HA diagnostic sensor SAT_Room_Temp_Source; satGetRoomTemp() records its source at every return and the REST room age reads it. Evidence: tests/test_sat_ble_pin_only.py (every return records a source, topic/REST/discovery present), discovery tests 9 files PASS (index recomputed), bench on .61: discovery entity present, room_temp_source published retained with SAT running (re-check). Shipped with TASK-3011 in c3d3f637c (beta.416).
+<!-- SECTION:FINAL_SUMMARY:END -->

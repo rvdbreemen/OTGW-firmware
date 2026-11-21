@@ -3007,11 +3007,22 @@
     var url = (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + BASE + WS_PATH;
     try {
       ws = new WebSocket(url);
-      ws.onmessage = onWsMessage;
-      ws.onopen = function () { wsOpenMs = Date.now(); noteWsMark(true); };
+      // TASK-3017: every message, the 30 s keepalive included, proves the stream is alive (wsWatchdogTick)
+      ws.onmessage = function (ev) { wsLastMsgMs = Date.now(); onWsMessage(ev); };
+      ws.onopen = function () { wsOpenMs = Date.now(); wsLastMsgMs = wsOpenMs; noteWsMark(true); };
       ws.onclose = function () { ws = null; noteWsMark(false); scheduleReconnect(); fetchSeed(); };
       ws.onerror = function () { try { if (ws) ws.close(); } catch (e) { } };
     } catch (e) { scheduleReconnect(); }
+  }
+  // TASK-3017: a socket can stay open while the stream stops (seen on .61 after ~14 min); onclose then never fires
+  // and the page would wait forever. The firmware sends {"type":"keepalive"} every 30 s (webSocketStuff.ino
+  // KEEPALIVE_INTERVAL_MS), so 90 s without any message (three keepalives missed) closes the socket and onclose
+  // reconnects. PS=1 keeps its own check (psCheckTick); a socket that is still connecting is left alone.
+  var WS_SILENCE_MS = 90000, wsLastMsgMs = 0;
+  function wsWatchdogTick() {
+    if (!ws || ws.readyState !== 1 || psMode) return;
+    if (Date.now() - Math.max(wsOpenMs, wsLastMsgMs) < WS_SILENCE_MS) return;
+    try { ws.close(); } catch (e) { }
   }
   function scheduleReconnect() {
     if (wsTimer) return;
@@ -5606,6 +5617,7 @@
   var DEVTIME_POLL_MS = 10000;
   var psMode = false, wsOpenMs = 0, wsLastFrameMs = 0, devTimeInflight = false, devTimeLastMs = 0;
   function psCheckTick() {
+    wsWatchdogTick();   // TASK-3017: also in a hidden tab, so a stuck socket is replaced before the tab is shown again
     if (document.hidden || devTimeInflight || !ws || ws.readyState !== 1) return;
     var now = Date.now();
     var quietSince = Math.max(wsOpenMs, wsLastFrameMs);
