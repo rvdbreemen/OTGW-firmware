@@ -7,6 +7,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-21T14:02:00Z'
+updated_date: '2026-11-21T15:24:00Z'
 labels:
   - tooling
 milestone: 2.0.0
@@ -27,3 +28,9 @@ will_85903's 31 h capture (beta.392 device, capture tool on Windows, Python 3.14
 - [ ] #2 The tool notices a recorder that produced nothing for N minutes and reports it in summary.txt and gaps.log instead of continuing silently
 - [ ] #3 The upload zip contains mqtt.log whenever the summary reports MQTT messages, or the summary says why it is missing
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-21 (BlueFlame): likely cause from the tester, #beta-testing msg 1573720571928248551 (will_85903): 'Think that was me closing the lid of my laptop'. Laptop sleep stops the capture process, so the recorders going silent after ~45 min is probably host sleep, not a tool bug. Open for this task: the missing mqtt.log while the summary claimed 143k messages is not explained by sleep; and the tool could detect a host sleep (wall-clock jump with no frames) and say so in summary.txt / gaps.log, plus keep the machine awake (Windows SetThreadExecutionState) while recording.
+<!-- SECTION:NOTES:END -->
