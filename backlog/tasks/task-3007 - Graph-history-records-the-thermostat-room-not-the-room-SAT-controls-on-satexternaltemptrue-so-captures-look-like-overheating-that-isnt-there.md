@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-21T14:21:00Z'
+updated_date: '2026-11-21T14:55:00Z'
 labels:
   - graph
   - sat
@@ -27,3 +28,9 @@ will_85903's capture (OTGW-field-data/will_85903/2026-11-21_upload/, beta.392, s
 - [ ] #2 With SAT on and an external room sensor, the graph history and its CSV/JSON export carry the room SAT regulates on (or both values, labelled)
 - [ ] #3 Test on the real graph-history code red before / green after; web UI Monitor graph checked
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-21 (BlueFlame): will_85903 sent openHAB event logs (OTGW-field-data/will_85903/2026-11-21_upload/openhab/, room_sources.csv). OTGW_SATIndoorTemperature (the room SAT regulates on, from his MQTT sensor) vs OTGW_Tr (thermostat): SAT room 0.3-1.1 C lower all day (e.g. 20 Nov 15:00 20.96 vs 21.72; 21 Nov 03:00 18.56 vs 19.62). 20 Nov 13:45-18:55 SAT room 20.54-21.67 against target 21: the afternoon burns were justified; the graph history (thermostat room 21.6-22) made it look like overheating. Confirms this task's premise with a second source. Chart: charts/overview-v2.png, posted to #beta-testing msg 1573713243640430612.
+<!-- SECTION:NOTES:END -->
