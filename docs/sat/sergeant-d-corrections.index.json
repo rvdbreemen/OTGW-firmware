@@ -5912,6 +5912,19 @@
    "tasks": [
     "TASK-2993"
    ],
+   "confirmed_by_entry": 447
+  },
+  {
+   "id": 447,
+   "title": "Confirmed: during PWM OFF only the flow is frozen; the requested setpoint stays active and may change the OFF duty (Sergeant D, 2026-11-21; confirms our interpretation in entry 446)",
+   "date": "2026-11-21",
+   "source": "sergeant-d",
+   "kind": "interpretation",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1573607198859460671",
+   "supersedes": [],
+   "tasks": [
+    "TASK-2993"
+   ],
    "confirmed_by_entry": null
   }
  ]

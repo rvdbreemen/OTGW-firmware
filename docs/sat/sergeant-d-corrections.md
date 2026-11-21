@@ -8783,3 +8783,18 @@ Robert, 16:18:42 UTC (https://discord.com/channels/812969634638725140/9144987300
 **Task:** TASK-2993 (no change: built as A).
 
 **Open:** Q-444b (hot-water tick, parked for 2.1.0). Lesson for us: the question was too technical; he answered with the principle.
+
+## 447. Confirmed: during PWM OFF only the flow is frozen; the requested setpoint stays active and may change the OFF duty (Sergeant D, 2026-11-21; confirms our interpretation in entry 446)
+
+**Source:** #dev-sat-mqtt, Sergeant D 2026-11-21 07:53:12 UTC (https://discord.com/channels/812969634638725140/1105556725714649128/1573607198859460671), a reply to our acknowledgement of entry 446 (https://discord.com/channels/812969634638725140/1105556725714649128/1573606103009464391); unedited when read back via the Discord API more than 90 s later.
+
+**Quoted:**
+> "keep in mind that the requested setpoint is active during PWM OFF and it may change the PWM OFF duty cycle. Only the flow water temperature is freezed"
+
+**Settled:** during PWM OFF the duty is (current request - base) / (frozen flow - base): the flow of the last ON tick is frozen, the request is not. This is option A of Q-444a and turns the interpretation in entry 446 into his explicit statement. Built that way in TASK-2993 (_pwm_lastOnFlowTemp, lane d3-duty2993).
+
+**Compared with thermo-nova (7beaaf5):** the same structure: a held temperature, the duty recomputed every update with the current request (pwm.py:144-149, 229-239).
+
+**Task:** TASK-2993 (no change).
+
+**Open:** none.
