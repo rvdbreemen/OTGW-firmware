@@ -3,11 +3,11 @@ id: TASK-3000
 title: >-
   MQTT: publish the per-MsgID OT support table (boiler and thermostat,
   read/write) retained, like /api/v2/otgw/ot-support
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-21T10:20:00Z'
-updated_date: '2026-11-21T13:17:00Z'
+updated_date: '2026-11-21T13:55:00Z'
 labels:
   - mqtt
   - feature
@@ -27,7 +27,7 @@ gruijter, #alpha-testing 2026-11-21 (msg 1573643085097738272): 'could the per-Ms
 <!-- AC:BEGIN -->
 - [x] #1 Retained MQTT topics publish, for the boiler, the MsgIDs with read ack, write ack and unknown (CSV, same format as unsupported_msgids), and for the thermostat the MsgIDs it sent as read and as write; the values match GET /api/v2/otgw/ot-support on the same unit
 - [x] #2 Topics update on change and after an MQTT reconnect without overwriting a retained value with an empty one before the data is known (TASK-1781 lesson)
-- [ ] #3 Topic names and payloads documented in the MQTT docs; gruijter told the topic names in #alpha-testing
+- [x] #3 Topic names and payloads documented in the MQTT docs; gruijter told the topic names in #alpha-testing
 - [x] #4 Host test on the real publish code red before / green after; evaluate --quick no new FAIL; bench check on a unit via the NAS broker
 <!-- AC:END -->
 
@@ -51,4 +51,12 @@ Two retained CSV topics in the unsupported_msgids shape (ADR-101 holds: a CSV sc
 2026-11-21 12:22 (otgw-dev): rebased onto bce9496a5 (TASK-2993 push), one commit fd70da50c, bump beta.411. Build esp32-combo 12:11-12:22 exit 0, 'Build completed successfully': 2.0.0-beta.411+fd70da5; ino.bin 2154528 B vs 2153920 B on bce9496 = +608 B; app partition 2154091/2293760 B (93.9%). Artifacts + SHA256SUMS: OTGW-artifacts\beta.411+fd70da5\. Bench files (format-3 ot-boiler.json / ot-thermo.json with long lists + expected-topics.txt): OTGW-artifacts\task3000-bench\. Bench requested via the coordinator. Not yet: bench (AC1/AC2 on device, AC4 bench part), gruijter notice (AC3, after the push).
 
 Bench (otgw-bench-tester, 2026-11-21, .61 OTGW32 loopback, beta.411+fd70da5 app 8e2c2dfe/fs 402d08af, NAS broker 192.168.88.36): AC1 bench: after upload of task3000-bench ot-boiler.json/ot-thermo.json + reboot 14:08:04, boiler/supported_msgids, thermostat/sent_msgids, boiler/unsupported_msgids each byte-equal to expected-topics.txt (1 msg each, 0 empty); GET /api/v2/otgw/ot-support blAR/blAW, tsR/tsW, blUR/blUW lists == expected. AC2 bench (reconnect part): MQTT drop via mqttbroker 192.0.2.1 14:13:08 -> back 14:13:49, after the reconnect 1 msg per topic, 0 not-equal, 0 empty; no empty value during the reboot either (sub without -R from before the reboot). On-change part: host test only (no external trigger on loopback). AC4 bench: done via the NAS broker as above. Files + settings restored, settings.ini no diff. Evidence: OTGW-field-data/bench-otgw32/2026-11-21_task3000-fd70da5/ (steps.log, live-sub.raw, live-msgids.txt, step4-msgids.txt, ot-support.json, SHA256SUMS).
+
+2026-11-21 (otgw-dev): AC3: docs in docs/api/MQTT.md, manuals ch09/h09 (+ MANUAL.md), c4; gruijter told the topic names, example payloads and the rules by BlueFlame in #alpha-testing (msg 1573690224960344067, read back equal).
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+AC1: retained otgw-firmware/boiler/supported_msgids (blAR/blAW) and otgw-firmware/thermostat/sent_msgids (tsR/tsW) next to the existing unsupported_msgids (blUR/blUW), CSV '<id>R...,<id>W...'; bench .61 (beta.411+fd70da5, uploaded long-list ot-*.json): all three byte-equal to expected-topics.txt and equal to GET /api/v2/otgw/ot-support (otgw-bench-tester, OTGW-field-data/bench-otgw32/2026-11-21_task3000-fd70da5/). AC2: update per minute on a newly set bit (OT_SUPPORT_LIST_* dirty bits), republish in its own connect stage 5 with a retry mark on refusal, never published empty; host tests tests/test_mqtt_ot_support_lists.py 10/10 (red on origin/dev: 3 FAIL + ERROR) and test_mqtt_connect_staging.py 10/10 (retry test red without the mark); bench: 0 empty values during reboot and after an MQTT drop/reconnect. AC3: docs/api/MQTT.md, manuals EN/NL, MANUAL.md, c4; gruijter told in #alpha-testing msg 1573690224960344067. AC4: host tests red/green as above, full sweep 355/357 (manual regen fixed), evaluate --quick 0 FAIL, bench via the NAS broker. Pushed 8c929eee2 (beta.411), zip post 1573690022371135490; flash +608 B (app partition 93.9 %). Not verified on a device: the per-minute update after a live new MsgID (no external trigger on a loopback unit; host test only).
+<!-- SECTION:FINAL_SUMMARY:END -->
