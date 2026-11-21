@@ -224,7 +224,8 @@ def _vcvars():
 def compile_cpp(cpp: Path, exe: Path):
     for cc in ("g++", "clang++"):
         if shutil.which(cc):
-            subprocess.run([cc, "-std=c++17", "-o", str(exe), str(cpp)], check=True)
+            # TASK-3020: -O2: test_sat_tuner_convergence runs long simulations; unoptimised on the NAS it passed 900 s
+            subprocess.run([cc, "-std=c++17", "-O2", "-o", str(exe), str(cpp)], check=True)
             return exe
     bat = _vcvars()
     if bat:

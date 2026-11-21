@@ -40,7 +40,9 @@ def gxx_compile(cpp: Path, exe: Path, extra=""):
     cc = shutil.which("g++") or shutil.which("clang++")
     if not cc:
         return None, "no MSVC and no g++/clang++"
-    args = [cc, "-std=c++17", "-w", "-DBOARD_NODOSHOP_ESP32_COMBO", "-DESP32"]
+    # -fpermissive: the assembled unit declares a few functions extern (from the sources) and then defines stubs
+    # static; MSVC accepts that, g++ only with -fpermissive (as a warning).
+    args = [cc, "-std=c++17", "-w", "-fpermissive", "-DBOARD_NODOSHOP_ESP32_COMBO", "-DESP32"]
     args += [f"-I{p}" for p in (HERE / "sat_loop_stubs", FW, PLAT, REPO / "src" / "libraries" / "OpenTherm")]
     for opt in re.findall(r'/([DI])("[^"]*"|\S+)', extra or ""):
         args.append(f"-{opt[0]}{opt[1].strip(chr(34))}")
