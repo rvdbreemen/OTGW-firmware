@@ -1,7 +1,5 @@
 # Architecture Decision Records (ADRs)
 
-- **[ADR-290: Opt-in cloud telemetry from the gateway: outbound TLS to a self-hosted collection point, one compressed record a minute, bridge commands included](ADR-290-opt-in-cloud-telemetry-from-the-gateway.md)** 🆕 *(Accepted)*  
-- **[ADR-263: BLE and remote telemetry buffers may be allocated once from PSRAM at init (partly supersedes ADR-053)](ADR-263-ble-and-remote-telemetry-buffers-may-be-allocated-once-from-psram-at-init-partly-supersedes-adr-053.md)** 🆕 *(Accepted)*  
 This directory contains Architecture Decision Records (ADRs) that document significant architectural choices made in the OTGW-firmware project.
 
 ## What are ADRs?
@@ -637,6 +635,9 @@ Counts above are advisory rather than hand-maintained; the canonical set is the 
 - **[ADR-242: OT-Direct state has one writer: commands from other tasks run on the loop task through an ordered text ring](ADR-242-ot-direct-state-has-one-writer-commands-from-other-tasks-run-on-the-loop-task-through-an-ordered-text-ring.md)** 🆕 *(Proposed)*  
   A REST `GW=R` ran `resetTransientState()` on async_tcp next to `loopOTDirect()`, and a `CS=` right after it was wiped by the late reset (TASK-1761). Commands from another task go into a text ring (7 commands) in arrival order and run on the loop task between frames, never while a frame is in flight; a loop-task caller drains the ring first and keeps SAT's synchronous result; a full ring is Dropped and REST answers 503. Gate: `tests/test_otd_loop_task_commands.py`.
 
+- **[ADR-290: Opt-in cloud telemetry from the gateway: outbound TLS to a self-hosted collection point, one compressed record a minute, bridge commands included](ADR-290-opt-in-cloud-telemetry-from-the-gateway.md)** 🆕 *(Accepted)*  
+  Research PoC only (`esp32-combo-tlsdyn`, `HAS_REMOTE_TELEMETRY`, branch `research/cloud-recording`). An opt-in gateway enrolls itself and sends one LZ-coded, CRC-checked record a minute (OT frames, SATTICK, debug, events) over outbound TLS (esp-tls, session tickets, dynamic mbedTLS buffers) to a self-hosted PocketBase; 30-day retention, a 403 `otgw-blocked` reply turns the opt-in off, a central telemetry mode per gateway. Records port 25238 bridge commands inbound for this recorder only (narrows ADR-213's exclusion). Guideline-level per ADR-080; host-tested, bench pending.
+
 - **[ADR-173: Client Poll Pacing, Locally-Ticked Device Clock, and 429 Pause in the v2 Web UI](ADR-173-client-poll-pacing-local-clock-429-rephase.md)** 🆕 *(Accepted)*  
   Rewritten for the v2-only UI (ADR-192). `v2.js` names its poll periods (`OTMON_POLL_MS` 2 s, `DEVTIME_POLL_MS` 10 s) so `check_poll_window_coupling` can pair them with the firmware windows, polls otmonitor only while Monitor > Values is open or the PIC is in PS=1 mode, and routes every caller through one fetcher with an in-flight guard. A 429 pauses all callers for the `retry_after` read from the problem body (3 s fallback). The device clock ticks locally.
 
@@ -766,6 +767,8 @@ Counts above are advisory rather than hand-maintained; the canonical set is the 
   Binding (ADR-080), gated by `tests/test_bridge25238_sat_filter.py` on the real `handlePICSerial()`. With SAT off port 25238 stays byte-transparent; with SAT on each inbound line is held to CR, CS/CH/MM/C2/H2/TT/TC and non-text lines are dropped and counted (`ext_bridge_dropped`), allowed lines pass byte-identical (TASK-1695).
 
 - **[ADR-218: Allow outbound TLS client requests on boards with PSRAM, inbound stays plain HTTP (amends ADR-003)](ADR-218-allow-outbound-tls-client-requests-on-boards-with-psram-inbound-stays-plain-http-amends-adr-003.md)** 🆕 *(Proposed, parked)*  
+  Robert's TLS rules (PSRAM boards only, mini CA bundle, fallback or disable per feature) with the 2026-11-07 proof of concept; parked until a firmware feature needs an HTTPS request (no current user, TASK-1689).
+- **[ADR-263: BLE and remote telemetry buffers may be allocated once from PSRAM at init (partly supersedes ADR-053)](ADR-263-ble-and-remote-telemetry-buffers-may-be-allocated-once-from-psram-at-init-partly-supersedes-adr-053.md)** 🆕 *(Accepted)*  
   Robert's TLS rules (PSRAM boards only, mini CA bundle, fallback or disable per feature) with the 2026-11-07 proof of concept; parked until a firmware feature needs an HTTPS request (no current user, TASK-1689).
 
 - **[ADR-219: Translate the web UI with a t() helper, English built in, NL and DE packs on LittleFS](ADR-219-translate-the-web-ui-with-a-t-helper-english-built-in-nl-and-de-packs-on-littlefs.md)** 🆕 *(Accepted)*  
