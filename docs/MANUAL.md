@@ -4896,6 +4896,7 @@ The commands below pass the payload unchanged to the named setting, the same set
 | `sat/fireplace_mode` | `SATfireplace` |
 | `sat/mqtt_fallback` | `SATmqttfallback` |
 | `sat/external_temp` | `SATexternaltemp` |
+| `sat/room_source` | `SATroomsource` |
 | `sat/flame_off_offset` | `SATflameoffset` |
 | `sat/overshoot_protection` | `SATovershootprotection` |
 | `sat/flow_offset` | `SATflowoffset` |
