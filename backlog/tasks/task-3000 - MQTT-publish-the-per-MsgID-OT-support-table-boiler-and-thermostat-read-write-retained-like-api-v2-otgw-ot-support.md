@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-21T10:20:00Z'
-updated_date: '2026-11-21T11:23:00Z'
+updated_date: '2026-11-21T13:17:00Z'
 labels:
   - mqtt
   - feature
@@ -25,10 +25,10 @@ gruijter, #alpha-testing 2026-11-21 (msg 1573643085097738272): 'could the per-Ms
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Retained MQTT topics publish, for the boiler, the MsgIDs with read ack, write ack and unknown (CSV, same format as unsupported_msgids), and for the thermostat the MsgIDs it sent as read and as write; the values match GET /api/v2/otgw/ot-support on the same unit
-- [ ] #2 Topics update on change and after an MQTT reconnect without overwriting a retained value with an empty one before the data is known (TASK-1781 lesson)
+- [x] #1 Retained MQTT topics publish, for the boiler, the MsgIDs with read ack, write ack and unknown (CSV, same format as unsupported_msgids), and for the thermostat the MsgIDs it sent as read and as write; the values match GET /api/v2/otgw/ot-support on the same unit
+- [x] #2 Topics update on change and after an MQTT reconnect without overwriting a retained value with an empty one before the data is known (TASK-1781 lesson)
 - [ ] #3 Topic names and payloads documented in the MQTT docs; gruijter told the topic names in #alpha-testing
-- [ ] #4 Host test on the real publish code red before / green after; evaluate --quick no new FAIL; bench check on a unit via the NAS broker
+- [x] #4 Host test on the real publish code red before / green after; evaluate --quick no new FAIL; bench check on a unit via the NAS broker
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -49,4 +49,6 @@ Two retained CSV topics in the unsupported_msgids shape (ADR-101 holds: a CSV sc
 2026-11-21 (otgw-dev): topic -> REST mapping (per msgid in GET /api/v2/otgw/ot-support): blAR <=> '<id>R' in otgw-firmware/boiler/supported_msgids, blAW <=> '<id>W' there; tsR <=> '<id>R' in otgw-firmware/thermostat/sent_msgids, tsW <=> '<id>W' there; blUR/blUW <=> '<id>R'/'<id>W' in the existing otgw-firmware/boiler/unsupported_msgids; never seen = in none of the three. Example payloads: boiler/supported_msgids '0R,3R,5R,25R,125R,1W,16W,56W', thermostat/sent_msgids '0R,3R,17R,1W,16W,24W' (read entries first, then write, each ascending). Two topics, not four: the R/W suffix keeps the direction, it is the format of unsupported_msgids that gruijter asked to match, and one parser serves all three topics (ADR-101 holds: a string scalar per topic, no JSON).
 
 2026-11-21 12:22 (otgw-dev): rebased onto bce9496a5 (TASK-2993 push), one commit fd70da50c, bump beta.411. Build esp32-combo 12:11-12:22 exit 0, 'Build completed successfully': 2.0.0-beta.411+fd70da5; ino.bin 2154528 B vs 2153920 B on bce9496 = +608 B; app partition 2154091/2293760 B (93.9%). Artifacts + SHA256SUMS: OTGW-artifacts\beta.411+fd70da5\. Bench files (format-3 ot-boiler.json / ot-thermo.json with long lists + expected-topics.txt): OTGW-artifacts\task3000-bench\. Bench requested via the coordinator. Not yet: bench (AC1/AC2 on device, AC4 bench part), gruijter notice (AC3, after the push).
+
+Bench (otgw-bench-tester, 2026-11-21, .61 OTGW32 loopback, beta.411+fd70da5 app 8e2c2dfe/fs 402d08af, NAS broker 192.168.88.36): AC1 bench: after upload of task3000-bench ot-boiler.json/ot-thermo.json + reboot 14:08:04, boiler/supported_msgids, thermostat/sent_msgids, boiler/unsupported_msgids each byte-equal to expected-topics.txt (1 msg each, 0 empty); GET /api/v2/otgw/ot-support blAR/blAW, tsR/tsW, blUR/blUW lists == expected. AC2 bench (reconnect part): MQTT drop via mqttbroker 192.0.2.1 14:13:08 -> back 14:13:49, after the reconnect 1 msg per topic, 0 not-equal, 0 empty; no empty value during the reboot either (sub without -R from before the reboot). On-change part: host test only (no external trigger on loopback). AC4 bench: done via the NAS broker as above. Files + settings restored, settings.ini no diff. Evidence: OTGW-field-data/bench-otgw32/2026-11-21_task3000-fd70da5/ (steps.log, live-sub.raw, live-msgids.txt, step4-msgids.txt, ot-support.json, SHA256SUMS).
 <!-- SECTION:NOTES:END -->
