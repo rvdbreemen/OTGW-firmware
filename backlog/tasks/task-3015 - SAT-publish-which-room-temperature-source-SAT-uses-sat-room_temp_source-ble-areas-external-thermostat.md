@@ -6,10 +6,10 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-21T16:21:00Z'
+updated_date: '2026-11-21T16:38:00Z'
 labels:
   - sat
   - mqtt
-  - needs-maintainer-ok
 milestone: 2.0.0
 dependencies: []
 priority: medium
@@ -28,3 +28,9 @@ gruijter, #alpha-testing msg 1573734878216855563 (2026-11-21): MQTT clients cann
 - [ ] #2 satGetRoomTemp() records the chosen source; topic published on change with heartbeat (and REST/web UI if decided); HA discovery entity if decided
 - [ ] #3 Host test on the real satGetRoomTemp(): each fallback path yields the right source value (red on old code, green on fix)
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-21: released by Robert in #alpha-testing (msg 1573739250422386720, reply to our TASK-3015 notice): implement as suggested (sat/room_temp_source with values ble / areas / external / thermostat). Design input from gruijter on TASK-3011 (source-order command + retained state) belongs to the same design.
+<!-- SECTION:NOTES:END -->

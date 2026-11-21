@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-21T15:38:00Z'
-updated_date: '2026-11-21T16:39:00Z'
+updated_date: '2026-11-21T16:41:00Z'
 labels:
   - sat
   - ble
@@ -57,4 +57,6 @@ Scope after the answers: SATcontrol.ino (satGetRoomTemp + source enum), SATble.i
 2026-11-21: released by Robert in #alpha-testing (msg 1573738563596591167), recorded as entry 451 in the private SAT decision register: BLE feeds SAT only from a user-chosen sensor; a primary-source setting with multiple fallbacks is to be considered. Open per entry 451: default source order, failover default, migration of existing installs.
 
 2026-11-21 tester input (gruijter, msg 1573738963787714691, not a decision): make the source order MQTT-accessible, a command plus a retained state (e.g. sat/room_temp_sources = areas,external,thermostat), and the active source as its own topic (sat/room_temp_source, see TASK-3015). Design input for the open part of entry 451.
+
+2026-11-21: Robert chose gruijter's MQTT design (msg 1573739569545871583), recorded as entry 452 in the private register: source order via MQTT command + retained state, active source on its own topic (TASK-3015). Final topic names per ADR-101/111 in the plan.
 <!-- SECTION:NOTES:END -->
