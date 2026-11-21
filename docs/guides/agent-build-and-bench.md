@@ -164,8 +164,15 @@ Rules:
   arm resets the `hd_dip_*` snapshot; `hd_min_free_heap` is the allocator watermark since boot and is not
   resettable.
 - **Soaks and reruns** (beta soak, A/B arms) are `bench.sh` runs on the NAS, with an `info:10` poller at minimum.
-- **The `mqtt` job subscribes to the broker on the laptop (192.168.88.32).** That broker has not moved to the
-  NAS yet.
+- **Bench broker = the NAS (192.168.88.36:1883), since 2026-11-21 01:27 (TASK-2986).** Container
+  `otgw-bench-mqtt` (eclipse-mosquitto, `--restart unless-stopped`, host network), config and log in
+  `/volume1/docker/otgw-bench/broker/`, anonymous, no persistence, listener on the NAS LAN IP only (the
+  older `mosquitto-mqtt` container on the NAS keeps 127.0.0.1:1883; leave it alone). The bench units (.61,
+  .63) have `mqttbroker` 192.168.88.36, and the `mqtt` job subscribes there. Read its log with
+  `ssh terradisk '/usr/local/bin/docker exec otgw-bench-mqtt tail /mosquitto/log/mosquitto.log'`. The `%I`
+  timestamps in `mqtt.log` are UTC. A run before 01:27 on 2026-11-21 used another broker (.61: the laptop
+  broker 192.168.88.32, .63: the Home Assistant broker): name the broker in every A/B comparison across
+  that date, a different broker means different ACK timing.
 
 Copy a finished run into the evidence folder with its checksums:
 

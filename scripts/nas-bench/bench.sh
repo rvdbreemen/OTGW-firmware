@@ -20,7 +20,7 @@ start)
       tel)  setsid nohup $PY -I $BIN/tellog.py "$ip" "$R" "$min" >/dev/null 2>>"$R/err.log" < /dev/null & ;;
       info|health|snap) setsid nohup $PY -I $BIN/poll.py "$kind" "$ip" "$R" "$min" "$arg" >/dev/null 2>>"$R/err.log" < /dev/null & ;;
       mqtt) name="otgwbench-$run-mqtt"; $DOCKER run -d --rm --name "$name" --network host -e TZ=Europe/Amsterdam eclipse-mosquitto:latest \
-              timeout $((min*60)) mosquitto_sub -h 192.168.88.32 -t "$arg" -v -F '%I %t %p' > /dev/null
+              timeout $((min*60)) mosquitto_sub -h 192.168.88.36 -t "$arg" -v -F '%I %t %p' > /dev/null
             ( $DOCKER logs -f "$name" >> "$R/mqtt.log" 2>&1 & ); echo "docker:$name" >> "$R/pids"; continue ;;
       *) echo "unknown job $job"; continue ;;
     esac
