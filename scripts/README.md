@@ -119,6 +119,13 @@ only when stdin is a terminal; `--no-prompt` / `-NoPrompt` never prompts. An
 empty broker skips the MQTT stream and writes one summary line saying so
 (TASK-1453). Press `Q` or Ctrl+C to stop; the transcript is still written.
 
+Without `--duration` and `--long-run`, the interactive run also asks how long to capture (TASK-2965):
+`1) Until you press Q`, `2) 24 hours` (the same run as `--long-run --duration 86400`) or `3) 3 days`
+(`--long-run --duration 259200`). The answer is saved and offered as the default next time.
+Started by a double-click, `capture-mqtt-debug.bat` and `flash_otgw.bat` end with
+"Press any key to close this window.", so the last message stays readable; started from cmd or
+PowerShell they exit without waiting.
+
 ### Options
 
 - `--device` / `-DeviceHost`: OTGW device IP address or hostname

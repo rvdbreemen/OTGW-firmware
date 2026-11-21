@@ -322,7 +322,8 @@ class ResolveCase(unittest.TestCase):
         parser = oc.build_parser()
         args = parser.parse_args(oc.normalize_argv([
             "--http-port", str(self.gw.port), "--mdns-target", f"127.0.0.1:{silent.port}",
-            "--mdns-interface", "127.0.0.1", "--discover-seconds", "1", "--broker", ""]))
+            "--mdns-interface", "127.0.0.1", "--discover-seconds", "1", "--broker", "",
+            "--duration", "60"]))   # TASK-2965: an explicit duration skips the duration question
         out = io.StringIO()
         with mock.patch.object(oc, "load_settings", return_value={"DeviceHost": "10.9.9.9"}), \
                 mock.patch.object(oc, "interactive", return_value=True), \

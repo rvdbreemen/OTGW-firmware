@@ -18,7 +18,8 @@ that changes it.
 3. **Capture tool:** `capture-mqtt-debug.bat` (Windows), `capture-mqtt-debug.sh` (Linux) or
    `capture-mqtt-debug-macos.sh` (macOS), all in the release zip next to `otgw_capture.py`. Run it as a long run
    (`--long-run`, or any `--duration` above 2 hours: one segment per wall-clock hour, packed into
-   `hours/YYYYMMDD-HH.zip`, otgw_capture.py:13-14). Keep it running for at least one full heating day (24 h)
+   `hours/YYYYMMDD-HH.zip`, otgw_capture.py:13-14). Started without options (a double-click on Windows), the tool
+   asks "How long?": choose `2) 24 hours` (TASK-2965). Keep it running for at least one full heating day (24 h)
    including a night and a morning start.
 4. **Write down** the boiler model, radiators or floor heating, thermostat or room sensor used by SAT, and any
    moment you changed a setting or the target (time and what).

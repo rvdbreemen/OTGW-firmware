@@ -1,4 +1,24 @@
 @echo off
+rem TASK-2965: started by a double-click, Explorer runs cmd /c ""<this file>" " and closes
+rem the window as soon as the script ends. Then run the script once more as a child and wait
+rem for a key, so its last message (or error) stays readable. From cmd or PowerShell the
+rem command line does not end in " " and nothing waits.
+if defined OTGW_PAUSE_CHILD goto :otgw_pause_done
+setlocal EnableDelayedExpansion
+set "OTGW_CCL=!cmdcmdline!"
+set "OTGW_Q=""
+set "OTGW_DBL="
+if "!OTGW_CCL:~-3!"=="!OTGW_Q! !OTGW_Q!" set "OTGW_DBL=1"
+endlocal & set "OTGW_DBL=%OTGW_DBL%"
+if not defined OTGW_DBL goto :otgw_pause_done
+set "OTGW_PAUSE_CHILD=1"
+call "%~f0" %*
+set "OTGW_RC=%ERRORLEVEL%"
+echo.
+echo Press any key to close this window.
+pause >nul
+exit /b %OTGW_RC%
+:otgw_pause_done
 setlocal enabledelayedexpansion
 title OTGW Flash Tool
 

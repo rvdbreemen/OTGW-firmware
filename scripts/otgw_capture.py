@@ -3452,6 +3452,8 @@ def save_settings(args, persist_password):
             data.pop("Topic", None)   # TASK-1988: the topic filter is never kept; each run derives it from the gateway
         if persist_password and args.password:
             data["MqttPassword"] = args.password
+        if getattr(args, "duration_choice", None):
+            data["DurationChoice"] = args.duration_choice   # TASK-2965: the next run offers the same length first
         path.parent.mkdir(parents=True, exist_ok=True)
         with open(path, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2)
@@ -3467,6 +3469,37 @@ def interactive():
         return sys.stdin is not None and sys.stdin.isatty()
     except Exception:
         return False
+
+
+# TASK-2965: the interactive run asks how long to capture, so a tester who double-clicks the
+# launcher can start the long run the field-run recipe asks for. Choice -> (long_run, duration).
+DURATION_CHOICES = {"1": (False, None), "2": (True, 86400), "3": (True, 259200)}
+
+
+def ask_duration(args, saved, ask_fn):
+    """Ask the capture length when neither --duration nor --long-run was given. Sets args.long_run,
+    args.duration and args.duration_choice (saved as the next default)."""
+    default = str(saved.get("DurationChoice") or "1")
+    if default not in DURATION_CHOICES:
+        default = "1"
+    print("How long?")
+    print("  1) Until you press Q")
+    print("  2) 24 hours (long run, recommended for SAT field data)")
+    print("  3) 3 days")
+    for _ in range(3):
+        answer = ask_fn("Choice 1, 2 or 3", default).strip()
+        if answer in DURATION_CHOICES:
+            break
+        print(f"Please type 1, 2 or 3 (not '{answer}').")
+    else:
+        answer = default
+        print(f"Using choice {default}.")
+    long_run, duration = DURATION_CHOICES[answer]
+    if long_run:
+        args.long_run = True
+        args.duration = duration
+    args.duration_choice = answer
+    return answer
 
 
 def ask(prompt, default=""):
@@ -3801,6 +3834,8 @@ def resolve_inputs(args, parser):
             args.password = getpass.getpass(f"MQTT password for {args.username}: ")
     if args.password and not args.username:
         parser.error("Username is required when a password is supplied.")
+    if can_prompt and args.duration is None and not args.long_run:
+        ask_duration(args, saved, ask)
 
 
 # --------------------------------------------------------------------------- #
