@@ -8766,3 +8766,20 @@ Robert, 16:18:42 UTC (https://discord.com/channels/812969634638725140/9144987300
 **Task:** TASK-2993/2992 first (public beta, 21 Nov 20:00 if bench passes); TASK-2987/2989 held, next in line after that release.
 
 **Open:** the release line for the guards (2.0.0 before stable, or 2.1.0); Sergeant D's view on TASK-2989 changing entry 342.
+
+## 446. During PWM OFF the last PWM ON flow temperature is frozen (Sergeant D, 2026-11-21; answers Q-444a, read as A; confirms our reading in entry 444)
+
+**Source:** #dev-sat-mqtt, Sergeant D 2026-11-21 07:46:17 UTC (https://discord.com/channels/812969634638725140/1105556725714649128/1573605458000879747), a reply to Q-444a (https://discord.com/channels/812969634638725140/1105556725714649128/1573604247805890651); unedited when read back via the Discord API more than 90 s later.
+
+**Quoted:**
+> "I am not sure what you are talking about. But during the PWM OFF we keep the last PWM ON boiler flow temperature for the PWM OFF phase. So we freeze the flow temperature."
+
+**Settled:** what is held during PWM OFF is the boiler flow temperature of the last PWM ON tick, not the duty. Read as option A of Q-444a: the duty formula (request - base) / (frozen flow - base) is evaluated with the current request, as built (otgw-dev, _pwm_lastOnFlowTemp in SATcontrol.ino of lane d3-duty2993). This confirms our interpretation in entry 444.
+
+**Interpretation (ours):** he did not pick a letter and said our question was unclear to him; "freeze the flow temperature" names the held quantity (the flow), which is option A. He did not mention the request; we read the duty as recomputed with the current request because only the flow is said to be frozen. If he meant the whole duty is frozen, he will see it in the charts of the next field runs (the OFF pause follows the request), and it comes back as a correction.
+
+**Compared with thermo-nova (7beaaf5):** thermo-nova holds a temperature (_effective_on_temperature) and recomputes the duty every update with the current request (pwm.py:144-149, 229-239); same structure, with the frozen value taken at the end of ON instead of after 180 s.
+
+**Task:** TASK-2993 (no change: built as A).
+
+**Open:** Q-444b (hot-water tick, parked for 2.1.0). Lesson for us: the question was too technical; he answered with the principle.

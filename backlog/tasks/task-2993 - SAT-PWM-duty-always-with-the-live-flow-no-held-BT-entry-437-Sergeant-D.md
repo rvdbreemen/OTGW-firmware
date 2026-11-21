@@ -5,7 +5,7 @@ status: To Do
 assignee:
   - '@otgw-dev'
 created_date: '2026-11-21T03:28:00Z'
-updated_date: '2026-11-21T07:41:00Z'
+updated_date: '2026-11-21T07:48:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -41,4 +41,6 @@ Sergeant D, entry 437 (#dev-sat-mqtt 2026-11-21 03:25 UTC, msg 15735397191475529
 2026-11-21 (92): Q-438b answered B (entry 444, msg 1573596529984544881): the live flow only in the PWM ON phase; in OFF the duty keeps the last ON value. Interpretation for you to confirm with a test: hold the last ON flow and recompute with the current request. All open Sergeant D questions on this thread are answered (queue 0).
 
 2026-11-21 (92): Q-444a asked 07:41 UTC (msg 1573604247805890651): hold the last ON flow (A, as built) or hold the duty (B) during OFF; without an answer before 17:30 the 20:00 beta goes with A. Known limit (Q-444b, parked for 2.1.0): a hot-water draw near the end of an ON phase makes the held flow the DHW-heated primary flow (about 55-60 C) for the whole OFF phase, so a long pause; rare, not handled in 2.0.0.
+
+2026-11-21 (92): Q-444a answered (entry 446, msg 1573605458000879747): 'during the PWM OFF we keep the last PWM ON boiler flow temperature ... we freeze the flow temperature'. Read as A = as built (frozen flow, duty recomputed with the current request). No code change needed.
 <!-- SECTION:NOTES:END -->

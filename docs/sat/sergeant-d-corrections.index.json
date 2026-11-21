@@ -5884,7 +5884,7 @@
    "tasks": [
     "TASK-2993"
    ],
-   "confirmed_by_entry": null
+   "confirmed_by_entry": 446
   },
   {
    "id": 445,
@@ -5897,6 +5897,19 @@
    "tasks": [
     "TASK-2987",
     "TASK-2989",
+    "TASK-2993"
+   ],
+   "confirmed_by_entry": null
+  },
+  {
+   "id": 446,
+   "title": "During PWM OFF the last PWM ON flow temperature is frozen (Sergeant D, 2026-11-21; answers Q-444a, read as A; confirms our reading in entry 444)",
+   "date": "2026-11-21",
+   "source": "sergeant-d",
+   "kind": "interpretation",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1573605458000879747",
+   "supersedes": [],
+   "tasks": [
     "TASK-2993"
    ],
    "confirmed_by_entry": null
