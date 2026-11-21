@@ -1,0 +1,261 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080" width="1920" height="1080" role="img" aria-labelledby="t d">
+<title id="t">OTGW agentic workshop</title>
+<desc id="d">Reference wireframe for an overview plate of the OTGW agentic development setup: people, channels, BlueFlame Bot and its subagents, knowledge and rules, the pipeline with gates, and what ships.</desc>
+<defs><marker id="ah-muted" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#56616c"/></marker><marker id="ah-cool" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#0e7490"/></marker><marker id="ah-flame" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#c2410c"/></marker><marker id="ah-ok" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#2f7d32"/></marker><marker id="ah-blue" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#1d4ed8"/></marker><radialGradient id="glow" cx="50%" cy="55%" r="50%"><stop offset="0%" stop-color="#3b82f6" stop-opacity="0.32"/><stop offset="60%" stop-color="#06b6d4" stop-opacity="0.08"/><stop offset="100%" stop-color="#f4f6f7" stop-opacity="0"/></radialGradient><linearGradient id="flamefill" x1="0" y1="1" x2="0" y2="0"><stop offset="0%" stop-color="#dbeafe"/><stop offset="35%" stop-color="#2563eb"/><stop offset="100%" stop-color="#06b6d4"/></linearGradient><filter id="soft" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="6"/></filter><filter id="card" x="-5%" y="-10%" width="110%" height="130%"><feDropShadow dx="0" dy="1.5" stdDeviation="2" flood-color="#151a1f" flood-opacity="0.08"/></filter><symbol id="person" viewBox="0 0 24 24"><circle cx="12" cy="7" r="4" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M4,22 C4,15 20,15 20,22" fill="none" stroke="currentColor" stroke-width="1.8"/></symbol><symbol id="group" viewBox="0 0 24 24"><circle cx="12" cy="7" r="3.2" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="5" cy="9" r="2.4" fill="none" stroke="currentColor" stroke-width="1.4"/><circle cx="19" cy="9" r="2.4" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M6,21 C6,15 18,15 18,21 M1,20 C1,16 6,15 7.5,15.5 M23,20 C23,16 18,15 16.5,15.5" fill="none" stroke="currentColor" stroke-width="1.5"/></symbol><symbol id="tester" viewBox="0 0 24 24"><circle cx="9" cy="7" r="3.5" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M2,22 C2,15 16,15 16,22" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M19,4 L19,14 C19,16 22,16 22,14 L22,4 M18,4 L23,4" fill="none" stroke="currentColor" stroke-width="1.4"/></symbol><symbol id="designer" viewBox="0 0 24 24"><circle cx="9" cy="7" r="3.5" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M2,22 C2,15 16,15 16,22" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M20,3 L17,13 M20,3 L23,13 M18,9 L22,9" fill="none" stroke="currentColor" stroke-width="1.4"/></symbol><symbol id="key" viewBox="0 0 24 24"><circle cx="9" cy="7" r="3.5" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M2,22 C2,15 16,15 16,22" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="20" cy="5" r="2.5" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M20,7.5 L20,15 M20,11 L22.5,11 M20,14 L22,14" fill="none" stroke="currentColor" stroke-width="1.4"/></symbol><symbol id="chat" viewBox="0 0 24 24"><path d="M3,4 H21 V16 H10 L5,20 V16 H3 Z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M9.5,7 L8.5,13 M13.5,7 L12.5,13 M7,9 H15 M6.5,11 H14.5" fill="none" stroke="currentColor" stroke-width="1.2"/></symbol><symbol id="mail" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M3,6 L12,13 L21,6" fill="none" stroke="currentColor" stroke-width="1.6"/></symbol><symbol id="branch" viewBox="0 0 24 24"><circle cx="6" cy="5" r="2.5" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="6" cy="19" r="2.5" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="18" cy="8" r="2.5" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M6,7.5 V16.5 M18,10.5 C18,15 6,13 6,16.5" fill="none" stroke="currentColor" stroke-width="1.6"/></symbol><symbol id="rss" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="3" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="8" cy="16" r="1.6" fill="currentColor"/><path d="M7,11 A6,6 0 0 1 13,17 M7,7 A10,10 0 0 1 17,17" fill="none" stroke="currentColor" stroke-width="1.6"/></symbol><symbol id="book" viewBox="0 0 24 24"><path d="M4,4 H11 C12,4 12,5 12,6 V20 C12,19 11,18 10,18 H4 Z M20,4 H13 C12,4 12,5 12,6 V20 C12,19 13,18 14,18 H20 Z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></symbol><symbol id="stamp" viewBox="0 0 24 24"><path d="M9,3 H15 V9 C15,11 18,11 18,13 V15 H6 V13 C6,11 9,11 9,9 Z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M4,19 H20 M8,15 V19 M16,15 V19" fill="none" stroke="currentColor" stroke-width="1.5"/></symbol><symbol id="map" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" fill="none" stroke="currentColor" stroke-width="1.5"/><rect x="6" y="6" width="12" height="12" rx="1" fill="none" stroke="currentColor" stroke-width="1.3"/><rect x="9" y="9" width="6" height="6" rx="1" fill="none" stroke="currentColor" stroke-width="1.2"/></symbol><symbol id="ledger" viewBox="0 0 24 24"><rect x="5" y="3" width="14" height="18" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8,3 V21 M10,8 H16 M10,11 H16 M10,14 H16 M10,17 H14" fill="none" stroke="currentColor" stroke-width="1.2"/></symbol><symbol id="queue" viewBox="0 0 24 24"><rect x="2" y="8" width="6" height="8" rx="1" fill="none" stroke="currentColor" stroke-width="1.4"/><rect x="9" y="8" width="6" height="8" rx="1" fill="none" stroke="currentColor" stroke-width="1.4"/><rect x="16" y="8" width="6" height="8" rx="1" fill="none" stroke="currentColor" stroke-width="1.4"/></symbol><symbol id="kanban" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M9,3 V21 M15,3 V21" stroke="currentColor" stroke-width="1.2"/><rect x="4.5" y="6" width="3" height="3" fill="currentColor"/><rect x="10.5" y="6" width="3" height="3" fill="currentColor"/><rect x="10.5" y="11" width="3" height="3" fill="currentColor"/><rect x="16.5" y="6" width="3" height="3" fill="currentColor"/></symbol><symbol id="wolf" viewBox="0 0 24 24"><path d="M4,3 L8,9 H16 L20,3 L21,13 L12,21 L3,13 Z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><circle cx="9" cy="12" r="1" fill="currentColor"/><circle cx="15" cy="12" r="1" fill="currentColor"/></symbol><symbol id="graph" viewBox="0 0 24 24"><circle cx="5" cy="6" r="2" fill="none" stroke="currentColor" stroke-width="1.4"/><circle cx="18" cy="5" r="2" fill="none" stroke="currentColor" stroke-width="1.4"/><circle cx="12" cy="13" r="2" fill="none" stroke="currentColor" stroke-width="1.4"/><circle cx="5" cy="19" r="2" fill="none" stroke="currentColor" stroke-width="1.4"/><circle cx="19" cy="19" r="2" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M6.5,7.5 L10.5,11.5 M16.5,6.5 L13.5,11.5 M10.5,14.5 L6.5,17.5 M13.5,14.5 L17.5,17.5" stroke="currentColor" stroke-width="1.2"/></symbol><symbol id="shield" viewBox="0 0 24 24"><path d="M12,2 L20,5 V11 C20,16 16,20 12,22 C8,20 4,16 4,11 V5 Z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M8,12 L11,15 L16,9" fill="none" stroke="currentColor" stroke-width="1.8"/></symbol><symbol id="lock" viewBox="0 0 24 24"><rect x="5" y="10" width="14" height="11" rx="2" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M8,10 V7 C8,2 16,2 16,7 V10" fill="none" stroke="currentColor" stroke-width="1.7"/></symbol><symbol id="clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12,6 V12 L16,14" fill="none" stroke="currentColor" stroke-width="1.6"/></symbol><symbol id="bench" viewBox="0 0 24 24"><path d="M2,15 H22 M4,15 V21 M20,15 V21" fill="none" stroke="currentColor" stroke-width="1.6"/><rect x="4" y="9" width="7" height="6" rx="1" fill="none" stroke="currentColor" stroke-width="1.4"/><rect x="13" y="9" width="7" height="6" rx="1" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M8,5 A6,6 0 0 1 16,5 M10,7 A3,3 0 0 1 14,7" fill="none" stroke="currentColor" stroke-width="1.3"/></symbol><symbol id="sat" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M3,12 H8 M16,12 H21 M5,9 V15 M19,9 V15" fill="none" stroke="currentColor" stroke-width="1.5"/></symbol><symbol id="hourglass" viewBox="0 0 24 24"><path d="M6,3 H18 M6,21 H18 M7,3 C7,9 17,9 17,12 C17,15 7,15 7,21 M17,3 C17,9 7,9 7,12 C7,15 17,15 17,21" fill="none" stroke="currentColor" stroke-width="1.4"/></symbol><symbol id="loop" viewBox="0 0 24 24"><path d="M19,12 A7,7 0 1 1 15,5.6" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M14,2.5 L16.5,6 L12.5,7.5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></symbol><symbol id="package" viewBox="0 0 24 24"><path d="M12,2 L21,7 V17 L12,22 L3,17 V7 Z M3,7 L12,12 L21,7 M12,12 V22" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></symbol><symbol id="globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M3,12 H21 M12,3 C8,7 8,17 12,21 C16,17 16,7 12,3" fill="none" stroke="currentColor" stroke-width="1.3"/></symbol><symbol id="server" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="7" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.5"/><rect x="4" y="13" width="16" height="7" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.5"/><circle cx="8" cy="7.5" r="1" fill="currentColor"/><circle cx="8" cy="16.5" r="1" fill="currentColor"/></symbol></defs>
+<rect width="1920" height="1080" fill="#f4f6f7"/>
+<text x="40" y="42" font-family="Archivo, 'Helvetica Neue', Arial, sans-serif" font-size="28" font-weight="800" fill="#151a1f" text-anchor="start">OTGW agentic workshop</text>
+<text x="394.2" y="42" font-family="'JetBrains Mono', ui-monospace, Consolas, monospace" font-size="13" font-weight="400" fill="#56616c" text-anchor="start">architecture overview · plate A · as of 2026-11-15</text>
+<path d="M1110,32 H1136" fill="none" stroke="#c2410c" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="1142" y="36" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="12" font-weight="400" fill="#56616c" text-anchor="start">human decision</text>
+<path d="M1251.6,32 H1277.6" fill="none" stroke="#0e7490" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="1283.6" y="36" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="12" font-weight="400" fill="#56616c" text-anchor="start">work between agents</text>
+<path d="M1425.1999999999998,32 H1451.1999999999998" fill="none" stroke="#0e7490" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="5 4"/>
+<text x="1457.1999999999998" y="36" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="12" font-weight="400" fill="#56616c" text-anchor="start">read only</text>
+<path d="M1534.7999999999997,32 H1560.7999999999997" fill="none" stroke="#2f7d32" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="1566.7999999999997" y="36" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="12" font-weight="400" fill="#56616c" text-anchor="start">ships</text>
+<use href="#shield" x="1617.7999999999997" y="23.0" width="18" height="18" style="color:#a15c00"/>
+<text x="1640.7999999999997" y="36" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="12" font-weight="400" fill="#56616c" text-anchor="start">gate</text>
+<use href="#lock" x="1688.7999999999997" y="24.0" width="16" height="16" style="color:#b42318"/>
+<text x="1710.7999999999997" y="36" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="12" font-weight="400" fill="#56616c" text-anchor="start">hard stop</text>
+<path d="M30,60 H1890" fill="none" stroke="#d5dce2" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="40" y="80" font-family="'JetBrains Mono', ui-monospace, Consolas, monospace" font-size="13" font-weight="700" fill="#c2410c" text-anchor="start" letter-spacing="2">PEOPLE</text>
+<rect x="89" y="90" width="360" height="76" rx="6" fill="#fde7d9" stroke="#c2410c" stroke-width="1.4" filter="url(#card)"/>
+<use href="#group" x="112.0" y="111.0" width="34" height="34" style="color:#c2410c"/>
+<text x="159" y="122" font-family="Archivo, 'Helvetica Neue', Arial, sans-serif" font-size="18" font-weight="700" fill="#151a1f" text-anchor="start">End users</text>
+<text x="159" y="146" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#56616c" text-anchor="start">reports and questions</text>
+<rect x="550" y="90" width="360" height="76" rx="6" fill="#fde7d9" stroke="#c2410c" stroke-width="1.4" filter="url(#card)"/>
+<use href="#key" x="573.0" y="111.0" width="34" height="34" style="color:#c2410c"/>
+<text x="620" y="122" font-family="Archivo, 'Helvetica Neue', Arial, sans-serif" font-size="18" font-weight="700" fill="#151a1f" text-anchor="start">Maintainer</text>
+<text x="620" y="146" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#56616c" text-anchor="start">scope, priority, release</text>
+<rect x="1010" y="90" width="360" height="76" rx="6" fill="#fde7d9" stroke="#c2410c" stroke-width="1.4" filter="url(#card)"/>
+<use href="#designer" x="1033.0" y="111.0" width="34" height="34" style="color:#c2410c"/>
+<text x="1080" y="122" font-family="Archivo, 'Helvetica Neue', Arial, sans-serif" font-size="18" font-weight="700" fill="#151a1f" text-anchor="start">SAT designer</text>
+<text x="1080" y="146" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#56616c" text-anchor="start">source of truth for SAT</text>
+<rect x="1471" y="90" width="360" height="76" rx="6" fill="#fde7d9" stroke="#c2410c" stroke-width="1.4" filter="url(#card)"/>
+<use href="#tester" x="1494.0" y="111.0" width="34" height="34" style="color:#c2410c"/>
+<text x="1541" y="122" font-family="Archivo, 'Helvetica Neue', Arial, sans-serif" font-size="18" font-weight="700" fill="#151a1f" text-anchor="start">Alpha testers</text>
+<text x="1541" y="146" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#56616c" text-anchor="start">flash, capture, no decisions</text>
+<text x="40" y="202" font-family="'JetBrains Mono', ui-monospace, Consolas, monospace" font-size="13" font-weight="700" fill="#c2410c" text-anchor="start" letter-spacing="2">CHANNELS</text>
+<rect x="25" y="212" width="270" height="76" rx="6" fill="#f4f6f7" stroke="#56616c" stroke-width="1.1" stroke-dasharray="5 4"/>
+<use href="#rss" x="42.0" y="236.0" width="28" height="28" style="color:#56616c"/>
+<text x="80" y="244" font-family="Archivo, 'Helvetica Neue', Arial, sans-serif" font-size="16" font-weight="700" fill="#151a1f" text-anchor="start">Tweakers topic</text>
+<text x="80" y="266" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="12" font-weight="400" fill="#56616c" text-anchor="start">RSS · read only</text>
+<rect x="345" y="212" width="270" height="76" rx="6" fill="#f4f6f7" stroke="#56616c" stroke-width="1.1" stroke-dasharray="5 4"/>
+<use href="#branch" x="362.0" y="236.0" width="28" height="28" style="color:#56616c"/>
+<text x="400" y="244" font-family="Archivo, 'Helvetica Neue', Arial, sans-serif" font-size="16" font-weight="700" fill="#151a1f" text-anchor="start">GitHub</text>
+<text x="400" y="266" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="12" font-weight="400" fill="#56616c" text-anchor="start">issues · PRs · releases</text>
+<rect x="665" y="212" width="270" height="76" rx="6" fill="#f4f6f7" stroke="#56616c" stroke-width="1.1" stroke-dasharray="5 4"/>
+<use href="#chat" x="682.0" y="236.0" width="28" height="28" style="color:#56616c"/>
+<text x="720" y="244" font-family="Archivo, 'Helvetica Neue', Arial, sans-serif" font-size="16" font-weight="700" fill="#151a1f" text-anchor="start">Discord support</text>
+<text x="720" y="266" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="12" font-weight="400" fill="#56616c" text-anchor="start">4 channels · read · announce · replies</text>
+<rect x="985" y="212" width="270" height="76" rx="6" fill="#f4f6f7" stroke="#56616c" stroke-width="1.1" stroke-dasharray="5 4"/>
+<use href="#mail" x="1002.0" y="236.0" width="28" height="28" style="color:#56616c"/>
+<text x="1040" y="244" font-family="Archivo, 'Helvetica Neue', Arial, sans-serif" font-size="16" font-weight="700" fill="#151a1f" text-anchor="start">DM with maintainer</text>
+<text x="1040" y="266" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="12" font-weight="400" fill="#56616c" text-anchor="start">one question per message</text>
+<rect x="1305" y="212" width="270" height="76" rx="6" fill="#f4f6f7" stroke="#56616c" stroke-width="1.1" stroke-dasharray="5 4"/>
+<use href="#chat" x="1322.0" y="236.0" width="28" height="28" style="color:#56616c"/>
+<text x="1360" y="244" font-family="Archivo, 'Helvetica Neue', Arial, sans-serif" font-size="16" font-weight="700" fill="#151a1f" text-anchor="start">#dev-sat-mqtt</text>
+<text x="1360" y="266" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="12" font-weight="400" fill="#56616c" text-anchor="start">backlog commands</text>
+<rect x="1625" y="212" width="270" height="76" rx="6" fill="#f4f6f7" stroke="#56616c" stroke-width="1.1" stroke-dasharray="5 4"/>
+<use href="#chat" x="1642.0" y="236.0" width="28" height="28" style="color:#56616c"/>
+<text x="1680" y="244" font-family="Archivo, 'Helvetica Neue', Arial, sans-serif" font-size="16" font-weight="700" fill="#151a1f" text-anchor="start">#alpha-testing</text>
+<text x="1680" y="266" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="12" font-weight="400" fill="#56616c" text-anchor="start">builds · reports · SAT</text>
+<path d="M269,166 C269,188.0 160,188.0 160,210" fill="none" stroke="#56616c" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="3 4" marker-end="url(#ah-muted)"/>
+<path d="M269,166 C269,188.0 480,188.0 480,210" fill="none" stroke="#56616c" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="3 4" marker-end="url(#ah-muted)"/>
+<path d="M269,166 C269,188.0 800,188.0 800,210" fill="none" stroke="#56616c" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="3 4" marker-end="url(#ah-muted)"/>
+<path d="M730,166 C730,188.0 1120,188.0 1120,210" fill="none" stroke="#c2410c" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#ah-flame)"/>
+<path d="M1190,166 C1190,188.0 1440,188.0 1440,210" fill="none" stroke="#c2410c" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" marker-start="url(#ah-flame)" marker-end="url(#ah-flame)"/>
+<path d="M1190,166 C1190,188.0 1760,188.0 1760,210" fill="none" stroke="#c2410c" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" marker-start="url(#ah-flame)" marker-end="url(#ah-flame)"/>
+<path d="M1651,166 C1651,188.0 1760,188.0 1760,210" fill="none" stroke="#56616c" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="3 4" marker-start="url(#ah-muted)" marker-end="url(#ah-muted)"/>
+<path d="M160,330 H1760" fill="none" stroke="#0e7490" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M160,290 V328" fill="none" stroke="#0e7490" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="5 4" marker-end="url(#ah-cool)"/>
+<path d="M480,290 V328" fill="none" stroke="#0e7490" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" marker-start="url(#ah-cool)" marker-end="url(#ah-cool)"/>
+<path d="M800,290 V328" fill="none" stroke="#0e7490" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="5 4" marker-end="url(#ah-cool)"/>
+<path d="M1120,290 V328" fill="none" stroke="#0e7490" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" marker-start="url(#ah-cool)" marker-end="url(#ah-cool)"/>
+<path d="M1440,290 V328" fill="none" stroke="#0e7490" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" marker-start="url(#ah-cool)" marker-end="url(#ah-cool)"/>
+<path d="M1760,290 V328" fill="none" stroke="#0e7490" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" marker-start="url(#ah-cool)" marker-end="url(#ah-cool)"/>
+<path d="M812,328 V292" fill="none" stroke="#2f7d32" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#ah-ok)"/>
+<text x="40" y="382" font-family="'JetBrains Mono', ui-monospace, Consolas, monospace" font-size="13" font-weight="700" fill="#c2410c" text-anchor="start" letter-spacing="2">KNOWLEDGE &amp; RULES</text>
+<text x="460" y="382" font-family="'JetBrains Mono', ui-monospace, Consolas, monospace" font-size="13" font-weight="700" fill="#c2410c" text-anchor="start" letter-spacing="2">AGENT LAYER</text>
+<text x="1510" y="382" font-family="'JetBrains Mono', ui-monospace, Consolas, monospace" font-size="13" font-weight="700" fill="#c2410c" text-anchor="start" letter-spacing="2">PIPELINE &amp; GATES</text>
+<rect x="445" y="360" width="1030" height="562" rx="10" fill="none" stroke="#d5dce2" stroke-width="1" stroke-dasharray="2 5"/>
+<rect x="30" y="396" width="390" height="56" rx="6" fill="#ffffff" stroke="#d5dce2" stroke-width="1.2" filter="url(#card)"/>
+<use href="#book" x="46.0" y="410.0" width="28" height="28" style="color:#0e7490"/>
+<text x="88" y="420" font-family="Archivo, 'Helvetica Neue', Arial, sans-serif" font-size="16" font-weight="700" fill="#151a1f" text-anchor="start">Rules</text>
+<text x="88" y="440" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="12" font-weight="400" fill="#56616c" text-anchor="start">CLAUDE.md · AGENTS.md · rules/</text>
+<rect x="30" y="461" width="390" height="56" rx="6" fill="#ffffff" stroke="#d5dce2" stroke-width="1.2" filter="url(#card)"/>
+<use href="#stamp" x="46.0" y="475.0" width="28" height="28" style="color:#0e7490"/>
+<text x="88" y="485" font-family="Archivo, 'Helvetica Neue', Arial, sans-serif" font-size="16" font-weight="700" fill="#151a1f" text-anchor="start">ADRs + ADR kit</text>
+<text x="88" y="505" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="12" font-weight="400" fill="#56616c" text-anchor="start">245 decisions · 10 binding</text>
+<rect x="30" y="526" width="390" height="56" rx="6" fill="#ffffff" stroke="#d5dce2" stroke-width="1.2" filter="url(#card)"/>
+<use href="#map" x="46.0" y="540.0" width="28" height="28" style="color:#0e7490"/>
+<text x="88" y="550" font-family="Archivo, 'Helvetica Neue', Arial, sans-serif" font-size="16" font-weight="700" fill="#151a1f" text-anchor="start">C4 map</text>
+<text x="88" y="570" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="12" font-weight="400" fill="#56616c" text-anchor="start">which component owns which code</text>
+<rect x="30" y="591" width="390" height="56" rx="6" fill="#ffffff" stroke="#d5dce2" stroke-width="1.2" filter="url(#card)"/>
+<use href="#ledger" x="46.0" y="605.0" width="28" height="28" style="color:#0e7490"/>
+<text x="88" y="615" font-family="Archivo, 'Helvetica Neue', Arial, sans-serif" font-size="16" font-weight="700" fill="#151a1f" text-anchor="start">SAT register</text>
+<text x="88" y="635" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="12" font-weight="400" fill="#56616c" text-anchor="start">Sergeant D · record first</text>
+<rect x="30" y="656" width="390" height="56" rx="6" fill="#ffffff" stroke="#d5dce2" stroke-width="1.2" filter="url(#card)"/>
+<use href="#queue" x="46.0" y="670.0" width="28" height="28" style="color:#0e7490"/>
+<text x="88" y="680" font-family="Archivo, 'Helvetica Neue', Arial, sans-serif" font-size="16" font-weight="700" fill="#151a1f" text-anchor="start">Open questions</text>
+<text x="88" y="700" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="12" font-weight="400" fill="#56616c" text-anchor="start">queue with status</text>
+<rect x="30" y="721" width="390" height="56" rx="6" fill="#ffffff" stroke="#d5dce2" stroke-width="1.2" filter="url(#card)"/>
+<use href="#kanban" x="46.0" y="735.0" width="28" height="28" style="color:#0e7490"/>
+<text x="88" y="745" font-family="Archivo, 'Helvetica Neue', Arial, sans-serif" font-size="16" font-weight="700" fill="#151a1f" text-anchor="start">Backlog.md</text>
+<text x="88" y="765" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="12" font-weight="400" fill="#56616c" text-anchor="start">every change starts here</text>
+<rect x="30" y="786" width="390" height="56" rx="6" fill="#ffffff" stroke="#d5dce2" stroke-width="1.2" filter="url(#card)"/>
+<use href="#wolf" x="46.0" y="800.0" width="28" height="28" style="color:#0e7490"/>
+<text x="88" y="810" font-family="Archivo, 'Helvetica Neue', Arial, sans-serif" font-size="16" font-weight="700" fill="#151a1f" text-anchor="start">OpenWolf</text>
+<text x="88" y="830" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="12" font-weight="400" fill="#56616c" text-anchor="start">anatomy · cerebrum · buglog</text>
+<rect x="30" y="851" width="390" height="56" rx="6" fill="#ffffff" stroke="#d5dce2" stroke-width="1.2" filter="url(#card)"/>
+<use href="#graph" x="46.0" y="865.0" width="28" height="28" style="color:#0e7490"/>
+<text x="88" y="875" font-family="Archivo, 'Helvetica Neue', Arial, sans-serif" font-size="16" font-weight="700" fill="#151a1f" text-anchor="start">graphify</text>
+<text x="88" y="895" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="12" font-weight="400" fill="#56616c" text-anchor="start">code graph of src/</text>
+<rect x="1510" y="396" width="380" height="46" rx="6" fill="#ffffff" stroke="#0e7490" stroke-width="1.2" filter="url(#card)"/>
+<use href="#shield" x="1524.0" y="409.0" width="20" height="20" style="color:#a15c00"/>
+<text x="1556" y="425" font-family="'JetBrains Mono', ui-monospace, Consolas, monospace" font-size="12" font-weight="400" fill="#56616c" text-anchor="start">1</text>
+<text x="1578" y="425" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="15" font-weight="600" fill="#151a1f" text-anchor="start">Backlog task</text>
+<path d="M1700,442 V452" fill="none" stroke="#0e7490" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#ah-cool)"/>
+<rect x="1510" y="454" width="380" height="46" rx="6" fill="#ffffff" stroke="#0e7490" stroke-width="1.2" filter="url(#card)"/>
+<use href="#shield" x="1524.0" y="467.0" width="20" height="20" style="color:#a15c00"/>
+<text x="1556" y="483" font-family="'JetBrains Mono', ui-monospace, Consolas, monospace" font-size="12" font-weight="400" fill="#56616c" text-anchor="start">2</text>
+<text x="1578" y="483" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="15" font-weight="600" fill="#151a1f" text-anchor="start">Plan + self-review</text>
+<path d="M1700,500 V510" fill="none" stroke="#0e7490" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#ah-cool)"/>
+<rect x="1510" y="512" width="380" height="46" rx="6" fill="#ffffff" stroke="#0e7490" stroke-width="1.2" filter="url(#card)"/>
+<use href="#shield" x="1524.0" y="525.0" width="20" height="20" style="color:#a15c00"/>
+<text x="1556" y="541" font-family="'JetBrains Mono', ui-monospace, Consolas, monospace" font-size="12" font-weight="400" fill="#56616c" text-anchor="start">3</text>
+<text x="1578" y="541" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="15" font-weight="600" fill="#151a1f" text-anchor="start">Code red → green</text>
+<path d="M1700,558 V568" fill="none" stroke="#0e7490" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#ah-cool)"/>
+<rect x="1510" y="570" width="380" height="46" rx="6" fill="#ffffff" stroke="#0e7490" stroke-width="1.2" filter="url(#card)"/>
+<use href="#shield" x="1524.0" y="583.0" width="20" height="20" style="color:#a15c00"/>
+<text x="1556" y="599" font-family="'JetBrains Mono', ui-monospace, Consolas, monospace" font-size="12" font-weight="400" fill="#56616c" text-anchor="start">4</text>
+<text x="1578" y="599" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="15" font-weight="600" fill="#151a1f" text-anchor="start">Review team</text>
+<path d="M1700,616 V626" fill="none" stroke="#0e7490" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#ah-cool)"/>
+<rect x="1510" y="628" width="380" height="46" rx="6" fill="#ffffff" stroke="#a15c00" stroke-width="1.2" filter="url(#card)"/>
+<use href="#shield" x="1524.0" y="641.0" width="20" height="20" style="color:#a15c00"/>
+<text x="1556" y="657" font-family="'JetBrains Mono', ui-monospace, Consolas, monospace" font-size="12" font-weight="400" fill="#56616c" text-anchor="start">5</text>
+<text x="1578" y="657" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="15" font-weight="600" fill="#151a1f" text-anchor="start">evaluate · tests</text>
+<path d="M1700,674 V684" fill="none" stroke="#0e7490" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#ah-cool)"/>
+<rect x="1510" y="686" width="380" height="46" rx="6" fill="#ffffff" stroke="#a15c00" stroke-width="1.2" filter="url(#card)"/>
+<use href="#shield" x="1524.0" y="699.0" width="20" height="20" style="color:#a15c00"/>
+<text x="1556" y="715" font-family="'JetBrains Mono', ui-monospace, Consolas, monospace" font-size="12" font-weight="400" fill="#56616c" text-anchor="start">6</text>
+<text x="1578" y="715" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="15" font-weight="600" fill="#151a1f" text-anchor="start">Bump + commit hooks</text>
+<path d="M1700,732 V742" fill="none" stroke="#0e7490" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#ah-cool)"/>
+<rect x="1510" y="744" width="380" height="46" rx="6" fill="#ffffff" stroke="#a15c00" stroke-width="1.2" filter="url(#card)"/>
+<use href="#shield" x="1524.0" y="757.0" width="20" height="20" style="color:#a15c00"/>
+<text x="1556" y="773" font-family="'JetBrains Mono', ui-monospace, Consolas, monospace" font-size="12" font-weight="400" fill="#56616c" text-anchor="start">7</text>
+<text x="1578" y="773" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="15" font-weight="600" fill="#151a1f" text-anchor="start">Build esp32-combo · lock</text>
+<path d="M1700,790 V800" fill="none" stroke="#0e7490" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#ah-cool)"/>
+<rect x="1510" y="802" width="380" height="46" rx="6" fill="#ffffff" stroke="#a15c00" stroke-width="1.2" filter="url(#card)"/>
+<use href="#shield" x="1524.0" y="815.0" width="20" height="20" style="color:#a15c00"/>
+<text x="1556" y="831" font-family="'JetBrains Mono', ui-monospace, Consolas, monospace" font-size="12" font-weight="400" fill="#56616c" text-anchor="start">8</text>
+<text x="1578" y="831" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="15" font-weight="600" fill="#151a1f" text-anchor="start">Bench via OTA</text>
+<path d="M1700,848 V858" fill="none" stroke="#0e7490" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#ah-cool)"/>
+<rect x="1510" y="860" width="380" height="46" rx="6" fill="#ffffff" stroke="#0e7490" stroke-width="1.2" filter="url(#card)"/>
+<use href="#shield" x="1524.0" y="873.0" width="20" height="20" style="color:#a15c00"/>
+<text x="1556" y="889" font-family="'JetBrains Mono', ui-monospace, Consolas, monospace" font-size="12" font-weight="400" fill="#56616c" text-anchor="start">9</text>
+<text x="1578" y="889" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="15" font-weight="600" fill="#151a1f" text-anchor="start">Push dev · post zip</text>
+<circle cx="960" cy="600" r="92" fill="#dbeafe" stroke="#1d4ed8" stroke-width="2"/>
+<circle cx="960" cy="604" r="142" fill="url(#glow)"/>
+<path d="M960.0,545.1 C980.9,575.5 1001.8,596.4 998.0,621.1 C994.2,645.8 977.1,657.2 960.0,657.2 C942.9,657.2 925.8,645.8 922.0,621.1 C919.1,602.1 931.5,586.9 942.9,575.5 C944.8,592.6 952.4,600.2 958.1,604.0 C961.9,583.1 954.3,566.0 960.0,545.1 Z" fill="#2563eb" opacity="0.28" filter="url(#soft)"/>
+<path d="M960.0,545.1 C980.9,575.5 1001.8,596.4 998.0,621.1 C994.2,645.8 977.1,657.2 960.0,657.2 C942.9,657.2 925.8,645.8 922.0,621.1 C919.1,602.1 931.5,586.9 942.9,575.5 C944.8,592.6 952.4,600.2 958.1,604.0 C961.9,583.1 954.3,566.0 960.0,545.1 Z" fill="url(#flamefill)" stroke="#1d4ed8" stroke-width="1.4"/>
+<path d="M960.0,596.4 C971.4,611.6 979.0,624.9 976.1,636.3 C973.3,647.7 965.7,651.5 960.0,651.5 C954.3,651.5 946.7,647.7 943.9,636.3 C942.0,624.9 950.5,611.6 960.0,596.4 Z" fill="#ffffff" opacity="0.95"/>
+<text x="960" y="724" font-family="Archivo, 'Helvetica Neue', Arial, sans-serif" font-size="24" font-weight="800" fill="#151a1f" text-anchor="middle">BlueFlame Bot</text>
+<text x="960" y="746" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#56616c" text-anchor="middle">coordinator and comms session</text>
+<path d="M930,330 V514" fill="none" stroke="#0e7490" stroke-width="2.0" stroke-linecap="round" stroke-linejoin="round" marker-start="url(#ah-cool)" marker-end="url(#ah-cool)"/>
+<path d="M760,166 C760,190 958,188 958,212 V292 C958,316 990,312 990,348 V512" fill="none" stroke="#c2410c" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#ah-flame)"/>
+<text x="1000" y="352" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="12" font-weight="400" fill="#c2410c" text-anchor="start">instructions in the session</text>
+<rect x="700" y="392" width="196" height="26" rx="13" fill="#f4f6f7" stroke="#0e7490" stroke-width="1"/>
+<text x="798" y="410" font-family="'JetBrains Mono', ui-monospace, Consolas, monospace" font-size="12" font-weight="400" fill="#0e7490" text-anchor="middle">/implement-next-task</text>
+<rect x="700" y="426" width="196" height="26" rx="13" fill="#f4f6f7" stroke="#0e7490" stroke-width="1"/>
+<text x="798" y="444" font-family="'JetBrains Mono', ui-monospace, Consolas, monospace" font-size="12" font-weight="400" fill="#0e7490" text-anchor="middle">/backlog_discord</text>
+<rect x="700" y="460" width="196" height="26" rx="13" fill="#f4f6f7" stroke="#0e7490" stroke-width="1"/>
+<text x="798" y="478" font-family="'JetBrains Mono', ui-monospace, Consolas, monospace" font-size="12" font-weight="400" fill="#0e7490" text-anchor="middle">/check_otgw_issues</text>
+<rect x="1026" y="392" width="180" height="24" rx="12" fill="#f4f6f7" stroke="#0e7490" stroke-width="1"/>
+<text x="1116" y="409" font-family="'JetBrains Mono', ui-monospace, Consolas, monospace" font-size="12" font-weight="400" fill="#0e7490" text-anchor="middle">/beta-release-2x</text>
+<rect x="1026" y="422" width="180" height="24" rx="12" fill="#f4f6f7" stroke="#0e7490" stroke-width="1"/>
+<text x="1116" y="439" font-family="'JetBrains Mono', ui-monospace, Consolas, monospace" font-size="12" font-weight="400" fill="#0e7490" text-anchor="middle">/release-2x</text>
+<rect x="1026" y="452" width="180" height="24" rx="12" fill="#f4f6f7" stroke="#0e7490" stroke-width="1"/>
+<text x="1116" y="469" font-family="'JetBrains Mono', ui-monospace, Consolas, monospace" font-size="12" font-weight="400" fill="#0e7490" text-anchor="middle">/update-docs-2x</text>
+<rect x="1026" y="482" width="180" height="24" rx="12" fill="#f4f6f7" stroke="#0e7490" stroke-width="1"/>
+<text x="1116" y="499" font-family="'JetBrains Mono', ui-monospace, Consolas, monospace" font-size="12" font-weight="400" fill="#0e7490" text-anchor="middle">/analyze-capture</text>
+<path d="M866,604 L740,610" fill="none" stroke="#0e7490" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#ah-cool)"/>
+<polygon points="700.0,578.0 729.4,595.0 729.4,629.0 700.0,646.0 670.6,629.0 670.6,595.0" fill="#d9eff4" stroke="#0e7490" stroke-width="1.5"/>
+<text x="700" y="619" font-family="Archivo, 'Helvetica Neue', Arial, sans-serif" font-size="20" font-weight="800" fill="#0e7490" text-anchor="middle">S</text>
+<text x="700" y="666" font-family="Archivo, 'Helvetica Neue', Arial, sans-serif" font-size="15" font-weight="700" fill="#151a1f" text-anchor="middle">Sonnet</text>
+<text x="700" y="684" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="12" font-weight="400" fill="#56616c" text-anchor="middle">implementation</text>
+<path d="M892,665 L819,734" fill="none" stroke="#0e7490" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#ah-cool)"/>
+<polygon points="790.0,728.0 819.4,745.0 819.4,779.0 790.0,796.0 760.6,779.0 760.6,745.0" fill="#d9eff4" stroke="#0e7490" stroke-width="1.5"/>
+<text x="790" y="769" font-family="Archivo, 'Helvetica Neue', Arial, sans-serif" font-size="20" font-weight="800" fill="#0e7490" text-anchor="middle">H</text>
+<text x="790" y="816" font-family="Archivo, 'Helvetica Neue', Arial, sans-serif" font-size="15" font-weight="700" fill="#151a1f" text-anchor="middle">Haiku</text>
+<text x="790" y="834" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="12" font-weight="400" fill="#56616c" text-anchor="middle">runners</text>
+<path d="M960,756 L960,772" fill="none" stroke="#0e7490" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#ah-cool)"/>
+<polygon points="960.0,778.0 989.4,795.0 989.4,829.0 960.0,846.0 930.6,829.0 930.6,795.0" fill="#d9eff4" stroke="#0e7490" stroke-width="1.5"/>
+<text x="960" y="819" font-family="Archivo, 'Helvetica Neue', Arial, sans-serif" font-size="20" font-weight="800" fill="#0e7490" text-anchor="middle">O</text>
+<text x="960" y="866" font-family="Archivo, 'Helvetica Neue', Arial, sans-serif" font-size="15" font-weight="700" fill="#151a1f" text-anchor="middle">Opus</text>
+<text x="960" y="884" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="12" font-weight="400" fill="#56616c" text-anchor="middle">correctness review</text>
+<path d="M1028,665 L1101,734" fill="none" stroke="#0e7490" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#ah-cool)"/>
+<polygon points="1130.0,728.0 1159.4,745.0 1159.4,779.0 1130.0,796.0 1100.6,779.0 1100.6,745.0" fill="#d9eff4" stroke="#0e7490" stroke-width="1.5"/>
+<text x="1130" y="769" font-family="Archivo, 'Helvetica Neue', Arial, sans-serif" font-size="20" font-weight="800" fill="#0e7490" text-anchor="middle">A</text>
+<text x="1130" y="816" font-family="Archivo, 'Helvetica Neue', Arial, sans-serif" font-size="15" font-weight="700" fill="#151a1f" text-anchor="middle">Advisor</text>
+<text x="1130" y="834" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="12" font-weight="400" fill="#56616c" text-anchor="middle">plan self-review</text>
+<path d="M1054,604 L1180,610" fill="none" stroke="#0e7490" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#ah-cool)"/>
+<polygon points="1220.0,578.0 1249.4,595.0 1249.4,629.0 1220.0,646.0 1190.6,629.0 1190.6,595.0" fill="#d9eff4" stroke="#0e7490" stroke-width="1.5"/>
+<text x="1220" y="619" font-family="Archivo, 'Helvetica Neue', Arial, sans-serif" font-size="20" font-weight="800" fill="#0e7490" text-anchor="middle">L</text>
+<text x="1220" y="666" font-family="Archivo, 'Helvetica Neue', Arial, sans-serif" font-size="15" font-weight="700" fill="#151a1f" text-anchor="middle">Review lenses</text>
+<text x="1220" y="684" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="12" font-weight="400" fill="#56616c" text-anchor="middle">rules · tests · SAT</text>
+<path d="M422,500 C600,505 760,540 870,572" fill="none" stroke="#56616c" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" marker-start="url(#ah-muted)" marker-end="url(#ah-muted)"/>
+<text x="470" y="492" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="12" font-weight="400" fill="#56616c" text-anchor="start">reads rules · writes register and notes</text>
+<path d="M1050,572 C1200,520 1380,470 1506,477" fill="none" stroke="#0e7490" stroke-width="2.0" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#ah-cool)"/>
+<text x="1300" y="470" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="12" font-weight="400" fill="#0e7490" text-anchor="start">executes</text>
+<rect x="462" y="842" width="205" height="70" rx="6" fill="#ffffff" stroke="#1d4ed8" stroke-width="1.3" filter="url(#card)"/>
+<use href="#chat" x="473.0" y="864.0" width="26" height="26" style="color:#1d4ed8"/>
+<text x="508" y="872" font-family="Archivo, 'Helvetica Neue', Arial, sans-serif" font-size="15" font-weight="700" fill="#151a1f" text-anchor="start">Comms session</text>
+<text x="508" y="893" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="11" font-weight="400" fill="#56616c" text-anchor="start">Discord talk · post drafts</text>
+<path d="M600,842 C640,780 820,700 880,668" fill="none" stroke="#1d4ed8" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="4 3" marker-start="url(#ah-blue)" marker-end="url(#ah-blue)"/>
+<rect x="677" y="842" width="205" height="70" rx="6" fill="#ffffff" stroke="#d5dce2" stroke-width="1.2" filter="url(#card)"/>
+<use href="#sat" x="686.5" y="852.5" width="15" height="15" style="color:#56616c"/>
+<use href="#sat" x="702.5" y="865.5" width="15" height="15" style="color:#56616c"/>
+<use href="#sat" x="686.5" y="878.5" width="15" height="15" style="color:#56616c"/>
+<text x="724" y="872" font-family="Archivo, 'Helvetica Neue', Arial, sans-serif" font-size="15" font-weight="700" fill="#151a1f" text-anchor="start">Other agents</text>
+<text x="724" y="893" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="11" font-weight="400" fill="#56616c" text-anchor="start">Codex · Copilot · CI Claude</text>
+<rect x="1190" y="842" width="270" height="70" rx="6" fill="#ffffff" stroke="#0e7490" stroke-width="1.4" filter="url(#card)"/>
+<use href="#bench" x="1206.0" y="857.0" width="40" height="40" style="color:#0e7490"/>
+<text x="1256" y="872" font-family="Archivo, 'Helvetica Neue', Arial, sans-serif" font-size="16" font-weight="700" fill="#151a1f" text-anchor="start">Bench tester</text>
+<text x="1256" y="894" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="12" font-weight="400" fill="#56616c" text-anchor="start">the only one that flashes</text>
+<path d="M1460,877 C1485,877 1490,825 1506,825" fill="none" stroke="#0e7490" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" marker-start="url(#ah-cool)" marker-end="url(#ah-cool)"/>
+<path d="M30,932 H1890" fill="none" stroke="#d5dce2" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="40" y="958" font-family="'JetBrains Mono', ui-monospace, Consolas, monospace" font-size="13" font-weight="700" fill="#c2410c" text-anchor="start" letter-spacing="2">EXTERNAL KNOWLEDGE</text>
+<circle cx="80" cy="1004" r="24" fill="#ffffff" stroke="#56616c" stroke-width="1"/>
+<use href="#globe" x="67.0" y="991.0" width="26" height="26" style="color:#56616c"/>
+<text x="80" y="1052" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="12" font-weight="400" fill="#56616c" text-anchor="middle">OpenTherm matrix</text>
+<circle cx="250" cy="1004" r="24" fill="#ffffff" stroke="#56616c" stroke-width="1"/>
+<use href="#branch" x="237.0" y="991.0" width="26" height="26" style="color:#56616c"/>
+<text x="250" y="1052" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="12" font-weight="400" fill="#56616c" text-anchor="middle">thermo-nova</text>
+<circle cx="420" cy="1004" r="24" fill="#ffffff" stroke="#56616c" stroke-width="1"/>
+<use href="#book" x="407.0" y="991.0" width="26" height="26" style="color:#56616c"/>
+<text x="420" y="1052" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="12" font-weight="400" fill="#56616c" text-anchor="middle">OpenTherm spec</text>
+<circle cx="590" cy="1004" r="24" fill="#ffffff" stroke="#56616c" stroke-width="1"/>
+<use href="#server" x="577.0" y="991.0" width="26" height="26" style="color:#56616c"/>
+<text x="590" y="1052" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="12" font-weight="400" fill="#56616c" text-anchor="middle">toolchains</text>
+<text x="790" y="958" font-family="'JetBrains Mono', ui-monospace, Consolas, monospace" font-size="13" font-weight="700" fill="#c2410c" text-anchor="start" letter-spacing="2">WHAT SHIPS</text>
+<rect x="790" y="972" width="255" height="78" rx="6" fill="#fde4e1" stroke="#d5dce2" stroke-width="1.4" filter="url(#card)"/>
+<use href="#lock" x="807.0" y="998.0" width="26" height="26" style="color:#b42318"/>
+<text x="844" y="1004" font-family="Archivo, 'Helvetica Neue', Arial, sans-serif" font-size="17" font-weight="700" fill="#151a1f" text-anchor="start">1.x LTS</text>
+<text x="844" y="1026" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="12" font-weight="400" fill="#56616c" text-anchor="start">otgw-1.x.x → main</text>
+<rect x="1065" y="972" width="255" height="78" rx="6" fill="#fde4e1" stroke="#d5dce2" stroke-width="1.4" filter="url(#card)"/>
+<use href="#lock" x="1082.0" y="998.0" width="26" height="26" style="color:#b42318"/>
+<text x="1119" y="1004" font-family="Archivo, 'Helvetica Neue', Arial, sans-serif" font-size="17" font-weight="700" fill="#151a1f" text-anchor="start">Stable 2.x</text>
+<text x="1119" y="1026" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="12" font-weight="400" fill="#56616c" text-anchor="start">release/2.x · after go</text>
+<rect x="1340" y="972" width="255" height="78" rx="6" fill="#fdf0d5" stroke="#d5dce2" stroke-width="1.4" filter="url(#card)"/>
+<use href="#clock" x="1357.0" y="998.0" width="26" height="26" style="color:#a15c00"/>
+<text x="1394" y="1004" font-family="Archivo, 'Helvetica Neue', Arial, sans-serif" font-size="17" font-weight="700" fill="#151a1f" text-anchor="start">Beta 2.x</text>
+<text x="1394" y="1026" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="12" font-weight="400" fill="#56616c" text-anchor="start">standing permission 08:00/20:00</text>
+<rect x="1615" y="972" width="255" height="78" rx="6" fill="#e3f1e4" stroke="#2f7d32" stroke-width="1.4" filter="url(#card)"/>
+<use href="#package" x="1632.0" y="998.0" width="26" height="26" style="color:#2f7d32"/>
+<text x="1669" y="1004" font-family="Archivo, 'Helvetica Neue', Arial, sans-serif" font-size="17" font-weight="700" fill="#151a1f" text-anchor="start">Alpha zip</text>
+<text x="1669" y="1026" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="12" font-weight="400" fill="#56616c" text-anchor="start">per tested task</text>
+<path d="M1742,906 V968" fill="none" stroke="#2f7d32" stroke-width="3.0" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#ah-ok)"/>
+<path d="M1870,1011 H1906 V252 H1898" fill="none" stroke="#2f7d32" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="6 5" marker-end="url(#ah-ok)"/>
+<text x="1780" y="962" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="12" font-weight="400" fill="#2f7d32" text-anchor="start">to testers</text>
+</svg>

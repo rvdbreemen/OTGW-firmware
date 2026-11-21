@@ -1,7 +1,7 @@
 # anatomy.md
 
-> Auto-maintained by OpenWolf. Last scanned: 2026-11-14T13:05:42.350Z
-> Files: 158 tracked | Anatomy hits: 0 | Misses: 0
+> Auto-maintained by OpenWolf. Last scanned: 2026-11-15T20:49:15.984Z
+> Files: 165 tracked | Anatomy hits: 0 | Misses: 0
 
 ## ../../../../AppData/Local/Temp/
 
@@ -961,6 +961,9 @@
 
 ## docs/process/
 
+- `agentic-setup-image-brief.md` — Beeldbrief: compositie, licht palet en Engelse prompts voor de overzichtsplaten A, B en C (TASK-1984) (~13500 tok)
+- `agentic-setup.html` — Visual companion (English, light theme): the agentic workshop explained for outsiders, inline SVG visuals, plates as PNG (~37000 tok)
+- `agentic-setup.md` — Architectuurbeschrijving van de agentic werkplaats, peildatum 2026-11-15: 16 hoofdstukken, BlueFlame Bot, bevindingen F1-F19 (~95000 tok)
 
 ## docs/releases/
 
@@ -1008,3 +1011,12 @@
 
 ## tests/webui/
 
+## tools/agentic-plates/
+
+- `README.md` — How to regenerate the agentic-setup plates (~400 tok)
+- `plate_a.py` — Plate A generator: the whole agentic workshop, 1920x1080, light theme (~3900 tok)
+- `plate_b.py` — Plate B generator: BlueFlame Bot, watch loops and replies per channel (~3500 tok)
+- `plate_overview.py` — Overview plate generator: architecture at a glance, 2560x1440 (~12000 tok)
+- `render.js` — Renders a plate SVG to PNG with Playwright and Google Fonts (~250 tok)
+- `render_pdf.js` — Renders a plate SVG to a one-page vector PDF with embedded fonts (~300 tok)
+- `svgkit.py` — Shared palette, symbols, markers and flame for the plates (~4000 tok)

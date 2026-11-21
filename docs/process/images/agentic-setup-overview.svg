@@ -1,0 +1,651 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 2560 1440" width="2560" height="1440" role="img" aria-labelledby="t d">
+<title id="t">OTGW agentic workshop: architecture at a glance</title>
+<desc id="d">Overview poster of the OTGW agentic development setup as of 2026-11-15: people and decision rights, channels, BlueFlame Bot and its three watch loops, sessions and agents, rule layers and how they are enforced, the knowledge base, the ADR kit, the pipeline with its gates, what ships, external sources and key numbers.</desc>
+<defs><marker id="ah-muted" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#56616c"/></marker><marker id="ah-cool" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#0e7490"/></marker><marker id="ah-flame" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#c2410c"/></marker><marker id="ah-ok" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#2f7d32"/></marker><marker id="ah-blue" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#1d4ed8"/></marker><radialGradient id="glow" cx="50%" cy="55%" r="50%"><stop offset="0%" stop-color="#3b82f6" stop-opacity="0.32"/><stop offset="60%" stop-color="#06b6d4" stop-opacity="0.08"/><stop offset="100%" stop-color="#f4f6f7" stop-opacity="0"/></radialGradient><linearGradient id="flamefill" x1="0" y1="1" x2="0" y2="0"><stop offset="0%" stop-color="#dbeafe"/><stop offset="35%" stop-color="#2563eb"/><stop offset="100%" stop-color="#06b6d4"/></linearGradient><filter id="soft" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="6"/></filter><filter id="card" x="-5%" y="-10%" width="110%" height="130%"><feDropShadow dx="0" dy="1.5" stdDeviation="2" flood-color="#151a1f" flood-opacity="0.08"/></filter><symbol id="person" viewBox="0 0 24 24"><circle cx="12" cy="7" r="4" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M4,22 C4,15 20,15 20,22" fill="none" stroke="currentColor" stroke-width="1.8"/></symbol><symbol id="group" viewBox="0 0 24 24"><circle cx="12" cy="7" r="3.2" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="5" cy="9" r="2.4" fill="none" stroke="currentColor" stroke-width="1.4"/><circle cx="19" cy="9" r="2.4" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M6,21 C6,15 18,15 18,21 M1,20 C1,16 6,15 7.5,15.5 M23,20 C23,16 18,15 16.5,15.5" fill="none" stroke="currentColor" stroke-width="1.5"/></symbol><symbol id="tester" viewBox="0 0 24 24"><circle cx="9" cy="7" r="3.5" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M2,22 C2,15 16,15 16,22" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M19,4 L19,14 C19,16 22,16 22,14 L22,4 M18,4 L23,4" fill="none" stroke="currentColor" stroke-width="1.4"/></symbol><symbol id="designer" viewBox="0 0 24 24"><circle cx="9" cy="7" r="3.5" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M2,22 C2,15 16,15 16,22" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M20,3 L17,13 M20,3 L23,13 M18,9 L22,9" fill="none" stroke="currentColor" stroke-width="1.4"/></symbol><symbol id="key" viewBox="0 0 24 24"><circle cx="9" cy="7" r="3.5" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M2,22 C2,15 16,15 16,22" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="20" cy="5" r="2.5" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M20,7.5 L20,15 M20,11 L22.5,11 M20,14 L22,14" fill="none" stroke="currentColor" stroke-width="1.4"/></symbol><symbol id="chat" viewBox="0 0 24 24"><path d="M3,4 H21 V16 H10 L5,20 V16 H3 Z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M9.5,7 L8.5,13 M13.5,7 L12.5,13 M7,9 H15 M6.5,11 H14.5" fill="none" stroke="currentColor" stroke-width="1.2"/></symbol><symbol id="mail" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M3,6 L12,13 L21,6" fill="none" stroke="currentColor" stroke-width="1.6"/></symbol><symbol id="branch" viewBox="0 0 24 24"><circle cx="6" cy="5" r="2.5" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="6" cy="19" r="2.5" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="18" cy="8" r="2.5" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M6,7.5 V16.5 M18,10.5 C18,15 6,13 6,16.5" fill="none" stroke="currentColor" stroke-width="1.6"/></symbol><symbol id="rss" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="3" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="8" cy="16" r="1.6" fill="currentColor"/><path d="M7,11 A6,6 0 0 1 13,17 M7,7 A10,10 0 0 1 17,17" fill="none" stroke="currentColor" stroke-width="1.6"/></symbol><symbol id="book" viewBox="0 0 24 24"><path d="M4,4 H11 C12,4 12,5 12,6 V20 C12,19 11,18 10,18 H4 Z M20,4 H13 C12,4 12,5 12,6 V20 C12,19 13,18 14,18 H20 Z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></symbol><symbol id="stamp" viewBox="0 0 24 24"><path d="M9,3 H15 V9 C15,11 18,11 18,13 V15 H6 V13 C6,11 9,11 9,9 Z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M4,19 H20 M8,15 V19 M16,15 V19" fill="none" stroke="currentColor" stroke-width="1.5"/></symbol><symbol id="map" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" fill="none" stroke="currentColor" stroke-width="1.5"/><rect x="6" y="6" width="12" height="12" rx="1" fill="none" stroke="currentColor" stroke-width="1.3"/><rect x="9" y="9" width="6" height="6" rx="1" fill="none" stroke="currentColor" stroke-width="1.2"/></symbol><symbol id="ledger" viewBox="0 0 24 24"><rect x="5" y="3" width="14" height="18" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8,3 V21 M10,8 H16 M10,11 H16 M10,14 H16 M10,17 H14" fill="none" stroke="currentColor" stroke-width="1.2"/></symbol><symbol id="queue" viewBox="0 0 24 24"><rect x="2" y="8" width="6" height="8" rx="1" fill="none" stroke="currentColor" stroke-width="1.4"/><rect x="9" y="8" width="6" height="8" rx="1" fill="none" stroke="currentColor" stroke-width="1.4"/><rect x="16" y="8" width="6" height="8" rx="1" fill="none" stroke="currentColor" stroke-width="1.4"/></symbol><symbol id="kanban" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M9,3 V21 M15,3 V21" stroke="currentColor" stroke-width="1.2"/><rect x="4.5" y="6" width="3" height="3" fill="currentColor"/><rect x="10.5" y="6" width="3" height="3" fill="currentColor"/><rect x="10.5" y="11" width="3" height="3" fill="currentColor"/><rect x="16.5" y="6" width="3" height="3" fill="currentColor"/></symbol><symbol id="wolf" viewBox="0 0 24 24"><path d="M4,3 L8,9 H16 L20,3 L21,13 L12,21 L3,13 Z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><circle cx="9" cy="12" r="1" fill="currentColor"/><circle cx="15" cy="12" r="1" fill="currentColor"/></symbol><symbol id="graph" viewBox="0 0 24 24"><circle cx="5" cy="6" r="2" fill="none" stroke="currentColor" stroke-width="1.4"/><circle cx="18" cy="5" r="2" fill="none" stroke="currentColor" stroke-width="1.4"/><circle cx="12" cy="13" r="2" fill="none" stroke="currentColor" stroke-width="1.4"/><circle cx="5" cy="19" r="2" fill="none" stroke="currentColor" stroke-width="1.4"/><circle cx="19" cy="19" r="2" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M6.5,7.5 L10.5,11.5 M16.5,6.5 L13.5,11.5 M10.5,14.5 L6.5,17.5 M13.5,14.5 L17.5,17.5" stroke="currentColor" stroke-width="1.2"/></symbol><symbol id="shield" viewBox="0 0 24 24"><path d="M12,2 L20,5 V11 C20,16 16,20 12,22 C8,20 4,16 4,11 V5 Z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M8,12 L11,15 L16,9" fill="none" stroke="currentColor" stroke-width="1.8"/></symbol><symbol id="lock" viewBox="0 0 24 24"><rect x="5" y="10" width="14" height="11" rx="2" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M8,10 V7 C8,2 16,2 16,7 V10" fill="none" stroke="currentColor" stroke-width="1.7"/></symbol><symbol id="clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M12,6 V12 L16,14" fill="none" stroke="currentColor" stroke-width="1.6"/></symbol><symbol id="bench" viewBox="0 0 24 24"><path d="M2,15 H22 M4,15 V21 M20,15 V21" fill="none" stroke="currentColor" stroke-width="1.6"/><rect x="4" y="9" width="7" height="6" rx="1" fill="none" stroke="currentColor" stroke-width="1.4"/><rect x="13" y="9" width="7" height="6" rx="1" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M8,5 A6,6 0 0 1 16,5 M10,7 A3,3 0 0 1 14,7" fill="none" stroke="currentColor" stroke-width="1.3"/></symbol><symbol id="sat" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M3,12 H8 M16,12 H21 M5,9 V15 M19,9 V15" fill="none" stroke="currentColor" stroke-width="1.5"/></symbol><symbol id="hourglass" viewBox="0 0 24 24"><path d="M6,3 H18 M6,21 H18 M7,3 C7,9 17,9 17,12 C17,15 7,15 7,21 M17,3 C17,9 7,9 7,12 C7,15 17,15 17,21" fill="none" stroke="currentColor" stroke-width="1.4"/></symbol><symbol id="loop" viewBox="0 0 24 24"><path d="M19,12 A7,7 0 1 1 15,5.6" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M14,2.5 L16.5,6 L12.5,7.5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></symbol><symbol id="package" viewBox="0 0 24 24"><path d="M12,2 L21,7 V17 L12,22 L3,17 V7 Z M3,7 L12,12 L21,7 M12,12 V22" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></symbol><symbol id="globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M3,12 H21 M12,3 C8,7 8,17 12,21 C16,17 16,7 12,3" fill="none" stroke="currentColor" stroke-width="1.3"/></symbol><symbol id="server" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="7" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.5"/><rect x="4" y="13" width="16" height="7" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.5"/><circle cx="8" cy="7.5" r="1" fill="currentColor"/><circle cx="8" cy="16.5" r="1" fill="currentColor"/></symbol><marker id="ah-amber" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#a15c00"/></marker><marker id="ah-crit" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#b42318"/></marker><symbol id="flame_s" viewBox="0 0 24 24"><path d="M12,2 C15,6 19,9 18.5,14 C18,19 15,22 12,22 C9,22 6,19 5.5,14 C5.2,11 7,9 9,7.5 C9.3,10 10.5,11.5 11.7,12 C12.3,9 11,5 12,2 Z" fill="currentColor"/></symbol><symbol id="shield_f" viewBox="0 0 24 24"><path d="M12,2 L20,5 V11 C20,16 16,20 12,22 C8,20 4,16 4,11 V5 Z" fill="currentColor" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M8,12 L11,15 L16,9" fill="none" stroke="#ffffff" stroke-width="2"/></symbol><symbol id="shield_o" viewBox="0 0 24 24"><path d="M12,2 L20,5 V11 C20,16 16,20 12,22 C8,20 4,16 4,11 V5 Z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-dasharray="3 2.4"/></symbol><symbol id="terminal" viewBox="0 0 24 24"><rect x="2.5" y="4" width="19" height="16" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M6.5,9 L10,12 L6.5,15 M12,15.5 H17" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></symbol><symbol id="spark" viewBox="0 0 24 24"><path d="M12,2 C12.6,8 16,11.4 22,12 C16,12.6 12.6,16 12,22 C11.4,16 8,12.6 2,12 C8,11.4 11.4,8 12,2 Z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></symbol></defs>
+<rect width="2560" height="1440" fill="#f4f6f7"/>
+<text x="40" y="58" font-family="Archivo, 'Helvetica Neue', Arial, sans-serif" font-size="40" font-weight="800" fill="#151a1f" text-anchor="start">OTGW agentic workshop: architecture at a glance</text>
+<text x="42" y="86" font-family="'JetBrains Mono', ui-monospace, Consolas, monospace" font-size="15" font-weight="400" fill="#56616c" text-anchor="start">as of 2026-11-15 · firmware 2.0.0-beta.327</text>
+<text x="1236" y="45" font-family="'JetBrains Mono', ui-monospace, Consolas, monospace" font-size="13" font-weight="400" fill="#56616c" text-anchor="start" letter-spacing="1.2">COLOUR</text>
+<rect x="1314" y="31" width="18" height="18" rx="4" fill="#fde7d9" stroke="#c2410c" stroke-width="1.5"/>
+<text x="1340" y="45" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="14" font-weight="400" fill="#56616c" text-anchor="start">people · decision</text>
+<rect x="1485.0" y="31" width="18" height="18" rx="4" fill="#d9eff4" stroke="#0e7490" stroke-width="1.5"/>
+<text x="1511.0" y="45" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="14" font-weight="400" fill="#56616c" text-anchor="start">agents</text>
+<rect x="1579.0" y="31" width="18" height="18" rx="4" fill="#dbeafe" stroke="#1d4ed8" stroke-width="1.5"/>
+<text x="1605.0" y="45" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="14" font-weight="400" fill="#56616c" text-anchor="start">BlueFlame Bot</text>
+<rect x="1722.0" y="31" width="18" height="18" rx="4" fill="#fdf0d5" stroke="#a15c00" stroke-width="1.5"/>
+<text x="1748.0" y="45" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="14" font-weight="400" fill="#56616c" text-anchor="start">gate</text>
+<rect x="1802.0" y="31" width="18" height="18" rx="4" fill="#e3f1e4" stroke="#2f7d32" stroke-width="1.5"/>
+<text x="1828.0" y="45" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="14" font-weight="400" fill="#56616c" text-anchor="start">ships</text>
+<rect x="1889.0" y="31" width="18" height="18" rx="4" fill="#fde4e1" stroke="#b42318" stroke-width="1.5"/>
+<text x="1915.0" y="45" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="14" font-weight="400" fill="#56616c" text-anchor="start">hard stop</text>
+<rect x="2004.0" y="31" width="18" height="18" rx="4" fill="#ffffff" stroke="#56616c" stroke-width="1.5"/>
+<text x="2030.0" y="45" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="14" font-weight="400" fill="#56616c" text-anchor="start">store</text>
+<text x="1236" y="79" font-family="'JetBrains Mono', ui-monospace, Consolas, monospace" font-size="13" font-weight="400" fill="#56616c" text-anchor="start" letter-spacing="1.2">LINES</text>
+<path d="M1318,74 H1350" fill="none" stroke="#c2410c" stroke-width="3.0" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#ah-flame)"/>
+<text x="1362" y="79" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="14" font-weight="400" fill="#56616c" text-anchor="start">human decision</text>
+<path d="M1490.0,74 H1522.0" fill="none" stroke="#0e7490" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" marker-start="url(#ah-cool)" marker-end="url(#ah-cool)"/>
+<text x="1534.0" y="79" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="14" font-weight="400" fill="#56616c" text-anchor="start">two-way</text>
+<path d="M1613.0,74 H1645.0" fill="none" stroke="#0e7490" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="5 4" marker-end="url(#ah-cool)"/>
+<text x="1657.0" y="79" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="14" font-weight="400" fill="#56616c" text-anchor="start">read only</text>
+<path d="M1750.0,74 H1782.0" fill="none" stroke="#2f7d32" stroke-width="3.0" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#ah-ok)"/>
+<text x="1794.0" y="79" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="14" font-weight="400" fill="#56616c" text-anchor="start">ships</text>
+<use href="#shield_f" x="1854.0" y="64.0" width="20" height="20" style="color:#a15c00"/>
+<text x="1881.0" y="79" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="14" font-weight="400" fill="#56616c" text-anchor="start">refuses</text>
+<use href="#shield_o" x="1955.0" y="64.0" width="20" height="20" style="color:#a15c00"/>
+<text x="1982.0" y="79" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="14" font-weight="400" fill="#56616c" text-anchor="start">convention or review</text>
+<use href="#lock" x="2147.0" y="64.0" width="20" height="20" style="color:#b42318"/>
+<text x="2174.0" y="79" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="14" font-weight="400" fill="#56616c" text-anchor="start">per-action yes</text>
+<path d="M40,104 H2520" fill="none" stroke="#d5dce2" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="40" y="132" font-family="'JetBrains Mono', ui-monospace, Consolas, monospace" font-size="15" font-weight="700" fill="#c2410c" text-anchor="start" letter-spacing="2.5">PEOPLE</text>
+<text x="123.6" y="132" font-family="'JetBrains Mono', ui-monospace, Consolas, monospace" font-size="13" font-weight="400" fill="#56616c" text-anchor="start" letter-spacing="1.2">two decide · the others bring input and evidence</text>
+<rect x="40" y="144" width="292" height="74" rx="6" fill="#ffffff" stroke="#c2410c" stroke-width="1.1" filter="url(#card)"/>
+<use href="#group" x="53.0" y="164.0" width="34" height="34" style="color:#c2410c"/>
+<text data-box="40,144,292,74" x="98" y="175" font-family="Archivo, 'Helvetica Neue', Arial, sans-serif" font-size="17" font-weight="700" fill="#151a1f" text-anchor="start">End users</text>
+<text data-box="40,144,292,74" x="98" y="198" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#56616c" text-anchor="start">issues, PRs, forum posts become tasks</text>
+<rect x="344" y="144" width="292" height="74" rx="6" fill="#ffffff" stroke="#c2410c" stroke-width="1.1" filter="url(#card)"/>
+<use href="#person" x="357.0" y="164.0" width="34" height="34" style="color:#c2410c"/>
+<text data-box="344,144,292,74" x="402" y="175" font-family="Archivo, 'Helvetica Neue', Arial, sans-serif" font-size="17" font-weight="700" fill="#151a1f" text-anchor="start">Read-only members</text>
+<text data-box="344,144,292,74" x="402" y="198" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#56616c" text-anchor="start">no effect on the bot · answered once</text>
+<rect x="648" y="144" width="292" height="74" rx="6" fill="#ffffff" stroke="#c2410c" stroke-width="1.1" filter="url(#card)"/>
+<use href="#tester" x="661.0" y="164.0" width="34" height="34" style="color:#c2410c"/>
+<text data-box="648,144,292,74" x="706" y="175" font-family="Archivo, 'Helvetica Neue', Arial, sans-serif" font-size="17" font-weight="700" fill="#151a1f" text-anchor="start">Alpha testers</text>
+<text data-box="648,144,292,74" x="706" y="198" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#56616c" text-anchor="start">flash, capture, report · no decisions</text>
+<rect x="952" y="144" width="292" height="74" rx="6" fill="#fde7d9" stroke="#c2410c" stroke-width="2.2" filter="url(#card)"/>
+<use href="#designer" x="965.0" y="164.0" width="34" height="34" style="color:#c2410c"/>
+<text data-box="952,144,292,74" x="1010" y="175" font-family="Archivo, 'Helvetica Neue', Arial, sans-serif" font-size="17" font-weight="700" fill="#151a1f" text-anchor="start">Sergeant D · SAT designer</text>
+<text data-box="952,144,292,74" x="1010" y="198" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#56616c" text-anchor="start">decides SAT behaviour · recorded first</text>
+<rect x="1256" y="144" width="292" height="74" rx="6" fill="#fde7d9" stroke="#c2410c" stroke-width="2.2" filter="url(#card)"/>
+<use href="#key" x="1269.0" y="164.0" width="34" height="34" style="color:#c2410c"/>
+<text data-box="1256,144,292,74" x="1314" y="175" font-family="Archivo, 'Helvetica Neue', Arial, sans-serif" font-size="17" font-weight="700" fill="#151a1f" text-anchor="start">Robert · maintainer</text>
+<text data-box="1256,144,292,74" x="1314" y="198" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#56616c" text-anchor="start">scope, priority, waivers, releases</text>
+<text x="1596" y="132" font-family="'JetBrains Mono', ui-monospace, Consolas, monospace" font-size="15" font-weight="700" fill="#c2410c" text-anchor="start" letter-spacing="2.5">WHO DECIDES WHAT</text>
+<text x="1967.0" y="162" font-family="Archivo, 'Helvetica Neue', Arial, sans-serif" font-size="14" font-weight="700" fill="#c2410c" text-anchor="middle">Robert</text>
+<text x="2125.0" y="162" font-family="Archivo, 'Helvetica Neue', Arial, sans-serif" font-size="14" font-weight="700" fill="#c2410c" text-anchor="middle">Sergeant D</text>
+<text x="2283.0" y="162" font-family="Archivo, 'Helvetica Neue', Arial, sans-serif" font-size="14" font-weight="700" fill="#56616c" text-anchor="middle">Testers · users</text>
+<text x="2441.0" y="162" font-family="Archivo, 'Helvetica Neue', Arial, sans-serif" font-size="14" font-weight="700" fill="#0e7490" text-anchor="middle">Agents</text>
+<path d="M1596,172 H2520" fill="none" stroke="#d5dce2" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+<text data-box="1596,172,292,30" x="1604" y="192" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="14" font-weight="600" fill="#151a1f" text-anchor="start">Have a task created</text>
+<rect x="1893.0" y="176.0" width="148" height="22" rx="11.0" fill="#fde7d9" stroke="#c2410c" stroke-width="1.1"/>
+<text data-box="1893,176,148,22" x="1967.0" y="191.55" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="600" fill="#151a1f" text-anchor="middle">decides</text>
+<rect x="2051.0" y="176.0" width="148" height="22" rx="11.0" fill="#fde7d9" stroke="#c2410c" stroke-width="1.1"/>
+<text data-box="2051,176,148,22" x="2125.0" y="191.55" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="600" fill="#151a1f" text-anchor="middle">yes, directly</text>
+<rect x="2209.0" y="176.0" width="148" height="22" rx="11.0" fill="#fdf0d5" stroke="#a15c00" stroke-width="1.1"/>
+<text data-box="2209,176,148,22" x="2283.0" y="191.55" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="600" fill="#151a1f" text-anchor="middle">input, partly gated</text>
+<rect x="2367.0" y="176.0" width="148" height="22" rx="11.0" fill="#d9eff4" stroke="#0e7490" stroke-width="1.1"/>
+<text data-box="2367,176,148,22" x="2441.0" y="191.55" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="600" fill="#151a1f" text-anchor="middle">standing permission</text>
+<path d="M1596,202 H2520" fill="none" stroke="#d5dce2" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+<text data-box="1596,202,292,30" x="1604" y="222" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="14" font-weight="600" fill="#151a1f" text-anchor="start">Scope · priority · waivers</text>
+<rect x="1893.0" y="206.0" width="148" height="22" rx="11.0" fill="#fde7d9" stroke="#c2410c" stroke-width="1.1"/>
+<text data-box="1893,206,148,22" x="1967.0" y="221.55" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="600" fill="#151a1f" text-anchor="middle">decides</text>
+<text x="2125.0" y="222.0" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#56616c" text-anchor="middle">no</text>
+<text x="2283.0" y="222.0" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#56616c" text-anchor="middle">no</text>
+<text x="2441.0" y="222.0" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#56616c" text-anchor="middle">no</text>
+<path d="M1596,232 H2520" fill="none" stroke="#d5dce2" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+<text data-box="1596,232,292,30" x="1604" y="252" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="14" font-weight="600" fill="#151a1f" text-anchor="start">SAT behaviour</text>
+<rect x="1893.0" y="236.0" width="148" height="22" rx="11.0" fill="#ffffff" stroke="#c2410c" stroke-width="1.1" stroke-dasharray="4 3"/>
+<text data-box="1893,236,148,22" x="1967.0" y="251.55" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="600" fill="#151a1f" text-anchor="middle">exceptions only</text>
+<rect x="2051.0" y="236.0" width="148" height="22" rx="11.0" fill="#fde7d9" stroke="#c2410c" stroke-width="1.1"/>
+<text data-box="2051,236,148,22" x="2125.0" y="251.55" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="600" fill="#151a1f" text-anchor="middle">decides</text>
+<text x="2283.0" y="252.0" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#56616c" text-anchor="middle">no</text>
+<text x="2441.0" y="252.0" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#56616c" text-anchor="middle">no</text>
+<path d="M1596,262 H2520" fill="none" stroke="#d5dce2" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+<text data-box="1596,262,292,30" x="1604" y="282" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="14" font-weight="600" fill="#151a1f" text-anchor="start">Push to dev and the 1.x line</text>
+<rect x="1893.0" y="266.0" width="148" height="22" rx="11.0" fill="#fde7d9" stroke="#c2410c" stroke-width="1.1"/>
+<text data-box="1893,266,148,22" x="1967.0" y="281.55" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="600" fill="#151a1f" text-anchor="middle">decides</text>
+<text x="2125.0" y="282.0" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#56616c" text-anchor="middle">no</text>
+<text x="2283.0" y="282.0" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#56616c" text-anchor="middle">no</text>
+<rect x="2367.0" y="266.0" width="148" height="22" rx="11.0" fill="#d9eff4" stroke="#0e7490" stroke-width="1.1"/>
+<text data-box="2367,266,148,22" x="2441.0" y="281.55" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="600" fill="#151a1f" text-anchor="middle">standing permission</text>
+<path d="M1596,292 H2520" fill="none" stroke="#d5dce2" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+<text data-box="1596,292,292,30" x="1604" y="312" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="14" font-weight="600" fill="#151a1f" text-anchor="start">Flash a bench unit</text>
+<rect x="1893.0" y="296.0" width="148" height="22" rx="11.0" fill="#fde7d9" stroke="#c2410c" stroke-width="1.1"/>
+<text data-box="1893,296,148,22" x="1967.0" y="311.55" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="600" fill="#151a1f" text-anchor="middle">decides</text>
+<text x="2125.0" y="312.0" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#56616c" text-anchor="middle">no</text>
+<text x="2283.0" y="312.0" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#56616c" text-anchor="middle">no</text>
+<rect x="2367.0" y="296.0" width="148" height="22" rx="11.0" fill="#d9eff4" stroke="#0e7490" stroke-width="1.1"/>
+<text data-box="2367,296,148,22" x="2441.0" y="311.55" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="600" fill="#151a1f" text-anchor="middle">bench tester only</text>
+<path d="M1596,322 H2520" fill="none" stroke="#d5dce2" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+<text data-box="1596,322,292,30" x="1604" y="342" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="14" font-weight="600" fill="#151a1f" text-anchor="start">Public 2.x beta · 08:00 / 20:00 slot</text>
+<rect x="1893.0" y="326.0" width="148" height="22" rx="11.0" fill="#fde7d9" stroke="#c2410c" stroke-width="1.1"/>
+<text data-box="1893,326,148,22" x="1967.0" y="341.55" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="600" fill="#151a1f" text-anchor="middle">decides</text>
+<text x="2125.0" y="342.0" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#56616c" text-anchor="middle">no</text>
+<text x="2283.0" y="342.0" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#56616c" text-anchor="middle">no</text>
+<rect x="2367.0" y="326.0" width="148" height="22" rx="11.0" fill="#d9eff4" stroke="#0e7490" stroke-width="1.1"/>
+<text data-box="2367,326,148,22" x="2441.0" y="341.55" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="600" fill="#151a1f" text-anchor="middle">standing permission</text>
+<path d="M1596,352 H2520" fill="none" stroke="#d5dce2" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+<use href="#lock" x="1600.5" y="366.5" width="17" height="17" style="color:#b42318"/>
+<text data-box="1596,352,292,46" x="1622" y="371" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="14" font-weight="600" fill="#151a1f" text-anchor="start">Stable release · push to main · force-push</text>
+<text data-box="1596,352,292,46" x="1622" y="388" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="14" font-weight="600" fill="#151a1f" text-anchor="start">PIC flash · merging another person's PR</text>
+<rect x="1893.0" y="364.0" width="148" height="22" rx="11.0" fill="#fde4e1" stroke="#b42318" stroke-width="1.1"/>
+<text data-box="1893,364,148,22" x="1967.0" y="379.55" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="600" fill="#151a1f" text-anchor="middle">per-action yes via DM</text>
+<text x="2125.0" y="380.0" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#56616c" text-anchor="middle">no</text>
+<text x="2283.0" y="380.0" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#56616c" text-anchor="middle">no</text>
+<text x="2441.0" y="380.0" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#56616c" text-anchor="middle">no</text>
+<path d="M1596,398 H2520" fill="none" stroke="#d5dce2" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="40" y="250" font-family="'JetBrains Mono', ui-monospace, Consolas, monospace" font-size="15" font-weight="700" fill="#c2410c" text-anchor="start" letter-spacing="2.5">CHANNELS</text>
+<rect x="40.0" y="262" width="240" height="84" rx="6" fill="#f4f6f7" stroke="#56616c" stroke-width="1.1" stroke-dasharray="5 4"/>
+<use href="#rss" x="52.0" y="278.0" width="28" height="28" style="color:#56616c"/>
+<text data-box="40,262,240,84" x="90.0" y="292" font-family="Archivo, 'Helvetica Neue', Arial, sans-serif" font-size="16" font-weight="700" fill="#151a1f" text-anchor="start">Tweakers topic</text>
+<text data-box="40,262,240,84" x="90.0" y="314" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#56616c" text-anchor="start">RSS · read only</text>
+<text data-box="40,262,240,84" x="90.0" y="332" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#56616c" text-anchor="start">no way to post</text>
+<rect x="293.6" y="262" width="240" height="84" rx="6" fill="#f4f6f7" stroke="#56616c" stroke-width="1.1" stroke-dasharray="5 4"/>
+<use href="#branch" x="305.6" y="278.0" width="28" height="28" style="color:#56616c"/>
+<text data-box="293.6,262,240,84" x="343.6" y="292" font-family="Archivo, 'Helvetica Neue', Arial, sans-serif" font-size="16" font-weight="700" fill="#151a1f" text-anchor="start">GitHub</text>
+<text data-box="293.6,262,240,84" x="343.6" y="314" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#56616c" text-anchor="start">issues · PRs · releases</text>
+<text data-box="293.6,262,240,84" x="343.6" y="332" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#0e7490" text-anchor="start">two-way · maintainer account</text>
+<rect x="547.2" y="262" width="240" height="84" rx="6" fill="#f4f6f7" stroke="#56616c" stroke-width="1.1" stroke-dasharray="5 4"/>
+<use href="#chat" x="559.2" y="278.0" width="28" height="28" style="color:#56616c"/>
+<text data-box="547.2,262,240,84" x="597.2" y="292" font-family="Archivo, 'Helvetica Neue', Arial, sans-serif" font-size="16" font-weight="700" fill="#151a1f" text-anchor="start">Discord support</text>
+<text data-box="547.2,262,240,84" x="597.2" y="314" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#56616c" text-anchor="start">read + announcements</text>
+<text data-box="547.2,262,240,84" x="597.2" y="332" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#56616c" text-anchor="start">replies in practice</text>
+<rect x="800.8" y="262" width="240" height="84" rx="6" fill="#f4f6f7" stroke="#56616c" stroke-width="1.1" stroke-dasharray="5 4"/>
+<use href="#chat" x="812.8" y="278.0" width="28" height="28" style="color:#56616c"/>
+<text data-box="800.8,262,240,84" x="850.8" y="292" font-family="Archivo, 'Helvetica Neue', Arial, sans-serif" font-size="16" font-weight="700" fill="#151a1f" text-anchor="start">#alpha-testing</text>
+<text data-box="800.8,262,240,84" x="850.8" y="314" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#56616c" text-anchor="start">zips · reports · SAT questions</text>
+<text data-box="800.8,262,240,84" x="850.8" y="332" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#0e7490" text-anchor="start">two-way</text>
+<rect x="1054.4" y="262" width="240" height="84" rx="6" fill="#f4f6f7" stroke="#56616c" stroke-width="1.1" stroke-dasharray="5 4"/>
+<use href="#chat" x="1066.4" y="278.0" width="28" height="28" style="color:#56616c"/>
+<text data-box="1054.4,262,240,84" x="1104.4" y="292" font-family="Archivo, 'Helvetica Neue', Arial, sans-serif" font-size="16" font-weight="700" fill="#151a1f" text-anchor="start">#dev-sat-mqtt</text>
+<text data-box="1054.4,262,240,84" x="1104.4" y="314" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#56616c" text-anchor="start">backlog commands · SAT</text>
+<text data-box="1054.4,262,240,84" x="1104.4" y="332" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#0e7490" text-anchor="start">two-way</text>
+<rect x="1308.0" y="262" width="240" height="84" rx="6" fill="#f4f6f7" stroke="#56616c" stroke-width="1.1" stroke-dasharray="5 4"/>
+<use href="#mail" x="1320.0" y="278.0" width="28" height="28" style="color:#56616c"/>
+<text data-box="1308,262,240,84" x="1358.0" y="292" font-family="Archivo, 'Helvetica Neue', Arial, sans-serif" font-size="16" font-weight="700" fill="#151a1f" text-anchor="start">DM with maintainer</text>
+<text data-box="1308,262,240,84" x="1358.0" y="314" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#56616c" text-anchor="start">one question per message</text>
+<text data-box="1308,262,240,84" x="1358.0" y="332" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#0e7490" text-anchor="start">decisions · hard-stop yes</text>
+<path d="M166.0,218 C166.0,238.5 160.0,238.5 160.0,259" fill="none" stroke="#56616c" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="3 4" marker-end="url(#ah-muted)"/>
+<path d="M166.0,218 C166.0,238.5 413.6,238.5 413.6,259" fill="none" stroke="#56616c" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="3 4" marker-end="url(#ah-muted)"/>
+<path d="M166.0,218 C166.0,238.5 667.2,238.5 667.2,259" fill="none" stroke="#56616c" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="3 4" marker-end="url(#ah-muted)"/>
+<path d="M794.0,218 C794.0,238.5 890.8,238.5 890.8,259" fill="none" stroke="#56616c" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="3 4" marker-start="url(#ah-muted)" marker-end="url(#ah-muted)"/>
+<path d="M1078.0,218 C1078.0,238.5 950.8,238.5 950.8,259" fill="none" stroke="#c2410c" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" marker-start="url(#ah-flame)" marker-end="url(#ah-flame)"/>
+<path d="M1118.0,218 C1118.0,238.5 1174.4,238.5 1174.4,259" fill="none" stroke="#c2410c" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" marker-start="url(#ah-flame)" marker-end="url(#ah-flame)"/>
+<path d="M1428.0,221 V259" fill="none" stroke="#c2410c" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" marker-start="url(#ah-flame)" marker-end="url(#ah-flame)"/>
+<path d="M160.0,368 H1428.0" fill="none" stroke="#0e7490" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M160.0,349 V366" fill="none" stroke="#0e7490" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="5 4" marker-end="url(#ah-cool)"/>
+<path d="M413.6,349 V366" fill="none" stroke="#0e7490" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" marker-start="url(#ah-cool)" marker-end="url(#ah-cool)"/>
+<path d="M667.2,349 V366" fill="none" stroke="#0e7490" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" marker-start="url(#ah-cool)" marker-end="url(#ah-cool)"/>
+<path d="M920.8,349 V366" fill="none" stroke="#0e7490" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" marker-start="url(#ah-cool)" marker-end="url(#ah-cool)"/>
+<path d="M1174.4,349 V366" fill="none" stroke="#0e7490" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" marker-start="url(#ah-cool)" marker-end="url(#ah-cool)"/>
+<path d="M1428.0,349 V366" fill="none" stroke="#0e7490" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" marker-start="url(#ah-cool)" marker-end="url(#ah-cool)"/>
+<path d="M1260,368 V506" fill="none" stroke="#0e7490" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" marker-start="url(#ah-cool)" marker-end="url(#ah-cool)"/>
+<text x="1248" y="412" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#0e7490" text-anchor="end">watch and reply</text>
+<path d="M1548,181.0 H1560 Q1570,181.0 1570,191.0 V380 Q1570,390 1560,390 H1312 Q1302,390 1302,400 V506" fill="none" stroke="#c2410c" stroke-width="3.0" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#ah-flame)"/>
+<text x="1316" y="412" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#c2410c" text-anchor="start">instructions in the session</text>
+<text x="760" y="418" font-family="'JetBrains Mono', ui-monospace, Consolas, monospace" font-size="15" font-weight="700" fill="#c2410c" text-anchor="start" letter-spacing="2.5">BLUEFLAME BOT</text>
+<text x="924.8" y="418" font-family="'JetBrains Mono', ui-monospace, Consolas, monospace" font-size="13" font-weight="400" fill="#56616c" text-anchor="start" letter-spacing="1.2">a persona, not a program</text>
+<circle cx="1280" cy="606" r="104" fill="#dbeafe" stroke="#1d4ed8" stroke-width="2.2"/>
+<circle cx="1280" cy="610" r="162" fill="url(#glow)"/>
+<path d="M1280.0,543.0 C1303.8,577.6 1327.5,601.4 1323.2,629.4 C1318.9,657.5 1299.4,670.5 1280.0,670.5 C1260.6,670.5 1241.1,657.5 1236.8,629.4 C1233.6,607.8 1247.6,590.6 1260.6,577.6 C1262.7,597.0 1271.4,605.7 1277.8,610.0 C1282.2,586.2 1273.5,566.8 1280.0,543.0 Z" fill="#2563eb" opacity="0.28" filter="url(#soft)"/>
+<path d="M1280.0,543.0 C1303.8,577.6 1327.5,601.4 1323.2,629.4 C1318.9,657.5 1299.4,670.5 1280.0,670.5 C1260.6,670.5 1241.1,657.5 1236.8,629.4 C1233.6,607.8 1247.6,590.6 1260.6,577.6 C1262.7,597.0 1271.4,605.7 1277.8,610.0 C1282.2,586.2 1273.5,566.8 1280.0,543.0 Z" fill="url(#flamefill)" stroke="#1d4ed8" stroke-width="1.4"/>
+<path d="M1280.0,601.4 C1293.0,618.6 1301.6,633.8 1298.4,646.7 C1295.1,659.7 1286.5,664.0 1280.0,664.0 C1273.5,664.0 1264.9,659.7 1261.6,646.7 C1259.5,633.8 1269.2,618.6 1280.0,601.4 Z" fill="#ffffff" opacity="0.95"/>
+<circle cx="1280" cy="606" r="114" fill="none" stroke="#0e7490" stroke-width="1.2" opacity="0.7"/>
+<circle cx="1280" cy="606" r="124" fill="none" stroke="#0e7490" stroke-width="1.2" stroke-dasharray="7 4" opacity="0.7"/>
+<circle cx="1280" cy="606" r="134" fill="none" stroke="#0e7490" stroke-width="1.2" stroke-dasharray="2 5" opacity="0.7"/>
+<text x="1280" y="782" font-family="Archivo, 'Helvetica Neue', Arial, sans-serif" font-size="27" font-weight="800" fill="#151a1f" text-anchor="middle">BlueFlame Bot</text>
+<text x="1280" y="804" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="14" font-weight="400" fill="#56616c" text-anchor="middle">the voice of the workshop</text>
+<text x="760" y="446" font-family="'JetBrains Mono', ui-monospace, Consolas, monospace" font-size="13" font-weight="400" fill="#56616c" text-anchor="start" letter-spacing="1.2">THREE WATCH LOOPS</text>
+<path d="M1113,498.0 H1243.5" fill="none" stroke="#0e7490" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+<circle cx="1243.5" cy="498.0" r="3.5" fill="#0e7490" stroke="#0e7490" stroke-width="1.2"/>
+<rect x="760" y="458" width="352" height="80" rx="6" fill="#ffffff" stroke="#0e7490" stroke-width="1.3" filter="url(#card)"/>
+<use href="#loop" x="771.0" y="483.0" width="30" height="30" style="color:#0e7490"/>
+<text data-box="760,458,352,80" x="812" y="485" font-family="'JetBrains Mono', ui-monospace, Consolas, monospace" font-size="15" font-weight="700" fill="#151a1f" text-anchor="start">/backlog_discord</text>
+<text data-box="760,458,352,80" x="1100" y="485" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="600" fill="#0e7490" text-anchor="end">before every task</text>
+<text data-box="760,458,352,80" x="812" y="507" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#56616c" text-anchor="start">unanswered sweep always runs</text>
+<text data-box="760,458,352,80" x="812" y="525" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#56616c" text-anchor="start">commands: early exit if checked &lt; 5 min ago</text>
+<path d="M1113,590.0 H1157.0" fill="none" stroke="#0e7490" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="7 4"/>
+<circle cx="1157.0" cy="590.0" r="3.5" fill="#0e7490" stroke="#0e7490" stroke-width="1.2"/>
+<rect x="760" y="550" width="352" height="80" rx="6" fill="#ffffff" stroke="#0e7490" stroke-width="1.3" filter="url(#card)"/>
+<use href="#loop" x="771.0" y="575.0" width="30" height="30" style="color:#0e7490"/>
+<text data-box="760,550,352,80" x="812" y="577" font-family="'JetBrains Mono', ui-monospace, Consolas, monospace" font-size="15" font-weight="700" fill="#151a1f" text-anchor="start">GitHub sweep</text>
+<text data-box="760,550,352,80" x="1100" y="577" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="600" fill="#0e7490" text-anchor="end">before every task</text>
+<text data-box="760,550,352,80" x="812" y="599" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#56616c" text-anchor="start">open issues and PRs via gh, as maintainer</text>
+<text data-box="760,550,352,80" x="812" y="617" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#56616c" text-anchor="start">no early exit · deduplicated on the URL</text>
+<path d="M1113,682.0 H1169.6" fill="none" stroke="#0e7490" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="2 5"/>
+<circle cx="1169.6" cy="682.0" r="3.5" fill="#0e7490" stroke="#0e7490" stroke-width="1.2"/>
+<rect x="760" y="642" width="352" height="80" rx="6" fill="#ffffff" stroke="#0e7490" stroke-width="1.3" filter="url(#card)"/>
+<use href="#loop" x="771.0" y="667.0" width="30" height="30" style="color:#0e7490"/>
+<text data-box="760,642,352,80" x="812" y="669" font-family="'JetBrains Mono', ui-monospace, Consolas, monospace" font-size="15" font-weight="700" fill="#151a1f" text-anchor="start">/check_otgw_issues</text>
+<text data-box="760,642,352,80" x="1100" y="669" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="600" fill="#0e7490" text-anchor="end">by hand</text>
+<text data-box="760,642,352,80" x="812" y="691" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#56616c" text-anchor="start">Discord · GitHub · Tweakers, triage only</text>
+<text data-box="760,642,352,80" x="812" y="709" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#56616c" text-anchor="start">early exit if all three checked &lt; 2 h ago</text>
+<text x="1456" y="446" font-family="'JetBrains Mono', ui-monospace, Consolas, monospace" font-size="13" font-weight="400" fill="#56616c" text-anchor="start" letter-spacing="1.2">RULES OF PLAY</text>
+<use href="#shield_o" x="1457.0" y="464.0" width="22" height="22" style="color:#a15c00"/>
+<text data-box="1456,458,362,34" x="1490" y="480" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="14" font-weight="400" fill="#151a1f" text-anchor="start">English · answer first · real mention</text>
+<use href="#shield_o" x="1457.0" y="510.0" width="22" height="22" style="color:#a15c00"/>
+<text data-box="1456,504,362,34" x="1490" y="526" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="14" font-weight="400" fill="#151a1f" text-anchor="start">Never names the 2.x gateway board in public</text>
+<use href="#shield_o" x="1457.0" y="556.0" width="22" height="22" style="color:#a15c00"/>
+<text data-box="1456,550,362,34" x="1490" y="572" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="14" font-weight="400" fill="#151a1f" text-anchor="start">Boiler or thermostat question: equipment matrix first</text>
+<use href="#shield_o" x="1457.0" y="602.0" width="22" height="22" style="color:#a15c00"/>
+<text data-box="1456,596,362,34" x="1490" y="618" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="14" font-weight="400" fill="#151a1f" text-anchor="start">SAT claim: thermo-nova citation + register check</text>
+<use href="#shield_o" x="1457.0" y="648.0" width="22" height="22" style="color:#a15c00"/>
+<text data-box="1456,642,362,34" x="1490" y="664" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="14" font-weight="400" fill="#151a1f" text-anchor="start">Technical claims verified in the code first</text>
+<use href="#shield_f" x="1457.0" y="694.0" width="22" height="22" style="color:#a15c00"/>
+<text data-box="1456,688,362,34" x="1490" y="710" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="14" font-weight="400" fill="#151a1f" text-anchor="start">Zip post pings no one and must match HEAD</text>
+<path d="M706,792 H1080 C1130,792 1150,750 1184,650" fill="none" stroke="#56616c" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#ah-muted)"/>
+<text x="716" y="784" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#56616c" text-anchor="start">rules load into every session</text>
+<path d="M1854,792 H1480 C1430,792 1410,750 1376,650" fill="none" stroke="#56616c" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" marker-start="url(#ah-muted)" marker-end="url(#ah-muted)"/>
+<text x="1844" y="784" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#56616c" text-anchor="end">reads knowledge · writes register and notes</text>
+<text x="760" y="826" font-family="'JetBrains Mono', ui-monospace, Consolas, monospace" font-size="15" font-weight="700" fill="#c2410c" text-anchor="start" letter-spacing="2.5">SESSIONS &amp; AGENTS</text>
+<text x="971.2" y="826" font-family="'JetBrains Mono', ui-monospace, Consolas, monospace" font-size="13" font-weight="400" fill="#56616c" text-anchor="start" letter-spacing="1.2">one worktree per live session</text>
+<rect x="760" y="838" width="254" height="76" rx="6" fill="#d9eff4" stroke="#0e7490" stroke-width="1.5" filter="url(#card)"/>
+<use href="#branch" x="771.0" y="853.0" width="30" height="30" style="color:#0e7490"/>
+<text data-box="760,838,254,76" x="812" y="865" font-family="Archivo, 'Helvetica Neue', Arial, sans-serif" font-size="16" font-weight="700" fill="#151a1f" text-anchor="start">Developer lanes</text>
+<text data-box="760,838,254,76" x="812" y="885" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#56616c" text-anchor="start">own worktree or lane</text>
+<text data-box="760,838,254,76" x="812" y="904" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#56616c" text-anchor="start">push only after the bench OK</text>
+<rect x="1026" y="838" width="254" height="76" rx="6" fill="#dbeafe" stroke="#1d4ed8" stroke-width="1.5" filter="url(#card)"/>
+<use href="#terminal" x="1037.0" y="853.0" width="30" height="30" style="color:#1d4ed8"/>
+<text data-box="1026,838,254,76" x="1078" y="865" font-family="Archivo, 'Helvetica Neue', Arial, sans-serif" font-size="16" font-weight="700" fill="#151a1f" text-anchor="start">Coordinator</text>
+<text data-box="1026,838,254,76" x="1078" y="885" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#56616c" text-anchor="start">picks tasks · owns DM and ledger</text>
+<use href="#flame_s" x="1077.0" y="892.0" width="14" height="14" style="color:#1d4ed8"/>
+<text data-box="1026,838,254,76" x="1094" y="904" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="600" fill="#1d4ed8" text-anchor="start">speaks as BlueFlame Bot</text>
+<rect x="1292" y="838" width="254" height="76" rx="6" fill="#d9eff4" stroke="#0e7490" stroke-width="1.5" filter="url(#card)"/>
+<use href="#bench" x="1303.0" y="853.0" width="30" height="30" style="color:#0e7490"/>
+<text data-box="1292,838,254,76" x="1344" y="865" font-family="Archivo, 'Helvetica Neue', Arial, sans-serif" font-size="16" font-weight="700" fill="#151a1f" text-anchor="start">Bench tester</text>
+<text data-box="1292,838,254,76" x="1344" y="885" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#56616c" text-anchor="start">the only one that flashes</text>
+<text data-box="1292,838,254,76" x="1344" y="904" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#56616c" text-anchor="start">OTA first · ticks the bench ACs</text>
+<rect x="1558" y="838" width="254" height="76" rx="6" fill="#dbeafe" stroke="#1d4ed8" stroke-width="1.5" filter="url(#card)"/>
+<use href="#chat" x="1569.0" y="853.0" width="30" height="30" style="color:#1d4ed8"/>
+<text data-box="1558,838,254,76" x="1610" y="865" font-family="Archivo, 'Helvetica Neue', Arial, sans-serif" font-size="16" font-weight="700" fill="#151a1f" text-anchor="start">Comms session</text>
+<text data-box="1558,838,254,76" x="1610" y="885" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#56616c" text-anchor="start">Discord talk · post drafts</text>
+<use href="#flame_s" x="1609.0" y="892.0" width="14" height="14" style="color:#1d4ed8"/>
+<text data-box="1558,838,254,76" x="1626" y="904" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="600" fill="#1d4ed8" text-anchor="start">speaks as BlueFlame Bot</text>
+<text x="760" y="931" font-family="'JetBrains Mono', ui-monospace, Consolas, monospace" font-size="13" font-weight="400" fill="#56616c" text-anchor="start" letter-spacing="1.2">SUBAGENTS PER MODEL</text>
+<polygon points="786.0,942.0 806.8,954.0 806.8,978.0 786.0,990.0 765.2,978.0 765.2,954.0" fill="#d9eff4" stroke="#0e7490" stroke-width="1.5"/>
+<text x="786" y="972" font-family="Archivo, 'Helvetica Neue', Arial, sans-serif" font-size="17" font-weight="800" fill="#0e7490" text-anchor="middle">S</text>
+<text data-box="760,940,156,52" x="818" y="962" font-family="Archivo, 'Helvetica Neue', Arial, sans-serif" font-size="15" font-weight="700" fill="#151a1f" text-anchor="start">Sonnet</text>
+<text data-box="760,940,156,62" x="818" y="979" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#56616c" text-anchor="start">implementation</text>
+<polygon points="942.0,942.0 962.8,954.0 962.8,978.0 942.0,990.0 921.2,978.0 921.2,954.0" fill="#d9eff4" stroke="#0e7490" stroke-width="1.5"/>
+<text x="942" y="972" font-family="Archivo, 'Helvetica Neue', Arial, sans-serif" font-size="17" font-weight="800" fill="#0e7490" text-anchor="middle">H</text>
+<text data-box="916,940,156,52" x="974" y="962" font-family="Archivo, 'Helvetica Neue', Arial, sans-serif" font-size="15" font-weight="700" fill="#151a1f" text-anchor="start">Haiku</text>
+<text data-box="916,940,156,62" x="974" y="979" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#56616c" text-anchor="start">runners,</text>
+<text data-box="916,940,156,62" x="974" y="994" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#56616c" text-anchor="start">verbatim output</text>
+<polygon points="1098.0,942.0 1118.8,954.0 1118.8,978.0 1098.0,990.0 1077.2,978.0 1077.2,954.0" fill="#d9eff4" stroke="#0e7490" stroke-width="1.5"/>
+<text x="1098" y="972" font-family="Archivo, 'Helvetica Neue', Arial, sans-serif" font-size="17" font-weight="800" fill="#0e7490" text-anchor="middle">O</text>
+<text data-box="1072,940,156,52" x="1130" y="962" font-family="Archivo, 'Helvetica Neue', Arial, sans-serif" font-size="15" font-weight="700" fill="#151a1f" text-anchor="start">Opus</text>
+<text data-box="1072,940,156,62" x="1130" y="979" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#56616c" text-anchor="start">correctness</text>
+<text data-box="1072,940,156,62" x="1130" y="994" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#56616c" text-anchor="start">review</text>
+<polygon points="1254.0,942.0 1274.8,954.0 1274.8,978.0 1254.0,990.0 1233.2,978.0 1233.2,954.0" fill="#d9eff4" stroke="#0e7490" stroke-width="1.5"/>
+<text x="1254" y="972" font-family="Archivo, 'Helvetica Neue', Arial, sans-serif" font-size="17" font-weight="800" fill="#0e7490" text-anchor="middle">A</text>
+<text data-box="1228,940,156,52" x="1286" y="962" font-family="Archivo, 'Helvetica Neue', Arial, sans-serif" font-size="15" font-weight="700" fill="#151a1f" text-anchor="start">Advisor</text>
+<text data-box="1228,940,156,62" x="1286" y="979" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#56616c" text-anchor="start">plan self-review</text>
+<text x="1414" y="931" font-family="'JetBrains Mono', ui-monospace, Consolas, monospace" font-size="13" font-weight="400" fill="#56616c" text-anchor="start" letter-spacing="1.2">OTHER AGENTS · SAME CORE BLOCK</text>
+<use href="#spark" x="1416.0" y="954.0" width="20" height="20" style="color:#56616c"/>
+<text data-box="1414,940,134,52" x="1444" y="962" font-family="Archivo, 'Helvetica Neue', Arial, sans-serif" font-size="15" font-weight="700" fill="#151a1f" text-anchor="start">Codex</text>
+<text data-box="1414,940,134,52" x="1444" y="979" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#56616c" text-anchor="start">via AGENTS.md</text>
+<use href="#spark" x="1550.0" y="954.0" width="20" height="20" style="color:#56616c"/>
+<text data-box="1548,940,134,52" x="1578" y="962" font-family="Archivo, 'Helvetica Neue', Arial, sans-serif" font-size="15" font-weight="700" fill="#151a1f" text-anchor="start">Copilot</text>
+<text data-box="1548,940,134,52" x="1578" y="979" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#56616c" text-anchor="start">13 agent profiles</text>
+<use href="#spark" x="1684.0" y="954.0" width="20" height="20" style="color:#56616c"/>
+<text data-box="1682,940,134,52" x="1712" y="962" font-family="Archivo, 'Helvetica Neue', Arial, sans-serif" font-size="15" font-weight="700" fill="#151a1f" text-anchor="start">Claude</text>
+<text data-box="1682,940,134,52" x="1712" y="979" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#56616c" text-anchor="start">in GitHub Actions</text>
+<text x="760" y="1031" font-family="'JetBrains Mono', ui-monospace, Consolas, monospace" font-size="13" font-weight="400" fill="#56616c" text-anchor="start" letter-spacing="1.2">SKILLS</text>
+<rect x="822" y="1012" width="178.0" height="28" rx="14.0" fill="#f4f6f7" stroke="#0e7490" stroke-width="1.1"/>
+<text data-box="822,1012,178,28" x="911.0" y="1030.55" font-family="'JetBrains Mono', ui-monospace, Consolas, monospace" font-size="13" font-weight="600" fill="#0e7490" text-anchor="middle">/implement-next-task</text>
+<rect x="1008.0" y="1012" width="146.4" height="28" rx="14.0" fill="#f4f6f7" stroke="#0e7490" stroke-width="1.1"/>
+<text data-box="1008,1012,146.4,28" x="1081.2" y="1030.55" font-family="'JetBrains Mono', ui-monospace, Consolas, monospace" font-size="13" font-weight="600" fill="#0e7490" text-anchor="middle">/backlog_discord</text>
+<rect x="1162.4" y="1012" width="162.20000000000002" height="28" rx="14.0" fill="#f4f6f7" stroke="#0e7490" stroke-width="1.1"/>
+<text data-box="1162.4,1012,162.2,28" x="1243.5" y="1030.55" font-family="'JetBrains Mono', ui-monospace, Consolas, monospace" font-size="13" font-weight="600" fill="#0e7490" text-anchor="middle">/check_otgw_issues</text>
+<rect x="1414" y="1012" width="146.4" height="28" rx="14.0" fill="#f4f6f7" stroke="#0e7490" stroke-width="1.1"/>
+<text data-box="1414,1012,146.4,28" x="1487.2" y="1030.55" font-family="'JetBrains Mono', ui-monospace, Consolas, monospace" font-size="13" font-weight="600" fill="#0e7490" text-anchor="middle">/beta-release-2x</text>
+<rect x="1568.4" y="1012" width="122.9" height="28" rx="14" fill="#f4f6f7" stroke="#b42318" stroke-width="1.1"/>
+<use href="#lock" x="1576.9" y="1018.5" width="15" height="15" style="color:#b42318"/>
+<text data-box="1568.4,1012,122.9,28" x="1594.4" y="1030.5" font-family="'JetBrains Mono', ui-monospace, Consolas, monospace" font-size="13" font-weight="600" fill="#b42318" text-anchor="start">/release-2x</text>
+<rect x="1699.3000000000002" y="1012" width="138.5" height="28" rx="14.0" fill="#f4f6f7" stroke="#0e7490" stroke-width="1.1"/>
+<text data-box="1699.3,1012,138.5,28" x="1768.5500000000002" y="1030.55" font-family="'JetBrains Mono', ui-monospace, Consolas, monospace" font-size="13" font-weight="600" fill="#0e7490" text-anchor="middle">analyze-capture</text>
+<text x="40" y="418" font-family="'JetBrains Mono', ui-monospace, Consolas, monospace" font-size="15" font-weight="700" fill="#c2410c" text-anchor="start" letter-spacing="2.5">RULES &amp; ENFORCEMENT</text>
+<text x="40" y="446" font-family="'JetBrains Mono', ui-monospace, Consolas, monospace" font-size="13" font-weight="400" fill="#56616c" text-anchor="start" letter-spacing="1.2">LAYERS · WHAT AN AGENT READS</text>
+<rect x="43" y="463" width="312" height="52" rx="6" fill="#d5dce2"/>
+<rect x="40" y="458" width="312" height="52" rx="6" fill="#fde7d9" stroke="#c2410c" stroke-width="1.2"/>
+<rect x="40" y="458" width="7" height="52" rx="3" fill="#c2410c"/>
+<text data-box="40,458,312,52" x="60" y="480" font-family="Archivo, 'Helvetica Neue', Arial, sans-serif" font-size="15" font-weight="700" fill="#151a1f" text-anchor="start">Maintainer directives</text>
+<text data-box="40,458,312,52" x="60" y="499" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#56616c" text-anchor="start">dated and quoted · highest authority</text>
+<rect x="43" y="524" width="312" height="52" rx="6" fill="#d5dce2"/>
+<rect x="40" y="519" width="312" height="52" rx="6" fill="#fdf0d5" stroke="#a15c00" stroke-width="1.2"/>
+<rect x="40" y="519" width="7" height="52" rx="3" fill="#a15c00"/>
+<text data-box="40,519,312,52" x="60" y="541" font-family="Archivo, 'Helvetica Neue', Arial, sans-serif" font-size="15" font-weight="700" fill="#151a1f" text-anchor="start">Shared core block</text>
+<text data-box="40,519,312,52" x="340" y="541" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#56616c" text-anchor="end" font-style="italic">every session</text>
+<text data-box="40,519,312,52" x="60" y="560" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#56616c" text-anchor="start">identical in three instruction files</text>
+<rect x="43" y="585" width="312" height="52" rx="6" fill="#d5dce2"/>
+<rect x="40" y="580" width="312" height="52" rx="6" fill="#ffffff" stroke="#56616c" stroke-width="1.2"/>
+<rect x="40" y="580" width="7" height="52" rx="3" fill="#56616c"/>
+<text data-box="40,580,312,52" x="60" y="602" font-family="Archivo, 'Helvetica Neue', Arial, sans-serif" font-size="15" font-weight="700" fill="#151a1f" text-anchor="start">CLAUDE.md</text>
+<text data-box="40,580,312,52" x="340" y="602" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#56616c" text-anchor="end" font-style="italic">every session</text>
+<text data-box="40,580,312,52" x="60" y="621" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#56616c" text-anchor="start">189 lines, test limit 230 · wins on conflict</text>
+<rect x="43" y="646" width="312" height="52" rx="6" fill="#d5dce2"/>
+<rect x="40" y="641" width="312" height="52" rx="6" fill="#ffffff" stroke="#56616c" stroke-width="1.2"/>
+<rect x="40" y="641" width="7" height="52" rx="3" fill="#56616c"/>
+<text data-box="40,641,312,52" x="60" y="663" font-family="Archivo, 'Helvetica Neue', Arial, sans-serif" font-size="15" font-weight="700" fill="#151a1f" text-anchor="start">OpenWolf protocol</text>
+<text data-box="40,641,312,52" x="340" y="663" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#56616c" text-anchor="end" font-style="italic">every session</text>
+<text data-box="40,641,312,52" x="60" y="682" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#56616c" text-anchor="start">anatomy · cerebrum · buglog · Claude only</text>
+<rect x="43" y="707" width="312" height="52" rx="6" fill="#d5dce2"/>
+<rect x="40" y="702" width="312" height="52" rx="6" fill="#ffffff" stroke="#56616c" stroke-width="1.2"/>
+<rect x="40" y="702" width="7" height="52" rx="3" fill="#56616c"/>
+<text data-box="40,702,312,52" x="60" y="724" font-family="Archivo, 'Helvetica Neue', Arial, sans-serif" font-size="15" font-weight="700" fill="#151a1f" text-anchor="start">Always-loaded rules</text>
+<text data-box="40,702,312,52" x="340" y="724" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#56616c" text-anchor="end" font-style="italic">every session</text>
+<text data-box="40,702,312,52" x="60" y="743" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#56616c" text-anchor="start">sat-ground-truth · discord · openwolf</text>
+<rect x="43" y="768" width="312" height="52" rx="6" fill="#d5dce2"/>
+<rect x="40" y="763" width="312" height="52" rx="6" fill="#ffffff" stroke="#56616c" stroke-width="1.2"/>
+<rect x="40" y="763" width="7" height="52" rx="3" fill="#56616c"/>
+<text data-box="40,763,312,52" x="60" y="785" font-family="Archivo, 'Helvetica Neue', Arial, sans-serif" font-size="15" font-weight="700" fill="#151a1f" text-anchor="start">Path-loaded rules</text>
+<text data-box="40,763,312,52" x="340" y="785" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#56616c" text-anchor="end" font-style="italic">on demand</text>
+<text data-box="40,763,312,52" x="60" y="804" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#56616c" text-anchor="start">firmware-coding · navigation</text>
+<rect x="43" y="829" width="312" height="52" rx="6" fill="#d5dce2"/>
+<rect x="40" y="824" width="312" height="52" rx="6" fill="#d9eff4" stroke="#0e7490" stroke-width="1.2"/>
+<rect x="40" y="824" width="7" height="52" rx="3" fill="#0e7490"/>
+<text data-box="40,824,312,52" x="60" y="846" font-family="Archivo, 'Helvetica Neue', Arial, sans-serif" font-size="15" font-weight="700" fill="#151a1f" text-anchor="start">Skills and commands</text>
+<text data-box="40,824,312,52" x="340" y="846" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#56616c" text-anchor="end" font-style="italic">on demand</text>
+<text data-box="40,824,312,52" x="60" y="865" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#56616c" text-anchor="start">11 skills + 2 commands, loaded when invoked</text>
+<rect x="43" y="890" width="312" height="52" rx="6" fill="#d5dce2"/>
+<rect x="40" y="885" width="312" height="52" rx="6" fill="#fdf0d5" stroke="#a15c00" stroke-width="1.2"/>
+<rect x="40" y="885" width="7" height="52" rx="3" fill="#a15c00"/>
+<text data-box="40,885,312,52" x="60" y="907" font-family="Archivo, 'Helvetica Neue', Arial, sans-serif" font-size="15" font-weight="700" fill="#151a1f" text-anchor="start">ADRs</text>
+<text data-box="40,885,312,52" x="60" y="926" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#56616c" text-anchor="start">10 binding, each names a gate · rest: review</text>
+<rect x="43" y="951" width="312" height="52" rx="6" fill="#d5dce2"/>
+<rect x="40" y="946" width="312" height="52" rx="6" fill="#fde7d9" stroke="#c2410c" stroke-width="1.2"/>
+<rect x="40" y="946" width="7" height="52" rx="3" fill="#c2410c"/>
+<text data-box="40,946,312,52" x="60" y="968" font-family="Archivo, 'Helvetica Neue', Arial, sans-serif" font-size="15" font-weight="700" fill="#151a1f" text-anchor="start">SAT ground truth</text>
+<text data-box="40,946,312,52" x="60" y="987" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#56616c" text-anchor="start">register → thermo-nova → spec → firmware</text>
+<text x="382" y="446" font-family="'JetBrains Mono', ui-monospace, Consolas, monospace" font-size="13" font-weight="400" fill="#56616c" text-anchor="start" letter-spacing="1.2">WHAT ACTUALLY STOPS A CHANGE</text>
+<rect x="382" y="458" width="320" height="60" rx="6" fill="#ffffff" stroke="#a15c00" stroke-width="1.2" filter="url(#card)"/>
+<use href="#shield_f" x="391.0" y="466.0" width="22" height="22" style="color:#a15c00"/>
+<text data-box="382,458,320,60" x="420" y="480" font-family="Archivo, 'Helvetica Neue', Arial, sans-serif" font-size="15" font-weight="700" fill="#151a1f" text-anchor="start">Claude hooks</text>
+<rect x="624.7" y="466" width="69.30000000000001" height="20" rx="4" fill="#fdf0d5" stroke="#a15c00" stroke-width="1"/>
+<text data-box="382,458,320,60" x="659.35" y="480.5" font-family="'JetBrains Mono', ui-monospace, Consolas, monospace" font-size="13" font-weight="700" fill="#a15c00" text-anchor="middle">REFUSES</text>
+<text data-box="382,458,320,60" x="396" y="498" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#56616c" text-anchor="start">backlog guard blocks Edit and Write, not Bash</text>
+<text data-box="382,458,320,60" x="396" y="513" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#56616c" text-anchor="start">post-edit evaluate returns the FAIL lines</text>
+<rect x="382" y="524" width="320" height="60" rx="6" fill="#ffffff" stroke="#a15c00" stroke-width="1.2" filter="url(#card)"/>
+<use href="#shield_f" x="391.0" y="532.0" width="22" height="22" style="color:#a15c00"/>
+<text data-box="382,524,320,60" x="420" y="546" font-family="Archivo, 'Helvetica Neue', Arial, sans-serif" font-size="15" font-weight="700" fill="#151a1f" text-anchor="start">Git hooks</text>
+<rect x="624.7" y="532" width="69.30000000000001" height="20" rx="4" fill="#fdf0d5" stroke="#a15c00" stroke-width="1"/>
+<text data-box="382,524,320,60" x="659.35" y="546.5" font-family="'JetBrains Mono', ui-monospace, Consolas, monospace" font-size="13" font-weight="700" fill="#a15c00" text-anchor="middle">REFUSES</text>
+<text data-box="382,524,320,60" x="396" y="564" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#56616c" text-anchor="start">no bump or no TASK id: commit rejected</text>
+<text data-box="382,524,320,60" x="396" y="579" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#56616c" text-anchor="start">the adr-judge pass is off by default</text>
+<rect x="382" y="590" width="320" height="60" rx="6" fill="#ffffff" stroke="#a15c00" stroke-width="1.2" filter="url(#card)"/>
+<use href="#shield_f" x="391.0" y="598.0" width="22" height="22" style="color:#a15c00"/>
+<text data-box="382,590,320,60" x="420" y="612" font-family="Archivo, 'Helvetica Neue', Arial, sans-serif" font-size="15" font-weight="700" fill="#151a1f" text-anchor="start">evaluate.py</text>
+<rect x="624.7" y="598" width="69.30000000000001" height="20" rx="4" fill="#fdf0d5" stroke="#a15c00" stroke-width="1"/>
+<text data-box="382,590,320,60" x="659.35" y="612.5" font-family="'JetBrains Mono', ui-monospace, Consolas, monospace" font-size="13" font-weight="700" fill="#a15c00" text-anchor="middle">REFUSES</text>
+<text data-box="382,590,320,60" x="396" y="630" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#56616c" text-anchor="start">42 checks, 34 in --quick · exit 1 on FAIL</text>
+<text data-box="382,590,320,60" x="396" y="645" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#56616c" text-anchor="start">String in hot paths only warns</text>
+<rect x="382" y="656" width="320" height="60" rx="6" fill="#ffffff" stroke="#56616c" stroke-width="1.2" filter="url(#card)"/>
+<use href="#shield_o" x="391.0" y="664.0" width="22" height="22" style="color:#56616c"/>
+<text data-box="382,656,320,60" x="420" y="678" font-family="Archivo, 'Helvetica Neue', Arial, sans-serif" font-size="15" font-weight="700" fill="#151a1f" text-anchor="start">Tests</text>
+<rect x="601.0" y="664" width="93.0" height="20" rx="4" fill="#f4f6f7" stroke="#56616c" stroke-width="1"/>
+<text data-box="382,656,320,60" x="647.5" y="678.5" font-family="'JetBrains Mono', ui-monospace, Consolas, monospace" font-size="13" font-weight="700" fill="#56616c" text-anchor="middle">LOCAL ONLY</text>
+<text data-box="382,656,320,60" x="396" y="696" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#56616c" text-anchor="start">274 Python tests through run_tests.py</text>
+<text data-box="382,656,320,60" x="396" y="711" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#56616c" text-anchor="start">CI runs only test_adr_governance.py</text>
+<rect x="382" y="722" width="320" height="60" rx="6" fill="#ffffff" stroke="#56616c" stroke-width="1.2" filter="url(#card)"/>
+<use href="#shield_o" x="391.0" y="730.0" width="22" height="22" style="color:#56616c"/>
+<text data-box="382,722,320,60" x="420" y="744" font-family="Archivo, 'Helvetica Neue', Arial, sans-serif" font-size="15" font-weight="700" fill="#151a1f" text-anchor="start">CI on push to dev</text>
+<rect x="601.0" y="730" width="93.0" height="20" rx="4" fill="#f4f6f7" stroke="#56616c" stroke-width="1"/>
+<text data-box="382,722,320,60" x="647.5" y="744.5" font-family="'JetBrains Mono', ui-monospace, Consolas, monospace" font-size="13" font-weight="700" fill="#56616c" text-anchor="middle">AFTER PUSH</text>
+<text data-box="382,722,320,60" x="396" y="762" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#56616c" text-anchor="start">evaluate.yml · build.yml esp32-combo</text>
+<text data-box="382,722,320,60" x="396" y="777" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#56616c" text-anchor="start">adr-governance.yml · red after the push</text>
+<rect x="382" y="788" width="320" height="60" rx="6" fill="#ffffff" stroke="#a15c00" stroke-width="1.2" filter="url(#card)"/>
+<use href="#shield_f" x="391.0" y="796.0" width="22" height="22" style="color:#a15c00"/>
+<text data-box="382,788,320,60" x="420" y="810" font-family="Archivo, 'Helvetica Neue', Arial, sans-serif" font-size="15" font-weight="700" fill="#151a1f" text-anchor="start">Script refusals</text>
+<rect x="624.7" y="796" width="69.30000000000001" height="20" rx="4" fill="#fdf0d5" stroke="#a15c00" stroke-width="1"/>
+<text data-box="382,788,320,60" x="659.35" y="810.5" font-family="'JetBrains Mono', ui-monospace, Consolas, monospace" font-size="13" font-weight="700" fill="#a15c00" text-anchor="middle">REFUSES</text>
+<text data-box="382,788,320,60" x="396" y="828" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#56616c" text-anchor="start">build lock: one build, at most 4 jobs</text>
+<text data-box="382,788,320,60" x="396" y="843" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#56616c" text-anchor="start">post script: the zip must come from HEAD</text>
+<rect x="382" y="854" width="320" height="60" rx="6" fill="#ffffff" stroke="#0e7490" stroke-width="1.2" filter="url(#card)"/>
+<use href="#shield_o" x="391.0" y="862.0" width="22" height="22" style="color:#0e7490"/>
+<text data-box="382,854,320,60" x="420" y="876" font-family="Archivo, 'Helvetica Neue', Arial, sans-serif" font-size="15" font-weight="700" fill="#151a1f" text-anchor="start">Review</text>
+<rect x="608.9" y="862" width="85.10000000000001" height="20" rx="4" fill="#d9eff4" stroke="#0e7490" stroke-width="1"/>
+<text data-box="382,854,320,60" x="651.45" y="876.5" font-family="'JetBrains Mono', ui-monospace, Consolas, monospace" font-size="13" font-weight="700" fill="#0e7490" text-anchor="middle">JUDGEMENT</text>
+<text data-box="382,854,320,60" x="396" y="894" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#56616c" text-anchor="start">the reviewer team is told to refute</text>
+<text data-box="382,854,320,60" x="396" y="909" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#56616c" text-anchor="start">main session reads the raw evidence itself</text>
+<rect x="382" y="920" width="320" height="60" rx="6" fill="#ffffff" stroke="#b42318" stroke-width="1.2" stroke-dasharray="5 4" filter="url(#card)"/>
+<use href="#shield_o" x="391.0" y="928.0" width="22" height="22" style="color:#b42318"/>
+<text data-box="382,920,320,60" x="420" y="942" font-family="Archivo, 'Helvetica Neue', Arial, sans-serif" font-size="15" font-weight="700" fill="#151a1f" text-anchor="start">Convention only</text>
+<rect x="624.7" y="928" width="69.30000000000001" height="20" rx="4" fill="#fde4e1" stroke="#b42318" stroke-width="1"/>
+<text data-box="382,920,320,60" x="659.35" y="942.5" font-family="'JetBrains Mono', ui-monospace, Consolas, monospace" font-size="13" font-weight="700" fill="#b42318" text-anchor="middle">NO GATE</text>
+<text data-box="382,920,320,60" x="396" y="960" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#56616c" text-anchor="start">hard stops · wrapper build · DM route</text>
+<text data-box="382,920,320,60" x="396" y="975" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#56616c" text-anchor="start">only the bench tester flashes · register first</text>
+<text x="40" y="1017" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#56616c" text-anchor="start" font-style="italic">Codex and Copilot do not load .claude/rules.</text>
+<text x="382" y="1004" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#b42318" text-anchor="start" font-style="italic">In the repo the hard stops are convention:</text>
+<text x="382" y="1021" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#b42318" text-anchor="start" font-style="italic">no hook guards a push to main or a force-push.</text>
+<text x="1860" y="418" font-family="'JetBrains Mono', ui-monospace, Consolas, monospace" font-size="15" font-weight="700" fill="#c2410c" text-anchor="start" letter-spacing="2.5">KNOWLEDGE BASE</text>
+<text x="2036.4" y="418" font-family="'JetBrains Mono', ui-monospace, Consolas, monospace" font-size="13" font-weight="400" fill="#56616c" text-anchor="start" letter-spacing="1.2">what the workshop remembers</text>
+<rect x="1860" y="436" width="324" height="74" rx="6" fill="#ffffff" stroke="#d5dce2" stroke-width="1.2" filter="url(#card)"/>
+<use href="#kanban" x="1873.0" y="458.0" width="30" height="30" style="color:#0e7490"/>
+<text data-box="1860,436,324,74" x="1914" y="467" font-family="Archivo, 'Helvetica Neue', Arial, sans-serif" font-size="16" font-weight="700" fill="#151a1f" text-anchor="start">Backlog.md</text>
+<text data-box="1860,436,324,74" x="2170" y="469" font-family="Archivo, 'Helvetica Neue', Arial, sans-serif" font-size="22" font-weight="800" fill="#0e7490" text-anchor="end">477</text>
+<text data-box="1860,436,324,74" x="1914" y="490" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#56616c" text-anchor="start">active tasks + 1,323 archived</text>
+<rect x="2196" y="436" width="324" height="74" rx="6" fill="#ffffff" stroke="#d5dce2" stroke-width="1.2" filter="url(#card)"/>
+<use href="#stamp" x="2209.0" y="458.0" width="30" height="30" style="color:#0e7490"/>
+<text data-box="2196,436,324,74" x="2250" y="467" font-family="Archivo, 'Helvetica Neue', Arial, sans-serif" font-size="16" font-weight="700" fill="#151a1f" text-anchor="start">ADRs</text>
+<text data-box="2196,436,324,74" x="2506" y="469" font-family="Archivo, 'Helvetica Neue', Arial, sans-serif" font-size="22" font-weight="800" fill="#0e7490" text-anchor="end">245</text>
+<text data-box="2196,436,324,74" x="2250" y="490" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#56616c" text-anchor="start">10 binding · written with the ADR kit</text>
+<rect x="1860" y="520" width="324" height="74" rx="6" fill="#ffffff" stroke="#d5dce2" stroke-width="1.2" filter="url(#card)"/>
+<use href="#ledger" x="1873.0" y="542.0" width="30" height="30" style="color:#0e7490"/>
+<text data-box="1860,520,324,74" x="1914" y="551" font-family="Archivo, 'Helvetica Neue', Arial, sans-serif" font-size="16" font-weight="700" fill="#151a1f" text-anchor="start">SAT register</text>
+<text data-box="1860,520,324,74" x="2170" y="553" font-family="Archivo, 'Helvetica Neue', Arial, sans-serif" font-size="22" font-weight="800" fill="#0e7490" text-anchor="end">353</text>
+<text data-box="1860,520,324,74" x="1914" y="574" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#56616c" text-anchor="start">entries · record first, then build</text>
+<rect x="2196" y="520" width="324" height="74" rx="6" fill="#ffffff" stroke="#d5dce2" stroke-width="1.2" filter="url(#card)"/>
+<use href="#queue" x="2209.0" y="542.0" width="30" height="30" style="color:#0e7490"/>
+<text data-box="2196,520,324,74" x="2250" y="551" font-family="Archivo, 'Helvetica Neue', Arial, sans-serif" font-size="16" font-weight="700" fill="#151a1f" text-anchor="start">Open questions</text>
+<text data-box="2196,520,324,74" x="2506" y="553" font-family="Archivo, 'Helvetica Neue', Arial, sans-serif" font-size="22" font-weight="800" fill="#0e7490" text-anchor="end">227</text>
+<text data-box="2196,520,324,74" x="2250" y="574" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#56616c" text-anchor="start">questions to Sergeant D · 18 open</text>
+<rect x="1860" y="604" width="324" height="74" rx="6" fill="#ffffff" stroke="#d5dce2" stroke-width="1.2" filter="url(#card)"/>
+<use href="#map" x="1873.0" y="626.0" width="30" height="30" style="color:#0e7490"/>
+<text data-box="1860,604,324,74" x="1914" y="635" font-family="Archivo, 'Helvetica Neue', Arial, sans-serif" font-size="16" font-weight="700" fill="#151a1f" text-anchor="start">C4 map</text>
+<text data-box="1860,604,324,74" x="2170" y="637" font-family="Archivo, 'Helvetica Neue', Arial, sans-serif" font-size="22" font-weight="800" fill="#0e7490" text-anchor="end">20</text>
+<text data-box="1860,604,324,74" x="1914" y="658" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#56616c" text-anchor="start">docs · which component owns which code</text>
+<rect x="2196" y="604" width="324" height="74" rx="6" fill="#ffffff" stroke="#d5dce2" stroke-width="1.2" filter="url(#card)"/>
+<use href="#wolf" x="2209.0" y="626.0" width="30" height="30" style="color:#0e7490"/>
+<text data-box="2196,604,324,74" x="2250" y="635" font-family="Archivo, 'Helvetica Neue', Arial, sans-serif" font-size="16" font-weight="700" fill="#151a1f" text-anchor="start">OpenWolf</text>
+<text data-box="2196,604,324,74" x="2506" y="637" font-family="Archivo, 'Helvetica Neue', Arial, sans-serif" font-size="22" font-weight="800" fill="#0e7490" text-anchor="end">224</text>
+<text data-box="2196,604,324,74" x="2250" y="658" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#56616c" text-anchor="start">buglog entries · anatomy · cerebrum</text>
+<rect x="1860" y="688" width="324" height="74" rx="6" fill="#ffffff" stroke="#d5dce2" stroke-width="1.2" filter="url(#card)"/>
+<use href="#graph" x="1873.0" y="710.0" width="30" height="30" style="color:#0e7490"/>
+<text data-box="1860,688,324,74" x="1914" y="719" font-family="Archivo, 'Helvetica Neue', Arial, sans-serif" font-size="16" font-weight="700" fill="#151a1f" text-anchor="start">graphify</text>
+<text data-box="1860,688,324,74" x="2170" y="721" font-family="Archivo, 'Helvetica Neue', Arial, sans-serif" font-size="22" font-weight="800" fill="#0e7490" text-anchor="end">1,628</text>
+<text data-box="1860,688,324,74" x="1914" y="742" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#56616c" text-anchor="start">nodes · code graph of src/</text>
+<rect x="2196" y="688" width="324" height="74" rx="6" fill="#ffffff" stroke="#d5dce2" stroke-width="1.2" filter="url(#card)"/>
+<use href="#book" x="2209.0" y="710.0" width="30" height="30" style="color:#0e7490"/>
+<text data-box="2196,688,324,74" x="2250" y="719" font-family="Archivo, 'Helvetica Neue', Arial, sans-serif" font-size="16" font-weight="700" fill="#151a1f" text-anchor="start">Reference projects</text>
+<text data-box="2196,688,324,74" x="2250" y="742" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#56616c" text-anchor="start">thermo-nova · PIC firmware · pyotgw</text>
+<text x="1860" y="816" font-family="'JetBrains Mono', ui-monospace, Consolas, monospace" font-size="15" font-weight="700" fill="#c2410c" text-anchor="start" letter-spacing="2.5">ADR KIT</text>
+<text x="1955.2" y="816" font-family="'JetBrains Mono', ui-monospace, Consolas, monospace" font-size="13" font-weight="400" fill="#56616c" text-anchor="start" letter-spacing="1.2">how a decision becomes binding</text>
+<rect x="1860" y="842" width="118" height="32" rx="16.0" fill="#f4f6f7" stroke="#56616c" stroke-width="1.4" stroke-dasharray="5 4"/>
+<text data-box="1860,842,118,32" x="1919.0" y="862.9" font-family="Archivo, 'Helvetica Neue', Arial, sans-serif" font-size="14" font-weight="700" fill="#151a1f" text-anchor="middle">Proposed</text>
+<path d="M1983,858 H2027" fill="none" stroke="#56616c" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#ah-muted)"/>
+<rect x="2034" y="842" width="128" height="32" rx="16.0" fill="#fdf0d5" stroke="#a15c00" stroke-width="1.4"/>
+<text data-box="2034,842,128,32" x="2098.0" y="862.9" font-family="Archivo, 'Helvetica Neue', Arial, sans-serif" font-size="14" font-weight="700" fill="#151a1f" text-anchor="middle">Four gates</text>
+<path d="M2167,858 H2211" fill="none" stroke="#56616c" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#ah-muted)"/>
+<rect x="2218" y="842" width="118" height="32" rx="16.0" fill="#e3f1e4" stroke="#2f7d32" stroke-width="1.4"/>
+<text data-box="2218,842,118,32" x="2277.0" y="862.9" font-family="Archivo, 'Helvetica Neue', Arial, sans-serif" font-size="14" font-weight="700" fill="#151a1f" text-anchor="middle">Accepted</text>
+<path d="M2341,858 H2385" fill="none" stroke="#56616c" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#ah-muted)"/>
+<rect x="2392" y="842" width="128" height="32" rx="16.0" fill="#f4f6f7" stroke="#56616c" stroke-width="1.4"/>
+<text data-box="2392,842,128,32" x="2456.0" y="862.9" font-family="Archivo, 'Helvetica Neue', Arial, sans-serif" font-size="14" font-weight="700" fill="#151a1f" text-anchor="middle">Superseded</text>
+<text x="2190" y="838" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="600" fill="#c2410c" text-anchor="middle">maintainer yes</text>
+<path d="M2098.0,874 V884 M1939.0,892 V884 H2440.9 V892" fill="none" stroke="#a15c00" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+<rect x="1860.0" y="892" width="158" height="26" rx="13.0" fill="#ffffff" stroke="#a15c00" stroke-width="1.1"/>
+<text data-box="1860,892,158,26" x="1939.0" y="909.55" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="600" fill="#151a1f" text-anchor="middle">Completeness</text>
+<path d="M2106.3,884 V892" fill="none" stroke="#a15c00" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+<rect x="2027.3" y="892" width="158" height="26" rx="13.0" fill="#ffffff" stroke="#a15c00" stroke-width="1.1"/>
+<text data-box="2027.3,892,158,26" x="2106.3" y="909.55" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="600" fill="#151a1f" text-anchor="middle">Evidence</text>
+<path d="M2273.6,884 V892" fill="none" stroke="#a15c00" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+<rect x="2194.6" y="892" width="158" height="26" rx="13.0" fill="#ffffff" stroke="#a15c00" stroke-width="1.1"/>
+<text data-box="2194.6,892,158,26" x="2273.6" y="909.55" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="600" fill="#151a1f" text-anchor="middle">Clarity</text>
+<rect x="2361.9" y="892" width="158" height="26" rx="13.0" fill="#ffffff" stroke="#a15c00" stroke-width="1.1"/>
+<text data-box="2361.9,892,158,26" x="2440.9" y="909.55" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="600" fill="#151a1f" text-anchor="middle">Consistency</text>
+<text x="1860" y="936" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#56616c" text-anchor="start">Never self-accepted · content immutable after acceptance</text>
+<text x="1860" y="956" font-family="'JetBrains Mono', ui-monospace, Consolas, monospace" font-size="13" font-weight="400" fill="#56616c" text-anchor="start" letter-spacing="1.2">ENFORCEMENT PATH</text>
+<rect x="1860" y="964" width="164" height="28" rx="14.0" fill="#ffffff" stroke="#56616c" stroke-width="1.1"/>
+<text data-box="1860,964,164,28" x="1942.0" y="982.55" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="600" fill="#151a1f" text-anchor="middle">Enforcement block</text>
+<path d="M2029,978 H2059" fill="none" stroke="#56616c" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="4 3" marker-end="url(#ah-muted)"/>
+<rect x="2064" y="964" width="220" height="28" rx="14.0" fill="#f4f6f7" stroke="#b42318" stroke-width="1.1" stroke-dasharray="5 4"/>
+<text data-box="2064,964,220,28" x="2174.0" y="982.55" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="600" fill="#151a1f" text-anchor="middle">adr-judge in pre-commit</text>
+<text x="2296" y="983" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="600" fill="#b42318" text-anchor="start">currently off by default</text>
+<rect x="1860" y="998" width="164" height="28" rx="14.0" fill="#fdf0d5" stroke="#a15c00" stroke-width="1.1"/>
+<text data-box="1860,998,164,28" x="1942.0" y="1016.55" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="600" fill="#151a1f" text-anchor="middle">Binding ADR</text>
+<path d="M2029,1012 H2059" fill="none" stroke="#a15c00" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#ah-amber)"/>
+<rect x="2064" y="998" width="220" height="28" rx="14.0" fill="#fdf0d5" stroke="#a15c00" stroke-width="1.1"/>
+<text data-box="2064,998,220,28" x="2174.0" y="1016.55" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="600" fill="#151a1f" text-anchor="middle">check_* gate in evaluate.py</text>
+<path d="M2289,1012 H2319" fill="none" stroke="#a15c00" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#ah-amber)"/>
+<rect x="2324" y="998" width="196" height="28" rx="14.0" fill="#fdf0d5" stroke="#a15c00" stroke-width="1.1"/>
+<text data-box="2324,998,196,28" x="2422.0" y="1016.55" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="600" fill="#151a1f" text-anchor="middle">CI gate on push to dev</text>
+<text x="1860" y="1044" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#56616c" text-anchor="start">Of the 10 binding ADRs: 4 gated in CI · 4 by local tests or build · 2 via adr-judge, now off</text>
+<text x="40" y="1078" font-family="'JetBrains Mono', ui-monospace, Consolas, monospace" font-size="15" font-weight="700" fill="#c2410c" text-anchor="start" letter-spacing="2.5">PIPELINE &amp; GATES</text>
+<text x="239.6" y="1078" font-family="'JetBrains Mono', ui-monospace, Consolas, monospace" font-size="13" font-weight="400" fill="#56616c" text-anchor="start" letter-spacing="1.2">from backlog task to alpha zip · under each step: what makes it refuse or stop</text>
+<rect x="40" y="1102" width="164" height="50" rx="6" fill="#ffffff" stroke="#0e7490" stroke-width="1.2" filter="url(#card)"/>
+<use href="#shield_o" x="48.0" y="1116.0" width="22" height="22" style="color:#a15c00"/>
+<text data-box="40,1102,164,50" x="76" y="1132" font-family="Archivo, 'Helvetica Neue', Arial, sans-serif" font-size="14" font-weight="700" fill="#151a1f" text-anchor="start">Backlog task</text>
+<text data-box="36,1152,172,50" x="44" y="1174" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#56616c" text-anchor="start">no task, no work</text>
+<path d="M205,1127 H213" fill="none" stroke="#0e7490" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#ah-cool)"/>
+<rect x="216" y="1102" width="164" height="50" rx="6" fill="#ffffff" stroke="#0e7490" stroke-width="1.2" filter="url(#card)"/>
+<use href="#shield_o" x="224.0" y="1116.0" width="22" height="22" style="color:#a15c00"/>
+<text data-box="216,1102,164,50" x="252" y="1132" font-family="Archivo, 'Helvetica Neue', Arial, sans-serif" font-size="14" font-weight="700" fill="#151a1f" text-anchor="start">Plan + self-review</text>
+<text data-box="212,1152,172,50" x="220" y="1174" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#56616c" text-anchor="start">SAT control change waits</text>
+<text data-box="212,1152,172,50" x="220" y="1191" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#56616c" text-anchor="start">for Sergeant D's OK</text>
+<path d="M381,1127 H389" fill="none" stroke="#0e7490" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#ah-cool)"/>
+<rect x="392" y="1102" width="164" height="50" rx="6" fill="#ffffff" stroke="#0e7490" stroke-width="1.2" filter="url(#card)"/>
+<use href="#shield_o" x="400.0" y="1116.0" width="22" height="22" style="color:#a15c00"/>
+<text data-box="392,1102,164,50" x="428" y="1132" font-family="Archivo, 'Helvetica Neue', Arial, sans-serif" font-size="14" font-weight="700" fill="#151a1f" text-anchor="start">Red → green</text>
+<text data-box="388,1152,172,50" x="396" y="1174" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#56616c" text-anchor="start">green on the fix alone</text>
+<text data-box="388,1152,172,50" x="396" y="1191" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#56616c" text-anchor="start">is no proof</text>
+<path d="M557,1127 H565" fill="none" stroke="#0e7490" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#ah-cool)"/>
+<rect x="568" y="1102" width="164" height="50" rx="6" fill="#ffffff" stroke="#0e7490" stroke-width="1.2" filter="url(#card)"/>
+<use href="#shield_o" x="576.0" y="1116.0" width="22" height="22" style="color:#a15c00"/>
+<text data-box="568,1102,164,50" x="604" y="1132" font-family="Archivo, 'Helvetica Neue', Arial, sans-serif" font-size="14" font-weight="700" fill="#151a1f" text-anchor="start">Reviewer team</text>
+<text data-box="564,1152,172,50" x="572" y="1174" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#56616c" text-anchor="start">told to refute,</text>
+<text data-box="564,1152,172,50" x="572" y="1191" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#56616c" text-anchor="start">not to approve</text>
+<path d="M733,1127 H741" fill="none" stroke="#0e7490" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#ah-cool)"/>
+<rect x="744" y="1102" width="164" height="50" rx="6" fill="#fdf0d5" stroke="#a15c00" stroke-width="1.5" filter="url(#card)"/>
+<use href="#shield_f" x="752.0" y="1116.0" width="22" height="22" style="color:#a15c00"/>
+<text data-box="744,1102,164,50" x="780" y="1132" font-family="Archivo, 'Helvetica Neue', Arial, sans-serif" font-size="14" font-weight="700" fill="#151a1f" text-anchor="start">evaluate · tests</text>
+<text data-box="740,1152,172,50" x="748" y="1174" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#56616c" text-anchor="start">exit 1 on any FAIL</text>
+<text data-box="740,1152,172,50" x="748" y="1191" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#56616c" text-anchor="start">no new FAIL allowed</text>
+<path d="M909,1127 H917" fill="none" stroke="#0e7490" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#ah-cool)"/>
+<rect x="920" y="1102" width="164" height="50" rx="6" fill="#fdf0d5" stroke="#a15c00" stroke-width="1.5" filter="url(#card)"/>
+<use href="#shield_f" x="928.0" y="1116.0" width="22" height="22" style="color:#a15c00"/>
+<text data-box="920,1102,164,50" x="956" y="1132" font-family="Archivo, 'Helvetica Neue', Arial, sans-serif" font-size="14" font-weight="700" fill="#151a1f" text-anchor="start">Bump + commit</text>
+<text data-box="916,1152,172,50" x="924" y="1174" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#56616c" text-anchor="start">no prerelease bump,</text>
+<text data-box="916,1152,172,50" x="924" y="1191" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#56616c" text-anchor="start">or TASK id without its file</text>
+<path d="M1085,1127 H1093" fill="none" stroke="#0e7490" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#ah-cool)"/>
+<rect x="1096" y="1102" width="164" height="50" rx="6" fill="#fdf0d5" stroke="#a15c00" stroke-width="1.5" filter="url(#card)"/>
+<use href="#shield_f" x="1104.0" y="1116.0" width="22" height="22" style="color:#a15c00"/>
+<text data-box="1096,1102,164,50" x="1132" y="1132" font-family="Archivo, 'Helvetica Neue', Arial, sans-serif" font-size="14" font-weight="700" fill="#151a1f" text-anchor="start">Build + lock</text>
+<text data-box="1092,1152,172,50" x="1100" y="1174" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#56616c" text-anchor="start">one build per machine:</text>
+<text data-box="1092,1152,172,50" x="1100" y="1191" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#56616c" text-anchor="start">the second one waits</text>
+<path d="M1261,1127 H1269" fill="none" stroke="#0e7490" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#ah-cool)"/>
+<rect x="1272" y="1102" width="164" height="50" rx="6" fill="#ffffff" stroke="#0e7490" stroke-width="1.2" filter="url(#card)"/>
+<use href="#shield_o" x="1280.0" y="1116.0" width="22" height="22" style="color:#a15c00"/>
+<text data-box="1272,1102,164,50" x="1308" y="1132" font-family="Archivo, 'Helvetica Neue', Arial, sans-serif" font-size="14" font-weight="700" fill="#151a1f" text-anchor="start">Bench via OTA</text>
+<text data-box="1268,1152,172,50" x="1276" y="1174" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#56616c" text-anchor="start">a failed bench test</text>
+<text data-box="1268,1152,172,50" x="1276" y="1191" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#56616c" text-anchor="start">publishes nothing</text>
+<path d="M1437,1127 H1445" fill="none" stroke="#0e7490" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#ah-cool)"/>
+<rect x="1448" y="1102" width="164" height="50" rx="6" fill="#ffffff" stroke="#0e7490" stroke-width="1.2" filter="url(#card)"/>
+<use href="#shield_o" x="1456.0" y="1116.0" width="22" height="22" style="color:#a15c00"/>
+<text data-box="1448,1102,164,50" x="1484" y="1132" font-family="Archivo, 'Helvetica Neue', Arial, sans-serif" font-size="14" font-weight="700" fill="#151a1f" text-anchor="start">Push to dev</text>
+<text data-box="1444,1152,172,50" x="1452" y="1174" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#56616c" text-anchor="start">a freeze is announced,</text>
+<text data-box="1444,1152,172,50" x="1452" y="1191" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#56616c" text-anchor="start">or the bench OK is missing</text>
+<path d="M1613,1127 H1621" fill="none" stroke="#0e7490" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#ah-cool)"/>
+<rect x="1624" y="1102" width="164" height="50" rx="6" fill="#fdf0d5" stroke="#a15c00" stroke-width="1.5" filter="url(#card)"/>
+<use href="#shield_f" x="1632.0" y="1116.0" width="22" height="22" style="color:#a15c00"/>
+<text data-box="1624,1102,164,50" x="1660" y="1132" font-family="Archivo, 'Helvetica Neue', Arial, sans-serif" font-size="14" font-weight="700" fill="#151a1f" text-anchor="start">Zip post + ledger</text>
+<text data-box="1620,1152,172,50" x="1628" y="1174" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#56616c" text-anchor="start">zip is not HEAD, tag already</text>
+<text data-box="1620,1152,172,50" x="1628" y="1191" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#56616c" text-anchor="start">posted, or zip above 10 MB</text>
+<circle cx="45" cy="1231" r="3.5" fill="#0e7490" stroke="#0e7490" stroke-width="1.2"/>
+<text x="56" y="1236" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="14" font-weight="600" fill="#151a1f" text-anchor="start">A refusal is reported, never bypassed</text>
+<circle cx="375.09999999999997" cy="1231" r="3.5" fill="#0e7490" stroke="#0e7490" stroke-width="1.2"/>
+<text x="386.09999999999997" y="1236" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="14" font-weight="600" fill="#151a1f" text-anchor="start">Exit 0 is not evidence</text>
+<circle cx="595.6999999999999" cy="1231" r="3.5" fill="#0e7490" stroke="#0e7490" stroke-width="1.2"/>
+<text x="606.6999999999999" y="1236" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="14" font-weight="600" fill="#151a1f" text-anchor="start">Done only with evidence from the same session</text>
+<circle cx="984.1999999999999" cy="1231" r="3.5" fill="#0e7490" stroke="#0e7490" stroke-width="1.2"/>
+<text x="995.1999999999999" y="1236" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="14" font-weight="600" fill="#151a1f" text-anchor="start">One prerelease tag per firmware commit</text>
+<path d="M1400,917 V1098" fill="none" stroke="#0e7490" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" marker-start="url(#ah-cool)" marker-end="url(#ah-cool)"/>
+<text x="1412" y="1064" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#0e7490" text-anchor="start">bench request · OK</text>
+<path d="M40,1097 V1092 H1391 M1409,1092 H1788 V1097" fill="none" stroke="#0e7490" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M1352,1046 V1089" fill="none" stroke="#0e7490" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#ah-cool)"/>
+<text x="1340" y="1064" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#0e7490" text-anchor="end">sessions run the pipeline</text>
+<text x="1840" y="1078" font-family="'JetBrains Mono', ui-monospace, Consolas, monospace" font-size="15" font-weight="700" fill="#c2410c" text-anchor="start" letter-spacing="2.5">WHAT SHIPS</text>
+<rect x="1840" y="1102" width="334" height="82" rx="6" fill="#e3f1e4" stroke="#2f7d32" stroke-width="1.5" filter="url(#card)"/>
+<use href="#package" x="1854.0" y="1129.0" width="28" height="28" style="color:#2f7d32"/>
+<text data-box="1840,1102,334,82" x="1894" y="1130" font-family="Archivo, 'Helvetica Neue', Arial, sans-serif" font-size="17" font-weight="700" fill="#151a1f" text-anchor="start">Alpha zip</text>
+<text data-box="1840,1102,334,82" x="1894" y="1152" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#151a1f" text-anchor="start">every firmware tag · from dev</text>
+<text data-box="1840,1102,334,82" x="1894" y="1170" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#56616c" text-anchor="start">bench OK + post script → #alpha-testing</text>
+<rect x="2186" y="1102" width="334" height="82" rx="6" fill="#fdf0d5" stroke="#a15c00" stroke-width="1.5" filter="url(#card)"/>
+<use href="#clock" x="2200.0" y="1129.0" width="28" height="28" style="color:#a15c00"/>
+<text data-box="2186,1102,334,82" x="2240" y="1130" font-family="Archivo, 'Helvetica Neue', Arial, sans-serif" font-size="17" font-weight="700" fill="#151a1f" text-anchor="start">Beta 2.x</text>
+<text data-box="2186,1102,334,82" x="2240" y="1152" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#151a1f" text-anchor="start">standing permission · 08:00 / 20:00 slot</text>
+<text data-box="2186,1102,334,82" x="2240" y="1170" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#56616c" text-anchor="start">1 h soak · GitHub prerelease</text>
+<rect x="1840" y="1194" width="334" height="82" rx="6" fill="#fde4e1" stroke="#b42318" stroke-width="1.5" filter="url(#card)"/>
+<use href="#lock" x="1854.0" y="1221.0" width="28" height="28" style="color:#b42318"/>
+<text data-box="1840,1194,334,82" x="1894" y="1222" font-family="Archivo, 'Helvetica Neue', Arial, sans-serif" font-size="17" font-weight="700" fill="#151a1f" text-anchor="start">Stable 2.x</text>
+<text data-box="1840,1194,334,82" x="1894" y="1244" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#151a1f" text-anchor="start">per-action yes via DM · release/2.x</text>
+<text data-box="1840,1194,334,82" x="1894" y="1262" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#56616c" text-anchor="start">3 checkpoints · 24 h soak · freeze</text>
+<rect x="2186" y="1194" width="334" height="82" rx="6" fill="#fde4e1" stroke="#b42318" stroke-width="1.5" filter="url(#card)"/>
+<use href="#lock" x="2200.0" y="1221.0" width="28" height="28" style="color:#b42318"/>
+<text data-box="2186,1194,334,82" x="2240" y="1222" font-family="Archivo, 'Helvetica Neue', Arial, sans-serif" font-size="17" font-weight="700" fill="#151a1f" text-anchor="start">1.x LTS</text>
+<text data-box="2186,1194,334,82" x="2240" y="1244" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#151a1f" text-anchor="start">per-action yes · otgw-1.x.x → main</text>
+<text data-box="2186,1194,334,82" x="2240" y="1262" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#56616c" text-anchor="start">skill lives in the 1.x worktree</text>
+<path d="M1790,1127 H1835" fill="none" stroke="#2f7d32" stroke-width="3.0" stroke-linecap="round" stroke-linejoin="round" marker-end="url(#ah-ok)"/>
+<path d="M40,1282 H2520" fill="none" stroke="#d5dce2" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="40" y="1308" font-family="'JetBrains Mono', ui-monospace, Consolas, monospace" font-size="15" font-weight="700" fill="#c2410c" text-anchor="start" letter-spacing="2.5">EXTERNAL KNOWLEDGE &amp; SERVICES</text>
+<circle cx="104" cy="1350" r="22" fill="#ffffff" stroke="#56616c" stroke-width="1.1" stroke-dasharray="4 3"/>
+<use href="#globe" x="92.0" y="1338.0" width="24" height="24" style="color:#56616c"/>
+<text x="104" y="1394" font-family="Archivo, 'Helvetica Neue', Arial, sans-serif" font-size="14" font-weight="700" fill="#151a1f" text-anchor="middle">Equipment matrix</text>
+<text x="104" y="1412" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#56616c" text-anchor="middle">check first: boilers</text>
+<circle cx="243" cy="1350" r="22" fill="#ffffff" stroke="#56616c" stroke-width="1.1" stroke-dasharray="4 3"/>
+<use href="#branch" x="231.0" y="1338.0" width="24" height="24" style="color:#56616c"/>
+<text x="243" y="1394" font-family="Archivo, 'Helvetica Neue', Arial, sans-serif" font-size="14" font-weight="700" fill="#151a1f" text-anchor="middle">thermo-nova</text>
+<text x="243" y="1412" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#56616c" text-anchor="middle">pinned · read only</text>
+<circle cx="382" cy="1350" r="22" fill="#ffffff" stroke="#56616c" stroke-width="1.1" stroke-dasharray="4 3"/>
+<use href="#book" x="370.0" y="1338.0" width="24" height="24" style="color:#56616c"/>
+<text x="382" y="1394" font-family="Archivo, 'Helvetica Neue', Arial, sans-serif" font-size="14" font-weight="700" fill="#151a1f" text-anchor="middle">OpenTherm spec</text>
+<text x="382" y="1412" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#56616c" text-anchor="middle">v4.2</text>
+<circle cx="521" cy="1350" r="22" fill="#ffffff" stroke="#56616c" stroke-width="1.1" stroke-dasharray="4 3"/>
+<use href="#server" x="509.0" y="1338.0" width="24" height="24" style="color:#56616c"/>
+<text x="521" y="1394" font-family="Archivo, 'Helvetica Neue', Arial, sans-serif" font-size="14" font-weight="700" fill="#151a1f" text-anchor="middle">Toolchains</text>
+<text x="521" y="1412" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#56616c" text-anchor="middle">pinned registries</text>
+<circle cx="660" cy="1350" r="22" fill="#ffffff" stroke="#56616c" stroke-width="1.1" stroke-dasharray="4 3"/>
+<use href="#chat" x="648.0" y="1338.0" width="24" height="24" style="color:#56616c"/>
+<text x="660" y="1394" font-family="Archivo, 'Helvetica Neue', Arial, sans-serif" font-size="14" font-weight="700" fill="#151a1f" text-anchor="middle">Discord</text>
+<text x="660" y="1412" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#56616c" text-anchor="middle">MCP + webhook</text>
+<circle cx="799" cy="1350" r="22" fill="#ffffff" stroke="#56616c" stroke-width="1.1" stroke-dasharray="4 3"/>
+<use href="#terminal" x="787.0" y="1338.0" width="24" height="24" style="color:#56616c"/>
+<text x="799" y="1394" font-family="Archivo, 'Helvetica Neue', Arial, sans-serif" font-size="14" font-weight="700" fill="#151a1f" text-anchor="middle">GitHub</text>
+<text x="799" y="1412" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#56616c" text-anchor="middle">gh as maintainer</text>
+<circle cx="938" cy="1350" r="22" fill="#ffffff" stroke="#56616c" stroke-width="1.1" stroke-dasharray="4 3"/>
+<use href="#rss" x="926.0" y="1338.0" width="24" height="24" style="color:#56616c"/>
+<text x="938" y="1394" font-family="Archivo, 'Helvetica Neue', Arial, sans-serif" font-size="14" font-weight="700" fill="#151a1f" text-anchor="middle">Tweakers</text>
+<text x="938" y="1412" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#56616c" text-anchor="middle">RSS · read only</text>
+<circle cx="1077" cy="1350" r="22" fill="#ffffff" stroke="#56616c" stroke-width="1.1" stroke-dasharray="4 3"/>
+<use href="#spark" x="1065.0" y="1338.0" width="24" height="24" style="color:#56616c"/>
+<text x="1077" y="1394" font-family="Archivo, 'Helvetica Neue', Arial, sans-serif" font-size="14" font-weight="700" fill="#151a1f" text-anchor="middle">AI services</text>
+<text x="1077" y="1412" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#56616c" text-anchor="middle">Claude · Copilot · Codex</text>
+<text x="1200" y="1308" font-family="'JetBrains Mono', ui-monospace, Consolas, monospace" font-size="15" font-weight="700" fill="#c2410c" text-anchor="start" letter-spacing="2.5">THE WORKSHOP IN NUMBERS</text>
+<text x="1200" y="1366" font-family="Archivo, 'Helvetica Neue', Arial, sans-serif" font-size="34" font-weight="800" fill="#0e7490" text-anchor="start">327</text>
+<text x="1200" y="1392" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#56616c" text-anchor="start">firmware beta,</text>
+<text x="1200" y="1409" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#56616c" text-anchor="start">beta.79 on 11-04</text>
+<path d="M1327,1330 V1412" fill="none" stroke="#d5dce2" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="1341" y="1366" font-family="Archivo, 'Helvetica Neue', Arial, sans-serif" font-size="34" font-weight="800" fill="#0e7490" text-anchor="start">8.7</text>
+<text x="1341" y="1392" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#56616c" text-anchor="start">prerelease tags</text>
+<text x="1341" y="1409" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#56616c" text-anchor="start">per day</text>
+<path d="M1468,1330 V1412" fill="none" stroke="#d5dce2" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="1482" y="1366" font-family="Archivo, 'Helvetica Neue', Arial, sans-serif" font-size="34" font-weight="800" fill="#0e7490" text-anchor="start">42</text>
+<text x="1482" y="1392" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#56616c" text-anchor="start">checks in</text>
+<text x="1482" y="1409" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#56616c" text-anchor="start">evaluate.py</text>
+<path d="M1609,1330 V1412" fill="none" stroke="#d5dce2" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="1623" y="1366" font-family="Archivo, 'Helvetica Neue', Arial, sans-serif" font-size="34" font-weight="800" fill="#0e7490" text-anchor="start">274</text>
+<text x="1623" y="1392" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#56616c" text-anchor="start">Python tests</text>
+<path d="M1750,1330 V1412" fill="none" stroke="#d5dce2" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="1764" y="1366" font-family="Archivo, 'Helvetica Neue', Arial, sans-serif" font-size="34" font-weight="800" fill="#0e7490" text-anchor="start">11 + 2</text>
+<text x="1764" y="1392" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#56616c" text-anchor="start">skills and</text>
+<text x="1764" y="1409" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#56616c" text-anchor="start">commands</text>
+<path d="M1891,1330 V1412" fill="none" stroke="#d5dce2" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="1905" y="1366" font-family="Archivo, 'Helvetica Neue', Arial, sans-serif" font-size="34" font-weight="800" fill="#0e7490" text-anchor="start">7</text>
+<text x="1905" y="1392" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#56616c" text-anchor="start">GitHub</text>
+<text x="1905" y="1409" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#56616c" text-anchor="start">workflows</text>
+<path d="M2032,1330 V1412" fill="none" stroke="#d5dce2" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"/>
+<text x="2046" y="1366" font-family="Archivo, 'Helvetica Neue', Arial, sans-serif" font-size="34" font-weight="800" fill="#0e7490" text-anchor="start">293</text>
+<text x="2046" y="1392" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#56616c" text-anchor="start">register entries</text>
+<text x="2046" y="1409" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#56616c" text-anchor="start">by Sergeant D</text>
+<rect x="2212" y="1320" width="308" height="94" rx="6" fill="#ffffff" stroke="#c2410c" stroke-width="1.3" stroke-dasharray="6 4" filter="url(#card)"/>
+<text data-box="2212,1320,308,94" x="2228" y="1348" font-family="Archivo, 'Helvetica Neue', Arial, sans-serif" font-size="17" font-weight="700" fill="#151a1f" text-anchor="start">11 new findings</text>
+<text data-box="2212,1320,308,94" x="2228" y="1371" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="14" font-weight="600" fill="#c2410c" text-anchor="start">3 decisions open for the maintainer</text>
+<text data-box="2212,1320,308,94" x="2228" y="1396" font-family="'Source Sans 3', 'Segoe UI', system-ui, sans-serif" font-size="13" font-weight="400" fill="#56616c" text-anchor="start">chapters 13 and 14 of agentic-setup.md</text>
+</svg>
