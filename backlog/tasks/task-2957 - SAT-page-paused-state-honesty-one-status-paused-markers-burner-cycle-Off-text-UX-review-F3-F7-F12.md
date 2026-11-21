@@ -3,10 +3,11 @@ id: TASK-2957
 title: >-
   SAT page paused-state honesty: one status, paused markers, burner-cycle Off
   text (UX review F3 F7 F12)
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-11-20T14:17:00Z'
-updated_date: '2026-11-20T15:23:00Z'
+updated_date: '2026-11-21T14:10:00Z'
 labels:
   - ux
   - webui
@@ -43,4 +44,10 @@ From the TASK-2952 UX review (docs/reviews/2026-11-20_ux-heuristic-v2-webui/READ
 2026-11-20 otgw-ux-designer: otgw-dev answered Q1-Q7 (relayed by the coordinator); spec T2 updated: STARTING became WAITING (unbounded gates, no time promise) with a boiler-link-down variant; IDLE uses the firmware band (target + 0.1); not-live values show '—'; current_modulation is the MM SAT sends, so the row is 'Modulation sent'; the burner cycle card ignores control_mode while not active. Follow-up proposal for otgw-dev (not in this task): a wait_reason field in /v2/sat/status.
 
 Suggestion (not in this task, no separate task yet, coordinator 2026-11-20): a wait_reason field in /v2/sat/status (boot_silence, ntp, no_interface, no_boiler, mqtt_fallback, flashing) so the WAITING state can name its reason; owner otgw-dev if picked up.
+
+2026-11-21 otgw-webui (WIP, paused for TASK-2998; uncommitted in wt-ba-2959 on lane/ba-2957): satDisplayState() per spec T2 section 2, pill/headline/sub-line/stale cards per section 3, IDLE per 3.1, dashes while not active, Modulation sent, burner cycle per 3.3, visible messages badge text, loop label state word, takeover switch label. Firmware lines still match origin/dev: bActive=true SATcontrol.ino:8045, bSafetyTripped=true :8536, SAT_MAX_PIC_FAILS :148. New test tests/webui/sat-display-states.test.mjs: RED on the old code 0/3 (headline 'At target · idle' for enabled+ot_link_lost, the .63 case), GREEN 3/3. Also fixed t(): a count key without plural forms returned the bare key, so the messages aria-label read 'tools.sat_msgs_aria' and the connection summary 'conn.degraded'; now falls back to the plain key. Updated sat-status-pill (safety trip pill Stopped, inactive = Waiting) and sat-explain-state (badge text) to the spec. NL/DE/EL written by hand per i18n/glossary.md (32 keys each; no review workflow run, EL needs a native read). Green: sat-explain-state, sat-status-pill, sat-page-order, i18n-lang 6/0, i18n-no-hardcoded 3/0, i18n-followups 4/0, lang-menu 7/0. Screenshots before/after (paused_ot, waiting, takeover, idle_above, light+dark) in OTGW-build-artifacts-safe/evidence-TASK-2957/shots/. Open: full webui sweep, build, bench, push after the 20:00 compose (coordinator).
+
+2026-11-21: fixed 'Set up a source': it opened Settings › SAT, which only shows the 'moved to the SAT page' card (TASK-1211); it now opens the SAT page in the Control view and focuses Latitude (the Weather group heading while SAT is off). New case in sat-display-states.test.mjs: red on the previous commit (page not SAT), green now; file 4/0.
+
+2026-11-21 ux critique P1 (otgw-ux-designer): 'Check connection ›' called showPage('monitor') without a tab, so Monitor restored its last tab (Log hides the map). Now showPage('monitor', {tab:'mconn'}). New case in sat-display-states: red on 8a5a226b6 (tab mlog), green now (file 5/0). NAS full sweep on 9d3056538 (otgw-bench-tester): 91/101 first pass, 6 of 10 green on rerun; contrast-tokens, inline-accent-contrast, harness-stall, poll-spread-hidden red only by CDP evaluate/timing timeouts on the NAS (no assertion), all green locally single-file.
 <!-- SECTION:NOTES:END -->

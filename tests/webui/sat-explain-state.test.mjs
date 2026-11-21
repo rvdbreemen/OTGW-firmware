@@ -163,7 +163,7 @@ let r = await show({ pwm_veto_reason: 2, slave_low_off_denied: true, valves_open
   curve_recommendation: 'increase', '24h_cycles': 14, '24h_duty_ratio': 0.42, '24h_overshoot_fraction': 0.07,
   '24h_underheat_fraction': 0.14, '24h_long_cycle_fraction': 0.21 });
 check(!!r.whyVis && /bit 4/.test(r.why || ''), `U2 why-line names the PWM refusal first (got ${JSON.stringify(r.why)})`);
-check(!!r.btnVis && r.count === '2' && !r.btnWarn, `U3 messages button shows 2, info level (got vis=${r.btnVis} count=${r.count} warn=${r.btnWarn})`);
+check(!!r.btnVis && r.count === '2 messages' && !r.btnWarn, `U3 messages button shows 2, info level (got vis=${r.btnVis} count=${r.count} warn=${r.btnWarn})`);
 check(!r.panelVis, `U3 panel stays closed without a warning (got ${r.panelVis})`);
 check(/valves are closed/.test(r.msgs || ''), `U3 panel lists the valves message (got ${JSON.stringify(r.msgs)})`);
 check(r.trend === '↑' && /\+0\.6/.test(r.trendTitle || ''), `U4 rising arrow with rate (got ${r.trend} / ${r.trendTitle})`);
@@ -189,7 +189,7 @@ check(r.trend === '↓', `U4 falling arrow (got ${r.trend})`);
 
 // 4. Push refused only: the old hint stays visible, inside the panel that opened by itself.
 r = await show({ push_refused: true });
-check(!!r.push && !!r.panelVis && r.count === '1', `push-refused hint visible inside the open panel (got push=${r.push} panel=${r.panelVis} count=${r.count})`);
+check(!!r.push && !!r.panelVis && r.count === '1 message', `push-refused hint visible inside the open panel (got push=${r.push} panel=${r.panelVis} count=${r.count})`);
 check(!r.whyVis && r.trend === '', `no why-line and no arrow when nothing applies (got why=${r.whyVis} trend=${JSON.stringify(r.trend)})`);
 
 // 5. A sticky veto reason without the live flag: no PWM message.

@@ -774,6 +774,8 @@ html[data-theme="dark"]{--accent:var(--brand-cyan);--nav:#383838;--tile-off:#545
   .sat-title{font-size:1.05rem;font-weight:700;display:flex;align-items:center;gap:10px}
   .sat-pill{font-size:.7rem;font-weight:700;color:var(--on-hot);background:var(--hot-fill);border-radius:10px;padding:3px 10px}
   .sat-pill.idle,.sat-pill.off{background:var(--pill-off);color:#fff}
+  /* TASK-2957: paused, stopped, takeover and waiting without a boiler link */
+  .sat-pill.warn{background:var(--status-warn-bg);color:var(--status-warn-text)}
   /* TASK-999: SAT depth-level nav (Thermostat/Control/Technical) as 1a underlined
      text tabs — the same second-tier pattern as .subtabs, keeping the small hint. */
   .sat-views{display:flex;gap:2px;margin-bottom:16px;overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;
@@ -806,6 +808,11 @@ html[data-theme="dark"]{--accent:var(--brand-cyan);--nav:#383838;--tile-off:#545
     padding:8px 14px;font-size:.8rem;cursor:pointer;min-height:38px;font-family:var(--font-sans)}
   .sat-preset.active{background:var(--accent);border-color:var(--accent);color:var(--on-accent);font-weight:700}
   .sat-hint{font-size:.78rem;color:var(--muted);margin-top:12px}
+  /* TASK-2957 (spec T2 section 3): the state sub-line and the muted live cards */
+  .sat-state-sub{font-size:.85rem;font-weight:400;color:var(--muted);margin-top:6px}
+  .sat-state-sub[hidden]{display:none}
+  .card.is-stale .kv-v,.card.is-stale .sat-status-big{color:var(--muted)}
+  .sat-card-state{font-weight:400;color:var(--muted)}
   /* TASK-1884: why-line, messages button/panel, room trend arrow */
   .sat-status-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
   .sat-why{font-size:.85rem;color:var(--text);margin-top:6px}

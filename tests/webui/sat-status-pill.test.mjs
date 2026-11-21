@@ -202,8 +202,9 @@ check(/Heating to/.test(r.big || ''), `v2: headline reports the target while fir
 // pill reports burner activity alone (Off / Heating / Idle); safety, window and summer
 // are reported by the headline (#satStatusBig), in that order of precedence.
 r = await v2Pill({ boiler_status: 'heating', safety_tripped: true, window_open: true, summer_active: true });
-check(r.big === 'Safety tripped!', `v2: safety trip outranks window, summer and activity in the headline (got "${r.big}")`);
-check(r.pill === 'Heating', `v2: pill keeps reporting burner activity during a safety trip (got "${r.pill}")`);
+check(r.big === 'SAT stopped: no OpenTherm interface', `v2: safety trip outranks window, summer and activity in the headline (got "${r.big}")`);
+// TASK-2957 (spec T2 STOPPED): a safety trip stops the control loop, so the pill says Stopped.
+check(r.pill === 'Stopped', `v2: pill reads Stopped during a safety trip (got "${r.pill}")`);
 
 r = await v2Pill({ boiler_status: 'heating', window_open: true, summer_active: true });
 check(r.big === 'Window open', `v2: window open outranks summer and activity in the headline (got "${r.big}")`);
@@ -220,8 +221,9 @@ check(r.en === 'Disabled', `v2: enable switch label reads "Disabled" (got "${r.e
 r = await v2Pill({ active: true });
 check(r.pill === 'Heating', `v2: no boiler_status + active -> falls back to control-loop state "Heating" (got "${r.pill}")`);
 r = await v2Pill({ active: false });
-check(r.pill === 'Idle', `v2: no boiler_status + inactive -> "Idle" (got "${r.pill}")`);
-check(r.big === 'At target · idle', `v2: no boiler_status + inactive -> idle headline (got "${r.big}")`);
+// TASK-2957 (spec T2 WAITING): enabled but the control loop not active yet is the waiting state.
+check(r.pill === 'Waiting', `v2: no boiler_status + inactive -> "Waiting" (got "${r.pill}")`);
+check(r.big === 'Waiting to take over', `v2: no boiler_status + inactive -> waiting headline (got "${r.big}")`);
 
 // ------------------------------------------------- visual receipt (opt-in)
 // Exactly the state sergeantd reported: SAT engaged, control mode Continuous,

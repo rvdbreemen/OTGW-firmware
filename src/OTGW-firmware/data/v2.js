@@ -1527,6 +1527,27 @@
       "sat_why_dhw": "Hot water is running: room heating waits.",
       "sat_why_valves_closed": "All radiator valves are closed: SAT does not start heating.",
       "sat_msgs_aria": "Messages: {{count}}",
+      "sat_msgs_one": "{{count}} message",
+      "sat_msgs_other": "{{count}} messages",
+      "sat_pill_paused": "Paused",
+      "sat_pill_waiting": "Waiting",
+      "sat_pill_stopped": "Stopped",
+      "sat_enable_takeover": "Off · takeover active",
+      "sat_sub_takeover": "Home Assistant has been unreachable over MQTT for more than 5 minutes, so SAT controls the boiler. The switch stays off: SAT stops again when MQTT is back.",
+      "sat_sub_stopped": "SAT lost contact with the OpenTherm interface and stopped itself. Check the connection, then switch SAT off and on again to restart it.",
+      "sat_sub_paused_ot": "SAT gets no reply from the boiler, so the boiler runs on its own control. SAT resumes by itself when the boiler answers again.",
+      "sat_sub_paused_outside": "SAT needs an outside temperature less than 1 hour old; until then your thermostat controls the boiler. SAT resumes by itself when one arrives.",
+      "sat_sub_source_link": "Set up a source",
+      "sat_sub_waiting": "SAT waits until it can take over the boiler safely: a boiler reply, the OpenTherm interface and a valid start state.",
+      "sat_sub_waiting_boiler": "SAT waits for a reply from the boiler before it takes over.",
+      "sat_sub_check_conn": "Check connection ›",
+      "sat_card_paused": "(paused)",
+      "sat_card_waiting": "(waiting)",
+      "sat_card_stopped": "(stopped)",
+      "sat_loop_state_paused": "paused",
+      "sat_loop_state_waiting": "waiting",
+      "sat_loop_state_stopped": "stopped",
+      "sat_loop_state_off": "off",
       "sat_trend_rate": "{{rate}} °C per hour",
       "sat_curve_rec_insufficient": "Curve advice: not enough data yet (at least 6 hours of control).",
       "sat_curve_rec_increase": "Curve advice: the room stayed below target on average; a higher curve may help.",
@@ -1547,7 +1568,7 @@
       "kv_last_update": "Last update",
       "kv_manufacturer": "Manufacturer",
       "kv_max_modulation": "Max modulation",
-      "kv_modulation": "Modulation",
+      "kv_modulation": "Modulation sent",
       "kv_ot_bus": "OT bus",
       "kv_ot_bus_weather": "OT bus / weather",
       "kv_outdoor_sensor": "Outdoor sensor",
@@ -1587,10 +1608,17 @@
       "sat_age_now": "updated just now",
       "sat_beta_body": "Field data helps us improve it. Please run the capture tool now and then (scripts/capture-mqtt-debug.bat on Windows, scripts/capture-mqtt-debug.sh on Linux or macOS) and share the transcript in the Discord #beta-testing channel (discord.gg/zjW3ju7vGQ) or as a GitHub issue (github.com/rvdbreemen/OTGW-firmware/issues).",
       "sat_beta_head": "SAT controls your boiler. This is a beta firmware.",
-      "sat_big_at_target": "At target · idle",
+      "sat_big_at_target": "Idle · room at target",
+      "sat_big_idle": "Idle",
+      "sat_big_idle_above": "Idle · room above target",
+      "sat_big_idle_status": "Idle · {{status}}",
+      "sat_big_paused_ot": "Paused: no boiler connection",
+      "sat_big_paused_outside": "Paused: no outside temperature",
+      "sat_big_waiting": "Waiting to take over",
+      "sat_big_waiting_boiler": "Waiting: no boiler connection",
       "sat_big_heating_to": "Heating to {{temp}}",
       "sat_big_off": "SAT is off",
-      "sat_big_safety": "Safety tripped!",
+      "sat_big_safety": "SAT stopped: no OpenTherm interface",
       "sat_big_summer": "Summer mode",
       "sat_big_window": "Window open",
       "sat_blocked_cmd_ago": "{{cmd}} ({{seconds}}s ago)",
@@ -1617,7 +1645,7 @@
       "sat_cycle_overshoot": "Overshoot",
       "sat_cycle_short": "Short",
       "sat_cycle_sub_continuous": "PID drives the burner continuously. SAT chooses the mode itself.",
-      "sat_cycle_sub_off": "SAT is not actively controlling. SAT chooses the mode itself.",
+      "sat_cycle_sub_off": "SAT is not actively controlling.",
       "sat_cycle_sub_pwm": "PID modulates the burner in PWM bursts. SAT chooses the mode itself.",
       "sat_cycle_uncertain": "Uncertain",
       "sat_cycle_underheat": "Underheat",
@@ -1858,7 +1886,8 @@
     if (typeof p.count === 'number') {
       var form = p.count === 1 ? 'one' : 'other';
       try { form = new Intl.PluralRules(i18nLang).select(p.count); } catch (e) { }
-      k = (i18nString(key + '_' + form) !== undefined) ? key + '_' + form : key + '_other';
+      // A key without plural forms (for example an aria-label with a count) uses the plain key.
+      k = (i18nString(key + '_' + form) !== undefined) ? key + '_' + form : (i18nString(key + '_other') !== undefined ? key + '_other' : key);
     }
     var s = i18nString(k);
     if (s === undefined) return key;   // a visible hint of a missing key
@@ -7026,6 +7055,88 @@
     if (!d || d.boiler_status === undefined) return !!(d && d.active);
     return !SAT_BOILER_IDLE[d.boiler_status];
   }
+  // TASK-2957 (spec T2 section 2): one display state per status poll; the first match wins.
+  // Display only: it reads fields /api/v2/sat/status already sends and changes nothing SAT does.
+  function satDisplayState(d, boilerLinkDown) {
+    var userEnabled = !!d.enabled, takeover = !userEnabled && !!d.fallback_active;
+    if (!userEnabled && !takeover) return 'off';
+    if (d.safety_tripped) return 'stopped';
+    if (d.ot_link_lost) return 'paused_ot';
+    if (d.outside_temp_missing) return 'paused_outside';
+    if (takeover) return 'takeover';
+    if (!d.active) return boilerLinkDown ? 'waiting_boiler' : 'waiting';
+    if (d.window_open) return 'window';
+    if (d.summer_active) return 'summer';
+    if (satBurnerIsFiring(d)) return 'heating';
+    return 'idle';
+  }
+  // States in which the control loop is not running: the live cards are muted and say why.
+  var SAT_STALE_STATES = { stopped: 'stopped', paused_ot: 'paused', paused_outside: 'paused', waiting: 'waiting', waiting_boiler: 'waiting' };
+  // Spec T2 section 3.1: the IDLE headline uses the tolerance band (stop at target + 0.1,
+  // SATchEnable.h) and a display-only 'above target' step at + 1.0.
+  function satIdleHeadline(d) {
+    var room = satNum(d.room_temp), target = satNum(d.target_temp);
+    if (room === null || target === null) return t('tools.sat_big_idle');
+    var over = Math.round((room - target) * 100) / 100;
+    if (over >= 1.0) return t('tools.sat_big_idle_above');
+    if (over >= 0.1) return t('tools.sat_big_at_target');
+    var bs = d.boiler_status;
+    if (bs && bs !== 'idle' && bs !== 'off' && SAT_BOILER_LABELS[bs]) return t('tools.sat_big_idle_status', { status: satLbl('sat_boiler', SAT_BOILER_LABELS[bs]) });
+    return t('tools.sat_big_idle');
+  }
+  // The boiler link the connection panel shows (CONN.boiler.s from /v2/health).
+  function satBoilerLinkDown() { return CONN.boiler.s === 'st-down'; }
+  // The SAT settings live on the SAT page (TASK-1211): Control view, group Weather. Latitude gets
+  // the focus; while SAT is off its fields are locked, so the group heading gets it instead.
+  function satOpenWeatherSettings() {
+    showPage('sat');
+    var body = document.getElementById('satBody');
+    if (!body || body.className === 'sv-simple') satShowView('control');
+    var row = document.querySelector('#satSetL2 .srow[data-key="satweatherlat"]');
+    var input = row && row.querySelector('input, select');
+    var target = (input && !input.disabled) ? input : null;
+    if (!target) {
+      var grp = row ? row.closest('.set-group') : null;
+      target = grp ? grp.querySelector('h3') : document.getElementById('satSetL2');
+      if (target) target.setAttribute('tabindex', '-1');
+    }
+    if (target) { if (target.scrollIntoView) target.scrollIntoView({ block: 'center' }); target.focus(); }
+  }
+  function satOpenConnection() {
+    showPage('monitor', { tab: 'mconn' });   // without a tab Monitor restores its last tab (Log hides the map)
+    var m = document.getElementById('connMap');
+    if (m && m.scrollIntoView) m.scrollIntoView({ block: 'center' });
+  }
+  // Sub-line under the headline: one sentence, plus an optional link button.
+  function satRenderStateSub(state) {
+    var box = document.getElementById('satStateSub'); if (!box) return;
+    var key = { stopped: 'sat_sub_stopped', paused_ot: 'sat_sub_paused_ot', paused_outside: 'sat_sub_paused_outside',
+      takeover: 'sat_sub_takeover', waiting: 'sat_sub_waiting', waiting_boiler: 'sat_sub_waiting_boiler' }[state];
+    var link = { paused_outside: ['sat_sub_source_link', satOpenWeatherSettings], waiting_boiler: ['sat_sub_check_conn', satOpenConnection] }[state];
+    var sig = key ? state + '|' + i18nLang : '';
+    if (box.getAttribute('data-sig') === sig) return;   // rebuild only on a change, so a focused link keeps its focus
+    box.setAttribute('data-sig', sig);
+    box.textContent = '';
+    box.hidden = !key;
+    if (!key) return;
+    box.appendChild(document.createTextNode(t('tools.' + key)));
+    if (link) {
+      var a = document.createElement('button'); a.type = 'button'; a.className = 'sat-link';
+      a.textContent = t('tools.' + link[0]); a.addEventListener('click', link[1]);
+      box.appendChild(document.createTextNode(' ')); box.appendChild(a);
+    }
+  }
+  // Spec T2 section 3.2: mute the live cards and name the state in their title.
+  function satRenderStale(state) {
+    var why = SAT_STALE_STATES[state] || '';
+    ['satControlStatus', 'satPidKv', 'satPwmKv', 'satCycleMode', 'satHistChart'].forEach(function (id) {
+      var el = document.getElementById(id); var card = el && el.closest('.card'); if (!card) return;
+      card.classList.toggle('is-stale', !!why);
+      var suf = card.querySelector('.sat-card-state'); if (suf) suf.textContent = why ? ' ' + t('tools.sat_card_' + why) : '';
+    });
+    var live = document.getElementById('satLoopState');
+    if (live) live.textContent = why ? t('tools.sat_loop_state_' + why) : (state === 'off' ? t('tools.sat_loop_state_off') : t('h_mon.sat_loop_live'));
+  }
   // Heating-curve constants — JS port of satCalcHeatingCurve() in SATcontrol.ino.
   var SAT_HC_FLOOR = 20.0, SAT_HC_RAD = 27.2, SAT_HC_REF = 20.0;
 
@@ -7318,7 +7429,7 @@
       btn.setAttribute('aria-expanded', open ? 'true' : 'false');
       btn.setAttribute('aria-label', t('tools.sat_msgs_aria', { count: count }));
       txt('satMsgIco', warns ? '!' : 'i');
-      txt('satMsgCount', String(count));
+      txt('satMsgCount', t('tools.sat_msgs', { count: count }));
     }
   }
   // TASK-1884 U4: room trend from indoor_rise_rate (°C/h, EMA). The firmware computes it only while
@@ -7390,26 +7501,37 @@
     // running. Deriving "heating" from it made the pill read Heating with a cold boiler.
     var userEnabled = !!d.enabled, takeover = !userEnabled && !!d.fallback_active;
     var enabled = userEnabled || takeover, active = !!d.active, heating = enabled && satBurnerIsFiring(d);
+    var state = satDisplayState(d, satBoilerLinkDown());
 
     var pill = document.getElementById('satPill');
     if (pill) {
-      pill.textContent = !enabled ? t('tools.off') : (takeover ? t('tools.sat_takeover') : (heating ? t('tools.heating') : t('tools.idle')));
-      pill.className = 'sat-pill' + (!enabled ? ' off' : (heating ? '' : ' idle'));
+      var pTxt, pCls;
+      if (state === 'off') { pTxt = t('tools.off'); pCls = ' off'; }
+      else if (state === 'stopped') { pTxt = t('tools.sat_pill_stopped'); pCls = ' warn'; }
+      else if (state === 'paused_ot' || state === 'paused_outside') { pTxt = t('tools.sat_pill_paused'); pCls = ' warn'; }
+      else if (state === 'waiting') { pTxt = t('tools.sat_pill_waiting'); pCls = ' idle'; }
+      else if (state === 'waiting_boiler') { pTxt = t('tools.sat_pill_waiting'); pCls = ' warn'; }
+      else if (state === 'takeover') { pTxt = heating ? t('tools.heating') : t('tools.idle'); pCls = ' warn'; }
+      else { pTxt = heating ? t('tools.heating') : t('tools.idle'); pCls = heating ? '' : ' idle'; }
+      pill.textContent = pTxt;
+      pill.className = 'sat-pill' + pCls;
     }
-    txt('satEnableLbl', userEnabled ? t('tools.enabled') : t('tools.disabled'));
+    txt('satEnableLbl', userEnabled ? t('tools.enabled') : (takeover ? t('tools.sat_enable_takeover') : t('tools.disabled')));
     var enCb = document.getElementById('satEnable'); if (enCb && !satEnPending) enCb.checked = userEnabled;
 
     // L1 — dial + status + presets
     satDialDraw(d);
-    var big;
-    if (!enabled) big = t('tools.sat_big_off');
-    else if (d.safety_tripped) big = t('tools.sat_big_safety');
-    else if (takeover) big = t('tools.sat_takeover');
-    else if (d.window_open) big = t('tools.sat_big_window');
-    else if (d.summer_active) big = t('tools.sat_big_summer');
-    else if (heating) big = t('tools.sat_big_heating_to', { temp: satFmt(d.target_temp, 1, '°') });
-    else big = t('tools.sat_big_at_target');
+    var big = {
+      off: 'tools.sat_big_off', stopped: 'tools.sat_big_safety', paused_ot: 'tools.sat_big_paused_ot',
+      paused_outside: 'tools.sat_big_paused_outside', takeover: 'tools.sat_takeover', waiting: 'tools.sat_big_waiting',
+      waiting_boiler: 'tools.sat_big_waiting_boiler', window: 'tools.sat_big_window', summer: 'tools.sat_big_summer'
+    }[state];
+    if (big) big = t(big);
+    else if (state === 'heating') big = t('tools.sat_big_heating_to', { temp: satFmt(d.target_temp, 1, '°') });
+    else big = satIdleHeadline(d);
     txt('satStatusBig', big);
+    satRenderStateSub(state);
+    satRenderStale(state);
     var pr = document.getElementById('satPushRefused'); if (pr) pr.hidden = !(enabled && d.push_refused);
     var rl = document.getElementById('satRoomLost'); if (rl) rl.hidden = !(enabled && d.room_temp_lost);
     sat.roomLost = !!(userEnabled && d.room_temp_lost);   // TASK-1546: the graph reads it
@@ -7431,7 +7553,7 @@
     satRenderMaxTSet(d);
     satRenderMaxMod(d);
     satRenderTune(d);   // TASK-1881
-    satRenderCycle(d);
+    satRenderCycle(d, state);
     satDrawCurve(d);
     satRenderCurveRec(d);
     satKv('satControlStatus', [
@@ -7440,9 +7562,9 @@
       [t('tools.kv_active_preset'), satLbl('sat_preset', SAT_PRESET_NAMES[d.active_preset | 0])],
       [t('tools.kv_manufacturer'), d.manufacturer || '—'],
       [t('tools.kv_coefficient'), satFmt(d.coefficient, 2)],
-      [t('tools.kv_pid_output'), satFmt(d.pid_output, 1, ' °C')],
-      [t('tools.kv_error'), satFmt(d.error, 2, ' °C')],
-      [t('tools.kv_modulation'), d.current_modulation != null ? d.current_modulation + ' %' : '—'],
+      [t('tools.kv_pid_output'), active ? satFmt(d.pid_output, 1, ' °C') : '—'],
+      [t('tools.kv_error'), active ? satFmt(d.error, 2, ' °C') : '—'],
+      [t('tools.kv_modulation'), (active && d.current_modulation != null) ? d.current_modulation + ' %' : '—'],
       [t('tools.kv_max_modulation'), d.max_rel_modulation != null ? d.max_rel_modulation + ' %' : '—']
     ]);
 
@@ -7450,7 +7572,7 @@
     satRenderHealth(d);
     satRenderCycles24(d);
     satKv('satPidKv', [
-      [t('tools.kv_p_term'), satFmt(d.pid_p, 2)], [t('tools.kv_i_term'), satFmt(d.pid_i, 2) + (d.pid_curve_only ? ' ' + t('tools.kv_i_not_applied') : '')], [t('tools.kv_d_term'), satFmt(d.pid_d, 2)],
+      [t('tools.kv_p_term'), active ? satFmt(d.pid_p, 2) : '—'], [t('tools.kv_i_term'), active ? satFmt(d.pid_i, 2) + (d.pid_curve_only ? ' ' + t('tools.kv_i_not_applied') : '') : '—'], [t('tools.kv_d_term'), active ? satFmt(d.pid_d, 2) : '—'],
       ['Kp', satFmt(d.kp, 4)], ['Ki', satFmt(d.ki, 4)], ['Kd', satFmt(d.kd, 4)],
       [t('tools.kv_raw_derivative'), satFmt(d.raw_derivative, 4)]
     ]);
@@ -7586,8 +7708,11 @@
     if (cb && !satDhwEnPending && d.dhw_enable !== undefined) cb.checked = !!d.dhw_enable;
   }
 
-  function satRenderCycle(d) {
+  function satRenderCycle(d, state) {
     var cm = d.control_mode | 0;
+    // Spec T2 section 3.3: control_mode can read Continuous while the loop is not active, so a
+    // not-active state shows a dash and the Off sub-line whatever the mode says.
+    if (SAT_STALE_STATES[state]) { txt('satCycleMode', '—'); txt('satCycleSub', t('tools.sat_cycle_sub_off')); return; }
     txt('satCycleMode', t(cm === 2 ? 'tools.sat_mode_pwm' : (cm === 1 ? 'tools.sat_mode_continuous' : 'tools.sat_mode_off')));
     txt('satCycleSub', t(cm === 2 ? 'tools.sat_cycle_sub_pwm' : (cm === 1 ? 'tools.sat_cycle_sub_continuous' : 'tools.sat_cycle_sub_off')));
   }
