@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-21T10:20:00Z'
-updated_date: '2026-11-21T11:01:00Z'
+updated_date: '2026-11-21T11:23:00Z'
 labels:
   - mqtt
   - feature
@@ -47,4 +47,6 @@ Two retained CSV topics in the unsupported_msgids shape (ADR-101 holds: a CSV sc
 2026-11-21 (otgw-dev): review (subagent, read-only) found 1 risk: a list refused at connect stage 5 (heap, a forced portion under the 16 KB floor, malloc) was never retried. Fixed: stage 5 marks the lists it could not send (markOtSupportListsDirty), the minute tick retries; test_mqtt_connect_staging.py test_support_lists_refused_at_connect_are_marked_for_the_minute_tick red without the mark line (marked=-1) / green. Comments 'four portions' -> five, docs mention the connect republish. Low risk left as is: the minute tick may publish a changed list while stages 1-4 still run (as unsupported_msgids already does). Full sweep 355/357 (test_manual_generated fixed by scripts/build_manual.py; 1 skip); test/host/test_boiler_unsupported_origin.py PASS after slicing the new enum.
 
 2026-11-21 (otgw-dev): topic -> REST mapping (per msgid in GET /api/v2/otgw/ot-support): blAR <=> '<id>R' in otgw-firmware/boiler/supported_msgids, blAW <=> '<id>W' there; tsR <=> '<id>R' in otgw-firmware/thermostat/sent_msgids, tsW <=> '<id>W' there; blUR/blUW <=> '<id>R'/'<id>W' in the existing otgw-firmware/boiler/unsupported_msgids; never seen = in none of the three. Example payloads: boiler/supported_msgids '0R,3R,5R,25R,125R,1W,16W,56W', thermostat/sent_msgids '0R,3R,17R,1W,16W,24W' (read entries first, then write, each ascending). Two topics, not four: the R/W suffix keeps the direction, it is the format of unsupported_msgids that gruijter asked to match, and one parser serves all three topics (ADR-101 holds: a string scalar per topic, no JSON).
+
+2026-11-21 12:22 (otgw-dev): rebased onto bce9496a5 (TASK-2993 push), one commit fd70da50c, bump beta.411. Build esp32-combo 12:11-12:22 exit 0, 'Build completed successfully': 2.0.0-beta.411+fd70da5; ino.bin 2154528 B vs 2153920 B on bce9496 = +608 B; app partition 2154091/2293760 B (93.9%). Artifacts + SHA256SUMS: OTGW-artifacts\beta.411+fd70da5\. Bench files (format-3 ot-boiler.json / ot-thermo.json with long lists + expected-topics.txt): OTGW-artifacts\task3000-bench\. Bench requested via the coordinator. Not yet: bench (AC1/AC2 on device, AC4 bench part), gruijter notice (AC3, after the push).
 <!-- SECTION:NOTES:END -->
