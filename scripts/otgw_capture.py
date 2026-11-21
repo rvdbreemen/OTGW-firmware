@@ -377,6 +377,14 @@ class SegmentStore:
                 pass
         self._handles = {}
 
+    def _drop_handle_locked(self, stream):
+        handle = self._handles.pop(stream, None)
+        if handle is not None:
+            try:
+                handle.close()
+            except (OSError, ValueError):
+                pass
+
     def _roll_locked(self, now):
         if not self.hourly:
             return
@@ -448,21 +456,26 @@ class SegmentStore:
             now = self.now_fn()
             self._roll_locked(now)
             jobs = self._take_jobs_locked()
-            try:
-                stamp = now.astimezone().isoformat(timespec="milliseconds")
-                for stream, text in items:
+            stamp = now.astimezone().isoformat(timespec="milliseconds")
+            for stream, text in items:
+                # TASK-3006: one item at a time. A failed write closes and drops that stream's handle, so the next
+                # write reopens the file; before, the broken handle stayed cached and every later write of the
+                # stream failed (will_85903, run folder on a NAS share: 10,000+ errors, streams silent for 29 h).
+                try:
                     handle = self._handle_locked(stream)
                     handle.write(text)
                     handle.flush()
-                    if self.hourly:
-                        stat = self._stat_locked(stream)
-                        stat["lines"] += text.count("\n")
-                        stat["bytes"] += len(text.encode("utf-8", "replace"))
-                        stat["first"] = stat["first"] or stamp
-                        stat["last"] = stamp
-            except (OSError, ValueError) as exc:
-                ok = False
-                self._write_failed(exc)
+                except (OSError, ValueError) as exc:
+                    ok = False
+                    self._write_failed(exc)
+                    self._drop_handle_locked(stream)
+                    continue
+                if self.hourly:
+                    stat = self._stat_locked(stream)
+                    stat["lines"] += text.count("\n")
+                    stat["bytes"] += len(text.encode("utf-8", "replace"))
+                    stat["first"] = stat["first"] or stamp
+                    stat["last"] = stamp
         if jobs:
             self._dispatch(jobs)
         return ok
@@ -650,9 +663,13 @@ class StreamWriter:
     def __init__(self, store, stream):
         self.store = store
         self.stream = stream
+        self.failed = 0     # TASK-3006: writes the store could not complete
 
     def write(self, text):
-        self.store.write(self.stream, text)
+        ok = self.store.write(self.stream, text)
+        if not ok:
+            self.failed += 1
+        return ok
 
     def flush(self):
         pass
@@ -1311,6 +1328,7 @@ class MqttCapture:
         self.log = None
         self.err = None
         self.messages = 0
+        self.written = 0            # TASK-3006: messages that reached mqtt.log
         self.connected_once = False
         self.gap_start = None
         self.gap_reason = None
@@ -1378,17 +1396,19 @@ class MqttCapture:
         if self.keep is not None and not self.keep(topic):
             self.dropped += 1
             return
-        self.messages += 1
+        self.messages += 1                          # received
         try:
             payload = payload_bytes.decode("utf-8", "replace")
             if self.cap.store.hourly:
                 payload = payload.replace("\r", "\\r").replace("\n", "\\n")
                 stamp = datetime.now().astimezone().isoformat(timespec="milliseconds")
-                self.log.write(f"{stamp}\t{int(bool(retain))}\t{topic}\t{payload}\n")
+                ok = self.log.write(f"{stamp}\t{int(bool(retain))}\t{topic}\t{payload}\n")
             else:
-                self.log.write(f"{topic} {payload}\n")
+                ok = self.log.write(f"{topic} {payload}\n")
         except Exception:
-            pass
+            ok = False
+        if ok:
+            self.written += 1                        # TASK-3006: only what reached mqtt.log
 
     def stop(self):
         if self.client is not None:
@@ -1407,7 +1427,11 @@ class MqttCapture:
             pass
         if self.gap_start is not None:
             self.cap.summary(f"MQTT gap still open at stop: since {self.gap_start.isoformat(timespec='seconds')} ({self.gap_reason})")
-        self.cap.summary(f"MQTT capture: {self.messages} message(s) written to mqtt.log."
+        # TASK-3006: received and written are reported apart; will_85903's summary said 143483 "written" while the
+        # store had failed on every write for hours.
+        lost = self.messages - self.written
+        self.cap.summary(f"MQTT capture: {self.messages} message(s) received, {self.written} written to mqtt.log."
+                         + (f" WARNING: {lost} message(s) NOT written (write errors, see TOOL ERRORS)." if lost > 0 else "")
                          + (f" {self.dropped} message(s) of other devices on the broker not recorded."
                             if self.keep is not None else ""))
 
@@ -2165,7 +2189,8 @@ class FrameLogWriter:
     firmware replay reads). Both are LF-terminated on every platform."""
 
     def __init__(self, frames_path, sim_path, store=None):
-        self.count = 0
+        self.count = 0          # frames written (TASK-3006: a failed write is not counted)
+        self.received = 0       # frames handed to write()
         self._lock = threading.Lock()
         self._store = store
         if store is not None:   # TASK-1523: both files follow the store's hour segments
@@ -2179,13 +2204,16 @@ class FrameLogWriter:
     def write(self, host_time, device_time, letter, frame):
         host = host_time.astimezone().isoformat(timespec="milliseconds")
         with self._lock:
+            self.received += 1
             if self._store is not None:
-                self._store.write_many(((FRAMES_LOG, f"{host}\t{device_time}\t{letter}\t{frame}\n"),
-                                        (SIM_LOG, f"{letter}{frame}\n")))
+                ok = self._store.write_many(((FRAMES_LOG, f"{host}\t{device_time}\t{letter}\t{frame}\n"),
+                                             (SIM_LOG, f"{letter}{frame}\n")))
             else:
                 self._frames.write(f"{host}\t{device_time}\t{letter}\t{frame}\n")
                 self._sim.write(f"{letter}{frame}\n")
-            self.count += 1
+                ok = True
+            if ok:
+                self.count += 1
 
     def comment(self, text):
         with self._lock:
@@ -2271,9 +2299,11 @@ class FrameCapture(threading.Thread):
         finally:
             if gap_start is not None:
                 self.writer.comment(f"GAP still open at stop: start={gap_start.isoformat(timespec='seconds')} reason={gap_reason}")
-            count = self.writer.count
+            count, received = self.writer.count, self.writer.received
             self.writer.close()
-            self.cap.summary(f"{result} {count} frame(s) -> {FRAMES_LOG}, {SIM_LOG}")
+            self.cap.summary(f"{result} {count} frame(s) -> {FRAMES_LOG}, {SIM_LOG}"
+                             + (f" WARNING: {received - count} of {received} received frame(s) NOT written "
+                                f"(write errors, see TOOL ERRORS)." if received > count else ""))
 
     def _close_gap(self, start, reason):
         end = datetime.now().astimezone()
