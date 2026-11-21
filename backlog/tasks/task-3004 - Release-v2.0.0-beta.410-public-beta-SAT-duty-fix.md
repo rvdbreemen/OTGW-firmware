@@ -4,6 +4,7 @@ title: 'Release v2.0.0-beta.410 (public beta: SAT duty fix)'
 status: To Do
 assignee: []
 created_date: '2026-11-21T12:54:00Z'
+updated_date: '2026-11-21T14:17:00Z'
 labels:
   - release
 milestone: 2.0.0
@@ -24,3 +25,9 @@ Public 2.x beta on Robert's order (#alpha-testing 1573682252607397969: Publish b
 - [ ] #3 Tag + GitHub prerelease with verified assets (SHA256)
 - [ ] #4 #alpha-testing note and #beta-testing post
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-21 (92): #beta-testing announcement of v2.0.0-beta.410 posted in 2 parts: 1573703875834286180 (1415 chars) and 1573703884793446487 (1038 chars), both read back equal; test-run line from the coordinator verbatim. Q-342b to Sergeant D followed (1573703896008892611 / 1573703904909328416).
+<!-- SECTION:NOTES:END -->
