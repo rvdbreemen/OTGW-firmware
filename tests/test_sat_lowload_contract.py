@@ -307,6 +307,11 @@ def delegated_results(module, cls, names):
             # the private SAT decision register (submodule docs/sat/decisions) is absent on public CI
             if "docs/sat/decisions submodule not checked out" in why:
                 continue
+            # TASK-3020: the thermo-nova reference folder is gone on purpose (ADR-292, TASK-3013: Alex Wijn's SAT is a
+            # reference, other-projects holds SAT-develop); until the parity tests are pointed at SAT-develop, their
+            # "not checked out" skip counts as a skip here, not as a failure.
+            if "SAT-releases-thermo-nova is not checked out" in why:
+                continue
             out[tname(t)] = (False, "skipped: %s" % why)
         for t, _ in res.expectedFailures:
             out[tname(t)] = (False, "expectedFailure in the delegated suite")

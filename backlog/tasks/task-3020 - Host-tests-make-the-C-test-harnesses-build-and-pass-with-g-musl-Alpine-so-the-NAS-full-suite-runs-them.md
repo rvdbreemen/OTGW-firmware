@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-21T18:10:00Z'
-updated_date: '2026-11-21T20:45:00Z'
+updated_date: '2026-11-21T20:53:00Z'
 labels:
   - tests
 milestone: 2.0.0
@@ -41,4 +41,6 @@ Correction to the note above: test_sat_lowload_contract was NOT OK on MSVC in th
 2026-11-21 batch 3 (lane-5e-gxx): the 30 MSVC-only test/host harnesses build through host_cxx_build() (sonnet subagent; per file one or more compiles converted, same sources/includes/defines, same failure messages and exit codes; /Od and /W4 dropped, /utf-8 and _CRT_SECURE_NO_WARNINGS now on every MSVC build); 8 test/host .cpp got the strlcpy rename, 2 the strcasecmp mapping; test_dhw_water_meter keeps its cached vcvars path on Windows and uses host_cxx_build elsewhere (my own first edit wrote a backspace byte for \b in its CASE regex; caught by a byte scan, fixed). scripts/run_tests.py (coordinator OK): test/host runs on a non-Windows host with --host-gxx or OTGW_HOST_GXX=1 (default stays off there until the NAS run is green; Windows unchanged: 35 test/host files listed). MSVC single files: all 30 + test_dhw_water_meter pass. Finding, not fixed (pre-existing on origin/dev, could turn the tests red): test/host/test_diag_recording_routes.py:69 and test/host/test_reboot_log_reset_raw.py:126 contain a backspace byte where a regex \b was meant, so those checks are weaker than written; separate task worth considering.
 
 2026-11-21 NAS run of batch 1b (09, d802486cd, full shallow clone + submodules, image b; OTGW-field-data/bench-nas/2026-11-21_suite-gxx-d802486/): 323 files, 317 passed, 4 failed, 1 timeout (was 12; git-history and otgw-6.8 tests pass from the clone). Batch 1c: tests/sat_loop_build.py g++ build gets -fpermissive (the assembled unit declares satPublishDeferred/mqttConnectPaceHold/localtime_r extern and defines static stubs; MSVC accepts that, g++ only permissive) for loop_integration, pwm_first_start, thermal_learning_gate; test_sat_curve_selftune compile_cpp builds with -O2 under g++ (test_sat_tuner_convergence passed the 900 s timeout unoptimised on the NAS). Not g++: LL-021 of test_sat_lowload_contract fails on any fresh clone because the other-projects gitlink on dev (2b01ba65) has no SAT-releases-thermo-nova (only SAT-develop); test_sat_classifier_parity skips then and lowload counts the skip as a failure: repo/submodule question for the coordinator.
+
+2026-11-21 coordinator (Robert removed SAT-releases-thermo-nova on purpose, ADR-292/TASK-3013; parity tests get repointed at SAT-develop later): option 2: test_sat_lowload_contract.delegated_results() counts the parity classes' 'SAT-releases-thermo-nova is not checked out' skip as a skip, not a failure, with a comment pointing to ADR-292/TASK-3013. Laptop worktree without the folder: lowload OK (skipped=1), LL-021 reported as pass (its other delegated suite, test_sat_cycle_classifier, runs). Note: LL-021 then rests on the cycle classifier alone until the repoint.
 <!-- SECTION:NOTES:END -->
