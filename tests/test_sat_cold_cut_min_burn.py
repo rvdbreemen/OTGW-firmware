@@ -41,6 +41,7 @@ static uint8_t satGetManufacturerQuirks() { return 0; }
 #define SAT_MM_T 255
 #endif
 static uint8_t satReportedModulation(bool atMax, uint8_t mm) { return atMax ? 100 : mm; }
+#define strlcpy otgw_test_strlcpy
 static size_t strlcpy(char* d, const char* s, size_t n) { snprintf(d, n, "%s", s); return strlen(s); }
 #define snprintf_P snprintf
 """

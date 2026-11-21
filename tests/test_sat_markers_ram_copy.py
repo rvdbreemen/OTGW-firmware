@@ -66,6 +66,7 @@ template <typename T> static T atomicExchangeStub(T* p, T v) { T o = *p; *p = v;
 #define __ATOMIC_RELEASE 0
 #define __ATOMIC_ACQ_REL 0
 #endif
+#define strlcpy otgw_test_strlcpy
 static size_t strlcpy(char* d, const char* s, size_t n) { size_t l = strlen(s); if (n) { size_t c = l < n - 1 ? l : n - 1; memcpy(d, s, c); d[c] = 0; } return l; }
 #define strlcpy_P strlcpy
 static uint32_t g_ms = 100000;

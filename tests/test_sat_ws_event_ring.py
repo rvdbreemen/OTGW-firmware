@@ -86,6 +86,7 @@ static std::mutex g_mu;
 #define portMUX_INITIALIZER_UNLOCKED 0
 #define portENTER_CRITICAL(x) g_mu.lock()
 #define portEXIT_CRITICAL(x) g_mu.unlock()
+#define strlcpy otgw_test_strlcpy
 static size_t strlcpy(char *d, const char *s, size_t n){ size_t l=strlen(s); if(n){size_t c=l>=n?n-1:l; memcpy(d,s,c); d[c]=0;} return l; }
 #include "ring.inc"
 static int fails = 0;

@@ -51,6 +51,7 @@ static uint32_t millis() { return g_ms; }
 #define F(s) (s)
 #define PGM_P const char *
 #define snprintf_P snprintf
+#define strlcpy otgw_test_strlcpy
 static size_t strlcpy(char *d, const char *s, size_t n) {
   size_t l = strlen(s);
   if (n) { size_t c = l < n - 1 ? l : n - 1; memcpy(d, s, c); d[c] = 0; }

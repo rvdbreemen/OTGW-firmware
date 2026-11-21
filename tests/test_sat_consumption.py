@@ -46,6 +46,8 @@ STUBS = r"""
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <cmath>
+using std::isnan; using std::isfinite; using std::isinf;
 struct __FlashStringHelper;
 #define F(s) (reinterpret_cast<const __FlashStringHelper*>(s))
 struct SatSettings { float fMinConsumption = 0, fMaxConsumption = 0; bool bSimulation = false; };

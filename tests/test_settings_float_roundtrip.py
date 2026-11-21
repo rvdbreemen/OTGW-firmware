@@ -50,6 +50,7 @@ HARNESS = r"""
 #include <cstring>
 #include <cctype>
 #include <cmath>
+using std::isnan; using std::isfinite; using std::isinf;
 #include <cstdarg>
 #include <string>
 struct __FlashStringHelper;

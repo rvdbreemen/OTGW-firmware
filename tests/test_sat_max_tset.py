@@ -47,6 +47,7 @@ STUBS = r"""
 #include <cstdlib>
 #include <cstring>
 #include <cmath>
+using std::isnan; using std::isfinite; using std::isinf;
 #include <vector>
 #include <string>
 #define F(x) x

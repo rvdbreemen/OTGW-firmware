@@ -14,6 +14,7 @@ Checks, on the real files:
 Red on the code before TASK-1955 (no settingsHelpGz.h). Run: python tests/test_progmem_assets_deflated.py
 """
 import gzip
+import zlib
 import json
 import re
 import sys
@@ -47,9 +48,25 @@ class SettingsHelpGzipped(unittest.TestCase):
         self.assertLess(len(gz), len(body) // 2, "the help is not really compressed")
 
     def test_2_committed_headers_match_the_generator(self):
+        # TASK-3020: compare what the arrays hold, not the deflate bytes: those depend on the zlib build (Windows
+        # Python bundles its own, python:3.12-alpine uses the system one), the content does not.
         import webui_pages
+
+        def unpacked(header):
+            names = re.findall(r"static const uint8_t (\w+)\[\] PROGMEM", header)
+            out = {}
+            for nm in names:
+                data = array_bytes(header, nm)
+                out[nm] = gzip.decompress(data) if data[:2] == b"\x1f\x8b" else zlib.decompress(data)   # a zlib stream with header (webui_pages: zlib.compress)
+            return out
+
+        def shape(header):   # everything except the byte values and the size comments
+            return re.sub(r"0x[0-9a-f]{2},?|\d+ bytes", "", header)
+
         for name, want in webui_pages.asset_headers(REPO).items():
-            self.assertEqual(text(FW / name), want, name + " is stale: run the build (or webui_pages.write_asset_headers)")
+            have = text(FW / name)
+            self.assertEqual(unpacked(have), unpacked(want), name + " is stale: run the build (or webui_pages.write_asset_headers)")
+            self.assertEqual(shape(have), shape(want), name + ": the header layout differs from the generator")
 
     def test_3_route_sends_the_gzip_array(self):
         fs = text(FW / "FSexplorer.ino")

@@ -38,6 +38,7 @@ HARNESS = r"""
 #include <cstdio>
 #include <cstring>
 #include <cmath>
+using std::isnan; using std::isfinite; using std::isinf;
 #include <cstdlib>
 #define PSTR(s) (s)
 #define F(s) (s)

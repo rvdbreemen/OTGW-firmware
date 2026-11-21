@@ -38,6 +38,7 @@ STUBS = r"""
 #include <cstdlib>
 #include <cstring>
 #include <cmath>
+using std::isnan; using std::isfinite; using std::isinf;
 typedef long long time_t_;
 #define time_t time_t_
 #define F(x) x

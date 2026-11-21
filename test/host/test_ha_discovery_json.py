@@ -75,7 +75,7 @@ from collections import Counter, defaultdict
 from pathlib import Path
 
 from test_dhw_water_meter import construct, line, mutate, read, typedef_ending
-from test_ot_reserved_range import GEN, HERE, find_vcvars
+from test_ot_reserved_range import GEN, HERE, host_cxx_build
 
 try:
     import orjson    # Home Assistant's parser: json_loads_object() in homeassistant/util/json.py
@@ -223,18 +223,16 @@ def build_and_run(label, out_dir, rev=None):
     exe = out_dir / "test_ha_discovery_json.exe"
     if exe.exists():
         exe.unlink()
-    bat = out_dir / "_compile.bat"
-    fwd = str(out_dir).replace("\\", "/")
-    bat.write_text("@echo off\r\n"
-                   f'call "{find_vcvars()}" >nul 2>nul\r\n'
-                   "cl /nologo /EHsc /W3 /std:c++17 /utf-8 /D_CRT_SECURE_NO_WARNINGS /DBOARD_NODOSHOP_ESP32_COMBO "
-                   + ("/DHAS_THERMOSTAT_DUP_CLEAR " if DUP_CLEAR in entry_points(rev) else "")
-                   + ("/DHAS_DRIP_STEP " if has_drip_step(read(MQTT_INO, rev).splitlines()) else "") +
-                   f'/Fo:"{fwd}/" /Fe:"{exe}" "{HERE / CPP}" "{out_dir / "MQTTHaDiscovery.cpp"}" '
-                   f'/I"{out_dir}" /I"{SHIM}"\r\n', encoding="ascii", newline="")
-    c = subprocess.run(["cmd.exe", "/c", str(bat)], capture_output=True, text=True, errors="replace")
-    if c.returncode != 0 or not exe.exists():
-        print(c.stdout[-6000:], c.stderr[-2000:])
+    # TASK-3020: MSVC on Windows, g++/clang++ elsewhere (the NAS suite)
+    defines = ["BOARD_NODOSHOP_ESP32_COMBO"]
+    if DUP_CLEAR in entry_points(rev):
+        defines.append("HAS_THERMOSTAT_DUP_CLEAR")
+    if has_drip_step(read(MQTT_INO, rev).splitlines()):
+        defines.append("HAS_DRIP_STEP")
+    ok, out = host_cxx_build([HERE / CPP, out_dir / "MQTTHaDiscovery.cpp"], exe, includes=[out_dir, SHIM],
+                             defines=defines, workdir=out_dir)
+    if not ok:
+        print(out[-8000:])
         print(f"COMPILATION FAILED ({label})")
         sys.exit(2)
     r = subprocess.run([str(exe)], capture_output=True, text=True, errors="replace")

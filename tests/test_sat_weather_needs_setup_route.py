@@ -40,6 +40,7 @@ class NeedsSetupRoute(unittest.TestCase):
                "#include <cstdio>\n#include <cstring>\n#define strcasecmp _stricmp\n#define strtok_r strtok_s\n")
         src += ("#define PSTR(s) s\n#define strcasecmp_P strcasecmp\n#define API_WORD_LEN 32\n"
                 f"#define API_MAX_WORDS {mw.group(1) if mw else 8}\n"
+                "#define strlcpy otgw_test_strlcpy\n"
                 "static size_t strlcpy(char* d, const char* s, size_t n){ size_t l=strlen(s); if(n){ size_t c=l<n-1?l:n-1; memcpy(d,s,c); d[c]=0;} return l; }\n"
                 "static bool hit(const char* path, int* wcOut) {\n"
                 "  char URI[64]; strlcpy(URI, path, sizeof(URI)); char words[API_MAX_WORDS][API_WORD_LEN] = {{0}};\n"

@@ -39,6 +39,8 @@ PRE = r"""
 #include <cstdint>
 #include <cstdio>
 #include <cstring>
+#include <cmath>
+using std::isnan; using std::isfinite; using std::isinf;
 #define F(s) (s)
 #define SATDebugTln(s) ((void)0)
 struct { struct { bool bSimulation = false; } sat; } settings;

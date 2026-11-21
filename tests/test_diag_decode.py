@@ -29,24 +29,15 @@ HEADER_DIR = REPO / "src" / "OTGW-firmware"
 
 
 def build_generator(out_dir):
-    """Compile the generator with MSVC; None when no MSVC is installed."""
-    try:
-        from test_ot_reserved_range import find_vcvars
-        vcvars = find_vcvars()
-    except Exception:
-        return None
-    if not vcvars:
-        return None
+    """Compile the generator with MSVC (Windows) or g++/clang++ (TASK-3020); None when no compiler is installed."""
+    from test_ot_reserved_range import host_cxx_build
     exe = out_dir / "diag_fixture_gen.exe"
-    bat = out_dir / "_compile.bat"
-    fwd = str(out_dir).replace("\\", "/")
-    bat.write_text("@echo off\r\n"
-                   f"call \"{vcvars}\" >nul 2>nul\r\n"
-                   f"cl /nologo /EHsc /W3 /std:c++17 /utf-8 /D_CRT_SECURE_NO_WARNINGS "
-                   f"/Fo:\"{fwd}/\" /Fe:\"{exe}\" \"{GEN_SRC}\" /I\"{HEADER_DIR}\"\r\n", encoding="ascii")
-    c = subprocess.run(["cmd.exe", "/c", str(bat)], capture_output=True, text=True, errors="replace")
-    if c.returncode != 0 or not exe.exists():
-        raise AssertionError("generator did not compile:\n" + c.stdout[-3000:] + c.stderr[-1000:])
+    try:
+        ok, out = host_cxx_build([GEN_SRC], exe, includes=[HEADER_DIR], workdir=out_dir)
+    except SystemExit:          # no compiler at all (find_vcvars / host_cxx_build raise SystemExit)
+        return None
+    if not ok:
+        raise AssertionError("generator did not compile:\n" + out[-4000:])
     return exe
 
 

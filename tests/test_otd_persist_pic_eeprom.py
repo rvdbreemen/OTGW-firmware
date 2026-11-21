@@ -71,6 +71,7 @@ PRE = r"""
 static bool otdOutsideSet = false; static uint16_t otdOutsideF88 = 0;   // TASK-1803 relay state (tests/test_otd_relay_rw.py)
 static bool otdInitSW = false, otdInitSH = false; static uint16_t otdDhwSetF88 = 0, otdMaxChSetF88 = 0;
 static bool otdBoilerAllowsWrite(uint8_t) { return false; }
+#define strlcpy otgw_test_strlcpy
 static size_t strlcpy(char* d, const char* s, size_t n) { size_t l = strlen(s); if (n) { size_t c = l < n - 1 ? l : n - 1; memcpy(d, s, c); d[c] = 0; } return l; }
 static char* dtostrf(double v, int w, int p, char* out) { sprintf(out, "%*.*f", w, p, v); return out; }
 @SETTINGS_STRUCT@

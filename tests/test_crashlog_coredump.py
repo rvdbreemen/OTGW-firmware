@@ -43,6 +43,7 @@ STUBS = r"""
 #define PSTR(s) (s)
 #define strncmp_P strncmp
 #define snprintf_P snprintf
+#define strlcpy otgw_test_strlcpy
 static size_t strlcpy(char *d, const char *s, size_t n) {
   size_t l = strlen(s);
   if (n) { size_t c = l < n - 1 ? l : n - 1; memcpy(d, s, c); d[c] = 0; }

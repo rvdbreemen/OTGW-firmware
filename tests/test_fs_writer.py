@@ -40,6 +40,7 @@ STUBS = r"""
 #include <string>
 #include <vector>
 #define PSTR(s) s
+#define strlcpy otgw_test_strlcpy
 static size_t strlcpy(char* d, const char* s, size_t n) { snprintf(d, n, "%s", s); return strlen(s); }
 static uint32_t g_ms = 1000;
 static uint32_t millis() { return g_ms; }

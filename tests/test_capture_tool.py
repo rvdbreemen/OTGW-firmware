@@ -170,6 +170,13 @@ class FakeDevice:
         for c in conns:
             try:
                 c.setsockopt(socket.SOL_SOCKET, socket.SO_LINGER, struct.pack("ii", 1, 0))
+                # TASK-3020: on Linux a close() while the handler thread blocks in recv() on this socket sends
+                # nothing (the in-flight recv keeps it alive), so the tool never saw the reset; shutdown() first
+                # wakes that thread and ends the connection on every platform.
+                try:
+                    c.shutdown(socket.SHUT_RDWR)
+                except OSError:
+                    pass
                 c.close()
             except OSError:
                 pass

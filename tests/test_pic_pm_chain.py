@@ -82,6 +82,7 @@ struct State { PicState pic; };
 static State state;
 #define CCONOFF(b) ((b) ? "ON" : "OFF")
 static void sendMQTTData(const char*, const char*, bool) {}
+#define strlcpy otgw_test_strlcpy
 static size_t strlcpy(char* d, const char* s, size_t n) { size_t l = strlen(s); if (n) { size_t c = l < n - 1 ? l : n - 1; memcpy(d, s, c); d[c] = 0; } return l; }
 static char g_sent[512];
 static bool g_simBlock = false;   // TASK-1580: the bench simulation refuses PR= (satSimulationBlocksBusTx)

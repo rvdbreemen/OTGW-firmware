@@ -36,6 +36,7 @@ STUBS = r"""
 #include <cstdlib>
 #include <cstring>
 #include <cmath>
+using std::isnan; using std::isfinite; using std::isinf;
 #define F(x) x
 #define SATDebugTln(x) ((void)0)
 struct SatSettings { bool bSolarGainEnable = true; float fSolarMinRiseRate = 0.6f; float fSolarMinElevation = 12.0f; };

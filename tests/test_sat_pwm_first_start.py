@@ -86,7 +86,7 @@ def build(name="base", edits=None):
             src = src.replace(old, new)
         ov[f] = src
     d = Path(_TMP.name) / name
-    d.mkdir()
+    d.mkdir(exist_ok=True)   # TASK-3020: a failed or skipped first build leaves the directory
     (d / "t.cpp").write_text(B.assemble(driver=patched_driver(), overrides=ov), encoding="utf-8")
     rc, out = B.cl_compile(d / "t.cpp", d / "t.exe")
     if rc is None:

@@ -47,6 +47,8 @@ static void MQTTDebugln(const char*) {}
 static void MQTTDebugTln(const char*) {}
 static void Debugln(const char*) {}
 static void DebugTln(const char*) {}
+#define strlcpy otgw_test_strlcpy
+#define strlcat otgw_test_strlcat
 static size_t strlcpy(char* d, const char* s, size_t n) { size_t l = strlen(s); if (n) { size_t c = l < n - 1 ? l : n - 1; memcpy(d, s, c); d[c] = 0; } return l; }
 static size_t strlcat(char* d, const char* s, size_t n) { size_t l = strlen(d); return l + strlcpy(d + l, s, n > l ? n - l : 0); }
 #define MQTT_TOPIC_MAX_LEN 128

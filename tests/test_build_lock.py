@@ -47,12 +47,21 @@ class BuildLock(unittest.TestCase):
         self.tmp = tempfile.TemporaryDirectory()
         self.lock = Path(self.tmp.name) / "build.lock"
 
+    def wait_for_lock(self, timeout=20.0):
+        # TASK-3020: a fixed 0.8 s was too short on the NAS (python:3.12-alpine): the second child got the lock
+        # before the first one had taken it. Wait until the first one really holds it.
+        end = time.time() + timeout
+        while not self.lock.exists():
+            self.assertLess(time.time(), end, "the first build never took the lock")
+            time.sleep(0.05)
+        time.sleep(0.2)
+
     def tearDown(self):
         self.tmp.cleanup()
 
     def test_second_build_waits_for_the_first(self):
         a = run_child(self.lock, 5, 2.0)
-        time.sleep(0.8)                       # a holds the lock
+        self.wait_for_lock()                  # a holds the lock
         b = run_child(self.lock, 5, 0.1)
         oa, _ = a.communicate(timeout=30)
         ob, _ = b.communicate(timeout=30)
@@ -65,7 +74,7 @@ class BuildLock(unittest.TestCase):
 
     def test_wait_zero_refuses_and_names_the_holder(self):
         a = run_child(self.lock, 5, 2.0)
-        time.sleep(0.8)
+        self.wait_for_lock()
         b = run_child(self.lock, 0, 0.1)
         ob, _ = b.communicate(timeout=30)
         a.communicate(timeout=30)

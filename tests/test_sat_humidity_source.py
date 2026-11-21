@@ -45,6 +45,7 @@ STUBS = r"""
 #include <cstdlib>
 #include <cstring>
 #include <cmath>
+using std::isnan; using std::isfinite; using std::isinf;
 #define F(x) x
 #define PSTR(x) x
 #define SATTraceTf(...) ((void)0)

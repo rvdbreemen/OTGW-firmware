@@ -47,7 +47,7 @@ def exe():
     if "x" in _EXE:
         return _EXE["x"]
     d = Path(_TMP.name) / "gate"
-    d.mkdir()
+    d.mkdir(exist_ok=True)   # TASK-3020: a failed or skipped first build leaves the directory
     old = os.environ.get("OTGW_SATCONTROL_INO")   # another SATcontrol.ino for old-vs-fix
     overrides = {"SATcontrol.ino": Path(old).read_text(encoding="utf-8")} if old else None
     (d / "t.cpp").write_text(B.assemble(driver=driver_with_coeff(), overrides=overrides), encoding="utf-8")

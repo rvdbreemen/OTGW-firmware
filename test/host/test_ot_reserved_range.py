@@ -13,7 +13,9 @@ Tools, located with vswhere like test/host/build_and_run.ps1.
 Exit code: 0 PASS, 1 FAIL (mismatch against OT spec v4.2), 2 harness error.
 """
 import argparse
+import os
 import re
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -73,6 +75,31 @@ def find_vcvars():
     if not vcvars.exists():
         raise SystemExit(f"vcvars64.bat not found under {root}")
     return vcvars
+
+
+def host_cxx_build(sources, exe, includes=(), defines=(), workdir=None):
+    """TASK-3020: build a C++17 host test with MSVC cl (Windows, via vcvars) or g++/clang++ elsewhere (the NAS runs
+    the suite in python:3.12-alpine + g++). Returns (ok, output). `defines` are NAME or NAME=VALUE strings."""
+    exe = Path(exe)
+    sources = [str(s) for s in sources]
+    if os.name == "nt":
+        workdir = Path(workdir or exe.parent)
+        fwd = str(workdir).replace("\\", "/")
+        bat = workdir / "_compile_host.bat"
+        bat.write_text("@echo off\r\n"
+                       f'call "{find_vcvars()}" >nul 2>nul\r\n'
+                       "cl /nologo /EHsc /W3 /std:c++17 /utf-8 /D_CRT_SECURE_NO_WARNINGS "
+                       + "".join(f"/D{d} " for d in defines)
+                       + f'/Fo:"{fwd}/" /Fe:"{exe}" ' + " ".join(f'"{s}"' for s in sources) + " "
+                       + " ".join(f'/I"{i}"' for i in includes) + "\r\n", encoding="ascii", newline="")
+        c = subprocess.run(["cmd.exe", "/c", str(bat)], capture_output=True, text=True, errors="replace")
+        return c.returncode == 0 and exe.exists(), c.stdout + c.stderr
+    for cc in ("g++", "clang++"):
+        if shutil.which(cc):
+            c = subprocess.run([cc, "-std=c++17", "-o", str(exe), *sources, *(f"-I{i}" for i in includes),
+                                *(f"-D{d}" for d in defines)], capture_output=True, text=True, errors="replace")
+            return c.returncode == 0 and exe.exists(), c.stdout + c.stderr
+    raise SystemExit("no C++ compiler: MSVC (Windows) or g++/clang++ required")
 
 
 def main():

@@ -50,6 +50,7 @@ PRELUDE = r"""
 #include <cstdlib>
 #include <cstring>
 #include <cmath>
+using std::isnan; using std::isfinite; using std::isinf;
 #include <cstdarg>
 #include <ctime>
 #define F(x) x

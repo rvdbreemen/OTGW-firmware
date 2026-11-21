@@ -25,11 +25,27 @@ def vcvars():
 def cl_compile(cpp: Path, exe: Path, extra=""):
     bat = vcvars()
     if not bat:
-        return None, "no MSVC"
+        return gxx_compile(cpp, exe, extra)
     incs = " ".join(f'/I"{p}"' for p in (HERE / "sat_loop_stubs", FW, PLAT, REPO / "src" / "libraries" / "OpenTherm"))
     cmd = (f'call "{bat}" >nul && cl /nologo /std:c++17 /EHsc /utf-8 /Zc:__cplusplus /permissive- /wd4244 /wd4267 /wd4305 /wd4018 /wd4838 /wd4101 /wd4189 /wd4996 /wd4068 '
            f'/DBOARD_NODOSHOP_ESP32_COMBO /DESP32 {incs} {extra} /Fe:"{exe}" /Fo:"{cpp.parent}\\\\" "{cpp}"')
     r = subprocess.run(cmd, shell=True, cwd=cpp.parent, capture_output=True, text=True)
+    return r.returncode, r.stdout + r.stderr
+
+
+def gxx_compile(cpp: Path, exe: Path, extra=""):
+    """TASK-3020: the same build with g++/clang++ where there is no MSVC (the NAS suite in python:3.12-alpine + g++).
+    `extra` holds MSVC-style /D... and /I"..." options; they are translated. (None, why) when there is no compiler."""
+    import shutil
+    cc = shutil.which("g++") or shutil.which("clang++")
+    if not cc:
+        return None, "no MSVC and no g++/clang++"
+    args = [cc, "-std=c++17", "-w", "-DBOARD_NODOSHOP_ESP32_COMBO", "-DESP32"]
+    args += [f"-I{p}" for p in (HERE / "sat_loop_stubs", FW, PLAT, REPO / "src" / "libraries" / "OpenTherm")]
+    for opt in re.findall(r'/([DI])("[^"]*"|\S+)', extra or ""):
+        args.append(f"-{opt[0]}{opt[1].strip(chr(34))}")
+    args += ["-o", str(exe), str(cpp)]
+    r = subprocess.run(args, cwd=cpp.parent, capture_output=True, text=True)
     return r.returncode, r.stdout + r.stderr
 
 
