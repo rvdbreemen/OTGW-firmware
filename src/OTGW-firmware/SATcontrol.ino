@@ -1227,14 +1227,19 @@ void satGetBoilerStatusName(char* buf, size_t bufLen)
 //=====================================================================
 // PWM state tracking for effective temperature and flame timing
 static float    _pwm_effectiveBoilerTemp    = 0.0f;
+static float    _pwm_lastOnFlowTemp         = 0.0f;  // TASK-2993 (entry 444): the flow the duty used on the last ON-phase tick; 0 = none yet
 static uint32_t _pwm_flameOnMs             = 0;
 static bool     _pwm_waitingForFlame       = false;
 static float    _pwm_flameOffHoldSetpoint  = 0.0f;
 static uint32_t _pwm_lastOffTimeMs         = 1;    // Last PWM off-phase duration (ms); 0 = saturation (duty wants continuous ON). Read by the off_time==0 saturation guard.
-static bool     _pwm_atMaxDuty             = false; // TASK-1581: the last schedule pass was duty range 5 (the maximum duty); read by satPwmAtMaxDuty()
+static bool     _pwm_atMaxDuty             = false; // TASK-1581: the last schedule pass was duty range 5 (the maximum duty); read by satPwmInMaxDutyRange()
+static bool     _pwm_mmRelease             = false; // TASK-2992 (entries 436/440): range 5 with the raw duty above 1.03; read by satPwmAtMaxDuty() (MM=T)
 static bool     _pwm_idle                  = true; // thermo-nova PWMStatus.IDLE: no ON/OFF phase since the last reset (pwm.py:92, :122-128, :179-180). Read by the cycle classifier (classifier.py:28-29, TASK-1387).
-// TASK-1581: PWM mode with the duty in range 5 (the maximum): SAT sends MM=T instead of its own MM= (entries 242, 243).
-static bool satPwmAtMaxDuty() { return state.sat.eControlMode == SAT_MODE_PWM && _pwm_atMaxDuty; }
+// TASK-1581: PWM mode with the duty in range 5 (the maximum): SAT sends MM=T instead of its own MM= (entries 242, 243);
+// TASK-2992 (entries 436/440): only while the raw duty is above SAT_PWM_MM_RELEASE_DUTY (1.03).
+static bool satPwmAtMaxDuty() { return state.sat.eControlMode == SAT_MODE_PWM && _pwm_mmRelease; }
+// PWM mode with the duty in range 5 (continuous ON, off time 0), whatever the MM release: the diagnostics' "at the maximum".
+static bool satPwmInMaxDutyRange() { return state.sat.eControlMode == SAT_MODE_PWM && _pwm_atMaxDuty; }
 static uint32_t _pwm_lastOnTimeMs          = 0;    // Last PWM on-phase duration (ms) = Python pwm_state.on_time_seconds. Read by the cycle classifier's SHORT_CYCLING threshold (TASK-891.4 AC#3).
 static bool     _pwm_entryPending          = false; // PWM was just entered (satSetControlMode): the first schedule step starts ON without the off wait, as thermo-nova from IDLE (pwm.py:154-155; entry 43, TASK-1369)
 static uint32_t _pwm_lastUpdateMs          = 0;    // thermo-nova _last_update: the one anchor of both phases. Set at reset (pwm.py:91), at OFF/IDLE->ON (:162), at the first ignition while waiting (:188) and at ON->OFF (:208); the ON time and the off wait count from it (:155, :205; entries 43, 80, 91, 92)
@@ -1279,6 +1284,18 @@ static bool     _sat_thermalSafeActive      = false; // The thermal safe fallbac
 // Python HEATER_STARTUP_TIMEFRAME 180 s (pwm.py const): the ignition wait at the start of an ON phase before the
 // ON timer runs anyway, the minimum flame-on hold, and the start-up EMA window. Nothing aborts the phase.
 static const uint32_t PWM_IGNITION_TIMEOUT_MS = 180000UL; // 180s ignition timeout
+// TASK-2993 (Sergeant D entry 437; the 30 s start-up filter per entry 438): the PWM duty uses the live flow temperature, except
+// for the first 30 s after the ignition of an ON phase, where the EMA 0.3/0.7 of the flow smooths the light-off (the flow can fall
+// several degrees within 30 s, indigo_light 19 Nov 21:23). thermo-nova filters for 180 s and then holds the value until the next
+// ON phase (pwm.py:144-149, 229-239); that held value pinned the duty at the maximum while the flow rose (indigo 21:27-21:33).
+static const uint32_t SAT_PWM_BT_FILTER_MS = 30000UL;
+// The control ticks run a few ms late or early against the ignition tick (bench .61: +30003 and +30023 ms), so the tick 30 s
+// after the ignition is inside the window only with this slack (TASK-2993, entry 443: the window includes that tick).
+static const uint32_t SAT_PWM_BT_FILTER_SLACK_MS = 1000UL;
+// TASK-2992 (Sergeant D entries 436/440): SAT hands the modulation back (MM=T, entries 242/243) only above this raw duty, not at
+// range 5 (dutyMax, 0.90 at 4 cycles/h). With the live-flow duty the value near 0.90 moves with every 0.3 C of flow; on
+// indigo_light 19 Nov it flipped MM=T on and off per tick at 0.86-0.94 (TASK-2993 replay).
+static const float SAT_PWM_MM_RELEASE_DUTY = 1.03f;
 
 // Flame-off hold setpoint of the PWM ON phase (thermo-nova flame_off_hold_setpoint): return
 // temperature + fFlameOffOffset, clamped to COLD_SETPOINT..max. The only place the flame-off
@@ -1609,8 +1626,8 @@ static void satPwmSchedule(float pidOutput)
   // --- Duty cycle, thermo-nova pwm.py:229-239: (setpoint - base) / (BT - base) ---
   // BT is the filtered boiler (flow) temperature, seeded from the live flow at the first flame
   // (pwm.py:130-131), at an ON start with the flame already burning (pwm.py:164-167) and at the
-  // first ignition of an ON phase (pwm.py:189-191), filtered for the start-up window after that
-  // flame-on (pwm.py:148-149) and then held until the next ON phase reseeds it. A relight inside
+  // first ignition of an ON phase (pwm.py:189-191) and filtered for the start-up window after that
+  // flame-on (pwm.py:148-149). TASK-2993 (entries 437, 444): after that window an ON-phase tick uses the live flow, an OFF-phase tick the flow of the last ON tick. A relight inside
   // the same ON phase keeps BT and does not reopen the window (pwm.py:145-146, 206). Before any
   // seed the live flow is used (pwm.py:232). The floor base + 1 exists only against a division by
   // zero or a negative value (pwm.py:235; Sergeant D, docs/sat/sergeant-d-corrections.md entry 1).
@@ -1637,15 +1654,24 @@ static void satPwmSchedule(float pidOutput)
   const bool wasIdle = _pwm_idle;
   _pwm_idle = false;
   _pwm_atMaxDuty = false;   // TASK-1581: set again in the range 5 branch below
+  _pwm_mmRelease = false;   // TASK-2992: idem
   // First step after PWM was entered (thermo-nova IDLE): it may start ON without the off wait (pwm.py:155).
   // Consumed here; only the hour-limit return below gives it back, as that return keeps IDLE (pwm.py:156-158).
   const bool entry = _pwm_entryPending;
   _pwm_entryPending = false;
   if (_pwm_effectiveBoilerTemp <= 0.0f && flame) _pwm_effectiveBoilerTemp = boilerTemp;
-  float effectiveTemp = (_pwm_effectiveBoilerTemp > 0.0f) ? _pwm_effectiveBoilerTemp : boilerTemp;
+  // TASK-2993 (entry 437): the live flow, or the start-up EMA inside the 30 s window after this ON phase's ignition.
+  const bool btFiltered = flame && !_pwm_waitingForFlame && !_pwm_dhwResumed && _pwm_flameOnMs != 0 &&
+                          (uint32_t)(millis() - _pwm_flameOnMs) <= SAT_PWM_BT_FILTER_MS + SAT_PWM_BT_FILTER_SLACK_MS && _pwm_effectiveBoilerTemp > 0.0f;
+  float effectiveTemp = btFiltered ? _pwm_effectiveBoilerTemp : boilerTemp;
+  // Entry 444 (Sergeant D, Q-438b B): the live flow counts only in the ON phase. In the OFF phase the duty uses the flow of the
+  // last ON tick with the current request, so a cooling flow does not shorten the pause. Before any ON tick the live flow is used.
+  if (state.sat.bPwmFlameRequested) _pwm_lastOnFlowTemp = effectiveTemp;
+  else if (_pwm_lastOnFlowTemp > 0.0f) effectiveTemp = _pwm_lastOnFlowTemp;
   if (effectiveTemp < baseOffset + 1.0f) effectiveTemp = baseOffset + 1.0f;
 
   float duty = (pidOutput - baseOffset) / (effectiveTemp - baseOffset);
+  const float dutyRaw = duty;   // TASK-2992 (entries 436/440): before the [0, 1] cap, for the MM=T release below
   if (duty < 0.0f) duty = 0.0f;
   if (duty > 1.0f) duty = 1.0f;
   state.sat.fPwmDutyCycle = duty;
@@ -1665,11 +1691,11 @@ static void satPwmSchedule(float pidOutput)
     _pwm_flameOnMs = millis();
   }
 
-  // --- Effective temperature: EMA 0.3/0.7 for HEATER_STARTUP_TIMEFRAME (180 s) after flame-on
-  // (pwm.py:148-149; Sergeant D confirmed 180 s on 2026-10-22). After the window the value is held.
+  // --- Effective temperature: EMA 0.3/0.7 for SAT_PWM_BT_FILTER_MS (30 s, entries 437/438; thermo-nova and entry 1 as resolved
+  // on 2026-10-22: 180 s, pwm.py:148-149) after flame-on. After the window the ON phase uses the live flow (above, entry 444).
   if (flame && !_pwm_waitingForFlame && !_pwm_dhwResumed && _pwm_flameOnMs != 0) {
     uint32_t sinceFlamOn = millis() - _pwm_flameOnMs;
-    if (sinceFlamOn < PWM_IGNITION_TIMEOUT_MS) {
+    if (sinceFlamOn <= SAT_PWM_BT_FILTER_MS + SAT_PWM_BT_FILTER_SLACK_MS) {   // <= as thermo-nova pwm.py:148: at the 30 s control tick the tick 30 s after the ignition is inside
       _pwm_effectiveBoilerTemp = 0.3f * boilerTemp + 0.7f * _pwm_effectiveBoilerTemp;
     }
   }
@@ -1696,7 +1722,11 @@ static void satPwmSchedule(float pidOutput)
   uint32_t onTimeMs, offTimeMs;
 
   if (duty >= dutyMax) {
-    _pwm_atMaxDuty = true;   // TASK-1581: MM=T while the duty stays here, whatever the phase (entry 242)
+    // TASK-1581 (entry 242): MM=T while the duty stays here, whatever the phase. TASK-2992 (Sergeant D entries 436/440): only
+    // when the raw duty is above 1.03, i.e. the request is clearly above what the flow delivers; range 5 itself (continuous ON,
+    // off time 0) still starts at dutyMax.
+    _pwm_atMaxDuty = true;
+    _pwm_mmRelease = dutyRaw > SAT_PWM_MM_RELEASE_DUTY;
     // Range 5: Over-max - continuous ON (no CS startup sequence needed). Its OFF->ON start is a normal ON
     // start (pwm.py:160-167 with off_time 0, pwm.py:296-301): counted (entry 59) and anchored, so a later
     // drop into ranges 1-4 times the ON phase from this start, not from an older flame-on. It is not held
@@ -1915,8 +1945,10 @@ void satPwmReset()
   _pwm_flameOffHoldSetpoint   = 0.0f;
   _pwm_lastOffTimeMs          = 1;
   _pwm_effectiveBoilerTemp    = 0.0f;   // thermo-nova pwm.reset(): _effective_on_temperature = None (pwm.py:100)
+  _pwm_lastOnFlowTemp         = 0.0f;   // TASK-2993 (entry 444)
   _pwm_idle                   = true;   // pwm.reset(): _status = PWMStatus.IDLE (pwm.py:92)
   _pwm_atMaxDuty              = false;  // TASK-1581
+  _pwm_mmRelease              = false;  // TASK-2992
   state.sat.bModSuppressed    = false;  // no PWM stint, no suppression (entry 267)
   state.sat.iModSuppressionSinceMs = 0;
   _pwm_dhwFlameLit            = false;
@@ -8500,7 +8532,7 @@ static void satControlLoopRun()
     d.chAsked = !coldCutoff && satChEnableDecide(pidOutput, satColdThreshold(), pwmDrivesSetpoint, pwmOn);
     d.flame = satIsFlameOn();
     d.flowAboveCs = satGetFlowTemp() >= finalSetpoint;
-    d.atMax = atMax || (pwmMode && satPwmAtMaxDuty());
+    d.atMax = atMax || (pwmMode && satPwmInMaxDutyRange());   // TASK-2992: range 5, not the narrower MM=T release
     d.roomValid = roomValid;
     d.room = roomTemp;
     d.cs = finalSetpoint;

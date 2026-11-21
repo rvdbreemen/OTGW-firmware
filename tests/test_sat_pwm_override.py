@@ -182,6 +182,7 @@ int main(int argc, char** argv) {
   }
   if (!strcmp(sc, "idle")) {               // TASK-1387: PWM IDLE flag (pwm.py PWMStatus.IDLE), read by the cycle classifier
 #ifdef HAS_IDLE
+    g_flow = 47.2f;   // TASK-2993 (entry 437): the duty uses the live flow, so the flow (not a seeded BT) sets the legacy duty 0.39
     g_flameOffStart = g_ms - 600000UL; _pwm_lastUpdateMs = g_ms - 600000UL;     // long OFF: the schedule step would start an ON phase
     state.sat.eControlMode = SAT_MODE_PWM;
     _pwm_idle = false; satPwmReset();                         const int a = (int)_pwm_idle;   // reset -> IDLE (pwm.py:92)
@@ -282,6 +283,7 @@ int main(int argc, char** argv) {
     state.sat.eControlMode = SAT_MODE_PWM; state.sat.bPwmFlameRequested = true;
     _pwm_waitingForFlame = true; _pwm_lastUpdateMs = g_ms - 181000UL; _pwm_flameOnMs = 0;
     _pwm_effectiveBoilerTemp = 46.0f; g_flame = false; g_flameOnStart = g_ms - 10000UL;
+    g_flow = 47.2f;   // TASK-2993 (entry 437): the live flow keeps the scenario's duty at range 3 (flow 33 would give range 5)
     satApplyPWM(pid);
     printf("req=%d wait=%d anchor=%u bt=%.1f\n", (int)state.sat.bPwmFlameRequested, (int)_pwm_waitingForFlame,
            (unsigned)_pwm_flameOnMs, _pwm_effectiveBoilerTemp);
@@ -294,9 +296,9 @@ int main(int argc, char** argv) {
     satApplyPWM(pid);                                                   // window over: BT stays 46
     g_ms += 30000UL; g_flame = false; satApplyPWM(pid);                 // flame out mid-phase: wait re-armed
     int rearmed = (int)_pwm_waitingForFlame;
-    g_ms += 30000UL; g_flame = true; g_flow = 58.0f; satApplyPWM(pid);  // relight at a hotter flow
-    printf("bt=%.1f rearmed=%d wait=%d onago=%u req=%d\n", _pwm_effectiveBoilerTemp, rearmed, (int)_pwm_waitingForFlame,
-           (unsigned)(g_ms - _pwm_flameOnMs), (int)state.sat.bPwmFlameRequested);
+    g_ms += 30000UL; g_flame = true; g_flow = 47.0f; satApplyPWM(pid);  // relight at a hotter flow (TASK-2993: 47, duty 0.39 keeps the phase ON)
+    printf("bt=%.1f rearmed=%d wait=%d onago=%u req=%d duty=%.2f\n", _pwm_effectiveBoilerTemp, rearmed, (int)_pwm_waitingForFlame,
+           (unsigned)(g_ms - _pwm_flameOnMs), (int)state.sat.bPwmFlameRequested, state.sat.fPwmDutyCycle);
     return 0;
   }
   if (!strcmp(sc, "reset")) {              // dirty state -> satPwmReset()/satSetControlMode()
@@ -310,6 +312,7 @@ int main(int argc, char** argv) {
   if (!strcmp(sc, "tick")) {               // tick prot solar pid: first ON tick (ignition) through the real requested-setpoint segment
     state.sat.bSolarGainActive = atoi(argv[3]) != 0; settings.sat.bSolarGainEnable = atoi(argv[3]) != 0;
     state.sat.bPwmFlameRequested = false; g_flameOffStart = g_ms - 600000UL; _pwm_lastUpdateMs = g_ms - 600000UL;
+    if (argc > 5) g_flow = (float)atof(argv[5]);   // TASK-2993 (entry 437): optional live flow, it sets the duty
     const float cs = tickRun((float)atof(argv[4]));
     printf("cs=%.1f req=%d\n", cs, (int)state.sat.bPwmFlameRequested);
     return 0;
@@ -411,6 +414,7 @@ int main(int argc, char** argv) {
   }
   if (!strcmp(sc, "off")) {
     state.sat.bPwmFlameRequested = false; g_flameOffStart = g_ms - 100000UL; _pwm_lastUpdateMs = g_ms - 100000UL;
+    g_flow = 47.2f;   // TASK-2993 (entry 437): the live flow sets the legacy duty 0.39 (range 3), as the seeded BT did before
   } else if (!strcmp(sc, "start")) {
     if (argc > 4) { g_cold = (float)atof(argv[3]); g_ret = (float)atof(argv[4]); }   // cold start: cold setpoint, return temperature
     state.sat.bPwmFlameRequested = false; g_flameOffStart = g_ms - 600000UL; _pwm_lastUpdateMs = g_ms - 600000UL;
@@ -739,13 +743,18 @@ class SatPwmOverride(unittest.TestCase):
     def test_relight_inside_the_on_phase_keeps_bt_and_the_closed_window(self):
         # pwm.py:145-146 and 206: _flame_on_at survives a mid-phase flame-out, so no reseed and no new window
         # TASK-1382 (entry 80): a flame-out mid-phase no longer re-arms the ignition wait (rearmed 0, pwm.py:144-146)
+        # TASK-2993 (entries 437/438): the relight is at flow 47 (was 58): the duty uses the live flow, (35 - 27.2)/(47 - 27.2) =
+        # 0.39, so the phase stays ON and the window/anchor part is still visible; BT stays 46 (no reseed to 47).
         r = self.run_sc("relight", 1)
         self.assertEqual((r["bt"], r["rearmed"], r["wait"], r["onago"], r["req"]), ("46.0", "0", "0", "260000", "1"))
+        self.assertEqual(r["duty"], "0.39")
 
-    def test_learned_bt_is_still_filtered_between_30_and_180_s_after_ignition(self):
-        # seeded 50, flow 60, 100 s after flame-on: EMA 0.3*60+0.7*50 = 53.0 (the old 30 s window froze it at 50)
+    def test_bt_filter_ends_30_s_after_ignition_and_the_duty_uses_the_live_flow(self):
+        # TASK-2993, Sergeant D entries 437 (duty always with the live flow) and 438 (keep a 30 s start-up EMA; was 180 s,
+        # thermo-nova pwm.py:148-149): seeded 50, flow 60, 100 s after flame-on: the EMA no longer runs (BT stays 50) and the duty
+        # is (40 - 27.2)/(60 - 27.2) = 0.39 from the live flow, not (40 - 27.2)/(50 - 27.2) = 0.56 from BT.
         r = self.run_sc("duty", 1, 1, 60.0, 40.0, 1, 100000)
-        self.assertEqual(r["bt"], "53.0")
+        self.assertEqual((r["bt"], r["duty"]), ("50.0", "0.39"))
 
     def test_learned_bt_is_held_after_the_180_s_window(self):
         r = self.run_sc("duty", 1, 1, 60.0, 40.0, 1, 200000)
@@ -842,7 +851,8 @@ class SatPwmOverride(unittest.TestCase):
         # requested setpoint drops to 33 before the PWM step, too low for an ON start: the phase stays OFF, which sends 10 (entry 230).
         if not self.has_reqsp:
             self.skipTest("HEAD has no requested-setpoint segment")
-        no_solar, solar = self.run_sc("tick", 0, 0, 35), self.run_sc("tick", 0, 1, 35)
+        # TASK-2993 (entry 437): live flow 47.2 gives the legacy duty (the seeded BT set it before)
+        no_solar, solar = self.run_sc("tick", 0, 0, 35, 47.2), self.run_sc("tick", 0, 1, 35, 47.2)
         self.assertEqual((float(no_solar["cs"]), no_solar["req"]), (28.0, "1"))
         self.assertEqual((float(solar["cs"]), solar["req"]), (10.0, "0"))
 

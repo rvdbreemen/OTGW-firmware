@@ -669,13 +669,15 @@ class SatPwmAnchors(unittest.TestCase):
         self.assertTrue(all(cs == 10.0 and ch[s] == 0 for s, q, cs, _f, _b in tl.rows if s >= offs[0] and not q), tl.dump(1300))
 
     def test_g3_short_draw_inside_the_start_up_window_leaves_bt_alone(self):
-        # Burning start at 0 (window 0..180, BT 50). Draw 50..85 with the flow at 62 C afterwards (first tick with the bit 60, resume at
-        # 90, 60 s used): the EMA must not follow the hot flow, BT stays 50; ON ends at 90 - 60 + 264 = 294 (tick 300).
+        # Burning start at 0 (BT 50). Draw 50..85 with the flow at 62 C afterwards (first tick with the bit 60, resume at 90, 60 s
+        # used): the EMA must not follow the hot flow, BT stays 50. TASK-2993 (Sergeant D entries 437/438): the duty after the draw
+        # uses the live flow, (32.2 - 27.2)/(62 - 27.2) = 0.14 (range 2 at 3 cycles/h, ON = the 180 s minimum), not BT 50 (0.22,
+        # ON 264 s): ON ends at 90 - 60 + 180 = 210 (was 294 with the held BT).
         tl = self.sim(3, 0.22, "burning", [(50, "dhw", 1), (50, "flow", 62), (85, "dhw", 0)], 700)
         self.assertEqual({bt for s, _q, _c, _f, bt in tl.rows if s >= 90}, {50.0}, tl.rows)
         _ons, offs = tl.edges()
         self.assertTrue(offs, f"ON never ended: {tl.dump()}")
-        self.assertLessEqual(abs(offs[0] - 294), TICK, f"ON ended at {offs[0]} s, expected 294 s; {tl.dump(500)}")
+        self.assertLessEqual(abs(offs[0] - 210), TICK, f"ON ended at {offs[0]} s, expected 210 s; {tl.dump(500)}")
 
     def test_g4_second_draw_in_the_post_draw_wait_counts_the_180_s_from_the_last_draw_end(self):
         # Draw 1 40..200 (tick 210 = end, Wait), draw 2 bit 250..320 (ticks 270..300 skipped, end tick 330). No flame. The wait runs
@@ -786,16 +788,18 @@ class SatPwmAnchors(unittest.TestCase):
         r = subprocess.run([str(self.exe)], input=NL.join(lines) + NL, capture_output=True, text=True, check=True)
         return {int(p[1]): int(p[2]) for p in (ln.split() for ln in r.stderr.splitlines() if ln.startswith("M "))}
 
-    def test_n11_mm_t_flag_is_up_exactly_while_the_duty_is_in_range_5(self):
-        # TASK-1581, entries 242 and 243: duty 0.5 (range 3), then 0.95 (range 5) from 905, then 0.5 again from 1805.
+    def test_n11_mm_t_flag_is_up_exactly_while_the_raw_duty_is_above_1_03(self):
+        # TASK-1581, entries 242 and 243: MM=T at the maximum duty. TASK-2992 (Sergeant D entries 436/440): only while the raw duty
+        # (before the [0, 1] cap) is above 1.03, not for all of range 5. Flow = BT = 50, so the raw duty is the ratio: 0.5 (range 3),
+        # then 1.10 from 905 (above 1.03), then 0.95 from 1805 (range 5 but below 1.03: no MM=T), then 0.5 again from 2405.
         # Any phase counts (a heat pump restart wait is OFF): the flag follows the duty only.
         for src in (None, self.SRC_HP, self.SRC_HYB):
             with self.subTest(src=src):
                 extra = (f"src {src}",) if src else ()
-                m = self.at_max_duty(3, 0.5, "burning", [(905, "ratio", 95), (1805, "ratio", 50)], 2400, extra)
+                m = self.at_max_duty(3, 0.5, "burning", [(905, "ratio", 110), (1805, "ratio", 95), (2405, "ratio", 50)], 3000, extra)
                 self.assertTrue(all(m[s] == 0 for s in m if s < 905), m)
                 self.assertTrue(all(m[s] == 1 for s in range(930, 1800, 30)), m)
-                self.assertTrue(all(m[s] == 0 for s in range(1830, 2400, 30)), m)
+                self.assertTrue(all(m[s] == 0 for s in range(1830, 3000, 30)), m)
 
     def test_n10_phase_edges_survive_the_millis_rollover(self):
         # LL-019 timestamp rollover: the same runs with millis() just below 2^32 (the wrap falls inside the run, at second 400) give the

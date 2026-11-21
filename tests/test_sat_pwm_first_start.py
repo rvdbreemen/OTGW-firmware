@@ -295,7 +295,10 @@ class Mutants(unittest.TestCase):
         # tick with the flame on, so it needs 60 s too.
         edits = {"SATcontrol.ino": [("static const uint32_t SAT_START_GATE_MS = 60000UL;", "static const uint32_t SAT_START_GATE_MS = 200000UL;")]}
         long_exe = build("gate200", edits)
-        r = Run(long_exe, ["run 400000"])
+        # TASK-2993 (entries 437/438): room 19.5 gives a request of 42.4 C against a flow of 31-33 C, a real underheat. With the default
+        # room the flow passes the request at 180 s and the live-flow duty leaves range 5, so no exit exists to hold back
+        # (test_boiler_above_the_request_gets_no_saturation_exit pins that).
+        r = Run(long_exe, ["room 19.5", "run 400000"])
         t_pwm = [t for t, x in r.modes() if x == 2]
         fl = r.flame_on(0)
         self.assertTrue(t_pwm and fl, r.dump())
@@ -306,9 +309,25 @@ class Mutants(unittest.TestCase):
         nog = build("gate200_noguard", {"SATcontrol.ino": edits["SATcontrol.ino"],
                                          "SATcycles.ino": [("SAT_UNDERHEAT_SUSTAIN_MS) && !satStartGateActive()) {", "SAT_UNDERHEAT_SUSTAIN_MS)) {"),
                                                            ("SAT_SATURATION_SUSTAIN_MS) && !satStartGateActive()) {", "SAT_SATURATION_SUSTAIN_MS)) {")]})
-        r2 = Run(nog, ["run 400000"])
+        r2 = Run(nog, ["room 19.5", "run 400000"])
         left2 = [t for t, x in r2.modes() if x == 1 and t > [t2 for t2, y in r2.modes() if y == 2][0]]
         self.assertTrue(left2 and left2[0] - r2.flame_on(0)[0] < 200000, "control run without the guard did not exit early:\n" + r2.dump())
+
+
+class LiveFlowDuty2993(unittest.TestCase):
+    def test_boiler_above_the_request_gets_no_saturation_exit(self):
+        # TASK-2993 (Sergeant D entries 437/438): the default heating start (request 31.8 C) with the simulated boiler: the flow rises
+        # past the request at about 180 s (CS = flow - 1). The start sequence is lengthened to 200 s (in memory) so the underheat exit
+        # (request above the flow at 90-150 s) is held back until the flow is above the request; what is left is the saturation exit.
+        # The duty uses the live flow, so it leaves range 5 (off time 0) once the flow is above the request and no saturation exit
+        # follows; with the held BT (ignition flow ~30 C) the duty stayed at range 5 and the saturation exit ended PWM (the
+        # indigo_light 19 Nov 21:32:30 pattern). Red on the code before TASK-2993.
+        edits = {"SATcontrol.ino": [("static const uint32_t SAT_START_GATE_MS = 60000UL;", "static const uint32_t SAT_START_GATE_MS = 200000UL;")]}
+        r = Run(build("gate200", edits), ["run 400000"])
+        pwm = [t for t, x in r.modes() if x == 2]
+        self.assertTrue(pwm and r.flame_on(0), r.dump())
+        self.assertEqual([t for t, x in r.modes() if x == 1 and t > pwm[0]], [],
+                         "PWM ended although the boiler delivers above the request: " + r.dump())
 
 
 if __name__ == "__main__":

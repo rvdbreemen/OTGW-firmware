@@ -1,11 +1,11 @@
 ---
 id: TASK-2992
 title: 'SAT: MM=T only at raw duty above 1.03 (entry 436, Sergeant D)'
-status: To Do
+status: In Progress
 assignee:
-  - '@otgw-dev'
+  - '@claude'
 created_date: '2026-11-21T03:12:00Z'
-updated_date: '2026-11-21T07:08:00Z'
+updated_date: '2026-11-21T08:48:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -39,4 +39,6 @@ Sergeant D, entry 436 (#dev-sat-mqtt 2026-11-21, msg 1573536221601210410): relea
 2026-11-21 03:52 UTC: RESTORED. Sergeant D chose to keep the 1.03 rule next to the duty fix (entry 440, msg 1573546640378171483 'yes A'), after the replay showed that with only the live-flow duty MM=T would still flip on at 21:25:00 / off 21:26:00 / on 21:26:30 in indigo's warm-up (raw duty 0.93-1.015). Build together with TASK-2993 in the same lane (the raw duty variable is shared). The 'cancelled' note above is void.
 
 2026-11-21 (92): entry 441 (Robert's OK for the duty fix in 2.0.0) and entry 442 (guards 2987/2989 to 2.1.0) recorded; this 1.03 rule (entry 440) stays in the 2.0.0 lane with TASK-2993.
+
+2026-11-21 05:30 (otgw-dev): implemented in lane/d3-duty2993 with TASK-2993. dutyRaw before the [0,1] cap; _pwm_mmRelease = range 5 AND dutyRaw > SAT_PWM_MM_RELEASE_DUTY (1.03) feeds satPwmAtMaxDuty() (mmTarget, reported modulation); range 5 / off time 0 unchanged (_pwm_atMaxDuty, satPwmInMaxDutyRange() for diagnostics d.atMax). Tests: MmReleaseAbove103 3/3 (indigo flame no MM=T, max raw 1.015; 21:27:30 duty 1.00 off time 0 no MM=T; raw 1.053 releases, 1.013 does not); without 2992 the duty fix gave MM=T at 21:25:00/21:26:30/21:27:00; anchors n11 rewritten (raw 1.10 MM=T, 0.95 none), red on origin 3/3 subtests.
 <!-- SECTION:NOTES:END -->

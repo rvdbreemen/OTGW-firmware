@@ -1,11 +1,11 @@
 ---
 id: TASK-2993
 title: 'SAT: PWM duty always with the live flow, no held BT (entry 437, Sergeant D)'
-status: To Do
+status: In Progress
 assignee:
-  - '@otgw-dev'
+  - '@claude'
 created_date: '2026-11-21T03:28:00Z'
-updated_date: '2026-11-21T08:37:00Z'
+updated_date: '2026-11-21T08:49:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -47,4 +47,10 @@ Sergeant D, entry 437 (#dev-sat-mqtt 2026-11-21 03:25 UTC, msg 15735397191475529
 2026-11-21 (92): entry 447: Sergeant D confirmed explicitly (msg 1573607198859460671): during PWM OFF the request stays active and may change the OFF duty; only the flow is frozen. That matches the build.
 
 2026-11-21 (92): otgw-dev found on the .61 bench that the +30 s tick lands at +30003 / +30023 ms (firmware tick jitter), so a strict 30 s window would miss that tick about half the time. 1 s slack added: an implementation of entry 443 (one tick after ignition, incl. the +30 s tick), not a behaviour change; no question to Sergeant D. Requested test: tick at +30.02 s filtered, +60 s live.
+
+2026-11-21 05:30 (otgw-dev): implemented with TASK-2992 in lane/d3-duty2993. Live-flow duty after a 30 s EMA window, inclusive (<=) as thermo-nova pwm.py:148 (review finding: with < the filter never reached the duty at the 30 s tick). Tests: test_sat_pwm_live_flow_duty_2993.py 9/9 (old code 939f9406b reproduces the indigo logged duty within 0.011; 18 FAIL on old code; window test red on the < mutant); pwm_override 83/83, pwm_anchors 64/64, pwm_first_start 15/15; SAT sweep 115/117 then the 2 rechecked green (n11 updated to the 1.03 rule, lowload_contract 35 OK alone = -j2 flake); evaluate --quick 88 passed 0 failed. Reviewer (read-only subagent) findings fixed: inclusive window, pinned test base, d.atMax on range 5, relight test keeps the window assert. Open for Sergeant D (via BlueFlame): Q1 a 30 s filter covers one 30 s tick; Q2 live flow also in the OFF phase. Stale docs -> TASK-2994. No push before Robert's OK on entry 64 and bench OK.
+
+2026-11-21 (otgw-dev): entry 444 (Sergeant D, Q-438b B, via BlueFlame): live flow only in the PWM ON phase; in OFF the duty uses the flow of the last ON tick with the current request (_pwm_lastOnFlowTemp, reset in satPwmReset). Entry 441 (Robert A, reverses entry 64) and entry 443 (Q-438a A, 30 s window as built) recorded by BlueFlame. Test tests/test_sat_pwm_live_flow_duty_2993.py: 13/13 OK on the fix; on the 1693b64 source (OTGW_SAT_INO) 3 FAIL (LiveFlowDuty 21:31:30/21:32:00 OFF ticks use the live flow 41.5 -> 0.465 instead of the held 40.7 -> 0.49) + new class refuses (no OFF branch); mutant without the OFF line: shorter pause, duty 1.00 at the cooled flow 34.0 (red side asserted in the class).
+
+2026-11-21 (otgw-dev): bench .61 run 1 (beta.406+1693b64, sim, control interval 10 s; otgw-bench-tester, OTGW-field-data\bench-otgw32\2026-11-21_task2993-2992\t2993-sim-61): checks 3 (MM=T only at raw > 1.03: 73/73 T, 156/156 numeric) and 4 (no saturation exit) PASS. Check 2: the +20 s ticks correctly use the EMA (08:29:29 0.33 = 2.21/(33.95-27.2), 08:57:30 0.36), but the +30 s tick landed at +30003 ms (08:29:39) and +30023 ms (08:57:40) after the ignition and already used the live flow (0.31/0.34 instead of 0.32/0.35): the <= 30000 ms bound depends on tick jitter, so at the default 30 s interval the one filtered tick of entry 443 would be missed about half the time. Fix: SAT_PWM_BT_FILTER_SLACK_MS = 1000 on both window checks. Tests WindowToleratesTickJitter (ticks at +30.026 s / +30.020 s filtered, +41.2 s and +60.03 s live): red on 9d2007d (0.77 and 1.00), green on the fix; 16/16 in the file.
 <!-- SECTION:NOTES:END -->
