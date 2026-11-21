@@ -363,8 +363,8 @@ The recommended path through the remaining five: **2(A) → 3(sibling cycles) �
 - ADR-087 — Frame bridge pattern
 - ADR-090 — Re-entrancy guard pattern, with cross-task amendment of 2026-04-30
 - ADR-111 — SAT MQTT publish-on-change (subject to amendment)
-- `docs/plan/OTGW32_INTEGRATION_PLAN.md` — parent OTGW32 plan
-- `docs/plan/HAL_2_0_0_DESIGN_PLAN.md` — sibling concern; check for HAL boundary intersect before Phase 3
+- `docs/plans/OTGW32_INTEGRATION_PLAN.md` — parent OTGW32 plan
+- `docs/plans/HAL_2_0_0_DESIGN_PLAN.md` — sibling concern; check for HAL boundary intersect before Phase 3
 
 ---
 

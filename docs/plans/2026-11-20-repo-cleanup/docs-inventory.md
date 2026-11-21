@@ -18,7 +18,7 @@ otgw-docs (95), 2026-11-20, on origin/dev 55c4146b7. Nothing was moved. Executio
 **Must stay at their path (HARD, `blob/dev` links in published releases or notes, 19 targets):** CONTRIBUTORS.md, docs/BREAKING_CHANGES.md, docs/guides/REVERSE_PROXY_AND_HA_INGRESS.md, docs/guides/WIFI_FIRMWARE_UPDATE.md, docs/sat/field-run-recipe-2.0.0.md, and the release notes of beta.62, 77, 105, 118, 130, 144, 158, 162, 167, 170, 174, 203, 218 and 250 in docs/releases/. The architect counted 23; my count includes the docs/releases and docs/releases/archive files plus all 94 published GitHub release bodies, `blob/dev` only (`blob/main` points at the 1.x line and does not limit moves on dev; those are listed per row as "blob/main xN"). The difference of 4 is worth a cross-check.
 
 **Clear moves (low risk, phase 2):**
-1. `docs/plan/*` (8) and root `plan/feature-openweathermap-onboarding-1.md` -> `docs/plans/` (one plans folder). `docs/process/ps1-lean-translator-refactor-plan.md` -> `docs/plans/`.
+1. `docs/plans/*` (8) and root `plan/feature-openweathermap-onboarding-1.md` -> `docs/plans/` (one plans folder). `docs/process/ps1-lean-translator-refactor-plan.md` -> `docs/plans/`.
 2. `docs/archive/*` -> `docs/archive/1.x/` (one archive root); fix the merge-conflict markers in `docs/archive/mqttha.cfg` first.
 3. `docs/images/` (21, 2021 screenshots of the 1.x UI, 20 without inbound link, all on otgw-1.x.x) -> `docs/archive/1.x/images/`.
 4. `docs/fixes/` (1.x fix write-ups) -> `docs/archive/1.x/fixes/`; README.md:319 and CHANGELOG.md:1051 link `opentherm-v42-mqtt-breaking-changes.md`: update those links in the same commit (CHANGELOG history is not edited: leave a stub instead).
@@ -263,25 +263,25 @@ otgw-docs (95), 2026-11-20, on origin/dev 55c4146b7. Nothing was moved. Executio
 |---|---|---|---|---|---|---|---|---|---|---|
 | `docs/pic/pic-firmware-6.8-spec.md` | PIC firmware 6.8 reference specification | yes | no | no | 2026-11-12 |  | 5 (backlog 5) |  | keep |  |
 
-## docs/plan/
+## docs/plans/
 
 | path | purpose | current? | 1.x-only? | on otgw-1.x.x | last change | duplicate of | inbound links | HARD (published notes) | proposed target | note |
 |---|---|---|---|---|---|---|---|---|---|---|
-| `docs/plan/CPP_REFACTORING_PLAN.md` | Older plans (C++ refactoring, HAL, OTGW32 integration, SAT simulation, settings streaming, adr-kit governance) | historical | mixed | yes | 2026-03-12 | docs/plans/ (same purpose, other name) | 0 |  | move -> docs/plans/ | one plans folder; OTGW32 plan name stays internal (not public text) |
-| `docs/plan/HAL_2_0_0_DESIGN_PLAN.md` | Older plans (C++ refactoring, HAL, OTGW32 integration, SAT simulation, settings streaming, adr-kit governance) | historical | mixed | no | 2026-05-22 | docs/plans/ (same purpose, other name) | 1 (docs 1) |  | move -> docs/plans/ | one plans folder; OTGW32 plan name stays internal (not public text) |
-| `docs/plan/OTGW32_INTEGRATION_PLAN.md` | Older plans (C++ refactoring, HAL, OTGW32 integration, SAT simulation, settings streaming, adr-kit governance) | historical | mixed | no | 2026-04-13 | docs/plans/ (same purpose, other name) | 2 (ADR 1, docs 1) |  | move -> docs/plans/ | one plans folder; OTGW32 plan name stays internal (not public text) |
-| `docs/plan/SAT_SIMULATION_CONTRACT_PLAN.md` | Older plans (C++ refactoring, HAL, OTGW32 integration, SAT simulation, settings streaming, adr-kit governance) | historical | mixed | no | 2026-05-31 | docs/plans/ (same purpose, other name) | 1 (ADR 1) |  | move -> docs/plans/ | one plans folder; OTGW32 plan name stays internal (not public text) |
-| `docs/plan/SAT_SIM_F7_BOILER_EMULATOR_OPTIONS.md` | Older plans (C++ refactoring, HAL, OTGW32 integration, SAT simulation, settings streaming, adr-kit governance) | historical | mixed | no | 2026-06-03 | docs/plans/ (same purpose, other name) | 2 (ADR 1, docs 1) |  | move -> docs/plans/ | one plans folder; OTGW32 plan name stays internal (not public text) |
-| `docs/plan/SAT_TASK_SEPARATION_PLAN.md` | Older plans (C++ refactoring, HAL, OTGW32 integration, SAT simulation, settings streaming, adr-kit governance) | historical | mixed | no | 2026-05-29 | docs/plans/ (same purpose, other name) | 0 |  | move -> docs/plans/ | one plans folder; OTGW32 plan name stays internal (not public text) |
-| `docs/plan/SETTINGS_STREAMING_REFACTOR_PLAN.md` | Older plans (C++ refactoring, HAL, OTGW32 integration, SAT simulation, settings streaming, adr-kit governance) | historical | mixed | yes | 2026-03-28 | docs/plans/ (same purpose, other name) | 0 |  | move -> docs/plans/ | one plans folder; OTGW32 plan name stays internal (not public text) |
-| `docs/plan/adr-kit-governance-plan.md` | Older plans (C++ refactoring, HAL, OTGW32 integration, SAT simulation, settings streaming, adr-kit governance) | historical | mixed | no | 2026-07-04 | docs/plans/ (same purpose, other name) | 10 (backlog 8, agent-rules/skills 1, code/tests 1) |  | move -> docs/plans/ | one plans folder; OTGW32 plan name stays internal (not public text) |
+| `docs/plans/CPP_REFACTORING_PLAN.md` | Older plans (C++ refactoring, HAL, OTGW32 integration, SAT simulation, settings streaming, adr-kit governance) | historical | mixed | yes | 2026-03-12 | docs/plans/ (same purpose, other name) | 0 |  | move -> docs/plans/ | one plans folder; OTGW32 plan name stays internal (not public text) |
+| `docs/plans/HAL_2_0_0_DESIGN_PLAN.md` | Older plans (C++ refactoring, HAL, OTGW32 integration, SAT simulation, settings streaming, adr-kit governance) | historical | mixed | no | 2026-05-22 | docs/plans/ (same purpose, other name) | 1 (docs 1) |  | move -> docs/plans/ | one plans folder; OTGW32 plan name stays internal (not public text) |
+| `docs/plans/OTGW32_INTEGRATION_PLAN.md` | Older plans (C++ refactoring, HAL, OTGW32 integration, SAT simulation, settings streaming, adr-kit governance) | historical | mixed | no | 2026-04-13 | docs/plans/ (same purpose, other name) | 2 (ADR 1, docs 1) |  | move -> docs/plans/ | one plans folder; OTGW32 plan name stays internal (not public text) |
+| `docs/plans/SAT_SIMULATION_CONTRACT_PLAN.md` | Older plans (C++ refactoring, HAL, OTGW32 integration, SAT simulation, settings streaming, adr-kit governance) | historical | mixed | no | 2026-05-31 | docs/plans/ (same purpose, other name) | 1 (ADR 1) |  | move -> docs/plans/ | one plans folder; OTGW32 plan name stays internal (not public text) |
+| `docs/plans/SAT_SIM_F7_BOILER_EMULATOR_OPTIONS.md` | Older plans (C++ refactoring, HAL, OTGW32 integration, SAT simulation, settings streaming, adr-kit governance) | historical | mixed | no | 2026-06-03 | docs/plans/ (same purpose, other name) | 2 (ADR 1, docs 1) |  | move -> docs/plans/ | one plans folder; OTGW32 plan name stays internal (not public text) |
+| `docs/plans/SAT_TASK_SEPARATION_PLAN.md` | Older plans (C++ refactoring, HAL, OTGW32 integration, SAT simulation, settings streaming, adr-kit governance) | historical | mixed | no | 2026-05-29 | docs/plans/ (same purpose, other name) | 0 |  | move -> docs/plans/ | one plans folder; OTGW32 plan name stays internal (not public text) |
+| `docs/plans/SETTINGS_STREAMING_REFACTOR_PLAN.md` | Older plans (C++ refactoring, HAL, OTGW32 integration, SAT simulation, settings streaming, adr-kit governance) | historical | mixed | yes | 2026-03-28 | docs/plans/ (same purpose, other name) | 0 |  | move -> docs/plans/ | one plans folder; OTGW32 plan name stays internal (not public text) |
+| `docs/plans/adr-kit-governance-plan.md` | Older plans (C++ refactoring, HAL, OTGW32 integration, SAT simulation, settings streaming, adr-kit governance) | historical | mixed | no | 2026-07-04 | docs/plans/ (same purpose, other name) | 10 (backlog 8, agent-rules/skills 1, code/tests 1) |  | move -> docs/plans/ | one plans folder; OTGW32 plan name stays internal (not public text) |
 
 ## docs/plans/
 
 | path | purpose | current? | 1.x-only? | on otgw-1.x.x | last change | duplicate of | inbound links | HARD (published notes) | proposed target | note |
 |---|---|---|---|---|---|---|---|---|---|---|
-| `docs/plans/2026-11-20-mqtt-burst-pacing-analysis.md` | Plans (MQTT burst pacing, JsonEmit) | yes | no | no | 2026-11-20 | docs/plan/ (same purpose) | 2 (backlog 1, ADR 1) |  | keep | target folder for docs/plan/* and root plan/* |
-| `docs/plans/PLAN-streaming-json-jsonEmit.md` | Plans (MQTT burst pacing, JsonEmit) | yes | no | no | 2026-06-18 | docs/plan/ (same purpose) | 2 (backlog 1, ADR 1) |  | keep | target folder for docs/plan/* and root plan/* |
+| `docs/plans/2026-11-20-mqtt-burst-pacing-analysis.md` | Plans (MQTT burst pacing, JsonEmit) | yes | no | no | 2026-11-20 | docs/plans/ (same purpose) | 2 (backlog 1, ADR 1) |  | keep | target folder for docs/plans/* and root plan/* |
+| `docs/plans/PLAN-streaming-json-jsonEmit.md` | Plans (MQTT burst pacing, JsonEmit) | yes | no | no | 2026-06-18 | docs/plans/ (same purpose) | 2 (backlog 1, ADR 1) |  | keep | target folder for docs/plans/* and root plan/* |
 
 ## docs/process/
 

@@ -130,7 +130,7 @@ Risk: low for the deletes (no workflow or script on dev uses them; evaluate.py g
 
 ### C6: docs moves (otgw-docs; one commit per numbered item)
 
-1. **One plans folder.** `docs/plan/*` (8 files), the root `plan/` file and `docs/process/ps1-lean-translator-refactor-plan.md` go to `docs/plans/`.
+1. **One plans folder.** `docs/plans/*` (8 files), the root `plan/` file and `docs/process/ps1-lean-translator-refactor-plan.md` go to `docs/plans/`.
 2. **The existing `docs/archive/` stays as it is.** It holds 2.x archives too: ADR-077 cites `docs/archive/mqttha.cfg` (a 2.x snapshot, not on otgw-1.x.x) and ADR-065 cites `docs/archive/mqttha-generator/`. F1 is fixed in place. New 1.x material from this plan goes under a new `docs/archive/1.x/`. No ADR cites a path under `docs/fixes/` or `docs/images/` (`git grep` of docs/adr, this session). ADR-020:504 names `docs/wemosd1mini-pinout-ds18b20.png`, a path that has not existed for a long time; the move changes nothing there (otgw-docs).
 3. **1.x UI screenshots.** `docs/images/` holds 21 screenshots from 2021; 20 have no inbound link, and all are on otgw-1.x.x. They move to `docs/archive/1.x/images/`, and the one link is updated.
 4. **1.x fix write-ups.** `docs/fixes/` moves to `docs/archive/1.x/fixes/`. `README.md:319` links one of them: update it. `CHANGELOG.md:1051` links one too, but CHANGELOG history is not edited, so that file keeps a stub (rule 5).

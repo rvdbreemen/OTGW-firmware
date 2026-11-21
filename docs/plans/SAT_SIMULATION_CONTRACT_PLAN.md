@@ -1044,7 +1044,7 @@ After authoring: `bin/adr-lint docs/adr/ADR-NNN-sat-simulation-contract.md` (mus
 ```bash
 # Create or pick up the task. If it doesn't exist yet:
 backlog task create "feat-2.0.0: SAT simulation contract — boiler model, bus isolation, availability gate, command trace" \
-  -d "Implements plan docs/plan/SAT_SIMULATION_CONTRACT_PLAN.md §4-§7. See plan for full design." \
+  -d "Implements plan docs/plans/SAT_SIMULATION_CONTRACT_PLAN.md §4-§7. See plan for full design." \
   -l sat,simulation,safety
 
 # Returns an ID like TASK-XXX. Immediately:
@@ -1107,7 +1107,7 @@ gh pr create --draft --title "feat-2.0.0: SAT simulation contract" --body "$(cat
 - [ ] Standalone bench (no thermostat, no boiler): full SAT loop (§10 step 10)
 - [ ] Real-boiler regression: SAT command stream byte-identical with `bSimulation=false` (§10 step 11)
 
-Plan: `docs/plan/SAT_SIMULATION_CONTRACT_PLAN.md`
+Plan: `docs/plans/SAT_SIMULATION_CONTRACT_PLAN.md`
 ADR: `docs/adr/ADR-NNN-sat-simulation-contract.md` (Accepted)
 Backlog: TASK-XXX
 EOF

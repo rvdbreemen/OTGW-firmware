@@ -38,4 +38,6 @@ Robert, 2026-11-20, DM 1573349163083505787 (reply to the coordinator's D1-D7 que
 Plan corrections from otgw-docs' dry run (2026-11-20): C6.7 keeps a stub (ADR-097 and two src comments cite the audit); ADR-020 note under C6.2; the F4 PINOUT link is not dangling; F6 goes to otgw-bench-tester through the coordinator.
 
 2026-11-21 phase 2 C4 (otgw-docs): remove the duplicate .full-review-archive-20260421-085044 (3 files blob-identical to .full-review/archive/, state.json moved there)
+
+2026-11-21 phase 2 C6.1 (otgw-docs): one plans folder: docs/plan/*, plan/ and the ps1 translator plan move to docs/plans/
 <!-- SECTION:NOTES:END -->

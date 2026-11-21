@@ -1,7 +1,7 @@
 name: ADR governance
 
 # Repo-local realization of the adr-kit governance plan
-# (docs/plan/adr-kit-governance-plan.md), pending the adr-kit CLI (TASK-422/424).
+# (docs/plans/adr-kit-governance-plan.md), pending the adr-kit CLI (TASK-422/424).
 # Fails a PR that leaves the ADR set inconsistent or the index stale:
 #   - lint: superseded_by resolves; ADR-080 binding ADRs name an existing gate;
 #           status <-> superseded_by reciprocity.

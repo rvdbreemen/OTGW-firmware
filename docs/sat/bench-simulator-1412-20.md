@@ -125,7 +125,7 @@ AC1 itself needs an OpenTherm slave on the boiler side of each board, with the r
 |---|---|---|---|
 | A. Library slave on a spare ESP32 | the vendored Ihor Melnyk OpenTherm library (`src/libraries/OpenTherm`, `OpenTherm(in, out, isSlave=true)`, `buildResponse()`) plus an OpenTherm slave-side interface | open source and already in the tree; can play the same timelines and the reactive rules in `expected_wire` | needs interface hardware and a small sketch; its own timing must be calibrated |
 | B. Thermostat-side port of a second OTGW32 | the OTGW32 has an OT slave port (`PIN_OT_SLAVE_IN/OUT` in `boards.h`) | known hardware | needs a slave-emulator firmware for that board; it ties up a second OTGW32 |
-| C. Firmware injection hook | option B of `docs/plan/SAT_SIM_F7_BOILER_EMULATOR_OPTIONS.md` | no hardware | not a wire: it does not give transport identity, so it does not meet AC1 |
+| C. Firmware injection hook | option B of `docs/plans/SAT_SIM_F7_BOILER_EMULATOR_OPTIONS.md` | no hardware | not a wire: it does not give transport identity, so it does not meet AC1 |
 
 Identity evidence with a wire slave:
 

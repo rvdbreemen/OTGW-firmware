@@ -2,7 +2,7 @@
 """adr_governance.py - repo-local ADR governance checks for OTGW-firmware.
 
 A self-contained realization of the adr-kit governance plan
-(docs/plan/adr-kit-governance-plan.md), pending the adr-kit CLI (TASK-422/424).
+(docs/plans/adr-kit-governance-plan.md), pending the adr-kit CLI (TASK-422/424).
 No third-party dependencies; operates directly on docs/adr/*.md and the index.
 
 Subcommands:
