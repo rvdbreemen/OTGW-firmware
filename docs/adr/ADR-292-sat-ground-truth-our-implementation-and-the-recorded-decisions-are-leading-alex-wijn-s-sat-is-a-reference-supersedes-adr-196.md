@@ -34,7 +34,7 @@ aliases:
   - "reference implementation"
 components:
   - "SAT source precedence rule"
-  - "docs/sat/sergeant-d-corrections.md"
+  - "docs/sat/decisions/sergeant-d-corrections.md"
   - "other-projects/SAT-develop/"
 symbols: []
 context_scope: "selective"
@@ -86,7 +86,7 @@ authority for what SAT should do". That ranking fitted a fresh port. Since then
 three facts changed:
 
 - **Our implementation has moved past the port by decision.**
-  `docs/sat/sergeant-d-corrections.md` now has 450 numbered entries (count of
+  `docs/sat/decisions/sergeant-d-corrections.md` now has 450 numbered entries (count of
   `## <n>.` headings, 2026-11-21). Several deliberately leave 7beaaf5: entry 441
   (Robert, 2026-11-21) reverses his entry-64 choice to keep thermo-nova's held
   boiler temperature (`pwm.py:144-149` at 7beaaf5) and builds the live-flow
@@ -133,7 +133,7 @@ For every statement or change about SAT behaviour the sources rank in this
 order, and a higher source wins over a lower one:
 
 1. **Recorded decisions** of Sergeant D and of Robert in
-   `docs/sat/sergeant-d-corrections.md`: one numbered, dated entry each, with
+   `docs/sat/decisions/sergeant-d-corrections.md`: one numbered, dated entry each, with
    the words quoted and the Discord message link.
 2. **Our SAT implementation**: `src/OTGW-firmware/SAT*.ino`, `SATtypes.h`, the
    SAT ADRs in `docs/adr/` and `docs/sat/firmware-sat-spec.md`. Where the code
@@ -179,7 +179,7 @@ text; this ADR records it so ADR authors and `/adr-kit:context` find it.
 
 ### Must
 
-- Read `docs/sat/sergeant-d-corrections.md` before writing a SAT ADR, plan,
+- Read `docs/sat/decisions/sergeant-d-corrections.md` before writing a SAT ADR, plan,
   review or SAT-control change. Cite the entry numbers it relies on, or state
   "no entry covers this topic".
 - Cite our firmware as `file:line` and Alex's code as
@@ -299,7 +299,7 @@ cannot read from a diff.
 ## Open Questions
 
 - [ ] Robert: record the 2026-11-21 directive as a numbered entry in
-  `docs/sat/sergeant-d-corrections.md` (rank 1 names Robert's SAT decisions,
+  `docs/sat/decisions/sergeant-d-corrections.md` (rank 1 names Robert's SAT decisions,
   but this one is only in the rule block and the directive changelog).
 - [ ] Robert: the parity tests and `scripts/inspect_sat_reference.py` (point at
   `other-projects/SAT-develop/`, at a 7beaaf5 checkout, or retire).
@@ -326,7 +326,7 @@ cannot read from a diff.
 - Maintainer directive, 2026-11-21: SAT-GROUND-TRUTH block in
   `.claude/rules/sat-ground-truth.md` and AGENTS.md;
   `docs/process/directive-changelog.md` lines 17 and 36.
-- `docs/sat/sergeant-d-corrections.md`: entry 441 (line 8683), entry 448
+- `docs/sat/decisions/sergeant-d-corrections.md`: entry 441 (line 8683), entry 448
   (line 8802), entry 449 (line 8823,
   https://discord.com/channels/812969634638725140/1105556725714649128/1573705702512398387).
 - `other-projects/SAT-develop/UPSTREAM_COMMIT` (ba515c8, develop, 2026-11-21).

@@ -1,6 +1,6 @@
-"""TASK-1630: docs/sat/sergeant-d-corrections.index.json covers the register and is current.
+"""TASK-1630: docs/sat/decisions/sergeant-d-corrections.index.json covers the register and is current.
 
-The register (docs/sat/sergeant-d-corrections.md) is immutable; its provenance metadata lives in
+The register (docs/sat/decisions/sergeant-d-corrections.md) is immutable; its provenance metadata lives in
 the generated JSON index next to it. This test fails when an entry has no index record, when the
 ids differ, when a field holds a value outside the schema, or when the index is stale.
 Refresh with: python scripts/sat_corrections_index.py --update
@@ -23,6 +23,8 @@ KINDS = {"correction", "answer", "decision", "interpretation", "unclassified"}
 
 class CorrectionsIndex(unittest.TestCase):
     def setUp(self):
+        if not idx.REGISTER.exists():
+            self.skipTest("docs/sat/decisions submodule not checked out (private repo)")
         self.assertTrue(idx.INDEX.exists(), "index missing: run python scripts/sat_corrections_index.py --update")
         with open(idx.INDEX, encoding="utf-8") as f:
             self.index = json.load(f)
@@ -50,10 +52,10 @@ class CorrectionsIndex(unittest.TestCase):
                          "index is stale: run python scripts/sat_corrections_index.py --update")
 
     def test_open_questions_answers_point_at_index_entries(self):
-        # TASK-1630 AC3: every "answered" checkmark in docs/sat/open-questions.md names an entry
+        # TASK-1630 AC3: every "answered" checkmark in docs/sat/decisions/open-questions.md names an entry
         # that exists in the index, so the queue and the register cannot drift apart silently.
         ids = {r["id"] for r in self.records}
-        text = open(os.path.join(REPO, "docs", "sat", "open-questions.md"), encoding="utf-8").read()
+        text = open(os.path.join(REPO, "docs", "sat", "decisions", "open-questions.md"), encoding="utf-8").read()
         missing = []
         for line in text.splitlines():
             m = re.match(r"^\| *((?:Q|Conf|QD)[\w.-]*)[^|]*\| *✓\s*(\d+)", line)

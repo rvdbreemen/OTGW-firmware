@@ -72,7 +72,7 @@ status_history:
 
 ## Context
 
-ADR-250 (Accepted) built the SAT tolerance band on our reading of the Home Assistant generic thermostat (entry 328 in `docs/sat/sergeant-d-corrections.md`): heating stops when the deciding rooms are at or above target + 0.1 C and starts again below target - 0.1 C, with a hold zone in between.
+ADR-250 (Accepted) built the SAT tolerance band on our reading of the Home Assistant generic thermostat (entry 328 in `docs/sat/decisions/sergeant-d-corrections.md`): heating stops when the deciding rooms are at or above target + 0.1 C and starts again below target - 0.1 C, with a hold zone in between.
 
 On a real boiler (indigo's Vitodens capture, 2026-11-16) Sergeant D, who designed SAT, saw heating start too late and settled the meaning in three steps:
 - entry 401 (Q-399a A): both tolerances mean 0.1 above the target, so heating starts again as soon as a room is below target + 0.1; the target - 0.1 reading is withdrawn;
@@ -152,6 +152,6 @@ The band stops at target + 0.1 and may restart below target + 0.1, and once CH i
 
 ## References
 
-- `docs/sat/sergeant-d-corrections.md` entries 38, 46, 326, 328, 376, 398, 400, 401, 402, 403, 405.
+- `docs/sat/decisions/sergeant-d-corrections.md` entries 38, 46, 326, 328, 376, 398, 400, 401, 402, 403, 405.
 - `src/OTGW-firmware/SATchEnable.h` (`satToleranceDemand`, `SAT_TOL_MIN_OFF_MS`), `src/OTGW-firmware/SATcontrol.ino` (the band block of the control tick).
 - TASK-1887.

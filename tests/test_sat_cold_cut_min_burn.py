@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """TASK-1652: a lit PWM ON phase burns at least 180 s before the cold cutoff ends it (maintainer decision 2026-11-05,
-docs/sat/sergeant-d-corrections.md entry 275; minimum burn of entries 31 and 80; cold cutoff of entries 12 and 199).
+docs/sat/decisions/sergeant-d-corrections.md entry 275; minimum burn of entries 31 and 80; cold cutoff of entries 12 and 199).
 
 Before TASK-1652 the control tick latched the cold cutoff and, on the same tick, sent CS=10 / CH=0 and left PWM
 (satPwmDisableOnHeaterOff()), whatever flame time the running ON phase had. With the rule the latched cutoff waits while

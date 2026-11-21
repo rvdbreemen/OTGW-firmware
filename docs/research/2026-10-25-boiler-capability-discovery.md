@@ -9,7 +9,7 @@
 - Firmware files are under `src/OTGW-firmware/`.
 - `gateway.asm` is `other-projects/otgw-6.6/gateway.asm`. Field units run PIC 6.8 (TASK-1344 notes), so every PIC citation comes from a single source, version 6.6.
 - thermo-nova paths are relative to `other-projects/SAT-releases-thermo-nova/custom_components/sat`. That snapshot records upstream 7beaaf5.
-- `corr:` is `docs/sat/sergeant-d-corrections.md`.
+- `corr:` is `docs/sat/decisions/sergeant-d-corrections.md`.
 - `capslog` is `other-projects/otmonitor-6.6/otmonitor.vfs/lib/tcl8/8.6/capslog-1.0.tm`.
 
 **Verification:** every citation without "(relayed)" was opened in this session. The ones marked "(relayed)" come from earlier explorations and were not reopened. **Fact**, **Inference** and **Opinion** are labelled.
@@ -290,7 +290,7 @@ One record per boiler. Each fact has a source, a confidence and an age.
 1. A now. Bench-capture M3 first.
 2. Then B.
 3. C only per area, after his answer.
-4. Queue the questions as Q40 and Q41 in `docs/sat/open-questions.md`, asked one at a time after Q12:
+4. Queue the questions as Q40 and Q41 in `docs/sat/decisions/open-questions.md`, asked one at a time after Q12:
    - **Q40 (Tret detection):** A) never reported, `None` as in thermo-nova (heating_control.py:393); B) Unknown on MsgID 28; C) Data-Invalid or stale; D) present only through the board sensor.
    - **Q41 (MaxTSet bounds):** entry 48 says the MsgID 57 bounds. The spec puts bounds in 49 and writability in 6, and named boilers misreport 6. Which applies?
 5. **Q42, a third question, before any "on/off → PWM" mapping:** does entry 13 rule out a capability-forced PWM?
@@ -308,4 +308,4 @@ One record per boiler. Each fact has a source, a confidence and an age.
 
 ---
 
-Follow-up task for M3: TASK-1391. Questions queued as Q40-Q42 in docs/sat/open-questions.md.
+Follow-up task for M3: TASK-1391. Questions queued as Q40-Q42 in docs/sat/decisions/open-questions.md.

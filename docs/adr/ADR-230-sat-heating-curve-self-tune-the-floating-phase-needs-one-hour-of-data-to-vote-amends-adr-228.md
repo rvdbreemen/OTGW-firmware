@@ -38,7 +38,7 @@ Accepted, 2026-11-12. Amends ADR-228 decision 4 (the decision rule) only; all ot
 The gate named in the frontmatter is the host test that compiles the real tuner.
 
 **Decision Maker:** Sergeant D (SAT design owner) for the rule, entries 313 and 315 of
-`docs/sat/sergeant-d-corrections.md`; Robert (maintainer) accepts or rejects this record. Robert chose on 2026-11-12 to
+`docs/sat/decisions/sergeant-d-corrections.md`; Robert (maintainer) accepts or rejects this record. Robert chose on 2026-11-12 to
 keep this ADR to the floating minimum and to give the PWM-hours rule of entry 316 its own ADR once Sergeant D has
 answered Q-1817a and Q-1817b (TASK-1817). Written by an agent (otgw-firmware-d3, TASK-1816).
 
@@ -146,7 +146,7 @@ its minimum-ticks check uses); `SATTUNED` logs `fvote` (1 the floating phase too
 
 ## References
 
-- `docs/sat/sergeant-d-corrections.md` entries 305, 313, 315 (and 298).
+- `docs/sat/decisions/sergeant-d-corrections.md` entries 305, 313, 315 (and 298).
 - `src/OTGW-firmware/SATcurveTune.h` (`SAT_CT_FLOAT_MIN_MS`), `src/OTGW-firmware/SATcontrol.ino` (`satTuneCloseDay()`,
   `satTuneRollHour()`, `satTuneLogDay()`).
 - `docs/sat/sat-log-format.md` (`SATTUNED fvote`).

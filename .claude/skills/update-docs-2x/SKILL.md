@@ -150,7 +150,7 @@ For each AC in order:
 > Edit only these two files. Report: sections changed and why, the `file:line` behind
 > each claim, findings, and anything that needs a decision rather than a doc edit.
 
-**Chapter 5 (SAT) adds:** read `docs/sat/sergeant-d-corrections.md` first. Describe what
+**Chapter 5 (SAT) adds:** read `docs/sat/decisions/sergeant-d-corrections.md` first. Describe what
 the firmware port does (`src/OTGW-firmware/SAT*.ino`). Any statement about what SAT
 should do needs a citation to a recorded decision or our firmware; a statement about Alex Wijn's
 SAT (a reference, not leading) cites `other-projects/SAT-develop/custom_components/sat/<file>:<line>`, opened

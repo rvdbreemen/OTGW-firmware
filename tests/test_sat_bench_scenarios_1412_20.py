@@ -9,7 +9,7 @@ Checks, on freshly generated output:
   - each scenario's stimulus is really in its fixture (decoded: MsgID 3 HB bit 4, Data-Invalid / Unknown-DataID / missing
     answers on the named IDs, the silent window, the DHW, flame and fault bits, the banner);
   - every scenario has expected outputs, and every expected output cites a source that exists: a "## N." heading in
-    docs/sat/sergeant-d-corrections.md, a "def name" in the named test file, the symbol in the named source file, an ADR
+    docs/sat/decisions/sergeant-d-corrections.md, a "def name" in the named test file, the symbol in the named source file, an ADR
     file; an output without a source must be marked open with the question to ask;
   - the generator is deterministic and index.json matches the files;
   - the firmware's own replay parser and scheduler (cut from OTGW-Core.ino through tests/test_replay_timing.py, nothing
@@ -30,7 +30,7 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 GEN_PATH = REPO / "scripts" / "sat_bench_scenarios_1412_20.py"
-CORRECTIONS = REPO / "docs" / "sat" / "sergeant-d-corrections.md"
+CORRECTIONS = REPO / "docs" / "sat" / "decisions" / "sergeant-d-corrections.md"
 
 
 def load_gen():
@@ -194,6 +194,8 @@ class Generated(unittest.TestCase):
                 self.assertTrue(doc["fixture"] or doc["uses_fixture"], sid)
 
     def test_every_expected_output_cites_an_existing_source_or_is_open(self):
+        if not CORRECTIONS.exists():
+            self.skipTest("docs/sat/decisions submodule not checked out (private repo)")
         headings = set(re.findall(r"^## (\d+)\.", CORRECTIONS.read_text(encoding="utf-8"), re.M))
         checked = 0
         for sid, doc in self.expected.items():
@@ -220,6 +222,8 @@ class Generated(unittest.TestCase):
         self.assertGreater(checked, 40)
 
     def test_source_checker_rejects_a_made_up_citation(self):
+        if not CORRECTIONS.exists():
+            self.skipTest("docs/sat/decisions submodule not checked out (private repo)")
         headings = set(re.findall(r"^## (\d+)\.", CORRECTIONS.read_text(encoding="utf-8"), re.M))
         self.assertNotIn("99999", headings)
         text = (REPO / gen.SLAVE).read_text(encoding="utf-8")

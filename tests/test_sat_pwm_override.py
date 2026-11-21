@@ -705,7 +705,7 @@ class SatPwmOverride(unittest.TestCase):
     def test_overshoot_switch_with_the_old_setting_on_is_unchanged(self):
         self.assertEqual(self.run_sc("sw", 1, 1, "os")["mode"], "2")
 
-    # --- TASK-1273: duty-cycle BT (Sergeant D 2026-10-22, docs/sat/sergeant-d-corrections.md entry 1) ---
+    # --- TASK-1273: duty-cycle BT (Sergeant D 2026-10-22, docs/sat/decisions/sergeant-d-corrections.md entry 1) ---
     def test_duty_uses_the_live_flow_at_the_first_flame_not_a_placeholder(self):
         # requested 40, boiler at 60, nothing learned yet: (40-27.2)/(60-27.2) = 0.39; the old
         # base+20 placeholder gave (40-27.2)/(47.2-27.2) = 0.64 and burned much longer per cycle

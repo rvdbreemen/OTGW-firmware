@@ -58,7 +58,7 @@ results. Check the firmware version against the newest beta; an old build is wor
   and turn it into a question for the tester.
 - **SAT**: the firmware is never the source of truth for SAT behaviour. Any statement about what
   SAT should do needs a thermo-nova citation and a check against
-  `docs/sat/sergeant-d-corrections.md` (`.claude/rules/sat-ground-truth.md`). Stick to what the
+  `docs/sat/decisions/sergeant-d-corrections.md` (`.claude/rules/sat-ground-truth.md`). Stick to what the
   capture shows.
 - Compare with what we predicted where it applies (for example starts per day from the
   heat-pump simulation) and say whether one capture is enough.

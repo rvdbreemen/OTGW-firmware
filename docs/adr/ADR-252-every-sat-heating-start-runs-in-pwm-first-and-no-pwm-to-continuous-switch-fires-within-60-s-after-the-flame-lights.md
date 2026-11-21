@@ -72,7 +72,7 @@ heating start in continuous: after a heater off it disables PWM (`heating_contro
 PWM is off unless a saved state restores it (`pwm.py:63`, `:89`, `:112-114`), and PWM is enabled only on a sustained overshoot
 (`heating_control.py:262-305`). The firmware mirrored that until TASK-1942.
 
-Sergeant D, who decides SAT behaviour, decided otherwise (`docs/sat/sergeant-d-corrections.md`):
+Sergeant D, who decides SAT behaviour, decided otherwise (`docs/sat/decisions/sergeant-d-corrections.md`):
 
 - entry 385: every heating start runs in PWM first; PWM or continuous is chosen after the start sequence;
 - entry 387: the reasons: (1) after a restart SAT continues in PWM, (2) a start gets a short warm-up of the boiler components,
@@ -174,7 +174,7 @@ The firmware differs from thermo-nova here on purpose.
 
 ## References
 
-- TASK-1942; `docs/sat/sergeant-d-corrections.md` entries 348, 385, 387, 389, 391, 394.
+- TASK-1942; `docs/sat/decisions/sergeant-d-corrections.md` entries 348, 385, 387, 389, 391, 394.
 - `src/OTGW-firmware/SATcontrol.ino`: `satPwmFirstStart()`, `satStartGateActive()`, `satStartGateOpen()`, `satRestoreDeferredStep()`;
   `src/OTGW-firmware/SATcycles.ino`: `satCycleCheckPwmExits()`, `satCycleApplyEndOfCycle()`.
 - thermo-nova `custom_components/sat` at 7beaaf531ee99dc74a19ac74f3c06ce7f2922cfb: `heating_control.py:203-204`, `:229-231`,

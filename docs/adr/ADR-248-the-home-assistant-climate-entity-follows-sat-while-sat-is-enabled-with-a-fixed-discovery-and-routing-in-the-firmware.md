@@ -46,7 +46,7 @@ format: "canonical"
 
 Accepted, 2026-11-15.
 
-**Decision Maker:** User: Robert van den Breemen (maintainer), following Sergeant D's proposal (docs/sat/sergeant-d-corrections.md entries 351, 352, 353).
+**Decision Maker:** User: Robert van den Breemen (maintainer), following Sergeant D's proposal (docs/sat/decisions/sergeant-d-corrections.md entries 351, 352, 353).
 
 ## Status History
 
@@ -186,7 +186,7 @@ so the card is SAT's thermostat while SAT is enabled and today's thermostat card
 
 ## Open Questions
 
-- [x] What Sergeant D meant by "SAT should be displayed as `OTGW_Thermostat`" (entry 351): the entity's display name, or the gateway taking the thermostat role. Queued as Q-1979a in docs/sat/open-questions.md; this ADR keeps the name "Thermostat" until it is answered. — **Answered 2026-11-15 by User: Robert van den Breemen:** Keep the name 'Thermostat'. Decided by the coordinator under Robert's directive 2026-11-15 (CLI) 'Do not wait for Sergeant D. Finish everything that can be finished.' (Q-1979a option B, our recommendation); Sergeant D is asked in the same batch and may overrule, which then becomes a follow-up task.
+- [x] What Sergeant D meant by "SAT should be displayed as `OTGW_Thermostat`" (entry 351): the entity's display name, or the gateway taking the thermostat role. Queued as Q-1979a in docs/sat/decisions/open-questions.md; this ADR keeps the name "Thermostat" until it is answered. — **Answered 2026-11-15 by User: Robert van den Breemen:** Keep the name 'Thermostat'. Decided by the coordinator under Robert's directive 2026-11-15 (CLI) 'Do not wait for Sergeant D. Finish everything that can be finished.' (Q-1979a option B, our recommendation); Sergeant D is asked in the same batch and may overrule, which then becomes a follow-up task.
 
 ## Related Decisions
 
@@ -200,7 +200,7 @@ so the card is SAT's thermostat while SAT is enabled and today's thermostat card
 ## References
 
 - TASK-1979 (research notes, plan, review findings).
-- docs/sat/sergeant-d-corrections.md entries 2, 311, 351, 352, 353.
+- docs/sat/decisions/sergeant-d-corrections.md entries 2, 311, 351, 352, 353.
 - `src/OTGW-firmware/MQTTHaDiscovery.cpp:3023-3197`; `src/OTGW-firmware/MQTTstuff.ino:673-690`; `src/OTGW-firmware/SATcontrol.ino:2284`, `:3688-3710`, `:4988`, `:5023`, `:5106`, `:5199`; `src/OTGW-firmware/settingStuff.ino:1096-1115`; `src/OTGW-firmware/SATtypes.h:508-513`.
 - thermo-nova `custom_components/sat/climate.py:101`, `:557-568`, `:604-624`, `:858-865` at 7beaaf5.
 - Home Assistant MQTT climate: https://www.home-assistant.io/integrations/climate.mqtt/ and `other-projects/core-dev/homeassistant/components/mqtt/climate.py:213-216`, `:300-306`, `:709-710`.

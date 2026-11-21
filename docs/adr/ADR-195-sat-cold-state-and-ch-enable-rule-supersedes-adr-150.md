@@ -77,7 +77,7 @@ status_history:
 
 ## Context
 
-SAT (Smart Autotune Thermostat) is the firmware's port of the thermo-nova Home Assistant component. Ground truth for SAT behaviour is, in order: Sergeant D's recorded corrections in `docs/sat/sergeant-d-corrections.md`, then the thermo-nova code at commit `7beaaf531ee99dc74a19ac74f3c06ce7f2922cfb` (local copy `other-projects/SAT-releases-thermo-nova/`, paths below relative to `custom_components/sat`). The firmware is never a source of truth for SAT behaviour (CLAUDE.md, "SAT ground truth").
+SAT (Smart Autotune Thermostat) is the firmware's port of the thermo-nova Home Assistant component. Ground truth for SAT behaviour is, in order: Sergeant D's recorded corrections in `docs/sat/decisions/sergeant-d-corrections.md`, then the thermo-nova code at commit `7beaaf531ee99dc74a19ac74f3c06ce7f2922cfb` (local copy `other-projects/SAT-releases-thermo-nova/`, paths below relative to `custom_components/sat`). The firmware is never a source of truth for SAT behaviour (CLAUDE.md, "SAT ground truth").
 
 thermo-nova has one global cold threshold, `COLD_SETPOINT = 22` (`const.py:34`), next to `MINIMUM_SETPOINT = 10.0` (`const.py:35`). It uses it at six places:
 
@@ -99,7 +99,7 @@ ADR-150 (Accepted 2026-06-24) brought a per-heating-system cold setpoint into th
 
 ADR-150 names the SAT designer George; his Discord name is Sergeant D (handle sergeantd), the name the corrections file and this ADR use. Sergeant D (named George in ADR-150) is the same person.
 
-The decisions this ADR records, all from 2026-10-23, in `docs/sat/sergeant-d-corrections.md`:
+The decisions this ADR records, all from 2026-10-23, in `docs/sat/decisions/sergeant-d-corrections.md`:
 
 - **Entry 5** (PWM off: CH=0 together with CS=10), #alpha-testing 10:21 UTC (Coordinated Universal Time), https://discord.com/channels/812969634638725140/1514720723980259460/1563135315991072789: "When the PMW goes to OFF, correctly you send the CS=10 command, but you should also send the command CH=0." (His PMW means PWM.)
 - **Entry 7** (CH threshold and cold-start hold), 12:49 UTC, https://discord.com/channels/812969634638725140/1514720723980259460/1563172561162862714 ("below 28.2 not 22. Other than that follow the thermo-nova exactly") and 13:31 UTC, https://discord.com/channels/812969634638725140/1514720723980259460/1563182969345282071 ("You are correct"; "We can limit the cold start value to 28.2 and 21 for underfloor").
@@ -196,7 +196,7 @@ This departs deliberately from thermo-nova `heating_control.py:238` in two ways:
 
 ## Open Questions
 
-- [x] Sergeant D confirms the cutoff boundary: at or below (`<=`, thermo-nova) or strictly below (`<`, his wording)? — **Answered 2026-10-24 by User: Robert van den Breemen:** Settled: at or below (<=), as thermo-nova. Sergeant D answered 'keep the thermo-nova solution' on the cutoff (docs/sat/sergeant-d-corrections.md entry 12, 2026-10-23); the firmware uses <= since TASK-1323.
+- [x] Sergeant D confirms the cutoff boundary: at or below (`<=`, thermo-nova) or strictly below (`<`, his wording)? — **Answered 2026-10-24 by User: Robert van den Breemen:** Settled: at or below (<=), as thermo-nova. Sergeant D answered 'keep the thermo-nova solution' on the cutoff (docs/sat/decisions/sergeant-d-corrections.md entry 12, 2026-10-23); the firmware uses <= since TASK-1323.
 - [x] Sergeant D confirms CH=1 during the PWM ON phase whatever CS keeps the flame on (entry 9 point 1), on his own setup (TASK-1316 AC3). — **Answered 2026-10-24 by User: Robert van den Breemen:** Deferred: the rule is decided (entry 9); the remaining item is Sergeant D's confirmation on his own installation, tracked as TASK-1316 AC3. It does not change this decision.
 - [x] TASK-1327 lands, including the reset of the PWM disable guard timers on the cutoff. Done in commit `c3aa767a0` (`satPwmDisableOnHeaterOff()`, `satCycleResetSustainGuards()`).
 - [x] TASK-1238 decides how SAT's CH=0 reaches the boiler in OT-Direct gateway mode (MsgID 0, see ADR-179 Open Questions); until then the cutoff's CH=0 is not reliably honoured there. — **Answered 2026-10-24 by User: Robert van den Breemen:** Deferred to TASK-1238: this ADR decides when SAT wants CH=0, not how the bit reaches the boiler in OT-Direct gateway mode (ADR-179 Open Questions).
@@ -212,7 +212,7 @@ This departs deliberately from thermo-nova `heating_control.py:238` in two ways:
 
 ## References
 
-- `docs/sat/sergeant-d-corrections.md` entries 5, 7, 9, 11 and 12 (2026-10-23), with the Discord links quoted in Context.
+- `docs/sat/decisions/sergeant-d-corrections.md` entries 5, 7, 9, 11 and 12 (2026-10-23), with the Discord links quoted in Context.
 - thermo-nova at `7beaaf531ee99dc74a19ac74f3c06ce7f2922cfb`, `custom_components/sat`: `const.py:34-35`; `heating_control.py:69-72`, `:148-152`, `:229-238`, `:280-282`, `:317-319`, `:385`, `:388-389`, `:398`, `:441`, `:525-528`; `pwm.py:106-109`, `:219-223`; `coordinator/serial/__init__.py:212-214`.
 - Firmware at HEAD `c3aa767a0`: `src/OTGW-firmware/SATchEnable.h:26-29` (`satColdCutoff`), `:46-52` (`satChEnableDecide`); `src/OTGW-firmware/SATcontrol.ino:57-58`, `:266-270` (`satGetColdSetpoint`), `:353`, `:385-393`, `:432-441`, `:704-710`, `:906-936`, `:951`, `:966-975` (`satPwmReset`), `:997-1006` (`satPwmDisableOnHeaterOff`), `:2250`, `:4850-4858`, `:4978-4993`, `:5034`, `:5052-5069`; `src/OTGW-firmware/SATcycles.ino:147-152` (`satCycleResetSustainGuards`), `:197-209` (`satCycleInit`), `:951` (`satCycleCheckAutoSwitch`).
 - Tasks: TASK-891.2 (original cutoff), TASK-1316 (CH rule, commit `812cca580`, 2.0.0-alpha.471), TASK-1323 (solar offset, `<=`, `satChEnableDecide`, commit `9ec1b87e2`, 2.0.0-alpha.474), TASK-1324 (CH/MM resend gap), TASK-1327 (PWM off and reset on the cutoff, commit `c3aa767a0`, Done), TASK-1331 (`on_cycle_end` PWM re-enable, open), TASK-1238 (CH enable via MsgID 0 in OT-Direct gateway mode, open).

@@ -105,6 +105,6 @@ weather that overshoots up to 0.6 K and more in some runs before the reading ret
   AC2 is not met. Its failures are recorded with their causes (section 3).
 - **AC3** (limitations and failed scenarios recorded; no simulator result labelled physical proof): sections 3 and 4.
 
-Inputs for Sergeant D (observations, not proposals; one question at a time through docs/sat/open-questions.md):
+Inputs for Sergeant D (observations, not proposals; one question at a time through docs/sat/decisions/open-questions.md):
 the cold cutoff can end a PWM ON phase after less than 180 s of flame (entries 12, 199 vs the 180 s minimum of entries
 31, 80); and with throttled flow the return + 18 ignition hold can trip a boiler's high limit at once.

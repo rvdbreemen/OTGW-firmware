@@ -20,7 +20,7 @@ Deliverable of **TASK-1412.2** (review coverage R01, R06, R07, R08, R09, R14, R1
 | thermo-nova | `releases/thermo-nova` @ `7beaaf531ee99dc74a19ac74f3c06ce7f2922cfb`, local copy `other-projects/SAT-releases-thermo-nova/`, paths relative to `custom_components/sat`. Only the ranges listed in section 11 were opened in this session; any other thermo-nova location is marked "(cited in entry N, not re-opened)". |
 | OpenTherm protocol | `docs/opentherm specification/OpenTherm-Protocol-Specification-v4.2.md`. Cited as section, PDF page (the `## Pagina N` marker in the file) and line in the repository text. |
 | OpenTherm application spec (AFS) | OpenTherm Application Functional Specification v1.1f, `D:/Users/Robert/Documents/GitHub/RvdB/OTGW-other-projects/OT-Spec/` (outside this repository). Section text read from the `.md` there; printed page numbers taken from the PDF text layer in the adjacent docling `.json` (field `page`, matching the printed "Page N" footer). The PDF itself could not be rendered in this session (no `pdftoppm`), so figures were not checked. |
-| Decision log | [sergeant-d-corrections.md](sergeant-d-corrections.md), entries 1 to 190 as on 2026-10-31. |
+| Decision log | [sergeant-d-corrections.md](decisions/sergeant-d-corrections.md), entries 1 to 190 as on 2026-10-31. |
 | Planning documents | The 2026-10-28/29 plans describe an older state. Since then TASK-1365, 1370, 1371, 1373, 1375, 1380-1383, 1385, 1390, 1405, 1513, 1531 are Done. Every "firmware today" statement below comes from code opened at the revision above, not from the register's wording. |
 
 Second-reader status: CLAUDE.md requires a second reader to open both citations before a thermo-nova-versus-firmware difference is published. **Every difference claim in this document is pending that second read.**
@@ -316,7 +316,7 @@ These can be written as tests in TASK-1412.3 now. Items 2 to 6 describe recorded
 
 ## 9. Queued for Sergeant D
 
-Proposed for the main session to add to [open-questions.md](open-questions.md) (this document does not edit it). One question per message, as the queue rules require. IDs are proposals; the main session assigns the final ones. Advice follows the 2026-10-30 ordering (best control result, then his recorded answers, then thermo-nova); it is our recommendation, not a decision.
+Proposed for the main session to add to [open-questions.md](decisions/open-questions.md) (this document does not edit it). One question per message, as the queue rules require. IDs are proposals; the main session assigns the final ones. Advice follows the 2026-10-30 ordering (best control result, then his recorded answers, then thermo-nova); it is our recommendation, not a decision.
 
 **QD-1 (R01, entry 179; possibly what entry 179 calls Q-1519j, which has no queue row).** The specification fixes what bit 4 means and makes honouring it mandatory (AFS 2.1.1.2.10, p9); Robert chose to build it after your OK (entry 179). This asks for your OK and one policy choice. The boiler reports MsgID 3 bit 4 = 1 ("master low-load not allowed"). Which PWM entries does that block?
 - A) All of them: the 60 s overshoot switch, PWM restored after a restart, the manual `pwm` mode command and the future end-of-cycle switch. SAT stays continuous. Consequence: such a boiler never gets SAT PWM, even if the user asks for it.

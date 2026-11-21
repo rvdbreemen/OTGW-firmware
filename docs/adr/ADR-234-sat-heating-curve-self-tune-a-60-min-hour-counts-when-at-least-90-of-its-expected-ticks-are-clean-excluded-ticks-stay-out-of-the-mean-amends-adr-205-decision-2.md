@@ -46,7 +46,7 @@ Amends ADR-205 decision 2 (the clean hour) and entry 174's clean-hour rule. Ever
 ADR-231 stays in force. Implemented by TASK-1932.
 
 **Decision Maker:** Robert (maintainer) and Sergeant D (SAT design owner) for the rule: entry 340 of
-`docs/sat/sergeant-d-corrections.md` (Q-TUNE2 B, 2026-11-14), and entry 343 (Q-340a changed to B, 2026-11-14,
+`docs/sat/decisions/sergeant-d-corrections.md` (Q-TUNE2 B, 2026-11-14), and entry 343 (Q-340a changed to B, 2026-11-14,
 supersedes entry 341's A) for the share basis.
 Robert accepts or rejects this record.
 
@@ -211,7 +211,7 @@ ticks a full hour should have; its excluded ticks stay out of the hour mean and 
 ## References
 
 - TASK-1932 (implementation), TASK-1927 (evidence).
-- `docs/sat/sergeant-d-corrections.md` entries 174, 340, 341, 343.
+- `docs/sat/decisions/sergeant-d-corrections.md` entries 174, 340, 341, 343.
 - `src/OTGW-firmware/SATcontrol.ino:6291` (`satTuneTickReason`), `:6348` (`satTuneNoteReason`), `:6354`
   (`satTuneMarkReason`), `:6362` (`satTuneAddTick`), `:6398` (`satTuneCloseHour`), `:6752` (expected ticks).
 - `src/OTGW-firmware/SATcurveTune.h:19` (`SAT_CT_MIN_TICK_FRACTION`), `:25` (`SAT_CT_MIN_CLEAN_PCT`).

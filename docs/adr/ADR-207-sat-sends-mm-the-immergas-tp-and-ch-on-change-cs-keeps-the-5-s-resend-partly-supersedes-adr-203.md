@@ -48,7 +48,7 @@ format: "canonical"
 
 Accepted, 2026-11-02.
 
-The cadence is Sergeant D's decision in entry 237 of `docs/sat/sergeant-d-corrections.md` (2026-11-02, Discord messages 1566917384483381390 and 1566917834351575095). The 60 s repair resend is his decision too: entry 238 confirmed the resend after a cache reset or PIC restart, and entry 239 set the repair period to one minute (Discord message 1566926416170455091). The maintainer agreed (Discord messages 1566928520410832958, 1566928637830103083, 1566928681140490352). Q-1570a is answered.
+The cadence is Sergeant D's decision in entry 237 of `docs/sat/decisions/sergeant-d-corrections.md` (2026-11-02, Discord messages 1566917384483381390 and 1566917834351575095). The 60 s repair resend is his decision too: entry 238 confirmed the resend after a cache reset or PIC restart, and entry 239 set the repair period to one minute (Discord message 1566926416170455091). The maintainer agreed (Discord messages 1566928520410832958, 1566928637830103083, 1566928681140490352). Q-1570a is answered.
 
 This ADR replaces ADR-203 for MM and CH only. ADR-203 stays in force for CS (its 5 s resend). The front-matter `supersedes` list stays empty and ADR-203 is not touched by this proposal (see Consequences for what acceptance needs).
 
@@ -155,7 +155,7 @@ The repair resend is Sergeant D's decision (entries 238 and 239; our first propo
 
 ## References
 
-- `docs/sat/sergeant-d-corrections.md` entries 237, 238 and 239 (this decision and the 60 s repair resend), entry 236 (first proposal), entry 44 (changed for MM and CH), with their Discord links.
+- `docs/sat/decisions/sergeant-d-corrections.md` entries 237, 238 and 239 (this decision and the 60 s repair resend), entry 236 (first proposal), entry 44 (changed for MM and CH), with their Discord links.
 - thermo-nova (pinned copy `other-projects/SAT-releases-thermo-nova/`): `climate.py:706-710`; `coordinator/mqtt/opentherm.py:211-220`.
 - PIC firmware: `other-projects/otgw-6.6/gateway.asm:493-496`, `:1281`, `:1619-1641`, `:4752-4764`.
 - OT-Direct: `src/OTGW-firmware/OTDirect.ino:450-463`, `:2161-2180`.

@@ -93,7 +93,7 @@ status_history:
 
 ## Context
 
-SAT (Smart Autotune Thermostat) is the firmware's port of the thermo-nova Home Assistant component. Its PID (proportional-integral-derivative) controller trims the weather-compensated heating curve with the room-temperature error. Ground truth for SAT behaviour is, in order (ADR-196): Sergeant D's recorded decisions in `docs/sat/sergeant-d-corrections.md`, then thermo-nova at commit `7beaaf531ee99dc74a19ac74f3c06ce7f2922cfb` (local copy `other-projects/SAT-releases-thermo-nova/`, verified identical to that commit on 2026-10-22; paths below are relative to `custom_components/sat`), then the specs, then the firmware. Firmware citations are at the `dev` branch head (HEAD) `2d01d3297` (`src/OTGW-firmware/`); `git diff 2d01d3297 47a0d7e59 -- src` is empty, so the line numbers also hold at `47a0d7e59`.
+SAT (Smart Autotune Thermostat) is the firmware's port of the thermo-nova Home Assistant component. Its PID (proportional-integral-derivative) controller trims the weather-compensated heating curve with the room-temperature error. Ground truth for SAT behaviour is, in order (ADR-196): Sergeant D's recorded decisions in `docs/sat/decisions/sergeant-d-corrections.md`, then thermo-nova at commit `7beaaf531ee99dc74a19ac74f3c06ce7f2922cfb` (local copy `other-projects/SAT-releases-thermo-nova/`, verified identical to that commit on 2026-10-22; paths below are relative to `custom_components/sat`), then the specs, then the firmware. Firmware citations are at the `dev` branch head (HEAD) `2d01d3297` (`src/OTGW-firmware/`); `git diff 2d01d3297 47a0d7e59 -- src` is empty, so the line numbers also hold at `47a0d7e59`.
 
 Sergeant D's entry 28 (2026-04-05 to 2026-10-03) settles the PID: outside the deadband it is P + heating curve + derivative with the integral at 0; inside the deadband it is P + heating curve + integral with the derivative frozen at its last value; the integral compensates for other heat sources (sun, cooking, activity); the PID must be identical to `pid.py`; sensor noise is handled by a low-pass filter on the raw room temperature before the PID (TASK-894), not by changing the PID. On 2026-10-03 he said of the filter chain: "No, don't change anything. Everything looks good now".
 
@@ -177,7 +177,7 @@ The decided behaviour, each point with the firmware and the thermo-nova location
 **Benefits**
 
 - The PID record matches the code at `2d01d3297` and thermo-nova, with a citation per value.
-- The departures from `pid.py` are listed in one place, each tied to an audit finding or an entry, so they can be put to Sergeant D one at a time (`docs/sat/open-questions.md`).
+- The departures from `pid.py` are listed in one place, each tied to an audit finding or an entry, so they can be put to Sergeant D one at a time (`docs/sat/decisions/open-questions.md`).
 
 **Trade-offs**
 
@@ -192,7 +192,7 @@ The decided behaviour, each point with the firmware and the thermo-nova location
 
 ## Open Questions
 
-None open. Every question that was listed here has been answered by Sergeant D and recorded in `docs/sat/sergeant-d-corrections.md`; see "Resolved questions". The firmware differences from `pid.py` that some of these answers remove are implemented by the tasks named below. Until a task is Done, the code still shows the old difference; the Decision text states the decided rule and names that task as pending.
+None open. Every question that was listed here has been answered by Sergeant D and recorded in `docs/sat/decisions/sergeant-d-corrections.md`; see "Resolved questions". The firmware differences from `pid.py` that some of these answers remove are implemented by the tasks named below. Until a task is Done, the code still shows the old difference; the Decision text states the decided rule and names that task as pending.
 
 ## Resolved Questions
 
@@ -217,9 +217,9 @@ None open. Every question that was listed here has been answered by Sergeant D a
 
 ## References
 
-- `docs/sat/sergeant-d-corrections.md` entries 11 (answer 3) and 28 (sources include 2026-04-05 19:42 UTC: https://discord.com/channels/812969634638725140/1105556725714649128/1490436555050057789; and the 2026-10-03 08:42 UTC reply: https://discord.com/channels/812969634638725140/1514720723980259460/1555862708765593692).
+- `docs/sat/decisions/sergeant-d-corrections.md` entries 11 (answer 3) and 28 (sources include 2026-04-05 19:42 UTC: https://discord.com/channels/812969634638725140/1105556725714649128/1490436555050057789; and the 2026-10-03 08:42 UTC reply: https://discord.com/channels/812969634638725140/1514720723980259460/1555862708765593692).
 - thermo-nova pinned source: https://github.com/Alexwijn/SAT/tree/7beaaf531ee99dc74a19ac74f3c06ce7f2922cfb/custom_components/sat
-- `docs/sat/sat-port-audit-2026-10-24.md` findings 14, 15, 38 and 69, table row 40, correction F5 (`:1101-1103`); `docs/sat/open-questions.md` Q10.
+- `docs/sat/sat-port-audit-2026-10-24.md` findings 14, 15, 38 and 69, table row 40, correction F5 (`:1101-1103`); `docs/sat/decisions/open-questions.md` Q10.
 - thermo-nova at `7beaaf531ee99dc74a19ac74f3c06ce7f2922cfb`, `custom_components/sat`: `const.py:16`; `pid.py:20`, `:64-114`, `:132-137`, `:141-157`, `:159-192`, `:199-232`, `:239-251`; `helpers.py:148-150`; `temperature/state.py:16-18`; `climate.py:137`, `:143`, `:217-220`, `:461-464`, `:470-478`, `:499-502`, `:570-583`, `:641-660`, `:712-716`, `:808-832`.
 - Firmware at HEAD `2d01d3297`, `src/OTGW-firmware/`: `SATpid.ino:20-56`, `:63-66`, `:75-114`, `:120-182`, `:190-250`, `:254-323`; `SATtypes.h:466-467`, `:540-543`, `:549`; `settingStuff.ino:1000-1004`; `SATcontrol.ino:582`, `:1169`, `:1177`, `:1316`, `:1336`, `:2100-2131`, `:2190`, `:2230`, `:2239`, `:2381`, `:2417`, `:3905`, `:4699`, `:4745`, `:4800`, `:4844`, `:4905-4910`, `:4916-4943`, `:4957`, `:4977-4981`, `:5005`, `:5020`, `:5070`, `:5132-5135`, `:5239-5244`; `settingStuff.ino:989`; `MQTTstuff.ino:620`; `restAPI.ino:1349`, `:1600`.
 - Tasks: TASK-1355 (this supersession), TASK-894 (room EMA), TASK-1195 (derivative timer, error rounding), TASK-1323 (solar freeze), TASK-8 (integral outside the deadband, reverted).

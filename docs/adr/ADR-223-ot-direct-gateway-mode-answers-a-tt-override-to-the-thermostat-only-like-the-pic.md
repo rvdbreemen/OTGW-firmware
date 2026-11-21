@@ -211,6 +211,6 @@ The parity sub-points, decided by Robert on 2026-11-09:
 - `src/OTGW-firmware/OTDirect.ino`: 420-431 (`otOverrides`), 464-466 (tolerances), 630-645
   (`applyOverrides`), 1397-1450 (MsgID 9/100 answers), 2345-2381 (`setRemoteOverride`), 2382-2404
   (`clearRemoteOverride`), 2419-2457 (`onThermostatMsgID16`).
-- `docs/sat/sergeant-d-corrections.md` entries 14, 16 and 286 (push-setpoint, `TC=`).
+- `docs/sat/decisions/sergeant-d-corrections.md` entries 14, 16 and 286 (push-setpoint, `TC=`).
 - thermo-nova at 7beaaf5: `climate.py:656-657`, `coordinator/mqtt/opentherm.py:206-209` (`TC=`),
   `coordinator/serial/__init__.py:204-208` with pyotgw `pyotgw.py:71-83` (`TT=` by default).

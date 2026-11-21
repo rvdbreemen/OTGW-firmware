@@ -154,7 +154,7 @@ Risk: low for the deletes (no workflow or script on dev uses them; evaluate.py g
 ## 4. Stays where it is (checked, no action)
 
 - **docs, process and SAT ground truth:**
-  - `docs/adr/**`, `docs/sat/sergeant-d-corrections.md` with its `.index.json`, `docs/sat/open-questions.md`;
+  - `docs/adr/**`, `docs/sat/decisions/sergeant-d-corrections.md` with its `.index.json`, `docs/sat/decisions/open-questions.md`;
   - `docs/manuals/`, `docs/MANUAL.md`, `docs/c4/`, `docs/api/` (except the one audit), `docs/releases/` (with its archive), `docs/reviews/`;
   - `docs/BREAKING_CHANGES.md`, `docs/upgrade-from-0.x.md`, `docs/guides/FLASH_GUIDE.md` (`evaluate.py:2877` warns if it moves), `docs/guides/BUILD.md`.
 - **Hardware and build inputs:**

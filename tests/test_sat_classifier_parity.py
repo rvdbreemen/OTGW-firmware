@@ -30,7 +30,7 @@ Q-PARITY-1 (entry 248, TASK-1586), Q-PARITY-3 (entry 244, TASK-1584), Q-PARITY-5
 TASK-1588) are implemented and have no difference left.
 Q-PARITY-2, -4, -6 and -11 are RECORDED deviations since entry 250 (maintainer, 2026-11-03): they stay in the catalogue as class (a).
 Every verdict difference between the two sides must appear in DIFFERENCES with its classification:
-  (a) already a RECORDED deviation: a decision of Sergeant D or the maintainer in docs/sat/sergeant-d-corrections.md (entry number given);
+  (a) already a RECORDED deviation: a decision of Sergeant D or the maintainer in docs/sat/decisions/sergeant-d-corrections.md (entry number given);
   (b) UNRECORDED: not decided; listed as an open question (Q-PARITY-n); behaviour is not changed here. None is left.
 A difference that is not listed fails the run, and a listed difference that no longer occurs fails too (remove it when fixed).
 The last test, TestParityGate.test_no_unrecorded_difference_remains, is a normal test: it fails as soon as a class (b) difference

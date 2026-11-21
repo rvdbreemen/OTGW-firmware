@@ -29,7 +29,7 @@ aliases:
   - "SAT anti-drift rules"
 components:
   - "SAT source precedence rule"
-  - "docs/sat/sergeant-d-corrections.md"
+  - "docs/sat/decisions/sergeant-d-corrections.md"
 symbols: []
 context_scope: "selective"
 format: "canonical"
@@ -70,7 +70,7 @@ Home Assistant component. SAT was designed on paper by Sergeant D and turned int
 code by Alex (Alexwijn); there is no written design document (CLAUDE.md, SAT
 ground-truth block, lines 465-486). Sergeant D is the person the maintainer calls
 George: ADR-150 line 41 names "George (the SAT author)", and
-`docs/sat/sergeant-d-corrections.md` line 3 says "Sergeant D designed SAT". He
+`docs/sat/decisions/sergeant-d-corrections.md` line 3 says "Sergeant D designed SAT". He
 is Discord user `sergeantd`, not the 1.x beta tester GeorgeZ83 (project memory,
 Discord people reference).
 
@@ -129,7 +129,7 @@ For every statement or change about SAT behaviour the sources rank in this
 order, and a higher source wins over a lower one:
 
 1. **Sergeant D's recorded corrections and decisions** in
-   `docs/sat/sergeant-d-corrections.md`: one numbered, dated entry each, with
+   `docs/sat/decisions/sergeant-d-corrections.md`: one numbered, dated entry each, with
    his words quoted and the Discord message link.
 2. **thermo-nova at the pinned commit**
    `7beaaf531ee99dc74a19ac74f3c06ce7f2922cfb` (2026-03-18,
@@ -166,7 +166,7 @@ architectural decision so that ADR authors and `/adr-kit:context` find it.
 
 ### Must
 
-- Read `docs/sat/sergeant-d-corrections.md` before writing a SAT ADR, plan,
+- Read `docs/sat/decisions/sergeant-d-corrections.md` before writing a SAT ADR, plan,
   review or SAT-control change, and cite the matching entry numbers or state
   "no entry covers this topic".
 - Cite thermo-nova as `file:line` at commit
@@ -281,7 +281,7 @@ architectural decision so that ADR authors and `/adr-kit:context` find it.
 
 ## References
 
-- `docs/sat/sergeant-d-corrections.md`, entries 1 to 12 (2026-10-22 and
+- `docs/sat/decisions/sergeant-d-corrections.md`, entries 1 to 12 (2026-10-22 and
   2026-10-23), notably entry 1 (#alpha-testing,
   https://discord.com/channels/812969634638725140/1514720723980259460/1562827601834418319),
   entry 4 (message 1562888583004688629, channel not recorded in the entry),

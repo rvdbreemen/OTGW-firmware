@@ -11,7 +11,7 @@ Reviewed at commit 3baed73d8 (dev), SAT code unchanged since f4b8be6d9. Written 
 
 A task that is Done, or a question that is answered, is **not** a physical-performance certificate. "Implemented" and "host-tested" never imply "physically verified". Every row below was written from source reading on 2026-10-29. Re-run by the second reader at bf5f84c54 (2026-10-29): test_sat_pwm_anchors 32 OK, test_sat_pwm_start_limit 21 OK, test_sat_overshoot_sustain 43 OK, test_sat_hp_pwm 22 OK, test_sat_pid_cadence 27 OK, test_sat_pwm_override 73 OK, test_sat_cycle_classifier 26 OK. Red-then-green not re-run. Second read done 2026-10-29 (opus reviewer); per-row verdicts below. No row is physically verified.
 
-The numbered entries stay in [sergeant-d-corrections.md](sergeant-d-corrections.md) (append-only; entries 122 to 125 of 2026-10-29 are our own findings or interpretations, not Sergeant D statements). The question queue stays in [open-questions.md](open-questions.md).
+The numbered entries stay in [sergeant-d-corrections.md](decisions/sergeant-d-corrections.md) (append-only; entries 122 to 125 of 2026-10-29 are our own findings or interpretations, not Sergeant D statements). The question queue stays in [open-questions.md](decisions/open-questions.md).
 
 | Item | Decision state | Implemented | Host-tested | Physically verified | Notes/refs |
 |---|---|---|---|---|---|

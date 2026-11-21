@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Build the machine-readable index of docs/sat/sergeant-d-corrections.md (TASK-1630).
+"""Build the machine-readable index of docs/sat/decisions/sergeant-d-corrections.md (TASK-1630).
 
 The register's entries are immutable, so their metadata lives next to them in
-docs/sat/sergeant-d-corrections.index.json, one record per entry. Every field is taken
+docs/sat/decisions/sergeant-d-corrections.index.json, one record per entry. Every field is taken
 from what the entry itself states; nothing is guessed:
 
   id                  entry number from the "## N." heading
@@ -35,8 +35,8 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-REGISTER = ROOT / "docs" / "sat" / "sergeant-d-corrections.md"
-INDEX = ROOT / "docs" / "sat" / "sergeant-d-corrections.index.json"
+REGISTER = ROOT / "docs" / "sat" / "decisions" / "sergeant-d-corrections.md"
+INDEX = ROOT / "docs" / "sat" / "decisions" / "sergeant-d-corrections.index.json"
 HEAD = re.compile(r"^## (\d+)\.\s+(.*)$", re.M)
 DATE = re.compile(r"\b(20\d\d-\d\d-\d\d)\b")
 LINK = re.compile(r"https://discord\.com/channels/[\d/]+")
@@ -155,6 +155,9 @@ def render(records):
 
 
 def main(argv):
+    if not REGISTER.exists():
+        print("SAT decision register not checked out (docs/sat/decisions, private submodule): skipped")
+        return 0
     records = build()
     want = render(records)
     if "--update" in argv:

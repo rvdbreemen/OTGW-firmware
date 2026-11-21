@@ -261,8 +261,8 @@ outside +-1.0 C of flow.
 
 ## References
 
-- Task: TASK-1519. Decisions: `docs/sat/sergeant-d-corrections.md` entries 72, 160-176; questions
-  `docs/sat/open-questions.md` Q-1519a .. Q-1519i.
+- Task: TASK-1519. Decisions: `docs/sat/decisions/sergeant-d-corrections.md` entries 72, 160-176; questions
+  `docs/sat/decisions/open-questions.md` Q-1519a .. Q-1519i.
 - Study: `docs/sat/sim-1519/round5b-round7.md` (sections 1-9), `docs/sat/sim-1519/evaluation-2026-10-31.md`,
   scripts `scripts/sat_curve_selftune_study*.py`, data `docs/sat/sim-1519/data/`.
 - Firmware anchors: coefficient `SATtypes.h:477`, clamp `settingStuff.ino:1060`, sun elevation

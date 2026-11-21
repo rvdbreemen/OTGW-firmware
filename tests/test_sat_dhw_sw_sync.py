@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """TASK-1376: SAT sends SW=<int> when the DHW setpoint changes and once after a restart, not at the start of a draw.
 
-Sergeant D entries 33, 53, 69, 121, 150 (docs/sat/sergeant-d-corrections.md); thermo-nova number.py:72-74 is its only SW sender.
+Sergeant D entries 33, 53, 69, 121, 150 (docs/sat/decisions/sergeant-d-corrections.md); thermo-nova number.py:72-74 is its only SW sender.
 
 Nothing is re-implemented: satDhwSetpointSync() is cut out of SATcontrol.ino and compiled with a host C++ compiler; the
 harness runs one control pass per call, with the setpoint, DHW control and SAT state set per scenario. The placement in

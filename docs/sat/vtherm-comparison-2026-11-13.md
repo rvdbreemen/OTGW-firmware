@@ -12,7 +12,7 @@ Status: internal analysis, not yet second-read. No claimed difference in this fi
 - **thermo-nova**: the pinned commit `7beaaf531ee99dc74a19ac74f3c06ce7f2922cfb`. Paths are relative to
   `custom_components/sat/`.
 - **Firmware**: `src/OTGW-firmware/` on `dev`. Corrections entries are in
-  [`sergeant-d-corrections.md`](sergeant-d-corrections.md).
+  [`sergeant-d-corrections.md`](decisions/sergeant-d-corrections.md).
 
 Every citation below was opened during the session that wrote this file. Two readers read the code,
 and the main session opened the core citations again: `pid.py:186-189`, `pwm.py:150-158`,
@@ -125,7 +125,7 @@ One control point is a question for Sergeant D: the integral (lesson 6).
   - (B) shrink (for example halve) instead of reset on leaving the band;
   - (C) a bounded leaky integral.
 - *Timing:* ask only after the evening analysis that entry 324 waits for, so we do not steer on a
-  hunch. Queued as Q-VT1 in [`open-questions.md`](open-questions.md).
+  hunch. Queued as Q-VT1 in [`open-questions.md`](decisions/open-questions.md).
 
 **7. Slope-based open-window detection.** Not proposed. With one reference room, PWM cycles produce
 room drops of their own, so false positives are likely. YAGNI unless testers ask for it.
@@ -206,4 +206,4 @@ Produced under TASK-1879.
 | 2. Tuner exclusion counters | TASK-1881 |
 | 3. Heating-failure / no-ignition event | TASK-1882 (needs-maintainer-ok) |
 | 4 + 5. Offline identification, tuner convergence test | TASK-1883 |
-| 6. Integral outside the deadband | Q-VT1 in [`open-questions.md`](open-questions.md) (queued, after the entry 324 evening analysis) |
+| 6. Integral outside the deadband | Q-VT1 in [`open-questions.md`](decisions/open-questions.md) (queued, after the entry 324 evening analysis) |

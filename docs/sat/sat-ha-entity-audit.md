@@ -47,7 +47,7 @@ comm -23 pub.txt disc.txt                                                       
 4. **No duplicate entities.** If the value already has an entity (OT entity, SAT sensor, switch state or climate attribute), the topic stays MQTT-only.
 5. **Firmware-only safety states have no thermo-nova counterpart.** Adding them is Robert's call, so they are listed as open with a recommendation.
 
-`docs/sat/sergeant-d-corrections.md` was searched for entity, health and sync entries. None of its entries governs which Home Assistant entities exist; they concern control behaviour. No conflict.
+`docs/sat/decisions/sergeant-d-corrections.md` was searched for entity, health and sync entries. None of its entries governs which Home Assistant entities exist; they concern control behaviour. No conflict.
 
 Columns: **Gate** = an extra condition on top of "SAT enabled". `satPublishMQTT()` returns early while SAT is disabled (`SATcontrol.ino:3299`). Only `satPublishCoreState()` (`:3248-3271`) publishes while SAT is off: enabled, fallback_active, push_refused, room_temp_lost, ot_link_lost, mode, control_mode and preset. "none" means published whenever SAT is enabled. A topic is published only under its gate. An entity on a gated topic shows "unknown" in HA until the gate opens. **Payload** = what the firmware publishes today.
 

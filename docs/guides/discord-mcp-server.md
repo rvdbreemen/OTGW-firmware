@@ -60,7 +60,7 @@ ground truth blocks of CLAUDE.md. In short:
 - Testers have no admin control: a change they ask for becomes a task labelled
   `needs-maintainer-ok`. Read-only members get one reply: "Changes go through Robert."
 - Every SAT correction or decision by Sergeant D is recorded in
-  `docs/sat/sergeant-d-corrections.md` in the same session, before it is implemented.
+  `docs/sat/decisions/sergeant-d-corrections.md` in the same session, before it is implemented.
 - Never name the OTGW32 board in public.
 
 ## When calls fail

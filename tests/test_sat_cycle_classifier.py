@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """TASK-1387: host test for the end-of-cycle classifier against thermo-nova cycles/classifier.py.
 
-Sergeant D entry 55 (docs/sat/sergeant-d-corrections.md, Q4 answer A): the firmware classifier must match
+Sergeant D entry 55 (docs/sat/decisions/sergeant-d-corrections.md, Q4 answer A): the firmware classifier must match
 thermo-nova cycles/classifier.py (pin 7beaaf5) exactly, with these firmware deviations from the plan:
   - cold setpoint 28.2 (radiators, entry 11) through satGetColdSetpoint(), not COLD_SETPOINT 22;
   - overshoot margin settings.sat.fOvershootMargin = 2.0 (entry 15), not OVERSHOOT_MARGIN_CELSIUS 3.0;

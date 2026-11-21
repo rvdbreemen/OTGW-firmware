@@ -18,7 +18,7 @@ person > Copy User ID. Mentions are written `<@USER-ID>`; check them by reading 
 
 | Name | Discord | User ID | Rules |
 |---|---|---|---|
-| <full name>, "Sergeant D" | <discord username> | `<user id>` | First source for SAT behaviour. Answer in English, one question per message. Record every correction or decision in docs/sat/sergeant-d-corrections.md before acting on it. Tasks may be named; builds are not announced to him. |
+| <full name>, "Sergeant D" | <discord username> | `<user id>` | First source for SAT behaviour. Answer in English, one question per message. Record every correction or decision in docs/sat/decisions/sergeant-d-corrections.md before acting on it. Tasks may be named; builds are not announced to him. |
 
 ## Alpha testers (#alpha-testing)
 

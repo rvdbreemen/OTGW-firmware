@@ -139,7 +139,7 @@ picked up through step 1.
 1. Read the task, its notes and the code it touches (follow the "what to
    read" table in `.claude/rules/navigation.md` and the C4 docs for the owning component).
 2. Run `/adr-kit:context <topic>` and honour the Accepted ADRs it returns. For anything that
-   touches SAT, also read `docs/sat/sergeant-d-corrections.md` and list in the plan the entries
+   touches SAT, also read `docs/sat/decisions/sergeant-d-corrections.md` and list in the plan the entries
    the change relies on or conflicts with (SAT ground truth block, `.claude/rules/sat-ground-truth.md`).
 3. Non-trivial new functionality: look for an open-source solution first and record
    what was considered (project rule).
@@ -154,7 +154,7 @@ picked up through step 1.
 Review the design as if someone else wrote it: missed callers and readers, other
 platforms and boards (`HAS_*`), old-firmware/new-UI mixes, settings migration, the
 2-concurrent-API rule, PROGMEM/no-String/no-ArduinoJson, MQTT/REST/HA contracts, and for SAT
-every entry in `docs/sat/sergeant-d-corrections.md` (a conflict goes to Sergeant D). Then
+every entry in `docs/sat/decisions/sergeant-d-corrections.md` (a conflict goes to Sergeant D). Then
 call the **advisor** with the plan (no advisor tool in this session: run one `opus`
 review agent on the plan instead). Adapt the plan to findings that hold; if you
 reject one, write down why. An architectural change, a new dependency or an API/MQTT
@@ -175,7 +175,7 @@ not leading) handles it where that helps, as the "SAT ground truth" block (`.cla
 requires; a plan without them is not ready to post. Record the wait in the task notes, leave the task `In Progress`, and continue
 the cycle with the next task that does not change SAT behaviour. When his answer
 arrives (via `/backlog_discord`), record it as a numbered entry in
-`docs/sat/sergeant-d-corrections.md` (quote, Discord link, firmware and, where relevant, Alex's code
+`docs/sat/decisions/sergeant-d-corrections.md` (quote, Discord link, firmware and, where relevant, Alex's code
 comparison, task id; SAT ground truth block in `.claude/rules/sat-ground-truth.md`) and in the task notes, then resume
 the task. The same applies to any correction he makes outside a pending question. SAT changes without a
 behaviour choice (logging, UI, graphs, docs) do not wait.
@@ -214,7 +214,7 @@ diff, each with its own lens and told to refute, not to approve:
   (`sonnet`);
 - add a lens when the change needs it (security for auth/OTA, UI for web changes);
 - for SAT changes, one reviewer checks the diff against every entry in
-  `docs/sat/sergeant-d-corrections.md` and reports any conflict that the plan did not name.
+  `docs/sat/decisions/sergeant-d-corrections.md` and reports any conflict that the plan did not name.
 
 Verify every finding yourself against the code. Fix the ones that hold (implementation
 agent), re-run the affected gates and tests, and note why you rejected the others. A

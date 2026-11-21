@@ -178,7 +178,7 @@ holds for 60 s, the 3.5 C / 30 s fail-safe stays unchanged on its own timer, and
 
 ## References
 
-- `docs/sat/sergeant-d-corrections.md` entry 407 (with the Q-407a answer), entries 327, 359, 360, 404.
+- `docs/sat/decisions/sergeant-d-corrections.md` entry 407 (with the Q-407a answer), entries 327, 359, 360, 404.
 - TASK-2005 (indigo's Vitodens capture 2026-11-16).
 - `src/OTGW-firmware/SATcycles.ino:35`, `:42`, `:1376`, `:1393`; `src/OTGW-firmware/SATtypes.h:541`;
   `src/OTGW-firmware/settingStuff.ino:283`, `:378`, `:693`.

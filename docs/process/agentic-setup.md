@@ -68,8 +68,8 @@ Waar het project zelf een term vastlegt (CLAUDE.md, ADR's, skills), volgt deze d
 |---|---|
 | **ADR, binding** | Een architectuurbesluit dat een patroon vastlegt en een CI- of testpoort heeft (ADR-080). Er zijn er nu 7, en `tests/test_adr_governance.py` bewaakt de lijst. **Structurele ADR's** worden alleen bij review gecontroleerd. |
 | **Ground truth (SAT)** | De rangorde voor SAT-gedrag: (1) het register van Sergeant D, (2) de thermo-nova-code op commit `7beaaf5`, (3) `docs/sat/thermo-nova-spec.md`, (4) de firmware en haar specs, die alleen beschrijven wat de port nu doet. Elke uitspraak citeert `file:line` en is in de huidige sessie geopend. |
-| **Beslisregister** | `docs/sat/sergeant-d-corrections.md`: genummerde, onveranderlijke entries met letterlijk citaat, Discord-link, vergelijking met thermo-nova en de firmware, de taak die eruit volgt en wat open blijft. Een latere entry die een eerdere wijzigt, noemt die eerdere. |
-| **Open-vragenwachtrij** | `docs/sat/open-questions.md`: de SAT-vragen die het port-team niet zelf mag beantwoorden, met de status queued, asked, answered of dropped. |
+| **Beslisregister** | `docs/sat/decisions/sergeant-d-corrections.md`: genummerde, onveranderlijke entries met letterlijk citaat, Discord-link, vergelijking met thermo-nova en de firmware, de taak die eruit volgt en wat open blijft. Een latere entry die een eerdere wijzigt, noemt die eerdere. |
+| **Open-vragenwachtrij** | `docs/sat/decisions/open-questions.md`: de SAT-vragen die het port-team niet zelf mag beantwoorden, met de status queued, asked, answered of dropped. |
 | **C4-documentatie** | `docs/c4/`: context, containers, componenten en code. Bepaalt welk component welke code bezit. |
 | **OpenWolf** | Contextlaag in `.wolf/`: `anatomy.md` (bestandsindex), `cerebrum.md` (lessen en Do-Not-Repeat), `buglog.json` en `memory.md`. Hooks rond Read en Write houden die bij. |
 | **graphify** | Kennisgraaf van `src/` in `graphify-out/` voor structuurvragen ("wat roept X aan"). |
@@ -178,8 +178,8 @@ De **hoofdsessie** is het enige orkestratiepunt. Ze draait skills (procedures di
 | `AGENTS.md` | 918 regels | Projectregels voor Codex, afgeleid van CLAUDE.md |
 | `docs/adr/` | ±210 ADR's, 7 binding | Architectuurbesluiten |
 | `docs/c4/` | context t/m code | Eigenaarschap van componenten |
-| `docs/sat/sergeant-d-corrections.md` | 269 entries, 6.013 regels | SAT-beslisregister |
-| `docs/sat/open-questions.md` | ±86 vragen | SAT-wachtrij |
+| `docs/sat/decisions/sergeant-d-corrections.md` | 269 entries, 6.013 regels | SAT-beslisregister |
+| `docs/sat/decisions/open-questions.md` | ±86 vragen | SAT-wachtrij |
 | `docs/sat/thermo-nova-spec.md` | | Specificatie afgeleid van de gepinde thermo-nova-code |
 | `other-projects/` | alleen lezen | Referentie-implementaties (otgw, otmonitor, OT-Thing, SAT thermo-nova) |
 | `.wolf/` | | OpenWolf-geheugen, buglog, Do-Not-Repeat |
@@ -345,7 +345,7 @@ Wat goed werkt: het bewijsregime (oud tegen fix, Done alleen met bewijs, reviewe
 | F3 | Middel | **De omgeving zit vast aan één werkplek.** De evaluate-hook heeft `cd 'D:/...'` en `|| true`. Bench-IP en COM4, webhook, Discord-MCP, people-file en ledger zijn lokaal. Alles draait met `bypassPermissions` en `Bash(*)`. | `.claude/settings.json` | TASK-1627, TASK-1632 (deels opgelost in TASK-1627, 2026-11-05: evaluate-hook draagbaar en meldt FAIL, hooksPath bij sessiestart; rest opgelost in TASK-1632: `scripts/alpha_ledger.py` herbouwt het ledger, postlog in `discord-post-build.sh`, sjabloon `.claude/discord-people.example.md`, runbook `docs/guides/second-machine-setup.md`) |
 | F3b | Middel | **Builds door hooks laten een build-stempel achter**, waardoor de stop-hook om een commit vraagt. | waargenomen 2026-11-04 | TASK-1628 |
 | F4 | Middel | **Regels groeien als lagen bij.** 673 regels, 14 directives, vervangen regels blijven staan, workarounds voor bugs op meerdere plekken. | `CLAUDE.md` | TASK-1631, TASK-1635 |
-| F5 | Middel | **Het SAT-register en de wachtrij zijn ongestructureerd.** Er is geen machineleesbare herkomst, maintainer-besluiten staan tussen die van Sergeant D, de statuskolom loopt achter (Q-1519b, -d, -e, Q-1531a, Q-1537a) en de geschiedenis is in "Update"-alinea's opgestapeld. | `docs/sat/open-questions.md` | TASK-1629, TASK-1630 (deel 1 opgelost in TASK-1629, 2026-11-05: statuskolom genormaliseerd, Live queue gegenereerd door `scripts/sat_open_questions.py`; deel 2 opgelost in TASK-1630, 2026-11-05: JSON-index `docs/sat/sergeant-d-corrections.index.json` met bron per entry (sergeant-d 222, maintainer 31, port-team 16) en bevestigingen) |
+| F5 | Middel | **Het SAT-register en de wachtrij zijn ongestructureerd.** Er is geen machineleesbare herkomst, maintainer-besluiten staan tussen die van Sergeant D, de statuskolom loopt achter (Q-1519b, -d, -e, Q-1531a, Q-1537a) en de geschiedenis is in "Update"-alinea's opgestapeld. | `docs/sat/decisions/open-questions.md` | TASK-1629, TASK-1630 (deel 1 opgelost in TASK-1629, 2026-11-05: statuskolom genormaliseerd, Live queue gegenereerd door `scripts/sat_open_questions.py`; deel 2 opgelost in TASK-1630, 2026-11-05: JSON-index `docs/sat/decisions/sergeant-d-corrections.index.json` met bron per entry (sergeant-d 222, maintainer 31, port-team 16) en bevestigingen) |
 | F6 | Laag | **Doorvoer is bewust geserialiseerd**: één build tegelijk, een benchtest per taak, maximaal 3 uur tussen builds. Waar de bottleneck zit is niet gemeten. | CLAUDE.md, Build Commands | TASK-1633, TASK-1636 |
 | F7 | Laag | **Onderzoek staat tussen gereedschap.** 45 `sat_*`-studies in `scripts/` worden veel vanuit `docs/sat/` aangeroepen. | `scripts/` | TASK-1634 |
 | F8 | Laag | **"`backlog task list` is leeg" lijkt niet (meer) universeel.** Op Linux met v1.46.1 werkt het. De workaround staat wel op meerdere plekken. | cloudsessie 2026-11-04 | TASK-1635 (opgelost in TASK-1635, 2026-11-05: bug reproduceert niet; workaround vervangen door de echte Windows-valkuil, `backlog.cmd` kapt argumenten met regeleinden af) |

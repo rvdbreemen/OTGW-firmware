@@ -10,7 +10,7 @@
 > **Scope.** This document describes what the firmware port does today. It is source rank 4 under
 > `.claude/rules/sat-ground-truth.md` and ADR-196: it is **not** a statement of what SAT should do.
 > The ground truth for SAT behaviour is Sergeant D's recorded decisions
-> (`docs/sat/sergeant-d-corrections.md`) and the pinned thermo-nova code. Differences between the
+> (`docs/sat/decisions/sergeant-d-corrections.md`) and the pinned thermo-nova code. Differences between the
 > firmware and thermo-nova are in `docs/sat/sat-comparison.md`.
 >
 > Every claim cites a firmware `file:line`. Each citation was opened by the author of a draft and

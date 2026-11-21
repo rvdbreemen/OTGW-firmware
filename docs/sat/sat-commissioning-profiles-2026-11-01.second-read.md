@@ -5,7 +5,7 @@ Independent second reader for `docs/sat/sat-commissioning-profiles-2026-11-01.md
 **Method.** Every cited location was opened in this session:
 - firmware `src/OTGW-firmware` at `d458ac307` (the doc names `159f47177`; the only commit between them is docs-only, so the firmware lines are the same);
 - thermo-nova `other-projects/SAT-releases-thermo-nova/custom_components/sat` (local snapshot commit `c5211afe`, which records itself as a mirror of `7beaaf5`);
-- `docs/sat/sergeant-d-corrections.md`, `docs/sat/open-questions.md`;
+- `docs/sat/decisions/sergeant-d-corrections.md`, `docs/sat/decisions/open-questions.md`;
 - OT protocol v4.2 md, AFS md;
 - the crosswalk and its second read, and verification plan lines 102 and 118.
 

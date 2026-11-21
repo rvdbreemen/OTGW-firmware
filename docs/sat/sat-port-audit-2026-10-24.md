@@ -14,7 +14,7 @@ by priority, so that Sergeant D (George), who designed SAT, can read it and corr
 - thermo-nova, the SAT reference code, branch `releases/thermo-nova`, pinned at commit `7beaaf5`
   (`7beaaf531ee99dc74a19ac74f3c06ce7f2922cfb`). A citation such as `pwm.py:155` is a path relative to
   `custom_components/sat` at that commit.
-- `docs/sat/sergeant-d-corrections.md`, entries 1-18. Entry 19 was recorded today. It is the "remove
+- `docs/sat/decisions/sergeant-d-corrections.md`, entries 1-18. Entry 19 was recorded today. It is the "remove
   the PWM auto switch setting" answer, and the audit treats it as recorded.
 - The firmware working tree on branch `dev` on 2026-10-24 (HEAD `6fe82f3b0` plus uncommitted
   changes). A citation such as `SATcontrol.ino:5145` points into `src/OTGW-firmware/`. Line numbers

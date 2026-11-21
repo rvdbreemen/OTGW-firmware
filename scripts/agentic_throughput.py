@@ -7,9 +7,9 @@ Prints a Markdown report. Sources and their limits:
   tasks       backlog/tasks + backlog/archive/tasks frontmatter. Lead time = created_date to
               updated_date of tasks whose status is Done. updated_date is the last edit, which is
               usually the Done edit, so the figure is an upper-bound approximation.
-  questions   docs/sat/open-questions.md: the first "asked YYYY-MM-DD[ ~]HH:MM" in a row's Status,
+  questions   docs/sat/decisions/open-questions.md: the first "asked YYYY-MM-DD[ ~]HH:MM" in a row's Status,
               and the date of the entry named by its checkmark, taken from
-              docs/sat/sergeant-d-corrections.index.json (day resolution).
+              docs/sat/decisions/sergeant-d-corrections.index.json (day resolution).
   labels      needs-maintainer-ok on tasks that are not Done.
   alpha tags  git log -G"_VERSION_PRERELEASE" -- src/OTGW-firmware/version.h on the current branch.
   waits       (TASK-1647) git history of the task files. A task waits for a maintainer decision
@@ -35,8 +35,8 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 TASK_DIRS = [ROOT / "backlog" / "tasks", ROOT / "backlog" / "archive" / "tasks"]
-QUESTIONS = ROOT / "docs" / "sat" / "open-questions.md"
-INDEX = ROOT / "docs" / "sat" / "sergeant-d-corrections.index.json"
+QUESTIONS = ROOT / "docs" / "sat" / "decisions" / "open-questions.md"
+INDEX = ROOT / "docs" / "sat" / "decisions" / "sergeant-d-corrections.index.json"
 
 # Wait markers (TASK-1647). "field" and "field-report" mark where a report came from, not a wait.
 MAINTAINER_LABELS = {"needs-maintainer-ok", "needs-decision"}
@@ -199,7 +199,7 @@ def main():
         for r in json.loads(INDEX.read_text(encoding="utf-8"))["entries"]:
             if r.get("date"):
                 entry_date[r["id"]] = dt.datetime.fromisoformat(r["date"])
-    register = sci.REGISTER.read_text(encoding="utf-8").replace("\r\n", "\n")
+    register = (sci.REGISTER.read_text(encoding="utf-8") if sci.REGISTER.exists() else "").replace("\r\n", "\n")
     for n, _title, body in sci.entries(register):
         t = re.search(r"(20\d\d-\d\d-\d\d)[ T,]+~?(\d\d):(\d\d) UTC", sci.source_line(body))
         if t:
@@ -209,7 +209,7 @@ def main():
         if re.search(r"(20\d\d-\d\d-\d\d)[ T,]+~?(\d\d):(\d\d) UTC", sci.source_line(body)):
             timed.add(n)
     waits, open_ages, excluded = [], [], 0
-    for line in QUESTIONS.read_text(encoding="utf-8").splitlines():
+    for line in (QUESTIONS.read_text(encoding="utf-8").splitlines() if QUESTIONS.exists() else []):
         m = re.match(r"^\| *((?:Q|Conf|QD)[\w.-]*)[^|]*\|([^|]*)\|([^|]*)\|", line)
         if not m:
             continue

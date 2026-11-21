@@ -13,7 +13,7 @@ reach SAT's flow/return feeds (SATboilerFeed.h, satFeedEventForFrame), so every 
 mode it needs: replay-only, satsim+replay, wire-slave-required (a real OpenTherm slave on the bus,
 not available yet) or host-only.
 
-Every expected output carries its source: a decision entry in docs/sat/sergeant-d-corrections.md,
+Every expected output carries its source: a decision entry in docs/sat/decisions/sergeant-d-corrections.md,
 a host test function, a code symbol or an ADR. An expectation no entry or test pins is written as
 open (expected: open, ask). tests/test_sat_bench_scenarios_1412_20.py checks that each source exists.
 

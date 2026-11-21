@@ -60,13 +60,22 @@ class SatGroundTruthBlock(unittest.TestCase):
         # Maintainer directive 2026-10-23 (TASK-1329): every correction or decision by
         # Sergeant D goes into one named file, in the same session, before implementing.
         b = block(RULE)
-        self.assertIn("docs/sat/sergeant-d-corrections.md", b)
+        self.assertIn("docs/sat/decisions/sergeant-d-corrections.md", b)
         self.assertIn("in the same session and before the change it leads to is implemented", b)
         # TASK-1330: decisions are checked against the recorded entries, conflicts go to him.
         self.assertIn("checked against Sergeant D's recorded decisions before it is taken", b)
         self.assertIn("never resolved silently", b)
-        self.assertTrue(os.path.exists(os.path.join(REPO, "docs", "sat", "sergeant-d-corrections.md")),
-                        "docs/sat/sergeant-d-corrections.md is missing")
+        self.assertIn("The register is private since 2026-11-21", b)
+        self.assertIn("rvdbreemen/OTGW-sat-decisions", b)
+        self.assertIn("refer to entries by number and never quote them", b)
+
+    def test_register_file_exists_when_the_submodule_is_checked_out(self):
+        # The register is private (rvdbreemen/OTGW-sat-decisions); public CI cannot fetch the submodule.
+        sub = os.path.join(REPO, "docs", "sat", "decisions")
+        if not (os.path.isdir(sub) and os.listdir(sub)):
+            self.skipTest("docs/sat/decisions submodule not checked out (private repo)")
+        self.assertTrue(os.path.exists(os.path.join(sub, "sergeant-d-corrections.md")),
+                        "docs/sat/decisions/sergeant-d-corrections.md is missing")
 
     def test_reference_snapshot_records_its_upstream_commit(self):
         # The reference snapshot carries an UPSTREAM_COMMIT marker; the block names that commit.

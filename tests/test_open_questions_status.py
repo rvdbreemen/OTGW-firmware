@@ -1,4 +1,4 @@
-"""Status hygiene of docs/sat/open-questions.md (TASK-1629).
+"""Status hygiene of docs/sat/decisions/open-questions.md (TASK-1629).
 
 The question table has an "Answered" column (a checkmark plus the entry number in
 sergeant-d-corrections.md) and a "Status" column (queued, asked, answered, dropped).
@@ -12,7 +12,7 @@ import re
 import unittest
 from pathlib import Path
 
-DOC = Path(__file__).resolve().parent.parent / "docs" / "sat" / "open-questions.md"
+DOC = Path(__file__).resolve().parent.parent / "docs" / "sat" / "decisions" / "open-questions.md"
 ROW = re.compile(r"^\| *((?:Q|Conf|QD)[\w.-]*)[^|]*\|")
 STATUS_WORDS = ("queued", "asked", "answered", "dropped", "decided")  # decided: Robert's directive 2026-11-15, not Sergeant D's answer
 
@@ -29,6 +29,8 @@ def table_rows(text):
 
 class OpenQuestionsStatus(unittest.TestCase):
     def setUp(self):
+        if not DOC.exists():
+            self.skipTest("docs/sat/decisions submodule not checked out (private repo)")
         self.text = DOC.read_text(encoding="utf-8")
         self.rows = list(table_rows(self.text))
 

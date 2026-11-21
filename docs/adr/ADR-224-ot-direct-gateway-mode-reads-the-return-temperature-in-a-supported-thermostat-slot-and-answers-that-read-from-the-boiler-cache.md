@@ -185,7 +185,7 @@ Field proof: a capture from tjfs. There is no bench with a thermostat in gateway
 ## References
 
 - **Tasks:** TASK-1759 (implementation plan), TASK-1707 (alternative slots), TASK-1701, TASK-1767 (the PIC `PM=` / `AA=` slot limit), Q-1759a.
-- **Corrections:** `docs/sat/sergeant-d-corrections.md` entries 287 and 290; entries 135, 149, 151 and 263 (the no-return fallback).
+- **Corrections:** `docs/sat/decisions/sergeant-d-corrections.md` entries 287 and 290; entries 135, 149, 151 and 263 (the no-return fallback).
 - **`src/OTGW-firmware/OTDirect.ino`:**
   - `:296-297` (`otBoilerCache`)
   - `:1517-1527` (`otBoilerCacheStore`)

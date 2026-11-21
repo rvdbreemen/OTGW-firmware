@@ -27,7 +27,7 @@ that changes it.
 ## 2. What we want to see (and where it shows)
 
 All lines below appear in the telnet log that the capture records. "Entry" is the numbered Sergeant D decision in
-`docs/sat/sergeant-d-corrections.md`.
+`docs/sat/decisions/sergeant-d-corrections.md`.
 
 | # | What | Decided in | How it shows in the capture |
 |---|---|---|---|

@@ -84,7 +84,7 @@ permission comes first (entry 213)". thermo-nova (pinned 7beaaf5) only shows the
 never acts on it.
 
 In the field the rule kept a Viessmann Vitodens 100-W (indigo_light, beta.339) in continuous mode forever: it reports bit 4 = 1, so
-`pwm_veto_reason` 2 / `pwm_veto_path` 1 / `slave_low_off_denied` true. Sergeant D, 2026-11-16 (docs/sat/sergeant-d-corrections.md):
+`pwm_veto_reason` 2 / `pwm_veto_path` 1 / `slave_low_off_denied` true. Sergeant D, 2026-11-16 (docs/sat/decisions/sergeant-d-corrections.md):
 
 - Entry 392: "Don't look at bit 4 at all. You should not consider MsgID3:HB4. boiler should be able to enter PWM" and "Probably was
   a wrong decision from my side". Reverses entries 213 and 214.
@@ -157,7 +157,7 @@ comes first (entry 213)"; the rest of ADR-249 stands.
 
 ## References
 
-- docs/sat/sergeant-d-corrections.md entries 213, 214, 215, 392, 393.
+- docs/sat/decisions/sergeant-d-corrections.md entries 213, 214, 215, 392, 393.
 - `src/OTGW-firmware/SATcycles.ino` `satPwmPermitted()` (TASK-2000).
 - thermo-nova 7beaaf5 coordinator/serial/binary_sensor.py:54.
 - TASK-2000, TASK-1412.4, TASK-1998 (field check on the Vitodens 100-W).

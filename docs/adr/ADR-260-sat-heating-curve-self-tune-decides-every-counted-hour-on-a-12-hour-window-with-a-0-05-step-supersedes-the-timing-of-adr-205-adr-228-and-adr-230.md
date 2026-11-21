@@ -206,7 +206,7 @@ the code that was reviewed for ADR-228; the header and this ADR say what a "day"
 
 ## References
 
-- TASK-1889; Sergeant D corrections entries 72, 305, 329, 340, 358, 367, 422, 423, 424; docs/sat/open-questions.md Q-1889a, Q-1889b.
+- TASK-1889; Sergeant D corrections entries 72, 305, 329, 340, 358, 367, 422, 423, 424; docs/sat/decisions/open-questions.md Q-1889a, Q-1889b.
 - `src/OTGW-firmware/SATcurveTune.h` (constants), `src/OTGW-firmware/SATcontrol.ino` (`satTuneCloseDay`, `satTuneFormat`,
   `satTuneParse`, `satTuneRollHour`, the `curve_tune` REST object and MQTT publish).
 - thermo-nova 7beaaf5 (`other-projects/SAT-releases-thermo-nova/custom_components/sat`): `entry_data.py:213`,

@@ -76,7 +76,7 @@ status_history:
 
 SAT (Smart Autotune Thermostat) decides whether the boiler heats from the requested setpoint: the cold cutoff of ADR-199 turns heating off when the requested setpoint is at or below the cold setpoint, and in PWM (pulse-width modulation: on/off cycles) the off phase does the same. The room temperature itself has no on/off threshold.
 
-Sergeant D, who designed SAT, asked for "a hot tolerance 0.1 and cold tolerance -0.1" on the SAT climate entity (entry 326 in `docs/sat/sergeant-d-corrections.md`) and pointed to the Home Assistant generic thermostat for the meaning (entry 328): heating stops when the room is at or above target + tolerance and starts again below target - tolerance. He then settled how it works in the firmware, one question at a time:
+Sergeant D, who designed SAT, asked for "a hot tolerance 0.1 and cold tolerance -0.1" on the SAT climate entity (entry 326 in `docs/sat/decisions/sergeant-d-corrections.md`) and pointed to the Home Assistant generic thermostat for the meaning (entry 328): heating stops when the room is at or above target + tolerance and starts again below target - tolerance. He then settled how it works in the firmware, one question at a time:
 - entry 361: the band only decides heating on/off, the proportional-integral-derivative (PID) controller keeps running, and the cold cutoff stays as it is;
 - entry 384 (Q-377a, "yes, B", confirming entry 377): a band stop sends CH=0 and PWM stays active, not CS=10 with PWM ending, so the burner does not restart inside the 20 minute PWM cycle when the room swings around target + 0.1;
 - entry 376 (Q-361c B): a continuous burn runs at least 180 s before a band stop, the same minimum as a PWM ON phase (entry 275);
@@ -167,7 +167,7 @@ While the tolerance band says stop, the CH-enable bit SAT sends is 0, and nothin
 
 ## References
 
-- `docs/sat/sergeant-d-corrections.md` entries 28, 59, 83, 90, 95, 275, 326, 328, 361, 376, 377, 378, 384, 398.
+- `docs/sat/decisions/sergeant-d-corrections.md` entries 28, 59, 83, 90, 95, 275, 326, 328, 361, 376, 377, 378, 384, 398.
 - thermo-nova 7beaaf5: `custom_components/sat/heating_control.py:66-72`, `:229-234`, `pwm.py:201-203`, `climate.py:384-385`.
 - Home Assistant generic thermostat: https://www.home-assistant.io/integrations/generic_thermostat/ (cold_tolerance, hot_tolerance).
 - `src/OTGW-firmware/SATchEnable.h` (`satToleranceMaxError`, `satToleranceDemand`, `satChEnableDecide`), `src/OTGW-firmware/SATcontrol.ino` (`satBandWaitsForMinBurn`, the band latch in the control tick, the reset after `satDisable()`).

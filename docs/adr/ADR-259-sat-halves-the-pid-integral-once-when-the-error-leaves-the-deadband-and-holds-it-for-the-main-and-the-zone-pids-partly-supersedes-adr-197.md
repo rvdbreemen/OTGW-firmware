@@ -80,7 +80,7 @@ thermo-nova, the SAT code this firmware ports, sets the integral to 0 whenever t
 class (`area.py:50`). The firmware followed that: `_pidUpdateIntegral()` (`SATpid.ino`) for the main PID and
 `satZonePidAdvance()` (`SATcontrol.ino`) for the zones; ADR-197 decision 3 records it.
 
-Decisions recorded in `docs/sat/sergeant-d-corrections.md`:
+Decisions recorded in `docs/sat/decisions/sergeant-d-corrections.md`:
 
 - entry 329 (Sergeant D, 2026-11-13, msg 1570710410427109397, on Robert's proposal): "We can follow this approach":
   outside the deadband, halve the integral instead of resetting it to 0;
@@ -173,7 +173,7 @@ PID and to every zone PID.
 
 ## References
 
-- `docs/sat/sergeant-d-corrections.md` entries 329 and 333; Q-329b (queued 2026-11-18).
+- `docs/sat/decisions/sergeant-d-corrections.md` entries 329 and 333; Q-329b (queued 2026-11-18).
 - thermo-nova 7beaaf5: `custom_components/sat/pid.py:185-189`, `const.py:16`, `area.py:50`.
 - `src/OTGW-firmware/SATpid.ino` `_pidUpdateIntegral()`, `src/OTGW-firmware/SATcontrol.ino` `satZonePidAdvance()`,
   `src/OTGW-firmware/SATtypes.h` `SATZoneState::bPidInBand`.

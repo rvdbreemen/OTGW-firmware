@@ -4,7 +4,7 @@ Author: otgw-ux-designer, 2026-11-20. Builder: otgw-webui. State semantics: answ
 
 **Scope: display only.** Nothing here changes what SAT sends to the boiler or when. The spec reads the fields that `/api/v2/sat/status` already sends and decides what the page says. Where a state cannot be told apart from today's fields, it says so and asks; it does not invent a field.
 
-**Source of truth.** This spec describes what the firmware port *reports*, read from the code at origin/dev b3d14f76a. ADR-196 ranks Sergeant D's entries and thermo-nova above the firmware for SAT behaviour. The sub-lines below say what SAT does in a state, so they were checked against `docs/sat/sergeant-d-corrections.md`:
+**Source of truth.** This spec describes what the firmware port *reports*, read from the code at origin/dev b3d14f76a. ADR-196 ranks Sergeant D's entries and thermo-nova above the firmware for SAT behaviour. The sub-lines below say what SAT does in a state, so they were checked against `docs/sat/decisions/sergeant-d-corrections.md`:
 
 | Entry | Settles | Sub-line it supports | Later entries checked | Agrees |
 |---|---|---|---|---|

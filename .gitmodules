@@ -7,3 +7,7 @@
 [submodule "other-projects"]
 	path = other-projects
 	url = https://github.com/rvdbreemen/OTGW-other-projects.git
+[submodule "docs/sat/decisions"]
+	path = docs/sat/decisions
+	url = https://github.com/rvdbreemen/OTGW-sat-decisions.git
+	branch = main

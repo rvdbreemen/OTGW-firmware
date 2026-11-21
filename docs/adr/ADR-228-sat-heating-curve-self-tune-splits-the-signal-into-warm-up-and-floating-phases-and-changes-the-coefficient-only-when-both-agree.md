@@ -50,7 +50,7 @@ integral (setpoint before the PWM (pulse-width modulation) override, minus the c
 (clean hour, bounds, PID (proportional-integral-derivative controller), persistence, setting, logging) stay in force. The gate named in
 the frontmatter is the host test that compiles the real tuner (ADR-080).
 
-**Decision Maker:** Sergeant D (SAT design owner) for the rule, entries 303-307 of `docs/sat/sergeant-d-corrections.md`;
+**Decision Maker:** Sergeant D (SAT design owner) for the rule, entries 303-307 of `docs/sat/decisions/sergeant-d-corrections.md`;
 Robert (maintainer) accepts or rejects this record. Written by an agent (otgw-firmware-d3, TASK-1796).
 
 ## Status History
@@ -248,7 +248,7 @@ and a phase without data in the window does not veto: the phase with data then d
 ## References
 
 - TASK-1796.
-- `docs/sat/sergeant-d-corrections.md` entries 163, 164, 171-176 (ADR-205 design, unchanged except signal and decision),
+- `docs/sat/decisions/sergeant-d-corrections.md` entries 163, 164, 171-176 (ADR-205 design, unchanged except signal and decision),
   298 (no tuner in thermo-nova), 302-307. Each agrees with this record: 302-306 are its source, 307 keeps the ADR-205 tuner
   on until this one ships; 163/171 (signal is
   setpoint minus curve) still hold per phase; 164/172-175 (3-day window, +-1.0 C, step 0.1) still hold per phase; 176

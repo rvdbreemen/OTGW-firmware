@@ -159,7 +159,7 @@ While SAT is in PWM and the PWM phase is ON, and there is heating demand, it swi
 
 ## References
 
-- Sergeant D corrections, `docs/sat/sergeant-d-corrections.md`:
+- Sergeant D corrections, `docs/sat/decisions/sergeant-d-corrections.md`:
   - entries 339, 342 (the replaced rule), 350 (build and watch), 433 and 435 (latch and margin, not chosen), 437 and 444 (live-flow duty);
   - entry 448 (answer D, the decision);
   - entry 449 (upstream at 5.0.0, the pin stays 7beaaf5).

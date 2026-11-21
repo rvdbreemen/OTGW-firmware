@@ -46,7 +46,7 @@ Sergeant D (entries 322, 323). Robert accepted this record on 2026-11-12 (DM msg
 the accept question 1570337513208414273).
 
 **Decision Maker:** Sergeant D (SAT design owner) for the rule: entries 316, 318 and 319 of
-`docs/sat/sergeant-d-corrections.md`, and entries 322 (Q-1817c A) and 323 (Q-1817d A), 2026-11-12. Robert (maintainer) accepts or rejects this record;
+`docs/sat/decisions/sergeant-d-corrections.md`, and entries 322 (Q-1817c A) and 323 (Q-1817d A), 2026-11-12. Robert (maintainer) accepts or rejects this record;
 he chose Q-1796b B as well (DM msg 1570171160111620147, relayed by the coordinator, TASK-1817 description).
 
 ## Status History
@@ -210,7 +210,7 @@ hour; for a heat pump and a hybrid, a PWM tick keeps excluding the hour (`pwm`) 
 
 ## References
 
-- `docs/sat/sergeant-d-corrections.md` entries 205, 298, 316, 318, 319; `docs/sat/open-questions.md` Q-1817c.
+- `docs/sat/decisions/sergeant-d-corrections.md` entries 205, 298, 316, 318, 319; `docs/sat/decisions/open-questions.md` Q-1817c.
 - `src/OTGW-firmware/SATcontrol.ino:6018-6031` (`satTuneTickReason`), `:6035-6039` (`satTuneTickPhase`),
   `:6077-6088` (`satTuneAddTick`), `:7580-7598` (the tick input), `:309-314` (`satGetEffectiveHeatingSource`).
 - `src/OTGW-firmware/SATcurveTune.h:18` (`SAT_CT_DEFAULT_MIN_MOD 5.0f`).

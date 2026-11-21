@@ -6884,14 +6884,14 @@
         "thermo-nova-spec"
       ],
       "components": [
-        "docs/sat/sergeant-d-corrections.md",
+        "docs/sat/decisions/sergeant-d-corrections.md",
         "SAT source precedence rule"
       ],
       "symbols": [],
       "context_scope": "selective",
       "decision_contract": {
         "must": [
-          "Read docs/sat/sergeant-d-corrections.md before writing a SAT ADR, plan, review or SAT-control change, and cite the matching entry numbers or state \"no entry covers this topic\".",
+          "Read docs/sat/decisions/sergeant-d-corrections.md before writing a SAT ADR, plan, review or SAT-control change, and cite the matching entry numbers or state \"no entry covers this topic\".",
           "Cite thermo-nova as file:line at commit 7beaaf531ee99dc74a19ac74f3c06ce7f2922cfb, opened in the current session.",
           "Record a new correction or decision by Sergeant D as a new numbered entry (date, verbatim quote, Discord link, thermo-nova and firmware comparison, task, what stays open), marking a short reply that we interpreted as an interpretation.",
           "Report a conflict between an entry and the thermo-nova code to Sergeant D with both citations.",
@@ -11579,7 +11579,7 @@
         "thermo-nova-spec"
       ],
       "components": [
-        "docs/sat/sergeant-d-corrections.md",
+        "docs/sat/decisions/sergeant-d-corrections.md",
         "other-projects/SAT-develop/",
         "SAT source precedence rule"
       ],
@@ -11587,7 +11587,7 @@
       "context_scope": "selective",
       "decision_contract": {
         "must": [
-          "Read docs/sat/sergeant-d-corrections.md before writing a SAT ADR, plan, review or SAT-control change. Cite the entry numbers it relies on, or state \"no entry covers this topic\".",
+          "Read docs/sat/decisions/sergeant-d-corrections.md before writing a SAT ADR, plan, review or SAT-control change. Cite the entry numbers it relies on, or state \"no entry covers this topic\".",
           "Cite our firmware as file:line and Alex's code as customcomponents/sat/ : at a named commit, opened in the current session.",
           "Answer a Sergeant D reference to Alex's code with a factual comparison: differences, pros and cons, recommendation, with citations.",
           "Treat a disagreement between our code and a recorded decision as a bug in the code.",

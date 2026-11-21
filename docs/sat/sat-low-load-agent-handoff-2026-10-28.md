@@ -20,7 +20,7 @@ Robert explicitly requested this handoff and execution-graph update in the Codex
 
 ## Decisions are separate gates
 
-Read docs/sat/sergeant-d-corrections.md first. Entry 111 settles Q55; entry 110 updates the underfloor default decision. Q53 (continuous clamp), Q54 / TASK-1426 (heat-pump MM), the remaining MaxTSet defaults/write behaviour and TASK-1415 write cadence remain governed by their recorded questions/owner. Entry 100 and the OT ID6 support/writability contract still need an explicit interoperability resolution. This handoff settles none of those policies. Interpretations in entries 104/107/108 are not silently upgraded to designer confirmation.
+Read docs/sat/decisions/sergeant-d-corrections.md first. Entry 111 settles Q55; entry 110 updates the underfloor default decision. Q53 (continuous clamp), Q54 / TASK-1426 (heat-pump MM), the remaining MaxTSet defaults/write behaviour and TASK-1415 write cadence remain governed by their recorded questions/owner. Entry 100 and the OT ID6 support/writability contract still need an explicit interoperability resolution. This handoff settles none of those policies. Interpretations in entries 104/107/108 are not silently upgraded to designer confirmation.
 
 ## Bench and release gates
 

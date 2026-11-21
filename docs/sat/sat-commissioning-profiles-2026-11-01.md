@@ -6,7 +6,7 @@ This document is a specification of what each profile must record and what SAT d
 
 ## 0. Sources and method
 
-- **Sergeant D entries:** `docs/sat/sergeant-d-corrections.md`, entries up to 191. Cited as "entry N".
+- **Sergeant D entries:** `docs/sat/decisions/sergeant-d-corrections.md`, entries up to 191. Cited as "entry N".
 - **thermo-nova:** `other-projects/SAT-releases-thermo-nova/custom_components/sat` at the pin `7beaaf5`. Locations marked "opened" were opened in this session. Others are marked "as recorded in entry N, not re-opened".
 - **Firmware:** `src/OTGW-firmware` at `dev` HEAD `159f47177`. Every firmware line number was taken from a `grep -n` or read in this session.
 - **OpenTherm:** `docs/opentherm specification/OpenTherm-Protocol-Specification-v4.2.md` (cited as "OT protocol line N"). AFS text: `OTGW-other-projects/OT-Spec/OT Application Functional Specification v1-1f.md` (cited as "AFS md:N").
@@ -68,7 +68,7 @@ Every installation that is used as evidence fills in this record before any actu
 
 ### 3.1 On/off versus modulating
 
-**Not distinguished in today's firmware.** SAT ignores ID3 HB bit 1 (control type) for control (entry 102), and there is no setting for a modulating versus on/off heat pump. A split exists only as a proposal in Q-1527a: entry 181 records the first version ("heat pump controls itself" for a modulating unit, a long time-proportional PWM for an on/off unit); the Q-1527a row in `docs/sat/open-questions.md` (line 163) records that after round 13 the direction for on/off heat pumps moved to a degree-minute mode. Q-1527a is open and not re-posed here, and none of its numbers is a value of this profile. One table therefore covers both; the rows that Q-1527a would change are marked "under review".
+**Not distinguished in today's firmware.** SAT ignores ID3 HB bit 1 (control type) for control (entry 102), and there is no setting for a modulating versus on/off heat pump. A split exists only as a proposal in Q-1527a: entry 181 records the first version ("heat pump controls itself" for a modulating unit, a long time-proportional PWM for an on/off unit); the Q-1527a row in `docs/sat/decisions/open-questions.md` (line 163) records that after round 13 the direction for on/off heat pumps moved to a degree-minute mode. Q-1527a is open and not re-posed here, and none of its numbers is a value of this profile. One table therefore covers both; the rows that Q-1527a would change are marked "under review".
 
 ### 3.2 Table
 

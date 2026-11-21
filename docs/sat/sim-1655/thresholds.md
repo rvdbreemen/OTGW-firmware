@@ -11,7 +11,7 @@ numbers were not looked at beyond pass/fail, and they only measured the run time
 
 ## Question
 
-Sergeant D (`docs/sat/sergeant-d-corrections.md` entries 277 and 278) attributes the slow warm-up to the derivative term,
+Sergeant D (`docs/sat/decisions/sergeant-d-corrections.md` entries 277 and 278) attributes the slow warm-up to the derivative term,
 not to the integral. The integral stays exactly as thermo-nova (entry 277). He proposes KD -10 %. We simulate
 KD x0.9 and x0.8 against today (x1.0).
 

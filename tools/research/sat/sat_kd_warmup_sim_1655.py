@@ -1,7 +1,7 @@
 """TASK-1655: does a lower KD shorten SAT's warm-up without hurting regulation? KD x1.0 (today) vs x0.9 vs x0.8,
 scored against the thresholds and the decision rule pre-registered in docs/sat/sim-1655/thresholds.md.
 
-Question (Sergeant D, docs/sat/sergeant-d-corrections.md entries 277/278): the slow warm-up comes from the derivative
+Question (Sergeant D, docs/sat/decisions/sergeant-d-corrections.md entries 277/278): the slow warm-up comes from the derivative
 term, not from the integral; the integral stays exactly as thermo-nova (entry 277). thermo-nova at 7beaaf5:
 kd = round(0.07 * 8400 * kp, 6) (custom_components/sat/pid.py:84-93), D = round(kd * raw_derivative, 3)
 (pid.py:109-114), raw derivative frozen inside the 0.1 C deadband (pid.py:205-207). Firmware: SATpid.ino:219

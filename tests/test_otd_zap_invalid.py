@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """TASK-1804 A2: a boiler Data-Invalid / Unknown-DataID answer to MsgID 1 or 56 drops the gateway's CS= / SW=, like the PIC.
 
-Decision: Q-1804a = A (2026-11-15, under Robert's directive, docs/sat/open-questions.md). PIC ground truth
+Decision: Q-1804a = A (2026-11-15, under Robert's directive, docs/sat/decisions/open-questions.md). PIC ground truth
 (other-projects/otgw-6.6/gateway.asm): ctrlsetptreturn :2822-2825 sets SysCtrlSetpoint on a Data-Invalid response to
 MsgID 1 (byte1 bit 5 is set for Data-Invalid and Unknown-DataID), so the thermostat's setpoint goes to the boiler again;
 InvalidHotWater :3141-3147 clears dhwsetpoint1/2 and the stored value, and does nothing when none was set. SH= (MsgID 57)

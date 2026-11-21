@@ -12,7 +12,7 @@ stores and publishes when it is fed the same frames. Nothing of the code under t
 The thin adapter in the cycle harness feeds one status frame per second and calls satCycleOnFlameChange on a flame-bit edge, the
 way SATcontrol.ino:6803-6814 does. OTGW-Core.ino's frame decode and the control loop around that call are NOT run here.
 
-Decisions applied here (docs/sat/sergeant-d-corrections.md): entry 266 (Q-TW-1) an unknown first off gap is excluded from the averages
+Decisions applied here (docs/sat/decisions/sergeant-d-corrections.md): entry 266 (Q-TW-1) an unknown first off gap is excluded from the averages
 and the duty EMA, entry 267 (Q-TW-2) mod_suppressed follows the PWM suppression, entry 268 (Q-TW-3) the 4 h / 24 h duty is flame-on
 seconds / window length, entry 269 (Q-TW-4) current_modulation is 100 while MM=T goes out.
 

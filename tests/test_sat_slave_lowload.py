@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """TASK-1412.4: host test for the slave low-load permission (OpenTherm MsgID 3, HB bit 4) in SAT.
 
-Decisions (docs/sat/sergeant-d-corrections.md): entry 213 (QD-1 A: bit 4 = 1 blocks every PWM entry path: the 60 s overshoot
+Decisions (docs/sat/decisions/sergeant-d-corrections.md): entry 213 (QD-1 A: bit 4 = 1 blocks every PWM entry path: the 60 s overshoot
 switch, PWM restored after a restart, the manual pwm command, the future end-of-cycle switch; SAT stays continuous), entry 214
 (QD-2 A: bit 4 turning 1 while PWM runs leaves PWM in that tick, the continuous setpoint goes out as with the underheat exit),
 entry 215 (QD-3 B: no PWM until a valid MsgID 3 reply) and ADR-157.

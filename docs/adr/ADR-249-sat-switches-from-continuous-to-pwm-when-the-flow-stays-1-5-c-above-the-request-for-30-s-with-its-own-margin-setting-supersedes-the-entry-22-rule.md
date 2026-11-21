@@ -75,7 +75,7 @@ status_history:
 
 SAT (Smart Autotune Thermostat) runs the boiler either continuously, following a flow setpoint, or in PWM (pulse-width modulation: on/off cycles). It leaves continuous for PWM when the boiler keeps delivering hotter water than requested, because the boiler cannot modulate low enough.
 
-thermo-nova at the pinned commit 7beaaf5 (the SAT ground truth after Sergeant D's decisions, ADR-196) switches when flow >= requested setpoint + `OVERSHOOT_MARGIN_CELSIUS` (3.0, `custom_components/sat/cycles/const.py:10`) holds for `OVERSHOOT_SUSTAIN_SECONDS` (60, `const.py:21`), in `_maybe_enable_pwm_on_sustained_overshoot()` (`heating_control.py:262-300`). Sergeant D first changed that to 2.0 C / 60 s (entry 22 in `docs/sat/sergeant-d-corrections.md`); the firmware took the margin from the setting `settings.sat.fOvershootMargin` (default 2.0, `SATtypes.h`), which also sets the margin of the cycle classifier (entry 37), and the 60 s from `SAT_OVERSHOOT_SUSTAIN_MS` (`SATcycles.ino`). Beside it sits a flame-out fail-safe: flow - requested >= 3.5 C for 30 s (entries 288 and 289, TASK-1762).
+thermo-nova at the pinned commit 7beaaf5 (the SAT ground truth after Sergeant D's decisions, ADR-196) switches when flow >= requested setpoint + `OVERSHOOT_MARGIN_CELSIUS` (3.0, `custom_components/sat/cycles/const.py:10`) holds for `OVERSHOOT_SUSTAIN_SECONDS` (60, `const.py:21`), in `_maybe_enable_pwm_on_sustained_overshoot()` (`heating_control.py:262-300`). Sergeant D first changed that to 2.0 C / 60 s (entry 22 in `docs/sat/decisions/sergeant-d-corrections.md`); the firmware took the margin from the setting `settings.sat.fOvershootMargin` (default 2.0, `SATtypes.h`), which also sets the margin of the cycle classifier (entry 37), and the 60 s from `SAT_OVERSHOOT_SUSTAIN_MS` (`SATcycles.ino`). Beside it sits a flame-out fail-safe: flow - requested >= 3.5 C for 30 s (entries 288 and 289, TASK-1762).
 
 On 2026-11-13 Sergeant D decided a tighter switch: flow - requested >= 1.5 C for 30 s (entry 327). On 2026-11-15 he answered the two follow-up questions: keep the 3.5 C / 30 s fail-safe beside it (Q-327a A, entry 359), and give the switch a separate value while the overshoot margin keeps 2.0 for the classifier, with no migration (Q-327b A, entry 360).
 
@@ -131,7 +131,7 @@ Everything else of the switch stays: equality counts (entry 86, Q43 A), the time
 
 ## Open Questions
 
-- [x] Q-327c: Sergeant D confirms that "a separate value for the switch" (entry 360) means a user setting with default 1.5 (asked non-blocking by 92 on 2026-11-15, #dev-sat-mqtt message 1571655324086050819, `docs/sat/open-questions.md` Q-327c; the implementation goes ahead under Robert's directive). — **Answered 2026-11-16 by User: Robert van den Breemen:** Robert (maintainer) chose A on 2026-11-16, Discord direct message (DM) 1571779788178194473 in reply to 1571670760131534909: accept with the user setting 'PWM switch margin' fPwmSwitchMargin, default 1.5 C, range 0.5-5.0. That settles the setting-versus-constant reading for the implementation; Sergeant D's own confirmation of Q-327c stays welcome and becomes a follow-up if he differs.
+- [x] Q-327c: Sergeant D confirms that "a separate value for the switch" (entry 360) means a user setting with default 1.5 (asked non-blocking by 92 on 2026-11-15, #dev-sat-mqtt message 1571655324086050819, `docs/sat/decisions/open-questions.md` Q-327c; the implementation goes ahead under Robert's directive). — **Answered 2026-11-16 by User: Robert van den Breemen:** Robert (maintainer) chose A on 2026-11-16, Discord direct message (DM) 1571779788178194473 in reply to 1571670760131534909: accept with the user setting 'PWM switch margin' fPwmSwitchMargin, default 1.5 C, range 0.5-5.0. That settles the setting-versus-constant reading for the implementation; Sergeant D's own confirmation of Q-327c stays welcome and becomes a follow-up if he differs.
 
 ## Related Decisions
 
@@ -141,7 +141,7 @@ Everything else of the switch stays: equality counts (entry 86, Q43 A), the time
 
 ## References
 
-- `docs/sat/sergeant-d-corrections.md` entries 22, 37, 86, 109, 213, 288, 289, 327, 359, 360.
+- `docs/sat/decisions/sergeant-d-corrections.md` entries 22, 37, 86, 109, 213, 288, 289, 327, 359, 360.
 - thermo-nova 7beaaf5: `custom_components/sat/heating_control.py:262-300`, `cycles/const.py:10`, `const.py:21`.
 - `src/OTGW-firmware/SATcycles.ino` (`satCycleCheckOvershootSwitch()`, `SAT_OVERSHOOT_SUSTAIN_MS`, `SAT_OVERSHOOT_FAILSAFE_DELTA_C`), `src/OTGW-firmware/SATtypes.h` (`fPwmSwitchMargin`).
 - TASK-1888, TASK-1762.

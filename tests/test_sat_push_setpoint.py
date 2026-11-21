@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""TASK-1272: host test for the SAT TC= push (Sergeant D entry 14, docs/sat/sergeant-d-corrections.md).
+"""TASK-1272: host test for the SAT TC= push (Sergeant D entry 14, docs/sat/decisions/sergeant-d-corrections.md).
 
 The real code is cut out of src/OTGW-firmware/SATcontrol.ino and compiled with a host C++ compiler:
 the command-cache block (SAT_CMD_REFRESH_MS up to the Thermal Drop section: satResetCmdCache(),

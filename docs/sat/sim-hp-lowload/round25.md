@@ -144,5 +144,5 @@ A capture is planned after 2026-11-05.
 
 ## Next
 
-Design question Q-1566a for Sergeant D (queued in `docs/sat/open-questions.md`): should SAT use a
+Design question Q-1566a for Sergeant D (queued in `docs/sat/decisions/open-questions.md`): should SAT use a
 short-horizon forecast term in the heating curve?

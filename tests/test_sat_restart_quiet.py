@@ -2,7 +2,7 @@
 """TASK-1482 / TASK-1390: host test for the SAT restart and the outside-temperature rule.
 
 Sergeant D entries 121, 126, 129 (restart), 56, 57 (outside temperature), with the hand-back of entry 47 and the
-resume of entry 79 (docs/sat/sergeant-d-corrections.md).
+resume of entry 79 (docs/sat/decisions/sergeant-d-corrections.md).
 
 Nothing is re-implemented. The test cuts the real code out of SATcontrol.ino and compiles it with a host C++ compiler:
   - the outside-temperature resolver (fix: "// --- satOutside begin" .. "end"; HEAD: satGetOutsideTemp());

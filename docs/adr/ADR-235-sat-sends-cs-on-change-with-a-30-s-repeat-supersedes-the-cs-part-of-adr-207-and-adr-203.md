@@ -120,7 +120,7 @@ tick repeats it once it is 29 s old, and a loop repeat timed on raw `millis()` s
   `fModSupOffset` 1.0); then the entry-112 clamp with `fFlowOffset` 2.0 (entry 349). A boiler without a return temperature
   gets the start-up flood in continuous mode too. A flame already burning when SAT is switched on is no start
   (`_sat_flameOffSeen`). The rule is Sergeant D's (Robert entry 338, Sergeant D entries 344, 347, 348, 349, recorded in
-  `docs/sat/sergeant-d-corrections.md`; thermo-nova has the start sequence in PWM only, `heating_control.py:224-225`,
+  `docs/sat/decisions/sergeant-d-corrections.md`; thermo-nova has the start sequence in PWM only, `heating_control.py:224-225`,
   `:380-448`); this ADR records only that its output uses the on-change sender.
 - The no-return start-up flood (TASK-1371, Sergeant D entries 45, 142, 149, 151) keeps its own cadence of one CS= every
   2 s, also when the value is unchanged (`satSendCS(cs, true)`, `:1987`, `:1999`). Entry 334 is read as being about the
@@ -205,7 +205,7 @@ tick repeats it once it is 29 s old, and a loop repeat timed on raw `millis()` s
 
 ## References
 
-- TASK-1924, TASK-1942; Sergeant D corrections entries 334, 335, 337, 338, 344, 347, 348, 349 (`docs/sat/sergeant-d-corrections.md`), 44, 237, 239.
+- TASK-1924, TASK-1942; Sergeant D corrections entries 334, 335, 337, 338, 344, 347, 348, 349 (`docs/sat/decisions/sergeant-d-corrections.md`), 44, 237, 239.
 - `src/OTGW-firmware/SATcontrol.ino:600`, `:687`, `:719`, `:721`, `:793`, `:951`, `:963`, `:1987`, `:1999`, `:2560`, `:2577`
   (lane-1924 at beta.250, baf84d9).
 - thermo-nova 7beaaf5 (https://github.com/Alexwijn/SAT/tree/7beaaf531ee99dc74a19ac74f3c06ce7f2922cfb): `custom_components/sat/climate.py:706-710`, `custom_components/sat/heating_control.py:236-238`.

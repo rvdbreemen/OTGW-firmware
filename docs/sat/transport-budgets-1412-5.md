@@ -280,5 +280,5 @@ python scripts/sat_transport_delay_1412_5.py --label D61 --otframes <hour1>/otfr
 The output is aggregates only. Raw field captures stay outside the repository.
 
 Related: TASK-1412.5, TASK-1412.21, TASK-1571 (echo-paced queue), LL-011/LL-011b in
-`tests/test_sat_lowload_contract.py`, entries 217, 218 and 241 in `docs/sat/sergeant-d-corrections.md`,
+`tests/test_sat_lowload_contract.py`, entries 217, 218 and 241 in `docs/sat/decisions/sergeant-d-corrections.md`,
 `docs/sat/sat-low-load-verification-plan-2026-10-28.md` (LL-015, PH-PROFILE).

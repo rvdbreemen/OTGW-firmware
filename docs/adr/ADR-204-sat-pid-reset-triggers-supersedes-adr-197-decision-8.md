@@ -81,7 +81,7 @@ status_history:
 
 ## Context
 
-SAT is the firmware's port of the thermo-nova Home Assistant component. Ground truth for SAT behaviour is, in order: Sergeant D's recorded decisions (`docs/sat/sergeant-d-corrections.md`), then thermo-nova at commit `7beaaf531ee99dc74a19ac74f3c06ce7f2922cfb`, then the specs, then the firmware (ADR-196). thermo-nova paths below are relative to `custom_components/sat` in the local copy `other-projects/SAT-releases-thermo-nova/`; the lines were opened in this session. Firmware paths are relative to `src/OTGW-firmware/`.
+SAT is the firmware's port of the thermo-nova Home Assistant component. Ground truth for SAT behaviour is, in order: Sergeant D's recorded decisions (`docs/sat/decisions/sergeant-d-corrections.md`), then thermo-nova at commit `7beaaf531ee99dc74a19ac74f3c06ce7f2922cfb`, then the specs, then the firmware (ADR-196). thermo-nova paths below are relative to `custom_components/sat` in the local copy `other-projects/SAT-releases-thermo-nova/`; the lines were opened in this session. Firmware paths are relative to `src/OTGW-firmware/`.
 
 Terms: PID is the controller of SAT, REST (representational state transfer) the HTTP API, MQTT (Message Queuing Telemetry Transport) the broker protocol, HVAC (heating, ventilation and air conditioning) the Home Assistant climate mode. TASK-1270 is the earlier bug where the first PID output after a reset was 0.
 
@@ -167,7 +167,7 @@ Implementation is TASK-1414.
 
 ## References
 
-- `docs/sat/sergeant-d-corrections.md` entries 73 (decision), 38 and 46 (stale-sensor path, out of scope) and 157 (readings acted on).
+- `docs/sat/decisions/sergeant-d-corrections.md` entries 73 (decision), 38 and 46 (stale-sensor path, out of scope) and 157 (readings acted on).
 - thermo-nova at commit `7beaaf531ee99dc74a19ac74f3c06ce7f2922cfb`, `custom_components/sat`: `pid.py:134-137` (`reset`), `climate.py:217-220`, `:461-464`, `:570-583`, `:610-624`, `:643-660`, `:785-796`, `:817-833`; `services.py:31-39`.
 - Firmware: `SATpid.ino` `satPidResetTerms()`; `SATcontrol.ino` `satResetControlState()`, `satApplyControlStateReset()`, `satControlLoopRun()`; `settingStuff.ino` `updateSetting()` (`SATtargettemp`, `SATenabled`); `MQTTstuff.ino` `_satResetIntegralCmd`; `restAPI.ino` reset paths.
 - Tests: `tests/test_sat_pid_resets.py`.

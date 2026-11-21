@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """TASK-1367 / TASK-1420: host test for the sustained switches of SAT (SATcycles.ino).
 
-Sergeant D entries 41, 86 (Q43 A, Q44 A, Q46 B), 88 (Q47 A), 95 (Q46b) and 108 (docs/sat/sergeant-d-corrections.md):
+Sergeant D entries 41, 86 (Q43 A, Q44 A, Q46 B), 88 (Q47 A), 95 (Q46b) and 108 (docs/sat/decisions/sergeant-d-corrections.md):
 the sustained overshoot (continuous -> PWM, 60 s), underheat (PWM -> continuous; TASK-1933 entries 342/350: flame on and request
 above the flow for 60 s, was flow <= request - 3 for 180 s) and saturation
 (PWM -> continuous, 300 s) are timed as thermo-nova does (heating_control.py:262-372, helpers.py:51-56 at pin
