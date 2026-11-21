@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-20T14:10:00Z'
-updated_date: '2026-11-21T03:46:00Z'
+updated_date: '2026-11-21T06:27:00Z'
 labels:
   - ux
   - webui
@@ -30,7 +30,7 @@ From the TASK-2952 UX review (docs/reviews/2026-11-20_ux-heuristic-v2-webui/READ
 - [x] #2 Every row of spec T1 section 2 measures at least its Proposal ratio, checked with mock-contrast.mjs in light and dark and by pixel sampling for the composite backgrounds (D1, D2b, D3, D4, F1, F2); 0 FAIL lines in both themes on Home, SAT (3 views) and Settings
 - [x] #3 The SAT pill is checked in heating, idle and off in both themes (heating needs a status fixture with a firing boiler_status)
 - [x] #4 v2.css:68 (.lang-menu li a.active color #0d2026) is replaced by --on-accent with no visual change
-- [ ] #5 python evaluate.py --quick shows no new FAIL (ADR-091 class drift included) and the full tests/webui suite passes, sat-chart-actual-flow.test.mjs included
+- [x] #5 python evaluate.py --quick shows no new FAIL (ADR-091 class drift included) and the full tests/webui suite passes, sat-chart-actual-flow.test.mjs included
 - [x] #6 Before/after screenshots of Home, SAT Control and Settings in light and dark show only the intended colour changes
 - [x] #7 tests/webui/contrast-tokens.test.mjs exists per docs/reviews/2026-11-20_ux-heuristic-v2-webui/spec-T1b-contrast-regression-test.md: layer A checks every row of spec T1 section 2 (undefined token = explicit failure), layer B scans the rendered pages, themes and state fixtures; colours normalised through a canvas (color-mix safe)
 - [x] #8 The contrast test is red on the pre-TASK-2956 data (output with the failing rows in the task notes), green on the change, and a scratch copy with --status-warn-text #9c5700 fails on row D2b
@@ -53,4 +53,6 @@ RED on pre-TASK-2956 data (tests/webui/contrast-tokens.test.mjs, OTGW_DATA_DIR =
 GREEN on the change: layer A all 21 rows pass (A1 5.83 ... D4 4.95), layer B 0 below the minimum in light and dark (3/3 tests pass). Mutation: scratch copy with --status-warn-text #9c5700 -> layer A FAIL D2b 4.44 only. Pixel sampling on screenshots (before -> after): F1 tag 2.57 -> 5.42, F2 3.97 -> 6.17, E1 pill 3.10 -> 5.18, E2 2.83 -> 6.01, E3 2.68 -> 5.06, E4 7.35 -> 7.35, D1 banner 1.77 -> 5.56, D3 6.58 -> 6.88, D2 badge 2.16 -> 6.80, B1 nav 2.82 -> 5.53. D2b/D4 (.dir-tb on Monitor) measured by layer A only, not pixel-sampled. Spec T1b fixture fix: /v2/device/info answers {device:{fwversion}}, not {fwversion}; with the spec's shape the beta banner never shows.
 
 Other checks: evaluate.py --quick 95 checks, 0 failed, design-system drift 0 FAIL. Colour-pinning webui tests one by one green: header-controls-same-height 2/2, lang-menu 7/7, sat-chart-actual-flow 4/4, sat-status-pill 1/1, settings-select-fits 2/2, mission-control-follows-theme 2/2, settings-reboot-badge 1/1. Screenshots before/after (Home, SAT Control heating+idle, Settings; light+dark) checked by eye: only the intended colour changes. Full tests/webui sweep still to run in a heavy slot (AC5).
+
+2026-11-21 07:01-07:26 (heavy slot from coordinator): rebased alone onto origin/dev d61678eef as 9c731ca26 (lane/ba-2956), beta.408; diff be15333dc..9c731ca26 -- src tests = only the TASK-2991 lines (v2.js 3, a11y-structure test 10) + build stamps. Full webui sweep, one file per node --test: files=93 pass 438 fail 0 (07:01-07:15). build.bat esp32-combo SUCCESS 00:06:54, zip OTGW-firmware-esp32-combo-2.0.0-beta.408+9c731ca-flash.zip sha256 1e851edd16da22b14403b439b8b3976767c0a2503e9e794cf6b0aa5dff493a0c, 13 files in OTGW-build-artifacts-safe/beta.408+9c731ca/, log OTGW-build-artifacts-safe/build-2956-408.log. Bench pending (otgw-bench-tester, .63 after 2991).
 <!-- SECTION:NOTES:END -->
