@@ -484,6 +484,7 @@ html[data-theme="dark"]{--accent:var(--brand-cyan);--nav:#383838;--tile-off:#545
   .ble-ctrls select{border:1px solid var(--border);background:var(--panel-2);color:var(--text);
     border-radius:7px;padding:5px 7px;font-size:.78rem;font-family:var(--font-sans)}
   .ble-val{font-family:var(--font-mono);font-size:.8rem;color:var(--muted);margin-left:auto}
+  .set-group-desc{margin:0 0 8px;font-size:.78rem;color:var(--muted)}
   .set-group h3{margin:0 0 4px;font-size:.95rem;display:flex;align-items:center;gap:8px}
   .set-group .gdesc{font-size:.76rem;color:var(--muted);margin:0 0 10px}
   .badge-reboot{font-size:.62rem;font-weight:700;color:var(--status-warn-text);

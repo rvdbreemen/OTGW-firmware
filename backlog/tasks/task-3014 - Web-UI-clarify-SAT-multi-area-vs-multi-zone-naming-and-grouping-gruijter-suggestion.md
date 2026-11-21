@@ -3,10 +3,11 @@ id: TASK-3014
 title: >-
   Web UI: clarify SAT multi-area vs multi-zone naming and grouping (gruijter
   suggestion)
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-11-21T16:14:00Z'
-updated_date: '2026-11-21T16:51:00Z'
+updated_date: '2026-11-21T17:38:00Z'
 labels:
   - webui
   - sat
@@ -24,7 +25,7 @@ gruijter, #alpha-testing msg 1573733241079468133 (2026-11-21): 'multi-area' vs '
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Robert decides which of the three suggestions to take
+- [x] #1 Robert decides which of the three suggestions to take
 - [ ] #2 Web UI groups and labels changed as decided; settings keys, MQTT and REST unchanged; screenshots before/after
 - [ ] #3 Docs/help text use the same names
 <!-- AC:END -->
@@ -89,4 +90,6 @@ Labels EN / NL / DE:
 Cost when approved: v2.js (labels, SAT_L2/L3 groups, two group explanation lines), i18n packs, settingsHelp.h (+ its gz) help texts, a browser test that checks the groups and labels, screenshots before/after, one build + bench. About half a day, low risk (no behaviour change).
 
 Open point for otgw-dev, not part of this task: settingsHelp.h says Zone headroom is 'unused with 4 zones or fewer' while Zone count allows 1 to 4, so as written the headroom never applies. Either the help text or the range is off; worth a check before it gets a prominent place in the Zones group.
+
+2026-11-21 Robert approved the proposal as written (coordinator). Built on lane/ba-3014: SET_META labels (Sensor 1-4, Weight sensor 1-4, Average several room sensors, Number of sensors, Number of zones; sub 'Averaged room sensors'), SAT_L2 groups 'Averaged room sensors' (on/off, count, sensor+weight pairs 1-4) and 'Zones' (count, timeout, headroom) with a one-line explanation each (new .set-group-desc), Technical 'Sensors' keeps Error monitoring; settings.group.areas -> averaged_room_sensors, multi_area removed, zones and group_desc added; NL/DE/EL labels (NL no longer has 'Aantal zones' twice); settingsHelp.h texts area N -> sensor N+1 and settingsHelpGz.h regenerated (test_progmem_assets_deflated 4 passed). Keys, MQTT and REST unchanged. Test tests/webui/sat-areas-zones-groups.test.mjs: RED on origin/dev 0/2 (group 'Areas'; NL 'Aantal zones' twice), GREEN 2/2; sat-area-sensor-mapping, v2-settings-sat-followups, setting-hints-two-lines, settings-help 29/0, i18n-lang 6/0, lang-menu 7/0, i18n-no-hardcoded 3/0; evaluate --quick 0 failed. Screenshots before/after light+dark: OTGW-build-artifacts-safe/evidence-TASK-3014/shots/. Note on 'side by side': the SAT settings use a CSS multi-column flow (columns:300px), so the two groups are adjacent in the flow; whether they render next to or under each other depends on the width and the other groups (in the 1400 px screenshot with only these groups they stack). A fixed two-up row would leave that layout. AC3 (manuals ch04/ch05 EN and h04/h05 NL still say area/multi-area) goes to otgw-docs (deferred to 25 Nov).
 <!-- SECTION:NOTES:END -->
