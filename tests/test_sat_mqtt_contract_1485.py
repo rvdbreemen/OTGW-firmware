@@ -91,9 +91,12 @@ COMMON = r"""
 #define strcasecmp_P strcasecmp
 #ifdef _MSC_VER
 #define strcasecmp _stricmp
+#else   // TASK-3020: g++/musl
+#include <strings.h>
 #endif
 #define SATDebugTln(x) ((void)0)
 #define SATDebugTf(...) ((void)0)
+#define strlcpy otgw_test_strlcpy   // TASK-3020: musl declares strlcpy extern
 static size_t strlcpy(char* d, const char* s, size_t n) { size_t l = strlen(s); if (n) { size_t c = l < n - 1 ? l : n - 1; memcpy(d, s, c); d[c] = 0; } return l; }
 static std::vector<std::string> g_out;
 static void feedWatchDog() {}

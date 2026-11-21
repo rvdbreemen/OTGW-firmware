@@ -87,6 +87,7 @@ COMMON = r"""
 #include <cstdlib>
 #include <cstring>
 #include <cmath>
+using std::isnan; using std::isfinite; using std::isinf;   // TASK-3020: g++/musl
 #include <string>
 #include <vector>
 #define F(x) x
@@ -99,6 +100,8 @@ COMMON = r"""
 #define strcasecmp_P strcasecmp
 #ifdef _MSC_VER
 #define strcasecmp _stricmp
+#else   // TASK-3020: g++/musl
+#include <strings.h>
 #endif
 #define DebugTf(...) ((void)0)
 static std::vector<std::string> g_out;

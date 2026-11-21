@@ -213,6 +213,7 @@ def build_cycle_exe(wd: Path):
                  "static int g_dailyCalls = 0;\n", "static void _dailyRecord(uint32_t, uint32_t, uint32_t, SATCycleClass, float) { g_dailyCalls++; }\n"):
         assert line in stubs, "stub not found in the classifier harness: " + line
         stubs = stubs.replace(line, "")
+    stubs += "#define strlcpy otgw_test_strlcpy\n"   # TASK-3020: musl declares strlcpy extern in <string.h>
     stubs += "static size_t strlcpy(char* d, const char* s, size_t n) { snprintf(d, n, \"%s\", s); return strlen(s); }\n"
     cpp = wd / "cyc.cpp"
     cpp.write_text(tcc.PRELUDE + tcc.extract_types(types_src, True) + stubs + body + MAIN2, encoding="utf-8")

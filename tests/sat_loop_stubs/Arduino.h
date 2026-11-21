@@ -25,10 +25,16 @@ struct __FlashStringHelper;           // incomplete on purpose, as on the real c
 #define vsnprintf_P vsnprintf
 #define strcmp_P strcmp
 #define strncmp_P strncmp
+#if defined(_MSC_VER)
 #define strcasecmp_P _stricmp
 #define strncasecmp_P _strnicmp
 #define strcasecmp _stricmp
 #define strncasecmp _strnicmp
+#else   // TASK-3020: g++/musl (NAS) has the POSIX names in <strings.h>
+#include <strings.h>
+#define strcasecmp_P strcasecmp
+#define strncasecmp_P strncasecmp
+#endif
 #define strlen_P strlen
 #define strcpy_P strcpy
 #define strncpy_P strncpy

@@ -64,6 +64,7 @@ static void g_append(const char* prefix, const char* fmt, va_list ap) {
 static void g_logf(const char* fmt, ...) { va_list ap; va_start(ap, fmt); g_append("", fmt, ap); va_end(ap); }
 static void satNarratef_P(PGM_P fmt, ...) { va_list ap; va_start(ap, fmt); g_append("NARR ", fmt, ap); va_end(ap); }
 #define SATDebugTf(...) g_logf(__VA_ARGS__)
+#define strlcpy otgw_test_strlcpy   // TASK-3020: musl declares strlcpy extern in <string.h>
 static size_t strlcpy(char* d, const char* s, size_t n) { size_t l = strlen(s); if (n) { size_t c = l >= n ? n - 1 : l; memcpy(d, s, c); d[c] = 0; } return l; }
 #define strlcpy_P strlcpy
 

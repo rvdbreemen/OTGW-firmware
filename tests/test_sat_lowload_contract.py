@@ -298,17 +298,20 @@ def delegated_results(module, cls, names):
         res = unittest.TestResult()
         suite.run(res)
         out = {n: (True, "") for n in wanted}
+        # TASK-3020: a setUpClass skip or error comes back as an _ErrorHolder without _testMethodName; name it by
+        # its description so the LL id reports it instead of crashing the whole contract run.
+        tname = lambda t: getattr(t, "_testMethodName", None) or str(t)   # noqa: E731
         for t, tb in res.failures + res.errors:
-            out[t._testMethodName] = (False, tb[-600:])
+            out[tname(t)] = (False, tb[-600:])
         for t, why in res.skipped:
             # the private SAT decision register (submodule docs/sat/decisions) is absent on public CI
             if "docs/sat/decisions submodule not checked out" in why:
                 continue
-            out[t._testMethodName] = (False, "skipped: %s" % why)
+            out[tname(t)] = (False, "skipped: %s" % why)
         for t, _ in res.expectedFailures:
-            out[t._testMethodName] = (False, "expectedFailure in the delegated suite")
+            out[tname(t)] = (False, "expectedFailure in the delegated suite")
         for t in res.unexpectedSuccesses:
-            out[t._testMethodName] = (False, "unexpected success in the delegated suite")
+            out[tname(t)] = (False, "unexpected success in the delegated suite")
         _delegated[key] = out
     return _delegated[key]
 
