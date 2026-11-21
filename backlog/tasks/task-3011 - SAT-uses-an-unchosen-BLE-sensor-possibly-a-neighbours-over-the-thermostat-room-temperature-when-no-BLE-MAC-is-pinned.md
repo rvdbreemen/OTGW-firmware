@@ -6,11 +6,11 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-21T15:38:00Z'
+updated_date: '2026-11-21T16:37:00Z'
 labels:
   - sat
   - ble
   - bug
-  - needs-maintainer-ok
 milestone: 2.0.0
 dependencies: []
 priority: high
@@ -29,3 +29,11 @@ Reported by gruijter, #alpha-testing msg 1573723870945353759 (2026-11-21). Verif
 - [ ] #2 Host test on the real satBLEUpdateState()/satGetRoomTemp(): with no pin and a fresh unknown sensor, SAT keeps the thermostat/MQTT room (red on old code, green on fix)
 - [ ] #3 Web UI / release notes say how to choose the BLE sensor
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-21: released by Robert in #alpha-testing (msg 1573738563596591167), recorded as entry 451 in the private SAT decision register: BLE feeds SAT only from a user-chosen sensor; a primary-source setting with multiple fallbacks is to be considered. Open per entry 451: default source order, failover default, migration of existing installs.
+
+2026-11-21 tester input (gruijter, msg 1573738963787714691, not a decision): make the source order MQTT-accessible, a command plus a retained state (e.g. sat/room_temp_sources = areas,external,thermostat), and the active source as its own topic (sat/room_temp_source, see TASK-3015). Design input for the open part of entry 451.
+<!-- SECTION:NOTES:END -->
