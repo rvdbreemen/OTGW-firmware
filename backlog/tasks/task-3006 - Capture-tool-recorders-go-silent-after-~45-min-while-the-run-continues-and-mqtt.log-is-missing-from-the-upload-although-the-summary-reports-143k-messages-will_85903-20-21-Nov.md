@@ -25,9 +25,9 @@ will_85903's 31 h capture (beta.392 device, capture tool on Windows, Python 3.14
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Reproduce or explain the silent stop of the telnet/frame/crashlog recorders (e.g. a NAS run folder, a blocking write, Python 3.14), with a test on the real tool that fails on the old code
-- [ ] #2 The tool notices a recorder that produced nothing for N minutes and reports it in summary.txt and gaps.log instead of continuing silently
-- [ ] #3 The upload zip contains mqtt.log whenever the summary reports MQTT messages, or the summary says why it is missing
+- [x] #1 Reproduce or explain the silent stop of the telnet/frame/crashlog recorders (e.g. a NAS run folder, a blocking write, Python 3.14), with a test on the real tool that fails on the old code
+- [x] #2 The tool notices a recorder that produced nothing for N minutes and reports it in summary.txt and gaps.log instead of continuing silently
+- [x] #3 The upload zip contains mqtt.log whenever the summary reports MQTT messages, or the summary says why it is missing
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -44,4 +44,6 @@ will_85903's 31 h capture (beta.392 device, capture tool on Windows, Python 3.14
 2026-11-21 AC #2: StreamWatch in the capture main loop (every 30 s) watches telnet.log, otframes.log (unless --skip-frame-capture) and mqtt.log (when MQTT runs); a stream that wrote at least once and then nothing for --stream-silent-minutes (default 10, 0 = off, launcher -StreamSilentMinutes) is reported once in the TOOL ERRORS; when it writes again, or at stop, the silence goes into gaps.log (long run, via cap.gap) and a WARNING line into summary.txt. crashlog.log is not watched (it logs only changes). The store keeps the last successful write per stream (aware time). A check error never stops the capture. Own mistake caught by tests/test_capture_tool.py: first version compared a naive store time with an aware watch time and crashed the run (21 failures); fixed + test h. Evidence: tests/test_capture_write_recovery.py OK (10 tests; the watch tests error on the old code: no StreamWatch), tests/test_capture_tool.py OK (skipped=2). Not done: reconnect on 'no data while health OK' (otgw-dev point 3): the watch reports it, it does not reconnect.
 
 2026-11-21 AC #3: convert_mqtt_csv() now also reads short-run 'topic payload' lines (empty host_time/retain); before, they gave 0 rows and csv/mqtt.csv was deleted from the upload. A short-run upload now says in summary.txt where the MQTT messages are (transcript section MQTT BROKER STREAM + csv/mqtt.csv), or warns when mqtt.log held no MQTT line. mqtt.log itself stays out of a short-run upload by design (it is already in the transcript). Evidence: tests/test_capture_write_recovery.py MqttCsv: old code 1 row (FAIL 1 != 3), fix 3 rows; tests/test_capture_tool.py OK (skipped=2).
+
+2026-11-21 ACs 1-3 ticked on host evidence (tests/test_capture_write_recovery.py, 11 tests, each red on the old code; tests/test_capture_tool.py OK, which runs the real tool as a subprocess against a fake device). Still open before Done: an end-to-end run of the fixed tool on the NAS via 09 (not on .63, which is in the 25 h telemetry soak), and the push. Not reproduced: the share itself dropping the handle (will_85903's NAS); the test models it with a handle whose writes raise OSError 22.
 <!-- SECTION:NOTES:END -->
