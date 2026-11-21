@@ -9373,48 +9373,53 @@
     },
     {
       "id": "ADR-236",
-      "title": "SAT leaves PWM for continuous when the flame is on and the request stays above the flow for 60 s (replaces the thermo-nova underheat exit)",
+      "title": "SAT leaves PWM for continuous only when the flow stays at least 3.0 C under the request for 180 s, thermo-nova's underheat exit",
       "path": "ADR-236-sat-leaves-pwm-for-continuous-when-the-flame-is-on-and-the-request-stays-above-the-flow-for-60-s-replaces-the-thermo-nova-underheat-exit.md",
       "format": "canonical",
       "status": "Proposed",
       "date": "2026-11-14",
-      "decision_summary": "While SAT is in PWM and the PWM phase is ON, it switches to continuous when the flame is on and the requested setpoin...",
+      "decision_summary": "While SAT is in PWM and the PWM phase is ON, it switches to continuous only when, with the flame on, the flow is at o...",
       "topics": [
         "control-mode",
         "pwm",
         "sat"
       ],
       "aliases": [
-        "entry 342 exit",
+        "entry 448 exit",
         "PWM to continuous",
         "PWM underheat exit",
-        "Q-342a"
+        "Q-342b",
+        "thermo-nova underheat exit"
       ],
       "components": [
         "SAT PWM to continuous exit"
       ],
       "symbols": [
         "SAT_UNDERHEAT_SUSTAIN_MS",
+        "SAT_UNDERSHOOT_MARGIN_C",
         "satCycleCheckPwmExits"
       ],
       "context_scope": "selective",
       "decision_contract": {
         "must": [
-          "Count a tick only with the flame on and the request strictly above the flow (satIsFlameOn() && requestedSetpoint > flowTemp); any other tick clears the timer.",
-          "Fire on the first control tick at least SATUNDERHEATSUSTAINMS (60 000 ms) after the first qualifying tick.",
-          "Keep the PWM ON, hot-water and 300 s guards and the saturation exit as they are."
+          "What counts. A tick counts only with the flame on and flowTemp <= requestedSetpoint - SATUNDERSHOOTMARGINC (3.0 C, SATcycles.ino:43). Any other tick clears the timer.",
+          "When it fires. On the first control tick at least 180 s (SATUNDERHEATSUSTAINMS = 180,000 ms) after the first qualifying tick.",
+          "What stays as it is: the PWM ON, hot-water and 300 s guards, the saturation exit and the ADR-252 start gate."
         ],
         "must_not": [
-          "Count a tick with the flame off, or with the flow equal to or above the request.",
-          "Use the 3.0 C margin for this exit (SATUNDERSHOOTMARGINC stays for the cycle classifier only)."
+          "Count a tick with the flame off, or with the flow above request - 3.0 C.",
+          "Bring back the entry-342 60 s rule, or a margin or latch variant of it (Q-342b options B and C, TASK-2987 and TASK-2989 stay 2.1.0 per entry 448)."
         ],
         "exceptions": [
           "None."
         ],
         "verification": [
-          "tests/testsatovershootsustain.py compiles the real satCycleCheckPwmExits(): the exit fires 60 s after the first tick at 30 s and 60 s intervals, a flow 0.5 C below the request counts, a flow equal to the request does not, the flame off n...",
-          "Bench (TASK-1933 AC6, bench-tester): the exit fires as specified in a simulated warm-up, no reboot.",
-          "Field: the testers' captures are watched for PWM re-entries shortly after an ignition (hot water and slow ignition first), as promised to Sergeant D in entry 350."
+          "Host test. tests/testsatovershootsustain.py compiles the real satCycleCheckPwmExits():",
+          "the exit fires 180 s after the first tick at a flow 3.0 C below the request (equality counts, as heatingcontrol.py:338 returns only when flow > threshold);",
+          "a flow 2.9 C below never fires;",
+          "the flame off never counts. The cases fail on the entry-342 code; a mutant with a 60 s hold fails the 180 s case.",
+          "Replay. switch5.py on the indigolight and marceld captures gives 0 PWM to continuous exits in the loop windows (replay/REPORT.md, column \"thermo-nova 3 C / 180 s\").",
+          "Field. The next captures from indigolight and marceld are checked for PWM to continuous exits inside one burn."
         ]
       },
       "scope": {
@@ -18272,7 +18277,37 @@
     },
     {
       "source": "ADR-236",
-      "target": "ADR-235",
+      "target": "ADR-196",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-236",
+      "target": "ADR-249",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-236",
+      "target": "ADR-250",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-236",
+      "target": "ADR-252",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-236",
+      "target": "ADR-253",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-236",
+      "target": "ADR-254",
       "type": "related",
       "resolved": true
     },
