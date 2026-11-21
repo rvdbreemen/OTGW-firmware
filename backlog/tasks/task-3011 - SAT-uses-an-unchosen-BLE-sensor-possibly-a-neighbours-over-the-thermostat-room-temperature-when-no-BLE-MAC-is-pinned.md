@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-21T15:38:00Z'
-updated_date: '2026-11-21T16:45:00Z'
+updated_date: '2026-11-21T16:48:00Z'
 labels:
   - sat
   - ble
@@ -67,4 +67,6 @@ Scope after the answers: SATcontrol.ino (satGetRoomTemp + source enum), SATble.i
 2026-11-21 (coordinator, Robert DM): Q2 = A. A stale primary source falls back to the next source (ON by default). BLE sensor-to-sensor failover OFF by default, and when used only to sensors the user chose (never to an unchosen roster sensor). Implies: bBleFailover default false plus a one-time reset of persisted true (details with Q3). Still open: Q1 list vs single setting (clarifying DM), Q3 migration. No code.
 
 2026-11-21 (coordinator, Robert): Q1 settled = A. One primary room-source setting with the fixed fallback (primary -> next source -> thermostat -> curve only, per Q2 A). No ordered list: gruijter's MQTT command + retained state is only the interface that sets/reports that one value (for Homey), plus sat/room_temp_source (TASK-3015) for the active source. Q2 = A. Q3 (migration, recommendation C) with Robert. Code starts after Q3: 3011 + 3015 in one change, ADR via adr-kit (Proposed).
+
+2026-11-21 (coordinator, Robert DM 1573741732494053547): Q3 = C. Every stored BLE pin stays as the user's choice (primary = BLE when a pin exists); unpinned BLE stops feeding SAT; a one-time notice on the SAT page and in the log: SAT uses BLE sensor <name>, confirm or change; a stored bBleFailover=true is reset once to off. All three answered (Q1 A, Q2 A, Q3 C): code GO for 3011 + 3015 in one change, ADR via adr-kit (Proposed).
 <!-- SECTION:NOTES:END -->
