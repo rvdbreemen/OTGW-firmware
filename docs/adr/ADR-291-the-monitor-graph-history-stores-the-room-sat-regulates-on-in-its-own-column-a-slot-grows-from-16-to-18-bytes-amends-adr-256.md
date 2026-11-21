@@ -1,7 +1,7 @@
 ---
 id: "ADR-291"
 title: "The Monitor graph history stores the room SAT regulates on in its own column; a slot grows from 16 to 18 bytes (amends ADR-256)"
-status: "Proposed"
+status: "Accepted"
 date: "2026-11-21"
 binding: false
 gate: null
@@ -46,6 +46,11 @@ status_history:
     status: Proposed
     changed_by: "Agent: Claude (otgw-architect)"
     reason: Initial proposal
+    changed_via: adr-kit
+  - date: 2026-11-21
+    status: Accepted
+    changed_by: "User: Robert van den Breemen"
+    reason: Accepted by the maintainer ("Accepteren", interactive answer in the otgw-poc-dev session, 2026-11-21)
     changed_via: adr-kit
 ```
 
