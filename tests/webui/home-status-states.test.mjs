@@ -79,3 +79,16 @@ test('OpenTherm data but no health answer yet: still waiting, never everything q
     assert.equal(r.status, 'Waiting for data from the gateway…');
   } finally { await h.close(); }
 });
+
+// ux check of beta.413 (2026-11-21): live data was on the tiles while Home still said "Waiting for data",
+// because the waiting line also held until the first /v2/health answer. With data, Home shows what the
+// data says; only "No boiler connected" and "everything quiet" need the health answer.
+test('live data before the first health answer: Home shows the data, not the waiting line', async () => {
+  const FLAME = { otmonitor: Object.assign({}, OTMON.otmonitor, { flamestatus: { value: 'On', epoch: 1 }, chmodus: { value: 'On', epoch: 1 } }) };
+  const h = await open((m, p) => (p.endsWith('/v2/otgw/otmonitor') ? FLAME : p.endsWith('/v2/health') ? { __status: 503 } : undefined));
+  try {
+    const ok = await h.until(`/flame on/i.test(document.getElementById('aStatusTxt').textContent)`, 10000);
+    const r = await h.evalJs(READ);
+    assert.ok(ok, 'status reads ' + r.status);
+  } finally { await h.close(); }
+});

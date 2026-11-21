@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : SATtypes.h
-**  Version  : v2.0.0-beta.413
+**  Version  : v2.0.0-beta.414
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **

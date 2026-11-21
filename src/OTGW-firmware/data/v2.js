@@ -3060,9 +3060,9 @@
   // TASK-2959 F4 (spec T4): no healthy words without a healthy bus. Waiting until the first
   // OpenTherm data, then the boiler link of the connection panel (CONN.boiler from /v2/health).
   // Data counts from the first otmonitor answer or the first OpenTherm frame on the socket; the boiler
-  // link is only known after the first /v2/health answer, so the waiting line holds until both are in.
-  function statusWaiting() { return (!otmonLastOkMs && !wsLastFrameMs) || !healthSeen; }
-  function statusNoBoiler() { return !statusWaiting() && !model.fault && CONN.boiler.s === 'st-down'; }
+  // link is only known after the first /v2/health answer, so only "No boiler connected" and "everything quiet" wait for it.
+  function statusWaiting() { return !otmonLastOkMs && !wsLastFrameMs; }
+  function statusNoBoiler() { return !statusWaiting() && healthSeen && !model.fault && CONN.boiler.s === 'st-down'; }
   function renderStatusLink(id) { var b = document.getElementById(id); if (b) b.hidden = !statusNoBoiler(); }
   function statusSentence(isHP) {
     if (statusWaiting()) return t('home.status_waiting');
@@ -3075,7 +3075,8 @@
       ? t(isHP ? 'home.status_heating_compressor_mod' : 'home.status_heating_flame_mod', { pct: Math.round(model.mod) })
       : t(isHP ? 'home.status_heating_compressor' : 'home.status_heating_flame');
     if (model.ch) return t(isHP ? 'home.status_idle_compressor' : 'home.status_idle_flame');
-    return t('home.status_standby');
+    // "everything quiet" only with a known boiler link: before the first health answer it is still the waiting line
+    return healthSeen ? t('home.status_standby') : t('home.status_waiting');
   }
   function renderA() {
     var isHP = effectiveSource() === 2;  // 2 = Heat Pump (electric → bolt + HP labels)
