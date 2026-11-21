@@ -14,7 +14,7 @@ lives here.
 | 2026-07-05 | Build and flash only through the wrappers, never `python build.py` / `flash_esp.py` | CLAUDE.md "Build, flash and bench", `docs/guides/agent-build-and-bench.md` |
 | 2026-10-14 | Reuse open source before building your own | CLAUDE.md "Design Principles" |
 | 2026-10-20 | `/implement-next-task` replaces the plan wait with an advisor self-review | CLAUDE.md "Tasks" |
-| 2026-10-22 | SAT ground truth and anti-drift rules | `.claude/rules/sat-ground-truth.md` |
+| 2026-11-21 | SAT ground truth: our implementation plus the recorded decisions of Sergeant D and Robert is leading; Alex Wijn's SAT (`other-projects/SAT-develop/`) is a reference; comparisons for Sergeant D are factual, with pros, cons and a recommendation, and use field data, replays of both implementations, the OpenTherm spec and the low-load application notes | `.claude/rules/sat-ground-truth.md`, AGENT-CORE block |
 | 2026-10-23 | Record every Sergeant D decision first; check SAT decisions against the register | `.claude/rules/sat-ground-truth.md` |
 | 2026-10-24 | Resolve unclear SAT behaviour by questioning Sergeant D step by step | `.claude/rules/sat-ground-truth.md` |
 | 2026-10-24 | Flash over WiFi OTA first, USB only with `--migrate --host` | `docs/guides/agent-build-and-bench.md`, CLAUDE.md summary |
@@ -33,6 +33,7 @@ lives here.
 
 | Date | Old directive | Replaced by | Date replaced |
 |---|---|---|---|
+| 2026-10-22 | SAT ground truth ranking with the pinned thermo-nova code (7beaaf5) second, above our firmware | Our implementation plus the recorded decisions is leading; Alex Wijn's SAT is a reference (TASK-3013) | 2026-11-21 |
 | 2026-11-04 | 2.0.0 stable waits until SAT low-load is field-validated (epic TASK-1412 closed, TASK-1412.16-26) | 2.0.0 stable gate = TASK-1740; the epic and its full gate go to 2.1.0, 2.0.0 keeps the reduced slice (Robert, DM 1571910380756668488, option A of the TASK-1412 proposal) | 2026-11-16 |
 | before 2026-10-25 | Repeat an unanswered SAT question to Sergeant D every 12 hours | Pace questions to his presence: check hourly, re-ask as soon as he is back | 2026-10-25 |
 | 2026-10-29 | Batch cadence: build and publish after every 4 finished tasks | Per-task cadence: each task bench-tested before its zip is published | 2026-10-30 |

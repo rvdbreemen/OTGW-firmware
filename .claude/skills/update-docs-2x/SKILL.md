@@ -152,8 +152,8 @@ For each AC in order:
 
 **Chapter 5 (SAT) adds:** read `docs/sat/sergeant-d-corrections.md` first. Describe what
 the firmware port does (`src/OTGW-firmware/SAT*.ino`). Any statement about what SAT
-should do or how thermo-nova does it needs a citation at the pinned commit
-(`other-projects/SAT-releases-thermo-nova/custom_components/sat/<file>:<line>`), opened
+should do needs a citation to a recorded decision or our firmware; a statement about Alex Wijn's
+SAT (a reference, not leading) cites `other-projects/SAT-develop/custom_components/sat/<file>:<line>`, opened
 in this run; without one, leave it out and list it as a finding. SAT stays described as
 experimental and opt-in unless the release notes say otherwise.
 

@@ -1,7 +1,8 @@
 """TASK-1292: the 'SAT ground truth' rules must not drift.
 
 .claude/rules/sat-ground-truth.md (split out of CLAUDE.md by TASK-1631, loaded in every session) and
-AGENTS.md both carry the block between the SAT-GROUND-TRUTH markers, word for word, and it pins the thermo-nova commit that the local copy and docs/sat/ are written against.
+AGENTS.md both carry the block between the SAT-GROUND-TRUTH markers, word for word, and since the maintainer directive of 2026-11-21 (TASK-3013) it ranks our own implementation and the recorded
+decisions above Alex Wijn's SAT, which is a reference (other-projects/SAT-develop/) only.
 Mirrors tests/test_adr_governance.py, which guards the binding-ADR block the same way.
 
 Run: python tests/test_sat_ground_truth_block.py
@@ -35,14 +36,24 @@ class SatGroundTruthBlock(unittest.TestCase):
         self.assertEqual(block(RULE), block("AGENTS.md"),
                          "the SAT ground truth block differs between " + RULE + " and AGENTS.md")
 
-    def test_block_pins_the_thermo_nova_commit_and_the_rules(self):
+    def test_block_makes_our_implementation_leading(self):
+        # Maintainer directive 2026-11-21: our SAT implementation plus the recorded decisions is
+        # leading; Alex Wijn's SAT is a reference; Sergeant D stays the designer.
         b = block(RULE)
-        self.assertIn(PINNED, b, "pinned thermo-nova commit missing")
-        self.assertIn("releases/thermo-nova", b)
-        self.assertIn("other-projects/SAT-releases-thermo-nova/", b)
-        self.assertIn("docs/sat/thermo-nova-spec.md", b)
+        self.assertIn("our implementation is leading", b)
+        self.assertIn("De implementatie die wij hebben van SAT is leidend", b)
+        self.assertIn("Reference, not leading", b)
+        self.assertIn("other-projects/SAT-develop/", b)
+        self.assertIn("Sergeant D stays the SAT designer", b)
+        self.assertNotIn("other-projects/SAT-releases-thermo-nova/", b)
+        # the old ranking put thermo-nova second, above our firmware
+        self.assertNotIn("2. The thermo-nova code", b)
+        self.assertIn(PINNED, b, "the historical port commit must stay named")
+        self.assertIn("not as ground truth", b)
+        self.assertIn("pros and cons", b)
+        self.assertIn("replay the same data through both implementations", b)
         for rule in ("No citation, no claim", "not found in the code", "time order",
-                     "Sergeant D", "second reader", "pinned commit only on purpose"):
+                     "second reader", "only on purpose"):
             self.assertIn(rule, b, "rule missing from the block: " + rule)
 
     def test_block_requires_recording_sergeant_d_decisions(self):
@@ -57,14 +68,14 @@ class SatGroundTruthBlock(unittest.TestCase):
         self.assertTrue(os.path.exists(os.path.join(REPO, "docs", "sat", "sergeant-d-corrections.md")),
                         "docs/sat/sergeant-d-corrections.md is missing")
 
-    def test_pinned_commit_matches_the_local_copy_when_it_is_a_git_repo(self):
-        # The local copy is a snapshot (no upstream history), so only check the marker file
-        # that records which commit it mirrors, when present.
-        marker = os.path.join(REPO, "other-projects", "SAT-releases-thermo-nova", "UPSTREAM_COMMIT")
+    def test_reference_snapshot_records_its_upstream_commit(self):
+        # The reference snapshot carries an UPSTREAM_COMMIT marker; the block names that commit.
+        marker = os.path.join(REPO, "other-projects", "SAT-develop", "UPSTREAM_COMMIT")
         if not os.path.exists(marker):
-            self.skipTest("no UPSTREAM_COMMIT marker in the local copy")
+            self.skipTest("other-projects submodule not checked out")
         with open(marker, encoding="utf-8") as f:
-            self.assertEqual(f.read().strip().split()[0], PINNED)
+            commit = f.read().strip().split()[0]
+        self.assertIn(commit[:7], block(RULE))
 
     def test_navigation_rows_point_at_the_spec(self):
         # TASK-1631: the navigation table moved from CLAUDE.md to a path-scoped rule.

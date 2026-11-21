@@ -11544,6 +11544,82 @@
         "supersedes": [],
         "superseded_by": null
       }
+    },
+    {
+      "id": "ADR-292",
+      "title": "SAT ground truth: our implementation and the recorded decisions are leading, Alex Wijn's SAT is a reference (proposed successor to ADR-196)",
+      "path": "ADR-292-sat-ground-truth-our-implementation-and-the-recorded-decisions-are-leading-alex-wijn-s-sat-is-a-reference-supersedes-adr-196.md",
+      "format": "canonical",
+      "status": "Proposed",
+      "date": "2026-11-21",
+      "decision_summary": "For every statement or change about SAT behaviour the sources rank in this order, and a higher source wins over a low...",
+      "topics": [
+        "documentation-process",
+        "governance",
+        "ground-truth",
+        "leading implementation",
+        "sat",
+        "thermo-nova"
+      ],
+      "aliases": [
+        "Alex Wijn",
+        "Alexwijn",
+        "George",
+        "leading implementation",
+        "reference implementation",
+        "SAT anti-drift rules",
+        "SAT ground truth",
+        "SAT-develop",
+        "Sergeant D",
+        "Sergeant D corrections",
+        "sergeant-d-corrections",
+        "sergeantd",
+        "source precedence",
+        "thermo-nova",
+        "thermo-nova-spec"
+      ],
+      "components": [
+        "docs/sat/sergeant-d-corrections.md",
+        "other-projects/SAT-develop/",
+        "SAT source precedence rule"
+      ],
+      "symbols": [],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [
+          "Read docs/sat/sergeant-d-corrections.md before writing a SAT ADR, plan, review or SAT-control change. Cite the entry numbers it relies on, or state \"no entry covers this topic\".",
+          "Cite our firmware as file:line and Alex's code as customcomponents/sat/ : at a named commit, opened in the current session.",
+          "Answer a Sergeant D reference to Alex's code with a factual comparison: differences, pros and cons, recommendation, with citations.",
+          "Treat a disagreement between our code and a recorded decision as a bug in the code.",
+          "Check a historical 7beaaf5 citation with git -C ../OTGW-reference/SAT-git show 7beaaf5:customcomponents/sat/ .",
+          "Refresh other-projects/SAT-develop/ only in one commit that records the new upstream commit in its UPSTREAMCOMMIT and in the other-projects README and says what changed."
+        ],
+        "must_not": [
+          "Treat thermo-nova, Alex's develop branch or thermo-nova-spec.md as ground truth for SAT behaviour.",
+          "Adopt a behaviour from Alex's code without a recorded decision.",
+          "Rewrite an existing corrections entry, or an earlier ADR that cites 7beaaf5, to the new ranking.",
+          "Fill a gap with plausible behaviour."
+        ],
+        "exceptions": [
+          "None beyond ADR-196's: firmware-only features where Sergeant D defers to the maintainer are decided by the maintainer and recorded as an entry."
+        ],
+        "verification": [
+          "python tests/testsatgroundtruthblock.py: keeps the block identical in .claude/rules/sat-ground-truth.md and AGENTS.md and checks the new ranking's text (for example \"our implementation is leading\", \"Reference, not leading\", other-project...",
+          "Review: the reviewer reads the corrections file and treats an unmentioned conflict with an entry as a finding.",
+          "/adr-kit:context \"SAT ground truth\" surfaces this ADR."
+        ]
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
     }
   ],
   "relationships": [
@@ -19116,6 +19192,48 @@
     {
       "source": "ADR-291",
       "target": "ADR-256",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-292",
+      "target": "ADR-080",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-292",
+      "target": "ADR-085",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-292",
+      "target": "ADR-196",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-292",
+      "target": "ADR-197",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-292",
+      "target": "ADR-198",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-292",
+      "target": "ADR-199",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-292",
+      "target": "ADR-253",
       "type": "related",
       "resolved": true
     }

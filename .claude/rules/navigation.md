@@ -18,7 +18,7 @@ paths:
 | New MQTT topic | `docs/api/MQTT.md` + `c4-code-mqtt.md` + relevant ADRs |
 | Settings/config change | `c4-component-configuration-state.md` + ADR-051 + `c4-code-settings.md` |
 | Network/WiFi/OTA change | `c4-component-network.md` + `c4-code-network.md` |
-| SAT/BLE feature | `c4-component-smart-thermostat.md` + `other-projects/SAT-releases-thermo-nova/` + `docs/sat/thermo-nova-spec.md` (see "SAT ground truth" below) |
+| SAT/BLE feature | `c4-component-smart-thermostat.md` + `other-projects/SAT-develop/ (reference)` + `docs/sat/thermo-nova-spec.md` (see "SAT ground truth" below) |
 | ESP32 port/feature | `c4-container.md` + `other-projects/OT-Thing-OTGW32/` + relevant ADRs |
 | OpenTherm protocol/message IDs | `docs/opentherm specification/OpenTherm-Protocol-Specification-v4.2.md` |
 | MQTT/REST/WebSocket API change | `docs/api/MQTT.md` + `docs/api/WEBSOCKET_FLOW.md` — breaking silently breaks HA integrations |
@@ -44,7 +44,7 @@ paths:
 | Directory | When to read |
 |---|---|
 | `OT-Thing-OTGW32/` | ESP32 port, OTDirect, Ethernet, BLE |
-| `SAT-releases-thermo-nova/` | SAT subsystem, BLE protocol |
+| `SAT-develop/` (reference, not leading) | SAT subsystem, BLE protocol |
 | `otgw-6.6/` | PIC command set, response timing |
 | `otmonitor-6.6/` | How a well-tested client drives the PIC |
 
