@@ -1,6 +1,6 @@
 ---
 id: "ADR-266"
-title: "Bound the lwIP segments one espMqttClient loop creates, with Nagle on the MQTT socket and a per-loop PUBLISH cap as backstop"
+title: "Turn Nagle on for the espMqttClient socket, so one MQTT loop hands lwIP 2-3 segments instead of 16"
 status: "Proposed"
 date: "2026-11-20"
 binding: false
@@ -20,27 +20,23 @@ aliases:
   - "MQTT segment cost"
   - "Nagle on MQTT socket"
   - "EMC_TCP_NODELAY"
-  - "max packets per loop"
-  - "setMaxPacketsPerLoop"
+  - "max packets per loop (not adopted)"
 components:
   - "EMC_TCP_NODELAY (fork Config.h)"
-  - "EMC_MAX_PACKETS_PER_LOOP / MqttClient::setMaxPacketsPerLoop (fork)"
 symbols:
   - "EMC_TCP_NODELAY"
-  - "EMC_MAX_PACKETS_PER_LOOP"
-  - "setMaxPacketsPerLoop"
-  - "MqttClient::_checkOutbox"
   - "ClientSync::connect"
+  - "MqttClient::_checkOutbox"
 context_scope: "selective"
 ---
 
 <!-- markdownlint-disable MD025 -->
 
-# ADR-266 Bound the lwIP segments one espMqttClient loop creates, with Nagle on the MQTT socket and a per-loop PUBLISH cap as backstop
+# ADR-266 Turn Nagle on for the espMqttClient socket, so one MQTT loop hands lwIP 2-3 segments instead of 16
 
 ## Status
 
-Proposed, 2026-11-20. Acceptance waits for the bench A/B in TASK-2949.5, which settles Open Question 1.
+Proposed, 2026-11-20. Rewritten 2026-11-21 after the TASK-2949.5 bench: the per-loop PUBLISH cap of the first version is not adopted (Open Question 1). Acceptance is Robert's, together with his AC2 choice (Open Question 5).
 
 **Decision Maker:** User: Robert van den Breemen asked on 2026-11-20 for a per-loop cap in our fork, for 2.0.0. Which mechanism to use is the agent's recommendation, weighed below.
 
@@ -72,26 +68,45 @@ Our fork is the library source (ADR-264), so the socket option and the flush loo
 
 ## Decision
 
-The decision has two parts.
+**Nagle on for the MQTT socket.**
 
-**Primary measure: Nagle on for the MQTT socket.** The fork gains `EMC_TCP_NODELAY` in `src/Config.h`. The default is 1, which keeps upstream's `TCP_NODELAY`. The firmware builds with 0, so `ClientSync::connect()` leaves Nagle on. lwIP then sends the first small packet at once and merges the following writes into the segment that is still unsent, up to one MSS, until the broker's ACK. A burst of 25 small SAT packets becomes 2-3 segments (about 3-5 KB) instead of 16 (about 24 KB).
+- **The fork.** It gains `EMC_TCP_NODELAY` in `src/Config.h`. The default is 1, which keeps upstream's `TCP_NODELAY`.
+- **The firmware.** It builds with 0, so `ClientSync::connect()` leaves Nagle on.
+- **What lwIP does then.** It sends the first small packet at once. Later writes go into the segment that is still unsent, up to one MSS, until the broker's ACK comes back.
+- **The effect.** A burst of small SAT packets becomes 2-3 segments instead of 16.
 
-**Backstop: the per-loop PUBLISH cap.** The fork gains `EMC_MAX_PACKETS_PER_LOOP` in `src/Config.h`, plus a `setMaxPacketsPerLoop(n)` setter. The default 0 means unlimited, which is upstream behaviour. The firmware sets `n = 8`. With Nagle on, small packets no longer create a segment each, so the cap mainly limits bursts of large packets, such as discovery configs or PIC settings: 8 large packets cost about 12 KB, against 24 KB without the cap.
+**The per-loop PUBLISH cap of the first version (`EMC_MAX_PACKETS_PER_LOOP`, `setMaxPacketsPerLoop`) is not adopted.**
 
-Rules for the cap:
+- With Nagle alone, the broker socket's send-queue high-water mark is 2-3 segments on both boards (measured below).
+- The cap would only bound bursts of large packets, and the bench did not show a failure that needs it (YAGNI).
+- If a later measurement shows that need, it becomes its own ADR.
 
-- Only fully written PUBLISH packets count. PINGREQ (`MqttClient.cpp:481`), PUBACK (`:530`), PUBREC, PUBREL, PUBCOMP, SUBSCRIBE, UNSUBSCRIBE, CONNECT and DISCONNECT never count.
-- A partly written packet continues through `_bytesSent` on the next call.
-- The cap covers both callers of `_checkOutbox()`: the connected state (`:271`) and `disconnectingMqtt1` (`:293`).
+**Measured** (otgw-bench-tester on the NAS rig, 2026-11-21, beta.409+41827f9 and beta.410+eedf081 diag arms; arm identified by sha256; loopback otdmode 4, SAT on, satsimulation false, weather off, BLE off, no telnet client, no `/ws` client (`hd_dip_ws` 0 in every run), broker on the NAS):
 
-**Provisional parts.** Both values, and whether the cap is needed at all, are settled by a bench A/B on .61 and .63 (TASK-2949.3) on four variants:
+| quantity | TCP_NODELAY (today) | Nagle on | n, board |
+|---|---|---|---|
+| `hd_min_free_heap` | 728 / 844 / 2,736 B; repeat 1,632 / 2,444 / 6,312 B | 13,432 / 21,132 / 21,872 B; repeat 21,828 / 28,288 / 33,228 B | 3+3 per arm, .61 |
+| broker socket send-queue high-water mark (segments) | 10 / 16 / 16 | 2 / 2 / 3 | 3 per arm, .61 |
+| the same, as an allocation estimate | 15.4-24.7 KB | 3.1-4.6 KB | .61 |
+| `hd_min_free_heap` | 23,468 / 24,116 / 25,848 B | 23,780 / 29,832 / 30,008 B | 3 per arm, .63 (PSRAM) |
+| send-queue high-water mark | 16 | 3 | .63 |
+| largest drop inside one `MQTTclient.loop()` (probe `at=13 from=12`), takeover / republish-all / discovery republish | 42.9 / 42.9 / 43.1 KB | 7.3 / 9.0 / 13.5 KB | 3 per arm, .61 |
+| command echo (HA `set/` to its state on the broker), p50 / p95 per boot | 111.5-114.0 / 126.7-221.0 ms | 111.0-114.9 / 121.2-221.1 ms | 3 boots x 20 per arm, .61 |
+| PINGREQ to PINGRESP (broker log) | under 1 s | under 1 s, no disconnect | 5 of 6 boots, .61 |
 
-1. today;
-2. Nagle only;
-3. cap only (4 and 8);
-4. both.
+- **Echo spread.** The 221 ms p95 boot occurs once in each arm, so it is not bound to Nagle. One sample of 120 reached 251.4 ms (the max, Nagle arm).
+- **Soak.** 60 min on .61 with Nagle on: no restart, MQTT connected throughout, heap flat. `hd_min` went once to 8,228 B at 14:48, cause not visible (no probe record at that moment).
+- **Evidence paths** (each with SHA256SUMS), all under `OTGW-field-data`:
+  - `bench-otgw32/2026-11-21_task2949-5-heapab/`;
+  - `bench-otgw32/2026-11-21_task2949-5-rtt/`;
+  - `bench-otgw32/2026-11-21_task2949-5-takeover/`;
+  - `bench-otgw32/2026-11-21_task2949-5-soak/`;
+  - `bench-63/2026-11-21_task2949-5-events/`.
 
-If Nagle alone keeps the largest one-`loop()` drop under 10 KB at the SAT takeover, at republish-all and at a boot discovery burst, the cap is still added to the fork but left at 0 in the firmware (YAGNI). If Nagle shows a latency problem (Open Question 3), the cap becomes the primary measure at `n = 4`.
+**What this decision does not bound.**
+
+- **Drops outside the MQTT loop.** With Nagle on, the largest drops are no longer in the MQTT loop. They are in the SAT publish pass (`satPublishMQTT`, 10-18.5 KB) and in `satControlLoopRun` (16-20 KB) at the takeover. Those are TASK-3005 and ADR-265's scope, not this ADR's.
+- **On .63, per-loop drops of 8-14 KB** appear in both arms, so they are not bound to Nagle.
 
 ```cpp
 // fork Transport/ClientSync.cpp, in both connect() overloads (ESP32 branch)
@@ -99,35 +114,21 @@ If Nagle alone keeps the largest one-`loop()` drop under 10 KB at the SAT takeov
     int val = true;
     client.setSocketOption(IPPROTO_TCP, TCP_NODELAY, &val, sizeof(int));
 #endif
-
-// fork MqttClient.cpp
-void MqttClient::_checkOutbox() {
-  uint16_t sent = 0;
-  while (_sendPacket() > 0) {
-    OutgoingPacket* p = _outbox.getCurrent();
-    bool donePublish = p && _bytesSent == p->packet.size() &&
-                       p->packet.packetType() == PacketType.PUBLISH;
-    if (!_advanceOutbox()) break;
-    if (donePublish && _maxPacketsPerLoop && ++sent >= _maxPacketsPerLoop) break;
-  }
-}
 ```
 
 ## Decision Contract
 
 ### Must
 
-- Both knobs default to upstream behaviour (`EMC_TCP_NODELAY 1`, `EMC_MAX_PACKETS_PER_LOOP 0`), so the fork commits can go upstream unchanged.
-- The firmware sets its values in one place (`platformio.ini` build flags or the MQTT setup in `MQTTstuff.ino`), with a comment citing this ADR and the bench numbers.
-- Only PUBLISH packets count towards the cap.
-- **Fault 5, the outbox grows under the cap.** The firmware never queues PUBLISH faster than the cap drains. Deferrable producers are held by the ADR-265 outbox gate. The event-driven producers stay at about 1 OT frame per second and at most 9 packets per fan-out. A 60 min soak reports the maximum outbox depth and shows no rise in refused publishes: `mqttPublishRaw()` false (`MQTTstuff.ino:344`), and espMqttClient refuses packets while the largest free block is below `EMC_MIN_FREE_MEMORY` 16,384 B (`Config.h:32`).
-- **Fault 6, control packets starve behind the cap.** A control packet queued behind `k` PUBLISH packets leaves within `ceil(k / n) + 1` `loop()` calls, well inside the 60 s keepalive (`MQTTstuff.ino:1612`).
-- Each change is a separate fork commit, marked with a comment naming this ADR (ADR-264 process).
+- **Default.** `EMC_TCP_NODELAY` defaults to 1 (upstream behaviour), so the fork commit can go upstream unchanged.
+- **One place.** The firmware sets `EMC_TCP_NODELAY=0` in one place (a `platformio.ini` build flag), with a comment citing this ADR and the TASK-2949.5 numbers.
+- **ADR-264 process.** The fork change is its own fork commit, marked with a comment naming this ADR. It reaches the firmware the ADR-264 way: a new pinned fork tag, then the vendored copy updated to that tag. No hand edit in `src/libraries/espMqttClient`.
 
 ### Must Not
 
 - Must not drop or reorder packets. The outbox stays first-in-first-out.
 - Must not block the loop task: the non-blocking write of ADR-186 stays.
+- Must not add the per-loop PUBLISH cap without a new ADR and a measurement that shows the need.
 
 ### Exceptions
 
@@ -135,21 +136,12 @@ void MqttClient::_checkOutbox() {
 
 ### Verification
 
-- A host test compiles the real `MqttClient.cpp` with a stub transport:
-  - 40 PUBLISH: `n = 0` sends 40 in one `loop()`, `n = 8` sends 8. Red on the code before the cap.
-  - Fault 6: a PINGREQ and a PUBACK queued behind 40 PUBLISH at `n = 8` leave within 6 calls.
-  - A half-accepted packet continues on the next call and is counted once.
-- A host test checks that `ClientSync::connect()` sets `TCP_NODELAY` only when `EMC_TCP_NODELAY` is 1: the stub records the socket option.
-- Bench A/B (TASK-2949.5) on .61 and .63, at three events: the TASK-2019 takeover, a republish-all and a boot discovery burst.
-  - Measured: the largest drop inside one `loop()` (probe `at=13 from=12`), SAT publish latency, and the latency of each small publish.
-  - The small-publish latency is measured explicitly, because Nagle plus the broker's delayed ACK can add about 40-200 ms per small publish (coordinator, 2026-11-20). Two measurements:
-    - the command echo: a Home Assistant `set/` command to the gateway, until its state comes back on the broker;
-    - the keepalive: PINGREQ to PINGRESP.
-  - Pass: under 10 KB per `loop()` with the chosen variant, a command echo under 250 ms at p95, and no PINGRESP or keepalive timeout over the soak.
+- **Host test.** It shows `ClientSync::connect()` sets `TCP_NODELAY` only when `EMC_TCP_NODELAY` is 1: the stub records the socket option. It is red when the firmware build flag is missing.
+- **Bench.** TASK-2949.5 on .61 and .63 (the table under Decision): broker socket send-queue high-water mark 2-3 with the firmware's value, and a command echo under 250 ms at p95.
 
 ## Alternatives Considered
 
-- **A. Per-loop PUBLISH cap alone.** It bounds about n x 1.5 KB per pass, for every packet type. Small packets still pay one segment each, so 4 SAT topics cost as much as 4 discovery configs. Simple and well-tested. Kept as the backstop, not the primary measure.
+- **A. Per-loop PUBLISH cap, alone or as a backstop.** It bounds about n x 1.5 KB per pass, for every packet type, but small packets still pay one segment each. Not adopted: with Nagle alone the send-queue high-water mark is 2-3 on both boards (TASK-2949.5), so a backstop has no measured failure to stop (YAGNI). The cap variants were not benched.
 - **B. Coalescing in the library through a staging buffer.** Copy several packets into one buffer of about one MSS and issue one `send()`. It has the same effect as Nagle, without the ACK wait, but it is new code on the hot path. Partial writes then span packet boundaries, and the buffer needs about 1.4 KB more RAM. `EMC_TX_BUFFER_SIZE` (1,440) exists, but it only serves chunked payload callbacks (`Packets/Packet.cpp:430`, `:438`), not coalescing. Not chosen: Nagle gets the same segment saving from code lwIP already has.
 - **B2. `MSG_MORE` on every `send()` except the last of a pass.** With `TF_NODELAY`, lwIP still pushes each write out at once, so the merge into the unsent segment probably does not happen. This is not verified in Espressif's lwIP. Not chosen.
 - **C. Do nothing in the library; ADR-265 pacer only.** The event-driven publishers stay unbounded and the 16-segment worst case remains. Not chosen.
@@ -159,23 +151,30 @@ void MqttClient::_checkOutbox() {
 
 **Positive:**
 
-- The cost is attacked at its cause: fewer segments, so less transient heap, fewer pbufs and fewer ACKs.
-- The change is one build flag in the firmware, plus two small, opt-in fork commits that can go upstream.
-- The cap bounds the remaining large-packet bursts for every publisher, including the event-driven ones.
+- **The cost is attacked at its cause:** fewer segments, so less transient heap. On .61:
+  - `hd_min_free_heap` went from 0.7-6.3 KB to 13.4-33.2 KB;
+  - the largest drop in one MQTT loop went from about 43 KB to 7.3-13.5 KB.
+- **Small change surface:** one build flag in the firmware and one small, opt-in fork commit that can go upstream.
 
 **Negative:**
 
-- Nagle can delay command replies and status updates by up to one delayed-ACK interval. *Mitigation:* the bench measures round-trip time (Open Question 3). If it fails, the fallback is the cap at `n = 4` with Nagle off.
-- A deep outbox drains more slowly under the cap. *Mitigation:* the ADR-265 pacer keeps deferrable producers from filling it. The soak checks fault 5.
-- The 4-8 KB that the segment count does not explain stays unexplained for now (Open Question 2).
+- **Latency.** Nagle can delay a reply by up to one delayed-ACK interval. Measured: no arm-bound difference in the command echo, and PINGRESP stayed under 1 s.
+- **The 10 KB target is missed once.** The discovery republish on .61 still had a 13.5 KB drop inside one MQTT loop, above the 10 KB the first version aimed for. Whether that is acceptable is Robert's AC2 choice (Open Question 5).
+- **Remaining drops sit elsewhere.** The largest drops are now outside the MQTT loop (TASK-3005).
+- **Still unexplained.** The 4-8 KB that the segment count did not explain in the first measurements (former Open Question 2) has its own follow-up, and the soak's single 8,228 B minimum has no probe record.
 
 ## Open Questions
 
-- [ ] 1. The bench A/B picks the variant and the values: Nagle only, cap only (4 or 8), or both.
-- [ ] 2. Where do the extra 4-8 KB go in runs 2#2 and 4? The candidates are tcp_seg/MEMP, RX pbufs, and a concurrent async_tcp allocation by the 2 s info poll. This is a separate measurement; it does not block this ADR.
-- [ ] 3. With Nagle on, are command round-trip and SAT publish latency still acceptable: under 250 ms, and with no keepalive or PUBACK stall?
-- [ ] 4. The upstream PR text for both knobs, after the bench, checked by the coordinator and Robert before it opens.
-- [ ] 5. Acceptance by the maintainer.
+- [x] 1. The bench A/B picks the variant and the values: Nagle only, cap only (4 or 8), or both. — **Answered 2026-11-21 by Agent: Claude (otgw-architect), from the TASK-2949.5 bench, with otgw-dev's agreement:** Nagle only. The cap is not adopted, and the cap variants were not benched (see Decision).
+- [x] 2. Where do the extra 4-8 KB go in runs 2#2 and 4? — **Answered 2026-11-21 by Agent: Claude (otgw-architect):** not part of this decision. With Nagle on, the largest drops are outside the MQTT loop, and they are followed up in TASK-3005.
+- [x] 3. With Nagle on, are command round-trip and SAT publish latency still acceptable: under 250 ms, and with no keepalive or PUBACK stall? — **Answered 2026-11-21 by Agent: Claude (otgw-architect), from TASK-2949.5:**
+  - the command echo p95 was under 250 ms on 6 of 6 boots, with no arm-bound difference;
+  - PINGRESP was under 1 s, with no disconnects (broker log);
+  - device-side PINGREQ timing has no firmware counter, so it was measured broker-side only.
+- [x] 4. The upstream PR text, after the bench, checked by the coordinator and Robert before it opens. — **Answered 2026-11-21 by Agent: Claude (otgw-architect):** a follow-up of the ADR-264 fork process, not part of this decision. It now covers one knob (`EMC_TCP_NODELAY`).
+- [ ] 5. Acceptance by the maintainer, together with his AC2 choice:
+  - (a) accept this ADR on what Nagle demonstrably does, with the per-loop allocation of `satPublishMQTT` and `satControlLoopRun` handled in TASK-3005 / ADR-265;
+  - (b) hold it until TASK-3005 has landed.
 
 ## Related Decisions
 
@@ -190,3 +189,4 @@ void MqttClient::_checkOutbox() {
 - `src/libraries/espMqttClient/src/MqttClient.cpp:271`, `:293`, `:354`, `:481`, `:530`; `Config.h:19-20`, `:32`; `Packets/Packet.cpp:430`, `:438`; `Transport/ClientSync.cpp:34-36`, `:52-54`, `:60-74`.
 - `framework-arduinoespressif32-libs/esp32s3`: `lwipopts.h:621`, `:627`, `:639-640`; `lwip/opt.h:1400`.
 - otgw-dev beta.403 diagnosis and source check (TASK-2019 notes, relayed by the coordinator, 2026-11-20); TASK-1757 probes; epic TASK-2949.
+- TASK-2949.5 bench, 2026-11-21: the evidence folders listed under Decision; TASK-3005 (drops outside the MQTT loop).

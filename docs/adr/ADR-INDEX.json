@@ -11296,12 +11296,12 @@
     },
     {
       "id": "ADR-266",
-      "title": "Bound the lwIP segments one espMqttClient loop creates, with Nagle on the MQTT socket and a per-loop PUBLISH cap as backstop",
+      "title": "Turn Nagle on for the espMqttClient socket, so one MQTT loop hands lwIP 2-3 segments instead of 16",
       "path": "ADR-266-bound-the-lwip-segments-one-espmqttclient-loop-creates-with-nagle-on-the-mqtt-socket-and-a-per-loop-publish-cap-as-backstop.md",
       "format": "canonical",
       "status": "Proposed",
       "date": "2026-11-20",
-      "decision_summary": "The decision has two parts.",
+      "decision_summary": "Nagle on for the MQTT socket.",
       "topics": [
         "burst-pacing",
         "espmqttclient",
@@ -11311,51 +11311,36 @@
       ],
       "aliases": [
         "EMC_TCP_NODELAY",
-        "max packets per loop",
+        "max packets per loop (not adopted)",
         "MQTT segment cost",
-        "Nagle on MQTT socket",
-        "setMaxPacketsPerLoop"
+        "Nagle on MQTT socket"
       ],
       "components": [
-        "EMC_MAX_PACKETS_PER_LOOP / MqttClient::setMaxPacketsPerLoop (fork)",
         "EMC_TCP_NODELAY (fork Config.h)"
       ],
       "symbols": [
         "ClientSync::connect",
-        "EMC_MAX_PACKETS_PER_LOOP",
         "EMC_TCP_NODELAY",
-        "MqttClient::_checkOutbox",
-        "setMaxPacketsPerLoop"
+        "MqttClient::_checkOutbox"
       ],
       "context_scope": "selective",
       "decision_contract": {
         "must": [
-          "Both knobs default to upstream behaviour (EMCTCPNODELAY 1, EMCMAXPACKETSPERLOOP 0), so the fork commits can go upstream unchanged.",
-          "The firmware sets its values in one place (platformio.ini build flags or the MQTT setup in MQTTstuff.ino), with a comment citing this ADR and the bench numbers.",
-          "Only PUBLISH packets count towards the cap.",
-          "Fault 5, the outbox grows under the cap. The firmware never queues PUBLISH faster than the cap drains. Deferrable producers are held by the ADR-265 outbox gate. The event-driven producers stay at about 1 OT frame per second and at most 9...",
-          "Fault 6, control packets starve behind the cap. A control packet queued behind k PUBLISH packets leaves within ceil(k / n) + 1 loop() calls, well inside the 60 s keepalive (MQTTstuff.ino:1612).",
-          "Each change is a separate fork commit, marked with a comment naming this ADR (ADR-264 process)."
+          "Default. EMCTCPNODELAY defaults to 1 (upstream behaviour), so the fork commit can go upstream unchanged.",
+          "One place. The firmware sets EMCTCPNODELAY=0 in one place (a platformio.ini build flag), with a comment citing this ADR and the TASK-2949.5 numbers.",
+          "ADR-264 process. The fork change is its own fork commit, marked with a comment naming this ADR. It reaches the firmware the ADR-264 way: a new pinned fork tag, then the vendored copy updated to that tag. No hand edit in src/libraries/esp..."
         ],
         "must_not": [
           "Must not drop or reorder packets. The outbox stays first-in-first-out.",
-          "Must not block the loop task: the non-blocking write of ADR-186 stays."
+          "Must not block the loop task: the non-blocking write of ADR-186 stays.",
+          "Must not add the per-loop PUBLISH cap without a new ADR and a measurement that shows the need."
         ],
         "exceptions": [
           "None."
         ],
         "verification": [
-          "A host test compiles the real MqttClient.cpp with a stub transport:",
-          "40 PUBLISH: n = 0 sends 40 in one loop(), n = 8 sends 8. Red on the code before the cap.",
-          "Fault 6: a PINGREQ and a PUBACK queued behind 40 PUBLISH at n = 8 leave within 6 calls.",
-          "A half-accepted packet continues on the next call and is counted once.",
-          "A host test checks that ClientSync::connect() sets TCPNODELAY only when EMCTCPNODELAY is 1: the stub records the socket option.",
-          "Bench A/B (TASK-2949.5) on .61 and .63, at three events: the TASK-2019 takeover, a republish-all and a boot discovery burst.",
-          "Measured: the largest drop inside one loop() (probe at=13 from=12), SAT publish latency, and the latency of each small publish.",
-          "The small-publish latency is measured explicitly, because Nagle plus the broker's delayed ACK can add about 40-200 ms per small publish (coordinator, 2026-11-20). Two measurements:",
-          "the command echo: a Home Assistant set/ command to the gateway, until its state comes back on the broker;",
-          "the keepalive: PINGREQ to PINGRESP.",
-          "Pass: under 10 KB per loop() with the chosen variant, a command echo under 250 ms at p95, and no PINGRESP or keepalive timeout over the soak."
+          "Host test. It shows ClientSync::connect() sets TCPNODELAY only when EMCTCPNODELAY is 1: the stub records the socket option. It is red when the firmware build flag is missing.",
+          "Bench. TASK-2949.5 on .61 and .63 (the table under Decision): broker socket send-queue high-water mark 2-3 with the firmware's value, and a command echo under 250 ms at p95."
         ]
       },
       "scope": {
@@ -18790,6 +18775,36 @@
       "resolved": true
     },
     {
+      "source": "ADR-263",
+      "target": "ADR-030",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-263",
+      "target": "ADR-053",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-263",
+      "target": "ADR-185",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-263",
+      "target": "ADR-218",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-263",
+      "target": "ADR-257",
+      "type": "related",
+      "resolved": true
+    },
+    {
       "source": "ADR-264",
       "target": "ADR-186",
       "type": "related",
@@ -18930,42 +18945,6 @@
     {
       "source": "ADR-268",
       "target": "ADR-263",
-      "type": "related",
-      "resolved": false
-    },
-    {
-      "source": "ADR-218",
-      "target": "ADR-290",
-      "type": "supersedes",
-      "resolved": true
-    },
-    {
-      "source": "ADR-263",
-      "target": "ADR-030",
-      "type": "related",
-      "resolved": true
-    },
-    {
-      "source": "ADR-263",
-      "target": "ADR-053",
-      "type": "related",
-      "resolved": true
-    },
-    {
-      "source": "ADR-263",
-      "target": "ADR-185",
-      "type": "related",
-      "resolved": true
-    },
-    {
-      "source": "ADR-263",
-      "target": "ADR-218",
-      "type": "related",
-      "resolved": true
-    },
-    {
-      "source": "ADR-263",
-      "target": "ADR-257",
       "type": "related",
       "resolved": true
     },
