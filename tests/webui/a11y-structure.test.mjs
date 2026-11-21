@@ -100,10 +100,17 @@ test('accessibility structure: skip link, landmarks, aria-current, SAT switch, d
     await h.evalJs(`(function(){ var r = document.querySelector('#setRail .rail-item[data-cat="${cats[1]}"]'); if (r) r.focus(); })()`);
     await key(h, 'Enter');
     R.afterEnter = await h.evalJs(`(function(){ var a = document.querySelector('#setRail .rail-item.active'); return a ? { cat: a.dataset.cat, cur: a.getAttribute('aria-current') } : null; })()`);
+    R.focusAfterEnter = await h.evalJs(`(function(){ var a = document.activeElement; return a && a.classList && a.classList.contains('rail-item') ? a.dataset.cat : (a ? a.tagName : null); })()`);   // TASK-2991
     await h.evalJs(`(function(){ var r = document.querySelector('#setRail .rail-item[data-cat="${cats[0]}"]'); if (r) r.focus(); })()`);
     await key(h, ' ');
     R.afterSpace = await h.evalJs(`(function(){ var a = document.querySelector('#setRail .rail-item.active'); return a ? a.dataset.cat : null; })()`);
+    R.focusAfterSpace = await h.evalJs(`(function(){ var a = document.activeElement; return a && a.classList && a.classList.contains('rail-item') ? a.dataset.cat : (a ? a.tagName : null); })()`);   // TASK-2991
     R.cats = cats;
+    // TASK-2991 AC2: typing in the settings search re-renders the rail; focus stays in the search field
+    await h.evalJs(`document.getElementById('setSearch').focus()`);
+    await h.send('Input.insertText', { text: 'mq' }); await sleep(400);
+    R.searchFocus = await h.evalJs(`(function(){ var a = document.activeElement; return { id: a.id, value: a.value }; })()`);
+    await h.evalJs(`(function(){ var s = document.getElementById('setSearch'); s.value = ''; s.dispatchEvent(new Event('input', { bubbles: true })); })()`); await sleep(400);
     // TASK-2982 D3: keyboard only: Tab from one rail button reaches the next, Enter opens it, Space opens the next one
     await h.evalJs(`document.querySelector('#setRail .rail-item[data-cat="${cats[0]}"]').focus()`);
     await key(h, 'Tab');
@@ -164,6 +171,9 @@ test('accessibility structure: skip link, landmarks, aria-current, SAT switch, d
     assert.ok(R.rail.length > 1 && R.rail.every((r) => r.tag === 'BUTTON' && r.type === 'button'), JSON.stringify(R.rail));
     assert.deepEqual(R.afterEnter, { cat: R.cats[1], cur: 'true' }, 'Enter opens the focused category');
     assert.equal(R.afterSpace, R.cats[0], 'Space opens the focused category');
+    assert.deepEqual(R.searchFocus, { id: 'setSearch', value: 'mq' }, 'TASK-2991: typing in the search keeps its focus');
+    assert.equal(R.focusAfterEnter, R.cats[1], 'TASK-2991: focus stays on the rail button that Enter opened');
+    assert.equal(R.focusAfterSpace, R.cats[0], 'TASK-2991: focus stays on the rail button that Space opened');
     assert.equal(R.tabReach, R.cats[1], 'Tab moves from one rail button to the next');
     assert.equal(R.tabEnter, R.cats[1], 'Enter on the Tab-reached button opens it');
     if (R.cats.length > 2) assert.equal(R.tabSpace, R.cats[2], 'Space on the Tab-reached button opens it');

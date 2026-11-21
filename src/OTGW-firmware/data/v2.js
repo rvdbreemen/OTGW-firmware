@@ -4704,6 +4704,8 @@
     if (!rail || !cols) return;
     hideHelp();   // TASK-1281: the rows are rebuilt below, so a popover on an old icon would point at nothing
     var q = setSearch.trim().toLowerCase();
+    // TASK-2991: the rail is rebuilt below; remember the focused rail button so keyboard focus survives the rebuild
+    var ae = document.activeElement, refocusCat = (ae && rail.contains(ae) && ae.dataset) ? ae.dataset.cat : null;
     rail.textContent = ''; cols.textContent = '';
     // Build the rail (one item per category that has at least one field), with
     // per-category counts and a REBOOT badge on reboot-sensitive categories.
@@ -4734,6 +4736,7 @@
       showCats = active ? [active] : [];
       var act = rail.querySelector('.rail-item[data-cat="' + active + '"]'); if (act) { act.classList.add('active'); act.setAttribute('aria-current', 'true'); }
     }
+    if (refocusCat) { var rf = rail.querySelector('.rail-item[data-cat="' + refocusCat + '"]'); if (rf) rf.focus(); }   // TASK-2991
     showCats.forEach(function (id) {
       var c = catById(id); if (!c) return;
       var keys = catKeys(id);
