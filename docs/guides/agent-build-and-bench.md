@@ -168,7 +168,12 @@ Rules:
   `otgw-bench-mqtt` (eclipse-mosquitto, `--restart unless-stopped`, host network), config and log in
   `/volume1/docker/otgw-bench/broker/`, anonymous, no persistence, listener on the NAS LAN IP only (the
   older `mosquitto-mqtt` container on the NAS keeps 127.0.0.1:1883; leave it alone). The bench units (.61,
-  .63) have `mqttbroker` 192.168.88.36, and the `mqtt` job subscribes there. Read its log with
+  .63) have `mqttbroker` 192.168.88.36. The `mqtt` job subscribes to whatever broker the unit itself uses:
+  `scripts/nas-bench/mqttcfg.py` reads host, port, user and password from the unit's `/settings.ini`
+  (a `.local` name is resolved by one mDNS query, the NAS resolver has no mDNS) and hands them to the
+  container through a temporary `.mqtt.env` (mode 600) that `bench.sh` deletes right after `docker run`,
+  so the password never lands in the run folder or the evidence tar. Which broker the units use (NAS or the
+  Home Assistant broker) is Robert's call; the job follows the unit either way. Read the NAS broker log with
   `ssh terradisk '/usr/local/bin/docker exec otgw-bench-mqtt tail /mosquitto/log/mosquitto.log'`. The `%I`
   timestamps in `mqtt.log` are UTC. A run before 01:27 on 2026-11-21 used another broker (.61: the laptop
   broker 192.168.88.32, .63: the Home Assistant broker): name the broker in every A/B comparison across

@@ -1,6 +1,6 @@
 #!/bin/sh
 # OTGW bench captures on the NAS. Runs survive laptop reboots (setsid + nohup).
-#   bench.sh start <run> <ip> <minutes> <job>...   jobs: tel  info:<s>  health:<s>  snap:<s>  mqtt:<topic>
+#   bench.sh start <run> <ip> <minutes> <job>...   jobs: tel  info:<s>  health:<s>  snap:<s>  mqtt:<topic> (the unit's own broker)
 #   bench.sh stop <run>        bench.sh status [run]        bench.sh list
 # Output: /volume1/docker/otgw-bench/runs/<run>/   (pids in <run>/pids)
 BASE=/volume1/docker/otgw-bench; BIN=$BASE/bin; PY=/usr/bin/python3; DOCKER=/usr/local/bin/docker
@@ -19,8 +19,13 @@ start)
     case "$kind" in
       tel)  setsid nohup $PY -I $BIN/tellog.py "$ip" "$R" "$min" >/dev/null 2>>"$R/err.log" < /dev/null & ;;
       info|health|snap) setsid nohup $PY -I $BIN/poll.py "$kind" "$ip" "$R" "$min" "$arg" >/dev/null 2>>"$R/err.log" < /dev/null & ;;
-      mqtt) name="otgwbench-$run-mqtt"; $DOCKER run -d --rm --name "$name" --network host -e TZ=Europe/Amsterdam eclipse-mosquitto:latest \
-              timeout $((min*60)) mosquitto_sub -h 192.168.88.36 -t "$arg" -v -F '%I %t %p' > /dev/null
+      mqtt) # The broker the unit itself uses (Robert 2026-11-21: the Home Assistant broker; host, port, user and
+            # password from the unit's /settings.ini; a .local host is resolved by mDNS in mqttcfg.py). The env file
+            # holds the password: it is removed once docker has read it, so it never lands in the evidence tar.
+            $PY -I $BIN/mqttcfg.py "$ip" "$R" >> "$R/run.log" 2>>"$R/err.log" || { echo "mqtt: no broker config (see err.log)"; continue; }
+            name="otgwbench-$run-mqtt"; $DOCKER run -d --rm --name "$name" --network host --env-file "$R/.mqtt.env" -e TZ=Europe/Amsterdam \
+              eclipse-mosquitto:latest sh -c 'exec timeout "$1" mosquitto_sub -h "$MQTT_HOST" -p "$MQTT_PORT" ${MQTT_USER:+-u "$MQTT_USER"} ${MQTT_PASS:+-P "$MQTT_PASS"} -t "$2" -v -F "%I %t %p"' \
+              sh "$((min*60))" "$arg" > /dev/null; rm -f "$R/.mqtt.env"
             ( $DOCKER logs -f "$name" >> "$R/mqtt.log" 2>&1 & ); echo "docker:$name" >> "$R/pids"; continue ;;
       *) echo "unknown job $job"; continue ;;
     esac
