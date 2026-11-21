@@ -46,4 +46,6 @@ Plan corrections from otgw-docs' dry run (2026-11-20): C6.7 keeps a stub (ADR-09
 2026-11-21 phase 2 C6.3 (otgw-docs): 1.x UI screenshots: docs/images/ moves to docs/archive/1.x/images/
 
 2026-11-21 phase 2 C6.4 (otgw-docs): 1.x fix write-ups: docs/fixes/ moves to docs/archive/1.x/fixes/ (stub kept for the CHANGELOG link)
+
+2026-11-21 phase 2 C6.5 (otgw-docs): classic-UI feature pages: docs/features/TEMPERATURE_SENSOR_* move to docs/archive/1.x/features/
 <!-- SECTION:NOTES:END -->

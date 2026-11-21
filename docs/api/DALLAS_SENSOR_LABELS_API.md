@@ -568,7 +568,7 @@ http://localhost:8000/docs/openapi-dallas-sensors.yaml
 
 - **API Documentation:** `example-api/api-call-responses.txt`
 - **API Changes:** `example-api/API_CHANGES_v1.0.0.md`
-- **Implementation Guide:** `docs/TEMPERATURE_SENSOR_GRAPH_IMPLEMENTATION.md`
+- **Implementation Guide:** `docs/archive/1.x/features/TEMPERATURE_SENSOR_GRAPH_IMPLEMENTATION.md`
 - **Architecture Decision:** `docs/adr/ADR-033-dallas-sensor-custom-labels-graph-visualization.md`
 - **OpenAPI Spec:** `docs/openapi-dallas-sensors.yaml`
 
