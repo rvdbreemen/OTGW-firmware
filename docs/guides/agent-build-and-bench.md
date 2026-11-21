@@ -126,6 +126,57 @@ heap-frag soak, TASK-934):
   after the heap recovers to HEALTHY and re-enters the tier (they share
   `getHeapHealth()`'s internal state, which the reset deliberately does not touch).
 
+## Measurements run on the NAS (Robert, 2026-11-21)
+
+All measurements against a unit run as jobs on the NAS (terradisk, 192.168.88.36, `ssh terradisk`), never on
+the laptop: telnet loggers, REST pollers, MQTT subscriptions, soaks, captures, and A/B reruns. The laptop
+does builds, host tests, USB flashes when OTA cannot work, and coordination. OTA flashing from the laptop is
+fine, but the measurement around it runs on the NAS. The jobs keep running across a laptop reboot.
+
+The tools live in `scripts/nas-bench/` and are deployed to `/volume1/docker/otgw-bench/bin/` on the NAS
+(Python 3.8 there, so stdlib only). Redeploy after a change with
+`ssh terradisk "cat > /volume1/docker/otgw-bench/bin/<file>" < scripts/nas-bench/<file>`.
+
+```sh
+# start: run name, unit IP, duration in minutes, then one or more jobs
+ssh terradisk 'sh /volume1/docker/otgw-bench/bin/bench.sh start t2949-A1-61-r1 192.168.88.61 18 tel info:10'
+ssh terradisk 'sh /volume1/docker/otgw-bench/bin/bench.sh status [run]'   # running / ended per job, file sizes
+ssh terradisk 'sh /volume1/docker/otgw-bench/bin/bench.sh stop <run>'
+ssh terradisk 'sh /volume1/docker/otgw-bench/bin/bench.sh list'
+```
+
+| Job | What it does | Output in `runs/<run>/` |
+|---|---|---|
+| `tel` | telnet logger on port 23, timestamps each line, reconnects on close and after 30 s of silence | `tel.log`, `telnet.raw` |
+| `info:<s>` | polls `/api/v2/device/info` every `<s>` s, keeps uptime, bootcount, MQTT state and every heap and `hd_*` field | `info.jsonl` |
+| `health:<s>` | polls `/api/v2/health` in full | `health.jsonl` |
+| `snap:<s>` | device/info + health + reboot log + crashlog status in one line (long soaks, e.g. every 3600 s) | `snap.jsonl` |
+| `mqtt:<topic>` | `mosquitto_sub` in an eclipse-mosquitto container, `-F '%I %t %p'` timestamps | `mqtt.log` |
+
+Rules:
+
+- **One telnet logger per unit.** The unit serves one telnet client; two loggers kick each other off and
+  contaminate a heap measurement. `bench.sh start` refuses a second live run on the same IP; stop the old
+  run first, and give every run a duration that ends before the next one starts.
+- **Nothing else connected during a heap measurement.** Before each arm check that no browser tab or
+  other client holds the unit: `netstat -ano | grep "<ip>:80 "` on the laptop, the same on the NAS, and
+  `hd_tcp_active_pcbs` in `device/info` (1 = MQTT only). Log the result in the run's notes. A fresh boot per
+  arm resets the `hd_dip_*` snapshot; `hd_min_free_heap` is the allocator watermark since boot and is not
+  resettable.
+- **Soaks and reruns** (beta soak, A/B arms) are `bench.sh` runs on the NAS, with an `info:10` poller at minimum.
+- **The `mqtt` job subscribes to the broker on the laptop (192.168.88.32).** That broker has not moved to the
+  NAS yet.
+
+Copy a finished run into the evidence folder with its checksums:
+
+```sh
+ssh terradisk 'cd /volume1/docker/otgw-bench/runs/<run> && sha256sum * > SHA256SUMS'
+ssh terradisk 'cd /volume1/docker/otgw-bench/runs && tar cf - <run>' | tar xf - -C <OTGW-field-data/...>/
+```
+
+`scripts/nas-bench/satcount.py <mqtt.log> <uid> <nth_set>` counts the unique `OTGW/value/<uid>/sat/*` topics in
+an `mqtt.log` after the N-th `set/<uid>/sat/outdoor_temp`.
+
 ## SAT simulation: thermal-learning test (TASK-1891)
 
 The SAT simulation defaults (`satsimcoolrate` 0.1, `satsimheatrate` 0.5) make the house about 6x faster than a real
