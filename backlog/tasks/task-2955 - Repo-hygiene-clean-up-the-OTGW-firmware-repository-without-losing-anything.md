@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-20T14:05:00Z'
-updated_date: '2026-11-20T15:27:00Z'
+updated_date: '2026-11-21T00:23:00Z'
 labels:
   - repo-hygiene
 milestone: 2.0.0
@@ -36,4 +36,6 @@ Phase 1 done 2026-11-20 (otgw-architect): plan docs/plans/2026-11-20-repo-cleanu
 Robert, 2026-11-20, DM 1573349163083505787 (reply to the coordinator's D1-D7 question): "A" = all recommendations as listed. D1 per-branch archive tags only to the NAS backup remote; D2 delete GitHub branch task1757-staged-connect after an archive tag; D3 SAT sim output stays for 2.0.0; D4 remove the 17 generic Copilot skills, keep .github/skills/adr and fix docs/adr/README.md:1071; D5 untrack .claude/*_last_checked.txt; D6 leave docs/opentherm specification; D7 per-file 1.x docs check after the 2.0.0 stable. F2 split off as TASK-2962 (owner otgw-dev). Phase 2 starts after the 20:00 beta: coordinator tags archive/pre-cleanup-2026-11-20 on the dev tip, then C1 (coordinator), docs (otgw-docs), C3/C5 (otgw-dev, build slot).
 
 Plan corrections from otgw-docs' dry run (2026-11-20): C6.7 keeps a stub (ADR-097 and two src comments cite the audit); ADR-020 note under C6.2; the F4 PINOUT link is not dangling; F6 goes to otgw-bench-tester through the coordinator.
+
+2026-11-21 phase 2 C4 (otgw-docs): remove the duplicate .full-review-archive-20260421-085044 (3 files blob-identical to .full-review/archive/, state.json moved there)
 <!-- SECTION:NOTES:END -->
