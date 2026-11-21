@@ -5940,6 +5940,17 @@
     "TASK-2989"
    ],
    "confirmed_by_entry": null
+  },
+  {
+   "id": 449,
+   "title": "Upstream note: the thermo-nova branch no longer exists; SAT is at v5.0 (Sergeant D, 2026-11-21; information, the pin is not moved by this entry)",
+   "date": "2026-11-21",
+   "source": "sergeant-d",
+   "kind": "answer",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1573705702512398387",
+   "supersedes": [],
+   "tasks": [],
+   "confirmed_by_entry": null
   }
  ]
 }

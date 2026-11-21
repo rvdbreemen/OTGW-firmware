@@ -8819,3 +8819,16 @@ Robert, 16:18:42 UTC (https://discord.com/channels/812969634638725140/9144987300
 **Task:** to be filed for otgw-dev (implementation + ADR superseding ADR-236); TASK-2987 and TASK-2989 stay on 2.1.0.
 
 **Open:** Robert's entry 445 sequenced "the guards" after the public duty fix; whether this switch-rule change goes out as the next separate change is the coordinator's/Robert's scheduling.
+
+## 449. Upstream note: the thermo-nova branch no longer exists; SAT is at v5.0 (Sergeant D, 2026-11-21; information, the pin is not moved by this entry)
+
+**Source:** #dev-sat-mqtt, Sergeant D 2026-11-21 14:24:37 UTC (https://discord.com/channels/812969634638725140/1105556725714649128/1573705702512398387), right after his answer in entry 448; unedited when read back via the Discord API more than 90 s later.
+
+**Quoted:**
+> "keep in mind that the thermo-nova branch does not exist anymore. SAT custom component is in v5.0 now"
+
+**Checked (2026-11-21, GitHub API, read-only):** Alexwijn/SAT has only the branches develop and master; release 5.0.0 was published 2026-11-21 12:42 UTC on master. Our pinned commit 7beaaf531ee99dc74a19ac74f3c06ce7f2922cfb (2026-03-18) still exists and is an ancestor of 5.0.0 (compare 7beaaf5...5.0.0: ahead by 140 commits, behind by 0, 108 files changed). For entry 448: 5.0.0 keeps the same underheat exit (heating_control.py:418-430, UNDERSHOOT_MARGIN_CELSIUS = -3.0 in cycles/const.py:11, UNDERHEAT_SUSTAIN_SECONDS = 180.0 in const.py:23), MINIMUM_RELATIVE_MODULATION = 0 (const.py:40) and the suppression offset default 1.0 (const.py:162); line numbers differ from the pin.
+
+**Settled:** nothing changes in the ground-truth order yet: the pin stays 7beaaf5 until Robert decides to move it (sat-ground-truth rule: move the pin only on purpose, in one commit that re-diffs docs/sat/thermo-nova-spec.md).
+
+**Open:** whether to move the pin to 5.0.0 (Robert); the 140-commit diff since the pin is not reviewed.
