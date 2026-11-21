@@ -5,6 +5,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [2.0.0-beta.405] - 2026-11-21
+
+### Changed
+- Web UI: with SAT on, the Home room temperature readouts show the room temperature SAT regulates on (sat/status room_temp); the thermostat's MsgID 24 goes in a tooltip, only when the thermostat reports one (TASK-2946, beta.402 and beta.403).
+- Web UI: the About screen at the end of Settings is three cards, Makers, Credits and Community, in the settings row type, with a link to CONTRIBUTORS.md (TASK-2948, beta.403).
+- Web UI: accessibility structure: a skip link, one h1, labelled main and Settings navigation, a hidden heading per page, aria-current on the active page, SAT view, Monitor tab and Advanced tab (also on first load), the SAT switch named "SAT", one disabled look, one focus ring (also inside the scrolling page switcher), Settings rail items as buttons (TASK-2958, beta.404; TASK-2982, beta.405).
+
 ## [2.0.0-beta.401] - 2026-11-20
 
 ### Changed
@@ -1165,7 +1172,8 @@ Legacy release. See git history for details.
 
 Legacy releases. See git history for details.
 
-[Unreleased]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.401...HEAD
+[Unreleased]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.405...HEAD
+[2.0.0-beta.405]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.401...v2.0.0-beta.405
 [2.0.0-beta.401]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.392...v2.0.0-beta.401
 [2.0.0-beta.392]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.382...v2.0.0-beta.392
 [2.0.0-beta.382]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.374...v2.0.0-beta.382
