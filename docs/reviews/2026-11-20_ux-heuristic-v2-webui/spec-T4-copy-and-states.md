@@ -33,14 +33,16 @@ Code read at origin/dev b3d14f76a. Line numbers are from that commit.
 | idle | Enable simulation | enabled | `sat.sim_body` (as today) |
 | pending | Enabling… (disabled, `aria-busy="true"`) | disabled | as today |
 | success | the modal closes, toast `sat.sim_enabled` "Simulation enabled" | | |
-| error | Try again | enabled | as today, plus a line under it in the error colour: "Could not enable simulation ({{reason}}). Try again, or switch it on under Settings › SAT › Simulation." |
+| error | Try again (not shown for a refusal the device explains, see below) | enabled | as today, plus a line under it in the error colour: "Could not enable simulation ({{reason}})." followed by a link "Open the simulation setting" to SAT › Technical › SAT settings › Simulation (the `satsimulation` field sits in `SAT_L3`, `v2.js:4392-4405`, which only the Technical view shows, `v2.css:794`). |
+
+**Correction 2026-11-21 (impeccable critique of TASK-2959):** the first version of this spec named the path "Settings › SAT › Simulation", which does not exist: since TASK-1211 the Settings page shows only a pointer card for SAT. Also, when the device refuses with a reason (HTTP 409 with a plain-text body, for example "simulation unavailable: boiler hardware detected", `restAPI.ino:1699`), `{{reason}}` is that body text and the button reads "Close" instead of "Try again", because retrying cannot succeed.
 
 - `{{reason}}`: "HTTP {{status}}" for a non-2xx answer, "no answer from the gateway" for a network error or timeout.
 - The error line gets `role="alert"` so a screen reader hears it.
 - The backdrop click keeps setting `otgw-sim-prompted` (unchanged); during pending it does nothing.
 - **Optional (recommended):** offer the modal only while the user is on Home, so it does not cover work on Settings or Monitor. When the user is elsewhere, show it on the next visit to Home.
 
-Copy keys: `sat.sim_enabling` "Enabling…", `sat.sim_retry` "Try again", `sat.sim_failed` (the error line), `sat.sim_reason_http` "HTTP {{status}}", `sat.sim_reason_net` "no answer from the gateway".
+Copy keys: `sat.sim_enabling` "Enabling…", `sat.sim_retry` "Try again", `sat.sim_failed` (the error line), `sat.sim_reason_http` "HTTP {{status}}", `sat.sim_reason_net` "no answer from the gateway". Added 2026-11-21: `sat.sim_failed` is now "Could not enable simulation ({{reason}})." (no path in the text), plus `sat.sim_open_setting` "Open the simulation setting" (the link) and `sat.sim_close` "Close" (refusal with a reason).
 
 ## F10. Long setting hints move into the (i) popover
 
@@ -52,7 +54,7 @@ Copy keys: `sat.sim_enabling` "Enabling…", `sat.sim_retry` "Try again", `sat.s
 
 For `satsource`:
 - Inline hint (EN): "What produces the heat. The (i) explains each type."
-- Popover (`SET_META.satsource.help`): the current hint text, unchanged.
+- Popover (`SET_META.satsource.help`): first the sentence from `settingsHelp.h` that names every type ("Heat source: auto (gas boiler), gas boiler, heat pump or hybrid. Sets cycle timing; heat pumps never get modulation 0.", line 75), then the current hint text (the experimental on/off heat-pump paragraph). **Correction 2026-11-21:** the first version said "the current hint text, unchanged"; because `SET_META[k].help` overrides `settings-help.json`, that hid the sentence listing the types, so the inline promise "The (i) explains each type" was not kept.
 
 otgw-webui lists the other settings whose hint renders longer than 2 lines at 1400 px and applies the same rule. Where a hint has no short form yet, the inline line is "See (i) for details." and the coordinator assigns the short copy to me.
 
@@ -113,8 +115,8 @@ Copy keys: `tools.sat_loop_empty_off`, `tools.sat_loop_empty_paused`, `tools.sat
 ## Acceptance (replaces the ACs of TASK-2959 where they differ)
 
 1. **F4:** Home shows "Waiting for data from the gateway…" until the first OpenTherm data, "No boiler connected" with a working [Check connection ›] while `boilerOk` is false, and "everything quiet" only with the boiler link up. The header reads "checking…" until the first health answer. A browser test covers the four cases.
-2. **F6:** a browser test answers the enable POST with HTTP 500 (the modal stays open, the error line names "HTTP 500", the button reads "Try again"), with a network error (the reason reads "no answer from the gateway") and with HTTP 200 (the modal closes and the toast shows). Pending disables both buttons.
-3. **F10:** no settings hint under a label renders longer than 2 lines at 1400 px; Appliance type shows the short line, and its (i) holds the full text from `SET_META.satsource.help`; `settingsHelp.h` unchanged.
+2. **F6:** a browser test answers the enable POST with HTTP 500 (the modal stays open, the error line names "HTTP 500", the button reads "Try again"), with a network error (the reason reads "no answer from the gateway") and with HTTP 200 (the modal closes and the toast shows). Pending disables both buttons. A 409 with a reason body shows that reason and a "Close" button (no "Try again"); every error line carries the link to SAT › Technical › SAT settings › Simulation.
+3. **F10:** no settings hint under a label renders longer than 2 lines at 1400 px; Appliance type shows the short line, and its (i) names every type (the `settingsHelp.h` sentence) plus the experimental paragraph, from `SET_META.satsource.help`; `settingsHelp.h` unchanged.
 4. **F11:** on an HTTP page the "Detect location" button is hidden and the hint has no "HTTPS"; the link opens SAT settings › Weather with Latitude focused; otgw-docs has the same wording in §5.9 (EN and NL).
 5. **F13:** the control-loop chart shows the overlay and label per the table in each state (the paused, stopped and waiting rows after TASK-2957); the heating curve card shows its one-line empty state at 120 px.
 6. **F15:** the discovery card body is in the UI font and spans the width at 390 px; no auto-collapse.
