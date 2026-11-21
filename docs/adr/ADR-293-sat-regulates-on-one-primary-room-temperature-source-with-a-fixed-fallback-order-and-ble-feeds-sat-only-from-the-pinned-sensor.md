@@ -1,7 +1,7 @@
 ---
 id: "ADR-293"
 title: "SAT regulates on one primary room temperature source with a fixed fallback order, and BLE feeds SAT only from the pinned sensor"
-status: "Proposed"
+status: "Accepted"
 date: "2026-11-21"
 binding: false
 gate: null
@@ -49,6 +49,11 @@ status_history:
     status: Proposed
     changed_by: "Agent: Claude (otgw-dev)"
     reason: TASK-3011 / TASK-3015 initial proposal
+    changed_via: adr-kit
+  - date: 2026-11-21
+    status: Accepted
+    changed_by: "User: Robert van den Breemen"
+    reason: Accepted by the maintainer in the coordinator session (AskUserQuestion, 2026-11-21) after the TASK-3011 bench passed
     changed_via: adr-kit
 ```
 
