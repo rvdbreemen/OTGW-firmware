@@ -172,8 +172,10 @@ Rules:
   `scripts/nas-bench/mqttcfg.py` reads host, port, user and password from the unit's `/settings.ini`
   (a `.local` name is resolved by one mDNS query, the NAS resolver has no mDNS) and hands them to the
   container through a temporary `.mqtt.env` (mode 600) that `bench.sh` deletes right after `docker run`,
-  so the password never lands in the run folder or the evidence tar. Which broker the units use (NAS or the
-  Home Assistant broker) is Robert's call; the job follows the unit either way. Read the NAS broker log with
+  so the password never lands in the run folder or the evidence tar. Robert chose the NAS broker for the bench
+  units (2026-11-21, A): their retained discovery and test topics stay out of his production Home Assistant.
+  For a real HA test, point one unit at `homeassistant.local` for that test only (save `/api/v2/settings`
+  first, put the broker back after it, `settings.ini` diff 0); the job follows the unit. Read the NAS broker log with
   `ssh terradisk '/usr/local/bin/docker exec otgw-bench-mqtt tail /mosquitto/log/mosquitto.log'`. The `%I`
   timestamps in `mqtt.log` are UTC. A run before 01:27 on 2026-11-21 used another broker (.61: the laptop
   broker 192.168.88.32, .63: the Home Assistant broker): name the broker in every A/B comparison across
