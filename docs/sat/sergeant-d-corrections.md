@@ -8601,3 +8601,24 @@ Robert, 16:18:42 UTC (https://discord.com/channels/812969634638725140/9144987300
 **Task:** new otgw-dev task (2.0.0, high, sat), implementation only after his confirmation of the reading.
 
 **Open:** confirmation of the reading (raw duty before the cap); release scope (not stated; read as part of the 2.0.0 toggling fix until he says otherwise).
+
+## 437. The PWM duty is always computed with the live flow: (request - 27.2) / (flow - 27.2), no held BT (Sergeant D, 2026-11-21; deviates from thermo-nova 7beaaf5; reverses the entry-1 resolution and Robert's entry-64 choice, Robert asked)
+
+**Source:** #dev-sat-mqtt, Sergeant D 2026-11-21 03:25:03 UTC (https://discord.com/channels/812969634638725140/1105556725714649128/1573539719147552939); unedited when read back via the Discord API about 90 s after the post. It follows our tables of indigo_light's 19 Nov flame (msgs 1573537969942306919, 1573539237599514645).
+
+**Quoted:**
+> "The duty cycle calculation should ALWAYS BE requested setpoint value-27.2 / flow water temperature - 27.2"
+
+**Settled:** the PWM duty uses the live boiler flow temperature (MsgID 25), not a BT held after the start-up window. duty = (requested setpoint - base) / (flow - base), base 27.2 for radiators (20.0 for underfloor; the heating-system base offset satGetBaseOffset(), SATcontrol.ino:440-445, as thermo-nova HeatingSystem.base_offset, types.py:117-118; not a fixed 27.2, read as his radiator example), with the base + 1 floor only against division by zero (entry 1).
+
+**Changes earlier entries:** entry 1, as resolved on 2026-10-22 ("keep the thermo-nova solution": EMA for 180 s, then BT held until the next ON phase), for the part after the window; it returns to his original words in entry 1 ("then we use the raw BT value"). Entry 64: Robert's maintainer choice to keep 7beaaf5 (BT held) is reversed for this point; Robert was asked in-channel (https://discord.com/channels/812969634638725140/1105556725714649128/1573540314436730942) before otgw-dev implements.
+
+**Compared with thermo-nova (7beaaf5):** the pinned code holds _effective_on_temperature after HEATER_STARTUP_TIMEFRAME 180 s (pwm.py:144-149, used in the duty at pwm.py:229-239). This decision deviates from the pin on purpose (ground truth #1 ranks above the code); it matches Alex's description of his develop branch (entry 64), but the port does not follow develop as such.
+
+**Field evidence:** indigo_light 19 Nov flame, 21:27-21:33: duty with the live flow 101 %, 101 %, then 74 %, 57 %, 52 %, about 47 % while the flow rose to 41.9 C; SAT's logged duty with the held BT (32.12 C) was 97 % to 100 %, which gave range 5, MM=T (entries 242/243), the saturation exit at 21:32:30 and the fail-safe at 21:33:30.
+
+**Likely moot once built (not superseded until he says so):** entry 436 (MM=T only above 1.03; with the live flow the duty stayed at or below 101 % in this flame) and Q-2005f options B/E (the saturation exit while overshooting); Q-2005f option C is this decision.
+
+**Open:** whether "ALWAYS" also drops the start-up filter (EMA 0.3/0.7 for the first 180 s): asked as a follow-up (https://discord.com/channels/812969634638725140/1105556725714649128/1573540311874142270), recommendation B (keep a 30 s filter, entry 1; flow 38.7 -> 32.3 C within 30 s after indigo's ignition at 21:23:09); Robert's OK for reversing entry 64; release scope (read as 2.0.0, the toggling fix).
+
+**Task:** TASK-2993 (otgw-dev, 2.0.0, high), implementation after Robert's OK and the filter answer.

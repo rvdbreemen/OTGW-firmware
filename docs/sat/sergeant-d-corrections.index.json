@@ -5773,6 +5773,19 @@
    "supersedes": [],
    "tasks": [],
    "confirmed_by_entry": null
+  },
+  {
+   "id": 437,
+   "title": "The PWM duty is always computed with the live flow: (request - 27.2) / (flow - 27.2), no held BT (Sergeant D, 2026-11-21; deviates from thermo-nova 7beaaf5; reverses the entry-1 resolution and Robert's entry-64 choice, Robert asked)",
+   "date": "2026-11-21",
+   "source": "sergeant-d",
+   "kind": "unclassified",
+   "discord_link": "https://discord.com/channels/812969634638725140/1105556725714649128/1573539719147552939",
+   "supersedes": [],
+   "tasks": [
+    "TASK-2993"
+   ],
+   "confirmed_by_entry": null
   }
  ]
 }
