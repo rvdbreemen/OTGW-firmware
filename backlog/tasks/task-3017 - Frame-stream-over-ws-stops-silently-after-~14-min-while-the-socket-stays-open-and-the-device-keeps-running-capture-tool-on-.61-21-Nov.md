@@ -7,7 +7,7 @@ status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-21T16:41:00Z'
-updated_date: '2026-11-22T06:04:00Z'
+updated_date: '2026-11-22T06:13:00Z'
 labels:
   - tooling
   - bug
@@ -77,6 +77,8 @@ Bench AC3 2026-11-22 (otgw-bench-tester): FAILED, not ticked. .61 beta.417+56dd4
 2026-11-22 AC evidence (09's bench, relayed by the coordinator; ticked in this lane because the wording is only here). AC1 reproduced: 09's 56dd422 baseline OTGW-field-data/bench-otgw32/2026-11-22 abc-56dd422 case C (one half-open /ws client stalls a fresh healthy client: 22 frames in 20 s, last at 3.57 s) plus the 21 Nov 3 h capture (stall 174 min; device side: hd_dip_ws 0 / hd_tcp_active_pcbs 3, the client outside WS_CONNECTED with an open socket; tool side: otframes.log ends 22:00:32 while telnet shows ~230 frames/min to the end). AC2 fixed with tests red on the old code: tests/test_ws_rx_timeout_reap.py (case B red on 56dd422, case C red on 4846f20, ws_clients not_connected red on 1f5b78aba; 7 OK on 045e1fd) and 09's 045e1fd bench PASS: during C the fresh client keeps 128 frames/20 s (vs 22), B closed after 5 s, D healthy 825 s (cap costs nothing: 462 vs 455 frames/min, 0 drops), ws_clients shows not_connected at 03:22:11, a frozen tab is closed by the ack abort like a paused reader. AC3 (>= 2 h capture without /ws silence) running, verdict ~07:05.
 
 2026-11-22 AC3 PASS (09, 2 h capture on 045e1fd, .61): two WiFi drops (incl. 05:01:54-05:04:06 NOT_AUTHED, the trigger of the 21 Nov stall) and the /ws stream resumed at once each time (21 Nov, same trigger: 174 min). One 73 s silence at 05:17:42 came from ADR-107's WS-level close followed by the 70 s rx timeout: that is TASK-3025 (09 records it there as its reproduction), not a TASK-3017 defect. Field watch: on a reading client with a weak link (-62 dBm) the 5 s ack abort fired 5x in 2 h, each reconnect within 3 s; accepted, watch it in the field.
+
+2026-11-22 AC3 evidence folder: OTGW-field-data/bench-otgw32/2026-11-22_task3017-ac3-045e1fd/ (09). In those 2 h: five ack-timeout RSTs and one device close on the weak-link reader, each reconnecting within 3 s. Pushed as 6a2412656 (beta.418), zip posted #alpha-testing message 1573944526672756826.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
