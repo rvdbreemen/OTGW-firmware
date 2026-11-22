@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-22T07:08:00Z'
-updated_date: '2026-11-22T07:11:00Z'
+updated_date: '2026-11-22T07:24:00Z'
 labels:
   - release
 milestone: 2.0.0
@@ -33,4 +33,6 @@ Robert 2026-11-22 08:05 (coordinator session): 'Do Public beta release.' Candida
 BlueFlame 2026-11-22: notes file docs/releases/RELEASE_NOTES_2.0.0-beta.418.md (from beta.410's file; new top section + disclaimer bullet for 411-418; em-dash grep 0, TODO grep 0, OTGW32 not named), CHANGELOG Unreleased -> [2.0.0-beta.418] - 2026-11-22 with Added/Changed/Fixed lines for 3011/3015/3017/2957/2959/3014 plus the existing 3000 line, compare links updated; README disclaimer, breaking-changes link and BLE highlight updated.
 
 Release commit a2cbf9da5 pushed (e57a0b958..a2cbf9da5). #beta-testing draft in OTGW-field-data/_comms/beta418_p1.txt (1683 chars) and beta418_p2.txt (935 chars, soak placeholder), handed to the coordinator; not posted by me. Publish/tag/soak are the coordinator's (skill Phase 3-6).
+
+Follow-up (coordinator, from 09's .63 upgrade settings diff): the one-time BLE failover reset (SATblefailover true -> false, settingStuff.ino:738 at a2cbf9d; entries 455/457/458) added to the upgrade line and as a new 'New from beta.410 to beta.418' block under BREAKING changes; same line in the #beta-testing draft p1. Tag stays on a2cbf9da5.
 <!-- SECTION:NOTES:END -->

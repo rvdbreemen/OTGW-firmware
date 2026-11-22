@@ -57,7 +57,7 @@ The builds beta.411 to beta.418. Main changes: SAT only uses a Bluetooth room se
 ### SAT and room temperature
 
 - **beta.416: SAT uses a Bluetooth (BLE) room sensor only when you chose it** (TASK-3011, ADR-293). Before, with no sensor chosen, SAT took the first fresh BLE sensor it heard, which could be a neighbour's, and put it above the thermostat and an MQTT sensor. Now an unchosen sensor never feeds SAT, and failing over from one BLE sensor to another is off by default.
-  - **Upgrade from an earlier 2.0.0 beta:** a BLE sensor you already chose stays your choice. The SAT page then shows a one-time notice "SAT uses BLE sensor <name>: confirm or change"; please check that it is your own sensor.
+  - **Upgrade from an earlier 2.0.0 beta:** a BLE sensor you already chose stays your choice. The SAT page then shows a one-time notice "SAT uses BLE sensor <name>: confirm or change"; please check that it is your own sensor. If you had BLE failover switched on, the upgrade switches it off once; switch it back on in the SAT settings if you want it.
 - **beta.416: new setting "Primary room source"** (TASK-3011). Values: auto (default), thermostat, external (MQTT), ble, areas. Auto keeps the order SAT used before: your chosen BLE sensor, then the averaged room sensors, then an external MQTT sensor, then the thermostat. A specific value puts that source first; if it goes stale, SAT falls back along the auto order, and then to the heating curve only. Settable in the web UI, over REST and over MQTT (`set/<node>/sat/room_source`, retained state `sat/room_source`).
 - **beta.416: SAT publishes which room temperature it actually uses** (TASK-3015): retained MQTT topic `sat/room_temp_source` (ble, areas, external, thermostat, simulation, estimate, none) and a Home Assistant diagnostic sensor "SAT Room Temp Source".
   Tested: host tests on the real SAT code that fail on the old code (the no-pin path, the migration and the primary source), web UI tests, and bench runs with SAT running, including the retained room source after a reboot.
@@ -559,6 +559,13 @@ The Windows launcher is tested on our bench, also without Python installed. A te
 
 ---
 ## BREAKING changes
+
+### New from beta.410 to beta.418
+
+No MQTT topic is renamed or removed. New: the setting "Primary room source" (`SATroomsource`, default auto) with `set/<node>/sat/room_source` and the retained `sat/room_source`, the retained `sat/room_temp_source`, and the retained `boiler/supported_msgids` and `thermostat/sent_msgids`. Changes you may notice:
+
+- **BLE and SAT** (TASK-3011): an unchosen Bluetooth sensor no longer feeds SAT. A sensor you already chose stays your choice, with a one-time "confirm or change" notice on the SAT page.
+- **BLE failover** (TASK-3011): if you had BLE failover switched on, the upgrade switches it off once; switch it back on in the SAT settings if you want it.
 
 ### New from beta.374 to beta.382
 
