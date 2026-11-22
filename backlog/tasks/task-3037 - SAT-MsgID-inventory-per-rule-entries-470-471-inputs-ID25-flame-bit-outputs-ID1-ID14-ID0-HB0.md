@@ -3,10 +3,11 @@ id: TASK-3037
 title: >-
   SAT: MsgID inventory per rule (entries 470/471: inputs ID25 + flame bit;
   outputs ID1, ID14, ID0 HB0)
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-11-22T16:44:00Z'
-updated_date: '2026-11-22T16:46:00Z'
+updated_date: '2026-11-22T17:24:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -31,3 +32,9 @@ Entries 470/471 (private SAT register): SAT's inputs are ID25 (flow) and the fla
 - [ ] #6 Rules without an entry and entries without a rule are listed as findings
 - [ ] #7 Sergeant D reviews the document
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-22 step 1 (Robert: 'Go ahead. Do it.', #dev-sat-mqtt 1574112435315548282): docs/sat/sat-msgid-inventory.md, read-only inventory of origin/dev 9caac3519: one table row per SAT rule (source entry/ADR, OT inputs, outputs, fallback, file:line, steers yes/no), rows reading beyond ID25 + flame bit flagged BEYOND, and an 'Open for Sergeant D' section (5 questions: ID28 in the flame-off hold; ID28 in the no-return path; ID17 in solar gain; ID0 LB fault/DHW bits; ID24/ID27 as inputs out of scope). Method: a script listed every OT read (direct and through the six getters) per enclosing function; the steering ID28/ID17 uses were opened and read. Rows marked 'not traced' were not opened. Not done yet (after Wednesday): per-rule host tests, the findings list, Sergeant D's review.
+<!-- SECTION:NOTES:END -->
