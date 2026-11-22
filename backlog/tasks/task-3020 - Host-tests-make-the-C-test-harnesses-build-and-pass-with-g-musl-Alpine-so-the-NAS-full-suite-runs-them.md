@@ -3,11 +3,11 @@ id: TASK-3020
 title: >-
   Host tests: make the C++ test harnesses build and pass with g++/musl (Alpine)
   so the NAS full suite runs them
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-21T18:10:00Z'
-updated_date: '2026-11-22T00:22:00Z'
+updated_date: '2026-11-22T00:27:00Z'
 labels:
   - tests
 milestone: 2.0.0
@@ -24,10 +24,10 @@ Robert 2026-11-21 (via coordinator, 'port now', overrides the 25 Nov deferral fo
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Every C++ host test file that fails on g++/musl at 2f26146ce builds and passes there, or is listed with the reason it cannot (e.g. needs a src change)
-- [ ] #2 The same files still pass with MSVC on the laptop (spot check per batch, single files)
-- [ ] #3 A NAS full-suite run via otgw-bench-tester shows the before/after count of failing files
-- [ ] #4 test_sat_tuner_convergence finishes within its timeout on the NAS (g++); today it is the one known NAS timeout: > 2400 s there vs 33 s with MSVC on the laptop; a timing probe (slow vs stuck) decides the fix; until then --host-gxx stays opt-in
+- [x] #1 Every C++ host test file that fails on g++/musl at 2f26146ce builds and passes there, or is listed with the reason it cannot (e.g. needs a src change)
+- [x] #2 The same files still pass with MSVC on the laptop (spot check per batch, single files)
+- [x] #3 A NAS full-suite run via otgw-bench-tester shows the before/after count of failing files
+- [x] #4 test_sat_tuner_convergence finishes within its timeout on the NAS (g++); today it is the one known NAS timeout: > 2400 s there vs 33 s with MSVC on the laptop; a timing probe (slow vs stuck) decides the fix; until then --host-gxx stays opt-in
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -53,3 +53,9 @@ Correction to the note above: test_sat_lowload_contract was NOT OK on MSVC in th
 
 2026-11-22 tuner NAS timeout root cause (09 probe, OTGW-field-data/bench-nas/2026-11-22_tuner-probe/): conv.exe in State D, wchan wait_on_page_bit, utime 2->3 ticks in 30 s: blocked on I/O of the SATTUNE_FILE state file on the container overlay disk; 60 days: killed at 120 s after 2 lines with the file on /tmp, rc 0 in 0 s (2920 lines) with it on /dev/shm. Fix (test only): the state files go to a /dev/shm temp dir on POSIX hosts that have it; the exe stays in the normal temp dir (/dev/shm is often noexec). Laptop MSVC unchanged: Ran 5 tests in 28.5 s, OK, rc 0. AC #4 waits for the NAS run.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+AC1: NAS --host-gxx run on 5b04d2bd5 (09, OTGW-field-data/bench-nas/2026-11-21_suite-gxx-5b04d2bd5/run_tests-gxx.log): 358 files, 355 passed, 0 failed, 2 skipped with reason (S4/MC4 mutants of test_reboot_log_reset_raw need the pinned libs' reset_reasons.h; the cbuf harness needs PowerShell), 1 timeout = tuner, fixed under AC4; LL-021 counts the missing thermo-nova reference as a skip. AC2: MSVC single-file spot checks after the rebase on origin/dev (build_lock, progmem_assets_deflated, diag_decode, ha_climate_sat_follow, tuner_convergence OK; test/host ot_reserved_range, pic_led_ledc PASS), and the tuner at 182261736: Ran 5 tests in 28.5 s, OK. AC3: before 62 failing files on g++/musl (first NAS run at 2f26146ce), after 0 failed (5b04d2bd5) plus the tuner. AC4: root cause by probe (OTGW-field-data/bench-nas/2026-11-22_tuner-probe/): conv.exe in D state on the SATTUNE_FILE writes to the overlay disk; fix 182261736 puts the state files on /dev/shm; NAS rerun (2026-11-22_tuner-182261736/tuner.log): Ran 5 tests in 18.875 s, OK, rc 0 (was > 2400 s). Batches 1-3c pushed 4aa13764f..4bf0da427; --host-gxx stays an explicit flag (a default flip is a separate change). Not verified: a fresh full-suite NAS run on 182261736 itself (only the one changed file reran).
+<!-- SECTION:FINAL_SUMMARY:END -->
