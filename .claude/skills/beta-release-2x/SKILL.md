@@ -37,8 +37,8 @@ nothing builds or publishes for you. `dev` is the GitHub default branch: without
 
 - **Never use em dashes.** Colons, periods, commas, parentheses.
 - **All release text in English.** No emojis.
-- **Never name the OTGW32 board or the `esp32-otgw32` token publicly** (release
-  body, Discord, tag message). The public hardware is the OTGW Classic with an S3 Mini.
+- **OTGW32 may be named publicly** (Robert, 2026-11-22): call it a prototype board. The
+  main public hardware is still the OTGW Classic with an S3 Mini.
 
 ## Process
 

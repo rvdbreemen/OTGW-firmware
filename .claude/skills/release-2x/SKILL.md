@@ -38,7 +38,7 @@ never merges back into dev as a whole: its production commit comments out
 ## Writing style rules
 
 - **Never use em dashes.** All release text in English (the NL Discord post in idiomatic Dutch). No emojis.
-- **Never name the OTGW32 board or the `esp32-otgw32` token publicly.**
+- **OTGW32 may be named publicly** (Robert, 2026-11-22): call it a prototype board.
 
 ## Checkpoints (3)
 

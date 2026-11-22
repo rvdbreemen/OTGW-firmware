@@ -245,7 +245,7 @@ If an AC cannot be evidenced (tester, hardware, maintainer sign-off): leave the 
 
 Post what was done: task id, the change in plain words, the evidence (old vs new) and
 the build tag (`2.0.0-alpha.N+hash`). Rules for that channel: English, answer first,
-never name the OTGW32 board, do not tag Sergeant D on build announcements, and say
+OTGW32 may be named (prototype), do not tag Sergeant D on build announcements, and say
 plainly what is not verified yet.
 
 ## Step 9: leave the build ready
