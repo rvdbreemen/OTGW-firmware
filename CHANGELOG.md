@@ -5,8 +5,22 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [2.0.0-beta.418] - 2026-11-22
+
 ### Added
 - MQTT: two retained topics with the OpenTherm support table that `GET /api/v2/otgw/ot-support` shows, in the format of `boiler/unsupported_msgids` (`<id>R` per read MsgID, then `<id>W` per write MsgID): `otgw-firmware/boiler/supported_msgids` (the MsgIDs the boiler acknowledged) and `otgw-firmware/thermostat/sent_msgids` (the MsgIDs the thermostat sent). Published at connect and within a minute of a change; an empty list is not published (TASK-3000, beta.411).
+- SAT: new setting "Primary room source" (`SATroomsource`: auto, thermostat, external, ble, areas; default auto = the previous order: pinned BLE, averaged room sensors, external MQTT sensor, thermostat). An explicit value puts that source first; a stale primary falls back along the auto order, then to the heating curve only. REST, web UI, MQTT `set/<node>/sat/room_source` and retained `sat/room_source` (TASK-3011, ADR-293, beta.416).
+- SAT: retained MQTT topic `sat/room_temp_source` (ble, areas, external, thermostat, simulation, estimate, none), status field `room_temp_source` and Home Assistant diagnostic sensor `SAT_Room_Temp_Source` (TASK-3015, beta.416).
+- Diagnostics: `device/info` lists the live-log (/ws) clients with status, queue length and ages, plus `hd_ws_disconnects`; discarded live-log messages count in `ws_drops` (TASK-3017, beta.417/418).
+
+### Changed
+- SAT: a Bluetooth room sensor feeds SAT only when it is pinned by the user; the no-pin path and the auto-select of the only fresh sensor are removed, and BLE sensor-to-sensor failover is off by default (only to an area-assigned sensor). A one-time migration keeps a stored pin and shows a "confirm or change" notice (TASK-3011, ADR-293, beta.416).
+- Web UI: the SAT page shows one status per state, with paused, waiting and stopped markers and an "Off" burner-cycle text (TASK-2957, beta.412).
+- Web UI: clearer copy and empty/error states: the Home page shows live data before the first health answer, simulation dialog errors, shorter setting hints, chart notes, the weather link without HTTPS (TASK-2959, beta.413/414).
+- Web UI: SAT settings show "Averaged room sensors" and "Zones" as two groups, sensors numbered 1-4; setting keys, MQTT and REST unchanged (TASK-3014, beta.415).
+
+### Fixed
+- Web UI live log: a browser connection that received nothing could stay open for hours. Every /ws connection now gets a 70 s receive timeout and the ADR-189/ADR-216 send cap and ack-timeout abort, and the web UI reconnects after 90 s of silence (about 150 s in a background tab) (TASK-3017, beta.417/418).
 
 ## [2.0.0-beta.410] - 2026-11-21
 
@@ -1186,7 +1200,8 @@ Legacy release. See git history for details.
 
 Legacy releases. See git history for details.
 
-[Unreleased]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.410...HEAD
+[Unreleased]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.418...HEAD
+[2.0.0-beta.418]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.410...v2.0.0-beta.418
 [2.0.0-beta.410]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.405...v2.0.0-beta.410
 [2.0.0-beta.405]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.401...v2.0.0-beta.405
 [2.0.0-beta.401]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.392...v2.0.0-beta.401
