@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-22T16:43:00Z'
-updated_date: '2026-11-22T16:56:00Z'
+updated_date: '2026-11-22T17:26:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -37,4 +37,6 @@ Source: entry 471 in the private SAT register (Sergeant D, Q-470a answer 1: an I
 2026-11-22 (coordinator): BLOCKED on Q-471a. Entry 471 conflicts with entries 218/241: today a flow Data-Invalid or a flow stale for 60 s counts as 'flow missing': PWM idle, continuous setpoint, SAT keeps control (SATcontrol.ino:3045-3052, satGetFlowTemp :3105-3109). So this task changes the flow-missing behaviour; it is not a new rule. Sergeant D must confirm that 471 replaces 218/241, and the 60 s timeout, before any code.
 
 2026-11-22 UNBLOCKED: Sergeant D answered Q-471a 'A' (#dev-sat-mqtt 1574105562562429060), entry 472 (private register): an ID25 Data-Invalid answer or a flow stale for more than 60 s stops SAT and the thermostat takes over; the 60 s limit of entry 241 stays; this replaces the keep-control part of entries 218/241. Release 2.0.0. OPEN, our interpretation (not decided by Sergeant D): when a valid flow returns, SAT re-enters through its normal start path.
+
+2026-11-22 BRANCH RULE (Robert, #dev-sat-mqtt 1574113439813603421: 'this is a separate branch for now'): all code for the ID25/flame principle (TASK-3036, the TASK-3037 per-rule host tests and doc follow-ups, and the Q-466a change once Sergeant D decides) goes on ONE branch off origin/dev, sat/id25-principle, not on dev. Keep it rebased on origin/dev, bumps per the usual rule. Merging it into dev needs Robert's explicit yes (hard stop). Docs-only task notes and docs/sat/sat-msgid-inventory.md stay on dev. Code after Wednesday's reset.
 <!-- SECTION:NOTES:END -->
