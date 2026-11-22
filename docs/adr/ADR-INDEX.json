@@ -11611,7 +11611,7 @@
       "title": "SAT regulates on one primary room temperature source with a fixed fallback order, and BLE feeds SAT only from the pinned sensor",
       "path": "ADR-293-sat-regulates-on-one-primary-room-temperature-source-with-a-fixed-fallback-order-and-ble-feeds-sat-only-from-the-pinned-sensor.md",
       "format": "canonical",
-      "status": "Proposed",
+      "status": "Accepted",
       "date": "2026-11-21",
       "decision_summary": "SAT regulates on one primary room temperature source chosen by the setting SATroomsource, with a fixed fallback order...",
       "topics": [
@@ -11661,6 +11661,47 @@
       },
       "scope": {
         "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
+    },
+    {
+      "id": "ADR-295",
+      "title": "Emergency heap recovery drops the /ws clients by aborting their TCP connections instead of a WebSocket close (partly supersedes ADR-107 action 1)",
+      "path": "ADR-295-emergency-heap-recovery-drops-the-ws-clients-by-aborting-their-tcp-connections-instead-of-a-websocket-close-partly-supersedes-adr-107-action-1.md",
+      "format": "canonical",
+      "status": "Proposed",
+      "date": "2026-11-22",
+      "decision_summary": "State one concrete chosen approach and its rationale.",
+      "topics": [],
+      "aliases": [],
+      "components": [],
+      "symbols": [],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [
+          "State required implementation constraints."
+        ],
+        "must_not": [
+          "State prohibited implementation choices."
+        ],
+        "exceptions": [
+          "State explicit exceptions, or None."
+        ],
+        "verification": [
+          "Name the test, command, or source anchor that verifies this decision."
+        ]
+      },
+      "scope": {
+        "path_globs": [
+          "src/**/*.py"
+        ]
       },
       "metadata": {
         "binding": false,

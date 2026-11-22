@@ -275,4 +275,5 @@ One row per Architecture Decision Record. Scope is the Enforcement `path_glob` s
 | ADR-290 | Superseded | - | Outbound TLS client only, for this one upload. |
 | ADR-291 | Accepted | - | The device history slot gets an eighth int16t temperature column, satRoom, so a slot is 18 bytes. |
 | ADR-292 | Accepted | - | For every statement or change about SAT behaviour the sources rank in this order, and a higher source wins over a low... |
-| ADR-293 | Proposed | - | SAT regulates on one primary room temperature source chosen by the setting SATroomsource, with a fixed fallback order... |
+| ADR-293 | Accepted | - | SAT regulates on one primary room temperature source chosen by the setting SATroomsource, with a fixed fallback order... |
+| ADR-295 | Proposed | `src/**/*.py` | State one concrete chosen approach and its rationale. |
