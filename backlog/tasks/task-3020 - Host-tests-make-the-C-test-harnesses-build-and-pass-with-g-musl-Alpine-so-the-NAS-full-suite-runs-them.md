@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-21T18:10:00Z'
-updated_date: '2026-11-21T22:59:00Z'
+updated_date: '2026-11-22T00:22:00Z'
 labels:
   - tests
 milestone: 2.0.0
@@ -50,4 +50,6 @@ Correction to the note above: test_sat_lowload_contract was NOT OK on MSVC in th
 2026-11-21 deciding NAS run on c5238004e (09, --host-gxx, OTGW-field-data/bench-nas/2026-11-21_suite-gxx-c5238004e/): 358 files, 351 passed, 4 failed, 1 timeout, 2 skipped. Batch 3c: tests/sat_loop_stubs.h defined localtime_r over the MSVC-only localtime_s on every compiler -> only under _MSC_VER (POSIX has localtime_r) [loop_integration, pwm_first_start, thermal_learning_gate]; test_reboot_log_reset_raw mutant MC4 expects S4, which is a skip without the pinned libs -> MC4 skipped there too; test_sat_tuner_convergence gets a 2400 s per-file timeout in run_tests.py MIN_TIMEOUT (past 900 s on the NAS even with -O2; 33 s on the laptop). MSVC: thermal_learning_gate OK, reboot_log_reset_raw PASS.
 
 2026-11-22 NAS run on 5b04d2bd5 (09, --host-gxx, all 358 files incl. test/host; OTGW-field-data/bench-nas/2026-11-21_suite-gxx-5b04d2bd5/): 355 passed, 0 FAILED, 1 TIMEOUT, 2 skipped. The one known NAS timeout: test_sat_tuner_convergence (test_one_sided_disturbance, cut off at 2400 s; 33 s with MSVC on the laptop) -> new AC #4. Pushed with the coordinator's slot: batches 1-3c (tests/, test/host/, scripts/run_tests.py, tooling only; no src/); --host-gxx stays opt-in until AC #4 holds.
+
+2026-11-22 tuner NAS timeout root cause (09 probe, OTGW-field-data/bench-nas/2026-11-22_tuner-probe/): conv.exe in State D, wchan wait_on_page_bit, utime 2->3 ticks in 30 s: blocked on I/O of the SATTUNE_FILE state file on the container overlay disk; 60 days: killed at 120 s after 2 lines with the file on /tmp, rc 0 in 0 s (2920 lines) with it on /dev/shm. Fix (test only): the state files go to a /dev/shm temp dir on POSIX hosts that have it; the exe stays in the normal temp dir (/dev/shm is often noexec). Laptop MSVC unchanged: Ran 5 tests in 28.5 s, OK, rc 0. AC #4 waits for the NAS run.
 <!-- SECTION:NOTES:END -->

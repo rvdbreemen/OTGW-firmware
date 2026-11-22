@@ -208,12 +208,20 @@ class TunerConvergence(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.tmp = tempfile.TemporaryDirectory()
+        # TASK-3020: the tuner state file is rewritten often; on the NAS disk (overlay) each write blocked the sim in
+        # I/O (D state, > 2400 s for one run, 0 s on tmpfs). Keep the state files in memory where the host has
+        # /dev/shm; the executable stays in the normal temp dir (/dev/shm is often noexec in a container).
+        shm = "/dev/shm"
+        cls.state = (tempfile.TemporaryDirectory(dir=shm) if os.name != "nt" and os.path.isdir(shm)
+                     and os.access(shm, os.W_OK) else cls.tmp)
         cls.mutant = os.environ.get("OTGW_TUNER_MUTANT") or None
         cls.exe = build(Path(cls.tmp.name), cls.mutant)
         cls.mexe = {}
 
     @classmethod
     def tearDownClass(cls):
+        if cls.state is not cls.tmp:
+            cls.state.cleanup()
         cls.tmp.cleanup()
 
     def setUp(self):
@@ -221,7 +229,7 @@ class TunerConvergence(unittest.TestCase):
             self.skipTest("no host C++ compiler (g++, clang++ or MSVC)")
 
     def run_sim(self, exe, c_true, c0, days, to_mean, to_amp, tag, evening_only=False):
-        env = dict(os.environ, SATTUNE_FILE=str(Path(self.tmp.name) / f"{tag}.json"))
+        env = dict(os.environ, SATTUNE_FILE=str(Path(self.state.name) / f"{tag}.json"))
         args = [str(exe), str(c_true), str(c0), str(days), str(to_mean), str(to_amp), "1" if evening_only else "0"]
         r = subprocess.run(args, capture_output=True,
                            text=True, check=True, env=env, cwd=self.tmp.name)
