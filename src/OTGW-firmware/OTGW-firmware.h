@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v2.0.0-beta.417
+**  Version  : v2.0.0-beta.418
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -463,6 +463,9 @@ void satControlLoop();
 // safety-tripped SAT is still the owner, it just is not commanding, and handing
 // TSet back to the heating curve in that window is how the two used to fight.
 bool satOwnsControlSetpoint();
+// TASK-3017: one /ws client as device/info shows it (webSocketStuff.ino webSocketSnapshotClients, async_tcp only).
+struct WsClientSnap { uint32_t id; const char* status; uint16_t queueLen; uint32_t statusAgeS; uint32_t ageS; };
+uint8_t webSocketSnapshotClients(WsClientSnap* out, uint8_t max, uint32_t now);
 // TASK-1709: shape of an OTGW command as the REST API accepts it: a letter, then a letter or a digit (C2=, H2=), then '='.
 // The caller checks the length and the PIC checks the value. Digit-first and non-ASCII prefixes fail.
 inline bool otgwCommandFormatOk(const char* s, size_t len) {
@@ -595,6 +598,8 @@ struct DiscoverySection {                    // state.discovery — MQTT auto-di
 // NOT automatically surface on MQTT — add a corresponding
 // case to publishStatAt() in MQTTstuff.ino and raise STATS_COUNT.
 struct HeapDiagSection {                 // state.heapdiag — cumulative heap-pressure diagnostics (reset on reboot)
+  uint32_t iWsAckAbortCount         = 0; // TASK-3017: /ws connections aborted on the ack timeout (ADR-189 applied to /ws; not in iWebAckAbortCount)
+  uint32_t iWsDisconnects           = 0; // TASK-3017: /ws disconnects of accepted clients (incl. the AsyncTCP rx timeout close)
   uint32_t iWsDropsTotal            = 0; // lifetime WebSocket messages dropped: refused at heap CRITICAL, or not queued for every client (a full client queue, TASK-3017)
   uint32_t iMqttDropsTotal          = 0; // lifetime MQTT messages dropped due to heap pressure
   uint32_t iEnteredLowCount         = 0; // transitions into HEAP_LOW tier (from HEALTHY)

@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-beta.417
+**  Version  : v2.0.0-beta.418
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -3172,6 +3172,8 @@ struct DeviceInfoSnap {
   char      dns2[16];
   WifiLinkRecord wifiLink;            // TASK-1444: WiFi link record, copied once under its lock
   uint32_t  wifiDropAgoSec;           // now - wifiLink.iDropStartMs, frozen here (no millis() in the closure)
+  WsClientSnap wsClients[4];          // TASK-3017: the /ws clients, frozen here
+  uint8_t   wsClientCount;
   char      wifiApBssid[18];
   char      wifiDropBssid[18];
   const char* wifiDropReasonName;     // rodata names from wifiReasonName(), "" before the first drop
@@ -3197,6 +3199,7 @@ void sendDeviceInfoV2()
   // way the old contiguous cbuf could; the closure owns it via shared_ptr.
   auto snap = std::make_shared<DeviceInfoSnap>();
   snap->st              = state;                         // en-bloc freeze of all state.*
+  snap->wsClientCount   = webSocketSnapshotClients(snap->wsClients, 4, millis());   // TASK-3017
   snap->picEnabled      = isPICEnabled();
   snap->otDirectEnabled = isOTDirectEnabled();
   snap->hasOtCmd        = hasOTCommandInterface();
@@ -3499,6 +3502,21 @@ void sendDeviceInfoV2()
 
     // --- Reliability drops (heap-pressure side effects) ---
     je.field(F("hd_ws_drops"),         snap->st.heapdiag.iWsDropsTotal);
+    // TASK-3017: per /ws client (status connected / disconnecting / disconnected, queue length, seconds in that
+    // status, seconds since connect) and the disconnect count; AsyncTCP's rx timeout closes a stuck client.
+    je.field(F("hd_ws_disconnects"),   snap->st.heapdiag.iWsDisconnects);
+    je.field(F("hd_ws_ack_abort"),     snap->st.heapdiag.iWsAckAbortCount);   // ADR-189 on /ws; HTTP: hd_weback_abort
+    je.beginArray(F("ws_clients"));
+    for (uint8_t i = 0; i < snap->wsClientCount; i++) {
+      je.beginObject();
+      je.field(F("id"),           snap->wsClients[i].id);
+      je.field(F("status"),       snap->wsClients[i].status);
+      if (snap->wsClients[i].queueLen != 0xFFFF) je.field(F("queue_len"), (uint32_t)snap->wsClients[i].queueLen);
+      je.field(F("status_age_s"), snap->wsClients[i].statusAgeS);
+      je.field(F("age_s"),        snap->wsClients[i].ageS);
+      je.endObject();
+    }
+    je.endArray();
     je.field(F("hd_mqtt_drops"),       snap->st.heapdiag.iMqttDropsTotal);
     // TASK-1439: PIC commands dropped after OTGW_CMD_RETRY tries.
     je.field(F("cmd_dropped"),         snap->st.pic.iCmdDropped);

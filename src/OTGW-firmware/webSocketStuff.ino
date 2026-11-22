@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : webSocketStuff.ino
-**  Version  : v2.0.0-beta.417
+**  Version  : v2.0.0-beta.418
 **
 **  Copyright (c) 2021-2025 Robert van den Breemen
 **
@@ -67,6 +67,93 @@ static bool wsInitialized = false;
 // Application-level keepalive tracking
 static unsigned long lastKeepaliveMs = 0;
 const unsigned long KEEPALIVE_INTERVAL_MS = 30000; // 30 seconds
+
+// TASK-3017 (AC3 run, 2026-11-21): a /ws client can leave WS_CONNECTED while its TCP connection stays open
+// (WS_DISCONNECTING with a close frame that never leaves). count() then skips it, so nothing is sent to it and
+// cleanupClients() never removes it (it only deletes clients whose TCP is gone, AsyncWebSocket.cpp:1072-1085); a
+// reader that only reads waits forever. Every accepted /ws connection gets AsyncTCP's rx timeout: AsyncTCP closes
+// the connection on its own task when for WS_RX_TIMEOUT_S nothing arrived AND nothing we sent was acknowledged
+// (AsyncClient::_poll, AsyncTCP.cpp:1106-1108; an ACK of our data resets the timer too, :1049). A healthy client
+// acknowledges at least the 30 s keepalive, so only a client that receives nothing (stuck outside WS_CONNECTED),
+// stopped reading, or vanished without a FIN is closed. The library then removes it as for any disconnect.
+// The /ws connection also gets the two rules every other port-80 connection gets in webBeginRequest()
+// (webServerCompat.h), which the /ws upgrade does not pass through: ADR-216, its lwIP send queue capped at 2 x MSS
+// (WEB_TCP_SEND_CAP), and ADR-189, an ack timeout (5 s, CONFIG_ASYNC_TCP_MAX_ACK_TIME) aborts the connection with a
+// RST instead of the library's graceful close (AsyncWebSocketClient::_onTimeout -> AsyncClient::close(), which queues
+// the FIN behind the unacked data, so the pcb kept its queue and kept retransmitting). 09's baseline on 56dd422: one
+// half-open /ws client stalled a fresh healthy one; the abort frees its queue at once.
+// The table below is only for device/info and the disconnect line; it is written on the async_tcp task (the /ws
+// events and the REST handler run there).
+// --- wsTrack begin
+static const uint32_t WS_RX_TIMEOUT_S = 70;   // more than two keepalive intervals
+#define WS_TRACK_SLOTS (MAX_WEBSOCKET_CLIENTS + 1)
+struct WsTrackRow { uint32_t id; uint32_t connectMs; uint8_t seenStatus; uint32_t seenSinceMs; };
+static WsTrackRow wsTrack[WS_TRACK_SLOTS];
+
+static const char* wsStatusName(uint8_t st) {
+  switch (st) {
+    case WS_CONNECTED:     return "connected";
+    case WS_DISCONNECTING: return "disconnecting";
+    case WS_DISCONNECTED:  return "disconnected";
+    case 0xFE:             return "not_connected";   // WS_STATUS_NOT_CONNECTED: tracked, not returned by client(id)
+    default:               return "unknown";
+  }
+}
+
+static void wsTrackConnect(AsyncWebSocketClient* client, uint32_t now) {
+  AsyncClient* tcp = client->client();
+  if (tcp != nullptr) {
+    tcp->setRxTimeout(WS_RX_TIMEOUT_S);                         // case B: nothing sent, so no ack timeout runs
+    platformTcpCapSendBuffer(tcp->pcb(), WEB_TCP_SEND_CAP);     // ADR-216
+    tcp->onTimeout([](void*, AsyncClient* c, uint32_t) {        // ADR-189: replaces the library's graceful close
+      state.heapdiag.iWsAckAbortCount++;
+      c->abort();
+    }, nullptr);
+  }
+  for (uint8_t i = 0; i < WS_TRACK_SLOTS; i++) {
+    if (wsTrack[i].id == 0) {
+      wsTrack[i] = { client->id(), now, (uint8_t)WS_CONNECTED, now };
+      return;
+    }
+  }
+}
+
+// Returns the row's data for the disconnect line; false when the client was never tracked (a rejected one).
+static bool wsTrackDisconnect(uint32_t id, uint32_t now, uint32_t* lifeS, uint8_t* lastStatus, uint32_t* lastAgeS) {
+  for (uint8_t i = 0; i < WS_TRACK_SLOTS; i++) {
+    if (wsTrack[i].id == id) {
+      *lifeS      = (now - wsTrack[i].connectMs) / 1000UL;
+      *lastStatus = wsTrack[i].seenStatus;
+      *lastAgeS   = (now - wsTrack[i].seenSinceMs) / 1000UL;
+      wsTrack[i].id = 0;
+      return true;
+    }
+  }
+  return false;
+}
+
+// device/info (async_tcp): one row per tracked /ws client. The library's locked client(id) lookup returns only a client
+// in WS_CONNECTED (AsyncWebSocket.cpp:1043-1053), so a tracked client it does not return is still in the list (no
+// disconnect event yet) but outside WS_CONNECTED: shown as "not_connected" without a queue length. That is the state
+// of the AC3 stall. status_age_s counts from the first time this read (or the connect) saw the current status.
+static const uint8_t WS_STATUS_NOT_CONNECTED = 0xFE;
+uint8_t webSocketSnapshotClients(WsClientSnap* out, uint8_t max, uint32_t now) {
+  uint8_t n = 0;
+  for (uint8_t i = 0; i < WS_TRACK_SLOTS && n < max; i++) {
+    if (wsTrack[i].id == 0) continue;
+    AsyncWebSocketClient* c = otLogWs.client(wsTrack[i].id);
+    const uint8_t st = (c != nullptr) ? (uint8_t)c->status() : WS_STATUS_NOT_CONNECTED;
+    if (st != wsTrack[i].seenStatus) { wsTrack[i].seenStatus = st; wsTrack[i].seenSinceMs = now; }
+    out[n].id         = wsTrack[i].id;
+    out[n].status     = (c != nullptr) ? wsStatusName(st) : "not_connected";
+    out[n].queueLen   = (c != nullptr) ? (uint16_t)c->queueLen() : (uint16_t)0xFFFF;
+    out[n].statusAgeS = (now - wsTrack[i].seenSinceMs) / 1000UL;
+    out[n].ageS       = (now - wsTrack[i].connectMs) / 1000UL;
+    n++;
+  }
+  return n;
+}
+// --- wsTrack end
 
 static const uint8_t WS_BURST_CONNECTED = 1;
 static const uint8_t WS_BURST_DISCONNECTED = 2;
@@ -158,9 +245,20 @@ void webSocketEvent(AsyncWebSocket *server, AsyncWebSocketClient *client,
                     AwsEventType type, void *arg, uint8_t *data, size_t len) {
   switch (type) {
     case WS_EVT_DISCONNECT:
-      noteWebSocketBurstEvent(WS_BURST_DISCONNECTED);
-      DebugTf(PSTR("[%lu] WebSocket[%u] disconnected. Clients: %u\r\n"),
-              millis(), client->id(), (unsigned)otLogWs.count());
+      {
+        noteWebSocketBurstEvent(WS_BURST_DISCONNECTED);
+        state.heapdiag.iWsDisconnects++;   // TASK-3017
+        uint32_t lifeS = 0, lastAgeS = 0;
+        uint8_t lastSt = 0;
+        if (wsTrackDisconnect(client->id(), millis(), &lifeS, &lastSt, &lastAgeS)) {
+          DebugTf(PSTR("[%lu] WebSocket[%u] disconnected after %lus (last seen %s for %lus). Clients: %u\r\n"),
+                  millis(), client->id(), (unsigned long)lifeS, wsStatusName(lastSt), (unsigned long)lastAgeS,
+                  (unsigned)otLogWs.count());
+        } else {
+          DebugTf(PSTR("[%lu] WebSocket[%u] disconnected. Clients: %u\r\n"),
+                  millis(), client->id(), (unsigned)otLogWs.count());
+        }
+      }
       break;
 
     case WS_EVT_CONNECT:
@@ -184,6 +282,7 @@ void webSocketEvent(AsyncWebSocket *server, AsyncWebSocketClient *client,
           return;
         }
 
+        wsTrackConnect(client, millis());   // TASK-3017: AsyncTCP rx timeout + the device/info row
         IPAddress ip = client->remoteIP();
         noteWebSocketBurstEvent(WS_BURST_CONNECTED);
         DebugTf(PSTR("[%lu] WebSocket[%u] connected from %d.%d.%d.%d. Clients: %u\r\n"),
