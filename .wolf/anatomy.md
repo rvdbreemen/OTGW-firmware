@@ -1,6 +1,6 @@
 # anatomy.md
 
-> Auto-maintained by OpenWolf. Last scanned: 2026-11-14T13:05:42.350Z
+> Auto-maintained by OpenWolf. Last scanned: 2026-11-23T21:24:25.794Z
 > Files: 158 tracked | Anatomy hits: 0 | Misses: 0
 
 ## ../../../../AppData/Local/Temp/
@@ -936,6 +936,7 @@
 
 ## docs/api/
 
+- `MQTT.md` — OTGW-firmware MQTT Topic Documentation (~40253 tok)
 
 ## docs/c4/
 
