@@ -1666,7 +1666,7 @@ Three paths trigger it:
 2. **Home Assistant restart**: `homeassistant/status` goes `offline`, then `online` (ADR-174). Only an observed `offline` arms it; a replayed retained `online` cannot arm it. Once armed, the flag survives any reconnect until an `online` consumes it, so an `online` replayed after a reconnect does fire it. Only a reboot clears an armed flag without firing it.
 3. **`POST /api/v2/mqtt/republish`**, with a 60-second cooldown.
 
-SAT topics are not part of this reset; see the SAT publish semantics above.
+The SAT topics are part of this reset (TASK-1284, TASK-1603): `requestMQTTRepublishAll()` also calls `satRepublishCoreState()` (`SATcontrol.ino`). That clears the shadows of the SAT core state topics (`sat/enabled`, `sat/active`, `sat/mode`, `sat/preset`, `sat/room_source` and the other core flags), forces the two HA thermostat card topics, and bumps `g_satShadowEpoch` so every other SAT shadow counts as unseen. Each SAT topic then goes out again on its next publish pass; the core set also while SAT is off, the rest only while SAT publishes. See the SAT publish semantics above.
 
 ### MQTT Gate Debug Flag
 
