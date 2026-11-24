@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-24T18:27:00Z'
-updated_date: '2026-11-24T18:30:00Z'
+updated_date: '2026-11-24T18:32:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -48,6 +48,7 @@ STATUS: PLAN ONLY. No code before Sergeant D answers Q-475a. All firmware citati
 - Precedent for freezing: hot water (entry 95/103/132): satPwmOnDhwStart() stores _pwm_dhwUsedMs = millis() - _pwm_lastUpdateMs (C:1520), satPwmOnDhwEnd() restores _pwm_lastUpdateMs = millis() - _pwm_dhwUsedMs (C:1599, :1616). The draw time does not count.
 
 3. HOW FLIPS HAPPEN TODAY (needed to understand the change)
+- ENTRY 429, exact text. Sergeant D's own words (Q-2005b, 2026-11-19 11:17 UTC): "My answer is B. But instead of flow above 3.5 change it to flow above 3." Option B as put to him (open-questions.md row Q-2005b; the Discord post itself not re-read today): "also at most one PWM entry per flame, continuous until flame-off except the 3.5 C/30 s fail-safe (entries 288/289/359)". The register's Settled line (2) reads: "The only way back to PWM during that burn is the fail-safe". So the fail-safe is an EXPLICIT exception in the option he chose, but not in his own typed words; his own words only move its threshold (3.5 -> 3.0), which presupposes it stays. Entry 417 (Q-410a A) additionally gates the fail-safe by heating allowed. Result: flips inside one flame can only be fail-safe re-entries, and entry 475's request applies to exactly those. Not a gap in the code; a point to confirm with Sergeant D in Q-475a ("do you mean the fail-safe flips of entry 429?").
 - PWM -> continuous: satCycleCheckPwmExits() (Y:1481): underheat (Y:1495; on origin/dev still the 60 s rule, TASK-3008 on lane/d3-underheat changes it to entries 448/456 and does not touch the clock) and saturation (Y:1510); the at-max rule; the end-of-cycle verdict (Y:1040-1046). Each of the first two sets _cycle_burnLeftPwm = true (Y:1498, :1512).
 - continuous -> PWM inside the same flame: after _cycle_burnLeftPwm the 2.0 C / 60 s rule waits for the next flame (entry 429; Y:1420-1431). The ONLY way back inside that flame is the fail-safe (flow - request >= 3.0 C for 30 s, Y:41-42, :1434-1441). A flame-out clears the flag (satCycleNoteBurnEnd, Y:193, called from Y:1121). So the 3-4 flips of a flame-on phase are fail-safe re-entries. The manual control_mode command and satPwmFirstStart() (C:4178, a heating start) can also enter PWM; a start enters when the flame is not yet burning.
 
@@ -66,13 +67,13 @@ STATUS: PLAN ONLY. No code before Sergeant D answers Q-475a. All firmware citati
 
 6. EDGE CASES (decide with the answer)
 - Frozen time >= the ON time asked at resume: the ON phase ends on the first tick after the minimum burn. Then CH off at once (OFF phase, entry 43/ADR-250 rules apply as today).
-- The 180 s minimum burn (C:1797, pwm.py:201): measured from _pwm_flameOnMs, which satPwmBeginOn sets to now at the re-entry. If it stays per segment, a resume with little ON time left still burns 180 s more, which weakens the intent. Recommendation: count the minimum burn from the real flame-on of the flame (_sat_chFlameOnMs, C:8123), not per segment. This is Q-475a point 3.
+- The 180 s minimum burn (C:1797, pwm.py:201): measured from _pwm_flameOnMs, which satPwmBeginOn sets to now at the re-entry. If it stays per segment, a resume with little ON time left still burns 180 s more, which weakens the intent. Recommendation, PENDING (design choice, becomes Q-475b to Sergeant D after he answers Q-475a; BlueFlame asks): count the minimum burn from the real flame-on of the flame (_sat_chFlameOnMs, C:8123), not per segment. This is Q-475a point 3.
 - Heat pump (minOnMs 600 s, C:1796-1797): same rule.
 - Start gate / 448 exit: unchanged. A flip needs the exit rule to fire, which is gated for 60 s after the first CH flame-on (ADR-252).
 - Telemetry (TASK-1880, satPwmPhaseOpen/Close, C:1441, :1495): stays per PWM segment; add the used time to the open record only if cheap.
 - MM=T / at-max (entry 463) and the flame-off hold: unaffected, they read bPwmFlameRequested.
 
-7. THERMO-NOVA (local read-only copy custom_components/sat/pwm.py; NOTE its own .git HEAD reads 770aa45, not the pin 7beaaf5, and the pin object is not in that clone; the line numbers below match the lines entry 475 cites and I did not re-verify the content against upstream today)
+7. THERMO-NOVA - NOT VERIFIED AGAINST THE PIN 7beaaf5. other-projects/SAT-releases-thermo-nova/ does not exist in this checkout (only other-projects/SAT-develop, HEAD 2b01ba65, which is not the pin). I read a copy in another clone (OTGW-other-projects/SAT-releases-thermo-nova, its own .git HEAD 770aa45, not the pin; the pin object is not in it). The lines below match what entry 475 cites, but they are unverified. Morning fix: fetch commit 7beaaf5 (github.com/Alexwijn/SAT, branch releases/thermo-nova) into other-projects/SAT-releases-thermo-nova, verify pwm.py:87-97, 106-108, 134, 201, 205 there, and file an issue for the missing local copy (coordinator order, 2026-11-24).
 - pwm.py:106-108 disable() calls reset(); reset() (:87-97) sets _last_update = timestamp() and clears _flame_on_at. :134 elapsed = timestamp - self._last_update. :205 if elapsed >= on_time_seconds: ON ends. :201 the flame-on hold from _flame_on_at.
 - PWM and continuous are chosen outside this class (heating_control.py), so thermo-nova clears the ON clock whenever PWM is left. DIFFERENCE: our change keeps the clock across PWM stints within one flame. By design a deviation from the pin (higher source: entry 475).
 
@@ -98,4 +99,6 @@ STATUS: PLAN ONLY. No code before Sergeant D answers Q-475a. All firmware citati
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-11-24 plan written, read-only on the code, nothing built or run. Waiting for Sergeant D's answer to Q-475a (BlueFlame owns the question). Branch sat/pwm-on-freeze off origin/dev is created only after the answer is recorded.
+
+2026-11-24 plan revised after the coordinator's second read: (1) thermo-nova lines labelled NOT verified against pin 7beaaf5; fetch the pin into other-projects/SAT-releases-thermo-nova and verify pwm.py:87-97, 106-108, 134, 201, 205, plus an issue for the missing local copy, first thing after the reset. (2) entry 429 quoted in full; the fail-safe exception is explicit in option B as put to him, not in his own typed words. (3) the min-burn choice is recommendation, pending, Q-475b after Q-475a.
 <!-- SECTION:NOTES:END -->
