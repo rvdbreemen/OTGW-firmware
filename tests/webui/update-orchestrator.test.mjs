@@ -657,7 +657,7 @@ test('filesystem image: the runtime files the firmware writes back are not in it
   for (const n of runtime) assert.equal(img.indexOf(n), -1, n + ' is in the image');
 });
 
-// ---------- 5. cross-version contract (docs/guides/WIFI_FIRMWARE_UPDATE.md) ----------
+// ---------- 5. cross-version contract (docs/guides/WIFI_FIRMWARE_UPDATE_REFERENCE.md) ----------
 // Release N's page drives release N+1's firmware, so these names are an API.
 // The test pins the page's side to the firmware sources: when one is renamed
 // the other must follow, and the guide section must be revisited.

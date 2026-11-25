@@ -487,7 +487,7 @@ class TestSatFolder(unittest.TestCase):
 
 class TestDocsMatch(unittest.TestCase):
     def test_guide_names_every_kept_file(self):
-        guide = read("docs", "guides", "WIFI_FIRMWARE_UPDATE.md")
+        guide = read("docs", "guides", "WIFI_FIRMWARE_UPDATE_REFERENCE.md")
         section = guide[guide.index("### What a filesystem update keeps and loses"):]
         section = section[:section.index("### Cross-version contract")]
         for name in ("settings.ini", "dallas_labels.ini", "sat_pid_state.json", "sat_energy.json", "sat_energy_estimate.json",
