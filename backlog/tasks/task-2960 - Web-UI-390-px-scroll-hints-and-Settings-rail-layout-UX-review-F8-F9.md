@@ -1,11 +1,11 @@
 ---
 id: TASK-2960
 title: Web UI 390 px scroll hints and Settings rail layout (UX review F8 F9)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-20T14:30:00Z'
-updated_date: '2026-11-25T06:06:00Z'
+updated_date: '2026-11-25T10:04:00Z'
 labels:
   - ux
   - webui
@@ -38,3 +38,9 @@ From the TASK-2952 UX review (docs/reviews/2026-11-20_ux-heuristic-v2-webui/READ
 
 2026-11-25 (lane/ba-2960 from origin/dev 5bcd5b54c). AC1: .hscroll on the main nav, SAT views, both .subtabs rows (Monitor, Advanced), the Settings rail and the Home chips; syncHScroll() sets data-overflow end/both/start from scrollLeft/clientWidth/scrollWidth (1 px tolerance) on scroll, resize, ResizeObserver and a MutationObserver (childList, class, aria-current), masks in v2.css with the -webkit twin; the active item is scrolled sideways into view when it changes (smooth, instant under prefers-reduced-motion), without scrolling the page. AC2: rail item = .ri-ic + .ri-lbl (ellipsis, full title in title) + .ri-reboot dot (Network) + count; the full REBOOT badge stays in the category header and on the rows; short titles settings.cat.otgw/sat/s0.short (EN, NL, DE, EL; EL written by me, add to TASK-3047). AC3 (rail as a button) was done in TASK-2958 and is untouched, so tick it as already done there. AC4: set-cards--few (columns:auto; max-width:760px) when a category has at most 2 cards and no search is active. AC5/6 of spec T5: the open question (is the SAT group the same set as the SAT page) is answered in spec T5 section 3: one source (setData, catFor === sat), two renderings; no change to how the pages share setData. Evidence: tests/webui/hscroll-and-rail-2960.test.mjs red 0/4 on origin/dev data (no hscroll class; rail items 54 px high with the icon on its own line, REBOOT text badge) and green 4/4 on the fix; a11y-structure 12, footer-copyright 2, about-cards-typography 2, otd-hidden-in-pic-mode 2, contrast-tokens 3, ble-nopsram-warning 3, i18n-lang 6, i18n-no-hardcoded 3, i18n-followups 4, sat-areas-zones-groups 2, sat-page-order 1, sat-settings-locked-when-off 6 pass; evaluate.py --quick 88 pass 0 fail (Design-System Class Drift clean for .hscroll, .ri-ic, .ri-lbl, .ri-reboot, .set-cards--few). Screenshots before/after (synthetic data): OTGW-build-artifacts-safe/evidence-TASK-2960/. Not verified: a real phone or unit; SAT views and the Home chips fade only when their content overflows (the SAT views fit at 390 px today), covered by the invariant check in the test, not by a screenshot; the NAS full suite (09).
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+390 px edge fades, one-line Settings rail items with reboot dot and short titles, one column for categories with at most 2 cards. Evidence: tests/webui/hscroll-and-rail-2960.test.mjs (4 pass) red on origin/dev data and green on the fix; settings-reboot-badge test follows the dot (7a4104098); evaluate --quick no new FAIL. Bench screenshots in OTGW-field-data/bench-63/2026-11-25_beta-candidate/screenshots/ (build 4f303da, banner beta.428, light and dark): B1 S10 (nav and chips fade right), B2 S11 (left fade after scroll), B3 S12 (Advanced scrolled fully in, subtab fade), B4 S13a (rail fade right; the click on the last category, S13, was not reviewed), B5 S14 at 1400 px (one-line items, orange dot at Network, System card in one column). Not seen on the bench: SAT view strip and Monitor tab fades (only overflow in some languages) and the language rendering (el short rail titles are TASK-3047). Published in tag v2.0.0-beta.428.
+<!-- SECTION:FINAL_SUMMARY:END -->

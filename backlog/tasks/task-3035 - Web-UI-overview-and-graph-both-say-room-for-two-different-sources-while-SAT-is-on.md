@@ -3,11 +3,11 @@ id: TASK-3035
 title: >-
   Web UI: overview and graph both say 'room' for two different sources while SAT
   is on
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-22T16:32:00Z'
-updated_date: '2026-11-25T05:58:00Z'
+updated_date: '2026-11-25T10:03:00Z'
 labels:
   - webui
   - sat
@@ -40,3 +40,9 @@ Evidence: will_85903 beta.410 screenshots (OTGW-field-data/will_85903/2026-11-22
 
 2026-11-25 EL unreviewed: the Greek strings of this task (and of TASK-3012) were written by otgw-webui directly, not through the translate_webui_otgw-firmware skill (no glossary, adversarial reviews or editor pass). NL/DE/EN follow the ux README as agreed. Proper EL review is TASK-3047, after the beta that carries 3035/3012.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Room labels name the thermostat reading (MsgID 24) when SAT controls on another source. Evidence: tests/webui/room-label-sat-source.test.mjs red on origin/dev data and green on the fix; python evaluate.py --quick 88 pass/0 fail at the time; EN/NL/DE packs agree (EL written by otgw-webui, unreviewed, TASK-3047). Bench screenshots in OTGW-field-data/bench-63/2026-11-25_beta-candidate/screenshots/ (build 4f303da, banner beta.428, light and dark): A1 S1 (tag ROOM, no second line), A4 S8 light+dark (ROOM · SAT, thermostat: no reading, no cut-off, no overlap), S4b graph with BLE source (legend room (thermostat) + line SAT uses 25.7 (BLE sensor)). Not reachable on the bench (no thermostat on the bench unit): A2 with a differing thermostat value (S3/S5), A3 (S6/S7), A5 (S9), the room tooltip, S16/S17 (anti-cycling idle, takeover STOPPED) and the Messages-button accessible name. The nl, de and el packs were only fetched (HTTP 200, JSON parses), not seen rendered. Those states are covered by host browser tests only. Published in tag v2.0.0-beta.428.
+<!-- SECTION:FINAL_SUMMARY:END -->
