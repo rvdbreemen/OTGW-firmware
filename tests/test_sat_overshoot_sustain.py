@@ -849,6 +849,27 @@ class LowLoadEntryCells(unittest.TestCase):
         self.assertLess(a, b)
 
 
+class AtMaxExitKeepsOnlyTheStartGate(unittest.TestCase):
+    """Entry 463 (Q-456g A, ADR-297): at the clamped maximum PWM ends for continuous after the 60 s start gate, without waiting for the
+    180 s flame gate of the underheat exit (entry 456). STRUCTURAL: the loop cannot be sliced on the host, so the branch is read."""
+
+    def test_the_at_max_branch_has_the_start_gate_and_no_flame_gate(self):
+        s = SAT_INO.read_text(encoding="utf-8").replace("\r\n", "\n")
+        a = s.index("if (pidOutput >= maxSetpoint && state.sat.eControlMode == SAT_MODE_PWM")
+        branch = s[a:s.index("}", a)]
+        self.assertIn("!satStartGateActive()", branch)                       # the 60 s start gate (entries 385/387, ADR-252)
+        self.assertNotRegex(branch, r"flameEstablished|SAT_UNDERHEAT_FLAME_MIN_MS|satCycleGetFlameOnStartMs")
+        self.assertIn("SAT_MODE_CONTINUOUS", branch)
+
+    def test_the_underheat_exit_has_the_flame_gate_and_the_start_gate(self):
+        c = CYCLES_INO.read_text(encoding="utf-8").replace("\r\n", "\n")
+        a = c.index("bool satCycleCheckPwmExits(")
+        body = c[a:c.index("\n}\n", a)]
+        self.assertRegex(body, r"flameEstablished\s*=\s*satIsFlameOn\(\)")
+        self.assertIn("SAT_UNDERHEAT_FLAME_MIN_MS", body)
+        self.assertIn("!satStartGateActive()", body)
+
+
 class GateHeatPumpSwitch(unittest.TestCase):
     @classmethod
     def setUpClass(cls):

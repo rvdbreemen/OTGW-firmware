@@ -1478,7 +1478,7 @@ bool satCycleCheckOvershootSwitch(float requestedSetpoint, uint32_t tickMs)
 // Both timers reset while PWM is not the mode (:308-311), during hot water and within 300 s after it (:313-315,
 // entry 108), and outside the PWM ON phase (:321-323): in the OFF phase the flow is low by design.
 // Underheat (TASK-3008, entry 448; thermo-nova heating_control.py:330-344) counts while the flow is at most the requested setpoint minus
-// SAT_UNDERSHOOT_MARGIN_C (3.0 C), with no flame condition as in thermo-nova, and resets otherwise; 180 s from the first qualifying tick.
+// SAT_UNDERSHOOT_MARGIN_C (3.0 C), only once the flame has burned 180 s (entry 456, the gate below; thermo-nova 7beaaf5 has no such gate), and resets otherwise; 180 s from the first qualifying tick.
 // Saturation counts while the last PWM off time is 0, 300 s from the first such tick
 // (:359-362), and is only looked at when underheat did not fire (:217-220, :325-329).
 // Entries 385/387: neither exit fires inside the start sequence of a heating start (satStartGateActive(): the PWM entry of the start until 60 s

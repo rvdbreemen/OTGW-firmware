@@ -137,8 +137,14 @@ def check_s1(tc, r):
 
 
 # ---- scenario 2: MsgID 25 lost -------------------------------------------------------------------------------------------------------
+# The scenario starts at 540 s: the PWM ON phase that SAT opened at 60 s is still running there (it ends at 660 s). Since the
+# underheat exit is thermo-nova's (entry 448, TASK-3008: flow 3.0 C under the request for 180 s after 180 s of flame) the
+# 60 s rule no longer flips this run to continuous at 150 s, so the old start at 700 s now falls in an OFF phase.
+S2_T = 540000
+
+
 def s2_script(gap_s):
-    return ["run 700000", "snap before", "mute25 1", "run %d" % (700000 + gap_s * 1000 - 1000), "snap during", "mute25 0", "run %d" % (700000 + gap_s * 1000 + 120000), "snap after"]
+    return ["run %d" % S2_T, "snap before", "mute25 1", "run %d" % (S2_T + gap_s * 1000 - 1000), "snap during", "mute25 0", "run %d" % (S2_T + gap_s * 1000 + 120000), "snap after"]
 
 
 def cont_cs(r):
@@ -155,10 +161,10 @@ def check_s2_loss(tc, r):
     tc.assertEqual(d["pwmOn"], "0")
     # TASK-1412.18.1 finding: with the flow stale the 3 s suppression refresh must not send the minimum CS while CH stays on;
     # thermo-nova makes no override without a flow temperature (heating_control.py:435-437) and keeps the setpoint.
-    low = [(t, x) for t, x in r.tx(700000, 790000, "CS=") if float(x[3:]) <= 10.05]
+    low = [(t, x) for t, x in r.tx(S2_T, S2_T + 90000, "CS=") if float(x[3:]) <= 10.05]
     tc.assertEqual(low, [], "minimum CS sent during the flow loss (3 s refresh without a flow temperature)")
-    cs = cont_cs(r)
-    in_loss = [float(x[3:]) for t, x in r.tx(762000, 790000, "CS=")]
+    cs = float(d["final"])   # the continuous setpoint SAT holds while PWM idles on the missing flow (no continuous stint before it in this run)
+    in_loss = [float(x[3:]) for t, x in r.tx(S2_T + 58000, S2_T + 90000, "CS=")]
     tc.assertTrue(in_loss and abs(in_loss[-1] - cs) < 0.15, "during the loss the CS on the wire is %r, not the continuous setpoint %.1f" % (in_loss, cs))
     a, _ = r.snap("after")
     tc.assertEqual(a["idle"], "0", "PWM did not recover after the flow temperature came back: %r" % a)
@@ -168,7 +174,7 @@ def check_s2_loss(tc, r):
 def check_s2_short(tc, r):
     d, _ = r.snap("during")
     tc.assertEqual((d["idle"], d["pwmOn"], d["mode"]), ("0", "1", "2"), "a 50 s MsgID 25 gap idled PWM (validity window is 60 s): %r" % d)
-    cs = [float(x[3:]) for t, x in r.tx(700000, 752000, "CS=")]
+    cs = [float(x[3:]) for t, x in r.tx(S2_T, S2_T + 52000, "CS=")]
     tc.assertTrue(cs and all(v > 30.0 for v in cs), "CS on the wire during a 50 s gap left the ON-phase values: %r" % cs)
 
 

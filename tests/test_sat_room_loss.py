@@ -166,14 +166,14 @@ class RoomLoss(unittest.TestCase):
         pre_i = r[len(PRE) - 1]["I"]
         x = r[-1]
         self.assertEqual(x["ran"], 1)
-        # Automatic gains (TASK-1357): coefficient 1.0, curve 45, radiators -> kp = 15, ki = kp / 8400 rounded to 3
-        # decimals = 0.002 (TASK-1423, entry 95 Q28a; pid.py:82 rounds, to 6 there).
+        # Automatic gains (TASK-1357): coefficient 1.0, curve 45, radiators -> kp = 15, ki = kp / 8400 rounded to 6
+        # decimals = 0.001786 (entry 482, TASK-3050; pid.py:82).
         # Error 0.05 (inside the deadband), 60 s per update: I restarts at 0 and gains ki * 0.05 * 60 on the first update,
-        # published rounded to 3 decimals (pid.py:106): 0.006.
-        self.assertAlmostEqual(x["I"], round(round(KP / 8400.0, 3) * 0.05 * 60.0, 3), places=4, msg="I must restart from 0 (pre-loss I was %.3f)" % pre_i)
+        # published rounded to 3 decimals (pid.py:106): 0.005.
+        self.assertAlmostEqual(x["I"], round(round(KP / 8400.0, 6) * 0.05 * 60.0, 3), places=4, msg="I must restart from 0 (pre-loss I was %.3f)" % pre_i)
         self.assertEqual(x["D"], 0.0, "D must restart from 0 (inside the deadband it stays frozen at the reset value)")
         self.assertAlmostEqual(x["P"], KP * 0.05, places=3)
-        self.assertAlmostEqual(x["out"], 45.0 + x["P"] + x["I"] + x["D"], places=3)
+        self.assertAlmostEqual(x["out"], round(45.0 + x["P"] + x["I"] + x["D"], 1), places=3)   # the output is rounded to 1 decimal (pid.py:132, entry 490)
         self.assertNotAlmostEqual(x["out"], 45.0, places=2, msg="the PID must have run again, not handed back the curve")
 
     def test_e_short_gap_recovery_is_not_swallowed(self):

@@ -582,7 +582,7 @@ class Cadence(unittest.TestCase):
 
     def test_m_first_output_with_pid_terms_has_d_zero_then_d(self):
         """Entry 95 Q39b (round 3): the first output that includes the PID terms has D = 0, also when it comes after a restore and
-        a stretch of curve-only outputs; the next output has D = kd * raw derivative (curve 40, coefficient 1.6: kd = 0.04 * 8400 * round3(1.6 * 40 / 3) = 8959.86, raw 0.02 -> 179.197)."""
+        a stretch of curve-only outputs; the next output has D = kd * raw derivative (curve 40, coefficient 1.6: kd = 0.04 * 8400 * 21.333333 = 7168.0, raw 0.02 -> D = 143.36)."""
         if self.head:
             self.fail("HEAD has no restore hold")
         rows = {int(r["t"]): r for r in self.run_sc("holdsave", 10)}

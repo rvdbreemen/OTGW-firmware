@@ -8,7 +8,7 @@ Two parts:
      ki_manual / kd_manual / auto_gains_value. This part fails on HEAD before the removal.
   2. Behaviour: the REAL _pidCalculateGains() is cut out of SATpid.ino and compiled with a host C++ compiler; the Kp/Ki/Kd it
      computes for a grid of heating-curve inputs are compared with the automatic formula as it stood on HEAD
-     (pid.py automatic_gains: kp = coeff * curve / divisor, ki = kp / 8400, kd = 0.07 * 8400 * kp, the firmware uses 0.05 since entry 425 (0.063 by entry 279, TASK-1656); divisor 4 underfloor,
+     (pid.py automatic_gains: kp = coeff * curve / divisor, ki = kp / 8400, kd = 0.07 * 8400 * kp, the firmware uses 0.04 since entry 477 (0.05 by entry 425, 0.063 by entry 279, TASK-1656); divisor 4 underfloor,
      3 radiators), each rounded to 6 decimals like pid.py:71, :82, :93 (entries 482 and 490; Ki and Kd from the rounded Kp; Python round(),
      ties to even) and stored as float32. The stub settings carry the old fields at their old defaults (bAutoGains true), so the same
      harness also compiles the pre-removal SATpid.ino; it only matches while that file does not round.

@@ -55,10 +55,12 @@ class ClosedLoop(unittest.TestCase):
         self.assertFalse(r["pass"]["H3"])
 
     def test_h4_curve_only_red_on_a_stale_room(self):
-        self.assertTrue(c.run("room_fault", *ARGS, 1)["pass"]["H4"])
+        # Seed 2, not 1: with the PID output rounded to 1 decimal (entry 490, pid.py:132) the stale-room error of seed 1 is
+        # too small to move the rounded output off the curve, so seed 1 no longer tells the mutant from the rule (seeds 2-8 do).
+        self.assertTrue(c.run("room_fault", *ARGS, 2)["pass"]["H4"])
         c.ROOM_LOST_CURVE_ONLY = False
         try:
-            r = c.run("room_fault", *ARGS, 1)
+            r = c.run("room_fault", *ARGS, 2)
         finally:
             c.ROOM_LOST_CURVE_ONLY = True
         self.assertFalse(r["pass"]["H4"])
