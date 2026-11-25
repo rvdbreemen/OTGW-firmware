@@ -41,7 +41,7 @@ format: "canonical"
 
 ## Status
 
-Accepted, 2026-10-24.
+Superseded by ADR-292, 2026-11-21.
 
 Guideline-level per ADR-080: no CI (continuous integration) gate checks
 whether a SAT decision followed this rule. `tests/test_sat_ground_truth_block.py`

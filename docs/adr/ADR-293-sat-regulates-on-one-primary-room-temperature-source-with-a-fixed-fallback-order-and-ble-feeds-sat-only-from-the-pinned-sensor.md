@@ -39,7 +39,7 @@ context_scope: "selective"
 
 ## Status
 
-Proposed, 2026-11-21.
+Accepted, 2026-11-21.
 
 ## Status History
 

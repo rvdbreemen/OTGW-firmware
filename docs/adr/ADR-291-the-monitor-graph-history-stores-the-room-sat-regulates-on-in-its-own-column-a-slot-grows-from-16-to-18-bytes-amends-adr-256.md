@@ -34,7 +34,7 @@ context_scope: "selective"
 
 ## Status
 
-Proposed, 2026-11-21. Guideline-level per ADR-080: verified by host and web UI tests, no evaluate.py gate. Amends ADR-256 (the slot size), and through it ADR-193 and ADR-245.
+Accepted, 2026-11-21. Guideline-level per ADR-080: verified by host and web UI tests, no evaluate.py gate. Amends ADR-256 (the slot size), and through it ADR-193 and ADR-245.
 
 **Decision Maker:** the coordinator chose option (b) of the architect's comparison for TASK-3007 on 2026-11-21. Robert accepts.
 
