@@ -3,12 +3,12 @@ id: TASK-3055
 title: >-
   Public SAT docs: how to cite Sergeant D register entries (EN ch05 + NL h05 +
   MANUAL.md)
-status: To Do
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-25T10:48:00Z'
+updated_date: '2026-11-25T15:51:00Z'
 labels:
-  - needs-maintainer-ok
   - docs
   - sat
 milestone: 2.0.0
@@ -24,6 +24,12 @@ Open question for Robert (via the coordinator, DM). The user-facing SAT manual c
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Robert chose A, B or C
-- [ ] #2 EN ch05, NL h05 and MANUAL.md follow the choice; build_manual.py leaves no diff; test_manual_generated passes
+- [x] #1 Robert chose A, B or C
+- [x] #2 EN ch05, NL h05 and MANUAL.md follow the choice; build_manual.py leaves no diff; test_manual_generated passes
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Robert chose B (interactive, 2026-11-25, relayed by the coordinator): plain words in the public SAT manual, entry numbers stay in docs/sat/ specs and the register. EN ch05 and NL h05: every 'Sergeant D entry N' / 'entry N' citation (21 lines each) removed or replaced by plain statements; factual content unchanged, ADR and TASK references kept. Only wording that carried content was rewritten: the tolerance band phase that sees CH allowed again is counted once at that moment (was 'entry 400'); the Kd factor history sentence now just lists the values. MANUAL.md rebuilt (build_manual.py, 5725 lines); grep for 'Sergeant D entr' and '(entry N' in MANUAL.md, ch05 and h05: 0 hits (remaining 'entry' words are the unrelated list-entry wording). Tests: test_manual_generated + test_manual_sat_commands + test_sat_mqtt_state = 41 passed. No em dashes. Not verified: no native reader read the rewritten sentences; the replacement for entry 400 follows the register text (our interpretation entry), not Sergeant D's words.
+<!-- SECTION:FINAL_SUMMARY:END -->
