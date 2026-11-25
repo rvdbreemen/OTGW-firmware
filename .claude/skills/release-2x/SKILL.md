@@ -59,7 +59,7 @@ Each push to `release/2.x` happens only inside this flow after checkpoint 1.
    more than 24 h on the final candidate (Robert, 2026-11-25 22:00 correction: 15 min per TASK on the bench, 60 min on a public beta
    release build, more than 24 h before the FINAL release; the long run may be field data from public betas and testers: how many units
    at least, no restart, heap flat; the number N of units is an open question for Robert, put it to him by DM before relying on field data;
-   until he answers, the long run is a 24 h soak on a Classic + S3 Mini), capture runs on Windows, Linux and macOS
+   until he answers, the long run is a 24 h soak on a Classic + S3 Mini; the long run is on the exact production binary, and it and the other gates may run on the local production build of Phase 3b before the go), capture runs on Windows, Linux and macOS
    (TASK-1544 for the first stable). Report each as met or not met with evidence.
 3. **CHECKPOINT 1** (by Discord DM via the coordinator, never as an interactive CLI question; one question per
    decision, with a recommendation. A release is a hard stop: only Robert's explicit yes as a reply to a DM that names
@@ -137,6 +137,14 @@ Each push to `release/2.x` happens only inside this flow after checkpoint 1.
 
    Hook bypass: the bump hook cannot see a commented-out prerelease as a bump."
    ```
+
+### Phase 3b: Dry run before the go (optional, no push)
+
+The production commit may be built and benched locally before Robert's go (Phase 3, Phase 4), in a locally created `wt-release-2x`
+(first stable: `git worktree add -b release/2.x ../wt-release-2x <CAND>`), with no push of `release/2.x` and no tag. The published asset is
+exactly that benched file: after the go, push the same commit fast-forward (no amend, no rebase, no rebuild), tag it, and verify that the
+sha256 of every release asset equals the one recorded at the bench. Any changed commit, even a docs change, means rebuild and bench again.
+Checkpoint 1 still gates every push, the tag and the publish (Robert, via the coordinator, 2026-11-25).
 
 ### Phase 4: Build and bench check
 
