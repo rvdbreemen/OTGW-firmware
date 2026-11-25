@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-24T18:27:00Z'
-updated_date: '2026-11-24T18:32:00Z'
+updated_date: '2026-11-25T05:09:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -24,19 +24,20 @@ Sergeant D, #dev-sat-mqtt 2026-11-24 (entry 475, private register): during one f
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Sergeant D has answered Q-475a and the answer is recorded as an entry in the decisions register before any code
+- [x] #1 Sergeant D has answered Q-475a and the answer is recorded as an entry in the decisions register before any code
 - [ ] #2 Host test: a scripted flame-on phase with 3 PWM/continuous flips is red on origin/dev (the ON timer restarts at each re-entry) and green on the fix (the ON timer freezes and resumes)
 - [ ] #3 Host test: the clock resets when the flame goes out, when an ON phase ends normally, and when SAT is disabled or the heater goes off; DHW draw time still does not count (entry 95 unchanged)
 - [ ] #4 The start gate (entries 385/387, ADR-252), the 448/456 exit rule, the at-max rule (entry 463) and the entry 428/429 per-flame counting are unchanged (existing tests green)
 - [ ] #5 evaluate.py --quick shows no new FAIL; full tests/ run green; esp32-combo build OK
 - [ ] #6 Bench on .63 (bench-tester): a flame-on phase with several PWM/continuous flips shows a shorter total ON time per flame than before; field proof by Sergeant D's testers
 - [ ] #7 ADR (adr-kit, Proposed) records the freeze rule and cites the entry
+- [ ] #8 The min burn (180 s, 600 s heat pump) is read from the real flame-on of the flame across flips (entry 479); host test: a resume with little ON left ends after the frozen ON clock, not 180 s later
 <!-- AC:END -->
 
 ## Implementation Plan
 
 <!-- SECTION:PLAN:BEGIN -->
-STATUS: PLAN ONLY. No code before Sergeant D answers Q-475a. All firmware citations are origin/dev 9f0ccba38 (src/OTGW-firmware, SATcontrol.ino = C, SATcycles.ino = Y), opened in this session. Read-only; nothing built or tested.
+STATUS 2026-11-25: DECIDED, fully specified (entries 476, 478, 479, release 2.0.0). Code goes on branch sat/pwm-on-freeze off origin/dev, no merge into dev without Robert's yes. This text was written before the answers; the decisions are folded in below. All firmware citations are origin/dev 9f0ccba38 (src/OTGW-firmware, SATcontrol.ino = C, SATcycles.ino = Y), opened in this session. Read-only; nothing built or tested.
 
 1. WHAT TO CHANGE (Sergeant D, entry 475): in one flame-on phase the PWM ON clock is one clock. PWM -> continuous freezes it (no reset); the next PWM entry continues from the frozen value.
 
@@ -67,15 +68,13 @@ STATUS: PLAN ONLY. No code before Sergeant D answers Q-475a. All firmware citati
 
 6. EDGE CASES (decide with the answer)
 - Frozen time >= the ON time asked at resume: the ON phase ends on the first tick after the minimum burn. Then CH off at once (OFF phase, entry 43/ADR-250 rules apply as today).
-- The 180 s minimum burn (C:1797, pwm.py:201): measured from _pwm_flameOnMs, which satPwmBeginOn sets to now at the re-entry. If it stays per segment, a resume with little ON time left still burns 180 s more, which weakens the intent. Recommendation, PENDING (design choice, becomes Q-475b to Sergeant D after he answers Q-475a; BlueFlame asks): count the minimum burn from the real flame-on of the flame (_sat_chFlameOnMs, C:8123), not per segment. This is Q-475a point 3.
+- The 180 s minimum burn (C:1797, pwm.py:201): measured from _pwm_flameOnMs, which satPwmBeginOn sets to now at the re-entry. If it stays per segment, a resume with little ON time left still burns 180 s more, which weakens the intent. DECIDED (entry 479, Q-475b A): the minimum burn (180 s; 600 s heat pump, entry 197) is counted from the real flame-on of the flame (_sat_chFlameOnMs, C:8123), across flips, not per PWM segment. A resume with little ON time left ends when the frozen ON clock ends (476/478). Implementation: the min-burn test at C:1797 must read the flame-on of the flame, not the per-segment _pwm_flameOnMs that satPwmBeginOn sets to now. This is Q-475a point 3.
 - Heat pump (minOnMs 600 s, C:1796-1797): same rule.
 - Start gate / 448 exit: unchanged. A flip needs the exit rule to fire, which is gated for 60 s after the first CH flame-on (ADR-252).
 - Telemetry (TASK-1880, satPwmPhaseOpen/Close, C:1441, :1495): stays per PWM segment; add the used time to the open record only if cheap.
 - MM=T / at-max (entry 463) and the flame-off hold: unaffected, they read bPwmFlameRequested.
 
-7. THERMO-NOVA - NOT VERIFIED AGAINST THE PIN 7beaaf5. other-projects/SAT-releases-thermo-nova/ does not exist in this checkout (only other-projects/SAT-develop, HEAD 2b01ba65, which is not the pin). I read a copy in another clone (OTGW-other-projects/SAT-releases-thermo-nova, its own .git HEAD 770aa45, not the pin; the pin object is not in it). The lines below match what entry 475 cites, but they are unverified. Morning fix: fetch commit 7beaaf5 (github.com/Alexwijn/SAT, branch releases/thermo-nova) into other-projects/SAT-releases-thermo-nova, verify pwm.py:87-97, 106-108, 134, 201, 205 there, and file an issue for the missing local copy (coordinator order, 2026-11-24).
-- pwm.py:106-108 disable() calls reset(); reset() (:87-97) sets _last_update = timestamp() and clears _flame_on_at. :134 elapsed = timestamp - self._last_update. :205 if elapsed >= on_time_seconds: ON ends. :201 the flame-on hold from _flame_on_at.
-- PWM and continuous are chosen outside this class (heating_control.py), so thermo-nova clears the ON clock whenever PWM is left. DIFFERENCE: our change keeps the clock across PWM stints within one flame. By design a deviation from the pin (higher source: entry 475).
+7. THERMO-NOVA - VERIFIED AGAINST THE PIN 7beaaf5 on 2026-11-25 (fetched from github.com/Alexwijn/SAT into other-projects/SAT-releases-thermo-nova, HEAD 7beaaf531ee99dc74a19ac74f3c06ce7f2922cfb, 2026-03-18 "Improve pressure sensor"). pwm.py:87-97 reset() body (_last_update = timestamp() at :91; _flame_on_at is cleared one line further, :98), :106-108 disable() calls reset(), :134 elapsed = timestamp - self._last_update, :201 flame-on hold from _flame_on_at, :205 if elapsed >= on_time_seconds. All as cited in entry 475. PWM and continuous are chosen outside this class, so thermo-nova clears the ON clock whenever PWM is left. DIFFERENCE: ours keeps it across PWM stints inside one flame, deliberate (entry 475/476 outrank the pin). Correction of my 2026-11-24 note: the HEAD 770aa45 I quoted for the other copy was the enclosing OTGW-other-projects repo, not a SAT clone; its files are content-identical to the pin (diff -rq empty).
 
 8. SERGEANT D ENTRIES RELIED ON (decisions register, entry numbers only)
 - 475 (the request; its own check says "no conflict"). 95/103/132 (DHW freeze: precedent, unchanged). 385/387 + ADR-252 (start gate, unchanged). 428 (one counted PWM ON per flame, unchanged). 429 (settled reading b: one PWM entry per flame, fail-safe the only way back; this plan relies on 429(2)). 448/456/463 (exit rules, unchanged). 43 (first PWM phase is ON).
@@ -92,7 +91,7 @@ STATUS: PLAN ONLY. No code before Sergeant D answers Q-475a. All firmware citati
 - F7: PWM left while waiting for ignition: no accumulated time.
 - Then: evaluate --quick, full tests/, bump, esp32-combo build, bench request to otgw-bench-tester (.63: a flame phase with flips, compare PWM ON time per flame before/after).
 
-10. OPEN FOR SERGEANT D (Q-475a, BlueFlame owns it): A only PWM time counts (recommended: continuous time does not eat the ON time, matches "freeze") / B all flame time counts / C other; plus point 3: does the 180 s minimum burn run per segment or from the real flame-on. Scope is 2.0.0 per Robert.
+10. DECISIONS (all recorded): entry 476 (Q-475a A: only PWM time counts, frozen in continuous, resets when the flame goes out), entry 478 (Q-475a1 A: applies to the fail-safe flips of entry 429, the only flips inside one flame), entry 479 (Q-475b A: min burn from the real flame-on). Scope 2.0.0. NOTE from entry 476: the open-loop replay of the indigo beta.410 logs showed the freeze alone would pre-empt only about 4 of 62 flips; the 448 exit and the request-above-floor effect carry the rest. Hence the three-way flip test build (dev baseline vs +448 vs +448+freeze, branch sat/flip-test).
 <!-- SECTION:PLAN:END -->
 
 ## Implementation Notes
@@ -101,4 +100,6 @@ STATUS: PLAN ONLY. No code before Sergeant D answers Q-475a. All firmware citati
 2026-11-24 plan written, read-only on the code, nothing built or run. Waiting for Sergeant D's answer to Q-475a (BlueFlame owns the question). Branch sat/pwm-on-freeze off origin/dev is created only after the answer is recorded.
 
 2026-11-24 plan revised after the coordinator's second read: (1) thermo-nova lines labelled NOT verified against pin 7beaaf5; fetch the pin into other-projects/SAT-releases-thermo-nova and verify pwm.py:87-97, 106-108, 134, 201, 205, plus an issue for the missing local copy, first thing after the reset. (2) entry 429 quoted in full; the fail-safe exception is explicit in option B as put to him, not in his own typed words. (3) the min-burn choice is recommendation, pending, Q-475b after Q-475a.
+
+2026-11-25 Sergeant D decided: Q-475a A (entry 476), clarifier A (478: fail-safe flips of entry 429), Q-475b A (479: min burn from the real flame-on). AC 1 ticked on those entries. thermo-nova lines verified at the pin 7beaaf5 (fetched into other-projects/SAT-releases-thermo-nova): pwm.py:87-97, 106-108, 134, 201, 205 confirmed; the not-verified label is gone. Code next on sat/pwm-on-freeze, after TASK-3034, TASK-3008 and the Kd task (coordinator order).
 <!-- SECTION:NOTES:END -->
