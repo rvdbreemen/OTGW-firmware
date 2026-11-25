@@ -72,7 +72,7 @@ static const char SETTINGS_HELP_JSON[] PROGMEM = R"json({
 "telnetenabled":"Telnet debug console on port 23, without login; its keys can switch the GPIO output. Off closes the port at once.",
 "satenabled":"Master switch. On: SAT sets the boiler flow temperature. Off: the thermostat controls the boiler again.",
 "satsystem":"How heat is distributed: auto (treated as radiators), radiators or underfloor. Sets curve offset and flow limits.",
-"satroomsource":"Which room temperature SAT regulates on first: auto (pinned BLE sensor, then areas, then the MQTT/REST sensor, then the thermostat), or thermostat, external, ble or areas first. When that source has no fresh value SAT uses the next one in the auto order, and with none it heats on the heating curve only.",
+"satroomsource":"Which room temperature SAT regulates on first: auto (pinned BLE sensor, then areas, then the MQTT/REST sensor, then the thermostat), or thermostat, external, ble or areas first. Without a fresh value SAT tries the next one in the auto order; with none it heats on the heating curve only.",
 "satsource":"Heat source: auto (gas boiler), gas boiler, heat pump or hybrid. Sets cycle timing; heat pumps never get modulation 0.",
 "sattargettemp":"Wanted room temperature, 5 to 30 °C. Default 20.",
 "sattempstep":"Step for target temperature changes, 0.1 to 1 °C. Default 0.5.",
