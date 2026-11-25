@@ -48,25 +48,21 @@ nothing builds or publishes for you. `dev` is the GitHub default branch: without
    "every beta public" morning rule): at most one public beta per 12 hours, at 08:00 or 20:00 local time. Every firmware task keeps its own
    `2.0.0-beta.N` bump and its #alpha-testing zip (alpha track); only the daily release gets a
    GitHub prerelease and a #beta-testing post. Candidate: origin/dev HEAD at compose time (T-75, see
-   below), published as the release build that ran its tier's soak (below) on the bench unit (.63) with MQTT
+   below), published as the release build that ran at least 1 h on the bench unit (.63) with MQTT
    connected, without a restart (bootcount = flash + 2, no crashlog, heap not trending down). Robert 2026-11-03: "Soak terugbrengen naar zinvol minimum. Beta
    testers zijn er ook om problemen te ontdekken." (was 8 h).
-   **Tiered soak (Robert, interactive, 2026-11-25; his rule, not an agent convenience).** The soak length depends on what changed
-   against a build that already soaked:
-   - **Tier A, 15 min sanity** on the EXACT release binary (flash, boot, MQTT up, REST and web UI load, no crashlog, heap sane). Allowed only
-     when the release commit differs from a build that already soaked at least 60 min in docs, web-UI data or comments, and
-     `git diff <soaked>..<release> -- src/ scripts/ build.py platformio.ini` is empty or comment-only (prove it, quote the result).
-     The candidate itself is soaked earlier, for example overnight on the bench.
-   - **Tier B, 60 min minimum** for firmware logic, discovery payloads and SAT or PIC command paths. The run must pass uptime 3600 s,
-     because the hourly block (`OTGW-firmware.ino:949`, uptime above 3600 s plus NTP) runs only then; a leak in such a block killed 1.x units
-     at 82 min. The old reason "1 h covers the safeboot rollback window" is wrong: the health gate confirms the app after 30 s
-     (`OTGW-firmware.ino:1206`).
-   - **Tier C, hours on .61** for MQTT, TCP and heap changes (Nagle, the pacer cuts), per the schedule of the architect
-     (`adr265_schedule.md`).
-   **Attribution rule:** one soak is one cause, unless the changes have independent signatures AND separate commits (bisectable). Every
-   candidate has a halving fallback: drop one commit, rebuild, soak again. MQTT, TCP and heap changes (Nagle, each pacer cut) always go alone.
-   No soak waiver for tier B and C: a slot whose candidate has not finished its soak waits until it has. Every flash
-   of the bench unit restarts the soak, so the last flash before a slot is at least the tier's soak time before it. Skip also when nothing user-visible changed or the candidate failed its soak or a bench
+   **Soak levels (Robert, 2026-11-25; first a tiered version, corrected by him the same evening at 22:00).** Three levels:
+   15 min per TASK on the bench (the developer's per-task bench run); **60 min on the public beta release build** (this skill; the
+   soak end is the publish moment); and for the FINAL release a long run of more than 24 h (see `/release-2x`). There is no shorter
+   sanity soak for a beta release build and no separate "hours on .61" level.
+   - Why 60 min and not less: the run must pass uptime 3600 s, because the hourly block (`OTGW-firmware.ino:949`, uptime above 3600 s plus
+     NTP) runs only then; a leak in such a block killed 1.x units at 82 min. The old reason "1 h covers the safeboot rollback window"
+     is wrong: the health gate confirms the app after 30 s (`OTGW-firmware.ino:1206`).
+   - **Attribution default:** one cause per build for MQTT, TCP and heap changes (Nagle, each pacer cut), so a failed soak points at one
+     change. Other changes may share a build when they have independent signatures AND separate commits (bisectable). Every candidate has a
+     halving fallback: drop one commit, rebuild, soak again.
+   No soak waiver: a slot whose candidate has not finished its 60 min soak waits until it has. Every flash
+   of the bench unit restarts the soak, so the last flash before a slot is at least 1 h before it. Skip also when nothing user-visible changed or the candidate failed its soak or a bench
    check. Hotfix exception: a public beta that breaks or crashes units may get its fix out at
    once. No per-release question within this rule; still ask (by Discord DM via the coordinator, one question
    each; never an interactive CLI question, TASK-1829) for anything new to weigh: a new waiver, a failed gate, a breaking change. The
@@ -91,11 +87,11 @@ nothing builds or publishes for you. `dev` is the GitHub default branch: without
    - **T-70 to T-62: build** that release commit (Phase 3.1, from a worktree at the commit if
      the tree moved on).
    - **T-62: flash** the release build on the bench unit (.63) and run the Phase 3 checks: this
-     flash starts the soak of its tier (60 min for tier B: soak end = T-2 at the latest; 15 min for tier A).
+     flash starts the 1 h soak (soak end = T-2 at the latest).
    - **T: soak verdict, then at once** tag THE RELEASE COMMIT (not HEAD; `git tag -a ... <commit>`),
      draft, verify, publish, posts (Phase 4.2-6). No rebuild after the soak: the soaked binary is
      the published binary (sha256 of the bench artifact = the release asset).
-   If the build or the bench check fails, publish at the earliest time the soak of its tier of the fixed
+   If the build or the bench check fails, publish at the earliest time a 1 h soak of the fixed
    build can finish, not at the next slot; skip the slot only if the fix needs new firmware.
    **No dev freeze** (Robert 2026-11-15: "Waarom de lange freeze periodes"). Only the bench unit
    is held, from the flash until the verdict. Phase 4.1's push is the T-75 push above; the

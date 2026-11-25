@@ -55,8 +55,11 @@ Each push to `release/2.x` happens only inside this flow after checkpoint 1.
 1. The candidate is a dev commit that shipped as a beta (or rc) and passed field
    testing. Name it: `CAND=<commit>` (usually the last beta tag: `git rev-parse "v2.0.0-beta.N^{}"`).
    Everything between that beta and `CAND` must be bench-tested.
-2. Gates on the candidate: the open release blockers in the tracking task, the 24 h
-   soak on a Classic + S3 Mini, capture runs on Windows, Linux and macOS
+2. Gates on the candidate: the open release blockers in the tracking task, the long run of
+   more than 24 h on the final candidate (Robert, 2026-11-25 22:00 correction: 15 min per TASK on the bench, 60 min on a public beta
+   release build, more than 24 h before the FINAL release; the long run may be field data from public betas and testers: how many units
+   at least, no restart, heap flat; the number N of units is an open question for Robert, put it to him by DM before relying on field data;
+   until he answers, the long run is a 24 h soak on a Classic + S3 Mini), capture runs on Windows, Linux and macOS
    (TASK-1544 for the first stable). Report each as met or not met with evidence.
 3. **CHECKPOINT 1** (by Discord DM via the coordinator, never as an interactive CLI question; one question per
    decision, with a recommendation. A release is a hard stop: only Robert's explicit yes as a reply to a DM that names
