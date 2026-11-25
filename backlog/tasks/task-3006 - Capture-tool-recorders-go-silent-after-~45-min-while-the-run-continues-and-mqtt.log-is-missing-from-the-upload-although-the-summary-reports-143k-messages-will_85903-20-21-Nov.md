@@ -4,11 +4,11 @@ title: >-
   Capture tool: recorders go silent after ~45 min while the run continues, and
   mqtt.log is missing from the upload although the summary reports 143k messages
   (will_85903, 20-21 Nov)
-status: In Progress
+status: In Review
 assignee:
   - otgw-poc-dev
 created_date: '2026-11-21T14:02:00Z'
-updated_date: '2026-11-25T05:53:00Z'
+updated_date: '2026-11-25T05:58:00Z'
 labels:
   - tooling
 milestone: 2.0.0
@@ -28,6 +28,9 @@ will_85903's 31 h capture (beta.392 device, capture tool on Windows, Python 3.14
 - [x] #1 Reproduce or explain the silent stop of the telnet/frame/crashlog recorders (e.g. a NAS run folder, a blocking write, Python 3.14), with a test on the real tool that fails on the old code
 - [x] #2 The tool notices a recorder that produced nothing for N minutes and reports it in summary.txt and gaps.log instead of continuing silently
 - [x] #3 The upload zip contains mqtt.log whenever the summary reports MQTT messages, or the summary says why it is missing
+- [x] #4 A run folder that cannot be written (even after reopening) loses no line: the lines are kept in a bounded memory buffer, written in order on the next write that works, and at stop saved in a local fallback folder whose path is reported (tests/test_capture_write_buffer.py a-c: old tool loses the lines, new one passes)
+- [x] #5 summary.txt carries a STREAM INTEGRITY line per stream (received, saved, in memory, in fallback, lost) with a WARNING when they differ, and summary.txt / script.error.log lines are shown and kept in the fallback folder when the run folder is gone (tests d and e)
+- [ ] #6 A real tester run on a NAS share shows the STREAM INTEGRITY block (next gruijter or will capture)
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -58,4 +61,6 @@ Correction: the /ws stall task is TASK-3017, not TASK-3011.
 2026-11-25 part 2 (coordinator proposal after the third NAS loss, will_85903 beta.418): when the run folder cannot be written even after reopening (a NAS share that is gone) SegmentStore keeps the lines of that stream in a bounded memory buffer (8 MiB, oldest dropped and counted as lost when full), writes them in order ahead of the next write that works, and at stop puts what is left into a local fallback folder (%LOCALAPPDATA%\OTGW-capture\fallback\<run>, or ~/.local/share/OTGW-capture/fallback/<run>) with a message that names the path. Per-stream counters (received, saved, fallback, lost, in lines) back integrity_lines(). Tests tests/test_capture_write_buffer.py a-d (real SegmentStore, the outage simulated by _handle_locked raising OSError 22): OLD scripts/otgw_capture.py from origin/dev 683e429ea: a FAILS ['l1','l4'] != ['l1','l2','l3','l4'] (outage lines lost), b FAILS (no fallback file), c and d error (no such API); NEW: 5 of 5 pass (e belongs to the next commit). test_capture_write_recovery.py test a adjusted: the failed line is now written in order and the write-failed error is still counted once. Duplicate risk: if a write fails half-way the file may hold part of that chunk twice after the retry (at-least-once, not exactly-once).
 
 2026-11-25 part 3 (same proposal): summary.txt and script.error.log no longer drop a line when the run folder is gone: the line is shown on stderr and appended to the same file name in the fallback folder; after store.close() the run summary gets one STREAM INTEGRITY line per stream (received, saved, in memory, in fallback, lost) and a WARNING with the difference, and the fallback file path when one was used. Test e in tests/test_capture_write_buffer.py (real Capture, run folder removed): OLD tool: FAILS, the summary line is silently dropped (stderr empty); NEW: passes; whole file 5 of 5. All 15 capture test files via scripts/run_tests.py --no-host capture: 15 passed, 0 failed (test_capture_tool 63 tests, 2 skipped inside it); evaluate.py --quick: Passed 88, Failed 0.
+
+2026-11-25 STATUS In Review, not Done. Evidence for AC 4 and 5: after the rebase on origin/dev (5bcd5b54c) scripts/run_tests.py --no-host capture = 15 files passed, 0 failed, 0 timeout (test_capture_tool 63 tests with 2 skipped inside, write_recovery 14, write_buffer 5); evaluate.py --quick Passed 88, Failed 0; old tool (origin/dev 683e429ea) fails tests a, b, e of test_capture_write_buffer.py on behaviour and has no API for c and d. NOT VERIFIED: (1) a real SMB/NAS share that disappears and comes back: the outage is simulated by _handle_locked raising OSError 22, so how Windows SMB behaves (stale handle, long timeouts that block the lock) is untested; (2) hourly (long-run) mode edge: lines buffered during an outage land in the file of the hour in which the share comes back, and a pack job of the hour in between is not retried for them; (3) delivery is at-least-once: a write that dies half-way can leave part of one chunk twice after the retry; (4) a write that BLOCKS for minutes on a hung share holds the store lock and the buffer never gets a chance (the code handles errors, not hangs). AC 6 stays open until a tester run on a NAS share (gruijter or will, next capture) shows the STREAM INTEGRITY block in summary.txt.
 <!-- SECTION:NOTES:END -->
