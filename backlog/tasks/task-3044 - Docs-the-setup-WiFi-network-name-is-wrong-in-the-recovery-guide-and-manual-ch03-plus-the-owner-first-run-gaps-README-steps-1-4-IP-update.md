@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-25T05:21:00Z'
-updated_date: '2026-11-25T05:31:00Z'
+updated_date: '2026-11-25T15:49:00Z'
 labels:
   - docs
   - ux
@@ -26,7 +26,7 @@ otgw-ux-designer review docs/reviews/2026-11-25_ux-owner-first-run-text/README.m
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [x] #1 Setup network name: WIFI_RECOVERY_TRIPLE_RESET.md and ch03 (EN, and NL where the sentence exists) match networkStuff.ino:321-332 and say once that the fallback network (networkStuff.ino:503-513) is different. Evidence: grep of both source lines quoted in the task notes at fix time, and a grep over README, docs/guides and docs/manuals for OTGW-XXXXXX / OTGW-21B4F8 showing only fallback uses remain
-- [ ] #2 README Quick Start steps 1 to 4 and the Which firmware section cover review items 2 to 6 (IP from the router list, first USB flash help, MQTT broker in one line plus link, /update address, how to tell the module); no new claim about what the web UI or OLED shows without checking it
+- [x] #2 README Quick Start steps 1 to 4 and the Which firmware section cover review items 2 to 6 (IP from the router list, first USB flash help, MQTT broker in one line plus link, /update address, how to tell the module); no new claim about what the web UI or OLED shows without checking it
 - [x] #3 docs/MANUAL.md regenerated with python scripts/build_manual.py and python scripts/run_tests.py shows test_manual_generated passing; output quoted in the final summary
 <!-- AC:END -->
 
@@ -40,4 +40,6 @@ Fixed: WIFI_RECOVERY_TRIPLE_RESET.md (setup name in steps 1 and 6, a 'Two differ
 AC2 (README Quick Start steps 1 to 4 and the Which firmware section) is NOT done: per the coordinator it waits until he has cleared it with Robert (R1 landing); separate commit when cleared.
 
 Evidence for 'the AP fallback is in all builds since TASK-2931' (file:line at dev 81f1e5dc0): networkStuff.ino:496-497 (comment 'AP fallback ... TASK-2931 (Robert, DM 2026-11-19): part of prerelease AND stable builds') above startAPFallback() at :499, with no prerelease guard inside it (grep for _VERSION_PRERELEASE / IS_PRERELEASE in networkStuff.ino: no hit); the decision to enter it is networkStuff.ino:653 ('in prerelease and stable builds alike. After 2 failed ...'); restAPI.ino:3337 and :4099 emit apfallback in both (comment 'TASK-2931: AP fallback in prerelease and stable builds'). Not run on a stable build image: read from the code only.
+
+AC2 done 2026-11-25 (Robert cleared README steps 1-4 via the coordinator; wording from otgw-ux-designer, ux-readme-quickstart-steps-1-4.md). Checked: /update route OTGW-ModUpdateServer-esp32.h:460; 'Download a settings backup' link on the update page (manual ch03:240), so the unverified 'Settings > Download settings / settings.ini' clause was dropped; USB: ch02 says built-in USB, normally no driver, flash_otgw --port (ch02:165-180), so the CP210x/CH340 and 'charge-only cable' clauses were dropped (CP210x/CH340 is the 1.x ESP8266 guide); update warning: WIFI_FIRMWARE_UPDATE.md:5 says the gateway does nothing for the heating for 1 to 2 minutes, boiler-own-settings applies only to boards without PIC, so README says only 'does nothing for your heating'; old layout: ch02:179 and the guide say early 2.0.0 alpha; step 3 names only the router (hostname OTGW2 default, OTGW-firmware.h:136; whether the router shows it is not verified); anchors setting-up-mqtt-with-home-assistant (README:192) and ch02 flashing-the-firmware (ch02:148) exist. Also fixed the stale link label 'beta.418 release notes'. Not verified: how a router displays the gateway; no OLED/UI claim made.
 <!-- SECTION:NOTES:END -->

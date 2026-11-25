@@ -9,7 +9,7 @@
 - Your gateway has a **Wemos D1 mini or NodeMCU (ESP8266)**: use the stable 1.x firmware. Take the [latest stable release](https://github.com/rvdbreemen/OTGW-firmware/releases/latest) (currently v1.7.10) and read the [1.x README](https://github.com/rvdbreemen/OTGW-firmware/tree/otgw-1.x.x).
 - Your gateway has a **LOLIN S3 Mini or S3 Mini Pro (ESP32-S3)**, or you want to try 2.0.0 (swap the module first, see [Migrating from ESP8266](#migrating-from-esp8266-1x)): read on. 2.0.0 is in beta.
 
-> **Disclaimer: v2.0.0-beta.428 is a beta of the 2.0.0 line.** It is not a stable release. It has had alpha and beta testing on a small group of units, but not yet the long field runs a stable release needs. Expect bugs, save your settings before you flash (a power cut during a filesystem update can still reset them), and read the [beta.418 release notes](https://github.com/rvdbreemen/OTGW-firmware/releases/tag/v2.0.0-beta.428) first, including the known issues.
+> **Disclaimer: v2.0.0-beta.428 is a beta of the 2.0.0 line.** It is not a stable release. It has had alpha and beta testing on a small group of units, but not yet the long field runs a stable release needs. Expect bugs, save your settings before you flash (a power cut during a filesystem update can still reset them), and read the [release notes of this beta](https://github.com/rvdbreemen/OTGW-firmware/releases/tag/v2.0.0-beta.428) first, including the known issues.
 >
 > If you need a gateway that just works, stay on the 1.x line for now: the [`otgw-1.x.x` branch](https://github.com/rvdbreemen/OTGW-firmware/tree/otgw-1.x.x) and the [published releases](https://github.com/rvdbreemen/OTGW-firmware/releases).
 
@@ -29,14 +29,16 @@ A prototype ESP32 board that drives OpenTherm directly, without a PIC, also exis
 
 Choose the route that fits your unit:
 
-- **New S3 module, or a clean start:** a factory install over USB. It **erases the flash**, so WiFi settings and all other settings are gone. Unpack the release zip (`OTGW-firmware-<board>-<version>-flash.zip`), connect the unit over USB and run the flash tool from it:
+- **New S3 module, or a clean start:** a factory install over USB. It **erases everything on the unit**, so its WiFi login and all its settings are gone. If the unit still runs and you want to keep its settings, save them first: the update page (`http://<device-ip>/update`) has a **Download a settings backup** link. Unpack the release zip (`OTGW-firmware-<board>-<version>-flash.zip`), connect the unit over USB and run the flash tool from it:
 
   ```bash
   flash_otgw.bat            # Windows
   ./flash_otgw.sh           # Linux/macOS
   ```
 
-- **Unit already on 2.0.0:** update over WiFi from the web UI with the release zip; your settings stay (save them first anyway: a power cut during the update can still reset them). Units on an older flash layout need one USB migration first. See [docs/guides/WIFI_FIRMWARE_UPDATE.md](docs/guides/WIFI_FIRMWARE_UPDATE.md).
+  Use the USB port of the S3 module; it has built-in USB and normally needs no extra driver. The tool finds the port by itself. If it does not, or more than one S3 is connected, name the port: `flash_otgw.bat --port COM5` (Windows) or `./flash_otgw.sh --port /dev/ttyACM0` (Linux). More in [Flashing the Firmware](docs/manuals/en/ch02-hardware-setup.md#flashing-the-firmware).
+
+- **Unit already on 2.0.0:** update over WiFi: open `http://<device-ip>/update` and choose the files from the release zip; your settings stay (save them first anyway: a power cut during the update can still reset them). During the update the gateway does nothing for your heating for 1 to 2 minutes, so pick a quiet moment. A unit on the old partition layout (an early 2.0.0 alpha) needs a one-time USB step first, which changes how the unit's memory is divided. See [docs/guides/WIFI_FIRMWARE_UPDATE.md](docs/guides/WIFI_FIRMWARE_UPDATE.md).
 
 To build from source, see [docs/guides/BUILD.md](docs/guides/BUILD.md).
 
@@ -46,11 +48,11 @@ On first boot the device creates an access point named `<hostname>-<mac>`, for e
 
 ### 3. Open the Web UI
 
-Navigate to `http://<device-ip>/` or `http://otgw2.local/`. **Home** shows the system view with temperatures and boiler status; the live OpenTherm log is under **Monitor > Log**.
+Find the unit's address in your router's list of connected devices (look for a new device, named OTGW2 by default if your router shows names), then open `http://<that address>/`. If `http://otgw2.local/` opens, you can use that too; not every phone or network resolves `.local` names. **Home** shows the system view with temperatures and boiler status; the live OpenTherm log is under **Monitor > Log**.
 
 ### 4. Configure MQTT
 
-Go to **Settings > MQTT**, switch on **Enable MQTT** and fill in your broker details. Home Assistant discovery is always on; the **HA discovery prefix** must match Home Assistant (default `homeassistant`). Click **Save**. Home Assistant discovers the device within seconds.
+MQTT is how the gateway talks to Home Assistant. The "broker" is the add-on in Home Assistant that passes the messages (usually Mosquitto). Go to **Settings > MQTT**, switch on **Enable MQTT** and fill in the broker's address, port, user and password. Step by step: [Setting Up MQTT with Home Assistant](#setting-up-mqtt-with-home-assistant). Home Assistant discovery is always on; the **HA discovery prefix** must match Home Assistant (default `homeassistant`). Click **Save**. Home Assistant discovers the device within seconds.
 
 ### 5. Check Home Assistant
 
