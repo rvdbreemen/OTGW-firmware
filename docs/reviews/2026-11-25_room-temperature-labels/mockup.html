@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Room temperature labels: mockup for TASK-3035</title>
+<style>
+  :root{--bg:#f1f7f8;--panel:#fff;--text:#2a2d2f;--muted:#5e6266;--border:#d8dde0;--accent:#016f83;--on-accent:#fff;
+    --ok:#2e7d32;--cold:#2f8fe8;--tile:#fff;--tag-bg:#e6f2f4}
+  @media (prefers-color-scheme:dark){:root{--bg:#1a1a1a;--panel:#2c2c2e;--text:#e8e8ea;--muted:#a0a8b0;--border:#45474a;--accent:#00bffe;
+    --on-accent:#0d2026;--ok:#66bb6a;--cold:#4da3ff;--tile:#2c2c2e;--tag-bg:#20414b}}
+  *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--text);font:15px/1.5 system-ui,"Segoe UI",Roboto,sans-serif;padding:20px}
+  main{max-width:1000px;margin:0 auto} h1{font-size:1.4rem;margin:0 0 4px} p.lead{color:var(--muted);margin:0 0 18px}
+  section{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:16px 18px;margin:0 0 16px}
+  h2{font-size:1.05rem;margin:0 0 10px} .pair{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  @media(max-width:700px){.pair{grid-template-columns:1fr}}
+  .lbl{font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:0 0 6px}
+  .box{border:1px solid var(--border);border-radius:12px;padding:12px;background:var(--bg)}
+  .tile{background:var(--tile);border:1px solid var(--border);border-radius:12px;padding:10px 14px;display:inline-block;min-width:200px}
+  .tile .k{font-size:.7rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);display:flex;gap:8px;align-items:center}
+  .tile .v{font-size:1.9rem;font-weight:700;line-height:1.15}
+  .tile .sub{font-size:.82rem;color:var(--muted);margin-top:2px}
+  .tag{font-size:.68rem;font-weight:700;background:var(--tag-bg);color:var(--accent);border-radius:6px;padding:1px 7px;letter-spacing:0}
+  .chart{background:var(--tile);border:1px solid var(--border);border-radius:12px;padding:10px}
+  .chart h3{font-size:.8rem;margin:0 0 4px} .legend{display:flex;gap:14px;flex-wrap:wrap;font-size:.8rem;color:var(--muted);margin-top:6px}
+  .legend i{display:inline-block;width:22px;height:0;border-top:3px solid;vertical-align:middle;margin-right:5px}
+  .note{font-size:.82rem;border-left:3px solid var(--accent);padding:4px 10px;margin:0 0 8px;background:color-mix(in srgb,var(--accent) 8%,transparent)}
+  ul{margin:6px 0 0;padding-left:20px} li{margin:3px 0} .small{font-size:.82rem;color:var(--muted)}
+  svg text{font-family:inherit}
+</style>
+</head>
+<body>
+<main>
+  <h1>Which room temperature is which</h1>
+  <p class="lead">Mockup for TASK-3035 by otgw-ux-designer, 2026-11-25. Synthetic data. SAT on, room source: MQTT push (20.5°), thermostat reads 19.8°. Design only; text and rules in README.md.</p>
+
+  <section aria-labelledby="s1">
+    <h2 id="s1">1. Home overview, room tile</h2>
+    <div class="pair">
+      <div><p class="lbl">Today</p><div class="box"><div class="tile" title="Room temperature SAT controls on; the thermostat reports 19.8°"><div class="k">Room</div><div class="v">20.5°</div></div>
+        <p class="small" style="margin:8px 0 0">The thermostat value only appears in a tooltip: invisible on a phone.</p></div></div>
+      <div><p class="lbl">Proposed</p><div class="box"><div class="tile"><div class="k">Room · SAT</div><div class="v">20.5°</div><div class="sub">thermostat 19.8° · via MQTT</div></div>
+        <p class="small" style="margin:8px 0 0">Visible second line, only when SAT uses another source than the thermostat. The tooltip stays as extra.</p></div></div>
+    </div>
+    <div class="pair" style="margin-top:12px">
+      <div><p class="lbl">SAT off, or SAT uses the thermostat's reading</p><div class="box"><div class="tile"><div class="k">Room</div><div class="v">19.8°</div></div></div></div>
+      <div><p class="lbl">SAT on, thermostat has not reported</p><div class="box"><div class="tile"><div class="k">Room · SAT</div><div class="v">20.5°</div><div class="sub">thermostat: no reading · via MQTT</div></div></div></div>
+    </div>
+  </section>
+
+  <section aria-labelledby="s2">
+    <h2 id="s2">2. SAT page: room tile and control-loop chart</h2>
+    <div class="pair">
+      <div><p class="lbl">Tile (proposed): source tag, same pattern as "SAT → boiler"</p><div class="box">
+        <div class="tile"><div class="k">Room <span class="tag">MQTT</span></div><div class="v">20.5°</div><div class="sub">updated just now</div></div></div></div>
+      <div><p class="lbl">Chart panel and legend (proposed)</p><div class="box"><div class="chart">
+        <h3>Room (SAT) · Outside</h3>
+        <svg viewBox="0 0 300 70" width="100%" role="img" aria-label="Room (SAT) rising to 20.5, outside 6 degrees">
+          <line x1="0" y1="60" x2="300" y2="60" stroke="var(--border)"/><line x1="0" y1="30" x2="300" y2="30" stroke="var(--border)"/>
+          <polyline fill="none" stroke="var(--ok)" stroke-width="2.5" points="0,48 60,44 120,40 180,34 240,30 300,27"/>
+          <polyline fill="none" stroke="var(--cold)" stroke-width="2" stroke-dasharray="6 4" points="0,58 100,57 200,56 300,55"/>
+        </svg>
+        <div class="legend"><span><i style="border-color:var(--ok)"></i>Room (SAT)</span><span><i style="border-color:var(--cold);border-top-style:dashed"></i>Outside</span></div></div></div></div>
+    </div>
+  </section>
+
+  <section aria-labelledby="s3">
+    <h2 id="s3">3. Monitor › Graph (option A, 2.0.0: web UI only)</h2>
+    <div class="pair">
+      <div><p class="lbl">Today</p><div class="box"><div class="chart"><h3>Temperatures</h3>
+        <svg viewBox="0 0 300 70" width="100%" role="img" aria-label="Room 19.8"><line x1="0" y1="60" x2="300" y2="60" stroke="var(--border)"/>
+          <polyline fill="none" stroke="var(--ok)" stroke-width="2.5" points="0,52 60,50 120,48 180,46 240,45 300,44"/></svg>
+        <div class="legend"><span><i style="border-color:var(--ok)"></i>room</span></div></div></div></div>
+      <div><p class="lbl">Proposed</p><div class="box"><div class="note">SAT uses 20.5° (MQTT). The graph shows the thermostat's reading.</div>
+        <div class="chart"><h3>Temperatures</h3>
+        <svg viewBox="0 0 300 70" width="100%" role="img" aria-label="Room (thermostat) 19.8"><line x1="0" y1="60" x2="300" y2="60" stroke="var(--border)"/>
+          <polyline fill="none" stroke="var(--ok)" stroke-width="2.5" points="0,52 60,50 120,48 180,46 240,45 300,44"/></svg>
+        <div class="legend"><span><i style="border-color:var(--ok)"></i>room (thermostat)</span></div></div></div></div>
+    </div>
+  </section>
+
+  <section aria-labelledby="s4">
+    <h2 id="s4">4. Monitor › Graph, option B (2.1.0, needs firmware + ADR-193 amendment)</h2>
+    <div class="box"><div class="chart"><h3>Temperatures</h3>
+      <svg viewBox="0 0 300 80" width="100%" role="img" aria-label="Room (SAT) 20.5 solid, room (thermostat) 19.8 dash-dot">
+        <line x1="0" y1="70" x2="300" y2="70" stroke="var(--border)"/>
+        <polyline fill="none" stroke="var(--ok)" stroke-width="2.5" points="0,40 60,38 120,36 180,34 240,33 300,32"/>
+        <polyline fill="none" stroke="var(--ok)" stroke-width="2" stroke-dasharray="8 3 2 3" points="0,52 60,50 120,48 180,46 240,45 300,44"/>
+      </svg>
+      <div class="legend"><span><i style="border-color:var(--ok)"></i>room (SAT)</span><span><i style="border-color:var(--ok);border-top-style:dashed"></i>room (thermostat)</span></div></div>
+      <p class="small" style="margin:8px 0 0">Difference carried by line pattern, not by colour alone (WCAG 1.4.1). Not part of 2.0.0: the history ring has one room slot (ADR-193).</p></div>
+  </section>
+
+  <section aria-labelledby="s5">
+    <h2 id="s5">Rules</h2>
+    <ul>
+      <li>A qualifier appears only when the two values can differ: SAT on with a source other than the thermostat.</li>
+      <li>SAT off, or SAT using the thermostat: plain "Room", as today.</li>
+      <li>One vocabulary everywhere: "room (thermostat)" and "room (SAT)"; the same words in EN, NL, DE and in the Home Assistant entity names (TASK-2973).</li>
+    </ul>
+  </section>
+</main>
+</body>
+</html>

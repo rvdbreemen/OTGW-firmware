@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-22T16:32:00Z'
+updated_date: '2026-11-25T05:13:00Z'
 labels:
   - webui
   - sat
@@ -27,3 +28,9 @@ Evidence: will_85903 beta.410 screenshots (OTGW-field-data/will_85903/2026-11-22
 - [ ] #2 The overview and graph labels agree in the EN, NL and DE language packs
 - [ ] #3 Screenshots before and after with synthetic data
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-25 otgw-ux-designer: label proposal and mockup in docs/reviews/2026-11-25_room-temperature-labels/ (README.md + mockup.html). Recommended for 2.0.0 (web UI only): vocabulary room (thermostat) / room (SAT), qualifier only when SAT uses another source; Home tile label ROOM · SAT + visible sub-line 'thermostat 19.8° · via MQTT'; SAT chart panel/legend 'Room (SAT)'; Monitor graph series 'room (thermostat)' + one live line 'SAT uses 20.5° (MQTT)'. A second graph series needs a firmware change: the 24 h ring has one room slot, filled from MsgID 24 (graphHistoryStuff.ino:66, ADR-193), so it is a 2.1.0 option. Sharper ACs are in the README section 6. Open question for webui/dev: does /api/v2/sat/status name the room source (only external_temp_valid seen, v2.js:7737)?
+<!-- SECTION:NOTES:END -->
