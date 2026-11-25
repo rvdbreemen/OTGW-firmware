@@ -1,8 +1,8 @@
 ---
 id: "ADR-237"
 title: "Run the PlatformIO buildfs step in its own build directory so firmware objects survive between builds"
-status: "Proposed"
-date: "2026-11-14"
+status: "Accepted"
+date: "2026-11-25"
 binding: false
 gate: null
 documents_shipped: false
@@ -38,10 +38,10 @@ format: "canonical"
 
 ## Status
 
-Proposed, 2026-11-14.
+Accepted, 2026-11-25, by Robert van den Breemen (interactive in the coordinator session, relayed). Guideline-level (ADR-080): verified by `tests/test_build.py` and the `require_pattern` rule in Enforcement.
 
-**Decision Maker:** Agent (otgw-firmware-95) for TASK-1921, assigned by the coordinator; Robert (maintainer) accepts or
-rejects this record.
+**Decision Maker:** Agent (otgw-firmware-95) for TASK-1921, assigned by the coordinator; Robert (maintainer) accepted
+this record on 2026-11-25.
 
 ## Status History
 
@@ -49,18 +49,23 @@ rejects this record.
 status_history:
   - date: 2026-11-14
     status: Proposed
-    changed_by: "User: Robert van den Breemen"
+    changed_by: "Agent: Claude (otgw-firmware-95)"
     reason: Initial proposal
     changed_via: adr-kit
   - date: 2026-11-14
     status: Proposed
-    changed_by: "User: Robert van den Breemen"
+    changed_by: "Agent: Claude (otgw-firmware-95)"
     reason: Related to ADR-190
     changed_via: adr-kit lifecycle
   - date: 2026-11-14
     status: Proposed
-    changed_by: "User: Robert van den Breemen"
+    changed_by: "Agent: Claude (otgw-firmware-95)"
     reason: Related to ADR-083
+    changed_via: adr-kit lifecycle
+  - date: 2026-11-25
+    status: Accepted
+    changed_by: "Agent: Claude (otgw-architect)"
+    reason: Accepted by Robert van den Breemen, 2026-11-25 (interactive in the coordinator session, about 18:45, relayed to otgw-architect); evidence rechecked on origin/dev a60386c99
     changed_via: adr-kit lifecycle
 ```
 
@@ -85,9 +90,9 @@ symptom ("buildfs may clean parts of `.pio/build/<env>` and remove `firmware.bin
 
 ## Decision
 
-The buildfs step runs with `PLATFORMIO_BUILD_DIR=.pio/build-fs` (`pio_fs_build_root()`, `build.py:2488`), so
+The buildfs step runs with `PLATFORMIO_BUILD_DIR=.pio/build-fs` (`pio_fs_build_root()`, `build.py:2614-2621`), so
 `.pio/build` keeps one checksum and its object files between builds; `build.py` verifies and collects `littlefs.bin`
-from `.pio/build-fs/<env>/` (`build.py:2513`, `:2555`), `--clean` removes that directory too (`build.py:2616`), and
+from `.pio/build-fs/<env>/` (`build.py:2646`, `:2689`), `--clean` removes that directory too (`build.py:2758`), and
 `flash_otgw.bat` looks there in its last fallback for a filesystem image.
 
 ## Decision Contract
@@ -115,6 +120,12 @@ from `.pio/build-fs/<env>/` (`build.py:2513`, `:2555`), `--clean` removes that d
   PlatformIO's own `compute_project_checksum()` differs with the data-dir override (the cause).
 - Two consecutive esp32-combo builds without a source change: the second shows far fewer `Compiling` lines than the
   first, with the same filesystem image (TASK-1921 AC3).
+
+**Evidence at acceptance (2026-11-25, otgw-architect, origin/dev a60386c99):**
+
+- `tests/test_build.py` class `TestFilesystemStepKeepsFirmwareObjects` (run from `tests/` with `python -m unittest`): Ran 3 tests, OK. TASK-1921 recorded the core test failing on the `build.py` from before the fix.
+- TASK-1921 AC3 (2026-11-14, 36fb13763): cold build 609 s with 364 `Compiling` lines; warm build without a source change 253 s with 1 `Compiling` line (the sketch, restamped `version.h`); 364 object files kept; the littlefs files identical.
+- Builds of 2026-11-25: the build trees `wt-d3-rel` (buildfs checksum written 18:35) and `wt-d3-fr` (17:16) hold `.pio/build-fs/project.checksum` beside 364 object files in `.pio/build/esp32-combo`, so the firmware objects survived the filesystem step.
 
 ## Alternatives Considered
 
@@ -156,9 +167,9 @@ None.
 ## References
 
 - TASK-1921.
-- `build.py:2488` (`pio_fs_build_root`), `:2498` (`build_filesystem_pio`), `:2555` (collect), `:2616` (`clean_build`).
+- `build.py:2614-2621` (`pio_fs_build_root`), `:2624` (`build_filesystem_pio`, `PLATFORMIO_BUILD_DIR` at `:2639`), `:2689` (collect), `:2749`/`:2758` (`clean_build`), at origin/dev a60386c99 (the line numbers of 2026-11-14 were `:2488`, `:2498`, `:2555`, `:2616`).
 - `.build-venv/Lib/site-packages/platformio/run/helpers.py:26-45`, `platformio/project/helpers.py:93` (PIO Core 6.2.0).
-- `flash_otgw.bat:383` (fallback for a filesystem image).
+- `flash_otgw.bat:403` (fallback for a filesystem image).
 
 ## Enforcement
 

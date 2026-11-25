@@ -9386,9 +9386,9 @@
       "title": "Run the PlatformIO buildfs step in its own build directory so firmware objects survive between builds",
       "path": "ADR-237-run-the-platformio-buildfs-step-in-its-own-build-directory-so-firmware-objects-survive-between-builds.md",
       "format": "canonical",
-      "status": "Proposed",
-      "date": "2026-11-14",
-      "decision_summary": "The buildfs step runs with PLATFORMIOBUILDDIR=.pio/build-fs (piofsbuildroot(), build.py:2488), so .pio/build keeps on...",
+      "status": "Accepted",
+      "date": "2026-11-25",
+      "decision_summary": "The buildfs step runs with PLATFORMIOBUILDDIR=.pio/build-fs (piofsbuildroot(), build.py:2614-2621), so .pio/build kee...",
       "topics": [
         "build tooling",
         "incremental build",
@@ -9425,7 +9425,10 @@
         ],
         "verification": [
           "tests/testbuild.py, class TestFilesystemStepKeepsFirmwareObjects: the buildfs step gets its own PLATFORMIOBUILDDIR (fails on the build.py from before TASK-1921), the image is collected from there, and PlatformIO's own computeprojectcheck...",
-          "Two consecutive esp32-combo builds without a source change: the second shows far fewer Compiling lines than the first, with the same filesystem image (TASK-1921 AC3)."
+          "Two consecutive esp32-combo builds without a source change: the second shows far fewer Compiling lines than the first, with the same filesystem image (TASK-1921 AC3). Evidence at acceptance (2026-11-25, otgw-architect, origin/dev a60386c...",
+          "tests/testbuild.py class TestFilesystemStepKeepsFirmwareObjects (run from tests/ with python -m unittest): Ran 3 tests, OK. TASK-1921 recorded the core test failing on the build.py from before the fix.",
+          "TASK-1921 AC3 (2026-11-14, 36fb13763): cold build 609 s with 364 Compiling lines; warm build without a source change 253 s with 1 Compiling line (the sketch, restamped version.h); 364 object files kept; the littlefs files identical.",
+          "Builds of 2026-11-25: the build trees wt-d3-rel (buildfs checksum written 18:35) and wt-d3-fr (17:16) hold .pio/build-fs/project.checksum beside 364 object files in .pio/build/esp32-combo, so the firmware objects survived the filesystem..."
         ]
       },
       "scope": {
@@ -10930,8 +10933,8 @@
       "title": "The WiFi dead-link streak continues across a re-association while the heap is starved (amends ADR-258)",
       "path": "ADR-261-the-wifi-dead-link-streak-continues-across-a-re-association-while-the-heap-is-starved-amends-adr-258.md",
       "format": "canonical",
-      "status": "Proposed",
-      "date": "2026-11-19",
+      "status": "Accepted",
+      "date": "2026-11-25",
       "decision_summary": "While the heap is starved (platformMaxFreeBlock() < WIFISTARVEDMAXBLOCK), wifiLinkProbeOnReconnect() keeps the dead s...",
       "topics": [
         "dead-link supervisor",
@@ -10965,7 +10968,10 @@
           "None."
         ],
         "verification": [
-          "tests/testwifideadlink.py::WifiDeadLinkStateMachine::teststarvedlinkwithapdropsevery4minstillrecovers runs the real state machine with a starved heap, a dead link and an AP drop every 4 min for 40 min. It fails on the code before this AD..."
+          "tests/testwifideadlink.py::WifiDeadLinkStateMachine::teststarvedlinkwithapdropsevery4minstillrecovers runs the real state machine with a starved heap, a dead link and an AP drop every 4 min for 40 min. It fails on the code before this AD...",
+          "python -m pytest tests/testwifideadlink.py tests/testheapholdhook.py -q: 40 passed in 23.8 s; the starved-flap case alone: 1 passed.",
+          "The same case with OTGWNETWORKINO pointing at networkStuff.ino of b0febe073 (before the fix): 1 failed, tests/testwifideadlink.py:515 \"0 not greater than or equal to 1 : a starved, unreachable unit whose AP keeps re-associating is never...",
+          "Field basis: TASK-2026 run 3 on .63 (2026-11-19, beta.381): 7 outages in 30 min under a starved heap, never recovered by the old code (Context)."
         ]
       },
       "scope": {

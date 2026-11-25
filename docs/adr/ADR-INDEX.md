@@ -241,7 +241,7 @@ One row per Architecture Decision Record. Scope is the Enforcement `path_glob` s
 | ADR-234 | Accepted | `src/OTGW-firmware/SATcurveTune.h` | A tuner hour stays 60 min and counts when no whole-hour marker was set and its clean ticks are at least 90 % of the t... |
 | ADR-235 | Accepted | - | SAT sends CS= when the value it sends, rounded to 0.1, changes, and repeats an unchanged CS= about every 30 s: the co... |
 | ADR-236 | Accepted | - | While SAT is in PWM and the PWM phase is ON, and there is heating demand, it switches to continuous only when the flo... |
-| ADR-237 | Proposed | `build.py` | The buildfs step runs with PLATFORMIOBUILDDIR=.pio/build-fs (piofsbuildroot(), build.py:2488), so .pio/build keeps on... |
+| ADR-237 | Accepted | `build.py` | The buildfs step runs with PLATFORMIOBUILDDIR=.pio/build-fs (piofsbuildroot(), build.py:2614-2621), so .pio/build kee... |
 | ADR-238 | Accepted | - | On the ESP32-S3 a boot counts towards the triple-reset WiFi recovery when it is a reset-button press or a power-on (E... |
 | ADR-239 | Accepted | - | The first 32 bytes of RTC slow memory (0x50000200-0x5000021F) belong to the safeboot updater: the main firmware holds... |
 | ADR-240 | Accepted | - | A connection on port 80 that is not ESTABLISHED counts towards the ADR-188 cap only while at least one queued segment... |
@@ -265,7 +265,7 @@ One row per Architecture Decision Record. Scope is the Enforcement `path_glob` s
 | ADR-258 | Accepted | - | A probe that cannot run for lack of memory counts as a dead probe, instead of a skip, when the dead-link check is arm... |
 | ADR-259 | Accepted | - | When the error leaves the 0.1 C deadband the integral is multiplied by 0.5 once and then held while the error stays o... |
 | ADR-260 | Accepted | - | The tuner keeps its hour, its exclusions, its two phases and its agreement rule, and changes three constants: a tuner... |
-| ADR-261 | Proposed | - | While the heap is starved (platformMaxFreeBlock() < WIFISTARVEDMAXBLOCK), wifiLinkProbeOnReconnect() keeps the dead s... |
+| ADR-261 | Accepted | - | While the heap is starved (platformMaxFreeBlock() < WIFISTARVEDMAXBLOCK), wifiLinkProbeOnReconnect() keeps the dead s... |
 | ADR-262 | Accepted | `src/OTGW-firmware/**/*.ino` | The web UI (user interface), running in the user's browser, checks the GitHub releases list for a newer firmware and... |
 | ADR-263 | Accepted | - | On a board with PSRAM, buffers of BLE and remote telemetry may be allocated from PSRAM once, at init, and are never f... |
 | ADR-264 | Accepted | - | espMqttClient comes from our fork. |

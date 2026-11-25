@@ -1,8 +1,8 @@
 ---
 id: "ADR-261"
 title: "The WiFi dead-link streak continues across a re-association while the heap is starved (amends ADR-258)"
-status: "Proposed"
-date: "2026-11-19"
+status: "Accepted"
+date: "2026-11-25"
 binding: false
 gate: null
 documents_shipped: false
@@ -35,13 +35,13 @@ format: "canonical"
 
 ## Status
 
-Proposed, 2026-11-19. Guideline-level (ADR-080): verified by the host test named below, no evaluate.py gate. Amends
+Accepted, 2026-11-25, by Robert van den Breemen (interactive in the coordinator session, relayed). Guideline-level (ADR-080): verified by the host test named below, no evaluate.py gate. Amends
 ADR-258: it adds one rule to the dead-link supervisor; the rest of ADR-258 (a starved probe counts as dead, the witness
 rule, the reconnect-then-restart path and the cap of 3) stays.
 
-User Decision: Robert chose option C for 2.0.0 (Discord DM 1572842729485111327, 2026-11-19 05:15 UTC, a reply to
+User Decision: Robert chose option C for 2.0.0 (Discord direct message (DM) 1572842729485111327, 2026-11-19 05:15 UTC, a reply to
 the coordinator's update 1572774626625589432; relayed by the coordinator), with option B as the 2.1.0 follow-up
-(TASK-2038). That choice settles the option; acceptance of this ADR is a separate yes from Robert.
+(TASK-2038). That choice settles the option; acceptance of this ADR is a separate yes from Robert, given on 2026-11-25.
 
 ## Status History
 
@@ -56,6 +56,11 @@ status_history:
     status: Proposed
     changed_by: "Agent: Claude"
     reason: Related to ADR-258
+    changed_via: adr-kit lifecycle
+  - date: 2026-11-25
+    status: Accepted
+    changed_by: "Agent: Claude (otgw-architect)"
+    reason: Accepted by Robert van den Breemen, 2026-11-25 (interactive in the coordinator session, about 18:45, relayed to otgw-architect); evidence rechecked on origin/dev a60386c99
     changed_via: adr-kit lifecycle
 ```
 
@@ -106,11 +111,17 @@ link that really works again is not counted against.
   code before this ADR (0 forced reconnects, no restart; commit b0febe073 ran it as an expected failure) and passes with
   it. The other scenarios of the file stay green (36 passed with `tests/test_heaphold_hook.py`).
 
+**Evidence at acceptance (2026-11-25, otgw-architect, origin/dev a60386c99):**
+
+- `python -m pytest tests/test_wifi_deadlink.py tests/test_heaphold_hook.py -q`: 40 passed in 23.8 s; the starved-flap case alone: 1 passed.
+- The same case with `OTGW_NETWORK_INO` pointing at `networkStuff.ino` of b0febe073 (before the fix): 1 failed, `tests/test_wifi_deadlink.py:515` "0 not greater than or equal to 1 : a starved, unreachable unit whose AP keeps re-associating is never recovered".
+- Field basis: TASK-2026 run 3 on .63 (2026-11-19, beta.381): 7 outages in 30 min under a starved heap, never recovered by the old code (Context).
+
 ## Alternatives Considered
 
 - **A: keep ADR-258 as is and document the limit.** Rejected: the bench showed the limit is reached in the very state
   ADR-258 is meant to recover from, so the fix would not act there.
-- **B: judge the app layer as well (no completed REST response or MQTT acknowledgement within the window).** Not chosen
+- **B: judge the app layer as well (no completed REST response or MQTT (Message Queuing Telemetry Transport) acknowledgement within the window).** Not chosen
   for now: it also covers a unit whose network stack answers but whose app is starved, but it is a larger behaviour
   change with a risk of false restarts on a quiet, healthy unit. It is a separate follow-up (2.1.0).
 - **Do not reset the streak on any re-association.** Rejected: a normal reconnect after a real outage would then count
@@ -127,8 +138,8 @@ link that really works again is not counted against.
 
 - A unit with a starved heap whose link really recovered through a re-association, but whose gateway does not answer
   ping yet, keeps its streak a little longer. Mitigation: the first answered probe resets it, and the witness rule
-  (MQTT, REST or port 25238 traffic) still blocks an action while the LAN works.
-- The probe is an ICMP echo to the gateway: it does not test a TCP round trip through the app. A unit whose network stack
+  (MQTT, REST or port 25238 traffic) still blocks an action while the LAN (local area network) works.
+- The probe is an ICMP (Internet Control Message Protocol) echo to the gateway: it does not test a TCP round trip through the app. A unit whose network stack
   answers but whose app is starved is not covered by ADR-258 or this ADR (alternative B, follow-up).
 
 ## Open Questions
@@ -144,3 +155,4 @@ link that really works again is not counted against.
 - TASK-2026 notes (2026-11-19): run 3 on .63, 381+b06eeff, counters and `wifi_outages`.
 - `src/OTGW-firmware/networkStuff.ino`: `wifiLinkProbeOnReconnect()`, `WIFI_STARVED_MAXBLOCK`.
 - `tests/test_wifi_deadlink.py`: scenario `starved_flap`.
+- Code at acceptance (origin/dev a60386c99): `src/OTGW-firmware/networkStuff.ino:926-940` (`wifiLinkProbeOnReconnect()`: the streak resets only when `platformMaxFreeBlock() >= WIFI_STARVED_MAXBLOCK`, else it is kept and logged); fix commit 24679e271, red reproduction b0febe073.
