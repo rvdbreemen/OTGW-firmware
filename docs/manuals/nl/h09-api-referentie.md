@@ -1098,6 +1098,7 @@ De onderstaande commando's geven de payload ongewijzigd door aan de genoemde ins
 | `sat/ble_enable` | `SATbleenable` |
 | `sat/ble_failover` | `SATblefailover` |
 | `sat/ble_mac` | `SATblemac` |
+| `sat/room_source` | `SATroomsource` |
 | `sat/ble_interval` | `SATbleinterval` |
 | `sat/preset_sync` | `SATpresetsync` |
 | `sat/preset_sync_topic` | `SATpresetsynctopic` |

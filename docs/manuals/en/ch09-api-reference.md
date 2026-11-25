@@ -1305,6 +1305,7 @@ The commands below pass the payload unchanged to the named setting, the same set
 | `sat/ble_enable` | `SATbleenable` |
 | `sat/ble_failover` | `SATblefailover` |
 | `sat/ble_mac` | `SATblemac` |
+| `sat/room_source` | `SATroomsource` |
 | `sat/ble_interval` | `SATbleinterval` |
 | `sat/preset_sync` | `SATpresetsync` |
 | `sat/preset_sync_topic` | `SATpresetsynctopic` |
