@@ -214,5 +214,29 @@ class NoControlAction(unittest.TestCase):
         self.assertLess(call, src.index("satSendCS(finalSetpoint);", call))
 
 
+class ChAskedFollowsTheBand(unittest.TestCase):
+    """TASK-3034: the CH decision the diagnostic step reads is the one satSendCH sends.
+
+    STRUCTURAL: the call sites sit inside satControlLoopRun(), which cannot be compiled on the host, so this reads the
+    source. marceld91d beta.410 capture: 10 of 10 no_ignition events fired inside 'Heating paused (CH off, PWM stays
+    active)' windows, CH bit 0 all the time, because d.chAsked called satChEnableDecide() without the band flag. The
+    helper itself is covered with bandOff in test_sat_ch_enable.cpp; the bench (TASK-3034 AC 4) covers the live path."""
+
+    def test_every_chenable_decision_in_the_tick_passes_the_band_flag(self):
+        src = re.sub(r"//[^\n]*", "", source())
+        run = src[src.index("static void satControlLoopRun()"):]
+        calls = re.findall(r"satChEnableDecide\(([^;]*?)\)\s*[;)&|]", run)
+        self.assertGreaterEqual(len(calls), 2, calls)
+        for args in calls:
+            self.assertIn("_sat_tolBandOff", args, f"satChEnableDecide({args}) ignores the tolerance band")
+
+    def test_the_diag_input_uses_the_same_decision_as_the_send(self):
+        src = re.sub(r"//[^\n]*", "", source())
+        diag =re.search(r"d\.chAsked\s*=([^;]*);", src).group(1)
+        send = re.search(r"satSendCH\((satChEnableDecide\([^;]*\))\);", src).group(1)
+        inner = lambda t: re.sub(r"\s+", "", t[t.index("satChEnableDecide("):].rstrip(")"))
+        self.assertEqual(inner(diag), inner(send))
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

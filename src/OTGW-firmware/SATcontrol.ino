@@ -8622,7 +8622,7 @@ static void satControlLoopRun()
     SatDiagIn d;
     d.now = _sat_tickMs;
     d.intervalMs = (uint32_t)settings.sat.iControlInterval * 1000UL;
-    d.chAsked = !coldCutoff && satChEnableDecide(pidOutput, satColdThreshold(), pwmDrivesSetpoint, pwmOn);
+    d.chAsked = !coldCutoff && satChEnableDecide(pidOutput, satColdThreshold(), pwmDrivesSetpoint, pwmOn, _sat_tolBandOff);   // TASK-3034: the CH decision satSendCH sends, band included
     d.flame = satIsFlameOn();
     d.flowAboveCs = satGetFlowTemp() >= finalSetpoint;
     d.atMax = atMax || (pwmMode && satPwmInMaxDutyRange());   // TASK-2992: range 5, not the narrower MM=T release
