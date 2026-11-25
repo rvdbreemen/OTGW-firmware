@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-21T14:29:00Z'
-updated_date: '2026-11-25T07:50:00Z'
+updated_date: '2026-11-25T08:45:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -59,3 +59,9 @@ Cold-setpoint gate (ADR-199, upstream in SATcontrol.ino, unchanged): evidence te
 
 2026-11-25 integrated on lane/d3-beta: test pins moved by the 448 rule: tests/test_sat_loop_integration.py scenario s2 now starts at 540 s (the 60 s underheat rule no longer flips the run to continuous at 150 s, the ON phase opened at 60 s runs to 660 s); new source tests AtMaxExitKeepsOnlyTheStartGate (entry 463: the at-max branch keeps the start gate and has no flame gate; the underheat exit has the flame gate and the start gate; red on a mutant that drops the at-max start gate). SATcycles.ino comment at the underheat block corrected (flame gate, entry 456). Bench so far (bench-tester, 8401c72): negative half evidenced, positive exit not evidenced: that AC rests on host tests + a field check, not ticked.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+DRAFT 2026-11-25 (bench item open, task NOT Done). Change (entries 448, 456, 463, ADR-236 and ADR-297): PWM -> continuous underheat exit = flow <= request - 3.0 C for 180 s, counted only once the flame has burned 180 s (SAT_UNDERHEAT_FLAME_MIN_MS, a flame-off resets it); heating demand is guaranteed upstream (the exits are only checked when pidOutput > cold threshold); the at-max exit keeps only the 60 s start gate. Note: the AC1 text still says no flame condition as thermo-nova; entry 456 added the flame gate and ADR-297 records it. Evidence: host tests red on origin/dev (overshoot_sustain 18, pwm_override 4, lowload_contract 43 failures) and green on the fix; on the integrated branch overshoot_sustain 93 tests OK including the new AtMaxExitKeepsOnlyTheStartGate (structural, killed by a mutant that drops the at-max start gate), pwm_anchors, hp_pwm, pwm_first_start, lowload_contract OK; loop_integration scenario s2 moved to start at 540 s because the 60 s rule no longer flips that run at 150 s. AC3 replay proof from the earlier lane (indigo_light 21 Nov night, marceld91d). evaluate --quick 89/0/0 and build OK (R = 4f303da8c). Bench so far (otgw-bench-tester on 8401c72, OTGW-field-data/bench-63/2026-11-25_8401c72-448exit): NEGATIVE half evidenced (no exit within 180 s of flame at a 10.8 C flow gap; the flame ended after 213 s without a switch), the at-max exit fired as designed; the POSITIVE exit (>= 180 s flame AND gap >= 3 C for 180 s) is NOT evidenced on the bench (the sim flame ended first). That part rests on host tests and a real-boiler field check: AC4 stays OPEN, do not tick. Takeover with the flame already burning: the gate counts from the first pass of SAT (residual edge case in the notes).
+<!-- SECTION:FINAL_SUMMARY:END -->

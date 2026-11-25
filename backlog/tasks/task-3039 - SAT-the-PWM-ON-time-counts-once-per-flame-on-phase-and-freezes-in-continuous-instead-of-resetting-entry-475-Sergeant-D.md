@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-24T18:27:00Z'
-updated_date: '2026-11-25T07:56:00Z'
+updated_date: '2026-11-25T08:45:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -105,3 +105,9 @@ STATUS 2026-11-25: DECIDED, fully specified (entries 476, 478, 479, release 2.0.
 
 2026-11-25 code on lane/d3-beta (written by a Sonnet lane in wt-d3-freeze, reviewed and integrated by otgw-dev, architect-cleared): SATcontrol.ino satPwmKeptFreeze/Clear, resume in satPwmBeginOn, clears in satPwmEndOn, satPwmDisableOnHeaterOff, satDisable and the flame-edge handler. tests/test_sat_pwm_on_freeze.py: 25 tests (F1-F10, F5a-c, F6b, F6c heat pump 600 s from the real flame-on, F11a-c, F12, source-order tests): RED on the old source 14 failures + 1 error, GREEN on the fix; mutants killed: live-flame check removed, clear before the switch, satPwmReset clearing the kept time. PWM pack (anchors, override, hp_pwm, pwm_first_start, overshoot_sustain, diag_events, no_return_ignition, ot_loss, pwm_start_limit, restart_quiet, slave_lowload, continuous_startup, disable_handback) all OK on the integrated branch. OUR READING (e), wider than entry 478's wording: the freeze applies to EVERY PWM -> continuous exit and EVERY re-entry in the same flame (the at-max exit and the 2.0 C / 60 s re-entry too, not only the fail-safe flips), because every mode change goes through satSetControlMode(). Sergeant D may object; recorded in the beta notes. Gaps (bench): real flame-edge handler, satDisable and satCycleApplyEndOfCycle ordering covered structurally; min burn never binds with the current duty mapper (ON time asked >= 180/600 s).
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+DRAFT 2026-11-25 (bench item pending, task NOT Done). Change (entries 475, 476, 478, 479; ADR-296 Proposed; our reading (e): the freeze covers every PWM -> continuous exit and every re-entry in one flame, wider than the wording of entry 478, Sergeant D may object): one PWM ON clock per flame. satPwmKeptFreeze() decides on the LIVE flame when PWM is left (satSetControlMode, before satPwmReset), resume in satPwmBeginOn (anchor set back by the kept time after the flame-on assignment; minimum-burn anchor = real flame-on _sat_chFlameOnMs with a fallback to the anchor of the left segment when it is 0), clear in satPwmEndOn, satPwmDisableOnHeaterOff and satDisable (after the mode switch) and in the flame-edge handler when the flame goes out; satPwmReset does NOT clear it. Evidence: tests/test_sat_pwm_on_freeze.py 25 tests (F1-F10 plus F5a-c, F6b, F6c heat pump 600 s from the real flame-on, F11a-c, F12, source-order tests): RED on the old source 14 failures + 1 error, GREEN on the fix; three mutants killed (live-flame check removed, clear before the switch, satPwmReset clearing the kept time). PWM pack OK on the integrated branch (anchors, override, hp_pwm, pwm_first_start, overshoot_sustain, diag_events, no_return_ignition, ot_loss, pwm_start_limit, restart_quiet, slave_lowload, continuous_startup, disable_handback). evaluate --quick 89/0/0, affected-tests 416 of 422 (5 pre-existing red), build OK (R = 4f303da8c). Open-loop replay (entry 476): the freeze alone pre-empts only about 4 of 62 flips; the 448 exit and the request-above-floor effect carry the rest. PENDING: AC6 bench (a flame with several flips: shorter total ON time per flame; field proof by the testers of Sergeant D); AC7 ADR-296 stays Proposed until the bench confirms. Gaps: the real flame-edge handler, satDisable and the satCycleApplyEndOfCycle ordering are covered structurally, not compiled; the minimum burn never binds with the current duty mapper (ON time asked >= 180/600 s).
+<!-- SECTION:FINAL_SUMMARY:END -->

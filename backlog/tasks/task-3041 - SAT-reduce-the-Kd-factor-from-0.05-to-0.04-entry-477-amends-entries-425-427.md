@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-25T05:11:00Z'
-updated_date: '2026-11-25T07:50:00Z'
+updated_date: '2026-11-25T08:45:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -37,3 +37,9 @@ Sergeant D, #dev-sat-mqtt 2026-11-24 (entry 477): "moreover reduce the KD coeffi
 
 2026-11-25 entry 480 asked for a run on the fitted model first: OTGW-field-data/_replay_tools/q466a/sim/kdki_REPORT.txt (kdki_run.py, kdki_results.json, kdki_compare.json, kdki_room_traces.png). Fitted indigo model, 9 plant variants: Kd 0.05 -> 0.04 changes nothing on the base model in the afternoon and at night (swing 0.486 / 0.537 C, in band 49.7 / 40.2 %, starts 0.83 / 0.77 per h identical); morning ramp swing 0.117 -> 0.126 C, offset -0.181 -> -0.175 C. Per model C1 vs C0: 0 better / 9 same / 0 worse; worst corner +0.013 C swing, -1.1 percentage points in band (morning). Limits: no PWM/MM=0 loops, hot water or sun; one house. No problem found.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+DRAFT 2026-11-25 (bench item pending, task NOT Done). Change: SAT_PID_KD_FACTOR 0.05 -> 0.04 (entry 477, confirmed for 2.0.0 by entry 480), kd = 0.04 x 8400 x kp = 336 x kp; SATpid.ino plus every pin: tests/test_sat_autogains_removed.py, test_sat_pid_cadence.py, test_sat_pid_semantics.py (via cad.KD_FACTOR), tools/research/sat/sat_sim_port.py, docs/sat/firmware-sat-spec.md, MANUAL.md and the EN/NL manuals. Evidence per AC: AC1 grep over src/tests/docs shows no 0.05 or 420 x kp left outside history files (sat-comparison, ADR-197, the TASK-1784 study). AC2 RED: with the tests at 0.04 on the old source test_sat_autogains_removed 1 failure, test_sat_pid_cadence 2, test_sat_pid_semantics 1; GREEN after the source change (all OK). AC3 evaluate --quick 89/0/0 on release commit 4f303da8c; affected-tests pass 422 files, 416 pass, the 5 red are pre-existing on origin/dev; esp32-combo build OK (R = 4f303da8c, 2.0.0-beta.428+4f303da, free flash 135200 B). Entry 480 model run: OTGW-field-data/_replay_tools/q466a/sim/kdki_REPORT.txt: no change on the fitted base model in the afternoon and at night; morning ramp swing 0.117 -> 0.126 C; 9 plant variants 0 better / 9 same / 0 worse. PENDING: AC4 bench (check_pid_formulas.py, D term smaller, no PID regression) by otgw-bench-tester on the soak build. Not verified: real boiler, field.
+<!-- SECTION:FINAL_SUMMARY:END -->

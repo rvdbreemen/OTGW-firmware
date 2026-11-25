@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-22T14:50:00Z'
-updated_date: '2026-11-25T06:38:00Z'
+updated_date: '2026-11-25T08:45:00Z'
 labels:
   - sat
   - bug
@@ -36,3 +36,9 @@ Evidence: marceld91d beta.410 capture (OTGW-field-data/marceld91d/2026-11-22_bet
 
 2026-11-25 second field instance: will_85903 beta.418, no_ignition=1 at 08:13:28 (cleared 08:19:28) while SAT itself held CH off (OTGW-field-data/will_85903/2026-11-23_beta.418_capture/analysis_findings.txt, via the coordinator); confirmed on origin/dev: diag d.chAsked (SATcontrol.ino:8625) omitted _sat_tolBandOff, the real send passes it. Fix applied again on the beta branch.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+DRAFT 2026-11-25 (bench item pending, task NOT Done). Change: SATcontrol.ino d.chAsked (the diag input of satDiagEventsStep) now calls satChEnableDecide(..., _sat_tolBandOff), the same arguments as the satSendCH call, so a band pause (CH bit 0) no longer counts as CH asked. Field evidence: marceld91d beta.410 (10 of 10 no_ignition events inside Heating paused windows) and will_85903 beta.418 (no_ignition=1 at 08:13:28, cleared 08:19:28, while SAT itself held CH off). Evidence: AC2 done by reading the two call sites. tests/test_sat_diag_events.py class ChAskedFollowsTheBand (2 tests): RED on origin/dev (the diag call lacks _sat_tolBandOff), GREEN on the fix, 14 tests OK. HONEST LIMIT: the call sites sit inside satControlLoopRun(), which cannot be compiled on the host, so AC1 is covered structurally (source read), not by driving the tick: AC1 stays unticked. evaluate --quick 89/0/0 and build OK (R = 4f303da8c); otgw-architect cleared it. PENDING: AC4 bench (a band pause shows no no_ignition). Follow-up (2.1.0, low): remove the default of bandOff in satChEnableDecide so a caller that forgets it fails to compile.
+<!-- SECTION:FINAL_SUMMARY:END -->
