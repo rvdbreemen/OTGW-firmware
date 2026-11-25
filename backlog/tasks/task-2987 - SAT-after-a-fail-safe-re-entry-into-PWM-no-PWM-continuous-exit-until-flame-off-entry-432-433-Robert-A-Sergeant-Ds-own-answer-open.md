@@ -7,10 +7,10 @@ status: To Do
 assignee:
   - '@otgw-dev'
 created_date: '2026-11-21T01:44:00Z'
-updated_date: '2026-11-21T13:59:00Z'
+updated_date: '2026-11-25T06:42:00Z'
 labels:
   - sat
-milestone: 2.1.0
+milestone: 2.0.0
 dependencies: []
 priority: high
 ordinal: 1116000
@@ -41,4 +41,6 @@ Parked by Robert's A 2026-11-21 (DM 1573595175458963567, reply to 15735428235071
 2026-11-21 (92): entry 445 (Robert, #dev-sat-mqtt 07:23 UTC): one change at a time. First the duty fix (TASK-2993/2992) goes out in a public release, then these guards are the next change, in their own build. Release line (2.0.0 or 2.1.0) still open.
 
 2026-11-21 (otgw-dev): see TASK-2989 notes/ACs of today (architect's second reading: on >= beta.410 the saturation exit is a real-shortfall exit; ADR-236 amendment two-step; stale comments). Both guards ride the same lane lane/d3-sat2987 (6e1eacf30), rebase onto dev before implementing for 2.1.0.
+
+2026-11-25 otgw-docs (95): milestone moved to 2.0.0 on Robert's DM A (via the coordinator). Overlap warning for otgw-dev, who owns this code area (SAT PWM exits): TASK-2987 (no PWM -> continuous exit after the fail-safe re-entry until the flame goes out) overlaps with TASK-3039 / ADR-296 (Proposed: one PWM ON clock per flame, frozen while continuous, resumed on the PWM re-entry, entries 475-479, which are about exactly these fail-safe flips) and with TASK-3008 / ADR-236 and ADR-297 (the rewritten underheat exit). Re-read this task after the freeze (TASK-3039) lands; do not implement it against the old exit code. Note: ADR-236 (Accepted) still says TASK-2987 and TASK-2989 'stay 2.1.0 per entry 448' and ADR-236 option C 'not chosen'; with this milestone change the ADR text and the backlog disagree, so the ADR needs one line or the milestone a reason.
 <!-- SECTION:NOTES:END -->

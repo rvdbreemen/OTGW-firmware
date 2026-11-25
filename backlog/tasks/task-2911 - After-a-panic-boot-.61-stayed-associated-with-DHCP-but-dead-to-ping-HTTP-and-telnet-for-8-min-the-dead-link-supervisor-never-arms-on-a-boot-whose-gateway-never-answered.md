@@ -7,10 +7,10 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-19T09:43:00Z'
-updated_date: '2026-11-19T12:32:00Z'
+updated_date: '2026-11-25T06:40:00Z'
 labels:
   - wifi
-milestone: 2.1.0
+milestone: 2.0.0
 dependencies: []
 priority: high
 ordinal: 1053000

@@ -7,11 +7,12 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-15T16:03:00Z'
-updated_date: '2026-11-16T05:01:00Z'
+updated_date: '2026-11-25T06:39:00Z'
 labels:
   - otdirect
   - upstream
   - bug
+milestone: 2.0.0
 dependencies: []
 priority: medium
 ordinal: 1012000

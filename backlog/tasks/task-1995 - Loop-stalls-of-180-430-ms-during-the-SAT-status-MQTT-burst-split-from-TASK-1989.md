@@ -7,9 +7,10 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-16T06:28:00Z'
-updated_date: '2026-11-18T21:18:00Z'
+updated_date: '2026-11-25T06:39:00Z'
 labels:
   - performance
+milestone: 2.0.0
 dependencies: []
 priority: low
 ordinal: 1019000

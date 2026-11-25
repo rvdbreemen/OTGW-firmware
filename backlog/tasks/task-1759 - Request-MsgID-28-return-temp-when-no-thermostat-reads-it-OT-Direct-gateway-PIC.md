@@ -7,12 +7,13 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-09T17:08:00Z'
-updated_date: '2026-11-16T23:24:00Z'
+updated_date: '2026-11-25T06:39:00Z'
 labels:
   - sat
   - opentherm
   - ot-direct
   - pic
+milestone: 2.0.0
 dependencies: []
 priority: high
 ordinal: 860000

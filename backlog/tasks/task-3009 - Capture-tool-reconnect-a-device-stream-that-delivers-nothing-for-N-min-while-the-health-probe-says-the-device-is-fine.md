@@ -6,9 +6,10 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-21T14:56:00Z'
-updated_date: '2026-11-21T16:05:00Z'
+updated_date: '2026-11-25T06:40:00Z'
 labels:
   - tooling
+milestone: 2.0.0
 dependencies: []
 priority: medium
 ordinal: 1130000

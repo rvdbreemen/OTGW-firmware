@@ -7,11 +7,12 @@ status: In Review
 assignee:
   - '@claude'
 created_date: '2026-11-18T06:27:00Z'
-updated_date: '2026-11-18T17:43:00Z'
+updated_date: '2026-11-25T06:40:00Z'
 labels:
   - ha
   - sat
   - needs-maintainer-ok
+milestone: 2.0.0
 dependencies: []
 priority: low
 ordinal: 1032000

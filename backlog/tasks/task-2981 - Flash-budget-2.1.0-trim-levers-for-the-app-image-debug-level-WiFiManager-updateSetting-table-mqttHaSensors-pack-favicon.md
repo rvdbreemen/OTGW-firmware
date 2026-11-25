@@ -6,11 +6,11 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-20T17:07:00Z'
-updated_date: '2026-11-20T17:26:00Z'
+updated_date: '2026-11-25T06:40:00Z'
 labels:
   - build
   - flash-size
-milestone: 2.1.0
+milestone: 2.0.0
 dependencies: []
 priority: medium
 ordinal: 1113000

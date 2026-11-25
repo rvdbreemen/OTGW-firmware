@@ -7,11 +7,11 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-15T10:03:00Z'
-updated_date: '2026-11-20T01:20:00Z'
+updated_date: '2026-11-25T06:40:00Z'
 labels:
   - capture
   - tooling
-milestone: 2.1.0
+milestone: 2.0.0
 dependencies: []
 priority: medium
 ordinal: 1004000
