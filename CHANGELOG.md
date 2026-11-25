@@ -5,6 +5,16 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [2.0.0-beta.432] - 2026-11-25
+
+### Changed
+- Web UI: contrast of the SIMULATION badges, titles, hints, placeholders, toast and connection badge reaches 4.5:1, a skipped heading level is fixed, the rail focus ring sits inside its item, and the wizard uses defined colour tokens (TASK-2997).
+- Web UI: the help text of the SAT room source setting is 287 characters instead of 304.
+- Docs: README Quick Start steps 1, 3 and 4 for a first-time owner (TASK-3044); SAT chapters of the manual in plain words (TASK-3055); `sat/room_source` in the SAT command tables; how a cold start leaves PWM (TASK-3053).
+- SAT: the one PWM ON clock per flame was bench-tested on the SAT simulator and ADR-296 is Accepted (TASK-3039).
+- SAT: the central heating enable decision has no default for the tolerance band flag, so a caller that omits it does not compile (TASK-3054).
+- Internal: bound on the BLE pin notice text (TASK-3056); duplicate backlog task ids renumbered and a pre-commit check against new ones (TASK-3042).
+
 ## [2.0.0-beta.428] - 2026-11-25
 
 ### Changed
@@ -1215,7 +1225,8 @@ Legacy release. See git history for details.
 
 Legacy releases. See git history for details.
 
-[Unreleased]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.428...HEAD
+[Unreleased]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.432...HEAD
+[2.0.0-beta.432]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.428...v2.0.0-beta.432
 [2.0.0-beta.428]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.418...v2.0.0-beta.428
 [2.0.0-beta.418]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.410...v2.0.0-beta.418
 [2.0.0-beta.410]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.405...v2.0.0-beta.410

@@ -3,11 +3,11 @@ id: TASK-3044
 title: >-
   Docs: the setup WiFi network name is wrong in the recovery guide and manual
   ch03, plus the owner first-run gaps (README steps 1-4, IP, /update)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-25T05:21:00Z'
-updated_date: '2026-11-25T15:49:00Z'
+updated_date: '2026-11-25T17:22:00Z'
 labels:
   - docs
   - ux
@@ -42,4 +42,12 @@ AC2 (README Quick Start steps 1 to 4 and the Which firmware section) is NOT done
 Evidence for 'the AP fallback is in all builds since TASK-2931' (file:line at dev 81f1e5dc0): networkStuff.ino:496-497 (comment 'AP fallback ... TASK-2931 (Robert, DM 2026-11-19): part of prerelease AND stable builds') above startAPFallback() at :499, with no prerelease guard inside it (grep for _VERSION_PRERELEASE / IS_PRERELEASE in networkStuff.ino: no hit); the decision to enter it is networkStuff.ino:653 ('in prerelease and stable builds alike. After 2 failed ...'); restAPI.ino:3337 and :4099 emit apfallback in both (comment 'TASK-2931: AP fallback in prerelease and stable builds'). Not run on a stable build image: read from the code only.
 
 AC2 done 2026-11-25 (Robert cleared README steps 1-4 via the coordinator; wording from otgw-ux-designer, ux-readme-quickstart-steps-1-4.md). Checked: /update route OTGW-ModUpdateServer-esp32.h:460; 'Download a settings backup' link on the update page (manual ch03:240), so the unverified 'Settings > Download settings / settings.ini' clause was dropped; USB: ch02 says built-in USB, normally no driver, flash_otgw --port (ch02:165-180), so the CP210x/CH340 and 'charge-only cable' clauses were dropped (CP210x/CH340 is the 1.x ESP8266 guide); update warning: WIFI_FIRMWARE_UPDATE.md:5 says the gateway does nothing for the heating for 1 to 2 minutes, boiler-own-settings applies only to boards without PIC, so README says only 'does nothing for your heating'; old layout: ch02:179 and the guide say early 2.0.0 alpha; step 3 names only the router (hostname OTGW2 default, OTGW-firmware.h:136; whether the router shows it is not verified); anchors setting-up-mqtt-with-home-assistant (README:192) and ch02 flashing-the-firmware (ch02:148) exist. Also fixed the stale link label 'beta.418 release notes'. Not verified: how a router displays the gateway; no OLED/UI claim made.
+
+Release commit for v2.0.0-beta.432 (notes, CHANGELOG rollover, README beta link) carries this task: its three ACs are met (AC1/AC3 earlier, AC2 in a3ad52d08). The beta.432 notes name the README Quick Start change under TASK-3044.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+AC1: setup network name fixed in WIFI_RECOVERY_TRIPLE_RESET.md, manual ch02/ch03 EN+NL, openapi apfallback (grep shows only fallback uses of OTGW-XXXXXX remain). AC2: README Quick Start steps 1, 3, 4 in a3ad52d08 (checked per clause against code and manual; unverifiable clauses dropped, see notes). AC3: MANUAL.md regenerated, test_manual_generated passed. Not verified: whether a router displays the hostname OTGW2; no OLED or web UI claim made; no first-time owner has read the new text.
+<!-- SECTION:FINAL_SUMMARY:END -->
