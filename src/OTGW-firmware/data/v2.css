@@ -232,6 +232,10 @@ html[data-theme="dark"]{--accent:var(--brand-cyan);--nav:#383838;--tile-off:#545
   .press-txt{fill:var(--gauge-text);font-size:12.5px;font-weight:700;text-anchor:middle}
   .cloud{fill:var(--gauge-track);stroke:var(--border)}
   .house{fill:var(--panel-2);stroke:var(--muted);stroke-width:2}
+  /* TASK-2960: edge fade on a strip that scrolls sideways; data-overflow is set by syncHScroll() in v2.js */
+  .hscroll[data-overflow="end"]{-webkit-mask-image:linear-gradient(to right,#000 calc(100% - 24px),transparent);mask-image:linear-gradient(to right,#000 calc(100% - 24px),transparent)}
+  .hscroll[data-overflow="start"]{-webkit-mask-image:linear-gradient(to left,#000 calc(100% - 24px),transparent);mask-image:linear-gradient(to left,#000 calc(100% - 24px),transparent)}
+  .hscroll[data-overflow="both"]{-webkit-mask-image:linear-gradient(to right,transparent,#000 24px,#000 calc(100% - 24px),transparent);mask-image:linear-gradient(to right,transparent,#000 24px,#000 calc(100% - 24px),transparent)}
   .mobile-strip{display:none;gap:8px;overflow-x:auto;padding:8px 6px 10px}
   .mobile-strip .mchip{flex:0 0 auto;background:var(--panel-2);border:1px solid var(--border);
     border-radius:10px;padding:6px 12px;font-size:.8rem;white-space:nowrap}
@@ -444,6 +448,9 @@ html[data-theme="dark"]{--accent:var(--brand-cyan);--nav:#383838;--tile-off:#545
   .rail-item:hover{background:var(--panel-2)}
   .rail-item.active{background:color-mix(in srgb,var(--accent) 14%,transparent);
     color:var(--accent);font-weight:700}
+  .rail-item .ri-ic{flex:0 0 auto}
+  .rail-item .ri-lbl{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .rail-item .ri-reboot{flex:0 0 auto;width:8px;height:8px;border-radius:50%;background:var(--status-warn-text)}
   .rail-item .cnt{margin-left:auto;font-size:.68rem;color:var(--muted);background:var(--panel-2);
     border-radius:9px;padding:2px 7px}
   .set-cat-title{font-size:1.08rem;font-weight:700;display:flex;align-items:center;gap:8px;margin:2px 2px 4px}
@@ -468,6 +475,7 @@ html[data-theme="dark"]{--accent:var(--brand-cyan);--nav:#383838;--tile-off:#545
   .cat-desc{font-size:.8rem;color:var(--muted);margin:0 2px 14px;max-width:70ch}
   /* masonry flow: cards pack tightly per column (no grid row-alignment whitespace) */
   .set-cards{columns:300px;column-gap:16px}
+  .set-cards--few{columns:auto;max-width:760px}   /* TASK-2960: one or two cards fill a column, not 300 px of 1000 */
   .sfield{display:inline-flex;align-items:center;gap:6px}
   .sunit{font-size:.74rem;color:var(--muted);min-width:1.5em}
   .set-group{break-inside:avoid;background:var(--panel);border:1px solid var(--border);

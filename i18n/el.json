@@ -916,6 +916,7 @@
       },
       "otgw": {
         "desc": "Εντολές που στέλνονται στο PIC κατά την εκκίνηση.",
+        "short": "OpenTherm",
         "title": "OpenTherm Gateway"
       },
       "outputs": {
@@ -924,10 +925,12 @@
       },
       "s0": {
         "desc": "Μέτρηση παλμών ενέργειας.",
+        "short": "Μετρητής S0",
         "title": "Μετρητής παλμών S0"
       },
       "sat": {
         "desc": "Smart Autotune Thermostat.",
+        "short": "SAT",
         "title": "SAT — Έξυπνος θερμοστάτης"
       },
       "sensors": {

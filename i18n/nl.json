@@ -916,6 +916,7 @@
       },
       "otgw": {
         "desc": "Commando's die bij het opstarten naar de PIC gaan.",
+        "short": "OpenTherm",
         "title": "OpenTherm Gateway"
       },
       "outputs": {
@@ -924,10 +925,12 @@
       },
       "s0": {
         "desc": "Energiepulsen tellen.",
+        "short": "S0-teller",
         "title": "S0-pulsteller"
       },
       "sat": {
         "desc": "Smart Autotune Thermostat.",
+        "short": "SAT",
         "title": "SAT — slimme thermostaat"
       },
       "sensors": {

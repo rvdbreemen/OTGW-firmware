@@ -1037,6 +1037,7 @@
         },
         "otgw": {
           "desc": "Commands sent to the PIC at boot.",
+          "short": "OpenTherm",
           "title": "OpenTherm Gateway"
         },
         "outputs": {
@@ -1045,10 +1046,12 @@
         },
         "s0": {
           "desc": "Energy pulse counting.",
+          "short": "S0 counter",
           "title": "S0 Pulse Counter"
         },
         "sat": {
           "desc": "Smart Autotune Thermostat.",
+          "short": "SAT",
           "title": "SAT — Smart Thermostat"
         },
         "sensors": {
@@ -4297,6 +4300,8 @@
   function gSlug(s) { return String(s).toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, ''); }
   function groupT(s) { return s ? setT('settings.group.' + gSlug(s), s) : s; }
   function catTitle(c) { return setT('settings.cat.' + c.id + '.title', c.title); }
+  // TASK-2960 (spec T5 2): the rail uses a shorter title for three long categories; the category header keeps the full one
+  function catShort(c) { return setT('settings.cat.' + c.id + '.short', catTitle(c)); }
   function catDesc(c) { return setT('settings.cat.' + c.id + '.desc', c.desc); }
   // Pure unit hints stay as they are; a longer hint is keyed by its text, or by the setting when long.
   var HINT_UNIT_RE = /^(°C|°|%|W|kW|bar|ms|m³\/h|°C\/min|bar\/hr|0–23)$/;
@@ -4869,8 +4874,12 @@
       if (!n) return;
       if (!firstNonEmpty) firstNonEmpty = c.id;
       var ri = document.createElement('button'); ri.type = 'button'; ri.className = 'rail-item';   // TASK-2958: keyboard reachable (WCAG 2.1.1)
-      ri.appendChild(document.createTextNode(c.icon + ' ' + catTitle(c) + ' '));
-      if (c.reboot) ri.appendChild(rebootBadge());
+      var ric = document.createElement('span'); ric.className = 'ri-ic'; ric.setAttribute('aria-hidden', 'true'); ric.textContent = c.icon; ri.appendChild(ric);
+      var rlb = document.createElement('span'); rlb.className = 'ri-lbl'; rlb.textContent = catShort(c); rlb.title = catTitle(c); ri.appendChild(rlb);
+      if (c.reboot) {   // TASK-2960: a dot in the rail; the full REBOOT badge stays in the category header and on the rows
+        var rrb = document.createElement('span'); rrb.className = 'ri-reboot'; rrb.setAttribute('role', 'img');
+        rrb.title = t('settings.reboot_title'); rrb.setAttribute('aria-label', t('settings.reboot_aria')); ri.appendChild(rrb);
+      }
       var cnt = document.createElement('span'); cnt.className = 'cnt'; cnt.textContent = n; ri.appendChild(cnt);
       ri.addEventListener('click', function () { setActiveCat = c.id; renderSettings(); });
       ri.dataset.cat = c.id;
@@ -4903,6 +4912,7 @@
       if (id === 'sat') { wrap.appendChild(satMovedCard()); cols.appendChild(wrap); return; }   // TASK-1211
       var bySub = {}; var subOrder = [];
       keys.forEach(function (k) { var s = subFor(k); if (!(s in bySub)) { bySub[s] = []; subOrder.push(s); } bySub[s].push(k); });
+      if (!q && subOrder.length <= 2) wrap.classList.add('set-cards--few');   // TASK-2960: at most 2 cards, no search: one column
       subOrder.forEach(function (s) {
         var card = document.createElement('section'); card.className = 'set-group';
         if (s) { var h = document.createElement('h3'); h.textContent = groupT(s); card.appendChild(h); }
@@ -9135,9 +9145,40 @@
   }
 
   // ---------- init ----------
+  // TASK-2960 (spec T5 1): a strip that scrolls sideways shows an edge fade on the side with hidden content (data-overflow
+  // end, start or both, styled by .hscroll in v2.css) and keeps its active item in view after a page or view change.
+  function syncHScroll(el) {
+    var max = el.scrollWidth - el.clientWidth, x = el.scrollLeft, st = '';
+    if (max > 1) { var more = x < max - 1, before = x > 1; st = more && before ? 'both' : more ? 'end' : before ? 'start' : ''; }
+    if (st) el.setAttribute('data-overflow', st); else el.removeAttribute('data-overflow');
+  }
+  function hscrollActiveIntoView(el) {   // sideways only: the page itself does not scroll
+    var a = el.querySelector('.active, [aria-current="true"]'); if (!a) return;
+    var ar = a.getBoundingClientRect(), er = el.getBoundingClientRect(), dx = 0;
+    if (ar.left < er.left) dx = ar.left - er.left - 8; else if (ar.right > er.right) dx = ar.right - er.right + 8;
+    if (!dx) return;
+    var calm = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (el.scrollTo) el.scrollTo({ left: el.scrollLeft + dx, behavior: calm ? 'auto' : 'smooth' }); else el.scrollLeft += dx;
+  }
+  function hscrollInit() {
+    Array.prototype.forEach.call(document.querySelectorAll('.hscroll'), function (el) {
+      var last = null;
+      function sync() {
+        var a = el.querySelector('.active, [aria-current="true"]');
+        if (a && a !== last) { last = a; hscrollActiveIntoView(el); }
+        syncHScroll(el);
+      }
+      el.addEventListener('scroll', function () { syncHScroll(el); }, { passive: true });
+      window.addEventListener('resize', function () { syncHScroll(el); });
+      if (window.ResizeObserver) new ResizeObserver(function () { syncHScroll(el); }).observe(el);
+      if (window.MutationObserver) new MutationObserver(sync).observe(el, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ['class', 'aria-current'] });
+      sync();
+    });
+  }
   function init() {
     initTheme();
     initI18n();   // TASK-1689
+    hscrollInit();   // TASK-2960
     document.querySelectorAll('.seg').forEach(function (s) {
       s.addEventListener('click', function () { showPage(s.dataset.page); });
     });

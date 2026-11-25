@@ -61,7 +61,7 @@
   </div>
 </div>
 <div class="fs-banner" id="fsMismatch" role="alert" hidden></div>
-<nav class="switcher" aria-label="Main" data-i18n-aria-label="core.nav_main">
+<nav class="switcher hscroll" aria-label="Main" data-i18n-aria-label="core.nav_main">
   <button class="seg active" data-page="home" aria-current="page"><b data-i18n="nav.home">Home</b><small data-i18n="h_home.nav_home_sub">opening page</small></button>
   <button class="seg" data-page="sat"><b data-i18n="nav.sat">SAT</b><small data-i18n="h_home.nav_sat_sub">thermostat · control · technical</small></button>
   <button class="seg" data-page="monitor"><b data-i18n="nav.monitor">Monitor</b><small data-i18n="h_home.nav_monitor_sub">log · stats · support · graph · connection</small></button>
@@ -246,7 +246,7 @@
       <text class="label-tag" x="638" y="332" text-anchor="middle" data-i18n="h_home.svg_space_heating">SPACE HEATING</text>
     </svg>
 
-    <div class="mobile-strip" id="aStrip"></div>
+    <div class="mobile-strip hscroll" id="aStrip"></div>
   </div>
 
   <div class="tiles">
@@ -348,7 +348,7 @@
     <label class="sat-switch" style="margin-left:12px"><span id="satEnableLbl" aria-hidden="true">Enabled</span><input type="checkbox" class="sw" id="satEnable" aria-label="SAT" data-i18n-aria-label="core.sat_switch_name"></label>
   </div>
 
-  <div class="sat-views">
+  <div class="sat-views hscroll">
     <button class="satview-btn active" data-sv="simple" aria-current="true"><b>🏠 <span data-i18n="h_mon.sv_thermo">Thermostat</span></b><small data-i18n="h_mon.sv_thermo_sub">simple</small></button>
     <button class="satview-btn" data-sv="control"><b>🎛 <span data-i18n="h_mon.sv_control">Control</span></b><small data-i18n="h_mon.sv_control_sub">operational</small></button>
     <button class="satview-btn" data-sv="technical"><b>🔬 <span data-i18n="h_mon.sv_tech">Technical</span></b><small data-i18n="h_mon.sv_tech_sub">the control loop</small></button>
@@ -494,7 +494,7 @@
 <div id="page-monitor" class="page">
   <h2 class="sr-only" data-i18n="nav.monitor">Monitor</h2>
 
-  <div class="subtabs">
+  <div class="subtabs hscroll">
     <button class="subtab active" data-tab="mlog" aria-current="true" data-i18n="h_mon.tab_log">Log</button>
     <button class="subtab" data-tab="mvalues" data-i18n="h_mon.tab_values">Values</button>
     <button class="subtab" data-tab="mstats" data-i18n="h_mon.tab_stats">Statistics</button>
@@ -777,7 +777,7 @@
   <input class="set-search" id="setSearch" placeholder="Search settings… (e.g. broker, ntp, pin)" data-i18n-placeholder="h_set.search_ph">
 
   <div class="set-layout">
-    <nav class="set-rail" id="setRail" aria-label="Settings sections" data-i18n-aria-label="core.nav_settings_sections"></nav>
+    <nav class="set-rail hscroll" id="setRail" aria-label="Settings sections" data-i18n-aria-label="core.nav_settings_sections"></nav>
     <div>
       <div class="set-cols" id="setCols"></div>
       <div class="savebar" id="saveBar">
@@ -828,7 +828,7 @@
 <div id="page-advanced" class="page">
   <h2 class="sr-only" data-i18n="nav.advanced">Advanced</h2>
 
-  <div class="subtabs" id="advTabs">
+  <div class="subtabs hscroll" id="advTabs">
     <button class="subtab active" data-adv="pic" aria-current="true" data-i18n="h_set.tab_pic">PIC firmware</button>
     <button class="subtab" data-adv="debug" data-i18n="h_set.tab_debug">Debug Information</button>
     <button class="subtab" data-adv="files" data-i18n="h_set.tab_files">File System</button>
