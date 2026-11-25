@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : MQTTstuff
-**  Version  : v2.0.0-beta.433
+**  Version  : v2.0.0-beta.434
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **      Modified version from (c) 2020 Willem Aandewiel
@@ -3788,6 +3788,15 @@ static bool satBLEPublishOneDiscovery(const char* macCompact,
                                          const __FlashStringHelper* valueTemplate,
                                          const char* labelOverride)  // TASK-508: optional, NULL = legacy "BLE %s %s" form
 {
+  // TASK-2971 H5 (ADR-148): a BLE entity turns unavailable when the gateway is offline (avty_t = the gateway
+  // availability topic, as every main entity) or when its value stops coming (exp_aft). The state topics are
+  // published on change plus a heartbeat of at most SAT_HEARTBEAT_MAX_MS (11 min, SATmqttPublish.h), and stop
+  // once the sensor is stale (BLE_STALE_MS, SATble.ino). So the longest gap while the sensor is alive is one
+  // heartbeat plus a publish cycle: 1260 s = 660 s (SAT_HEARTBEAT_MAX_MS, SATmqttPublish.h:58) + 2 x 300 s
+  // (the iBleInterval maximum, settingStuff.ino:1331; BLE_STALE_MS is also 300 s, SATble.ino:42). The four kinds
+  // (temp, rh, bat, rssi) share that cadence, so they share the value. A dead probe turns unavailable in HA
+  // after at most ~21 min. tests/test_ble_discovery_availability.py fails when the three sources outgrow it.
+  static const uint32_t BLE_HA_EXPIRE_AFTER_S = 660UL + 2UL * 300UL;
   if (!settings.mqtt.bEnable) return false;
   if (!MQTTclient.connected()) return false;
   if (!isValidIP(MQTTbrokerIP)) return false;
@@ -3829,6 +3838,8 @@ static bool satBLEPublishOneDiscovery(const char* macCompact,
         "\"name\":\"%s %S\","
         "\"uniq_id\":\"%s_ble_%s_%s\","
         "\"stat_t\":\"%s\","
+        "\"avty_t\":\"%s\","
+        "\"exp_aft\":%lu,"
         "\"dev_cla\":\"%S\","
         "\"unit_of_meas\":\"%S\","
         "\"val_tpl\":\"%S\","
@@ -3843,6 +3854,7 @@ static bool satBLEPublishOneDiscovery(const char* macCompact,
       labelEsc, reinterpret_cast<PGM_P>(friendlyName),
       uniqueId, macCompact, kindKey,
       stateTopic,
+      MQTTPubNamespace, (unsigned long)BLE_HA_EXPIRE_AFTER_S,
       reinterpret_cast<PGM_P>(deviceClass),
       reinterpret_cast<PGM_P>(unit),
       reinterpret_cast<PGM_P>(valueTemplate),
@@ -3855,6 +3867,8 @@ static bool satBLEPublishOneDiscovery(const char* macCompact,
         "\"name\":\"BLE %s %s\","
         "\"uniq_id\":\"%s_ble_%s_%s\","
         "\"stat_t\":\"%s\","
+        "\"avty_t\":\"%s\","
+        "\"exp_aft\":%lu,"
         "\"dev_cla\":\"%S\","
         "\"unit_of_meas\":\"%S\","
         "\"val_tpl\":\"%S\","
@@ -3869,6 +3883,7 @@ static bool satBLEPublishOneDiscovery(const char* macCompact,
       macWithColons, reinterpret_cast<PGM_P>(friendlyName),
       uniqueId, macCompact, kindKey,
       stateTopic,
+      MQTTPubNamespace, (unsigned long)BLE_HA_EXPIRE_AFTER_S,
       reinterpret_cast<PGM_P>(deviceClass),
       reinterpret_cast<PGM_P>(unit),
       reinterpret_cast<PGM_P>(valueTemplate),
