@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : settingsStuff
-**  Version  : v2.0.0-beta.437
+**  Version  : v2.0.0-beta.438
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -443,7 +443,6 @@ bool writeSettings(bool show)
   // Multi-zone PID (Task #233)
   writeJsonIntKV(file, F("SATzonecount"), settings.sat.iZoneCount);
   writeJsonIntKV(file, F("SATzonetimeout"), settings.sat.iZoneTimeoutS);
-  writeJsonFloatKV(file, F("SATzoneheadroom"), settings.sat.fZoneAggregationHeadroom);
   // TASK-587: DS18B20 sensor-to-SAT-area mapping (area 0..3)
   writeJsonStringKV(file, F("SATsensorarea0"), settings.sat.sSensorArea[0]);
   writeJsonStringKV(file, F("SATsensorarea1"), settings.sat.sSensorArea[1]);
@@ -1319,7 +1318,6 @@ void updateSetting(const char *field, const char *newValue)
   // Multi-zone PID (Task #233)
   else if (strcasecmp_P(field, PSTR("SATzonecount")) == 0)    settings.sat.iZoneCount = (uint8_t)constrain(atoi(newValue), 1, 4);
   else if (strcasecmp_P(field, PSTR("SATzonetimeout")) == 0)  settings.sat.iZoneTimeoutS = (uint16_t)constrain(atoi(newValue), 30, 3600);
-  else if (strcasecmp_P(field, PSTR("SATzoneheadroom")) == 0) settings.sat.fZoneAggregationHeadroom = clampSettingFloat(newValue, settings.sat.fZoneAggregationHeadroom, 0.0f, 15.0f);
   // TASK-587: DS18B20 sensor-to-SAT-area mapping
   else if (strcasecmp_P(field, PSTR("SATsensorarea0")) == 0) strlcpy(settings.sat.sSensorArea[0], newValue, sizeof(settings.sat.sSensorArea[0]));
   else if (strcasecmp_P(field, PSTR("SATsensorarea1")) == 0) strlcpy(settings.sat.sSensorArea[1], newValue, sizeof(settings.sat.sSensorArea[1]));

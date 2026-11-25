@@ -50,7 +50,7 @@ STUBS = r"""
 #define SAT_HSYS_UNDERFLOOR 2
 static const float SAT_HC_REF_TEMP = 20.0f;
 struct SatSettings { float fHeatingCurveCoeff = 1.6f; int iZoneCount = 1; int iZoneTimeoutS = 900;
-                     float fDeadband = 0.1f; float fZoneAggregationHeadroom = 0.0f; int iHeatingMode = 0; };
+                     float fDeadband = 0.1f; int iHeatingMode = 0; };
 struct Settings { SatSettings sat; };
 struct SatState { float fHeatingCurveValue = 0.0f; };
 struct State { SatState sat; };

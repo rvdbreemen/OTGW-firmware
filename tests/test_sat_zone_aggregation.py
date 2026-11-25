@@ -61,7 +61,7 @@ STUBS = r"""
 #define SAT_HSYS_UNDERFLOOR 2
 #define SAT_MAX_ZONES 4
 struct SatSettings { float fHeatingCurveCoeff = 1.6f; int iZoneCount = 1; int iZoneTimeoutS = 900;
-                     float fDeadband = 0.1f; float fZoneAggregationHeadroom = 5.0f; int iHeatingMode = 0; };
+                     float fDeadband = 0.1f; int iHeatingMode = 0; };
 struct Settings { SatSettings sat; };
 struct SatState { float fHeatingCurveValue = 0.0f; };
 struct State { SatState sat; };
@@ -109,18 +109,18 @@ int main(int argc, char** argv) {   // eco hsys primary zoneCount [out target ro
 """
 
 HELPER_MAIN = r"""
-int main(int argc, char** argv) {   // primary n coldSp headroom eco [out err usable]...
-  if (argc < 6) return 2;
+int main(int argc, char** argv) {   // primary n coldSp eco [out err usable]...
+  if (argc < 5) return 2;
   float primary = (float)atof(argv[1]);
   int n = atoi(argv[2]);
-  float coldSp = (float)atof(argv[3]), headroom = (float)atof(argv[4]);
-  bool eco = atoi(argv[5]) != 0;
+  float coldSp = (float)atof(argv[3]);
+  bool eco = atoi(argv[4]) != 0;
   float outs[16], errs[16]; bool use[16];
   for (int i = 0; i < n && i < 16; i++) {
-    outs[i] = (float)atof(argv[6 + 3 * i]); errs[i] = (float)atof(argv[7 + 3 * i]);
-    use[i] = atoi(argv[8 + 3 * i]) != 0;
+    outs[i] = (float)atof(argv[5 + 3 * i]); errs[i] = (float)atof(argv[6 + 3 * i]);
+    use[i] = atoi(argv[7 + 3 * i]) != 0;
   }
-  printf("pid=%.3f\n", satAggregateZoneSetpoint(primary, outs, errs, use, (uint8_t)n, coldSp, headroom, eco));
+  printf("pid=%.3f\n", satAggregateZoneSetpoint(primary, outs, errs, use, (uint8_t)n, coldSp, eco));
   return 0;
 }
 """
@@ -224,12 +224,12 @@ class ZoneAggregation(unittest.TestCase):
             args += list(z)
         return self._run(self.tick_exe, args)
 
-    def helper(self, primary, zones, cold=28.2, headroom=5.0, eco=0):
+    def helper(self, primary, zones, cold=28.2, eco=0):
         """zones: list of (output, error, usable)."""
         self.assertIsNotNone(_helper(self.src), "satAggregateZoneSetpoint() is missing from SATcontrol.ino")
         if not self.helper_exe:
             self.skipTest("no host C++ compiler")
-        args = [primary, len(zones), cold, headroom, eco]
+        args = [primary, len(zones), cold, eco]
         for z in zones:
             args += list(z)
         return self._run(self.helper_exe, args)

@@ -5,6 +5,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Removed
+- SAT: the setting `satzoneheadroom` is removed (TASK-3089). It had no effect: with at most 4 zones the zones ask for the highest zone output whatever its value. SAT behaviour is unchanged (the fixed 5.0 of thermo-nova stays). The key is gone from `GET /api/v2/settings` and `POST /api/v2/settings` answers 400 "Unknown setting name" for it; an integration that wrote the key must stop doing so. An old `settings.ini` that still has the key loads without error and drops it on the next save.
+
 ## [2.0.0-beta.432] - 2026-11-25
 
 ### Changed

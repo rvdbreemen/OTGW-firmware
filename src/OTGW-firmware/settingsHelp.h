@@ -109,7 +109,6 @@ static const char SETTINGS_HELP_JSON[] PROGMEM = R"json({
 "satdhwenable":"Hot-water enable (HW=) sent to the gateway. Only used when the boiler reports a hot-water tank.",
 "satzonecount":"Number of extra zones (rooms) with their own PID, 1 to 4. Zones only raise the main room's demand.",
 "satzonetimeout":"Seconds without an update before a zone goes inactive, 30 to 3600. Default 300.",
-"satzoneheadroom":"Most the zones may ask above their 75th-percentile output, 0 to 15 °C. Default 5. Unused with 4 zones or fewer.",
 "satsensorarea0":"DS18B20 or BLE room sensor 1 of the averaged room temperature.",
 "satsensorarea1":"DS18B20 or BLE room sensor 2 of the averaged room temperature.",
 "satsensorarea2":"DS18B20 or BLE room sensor 3 of the averaged room temperature.",

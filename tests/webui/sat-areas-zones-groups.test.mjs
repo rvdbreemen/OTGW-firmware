@@ -20,7 +20,7 @@ const SETTINGS = {
   satmultiarea: S('true', 'b'), satmultiareacount: S('4', 'i'),
   satsensorarea0: S('', 's'), satsensorarea1: S('', 's'), satsensorarea2: S('', 's'), satsensorarea3: S('', 's'),
   satareaweight0: S('1', 'f'), satareaweight1: S('1', 'f'), satareaweight2: S('1', 'f'), satareaweight3: S('1', 'f'),
-  satzonecount: S('2', 'i'), satzonetimeout: S('300', 'i'), satzoneheadroom: S('5', 'f'), saterrormon: S('true', 'b'),
+  satzonecount: S('2', 'i'), satzonetimeout: S('300', 'i'), saterrormon: S('true', 'b'),
 };
 const GROUPS = `(function () {
   function groups(id) {
@@ -56,7 +56,7 @@ test('Control view: Averaged room sensors and Zones side by side, sensors number
     assert.equal(lbl.satmultiareacount, 'Number of sensors');
     assert.deepEqual(['satsensorarea0', 'satsensorarea1', 'satsensorarea2', 'satsensorarea3'].map((k) => lbl[k]), ['Sensor 1', 'Sensor 2', 'Sensor 3', 'Sensor 4']);
     assert.deepEqual(['satareaweight0', 'satareaweight1', 'satareaweight2', 'satareaweight3'].map((k) => lbl[k]), ['Weight sensor 1', 'Weight sensor 2', 'Weight sensor 3', 'Weight sensor 4']);
-    assert.deepEqual(zones.rows.map((x) => x.key), ['satzonecount', 'satzonetimeout', 'satzoneheadroom']);
+    assert.deepEqual(zones.rows.map((x) => x.key), ['satzonecount', 'satzonetimeout']);
     assert.equal(zones.rows[0].label, 'Number of zones');
     const l3keys = r.l3.flatMap((g) => g.rows.map((x) => x.key));
     assert.ok(l3keys.includes('saterrormon'), 'error monitoring stays in Technical');

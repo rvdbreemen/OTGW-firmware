@@ -3979,9 +3979,9 @@ static float satZonePidOutput(uint8_t idx, float outsideTemp)
 // - A zone counts when it is usable and its output is above the cold setpoint (requires_heat,
 //   area.py:166-175; the firmware has no per-zone valve position, so only the output test applies).
 // - Zones output (area.py:286-301): the counted outputs sorted, baseline = outputs[int(N * 0.75)],
-//   chosen = min(highest, baseline + headroom), rounded to 1 decimal; no counted zone gives
+//   chosen = min(highest, baseline + 5.0), rounded to 1 decimal; no counted zone gives
 //   SAT_MIN_SETPOINT (area.py:291-292). With at most SAT_MAX_ZONES (4) zones the baseline is always the
-//   highest output, so the headroom only binds with more zones than the firmware has.
+//   highest output, so the 5.0 headroom only binds with more zones than the firmware has.
 // - setpoint = max(primary, zones output): the zones only raise the primary (climate.py:385-386).
 // - Overshoot cap (area.py:303-333): a counted zone more than 0.3 above its target gives
 //   cold + 10 - 4 * degrees over; the lowest wins, floored at cold, rounded to 1 decimal, applied as
@@ -3990,13 +3990,14 @@ static float satZonePidOutput(uint8_t idx, float outsideTemp)
 // COLD_SETPOINT 22: ADR-199, Robert's decision of 2026-10-24 for area.py:175, :322 and :331.
 static float satAggregateZoneSetpoint(float primary, float *zoneOut, const float *zoneErr,
                                       const bool *zoneUsable, uint8_t zoneCount,
-                                      float coldSp, float headroom, bool eco)
+                                      float coldSp, bool eco)
 {
   if (eco) return primary;
 
   const float overshootMargin = 0.3f;    // area.py:33 OVERSHOOT_MARGIN
   const float coolingHeadroom = 10.0f;   // area.py:34 COOLING_HEADROOM
   const float coolingSlope    = 4.0f;    // area.py:32 COOLING_SLOPE
+  const float zoneHeadroom    = 5.0f;    // area.py:267 _PIDs headroom: a constant, no user setting (TASK-3089)
 
   uint8_t n = 0;
   bool  haveCap = false;
@@ -4021,7 +4022,7 @@ static float satAggregateZoneSetpoint(float primary, float *zoneOut, const float
     }
     uint8_t idx = (uint8_t)((float)n * 0.75f);               // area.py:295 int(len * percentile)
     if (idx > n - 1) idx = n - 1;
-    float allowed = zoneOut[idx] + headroom;                  // area.py:298
+    float allowed = zoneOut[idx] + zoneHeadroom;                  // area.py:298
     float chosen  = (zoneOut[n - 1] < allowed) ? zoneOut[n - 1] : allowed;   // area.py:299
     zonesOut = roundf(chosen * 10.0f) / 10.0f;                // area.py:301
   }
@@ -8601,7 +8602,7 @@ static void satControlLoopRun()
       zoneErr[z] = satPidError(satZones[z].fSetpoint, satZones[z].fRoomTemp);   // area temperature_state.error
     }
     pidOutput = satAggregateZoneSetpoint(pidOutput, zoneOut, zoneErr, zoneUse, zoneCount,
-                                         satGetColdSetpoint(), settings.sat.fZoneAggregationHeadroom,
+                                         satGetColdSetpoint(),
                                          settings.sat.iHeatingMode == 1);   // 1 = ECO
     // TASK-1887 (entry 378): the band input from the PID's own room (filtered) and target; in COMFORT every usable zone counts too,
     // in ECO (iHeatingMode 1) only the main room.

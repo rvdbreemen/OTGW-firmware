@@ -768,7 +768,7 @@ Differs from thermo-nova: there the output is recomputed on each read. Here noth
 2. Zones, for every configured zone (`iZoneCount` 1 to 4), through `satAggregateZoneSetpoint()` (SATcontrol.ino:5540-5561, SATcontrol.ino:2329-2377). Ported from thermo-nova climate.py:369-394 and area.py:166-175, :264-333 (entry 116, TASK-1440). Each zone step returns its output, or 10.0 when the zone is not usable (OFF, stale, never pushed, out of range: `satZoneUsable()`, SATcontrol.ino:2231). A zone without usable inputs does not count, so a setup without zone data is unchanged.
    1. ECO (`iHeatingMode` 1): `pidOutput` stays the main PID output (climate.py:377-379). The zone outputs are still computed, for the diagnostics.
    2. A zone counts when it is usable and its output is above the cold setpoint: 28.2 °C radiators, 21.0 °C underfloor (`satGetColdSetpoint()`, ADR-199; thermo-nova uses `COLD_SETPOINT` 22 at area.py:175). The firmware has no per-zone valve position, so only the output test of area.py:166-175 applies.
-   3. Zones output (area.py:264-301): the counted outputs sorted ascending, `baseline = outputs[int(N * 0.75)]` (clamped to N - 1), `chosen = min(highest, baseline + fZoneAggregationHeadroom)`, rounded to 1 decimal. No counted zone gives 10.0 (`SAT_MIN_SETPOINT`), which leaves the main PID output alone (area.py:291-292).
+   3. Zones output (area.py:264-301): the counted outputs sorted ascending, `baseline = outputs[int(N * 0.75)]` (clamped to N - 1), `chosen = min(highest, baseline + 5.0)`, rounded to 1 decimal. No counted zone gives 10.0 (`SAT_MIN_SETPOINT`), which leaves the main PID output alone (area.py:291-292).
    4. `pidOutput = max(main PID output, zones output)` (climate.py:385-386). The zones only raise the demand of the main room, they never lower it.
    5. Overshoot cap (area.py:303-333, climate.py:388-389): every counted zone more than 0.3 °C above its target gives `cold + 10 - 4 * degrees over`. The lowest wins, floored at the cold setpoint and rounded to 1 decimal. Then `pidOutput = min(pidOutput, cap)`. The cap can lower `pidOutput` below the main PID output, as in thermo-nova.
 3. Clamp to [10.0, `satEffectiveMaxSetpoint()`] (SATcontrol.ino:5583-5585). The ceiling is the lowest of:
@@ -840,7 +840,7 @@ Variable names as in the code.
 **Zone aggregation** (`satAggregateZoneSetpoint()`, SATcontrol.ino:2329-2377; ports thermo-nova area.py:264-333 and climate.py:369-394, entry 116, TASK-1440):
 - A zone counts when it is usable and its output is above the cold setpoint (`satGetColdSetpoint()`: 28.2 radiators, 21.0 underfloor, ADR-199).
 - `baseline = sorted[int(N * 0.75)]`, clamped to N - 1.
-- `chosen = min(highest, baseline + fZoneAggregationHeadroom)`, rounded to 1 decimal. No counted zone gives 10.0.
+- `chosen = min(highest, baseline + 5.0)`, rounded to 1 decimal. No counted zone gives 10.0.
 - `requested = max(main PID output, chosen)`.
 - Overshoot cap: for each counted zone with `target - room` below -0.3, `cap = cold + 10 - 4 * (room - target)`. The lowest cap wins, floored at the cold setpoint, rounded to 1 decimal. `requested = min(requested, cap)`.
 - Computed from the formula (not stated in the code): `int(N * 0.75)` is 0, 1, 2, 3 for N = 1, 2, 3, 4, which is always the highest output. With at most 4 zones the headroom therefore never binds; it would only matter with 5 or more zones.
@@ -900,7 +900,6 @@ With the firmware default coefficient of 1.5 (SATtypes.h:442) and the same input
 | PID state maximum age on restore | 1800 | s | SATcontrol.ino:1993 |
 | PID state periodic save | 300 | s | SATcontrol.ino:5010 |
 | `iZoneCount` default | 1 | zones | SATtypes.h:531 |
-| `fZoneAggregationHeadroom` default (most the zones may ask above their P75 output) | 5.0 | degrees | SATtypes.h:552 |
 | Zone P75 fraction | 0.75 | fraction | SATcontrol.ino:2360 |
 | Zone overshoot margin / cooling headroom / cooling slope | 0.3 / 10.0 / 4.0 | degrees, degrees, degrees per degree | SATcontrol.ino:2335-2337 |
 | Zone timeout default | 300 | s | SATtypes.h:532 |
@@ -1247,7 +1246,7 @@ pidOutput = clamp(pidOutput, 10, satEffectiveMaxSetpoint())    (5581-5586)
 ECO (iHeatingMode == 1)  : pidOutput unchanged                    (2333)
 counted outputs sorted ascending                                  (2354-2359)
 idx        = int(N * 0.75), at most N - 1                         (2360-2361)
-chosen     = min(highest, outputs[idx] + fZoneAggregationHeadroom)  (2362-2363)
+chosen     = min(highest, outputs[idx] + 5.0)  (2362-2363)
 zonesOut   = round1(chosen);  N == 0 gives 10                     (2352, 2364)
 setpoint   = max(pidOutput, zonesOut)                             (2367)
 per counted zone with error < -0.3:
@@ -1256,7 +1255,7 @@ cap        = min of the c values, at least cold, round1           (2346, 2369-23
 setpoint   = min(setpoint, cap)  if there is a cap                (2371)
 ```
 
-Derived from line 2360 (computed, not stated in the code): `int(N * 0.75)` is 0, 1, 2, 3 for N = 1, 2, 3, 4, always the highest output, so with at most 4 zones `min(highest, baseline + headroom)` is the highest output and `fZoneAggregationHeadroom` never binds. It would only bind with 5 or more zones. `fZoneAggregationHeadroom` defaults to 5.0 °C, range 0 to 15 (SATtypes.h:552, settingStuff.ino:1110); its meaning changed in TASK-1440: before it was added on top of the P75 value, now it is the most the zones may ask above their P75 output. No settings migration.
+Derived from line 2360 (computed, not stated in the code): `int(N * 0.75)` is 0, 1, 2, 3 for N = 1, 2, 3, 4, always the highest output, so with at most 4 zones `min(highest, baseline + headroom)` is the highest output and the 5.0 headroom never binds. It would only bind with 5 or more zones. The headroom is the constant 5.0 °C (area.py:267), not a setting (TASK-3089). An old settings.ini that still has the key `SATzoneheadroom` loads without error; the next save drops it.
 
 Computed examples (radiators, cold 28.2, 4.0 per degree, headroom irrelevant): 1.0 °C over a target gives a cap of 34.2; 4.0 °C over gives 22.2, floored to 28.2; exactly 0.3 °C over gives no cap (the test is strictly below -0.3).
 
@@ -1333,7 +1332,6 @@ Derived from the curve formula and the cold setpoints (computed, not stated in t
 | `fTargetTemp` accepted range | 5 to 30 | °C | settingStuff.ino:997 |
 | Preset comfort / eco / away / sleep / activity / home | 21 / 18 / 15 / 16 / 10 / 18 | °C | SATtypes.h:446-451 |
 | `iZoneCount` default | 1 | | SATtypes.h:531 |
-| `fZoneAggregationHeadroom` default (most the zones may ask above their P75 output) | 5.0 | °C | SATtypes.h:552 |
 | Zone percentile | 0.75 (index `int(N * 0.75)`, at most N - 1) | | SATcontrol.ino:2360-2361 |
 | Zone overshoot margin / cooling headroom / cooling slope | 0.3 / 10.0 / 4.0 | °C, °C, °C per °C | SATcontrol.ino:2335-2337 |
 | `fSolarSetpointOffset` default | 2.0 | °C | SATtypes.h:496 |
@@ -2650,7 +2648,7 @@ The requested setpoint is formed as follows (SATcontrol.ino:4831-4912):
    1. Run every configured zone's PID. A zone that is not usable (OFF, stale, never pushed, out of range: `satZoneUsable()`) does not count, so a setup without zone data is unchanged (SATcontrol.ino:5552-5556).
    2. ECO (`iHeatingMode` 1): keep the main PID output; the zone outputs are still computed for the diagnostics (SATcontrol.ino:2333).
    3. A zone counts when it is usable and its output is above the cold setpoint: 28.2 °C radiators, 21.0 °C underfloor (`satGetColdSetpoint()`, ADR-199). No counted zone gives a zones output of 10 °C, which leaves the main output alone (SATcontrol.ino:2343, SATcontrol.ino:2352).
-   4. Zones output: sort the counted outputs ascending, `baseline = outputs[int(N * 0.75)]` (at most N - 1), `chosen = min(highest, baseline + fZoneAggregationHeadroom)`, rounded to 1 decimal (SATcontrol.ino:2354-2364).
+   4. Zones output: sort the counted outputs ascending, `baseline = outputs[int(N * 0.75)]` (at most N - 1), `chosen = min(highest, baseline + 5.0)`, rounded to 1 decimal (SATcontrol.ino:2354-2364).
    5. `requested = max(main PID output, zones output)` (SATcontrol.ino:2367). The zones only raise the demand of the main room.
    6. Overshoot cap: each counted zone more than 0.3 °C above its target gives `cold + 10 - 4 * degrees over`; the lowest wins, floored at the cold setpoint, rounded to 1 decimal; `requested = min(requested, cap)`. The cap can lower `requested` below the main PID output (SATcontrol.ino:2342-2350, SATcontrol.ino:2368-2372).
    7. Publish zone diagnostics, only when `iZoneCount` > 1 (SATcontrol.ino:5561).
@@ -2805,7 +2803,7 @@ else:
 output = clamp(curve + kp * error + I, 10, system_max)
 ```
 
-Zone aggregation (`satAggregateZoneSetpoint()`, SATcontrol.ino:2329-2377), with `N` counted zones (usable and output above the cold setpoint `cold`: 28.2 radiators, 21.0 underfloor), `headroom = fZoneAggregationHeadroom` (default 5.0), `primary` the main PID output:
+Zone aggregation (`satAggregateZoneSetpoint()`, SATcontrol.ino:2329-2377), with `N` counted zones (usable and output above the cold setpoint `cold`: 28.2 radiators, 21.0 underfloor), `headroom = 5.0` (a constant since TASK-3089; the former setting was removed), `primary` the main PID output:
 
 ```
 if ECO: result = primary
@@ -2852,7 +2850,6 @@ switch when (millis() - iWindowOpenSinceMs) / 1000 >= iWindowMinOpenSec
 | `SAT_MAX_ZONES` | 4 | zones | SATcontrol.ino:1729 |
 | Zone aggregation percentile | 0.75, index `int(N * 0.75)` clamped to N - 1 | fraction | SATcontrol.ino:2360-2361 |
 | Zone overshoot margin / cooling headroom / cooling slope | 0.3 / 10.0 / 4.0 | °C, °C, °C per °C | SATcontrol.ino:2335-2337 |
-| `fZoneAggregationHeadroom` default / range (most the zones may ask above their P75 output) | 5.0 / 0 to 15 | °C | SATtypes.h:552, settingStuff.ino:1110 |
 | `iZoneCount` default / range | 1 / 1 to 4 | zones | SATtypes.h:531, settingStuff.ino:1112 |
 | `iZoneTimeoutS` default / range | 300 / 30 to 3600 | s | SATtypes.h:532, settingStuff.ino:1113 |
 | Zone room temperature accepted | -10 to 50 | °C | SATcontrol.ino:1760 |

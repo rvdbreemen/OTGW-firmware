@@ -1300,7 +1300,6 @@
         "satwindowdetect": "Window detection",
         "satwindowminsec": "Window min open time",
         "satzonecount": "Number of zones",
-        "satzoneheadroom": "Zone headroom",
         "satzonetimeout": "Zone sensor timeout",
         "ssid": "Wi-Fi network",
         "telnetenabled": "Telnet debug console",
@@ -4427,7 +4426,6 @@
     satdhwenable:        { cat: 'sat', label: 'DHW enable (HW= master)' },
     satzonecount:        { cat: 'sat', label: 'Number of zones' },
     satzonetimeout:      { cat: 'sat', label: 'Zone sensor timeout', hint: 'Seconds' },
-    satzoneheadroom:     { cat: 'sat', label: 'Zone headroom', hint: '°C' },
     satsensorarea0:      { cat: 'sat', label: 'Sensor 1', hint: 'DS18B20 or BLE' },
     satsensorarea1:      { cat: 'sat', label: 'Sensor 2' },
     satsensorarea2:      { cat: 'sat', label: 'Sensor 3' },
@@ -4524,7 +4522,7 @@
     // TASK-3014: two groups side by side (gruijter, Robert approved); keys unchanged, labels numbered 1-4
     ['Averaged room sensors', ['satmultiarea', 'satmultiareacount', 'satsensorarea0', 'satareaweight0', 'satsensorarea1', 'satareaweight1',
                                'satsensorarea2', 'satareaweight2', 'satsensorarea3', 'satareaweight3']],
-    ['Zones', ['satzonecount', 'satzonetimeout', 'satzoneheadroom']],
+    ['Zones', ['satzonecount', 'satzonetimeout']],
     ['Weather', ['satweatherenable', 'satweatherlat', 'satweatherlon', 'satweatherinterval']],
     ['Season', ['satsummersimmer', 'satsummerthreshold', 'satsummerminhours', 'satwindowdetect', 'satwindowminsec']]
   ];

@@ -1179,7 +1179,6 @@
       "satwindowdetect": "Fenster-offen-Erkennung",
       "satwindowminsec": "Min. Öffnungsdauer Fenster",
       "satzonecount": "Anzahl Zonen",
-      "satzoneheadroom": "Zonen-Reserve",
       "satzonetimeout": "Timeout Zonensensor",
       "ssid": "WLAN-Netz",
       "telnetenabled": "Telnet-Debugkonsole",

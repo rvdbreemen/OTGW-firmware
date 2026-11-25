@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-beta.437
+**  Version  : v2.0.0-beta.438
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -4416,7 +4416,6 @@ void sendDeviceSettings()
     dtostrf(settings.sat.fMinPressure,             1, 2, tmpBuf); addNum(F("satminpressure"),      tmpBuf, "f", 0, 3);
     dtostrf(settings.sat.fMaxPressure,             1, 2, tmpBuf); addNum(F("satmaxpressure"),      tmpBuf, "f", 1, 4);
     dtostrf(settings.sat.fMaxPressureDrop,         1, 2, tmpBuf); addNum(F("satmaxpressdrop"), tmpBuf, "f", 0.05f, 2.0f);
-    dtostrf(settings.sat.fZoneAggregationHeadroom, 1, 1, tmpBuf); addNum(F("satzoneheadroom"),     tmpBuf, "f", 0, 15);
     dtostrf(settings.sat.fSolarMinElevation,       1, 1, tmpBuf); addNum(F("satsolarminelev"),     tmpBuf, "f", -10, 45);
     dtostrf(settings.sat.fBoilerRatedKW,           1, 1, tmpBuf); addNum(F("satboilerratedkw"),    tmpBuf, "f", 0, 200);
     dtostrf(settings.sat.fBoilerEfficiency,        1, 2, tmpBuf); addNum(F("satboilerefficiency"), tmpBuf, "f", 0.5f, 1.0f);
@@ -4549,7 +4548,7 @@ static const char* const PROGMEM knownSettings[] = {
   "satsummerminhours", "satsummersimmer", "satsummerthreshold",
   "satsystem", "satroomsource", "sattargettemp", "sattempstep", "satthermalcoeff", "satthermalcomfort",
   "satweatherenable", "satweatherinterval", "satweatherlat", "satweatherlon",
-  "satwindowdetect", "satwindowminsec", "satzonecount", "satzoneheadroom", "satzonetimeout",
+  "satwindowdetect", "satwindowminsec", "satzonecount", "satzonetimeout",
   // TASK-933 P2: SAT keys that already had GET + dispatch but were missing from the
   // whitelist (POST-blocked). isKnownSetting is a
   // linear scan so position is cosmetic; grouped here for traceability.

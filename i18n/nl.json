@@ -1179,7 +1179,6 @@
       "satwindowdetect": "Raamdetectie",
       "satwindowminsec": "Min. tijd raam open",
       "satzonecount": "Aantal zones",
-      "satzoneheadroom": "Zonemarge",
       "satzonetimeout": "Time-out zonesensor",
       "ssid": "Wi-Fi-netwerk",
       "telnetenabled": "Telnet-debugconsole",
