@@ -23,9 +23,9 @@ static const float SAT_PID_UPDATE_INTERVAL      = 60.0f;   // seconds (pid.py:20
 // Derivative alpha is now adaptive: alpha = dt / (PID_UPDATE_INTERVAL + dt)
 static const float SAT_PID_DERIVATIVE_CAP       = 5.0f;    // Max raw derivative magnitude
 static const float SAT_PID_AGGRESSION_V3        = 8400.0f;
-// Kd factor 0.05: Sergeant D decided it (entry 425, which supersedes the 0.063 of entry 279). Deliberate deviation
-// from thermo-nova pid.py:93, which uses 0.07.
-static const float SAT_PID_KD_FACTOR            = 0.05f;
+// Kd factor 0.04: Sergeant D decided it (entry 477, which amends 425/427; 0.05 since entry 425, 0.063 before, entry 279). Deliberate
+// deviation from thermo-nova pid.py:93, which uses 0.07.
+static const float SAT_PID_KD_FACTOR            = 0.04f;
 
 // Underfloor divisor=4, radiator divisor=3 for Kp calculation
 static const float SAT_PID_KP_DIVISOR_FLOOR     = 4.0f;
@@ -223,7 +223,7 @@ float satPidCurveOnly(float heatingCurveValue)
 //=== Auto-Gain Calculation (Version 3) ===
 // Automatic gains from the heating curve (thermo-nova pid.py automatic_gains=True), each rounded to 3 decimals
 // (entry 95, Q28a; pid.py rounds to 6). Ki and Kd derive from the rounded Kp, as pid.py reads self.kp (:82, :93).
-// Kd uses SAT_PID_KD_FACTOR 0.05 (entry 425), not the 0.07 of pid.py:93: kd = 0.05 * 8400 * kp = 420 * kp.
+// Kd uses SAT_PID_KD_FACTOR 0.04 (entry 477), not the 0.07 of pid.py:93: kd = 0.04 * 8400 * kp = 336 * kp.
 static void _pidCalculateGains(float curveValue)
 {
   float coeff = settings.sat.fHeatingCurveCoeff;

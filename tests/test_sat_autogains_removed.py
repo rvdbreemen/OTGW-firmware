@@ -72,7 +72,7 @@ def extract_gain_code(src: str) -> str:
     return "\n".join(consts) + "\n" + src[r:src.index("\n}\n", r) + 3] + "\n" + src[a:b]
 
 
-KD_FACTOR = 0.05   # Sergeant D entry 425 (supersedes the 0.063 of entry 279, TASK-1656): deliberate deviation from thermo-nova pid.py:93, which uses 0.07
+KD_FACTOR = 0.04   # Sergeant D entry 477 (amends 425/427, TASK-3041; was 0.05 since entry 425, 0.063 before): deliberate deviation from thermo-nova pid.py:93, which uses 0.07
 
 
 def expected_gains(coeff: float, curve: float, system: int):
