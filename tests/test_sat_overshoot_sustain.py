@@ -86,6 +86,10 @@ static uint32_t millis() { return g_ms; }
 static float satGetFlowTemp() { return g_flow; }
 static bool g_flame = true;            // TASK-1933: the entry-342 exit counts only with the flame on (token f: flame off)
 static bool satIsFlameOn() { return g_flame; }
+// TASK-3008 (entry 456): the flame edge state satCycleFlameEstablished() reads (satCycleOnFlameChange() keeps it on the device).
+static bool _cycle_flameOn = true;
+static uint32_t _cycle_flameOnStartMs = 0;
+static uint32_t satCycleGetFlameOnStartMs() { return _cycle_flameOnStartMs; }
 static uint32_t g_offTime = 1;
 static uint32_t satPwmLastOffTimeMs() { return g_offTime; }
 static int g_switches = 0;
@@ -116,6 +120,7 @@ int main(int argc, char** argv) {
   if (argc > 1 && !strcmp(argv[1], "all")) { all = true; argv++; argc--; }
   if (argc > 1 && !strncmp(argv[1], "start=", 6)) { g_ms = (uint32_t)strtoul(argv[1] + 6, 0, 10); argv++; argc--; }
   uint32_t tick = g_ms;
+  _cycle_flameOn = true; _cycle_flameOnStartMs = g_ms - 600000UL;   // burning for 10 min at the start
   const uint32_t t0 = tick;
   float g_req = 50.0f;
 #ifdef HEAD_API
@@ -182,10 +187,13 @@ int main(int argc, char** argv) {
                                             g_flow = (k == 'o') ? 52.5f : (k == 'e') ? 52.0f : 49.0f; g_offTime = 1; }
     if (k == 'p') { state.sat.eControlMode = SAT_MODE_PWM; state.sat.bPwmFlameRequested = false; g_flow = 55.0f; g_offTime = 1; }
     g_flame = (k != 'f');
+    if (g_flame && !_cycle_flameOn) _cycle_flameOnStartMs = g_ms;   // TASK-3008: a flame-on edge at this tick
+    _cycle_flameOn = g_flame;
     if (k == 'u') { state.sat.eControlMode = SAT_MODE_PWM; state.sat.bPwmFlameRequested = true; g_flow = 40.0f; g_offTime = 1; }
     if (k == 'f') { state.sat.eControlMode = SAT_MODE_PWM; state.sat.bPwmFlameRequested = true; g_flow = 40.0f; g_offTime = 1; }
     if (k == 'v') { state.sat.eControlMode = SAT_MODE_PWM; state.sat.bPwmFlameRequested = true; g_flow = 49.5f; g_offTime = 1; }
     if (k == 'U') { state.sat.eControlMode = SAT_MODE_PWM; state.sat.bPwmFlameRequested = true; g_flow = 47.0f; g_offTime = 1; }
+    if (k == 'q') { state.sat.eControlMode = SAT_MODE_PWM; state.sat.bPwmFlameRequested = true; g_flow = 47.1f; g_offTime = 1; }   // TASK-3008: request - 2.9
     if (k == 'm') { state.sat.eControlMode = SAT_MODE_PWM; state.sat.bPwmFlameRequested = true; g_flow = 0.0f; g_offTime = 1; }
     if (k == 'y') { state.sat.eControlMode = SAT_MODE_CONTINUOUS; state.sat.bPwmFlameRequested = false; g_flow = 0.0f; g_offTime = 1; }
     if (k == 'w') { state.sat.eControlMode = SAT_MODE_PWM; state.sat.bPwmFlameRequested = true; g_flow = 50.0f; g_offTime = 1; }
@@ -357,33 +365,48 @@ class SustainedSwitches(unittest.TestCase):
     # TASK-1933 (Sergeant D entries 339, 342, 350): the exit is "flame on and request above the flow for 60 s", 60 s after the
     # first qualifying tick (Q44 A timing), at a 30 s and a 60 s tick. Rewritten on purpose: thermo-nova's flow <= request - 3
     # for 180 s (:337-347, const.py:22) fired at dt + 180000.
-    def test_underheat_fires_60s_after_the_first_tick_at_30s_and_60s_ticks(self):
+    # TASK-3008 (entry 448): thermo-nova's underheat exit, flow <= request - 3.0 C for 180 s (heating_control.py:330-344, const.py:22).
+    def test_underheat_fires_180s_after_the_first_tick_at_30s_and_60s_ticks(self):
         for dt in (30000, 60000):
             with self.subTest(tick_s=dt // 1000):
                 r = self.run_ticks(ticks(dt, "u" * 12))
-                self.assertEqual((int(r["t"]), r["mode"]), (dt + 60000, "1"))
+                self.assertEqual((int(r["t"]), r["mode"]), (dt + 180000, "1"))
 
-    # TASK-1933: any flow below the request counts (49.5 < 50), not only 3 C below; old code: flow 47 (requested - 3) was the edge
-    # and 49.5 never fired. Flow equal to the request (w, 50) does not count.
-    def test_underheat_counts_with_the_flow_just_below_the_request(self):
+    # TASK-3008: the edge is request - 3.0 (U, flow 47 = 50 - 3 counts); a flow just below the request (v, 49.5) or equal to it
+    # (w, 50) never fires. The entry-342 rule (TASK-1933) fired on 49.5 after 60 s.
+    def test_underheat_counts_only_3c_below_the_request(self):
         for dt in (30000, 60000):
             with self.subTest(tick_s=dt // 1000):
-                self.assertEqual(self.switch_at(ticks(dt, "v" * 12)), dt + 60000)
+                self.assertEqual(self.switch_at(ticks(dt, "U" * 12)), dt + 180000)
+                self.assertEqual(self.run_ticks(ticks(dt, "q" * 12))["t"], "-1")   # flow 47.1 = request - 2.9
+                self.assertEqual(self.run_ticks(ticks(dt, "v" * 12))["t"], "-1")
                 self.assertEqual(self.run_ticks(ticks(dt, "w" * 12))["t"], "-1")
 
-    # TASK-1933: the flame must be on (entry 342 "flame on"): request above flow with the flame off never fires.
+    # TASK-3008 (entry 456, ba515c8 heating_control.py:418-422, :455-460): the underheat timer counts only once the flame has
+    # burned 180 s. Flame off throughout: never. f@30 (off) then u from 60: the flame lights at 60, is established at 240,
+    # underheat starts there and fires at 240 + 180 = 420. Entry 448 alone (7beaaf5) fired at 60 + 180 = 240.
     def test_underheat_never_counts_with_the_flame_off(self):
-        self.assertEqual(self.run_ticks(ticks(30000, "f" * 12))["t"], "-1")
-        # u@30 f@60 (flame off: reset) u@90 u@120 u@150: fires at 90 + 60
-        self.assertEqual(self.switch_at(ticks(30000, "ufuuuu")), 30000 * 3 + 60000)
+        self.assertEqual(self.run_ticks(ticks(30000, "f" * 20))["t"], "-1")
 
-    # A flow at or above the request resets the underheat start: u@30 w@60 u@90 ... fires at 90 + 60.
+    def test_underheat_waits_for_180s_of_flame(self):
+        self.assertEqual(self.switch_at(ticks(30000, "f" + "u" * 16)), 30000 * 2 + 180000 + 180000)
+
+    # A flame-off in the middle resets it: u from 30, f@120 (out), u from 150: lit at 150, established at 330, fires at 510.
+    def test_flame_off_restarts_the_flame_wait(self):
+        self.assertEqual(self.switch_at(ticks(30000, "uuu" + "f" + "u" * 16)), 30000 * 5 + 180000 + 180000)
+
+    # A flow above request - 3 resets the underheat start: u@30 w@60 u@90 ... fires at 90 + 180.
     def test_underheat_dip_restarts_the_timer(self):
-        self.assertEqual(self.switch_at(ticks(30000, "uwuuuuuu")), 30000 * 3 + 60000)
+        self.assertEqual(self.switch_at(ticks(30000, "uw" + "u" * 8)), 30000 * 3 + 180000)
 
-    # Q44 A: a 61 s tick counts and fires 61 s after the first tick (the first tick at least 60 s later).
+    # Q44 A: a 61 s tick counts and fires on the first tick at least 180 s after the first one (61 + 183).
     def test_underheat_61s_tick_still_fires(self):
-        self.assertEqual(self.switch_at(ticks(61000, "uuuuu")), 61000 + 61000)
+        self.assertEqual(self.switch_at(ticks(61000, "uuuuu")), 61000 + 183000)
+
+    # TASK-3008: 170 s of underheat does not fire (10 s ticks: u@10 .. u@180 is 170 s), the next tick (180 s) does.
+    def test_underheat_needs_the_full_180s(self):
+        self.assertEqual(self.run_ticks(ticks(10000, "u" * 18))["t"], "-1")
+        self.assertEqual(self.switch_at(ticks(10000, "u" * 19)), 10000 + 180000)
 
     def test_saturation_fires_300s_after_the_first_tick_at_30s_and_60s_ticks(self):
         for dt in (30000, 60000):
@@ -402,8 +425,8 @@ class SustainedSwitches(unittest.TestCase):
 
     # Exit timers reset in the PWM OFF phase and when the mode is not PWM (thermo-nova :308-311, :321-323).
     def test_exit_timers_reset_in_the_off_phase(self):
-        # u@30 p@60 (OFF phase: reset) u@90 starts again, fires 60 s later (TASK-1933: 60 s, was 180 s)
-        self.assertEqual(self.switch_at(ticks(30000, "upuuuuuu")), 30000 * 3 + 60000)
+        # u@30 p@60 (OFF phase: reset) u@90 starts again, fires 180 s later (TASK-3008, entry 448)
+        self.assertEqual(self.switch_at(ticks(30000, "up" + "u" * 8)), 30000 * 3 + 180000)
 
     # --- hot-water guard (entry 108, thermo-nova :272-274, :313-315) ---
 
@@ -445,9 +468,9 @@ class SustainedSwitches(unittest.TestCase):
 
     # A draw also resets running exit timers, and they count only 300 s after it.
     def test_dhw_resets_underheat_and_blocks_it_for_300s(self):
-        # u@30 u@60 d@90 u@120..u@360 guarded (tick - 90 < 300), u@390 starts, fires at 450 (TASK-1933: 60 s, was 180 s)
+        # u@30 u@60 d@90 u@120..u@360 guarded (tick - 90 < 300), u@390 starts, fires at 570 (TASK-3008: 180 s)
         toks = ticks(30000, "uu") + ["30000:d"] + ticks(30000, "u" * 20)
-        self.assertEqual(self.switch_at(toks), 390000 + 60000)
+        self.assertEqual(self.switch_at(toks), 390000 + 180000)
 
     def test_dhw_resets_saturation_and_blocks_it_for_300s(self):
         toks = ticks(30000, "zzz") + ["30000:d"] + ticks(30000, "z" * 24)
@@ -458,7 +481,7 @@ class SustainedSwitches(unittest.TestCase):
     # u@30 u@60 m@90 (flow missing: the underheat start is cleared) u@120 restarts, fires at 120 + 180. Old code: the
     # missing flow (0.0) counts as underheat, fires at 30 + 180.
     def test_missing_flow_resets_the_underheat_start(self):
-        self.assertEqual(self.switch_at(ticks(30000, "umuuuuuu")), 30000 * 3 + 60000)   # TASK-1933: 60 s
+        self.assertEqual(self.switch_at(ticks(30000, "um" + "u" * 8)), 30000 * 3 + 180000)   # TASK-3008: 180 s
 
     # Missing flow for the whole stint never fires underheat. Old code: fires 180 s after the first tick.
     def test_missing_flow_alone_never_counts_as_underheat(self):
@@ -466,7 +489,7 @@ class SustainedSwitches(unittest.TestCase):
 
     # The missing flow also clears the start on a long (> 60 s) tick.
     def test_missing_flow_resets_the_underheat_start_at_a_90s_tick(self):
-        self.assertEqual(self.switch_at(ticks(90000, "umuu")), 90000 * 4)   # u@90 m@180 u@270 u@360: 90 s >= 60 s (TASK-1933)
+        self.assertEqual(self.switch_at(ticks(90000, "umuuu")), 90000 * 5)   # u@90 m@180 u@270 .. u@450: 180 s (TASK-3008)
 
     # Overshoot: o@30 o@60 y@90 (flow missing) o@120 restarts, switch at 120 + 30 (TASK-1888). Without the missing-flow
     # reset the o@30 start would have switched at o@60 already.
@@ -480,8 +503,8 @@ class SustainedSwitches(unittest.TestCase):
     def test_bypass_clears_the_underheat_start(self):
         toks = ["30000:u", "30000:u", "30000:b", "200000:u"]
         self.assertEqual(self.run_ticks(toks)["t"], "-1", "a bypassed tick must clear the underheat start")
-        # the next ticks count from the restart (u@290): fires 60 s later (TASK-1933: was 180 s)
-        self.assertEqual(self.switch_at(toks + ticks(30000, "u" * 8)), 30000 + 30000 + 30000 + 200000 + 60000)
+        # the next ticks count from the restart (u@290): fires 180 s later (TASK-3008)
+        self.assertEqual(self.switch_at(toks + ticks(30000, "u" * 8)), 30000 + 30000 + 30000 + 200000 + 180000)
 
     def test_bypass_clears_the_saturation_start(self):
         toks = ["30000:z", "30000:z", "30000:b", "400000:z"]
@@ -511,22 +534,22 @@ class OnePwmEntryPerFlame(unittest.TestCase):
         return [(int(dict(kv.split("=") for kv in line.split())["t"]), int(dict(kv.split("=") for kv in line.split())["mode"]))
                 for line in out.splitlines() if not line.startswith("t=-1")]
 
-    EXIT = ["0:u", "30000:u", "30000:u"]   # the underheat exit to continuous at t=60000 (PWM ON, flame on)
+    EXIT = ["0:u"] + ["30000:u"] * 6   # the underheat exit to continuous at t=180000 (PWM ON, flame on; TASK-3008: 180 s)
 
     def test_the_burn_that_left_pwm_stays_continuous_on_the_switch_rule(self):
         sw = self.switches(self.EXIT + ticks(30000, "o" * 6))   # 52.5 >= 50 + 2.0 for 180 s, below the 3.0 fail-safe
-        self.assertEqual(sw[0][0], 60000, sw)
+        self.assertEqual(sw[0][0], 180000, sw)
         self.assertEqual(len(sw), 1, "the switch rule took the same flame back to PWM: %r" % (sw,))
 
     def test_only_the_failsafe_takes_that_burn_back_to_pwm_after_30s(self):
         sw = self.switches(self.EXIT + ["30000:g50,53", "30000:g50,53", "30000:g50,53"])   # 53 - 50 = 3.0
         self.assertEqual(len(sw), 2, sw)
-        self.assertEqual(sw[1], (120000, 2), "the 3.0 fail-safe fires 30 s after its first tick (t=90000): %r" % (sw,))
+        self.assertEqual(sw[1], (240000, 2), "the 3.0 fail-safe fires 30 s after its first tick (t=210000): %r" % (sw,))
 
     def test_the_flame_going_out_lets_the_next_flame_switch_again(self):
         sw = self.switches(self.EXIT + ["0:F"] + ticks(30000, "o" * 4))
         self.assertEqual(len(sw), 2, sw)
-        self.assertEqual(sw[1], (150000, 2), "after flame-off the 60 s switch rule applies again (first tick 90000): %r" % (sw,))
+        self.assertEqual(sw[1], (270000, 2), "after flame-off the 60 s switch rule applies again (first tick 210000): %r" % (sw,))
 
 
 class FlameOutFailsafe(unittest.TestCase):
@@ -866,11 +889,11 @@ class GateHeatPumpSwitch(unittest.TestCase):
                 r = self.run_gate(src, 20)            # below the radiator cold setpoint 28.2
                 self.assertEqual((r["t"], r["mode"]), ("-1", "1"), r)
 
-    # The exits gate: above the cold setpoint the underheat exit fires 60 s after the first tick (TASK-1933); at or below it
+    # The exits gate: above the cold setpoint the underheat exit fires 180 s after the first tick (TASK-3008); at or below it
     # the exit timers are reset every tick (thermo-nova :317-319) and nothing fires.
     def test_pwm_exit_gate_above_and_below_cold_setpoint(self):
         r = self.run_gate(1, 50, "pwm")
-        self.assertEqual((r["t"], r["mode"]), ("61000", "1"), r)   # TASK-1933: 60 s (was 181000)
+        self.assertEqual((r["t"], r["mode"]), ("181000", "1"), r)   # TASK-3008: 180 s (entry 448)
         r = self.run_gate(1, 20, "pwm")
         self.assertEqual((r["t"], r["mode"]), ("-1", "2"), r)
 

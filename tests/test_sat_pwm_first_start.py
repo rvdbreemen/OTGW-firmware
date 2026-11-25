@@ -290,28 +290,28 @@ class Mutants(unittest.TestCase):
         self.assertIn(2, [m for _, m in r.modes()], "mutant should enter PWM mid-burn:\n" + r.dump())
 
     def test_e_underheat_exit_is_gated(self):
-        # With the start sequence lengthened to 200 s (in memory), the underheat exit (request above flow for 60 s) is held back
-        # by the gate and fires only after it. The real 60 s gate cannot show this: the underheat count starts at the first
-        # tick with the flame on, so it needs 60 s too.
-        edits = {"SATcontrol.ino": [("static const uint32_t SAT_START_GATE_MS = 60000UL;", "static const uint32_t SAT_START_GATE_MS = 200000UL;")]}
-        long_exe = build("gate200", edits)
+        # With the start sequence lengthened to 400 s (in memory), the underheat exit is held back by the gate and fires only
+        # after it. TASK-3008 (entries 448, 456): the underheat count starts once the flame has burned 180 s and needs 180 s,
+        # so its earliest exit is about 360 s after ignition; the real 60 s gate can no longer hold anything back.
+        edits = {"SATcontrol.ino": [("static const uint32_t SAT_START_GATE_MS = 60000UL;", "static const uint32_t SAT_START_GATE_MS = 400000UL;")]}
+        long_exe = build("gate400", edits)
         # TASK-2993 (entries 437/438): room 19.5 gives a request of 42.4 C against a flow of 31-33 C, a real underheat. With the default
         # room the flow passes the request at 180 s and the live-flow duty leaves range 5, so no exit exists to hold back
         # (test_boiler_above_the_request_gets_no_saturation_exit pins that).
-        r = Run(long_exe, ["room 19.5", "run 400000"])
+        r = Run(long_exe, ["room 19.5", "run 700000"])
         t_pwm = [t for t, x in r.modes() if x == 2]
         fl = r.flame_on(0)
         self.assertTrue(t_pwm and fl, r.dump())
         left = [t for t, x in r.modes() if x == 1 and t > t_pwm[0]]
         self.assertTrue(left, "no exit at all:\n" + r.dump())
-        self.assertGreaterEqual(left[0] - fl[0], 200000, "an exit fired %d ms after the flame-on, inside the 200 s gate:\n%s" % (left[0] - fl[0], r.dump()))
+        self.assertGreaterEqual(left[0] - fl[0], 400000, "an exit fired %d ms after the flame-on, inside the 400 s gate:\n%s" % (left[0] - fl[0], r.dump()))
         # control: without the gate guards the same run exits earlier
-        nog = build("gate200_noguard", {"SATcontrol.ino": edits["SATcontrol.ino"],
+        nog = build("gate400_noguard", {"SATcontrol.ino": edits["SATcontrol.ino"],
                                          "SATcycles.ino": [("SAT_UNDERHEAT_SUSTAIN_MS) && !satStartGateActive()) {", "SAT_UNDERHEAT_SUSTAIN_MS)) {"),
                                                            ("SAT_SATURATION_SUSTAIN_MS) && !satStartGateActive()) {", "SAT_SATURATION_SUSTAIN_MS)) {")]})
-        r2 = Run(nog, ["room 19.5", "run 400000"])
+        r2 = Run(nog, ["room 19.5", "run 700000"])
         left2 = [t for t, x in r2.modes() if x == 1 and t > [t2 for t2, y in r2.modes() if y == 2][0]]
-        self.assertTrue(left2 and left2[0] - r2.flame_on(0)[0] < 200000, "control run without the guard did not exit early:\n" + r2.dump())
+        self.assertTrue(left2 and left2[0] - r2.flame_on(0)[0] < 400000, "control run without the guard did not exit early:\n" + r2.dump())
 
 
 class LiveFlowDuty2993(unittest.TestCase):

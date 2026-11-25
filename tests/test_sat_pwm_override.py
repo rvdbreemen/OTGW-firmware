@@ -924,7 +924,7 @@ class SatPwmOverride(unittest.TestCase):
         self.assertEqual(r["ch"], "1", r)
 
     def test_underheat_exit_tick_sends_the_continuous_setpoint(self):
-        self._exit_tick("uh", "3", "19.0")        # TASK-1933: 60 s after the first qualifying tick at 30 s steps (was 180 s: tick 7)
+        self._exit_tick("uh", "7", "19.0")        # TASK-3008 (entry 448): 180 s after the first qualifying tick at 30 s steps
 
     def test_saturation_exit_tick_sends_the_continuous_setpoint(self):
         self._exit_tick("sat", "11", "45.0")      # 300 s; the off time 0 of the tick's own schedule step counts from tick 1
@@ -942,7 +942,7 @@ class SatPwmOverride(unittest.TestCase):
     # ticks needed to span the limit (ceil(limit / interval)); the transition tick itself carries the new mode's CS.
     def test_same_tick_exits_at_10s_60s_and_90s_ticks(self):
         for step_s in (10, 60, 90):
-            for kind, limit_s, prev in (("uh", 60, "19.0"), ("sat", 300, "45.0")):   # TASK-1933: underheat 60 s (entries 342, 350)
+            for kind, limit_s, prev in (("uh", 180, "19.0"), ("sat", 300, "45.0")):   # TASK-3008: underheat 180 s (entry 448)
                 with self.subTest(tick_s=step_s, exit=kind):
                     r = self.run_sc("exittick", 1, kind, step_s * 1000)
                     self.assertEqual(r["mode"], "1", r)

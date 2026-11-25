@@ -429,12 +429,12 @@ class LowLoadContract(unittest.TestCase):
 
     @ll("LL-004", "contract", "satCycleCheckOvershootSwitch / satCycleCheckPwmExits (SATcycles.ino, via test_sat_overshoot_sustain.extract)",
         task="TASK-1420 (fixed; entries 86, 95, 109); TASK-1412.8 AC2: every supported tick (10 s to 300 s) for all three timers, exact against the contract")
-    def test_ll004_underheat_and_saturation_exit_after_60_300_s_from_the_first_qualifying_sample(self):
-        # TASK-1933 (Sergeant D entries 342, 350): the underheat exit is "flame on and request above the flow for 60 s" (was 180 s)
+    def test_ll004_overshoot_underheat_and_saturation_exit_after_60_180_300_s_from_the_first_qualifying_sample(self):
+        # TASK-3008 (Sergeant D entry 448, replaces entries 342/350): the underheat exit is flow <= request - 3.0 C for 180 s
         # TASK-2005 (entry 407): the continuous-to-PWM overshoot switch ("o") needs 60 s (30 s under TASK-1888, entry 327)
         rows = []
         for interval in (10, 30, 60, 90, 120, 300):
-            for kind, threshold, mode in (("o", 60, 2), ("u", 60, 1), ("z", 300, 1)):
+            for kind, threshold, mode in (("o", 60, 2), ("u", 180, 1), ("z", 300, 1)):
                 elapsed, t = self.exit_after(interval * 1000, kind)
                 rows.append((interval, kind, threshold, elapsed))
                 with self.subTest(interval_s=interval, condition=kind):
@@ -584,7 +584,7 @@ class LowLoadContract(unittest.TestCase):
     def test_ll020b_exit_timing_with_jitter_and_millis_wrap(self):
         results = []
         for interval in (10, 30, 60, 120):
-            for kind, threshold in (("o", 60), ("u", 60), ("z", 300)):   # TASK-1933: underheat 60 s (entries 342, 350); TASK-2005: overshoot switch 60 s (entry 407)
+            for kind, threshold in (("o", 60), ("u", 180), ("z", 300)):   # TASK-3008: underheat 180 s (entry 448); TASK-2005: overshoot switch 60 s (entry 407)
                 for jitter in ((0, 7000, 3000, 5000), (0, 25000), (12000,)):
                     for start in (None, 4294967295 - 100000, 4294967295 - int(interval * 1500)):   # the last: the wrap falls inside the timer
                         elapsed, t = self.exit_after(interval * 1000, kind, jitter=jitter, start=start)

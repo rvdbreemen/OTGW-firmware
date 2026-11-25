@@ -40,11 +40,15 @@ static const uint32_t SAT_OVERSHOOT_SUSTAIN_MS      = 60000UL;  // Sustained ove
 // flame that already left PWM (entry 429, _cycle_burnLeftPwm).
 static const float    SAT_OVERSHOOT_FAILSAFE_DELTA_C = 3.0f;
 static const uint32_t SAT_OVERSHOOT_FAILSAFE_SUSTAIN_MS = 30000UL;
-static const float    SAT_UNDERSHOOT_MARGIN_C       = 3.0f;    // Below-setpoint margin for underheat (Python UNDERSHOOT_MARGIN_CELSIUS=-3.0)
-// TASK-1933 (Sergeant D entries 339, 342, 350): the PWM -> continuous exit is "flame on and request above the flow for 60 s",
-// replacing thermo-nova's flow <= request - 3.0 for 180 s (heating_control.py:337-347, const.py:22). SAT_UNDERSHOOT_MARGIN_C stays for the
-// cycle classifier.
-static const uint32_t SAT_UNDERHEAT_SUSTAIN_MS      = 60000UL;  // Request above the flow (flame on) before the continuous switch
+static const float    SAT_UNDERSHOOT_MARGIN_C       = 3.0f;    // Below-setpoint margin for underheat (Python UNDERSHOOT_MARGIN_CELSIUS=-3.0, cycles/const.py:11)
+// TASK-3008 (Sergeant D entry 448, replaces entry 342): the PWM -> continuous underheat exit is thermo-nova's own: the flow at least
+// SAT_UNDERSHOOT_MARGIN_C under the requested setpoint for 180 s (heating_control.py:330-344, UNDERHEAT_SUSTAIN_SECONDS const.py:22).
+// The same margin feeds the cycle classifier.
+static const uint32_t SAT_UNDERHEAT_SUSTAIN_MS      = 180000UL; // Flow <= request - 3.0 C before the continuous switch
+// TASK-3008 (entry 456): the underheat timer only counts once the flame has burned this long, so the flow reflects the
+// burner's output (SAT develop ba515c8 _flame_established, heating_control.py:455-460, HEATER_STARTUP_TIMEFRAME const.py:17;
+// thermo-nova 7beaaf5 had no such gate). Earliest underheat exit: about 360 s after ignition.
+static const uint32_t SAT_UNDERHEAT_FLAME_MIN_MS    = 180000UL;
 static const uint32_t SAT_SATURATION_SUSTAIN_MS     = 300000UL; // Sustained saturation before continuous switch
 static const uint32_t SAT_DHW_OVERSHOOT_GUARD_MS    = 300000UL; // 300s guard: no overshoot count and no PWM exit count during/after DHW (heating_control.py:272-274, :313-315)
 
@@ -1473,8 +1477,9 @@ bool satCycleCheckOvershootSwitch(float requestedSetpoint, uint32_t tickMs)
 // that fires sends the continuous CS in that tick, entry 134), with the tick time (entry 95, Q46b). Returns true if the mode was switched.
 // Both timers reset while PWM is not the mode (:308-311), during hot water and within 300 s after it (:313-315,
 // entry 108), and outside the PWM ON phase (:321-323): in the OFF phase the flow is low by design.
-// Underheat (TASK-1933, entries 339, 342, 350; thermo-nova: flow <= requested - 3 for 180 s, :337-347) counts while the flame
-// is on and the requested setpoint is above the flow, and resets otherwise; 60 s from the first qualifying tick (Q44 A). Saturation counts while the last PWM off time is 0, 300 s from the first such tick
+// Underheat (TASK-3008, entry 448; thermo-nova heating_control.py:330-344) counts while the flow is at most the requested setpoint minus
+// SAT_UNDERSHOOT_MARGIN_C (3.0 C), with no flame condition as in thermo-nova, and resets otherwise; 180 s from the first qualifying tick.
+// Saturation counts while the last PWM off time is 0, 300 s from the first such tick
 // (:359-362), and is only looked at when underheat did not fire (:217-220, :325-329).
 // Entries 385/387: neither exit fires inside the start sequence of a heating start (satStartGateActive(): the PWM entry of the start until 60 s
 // after its first CH flame-on); the timers keep counting, so a condition that lasted through the sequence fires on the first tick after it.
@@ -1489,13 +1494,19 @@ bool satCycleCheckPwmExits(float requestedSetpoint, uint32_t tickMs)
 
   // A missing flow temperature (0.0, see satCycleCheckOvershootSwitch) clears the underheat start instead of counting as a very
   // low flow (heating_control.py:333-335, entry 218). The saturation timer does not look at the flow (:353-367).
-  if (flowTemp <= 0.0f) {
+  // TASK-3008 (entry 456): before the flame has burned 180 s the underheat start is cleared too (ba515c8
+  // heating_control.py:418-422): the first minutes of a burn are a warm-up, not underheat.
+  // The flame-on edge is processed earlier in the same satControlLoopRun() pass (satCycleOnFlameChange()), so
+  // satCycleGetFlameOnStartMs() is the start of the flame burning now; a flame-off ends it.
+  const bool flameEstablished = satIsFlameOn() &&
+                                (uint32_t)(tickMs - satCycleGetFlameOnStartMs()) >= SAT_UNDERHEAT_FLAME_MIN_MS;
+  if (flowTemp <= 0.0f || !flameEstablished) {
     _sustain_underheatRunning = false;
-  } else if (satIsFlameOn() && requestedSetpoint > flowTemp) {
+  } else if (flowTemp <= requestedSetpoint - SAT_UNDERSHOOT_MARGIN_C) {
     if (satSustainedFor(_sustain_underheatRunning, _sustain_underheatStartMs, tickMs, SAT_UNDERHEAT_SUSTAIN_MS) && !satStartGateActive()) {
-      SATDebugTf(PSTR("SAT: flame on and request %.1f above flow %.1f for %lus, switching to continuous mode\r\n"),
-                 requestedSetpoint, flowTemp, (unsigned long)(SAT_UNDERHEAT_SUSTAIN_MS / 1000UL));
-      _cycle_burnLeftPwm = true;   // entry 429: this flame stays continuous until it goes out (the flame is on here)
+      SATDebugTf(PSTR("SAT: sustained underheat (flow %.1f <= request %.1f - %.1f for %lus), switching to continuous mode\r\n"),
+                 flowTemp, requestedSetpoint, SAT_UNDERSHOOT_MARGIN_C, (unsigned long)(SAT_UNDERHEAT_SUSTAIN_MS / 1000UL));
+      if (satIsFlameOn()) _cycle_burnLeftPwm = true;   // entry 429: a burning flame stays continuous until it goes out
       satSetControlMode(SAT_MODE_CONTINUOUS);
       satNarrate_P(PSTR("Control mode: continuous (flow stayed below the setpoint, PWM ended)"));   // TASK-1521
       satCycleResetSustainGuards();
