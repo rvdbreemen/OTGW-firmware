@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-24T18:27:00Z'
-updated_date: '2026-11-25T10:01:00Z'
+updated_date: '2026-11-25T11:34:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -28,7 +28,7 @@ Sergeant D, #dev-sat-mqtt 2026-11-24 (entry 475, private register): during one f
 - [x] #2 Host test: a scripted flame-on phase with 3 PWM/continuous flips is red on origin/dev (the ON timer restarts at each re-entry) and green on the fix (the ON timer freezes and resumes)
 - [x] #3 Host test: the clock resets when the flame goes out, when an ON phase ends normally, and when SAT is disabled or the heater goes off; DHW draw time still does not count (entry 95 unchanged)
 - [x] #4 The start gate (entries 385/387, ADR-252), the 448/456 exit rule, the at-max rule (entry 463) and the entry 428/429 per-flame counting are unchanged (existing tests green)
-- [ ] #5 evaluate.py --quick shows no new FAIL; full tests/ run green; esp32-combo build OK
+- [x] #5 evaluate.py --quick shows no new FAIL; full tests/ run green; esp32-combo build OK
 - [ ] #6 Bench on .63 (bench-tester): a flame-on phase with several PWM/continuous flips shows a shorter total ON time per flame than before; field proof by Sergeant D's testers
 - [ ] #7 ADR (adr-kit, Proposed) records the freeze rule and cites the entry
 - [x] #8 The min burn (180 s, 600 s heat pump) is read from the real flame-on of the flame across flips (entry 479); host test: a resume with little ON left ends after the frozen ON clock, not 180 s later
@@ -104,6 +104,8 @@ STATUS 2026-11-25: DECIDED, fully specified (entries 476, 478, 479, release 2.0.
 2026-11-25 Sergeant D decided: Q-475a A (entry 476), clarifier A (478: fail-safe flips of entry 429), Q-475b A (479: min burn from the real flame-on). AC 1 ticked on those entries. thermo-nova lines verified at the pin 7beaaf5 (fetched into other-projects/SAT-releases-thermo-nova): pwm.py:87-97, 106-108, 134, 201, 205 confirmed; the not-verified label is gone. Code next on sat/pwm-on-freeze, after TASK-3034, TASK-3008 and the Kd task (coordinator order).
 
 2026-11-25 code on lane/d3-beta (written by a Sonnet lane in wt-d3-freeze, reviewed and integrated by otgw-dev, architect-cleared): SATcontrol.ino satPwmKeptFreeze/Clear, resume in satPwmBeginOn, clears in satPwmEndOn, satPwmDisableOnHeaterOff, satDisable and the flame-edge handler. tests/test_sat_pwm_on_freeze.py: 25 tests (F1-F10, F5a-c, F6b, F6c heat pump 600 s from the real flame-on, F11a-c, F12, source-order tests): RED on the old source 14 failures + 1 error, GREEN on the fix; mutants killed: live-flame check removed, clear before the switch, satPwmReset clearing the kept time. PWM pack (anchors, override, hp_pwm, pwm_first_start, overshoot_sustain, diag_events, no_return_ignition, ot_loss, pwm_start_limit, restart_quiet, slave_lowload, continuous_startup, disable_handback) all OK on the integrated branch. OUR READING (e), wider than entry 478's wording: the freeze applies to EVERY PWM -> continuous exit and EVERY re-entry in the same flame (the at-max exit and the 2.0 C / 60 s re-entry too, not only the fail-safe flips), because every mode change goes through satSetControlMode(). Sergeant D may object; recorded in the beta notes. Gaps (bench): real flame-edge handler, satDisable and satCycleApplyEndOfCycle ordering covered structurally; min burn never binds with the current duty mapper (ON time asked >= 180/600 s).
+
+2026-11-25 FULL TESTS on origin/dev 686e33438 (= beta.429 build tree), after 'npm ci --prefix tests/webui': python scripts/run_tests.py --webui -j 4 --timeout 900: 475 files, 469 passed, 5 failed, 0 timeout, 1 skipped (1584.8 s). The 5 reds, none caused by this task: (1) tests/test_manual_sat_commands.py and (2) tests/test_sat_mqtt_state.py: MQTT command room_source (SATroomsource) missing in MANUAL.md and manuals; present in MQTTstuff.ino and absent from the manual already at 21e5ecb01, before beta.428 (TASK-3011/3015 lane, docs owner); (3) tests/test_sat_narrate_fits.py: SATble.ino:851 narration with an unbounded %s, from TASK-3011 (5076410fd), predates beta.428; (4) tests/test_open_questions_status.py: live queue lacks Q-466a while the table lists it; red with the older decisions pointer 71698ea too, decisions-repo bookkeeping (sat_open_questions.py --update); (5) tests/webui/settings-help.test.mjs: satroomsource help text 304 chars (limit 300), otgw-webui fixes. tests/webui/v2-undefined-names passes with acorn installed (a81749c8a). Judged against this: 'full tests green' holds except these 5 named pre-existing reds.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary

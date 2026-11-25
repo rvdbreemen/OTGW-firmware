@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-25T10:29:00Z'
-updated_date: '2026-11-25T11:05:00Z'
+updated_date: '2026-11-25T11:34:00Z'
 labels:
   - sat
 milestone: 2.1.0
@@ -26,7 +26,7 @@ TASK-3034 found a caller (the diag input of satDiagEventsStep) that omitted band
 <!-- AC:BEGIN -->
 - [x] #1 satChEnableDecide has no default for bandOff and the firmware and every host test caller passes it explicitly
 - [x] #2 A host test goes red when the default is present (grep or compile of a call without the argument) and green on the fix
-- [ ] #3 evaluate.py --quick no new FAIL; the SAT host tests that call the function pass; esp32-combo build OK
+- [x] #3 evaluate.py --quick no new FAIL; the SAT host tests that call the function pass; esp32-combo build OK
 <!-- AC:END -->
 
 ## Implementation Notes
