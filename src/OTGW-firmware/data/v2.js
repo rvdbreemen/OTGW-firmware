@@ -343,7 +343,8 @@
       "series_ch_set": "control setpoint",
       "series_room_set": "thermostat setpoint",
       "series_sat_target": "SAT target",
-      "series_room": "room",
+      "series_room": "thermostat room",
+      "series_room_sat": "thermostat room (SAT uses {{src}})",
       "series_outside": "outside",
       "series_dhw": "DHW temperature",
       "series_mod": "modulation",
@@ -742,7 +743,8 @@
       "status_check_conn": "Check connection ›",
       "setpoint_set": "set {{temp}}",
       "setpoint_set_thermostat": "set {{target}} (thermostat {{thermostat}})",
-      "room_sat_tip": "Room temperature SAT controls on; the thermostat reports {{thermostat}}",
+      "room_sat_tip": "Room temperature SAT controls on ({{src}}); the thermostat reports {{thermostat}}",
+      "room_tag_sat": "ROOM · SAT",
       "tag_compressor": "COMPRESSOR",
       "tag_modulation": "MODULATION",
       "lcd_fault": "FAULT",
@@ -3074,9 +3076,15 @@
   function showRoom(id) {
     var el = document.getElementById(id); if (!el) return;
     el.textContent = fmt(roomShown(), 1, '°');
-    if (roomFromSat() && model.room !== null) el.setAttribute('title', t('home.room_sat_tip', { thermostat: fmt(model.room, 1, '°') }));
+    var fromSat = roomFromSat();
+    if (fromSat && model.room !== null) el.setAttribute('title', t('home.room_sat_tip', { src: satRoomSrcName(), thermostat: fmt(model.room, 1, '°') }));
     else el.removeAttribute('title');
+    // TASK-3035: the ROOM tag says whose room temperature the value is: SAT's (source in the tooltip) or the thermostat's.
+    if (id === 'aRoom') { var tag = document.getElementById('aRoomTag'); if (tag) tag.textContent = fromSat ? t('home.room_tag_sat') : t('h_home.svg_room'); }
   }
+  // TASK-3035: the source SAT takes its room temperature from, as the SAT page names it; the plain word when the firmware
+  // has not reported one.
+  function satRoomSrcName() { return sat.roomSrc ? t('tools.sat_room_src_' + sat.roomSrc) : t('tools.sat_room_src_none'); }
   function fmt(v, dp, suffix) {
     if (v === null || v === undefined || isNaN(v)) return '—';
     return v.toFixed(dp === undefined ? 1 : dp) + (suffix || '');
@@ -3554,7 +3562,11 @@
   }
   function gVal(r, k) { return k.charAt(1) === ':' ? (r.d ? r.d[k.substring(2)] : null) : r[k]; }
   function gMeta(k, i) {
-    for (var j = 0; j < GSER.length; j++) if (GSER[j][0] === k) return [GSER[j][0], t(GSER_LABEL_KEY[k]), GSER[j][2], GSER[j][3]];
+    for (var j = 0; j < GSER.length; j++) if (GSER[j][0] === k) {
+      // TASK-3035: the 'room' series is the thermostat's MsgID 24; while SAT regulates on a room temperature the label says which source SAT uses.
+      var lab = (k === 'room' && roomFromSat() && sat.roomSrc) ? t('graph.series_room_sat', { src: satRoomSrcName() }) : t(GSER_LABEL_KEY[k]);
+      return [GSER[j][0], lab, GSER[j][2], GSER[j][3]];
+    }
     var a = k.substring(2);
     return [k, dallasLabelFor(a) || a, GDCOL[i % GDCOL.length], 't'];
   }
@@ -5885,6 +5897,7 @@
       if (st.heating_source_detected !== undefined) sat.detected = st.heating_source_detected | 0;
       if (st.target_temp !== undefined) sat.target = parseFloat(st.target_temp);
       sat.room = (typeof st.room_temp === 'number' && !isNaN(st.room_temp)) ? st.room_temp : null;   // TASK-2946
+      sat.roomSrc = SAT_ROOM_SRC[st.room_temp_source] ? st.room_temp_source : null;   // TASK-3035: named in the labels
       if (st.dhw_config_tank !== undefined) sat.tank = !!st.dhw_config_tank;   // TASK-1392
       sat.active = !!st.active;   // TASK-1342: room tile shows SAT's target while SAT controls
       sat.owns = !!(st.enabled || st.fallback_active);   // the rule of satOwnsControlSetpoint()
