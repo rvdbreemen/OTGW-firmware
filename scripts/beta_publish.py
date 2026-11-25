@@ -186,13 +186,13 @@ def make_body(notes_path, tag):
     if len(text) <= MAX_BODY:
         return text, "full notes file"
     # Shortened body (SKILL.md Phase 4.4): the header through the "What changed since" section, a short
-    # "Earlier changes" section linking the full file at the tag, then every section from the SAT disclaimer on.
+    # "Earlier changes" section linking the full file at the tag, then every section from the 'SAT is ...' heading on.
     heads = [(m.start(), m.group(0)) for m in re.finditer(r"(?m)^## .*$", text)]
     what = next((i for i, (_, h) in enumerate(heads) if h.startswith("## What changed since")), None)
-    sat = next((p for p, h in heads if h.startswith("## SAT is experimental and opt-in")), None)
+    sat = next((p for p, h in heads if h.startswith("## SAT is ")), None)
     if what is None or sat is None:
         raise Refuse(f"notes are {len(text)} characters (limit {MAX_BODY}) and lack the 'What changed since' or "
-                     "'SAT is experimental and opt-in' heading the shortened body is cut at")
+                     "'SAT is ...' heading the shortened body is cut at")
     end_what = heads[what + 1][0] if what + 1 < len(heads) else len(text)
     if sat < end_what:
         raise Refuse("the SAT section comes before the end of 'What changed since': cannot cut the body")

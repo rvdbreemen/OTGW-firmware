@@ -268,6 +268,19 @@ class Body(Base):
         w.notes.write_text("# t\n\n" + "line\n" * 40000)
         self.refused(w, "lack the", "--dry-run")
 
+    def test_real_note_layout_several_what_changed_sections_and_sat_is_opt_in(self):
+        w = World(self)
+        text = notes_text(extra=20000).replace("## SAT is experimental and opt-in", "## SAT is opt-in").replace(
+            "## Old stuff nobody needs twice",
+            "## What changed since beta.430\n\n- older list\n\n## What changed since beta.420\n\n" + "older line\n" * 20000)
+        w.notes.write_text(text, encoding="utf-8")
+        rc, out, err = w.run("--dry-run")
+        self.assertEqual(rc, 0, out + err)
+        sent = (w.scratch / "body.md").read_text(encoding="utf-8")
+        self.assertIn("- TASK-1 a change", sent)
+        self.assertNotIn("older list", sent)
+        self.assertIn("## SAT is opt-in", sent)
+
     def test_short_notes_go_out_whole(self):
         w = World(self)
         rc, out, err = w.run("--dry-run")
