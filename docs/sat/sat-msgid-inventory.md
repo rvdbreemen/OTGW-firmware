@@ -45,7 +45,38 @@ open it.
 | Setpoint sync check | (not traced) | **ID1 read-back** (BEYOND) | - | - | SATcontrol.ino:6353 | not traced |
 | Cycle statistics | Task #227 | ID25, **ID28**, ID24 (BEYOND) | - | return out of 10-100 C: not counted | SATcycles.ino:1250-1260, 1063-1134 | no (statistics) |
 
-## Open for Sergeant D
+## Optional outputs kept (entry 486)
+
+Entry 470 lists SAT's control outputs as ID1, ID14 and ID0 HB0. Two more outputs exist and stay (entry 486, "3: A",
+Sergeant D 2026-11-25, release 2.0.0): they are the documented exception to that list.
+
+| Rule | Source | Reads | Writes | When | file:line (origin/dev f178d164c) | Steers |
+|---|---|---|---|---|---|---|
+| Max CH setpoint | entries 240, 486; TASK-1541 | the boiler's own MaxTSet (ID57) once, before the first SH= | **SH=** (ID57) | only when the user sets a max CH setpoint; restored to the boiler's own value on hand-back | SATcontrol.ino:396-412 (satMaxTSetSendStep), 855-857 (restore bookkeeping) | yes (boiler limit) |
+| DHW setpoint | entries 33, 53, 69, 121, 150, 240, 486; TASK-1376, TASK-1541 | the boiler's own TdhwSet (ID56) once, before the first SW= | **SW=** (ID56) | only when DHW control is on with a valid setpoint; restored to the boiler's own value on hand-back | SATcontrol.ino:7902-7916 (satDhwSetpointSync), 837 (restore bookkeeping) | yes (DHW target) |
+
+Both are restored with the hand-back (SATcontrol.ino:4430, 4461). Entry 486 asks that this table lists them as kept
+optional outputs, so they are no longer read as a gap against entry 470.
+
+## Settled for Sergeant D (questions 1 to 5 of step 1)
+
+The five questions of step 1 are settled by the entries below. Where an answer exists only for the branch
+sat/id25-principle, the table says so: the rows above still describe origin/dev.
+
+| # | Question | Settled by | Result |
+|---|---|---|---|
+| 1 | ID28 in the flame-off hold | entry 474 (corrects 473 point b) | ID28 stays when the boiler supplies a valid return temperature; flow + offset only for a no-return boiler. Entries 45, 84, 135, 149, 217 stay in force. |
+| 2 | ID28 in the no-return detection and start-up flood | entry 474 | No change: the no-return path (flow + 18) stays the path for a boiler without ID28; entry 217's 5-minute rule is the "available" test (our reading). |
+| 3 | ID17 in the solar gain offset | entry 473 point a (derived, not asked) | Branch sat/id25-principle only: the condition becomes "flame on less than 20 % of the last 10 minutes". Not on dev; a merge needs Robert's yes. |
+| 4 | ID0 bits 0 (fault) and 2 (DHW) | entry 473 point c (derived, not asked) | They count as part of "the flame bit" of entry 471 (same mandatory ID0 reply) and stay in use. |
+| 5 | ID24 and ID27 | entry 473 point d (derived, not asked) | Outside the scope of entries 470/471: no change. |
+
+Entries 470 and 471 set the principle (ID25 and the flame bit as inputs), entry 472 the hand-back on an invalid flow,
+entry 486 the optional SH=/SW= outputs. Points 3 to 5 come from the coordinator's derivation under Robert's one-time
+permission (entry 473) and have not been confirmed by Sergeant D; he may correct them, and a correction is recorded
+as a new entry.
+
+## Questions as posted in step 1 (kept for the record)
 
 Each question is about a rule that steers ID1, ID14 or ID0 HB0 and reads something beyond ID25 and the flame bit.
 
