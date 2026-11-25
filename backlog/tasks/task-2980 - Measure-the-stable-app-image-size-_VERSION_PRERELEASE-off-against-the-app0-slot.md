@@ -9,7 +9,7 @@ assignee:
   - '@otgw-poc-dev'
   - '@otgw-dev'
 created_date: '2026-11-20T17:04:00Z'
-updated_date: '2026-11-20T17:26:00Z'
+updated_date: '2026-11-25T15:20:00Z'
 labels:
   - build
   - flash-size
@@ -36,4 +36,8 @@ Robert, 2026-11-20 (DM 'A1', relayed by the coordinator): the TASK-1993 size gat
 
 <!-- SECTION:NOTES:BEGIN -->
 otgw-dev input (2026-11-20, relayed by otgw-poc-dev): the BOL+printf merge per debug call site is already on the telemetry lane (-5.5 KB measured), and the debug gate stays inline, so the compile-time debug level item has less left than first estimated; measure before choosing it. The build.py comment for the temporary 99.5 % gate references this task; the gate change itself is TASK-2983.
+
+PARKED 2026-11-25 (Robert via coordinator): later, not needed for 2.0.0. The app image is now 2,158,544 B (94.1 %) against the 98 % limit of 2,247,884 B, an 89 KB margin, so the mbedTLS trim measurement build and the 98 % gate question (Q5, Q6) lapse.
+
+State kept as is, nothing deleted: env esp32-combo-trim, tests/test_trim_env_config.py, commits 9f7dedc24 and 050a75bc5 on lane-5e-trim (not on dev), draft ADR text in OTGW-build-artifacts/adr-draft-mbedtls-trim-TASK-2980.md. Unverified: the trim was never built, so the saving (at least 14,254 B computed) and the WPA2/WPA3/OTA behaviour are not measured. Pick this up again only when the margin shrinks.
 <!-- SECTION:NOTES:END -->
