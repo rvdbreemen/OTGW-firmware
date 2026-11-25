@@ -42,6 +42,8 @@ context_scope: "selective"
 
 Proposed, 2026-11-20.
 
+**Amended in place on 2026-11-25 (still Proposed)**, after ADR-266 was Accepted as Nagle only, without the per-loop PUBLISH cap. Robert decided on 2026-11-25 that this pacer is built for 2.0.0 in four cuts before the stable, each behind its own compile-time switch, with Nagle (ADR-266) in its own soak. The library-cap reliance is removed, and the Decision Contract is split into a contract per cut and the target after cut 4.
+
 **Decision Maker:** Agent: Claude (otgw-architect), on a design question from the coordinator. Acceptance is Robert's.
 
 ## Status History
@@ -116,7 +118,9 @@ It allows a publish only while both of these hold:
 - the outbox holds at most `MQTT_PACE_MAX_OUTBOX` packets;
 - the largest free block is at least `MQTT_PACE_MIN_BLOCK` bytes.
 
-The segments that one `MQTTclient.loop()` hands to lwIP are bounded in the library (ADR-266: Nagle on for the MQTT socket, with a per-loop PUBLISH cap as backstop). That is the per-pass bound, and it covers the event-driven publishers too. The pacer bounds how much waits in the outbox; the cap bounds how much leaves per pass. The pacer therefore keeps no per-pass counter of its own.
+The pacer bounds how much our deferrable producers have waiting in the outbox, and so how many of their packets one `MQTTclient.loop()` can still write. It does not bound the event-driven publishers, and it does not bound what already sits in lwIP: a QoS 0 packet leaves the outbox as soon as it is written (`espMqttClient/src/Packets/Packet.cpp:60-61`, `MqttClient.cpp:387-388`). The segment bound for every publisher is Nagle on the MQTT socket (ADR-266, Accepted 2026-11-25, Nagle only; the per-loop PUBLISH cap of its first version is dropped). The pacer keeps no per-pass counter of its own.
+
+**Precedent.** The TASK-2019 pace window, the same outbox-and-block hold limited to SAT at a takeover, was benched not green on .61 (commit 54bd8b8bc, beta.403, run 4: -29.4 KB). Each cut therefore has its own bench criterion and ships OFF when it fails.
 
 A per-producer liveness bound guarantees progress: after waiting `MQTT_PACE_MAX_WAIT_MS`, the producer publishes anyway.
 
@@ -130,7 +134,7 @@ Example of the intended shape (illustrative; the implementation task sets the fi
 
 ```cpp
 // MQTTstuff.ino, loop task only
-// The per-loop flush bound is the library cap (ADR-266): MQTTclient.setMaxPacketsPerLoop(MQTT_MAX_PACKETS_PER_LOOP)
+// The per-pass segment bound is Nagle on the MQTT socket (ADR-266), not a library cap.
 bool mqttPaceAllows() {
   if ((uint32_t)MQTTclient.queueSize() > MQTT_PACE_MAX_OUTBOX) return false;
   if (platformMaxFreeBlock() < MQTT_PACE_MIN_BLOCK) return false;
@@ -147,25 +151,25 @@ static inline bool satOutboxFull() {
 
 ## Decision Contract
 
-### Must
+### Must (contract per cut; each cut ships with its own compile-time switch, `false` = the code before that cut)
 
-- Every deferrable bulk producer calls `mqttPaceAllows()` before a publish and keeps its shadow or pending bit when the answer is no:
-  - SAT shadow helpers in `SATmqttPublish.cpp`
-  - `loopMQTTDiscovery()`
-  - `connStageTick()`
-  - `staleOverrideClearTick()`
-  - `publishAllPICsettings()`
-  - `loopMQTTStatsPacer()`
-- `MQTT_PACE_MAX_OUTBOX`, `MQTT_PACE_MIN_BLOCK` and `MQTT_PACE_MAX_WAIT_MS` are defined once, next to `mqttPaceAllows()`. The library cap value `MQTT_MAX_PACKETS_PER_LOOP` (ADR-266) is set in the same place.
-- Every paced producer has a liveness bound: after `MQTT_PACE_MAX_WAIT_MS` without a yes, it publishes anyway.
-- The pacer runs on the loop task only, like espMqttClient itself. A request from another task sets a flag that the loop task consumes, as `queueMQTTRepublishAll()` does (`OTGW-Core.ino:2217`).
+- **Cut 1, SAT shadow gate:** `satOutboxFull()` (`SATmqttPublish.cpp`) defers when `mqttPaceAllows()` says no, on top of its existing conditions, and keeps the shadow and `s_satPublishDeferred`. A liveness bound publishes one SAT helper per pass after `MQTT_PACE_MAX_WAIT_MS` without a yes. The post-connect pace window and the SAT limit of 24 stay until the target.
+- **Cut 2, discovery drip:** `loopMQTTDiscovery()` asks `mqttPaceAllows()` before a drip publish, keeps its pending position, and keeps consulting `isDripDeferred()` (ADR-088).
+- **Cut 3, connect stages:** `connStageTick()` asks `mqttPaceAllows()` for each portion, with the existing 5 s publish-anyway as its liveness. The decision on `publishAllPICsettings()` (Open Question 3) is made in this cut.
+- **Cut 4, stale override sweep and hourly stats:** `staleOverrideClearTick()` and `loopMQTTStatsPacer()` ask `mqttPaceAllows()` and keep their pending state.
+- **Every cut:** `MQTT_PACE_MAX_OUTBOX`, `MQTT_PACE_MIN_BLOCK` and `MQTT_PACE_MAX_WAIT_MS` are defined once, next to `mqttPaceAllows()`, with values from the Open Question 1 measurement; every paced producer has a liveness bound; the pacer runs on the loop task only, and a request from another task sets a flag the loop task consumes, as `queueMQTTRepublishAll()` does (`OTGW-Core.ino:2217`).
+
+### Must (target, after cut 4)
+
+- Every deferrable bulk producer (the SAT shadow helpers, `loopMQTTDiscovery()`, `connStageTick()`, `staleOverrideClearTick()`, `publishAllPICsettings()` unless Open Question 3 decides otherwise, `loopMQTTStatsPacer()`) is paced only by `mqttPaceAllows()`. The per-gate constants, the post-connect window and `SAT_MQTT_OUTBOX_LIMIT` are removed; the compile-time switches go once each cut has soaked.
 
 ### Must Not
 
 - Must not hold or drop a per-frame `processOT()` publish or a status fan-out. Those stay under ADR-088.
-- Must not compare `MQTTclient.queueSize()` or `mqttOutboxDepth()` against a threshold outside the pacer.
-- Must not patch the vendored espMqttClient beyond what ADR-186 allows.
+- Must not patch the vendored espMqttClient beyond what ADR-186, ADR-264 and ADR-266 allow. The pacer itself needs no library change.
 - Must not bring back heap-tier gating. ADR-167 stays: the pacer reads the largest free block as a send condition, not as a tier.
+- Before the target: must not add a new outbox-depth threshold outside `mqttPaceAllows()`; the existing ones of gates not yet converted stay until their cut.
+- After the target: must not compare `MQTTclient.queueSize()` or `mqttOutboxDepth()` against a threshold outside the pacer.
 
 ### Exceptions
 
@@ -174,15 +178,16 @@ static inline bool satOutboxFull() {
 ### Verification
 
 - A host test compiles the real `mqttPaceAllows()` and the real `SATmqttPublish.cpp`, then drives a first-seen SAT set of at least 140 topics. It counts the packets queued per pass. It must go red on the code before this ADR (up to 24 or 25 per pass) and green on the pacer (the outbox never holds more than `MQTT_PACE_MAX_OUTBOX` plus the event-driven packets of that pass). A second case keeps the outbox stuck and shows the liveness bound publishes everything.
-- An `evaluate.py` gate fails when `queueSize()` or `mqttOutboxDepth()` is compared against a number outside `mqttPaceAllows()`.
+- Per cut, a host test runs red on the code before the cut and green on it, with its switch `false` equal to the old behaviour, and mutants (pacer always yes, liveness removed, liveness publishing the whole set) that turn a test red.
+- Until the target, a narrow `evaluate.py` check: each converted producer calls `mqttPaceAllows()`, and the `MQTT_PACE_*` constants are defined once. After cut 4, the full gate: it fails when `queueSize()` or `mqttOutboxDepth()` is compared against a number outside `mqttPaceAllows()` (TASK-2949.10).
 - Bench: the TASK-2019 takeover recipe and the TASK-1757 W/C/B boot recipe on .61. No `[HEAP] sat-takeover-probe` or connect-probe drop of 10 KB or more at `at=13 from=12`. Old-vs-new numbers go in the task.
 
 ## Alternatives Considered
 
-- **Keep the patchwork and add triggers as they come (the TASK-2019 2.0.0 fix).** This is the right minimal fix for the 2.0.0 stable release. As a structure it fails open: every new bulk trigger needs someone to remember to open the window. Six thresholds on one resource cannot be reasoned about together. Rejected for 2.1.0; kept as the baseline this ADR replaces.
+- **Keep the patchwork and add triggers as they come (the TASK-2019 fix).** As a structure it fails open: every new bulk trigger needs someone to remember to open the window, and six thresholds on one resource cannot be reasoned about together. Its pace window was also benched not green at the takeover (TASK-2019, beta.403 run 4). Rejected; the parked branch is not landed, and cut 1 replaces it.
 - **Extend ADR-088's burst window to every publisher.** The ADR-088 window only makes the discovery drip wait. It does not slow the publisher inside the window, so it would not have prevented either measured dip. Widening it would also change a binding, gated rule for no gain. Rejected.
-- **Turn Nagle back on for the MQTT socket.** The debug telnet socket already does this (`networkStuff.ino:1285`). This acts at the suspected cause: small writes would coalesce into full segments. But `setNoDelay(true)` sits in the vendored `ClientSync.cpp:32` and `:50`, and ADR-186 allows changes only in `ClientSync::write()`. Nagle would also add up to one RTT (round-trip time) of latency, plus the delayed-ACK interaction, to every command reply and status publish. This needs its own superseding ADR and is worth measuring in the Open Question 1 spike, not choosing blind. Not chosen now.
-- **Limit packets per `loop()` inside espMqttClient, as the only measure.** This bounds the flush for every producer, including the event-driven ones. Robert decided on 2026-11-20 to carry it in our fork (fork as source: ADR-264; the cap itself: ADR-266, conditional on the TASK-2949.1 measurement). If accepted, it is the per-pass bound, not the only measure. On its own it lets the outbox grow without limit when deferrable producers queue faster than the cap drains (ADR-266, fault 5). The pacer's outbox bound closes that gap.
+- **Turn Nagle back on for the MQTT socket, as the only measure.** Accepted separately as ADR-266 (2026-11-25), through the fork (ADR-264), in its own soak. It bounds the segments of every publisher, but not how much our deferrable producers queue in one pass, which is what this pacer bounds. Both are kept: they act on different quantities.
+- **Limit packets per `loop()` inside espMqttClient, as the only measure.** Robert asked for it on 2026-11-20 and dropped it on 2026-11-25 (ADR-266, Open Question 1): with Nagle the broker socket's send queue peaked at 2-3 segments, so the cap had no measured failure to bound. Not chosen.
 - **Cap the MQTT socket's lwIP send credit, as ADR-216 does for port 80.** `snd_buf` limits bytes, not segments. With Nagle off, 16 tiny segments still fit in a 2,872 B credit. On the measured cost, this would not bound the dip. Rejected.
 - **Make the gate byte-based.** The measured cost is about ten times the payload and follows the packet count (about 1.5 KB per packet in beta.403 runs 2 and 3), so bytes are the wrong unit. Rejected, pending Open Question 1.
 
@@ -197,12 +202,13 @@ static inline bool satOutboxFull() {
 **Negative:**
 
 - An always-on pacer slows steady-state SAT publishing and discovery a little. A change waits up to one loop pass, and up to `MQTT_PACE_MAX_WAIT_MS` under load. Mitigation: SAT already retries every 500 ms. The spike measures the steady-state outbox depth (the comment at `SATmqttPublish.h:89` says 0 to 35 packets on the bench) before the constants are fixed.
-- Per-frame and status publishes are not held back by the pacer. Their flush is bounded by the library cap (ADR-266), and ADR-088 keeps the drip out of their way.
+- Per-frame and status publishes are not held back by the pacer. Their segments are bounded by Nagle once ADR-266 is built, and ADR-088 keeps the drip out of their way. Until Nagle is built, a cut may not reach its bench criterion (the TASK-2019 precedent above).
+- A large remaining drop is not an MQTT publish at all: `satControlLoopRun` (16-20 KB in ADR-266's table, TASK-3005). No cut of this pacer touches it.
 - The cause of the per-packet cost stays unattributed until the spike runs. If it turns out to be something else, the unit (packets) may need revisiting. Mitigation: Open Question 1 blocks acceptance.
 
 ## Open Questions
 
-- [ ] 1. What does one flushed MQTT packet cost on .61, and where does it go (lwIP pbufs and segments, WiFi dynamic TX buffers, other)? Measure KB per packet for 4, 8, 16 and 24 packets in one flush, with `TCP_NODELAY` on and off. This sets the ADR-266 cap value and confirms packets as the unit (this is also ADR-266's precondition).
+- [ ] 1. What does one queued and flushed MQTT packet cost on .61 on the build that ships? Partly answered: TASK-2949.5 measured `TCP_NODELAY` against Nagle (ADR-266's table), and TASK-2019 measured about 1.3-1.5 KB per packet per loop with `TCP_NODELAY` (16 packets, 20-24 KB). Still open: the cost per packet in the SAT publish pass itself, which sets `MQTT_PACE_MAX_OUTBOX` (step 0 of the implementation plan, `OTGW-field-data/_comms/adr265_plan.md`). The ADR-266 cap value is no longer needed.
 - [ ] 2. Steady-state impact: with the pacer on, what is the added SAT publish latency and the discovery completion time after boot, compared with today?
 - [ ] 3. Should `publishAllPICsettings()` (up to 15 publishes on a Classic) move under the pacer, or stay inside connect stage 3 as one portion?
 - [ ] 4. Acceptance by the maintainer.
@@ -213,7 +219,8 @@ static inline bool satOutboxFull() {
 - ADR-131 (espMqttClient engine, single publish chokepoint): the loop-task pumping model this pacer depends on.
 - ADR-186 (vendored espMqttClient, non-blocking write) and ADR-187 (track upstream): why the pacer sits on the producer side, not in the library.
 - ADR-167 (heap tier gating retired): the pacer is not a tier gate.
-- ADR-266 (per-loop PUBLISH cap in espMqttClient, Proposed and conditional on the TASK-2949.1 measurement): the library-side per-pass bound this pacer relies on once accepted; ADR-266 (espMqttClient from our fork) is where that cap would live.
+- ADR-266 (Accepted 2026-11-25: Nagle on the MQTT socket, via the fork; the per-loop cap dropped): the segment bound for every publisher. The pacer does not depend on it, but a cut's bench result does.
+- ADR-264 (Accepted: espMqttClient from our fork as a vendored copy of a pinned tag): the route for the Nagle change.
 - ADR-216 (web send-queue cap): the transport-level precedent, and why it does not carry over to small MQTT packets.
 - ADR-090 (re-entrancy guards): the per-pass counter is loop-task state; `doBackgroundTasks()` re-entry must not reset it mid-pass.
 
