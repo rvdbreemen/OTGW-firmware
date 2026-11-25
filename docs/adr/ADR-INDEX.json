@@ -11724,7 +11724,7 @@
       "decision_contract": {
         "must": [
           "Decide the freeze on the live flame, satIsFlameOn(), at the moment PWM is left, not on the ON-phase state (bPwmFlameRequested, pwmflameOnMs). Reason: at flame-off the end-of-cycle verdict can switch PWM to continuous (SATcycles.ino:1235,...",
-          "Clear the kept time after the mode switch inside the reset paths, not before: satPwmDisableOnHeaterOff() switches mode first (SATcontrol.ino:2018) and resets after (:2020); the same applies to satSetControlMode(SATMODEOFF) (:4395) and th...",
+          "Clear the kept time after the mode switch inside the reset paths, not before: satPwmDisableOnHeaterOff() switches mode first (SATcontrol.ino:2018) and resets after (:2020); the same applies to satSetControlMode(SATMODEOFF) in satDisable(...",
           "Set the minimum-burn anchor explicitly from the real flame-on. Do not inherit it from the set-back clock (today pwmflameOnMs copies pwmlastUpdateMs at :1451).",
           "Fall back to the segment's own flame-on time when satchFlameOnMs is 0 (a flame lit with the hot-water bit set, or before the first flame-off was seen, :8121-8125). Otherwise the != 0 guard at :1797 would skip the minimum burn altogether...",
           "Leave unchanged: the start gate (entries 385/387, ADR-252), the exit rules (ADR-236, entries 456 and 463), the per-flame start counting (entry 428) and the hourly start limit."

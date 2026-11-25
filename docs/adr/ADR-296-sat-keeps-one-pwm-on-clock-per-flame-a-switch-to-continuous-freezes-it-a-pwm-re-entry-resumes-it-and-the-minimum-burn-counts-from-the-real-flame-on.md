@@ -92,14 +92,14 @@ SAT keeps one PWM ON clock per flame.
    - when an ON phase ends by its own timer (interpretation (ours): the next ON phase is a new one, otherwise it would end at once);
    - on heater off, SAT disable and restart (interpretation (ours), in line with entry 462: no PWM state is kept after a restart or a full heating-off).
 6. **Hot water** keeps its own freeze; draw time still does not count (entry 95 unchanged).
-7. **Which flips.** Every PWM to other-mode switch with the flame burning freezes, through the one code path `satSetControlMode()`. That covers the exit rules followed by the fail-safe re-entry (entry 478) and also a manual `control_mode` command (interpretation (ours): the same code path, no separate rule).
+7. **Which flips.** Every PWM to other-mode switch with the flame burning freezes, through the one code path `satSetControlMode()`. That covers the exit rules followed by the fail-safe re-entry (entry 478) and also a manual `control_mode` command (interpretation (ours): the same code path, no separate rule). Interpretation (ours), point e: the freeze applies to every PWM to continuous exit (underheat, saturation, at-max) and to every re-entry into PWM inside the same flame. That is wider than entry 478's wording "the fail-safe flips": the at-max exit (`SATcontrol.ino:8544` at baa638fa9) does not set `_cycle_burnLeftPwm`, so after it the 2.0 C / 60 s continuous to PWM rule (ADR-254) can re-enter PWM in the same flame, not only the fail-safe. Sergeant D is told and may object.
 
 ## Decision Contract
 
 ### Must
 
 - Decide the freeze on the live flame, `satIsFlameOn()`, at the moment PWM is left, not on the ON-phase state (`bPwmFlameRequested`, `_pwm_flameOnMs`). Reason: at flame-off the end-of-cycle verdict can switch PWM to continuous (`SATcycles.ino:1235`, `:1045`) after the burn-end hook has run (`:1121`), while the ON-phase flag is still set.
-- Clear the kept time after the mode switch inside the reset paths, not before: `satPwmDisableOnHeaterOff()` switches mode first (`SATcontrol.ino:2018`) and resets after (`:2020`); the same applies to `satSetControlMode(SAT_MODE_OFF)` (`:4395`) and the switch at `:8495`.
+- Clear the kept time after the mode switch inside the reset paths, not before: `satPwmDisableOnHeaterOff()` switches mode first (`SATcontrol.ino:2018`) and resets after (`:2020`); the same applies to `satSetControlMode(SAT_MODE_OFF)` in `satDisable()` (`:4395`). The at-max switch to continuous (`:8495` at 15d8e2b58) is an exit like the others: it freezes, it does not clear.
 - Set the minimum-burn anchor explicitly from the real flame-on. Do not inherit it from the set-back clock (today `_pwm_flameOnMs` copies `_pwm_lastUpdateMs` at `:1451`).
 - Fall back to the segment's own flame-on time when `_sat_chFlameOnMs` is 0 (a flame lit with the hot-water bit set, or before the first flame-off was seen, `:8121-8125`). Otherwise the `!= 0` guard at `:1797` would skip the minimum burn altogether (interpretation (ours) of entry 479 for that edge).
 - Leave unchanged: the start gate (entries 385/387, ADR-252), the exit rules (ADR-236, entries 456 and 463), the per-flame start counting (entry 428) and the hourly start limit.
@@ -151,6 +151,7 @@ SAT keeps one PWM ON clock per flame.
 
 ## Open Questions
 
+- [ ] Robert accepts point e (interpretation, ours): the freeze applies to every PWM to continuous exit and every PWM re-entry inside the same flame, including the at-max exit and the 2.0 C / 60 s re-entry, wider than entry 478's "fail-safe flips".
 - [x] Robert accepts the four interpretations marked "(ours)": reset at the end of an ON phase; reset on heater off, SAT disable and restart; a manual `control_mode` flip freezes too; the fallback when the real flame-on is not known. — **Answered 2026-11-25 by Agent: Claude (otgw-architect):** Robert, 2026-11-25 (interactive in the coordinator session, relayed): yes to all four (a reset at the end of an ON phase, b reset on heater off, SAT disable and restart, c a manual control_mode flip freezes too, d the segment fallback when the real flame-on is unknown), as our interpretations, not Sergeant D's words. Acceptance of this ADR waits until the host test F1-F10 is green on the real code and the bench confirms.
 
 ## Related Decisions
