@@ -113,6 +113,7 @@ static void satSetControlMode(int m) { state.sat.eControlMode = m; }
 static void satRestoreDeferredStep() {}   // TASK-1412.4: tested in test_sat_slave_lowload.py
 static void satPwmSaveStep() {}
 static void satPwmReset() {}
+static void satPwmKeptClear() {}   // TASK-3039: the kept-ON-time clear of satDisable()
 static void satCycleSkipAutoSwitch() {}   // TASK-1367: called by satDisable(); the overshoot timer is not under test here
 static void satDiagEventsReset() {}   // TASK-1882: called by satDisable(); tested in tests/test_sat_diag_events.py
 static bool _sat_heaterOn = false, _sat_startPwmWanted = false, _sat_startGate = false; static uint32_t _sat_startFlameOnMs = 0;   // TASK-1942: reset by satDisable(); tested in tests/test_sat_pwm_first_start.py

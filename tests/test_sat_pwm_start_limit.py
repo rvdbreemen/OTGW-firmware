@@ -58,6 +58,7 @@ static Settings settings;
 static State state;
 struct OTSys { uint16_t Statusflags = 0; uint8_t MasterStatus = 0; uint8_t SlaveStatus = 0; float Tr = 20.0f; float Tboiler = 0; float Tret = 30.0f; };
 static OTSys OTcurrentSystemState;
+static uint32_t _sat_chFlameOnMs = 0;   // TASK-3039: read by satPwmBeginOn() (the real one sits above the cut, SATcontrol.ino ~960); the harness never sets a CH flame-on
 static uint32_t g_ms = 1000000UL; static float g_flow = 50.0f; static bool g_flame = false; static uint8_t g_cph = 3;
 static int g_csSent = 0; static float g_csLast = 0;
 static const float SAT_MIN_SETPOINT = 10.0f;   // SATcontrol.ino:129

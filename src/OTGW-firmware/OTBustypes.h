@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTBustypes.h
-**  Version  : v2.0.0-beta.427
+**  Version  : v2.0.0-beta.428
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **

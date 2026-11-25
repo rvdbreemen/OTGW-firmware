@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-24T18:27:00Z'
-updated_date: '2026-11-25T05:09:00Z'
+updated_date: '2026-11-25T07:56:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -25,8 +25,8 @@ Sergeant D, #dev-sat-mqtt 2026-11-24 (entry 475, private register): during one f
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [x] #1 Sergeant D has answered Q-475a and the answer is recorded as an entry in the decisions register before any code
-- [ ] #2 Host test: a scripted flame-on phase with 3 PWM/continuous flips is red on origin/dev (the ON timer restarts at each re-entry) and green on the fix (the ON timer freezes and resumes)
-- [ ] #3 Host test: the clock resets when the flame goes out, when an ON phase ends normally, and when SAT is disabled or the heater goes off; DHW draw time still does not count (entry 95 unchanged)
+- [x] #2 Host test: a scripted flame-on phase with 3 PWM/continuous flips is red on origin/dev (the ON timer restarts at each re-entry) and green on the fix (the ON timer freezes and resumes)
+- [x] #3 Host test: the clock resets when the flame goes out, when an ON phase ends normally, and when SAT is disabled or the heater goes off; DHW draw time still does not count (entry 95 unchanged)
 - [ ] #4 The start gate (entries 385/387, ADR-252), the 448/456 exit rule, the at-max rule (entry 463) and the entry 428/429 per-flame counting are unchanged (existing tests green)
 - [ ] #5 evaluate.py --quick shows no new FAIL; full tests/ run green; esp32-combo build OK
 - [ ] #6 Bench on .63 (bench-tester): a flame-on phase with several PWM/continuous flips shows a shorter total ON time per flame than before; field proof by Sergeant D's testers
@@ -102,4 +102,6 @@ STATUS 2026-11-25: DECIDED, fully specified (entries 476, 478, 479, release 2.0.
 2026-11-24 plan revised after the coordinator's second read: (1) thermo-nova lines labelled NOT verified against pin 7beaaf5; fetch the pin into other-projects/SAT-releases-thermo-nova and verify pwm.py:87-97, 106-108, 134, 201, 205, plus an issue for the missing local copy, first thing after the reset. (2) entry 429 quoted in full; the fail-safe exception is explicit in option B as put to him, not in his own typed words. (3) the min-burn choice is recommendation, pending, Q-475b after Q-475a.
 
 2026-11-25 Sergeant D decided: Q-475a A (entry 476), clarifier A (478: fail-safe flips of entry 429), Q-475b A (479: min burn from the real flame-on). AC 1 ticked on those entries. thermo-nova lines verified at the pin 7beaaf5 (fetched into other-projects/SAT-releases-thermo-nova): pwm.py:87-97, 106-108, 134, 201, 205 confirmed; the not-verified label is gone. Code next on sat/pwm-on-freeze, after TASK-3034, TASK-3008 and the Kd task (coordinator order).
+
+2026-11-25 code on lane/d3-beta (written by a Sonnet lane in wt-d3-freeze, reviewed and integrated by otgw-dev, architect-cleared): SATcontrol.ino satPwmKeptFreeze/Clear, resume in satPwmBeginOn, clears in satPwmEndOn, satPwmDisableOnHeaterOff, satDisable and the flame-edge handler. tests/test_sat_pwm_on_freeze.py: 25 tests (F1-F10, F5a-c, F6b, F6c heat pump 600 s from the real flame-on, F11a-c, F12, source-order tests): RED on the old source 14 failures + 1 error, GREEN on the fix; mutants killed: live-flame check removed, clear before the switch, satPwmReset clearing the kept time. PWM pack (anchors, override, hp_pwm, pwm_first_start, overshoot_sustain, diag_events, no_return_ignition, ot_loss, pwm_start_limit, restart_quiet, slave_lowload, continuous_startup, disable_handback) all OK on the integrated branch. OUR READING (e), wider than entry 478's wording: the freeze applies to EVERY PWM -> continuous exit and EVERY re-entry in the same flame (the at-max exit and the 2.0 C / 60 s re-entry too, not only the fail-safe flips), because every mode change goes through satSetControlMode(). Sergeant D may object; recorded in the beta notes. Gaps (bench): real flame-edge handler, satDisable and satCycleApplyEndOfCycle ordering covered structurally; min burn never binds with the current duty mapper (ON time asked >= 180/600 s).
 <!-- SECTION:NOTES:END -->

@@ -510,6 +510,8 @@ def extract(src: str) -> str:
     tick = extract_tick(src)
     # the tick clock: the TASK-1887 band block and the switch segment read it; declared once here for every user of extract()
     clock = "static uint32_t _sat_tickMs = 0;\n" if "static uint32_t _sat_tickMs" not in block + tick else ""
+    # TASK-3039 (entry 479): the resumed ON phase reads the real CH flame-on, which sits above the cut (SATcontrol.ino ~960)
+    clock += "static uint32_t _sat_chFlameOnMs = 0;\n" if "_sat_chFlameOnMs" in block + tick and "static uint32_t _sat_chFlameOnMs" not in block + tick else ""
     return clock + start_gate_prelude(src, block + tick) + block + "\n" + mm + "\n" + tick
 
 

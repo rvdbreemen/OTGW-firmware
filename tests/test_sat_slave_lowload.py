@@ -71,6 +71,7 @@ static void satSavePwmEnabled(bool enabled) { g_savedPwm = enabled; }
 static uint8_t _sat_pwmRestore = 0;   // the .ino declares it next to satRestoreControlMode()
 static int g_pwmResets = 0;
 static void satPwmReset() { g_pwmResets++; }
+static void satPwmKeptFreeze() {}   // TASK-3039: the real satSetControlMode() freezes the kept ON time before the reset; not under test here
 static bool _pwm_idle = true, _pwm_entryPending = false;
 void satCycleSkipAutoSwitch();
 bool satPwmPermitted();

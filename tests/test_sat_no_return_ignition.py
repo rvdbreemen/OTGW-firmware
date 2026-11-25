@@ -70,6 +70,7 @@ static bool satIsEnabled() { return settings.sat.bEnabled; }
 static int16_t satPreSatPersisted(bool) { return 0; }   // TASK-1541
 static void satPreSatPersist(int16_t, int16_t) {}
 static uint32_t g_ms = 1000000; static bool g_flame = false; static float g_flow = 40, g_ret = 0;
+static uint32_t _sat_chFlameOnMs = 0;   // TASK-3039: read by satPwmBeginOn() (real one above the cut); never set here
 static uint32_t g_flameOnStart = 0, g_flameOffStart = 0; static bool g_due = false; static bool g_hourLimit = false;
 static float g_cold = 28.2f, g_effMax = 62.0f, g_userMax = 62.0f;
 static uint32_t millis() { return g_ms; }

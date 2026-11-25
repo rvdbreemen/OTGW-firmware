@@ -128,6 +128,7 @@ static bool satPwmEntryAllowed(uint8_t) { return true; }
 static bool satCycleCheckLowLoadVeto() { return false; }
 
 static void satPwmReset() {}
+static void satPwmKeptClear() {}   // TASK-3039: the kept-ON-time clear of satDisable()
 static void satCycleSkipAutoSwitch() {}
 static void satDiagEventsReset() {}   // TASK-1882: called by satDisable(); tested in tests/test_sat_diag_events.py
 static bool _sat_heaterOn = true, _sat_startPwmWanted = false, _sat_startGate = false;   /* heater running: the deferred PWM restore may act */ static uint32_t _sat_startFlameOnMs = 0;
