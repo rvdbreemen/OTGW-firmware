@@ -27,6 +27,8 @@ Two passes:
    `data/version.hash` alongside your code change.
    Bypass: `OTGW_BUMP_HOOK_DISABLE=1 git commit ...`
 
+3. **Backlog task id check** (TASK-3042) - if the staged set includes `backlog/**/*.md`, `scripts/check_backlog_task_ids.py` fails the commit when a staged task file shares its id with another backlog task file (the CLI refuses such an id as ambiguous). Duplicates that the commit does not touch do not block it. Test: `tests/test_backlog_task_id_check.py`. Bypass: `OTGW_TASKID_HOOK_DISABLE=1 git commit ...`
+
 ### `post-checkout` (TASK-1725)
 
 On the first checkout of a new worktree (`git worktree add`; git passes the null ref as the previous

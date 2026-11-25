@@ -40,6 +40,23 @@ if [ "${OTGW_BUMP_HOOK_DISABLE:-0}" != "1" ]; then
   fi
 fi
 
+# ── 1b. Backlog task id uniqueness (TASK-3042) ──────────────────────────────
+# A second backlog file with the same id makes the backlog CLI refuse that id as
+# ambiguous. Fails only when a duplicate group contains a staged file.
+# Bypass: OTGW_TASKID_HOOK_DISABLE=1 git commit ...
+if [ "${OTGW_TASKID_HOOK_DISABLE:-0}" != "1" ] && git diff --cached --name-only --diff-filter=ACMR | grep -q '^backlog/.*\.md$'; then
+  _PYTHON_TID=""
+  for _cmd in python3 python py; do
+    if command -v "$_cmd" >/dev/null 2>&1; then
+      _ver=$("$_cmd" --version 2>&1 | grep -oE '[0-9]+\.[0-9]+' | head -1)
+      if [ "$(echo "$_ver" | cut -d. -f1)" -ge 3 ] 2>/dev/null; then _PYTHON_TID="$_cmd"; break; fi
+    fi
+  done
+  if [ -n "$_PYTHON_TID" ] && [ -f scripts/check_backlog_task_ids.py ]; then
+    "$_PYTHON_TID" scripts/check_backlog_task_ids.py || exit 1
+  fi
+fi
+
 # ── 2. adr-kit ADR-compliance check ──────────────────────────────────────────
 # Mirrors the canonical adr-kit hook template (templates/githooks/pre-commit) so
 # this project's copy stays in sync with upstream: Python 3 detection validated
