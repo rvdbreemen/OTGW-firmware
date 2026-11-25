@@ -55,7 +55,7 @@ int main() {
   for (float req : reqs)
     for (int drives = 0; drives < 2; drives++)
       for (int on = 0; on < 2; on++)
-        printf("req=%.1f drives=%d on=%d ch=%u\n", req, drives, on, (unsigned)satChEnableDecide(req, cold, drives != 0, on != 0));
+        printf("req=%.1f drives=%d on=%d ch=%u\n", req, drives, on, (unsigned)satChEnableDecide(req, cold, drives != 0, on != 0, false));
   return 0;
 }
 '''

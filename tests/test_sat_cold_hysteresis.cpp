@@ -29,7 +29,7 @@ static int countFlips(const float* seq, int n, float cold, float band, int* bare
   for (int i = 0; i < n; i++) {
     cut = satColdCutoffLatched(seq[i], cold, cut, band);
     const float threshold = cold + (cut ? band : 0.0f);
-    const int ch = satChEnableDecide(seq[i], threshold, false, false);
+    const int ch = satChEnableDecide(seq[i], threshold, false, false, false);
     // The CH bit computed from the threshold must agree with the latch on every tick.
     if ((ch == 0) != cut) { printf("  tick %d: CH %d disagrees with latch %d\n", i, ch, cut); failures++; }
     const int chBare = satColdCutoff(seq[i], cold) ? 0 : 1;

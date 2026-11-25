@@ -1503,6 +1503,8 @@ bool satCycleCheckPwmExits(float requestedSetpoint, uint32_t tickMs)
   if (flowTemp <= 0.0f || !flameEstablished) {
     _sustain_underheatRunning = false;
   } else if (flowTemp <= requestedSetpoint - SAT_UNDERSHOOT_MARGIN_C) {
+    // Entry 492: on a cold start the saturation exit below fires first (about 300 s); this exit is reached when the flame
+    // already burns with an off time above 0 and the request then steps up (mid-burn).
     if (satSustainedFor(_sustain_underheatRunning, _sustain_underheatStartMs, tickMs, SAT_UNDERHEAT_SUSTAIN_MS) && !satStartGateActive()) {
       SATDebugTf(PSTR("SAT: sustained underheat (flow %.1f <= request %.1f - %.1f for %lus), switching to continuous mode\r\n"),
                  flowTemp, requestedSetpoint, SAT_UNDERSHOOT_MARGIN_C, (unsigned long)(SAT_UNDERHEAT_SUSTAIN_MS / 1000UL));
@@ -1517,6 +1519,9 @@ bool satCycleCheckPwmExits(float requestedSetpoint, uint32_t tickMs)
   }
 
   // satPwmLastOffTimeMs() is recorded by satPwmSchedule() earlier in the same control tick.
+  // Entry 492: saturation is not flame-gated by design. On a cold start with real underheat the duty is above the range-5
+  // limit from the first ON tick, so this exit ends PWM at about 300 s after ignition, ahead of the underheat exit above
+  // (flame gate 180 s plus sustain 180 s = 360 s). Same end state: continuous, the flame stays continuous (entry 429).
   if (satPwmLastOffTimeMs() == 0) {
     if (satSustainedFor(_sustain_saturationRunning, _sustain_saturationStartMs, tickMs, SAT_SATURATION_SUSTAIN_MS) && !satStartGateActive()) {
       SATDebugTln(F("SAT: PWM saturation (off_time=0 sustained), switching to continuous mode"));

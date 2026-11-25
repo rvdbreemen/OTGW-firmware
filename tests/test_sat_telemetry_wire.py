@@ -536,7 +536,7 @@ int main(int argc, char** argv) {
   const float request=38.6f;
   for(int i=0;i<200;i++) {
     const float cs=satApplyPWM(request);
-    const unsigned ch=satChEnableDecide(request,g_cold,satPwmDrivesSetpoint(request),state.sat.bPwmFlameRequested);
+    const unsigned ch=satChEnableDecide(request,g_cold,satPwmDrivesSetpoint(request),state.sat.bPwmFlameRequested,false);
     printf("t=%d flame=%d ch=%u cs=%.1f on_ms=%lu off_ms=%lu duty=%.4f sup=%d\n", i*30, (int)g_flame, ch, cs,
            (unsigned long)_pwm_lastOnTimeMs, (unsigned long)_pwm_lastOffTimeMs, state.sat.fPwmDutyCycle, (int)state.sat.bModSuppressed);
     g_ms+=30000UL;

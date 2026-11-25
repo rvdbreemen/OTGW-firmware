@@ -95,7 +95,7 @@ int main(int argc, char** argv) {
   const float request=ultra ? 28.568f : 38.6f;
   for(int i=0;i<3;i++) {
     const float cs=satApplyPWM(request);
-    const unsigned ch=satChEnableDecide(request,g_cold,satPwmDrivesSetpoint(request),state.sat.bPwmFlameRequested);
+    const unsigned ch=satChEnableDecide(request,g_cold,satPwmDrivesSetpoint(request),state.sat.bPwmFlameRequested,false);
     printf("elapsed_s=%d request=%.3f duty=%.6f on_s=%.3f off_s=%.3f phase_on=%d cs=%.3f ch=%u\n",
       i*30,request,state.sat.fPwmDutyCycle,_pwm_lastOnTimeMs/1000.0,_pwm_lastOffTimeMs/1000.0,
       (int)state.sat.bPwmFlameRequested,cs,ch);

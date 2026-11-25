@@ -204,7 +204,7 @@ class PortEquivalence(unittest.TestCase):
 #include <cstdio>
 #include "@H@"
 int main() { const float req[] = {9.f, 21.f, 21.01f, 30.f}; for (float r : req) for (int d = 0; d < 2; d++) for (int o = 0; o < 2; o++)
-  printf("%.2f %d %d %d\n", r, d, o, (int)satChEnableDecide(r, 21.0f, d, o)); return 0; }
+  printf("%.2f %d %d %d\n", r, d, o, (int)satChEnableDecide(r, 21.0f, d, o, false)); return 0; }
 """.replace("@H@", (REPO / "src" / "OTGW-firmware" / "SATchEnable.h").as_posix())
         cpp = Path(self.tmp.name) / "ch.cpp"; cpp.write_text(src, encoding="utf-8")
         exe = compile_cpp(cpp, Path(self.tmp.name) / "ch.exe")

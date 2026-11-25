@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-25T10:24:00Z'
+updated_date: '2026-11-25T10:53:00Z'
 labels:
   - sat-question
   - needs-maintainer-ok
@@ -28,3 +29,9 @@ OPEN: confirm or refute (otgw-architect second reader, then the bench timing fro
 - [ ] #2 Bench timing from the flip test (which exit fires, at what second) is recorded in the task
 - [ ] #3 If confirmed: one question to Sergeant D with the options and the 2.0.0 scope, answer recorded in the decisions register before any change
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-25 entry 492 (Sergeant D: A, keep as built). Only code touch: a comment at both exits in SATcycles.ino ('entry 492: saturation is not flame-gated by design', cold start ends PWM at about 300 s, underheat reached on a mid-burn request step), committed with TASK-3054's bump. Docs side: otgw-docs 0656038fd.
+<!-- SECTION:NOTES:END -->

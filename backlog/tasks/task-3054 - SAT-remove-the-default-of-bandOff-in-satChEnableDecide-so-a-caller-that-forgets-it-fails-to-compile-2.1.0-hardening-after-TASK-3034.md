@@ -1,0 +1,36 @@
+---
+id: TASK-3054
+title: >-
+  SAT: remove the default of bandOff in satChEnableDecide so a caller that
+  forgets it fails to compile (2.1.0 hardening after TASK-3034)
+status: In Progress
+assignee:
+  - '@claude'
+created_date: '2026-11-25T10:29:00Z'
+updated_date: '2026-11-25T10:53:00Z'
+labels:
+  - sat
+milestone: 2.1.0
+dependencies: []
+priority: low
+ordinal: 1157000
+---
+
+## Description
+
+<!-- SECTION:DESCRIPTION:BEGIN -->
+TASK-3034 found a caller (the diag input of satDiagEventsStep) that omitted bandOff and silently got false. The default (SATchEnable.h:94, bandOff = false) hides that class of bug. Remove the default; every caller passes bandOff explicitly: SATcontrol.ino:8674 and :8697 already do; the host tests that call satChEnableDecide (test_sat_pwm_anchors.py, test_sat_pwm_override.py, test_sat_requested_vs_transmitted.py, test_sat_ch_enable.cpp) pass false. No behaviour change. Low priority, 2.1.0.
+<!-- SECTION:DESCRIPTION:END -->
+
+## Acceptance Criteria
+<!-- AC:BEGIN -->
+- [ ] #1 satChEnableDecide has no default for bandOff and the firmware and every host test caller passes it explicitly
+- [ ] #2 A host test goes red when the default is present (grep or compile of a call without the argument) and green on the fix
+- [ ] #3 evaluate.py --quick no new FAIL; the SAT host tests that call the function pass; esp32-combo build OK
+<!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-25 done in code: bandOff has no default in satChEnableDecide (SATchEnable.h:94); the 2 firmware calls already pass it; 9 test/script call sites pass false (test_sat_ch_enable.cpp, cold_hysteresis.cpp, lowload_contract, telemetry_wire, pwm_anchors, pwm_override x2, requested_vs_transmitted, sim_port_equivalence, scripts/verify_sat_low_load.py). New test tests/test_sat_ch_enable_band_required.py (4 tests): RED with the default restored (signature test + 'four-argument call does not build' fail), GREEN on the fix. Affected SAT tests green: ch_signals 4, tolerance_band 30, pwm_anchors 64, pwm_override 83, requested_vs_transmitted 10, sim_port_equivalence 4, telemetry_wire 18, diag_events 14, cold_cut_min_burn 8, lowload_contract 35 (1 skipped). evaluate --quick 88 passed, 0 failed. Build and commit pending.
+<!-- SECTION:NOTES:END -->

@@ -107,7 +107,7 @@ int main() {
     _sat_lastControlCS = cs;
     printf("T %d %d %.1f %d %.1f\n", sec, (int)state.sat.bPwmFlameRequested, cs, (int)g_flame, _pwm_effectiveBoilerTemp);
     // the CH bit the control tick sends for this CS (satControlLoopRun: satChEnableDecide with satPwmDrivesSetpoint)
-    fprintf(stderr, "H %d %d\n", sec, (int)satChEnableDecide(pid, satColdThreshold(), satPwmDrivesSetpoint(pid), state.sat.bPwmFlameRequested));
+    fprintf(stderr, "H %d %d\n", sec, (int)satChEnableDecide(pid, satColdThreshold(), satPwmDrivesSetpoint(pid), state.sat.bPwmFlameRequested, false));
     fprintf(stderr, "M %d %d\n", sec, @ATMAX@);   // TASK-1581: duty range 5 (SAT sends MM=T); 0 on a source without the flag
   }
   fprintf(stderr, "C %d\n", g_pwmStarts);          // satCycleRecordPwmStart() calls = PWM starts counted (TASK-1421)

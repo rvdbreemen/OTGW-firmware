@@ -45,7 +45,7 @@ int main() {
     {"continuous req 45 rad",          45.0f, 28.2f, false, false, 45.0f, 1},
   };
   for (unsigned i = 0; i < sizeof(d) / sizeof(d[0]); i++) {
-    const uint8_t got = satChEnableDecide(d[i].requested, d[i].cold, d[i].drives, d[i].on);
+    const uint8_t got = satChEnableDecide(d[i].requested, d[i].cold, d[i].drives, d[i].on, false);
     const uint8_t old = oldRule(d[i].requested, d[i].sentCs, d[i].cold, d[i].drives, d[i].on);
     const bool ok = (got == d[i].want);
     printf("%-32s req %5.2f  new CH=%u  old CH=%u  want %u  %s\n", d[i].name, d[i].requested, got, old, d[i].want, ok ? "PASS" : "FAIL");

@@ -221,7 +221,7 @@ int main(int argc, char** argv) {
       if (before == SAT_MODE_CONTINUOUS && state.sat.eControlMode == SAT_MODE_CONTINUOUS && cs >= 61.9f) contBefore++;
       if (state.sat.eControlMode == SAT_MODE_PWM) break;
     }
-    const int ch = (int)satChEnableDecide(pid, satGetColdSetpoint(), g_swDrives, g_swPwmOn);
+    const int ch = (int)satChEnableDecide(pid, satGetColdSetpoint(), g_swDrives, g_swPwmOn, false);
     printf("mode=%d ticks=%d cs=%.1f final=%.1f cont_marker=%d continuous_ticks=%d req=%d drives=%d ch=%d\n", state.sat.eControlMode, ticks + 1, cs,
            state.sat.fFinalSetpoint, (int)(cs >= 61.9f), contBefore, (int)g_swPwmOn, (int)g_swDrives, ch);
 #else
@@ -246,7 +246,7 @@ int main(int argc, char** argv) {
       cs = tickRunSw(p);
       if (state.sat.eControlMode != SAT_MODE_PWM) break;
     }
-    const int ch = (int)satChEnableDecide(p, satGetColdSetpoint(), g_swDrives, g_swPwmOn);
+    const int ch = (int)satChEnableDecide(p, satGetColdSetpoint(), g_swDrives, g_swPwmOn, false);
     printf("mode=%d ticks=%d cs=%.1f prev=%.1f cont_marker=%d ch=%d\n", state.sat.eControlMode, ticks + 1, cs, prev, (int)(cs >= 61.9f), ch);
 #else
     printf("mode=-1\n");

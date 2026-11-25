@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : SATchEnable.h
-**  Version  : v2.0.0-beta.428
+**  Version  : v2.0.0-beta.429
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -91,7 +91,7 @@ static inline bool satColdCutoffLatched(float requestedSetpoint, float coldSetpo
 //   bandOff           TASK-1887 (entry 384): the tolerance band holds heating off (after the 180 s minimum burn of
 //                     entries 275/376); only the CH bit follows it, the CS and PWM are not touched
 static inline uint8_t satChEnableDecide(float requestedSetpoint, float coldSetpoint,
-                                        bool pwmDrivesSetpoint, bool pwmOn, bool bandOff = false)
+                                        bool pwmDrivesSetpoint, bool pwmOn, bool bandOff)
 {
   if (satColdCutoff(requestedSetpoint, coldSetpoint)) return 0;
   if (bandOff) return 0;
