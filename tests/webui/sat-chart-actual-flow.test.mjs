@@ -47,7 +47,7 @@ function load() {
 }
 
 const payload = (i) => ({
-  final_setpoint: 50, flow_temp: 40 + i, heating_curve: null, current_modulation: 20 * i, flame_on: i > 0,
+  active: true, final_setpoint: 50, flow_temp: 40 + i, heating_curve: null, current_modulation: 20 * i, flame_on: i > 0,
   room_temp: 20.5, outside_temp: 8, pid_output: 1.5, room_temp_age_s: 125, outside_temp_age_s: -1,
 });
 

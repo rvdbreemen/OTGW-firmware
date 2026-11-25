@@ -1553,7 +1553,6 @@
       "sat_why_mod_suppressed": "On/off cycling: modulation is held low during this burner phase.",
       "sat_why_dhw": "Hot water is running: room heating waits.",
       "sat_why_valves_closed": "All radiator valves are closed: SAT does not start heating.",
-      "sat_msgs_aria": "Messages: {{count}}",
       "sat_msgs_one": "{{count}} message",
       "sat_msgs_other": "{{count}} messages",
       "sat_pill_paused": "Paused",
@@ -1562,6 +1561,7 @@
       "sat_enable_takeover": "Off · takeover active",
       "sat_sub_takeover": "Home Assistant has been unreachable over MQTT for more than 5 minutes, so SAT controls the boiler. The switch stays off: SAT stops again when MQTT is back.",
       "sat_sub_stopped": "SAT lost contact with the OpenTherm interface and stopped itself. Check the connection, then switch SAT off and on again to restart it.",
+      "sat_sub_stopped_takeover": "SAT lost contact with the OpenTherm interface and stopped itself. Check the connection.",
       "sat_sub_paused_ot": "SAT gets no reply from the boiler, so the boiler runs on its own control. SAT resumes by itself when the boiler answers again.",
       "sat_sub_paused_outside": "SAT needs an outside temperature less than 1 hour old; until then your thermostat controls the boiler. SAT resumes by itself when one arrives.",
       "sat_sub_source_link": "Set up a source",
@@ -1657,6 +1657,7 @@
       "sat_big_idle": "Idle",
       "sat_big_idle_above": "Idle · room above target",
       "sat_big_idle_status": "Idle · {{status}}",
+      "sat_big_idle_anti_cycling": "Idle · anti-cycling pause",
       "sat_big_paused_ot": "Paused: no boiler connection",
       "sat_big_paused_outside": "Paused: no outside temperature",
       "sat_big_waiting": "Waiting to take over",
@@ -7213,6 +7214,7 @@
     if (over >= 1.0) return t('tools.sat_big_idle_above');
     if (over >= 0.1) return t('tools.sat_big_at_target');
     var bs = d.boiler_status;
+    if (bs === 'anti_cycling') return t('tools.sat_big_idle_anti_cycling');   // TASK-3012: spec T2 3.1 wording
     if (bs && bs !== 'idle' && bs !== 'off' && SAT_BOILER_LABELS[bs]) return t('tools.sat_big_idle_status', { status: satLbl('sat_boiler', SAT_BOILER_LABELS[bs]) });
     return t('tools.sat_big_idle');
   }
@@ -7242,12 +7244,12 @@
     if (m && m.scrollIntoView) m.scrollIntoView({ block: 'center' });
   }
   // Sub-line under the headline: one sentence, plus an optional link button.
-  function satRenderStateSub(state) {
+  function satRenderStateSub(state, takeoverStop) {
     var box = document.getElementById('satStateSub'); if (!box) return;
-    var key = { stopped: 'sat_sub_stopped', paused_ot: 'sat_sub_paused_ot', paused_outside: 'sat_sub_paused_outside',
+    var key = { stopped: takeoverStop ? 'sat_sub_stopped_takeover' : 'sat_sub_stopped', paused_ot: 'sat_sub_paused_ot', paused_outside: 'sat_sub_paused_outside',
       takeover: 'sat_sub_takeover', waiting: 'sat_sub_waiting', waiting_boiler: 'sat_sub_waiting_boiler' }[state];
     var link = { paused_outside: ['sat_sub_source_link', satOpenWeatherSettings], waiting_boiler: ['sat_sub_check_conn', satOpenConnection] }[state];
-    var sig = key ? state + '|' + i18nLang : '';
+    var sig = key ? key + '|' + i18nLang : '';   // TASK-3012: the key, not the state: STOPPED has two wordings
     if (box.getAttribute('data-sig') === sig) return;   // rebuild only on a change, so a focused link keeps its focus
     box.setAttribute('data-sig', sig);
     box.textContent = '';
@@ -7561,7 +7563,7 @@
       btn.hidden = !count;
       btn.className = 'sat-msg-btn' + (warns ? ' warn' : '');
       btn.setAttribute('aria-expanded', open ? 'true' : 'false');
-      btn.setAttribute('aria-label', t('tools.sat_msgs_aria', { count: count }));
+      btn.setAttribute('aria-label', t('tools.sat_msgs', { count: count }));   // TASK-3012: the name contains the visible text (WCAG 2.5.3)
       txt('satMsgIco', warns ? '!' : 'i');
       txt('satMsgCount', t('tools.sat_msgs', { count: count }));
     }
@@ -7700,13 +7702,14 @@
     else if (state === 'heating') big = t('tools.sat_big_heating_to', { temp: satFmt(d.target_temp, 1, '°') });
     else big = satIdleHeadline(d);
     txt('satStatusBig', big);
-    satRenderStateSub(state);
+    satRenderStateSub(state, !d.enabled && !!d.fallback_active);   // TASK-3012
     satRenderStale(state);
     var pr = document.getElementById('satPushRefused'); if (pr) pr.hidden = !(enabled && d.push_refused);
     var rl = document.getElementById('satRoomLost'); if (rl) rl.hidden = !(enabled && d.room_temp_lost);
     sat.roomLost = !!(userEnabled && d.room_temp_lost);   // TASK-1546: the graph reads it
-    var ol = document.getElementById('satOtLost'); if (ol) ol.hidden = !(enabled && d.ot_link_lost);
-    var om = document.getElementById('satOutsideMissing'); if (om) om.hidden = !(enabled && d.outside_temp_missing);
+    // TASK-3012: in PAUSED_OT / PAUSED_OUTSIDE the headline and sub-line say it; the hint stays for a state that does not cover it (STOPPED, ...)
+    var ol = document.getElementById('satOtLost'); if (ol) ol.hidden = !(enabled && d.ot_link_lost) || state === 'paused_ot';
+    var om = document.getElementById('satOutsideMissing'); if (om) om.hidden = !(enabled && d.outside_temp_missing) || state === 'paused_outside';
     satRenderMessages(d, enabled);
     satRenderPresets(d);
 
@@ -7841,11 +7844,12 @@
     satHist.set.push(satNum(d.final_setpoint));
     satHist.flow.push(satNum(d.flow_temp));
     satHist.curve.push(satNum(d.heating_curve));
-    satHist.mod.push(satNum(d.current_modulation));
+    var run = !!d.active;   // TASK-3012: current_modulation / pid_output do not belong to SAT while the loop is inactive (100 % at the MM=T hand-back)
+    satHist.mod.push(run ? satNum(d.current_modulation) : null);
     satHist.flame.push(d.flame_on == null ? null : (d.flame_on ? 1 : 0));
     satHist.room.push(satNum(d.room_temp));
     satHist.out.push(satNum(d.outside_temp));
-    satHist.pid.push(satNum(d.pid_output));
+    satHist.pid.push(run ? satNum(d.pid_output) : null);
     ['set', 'flow', 'curve', 'mod', 'flame', 'room', 'out', 'pid'].forEach(function (k) { if (satHist[k].length > SAT_HIST_MAX) satHist[k].shift(); });
   }
 

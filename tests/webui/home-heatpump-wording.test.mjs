@@ -18,7 +18,9 @@ const OTMON = { otmonitor: {
   flamestatus: ON('On'), chmodus: ON('Off'), dhwmode: ON('On'), faultindicator: ON('Off'),
 } };
 
-async function home(satStatus, shotName) {
+// TASK-3012: `settled` is the page condition that holds once this case's sat/status answer is rendered; the test waits for it
+// instead of a fixed sleep (flaky once on the NAS).
+async function home(satStatus, shotName, settled) {
   const h = await startPage({
     width: 1280,
     api: (m, p) => {
@@ -33,7 +35,7 @@ async function home(satStatus, shotName) {
     // v2.js fetches sat/status 2.8 s after load (seed at 2 s); wait for both, then for the render.
     await h.until(`/Hot water/.test((document.getElementById('aStatusTxt') || {}).textContent || '')`);
     for (let i = 0; i < 100 && !h.log.some((l) => l.startsWith('GET /api/v2/sat/status')); i++) await h.sleep(100);
-    await h.sleep(800);
+    assert.ok(await h.until(settled, 20000), 'the sat/status answer is rendered: ' + settled);
     const r = await h.evalJs(`(function(){
       var tags = Array.prototype.map.call(document.querySelectorAll('#schem .label-tag'), function (t) { return t.textContent; });
       return { a: document.getElementById('aStatusTxt').textContent, tags: tags, hp: (document.getElementById('aTFlame').querySelector('.lbl') || {}).textContent };
@@ -54,7 +56,8 @@ async function home(satStatus, shotName) {
 const skip = !CHROME && 'no Chrome';
 
 test('gas boiler keeps "Hot water running · tap open"; the emitter label is neutral', { skip }, async () => {
-  const r = await home({ heating_source: 1, heating_source_detected: 1, dhw_config_tank: false }, '1392-gas');
+  const r = await home({ heating_source: 1, heating_source_detected: 1, dhw_config_tank: false }, '1392-gas',
+    `document.getElementById('aStatusTxt').textContent === 'Hot water running · tap open'`);
   assert.equal(r.a, 'Hot water running · tap open');
   assert.equal(r.b, 'Hot water running · tap open');
   assert.equal(r.bState, 'running');
@@ -63,7 +66,8 @@ test('gas boiler keeps "Hot water running · tap open"; the emitter label is neu
 });
 
 test('heat pump uses tank-charging wording', { skip }, async () => {
-  const r = await home({ heating_source: 2, heating_source_detected: 2, dhw_config_tank: false }, '1392-heatpump');
+  const r = await home({ heating_source: 2, heating_source_detected: 2, dhw_config_tank: false }, '1392-heatpump',
+    `(document.getElementById('aTFlame').querySelector('.lbl') || {}).textContent === 'Compressor' && document.getElementById('aStatusTxt').textContent === 'Hot water demand · charging the tank'`);
   assert.equal(r.hp, 'Compressor', 'the page really is in heat-pump mode');
   assert.equal(r.a, 'Hot water demand · charging the tank');
   assert.equal(r.b, 'Hot water demand · charging the tank');
@@ -72,7 +76,8 @@ test('heat pump uses tank-charging wording', { skip }, async () => {
 });
 
 test('a boiler that reports a DHW storage tank (MsgID 3 HB bit 3) uses the tank wording too', { skip }, async () => {
-  const r = await home({ heating_source: 1, heating_source_detected: 1, dhw_config_tank: true }, '1392-gas-tank');
+  const r = await home({ heating_source: 1, heating_source_detected: 1, dhw_config_tank: true }, '1392-gas-tank',
+    `document.getElementById('aStatusTxt').textContent === 'Hot water demand · charging the tank'`);
   assert.equal(r.a, 'Hot water demand · charging the tank');
   assert.equal(r.bState, 'charging');
 });

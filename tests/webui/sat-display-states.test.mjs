@@ -99,7 +99,7 @@ test('every display state renders its pill, headline, sub-line and card treatmen
     r = await show(env, { room_temp: 25.5, target_temp: 19.8 }, 'Idle · room above target');
     assert.equal(r.pill, 'Idle');
     r = await show(env, { room_temp: 20.0, target_temp: 19.8 }, 'Idle · room at target');
-    r = await show(env, { room_temp: 19.0, target_temp: 19.8, boiler_status: 'anti_cycling' }, 'Idle · Anti-cycling');
+    r = await show(env, { room_temp: 19.0, target_temp: 19.8, boiler_status: 'anti_cycling' }, 'Idle · anti-cycling pause');   // TASK-3012: spec T2 3.1 wording
     r = await show(env, { room_temp: null }, 'Idle');
   } finally { await env.h.close(); }
 });
@@ -107,12 +107,12 @@ test('every display state renders its pill, headline, sub-line and card treatmen
 test('not-live values show a dash while active is false; Modulation sent; burner cycle ignores control_mode', async () => {
   const env = await openSat(HEALTH_OK);
   try {
-    let r = await show(env, { active: false, ot_link_lost: true, control_mode: 1 }, 'Paused: no boiler connection');
+    let r = await show(env, { active: false, ot_link_lost: true, room_temp_lost: true, control_mode: 1 }, 'Paused: no boiler connection');   // TASK-3012: the OT hint is not repeated in PAUSED_OT, so the badge needs another message (room lost)
     assert.equal(r.modOld, null, 'the Modulation row is renamed');
     assert.equal(r.mod, '—'); assert.equal(r.pidOut, '—'); assert.equal(r.err, '—'); assert.equal(r.pTerm, '—');
     assert.equal(r.cycle, '—'); assert.equal(r.cycleSub, 'SAT is not actively controlling.');
     // AC6: the messages badge shows visible text and keeps its aria-label.
-    assert.equal(r.msgHidden, false); assert.match(r.msgTxt, /^\d+ messages?$/); assert.match(r.msgAria, /^Messages: \d+$/);
+    assert.equal(r.msgHidden, false); assert.match(r.msgTxt, /^\d+ messages?$/); assert.equal(r.msgAria, r.msgTxt, 'TASK-3012: the accessible name is the visible text (WCAG 2.5.3)');
 
     for (const s of [{ active: false, safety_tripped: true, control_mode: 2 }, { active: false, outside_temp_missing: true, control_mode: 2 }, { active: false, control_mode: 1 }]) {
       env.ref.sat = Object.assign({}, BASE, s);

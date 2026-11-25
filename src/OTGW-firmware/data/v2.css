@@ -823,7 +823,7 @@ html[data-theme="dark"]{--accent:var(--brand-cyan);--nav:#383838;--tile-off:#545
   .sat-hist-wrap{position:relative}
   .sat-chart-empty{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;
     color:var(--muted);font-size:.9rem;padding:12px;pointer-events:none}
-  .sat-chart-empty.corner{inset:auto auto auto 0;top:0;justify-content:flex-start;background:var(--panel);border-radius:8px;padding:4px 8px}
+  .sat-chart-empty.corner{inset:auto 0 auto auto;top:0;justify-content:flex-end;background:var(--panel);border-radius:8px;padding:4px 8px}
   .sat-chart-empty[hidden],.sat-curve-empty[hidden]{display:none}
   .sat-curve-empty{min-height:120px;display:flex;align-items:center;justify-content:center;text-align:center;color:var(--muted);font-size:.9rem;padding:12px}
   /* TASK-1884: why-line, messages button/panel, room trend arrow */
