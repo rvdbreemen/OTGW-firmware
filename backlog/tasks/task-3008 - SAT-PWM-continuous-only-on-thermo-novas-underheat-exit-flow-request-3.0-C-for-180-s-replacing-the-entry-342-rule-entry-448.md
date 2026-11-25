@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-21T14:29:00Z'
-updated_date: '2026-11-25T10:26:00Z'
+updated_date: '2026-11-25T17:08:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -27,7 +27,7 @@ Sergeant D entry 448 (Q-342b answered D, 2026-11-21): the PWM -> continuous exit
 - [x] #1 satCycleCheckPwmExits() leaves PWM for continuous only when flow <= request - 3.0 C for 180 s (no flame condition, as thermo-nova); a missing flow clears the timer; the existing PWM-mode / ON-phase / hot-water / start-gate gating unchanged
 - [x] #2 Host tests red on origin/dev and green on the fix: a 60 s request-above-flow case no longer exits, a 180 s flow <= request - 3 case exits, a 170 s case does not, flow at request - 2.9 does not; affected tests (test_sat_overshoot_sustain, test_sat_pwm_first_start, test_sat_lowload_contract, test_sat_cycle_classifier, grep underheat) updated
 - [x] #3 Replay proof with the real code (OTGW-field-data/_replay_tools/sat_switch/switch5.py on the fix): indigo_light 21 Nov night burns 0 exits after the fail-safe loops, marceld91d 09:03-09:30 no switch
-- [ ] #4 evaluate --quick no new FAIL, esp32-combo build, bench by otgw-bench-tester; push only after the indigo 24 h beta.410 analysis (Robert entry 445)
+- [x] #4 evaluate --quick no new FAIL, esp32-combo build, bench by otgw-bench-tester; push only after the indigo 24 h beta.410 analysis (Robert entry 445)
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -60,6 +60,10 @@ Cold-setpoint gate (ADR-199, upstream in SATcontrol.ino, unchanged): evidence te
 2026-11-25 integrated on lane/d3-beta: test pins moved by the 448 rule: tests/test_sat_loop_integration.py scenario s2 now starts at 540 s (the 60 s underheat rule no longer flips the run to continuous at 150 s, the ON phase opened at 60 s runs to 660 s); new source tests AtMaxExitKeepsOnlyTheStartGate (entry 463: the at-max branch keeps the start gate and has no flame gate; the underheat exit has the flame gate and the start gate; red on a mutant that drops the at-max start gate). SATcycles.ino comment at the underheat block corrected (flame gate, entry 456). Bench so far (bench-tester, 8401c72): negative half evidenced, positive exit not evidenced: that AC rests on host tests + a field check, not ticked.
 
 2026-11-25 follow-up filed as TASK-3053: reading of the code says the 456 flame gate lets the 300 s saturation exit fire before the 448 underheat exit (about 300 s vs 360 s after ignition). NOT MEASURED, second reader pending. AC4 stays open.
+
+Bench .63 25 Nov 2026 (otgw-bench-tester), beta.432+43ac963 (SAT logic as R 428), evidence OTGW-field-data/bench-63/2026-11-25_flip-test/ (RESULTS_E6_E7.md, key_lines.txt, 10 s CSV, SHA256SUMS): A2 = sustained underheat line 17:00:53.236, exactly 180.0 s after the request step (request 61.0, gap 26 K, flame burning 14 min, pwm_off 367 s > 0 before the step); negative control 24 kW gap 1.0-2.65 K: no underheat, saturation 17:09:53.257 (300 s). Covered by AC4: the bench part only; evaluate --quick, build and the indigo-analysis push gate are not covered by this bench note.
+
+ADR-297 bench line met as the property no underheat exit before ~6 min: cold start A1 (key_lines.txt, 17:21:53-17:26:53) ends through saturation at ~300 s (entry 492), no underheat line, no switch in the first 60 s; established-flame hold 180 s by A2 (17:00:53.236).
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
