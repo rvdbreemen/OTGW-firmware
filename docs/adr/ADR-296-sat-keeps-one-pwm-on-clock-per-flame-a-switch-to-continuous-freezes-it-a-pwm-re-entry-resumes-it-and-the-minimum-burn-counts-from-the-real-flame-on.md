@@ -1,7 +1,7 @@
 ---
 id: "ADR-296"
 title: "SAT keeps one PWM ON clock per flame: a switch to continuous freezes it, a PWM re-entry resumes it, and the minimum burn counts from the real flame-on"
-status: "Proposed"
+status: "Accepted"
 date: "2026-11-25"
 binding: false
 gate: null
@@ -37,11 +37,11 @@ format: "canonical"
 
 ## Status
 
-Proposed, 2026-11-25. Guideline-level per ADR-080: verified by a host test, no evaluate.py gate. Release 2.0.0 (Robert, 2026-11-24).
+Accepted, 2026-11-25, by Robert van den Breemen (go relayed by the coordinator once the acceptance condition was met). Guideline-level per ADR-080: verified by a host test, no evaluate.py gate. Release 2.0.0 (entries 475-479, 481, 491; point e: entry 493).
 
-**Decision Maker:** Sergeant D, who decides SAT behaviour (ADR-292), in entries 475, 476, 478 and 479 (2026-11-24 and 2026-11-25). The points marked "interpretation (ours)" below are not his words. Robert said yes to all four on 2026-11-25 (Open Questions); Sergeant D may still correct any of them as a new entry.
+**Decision Maker:** Sergeant D, who decides SAT behaviour (ADR-292), in entries 475, 476, 478 and 479 (2026-11-24 and 2026-11-25). The points marked "interpretation (ours)" below are not his words. Robert said yes to points a-d (entry 481) and to point e (entry 493) on 2026-11-25 (Open Questions); Sergeant D may still correct any of them as a new entry.
 
-**Acceptance condition (Robert, 2026-11-25):** this ADR stays Proposed until the host test F1-F10 (`tests/test_sat_pwm_on_freeze.py`) is green on the real code and the bench run of TASK-3039 confirms it; only then does it go to Accepted.
+**Acceptance condition (Robert, 2026-11-25), met:** the host test F1-F10 (`tests/test_sat_pwm_on_freeze.py`) is green on the real code and red on the code before the fix, and the bench flip test of TASK-3039 (simulated boiler, unit .63) passed. The evidence is listed under Verification. Field confirmation on a real boiler follows after acceptance.
 
 ## Status History
 
@@ -52,6 +52,11 @@ status_history:
     changed_by: "Agent: Claude (otgw-architect)"
     reason: Initial proposal
     changed_via: adr-kit
+  - date: 2026-11-25
+    status: Accepted
+    changed_by: "Agent: Claude (otgw-architect)"
+    reason: "Accepted by Robert van den Breemen, 2026-11-25: acceptance condition met (F1-F10 green on the real code, bench flip test on .63 PASS), go relayed by the coordinator; point e yes (entry 493)"
+    changed_via: adr-kit lifecycle
 ```
 
 ## Context
@@ -68,7 +73,7 @@ SAT (Smart Autotune Thermostat) runs the boiler either continuously or in PWM (p
 
 **The result.** Each fail-safe re-entry gives the flame a full new ON time, so three or four flips stretch the PWM ON time of one flame.
 
-**Sergeant D's decisions** (`docs/sat/decisions/sergeant-d-corrections.md`, OTGW-sat-decisions origin/main 5b8c13d):
+**Sergeant D's decisions** (`docs/sat/decisions/sergeant-d-corrections.md`, OTGW (OpenTherm Gateway) sat-decisions repository OTGW-sat-decisions, origin/main 5b8c13d):
 
 - **Entry 475 (the request):** "Whenever the flame is ON we count time only once. So when goes from PWM to continuous we freeze the PWM ON time instead of resetting."
 - **Entry 476 (Q-475a, answer A):** only PWM time counts; continuous time is not added; the total resets when the flame goes out.
@@ -86,13 +91,13 @@ SAT keeps one PWM ON clock per flame.
 1. **Freeze.** When SAT leaves PWM while the flame burns, the ON time already used in this flame is kept. It is not reset.
 2. **Resume.** When SAT enters PWM again in the same flame, the new ON phase continues from the kept time: the anchor is set back by that time, as the hot-water freeze does. The existing check `elapsed >= onTimeMs` then ends the phase against the ON time the schedule asks for at that tick.
 3. **Only PWM time counts.** Time in continuous is not added (entry 476).
-4. **Minimum burn from the real flame-on.** The 180 s (600 s heat pump) minimum burn counts from the CH flame-on of the flame (`_sat_chFlameOnMs`, `SATcontrol.ino:8121-8125`), across flips (entry 479).
+4. **Minimum burn from the real flame-on.** The 180 s (600 s heat pump) minimum burn counts from the CH (central heating) flame-on of the flame (`_sat_chFlameOnMs`, `SATcontrol.ino:8121-8125`), across flips (entry 479).
 5. **Reset.** The kept time goes back to zero:
    - when the flame goes out (entry 476);
    - when an ON phase ends by its own timer (interpretation (ours): the next ON phase is a new one, otherwise it would end at once);
    - on heater off, SAT disable and restart (interpretation (ours), in line with entry 462: no PWM state is kept after a restart or a full heating-off).
 6. **Hot water** keeps its own freeze; draw time still does not count (entry 95 unchanged).
-7. **Which flips.** Every PWM to other-mode switch with the flame burning freezes, through the one code path `satSetControlMode()`. That covers the exit rules followed by the fail-safe re-entry (entry 478) and also a manual `control_mode` command (interpretation (ours): the same code path, no separate rule). Interpretation (ours), point e: the freeze applies to every PWM to continuous exit (underheat, saturation, at-max) and to every re-entry into PWM inside the same flame. That is wider than entry 478's wording "the fail-safe flips": the at-max exit (`SATcontrol.ino:8544` at baa638fa9) does not set `_cycle_burnLeftPwm`, so after it the 2.0 C / 60 s continuous to PWM rule (ADR-254) can re-enter PWM in the same flame, not only the fail-safe. Sergeant D is told and may object.
+7. **Which flips.** Every PWM to other-mode switch with the flame burning freezes, through the one code path `satSetControlMode()`. That covers the exit rules followed by the fail-safe re-entry (entry 478) and also a manual `control_mode` command (interpretation (ours): the same code path, no separate rule). Interpretation (ours), point e: the freeze applies to every PWM to continuous exit (underheat, saturation, at-max) and to every re-entry into PWM inside the same flame. That is wider than entry 478's wording "the fail-safe flips": the at-max exit (`SATcontrol.ino:8544` at baa638fa9) does not set `_cycle_burnLeftPwm`, so after it the 2.0 C / 60 s continuous to PWM rule (ADR-254) can re-enter PWM in the same flame, not only the fail-safe. Robert said yes to point e on 2026-11-25 (entry 493); Sergeant D is told and may object as a new entry.
 
 ## Decision Contract
 
@@ -129,6 +134,14 @@ SAT keeps one PWM ON clock per flame.
   - F10: a first PWM entry with nothing kept: the same ON phase as before this ADR.
 - The existing tests of the start gate, the exit rules and the per-flame counting stay green.
 - **Bench and field.** A flame with several flips on the bench (otgw-bench-tester) shows a shorter total PWM ON time per flame than before; Sergeant D's testers confirm it in the field.
+- **Harness limit.** The host test compiles the real PWM block, but not the flame-edge handler of `satControlLoopRun()`, `satDisable()` or the end-of-cycle verdict (`satCycleApplyEndOfCycle()`); its driver replays their calls and source-read pins check the order (`tests/test_sat_pwm_on_freeze.py:15-24`). The bench covers those paths.
+
+**Evidence at acceptance (2026-11-25):**
+
+- Code: commit `e7297ebae` on `dev` (in v2.0.0-beta.428; `f57c7e54f` is its pre-rebase copy). Freeze in `satSetControlMode()` at `SATcontrol.ino:2027`; kept time cleared at `:1547` (ON phase ends by its timer), `:2065` (heater off), `:4442` (SAT disable), `:8174` (flame out).
+- Host test on origin/dev a3ad52d08: `python -m pytest tests/test_sat_pwm_on_freeze.py -q -p no:cacheprovider` gives 25 passed, F1-F10 named (run by otgw-dev and again by otgw-architect on a separate copy). On the code before the fix (`826e6a85e`, via `OTGW_SAT_INO`): 16 failed, 8 passed, 1 skipped; F1 red at `:181` (`420 != 330`). Eight existing SAT PWM test files: 345 passed (otgw-dev's run, not repeated by the architect). Record: `OTGW-field-data/_comms/adr296_evidence_E1-E5.md`.
+- Bench by otgw-bench-tester on a simulated boiler (satsimulation on), unit .63, 2.0.0-beta.432+43ac963 (SAT logic as beta.428). Clean flame W3: PWM segment 1 420.1 s, underheat exit, continuous 510.0 s, fail-safe re-entry, segment 2 30.0 s; ON time asked 444 s at the end tick; sum of PWM ON 450.1 s <= 444 + one 30 s tick. Without the freeze segment 2 would have run a full ON time of about 440 s. Record: `OTGW-field-data/bench-63/2026-11-25_flip-test/RESULTS_E6_E7.md` (with `key_lines.txt`, `SHA256SUMS`).
+- Not verified: a real boiler. Field confirmation by Sergeant D's testers follows after acceptance.
 
 ## Alternatives Considered
 
@@ -151,7 +164,7 @@ SAT keeps one PWM ON clock per flame.
 
 ## Open Questions
 
-- [ ] Robert accepts point e (interpretation, ours): the freeze applies to every PWM to continuous exit and every PWM re-entry inside the same flame, including the at-max exit and the 2.0 C / 60 s re-entry, wider than entry 478's "fail-safe flips".
+- [x] Robert accepts point e (interpretation, ours): the freeze applies to every PWM to continuous exit and every PWM re-entry inside the same flame, including the at-max exit and the 2.0 C / 60 s re-entry, wider than entry 478's "fail-safe flips". — **Answered 2026-11-25 by Agent: Claude (otgw-architect):** Robert, 2026-11-25 (interactive in the coordinator session, relayed): "Ja, punt e akkoord". Recorded as entry 493 (interpretation, ours, Robert's yes, not Sergeant D's words; OTGW-sat-decisions 7655cca, with the verbatim question in its correction note). Sergeant D has not been asked about the wider reading; a field result may reopen it.
 - [x] Robert accepts the four interpretations marked "(ours)": reset at the end of an ON phase; reset on heater off, SAT disable and restart; a manual `control_mode` flip freezes too; the fallback when the real flame-on is not known. — **Answered 2026-11-25 by Agent: Claude (otgw-architect):** Robert, 2026-11-25 (interactive in the coordinator session, relayed): yes to all four (a reset at the end of an ON phase, b reset on heater off, SAT disable and restart, c a manual control_mode flip freezes too, d the segment fallback when the real flame-on is unknown), as our interpretations, not Sergeant D's words. Acceptance of this ADR waits until the host test F1-F10 is green on the real code and the bench confirms.
 
 ## Related Decisions
@@ -163,8 +176,9 @@ SAT keeps one PWM ON clock per flame.
 
 ## References
 
-- Sergeant D entries 475, 476, 478 and 479, `docs/sat/decisions/sergeant-d-corrections.md` (OTGW-sat-decisions origin/main 5b8c13d); also entries 95, 428, 429 and 462.
-- thermo-nova 7beaaf5, `custom_components/sat/pwm.py:87-97`, `:106-108`, `:134`, `:201`, `:205`.
+- Sergeant D entries 475, 476, 478 and 479, `docs/sat/decisions/sergeant-d-corrections.md` (OTGW-sat-decisions origin/main 5b8c13d); also entries 95, 428, 429 and 462; entries 481 and 493 (Robert's yes to the interpretations, OTGW-sat-decisions 7655cca).
+- thermo-nova 7beaaf5 (https://github.com/Alexwijn/SAT/tree/7beaaf531ee99dc74a19ac74f3c06ce7f2922cfb), `custom_components/sat/pwm.py:87-97`, `:106-108`, `:134`, `:201`, `:205`.
 - Firmware `src/OTGW-firmware/SATcontrol.ino`: `:1435-1457` (`satPwmBeginOn`), `:1520`, `:1599`, `:1616` (hot-water freeze), `:1783-1800` (ON phase end and minimum burn), `:1936-1969` (`satPwmReset`), `:1975-1999` (`satSetControlMode`), `:2013-2025` (`satPwmDisableOnHeaterOff`), `:4395`, `:8121-8125` (CH flame-on).
 - Firmware `src/OTGW-firmware/SATcycles.ino`: `:41-42`, `:1434-1466` (fail-safe), `:1488-1516` (exits), `:1121`, `:1235` (flame-off hooks).
-- TASK-3039 (implementation plan and the architect's review notes).
+- TASK-3039 (implementation plan and the architect's review notes); implementation commit `e7297ebae`.
+- Acceptance evidence: `OTGW-field-data/_comms/adr296_evidence_E1-E5.md`, `OTGW-field-data/bench-63/2026-11-25_flip-test/RESULTS_E6_E7.md`.

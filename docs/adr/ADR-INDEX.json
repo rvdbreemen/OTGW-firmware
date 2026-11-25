@@ -11695,7 +11695,7 @@
       "title": "SAT keeps one PWM ON clock per flame: a switch to continuous freezes it, a PWM re-entry resumes it, and the minimum burn counts from the real flame-on",
       "path": "ADR-296-sat-keeps-one-pwm-on-clock-per-flame-a-switch-to-continuous-freezes-it-a-pwm-re-entry-resumes-it-and-the-minimum-burn-counts-from-the-real-flame-on.md",
       "format": "canonical",
-      "status": "Proposed",
+      "status": "Accepted",
       "date": "2026-11-25",
       "decision_summary": "SAT keeps one PWM ON clock per flame.",
       "topics": [
@@ -11750,7 +11750,12 @@
           "F9: a flame lit with the hot-water bit set (satchFlameOnMs 0): the minimum burn still applies.",
           "F10: a first PWM entry with nothing kept: the same ON phase as before this ADR.",
           "The existing tests of the start gate, the exit rules and the per-flame counting stay green.",
-          "Bench and field. A flame with several flips on the bench (otgw-bench-tester) shows a shorter total PWM ON time per flame than before; Sergeant D's testers confirm it in the field."
+          "Bench and field. A flame with several flips on the bench (otgw-bench-tester) shows a shorter total PWM ON time per flame than before; Sergeant D's testers confirm it in the field.",
+          "Harness limit. The host test compiles the real PWM block, but not the flame-edge handler of satControlLoopRun(), satDisable() or the end-of-cycle verdict (satCycleApplyEndOfCycle()); its driver replays their calls and source-read pins ch...",
+          "Code: commit e7297ebae on dev (in v2.0.0-beta.428; f57c7e54f is its pre-rebase copy). Freeze in satSetControlMode() at SATcontrol.ino:2027; kept time cleared at :1547 (ON phase ends by its timer), :2065 (heater off), :4442 (SAT disable),...",
+          "Host test on origin/dev a3ad52d08: python -m pytest tests/testsatpwmonfreeze.py -q -p no:cacheprovider gives 25 passed, F1-F10 named (run by otgw-dev and again by otgw-architect on a separate copy). On the code before the fix (826e6a85e,...",
+          "Bench by otgw-bench-tester on a simulated boiler (satsimulation on), unit .63, 2.0.0-beta.432+43ac963 (SAT logic as beta.428). Clean flame W3: PWM segment 1 420.1 s, underheat exit, continuous 510.0 s, fail-safe re-entry, segment 2 30.0...",
+          "Not verified: a real boiler. Field confirmation by Sergeant D's testers follows after acceptance."
         ]
       },
       "scope": {
