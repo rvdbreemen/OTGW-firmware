@@ -1,7 +1,7 @@
 ---
 id: "ADR-297"
 title: "SAT's underheat exit counts only once the flame has burned 180 s; the at-max exit keeps only the 60 s start gate (amends ADR-236)"
-status: "Proposed"
+status: "Accepted"
 date: "2026-11-25"
 binding: false
 gate: null
@@ -9,7 +9,6 @@ documents_shipped: false
 verified_in: []
 supersedes: []
 superseded_by: null
-format: "canonical"
 topics:
   - "sat"
   - "pwm"
@@ -26,6 +25,7 @@ symbols:
   - "satCycleCheckPwmExits"
   - "satCycleGetFlameOnStartMs"
 context_scope: "selective"
+format: "canonical"
 ---
 
 <!-- markdownlint-disable MD025 -->
@@ -34,9 +34,9 @@ context_scope: "selective"
 
 ## Status
 
-Proposed, 2026-11-25. Guideline-level per ADR-080: verified by a host test, no evaluate.py gate. Amends ADR-236 (Accepted 2026-11-25) in three points; the rest of ADR-236 stands. Release 2.0.0 (entries 456, 463, 484).
+Accepted, 2026-11-25, by Robert van den Breemen (interactive in the coordinator session). Guideline-level per ADR-080: verified by a host test, no evaluate.py gate. Amends ADR-236 (Accepted 2026-11-25) in three points; the rest of ADR-236 stands. Release 2.0.0 (entries 456, 463, 484).
 
-**Decision Maker:** Sergeant D, who decides SAT behaviour (ADR-292), in entries 456 and 463 (2026-11-21). Robert accepts this record.
+**Decision Maker:** Sergeant D, who decides SAT behaviour (ADR-292), in entries 456 and 463 (2026-11-21). Robert accepted this record on 2026-11-25.
 
 ## Status History
 
@@ -47,6 +47,11 @@ status_history:
     changed_by: "Agent: Claude (otgw-architect)"
     reason: Initial proposal
     changed_via: adr-kit
+  - date: 2026-11-25
+    status: Accepted
+    changed_by: "Agent: Claude (otgw-architect)"
+    reason: Accepted by Robert van den Breemen, 2026-11-25, interactive in the coordinator session ("Accepteren"), relayed to otgw-architect
+    changed_via: adr-kit lifecycle
 ```
 
 ## Context
@@ -122,7 +127,7 @@ This ADR amends ADR-236 in three points. Everything else in ADR-236 stands: the 
 
 ## Open Questions
 
-- [ ] Robert accepts this amendment, which records entries 456 and 463 against the Accepted ADR-236.
+- [x] Robert accepts this amendment, which records entries 456 and 463 against the Accepted ADR-236. — **Answered 2026-11-25 by Agent: Claude (otgw-architect):** Robert accepted it on 2026-11-25, interactive in the coordinator session ("Accepteren").
 
 ## Related Decisions
 

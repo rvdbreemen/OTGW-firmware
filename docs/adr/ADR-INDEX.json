@@ -11770,7 +11770,7 @@
       "title": "SAT's underheat exit counts only once the flame has burned 180 s; the at-max exit keeps only the 60 s start gate (amends ADR-236)",
       "path": "ADR-297-sat-s-underheat-exit-counts-only-once-the-flame-has-burned-180-s-the-at-max-exit-keeps-only-the-60-s-start-gate-amends-adr-236.md",
       "format": "canonical",
-      "status": "Proposed",
+      "status": "Accepted",
       "date": "2026-11-25",
       "decision_summary": "This ADR amends ADR-236 in three points.",
       "topics": [
