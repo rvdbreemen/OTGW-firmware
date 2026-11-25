@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v2.0.0-beta.432
+**  Version  : v2.0.0-beta.433
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -466,6 +466,7 @@ bool satOwnsControlSetpoint();
 // TASK-3017: one /ws client as device/info shows it (webSocketStuff.ino webSocketSnapshotClients, async_tcp only).
 struct WsClientSnap { uint32_t id; const char* status; uint16_t queueLen; uint32_t statusAgeS; uint32_t ageS; };
 uint8_t webSocketSnapshotClients(WsClientSnap* out, uint8_t max, uint32_t now);
+void satNoteExternalCS(const char* value);   // TASK-3021: a CS= that is not SAT's own (addCommandToQueue)
 // TASK-1709: shape of an OTGW command as the REST API accepts it: a letter, then a letter or a digit (C2=, H2=), then '='.
 // The caller checks the length and the PIC checks the value. Digit-first and non-ASCII prefixes fail.
 inline bool otgwCommandFormatOk(const char* s, size_t len) {

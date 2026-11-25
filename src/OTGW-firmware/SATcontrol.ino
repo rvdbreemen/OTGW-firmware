@@ -2943,6 +2943,144 @@ static float satGetRoomTemp()
   return otRoom;
 }
 
+// TASK-3021 (entries 460, 461): the frost guard. While SAT is off and no thermostat is seen on the bus, a room at or below
+// 6.0 C makes the gateway ask the boiler for heat itself, CS=30 with CH=1, until the room is back at 7.0 C. Without a known
+// room temperature it does nothing. One output for both boards: the CS=/CH= commands through addCommandToQueue(), which the
+// PIC (gateway.asm 6.6 readstatus :2712-2742, CH enable only while a CS= is in force) and OT-Direct (otdEffectiveMasterFlags,
+// the MsgID 1 override) both turn into CH enable on with a 30 C flow setpoint. Reference only (ADR-292): Alex's develop
+// ba515c8 demand_control.py:610-622 (on at <= threshold, off at >= threshold + 1, no room -> off) and :815-828 (30 C).
+// Decided by Sergeant D / Robert (register entries 460, 461, 485): SAT off, no thermostat seen, room <= 6 C, a 30 C flow
+// (CS=30 + CH=1) until the room is back at 7 C, both boards, fixed values without a setting.
+// Implementation choices (NOT in the register; ours, TASK-3021): monitor mode does nothing; a 60 s grace after boot for a
+// thermostat to show itself; a user CS= of 8 C or more wins for 130 s (below 8 C until a CS=0); no action while a hand-back
+// is pending or while flashing; evaluation every 5 s; CS=30 repeated about every 30 s; the room temperature comes from
+// the chosen BLE sensor or the external MQTT sensor only (entries 457/458), see satFrostRoomTemp().
+static const float    SAT_FROST_ON_C          = 6.0f;
+static const float    SAT_FROST_OFF_C         = 7.0f;
+static const uint32_t SAT_FROST_BOOT_GRACE_MS = 60000UL;   // a thermostat that is there gets 60 s to show itself after boot
+static const uint32_t SAT_FROST_USER_CS_MS    = 130000UL;  // a user CS= of 8 C or more counts this long (PIC expiry is up to ~126 s)
+static const uint32_t SAT_FROST_EVAL_MS       = 5000UL;
+
+// --- satFrostGuard begin
+// The hysteresis: on at room <= 6.0, off at room >= 7.0, in between it keeps its state; no room temperature means off.
+static bool satFrostGuardStep(bool active, float room)
+{
+  if (isnan(room)) return false;
+  if (room <= SAT_FROST_ON_C) return true;
+  if (room >= SAT_FROST_OFF_C) return false;
+  return active;
+}
+
+// Whether a CS= from someone else (REST, MQTT, telnet) is in force now: a value of 8 C or more for SAT_FROST_USER_CS_MS after
+// it was sent (it expires on both boards unless it is repeated), a value below 8 until a CS=0 (it never expires: PIC
+// gateway.asm CommandExpiry, OT-Direct otdCsc2ExpiryStamp).
+static bool satFrostUserCsInForce(bool seen, float value, uint32_t ageMs)
+{
+  if (!seen || !(value > 0.0f)) return false;
+  if (value < 8.0f) return true;
+  return ageMs < SAT_FROST_USER_CS_MS;
+}
+
+// One decision per evaluation. Someone else owning the setpoint (SAT, a user CS=) ends the guard without a CS=0, so their
+// setpoint stays; a thermostat that appears, a room back at 7 C or a lost room temperature end it with CS=0.
+static SatFrostAction satFrostGuardDecide(const SatFrostIn& in)
+{
+  if (in.otherOwner) return in.active ? SAT_FROST_DROP : SAT_FROST_NONE;
+  const bool want = in.mayAct && !in.thermostat && satFrostGuardStep(in.active, in.room);
+  if (!in.active) return want ? SAT_FROST_ENTER : SAT_FROST_NONE;
+  if (!want) return SAT_FROST_RELEASE;
+  return (in.sinceSendMs >= SAT_CS_REPEAT_MS) ? SAT_FROST_REPEAT : SAT_FROST_NONE;
+}
+// --- satFrostGuard end
+
+static volatile bool     _sat_frostUserCsSeen  = false;
+static volatile float    _sat_frostUserCsValue = 0.0f;
+static volatile uint32_t _sat_frostUserCsMs    = 0;
+
+// Called by addCommandToQueue() for every CS= that is not SAT's own (any task; three single-word stores).
+void satNoteExternalCS(const char* value)
+{
+  _sat_frostUserCsValue = (value != nullptr) ? strtof(value, nullptr) : 0.0f;
+  _sat_frostUserCsMs    = millis();
+  _sat_frostUserCsSeen  = true;
+}
+
+// The room temperature the guard uses (implementation choice, entries 457/458): only a chosen BLE sensor or the external MQTT
+// sensor, a measured value without simulation, fallback estimate or Summer Simmer, and without changing _sat_roomSrc
+// (sat/room_temp_source reports SAT's own choice). An explicit primary of BLE or external goes first. No averaged areas and
+// no thermostat MsgID 24: the guard only acts with no thermostat on the bus, and an average over areas can hide a cold room.
+// No room temperature means NAN and the guard does nothing.
+static float satFrostRoomTemp()
+{
+  const char keepSrc = _sat_roomSrc;
+  float v = NAN;
+  bool found = false;
+  const uint8_t primary = settings.sat.iRoomSource;
+  if (primary == SAT_ROOMSRC_BLE || primary == SAT_ROOMSRC_EXTERNAL) found = satTryRoomSource(primary, &v);
+  static const uint8_t kOrder[2] = { SAT_ROOMSRC_BLE, SAT_ROOMSRC_EXTERNAL };
+  for (uint8_t k = 0; k < 2 && !found; k++) {
+    if (kOrder[k] != primary) found = satTryRoomSource(kOrder[k], &v);
+  }
+  _sat_roomSrc = keepSrc;
+  return (found && satRoomTempValid(v)) ? v : NAN;
+}
+
+static bool     _sat_frostActive  = false;
+static uint32_t _sat_frostSendMs  = 0;
+static uint32_t _sat_frostEvalMs  = 0;
+
+static bool satFrostSend(const char* cmd)
+{
+  return addCommandToQueue(cmd, strlen(cmd), false, 0, true) != CmdQueueResult::Dropped;
+}
+
+// Loop task, every satControlLoop() pass; evaluates every 5 s.
+static void satFrostGuardService()
+{
+  const uint32_t now = millis();
+  if (_sat_frostEvalMs != 0 && (uint32_t)(now - _sat_frostEvalMs) < SAT_FROST_EVAL_MS) return;
+  _sat_frostEvalMs = (now == 0) ? 1 : now;
+
+  SatFrostIn in;
+  in.active      = _sat_frostActive;
+  in.room        = satFrostRoomTemp();
+  const bool monitorMode = state.otBus.bGatewayModeKnown && !state.otBus.bGatewayMode;
+  in.mayAct      = !_sat_releasePending && now >= SAT_FROST_BOOT_GRACE_MS && !monitorMode && !isFlashing();
+  in.thermostat  = state.otBus.bThermostatState;
+  in.otherOwner  = satOwnsControlSetpoint() ||
+                   satFrostUserCsInForce(_sat_frostUserCsSeen, _sat_frostUserCsValue, now - _sat_frostUserCsMs);
+  in.sinceSendMs = now - _sat_frostSendMs;
+
+  switch (satFrostGuardDecide(in)) {
+    case SAT_FROST_ENTER:
+      if (satFrostSend("CS=30.0") && satFrostSend("CH=1")) {
+        _sat_frostActive = true;
+        _sat_frostSendMs = now;
+        SATDebugTf(PSTR("SAT: frost guard on: room %.1f C <= %.1f C, no thermostat, SAT off: CS=30 CH=1\r\n"),
+                   in.room, SAT_FROST_ON_C);
+      }
+      break;
+    case SAT_FROST_REPEAT:
+      if (satFrostSend("CS=30.0")) _sat_frostSendMs = now;   // CS= expires on both boards unless repeated
+      break;
+    case SAT_FROST_RELEASE:
+      if (satFrostSend("CS=0")) {
+        _sat_frostActive = false;
+        if (isnan(in.room)) SATDebugTln(F("SAT: frost guard off: no room temperature, CS=0"));
+        else if (in.thermostat) SATDebugTln(F("SAT: frost guard off: a thermostat is connected, CS=0"));
+        else SATDebugTf(PSTR("SAT: frost guard off: room %.1f C, CS=0\r\n"), in.room);
+      }
+      break;
+    case SAT_FROST_DROP:
+      _sat_frostActive = false;
+      SATDebugTln(F("SAT: frost guard off: SAT or a user CS= controls the setpoint (no CS=0)"));
+      break;
+    default:
+      break;
+  }
+  state.sat.bFrostGuardActive = _sat_frostActive;
+}
+
 // TASK-3011: SATroomsource as a name (MQTT state sat/room_source, REST) and back. A number 0..4 or a name is accepted;
 // anything else keeps the current value.
 const char* satPrimaryRoomSourceName(uint8_t src)
@@ -5086,6 +5224,7 @@ void satSendStatusJSON()
     je.field(F("no_ignition_events"),   snap->st.sat.iNoIgnitionEvents);
     je.field(F("heating_failure"),      snap->st.sat.bHeatingFailure);     // TASK-1882, diagnostic only
     je.field(F("heating_failure_events"), snap->st.sat.iHfEvents);
+    je.field(F("frost_guard_active"),   snap->st.sat.bFrostGuardActive);   // TASK-3021: SAT off, no thermostat, room <= 6 C
     je.field(F("heating_failure_room_start"), snap->st.sat.fHfRoomStart);  // the last 15 min window
     je.field(F("heating_failure_room_end"),   snap->st.sat.fHfRoomEnd);
     je.field(F("outside_temp_missing"), snap->st.sat.bOutsideTempMissing);   // TASK-1390
@@ -7927,6 +8066,7 @@ void satControlLoop()
   _thermal_lastPassControlled = _sat_tuneGatesPassed;   // TASK-2010: the previous pass's gate result, read by this pass's thermal learning
   _sat_tuneGatesPassed = false;
   satControlLoopRun();
+  satFrostGuardService();          // TASK-3021: also while SAT is off
 #ifdef OTGW_CONN_PROBE
   OTGW_CONN_PROBE(CPROBE_SAT_RUN);   // TASK-1757 AC3 diagnostics (MQTTstuff.h); absent in host test harnesses
 #endif

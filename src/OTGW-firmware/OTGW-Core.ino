@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v2.0.0-beta.432
+**  Version  : v2.0.0-beta.433
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -3989,6 +3989,14 @@ static void triggerReadoutForSettingsCmd(const char* buf) {
 // the back), Sent (OT-Direct board: handled on the spot) or Dropped (refused, invalid, queue full, or the queue lock not
 // acquired within CMD_QUEUE_LOCK_MS). A caller that must not lose a value (SAT) can retry on Dropped.
 CmdQueueResult addCommandToQueue(const char* buf, const int len, const bool forceQueue, const int16_t delay, const bool satOwn){
+  // TASK-3021: the frost guard yields to a CS= of someone else (REST, MQTT, telnet); SAT's own and the guard's are satOwn; while SAT is on, an external CS= is refused anyway.
+  if (!satOwn && !satOwnsControlSetpoint() && buf != nullptr && len >= 3 && buf[0] == 'C' && buf[1] == 'S' && buf[2] == '=') {
+    char v[12];
+    const int n = (len - 3) < (int)sizeof(v) - 1 ? (len - 3) : (int)sizeof(v) - 1;
+    memcpy(v, buf + 3, (size_t)n);
+    v[n] = '\0';
+    satNoteExternalCS(v);
+  }
   if (!isPICEnabled()) {
 #if HAS_DIRECT_OT
     // On OTGW32, route commands directly to OT-direct handler

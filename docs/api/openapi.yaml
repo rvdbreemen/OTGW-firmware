@@ -4821,6 +4821,7 @@ components:
         no_ignition_events: { type: integer, description: "No-ignition events since boot" }
         heating_failure: { type: boolean, description: "TASK-1882, diagnostic only: SAT at its maximum for 15 min while the room rose less than 0.5 C" }
         heating_failure_events: { type: integer, description: "Heating-failure events since boot" }
+        frost_guard_active: { type: boolean, description: "TASK-3021: the frost guard holds CS=30 with CH=1 (SAT off, no thermostat on the bus, measured room <= 6.0 C, until 7.0 C)" }
         heating_failure_room_start: { type: number, description: "Room temperature at the start of the last 15 min window, C" }
         heating_failure_room_end: { type: number, description: "Room temperature at the end of the last 15 min window, C" }
         fireplace_mode:

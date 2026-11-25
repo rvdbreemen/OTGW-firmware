@@ -223,7 +223,15 @@ class SourceChecks(unittest.TestCase):
                               capture_output=True, text=True, encoding="utf-8", check=True).stdout.replace("\r\n", "\n")
         def pic_part(core):
             fn = add_cmd_fn(core)
-            return fn.replace(otd_branch(core), "")
+            fn = fn.replace(otd_branch(core), "")
+            # TASK-3021: the frost guard's note of an external CS= runs before both board paths and does not touch the
+            # PIC queue; it is left out of this comparison (tests/test_sat_frost_guard.py checks it).
+            h = fn.find("  // TASK-3021: the frost guard yields")
+            if h >= 0:
+                blk = braced(fn, fn.index("if (!satOwn && !satOwnsControlSetpoint()", h))
+                end = fn.index(blk, h) + len(blk) + 1
+                fn = fn[:h] + fn[end:]
+            return fn
         self.assertEqual(pic_part(CORE), pic_part(base))
 
     def test_rest_reports_a_dropped_command(self):

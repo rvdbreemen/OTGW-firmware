@@ -79,6 +79,7 @@ static void pmChainTick() {}
 static void triggerPICsettingsReadout() {}
 static bool isPICEnabled() { return true; }
 static bool satOwnsControlSetpoint() { return false; }
+static void satNoteExternalCS(const char*) {}   // TASK-3021: addCommandToQueue() tells the frost guard about a foreign CS=
 // TASK-1695 refuse gate in addCommandToQueue(): never reached here, SAT does not own the setpoint (above).
 static bool satBlocksExternalCommand(const char*, int) { return false; }
 static void satNoteExternalRefused(const char*, int) {}

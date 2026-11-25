@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : SATtypes.h
-**  Version  : v2.0.0-beta.432
+**  Version  : v2.0.0-beta.433
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -163,6 +163,20 @@ struct SatDiagIn {
 //====================================================================
 //=== state.sat — transient SAT runtime state ===
 //====================================================================
+
+// TASK-3021: the frost guard's decision (satFrostGuardDecide() in SATcontrol.ino). Here so the Arduino prototype pass sees them.
+// --- satFrostTypes begin
+enum SatFrostAction : uint8_t { SAT_FROST_NONE = 0, SAT_FROST_ENTER, SAT_FROST_REPEAT, SAT_FROST_RELEASE, SAT_FROST_DROP };
+
+struct SatFrostIn {
+  bool     active;        // the guard holds CS=30 now
+  float    room;          // a measured room temperature, NaN when none
+  bool     mayAct;        // SAT off, no hand-back pending, past the boot grace, not in monitor mode, not flashing
+  bool     thermostat;    // a thermostat frame within the bus window (state.otBus.bThermostatState)
+  bool     otherOwner;    // SAT controls the setpoint or a user CS= is in force
+  uint32_t sinceSendMs;   // time since the guard's last CS=30
+};
+// --- satFrostTypes end
 
 struct SATRuntimeSection {         // state.sat — SAT thermostat controller state
   bool            bActive        = false;
@@ -431,6 +445,7 @@ struct SATRuntimeSection {         // state.sat — SAT thermostat controller st
   bool     bOtLinkLost            = false;  // no boiler reply for 30 s: SAT handed the boiler back once and sends nothing until a reply returns (TASK-1365)
   // TASK-1882: diagnostic events, no control action (satDiagEventsStep in SATcontrol.ino)
   bool     bNoIgnition            = false;  // CH asked (PWM ON phase or CS above the cold cutoff) for 180 s, flow below CS, no flame
+  bool     bFrostGuardActive      = false;  // TASK-3021: the frost guard holds CS=30 (SAT off, no thermostat, room <= 6 C until 7 C)
   bool     bHeatingFailure        = false;  // SAT at the maximum (setpoint or PWM duty) for 15 min while the room rose < 0.5 C
   float    fHfRoomStart           = 0.0f;   // last heating-failure window: room at its start
   float    fHfRoomEnd             = 0.0f;   //   and at its end (the window is 15 min)

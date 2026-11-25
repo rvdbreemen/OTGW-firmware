@@ -276,6 +276,7 @@ One row per Architecture Decision Record. Scope is the Enforcement `path_glob` s
 | ADR-291 | Accepted | - | The device history slot gets an eighth int16t temperature column, satRoom, so a slot is 18 bytes. |
 | ADR-292 | Accepted | - | For every statement or change about SAT behaviour the sources rank in this order, and a higher source wins over a low... |
 | ADR-293 | Accepted | - | SAT regulates on one primary room temperature source chosen by the setting SATroomsource, with a fixed fallback order... |
+| ADR-294 | Proposed | - | While SAT does not control the setpoint, no thermostat frame was seen on the bus for 30 s (state.otBus.bThermostatSta... |
 | ADR-295 | Proposed | - | At CRITICAL heap, ADR-107 action 1 aborts every /ws TCP connection in lwIP, with a RST, instead of otLogWs.closeAll(). |
 | ADR-296 | Accepted | - | SAT keeps one PWM ON clock per flame. |
 | ADR-297 | Accepted | - | This ADR amends ADR-236 in three points. |
