@@ -2873,7 +2873,7 @@ static float satGetRoomTemp()
 
   // TASK-204: Thermal comfort mode -- substitute Summer Simmer Index as PID room temp input.
   // Matches Python climate.py thermal_comfort: the PID targets heat-index-adjusted perceived
-  // temperature rather than raw sensor temp, so e.g. 22C at 70% humidity "feels like" 23C.
+  // temperature rather than raw sensor temp, so e.g. 22C at 70% humidity "feels like" 26.9C (the index, 1 decimal).
   // Only active when bThermalComfort is enabled AND humidity data is fresh (< iHumidityTimeoutS).
   // TASK-521: skip SSI when otRoom is a ghost zero -- SSI(0,H) is meaningless and would mask
   // the no-source condition from the control-loop NaN guard.
@@ -5225,13 +5225,16 @@ void satSendStatusJSON()
 //=====================================================================
 //=== Summer Simmer Index (Task #64) ===
 //=====================================================================
-// Matches SAT Python summer_simmer.py formula exactly
+// Matches SAT Python summer_simmer.py formula exactly, including its rounding: one return, rounded to 1 decimal in Celsius
+// (summer_simmer.py:38; entry 490, which settles entry 489). Every path of this function rounds the same way: below 58 F
+// the index is the temperature, and a humidity outside 0..100 (a firmware guard, the Python code has none) gives the
+// temperature. Computed in double with Python's 1.8 conversion, rounded half to even like Python's round().
 static float satCalcSimmerIndex(float tempC, float humidity) {
-  if (humidity < 0 || humidity > 100) return tempC;
-  float F = tempC * 9.0f / 5.0f + 32.0f;
-  if (F < 58.0f) return tempC;  // below threshold, return raw temp
-  float idx = 1.98f * (F - (0.55f - 0.0055f * humidity) * (F - 58.0f)) - 56.83f;
-  return (idx - 32.0f) * 5.0f / 9.0f;  // convert back to Celsius
+  if (humidity < 0 || humidity > 100) return (float)satRoundHalfEvenDecimals((double)tempC, 1);
+  const double F = (double)tempC * 1.8 + 32.0;
+  double idx = F;  // below 58 F (summer_simmer.py:34-35) the index is the temperature
+  if (F >= 58.0) idx = 1.98 * (F - (0.55 - 0.0055 * (double)humidity) * (F - 58.0)) - 56.83;
+  return (float)satRoundHalfEvenDecimals((idx - 32.0) / 1.8, 1);  // convert back to Celsius, 1 decimal
 }
 
 static const char* satSimmerPerception(float indexC) {

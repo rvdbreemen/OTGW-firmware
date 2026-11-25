@@ -18,10 +18,15 @@ import sat_sim_port as port
 
 class KdWarmup(unittest.TestCase):
     def test_copy_matches_1412_19_run(self):
-        ref = c19.run("very_low_load", "3_1983-92", "rad", "variable", 5.5, True, 2)
-        self.assertEqual(ref["outdoor"], "steady_12")
-        mine = k.run("3_1983-92", ref["mass"], "rad", "variable", 5.5, True, 12.0, 0.0, factor=0.9,
-                     hours=c19.HOURS, skip_h=c19.SETTLE_H)
+        saved = port.Pid.ENTRY95_ROUNDING
+        port.Pid.ENTRY95_ROUNDING = True   # the 1655 copy rounds the gains to 3 decimals (entry 95 Q28a); the port default is 6 since entries 482 and 490
+        try:
+            ref = c19.run("very_low_load", "3_1983-92", "rad", "variable", 5.5, True, 2)
+            self.assertEqual(ref["outdoor"], "steady_12")
+            mine = k.run("3_1983-92", ref["mass"], "rad", "variable", 5.5, True, 12.0, 0.0, factor=0.9,
+                         hours=c19.HOURS, skip_h=c19.SETTLE_H)
+        finally:
+            port.Pid.ENTRY95_ROUNDING = saved
         self.assertEqual(mine["share_in_0_3_scored"], ref["S1_share_in_0_3"])
         self.assertEqual(mine["max_over_scored"], ref["S2_max_over"])
         self.assertEqual(mine["starts_per_day"], ref["S4_starts_per_day"])

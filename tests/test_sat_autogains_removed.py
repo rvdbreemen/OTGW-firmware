@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """TASK-1357: the dead SAT settings satautogains (fAutoGainsValue) and the manual-gain switch
-(bAutoGains, fKpManual/fKiManual/fKdManual) are gone, and the PID gains did not change, except for the 3-decimal rounding of TASK-1423 (Sergeant D entry 95, Q28a).
+(bAutoGains, fKpManual/fKiManual/fKdManual) are gone, and the PID gains did not change, except for the rounding: 3 decimals since TASK-1423 (Sergeant D entry 95, Q28a), 6 decimals like thermo-nova since entries 482 (Ki) and 490 (kp, kd).
 
 Two parts:
   1. Source check: no firmware source (src/OTGW-firmware, every file type, the web UI included) still names
@@ -9,8 +9,8 @@ Two parts:
   2. Behaviour: the REAL _pidCalculateGains() is cut out of SATpid.ino and compiled with a host C++ compiler; the Kp/Ki/Kd it
      computes for a grid of heating-curve inputs are compared with the automatic formula as it stood on HEAD
      (pid.py automatic_gains: kp = coeff * curve / divisor, ki = kp / 8400, kd = 0.07 * 8400 * kp, the firmware uses 0.05 since entry 425 (0.063 by entry 279, TASK-1656); divisor 4 underfloor,
-     3 radiators), each rounded to 3 decimals since TASK-1423 (entry 95, Q28a; Ki and Kd from the rounded Kp, pid.py:82, :93;
-     pid.py itself rounds to 6). The stub settings carry the old fields at their old defaults (bAutoGains true), so the same
+     3 radiators), each rounded to 6 decimals like pid.py:71, :82, :93 (entries 482 and 490; Ki and Kd from the rounded Kp; Python round(),
+     ties to even) and stored as float32. The stub settings carry the old fields at their old defaults (bAutoGains true), so the same
      harness also compiles the pre-removal SATpid.ino; it only matches while that file does not round.
 
 OTGW_FW_DIR points at another copy of src/OTGW-firmware (e.g. a `git show HEAD:` export) for the old-vs-fix run.
@@ -19,6 +19,7 @@ Run: python tests/test_sat_autogains_removed.py
 """
 import os
 import re
+import struct
 import subprocess
 import sys
 import tempfile
@@ -64,21 +65,26 @@ int main(int argc, char** argv) {
 
 def extract_gain_code(src: str) -> str:
     """The gain constants and the real _pidCalculateGains() body, verbatim."""
-    consts = [m.group(0) for m in re.finditer(r"^static const float SAT_PID_(?:AGGRESSION_V3|KD_FACTOR|KP_DIVISOR_FLOOR|KP_DIVISOR_RAD)\s*=.*;", src, re.M)]
+    consts = [m.group(0) for m in re.finditer(r"^static const (?:float|double) SAT_PID_(?:AGGRESSION_V3|KD_FACTOR|KP_DIVISOR_FLOOR|KP_DIVISOR_RAD)\s*=.*;", src, re.M)]
     assert len(consts) in (3, 4), consts   # 3 on a pre-TASK-1656 copy, which writes 0.07f inline
     a = src.index("static void _pidCalculateGains(float curveValue)")
     b = src.index("\n}\n", a) + 3
-    r = src.index("float satPidRound3(float v)")
-    return "\n".join(consts) + "\n" + src[r:src.index("\n}\n", r) + 3] + "\n" + src[a:b]
+    r = src.index("//=== PID rounding")
+    return "\n".join(consts) + "\n" + src[r:src.index("//=== Restore PID internal state")] + "\n" + src[a:b]
 
 
 KD_FACTOR = 0.04   # Sergeant D entry 477 (amends 425/427, TASK-3041; was 0.05 since entry 425, 0.063 before): deliberate deviation from thermo-nova pid.py:93, which uses 0.07
 
 
+def f32(x):
+    return struct.unpack("f", struct.pack("f", x))[0]
+
+
 def expected_gains(coeff: float, curve: float, system: int):
+    """pid.py:71, :82, :93 with Python round(x, 6), fed the float32 inputs the firmware has, as float32 (what the state holds)."""
     divisor = 4.0 if system == 2 else 3.0
-    kp = round(coeff * curve / divisor, 3)   # TASK-1423: 3 decimals, Ki and Kd from the rounded Kp
-    return kp, round(kp / 8400.0, 3), round(KD_FACTOR * 8400.0 * kp, 3)
+    kp = round(f32(coeff) * f32(curve) / divisor, 6)   # entry 490: 6 decimals; Ki (entry 482) and Kd from the rounded Kp
+    return f32(kp), f32(round(kp / 8400.0, 6)), f32(round(KD_FACTOR * 8400.0 * kp, 6))
 
 
 class AutoGainsNamesGone(unittest.TestCase):
@@ -97,7 +103,7 @@ class AutoGainsNamesGone(unittest.TestCase):
         pid = (FW / "SATpid.ino").read_text(encoding="utf-8")
         body = extract_gain_code(pid)
         self.assertNotIn("Manual", body)
-        self.assertIn("(coeff * curveValue) / divisor", body)
+        self.assertIn("((double)coeff * (double)curveValue) / (double)divisor", body)
 
 
 class GainsUnchanged(unittest.TestCase):
@@ -124,12 +130,32 @@ class GainsUnchanged(unittest.TestCase):
                 for curve in (25.0, 40.0, 55.0):
                     out = subprocess.run([str(self.exe), str(coeff), str(curve), str(system)],
                                          capture_output=True, text=True, check=True).stdout.split()
-                    got = [float(x) for x in out]
+                    got = [f32(float(x)) for x in out]
                     for g, e, what in zip(got, expected_gains(coeff, curve, system), ("kp", "ki", "kd")):
-                        self.assertAlmostEqual(g, e, delta=max(1.5e-6, abs(e) * 2e-6),
-                                               msg=f"{what} coeff={coeff} curve={curve} system={system}")
+                        self.assertEqual(g, e, msg=f"{what} coeff={coeff} curve={curve} system={system}")
                     n += 1
         self.assertEqual(n, 24)
+
+    def gains(self, coeff, curve, system):
+        out = subprocess.run([str(self.exe), str(coeff), str(curve), str(system)], capture_output=True, text=True, check=True).stdout.split()
+        return [f32(float(x)) for x in out]   # the driver prints float32 with %.9g, which round-trips
+
+    def test_named_cases_entries_482_and_490(self):
+        if not self.exe:
+            self.skipTest("no host C++ compiler")
+        # (coefficient, curve, system, kp, ki, kd) as Python 3.12 gives them in doubles (round(x, 6)); the firmware holds float32
+        cases = [
+            (2.3, 38.7, 1, 29.67, 0.003532, 9969.12),      # indigo, 24 Nov 12:54:41: ki 0.003532 (3 decimals gave 0.004)
+            (1.0, 12.0, 1, 4.0, 0.000476, 1344.0),         # kp 4.0: ki with 3 decimals = 0.000, with 6 decimals = 0.000476
+            (0.01, 1.0, 1, 0.003333, 0.0, 1.119888),       # kp below 0.0042: kp / 8400 < 5e-7, ki rounds to 0.0 (3 decimals gave kp 0.003)
+            (1.0, 0.0126, 1, 0.0042, 0.0, 1.4112),         # kp 0.0042: 0.0042 / 8400 is just below 5e-7 in binary, python gives 0.0
+        ]
+        for coeff, curve, system, kp, ki, kd in cases:
+            with self.subTest(coeff=coeff, curve=curve):
+                kp_py = round(f32(coeff) * f32(curve) / 3.0, 6)
+                self.assertEqual((kp_py, round(kp_py / 8400.0, 6), round(KD_FACTOR * 8400.0 * kp_py, 6)), (kp, ki, kd),
+                                 "the pasted expectation is what python gives")
+                self.assertEqual(self.gains(coeff, curve, system), [f32(kp), f32(ki), f32(kd)])
 
 
 if __name__ == "__main__":

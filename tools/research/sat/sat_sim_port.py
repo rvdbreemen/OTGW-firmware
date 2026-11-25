@@ -14,8 +14,10 @@ Ported (firmware source):
 Not ported here (the simulation models them in its own loop, see sat_hp_library_study21.py): the PWM entry switch and
 exits (SATcycles.ino), the ON-phase setpoint overrides, the room sensor filter, presets, solar gain.
 
-Floats: the firmware computes in float32; this port uses numpy float32 for the rounding steps so that the 3-decimal
-roundings land on the same side.
+Floats: the firmware computes in float32; this port uses numpy float32 for the integral and derivative steps. The gains,
+the P, I and D terms and the output are computed and rounded in double with Python round() as the firmware does since
+entries 482 and 490 (gains 6 decimals, P/I/D 3, output 1), and stored as float32. round3() stays the float32 roundf of
+satPidError (and of the frozen what-if studies that import it).
 """
 import math
 import numpy as np
@@ -33,6 +35,18 @@ def round3(v):
     x = float(f32(v) * f32(1000.0))
     r = math.copysign(math.floor(abs(x) + 0.5), x)
     return f32(f32(r) / f32(1000.0))
+
+
+def py_round(v, n):
+    """satRoundHalfEvenDecimals (SATpid.ino): Python round(x, n) on the exact value of a float32 or float64, as a float64.
+    Python's round rounds the exact binary value and sends an exact tie to the even neighbour, which is what the firmware's
+    fma-based helper does (tests/test_sat_pid_rounding.py compares it with round() on 20 000 values per decimal count)."""
+    return round(float(v), n)
+
+
+def pid_round3(v):
+    """satPidRound3: the 3-decimal value of Python round(), stored as float32 (entries 95, 482, 490)."""
+    return f32(py_round(v, 3))
 
 
 def pid_error(target, room):
@@ -53,6 +67,9 @@ class Pid:
     # True = the firmware since TASK-1890 (ADR-259): outside the deadband the integral is halved once and held. False = the
     # rule before it (set to 0, thermo-nova pid.py:187-189); only for reproducing studies whose committed results used it.
     HALVE_ON_EXIT = True
+    # True = the rounding before entries 482 and 490 (every PID value at 3 decimals, entry 95 Q28a), for reproducing studies and
+    # committed results made with it. False = the firmware: gains 6 decimals, P/I/D 3, output 1, Python round().
+    ENTRY95_ROUNDING = False
 
     def __init__(self, coeff, underfloor):
         self.coeff = f32(coeff); self.divisor = f32(4.0) if underfloor else f32(3.0)
@@ -68,9 +85,17 @@ class Pid:
         self.kp = self.ki = self.kd = f32(0.0)
 
     def _gains(self, cv):
-        self.kp = round3(self.coeff * f32(cv) / self.divisor)
-        self.ki = round3(self.kp / AGGRESSION)
-        self.kd = round3(f32(0.04) * AGGRESSION * self.kp)   # SAT_PID_KD_FACTOR, entry 477 (was 0.05, entry 425; 0.063, entry 279; pid.py:93 has 0.07)
+        if self.ENTRY95_ROUNDING:
+            self.kp = round3(self.coeff * f32(cv) / self.divisor)
+            self.ki = round3(self.kp / AGGRESSION)
+            self.kd = round3(f32(0.04) * AGGRESSION * self.kp)
+            return
+        # Entries 482 and 490: 6 decimals like pid.py:71, :82, :93, computed in double from the float32 inputs, stored as float32.
+        # kp is held as the double the firmware computes before it stores the float (Ki and Kd derive from that, as in the firmware).
+        kp = py_round(float(self.coeff) * float(f32(cv)) / float(self.divisor), 6)
+        self.kp = f32(kp)
+        self.ki = f32(py_round(kp / 8400.0, 6))
+        self.kd = f32(py_round(0.04 * 8400.0 * kp, 6))   # SAT_PID_KD_FACTOR, entry 477 (was 0.05, entry 425; 0.063, entry 279; pid.py:93 has 0.07)
 
     def note_room(self, room, now_ms):
         room = f32(room)
@@ -119,12 +144,19 @@ class Pid:
 
     def output(self, cv):
         self._gains(cv)
-        P = I = D = f32(0.0)
+        if self.ENTRY95_ROUNDING:
+            P = I = D = f32(0.0)
+            if not math.isnan(float(self.last_error)):
+                P = round3(self.kp * self.last_error); I = round3(self.integral)
+                if not self.first_output_pending: D = round3(self.kd * self.raw_d)
+                self.first_output_pending = False
+            return round3(f32(cv) + P + I + D)
+        P = I = D = 0.0   # float64 terms, each the double nearest to its 3-decimal value: the firmware sums them in double (entry 490)
         if not math.isnan(float(self.last_error)):
-            P = round3(self.kp * self.last_error); I = round3(self.integral)
-            if not self.first_output_pending: D = round3(self.kd * self.raw_d)
+            P = py_round(float(self.kp) * float(self.last_error), 3); I = py_round(float(self.integral), 3)
+            if not self.first_output_pending: D = py_round(float(self.kd) * float(self.raw_d), 3)
             self.first_output_pending = False
-        return round3(f32(cv) + P + I + D)
+        return f32(py_round(float(f32(cv)) + P + I + D, 1))   # pid.py:132: the output has 1 decimal
 
     def service(self, now_ms, room, target, cv):
         """satPidService with a valid room temperature: a step at start-up, then every 60 s (SKIP_MISSED_TICKS)."""

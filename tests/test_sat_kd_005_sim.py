@@ -58,12 +58,14 @@ class Kd005(unittest.TestCase):
     def _run_as_committed(self, *args, **kw):
         # The committed 1655 x09 rows were produced before TASK-1890 (ADR-259): the integral was set to 0 outside the
         # deadband. Reproduce them with that rule; the port's default follows the firmware (halve once, hold).
-        saved = port.Pid.HALVE_ON_EXIT
+        # They were also made with every PID value rounded to 3 decimals (entry 95 Q28a, before entries 482 and 490).
+        saved = port.Pid.HALVE_ON_EXIT, port.Pid.ENTRY95_ROUNDING
         port.Pid.HALVE_ON_EXIT = False
+        port.Pid.ENTRY95_ROUNDING = True
         try:
             return k.run(*args, **kw)
         finally:
-            port.Pid.HALVE_ON_EXIT = saved
+            port.Pid.HALVE_ON_EXIT, port.Pid.ENTRY95_ROUNDING = saved
 
     def test_baseline_reproduces_1655_x09_warmup_row(self):
         ref = next(r for r in committed_x09() if r["kind"] == "warmup" and r["plant_class"] == "3_1983-92/light/rad"

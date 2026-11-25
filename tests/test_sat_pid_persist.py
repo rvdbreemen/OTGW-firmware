@@ -133,7 +133,7 @@ def build_cpp():
     pid = PID_INO.read_text(encoding="utf-8").replace("\r\n", "\n")
     persist = _between(sat, "//=== PID State Persistence", "// --- satPwmFlag begin")
     pidvars = _between(pid, "static float  _pid_lastError", "// The PID moves on its own 60 s timer")
-    pidfuncs = _between(pid, "//=== PID rounding (entry 95, Q28a)", "//=== Reset of the integral and the raw derivative")
+    pidfuncs = _between(pid, "//=== PID rounding (entries 95, 482, 490)", "//=== Reset of the integral and the raw derivative")
     return STUBS.replace("@PIDVARS@", pidvars).replace("@PIDFUNCS@", pidfuncs).replace("@PERSIST@", persist) + MAIN
 
 

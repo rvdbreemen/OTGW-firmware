@@ -427,10 +427,12 @@ baseOffset = 20 underfloor, 27.2 otherwise                (SATcontrol.ino:49-50,
 **Gains** (`SATpid.ino:120-142`):
 
 ```
-kp = round3(fHeatingCurveCoeff * curveValue / divisor)   (divisor 4 underfloor, 3 otherwise)
-ki = round3(kp / 8400)                                   (the rounded kp, as pid.py:82)
-kd = round3(0.04 * 8400 * kp)                            (the rounded kp; factor 0.04, SAT_PID_KD_FACTOR, entry 477; pid.py:93 has 0.07)
-(round3 = rounded to 3 decimals, satPidRound3(); entry 95 Q28a, TASK-1423. pid.py rounds the gains to 6.)
+kp = round6(fHeatingCurveCoeff * curveValue / divisor)   (divisor 4 underfloor, 3 otherwise; pid.py:71)
+ki = round6(kp / 8400)                                   (the rounded kp, as pid.py:82; entry 482)
+kd = round6(0.04 * 8400 * kp)                            (the rounded kp; factor 0.04, SAT_PID_KD_FACTOR, entry 477; pid.py:93 has 0.07)
+(round6 = satRoundHalfEvenDecimals(x, 6): Python round(x, 6), ties to even, computed in double and stored as float32.
+ Entry 95 Q28a had 3 decimals; entry 482 changed Ki and entry 490 kp and kd to thermo-nova's 6. In float32 kd (about 1e4)
+ keeps about 3 decimals, kp (about 30) 5 to 6, ki (about 3e-3) all 6.)
 (automatic gains only; the manual-gain switch and its fields were removed, TASK-1357)
 ```
 
@@ -448,7 +450,9 @@ D: dt = (time the current room value first appeared) - (time of the derivative r
      if |rawDeriv| >= 5: rawDerivative = clamp(rawDeriv, -5, 5)
      else: alpha = dt / (60 + dt); rawDerivative = clamp(alpha*rawDeriv + (1-alpha)*rawDerivative, -5, 5)
 P = round3(kp * error),  I = round3(integral),  D = round3(kd * rawDerivative),  rawDerivative shown as round3(rawDerivative)
-output = round3(curveValue + P + I + D)        (TASK-1423, entry 95 Q28a; the held integral and raw derivative stay unrounded)
+output = round1(curveValue + P + I + D)        (sum of the rounded terms in double, 1 decimal, pid.py:132; entry 490. The held
+                                                integral and raw derivative stay unrounded. P, I, D and rawDerivative stay at 3
+                                                decimals, pid.py:101-119; all roundings are Python round(), ties to even)
 ```
 
 **Room filter** (`SATcontrol.ino:4705-4710`): `alphaF = dt / (45 + dt)`, `filtered += alphaF * (raw - filtered)`.
@@ -738,7 +742,7 @@ Differs from thermo-nova:
 
 1. If `state.sat.bSolarGainActive` and `settings.sat.bSolarFreezeIntegral`: stop without change, so the integral is frozen and not even reset (TASK-1323; thermo-nova `climate.py:499-502`, `pid.py:167-168`).
 2. If `fabsf(error) > deadband`: the integral is set to 0.0 and the function stops (SATpid.ino:153-157).
-3. There is no Ki-near-0 branch (TASK-1423, entry 95 Q28b; thermo-nova `pid.py:191-192` always adds and clamps): a `fKi` of 0 adds nothing and the clamp below still applies. `fKi` is the gain rounded to 3 decimals, so it is 0 whenever `kp` is below about 4.2 (`kp / 8400` under 0.0005).
+3. There is no Ki-near-0 branch (TASK-1423, entry 95 Q28b; thermo-nova `pid.py:191-192` always adds and clamps): a `fKi` of 0 adds nothing and the clamp below still applies. `fKi` is the gain rounded to 6 decimals (entry 482), so it is 0 whenever `kp` is at most 0.0042 (`kp / 8400` under 5e-7); with 3 decimals (entry 95 Q28a) it was 0 below about 4.2.
 4. `_pid_integral += fKi * error * 60` (in `_pidUpdateIntegral()`, SATpid.ino:205; the step uses the rounded `fKi`, as pid.py:191). The 60 is the constant `SAT_PID_UPDATE_INTERVAL`, not the measured time between updates (SATpid.ino:22).
 5. The integral is clamped to [-curveValue, +curveValue] (SATpid.ino:172-173).
 6. No further clamp: the firmware's absolute cap of +-20 is removed (TASK-1416, entry 75, Q25), as pid.py:191-192.
@@ -828,7 +832,7 @@ Variable names as in the code.
 - else: `alpha = deltaTime / (60 + deltaTime)`; `_pid_rawDerivative = clamp(alpha * rawDeriv + (1 - alpha) * _pid_rawDerivative, -5.0, 5.0)`
 - `D = round3(fKd * _pid_rawDerivative)` (pid.py:114); the published raw derivative is `round3(_pid_rawDerivative)` (pid.py:119); the held value is not rounded (pid.py:229-230)
 
-**Output** (`satPidOutput()`, SATpid.ino:365-387): `output = round3(heatingCurveValue + P + I + D)` with the rounded P, I and D (Sergeant D entry 95, Q28a: 3 decimals for every value; pid.py:132 rounds to 1), computed on every control tick from the current curve, with Kp and Kd recomputed from it and the error, integral and raw derivative held from the last PID step. D is left out of the first output after a reset (entry 95 Q39b). No limit inside the PID. Limits are applied in the control tick.
+**Output** (`satPidOutput()`, SATpid.ino:365-387): `output = round1(heatingCurveValue + P + I + D)` with the rounded P, I and D, summed in double and rounded to 1 decimal as pid.py:132 does (Sergeant D entry 490; entry 95 Q28a had 3 decimals for every value; the curve-only output is round1 of the curve), computed on every control tick from the current curve, with Kp and Kd recomputed from it and the error, integral and raw derivative held from the last PID step. D is left out of the first output after a reset (entry 95 Q39b). No limit inside the PID. Limits are applied in the control tick.
 
 **Zone PID** (SATcontrol.ino:1828-1866), per zone:
 - `curveValue` from the zone target and outside temperature.
@@ -873,7 +877,7 @@ With the firmware default coefficient of 1.5 (SATtypes.h:442) and the same input
 | Kd factor (`SAT_PID_KD_FACTOR`) | 0.04 * 8400 = 336 (thermo-nova pid.py:93: 0.07 * 8400 = 588) | not stated in the code | SATpid.ino, entry 477 (was 0.05, entries 425/427; 0.063, entry 279) |
 | Integral absolute cap | 20.0 | degrees | SATpid.ino:176 |
 | Ki minimum for accumulation | none (the 1e-9 guard was removed, TASK-1423, entry 95 Q28b) | none | |
-| PID value rounding | 3 decimals for gains, P, I, D, raw derivative and output (entry 95 Q28a; pid.py: 6 for the gains, 3 for P, I, D and raw derivative, 1 for the output) | decimals | SATpid.ino:79 |
+| PID value rounding | 6 decimals for the gains, 3 for P, I, D and raw derivative, 1 for the output; all Python round(), ties to even (entries 482 and 490, which amend entry 95 Q28a; same as pid.py:71, :82, :93, :101-119, :132) | decimals | SATpid.ino satRoundHalfEvenDecimals |
 | `fHeatingCurveCoeff` default | 2.0 (TASK-1347, entry 24) | none | SATtypes.h:443 |
 | Heating curve coefficient setting range | 0.1 to 5.0 | none | settingStuff.ino:998 |
 | Heating system default | AUTO, treated as radiators | enum | SATtypes.h:438, SATcontrol.ino:198-199 |
@@ -1433,7 +1437,7 @@ Neither mechanism writes the coefficient. The firmware-only hourly auto-tune tha
 - **Continuous mode, boiler hotter than the request, flame on.** The setpoint stays at least `boiler - 2.0` °C by default (SATcontrol.ino:1179-1184). There is no hold on a falling request.
 - **Zones, one counted.** Its output raises the main PID output when it is higher; it never lowers it (SATcontrol.ino:2367). The old replace-the-primary behaviour is gone (TASK-1440).
 - **Zones, several counted.** The main PID output is kept and raised to the zones output, which is the highest counted output with up to 4 zones (SATcontrol.ino:2360-2367). An overshooting zone caps the result (SATcontrol.ino:2368-2372).
-- **Rounding.** The curve is not rounded (SATcontrol.ino:496); the PID gains, P, I, D, raw derivative and output are rounded to 3 decimals (SATpid.ino:79, TASK-1423). The PID error is rounded to 3 decimals (SATpid.ino:65). The `CS=` command is formatted with one decimal (SATcontrol.ino:390). The thermal safe fallback truncates to a whole degree (SATcontrol.ino:4740).
+- **Rounding.** The curve is not rounded (SATcontrol.ino:496); the PID gains are rounded to 6 decimals, P, I, D and the raw derivative to 3, the output to 1 (SATpid.ino satRoundHalfEvenDecimals; entries 482 and 490). The Summer Simmer index is rounded to 1 decimal on every return path (summer_simmer.py:38, entry 490). The PID error is rounded to 3 decimals (SATpid.ino:65). The `CS=` command is formatted with one decimal (SATcontrol.ino:390). The thermal safe fallback truncates to a whole degree (SATcontrol.ino:4740).
 - **Heat pump.** Same base offset as radiators (SATcontrol.ino:255-260), default system cap 40 °C while no max flow setpoint is chosen, a chosen value replaces it (entry 155), modulation 100 outside PWM (SATcontrol.ino:307), and it enters PWM through the same 60 s auto-switch as every other source (entry 87; SATcontrol.ino:5542-5546). A heat pump has no hourly PWM start limit (entry 81; SATcycles.ino:320-327).
 - **Heating system auto.** Treated as radiators for base offset, cold setpoint and caps (SATcontrol.ino:198-199).
 - **Room temperature invalid for 10 ticks.** Safety trip, `CS=0` (SATcontrol.ino:4675-4681). With the default 30 s tick that is about 5 minutes (derived from SATtypes.h:444 and SATcontrol.ino:68).

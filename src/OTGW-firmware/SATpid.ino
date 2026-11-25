@@ -22,10 +22,11 @@
 static const float SAT_PID_UPDATE_INTERVAL      = 60.0f;   // seconds (pid.py:20, PID_UPDATE_INTERVAL)
 // Derivative alpha is now adaptive: alpha = dt / (PID_UPDATE_INTERVAL + dt)
 static const float SAT_PID_DERIVATIVE_CAP       = 5.0f;    // Max raw derivative magnitude
-static const float SAT_PID_AGGRESSION_V3        = 8400.0f;
+// The gain constants are double: the gains are computed and rounded in double, as pid.py does, and stored as float (entry 490).
+static const double SAT_PID_AGGRESSION_V3       = 8400.0;
 // Kd factor 0.04: Sergeant D decided it (entry 477, which amends 425/427; 0.05 since entry 425, 0.063 before, entry 279). Deliberate
 // deviation from thermo-nova pid.py:93, which uses 0.07.
-static const float SAT_PID_KD_FACTOR            = 0.04f;
+static const double SAT_PID_KD_FACTOR           = 0.04;
 
 // Underfloor divisor=4, radiator divisor=3 for Kp calculation
 static const float SAT_PID_KP_DIVISOR_FLOOR     = 4.0f;
@@ -77,15 +78,42 @@ float satPidError(float target, float room)
   return roundf((target - room) * 1000.0f) / 1000.0f;
 }
 
-//=== PID rounding (entry 95, Q28a) ===
-// Every PID value is rounded to 3 decimals: the gains, P, I, D, the raw derivative and the output. thermo-nova
-// rounds the gains to 6 (pid.py:71, :82, :93), P, I, D and the raw derivative to 3 (:101, :106, :114, :119) and
-// the output to 1 (:132); Sergeant D chose 3 for all (entry 95: "Round all the values to 3 decimals not only the
-// Output"), a deliberate deviation for the gains and the output. As in pid.py the rounding is on read: the held
+//=== PID rounding (entries 95, 482, 490) ===
+// The roundings are thermo-nova's: kp, ki and kd to 6 decimals (pid.py:71, :82, :93), P, I, D and the raw derivative
+// to 3 (:101, :106, :114, :119), the output to 1 (:132). Entry 95 (Q28a) had every value at 3 decimals; entry 482
+// amended that for Ki (otherwise Ki rounds to 0 for a small Kp) and entry 490 for kp, kd and the output, "all roundings
+// like thermo-nova", with ties like Python as far as float32 allows. As in pid.py the rounding is on read: the held
 // integral and raw derivative stay unrounded (pid.py:191-192, :229-230), the integral step uses the rounded Ki.
+//
+// Python round(x, n) rounds the exact binary value of x and sends an exact tie to the even neighbour: round(45.25, 1)
+// = 45.2, round(0.125, 2) = 0.12, but round(2.675, 2) = 2.67 because 2.675 is stored as 2.67499999999999982. The scaled
+// product v * 10^n is rounded once by the multiplication, so it can land exactly on .5 when v was just below it;
+// fma() returns the exact error of that product and settles the question. The work is done on |v| (round-half-even is
+// symmetric), where p - floor(p) and its distance to 0.5 are exact. decimals is 0..6; a non-finite v, or one whose scaled
+// value is 2^52 or more, is returned as it is. Values go through double: a float32 input is widened exactly, and a result
+// is the double nearest to the decimal, which the caller stores as float (kd of about 1e4 keeps about 3 decimals in float32).
+double satRoundHalfEvenDecimals(double v, int decimals)
+{
+  static const double scales[] = { 1.0, 10.0, 100.0, 1000.0, 10000.0, 100000.0, 1000000.0 };
+  if (decimals < 0 || decimals > 6 || !isfinite(v)) return v;
+  const double scale = scales[decimals];
+  const double a     = fabs(v);
+  const double p     = a * scale;
+  if (p >= 4503599627370496.0) return v;            // 2^52: already a whole number of units
+  const double err   = fma(a, scale, -p);           // a * scale = p + err, exactly
+  const double f     = floor(p);
+  const double d     = (p - f) - 0.5;               // exact; the sign of d + err is the sign of d, or of err when d is 0
+  double n;
+  if (d > 0.0 || (d == 0.0 && err > 0.0))      n = f + 1.0;
+  else if (d < 0.0 || (d == 0.0 && err < 0.0)) n = f;
+  else                                         n = (fmod(f, 2.0) == 0.0) ? f : f + 1.0;   // exact tie: even
+  const double r = n / scale;
+  return (v < 0.0) ? -r : r;
+}
+
 float satPidRound3(float v)
 {
-  return roundf(v * 1000.0f) / 1000.0f;
+  return (float)satRoundHalfEvenDecimals((double)v, 3);
 }
 
 //=== Restore PID internal state from persistence (Task #589) ===
@@ -215,14 +243,17 @@ float satPidCurveOnly(float heatingCurveValue)
   state.sat.fPidP = 0.0f;
   state.sat.fPidD = 0.0f;
   state.sat.fError = 0.0f;
-  const float output = satPidRound3(heatingCurveValue);   // pid.output with P, I and D at 0, rounded (entry 95, Q28a)
+  const float output = (float)satRoundHalfEvenDecimals((double)heatingCurveValue, 1);   // pid.output with P, I and D at 0, 1 decimal (pid.py:132; entry 490)
   state.sat.fPidOutput = output;
   return output;
 }
 
 //=== Auto-Gain Calculation (Version 3) ===
-// Automatic gains from the heating curve (thermo-nova pid.py automatic_gains=True), each rounded to 3 decimals
-// (entry 95, Q28a; pid.py rounds to 6). Ki and Kd derive from the rounded Kp, as pid.py reads self.kp (:82, :93).
+// Automatic gains from the heating curve (thermo-nova pid.py automatic_gains=True), each rounded to 6 decimals like
+// pid.py:71, :82, :93 (entry 482 for Ki, entry 490 for kp and kd; entry 95 Q28a had 3). Ki and Kd derive from the rounded
+// Kp, as pid.py reads self.kp (:82, :93). Computed and rounded in double, then stored as float: kp (about 30) keeps its
+// 6 decimals to within one float32 step (2e-6), Ki (about 3e-3) keeps them, Kd (about 1e4) keeps only about 3 decimals.
+// A Kp below 0.0042 gives a Ki that rounds to 0 (kp / 8400 < 5e-7); the integral then adds nothing (entry 95 Q28b).
 // Kd uses SAT_PID_KD_FACTOR 0.04 (entry 477), not the 0.07 of pid.py:93: kd = 0.04 * 8400 * kp = 336 * kp.
 static void _pidCalculateGains(float curveValue)
 {
@@ -231,13 +262,13 @@ static void _pidCalculateGains(float curveValue)
   // on '==1'/radiators, which inverted the mapping; now via the heating-system axis.)
   float divisor = (satGetEffectiveHeatingSystem() == SAT_HSYS_UNDERFLOOR) ? SAT_PID_KP_DIVISOR_FLOOR : SAT_PID_KP_DIVISOR_RAD;
 
-  float kp = satPidRound3((coeff * curveValue) / divisor);
-  float ki = satPidRound3(kp / SAT_PID_AGGRESSION_V3);
-  float kd = satPidRound3(SAT_PID_KD_FACTOR * SAT_PID_AGGRESSION_V3 * kp);
+  const double kp = satRoundHalfEvenDecimals(((double)coeff * (double)curveValue) / (double)divisor, 6);
+  const double ki = satRoundHalfEvenDecimals(kp / SAT_PID_AGGRESSION_V3, 6);
+  const double kd = satRoundHalfEvenDecimals(SAT_PID_KD_FACTOR * SAT_PID_AGGRESSION_V3 * kp, 6);
 
-  state.sat.fKp = kp;
-  state.sat.fKi = ki;
-  state.sat.fKd = kd;
+  state.sat.fKp = (float)kp;
+  state.sat.fKi = (float)ki;
+  state.sat.fKd = (float)kd;
 }
 
 //=== Integral Update ===
@@ -412,23 +443,25 @@ void satPidStep(float roomTemp, float targetTemp, float heatingCurveValue, uint3
 float satPidOutput(float heatingCurveValue)
 {
   _pidCalculateGains(heatingCurveValue);
-  float P = 0.0f;
-  float I = 0.0f;
-  float D = 0.0f;
+  // The terms are kept as doubles: each is the double nearest to its 3-decimal value, so the sum below is formed in
+  // double as pid.py forms it (pid.py:132) and a tie at the 1-decimal rounding falls the way Python's does.
+  double P = 0.0;
+  double I = 0.0;
+  double D = 0.0;
   if (!isnan(_pid_lastError)) {
-    P = satPidRound3(state.sat.fKp * _pid_lastError);        // pid.py:101
-    I = satPidRound3(_pid_integral);                           // pid.py:106
-    if (!_pid_firstOutputPending) D = satPidRound3(state.sat.fKd * _pid_rawDerivative);   // pid.py:114; entry 95 Q39b: D = 0 on the first output with PID terms
+    P = satRoundHalfEvenDecimals((double)state.sat.fKp * (double)_pid_lastError, 3);        // pid.py:101
+    I = satRoundHalfEvenDecimals((double)_pid_integral, 3);                                   // pid.py:106
+    if (!_pid_firstOutputPending) D = satRoundHalfEvenDecimals((double)state.sat.fKd * (double)_pid_rawDerivative, 3);   // pid.py:114; entry 95 Q39b: D = 0 on the first output with PID terms
     _pid_firstOutputPending = false;   // only an output that includes the PID terms counts; a curve-only output leaves it set
   }
-  state.sat.fPidP = P;
-  state.sat.fPidI = I;
-  state.sat.fPidD = D;
+  state.sat.fPidP = (float)P;
+  state.sat.fPidI = (float)I;
+  state.sat.fPidD = (float)D;
   state.sat.fRawDerivative = satPidRound3(_pid_rawDerivative);   // pid.py:119
 
-  // PID output = heatingCurveValue + P + I + D (thermo-nova style), the sum of the rounded terms rounded to 3
-  // decimals (entry 95, Q28a; pid.py:132 rounds to 1)
-  float output = satPidRound3(heatingCurveValue + P + I + D);
+  // PID output = heatingCurveValue + P + I + D (thermo-nova style): the sum of the rounded terms rounded to 1 decimal
+  // (pid.py:132; entry 490, entry 95 Q28a had 3)
+  float output = (float)satRoundHalfEvenDecimals((double)heatingCurveValue + P + I + D, 1);
   state.sat.fPidOutput = output;
   return output;
 }

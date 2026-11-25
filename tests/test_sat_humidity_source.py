@@ -37,6 +37,7 @@ from test_sat_pwm_override import compile_cpp  # noqa: E402
 
 SRC = REPO / "src" / "OTGW-firmware"
 SAT_INO = Path(os.environ.get("OTGW_SAT_INO", SRC / "SATcontrol.ino"))
+PID_INO = Path(os.environ.get("OTGW_SATPID_INO", SRC / "SATpid.ino"))
 BLE_INO = SRC / "SATble.ino"
 
 STUBS = r"""
@@ -130,7 +131,9 @@ def build_cpp(src: str) -> str:
     sa = src.index("static float satCalcSimmerIndex")
     sb = src.index("Circulatory Collapse Imminent", sa)
     sb = src.index("\n}\n", sb) + 3
-    room = src[sa:sb] + room
+    pid = PID_INO.read_text(encoding="utf-8").replace(chr(13) + chr(10), chr(10))
+    rounding = pid[pid.index("//=== PID rounding"):pid.index("//=== Restore PID internal state")]   # satRoundHalfEvenDecimals (entry 490)
+    room = rounding + src[sa:sb] + room
     hum = between(src, "bool satHandleHumidity", "// --- Sun elevation handler")
     if "--- Humidity input" in src:
         inp = between(src, "  // --- Humidity input", "  // --- PV-surplus")

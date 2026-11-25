@@ -40,7 +40,7 @@ from test_sat_pwm_override import compile_cpp  # noqa: E402
 SAT_INO = Path(os.environ.get("OTGW_SAT_INO", REPO / "src" / "OTGW-firmware" / "SATcontrol.ino"))
 # Automatic gains are the only mode (TASK-1357): kd = 0.04 * 8400 * kp (entry 477; was 0.05, entry 425, 0.063, entry 279; pid.py:93 has 0.07), kp = coefficient * curve / 3 (radiators).
 KD_FACTOR = 0.04   # Sergeant D entry 477 (amends 425/427, TASK-3041; was 0.05 since entry 425)
-KD_AT_CURVE_40 = round(KD_FACTOR * 8400.0 * round(1.6 * 40.0 / 3.0, 3), 3)   # the gains are rounded to 3 decimals since TASK-1423 (entry 95, Q28a)
+KD_AT_CURVE_40 = round(KD_FACTOR * 8400.0 * round(1.6 * 40.0 / 3.0, 6), 6)   # the gains are rounded to 6 decimals like pid.py:71, :93 (entry 490)
 PID_INO = Path(os.environ.get("OTGW_SATPID_INO", REPO / "src" / "OTGW-firmware" / "SATpid.ino"))
 TIMERS = (REPO / "src" / "OTGW-firmware" / "safeTimers.h").as_posix()
 
@@ -402,8 +402,9 @@ class Cadence(unittest.TestCase):
             curve, out = float(r["curve"]), float(r["out"])
             kp, kd = float(r["kp"]), float(r["kd"])
             self.assertAlmostEqual(kp, 1.6 * curve / 3.0, places=3, msg="kp follows the CURRENT curve (pid.py:60-93)")
-            self.assertAlmostEqual(out, curve + kp * float(r["err"]) + float(r["I"]) + kd * float(r["rawD"]), delta=3e-3,   # P, I, D and the output are each rounded to 3 decimals (TASK-1423)
+            self.assertAlmostEqual(out, curve + kp * float(r["err"]) + float(r["I"]) + kd * float(r["rawD"]), delta=0.0501,   # P, I, D are rounded to 3 decimals, the output to 1 (entry 490)
                                    msg="output = curve + kp(curve)*held error + I + kd(curve)*held raw derivative (pid.py:126-132)")
+            self.assertLess(abs(out * 10.0 - round(out * 10.0)), 1e-3, "the output has 1 decimal (pid.py:132, entry 490): %r" % out)
         for key, group in by_step.items():
             if key < 0:
                 continue
@@ -442,7 +443,7 @@ class Cadence(unittest.TestCase):
             self.assertTrue(abs((steps - 1) - 10) <= 1)
             # kp = 1.6*curve/3, ki = kp/8400, error 0.05: one step adds ki*0.05*60
             curve = 27.2 + (1.6 / 4.0) * (4.0 * (21.0 - 20.0) + 0.03 * 15.0 ** 2 + 0.4 * 15.0)
-            ki = (1.6 * curve / 3.0) / 8400.0
+            ki = (1.6 * curve / 3.0) / 8400.0   # the zone PID keeps its gains unrounded (satZonePidAdvance); entries 482 and 490 are about the main PID
             self.assertAlmostEqual(zi[10], ki * 0.05 * 60.0 * steps, delta=1e-4, msg="zone I = steps * ki*error*60")
 
     def test_g3_zone_integral_is_halved_once_outside_the_band_and_held(self):
@@ -574,7 +575,7 @@ class Cadence(unittest.TestCase):
         self.assertGreater(err, 1.0, "premise: room 19.0 is well below target 21.0 (%s)" % first)
         self.assertGreater(kp, 0.0, "premise: the code computed a gain (%s)" % first)
         self.assertGreater(out, curve, "first output must carry the P term above the curve (%s)" % first)
-        self.assertAlmostEqual(out, curve + kp * err + i_term, delta=2e-3,
+        self.assertAlmostEqual(out, curve + kp * err + i_term, delta=0.0501,   # the output has 1 decimal (entry 490);
                                msg="first output = curve + kp*error + I (%s)" % first)
         self.assertEqual(float(first["D"]), 0.0, "D = 0 on the first output (%s)" % first)
         self.assertGreater(float(second["out"]), curve, "the tick 30 s later is still a computed setpoint (%s)" % second)

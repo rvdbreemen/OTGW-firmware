@@ -10,8 +10,9 @@ The ORACLE is thermo-nova's PID, transcribed line for line below from custom_com
 (update :159-171, _update_integral :185-197, _update_derivative :199-232, clamp_to_range helpers.py:148-150, outputs
 :101-132). It is the reference, not a copy of the firmware. It is fed what the firmware saw (the room value, the
 room-changed stamp). Recorded, deliberate deviations from pid.py are modelled as parameters of the oracle, each with
-its entry: gains and every term rounded to 3 decimals instead of 6 / 1 (entry 95, Q28a), and D = 0 on the first output
-after a boot, reset or restore (entry 95, Q39b). Nothing else differs; any other difference is a test failure.
+its entry: the Kd factor 0.04 instead of 0.07 (entry 477), and D = 0 on the first output after a boot, reset or restore
+(entry 95, Q39b). The roundings are thermo-nova's since entries 482 and 490 (gains 6 decimals, P/I/D/raw derivative 3,
+output 1; Python round(), ties to even). Nothing else differs; any other difference is a test failure.
 
 Room values are synthetic (no field recording); float32 on the firmware side, so the oracle is fed the float32 value.
 
@@ -44,6 +45,7 @@ int main() {
       g_ms = ms; satPidNoteRoom(room, ms); satPidStep(room, target, curve, ms); printStep("S"); continue; }
     if (!strcmp(c, "O")) { float curve; scanf("%f", &curve); float out = satPidOutput(curve);
       printf("O out=%.9g P=%.9g I=%.9g D=%.9g kp=%.9g kd=%.9g\n", out, state.sat.fPidP, state.sat.fPidI, state.sat.fPidD, state.sat.fKp, state.sat.fKd); continue; }
+    if (!strcmp(c, "C")) { float curve; scanf("%f", &curve); float out = satPidCurveOnly(curve); printf("C out=%.9g\n", out); continue; }
     if (!strcmp(c, "G")) { float i, d, rd, le; bool eh, th; float lt; uint32_t ms;
       satPidGetPersistState(&i, &d, &rd, &le); satPidGetPersistLast(&eh, &th, &lt, &ms);
       printf("G I=%.9g rd=%.9g lastErr=%.9g errHeld=%d tempHeld=%d lastTemp=%.9g ms=%u\n", i, rd, le, (int)eh, (int)th, lt, (unsigned)ms); continue; }
@@ -81,10 +83,10 @@ class PidPy:
         self.last_temperature = None
         self.last_derivative_updated = None
 
-    # gains: pid.py:61-93 rounds to 6; the firmware rounds to 3 (entry 95, Q28a), so the oracle takes 3
-    def kp(self, curve): return r3(self.coeff * curve / self.divisor)
-    def ki(self, curve): return r3(self.kp(curve) / 8400)
-    def kd(self, curve): return r3(cad.KD_FACTOR * 8400 * self.kp(curve))   # 0.05: entry 425 (was 0.063, entry 279), deliberate deviation from pid.py:93 (0.07)
+    # gains: pid.py:71, :82, :93 round to 6 decimals, Python round() (entries 482 and 490, amending entry 95 Q28a); the inputs are the float32 values
+    def kp(self, curve): return round(f32(self.coeff) * f32(curve) / self.divisor, 6)
+    def ki(self, curve): return round(self.kp(curve) / 8400, 6)
+    def kd(self, curve): return round(cad.KD_FACTOR * 8400 * self.kp(curve), 6)   # 0.04: entry 477, deliberate deviation from pid.py:93 (0.07)
 
     def update(self, current, error, last_changed, curve, freeze_integral=False):      # pid.py:159-171
         self._update_derivative(current, error, last_changed)
@@ -129,11 +131,14 @@ class PidPy:
         self.raw_derivative = clamp_to_range(filtered, DERIVATIVE_RAW_CAP)
         self.last_derivative_updated = last_changed
 
-    def terms(self, curve, d_zero=False):                                              # pid.py:101-132, 3 decimals (entry 95)
-        p = r3(self.kp(curve) * self.last_error)
-        i = r3(self.integral)
-        d = 0.0 if d_zero else r3(self.kd(curve) * self.raw_derivative)
-        return p, i, d, r3(curve + p + i + d)
+    def terms(self, curve, d_zero=False):                                              # pid.py:101-132: P, I, D to 3 decimals, the output to 1
+        p = round(self.kp(curve) * self.last_error, 3)
+        i = round(self.integral, 3)
+        d = 0.0 if d_zero else round(self.kd(curve) * self.raw_derivative, 3)
+        return p, i, d, round(f32(curve) + p + i + d, 1)
+
+
+KI_AT_40 = PidPy().ki(40.0)   # round(round(f32(1.6) * 40 / 3, 6) / 8400, 6) = 0.00254 (3 decimals gave 0.003)
 
 
 def num(tok):
@@ -196,7 +201,7 @@ class StartUp(Base):
         rows, pid = self.follow(["R", "S 20.95 21 40 1000", "O 40"])
         step = rows[0][1]
         self.assertEqual(step["rd"], 0.0)
-        self.assertAlmostEqual(step["I"], 0.003 * 0.05 * 60, places=5)        # ki(curve 40) = round3(21.333/8400) = 0.003
+        self.assertAlmostEqual(step["I"], KI_AT_40 * 0.05 * 60, places=5)     # ki(curve 40) = round6(21.333333/8400) = 0.00254
         self.assertAlmostEqual(step["I"], pid.integral, places=5)
 
     def test_first_update_outside_deadband_zeroes_the_integral_and_has_no_derivative(self):
@@ -206,7 +211,7 @@ class StartUp(Base):
         out = rows[1][1]
         p, i, d, total = pid.terms(40.0)
         self.assertAlmostEqual(out["P"], p, places=3)
-        self.assertAlmostEqual(out["out"], total, places=3)
+        self.assertEqual(f32(out["out"]), f32(total))
 
     def test_first_output_after_a_restore_has_d_zero_then_d(self):
         # Entry 95 (Q39b): "D = 0" on the first output after boot/reset/restore. pid.py:109-114 has no such rule
@@ -214,13 +219,13 @@ class StartUp(Base):
         rows = self.run_script(["R", "RS 0.5 0.02", "S 20.95 21 40 1000", "O 40", "O 40"])
         first, second = rows[1][1], rows[2][1]
         self.assertEqual(first["D"], 0.0)
-        self.assertAlmostEqual(second["D"], r3(first["kd"] * 0.02), places=3)
+        self.assertAlmostEqual(second["D"], round(first["kd"] * 0.02, 3), places=3)
         self.assertGreater(second["D"], 100.0, "premise: the restored raw derivative gives a large D")
         self.assertAlmostEqual(rows[0][1]["rd"], 0.02, places=6, msg="the start-up step must not drop the restored raw derivative")
 
     def test_restored_integral_survives_the_startup_step_inside_the_deadband_and_is_halved_outside(self):
         inside = self.run_script(["R", "RS 0.5 0", "S 20.95 21 40 1000"])[0][1]
-        self.assertAlmostEqual(inside["I"], 0.5 + 0.003 * 0.05 * 60, places=5)     # pid.py:191 adds to the restored value
+        self.assertAlmostEqual(inside["I"], 0.5 + KI_AT_40 * 0.05 * 60, places=5)    # pid.py:191 adds to the restored value
         outside = self.run_script(["R", "RS 0.5 0.02", "S 19 21 40 1000"])[0][1]
         self.assertAlmostEqual(outside["I"], 0.25, places=6)                        # halved once (TASK-1890; pid.py:187-189 resets to 0)
         self.assertAlmostEqual(outside["rd"], 0.02, places=6)                       # the derivative step is skipped, raw value held
@@ -240,7 +245,7 @@ class HeldDerivative(Base):
             self.assertAlmostEqual(out["P"], p, delta=2e-3)
             self.assertAlmostEqual(out["I"], i, delta=2e-3)
             self.assertAlmostEqual(out["D"], d, delta=max(2e-3, 2e-3 * abs(d)))
-            self.assertAlmostEqual(out["out"], total, delta=max(5e-3, 2e-3 * abs(total)))
+            self.assertEqual(f32(out["out"]), f32(total))
         self.assertEqual(len({round(o["D"], 3) for o in outs}), 3, "D must follow kd(curve), not stay a frozen number (entries 124, 136)")
 
     def test_inside_the_deadband_the_raw_derivative_is_frozen_while_the_integral_runs(self):
@@ -282,20 +287,20 @@ class Saturation(Base):
         script = ["R"]
         t = 0
         for room in ("20.9", "21.1"):                          # error +0.1 then -0.1: exactly on the deadband edge, inside
-            for _ in range(5000):
+            for _ in range(8000):                              # ki 0.00254 * 0.1 * 60 = 0.01524 per step: 80 / 0.01524 = 5250 steps from +40 to -40
                 script.append("S %s 21 40 %d" % (room, t))
                 t += 60000
             script.append("MARK")
         script.append("S 19 21 40 %d" % t)                     # outside: halved once (TASK-1890)
         out = subprocess.run([str(self.exe)], input="\n".join(l for l in script if l != "MARK") + "\n", capture_output=True, text=True, check=True).stdout
         steps = [parse(l)[1] for l in out.splitlines()]
-        self.assertEqual(len(steps), 10001)
-        self.assertAlmostEqual(steps[4999]["I"], 40.0, places=3)                 # +curve
-        self.assertAlmostEqual(steps[4999]["I"], 40.0, places=3)
+        self.assertEqual(len(steps), 16001)
+        self.assertAlmostEqual(steps[7999]["I"], 40.0, places=3)                 # +curve
+        self.assertAlmostEqual(steps[7999]["I"], 40.0, places=3)
         self.assertAlmostEqual(max(s["I"] for s in steps), 40.0, places=3, msg="never above +curve")
-        self.assertAlmostEqual(steps[9999]["I"], -40.0, places=3)                # -curve
+        self.assertAlmostEqual(steps[15999]["I"], -40.0, places=3)                # -curve
         self.assertAlmostEqual(min(s["I"] for s in steps), -40.0, places=3, msg="never below -curve")
-        self.assertAlmostEqual(steps[10000]["I"], -20.0, places=3)              # -40 halved once (TASK-1890)
+        self.assertAlmostEqual(steps[16000]["I"], -20.0, places=3)              # -40 halved once (TASK-1890)
         # the same series through the oracle
         pid = PidPy()
         for line in script[1:]:
@@ -351,7 +356,8 @@ class Saturation(Base):
         rows = self.run_script(["R", "S 0 21 40 0", "O 40"])
         out = rows[1][1]
         self.assertGreater(out["out"], 400.0)
-        self.assertAlmostEqual(out["out"], r3(40 + r3(r3(1.6 * 40 / 3) * 21.0)), delta=2e-3)
+        kp = round(f32(1.6) * 40 / 3, 6)
+        self.assertEqual(f32(out["out"]), f32(round(40 + round(kp * 21.0, 3), 1)))   # output to 1 decimal (pid.py:132)
 
     def test_solar_freeze_skips_the_whole_integral_update_including_the_reset(self):
         # climate.py:499-502 -> pid.py:167-168: freeze_integral skips _update_integral, the derivative still runs
@@ -371,7 +377,7 @@ class Deadband(Base):
                 rows = self.run_script(["R", "RS 1 0", "S %s 21 40 0" % room])
                 i = rows[0][1]["I"]
                 if inside:
-                    self.assertAlmostEqual(i, 1.0 + 0.003 * r3(21.0 - f32(float(room))) * 60, places=5)   # pid.py:191
+                    self.assertAlmostEqual(i, 1.0 + KI_AT_40 * r3(21.0 - f32(float(room))) * 60, places=5)  # pid.py:191
                 else:
                     self.assertAlmostEqual(i, 0.5, places=6)   # the restored 1 halved once (TASK-1890; pid.py:187-189 gives 0)
 
@@ -380,7 +386,7 @@ class Deadband(Base):
         rows = self.run_script(["R", "S 20.9 21 40 0"])
         self.assertAlmostEqual(rows[0][1]["err"], 0.1, places=6)
         rows = self.run_script(["R", "RS 1 0", "S 20.9 21 40 0"])
-        self.assertAlmostEqual(rows[0][1]["I"], 1.0 + 0.003 * 0.1 * 60, places=5)
+        self.assertAlmostEqual(rows[0][1]["I"], 1.0 + KI_AT_40 * 0.1 * 60, places=5)
 
     def test_derivative_boundary(self):
         # error 0.1 (inside) freezes, error 0.101 (outside) moves, same temperature step
@@ -391,25 +397,60 @@ class Deadband(Base):
 
 
 class KiZero(Base):
-    """A curve so low that Ki rounds to 0: the integral adds nothing, the clamp still applies (entry 95 Q28b; pid.py:191-192)."""
+    """A curve so low that Ki rounds to 0: the integral adds nothing, the clamp still applies (entry 95 Q28b; pid.py:191-192).
+    Ki has 6 decimals (entry 482), so this needs kp < 0.0042: coefficient 1.6, curve 0.005 gives kp 0.002667 and ki 0.0.
+    At curve 5 (kp 2.667) the 3-decimal Ki was 0.000; the 6-decimal Ki is 0.000317 and the integral moves."""
 
     def test_ki_zero_keeps_a_value_inside_the_clamp_and_clamps_one_outside(self):
-        rows = self.run_script(["R", "RS 3 0", "S 20.95 21 5 0"])
+        rows = self.run_script(["R", "RS 0.002 0", "S 20.95 21 0.005 0"])
         self.assertEqual(rows[0][1]["ki"], 0.0)
-        self.assertAlmostEqual(rows[0][1]["I"], 3.0, places=6)
-        rows = self.run_script(["R", "RS 50 0", "S 20.95 21 5 0"])
-        self.assertAlmostEqual(rows[0][1]["I"], 5.0, places=6)
-        rows = self.run_script(["R", "RS -50 0", "S 21.05 21 5 0"])
-        self.assertAlmostEqual(rows[0][1]["I"], -5.0, places=6)
+        self.assertAlmostEqual(rows[0][1]["I"], 0.002, places=6)
+        rows = self.run_script(["R", "RS 50 0", "S 20.95 21 0.005 0"])
+        self.assertAlmostEqual(rows[0][1]["I"], 0.005, places=6)
+        rows = self.run_script(["R", "RS -50 0", "S 21.05 21 0.005 0"])
+        self.assertAlmostEqual(rows[0][1]["I"], -0.005, places=6)
 
     def test_ki_zero_matches_the_oracle(self):
         oracle = PidPy()
-        oracle.integral = 50.0
-        rows = self.run_script(["R", "RS 50 0", "S 20.95 21 5 0"])
+        oracle.integral = 0.002
+        rows = self.run_script(["R", "RS 0.002 0", "S 20.95 21 0.005 0"])
         oracle.last_temperature = None
-        oracle.update(f32(20.95), 0.05, 0.0, 5.0)
-        self.assertEqual(oracle.ki(5.0), 0.0)
+        oracle.update(f32(20.95), 0.05, 0.0, 0.005)
+        self.assertEqual(oracle.ki(0.005), 0.0)
         self.assertAlmostEqual(rows[0][1]["I"], oracle.integral, places=6)
+
+    def test_curve_5_has_a_nonzero_ki_with_6_decimals(self):
+        oracle = PidPy()
+        self.assertEqual(oracle.ki(5.0), 0.000317)
+        rows = self.run_script(["R", "RS 3 0", "S 20.95 21 5 0"])
+        self.assertAlmostEqual(rows[0][1]["ki"], 0.000317, places=9)
+        self.assertAlmostEqual(rows[0][1]["I"], 3.0 + 0.000317 * 0.05 * 60, places=6)
+
+
+class OutputRounding(Base):
+    """Entry 490: the PID output has 1 decimal (pid.py:132), also the curve-only output; P, I, D stay at 3 decimals (pid.py:101-119).
+    The oracle sums the rounded 3-decimal terms in double and rounds with Python round()."""
+
+    def test_full_output_has_one_decimal_and_equals_the_oracle(self):
+        rows, pid = self.follow(["R", "S 19.37 21 33.37 1000", "O 33.37", "O 33.37"])
+        for out in (rows[1][1], rows[2][1]):
+            p, i, d, total = pid.terms(33.37)
+            self.assertEqual(f32(out["out"]), f32(total))
+            self.assertLess(abs(out["out"] * 10 - round(out["out"] * 10)), 1e-3, "one decimal: %r" % out["out"])
+            self.assertAlmostEqual(out["P"], p, places=3)   # P stays at 3 decimals
+        self.assertNotEqual(round(rows[1][1]["P"], 1), round(rows[1][1]["P"], 3), "premise: P itself is not a 1-decimal value")
+
+    def test_curve_only_output_has_one_decimal(self):
+        rows = self.run_script(["R", "C 40.26", "C 40.05", "C 40.04", "C 33.0"])
+        got = [r[1]["out"] for r in rows if r[0] == "C"]
+        # 40.26 -> 40.3; the float32 40.05 is 40.0499992 -> 40.0 (python round of the widened value); 40.04 -> 40.0
+        self.assertEqual([f32(g) for g in got], [f32(40.3), f32(40.0), f32(40.0), f32(33.0)])
+
+    def test_output_after_a_step_equals_the_oracle_to_the_last_digit(self):
+        rows, pid = self.follow(["R", "S 20.95 21 40 1000", "O 40"])
+        p, i, d, total = pid.terms(40.0)
+        self.assertEqual(f32(rows[1][1]["out"]), f32(total))
+        self.assertEqual(total, 41.1)   # 40 + P 1.067 + I 0.008 (D = 0 on the first output) = 41.075 -> 41.1
 
 
 class Persistence(Base):
