@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-25T10:24:00Z'
-updated_date: '2026-11-25T10:53:00Z'
+updated_date: '2026-11-25T11:05:00Z'
 labels:
   - sat-question
   - needs-maintainer-ok
@@ -34,4 +34,6 @@ OPEN: confirm or refute (otgw-architect second reader, then the bench timing fro
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-11-25 entry 492 (Sergeant D: A, keep as built). Only code touch: a comment at both exits in SATcycles.ino ('entry 492: saturation is not flame-gated by design', cold start ends PWM at about 300 s, underheat reached on a mid-burn request step), committed with TASK-3054's bump. Docs side: otgw-docs 0656038fd.
+
+2026-11-25 comment-only code touch built with TASK-3054: 0742d150a, beta.429, build OK, evaluate --quick 89/0/0. Not bench-tested, no behaviour change (comment). ACs 1 and 2 (architect confirm, bench timing) are still open; the Sergeant D answer is entry 492 (A).
 <!-- SECTION:NOTES:END -->
