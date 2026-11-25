@@ -48,7 +48,7 @@ format: "canonical"
 
 ## Status
 
-Proposed, 2026-11-21.
+Accepted, 2026-11-21, by Robert.
 
 On acceptance this ADR supersedes ADR-196 as a whole. Following the repo
 precedent for Proposed successors (commit 057535397, ADR-197 to ADR-199), the
