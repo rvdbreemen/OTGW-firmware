@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-21T14:29:00Z'
-updated_date: '2026-11-25T06:37:00Z'
+updated_date: '2026-11-25T06:40:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -54,4 +54,6 @@ Cold-setpoint gate (ADR-199, upstream in SATcontrol.ino, unchanged): evidence te
 2026-11-25 rebuilt on origin/dev fb917599a for the beta candidate: SATcycles.ino (SAT_UNDERHEAT_SUSTAIN_MS 180000, SAT_UNDERHEAT_FLAME_MIN_MS 180000, flameEstablished gate from satCycleGetFlameOnStartMs), 4 tests. Basis: entries 448, 456, 462, 463 and ADR-297; no entry 475. Tests on this tree: test_sat_overshoot_sustain, test_sat_pwm_override, test_sat_lowload_contract (skipped=1), test_sat_pwm_first_start, test_sat_pwm_anchors, test_sat_hp_pwm all OK; red on origin/dev earlier (18/4/43 failures). Open checks from otgw-architect: heating demand upstream and the flame-on edge at takeover.
 
 2026-11-25 otgw-architect: the planned ADR-236 References commit 2cbb195e4 (architect's local branch, dropped) is obsolete: ADR-236 is Accepted and immutable; ADR-297 (Accepted) is the record that names this task. The red/green + replay evidence goes in this task's final summary.
+
+2026-11-25 answers to otgw-architect's two checks (read in code, no host test added): (1) HEATING DEMAND is guaranteed upstream: satCycleCheckPwmExits() is only called when pidOutput > satColdThreshold() (SATcontrol.ino ~8545-8548; else satCycleResetSustainGuards()), and inside it only while the mode is PWM with bPwmFlameRequested (SATcycles.ino ~1488-1492) and outside the DHW guard. No extra demand condition added. (2) FLAME-ON EDGE AT TAKEOVER: the flame edge block runs in satControlLoopRun() AFTER the 'SAT disabled / flashing' early bail (edge detection is not processed while SAT is off), with _sat_prevFlameState starting false (SATcontrol.ino:957, :8113-8116). So when SAT is enabled (or boots) while the flame already burns, the first pass sees an edge and satCycleOnFlameChange(true) sets _cycle_flameOnStartMs = that pass: the 180 s gate counts from SAT's first pass (the fallback = SAT start time, by construction). Residual edge case: SAT disabled and re-enabled while the same flame still burns -> prevFlame stays true, no edge, _cycle_flameOnStartMs keeps the earlier real edge (older or equal to the true flame age: the gate can open earlier than 180 s after takeover, never later). Not changed; flag for the architect.
 <!-- SECTION:NOTES:END -->
