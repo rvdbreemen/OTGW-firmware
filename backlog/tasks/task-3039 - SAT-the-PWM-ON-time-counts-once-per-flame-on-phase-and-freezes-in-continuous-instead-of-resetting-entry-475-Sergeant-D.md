@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-24T18:27:00Z'
-updated_date: '2026-11-25T08:45:00Z'
+updated_date: '2026-11-25T10:01:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -27,11 +27,11 @@ Sergeant D, #dev-sat-mqtt 2026-11-24 (entry 475, private register): during one f
 - [x] #1 Sergeant D has answered Q-475a and the answer is recorded as an entry in the decisions register before any code
 - [x] #2 Host test: a scripted flame-on phase with 3 PWM/continuous flips is red on origin/dev (the ON timer restarts at each re-entry) and green on the fix (the ON timer freezes and resumes)
 - [x] #3 Host test: the clock resets when the flame goes out, when an ON phase ends normally, and when SAT is disabled or the heater goes off; DHW draw time still does not count (entry 95 unchanged)
-- [ ] #4 The start gate (entries 385/387, ADR-252), the 448/456 exit rule, the at-max rule (entry 463) and the entry 428/429 per-flame counting are unchanged (existing tests green)
+- [x] #4 The start gate (entries 385/387, ADR-252), the 448/456 exit rule, the at-max rule (entry 463) and the entry 428/429 per-flame counting are unchanged (existing tests green)
 - [ ] #5 evaluate.py --quick shows no new FAIL; full tests/ run green; esp32-combo build OK
 - [ ] #6 Bench on .63 (bench-tester): a flame-on phase with several PWM/continuous flips shows a shorter total ON time per flame than before; field proof by Sergeant D's testers
 - [ ] #7 ADR (adr-kit, Proposed) records the freeze rule and cites the entry
-- [ ] #8 The min burn (180 s, 600 s heat pump) is read from the real flame-on of the flame across flips (entry 479); host test: a resume with little ON left ends after the frozen ON clock, not 180 s later
+- [x] #8 The min burn (180 s, 600 s heat pump) is read from the real flame-on of the flame across flips (entry 479); host test: a resume with little ON left ends after the frozen ON clock, not 180 s later
 <!-- AC:END -->
 
 ## Implementation Plan

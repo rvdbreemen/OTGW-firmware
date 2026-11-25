@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-21T14:29:00Z'
-updated_date: '2026-11-25T08:45:00Z'
+updated_date: '2026-11-25T10:01:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -25,7 +25,7 @@ Sergeant D entry 448 (Q-342b answered D, 2026-11-21): the PWM -> continuous exit
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [x] #1 satCycleCheckPwmExits() leaves PWM for continuous only when flow <= request - 3.0 C for 180 s (no flame condition, as thermo-nova); a missing flow clears the timer; the existing PWM-mode / ON-phase / hot-water / start-gate gating unchanged
-- [ ] #2 Host tests red on origin/dev and green on the fix: a 60 s request-above-flow case no longer exits, a 180 s flow <= request - 3 case exits, a 170 s case does not, flow at request - 2.9 does not; affected tests (test_sat_overshoot_sustain, test_sat_pwm_first_start, test_sat_lowload_contract, test_sat_cycle_classifier, grep underheat) updated
+- [x] #2 Host tests red on origin/dev and green on the fix: a 60 s request-above-flow case no longer exits, a 180 s flow <= request - 3 case exits, a 170 s case does not, flow at request - 2.9 does not; affected tests (test_sat_overshoot_sustain, test_sat_pwm_first_start, test_sat_lowload_contract, test_sat_cycle_classifier, grep underheat) updated
 - [x] #3 Replay proof with the real code (OTGW-field-data/_replay_tools/sat_switch/switch5.py on the fix): indigo_light 21 Nov night burns 0 exits after the fail-safe loops, marceld91d 09:03-09:30 no switch
 - [ ] #4 evaluate --quick no new FAIL, esp32-combo build, bench by otgw-bench-tester; push only after the indigo 24 h beta.410 analysis (Robert entry 445)
 <!-- AC:END -->
