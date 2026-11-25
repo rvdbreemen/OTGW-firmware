@@ -33,6 +33,8 @@ context_scope: "selective"
 
 Proposed, 2026-11-08.
 
+**Deferred 2026-11-26 by Robert** (interactive, about 01:10, relayed by the coordinator): stays Proposed, "later, after the stable". Not part of 2.0.0.
+
 ## Status History
 
 ```yaml
@@ -106,7 +108,7 @@ This ADR stays **Proposed** until a concrete feature asks for it (most likely HT
 
 ## Open Questions
 
-- [ ] Robert: which feature triggers acceptance (HTTPS webhooks first?), and does it then become its own task.
+- [ ] Robert: which feature triggers acceptance (HTTPS webhooks first?), and does it then become its own task. — Robert, 2026-11-26: not before the 2.0.0 stable; the question stays open for after it.
 
 ## Related Decisions
 
