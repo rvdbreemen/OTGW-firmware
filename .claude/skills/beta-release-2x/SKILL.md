@@ -44,8 +44,8 @@ nothing builds or publishes for you. `dev` is the GitHub default branch: without
 
 ### Phase 0: Preconditions and coordination
 
-1. **CHECKPOINT 1: the 12-hour slots** (Robert 2026-11-02 evening; replaces that day's daily 08:00 rule and its
-   "every beta public" morning rule): at most one public beta per 12 hours, at 08:00 or 20:00 local time. Every firmware task keeps its own
+1. **CHECKPOINT 1: the four daily slots** (Robert 2026-11-25 22:20; replaces the 12-hour 08:00/20:00 rule of 2026-11-02): public beta slots
+   are 08:00, 12:00, 16:00 and 20:00 local time, at most one beta per slot; a slot with no soaked candidate is skipped. Every firmware task keeps its own
    `2.0.0-beta.N` bump and its #alpha-testing zip (alpha track); only the daily release gets a
    GitHub prerelease and a #beta-testing post. Candidate: origin/dev HEAD at compose time (T-75, see
    below), published as the release build that ran at least 1 h on the bench unit (.63) with MQTT
@@ -67,9 +67,10 @@ nothing builds or publishes for you. `dev` is the GitHub default branch: without
    once. No per-release question within this rule; still ask (by Discord DM via the coordinator, one question
    each; never an interactive CLI question, TASK-1829) for anything new to weigh: a new waiver, a failed gate, a breaking change. The
    soak/macOS waiver (TASK-1544) carries over and is stated in every notes file.
-   The release is a docs-only commit on top of the candidate (notes bundling every beta.N
-   since the previous public beta, CHANGELOG rollover, README link), tagged and built from
-   that commit (the beta.7 model); Phase 1/2 go into that commit.
+   The release docs (notes bundling every beta.N since the previous public beta, CHANGELOG rollover, README link; Phase 1/2) go INSIDE the
+   candidate commit, before the build (Robert 2026-11-25 22:20), so the soaked binary is the published binary: no docs-only release commit
+   on top of the candidate, no second build and no second soak. The tag goes on that candidate commit. Non-destructive 15 min task checks
+   run during the 60 min soak; destructive ones run first, before the soak starts.
    **Who starts it** (Robert 2026-11-14, standing permission: "Ik wil dat je de release van een beta
    gewoon uitvoert"): the coordinator invokes this skill itself at T-75 (compose + push the release commit), and
    publishes at T once the release build passed its soak; Robert does not have to type it. Stable releases (`/release-2x`, `/release`) keep the
@@ -77,13 +78,14 @@ nothing builds or publishes for you. `dev` is the GitHub default branch: without
    **Compose shortly before, publish at the slot** (Robert 2026-11-15: "de release kort van
    tevoren samenstelt. Zodat elke user de nieuwst mogelijke release krijgt. Geen vertraging na de
    soak van een 1 uur."). The soak runs on the RELEASE BUILD itself, so the soak end is the
-   publish moment. Timeline for slot T (08:00 or 20:00):
+   publish moment. Timeline for slot T (08:00, 12:00, 16:00 or 20:00). When the candidate is not built yet, follow the steps below. When the candidate was
+   built and soaked earlier, with its release docs already inside the commit, publish at the first slot after its 60 min soak passed (tag, draft,
+   verify, publish, posts; no rebuild):
    - all day: the notes draft and the Discord post draft are kept current after every push
      (one owner, the comms session), so composing takes minutes, not an hour;
-   - **T-75: compose** Phase 1 + 2 on top of origin/dev HEAD at that moment (the newest
-     firmware that passed its own bench), commit and **push the release commit to `dev` at
-     once**. No freeze: the release is that commit, not "HEAD at T". Pushes after it simply land
-     in the next release.
+   - **T-75: compose** Phase 1 + 2 together with the newest firmware that passed its own bench, as the candidate commit on top of
+     origin/dev HEAD at that moment, and **push the candidate commit to `dev` at once**. No freeze: the release is that commit, not
+     "HEAD at T". Pushes after it simply land in the next release.
    - **T-70 to T-62: build** that release commit (Phase 3.1, from a worktree at the commit if
      the tree moved on).
    - **T-62: flash** the release build on the bench unit (.63) and run the Phase 3 checks: this
@@ -161,7 +163,7 @@ from the file at create time.
      backslash on Windows: stage `src/OTGW-firmware/data/FSexplorer.html` by name).
    - beta.N -> beta.N+1: `bin/bump-prerelease.sh` (stages its own files).
    - **Normal slot release (candidate already at beta.N in `version.h`):** no bump. The release
-     commit is docs-only (notes, CHANGELOG rollover, README, task file) and the tag carries the
+     docs (notes, CHANGELOG rollover, README, task file) are part of the candidate commit (since 2026-11-25 22:20) and the tag carries the
      candidate's number (beta.237, beta.250). Commit as `docs(release): v<semver>-beta.N release
      notes, CHANGELOG rollover and README (TASK-NNN)`.
 2. Check: `grep -E "PRERELEASE|SEMVER_FULL" src/OTGW-firmware/version.h`.
@@ -295,7 +297,7 @@ from the file at create time.
    ```
    Add the row to `.claude/alpha-build-ledger.local.md` (for a note: "zip already
    posted as alpha beta.N" and both message ids).
-2. **#beta-testing announcement** (sent without showing it first under the 12-hour slot rule
+2. **#beta-testing announcement** (sent without showing it first under the four-slot rule
    above; show it first only when it announces something new to weigh).
    Channel `914498730001072149`, via `mcp__discord-mcp__send_message` (the webhook
    only reaches #alpha-testing). If the MCP is down, post through the Discord REST API with the
