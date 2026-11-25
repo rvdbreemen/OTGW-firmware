@@ -1,15 +1,16 @@
 ---
 id: "ADR-268"
 title: "Retire diagRec: the remote telemetry recorder's local ring becomes the one local diagnostic recorder"
-status: "Proposed"
-date: "2026-11-20"
+status: "Accepted"
+date: "2026-11-25"
 binding: false
 gate: null
 documents_shipped: false
 verified_in: []
-supersedes: []
+supersedes:
+  - "ADR-213"
+  - "ADR-214"
 superseded_by: null
-format: "canonical"
 topics:
   - "diagnostics"
   - "remote-telemetry"
@@ -30,6 +31,7 @@ symbols:
   - "RecRing"
   - "HAS_REMOTE_TELEMETRY"
 context_scope: "selective"
+format: "canonical"
 ---
 
 <!-- markdownlint-disable MD025 -->
@@ -38,7 +40,7 @@ context_scope: "selective"
 
 ## Status
 
-Proposed, 2026-11-20. On acceptance this ADR supersedes ADR-213 and ADR-214. `bin/adr supersede` then records that on both sides; until then both stay Accepted and in force.
+Accepted, 2026-11-25, by Robert van den Breemen. Proposed 2026-11-20. Supersedes ADR-213 and ADR-214, recorded on both sides with `bin/adr supersede`.
 
 **Decision Maker:** User: Robert van den Breemen. In the otgw-architect session on 2026-11-20 he wrote: "Laten we diagRec verwijderen, als we nu toch Remote Telemetry ontwikkelen" ("Let's remove diagRec, since we are developing Remote Telemetry anyway"). Release timing, decided by Robert interactively on 2026-11-20 (about 18:25, relayed by the coordinator and otgw-poc-dev): **now, in 2.0.0**, together with size-gate option A1 (99.5 % temporarily until 2026-11-29, with a linked trim task, TASK-2980).
 
@@ -51,6 +53,21 @@ status_history:
     changed_by: "Agent: Claude (otgw-architect)"
     reason: Initial proposal after Robert's decision to remove diagRec; written as a swap with the remote telemetry recorder
     changed_via: adr-kit
+  - date: 2026-11-25
+    status: Accepted
+    changed_by: "Agent: Claude (otgw-architect)"
+    reason: Accepted by Robert van den Breemen, 2026-11-25, interactive in the coordinator session (relayed to otgw-architect)
+    changed_via: adr-kit lifecycle
+  - date: 2026-11-25
+    status: Accepted
+    changed_by: "Agent: Claude (otgw-architect)"
+    reason: Superseded by ADR-268 (retire diagRec), accepted by Robert 2026-11-25
+    changed_via: adr-kit lifecycle
+  - date: 2026-11-25
+    status: Accepted
+    changed_by: "Agent: Claude (otgw-architect)"
+    reason: Superseded by ADR-268 (retire diagRec), accepted by Robert 2026-11-25
+    changed_via: adr-kit lifecycle
 ```
 
 ## Context
@@ -135,7 +152,7 @@ The firmware keeps one local diagnostic recorder: the local ring of the remote t
 ## Open Questions
 
 - [x] Release timing (Robert): (A) with the recorder in 2.1.0, the architect's recommendation, or (B) now in 2.0.0. **Answered 2026-11-20 by Robert (interactive, relayed by the coordinator):** now, in 2.0.0, with the recorder's local sink in the same change (so not B's "without local recording"), and size gate A1 99.5 % until 2026-11-29 with TASK-2980.
-- [ ] Is the 8 KB heap ring on a board without PSRAM enough for a useful tester capture (minutes of records)? Measure one capture on .61 with the recorder before the swap lands.
+- [x] Is the 8 KB heap ring on a board without PSRAM enough for a useful tester capture (minutes of records)? Measure one capture on .61 with the recorder before the swap lands. — **Answered 2026-11-25 by Agent: Claude (otgw-architect):** Not a precondition of the decision (Robert accepted 2026-11-25). It becomes a bench acceptance criterion of the diagRec removal task: one tester capture on a board without PSRAM (.61) with the recorder, before the swap lands.
 
 ## Related Decisions
 

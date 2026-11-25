@@ -230,10 +230,10 @@ Counts above are advisory rather than hand-maintained; the canonical set is the 
 - **[ADR-100: JIT HA Discovery with Smart Reconnect (Port of dev ADR-073)](ADR-100-jit-ha-discovery-smart-reconnect.md)** 🆕  
   Stops the bulk republish of all 256 configs at every boot/reconnect; republishes only after an offline-threshold reconnect (broker-restart heuristic).
 
-- **[ADR-174: Republish on-change gated MQTT state when Home Assistant comes back online](ADR-174-republish-on-change-gated-mqtt-state-when-home-assistant-comes-back-online.md)** *(Accepted)*  
+- **[ADR-174: Republish on-change gated MQTT state when Home Assistant comes back online](ADR-174-republish-on-change-gated-mqtt-state-when-home-assistant-comes-back-online.md)** 🆕 *(Accepted)*  
   When `homeassistant/status` goes `offline` and then `online`, the handler calls `requestMQTTRepublishAll()`, so a restarted Home Assistant does not sit on "unknown" until each value changes. A retained `online` replay triggers nothing, and discovery is untouched. Supersedes ADR-100.
 
-- **[ADR-176: Publish a firmware-integrated cumulative DHW water total for the Home Assistant Energy dashboard](ADR-176-publish-a-firmware-integrated-cumulative-dhw-water-total-for-the-home-assistant-energy-dashboard.md)** *(Accepted)*  
+- **[ADR-176: Publish a firmware-integrated cumulative DHW water total for the Home Assistant Energy dashboard](ADR-176-publish-a-firmware-integrated-cumulative-dhw-water-total-for-the-home-assistant-energy-dashboard.md)** 🆕 *(Accepted)*  
   A firmware-integrated cumulative DHW water total (`device_class: water`, unit L, `total_increasing`) so the Home Assistant Energy dashboard works without a helper. It integrates elapsed time multiplied by the MsgID 19 flow, persists in its own file with a bounded flash write rate, and keeps the same entity contract as the 1.x line. It is not a metrologically valid water meter. *(Amended by ADR-181: the PS=1 summary no longer feeds the total; by ADR-182: the entity is announced just in time; by ADR-183: the record of an unclean reboot is corrected.)*
 
 - **[ADR-181: Count only boiler Read-Ack frames into the DHW water total, not the PIC PS=1 summary](ADR-181-count-only-boiler-read-ack-frames-into-the-dhw-water-total-not-the-pic-ps-1-summary.md)** 🆕 *(Accepted)*  
@@ -257,7 +257,7 @@ Counts above are advisory rather than hand-maintained; the canonical set is the 
 - **[ADR-264: Take espMqttClient from our fork as a vendored copy of a pinned fork tag (partly supersedes ADR-187, amends ADR-186)](ADR-264-take-espmqttclient-from-our-fork-as-a-vendored-copy-of-a-pinned-fork-tag-partly-supersedes-adr-187-amends-adr-186.md)** 🆕 *(Accepted)*  
   Robert's decision: rvdbreemen/espMqttClient is the source. `src/libraries/espMqttClient` is a byte copy of a pinned fork tag (first: `v1.7.3-otgw.1` = upstream de31cb2 + PR #191 + the TASK-1325 connect timeout) with a provenance hash test; back to upstream once it releases the same changes.
 
-- **[ADR-266: Turn Nagle on for the espMqttClient socket, so one MQTT loop hands lwIP 2-3 segments instead of 16](ADR-266-bound-the-lwip-segments-one-espmqttclient-loop-creates-with-nagle-on-the-mqtt-socket-and-a-per-loop-publish-cap-as-backstop.md)** 🆕 *(Proposed)*  
+- **[ADR-266: Turn Nagle on for the espMqttClient socket, so one MQTT loop hands lwIP 2-3 segments instead of 16](ADR-266-bound-the-lwip-segments-one-espmqttclient-loop-creates-with-nagle-on-the-mqtt-socket-and-a-per-loop-publish-cap-as-backstop.md)** 🆕 *(Accepted)*  
   The library sets TCP_NODELAY, so every MQTT packet costs its own ~1.5 KB lwIP segment (up to 16 per loop). The fork gains `EMC_TCP_NODELAY` and the firmware builds with Nagle on. TASK-2949.5 bench (n=3 per arm, .61 and .63): send-queue high-water mark 16 -> 2-3, hd_min 0.7-6.3 KB -> 13.4-33.2 KB on .61, command echo unchanged. The per-loop PUBLISH cap of the first version is not adopted.
 
 - **[ADR-103: MQTT Source-Topic Worldview Routing — Proxy-Answer (no-B) Refinement](ADR-103-mqtt-source-topic-proxy-answer-routing.md)** 🆕 *(Supersedes ADR-096)*  
@@ -322,7 +322,7 @@ Counts above are advisory rather than hand-maintained; the canonical set is the 
 - **[ADR-130: PIC-UART Dedicated FreeRTOS Task as Sole OTGWSerial Owner (ADR-123 Phase 1)](ADR-130-pic-uart-dedicated-task-sole-serial-owner.md)** 🆕  
   Accepted (2026-06-13). Lifts the PIC UART runtime byte I/O onto a dedicated FreeRTOS task pinned to the app core, the sole runtime owner of `OTGWSerial` read/write; deletes the four-lines-per-call bound (`kMaxLinesPerDrain`, TASK-671). RX assembles lines onto the ADR-129 frame queue; TX uses a new value-copy `otTxQueue`; RX errors are detected in the task but reported loop-side to keep `OTGWState` single-writer. Task parks during a PIC flash (ADR-012 handshake) and on an OTDirect boot (ADR-127), gating on `isOTDirectEnabled()` so ADR-060 banner recovery survives. Refines ADR-123 §model-1's "high-priority task" to equal-to-loop priority for the Phase-1 (still-synchronous-networking) environment. First consumer of ADR-129; supersedes nothing. New CI gate `check_pic_uart_task_owns_serial`.
 
-- **[ADR-177: Keep the PIC byte stream verbatim from the serial task to every consumer](ADR-177-keep-the-pic-byte-stream-verbatim-from-the-serial-task-to-every-consumer.md)** *(Accepted)*  
+- **[ADR-177: Keep the PIC byte stream verbatim from the serial task to every consumer](ADR-177-keep-the-pic-byte-stream-verbatim-from-the-serial-task-to-every-consumer.md)** 🆕 *(Accepted)*  
   The raw PIC payload travels from the serial task to every consumer as a (pointer, length) pair and is never handed to an API that expects a NUL-terminated string. An `adr-judge` regex rule blocks staged diffs that do.
 
 - **[ADR-132: HTTP Stack on ESPAsyncWebServer with an Imperative-Push to Async-Pull Bridge (ADR-123 Phase 3)](ADR-132-async-web-server-and-imperative-push-bridge.md)** 🆕 *(Supersedes ADR-109)*  
@@ -646,7 +646,7 @@ Counts above are advisory rather than hand-maintained; the canonical set is the 
 
 ### SAT Subsystem
 
-- **[ADR-169: PSRAM-Aware BLE Default with a No-PSRAM Instability-Consent Gate](ADR-169-psram-aware-ble-default-with-no-psram-consent-gate.md)** *(Accepted)*  
+- **[ADR-169: PSRAM-Aware BLE Default with a No-PSRAM Instability-Consent Gate](ADR-169-psram-aware-ble-default-with-no-psram-consent-gate.md)** 🆕 *(Accepted)*  
   Proposed. Documents the code-only decision from TASK-995 (commit 2f3bd23d3): BLE runs by default only where `psramFound()` is true; on no-PSRAM boards (OTGW32) it stays dormant behind a persisted user-consent flag (`bBleRiskAck`) that acknowledges the internal-DRAM-headroom instability risk. `psramFound()` is the single runtime discriminator across one combined firmware image (`-DBOARD_HAS_PSRAM` global). Memory-headroom policy tied to the ADR-147 / ADR-149 concurrent web-serve budget; enforced by a declarative `require_pattern` on the `bleActive()` gate. Related to ADR-092, ADR-126, ADR-161; TASK-988 validates the PSRAM assumption before acceptance.
 
 - **[ADR-085: SAT (Smart Autotune Thermostat) Integration](ADR-085-sat-smart-autotune-thermostat-integration.md)** 🆕  
@@ -730,7 +730,7 @@ Counts above are advisory rather than hand-maintained; the canonical set is the 
 - **[ADR-206: REST API sets the telnet debug log flags by name from one shared table](ADR-206-rest-api-sets-the-telnet-debug-log-flags-by-name-from-one-shared-table.md)** 🆕 *(Accepted)*  
   `GET`/`POST /api/v2/debug/flags` reads and sets the twelve telnet debug flags by name, idempotent, from the one table (`debugFlags.h`) the telnet keys also use; the two simulation switches run their side effect only on a real change; admin route (ADR-056), transient state (TASK-1561).
 
-- **[ADR-207: SAT sends MM, the Immergas TP and CH on change, CS keeps the 5 s resend (partly supersedes ADR-203)](ADR-207-sat-sends-mm-the-immergas-tp-and-ch-on-change-cs-keeps-the-5-s-resend-partly-supersedes-adr-203.md)** *(Accepted)*  
+- **[ADR-207: SAT sends MM, the Immergas TP and CH on change, CS keeps the 5 s resend (partly supersedes ADR-203)](ADR-207-sat-sends-mm-the-immergas-tp-and-ch-on-change-cs-keeps-the-5-s-resend-partly-supersedes-adr-203.md)** 🆕 *(Accepted)*  
   Proposed, guideline-level (ADR-080) with a test gate (`tests/test_sat_cmd_cache.py`). Partly supersedes ADR-203: MM=, the Immergas TP=11:12 and CH= go to the PIC only on a changed value (Sergeant D entry 237), with a 60 s repair resend (Sergeant D entry 239, Q-1570a answered); CS= keeps the 5 s resend. A PIC restart banner clears the cache.
 
 - **[ADR-208: OT-Direct gateway mode applies the CH= override to the relayed thermostat MsgID 0](ADR-208-ot-direct-gateway-mode-applies-the-ch-override-to-the-relayed-thermostat-msgid-0.md)** 🆕 *(Accepted)*  
@@ -751,13 +751,13 @@ Counts above are advisory rather than hand-maintained; the canonical set is the 
 - **[ADR-212: Load the Web UI assets natively behind a bounded server-side file queue](ADR-212-load-web-ui-assets-natively-behind-a-bounded-server-side-file-queue.md)** 🆕 *(Proposed)*  
   Guideline-level (ADR-080) with a test gate (`tests/test_web_file_scheduling.py`). Native stylesheet, deferred script and font preloads replace the JavaScript loader; when both file slots are busy, up to four file requests wait in arrival order for up to 10 s instead of getting 503. Queued requests do not count as senders under ADR-188. Open caveat: lower heap minimum when two files stream at once (TASK-1659).
 
-- **[ADR-213: Record a local diagnostic event stream in a bounded on-device ring and stream it as a binary download](ADR-213-record-a-local-diagnostic-event-stream-in-a-bounded-on-device-ring-and-stream-it-as-a-binary-download.md)** 🆕 *(Proposed)*  
+- **[ADR-213: Record a local diagnostic event stream in a bounded on-device ring and stream it as a binary download](ADR-213-record-a-local-diagnostic-event-stream-in-a-bounded-on-device-ring-and-stream-it-as-a-binary-download.md)** *(Superseded by ADR-268)*  
   Guideline-level (ADR-080), no gate yet. Opt-in, local-only recording of OT frames, PIC commands and responses, MQTT publishes and external inputs in a compact versioned binary format (4 KB blocks with a sequence number, repeat records), a 1 MB PSRAM ring of self-decoding 4 KB blocks allocated once, no on-device ring on boards without PSRAM, and a streamed `GET /api/v2/diag/recording?since=` download; measured budget in `docs/diagnostics/recording-budget-1470.md` (TASK-1470). Six open questions for the maintainer.
 
-- **[ADR-214: Diagnostic recording identifies topics and settings by a 16-bit FNV-1a hash of the lowercased name (amends ADR-213 decision on the fixed id table)](ADR-214-diagnostic-recording-identifies-topics-and-settings-by-a-16-bit-fnv-1a-hash-of-the-lowercased-name-amends-adr-213-decision-on-the-fixed-id-table.md)** 🆕 *(Proposed)*  
+- **[ADR-214: Diagnostic recording identifies topics and settings by a 16-bit FNV-1a hash of the lowercased name (amends ADR-213 decision on the fixed id table)](ADR-214-diagnostic-recording-identifies-topics-and-settings-by-a-16-bit-fnv-1a-hash-of-the-lowercased-name-amends-adr-213-decision-on-the-fixed-id-table.md)** *(Superseded by ADR-268)*  
   Guideline-level (ADR-080); the host collision check over the real name lists (TASK-1666/1667) is its gate. Amends ADR-213: ids are a 16-bit FNV-1a hash instead of a device table, names travel in the file header, OT repeats have one type per source, text is len u8 with 255 = cut, the repeat caches sit outside the 4 KB ring (no-PSRAM start needs 9984 B free), REST route ids are listed with names in the header.
 
-- **[ADR-268: Retire diagRec: the remote telemetry recorder's local ring becomes the one local diagnostic recorder](ADR-268-retire-diagrec-the-remote-telemetry-recorder-s-local-ring-becomes-the-one-local-diagnostic-recorder.md)** 🆕 *(Proposed)*  
+- **[ADR-268: Retire diagRec: the remote telemetry recorder's local ring becomes the one local diagnostic recorder](ADR-268-retire-diagrec-the-remote-telemetry-recorder-s-local-ring-becomes-the-one-local-diagnostic-recorder.md)** 🆕 *(Accepted, supersedes ADR-213 and ADR-214)*  
   Decision maker Robert (2026-11-20): diagRec is removed in full in 2.0.0, in the same change that brings the remote telemetry recorder's local ring (PSRAM 1.5 MB, 8 KB heap without PSRAM) into the normal build. `/api/v2/diag/recording*` keeps its paths and status keys, served from the new ring ("OTGWMIX1" download); the capture tool reads the new format or skips it. On acceptance it supersedes ADR-213 and ADR-214. Guideline-level (ADR-080); verified by the RecRing host test, a capture-tool fixture test and an `nm` check that no DiagRecorder symbol is left.
 
 - **[ADR-215: Serve each web page as one gzipped file with an ETag (partly supersedes ADR-139, ADR-190 and ADR-192)](ADR-215-serve-each-web-page-as-one-gzipped-file-with-an-etag.md)** 🆕 *(Proposed)*  
@@ -782,7 +782,7 @@ Counts above are advisory rather than hand-maintained; the canonical set is the 
 
 - **[ADR-221: Language packs may be gzipped on LittleFS (amends ADR-194 for language packs only)](ADR-221-language-packs-may-be-gzipped-on-littlefs-amends-adr-194-for-language-packs-only.md)** 🆕 *(Accepted)*  
   `nl.json.gz`/`de.json.gz` served with `Content-Encoding: gzip` and an ETag like the ADR-215 pages; ADR-194's no-gzip rule stands for every other asset (TASK-1689).
-- **[ADR-247: The settings help and the built-in replay fixture may be stored deflated in firmware flash (amends ADR-194)](ADR-247-the-settings-help-and-the-built-in-replay-fixture-may-be-stored-deflated-in-firmware-flash-amends-adr-194.md)** *(Accepted)*  
+- **[ADR-247: The settings help and the built-in replay fixture may be stored deflated in firmware flash (amends ADR-194)](ADR-247-the-settings-help-and-the-built-in-replay-fixture-may-be-stored-deflated-in-firmware-flash-amends-adr-194.md)** 🆕 *(Accepted)*  
   `/settings-help.json` as a gzip PROGMEM array sent with `Content-Encoding: gzip`, the built-in replay fixture deflated and inflated once with the ROM tinfl while a replay runs; about 22 KB of flash (TASK-1955).
 
 - **[ADR-222: On boards without PSRAM BLE starts off and warns when the user enables it](ADR-222-on-boards-without-psram-ble-starts-off-and-warns-when-the-user-enables-it.md)** 🆕 *(Accepted)*  
@@ -824,7 +824,7 @@ Counts above are advisory rather than hand-maintained; the canonical set is the 
 - **[ADR-235: SAT sends CS= on change with a 30 s repeat (supersedes the CS part of ADR-207 and ADR-203)](ADR-235-sat-sends-cs-on-change-with-a-30-s-repeat-supersedes-the-cs-part-of-adr-207-and-adr-203.md)** 🆕 *(Proposed)*  
   Guideline-level (ADR-080) with a test gate (`tests/test_sat_cmd_cache.py`). CS= goes out when its 0.1-rounded value changes and is repeated every 30 s while unchanged, on raw `millis()` in the loop, inside the PIC's ~63 s expiry (Sergeant D entries 334, 335); a dropped CS= is retried after 5 s with its own value; the PIC keepalive shares the stamp; the no-return start-up flood keeps its 2 s cadence (open question). MM/TP/CH stay as ADR-207 (TASK-1924).
 
-- **[ADR-236: SAT leaves PWM for continuous only when the flow stays at least 3.0 C under the request for 180 s, thermo-nova's underheat exit](ADR-236-sat-leaves-pwm-for-continuous-when-the-flame-is-on-and-the-request-stays-above-the-flow-for-60-s-replaces-the-thermo-nova-underheat-exit.md)** 🆕 *(Proposed)*  
+- **[ADR-236: SAT leaves PWM for continuous only when the flow stays at least 3.0 C under the request for 180 s, thermo-nova's underheat exit](ADR-236-sat-leaves-pwm-for-continuous-when-the-flame-is-on-and-the-request-stays-above-the-flow-for-60-s-replaces-the-thermo-nova-underheat-exit.md)** 🆕 *(Accepted)*  
   Guideline-level (ADR-080) with a test gate (`tests/test_sat_overshoot_sustain.py`). Sergeant D, entry 448 (Q-342b answer D): while PWM is ON and there is heating demand (no flame check, as thermo-nova), SAT goes to continuous only after flow <= request - 3.0 C for 180 s (thermo-nova heating_control.py:331-354). Replaces his entry-342 60 s rule, which looped 3-4 times per night burn on indigo_light (replay 0 with this rule). With ADR-254 (2.0 C / 60 s in) the hysteresis is 2.0 C in, 3.0 C out.
 - **[ADR-249: SAT switches from continuous to PWM when the flow stays 1.5 C above the request for 30 s, with its own margin setting (supersedes the entry-22 rule)](ADR-249-sat-switches-from-continuous-to-pwm-when-the-flow-stays-1-5-c-above-the-request-for-30-s-with-its-own-margin-setting-supersedes-the-entry-22-rule.md)** (Accepted; threshold and time partly superseded by ADR-254)
   Guideline-level (ADR-080) with a test gate (`tests/test_sat_overshoot_sustain.py`). Continuous to PWM when flow - requested >= `fPwmSwitchMargin` (new setting `satpwmswitchmargin`, default 1.5, 0.5-5.0) for 30 s (Sergeant D entries 327, 360); `fOvershootMargin` keeps 2.0 for the classifier. The 3.5 C / 30 s fail-safe stays (entry 359) and only acts when the switch margin is set above 3.5.
@@ -1144,11 +1144,11 @@ Generated by `bin/adr-index`. Do not edit between the sentinels.
 | Metric | Count |
 | --- | ---: |
 | Total ADRs | 271 |
-| Accepted | 218 |
+| Accepted | 219 |
 | Amended | 1 |
-| Proposed | 9 |
+| Proposed | 6 |
 | Rejected | 2 |
-| Superseded | 40 |
+| Superseded | 42 |
 | Superseded by adr-124 | 1 |
 | Duplicate IDs | 0 |
 
@@ -1368,8 +1368,8 @@ Generated by `bin/adr-index`. Do not edit between the sentinels.
 | ADR-210 | REST API streams the stored ESP32 core dump as an admin download | Accepted | 2026-11-05 | - | ADR-210-rest-api-streams-the-stored-esp32-core-dump-as-an-admin-download.md |
 | ADR-211 | Skip the WiFi config portal on the boot after a WiFi supervisor restart | Accepted | 2026-11-08 | - | ADR-211-skip-the-wifi-config-portal-on-the-boot-after-a-wifi-supervisor-restart.md |
 | ADR-212 | Load the Web UI assets natively behind a bounded server-side file queue | Accepted | 2026-11-07 | - | ADR-212-load-web-ui-assets-natively-behind-a-bounded-server-side-file-queue.md |
-| ADR-213 | Record a local diagnostic event stream in a bounded on-device ring and stream it as a binary download | Accepted | 2026-11-05 | - | ADR-213-record-a-local-diagnostic-event-stream-in-a-bounded-on-device-ring-and-stream-it-as-a-binary-download.md |
-| ADR-214 | Diagnostic recording identifies topics and settings by a 16-bit FNV-1a hash of the lowercased name (amends ADR-213 decision on the fixed id table) | Accepted | 2026-11-05 | - | ADR-214-diagnostic-recording-identifies-topics-and-settings-by-a-16-bit-fnv-1a-hash-of-the-lowercased-name-amends-adr-213-decision-on-the-fixed-id-table.md |
+| ADR-213 | Record a local diagnostic event stream in a bounded on-device ring and stream it as a binary download | Superseded | 2026-11-25 | Superseded by ADR-268 | ADR-213-record-a-local-diagnostic-event-stream-in-a-bounded-on-device-ring-and-stream-it-as-a-binary-download.md |
+| ADR-214 | Diagnostic recording identifies topics and settings by a 16-bit FNV-1a hash of the lowercased name (amends ADR-213 decision on the fixed id table) | Superseded | 2026-11-25 | Superseded by ADR-268 | ADR-214-diagnostic-recording-identifies-topics-and-settings-by-a-16-bit-fnv-1a-hash-of-the-lowercased-name-amends-adr-213-decision-on-the-fixed-id-table.md |
 | ADR-215 | Serve each web page as one gzipped file with an ETag (partly supersedes ADR-139, ADR-190 and ADR-192) | Accepted | 2026-11-07 | - | ADR-215-serve-each-web-page-as-one-gzipped-file-with-an-etag.md |
 | ADR-216 | Cap each web connection's lwIP send queue at two segments | Accepted | 2026-11-07 | - | ADR-216-cap-each-web-connection-s-lwip-send-queue-at-two-segments.md |
 | ADR-217 | While SAT is enabled, the Classic port 25238 bridge filters inbound lines and drops CV control commands and binary data | Accepted | 2026-11-07 | - | ADR-217-while-sat-is-enabled-the-classic-port-25238-bridge-filters-inbound-lines-and-drops-cv-control-commands-and-binary-data.md |
@@ -1390,7 +1390,7 @@ Generated by `bin/adr-index`. Do not edit between the sentinels.
 | ADR-233 | Keep settings.ini, the reboot counter and the reboot log in an RTC snapshot during a filesystem OTA | Accepted | 2026-11-14 | - | ADR-233-keep-settings-ini-the-reboot-counter-and-the-reboot-log-in-an-rtc-snapshot-during-a-filesystem-ota.md |
 | ADR-234 | SAT heating curve self-tune: a 60 min hour counts when at least 90 % of its expected ticks are clean; excluded ticks stay out of the mean (amends ADR-205 decision 2) | Accepted | 2026-11-17 | - | ADR-234-sat-heating-curve-self-tune-a-60-min-hour-counts-when-at-least-90-of-its-expected-ticks-are-clean-excluded-ticks-stay-out-of-the-mean-amends-adr-205-decision-2.md |
 | ADR-235 | SAT sends CS= on change with a 30 s repeat (supersedes the CS part of ADR-207 and ADR-203) | Accepted | 2026-11-15 | - | ADR-235-sat-sends-cs-on-change-with-a-30-s-repeat-supersedes-the-cs-part-of-adr-207-and-adr-203.md |
-| ADR-236 | SAT leaves PWM for continuous only when the flow stays at least 3.0 C under the request for 180 s, thermo-nova's underheat exit | Proposed | 2026-11-14 | - | ADR-236-sat-leaves-pwm-for-continuous-when-the-flame-is-on-and-the-request-stays-above-the-flow-for-60-s-replaces-the-thermo-nova-underheat-exit.md |
+| ADR-236 | SAT leaves PWM for continuous only when the flow stays at least 3.0 C under the request for 180 s, thermo-nova's underheat exit | Accepted | 2026-11-25 | - | ADR-236-sat-leaves-pwm-for-continuous-when-the-flame-is-on-and-the-request-stays-above-the-flow-for-60-s-replaces-the-thermo-nova-underheat-exit.md |
 | ADR-237 | Run the PlatformIO buildfs step in its own build directory so firmware objects survive between builds | Proposed | 2026-11-14 | - | ADR-237-run-the-platformio-buildfs-step-in-its-own-build-directory-so-firmware-objects-survive-between-builds.md |
 | ADR-238 | On the ESP32-S3 the triple-reset WiFi recovery counts reset-button presses and power-ons alike | Accepted | 2026-11-14 | Supersedes ADR-043 | ADR-238-on-the-esp32-s3-the-triple-reset-wifi-recovery-counts-reset-button-presses-and-power-ons-alike.md |
 | ADR-239 | The main firmware keeps its RTC_NOINIT records out of the first 32 bytes of RTC slow memory, which the safeboot updater owns | Accepted | 2026-11-14 | - | ADR-239-the-main-firmware-keeps-its-rtc-noinit-records-out-of-the-first-32-bytes-of-rtc-slow-memory-which-the-safeboot-updater-owns.md |
@@ -1420,8 +1420,8 @@ Generated by `bin/adr-index`. Do not edit between the sentinels.
 | ADR-263 | BLE and remote telemetry buffers may be allocated once from PSRAM at init (partly supersedes ADR-053) | Accepted | 2026-11-20 | - | ADR-263-ble-and-remote-telemetry-buffers-may-be-allocated-once-from-psram-at-init-partly-supersedes-adr-053.md |
 | ADR-264 | Take espMqttClient from our fork as a vendored copy of a pinned fork tag (partly supersedes ADR-187, amends ADR-186) | Accepted | 2026-11-20 | - | ADR-264-take-espmqttclient-from-our-fork-as-a-vendored-copy-of-a-pinned-fork-tag-partly-supersedes-adr-187-amends-adr-186.md |
 | ADR-265 | Pace every deferrable MQTT bulk publisher through one shared pacer that limits packets per flush | Proposed | 2026-11-20 | - | ADR-265-pace-every-deferrable-mqtt-bulk-publisher-through-one-shared-pacer-that-limits-packets-per-flush.md |
-| ADR-266 | Turn Nagle on for the espMqttClient socket, so one MQTT loop hands lwIP 2-3 segments instead of 16 | Proposed | 2026-11-20 | - | ADR-266-bound-the-lwip-segments-one-espmqttclient-loop-creates-with-nagle-on-the-mqtt-socket-and-a-per-loop-publish-cap-as-backstop.md |
-| ADR-268 | Retire diagRec: the remote telemetry recorder's local ring becomes the one local diagnostic recorder | Proposed | 2026-11-20 | - | ADR-268-retire-diagrec-the-remote-telemetry-recorder-s-local-ring-becomes-the-one-local-diagnostic-recorder.md |
+| ADR-266 | Turn Nagle on for the espMqttClient socket, so one MQTT loop hands lwIP 2-3 segments instead of 16 | Accepted | 2026-11-25 | - | ADR-266-bound-the-lwip-segments-one-espmqttclient-loop-creates-with-nagle-on-the-mqtt-socket-and-a-per-loop-publish-cap-as-backstop.md |
+| ADR-268 | Retire diagRec: the remote telemetry recorder's local ring becomes the one local diagnostic recorder | Accepted | 2026-11-25 | Supersedes ADR-213, ADR-214 | ADR-268-retire-diagrec-the-remote-telemetry-recorder-s-local-ring-becomes-the-one-local-diagnostic-recorder.md |
 | ADR-290 | Opt-in cloud telemetry from the gateway: outbound TLS to a self-hosted collection point, one compressed record a minute, bridge commands included | Superseded | 2026-11-20 | Superseded by ADR-218 | ADR-290-opt-in-cloud-telemetry-from-the-gateway.md |
 | ADR-291 | The Monitor graph history stores the room SAT regulates on in its own column; a slot grows from 16 to 18 bytes (amends ADR-256) | Accepted | 2026-11-21 | - | ADR-291-the-monitor-graph-history-stores-the-room-sat-regulates-on-in-its-own-column-a-slot-grows-from-16-to-18-bytes-amends-adr-256.md |
 | ADR-292 | SAT ground truth: our implementation and the recorded decisions are leading, Alex Wijn's SAT is a reference (supersedes ADR-196) | Accepted | 2026-11-21 | Supersedes ADR-196 | ADR-292-sat-ground-truth-our-implementation-and-the-recorded-decisions-are-leading-alex-wijn-s-sat-is-a-reference-supersedes-adr-196.md |

@@ -7966,8 +7966,8 @@
       "title": "Record a local diagnostic event stream in a bounded on-device ring and stream it as a binary download",
       "path": "ADR-213-record-a-local-diagnostic-event-stream-in-a-bounded-on-device-ring-and-stream-it-as-a-binary-download.md",
       "format": "canonical",
-      "status": "Accepted",
-      "date": "2026-11-05",
+      "status": "Superseded",
+      "date": "2026-11-25",
       "decision_summary": "Opt-in, local, RAM (random-access memory) only.",
       "topics": [
         "diagnostics",
@@ -7998,34 +7998,10 @@
       ],
       "context_scope": "selective",
       "decision_contract": {
-        "must": [
-          "Keep recording off until the user starts it, and record nothing outbound.",
-          "Allocate the PSRAM ring once, through platformPsramAllocOnce(), on a board with PSRAM.",
-          "On a board without PSRAM, allocate the 4 KB ring only when a recording starts and free it when the recording stops.",
-          "Refuse to start (also on a resume after a reboot) and report a reason in the status when the allocation would drop free heap below the ADR-030 5120 B rung, or fails.",
-          "Resume a running recording after a reboot as a new recording that starts with the Reboot record.",
-          "Append without blocking: on contention or a full ring, drop and count (Gap record), never wait.",
-          "Stream the download block by block with a filler callback; fix the block range when the request starts.",
-          "Write a versioned file header so a decoder can refuse an unknown format.",
-          "Replace every secret setting value before it enters the ring, round latitude and longitude to 0.1 degree and replace BLE MAC addresses by slot numbers, because the download is open."
-        ],
-        "must_not": [
-          "Allocate a download buffer or copy the ring on the asynctcp task.",
-          "Keep a ring allocated on a no-PSRAM board while no recording runs.",
-          "Record the port 25238 bridge bytes in version 1.",
-          "Write the recording to LittleFS, or send it to any host the user did not ask.",
-          "Change the PIC byte stream or what other consumers see (ADR-177)."
-        ],
-        "exceptions": [
-          "None."
-        ],
-        "verification": [
-          "Host test (implementation task): encode a fixture of events, decode them back, and check the block sequence, the gaps after an overwrite and the redaction of secret settings.",
-          "Host test: the PSRAM ring allocation path calls platformPsramAllocOnce(); the no-PSRAM ring is allocated on start and freed on stop; a start is refused with a status reason when the free heap after the allocation would be below 5120 B (r...",
-          "Host test: a recording that was on before a reboot resumes with the Reboot record first.",
-          "Bench: start a recording on a PSRAM unit, download it twice with since=, check the gap after an overwrite and that hdmaxloopgapms and the REST 503 counters do not rise.",
-          "TASK-1470 AC3: a recorded day replays on the host and the diff shows PIC-command and MQTT-publish differences between two builds."
-        ]
+        "must": [],
+        "must_not": [],
+        "exceptions": [],
+        "verification": []
       },
       "scope": {
         "path_globs": []
@@ -8036,7 +8012,7 @@
         "documents_shipped": false,
         "verified_in": [],
         "supersedes": [],
-        "superseded_by": null
+        "superseded_by": "ADR-268"
       }
     },
     {
@@ -8044,8 +8020,8 @@
       "title": "Diagnostic recording identifies topics and settings by a 16-bit FNV-1a hash of the lowercased name (amends ADR-213 decision on the fixed id table)",
       "path": "ADR-214-diagnostic-recording-identifies-topics-and-settings-by-a-16-bit-fnv-1a-hash-of-the-lowercased-name-amends-adr-213-decision-on-the-fixed-id-table.md",
       "format": "canonical",
-      "status": "Accepted",
-      "date": "2026-11-05",
+      "status": "Superseded",
+      "date": "2026-11-25",
       "decision_summary": "Ids are a hash, not a table.",
       "topics": [
         "diagnostics",
@@ -8066,24 +8042,10 @@
       ],
       "context_scope": "selective",
       "decision_contract": {
-        "must": [
-          "Compute record ids with diagNameId() and nothing else.",
-          "Write the names and ids the firmware knows into the download header.",
-          "Fail a host check when two different names of the real topic or settings list share an id.",
-          "Count the repeat caches in the allocation the no-PSRAM start rule checks."
-        ],
-        "must_not": [
-          "Add dictionary records to the ring.",
-          "Share one id between two names on purpose.",
-          "Change diagNameId() or the type numbers without a new format version."
-        ],
-        "exceptions": [
-          "None."
-        ],
-        "verification": [
-          "test/host/testdiagrecorder.py includes the real diagRecorderStuff.h and covers the id function, repeat types, the 255 cut marker and the 9984 B start boundary (cases F1, F7, F9, F11).",
-          "The collision check over the real name lists is owned by TASK-1666 and TASK-1667. Until it exists this ADR is guideline-level per ADR-080."
-        ]
+        "must": [],
+        "must_not": [],
+        "exceptions": [],
+        "verification": []
       },
       "scope": {
         "path_globs": []
@@ -8094,7 +8056,7 @@
         "documents_shipped": false,
         "verified_in": [],
         "supersedes": [],
-        "superseded_by": null
+        "superseded_by": "ADR-268"
       }
     },
     {
@@ -9359,8 +9321,8 @@
       "title": "SAT leaves PWM for continuous only when the flow stays at least 3.0 C under the request for 180 s, thermo-nova's underheat exit",
       "path": "ADR-236-sat-leaves-pwm-for-continuous-when-the-flame-is-on-and-the-request-stays-above-the-flow-for-60-s-replaces-the-thermo-nova-underheat-exit.md",
       "format": "canonical",
-      "status": "Proposed",
-      "date": "2026-11-14",
+      "status": "Accepted",
+      "date": "2026-11-25",
       "decision_summary": "While SAT is in PWM and the PWM phase is ON, and there is heating demand, it switches to continuous only when the flo...",
       "topics": [
         "control-mode",
@@ -11289,8 +11251,8 @@
       "title": "Turn Nagle on for the espMqttClient socket, so one MQTT loop hands lwIP 2-3 segments instead of 16",
       "path": "ADR-266-bound-the-lwip-segments-one-espmqttclient-loop-creates-with-nagle-on-the-mqtt-socket-and-a-per-loop-publish-cap-as-backstop.md",
       "format": "canonical",
-      "status": "Proposed",
-      "date": "2026-11-20",
+      "status": "Accepted",
+      "date": "2026-11-25",
       "decision_summary": "Nagle on for the MQTT socket.",
       "topics": [
         "burst-pacing",
@@ -11350,8 +11312,8 @@
       "title": "Retire diagRec: the remote telemetry recorder's local ring becomes the one local diagnostic recorder",
       "path": "ADR-268-retire-diagrec-the-remote-telemetry-recorder-s-local-ring-becomes-the-one-local-diagnostic-recorder.md",
       "format": "canonical",
-      "status": "Proposed",
-      "date": "2026-11-20",
+      "status": "Accepted",
+      "date": "2026-11-25",
       "decision_summary": "The firmware keeps one local diagnostic recorder: the local ring of the remote telemetry recorder.",
       "topics": [
         "diagnostics",
@@ -11406,7 +11368,10 @@
         "gate": null,
         "documents_shipped": false,
         "verified_in": [],
-        "supersedes": [],
+        "supersedes": [
+          "ADR-213",
+          "ADR-214"
+        ],
         "superseded_by": null
       }
     },
@@ -11678,30 +11643,43 @@
       "format": "canonical",
       "status": "Proposed",
       "date": "2026-11-22",
-      "decision_summary": "State one concrete chosen approach and its rationale.",
-      "topics": [],
-      "aliases": [],
-      "components": [],
-      "symbols": [],
+      "decision_summary": "At CRITICAL heap, ADR-107 action 1 aborts every /ws TCP connection in lwIP, with a RST, instead of otLogWs.closeAll().",
+      "topics": [
+        "emergency heap recovery",
+        "tcp abort",
+        "websocket"
+      ],
+      "aliases": [
+        "heap recovery ws abort"
+      ],
+      "components": [
+        "emergencyHeapRecovery"
+      ],
+      "symbols": [
+        "doWebSocketDisconnectAll",
+        "emergencyHeapRecovery"
+      ],
       "context_scope": "selective",
       "decision_contract": {
         "must": [
-          "State required implementation constraints."
+          "The abort runs under LOCKTCPIPCORE() and only on pcbs found in tcpactivepcbs with local port 80 and the remote IP and port of a tracked /ws connection.",
+          "The recovery touches no AsyncWebSocketClient or AsyncClient object and does not walk the library's client list.",
+          "The abort count goes to a counter in device/info, and the recovery line keeps its actions bitmask (bit 0x01 = /ws aborted)."
         ],
         "must_not": [
-          "State prohibited implementation choices."
+          "No WebSocket-level closeAll() in the recovery path.",
+          "No library change."
         ],
         "exceptions": [
-          "State explicit exceptions, or None."
+          "None."
         ],
         "verification": [
-          "Name the test, command, or source anchor that verifies this decision."
+          "A host test that compiles the real recovery helper against a stub lwIP pcb list: a tracked /ws pcb is aborted, an HTTP pcb on port 80 and a pcb with another remote port are not; red on the code before (closeAll()).",
+          "Bench (otgw-bench-tester): a forced CRITICAL or 09's reproduction shows the /ws client gone at once, its memory back in the recovery line's after, and a web UI tab reconnecting."
         ]
       },
       "scope": {
-        "path_globs": [
-          "src/**/*.py"
-        ]
+        "path_globs": []
       },
       "metadata": {
         "binding": false,
@@ -18057,6 +18035,12 @@
       "resolved": true
     },
     {
+      "source": "ADR-213",
+      "target": "ADR-268",
+      "type": "superseded-by",
+      "resolved": true
+    },
+    {
       "source": "ADR-214",
       "target": "ADR-030",
       "type": "related",
@@ -18072,6 +18056,12 @@
       "source": "ADR-214",
       "target": "ADR-213",
       "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-214",
+      "target": "ADR-268",
+      "type": "superseded-by",
       "resolved": true
     },
     {
@@ -19210,8 +19200,20 @@
     },
     {
       "source": "ADR-268",
+      "target": "ADR-213",
+      "type": "supersedes",
+      "resolved": true
+    },
+    {
+      "source": "ADR-268",
       "target": "ADR-214",
       "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-268",
+      "target": "ADR-214",
+      "type": "supersedes",
       "resolved": true
     },
     {
@@ -19355,6 +19357,24 @@
     {
       "source": "ADR-293",
       "target": "ADR-292",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-295",
+      "target": "ADR-107",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-295",
+      "target": "ADR-167",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-295",
+      "target": "ADR-189",
       "type": "related",
       "resolved": true
     }

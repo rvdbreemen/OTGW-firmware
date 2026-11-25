@@ -1,14 +1,14 @@
 ---
 id: "ADR-214"
 title: "Diagnostic recording identifies topics and settings by a 16-bit FNV-1a hash of the lowercased name (amends ADR-213 decision on the fixed id table)"
-status: "Accepted"
-date: "2026-11-05"
+status: "Superseded"
+date: "2026-11-25"
 binding: false
 gate: null
 documents_shipped: false
 verified_in: []
 supersedes: []
-superseded_by: null
+superseded_by: "ADR-268"
 topics:
   - "diagnostics"
   - "recording"
@@ -32,7 +32,7 @@ format: "canonical"
 
 ## Status
 
-Accepted, 2026-11-05.
+Superseded by ADR-268, 2026-11-25.
 
 ## Status History
 
@@ -47,6 +47,11 @@ status_history:
     status: Accepted
     changed_by: Robert van den Breemen
     reason: Accepted by Robert in the session 2026-11-05; matches the TASK-1665 implementation and his hash decision
+    changed_via: adr-kit lifecycle
+  - date: 2026-11-25
+    status: Superseded
+    changed_by: "Agent: Claude (otgw-architect)"
+    reason: Superseded by ADR-268 (retire diagRec), accepted by Robert 2026-11-25
     changed_via: adr-kit lifecycle
 ```
 

@@ -1,15 +1,14 @@
 ---
 id: "ADR-236"
 title: "SAT leaves PWM for continuous only when the flow stays at least 3.0 C under the request for 180 s, thermo-nova's underheat exit"
-status: "Proposed"
-date: "2026-11-14"
+status: "Accepted"
+date: "2026-11-25"
 binding: false
 gate: null
 documents_shipped: false
 verified_in: []
 supersedes: []
 superseded_by: null
-format: "canonical"
 topics:
   - "sat"
   - "pwm"
@@ -27,6 +26,7 @@ symbols:
   - "SAT_UNDERHEAT_SUSTAIN_MS"
   - "SAT_UNDERSHOOT_MARGIN_C"
 context_scope: "selective"
+format: "canonical"
 ---
 
 <!-- markdownlint-disable MD025 -->
@@ -35,7 +35,7 @@ context_scope: "selective"
 
 ## Status
 
-Proposed, 2026-11-14. Rewritten 2026-11-21 after Sergeant D's answer D to Q-342b (entry 448). The first version recorded his entry-342 rule (request above the flow for 60 s). This version replaces it with thermo-nova's underheat exit. The record was still Proposed, so it is rewritten in place, not superseded. Guideline-level per ADR-080: verified by host tests, no evaluate.py gate.
+Accepted, 2026-11-25, by Robert van den Breemen. Proposed 2026-11-14 and rewritten 2026-11-21 after Sergeant D's answer D to Q-342b (entry 448), replacing the entry-342 rule in place. Guideline-level per ADR-080: verified by host tests, no evaluate.py gate.
 
 **Decision Maker:** Sergeant D, who decides SAT behaviour (ADR-196). Entry 448, 2026-11-21: "My answer is D".
 
@@ -48,15 +48,20 @@ status_history:
     changed_by: "Agent (d3)"
     reason: Initial proposal
     changed_via: adr-kit
+  - date: 2026-11-25
+    status: Accepted
+    changed_by: "Agent: Claude (otgw-architect)"
+    reason: Accepted by Robert van den Breemen, 2026-11-25, interactive in the coordinator session (relayed to otgw-architect)
+    changed_via: adr-kit lifecycle
 ```
 
 ## Context
 
-SAT (Smart Autotune Thermostat) runs the boiler either continuously or in PWM (pulse width modulation: timed ON and OFF phases for a low heat demand). This ADR covers the PWM to continuous exit while the boiler underheats.
+SAT (Smart Autotune Thermostat) runs the boiler either continuously or in PWM (pulse width modulation: timed `ON` and `OFF` phases for a low heat demand). This ADR covers the PWM to continuous exit while the boiler underheats.
 
 **The thermo-nova reference, pinned at 7beaaf5.** It leaves PWM for continuous on a sustained underheat (`custom_components/sat/heating_control.py:331-354`). The conditions:
 
-- the PWM status is ON, and there is heating demand (`demand.heater_state == HeaterState.ON`, `heating_control.py:317`). `HeaterState.ON` is a property of the demand, not of the flame: HEAT mode, valves open and the request above `COLD_SETPOINT` (`heating_control.py:65-72`). There is no flame check;
+- the PWM status is ON, and there is heating demand (`demand.heater_state == HeaterState.ON`, `heating_control.py:317`). `HeaterState.ON` is a property of the demand, not of the flame: `HEAT` mode, valves open and the request above `COLD_SETPOINT` (`heating_control.py:65-72`). There is no flame check;
 - the flow is at or below the request plus `UNDERSHOOT_MARGIN_CELSIUS` (-3.0, `cycles/const.py:11`), compared at `heating_control.py:337`;
 - that holds for `UNDERHEAT_SUSTAIN_SECONDS` (180, `const.py:22`), checked at `heating_control.py:345`;
 - not during hot water, and not within 300 s after it.
@@ -92,7 +97,7 @@ While SAT is in PWM and the PWM phase is ON, and there is heating demand, it swi
 - **What it replaces.** The entry-342 rule (request above the flow for 60 s) is gone, and so is its "flame on" condition. Entry 448 settles the rule as identical to `heating_control.py:337-347`, and that code checks heating demand, not the flame (`heating_control.py:65-72`, `:317`).
 - **The gates of thermo-nova stay:**
   - not during hot water or the 300 s after it;
-  - not in the PWM OFF phase;
+  - not in the PWM `OFF` phase;
   - not without heating demand, including a request at or below the cold setpoint (`heating_control.py:317`; the firmware's counterpart is the per-heating-system cold setpoint of ADR-199);
   - a missing flow temperature clears the timer.
 - **Saturation exit.** It is unchanged: 300 s without off time, with the live-flow duty since beta.410, entries 437 and 444.
@@ -109,7 +114,7 @@ While SAT is in PWM and the PWM phase is ON, and there is heating demand, it swi
 
 ### Must Not
 
-- Count a tick without heating demand, in the PWM OFF phase, or with the flow above request - 3.0 C.
+- Count a tick without heating demand, in the PWM `OFF` phase, or with the flow above request - 3.0 C.
 - Add a flame condition that thermo-nova does not have. If one is wanted, it goes to Sergeant D first.
 - Bring back the entry-342 60 s rule, or a margin or latch variant of it (Q-342b options B and C, TASK-2987 and TASK-2989 stay 2.1.0 per entry 448).
 
@@ -153,7 +158,7 @@ While SAT is in PWM and the PWM phase is ON, and there is heating demand, it swi
 
 - **ADR-196** (SAT ground truth): Sergeant D's entry 448 decides; thermo-nova at the pin confirms the rule.
 - **ADR-252** (PWM-first start and 60 s start gate, Accepted): unchanged; its gate keeps applying to this exit.
-- **ADR-254** (continuous to PWM at 2.0 C for 60 s, partly supersedes ADR-249): the opposite transition, unchanged; together they form the 2.0 C / -3.0 C hysteresis.
+- **ADR-254** (continuous to PWM at 2.0 C for 60 s; it partly replaces ADR-249): the opposite transition, unchanged; together they form the 2.0 C / -3.0 C hysteresis.
 - **ADR-249** (Accepted, partly superseded by ADR-254): unchanged.
 - **ADR-250 / ADR-253** (tolerance band): unchanged ("the PWM schedule and its exits run as before").
 

@@ -218,8 +218,8 @@ One row per Architecture Decision Record. Scope is the Enforcement `path_glob` s
 | ADR-210 | Accepted | - | Route. |
 | ADR-211 | Accepted | - | A WiFi supervisor restart marks the next boot. |
 | ADR-212 | Accepted | - | Native loading. |
-| ADR-213 | Accepted | - | Opt-in, local, RAM (random-access memory) only. |
-| ADR-214 | Accepted | - | Ids are a hash, not a table. |
+| ADR-213 | Superseded | - | Opt-in, local, RAM (random-access memory) only. |
+| ADR-214 | Superseded | - | Ids are a hash, not a table. |
 | ADR-215 | Accepted | - | One file per page. |
 | ADR-216 | Accepted | - | webBeginRequest() (src/OTGW-firmware/webServerCompat.h) calls platformTcpCapSendBuffer(pcb, WEBTCPSENDCAP) for every... |
 | ADR-217 | Accepted | `src/OTGW-firmware/OTGW-Core.ino` | While SAT is enabled, the Classic port 25238 inbound bridge buffers each line up to CR, forwards an allowed text line... |
@@ -240,7 +240,7 @@ One row per Architecture Decision Record. Scope is the Enforcement `path_glob` s
 | ADR-233 | Accepted | - | At the start of a filesystem OTA the firmware copies settings.ini, rebootcount.txt and rebootlog.txt, in that order,... |
 | ADR-234 | Accepted | `src/OTGW-firmware/SATcurveTune.h` | A tuner hour stays 60 min and counts when no whole-hour marker was set and its clean ticks are at least 90 % of the t... |
 | ADR-235 | Accepted | - | SAT sends CS= when the value it sends, rounded to 0.1, changes, and repeats an unchanged CS= about every 30 s: the co... |
-| ADR-236 | Proposed | - | While SAT is in PWM and the PWM phase is ON, and there is heating demand, it switches to continuous only when the flo... |
+| ADR-236 | Accepted | - | While SAT is in PWM and the PWM phase is ON, and there is heating demand, it switches to continuous only when the flo... |
 | ADR-237 | Proposed | `build.py` | The buildfs step runs with PLATFORMIOBUILDDIR=.pio/build-fs (piofsbuildroot(), build.py:2488), so .pio/build keeps on... |
 | ADR-238 | Accepted | - | On the ESP32-S3 a boot counts towards the triple-reset WiFi recovery when it is a reset-button press or a power-on (E... |
 | ADR-239 | Accepted | - | The first 32 bytes of RTC slow memory (0x50000200-0x5000021F) belong to the safeboot updater: the main firmware holds... |
@@ -270,10 +270,10 @@ One row per Architecture Decision Record. Scope is the Enforcement `path_glob` s
 | ADR-263 | Accepted | - | On a board with PSRAM, buffers of BLE and remote telemetry may be allocated from PSRAM once, at init, and are never f... |
 | ADR-264 | Accepted | - | espMqttClient comes from our fork. |
 | ADR-265 | Proposed | - | Every deferrable MQTT bulk publisher asks one shared pacer, mqttPaceAllows() in MQTTstuff.ino, before it publishes. |
-| ADR-266 | Proposed | - | Nagle on for the MQTT socket. |
-| ADR-268 | Proposed | - | The firmware keeps one local diagnostic recorder: the local ring of the remote telemetry recorder. |
+| ADR-266 | Accepted | - | Nagle on for the MQTT socket. |
+| ADR-268 | Accepted | - | The firmware keeps one local diagnostic recorder: the local ring of the remote telemetry recorder. |
 | ADR-290 | Superseded | - | Outbound TLS client only, for this one upload. |
 | ADR-291 | Accepted | - | The device history slot gets an eighth int16t temperature column, satRoom, so a slot is 18 bytes. |
 | ADR-292 | Accepted | - | For every statement or change about SAT behaviour the sources rank in this order, and a higher source wins over a low... |
 | ADR-293 | Accepted | - | SAT regulates on one primary room temperature source chosen by the setting SATroomsource, with a fixed fallback order... |
-| ADR-295 | Proposed | `src/**/*.py` | State one concrete chosen approach and its rationale. |
+| ADR-295 | Proposed | - | At CRITICAL heap, ADR-107 action 1 aborts every /ws TCP connection in lwIP, with a RST, instead of otLogWs.closeAll(). |

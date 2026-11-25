@@ -7,7 +7,8 @@ binding: false
 gate: null
 documents_shipped: false
 verified_in: []
-supersedes: ["ADR-196"]
+supersedes:
+  - "ADR-196"
 superseded_by: null
 topics:
   - "sat"
