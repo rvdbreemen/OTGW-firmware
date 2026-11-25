@@ -8,11 +8,15 @@ reopen itself fails because the share is down:
   a  the lines written during the outage are kept (bounded, in memory) and go out IN ORDER on the next write that works
   b  an outage that never ends: at stop the lines go to a local fallback folder and the tool says where
   c  the memory buffer is bounded; what does not fit is counted as lost and reported
-  d  integrity_lines(): received, saved, in memory, in fallback, lost per stream; no warning when equal
+  d  STREAM INTEGRITY in summary.txt: received, saved, in memory, in fallback, lost per stream; no warning when equal
+  e  summary.txt and script.error.log never drop a line silently when the run folder is gone
 All tests drive the real SegmentStore / Capture; the outage is simulated by making _handle_locked() raise OSError 22.
-Old code (origin/dev before this commit): a and b lose the lines, c and d have no such API.
+Old code (origin/dev before this commit): a and b lose the lines, c and d have no such API, e is silent.
 Run: python tests/test_capture_write_buffer.py
 """
+import contextlib
+import io
+import shutil
 import sys
 import tempfile
 import unittest
@@ -115,6 +119,26 @@ class Integrity(unittest.TestCase):
             "STREAM INTEGRITY otframes.log: received 2 line(s), saved 2, in memory 0, in fallback 0, lost 0",
             "STREAM INTEGRITY telnet.log: received 3 line(s), saved 3, in memory 0, in fallback 0, lost 0",
         ])
+
+
+class NeverSilent(unittest.TestCase):
+    def test_e_summary_and_error_log_do_not_vanish_when_the_run_folder_is_gone(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            run = root / "run"
+            run.mkdir()
+            cap = oc.Capture(run, echo=False)
+            cap.store.fallback_root = root / "fallback"
+            shutil.rmtree(run)                                  # the share is gone
+            seen = io.StringIO()
+            with contextlib.redirect_stderr(seen):
+                cap.summary("MQTT capture: 5 message(s) received, 5 written", echo=False)
+                cap.script_error("something broke")
+            self.assertIn("MQTT capture: 5 message(s)", seen.getvalue(), "the line is shown, not dropped")
+            saved = (root / "fallback" / "run" / "summary.txt").read_text(encoding="utf-8")
+            self.assertIn("MQTT capture: 5 message(s)", saved)
+            err = (root / "fallback" / "run" / "script.error.log").read_text(encoding="utf-8")
+            self.assertIn("something broke", err)
 
 
 if __name__ == "__main__":

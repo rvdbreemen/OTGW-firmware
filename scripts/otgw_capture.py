@@ -934,7 +934,9 @@ class Capture:
                 with open(self.path("summary.txt"), "a", encoding="utf-8") as f:
                     f.write(line + "\n")
             except OSError:
-                pass  # the run folder is gone; nothing to write into
+                # TASK-3006: the run folder is gone: keep the line in the fallback folder and show it, never drop it silently
+                saved = self.store.fallback_append("summary.txt", line)
+                print(f"(summary.txt is not writable{'; also saved in ' + str(saved) if saved else ''}) {line}", file=sys.stderr, flush=True)
         if self.echo if echo is None else echo:
             print(line, flush=True)
 
@@ -944,7 +946,7 @@ class Capture:
                 with open(self.path("script.error.log"), "a", encoding="utf-8") as f:
                     f.write(f"{now_iso()}  {line}\n")
             except OSError:
-                pass
+                self.store.fallback_append("script.error.log", f"{now_iso()}  {line}")   # TASK-3006: not dropped silently
 
     def gap(self, stream, start, end, reason):
         """A stream was down from `start` to `end` (aware datetimes): counted in index.csv and,
@@ -4464,6 +4466,8 @@ def main(argv=None):
 
     tail = cap.store.tail_text(TAIL_LINES) if long_run else None
     cap.store.close()   # long run: packs the last partial hour into hours/ and finishes index.csv
+    for integrity_line in cap.store.integrity_lines():   # TASK-3006: received against saved, per stream
+        s(integrity_line, echo=("WARNING" in integrity_line))
 
     try:
         build_tool_error_log(cap)
