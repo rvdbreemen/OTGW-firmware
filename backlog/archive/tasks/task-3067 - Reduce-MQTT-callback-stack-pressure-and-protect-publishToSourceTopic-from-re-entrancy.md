@@ -1,5 +1,5 @@
 ---
-id: TASK-9
+id: TASK-3067
 title: >-
   Reduce MQTT callback stack pressure and protect publishToSourceTopic from
   re-entrancy
@@ -50,3 +50,5 @@ Fixed two MQTT re-entrancy/stack hazards:
 
 Build passes.
 <!-- SECTION:FINAL_SUMMARY:END -->
+
+<!-- renumbered from TASK-9 (duplicate id; Robert DM 1575165989010804807, 2026-11-25). The file in backlog/tasks keeps TASK-9. -->

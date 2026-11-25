@@ -1,5 +1,5 @@
 ---
-id: TASK-8
+id: TASK-3066
 title: 'Fix undersized buffers: overflowCountBuf, MQTT payload, webhook expansion'
 status: Done
 assignee:
@@ -47,3 +47,5 @@ Fixed three undersized buffers:
 
 Build passes.
 <!-- SECTION:FINAL_SUMMARY:END -->
+
+<!-- renumbered from TASK-8 (duplicate id; Robert DM 1575165989010804807, 2026-11-25). The file in backlog/tasks keeps TASK-8. -->

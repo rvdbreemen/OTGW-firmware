@@ -1,5 +1,5 @@
 ---
-id: TASK-18
+id: TASK-3076
 title: Reclaim FSexplorer static HTML streaming buffers
 status: Done
 assignee: []
@@ -37,3 +37,5 @@ Evaluate the option to use the global scratch buffers that are available.
 <!-- SECTION:NOTES:BEGIN -->
 Removed the two static outBuf[512] allocations from the FSexplorer index.html streaming handler. Cache-busted src replacements now stream prefix, version token, hash, and suffix directly using the existing lineBuf[512], preserving String-free chunked output while reclaiming about 1024 bytes of persistent RAM.
 <!-- SECTION:NOTES:END -->
+
+<!-- renumbered from TASK-18 (duplicate id; Robert DM 1575165989010804807, 2026-11-25). The file in backlog/tasks keeps TASK-18. -->

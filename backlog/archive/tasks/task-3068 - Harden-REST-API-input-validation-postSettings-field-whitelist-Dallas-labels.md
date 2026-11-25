@@ -1,5 +1,5 @@
 ---
-id: TASK-10
+id: TASK-3068
 title: 'Harden REST API input validation (postSettings field whitelist, Dallas labels)'
 status: Done
 assignee:
@@ -48,3 +48,5 @@ Hardened REST API input validation:
 
 Build passes.
 <!-- SECTION:FINAL_SUMMARY:END -->
+
+<!-- renumbered from TASK-10 (duplicate id; Robert DM 1575165989010804807, 2026-11-25). The file in backlog/tasks keeps TASK-10. -->

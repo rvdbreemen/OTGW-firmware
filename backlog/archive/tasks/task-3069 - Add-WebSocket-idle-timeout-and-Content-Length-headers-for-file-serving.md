@@ -1,5 +1,5 @@
 ---
-id: TASK-11
+id: TASK-3069
 title: Add WebSocket idle timeout and Content-Length headers for file serving
 status: Done
 assignee:
@@ -48,3 +48,5 @@ Verified both acceptance criteria are already satisfied by existing code:
 
 No code changes required — closing as already-handled.
 <!-- SECTION:FINAL_SUMMARY:END -->
+
+<!-- renumbered from TASK-11 (duplicate id; Robert DM 1575165989010804807, 2026-11-25). The file in backlog/tasks keeps TASK-11. -->

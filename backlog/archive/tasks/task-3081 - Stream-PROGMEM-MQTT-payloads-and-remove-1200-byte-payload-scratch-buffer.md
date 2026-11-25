@@ -1,5 +1,5 @@
 ---
-id: TASK-23
+id: TASK-3081
 title: Stream PROGMEM MQTT payloads and remove 1200-byte payload scratch buffer
 status: Done
 assignee:
@@ -41,3 +41,5 @@ Validation:
 - Full firmware build succeeded.
 - Static publish-path sweep confirms outbound MQTT publishes now use beginPublish/write/endPublish rather than a copied RAM payload buffer.
 <!-- SECTION:FINAL_SUMMARY:END -->
+
+<!-- renumbered from TASK-23 (duplicate id; Robert DM 1575165989010804807, 2026-11-25). The file in backlog/tasks keeps TASK-23. -->

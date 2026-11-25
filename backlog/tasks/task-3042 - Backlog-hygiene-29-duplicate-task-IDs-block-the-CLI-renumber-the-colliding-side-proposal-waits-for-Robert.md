@@ -3,10 +3,10 @@ id: TASK-3042
 title: >-
   Backlog hygiene: 29 duplicate task IDs block the CLI, renumber the colliding
   side (proposal, waits for Robert)
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-11-25T05:13:00Z'
-updated_date: '2026-11-25T15:18:00Z'
+updated_date: '2026-11-25T15:19:00Z'
 labels:
   - tooling
 milestone: 2.0.0
@@ -23,8 +23,8 @@ ordinal: 1148000
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Robert decides option A, B or C (see notes); the decision is recorded here
-- [ ] #2 If A: dry run reviewed, one commit, CLI views every kept and new ID, tests/test_backlog_unique_ids.py green and red on a seeded duplicate
+- [x] #1 Robert decides option A, B or C (see notes); the decision is recorded here
+- [x] #2 If A: dry run reviewed, one commit, CLI views every kept and new ID, tests/test_backlog_unique_ids.py green and red on a seeded duplicate
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -50,3 +50,9 @@ Renumber applied (Robert B, DM 1575165989010804807; subtasks and pre-commit chec
 
 Pre-commit check added (Robert, interactive 2026-11-25): .githooks/pre-commit section 1b runs scripts/check_backlog_task_ids.py when backlog/*.md is staged; fails when a staged task file shares its id with another one. Test tests/test_backlog_task_id_check.py: 7 pass; red with the hook disabled (OTGW_TASKID_HOOK_DISABLE=1 fails the real-hook test), a mutant script that ignores the archive folder is caught. No allow-list; TASK-3038 stays with the id25 lane. Optional follow-up: none open.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Robert decided B (DM 1575165989010804807, reply to question 1575137105477111883, 2026-11-25): renumber the archive file of each duplicate pair, delete the archive test-task. Interactive yes the same afternoon (~16:1x) for the 6 archive subtasks and for the pre-commit check of option C. One-off exception to never editing backlog files directly, limited to id line, file name, parent_task_id of the 6, one note line, the test-task delete. AC1: decision recorded here. AC2 (written for option A, met in the B form): dry run OTGW-field-data/_comms/dup_id_dryrun.txt (sha256 cb6185389acd15594feca086f15d6d13714bc4c094dd6a3cc268ec5e30ccdaa7) reviewed by the coordinator; commit 78571bc20 renumbers 29 archive files to TASK-3059..3087 and 6 subtasks (15.x to 3073.x, 22.x to 3080.x); scan after apply: 0 duplicate groups, max id 3087; backlog task view works for all 29 old ids and the new ones, no ambiguous; evaluate --quick 0 failed (88 pass); test_agentic_throughput_waits 7 pass. The named test tests/test_backlog_unique_ids.py was replaced by tests/test_backlog_task_id_check.py (commit f00802fce, with .githooks/pre-commit section 1b and scripts/check_backlog_task_ids.py): 7 pass, red with the hook disabled, a mutant ignoring the archive folder is caught. Both pushed, origin/dev f00802fce, fast-forward. NOT verified: the hook under the Windows-shim Python in a real lane commit (the test runs it with real git in a temp repo); the hook skips silently when no python 3 is found. TASK-3038 (id25 lane) not touched; it blocks only that lane's own commit until renumbered.
+<!-- SECTION:FINAL_SUMMARY:END -->

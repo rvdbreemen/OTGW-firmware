@@ -1,5 +1,5 @@
 ---
-id: TASK-26
+id: TASK-3084
 title: Replace dense MQTT publish tracking table with bounded sparse tracking
 status: To Do
 assignee: []
@@ -36,3 +36,5 @@ Reason:
 - You later requested a simple linear 0..127 msgid array instead of a sparse or gap-compacted representation.
 - The larger MQTT memory savings were delivered through publish streaming and buffer reduction, so this higher-risk refactor is intentionally not pursued.
 <!-- SECTION:FINAL_SUMMARY:END -->
+
+<!-- renumbered from TASK-26 (duplicate id; Robert DM 1575165989010804807, 2026-11-25). The file in backlog/tasks keeps TASK-26. -->

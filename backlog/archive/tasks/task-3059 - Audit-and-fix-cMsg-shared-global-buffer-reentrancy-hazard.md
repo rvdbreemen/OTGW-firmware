@@ -1,5 +1,5 @@
 ---
-id: TASK-1
+id: TASK-3059
 title: Audit and fix cMsg shared global buffer reentrancy hazard
 status: Done
 assignee:
@@ -45,3 +45,5 @@ Audit complete. 16 cMsg use sites found across 5 files.\n\nOnly ONE genuine re-e
 <!-- SECTION:FINAL_SUMMARY:BEGIN -->
 Audited all 16 cMsg use sites across OTGW-Core.ino, jsonStuff.ino, restAPI.ino, FSexplorer.ino, and settingStuff.ino.\n\nOnly one genuine re-entrancy bug found and fixed: OTGW-Core.ino:3183 (reportOTGWEvent path). Inside reportOTGWEvent(), sendMQTTData() calls feedWatchDog() which yields; doBackgroundTasks re-enters, processOT overwrites cMsg, and then the subsequent sendEventToWebSocket() reads corrupted data. Fixed with local char evtBuf[60] on the caller side.\n\nAll sendEventToWebSocket sites are safe (AddLog copies synchronously before yield). All restAPI/jsonStuff sites are safe (HTTP handlers don't re-enter; String::indexOf doesn't yield). Safety rationale documented via inline comments.
 <!-- SECTION:FINAL_SUMMARY:END -->
+
+<!-- renumbered from TASK-1 (duplicate id; Robert DM 1575165989010804807, 2026-11-25). The file in backlog/tasks keeps TASK-1. -->

@@ -1,5 +1,5 @@
 ---
-id: TASK-6
+id: TASK-3064
 title: Fix MQTT subscription topic truncation and byte-by-byte streaming write
 status: Done
 assignee:
@@ -42,3 +42,5 @@ Fixed two MQTT issues:
 
 Build passes.
 <!-- SECTION:FINAL_SUMMARY:END -->
+
+<!-- renumbered from TASK-6 (duplicate id; Robert DM 1575165989010804807, 2026-11-25). The file in backlog/tasks keeps TASK-6. -->

@@ -1,5 +1,5 @@
 ---
-id: TASK-2
+id: TASK-3060
 title: Move networkStuff.h function bodies to networkStuff.ino
 status: Done
 assignee:
@@ -38,3 +38,5 @@ Verified: networkStuff.h is included only from OTGW-firmware.h (line 322). In Ar
 <!-- SECTION:FINAL_SUMMARY:BEGIN -->
 Moved all function bodies and variable definitions from networkStuff.h into a new networkStuff.ino. The .h now contains only: includes, enum NtpStatus_t, static const EPOCH_2000_01_01, extern variable declarations for NtpStatus/NtpLastSync/httpServer/httpUpdater/LittleFSinfo/LittleFSmounted/isConnected, macro WM_DEBUG_PORT, forward declarations for feedWatchDog and all network functions. networkStuff.ino holds the definitions and implementations. Firmware builds clean (single-TU Arduino model: .h included before .ino is concatenated, so all types and externs are in scope). No functional change.
 <!-- SECTION:FINAL_SUMMARY:END -->
+
+<!-- renumbered from TASK-2 (duplicate id; Robert DM 1575165989010804807, 2026-11-25). The file in backlog/tasks keeps TASK-2. -->

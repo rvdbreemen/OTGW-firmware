@@ -1,5 +1,5 @@
 ---
-id: TASK-24
+id: TASK-3082
 title: >-
   Convert all MQTT publishes to chunked beginPublish flow and shrink client
   buffer
@@ -43,3 +43,5 @@ Validation:
 - Full firmware build succeeded.
 - Static code sweep shows no remaining MQTTclient.publish() calls in MQTTstuff.ino and the only fixed client buffer allocation is now 384 bytes.
 <!-- SECTION:FINAL_SUMMARY:END -->
+
+<!-- renumbered from TASK-24 (duplicate id; Robert DM 1575165989010804807, 2026-11-25). The file in backlog/tasks keeps TASK-24. -->

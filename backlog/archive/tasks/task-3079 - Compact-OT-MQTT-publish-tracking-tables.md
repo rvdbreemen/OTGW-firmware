@@ -1,5 +1,5 @@
 ---
-id: TASK-21
+id: TASK-3079
 title: Compact OT/MQTT publish tracking tables
 status: In Progress
 assignee:
@@ -73,3 +73,5 @@ Reason:
 - You later requested the simpler linear 0..127 mapping instead of denser or sparse tracking variants.
 - Subsequent MQTT publish-path changes reclaimed roughly 1200 bytes of persistent RAM without increasing tracking-table complexity.
 <!-- SECTION:FINAL_SUMMARY:END -->
+
+<!-- renumbered from TASK-21 (duplicate id; Robert DM 1575165989010804807, 2026-11-25). The file in backlog/tasks keeps TASK-21. -->

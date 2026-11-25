@@ -1,5 +1,5 @@
 ---
-id: TASK-22
+id: TASK-3080
 title: Release MQTT autodiscovery workspace after publish sessions
 status: Done
 assignee:
@@ -67,3 +67,5 @@ Validation:
 Note:
 - This completes the reduced-workspace implementation path selected for TASK-22 subtasks, but it does not fully satisfy parent AC #1 if the requirement remains to reclaim the entire autodiscovery workspace after each session.
 <!-- SECTION:FINAL_SUMMARY:END -->
+
+<!-- renumbered from TASK-22 (duplicate id; Robert DM 1575165989010804807, 2026-11-25). The file in backlog/tasks keeps TASK-22. -->

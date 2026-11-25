@@ -1,5 +1,5 @@
 ---
-id: TASK-15
+id: TASK-3073
 title: Refactor OTA updater flow
 status: Done
 assignee:
@@ -48,3 +48,5 @@ Completed OTA refactor across updateServerHtml.h, OTGW-ModUpdateServer, and OTGW
 <!-- SECTION:FINAL_SUMMARY:BEGIN -->
 Completed the OTA updater refactor without changing shipped behavior. The update page JavaScript now uses a single shared reboot/health-check flow inside the PROGMEM HTML, the OTA backend upload lifecycle is split into smaller helpers, flash-mode background handling is extracted into named helpers, and the firmware build now passes successfully.
 <!-- SECTION:FINAL_SUMMARY:END -->
+
+<!-- renumbered from TASK-15 (duplicate id; Robert DM 1575165989010804807, 2026-11-25). The file in backlog/tasks keeps TASK-15. -->

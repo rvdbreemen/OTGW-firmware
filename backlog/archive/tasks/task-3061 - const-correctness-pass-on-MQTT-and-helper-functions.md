@@ -1,5 +1,5 @@
 ---
-id: TASK-3
+id: TASK-3061
 title: const-correctness pass on MQTT and helper functions
 status: Done
 assignee:
@@ -32,3 +32,5 @@ Many functions in MQTTstuff.ino and helperStuff.ino take `char*` parameters wher
 <!-- SECTION:FINAL_SUMMARY:BEGIN -->
 Full audit of MQTTstuff.ino and helperStuff.ino: the codebase is already const-correct. All non-mutating char* parameters (topic, json, payload-in, path) already use const char*. The remaining non-const parameters are intentionally mutable (output buffers like dest/summary/buffer, in-place mutators like trimInPlace/splitLine/trimwhitespace, and handleMQTTcallback which cannot be changed due to PubSubClient library API contract). No call-site casts were found. No changes needed.
 <!-- SECTION:FINAL_SUMMARY:END -->
+
+<!-- renumbered from TASK-3 (duplicate id; Robert DM 1575165989010804807, 2026-11-25). The file in backlog/tasks keeps TASK-3. -->

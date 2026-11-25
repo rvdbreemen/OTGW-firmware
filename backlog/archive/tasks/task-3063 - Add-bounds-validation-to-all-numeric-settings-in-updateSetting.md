@@ -1,5 +1,5 @@
 ---
-id: TASK-5
+id: TASK-3063
 title: Add bounds validation to all numeric settings in updateSetting()
 status: Done
 assignee:
@@ -62,3 +62,5 @@ Added bounds validation to all numeric settings in updateSetting():
 
 All invalid values are either clamped or rejected with a debug warning. Build passes.
 <!-- SECTION:FINAL_SUMMARY:END -->
+
+<!-- renumbered from TASK-5 (duplicate id; Robert DM 1575165989010804807, 2026-11-25). The file in backlog/tasks keeps TASK-5. -->

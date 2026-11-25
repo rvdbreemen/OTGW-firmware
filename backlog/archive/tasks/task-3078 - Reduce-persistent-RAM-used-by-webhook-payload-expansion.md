@@ -1,5 +1,5 @@
 ---
-id: TASK-20
+id: TASK-3078
 title: Reduce persistent RAM used by webhook payload expansion
 status: Done
 assignee:
@@ -57,3 +57,5 @@ Validation:
 - Global RAM: 58452 -> 58068 bytes (-384)
 - Remaining dynamic memory: 23852 bytes
 <!-- SECTION:FINAL_SUMMARY:END -->
+
+<!-- renumbered from TASK-20 (duplicate id; Robert DM 1575165989010804807, 2026-11-25). The file in backlog/tasks keeps TASK-20. -->

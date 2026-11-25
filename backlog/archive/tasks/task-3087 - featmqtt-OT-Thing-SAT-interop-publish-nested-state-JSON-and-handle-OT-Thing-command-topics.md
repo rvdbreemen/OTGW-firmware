@@ -1,5 +1,5 @@
 ---
-id: TASK-592
+id: TASK-3087
 title: >-
   feat(mqtt): OT-Thing SAT interop - publish nested state JSON and handle
   OT-Thing command topics
@@ -26,3 +26,5 @@ The SAT Python integration supports an OT-Thing coordinator mode that expects a 
 - [ ] #5 New setting settings.mqtt.bOtThingCompat (default false) gates the new publish path
 - [ ] #6 REST API exposes the compat setting at /api/v2/mqtt/settings
 <!-- AC:END -->
+
+<!-- renumbered from TASK-592 (duplicate id; Robert DM 1575165989010804807, 2026-11-25). The file in backlog/tasks keeps TASK-592. -->

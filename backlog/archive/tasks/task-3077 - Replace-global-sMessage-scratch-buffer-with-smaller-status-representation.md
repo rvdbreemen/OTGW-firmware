@@ -1,5 +1,5 @@
 ---
-id: TASK-19
+id: TASK-3077
 title: Replace global sMessage scratch buffer with smaller status representation
 status: Done
 assignee:
@@ -41,3 +41,5 @@ The firmware keeps a global sMessage[257] buffer in persistent RAM for API/statu
 - Verified with python build.py --firmware; build completed successfully on ESP8266 core 2.7.4.
 - No new file-level diagnostics were reported in the touched source files after the refactor.
 <!-- SECTION:NOTES:END -->
+
+<!-- renumbered from TASK-19 (duplicate id; Robert DM 1575165989010804807, 2026-11-25). The file in backlog/tasks keeps TASK-19. -->

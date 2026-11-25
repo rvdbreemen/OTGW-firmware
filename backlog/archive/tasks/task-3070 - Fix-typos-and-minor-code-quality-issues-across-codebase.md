@@ -1,5 +1,5 @@
 ---
-id: TASK-12
+id: TASK-3070
 title: Fix typos and minor code quality issues across codebase
 status: Done
 assignee:
@@ -51,3 +51,5 @@ Fixed typos and code quality issues:
 
 Build passes.
 <!-- SECTION:FINAL_SUMMARY:END -->
+
+<!-- renumbered from TASK-12 (duplicate id; Robert DM 1575165989010804807, 2026-11-25). The file in backlog/tasks keeps TASK-12. -->

@@ -1,5 +1,5 @@
 ---
-id: TASK-242
+id: TASK-3085
 title: 'Fix: upgrade to v6.6 fails (reported by Tomba on Tweakers)'
 status: To Do
 assignee: []
@@ -24,3 +24,5 @@ User "Tomba" on the Tweakers OTGW forum thread reported that upgrading to v6.6 f
 - [ ] #1 Upgrade path from previous version to v6.6 (or current) works without error
 - [ ] #2 Root cause identified and fixed or documented
 <!-- AC:END -->
+
+<!-- renumbered from TASK-242 (duplicate id; Robert DM 1575165989010804807, 2026-11-25). The file in backlog/tasks keeps TASK-242. -->

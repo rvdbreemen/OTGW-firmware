@@ -1,5 +1,5 @@
 ---
-id: TASK-243
+id: TASK-3086
 title: 'Investigate: Tado X DHW control not reflecting correctly via OTGW'
 status: To Do
 assignee: []
@@ -25,3 +25,5 @@ User "crashevans" in #beta-testing and #english-support reported that DHW (domes
 - [ ] #1 DHW setpoint from Tado X is correctly forwarded and reflected in MQTT/HA
 - [ ] #2 MaxRelModLevelSetting cycling behavior is documented or resolved
 <!-- AC:END -->
+
+<!-- renumbered from TASK-243 (duplicate id; Robert DM 1575165989010804807, 2026-11-25). The file in backlog/tasks keeps TASK-243. -->

@@ -1,5 +1,5 @@
 ---
-id: TASK-13
+id: TASK-3071
 title: Upgrade WiFiManager from RC to stable release
 status: Done
 assignee:
@@ -56,3 +56,5 @@ Upgraded WiFiManager from 2.0.15-rc.1 to 2.0.17 (stable, released March 2025).
 <!-- SECTION:FINAL_SUMMARY:BEGIN -->
 Upgraded WiFiManager from 2.0.15-rc.1 (release candidate) to 2.0.17 (first stable release in the 2.0.x series).\n\nChanges:\n- Replaced libraries/WiFiManager/ directory with v2.0.17 release\n- Updated build.py version pin: 2.0.15-rc.1 → 2.0.17\n- Renamed deprecated `setTimeout()` → `setConfigPortalTimeout()` in networkStuff.ino:68\n\nVerification:\n- All API methods used (setAPCallback, startConfigPortal, getWiFiIsSaved, setShowInfoUpdate, setShowInfoErase, setMenu, setHostname, resetSettings) confirmed present with compatible signatures\n- Firmware builds cleanly with zero warnings\n- Binary size: 673,504 bytes (+560 bytes / +0.08% from v2.0.15-rc.1)
 <!-- SECTION:FINAL_SUMMARY:END -->
+
+<!-- renumbered from TASK-13 (duplicate id; Robert DM 1575165989010804807, 2026-11-25). The file in backlog/tasks keeps TASK-13. -->

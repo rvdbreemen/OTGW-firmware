@@ -1,5 +1,5 @@
 ---
-id: TASK-25
+id: TASK-3083
 title: Stream mqttha.cfg parsing and remove persistent MQTT autodiscovery workspace
 status: Done
 assignee:
@@ -41,3 +41,5 @@ Validation:
 - Full firmware build succeeded.
 - Bulk and JIT discovery code paths still use the same parser and renderer, with only buffer lifetime changed.
 <!-- SECTION:FINAL_SUMMARY:END -->
+
+<!-- renumbered from TASK-25 (duplicate id; Robert DM 1575165989010804807, 2026-11-25). The file in backlog/tasks keeps TASK-25. -->

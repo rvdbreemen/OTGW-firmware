@@ -1,5 +1,5 @@
 ---
-id: TASK-16
+id: TASK-3074
 title: Fix MQTT status first publish and reconnect republish
 status: Done
 assignee: []
@@ -57,3 +57,5 @@ Validation:
 Compatibility:
 - Existing MQTT topic names and ON/OFF payload contracts are unchanged.
 <!-- SECTION:FINAL_SUMMARY:END -->
+
+<!-- renumbered from TASK-16 (duplicate id; Robert DM 1575165989010804807, 2026-11-25). The file in backlog/tasks keeps TASK-16. -->

@@ -1,5 +1,5 @@
 ---
-id: TASK-14
+id: TASK-3072
 title: 'Check and upgrade WebSockets, DallasTemperature, and OneWire libraries'
 status: Done
 assignee:
@@ -58,3 +58,5 @@ Checked and upgraded libraries:
 
 Build passes: 676,400 bytes (+2,896 from all session changes combined).
 <!-- SECTION:FINAL_SUMMARY:END -->
+
+<!-- renumbered from TASK-14 (duplicate id; Robert DM 1575165989010804807, 2026-11-25). The file in backlog/tasks keeps TASK-14. -->

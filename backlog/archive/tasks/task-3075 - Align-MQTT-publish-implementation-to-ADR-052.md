@@ -1,5 +1,5 @@
 ---
-id: TASK-17
+id: TASK-3075
 title: Align MQTT publish implementation to ADR-052
 status: Done
 assignee:
@@ -66,3 +66,5 @@ Validation:
 - get_errors reported no issues in the touched files.
 - python build.py --firmware completed successfully.
 <!-- SECTION:FINAL_SUMMARY:END -->
+
+<!-- renumbered from TASK-17 (duplicate id; Robert DM 1575165989010804807, 2026-11-25). The file in backlog/tasks keeps TASK-17. -->

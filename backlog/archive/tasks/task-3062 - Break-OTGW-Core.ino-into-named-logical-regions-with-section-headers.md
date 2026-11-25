@@ -1,5 +1,5 @@
 ---
-id: TASK-4
+id: TASK-3062
 title: Break OTGW-Core.ino into named logical regions with section headers
 status: Done
 assignee:
@@ -33,3 +33,5 @@ OTGW-Core.ino is 3909 lines and handles protocol parsing, command queuing, OT me
 <!-- SECTION:FINAL_SUMMARY:BEGIN -->
 Added 12 named section-header banners to OTGW-Core.ino covering every major logical group (Event/Log Helpers, Global Data, OT Spec Profile, MQTT send helpers, reset/boot/query helpers, Command & Response, Watchdog, OpenTherm data types & protocol helpers, Status Bit Query Helpers, MQTT throttle, OT Message Field Formatters, Command Queue, Send buffer to OTGW, PS=1 Summary Parsing, OT Message Processing, HandleOTGW, REST API, PIC upgrade). Added a Section Map block-comment TOC near the top of the file listing all sections with their approximate line numbers, giving a quick orientation to the 3500+ line file.
 <!-- SECTION:FINAL_SUMMARY:END -->
+
+<!-- renumbered from TASK-4 (duplicate id; Robert DM 1575165989010804807, 2026-11-25). The file in backlog/tasks keeps TASK-4. -->

@@ -1,5 +1,5 @@
 ---
-id: TASK-7
+id: TASK-3065
 title: Eliminate String class from FSexplorer HTTP handlers
 status: Done
 assignee:
@@ -58,3 +58,5 @@ Eliminated Arduino String class from all FSexplorer HTTP handlers and restAPI fs
 
 Net effect: zero heap allocations per index.html page load (was 3-5 String objects). Build passes.
 <!-- SECTION:FINAL_SUMMARY:END -->
+
+<!-- renumbered from TASK-7 (duplicate id; Robert DM 1575165989010804807, 2026-11-25). The file in backlog/tasks keeps TASK-7. -->
