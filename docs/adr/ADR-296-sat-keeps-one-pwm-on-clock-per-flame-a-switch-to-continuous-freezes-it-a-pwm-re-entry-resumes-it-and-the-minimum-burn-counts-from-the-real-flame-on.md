@@ -9,7 +9,6 @@ documents_shipped: false
 verified_in: []
 supersedes: []
 superseded_by: null
-format: "canonical"
 topics:
   - "sat"
   - "pwm"
@@ -29,6 +28,7 @@ symbols:
   - "_pwm_lastUpdateMs"
   - "_sat_chFlameOnMs"
 context_scope: "selective"
+format: "canonical"
 ---
 
 <!-- markdownlint-disable MD025 -->
@@ -39,7 +39,9 @@ context_scope: "selective"
 
 Proposed, 2026-11-25. Guideline-level per ADR-080: verified by a host test, no evaluate.py gate. Release 2.0.0 (Robert, 2026-11-24).
 
-**Decision Maker:** Sergeant D, who decides SAT behaviour (ADR-292), in entries 475, 476, 478 and 479 (2026-11-24 and 2026-11-25). The points marked "interpretation (ours)" below are not his words; Robert accepts them with this ADR, and Sergeant D may correct any of them as a new entry.
+**Decision Maker:** Sergeant D, who decides SAT behaviour (ADR-292), in entries 475, 476, 478 and 479 (2026-11-24 and 2026-11-25). The points marked "interpretation (ours)" below are not his words. Robert said yes to all four on 2026-11-25 (Open Questions); Sergeant D may still correct any of them as a new entry.
+
+**Acceptance condition (Robert, 2026-11-25):** this ADR stays Proposed until the host test F1-F10 (`tests/test_sat_pwm_on_freeze.py`) is green on the real code and the bench run of TASK-3039 confirms it; only then does it go to Accepted.
 
 ## Status History
 
@@ -149,7 +151,7 @@ SAT keeps one PWM ON clock per flame.
 
 ## Open Questions
 
-- [ ] Robert accepts the four interpretations marked "(ours)": reset at the end of an ON phase; reset on heater off, SAT disable and restart; a manual `control_mode` flip freezes too; the fallback when the real flame-on is not known.
+- [x] Robert accepts the four interpretations marked "(ours)": reset at the end of an ON phase; reset on heater off, SAT disable and restart; a manual `control_mode` flip freezes too; the fallback when the real flame-on is not known. — **Answered 2026-11-25 by Agent: Claude (otgw-architect):** Robert, 2026-11-25 (interactive in the coordinator session, relayed): yes to all four (a reset at the end of an ON phase, b reset on heater off, SAT disable and restart, c a manual control_mode flip freezes too, d the segment fallback when the real flame-on is unknown), as our interpretations, not Sergeant D's words. Acceptance of this ADR waits until the host test F1-F10 is green on the real code and the bench confirms.
 
 ## Related Decisions
 
