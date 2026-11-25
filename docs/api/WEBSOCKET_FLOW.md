@@ -97,7 +97,7 @@ Browser Client                ESP8266 Device
    - **Initiator:** Browser JavaScript code
    - **Trigger:** Page load, navigation to main page, or after flash operations
    - **Auto-reconnect:** Attempts reconnection every 5 seconds on disconnect
-   - **Watchdog:** 30-second timeout, reconnects if no messages received
+   - **Watchdog:** 90 seconds without any message (keepalives count) closes the socket, so `onclose` reconnects (TASK-3017; a visible tab reconnects after about 92 s, a hidden tab up to about 150 s because the browser throttles timers; it was 30 s before). The device closes a `/ws` client from its side too: AsyncTCP's receive timeout of 70 s closes a connection when nothing arrived and nothing sent was acknowledged; a healthy or background tab acknowledges the 30 s keepalive
 
 ## Complete Connection Lifecycle
 

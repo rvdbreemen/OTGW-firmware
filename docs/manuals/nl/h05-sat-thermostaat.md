@@ -91,6 +91,7 @@ curl -X POST -d '{"name":"satenabled","value":"true"}' \
 | `satcoefficient` | `1.5` | 0.1-5.0 | Steilheid van de verwarmingscurve |
 | `satinterval` | `30` | 10-300 s | Regelinterval: hoe vaak SAT het setpoint berekent en verstuurt. De PID-toestand volgt dit niet: die schuift op met een eigen vaste timer van 60 s (zie PID-tuning) |
 | `satexternaltemp` | `false` | bool | Externe ruimtetemperatuurbron gebruiken |
+| `satroomsource` | `auto` | auto, thermostat, external, ble, areas | Primaire bron voor de ruimtetemperatuur (TASK-3011). REST en MQTT accepteren de naam of het nummer 0 tot 4. `auto` probeert eerst de vastgepinde BLE-sensor, dan de gemiddelde ruimtesensoren, dan de externe sensor, dan de thermostaat. Een andere keuze gaat voor, de overige bronnen volgen in diezelfde volgorde. Een bron telt alleen mee als hij aan staat en een verse waarde heeft. Is er geen enkele geldig, dan regelt SAT alleen op de stooklijn. De ruimtetegel in de webinterface en `sat/room_temp_source` tonen welke bron in gebruik is. De simulatiemodus gaat boven alles |
 | `satovershootprotection` | `true` | bool | PWM-start en modulatie-onderdrukking (zie 5.6). Geldt voor elke warmtebron |
 | `satmaxrelmod` | `100` | 0-100 % | Maximale relatieve modulatie naar ketel (MM= commando) |
 | `satmanufacturer` | `0` | 0-18 | Ketelmerkt (0 = auto-detect) |
@@ -212,7 +213,9 @@ Bij ketels met een hoge minimale modulatie (bijv. 30-40% minimum) kan de continu
 
 **Overshoot-beveiliging** (`satovershootprotection`, standaard aan, elke warmtebron): in PWM-modus stuurt SAT zelf het regelsetpoint (CS). UIT-fase: CS = 10 C en CH uit, zodat de ketel niet opnieuw ontsteekt. AAN-fase, wachten op de vlam: CS = retourtemperatuur + `satflameoffoffset`, vastgehouden tot `satmodsupdelay` seconden na ontsteking. Daarna: CS = aanvoertemperatuur - `satmodsupoffset`, ongeveer elke 3 seconden ververst (niet op de 30 s regeltik), zodat de brander op de laagste stand blijft. Stond de vlam al aan toen de AAN-fase begon, dan houdt CS de vorige waarde tot `satmodsupdelay` is verstreken sinds de echte vlam-aan-tijd. Staat de instelling uit, dan stuurt de UIT-fase toch CS = 10 C en CH uit, zodat de ketel in elke UIT-fase stopt (een bewuste keuze; thermo-nova doet dit alleen met de optie aan). De AAN-fase krijgt dan geen vasthouden en geen onderdrukking: CS houdt de waarde van de eerste AAN-tik (het gevraagde setpoint) voor de rest van die AAN-fase, en MM=0 werkt.
 
-**Modulatie (MM=) in PWM-modus**: MM=0 in beide fasen zolang PWM aan staat. Warmtepompen en hybride systemen krijgen nooit MM=0: zij houden de ingestelde maximale modulatie (`satmaxrelmod`). Geminox-ketels krijgen MM=10 in plaats van 0. De flame-off offset wordt niet meer opgeteld buiten de PWM-AAN-fase, dus de continue modus stuurt het PID-setpoint ook als de vlam uit is.
+**PWM-duty** (TASK-2993, Sergeant D entries 437, 438, 443, 444, 446, 447): de duty is (gevraagd setpoint - basis) / (aanvoertemperatuur ketel - basis), met basis 27,2 C voor radiatoren en 20 C voor vloerverwarming. In de AAN-fase wordt de actuele aanvoertemperatuur gebruikt; in de eerste 30 seconden na ontsteking wordt de aanvoer afgevlakt (EMA 0,3 nieuw / 0,7 oud), zodat de dip bij het ontsteken niet meetelt. In de UIT-fase ligt de aanvoer van de laatste AAN-meting vast, maar het gevraagde setpoint blijft actueel en kan de UIT-tijd nog veranderen. Vóór 2.0.0-beta.410 werd de aanvoer 180 s afgevlakt en daarna vastgehouden tot de volgende AAN-fase. Dit is een bewuste afwijking van thermo-nova.
+
+**Modulatie (MM=) in PWM-modus**: MM=0 in beide fasen zolang PWM aan staat. Warmtepompen en hybride systemen krijgen nooit MM=0: zij houden de ingestelde maximale modulatie (`satmaxrelmod`). Geminox-ketels krijgen MM=10 in plaats van 0. Uitzondering (TASK-1581, TASK-2992; Sergeant D entries 242, 243, 436, 440): ligt de duty, vóór de begrenzing op 100 %, boven 1,03, dan is het gevraagde setpoint duidelijk hoger dan wat de ketel levert. SAT stuurt dan `MM=T`, waarmee de maximale modulatie teruggaat naar de ketel (een Immergas krijgt eerst `TP=11:12=80`). Zodra de duty 1,03 of lager is, keert de waarde hierboven terug. De flame-off offset wordt niet meer opgeteld buiten de PWM-AAN-fase, dus de continue modus stuurt het PID-setpoint ook als de vlam uit is.
 
 #### Automatisch wisselen
 
@@ -461,7 +464,7 @@ Indien ingeschakeld, schakelt SAT automatisch de verwarming uit wanneer de buite
 
 ### 5.13 Multi-area temperatuur
 
-SAT ondersteunt tot 4 temperatuurinvoerzones met configureerbare gewichten. De effectieve ruimtetemperatuur die door de PID-controller wordt gebruikt, is het gewogen gemiddelde van alle geldige, niet-verlopen area-temperaturen.
+SAT ondersteunt tot 4 temperatuurinvoerzones met configureerbare gewichten. De effectieve ruimtetemperatuur die door de PID-controller wordt gebruikt, is het gewogen gemiddelde van alle geldige, niet-verlopen area-temperaturen. In de webinterface heet dit de groep **Gemiddelde ruimtesensoren** (Sensor 1 tot 4 met hun gewichten); het aantal zones, de timeout en de headroom staan in de aparte groep **Zones** (paragraaf 5.14). Sleutels, MQTT en REST zijn niet veranderd (TASK-3014). Of dit gemiddelde de ruimtetemperatuur is die SAT gebruikt, hangt af van `satroomsource` (paragraaf 5.4).
 
 Area-waarden kunnen uit drie onafhankelijke bronnen komen:
 
@@ -529,7 +532,7 @@ Kort gezegd: BLE is actief wanneer het is ingeschakeld EN het board PSRAM heeft.
 
 #### Zelfontdekkende sensor-roster (TASK-508)
 
-Open de categorie **Sensors** in de webinterface om het ontdekte roster te zien, een lijst van 8 slots. Elke regel toont de laatste temperatuur, RSSI en leeftijd. Geef sensoren herkenbare namen ("Woonkamer", "Slaapkamer") en hernoem ze op elk moment; de actieve sensor wordt vanuit het roster geselecteerd. Auto-select promoveert de enige verse sensor wanneer er maar een in bereik is. Labels worden via de retained discovery-configs doorgegeven aan Home Assistant (per-MAC entiteiten worden automatisch aangemaakt). "Forget" leegt een slot en wist de bijbehorende HA-discovery-topics met zero-byte retained payloads.
+Open de categorie **Sensors** in de webinterface om het ontdekte roster te zien, een lijst van 8 slots. Elke regel toont de laatste temperatuur, RSSI en leeftijd. Geef sensoren herkenbare namen ("Woonkamer", "Slaapkamer") en hernoem ze op elk moment; de actieve sensor wordt vanuit het roster vastgepind. SAT kiest er nooit zelf een: BLE stuurt SAT alleen vanaf de vastgepinde sensor (TASK-3011; de eerdere auto-select is verwijderd). Labels worden via de retained discovery-configs doorgegeven aan Home Assistant (per-MAC entiteiten worden automatisch aangemaakt). "Forget" leegt een slot en wist de bijbehorende HA-discovery-topics met zero-byte retained payloads.
 
 De Sensors-kaart biedt drie bedieningselementen:
 
@@ -537,7 +540,7 @@ De Sensors-kaart biedt drie bedieningselementen:
 - **Clear roster**: wist alle acht slots (een twee-druk-bevestiging voorkomt ongelukken).
 - **Naam-prefix filter**: typ een hoofdletterongevoelige prefix om het roster te beperken op de geadverteerde BLE-naam van de sensor. Standaard filtert dit alleen de weergave. Zet de toggle **restrict roster** aan om het te promoveren tot een ingest-poort: sensoren waarvan de bekende naam niet met de prefix overeenkomt, worden dan volledig uit het roster gehouden. Sensoren met een lege of onbekende naam worden altijd toegelaten.
 
-**Vertrouwen.** BLE-advertisements zijn niet-geauthenticeerde uitzendingen: elke sensor binnen radiobereik die een ondersteund formaat stuurt, komt in het roster terecht, ook die van de buren. SAT gebruikt alleen de geselecteerde sensor. Zolang er geen is geselecteerd en precies één rostersensor in de laatste twee publicatie-intervallen een meting stuurde, wordt die automatisch geselecteerd. Kies in een gebouw met veel BLE-apparaten uw sensor met de hand, of stel een naam-prefix filter in met **restrict roster** aan. De firmware maakt nooit verbinding met een sensor en schrijft er nooit naar.
+**Vertrouwen.** BLE-advertisements zijn niet-geauthenticeerde uitzendingen: elke sensor binnen radiobereik die een ondersteund formaat stuurt, komt in het roster terecht, ook die van de buren. SAT gebruikt alleen de vastgepinde sensor. Zonder vastgepinde sensor worden BLE-metingen getoond en gepubliceerd, maar negeert SAT ze. Na een upgrade vanaf oudere firmware blijft een opgeslagen sensor vastgepind; de SAT-pagina vraagt dan één keer om hem te **bevestigen** of te **wijzigen**, en het SAT-log noemt hem één keer per start. Kies in een gebouw met veel BLE-apparaten uw sensor met de hand, of stel een naam-prefix filter in met **restrict roster** aan. De firmware maakt nooit verbinding met een sensor en schrijft er nooit naar.
 
 REST-endpoints voor het roster:
 
@@ -552,7 +555,8 @@ REST-endpoints voor het roster:
 |---|---|---|---|
 | `satbleenable` | `true` | bool | BLE-sensor scanning inschakelen (passief, continu). No-op op boards zonder BLE-radio. Op een board zonder PSRAM altijd false: aanzetten wordt geweigerd (REST `409`) en een opgeslagen true wordt bij het opstarten gewist (TASK-2025) |
 | `satbleriskack` | `false` | bool | Blijft bestaan voor instellingenbestanden van oudere firmware; opent BLE niet meer op een board zonder PSRAM (TASK-2025, ADR-257) |
-| `satblemac` | `""` | MAC-adres | Actieve sensor-MAC (via roster select gezet; leeg = eerste verse slot wordt automatisch gekozen) |
+| `satblemac` | `""` | MAC-adres | Vastgepinde sensor-MAC (via roster select gezet). Leeg = geen BLE-ruimtebron: SAT gebruikt BLE niet |
+| `satblefailover` | `false` | bool | Wordt de vastgepinde sensor verlopen, gebruik dan de eerste verse BLE-sensor die u aan een area hebt toegewezen (nooit een sensor die alleen in de buurt uitzendt). Standaard uit. SAT keert terug naar de vastgepinde sensor als die weer vers is (TASK-3011) |
 | `satbleinterval` | `30` | 10-300 s | Publish/state-update-cadans (NIET scaninterval; de scan is continu) |
 | `satblenameprefix` | `""` | tot 23 tekens | Naam-prefix filter (hoofdletterongevoelig; leeg = uit) |
 | `satblenamefilteringest` | `false` | bool | false = alleen de weergave filteren; true = ook roster-ingest beperken (restrict roster) |

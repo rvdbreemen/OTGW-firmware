@@ -401,6 +401,8 @@ These thresholds are tunable; they are guideline-level under ADR-111 and may be 
 | Topic | Value | Retained | Description |
 | ----- | ----- | -------- | ----------- |
 | `sat/room_temp` | `"20.8"` | no | Room temperature used by PID (°C) |
+| `sat/room_source` | `"auto"` | yes | The primary room temperature source setting `SATroomsource`: `auto`, `thermostat`, `external`, `ble` or `areas` (TASK-3011). On the broker after every boot and reconnect |
+| `sat/room_temp_source` | `"ble"` | yes | The source SAT used for `sat/room_temp` right now: `simulation`, `ble` (the pinned sensor), `areas`, `external`, `thermostat`, `estimate` (thermal fallback) or `none` (TASK-3015, ADR-293). Also a Home Assistant diagnostic sensor |
 | `sat/outside_temp` | `"8.0"` | no | Outside temperature used by heating curve (°C) |
 | `sat/estimated_room` | `"20.5"` | no | Estimated room temp during sensor fallback (°C) |
 | `sat/humidity` | `"58.0"` | no | Indoor humidity % (pushed or BLE room sensor; no weather fallback). `sat/summer_simmer_index` and `sat/summer_simmer_perception` are published only while it is fresh (`humidity_timeout_s`) |
@@ -1103,6 +1105,7 @@ Payloads: `"true"` / `"false"`. Each of these corresponds to one of the auto-dis
 | `sat/overshoot_protection` | `SATovershootprotection` | PWM overshoot protection: CS override in the PWM phases (default on) |
 | `sat/push_setpoint` | `SATpushsetpoint` | Enable pushing setpoint changes to boiler |
 | `sat/external_temp` | `SATexternaltemp` | Prefer the MQTT/REST indoor temperature (`sat/indoor_temp`) over the thermostat room temperature. State: `sat/external_temp_enable` |
+| `sat/room_source` | `SATroomsource` | Primary room temperature source: `auto`, `thermostat`, `external`, `ble` or `areas`. State: `sat/room_source` (TASK-3011) |
 | `sat/follow_thermostat` | `SATfollowthermostat` | A room setpoint change on the thermostat (MsgID 16) becomes the SAT target and clears an active preset. Defaults to the push-setpoint value on units with no stored value |
 | `sat/curve_self_tune` | `SATcurveselftune` | Heating curve self-tune on/off (default on): SAT decides after every counted hour, once the window holds 12 counted hours of clean heating, and changes the curve slope by 0.05; a change empties that window, so two steps are at least 12 counted hours apart (ADR-205, ADR-260). State: `sat/curve_self_tune_enable` |
 | `sat/fireplace_mode` | `SATfireplace` | Fireplace mode (default off): SAT sends only the heating curve value to the control loop, P/I/D 0, exactly as with a missing room temperature. For a room with a stove or air conditioner. The room temperature stays shown |

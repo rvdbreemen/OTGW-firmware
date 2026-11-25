@@ -1478,6 +1478,7 @@ curl -X POST -d '{"name":"satenabled","value":"true"}' \
 | `satcoefficient` | 1.5 | 0.1-5.0 | Heating curve steepness |
 | `satinterval` | 30 | 10-300 s | Control loop interval: how often SAT computes and sends the setpoint. The PID state does not follow it: it advances on its own fixed 60 s timer (see PID tuning) |
 | `satexternaltemp` | false | bool | Use external indoor sensor via MQTT |
+| `satroomsource` | auto | auto, thermostat, external, ble, areas | Primary room temperature source (TASK-3011). REST and MQTT accept the name or the number 0 to 4. `auto` tries the pinned BLE sensor, then the averaged room sensors, then the external sensor, then the thermostat. Any other choice goes first, and the remaining sources follow in that same order. A source counts only when it is enabled and has a fresh value. With none valid SAT runs on the heating curve alone. The room tile in the web UI and `sat/room_temp_source` show which source is in use. Simulation mode overrides all of them |
 | `satovershootprotection` | true | bool | PWM start-up and modulation suppression (see 5.6). Applies to every heating source |
 | `satmaxrelmod` | 100 | 0-100 % | Maximum relative modulation sent to boiler (MM= command) |
 | `satmanufacturer` | 0 | 0-18 | Boiler manufacturer (0 = auto-detect) |
@@ -1582,7 +1583,9 @@ Continuous mode includes clamp logic: if the PID setpoint drops rapidly but the 
 
 **Overshoot protection** (`satovershootprotection`, default on, every heating source): in PWM mode SAT drives the control setpoint (CS) itself. OFF phase: CS = 10 C and CH off, so the boiler is not relit. ON phase, waiting for the flame: CS = return temperature + `satflameoffoffset`, held for `satmodsupdelay` seconds after ignition. After that: CS = flow temperature - `satmodsupoffset`, refreshed about every 3 seconds (not on the 30 s control tick) so the burner stays at its lowest level. If the flame was already on when the ON phase began, CS keeps its previous value until `satmodsupdelay` has passed since the real flame-on time. With the setting off, the OFF phase still sends CS = 10 C and CH off, so the boiler stops in every OFF phase (a deliberate choice; thermo-nova only does this with the option on). The ON phase then gets no hold and no suppression: CS keeps the value of the first ON tick (the requested setpoint) for the rest of that ON phase, and MM=0 applies.
 
-**Modulation (MM=) in PWM mode**: MM=0 in both phases while PWM is enabled. Heat pumps and hybrid systems never get MM=0: they keep the configured maximum modulation (`satmaxrelmod`), in PWM as well. Geminox boilers get MM=10 instead of 0. The flame-off offset is no longer added outside the PWM ON hold, so continuous mode sends the PID setpoint while the flame is off.
+**PWM duty cycle** (TASK-2993, Sergeant D entries 437, 438, 443, 444, 446, 447): the duty is (requested setpoint - base) / (boiler flow temperature - base), with base 27.2 C for radiators and 20 C for underfloor heating. In the ON phase it uses the live flow temperature; during the first 30 seconds after ignition the flow is smoothed (EMA 0.3 new / 0.7 old) so the light-off dip does not count. In the OFF phase the flow of the last ON measurement is frozen, but the requested setpoint stays live and can still change the OFF time. Before 2.0.0-beta.410 the flow was smoothed for 180 s and then held until the next ON phase. This is a deliberate difference from thermo-nova.
+
+**Modulation (MM=) in PWM mode**: MM=0 in both phases while PWM is enabled. Heat pumps and hybrid systems never get MM=0: they keep the configured maximum modulation (`satmaxrelmod`), in PWM as well. Geminox boilers get MM=10 instead of 0. Exception (TASK-1581, TASK-2992; Sergeant D entries 242, 243, 436, 440): when the duty, before it is capped at 100 %, is above 1.03, the requested setpoint is clearly above what the boiler delivers. SAT then sends `MM=T`, which hands the maximum modulation back to the boiler (an Immergas gets `TP=11:12=80` first). As soon as the duty is 1.03 or lower, the value above returns. The flame-off offset is no longer added outside the PWM ON hold, so continuous mode sends the PID setpoint while the flame is off.
 
 **Auto-switch**: SAT always monitors boiler behavior using cycle classification (see section 5.11) and switches modes automatically:
 
@@ -1818,7 +1821,7 @@ When enabled, SAT automatically disables heating when the outdoor temperature st
 
 ### 5.14 Multi-Area Temperature
 
-SAT supports up to 4 temperature input areas with configurable weights. The effective room temperature used by the PID controller is the weighted average of all valid, non-stale area temperatures.
+SAT supports up to 4 temperature input areas with configurable weights. The effective room temperature used by the PID controller is the weighted average of all valid, non-stale area temperatures. In the web UI this is the group **Averaged room sensors** (Sensor 1 to 4 with their weights); the zone count, timeout and headroom sit in the separate group **Zones** (section 5.15). Keys, MQTT and REST did not change (TASK-3014). Whether the average is the room temperature SAT uses depends on `satroomsource` (section 5.4).
 
 Areas can be fed from three independent sources:
 
@@ -1886,7 +1889,7 @@ In short, BLE is active when it is enabled AND the board has PSRAM. Firmware bef
 
 #### Self-discovering roster (TASK-508)
 
-Open the **Sensors** category in the web UI to see the discovered roster, an 8-slot list. Each entry shows the last temperature, RSSI, and age. Give entries friendly names ("Living room", "Bedroom") and rename them at any time; the active sensor is selected from the roster. Auto-select promotes the single fresh sensor when only one is in range. Labels propagate to Home Assistant via the retained discovery configs (per-MAC entities are created automatically). "Forget" wipes a slot and clears its HA discovery topics with zero-byte retained payloads.
+Open the **Sensors** category in the web UI to see the discovered roster, an 8-slot list. Each entry shows the last temperature, RSSI, and age. Give entries friendly names ("Living room", "Bedroom") and rename them at any time; the active sensor is pinned from the roster. SAT never picks one for you: BLE drives SAT only from the pinned sensor (TASK-3011; the earlier auto-select was removed). Labels propagate to Home Assistant via the retained discovery configs (per-MAC entities are created automatically). "Forget" wipes a slot and clears its HA discovery topics with zero-byte retained payloads.
 
 The Sensors card offers three controls:
 
@@ -1894,7 +1897,7 @@ The Sensors card offers three controls:
 - **Clear roster**: wipe all eight slots (a two-press confirm guards against accidents).
 - **Name-prefix filter**: type a case-insensitive prefix to narrow the roster by the sensor's advertised BLE name. By default this only filters the display. Enable the **restrict roster** toggle to promote it to an ingestion gate: sensors whose known name does not match the prefix are then kept out of the roster entirely. Sensors with an empty or unknown name are always admitted.
 
-**Trust.** BLE advertisements are unauthenticated broadcasts: any sensor in radio range that sends a supported format lands in the roster, a neighbour's too. SAT uses only the selected sensor. While none is selected and exactly one roster sensor sent a reading in the last two publish intervals, that one is selected automatically. In a building with many BLE devices, select your sensor by hand, or set a name-prefix filter with **restrict roster** on. The firmware never connects to a sensor and never writes to it.
+**Trust.** BLE advertisements are unauthenticated broadcasts: any sensor in radio range that sends a supported format lands in the roster, a neighbour's too. SAT uses only the pinned sensor. Without a pinned sensor BLE readings are shown and published, but SAT ignores them. After an upgrade from an older firmware a stored sensor stays pinned; the SAT page then asks once to **Confirm** or **Change** it, and the SAT log names it once per boot. In a building with many BLE devices, select your sensor by hand, or set a name-prefix filter with **restrict roster** on. The firmware never connects to a sensor and never writes to it.
 
 The roster is exposed at:
 
@@ -1909,7 +1912,8 @@ The roster is exposed at:
 |---|---|---|---|
 | `satbleenable` | true | bool | Enable BLE sensor scanning (passive, continuous). No-op on boards without a BLE radio. On a board without PSRAM it is always false: switching it on is refused (REST `409`) and a stored true is cleared at boot (TASK-2025) |
 | `satbleriskack` | false | bool | Kept for settings files from older firmware; it no longer opens BLE on a board without PSRAM (TASK-2025, ADR-257) |
-| `satblemac` | "" | MAC address | Active sensor MAC (set via roster select; empty = auto-select first fresh entry) |
+| `satblemac` | "" | MAC address | Pinned sensor MAC (set via roster select). Empty = no BLE room source: SAT does not use BLE |
+| `satblefailover` | false | bool | When the pinned sensor goes stale, use the first fresh BLE sensor that you assigned to an area (never a sensor that only advertises nearby). Off by default. SAT returns to the pinned sensor when it is fresh again (TASK-3011) |
 | `satbleinterval` | 30 | 10-300 s | Publish / state-update cadence (NOT scan rate; scan is continuous) |
 | `satblenameprefix` | "" | up to 23 chars | Name-prefix filter (case-insensitive; empty = off) |
 | `satblenamefilteringest` | false | bool | false = filter the display only; true = also gate roster ingestion (restrict roster) |

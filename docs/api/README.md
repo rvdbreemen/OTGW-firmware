@@ -354,6 +354,7 @@ Update a single device setting.
 | `satcoefficient` | float | 0-5 | `1.5` | Heating curve coefficient |
 | `satinterval` | int | 10-300 | `30` | Control loop interval (seconds) |
 | `satexternaltemp` | bool | - | `false` | Prefer external indoor sensor over OT bus |
+| `satroomsource` | int | 0-4 | `0` | Primary room temperature source: 0 auto, 1 thermostat, 2 external, 3 ble, 4 areas (TASK-3011). `POST /api/v2/sat/settings/room_source` also accepts the name |
 | `satpresetcomfort` | float | 15-28 | `21.0` | Comfort preset temperature (°C) |
 | `satpreseteco` | float | 10-22 | `18.0` | Eco preset temperature (°C) |
 | `satpresetaway` | float | 5-18 | `15.0` | Away preset temperature (°C) |
@@ -1112,6 +1113,8 @@ Returns the full SAT runtime state including temperatures, PID terms, cycle data
 | `flow_temp` | float or null | Actual boiler flow temperature (°C, OT MsgID 25; the model value in simulation). `null` when SAT has no valid flow temperature (no answer, Data-Invalid, Unknown-DataID or older than 60 s) |
 | `return_temp` | float or null | Actual return temperature (°C, OT MsgID 28 or the PIC board sensor; the model value in simulation). `null` when SAT has none |
 | `flame_on` | boolean | Boiler flame on (MsgID 0 slave status bit 3; the model flame in simulation) |
+| `room_temp_source` | string | The source behind `room_temp` right now: `simulation`, `ble`, `areas`, `external`, `thermostat`, `estimate` or `none` (TASK-3015) |
+| `room_source` | string | The primary room temperature source setting: `auto`, `thermostat`, `external`, `ble` or `areas` (TASK-3011) |
 | `room_temp_age_s` | integer | Age of the `room_temp` reading in seconds; `-1` when no age is known (no reading, the thermal fallback estimate, or a room temperature not stamped by a thermostat frame such as a `TR=` feed). A multi-area average reports its oldest area |
 | `outside_temp_age_s` | integer | Age of the outside temperature SAT uses, in seconds; `-1` when no source is valid |
 | `pid_output` | float | PID output = curve + P + I + D (°C) |

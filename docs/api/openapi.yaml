@@ -4683,6 +4683,14 @@ components:
         flame_on:
           type: boolean
           description: "TASK-1885: boiler flame on (MsgID 0 slave status bit 3; the model flame in simulation)"
+        room_temp_source:
+          type: string
+          enum: [simulation, ble, areas, external, thermostat, estimate, none]
+          description: "TASK-3015: the source behind room_temp right now"
+        room_source:
+          type: string
+          enum: [auto, thermostat, external, ble, areas]
+          description: "TASK-3011: the primary room temperature source setting (SATroomsource)"
         room_temp_age_s:
           type: integer
           description: "TASK-1885: age of the room_temp reading in seconds; -1 when no age is known (no reading, the thermal fallback estimate, or a room temperature not stamped by a thermostat frame such as a TR= feed). A multi-area average reports its oldest area"
