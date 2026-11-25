@@ -60,7 +60,9 @@ class WriteRecovery(unittest.TestCase):
         text = (self.run / "transcript.txt").read_text(encoding="utf-8")
         self.assertIn("line 1\n", text)
         self.assertIn("line 3\n", text)
-        self.assertEqual(len(self.errors), 1, self.errors)
+        # one write failure is reported; the buffering and recovery notices are separate lines (TASK-3006 part 2)
+        self.assertEqual(len([e for e in self.errors if "write failed" in e]), 1, self.errors)
+        self.assertEqual(text.splitlines(), ["line 1", "line 2", "line 3"], "the failed line is written in order, not lost")
 
     def test_b_one_failing_stream_does_not_stop_the_batch(self):
         self.assertTrue(self.store.write_many((("transcript.txt", "a\n"), ("otframes.log", "b\n"))))

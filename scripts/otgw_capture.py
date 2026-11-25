@@ -145,6 +145,7 @@ DISK_CHECK_SECONDS = 300
 EST_RAW_MB_PER_DAY = 400
 EST_ZIP_RATIO = 7
 RETRY_PACK_SECONDS = 60
+PENDING_MAX_BYTES = 8 * 1024 * 1024   # TASK-3006: lines a stream could not write are kept in memory up to this size
 UPLOAD_SUFFIX = "-upload.zip"
 PARTIAL_LINE_CAP = 65536     # a telnet chunk without a newline is written anyway beyond this many characters
 OT_MSG_TYPES = ("READ-DATA", "WRITE-DATA", "INVALID-DATA", "RESERVED", "READ-ACK", "WRITE-ACK",
@@ -330,6 +331,12 @@ def write_zip_verified(target, items):
 # Segment store: plain files, or one directory per wall-clock hour packed into a zip
 # --------------------------------------------------------------------------- #
 
+def _lines_of(text):
+    """Lines in a chunk of text; a last line without a newline counts as one."""
+    n = text.count("\n")
+    return n + (1 if text and not text.endswith("\n") else 0)
+
+
 class SegmentStore:
     """Every stream writes through here (TASK-1523).
 
@@ -364,6 +371,16 @@ class SegmentStore:
         self._last_ok = {}     # TASK-3006: stream -> aware datetime of its last successful write
         self._closed = False
         self._packed = set()   # hours whose zip exists: never packed again, only their leftover directory is deleted
+        # TASK-3006: when the run folder cannot be written (a NAS share that is gone) the lines wait here, bounded,
+        # and go out in order on the next write that works; at stop what is left goes to a local fallback folder.
+        self.pending_max_bytes = PENDING_MAX_BYTES
+        self.fallback_root = Path(os.environ.get("LOCALAPPDATA") or (Path.home() / ".local" / "share")) / "OTGW-capture" / "fallback"
+        self._pending = {}          # stream -> list of text chunks
+        self._pending_bytes = 0
+        self._outage = set()        # streams in an outage (the one-time message was given)
+        self._overflow = set()      # streams that already dropped their oldest lines
+        self._count = {}            # stream -> received / saved / fallback / lost, in lines
+        self._fallback_paths = {}
 
     # -- configuration ---------------------------------------------------------
     def register(self, stream, header=None, newline=None):
@@ -393,6 +410,93 @@ class SegmentStore:
                 handle.close()
             except (OSError, ValueError):
                 pass
+
+    def _count_locked(self, stream):
+        return self._count.setdefault(stream, {"received": 0, "saved": 0, "fallback": 0, "lost": 0})
+
+    def fallback_dir(self):
+        return self.fallback_root / self.run_path.name
+
+    def _buffer_locked(self, stream, text):
+        parts = self._pending.setdefault(stream, [])
+        parts.append(text)
+        self._pending_bytes += len(text.encode("utf-8", "replace"))
+        if stream not in self._outage:
+            self._outage.add(stream)
+            self.on_error(f"segment store: cannot write {stream}; keeping its lines in memory (up to "
+                          f"{self.pending_max_bytes // (1024 * 1024)} MiB) and retrying on every write; if the run folder "
+                          f"stays unwritable they go to {self.fallback_dir()} at stop")
+        while self._pending_bytes > self.pending_max_bytes and parts:
+            dropped = parts.pop(0)
+            self._pending_bytes -= len(dropped.encode("utf-8", "replace"))
+            self._count_locked(stream)["lost"] += _lines_of(dropped)
+            if stream not in self._overflow:
+                self._overflow.add(stream)
+                self.on_error(f"segment store: the memory buffer of {stream} is full, the oldest lines are dropped")
+
+    def _take_pending_locked(self, stream):
+        parts = self._pending.pop(stream, [])
+        blob = "".join(parts)
+        self._pending_bytes -= len(blob.encode("utf-8", "replace"))
+        if not self._pending:
+            self._pending_bytes = 0
+        return blob, _lines_of(blob)
+
+    def _flush_pending_final_locked(self):
+        """At stop: one last try in the run folder, else a local fallback folder, else the lines are lost (counted)."""
+        for stream in list(self._pending):
+            blob, n = self._take_pending_locked(stream)
+            counts = self._count_locked(stream)
+            try:
+                handle = self._handle_locked(stream)
+                handle.write(blob)
+                handle.flush()
+                counts["saved"] += n
+                self.on_error(f"segment store: {stream} writable again at stop, {n} buffered line(s) written")
+                continue
+            except (OSError, ValueError):
+                self._drop_handle_locked(stream)
+            path = self.fallback_dir() / stream
+            try:
+                path.parent.mkdir(parents=True, exist_ok=True)
+                with open(path, "a", encoding="utf-8", errors="replace", newline="") as f:
+                    f.write(blob)
+                counts["fallback"] += n
+                self._fallback_paths[stream] = path
+                self.on_error(f"segment store: the run folder is not writable; {n} line(s) of {stream} are saved only in {path}")
+            except OSError as exc:
+                counts["lost"] += n
+                self.on_error(f"segment store: {n} line(s) of {stream} could not be saved anywhere: {type(exc).__name__}: {exc}")
+
+    def fallback_append(self, name, line):
+        """Append one line to a file in the fallback folder (summary and error lines when the run folder is gone)."""
+        path = self.fallback_dir() / name
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            with open(path, "a", encoding="utf-8", errors="replace") as f:
+                f.write(line + "\n")
+            return path
+        except OSError:
+            return None
+
+    def integrity_lines(self):
+        """One line per stream: lines received by the store against lines that are in the run folder."""
+        with self._lock:
+            rows = {name: dict(c) for name, c in self._count.items()}
+            waiting = {name: sum(_lines_of(t) for t in parts) for name, parts in self._pending.items()}
+            where = dict(self._fallback_paths)
+        out = []
+        for name in sorted(rows):
+            c = rows[name]
+            mem = waiting.get(name, 0)
+            line = (f"STREAM INTEGRITY {name}: received {c['received']} line(s), saved {c['saved']}, in memory {mem}, "
+                    f"in fallback {c['fallback']}, lost {c['lost']}")
+            if c["received"] != c["saved"]:
+                line += f". WARNING: {c['received'] - c['saved']} line(s) are not in the run folder"
+                if name in where:
+                    line += f"; the fallback copy is {where[name]}"
+            out.append(line)
+        return out
 
     def _roll_locked(self, now):
         if not self.hourly:
@@ -470,15 +574,29 @@ class SegmentStore:
                 # TASK-3006: one item at a time. A failed write closes and drops that stream's handle, so the next
                 # write reopens the file; before, the broken handle stayed cached and every later write of the
                 # stream failed (will_85903, run folder on a NAS share: 10,000+ errors, streams silent for 29 h).
+                lines = _lines_of(text)
+                self._count_locked(stream)["received"] += lines
+                waiting = self._pending.get(stream)
+                blob = ("".join(waiting) + text) if waiting else text
                 try:
                     handle = self._handle_locked(stream)
-                    handle.write(text)
+                    handle.write(blob)
                     handle.flush()
                 except (OSError, ValueError) as exc:
                     ok = False
                     self._write_failed(exc)
                     self._drop_handle_locked(stream)
+                    self._buffer_locked(stream, text)
                     continue
+                if waiting:
+                    # the buffered lines were part of `blob`: they went out first, in order, ahead of this text
+                    older, n_old = self._take_pending_locked(stream)
+                    self._count_locked(stream)["saved"] += n_old
+                    self._outage.discard(stream)
+                    self._overflow.discard(stream)
+                    self.on_error(f"segment store: {stream} is writable again, {n_old} buffered line(s) written in order")
+                self._count_locked(stream)["saved"] += lines
+                text = blob
                 self._last_ok[stream] = now if now.tzinfo else now.astimezone()   # aware, as StreamWatch compares
                 if self.hourly:
                     stat = self._stat_locked(stream)
@@ -552,6 +670,7 @@ class SegmentStore:
         with self._lock:
             if self._closed:
                 return
+            self._flush_pending_final_locked()
             self._close_handles_locked()
             if self.hourly and self._key is not None:
                 self._closed_stats[self._key] = self._stats

@@ -8,7 +8,7 @@ status: In Progress
 assignee:
   - otgw-poc-dev
 created_date: '2026-11-21T14:02:00Z'
-updated_date: '2026-11-21T19:05:00Z'
+updated_date: '2026-11-25T05:53:00Z'
 labels:
   - tooling
 milestone: 2.0.0
@@ -54,4 +54,6 @@ will_85903's 31 h capture (beta.392 device, capture tool on Windows, Python 3.14
 2026-11-21 e2e on .61 by 09 (tool 1c16a65, NAS python:3.12-alpine, 60 min, throwaway broker stopped 17:03:25-17:15:47; evidence OTGW-field-data/bench-otgw32/2026-11-21_task3006-capture-1c16a65/): (a) PASS TOOL ERRORS 'stream watch: mqtt.log has written nothing since 17:03:03 (10 min)'; (b) PASS summary 'WARNING: mqtt.log wrote nothing from 17:03:03 to 17:16:06 (13 min, recovered)', matching the client gap line (17:03:05-17:16:06, 781 s); (c) PASS '4535 received, 4535 written', frames 6199, no NOT-written warning; (d) PASS csv/mqtt.csv 4535 rows + the summary line; (e) telnet.log no warning; otframes.log a TRUE silence warning: the /ws frame stream stopped at 16:51:44 with the socket open until stop, while the device kept producing OT traffic (telnet ~720 lines/min) and WS_drops=0. That is a new finding (silent /ws stall after 13.7 min), possibly the same as will_85903's 08:04 silence; separate task TASK-3011. Not yet run: the 7503290 run (keep-awake, sleep line), deferred to 25 Nov.
 
 Correction: the /ws stall task is TASK-3017, not TASK-3011.
+
+2026-11-25 part 2 (coordinator proposal after the third NAS loss, will_85903 beta.418): when the run folder cannot be written even after reopening (a NAS share that is gone) SegmentStore keeps the lines of that stream in a bounded memory buffer (8 MiB, oldest dropped and counted as lost when full), writes them in order ahead of the next write that works, and at stop puts what is left into a local fallback folder (%LOCALAPPDATA%\OTGW-capture\fallback\<run>, or ~/.local/share/OTGW-capture/fallback/<run>) with a message that names the path. Per-stream counters (received, saved, fallback, lost, in lines) back integrity_lines(). Tests tests/test_capture_write_buffer.py a-d (real SegmentStore, the outage simulated by _handle_locked raising OSError 22): OLD scripts/otgw_capture.py from origin/dev 683e429ea: a FAILS ['l1','l4'] != ['l1','l2','l3','l4'] (outage lines lost), b FAILS (no fallback file), c and d error (no such API); NEW: 5 of 5 pass (e belongs to the next commit). test_capture_write_recovery.py test a adjusted: the failed line is now written in order and the write-failed error is still counted once. Duplicate risk: if a write fails half-way the file may hold part of that chunk twice after the retry (at-least-once, not exactly-once).
 <!-- SECTION:NOTES:END -->
