@@ -30,6 +30,7 @@ import socket
 import struct
 import subprocess
 import sys
+import queue
 import threading
 import time
 import urllib.error
@@ -145,6 +146,8 @@ DISK_CHECK_SECONDS = 300
 EST_RAW_MB_PER_DAY = 400
 EST_ZIP_RATIO = 7
 RETRY_PACK_SECONDS = 60
+IO_TIMEOUT_SECONDS = 10      # TASK-3006: a file operation on the run folder that takes longer is treated as a hung share
+IO_COOLDOWN_SECONDS = 30     # ... and the run folder is then left alone for this long (lines go to the memory buffer)
 PENDING_MAX_BYTES = 8 * 1024 * 1024   # TASK-3006: lines a stream could not write are kept in memory up to this size
 UPLOAD_SUFFIX = "-upload.zip"
 PARTIAL_LINE_CAP = 65536     # a telnet chunk without a newline is written anyway beyond this many characters
@@ -337,6 +340,10 @@ def _lines_of(text):
     return n + (1 if text and not text.endswith("\n") else 0)
 
 
+class _IoTimeout(TimeoutError):
+    """A file operation did not finish in time; the thread that runs it is abandoned, not killed."""
+
+
 class SegmentStore:
     """Every stream writes through here (TASK-1523).
 
@@ -374,6 +381,13 @@ class SegmentStore:
         # TASK-3006: when the run folder cannot be written (a NAS share that is gone) the lines wait here, bounded,
         # and go out in order on the next write that works; at stop what is left goes to a local fallback folder.
         self.pending_max_bytes = PENDING_MAX_BYTES
+        # A write to a share that hangs blocks for minutes and, with the store lock held, stops every stream. File
+        # operations on the run folder therefore run in a worker thread with a deadline; after a timeout the folder is
+        # not touched for io_cooldown seconds. io_timeout = 0 or None runs them inline (as before).
+        self.io_timeout = IO_TIMEOUT_SECONDS
+        self.io_cooldown = IO_COOLDOWN_SECONDS
+        self._stuck_until = 0.0     # time.monotonic() until which the run folder is left alone
+        self._io_worker = None      # (thread, queue) of the current worker
         self.fallback_root = Path(os.environ.get("LOCALAPPDATA") or (Path.home() / ".local" / "share")) / "OTGW-capture" / "fallback"
         self._pending = {}          # stream -> list of text chunks
         self._pending_bytes = 0
@@ -395,11 +409,52 @@ class SegmentStore:
     def _dir_locked(self):
         return self.live_root / self._key if self.hourly else self.run_path
 
+    @staticmethod
+    def _io_loop(jobs):
+        while True:
+            job = jobs.get()
+            if job is None:
+                return
+            try:
+                job["res"] = job["fn"]()
+            except BaseException as exc:   # handed back to the caller
+                job["exc"] = exc
+            job["done"].set()
+
+    def _timed_io(self, fn):
+        """Run fn() with a deadline. Raises _IoTimeout when it does not finish; the worker that is stuck in it is left
+        to finish (or not) on its own and a fresh worker serves the next call."""
+        if not self.io_timeout:
+            return fn()
+        if self._io_worker is None:
+            jobs = queue.Queue()
+            thread = threading.Thread(target=self._io_loop, args=(jobs,), name="store-io", daemon=True)
+            thread.start()
+            self._io_worker = (thread, jobs)
+        jobs = self._io_worker[1]
+        job = {"fn": fn, "done": threading.Event(), "res": None, "exc": None}
+        jobs.put(job)
+        if not job["done"].wait(self.io_timeout):
+            jobs.put(None)            # the stuck worker stops after the call that hangs finally returns
+            self._io_worker = None
+            raise _IoTimeout(f"no answer from the run folder within {self.io_timeout:g} s")
+        if job["exc"] is not None:
+            raise job["exc"]
+        return job["res"]
+
+    def _write_chunk(self, stream, blob):
+        handle = self._handle_locked(stream)
+        handle.write(blob)
+        handle.flush()
+
     def _close_handles_locked(self):
+        if time.monotonic() < self._stuck_until:
+            self._handles = {}        # the folder hangs: closing would hang the same way; the OS closes them at exit
+            return
         for handle in self._handles.values():
             try:
-                handle.close()
-            except OSError:
+                self._timed_io(handle.close)
+            except (OSError, ValueError):
                 pass
         self._handles = {}
 
@@ -407,7 +462,7 @@ class SegmentStore:
         handle = self._handles.pop(stream, None)
         if handle is not None:
             try:
-                handle.close()
+                self._timed_io(handle.close)
             except (OSError, ValueError):
                 pass
 
@@ -444,18 +499,21 @@ class SegmentStore:
 
     def _flush_pending_final_locked(self):
         """At stop: one last try in the run folder, else a local fallback folder, else the lines are lost (counted)."""
+        hung = False
         for stream in list(self._pending):
             blob, n = self._take_pending_locked(stream)
             counts = self._count_locked(stream)
-            try:
-                handle = self._handle_locked(stream)
-                handle.write(blob)
-                handle.flush()
-                counts["saved"] += n
-                self.on_error(f"segment store: {stream} writable again at stop, {n} buffered line(s) written")
-                continue
-            except (OSError, ValueError):
-                self._drop_handle_locked(stream)
+            if not hung:
+                try:
+                    self._timed_io(lambda s=stream, b=blob: self._write_chunk(s, b))
+                    counts["saved"] += n
+                    self.on_error(f"segment store: {stream} writable again at stop, {n} buffered line(s) written")
+                    continue
+                except _IoTimeout:
+                    hung = True               # one wait is enough: the other streams go straight to the fallback folder
+                    self._handles.pop(stream, None)
+                except (OSError, ValueError):
+                    self._drop_handle_locked(stream)
             path = self.fallback_dir() / stream
             try:
                 path.parent.mkdir(parents=True, exist_ok=True)
@@ -578,10 +636,21 @@ class SegmentStore:
                 self._count_locked(stream)["received"] += lines
                 waiting = self._pending.get(stream)
                 blob = ("".join(waiting) + text) if waiting else text
+                if time.monotonic() < self._stuck_until:
+                    ok = False                # the run folder hung a moment ago: do not wait for it again
+                    self._buffer_locked(stream, text)
+                    continue
                 try:
-                    handle = self._handle_locked(stream)
-                    handle.write(blob)
-                    handle.flush()
+                    self._timed_io(lambda s=stream, b=blob: self._write_chunk(s, b))
+                except _IoTimeout as exc:
+                    ok = False
+                    self._write_failed(exc)
+                    self._stuck_until = time.monotonic() + self.io_cooldown
+                    self._handles.pop(stream, None)   # abandoned: closing it would hang the same way
+                    self.on_error(f"segment store: writing {stream} did not finish within {self.io_timeout:g} s (a share "
+                                  f"that hangs?); the run folder is left alone for {self.io_cooldown:g} s, lines are kept in memory")
+                    self._buffer_locked(stream, text)
+                    continue
                 except (OSError, ValueError) as exc:
                     ok = False
                     self._write_failed(exc)
