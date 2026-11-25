@@ -390,9 +390,9 @@ These thresholds are tunable; they are guideline-level under ADR-111 and may be 
 | `sat/pid_d` | `"-0.04"` | no | Derivative term (°C) |
 | `sat/pid_attributes` | JSON | no | PID attributes `{"error","proportional","integral","derivative"}` (°C, two decimals); republished when one of the four PID topics changes |
 | `sat/raw_derivative` | `"-0.04"` | no | Raw (unfiltered) derivative term |
-| `sat/kp` | `"5.0"` | no | Current Kp gain |
-| `sat/ki` | `"0.5"` | no | Current Ki gain |
-| `sat/kd` | `"0.05"` | no | Current Kd gain |
+| `sat/kp` | `"29.6700"` | no | Current Kp gain (4 decimals) |
+| `sat/ki` | `"0.003532"` | no | Current Ki gain (6 decimals) |
+| `sat/kd` | `"9969.12"` | no | Current Kd gain (2 decimals): 336 x Kp |
 | `sat/error_mean` | `"0.12"` | no | Mean PID error over the ring buffer (published regardless of the error-monitoring setting) |
 | `sat/error_stddev` | `"0.34"` | no | Std deviation of PID error over ring buffer |
 

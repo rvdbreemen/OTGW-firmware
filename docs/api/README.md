@@ -1085,7 +1085,7 @@ Returns the full SAT runtime state including temperatures, PID terms, cycle data
   "pid_d": -0.04,
   "kp": 1.6350,
   "ki": 0.000195,
-  "kd": 960.60,
+  "kd": 549.360000,
   "coefficient": 1.5,
   "cycle_count": 12,
   "last_cycle_class": 1,

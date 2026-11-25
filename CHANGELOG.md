@@ -5,6 +5,21 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [2.0.0-beta.428] - 2026-11-25
+
+### Changed
+- SAT: PID values are rounded like thermo-nova: kp, ki and kd to 6 decimals, the PID output and the Summer Simmer index to 1 decimal, ties like Python (TASK-3050).
+- SAT: the Kd factor is 0.04 instead of 0.05, so Kd = 336 x Kp (TASK-3041).
+- SAT: PWM switches to continuous only when the flow stays 3.0 C under the request for 180 s after 180 s of flame; at the maximum setpoint it still ends after the 60 s start gate (TASK-3008, ADR-236, ADR-297).
+- SAT: one PWM ON clock per flame: a switch to continuous freezes it, a PWM re-entry resumes it, the minimum burn counts from the real flame-on (TASK-3039, ADR-296).
+- Web UI: the room temperature labels and graph series say whose room temperature they show while SAT is on (TASK-3035).
+- Web UI: SAT page and Home polish: no repeated pause message, chart note off the axis, no modulation or PID history while SAT is paused, badge accessible name (TASK-3012).
+- Web UI: edge fades on the scroll strips at 390 px, one-line Settings rail items, Network reboot dot (TASK-2960).
+
+### Fixed
+- SAT: the No-ignition diagnostic no longer counts a tolerance-band pause as heating asked for (TASK-3034).
+- Capture tool: a failing output folder (for example a network share) no longer loses a long capture. A write error reopens the stream, unwritable lines are kept in memory (8 MiB) and saved to a local fallback folder, a write that hangs is given up after 10 s, a stream that stays silent for 10 minutes is reported (`--stream-silent-minutes`), the tool asks the computer not to sleep, short-run MQTT lines are converted to `csv/mqtt.csv`, and `summary.txt` has a STREAM INTEGRITY block with the lines received, saved, in memory, in fallback and lost (TASK-3006).
+
 ## [2.0.0-beta.418] - 2026-11-22
 
 ### Added
@@ -1200,7 +1215,8 @@ Legacy release. See git history for details.
 
 Legacy releases. See git history for details.
 
-[Unreleased]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.418...HEAD
+[Unreleased]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.428...HEAD
+[2.0.0-beta.428]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.418...v2.0.0-beta.428
 [2.0.0-beta.418]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.410...v2.0.0-beta.418
 [2.0.0-beta.410]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.405...v2.0.0-beta.410
 [2.0.0-beta.405]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.401...v2.0.0-beta.405
