@@ -3,11 +3,11 @@ id: TASK-2989
 title: >-
   SAT: entry-342 PWM->continuous exit needs the request 1.5 C above the flow for
   60 s (entry 435, Robert B)
-status: To Do
+status: Done
 assignee:
-  - '@otgw-dev'
+  - '@claude'
 created_date: '2026-11-21T01:55:00Z'
-updated_date: '2026-11-25T06:42:00Z'
+updated_date: '2026-11-25T10:04:00Z'
 labels:
   - sat
 milestone: 2.1.0
@@ -53,4 +53,12 @@ Parked by Robert's A 2026-11-21 (DM 1573595175458963567, reply to 15735428235071
 2026-11-21 (otgw-dev): coordinator relayed two stale comments found by otgw-docs' reviewer; checked on dev 8c929eee2: the 180 s 'start-up EMA window' wording is stale (TASK-2993); the 0.86-0.94 range is from the TASK-2993 replay (21:25:30 gave 0.94) while entry 440 names 0.93 on / 0.86 off, so the comment is reworded to the entry's numbers.
 
 2026-11-25 otgw-docs (95), assessed for the coordinator, NOT closed. (1) The rule this task changes is superseded as a rule: ADR-236 (Accepted 2026-11-25, rewritten to Sergeant D's entry 448) replaces the entry-342 exit (flame on, request above flow for 60 s) by thermo-nova's underheat exit (flow at least 3.0 C under the request for 180 s); ADR-297 (Accepted) adds the 180 s flame gate (entry 456) and keeps the at-max exit on the 60 s start gate (entry 463). ADR-236 lists this task as option B 'Entry 342 with a 1.5 C margin (TASK-2989). Not chosen (entry 448): 2-4 exits remain in the replay, and it stays 2.1.0' and under Must Not: 'Bring back the entry-342 60 s rule, or a margin or latch variant of it (TASK-2987 and TASK-2989 stay 2.1.0 per entry 448)'. Entry 484 keeps the 448 rules for 2.0.0. (2) But the code on dev (3f0b98f42 and later, SATcycles.ino:1494-1500) still has the old rule: TASK-3008 (the rewrite) is not on dev. So the task cannot be shown moot by code yet. (3) ACs 1 to 8 describe a margin on a rule that goes away with TASK-3008; ACs 9 and 10 are stale-comment fixes that do not: carry them into the TASK-3008 lane (the exit comment 180 s -> 60 s of AC9 becomes wrong again once the 180 s rule is back; check against the landed code first). Recommendation: leave it in 2.1.0; when TASK-3008 is on dev, close it as superseded by ADR-236 and ADR-297 (entries 448, 456) with the final summary naming them, after AC9 and AC10 are moved.
+
+Superseded by TASK-3008 (ADR-236 rewritten to entry 448, ADR-297): the 60 s rule with a 1.5 C margin of entry 435 is replaced by thermo-nova's underheat rule (flow 3.0 C under the request for 180 s, 180 s flame gate; at-max exit on the 60 s start gate). Landed on origin/dev in 4f303da8c (2.0.0-beta.428).
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Closed as superseded by TASK-3008. Entry 448 (Sergeant D, answer D) replaced the 60 s underheat rule that this task wanted to add a 1.5 C margin to: PWM leaves for continuous when the flow stays 3.0 C under the request for 180 s after 180 s of flame (ADR-236, ADR-297); at the maximum setpoint it ends on the 60 s start gate. Landed on origin/dev in commit 4f303da8c (2.0.0-beta.428), host tests red on the old code and green on the new (TASK-3008 notes). The ACs of this task describe the superseded rule and are not met by design; none was ticked.
+<!-- SECTION:FINAL_SUMMARY:END -->
