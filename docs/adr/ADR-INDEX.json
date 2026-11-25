@@ -11689,6 +11689,81 @@
         "supersedes": [],
         "superseded_by": null
       }
+    },
+    {
+      "id": "ADR-296",
+      "title": "SAT keeps one PWM ON clock per flame: a switch to continuous freezes it, a PWM re-entry resumes it, and the minimum burn counts from the real flame-on",
+      "path": "ADR-296-sat-keeps-one-pwm-on-clock-per-flame-a-switch-to-continuous-freezes-it-a-pwm-re-entry-resumes-it-and-the-minimum-burn-counts-from-the-real-flame-on.md",
+      "format": "canonical",
+      "status": "Proposed",
+      "date": "2026-11-25",
+      "decision_summary": "SAT keeps one PWM ON clock per flame.",
+      "topics": [
+        "control-mode",
+        "minimum-burn",
+        "pwm",
+        "sat"
+      ],
+      "aliases": [
+        "entry 475 freeze",
+        "frozen PWM ON clock",
+        "PWM ON freeze",
+        "TASK-3039"
+      ],
+      "components": [
+        "SAT PWM ON clock across mode switches"
+      ],
+      "symbols": [
+        "_pwm_lastUpdateMs",
+        "_sat_chFlameOnMs",
+        "satPwmBeginOn",
+        "satPwmReset",
+        "satSetControlMode"
+      ],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [
+          "Decide the freeze on the live flame, satIsFlameOn(), at the moment PWM is left, not on the ON-phase state (bPwmFlameRequested, pwmflameOnMs). Reason: at flame-off the end-of-cycle verdict can switch PWM to continuous (SATcycles.ino:1235,...",
+          "Clear the kept time after the mode switch inside the reset paths, not before: satPwmDisableOnHeaterOff() switches mode first (SATcontrol.ino:2018) and resets after (:2020); the same applies to satSetControlMode(SATMODEOFF) (:4395) and th...",
+          "Set the minimum-burn anchor explicitly from the real flame-on. Do not inherit it from the set-back clock (today pwmflameOnMs copies pwmlastUpdateMs at :1451).",
+          "Fall back to the segment's own flame-on time when satchFlameOnMs is 0 (a flame lit with the hot-water bit set, or before the first flame-off was seen, :8121-8125). Otherwise the != 0 guard at :1797 would skip the minimum burn altogether...",
+          "Leave unchanged: the start gate (entries 385/387, ADR-252), the exit rules (ADR-236, entries 456 and 463), the per-flame start counting (entry 428) and the hourly start limit."
+        ],
+        "must_not": [
+          "Add continuous time to the ON clock (entry 476, option B not chosen).",
+          "Count the minimum burn per PWM segment (entry 479, option B not chosen).",
+          "Clear the kept time in satPwmReset(): it runs on every mode change, so the freeze would never survive a flip."
+        ],
+        "exceptions": [
+          "None."
+        ],
+        "verification": [
+          "Host test tests/testsatpwmonfreeze.py, compiling the real PWM block of SATcontrol.ino as tests/testsatpwmanchors.py does. Each case runs on the code before this ADR (red where marked) and on the fix (green):",
+          "F1 (red before): one flip in one flame. The ON phase ends once the PWM time of both segments adds up to the ON time, not a full ON time after the re-entry.",
+          "F2: three flips: the sum of the PWM segments equals the ON time.",
+          "F3: flame out between two segments: the clock starts at zero.",
+          "F4: an ON phase ended by its timer: the next starts at zero.",
+          "F5: a hot-water draw during a frozen or running clock: draw time not counted.",
+          "F6: frozen time already at or above the ON time at the resume: the phase ends on the first tick after the minimum burn from the real flame-on.",
+          "F7: PWM left while waiting for ignition: nothing kept.",
+          "F8: a PWM to continuous switch by the end-of-cycle verdict at flame-off: nothing kept for the next flame.",
+          "F9: a flame lit with the hot-water bit set (satchFlameOnMs 0): the minimum burn still applies.",
+          "F10: a first PWM entry with nothing kept: the same ON phase as before this ADR.",
+          "The existing tests of the start gate, the exit rules and the per-flame counting stay green.",
+          "Bench and field. A flame with several flips on the bench (otgw-bench-tester) shows a shorter total PWM ON time per flame than before; Sergeant D's testers confirm it in the field."
+        ]
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
     }
   ],
   "relationships": [
@@ -19375,6 +19450,36 @@
     {
       "source": "ADR-295",
       "target": "ADR-189",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-296",
+      "target": "ADR-236",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-296",
+      "target": "ADR-250",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-296",
+      "target": "ADR-252",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-296",
+      "target": "ADR-253",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-296",
+      "target": "ADR-292",
       "type": "related",
       "resolved": true
     }
