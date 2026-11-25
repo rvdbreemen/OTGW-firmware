@@ -269,7 +269,7 @@ One row per Architecture Decision Record. Scope is the Enforcement `path_glob` s
 | ADR-262 | Accepted | `src/OTGW-firmware/**/*.ino` | The web UI (user interface), running in the user's browser, checks the GitHub releases list for a newer firmware and... |
 | ADR-263 | Accepted | - | On a board with PSRAM, buffers of BLE and remote telemetry may be allocated from PSRAM once, at init, and are never f... |
 | ADR-264 | Accepted | - | espMqttClient comes from our fork. |
-| ADR-265 | Proposed | - | Every deferrable MQTT bulk publisher asks one shared pacer, mqttPaceAllows() in MQTTstuff.ino, before it publishes. |
+| ADR-265 | Accepted | - | Every deferrable MQTT bulk publisher asks one shared pacer, mqttPaceAllows() in MQTTstuff.ino, before it publishes. |
 | ADR-266 | Accepted | - | Nagle on for the MQTT socket. |
 | ADR-268 | Accepted | - | The firmware keeps one local diagnostic recorder: the local ring of the remote telemetry recorder. |
 | ADR-290 | Superseded | - | Outbound TLS client only, for this one upload. |

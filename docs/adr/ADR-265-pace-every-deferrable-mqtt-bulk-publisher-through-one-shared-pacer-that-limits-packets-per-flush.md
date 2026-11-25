@@ -1,15 +1,14 @@
 ---
 id: "ADR-265"
 title: "Pace every deferrable MQTT bulk publisher through one shared pacer that limits packets per flush"
-status: "Proposed"
-date: "2026-11-20"
+status: "Accepted"
+date: "2026-11-26"
 binding: false
 gate: null
 documents_shipped: false
 verified_in: []
 supersedes: []
 superseded_by: null
-format: "canonical"
 topics:
   - "mqtt"
   - "heap"
@@ -32,6 +31,7 @@ symbols:
   - "staleOverrideClearTick"
   - "loopMQTTStatsPacer"
 context_scope: "selective"
+format: "canonical"
 ---
 
 <!-- markdownlint-disable MD025 -->
@@ -40,11 +40,13 @@ context_scope: "selective"
 
 ## Status
 
-Proposed, 2026-11-20.
+Accepted, 2026-11-26, by Robert (interactive, about 01:10, relayed by the coordinator). Proposed 2026-11-20. Guideline-level per ADR-080: verified by host tests and a narrow `evaluate.py` check (no `binding: true`). Release 2.0.0.
+
+**Accepted without the .61 numbers, by Robert's decision.** `MQTT_PACE_MAX_OUTBOX` ships as 6 (provisional value of cut 1, kept). The evidence channel is the per-producer counters on `/api/v2/device/info` and the `[HEAP]` line, the runtime flags in prerelease builds, and the .61 bench (step 0 and the A/B per flag), which Robert made a gate for the stable in the same answer. Implementation at acceptance: the cut stack on `lane-poc-pacer` up to 9beda9b9f (TASK-2949.6-.9, .11), second-reviewed by otgw-architect; not yet on `dev`.
 
 **Amended in place on 2026-11-25 (still Proposed)**, after ADR-266 was Accepted as Nagle only, without the per-loop PUBLISH cap. Robert decided on 2026-11-25 that this pacer is built for 2.0.0 in four cuts before the stable, each behind its own compile-time switch, with Nagle (ADR-266) in its own soak. The library-cap reliance is removed, and the Decision Contract is split into a contract per cut and the target after cut 4.
 
-**Amended in place again on 2026-11-25 (still Proposed)**, after Robert set the test scheme (2026-11-25, about 22:00, relayed by the coordinator): 15 min bench per task, 60 min on a public beta release build, and a 24 h bench run only for the final release, on the Classic + S3 Mini, with no field-unit count (Robert, about 22:20). One cause per build stays the attribution default for MQTT, TCP and heap changes, so Nagle and each cut ride their own beta. Each cut's switch gains a RAM-only runtime flag in prerelease builds, through the debug-flag table of ADR-206, so an anomaly is bisected by a toggle instead of a rebuild. Each paced producer gets two counters. ADR-206 itself is not changed.
+**Amended in place again on 2026-11-25 (still Proposed)**, after Robert set the test scheme (2026-11-25, about 22:00, relayed by the coordinator): 15 min bench per task, 60 min on a public beta release build, and a 24 h bench run only for the final release, on the Classic + S3 Mini, with no field-unit count (Robert, about 22:20). One cause per build stays the attribution default for MQTT (Message Queuing Telemetry Transport), TCP (Transmission Control Protocol) and heap changes, so Nagle and each cut ride their own beta. Each cut's switch gains a RAM-only runtime flag in prerelease builds, through the debug-flag table of ADR-206, so an anomaly is bisected by a toggle instead of a rebuild. Each paced producer gets two counters. ADR-206 itself is not changed.
 
 **Amended in place a third time on 2026-11-25 (still Proposed)**: Open Question 3 answered by Robert (about 23:10, relayed by the coordinator, option D). The 15 `otgw-pic/settings/*` topics become retained, the unpaced 5-minute refresh of `publishAllPICsettings()` is removed, and the connect block stays one portion of connect stage 3 under cut 3.
 
@@ -59,11 +61,16 @@ status_history:
     changed_by: "Agent: Claude (otgw-architect)"
     reason: Initial proposal
     changed_via: adr-kit
+  - date: 2026-11-26
+    status: Accepted
+    changed_by: "Agent: Claude (otgw-architect)"
+    reason: Accepted by Robert, 2026-11-26 ~01:10 (interactive, relayed by the coordinator), without the .61 numbers; MQTT_PACE_MAX_OUTBOX = 6 as shipped
+    changed_via: adr-kit lifecycle
 ```
 
 ## Context
 
-**The problem in one sentence.** When our code queues many MQTT (Message Queuing Telemetry Transport) packets in one loop pass, the next `MQTTclient.loop()` sends them all at once, and free heap falls 20 to 43 KB for a moment. On an ESP32-S3 (Espressif dual-core microcontroller) without PSRAM (pseudo-static RAM), that is enough to reach the CRITICAL tier (3,072 B) when a browser loads the web UI at the same time.
+**The problem in one sentence.** When our code queues many MQTT (Message Queuing Telemetry Transport) packets in one loop pass, the next `MQTTclient.loop()` sends them all at once, and free heap falls 20 to 43 KB (kilobytes) for a moment. On an ESP32-S3 (Espressif dual-core microcontroller) without PSRAM (pseudo-static RAM), that is enough to reach the CRITICAL (lowest heap) tier (3,072 B) when a browser loads the web UI at the same time.
 
 **Why the whole outbox leaves at once.** The firmware pumps espMqttClient from the loop task (`UseInternalTask::NO`, `MQTTstuff.ino:217`, ADR-131). One `MQTTclient.loop()` call (`MQTTstuff.ino:1571`) runs `_checkOutbox()` (`src/libraries/espMqttClient/src/MqttClient.cpp:354`): `while (_sendPacket() > 0)` keeps writing packets until the socket refuses. The ADR-186 patch makes that write non-blocking (`Transport/ClientSync.cpp:60-74`), but it does not limit how many packets go out per call.
 
@@ -76,13 +83,13 @@ So the flush costs about ten times the payload bytes.
 
 **Contested premise (beta.403, .61, 2026-11-20, otgw-bench-tester via the coordinator):** at a SAT takeover, one probe at `at=13 from=12` still fell 29.4 KB with outbox 9 and mqttTx 749 B (maxblk 7,668 B). That is about 3.3 KB per packet for packets of about 83 B. It does not show a clean per-packet scale, and something else in `loop()` may hold the bytes. otgw-dev's beta.403 runs 2 and 3 point the other way: outbox 25 to 9, so 16 packets handed to lwIP in one `loop()`, cost 20.3 and 23.9 KB, about 1.5 KB per packet regardless of payload, and the heap recovered within 14 ms. That fits one MSS-sized segment per packet, at most `TCP_SND_QUEUELEN` 16 per flush. The two readings conflict; Open Question 1 (TASK-2949.1) settles them before any pacing code is written.
 
-**Where the extra bytes go: not established.** The lwIP (lightweight IP stack) configuration in the pinned framework is as follows (`framework-arduinoespressif32-libs/esp32s3`, sdkconfig and `lwipopts.h:627`):
+**Where the extra bytes go: not established.** The lwIP (lightweight IP (Internet Protocol) stack) configuration in the pinned framework is as follows (`framework-arduinoespressif32-libs/esp32s3`, sdkconfig and `lwipopts.h:627`):
 
 - `TCP_SND_BUF` = 5,744 B
 - `TCP_MSS` = 1,436
 - `TCP_SND_QUEUELEN` = 16 segments
-- `TCP_OVERSIZE` = MSS
-- WiFi dynamic TX buffers: 32
+- `TCP_OVERSIZE` = MSS (maximum segment size)
+- WiFi dynamic TX (transmit) buffers: 32
 
 The MQTT socket sets `TCP_NODELAY` (`ClientSync.cpp:32`, `:50`). With Nagle off, every small packet becomes its own segment with its own pbuf and WiFi TX buffer. That points to a per-segment cost, but it has not been measured per allocator. Open Question 1 asks for that measurement.
 
@@ -96,7 +103,7 @@ The MQTT socket sets `TCP_NODELAY` (`ClientSync.cpp:32`, `:50`). With Nagle off,
 | Stale override sweep (TASK-1991) | `MQTTstuff.ino:1894-1901` | 2 | none | 100 ms gap |
 | Discovery drip (TASK-1757 B) | `MQTTstuff.ino:2808-2814` | 8 | none | 5 skipped ticks, then publish |
 | SAT shadow gate (TASK-1339) | `SATmqttPublish.cpp:50-55`, `SATmqttPublish.h:89` | 24 | none, except inside the pace window | retried every 500 ms |
-| Hourly stats pacer (TASK-2004) | `MQTTstuff.ino:2380-2434` | none | waits on HEAP_CRITICAL | one stat per 100 ms |
+| Hourly stats pacer (TASK-2004) | `MQTTstuff.ino:2380-2434` | none | waits on `HEAP_CRITICAL` | one stat per 100 ms |
 
 The TASK-2019 fix for 2.0.0 opens the post-connect window at more triggers: SAT takeover, SAT enable and republish-all. Each new trigger needs its own call site. A trigger that someone forgets brings the dip back.
 
@@ -124,7 +131,7 @@ It allows a publish only while both of these hold:
 
 The pacer bounds how much our deferrable producers have waiting in the outbox, and so how many of their packets one `MQTTclient.loop()` can still write. It does not bound the event-driven publishers, and it does not bound what already sits in lwIP: a QoS 0 packet leaves the outbox as soon as it is written (`espMqttClient/src/Packets/Packet.cpp:60-61`, `MqttClient.cpp:387-388`). The segment bound for every publisher is Nagle on the MQTT socket (ADR-266, Accepted 2026-11-25, Nagle only; the per-loop PUBLISH cap of its first version is dropped). The pacer keeps no per-pass counter of its own.
 
-**Precedent.** The TASK-2019 pace window, the same outbox-and-block hold limited to SAT at a takeover, was benched not green on .61 (commit 54bd8b8bc, beta.403, run 4: -29.4 KB). Each cut therefore has its own bench criterion and ships OFF when it fails.
+**Precedent.** The TASK-2019 pace window, the same outbox-and-block hold limited to SAT at a takeover, was benched not green on .61 (commit 54bd8b8bc, beta.403, run 4: -29.4 KB). Each cut therefore has its own bench criterion and ships off when it fails.
 
 A per-producer liveness bound guarantees progress: after waiting `MQTT_PACE_MAX_WAIT_MS`, the producer publishes anyway.
 
@@ -163,7 +170,7 @@ static inline bool satOutboxFull() {
 - **Cut 3a, PIC settings retained (Open Question 3, option D; a separate commit, independent of the pacer):** the 15 `otgw-pic/settings/*` topics are published retained, by `publishAllPICsettings()` (`OTGW-Core.ino:1536`) and by the on-change publish in `handlePRresponse()` (`OTGW-Core.ino`, `sendMQTTData(mqttTopic, stateField)`). The call from `do5minevent()` (`OTGW-firmware.ino:1043`) is removed: after a Home Assistant or broker restart the broker serves the retained values, and the connect block republishes the cached ones. The topic layout of ADR-065 is unchanged.
 - **Cut 4, stale override sweep and hourly stats:** `staleOverrideClearTick()` and `loopMQTTStatsPacer()` ask `mqttPaceAllows()` and keep their pending state.
 - **Every cut:** `MQTT_PACE_MAX_OUTBOX`, `MQTT_PACE_MIN_BLOCK` and `MQTT_PACE_MAX_WAIT_MS` are defined once, next to `mqttPaceAllows()`, with values from the Open Question 1 measurement; every paced producer has a liveness bound; the pacer runs on the loop task only, and a request from another task sets a flag the loop task consumes, as `queueMQTTRepublishAll()` does (`OTGW-Core.ino:2217`).
-- **Every cut, runtime flag:** one `bool` per cut in `DebugSection` (`state.debug`), default `true`, with one row in `kDebugFlags` (`debugFlags.h`, ADR-206), so the telnet key and `GET/POST /api/v2/debug/flags` share it. The table row exists only under `#if defined(_VERSION_PRERELEASE)`, like the bench hooks in `handleDebug.ino`. The `bool` itself stays in every build and is always `true` in a stable build, because nothing can set it there. The flag is RAM-only: no settings key, no persistence, a reboot sets it back to `true`. The pacer reads it on the loop task; a REST write from another task is a single `bool` store, as for the other debug flags. With the flag `false` the cut's producer behaves as the code before that cut.
+- **Every cut, runtime flag:** one `bool` per cut in `DebugSection` (`state.debug`), default `true`, with one row in `kDebugFlags` (`debugFlags.h`, ADR-206), so the telnet key and the GET (read) and POST (write) requests of `/api/v2/debug/flags` share it. The table row exists only under `#if defined(_VERSION_PRERELEASE)`, like the bench hooks in `handleDebug.ino`. The `bool` itself stays in every build and is always `true` in a stable build, because nothing can set it there. The flag is RAM-only: no settings key, no persistence, a reboot sets it back to `true`. The pacer reads it on the loop task; a REST (Representational State Transfer) write from another task is a single `bool` store, as for the other debug flags. With the flag `false` the cut's producer behaves as the code before that cut.
 - **Every cut, counters:** per paced producer, a count of "pace said no" and a count of "liveness fired", visible on telnet and in the `[HEAP]` telemetry, so an anomaly can be attributed to a producer without a bisect run.
 
 ### Must (target, after cut 4)
@@ -215,14 +222,14 @@ static inline bool satOutboxFull() {
 - An always-on pacer slows steady-state SAT publishing and discovery a little. A change waits up to one loop pass, and up to `MQTT_PACE_MAX_WAIT_MS` under load. Mitigation: SAT already retries every 500 ms. The spike measures the steady-state outbox depth (the comment at `SATmqttPublish.h:89` says 0 to 35 packets on the bench) before the constants are fixed.
 - Per-frame and status publishes are not held back by the pacer. Their segments are bounded by Nagle once ADR-266 is built, and ADR-088 keeps the drip out of their way. Until Nagle is built, a cut may not reach its bench criterion (the TASK-2019 precedent above).
 - A large remaining drop is not an MQTT publish at all: `satControlLoopRun` (16-20 KB in ADR-266's table, TASK-3005). No cut of this pacer touches it.
-- The cause of the per-packet cost stays unattributed until the spike runs. If it turns out to be something else, the unit (packets) may need revisiting. Mitigation: Open Question 1 blocks acceptance.
+- The cause of the per-packet cost stays unattributed until the spike runs. If it turns out to be something else, the unit (packets) may need revisiting. Mitigation: the counters and the .61 bench (a gate for the stable) measure it; Robert accepted this ADR before that measurement (2026-11-26).
 
 ## Open Questions
 
-- [ ] 1. What does one queued and flushed MQTT packet cost on .61 on the build that ships? Partly answered: TASK-2949.5 measured `TCP_NODELAY` against Nagle (ADR-266's table), and TASK-2019 measured about 1.3-1.5 KB per packet per loop with `TCP_NODELAY` (16 packets, 20-24 KB). Still open: the cost per packet in the SAT publish pass itself, which sets `MQTT_PACE_MAX_OUTBOX` (step 0 of the implementation plan, `OTGW-field-data/_comms/adr265_plan.md`). The ADR-266 cap value is no longer needed.
-- [ ] 2. Steady-state impact: with the pacer on, what is the added SAT publish latency and the discovery completion time after boot, compared with today?
-- [x] 3. Should `publishAllPICsettings()` (up to 15 publishes on a Classic) move under the pacer, or stay inside connect stage 3 as one portion? — **Answered 2026-11-25 by Robert (relayed by the coordinator), option D:** one portion of connect stage 3 under cut 3; the topics retained (on change and at every connect); the 5-minute refresh removed (YAGNI: the broker serves the retained values after a Home Assistant restart). Known limit: when the PIC is removed, the retained values (and the retained discovery configs, as today) stay on the broker until cleared by hand; the release notes say how.
-- [ ] 4. Acceptance by the maintainer.
+- [x] 1. What does one queued and flushed MQTT packet cost on .61 on the build that ships? Partly answered: TASK-2949.5 measured `TCP_NODELAY` against Nagle (ADR-266's table), and TASK-2019 measured about 1.3-1.5 KB per packet per loop with `TCP_NODELAY` (16 packets, 20-24 KB). Still open: the cost per packet in the SAT publish pass itself, which sets `MQTT_PACE_MAX_OUTBOX` (step 0 of the implementation plan, `OTGW-field-data/_comms/adr265_plan.md`). The ADR-266 cap value is no longer needed. — **Answered 2026-11-26 by Robert, 2026-11-26 about 01:10 (interactive, relayed by the coordinator):** ship `MQTT_PACE_MAX_OUTBOX` = 6 without waiting for step 0. Step 0 and the .61 numbers are still collected as gate evidence for the stable (.61 is a gate, same answer), and the value may be revised later with data.
+- [x] 2. Steady-state impact: with the pacer on, what is the added SAT publish latency and the discovery completion time after boot, compared with today? — **Deferred to measurement by Robert, 2026-11-26 about 01:10 (interactive, relayed by the coordinator):** accepted without this number. The per-producer counters (`hd_pace_*_no`, `hd_pace_*_live`) and the discovery completion time on the .61 bench are the evidence channel; a bad value is handled by the runtime flag (prerelease) or by shipping a cut OFF.
+- [x] 3. Should `publishAllPICsettings()` (up to 15 publishes on a Classic) move under the pacer, or stay inside connect stage 3 as one portion? — **Answered 2026-11-25 by Robert (relayed by the coordinator), option D:** one portion of connect stage 3 under cut 3; the topics retained (on change and at every connect); the 5-minute refresh removed (YAGNI (you aren't gonna need it): the broker serves the retained values after a Home Assistant restart). Known limit: when the PIC is removed, the retained values (and the retained discovery configs, as today) stay on the broker until cleared by hand; the release notes say how.
+- [x] 4. Acceptance by the maintainer. — **Answered 2026-11-26 by Robert, 2026-11-26 about 01:10 (interactive, relayed by the coordinator): accept now.**
 
 ## Related Decisions
 

@@ -11185,8 +11185,8 @@
       "title": "Pace every deferrable MQTT bulk publisher through one shared pacer that limits packets per flush",
       "path": "ADR-265-pace-every-deferrable-mqtt-bulk-publisher-through-one-shared-pacer-that-limits-packets-per-flush.md",
       "format": "canonical",
-      "status": "Proposed",
-      "date": "2026-11-20",
+      "status": "Accepted",
+      "date": "2026-11-26",
       "decision_summary": "Every deferrable MQTT bulk publisher asks one shared pacer, mqttPaceAllows() in MQTTstuff.ino, before it publishes.",
       "topics": [
         "backpressure",
@@ -11215,31 +11215,26 @@
       ],
       "context_scope": "selective",
       "decision_contract": {
-        "must": [
-          "Every deferrable bulk producer calls mqttPaceAllows() before a publish and keeps its shadow or pending bit when the answer is no:",
-          "SAT shadow helpers in SATmqttPublish.cpp",
-          "loopMQTTDiscovery()",
-          "connStageTick()",
-          "staleOverrideClearTick()",
-          "publishAllPICsettings()",
-          "loopMQTTStatsPacer()",
-          "MQTTPACEMAXOUTBOX, MQTTPACEMINBLOCK and MQTTPACEMAXWAITMS are defined once, next to mqttPaceAllows(). The library cap value MQTTMAXPACKETSPERLOOP (ADR-266) is set in the same place.",
-          "Every paced producer has a liveness bound: after MQTTPACEMAXWAITMS without a yes, it publishes anyway.",
-          "The pacer runs on the loop task only, like espMqttClient itself. A request from another task sets a flag that the loop task consumes, as queueMQTTRepublishAll() does (OTGW-Core.ino:2217)."
-        ],
+        "must": [],
         "must_not": [
           "Must not hold or drop a per-frame processOT() publish or a status fan-out. Those stay under ADR-088.",
-          "Must not compare MQTTclient.queueSize() or mqttOutboxDepth() against a threshold outside the pacer.",
-          "Must not patch the vendored espMqttClient beyond what ADR-186 allows.",
-          "Must not bring back heap-tier gating. ADR-167 stays: the pacer reads the largest free block as a send condition, not as a tier."
+          "Must not patch the vendored espMqttClient beyond what ADR-186, ADR-264 and ADR-266 allow. The pacer itself needs no library change.",
+          "Must not add a settings key, a persisted value or a stable-build REST control for a cut's switch.",
+          "Must not bring back heap-tier gating. ADR-167 stays: the pacer reads the largest free block as a send condition, not as a tier.",
+          "Before the target: must not add a new outbox-depth threshold outside mqttPaceAllows(); the existing ones of gates not yet converted stay until their cut.",
+          "After the target: must not compare MQTTclient.queueSize() or mqttOutboxDepth() against a threshold outside the pacer."
         ],
         "exceptions": [
           "None."
         ],
         "verification": [
           "A host test compiles the real mqttPaceAllows() and the real SATmqttPublish.cpp, then drives a first-seen SAT set of at least 140 topics. It counts the packets queued per pass. It must go red on the code before this ADR (up to 24 or 25 pe...",
-          "An evaluate.py gate fails when queueSize() or mqttOutboxDepth() is compared against a number outside mqttPaceAllows().",
-          "Bench: the TASK-2019 takeover recipe and the TASK-1757 W/C/B boot recipe on .61. No [HEAP] sat-takeover-probe or connect-probe drop of 10 KB or more at at=13 from=12. Old-vs-new numbers go in the task."
+          "Per cut, a host test runs red on the code before the cut and green on it, with its switch false equal to the old behaviour, and mutants (pacer always yes, liveness removed, liveness publishing the whole set, runtime flag ignored) that tu...",
+          "Until the target, a narrow evaluate.py check: each converted producer calls mqttPaceAllows(), and the MQTTPACE constants are defined once. After cut 4, the full gate: it fails when queueSize() or mqttOutboxDepth() is compared against a n...",
+          "Bench: the TASK-2019 takeover recipe and the TASK-1757 W/C/B boot recipe on .61. No [HEAP] sat-takeover-probe or connect-probe drop of 10 KB or more at at=13 from=12. Old-vs-new numbers go in the task. A/B runs toggle the runtime flag on...",
+          "Per cut on .61, on the cut's build: a 15 min bench with forced events, each once: a broker outage of about 30 s (connect stages only) and one of more than 300 s (MQTTREPUBLISHOFFLINETHRESHOLDMS, the only trigger of the value republish an...",
+          "Cut 3a: a host test compiles the real publishAllPICsettings() and handlePRresponse() with a capturing sendMQTTData(), red on the code before (retain false, the 5-minute call present) and green on the fix; mutants \"retain false at either...",
+          "Per cut, a host test compiles the cut's code with VERSIONPRERELEASE defined and undefined, and shows that the build without the flag behaves as the build with the flag ON."
         ]
       },
       "scope": {
@@ -11683,7 +11678,10 @@
         ],
         "verification": [
           "A host test that compiles the real recovery helper against a stub lwIP pcb list: a tracked /ws pcb is aborted, an HTTP pcb on port 80 and a pcb with another remote port are not; red on the code before (closeAll()).",
-          "Bench (otgw-bench-tester): a forced CRITICAL or 09's reproduction shows the /ws client gone at once, its memory back in the recovery line's after, and a web UI tab reconnecting."
+          "Bench (otgw-bench-tester), on the board without PSRAM (.61), because CRITICAL (free heap under 3072 B) rarely happens on a board with PSRAM. CRITICAL is forced with the prerelease-only deep heap hold, telnet key K (target 2560 B free, ne...",
+          "each [heap-recovery] line reports exactly as many aborted connections as /ws clients were connected at that moment (hdwsrecoveryabort rises by the same number). The hold tops up again after a recovery, so a 2 min hold can start more than...",
+          "no crash, reboot or crashlog for 10 min after the hold ends, the web UI tabs reconnect within about 10 s, and the free heap returns once the hold ends;",
+          "a control run with the same K hold on the build before this ADR (the closeAll() path) tells a crash of the hold itself apart from one of the abort path."
         ]
       },
       "scope": {
@@ -19261,6 +19259,12 @@
     },
     {
       "source": "ADR-265",
+      "target": "ADR-051",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-265",
       "target": "ADR-088",
       "type": "related",
       "resolved": true
@@ -19297,7 +19301,19 @@
     },
     {
       "source": "ADR-265",
+      "target": "ADR-206",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-265",
       "target": "ADR-216",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-265",
+      "target": "ADR-264",
       "type": "related",
       "resolved": true
     },
