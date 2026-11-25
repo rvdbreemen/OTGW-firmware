@@ -10487,8 +10487,8 @@
       "title": "SAT switches from continuous to PWM when the flow stays 2 C above the request for 60 s, and a stored old default of 1.5 C migrates once (partly supersedes ADR-249)",
       "path": "ADR-254-sat-switches-from-continuous-to-pwm-when-the-flow-stays-2-c-above-the-request-for-60-s-and-a-stored-old-default-of-1-5-c-migrates-once-partly-supersedes-adr-249.md",
       "format": "canonical",
-      "status": "Proposed",
-      "date": "2026-11-17",
+      "status": "Accepted",
+      "date": "2026-11-25",
       "decision_summary": "SAT switches from continuous to PWM when flow - requested setpoint >= settings.sat.fPwmSwitchMargin (default 2.0) hol...",
       "topics": [
         "continuous to pwm switch",
@@ -10521,7 +10521,9 @@
           "The continuous to PWM switch fires on the first control tick at least 60 s after the first qualifying tick (flow - requested >= fPwmSwitchMargin).",
           "The default of satpwmswitchmargin is 2.0; its range stays 0.5-5.0.",
           "A settings file without SATpwmmargin2 and with SATpwmswitchmargin 1.5 boots with 2.0 and writes the marker.",
-          "The 3.5 C fail-safe keeps its own 30 s timer."
+          "The fail-safe, 3.0 C (entry 429), keeps its own 30 s timer.",
+          "After a PWM to continuous exit that sets cycleburnLeftPwm, the margin rule does not switch that flame back to PWM (entry 429).",
+          "Both rules run only while heating is allowed (entries 410, 417)."
         ],
         "must_not": [
           "Move a stored margin other than 1.5, or move a 1.5 that is stored together with the marker.",
@@ -10533,7 +10535,7 @@
         "verification": [
           "python tests/testsatovershootsustain.py: 85 cases on the real satCycleCheckOvershootSwitch(); 31 fail on the code before this ADR (OTGWSATCYCLESINO / OTGWSATTYPESH pointing at origin/dev f4373938a), all pass after it.",
           "python tests/testsatpwmmarginmigration.py: the real setter, writer and migration lines of settingStuff.ino; cases a, b and d fail on the code before this ADR, all four pass after it.",
-          "python tests/testsatlowloadcontract.py (LL-004, LL-020b) and tests/testsatslavelowload.py, tests/testsatpwmoverride.py pin the 60 s timing."
+          "python tests/testsatlowloadcontract.py (low-load (LL) cases LL-004, LL-020b) and tests/testsatslavelowload.py, tests/testsatpwmoverride.py pin the 60 s timing."
         ]
       },
       "scope": {
@@ -19020,6 +19022,12 @@
     {
       "source": "ADR-254",
       "target": "ADR-252",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-254",
+      "target": "ADR-296",
       "type": "related",
       "resolved": true
     },
