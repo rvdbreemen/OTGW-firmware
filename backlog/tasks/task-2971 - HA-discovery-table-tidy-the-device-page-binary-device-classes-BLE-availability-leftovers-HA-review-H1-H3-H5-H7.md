@@ -7,6 +7,7 @@ status: To Do
 assignee:
   - '@otgw-dev'
 created_date: '2026-11-20T15:53:00Z'
+updated_date: '2026-11-25T13:21:00Z'
 labels:
   - mqtt
   - ha
@@ -32,3 +33,9 @@ From the TASK-2970 HA review (docs/reviews/2026-11-20_ux-ha-entities/README.md, 
 - [ ] #5 H7: the ventilation typo and the Cooling_configs plural are fixed, the %sensor_id% placeholder row is removed or documented, and override names follow the naming rule
 - [ ] #6 Topics and uniq_id are unchanged (golden topic test green), so existing HA installs keep their entity ids
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-25 lane backup: the unlanded lane lane/d3-2971 (cdc08aba3 H3, 49f5c687f H7, dc90a2c58 H1; head dc90a2c58) has NO remote branch; its only backup is OTGW-worktree-leftovers/d3-bundles/ha.bundle, sha256 0dd437592f0c035ab372a2986d049e9d5f655d37e3970e979cb36bc43973d8ec (git bundle verify okay, prerequisite origin/dev ca911f82f). Architect/coordinator decision: H7 dropped, H5 and H3 kept for 2.0.0 (owner otgw-dev, small additive, no topic or uniq_id change, split into sub-tasks after the 18:30 check), H1 waits for Robert.
+<!-- SECTION:NOTES:END -->
