@@ -343,8 +343,9 @@
       "series_ch_set": "control setpoint",
       "series_room_set": "thermostat setpoint",
       "series_sat_target": "SAT target",
-      "series_room": "thermostat room",
-      "series_room_sat": "thermostat room (SAT uses {{src}})",
+      "series_room": "room",
+      "series_room_thermostat": "room (thermostat)",
+      "sat_room_note": "SAT uses {{temp}} ({{source}}). The graph shows the thermostat reading.",
       "series_outside": "outside",
       "series_dhw": "DHW temperature",
       "series_mod": "modulation",
@@ -744,7 +745,9 @@
       "setpoint_set": "set {{temp}}",
       "setpoint_set_thermostat": "set {{target}} (thermostat {{thermostat}})",
       "room_sat_tip": "Room temperature SAT controls on ({{src}}); the thermostat reports {{thermostat}}",
-      "room_tag_sat": "ROOM · SAT",
+      "room_sat_label": "ROOM · SAT",
+      "room_thermostat_sub": "thermostat {{temp}} · via {{source}}",
+      "room_thermostat_none": "thermostat: no reading",
       "tag_compressor": "COMPRESSOR",
       "tag_modulation": "MODULATION",
       "lcd_fault": "FAULT",
@@ -1638,6 +1641,8 @@
       "legend_outside": "Outside",
       "legend_pid": "PID",
       "legend_room": "Room",
+      "legend_room_sat": "Room (SAT)",
+      "sat_room_src_other": "external",
       "legend_setpoint": "Setpoint",
       "log_pause": "⏸ Pause",
       "no": "No",
@@ -3076,15 +3081,25 @@
   function showRoom(id) {
     var el = document.getElementById(id); if (!el) return;
     el.textContent = fmt(roomShown(), 1, '°');
-    var fromSat = roomFromSat();
-    if (fromSat && model.room !== null) el.setAttribute('title', t('home.room_sat_tip', { src: satRoomSrcName(), thermostat: fmt(model.room, 1, '°') }));
+    var differs = roomDiffers();
+    if (differs && model.room !== null) el.setAttribute('title', t('home.room_sat_tip', { src: satRoomSrcName(), thermostat: fmt(model.room, 1, '°') }));
     else el.removeAttribute('title');
-    // TASK-3035: the ROOM tag says whose room temperature the value is: SAT's (source in the tooltip) or the thermostat's.
-    if (id === 'aRoom') { var tag = document.getElementById('aRoomTag'); if (tag) tag.textContent = fromSat ? t('home.room_tag_sat') : t('h_home.svg_room'); }
+    // TASK-3035 (ux proposal 2026-11-25): ROOM · SAT and a visible thermostat line, only while the two can differ; otherwise the tile is as before
+    var tag = id === 'aRoom' ? document.getElementById('aRoomTag') : null;
+    if (tag) tag.textContent = differs ? t('home.room_sat_label') : t('h_home.svg_room');
+    var sub = document.getElementById(id === 'aRoom' ? 'aRoomSub' : 'bRoomSub');
+    if (sub) {
+      sub.textContent = !differs ? '' : model.room === null ? t('home.room_thermostat_none')
+        : t('home.room_thermostat_sub', { temp: fmt(model.room, 1, '°'), source: satRoomSrcName() });
+      sub.removeAttribute('textLength');
+      var maxW = id === 'aRoom' ? 215 : 220;   // svg units: the schematic edge and the dial width
+      try { if (sub.textContent && sub.getComputedTextLength() > maxW) { sub.setAttribute('textLength', maxW); sub.setAttribute('lengthAdjust', 'spacingAndGlyphs'); } } catch (e) { }
+    }
   }
-  // TASK-3035: the source SAT takes its room temperature from, as the SAT page names it; the plain word when the firmware
-  // has not reported one.
-  function satRoomSrcName() { return sat.roomSrc ? t('tools.sat_room_src_' + sat.roomSrc) : t('tools.sat_room_src_none'); }
+  // TASK-3035: SAT room and thermostat room (MsgID 24) can differ only while SAT controls on a source other than the thermostat.
+  function roomDiffers() { return roomFromSat() && sat.roomSrc !== 'thermostat'; }
+  // The source SAT takes its room temperature from, named as on the SAT page; external when the firmware has not said (never an invented name).
+  function satRoomSrcName() { return t('tools.sat_room_src_' + (sat.roomSrc || 'other')); }
   function fmt(v, dp, suffix) {
     if (v === null || v === undefined || isNaN(v)) return '—';
     return v.toFixed(dp === undefined ? 1 : dp) + (suffix || '');
@@ -3563,8 +3578,8 @@
   function gVal(r, k) { return k.charAt(1) === ':' ? (r.d ? r.d[k.substring(2)] : null) : r[k]; }
   function gMeta(k, i) {
     for (var j = 0; j < GSER.length; j++) if (GSER[j][0] === k) {
-      // TASK-3035: the 'room' series is the thermostat's MsgID 24; while SAT regulates on a room temperature the label says which source SAT uses.
-      var lab = (k === 'room' && roomFromSat() && sat.roomSrc) ? t('graph.series_room_sat', { src: satRoomSrcName() }) : t(GSER_LABEL_KEY[k]);
+      // TASK-3035: the room series is the thermostat MsgID 24: qualified only while SAT controls on another source
+      var lab = (k === 'room' && roomDiffers()) ? t('graph.series_room_thermostat') : t(GSER_LABEL_KEY[k]);
       return [GSER[j][0], lab, GSER[j][2], GSER[j][3]];
     }
     var a = k.substring(2);
@@ -3813,6 +3828,12 @@
   var gLegendSig = '';
   function renderGraphLegend(keys, metas) {
     var lg = document.getElementById('gLegend'); if (!lg) return;
+    var note = document.getElementById('gSatNote');   // TASK-3035: one live line, SAT room is not in the history
+    if (note) {
+      var showNote = roomDiffers();
+      note.hidden = !showNote;
+      note.textContent = showNote ? t('graph.sat_room_note', { temp: fmt(sat.room, 1, '°'), source: satRoomSrcName() }) : '';
+    }
     var sig = keys.join('|') + '#' + Object.keys(gOff).join('|') + '#' + metas.map(function (m) { return m[1]; }).join('|');
     if (sig === gLegendSig) return;
     gLegendSig = sig; lg.textContent = '';
@@ -7836,7 +7857,7 @@
     // controls on), the flow it asks (setpoint) against the actual boiler flow with the heating curve dashed
     // (TASK-1885), modulation and flame as in Mission control, and the PID output (no unit shown).
     drawPanelChart(svg, { n: satHist.set.length, panels: [
-      { title: t('tools.legend_room') + ' · ' + t('tools.legend_outside'), kind: 't', unit: '°C', h: 90,
+      { title: t('tools.legend_room_sat') + ' · ' + t('tools.legend_outside'), kind: 't', unit: '°C', h: 90,
         series: [{ vals: satHist.room, color: ok }, { vals: satHist.out, color: cold, dash: '6 4' }] },
       { title: t('tools.legend_setpoint') + ' · ' + t('tools.legend_flow') + ' · ' + t('h_mon.sat_curve_title'), kind: 't', unit: '°C', h: 90,
         series: [{ vals: satHist.set, color: accent }, { vals: satHist.flow, color: hot }, { vals: satHist.curve, color: muted, dash: '5 4' }] },
@@ -7849,7 +7870,7 @@
       '<span><i style="background:' + accent + '"></i>' + esc(t('tools.legend_setpoint')) + '</span><span><i style="background:' + hot + '"></i>' + esc(t('tools.legend_flow')) + '</span>' +
       '<span><i style="background:' + muted + '"></i>' + esc(t('h_mon.sat_curve_title')) + '</span>' +
       '<span><i style="background:#00bffe"></i>' + esc(t('tools.legend_mod')) + '</span><span><i style="background:#ff7b00"></i>' + esc(t('tools.legend_flame')) + '</span>' +
-      '<span><i style="background:' + ok + '"></i>' + esc(t('tools.legend_room')) + '</span><span><i style="background:' + cold + '"></i>' + esc(t('tools.legend_outside')) + '</span>' +
+      '<span><i style="background:' + ok + '"></i>' + esc(t('tools.legend_room_sat')) + '</span><span><i style="background:' + cold + '"></i>' + esc(t('tools.legend_outside')) + '</span>' +
       '<span><i style="background:' + muted + '"></i>' + esc(t('tools.legend_pid')) + '</span>';
   }
 

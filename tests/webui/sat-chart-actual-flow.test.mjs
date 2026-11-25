@@ -58,7 +58,7 @@ test('the chart plots actual flow next to the setpoint and labels the heating cu
   const h = els.satHistChart.innerHTML;
   const titles = [...h.matchAll(/class="axis-txt gtitle"[^>]*>([^<]*)</g)].map((m) => m[1]);
   assert.deepEqual(titles, [
-    'tools.legend_room · tools.legend_outside',
+    'tools.legend_room_sat · tools.legend_outside',   // TASK-3035: the SAT chart says Room (SAT)
     'tools.legend_setpoint · tools.legend_flow · h_mon.sat_curve_title',
     'tools.legend_mod', 'tools.legend_flame', 'tools.legend_pid',
   ]);

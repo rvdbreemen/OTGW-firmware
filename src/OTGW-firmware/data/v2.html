@@ -238,6 +238,7 @@
         <text class="label-big" x="36" y="13" id="aRoom">—</text>
         <text class="label-sub" x="100" y="13" id="aRoomSet"></text>
         <text class="label-tag" x="36" y="28" id="aRoomTag" data-i18n="h_home.svg_room">ROOM</text>
+        <text class="label-sub" x="0" y="46" id="aRoomSub"></text>
       </g>
 
       <!-- emitter label (TASK-1392: neutral, the emitters may be radiators or floor heating); TASK-1893: centred under the
@@ -269,6 +270,7 @@
         <line class="hero-tick" id="bTick" x1="0" y1="0" x2="0" y2="0"/>
         <text class="hero-big" x="120" y="128" id="bRoom">—</text>
         <text class="hero-sub" x="120" y="152" id="bSet">target —</text>
+        <text class="label-sub" x="120" y="172" id="bRoomSub" text-anchor="middle"></text>
       </svg>
       <div>
         <button class="stepbtn" id="bDown" aria-label="Lower target" data-i18n-aria-label="h_home.target_down">−</button>
@@ -609,6 +611,7 @@
       <span class="tchip on" id="chipMarks" title="Show where the live connection dropped (red) and came back (green)" data-i18n-title="h_mon.graph_marks_title" data-i18n="h_mon.graph_marks">Disconnects</span>
     </div>
     <div class="graphcard">
+      <div class="g-sat-note" id="gSatNote" hidden></div>
       <div class="legend" id="gLegend"></div>
       <div class="legend" id="gMarkLegend" aria-live="off"></div>
       <!-- TASK-1821: five stacked panels on one time axis, as the 1.x OTGraph. The panel bands are GPANEL in v2.js. -->

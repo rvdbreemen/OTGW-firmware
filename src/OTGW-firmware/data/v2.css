@@ -213,6 +213,8 @@ html[data-theme="dark"]{--accent:var(--brand-cyan);--nav:#383838;--tile-off:#545
   .soft-txt{fill:var(--muted);font-size:14px;text-anchor:middle;font-weight:700}
   .label-big{fill:var(--gauge-text);font-size:20px;font-weight:700}
   .label-sub{fill:var(--muted);font-size:11px}
+  .g-sat-note{font-size:12px;color:var(--muted);margin:0 0 6px}
+  .g-sat-note[hidden]{display:none}
   .label-tag{fill:var(--muted);font-size:9.5px;letter-spacing:.12em;font-weight:700}
   .rad-bar{stroke:var(--border);stroke-width:1.5;transition:fill .8s}
   .rad-mani{fill:var(--gauge-track);stroke:var(--border)}
