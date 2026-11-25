@@ -11764,6 +11764,69 @@
         "supersedes": [],
         "superseded_by": null
       }
+    },
+    {
+      "id": "ADR-297",
+      "title": "SAT's underheat exit counts only once the flame has burned 180 s; the at-max exit keeps only the 60 s start gate (amends ADR-236)",
+      "path": "ADR-297-sat-s-underheat-exit-counts-only-once-the-flame-has-burned-180-s-the-at-max-exit-keeps-only-the-60-s-start-gate-amends-adr-236.md",
+      "format": "canonical",
+      "status": "Proposed",
+      "date": "2026-11-25",
+      "decision_summary": "This ADR amends ADR-236 in three points.",
+      "topics": [
+        "control-mode",
+        "pwm",
+        "sat"
+      ],
+      "aliases": [
+        "amends ADR-236",
+        "entry 456 flame gate",
+        "TASK-3008",
+        "underheat flame gate"
+      ],
+      "components": [
+        "SAT underheat exit flame gate"
+      ],
+      "symbols": [
+        "SAT_UNDERHEAT_FLAME_MIN_MS",
+        "satCycleCheckPwmExits",
+        "satCycleGetFlameOnStartMs"
+      ],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [
+          "Clear the underheat hold on every tick where the flame is off, or has burned less than 180 s since its current flame-on edge.",
+          "Take the flame-on time from the edge of the flame burning now (the cycle tracker's flame-on time), so a flame-off resets the gate.",
+          "Keep the at-max exit, the saturation exit and the end-of-cycle verdict gated by the ADR-252 start gate only.",
+          "Keep the heating-demand condition of ADR-236 in the underheat count."
+        ],
+        "must_not": [
+          "Apply the 180 s flame gate to the at-max exit (entry 463).",
+          "Count the 180 s flame gate from the start of the PWM ON phase or from the heating start instead of the flame-on edge."
+        ],
+        "exceptions": [
+          "None."
+        ],
+        "verification": [
+          "Host test tests/testsatovershootsustain.py (TASK-3008), compiling the real satCycleCheckPwmExits():",
+          "a flow 3.0 C under the request from the moment of ignition gives no exit before about 360 s, and an exit at the first tick at least 180 s after the flame has burned 180 s;",
+          "a flame-off inside the first 180 s resets the gate;",
+          "at the clamped maximum the at-max exit fires after the 60 s start gate, before the flame gate would allow the underheat exit (entry 463);",
+          "the cases fail on the code before TASK-3008.",
+          "Bench: a cold start shows the underheat exit no earlier than about 6 min after ignition."
+        ]
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
     }
   ],
   "relationships": [
@@ -19480,6 +19543,30 @@
     {
       "source": "ADR-296",
       "target": "ADR-292",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-297",
+      "target": "ADR-236",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-297",
+      "target": "ADR-252",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-297",
+      "target": "ADR-292",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-297",
+      "target": "ADR-296",
       "type": "related",
       "resolved": true
     }
