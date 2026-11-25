@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-25T05:13:00Z'
-updated_date: '2026-11-25T05:17:00Z'
+updated_date: '2026-11-25T15:16:00Z'
 labels:
   - tooling
 milestone: 2.0.0
@@ -45,4 +45,6 @@ HOW IT WOULD RUN. One script, dry run by default, that prints old to new and tou
 OPTIONS. A (recommended): renumber as above + guard test. Cost: one-off direct edit of 35 task files, an exception to the CLI-only rule. B: leave the files, commit the mapping and a guard test with an allow-list of the 29 IDs; cost: 29 IDs stay unusable through the CLI (the archived open ones cannot be closed), but no file edit. C: only delete the test-task and add the guard. Main risk of A: a mistake in the id/dependency rewrite; mitigated by the dry run, the single revert-able commit and the CLI check at the end. Not verified: a real run (the script does not exist yet; this task is the proposal).
 
 MAPPING (old id, folder, status, title, proposal): see docs/process/task-id-renumbering-2026-11.md after the run; the draft table is in C:\Users\rvdbr\Claude\otgw-docs-prep\dupids-mapping-table.md (59 rows: 29 renumber, 29 keep, 1 delete). Scripts: dupids_scan.py, dupids_refs.py, build_proposal.py in the same folder.
+
+Renumber applied (Robert B, DM 1575165989010804807; subtasks and pre-commit check also approved interactively 2026-11-25): archive file of each pair got a new id TASK-3059..TASK-3087 in order of the old id (list in OTGW-field-data/_comms/dup_id_dryrun.txt, sha256 beside it); the file in backlog/tasks keeps the old id; 6 archive subtasks (15.x, 22.x) follow their archive parent (TASK-3073.x, TASK-3080.x) incl. parent_task_id; task-19 test-task deleted. One-off exception to never editing backlog files directly: id line, file name, parent_task_id of the 6, one note line, the delete; nothing else. Verified: scan shows 0 duplicate groups, backlog task view works for all 29 old ids and the new ones, no ambiguous, evaluate --quick 0 failed.
 <!-- SECTION:NOTES:END -->
