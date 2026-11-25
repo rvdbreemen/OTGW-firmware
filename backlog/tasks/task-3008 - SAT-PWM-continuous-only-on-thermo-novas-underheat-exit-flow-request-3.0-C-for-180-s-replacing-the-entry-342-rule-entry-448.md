@@ -3,11 +3,11 @@ id: TASK-3008
 title: >-
   SAT: PWM -> continuous only on thermo-nova's underheat exit (flow <= request -
   3.0 C for 180 s), replacing the entry-342 rule (entry 448)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-21T14:29:00Z'
-updated_date: '2026-11-25T17:08:00Z'
+updated_date: '2026-11-25T17:11:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -64,10 +64,12 @@ Cold-setpoint gate (ADR-199, upstream in SATcontrol.ino, unchanged): evidence te
 Bench .63 25 Nov 2026 (otgw-bench-tester), beta.432+43ac963 (SAT logic as R 428), evidence OTGW-field-data/bench-63/2026-11-25_flip-test/ (RESULTS_E6_E7.md, key_lines.txt, 10 s CSV, SHA256SUMS): A2 = sustained underheat line 17:00:53.236, exactly 180.0 s after the request step (request 61.0, gap 26 K, flame burning 14 min, pwm_off 367 s > 0 before the step); negative control 24 kW gap 1.0-2.65 K: no underheat, saturation 17:09:53.257 (300 s). Covered by AC4: the bench part only; evaluate --quick, build and the indigo-analysis push gate are not covered by this bench note.
 
 ADR-297 bench line met as the property no underheat exit before ~6 min: cold start A1 (key_lines.txt, 17:21:53-17:26:53) ends through saturation at ~300 s (entry 492), no underheat line, no switch in the first 60 s; established-flame hold 180 s by A2 (17:00:53.236).
+
+2026-11-25 otgw-dev closeout: AC4 ticked by the bench-tester (7bb27a7da) with the flip-test evidence.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
 
 <!-- SECTION:FINAL_SUMMARY:BEGIN -->
-DRAFT 2026-11-25 (bench item open, task NOT Done). Change (entries 448, 456, 463, ADR-236 and ADR-297): PWM -> continuous underheat exit = flow <= request - 3.0 C for 180 s, counted only once the flame has burned 180 s (SAT_UNDERHEAT_FLAME_MIN_MS, a flame-off resets it); heating demand is guaranteed upstream (the exits are only checked when pidOutput > cold threshold); the at-max exit keeps only the 60 s start gate. Note: the AC1 text still says no flame condition as thermo-nova; entry 456 added the flame gate and ADR-297 records it. Evidence: host tests red on origin/dev (overshoot_sustain 18, pwm_override 4, lowload_contract 43 failures) and green on the fix; on the integrated branch overshoot_sustain 93 tests OK including the new AtMaxExitKeepsOnlyTheStartGate (structural, killed by a mutant that drops the at-max start gate), pwm_anchors, hp_pwm, pwm_first_start, lowload_contract OK; loop_integration scenario s2 moved to start at 540 s because the 60 s rule no longer flips that run at 150 s. AC3 replay proof from the earlier lane (indigo_light 21 Nov night, marceld91d). evaluate --quick 89/0/0 and build OK (R = 4f303da8c). Bench so far (otgw-bench-tester on 8401c72, OTGW-field-data/bench-63/2026-11-25_8401c72-448exit): NEGATIVE half evidenced (no exit within 180 s of flame at a 10.8 C flow gap; the flame ended after 213 s without a switch), the at-max exit fired as designed; the POSITIVE exit (>= 180 s flame AND gap >= 3 C for 180 s) is NOT evidenced on the bench (the sim flame ended first). That part rests on host tests and a real-boiler field check: AC4 stays OPEN, do not tick. Takeover with the flame already burning: the gate counts from the first pass of SAT (residual edge case in the notes).
+TASK-3008 done: PWM leaves for continuous on the underheat exit only when flow <= request - 3.0 C for 180 s after 180 s of flame (entries 448, 456, 463; integrated as 529192f82, in v2.0.0-beta.428). AC1-AC3 as ticked earlier: host tests red on the old code and green on the fix (60 s case no exit, 180 s exits, 170 s not, request - 2.9 not), replay with the real code on indigo_light and marceld91d with 0 spurious exits. AC4: evaluate --quick 88 passed 0 failed (34cce5132), esp32-combo build OK, bench-tester flip test 25 Nov on .63 (2.0.0-beta.432, RESULTS_E6_E7.md): A2 mid-burn request step 17.45 -> 19.0 C: SAT: sustained underheat (flow 34.3 <= request 61.0 - 3.0 for 180 s) at 17:00:53.236, 180.0 s after the step, request - flow 26.3 to 26.4 K the whole time; negative control (capacity 24) no underheat line, saturation at 300.0 s; A1 cold start: no switch in the first 60 s (start gate), no underheat line, saturation exit 300.0 s after the first ON tick (entry 492, TASK-3053). The indigo beta.410 24 h analysis (BlueFlame, 25 Nov, entry 445 condition) is in TASK-3053. NOT verified: boiler was the SAT simulator, not a real boiler; a real-boiler check is pending (indigo field run); on a cold start the saturation exit (300 s) ends PWM before this exit, by design.
 <!-- SECTION:FINAL_SUMMARY:END -->
