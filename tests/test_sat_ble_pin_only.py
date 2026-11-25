@@ -326,7 +326,7 @@ class Source(unittest.TestCase):
     def test_notice_reaches_rest_and_log(self):
         ble = read(BLE_INO)
         self.assertIn('je.field(F("ble_pin_notice"),', ble)
-        self.assertIn("SAT uses BLE sensor %s: confirm or change it on the SAT page", ble)
+        self.assertIn("SAT uses BLE sensor %.17s: confirm or change it on the SAT page", ble)
 
     def test_every_room_temp_return_records_its_source(self):
         sat = read(SAT_INO)

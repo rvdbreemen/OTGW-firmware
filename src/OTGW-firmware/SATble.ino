@@ -848,7 +848,7 @@ void satBLEUpdateState()
   static bool s_pinNoticeLogged = false;
   if (settings.sat.bBlePinNotice && havePin && !s_pinNoticeLogged) {
     s_pinNoticeLogged = true;
-    satNarratef_P(PSTR("SAT uses BLE sensor %s: confirm or change it on the SAT page"), settings.sat.sBleMAC);
+    satNarratef_P(PSTR("SAT uses BLE sensor %.17s: confirm or change it on the SAT page"), settings.sat.sBleMAC);   // TASK-3056: sBleMAC is char[18], at most 17 characters
   }
 
   if (chosen < 0) {
