@@ -260,7 +260,7 @@ await openSat('simple');
 const h = await evalJs(`(function(){
   var card = document.getElementById('satHistChart'); card = card && card.closest('.card');
   var lg = document.getElementById('satHistLegend');
-  return { title: card ? card.querySelector('h4').textContent : '', legend: lg ? lg.textContent : '',
+  return { title: card ? card.querySelector('h3').textContent : '', legend: lg ? lg.textContent : '',
            link: !!document.getElementById('satHistMonitorLink') };
 })()`);
 check(/^SAT control loop/.test(h.title), `SAT chart is titled 'SAT control loop' (got "${h.title}")`);

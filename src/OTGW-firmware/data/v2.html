@@ -392,7 +392,7 @@
           <div class="sat-hint" data-i18n="h_mon.sat_presets_hint">Pick a preset or set the temperature — SAT works out the boiler.</div>
         </div>
       </div>
-      <div class="card"><h4><span data-i18n="h_mon.sat_loop_title">SAT control loop</span> <span class="sub" id="satLoopState" data-i18n-skip>live</span></h4>
+      <div class="card"><h3><span data-i18n="h_mon.sat_loop_title">SAT control loop</span> <span class="sub" id="satLoopState" data-i18n-skip>live</span></h3>
         <div class="sat-hist-wrap"><svg viewBox="0 0 780 320" id="satHistChart" style="width:100%;height:auto;display:block"></svg><!-- TASK-1841: drawPanelChart -->
           <div class="sat-chart-empty" id="satHistEmpty" hidden></div></div>
         <div class="legend" id="satHistLegend"></div>
@@ -424,7 +424,7 @@
     <!-- L2 Control: burner cycle mode, live tiles, heating curve, control status, weather -->
     <div class="sat-l2">
       <div class="sat-row2 sat-row-1up">
-        <div class="card sat-mini"><h4><span data-i18n="h_mon.sat_cycle_title">Burner cycle mode</span><span class="sat-card-state"></span></h4><div class="sat-status-big" id="satCycleMode">—</div><div class="sub" id="satCycleSub">—</div></div>
+        <div class="card sat-mini"><h3><span data-i18n="h_mon.sat_cycle_title">Burner cycle mode</span><span class="sat-card-state"></span></h3><div class="sat-status-big" id="satCycleMode">—</div><div class="sub" id="satCycleSub">—</div></div>
       </div>
       <div class="sat-tiles4">
         <div class="sat-tile"><div class="l" data-i18n="h_mon.sat_tile_outside">Outside</div><div class="v" id="satOut">—</div><div class="sub" id="satOutAge" hidden></div></div>
@@ -432,7 +432,7 @@
         <div class="sat-tile"><div class="l" data-i18n="h_mon.sat_tile_room">Room</div><div class="v"><span id="satRoom">—</span><span class="sat-trend" id="satRoomTrend"></span></div><div class="sub" id="satRoomAge" hidden></div><div class="sub" id="satRoomSrc" hidden></div></div>
         <div class="sat-tile is-target"><div class="l" data-i18n="h_mon.sat_tile_target">Target</div><div class="v" id="satTargetT">—</div></div>
       </div>
-      <div class="card sat-curve-hero"><h4><span data-i18n="h_mon.sat_curve_title">Heating curve</span> <span class="sub" id="satCurveLbl"></span></h4>
+      <div class="card sat-curve-hero"><h3><span data-i18n="h_mon.sat_curve_title">Heating curve</span> <span class="sub" id="satCurveLbl"></span></h3>
         <div class="curve-wrap">
           <svg viewBox="0 0 600 300" id="satCurveBig"></svg>
           <div class="sat-curve-empty" id="satCurveEmpty" hidden></div>
@@ -446,40 +446,40 @@
         </div>
       </div>
       <div class="sat-row2 sat-row-2up">
-        <div class="card"><h4><span data-i18n="h_mon.sat_ctrl_status">Control status</span><span class="sat-card-state"></span></h4><div class="kv" id="satControlStatus"></div></div>
-        <div class="card"><h4><span data-i18n="h_mon.sat_weather">Weather</span> <span class="sub">Open-Meteo</span></h4><div class="kv" id="satWeatherKv"></div>
+        <div class="card"><h3><span data-i18n="h_mon.sat_ctrl_status">Control status</span><span class="sat-card-state"></span></h3><div class="kv" id="satControlStatus"></div></div>
+        <div class="card"><h3><span data-i18n="h_mon.sat_weather">Weather</span> <span class="sub">Open-Meteo</span></h3><div class="kv" id="satWeatherKv"></div>
           <button class="tbtn" id="satDetectLoc" style="margin-top:8px" data-i18n="h_mon.sat_detect_loc">Detect location</button>
           <span class="sub" id="satCoords" style="margin-left:8px"></span>
           <div class="sub" id="satLocHint" style="margin-top:8px" hidden></div></div>
       </div>
       <!-- TASK-1211: the SAT settings a user chooses (system, presets, indoor source, areas, weather, hot water, season) -->
-      <h4 class="sat-set-head" data-i18n="h_mon.sat_settings_head">SAT settings</h4>
+      <h3 class="sat-set-head" data-i18n="h_mon.sat_settings_head">SAT settings</h3>
       <div class="set-cards" id="satSetL2"></div>
     </div>
 
     <!-- L3 Technical — health, PID, PWM/cycle, smart features, external sensors, simulation, raw JSON -->
     <div class="sat-l3">
-      <div class="card"><h4 data-i18n="h_mon.sat_health">Health</h4><div class="health-strip" id="satHealth"></div></div>
+      <div class="card"><h3 data-i18n="h_mon.sat_health">Health</h3><div class="health-strip" id="satHealth"></div></div>
       <div class="sat-row2 sat-row-2up">
-        <div class="card"><h4><span data-i18n="h_mon.sat_pid">PID controller</span><span class="sat-card-state"></span></h4><div class="kv" id="satPidKv"></div></div>
-        <div class="card"><h4><span data-i18n="h_mon.sat_pwm">PWM &amp; cycle tracking</span><span class="sat-card-state"></span></h4><div class="kv" id="satPwmKv"></div></div>
+        <div class="card"><h3><span data-i18n="h_mon.sat_pid">PID controller</span><span class="sat-card-state"></span></h3><div class="kv" id="satPidKv"></div></div>
+        <div class="card"><h3><span data-i18n="h_mon.sat_pwm">PWM &amp; cycle tracking</span><span class="sat-card-state"></span></h3><div class="kv" id="satPwmKv"></div></div>
       </div>
-      <div class="card"><h4><span data-i18n="h_mon.sat_cycles24">Burner cycles</span> <span class="sub" data-i18n="h_mon.sat_cycles24_sub">last 24 h</span></h4><div class="kv" id="satCycles24Kv"></div></div>
+      <div class="card"><h3><span data-i18n="h_mon.sat_cycles24">Burner cycles</span> <span class="sub" data-i18n="h_mon.sat_cycles24_sub">last 24 h</span></h3><div class="kv" id="satCycles24Kv"></div></div>
       <!-- TASK-1880 (U10): per PWM ON phase, what SAT asked and what the boiler did -->
-      <div class="card"><h4 data-i18n="h_mon.sat_pwm_phases">PWM ON phases: asked vs done</h4><div class="kv" id="satPwmPhaseKv"></div><div id="satPwmPhaseList"></div></div>
+      <div class="card"><h3 data-i18n="h_mon.sat_pwm_phases">PWM ON phases: asked vs done</h3><div class="kv" id="satPwmPhaseKv"></div><div id="satPwmPhaseList"></div></div>
       <div class="sat-row2 sat-row-2up">
-        <div class="card"><h4 data-i18n="h_mon.sat_smart">Smart features</h4><div class="kv" id="satSmartKv"></div></div>
-        <div class="card"><h4 data-i18n="h_mon.sat_ext">External sensors</h4><div class="kv" id="satExtKv"></div></div>
+        <div class="card"><h3 data-i18n="h_mon.sat_smart">Smart features</h3><div class="kv" id="satSmartKv"></div></div>
+        <div class="card"><h3 data-i18n="h_mon.sat_ext">External sensors</h3><div class="kv" id="satExtKv"></div></div>
       </div>
       <div class="sat-row2 sat-row-2up">
-        <div class="card"><h4 data-i18n="h_mon.sat_sim">Simulation &amp; diagnostics</h4><div class="kv" id="satSimKv"></div>
+        <div class="card"><h3 data-i18n="h_mon.sat_sim">Simulation &amp; diagnostics</h3><div class="kv" id="satSimKv"></div>
           <label class="sat-switch" style="margin-top:10px"><span data-i18n="h_mon.sat_bench_sim">Bench simulation</span><input type="checkbox" class="sw" id="satSim"></label>
           <div class="sub" id="satSimHint" style="margin-top:6px"></div></div>
-        <div class="card"><h4><button class="raw-toggle" id="satRawToggle" aria-expanded="false">▸ <span data-i18n="tools.sat_raw_data">Raw data (JSON)</span></button></h4>
+        <div class="card"><h3><button class="raw-toggle" id="satRawToggle" aria-expanded="false">▸ <span data-i18n="tools.sat_raw_data">Raw data (JSON)</span></button></h3>
           <pre class="raw-json" id="satRawJson" style="display:none"></pre></div>
       </div>
       <!-- TASK-1211: the SAT tuning settings (curve, PID/PWM, offsets, boiler, thermal, sensors, PV boost) -->
-      <h4 class="sat-set-head" data-i18n="h_mon.sat_tuning_head">SAT tuning</h4>
+      <h3 class="sat-set-head" data-i18n="h_mon.sat_tuning_head">SAT tuning</h3>
       <div class="set-cards" id="satSetL3"></div>
     </div>
     <div class="savebar" id="satSaveBar">
@@ -793,13 +793,13 @@
        assistants naming the products the git history shows; public names only; a short list here and the full list in
        CONTRIBUTORS.md. Upstream names from TASK-2947 (code headers, library.properties, README credits). -->
   <div class="adv-card" id="setAbout" style="margin-top:14px">
-    <h4 data-i18n="h_set.about_makers">Makers</h4>
+    <h3 data-i18n="h_set.about_makers">Makers</h3>
     <div class="srow"><span class="slbl"><b data-i18n-skip>Robert van den Breemen</b><span class="shint" data-i18n="h_set.about_maker_role">Author and maintainer of this independent open-source firmware.</span></span></div>
     <div class="srow"><span class="slbl"><span class="shint" data-i18n="h_set.about_ai_role">Built with help from AI coding assistants (GitHub Copilot, Claude Code, OpenAI Codex) under Robert's direction and review.</span></span></div>
     <div class="srow"><span class="slbl"><span class="shint" data-i18n-skip>© 2021-2026 Robert van den Breemen · GPL-3.0</span></span></div>
   </div>
   <div class="adv-card" id="setCredits">
-    <h4 data-i18n="h_set.about_credits">Credits</h4>
+    <h3 data-i18n="h_set.about_credits">Credits</h3>
     <div class="srow"><span class="slbl"><b data-i18n-skip>Schelte Bron</b><span class="shint"><span data-i18n="h_set.about_schelte">Designed the</span> <a href="https://otgw.tclcode.com/" target="_blank" rel="noopener" data-i18n-skip>OpenTherm Gateway</a> <span data-i18n="h_set.about_schelte2">and its PIC firmware.</span></span></span></div>
     <div class="srow"><span class="slbl"><b data-i18n-skip>George Ntellas (Sergeant D)</b><span class="shint" data-i18n="h_set.about_george">Designed the SAT algorithm.</span></span></div>
     <div class="srow"><span class="slbl"><b data-i18n-skip>Alex (Alexwijn)</b><span class="shint"><span data-i18n="h_set.about_alex">Developed the original</span> <a href="https://github.com/Alexwijn/SAT" target="_blank" rel="noopener" data-i18n="h_set.about_alex_link">SAT component for Home Assistant</a><span data-i18n="h_set.about_alex2">, which the SAT controller in 2.0 is ported from.</span></span></span></div>
@@ -814,7 +814,7 @@
        left out, aliases merged). Discord: messages in the OTGW server since 2021 (bots and deleted accounts left out).
        Short list from CONTRIBUTORS.md (counted 2026-11-20, public names only, one entry per person); the full list is CONTRIBUTORS.md, refreshed at every stable release. -->
   <div class="adv-card" id="setContrib">
-    <h4 data-i18n="h_set.contrib_title">Community</h4>
+    <h3 data-i18n="h_set.contrib_title">Community</h3>
     <div class="srow"><span class="slbl"><span class="shint" data-i18n="h_set.contrib_sub">Thank you to everyone who built, tested and supported this firmware over the years. Most contributions first.</span></span></div>
     <div class="srow"><span class="slbl"><b data-i18n="h_set.contrib_code">Code on GitHub</b><span style="display:block;font-weight:400" data-i18n-skip>DaveDavenport, rlagerweij, DutchessNicole, GeorgeZ83, Roos-AID (RobR), Crash-Evans, STemplar, sjorsjuhmaniac, andrebrait, brhahlen, Martinvdm, hgokduman, justink0k, mcc05, pixelspark, proditaki, tjfsteele</span></span></div>
     <div class="srow"><span class="slbl"><b data-i18n="h_set.contrib_community">Discord</b><span style="display:block;font-weight:400" data-i18n-skip>Qball, Richard_HA, fuzzyduck, Bas, TechJunky, Daballiemo, Dayton, kapryk85, (DSRT) John H., pzzy8127, gruijter, WitteTonnie, NLJ, DeKemp, Tomas Salfischberger, marcelveldt, beEnry, Indigolight, Deebugzz, Pim_85</span></span></div>
@@ -856,7 +856,7 @@
         <div class="lbl" id="picProgTxt" data-i18n="h_set.pic_ready">Ready to flash</div>
       </div>
       <div class="adv-card" style="margin-top:14px">
-        <h4><span data-i18n="h_set.gw_title">Gateway settings</span> <span style="font-weight:400;color:var(--muted);font-size:.8rem" data-i18n="h_set.gw_sub">· cached PR= values</span></h4>
+        <h3><span data-i18n="h_set.gw_title">Gateway settings</span> <span style="font-weight:400;color:var(--muted);font-size:.8rem" data-i18n="h_set.gw_sub">· cached PR= values</span></h3>
         <div class="prtable" id="picPrTable"></div>
       </div>
     </div>
@@ -868,7 +868,7 @@
     <pre id="dbgCrash" class="console" style="display:none;max-height:320px;white-space:pre-wrap">—</pre>
     <!-- Diagnostic recording (TASK-1700, ADR-213): local only, off by default -->
     <div class="adv-card" id="diagRec" style="margin:12px 0">
-      <h4><span data-i18n="h_set.rec_title">Diagnostic recording</span> <span style="font-weight:400;color:var(--muted);font-size:.8rem" data-i18n="h_set.rec_sub">· stays on this gateway until you download it</span></h4>
+      <h3><span data-i18n="h_set.rec_title">Diagnostic recording</span> <span style="font-weight:400;color:var(--muted);font-size:.8rem" data-i18n="h_set.rec_sub">· stays on this gateway until you download it</span></h3>
       <div id="diagRecStatus" role="status" aria-live="polite" style="font-size:.85rem" data-i18n="h_set.loading">Loading…</div>
       <div class="fs-btnrow" style="margin-top:10px">
         <button type="button" class="fs-btn primary" id="diagRecStart" data-i18n="h_set.rec_start">Start</button>
@@ -906,7 +906,7 @@
   <!-- ---- System (relocated Tools + new device status + actions, TASK-968/982) ---- -->
   <div id="adv-system" class="mpanel">
     <div class="adv-card" style="margin-bottom:14px">
-      <h4 data-i18n="h_set.dev_status">Device status</h4>
+      <h3 data-i18n="h_set.dev_status">Device status</h3>
       <div class="fs-btnrow" style="gap:8px">
         <span class="fw-badge fw-conn" id="sysConn" title="Live WebSocket link to the gateway" data-i18n-title="h_set.conn_title">● …</span>
         <span class="fw-badge fw-mode" id="sysMode" title="Current OpenTherm rewrite mode" data-i18n-title="h_set.mode_title">⇄ …</span>
@@ -915,7 +915,7 @@
       <p style="font-size:.75rem;color:var(--muted);margin:10px 2px 0" data-i18n="h_set.dev_note">Live gateway link, current OT-rewrite mode, and simulation state.</p>
     </div>
     <div class="fs-actions" style="border-top:0;padding-top:0">
-      <h4><span data-i18n="h_set.sys_actions">System Actions</span> <span style="font-weight:400;color:var(--muted);font-size:.8rem" data-i18n="h_set.sys_actions_sub">· device-wide</span></h4>
+      <h3><span data-i18n="h_set.sys_actions">System Actions</span> <span style="font-weight:400;color:var(--muted);font-size:.8rem" data-i18n="h_set.sys_actions_sub">· device-wide</span></h3>
       <div class="fs-btnrow">
         <button class="fs-btn primary" data-act="update" data-i18n="h_set.act_update">Update Firmware</button>
         <button class="fs-btn" data-act="reboot" data-i18n="h_set.act_reboot">ReBoot</button>
@@ -936,7 +936,7 @@
 <div id="page-diagnose" class="page">
   <h2 class="sr-only" data-i18n="h_home.nav_diagnose">Diagnose</h2>
   <div class="card">
-    <h4><span data-i18n="h_set.diag_title">PIC diagnose</span> <span class="sub" data-i18n="h_set.diag_sub">interactive test menu on the PIC serial line</span></h4>
+    <h3><span data-i18n="h_set.diag_title">PIC diagnose</span> <span class="sub" data-i18n="h_set.diag_sub">interactive test menu on the PIC serial line</span></h3>
 
     <div id="diagBanner" class="pic-banner warn" style="display:none"></div>
 

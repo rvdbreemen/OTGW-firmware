@@ -102,7 +102,7 @@ html[data-theme="dark"]{--accent:var(--brand-cyan);--nav:#383838;--tile-off:#545
   html[data-theme="dark"] .headerrow .hdr-id{background:rgba(255,255,255,.09)}
   .hdr-sim{font-size:.66rem;font-weight:700;border-radius:20px;padding:4px 10px;white-space:nowrap;
     line-height:1;display:inline-flex;align-items:center;letter-spacing:.03em;
-    background:color-mix(in srgb,var(--zone-warn) 82%,#000);color:#fff}
+    background:color-mix(in srgb,var(--zone-warn) 60%,#000);color:#fff}   /* TASK-2997: white on it >= 4.5:1 */
   .hdr-sim.hidden{display:none}
   .fs-banner{margin:6px 12px;padding:8px 12px;border-radius:10px;font-size:.8rem;border:1px solid var(--zone-warn);
     background:color-mix(in srgb,var(--zone-warn) 16%,var(--panel));color:var(--text)}
@@ -285,7 +285,7 @@ html[data-theme="dark"]{--accent:var(--brand-cyan);--nav:#383838;--tile-off:#545
   .mc{background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-2xl);padding:14px;color:var(--text)}
   .mc h2{font-family:var(--font-mono);font-size:.95rem;margin:2px 4px 12px;color:var(--muted);
     letter-spacing:.08em}
-  .mc h2 b{color:var(--zone-ok)}
+  .mc h2 b{color:var(--status-ok-text)}
   .stripcard{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius-2xl);padding:8px}
   .stripcard svg{width:100%;height:auto;display:block}
   .axis-txt{fill:var(--muted);font-size:10px;font-family:var(--font-mono)}
@@ -363,7 +363,7 @@ html[data-theme="dark"]{--accent:var(--brand-cyan);--nav:#383838;--tile-off:#545
   .cmdbar{display:flex;align-items:center;gap:8px;margin-bottom:8px;background:#0a0e14;border:1px solid var(--border);border-radius:10px;padding:6px 8px 6px 12px}
   .cmdbar-prompt{font-family:var(--font-mono);font-size:.8rem;color:#79f2c0;font-weight:700;flex:0 0 auto}
   .cmdbar-in{flex:1;min-width:0;background:none;border:0;outline:none;color:#e8e8ea;font-family:var(--font-mono);font-size:.8rem;padding:6px 2px}
-  .cmdbar-in::placeholder{color:#566069}
+  .cmdbar-in::placeholder{color:#8b98a5}   /* TASK-2997: on #0a0e14 >= 4.5:1 */
   .cmdbar-send{flex:0 0 auto;border:0;background:var(--accent);color:var(--on-accent);border-radius:8px;padding:8px 16px;font-size:.8rem;font-weight:700;cursor:pointer;font-family:var(--font-sans);min-height:36px}
   .cmdbar-send:hover{filter:brightness(1.08)}
   .statfoot{display:flex;gap:16px;font-size:.76rem;color:var(--muted);padding:8px 4px 0;flex-wrap:wrap}
@@ -446,6 +446,7 @@ html[data-theme="dark"]{--accent:var(--brand-cyan);--nav:#383838;--tile-off:#545
     cursor:pointer;font-size:.86rem;color:var(--text);
     width:100%;background:none;border:0;margin:0;font-family:inherit;line-height:inherit;text-align:left}   /* TASK-2958: <button> since T5 2.1 */
   .rail-item:hover{background:var(--panel-2)}
+  .rail-item:focus-visible{outline-offset:-2px}   /* TASK-2997: inside the item, so the ring never overlaps a neighbour's active tint (as .seg) */
   .rail-item.active{background:color-mix(in srgb,var(--accent) 14%,transparent);
     color:var(--accent);font-weight:700}
   .rail-item .ri-ic{flex:0 0 auto}
@@ -542,7 +543,7 @@ html[data-theme="dark"]{--accent:var(--brand-cyan);--nav:#383838;--tile-off:#545
     padding:10px 22px;font-weight:700;cursor:pointer;min-height:44px}
   .savebar .discard{background:none;border:1px solid var(--border);color:var(--muted);
     border-radius:10px;padding:10px 16px;cursor:pointer;min-height:44px}
-  .toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:var(--zone-ok);
+  .toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:var(--status-ok-dark);
     color:#fff;font-weight:700;border-radius:12px;padding:11px 22px;opacity:0;transition:opacity .3s;
     pointer-events:none;z-index:9}
   .toast.show{opacity:1}
@@ -609,7 +610,7 @@ html[data-theme="dark"]{--accent:var(--brand-cyan);--nav:#383838;--tile-off:#545
     border:1px solid var(--zone-warn);border-radius:12px;box-shadow:0 10px 28px rgba(0,0,0,.22);
     padding:13px 15px;z-index:40;display:none}
   .ovr-panel.show{display:block}
-  .ovr-panel h4{margin:0 0 4px;font-size:.86rem;display:flex;align-items:center;gap:7px}
+  .ovr-panel h3{margin:0 0 4px;font-size:.86rem;display:flex;align-items:center;gap:7px}
   .ovr-panel .sub{font-size:.72rem;color:var(--muted);margin:0 0 8px}
   .ovr-item{font-size:.82rem;padding:8px 0;border-top:1px solid var(--border)}
   .ovr-item:first-of-type{border-top:0}
@@ -644,7 +645,7 @@ html[data-theme="dark"]{--accent:var(--brand-cyan);--nav:#383838;--tile-off:#545
   .cn-modechip{font-size:11px;font-weight:700;font-family:var(--font-sans);text-anchor:middle}
 
   .conngroup{margin-bottom:16px}
-  .conngroup h4{margin:0 0 8px 2px;font-size:.78rem;color:var(--muted);text-transform:uppercase;
+  .conngroup h3{margin:0 0 8px 2px;font-size:.78rem;color:var(--muted);text-transform:uppercase;
     letter-spacing:.05em;font-weight:700}
   .connrow{display:flex;align-items:flex-start;gap:12px;background:var(--panel);border:1px solid var(--border);
     border-left:4px solid var(--s);border-radius:12px;box-shadow:var(--shadow);padding:11px 14px;margin-bottom:8px}
@@ -672,16 +673,16 @@ html[data-theme="dark"]{--accent:var(--brand-cyan);--nav:#383838;--tile-off:#545
   /* Device-status badges (System tab) — firmware-authentic pills synced from the CONN model. */
   .fw-badge{font-size:.66rem;font-weight:700;letter-spacing:.02em;border-radius:20px;
     padding:4px 10px;display:inline-flex;align-items:center;gap:5px;white-space:nowrap;line-height:1}
-  .fw-conn{background:color-mix(in srgb,var(--zone-ok) 34%,transparent);color:#fff}
-  .fw-conn.down{background:color-mix(in srgb,var(--zone-alert) 42%,transparent)}
+  .fw-conn{background:color-mix(in srgb,var(--zone-ok) 24%,var(--panel));color:var(--status-ok-text)}   /* TASK-2997: the badge sits on a light card, white on a tint read 1.8:1 */
+  .fw-conn.down{background:color-mix(in srgb,var(--zone-alert) 20%,var(--panel));color:var(--status-error-text)}
   /* Deviation from mockup: mockup fw-mode is white-on-rgba-white (built for the dark
      header). In v2 these badges sit on a light --panel card, so use a neutral, theme
      readable chip instead of the near-invisible translucent-white original. */
   .fw-mode{background:var(--panel-2);color:var(--text);border:1px solid var(--border)}
-  .fw-sim{background:color-mix(in srgb,var(--zone-warn) 82%,#000);color:#fff}
+  .fw-sim{background:color-mix(in srgb,var(--zone-warn) 60%,#000);color:#fff}
   .fw-badge.hidden{display:none}
   .adv-card{background:var(--panel);border:1px solid var(--border);border-radius:14px;box-shadow:var(--shadow);padding:16px 18px;margin:0 0 14px}
-  .adv-card h4{margin:0 0 12px;font-size:.95rem}
+  .adv-card h3{margin:0 0 12px;font-size:.95rem}
   #page-settings .adv-card a{color:var(--accent)}   /* TASK-2948: About/Credits links in the accent, not the browser default */
   .pic-head{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;
     background:var(--panel);border:1px solid var(--border);border-radius:14px;box-shadow:var(--shadow);padding:14px 16px;margin-bottom:12px}
@@ -735,7 +736,7 @@ html[data-theme="dark"]{--accent:var(--brand-cyan);--nav:#383838;--tile-off:#545
   .vlbl-edit:hover{color:var(--accent)}
   .vlbl-input{font:inherit;width:12em;max-width:100%;border:1px solid var(--accent);border-radius:6px;background:var(--panel);color:var(--text);padding:2px 6px}
   .devinfo-group{margin:0 0 14px}
-  .devinfo-group h4{margin:0 0 8px 2px;font-size:.7rem;text-transform:uppercase;letter-spacing:.08em;color:var(--accent)}
+  .devinfo-group h3{margin:0 0 8px 2px;font-size:.7rem;text-transform:uppercase;letter-spacing:.08em;color:var(--accent)}
   .devinfo-rows{background:var(--panel);border:1px solid var(--border);border-radius:12px;overflow:hidden;box-shadow:var(--shadow)}
   .devinforow{display:grid;grid-template-columns:1fr auto;gap:12px;padding:9px 14px;border-bottom:1px solid var(--border);font-size:.83rem}
   .devinforow:last-child{border-bottom:0}
@@ -743,7 +744,7 @@ html[data-theme="dark"]{--accent:var(--brand-cyan);--nav:#383838;--tile-off:#545
   .devinfocolumn1{color:var(--muted)}
   .devinfocolumn2{font-family:var(--font-mono);font-weight:700;text-align:right;color:var(--text)}
   .crashlog-ok{display:flex;align-items:center;gap:8px;background:color-mix(in srgb,var(--zone-ok) 12%,transparent);
-    border:1px solid color-mix(in srgb,var(--zone-ok) 40%,transparent);color:var(--zone-ok);
+    border:1px solid color-mix(in srgb,var(--zone-ok) 40%,transparent);color:var(--status-ok-text);
     border-radius:10px;padding:10px 14px;font-size:.84rem;font-weight:700;margin-bottom:14px}
   .fs-title{margin:0 0 10px;font-size:1.05rem}
   .fs-crumb{font-family:var(--font-mono);font-size:.82rem;font-weight:700;margin:0 0 8px;color:var(--text)}
@@ -765,7 +766,7 @@ html[data-theme="dark"]{--accent:var(--brand-cyan);--nav:#383838;--tile-off:#545
   .fs-upload legend{font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
   .fs-upload .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
   .fs-actions{border-top:2px solid var(--border);padding-top:14px}
-  .fs-actions h4{margin:0 0 10px;font-size:.95rem}
+  .fs-actions h3{margin:0 0 10px;font-size:.95rem}
   .fs-btnrow{display:flex;gap:10px;flex-wrap:wrap}
   .fs-btn{border:1px solid var(--border);background:var(--panel);color:var(--text);border-radius:8px;
     padding:11px 16px;font-size:.85rem;font-weight:700;cursor:pointer;min-height:44px;
@@ -773,7 +774,7 @@ html[data-theme="dark"]{--accent:var(--brand-cyan);--nav:#383838;--tile-off:#545
   .fs-btn:hover{transform:translateY(-2px);box-shadow:0 4px 10px rgba(0,0,0,.15)}
   .fs-btn:disabled{opacity:.5;cursor:not-allowed;transform:none;box-shadow:none}
   .fs-btn.primary{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
-  .fs-btn.danger{border-color:color-mix(in srgb,var(--zone-alert) 55%,var(--border));color:var(--zone-alert)}
+  .fs-btn.danger{border-color:color-mix(in srgb,var(--zone-alert) 55%,var(--border));color:var(--status-error-text)}
   .fs-btn.danger:hover{background:color-mix(in srgb,var(--zone-alert) 12%,transparent)}
 
   /* ================= SAT page (TASK-986): thermostat · control · technical ================= */
@@ -795,10 +796,10 @@ html[data-theme="dark"]{--accent:var(--brand-cyan);--nav:#383838;--tile-off:#545
     cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:1px;padding:9px 16px 8px;
     margin-bottom:-1px;white-space:nowrap;font-family:var(--font-sans);transition:color .15s,border-color .15s}
   .satview-btn b{font-size:.86rem;font-weight:600}
-  .satview-btn small{font-size:.62rem;color:inherit;opacity:.7;text-transform:uppercase;letter-spacing:.04em}
+  .satview-btn small{font-size:.62rem;color:inherit;text-transform:uppercase;letter-spacing:.04em}
   .satview-btn:hover{color:var(--text)}
   .satview-btn.active{border-bottom-color:var(--accent);color:var(--accent)}
-  .satview-btn.active small{color:var(--accent);opacity:.85}
+  .satview-btn.active small{color:var(--accent)}
   /* cumulative reveal: Thermostat shows L1 only; Control adds L2; Technical adds L3 */
   .sat-l1{display:block}
   .sat-l2,.sat-l3{display:none}
@@ -870,7 +871,7 @@ html[data-theme="dark"]{--accent:var(--brand-cyan);--nav:#383838;--tile-off:#545
   @media(max-width:899px){.sat-row2{grid-template-columns:1fr 1fr}.sat-row2.sat-row-2up{grid-template-columns:1fr}}
   @media(max-width:520px){.sat-row2{grid-template-columns:1fr}}
   .page .card{background:var(--panel);border:1px solid var(--border);border-radius:14px;box-shadow:var(--shadow);padding:14px 16px;margin-bottom:14px}
-  .sat-mini h4,.card h4{margin:0 0 8px;font-size:.82rem;display:flex;align-items:center;gap:8px}
+  .sat-mini h3,.card h3{margin:0 0 8px;font-size:.82rem;display:flex;align-items:center;gap:8px}
   .sat-mini .sub,.card .sub{font-size:.7rem;color:var(--muted);font-weight:400}
   .kv{display:grid;grid-template-columns:1fr 1fr;gap:2px 18px}
   .kv-row{display:flex;justify-content:space-between;gap:10px;padding:6px 0;border-bottom:1px solid var(--border);font-size:.82rem}

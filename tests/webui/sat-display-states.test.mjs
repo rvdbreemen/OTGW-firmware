@@ -41,7 +41,7 @@ const READ = `(function () {
     big: tx('satStatusBig'), pill: tx('satPill'), pillCls: (document.getElementById('satPill') || {}).className,
     sub: sub && !sub.hidden ? sub.textContent.trim() : '', subLink: sub && !sub.hidden && sub.querySelector('button') ? sub.querySelector('button').textContent : '',
     enLbl: tx('satEnableLbl'), loop: tx('satLoopState'),
-    ctrlStale: !!(ctrl && ctrl.classList.contains('is-stale')), ctrlTitle: ctrl ? ctrl.querySelector('h4').textContent.trim() : null,
+    ctrlStale: !!(ctrl && ctrl.classList.contains('is-stale')), ctrlTitle: ctrl ? ctrl.querySelector('h3').textContent.trim() : null,
     mod: kv('satControlStatus', 'Modulation sent'), modOld: kv('satControlStatus', 'Modulation'),
     pidOut: kv('satControlStatus', 'PID output'), err: kv('satControlStatus', 'Error'), pTerm: kv('satPidKv', 'P term'),
     cycle: tx('satCycleMode'), cycleSub: tx('satCycleSub'),

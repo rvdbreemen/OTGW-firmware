@@ -34,6 +34,18 @@ const ROWS = [
   ['E4', 'dark', '#ffffff', 'var(--pill-off)', 4.5],
   ['F1', 'light', 'var(--hot-text)', 'color-mix(in srgb, var(--hot) 16%, var(--panel))', 4.5],
   ['F2', 'dark', 'var(--hot-text)', 'color-mix(in srgb, var(--hot) 16%, var(--panel))', 4.5],
+  // TASK-2997: the detector-only pairs, traced to their elements
+  ['G1', 'light', 'var(--status-ok-text)', 'var(--bg)', 4.5],
+  ['G2', 'light', 'var(--status-ok-text)', 'color-mix(in srgb, var(--zone-ok) 12%, var(--bg))', 4.5],
+  ['G3', 'dark', 'var(--status-ok-text)', 'var(--bg)', 4.5],
+  ['G4', 'dark', 'var(--status-ok-text)', 'color-mix(in srgb, var(--zone-ok) 12%, var(--bg))', 4.5],
+  ['H1', 'light', 'var(--status-error-text)', 'var(--panel)', 4.5],
+  ['H2', 'dark', 'var(--status-error-text)', 'var(--panel)', 4.5],
+  ['I1', 'light', '#ffffff', 'color-mix(in srgb, var(--zone-warn) 60%, #000)', 4.5],
+  ['I2', 'dark', '#ffffff', 'color-mix(in srgb, var(--zone-warn) 60%, #000)', 4.5],
+  ['J1', 'light', '#ffffff', 'var(--status-ok-dark)', 4.5],
+  ['J2', 'dark', '#ffffff', 'var(--status-ok-dark)', 4.5],
+  ['K1', 'dark', '#8b98a5', '#0a0e14', 4.5],
 ];
 
 // In-page helpers: canvas colour normalisation, compositing, WCAG ratio.

@@ -54,7 +54,7 @@ async function look(h) {
   await h.evalJs(`document.querySelector('button.seg[data-page="advanced"]').click()`);
   await h.evalJs(`document.querySelector('.subtab[data-adv="debug"]').click()`);
   assert.ok(await h.until(`document.querySelectorAll('#dbgGroups .devinfo-group').length > 0`, 40000), 'device info groups rendered');
-  const group = await h.evalJs(`[].some.call(document.querySelectorAll('#dbgGroups h4'), function (e) { return /OT-Direct/.test(e.textContent); })`);
+  const group = await h.evalJs(`[].some.call(document.querySelectorAll('#dbgGroups h3'), function (e) { return /OT-Direct/.test(e.textContent); })`);
   return { rail, group, panels };
 }
 

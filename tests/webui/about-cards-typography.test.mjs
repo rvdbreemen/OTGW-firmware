@@ -17,7 +17,7 @@ const PROBE = `(function () {
   var ids = ['setAbout', 'setCredits', 'setContrib'], out = { cards: [], texts: [] };
   ids.forEach(function (id) {
     var card = document.getElementById(id); if (!card) return;
-    var h = card.querySelector('h4');
+    var h = card.querySelector('h3');
     out.cards.push({ id: id, heading: h ? h.textContent.trim() : null });
     var tw = document.createTreeWalker(card, NodeFilter.SHOW_TEXT);
     while (tw.nextNode()) {
@@ -31,7 +31,7 @@ const PROBE = `(function () {
   row.innerHTML = '<span class="slbl">x<span class="shint">y</span></span>';
   document.getElementById('setAbout').parentNode.appendChild(row);
   out.ref = { slbl: getComputedStyle(row.querySelector('.slbl')).fontSize, shint: getComputedStyle(row.querySelector('.shint')).fontSize,
-    h4: getComputedStyle(document.querySelector('#setAbout h4')).fontSize, family: getComputedStyle(row.querySelector('.slbl')).fontFamily };
+    h4: getComputedStyle(document.querySelector('#setAbout h3')).fontSize, family: getComputedStyle(row.querySelector('.slbl')).fontFamily };
   row.remove();
   return out;
 })()`;

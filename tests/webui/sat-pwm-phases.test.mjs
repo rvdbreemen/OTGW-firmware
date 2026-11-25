@@ -71,7 +71,7 @@ const FIXTURE = {
 
 test('the card sits in the Technical layer with its own title', () => {
   const l3 = HTML.slice(HTML.indexOf('<div class="sat-l3">'));
-  assert.match(l3, /<h4 data-i18n="h_mon\.sat_pwm_phases">PWM ON phases: asked vs done<\/h4><div class="kv" id="satPwmPhaseKv"><\/div><div id="satPwmPhaseList"><\/div>/);
+  assert.match(l3, /<h3 data-i18n="h_mon\.sat_pwm_phases">PWM ON phases: asked vs done<\/h3><div class="kv" id="satPwmPhaseKv"><\/div><div id="satPwmPhaseList"><\/div>/);
   assert.equal(i18nEn(SRC).i18nString('h_mon.sat_pwm_phases'), 'PWM ON phases: asked vs done');
   assert.match(SRC, /satKv\('satPwmKv', \[[\s\S]*?\]\);\s*satRenderPwmPhases\(d\);/, 'renderSatPage calls it with the status');
 });

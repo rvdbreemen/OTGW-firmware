@@ -93,6 +93,7 @@
   /* Status */
   --status-ok:         #4caf50;
   --status-ok-dark:    #2e7d32;
+  --status-ok-text:    #1b5e20;   /* TASK-2997: text on the page and on the 12 % ok tint, >= 4.5:1 */
   --status-ok-glow:    rgba(76,175,80,.6);
   --status-info:       #2196f3;
   --status-info-dark:  #1976d2;
@@ -102,6 +103,7 @@
   --status-warn-glow:  rgba(255,152,0,.6);
   --status-alert:      #e65c00;
   --status-error:      #f44336;
+  --status-error-text: #c62828;   /* TASK-2997: error text on white, >= 4.5:1 */
   --status-error-bg:   #ffd6d6;   /* light tint for pill bg (was #ff6b6b which clashed with --status-error text) */
   --status-error-glow: rgba(244,67,54,.6);
   --status-critical:   #c62828;
@@ -210,6 +212,7 @@ html.dark {
 
   --status-ok:         #66bb6a;
   --status-ok-dark:    #1b5e20;
+  --status-ok-text:    #81c784;
   --status-ok-glow:    rgba(102,187,106,.6);
   --status-info:       #42a5f5;
   --status-info-dark:  #1565c0;
@@ -219,6 +222,7 @@ html.dark {
   --status-warn-glow:  rgba(255,167,38,.6);
   --status-alert:      #bf360c;
   --status-error:      #ef5350;
+  --status-error-text: #ff8a80;
   --status-error-bg:   #4a1f1f;   /* dark tint for pill bg in dark mode */
   --status-error-glow: rgba(239,83,80,.6);
   --status-critical:   #7f0000;

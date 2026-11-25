@@ -4263,7 +4263,7 @@
   function renderOvrPanel() {
     var p = document.getElementById('ovrPanel'); if (!p) return;
     p.textContent = '';
-    var h = document.createElement('h4'); h.textContent = '⛓ ' + t('settings.ovr_title'); p.appendChild(h);
+    var h = document.createElement('h3'); h.textContent = '⛓ ' + t('settings.ovr_title'); p.appendChild(h);
     var sub = document.createElement('p'); sub.className = 'sub';
     sub.textContent = t('settings.ovr_sub');
     p.appendChild(sub);
@@ -6048,7 +6048,7 @@
       var keys = Object.keys(CONN).filter(function (k) { return CONN[k].grp === g.id; });
       if (!keys.length) return;
       var grp = document.createElement('div'); grp.className = 'conngroup';
-      var h4 = document.createElement('h4'); h4.textContent = t(g.key); grp.appendChild(h4);
+      var h4 = document.createElement('h3'); h4.textContent = t(g.key); grp.appendChild(h4);
       keys.forEach(function (k) { grp.appendChild(connDetailRow(k)); });
       box.appendChild(grp);
     });
@@ -6404,7 +6404,7 @@
       var rows = g[1].filter(function (r) { return r[1] !== undefined && r[1] !== null && r[1] !== ''; });
       if (!rows.length) return;
       var wrap = document.createElement('div'); wrap.className = 'devinfo-group';
-      var h = document.createElement('h4'); h.textContent = g[0]; wrap.appendChild(h);
+      var h = document.createElement('h3'); h.textContent = g[0]; wrap.appendChild(h);
       var bodyEl = document.createElement('div'); bodyEl.className = 'devinfo-rows';
       rows.forEach(function (r) {
         var row = document.createElement('div'); row.className = 'devinforow';
@@ -8559,7 +8559,7 @@
       }
       if (st.screen === 'welcome') {
         h += '<div style="' + CARD + ';text-align:center">' +
-          '<div style="width:54px;height:54px;border-radius:50%;background:color-mix(in srgb,var(--ok,#27c469) 18%,transparent);display:flex;align-items:center;justify-content:center;margin:0 auto 18px"><span style="width:16px;height:16px;border-radius:50%;background:var(--ok,#27c469);box-shadow:0 0 10px var(--ok,#27c469)"></span></div>' +
+          '<div style="width:54px;height:54px;border-radius:50%;background:color-mix(in srgb,var(--status-ok) 18%,transparent);display:flex;align-items:center;justify-content:center;margin:0 auto 18px"><span style="width:16px;height:16px;border-radius:50%;background:var(--status-ok);box-shadow:0 0 10px var(--status-ok)"></span></div>' +
           '<h1 style="font-weight:700;font-size:25px;color:var(--text);margin:0 0 8px">' + satH('sat.setup_welcome_title') + '</h1>' +
           '<p style="font:400 13px/1.65 inherit;color:var(--muted);margin:0 auto 24px;max-width:400px">' + satH('sat.setup_welcome_body') + '</p>' +
           '<button data-act="begin" style="' + PRIM + ';font-size:15px;padding:13px 30px">' + satH('sat.get_started') + '</button></div>';
@@ -8584,8 +8584,8 @@
             '<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;min-height:40px">' +
             '<button data-act="test" style="background:none;color:var(--accent);font-weight:600;font-size:12.5px;border-radius:9px;padding:9px 15px;min-height:40px;border:1px solid var(--accent);cursor:pointer">' + (st.test === 'testing' ? satH('sat.setup_testing') : (st.test === 'ok' || st.test === 'fail') ? satH('sat.setup_test_again') : satH('sat.setup_test_conn')) + '</button>' +
             (st.test === 'testing' ? '<span style="font:500 12px inherit;color:var(--muted)">' + satH('sat.setup_testing_conn') + '</span>' : '') +
-            (st.test === 'ok' ? '<span style="font-weight:600;font-size:12px;color:var(--ok,#27c469)">✓ ' + satH('sat.setup_connected') + '</span>' : '') +
-            (st.test === 'fail' ? '<span style="font-weight:600;font-size:12px;color:var(--warn,#e0a300)">' + satH('sat.setup_no_response') + '</span>' : '') +
+            (st.test === 'ok' ? '<span style="font-weight:600;font-size:12px;color:var(--status-ok-text)">✓ ' + satH('sat.setup_connected') + '</span>' : '') +
+            (st.test === 'fail' ? '<span style="font-weight:600;font-size:12px;color:var(--status-warn-text)">' + satH('sat.setup_no_response') + '</span>' : '') +
             '</div></div>';
         }
         h += '<div style="display:flex;align-items:center;gap:12px;margin-top:22px"><button data-act="back-appliance" style="' + GHOST + '">' + satH('sat.back') + '</button>' +
