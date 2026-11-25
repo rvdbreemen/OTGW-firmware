@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-22T16:43:00Z'
-updated_date: '2026-11-25T13:20:00Z'
+updated_date: '2026-11-25T17:14:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -41,4 +41,6 @@ Source: entry 471 in the private SAT register (Sergeant D, Q-470a answer 1: an I
 2026-11-22 BRANCH RULE (Robert, #dev-sat-mqtt 1574113439813603421: 'this is a separate branch for now'): all code for the ID25/flame principle (TASK-3036, the TASK-3037 per-rule host tests and doc follow-ups, and the Q-466a change once Sergeant D decides) goes on ONE branch off origin/dev, sat/id25-principle, not on dev. Keep it rebased on origin/dev, bumps per the usual rule. Merging it into dev needs Robert's explicit yes (hard stop). Docs-only task notes and docs/sat/sat-msgid-inventory.md stay on dev. Code after Wednesday's reset.
 
 2026-11-25 ID COLLISION WARNING: the id TASK-3038 names two different task files. One is 'docs MQTT.md republish section wrongly says SAT topics are not...' (Done on origin/dev); the other is the id25 solar-gain task 'SAT entry 473 on sat/id25-principle: solar gain on the flame duty instead of ID17 and the no-return path' (referenced by commit 5247c37fc on branch sat/id25-principle and by the uncommitted task-3038 file in wt-d3-id25, with the bench-tester's AC4 note). Check the file title before editing either; renumbering is routed to otgw-docs with the 29 duplicate-id groups. Same lane also carries the ADR-296 number clash (renumber on next touch). Lane backed up as OTGW-worktree-leftovers/d3-bundles/id25.bundle (+ id25.uncommitted-unstaged.patch).
+
+2026-11-25 Robert decided for the id25 lane (sat/id25-principle), option B, relayed by the coordinator: merge into dev only after a real-boiler check (an indigo field run, or a redo of test A2 with the flame off); the lane stays as bundled (OTGW-worktree-leftovers/d3-bundles/id25.bundle) until then. Before that lane's files are ever committed to dev: (1) the lane's task file TASK-3038 (solar gain) gets a new number, because the duplicate-id pre-commit check (scripts/check_backlog_task_ids.py) blocks a commit that stages a file of a duplicate-id group; (2) its ADR-296 (SAT boiler feedback, ID0) is renumbered to ADR-298 (file name, id, heading, README entry; bin/adr-index regenerates the index) because ADR-296 is the PWM ON clock on dev and ADR-297 is taken; its Enforcement block still has the template placeholder: fix it in the same renumber commit. Owner: otgw-dev, at the lane's next touch.
 <!-- SECTION:NOTES:END -->
