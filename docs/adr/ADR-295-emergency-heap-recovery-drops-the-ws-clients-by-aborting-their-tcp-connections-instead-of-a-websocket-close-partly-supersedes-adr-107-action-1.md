@@ -85,7 +85,10 @@ Scope: only action 1 of ADR-107 changes. Actions 2 and 3, the 30 s rate limit, t
 ### Verification
 
 - A host test that compiles the real recovery helper against a stub lwIP pcb list: a tracked /ws pcb is aborted, an HTTP pcb on port 80 and a pcb with another remote port are not; red on the code before (closeAll()).
-- Bench (otgw-bench-tester): a forced CRITICAL or 09's reproduction shows the /ws client gone at once, its memory back in the recovery line's `after`, and a web UI tab reconnecting.
+- Bench (otgw-bench-tester), on the board without PSRAM (.61), because CRITICAL (free heap under 3072 B) rarely happens on a board with PSRAM. CRITICAL is forced with the prerelease-only deep heap hold, telnet key `K` (target 2560 B free, never under 1792 B, releases itself after 2 min; TASK-3025). The plain hold `H` never goes under its 4096 B floor, so it never starts the recovery. With 2-3 /ws clients connected, run three times:
+  - each `[heap-recovery]` line reports exactly as many aborted connections as /ws clients were connected at that moment (`hd_ws_recovery_abort` rises by the same number). The hold tops up again after a recovery, so a 2 min hold can start more than one recovery; count per recovery line, not per hold;
+  - no crash, reboot or crashlog for 10 min after the hold ends, the web UI tabs reconnect within about 10 s, and the free heap returns once the hold ends;
+  - a control run with the same `K` hold on the build before this ADR (the `closeAll()` path) tells a crash of the hold itself apart from one of the abort path.
 
 ## Alternatives Considered
 
