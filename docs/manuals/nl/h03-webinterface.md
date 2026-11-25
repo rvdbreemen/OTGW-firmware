@@ -97,7 +97,7 @@ Klik op **Opslaan** onderaan een sectie om de wijzigingen toe te passen. De mees
 | Wi-Fi Network (SSID) | Alleen-lezen weergave van het huidig verbonden Wi-Fi-netwerk | (huidige SSID) |
 | Reset WiFi | Knop naast het SSID-veld. Wist de opgeslagen Wi-Fi-gegevens en herstart het apparaat in Access Point (AP) modus | n.v.t. |
 
-Om naar een ander Wi-Fi-netwerk over te schakelen, klikt u op **Reset WiFi** en bevestigt u de dialoog. Het apparaat herstart, start een AP met de naam `OTGW-XXXXXX` (waarbij `XXXXXX` afgeleid is van het chip-ID) en opent opnieuw de captive portal, zodat u tegen het nieuwe netwerk kunt authenticeren. Dezelfde actie is beschikbaar onder **FSexplorer > System Actions** via de knop *Reset Wireless*.
+Om naar een ander Wi-Fi-netwerk over te schakelen, klikt u op **Reset WiFi** en bevestigt u de dialoog. Het apparaat herstart, start het installatienetwerk `<hostname>-<MAC-adres>` (bijvoorbeeld `OTGW2-A4:CF:12:21:B4:F8`, zie hoofdstuk 2) en opent opnieuw de captive portal, zodat u tegen het nieuwe netwerk kunt authenticeren. Dezelfde actie is beschikbaar onder **FSexplorer > System Actions** via de knop *Reset Wireless*.
 
 #### Wi-Fi-scan
 

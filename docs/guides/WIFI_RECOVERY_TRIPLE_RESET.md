@@ -33,8 +33,9 @@ configuration portal until you set the WiFi again.
 
 The device boots straight into the WiFiManager configuration portal:
 
-1. It starts an access point named `<hostname>-XXXXXX`, where `<hostname>` is the configured device hostname
-   (default `OTGW`) and `XXXXXX` is the last three bytes of the MAC address, for example `OTGW-21B4F8`.
+1. It starts the setup network, named `<hostname>-<MAC address>`: the configured device hostname (default `OTGW2` on
+   2.0.0), a dash, and the full MAC address of the board with colons, for example `OTGW2-A4:CF:12:21:B4:F8`. The
+   network has no password. This is not the fallback network below.
 2. Connect to that access point from a phone or laptop.
 3. A captive portal page opens automatically, or browse to `http://192.168.4.1/` manually.
 4. Enter your WiFi SSID and password and save. The new credentials replace the old ones, and the device reboots and
@@ -42,7 +43,18 @@ The device boots straight into the WiFiManager configuration portal:
 
 The triple reset clears the stored WiFi credentials (ADR-043, ADR-238) and then opens the config portal. If the
 portal times out (240 seconds) without a save, the device reboots with no stored network: it re-enters the config
-portal (or, on prerelease builds, the AP fallback) rather than reconnecting to the old network.
+portal rather than reconnecting to the old network.
+
+## Two different networks
+
+A gateway can open two different access points. Do not mix them up:
+
+| | Setup network | Fallback network |
+|---|---|---|
+| Name | `<hostname>-<MAC address>`, for example `OTGW2-A4:CF:12:21:B4:F8` | `OTGW-<last 3 bytes of the MAC>`, for example `OTGW-21B4F8` |
+| Password | none | `otgw1234` |
+| When | first boot, **Reset WiFi**, the triple reset | the gateway has a stored WiFi network but cannot reach it |
+| What you do | pick your home network in the portal | open `http://192.168.4.1/`; the gateway keeps trying your network |
 
 ## Recovery steps
 
@@ -51,7 +63,7 @@ portal (or, on prerelease builds, the AP fallback) rather than reconnecting to t
 3. Do it a second time. Wait for it to boot again.
 4. Do it a third time, each within roughly 10 seconds of the board coming back up.
 5. The device boots into WiFi config mode.
-6. Connect to the access point (`<hostname>-XXXXXX`).
+6. Connect to the setup network (`<hostname>-<MAC address>`, for example `OTGW2-A4:CF:12:21:B4:F8`).
 7. Open the portal and configure the new WiFi network.
 
 ## Notes

@@ -95,7 +95,7 @@ Next to each setting label is an **i** button. Hover it, focus it with the keybo
 | Wi-Fi Network (SSID) | Read-only display of the currently connected Wi-Fi network |
 | Reset WiFi | Button next to the SSID field. Clears the stored Wi-Fi credentials and reboots the device in Access Point (AP) mode |
 
-To move the gateway to a different Wi-Fi network, click **Reset WiFi** and confirm the prompt. The device reboots, starts an AP named `OTGW-XXXXXX` (where `XXXXXX` is derived from the chip ID), and reopens the captive portal so you can select and authenticate against the new network. The Reset WiFi action is also available under **FSexplorer > System Actions** as the *Reset Wireless* button.
+To move the gateway to a different Wi-Fi network, click **Reset WiFi** and confirm the prompt. The device reboots, starts the setup network `<hostname>-<MAC address>` (for example `OTGW2-A4:CF:12:21:B4:F8`, see Chapter 2), and reopens the captive portal so you can select and authenticate against the new network. The Reset WiFi action is also available under **FSexplorer > System Actions** as the *Reset Wireless* button.
 
 #### Wi-Fi Scan
 

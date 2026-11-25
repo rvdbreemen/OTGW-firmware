@@ -234,13 +234,13 @@ Get-FileHash -Algorithm SHA256 OTGW-firmware-esp32-combo-<version>-flash.zip
 
 On the first boot after flashing, the device has no saved Wi-Fi credentials. It broadcasts a temporary Wi-Fi access point so you can configure it.
 
-**AP name format**: `<hostname>-<MAC suffix>`
+**AP name format**: `<hostname>-<MAC address>`: the hostname, a dash, and the full MAC address of the board with colons. The network has no password.
 
 The default hostname on 2.0.0 is `OTGW2`, so the AP will typically be named something like `OTGW2-A4:CF:12:21:B4:F8`.
 
 **Steps:**
 
-1. On your phone or laptop, open the Wi-Fi settings and connect to the `otgw-XXXXXX` network.
+1. On your phone or laptop, open the Wi-Fi settings and connect to the network named after your gateway, like `OTGW2-A4:CF:12:21:B4:F8`.
 
 2. A captive portal opens automatically in your browser. If it does not open automatically, navigate to `http://192.168.4.1/`.
 
@@ -250,7 +250,7 @@ The default hostname on 2.0.0 is `OTGW2`, so the AP will typically be named some
 
 5. Navigate to `http://otgw2.local/` in your browser to open the web interface. On Windows, the device also responds to `http://otgw2/` via LLMNR.
 
-> **AP Fallback Mode (all builds from 2.0.0-beta.401; before that beta builds only)**: If the configured Wi-Fi network becomes unavailable after initial setup, or cannot be reached at boot, the device opens a fallback AP named `OTGW-<MAC>` with password `otgw1234` and IP `192.168.4.1`, keeping the web UI accessible.
+> **AP Fallback Mode (all builds from 2.0.0-beta.401; before that beta builds only)**: If the configured Wi-Fi network becomes unavailable after initial setup, or cannot be reached at boot, the device opens a fallback AP named `OTGW-<last 3 bytes of the MAC>` (for example `OTGW-21B4F8`; a different name from the setup network) with password `otgw1234` and IP `192.168.4.1`, keeping the web UI accessible.
 
 ### Filesystem Upload (LittleFS)
 

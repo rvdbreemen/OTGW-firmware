@@ -1091,7 +1091,7 @@ paths:
                         description: Active network mode
                       apfallback:
                         type: boolean
-                        description: "True when the device has fallen back to AP mode (SSID: OTGW-<MAC>, IP: 192.168.4.1). Only present in pre-release builds and only when AP fallback is active."
+                        description: "True when the device has fallen back to AP mode (SSID: OTGW-<last 3 bytes of the MAC>, IP: 192.168.4.1). Only present while AP fallback is active (TASK-2931: in pre-release and stable builds)."
         '405':
           $ref: '#/components/responses/MethodNotAllowedJson'
         '429':

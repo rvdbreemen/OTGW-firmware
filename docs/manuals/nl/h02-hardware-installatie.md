@@ -262,7 +262,7 @@ Get-FileHash -Algorithm SHA256 OTGW-firmware-esp32-combo-<versie>-flash.zip
 
 Bij de allereerste start, of na het wissen van de Wi-Fi-instellingen, opent de OTGW een eigen Wi-Fi-accesspoint (AP).
 
-**AP-naamformaat**: `<hostname>-<MAC suffix>`
+**AP-naamformaat**: `<hostname>-<MAC-adres>`: de hostname, een streepje en het volledige MAC-adres van het board met dubbele punten. Het netwerk heeft geen wachtwoord.
 
 De standaard hostname op 2.0.0 is `OTGW2`, dus het AP heet doorgaans iets als `OTGW2-A4:CF:12:21:B4:F8`.
 
@@ -284,7 +284,7 @@ De standaard hostname op 2.0.0 is `OTGW2`, dus het AP heet doorgaans iets als `O
 
 **mDNS-opmerking:** De hostnaam `otgw2.local` werkt op de meeste thuisnetwerken. Op sommige Windows-systemen werkt mDNS alleen als de Bonjour-service actief is. Gebruik bij twijfel het IP-adres van uw router.
 
-> **AP-fallbackmodus (in alle builds vanaf 2.0.0-beta.401; daarvoor alleen in betabuilds)**: Als het geconfigureerde Wi-Fi-netwerk na de initialisatie onbereikbaar wordt, of bij het opstarten niet bereikbaar is, opent het apparaat een fallback-AP genaamd `OTGW-<MAC>` met wachtwoord `otgw1234` en IP `192.168.4.1`, zodat de webinterface bereikbaar blijft.
+> **AP-fallbackmodus (in alle builds vanaf 2.0.0-beta.401; daarvoor alleen in betabuilds)**: Als het geconfigureerde Wi-Fi-netwerk na de initialisatie onbereikbaar wordt, of bij het opstarten niet bereikbaar is, opent het apparaat een fallback-AP genaamd `OTGW-<laatste 3 bytes van het MAC-adres>` (bijvoorbeeld `OTGW-21B4F8`; een andere naam dan het installatienetwerk) met wachtwoord `otgw1234` en IP `192.168.4.1`, zodat de webinterface bereikbaar blijft.
 
 ---
 
