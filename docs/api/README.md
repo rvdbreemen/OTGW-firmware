@@ -1128,7 +1128,6 @@ Returns the full SAT runtime state including temperatures, PID terms, cycle data
 | `ki` | float | Current Ki gain |
 | `kd` | float | Current Kd gain |
 | `coefficient` | float | Heating curve coefficient setting |
-| `deadband` | float | PID deadband setting (°C) |
 | `cycle_count` | integer | Total completed flame cycles |
 | `last_cycle_class` | integer | 0=None, 1=Good, 2=Overshoot, 3=Underheat, 4=Short, 5=Uncertain |
 | `cycle_max_flow` | float | Maximum flow temp in last cycle (°C) |

@@ -4317,7 +4317,7 @@ paths:
       description: |
         Updates any named SAT setting. This mirrors all MQTT `sat/<name>` command
         handlers. The setting name corresponds to the MQTT subtopic (e.g.,
-        `heating_curve_coeff`, `deadband`, `boiler_capacity`, `heating_system`,
+        `heating_curve_coeff`, `boiler_capacity`, `heating_system`,
         `overshoot_margin`, `manufacturer`, `simulation`, etc.).
 
         The special no-value command `reset_integral` is also accepted here
@@ -4336,7 +4336,7 @@ paths:
           required: true
           schema:
             type: string
-          description: SAT setting name (e.g., `heating_curve_coeff`, `deadband`, `boiler_capacity`)
+          description: SAT setting name (e.g., `heating_curve_coeff`, `boiler_capacity`)
           example: "heating_curve_coeff"
       requestBody:
         required: false

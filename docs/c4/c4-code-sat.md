@@ -169,7 +169,7 @@ PID controller with automatic gain calculation, deadband mode, temperature-based
 - `satPidService(uint32_t nowMs): void` (TASK-1368, entries 42, 28, 111)
   - Called every loop pass of `satControlLoopRun()` while SAT is enabled, not tripped, not flashing and with a live OpenTherm link, before the control tick's early returns
   - Takes one start-up step after `satPidReset()`, then one step per expiry of `timerSATPid` (`DECLARE_TIMER_SEC(timerSATPid, 60, SKIP_MISSED_TICKS)`, thermo-nova `climate.py:712-716`); a loop stall gives one step
-  - Gets its inputs from `satPidGatherInputs()` (SATcontrol.ino: filtered room temperature, effective target, heating curve, thermal deadband widening); no room temperature: `satPidCurveOnly()`; then `satZonePidAdvanceAll()`
+  - Gets its inputs from `satPidGatherInputs()` (SATcontrol.ino: filtered room temperature, effective target, heating curve); no room temperature: `satPidCurveOnly()`; then `satZonePidAdvanceAll()`
 - `satPidStep(float roomTemp, float targetTemp, float heatingCurveValue, uint32_t nowMs): void`
   - Moves the held state once (gains, integral, derivative, error); no time gate and no unchanged-error gate (`pid.py:159-171`)
 - `satPidOutput(float heatingCurveValue): float`
@@ -269,7 +269,7 @@ Up to 4 weighted areas (`fAreaWeight[4]`, `iMultiAreaCount`). Each area is fed b
 
 All SAT settings are stored in `settings.sat` (`SATSection` in SATtypes.h, 100+ fields). Main groups:
 
-- Core: `bEnabled`, `iHeatingSystem` (auto/radiators/underfloor), `iHeatingSource` (auto/gas_boiler/heat_pump/hybrid), `iHpCycleSeconds`, `fTargetTemp`, `fHeatingCurveCoeff`, `fDeadband`, `iControlInterval`, `bUseExternalTemp`, `iSensorMaxAgeS`, `fMaxSetpoint`
+- Core: `bEnabled`, `iHeatingSystem` (auto/radiators/underfloor), `iHeatingSource` (auto/gas_boiler/heat_pump/hybrid), `iHpCycleSeconds`, `fTargetTemp`, `fHeatingCurveCoeff`, `iControlInterval`, `bUseExternalTemp`, `iSensorMaxAgeS`, `fMaxSetpoint`
 - Presets: `fPresetComfort/Eco/Away/Sleep/Activity/Home`, `bPresetSync`, `sPresetSyncTopic`
 - Output: `bOvershootProtection` (default on), `fOvershootMargin` (default 2.0), `iMaxRelModulation`, `fFlameOffOffset`, `fFlowOffset`, `fModSupDelay/Offset`, `bPushSetpoint` (TC=), `bFollowThermostat` (TASK-1259: `satOnThermostatSetpoint()` is called by `processOT()` for each thermostat MsgID 16 Write-Data T frame; `satFollowThermostatDecide()` is the pure edge/echo test; `satAdoptThermostatSetpoint()` sets the target and clears the preset without the none-restore; default = push-setpoint when no stored key), `iCyclesPerHour`, DHW (`bDhwEnabled`, `bDhwEnable`, `fDhwSetpoint`)
 - Environment: weather (`bWeatherEnable`, `fWeatherLat/Lon`, `iWeatherInterval`), solar gain, summer simmer, window detection, pressure limits
