@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-25T05:21:00Z'
-updated_date: '2026-11-25T05:30:00Z'
+updated_date: '2026-11-25T05:31:00Z'
 labels:
   - docs
   - ux
@@ -38,4 +38,6 @@ otgw-ux-designer review docs/reviews/2026-11-25_ux-owner-first-run-text/README.m
 Fixed: WIFI_RECOVERY_TRIPLE_RESET.md (setup name in steps 1 and 6, a 'Two different networks' table, the stale 'on prerelease builds, the AP fallback' clause removed: the fallback is in all builds since TASK-2931), manual ch02 EN/h02 NL (AP name format, step text 'otgw-XXXXXX', fallback name), ch03 EN/h03 NL (Reset WiFi sentence, the old 'derived from the chip ID' wrong), openapi.yaml apfallback description (no longer 'pre-release only', matches restAPI.ino:3337). README line 45 was already right. Grep after the fix over README, docs/guides, docs/manuals for OTGW-XXXXXX / OTGW-21B4F8 / OTGW-<MAC>: only fallback uses remain (ch02:253, ch06:45 EN and h06:57 NL, ch07:162, h02:287 and the new table row, all about the fallback network). MANUAL.md regenerated; python scripts/run_tests.py test_manual_generated: PASS 1.5s (4 tests). Not verified: the web UI or the OLED showing this name (no new claim made).
 
 AC2 (README Quick Start steps 1 to 4 and the Which firmware section) is NOT done: per the coordinator it waits until he has cleared it with Robert (R1 landing); separate commit when cleared.
+
+Evidence for 'the AP fallback is in all builds since TASK-2931' (file:line at dev 81f1e5dc0): networkStuff.ino:496-497 (comment 'AP fallback ... TASK-2931 (Robert, DM 2026-11-19): part of prerelease AND stable builds') above startAPFallback() at :499, with no prerelease guard inside it (grep for _VERSION_PRERELEASE / IS_PRERELEASE in networkStuff.ino: no hit); the decision to enter it is networkStuff.ino:653 ('in prerelease and stable builds alike. After 2 failed ...'); restAPI.ino:3337 and :4099 emit apfallback in both (comment 'TASK-2931: AP fallback in prerelease and stable builds'). Not run on a stable build image: read from the code only.
 <!-- SECTION:NOTES:END -->
