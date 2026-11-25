@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-21T14:29:00Z'
-updated_date: '2026-11-25T10:01:00Z'
+updated_date: '2026-11-25T10:26:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -58,6 +58,8 @@ Cold-setpoint gate (ADR-199, upstream in SATcontrol.ino, unchanged): evidence te
 2026-11-25 answers to otgw-architect's two checks (read in code, no host test added): (1) HEATING DEMAND is guaranteed upstream: satCycleCheckPwmExits() is only called when pidOutput > satColdThreshold() (SATcontrol.ino ~8545-8548; else satCycleResetSustainGuards()), and inside it only while the mode is PWM with bPwmFlameRequested (SATcycles.ino ~1488-1492) and outside the DHW guard. No extra demand condition added. (2) FLAME-ON EDGE AT TAKEOVER: the flame edge block runs in satControlLoopRun() AFTER the 'SAT disabled / flashing' early bail (edge detection is not processed while SAT is off), with _sat_prevFlameState starting false (SATcontrol.ino:957, :8113-8116). So when SAT is enabled (or boots) while the flame already burns, the first pass sees an edge and satCycleOnFlameChange(true) sets _cycle_flameOnStartMs = that pass: the 180 s gate counts from SAT's first pass (the fallback = SAT start time, by construction). Residual edge case: SAT disabled and re-enabled while the same flame still burns -> prevFlame stays true, no edge, _cycle_flameOnStartMs keeps the earlier real edge (older or equal to the true flame age: the gate can open earlier than 180 s after takeover, never later). Not changed; flag for the architect.
 
 2026-11-25 integrated on lane/d3-beta: test pins moved by the 448 rule: tests/test_sat_loop_integration.py scenario s2 now starts at 540 s (the 60 s underheat rule no longer flips the run to continuous at 150 s, the ON phase opened at 60 s runs to 660 s); new source tests AtMaxExitKeepsOnlyTheStartGate (entry 463: the at-max branch keeps the start gate and has no flame gate; the underheat exit has the flame gate and the start gate; red on a mutant that drops the at-max start gate). SATcycles.ino comment at the underheat block corrected (flame gate, entry 456). Bench so far (bench-tester, 8401c72): negative half evidenced, positive exit not evidenced: that AC rests on host tests + a field check, not ticked.
+
+2026-11-25 follow-up filed as TASK-3053: reading of the code says the 456 flame gate lets the 300 s saturation exit fire before the 448 underheat exit (about 300 s vs 360 s after ignition). NOT MEASURED, second reader pending. AC4 stays open.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
