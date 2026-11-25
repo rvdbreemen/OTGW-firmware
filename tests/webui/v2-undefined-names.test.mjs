@@ -32,7 +32,7 @@ const ALLOW = new Set([
   'getComputedStyle', 'requestAnimationFrame', 'confirm', 'btoa',
   'setTimeout', 'clearTimeout', 'setInterval', 'clearInterval',
   // Web APIs
-  'fetch', 'AbortController', 'Blob', 'FormData', 'Image', 'URL', 'WebSocket', 'XMLSerializer',
+  'fetch', 'AbortController', 'Blob', 'FormData', 'Image', 'URL', 'WebSocket', 'XMLSerializer', 'ResizeObserver', 'MutationObserver',   // TASK-2960: both guarded by window.X in hscrollInit
 ]);
 
 function loadDeps() {
