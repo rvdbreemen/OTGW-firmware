@@ -40,7 +40,7 @@ format: "canonical"
 
 ## Status
 
-Accepted, 2026-11-26, by Robert (interactive, about 01:10, relayed by the coordinator). Proposed 2026-11-20. Guideline-level per ADR-080: verified by host tests and a narrow `evaluate.py` check (no `binding: true`). Release 2.0.0.
+Accepted, 2026-11-26, by Robert (interactive, about 00:40, relayed by the coordinator). Proposed 2026-11-20. Guideline-level per ADR-080: verified by host tests and a narrow `evaluate.py` check (no `binding: true`). Release 2.0.0.
 
 **Accepted without the .61 numbers, by Robert's decision.** `MQTT_PACE_MAX_OUTBOX` ships as 6 (provisional value of cut 1, kept). The evidence channel is the per-producer counters on `/api/v2/device/info` and the `[HEAP]` line, the runtime flags in prerelease builds, and the .61 bench (step 0 and the A/B per flag), which Robert made a gate for the stable in the same answer. Implementation at acceptance: the cut stack on `lane-poc-pacer` up to 9beda9b9f (TASK-2949.6-.9, .11), second-reviewed by otgw-architect; not yet on `dev`.
 
@@ -51,6 +51,8 @@ Accepted, 2026-11-26, by Robert (interactive, about 01:10, relayed by the coordi
 **Amended in place a third time on 2026-11-25 (still Proposed)**: Open Question 3 answered by Robert (about 23:10, relayed by the coordinator, option D). The 15 `otgw-pic/settings/*` topics become retained, the unpaced 5-minute refresh of `publishAllPICsettings()` is removed, and the connect block stays one portion of connect stage 3 under cut 3.
 
 **Decision Maker:** Agent: Claude (otgw-architect), on a design question from the coordinator. Acceptance is Robert's.
+
+**Time corrected 2026-11-26:** Robert's answer was first recorded here as "about 01:10"; it was given interactively between about 00:35 and 00:41 on 2026-11-26 (coordinator's session order; no exact minute), so "about 00:40".
 
 ## Status History
 
@@ -64,7 +66,7 @@ status_history:
   - date: 2026-11-26
     status: Accepted
     changed_by: "Agent: Claude (otgw-architect)"
-    reason: Accepted by Robert, 2026-11-26 ~01:10 (interactive, relayed by the coordinator), without the .61 numbers; MQTT_PACE_MAX_OUTBOX = 6 as shipped
+    reason: Accepted by Robert, 2026-11-26 ~00:40 (interactive, relayed by the coordinator), without the .61 numbers; MQTT_PACE_MAX_OUTBOX = 6 as shipped
     changed_via: adr-kit lifecycle
 ```
 
@@ -226,10 +228,10 @@ static inline bool satOutboxFull() {
 
 ## Open Questions
 
-- [x] 1. What does one queued and flushed MQTT packet cost on .61 on the build that ships? Partly answered: TASK-2949.5 measured `TCP_NODELAY` against Nagle (ADR-266's table), and TASK-2019 measured about 1.3-1.5 KB per packet per loop with `TCP_NODELAY` (16 packets, 20-24 KB). Still open: the cost per packet in the SAT publish pass itself, which sets `MQTT_PACE_MAX_OUTBOX` (step 0 of the implementation plan, `OTGW-field-data/_comms/adr265_plan.md`). The ADR-266 cap value is no longer needed. — **Answered 2026-11-26 by Robert, 2026-11-26 about 01:10 (interactive, relayed by the coordinator):** ship `MQTT_PACE_MAX_OUTBOX` = 6 without waiting for step 0. Step 0 and the .61 numbers are still collected as gate evidence for the stable (.61 is a gate, same answer), and the value may be revised later with data.
-- [x] 2. Steady-state impact: with the pacer on, what is the added SAT publish latency and the discovery completion time after boot, compared with today? — **Deferred to measurement by Robert, 2026-11-26 about 01:10 (interactive, relayed by the coordinator):** accepted without this number. The per-producer counters (`hd_pace_*_no`, `hd_pace_*_live`) and the discovery completion time on the .61 bench are the evidence channel; a bad value is handled by the runtime flag (prerelease) or by shipping a cut OFF.
+- [x] 1. What does one queued and flushed MQTT packet cost on .61 on the build that ships? Partly answered: TASK-2949.5 measured `TCP_NODELAY` against Nagle (ADR-266's table), and TASK-2019 measured about 1.3-1.5 KB per packet per loop with `TCP_NODELAY` (16 packets, 20-24 KB). Still open: the cost per packet in the SAT publish pass itself, which sets `MQTT_PACE_MAX_OUTBOX` (step 0 of the implementation plan, `OTGW-field-data/_comms/adr265_plan.md`). The ADR-266 cap value is no longer needed. — **Answered 2026-11-26 by Robert, 2026-11-26 about 00:40 (interactive, relayed by the coordinator):** ship `MQTT_PACE_MAX_OUTBOX` = 6 without waiting for step 0. Step 0 and the .61 numbers are still collected as gate evidence for the stable (.61 is a gate, same answer), and the value may be revised later with data.
+- [x] 2. Steady-state impact: with the pacer on, what is the added SAT publish latency and the discovery completion time after boot, compared with today? — **Deferred to measurement by Robert, 2026-11-26 about 00:40 (interactive, relayed by the coordinator):** accepted without this number. The per-producer counters (`hd_pace_*_no`, `hd_pace_*_live`) and the discovery completion time on the .61 bench are the evidence channel; a bad value is handled by the runtime flag (prerelease) or by shipping a cut OFF.
 - [x] 3. Should `publishAllPICsettings()` (up to 15 publishes on a Classic) move under the pacer, or stay inside connect stage 3 as one portion? — **Answered 2026-11-25 by Robert (relayed by the coordinator), option D:** one portion of connect stage 3 under cut 3; the topics retained (on change and at every connect); the 5-minute refresh removed (YAGNI (you aren't gonna need it): the broker serves the retained values after a Home Assistant restart). Known limit: when the PIC is removed, the retained values (and the retained discovery configs, as today) stay on the broker until cleared by hand; the release notes say how.
-- [x] 4. Acceptance by the maintainer. — **Answered 2026-11-26 by Robert, 2026-11-26 about 01:10 (interactive, relayed by the coordinator): accept now.**
+- [x] 4. Acceptance by the maintainer. — **Answered 2026-11-26 by Robert, 2026-11-26 about 00:40 (interactive, relayed by the coordinator): accept now.**
 
 ## Related Decisions
 

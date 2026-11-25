@@ -33,7 +33,9 @@ context_scope: "selective"
 
 Proposed, 2026-11-08.
 
-**Deferred 2026-11-26 by Robert** (interactive, about 01:10, relayed by the coordinator): stays Proposed, "later, after the stable". Not part of 2.0.0.
+**Deferred 2026-11-26 by Robert** (interactive, about 00:40, relayed by the coordinator): stays Proposed, "later, after the stable". Not part of 2.0.0.
+
+**Time corrected 2026-11-26:** Robert's answer was first recorded here as "about 01:10"; it was given interactively between about 00:35 and 00:41 on 2026-11-26 (coordinator's session order; no exact minute), so "about 00:40".
 
 ## Status History
 
