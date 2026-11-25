@@ -701,6 +701,13 @@ html[data-theme="dark"]{--accent:var(--brand-cyan);--nav:#383838;--tile-off:#545
   .picrow.head{background:var(--panel-2);font-size:.68rem;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);font-weight:700}
   .picrow .fname{font-family:var(--font-mono);font-weight:700;overflow:hidden;text-overflow:ellipsis}
   .picrow .fver,.picrow .fsize{font-family:var(--font-mono);color:var(--muted)}
+  /* TASK-3051: narrow screens stack the row: the name takes its own line (wrapping, never cut), version and size sit
+     under it and the three buttons stay in the same row; the column heading row would no longer line up, so it goes */
+  @media(max-width:719px){
+    .picrow{grid-template-columns:1fr 1fr 40px 40px 40px;row-gap:6px}
+    .picrow.head{display:none}
+    .picrow .fname{grid-column:1/-1;overflow:visible;text-overflow:clip;overflow-wrap:anywhere}
+  }
   .picrow.newer .fver{color:var(--zone-ok)}
   .picempty{padding:14px;color:var(--muted);font-size:.83rem}
   .picbtn{width:34px;height:34px;border:1px solid var(--border);background:var(--panel-2);border-radius:8px;
