@@ -44,8 +44,9 @@ nothing builds or publishes for you. `dev` is the GitHub default branch: without
 
 ### Phase 0: Preconditions and coordination
 
-1. **CHECKPOINT 1: the four daily slots** (Robert 2026-11-25 22:20; replaces the 12-hour 08:00/20:00 rule of 2026-11-02): public beta slots
-   are 08:00, 12:00, 16:00 and 20:00 local time, at most one beta per slot; a slot with no soaked candidate is skipped. Every firmware task keeps its own
+1. **CHECKPOINT 1: hourly slots** (Robert 2026-11-25 22:50; replaces the four-slot rule of 22:20 and the 12-hour 08:00/20:00 rule of
+   2026-11-02): a public beta may go out at any full hour from 07:00 to 23:00, at most one beta per hour, and only with a candidate that
+   finished its 60 min soak; an hour without a soaked candidate is skipped. Every firmware task keeps its own
    `2.0.0-beta.N` bump and its #alpha-testing zip (alpha track); only the daily release gets a
    GitHub prerelease and a #beta-testing post. Candidate: origin/dev HEAD at compose time (T-75, see
    below), published as the release build that ran at least 1 h on the bench unit (.63) with MQTT
@@ -58,8 +59,8 @@ nothing builds or publishes for you. `dev` is the GitHub default branch: without
    - Why 60 min and not less: the run must pass uptime 3600 s, because the hourly block (`OTGW-firmware.ino:949`, uptime above 3600 s plus
      NTP) runs only then; a leak in such a block killed 1.x units at 82 min. The old reason "1 h covers the safeboot rollback window"
      is wrong: the health gate confirms the app after 30 s (`OTGW-firmware.ino:1206`).
-   - **Attribution default:** one cause per build for MQTT, TCP and heap changes (Nagle, each pacer cut), so a failed soak points at one
-     change. Other changes may share a build when they have independent signatures AND separate commits (bisectable). Every candidate has a
+   - **Attribution** (Robert 2026-11-25 22:50: bundling is the default; this replaces "one MQTT/TCP/heap cause per build"): one commit per
+     task, behaviour changes behind runtime flags, so a failed soak can be traced to one commit. Every candidate has a
      halving fallback: drop one commit, rebuild, soak again.
    No soak waiver: a slot whose candidate has not finished its 60 min soak waits until it has. Every flash
    of the bench unit restarts the soak, so the last flash before a slot is at least 1 h before it. Skip also when nothing user-visible changed or the candidate failed its soak or a bench
@@ -78,7 +79,7 @@ nothing builds or publishes for you. `dev` is the GitHub default branch: without
    **Compose shortly before, publish at the slot** (Robert 2026-11-15: "de release kort van
    tevoren samenstelt. Zodat elke user de nieuwst mogelijke release krijgt. Geen vertraging na de
    soak van een 1 uur."). The soak runs on the RELEASE BUILD itself, so the soak end is the
-   publish moment. Timeline for slot T (08:00, 12:00, 16:00 or 20:00). When the candidate is not built yet, follow the steps below. When the candidate was
+   publish moment. Timeline for slot T (any full hour 07:00-23:00). When the candidate is not built yet, follow the steps below. When the candidate was
    built and soaked earlier, with its release docs already inside the commit, publish at the first slot after its 60 min soak passed (tag, draft,
    verify, publish, posts; no rebuild):
    - all day: the notes draft and the Discord post draft are kept current after every push
@@ -297,8 +298,9 @@ from the file at create time.
    ```
    Add the row to `.claude/alpha-build-ledger.local.md` (for a note: "zip already
    posted as alpha beta.N" and both message ids).
-2. **#beta-testing announcement** (sent without showing it first under the four-slot rule
-   above; show it first only when it announces something new to weigh).
+2. **#beta-testing announcement** (sent without showing it first under the hourly-slot rule
+   above; show it first only when it announces something new to weigh). One post per release; when two betas go out within 3 h, they may be
+   combined in one message, newest release link first.
    Channel `914498730001072149`, via `mcp__discord-mcp__send_message` (the webhook
    only reaches #alpha-testing). If the MCP is down, post through the Discord REST API with the
    bot token from the user environment (`DISCORD_TOKEN`, header `User-Agent: DiscordBot (local, 1.0)`,
