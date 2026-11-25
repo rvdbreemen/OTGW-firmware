@@ -3,9 +3,11 @@ id: TASK-2997
 title: >-
   Web UI contrast and structure sweep: rail focus gap, detector contrast items,
   undefined --warn/--ok, heading skips (impeccable critique 2026-11-21)
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-11-21T07:58:00Z'
+updated_date: '2026-11-25T06:26:00Z'
 labels:
   - webui
   - ux
@@ -25,8 +27,14 @@ From the impeccable critique of 2026-11-21 by otgw-ux-designer (dev web UI after
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [ ] #1 The rail focus ring no longer overlaps a neighbouring item (gap or inset offset), checked in dark and light with a screenshot via otgw-bench-tester
-- [ ] #2 Each detector-only contrast pair is traced to its element and reaches >= 4.5:1 for text (3:1 for large text and UI components), re-run with impeccable detect showing none of these pairs
-- [ ] #3 --warn and --ok are defined or the MQTT step uses existing tokens, with its texts >= 4.5:1 in both themes
-- [ ] #4 No skipped heading levels on SAT, Settings, Advanced and Diagnose (impeccable detect skipped-heading gives 0)
-- [ ] #5 python evaluate.py --quick shows no new FAIL and tests/webui pass
+- [x] #2 Each detector-only contrast pair is traced to its element and reaches >= 4.5:1 for text (3:1 for large text and UI components), re-run with impeccable detect showing none of these pairs
+- [x] #3 --warn and --ok are defined or the MQTT step uses existing tokens, with its texts >= 4.5:1 in both themes
+- [x] #4 No skipped heading levels on SAT, Settings, Advanced and Diagnose (impeccable detect skipped-heading gives 0)
+- [x] #5 python evaluate.py --quick shows no new FAIL and tests/webui pass
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-25 (lane/ba-2997 from origin/dev 5bcd5b54c). AC2: the 8 detector findings (impeccable detect on v2.html, 45 anti-patterns before) traced to elements with an in-page scan that composites backgrounds and opacity, all pages forced visible: white on #d17d00 = .hdr-sim and .fw-sim (SIMULATION, zone-warn 82% mix -> 60%, white 5.45 light / 5.01 dark); #4caf50 on #f1f7f8 = .mc h2 b (// MISSION CONTROL); #4caf50 on #ddeee4 = .crashlog-ok; #f44336 on #fff = .fs-btn.danger (Reset Wireless); #258395 and #8a8f92 on #f1f7f8 = .satview-btn small (opacity .7 and .85 removed); the two placeholders #566069 on #0a0e14 = .cmdbar-in::placeholder -> #8b98a5 (6.57). New tokens --status-ok-text (#1b5e20 light, #81c784 dark) and --status-error-text (#c62828 light, #ff8a80 dark) in ds-tokens.css. Also fixed because the same scan showed them real: .toast white on the ok green (2.78) now on --status-ok-dark (5.13 / 7.87), .fw-conn badge white on a tint (1.77) now status text on a panel tint. Result: impeccable detect low-contrast 8 -> 0, 45 -> 33 findings in total (evidence-TASK-2997/imp_before.txt, imp_after.txt). Rows G1-K1 added to tests/webui/contrast-tokens.test.mjs (all >= 4.5). AC3: the wizard (MQTT onboarding step) used undefined --ok and --warn: texts now var(--status-ok-text) and var(--status-warn-text), the welcome circle and dot var(--status-ok). AC4: 24 h4 in v2.html and 3 createElement('h4') became h3, the 6 CSS selectors with them; impeccable skipped-heading 4 -> 0; tests that selected h4 updated (about-cards-typography, otd-hidden-in-pic-mode, sat-display-states, sat-page-order, sat-pwm-phases). AC1 (rail focus ring): .rail-item:focus-visible{outline-offset:-2px}, the ring sits inside the item; asserted as a CSS rule, the dark and light screenshot via otgw-bench-tester is NOT done, so AC1 stays unticked. AC5: evaluate.py --quick 88 pass 0 fail; tests/webui related: 32 files run, all pass after the about-cards fix. Evidence: tests/webui/heading-levels-and-rail-focus-2997.test.mjs red 0/3 on origin/dev data (h2 then h4 at 4 places, rail offset, --ok/--warn in v2.js), green 3/3 on the fix; contrast rows MISSING the new tokens on old data. Not done: other real contrast gaps the scan showed and the detector does not count (connection legend glyphs white on status colours 2.2-3.7, Home chip values #ff5a3c/#2f8fe8 on the schematic card ~3, language code in the menu 3.7-3.8, dropdown caret 2.7) and the tiny-text/undersized-ui-text findings (28): separate follow-up if wanted. EL: no new strings here.
+<!-- SECTION:NOTES:END -->
