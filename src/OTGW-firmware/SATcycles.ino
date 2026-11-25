@@ -1399,11 +1399,11 @@ bool satCycleCheckLowLoadVeto()
 // time 60 s (entry 407, as thermo-nova). The 60 s are tickMs - start (Q46 B), so the switch comes on the first tick at
 // least 60 s after the first qualifying tick (ticks are never closer than one interval; entry 109). A tick outside CONTINUOUS (:264-266), or within the hot-water guard (:268-274),
 // clears the start.
-// TASK-1762 (Sergeant D entries 288/289): a second rule beside it, a fail-safe for flame out. flow - requested >= 3.5 C
+// TASK-1762 (Sergeant D entries 288/289): a second rule beside it, a fail-safe for flame out. flow - requested >= 3.0 C
 // (SAT_OVERSHOOT_FAILSAFE_DELTA_C, equality included) held for 30 s also switches to PWM. It has its own timer, counted the same
 // way (first qualifying tick starts it, no catch-up, entry 109), and the same gates: outside CONTINUOUS, the hot-water guard and
-// a missing flow clear both starts. Each rule is evaluated on its own: the switch margin setting (fPwmSwitchMargin) may be 0.5-5.0 C, so the 3.5 C rule
-// does not depend on the margin check, and a tick below 3.5 C clears only the fail-safe start. Both use entry path 1 for the
+// a missing flow clear both starts. Each rule is evaluated on its own: the switch margin setting (fPwmSwitchMargin) may be 0.5-5.0 C, so the 3.0 C rule
+// does not depend on the margin check, and a tick below 3.0 C clears only the fail-safe start. Both use entry path 1 for the
 // MsgID 3 permission (always given since entries 392/393); a refusal would clear both starts.
 bool satCycleCheckOvershootSwitch(float requestedSetpoint, uint32_t tickMs)
 {
