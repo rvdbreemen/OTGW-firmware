@@ -393,6 +393,8 @@ static const char ha_tpl_sat_kmh_to_ms[]          PROGMEM = "{{ (value | float /
 static const char ha_json_sat_pid_attributes[]    PROGMEM = "sat/pid_attributes";
 static const char ha_json_sat_cycle_attributes[]  PROGMEM = "sat/cycle_attributes";
 static const char ha_bincls_problem[]             PROGMEM = "problem";
+static const char ha_bincls_connectivity[]        PROGMEM = "connectivity";   // TASK-2971 H3 (ADR-140 section 3)
+static const char ha_bincls_running[]             PROGMEM = "running";        // TASK-2971 H3
 static const char ha_bincls_window[]              PROGMEM = "window";
 const char ha_lbl_centralheating[] PROGMEM = "centralheating";
 const char ha_lbl_centralheating2[] PROGMEM = "centralheating2";
@@ -1451,27 +1453,27 @@ const MqttHaBinSensorCfg PROGMEM mqttHaBinSensors[] = {
 #define SAT_BIN(id, key, icon, cat, enabled, devCls, payloadKind) \
     {id, 0x00, ha_lbl_##key, ha_name_##key, icon, cat, enabled, devCls, payloadKind}
     // --- OT ID 0 ---
-    {  0, MQTT_HA_FLAG_LEGACY_REPLACED_BY_ALIAS, ha_lbl_centralheating, ha_name_central_heating, HaIcon::radiator, HaEntityCat::none, true},
-    {  0, MQTT_HA_FLAG_LEGACY_REPLACED_BY_ALIAS, ha_lbl_centralheating2, ha_name_central_heating_2, HaIcon::radiator, HaEntityCat::none, true},
+    {  0, MQTT_HA_FLAG_LEGACY_REPLACED_BY_ALIAS, ha_lbl_centralheating, ha_name_central_heating, HaIcon::radiator, HaEntityCat::none, true, ha_bincls_running, HaBinaryPayload::on_off},
+    {  0, MQTT_HA_FLAG_LEGACY_REPLACED_BY_ALIAS, ha_lbl_centralheating2, ha_name_central_heating_2, HaIcon::radiator, HaEntityCat::none, true, ha_bincls_running, HaBinaryPayload::on_off},
     {  0, 0x00, ha_lbl_ch2_enable, ha_name_central_heating_2_enable, HaIcon::toggle_switch, HaEntityCat::none, false},
     {  0, 0x00, ha_lbl_ch_enable, ha_name_central_heating_enable, HaIcon::radiator, HaEntityCat::none, true},
-    {  0, 0x00, ha_lbl_cooling, ha_name_cooling, HaIcon::snowflake, HaEntityCat::none, true},
+    {  0, 0x00, ha_lbl_cooling, ha_name_cooling, HaIcon::snowflake, HaEntityCat::none, true, ha_bincls_running, HaBinaryPayload::on_off},
     {  0, 0x00, ha_lbl_cooling_enable, ha_name_cooling_enable, HaIcon::snowflake, HaEntityCat::none, true},
     {  0, 0x00, ha_lbl_dhw_blocking, ha_name_dhw_blocking, HaIcon::water_boiler, HaEntityCat::none, true},
     {  0, 0x00, ha_lbl_dhw_enable, ha_name_domestic_hot_water_enable, HaIcon::water_boiler, HaEntityCat::none, true},
     {  0, MQTT_HA_FLAG_LEGACY_REPLACED_BY_ALIAS, ha_lbl_diagnostic_indicator, ha_name_diagnostic_indicator, HaIcon::information, HaEntityCat::none, true},
-    {  0, MQTT_HA_FLAG_LEGACY_REPLACED_BY_ALIAS, ha_lbl_domestichotwater, ha_name_domestic_hot_water, HaIcon::water_boiler, HaEntityCat::none, true},
+    {  0, MQTT_HA_FLAG_LEGACY_REPLACED_BY_ALIAS, ha_lbl_domestichotwater, ha_name_domestic_hot_water, HaIcon::water_boiler, HaEntityCat::none, true, ha_bincls_running, HaBinaryPayload::on_off},
     {  0, 0x00, ha_lbl_electric_production, ha_name_electric_production, HaIcon::checkbox_marked_circle, HaEntityCat::none, true},
-    {  0, MQTT_HA_FLAG_LEGACY_REPLACED_BY_ALIAS, ha_lbl_fault, ha_name_fault, HaIcon::alert_circle, HaEntityCat::none, true},
-    {  0, 0x00, ha_lbl_flame, ha_name_flame, HaIcon::fire, HaEntityCat::none, true},
+    {  0, MQTT_HA_FLAG_LEGACY_REPLACED_BY_ALIAS, ha_lbl_fault, ha_name_fault, HaIcon::alert_circle, HaEntityCat::none, true, ha_bincls_problem, HaBinaryPayload::on_off},
+    {  0, 0x00, ha_lbl_flame, ha_name_flame, HaIcon::fire, HaEntityCat::none, true, ha_bincls_running, HaBinaryPayload::on_off},
     {  0, 0x00, ha_lbl_otc_active, ha_name_otc_enable, HaIcon::information, HaEntityCat::none, true},
     {  0, 0x00, ha_lbl_summerwintertime, ha_name_summerwintertime, HaIcon::checkbox_marked_circle, HaEntityCat::none, true},
     // ADR-084: OT-bus presence entries are generic (no otgw-pic/ prefix) since
     // 2.0.0 -- stat_t now points at OTGW/value/<uid>/{boiler,thermostat}_connected
     // and HA-discovery no longer requires isPICEnabled() to pass. Do not restore
     // MQTT_HA_FLAG_IS_PIC_ENTRY (0x08) on these rows.
-    {  0, 0x00, ha_lbl_boiler_connected, ha_name_boiler_connected, HaIcon::lan_connect, HaEntityCat::none, true},
-    {  0, 0x00, ha_lbl_thermostat_connected, ha_name_thermostat_connected, HaIcon::lan_connect, HaEntityCat::none, true},
+    {  0, 0x00, ha_lbl_boiler_connected, ha_name_boiler_connected, HaIcon::lan_connect, HaEntityCat::none, true, ha_bincls_connectivity, HaBinaryPayload::on_off},
+    {  0, 0x00, ha_lbl_thermostat_connected, ha_name_thermostat_connected, HaIcon::lan_connect, HaEntityCat::none, true, ha_bincls_connectivity, HaBinaryPayload::on_off},
     // --- OT ID 2 ---
     {  2, MQTT_HA_FLAG_LEGACY_REPLACED_BY_ALIAS, ha_lbl_master_configuration_smart_power, ha_name_master_configuration_smart_power, HaIcon::checkbox_marked_circle, HaEntityCat::diagnostic, true},
     // --- OT ID 3 ---
@@ -1484,12 +1486,12 @@ const MqttHaBinSensorCfg PROGMEM mqttHaBinSensors[] = {
     {  3, MQTT_HA_FLAG_LEGACY_REPLACED_BY_ALIAS, ha_lbl_master_low_off_pump_control_function, ha_name_master_low_off_pump_control_function, HaIcon::checkbox_marked_circle, HaEntityCat::diagnostic, true},
     {  3, MQTT_HA_FLAG_LEGACY_REPLACED_BY_ALIAS, ha_lbl_remote_water_filling_function, ha_name_remote_water_filling_function, HaIcon::checkbox_marked_circle, HaEntityCat::diagnostic, true},
     // --- OT ID 5 ---
-    {  5, 0x00, ha_lbl_air_pressure_fault, ha_name_air_press_fault, HaIcon::alert_circle, HaEntityCat::diagnostic, true},
-    {  5, MQTT_HA_FLAG_LEGACY_REPLACED_BY_ALIAS, ha_lbl_gas_flame_fault, ha_name_gas_flame_fault, HaIcon::alert_circle, HaEntityCat::diagnostic, true},
+    {  5, 0x00, ha_lbl_air_pressure_fault, ha_name_air_press_fault, HaIcon::alert_circle, HaEntityCat::diagnostic, true, ha_bincls_problem, HaBinaryPayload::on_off},
+    {  5, MQTT_HA_FLAG_LEGACY_REPLACED_BY_ALIAS, ha_lbl_gas_flame_fault, ha_name_gas_flame_fault, HaIcon::alert_circle, HaEntityCat::diagnostic, true, ha_bincls_problem, HaBinaryPayload::on_off},
     {  5, MQTT_HA_FLAG_LEGACY_REPLACED_BY_ALIAS, ha_lbl_lockout_reset, ha_name_lockout_reset, HaIcon::checkbox_marked_circle, HaEntityCat::diagnostic, true},
-    {  5, 0x00, ha_lbl_low_water_pressure, ha_name_low_water_press, HaIcon::checkbox_marked_circle, HaEntityCat::diagnostic, true},
-    {  5, MQTT_HA_FLAG_LEGACY_REPLACED_BY_ALIAS, ha_lbl_service_request, ha_name_service_request, HaIcon::checkbox_marked_circle, HaEntityCat::diagnostic, true},
-    {  5, MQTT_HA_FLAG_LEGACY_REPLACED_BY_ALIAS, ha_lbl_water_over_temperature, ha_name_water_over_temp, HaIcon::checkbox_marked_circle, HaEntityCat::diagnostic, true},
+    {  5, 0x00, ha_lbl_low_water_pressure, ha_name_low_water_press, HaIcon::checkbox_marked_circle, HaEntityCat::diagnostic, true, ha_bincls_problem, HaBinaryPayload::on_off},
+    {  5, MQTT_HA_FLAG_LEGACY_REPLACED_BY_ALIAS, ha_lbl_service_request, ha_name_service_request, HaIcon::checkbox_marked_circle, HaEntityCat::diagnostic, true, ha_bincls_problem, HaBinaryPayload::on_off},
+    {  5, MQTT_HA_FLAG_LEGACY_REPLACED_BY_ALIAS, ha_lbl_water_over_temperature, ha_name_water_over_temp, HaIcon::checkbox_marked_circle, HaEntityCat::diagnostic, true, ha_bincls_problem, HaBinaryPayload::on_off},
     // --- OT ID 6 ---
     {  6, MQTT_HA_FLAG_LEGACY_REPLACED_BY_ALIAS, ha_lbl_rbp_dhw_setpoint, ha_name_rbp_dhw_setpoint, HaIcon::water_boiler, HaEntityCat::diagnostic, true},
     {  6, MQTT_HA_FLAG_LEGACY_REPLACED_BY_ALIAS, ha_lbl_rbp_max_ch_setpoint, ha_name_rbp_max_ch_setpoint, HaIcon::checkbox_marked_circle, HaEntityCat::diagnostic, true},
@@ -1501,7 +1503,7 @@ const MqttHaBinSensorCfg PROGMEM mqttHaBinSensors[] = {
     { 70, MQTT_HA_FLAG_LEGACY_REPLACED_BY_ALIAS, ha_lbl_vh_bypass_position, ha_name_vh_bypass_position, HaIcon::checkbox_marked_circle, HaEntityCat::none, false},
     { 70, MQTT_HA_FLAG_LEGACY_REPLACED_BY_ALIAS, ha_lbl_vh_bypass_status, ha_name_vh_bypass_status, HaIcon::checkbox_marked_circle, HaEntityCat::none, false},
     { 70, MQTT_HA_FLAG_LEGACY_REPLACED_BY_ALIAS, ha_lbl_vh_diagnostic_indicator, ha_name_vh_diagnostic_indicator, HaIcon::information, HaEntityCat::none, false},
-    { 70, MQTT_HA_FLAG_LEGACY_REPLACED_BY_ALIAS, ha_lbl_vh_fault, ha_name_vh_fault, HaIcon::alert_circle, HaEntityCat::none, false},
+    { 70, MQTT_HA_FLAG_LEGACY_REPLACED_BY_ALIAS, ha_lbl_vh_fault, ha_name_vh_fault, HaIcon::alert_circle, HaEntityCat::none, false, ha_bincls_problem, HaBinaryPayload::on_off},
     { 70, MQTT_HA_FLAG_LEGACY_REPLACED_BY_ALIAS, ha_lbl_vh_free_ventilation_mode, ha_name_vh_free_ventilation_mode, HaIcon::checkbox_marked_circle, HaEntityCat::none, false},
     { 70, MQTT_HA_FLAG_LEGACY_REPLACED_BY_ALIAS, ha_lbl_vh_free_ventliation_status, ha_name_vh_free_ventliation_status, HaIcon::checkbox_marked_circle, HaEntityCat::none, false},
     { 70, MQTT_HA_FLAG_LEGACY_REPLACED_BY_ALIAS, ha_lbl_vh_ventilation_enabled, ha_name_vh_ventilation_enabled, HaIcon::toggle_switch, HaEntityCat::none, false},
@@ -1514,7 +1516,7 @@ const MqttHaBinSensorCfg PROGMEM mqttHaBinSensors[] = {
     {100, MQTT_HA_FLAG_LEGACY_REPLACED_BY_ALIAS, ha_lbl_remote_override_manual_change_priority, ha_name_remote_override_manual_change_priority, HaIcon::checkbox_marked_circle, HaEntityCat::none, true},
     {100, MQTT_HA_FLAG_LEGACY_REPLACED_BY_ALIAS, ha_lbl_remote_override_program_change_priority, ha_name_remote_override_program_change_priority, HaIcon::checkbox_marked_circle, HaEntityCat::none, true},
     // --- OT ID 101 ---
-    {101, MQTT_HA_FLAG_LEGACY_REPLACED_BY_ALIAS, ha_lbl_solar_storage_slave_fault_indicator, ha_name_solar_storage_slave_fault_indicator, HaIcon::alert_circle, HaEntityCat::none, false},
+    {101, MQTT_HA_FLAG_LEGACY_REPLACED_BY_ALIAS, ha_lbl_solar_storage_slave_fault_indicator, ha_name_solar_storage_slave_fault_indicator, HaIcon::alert_circle, HaEntityCat::none, false, ha_bincls_problem, HaBinaryPayload::on_off},
     // --- OT ID 113 ---
     {113, 0x00, ha_lbl_solar_storage_system_type, ha_name_solar_storage_system_type, HaIcon::checkbox_marked_circle, HaEntityCat::none, true},
     // --- Pseudo-ID 253: TASK-543 weather binary ---
@@ -1544,7 +1546,7 @@ const MqttHaBinSensorCfg PROGMEM mqttHaBinSensors[] = {
     // Values publish "ON"/"OFF" via CCONOFF; the on_off payload writes no
     // pl_on/pl_off, so HA's default ON/OFF payloads apply and match.
     {244, 0x08, ha_lbl_gateway_mode,   ha_name_gateway_mode,   HaIcon::lan_connect, HaEntityCat::diagnostic, true},
-    {244, 0x00, ha_lbl_otgw_connected, ha_name_otgw_connected, HaIcon::lan_connect, HaEntityCat::diagnostic, true},
+    {244, 0x00, ha_lbl_otgw_connected, ha_name_otgw_connected, HaIcon::lan_connect, HaEntityCat::diagnostic, true, ha_bincls_connectivity, HaBinaryPayload::on_off},
     // --- Pseudo-ID 240: a command was dropped after 5 unanswered tries (TASK-1439) ---
     // ON on a drop, OFF on the next confirmed command; ON/OFF via CCONOFF.
     {240, 0x00, ha_lbl_cmd_retry_exceeded, ha_name_cmd_retry_exceeded, HaIcon::alert_circle, HaEntityCat::diagnostic, true},
@@ -1573,16 +1575,16 @@ const MqttHaBinSensorCfg PROGMEM mqttHaBinSensors[] = {
     {  6, MQTT_HA_FLAG_IS_HA_CORE_ALIAS, ha_lbl_alias_supports_central_heating_setpoint_writing,  ha_name_alias_supports_central_heating_setpoint_writing,  HaIcon::checkbox_marked_circle, HaEntityCat::diagnostic, true},
     { 74, MQTT_HA_FLAG_IS_HA_CORE_ALIAS, ha_lbl_alias_supports_ventilation_bypass,                ha_name_alias_supports_ventilation_bypass,                HaIcon::checkbox_marked_circle, HaEntityCat::diagnostic, false},
     // --- ADR-105 Category B: plain-name HA-core verbatim (12) ---
-    {  0, MQTT_HA_FLAG_IS_HA_CORE_ALIAS, ha_lbl_alias_fault_indication,             ha_name_alias_fault_indication,             HaIcon::alert_circle,           HaEntityCat::none, true},
-    {  0, MQTT_HA_FLAG_IS_HA_CORE_ALIAS, ha_lbl_alias_central_heating,              ha_name_alias_central_heating,              HaIcon::radiator,               HaEntityCat::none, true},
-    {  0, MQTT_HA_FLAG_IS_HA_CORE_ALIAS, ha_lbl_alias_hot_water,                    ha_name_alias_hot_water,                    HaIcon::water_boiler,           HaEntityCat::none, true},
-    {  0, MQTT_HA_FLAG_IS_HA_CORE_ALIAS, ha_lbl_alias_central_heating_2,            ha_name_alias_central_heating_2,            HaIcon::radiator,               HaEntityCat::none, true},
+    {  0, MQTT_HA_FLAG_IS_HA_CORE_ALIAS, ha_lbl_alias_fault_indication,             ha_name_alias_fault_indication,             HaIcon::alert_circle,           HaEntityCat::none, true, ha_bincls_problem, HaBinaryPayload::on_off},
+    {  0, MQTT_HA_FLAG_IS_HA_CORE_ALIAS, ha_lbl_alias_central_heating,              ha_name_alias_central_heating,              HaIcon::radiator,               HaEntityCat::none, true, ha_bincls_running, HaBinaryPayload::on_off},
+    {  0, MQTT_HA_FLAG_IS_HA_CORE_ALIAS, ha_lbl_alias_hot_water,                    ha_name_alias_hot_water,                    HaIcon::water_boiler,           HaEntityCat::none, true, ha_bincls_running, HaBinaryPayload::on_off},
+    {  0, MQTT_HA_FLAG_IS_HA_CORE_ALIAS, ha_lbl_alias_central_heating_2,            ha_name_alias_central_heating_2,            HaIcon::radiator,               HaEntityCat::none, true, ha_bincls_running, HaBinaryPayload::on_off},
     {  0, MQTT_HA_FLAG_IS_HA_CORE_ALIAS, ha_lbl_alias_diagnostic_indication,        ha_name_alias_diagnostic_indication,        HaIcon::information,            HaEntityCat::none, true},
     {  3, MQTT_HA_FLAG_IS_HA_CORE_ALIAS, ha_lbl_alias_control_type,                 ha_name_alias_control_type,                 HaIcon::checkbox_marked_circle, HaEntityCat::diagnostic, true},
     {  3, MQTT_HA_FLAG_IS_HA_CORE_ALIAS, ha_lbl_alias_hot_water_config,             ha_name_alias_hot_water_config,             HaIcon::water_boiler,           HaEntityCat::diagnostic, true},
-    {  5, MQTT_HA_FLAG_IS_HA_CORE_ALIAS, ha_lbl_alias_service_required,             ha_name_alias_service_required,             HaIcon::checkbox_marked_circle, HaEntityCat::diagnostic, true},
-    {  5, MQTT_HA_FLAG_IS_HA_CORE_ALIAS, ha_lbl_alias_gas_fault,                    ha_name_alias_gas_fault,                    HaIcon::alert_circle,           HaEntityCat::diagnostic, true},
-    {  5, MQTT_HA_FLAG_IS_HA_CORE_ALIAS, ha_lbl_alias_water_overtemperature,        ha_name_alias_water_overtemperature,        HaIcon::checkbox_marked_circle, HaEntityCat::diagnostic, true},
+    {  5, MQTT_HA_FLAG_IS_HA_CORE_ALIAS, ha_lbl_alias_service_required,             ha_name_alias_service_required,             HaIcon::checkbox_marked_circle, HaEntityCat::diagnostic, true, ha_bincls_problem, HaBinaryPayload::on_off},
+    {  5, MQTT_HA_FLAG_IS_HA_CORE_ALIAS, ha_lbl_alias_gas_fault,                    ha_name_alias_gas_fault,                    HaIcon::alert_circle,           HaEntityCat::diagnostic, true, ha_bincls_problem, HaBinaryPayload::on_off},
+    {  5, MQTT_HA_FLAG_IS_HA_CORE_ALIAS, ha_lbl_alias_water_overtemperature,        ha_name_alias_water_overtemperature,        HaIcon::checkbox_marked_circle, HaEntityCat::diagnostic, true, ha_bincls_problem, HaBinaryPayload::on_off},
     {100, MQTT_HA_FLAG_IS_HA_CORE_ALIAS, ha_lbl_alias_override_manual_change_prio,  ha_name_alias_override_manual_change_prio,  HaIcon::checkbox_marked_circle, HaEntityCat::none, true},
     {100, MQTT_HA_FLAG_IS_HA_CORE_ALIAS, ha_lbl_alias_override_program_change_prio, ha_name_alias_override_program_change_prio, HaIcon::checkbox_marked_circle, HaEntityCat::none, true},
     // --- ADR-105 Category C: plain-name firmware-coined (13) ---
@@ -1590,7 +1592,7 @@ const MqttHaBinSensorCfg PROGMEM mqttHaBinSensors[] = {
     { 70, MQTT_HA_FLAG_IS_HA_CORE_ALIAS, ha_lbl_alias_ventilation_bypass_position,  ha_name_alias_ventilation_bypass_position,  HaIcon::checkbox_marked_circle, HaEntityCat::none, false},
     { 70, MQTT_HA_FLAG_IS_HA_CORE_ALIAS, ha_lbl_alias_ventilation_bypass_mode,      ha_name_alias_ventilation_bypass_mode,      HaIcon::checkbox_marked_circle, HaEntityCat::none, false},
     { 70, MQTT_HA_FLAG_IS_HA_CORE_ALIAS, ha_lbl_alias_ventilation_free_mode,        ha_name_alias_ventilation_free_mode,        HaIcon::checkbox_marked_circle, HaEntityCat::none, false},
-    { 70, MQTT_HA_FLAG_IS_HA_CORE_ALIAS, ha_lbl_alias_ventilation_fault,            ha_name_alias_ventilation_fault,            HaIcon::alert_circle,           HaEntityCat::none, false},
+    { 70, MQTT_HA_FLAG_IS_HA_CORE_ALIAS, ha_lbl_alias_ventilation_fault,            ha_name_alias_ventilation_fault,            HaIcon::alert_circle,           HaEntityCat::none, false, ha_bincls_problem, HaBinaryPayload::on_off},
     { 70, MQTT_HA_FLAG_IS_HA_CORE_ALIAS, ha_lbl_alias_ventilation_active,           ha_name_alias_ventilation_active,           HaIcon::checkbox_marked_circle, HaEntityCat::none, false},
     { 70, MQTT_HA_FLAG_IS_HA_CORE_ALIAS, ha_lbl_alias_ventilation_bypass_status,    ha_name_alias_ventilation_bypass_status,    HaIcon::checkbox_marked_circle, HaEntityCat::none, false},
     { 70, MQTT_HA_FLAG_IS_HA_CORE_ALIAS, ha_lbl_alias_ventilation_bypass_automatic, ha_name_alias_ventilation_bypass_automatic, HaIcon::checkbox_marked_circle, HaEntityCat::none, false},
@@ -1598,7 +1600,7 @@ const MqttHaBinSensorCfg PROGMEM mqttHaBinSensors[] = {
     { 70, MQTT_HA_FLAG_IS_HA_CORE_ALIAS, ha_lbl_alias_ventilation_diagnostic,       ha_name_alias_ventilation_diagnostic,       HaIcon::information,            HaEntityCat::none, false},
     { 74, MQTT_HA_FLAG_IS_HA_CORE_ALIAS, ha_lbl_alias_ventilation_system_type,      ha_name_alias_ventilation_system_type,      HaIcon::checkbox_marked_circle, HaEntityCat::diagnostic, false},
     { 74, MQTT_HA_FLAG_IS_HA_CORE_ALIAS, ha_lbl_alias_ventilation_speed_control_type, ha_name_alias_ventilation_speed_control_type, HaIcon::checkbox_marked_circle, HaEntityCat::diagnostic, false},
-    {101, MQTT_HA_FLAG_IS_HA_CORE_ALIAS, ha_lbl_alias_solar_storage_fault,          ha_name_alias_solar_storage_fault,          HaIcon::alert_circle,           HaEntityCat::none, false},
+    {101, MQTT_HA_FLAG_IS_HA_CORE_ALIAS, ha_lbl_alias_solar_storage_fault,          ha_name_alias_solar_storage_fault,          HaIcon::alert_circle,           HaEntityCat::none, false, ha_bincls_problem, HaBinaryPayload::on_off},
 };
 #undef SAT_BIN
 
