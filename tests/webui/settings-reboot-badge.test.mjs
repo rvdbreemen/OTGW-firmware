@@ -27,7 +27,7 @@ test('REBOOT badge: tooltip, aria-label, not clickable-looking', { skip: !CHROME
     // there with a non-auto cursor, for at most 5 s of wall time, then assert on the last read. A real
     // regression (badge missing, pointer cursor) still fails: it never settles to the right state.
     const READ = `(function(){
-      return ['.rail-item[data-cat="network"] .badge-reboot', '.set-cat-title .badge-reboot'].map(function (sel) {
+      return ['.rail-item[data-cat="network"] .ri-reboot', '.set-cat-title .badge-reboot'].map(function (sel) {
         var b = document.querySelector(sel); if (!b) return null;
         var cs = getComputedStyle(b);
         return { tag: b.tagName, text: b.textContent, title: b.title, aria: b.getAttribute('aria-label'), role: b.getAttribute('role'),
@@ -43,7 +43,16 @@ test('REBOOT badge: tooltip, aria-label, not clickable-looking', { skip: !CHROME
     assert.ok(Array.isArray(info), 'badge read returned ' + JSON.stringify(info));
     const shotDir = process.env.OTGW_SHOT_DIR;
     if (shotDir) await h.shot(path.join(shotDir, '1398.png'));
-    for (const b of info) {
+    // TASK-2960: the rail shows a dot (role img, no text); the category header keeps the REBOOT badge
+    const [dot, badge] = info;
+    assert.ok(dot, 'rail dot present: ' + JSON.stringify(info));
+    assert.equal(dot.text, '', 'the rail dot carries no text');
+    assert.equal(dot.tag, 'SPAN');
+    assert.equal(dot.role, 'img');
+    assert.match(dot.title, /reboot/i, 'dot tooltip explains it: ' + JSON.stringify(dot));
+    assert.match(dot.aria || '', /reboot/i, 'dot aria-label explains it: ' + JSON.stringify(dot));
+    assert.equal(dot.tabindex, null, 'the dot is not a control: it is part of the rail button');
+    for (const b of [badge]) {
       assert.ok(b, 'badge present: ' + JSON.stringify(info));
       assert.equal(b.text, 'REBOOT');
       assert.match(b.title, /reboot/i, 'tooltip explains the badge: ' + JSON.stringify(b));
