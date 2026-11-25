@@ -44,6 +44,8 @@ Proposed, 2026-11-20.
 
 **Amended in place on 2026-11-25 (still Proposed)**, after ADR-266 was Accepted as Nagle only, without the per-loop PUBLISH cap. Robert decided on 2026-11-25 that this pacer is built for 2.0.0 in four cuts before the stable, each behind its own compile-time switch, with Nagle (ADR-266) in its own soak. The library-cap reliance is removed, and the Decision Contract is split into a contract per cut and the target after cut 4.
 
+**Amended in place again on 2026-11-25 (still Proposed)**, after Robert set the test scheme (2026-11-25, about 22:00, relayed by the coordinator): 15 min bench per task, 60 min on a public beta release build, and a long run of more than 24 h only for the final release, which may run in the field on the public betas. One cause per build stays the attribution default for MQTT, TCP and heap changes, so Nagle and each cut ride their own beta. Each cut's switch gains a RAM-only runtime flag in prerelease builds, through the debug-flag table of ADR-206, so an anomaly is bisected by a toggle instead of a rebuild. Each paced producer gets two counters. ADR-206 itself is not changed.
+
 **Decision Maker:** Agent: Claude (otgw-architect), on a design question from the coordinator. Acceptance is Robert's.
 
 ## Status History
@@ -151,22 +153,25 @@ static inline bool satOutboxFull() {
 
 ## Decision Contract
 
-### Must (contract per cut; each cut ships with its own compile-time switch, `false` = the code before that cut)
+### Must (contract per cut; each cut ships with its own switch: a compile-time default, `false` = the code before that cut, plus a runtime flag in prerelease builds)
 
 - **Cut 1, SAT shadow gate:** `satOutboxFull()` (`SATmqttPublish.cpp`) defers when `mqttPaceAllows()` says no, on top of its existing conditions, and keeps the shadow and `s_satPublishDeferred`. A liveness bound publishes one SAT helper per pass after `MQTT_PACE_MAX_WAIT_MS` without a yes. The post-connect pace window and the SAT limit of 24 stay until the target.
 - **Cut 2, discovery drip:** `loopMQTTDiscovery()` asks `mqttPaceAllows()` before a drip publish, keeps its pending position, and keeps consulting `isDripDeferred()` (ADR-088).
 - **Cut 3, connect stages:** `connStageTick()` asks `mqttPaceAllows()` for each portion, with the existing 5 s publish-anyway as its liveness. The decision on `publishAllPICsettings()` (Open Question 3) is made in this cut.
 - **Cut 4, stale override sweep and hourly stats:** `staleOverrideClearTick()` and `loopMQTTStatsPacer()` ask `mqttPaceAllows()` and keep their pending state.
 - **Every cut:** `MQTT_PACE_MAX_OUTBOX`, `MQTT_PACE_MIN_BLOCK` and `MQTT_PACE_MAX_WAIT_MS` are defined once, next to `mqttPaceAllows()`, with values from the Open Question 1 measurement; every paced producer has a liveness bound; the pacer runs on the loop task only, and a request from another task sets a flag the loop task consumes, as `queueMQTTRepublishAll()` does (`OTGW-Core.ino:2217`).
+- **Every cut, runtime flag:** one `bool` per cut in `DebugSection` (`state.debug`), default `true`, with one row in `kDebugFlags` (`debugFlags.h`, ADR-206), so the telnet key and `GET/POST /api/v2/debug/flags` share it. The flag and its row exist only under `#if defined(_VERSION_PRERELEASE)`, like the bench hooks in `handleDebug.ino`; a stable build has the compile-time default only. The flag is RAM-only: no settings key, no persistence, a reboot sets it back to `true`. The pacer reads it on the loop task; a REST write from another task is a single `bool` store, as for the other debug flags. With the flag `false` the cut's producer behaves as the code before that cut.
+- **Every cut, counters:** per paced producer, a count of "pace said no" and a count of "liveness fired", visible on telnet and in the `[HEAP]` telemetry, so an anomaly can be attributed to a producer without a bisect run.
 
 ### Must (target, after cut 4)
 
-- Every deferrable bulk producer (the SAT shadow helpers, `loopMQTTDiscovery()`, `connStageTick()`, `staleOverrideClearTick()`, `publishAllPICsettings()` unless Open Question 3 decides otherwise, `loopMQTTStatsPacer()`) is paced only by `mqttPaceAllows()`. The per-gate constants, the post-connect window and `SAT_MQTT_OUTBOX_LIMIT` are removed; the compile-time switches go once each cut has soaked.
+- Every deferrable bulk producer (the SAT shadow helpers, `loopMQTTDiscovery()`, `connStageTick()`, `staleOverrideClearTick()`, `publishAllPICsettings()` unless Open Question 3 decides otherwise, `loopMQTTStatsPacer()`) is paced only by `mqttPaceAllows()`. The per-gate constants, the post-connect window and `SAT_MQTT_OUTBOX_LIMIT` are removed; the compile-time switches and the runtime flags go once each cut has passed its gates and the final release's long run.
 
 ### Must Not
 
 - Must not hold or drop a per-frame `processOT()` publish or a status fan-out. Those stay under ADR-088.
 - Must not patch the vendored espMqttClient beyond what ADR-186, ADR-264 and ADR-266 allow. The pacer itself needs no library change.
+- Must not add a settings key, a persisted value or a stable-build REST control for a cut's switch.
 - Must not bring back heap-tier gating. ADR-167 stays: the pacer reads the largest free block as a send condition, not as a tier.
 - Before the target: must not add a new outbox-depth threshold outside `mqttPaceAllows()`; the existing ones of gates not yet converted stay until their cut.
 - After the target: must not compare `MQTTclient.queueSize()` or `mqttOutboxDepth()` against a threshold outside the pacer.
@@ -178,9 +183,10 @@ static inline bool satOutboxFull() {
 ### Verification
 
 - A host test compiles the real `mqttPaceAllows()` and the real `SATmqttPublish.cpp`, then drives a first-seen SAT set of at least 140 topics. It counts the packets queued per pass. It must go red on the code before this ADR (up to 24 or 25 per pass) and green on the pacer (the outbox never holds more than `MQTT_PACE_MAX_OUTBOX` plus the event-driven packets of that pass). A second case keeps the outbox stuck and shows the liveness bound publishes everything.
-- Per cut, a host test runs red on the code before the cut and green on it, with its switch `false` equal to the old behaviour, and mutants (pacer always yes, liveness removed, liveness publishing the whole set) that turn a test red.
+- Per cut, a host test runs red on the code before the cut and green on it, with its switch `false` equal to the old behaviour, and mutants (pacer always yes, liveness removed, liveness publishing the whole set, runtime flag ignored) that turn a test red. One case toggles the runtime flag in the middle of a pass. `tests/test_debug_flags_api.py` stays green with the new rows.
 - Until the target, a narrow `evaluate.py` check: each converted producer calls `mqttPaceAllows()`, and the `MQTT_PACE_*` constants are defined once. After cut 4, the full gate: it fails when `queueSize()` or `mqttOutboxDepth()` is compared against a number outside `mqttPaceAllows()` (TASK-2949.10).
-- Bench: the TASK-2019 takeover recipe and the TASK-1757 W/C/B boot recipe on .61. No `[HEAP] sat-takeover-probe` or connect-probe drop of 10 KB or more at `at=13 from=12`. Old-vs-new numbers go in the task.
+- Bench: the TASK-2019 takeover recipe and the TASK-1757 W/C/B boot recipe on .61. No `[HEAP] sat-takeover-probe` or connect-probe drop of 10 KB or more at `at=13 from=12`. Old-vs-new numbers go in the task. A/B runs toggle the runtime flag on one binary (same heap layout).
+- Per cut on .61, on the cut's build: a 15 min bench with forced events, each once: a broker outage of about 30 s (connect stages only) and one of more than 300 s (`MQTT_REPUBLISH_OFFLINE_THRESHOLD_MS`, the only trigger of the value republish and discovery reset after a reconnect), republish-all, discovery republish, SAT disable and enable, and a WiFi drop (recipe `OTGW-field-data/_comms/soak12_recipe.md`). Then 60 min on the public beta release build that carries the cut. The final release candidate, carrying all four cuts, runs more than 24 h in the field before the stable.
 
 ## Alternatives Considered
 
@@ -222,6 +228,8 @@ static inline bool satOutboxFull() {
 - ADR-266 (Accepted 2026-11-25: Nagle on the MQTT socket, via the fork; the per-loop cap dropped): the segment bound for every publisher. The pacer does not depend on it, but a cut's bench result does.
 - ADR-264 (Accepted: espMqttClient from our fork as a vendored copy of a pinned tag): the route for the Nagle change.
 - ADR-216 (web send-queue cap): the transport-level precedent, and why it does not carry over to small MQTT packets.
+- ADR-206 (Accepted: debug flags by name from one shared table): the cut switches use its table as prerelease-only rows. Not amended; this ADR records that use.
+- ADR-051 (settings and state): the runtime flag lives in the state struct (`DebugSection`), not in settings.
 - ADR-090 (re-entrancy guards): the per-pass counter is loop-task state; `doBackgroundTasks()` re-entry must not reset it mid-pass.
 
 ## References
