@@ -1709,7 +1709,7 @@ Weather data provides:
 | `satweatherlon` | 0.0 | -180 to 180 | Longitude |
 | `satweatherinterval` | 900 | 300-3600 s | Poll interval (default 15 min, minimum 5 min) |
 
-Browsers only allow geolocation over HTTPS or on localhost. When you open the web UI over HTTPS (behind a reverse proxy), the SAT page shows a **Detect location** button. On plain `http://<device-ip>` the button is hidden; enter Latitude and Longitude under SAT settings > Weather instead. Weather data is fetched via plain HTTP (no HTTPS). The first fetch is gated 5 minutes after boot so DHCP, NTP, and MQTT have time to settle before the first HTTPS-free Open-Meteo call. The streaming JSON parser is allocation-free (no malloc inside the SAT loop). For debugging, the telnet console accepts `w` to force an immediate fetch + dump (TASK-513).
+Browsers only allow geolocation over HTTPS or on localhost. When you open the web UI over HTTPS (behind a reverse proxy), the SAT page shows a **Detect location** button. On plain `http://<device-ip>` the button is hidden and the SAT page shows this hint instead: "Enter your Latitude and Longitude under SAT settings › Weather, or let Home Assistant publish sat/sun_elevation." The words "SAT settings › Weather" are a link: it opens the SAT page in the Control view at the Weather group with the Latitude field focused (while SAT is off the fields are locked and the group heading gets the focus). **Detect location** only appears in a secure context, for example behind an HTTPS Home Assistant ingress. A published `sat/sun_elevation` only replaces the sun elevation for solar gain (section 5.10); fetching the weather itself still needs Latitude and Longitude. Weather data is fetched via plain HTTP (no HTTPS). The first fetch is gated 5 minutes after boot so DHCP, NTP, and MQTT have time to settle before the first HTTPS-free Open-Meteo call. The streaming JSON parser is allocation-free (no malloc inside the SAT loop). For debugging, the telnet console accepts `w` to force an immediate fetch + dump (TASK-513).
 
 ---
 
@@ -4896,7 +4896,6 @@ The commands below pass the payload unchanged to the named setting, the same set
 | `sat/fireplace_mode` | `SATfireplace` |
 | `sat/mqtt_fallback` | `SATmqttfallback` |
 | `sat/external_temp` | `SATexternaltemp` |
-| `sat/room_source` | `SATroomsource` |
 | `sat/flame_off_offset` | `SATflameoffset` |
 | `sat/overshoot_protection` | `SATovershootprotection` |
 | `sat/flow_offset` | `SATflowoffset` |
