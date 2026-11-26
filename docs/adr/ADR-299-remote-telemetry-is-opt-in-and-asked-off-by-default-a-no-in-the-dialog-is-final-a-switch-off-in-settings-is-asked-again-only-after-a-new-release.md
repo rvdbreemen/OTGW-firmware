@@ -1,7 +1,7 @@
 ---
 id: "ADR-299"
 title: "Remote telemetry is opt-in and asked: off by default, a No in the dialog is final, a switch-off in Settings is asked again only after a new release"
-status: "Proposed"
+status: "Accepted"
 date: "2026-11-26"
 binding: false
 gate: null
@@ -30,7 +30,7 @@ format: "canonical"
 
 ## Status
 
-Proposed, 2026-11-26.
+Accepted, 2026-11-26.
 
 ## Status History
 
@@ -41,6 +41,11 @@ status_history:
     changed_by: "Agent: Claude (otgw-architect)"
     reason: Initial proposal
     changed_via: adr-kit
+  - date: 2026-11-26
+    status: Accepted
+    changed_by: "Robert van den Breemen (decision, interactive answer to the coordinator, relayed), recorded by Agent: Claude (otgw-architect)"
+    reason: "Accepted by Robert: verbatim 'Accepteren zoals het staat (Recommended)', interactive answer to the coordinator, relayed; not seen by otgw-architect"
+    changed_via: adr-kit lifecycle
 ```
 
 ## Context
@@ -215,7 +220,7 @@ Guideline-level per ADR-080, with a test gate once TASK-3092 is built:
   what the rule gives any Settings switch-off. (An earlier draft asked about a blocked gateway; that is covered by
   Robert's 2026-11-19 and 2026-11-20 points, see Must Not.)
   — **Answered 2026-11-26 by Robert van den Breemen (decision, interactive answer to the coordinator, relayed), recorded by Agent: Claude (otgw-architect):** verbatim 'Eenmalig vragen (Recommended)', Robert, 2026-11-26 about 21:30 local, interactive answer to the coordinator (relayed by the coordinator; not seen by otgw-architect). Option B: a unit with optin off and no offsrc is asked once (after the next release); a No in that dialog is then final, a Settings switch-off follows the normal rule.
-- [ ] 2. Robert: acceptance of this ADR.
+- [x] 2. Robert: acceptance of this ADR. — **Answered 2026-11-26 by Robert van den Breemen (decision, interactive answer to the coordinator, relayed), recorded by Agent: Claude (otgw-architect):** Accepted. Verbatim 'Accepteren zoals het staat (Recommended)', Robert, 2026-11-26, recorded 23:14 WEST (time from date on this machine), interactive answer to the coordinator (relayed by the coordinator; not seen by otgw-architect).
 
 ## Related Decisions
 

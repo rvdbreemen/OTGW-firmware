@@ -281,5 +281,5 @@ One row per Architecture Decision Record. Scope is the Enforcement `path_glob` s
 | ADR-296 | Accepted | - | SAT keeps one PWM ON clock per flame. |
 | ADR-297 | Accepted | - | This ADR amends ADR-236 in three points. |
 | ADR-298 | Accepted | - | All three 4MB targets (esp32, esp32-classic, esp32-combo) move to one new table. |
-| ADR-299 | Proposed | - | Remote telemetry is off until the user says yes, and the gateway asks the user in a dialog, at most at these moments. |
+| ADR-299 | Accepted | - | Remote telemetry is off until the user says yes, and the gateway asks the user in a dialog, at most at these moments. |
 | ADR-300 | Accepted | - | Decision maker: Robert van den Breemen (maintainer). |

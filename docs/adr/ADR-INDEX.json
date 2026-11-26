@@ -11974,7 +11974,7 @@
       "title": "Remote telemetry is opt-in and asked: off by default, a No in the dialog is final, a switch-off in Settings is asked again only after a new release",
       "path": "ADR-299-remote-telemetry-is-opt-in-and-asked-off-by-default-a-no-in-the-dialog-is-final-a-switch-off-in-settings-is-asked-again-only-after-a-new-release.md",
       "format": "canonical",
-      "status": "Proposed",
+      "status": "Accepted",
       "date": "2026-11-26",
       "decision_summary": "Remote telemetry is off until the user says yes, and the gateway asks the user in a dialog, at most at these moments.",
       "topics": [
