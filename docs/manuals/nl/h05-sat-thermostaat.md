@@ -39,7 +39,7 @@ SAT ondersteunt vier systeemtypes: auto-detect, radiatoren, warmtepomp en vloerv
 **Ruimtetemperatuurmeting**
 SAT heeft een ruimtetemperatuurmeting nodig. SAT gebruikt de eerste bron met een bruikbare waarde, in deze volgorde:
 1. BLE-sensor (Xiaomi LYWSD03MMC of BTHome v2; verouderd na 5 minuten zonder update)
-2. Multi-area gewogen gemiddelde (tot 4 zones; als multi-area aan staat en minstens één zone geldig is)
+2. Gewogen gemiddelde van de kamersensoren (tot 4 sensoren; als "Meerdere kamersensoren middelen" aan staat en minstens één sensor geldig is)
 3. Externe push via MQTT (`sat/indoor_temp`) of de REST API (alleen met `satexternaltemp` aan; verouderd na `satsensormaxage`, standaard 21600 s = 6 uur)
 4. OpenTherm bericht-ID 24 van uw thermostaat (verouderd na 5 minuten zonder verversing)
 
@@ -91,7 +91,7 @@ curl -X POST -d '{"name":"satenabled","value":"true"}' \
 | `satcoefficient` | `1.5` | 0.1-5.0 | Steilheid van de verwarmingscurve |
 | `satinterval` | `30` | 10-300 s | Regelinterval: hoe vaak SAT het setpoint berekent en verstuurt. De PID-toestand volgt dit niet: die schuift op met een eigen vaste timer van 60 s (zie PID-tuning) |
 | `satexternaltemp` | `false` | bool | Externe ruimtetemperatuurbron gebruiken |
-| `satroomsource` | `auto` | auto, thermostat, external, ble, areas | Primaire bron voor de ruimtetemperatuur (TASK-3011). REST en MQTT accepteren de naam of het nummer 0 tot 4. `auto` probeert eerst de vastgepinde BLE-sensor, dan de gemiddelde ruimtesensoren, dan de externe sensor, dan de thermostaat. Een andere keuze gaat voor, de overige bronnen volgen in diezelfde volgorde. Een bron telt alleen mee als hij aan staat en een verse waarde heeft. Is er geen enkele geldig, dan regelt SAT alleen op de stooklijn. De ruimtetegel in de webinterface en `sat/room_temp_source` tonen welke bron in gebruik is. De simulatiemodus gaat boven alles |
+| `satroomsource` | `auto` | auto, thermostat, external, ble, areas | Primaire bron voor de ruimtetemperatuur (TASK-3011). REST en MQTT accepteren de naam of het nummer 0 tot 4. `auto` probeert eerst de vastgepinde BLE-sensor, dan de gemiddelde kamersensoren, dan de externe sensor, dan de thermostaat. Een andere keuze gaat voor, de overige bronnen volgen in diezelfde volgorde. Een bron telt alleen mee als hij aan staat en een verse waarde heeft. Is er geen enkele geldig, dan regelt SAT alleen op de stooklijn. De ruimtetegel in de webinterface en `sat/room_temp_source` tonen welke bron in gebruik is. De simulatiemodus gaat boven alles |
 | `satovershootprotection` | `true` | bool | PWM-start en modulatie-onderdrukking (zie 5.6). Geldt voor elke warmtebron |
 | `satmaxrelmod` | `100` | 0-100 % | Maximale relatieve modulatie naar ketel (MM= commando) |
 | `satmanufacturer` | `0` | 0-18 | Ketelmerkt (0 = auto-detect) |
@@ -466,9 +466,9 @@ Indien ingeschakeld, schakelt SAT automatisch de verwarming uit wanneer de buite
 
 ---
 
-### 5.13 Multi-area temperatuur
+### 5.13 Gemiddelde kamersensoren
 
-SAT ondersteunt tot 4 temperatuurinvoerzones met configureerbare gewichten. De effectieve ruimtetemperatuur die door de PID-controller wordt gebruikt, is het gewogen gemiddelde van alle geldige, niet-verlopen area-temperaturen. In de webinterface heet dit de groep **Gemiddelde ruimtesensoren** (Sensor 1 tot 4 met hun gewichten); het aantal zones, de timeout en de headroom staan in de aparte groep **Zones** (paragraaf 5.14). Sleutels, MQTT en REST zijn niet veranderd (TASK-3014). Of dit gemiddelde de ruimtetemperatuur is die SAT gebruikt, hangt af van `satroomsource` (paragraaf 5.4).
+SAT ondersteunt tot 4 temperatuurinvoerzones met configureerbare gewichten. De effectieve ruimtetemperatuur die door de PID-controller wordt gebruikt, is het gewogen gemiddelde van alle geldige, niet-verlopen area-temperaturen. In de webinterface heet dit de groep **Gemiddelde kamersensoren** (Sensor 1 tot 4 met hun gewichten); het aantal zones, de timeout en de headroom staan in de aparte groep **Zones** (paragraaf 5.14). Sleutels, MQTT en REST zijn niet veranderd (TASK-3014). Of dit gemiddelde de ruimtetemperatuur is die SAT gebruikt, hangt af van `satroomsource` (paragraaf 5.4).
 
 Area-waarden kunnen uit drie onafhankelijke bronnen komen:
 
@@ -484,7 +484,7 @@ mosquitto_pub -h your-broker -t "OTGW/set/otgw-AABBCCDDEEFF/sat/area/1" -m "20.8
 
 | Parameter | Standaard | Bereik | Omschrijving |
 |---|---|---|---|
-| `satmultiarea` | `false` | bool | Multi-area gewogen temperatuur inschakelen |
+| `satmultiarea` | `false` | bool | Meerdere kamersensoren middelen (gewogen gemiddelde) |
 | `satmultiareacount` | `0` | 0-4 | Aantal geconfigureerde zones |
 | `satareaweight0..3` | `1.0` | 0-10 | Gewicht per zone |
 
