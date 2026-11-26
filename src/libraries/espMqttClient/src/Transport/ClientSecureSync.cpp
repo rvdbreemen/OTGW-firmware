@@ -9,6 +9,7 @@ the LICENSE file.
 #if defined(ARDUINO_ARCH_ESP8266) || defined(ARDUINO_ARCH_ESP32)
 
 #include "ClientSecureSync.h"
+#include "../Config.h"
 #include <lwip/sockets.h>  // socket options
 
 namespace espMqttClientInternals {
@@ -22,10 +23,10 @@ bool ClientSecureSync::connect(IPAddress ip, uint16_t port) {
   bool ret = client.connect(ip, port);  // implicit conversion of return code int --> bool
   if (ret) {
     #if defined(ARDUINO_ARCH_ESP8266)
-    client.setNoDelay(true);
+    client.setNoDelay(EMC_TCP_NODELAY);
     #elif defined(ARDUINO_ARCH_ESP32)
     // Set TCP option directly to bypass lack of working setNoDelay for WiFiClientSecure
-    int val = true;
+    int val = EMC_TCP_NODELAY;
     client.setSocketOption(IPPROTO_TCP, TCP_NODELAY, &val, sizeof(int));
     #endif
   }
@@ -36,10 +37,10 @@ bool ClientSecureSync::connect(const char* host, uint16_t port) {
   bool ret = client.connect(host, port);  // implicit conversion of return code int --> bool
   if (ret) {
     #if defined(ARDUINO_ARCH_ESP8266)
-    client.setNoDelay(true);
+    client.setNoDelay(EMC_TCP_NODELAY);
     #elif defined(ARDUINO_ARCH_ESP32)
     // Set TCP option directly to bypass lack of working setNoDelay for WiFiClientSecure
-    int val = true;
+    int val = EMC_TCP_NODELAY;
     client.setSocketOption(IPPROTO_TCP, TCP_NODELAY, &val, sizeof(int));
     #endif
   }

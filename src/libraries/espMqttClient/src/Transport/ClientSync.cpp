@@ -21,18 +21,18 @@ ClientSync::ClientSync()
 
 bool ClientSync::connect(IPAddress ip, uint16_t port) {
   #if defined(ARDUINO_ARCH_ESP32)
-  // OTGW-firmware patch (TASK-1325): NetworkClient::connect(ip, port) waits up to its
-  // default 3000 ms for an unreachable host, on the loop task that pumps this client.
+  // NetworkClient::connect(ip, port) waits up to its default 3000 ms for an unreachable host, on the task that
+  // pumps this client. EMC_CONNECT_TIMEOUT_MS (Config.h) lets the application choose a shorter bound.
   bool ret = client.connect(ip, port, EMC_CONNECT_TIMEOUT_MS);
   #else
   bool ret = client.connect(ip, port);  // implicit conversion of return code int --> bool
   #endif
   if (ret) {
     #if defined(ARDUINO_ARCH_ESP8266)
-    client.setNoDelay(true);
+    client.setNoDelay(EMC_TCP_NODELAY);
     #elif defined(ARDUINO_ARCH_ESP32)
     // Set TCP option directly to bypass lack of working setNoDelay for WiFiClientSecure (for consistency also here)
-    int val = true;
+    int val = EMC_TCP_NODELAY;
     client.setSocketOption(IPPROTO_TCP, TCP_NODELAY, &val, sizeof(int));
     #endif
   }
@@ -41,16 +41,16 @@ bool ClientSync::connect(IPAddress ip, uint16_t port) {
 
 bool ClientSync::connect(const char* host, uint16_t port) {
   #if defined(ARDUINO_ARCH_ESP32)
-  bool ret = client.connect(host, port, EMC_CONNECT_TIMEOUT_MS);  // TASK-1325, see above
+  bool ret = client.connect(host, port, EMC_CONNECT_TIMEOUT_MS);  // see connect(ip, port)
   #else
   bool ret = client.connect(host, port);  // implicit conversion of return code int --> bool
   #endif
   if (ret) {
     #if defined(ARDUINO_ARCH_ESP8266)
-    client.setNoDelay(true);
+    client.setNoDelay(EMC_TCP_NODELAY);
     #elif defined(ARDUINO_ARCH_ESP32)
     // Set TCP option directly to bypass lack of working setNoDelay for WiFiClientSecure (for consistency also here)
-    int val = true;
+    int val = EMC_TCP_NODELAY;
     client.setSocketOption(IPPROTO_TCP, TCP_NODELAY, &val, sizeof(int));
     #endif
   }
@@ -59,16 +59,15 @@ bool ClientSync::connect(const char* host, uint16_t port) {
 
 size_t ClientSync::write(const uint8_t* buf, size_t size) {
   #if defined(ARDUINO_ARCH_ESP32)
-  // OTGW-firmware patch (ADR-186, TASK-1213), offered upstream as
-  // https://github.com/bertmelis/espMqttClient/pull/191: never block the caller.
-  // NetworkClient::write() waits in select() until a slow broker takes the data, which
-  // stalled the Arduino loop task that pumps this client (UseInternalTask::NO) for seconds.
-  // Hand the socket only what it accepts now: MqttClient::_sendPacket() adds the count to
-  // _bytesSent, and _checkOutbox() stops on 0 and continues on the next loop() call.
+  // Do not block the caller. NetworkClient::write() waits in select() (up to
+  // WIFI_CLIENT_MAX_WRITE_RETRY times) until the peer takes the data, which stalls
+  // the task that pumps loop() for as long as a slow broker needs. Hand the socket
+  // only what it accepts now: MqttClient::_sendPacket() adds the count to _bytesSent,
+  // and _checkOutbox() stops on 0 and continues on the next loop() call.
   int fd = client.fd();
   if (fd < 0) return 0;
   ssize_t sent = ::send(fd, buf, size, MSG_DONTWAIT);
-  if (sent < 0) return 0;  // EAGAIN/EWOULDBLOCK: buffer full; a real error shows up as a disconnect
+  if (sent < 0) return 0;  // EAGAIN/EWOULDBLOCK: send buffer full; a real error surfaces as a disconnect
   return static_cast<size_t>(sent);
   #else
   return client.write(buf, size);
