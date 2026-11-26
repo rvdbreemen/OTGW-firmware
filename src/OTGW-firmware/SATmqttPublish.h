@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : SATmqttPublish.h
-**  Version  : v2.0.0-beta.445
+**  Version  : v2.0.0-beta.446
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -116,6 +116,11 @@ uint32_t satPaceLiveCount();        // only the publishes the liveness bound let
 static constexpr bool kMqttPaceDripOn = true;
 uint32_t dripPaceNoCount();         // drip ticks the pacer made wait since boot (cut 2 counter)
 uint32_t dripPaceLiveCount();       // drip ticks the liveness bound let through since boot
+// Cut 3 (TASK-2949.8, the connect stages in MQTTstuff.ino): kMqttPaceConnOn is its compile-time default, false = connStageReady()
+// decides as before the cut; the runtime switch is state.debug.bPaceConn. The 200 ms gap and the 5 s publish-anyway bound stay.
+static constexpr bool kMqttPaceConnOn = true;
+uint32_t connPaceNoCount();         // connect portions the pacer refused at least once since boot (counted once per portion)
+uint32_t connPaceLiveCount();       // connect portions the 5 s bound let go without a yes since boot
 
 // ---------------------------------------------------------------------------
 // Per-field float tolerances (per ADR-111 sub-rule 4, guideline-level).

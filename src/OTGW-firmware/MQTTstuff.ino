@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : MQTTstuff
-**  Version  : v2.0.0-beta.445
+**  Version  : v2.0.0-beta.446
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **      Modified version from (c) 2020 Willem Aandewiel
@@ -1270,9 +1270,10 @@ static void connProbePrint(PGM_P label) {
 // ADR-265 cut 1 (TASK-2949.6): the SAT pacer counters since boot and the runtime switch, one line after the heap summaries
 // that the bench reads (sat-takeover end, boot done, burst end). Same counters as hd_pace_sat_no / hd_pace_sat_live.
 static void heapPaceLine() {
-  DebugTf(PSTR("[HEAP] pace sat no=%lu live=%lu sw=%d drip no=%lu live=%lu sw=%d\r\n"),
+  DebugTf(PSTR("[HEAP] pace sat no=%lu live=%lu sw=%d drip no=%lu live=%lu sw=%d conn no=%lu live=%lu sw=%d\r\n"),
           (unsigned long)satPaceNoCount(), (unsigned long)satPaceLiveCount(), (int)state.debug.bPaceSat,
-          (unsigned long)dripPaceNoCount(), (unsigned long)dripPaceLiveCount(), (int)state.debug.bPaceDrip);
+          (unsigned long)dripPaceNoCount(), (unsigned long)dripPaceLiveCount(), (int)state.debug.bPaceDrip,
+          (unsigned long)connPaceNoCount(), (unsigned long)connPaceLiveCount(), (int)state.debug.bPaceConn);
 }
 
 static void satTakeoverHeapTraceFinish() {
@@ -1871,10 +1872,37 @@ static bool connStageReady(uint32_t nowMs, uint32_t outbox, uint32_t maxBlock) {
   return waited >= CONN_STAGE_GAP_MS && outbox <= CONN_STAGE_MAX_OUTBOX && maxBlock >= CONN_STAGE_MIN_BLOCK;
 }
 
+// ADR-265 cut 3 (TASK-2949.8): the connect portions ask the shared pacer instead of their own outbox and block thresholds.
+// The gap between portions (CONN_STAGE_GAP_MS) and the publish-anyway bound (CONN_STAGE_MAX_WAIT_MS) stay. A portion is
+// counted once when the pacer first refuses it (sConnPaceNo) and once more when the bound lets it go without a yes (sConnPaceLive).
+// Note the single threshold: the old gate waited until at most CONN_STAGE_MAX_OUTBOX (2) packets were left, the pacer allows
+// MQTT_PACE_MAX_OUTBOX. With the switch off (kMqttPaceConnOn or state.debug.bPaceConn false) connStageReady() decides as before.
+static uint32_t sConnPaceNo = 0;
+static uint32_t sConnPaceLive = 0;
+static bool     sConnPaceNoCounted = false;
+uint32_t connPaceNoCount()   { return sConnPaceNo; }
+uint32_t connPaceLiveCount() { return sConnPaceLive; }
+static void connPaceCountNo() { if (!sConnPaceNoCounted) { sConnPaceNoCounted = true; ++sConnPaceNo; } }
+static bool connStagePaceReady(uint32_t nowMs) {
+  const uint32_t waited = nowMs - sConnStageMs;
+  if (waited >= CONN_STAGE_MAX_WAIT_MS) {
+    if (!mqttPaceAllows()) { connPaceCountNo(); ++sConnPaceLive; }
+    return true;
+  }
+  if (waited < CONN_STAGE_GAP_MS) return false;
+  if (mqttPaceAllows()) return true;
+  connPaceCountNo();
+  return false;
+}
+
 static void connStageTick() {
   if (sConnStage == 0) return;
   if (!MQTTclient.connected()) { connStageReset(); return; }
-  if (!connStageReady(millis(), (uint32_t)MQTTclient.queueSize(), platformMaxFreeBlock())) return;
+  const bool ready = (kMqttPaceConnOn && state.debug.bPaceConn)
+      ? connStagePaceReady(millis())
+      : connStageReady(millis(), (uint32_t)MQTTclient.queueSize(), platformMaxFreeBlock());
+  if (!ready) return;
+  sConnPaceNoCounted = false;   // the next portion is counted afresh
   switch (sConnStage) {
     case 1:
       // TASK-410 / ADR-084: briefly subscribe to the six deprecated OT-bus topics so

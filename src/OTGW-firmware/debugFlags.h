@@ -45,6 +45,7 @@ static const DebugFlagDef kDebugFlags[] = {
   // ADR-265 (TASK-2949.6): bisect aid for the MQTT pacer, a behaviour switch in prerelease builds only, RAM only (a reboot sets it back to true)
   { "pacesat",   'x', &DebugSection::bPaceSat,        "MQTT pacer SAT gate",      nullptr },
   { "pacedrip",  'y', &DebugSection::bPaceDrip,       "MQTT pacer discovery drip", nullptr },
+  { "paceconn",  'c', &DebugSection::bPaceConn,       "MQTT pacer connect stages", nullptr },
 #endif
   { "mqttgate",  'g', &DebugSection::bMQTTGate,       "MQTT Gating",              nullptr },
   { "ntp",       'n', &DebugSection::bNTP,            "NTP",                      nullptr },

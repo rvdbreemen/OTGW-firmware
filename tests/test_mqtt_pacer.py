@@ -339,6 +339,13 @@ int main() {
   printf("drip_set|%d|%d|%d\n", errd, fd ? 1 : 0, (int)d.bPaceDrip);
   const DebugFlagDef* kd = debugFlagByKey('y');
   printf("drip_key|%s\n", kd ? kd->name : "-");
+  // cut 3: the connect-stage switch
+  printf("conn_default|%d\n", (int)state.debug.bPaceConn);
+  int errc = -9;
+  const DebugFlagDef* fc = debugFlagSet(d, "paceconn", "false", &errc);
+  printf("conn_set|%d|%d|%d\n", errc, fc ? 1 : 0, (int)d.bPaceConn);
+  const DebugFlagDef* kc = debugFlagByKey('c');
+  printf("conn_key|%s\n", kc ? kc->name : "-");
   return 0;
 }
 """
@@ -376,6 +383,9 @@ class PrereleaseFlag(unittest.TestCase):
         self.assertEqual(o["drip_default"], ["1"])
         self.assertEqual(o["drip_set"], ["0", "1", "0"])
         self.assertEqual(o["drip_key"], ["pacedrip"])
+        self.assertEqual(o["conn_default"], ["1"])
+        self.assertEqual(o["conn_set"], ["0", "1", "0"])
+        self.assertEqual(o["conn_key"], ["paceconn"])
 
     def test_without_prerelease_there_is_no_row_and_the_gate_is_the_flag_on(self):
         o = self.run_variant(False)
@@ -386,6 +396,9 @@ class PrereleaseFlag(unittest.TestCase):
         self.assertEqual(o["drip_default"], ["1"])
         self.assertEqual(o["drip_set"], ["1", "0", "1"], "unknown name, the drip switch stays true")
         self.assertEqual(o["drip_key"], ["-"])
+        self.assertEqual(o["conn_default"], ["1"])
+        self.assertEqual(o["conn_set"], ["1", "0", "1"], "unknown name, the connect switch stays true")
+        self.assertEqual(o["conn_key"], ["-"])
 
 
 if __name__ == "__main__":

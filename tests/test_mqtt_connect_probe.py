@@ -43,7 +43,9 @@ static uint32_t satPaceNoCount() { return 0; }
 static uint32_t satPaceLiveCount() { return 0; }
 static uint32_t dripPaceNoCount() { return 0; }
 static uint32_t dripPaceLiveCount() { return 0; }
-static struct { struct { bool bPaceSat = true; bool bPaceDrip = true; } debug; } state;
+static uint32_t connPaceNoCount() { return 0; }
+static uint32_t connPaceLiveCount() { return 0; }
+static struct { struct { bool bPaceSat = true; bool bPaceDrip = true; bool bPaceConn = true; } debug; } state;
 static bool platformHeapWindowActive() { return winActive; }
 static bool platformHeapWindowStart() { winActive = true; winGen++; winMin = freeHeap; return true; }
 static void platformHeapWindowStop() { winActive = false; }

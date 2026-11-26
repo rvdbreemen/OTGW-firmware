@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-beta.445
+**  Version  : v2.0.0-beta.446
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -3472,6 +3472,8 @@ void sendDeviceInfoV2()
     je.field(F("hd_pace_sat_live"),        satPaceLiveCount());   // and only the publishes the liveness bound let through anyway
     je.field(F("hd_pace_drip_no"),         dripPaceNoCount());    // ADR-265 cut 2: discovery drip ticks the pacer made wait,
     je.field(F("hd_pace_drip_live"),       dripPaceLiveCount());  // and ticks the liveness bound let through anyway
+    je.field(F("hd_pace_conn_no"),         connPaceNoCount());    // ADR-265 cut 3: connect portions the pacer refused (once per portion),
+    je.field(F("hd_pace_conn_live"),       connPaceLiveCount());  // and portions the 5 s bound let go without a yes
     je.field(F("hd_ipc0_stack_min"),       snap->ipc0StackMin);   // TASK-1865 / ADR-225: IPC stack headroom
     je.field(F("hd_ipc1_stack_min"),       snap->ipc1StackMin);
     je.field(F("hd_ipc0_stack_min_hwdetect"), snap->st.heapdiag.iIpc0StackMinHwDetect);  // TASK-1870.1: boot phase

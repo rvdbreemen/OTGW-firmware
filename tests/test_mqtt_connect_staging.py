@@ -95,7 +95,11 @@ static int sBootHeapState = 0;
 static int8_t reconnectAttempts = 0;
 enum states_of_MQTT { MQTT_STATE_INIT, MQTT_STATE_IS_CONNECTED };
 static states_of_MQTT stateMQTT = MQTT_STATE_INIT;
-struct { struct { bool bConnected; uint32_t iLastConnectedMs; } mqtt; } state = {{false, 0}};
+struct { struct { bool bConnected; uint32_t iLastConnectedMs; } mqtt; struct { bool bPaceConn; } debug; } state = {{false, 0}, {true}};
+// ADR-265 cut 3: this test pins the connect stages as they were (own outbox and block thresholds); the pacer path has its own
+// test, tests/test_mqtt_pacer_conn.py. kMqttPaceConnOn false keeps connStageTick() on connStageReady() here.
+static constexpr bool kMqttPaceConnOn = false;
+static bool mqttPaceAllows() { return false; }
 """
 
 MAIN = r"""

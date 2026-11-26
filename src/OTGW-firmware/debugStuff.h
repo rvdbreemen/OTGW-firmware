@@ -59,6 +59,7 @@ struct DebugSection {          // state.debug — Runtime diagnostic output flag
   bool     bSATBLE                = false;  // SAT BLE scan/parse/match/update trace (ESP32-only, default off: log-spam on busy advert bursts)
   bool     bPaceSat               = true;   // ADR-265 cut 1 (TASK-2949.6): false = the SAT shadow gate without the MQTT pacer; settable only in prerelease builds (debugFlags.h), RAM only
   bool     bPaceDrip              = true;   // ADR-265 cut 2 (TASK-2949.7): false = the discovery drip waits on its own outbox threshold; settable only in prerelease builds, RAM only
+  bool     bPaceConn              = true;   // ADR-265 cut 3 (TASK-2949.8): false = the connect portions decide on their own outbox and block thresholds; prerelease only, RAM only
   uint32_t iOTGWSimulationIntervalMs = 750;
   uint32_t iOTGWSimulationNextDueMs  = 0;
 };
