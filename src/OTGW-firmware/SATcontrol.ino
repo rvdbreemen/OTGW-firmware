@@ -1708,8 +1708,17 @@ static void satPwmSchedule(float pidOutput)
   float effectiveTemp = btFiltered ? _pwm_effectiveBoilerTemp : boilerTemp;
   // Entry 444 (Sergeant D, Q-438b B): the live flow counts only in the ON phase. In the OFF phase the duty uses the flow of the
   // last ON tick with the current request, so a cooling flow does not shorten the pause. Before any ON tick the live flow is used.
-  if (state.sat.bPwmFlameRequested) _pwm_lastOnFlowTemp = effectiveTemp;
-  else if (_pwm_lastOnFlowTemp > 0.0f) effectiveTemp = _pwm_lastOnFlowTemp;
+  // Entry 499 (Sergeant D, Q-444c A; corrects entry 494): after a hot-water draw inside a PWM ON phase the stored flow is no longer
+  // updated for the rest of that ON phase, so the OFF phase freezes the flow of the last tick before the draw (our reading of 'last heating
+  // tick', entry 499), not a flow the draw heated. A tick with the DHW bit set never reaches this function (the control loop returns first, "The branch above returns before
+  // satPwmSchedule()"), so what a draw leaves behind is the first ticks after it, still on the draw-heated flow. Once a draw paused this
+  // ON phase (_pwm_dhwResumed, set by satPwmDhwResume(), cleared by the next ON start and satPwmReset()), the stored flow stays the one of
+  // the last tick before the draw. The duty of the ON phase itself keeps using the live flow (effectiveTemp above).
+  // thermo-nova (7beaaf5) cannot be moved by a late draw: its held temperature changes by EMA only while the flame is younger than the update
+  // window (pwm.py:144-149) and the duty reads that held value (pwm.py:229-239); ours follows the live flow in ON (entries 437, 444).
+  if (state.sat.bPwmFlameRequested) {
+    if (!_pwm_dhwResumed) _pwm_lastOnFlowTemp = effectiveTemp;
+  } else if (_pwm_lastOnFlowTemp > 0.0f) effectiveTemp = _pwm_lastOnFlowTemp;
   if (effectiveTemp < baseOffset + 1.0f) effectiveTemp = baseOffset + 1.0f;
 
   float duty = (pidOutput - baseOffset) / (effectiveTemp - baseOffset);

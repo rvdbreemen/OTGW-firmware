@@ -221,7 +221,7 @@ class OffPhaseKeepsTheLastOnFlow(unittest.TestCase):
     """Entry 444 (Sergeant D, Q-438b B): the live flow counts only in the ON phase. In the OFF phase the duty uses the flow of the
     last ON tick with the current request, so a cooling flow does not shorten the pause. Red side: the same source with the OFF
     branch removed (the 1693b64 behaviour, live flow in both phases)."""
-    OFF_LINE = "  else if (_pwm_lastOnFlowTemp > 0.0f) effectiveTemp = _pwm_lastOnFlowTemp;\n"
+    OFF_LINE = "  } else if (_pwm_lastOnFlowTemp > 0.0f) effectiveTemp = _pwm_lastOnFlowTemp;\n"   # entry 494 put braces around the ON branch
 
     @classmethod
     def setUpClass(cls):
@@ -233,7 +233,7 @@ class OffPhaseKeepsTheLastOnFlow(unittest.TestCase):
         cls.exe_fix = build(fix, d, "fix")
         if not cls.exe_fix:
             raise unittest.SkipTest("no host C++ compiler")
-        cls.exe_mut = build(fix.replace(cls.OFF_LINE, ""), d, "mut")
+        cls.exe_mut = build(fix.replace(cls.OFF_LINE, "  }\n"), d, "mut")
         # ON phase at flow 40, request 34; find where the harness ends it, then cool the flow 1 C per tick in the OFF phase
         on = [(0, 0, "45.0", "34.0")] + [(t, 1, "40.0", "34.0") for t in range(30, 1230, 30)]
         r0 = run(cls.exe_fix, on)
