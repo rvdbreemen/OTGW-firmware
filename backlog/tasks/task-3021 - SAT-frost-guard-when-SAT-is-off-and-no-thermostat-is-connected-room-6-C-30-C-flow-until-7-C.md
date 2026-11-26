@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-21T18:47:00Z'
-updated_date: '2026-11-25T16:04:00Z'
+updated_date: '2026-11-26T09:10:00Z'
 labels:
   - sat
   - safety
@@ -25,9 +25,9 @@ Decision: entry 460 in the private SAT register (Robert, 2026-11-21, Q-456a = B)
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 With SAT off, no thermostat detected and room <= 6.0 C, the gateway sends CH enable on with a 30 C flow setpoint; at room >= 7.0 C it returns to CH off
+- [x] #1 With SAT off, no thermostat detected and room <= 6.0 C, the gateway sends CH enable on with a 30 C flow setpoint; at room >= 7.0 C it returns to CH off
 - [ ] #2 With a thermostat connected, behaviour is unchanged (hand-back only)
-- [ ] #3 No room temperature known -> no frost demand
+- [x] #3 No room temperature known -> no frost demand
 - [ ] #4 Host test on the real code: red on the old code (no demand at 5 C), green on the fix; bench or simulation check on OT-Direct master mode
 <!-- AC:END -->
 
@@ -65,4 +65,6 @@ Implementation choices, NOT in the register (ours, each marked as such in the co
 Room chain (judgement, otgw-dev 2026-11-25): cut to the chosen BLE sensor and the external MQTT sensor only (entries 457/458; an explicit primary of one of them first). Removed: averaged areas and the thermostat MsgID 24. Why: the guard only acts with no thermostat on the bus, so MsgID 24 is by construction absent or stale; an average over areas can hide a cold room (a frost guard on a wrong room is the one failure that matters); the develop reference itself uses the primary room or the coldest room (demand_control.py:610-613), not an average. Cost: a unit whose room comes only from HA areas has no frost cover until it also gets a BLE or external sensor.
 
 Reference quoted only as the entry does, opened this session at other-projects/SAT-develop (local copy HEAD 2b01ba65; entry 460 cites ba515c8): demand_control.py:610-622 _update_frost_protection (threshold <= 0 or no temperature -> off; <= threshold -> on; >= threshold + FROST_PROTECTION_HYSTERESIS_CELSIUS -> off), :815-828 (HVAC off and frost -> demand with requested_setpoint max(minimum_setpoint, FROST_PROTECTION_SETPOINT)), const.py:31-32 (hysteresis 1.0, setpoint 30.0), const.py:182 default 6.0. Alex has a threshold setting; we do not (entry 485). Reference only (ADR-292). Lane: cherry-pick of dcf09a698 and 8cc21d96e onto origin/dev 34cce5132, banner conflicts resolved with origin/dev's, own bump.
+
+R1 bench .63 (bench-tester, cand-0827 bfae2b808 chain, 2026-11-25): frost steps 1-5 PASS on the PIC path (frost.md in OTGW-field-data/bench-63/2026-11-25_cand-0827): CS=30.0 + CH=1 at room 5.0, hold at 6.5, off at 7.0, stale room temperature -> off. AC2 (thermostat connected) NOT testable on the bench (N3), AC4 OT-Direct master mode not benched: both stay open.
 <!-- SECTION:NOTES:END -->
