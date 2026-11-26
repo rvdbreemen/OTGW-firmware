@@ -35,6 +35,8 @@ Proposed, 2026-11-08.
 
 **Deferred 2026-11-26 by Robert** (interactive, about 00:40, relayed by the coordinator): stays Proposed, "later, after the stable". Not part of 2.0.0.
 
+**Deferral lifted 2026-11-26, about 01:05** (between 01:00 and 01:08; exact minute not recorded), by Robert in otgw-poc-dev's chat, verbatim: "Ik wili dat als deze werkt, het meegaat in Dev, dus TLS mag je integreren voor uitgaande TLS. Oftewl ADR-218 akkoord" (relayed by otgw-poc-dev and the coordinator; the quote is also in the remote-telemetry task). Reading (otgw-poc-dev's interpretation, not Robert's words): the acceptance is conditional on the remote-telemetry proof working ("als deze werkt"). This ADR therefore stays Proposed until that proof is recorded; the coordinator asks Robert whether his "akkoord" is conditional or unconditional. This replaces the "after the stable" deferral above.
+
 **Time corrected 2026-11-26:** Robert's answer was first recorded here as "about 01:10"; it was given interactively between about 00:35 and 00:41 on 2026-11-26 (coordinator's session order; no exact minute), so "about 00:40".
 
 ## Status History
@@ -110,7 +112,7 @@ This ADR stays **Proposed** until a concrete feature asks for it (most likely HT
 
 ## Open Questions
 
-- [ ] Robert: which feature triggers acceptance (HTTPS webhooks first?), and does it then become its own task. — Robert, 2026-11-26: not before the 2.0.0 stable; the question stays open for after it.
+- [ ] Robert: which feature triggers acceptance (HTTPS webhooks first?), and does it then become its own task. — Robert, 2026-11-26: not before the 2.0.0 stable; the question stays open for after it. Superseded about 01:05 the same night: the first trigger is the remote-telemetry feature (outbound TLS), acceptance after its proof (see Status).
 
 ## Related Decisions
 
