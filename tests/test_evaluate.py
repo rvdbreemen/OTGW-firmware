@@ -11,6 +11,7 @@ which is exactly what TASK-297 (TEST-H3) was created to prevent.
 """
 
 import io
+import re
 import sys
 import tempfile
 import unittest
@@ -885,6 +886,23 @@ class TestMqttPacerWiring(unittest.TestCase):
         h = self.t[1] + "\nstatic constexpr uint32_t MQTT_PACE_MIN_BLOCK = 1;\n"
         self.assertEqual(evaluate.mqtt_pacer_findings(self.t[0], h, self.t[2]),
                          ["MQTT_PACE_MIN_BLOCK is defined 2 times (expected once)"])
+
+    def test_fails_when_a_converted_producer_stops_calling_its_helper(self):
+        # cuts 2 to 4: the drip, the connect stages, the override sweep and the stats pacer
+        for producer, helper in evaluate.MQTT_PACE_PRODUCERS:
+            fm = re.search(r"^(?:static )?(?:void|bool) " + producer + r"\([^)]*\)\s*\{", self.t[2], re.M)
+            self.assertIsNotNone(fm, producer)
+            end = self.t[2].index("\n}\n", fm.end())
+            body = self.t[2][fm.end():end]
+            self.assertIn(helper + "(", body, producer)
+            ino = self.t[2][:fm.end()] + body.replace(helper + "(", "unpaced(") + self.t[2][end:]
+            self.assertEqual(evaluate.mqtt_pacer_findings(self.t[0], self.t[1], ino),
+                             [f"{producer}() does not call {helper}()"], producer)
+
+    def test_fails_when_a_pacer_helper_no_longer_asks_the_pacer(self):
+        ino = self.t[2].replace("if (mqttPaceAllows()) { g.since = 0;", "if (true) { g.since = 0;")
+        self.assertNotEqual(ino, self.t[2])
+        self.assertEqual(evaluate.mqtt_pacer_findings(self.t[0], self.t[1], ino), ["paceGateStep() does not ask the pacer"])
 
     def test_fails_when_the_pacer_is_not_defined(self):
         ino = self.t[2].replace("bool mqttPaceAllows()", "bool somethingElse()")

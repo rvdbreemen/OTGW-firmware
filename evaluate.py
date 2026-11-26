@@ -629,6 +629,10 @@ def status_burst_cooldown_findings(text: str) -> List[Tuple[int, int, bool]]:
 MQTT_PACE_SOURCES = ("src/OTGW-firmware/SATmqttPublish.cpp", "src/OTGW-firmware/SATmqttPublish.h",
                      "src/OTGW-firmware/MQTTstuff.ino")
 MQTT_PACE_CONSTANTS = ("MQTT_PACE_MAX_OUTBOX", "MQTT_PACE_MIN_BLOCK", "MQTT_PACE_MAX_WAIT_MS")
+# (producer function in MQTTstuff.ino, the helper it must call): cut 2 the discovery drip, cut 3 the connect stages,
+# cut 4 the stale override sweep and the hourly stats
+MQTT_PACE_PRODUCERS = (("loopMQTTDiscovery", "dripPaceWait"), ("connStageTick", "connStagePaceReady"),
+                       ("staleOverrideClearTick", "paceGateStep"), ("loopMQTTStatsPacer", "paceGateStep"))
 
 
 def mqtt_pacer_findings(publish_cpp: str, publish_h: str, ino: str) -> List[str]:
@@ -654,6 +658,36 @@ def mqtt_pacer_findings(publish_cpp: str, publish_h: str, ino: str) -> List[str]
         n = len(re.findall(r"\bconstexpr\s+\w+\s+" + name + r"\s*=", everything))
         if n != 1:
             problems.append(f"{name} is defined {n} times (expected once)")
+    # cuts 2 to 4 (TASK-2949.7 to .9): each converted producer asks the pacer through its own helper, which asks mqttPaceAllows()
+    for producer, helper in MQTT_PACE_PRODUCERS:
+        fm = re.search(r"^(?:static )?(?:void|bool) " + re.escape(producer) + r"\([^)]*\)\s*\{", ino, re.M)
+        if not fm:
+            problems.append(f"{producer}() not found in MQTTstuff.ino")
+            continue
+        depth, k = 0, fm.end() - 1
+        while k < len(ino):
+            depth += ino[k] == "{"
+            depth -= ino[k] == "}"
+            k += 1
+            if depth == 0:
+                break
+        if helper + "(" not in ino[fm.end():k]:
+            problems.append(f"{producer}() does not call {helper}()")
+    for helper in sorted({h for _, h in MQTT_PACE_PRODUCERS}):
+        hm = re.search(r"^static (?:void|bool) " + re.escape(helper) + r"\([^)]*\)\s*\{", ino, re.M)
+        if not hm:
+            problems.append(f"{helper}() is not defined in MQTTstuff.ino")
+            continue
+        depth, k = 0, hm.end() - 1
+        while k < len(ino):
+            depth += ino[k] == "{"
+            depth -= ino[k] == "}"
+            k += 1
+            if depth == 0:
+                break
+        helper_body = ino[hm.end():k]
+        if "mqttPaceAllows(" not in helper_body and "paceGateStep(" not in helper_body:
+            problems.append(f"{helper}() does not ask the pacer")
     return problems
 
 
