@@ -622,6 +622,41 @@ def status_burst_cooldown_findings(text: str) -> List[Tuple[int, int, bool]]:
     return findings
 
 
+# ===== MQTT PACER WIRING (ADR-265, TASK-2949.6; guideline-level per ADR-080) =====
+# Until the target after cut 4 only the narrow rule holds: each converted producer calls mqttPaceAllows(), and
+# the three MQTT_PACE_* constants are defined once. The full rule (no queueSize()/mqttOutboxDepth() threshold outside
+# the pacer) waits for TASK-2949.10, because the gates not yet converted still compare the outbox.
+MQTT_PACE_SOURCES = ("src/OTGW-firmware/SATmqttPublish.cpp", "src/OTGW-firmware/SATmqttPublish.h",
+                     "src/OTGW-firmware/MQTTstuff.ino")
+MQTT_PACE_CONSTANTS = ("MQTT_PACE_MAX_OUTBOX", "MQTT_PACE_MIN_BLOCK", "MQTT_PACE_MAX_WAIT_MS")
+
+
+def mqtt_pacer_findings(publish_cpp: str, publish_h: str, ino: str) -> List[str]:
+    """Problems with the ADR-265 wiring, empty when it holds (cut 1: the SAT shadow gate)."""
+    problems: List[str] = []
+    m = re.search(r"static inline bool satOutboxFull\(\)\s*\{", publish_cpp)
+    if not m:
+        problems.append("satOutboxFull() not found in SATmqttPublish.cpp")
+    else:
+        depth, k = 0, m.end() - 1
+        while k < len(publish_cpp):
+            depth += publish_cpp[k] == "{"
+            depth -= publish_cpp[k] == "}"
+            k += 1
+            if depth == 0:
+                break
+        if "mqttPaceAllows(" not in publish_cpp[m.end():k]:
+            problems.append("satOutboxFull() does not call mqttPaceAllows()")
+    if not re.search(r"^bool mqttPaceAllows\(\)\s*\{", ino, re.M):
+        problems.append("mqttPaceAllows() is not defined in MQTTstuff.ino")
+    everything = "\n".join((publish_cpp, publish_h, ino))
+    for name in MQTT_PACE_CONSTANTS:
+        n = len(re.findall(r"\bconstexpr\s+\w+\s+" + name + r"\s*=", everything))
+        if n != 1:
+            problems.append(f"{name} is defined {n} times (expected once)")
+    return problems
+
+
 # ===== PIC-TASK FIRMWARE CALLBACK SEAM (ADR-130, TASK-1175) =====
 #
 # OTGWSerial calls the function registered with registerFirmwareCallback()
@@ -1903,6 +1938,26 @@ class WorkspaceEvaluator:
                 f"{len(findings)} per-board declaration(s) within bound: {values}",
                 ", ".join(f"{label}:{ln}" for ln, _, _ in findings)
             ))
+
+    def check_mqtt_pacer_wiring(self):
+        """ADR-265 (TASK-2949.6): the SAT shadow gate calls mqttPaceAllows() and the MQTT_PACE_* constants are defined
+        once. Guideline-level (ADR-080) until the target after cut 4."""
+        print(f"\n{Colors.BOLD}{Colors.OKBLUE}=== MQTT pacer wiring (ADR-265) ==={Colors.ENDC}")
+        name = "MQTT pacer wiring"
+        texts = []
+        for rel in MQTT_PACE_SOURCES:
+            path = config.PROJECT_DIR / rel
+            if not path.exists():
+                self.add_result(EvaluationResult("Tuning", name, "FAIL", f"{rel} not found: the pacer wiring cannot be checked"))
+                return
+            texts.append(path.read_text(encoding="utf-8", errors="ignore"))
+        problems = mqtt_pacer_findings(*texts)
+        if problems:
+            for p in problems:
+                self.add_result(EvaluationResult("Tuning", name, "FAIL", p))
+        else:
+            self.add_result(EvaluationResult("Tuning", name, "PASS",
+                                             "satOutboxFull() asks mqttPaceAllows(); MQTT_PACE_* defined once"))
 
     def check_status_publishers_wrap_burst(self):
         """TASK-347/354: every status-publisher function whose name matches
@@ -3796,6 +3851,7 @@ class WorkspaceEvaluator:
         self.check_no_settings_state_snapshots()      # ESP8266 memory audit PR #644 Trim 1 gate
         self.check_dispatch_tables_progmem()          # ESP8266 memory audit PR #644 Trim 2 gate
         self.check_status_burst_cooldown_bound()      # TASK-353/368
+        self.check_mqtt_pacer_wiring()                # ADR-265, TASK-2949.6
         self.check_status_publishers_wrap_burst()     # TASK-347/354/368, ADR-088 sub-rule 1
         self.check_drip_consults_deferred()           # TASK-426, ADR-088 sub-rule 3
         self.check_design_system_drift()              # TASK-470, ADR-091 FAIL gate (TASK-480 grace complete)

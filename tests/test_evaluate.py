@@ -866,5 +866,31 @@ class TestPicTaskCallbackSeam(unittest.TestCase):
         self.assertEqual((r["callbacks"], r["violations"]), ([], []))
 
 
+class TestMqttPacerWiring(unittest.TestCase):
+    """ADR-265 cut 1 (TASK-2949.6): the narrow pacer gate in evaluate.py."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.t = [(REPO_ROOT / rel).read_text(encoding="utf-8") for rel in evaluate.MQTT_PACE_SOURCES]
+
+    def test_holds_on_the_real_sources(self):
+        self.assertEqual(evaluate.mqtt_pacer_findings(*self.t), [])
+
+    def test_fails_when_the_sat_gate_stops_asking_the_pacer(self):
+        cpp = self.t[0].replace("mqttPaceAllows()", "true")
+        self.assertEqual(evaluate.mqtt_pacer_findings(cpp, self.t[1], self.t[2]),
+                         ["satOutboxFull() does not call mqttPaceAllows()"])
+
+    def test_fails_when_a_constant_is_defined_twice(self):
+        h = self.t[1] + "\nstatic constexpr uint32_t MQTT_PACE_MIN_BLOCK = 1;\n"
+        self.assertEqual(evaluate.mqtt_pacer_findings(self.t[0], h, self.t[2]),
+                         ["MQTT_PACE_MIN_BLOCK is defined 2 times (expected once)"])
+
+    def test_fails_when_the_pacer_is_not_defined(self):
+        ino = self.t[2].replace("bool mqttPaceAllows()", "bool somethingElse()")
+        self.assertEqual(evaluate.mqtt_pacer_findings(self.t[0], self.t[1], ino),
+                         ["mqttPaceAllows() is not defined in MQTTstuff.ino"])
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
