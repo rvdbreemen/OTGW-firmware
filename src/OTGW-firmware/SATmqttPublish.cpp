@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : SATmqttPublish.cpp
-**  Version  : v2.0.0-beta.440
+**  Version  : v2.0.0-beta.441
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -48,6 +48,12 @@ uint8_t g_satShadowEpoch = 0;
 // pass already let one helper through. satPublishDeferredClear() opens every pass, so it also re-arms the one-per-pass allowance.
 static uint32_t s_satPaceWaitSinceMs = 0;
 static bool     s_satPaceForcedThisPass = false;
+// Per-producer counters since boot (/api/v2/device/info hd_pace_sat_no, hd_pace_sat_live): publishes the pacer deferred,
+// and publishes the liveness bound let through anyway.
+static uint32_t s_satPaceNo = 0;
+static uint32_t s_satPaceLive = 0;
+uint32_t satPaceNoCount()   { return s_satPaceNo; }
+uint32_t satPaceLiveCount() { return s_satPaceLive; }
 
 bool satPublishDeferred()      { return s_satPublishDeferred; }
 void satPublishDeferredClear() {
@@ -59,15 +65,19 @@ void satPublishDeferredClear() {
 static inline bool satOutboxFull() {
   // TASK-1757: right after a connect, wait until the outbox is shallow (MQTTstuff.ino mqttConnectPaceHold())
   const bool oldGateOpen = !mqttConnectPaceHold() && mqttOutboxDepth() <= SAT_MQTT_OUTBOX_LIMIT;
-  if (oldGateOpen && !kMqttPaceOn) return false;
+  // kMqttPaceOn: the compile-time default; mqttPaceSatEnabled(): the prerelease runtime flag (state.debug.bPaceSat, RAM only).
+  const bool paced = kMqttPaceOn && mqttPaceSatEnabled();
+  if (oldGateOpen && !paced) { s_satPaceWaitSinceMs = 0; return false; }
   if (oldGateOpen) {
     // ADR-265 cut 1, on top of the old conditions: the shared pacer. The old gate stays until the target; the pacer only
     // makes this one stricter. Past MQTT_PACE_MAX_WAIT_MS without a yes, ONE helper per pass goes through, so liveness cannot rebuild the burst.
     if (mqttPaceAllows()) { s_satPaceWaitSinceMs = 0; return false; }
+    ++s_satPaceNo;
     const uint32_t now = millis();
     if (s_satPaceWaitSinceMs == 0) s_satPaceWaitSinceMs = now ? now : 1;
     if (!s_satPaceForcedThisPass && (uint32_t)(now - s_satPaceWaitSinceMs) >= MQTT_PACE_MAX_WAIT_MS) {
       s_satPaceForcedThisPass = true;
+      ++s_satPaceLive;
       return false;
     }
   }

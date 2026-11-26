@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-beta.440
+**  Version  : v2.0.0-beta.441
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -3468,6 +3468,8 @@ void sendDeviceInfoV2()
     je.field(F("hd_dip_mqtt_queue"),       (uint32_t)snap->st.heapdiag.iDipMqttQueue);
     je.field(F("hd_dip_mqtt_tx_bytes"),    (uint32_t)snap->st.heapdiag.iDipMqttTxBytes);
     je.field(F("hd_mqtt_queue_hwm"),       (uint32_t)snap->st.heapdiag.iMqttQueueHwm);
+    je.field(F("hd_pace_sat_no"),          satPaceNoCount());     // ADR-265 cut 1 counters since boot: publishes the pacer deferred,
+    je.field(F("hd_pace_sat_live"),        satPaceLiveCount());   // and publishes the liveness bound let through anyway
     je.field(F("hd_ipc0_stack_min"),       snap->ipc0StackMin);   // TASK-1865 / ADR-225: IPC stack headroom
     je.field(F("hd_ipc1_stack_min"),       snap->ipc1StackMin);
     je.field(F("hd_ipc0_stack_min_hwdetect"), snap->st.heapdiag.iIpc0StackMinHwDetect);  // TASK-1870.1: boot phase

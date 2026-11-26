@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : SATmqttPublish.h
-**  Version  : v2.0.0-beta.440
+**  Version  : v2.0.0-beta.441
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -107,6 +107,9 @@ static constexpr uint32_t MQTT_PACE_MAX_OUTBOX  = 6;
 static constexpr uint32_t MQTT_PACE_MIN_BLOCK   = 20480;   // bytes; espMqttClient refuses below 16384 (Helpers.h)
 static constexpr uint32_t MQTT_PACE_MAX_WAIT_MS = 5000;
 bool     mqttPaceAllows();          // MQTTstuff.ino: outbox and largest free block both allow a deferrable publish
+bool     mqttPaceSatEnabled();      // MQTTstuff.ino: state.debug.bPaceSat, the prerelease runtime switch of the SAT gate (default true)
+uint32_t satPaceNoCount();          // publishes the pacer deferred since boot (cut 1 counter)
+uint32_t satPaceLiveCount();        // publishes the liveness bound let through since boot
 
 // ---------------------------------------------------------------------------
 // Per-field float tolerances (per ADR-111 sub-rule 4, guideline-level).

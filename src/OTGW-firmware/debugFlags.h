@@ -41,6 +41,10 @@ static const DebugFlagDef kDebugFlags[] = {
   { "satble",    '7', &DebugSection::bSATBLE,         "SAT BLE",                  nullptr },
 #endif
   { "sattrace",  '8', &DebugSection::bSATTrace,       "SAT trace (high volume)",  nullptr },
+#if defined(_VERSION_PRERELEASE)
+  // ADR-265 (TASK-2949.6): bisect aid for the MQTT pacer, a behaviour switch in prerelease builds only, RAM only (a reboot sets it back to true)
+  { "pacesat",   'x', &DebugSection::bPaceSat,        "MQTT pacer SAT gate",      nullptr },
+#endif
   { "mqttgate",  'g', &DebugSection::bMQTTGate,       "MQTT Gating",              nullptr },
   { "ntp",       'n', &DebugSection::bNTP,            "NTP",                      nullptr },
   { "sensorsim", 'd', &DebugSection::bSensorSim,      "Dallas sensor simulation", debugFlagSensorSimChanged },

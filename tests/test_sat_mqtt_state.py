@@ -224,6 +224,7 @@ static char g_lastPayload[64];
 uint32_t mqttOutboxDepth() { return g_outbox; }
 static bool g_paceHold = false;   // TASK-1757: MQTTstuff.ino post-connect pace window (stub)
 bool mqttConnectPaceHold() { return g_paceHold; }
+bool mqttPaceSatEnabled() { return false; }   // ADR-265: the pacer is off here, the old gate alone is under test
 bool mqttPaceAllows() { return true; }   // ADR-265: the real pacer is exercised in tests/test_mqtt_pacer.py; here the old gate alone is under test
 bool sendMQTTData(const char* topic, const char* json, const bool retain) {
   (void)topic; (void)retain; ++g_sent; ++g_outbox; test_strlcpy(g_lastPayload, json, sizeof(g_lastPayload)); return true; }
