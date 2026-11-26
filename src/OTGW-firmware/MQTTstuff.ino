@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : MQTTstuff
-**  Version  : v2.0.0-beta.442
+**  Version  : v2.0.0-beta.443
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **      Modified version from (c) 2020 Willem Aandewiel
@@ -1270,8 +1270,9 @@ static void connProbePrint(PGM_P label) {
 // ADR-265 cut 1 (TASK-2949.6): the SAT pacer counters since boot and the runtime switch, one line after the heap summaries
 // that the bench reads (sat-takeover end, boot done, burst end). Same counters as hd_pace_sat_no / hd_pace_sat_live.
 static void heapPaceLine() {
-  DebugTf(PSTR("[HEAP] pace sat no=%lu live=%lu sw=%d\r\n"), (unsigned long)satPaceNoCount(), (unsigned long)satPaceLiveCount(),
-          (int)state.debug.bPaceSat);
+  DebugTf(PSTR("[HEAP] pace sat no=%lu live=%lu sw=%d drip no=%lu live=%lu sw=%d\r\n"),
+          (unsigned long)satPaceNoCount(), (unsigned long)satPaceLiveCount(), (int)state.debug.bPaceSat,
+          (unsigned long)dripPaceNoCount(), (unsigned long)dripPaceLiveCount(), (int)state.debug.bPaceDrip);
 }
 
 static void satTakeoverHeapTraceFinish() {
@@ -2882,6 +2883,23 @@ static bool dripOutboxWait(uint32_t outbox, uint8_t& waits) {
   return false;
 }
 
+// ADR-265 cut 2 (TASK-2949.7): the drip asks the shared pacer instead of its own outbox threshold. The liveness is the old
+// tick count (DRIP_OUTBOX_MAX_WAITS ticks in a row, then publish anyway). With the switch off (kMqttPaceDripOn or
+// state.debug.bPaceDrip false) it is exactly dripOutboxWait() as before the cut. The counters are per tick.
+static uint32_t sDripPaceNo = 0;
+static uint32_t sDripPaceLive = 0;
+uint32_t dripPaceNoCount()   { return sDripPaceNo; }
+uint32_t dripPaceLiveCount() { return sDripPaceLive; }
+static bool dripPaceWait(uint8_t& waits) {
+  if (!(kMqttPaceDripOn && state.debug.bPaceDrip)) return dripOutboxWait(mqttOutboxDepth(), waits);
+  if (mqttPaceAllows()) { waits = 0; return false; }
+  ++sDripPaceNo;
+  if (waits < DRIP_OUTBOX_MAX_WAITS) { waits++; return true; }
+  waits = 0;
+  ++sDripPaceLive;
+  return false;
+}
+
 void loopMQTTDiscovery()
 {
   DECLARE_TIMER_SEC(timerDiscoveryDrip, DISCOVERY_INTERVAL_NORMAL, SKIP_MISSED_TICKS);
@@ -2938,7 +2956,7 @@ void loopMQTTDiscovery()
   }
   {
     static uint8_t outboxWaits = 0;  // TASK-1757: ticks skipped in a row on a deep outbox
-    if (dripOutboxWait(mqttOutboxDepth(), outboxWaits)) return;
+    if (dripPaceWait(outboxWaits)) return;   // ADR-265 cut 2: the shared pacer (dripOutboxWait with the switch off)
   }
 
   // Scan pending bitmap for the next set bit

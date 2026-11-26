@@ -278,6 +278,13 @@ int main() {
   printf("after|%d|%d\n", (int)d.bPaceSat, (int)mqttPaceSatEnabled());
   const DebugFlagDef* k = debugFlagByKey('x');
   printf("key|%s\n", k ? k->name : "-");
+  // cut 2: the discovery drip switch
+  printf("drip_default|%d\n", (int)state.debug.bPaceDrip);
+  int errd = -9;
+  const DebugFlagDef* fd = debugFlagSet(d, "pacedrip", "false", &errd);
+  printf("drip_set|%d|%d|%d\n", errd, fd ? 1 : 0, (int)d.bPaceDrip);
+  const DebugFlagDef* kd = debugFlagByKey('y');
+  printf("drip_key|%s\n", kd ? kd->name : "-");
   return 0;
 }
 """
@@ -312,6 +319,9 @@ class PrereleaseFlag(unittest.TestCase):
         self.assertEqual(o["set"], ["0", "1"])
         self.assertEqual(o["after"], ["0", "0"], "off through the table reaches the gate")
         self.assertEqual(o["key"], ["pacesat"])
+        self.assertEqual(o["drip_default"], ["1"])
+        self.assertEqual(o["drip_set"], ["0", "1", "0"])
+        self.assertEqual(o["drip_key"], ["pacedrip"])
 
     def test_without_prerelease_there_is_no_row_and_the_gate_is_the_flag_on(self):
         o = self.run_variant(False)
@@ -319,6 +329,9 @@ class PrereleaseFlag(unittest.TestCase):
         self.assertEqual(o["set"], ["1", "0"], "unknown name: the stable cannot switch the pacer off")
         self.assertEqual(o["after"], ["1", "1"])
         self.assertEqual(o["key"], ["-"])
+        self.assertEqual(o["drip_default"], ["1"])
+        self.assertEqual(o["drip_set"], ["1", "0", "1"], "unknown name, the drip switch stays true")
+        self.assertEqual(o["drip_key"], ["-"])
 
 
 if __name__ == "__main__":

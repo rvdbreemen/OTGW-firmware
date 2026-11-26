@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : SATmqttPublish.h
-**  Version  : v2.0.0-beta.442
+**  Version  : v2.0.0-beta.443
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -110,6 +110,12 @@ bool     mqttPaceAllows();          // MQTTstuff.ino: outbox and largest free bl
 bool     mqttPaceSatEnabled();      // MQTTstuff.ino: state.debug.bPaceSat, the prerelease runtime switch of the SAT gate (default true)
 uint32_t satPaceNoCount();          // publishes the pacer deferred since boot (cut 1 counter)
 uint32_t satPaceLiveCount();        // publishes the liveness bound let through since boot
+// Cut 2 (TASK-2949.7, the discovery drip in MQTTstuff.ino): kMqttPaceDripOn is its compile-time default, false = the drip
+// waits on dripOutboxWait() as before the cut. The runtime switch is state.debug.bPaceDrip. The drip keeps its own liveness:
+// DRIP_OUTBOX_MAX_WAITS ticks in a row, then it publishes anyway (in ticks, so slow mode waits proportionally longer).
+static constexpr bool kMqttPaceDripOn = true;
+uint32_t dripPaceNoCount();         // drip ticks the pacer made wait since boot (cut 2 counter)
+uint32_t dripPaceLiveCount();       // drip ticks the liveness bound let through since boot
 
 // ---------------------------------------------------------------------------
 // Per-field float tolerances (per ADR-111 sub-rule 4, guideline-level).
