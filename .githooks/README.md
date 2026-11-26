@@ -39,7 +39,7 @@ Bypass: `OTGW_SUBMODULE_HOOK_DISABLE=1 git worktree add ...`
 
 ### `commit-msg` (TASK-659)
 
-Two passes:
+Two passes, plus a subject time check (TASK-3098): a subject that starts with `docs(adr)` or `docs(skill)` and contains `Robert` or `Accepted` may not carry a `YYYY-MM-DD HH:MM` or `YYYY-MM-DD ~HH:MM` time later than the commit's author date (read with its UTC offset from `git var GIT_AUTHOR_IDENT`; `scripts/check_commit_subject_time.py`, test `tests/test_commit_subject_time.py`). Past times and planned slots such as `08:00 beta` pass. Bypass: `OTGW_TASKID_HOOK_DISABLE=1`.
 
 1. **Task reference required for firmware/docs commits** — if any staged path
    matches `src/OTGW-firmware/**`, `src/libraries/**`, `docs/**`, or

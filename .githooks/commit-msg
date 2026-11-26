@@ -82,6 +82,24 @@ EOF
     exit 1
 fi
 
+# --- Pass 1b: a docs(adr)/docs(skill) subject must not state a time later than its author date (TASK-3098) --
+# Subjects like "ADR-265 Accepted (Robert, 2026-11-26 ~01:10)" written at 00:44 claim a time that has not happened.
+if [ "${OTGW_TASKID_HOOK_DISABLE:-0}" != "1" ] && [ -f scripts/check_commit_subject_time.py ]; then
+    case "$(printf '%s' "$msg" | head -1)" in
+        "docs(adr)"*|"docs(skill)"*)
+            for _cmd in python3 python py; do
+                if command -v "$_cmd" >/dev/null 2>&1; then
+                    _ver=$("$_cmd" --version 2>&1 | grep -oE '[0-9]+\.[0-9]+' | head -1)
+                    if [ "$(echo "$_ver" | cut -d. -f1)" -ge 3 ] 2>/dev/null; then
+                        "$_cmd" scripts/check_commit_subject_time.py "$msg_file" || exit 1
+                        break
+                    fi
+                fi
+            done
+            ;;
+    esac
+fi
+
 # --- Pass 2: TASK-NNN reference must have a staged/tracked task file --------
 
 if [ -n "$ids" ]; then
