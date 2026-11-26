@@ -9,7 +9,6 @@ documents_shipped: false
 verified_in: []
 supersedes: []
 superseded_by: null
-format: "canonical"
 topics:
   - "remote-telemetry"
   - "consent"
@@ -22,6 +21,7 @@ components:
   - "remote telemetry consent rule"
 symbols: []
 context_scope: "selective"
+format: "canonical"
 ---
 
 <!-- markdownlint-disable MD025 -->
@@ -92,6 +92,7 @@ compilable):
 
 ```text
 ask = psram && ( optin == never-set
+              || ( optin == off && offsrc == none )
               || ( optin == off && offsrc == settings && offrel != current release ) )
 ```
 
@@ -103,7 +104,7 @@ ask = psram && ( optin == never-set
 | off in Settings, same release | no |
 | off in Settings, a new release since (`offrel` differs) | yes, once |
 | board without PSRAM | no, never |
-| off, `offsrc` absent (switched off before this rule existed, for example the proof-of-concept units) | no (see Open Question 1) |
+| off, `offsrc` absent (switched off before this rule existed, for example the proof-of-concept units) | yes, once: the answer records a source (Open Question 1, option B) |
 
 "Release" is `_SEMVER_CORE` + "-" + `_VERSION_PRERELEASE` (for example `2.0.0-beta.433`; a stable is `2.0.0`), never
 the githash or the build counter, so a developer build does not ask again (Robert, decision 3).
@@ -168,7 +169,7 @@ once. What is sent is not changed by this ADR (decision 1).
 Guideline-level per ADR-080, with a test gate once TASK-3092 is built:
 
 - A host table test that compiles the real `rtel::askNow()` (never set, on, off by prompt, off in Settings with the
-  same release, off in Settings after a new release, no PSRAM), red on code without it, with mutants (offsrc
+  same release, off in Settings after a new release, off with no source, no PSRAM), red on code without it, with mutants (offsrc
   ignored, release compare removed, PSRAM ignored) killed (*planned*).
 - A REST round-trip test: `health` has `ask`, the settings POST reads `source`, the "on" write is ignored without
   PSRAM (*planned*).
@@ -198,18 +199,22 @@ Guideline-level per ADR-080, with a test gate once TASK-3092 is built:
 
 - Two new NVS fields (`offsrc`, `offrel`; about 24 B, against 20 KB of NVS) in the existing NVS partition (*read*, otgw-poc-dev).
 - An existing install sees the dialog once after the update that brings it, because its state is "never set".
+- A unit that was switched off before this rule existed (`optin` off, no `offsrc`) is asked once, at the first start
+  of a release that has this rule (Robert, Open Question 1, option B). A "No" in that dialog is then final; a tester who only paused telemetry
+  gets that one reminder.
 - The rule depends on `_VERSION_PRERELEASE` naming releases; a release with the same string as the one in
   `offrel` does not ask again.
 
 ## Open Questions
 
-- [ ] 1. Robert: a unit that was switched off before this rule existed has `optin` = off and no `offsrc`, so we cannot
+- [x] 1. Robert: a unit that was switched off before this rule existed has `optin` = off and no `offsrc`, so we cannot
   tell a "No" from a Settings switch-off. Options: (A) treat it as a "No": never asked again (as planned; safe for
   privacy, but a tester who only paused it is never reminded); (B) treat it as a Settings switch-off: asked once after
   the next release, then the normal rule. Recommendation: B. Only the proof-of-concept and tester units can be in that
   state, they switched it off by hand in Settings (the dialog did not exist yet), and one question after a release is
   what the rule gives any Settings switch-off. (An earlier draft asked about a blocked gateway; that is covered by
   Robert's 2026-11-19 and 2026-11-20 points, see Must Not.)
+  — **Answered 2026-11-26 by Robert van den Breemen (decision, interactive answer to the coordinator, relayed), recorded by Agent: Claude (otgw-architect):** verbatim 'Eenmalig vragen (Recommended)', Robert, 2026-11-26 about 21:30 local, interactive answer to the coordinator (relayed by the coordinator; not seen by otgw-architect). Option B: a unit with optin off and no offsrc is asked once (after the next release); a No in that dialog is then final, a Settings switch-off follows the normal rule.
 - [ ] 2. Robert: acceptance of this ADR.
 
 ## Related Decisions

@@ -12014,7 +12014,7 @@
           "None."
         ],
         "verification": [
-          "A host table test that compiles the real rtel::askNow() (never set, on, off by prompt, off in Settings with the same release, off in Settings after a new release, no PSRAM), red on code without it, with mutants (offsrc ignored, release c...",
+          "A host table test that compiles the real rtel::askNow() (never set, on, off by prompt, off in Settings with the same release, off in Settings after a new release, off with no source, no PSRAM), red on code without it, with mutants (offsr...",
           "A REST round-trip test: health has ask, the settings POST reads source, the \"on\" write is ignored without PSRAM (planned).",
           "Bench on .63 by otgw-bench-tester, with a flash between two releases: the dialog appears after a switch-off in Settings and a new release, and not after a \"No\" in the dialog (TASK-3092 AC5, not verified)."
         ]
