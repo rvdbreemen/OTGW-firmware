@@ -29,6 +29,10 @@ Two passes:
 
 3. **Backlog task id check** (TASK-3042) - if the staged set includes `backlog/**/*.md`, `scripts/check_backlog_task_ids.py` fails the commit when a staged task file shares its id with another backlog task file (the CLI refuses such an id as ambiguous). Duplicates that the commit does not touch do not block it. Test: `tests/test_backlog_task_id_check.py`. Bypass: `OTGW_TASKID_HOOK_DISABLE=1 git commit ...`
 
+### `pre-push` (TASK-3096)
+
+Reads the pushed ref lines and runs `scripts/check_backlog_task_ids.py --pre-push`: every task file ADDED in the pushed range is compared with `git ls-tree -r origin/dev backlog/`; the same id under another file name (another title) blocks the push, because two worktrees that do not see each other's file pick the same next id and a rebase runs no pre-commit hook. The same file name, or a file the range itself deletes or renames, is fine. `origin/dev` not fetched: warns and skips. Test: `tests/test_backlog_prepush_task_id.py`. Bypass: `OTGW_TASKID_HOOK_DISABLE=1 git push ...`
+
 ### `post-checkout` (TASK-1725)
 
 On the first checkout of a new worktree (`git worktree add`; git passes the null ref as the previous

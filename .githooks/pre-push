@@ -1,0 +1,23 @@
+#!/bin/sh
+# Git pre-push hook (OTGW dev): backlog task id collision check (TASK-3096).
+# A task file added in the pushed range must not reuse an id that origin/dev already has under another file
+# name: two worktrees pick the same next id when they do not see each other's file, and a rebase does not run
+# the pre-commit hook. Reads the ref lines git gives a pre-push hook on stdin.
+# origin/dev not fetched: warns and skips. Bypass: OTGW_TASKID_HOOK_DISABLE=1 git push ...
+if [ "${OTGW_TASKID_HOOK_DISABLE:-0}" = "1" ]; then
+    echo "[task-id] pre-push check disabled (OTGW_TASKID_HOOK_DISABLE=1)" >&2
+    cat >/dev/null
+    exit 0
+fi
+_py=""
+for _cmd in python3 python py; do
+    if command -v "$_cmd" >/dev/null 2>&1; then
+        _ver=$("$_cmd" --version 2>&1 | grep -oE '[0-9]+\.[0-9]+' | head -1)
+        if [ "$(echo "$_ver" | cut -d. -f1)" -ge 3 ] 2>/dev/null; then _py="$_cmd"; break; fi
+    fi
+done
+if [ -z "$_py" ] || [ ! -f scripts/check_backlog_task_ids.py ]; then
+    cat >/dev/null
+    exit 0
+fi
+exec "$_py" scripts/check_backlog_task_ids.py --pre-push
