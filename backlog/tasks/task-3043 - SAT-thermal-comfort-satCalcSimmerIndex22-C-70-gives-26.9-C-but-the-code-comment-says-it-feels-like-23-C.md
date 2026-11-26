@@ -6,7 +6,7 @@ title: >-
 status: Done
 assignee: []
 created_date: '2026-11-25T05:17:00Z'
-updated_date: '2026-11-26T11:03:00Z'
+updated_date: '2026-11-26T20:32:00Z'
 labels:
   - sat
   - bug
@@ -39,6 +39,8 @@ Correction 2026-11-25 (BlueFlame): the wrong comment is at SATcontrol.ino:2875-2
 2026-11-26 otgw-webui AC1+AC2 (read only, thermo-nova pinned 7beaaf5, files opened this session). AC1: thermo-nova custom_components/sat/summer_simmer.py:31 index = 1.98*(F-(0.55-0.0055*H)*(F-58.0))-56.83; :34-35 below 58 F the index is F; :38 result converted to C and rounded to 0.1. Firmware satCalcSimmerIndex SATcontrol.ino:5069-5075 is the same formula and threshold; only differences: no rounding to 0.1 (published values are formatted anyway) and a guard that returns the raw temperature for humidity <0 or >100 (thermo-nova has none). Hand-checked with Python on the same formula: (22 C,70 %)=26.9, (20,50)=22.4, (22,50)=25.3, (22,30)=23.7. So 26.9 C IS the reference value; the formula is not wrong, the comment at SATcontrol.ino:2793 ('22C at 70% humidity feels like 23C') is. AC2: entries 32 (humidity only with the comfort option; Summer Simmer stays), 114 (no firmware-only comfort adjust; humidity only through Thermal comfort), 117 (indoor humidity only), 189 (published index stays as thermo-nova), 190 (summer simmer cutoff leaves PWM). All agree; no conflict; none states a feels-like value. AC3: only the comment is wrong, so no SAT behaviour changes and no Sergeant D decision is needed for the fix; proposed comment: e.g. 22 C at 70 % humidity gives an index of 26.9 C. Real effect worth knowing, but already settled by entries 114/117/189 (parity): with Thermal comfort on, a humid room reads warmer to the PID. Comment edit touches src, so it needs a prerelease bump and the normal gates; not done yet.
 
 2026-11-26 otgw-webui AC3: only the comment was wrong (formula equals thermo-nova summer_simmer.py:31, no Sergeant D decision needed, entries 32/114/117/189/190 agree). The comment was corrected in 5534647d8 (TASK-3050), now at SATcontrol.ino:2920: '22C at 70% humidity ... 26.9C'. No behaviour change, so no red/green test applies; the value 26.9 for (22,70) is the one the harness of that commit rounds to 1 decimal. Closing with this reference.
+
+Traceability (2026-11-26, otgw-webui): the comment fix at SATcontrol.ino:2920 ('26.9C (the index, 1 decimal)') is in commit 5534647d8 (otgw-dev, 25 Nov, under TASK-3050), contained in v2.0.0-beta.428, beta.432 and beta.438. Comment-only, no behaviour change, no CHANGELOG line needed.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
