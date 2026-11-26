@@ -100,6 +100,7 @@ if [ -n "$ids" ]; then
     if [ -n "$missing" ]; then
         cat >&2 <<EOF
 commit-msg: blocked — task record(s) not in index for:$missing
+Two ways out: stage the task file (git add backlog/tasks/task-NNN-*.md) OR drop the TASK-NNN reference from the message; a docs-only or backlog-only commit with no task of its own uses [no-task].
 
 The commit references TASK-NNN identifier(s) above, but no matching
 backlog/tasks/task-NNN-*.md file is tracked or staged.
