@@ -468,7 +468,7 @@ Indien ingeschakeld, schakelt SAT automatisch de verwarming uit wanneer de buite
 
 ### 5.13 Gemiddelde kamersensoren
 
-SAT ondersteunt tot 4 temperatuurinvoerzones met configureerbare gewichten. De effectieve ruimtetemperatuur die door de PID-controller wordt gebruikt, is het gewogen gemiddelde van alle geldige, niet-verlopen area-temperaturen. In de webinterface heet dit de groep **Gemiddelde kamersensoren** (Sensor 1 tot 4 met hun gewichten); het aantal zones, de timeout en de headroom staan in de aparte groep **Zones** (paragraaf 5.14). Sleutels, MQTT en REST zijn niet veranderd (TASK-3014). Of dit gemiddelde de ruimtetemperatuur is die SAT gebruikt, hangt af van `satroomsource` (paragraaf 5.4).
+SAT ondersteunt tot 4 kamersensoren met configureerbare gewichten. De effectieve ruimtetemperatuur die door de PID-controller wordt gebruikt, is het gewogen gemiddelde van alle geldige, niet-verlopen sensortemperaturen. In de webinterface heet dit de groep **Gemiddelde kamersensoren** (Sensor 1 tot 4 met hun gewichten); het aantal zones en de time-out van de zonesensor staan in de aparte groep **Zones** (paragraaf 5.14). Sleutels, MQTT en REST zijn niet veranderd (TASK-3014). Of dit gemiddelde de ruimtetemperatuur is die SAT gebruikt, hangt af van `satroomsource` (paragraaf 5.4).
 
 Area-waarden kunnen uit drie onafhankelijke bronnen komen:
 
