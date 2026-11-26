@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@otgw-architect'
 created_date: '2026-11-26T11:35:00Z'
-updated_date: '2026-11-26T16:46:00Z'
+updated_date: '2026-11-26T19:12:00Z'
 labels:
   - research
   - rest
@@ -99,4 +99,34 @@ BLE A/B with reboot (idle, 30 min from boot each, 14:42-15:43): BLE on: freeheap
 Series 3, BLE on, N2/N3 with tx4/tx6 (uptime 0:15 at start, 17:24-17:43, no stop, bootcount 416): cap_eff==cap % / min freeheap / 200s per 180 s / 503: N2 tx4 0.0 (cap_eff 1 in all samples; gate_floor 1621) / 19356 / 1659 / conn 5725 rest 1839; N3 tx4 89.0 / 15428 / 2783 / conn 5534 rest 293 other 12; N2 tx6 0.0 (cap_eff 1; gate_floor 5191) / 19808 / 2184 / rest 5995 conn 539; N3 tx6 53.0 / 9540 / 4891 / rest 2755 conn 794 other 79; N3 tx6 offered 4 52.6 / 11968 / 5215 / rest 1290 other 7. Idle maxblock in this boot was 14836 (below MIN_BLOCK 17408; 21492 in series 1), so rule 0 sat at cap_eff 1. hd_max_loop_gap_ms 334 before and after every window (no new max), one [loop-stall] line (220 ms), cmd_dropped 0 -> 0, ws/mqtt drops 0. Files: sweep_ble_on3/analysis_series3_ble_on.txt (sha256 0e94c52b41a77fc92ea20f17c6af41df0cc805d7f29080cb3375dea160c3f794), s3/arms_s3.jsonl (c90d16dc13cef5f12b410a942854c87595bed33640d9c0880a8f601afbe9e0b7).
 
 Not done / caveats: Per-request NDJSON and telnet.raw stay on the NAS (local, not for publication). otFrameQueueDrops is not exposed in device/info (static in OTGW-Core.ino); cmd_dropped is. Series 1 and 2 have no per-window hd_max_loop_gap_ms. One boot per series: the idle block size differs per boot (21492, 14836; BLE off 36852).
+
+TASK-3104 bench notes: series 4 (adaptive rule, 'z' per arm) on .63 (otgw-bench-tester, 2026-11-26)
+
+Unit .63, build 2.0.0-beta.453+564ac47, txcap 4, restlog 1, load = 4 endpoints closed loop (offered 8 or 4) + otmonitor poller every 2 s, 3 x 60 s per arm, no REST sampler. Driver run_sweep4.py (sweep_tools/, sha256 in SHA256SUMS) owns the single telnet connection, sends 'z' at the start of each arm (resets hd_max_loop_gap_ms, hd_min_max_block, hd_rest_503/hd_webconn_503, hd_rest_inflight_hwm), samples by seq. Stop rules: telnet freeheap < 8192, loop gap > 750 ms, reboot, crashlog: none fired. cmd_dropped 0 and ws/mqtt drops 0 in every arm. First boot-B attempt rerun, data unaffected.
+
+Boot A, BLE on (uptime 16 min at start, 18:05:44-18:21:25, bootcount 417); at-rest block 26612 (min 23540): arm: cap_eff distribution | min freeheap | requests / ~200s | 503 | arm-end loop gap; 1 baseline rule0 cap2 rm12288 o8: 2:84 1:83 | 18124 | 8547 / 1742 | conn 6075 rest 730 | 173 ms; 2 rule1 cap8 rm14336 o8: 8:127 2:17 1:18 3:2 | 14740 | 8414 / 2406 | conn 5613 rest 390 other 5 | 120 ms; 3 baseline again: 2:84 1:80 | 13984 | 8769 / 2120 | conn 5657 rest 987 other 5 | 73 ms; 4 rule1 cap8 rm14336 o4: 8:95 1:43 3:7 2:17 | 14276 | 6301 / 4926 | conn 180 rest 1195 | 140 ms; 5 (rm16384) skipped: arm 2 telnet freeheap min 14740 >= 12288.; Files: sweep_ble_on4/analysis_series4a_boot_a.txt sha256 7819d906061079c76386b4049c2228f8e9d7f5125ac3078c0b5ef2f8aeb83bc0; a/arms_s4a.jsonl e06b569a681fbcbae4a688ed0398765c5045c48e36091951e22ebeb10f00cded.
+
+Boot B, BLE on (uptime 15 min at start, 19:39:09-19:54:54, bootcount 419); at-rest block 15860 (below MIN_BLOCK 17408): 1 baseline o8: cap_eff 1:165 | 18452 | 8660 / 1393 | conn 5630 rest 1637 | loop gap 124 | in-flight hwm 1; 2 rule1 cap8 rm14336 o8: 8:119 1:29 2:13 4:2 3:2 | 15616 | 8344 / 2615 | conn 5323 rest 401 other 5 | 71 | hwm 4; 4 rule1 cap8 rm14336 o4: 8:93 1:46 2:18 3:7 | 14088 | 6298 / 4809 | conn 227 rest 1253 other 9 | 86 | hwm 4; 8 baseline o4 (new): 1:166 | 21856 | 6888 / 1970 | conn 224 rest 4694 | 89 | hwm 1; min maxblock 10740; Files: sweep_ble_on4/analysis_series4b_boot_b.txt sha256 7fe10a914a212fd5d309bfb3947ff2bf290c5267bdd5bd288beb13bb785647c9; b/arms_s4b.jsonl f2f9f678db64ed0a2de598f2af657f82b0015ad4353a15b0f7ec3fbbad892e98.
+
+BLE off from boot (uptime 5 min at start, 20:00:52-20:08:42, bootcount 420); at-rest block 34804: 6 rule1 cap8 rm14336 o8: cap_eff 8:164 | min freeheap 59784, min maxblock 31732 | 12277 / 5649 | conn 6628 rest 0 | loop gap 168 | hwm 4; 7 rule1 cap8 rm14336 o4: cap_eff 8:161 | 56228, 31732 | 9256 / 9115 | conn 141 | loop gap 211 | hwm 4; Files: sweep_ble_on4/analysis_series4c_ble_off.txt sha256 ec1a5b2fdc1be6abda60d4ff72d43bbc874d47d705b31bc6a9fcfbda9e1de53e; c/arms_s4c.jsonl b4df697c8a6cc94b2ebd1ad80ee7228059455cf4996c7f302b1b2d1e676cd594.
+
+End state: BLE on again and rebooted (bootcount 421), flags restcap 2 / restrule 0 / restlog 0 / restrmax 12288 / txcap 4, settings.ini and /api/v2/settings byte-identical to the snapshot taken before series 2. Per-request NDJSON and telnet.raw stay on the NAS (runs/sweep4), not for publication.
+
+Series 4 boot B, BLE on (architect reading of the bench-tester analysis, measured; analysis_series4b_boot_b.txt sha256 7fe10a91..., opened and hash checked). Bootcount 419, start 19:39:09 at 15 min uptime, end 19:54:54. No stop, no reboot, cmd_dropped 0, WS/MQTT drops 0. 'z' at the start of every arm; hd_rest_inflight_hwm read 1 right after 'z' in all four arms, so the 'z' reset of the hwm is confirmed.
+
+Boot B at-rest block 15860 (boot A: 26612). That is below the shipped rule's 16000 floor, so both baselines ran at cap_eff 1 (165/165 and 166/166 samples), not 2. Boot B therefore compares adaptive against the shipped rule clamped to 1, the state a fragmented unit is in.
+
+Boot B table (rule / cap / restrmax / tx / offered; min freeheap; min maxblock; successes per ~180 s; 503 conn / rest / other; worst p99; loop gap; hwm): arm 1 baseline 0/2/12288/4/8; 18452; 7668; about 1393; 5630/1637/0; 3118 ms (otmonitor); 124 ms; 1. Arm 2 adaptive 1/8/14336/4/8; 15616; 7668; about 2615; 5323/401/5; 1599 ms (otmonitor); 71 ms; 4. Arm 4 adaptive 1/8/14336/4/4; 14088; 7668; about 4809; 227/1253/9; 590 ms (device/info); 86 ms; 4. Arm 8 baseline_o4 0/2/12288/4/4; 21856; 10740; about 1970; 224/4694/0; 3661 ms (otmonitor); 89 ms; 1.
+
+cap_eff distribution: arm 2 {8: 119, 1: 29, 2: 13, 3: 2, 4: 2}; arm 4 {8: 93, 1: 46, 2: 18, 3: 7}. Gate deltas: arm 2 block 111 / free 242 / cap 17 / tx 4783; arm 4 block 422 / free 593 / cap 107 / tx 202. Timeouts 0 in all arms.
+
+Same-offered pairs, adaptive against the cap-1 baseline (arithmetic from the figures above). Successes: offered 8 +88 % (2615 against 1393), offered 4 +144 % (4809 against 1970). 503 total: offered 8 -21 % (5729 against 7267), offered 4 -70 % (1489 against 4918). Worst p99: offered 8 1.6 s against 3.1 s, offered 4 0.59 s against 3.66 s. Min freeheap: offered 8 -15 % (15616 against 18452), offered 4 -36 % (14088 against 21856). Real concurrency: hwm 4 in both adaptive arms (the ADR-188 TX cap 4 limits), 1 in both baselines.
+
+Series 4 criteria and the TASK-3091 rule on boot B. Freeheap >= 12 KB with BLE on: pass (15.6 and 14.1 KB), floor 8192 never approached. Successes >= baseline: pass (+88 % and +144 %). 0 reboots, 0 drops, loop gap <= 500 ms: pass (max 124 ms, in the baseline). TASK-3091 'heap at most 25 % worse than the baseline': pass at offered 8 (-15 %), FAILED at offered 4 (-36 %). TASK-3091 '>= 30 % fewer 503s': pass at offered 4 (-70 %), FAILED at offered 8 (-21 %; 503 conn 5323 of 5729 total).
+
+Context for the failed heap criterion, stated as it is in the analysis: the baseline here is a cap-1 baseline (1 request in flight against 4), so a larger heap dip is the expected price of 4 times the concurrency; the absolute value 14.1 KB is at the level of boot A's baselines (14.0 KB). Whether the 25 % rule is read against a cap-1 baseline is not decided; the criterion is not waived. Min maxblock 7668 in arms 1, 2 and 4 alike: the block dip below 8192 also happens under the shipped rule at offered 8.
+
+Boot A against boot B, as measured: with at-rest block 26612 (boot A) the shipped rule allowed 2 and the adaptive gain was +14 to 38 %; with 15860 (boot B) the shipped rule fell to 1 and the gain was +88 to 144 %.
+
+Not verified: the per-request success counts are 'about' values from the load generator; boot-to-boot drift (about 20 % within one boot) applies. One test unit (.63, PIC board class). OT-Direct class not measured.
 <!-- SECTION:NOTES:END -->
