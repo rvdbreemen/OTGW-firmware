@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@otgw-dev'
 created_date: '2026-11-22T01:58:00Z'
-updated_date: '2026-11-26T07:03:00Z'
+updated_date: '2026-11-26T07:04:00Z'
 labels:
   - heap
   - websocket
@@ -41,4 +41,6 @@ Parent: TASK-3024. ADR-107's action 1 (emergencyHeapRecovery, helperStuff.ino:13
 2026-11-26 otgw-dev: heaprec re-cut onto origin/dev as its own branch (lane/heaprec): commit 1 = bench hook only (telnet key K, prerelease only, closeAll() control image), commit 2 = the abort (platformTcpAbortWhere, wsAbortMatch, hd_ws_recovery_abort), commit 3 = host test of the real abort walk + byte-order source pins. The plain hold H (floor 4096 B) can never reach CRITICAL (free < 3072 B), so K (target 2560 B, floor 1792 B, self-release 2 min) is the only way the recovery runs on a unit. Bench plan: OTGW-field-data/_comms/t3_bench_recipe.md (control image first).
 
 2026-11-26 otgw-dev: lane/heaprec commit 2 = the abort of the tracked /ws pcbs under the lwIP core lock (platformTcpAbortWhere in platform_esp32.h, wsAbortMatch on port 80 and the tracked remote ip/port, collect at most 8 then abort), trigger HEAP_CRITICAL via emergencyHeapRecovery (at most once per 30 s), counter hd_ws_recovery_abort in /api/v2/device/info, tests/test_ws_rx_timeout_reap.py. ADR-295 stays Proposed until the architect accepts it after the .61 K bench.
+
+2026-11-26 otgw-dev: lane/heaprec commit 3 = tests/test_platform_tcp_abort_where.py: the real platformTcpAbortWhere() cut from the header against a fake lwIP pcb list (select, all_adjacent, cap8, nullmatch, empty), the real wsAbortMatch(), static wiring pins, and the byte-order source pins (AsyncTCP remoteIP/getRemotePort and the Arduino IPAddress keep the raw lwIP word; skipped when the sources are not on the machine, OTGW_ASYNCTCP_SRC / OTGW_ARDUINO_CORE). The use-after-free corner (AsyncTCP error callback while the loop task holds the lwIP lock) cannot be stubbed on the host: the .61 K bench is its only test.
 <!-- SECTION:NOTES:END -->
