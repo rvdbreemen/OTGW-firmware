@@ -11870,6 +11870,7 @@
           "Make the main firmware's file-system update refuse an image whose LittleFS block count differs from the partition, before it erases anything. Reason (read, otgw-dev): OTGW-ModUpdateServer-esp32.h:653-673 accepts an image smaller than the...",
           "Report the layout: a partitionlayout field (legacy, safeboot, safeboot2) in /api/v2/device/info, a boot log line on telnet, and a warning on the /update page when the running layout is older than the firmware expects.",
           "Build the migrate image pair for the new table and let --migrate accept a safeboot unit as its source.",
+          "Announce the change in #beta-testing with the first public beta that carries the new table, prepared by BlueFlame or otgw-docs: it must be flashed over USB once and it is a breaking change. Robert, same source as Open Question 1, verbati...",
           "Say in the release notes of the first release with this table: every existing 4MB unit needs one --migrate over USB; an over-the-air update alone is not enough; a migrated unit is rolled back only with the old release's full merged image..."
         ],
         "must_not": [

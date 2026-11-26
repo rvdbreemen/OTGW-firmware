@@ -140,6 +140,10 @@ round (*estimate*, otgw-poc-dev).
 - Report the layout: a `partition_layout` field (`legacy`, `safeboot`, `safeboot2`) in `/api/v2/device/info`, a boot
   log line on telnet, and a warning on the `/update` page when the running layout is older than the firmware expects.
 - Build the migrate image pair for the new table and let `--migrate` accept a `safeboot` unit as its source.
+- Announce the change in #beta-testing with the first public beta that carries the new table, prepared by
+  BlueFlame or otgw-docs: it must be flashed over USB once and it is a breaking change. Robert, same source as
+  Open Question 1, verbatim: "Leg uit in het beta-kanaal bij de volgende publieke beta waar de partition table
+  verandert, dat het via USB geflasht moet worden en dat het een breaking change betreft."
 - Say in the release notes of the first release with this table: every existing 4MB unit needs one `--migrate` over
   USB; an over-the-air update alone is not enough; a migrated unit is rolled back only with the old release's full
   merged image, never with the old tool's `--update`.
@@ -203,8 +207,8 @@ round (*estimate*, otgw-poc-dev).
 
 **Negative:**
 
-- Every existing 4MB unit (OT-Direct boards and Classic boards with an S3 module, Robert's and the testers') needs one USB flash with a
-  laptop. How many units that is, is not known (Open Question 1).
+- Every existing 4MB unit (OT-Direct boards and Classic boards with an S3 module) needs one USB flash with a
+  laptop. Robert's estimate: about 10 to 15 units, all beta testers (Open Question 1).
 - Files on LittleFS other than settings.ini and dallas_labels.ini are lost in the migration (*read*, otgw-dev,
   `flash_otgw.bat:236-261`).
 - LittleFS loses 64K: about 225 KB stays free for runtime files (*estimate*).
@@ -215,8 +219,11 @@ round (*estimate*, otgw-poc-dev).
 
 ## Open Questions
 
-- [ ] 1. Robert: how many units (his own and the testers') run the current `safeboot` table? This sets the size of
-  the USB round and whether the migration needs a guided step in the release notes or per-tester help.
+- [x] 1. Robert: how many units (his own and the testers') run the current `safeboot` table? This sets the size of
+  the USB round and whether the migration needs a guided step in the release notes or per-tester help. — **Answered
+  2026-11-26 by Robert (interactive in the coordinator's session, at or before 07:08 local, 2026-11-26; no DM id):** verbatim "Er zijn op dit moment een beperkt aantal beta-testers die de huidige
+  partition-indeling gebruiken. Denk aan een stuk of 10 tot 15." His own estimate: about 10 to 15 units, all
+  beta testers. It supports the +64K route: the USB round is small and happens before the stable.
 - [ ] 2. Robert: one table for all three 4MB targets (recommended: one set of mirrors, one detection rule), or a second
   table for esp32-combo only?
 - [ ] 3. Robert: on a unit that is not migrated, should a release with the new table refuse the firmware step
