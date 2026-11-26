@@ -11644,8 +11644,8 @@
       "title": "Frost guard: with SAT off and no thermostat on the bus the gateway sends CS=30 with CH=1 while the measured room is at or below 6 C, until 7 C",
       "path": "ADR-294-frost-guard-with-sat-off-and-no-thermostat-on-the-bus-the-gateway-sends-cs-30-with-ch-1-while-the-measured-room-is-at-or-below-6-c-until-7-c.md",
       "format": "canonical",
-      "status": "Proposed",
-      "date": "2026-11-21",
+      "status": "Accepted",
+      "date": "2026-11-26",
       "decision_summary": "While SAT does not control the setpoint, no thermostat frame was seen on the bus for 30 s (state.otBus.bThermostatSta...",
       "topics": [
         "frost protection",

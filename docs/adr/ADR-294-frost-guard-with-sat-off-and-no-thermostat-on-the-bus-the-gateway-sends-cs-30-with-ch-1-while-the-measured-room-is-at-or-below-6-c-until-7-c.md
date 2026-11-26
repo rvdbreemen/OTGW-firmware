@@ -1,29 +1,29 @@
 ---
 id: "ADR-294"
 title: "Frost guard: with SAT off and no thermostat on the bus the gateway sends CS=30 with CH=1 while the measured room is at or below 6 C, until 7 C"
-status: "Proposed"
-date: "2026-11-21"
+status: "Accepted"
+date: "2026-11-26"
 binding: false
 gate: null
 documents_shipped: false
 verified_in: []
 supersedes: []
 superseded_by: null
-format: "canonical"
 topics:
-  - frost protection
-  - sat off
-  - no thermostat
+  - "frost protection"
+  - "sat off"
+  - "no thermostat"
 aliases:
-  - frost guard
-  - vorstbeveiliging
+  - "frost guard"
+  - "vorstbeveiliging"
 components:
-  - SAT frost guard
+  - "SAT frost guard"
 symbols:
-  - satFrostGuardDecide
-  - satFrostGuardService
-  - satNoteExternalCS
+  - "satFrostGuardDecide"
+  - "satFrostGuardService"
+  - "satNoteExternalCS"
 context_scope: "selective"
+format: "canonical"
 ---
 
 <!-- markdownlint-disable MD025 -->
@@ -32,7 +32,7 @@ context_scope: "selective"
 
 ## Status
 
-Proposed, 2026-11-21.
+Accepted, 2026-11-26.
 
 ## Status History
 
@@ -43,9 +43,16 @@ status_history:
     changed_by: "Agent: Claude"
     reason: Initial proposal
     changed_via: adr-kit
+  - date: 2026-11-26
+    status: Accepted
+    changed_by: "Robert van den Breemen (decision, interactive answer to the coordinator, relayed), recorded by Agent: Claude (otgw-architect)"
+    reason: "Accepted: decision Robert van den Breemen, 2026-11-26 21:27 (date on the recording machine), verbatim 'Accepteren (Recommended)' (interactive answer to the coordinator, relayed; question: frost guard with SAT off, no thermostat, room <= 6 C gives CS=30 and CH=1, shipped since beta.438), recorded by Agent: Claude (otgw-architect); four gates passed in adr-kit"
+    changed_via: adr-kit lifecycle
 ```
 
 ## Context
+
+Terms used below: SAT (Smart Autotune Thermostat), PIC (the Classic gateway's Microchip microcontroller), BLE (Bluetooth Low Energy), MQTT (Message Queuing Telemetry Transport).
 
 With SAT switched off and no thermostat behind the gateway, nothing asks the boiler for heat. On OT-Direct the gateway's own MsgID 0 carries CH enable off without a CS= override (OTDirect.ino buildStatusRequest(), TASK-1806, "like the PIC"); on the Classic the PIC's standalone status sets CH enable only while a CS= is in force (gateway.asm 6.6 readstatus :2712-2742, NoThermostat set by Disconnect :1770-1789). A house with such a gateway can freeze. Robert decided that the gateway protects against frost in that case, on both boards, in 2.0.0 (entries 460 and 461 in the private SAT register, Q-456a = B). Alex Wijn's develop branch has the same idea and is a reference only (ADR-292): ba515c8 demand_control.py:610-622 (on at room <= threshold, off at >= threshold + 1.0, no room temperature means off) and :815-828 (HVAC off plus frost gives a demand with setpoint max(minimum, 30)).
 
@@ -100,7 +107,7 @@ While SAT does not control the setpoint, no thermostat frame was seen on the bus
 ## Open Questions
 
 - [x] Q-460a: fixed 6.0 / 7.0 C or a user setting: answered A by Sergeant D (entry 485, 2026-11-25), fixed, no setting.
-- Implementation choices that are not in the register (ours, listed in the code and in TASK-3021): monitor mode does nothing; 60 s boot grace; a user CS= of 8 C or more wins for 130 s; no action while a hand-back is pending or while flashing; evaluation every 5 s; CS=30 repeated about every 30 s; the room chain above.
+- [x] Implementation choices that are not in the register (ours, listed in the code and in TASK-3021): monitor mode does nothing; 60 s boot grace; a user CS= of 8 C or more wins for 130 s; no action while a hand-back is pending or while flashing; evaluation every 5 s; CS=30 repeated about every 30 s; the room chain above. — **Answered 2026-11-26 by Robert van den Breemen (decision, interactive answer to the coordinator, relayed), recorded by Agent: Claude (otgw-architect):** Not a separate question to Robert: these are our implementation choices, listed openly. They are taken as part of the ADR that Robert accepted as written (verbatim 'Accepteren (Recommended)', 2026-11-26 21:27 by date on the recording machine, interactive answer to the coordinator, relayed; not seen by otgw-architect). That reading is ours (coordinator and otgw-architect), not his words. A change to any of them goes through a new task.
 
 ## Related Decisions
 
