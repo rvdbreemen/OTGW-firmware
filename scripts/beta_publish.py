@@ -217,7 +217,16 @@ def missing_text(text, body, require_text):
             raise Refuse(f"the release body lacks the required text: {needle!r}")
 
 
-def make_body(notes_path, tag, require_text=()):
+def add_appended(body, append_text):
+    """Put the appended paragraph in front of the footer (the '## How to report' section), or at the end."""
+    add = append_text.strip("\n") + "\n\n"
+    i = body.rfind("\n## How to report")
+    if i < 0:
+        return body.rstrip("\n") + "\n\n" + add.rstrip("\n") + "\n"
+    return body[:i + 1] + add + body[i + 1:]
+
+
+def make_body(notes_path, tag, require_text=(), append_text=None):
     try:
         text = Path(notes_path).read_text(encoding="utf-8")
     except (OSError, UnicodeDecodeError) as e:
@@ -226,9 +235,14 @@ def make_body(notes_path, tag, require_text=()):
         i = text.index(EM_DASH)
         raise Refuse(f"release notes contain an em dash (line {text.count(chr(10), 0, i) + 1}); "
                      "the writing rules forbid it")
-    if len(text) <= MAX_BODY:
-        missing_text(text, text, require_text)
-        return text, "full notes file"
+    if append_text is not None:
+        if EM_DASH in append_text:
+            raise Refuse("the --append-body text contains an em dash")
+        require_text = (*require_text, append_text.strip("\n"))
+    full = add_appended(text, append_text) if append_text is not None else text
+    if len(full) <= MAX_BODY:
+        missing_text(text, full, require_text)
+        return full, "full notes file" + (" + appended text" if append_text is not None else "")
     # Shortened body (SKILL.md Phase 4.4): the header through the "What changed since" section, a short
     # "Earlier changes" section linking the full file at the tag, then every section from the 'SAT is ...' heading on.
     heads = [(m.start(), m.group(0)) for m in re.finditer(r"(?m)^## .*$", text)]
@@ -245,12 +259,14 @@ def make_body(notes_path, tag, require_text=()):
     earlier = (f"## Earlier changes\n\nThe changes of earlier betas are in the full release notes at the tag: "
                f"{link}\n\n")
     body = text[:end_what].rstrip("\n") + "\n\n" + earlier + text[sat:]
+    if append_text is not None:
+        body = add_appended(body, append_text)
     if len(body) > MAX_BODY:
         raise Refuse(f"even the shortened body is {len(body)} characters (limit {MAX_BODY})")
     if EM_DASH in body:
         raise Refuse("the shortened body contains an em dash")
     missing_text(text, body, require_text)
-    return body, f"shortened ({len(text)} -> {len(body)} characters)"
+    return body, f"shortened ({len(text)} -> {len(body)} characters)" + (" + appended text" if append_text is not None else "")
 
 
 def read_ledger(path):
@@ -334,7 +350,15 @@ def run(args, gh_cmd):
     step(3, f"build files ok: 6 assets, .ino.bin equals the soaked sha256, {how}, flash zip holds {n_in_zip} files")
 
     # 4. body
-    body, how_body = make_body(args.notes, args.tag, args.require_text)
+    append_text = None
+    if args.append_body:
+        try:
+            append_text = Path(args.append_body).read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError) as e:
+            raise Refuse(f"cannot read --append-body {args.append_body}: {e}") from None
+        if not append_text.strip():
+            raise Refuse(f"--append-body {args.append_body} is empty")
+    body, how_body = make_body(args.notes, args.tag, args.require_text, append_text)
     step(4, f"release body ok: {how_body}, no em dash, {len(body)} characters")
 
     scratch = Path(args.scratch) if args.scratch else Path(tempfile.mkdtemp(prefix="beta-publish-"))
@@ -459,6 +483,9 @@ def main(argv=None, gh_cmd=None):
                          "commit must add nothing under src/, libraries/, scripts/, build.py, platformio.ini")
     ap.add_argument("--require-text", action="append", default=[],
                     help="text that must be in the release body (repeatable), for example the numbers of a check")
+    ap.add_argument("--append-body", default=None,
+                    help="file whose text is appended to the body AFTER the shortening, in front of the footer "
+                         "('## How to report'); it is also a required text, so it cannot be dropped")
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--yes-publish", action="store_true", help="required for a real (non dry) run")
     ap.add_argument("--latest", action="store_true", help="refused: a beta is never the latest release")

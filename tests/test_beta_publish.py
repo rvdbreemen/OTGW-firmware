@@ -441,6 +441,57 @@ class RequireText(Base):
         self.refused(w, "lost the disclaimer", "--dry-run")
 
 
+class AppendBody(Base):
+    """--append-body FILE: appended after the shortening, in front of the footer, and itself required."""
+
+    def para(self, w, text="Soak: 60 minutes on one unit, PASS."):
+        f = w.tmp / "append.md"
+        f.write_text(text + "\n", encoding="utf-8")
+        return f
+
+    def body_of(self, w):
+        return (w.scratch / "body.md").read_text(encoding="utf-8")
+
+    def test_full_notes_get_the_paragraph_before_the_footer(self):
+        w = World(self)
+        rc, out, err = w.run("--dry-run", "--append-body", str(self.para(w)))
+        self.assertEqual(rc, 0, out + err)
+        b = self.body_of(w)
+        self.assertIn("Soak: 60 minutes on one unit, PASS.", b)
+        self.assertLess(b.index("Soak: 60 minutes"), b.index("## How to report"))
+        self.assertGreater(b.index("Soak: 60 minutes"), b.index("SAT text."))
+
+    def test_shortened_body_gets_the_paragraph_after_the_cut(self):
+        w = World(self)
+        w.notes.write_text(notes_text(extra=20000), encoding="utf-8")
+        rc, out, err = w.run("--dry-run", "--append-body", str(self.para(w)))
+        self.assertEqual(rc, 0, out + err)
+        b = self.body_of(w)
+        self.assertIn("shortened", out)
+        self.assertIn("+ appended text", out)
+        self.assertNotIn("old line", b)
+        self.assertLess(b.index("Soak: 60 minutes"), b.index("## How to report"))
+
+    def test_paragraph_without_a_footer_goes_to_the_end(self):
+        w = World(self)
+        w.notes.write_text(notes_text().replace("## How to report\n\nHere.\n", ""), encoding="utf-8")
+        rc, out, err = w.run("--dry-run", "--append-body", str(self.para(w)))
+        self.assertEqual(rc, 0, out + err)
+        self.assertTrue(self.body_of(w).rstrip().endswith("Soak: 60 minutes on one unit, PASS."))
+
+    def test_without_the_flag_the_body_is_unchanged(self):
+        w = World(self)
+        rc, out, err = w.run("--dry-run")
+        self.assertEqual(rc, 0, out + err)
+        self.assertNotIn("Soak:", self.body_of(w))
+
+    def test_empty_missing_or_em_dash_file_is_refused(self):
+        w = World(self)
+        self.refused(w, "is empty", "--dry-run", "--append-body", str(self.para(w, "  ")))
+        self.refused(w, "cannot read --append-body", "--dry-run", "--append-body", str(w.tmp / "nope.md"))
+        self.refused(w, "em dash", "--dry-run", "--append-body", str(self.para(w, "a \u2014 b")))
+
+
 class RealRun(Base):
     def real(self, w, **state):
         w.two_dry_runs_on_record()
