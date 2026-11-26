@@ -12,6 +12,7 @@ superseded_by: null
 related:
   - "ADR-165"
   - "ADR-172"
+  - "ADR-300"
 topics:
   - "webui"
   - "rest-gate"

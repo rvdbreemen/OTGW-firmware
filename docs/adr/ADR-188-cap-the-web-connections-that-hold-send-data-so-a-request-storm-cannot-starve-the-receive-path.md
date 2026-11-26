@@ -13,6 +13,7 @@ related:
   - "ADR-212"
   - "ADR-215"
   - "ADR-216"
+  - "ADR-300"
 topics:
   - "web-server"
   - "backpressure"

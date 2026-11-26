@@ -1,7 +1,7 @@
 ---
 id: "ADR-298"
 title: "Grow the 4MB app slot to 2304K and shrink LittleFS to 704K, with a one-time USB migration (amends ADR-191)"
-status: "Proposed"
+status: "Accepted"
 date: "2026-11-26"
 binding: false
 gate: null
@@ -9,7 +9,6 @@ documents_shipped: false
 verified_in: []
 supersedes: []
 superseded_by: null
-format: "canonical"
 topics:
   - "partition-table"
   - "flash-layout"
@@ -23,6 +22,7 @@ components:
   - "USB layout detection"
 symbols: []
 context_scope: "selective"
+format: "canonical"
 ---
 
 <!-- markdownlint-disable MD025 -->
@@ -31,7 +31,7 @@ context_scope: "selective"
 
 ## Status
 
-Proposed, 2026-11-26.
+Accepted, 2026-11-26.
 
 ## Status History
 
@@ -42,6 +42,11 @@ status_history:
     changed_by: "Agent: Claude (otgw-architect)"
     reason: Initial proposal
     changed_via: adr-kit
+  - date: 2026-11-26
+    status: Accepted
+    changed_by: "Robert van den Breemen (decision, interactive answer to the coordinator, relayed), recorded by Agent: Claude (otgw-architect)"
+    reason: "Accepted: decision Robert van den Breemen, 2026-11-26 about 21:00 local, verbatim 'Accepteren, migratie in de stable' (interactive answers to coordinator questions, relayed; Q2 'Eén tabel voor alle drie (Recommended)' about 21:10), recorded by Agent: Claude (otgw-architect); four gates passed in adr-kit"
+    changed_via: adr-kit lifecycle
 ```
 
 ## Context
@@ -147,7 +152,7 @@ round (*estimate*, otgw-poc-dev).
 - Report the layout: `partition_layout` (`legacy`, `safeboot`, `safeboot2`, `unknown`) and
   `partition_layout_expected` in `/api/v2/device/info`, and a boot warning on telnet when the two differ.
 - Mark every app image with the table it is built for, as the string `otgw-layout=<layout>` in the image. The
-  `/update` page and `scripts/ota_flash.py` read the marker from the IMAGE before they send it and refuse an image
+  `/update` page and `scripts/ota_flash.py` read the marker from the image before they send it and refuse an image
   whose marker differs from the unit's `partition_layout`; the page builds its own search string at run time, so its
   text in the image is no false match. Reason (review, otgw-architect): comparing the unit only with what the
   RUNNING firmware expects misses the transition itself, the first upload of a release for the other table.
@@ -157,7 +162,7 @@ round (*estimate*, otgw-poc-dev).
 - `flash_esp.py` writes a partition table only together with both the firmware and the file-system image, so a new
   table never points at a file system that was not written.
 - Build the migrate image pair for the new table and let `--migrate` accept a `safeboot` unit as its source.
-- Release order (Robert, Open Question 3): first a bridge release on the OLD table that carries the guards (layout
+- Release order (Robert, Open Question 3): first a bridge release on the old table that carries the guards (layout
   report, image marker check, file-system size and `size=` checks) and marks its own image `otgw-layout=safeboot`;
   only a later release changes the table. A unit that runs the bridge refuses the table-change release over WiFi
   and points to `--migrate`.
@@ -257,8 +262,9 @@ round (*estimate*, otgw-poc-dev).
   2026-11-26 by Robert (interactive in the coordinator's session, at or before 07:08 local, 2026-11-26; no DM id):** verbatim "Er zijn op dit moment een beperkt aantal beta-testers die de huidige
   partition-indeling gebruiken. Denk aan een stuk of 10 tot 15." His own estimate: about 10 to 15 units, all
   beta testers. It supports the +64K route: the USB round is small and happens before the stable.
-- [ ] 2. Robert: one table for all three 4MB targets (recommended: one set of mirrors, one detection rule), or a second
+- [x] 2. Robert: one table for all three 4MB targets (recommended: one set of mirrors, one detection rule), or a second
   table for esp32-combo only?
+  — **Answered 2026-11-26 by Robert van den Breemen (decision, interactive answer to the coordinator, relayed), recorded by Agent: Claude (otgw-architect):** verbatim 'Eén tabel voor alle drie (Recommended)', Robert, about 21:10 local, interactive answer to a coordinator question in the coordinator's session (relayed by the coordinator; not seen by otgw-architect). One table for esp32, esp32-classic and esp32-combo, as the Decision states.
 - [x] 3. Robert: on a unit that is not migrated, should a release with the new table refuse the firmware step
   too, so firmware and web assets never mismatch? The block is built (image marker, see Must), but it works only
   on a unit that already runs a firmware with the guards. Options: (A) one public beta with the guards and the old
@@ -273,8 +279,9 @@ round (*estimate*, otgw-poc-dev).
   His DM has no reply reference; it is the next message after question 9, read as its answer (coordinator and
   otgw-architect, checked through the Discord API). Outcome: option A of this list, the bridge first, with the
   fallback case kept as a known consequence.
-- [ ] 4. Robert: acceptance of this ADR. It amends the layout table and the first Must of ADR-191; the rest of ADR-191
+- [x] 4. Robert: acceptance of this ADR. It amends the layout table and the first Must of ADR-191; the rest of ADR-191
   stays.
+  — **Answered 2026-11-26 by Robert van den Breemen (decision, interactive answer to the coordinator, relayed), recorded by Agent: Claude (otgw-architect):** verbatim 'Accepteren, migratie in de stable', Robert, about 21:00 local, interactive answer to the coordinator's question 'ADR-298 ... Wat doen we ermee?' (relayed by the coordinator; not seen by otgw-architect). Accepted consequence: every 4MB unit needs one USB migration (settings saved first), over-the-air updates work again afterwards; the migration ships before the stable. Release order (plan of record, coordinator 2026-11-26 21:1x): beta N = bridge (guards and image marker, old table); beta N+1 = the table change with the USB round; beta N+2 = the REST change of ADR-300.
 
 ## Related Decisions
 
