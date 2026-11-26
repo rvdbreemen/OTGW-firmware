@@ -111,9 +111,14 @@ admin password) is not touched.
   Updater bounds the write by the on-flash ota_0 (*not verified*). An image above 2240K then fails and the unit
   stays in safeboot until a smaller image or a USB migration (ADR-191 recovery path).
 - While the app still fits 2240K (2,263,808 B today), the unit runs the new firmware with its old LittleFS content,
-  because the file-system step is refused. That is a firmware and web assets mismatch. The firmware then reports
-  `partition_layout` `safeboot` and the `/update` page warns (Must below); whether the release also blocks the
-  firmware step on such a unit is Open Question 3.
+  because the file-system step is refused. That is a firmware and web assets mismatch. A firmware that is older than
+  the guards of this ADR cannot be patched, so this path stays open for units that update straight from such a
+  release (Open Question 3 and the release-order Must).
+- The new firmware on the old table, at first boot (*read*, otgw-dev, lane/d3-trim f384db4cb; not built or run on a
+  unit): it mounts the old 768K file system with settings intact, logs a warning at boot ("partition table is X,
+  built for Y ... migrate once over USB"), reports `partition_layout` different from `partition_layout_expected` in
+  device info, and its `/update` page blocks the one-action update and refuses images for the other table. It writes
+  neither the table nor the settings.
 
 The table changes before the 2.0.0 stable, not after: once a stable is out, every stable unit would need the USB
 round (*estimate*, otgw-poc-dev).
@@ -125,21 +130,42 @@ round (*estimate*, otgw-poc-dev).
 - Change the layout in one place, `partitions_otgw_esp32.csv`, and keep every mirror equal to it in the same commit:
   `build.py:92-98` and its migrate images, `flash_otgw.bat:74-79`, `flash_otgw.sh:104-106`, `flash_esp.py:52-53`,
   `scripts/check_app_size.py`, `scripts/otgw-test.py:52-53`, `scripts/device-verify.sh`, and
-  `src/OTGW-firmware/webui/update.html:159` (`APP_MAX`, `FS_SIZE`). A host test fails when a mirror differs from the
-  CSV (comma-separated values).
+  `src/OTGW-firmware/webui/update.html:159` (`APP_MAX`, `FS_SIZE`), and the firmware's `OTGW_PARTITION_LAYOUT`. A
+  host test fails when a mirror differs from the CSV (comma-separated values): `tests/test_partition_mirrors.py`
+  (otgw-dev, lane/d3-trim 76ad1afaf).
 - Detect the layout of a connected unit by the app0 size in its table (0x230000 = `safeboot`, 0x240000 =
   `safeboot2`) in `flash_otgw.bat`, `flash_otgw.sh` and `flash_esp.py`. Refuse `--update` when the unit's layout
   differs from the images' layout and point to `--migrate`. Reason (*read*, otgw-dev, `flash_otgw.bat:471`): the
   tools now match the string "safeboot", which both tables contain, so `--update` with new images would write the
   file system at 0x340000, inside the old LittleFS partition, on an unmigrated unit.
-- Make the main firmware's file-system update refuse an image whose LittleFS block count differs from the partition,
-  before it erases anything. Reason (*read*, otgw-dev): `OTGW-ModUpdateServer-esp32.h:653-673` accepts an image smaller
+- Make the main firmware's file-system update refuse, before it erases anything, an image whose size differs from
+  the partition (a mklittlefs image spans the whole partition; the superblock block count is not read), and an
+  upload without `size=` in the query string, which cannot be compared. Reason (*read*, otgw-dev): `OTGW-ModUpdateServer-esp32.h:653-673` accepts an image smaller
   than the partition, so a 704K image on an old 768K partition is written, and the mount then fails on the block
   count (`lfs.c:4608-4613` in joltwallet/littlefs); `LittleFS.begin()` does not format (`OTGW-firmware.ino:337`). The
   unit boots, but the web UI (user interface) files and settings.ini are gone until a matching image is flashed.
-- Report the layout: a `partition_layout` field (`legacy`, `safeboot`, `safeboot2`) in `/api/v2/device/info`, a boot
-  log line on telnet, and a warning on the `/update` page when the running layout is older than the firmware expects.
+- Report the layout: `partition_layout` (`legacy`, `safeboot`, `safeboot2`, `unknown`) and
+  `partition_layout_expected` in `/api/v2/device/info`, and a boot warning on telnet when the two differ.
+- Mark every app image with the table it is built for, as the string `otgw-layout=<layout>` in the image. The
+  `/update` page and `scripts/ota_flash.py` read the marker from the IMAGE before they send it and refuse an image
+  whose marker differs from the unit's `partition_layout`; the page builds its own search string at run time, so its
+  text in the image is no false match. Reason (review, otgw-architect): comparing the unit only with what the
+  RUNNING firmware expects misses the transition itself, the first upload of a release for the other table.
+  An image without a marker (older releases) is not blocked by this check.
+- The `/update` page blocks the one-action update while `partition_layout` differs from
+  `partition_layout_expected`, and points to `--migrate`.
+- `flash_esp.py` writes a partition table only together with both the firmware and the file-system image, so a new
+  table never points at a file system that was not written.
 - Build the migrate image pair for the new table and let `--migrate` accept a `safeboot` unit as its source.
+- Release order (Robert, Open Question 3): first a bridge release on the OLD table that carries the guards (layout
+  report, image marker check, file-system size and `size=` checks) and marks its own image `otgw-layout=safeboot`;
+  only a later release changes the table. A unit that runs the bridge refuses the table-change release over WiFi
+  and points to `--migrate`.
+- Fallback for a unit that skips the bridge (case A of question 9, accepted by Robert): its older firmware and the
+  safeboot updater cannot check the marker, so the new app can land on the old table. The unit then runs the new
+  firmware on its old 768K file system with settings intact and old web files, warns at boot and in `/update` that
+  a USB migration is needed, and refuses further images for the other table. The release notes and the
+  #beta-testing announcement say this.
 - Announce the change in #beta-testing with the first public beta that carries the new table, prepared by
   BlueFlame or otgw-docs: it must be flashed over USB once and it is a breaking change. Robert, same source as
   Open Question 1, verbatim: "Leg uit in het beta-kanaal bij de volgende publieke beta waar de partition table
@@ -164,7 +190,14 @@ round (*estimate*, otgw-poc-dev).
 ### Verification
 
 - Host tests (to be written with the code, red on the old code): every mirror equals the CSV; the three USB tools
-  refuse `--update` on a layout mismatch; the file-system update refuses an image with a different block count.
+  refuse `--update` on a layout mismatch; the file-system update refuses an image whose size differs and an upload
+  without `size=`; the `/update` page and `ota_flash.py` refuse an image whose layout marker differs from the unit;
+  `flash_esp.py` refuses a table without both images. otgw-dev reports these red on the old code and green on
+  lane/d3-trim (b86614dec to f384db4cb); the counts are in his commit messages, not re-run by otgw-architect.
+- Review status (otgw-architect, 2026-11-26): findings F1 (the image marker), F2 (no upload without `size=`), F3
+  (`flash_esp.py` full set) and F4 (mirror test) were raised on b86614dec..bd58685cb and fixed in 76ad1afaf and
+  f384db4cb. Read again: the f384db4cb diff of `OTGW-ModUpdateServer-esp32.h`. *not verified*: the `scripts/ota_flash.py`
+  and `update.html` changes of f384db4cb were not re-read in full, and nothing was built or run on a unit.
 - Build log: app image against the new app0 under the 98 % gate; LittleFS budget against 704K.
 - Bench, by otgw-bench-tester, on one unit still on the `safeboot` table and on .63, with capture transcripts. *not verified* until it has run:
   - an over-the-air update with the new zip through the browser and through `scripts/ota_flash.py`: the file-system
@@ -226,11 +259,20 @@ round (*estimate*, otgw-poc-dev).
   beta testers. It supports the +64K route: the USB round is small and happens before the stable.
 - [ ] 2. Robert: one table for all three 4MB targets (recommended: one set of mirrors, one detection rule), or a second
   table for esp32-combo only?
-- [ ] 3. Robert: on a unit that is not migrated, should a release with the new table refuse the firmware step
-  too, so firmware and web assets never mismatch (the firmware's `/update` page would block it until
-  `partition_layout` is `safeboot2`)? Recommendation: yes, block with a message that points to `--migrate`; the
-  mismatch is otherwise silent until the app outgrows 2240K. Consequence of no: unmigrated units keep getting
-  firmware updates with old web assets, and the first image above 2240K leaves them in safeboot.
+- [x] 3. Robert: on a unit that is not migrated, should a release with the new table refuse the firmware step
+  too, so firmware and web assets never mismatch? The block is built (image marker, see Must), but it works only
+  on a unit that already runs a firmware with the guards. Options: (A) one public beta with the guards and the old
+  table first, then the table change (the release-order Must); (B) ship guards and table in one beta and accept
+  that units updating from an older beta get new firmware with old web files until they migrate (they warn at
+  boot and keep their settings). Recommendation: A. It costs one beta cycle and closes the gap for every unit that
+  takes that beta; B saves the cycle but leaves the mismatch for the 10 to 15 tester units, which have to migrate
+  anyway. — **Answered 2026-11-26 07:26 local by Robert** (Discord DM 1575397374891786251, verbatim "B met terugval
+  naar A"), answering the coordinator's question 9 (DM 1575397129101254667, 07:25 local). His letters follow that
+  question's labels, not this list: there B = "tussenrelease" (a bridge release on the old table with the marker
+  check and the guards), A = accept that a unit which skips the bridge ends with new firmware on the old table.
+  His DM has no reply reference; it is the next message after question 9, read as its answer (coordinator and
+  otgw-architect, checked through the Discord API). Outcome: option A of this list, the bridge first, with the
+  fallback case kept as a known consequence.
 - [ ] 4. Robert: acceptance of this ADR. It amends the layout table and the first Must of ADR-191; the rest of ADR-191
   stays.
 

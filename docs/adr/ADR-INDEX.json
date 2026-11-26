@@ -11867,9 +11867,14 @@
         "must": [
           "Change the layout in one place, partitionsotgwesp32.csv, and keep every mirror equal to it in the same commit: build.py:92-98 and its migrate images, flashotgw.bat:74-79, flashotgw.sh:104-106, flashesp.py:52-53, scripts/checkappsize.py,...",
           "Detect the layout of a connected unit by the app0 size in its table (0x230000 = safeboot, 0x240000 = safeboot2) in flashotgw.bat, flashotgw.sh and flashesp.py. Refuse --update when the unit's layout differs from the images' layout and po...",
-          "Make the main firmware's file-system update refuse an image whose LittleFS block count differs from the partition, before it erases anything. Reason (read, otgw-dev): OTGW-ModUpdateServer-esp32.h:653-673 accepts an image smaller than the...",
-          "Report the layout: a partitionlayout field (legacy, safeboot, safeboot2) in /api/v2/device/info, a boot log line on telnet, and a warning on the /update page when the running layout is older than the firmware expects.",
+          "Make the main firmware's file-system update refuse, before it erases anything, an image whose size differs from the partition (a mklittlefs image spans the whole partition; the superblock block count is not read), and an upload without s...",
+          "Report the layout: partitionlayout (legacy, safeboot, safeboot2, unknown) and partitionlayoutexpected in /api/v2/device/info, and a boot warning on telnet when the two differ.",
+          "Mark every app image with the table it is built for, as the string otgw-layout= in the image. The /update page and scripts/otaflash.py read the marker from the IMAGE before they send it and refuse an image whose marker differs from the u...",
+          "The /update page blocks the one-action update while partitionlayout differs from partitionlayoutexpected, and points to --migrate.",
+          "flashesp.py writes a partition table only together with both the firmware and the file-system image, so a new table never points at a file system that was not written.",
           "Build the migrate image pair for the new table and let --migrate accept a safeboot unit as its source.",
+          "Release order (Robert, Open Question 3): first a bridge release on the OLD table that carries the guards (layout report, image marker check, file-system size and size= checks) and marks its own image otgw-layout=safeboot; only a later re...",
+          "Fallback for a unit that skips the bridge (case A of question 9, accepted by Robert): its older firmware and the safeboot updater cannot check the marker, so the new app can land on the old table. The unit then runs the new firmware on i...",
           "Announce the change in #beta-testing with the first public beta that carries the new table, prepared by BlueFlame or otgw-docs: it must be flashed over USB once and it is a breaking change. Robert, same source as Open Question 1, verbati...",
           "Say in the release notes of the first release with this table: every existing 4MB unit needs one --migrate over USB; an over-the-air update alone is not enough; a migrated unit is rolled back only with the old release's full merged image..."
         ],
@@ -11882,7 +11887,8 @@
           "None. There is no 8MB target in the tree today (read, otgw-dev: platformio.ini:117-120, one CSV); the ADR-191 exception for 8MB boards stays as it is."
         ],
         "verification": [
-          "Host tests (to be written with the code, red on the old code): every mirror equals the CSV; the three USB tools refuse --update on a layout mismatch; the file-system update refuses an image with a different block count.",
+          "Host tests (to be written with the code, red on the old code): every mirror equals the CSV; the three USB tools refuse --update on a layout mismatch; the file-system update refuses an image whose size differs and an upload without size=;...",
+          "Review status (otgw-architect, 2026-11-26): findings F1 (the image marker), F2 (no upload without size=), F3 (flashesp.py full set) and F4 (mirror test) were raised on b86614dec..bd58685cb and fixed in 76ad1afaf and f384db4cb. Read again...",
           "Build log: app image against the new app0 under the 98 % gate; LittleFS budget against 704K.",
           "Bench, by otgw-bench-tester, on one unit still on the safeboot table and on .63, with capture transcripts. not verified until it has run:",
           "an over-the-air update with the new zip through the browser and through scripts/otaflash.py: the file-system step is refused and nothing changes;",
