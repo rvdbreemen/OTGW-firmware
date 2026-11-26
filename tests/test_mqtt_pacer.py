@@ -267,5 +267,59 @@ class Pacer(unittest.TestCase):
                     lambda o: any(int(x) > 1 for x in o["t3"]))
 
 
+FLAGS_MAIN = r"""
+int main() {
+  DebugSection d;
+  int err = -9;
+  printf("default|%d|%d\n", (int)state.debug.bPaceSat, (int)mqttPaceSatEnabled());
+  const DebugFlagDef* f = debugFlagSet(d, "pacesat", "false", &err);
+  printf("set|%d|%d\n", err, f ? 1 : 0);
+  if (f) state.debug.bPaceSat = d.bPaceSat;
+  printf("after|%d|%d\n", (int)d.bPaceSat, (int)mqttPaceSatEnabled());
+  const DebugFlagDef* k = debugFlagByKey('x');
+  printf("key|%s\n", k ? k->name : "-");
+  return 0;
+}
+"""
+
+
+class PrereleaseFlag(unittest.TestCase):
+    """ADR-265 amendment: the pacer switch row exists with _VERSION_PRERELEASE and is absent without it; without it the
+    behaviour is the flag ON (state.debug.bPaceSat stays true and cannot be changed). Real debugFlags.h, real DebugSection,
+    real mqttPaceSatEnabled(), compiled twice."""
+
+    def run_variant(self, prerelease):
+        dbg = read("debugStuff.h")
+        struct = re.search(r"struct DebugSection \{.*?\n\};", dbg, re.S).group(0)
+        gate = "bool mqttPaceSatEnabled() " + body(read("MQTTstuff.ino"), "bool mqttPaceSatEnabled()")
+        head = "#include <cstdint>\n#include <cstddef>\n#include <cstdio>\n#define HAS_SAT_BLE 1\n"
+        if prerelease:
+            head += "#define _VERSION_PRERELEASE beta.1\n"
+        src = (head + struct + "\nstatic struct { DebugSection debug; } state;\n" + read("debugFlags.h") + "\n" + gate
+               + "\nvoid debugFlagSensorSimChanged(bool) {}\nvoid debugFlagOtgwSimChanged(bool) {}\n" + FLAGS_MAIN)
+        with tempfile.TemporaryDirectory() as tmp:
+            cpp = Path(tmp) / "flags.cpp"
+            cpp.write_text(src, encoding="utf-8")
+            exe = compile_cpp(cpp, Path(tmp) / "flags.exe")
+            if exe is None:
+                self.skipTest("no host C++ compiler")
+            out = subprocess.run([str(exe)], capture_output=True, text=True, check=True).stdout
+        return {line.split("|")[0]: line.split("|")[1:] for line in out.splitlines()}
+
+    def test_with_prerelease_the_row_and_the_key_exist_and_the_switch_works(self):
+        o = self.run_variant(True)
+        self.assertEqual(o["default"], ["1", "1"])
+        self.assertEqual(o["set"], ["0", "1"])
+        self.assertEqual(o["after"], ["0", "0"], "off through the table reaches the gate")
+        self.assertEqual(o["key"], ["pacesat"])
+
+    def test_without_prerelease_there_is_no_row_and_the_gate_is_the_flag_on(self):
+        o = self.run_variant(False)
+        self.assertEqual(o["default"], ["1", "1"])
+        self.assertEqual(o["set"], ["1", "0"], "unknown name: the stable cannot switch the pacer off")
+        self.assertEqual(o["after"], ["1", "1"])
+        self.assertEqual(o["key"], ["-"])
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
