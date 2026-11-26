@@ -199,6 +199,17 @@ class Pacer(unittest.TestCase):
         self.assertEqual(text.count('"pacesat"'), 1)
         self.assertIn("bool     bPaceSat               = true;", read("debugStuff.h"), "default true, member always present")
 
+    def test_pace_counters_are_on_the_heap_telemetry_lines(self):
+        # the bench reads the [HEAP] lines (step 0 and the 15 min .61 bench): one 'pace sat' line after each summary
+        ino = read("MQTTstuff.ino")
+        self.assertIn('[HEAP] pace sat no=%lu live=%lu sw=%d', ino)
+        for fn in ("static void satTakeoverHeapTraceFinish()", "static void bootHeapFinish(const char *pstrReason)", "static void heapBurstClose(const char *reason)"):
+            self.assertIn(fn, ino)
+            self.assertIn("heapPaceLine();", body(ino, fn), fn)
+        self.assertGreaterEqual(ino.count("heapPaceLine();"), 3, "sat-takeover end, boot done and burst end")
+        self.assertIn('hd_pace_sat_no', read("restAPI.ino"))
+        self.assertIn('hd_pace_sat_live', read("restAPI.ino"))
+
     def test_t6_runtime_switch_off_is_the_old_gate_in_the_same_binary(self):
         self.need()
         t6 = kv(self.out["t6"])

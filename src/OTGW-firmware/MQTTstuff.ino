@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : MQTTstuff
-**  Version  : v2.0.0-beta.441
+**  Version  : v2.0.0-beta.442
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **      Modified version from (c) 2020 Willem Aandewiel
@@ -1267,11 +1267,19 @@ static void connProbePrint(PGM_P label) {
 // open and closes only that one, and only when no burst or boot window needs it. Known limit: once another owner closes
 // the shared window (after boot: the drip tick or a burst end), platformHeapWindowMin() reads 0 and no drop is kept;
 // at boot the boot watch keeps the window open. Loop task only.
+// ADR-265 cut 1 (TASK-2949.6): the SAT pacer counters since boot and the runtime switch, one line after the heap summaries
+// that the bench reads (sat-takeover end, boot done, burst end). Same counters as hd_pace_sat_no / hd_pace_sat_live.
+static void heapPaceLine() {
+  DebugTf(PSTR("[HEAP] pace sat no=%lu live=%lu sw=%d\r\n"), (unsigned long)satPaceNoCount(), (unsigned long)satPaceLiveCount(),
+          (int)state.debug.bPaceSat);
+}
+
 static void satTakeoverHeapTraceFinish() {
   sSatTraceOn = false;
   connProbePrint(PSTR("sat-takeover-probe"));
   DebugTf(PSTR("[HEAP] sat-takeover end min=%lu winMin=%lu free=%lu\r\n"), (unsigned long)platformMinFreeHeap(),
           (unsigned long)platformHeapWindowMin(), (unsigned long)platformFreeHeap());
+  heapPaceLine();
   if (sSatTraceOwnWindow && !sHeapBurstOpen && sBootHeapState != BOOTHEAP_RUN) platformHeapWindowStop();
   sSatTraceOwnWindow = false;
 }
@@ -1451,6 +1459,7 @@ static void bootHeapFinish(const char *pstrReason) {
   DebugTf(PSTR("[HEAP] boot done reason=%s phases=%u allWinMin=%lu nativeMin=%lu outside=%d\r\n"),
           pstrReason, (unsigned)sBootHeapPhases, (unsigned long)sBootHeapAllMin, (unsigned long)nativeMin,
           (nativeMin < sBootHeapAllMin) ? 1 : 0);  // 1 = a dip outside every window
+  heapPaceLine();
 }
 
 // Failsafe: a boot that never reaches the end of the discovery drip stops watching after 10 min.
@@ -1467,6 +1476,7 @@ static void heapBurstClose(const char *reason) {
           (unsigned long)(millis() - sHeapBurstStartMs), reason,
           (unsigned long)sHeapBurstMin, (unsigned)sHeapBurstLines,
           (unsigned)platformFreeHeap(), (unsigned)platformMaxFreeBlock());
+  heapPaceLine();
 }
 
 // Called at the top of onMqttConnect, before anything is queued.

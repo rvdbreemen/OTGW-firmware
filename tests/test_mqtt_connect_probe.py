@@ -38,6 +38,10 @@ static uint32_t platformFreeHeap() { return freeHeap; }
 static uint32_t platformMaxFreeBlock() { return 30000; }
 static bool winActive = true;   // TASK-2019: the takeover trace opens a window when none is open
 static uint32_t platformHeapWindowMin() { return winActive ? winMin : 0; }
+// ADR-265 cut 1: heapPaceLine() prints the pacer counters and the runtime switch
+static uint32_t satPaceNoCount() { return 0; }
+static uint32_t satPaceLiveCount() { return 0; }
+static struct { struct { bool bPaceSat = true; } debug; } state;
 static bool platformHeapWindowActive() { return winActive; }
 static bool platformHeapWindowStart() { winActive = true; winGen++; winMin = freeHeap; return true; }
 static void platformHeapWindowStop() { winActive = false; }
