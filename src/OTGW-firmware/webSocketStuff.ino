@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : webSocketStuff.ino
-**  Version  : v2.0.0-beta.452
+**  Version  : v2.0.0-beta.453
 **
 **  Copyright (c) 2021-2025 Robert van den Breemen
 **
@@ -46,12 +46,14 @@ void doWebSocketClose() {
   otLogWs.closeAll();
 }
 
-// Disconnect-all wrapper for emergencyHeapRecovery() in helperStuff.ino (ADR-107
-// action #1). Same scoping rationale as doWebSocketClose() above. closeAll()
-// closes all connected WS clients, releasing their lwIP buffers (~2-4 KB each).
-// Browsers reconnect on their own (v2.js connectWs retries after 5 s).
-void doWebSocketDisconnectAll() {
-  otLogWs.closeAll();
+// emergencyHeapRecovery() action 1 (helperStuff.ino), ADR-295 (partly supersedes ADR-107 action 1, TASK-3025): the
+// /ws connections are aborted in lwIP (RST, their send queues freed at once) instead of a WebSocket close, whose close
+// frame may never leave at CRITICAL heap. Browsers reconnect on their own (v2.js connectWs retries after 5 s).
+// Returns the number of connections aborted.
+uint8_t doWebSocketDisconnectAll() {
+  const uint8_t n = webSocketAbortAll();
+  state.heapdiag.iWsRecoveryAborts += n;
+  return n;
 }
 
 // Maximum number of simultaneous WebSocket clients
@@ -87,7 +89,7 @@ const unsigned long KEEPALIVE_INTERVAL_MS = 30000; // 30 seconds
 // --- wsTrack begin
 static const uint32_t WS_RX_TIMEOUT_S = 70;   // more than two keepalive intervals
 #define WS_TRACK_SLOTS (MAX_WEBSOCKET_CLIENTS + 1)
-struct WsTrackRow { uint32_t id; uint32_t connectMs; uint8_t seenStatus; uint32_t seenSinceMs; };
+struct WsTrackRow { uint32_t id; uint32_t connectMs; uint8_t seenStatus; uint32_t seenSinceMs; uint32_t remoteIp; uint16_t remotePort; };
 static WsTrackRow wsTrack[WS_TRACK_SLOTS];
 
 static const char* wsStatusName(uint8_t st) {
@@ -112,7 +114,8 @@ static void wsTrackConnect(AsyncWebSocketClient* client, uint32_t now) {
   }
   for (uint8_t i = 0; i < WS_TRACK_SLOTS; i++) {
     if (wsTrack[i].id == 0) {
-      wsTrack[i] = { client->id(), now, (uint8_t)WS_CONNECTED, now };
+      const IPAddress ip = client->remoteIP();   // TASK-3025: the 4-tuple ADR-295's abort matches on
+      wsTrack[i] = { client->id(), now, (uint8_t)WS_CONNECTED, now, (uint32_t)ip, client->remotePort() };
       return;
     }
   }
@@ -151,6 +154,30 @@ uint8_t webSocketSnapshotClients(WsClientSnap* out, uint8_t max, uint32_t now) {
     out[n].ageS       = (now - wsTrack[i].connectMs) / 1000UL;
     n++;
   }
+  return n;
+}
+// TASK-3025 (ADR-295): the /ws connections ADR-107's recovery aborts: local port 80 (the port-80 server /ws runs on)
+// with the remote address and port of a tracked client. Runs under the lwIP core lock inside platformTcpAbortWhere()
+// on the loop task; the rows are plain words written on async_tcp, so a row being written at that moment can only be
+// missed, never matched wrongly (lwIP keeps one pcb per 4-tuple).
+static const uint16_t WS_LOCAL_PORT = 80;
+static bool wsAbortMatch(uint16_t localPort, uint32_t remoteIp, uint16_t remotePort) {
+  if (localPort != WS_LOCAL_PORT) return false;
+  for (uint8_t i = 0; i < WS_TRACK_SLOTS; i++) {
+    if (wsTrack[i].id != 0 && wsTrack[i].remoteIp == remoteIp && wsTrack[i].remotePort == remotePort) return true;
+  }
+  return false;
+}
+
+uint8_t webSocketAbortAll() {
+  return platformTcpAbortWhere(wsAbortMatch);
+}
+
+// Tracked /ws connections, connected or not: count() sees only WS_CONNECTED ones, so a client stuck outside it
+// (TASK-3017) would be skipped by a recovery gated on hasWebSocketClients().
+uint8_t webSocketTrackedCount() {
+  uint8_t n = 0;
+  for (uint8_t i = 0; i < WS_TRACK_SLOTS; i++) if (wsTrack[i].id != 0) n++;
   return n;
 }
 // --- wsTrack end

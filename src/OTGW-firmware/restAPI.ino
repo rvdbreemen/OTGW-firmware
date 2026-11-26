@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-beta.452
+**  Version  : v2.0.0-beta.453
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -3543,7 +3543,8 @@ void sendDeviceInfoV2()
     // TASK-3017: per /ws client (status connected / disconnecting / disconnected, queue length, seconds in that
     // status, seconds since connect) and the disconnect count; AsyncTCP's rx timeout closes a stuck client.
     je.field(F("hd_ws_disconnects"),   snap->st.heapdiag.iWsDisconnects);
-    je.field(F("hd_ws_ack_abort"),     snap->st.heapdiag.iWsAckAbortCount);   // ADR-189 on /ws; HTTP: hd_weback_abort
+    je.field(F("hd_ws_ack_abort"),     snap->st.heapdiag.iWsAckAbortCount);
+    je.field(F("hd_ws_recovery_abort"), snap->st.heapdiag.iWsRecoveryAborts);   // TASK-3025, ADR-295   // ADR-189 on /ws; HTTP: hd_weback_abort
     je.beginArray(F("ws_clients"));
     for (uint8_t i = 0; i < snap->wsClientCount; i++) {
       je.beginObject();

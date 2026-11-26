@@ -494,6 +494,26 @@ inline uint32_t platformTcpTxBytesToRemotePort(uint16_t remotePort) {
   return bytes;
 }
 
+// TASK-3025 (ADR-295): abort, under the core lock, every active pcb for which match(localPort, remote IPv4 address
+// in network order, remotePort) is true; returns how many. tcp_abort() unlinks the pcb from tcp_active_pcbs and runs
+// its error callback in this locked context (AsyncTCP's tcp_error clears the client's _pcb and posts the error
+// event; the async_tcp task then removes the client), so the matches are collected first and aborted after the
+// walk. A pcb is only touched while it is on lwIP's own list, under the lock.
+typedef bool (*PlatformTcpMatchFn)(uint16_t localPort, uint32_t remoteIp, uint16_t remotePort);
+inline uint8_t platformTcpAbortWhere(PlatformTcpMatchFn match) {
+  if (match == nullptr) return 0;
+  struct tcp_pcb* hit[8];
+  uint8_t n = 0;
+  LOCK_TCPIP_CORE();
+  for (struct tcp_pcb *pcb = tcp_active_pcbs; pcb != nullptr && n < 8; pcb = pcb->next) {
+    if (!IP_IS_V4(&pcb->remote_ip)) continue;
+    if (match(pcb->local_port, ip4_addr_get_u32(ip_2_ip4(&pcb->remote_ip)), pcb->remote_port)) hit[n++] = pcb;
+  }
+  for (uint8_t i = 0; i < n; i++) tcp_abort(hit[i]);
+  UNLOCK_TCPIP_CORE();
+  return n;
+}
+
 inline uint16_t platformTcpActivePcbCount() {
   uint16_t count = 0;
   LOCK_TCPIP_CORE();

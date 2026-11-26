@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : helperStuff
-**  Version  : v2.0.0-beta.452
+**  Version  : v2.0.0-beta.453
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -1288,7 +1288,8 @@ void logHeapStats() {
 //===========================================================================================
 // Emergency heap recovery - called when heap is critically low.
 // ADR-107: performs three concrete recovery actions in order:
-//   1. Drop all WebSocket clients (browsers reconnect on their own).
+//   1. Drop all WebSocket clients (browsers reconnect on their own): since ADR-295 their TCP connections are
+//      aborted in lwIP, not closed with a WebSocket close frame (TASK-3025).
 //   2. Stop+restart OTGWstream port 25238 (OTmonitor users reconnect manually).
 //   3. Clear MQTT discovery pending bitmap (JIT path repopulates on next status burst).
 // Telnet is intentionally NOT dropped (operators need live diagnostics).
@@ -1312,8 +1313,9 @@ void emergencyHeapRecovery() {
 
   // Action 1: drop all WebSocket clients (~2-4 KB lwIP buffer per client).
   // Wrapper lives in webSocketStuff.ino (same pattern as doWebSocketClose).
-  if (hasWebSocketClients()) {
-    doWebSocketDisconnectAll();
+  // ADR-295 (TASK-3025): abort the tracked /ws connections, also one stuck outside WS_CONNECTED, which
+  // hasWebSocketClients() does not count.
+  if (webSocketTrackedCount() > 0 && doWebSocketDisconnectAll() > 0) {
     actions |= 0x01;
   }
 

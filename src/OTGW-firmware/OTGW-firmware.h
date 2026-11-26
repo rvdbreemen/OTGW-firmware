@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v2.0.0-beta.452
+**  Version  : v2.0.0-beta.453
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -599,6 +599,7 @@ struct DiscoverySection {                    // state.discovery — MQTT auto-di
 // NOT automatically surface on MQTT — add a corresponding
 // case to publishStatAt() in MQTTstuff.ino and raise STATS_COUNT.
 struct HeapDiagSection {                 // state.heapdiag — cumulative heap-pressure diagnostics (reset on reboot)
+  uint32_t iWsRecoveryAborts        = 0; // TASK-3025: /ws connections aborted by the heap recovery (ADR-295)
   uint32_t iWsAckAbortCount         = 0; // TASK-3017: /ws connections aborted on the ack timeout (ADR-189 applied to /ws; not in iWebAckAbortCount)
   uint32_t iWsDisconnects           = 0; // TASK-3017: /ws disconnects of accepted clients (incl. the AsyncTCP rx timeout close)
   uint32_t iWsDropsTotal            = 0; // lifetime WebSocket messages dropped: refused at heap CRITICAL, or not queued for every client (a full client queue, TASK-3017)

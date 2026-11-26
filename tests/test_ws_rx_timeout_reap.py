@@ -71,8 +71,22 @@ struct AsyncClient {
   }
 };
 struct { struct { uint32_t iWsAckAbortCount = 0; } heapdiag; } state;
+struct IPAddress { uint32_t v = 0; operator uint32_t() const { return v; } };
+// lwIP stand-in for platformTcpAbortWhere() (platform_esp32.h): the active pcbs and which ones were aborted
+struct FakePcb { uint16_t localPort; uint32_t remoteIp; uint16_t remotePort; bool aborted; };
+static FakePcb g_pcbs[4]; static uint8_t g_pcbCount = 0;
+typedef bool (*PlatformTcpMatchFn)(uint16_t, uint32_t, uint16_t);
+static uint8_t platformTcpAbortWhere(PlatformTcpMatchFn match) {
+  uint8_t n = 0;
+  for (uint8_t i = 0; i < g_pcbCount; i++)
+    if (!g_pcbs[i].aborted && match(g_pcbs[i].localPort, g_pcbs[i].remoteIp, g_pcbs[i].remotePort)) { g_pcbs[i].aborted = true; n++; }
+  return n;
+}
 struct AsyncWebSocketClient {
   uint32_t _id; AwsClientStatus _st = WS_CONNECTED; AsyncClient tcp; uint16_t q = 0;
+  uint32_t ip = 0x2458A8C0; uint16_t port = 50000;
+  IPAddress remoteIP() const { IPAddress a; a.v = ip; return a; }
+  uint16_t remotePort() const { return port; }
   uint32_t id() const { return _id; }
   AwsClientStatus status() const { return _st; }
   AsyncClient* client() { return &tcp; }
@@ -105,6 +119,17 @@ int main(int argc, char** argv) {
       if (c.tcp.aborted) { abortedAt = (long)ms; break; }
     }
     printf("aborted_after_ms=%ld aborts=%u cap=%u\n", abortedAt, state.heapdiag.iWsAckAbortCount, c.tcp.pcbObj.sndCap);
+  } else if (!strcmp(sc, "recovery")) {  // ADR-295: the heap recovery aborts the tracked /ws pcb, nothing else
+    c._st = WS_DISCONNECTING;               // the AC3 state: count() would not see it
+    g_pcbs[0] = {80, 0x2458A8C0, 50000, false};    // the /ws connection
+    g_pcbs[1] = {80, 0x2458A8C0, 50001, false};    // a REST request from the same browser
+    g_pcbs[2] = {54321, 0x2458A8C0, 1883, false};  // the MQTT connection to the broker
+    g_pcbs[3] = {80, 0x0B58A8C0, 50000, false};    // another host, same remote port
+    g_pcbCount = 4;
+    const uint8_t tracked = webSocketTrackedCount();
+    const uint8_t n = webSocketAbortAll();
+    printf("tracked=%u aborted=%u ws=%d rest=%d mqtt=%d other=%d\n", tracked, n, g_pcbs[0].aborted, g_pcbs[1].aborted,
+           g_pcbs[2].aborted, g_pcbs[3].aborted);
   } else if (!strcmp(sc, "healthy")) { // connected, the 30 s keepalive is acknowledged every time
     bool closed = false;
     for (uint32_t t = 1; t <= 3600; t++) { g_now = 1000 + t * 1000; if (t % 30 == 0) { c.tcp.sent(); g_now += 50; c.tcp.received(); } c.tcp.poll(); closed |= c.tcp.closed; }
@@ -185,6 +210,12 @@ class WsRxTimeoutReap(unittest.TestCase):
         self.assertEqual(r["status_age"], "20")
         self.assertEqual(r["age"], "40")
 
+    def test_recovery_aborts_only_the_ws_connection(self):
+        # TASK-3025 / ADR-295: also a client outside WS_CONNECTED (tracked, count() does not see it)
+        r = self.run_sc("recovery")
+        self.assertEqual((r["tracked"], r["aborted"], r["ws"]), ("1", "1", "1"))
+        self.assertEqual((r["rest"], r["mqtt"], r["other"]), ("0", "0", "0"))
+
     def test_disconnect_frees_the_row(self):
         r = self.run_sc("disconnect")
         self.assertEqual((r["hit"], r["again"], r["life"]), ("1", "0", "60"))
@@ -201,6 +232,14 @@ class Wiring(unittest.TestCase):
         self.assertIn("wsTrackDisconnect(client->id(), millis()", body)
         self.assertIn("state.heapdiag.iWsDisconnects++;", body)
         self.assertIn("state.heapdiag.iWsAckAbortCount++;", self.ws)   # separate from the HTTP iWebAckAbortCount
+
+    def test_heap_recovery_aborts_instead_of_closing(self):
+        i = self.ws.index("uint8_t doWebSocketDisconnectAll() {")
+        body = self.ws[i:self.ws.index("\n}\n", i)]
+        self.assertNotIn("closeAll", body)
+        self.assertIn("webSocketAbortAll()", body)
+        helper = (FW / "helperStuff.ino").read_text(encoding="utf-8")
+        self.assertIn("if (webSocketTrackedCount() > 0 && doWebSocketDisconnectAll() > 0) {", helper)
 
     def test_device_info_shows_the_clients(self):
         rest = (FW / "restAPI.ino").read_text(encoding="utf-8")
