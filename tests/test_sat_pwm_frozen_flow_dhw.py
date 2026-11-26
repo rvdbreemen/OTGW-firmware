@@ -154,6 +154,28 @@ class FrozenFlow(unittest.TestCase):
         self.assertEqual(rows[270]["on"], 0)
         self.assertAlmostEqual(rows[300]["duty"], 0.153, places=3)
 
+    def test_draw_ends_with_the_flame_out_and_the_draw_heated_flow_cools_in_the_wait(self):
+        # Review F1: the hot-water flame goes out at the end of the draw. The post-draw wait (entry 103 A, up to 180 s) runs ticks through
+        # the ON branch before the resume; they carry the cooling, draw-heated flow and must not be stored either.
+        ev = [(195, "flow", 60), (200, "dhw", 1), (250, "dhw", 0), (250, "flame", 0), (270, "flow", 58), (300, "flow", 56),
+              (330, "flow", 54), (340, "flame", 1), (340, "flow", 50)]
+        rows = self.sim(ev, 900)
+        for sec in (270, 300, 330):
+            self.assertEqual(rows[sec]["last"], 50.0, f"wait tick {sec}: the stored flow stays the one before the draw")
+        off = [s for s in sorted(rows) if s > 340 and rows[s]["on"] == 0]
+        self.assertTrue(off, "the ON phase ended")
+        self.assertEqual(rows[off[0]]["off"], self.OFF_CLEAN)
+
+    def test_a_draw_before_the_first_on_tick_of_a_later_phase_uses_the_live_flow(self):
+        # Review F2 (entries 444, 499): ON phase 2 has no tick before its draw, so there is no earlier value; the value of phase 1 is not
+        # carried over. Phase 1 stores 50 and ends at the tick 270; phase 2 begins at the tick 1230, its first storing tick would be 1260, and
+        # a draw covers exactly that tick (1245-1275, flow 60 after it).
+        ev = [(1245, "dhw", 1), (1245, "flow", 60), (1275, "dhw", 0)]
+        rows = self.sim(ev, 1800)
+        ticks = [s for s in sorted(rows) if s > 1290 and rows[s]["on"] == 0]
+        self.assertTrue(len(ticks) > 1, "phase 2 ended")
+        self.assertAlmostEqual(rows[ticks[1]]["duty"], 0.153, places=3, msg="live flow (60 C) for the OFF phase, not phase 1's 50 C")
+
     def test_the_next_on_phase_stores_again(self):
         # ON phase 2 starts after the OFF phase of 936 s; its heating ticks update the stored flow again
         rows = self.sim(self.DRAW_END_ON + [(1200, "flow", 52)], 1600)

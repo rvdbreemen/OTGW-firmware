@@ -1469,6 +1469,7 @@ static void satPwmBeginOn(bool flame, float boilerTemp, uint32_t onTimeMs, uint3
   state.sat.bPwmFlameRequested = true;
   _pwm_lastUpdateMs = millis();
   satPwmPhaseOpen(onTimeMs, flame && !state.sat.bDhwActive, _pwm_lastUpdateMs);   // TASK-1880 telemetry: per segment, from the real start
+  _pwm_lastOnFlowTemp = 0.0f;   // entries 444, 499: a new ON phase has no stored flow yet; a draw before its first tick leaves the live flow for its OFF phase
   _pwm_dhwResumed = false;
   _pwm_dhwAnchorLate = false;
   _pwm_dhwHoldLapsed = false;
@@ -1717,7 +1718,7 @@ static void satPwmSchedule(float pidOutput)
   // thermo-nova (7beaaf5) cannot be moved by a late draw: its held temperature changes by EMA only while the flame is younger than the update
   // window (pwm.py:144-149) and the duty reads that held value (pwm.py:229-239); ours follows the live flow in ON (entries 437, 444).
   if (state.sat.bPwmFlameRequested) {
-    if (!_pwm_dhwResumed) _pwm_lastOnFlowTemp = effectiveTemp;
+    if (!_pwm_dhwResumed && _pwm_dhwPhase == PwmDhwPhase::None) _pwm_lastOnFlowTemp = effectiveTemp;   // also not in the post-draw wait (flame out)
   } else if (_pwm_lastOnFlowTemp > 0.0f) effectiveTemp = _pwm_lastOnFlowTemp;
   if (effectiveTemp < baseOffset + 1.0f) effectiveTemp = baseOffset + 1.0f;
 
