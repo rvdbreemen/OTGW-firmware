@@ -3,15 +3,14 @@ id: TASK-2014
 title: >-
   HA: the SAT simulation switch bounces back without a reason while a boiler
   answers (thaghostnl)
-status: In Review
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-18T06:27:00Z'
-updated_date: '2026-11-25T06:40:00Z'
+updated_date: '2026-11-26T22:14:00Z'
 labels:
   - ha
   - sat
-  - needs-maintainer-ok
 milestone: 2.0.0
 dependencies: []
 priority: low
@@ -46,10 +45,12 @@ AC1 bench by 09 (2026-11-18, .63 Classic + S3, PIC 6.8 gateway, NO boiler; simul
 2026-11-18 pushed and published (otgw-docs, on the coordinator's GO): 1d124dbc5 (2.0.0-beta.374) with a9ff5dcb8 (ADR-255 Accepted) as a fast-forward 9e6636da7..1d124dbc5, remote HEAD confirmed after a fresh fetch; zip OTGW-firmware-esp32-combo-2.0.0-beta.374+1d124db-flash.zip (6431071 bytes) posted to #alpha-testing by scripts/discord-post-build.sh, http 200, message 1572665769706135653. AC2 basis: the host test tests/test_ha_sat_sim_availability.py (red on origin before the fix, green on it) plus 09's bench run with the boiler emulated by force-boiler; a run with a real answering boiler and a real HA instance greying out the entity is a field check (thaghostnl's Remeha), not an AC. The ot_link_lost side effect of force-boiler is a test-hook effect, not part of the 2014 change.
 
 2026-11-18 status In Review (coordinator): AC1 ticked on discovery payload + HA source (mixins AVAILABILITY_ALL); confirmation in a real HA pending: bench rig (09, HA ingress rig, after 375) or field (thaghostnl). AC1 reads 'In HA' and a real HA is available on the bench, so the HA code read counts only as a stand-in until that check.
+
+2026-11-26 status closed on Robert's decision 2026-11-26 (interactive, relayed by the coordinator); label needs-maintainer-ok removed. Both ACs were ticked with the evidence recorded above; no new test run in this step.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
 
 <!-- SECTION:FINAL_SUMMARY:BEGIN -->
-AC1: 09 bench on 2.0.0-beta.374+1d124db (.63): retained discovery of sat_simulation_enable carries avty [device LWT, sat/simulation_available] with avty_mode all and no avty_t, the 14 other SAT switches keep avty_t; sat/simulation_available goes false on force-boiler 1 and true on force-boiler 0 (14:27:27.5 / 14:27:39.6). AC2: tests/test_ha_sat_sim_availability.py, OTGW_SRC_REV=origin/dev red (5 of 6 failed) vs fix 6/6 OK, plus that bench run. Decision: Robert 'A' (DM 1572560403387523154), ADR-255 Accepted. Pushed 1d124dbc5, zip posted (message 1572665769706135653). Not verified: a real boiler answering and a real HA instance showing the entity unavailable (broker-side topics only); field check by the reporter.
+AC1: 09 bench on 2.0.0-beta.374+1d124db (.63): retained discovery of sat_simulation_enable carries avty [device LWT, sat/simulation_available] with avty_mode all and no avty_t, the 14 other SAT switches keep avty_t; sat/simulation_available goes false on force-boiler 1 and true on force-boiler 0. AC2: tests/test_ha_sat_sim_availability.py, red on origin/dev (5 of 6 failed) and green on the fix (6/6), plus that bench run. Decision: Robert 'A' (ADR-255 Accepted). Pushed 1d124dbc5. Status closed on Robert's decision 2026-11-26; no new test run in this step. Not verified: a real boiler answering and a real HA instance showing the entity unavailable (broker-side topics only); field check by the reporter.
 <!-- SECTION:FINAL_SUMMARY:END -->
