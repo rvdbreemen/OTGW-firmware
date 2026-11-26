@@ -7,7 +7,7 @@ Disconnected" and "Running / Not running" instead of a bare "On / Off".
 
 The payloads come from the REAL composers: test/host/test_ha_discovery_json.py compiles MQTTHaDiscovery.cpp
 verbatim with the MQTTstuff.ino slices it needs and records every publish. This test builds that program twice,
-from the working tree and from OTGW_DISC_BASE (default origin/dev), and checks:
+from the working tree and from OTGW_DISC_BASE (default 890b08680, the parent of the change). The pin works only while that commit stays reachable (never rewrite or drop it from origin/dev history); a default of origin/dev stopped working once the change landed., and checks:
   1. the rows above carry the expected device_class (red on the base, which has none);
   2. payload_on matches the class: these rows use HA's default ON/OFF payloads (no pl_on/pl_off keys), and the
      firmware publishes ON when the fault / connection / activity is present (CCONOFF, MQTTstuff.ino);
@@ -26,7 +26,7 @@ REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO / "test" / "host"))
 import test_ha_discovery_json as H   # noqa: E402
 
-BASE = os.environ.get("OTGW_DISC_BASE", "origin/dev")
+BASE = os.environ.get("OTGW_DISC_BASE", "890b08680")   # the last commit before the change under test; origin/dev carries it since the R1 release
 
 EXPECT = {
     "problem": ["fault", "gas_flame_fault", "air_pressure_fault", "low_water_pressure", "water_over_temperature",

@@ -12,7 +12,7 @@ MQTT client and captures the payload of all four kinds, with and without a user 
   1. avty_t == the gateway namespace, exp_aft == 1260 for temp, rh, bat and rssi (red on the base: both absent);
   2. topic, uniq_id, stat_t, dev_cla, unit and the device block are unchanged versus the base (contract unchanged).
 On the host the PROGMEM %S conversions are compiled as %s (PGM_P is a plain char pointer here).
-OTGW_MQTT_BASE (default origin/dev) is the revision for the comparison.
+OTGW_MQTT_BASE (default 890b08680, the parent of the change). The pin works only while that commit stays reachable (never rewrite or drop it from origin/dev history); a default of origin/dev stopped working once the change landed. is the revision for the comparison.
 """
 import json
 import os
@@ -29,7 +29,7 @@ sys.path.insert(0, str(HERE))
 import test_sat_pwm_override as base  # noqa: E402  (compile_cpp)
 
 INO = REPO / "src" / "OTGW-firmware" / "MQTTstuff.ino"
-BASE = os.environ.get("OTGW_MQTT_BASE", "origin/dev")
+BASE = os.environ.get("OTGW_MQTT_BASE", "890b08680")   # the last commit before the change under test; origin/dev carries it since the R1 release
 
 
 def cut_func(src, signature):
