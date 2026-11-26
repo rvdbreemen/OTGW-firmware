@@ -11943,8 +11943,12 @@
           "Show the dialog standalone in the web UI, also on existing installs, not only in the setup wizard, with the text Robert approved (decision 4) and its NL, DE and EL translations."
         ],
         "must_not": [
-          "Turn remote telemetry on by default, by an update, or by a restore of settings that never held a yes from this user.",
+          "Turn remote telemetry on by default or by an update. The opt-in lives in NVS, not in settings.ini, so a settings.ini restore cannot carry it (read, otgw-poc-dev; no settings import flow found in the v2 web UI). A REST client that posts r...",
           "Ask again because of a developer build, a githash change or a reboot.",
+          "Let the collection point change the opt-in. A blocked gateway stays opted in: it pauses and backs off (up to 60 min), and ask stays false.",
+          "Source: Robert, interactive in session 5e, no DM id, recorded in the TASK-2901 notes on lane-poc-merge (re-opened by otgw-architect 2026-11-26). 2026-11-19 about 23:40, as summarised there (not verbatim): \"a lifted block resumes by itsel...",
+          "The phrase \"the collection point can never turn remote telemetry off\" is a code comment that attributes the rule to Robert (RemoteTelemetryDevice.h:1505, \"TASK-2901 (Robert 2026-11-19)\"). It is not a quote of Robert.",
+          "As built (read: remoteTelemetryBlocked(), RemoteTelemetryDevice.h:1510-1523 on lane-poc-merge): the only writes of optin are the user paths remoteTelemetryRequestOptIn() :1589 and its apply :1620. The comment \"turn the opt-in off, stop\"...",
           "Change what is sent in the same change as the consent rule (decision 1)."
         ],
         "exceptions": [

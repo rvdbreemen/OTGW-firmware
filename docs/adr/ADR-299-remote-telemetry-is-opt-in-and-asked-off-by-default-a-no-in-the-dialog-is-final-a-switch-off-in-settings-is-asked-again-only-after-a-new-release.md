@@ -103,12 +103,15 @@ ask = psram && ( optin == never-set
 | off in Settings, same release | no |
 | off in Settings, a new release since (`offrel` differs) | yes, once |
 | board without PSRAM | no, never |
+| off, `offsrc` absent (switched off before this rule existed, for example the proof-of-concept units) | no (see Open Question 1) |
 
 "Release" is `_SEMVER_CORE` + "-" + `_VERSION_PRERELEASE` (for example `2.0.0-beta.433`; a stable is `2.0.0`), never
 the githash or the build counter, so a developer build does not ask again (Robert, decision 3).
 
-Stored state, NVS namespace `telemetry` (*planned*): `optin` (u8: never set / off / on, exists today), `offsrc` (u8:
-none / prompt / settings), `offrel` (string, at most 23 characters). Turning it on clears `offsrc` and `offrel`. A
+Stored state, NVS namespace `telemetry`: `optin` (u8; absent = never asked, 0 = off, 1 = on; exists today,
+*read*: `RemoteTelemetryDevice.h:1567`, lane-poc-merge) and two new fields (*planned*): `offsrc` (u8: none / prompt /
+settings) and `offrel` (string, at most 23 characters). Today's health JSON reports the opt-in as 0/1/2 (2 = never
+asked); the boolean `ask` sits next to it. Turning it on clears `offsrc` and `offrel`. A
 "No" in the dialog sets `offsrc` = prompt. A switch-off in Settings sets `offsrc` = settings and `offrel` = the
 running release.
 
@@ -138,9 +141,22 @@ once. What is sent is not changed by this ADR (decision 1).
 
 ### Must Not
 
-- Turn remote telemetry on by default, by an update, or by a restore of settings that never held a yes from this
-  user.
+- Turn remote telemetry on by default or by an update. The opt-in lives in NVS, not in settings.ini, so a
+  settings.ini restore cannot carry it (*read*, otgw-poc-dev; no settings import flow found in the v2 web UI). A REST
+  client that posts `remotetelemetry=true` counts as the user turning it on.
 - Ask again because of a developer build, a githash change or a reboot.
+- Let the collection point change the opt-in. A blocked gateway stays opted in: it pauses and backs off (up to
+  60 min), and `ask` stays false.
+  - Source: Robert, interactive in session 5e, no DM id, recorded in the TASK-2901 notes on lane-poc-merge (re-opened
+    by otgw-architect 2026-11-26). 2026-11-19 about 23:40, as summarised there (not verbatim): "a lifted block
+    resumes by itself: after 'blocked' the device retries with the pause backoff". 2026-11-20 about 00:20, verbatim:
+    "Op het moment dat het unblocked, dan gaat de ringbuffer leeglopen". Robert's own words on the block are seen
+    there, but not his original message; that is *not verified*.
+  - The phrase "the collection point can never turn remote telemetry off" is a code comment that attributes the rule
+    to Robert (`RemoteTelemetryDevice.h:1505`, "TASK-2901 (Robert 2026-11-19)"). It is not a quote of Robert.
+  - As built (*read*: `remoteTelemetryBlocked()`, `RemoteTelemetryDevice.h:1510-1523` on lane-poc-merge): the only
+    writes of `optin` are the user paths `remoteTelemetryRequestOptIn()` :1589 and its apply :1620. The comment
+    "turn the opt-in off, stop" at `RemoteTelemetryPolicy.h:42` is outdated.
 - Change what is sent in the same change as the consent rule (decision 1).
 
 ### Exceptions
@@ -180,16 +196,20 @@ Guideline-level per ADR-080, with a test gate once TASK-3092 is built:
 
 **Negative:**
 
-- Three new NVS fields (about 24 B, against 20 KB of NVS) in the existing NVS partition (*read*, otgw-poc-dev).
+- Two new NVS fields (`offsrc`, `offrel`; about 24 B, against 20 KB of NVS) in the existing NVS partition (*read*, otgw-poc-dev).
 - An existing install sees the dialog once after the update that brings it, because its state is "never set".
 - The rule depends on `_VERSION_PRERELEASE` naming releases; a release with the same string as the one in
   `offrel` does not ask again.
 
 ## Open Questions
 
-- [ ] 1. Robert: a gateway that the collection point blocks turns its own opt-in off (ADR-290 item 3,
-  `RemoteTelemetryPolicy.h` `OUT_BLOCKED`). Should that count as a "No" (never ask again, recommended: the maintainer
-  blocked it on purpose) or as a Settings switch-off (ask after the next release)?
+- [ ] 1. Robert: a unit that was switched off before this rule existed has `optin` = off and no `offsrc`, so we cannot
+  tell a "No" from a Settings switch-off. Options: (A) treat it as a "No": never asked again (as planned; safe for
+  privacy, but a tester who only paused it is never reminded); (B) treat it as a Settings switch-off: asked once after
+  the next release, then the normal rule. Recommendation: B. Only the proof-of-concept and tester units can be in that
+  state, they switched it off by hand in Settings (the dialog did not exist yet), and one question after a release is
+  what the rule gives any Settings switch-off. (An earlier draft asked about a blocked gateway; that is covered by
+  Robert's 2026-11-19 and 2026-11-20 points, see Must Not.)
 - [ ] 2. Robert: acceptance of this ADR.
 
 ## Related Decisions
