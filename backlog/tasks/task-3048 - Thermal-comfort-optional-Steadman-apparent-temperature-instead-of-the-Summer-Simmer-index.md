@@ -6,10 +6,10 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-25T06:24:00Z'
+updated_date: '2026-11-26T20:03:00Z'
 labels:
   - sat
   - feature
-  - needs-maintainer-ok
 milestone: 2.1.0
 dependencies: []
 priority: low
@@ -27,3 +27,15 @@ Idea from gruijter (#alpha-testing 2026-11-25, https://discord.com/channels/8129
 - [ ] #1 Sergeant D decides whether an optional Steadman AT mode is wanted (decisions repo entry)
 - [ ] #2 If yes: settings option, formula with the standard Magnus e, host test with 22 C/70 % = 24.1 C and 20 C/50 %, documented in the manual
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Maintainer go 2026-11-26 (Robert, interactive session: 'Voer taak 3048 optioneel uit'): execute as an OPTIONAL mode. The default stays the Summer Simmer index, so there is no behaviour change unless the user switches the mode. The label needs-maintainer-ok is removed; milestone 2.1.0 stays unless the coordinator says otherwise.
+
+Assignee: otgw-webui (SAT owner). Plan first, then implement.
+
+AC1 (Sergeant D decides whether the optional Steadman mode is wanted) stays open as a parallel question. The implementation does not wait for it (standing rule: build the recommended option meanwhile). It stays a lane until his answer is recorded in the decisions repo: no push before AC1 is recorded, or Robert says otherwise.
+
+Test values for the host test (AC2): 22 C at 70 % gives 24.1 C (description: e = 18.45 hPa, AT = 24.09 C). 20 C at 50 % is not stated in the description; the same formula (AT = T + 0.33 e - 4.00, e = rh/100 x 6.105 x exp(17.27 T/(237.7+T))) gives e = 11.66 hPa and AT = 19.85 C (arithmetic, checked with a script on 2026-11-26).
+<!-- SECTION:NOTES:END -->
