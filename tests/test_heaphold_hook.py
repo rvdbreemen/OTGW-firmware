@@ -68,7 +68,8 @@ int main(int argc, char** argv) {
   if (!strcmp(c, "near_floor")) { g_region = 1000; g_frag = 3500; }
   g_start = platformFreeHeap();
   printf("start free=%u maxblk=%u\n", platformFreeHeap(), platformMaxFreeBlock());
-  s_heapHoldReq = 1;                       // the key (async_tcp)
+  const bool deep = !strcmp(c, "deep") || !strcmp(c, "deep_timer") || !strcmp(c, "deep_then_plain");
+  s_heapHoldReq = deep ? 2 : 1;            // the key (async_tcp): 'H' = 1, 'K' = 2 (TASK-3025 deep hold)
   printf("before_tick n=%u\n", (unsigned)s_heapHoldN);
   heapHoldTick();                          // the loop task
   printf("held n=%u free=%u maxblk=%u\n", (unsigned)s_heapHoldN, platformFreeHeap(), platformMaxFreeBlock());
@@ -84,6 +85,12 @@ int main(int argc, char** argv) {
   if (!strcmp(c, "timer")) { g_ms += 29UL * 60000UL; heapHoldTick(); printf("at29 n=%u\n", (unsigned)s_heapHoldN);
                              g_ms += 60000UL; heapHoldTick();
                              for (int m = 0; m < 5; m++) { g_ms += 60000UL; heapHoldTick(); } }   // summary repeats
+  if (!strcmp(c, "deep_timer")) { g_ms += 119000UL; heapHoldTick(); printf("at119 n=%u\n", (unsigned)s_heapHoldN);
+                                  g_ms += 2000UL; heapHoldTick(); printf("at121 n=%u\n", (unsigned)s_heapHoldN); }
+  if (!strcmp(c, "deep_then_plain")) { s_heapHoldReq = 2; heapHoldTick();            // K again releases
+                                       printf("released n=%u\n", (unsigned)s_heapHoldN);
+                                       s_heapHoldReq = 1; heapHoldTick();            // then H holds the plain way
+                                       printf("plain n=%u free=%u maxblk=%u\n", (unsigned)s_heapHoldN, platformFreeHeap(), platformMaxFreeBlock()); }
   printf("end n=%u free=%u back=%d\n", (unsigned)s_heapHoldN, platformFreeHeap(), (int)(platformFreeHeap() == g_start));
   return 0;
 }
@@ -114,7 +121,7 @@ class HeapHoldHook(unittest.TestCase):
 
     def run_c(self, c):
         out = subprocess.run([str(self.exe), c], capture_output=True, check=True).stdout.decode().replace("\r", "")
-        keys = ("start", "before_tick", "held", "recovered", "at1s", "at6s", "squeezed", "at29", "end")   # the hook's own log lines are not key=value rows
+        keys = ("start", "before_tick", "held", "recovered", "at1s", "at6s", "squeezed", "at29", "at119", "at121", "released", "plain", "end")   # the hook's own log lines are not key=value rows
         rows = [l for l in out.splitlines() if l.split(" ", 1)[0] in keys]
         return dict((l.split(" ", 1)[0], dict(kv.split("=") for kv in l.split()[1:])) for l in rows), out
 
@@ -130,6 +137,30 @@ class HeapHoldHook(unittest.TestCase):
         # .61, on the edge). This fake heap keeps its fragments at up to 2 KB in one pool, so it cannot get below 2048
         # without crossing the floor: the floor wins (test_a_heap_near_the_floor_is_not_taken_further). Whether the real
         # heap gets under 2048 is read on the bench from the hook's own "heaphold: ... maxblk=" line.
+
+    # TASK-3025 (ADR-295): the plain hold never goes under its 4096 floor, so it never reaches CRITICAL (free < 3072) and
+    # emergencyHeapRecovery() never runs. The deep hold ('K') is the bench path to that recovery.
+    def test_the_plain_hold_never_reaches_the_critical_threshold(self):
+        r, out = self.run_c("key")
+        self.assertGreaterEqual(int(r["held"]["free"]), 4096, out)
+        self.assertGreater(int(r["held"]["free"]), 3072, "the plain hold must not reach CRITICAL: " + out)
+
+    def test_the_deep_hold_gets_free_under_the_critical_threshold_but_not_under_its_floor(self):
+        r, out = self.run_c("deep")
+        free = int(r["held"]["free"])
+        self.assertLess(free, 3072, "HEAP_CRITICAL_THRESHOLD is 3072: " + out)
+        self.assertGreaterEqual(free, 1792, "went under the deep floor: " + out)
+        self.assertIn("heaphold DEEP:", out)
+
+    def test_the_deep_hold_releases_itself_after_two_minutes(self):
+        r, out = self.run_c("deep_timer")
+        self.assertGreater(int(r["at119"]["n"]), 0, "released too early: " + out)
+        self.assertEqual(r["at121"]["n"], "0", "still held after 2 min: " + out)
+
+    def test_a_plain_request_after_a_deep_hold_uses_the_plain_floor_again(self):
+        r, out = self.run_c("deep_then_plain")
+        self.assertEqual(r["released"]["n"], "0", out)
+        self.assertGreaterEqual(int(r["plain"]["free"]), 4096, "the deep flag leaked into the plain hold: " + out)
 
     def test_the_key_again_releases_every_block(self):
         r, out = self.run_c("key")
