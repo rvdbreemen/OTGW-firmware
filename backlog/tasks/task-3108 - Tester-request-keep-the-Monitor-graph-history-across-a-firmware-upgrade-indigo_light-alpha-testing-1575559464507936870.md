@@ -6,8 +6,8 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-26T17:11:00Z'
+updated_date: '2026-11-26T20:01:00Z'
 labels:
-  - needs-maintainer-ok
   - tester-request
   - webui
 milestone: 2.1.0
@@ -28,3 +28,13 @@ Tester request, input only (needs-maintainer-ok): indigo_light asks to retain gr
 - [ ] #2 If yes: options compared with measured sizes and flash writes per upgrade (RTC snapshot not possible at about 70 KB; flash copy at OTA time vs every 15 min), with an ADR amending ADR-245
 - [ ] #3 Implementation with a host test and a bench check that the graph survives an app OTA and a filesystem OTA (or the documented limit)
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Maintainer decision 2026-11-26 (Robert, interactive session): research for 2.1.0, not 2.0.0. The label needs-maintainer-ok is removed; milestone 2.1.0 and priority low stay.
+
+Scope: compare the options with measured numbers (a flash copy of the ring before the OTA restart against a flash copy every 15 minutes; PSRAM boards only) including flash wear per upgrade and per day, then write an ADR that amends ADR-245.
+
+Assignee later: architect.
+<!-- SECTION:NOTES:END -->
