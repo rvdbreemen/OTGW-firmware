@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.ino
-**  Version  : v2.0.0-beta.444
+**  Version  : v2.0.0-beta.445
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -1040,7 +1040,7 @@ void do5minevent(){
   sendMQTTuptime();
   sendMQTTversioninfo();
   sendMQTTstateinformation();
-  publishAllPICsettings();  // Re-publish cached PIC settings every 5 min
+  // OQ3 option D (TASK-2949.11): the PIC settings are retained and published on change and on connect, not every 5 min
 }
 
 //===[ Do task every 15min — TASK-693 port ]===

@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v2.0.0-beta.444
+**  Version  : v2.0.0-beta.445
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -1517,7 +1517,7 @@ static void handlePRresponse(const char* buf, size_t len) {
   if (changed) {
     strlcpy(stateField, cleaned, fieldSize);
     OTDebugTf(PSTR("handlePRresponse: PR=%c updated to [%s]\r\n"), reg, stateField);
-    sendMQTTData(mqttTopic, stateField);
+    sendMQTTData(mqttTopic, stateField, true);   // OQ3 option D (TASK-2949.11): retained, published on change
   }
 
   if (hasWebSocketClients()) {
@@ -1529,30 +1529,30 @@ static void handlePRresponse(const char* buf, size_t len) {
 
 //===================[ publishAllPICsettings ]=====================
 /*
-  Publishes all currently cached PIC settings to MQTT.
-  Call on reconnect or periodic refresh to sync all topics.
+  Publishes all currently cached PIC settings to MQTT, retained (OQ3 option D, TASK-2949.11: no periodic refresh).
+  Called on every MQTT connect (connect stage 3); a PR= answer publishes its own field on change.
   Only publishes fields that have been queried (non-empty).
 */
 void publishAllPICsettings() {
   if (!isPICEnabled()) return;
   // Active settings
-  if (state.picSettings.sSetpointOverride[0]   != '\0') sendMQTTData(F("otgw-pic/settings/setpoint_override"),   state.picSettings.sSetpointOverride);
-  if (state.picSettings.sSetback[0]            != '\0') sendMQTTData(F("otgw-pic/settings/setback"),             state.picSettings.sSetback);
-  if (state.picSettings.sDhwOverride[0]        != '\0') sendMQTTData(F("otgw-pic/settings/dhw_override"),        state.picSettings.sDhwOverride);
+  if (state.picSettings.sSetpointOverride[0]   != '\0') sendMQTTData(F("otgw-pic/settings/setpoint_override"),   state.picSettings.sSetpointOverride, true);
+  if (state.picSettings.sSetback[0]            != '\0') sendMQTTData(F("otgw-pic/settings/setback"),             state.picSettings.sSetback, true);
+  if (state.picSettings.sDhwOverride[0]        != '\0') sendMQTTData(F("otgw-pic/settings/dhw_override"),        state.picSettings.sDhwOverride, true);
   // Hardware configuration
-  if (state.picSettings.sGpio[0]               != '\0') sendMQTTData(F("otgw-pic/settings/gpio"),                state.picSettings.sGpio);
-  if (state.picSettings.sGpioStates[0]         != '\0') sendMQTTData(F("otgw-pic/settings/gpio_states"),         state.picSettings.sGpioStates);
-  if (state.picSettings.sLed[0]                != '\0') sendMQTTData(F("otgw-pic/settings/led"),                 state.picSettings.sLed);
-  if (state.picSettings.sTweaks[0]             != '\0') sendMQTTData(F("otgw-pic/settings/tweaks"),              state.picSettings.sTweaks);
-  if (state.picSettings.sTempSensor[0]         != '\0') sendMQTTData(F("otgw-pic/settings/temp_sensor"),         state.picSettings.sTempSensor);
-  if (state.picSettings.sSmartPower[0]         != '\0') sendMQTTData(F("otgw-pic/settings/smart_power"),         state.picSettings.sSmartPower);
-  if (state.picSettings.sThermostatDetect[0]   != '\0') sendMQTTData(F("otgw-pic/settings/thermostat_detect"),   state.picSettings.sThermostatDetect);
+  if (state.picSettings.sGpio[0]               != '\0') sendMQTTData(F("otgw-pic/settings/gpio"),                state.picSettings.sGpio, true);
+  if (state.picSettings.sGpioStates[0]         != '\0') sendMQTTData(F("otgw-pic/settings/gpio_states"),         state.picSettings.sGpioStates, true);
+  if (state.picSettings.sLed[0]                != '\0') sendMQTTData(F("otgw-pic/settings/led"),                 state.picSettings.sLed, true);
+  if (state.picSettings.sTweaks[0]             != '\0') sendMQTTData(F("otgw-pic/settings/tweaks"),              state.picSettings.sTweaks, true);
+  if (state.picSettings.sTempSensor[0]         != '\0') sendMQTTData(F("otgw-pic/settings/temp_sensor"),         state.picSettings.sTempSensor, true);
+  if (state.picSettings.sSmartPower[0]         != '\0') sendMQTTData(F("otgw-pic/settings/smart_power"),         state.picSettings.sSmartPower, true);
+  if (state.picSettings.sThermostatDetect[0]   != '\0') sendMQTTData(F("otgw-pic/settings/thermostat_detect"),   state.picSettings.sThermostatDetect, true);
   // Diagnostics
-  if (state.picSettings.sBuilddate[0]          != '\0') sendMQTTData(F("otgw-pic/settings/builddate"),           state.picSettings.sBuilddate);
-  if (state.picSettings.sClockMHz[0]           != '\0') sendMQTTData(F("otgw-pic/settings/clock_mhz"),           state.picSettings.sClockMHz);
-  if (state.picSettings.sResetCause[0]         != '\0') sendMQTTData(F("otgw-pic/settings/reset_cause"),         state.picSettings.sResetCause);
-  if (state.picSettings.sStandaloneInterval[0] != '\0') sendMQTTData(F("otgw-pic/settings/standalone_interval"), state.picSettings.sStandaloneInterval);
-  if (state.picSettings.sVoltageRef[0]         != '\0') sendMQTTData(F("otgw-pic/settings/voltage_ref"),         state.picSettings.sVoltageRef);
+  if (state.picSettings.sBuilddate[0]          != '\0') sendMQTTData(F("otgw-pic/settings/builddate"),           state.picSettings.sBuilddate, true);
+  if (state.picSettings.sClockMHz[0]           != '\0') sendMQTTData(F("otgw-pic/settings/clock_mhz"),           state.picSettings.sClockMHz, true);
+  if (state.picSettings.sResetCause[0]         != '\0') sendMQTTData(F("otgw-pic/settings/reset_cause"),         state.picSettings.sResetCause, true);
+  if (state.picSettings.sStandaloneInterval[0] != '\0') sendMQTTData(F("otgw-pic/settings/standalone_interval"), state.picSettings.sStandaloneInterval, true);
+  if (state.picSettings.sVoltageRef[0]         != '\0') sendMQTTData(F("otgw-pic/settings/voltage_ref"),         state.picSettings.sVoltageRef, true);
 }
 
 //===================[ sendPICBootCommands ]=====================

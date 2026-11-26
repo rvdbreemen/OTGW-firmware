@@ -101,7 +101,7 @@ Note: the OT-bus presence values (`boiler_connected`, `thermostat_connected`, `o
 
 ### PIC Settings
 
-Published at startup, on MQTT (re)connect, every 5 minutes, and when settings are queried. Only fields that have been queried (non-empty) are published.
+Published retained: on change (the PR= answer) and on every MQTT connect. Only fields that have been queried (non-empty) are published. They are no longer republished every 5 minutes; after the PIC is removed the retained values stay on the broker until cleared (for example `mosquitto_pub -r -n -t <topic>`).
 
 | Topic | Value | Description |
 | ----- | ----- | ----------- |
