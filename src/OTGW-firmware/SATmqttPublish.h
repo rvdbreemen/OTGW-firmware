@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : SATmqttPublish.h
-**  Version  : v2.0.0-beta.450
+**  Version  : v2.0.0-beta.451
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -100,11 +100,15 @@ void     satPublishDeferredClear(); // satPublishMQTT() clears it at the start o
 // constants are defined here once for all cuts. MQTT_PACE_MAX_OUTBOX is provisional: ADR-265 step 0
 // (TASK-2949.1) sets the final value from the measured cost per written packet.
 // kMqttPaceOn is the cut-1 switch: false makes satOutboxFull() exactly the code before this cut.
-// MQTT_PACE_MAX_WAIT_MS bounds the wait: after it, one SAT helper per pass publishes without a yes.
+// MQTT_PACE_MAX_WAIT_MS bounds the wait: after it, one SAT ask per 500 ms publishes without a yes, in a pass or outside one (TASK-3103).
+// MQTT_PACE_MIN_BLOCK is 17408 = 16384 + 1024: 16384 is EMC_MIN_FREE_MEMORY (src/libraries/espMqttClient/src/Config.h:32), below it the
+// client refuses to write (Packets/Packet.cpp:315, measure = largest free block, Helpers.h:18); the 1024 B above it is the room for
+// the allocations between the pacer's yes and the client's own check (a margin, not a measurement; calibration is TASK-3103).
+// Loop task only: mqttPaceAllows() and the liveness statics in SATmqttPublish.cpp are not atomic.
 // ---------------------------------------------------------------------------
 static constexpr bool     kMqttPaceOn           = true;
 static constexpr uint32_t MQTT_PACE_MAX_OUTBOX  = 6;
-static constexpr uint32_t MQTT_PACE_MIN_BLOCK   = 20480;   // bytes; espMqttClient refuses below 16384 (Helpers.h)
+static constexpr uint32_t MQTT_PACE_MIN_BLOCK   = 17408;   // bytes; 16384 (Config.h:32 EMC_MIN_FREE_MEMORY, refusal Packet.cpp:315) + 1024 margin
 static constexpr uint32_t MQTT_PACE_MAX_WAIT_MS = 5000;
 bool     mqttPaceAllows();          // MQTTstuff.ino: outbox and largest free block both allow a deferrable publish
 bool     mqttPaceSatEnabled();      // MQTTstuff.ino: state.debug.bPaceSat, the prerelease runtime switch of the SAT gate (default true)

@@ -120,8 +120,9 @@ int main() {
     printf("t8a sent=%d valid=%d no=%u live=%u\n", sent, valid, (unsigned)(PNO() - no0), (unsigned)(PLIVE() - live0));
     g_paceSatOn = true; g_now += 60000;
     printf("t8b sent=%d\n", one_pass());                      // the old wait must not leak: nothing leaves yet
-    g_now += 5500;
-    printf("t8c sent=%d\n", one_pass()); }                    // now the liveness bound lets exactly one through
+    int t8c = 0;   // passes 500 ms apart, as the retry timer runs them: one closed stretch
+    for (int k = 0; k < 10; ++k) { g_now += 500; t8c += one_pass(); }
+    printf("t8c sent=%d\n", t8c); }                    // now the liveness bound lets exactly one through
   for (int i = 0; i < N; ++i) g_sh[i] = SATShadowF{};
   g_paceSatOn = false; g_now = 1000;
   { const uint32_t no0 = PNO(), live0 = PLIVE();
@@ -140,6 +141,45 @@ int main() {
   { int mx = 0, tot = 0, ps = 0;
     while (ps < 400) { int s = one_pass(); ++ps; tot += s; if (s > mx) mx = s; g_outbox = 0; g_now += 500; if (tot >= N) break; }
     printf("t6 max_per_pass=%d total=%d\n", mx, tot); }
+  // T9 (TASK-3103): the gate asked OUTSIDE satPublishMQTT() (climate bridge, core state, BLE helpers: no pass boundary), largest
+  // block under the minimum, outbox 0. 20 changed values in a row. Modes: 0 = asked every loop, no pass at all (SAT off or inactive);
+  // 1 = asked every loop + a pass every 500 ms; 2 = every loop + a pass every 30 s; 3 = a slow asker every 2 s; 4 = a slow asker every 10 s.
+  // Every change goes out within one ask period plus 1 s (modes 0-2: 6 s) and the liveness counter counts the forced ones.
+  g_paceSatOn = true; g_stuck = false; g_outbox = 0; g_maxblk = MQTT_PACE_MIN_BLOCK - 1;   // under the minimum of the pacer
+  for (int mode = 0; mode < 5; ++mode) {
+    const uint32_t per = (mode == 3) ? 2000 : (mode == 4) ? 10000 : 2;
+    SATShadowF sh; SATShadowF ble[6]; float val = 1.0f; int pub = 0, done = 0; uint32_t tch = 0, worst = 0;
+    const uint32_t live0 = PLIVE();
+    for (uint32_t t = 0; t < 400000; t += 2) {
+      g_now = 100000 + t; g_outbox = 0;
+      if (mode == 1 && t % 500 == 0) satPublishDeferredClear();
+      if (mode == 2 && t % 30000 == 0) satPublishDeferredClear();
+      if (t >= 8000 && t % 1000 == 0 && !tch && done < 20) { val += 1.0f; tch = t ? t : 1; }
+      if (t % per != 0) continue;
+      if (mode < 3) for (int i = 0; i < 6; ++i) publishIfChangedF("sat/ble", 1.0f, ble[i], 0.05f, 1, false);
+      const int b = pub;
+      if (publishIfChangedF("sat/climate_target", val, sh, 0.05f, 1, false)) ++pub;
+      if (pub > b && tch) { const uint32_t l = t - tch; if (l > worst) worst = l; ++done; tch = 0; }
+    }
+    printf("t9_%d changes=%d worst_ms=%u live=%u\n", mode, done, (unsigned)worst, (unsigned)(PLIVE() - live0));
+  }
+  // T10: a slow-draining outbox (stuck at 10, above the pacer limit of 6, below the old limit): the refusal comes from the outbox,
+  // an asker on every loop pass. After the 5 s wait at most one forced publish per 500 ms may leave: no stream that holds the outbox up.
+  { SATShadowF sh[40]; int pubs = 0; g_outbox = 10; g_maxblk = 100000; g_stuck = true;
+    const uint32_t live0 = PLIVE();
+    for (uint32_t t = 0; t < 25000; t += 2) {
+      g_now = 100000 + t; g_outbox = 10;
+      for (int k = 0; k < 40; ++k) if (publishIfChangedF("sat/many", 1.0f + (float)(t / 1000), sh[k], 0.05f, 1, false)) ++pubs;
+    }
+    printf("t10 publishes=%d live=%u\n", pubs, (unsigned)(PLIVE() - live0));
+    g_stuck = false; g_outbox = 0; }
+  g_maxblk = MQTT_PACE_MIN_BLOCK - 1;
+  // T9d: nothing changes, the block stays under the minimum: the periodic (heartbeat) publish of ADR-111 still goes out
+  { SATShadowF sh; int pub = 0;
+    g_maxblk = MQTT_PACE_MIN_BLOCK - 1;
+    for (uint32_t t = 0; t < 2400000; t += 20) { g_now = 100000 + t; g_outbox = 0; if (publishIfChangedF("sat/hb", 1.0f, sh, 0.05f, 1, false)) ++pub; }
+    printf("t9d publishes=%d\n", pub); }
+  g_maxblk = 100000; g_paceSatOn = false;   // back to what T6 left for T7
 #ifdef HAS_PACE_COUNTERS
   // T7: the counters. Stuck outbox of 10, 14 passes of 150 topics: every call is a "no"; the liveness bound fires from the 11th pass, once per pass
   for (int i = 0; i < N; ++i) g_sh[i] = SATShadowF{};
@@ -216,6 +256,26 @@ class Pacer(unittest.TestCase):
         # the wait starts at the first pass (t=1000); 5000 ms later is the 11th pass: nothing before, then exactly one per pass
         self.assertEqual(sent[:10], [0] * 10, sent)
         self.assertTrue(all(s == 1 for s in sent[10:]), sent)
+
+    def test_t9_outside_a_pass_every_change_goes_out_within_6_s_with_the_block_under_the_minimum(self):
+        self.need()
+        for mode, bound in (("t9_0", 6000), ("t9_1", 6000), ("t9_2", 6000), ("t9_3", 3000), ("t9_4", 11000)):
+            r = kv(self.out[mode])
+            self.assertEqual(int(r["changes"]), 20, (mode, r))
+            self.assertLessEqual(int(r["worst_ms"]), bound, (mode, r))
+            self.assertGreaterEqual(int(r["live"]), 1, (mode, r))
+
+    def test_t10_an_outbox_caused_refusal_is_never_forced_faster_than_every_500_ms(self):
+        self.need()
+        t10 = kv(self.out["t10"])
+        # 25 s simulated, 5 s wait, then at most one forced ask per 500 ms: 40 publishes at the most (+1 for the first)
+        self.assertGreaterEqual(int(t10["live"]), 1, t10)
+        self.assertLessEqual(int(t10["live"]), 41, t10)
+        self.assertEqual(t10["publishes"], t10["live"], t10)
+
+    def test_t9d_the_periodic_publish_survives_a_closed_gate(self):
+        self.need()
+        self.assertGreaterEqual(int(kv(self.out["t9d"])["publishes"]), 4, self.out["t9d"])
 
     def test_t5_small_block_defers_and_keeps_the_shadow(self):
         self.need()
@@ -313,11 +373,16 @@ class Pacer(unittest.TestCase):
                     lambda o: kv(o["t7_on"])["live"] != "4")
 
     def test_mutant_no_liveness_breaks_t3(self):
-        self.mutant("noliveness", lambda t: t.replace("!s_satPaceForcedThisPass && ", "false && "),
+        self.mutant("noliveness", lambda t: t.replace("(uint32_t)(now - s_satPaceWaitSinceMs) >= MQTT_PACE_MAX_WAIT_MS &&", "false &&"),
                     lambda o: all(int(x) == 0 for x in o["t3"]))
 
+    def test_mutant_allowance_consumed_once_breaks_t9(self):
+        # the defect of beta.450: one forced publish, then every ask outside a pass refused for good
+        self.mutant("consumedonce", lambda t: t.replace("(s_satPaceLastForcedMs == 0 || (uint32_t)(now - s_satPaceLastForcedMs) >= SAT_PACE_FORCE_EVERY_MS)", "s_satPaceLastForcedMs == 0"),
+                    lambda o: int(kv(o["t9_0"])["changes"]) < 20 or int(kv(o["t9_1"])["changes"]) < 20)
+
     def test_mutant_liveness_publishes_the_whole_set_breaks_t3(self):
-        self.mutant("wholeset", lambda t: t.replace("      s_satPaceForcedThisPass = true;\n", ""),
+        self.mutant("wholeset", lambda t: t.replace("      s_satPaceLastForcedMs = now;\n", ""),
                     lambda o: any(int(x) > 1 for x in o["t3"]))
 
 

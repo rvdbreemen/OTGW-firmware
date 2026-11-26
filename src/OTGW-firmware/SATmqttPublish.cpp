@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : SATmqttPublish.cpp
-**  Version  : v2.0.0-beta.450
+**  Version  : v2.0.0-beta.451
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -44,10 +44,18 @@ static bool s_satPublishDeferred = false;
 // TASK-1603 (ADR-174): see SATmqttPublish.h.
 uint8_t g_satShadowEpoch = 0;
 
-// ADR-265 cut 1 liveness: millis() of the first pacer "no" in the current stretch (0 = not waiting) and whether this
-// pass already let one helper through. satPublishDeferredClear() opens every pass, so it also re-arms the one-per-pass allowance.
+// Loop task only (the statics are not atomic): every caller runs from loop(): satControlLoopRun() (SATcontrol.ino:8074-8075, 8265),
+// satBLELoop() (OTGW-firmware.ino:1243) and the helpers called from them.
+// ADR-265 cut 1 liveness, in time and not in passes (TASK-3103): the gate is also asked outside satPublishMQTT() (the climate
+// bridge and the core state every SAT loop, SATcontrol.ino satPublishClimateBridge(); the BLE helpers), where no pass boundary
+// ever re-armed an allowance, so after one forced publish those asks stayed refused for good. Now: s_satPaceWaitSinceMs is the
+// first refusal of the current closed stretch; a stretch ends only when the pacer says yes (an asker that comes every 10 s must
+// not restart the wait with each ask, or it would never be forced). Once the stretch is MQTT_PACE_MAX_WAIT_MS old, one ask goes
+// through without a yes at most every SAT_PACE_FORCE_EVERY_MS (s_satPaceLastForcedMs): at most 2 forced publishes per second in
+// total, whatever the number of askers and whether the refusal comes from the outbox or from the block.
 static uint32_t s_satPaceWaitSinceMs = 0;
-static bool     s_satPaceForcedThisPass = false;
+static uint32_t s_satPaceLastForcedMs = 0;
+static constexpr uint32_t SAT_PACE_FORCE_EVERY_MS = 500;   // the old rate: one per 500 ms pass; a refusal caused by the outbox is never forced faster
 // Per-producer counters since boot (/api/v2/device/info hd_pace_sat_no, hd_pace_sat_live): s_satPaceNo counts every refusal
 // by the pacer, including the ones the liveness bound let through anyway; s_satPaceLive counts only those forced publishes.
 static uint32_t s_satPaceNo = 0;
@@ -57,9 +65,7 @@ uint32_t satPaceLiveCount() { return s_satPaceLive; }
 
 bool satPublishDeferred()      { return s_satPublishDeferred; }
 void satPublishDeferredClear() {
-  if (!s_satPublishDeferred) s_satPaceWaitSinceMs = 0;   // the previous pass deferred nothing: the wait is over
   s_satPublishDeferred = false;
-  s_satPaceForcedThisPass = false;
 }
 
 static inline bool satOutboxFull() {
@@ -70,13 +76,16 @@ static inline bool satOutboxFull() {
   if (oldGateOpen && !paced) { s_satPaceWaitSinceMs = 0; return false; }
   if (oldGateOpen) {
     // ADR-265 cut 1, on top of the old conditions: the shared pacer. The old gate stays until the target; the pacer only
-    // makes this one stricter. Past MQTT_PACE_MAX_WAIT_MS without a yes, ONE helper per pass goes through, so liveness cannot rebuild the burst.
+    // makes this one stricter. Past MQTT_PACE_MAX_WAIT_MS without a yes, one ask per SAT_PACE_FORCE_EVERY_MS goes through (also
+    // outside a pass), so liveness cannot rebuild the burst and cannot stop either.
     if (mqttPaceAllows()) { s_satPaceWaitSinceMs = 0; return false; }
     ++s_satPaceNo;
-    const uint32_t now = millis();
-    if (s_satPaceWaitSinceMs == 0) s_satPaceWaitSinceMs = now ? now : 1;
-    if (!s_satPaceForcedThisPass && (uint32_t)(now - s_satPaceWaitSinceMs) >= MQTT_PACE_MAX_WAIT_MS) {
-      s_satPaceForcedThisPass = true;
+    uint32_t now = millis();
+    if (now == 0) now = 1;
+    if (s_satPaceWaitSinceMs == 0) s_satPaceWaitSinceMs = now;
+    if ((uint32_t)(now - s_satPaceWaitSinceMs) >= MQTT_PACE_MAX_WAIT_MS &&
+        (s_satPaceLastForcedMs == 0 || (uint32_t)(now - s_satPaceLastForcedMs) >= SAT_PACE_FORCE_EVERY_MS)) {
+      s_satPaceLastForcedMs = now;
       ++s_satPaceLive;
       return false;
     }
