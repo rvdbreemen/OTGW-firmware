@@ -591,6 +591,10 @@ void handleDebugChar(char c){
                 DebugTf(PSTR("REST starved-heap simulation: %s (B toggles, off at boot)\r\n"),
                         restDebugToggleForceStarved() ? "ON" : "off");
                 break;
+            case 'R':   // TASK-3091 bench hook: the REST in-flight cap override, 2 -> 3 ... 8 -> 2 (RAM only, REST name restcap)
+                state.debug.iRestCap = debugRestCapNext(state.debug.iRestCap);
+                DebugTf(PSTR("REST in-flight cap override: %u (R cycles 2..8, off = 2 at boot)\r\n"), (unsigned)state.debug.iRestCap);
+                break;
 #endif
             case 'z':
                 resetHeapWatermark();

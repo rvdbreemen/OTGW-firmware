@@ -32,6 +32,7 @@ class __FlashStringHelper;
 typedef const char* PGM_P;
 #define snprintf_P snprintf
 #define REST_MAX_INFLIGHT 2
+struct { struct { uint8_t iRestCap = 2; } debug; } state;   // TASK-3091: restCapBase() reads state.debug.iRestCap in a prerelease build
 static uint32_t g_maxBlock = 40000;
 static uint32_t platformMaxFreeBlock() { return g_maxBlock; }
 static int restResponseStatus = 0;
@@ -62,6 +63,14 @@ def cut(src, signature):
     return m.group(0)
 
 
+def cap_base_block(src):
+    """TASK-3091: restCapBase(), the prerelease runtime override of the in-flight cap, with its release twin."""
+    m = re.search(r"^#if defined\(_VERSION_PRERELEASE\)\nstatic inline uint8_t restCapBase\(\).*?^#endif\n", src, re.S | re.M)
+    if not m:
+        raise AssertionError("restCapBase() block (TASK-3091) not found in restAPI.ino")
+    return m.group(0)
+
+
 def task_block(src):
     m = re.search(r"^#if defined\(_VERSION_PRERELEASE\)\nstatic std::atomic<bool> s_restForceStarved.*?^#endif\n", src, re.S | re.M)
     if not m:
@@ -74,7 +83,7 @@ class ForceStarvedKey(unittest.TestCase):
     def setUpClass(cls):
         src = REST_INO.read_text(encoding="utf-8").replace("\r\n", "\n")
         consts = "".join(m.group(0) + "\n" for m in re.finditer(r"^static const uint32_t REST_BUSY_\w+\s*=.*;", src, re.M))
-        body = (task_block(src) + cut(src, "static inline uint8_t restEffectiveInflightCap(") + "\n"
+        body = (task_block(src) + cap_base_block(src) + cut(src, "static inline uint8_t restEffectiveInflightCap(") + "\n"
                 + cut(src, "static void sendApiError(") + "\n" + consts + cut(src, "static void sendApiBusy(") + "\n")
         cls.tmp = tempfile.TemporaryDirectory()
         cls.exe = {}

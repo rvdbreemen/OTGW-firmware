@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-beta.449
+**  Version  : v2.0.0-beta.450
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -61,6 +61,18 @@ static inline bool restForceStarved() { return s_restForceStarved.load(std::memo
 static inline bool restForceStarved() { return false; }
 #endif
 
+// TASK-3091: the cap the heap-tier clamp below starts from. Prerelease builds can override it at runtime (debug flag "restcap",
+// telnet key 'R', RAM only, 2..8; state.debug.iRestCap, default 2 = the shipped cap) so one binary can sweep N on the bench; the
+// stable always uses the compile-time REST_MAX_INFLIGHT.
+#if defined(_VERSION_PRERELEASE)
+static inline uint8_t restCapBase() {
+  const uint8_t n = state.debug.iRestCap;
+  return (n < 2) ? 2 : ((n > 8) ? 8 : n);
+}
+#else
+static inline uint8_t restCapBase() { return REST_MAX_INFLIGHT; }
+#endif
+
 // Heap-tier-aware concurrency ceiling. The biggest REST response (~8.6 KB settings) needs a
 // contiguous block to buffer; admitting N of them needs ~N x that block. As maxblock falls
 // toward one response's worth, allowing 4 in flight is what fragments the heap below the
@@ -76,8 +88,8 @@ static inline uint8_t restEffectiveInflightCap() {
   if (restForceStarved()) return 1;   // TASK-2921 bench key: the starved-heap cap
   const uint32_t mb = platformMaxFreeBlock();
   if (mb < 16000) return 1;
-  if (mb < 24000) return (REST_MAX_INFLIGHT < 2) ? REST_MAX_INFLIGHT : 2;
-  return REST_MAX_INFLIGHT;
+  if (mb < 24000) return (restCapBase() < 2) ? restCapBase() : 2;
+  return restCapBase();
 }
 
 // ADR-147 D4.1: backpressure gate for the LittleFS static-file path (webSendFile in
@@ -2150,12 +2162,25 @@ static void handleDebugFlags(const char words[][API_WORD_LEN], uint8_t wc, HTTPM
       }
     }
     int err = 0;
-    if (debugFlagSet(state.debug, name, value, &err) == nullptr) {
-      if (err == 1) sendApiError(400, F("Unknown debug flag name"));
-      else          sendApiError(400, F("Value must be true or false"));
-      return;
+    bool restCapSet = false;
+#if defined(_VERSION_PRERELEASE)
+    // TASK-3091: the one integer knob, the REST in-flight cap override (2..8, RAM only, prerelease builds only)
+    if (debugFlagIEq(name, "restcap")) {
+      const uint8_t n = debugRestCapParse(value);
+      if (n == 0) { sendApiError(400, F("restcap must be a number from 2 to 8")); return; }
+      state.debug.iRestCap = n;
+      restCapSet = true;
+      DebugTf(PSTR("REST: debug restcap = %u\r\n"), (unsigned)n);
     }
-    DebugTf(PSTR("REST: debug flag %s = %s\r\n"), name, CBOOLEAN(debugFlagParseBool(value) == 1));
+#endif
+    if (!restCapSet) {
+      if (debugFlagSet(state.debug, name, value, &err) == nullptr) {
+        if (err == 1) sendApiError(400, F("Unknown debug flag name"));
+        else          sendApiError(400, F("Value must be true or false"));
+        return;
+      }
+      DebugTf(PSTR("REST: debug flag %s = %s\r\n"), name, CBOOLEAN(debugFlagParseBool(value) == 1));
+    }
   } else if (method != HTTP_GET) {
     sendApiMethodNotAllowed(F("GET, POST, PUT"));
     return;
@@ -2167,6 +2192,9 @@ static void handleDebugFlags(const char words[][API_WORD_LEN], uint8_t wc, HTTPM
     je.beginObject(F("flags"));
     for (size_t i = 0; i < kDebugFlagCount; i++) je.field(kDebugFlags[i].name, state.debug.*(kDebugFlags[i].member));
     je.endObject();
+#if defined(_VERSION_PRERELEASE)
+    je.field(F("restcap"), (uint32_t)state.debug.iRestCap);   // TASK-3091: the REST in-flight cap override, next to the bool flags
+#endif
     je.endObject();
   }
   restFinalize();
@@ -2789,7 +2817,7 @@ void processAPI(AsyncWebServerRequest *request)
   const uint8_t effectiveCap = restEffectiveInflightCap();
   if (restInFlight >= effectiveCap) {
     RESTDebugTf(PSTR("REST BUSY: %u/%u in-flight (cap %u) => 503 (freeheap=%u maxblock=%u)\r\n"),
-                restInFlight, REST_MAX_INFLIGHT, effectiveCap, platformFreeHeap(), platformMaxFreeBlock());
+                restInFlight, restCapBase(), effectiveCap, platformFreeHeap(), platformMaxFreeBlock());
     state.heapdiag.iRest503Count++;  // TASK-1017: load-test instrumentation
     sendApiBusy(F("Server busy: too many concurrent requests, please retry"));
     return;

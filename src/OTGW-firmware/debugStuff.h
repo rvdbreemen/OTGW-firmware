@@ -63,6 +63,7 @@ struct DebugSection {          // state.debug — Runtime diagnostic output flag
   bool     bPaceTail              = true;   // ADR-265 cut 4 (TASK-2949.9): false = the stale override sweep and the hourly stats without the pacer; prerelease only, RAM only
   uint32_t iOTGWSimulationIntervalMs = 750;
   uint32_t iOTGWSimulationNextDueMs  = 0;
+  uint8_t  iRestCap                  = 2;       // TASK-3091: the REST in-flight cap override (2..8); read only in prerelease builds (restAPI.ino), RAM only; 2 = ADR-165 as shipped
 };
 
 // ============================================================================

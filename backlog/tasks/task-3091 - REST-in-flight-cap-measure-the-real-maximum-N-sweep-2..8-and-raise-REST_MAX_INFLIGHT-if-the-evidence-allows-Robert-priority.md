@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@otgw-poc-dev'
 created_date: '2026-11-25T23:22:00Z'
-updated_date: '2026-11-26T07:06:00Z'
+updated_date: '2026-11-26T07:24:00Z'
 labels:
   - rest
   - heap
@@ -41,4 +41,6 @@ Robert (2026-11-26 00:50): 'REST in-flight cap is 2 (REST_MAX_INFLIGHT, restAPI.
 2026-11-26 otgw-webui (AC3): scripts/loadtest_sweep.py --restcap + tests/test_loadtest_restcap_sweep.py (26 host tests against a fake device with the firmware gate; 11 of 11 meaningful mutants killed). Sets the gate per arm through restcap (readback, else the arm ends with cap_not_applied and offers no load), fixed offered load (--offered, default 8), arms 2..8 plus a no-load control, rounds with rotating arm order, per repeat: 503, other failures, p50/p95/p99, bootcount, mqtt-down samples, hd_ws_disconnects, optional /ws client, hd_min_free_heap before/after, 1 Hz freeheap and maxfreeblock, the EFFECTIVE cap (min(override, heap tier)), /v2.html probe under load, own request rate; telnet z reset per repeat; abort below freeheap 6000; cap back to 2 in finally; sweep.json + SHA256SUMS. Decision rule = RULE + evaluate_decision() in the script. Proposed additions to the draft (architect to confirm or drop, AC2): (1) offered load fixed above N, because rule 4 is unmeasurable when offered equals N; (2) the 25 percent heap comparison on the sampled freeheap minimum, since hd_min_free_heap is an all-time low nothing resets (watermark keeps the 8192 floor); (3) at least 20 good samples per repeat (the sampler shares the REST gate); (4) N counts only if the effective cap was N in at least 95 percent of the samples. Not run on a device yet.
 
 AC3 done 2026-11-26 (otgw-webui): scripts/loadtest_sweep.py --restcap sweeps the REST in-flight cap per arm through the restcap override; rule equals rest_cap_decision_rule.md; 30 host tests against a fake device with the real gate logic, 19 mutants killed, evaluate --quick 88/0; pushed 4ce4731d8. Not run on a real unit yet (AC4, bench-tester).
+
+2026-11-26 otgw-dev: restcap (prerelease runtime override of REST_MAX_INFLIGHT, default 2 unchanged; /api/v2/debug/flags restcap and telnet key R) taken into the T2 stack as ONE commit from otgw-poc-dev's 963bfa348; tests/test_rest_cap_override.py 9/9. The loadtest_sweep --restcap tooling is already on origin/dev (4ce4731d8).
 <!-- SECTION:NOTES:END -->

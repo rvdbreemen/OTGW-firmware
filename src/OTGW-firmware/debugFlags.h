@@ -116,3 +116,20 @@ static inline const DebugFlagDef* debugFlagSet(DebugSection& d, const char* name
   if (err) *err = 0;
   return f;
 }
+
+// TASK-3091: the one integer knob next to the bool table, the REST in-flight cap override ("restcap", telnet key 'R'). The table
+// above is bool-typed (value parse, GET listing), so the number is handled beside it. Prerelease builds only (restAPI.ino reads
+// DebugSection::iRestCap); 2 = the shipped cap (ADR-165). A decimal 2..8 is accepted, anything else is refused (0).
+static const uint8_t kRestCapMin = 2;
+static const uint8_t kRestCapMax = 8;
+static inline uint8_t debugRestCapParse(const char* v)
+{
+  if (v == nullptr || v[0] < '0' || v[0] > '9' || v[1] != '\0') return 0;
+  const uint8_t n = (uint8_t)(v[0] - '0');
+  return (n >= kRestCapMin && n <= kRestCapMax) ? n : 0;
+}
+// The next value for the telnet key: 2, 3 ... 8, then back to 2.
+static inline uint8_t debugRestCapNext(uint8_t n)
+{
+  return (n < kRestCapMin || n >= kRestCapMax) ? kRestCapMin : (uint8_t)(n + 1);
+}
