@@ -1,15 +1,14 @@
 ---
 id: "ADR-218"
 title: "Allow outbound TLS client requests on boards with PSRAM, inbound stays plain HTTP (amends ADR-003)"
-status: "Proposed"
-date: "2026-11-08"
+status: "Accepted"
+date: "2026-11-26"
 binding: false
 gate: null
 documents_shipped: false
 verified_in: []
 supersedes: []
 superseded_by: null
-format: "canonical"
 topics:
   - "tls"
   - "https-client"
@@ -23,6 +22,7 @@ components:
   - "outbound TLS client capability"
 symbols: []
 context_scope: "selective"
+format: "canonical"
 ---
 
 <!-- markdownlint-disable MD025 -->
@@ -31,7 +31,9 @@ context_scope: "selective"
 
 ## Status
 
-Proposed, 2026-11-08.
+Accepted, 2026-11-26 (06:01 local), by Robert: Discord DM 1575375907462316074, verbatim "B", sent as a Discord reply to the coordinator's question 1575365769108263004 (reply reference checked through the Discord API by otgw-architect). The question read: "Lees ik dat als (A) voorwaardelijk: ADR-218 gaat naar Accepted nadat het remote-telemetry-bewijs op .63 (09:50-10:40) goed is, of (B) onvoorwaardelijk: nu Accepted?" Proposed 2026-11-08. Not binding (`binding: false`, no CI gate); structural rule reviewed at PR.
+
+**Unconditional, by Robert's decision.** This replaces the conditional reading recorded below (about 01:05). The first feature that uses outbound TLS is remote telemetry; its proof on .63 is collected after acceptance as evidence, not as a condition. If that proof fails, the remedy is a fix or a superseding ADR, not a silent rollback of this one. Other outbound TLS users (for example HTTPS webhooks) each need their own task. The Context paragraph "stays Proposed until a concrete feature asks for it" describes the state of 2026-11-08.
 
 **Deferred 2026-11-26 by Robert** (interactive, about 00:40, relayed by the coordinator): stays Proposed, "later, after the stable". Not part of 2.0.0.
 
@@ -48,26 +50,31 @@ status_history:
     changed_by: Agent (Claude, TASK-1689)
     reason: Initial proposal
     changed_via: adr-kit
+  - date: 2026-11-26
+    status: Accepted
+    changed_by: "Agent: Claude (otgw-architect)"
+    reason: "Robert, Discord DM 1575375907462316074 (2026-11-26 06:01, reply to coordinator question 1575365769108263004): 'B' = unconditional acceptance now"
+    changed_via: adr-kit lifecycle
 ```
 
 ## Context
 
-ADR-003 (2018, ESP8266 era) rules out HTTPS and WSS (WebSocket Secure) for the gateway: the device serves plain HTTP on a trusted LAN. Robert asked on 2026-11-07 to revisit that for the ESP32-S3 line (TASK-1689). This ADR covers only **outbound** TLS (Transport Layer Security): the gateway as an HTTPS client. Inbound web, REST and WebSocket stay plain HTTP as ADR-003 says.
+ADR-003 (2018, ESP8266 era) rules out HTTPS and WSS (WebSocket Secure) for the gateway: the device serves plain HTTP on a trusted LAN (local area network). Robert asked on 2026-11-07 to revisit that for the ESP32-S3 line (TASK-1689). This ADR covers only **outbound** TLS (Transport Layer Security): the gateway as an HTTPS client. Inbound web, REST (Representational State Transfer) and WebSocket stay plain HTTP as ADR-003 says.
 
-Proof of concept, 2026-11-07 (branch poc-tls-1689, not merged; `tlsPocStuff.ino`, one-shot task with 12 KB stack, `NetworkClientSecure`, GET to raw.githubusercontent.com and cdn.jsdelivr.net):
+Proof of concept, 2026-11-07 (branch poc-tls-1689, not merged; `tlsPocStuff.ino`, one-shot task with 12 KB (kilobytes) stack, `NetworkClientSecure`, GET (HTTP read request) to raw.githubusercontent.com and cdn.jsdelivr.net):
 
 - The prebuilt Arduino-ESP32 3.3.5 libraries set `CONFIG_MBEDTLS_INTERNAL_MEM_ALLOC` and `MBEDTLS_SSL_MAX_CONTENT_LEN 16384`. `mbedtls_ssl_setup()` allocates an input and an output record buffer of about 16.7 KB each, each one contiguous block, before any byte goes over the network.
-- The largest free internal block on both bench units was 31,732 B (free internal about 53 KB, fragmented). Without help every handshake failed with `-0x7F00` (SSL alloc failed) after 25-110 ms: .63 9/9, .61 (no PSRAM) 5/5.
+- The largest free internal block on both bench units was 31,732 B (free internal about 53 KB, fragmented). Without help every handshake failed with `-0x7F00` (SSL (Secure Sockets Layer) alloc failed) after 25-110 ms: .63 9/9, .61 (no PSRAM (pseudo-static RAM)) 5/5.
 - `esp_config.h` maps the mbedTLS allocator to a function, so `mbedtls_platform_set_calloc_free()` can redirect it at runtime. With blocks of 1 KB or more sent to PSRAM (fallback internal): .63 pin-mode 3/3, CA-bundle 2/2, jsDelivr 2/2, all HTTP 200; connect + handshake 706-823 ms; internal low point 23.5-27.6 KB; PSRAM peak about 50-54 KB; task stack used about 4.4 of 12 KB. 20 back-to-back fetches: internal free constant at 37,524 B, PSRAM stable.
-- Flash: the TLS client code adds about 96 KB; the full ESP-IDF CA bundle another 69 KB (app slot 2,293,760 B, already about 93% used, GitHub #694). A mini bundle of 14 roots from IDF 5.5.1 `cacrt_all.pem` is 5,427 B and validates all six target hosts (commit 1dd2007, `scripts/tls/`, `tests/test_tls_mini_bundle.py` 7/7; anchors ISRG Root X1/X2, USERTrust RSA/ECC).
+- Flash: the TLS client code adds about 96 KB; the full ESP-IDF CA (certificate authority) bundle another 69 KB (app slot 2,293,760 B, already about 93% used, GitHub #694). A mini bundle of 14 roots from IDF (IoT Development Framework) 5.5.1 `cacrt_all.pem` is 5,427 B and validates all six target hosts (commit 1dd2007, `scripts/tls/`, `tests/test_tls_mini_bundle.py` 7/7; anchors ISRG (Internet Security Research Group) Root X1/X2, USERTrust RSA/ECC).
 
-**What would use it today: nothing.** Checked 2026-11-08 in `src/OTGW-firmware`: the outbound `HTTPClient` users are the PIC firmware check and download (`OTGW-Core.ino:7017-7063`, plain HTTP) and the webhook (`webhook.ino:224`, `http://` only). The web UI language packs of TASK-1689 are fetched by the **browser** from jsDelivr (an `http://` page may load `https://` resources), so they need no TLS in the firmware. Candidate future users: HTTPS-only webhook targets (ntfy.sh, Pushover, Discord, IFTTT), the PIC firmware site if it ever goes HTTPS-only, a firmware-side update check.
+**What would use it today: nothing.** Checked 2026-11-08 in `src/OTGW-firmware`: the outbound `HTTPClient` users are the PIC (the gateway microcontroller) firmware check and download (`OTGW-Core.ino:7017-7063`, plain HTTP) and the webhook (`webhook.ino:224`, `http://` only). The web UI language packs of TASK-1689 are fetched by the **browser** from jsDelivr (an `http://` page may load `https://` resources), so they need no TLS in the firmware. Candidate future users: HTTPS-only webhook targets (ntfy.sh, Pushover, Discord, IFTTT (If This Then That)), the PIC firmware site if it ever goes HTTPS-only, a firmware-side update check.
 
 ## Decision
 
 **User Decision (Robert, 2026-11-07), parked 2026-11-08:** when a firmware feature needs an HTTPS request, the gateway may act as a TLS client only on boards with PSRAM, detected at runtime, with the mbedTLS allocator redirected to PSRAM and a mini CA bundle of about 15 roots; on boards without PSRAM that feature uses a reasonable fallback or is disabled with an explanation in the UI. Inbound HTTP/WS stays as ADR-003 says.
 
-This ADR stays **Proposed** until a concrete feature asks for it (most likely HTTPS webhooks). Accepting it before then would spend about 100 KB of a nearly full app slot on code nothing calls (YAGNI).
+This ADR stays **Proposed** until a concrete feature asks for it (most likely HTTPS webhooks). Accepting it before then would spend about 100 KB of a nearly full app slot on code nothing calls (YAGNI, you aren't gonna need it).
 
 ## Decision Contract
 
@@ -112,7 +119,7 @@ This ADR stays **Proposed** until a concrete feature asks for it (most likely HT
 
 ## Open Questions
 
-- [ ] Robert: which feature triggers acceptance (HTTPS webhooks first?), and does it then become its own task. — Robert, 2026-11-26: not before the 2.0.0 stable; the question stays open for after it. Superseded about 01:05 the same night: the first trigger is the remote-telemetry feature (outbound TLS), acceptance after its proof (see Status).
+- [x] Robert: which feature triggers acceptance (HTTPS webhooks first?), and does it then become its own task. — Robert, 2026-11-26: not before the 2.0.0 stable; the question stays open for after it. Superseded about 01:05 the same night: the first trigger is the remote-telemetry feature (outbound TLS), acceptance after its proof (see Status). **Answered 2026-11-26 06:01 by Robert (Discord DM (direct message) 1575375907462316074, "B", a reply to the coordinator's question 1575365769108263004): unconditional, accepted now; the remote-telemetry proof on .63 follows as evidence after acceptance.** HTTPS webhooks and other outbound TLS users are not decided here; each needs its own task.
 
 ## Related Decisions
 

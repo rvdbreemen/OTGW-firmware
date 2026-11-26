@@ -8269,8 +8269,8 @@
       "title": "Allow outbound TLS client requests on boards with PSRAM, inbound stays plain HTTP (amends ADR-003)",
       "path": "ADR-218-allow-outbound-tls-client-requests-on-boards-with-psram-inbound-stays-plain-http-amends-adr-003.md",
       "format": "canonical",
-      "status": "Proposed",
-      "date": "2026-11-08",
+      "status": "Accepted",
+      "date": "2026-11-26",
       "decision_summary": "User Decision (Robert, 2026-11-07), parked 2026-11-08: when a firmware feature needs an HTTPS request, the gateway ma...",
       "topics": [
         "ca-bundle",
