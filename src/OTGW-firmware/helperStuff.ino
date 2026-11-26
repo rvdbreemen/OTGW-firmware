@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : helperStuff
-**  Version  : v2.0.0-beta.453
+**  Version  : v2.0.0-beta.454
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -1315,7 +1315,9 @@ void emergencyHeapRecovery() {
   // Wrapper lives in webSocketStuff.ino (same pattern as doWebSocketClose).
   // ADR-295 (TASK-3025): abort the tracked /ws connections, also one stuck outside WS_CONNECTED, which
   // hasWebSocketClients() does not count.
-  if (webSocketTrackedCount() > 0 && doWebSocketDisconnectAll() > 0) {
+  const uint8_t wsTrackedBefore = webSocketTrackedCount();
+  uint8_t wsAborted = 0;
+  if (wsTrackedBefore > 0 && (wsAborted = doWebSocketDisconnectAll()) > 0) {
     actions |= 0x01;
   }
 
@@ -1334,10 +1336,12 @@ void emergencyHeapRecovery() {
   actions |= 0x04;
 
   uint32_t heapAfter = platformFreeHeap();
-  DebugTf(PSTR("[heap-recovery] before=%u after=%u delta=%+ld actions=0x%02X\r\n"),
+  // ws_tracked_before / ws_aborted / ws_tracked_after: a connection whose error event could not be allocated (new(nothrow) in the
+  // AsyncTCP error callback) keeps its tracked row, so after > 0 with before == aborted shows a leak on the bench (TASK-3025).
+  DebugTf(PSTR("[heap-recovery] before=%u after=%u delta=%+ld actions=0x%02X ws_tracked_before=%u ws_aborted=%u ws_tracked_after=%u\r\n"),
           (unsigned)heapBefore, (unsigned)heapAfter,
           (long)((int32_t)heapAfter - (int32_t)heapBefore),
-          (unsigned)actions);
+          (unsigned)actions, (unsigned)wsTrackedBefore, (unsigned)wsAborted, (unsigned)webSocketTrackedCount());
 }
 
 /***************************************************************************

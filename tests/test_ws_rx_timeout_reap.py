@@ -239,7 +239,9 @@ class Wiring(unittest.TestCase):
         self.assertNotIn("closeAll", body)
         self.assertIn("webSocketAbortAll()", body)
         helper = (FW / "helperStuff.ino").read_text(encoding="utf-8")
-        self.assertIn("if (webSocketTrackedCount() > 0 && doWebSocketDisconnectAll() > 0) {", helper)
+        self.assertIn("if (wsTrackedBefore > 0 && (wsAborted = doWebSocketDisconnectAll()) > 0) {", helper)
+        # the log line shows tracked-before, aborted and tracked-after, so a leaked row is visible on the bench
+        self.assertIn("ws_tracked_before=%u ws_aborted=%u ws_tracked_after=%u", helper)
 
     def test_device_info_shows_the_clients(self):
         rest = (FW / "restAPI.ino").read_text(encoding="utf-8")

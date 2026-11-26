@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@otgw-dev'
 created_date: '2026-11-22T01:58:00Z'
-updated_date: '2026-11-26T07:04:00Z'
+updated_date: '2026-11-26T14:09:00Z'
 labels:
   - heap
   - websocket
@@ -43,4 +43,6 @@ Parent: TASK-3024. ADR-107's action 1 (emergencyHeapRecovery, helperStuff.ino:13
 2026-11-26 otgw-dev: lane/heaprec commit 2 = the abort of the tracked /ws pcbs under the lwIP core lock (platformTcpAbortWhere in platform_esp32.h, wsAbortMatch on port 80 and the tracked remote ip/port, collect at most 8 then abort), trigger HEAP_CRITICAL via emergencyHeapRecovery (at most once per 30 s), counter hd_ws_recovery_abort in /api/v2/device/info, tests/test_ws_rx_timeout_reap.py. ADR-295 stays Proposed until the architect accepts it after the .61 K bench.
 
 2026-11-26 otgw-dev: lane/heaprec commit 3 = tests/test_platform_tcp_abort_where.py: the real platformTcpAbortWhere() cut from the header against a fake lwIP pcb list (select, all_adjacent, cap8, nullmatch, empty), the real wsAbortMatch(), static wiring pins, and the byte-order source pins (AsyncTCP remoteIP/getRemotePort and the Arduino IPAddress keep the raw lwIP word; skipped when the sources are not on the machine, OTGW_ASYNCTCP_SRC / OTGW_ARDUINO_CORE). The use-after-free corner (AsyncTCP error callback while the loop task holds the lwIP lock) cannot be stubbed on the host: the .61 K bench is its only test.
+
+Review by otgw-poc-dev (read-only) 2026-11-26, F = code read, I = inference: the abort path is sound (AsyncTCP 3.4.10 tcp_error sets _pcb = nullptr under the core lock, AsyncTCP.cpp:496-512, no double abort). Taken over: the [heap-recovery] line now carries ws_tracked_before / ws_aborted / ws_tracked_after (a failed new(nothrow) of the error event would leave a tracked row), and the glued comment at hd_ws_recovery_abort is fixed. For the bench request: the deep hold floor of 1792 B free is below what WiFi/lwIP/async_tcp tolerate, so the unit may panic or lose WiFi inside the 2 min, and a loop stall means no self-release; plan K with 1 to 3 /ws clients incl. one DISCONNECTING, check iWsRecoveryAborts == clients, tracked rows 0 afterwards, free heap before/after, no async_tcp panic. Facts: the trigger is getHeapHealth() == CRITICAL, TOTAL free heap < 3072 sampled each loop with a 30 s rate limit (OTGW-firmware.ino:1110, helperStuff.ino:1138), NOT the largest block (do not quote max-block numbers as its margin); TASK-1386 saw min free 2240 with entered_critical 0 once (sampling misses dips): ask for fleet entered_critical/min-free values before claiming it never fires normally. v2.js reconnects after a fixed 5000 ms without jitter (v2.js:3039): optional web UI follow-up, not in this release.
 <!-- SECTION:NOTES:END -->
