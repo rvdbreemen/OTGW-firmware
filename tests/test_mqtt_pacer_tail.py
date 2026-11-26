@@ -4,9 +4,10 @@
 Compiles the REAL gate (PaceGate / paceGateStep()), the REAL staleOverrideClearTick() and the REAL loopMQTTStatsPacer() /
 sendMQTTheapdiag() cut out of MQTTstuff.ino, and the REAL mqttPaceAllows(), against stubs for the clock, the MQTT outbox, the
 largest free block, state.debug and the sweep / stat publishers. The driver ticks every 10 ms:
-  S1  sweep, outbox 4 (above the old limit 2, below the pacer limit 6), 1 s: the pacer lets steps through (about 10, one per 100 ms),
-      the old gate none
-  S2  sweep, outbox 10 stuck, 12 s: the old gate none; the pacer lets one step per MQTT_PACE_MAX_WAIT_MS (2 in 12 s)
+  S1  sweep, outbox 4 (above the old limit 2, below the pacer limit 6), 1 s: the old limit stays a hard AND (architect review of
+      cut 4: no gate lets more through than before): no step, with the pacer on or off
+  S2  sweep, outbox 0 but the largest free block 16000 (the new block condition), 12 s: the old condition lets steps through, the
+      pacer holds them back and lets one step per MQTT_PACE_MAX_WAIT_MS (2 in 12 s); with the switch off about 120
   S3  stats, outbox 10 stuck, 12 s: the old code has no outbox gate (all 26 stats go within 3 s); the pacer lets one per
       MQTT_PACE_MAX_WAIT_MS (2 in 12 s)
   S4  runtime switch off (state.debug.bPaceTail = false): S1 and S3 behave as the old code, in the same binary
@@ -59,14 +60,14 @@ int main() {
   g_outbox = 4; g_steps = 0; g_now = 100000;
   tick_for(1000, true, false);
   printf("s1 steps=%d\n", g_steps);
-  // S2: stuck outbox of 10 (counters measured around it)
-  g_outbox = 10; g_steps = 0; g_now = 200000;
+  // S2: the outbox is empty, the largest block is below the pacer minimum (counters measured around it)
+  g_outbox = 0; g_maxblk = 16000; g_steps = 0; g_now = 200000;
   { const uint32_t no0 = ovrPaceNoCount(), live0 = ovrPaceLiveCount();
     tick_for(12000, true, false);
     printf("s2 steps=%d\n", g_steps);
     printf("s5_ovr no=%u live=%u\n", (unsigned)(ovrPaceNoCount() - no0), (unsigned)(ovrPaceLiveCount() - live0)); }
   // S3: stats round with the outbox stuck at 10
-  g_outbox = 10; g_now = 300000;
+  g_outbox = 10; g_maxblk = 100000; g_now = 300000;
   { const uint32_t no0 = statsPaceNoCount(), live0 = statsPaceLiveCount();
     sendMQTTheapdiag();
     tick_for(12000, false, true);
@@ -74,9 +75,10 @@ int main() {
     printf("s5_stats no=%u live=%u\n", (unsigned)(statsPaceNoCount() - no0), (unsigned)(statsPaceLiveCount() - live0)); }
   // S4: the switch off, same binary
   state.debug.bPaceTail = false;
-  g_outbox = 4; g_steps = 0; g_now = 400000;
+  g_outbox = 0; g_maxblk = 16000; g_steps = 0; g_now = 400000;
   tick_for(1000, true, false);
   printf("s4_sweep steps=%d\n", g_steps);
+  g_maxblk = 100000;
   g_outbox = 10; g_stats = 0; g_now = 500000;
   { const uint32_t no0 = statsPaceNoCount(), live0 = statsPaceLiveCount();
     sendMQTTheapdiag();
@@ -135,11 +137,11 @@ class TailPacer(unittest.TestCase):
         if not self.out:
             self.skipTest("no host C++ compiler")
 
-    def test_s1_sweep_goes_where_the_old_limit_blocked(self):
+    def test_s1_the_old_outbox_limit_stays_a_hard_and(self):
         self.need()
-        self.assertGreaterEqual(int(self.out["s1"]["steps"]), 8)
+        self.assertEqual(self.out["s1"]["steps"], "0", "outbox 4 is above the old limit of 2: not earlier than before")
 
-    def test_s2_stuck_outbox_sweep_is_let_through_by_the_bound(self):
+    def test_s2_small_block_holds_the_sweep_back_and_the_bound_lets_it_go(self):
         self.need()
         self.assertEqual(self.out["s2"]["steps"], "2")
 
@@ -149,7 +151,7 @@ class TailPacer(unittest.TestCase):
 
     def test_s4_switch_off_is_the_old_behaviour_in_the_same_binary(self):
         self.need()
-        self.assertEqual(self.out["s4_sweep"]["steps"], "0", "outbox 4 is above the old limit of 2")
+        self.assertGreaterEqual(int(self.out["s4_sweep"]["steps"]), 8, "the old sweep has no block condition")
         self.assertEqual(self.out["s4_stats"]["stats"], "26", "the old stats pacer has no outbox gate")
 
     def test_s5_counters(self):
@@ -182,11 +184,11 @@ class TailPacer(unittest.TestCase):
 
     def test_mutant_switch_ignored(self):
         self.mutant("switchignored", lambda t: t.replace("kMqttPaceTailOn && state.debug.bPaceTail", "kMqttPaceTailOn"),
-                    lambda o: o["s4_sweep"]["steps"] != "0")
+                    lambda o: int(o["s4_sweep"]["steps"]) < 8)
 
-    def test_mutant_counted_per_call(self):
-        self.mutant("percall", lambda t: t.replace("if (!g.counted) { g.counted = true; ++g.no; }", "++g.no;"),
-                    lambda o: o["s5_ovr"]["no"] != "3")
+    def test_mutant_old_limit_removed(self):
+        self.mutant("noold", lambda t: t.replace("if ((uint32_t)MQTTclient.queueSize() > CONN_STAGE_MAX_OUTBOX) return;", ""),
+                    lambda o: o["s1"]["steps"] != "0")
 
 
 if __name__ == "__main__":

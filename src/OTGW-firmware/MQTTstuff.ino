@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : MQTTstuff
-**  Version  : v2.0.0-beta.447
+**  Version  : v2.0.0-beta.448
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **      Modified version from (c) 2020 Willem Aandewiel
@@ -1875,11 +1875,10 @@ static bool connStageReady(uint32_t nowMs, uint32_t outbox, uint32_t maxBlock) {
   return waited >= CONN_STAGE_GAP_MS && outbox <= CONN_STAGE_MAX_OUTBOX && maxBlock >= CONN_STAGE_MIN_BLOCK;
 }
 
-// ADR-265 cut 3 (TASK-2949.8): the connect portions ask the shared pacer instead of their own outbox and block thresholds.
-// The gap between portions (CONN_STAGE_GAP_MS) and the publish-anyway bound (CONN_STAGE_MAX_WAIT_MS) stay. A portion is
-// counted once when the pacer first refuses it (sConnPaceNo) and once more when the bound lets it go without a yes (sConnPaceLive).
-// Note the single threshold: the old gate waited until at most CONN_STAGE_MAX_OUTBOX (2) packets were left, the pacer allows
-// MQTT_PACE_MAX_OUTBOX. With the switch off (kMqttPaceConnOn or state.debug.bPaceConn false) connStageReady() decides as before.
+// ADR-265 cut 3 (TASK-2949.8): the connect portions also ask the shared pacer, on top of the old connStageReady() condition
+// (outbox, block, gap and the 5 s bound all stay, as a hard AND: the pacer never lets a portion go earlier than before). A portion
+// is counted once when the pacer holds it back (sConnPaceNo) and once more when the 5 s bound lets it go without a yes
+// (sConnPaceLive). With the switch off (kMqttPaceConnOn or state.debug.bPaceConn false) connStageReady() decides alone, as before.
 static uint32_t sConnPaceNo = 0;
 static uint32_t sConnPaceLive = 0;
 static bool     sConnPaceNoCounted = false;
@@ -1887,12 +1886,14 @@ uint32_t connPaceNoCount()   { return sConnPaceNo; }
 uint32_t connPaceLiveCount() { return sConnPaceLive; }
 static void connPaceCountNo() { if (!sConnPaceNoCounted) { sConnPaceNoCounted = true; ++sConnPaceNo; } }
 static bool connStagePaceReady(uint32_t nowMs) {
+  // The old condition stays a hard AND (ADR-265 review of cut 3: no gate lets more through than before, the connect window is
+  // where the large dips sit): the pacer can only hold a portion back, and its counters see the portions it held back or let go.
+  if (!connStageReady(nowMs, (uint32_t)MQTTclient.queueSize(), platformMaxFreeBlock())) return false;
   const uint32_t waited = nowMs - sConnStageMs;
   if (waited >= CONN_STAGE_MAX_WAIT_MS) {
     if (!mqttPaceAllows()) { connPaceCountNo(); ++sConnPaceLive; }
     return true;
   }
-  if (waited < CONN_STAGE_GAP_MS) return false;
   if (mqttPaceAllows()) return true;
   connPaceCountNo();
   return false;
@@ -1948,8 +1949,9 @@ static uint32_t sOvrClearMs = 0;
 
 // ADR-265 cut 4 (TASK-2949.9): the stale override sweep and the hourly stats ask the shared pacer. One gate state per producer:
 // the first refusal of a step is counted once (no), a step that goes after MQTT_PACE_MAX_WAIT_MS without a yes is counted once
-// more (live) and the wait starts afresh. With the switch off (kMqttPaceTailOn or state.debug.bPaceTail false) the sweep waits
-// on CONN_STAGE_MAX_OUTBOX as before the cut and the stats pacer has no outbox gate, as before.
+// more (live) and the wait starts afresh. The sweep keeps its old outbox limit (CONN_STAGE_MAX_OUTBOX) as a hard AND, the pacer
+// comes on top; the stats had no outbox gate before and now get the pacer (stricter). With the switch off (kMqttPaceTailOn or
+// state.debug.bPaceTail false) both behave as before the cut.
 struct PaceGate { uint32_t since = 0; bool counted = false; uint32_t no = 0; uint32_t live = 0; };
 static bool paceGateStep(PaceGate& g, uint32_t now);   // own prototype: the builder's auto-prototype would sit above the struct (tests/test_ino_prototype_hoisting.py)
 static bool paceGateStep(PaceGate& g, uint32_t now) {
@@ -1970,11 +1972,9 @@ static void staleOverrideClearTick() {
   if (sConnStage != 0) return;
   const uint32_t now = millis();
   if ((uint32_t)(now - sOvrClearMs) < OVR_CLEAR_GAP_MS) return;
-  if (kMqttPaceTailOn && state.debug.bPaceTail) {
-    if (!paceGateStep(sOvrPaceGate, now)) return;
-  } else if ((uint32_t)MQTTclient.queueSize() > CONN_STAGE_MAX_OUTBOX) {
-    return;
-  }
+  // The old condition stays a hard AND (ADR-265 review of cut 4): the pacer gate comes on top, it never lets more through than before.
+  if ((uint32_t)MQTTclient.queueSize() > CONN_STAGE_MAX_OUTBOX) return;
+  if (kMqttPaceTailOn && state.debug.bPaceTail && !paceGateStep(sOvrPaceGate, now)) return;
   if (staleOverrideClearStep()) sOvrClearMs = now;
 }
 // Post-connect pace window (TASK-1757, beta.215 probes): right after CONNACK the SAT

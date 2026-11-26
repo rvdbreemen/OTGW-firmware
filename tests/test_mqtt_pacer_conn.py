@@ -6,14 +6,14 @@ connStagePaceReady()) and the REAL mqttPaceAllows(), against stubs for the clock
 state.debug. connStagePaceReady(now) says whether the next portion may go; the harness advances the clock in 50 ms steps from
 the connect and reports after how many ms a portion goes:
   C1  outbox 0, block ok: ready after the 200 ms gap
-  C2  outbox 4 (above the old limit 2, below the pacer limit 6): the old gate waits for the 5 s bound, the pacer goes at 200 ms
-      (the single threshold is looser than the old connect-stage one, on purpose: ADR-265 one rule)
+  C2  outbox 4 (above the old limit 2, below the pacer limit 6): the old condition stays a hard AND (architect review of cut 3:
+      no gate lets more through than before), so the portion waits for the 5 s bound, as the old gate did; the pacer only holds back
   C3  outbox 10: both wait for the 5 s bound, then publish anyway (counters: 1 'no', 1 'live' per portion)
   C4  largest free block 16000, outbox 0: both wait for the 5 s bound
   C5  runtime switch off (state.debug.bPaceConn = false): the old gate in the same binary: C2 waits 5 s
   C6  the counters count once per portion, not per call, and nothing counts with the switch off
-Red on the base (OTGW_SRC_REV, e.g. e37a6da87): the base has no pacer in the connect stage, C2 sees 5000 ms where the pacer goes at 200.
-Mutants (each must turn a test red): pacer always yes; bound removed; switch ignored; counted per call.
+Red on fa28bac49 (the first cut 3, before the review): C2 saw 200 ms because the pacer replaced the old outbox limit.
+Mutants (each must turn a test red): pacer always yes (counters); bound removed; old condition removed.
 """
 import re
 import subprocess
@@ -113,9 +113,9 @@ class ConnPacer(unittest.TestCase):
         self.need()
         self.assertEqual(self.out["c1"]["ms"], "200")
 
-    def test_c2_the_single_threshold_is_looser_than_the_old_connect_one(self):
+    def test_c2_the_old_condition_stays_a_hard_and(self):
         self.need()
-        self.assertEqual(self.out["c2"]["ms"], "200")
+        self.assertEqual(self.out["c2"]["ms"], "5000", "outbox 4 is above the old limit of 2: not earlier than before")
 
     def test_c3_deep_outbox_waits_for_the_bound(self):
         self.need()
@@ -147,17 +147,16 @@ class ConnPacer(unittest.TestCase):
     def test_mutant_pacer_always_yes(self):
         def tf(t):
             return re.sub(r"(bool mqttPaceAllows\(\)\s*\{).*?\n\}", r"\1 return true; }", t, count=1, flags=re.S)
-        self.mutant("alwaysyes", tf, lambda o: o["c3"]["ms"] != "5000")
+        self.mutant("alwaysyes", tf, lambda o: o["c6_one"] != {"no": "1", "live": "1"})
 
     def test_mutant_no_bound(self):
         self.mutant("nobound", lambda t: t.replace("if (waited >= CONN_STAGE_MAX_WAIT_MS) {\n    if (!mqttPaceAllows())",
                                                    "if (false) {\n    if (!mqttPaceAllows())"),
                     lambda o: o["c3"]["ms"] != "5000")
 
-    def test_mutant_counted_per_call(self):
-        self.mutant("percall", lambda t: t.replace("static void connPaceCountNo() { if (!sConnPaceNoCounted) { sConnPaceNoCounted = true; ++sConnPaceNo; } }",
-                                                   "static void connPaceCountNo() { ++sConnPaceNo; }"),
-                    lambda o: o["c6_one"]["no"] != "1")
+    def test_mutant_old_condition_removed(self):
+        self.mutant("noold", lambda t: t.replace("if (!connStageReady(nowMs, (uint32_t)MQTTclient.queueSize(), platformMaxFreeBlock())) return false;", ""),
+                    lambda o: o["c2"]["ms"] != "5000")
 
 
 if __name__ == "__main__":
