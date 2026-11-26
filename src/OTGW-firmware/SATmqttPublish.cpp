@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : SATmqttPublish.cpp
-**  Version  : v2.0.0-beta.439
+**  Version  : v2.0.0-beta.440
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -44,12 +44,33 @@ static bool s_satPublishDeferred = false;
 // TASK-1603 (ADR-174): see SATmqttPublish.h.
 uint8_t g_satShadowEpoch = 0;
 
+// ADR-265 cut 1 liveness: millis() of the first pacer "no" in the current stretch (0 = not waiting) and whether this
+// pass already let one helper through. satPublishDeferredClear() opens every pass, so it also re-arms the one-per-pass allowance.
+static uint32_t s_satPaceWaitSinceMs = 0;
+static bool     s_satPaceForcedThisPass = false;
+
 bool satPublishDeferred()      { return s_satPublishDeferred; }
-void satPublishDeferredClear() { s_satPublishDeferred = false; }
+void satPublishDeferredClear() {
+  if (!s_satPublishDeferred) s_satPaceWaitSinceMs = 0;   // the previous pass deferred nothing: the wait is over
+  s_satPublishDeferred = false;
+  s_satPaceForcedThisPass = false;
+}
 
 static inline bool satOutboxFull() {
   // TASK-1757: right after a connect, wait until the outbox is shallow (MQTTstuff.ino mqttConnectPaceHold())
-  if (!mqttConnectPaceHold() && mqttOutboxDepth() <= SAT_MQTT_OUTBOX_LIMIT) return false;
+  const bool oldGateOpen = !mqttConnectPaceHold() && mqttOutboxDepth() <= SAT_MQTT_OUTBOX_LIMIT;
+  if (oldGateOpen && !kMqttPaceOn) return false;
+  if (oldGateOpen) {
+    // ADR-265 cut 1, on top of the old conditions: the shared pacer. The old gate stays until the target; the pacer only
+    // makes this one stricter. Past MQTT_PACE_MAX_WAIT_MS without a yes, ONE helper per pass goes through, so liveness cannot rebuild the burst.
+    if (mqttPaceAllows()) { s_satPaceWaitSinceMs = 0; return false; }
+    const uint32_t now = millis();
+    if (s_satPaceWaitSinceMs == 0) s_satPaceWaitSinceMs = now ? now : 1;
+    if (!s_satPaceForcedThisPass && (uint32_t)(now - s_satPaceWaitSinceMs) >= MQTT_PACE_MAX_WAIT_MS) {
+      s_satPaceForcedThisPass = true;
+      return false;
+    }
+  }
   s_satPublishDeferred = true;
   return true;
 }

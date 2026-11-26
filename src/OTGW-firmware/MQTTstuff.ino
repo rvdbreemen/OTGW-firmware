@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : MQTTstuff
-**  Version  : v2.0.0-beta.439
+**  Version  : v2.0.0-beta.440
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **      Modified version from (c) 2020 Willem Aandewiel
@@ -2043,6 +2043,15 @@ uint32_t mqttSendSuccessCount = 0;
 // TASK-1339: packets queued in the outbox, for the SAT publish gate (SATmqttPublish.cpp,
 // declared in SATmqttPublish.h). O(n) list walk under the client mutex.
 uint32_t mqttOutboxDepth() { return (uint32_t)MQTTclient.queueSize(); }
+
+// ADR-265 (TASK-2949.6): the shared pacer for deferrable bulk publishers. A QoS 0 packet leaves the outbox once it is
+// written, so this bounds what our producers have waiting, not what already sits in lwIP. Loop task only.
+// Constants and the switch: SATmqttPublish.h.
+bool mqttPaceAllows() {
+  if ((uint32_t)MQTTclient.queueSize() > MQTT_PACE_MAX_OUTBOX) return false;
+  if (platformMaxFreeBlock() < MQTT_PACE_MIN_BLOCK) return false;
+  return true;
+}
 
 /*
   topic:  <string> , sensor topic, will be automatically prefixed with <mqtt topic>/value/<node_id>

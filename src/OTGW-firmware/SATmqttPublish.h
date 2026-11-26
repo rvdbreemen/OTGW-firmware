@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : SATmqttPublish.h
-**  Version  : v2.0.0-beta.439
+**  Version  : v2.0.0-beta.440
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -92,6 +92,21 @@ uint32_t mqttOutboxDepth();         // MQTTstuff.ino: packets queued in the MQTT
 bool     mqttConnectPaceHold();     // MQTTstuff.ino: TASK-1757 post-connect pace window says wait
 bool     satPublishDeferred();      // true when a helper skipped a publish since the last clear
 void     satPublishDeferredClear(); // satPublishMQTT() clears it at the start of every pass
+
+// ---------------------------------------------------------------------------
+// MQTT pacer (ADR-265, TASK-2949.6, cut 1: the SAT shadow gate). One gate, always on, for every deferrable
+// bulk publisher: mqttPaceAllows() (MQTTstuff.ino, loop task only) says yes while the outbox holds at most
+// MQTT_PACE_MAX_OUTBOX packets and the largest free block is at least MQTT_PACE_MIN_BLOCK bytes. The three
+// constants are defined here once for all cuts. MQTT_PACE_MAX_OUTBOX is provisional: ADR-265 step 0
+// (TASK-2949.1) sets the final value from the measured cost per written packet.
+// kMqttPaceOn is the cut-1 switch: false makes satOutboxFull() exactly the code before this cut.
+// MQTT_PACE_MAX_WAIT_MS bounds the wait: after it, one SAT helper per pass publishes without a yes.
+// ---------------------------------------------------------------------------
+static constexpr bool     kMqttPaceOn           = true;
+static constexpr uint32_t MQTT_PACE_MAX_OUTBOX  = 6;
+static constexpr uint32_t MQTT_PACE_MIN_BLOCK   = 20480;   // bytes; espMqttClient refuses below 16384 (Helpers.h)
+static constexpr uint32_t MQTT_PACE_MAX_WAIT_MS = 5000;
+bool     mqttPaceAllows();          // MQTTstuff.ino: outbox and largest free block both allow a deferrable publish
 
 // ---------------------------------------------------------------------------
 // Per-field float tolerances (per ADR-111 sub-rule 4, guideline-level).
