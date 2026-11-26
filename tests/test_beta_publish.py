@@ -361,6 +361,86 @@ class DryRun(Base):
         self.assertEqual(sh(w.repo, "git", "tag", "--list"), "")
 
 
+class BuildCommit(Base):
+    """--build-commit: a docs-only release commit on top of a named fix build (beta.451 case)."""
+
+    def add_commit(self, w, path, text, msg):
+        f = w.repo / path
+        f.parent.mkdir(parents=True, exist_ok=True)
+        f.write_text(text)
+        sh(w.repo, "git", "add", "."), sh(w.repo, "git", "commit", "-qm", msg)
+        sh(w.repo, "git", "push", "-q", "origin", "dev")
+        return sh(w.repo, "git", "rev-parse", "HEAD")
+
+    def test_docs_only_release_commit_on_the_named_build(self):
+        w = World(self)
+        rc, out, err = w.run("--dry-run", "--build-commit", w.cand)
+        self.assertEqual(rc, 0, out + err)
+        self.assertIn(f"build commit {w.cand[:9]} is an ancestor of the release commit", out)
+
+    def test_release_commit_equal_to_the_build_commit(self):
+        w = World(self)
+        w.make_build(w.rel[:7])
+        rc, out, err = w.run("--dry-run", "--build-commit", w.rel)
+        self.assertEqual(rc, 0, out + err)
+        self.assertIn("build commit and the release commit", out)
+
+    def test_zip_from_another_build_than_the_named_one(self):
+        w = World(self)
+        self.refused(w, "is not the --build-commit", "--dry-run", "--build-commit", w.base)
+
+    def test_unknown_build_commit(self):
+        w = World(self)
+        self.refused(w, "is not a commit", "--dry-run", "--build-commit", "deadbeef")
+
+    def test_scripts_change_after_the_build_is_refused_only_with_build_commit(self):
+        w = World(self)
+        rel2 = self.add_commit(w, "scripts/tool.py", "x\n", "tool change")
+        self.refused(w, "scripts/tool.py changed", "--dry-run", "--build-commit", w.cand, commit=rel2)
+        rc, out, err = w.run("--dry-run", commit=rel2)         # without the flag the normal path is as before
+        self.assertEqual(rc, 0, out + err)
+
+    def test_build_py_and_platformio_changes_are_refused(self):
+        for name in ("build.py", "platformio.ini"):
+            w = World(self)
+            rel2 = self.add_commit(w, name, "x\n", "change " + name)
+            self.refused(w, f"{name} changed", "--dry-run", "--build-commit", w.cand, commit=rel2)
+
+    def test_build_commit_not_an_ancestor_of_the_release_commit(self):
+        w = World(self)
+        w.make_build(w.rel[:7])
+        self.refused(w, "not an ancestor", "--dry-run", "--build-commit", w.rel, commit=w.cand)
+
+
+class RequireText(Base):
+    def test_required_text_present_in_a_full_body(self):
+        w = World(self)
+        rc, out, err = w.run("--dry-run", "--require-text", "SAT text.")
+        self.assertEqual(rc, 0, out + err)
+
+    def test_required_text_missing_is_refused(self):
+        w = World(self)
+        self.refused(w, "lacks the required text", "--dry-run", "--require-text", "SAT-on check: 12 of 12")
+
+    def test_required_text_that_the_shortening_cuts_is_refused(self):
+        w = World(self)
+        w.notes.write_text(notes_text(extra=20000).replace("old line\n", "old line SAT-on 12/12\n", 1), encoding="utf-8")
+        self.refused(w, "lacks the required text", "--dry-run", "--require-text", "SAT-on 12/12")
+
+    def test_disclaimer_survives_the_shortening(self):
+        w = World(self)
+        text = notes_text(extra=20000).replace("Header.\n", "Header.\n\n> **Disclaimer: this is a beta.**\n", 1)
+        w.notes.write_text(text, encoding="utf-8")
+        rc, out, err = w.run("--dry-run")
+        self.assertEqual(rc, 0, out + err)
+
+    def test_disclaimer_in_the_cut_part_is_refused(self):
+        w = World(self)
+        text = notes_text(extra=20000).replace("old line\n", "**Disclaimer** in the cut part\n", 1)
+        w.notes.write_text(text, encoding="utf-8")
+        self.refused(w, "lost the disclaimer", "--dry-run")
+
+
 class RealRun(Base):
     def real(self, w, **state):
         w.two_dry_runs_on_record()

@@ -25,6 +25,12 @@ deleted again, the local throw-away tag is removed) and records the success in t
         --soaked-sha256 <sha256 of the .ino.bin that was soaked> --verdict soak-verdict.txt \\
         --notes docs/releases/RELEASE_NOTES_2.0.0-beta.440.md --theme "web UI polish" --dry-run
 
+Run it from any worktree that has the release commit in its history (git fetch first): the tool only reads history
+(rev-parse, merge-base, diff between the build commit and the release commit), so extra commits on the lane it runs
+from do not matter; only the diff between the BUILD commit and the RELEASE commit is checked.
+--build-commit X names the commit the soaked build was made from (a fix build under a docs-only release commit);
+--require-text TEXT (repeatable) makes the run refuse when the final body, shortened or not, lacks TEXT.
+
 Soak verdict file (my format, one `key: value` per line, `#` lines ignored):
     verdict: PASS
     soak_minutes: 60
@@ -139,9 +145,36 @@ def find_semver_full(build_dir, semver):
     return hits[0]
 
 
-def check_githash(tools, commit_full, githash):
+BUILD_COMMIT_PATHS = ("src/", "libraries/", "scripts/", "build.py", "platformio.ini")
+
+
+def check_githash(tools, commit_full, githash, build_commit=None):
     """The zip githash is the release commit, or an ancestor of it with nothing changed under src/ or libraries
-    (the normal slot release: a docs-only release commit on top of the soaked candidate)."""
+    (the normal slot release: a docs-only release commit on top of the soaked candidate).
+
+    With an explicit build_commit (--build-commit) the zip githash must belong to that commit and the release
+    commit must be it or a descendant with an empty diff under src/, libraries/, scripts/, build.py and
+    platformio.ini (a docs-only release commit on top of a fix build)."""
+    if build_commit:
+        built = tools.git("rev-parse", "--verify", "-q", f"{build_commit}^{{commit}}", check=False)
+        if built.returncode != 0:
+            raise Refuse(f"--build-commit {build_commit} is not a commit in this repository")
+        built_full = built.stdout.strip()
+        if not built_full.startswith(githash):
+            raise Refuse(f"zip githash {githash} is not the --build-commit {built_full[:9]}: this is not the build "
+                         "that was named")
+        if built_full == commit_full:
+            return "zip githash is the build commit and the release commit"
+        anc = tools.git("merge-base", "--is-ancestor", built_full, commit_full, check=False)
+        if anc.returncode != 0:
+            raise Refuse(f"--build-commit {built_full[:9]} is not an ancestor of the release commit {commit_full[:9]}")
+        changed = tools.git("diff", "--name-only", built_full, commit_full, "--", *BUILD_COMMIT_PATHS).stdout.split()
+        if changed:
+            raise Refuse(f"{changed[0]} changed between the build commit {built_full[:9]} and the release commit "
+                         f"{commit_full[:9]} (checked: {' '.join(BUILD_COMMIT_PATHS)}): the binary is not what the "
+                         "tag contains")
+        return (f"build commit {built_full[:9]} is an ancestor of the release commit, nothing changed under "
+                f"{', '.join(BUILD_COMMIT_PATHS)} since")
     if commit_full.startswith(githash):
         return "zip githash is the release commit"
     full = tools.git("rev-parse", "--verify", "-q", f"{githash}^{{commit}}", check=False)
@@ -174,7 +207,17 @@ def check_zip(zip_path, names):
     return len(have)
 
 
-def make_body(notes_path, tag):
+def missing_text(text, body, require_text):
+    """The body that goes out keeps the honest part of the notes: the disclaimer block (when the notes have one) and
+    every --require-text string (for example the numbers of a check the coordinator named)."""
+    if "**Disclaimer" in text and "**Disclaimer" not in body:
+        raise Refuse("the shortened body lost the disclaimer block of the notes")
+    for needle in require_text:
+        if needle not in body:
+            raise Refuse(f"the release body lacks the required text: {needle!r}")
+
+
+def make_body(notes_path, tag, require_text=()):
     try:
         text = Path(notes_path).read_text(encoding="utf-8")
     except (OSError, UnicodeDecodeError) as e:
@@ -184,6 +227,7 @@ def make_body(notes_path, tag):
         raise Refuse(f"release notes contain an em dash (line {text.count(chr(10), 0, i) + 1}); "
                      "the writing rules forbid it")
     if len(text) <= MAX_BODY:
+        missing_text(text, text, require_text)
         return text, "full notes file"
     # Shortened body (SKILL.md Phase 4.4): the header through the "What changed since" section, a short
     # "Earlier changes" section linking the full file at the tag, then every section from the 'SAT is ...' heading on.
@@ -205,6 +249,7 @@ def make_body(notes_path, tag):
         raise Refuse(f"even the shortened body is {len(body)} characters (limit {MAX_BODY})")
     if EM_DASH in body:
         raise Refuse("the shortened body contains an em dash")
+    missing_text(text, body, require_text)
     return body, f"shortened ({len(text)} -> {len(body)} characters)"
 
 
@@ -284,12 +329,12 @@ def run(args, gh_cmd):
     if got.lower() != args.soaked_sha256.lower():
         raise Refuse(f"{names['app']} sha256 {got} differs from the soaked sha256 {args.soaked_sha256}: "
                      "this is not the binary that was soaked")
-    how = check_githash(tools, commit, githash)
+    how = check_githash(tools, commit, githash, args.build_commit)
     n_in_zip = check_zip(local[names["zip"]], names)
     step(3, f"build files ok: 6 assets, .ino.bin equals the soaked sha256, {how}, flash zip holds {n_in_zip} files")
 
     # 4. body
-    body, how_body = make_body(args.notes, args.tag)
+    body, how_body = make_body(args.notes, args.tag, args.require_text)
     step(4, f"release body ok: {how_body}, no em dash, {len(body)} characters")
 
     scratch = Path(args.scratch) if args.scratch else Path(tempfile.mkdtemp(prefix="beta-publish-"))
@@ -409,6 +454,11 @@ def main(argv=None, gh_cmd=None):
     ap.add_argument("--verdict", required=True, help="soak verdict file (verdict: PASS, soak_minutes: >=60)")
     ap.add_argument("--notes", required=True, help="docs/releases/RELEASE_NOTES_<semver>.md")
     ap.add_argument("--theme", required=True, help="short theme for the release title and the tag message")
+    ap.add_argument("--build-commit", default=None,
+                    help="the commit the soaked build was made from; the zip githash must be it and the release "
+                         "commit must add nothing under src/, libraries/, scripts/, build.py, platformio.ini")
+    ap.add_argument("--require-text", action="append", default=[],
+                    help="text that must be in the release body (repeatable), for example the numbers of a check")
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--yes-publish", action="store_true", help="required for a real (non dry) run")
     ap.add_argument("--latest", action="store_true", help="refused: a beta is never the latest release")
