@@ -245,7 +245,12 @@ Question 16 named both failures and said they are not waived by the agent; Rober
 - OT-Direct (OTGW32) is not measured. Its OpenTherm answer window is about 400 ms and a frame is dropped at 750 ms
   (*read*, `OTDirect.ino:960-967`). The longest loop gap on .63 was 211 ms. *Mitigation:* the soak and our own beta
   run before the stable; a loop gap above 500 ms on any unit stops the change.
-- A unit without PSRAM is not measured. The rule reads the free heap, so it admits less there (*estimate*).
+- The rule applies to boards without PSRAM unmeasured (Robert, Open Question 2, option A). It reads the free heap
+  itself, so it should admit less there (*estimate*, not measured). *Mitigation:* the .61 measurement and soak are
+  still planned before beta N+2; the 60 min soak on .63 and our own beta come first. If .61 contradicts the rule, a
+  follow-up task (and an ADR if the rule changes) sets the fallback. A stable build has no runtime switch for that:
+  `restrule`, `restcap` and `restrmax` exist only in prerelease builds and in RAM, so the fallback in a stable is a
+  build with `REST_MAX_INFLIGHT` 2, which the v2 UI then follows through `rest_max_inflight`.
 - One test unit; within one boot the runs drift by about 20 %.
 
 **Release order** (plan of record, coordinator 2026-11-26 21:1x, one cause per release): beta N = the ADR-298 bridge
@@ -256,12 +261,13 @@ N+2 = this ADR, over the air only, after its host test, the 60 min soak and Robe
 
 - [ ] 1. Robert: acceptance of this ADR, including the core-rule change in CLAUDE.md, AGENTS.md and
   copilot-instructions.md.
-- [ ] 2. Robert: boards without PSRAM are not measured. `REST_RMAX` 14336 and the per-request cost come from a PSRAM
+- [x] 2. Robert: boards without PSRAM are not measured. `REST_RMAX` 14336 and the per-request cost come from a PSRAM
   unit, where allocations above 4096 B go to PSRAM; without PSRAM they come from internal heap, so the rule's free
   test is the only protection and its margin there is unknown. Options: (A) the same rule on every board, accepted
   untested on no-PSRAM until .61 is measured; (B) keep the cap at 2 on boards without PSRAM (one `HAS_PSRAM`-style
   branch) until measured; (C) hold the whole change until .61 is measured. Recommendation: B if .61 cannot be
   measured before beta N+2, otherwise A with the .61 soak as evidence.
+  — **Answered 2026-11-26 by Robert van den Breemen (decision, interactive answer to the coordinator, relayed), recorded by Agent: Claude (otgw-architect):** verbatim 'A: dezelfde regel, ongetest', Robert, 2026-11-26 about 22:00 local, interactive answer to the coordinator (relayed by the coordinator; not seen by otgw-architect). Option A, against the recommendation B: the same rule on every board, unmeasured on boards without PSRAM.
 
 ## Related Decisions
 
