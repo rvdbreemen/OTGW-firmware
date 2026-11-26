@@ -1581,6 +1581,10 @@ This is the ADR-106 standalone flag. It controls whether legacy OT-spec-derived 
 
 Toggling `bUseLegacyOtTopics` triggers cleanup of the retained payloads in the other name set via the persistent bitmap in `/mqtt_topic_cleanup.bin` (ADR-106 design). See also the settings table entry for `mqttuselegacyottopics` and ADR-106.
 
+### Entity defaults for new registrations (2.0.0-beta.439 and later)
+
+In the discovery configs, 44 protocol-internal sensors (the raw byte values ending in `_hb`, `_lb` or `_u8`, plus `status_master` and `status_slave`) have `enabled_by_default` false and `entity_category` diagnostic, and 21 SAT tuning sensors (PID terms and output, Kp, Ki, Kd, raw derivative, error, duty and overshoot values, the 4 hour averages) have `entity_category` diagnostic and stay enabled. Home Assistant uses `enabled_by_default` only when it registers an entity for the first time: a new installation shows the 44 sensors as disabled entities under Diagnostics on the device page, and an existing installation keeps its entities and their state. Topics, `uniq_id`, names, `stat_t` and `cmd_t` do not change (the discovery payload diff test compares 1755 config topics before and after).
+
 ### Value topics and payloads are unchanged
 
 Only HA discovery grouping and unique_ids are described here. MQTT value topics, payloads and retain flags do not depend on it.
@@ -1660,6 +1664,14 @@ Individual status flag bits (master/slave status, Message ID 0) have per-bit pub
 ### Heap Health Backpressure
 
 The `canPublishMQTT()` function checks heap health before each publish. When free heap drops below critical thresholds, MQTT publishing is throttled or suspended to prevent crashes.
+
+### Shared pacer for MQTT bursts (2.0.0-beta.439 and later)
+
+The SAT topics, the Home Assistant discovery configs, the connect-time steps, the clean-up of old override topics and the hourly statistics ask one shared pacer before they publish. The pacer says "wait" while more than 6 messages sit in the MQTT outbox (`MQTT_PACE_MAX_OUTBOX`) or the largest free memory block is below 17408 bytes (`MQTT_PACE_MIN_BLOCK`, the 16384 bytes the MQTT client needs to write plus 1024 bytes of room). A held step always goes out in the end: after 5000 ms for the connect steps, the override clean-up and the hourly statistics (`MQTT_PACE_MAX_WAIT_MS`, `CONN_STAGE_MAX_WAIT_MS`); for the SAT topics a closed stretch that is 5000 ms old lets one ask per 500 ms through, whoever asks and whatever closed it (the wait is measured in time, not in passes); and after at most 5 discovery ticks for a discovery config (1 s per tick, 10 s per tick while memory is low). The SAT hold after a connect ends after 60 s at the latest. Messages, topics and values do not change; only the moment of sending does.
+
+The limits are not calibrated for a unit without extra RAM yet in this beta; calibration follows. Until then a small unit can see its MQTT messages held up to the bounds above.
+
+Beta builds only: the steps can be switched off at runtime with the telnet keys `x` (SAT topics), `y` (discovery), `c` (connect steps) and `k` (override clean-up and hourly statistics), or with `POST /api/v2/debug/flags` and the names `pacesat`, `pacedrip`, `paceconn` and `pacetail`; a reboot switches them back on. The counters `hd_pace_*` are on the heap telemetry line. A release build has the pacer always on. The MQTT socket also has Nagle on (a few small messages leave in one packet), which can delay a message slightly.
 
 ### Republish on Reconnect and Home Assistant Restart
 

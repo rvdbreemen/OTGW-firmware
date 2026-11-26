@@ -5,6 +5,18 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [2.0.0-beta.451] - 2026-11-26
+
+### Added
+- MQTT: Nagle for the broker connection (TASK-2949.3, ADR-266).
+- MQTT: a shared pacer for SAT topics, discovery, connect steps, override clean-up and hourly statistics (TASK-2949.6, TASK-2949.7, TASK-2949.8, TASK-2949.9, ADR-265); its minimum free block is 17408 bytes and its wait for SAT topics ends in time (TASK-3105).
+- MQTT: the PIC settings topics are retained and no longer republished every 5 minutes (TASK-2949.11).
+- Beta builds: runtime switches and `hd_pace_*` counters for the pacer, and the REST in-flight cap override `restcap` (TASK-2949.6, TASK-3091).
+
+### Changed
+- Home Assistant: 44 protocol-internal sensors are disabled and diagnostic, 21 SAT tuning sensors are diagnostic, for new registrations (TASK-2971.3).
+- Internal: evaluate gates for the pacer, tests for the pacer with and without a prerelease build, the discovery payload diff test, release-note fragments in the backlog (TASK-2949.x).
+
 ## [2.0.0-beta.438] - 2026-11-26
 
 ### Added
@@ -1241,7 +1253,8 @@ Legacy release. See git history for details.
 
 Legacy releases. See git history for details.
 
-[Unreleased]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.438...HEAD
+[Unreleased]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.451...HEAD
+[2.0.0-beta.451]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.438...v2.0.0-beta.451
 [2.0.0-beta.438]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.432...v2.0.0-beta.438
 [2.0.0-beta.432]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.428...v2.0.0-beta.432
 [2.0.0-beta.428]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.418...v2.0.0-beta.428

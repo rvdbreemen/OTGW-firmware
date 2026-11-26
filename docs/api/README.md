@@ -933,6 +933,8 @@ Names: `otmsg`, `restapi`, `mqtt`, `sensors`, `sat`, `otdirect`, `satble` (build
 
 **Errors**: `400` for an unknown name or a value that is not one of the above (nothing changes); `405` for other methods.
 
+**Beta builds only** (not in a release build): the names `pacesat`, `pacedrip`, `paceconn` and `pacetail` switch the held MQTT steps (telnet keys `x`, `y`, `c`, `k`; a reboot switches them back on), and the number `restcap` (2 to 8, default 2, telnet key `R`) raises the REST in-flight limit for a test; a value outside 2 to 8 gets `400`. The GET answer then also lists them (`restcap` as a number next to the flags).
+
 #### `GET /api/v2/debug`
 
 Returns a flat JSON map of build identifiers, runtime counters, every persistent setting (sensitive fields masked), and the full transient state struct. Intended for bug reports and field-support triage; the shape is not part of the long-term stable contract and may gain new keys between releases. OT-direct sub-sections appear only on OTGW32 builds; SAT BLE and weather sub-sections only on ESP32 builds.
