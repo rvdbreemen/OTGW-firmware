@@ -103,8 +103,10 @@ and chose to do it before the stable if the sweep passes (question 14, answer "C
 getal van de unit (standaard 2), de kernregel "max 2 API-calls" verandert in alle drie de instructiebestanden, 60
 minuten soak en eigen bèta vóór de stable. Je neemt de twee gemiste eisen bewust op je (geen vrijstelling van mij).",
 B "Alles blijft op 2" and C "Alleen de regel verbeteren zonder het plafond te verhogen". Robert answered verbatim "A"
-in DM 1575597641675575408 (20:42 local) and again "A" in DM 1575601390645157970 (20:57 local). Both messages have no
-reply reference; they are the next messages after question 16 (checked through the Discord API by otgw-architect).
+in DM 1575597641675575408 (20:42 local) and again "A" in DM 1575601390645157970 (20:57 local). The coordinator
+reports that the 20:57 message replies to question 16. otgw-architect read the DM history through the Discord API and
+saw no other message between question 16 and the two "A" messages; the reply reference itself was not checked by
+otgw-architect.
 That answer chooses the route; this ADR still needs his acceptance.
 
 The device admits a REST request by measured memory need, up to 4 in flight:
@@ -191,6 +193,8 @@ Question 16 named both failures and said they are not waived by the agent; Rober
 
 - Prerelease builds may keep the TASK-3104 switches (`restrule`, `restrmax`, `txcap`, `restlog`) to A/B against the
   old rule; a stable build compiles without them.
+- In a prerelease build `rest_max_inflight` reports the effective base cap (`restCapBase()`, the `restcap` switch),
+  so a bench run with the cap set to 2 also tells the UI 2. A stable build reports `REST_MAX_INFLIGHT`.
 
 ### Verification
 
@@ -204,6 +208,8 @@ Question 16 named both failures and said they are not waived by the agent; Rober
 - A web UI test in one file: the queue uses `rest_max_inflight` when present and 2 when missing or invalid.
 - Bench (otgw-bench-tester): 60 min soak on .63 with the final binary, the v2 UI open in 2 browsers; 0 reboots, 0
   crash logs, 0 WebSocket and MQTT disconnects, `hd_min_free_heap` at least 8192, 503 counters and p99 reported.
+- Bench, a unit without PSRAM (.61) if it is online: the same soak, 30 min. If it is not online, the result is
+  recorded as "not tested" and Open Question 2 decides.
 
 ## Alternatives Considered
 
@@ -250,6 +256,12 @@ N+2 = this ADR, over the air only, after its host test, the 60 min soak and Robe
 
 - [ ] 1. Robert: acceptance of this ADR, including the core-rule change in CLAUDE.md, AGENTS.md and
   copilot-instructions.md.
+- [ ] 2. Robert: boards without PSRAM are not measured. `REST_RMAX` 14336 and the per-request cost come from a PSRAM
+  unit, where allocations above 4096 B go to PSRAM; without PSRAM they come from internal heap, so the rule's free
+  test is the only protection and its margin there is unknown. Options: (A) the same rule on every board, accepted
+  untested on no-PSRAM until .61 is measured; (B) keep the cap at 2 on boards without PSRAM (one `HAS_PSRAM`-style
+  branch) until measured; (C) hold the whole change until .61 is measured. Recommendation: B if .61 cannot be
+  measured before beta N+2, otherwise A with the .61 soak as evidence.
 
 ## Related Decisions
 

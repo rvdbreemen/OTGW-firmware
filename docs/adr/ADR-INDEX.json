@@ -12087,14 +12087,16 @@
           "Let the UI send more requests at once than the device reports."
         ],
         "exceptions": [
-          "Prerelease builds may keep the TASK-3104 switches (restrule, restrmax, txcap, restlog) to A/B against the old rule; a stable build compiles without them."
+          "Prerelease builds may keep the TASK-3104 switches (restrule, restrmax, txcap, restlog) to A/B against the old rule; a stable build compiles without them.",
+          "In a prerelease build restmaxinflight reports the effective base cap (restCapBase(), the restcap switch), so a bench run with the cap set to 2 also tells the UI 2. A stable build reports RESTMAXINFLIGHT."
         ],
         "verification": [
           "Host test tests/testrestadmissionrule.py (to be written with the firmware change): it slices the real restEffectiveInflightCap() out of restAPI.ino with stub shims and runs a grid over in-flight count (0 to 4), largest block and free hea...",
           "go red on the code before this ADR for \"maxblock 15860, freeheap 35000, in flight 1\" (old rule: no admission; new rule: admit) and for \"maxblock 19444, freeheap 35004, in flight 2\" (old rule caps at 2);",
           "pin liveness (in flight 0 always gives at least 1), the block floor (8191 refuses), the free floor (22527 refuses) and the cap (in flight 4 refuses).",
           "A web UI test in one file: the queue uses restmaxinflight when present and 2 when missing or invalid.",
-          "Bench (otgw-bench-tester): 60 min soak on .63 with the final binary, the v2 UI open in 2 browsers; 0 reboots, 0 crash logs, 0 WebSocket and MQTT disconnects, hdminfreeheap at least 8192, 503 counters and p99 reported."
+          "Bench (otgw-bench-tester): 60 min soak on .63 with the final binary, the v2 UI open in 2 browsers; 0 reboots, 0 crash logs, 0 WebSocket and MQTT disconnects, hdminfreeheap at least 8192, 503 counters and p99 reported.",
+          "Bench, a unit without PSRAM (.61) if it is online: the same soak, 30 min. If it is not online, the result is recorded as \"not tested\" and Open Question 2 decides."
         ]
       },
       "scope": {
