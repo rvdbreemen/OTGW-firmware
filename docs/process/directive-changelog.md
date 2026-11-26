@@ -38,6 +38,7 @@ lives here.
 | before 2026-10-25 | Repeat an unanswered SAT question to Sergeant D every 12 hours | Pace questions to his presence: check hourly, re-ask as soon as he is back | 2026-10-25 |
 | 2026-10-29 | Batch cadence: build and publish after every 4 finished tasks | Per-task cadence: each task bench-tested before its zip is published | 2026-10-30 |
 | TASK-1014 | Flat single-flight rule for web UI API calls (one request in flight) | ADR-165: at most 2 in flight (TASK-1015 load study) | ADR-165 |
+| ADR-165 (2026-07-06) | Web UI and REST gate at most 2 API calls in flight | ADR-300: the device admits by memory need up to 4; the web UI keeps at most what the device reports (`rest_max_inflight`), 2 when it reports none (Robert, 2026-11-26, question 16 answer A and acceptance of ADR-300) | 2026-11-26 |
 | 2026-06-20 | `feature-2.0.0-esp32s3-async`, `feature-2.0.0-esp32s3-only`, `feature-dev-2.0.0-otgw32-esp32-sat-support` as work lines | Folded into `dev`; historical, not active | 2026-06-20 |
 | before 2026-07-04 | Discord MCP in a Docker container plus the `gustycube` Node server | Native Java `saseq/discord-mcp` process, one instance per token | 2026-07-04 |
 | before TASK-1160 | `flash_otgw --update --app` also wrote a littlefs image found in `build\` | `--update --app <bin>` writes the app only and keeps the settings | TASK-1160 |

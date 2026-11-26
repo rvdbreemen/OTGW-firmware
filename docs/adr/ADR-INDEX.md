@@ -170,7 +170,7 @@ One row per Architecture Decision Record. Scope is the Enforcement `path_glob` s
 | ADR-162 | Accepted | - | Add a deliberate, transient, auth-gated test hook: a REST (Representational State Transfer) endpoint POST /api/v2/sat... |
 | ADR-163 | Accepted | - | Serve Web UI static assets with Cache-Control: no-cache (the browser may store but MUST revalidate via If-None-Match... |
 | ADR-164 | Superseded | - | On the combo board, AUTO board detection (iBoardMode == 0) detects once on first boot and persists its verdict once i... |
-| ADR-165 | Accepted | - | Adopt N=2 as the confirmed safe-and-robust parallelism ceiling for RESTMAXINFLIGHT and WEBFILEMAXINFLIGHT on the ESP3... |
+| ADR-165 | Superseded | - | Adopt N=2 as the confirmed safe-and-robust parallelism ceiling for RESTMAXINFLIGHT and WEBFILEMAXINFLIGHT on the ESP3... |
 | ADR-166 | Superseded | - | Firmware/app OTA is rejected outright on any board whose partition table has no spare app slot (single otaX == the ru... |
 | ADR-167 | Accepted | - | On the dev branch, retire the ADR-089 heap tier machine and the ADR-121 per-consumer gating in a separate Phase-3 imp... |
 | ADR-168 | Accepted | `src/libraries/OTGWSerial/OTGWSerial.cpp` | On the PIC path (esp32-classic and combo-with-PIC), the PIC serial link binds the ESP32-S3's native UART0 on GPIO43/4... |
@@ -282,4 +282,4 @@ One row per Architecture Decision Record. Scope is the Enforcement `path_glob` s
 | ADR-297 | Accepted | - | This ADR amends ADR-236 in three points. |
 | ADR-298 | Accepted | - | All three 4MB targets (esp32, esp32-classic, esp32-combo) move to one new table. |
 | ADR-299 | Proposed | - | Remote telemetry is off until the user says yes, and the gateway asks the user in a dialog, at most at these moments. |
-| ADR-300 | Proposed | - | Decision maker: Robert van den Breemen (maintainer). |
+| ADR-300 | Accepted | - | Decision maker: Robert van den Breemen (maintainer). |

@@ -1,13 +1,14 @@
 ---
 id: "ADR-300"
 title: "Admit REST requests by measured memory need, up to 4 in flight (supersedes ADR-165, amends ADR-184)"
-status: "Proposed"
+status: "Accepted"
 date: "2026-11-26"
 binding: false
 gate: null
 documents_shipped: false
 verified_in: []
-supersedes: []
+supersedes:
+  - "ADR-165"
 superseded_by: null
 related:
   - "ADR-165"
@@ -47,7 +48,7 @@ format: "canonical"
 
 ## Status
 
-Proposed, 2026-11-26.
+Accepted, 2026-11-26.
 
 Guideline-level per ADR-080: the host test named under Verification compiles the real admission function and is the
 gate; it is not wired into evaluate.py. On acceptance this ADR replaces ADR-165 as a whole: its REST part is changed
@@ -62,6 +63,16 @@ status_history:
     changed_by: "Agent: Claude (otgw-architect)"
     reason: Initial proposal
     changed_via: adr-kit
+  - date: 2026-11-26
+    status: Accepted
+    changed_by: "Robert van den Breemen (decision, interactive answer to the coordinator, relayed), recorded by Agent: Claude (otgw-architect)"
+    reason: "Accepted: decision Robert van den Breemen, 2026-11-26 about 22:20 local, verbatim 'Accepteren zoals het staat (Recommended)' (interactive answer to the coordinator, relayed), recorded by Agent: Claude (otgw-architect); four gates passed in adr-kit"
+    changed_via: adr-kit lifecycle
+  - date: 2026-11-26
+    status: Accepted
+    changed_by: "Robert van den Breemen (decision: acceptance of ADR-300, interactive answer to the coordinator, relayed), recorded by Agent: Claude (otgw-architect)"
+    reason: Supersedes ADR-165 (its static-file cap of 2 carries over unchanged)
+    changed_via: adr-kit lifecycle
 ```
 
 ## Context
@@ -259,8 +270,9 @@ N+2 = this ADR, over the air only, after its host test, the 60 min soak and Robe
 
 ## Open Questions
 
-- [ ] 1. Robert: acceptance of this ADR, including the core-rule change in CLAUDE.md, AGENTS.md and
+- [x] 1. Robert: acceptance of this ADR, including the core-rule change in CLAUDE.md, AGENTS.md and
   copilot-instructions.md.
+  — **Answered 2026-11-26 by Robert van den Breemen (decision, interactive answer to the coordinator, relayed), recorded by Agent: Claude (otgw-architect):** verbatim 'Accepteren zoals het staat (Recommended)', Robert, 2026-11-26 about 22:20 local, interactive answer to the coordinator (relayed by the coordinator; not seen by otgw-architect). The option text included the core-rule change in CLAUDE.md, AGENTS.md and copilot-instructions.md and no runtime switch in a stable build (no persisted setting).
 - [x] 2. Robert: boards without PSRAM are not measured. `REST_RMAX` 14336 and the per-request cost come from a PSRAM
   unit, where allocations above 4096 B go to PSRAM; without PSRAM they come from internal heap, so the rule's free
   test is the only protection and its margin there is unknown. Options: (A) the same rule on every board, accepted

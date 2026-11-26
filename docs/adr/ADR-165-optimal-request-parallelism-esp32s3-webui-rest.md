@@ -1,15 +1,15 @@
 ---
 id: "ADR-165"
 title: "Optimal request parallelism on ESP32-S3 v2 Web UI/REST: N*=2 confirmed by two-phase load test (TASK-1015)"
-status: "Accepted"
-date: "2026-07-06"
+status: "Superseded"
+date: "2026-11-26"
 binding: false
 gate: null
 documents_shipped: false
 verified_in:
   - "src/OTGW-firmware/restAPI.ino:WEB_FILE_MAX_INFLIGHT"
 supersedes: []
-superseded_by: null
+superseded_by: "ADR-300"
 related:
   - "ADR-089"
   - "ADR-145"
@@ -39,7 +39,7 @@ tags:
 
 ## Status
 
-Accepted. Date: 2026-07-06.
+Superseded by ADR-300, 2026-11-26.
 
 **Accepted by explicit maintainer review** (Robert van den Breemen, 2026-07-06,
 in-session sign-off after reading this ADR). N*=2 is now the confirmed
@@ -90,6 +90,11 @@ status_history:
     status: Accepted
     changed_by: "User: Robert van den Breemen"
     reason: Related to ADR-216
+    changed_via: adr-kit lifecycle
+  - date: 2026-11-26
+    status: Superseded
+    changed_by: "Robert van den Breemen (decision: acceptance of ADR-300, interactive answer to the coordinator, relayed), recorded by Agent: Claude (otgw-architect)"
+    reason: Superseded by ADR-300 (REST admission by measured memory need, up to 4 in flight; the static-file cap of 2 carries over unchanged in ADR-300)
     changed_via: adr-kit lifecycle
 ```
 

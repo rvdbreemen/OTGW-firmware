@@ -399,17 +399,17 @@ Counts above are advisory rather than hand-maintained; the canonical set is the 
 - **[ADR-159: Symmetric Presence-Gating of the External 0x26 Watchdog (Amends ADR-135)](ADR-159-symmetric-0x26-watchdog-presence-gating.md)** 🆕 *(Accepted)*  
   Proposed, guideline-level (ADR-080). Presence-gates the external 0x26 watchdog symmetrically (feed/arm only when present) instead of the unconditional feed. Amends ADR-135.
 
-- **[ADR-165: Optimal request parallelism on ESP32-S3 v2 Web UI/REST: N*=2 confirmed by two-phase load test (TASK-1015)](ADR-165-optimal-request-parallelism-esp32s3-webui-rest.md)** *(Accepted 2026-07-06)*  
-  Documents the TASK-1015 two-phase load-test study (capacity curve + policy confirmation) on `esp32-classic`: N*=2 is the highest offered concurrency with zero incidents AND zero nominal-load 503s. Sets the shipped `REST_MAX_INFLIGHT`/`WEB_FILE_MAX_INFLIGHT` defaults to 2 and the CLAUDE.md cap rule. Complements ADR-149, ADR-147. The classic UI's client-side counterpart is ADR-184.
+- **[ADR-165: Optimal request parallelism on ESP32-S3 v2 Web UI/REST: N*=2 confirmed by two-phase load test (TASK-1015)](ADR-165-optimal-request-parallelism-esp32s3-webui-rest.md)** *(Accepted 2026-07-06, superseded by ADR-300 2026-11-26)*  
+  Documents the TASK-1015 two-phase load-test study (capacity curve + policy confirmation) on `esp32-classic`: N*=2 is the highest offered concurrency with zero incidents AND zero nominal-load 503s. Sets the shipped `REST_MAX_INFLIGHT`/`WEB_FILE_MAX_INFLIGHT` defaults to 2 and the CLAUDE.md cap rule. Complements ADR-149, ADR-147. The classic UI's client-side counterpart is ADR-184. Superseded by ADR-300: the REST cap is now up to 4 by memory need; the static-file cap of 2 carries over.
 
 - **[ADR-184: Queue the classic UI's API requests at two in flight](ADR-184-queue-the-classic-ui-s-api-requests-at-two-in-flight.md)** 🆕 *(Accepted)*  
-  The classic bundle sends every same-origin `/api/` request through one first-in-first-out queue with at most 2 in flight. The queue is a `window.fetch` wrapper at the top of `index.js`. `refreshDevTime()` sends at most one `device/time` request per 4 s. Measured on the bench: the page load and 5 thermostat page opens went from a peak of 8 in flight and 27 refusals to 2 and 0, and the markers loaded on 5 of 5 opens instead of 1. Corrects ADR-165's premise that the frontend already stayed within the cap; the v2 bundle is not covered. With ADR-192 the classic bundle is gone; the same queue now sits at the top of `v2.js` (TASK-1210).
+  The classic bundle sends every same-origin `/api/` request through one first-in-first-out queue with at most 2 in flight. The queue is a `window.fetch` wrapper at the top of `index.js`. `refreshDevTime()` sends at most one `device/time` request per 4 s. Measured on the bench: the page load and 5 thermostat page opens went from a peak of 8 in flight and 27 refusals to 2 and 0, and the markers loaded on 5 of 5 opens instead of 1. Corrects ADR-165's premise that the frontend already stayed within the cap; the v2 bundle is not covered. With ADR-192 the classic bundle is gone; the same queue now sits at the top of `v2.js` (TASK-1210). Amended by ADR-300: the queue size comes from the device (`rest_max_inflight`), 2 when it reports none.
 
 - **[ADR-188: Cap the web connections that hold send data, so a request storm cannot starve the receive path](ADR-188-cap-the-web-connections-that-hold-send-data-so-a-request-storm-cannot-starve-the-receive-path.md)** 🆕 *(Accepted)*  
   The REST and static-file gates first refuse a new request with the cheap 503 while more than `WEB_MAX_TX_CONNECTIONS` (4) port-80 connections hold or can queue send data, minus the open `/ws` clients. The count comes from the `platformTcpTxHoldingOnPort()` shim; refusals are counted in `hd_webconn_503`. No library is changed.
 
-- **[ADR-300: Admit REST requests by measured memory need, up to 4 in flight (supersedes ADR-165, amends ADR-184)](ADR-300-admit-rest-requests-by-measured-memory-need-up-to-4-in-flight-supersedes-adr-165-amends-adr-184.md)** 🆕 *(Proposed, would supersede ADR-165 and amend ADR-184)*  
-  Route chosen by Robert on 2026-11-26 (question 16, answer A, DM 1575601390645157970). With nothing in flight one request is always admitted; with one or more in flight a new one is admitted while fewer than 4 are in flight, the largest free block is at least 8192 B and the free heap at least 8192 + 14336 B. The 16000/24000 maxblock thresholds go. The ADR-188 send cap stays 4, the static-file cap stays 2. The device reports `rest_max_inflight` in `/api/v2/health`; the v2 UI queue uses it, 2 when it is missing. Gate: host test `tests/test_rest_admission_rule.py` (red on the old rule). Waits for Robert's acceptance.
+- **[ADR-300: Admit REST requests by measured memory need, up to 4 in flight (supersedes ADR-165, amends ADR-184)](ADR-300-admit-rest-requests-by-measured-memory-need-up-to-4-in-flight-supersedes-adr-165-amends-adr-184.md)** 🆕 *(Accepted 2026-11-26, supersedes ADR-165, amends ADR-184)*  
+  Route chosen by Robert on 2026-11-26 (question 16, answer A, DM 1575601390645157970). With nothing in flight one request is always admitted; with one or more in flight a new one is admitted while fewer than 4 are in flight, the largest free block is at least 8192 B and the free heap at least 8192 + 14336 B. The 16000/24000 maxblock thresholds go. The ADR-188 send cap stays 4, the static-file cap stays 2. The device reports `rest_max_inflight` in `/api/v2/health`; the v2 UI queue uses it, 2 when it is missing. Gate: host test `tests/test_rest_admission_rule.py` (red on the old rule). Accepted by Robert 2026-11-26 (interactive answer, relayed by the coordinator); boards without PSRAM get the same rule unmeasured (his answer to Open Question 2).
 
 - **[ADR-189: Abort a web connection on the ack timeout instead of closing it gracefully](ADR-189-abort-a-web-connection-on-the-ack-timeout-instead-of-closing-it-gracefully.md)** 🆕 *(Accepted)*  
   `webBeginRequest()` installs an ack-timeout handler that calls `AsyncClient::abort()`, which frees the queued send data at once and sends a RST the client sees immediately. Each abort is counted in `hd_weback_abort`. The timeout value and the AsyncTCP and ESPAsyncWebServer libraries stay unchanged.
@@ -1158,9 +1158,9 @@ Generated by `bin/adr-index`. Do not edit between the sentinels.
 | Total ADRs | 277 |
 | Accepted | 227 |
 | Amended | 1 |
-| Proposed | 4 |
+| Proposed | 3 |
 | Rejected | 2 |
-| Superseded | 42 |
+| Superseded | 43 |
 | Superseded by adr-124 | 1 |
 | Duplicate IDs | 0 |
 
@@ -1332,7 +1332,7 @@ Generated by `bin/adr-index`. Do not edit between the sentinels.
 | ADR-162 | Sanctioned SAT Force-Boiler Test Hook in Production Firmware | Accepted | 2026-07-04 | - | ADR-162-sat-force-boiler-test-hook.md |
 | ADR-163 | Web UI Static Assets Use Cache-Control: no-cache (Always-Revalidate via ETag); Amends ADR-139's Bounded max-age | Accepted | 2026-06-30 | - | ADR-163-web-asset-cache-control-no-cache-amends-adr139.md |
 | ADR-164 | Combo AUTO board detection persists its PIC verdict once (supersedes ADR-160) | Superseded | 2026-10-25 | Superseded by ADR-201; Supersedes ADR-160 | ADR-164-combo-auto-board-detect-persist-once-supersedes-adr160.md |
-| ADR-165 | Optimal request parallelism on ESP32-S3 v2 Web UI/REST: N*=2 confirmed by two-phase load test (TASK-1015) | Accepted | 2026-11-07 | - | ADR-165-optimal-request-parallelism-esp32s3-webui-rest.md |
+| ADR-165 | Optimal request parallelism on ESP32-S3 v2 Web UI/REST: N*=2 confirmed by two-phase load test (TASK-1015) | Superseded | 2026-11-26 | Superseded by ADR-300 | ADR-165-optimal-request-parallelism-esp32s3-webui-rest.md |
 | ADR-166 | Single-app-slot boards: firmware/app OTA is USB-only, filesystem OTA stays on WiFi | Superseded | 2026-10-15 | Superseded by ADR-191 | ADR-166-single-app-slot-ota-policy.md |
 | ADR-167 | Retire the ESP8266-Era Heap Tier Machine and Per-Consumer Gating on the ESP32-S3-Only Dev Branch | Accepted | 2026-07-31 | Supersedes ADR-089, ADR-121 | ADR-167-esp32s3-heap-tier-gating-removal-supersedes-adr089-adr121.md |
 | ADR-168 | PIC Serial Link Binds Native UART0 on GPIO43/44; IDF Console Muted on the PIC Path | Accepted | 2026-10-15 | - | ADR-168-pic-serial-native-uart0-and-idf-console-mute.md |
@@ -1444,5 +1444,5 @@ Generated by `bin/adr-index`. Do not edit between the sentinels.
 | ADR-297 | SAT's underheat exit counts only once the flame has burned 180 s; the at-max exit keeps only the 60 s start gate (amends ADR-236) | Accepted | 2026-11-25 | - | ADR-297-sat-s-underheat-exit-counts-only-once-the-flame-has-burned-180-s-the-at-max-exit-keeps-only-the-60-s-start-gate-amends-adr-236.md |
 | ADR-298 | Grow the 4MB app slot to 2304K and shrink LittleFS to 704K, with a one-time USB migration (amends ADR-191) | Accepted | 2026-11-26 | - | ADR-298-grow-the-4mb-app-slot-to-2304k-and-shrink-littlefs-to-704k-with-a-one-time-usb-migration-amends-adr-191.md |
 | ADR-299 | Remote telemetry is opt-in and asked: off by default, a No in the dialog is final, a switch-off in Settings is asked again only after a new release | Proposed | 2026-11-26 | - | ADR-299-remote-telemetry-is-opt-in-and-asked-off-by-default-a-no-in-the-dialog-is-final-a-switch-off-in-settings-is-asked-again-only-after-a-new-release.md |
-| ADR-300 | Admit REST requests by measured memory need, up to 4 in flight (supersedes ADR-165, amends ADR-184) | Proposed | 2026-11-26 | - | ADR-300-admit-rest-requests-by-measured-memory-need-up-to-4-in-flight-supersedes-adr-165-amends-adr-184.md |
+| ADR-300 | Admit REST requests by measured memory need, up to 4 in flight (supersedes ADR-165, amends ADR-184) | Accepted | 2026-11-26 | Supersedes ADR-165 | ADR-300-admit-rest-requests-by-measured-memory-need-up-to-4-in-flight-supersedes-adr-165-amends-adr-184.md |
 <!-- adr-kit-index:end -->

@@ -47,7 +47,7 @@ class AgentCoreBlock(unittest.TestCase):
         for rule in ("CLAUDE.md wins", "`dev` is the 2.x line: ESP32-S3 only", "`backlog` CLI",
                      "Never use the backlog MCP server", "No ArduinoJson (ADR-146)", "No HTTPS or WSS",
                      "addCommandToQueue()", "bin/bump-prerelease.sh", "needs-maintainer-ok",
-                     "docs/sat/decisions/sergeant-d-corrections.md", "at most 2 API calls"):
+                     "docs/sat/decisions/sergeant-d-corrections.md", "the device reports (`rest_max_inflight`), 2 when it reports none"):
             self.assertIn(rule, b, "rule missing from the AGENT-CORE block: " + rule)
 
     def test_agents_md_does_not_prefer_the_backlog_mcp_server(self):
