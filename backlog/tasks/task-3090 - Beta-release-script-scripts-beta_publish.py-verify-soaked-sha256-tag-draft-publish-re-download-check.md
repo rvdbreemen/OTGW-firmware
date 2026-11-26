@@ -3,11 +3,11 @@ id: TASK-3090
 title: >-
   Beta release script scripts/beta_publish.py: verify soaked sha256, tag, draft,
   publish, re-download check
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-25T21:21:00Z'
-updated_date: '2026-11-26T12:35:00Z'
+updated_date: '2026-11-26T13:18:00Z'
 labels:
   - tooling
   - release
@@ -41,4 +41,12 @@ otgw-webui 2026-11-26: scripts/beta_publish.py + tests/test_beta_publish.py (34 
 2026-11-26 AC3 evidence: dry run #1 on R1 (v2.0.0-beta.438, release commit 14539282e): exit 0, steps 1-8 ok. Dry run #2 on R2 (v2.0.0-beta.451, release commit 2bf4b3ab8, --build-commit 628de05ea, build dir wt-d3-t2/build with only the +628de05 set, ino.bin sha256 fce825dea37d3bd6060fa5d0197f4459b2edd45460bfbebc4894dab503ff4822, notes RELEASE_NOTES_2.0.0-beta.451.md, 5 --require-text anchors incl. 'Not verified: SAT behaviour with a boiler or a thermostat attached'): exit 0, step 3 'build commit 628de05ea is an ancestor of the release commit, nothing changed under src/, libraries/, scripts/, build.py, platformio.ini since', step 4 shortened 188855 -> 109775 characters with every anchor present, step 7 draft id 459383561 prerelease not latest with 7 assets of equal size, step 8 draft deleted. The soak verdict used for #2 was a labelled SCRATCH file (T2 soak verdict due about 14:07), so the real run needs the real verdict. After each run: gh release list 0 drafts, 0 dryrun tags locally and on origin, no v2.0.0-beta.438 / .451 tag on origin. Ledger (OTGW-capture/beta-publish-dryruns.tsv): 2 betas clean, so the two-dry-run gate is met. Not verified: a real publish (not run here, by design).
 
 2026-11-26 13:3x (date) --append-body FILE added at the coordinator's request: the file text goes into the body AFTER the shortening, in front of the footer ('## How to report', else at the end), is itself a required text (cannot be dropped), em dash and empty or missing file are refused. tests/test_beta_publish.py +5 (AppendBody): old script (HEAD) RED 4 errors, fix GREEN 5/5, 3 mutants killed (flag ignored, paragraph after the footer, shortened path forgets the paragraph), whole file 52 OK. Local only on lane ba-rel, not pushed (push after the publish).
+
+2026-11-26 14:1x (date) real runs and dry runs. Dry runs (ledger OTGW-capture/beta-publish-dryruns.tsv, 2 betas clean): #1 v2.0.0-beta.438 on a copy of the build dir (stale +bfae2b8 set made the script refuse, as designed); #2 v2.0.0-beta.451 with a labelled scratch verdict; #3 v2.0.0-beta.451 with the real inputs (preflight, exit 0). Real publishes: v2.0.0-beta.438 was published manually by the coordinator (before the tool had two dry runs); v2.0.0-beta.451 was published BY THE TOOL at 14:17 (date) under the coordinator's invocation of Robert's standing beta permission: tag v2.0.0-beta.451 -> 2bf4b3ab8 (git ls-remote ^{}), release https://github.com/rvdbreemen/OTGW-firmware/releases/tag/v2.0.0-beta.451, 7 assets (flash.zip 6511339, merged-full 4128768, elf 26246140, ino.bin 2162640, littlefs 786432, safeboot 931648, SHA256SUMS 733), step 9 re-download: every sha256 equal to the local file, flash zip sha256 b7a0d6da44f899ebc3ca9fd23df9d8fef3106850becc54d3cc58de33cf3c5520, Latest still v1.7.10, 0 drafts, no dryrun tags. The coordinator re-verified tag, assets, latest flag and the soak paragraph independently. Not covered here: Discord posts and the published-tags.txt ledger (BlueFlame / coordinator).
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+AC1: refusals and the shortened body are implemented and tested (tests/test_beta_publish.py, red on mutants). AC2: 52 tests with a fake gh, every step and refusal; mutants killed for each added flag (--build-commit 4, --require-text/disclaimer, --append-body 3). AC3: two clean dry runs on real betas (beta.438, beta.451) and a real publish of beta.451 through the tool with the evidence in the notes above (tag commit 2bf4b3ab8, 7 assets re-downloaded and compared by sha256, latest v1.7.10). Added beyond the plan, on the coordinator's request: --build-commit (docs-only release commit on a fix build), --require-text, --append-body. Not verified: a publish with a stale file in the build dir (the tool refuses; no real case exercised), and Discord posting (out of scope).
+<!-- SECTION:FINAL_SUMMARY:END -->
