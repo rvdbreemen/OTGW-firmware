@@ -60,6 +60,7 @@ struct DebugSection {          // state.debug — Runtime diagnostic output flag
   bool     bPaceSat               = true;   // ADR-265 cut 1 (TASK-2949.6): false = the SAT shadow gate without the MQTT pacer; settable only in prerelease builds (debugFlags.h), RAM only
   bool     bPaceDrip              = true;   // ADR-265 cut 2 (TASK-2949.7): false = the discovery drip waits on its own outbox threshold; settable only in prerelease builds, RAM only
   bool     bPaceConn              = true;   // ADR-265 cut 3 (TASK-2949.8): false = the connect portions decide on their own outbox and block thresholds; prerelease only, RAM only
+  bool     bPaceTail              = true;   // ADR-265 cut 4 (TASK-2949.9): false = the stale override sweep and the hourly stats without the pacer; prerelease only, RAM only
   uint32_t iOTGWSimulationIntervalMs = 750;
   uint32_t iOTGWSimulationNextDueMs  = 0;
 };

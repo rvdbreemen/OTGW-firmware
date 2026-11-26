@@ -46,6 +46,7 @@ static const DebugFlagDef kDebugFlags[] = {
   { "pacesat",   'x', &DebugSection::bPaceSat,        "MQTT pacer SAT gate",      nullptr },
   { "pacedrip",  'y', &DebugSection::bPaceDrip,       "MQTT pacer discovery drip", nullptr },
   { "paceconn",  'c', &DebugSection::bPaceConn,       "MQTT pacer connect stages", nullptr },
+  { "pacetail",  'k', &DebugSection::bPaceTail,       "MQTT pacer override sweep and stats", nullptr },
 #endif
   { "mqttgate",  'g', &DebugSection::bMQTTGate,       "MQTT Gating",              nullptr },
   { "ntp",       'n', &DebugSection::bNTP,            "NTP",                      nullptr },

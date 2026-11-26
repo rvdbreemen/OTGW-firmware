@@ -346,6 +346,13 @@ int main() {
   printf("conn_set|%d|%d|%d\n", errc, fc ? 1 : 0, (int)d.bPaceConn);
   const DebugFlagDef* kc = debugFlagByKey('c');
   printf("conn_key|%s\n", kc ? kc->name : "-");
+  // cut 4: the override sweep and stats switch
+  printf("tail_default|%d\n", (int)state.debug.bPaceTail);
+  int errt = -9;
+  const DebugFlagDef* ft = debugFlagSet(d, "pacetail", "false", &errt);
+  printf("tail_set|%d|%d|%d\n", errt, ft ? 1 : 0, (int)d.bPaceTail);
+  const DebugFlagDef* kt = debugFlagByKey('k');
+  printf("tail_key|%s\n", kt ? kt->name : "-");
   return 0;
 }
 """
@@ -386,6 +393,9 @@ class PrereleaseFlag(unittest.TestCase):
         self.assertEqual(o["conn_default"], ["1"])
         self.assertEqual(o["conn_set"], ["0", "1", "0"])
         self.assertEqual(o["conn_key"], ["paceconn"])
+        self.assertEqual(o["tail_default"], ["1"])
+        self.assertEqual(o["tail_set"], ["0", "1", "0"])
+        self.assertEqual(o["tail_key"], ["pacetail"])
 
     def test_without_prerelease_there_is_no_row_and_the_gate_is_the_flag_on(self):
         o = self.run_variant(False)
@@ -399,6 +409,9 @@ class PrereleaseFlag(unittest.TestCase):
         self.assertEqual(o["conn_default"], ["1"])
         self.assertEqual(o["conn_set"], ["1", "0", "1"], "unknown name, the connect switch stays true")
         self.assertEqual(o["conn_key"], ["-"])
+        self.assertEqual(o["tail_default"], ["1"])
+        self.assertEqual(o["tail_set"], ["1", "0", "1"], "unknown name, the tail switch stays true")
+        self.assertEqual(o["tail_key"], ["-"])
 
 
 if __name__ == "__main__":

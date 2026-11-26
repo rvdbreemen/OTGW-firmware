@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : SATmqttPublish.h
-**  Version  : v2.0.0-beta.446
+**  Version  : v2.0.0-beta.447
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -121,6 +121,14 @@ uint32_t dripPaceLiveCount();       // drip ticks the liveness bound let through
 static constexpr bool kMqttPaceConnOn = true;
 uint32_t connPaceNoCount();         // connect portions the pacer refused at least once since boot (counted once per portion)
 uint32_t connPaceLiveCount();       // connect portions the 5 s bound let go without a yes since boot
+// Cut 4 (TASK-2949.9, the stale override sweep and the hourly stats in MQTTstuff.ino): kMqttPaceTailOn is its compile-time
+// default, false = the sweep waits on CONN_STAGE_MAX_OUTBOX and the stats have no outbox gate, as before the cut; the runtime
+// switch is state.debug.bPaceTail. One counter pair per producer (a step refused at least once, a step the bound let go).
+static constexpr bool kMqttPaceTailOn = true;
+uint32_t ovrPaceNoCount();
+uint32_t ovrPaceLiveCount();
+uint32_t statsPaceNoCount();
+uint32_t statsPaceLiveCount();
 
 // ---------------------------------------------------------------------------
 // Per-field float tolerances (per ADR-111 sub-rule 4, guideline-level).

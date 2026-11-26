@@ -83,7 +83,13 @@ struct {
            iMinMaxBlock = 9, iMaxLoopGapMs = 10; uint32_t aMaxBlockBucket[5] = {11, 12, 13, 14, 15}; } heapdiag;
   struct { uint32_t iVerifyRunCount = 16, iRepublishTriggeredCount = 17, iLastMissingCount = 18, iLastOrphanCount = 19,
            iPublishedTopicCount = 20, iLastVerifyEpoch = 21, iLastDailyHealEpoch = 22; } discovery;
+  struct { bool bPaceTail = true; } debug;
 } state;
+// ADR-265 cut 4: this test pins the stats pacer without an outbox gate; tests/test_mqtt_pacer_tail.py covers the pacer path
+static constexpr bool kMqttPaceTailOn = false;
+struct PaceGate {};
+static PaceGate sStatsPaceGate;
+static bool paceGateStep(PaceGate&, uint32_t) { return true; }
 """
 
 MAIN = r"""

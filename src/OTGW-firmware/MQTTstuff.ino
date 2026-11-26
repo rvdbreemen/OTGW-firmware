@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : MQTTstuff
-**  Version  : v2.0.0-beta.446
+**  Version  : v2.0.0-beta.447
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **      Modified version from (c) 2020 Willem Aandewiel
@@ -1274,6 +1274,9 @@ static void heapPaceLine() {
           (unsigned long)satPaceNoCount(), (unsigned long)satPaceLiveCount(), (int)state.debug.bPaceSat,
           (unsigned long)dripPaceNoCount(), (unsigned long)dripPaceLiveCount(), (int)state.debug.bPaceDrip,
           (unsigned long)connPaceNoCount(), (unsigned long)connPaceLiveCount(), (int)state.debug.bPaceConn);
+  DebugTf(PSTR("[HEAP] pace tail ovr no=%lu live=%lu stats no=%lu live=%lu sw=%d\r\n"),
+          (unsigned long)ovrPaceNoCount(), (unsigned long)ovrPaceLiveCount(),
+          (unsigned long)statsPaceNoCount(), (unsigned long)statsPaceLiveCount(), (int)state.debug.bPaceTail);
 }
 
 static void satTakeoverHeapTraceFinish() {
@@ -1942,11 +1945,36 @@ static void connStageTick() {
 // dipped the free heap ~50 KB on a board without PSRAM). About 40 labels, so the sweep ends a few seconds after connect.
 constexpr uint32_t OVR_CLEAR_GAP_MS = 100;
 static uint32_t sOvrClearMs = 0;
+
+// ADR-265 cut 4 (TASK-2949.9): the stale override sweep and the hourly stats ask the shared pacer. One gate state per producer:
+// the first refusal of a step is counted once (no), a step that goes after MQTT_PACE_MAX_WAIT_MS without a yes is counted once
+// more (live) and the wait starts afresh. With the switch off (kMqttPaceTailOn or state.debug.bPaceTail false) the sweep waits
+// on CONN_STAGE_MAX_OUTBOX as before the cut and the stats pacer has no outbox gate, as before.
+struct PaceGate { uint32_t since = 0; bool counted = false; uint32_t no = 0; uint32_t live = 0; };
+static bool paceGateStep(PaceGate& g, uint32_t now);   // own prototype: the builder's auto-prototype would sit above the struct (tests/test_ino_prototype_hoisting.py)
+static bool paceGateStep(PaceGate& g, uint32_t now) {
+  if (mqttPaceAllows()) { g.since = 0; g.counted = false; return true; }
+  if (!g.counted) { g.counted = true; ++g.no; }
+  if (g.since == 0) g.since = now ? now : 1;
+  if ((uint32_t)(now - g.since) >= MQTT_PACE_MAX_WAIT_MS) { g.since = 0; g.counted = false; ++g.live; return true; }
+  return false;
+}
+static PaceGate sOvrPaceGate;
+static PaceGate sStatsPaceGate;
+uint32_t ovrPaceNoCount()    { return sOvrPaceGate.no; }
+uint32_t ovrPaceLiveCount()  { return sOvrPaceGate.live; }
+uint32_t statsPaceNoCount()  { return sStatsPaceGate.no; }
+uint32_t statsPaceLiveCount(){ return sStatsPaceGate.live; }
+
 static void staleOverrideClearTick() {
   if (sConnStage != 0) return;
   const uint32_t now = millis();
   if ((uint32_t)(now - sOvrClearMs) < OVR_CLEAR_GAP_MS) return;
-  if ((uint32_t)MQTTclient.queueSize() > CONN_STAGE_MAX_OUTBOX) return;
+  if (kMqttPaceTailOn && state.debug.bPaceTail) {
+    if (!paceGateStep(sOvrPaceGate, now)) return;
+  } else if ((uint32_t)MQTTclient.queueSize() > CONN_STAGE_MAX_OUTBOX) {
+    return;
+  }
   if (staleOverrideClearStep()) sOvrClearMs = now;
 }
 // Post-connect pace window (TASK-1757, beta.215 probes): right after CONNACK the SAT
@@ -2531,6 +2559,7 @@ void loopMQTTStatsPacer(){
   const uint32_t now = millis();
   if ((uint32_t)(now - statsPaceLastMs) < STATS_PACE_MS) return;
   if (getHeapHealth() == HEAP_CRITICAL) return;   // wait; canPublishMQTT() would drop it
+  if (kMqttPaceTailOn && state.debug.bPaceTail && !paceGateStep(sStatsPaceGate, now)) return;   // ADR-265 cut 4
   statsPaceLastMs = now;
   if (!publishStatAt(statsPaceIdx) || ++statsPaceIdx >= STATS_COUNT) statsPaceIdx = STATS_IDLE;
 }
