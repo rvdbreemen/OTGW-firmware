@@ -2436,6 +2436,25 @@ static void satResetControlStateIfTargetChanged(float before)
   if (fabsf(settings.sat.fTargetTemp - before) >= SAT_TARGET_CHANGE_MIN_C) satResetControlState();
 }
 
+// The preset whose temperature equals `temp` (strictly within 0.05 C), else SAT_PRESET_NONE. One table for
+// the MQTT/web target path (satHandleTargetTemp) and the thermostat path (satAdoptThermostatSetpoint), so
+// both pick the same preset; when two presets hold the same value the first in this order wins.
+static SATPreset satPresetForValue(float temp)
+{
+  const struct { SATPreset preset; float val; } presets[] = {
+    { SAT_PRESET_COMFORT,  settings.sat.fPresetComfort  },
+    { SAT_PRESET_ECO,      settings.sat.fPresetEco      },
+    { SAT_PRESET_AWAY,     settings.sat.fPresetAway     },
+    { SAT_PRESET_SLEEP,    settings.sat.fPresetSleep    },
+    { SAT_PRESET_ACTIVITY, settings.sat.fPresetActivity },
+    { SAT_PRESET_HOME,     settings.sat.fPresetHome     },
+  };
+  for (uint8_t i = 0; i < sizeof(presets) / sizeof(presets[0]); i++) {
+    if (fabsf(temp - presets[i].val) < 0.05f) return presets[i].preset;
+  }
+  return SAT_PRESET_NONE;
+}
+
 void satHandlePreset(const char* value)
 {
   SATPreset newPreset = SAT_PRESET_NONE;
@@ -2503,21 +2522,38 @@ void satHandlePreset(const char* value)
 // fPreCustomTemp: that restore would put the old pre-preset temperature back over the value the
 // user just chose. fPreCustomTemp is cleared so a later preset-none does not restore a stale value.
 // The target itself goes through updateSetting("SATtargettemp"), the same code a REST/MQTT target
-// change ends in (5-30 C clamp, deferred persist). satHandleTargetTemp() is not used here because
-// it maps a target that equals a preset value back onto that preset, which would undo the clear.
+// change ends in (5-30 C clamp, deferred persist); a real change clears the preset and the window
+// switch there. TASK-3032 (entry 465, amends entry 25 for this case only): when the thermostat value
+// equals a preset value (satPresetForValue, within 0.05 C) that preset becomes active after the
+// clear, with the thermostat value as target and fPreCustomTemp 0, so "preset off" later keeps the
+// thermostat value. The preset topic is published once, with the final state. A value that matches no
+// preset leaves the preset cleared.
 static void satAdoptThermostatSetpoint(float tr)
 {
   char valBuf[12];
   dtostrf(tr, 1, 1, valBuf);
   const bool hadPreset = (state.sat.eActivePreset != SAT_PRESET_NONE);
+  const SATPreset matched = satPresetForValue(tr);
   state.sat.eActivePreset  = SAT_PRESET_NONE;
   state.sat.fPreCustomTemp = 0.0f;
   updateSetting("SATtargettemp", valBuf);
+  if (matched != SAT_PRESET_NONE) {
+    // A window switch that updateSetting() left standing (the value equals the current target) ends
+    // here as it does for a preset chosen over MQTT, unless the thermostat chose the activity preset itself.
+    if (state.sat.fPreWindowTarget > 0.0f && matched != SAT_PRESET_ACTIVITY) {
+      state.sat.fPreWindowTarget   = 0.0f;
+      state.sat.fPreActivityTemp   = 0.0f;
+      state.sat.iPreWindowPreset   = (uint8_t)SAT_PRESET_NONE;
+      state.sat.iWindowOpenSinceMs = 0;
+    }
+    state.sat.eActivePreset = matched;
+  }
   _sat_followNarrPending = true;   // TASK-1521: narrated on the loop task (processOT holds the OT lock here)
   satTCNoteAdopted(settings.sat.fTargetTemp);   // the thermostat already has it: no TC= back (TASK-1272)
   SATDebugTf(PSTR("SAT: follow thermostat: target %.1f from thermostat setpoint%s\r\n"),
-             settings.sat.fTargetTemp, hadPreset ? ", preset cleared" : "");
-  if (hadPreset) satSyncPresetTopic(SAT_PRESET_NONE);
+             settings.sat.fTargetTemp,
+             (matched != SAT_PRESET_NONE) ? ", preset selected" : (hadPreset ? ", preset cleared" : ""));
+  if (matched != SAT_PRESET_NONE || hadPreset) satSyncPresetTopic(matched);
 }
 
 // Edge detector for "SAT target follows the thermostat setpoint" (TASK-1259). Pure: every input is an
@@ -4095,20 +4131,11 @@ bool satHandleTargetTemp(const char* value)
     // Auto-map to preset if temperature exactly matches a preset value (Task #218).
     // Mirrors Python climate.py:562-568 behaviour: set_temperature auto-activates the preset
     // so that HA preset display and MQTT preset topic stay in sync.
-    struct { const char* name; float val; } presets[] = {
-      { "comfort",  settings.sat.fPresetComfort  },
-      { "eco",      settings.sat.fPresetEco      },
-      { "away",     settings.sat.fPresetAway     },
-      { "sleep",    settings.sat.fPresetSleep    },
-      { "activity", settings.sat.fPresetActivity },
-      { "home",     settings.sat.fPresetHome     },
-    };
-    for (uint8_t i = 0; i < sizeof(presets) / sizeof(presets[0]); i++) {
-      if (fabsf(temp - presets[i].val) < 0.05f) {
-        SATDebugTf(PSTR("SAT: target %.1f matches preset '%s', activating preset\r\n"), temp, presets[i].name);
-        satHandlePreset(presets[i].name);
-        return true;
-      }
+    const SATPreset matched = satPresetForValue(temp);   // the table the thermostat path uses too (TASK-3032)
+    if (matched != SAT_PRESET_NONE) {
+      SATDebugTf(PSTR("SAT: target %.1f matches preset '%s', activating preset\r\n"), temp, satGetPresetName(matched));
+      satHandlePreset(satGetPresetName(matched));
+      return true;
     }
     // No preset match: go through updateSetting() to persist via deferred flush
     updateSetting("SATtargettemp", value);
