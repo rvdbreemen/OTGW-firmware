@@ -3,11 +3,11 @@ id: TASK-3014
 title: >-
   Web UI: clarify SAT multi-area vs multi-zone naming and grouping (gruijter
   suggestion)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-21T16:14:00Z'
-updated_date: '2026-11-21T17:38:00Z'
+updated_date: '2026-11-26T10:18:00Z'
 labels:
   - webui
   - sat
@@ -26,8 +26,8 @@ gruijter, #alpha-testing msg 1573733241079468133 (2026-11-21): 'multi-area' vs '
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [x] #1 Robert decides which of the three suggestions to take
-- [ ] #2 Web UI groups and labels changed as decided; settings keys, MQTT and REST unchanged; screenshots before/after
-- [ ] #3 Docs/help text use the same names
+- [x] #2 Web UI groups and labels changed as decided; settings keys, MQTT and REST unchanged; screenshots before/after
+- [x] #3 Docs/help text use the same names
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -92,4 +92,14 @@ Cost when approved: v2.js (labels, SAT_L2/L3 groups, two group explanation lines
 Open point for otgw-dev, not part of this task: settingsHelp.h says Zone headroom is 'unused with 4 zones or fewer' while Zone count allows 1 to 4, so as written the headroom never applies. Either the help text or the range is off; worth a check before it gets a prominent place in the Zones group.
 
 2026-11-21 Robert approved the proposal as written (coordinator). Built on lane/ba-3014: SET_META labels (Sensor 1-4, Weight sensor 1-4, Average several room sensors, Number of sensors, Number of zones; sub 'Averaged room sensors'), SAT_L2 groups 'Averaged room sensors' (on/off, count, sensor+weight pairs 1-4) and 'Zones' (count, timeout, headroom) with a one-line explanation each (new .set-group-desc), Technical 'Sensors' keeps Error monitoring; settings.group.areas -> averaged_room_sensors, multi_area removed, zones and group_desc added; NL/DE/EL labels (NL no longer has 'Aantal zones' twice); settingsHelp.h texts area N -> sensor N+1 and settingsHelpGz.h regenerated (test_progmem_assets_deflated 4 passed). Keys, MQTT and REST unchanged. Test tests/webui/sat-areas-zones-groups.test.mjs: RED on origin/dev 0/2 (group 'Areas'; NL 'Aantal zones' twice), GREEN 2/2; sat-area-sensor-mapping, v2-settings-sat-followups, setting-hints-two-lines, settings-help 29/0, i18n-lang 6/0, lang-menu 7/0, i18n-no-hardcoded 3/0; evaluate --quick 0 failed. Screenshots before/after light+dark: OTGW-build-artifacts-safe/evidence-TASK-3014/shots/. Note on 'side by side': the SAT settings use a CSS multi-column flow (columns:300px), so the two groups are adjacent in the flow; whether they render next to or under each other depends on the width and the other groups (in the 1400 px screenshot with only these groups they stack). A fixed two-up row would leave that layout. AC3 (manuals ch04/ch05 EN and h04/h05 NL still say area/multi-area) goes to otgw-docs (deferred to 25 Nov).
+
+2026-11-26 otgw-webui check against origin/dev 14539282e: AC2 holds. Code ddf4b3a22 is in tags v2.0.0-beta.418, .428, .432 (CHANGELOG beta.415 line); test sat-areas-zones-groups red on old, green on new, screenshots in OTGW-build-artifacts-safe/evidence-TASK-3014/shots/ (note of 2026-11-21). AC3 open on one point: EN manual ch05 5.14 uses 'Averaged room sensors' and 'Zones' (81f1e5dc0), but NL manual h05 line 471 says 'Gemiddelde ruimtesensoren' while the NL web UI pack (i18n/nl.json:958) says 'Gemiddelde kamersensoren'. h05 line 42 and 469/487 still use 'Multi-area'. Not closed; needs the one NL word fixed (otgw-docs or me with a docs slot).
+
+2026-11-26 AC3 verified on origin/dev 9f3b8af60 (otgw-docs): NL h05 uses 'Gemiddelde kamersensoren', 'Meerdere kamersensoren middelen' (lines 42, 469, 487), group names match nl.json; EN ch05 5.14 matches since 81f1e5dc0. Residual wording in h05 line 471: 'temperatuurinvoerzones' and 'area-temperaturen' (old terms, not group names).
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+AC1: Robert agreed 2026-11-21 (all three suggestions, design approved as written). AC2: ddf4b3a22, in beta.418/.428/.432; tests/webui/sat-areas-zones-groups.test.mjs red on old (0/2), green on new (2/2); settings-help 29/0, i18n gates green, evaluate --quick 0 failed; before/after screenshots light+dark in OTGW-build-artifacts-safe/evidence-TASK-3014/shots/; keys, MQTT, REST unchanged. Not verified: groups render side by side only when the multi-column flow allows (stacked in the 1400 px shot). AC3: EN ch05 (81f1e5dc0) and NL h05 (9f3b8af60) use the UI group names; checked by grep on origin/dev 9f3b8af60.
+<!-- SECTION:FINAL_SUMMARY:END -->
