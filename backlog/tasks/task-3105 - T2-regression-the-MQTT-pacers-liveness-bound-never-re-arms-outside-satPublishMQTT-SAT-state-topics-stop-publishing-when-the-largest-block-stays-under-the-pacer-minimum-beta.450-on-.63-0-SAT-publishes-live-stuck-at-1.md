@@ -8,6 +8,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-26T11:42:00Z'
+updated_date: '2026-11-26T11:58:00Z'
 labels:
   - bug
   - mqtt
@@ -28,3 +29,9 @@ Bench-tester on .63, 2.0.0-beta.450+944e29d, SAT on: R1 (beta.438) published 7-1
 - [ ] #2 Full run_tests.py and evaluate --quick green on the fix commit
 - [ ] #3 Bench on .63 (bench-tester): SAT-on echo of a set within 6 s, 10 of 10, zero silence over 5 min with a changing value, SAT topic traffic back at about the R1 rate (10-18 per 5 min) before the soak
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Follow-up list (coordinator 2026-11-26, all in TASK-3103 unless noted): (1) shadow update only after a successful send, with a host test of the retry path on the real helpers (publishIfChanged* sets the shadow before sendMQTTData returns, SATmqttPublish.cpp:113-117; sendMQTTData also returns false for MQTT off / publish not allowed / canPublishMQTT false); (2) ask mqttPaceAllows() once per loop pass and cache the answer (hd_pace_sat_no ~4000/s on .63 before this fix, heap walk per ask), measured cost before/after; (3) calibrate MQTT_PACE_MIN_BLOCK (now 17408 = 16384 + 1024 margin, not measured) and MQTT_PACE_MAX_OUTBOX against the steady largest block and outbox of .63 and .61; (4) bench check that drip, connect stage, override sweep and hourly stats, which share mqttPaceAllows() with their own 5 s liveness, do not all force together after a long closed gate (counters hd_pace_*_no/_live).
+<!-- SECTION:NOTES:END -->
