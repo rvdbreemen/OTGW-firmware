@@ -3,11 +3,11 @@ id: TASK-1995
 title: >-
   Loop stalls of 180-430 ms during the SAT status MQTT burst (split from
   TASK-1989)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-16T06:28:00Z'
-updated_date: '2026-11-25T06:39:00Z'
+updated_date: '2026-11-26T20:40:00Z'
 labels:
   - performance
 milestone: 2.0.0
@@ -73,3 +73,9 @@ AC2 bench evidence by 09 (2026-11-18, .61, app only, SAME 369 FS, 62 min each): 
 
 2026-11-18 field evidence (gruijter, OTGW Classic + S3, beta.356+cf29dd1, SAT off; capture 20261117-212615, #alpha-testing 1572709052100640932, unpacked by 92): Task watchdog reboot 2026-11-18 01:47:55 local, loopTask (CPU 1). ELF matched by SHA-256 (f3c4ef89055299e0 = OTGW-worktree-leftovers/wt-95-1960-build-20261116/OTGW-firmware-esp32-combo-2.0.0-beta.356+cf29dd1.elf); full core dump decoded with esp_coredump + xtensa-esp32s3-elf-gdb: #0 spi_flash_disable_interrupts_caches_and_other_cpu (cache_utils.c:176) <- esp_flash_read (128 B) <- esp_partition_read <- littlefs_esp_part_read <- lfs_bd_read <- lfs_dir_get <- lfs_fs_traverse_ (cb lfs_fs_size_count) <- lfs_fs_size <- esp_littlefs_info <- LittleFS.usedBytes <- platformFSInfo (platform_esp32.h:170) <- loopLittleFSStatus (helperStuff.ino:268, the 60 s mount check on the loop task) <- doBackgroundTasks (OTGW-firmware.ino:1115) <- loop. The loop task sat in a whole-filesystem traversal (one cross-core cache-disable per flash read) when the TWDT fired. This is the call Step B moved off the loop task: 41a9e44ed (beta.370, in public v2.0.0-beta.374): loopLittleFSStatus() only raises a request, fsHealthService() runs platformFSInfo() on the fsWriter task, which is not subscribed to the TWDT (esp_task_wdt_add only for the loop task, OTGW-Core.ino:1651/1785, and the MQTT task). Not determined: why the other CPU did not park quickly (the dump's other-core frames are ROM 0x400559e0, no ROM ELF loaded). Same class as TASK-1865/1899 (cross-core flash read), different caller. Field check: no loopTask TWDT with a platformFSInfo/lfs_fs_size stack on beta >= 370. Decode: scratchpad cd-gruijter-356.txt (otgw-dev session).
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+AC1 (capture naming the slowest step of the loop stalls): ticked; Step A instrumentation commit d6c2e0483 (first tag v2.0.0-beta.374), capture and Step B bench PASS in the task notes (beta.370: 0 stalls in 62 min). AC2 (fix with old-against-fix numbers): ticked; fix commit 41a9e44ed (LittleFS write probe and mount check run on the fsWriter task), first tag v2.0.0-beta.374; notes record 2 stalls on beta.369 against 0 on beta.370 plus 41a9e44. Related commit 3bd8e9112 (TASK-1989 fsWriter task), first tag v2.0.0-beta.360. Status closed from backlog evidence 2026-11-26; no new test run in this step.
+<!-- SECTION:FINAL_SUMMARY:END -->

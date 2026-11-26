@@ -1,11 +1,11 @@
 ---
 id: TASK-3051
 title: 'Web UI 390 px: Advanced PIC firmware table first column truncated'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-25T10:04:00Z'
-updated_date: '2026-11-26T09:10:00Z'
+updated_date: '2026-11-26T20:40:00Z'
 labels:
   - webui
   - ux
@@ -33,3 +33,9 @@ Fix: v2.css, @media max-width 719px stacks .picrow (name on its own wrapping lin
 
 R1 bench .63: 390 px light/dark screenshots S12-{light,dark}-{390,1400}.png in OTGW-field-data/bench-63/2026-11-25_cand-0827/screenshots-3051 (synthetic data).
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+AC1 (PIC firmware file names readable at 390 px): ticked; fix commit 18e0f61e2 (v2.css stacks .picrow below 720 px), first tag v2.0.0-beta.438; test tests/webui/pic-table-390-3051.test.mjs 4 pass on the fix, 2 fail on origin/dev data (per notes). AC2 (browser test and light/dark screenshots at 390 px): ticked; host screenshots in the notes and R1 bench .63 screenshots, tick commit fe76e9e47. Status closed from backlog evidence 2026-11-26; no new test run in this step.
+<!-- SECTION:FINAL_SUMMARY:END -->

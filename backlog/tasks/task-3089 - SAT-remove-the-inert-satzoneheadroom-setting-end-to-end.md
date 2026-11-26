@@ -1,11 +1,11 @@
 ---
 id: TASK-3089
 title: 'SAT: remove the inert satzoneheadroom setting end to end'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-25T19:19:00Z'
-updated_date: '2026-11-26T09:31:00Z'
+updated_date: '2026-11-26T20:40:00Z'
 labels:
   - sat
   - settings
@@ -39,3 +39,9 @@ Evidence: tests/test_sat_zone_headroom_removed.py 8 pass on the fix; with OTGW_S
 
 R1 final base 890b08680: evaluate --quick 100 % (89 pass, 0 fail); full run_tests.py 377/380, remaining 2 = README governance (fixed, 17/17) and a host-compile timeout under load (test_sat_loop_integration 21/21 alone).
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+AC1 to AC5: all ticked in the task file. Shipped in commit fdef714e1 ('SAT: remove the inert satzoneheadroom setting end to end'), first tag v2.0.0-beta.438; the evidence (removal test red on origin/dev and green on the fix, old settings.ini source check, SAT zone aggregation tests, evaluate --quick 88 pass 0 fail, webui suite) is in the implementation notes. Bench check of an old settings.ini with the key: tick commit fe76e9e47 (R1 bench ACs). Status closed from backlog evidence 2026-11-26; no new test run in this step.
+<!-- SECTION:FINAL_SUMMARY:END -->

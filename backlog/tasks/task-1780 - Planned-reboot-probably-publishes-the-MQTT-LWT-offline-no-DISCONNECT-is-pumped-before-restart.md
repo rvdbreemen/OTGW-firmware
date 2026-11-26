@@ -3,11 +3,11 @@ id: TASK-1780
 title: >-
   Planned reboot probably publishes the MQTT LWT 'offline': no DISCONNECT is
   pumped before restart
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-10T14:30:00Z'
-updated_date: '2026-11-20T10:59:00Z'
+updated_date: '2026-11-26T20:40:00Z'
 labels:
   - mqtt
   - bug
@@ -50,3 +50,9 @@ SUPPORTING EVIDENCE for AC2(b), NOT the HA observation (09, 2026-11-17 ~01:00). 
 
 2026-11-20 bench (09, otgw-bench-tester), AC2 evidence. Broker side, .61 401+47d08b1, mosquitto_sub on OTGW/value/otgw-1020BA21B4F8: REST /ReBoot 02:08:05.737 -> 'offline' 02:08:06.823 (1.09 s after the request, before the restart) -> boot 02:08:22 -> 'online' birth 02:08:24.483 (OTGW-field-data/bench-otgw32/2026-11-20_task1780-ac2-broker/avail.log). HA side, rig HA (setup_rig.py), .63 beta.402+b885f3d, entities scoped by unique_id otgw-AC276ECE45D8-*: /ReBoot 11:52:46.214 -> status_master/status_slave/outside_temperature/binary_sensor 'unavailable' at t+0.7 s, back at t+10.7 s (same in a first run at 11:48: t+0.7 s / t+10.8 s); HA error_log 0 mqtt lines (OTGW-field-data/bench-63/2026-11-20_ha-1780-1949/ha1780.log, ha_error_log.txt). No HA screenshots: REST/entity-registry + error_log are the evidence (coordinator: sufficient, no rerun).
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+AC1 (reproduction with a broker log, beta.257 against fix beta.353): ticked, evidence commit 1dde4dcda (task notes). AC2 (publish 'offline' retained before the clean disconnect on a planned reboot): ticked, fix commit 79c6c7ce0, first tag v2.0.0-beta.294; bench evidence on the HA rig ticked in commit c673e878d. Status closed from backlog evidence 2026-11-26; no new test run in this step.
+<!-- SECTION:FINAL_SUMMARY:END -->
