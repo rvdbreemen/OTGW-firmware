@@ -11838,6 +11838,70 @@
         "supersedes": [],
         "superseded_by": null
       }
+    },
+    {
+      "id": "ADR-298",
+      "title": "Grow the 4MB app slot to 2304K and shrink LittleFS to 704K, with a one-time USB migration (amends ADR-191)",
+      "path": "ADR-298-grow-the-4mb-app-slot-to-2304k-and-shrink-littlefs-to-704k-with-a-one-time-usb-migration-amends-adr-191.md",
+      "format": "canonical",
+      "status": "Proposed",
+      "date": "2026-11-26",
+      "decision_summary": "All three 4MB targets (esp32, esp32-classic, esp32-combo) move to one new table.",
+      "topics": [
+        "app-size",
+        "flash-layout",
+        "migration",
+        "partition-table"
+      ],
+      "aliases": [
+        "repartition",
+        "safeboot2"
+      ],
+      "components": [
+        "4MB partition layout",
+        "USB layout detection"
+      ],
+      "symbols": [],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [
+          "Change the layout in one place, partitionsotgwesp32.csv, and keep every mirror equal to it in the same commit: build.py:92-98 and its migrate images, flashotgw.bat:74-79, flashotgw.sh:104-106, flashesp.py:52-53, scripts/checkappsize.py,...",
+          "Detect the layout of a connected unit by the app0 size in its table (0x230000 = safeboot, 0x240000 = safeboot2) in flashotgw.bat, flashotgw.sh and flashesp.py. Refuse --update when the unit's layout differs from the images' layout and po...",
+          "Make the main firmware's file-system update refuse an image whose LittleFS block count differs from the partition, before it erases anything. Reason (read, otgw-dev): OTGW-ModUpdateServer-esp32.h:653-673 accepts an image smaller than the...",
+          "Report the layout: a partitionlayout field (legacy, safeboot, safeboot2) in /api/v2/device/info, a boot log line on telnet, and a warning on the /update page when the running layout is older than the firmware expects.",
+          "Build the migrate image pair for the new table and let --migrate accept a safeboot unit as its source.",
+          "Say in the release notes of the first release with this table: every existing 4MB unit needs one --migrate over USB; an over-the-air update alone is not enough; a migrated unit is rolled back only with the old release's full merged image..."
+        ],
+        "must_not": [
+          "Rewrite the partition table from the running firmware or from safeboot. read (otgw-dev, in the hybrid-build tree wt-d3-trim, sdkconfig.defaults:3151; the shipped libs sdkconfig.h:1438 alike) sets CONFIGSPIFLASHDANGEROUSWRITEABORTS=y, and...",
+          "Change the safeboot, nvs, otadata or coredump partitions.",
+          "Ship a release with the new table while any tool still detects the layout by the \"safeboot\" string only."
+        ],
+        "exceptions": [
+          "None. There is no 8MB target in the tree today (read, otgw-dev: platformio.ini:117-120, one CSV); the ADR-191 exception for 8MB boards stays as it is."
+        ],
+        "verification": [
+          "Host tests (to be written with the code, red on the old code): every mirror equals the CSV; the three USB tools refuse --update on a layout mismatch; the file-system update refuses an image with a different block count.",
+          "Build log: app image against the new app0 under the 98 % gate; LittleFS budget against 704K.",
+          "Bench, by otgw-bench-tester, on one unit still on the safeboot table and on .63, with capture transcripts. not verified until it has run:",
+          "an over-the-air update with the new zip through the browser and through scripts/otaflash.py: the file-system step is refused and nothing changes;",
+          "--update with new images on the old table: refused;",
+          "--migrate: settings.ini and dallaslabels.ini with 0 differences, WiFi kept, duration measured;",
+          "rollback with the old release's full merged image: the old layout comes back and boots.",
+          "Whether the ADR-233 RTC (real-time clock) snapshot restores settings after a failed mount: not verified, to be checked on the same bench run."
+        ]
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
     }
   ],
   "relationships": [
@@ -19602,6 +19666,42 @@
     {
       "source": "ADR-297",
       "target": "ADR-296",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-298",
+      "target": "ADR-077",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-298",
+      "target": "ADR-191",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-298",
+      "target": "ADR-194",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-298",
+      "target": "ADR-210",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-298",
+      "target": "ADR-218",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-298",
+      "target": "ADR-233",
       "type": "related",
       "resolved": true
     }

@@ -279,3 +279,4 @@ One row per Architecture Decision Record. Scope is the Enforcement `path_glob` s
 | ADR-295 | Proposed | - | At CRITICAL heap, ADR-107 action 1 aborts every /ws TCP connection in lwIP, with a RST, instead of otLogWs.closeAll(). |
 | ADR-296 | Accepted | - | SAT keeps one PWM ON clock per flame. |
 | ADR-297 | Accepted | - | This ADR amends ADR-236 in three points. |
+| ADR-298 | Proposed | - | All three 4MB targets (esp32, esp32-classic, esp32-combo) move to one new table. |

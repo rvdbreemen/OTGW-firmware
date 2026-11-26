@@ -557,7 +557,7 @@ Counts above are advisory rather than hand-maintained; the canonical set is the 
   On a 4 MB partition table with one app slot, an app-image OTA write targets the running partition and bricks the device (empirically confirmed, TASK-959). Firmware/app OTA is therefore rejected outright on any board with no spare `ota_X`; LittleFS OTA over WiFi is unaffected. The check is dynamic (`hasSpareAppOtaSlot()` compares the running partition against the next update slot), not board-name-based, so it re-enables itself automatically if a future 8 MB module gains an `ota_1`. Enforced at two layers: the backend before any `Update.begin()`, and the `/update` page hiding the firmware form via `app_ota_available`. Superseded by ADR-191: 4MB boards now update firmware over WiFi through a safeboot factory partition.
 
 - **[ADR-191: Update firmware over WiFi on 4MB boards through a safeboot factory partition](ADR-191-update-firmware-over-wifi-on-4mb-boards-through-a-safeboot-factory-partition.md)** 🆕 *(Accepted)*  
-  Supersedes ADR-166. The 4MB layout gets a safeboot updater in the factory partition (0x10000, 960K), one app slot ota_0 (0x100000, 2240K) and LittleFS (0x330000, 768K). The main firmware erases otadata and restarts into safeboot, which writes ota_0 and restarts into it; bootloader rollback returns to safeboot when the new image fails early. Units on the old layout need one USB `flash_otgw --migrate`.
+  Supersedes ADR-166. The 4MB layout gets a safeboot updater in the factory partition (0x10000, 960K), one app slot ota_0 (0x100000, 2240K) and LittleFS (0x330000, 768K). The main firmware erases otadata and restarts into safeboot, which writes ota_0 and restarts into it; bootloader rollback returns to safeboot when the new image fails early. Units on the old layout need one USB `flash_otgw --migrate`. ADR-298 (Proposed) would move the app0/LittleFS border by 64K.
 
 - **[ADR-240: A web connection that is not ESTABLISHED and holds no payload does not count towards the ADR-188 send cap](ADR-240-a-web-connection-that-is-not-established-and-holds-no-payload-does-not-count-towards-the-adr-188-send-cap.md)** 🆕 *(Accepted, amends ADR-188)*  
   A connection that is not ESTABLISHED counts only while a queued segment carries payload: a closing one with only its zero-length FIN and a half-open one with only its zero-length SYN-ACK no longer count, so a fresh page load is not refused with 503 by connections that hold no payload and no request. ESTABLISHED connections and the cap of 4 stay; ADR-188 stays Accepted apart from this rule (TASK-1947).
@@ -826,6 +826,8 @@ Counts above are advisory rather than hand-maintained; the canonical set is the 
 
 - **[ADR-236: SAT leaves PWM for continuous only when the flow stays at least 3.0 C under the request for 180 s, thermo-nova's underheat exit](ADR-236-sat-leaves-pwm-for-continuous-when-the-flame-is-on-and-the-request-stays-above-the-flow-for-60-s-replaces-the-thermo-nova-underheat-exit.md)** 🆕 *(Accepted)*  
   Guideline-level (ADR-080) with a test gate (`tests/test_sat_overshoot_sustain.py`). Sergeant D, entry 448 (Q-342b answer D): while PWM is ON and there is heating demand (no flame check, as thermo-nova), SAT goes to continuous only after flow <= request - 3.0 C for 180 s (thermo-nova heating_control.py:331-354). Replaces his entry-342 60 s rule, which looped 3-4 times per night burn on indigo_light (replay 0 with this rule). With ADR-254 (2.0 C / 60 s in) the hysteresis is 2.0 C in, 3.0 C out. Amended by ADR-297 (entries 456 and 463: the 180 s flame gate on this exit; at-max keeps only the start gate).
+- **[ADR-298: Grow the 4MB app slot to 2304K and shrink LittleFS to 704K, with a one-time USB migration (amends ADR-191)](ADR-298-grow-the-4mb-app-slot-to-2304k-and-shrink-littlefs-to-704k-with-a-one-time-usb-migration-amends-adr-191.md)** 🆕 *(Proposed, amends ADR-191)*  
+  Robert chose route A on 2026-11-26 (DM 1575388418098069604) to fit remote telemetry under the 98 % app gate: app0 0x100000 to 2304K, LittleFS 0x340000 at 704K, layout name `safeboot2`. One USB `--migrate` per existing 4MB unit; the USB tools detect the layout by app0 size and refuse `--update` on a mismatch; the file-system update refuses an image with a different block count. Waits for Robert's acceptance and the bench run.
 - **[ADR-297: SAT's underheat exit counts only once the flame has burned 180 s; the at-max exit keeps only the 60 s start gate (amends ADR-236)](ADR-297-sat-s-underheat-exit-counts-only-once-the-flame-has-burned-180-s-the-at-max-exit-keeps-only-the-60-s-start-gate-amends-adr-236.md)** 🆕 *(Accepted, amends ADR-236)*  
   Guideline-level (ADR-080) with a host test gate (`tests/test_sat_overshoot_sustain.py`, TASK-3008). Sergeant D, entry 456: the 180 s underheat hold of ADR-236 only counts once the flame has burned 180 s since its current flame-on edge (earliest exit about 6 min after ignition); entry 463: the at-max exit keeps only the 60 s start gate (ADR-252). Replaces ADR-236's Must Not on a flame condition; the rest of ADR-236 stands.
 - **[ADR-296: SAT keeps one PWM ON clock per flame: a switch to continuous freezes it, a PWM re-entry resumes it, and the minimum burn counts from the real flame-on](ADR-296-sat-keeps-one-pwm-on-clock-per-flame-a-switch-to-continuous-freezes-it-a-pwm-re-entry-resumes-it-and-the-minimum-burn-counts-from-the-real-flame-on.md)** 🆕 *(Accepted)*  
@@ -1147,10 +1149,10 @@ Generated by `bin/adr-index`. Do not edit between the sentinels.
 
 | Metric | Count |
 | --- | ---: |
-| Total ADRs | 273 |
+| Total ADRs | 274 |
 | Accepted | 226 |
 | Amended | 1 |
-| Proposed | 1 |
+| Proposed | 2 |
 | Rejected | 2 |
 | Superseded | 42 |
 | Superseded by adr-124 | 1 |
@@ -1433,4 +1435,5 @@ Generated by `bin/adr-index`. Do not edit between the sentinels.
 | ADR-295 | Emergency heap recovery drops the /ws clients by aborting their TCP connections instead of a WebSocket close (partly supersedes ADR-107 action 1) | Proposed | 2026-11-22 | - | ADR-295-emergency-heap-recovery-drops-the-ws-clients-by-aborting-their-tcp-connections-instead-of-a-websocket-close-partly-supersedes-adr-107-action-1.md |
 | ADR-296 | SAT keeps one PWM ON clock per flame: a switch to continuous freezes it, a PWM re-entry resumes it, and the minimum burn counts from the real flame-on | Accepted | 2026-11-25 | - | ADR-296-sat-keeps-one-pwm-on-clock-per-flame-a-switch-to-continuous-freezes-it-a-pwm-re-entry-resumes-it-and-the-minimum-burn-counts-from-the-real-flame-on.md |
 | ADR-297 | SAT's underheat exit counts only once the flame has burned 180 s; the at-max exit keeps only the 60 s start gate (amends ADR-236) | Accepted | 2026-11-25 | - | ADR-297-sat-s-underheat-exit-counts-only-once-the-flame-has-burned-180-s-the-at-max-exit-keeps-only-the-60-s-start-gate-amends-adr-236.md |
+| ADR-298 | Grow the 4MB app slot to 2304K and shrink LittleFS to 704K, with a one-time USB migration (amends ADR-191) | Proposed | 2026-11-26 | - | ADR-298-grow-the-4mb-app-slot-to-2304k-and-shrink-littlefs-to-704k-with-a-one-time-usb-migration-amends-adr-191.md |
 <!-- adr-kit-index:end -->
