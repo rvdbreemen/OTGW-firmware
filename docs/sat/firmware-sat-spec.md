@@ -3882,6 +3882,23 @@ Compare (defaults that differ from thermo-nova): overshoot protection true here,
 
 <a id="s8-not-found-in-the-code-unclear"></a>
 
+### Frost guard (TASK-3021, ADR-294; Sergeant D entries 460, 461, 485)
+
+Decision (entries 460, 461, 485; Q-460a A): a fixed 6 C on and 7 C off, no setting, SAT off, no thermostat seen, a 30 C flow (`CS=30` with `CH=1`), release 2.0.0. Reference only (ADR-292, not a source of truth): thermo-nova develop `ba515c8`, `demand_control.py:610-622` (on at or below the threshold, off at threshold + 1, no room temperature means off) and `:815-828` (30 C), `const.py:31-32`. The released thermo-nova (`7beaaf5`) has no frost protection (comparison row 45); the guard is a deliberate difference.
+
+Behaviour, in time order, from `satFrostGuardService()` (`SATcontrol.ino`, called from the control loop also while SAT is off):
+
+1. Every 5 s (`SAT_FROST_EVAL_MS`) the guard evaluates. Nothing happens while a hand-back is pending, before 60 s after boot (`SAT_FROST_BOOT_GRACE_MS`, so a thermostat can show itself), in monitor mode, or while flashing.
+2. The guard drops out and sends nothing more when SAT owns the control setpoint or when a `CS=` from someone else is in force: a REST, MQTT or telnet value of 8 C or more counts for 130 s (`SAT_FROST_USER_CS_MS`, the PIC expiry is up to about 126 s). If the guard was active it just stops, without `CS=0`.
+3. The room temperature (`satFrostRoomTemp()`) comes only from the chosen BLE sensor or the external MQTT/REST room temperature, a measured value without simulation, fallback estimate or Summer Simmer, without changing the SAT room source that is reported. No averaged areas and no thermostat MsgID 24. No room temperature means the guard does nothing.
+4. The decision (`satFrostGuardDecide()`): not active and thermostat seen on the bus (`state.otBus.bThermostatState`): nothing. Not active and room at or below 6.0 C (`SAT_FROST_ON_C`): enter, send `CS=30.0` then `CH=1` through `addCommandToQueue()`, log `SAT: frost guard on`. Active and room at or above 7.0 C (`SAT_FROST_OFF_C`), or a thermostat appears, or the room temperature is lost: release with `CS=0`, log `SAT: frost guard off`. Active and still cold: repeat `CS=30.0` every `SAT_CS_REPEAT_MS`, because `CS=` expires on both boards unless repeated. Between 6.0 and 7.0 C the state is kept.
+5. One output for both boards: the PIC (gateway.asm 6.6 `readstatus`, CH enable only while a `CS=` is in force) and OT-Direct (`otdEffectiveMasterFlags`, the MsgID 1 override) both turn the two commands into CH enable on with a 30 C flow.
+6. State: `state.sat.bFrostGuardActive`, REST SAT state field `frost_guard_active`.
+
+Implementation choices (not in entries 460, 461, 485; ours): the 60 s boot grace, monitor mode, hand-back pending, flashing, the 5 s evaluation, the `CS=` repeat, the 130 s user `CS=` window, and the room chain cut to the chosen BLE sensor and the external sensor (entries 457 and 458 describe these sources). A unit whose room temperature comes only from Home Assistant areas therefore has no frost cover.
+
+Not verified: the PIC path is read from PIC 6.6 code (gateway.asm `readstatus`); its bench proof is the first one with this build. Host tests: `tests/test_sat_frost_guard.py`.
+
 ### Not found in the code / unclear
 
 1. **What the PIC or boiler does with MM while SAT sends nothing (DHW, fault, trip).** The firmware does not re-send MM in those states (C.11, C.14). Whether the PIC keeps or expires an MM override was not checked in PIC code.
@@ -3890,7 +3907,7 @@ Compare (defaults that differ from thermo-nova): overshoot protection true here,
 4. **`SAT_FB_THERMOSTAT_LOST`** is declared (`SATtypes.h:60`) but never assigned (search of all firmware files).
 5. **`fMaxSetpoint`** has no settings key, MQTT command or file entry (search for `fMaxSetpoint` and `SATmaxsetpoint`), so the "global" ceiling is fixed at its default 65 (`SATtypes.h:514`).
 6. **No `PM=25`** after CS was found in the firmware (search). Thermo-nova sends it on its OTGW-MQTT path without a stated reason.
-7. **No hard overheat cutoff and no frost protection** were found in the SAT code. Only the setpoint clamps and the cold cutoff exist (Behaviour G). A full search for frost logic in SAT files was not done beyond the files read here.
+7. **No hard overheat cutoff** was found in the SAT code. Only the setpoint clamps and the cold cutoff exist (Behaviour G). Frost protection exists only as the frost guard of the Boiler I/O section (TASK-3021), which runs while SAT is off. A full search for frost logic in SAT files was not done beyond the files read here.
 8. **`iHeatingSource` has no MQTT command** in `kSatMqttCmds` (`MQTTstuff.ino:655-747`). Whether REST exposes it was not checked.
 9. **Boot `PM=` collapse and the first-MM/CH skip** (Edge cases) are derived from reading the code. Neither was reproduced on a bench.
 10. **Effect of OT-Direct local state changes during simulation** (Behaviour E) was not traced.

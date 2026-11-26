@@ -710,6 +710,8 @@ a single HA device with `model: "BLE Sensor"`, `manufacturer: "BLE"`, and
 `via_device: <uniqueId>`. The state_topic field references the per-MAC
 topics in the table above.
 
+The four configs carry `avty_t` (the gateway availability topic, so the entities go unavailable when the gateway is offline) and `exp_aft: 1260` (expire_after, 21 minutes: a probe that sends no value for that long turns unavailable instead of keeping its last value) (TASK-2971.1). The SAT summary entities (`sat_ble_*`) are not changed. Topics, unique ids and names are unchanged.
+
 If `bDiscoveryPublished` was set but the publish failed (low heap, MQTT
 not yet connected, broker hiccup), the helper returns `false` and the
 caller retries on the next iBleInterval cycle - discovery is never
@@ -1261,7 +1263,7 @@ The firmware emits the following entity categories (`MQTTHaDiscovery.cpp` and th
 | Component | Count | Source | Notes |
 |-----------|-------|--------|-------|
 | `sensor` | 406 (`MQTT_HA_SENSOR_COUNT`) | PROGMEM table `mqttHaSensors[]` (indexed via `mqttHaSensorIndex[256]`) | Covers all OT numeric fields, status decoding, RBP, VH, solar, SAT sensor fan-out |
-| `binary_sensor` | 113 (`MQTT_HA_BINSENSOR_COUNT`) | PROGMEM table `mqttHaBinSensors[]` (first 76 rows indexed via `mqttHaBinSensorIndex[256]`) | Master/slave status bits, ASF flags, SAT health binaries. 37 of these rows have HA-core-style alias siblings (ADR-106); the discovery streamer publishes exactly one of the two name sets depending on `settings.mqtt.bUseLegacyOtTopics`. |
+| `binary_sensor` | 113 (`MQTT_HA_BINSENSOR_COUNT`) | PROGMEM table `mqttHaBinSensors[]` (first 76 rows indexed via `mqttHaBinSensorIndex[256]`) | Master/slave status bits, ASF flags, SAT health binaries. 37 of these rows have HA-core-style alias siblings (ADR-106); the discovery streamer publishes exactly one of the two name sets depending on `settings.mqtt.bUseLegacyOtTopics`. 25 rows carry a `device_class` since TASK-2971.2: `running` (flame, central heating, hot water, cooling), `problem` (fault flags) and `connectivity` (boiler and thermostat connected). The payload values stay `ON`/`OFF`; only the words Home Assistant shows change. |
 | `climate` | 2 | `streamClimateDiscovery(idx=0/1)` | 0 = Thermostat, 1 = DHW Control |
 | `number` | 1 | `streamNumberDiscovery()` | `Toutside_override` slider |
 | `switch` (SAT, TASK-284) | 15 (`SAT_HA_SWITCH_COUNT`) | `streamSatSwitchDiscovery(idx=0..14)` | See list below; idx 10 (`dhw_enable`) only when the boiler reports a storage tank (MsgID 3 HB3) |

@@ -279,6 +279,8 @@ SAT implementeert zes onafhankelijke verdedigingslagen. Bij elke activering van 
 
 De overdracht reset de PID. Die nullen worden ook op flash opgeslagen, behalve als het verlies komt vóór de eerste kamertemperatuur sinds de boot, of voordat de klok via NTP is gezet. Dan blijft de opgeslagen PID-toestand op flash staan, zodat een ketel die vlak na een boot traag antwoordt de warmstart-toestand niet wist (d06005d7d).
 
+**Vorstbeveiliging (SAT uit, geen thermostaat) (TASK-3021).** Als SAT is uitgeschakeld en de gateway geen thermostaat op de OpenTherm-bus ziet, houdt verder niets het huis meer vorstvrij. Daarvoor heeft de gateway een vaste vorstbeveiliging: is de kamertemperatuur 6 C of lager, dan vraagt de gateway de ketel om warmte met een aanvoersetpoint van 30 C, en dat stopt zodra de kamer weer 7 C is. Die twee temperaturen zijn vast; er is geen instelling. Het werkt hetzelfde op de OTGW Classic (via de PIC) als op het directe OpenTherm-board. De beveiliging heeft een kamertemperatuur nodig van de Bluetooth-sensor die je voor SAT hebt gekozen of van de externe kamertemperatuur; een kamertemperatuur die alleen uit Home Assistant-ruimten komt telt niet mee, dus een unit die alleen die heeft, heeft geen vorstdekking. Zonder kamertemperatuur doet de beveiliging niets, en met een verbonden thermostaat verandert er niets. Een `CS=`-waarde die je zelf instelt, gaat voor. Je ziet het in de telnetregels `SAT: frost guard on` en `SAT: frost guard off` en in het REST-veld `frost_guard_active` van de SAT-status.
+
 ---
 
 ### 5.7 Simulatiemodus

@@ -5,8 +5,21 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [2.0.0-beta.438] - 2026-11-26
+
+### Added
+- SAT: a fixed frost guard for a gateway without a thermostat: with SAT off and no thermostat on the OpenTherm bus, a room at or below 6 C (from the chosen BLE sensor or the external room temperature) gets a 30 C flow request with heating on until the room is back at 7 C. No setting; both board types; REST SAT state `frost_guard_active`. A `CS=` value you send yourself wins, the guard is released when the room temperature goes away, it does nothing in the first 60 s after boot, and with SAT on it stays off. Bench-tested on the OTGW Classic only; not tested with a thermostat on the bus, on the direct OpenTherm board or on a real boiler (TASK-3021).
+- Home Assistant: the entities of a paired BLE probe carry the gateway availability and expire after 21 minutes without a value (TASK-2971.1).
+
+### Changed
+- Home Assistant: 25 OpenTherm binary sensors get device classes (running, problem, connectivity), so flame, central heating, hot water, cooling, faults and connected states show readable words; the state values stay on and off (TASK-2971.2).
+- Web UI: the PIC firmware file table stays readable at 390 px (TASK-3051).
+- Docs: frost guard in the SAT chapter, the SAT specification and the REST description (TASK-3021).
+- Internal: comment-only change in the SAT code naming the overshoot switch margin `fPwmSwitchMargin` and the 3.0 C flame-out fail-safe (beta.437).
+- Internal: release and test tooling in scripts/ changed (publishing, load test sweep, replay fixtures); none of it is part of the firmware image.
+
 ### Removed
-- SAT: the setting `satzoneheadroom` is removed (TASK-3089). It had no effect: with at most 4 zones the zones ask for the highest zone output whatever its value. SAT behaviour is unchanged (the fixed 5.0 of thermo-nova stays). The key is gone from `GET /api/v2/settings` and `POST /api/v2/settings` answers 400 "Unknown setting name" for it; an integration that wrote the key must stop doing so. An old `settings.ini` that still has the key loads without error and drops it on the next save.
+- SAT: the setting `satzoneheadroom` is removed (TASK-3089). It had no effect: with at most 4 zones the zones ask for the highest zone output whatever its value. SAT behaviour is unchanged. The key is gone from `GET /api/v2/settings` and `POST /api/v2/settings` answers 400 "Unknown setting name" for it; an old `settings.ini` that still has the key loads without error and drops it on the next save.
 
 ## [2.0.0-beta.432] - 2026-11-25
 
@@ -1228,7 +1241,8 @@ Legacy release. See git history for details.
 
 Legacy releases. See git history for details.
 
-[Unreleased]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.432...HEAD
+[Unreleased]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.438...HEAD
+[2.0.0-beta.438]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.432...v2.0.0-beta.438
 [2.0.0-beta.432]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.428...v2.0.0-beta.432
 [2.0.0-beta.428]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.418...v2.0.0-beta.428
 [2.0.0-beta.418]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.410...v2.0.0-beta.418

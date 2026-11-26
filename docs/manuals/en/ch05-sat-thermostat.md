@@ -252,6 +252,8 @@ SAT implements six independent safety layers. Any single layer tripping sends `C
 
 The hand-back resets the PID. It also saves the zeros to flash, except when the loss comes before the first room temperature reading since boot, or before the clock is set by NTP. In those cases the saved PID state stays on flash, so a boiler that is slow to answer right after a boot does not wipe the warm-start state (d06005d7d).
 
+**Frost guard (SAT off, no thermostat) (TASK-3021).** When SAT is switched off and the gateway sees no thermostat on the OpenTherm bus, nothing else would keep the house from freezing. For that case the gateway has a fixed frost guard: when the room temperature is at or below 6 C, it asks the boiler for heat with a flow setpoint of 30 C, and it stops when the room is back at 7 C. The two temperatures are fixed; there is no setting. It works the same on the OTGW Classic (through the PIC) and on the direct OpenTherm board. The guard needs a room temperature from the Bluetooth sensor you chose for SAT or from the external room temperature; a room temperature that only comes from Home Assistant areas does not count, so a unit that has only that has no frost cover. Without a room temperature the guard does nothing, and with a thermostat connected nothing changes. A `CS=` value you set yourself takes precedence. You see it in the telnet lines `SAT: frost guard on` and `SAT: frost guard off` and in the REST SAT state field `frost_guard_active`.
+
 ---
 
 ### 5.8 Simulation Mode
