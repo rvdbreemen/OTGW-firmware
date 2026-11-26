@@ -11909,6 +11909,64 @@
         "supersedes": [],
         "superseded_by": null
       }
+    },
+    {
+      "id": "ADR-299",
+      "title": "Remote telemetry is opt-in and asked: off by default, a No in the dialog is final, a switch-off in Settings is asked again only after a new release",
+      "path": "ADR-299-remote-telemetry-is-opt-in-and-asked-off-by-default-a-no-in-the-dialog-is-final-a-switch-off-in-settings-is-asked-again-only-after-a-new-release.md",
+      "format": "canonical",
+      "status": "Proposed",
+      "date": "2026-11-26",
+      "decision_summary": "Remote telemetry is off until the user says yes, and the gateway asks the user in a dialog, at most at these moments.",
+      "topics": [
+        "consent",
+        "opt-in",
+        "privacy",
+        "remote-telemetry"
+      ],
+      "aliases": [
+        "ask logic",
+        "telemetry opt-in"
+      ],
+      "components": [
+        "remote telemetry consent rule"
+      ],
+      "symbols": [],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [
+          "Keep remote telemetry off unless the user turned it on, in the dialog or in Settings.",
+          "Compute ask on the device from the stored state with the one function above, and expose it as remotetelemetry.ask in /api/v2/health.",
+          "Treat a \"No\" in the dialog as final: no dialog after it, through any release, until the user turns it on.",
+          "Ask again after a switch-off in Settings only once a new release runs, compared by the release string, not the build.",
+          "Never ask, and ignore an \"on\" write, on a board without PSRAM.",
+          "Show the dialog standalone in the web UI, also on existing installs, not only in the setup wizard, with the text Robert approved (decision 4) and its NL, DE and EL translations."
+        ],
+        "must_not": [
+          "Turn remote telemetry on by default, by an update, or by a restore of settings that never held a yes from this user.",
+          "Ask again because of a developer build, a githash change or a reboot.",
+          "Change what is sent in the same change as the consent rule (decision 1)."
+        ],
+        "exceptions": [
+          "None."
+        ],
+        "verification": [
+          "A host table test that compiles the real rtel::askNow() (never set, on, off by prompt, off in Settings with the same release, off in Settings after a new release, no PSRAM), red on code without it, with mutants (offsrc ignored, release c...",
+          "A REST round-trip test: health has ask, the settings POST reads source, the \"on\" write is ignored without PSRAM (planned).",
+          "Bench on .63 by otgw-bench-tester, with a flash between two releases: the dialog appears after a switch-off in Settings and a new release, and not after a \"No\" in the dialog (TASK-3092 AC5, not verified)."
+        ]
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
     }
   ],
   "relationships": [
@@ -19709,6 +19767,36 @@
     {
       "source": "ADR-298",
       "target": "ADR-233",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-299",
+      "target": "ADR-080",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-299",
+      "target": "ADR-218",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-299",
+      "target": "ADR-263",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-299",
+      "target": "ADR-268",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-299",
+      "target": "ADR-290",
       "type": "related",
       "resolved": true
     }
