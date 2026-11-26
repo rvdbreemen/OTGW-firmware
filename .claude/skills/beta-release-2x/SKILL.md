@@ -207,6 +207,10 @@ from the file at create time.
 3. Health: `GET /api/v2/device/info` shows the new `fwversion`, PIC detected;
    after at least 5 minutes the bootcount has not moved (the flash itself adds 2:
    safeboot handover + new firmware), no crashlog (`GET /api/v2/device/crashlog`).
+   **MQTT preflight and PASS criterion** (Robert, DM 1575388089852108851, 2026-11-26): before the soak clock starts the unit reports `mqttconnected=true`
+   against a broker the bench owns (`otgw-bench-mqtt`, started per run, removed afterwards); the production NAS broker is not a soak dependency. If it is false
+   at the start, switch to the bench broker then (save `/api/v2/settings` first, restore after, record the switch in the board file). During the soak at least
+   99 % of the health samples must show `mqttconnected` true; a lower share fails the soak. Details: `docs/guides/agent-build-and-bench.md` (Soak preflight).
 4. If possible also run the user route: `/update` with the release zip in a browser.
 5. A failed bench check publishes nothing: fix, new commit, rebuild.
 

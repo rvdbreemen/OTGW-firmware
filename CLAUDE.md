@@ -24,6 +24,7 @@ This block is shared word for word by CLAUDE.md, AGENTS.md (Codex) and .github/c
 - **Finish every lane.** Push only after the gates and announced freezes allow it, then `git fetch --prune` and bring your own tree up to date with origin. Once `git cherry origin/dev <branch>` shows your work landed, delete your lane branch locally and on the remote and remove your worktree. Touch only your own branches and worktrees: another session's local commits, dirty tree or branch go to the coordinator. Leftover directories move to `RvdB/OTGW-worktree-leftovers/`, never a blind delete. Checklist: `docs/guides/worktrees.md` (Finish a lane).
 - **Gates.** `python evaluate.py --quick` shows no new FAIL. Build only through `build.bat` / `./build.sh`, never `python build.py` directly. Run the tests with `python scripts/run_tests.py`.
 - **Discord.** Answer in English (in #nederlandse-ondersteuning always in Dutch, Robert 2026-11-21), answer first, with the real `<@ID>` mention. OTGW32 may be named in public (Robert, 2026-11-22); it is a prototype board. Every SAT correction or decision by Sergeant D goes into `docs/sat/decisions/sergeant-d-corrections.md` before it is implemented.
+- **Status reports.** A status message that says committed, pushed or build started quotes the output of `git rev-parse --short HEAD` (or the first line of the build log) taken after the command returned, in the same call. Never report from the plan.
 <!-- AGENT-CORE END -->
 
 ---

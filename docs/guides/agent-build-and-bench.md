@@ -117,6 +117,12 @@ heap-frag soak, TASK-934):
   <ip> -DurationSeconds <N> -Topic "otgw-firmware/stats/#"` → one merged
   transcript (telnet debug + MQTT stream + browser devtools + crashlog + HTTP
   probes).
+- **Soak preflight: a bench-owned MQTT broker** (Robert, DM 1575388089852108851, 2026-11-26, "A"). Before the soak clock starts, the unit under soak reports
+  `mqttconnected=true` against a broker the bench owns: `otgw-bench-mqtt`, started for this run and removed afterwards. The production NAS broker is not a soak
+  dependency. `mqttconnected` is a counted PASS criterion: at least 99 % of the health samples of the soak must show it true. If it is false at the start,
+  switch the unit to the bench broker then: save `/api/v2/settings` first, restore it after the soak, and record the switch in the board file. Evidence: the
+  overnight soak of 2026-11-25/26 had 0 of 247 health samples MQTT-connected (`OTGW-field-data/_retro/2026-11-26.md`, finding 3), so the MQTT paths were not
+  soaked at all.
 - **Heap soak (TASK-934):** watch `otgw-firmware/stats/min_max_block`,
   `/maxblock_lt2k…ge16k`, `/max_loop_gap_ms` and the gating counters
   (`/drip_slowmode`, `/mqtt_drops`, `/ws_drops`, `/enter_*`). Telnet `z` zeroes the

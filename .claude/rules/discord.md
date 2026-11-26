@@ -29,3 +29,11 @@ Maintainer directive, 2026-11-11: every question about whether a boiler or therm
 - It is best effort, not a guarantee. Cite it as "the equipment matrix shows ..." with the model name as listed, and say when the model is missing or only partly covered.
 - When the model is missing or has gaps, ask the user for a capture (and point them to the matrix page's own request to upload OTmonitor logs). Never claim support from the brand name alone.
 - A capture from the user's own system outranks the matrix for that system; report a conflict between the two instead of picking one.
+
+## Times, dates and numbers attributed to Robert or Sergeant D
+
+Maintainer directive, 2026-11-26 (Robert, DM 1575388608725000225, "A"). Any time, date or number attributed to Robert or Sergeant D in a skill, an ADR, a register entry or a public post is quoted verbatim, with the message id or DM id.
+
+- Take the time from a REST read-back of the message or from `date` at the moment of the answer, never from memory or from the time you wrote it down.
+- An estimate is labelled `estimate, <who>` and never stands in a Status line.
+- An interactive answer is recorded as `interactive, HH:MM` next to his quoted words.
