@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : SATmqttPublish.cpp
-**  Version  : v2.0.0-beta.443
+**  Version  : v2.0.0-beta.444
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -48,8 +48,8 @@ uint8_t g_satShadowEpoch = 0;
 // pass already let one helper through. satPublishDeferredClear() opens every pass, so it also re-arms the one-per-pass allowance.
 static uint32_t s_satPaceWaitSinceMs = 0;
 static bool     s_satPaceForcedThisPass = false;
-// Per-producer counters since boot (/api/v2/device/info hd_pace_sat_no, hd_pace_sat_live): publishes the pacer deferred,
-// and publishes the liveness bound let through anyway.
+// Per-producer counters since boot (/api/v2/device/info hd_pace_sat_no, hd_pace_sat_live): s_satPaceNo counts every refusal
+// by the pacer, including the ones the liveness bound let through anyway; s_satPaceLive counts only those forced publishes.
 static uint32_t s_satPaceNo = 0;
 static uint32_t s_satPaceLive = 0;
 uint32_t satPaceNoCount()   { return s_satPaceNo; }

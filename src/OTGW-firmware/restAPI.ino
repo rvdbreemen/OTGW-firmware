@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-beta.443
+**  Version  : v2.0.0-beta.444
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -3468,8 +3468,8 @@ void sendDeviceInfoV2()
     je.field(F("hd_dip_mqtt_queue"),       (uint32_t)snap->st.heapdiag.iDipMqttQueue);
     je.field(F("hd_dip_mqtt_tx_bytes"),    (uint32_t)snap->st.heapdiag.iDipMqttTxBytes);
     je.field(F("hd_mqtt_queue_hwm"),       (uint32_t)snap->st.heapdiag.iMqttQueueHwm);
-    je.field(F("hd_pace_sat_no"),          satPaceNoCount());     // ADR-265 cut 1 counters since boot: publishes the pacer deferred,
-    je.field(F("hd_pace_sat_live"),        satPaceLiveCount());   // and publishes the liveness bound let through anyway
+    je.field(F("hd_pace_sat_no"),          satPaceNoCount());     // ADR-265 cut 1 counters since boot: refusals by the pacer (including the forced ones),
+    je.field(F("hd_pace_sat_live"),        satPaceLiveCount());   // and only the publishes the liveness bound let through anyway
     je.field(F("hd_pace_drip_no"),         dripPaceNoCount());    // ADR-265 cut 2: discovery drip ticks the pacer made wait,
     je.field(F("hd_pace_drip_live"),       dripPaceLiveCount());  // and ticks the liveness bound let through anyway
     je.field(F("hd_ipc0_stack_min"),       snap->ipc0StackMin);   // TASK-1865 / ADR-225: IPC stack headroom

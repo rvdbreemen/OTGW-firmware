@@ -99,6 +99,41 @@ int main() {
   g_maxblk = 100000; g_outbox = 0;
   int s5b = one_pass();
   printf("t5b sent=%d valid=%d\n", s5b, (int)g_sh[0].valid);
+  // T8: the runtime switch toggled in the MIDDLE of a pass (stuck outbox of 10: above the pacer limit, below the old one)
+#ifdef HAS_PACE_COUNTERS
+#define PNO() satPaceNoCount()
+#define PLIVE() satPaceLiveCount()
+#else
+#define PNO() 0u
+#define PLIVE() 0u
+#endif
+  for (int i = 0; i < N; ++i) g_sh[i] = SATShadowF{};
+  g_paceSatOn = true; g_outbox = 10; g_stuck = true; g_maxblk = 100000; g_now = 1000;
+  { const uint32_t no0 = PNO(), live0 = PLIVE();
+    satPublishDeferredClear();
+    int sent = 0, valid = 0;
+    for (int i = 0; i < N; ++i) {
+      if (i == 50) g_paceSatOn = false;                       // ON -> OFF after helper 50 of the pass
+      if (publishIfChangedF(g_topic[i].c_str(), 1.0f, g_sh[i], 0.05f, 1, false)) ++sent;
+    }
+    for (int i = 0; i < N; ++i) valid += g_sh[i].valid ? 1 : 0;
+    printf("t8a sent=%d valid=%d no=%u live=%u\n", sent, valid, (unsigned)(PNO() - no0), (unsigned)(PLIVE() - live0));
+    g_paceSatOn = true; g_now += 60000;
+    printf("t8b sent=%d\n", one_pass());                      // the old wait must not leak: nothing leaves yet
+    g_now += 5500;
+    printf("t8c sent=%d\n", one_pass()); }                    // now the liveness bound lets exactly one through
+  for (int i = 0; i < N; ++i) g_sh[i] = SATShadowF{};
+  g_paceSatOn = false; g_now = 1000;
+  { const uint32_t no0 = PNO(), live0 = PLIVE();
+    satPublishDeferredClear();
+    int sent = 0, valid = 0;
+    for (int i = 0; i < N; ++i) {
+      if (i == 50) g_paceSatOn = true;                        // OFF -> ON after helper 50 of the pass
+      if (publishIfChangedF(g_topic[i].c_str(), 1.0f, g_sh[i], 0.05f, 1, false)) ++sent;
+    }
+    for (int i = 0; i < N; ++i) valid += g_sh[i].valid ? 1 : 0;
+    printf("t8d sent=%d valid=%d no=%u live=%u\n", sent, valid, (unsigned)(PNO() - no0), (unsigned)(PLIVE() - live0)); }
+  g_stuck = false; g_paceSatOn = true; g_outbox = 0;
   // T6: the runtime switch off (state.debug.bPaceSat = false) in the SAME binary: the old gate alone
   for (int i = 0; i < N; ++i) g_sh[i] = SATShadowF{};
   g_outbox = 0; g_maxblk = 100000; g_paceSatOn = false; g_now = 1000;
@@ -209,6 +244,25 @@ class Pacer(unittest.TestCase):
         self.assertGreaterEqual(ino.count("heapPaceLine();"), 3, "sat-takeover end, boot done and burst end")
         self.assertIn('hd_pace_sat_no', read("restAPI.ino"))
         self.assertIn('hd_pace_sat_live', read("restAPI.ino"))
+
+    def test_t8_toggle_in_the_middle_of_a_pass(self):
+        # architect review of cut 1: switch ON -> OFF and OFF -> ON after helper 50 of a pass. No double publish (sent equals
+        # valid), consistent counters, and the pacer wait of the stretch before does not leak into the next one.
+        self.need()
+        if "t8a" not in self.out:
+            self.skipTest("no t8")
+        a = kv(self.out["t8a"])
+        self.assertEqual((a["sent"], a["valid"]), ("100", "100"), "OFF half publishes through the old gate, ON half deferred")
+        d = kv(self.out["t8d"])
+        self.assertEqual((d["sent"], d["valid"]), ("50", "50"))
+        if self.has_counters():
+            self.assertEqual((a["no"], a["live"]), ("50", "0"))
+            self.assertEqual((d["no"], d["live"]), ("100", "0"))
+        self.assertEqual(kv(self.out["t8b"])["sent"], "0", "a stale wait would let one helper through at once")
+        self.assertEqual(kv(self.out["t8c"])["sent"], "1", "after MQTT_PACE_MAX_WAIT_MS the liveness bound lets one through")
+
+    def has_counters(self):
+        return "satPaceNoCount" in read("SATmqttPublish.h")
 
     def test_t6_runtime_switch_off_is_the_old_gate_in_the_same_binary(self):
         self.need()
