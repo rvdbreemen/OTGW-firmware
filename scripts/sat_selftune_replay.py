@@ -47,6 +47,7 @@ using std::isfinite; using std::isnan;
 #define F(x) x
 #define PSTR(x) x
 #define snprintf_P snprintf
+@DEFS@
 #include "@HDR@"
 @BLOCK@
 int main(int argc, char** argv) {
@@ -130,10 +131,24 @@ def gather(cap):
     return ticks, hours, frames
 
 
-def build_stream(ticks, hours, frames):
+def derive_min_mod(ticks, frames):
+    """Lowest relative modulation (> 0) the boiler reported while the flame was on (sattick flame=1), whole capture."""
+    fi, rel, lo = 0, None, None
+    for tt, r in ticks:
+        while fi < len(frames) and frames[fi][0] <= tt:
+            if frames[fi][1] == "17":
+                rel = float(frames[fi][2]["f88"])
+            fi += 1
+        if r.get("flame") == "1" and rel is not None and rel > 0 and (lo is None or rel < lo):
+            lo = rel
+    return lo
+
+
+def build_stream(ticks, hours, frames, derive_minmod=False):
     out = []
     fi = 0
     relmod, minmod = float("nan"), 0.0
+    derived = derive_min_mod(ticks, frames) if derive_minmod else None
     ti = 0
     n_t = len(ticks)
     for te, hr in hours:
@@ -159,6 +174,10 @@ def build_stream(ticks, hours, frames):
                     return float(r[k])
                 except (KeyError, ValueError):
                     return float("nan")
+            if derive_minmod and minmod == 0.0 and derived is not None:
+                mm_used = derived
+            else:
+                mm_used = minmod
             room, target = num("room"), num("target")
             roomlost = 0 if (r.get("rv", "1") == "1" and room == room) else 1
             sig = num("pid") - num("curve")
@@ -170,7 +189,7 @@ def build_stream(ticks, hours, frames):
             diag = 1 if reason == "diag_event" else 0
             out.append("T %d %.1f %s %d %s %s %d %d %d %.2f %.0f %.4f %.4f 1" % (
                 sun_valid, sun_el, "1" if r.get("mode") == "2" else "0", 1, r["ch"], r["flame"], roomlost, diag, int(r["dhw"] or 0),
-                relmod if relmod == relmod else 1e30, minmod, sig, err if err == err else 1e30))
+                relmod if relmod == relmod else 1e30, mm_used, sig, err if err == err else 1e30))
             j += 1
         ti = j
         for m in marks:
@@ -179,7 +198,7 @@ def build_stream(ticks, hours, frames):
     return "\n".join(out) + "\n"
 
 
-def compile_driver(src_ino, hdr, variant, workdir):
+def compile_driver(src_ino, hdr, variant, workdir, step=None, adaptive=False):
     text = Path(src_ino).read_text(encoding="utf-8").replace("\r\n", "\n")
     a = text.index("// --- satCurveTune begin")
     b = text.index("// --- satCurveTune end (pure)")
@@ -189,10 +208,16 @@ def compile_driver(src_ino, hdr, variant, workdir):
         old = "if (!pwmGas && !(in.relMod > minMod))         return SATT_MIN_MOD;"
         assert old in block, "min_mod line not found: the tuner changed"
         block = block.replace(old, "if (!pwmGas && !(in.relMod > minMod) && !(in.error > %s)) return SATT_MIN_MOD;   // VARIANT: only when the room is not under target" % thr + "")
-    cpp = Path(workdir) / ("tune_%s.cpp" % variant)
-    cpp.write_text(DRIVER.replace("@HDR@", str(Path(hdr).resolve()).replace("\\", "/")).replace("@BLOCK@", block), encoding="utf-8")
+    if adaptive:   # a step of 2 x SAT_CT_STEP when the window mean is more than 3 C outside the band
+        o1 = "target = coeff + SAT_CT_STEP;"; o2 = "target = coeff - SAT_CT_STEP;"
+        assert o1 in block and o2 in block, "step lines not found: the tuner changed"
+        block = block.replace(o1, "target = coeff + SAT_CT_STEP * (fabsf(out.mean3) > 3.0f ? 2.0f : 1.0f);").replace(o2, "target = coeff - SAT_CT_STEP * (fabsf(out.mean3) > 3.0f ? 2.0f : 1.0f);")
+    defs = ("#define SAT_CT_STEP %sf" % step) if step else ""
+    tag = "%s_%s_%s" % (variant.replace(".", "_"), step or "d", "ad" if adaptive else "fx")
+    cpp = Path(workdir) / ("tune_%s.cpp" % tag)
+    cpp.write_text(DRIVER.replace("@DEFS@", defs).replace("@HDR@", str(Path(hdr).resolve()).replace("\\", "/")).replace("@BLOCK@", block), encoding="utf-8")
     from test_sat_pwm_override import compile_cpp
-    exe = compile_cpp(cpp, Path(workdir) / ("tune_%s.exe" % variant))
+    exe = compile_cpp(cpp, Path(workdir) / ("tune_%s.exe" % tag))
     if exe is None:
         sys.exit("no host C++ compiler")
     return exe
