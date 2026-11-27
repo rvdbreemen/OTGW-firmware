@@ -58,7 +58,7 @@ async function look(h, pic) {
   return { nav: (nav || '').trim(), picRow, bootRows, otd };
 }
 
-test('OT-Direct board: no PIC temperature sensor row, nav subtitle without pic, not-available line, ventilation bypass labels', { skip }, async () => {
+test('OT-Direct board: no PIC temperature sensor row, nav subtitle without pic, not-available line, bypass rows hidden', { skip }, async () => {
   const h = await startPage({ api: fakeDevice(false) });
   try {
     const r = await look(h, false);
@@ -67,9 +67,9 @@ test('OT-Direct board: no PIC temperature sensor row, nav subtitle without pic, 
     assert.equal(r.bootRows, false, 'the boot-commands rows do nothing without a PIC and are hidden on OT-Direct');
     assert.equal(r.nav, 'debug · files · system', 'Advanced subtitle has no pic');
     assert.match(r.otd.page, /Not available on this board: PIC firmware updates and Bluetooth sensors\./, 'the not-available line');
-    assert.match(r.otd.labels.otdopenbypass, /Open ventilation bypass now/);
-    assert.match(r.otd.labels.otdautobypass, /Ventilation bypass: automatic/);
-    assert.match(r.otd.labels.otdhasbypassrelay, /Bypass relay fitted/, 'the relay row keeps its label');
+    // nothing reads the three bypass settings in this release (TASK-3121, coordinator decision): no row promises a function
+    assert.deepEqual(r.otd.labels, { otdopenbypass: null, otdautobypass: null, otdhasbypassrelay: null }, 'the three bypass rows are hidden');
+    assert.doesNotMatch(r.otd.page, /bypass/i, 'no bypass text in the OT-Direct group');
     assert.deepEqual(h.exceptions, []);
   } finally { await h.close(); }
 });
