@@ -343,6 +343,7 @@
       "series_ch_set": "control setpoint",
       "series_room_set": "thermostat setpoint",
       "series_sat_target": "SAT target",
+      "series_sat_room": "SAT room",
       "series_room": "room",
       "series_room_thermostat": "room (thermostat)",
       "sat_room_note": "SAT uses {{temp}} ({{source}}). The graph shows the thermostat reading.",
@@ -3420,7 +3421,7 @@
   }
   // [key, label, colour, kind]: t = temperature line (auto-scaled), m = modulation area, l = on/off lane
   var GSER = [['flow', 'boiler', '#f85149', 't'], ['ret', 'return', '#58a6ff', 't'], ['chSet', 'control setpoint', '#8b949e', 't'],
-    ['roomSet', 'thermostat setpoint', '#d29922', 't'], ['satTarget', 'SAT target', '#e0c341', 't'], ['room', 'room', '#3fb950', 't'], ['outside', 'outside', '#a371f7', 't'], ['dhw', 'DHW temperature', '#f778ba', 't'],
+    ['roomSet', 'thermostat setpoint', '#d29922', 't'], ['satTarget', 'SAT target', '#e0c341', 't'], ['satRoom', 'SAT room', '#2dd4bf', 't'], ['room', 'room', '#3fb950', 't'], ['outside', 'outside', '#a371f7', 't'], ['dhw', 'DHW temperature', '#f778ba', 't'],
     ['mod', 'modulation', '#00bffe', 'm'], ['flame', 'flame', '#ff7b00', 'l'], ['dhw_on', 'DHW mode', '#2f81f7', 'l'], ['ch', 'boiler CH mode', '#e5534b', 'l']];
   // 'ch' is the boiler's own CH-mode status bit (MsgID 0 slave bit 1; pump overrun keeps it on), not SAT's CH enable (Sergeant D entry 219)
   var GDCOL = ['#56d4dd', '#db61a2', '#7ee787', '#f0883e', '#79c0ff', '#bc8cff'];
@@ -3527,6 +3528,8 @@
     ['flow', 'ret', 'chSet', 'roomSet', 'room', 'outside', 'dhw', 'mod'].forEach(function (k) { r[k] = model[k]; });   // dhw: MsgID 26, live only (TASK-1776: not in the device history)
     // TASK-2018 (ADR-256): the SAT target while SAT is enabled, the firmware's rule for the device history column
     r.satTarget = (satEnabledLive === true && typeof sat.target === 'number' && !isNaN(sat.target)) ? sat.target : null;
+    // TASK-3007 (ADR-291): the room SAT regulates on, while SAT is enabled and its room is not lost (the firmware's rule)
+    r.satRoom = (satEnabledLive === true && !sat.roomLost && typeof sat.room === 'number' && !isNaN(sat.room)) ? sat.room : null;
     r.roomX = graphRoomLost(now) ? 1 : 0;   // TASK-1546: a dropout is no reading: the room value is empty (CSV, line break)
     if (r.roomX) r.room = null;
     ['flame', 'dhw_on', 'ch'].forEach(function (k) { if (model[k]) r[k] = 1; });
@@ -3561,6 +3564,7 @@
     // reported a room temperature has no dropout to show.
     var hasRoom = j.room.some(function (v) { return typeof v === 'number'; });
     var satCol = Array.isArray(j.satTarget) && j.satTarget.length === n;   // TASK-2018: optional column
+    var satRoomCol = Array.isArray(j.satRoom) && j.satRoom.length === n;   // TASK-3007 (ADR-291): optional column
     for (var i = 0; i < n; i++) {
       var x = nowMs - age - (n - i) * ivMs, t = x - x % GSLOT;
       while (li < live.length && live[li].t < t) li++;
@@ -3575,6 +3579,9 @@
       var st = satCol ? j.satTarget[i] : null;
       r.satTarget = (typeof st === 'number') ? st / sc : null;
       if (r.satTarget !== null) any = true;
+      var sr = satRoomCol ? j.satRoom[i] : null;
+      r.satRoom = (typeof sr === 'number') ? sr / sc : null;
+      if (r.satRoom !== null) any = true;
       var m = j.mod[i];
       r.mod = (typeof m === 'number') ? m : null;
       r.flame = j.flame[i] ? 1 : 0; r.dhw_on = j.dhw_on[i] ? 1 : 0; r.ch = j.ch[i] ? 1 : 0;
@@ -3642,7 +3649,7 @@
     return [k, dallasLabelFor(a) || a, GDCOL[i % GDCOL.length], 't'];
   }
   // Series labels are translated at render time (the GSER labels are the English defaults).
-  var GSER_LABEL_KEY = { flow: 'graph.series_flow', ret: 'graph.series_ret', chSet: 'graph.series_ch_set', roomSet: 'graph.series_room_set', satTarget: 'graph.series_sat_target',
+  var GSER_LABEL_KEY = { flow: 'graph.series_flow', ret: 'graph.series_ret', chSet: 'graph.series_ch_set', roomSet: 'graph.series_room_set', satTarget: 'graph.series_sat_target', satRoom: 'graph.series_sat_room',
     room: 'graph.series_room', outside: 'graph.series_outside', dhw: 'graph.series_dhw', mod: 'graph.series_mod', flame: 'graph.series_flame', dhw_on: 'graph.series_dhw_on', ch: 'graph.series_ch' };
   // TASK-1297: values of the visible series at time tMs. arr is ascending by t. Returns null when no
   // record covers tMs (before the first record, or more than GBREAK_MS past the record's data end).

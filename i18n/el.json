@@ -222,6 +222,7 @@
     "series_ch_set": "στόχος προσαγωγής",
     "series_room_set": "στόχος θερμοστάτη",
     "series_sat_target": "στόχος SAT",
+    "series_sat_room": "χώρος SAT",
     "series_room": "χώρος",
     "series_room_thermostat": "χώρος (θερμοστάτης)",
     "sat_room_note": "Το SAT χρησιμοποιεί {{temp}} ({{source}}). Το γράφημα δείχνει τη μέτρηση του θερμοστάτη.",

@@ -222,6 +222,7 @@
     "series_ch_set": "ketel-setpoint",
     "series_room_set": "thermostaat-setpoint",
     "series_sat_target": "SAT-doel",
+    "series_sat_room": "SAT-kamer",
     "series_room": "kamer",
     "series_room_thermostat": "kamer (thermostaat)",
     "sat_room_note": "SAT gebruikt {{temp}} ({{source}}). De grafiek toont de meting van de thermostaat.",
