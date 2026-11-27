@@ -17,6 +17,7 @@ Not a release yet. Skeleton for the beta after beta.458, built from the lane `la
 
 ### Web UI
 
+- **The File System table fits a 375 px phone screen** (TASK-2926): the Advanced page no longer scrolls sideways. Checked in a real browser layout with synthetic data.
 - **Help popover stays inside its card; chart axis label no longer touches the axis** (TASK-3058, TASK-3052). Checked in a real browser layout at 375 px and 1400 px with synthetic screenshots.
 - **Clearer English settings help** (TASK-3118): `ethdns` names the router, and the PWM cycle help gives minutes like the dropdowns. Other languages follow the translation sync.
 - **The page reconnects politely** (TASK-3124): the web socket retries after 5, 10, 20, 40 and then 60 seconds with some jitter, pauses after three sockets that opened and closed within a minute (a Reconnect button resumes), and no stale "page is reconnecting" hint shows while the page is paused. Tested in headless Chrome; not tried with several real browsers or a sleeping tab.
@@ -39,6 +40,8 @@ Not a release yet. Skeleton for the beta after beta.458, built from the lane `la
 ## Known issues
 
 (carry over from beta.458; add what the next bench shows)
+
+- **New in this beta, observation:** On a unit without extra memory, two web pages open at the same time plus other requests can bring the memory low for a moment; in our test the unit recovered by itself without a restart (one test run; the web UI reconnect backoff in this beta reduces repeated reconnects).
 
 - The host test `tests/test_loadtest_restcap_sweep.py` failed once in a full run under load (passed 2 of 2 alone); a timing test, not a firmware finding. Internal, not for the public notes unless it repeats.
 - For the 1.x line, not 2.x: the real 1.x `flash_otgw.sh` in an empty folder exits with code 2 before it downloads anything.
