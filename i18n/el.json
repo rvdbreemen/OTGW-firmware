@@ -356,7 +356,8 @@
     "leg_setpoint": "στόχος",
     "leg_modulation": "διαμόρφωση",
     "strip_aria": "Ζωντανό γράφημα προσαγωγής/επιστροφής/στόχου/διαμόρφωσης",
-    "ticker_aria": "Ζωντανά μηνύματα OpenTherm"
+    "ticker_aria": "Ζωντανά μηνύματα OpenTherm",
+    "nav_advanced_sub_otd": "αποσφαλμάτωση · αρχεία · σύστημα"
   },
   "h_mon": {
     "cmd_aria": "Εντολή OTGW",
@@ -914,7 +915,7 @@
         "title": "Ώρα / NTP"
       },
       "otd": {
-        "desc": "Άμεσος έλεγχος OpenTherm (υλικό χωρίς PIC).",
+        "desc": "Άμεσος έλεγχος OpenTherm (υλικό χωρίς PIC). Δεν διατίθεται σε αυτή την πλακέτα: ενημερώσεις υλικολογισμικού PIC και αισθητήρες Bluetooth.",
         "title": "OT-Direct"
       },
       "otgw": {
@@ -1066,7 +1067,7 @@
       "ntphostname": "Διακομιστής NTP",
       "ntpsendtime": "Αποστολή ώρας στον θερμοστάτη",
       "ntptimezone": "Ζώνη ώρας",
-      "otdautobypass": "Αυτόματο bypass",
+      "otdautobypass": "Bypass αερισμού: αυτόματα",
       "otdautodetect": "Αυτόματη ανίχνευση λειτουργίας OT-Direct",
       "otdenableslave": "Ενεργοποίηση διέλευσης slave (θερμοστάτη)",
       "otdfailsafe": "Ασφαλής λειτουργία σε απώλεια διαύλου OT",
@@ -1074,7 +1075,7 @@
       "otdhasbypassrelay": "Υπάρχει ρελέ bypass",
       "otdmode": "Λειτουργία OT-Direct",
       "otdmsginterval": "Διάστημα μηνυμάτων",
-      "otdopenbypass": "Άνοιγμα bypass τώρα",
+      "otdopenbypass": "Άνοιγμα bypass αερισμού τώρα",
       "otdsetbacktemp": "Θερμοκρασία μείωσης",
       "otdsummermode": "Θερινή λειτουργία (χωρίς θέρμανση)",
       "otdventenable": "Αερισμός ενεργός",
