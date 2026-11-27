@@ -373,6 +373,8 @@
       "conn_time_syncing": "time syncing",
       "conn_ws_streaming": "WebSocket · streaming",
       "conn_ws_reconnecting": "WebSocket · reconnecting…",
+      "conn_ws_paused": "WebSocket · paused after repeated drops",
+      "conn_ws_resume": "Reconnect",
       "conn_no_link": "no link",
       "conn_seen_ago": "seen {{s}}s ago",
       "conn_role_recency": "{{role}} · {{recency}}",
@@ -3019,8 +3021,8 @@
       ws = new WebSocket(url);
       // TASK-3017: every message, the 30 s keepalive included, proves the stream is alive (wsWatchdogTick)
       ws.onmessage = function (ev) { wsLastMsgMs = Date.now(); onWsMessage(ev); };
-      ws.onopen = function () { wsOpenMs = Date.now(); wsLastMsgMs = wsOpenMs; noteWsMark(true); };
-      ws.onclose = function () { ws = null; noteWsMark(false); scheduleReconnect(); fetchSeed(); };
+      ws.onopen = function () { wsOpenMs = Date.now(); wsLastMsgMs = wsOpenMs; wsSockOpenedMs = wsOpenMs; noteWsMark(true); };
+      ws.onclose = function () { ws = null; noteWsMark(false); wsHandleClose(Date.now()); seedThrottled(); };
       ws.onerror = function () { try { if (ws) ws.close(); } catch (e) { } };
     } catch (e) { scheduleReconnect(); }
   }
@@ -3034,9 +3036,41 @@
     if (Date.now() - Math.max(wsOpenMs, wsLastMsgMs) < WS_SILENCE_MS) return;
     try { ws.close(); } catch (e) { }
   }
+  // TASK-3124: reconnect with exponential backoff (5, 10, 20, 40 s, then 60 s, +-20 % jitter) instead of a fixed 5 s.
+  // The attempt counter resets only after a socket stayed open 60 s, so a socket that opens and closes at once keeps
+  // the delay growing. Three sockets that opened and closed within 60 s pause the page (no automatic reconnect, a
+  // Reconnect button in the connection detail). fetchSeed from onclose and the 20 s timer runs at most once per 30 s.
+  var WS_BACKOFF_S = [5, 10, 20, 40, 60], WS_STABLE_MS = 60000, WS_FLAP_MAX = 3, WS_FLAP_WINDOW_MS = 60000, SEED_MIN_GAP_MS = 30000;
+  var wsAttempt = 0, wsPaused = false, wsSockOpenedMs = 0, wsFlapCloses = [], seedLastMs = 0;
+  function wsBackoffMs(attempt, rnd) {
+    var s = WS_BACKOFF_S[Math.min(attempt, WS_BACKOFF_S.length - 1)];
+    return Math.round(s * 1000 * (0.8 + 0.4 * rnd));
+  }
+  function wsHandleClose(now) {
+    var wasOpen = wsSockOpenedMs > 0;
+    if (wasOpen && now - wsSockOpenedMs >= WS_STABLE_MS) { wsAttempt = 0; wsFlapCloses = []; }
+    else if (wasOpen) {
+      wsFlapCloses = wsFlapCloses.filter(function (t0) { return now - t0 < WS_FLAP_WINDOW_MS; });
+      wsFlapCloses.push(now);
+    }
+    wsSockOpenedMs = 0;
+    if (wsFlapCloses.length >= WS_FLAP_MAX) { wsPaused = true; if (wsTimer) { clearTimeout(wsTimer); wsTimer = null; } renderConnDetail(); }
+    else scheduleReconnect();
+  }
+  function wsResume() {
+    wsPaused = false; wsAttempt = 0; wsFlapCloses = [];
+    if (wsTimer) { clearTimeout(wsTimer); wsTimer = null; }
+    if (!ws) connectWs();
+    renderConnDetail();
+  }
+  function seedThrottled() {
+    var now = Date.now();
+    if (now - seedLastMs < SEED_MIN_GAP_MS) return;
+    seedLastMs = now; fetchSeed();
+  }
   function scheduleReconnect() {
-    if (wsTimer) return;
-    wsTimer = setTimeout(function () { wsTimer = null; connectWs(); }, 5000);
+    if (wsTimer || wsPaused) return;
+    wsTimer = setTimeout(function () { wsTimer = null; connectWs(); }, wsBackoffMs(wsAttempt++, Math.random()));
   }
 
   // ---------- render scheduling ----------
@@ -3982,7 +4016,7 @@
       // Live link (WS) + REST API — this browser session
       var wsUp = ws && ws.readyState === 1;
       CONN.ws.s = wsUp ? 'st-ok' : 'st-down';
-      CONN.ws.detail = wsUp ? t('graph.conn_ws_streaming') : t('graph.conn_ws_reconnecting');
+      CONN.ws.detail = wsUp ? t('graph.conn_ws_streaming') : (wsPaused ? t('graph.conn_ws_paused') : t('graph.conn_ws_reconnecting'));
       CONN.api.s = 'st-ok';
       renderConnMap(); renderConnStrip(); renderConnDetail();
       scheduleRender();   // TASK-2959 F4: the Home status line reads the boiler link
@@ -6036,6 +6070,10 @@
     // while the node is down/degraded contradicts the fix hint, so omit it there.
     if (c.exp && c.s !== 'st-down' && c.s !== 'st-warn') { var ex = document.createElement('div'); ex.className = 'exp'; ex.textContent = c.exp; body.appendChild(ex); }
     if ((c.s === 'st-down' || c.s === 'st-warn') && c.fix) { var fx = document.createElement('div'); fx.className = 'fix'; fx.textContent = '▸ ' + c.fix; body.appendChild(fx); }
+    if (key === 'ws' && wsPaused) {
+      var rb = document.createElement('button'); rb.type = 'button'; rb.className = 'btn'; rb.id = 'wsResumeBtn';
+      rb.textContent = t('graph.conn_ws_resume'); rb.addEventListener('click', wsResume); body.appendChild(rb);
+    }
     row.appendChild(badge); row.appendChild(body);
     return row;
   }
@@ -9342,7 +9380,7 @@
     // TASK-989: staggered (see the startup-burst note above) — seed/SAT/weather
     // trail the first-paint fetches one at a time instead of bursting together.
     setTimeout(fetchSeed, 2000); setTimeout(fetchSatStatus, 2800); setTimeout(fetchWeather, 3600);
-    setInterval(function () { if (!ws || ws.readyState !== 1) fetchSeed(); }, 20000);
+    setInterval(function () { if (!ws || ws.readyState !== 1) seedThrottled(); }, 20000);
     // TASK-1223.14: Monitor > Values / PS=1 otmonitor poll (no request unless needed),
     // and the PS=1 check (asks device/time only after 15 s of socket silence).
     // TASK-1741: these two get the tab's phase as well, so two tabs on Monitor > Values do not

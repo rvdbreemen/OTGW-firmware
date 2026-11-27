@@ -252,6 +252,8 @@
     "conn_time_syncing": "tijd synchroniseren",
     "conn_ws_streaming": "WebSocket · live",
     "conn_ws_reconnecting": "WebSocket · opnieuw verbinden…",
+    "conn_ws_paused": "WebSocket · gepauzeerd na herhaalde onderbrekingen",
+    "conn_ws_resume": "Opnieuw verbinden",
     "conn_no_link": "geen verbinding",
     "conn_seen_ago": "{{s}}s geleden gezien",
     "conn_role_recency": "{{role}} · {{recency}}",

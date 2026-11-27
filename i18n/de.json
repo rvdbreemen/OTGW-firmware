@@ -252,6 +252,8 @@
     "conn_time_syncing": "Zeit wird synchronisiert",
     "conn_ws_streaming": "WebSocket · Daten fließen",
     "conn_ws_reconnecting": "WebSocket · verbindet neu…",
+    "conn_ws_paused": "WebSocket · pausiert nach wiederholten Abbrüchen",
+    "conn_ws_resume": "Neu verbinden",
     "conn_no_link": "keine Verbindung",
     "conn_seen_ago": "vor {{s}} s gesehen",
     "conn_role_recency": "{{role}} · {{recency}}",

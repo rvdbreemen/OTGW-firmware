@@ -252,6 +252,8 @@
     "conn_time_syncing": "συγχρονισμός ώρας",
     "conn_ws_streaming": "WebSocket · ροή δεδομένων",
     "conn_ws_reconnecting": "WebSocket · επανασύνδεση…",
+    "conn_ws_paused": "WebSocket · σε παύση μετά από επαναλαμβανόμενες διακοπές",
+    "conn_ws_resume": "Επανασύνδεση",
     "conn_no_link": "χωρίς σύνδεση",
     "conn_seen_ago": "πριν από {{s}}s",
     "conn_role_recency": "{{role}} · {{recency}}",
