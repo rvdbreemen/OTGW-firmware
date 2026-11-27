@@ -5,6 +5,14 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [2.0.0-beta.452] - 2026-11-27
+
+Build in this beta: beta.452 only (previous public beta: beta.451). It is the build that was tested overnight on a test unit.
+
+### Changed
+- SAT: a hot-water tap late in a heating burst no longer makes the next pause longer than needed. SAT now keeps the flow temperature from just before the tap for the rest of that burst. Checked with automatic tests; not seen with a real hot-water tap or a real boiler yet (TASK-3099).
+- Internal: 32 changes in documentation and decisions, the release publishing tool and task administration; nothing to do for users.
+
 ## [2.0.0-beta.451] - 2026-11-26
 
 ### Added
@@ -1253,7 +1261,8 @@ Legacy release. See git history for details.
 
 Legacy releases. See git history for details.
 
-[Unreleased]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.451...HEAD
+[Unreleased]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.452...HEAD
+[2.0.0-beta.452]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.451...v2.0.0-beta.452
 [2.0.0-beta.451]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.438...v2.0.0-beta.451
 [2.0.0-beta.438]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.432...v2.0.0-beta.438
 [2.0.0-beta.432]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.428...v2.0.0-beta.432
