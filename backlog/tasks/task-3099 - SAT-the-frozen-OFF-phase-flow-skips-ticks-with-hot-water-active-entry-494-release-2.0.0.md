@@ -3,11 +3,11 @@ id: TASK-3099
 title: >-
   SAT: the frozen OFF-phase flow skips ticks with hot water active (entry 494,
   release 2.0.0)
-status: To Do
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-26T06:39:00Z'
-updated_date: '2026-11-27T04:51:00Z'
+updated_date: '2026-11-27T08:02:00Z'
 labels: []
 dependencies: []
 ordinal: 1164000
@@ -40,4 +40,14 @@ Evidence 2026-11-26 (host only, NOT verified on a unit): tests/test_sat_pwm_froz
 Known limits: (1) a draw that no control tick and no flame edge sees (starts and ends between two ticks, flame stays on) leaves no trace in the PWM block, so the first tick after it still stores the draw-heated flow (pinned by test_known_limit_a_draw_that_no_control_tick_sees_is_not_covered); coordinator decision: no live DHW-bit polling, documented only. (2) Open sub-question to Sergeant D: last tick BEFORE the draw (implemented, our reading, test_last_tick_before_the_draw_differs_from_the_last_clean_tick: 50 C) versus last clean tick (52 C); if he answers A2 the change is one flag. Push held until his answer is recorded.
 
 2026-11-27 (otgw-webui): AC unit evidence = flashed + 5 h soak; simulation not discriminating (_comms/task3099_bench_result.md: the sim DHW draw also cools the sim room 19.94 -> 19.09 C in 300 s, PID jumps 30 -> 56.5, duty 1.00 after every tap, so no OFF phase). Fix is host-tested on the real PWM block, NOT verified old-vs-new on a unit; the AC for a real tap stays open. Robert chose A on question 17 (DM 1575733951773941821): ships in the 08:00 beta with this wording. Rebased on origin/dev 25875e928 as 2a6aea677; src diff against 9348c1a6f is 0 lines.
+
+2026-11-27 otgw-docs check for AC3: beta.452 is published (tag v2.0.0-beta.452) and the release build soaked PASS on .63 (61 min) and the OTGW32 bench unit (60 min), see OTGW-field-data/_train/sat48rel.verdict.txt and sat48rel61.verdict.txt. AC3 says one prerelease bump per src commit: cfcddd034 (SATcontrol.ino, no version bump, banner still beta.451) and 2a6aea677 (banner beta.451 to beta.452) are two src commits with ONE bump, so AC3 is NOT met as written; the release image is beta.452 anyway. Left unticked. The change itself is verified by 10 host tests (python tests/test_sat_pwm_frozen_flow_dhw.py, rerun 2026-11-27, OK) and is NOT verified on a real hot-water tap (the simulation cannot separate old and new code).
+
+2026-11-27 Closed by the coordinator's decision under Robert's standing permission to finish tasks (2026-11-27). AC3 stays UNTICKED on purpose.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+AC1 and AC2 were ticked earlier: the plan with the entries and thermo-nova citations, and the host test on the real PWM block (python tests/test_sat_pwm_frozen_flow_dhw.py: 10 of 10 OK on the change, rerun 2026-11-27; 5 of 10 fail with the old SATcontrol.ino). AC3 DEVIATION, written plainly: two src commits, one bump. cfcddd034 carries no version bump (the banner stays beta.451), 2a6aea677 bumps beta.451 to beta.452; the shipped image beta.452 contains both; no behaviour effect. AC3 is therefore not met as written and is not ticked. Shipped in v2.0.0-beta.452 (published 2026-11-27 07:09 UTC). Release build soak PASS: unit .63 61 min (OTGW-field-data/_train/sat48rel.verdict.txt) and the OTGW32 bench unit 60 min (sat48rel61.verdict.txt). NOT verified: the fix on a real hot-water tap or a real boiler; the simulation cannot tell the old and the new code apart (a simulated draw also cools the simulated room).
+<!-- SECTION:FINAL_SUMMARY:END -->

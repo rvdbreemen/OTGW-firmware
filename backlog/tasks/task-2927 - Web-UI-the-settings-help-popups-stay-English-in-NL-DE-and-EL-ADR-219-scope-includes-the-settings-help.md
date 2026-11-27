@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-19T19:38:00Z'
-updated_date: '2026-11-27T05:18:00Z'
+updated_date: '2026-11-27T08:02:00Z'
 labels:
   - webui
   - i18n
@@ -37,4 +37,10 @@ Found in the read-only UI walk of 397 (7e31bc2) on .61, 2026-11-19, German UI at
 Maintainer decision (Robert, 2026-11-19 19:54 UTC, Discord DM 1573063839715557535, relayed by the coordinator; the only open question, read as the answer to it), verbatim reply: 'A' (A = milestone 2.1.0 plus a release-note line; the settings help stays English in 2.0.0). Label needs-maintainer-ok removed, milestone stays 2.1.0.
 
 2026-11-27 otgw-ux-designer, plan (no code: Robert chose A on 2026-11-19, milestone 2.1.0, and the work is translation, not CSS or markup): (1) run the translate_webui_otgw-firmware sync for NL, DE, EL with the help keys added to i18n/*.json (59 sentences each; ADR-219 scope), and make helpFor() (v2.js ~4437) read t('help.<key>') first with the English text as the per-key fallback: otgw-webui. (2) Measure the size change of data/ and i18n/ (AC3) before and after, because settingsHelp.h is 17,683 B raw per ADR-219 and three packs triple it on LittleFS. (3) Test: pack-completeness covers the help keys; web UI test opens a popup in NL and expects the pack text. UX input from me: apply the style rule of 2026-11-26 (no em-dash, plain words) to the 59 English sources first, so the translators do not copy the dashes (see docs/reviews/2026-11-26_style-em-dashes-and-ai-language).
+
+2026-11-27 Note (coordinator, from otgw-webui): the NL, DE and EL packs grow by +6.5, +6.6 and +8.3 KB with the translated help texts. The free space on LittleFS has NOT been measured. Decision: this is 2.1.0 and nothing is pushed until the free space is measured (the OTGW32 unit has 768 KB LittleFS and no PSRAM). Also found in the TASK-2927 review: i18n/glossary.md item 50 gives Dutch 'ruimtesensor' for room sensor, but the nl pack labels and help texts use 'kamersensor' (satmultiarea label, satsensorarea*); the new help texts follow the pack. The glossary owner decides which term wins; if the glossary wins, the labels and the four satsensorarea help texts change.
+
+2026-11-27 Related: TASK-3118 (two English help defects, sathpcycle/satcyclesperhour and ethdns).
+
+2026-11-27 Owner of i18n/glossary.md: otgw-webui (he runs the translate skill and the packs), decided by the coordinator. The conflict ruimtesensor (glossary item 50) versus kamersensor (nl pack labels and help texts) is his decision; if the glossary wins, the labels and the four satsensorarea help texts change.
 <!-- SECTION:NOTES:END -->

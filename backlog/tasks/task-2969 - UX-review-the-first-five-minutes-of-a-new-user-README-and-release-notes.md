@@ -1,11 +1,11 @@
 ---
 id: TASK-2969
 title: 'UX review: the first five minutes of a new user (README and release notes)'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-20T15:37:00Z'
-updated_date: '2026-11-27T05:04:00Z'
+updated_date: '2026-11-27T08:00:00Z'
 labels:
   - ux
   - docs
@@ -27,7 +27,7 @@ Read-only UX review by otgw-ux-designer, suggested by the coordinator: what a ne
 - [x] #2 Facts checked against the repo and gh (default branch, latest release, release list, settings names); what was not checked is listed under Not verified
 - [x] #3 Findings list delivered to the coordinator for triage
 - [x] #4 otgw-docs: R2, R3, R5, R6 and R7 of the review are fixed in README.md and the manual (each finding's proposed AC met)
-- [ ] #5 BlueFlame: R4, the next beta's release notes have the short head (what, who, known issues, what changed, how to update) and the test provenance as an appendix, and the /beta-release-2x template matches
+- [x] #5 BlueFlame: R4, the next beta's release notes have the short head (what, who, known issues, what changed, how to update) and the test provenance as an appendix, and the /beta-release-2x template matches
 - [x] #6 Robert: decision on R1 (default branch dev versus a landing text that sends ESP8266 users to /releases/latest) recorded in this task, and the README follows it
 <!-- AC:END -->
 
@@ -43,10 +43,12 @@ Read-only UX review by otgw-ux-designer, suggested by the coordinator: what a ne
 2026-11-21 otgw-docs (95): AC4 evidence: R2, R3, R5, R6, R7 landed in cffd87b78 (README + manual ch03/h03, MANUAL.md regenerated, test_manual_generated OK; notes above). AC6: Robert chose A for R1 (relayed by the coordinator 2026-11-21): README.md now opens, right under the badges and before the beta disclaimer, with 'Which firmware do you need?': ESP8266 (Wemos D1 mini / NodeMCU) -> https://github.com/rvdbreemen/OTGW-firmware/releases/latest (currently v1.7.10, checked with gh api releases/latest: v1.7.10, 2026-11-20) and the 1.x README on otgw-1.x.x; ESP32-S3 (LOLIN S3 Mini / Pro) or trying 2.0.0 -> read on, with a link to Migrating from ESP8266. The default branch stays dev.
 
 2026-11-27 otgw-ux-designer: recheck written at docs/reviews/2026-11-27_ux-first-five-minutes-recheck/README.md (N1-N5). R1-R3, R5-R7 and the README jargon are fixed. R4 is still open and worse: the beta.451 disclaimer is 37 lines and about 6,600 words, the update instruction is at line 631 of 1034, task numbers appear 166 times in the first 120 lines. AC5 stays unticked (BlueFlame owns it). No beta.452 draft exists yet. Not verified: only head, section list and the update line were read; no reader test.
+
+2026-11-27 AC5 checked against the PUBLISHED v2.0.0-beta.452 notes (https://github.com/rvdbreemen/OTGW-firmware/releases/tag/v2.0.0-beta.452, published 07:09 UTC) and the skill.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
 
 <!-- SECTION:FINAL_SUMMARY:BEGIN -->
-First-five-minutes UX review in docs/reviews/2026-11-20_ux-first-five-minutes/README.md: 7 findings R1-R7 with severity, effort, evidence and proposed AC. AC1: the review file. AC2: facts from gh repo view (default branch dev, latest release v1.7.9), gh release list (six 2.0.0 prereleases on top) and the settings names in v2.js SET_META and the firmware; badge value, the 1.x README and the backlog/docs guides' currency listed under Not verified. AC3: findings list sent to the coordinator for triage.
+AC5 (R4): the published beta.452 body (v2.0.0-beta.452) opens with a short plain head (disclaimer, then In short: what this is, who it is for, how to update, what is not tested; lines 10 to 16 of the release body), then Which builds are in this beta (line 17) and What is new in plain words (line 25); the test provenance of older ranges sits in an appendix at the end (line 528). The /beta-release-2x template matches: .claude/skills/beta-release-2x/SKILL.md Phase 1 has the structure and the language rule (commits e2ffa461f and 1a4ba3a90). AC1 to AC4 were ticked earlier. Not verified: whether testers find the update instruction faster; the old long notes remain in the Earlier changes and Appendix parts.
 <!-- SECTION:FINAL_SUMMARY:END -->

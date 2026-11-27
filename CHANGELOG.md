@@ -5,6 +5,10 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Known issues
+- Memory dip in the first minutes after a start on a unit without PSRAM (the OTGW32): in the release soak of beta.452 the lowest free memory dropped to 648 bytes about 5 minutes after the start and the unit reported a critical memory state once. It did not restart or crash and the memory recovered to about 46 KB. The same unit showed a similar dip on beta.418, so it is not new in beta.452. Open (TASK-3024).
+- Under very low memory a new browser connection can crash the gateway: in one bench run with 2 browser tabs reconnecting, the unit restarted about 5 seconds after a memory recovery when the web UI opened a new live connection. Not new in beta.452. The cause is not proven; open (TASK-3119).
+
 ## [2.0.0-beta.452] - 2026-11-27
 
 Build in this beta: beta.452 only (previous public beta: beta.451). It is the build that was tested overnight on a test unit.
