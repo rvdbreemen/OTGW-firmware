@@ -10,7 +10,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 Build in this beta: beta.455 only (previous public beta: beta.452; beta.453 and beta.454 were never published). It is the build that ran 60 minutes without a restart on two test units.
 
 ### Changed
-- Web UI live connections: when memory is almost out, the gateway drops the browser connections of the live log at once instead of asking each tab to close; a tab connects again by itself after about 5 seconds in the bench (TASK-3025, ADR-295). New counter `hd_ws_recovery_abort` in `GET /api/v2/device/info`.
+- Web UI live connections: when memory is almost out, the gateway drops the browser connections of the live log at once instead of asking each tab to close; a tab connects again by itself (about 5 seconds in the bench with the fix build; within 5.5 minutes with the final build, being checked) (TASK-3025, ADR-295). New counter `hd_ws_recovery_abort` in `GET /api/v2/device/info`.
 - Web UI live connections: a new connection is refused at the handshake while memory is almost gone, so the gateway no longer builds a connection it cannot close safely; a bench build panicked in 1 of 2 runs without this (TASK-3119). Checked with emulated browser tabs on a test unit (3 of 3 runs without a panic); not proven in real browsers.
 - Manual: new chapters 11 and 12 on hardware configurations; README says which release file to download (TASK-3115).
 - Internal: 42 changes in documentation and decisions, task administration, bench test keys (beta builds only) and tooling; nothing to do for users.
