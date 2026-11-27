@@ -4,7 +4,7 @@ title: >-
   OTGW32: Dallas default pin 10 is reserved (PIN_STEPUP_ENABLE) so sensors never
   start until the user sets pin 4; S0 default 12 and output default 16 collide
   with the W5500 SPI pins
-status: To Do
+status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-27T08:20:00Z'
@@ -32,6 +32,16 @@ Found by otgw-docs while writing the OTGW32 documentation (TASK-3115), coordinat
 - [ ] #4 docs ch11 section 11.6 (en and nl) and docs/hardware/PINOUT.md updated to the new defaults
 <!-- AC:END -->
 
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+PLAN (otgw-poc-dev, 2026-11-27; lane-poc-3120 on origin/dev; nothing built, nothing run on a unit). Decisions relayed by the coordinator: Q32 'A' (Robert, DM 1575796166912778281): hide the GPIO output on the OTGW32 board type; Robert (DM 1575798102273826878): 'S0 is belofte van mij. Feature van 1.0.' = S0 stays visible and usable; Dallas default 4. No new Sergeant D entry: no SAT behaviour is touched.
+FACTS (grep at this base, not run): boards.h:79 PIN_STEPUP_ENABLE 10, :82 PIN_1WIRE 4 (read by no source file), :90-91 SPI SCK 12 / RST 16; defaults Sensorstypes.h:23 iPin 10, S0types.h:22 iPin 12 (uint8_t), Outputstypes.h:22 iPin 16 (int8_t); reserved-pin test boardPinReserved OTGW-firmware.h:1038-1075 (OTGW32 map: SPI 11 to 16, step-up 10, OT pins, LEDs, I2C, buttons, bypass relay); Classic migration legacyPinMigrated OTGW-firmware.h:1088-1103 (stored legacy 12/16 moves on a Classic map, the OTGW32 map 'keeps 12/16' per its comment) called from applyLegacyPinDefaults settingStuff.ino:129-150 (setup() OTGW-firmware.ino:618, before initOutputs :619 and initS0Count :630); refusals: sensors_ext.ino:308-311, s0PulseCount.ino:42-45, outputs_ext.ino:21-28; REST: device fields restAPI.ino:488 dallas_gpio and :509 s0 gpio, settings echo :2292-2302, range metadata :4264 (sensors pin 0..48), :4267 (s0 pin 1..48), :4272 (output pin 0..48), device/info fields near :3307 (otdirectavailable) and :3339 (hardware_type); setting writers settingStuff.ino:1051-1121; checkGPIOConflict settingStuff.ino:104-124 already treats pin < 0 as 'not set'.
+DESIGN. (1) Dallas: extend legacyPinMigrated with an OTGW32 branch: stored legacy 10 on the OTGW32 map becomes 4 (PIN_1WIRE); any other stored value never changes; Classic maps untouched (10 is the valid D8 hole there). Honest caveat for AC3: writeSettings saves the key on every save, so 'stored 10' cannot tell 'never chose' from 'saved the default'; on the OTGW32 map 10 is a reserved pin that never worked, so moving it loses nothing. (2) S0: on the OTGW32 map a stored legacy 12 (W5500 SCK) becomes UNSET until the hardware owner confirms the DI pad (GPIO 5, net SWR); S0 stays in settings/UI/REST/MQTT, default 'off', the user chooses a pin, the refusal for reserved pins stays. Unset = -1: needs S0Section.iPin uint8_t -> int8_t (like sensors/outputs; 0..48 fits), REST range metadata :4267 min 1 -> -1 (the web UI field must show 'not set'; otgw-webui to confirm), initS0Count prints one line 'pin not set' instead of the reserved-pin refusal. One-line reversal when Tim confirms: a named constant OTGW32_S0_DEFAULT_PIN (now -1, then 5) read by the migration, plus its test case. (3) GPIO output: a runtime predicate boardHasOutputPin(ComboPinMap) (OTGW32 false, Classic maps true), a function and not a compile-time macro because the combo image picks the board at boot (HAS_RUNTIME_HW_DETECT, boards.h:316-320; same reason as boardPinReserved). On the OTGW32 map: initOutputs does nothing and says so once; updateSetting for the output settings is refused with a debug line (the REST/MQTT writers must not enable an output on a board without a pin); the device/info JSON gets has_output_pin (true/false; webui hides the output group on false, absent = shown); the settings echo keeps the keys so old clients do not break. LED blink is not touched. (4) Docs: docs/manuals ch11 11.6 en and nl, docs/hardware/PINOUT.md, MQTT.md/REST docs for has_output_pin.
+TESTS (host, real code, red first): extend the TASK-1698 harness tests/test_legacy_pin_defaults.py and tests/test_board_pin_reserved.py: per map the migrated defaults; stored non-legacy pins never move (4, 15, 5, 7, 40); no migrated default is a reserved pin of its map; OTGW32: Dallas 10 -> 4, S0 12 -> -1, output unchanged by migration but boardHasOutputPin false; Classic: unchanged results of TASK-1698; REST text checks for has_output_pin and the range metadata. Mutants: wrong target, migration of a non-legacy value, predicate true on OTGW32.
+OPEN, not mine to decide: Tim's answer on the DI pad (GPIO 5; question 1575794574629146645); whether the web UI shows an unset S0 pin cleanly (otgw-webui, told); whether the output settings should also be refused over MQTT/REST on OTGW32 or only hidden (I propose refused, one debug line). Bench: one OTGW32 unit (.62?) via the bench-tester: Dallas on GPIO 4 starts sensors, S0 shows not set, device/info has_output_pin false; Classic unit unchanged (has_output_pin true). Needs the coordinator's slot; not in B1 to B4.
+<!-- SECTION:PLAN:END -->
+
 ## Implementation Notes
 
 <!-- SECTION:NOTES:BEGIN -->
@@ -53,9 +63,16 @@ Found by otgw-docs while writing the OTGW32 documentation (TASK-3115), coordinat
 
 2026-11-27 EFFECT ON Q32: S0 may be possible on the DI pad (GPIO 5) after all, so the earlier recommendation to hide S0 on the OTGW32 board type is WITHHELD until the owner answers what DI is wired to and whether it may be a pulse input (one question asked by BlueFlame). The GPIO output still has no pad (no net, no terminal): hiding the output on this board type stays recommended. The Dallas half is unchanged: default pin 4. Docs changed to: the block has a digital-input pad DI whose use is not confirmed; no free pin confirmed for S0 and output.
 
+<<<<<<< HEAD
 2026-11-27 DECISION (Robert, DM 1575798102273826878, relayed by the coordinator, not seen by otgw-docs), verbatim: 'S0 is belofte van mij. Feature van 1.0.' So S0 stays a supported firmware feature on the OTGW32 and is NOT hidden: the earlier recommendation to hide S0 is dropped. The GPIO output is the one that has no pad on this board and is hidden or marked not available (Robert decides the exact handling). Dallas stays default pin 4. For S0 the pin is still to be confirmed (the DI pad, probably GPIO 5): until then the user chooses the pin in the settings; no pin promise in the docs. AC1 of this task therefore reads: S0 default pin that does not collide with the board (candidate GPIO 5, pending the owner's answer), output not available on this board type, Dallas default 4.
+<<<<<<< HEAD
 
 2026-11-27 (otgw-docs) hardware owner's answer in #beta-testing, relayed by BlueFlame: the DI pad is present and not connected; the only usable digital input on the terminal block is the pin marked 1wire (GPIO 4, 3k3 pull-up, 470 pF to ground), intended for DS18x20 sensors. Docs (PINOUT.md, ch11 11.6 and terminals line, ch12, NL h11 and h12, MANUAL.md) now say exactly that: 'DI pad present, not connected', no 'probably the SW line', no 'probably GPIO 5'. Nothing is written about whether S0 may use the 1wire pin: that is Robert's open decision. The earlier S0 AC wording ('DI candidate') no longer matches the facts; the AC owner decides.
 
 2026-11-27 (otgw-docs) CORRECTION of the note above: the hardware owner corrected his own answer. Terminal pin 5 'DI' is connected to GPIO 5 through a 330 ohm series resistor, with a 3.3 k pull-up and a 470 pF capacitor to ground (net SWR); it is a digital input, and the 1wire pin (GPIO 4) is the other one. The 'DI candidate' wording of the AC is valid again. Docs (PINOUT.md, ch11, ch12, NL h11 and h12, MANUAL.md) now say that, with 'untested on the OTGW32' for S0 and 'You choose the S0 pin in the settings'. No handle or name in public text.
+=======
+=======
+2026-11-27 otgw-poc-dev: plan written (lane-poc-3120). Told otgw-webui: has_output_pin only, S0 NOT hidden, S0 pin may be unset on the OTGW32. Code not started: red tests first, after the coordinator confirms the S0 sentinel choice (int8_t -1) or names another.
+>>>>>>> 37173d749 (docs(backlog): TASK-3120 In Progress, plan (Dallas 4, S0 unset until DI confirmed, output hidden on OTGW32) [no-task])
+>>>>>>> 4cab77806 (docs(backlog): TASK-3120 In Progress, plan (Dallas 4, S0 unset until DI confirmed, output hidden on OTGW32) [no-task])
 <!-- SECTION:NOTES:END -->
