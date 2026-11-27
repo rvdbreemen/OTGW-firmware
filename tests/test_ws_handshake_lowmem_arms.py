@@ -7,7 +7,8 @@ candidate, read with git show):
  - cooldown off + abort off: stdout equal to the B1 handler, byte for byte (log text, burst events, return value, no abort);
  - cooldown off + abort on: the same, plus exactly one abort on every refusal and none on an admission;
  - cooldown on: inside the 30 s a refusal is counted as the cooldown event and logged with its own text; outside it equals the B1 handler;
- - a release build (no _VERSION_PRERELEASE) ignores the switches: both measures are always on.
+ - a release build (no _VERSION_PRERELEASE) ignores the switches and follows the constants WS_RELEASE_COOLDOWN / WS_RELEASE_ABORT
+   (false as committed = the B1 handler; the matrix on the bench decides when they flip).
 What it cannot reach: the library's 401 path, lwIP, the recovery itself and the heap: bench (n >= 5 per arm on .76, telnet key T after each stall).
 """
 import os
@@ -95,18 +96,24 @@ class Arms(unittest.TestCase):
         cls.tmp = tempfile.TemporaryDirectory()
         cls.warn = re.search(r"#define HEAP_WARNING_THRESHOLD\s+(\d+)", HELPER_INO.read_text(encoding="utf-8")).group(1)
         new = WS_INO.read_text(encoding="utf-8").replace("\r\n", "\n")
-        body = "\n".join([
-            lines(new, r"^static const uint32_t WS_RECOVERY_COOLDOWN_MS\s*=.*;"),
-            "static uint32_t g_wsRecoveryMs = 0;",
-            cut(new, "static uint32_t wsCooldownLeftMs("),
-            cut(new, "static bool wsAdmitHandshake("),
-            cut(new, "static bool wsCooldownArmed("),
-            cut(new, "static bool wsAbortArmed("),
-            cut(new, "static bool wsHandshakeHandler("),
-        ])
+        def make_body(src):
+            return "\n".join([
+                lines(src, r"^static const uint32_t WS_RECOVERY_COOLDOWN_MS\s*=.*;"),
+                lines(src, r"^static const bool WS_RELEASE_(?:COOLDOWN|ABORT)\s*=.*;"),
+                "static uint32_t g_wsRecoveryMs = 0;",
+                cut(src, "static uint32_t wsCooldownLeftMs("),
+                cut(src, "static bool wsAdmitHandshake("),
+                cut(src, "static bool wsCooldownArmed("),
+                cut(src, "static bool wsAbortArmed("),
+                cut(src, "static bool wsHandshakeHandler("),
+            ])
+        body = make_body(new)
+        on = re.sub(r"(WS_RELEASE_(?:COOLDOWN|ABORT)\s*=\s*)false", r"\g<1>true", new)
+        assert on != new, "the release constants are not false as committed"
         setrec = "g_wsRecoveryMs = (uint32_t)strtoul(argv[4], 0, 10);"
         cls.new_exe = cls.build("new", body, "#define _VERSION_PRERELEASE 1", setrec)
         cls.rel_exe = cls.build("rel", body, "", setrec)
+        cls.rel_on_exe = cls.build("relon", make_body(on), "", setrec)
         try:
             old = subprocess.run(["git", "show", B1_COMMIT + ":src/OTGW-firmware/webSocketStuff.ino"], cwd=REPO,
                                  capture_output=True, text=True, check=True).stdout.replace("\r\n", "\n")
@@ -169,12 +176,22 @@ class Arms(unittest.TestCase):
         self.assertIn("recovery cooldown", out)
         self.assertEqual(aborts, 1)
 
-    def test_a_release_build_ignores_the_switches(self):
-        out, aborts = self.run_exe(self.rel_exe, 60000, 0, self.NOW, self.NOW - 100, False, False)
+    def test_a_release_build_ignores_the_switches_and_follows_the_two_constants(self):
+        # as committed both constants are false: a release build equals the B1 handler whatever the switches say
+        for free, conn in self.GRID:
+            old = self.run_exe(self.old_exe, free, conn, self.NOW, 0, True, True)
+            self.assertEqual(self.run_exe(self.rel_exe, free, conn, self.NOW, self.NOW - 100, True, True), old)
+        # flipping the constants (one line each) turns the measures on, again without a switch
+        out, aborts = self.run_exe(self.rel_on_exe, 60000, 0, self.NOW, self.NOW - 100, False, False)
         self.assertIn("recovery cooldown", out)
         self.assertEqual(aborts, 1)
-        out, aborts = self.run_exe(self.rel_exe, 1600, 0, self.NOW, 0, False, False)
+        out, aborts = self.run_exe(self.rel_on_exe, 1600, 0, self.NOW, 0, False, False)
         self.assertEqual(aborts, 1)
+
+    def test_one_release_constant_per_measure(self):
+        src = WS_INO.read_text(encoding="utf-8")
+        for name in ("WS_RELEASE_COOLDOWN", "WS_RELEASE_ABORT"):
+            self.assertEqual(len(re.findall(r"^static const bool " + name + r"\s*=", src, re.M)), 1)
 
 
 class Wiring(unittest.TestCase):

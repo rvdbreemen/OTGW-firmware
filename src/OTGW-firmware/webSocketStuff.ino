@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : webSocketStuff.ino
-**  Version  : v2.0.0-beta.461
+**  Version  : v2.0.0-beta.462
 **
 **  Copyright (c) 2021-2025 Robert van den Breemen
 **
@@ -305,20 +305,24 @@ static bool wsAdmitHandshake(uint32_t freeHeap, uint16_t connected, uint32_t now
 }
 
 // Lane A bench arms (prerelease builds only, RAM only, both on at boot): telnet keys m (wscool) and t (wsabort), REST names wscool and wsabort.
-// A release build has no switch and always runs both measures. With a switch off the handler behaves exactly like the handler of the
+// A release build has no switch: it runs what WS_RELEASE_COOLDOWN and WS_RELEASE_ABORT say, one constant per measure. They stay false
+// (the behaviour of the send-guard build 3f9176298) until the lane A matrix (TASK-3123 AC5, n >= 5 per arm on .76) shows an arm that is
+// no worse than base on stall length and panics; the release default then follows that data with a one-line change here. With a switch off the handler behaves exactly like the handler of the
 // send-guard build 3f9176298 (tests/test_ws_handshake_lowmem_arms.py compares the two on a grid, byte for byte).
+static const bool WS_RELEASE_COOLDOWN = false;
+static const bool WS_RELEASE_ABORT = false;
 static bool wsCooldownArmed() {
 #if defined(_VERSION_PRERELEASE)
   return state.debug.bWsCooldown;
 #else
-  return true;
+  return WS_RELEASE_COOLDOWN;
 #endif
 }
 static bool wsAbortArmed() {
 #if defined(_VERSION_PRERELEASE)
   return state.debug.bWsAbort;
 #else
-  return true;
+  return WS_RELEASE_ABORT;
 #endif
 }
 static bool wsHandshakeHandler(AsyncWebServerRequest* request) {
