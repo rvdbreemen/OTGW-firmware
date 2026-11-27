@@ -4,8 +4,10 @@ title: >-
   Remote telemetry: settings and REST (opt-in state, ask flag, consent version,
   deletion request)
 status: To Do
-assignee: []
+assignee:
+  - '@otgw-poc-dev'
 created_date: '2026-11-27T18:53:00Z'
+updated_date: '2026-11-27T19:54:00Z'
 labels: []
 milestone: 2.0.0
 dependencies: []

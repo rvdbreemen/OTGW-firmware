@@ -3,9 +3,9 @@ id: TASK-3119
 title: Panic when a new /ws connection is rejected under critical heap
 status: In Progress
 assignee:
-  - '@claude'
+  - '@otgw-dev'
 created_date: '2026-11-27T08:04:00Z'
-updated_date: '2026-11-27T12:39:00Z'
+updated_date: '2026-11-27T19:53:00Z'
 labels:
   - bug
   - ws

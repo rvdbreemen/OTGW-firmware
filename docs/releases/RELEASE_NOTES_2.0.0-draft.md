@@ -8,6 +8,8 @@
 
 <!-- Refreshed 2026-11-20 against dev at beta.401 (TASK-1740, 95): beta.383 to beta.401 checked per bump; added TASK-2043 (beta.386), TASK-2023 (beta.387), TASK-2914 (beta.392), TASK-2923 (beta.394), TASK-2037 (beta.396), TASK-2928 (beta.399), TASK-2932 (beta.400); beta.395 fixes the beta.393 chip itself, beta.397 and beta.398 touch prerelease debug keys only (no change in a stable build). New section Remote telemetry (TASK-2937, not on dev yet). Refreshed again 2026-11-20 for beta.402 (TASK-2946) and the CONTRIBUTORS.md highlight (TASK-2947). Highlight graph history corrected from 24 hours to 7 days (TASK-1963, ADR-245). -->
 
+<!-- Refreshed 2026-11-27 (otgw-docs) against dev at beta.474: OTGW32 version wording (Version 1.0 is the first production run), remote telemetry section rewritten from the approved dialog text, ADR-298 table and upgrade paths, Known issues carry-over. Local draft, not pushed. -->
+
 <!-- Review (95, 2026-11-20): stable date moved to Sunday 29 November 2026 (Robert "A", DM 1573294949347233795): the MQTT pacer consolidation and the switch to our espMqttClient fork (rvdbreemen/espMqttClient as the dependency) go into 2.0.0. Both are placeholders below until their bench OK. -->
 
 **Status:** draft, not released. **Planned:** Sunday 29 November 2026. **Branch:** dev. **Compared with:** the 1.x line (latest stable v1.7.9).
@@ -19,7 +21,7 @@
 **Supported hardware:** exactly two configurations. Use the combo image (`esp32-combo`) for both.
 
 1. **The OTGW Classic with an ESP32-S3 module** (a LOLIN S3 Mini or S3 Mini Pro in the module socket). The PIC stays in place and talks OpenTherm.
-2. **The OpenTherm Gateway OTGW32.** A board with an ESP32-S3 that speaks OpenTherm itself (OT-Direct), without a PIC. Hardware versions 1.0 and 1.1 are very similar; version 1.1 has an optional bypass relay that is not fitted as supplied and is not used by the firmware.
+2. **The OpenTherm Gateway OTGW32.** A board with an ESP32-S3 that speaks OpenTherm itself (OT-Direct), without a PIC. Version 1.0 of the OTGW32 is the first production run. The firmware does not use a bypass relay.
 
 Everything the gateway is for (OpenTherm, MQTT, Home Assistant, SAT) works on the OTGW32. A few optional extras (Bluetooth sensors, long graph history, bigger buffers) need PSRAM (extra working memory) and are off on this board.
 
@@ -67,18 +69,17 @@ Without SAT, the gateway behaves as a transparent OpenTherm gateway, as in 1.x.
 
 ## Remote telemetry is opt-in and off by default
 
-<!-- Review (95, 2026-11-20): written from ADR-263, the approved onboarding text in v2.js (I18N_EN.rtel) and the TASK-2937 commits ce95a638f and 1a0ea6302 on lane-5e-adr. Those commits are not on dev yet: keep this section only if TASK-2937 lands before the stable tag. To be matched with 92's text. -->
+<!-- Rewritten 2026-11-27 (otgw-docs) from the approved dialog text (draft 2, English) and ADR-302 (Proposed). It must say nothing stronger than the dialog the stable ships: re-check against the consent text and the field list at the release commit. Experimental label stays while the feature is experimental. -->
 
-Remote telemetry helps make the firmware better. It is **off by default** and nothing is sent until you turn it on yourself.
+Remote telemetry sends a diagnostic recording from your gateway to a server of the firmware maker, so we can see real systems and not only our test bench. It is **off by default**: nothing is sent until you say yes. It is experimental and only for boards with PSRAM (extra memory).
 
-- **Where you choose:** the last step of the setup wizard asks; on a gateway that is already set up, a one-time question asks once ("No, keep it off" is the default). You can change it at any time under **Settings > General** ("Send remote telemetry").
-- **What is sent:** OpenTherm messages, the decisions of the SAT control, firmware error messages and your settings. These also include the weather location, the name of your gateway and the room temperature. Passwords and tokens are never sent. Your gateway is recognisable by a device ID, not by your name.
-- **How:** encrypted, via Cloudflare to the maker's NAS, in the Netherlands.
-- **How long:** deleted automatically after 30 days.
-- **What for:** only for improving and validating the firmware.
-- **Off means off:** when you turn it off, the gateway stops sending and drops what it had not sent yet. The choice is stored on the gateway itself, not in `settings.ini`.
-- **Boards with PSRAM only.** Remote telemetry needs a board with PSRAM (ADR-263). On a board without PSRAM the wizard does not offer it and the switch is disabled with "Needs a board with PSRAM".
-- **Status in the header:** while it is on, a badge shows "Telemetry online", "Telemetry paused" or "Telemetry offline". While it is off, there is no badge.
+- **Where you choose:** a dialog asks once; a "No" is final. You can switch it on or off at any time under **Settings > System > Remote telemetry**; turning it off stops sending at once.
+- **What is sent:** OpenTherm messages between thermostat and boiler, the decisions of the SAT control, firmware error and debug lines, and gateway events such as setting changes, MQTT and REST traffic, and weather and sensor readings. Settings are sent as numbers and on/off values; text values only as "set" or "empty". A weather location is rounded to about 11 km. The dialog also lists what can still be in the data; read it before you say yes.
+- **Where it goes:** a server of the firmware maker (a NAS at the maker's home), over an encrypted connection that passes through Cloudflare's network, which can technically see it in transit.
+- **How long:** deleted from the server after 30 days.
+- **Your gateway** is recognised by an ID that cannot be traced back to its MAC address, not by your name.
+- **Boards without PSRAM:** the setting is greyed out and nothing is ever sent.
+- **To have your data deleted:** quote your telemetry ID in a GitHub issue or on the Discord support channel; we delete everything under that ID within 7 days. Switching telemetry off stops sending at once but does not delete data that was already sent; all data is deleted after 30 days anyway. Traffic on the OTmonitor port (25238) is not recorded.
 
 ---
 
@@ -95,6 +96,13 @@ curl http://<ip>/api/v2/settings -o settings-backup.json
 - **A new S3 Mini, or a unit on 1.x or on an old partition layout, needs a USB first flash with `flash_otgw`.** For a unit that holds settings the tool saves them, writes the new layout, keeps your WiFi credentials and restores the settings. Windows: `flash_otgw.bat --migrate --host <ip>`. Linux/macOS: `./flash_otgw.sh --migrate --host <ip>`. See the README and the [WiFi firmware update guide](https://github.com/rvdbreemen/OTGW-firmware/blob/dev/docs/guides/WIFI_FIRMWARE_UPDATE.md).
 - **A unit that already runs 2.0.0** (beta.1 or later, or a 2.0.0 alpha with the safeboot layout) **updates over WiFi with the flash zip.** Open `/update`, give it the release zip and press **Update**. The page runs the whole sequence: firmware through the safeboot updater, then the filesystem. Settings are kept. Let it finish: this build expects the new filesystem with the gzipped pages. Between the two steps it serves the plain page of the old filesystem.
 - Coming from 1.x: this is a different firmware line. Settings and the web UI differ. Read the breaking changes below.
+
+**2b. Upgrade paths to the stable** [verify each path on a bench unit before the release]:
+
+- **From 1.x (ESP8266):** a different firmware line. The ESP8266 board is replaced by an ESP32-S3 module (LOLIN S3 Mini or S3 Mini Pro); first flash over USB with `flash_otgw`. Settings do not carry over automatically; read the breaking changes below.
+- **From a 2.0.0 beta on the 2240 KB table** (every beta up to the one that brings the new table): one USB migration with `flash_otgw --migrate --host <ip>` (Windows `flash_otgw.bat`, Linux and macOS `./flash_otgw.sh`). Over-the-air update alone is not enough: the new firmware on the old table keeps your settings but warns at boot and in `/update`, and the file-system step is refused. [verify: the bridge beta with the guards, ADR-298 release order]
+- **From the beta that already has the new table:** open `/update`, give it the release zip, press **Update**.
+- **Going back:** a migrated unit is rolled back only with the old release's full merged image over USB, never with the old tool's `--update`.
 
 **3. Interrupted filesystem upload.** If the filesystem upload stops part-way, the settings are no longer lost. The gateway wipes the filesystem, writes your settings back from memory and asks you to upload the filesystem again. Until you do, it serves a fallback page with the file explorer upload (`device/info` reports `fsupdateincomplete`).
 
@@ -177,7 +185,7 @@ The items below changed during the 2.0.0 alphas and betas; most concern SAT, whi
 
 - **The classic web UI is removed; v2 is the only web UI** (ADR-192). The UI switch and the classic-only `ui_*` settings are gone. The File Explorer is the recovery page.
 - **Classic UI features not in v2:** the UI switch button; the heap footer; log persistence across page reloads; resizable table columns; the 8-option graph window list; graph disconnect markers; auto-hiding the log on small screens; the `otgwDebug` console helper; the design showcase page; WiFi network scan (the REST endpoint `GET /api/v2/network/scan` stays); the classic display preferences; weather location auto-fill and the OpenWeatherMap key wizard.
-- **New flash layout on 4 MB boards** (ADR-191): safeboot 960 KB, firmware 2240 KB, filesystem 768 KB. "Every unit needs one USB migration."
+- **New flash layout on 4 MB boards** (ADR-191, then ADR-298): safeboot 960 KB, firmware 2304 KB, filesystem 704 KB [verify at the tag: the 2304 KB table ships in the beta of 30 Nov and is in the stable]. Every unit that still has the 2240 KB table needs one USB migration (`flash_otgw --migrate --host <ip>`); settings.ini and dallas_labels.ini are saved first and restored, WiFi stays, other files on the filesystem are lost.
 - **GPIO output and webhook trigger-bit labels** were the wrong way round in the v2 settings page. Stored values are unchanged, so check the select after the update.
 
 ---
@@ -188,13 +196,13 @@ Most changes since the first 2.0.0 beta are already described above (Highlights 
 
 ### SAT
 
-- The derivative gain of the SAT PID is 0.05 x 8400 x Kp (was 0.063 x 8400 x Kp) (Sergeant D entries 425 and 427, TASK-2043, beta.386).
+- The derivative gain of the SAT PID is 0.04 x 8400 x Kp (it was 0.063, then 0.05; thermo-nova uses 0.07) (TASK-2043, TASK-3041).
 - With the room outside the 0.1 C band around the target, the PID integral is halved once and then held instead of reset to 0; the same applies to the zone thermostats (TASK-1890, beta.376).
 - SAT no longer switches from continuous to PWM while the tolerance band pauses heating (TASK-1887, beta.377).
 - PWM ON phases that start during a band pause do not count toward the hourly start limit, and the SAT narration names the value that decided a band stop or restart (TASK-1887, beta.358).
 - Fixed: within one burn SAT no longer flips back and forth between continuous and PWM, and those PWM re-entries no longer use up the cycles-per-hour limit. Once a burn has gone from PWM back to continuous, the switch margin no longer moves it to PWM: SAT stays continuous until the flame goes out, and only the safety switch can still take that burn to PWM. Only the first PWM ON of a burn counts toward the hourly limit. The safety switch back to PWM acts at 3.0 C above the request for 30 s instead of 3.5 C (Sergeant D entries 428 to 430, TASK-2913, beta.391).
 - SAT switches from continuous to PWM when the flow stays at least 2.0 C above its request for 60 s; the "PWM switch margin" setting (0.5 to 5.0 C) is in the web UI, REST and MQTT, and the 30 s safety switch stays (3.5 C, from beta.391 3.0 C) (TASK-1888, beta.345; TASK-2005, beta.361).
-- SAT leaves PWM for continuous mode when the flame is on and the request stays above the flow for 60 s (TASK-1933, beta.274).
+- SAT leaves PWM for continuous mode in two cases: a sustained underheat, when the flow stays at least 3.0 C under the requested setpoint for 180 s and the flame has burned at least 180 s (so no earlier than about 6 minutes after ignition), or saturation, when the PWM off time stays at 0 for 300 s. Neither exit fires in the first 60 s after the first flame of a heating start. This replaces the earlier rule "flame on and request above the flow for 60 s" (TASK-1933, beta.274) (TASK-3008).
 - The PWM ON setpoint follows the latest flow temperature, as thermo-nova does (TASK-1990, beta.343, after the 2 minute average of beta.330 and beta.333).
 - SAT raises a diagnostic event when the burner does not light or heating fails, and leaves those hours out of the heating curve self-tune; it takes no control action (TASK-1882, beta.341).
 - A self-tune hour counts at 90 % clean ticks (108 of 120); ticks left out for hot water or sun only stay out of the hour's mean (TASK-1932, beta.339).
@@ -211,6 +219,19 @@ Most changes since the first 2.0.0 beta are already described above (Highlights 
 - Ten SAT settings show the range the gateway really stores, in the web UI and in `GET /api/v2/settings`; very small lower limits such as 0.005 are shown as they are (TASK-1941, beta.264 and beta.285).
 - SAT calibration markers are handled in memory and written to flash in the background, not from the web server (TASK-1911, beta.284).
 
+- No SAT command in the first 60 s after a reboot, then the heating curve alone until the first room temperature arrives; the gateway's own start-up reads of the boiler still run at once (TASK-1866, beta.348). Host test; with SAT on, the 60 s wait rests on the host test.
+- The PWM duty cycle follows the live flow temperature while the burner is on: duty = (requested setpoint - base) / (flow - base). Before, SAT used a boiler temperature frozen 180 s after ignition, so the duty hit 100 % during warm-up, SAT asked for full modulation and the burner overshot. While the burner is off the flow of the last ON moment is frozen; full modulation (`MM=T`) is asked only when the duty before capping is above 1.03 (TASK-2992, TASK-2993, beta.410). Host tests and a replay of a field flame; bench runs with the SAT simulator, not a real boiler.
+- In one flame the PWM ON time is one clock: it counts only PWM time, stands still in continuous, and continues when the fail-safe returns SAT to PWM (TASK-3039). Bench-tested with the SAT simulator on one unit; not with a real boiler.
+- The PID values Kp, Ki and Kd are rounded to 6 decimals instead of 3, so Ki no longer rounds to 0 at a low curve value; the PID output and the Summer Simmer index are rounded to 1 decimal, as in thermo-nova. Published MQTT and REST decimals are unchanged (TASK-3050).
+- A hot-water tap late in a heating burst no longer makes the next pause longer than needed: SAT keeps the flow temperature from just before the tap for the rest of that burst (TASK-3099, beta.452). Automatic checks only; not seen with a real hot-water tap.
+- SAT uses a Bluetooth (BLE) room sensor only when you chose it; an unchosen sensor never feeds SAT, and failing over from one BLE sensor to another is off by default (TASK-3011, beta.416).
+- SAT publishes which room temperature it actually uses: retained MQTT topic `sat/room_temp_source` (ble, areas, external, thermostat, simulation, estimate, none) and a Home Assistant diagnostic sensor "SAT Room Temp Source" (TASK-3015, beta.416).
+- A false No-ignition message is gone: while the tolerance band held the central heating off, the check counted the pause as heating asked for (TASK-3034).
+- Frost guard for a gateway without a thermostat: with SAT off and no thermostat seen on the OpenTherm bus, a room at or below 6 C makes the gateway ask the boiler for heat with a flow setpoint of 30 C until the room is back at 7 C. The temperatures are fixed. The room temperature must come from the Bluetooth sensor you chose for SAT or the external room temperature; without one the guard does nothing, and a `CS=` you set yourself takes precedence. Telnet lines `SAT: frost guard on` and `off`, REST `frost_guard_active` (TASK-3021). Bench: one OTGW Classic, no boiler; a thermostat appearing on the bus was not tested.
+- A thermostat setpoint change that equals one of the SAT presets selects that preset (TASK-3032, beta.474). Host tests; the thermostat path has not run with a real thermostat.
+- SAT zone count: new and reset installations start with 0 extra rooms (the old default 1 counted the main room); an existing settings file keeps its value. Zone topics `sat/zone/<n>/active|output|error` appear only for an extra room that has received data, `sat/zone_count` is retained and `/api/v2/sat/status` has a `zones` array (TASK-3102, beta.474). Host tests; the retained echo has a known limit, see Known issues.
+- The setting `satzoneheadroom` is removed: it had no effect (the zones always ask for the highest zone output). `POST /api/v2/settings` with this key answers 400 `Unknown setting name`; an old `settings.ini` that still has it loads normally (TASK-3089).
+- SAT settings are regrouped in the web UI: "Averaged room sensors" and "Zones" are two groups, the averaged sensors are numbered 1-4; setting keys, MQTT and REST did not change (TASK-3014).
 ### Home Assistant and MQTT
 
 <!-- Placeholder (after bench): MQTT pacer consolidation, one pacer for every MQTT publish path; describe the user-visible effect (publish timing, free memory under bursts) once its task and bench evidence are on dev. -->
@@ -223,6 +244,10 @@ Most changes since the first 2.0.0 beta are already described above (Highlights 
 - MQTT commands keep working after a low-memory connect: a refused command subscription is retried until accepted (TASK-1778, beta.260).
 - A planned reboot publishes the retained "offline" status first and then disconnects (TASK-1780, beta.262).
 
+- Weather location over MQTT: set `sat/weather_lat` (-90 to 90) and `sat/weather_lon` (-180 to 180); a value outside the range, or not one number, is ignored. The REST settings `satweatherlat` and `satweatherlon` are unchanged (TASK-3016, beta.474). Host tests and MQTT set steps on a test unit; see Known issues for when the retained echo stays empty.
+- The OpenTherm support table on MQTT: retained topics `otgw-firmware/boiler/supported_msgids` (the MsgIDs your boiler acknowledged) and `otgw-firmware/thermostat/sent_msgids` (the MsgIDs your thermostat sent), the same data as the OT support table in the web UI (TASK-3000).
+- New retained topic `otgw-firmware/thermostat/override_refused`: "false" when the thermostat's own setpoint follows a `TT=` or `TC=` override within 0.25 C, "true" when it still differs 300 seconds after the command. Host tests only; not run with a real thermostat (TASK-3033, beta.474).
+- The entities of each paired Bluetooth probe (temperature, humidity, battery, signal) carry the gateway availability and expire after 21 minutes without a value, so a dead probe shows `unavailable`; topics, unique ids and names do not change (TASK-2971). Host test; not bench-verified.
 ### Web UI and graphs
 
 - While SAT controls the heating, the room temperature on the Home page is the one SAT regulates on (for example your MQTT or BLE sensor), like the setpoint next to it and the Home Assistant thermostat card; the thermostat's own reading is in the tooltip. With SAT off, or while SAT has no valid room temperature, the page shows the thermostat's reading as before (TASK-2946, beta.402).
@@ -246,6 +271,15 @@ Most changes since the first 2.0.0 beta are already described above (Highlights 
 - Mission control follows the light and dark theme (TASK-1863, beta.267).
 - On a phone the language button and the Light/Dark switch have the same height (TASK-1873, beta.266).
 
+- The live log no longer stops silently: the gateway closes a live-log connection that stops taking data (after about 70 s), and the web UI reconnects by itself when its live log has been silent for 90 s (about 150 s in a background tab) (TASK-3017, beta.418). Host tests and bench runs including a 2 h run; a reconnect took about 7 s.
+- Memory emergencies and the live connections of the web UI (beta.458): stuck browser tabs are cleaned up when memory runs low (TASK-3025), a new live connection is refused early when memory is almost gone (TASK-3119), and an out-of-memory error in the live-log sending on a board without extra memory is caught (TASK-3122). After a severe low-memory event the web interface can still be unreachable for up to about 3 minutes, see Known issues.
+- The page reconnects politely: the web socket retries after 5, 10, 20, 40 and then 60 seconds with some jitter, pauses after three sockets that opened and closed within a minute (a Reconnect button resumes) (TASK-3124, beta.474). Tried in headless Chrome only.
+- The room temperature says whose it is: the overview has a visible thermostat line, the tag says which room temperature it shows, and the graph series are named so that the thermostat room (MsgID 24) and SAT's room source can be told apart, in English, Dutch and German (TASK-3035).
+- SAT page and Home polish: a paused SAT no longer repeats the same message three times and no longer draws a full modulation band or PID values in the history (TASK-3012); the SAT page shows one clear status per state, with a dash for values that are not available (TASK-2957); clearer texts and empty states (TASK-2959).
+- Accessibility and contrast: a "Skip to content" link, one main heading, labelled navigation, one visible focus ring, Settings categories reachable with Tab, Enter and Space, and the focus stays on the category after Enter (TASK-2958, TASK-2982, TASK-2991); better colour contrast in light and dark theme, 8 to 0 low-contrast findings in a design check (TASK-2956, TASK-2998, TASK-2997). Web UI tests on the real files.
+- Phone width: edge fade where more content is hidden, and Settings rail items on one line on wide screens (TASK-2960); the PIC firmware file table (TASK-3051) and the File System table (TASK-2926) fit a phone screen; the help popover stays inside its card and the chart axis label no longer touches the axis (TASK-3058, TASK-3052). Checked in a real browser layout with synthetic data.
+- The About screen at the end of Settings has three cards: Makers, Credits and Community, with a link to the full list in CONTRIBUTORS.md (TASK-2948, beta.403).
+- Clearer English settings help: `ethdns` names the router, and the PWM cycle help gives minutes like the dropdowns; other languages follow the translation sync (TASK-3118, beta.474).
 ### REST API
 
 - Fixed a crash when two web requests arrived while memory was nearly exhausted: the "busy" answer itself needed memory and stopped the firmware. With the largest free memory block under 4 KB the gateway now closes that connection without an answer; above it the 503 with `Retry-After` is unchanged (TASK-2910, beta.389).
@@ -299,6 +333,7 @@ Timing and reliability:
 - A boiler "data invalid" answer is never stored as a value (TASK-1925, beta.280).
 - MsgIDs 1, 3, 14, 17 and 25 are never switched off after "unknown" answers (TASK-1801, beta.293).
 
+- OTGW32 pin defaults (TASK-3120, beta.474): Dallas sensors start on GPIO 4 (the old default GPIO 10 is a board pin and was refused, so sensors never started) and the S0 counter on GPIO 5, the DI pin of the terminal block (the old default GPIO 12 is the Ethernet clock). An installation that still holds an old default is moved once; a pin you chose yourself is never changed. The GPIO output has no pad on this board and is hidden and refused. The S0 counter does not start on the pin the enabled 1-wire sensors use. Host tests; counting S0 pulses on the DI pin is untested. The DI pad and the 1-wire pad are 3.3 V inputs and are not 5 V tolerant: do not connect an S0 meter or sensor that drives them to 5 V or 12 V (reported by the board's hardware owner).
 ### PIC (OTGW Classic)
 
 - The PIC settings fill in about a minute after a restart instead of four to five (TASK-1971, beta.340).
@@ -316,6 +351,7 @@ Timing and reliability:
 - The filesystem health check no longer writes to flash every 5 minutes; an unwritable filesystem is reported as health DEGRADED after the next SAT state-file write (TASK-2020, beta.373).
 - A reset during a save no longer empties the thermostat and boiler support files or the boot-detection log (TASK-1916, beta.282).
 
+- Release files (TASK-3116, beta.474): the GitHub release has no loose `.ino.bin` or `.littlefs.bin` file and `SHA256SUMS` lists none, because an old 1.x flash tool matches those names and would write a 2.x image to an ESP8266. The images stay inside the `-flash.zip`.
 ### BLE (Bluetooth sensors)
 
 - On boards without PSRAM BLE can no longer be switched on (greyed out with "BLE needs PSRAM", refused by REST with 409 and by MQTT, a stored "on" cleared at first start); the LOLIN S3 Mini and S3 Mini Pro keep BLE (TASK-2025, beta.375).
@@ -329,6 +365,10 @@ Timing and reliability:
 - On macOS with the built-in Python 3.9 the capture tool writes the graph history CSV again (TASK-2016).
 - The device check no longer counts an OT-Direct route that answers "not on this board" as a failure on an OTGW Classic (TASK-2012).
 
+- A failing output folder no longer loses a long capture: a failed write closes the file of that stream and the next write opens it again, lines of a folder that cannot be written are kept in memory (up to 8 MiB) and saved in a local fallback folder at the end, and a write that hangs on a stopped share is given up after 10 seconds (TASK-3006).
+- The capture tool records a sleep of the capture computer as a gap ("capture machine asleep or suspended") (TASK-2922).
+- Double-clicking `capture-mqtt-debug.bat` or `flash_otgw.bat` keeps the window open at the end, and the capture asks how long to record: until you press Q, 24 hours, or 3 days (TASK-2965).
+- The flash zip contains `sat_log_to_csv.py`, so the capture tool writes its SAT CSV files again (TASK-2917).
 ### WiFi
 
 - **The WiFi AP fallback is now part of the stable release** (TASK-2931, Robert's decision, beta.401). When the saved WiFi network cannot be reached, after 2 failed attempts (about a minute) or at boot, the gateway opens its own access point `OTGW-<last 3 bytes of the MAC>` (password `otgw1234`, web UI at `http://192.168.4.1`) and retries your network every 5 minutes. There is no AP fallback with the setting `wifinoportal` (the gateway keeps retrying without restarting) or, at runtime, while memory is critically low (it then restarts after 10 failed attempts; TASK-2923, beta.394, after a crash on a starved heap on the bench). Before beta.401 only beta builds had it. See section 6.1.3 of the manual.
@@ -357,6 +397,12 @@ These are design limits of 2.0.0, not bugs.
 
 ## Known issues
 
+- **Hardware limit of the OTGW32: 3.3 V only.** The DI pad (GPIO 5, the S0 default) and the 1-wire pad (GPIO 4) are 3.3 V inputs and are not 5 V tolerant. Do not connect an S0 meter or sensor that drives them to 5 V or 12 V (reported by the board's hardware owner).
+<!-- Carry-over from the beta.474 notes (2026-11-27, otgw-docs): re-check each item at the release commit. -->
+- **WiFi packet loss and failing filesystem updates while BLE scanning is on** (TASK-3126). On a Classic with an S3 module, BLE scanning can cause WiFi packet loss; a filesystem update over WiFi failed 5 of 5 times with BLE on in our tests (one unit). If an update fails, turn off "Enable BLE sensors" under Settings > Sensors, reboot, repeat the update.
+- **The web interface can be unreachable for up to about 3 minutes after a severe low-memory event** (TASK-3025, TASK-3119, TASK-3123). It recovers by itself; on a board without extra memory open pages can reconnect repeatedly. Close extra tabs.
+- **Memory dip in the first minutes after a start on a unit without extra memory** (TASK-3024).
+- **The retained state echo of the SAT settings topics** (`sat/weather_lat`, `sat/weather_lon`, `sat/zone_count` and the other static `sat/*` settings) is published only once SAT is not held back by its start gates: the first 60 seconds after boot, a lost OpenTherm link, or a missing outside temperature (TASK-3129). Setting them over MQTT or REST still works.
 - **Most settings help pop-ups are in English in Dutch, German and Greek** (TASK-2927). The rest of the web UI is translated, and every help text falls back to English, so no help is missing. The translation follows in 2.1.0 (Robert's decision, 2026-11-19).
 
 - **Under investigation: once, a bench unit hung after a crash restart** (TASK-2911). It was on WiFi with an address, but did not answer ping, the web UI or telnet for 8 minutes, until a USB reset; the cause is not known. Normal restarts on that unit worked 5 of 5 times. The WiFi self-recovery only starts after the gateway's router answered once since the start, so it does not cover this case. If your gateway is on WiFi but unreachable after a restart, please tell us.

@@ -12245,6 +12245,135 @@
       "title": "Remote telemetry in the normal build: what is collected and never collected, consent with a version, 30-day retention, deletion on request, the collection point and the PSRAM gate",
       "path": "ADR-302-remote-telemetry-in-the-normal-build-what-is-collected-and-never-collected-consent-with-a-version-30-day-retention-deletion-on-request-the-collection-point-and-the-psram-gate.md",
       "format": "canonical",
+      "status": "Accepted",
+      "date": "2026-11-27",
+      "decision_summary": "Remote telemetry ships in the normal esp32-combo build as an experimental, opt-in feature on boards with PSRAM only.",
+      "topics": [
+        "consent",
+        "data retention",
+        "privacy",
+        "remote telemetry"
+      ],
+      "aliases": [
+        "cloud telemetry",
+        "telemetry data contract"
+      ],
+      "components": [
+        "RemoteTelemetryDevice",
+        "RemoteTelemetryPolicy",
+        "telemetry field list"
+      ],
+      "symbols": [
+        "REMOTE_TELEMETRY_INTERVAL_MS",
+        "REMOTE_TELEMETRY_RING_PSRAM"
+      ],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [
+          "Send nothing until the user has turned telemetry on and agreed to the current consentver.",
+          "Send only fields on the reviewed field list, and every free-text value as set or empty.",
+          "Use the pseudonymous telemetry ID as the only central identity.",
+          "Round the location to 0.1 degree.",
+          "Delete every record older than 30 days on the collection point, and a telemetry ID's data within 7 days of a request.",
+          "Gate everything on PSRAM at runtime (ADR-218), and allocate the ring from PSRAM once (ADR-263).",
+          "Keep every capture point under 10 ms, and count a loss instead of waiting.",
+          "Label the feature experimental in the dialog, in the Settings row and in the release notes."
+        ],
+        "must_not": [
+          "Send any item of the never-collected list (decision 3).",
+          "Turn telemetry on by default, by an update or by a settings.ini restore (ADR-299).",
+          "Attempt a TLS handshake or allocate the ring on a board without PSRAM.",
+          "Disable certificate verification.",
+          "Let the collection point change the opt-in."
+        ],
+        "exceptions": [
+          "None."
+        ],
+        "verification": [
+          "A host test on a recorded sample from the real encoder finds zero hits for an IPv4 address, a MAC in any form, the bench SSID, the host name and an @ e-mail pattern. It fails on a mutant that leaks one of them (TASK-3010 AC5).",
+          "A host test of the policy shows:",
+          "no send before consent;",
+          "a new consentver asks again;",
+          "the PSRAM gate refuses an \"on\" write. It is red on code without the version check.",
+          "A server check shows that a record older than 30 days is gone after the retention hook runs, and that a deletion request removes every record of a test ID.",
+          "otgw-bench-tester runs a bench on .63 (PSRAM) and .76 (no PSRAM):",
+          "on .63: off after the update; on through the dialog; records arrive; a switch-off stops at once; a 60 min soak shows a flat heap;",
+          "on .76: no dialog; the row is disabled; an \"on\" write is ignored; no TLS attempt shows in telnet or the counters;",
+          "a decoded download is checked against the never-collected list.",
+          "otgw-architect reviews the field list before the beta, and the review findings are resolved in the list."
+        ]
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
+    },
+    {
+      "id": "ADR-303",
+      "title": "BLE child-device entities in Home Assistant expire when their values stop, after 1260 s (partly supersedes ADR-102 for BLE sensors only)",
+      "path": "ADR-303-ble-child-device-entities-in-home-assistant-expire-when-their-values-stop-after-1260-s-partly-supersedes-adr-102-for-ble-sensors-only.md",
+      "format": "canonical",
+      "status": "Proposed",
+      "date": "2026-11-27",
+      "decision_summary": "BLE child-device entities (temperature, humidity, battery and signal strength of each probe) carry, next to the gatew...",
+      "topics": [
+        "ble sensors",
+        "expire_after",
+        "home assistant availability"
+      ],
+      "aliases": [
+        "ble expire after",
+        "H5 ble availability"
+      ],
+      "components": [
+        "satBLEPublishOneDiscovery"
+      ],
+      "symbols": [
+        "BLE_HA_EXPIRE_AFTER_S"
+      ],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [
+          "Set expaft only on the BLE child-device entities, from one constant derived from the heartbeat and the scan interval.",
+          "Keep the gateway availability topic (avtyt) on those entities as well (ADR-102).",
+          "Fail a host test when the heartbeat or the scan interval grows past the constant."
+        ],
+        "must_not": [
+          "Put expireafter on any OpenTherm, SAT, Dallas or gateway entity (ADR-102 Alternative 3 stays rejected there).",
+          "Change topics or uniqid of the BLE entities."
+        ],
+        "exceptions": [
+          "None."
+        ],
+        "verification": [
+          "tests/testblediscoveryavailability.py (the payload carries avtyt and expaft 1260; red on the code before c24417857, per the TASK-2971.1 notes; not re-run by otgw-architect).",
+          "Bench by otgw-bench-tester (TASK-2971.1 AC4): after an HA rediscovery no entity is lost, and a stopped BLE probe turns unavailable within 1260 s."
+        ]
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
+    },
+    {
+      "id": "ADR-304",
+      "title": "One beta carries the ADR-298 guards, the new partition table and remote telemetry together (partly supersedes ADR-298 release order)",
+      "path": "ADR-304-one-beta-carries-the-adr-298-guards-the-new-partition-table-and-remote-telemetry-together-partly-supersedes-adr-298-release-order.md",
+      "format": "canonical",
       "status": "Proposed",
       "date": "2026-11-27",
       "decision_summary": "State one concrete chosen approach and its rationale.",
@@ -20284,6 +20413,72 @@
     {
       "source": "ADR-301",
       "target": "ADR-295",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-302",
+      "target": "ADR-177",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-302",
+      "target": "ADR-217",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-302",
+      "target": "ADR-218",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-302",
+      "target": "ADR-263",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-302",
+      "target": "ADR-268",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-302",
+      "target": "ADR-290",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-302",
+      "target": "ADR-299",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-303",
+      "target": "ADR-102",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-303",
+      "target": "ADR-142",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-303",
+      "target": "ADR-148",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-303",
+      "target": "ADR-255",
       "type": "related",
       "resolved": true
     }

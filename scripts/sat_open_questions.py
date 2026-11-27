@@ -33,6 +33,47 @@ def rows(text):
             yield m.group(1), cells[1], cells[2], cells[3]
 
 
+MSG = re.compile(r"\[msg\]\((https://discord\.com/channels/\d+/\d+/(\d+))\)")
+
+
+def ledger_problems(text):
+    """Ledger guards (Robert, 2026-11-27: number every question uniquely, record it, never repeat a question).
+
+    Applied to the OPEN rows (asked or queued, not answered); answered history is grandfathered, because
+    older posts held several questions in one message and one id was reused once (Q-2005a).
+      1. an open question id is not used by a second row;
+      2. an asked row carries the Discord message id of its post as [msg](url);
+      3. one [msg](url) post id is not recorded in two different open rows (a re-ask of the same question
+         is a second link in the SAME row, not a new row).
+    """
+    problems = []
+    count = {}
+    for qid, ans, status, topic in rows(text):
+        count[qid] = count.get(qid, 0) + 1
+    post_rows = {}
+    for line in text.splitlines():
+        m = ROW.match(line)
+        if not m:
+            continue
+        cells = [c.strip() for c in line.strip().strip("|").split("|")]
+        if len(cells) < 4:
+            continue
+        qid, ans, status = m.group(1), cells[1], cells[2]
+        if not re.match(r"(asked|queued)\b", status, re.I) or ans.startswith("✓"):
+            continue
+        if count[qid] > 1:
+            problems.append(f"open question id {qid} is used by {count[qid]} rows")
+        links = {mm.group(2) for mm in MSG.finditer(status)}
+        if re.match(r"asked\b", status, re.I) and not links:
+            problems.append(f"{qid} is asked but its row has no [msg](discord link) with the post id")
+        for pid in links:
+            post_rows.setdefault(pid, set()).add(qid)
+    for pid, ids in post_rows.items():
+        if len(ids) > 1:
+            problems.append(f"post {pid} is recorded in more than one open row: {', '.join(sorted(ids))}")
+    return problems
+
+
 def open_rows(text):
     return [r for r in rows(text)
             if re.match(r"(asked|queued)\b", r[2], re.I) and not r[1].startswith("✓")]
@@ -70,6 +111,11 @@ def main(argv):
             return 2
         have = text[span[0]:span[1]]
         if "--check" in argv:
+            probs = ledger_problems(text)
+            if probs:
+                for pr in probs:
+                    print("ledger: " + pr, file=sys.stderr)
+                return 1
             if have != want:
                 print("Live queue is stale: run python scripts/sat_open_questions.py --update", file=sys.stderr)
                 return 1

@@ -285,4 +285,6 @@ One row per Architecture Decision Record. Scope is the Enforcement `path_glob` s
 | ADR-299 | Accepted | - | Remote telemetry is off until the user says yes, and the gateway asks the user in a dialog, at most at these moments. |
 | ADR-300 | Accepted | - | Decision maker: Robert van den Breemen (maintainer). |
 | ADR-301 | Accepted | - | At build time, scripts/patchpiolibs.py replaces the std::recursivemutex typedef in the libdeps copy of ESPAsyncWebSer... |
-| ADR-302 | Proposed | `src/**/*.py` | State one concrete chosen approach and its rationale. |
+| ADR-302 | Accepted | - | Remote telemetry ships in the normal esp32-combo build as an experimental, opt-in feature on boards with PSRAM only. |
+| ADR-303 | Proposed | - | BLE child-device entities (temperature, humidity, battery and signal strength of each probe) carry, next to the gatew... |
+| ADR-304 | Proposed | `src/**/*.py` | State one concrete chosen approach and its rationale. |

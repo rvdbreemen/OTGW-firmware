@@ -7,7 +7,7 @@ status: To Do
 assignee:
   - '@claude'
 created_date: '2026-11-27T12:33:00Z'
-updated_date: '2026-11-27T15:08:00Z'
+updated_date: '2026-11-27T20:10:00Z'
 labels:
   - webui
   - heap
@@ -25,14 +25,20 @@ The 456 K panic on the unit without PSRAM was an uncaught std::bad_alloc from op
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Every textAll()/text() call on the loop task in webSocketStuff.ino sits inside try { ... } catch (const std::bad_alloc&) { ... }, keepalive and log broadcast included (grep the call sites). The catch counts a drop (iWsDropsTotal) and a new counter ws_alloc_fail in GET /api/v2/device/info, and logs at most once per 10 s
-- [ ] #2 Host test with a stub textAll() that throws std::bad_alloc, calling the real sendLogToWebSocket: no terminate, the counter rises, wsSafeBufBusy is false afterwards; red on the code before the change, and a mutant without the catch fails it
+- [x] #1 Every textAll()/text() call on the loop task in webSocketStuff.ino sits inside try { ... } catch (const std::bad_alloc&) { ... }, keepalive and log broadcast included (grep the call sites). The catch counts a drop (iWsDropsTotal) and a new counter ws_alloc_fail in GET /api/v2/device/info, and logs at most once per 10 s
+- [x] #2 Host test with a stub textAll() that throws std::bad_alloc, calling the real sendLogToWebSocket: no terminate, the counter rises, wsSafeBufBusy is false afterwards; red on the code before the change, and a mutant without the catch fails it
 - [ ] #3 A grep note in the task lists other loop-task allocations that can throw (std containers, make_shared, String growth) in MQTTstuff, restAPI and OTGW-Core, with a judgement for each; only the /ws sites are fixed here, the others become their own tasks if needed
-- [ ] #4 Bench on the unit without PSRAM (otgw-bench-tester): K x3 with this build, no panic; ws_alloc_fail > 0 in at least one run, otherwise the run is reported as 'path not hit'
+- [x] #4 Bench on the unit without PSRAM (otgw-bench-tester): K x3 with this build, no panic; ws_alloc_fail > 0 in at least one run, otherwise the run is reported as 'path not hit'
 <!-- AC:END -->
 
 ## Implementation Notes
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-11-27 16:08 otgw-dev: pushed to origin/dev as merge commit f13bca537dcfa588c2e9d020bc44786e45cf384c (ff-only on c1326b990); the fix commit 3f9176298 (githash 3f91762, image 2.0.0-beta.458+3f91762) is its second parent and src/ is identical to it. Fix: every /ws broadcast goes through wsTextAllNoThrow(), which catches std::bad_alloc, drops the message, counts it (hd_ws_alloc_fail in /api/v2/health) and logs once per 10 s. Evidence: tests/test_ws_send_nothrow.py (4 tests, real send paths against a throwing textAll stub, mutants red); bench .76 with K x3 on 3f91762 = 0 panics in 3 (a9aa6a9: 2 of 3), the catch fired 502x in run 2; soaks 61 min on .63 and 71 min on .76 passed (bench-tester verdict files via coordinator). The commit message of 3f9176298 names TASK-3119 only (TASK-3122 files were not on its base). Still exposed, same family (the /ws broadcast path): client->close() in webSocketEvent reject branches, cleanupClients(), closeAll() (control-frame allocation); other loop-task allocations (MQTT publish gated only below 3072 B, String/vector growth, telnet) not audited.
+
+otgw-architect verification 2026-11-27 21:xx (D-class triage): AC1 holds: every /ws send on the loop task goes through wsTextAllNoThrow() (webSocketStuff.ino:383, 425, 493, 498; only textAll at :467 inside try/catch), drops count via wsNoteSendStatus -> iWsDropsTotal (:454), hd_ws_alloc_fail in sendDeviceInfoV2 (restAPI.ino:3544), log once per 10 s (WS_ALLOC_LOG_INTERVAL_MS). AC2 holds: tests/test_ws_send_nothrow.py + test_platform_tcp_abort_where.py 16 passed 1 skipped (rerun 21:xx); mutant red per commit 3f9176298 message. OPEN: AC3 (the grep note with a judgement per site in MQTTstuff/restAPI/OTGW-Core is not written; the 16:08 note says 'not audited'). AC4 is a bench AC for otgw-bench-tester: evidence OTGW-field-data/_train/b1rel61b.verdict.txt:3 'K x3 on this build BEFORE the soak ... 0 panics in 3 runs' and b1rel2.verdict.txt:13 'hd_ws_alloc_fail +502 in run 2'.
+
+2026-11-27 otgw-bench-tester, AC4 evidence (read by me in this session): .76 (OTGW32, no PSRAM) on beta.458+3f91762 (HEAD 3f9176298ff2, assert-head exit 0, ino sha256 a63ff46c...ca41): K x3 BEFORE the soak, 0 panics in 3 runs, hd_ws_alloc_fail +502 in run 2 (so the catch path was hit, not just 'path not hit'). Source: OTGW-field-data/_train/b1rel61b.verdict.txt line 3 and b1rel2.verdict.txt line 13; run data bench-61/2026-11-27_458 and NAS runs/ABC3F_76.
+
+Also on that build: 60+ min soak b1rel61b on .76 PASS (71 min, bootcount constant, 0 panic, hd_enter_critical 0, hd_ws_alloc_fail 0 since a clean reboot) and the B2 build 7d20639 soaks (b2rel PASS .63, b2rel61b2 PASS .76, b2rel61 FAIL = my own two overlapping browsers). NOT covered by AC4: the post-K stall/CRITICAL loop after release is still there (not a panic).
 <!-- SECTION:NOTES:END -->

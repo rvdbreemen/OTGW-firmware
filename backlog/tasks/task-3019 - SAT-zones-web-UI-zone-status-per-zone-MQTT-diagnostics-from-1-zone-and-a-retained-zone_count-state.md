@@ -7,7 +7,7 @@ status: To Do
 assignee:
   - '@claude'
 created_date: '2026-11-21T17:16:00Z'
-updated_date: '2026-11-26T10:20:00Z'
+updated_date: '2026-11-27T20:05:00Z'
 labels:
   - sat
   - mqtt
@@ -50,4 +50,6 @@ Not verified yet: everything above is plan only.
 2026-11-21: Robert confirmed the zone_count meaning (DM check answered A) and timing after Wednesday 25 Nov; recorded as entry 459 in the private SAT decision register. Open per entry 459: exact migration mapping of stored values (check how the code counts the main room first).
 
 2026-11-26 otgw-webui: AC1 already decided: Robert 2026-11-21 (msg 1573770202410123305) took all three requests, zone_count meaning confirmed by DM (entry 459). Open for the plan: migration mapping of stored zone_count (1 = main room only under the old meaning) after reading how the code counts the main room; timing after 25 Nov.
+
+otgw-architect verification 2026-11-27 21:xx (D-class triage): kept. Firmware side is in TASK-3102 (b56c4a143: zone topics from one extra room, retained sat/zone_count). OPEN in AC2: web UI zone status rows and the screenshots (owner otgw-webui), and a host test red/green named for this task.
 <!-- SECTION:NOTES:END -->
