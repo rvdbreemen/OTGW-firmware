@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v2.0.0-beta.462
+**  Version  : v2.0.0-beta.463
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -3997,8 +3997,6 @@ CmdQueueResult addCommandToQueue(const char* buf, const int len, const bool forc
     v[n] = '\0';
     satNoteExternalCS(v);
   }
-  // TASK-3033: note a TT=/TC= override (also SAT's own) unless the SAT rule below (and the OT-Direct handler) refuses it.
-  if (satOwn || !satOwnsControlSetpoint() || !satBlocksExternalCommand(buf, len)) otOverrideNoteCommand(buf, len);
   if (!isPICEnabled()) {
 #if HAS_DIRECT_OT
     // On OTGW32, route commands directly to OT-direct handler
@@ -4007,14 +4005,16 @@ CmdQueueResult addCommandToQueue(const char* buf, const int len, const bool forc
       // on the loop task, in order; a full ring is Dropped. On the loop task the older queued commands run first, and
       // while they must wait for a frame in flight, this one queues behind them.
       if (!platformOnLoopTask() || otdCmdTextMustWait()) {
-        if (otdCmdTextPush(buf, len, satOwn)) return CmdQueueResult::Queued;
+        if (otdCmdTextPush(buf, len, satOwn)) { otOverrideNoteCommand(buf, len); return CmdQueueResult::Queued; }   // TASK-3033: only an accepted command is noted
         OTDebugTf(PSTR("CmdQueue: OT-Direct command [%.*s] dropped, text ring full\r\n"), len, buf);
         return CmdQueueResult::Dropped;
       }
       otdCmdTextDrain();
       // TASK-1593: a command the OT-Direct handler refused (ring full, validation error, SAT-owned CS=) is Dropped, not Sent,
       // so SAT does not cache it as delivered.
-      return handleOTDirectCommand(buf, len, satOwn) ? CmdQueueResult::Sent : CmdQueueResult::Dropped;
+      if (!handleOTDirectCommand(buf, len, satOwn)) return CmdQueueResult::Dropped;
+      otOverrideNoteCommand(buf, len);   // TASK-3033
+      return CmdQueueResult::Sent;
     }
 #endif
     OTDebugTln(F("CmdQueue: No PIC or OT-direct detected - command ignored"));
@@ -4121,6 +4121,7 @@ CmdQueueResult addCommandToQueue(const char* buf, const int len, const bool forc
   if (len >= 2) triggerReadoutForSettingsCmd(buf);
 
   OTDebugFlush();
+  otOverrideNoteCommand(buf, len);   // TASK-3033: every Dropped path above returned before this line
   return result;
 }
 
@@ -5874,6 +5875,7 @@ void markOtSupportListsDirty(uint8_t bits)  { otSupportListsDirty |= bits; }   /
 void clearBoilerUnsupportedDirty() { boilerUnsupportedDirty = false; }
 
 // --- otOverride begin
+#include <atomic>
 // TASK-3033 (gruijter, Robert released it 2026-11-22): remember whether the thermostat follows a TT=/TC= override.
 // Observed behaviour only, no capability read. Same verdict rule as satPushRefusedDecide (TASK-1343): the thermostat's
 // own MsgID 16 T frame is within 0.25 C of the value sent = it follows; still different 300 s after the command = it
@@ -5883,7 +5885,7 @@ void clearBoilerUnsupportedDirty() { boilerUnsupportedDirty = false; }
 // override too and then reads like a refusal (Sergeant D entry 16): the verdict is "observed", not "capability".
 enum : uint8_t { OT_OVERRIDE_UNKNOWN = 0, OT_OVERRIDE_FOLLOWED = 1, OT_OVERRIDE_REFUSED = 2 };
 static uint8_t  otOverrideVerdict = OT_OVERRIDE_UNKNOWN;
-static bool     otOverridePending = false;
+static std::atomic<bool> otOverridePending{false};   // set last (release) so a frame on the loop task never reads half of a new override
 static float    otOverrideSentC   = 0.0f;
 static uint32_t otOverrideSentMs  = 0;
 static float    otOverrideLastTr  = 0.0f;
@@ -5905,20 +5907,21 @@ void otOverrideNoteCommand(const char* buf, int len) {
   char* endp = nullptr;
   const float f = strtof(v, &endp);
   if (endp == v || (*endp != '\0' && *endp != '\r' && *endp != '\n') || !isfinite(f)) return;
-  if (f <= 0.0f) { otOverridePending = false; return; }   // cancel: the verdict stays as it was
-  if (otOverrideLastTrValid && fabsf(otOverrideLastTr - f) <= 0.25f) { otOverridePending = false; return; }   // proves nothing
-  otOverridePending = true;
+  otOverridePending.store(false, std::memory_order_release);   // addCommandToQueue also runs on async_tcp: hide the old override first
+  if (f <= 0.0f) return;   // cancel: the verdict stays as it was
+  if (otOverrideLastTrValid && fabsf(otOverrideLastTr - f) <= 0.25f) return;   // proves nothing
   otOverrideSentC   = f;
   otOverrideSentMs  = millis();
+  otOverridePending.store(true, std::memory_order_release);
 }
 
 // Called from processOT() for every MsgID 16 T frame (the thermostat's own value). Flag and dirty bit only: the OT lock is held.
 bool otOverrideOnThermostatSetpoint(float tr) {
   otOverrideLastTr = tr;
   otOverrideLastTrValid = true;
-  if (!otOverridePending) return false;
+  if (!otOverridePending.load(std::memory_order_acquire)) return false;
   const uint8_t v = otOverrideJudge(otOverrideSentC, millis() - otOverrideSentMs, tr, otOverrideVerdict);
-  if (v == OT_OVERRIDE_FOLLOWED) otOverridePending = false;   // decided; a refusal stays pending until a later frame follows
+  if (v == OT_OVERRIDE_FOLLOWED) otOverridePending.store(false, std::memory_order_release);   // decided; a refusal stays pending until a later frame follows
   if (v == otOverrideVerdict) return false;
   otOverrideVerdict = v;
   otSupportListsDirty |= OT_SUPPORT_LIST_OVERRIDE;
@@ -6386,7 +6389,6 @@ void processOT(const char *buf, int len, bool suppressOutput, bool localAnswer, 
       if (OTdata.id == OT_TrSet && OTdata.rsptype == OTGW_THERMOSTAT && OTdata.type == OT_WRITE_DATA
           && !OTdata.skipthis && !OTdata.bReplayed) {
         satOnThermostatSetpoint(roundf(OTdata.f88() * 100.0f) / 100.0f);
-        otOverrideOnThermostatSetpoint(roundf(OTdata.f88() * 100.0f) / 100.0f);   // TASK-3033
       }
 
       if (OTdata.rsptype == OTGW_BOILER && !OTdata.skipthis && !OTdata.bLocalAnswer && !OTdata.bReplayed) pmChainOnBoilerResponse(OTdata.id);   // TASK-1315

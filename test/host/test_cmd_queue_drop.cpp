@@ -79,6 +79,12 @@ static void pmChainTick() {}
 static void triggerPICsettingsReadout() {}
 static bool isPICEnabled() { return true; }
 static bool satOwnsControlSetpoint() { return false; }
+static int g_noted = 0;
+static char g_notedLast[24] = "";
+static inline void otOverrideNoteCommand(const char* b, int n) {   // TASK-3033: noted in addCommandToQueue() once a command is accepted
+  g_noted++;
+  std::snprintf(g_notedLast, sizeof g_notedLast, "%.*s", n < 23 ? n : 23, b);
+}
 static void satNoteExternalCS(const char*) {}   // TASK-3021: addCommandToQueue() tells the frost guard about a foreign CS=
 // TASK-1695 refuse gate in addCommandToQueue(): never reached here, SAT does not own the setpoint (above).
 static bool satBlocksExternalCommand(const char*, int) { return false; }
@@ -281,6 +287,19 @@ int main() {
   add("HW=1", false);
   report("Q6", cmdQueueSize == 4 && inQueue("PM=1") && inQueue("PM=2") && inQueue("PR=A") && inQueue("HW=1"),
          "not full: HW=1 appended, no read evicted", std::to_string(cmdQueueSize) + " slot(s)");
+
+  // N1 (TASK-3033 review F1): a TC= that the full queue dropped is not noted as an override (it never left the gateway).
+  resetQueue();
+  { char c[12]; for (int n = 0; cmdQueueSize < CMDQUEUE_MAX; n++) { std::snprintf(c, sizeof c, "TT=%d", n); add(c, true); } }
+  g_noted = 0; g_notedLast[0] = 0;
+  add("TC=21.5", false);
+  report("N1", !inQueue("TC=21.5") && g_noted == 0, "full of writes + TC=21.5: dropped and not noted as an override",
+         std::to_string(g_noted) + " noted");
+  // N2: an accepted TT= is noted once, with its text.
+  resetQueue(); g_noted = 0; g_notedLast[0] = 0;
+  add("TT=21.5", false);
+  report("N2", inQueue("TT=21.5") && g_noted == 1 && std::strcmp(g_notedLast, "TT=21.5") == 0,
+         "TT=21.5 accepted: noted once", std::to_string(g_noted) + " noted, last=" + g_notedLast);
 
   std::printf("%s (%d failed)\n", g_fail ? "FAIL" : "PASS", g_fail);
   return g_fail ? 1 : 0;

@@ -71,6 +71,7 @@ static DiagRecStub diagRec;
 static bool handleOTDirectCommand(const char* b, int n, bool = false) { strncat(g_direct, b, n); strcat(g_direct, ";"); return true; }
 static bool g_satOwns = false;      // TASK-1575: SAT owns the control setpoint
 static bool satOwnsControlSetpoint() { return g_satOwns; }
+static inline void otOverrideNoteCommand(const char*, int) {}   // TASK-3033: noted in addCommandToQueue()
 static void satNoteExternalCS(const char*) {}   // TASK-3021: the frost guard hook in addCommandToQueue()
 static bool g_inflight = false;     // the old global in-flight flag (read only by the code before TASK-1575)
 static bool satCommandInFlight() { return g_inflight; }

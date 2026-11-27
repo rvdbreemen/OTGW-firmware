@@ -2618,6 +2618,7 @@ static bool satPushRefusedDecide(bool pushOn, bool pushed, uint32_t sincePushMs,
 // either board (ADR-223). The PS=1 summary carries no T frame and is not a source.
 void satOnThermostatSetpoint(float tr)
 {
+  otOverrideOnThermostatSetpoint(tr);   // TASK-3033: also with SAT off (this runs for every thermostat T frame)
   const bool active = satIsEnabled() && settings.sat.bFollowThermostat;
   const bool hadBaseline = state.sat.bThermostatTrSetValid;
   const float baseline   = state.sat.fThermostatTrSet;

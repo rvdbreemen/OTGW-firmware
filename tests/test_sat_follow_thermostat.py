@@ -62,6 +62,7 @@ struct SatState { float fLastSentTC=0.0f, fThermostatTrSet=0.0f, fThermostatTrSe
 struct State { SatState sat; MqttState mqtt; };
 static Settings settings; static State state;
 static uint32_t millis() { return 0; }
+static bool otOverrideOnThermostatSetpoint(float) { return false; }   // TASK-3033: called first in satOnThermostatSetpoint()
 static bool satIsEnabled() { return settings.sat.bEnabled; }   // TASK-1345: the real one adds the MQTT-loss takeover flag
 static int g_syncCalls = 0, g_adopt = 0, g_ctrlReset = 0, g_rt = -1;
 #define snprintf_P snprintf
