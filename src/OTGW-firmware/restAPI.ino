@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-beta.455
+**  Version  : v2.0.0-beta.458
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -3540,6 +3540,7 @@ void sendDeviceInfoV2()
 
     // --- Reliability drops (heap-pressure side effects) ---
     je.field(F("hd_ws_drops"),         snap->st.heapdiag.iWsDropsTotal);
+    je.field(F("hd_ws_alloc_fail"),   snap->st.heapdiag.iWsAllocFail);   // TASK-3119: broadcasts dropped on std::bad_alloc
     // TASK-3017: per /ws client (status connected / disconnecting / disconnected, queue length, seconds in that
     // status, seconds since connect) and the disconnect count; AsyncTCP's rx timeout closes a stuck client.
     je.field(F("hd_ws_disconnects"),   snap->st.heapdiag.iWsDisconnects);

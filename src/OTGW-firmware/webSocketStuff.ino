@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : webSocketStuff.ino
-**  Version  : v2.0.0-beta.455
+**  Version  : v2.0.0-beta.458
 **
 **  Copyright (c) 2021-2025 Robert van den Breemen
 **
@@ -37,6 +37,9 @@
 // AsyncWebSocket is NOT a server: startWebSocket() attaches it via
 // server.addHandler(&otLogWs). No built-in authentication; local network use only.
 AsyncWebSocket otLogWs("/ws");
+// TASK-3119: defined further down (next to wsNoteSendStatus); the send sites above them need the names first.
+static void wsNoteSendStatus(AsyncWebSocket::SendStatus st);
+static AsyncWebSocket::SendStatus wsTextAllNoThrow(const char* msg);
 
 // Close wrapper for prepareForReboot() in helperStuff.ino. The otLogWs global
 // is defined here (not extern'd in a header) because it needs ESPAsyncWebServer
@@ -377,7 +380,7 @@ void sendWebSocketJSON(const char *json) {
   if (otLogWs.count() > 0) {
     Debugf(PSTR("[%lu] WebSocket broadcast JSON (%u bytes)\r\n"),
            millis(), static_cast<unsigned>(strlen(json)));
-    otLogWs.textAll(json);
+    wsNoteSendStatus(wsTextAllNoThrow(json));
   }
 }
 
@@ -419,7 +422,7 @@ void handleWebSocket() {
   unsigned long now = millis();
   if (otLogWs.count() > 0 &&
       (now - lastKeepaliveMs) >= KEEPALIVE_INTERVAL_MS) {
-    otLogWs.textAll("{\"type\":\"keepalive\"}");
+    wsNoteSendStatus(wsTextAllNoThrow("{\"type\":\"keepalive\"}"));
     lastKeepaliveMs = now;
   }
 }
@@ -452,6 +455,34 @@ static void wsNoteSendStatus(AsyncWebSocket::SendStatus st) {
 }
 // --- wsNoteSendStatus end
 
+// TASK-3119: a broadcast that cannot allocate is dropped, not thrown. textAll() allocates a shared buffer and a deque node per client
+// (AsyncWebSocketClient::_queueMessage); at a floor heap operator new throws std::bad_alloc, and an exception that nothing catches ends
+// in std::terminate and a panic (bench 2026-11-27 on .76, K hold: loopTask, release a9aa6a9 and 456). canSendWebSocket() blocks only
+// below 3072 B of total free heap and the allocation follows a moment later, so the window cannot be closed by a gate: every send site
+// goes through this helper, which drops the message, counts it (hd_ws_alloc_fail) and logs once per interval. The library keeps its
+// state sound: the queue lock is an RAII guard and std::deque::emplace_back gives the strong guarantee (read, not run).
+static const uint32_t WS_ALLOC_LOG_INTERVAL_MS = 10000;
+static AsyncWebSocket::SendStatus wsTextAllNoThrow(const char* msg) {
+  try {
+    return otLogWs.textAll(msg);
+  } catch (const std::bad_alloc&) {
+    static uint32_t lastLogMs = 0;
+    static uint32_t sinceLog = 0;
+    static bool everLogged = false;
+    state.heapdiag.iWsAllocFail++;
+    sinceLog++;
+    const uint32_t now = millis();
+    if (!everLogged || (uint32_t)(now - lastLogMs) > WS_ALLOC_LOG_INTERVAL_MS) {
+      everLogged = true;
+      DebugTf(PSTR("[%lu] WebSocket: broadcast dropped, out of memory (%u dropped since the last line, free heap %u, max block %u)\r\n"),
+              (unsigned long)now, (unsigned)sinceLog, (unsigned)platformFreeHeap(), (unsigned)platformMaxFreeBlock());
+      lastLogMs = now;
+      sinceLog = 0;
+    }
+    return AsyncWebSocket::DISCARDED;
+  }
+}
+
 void sendLogToWebSocket(const char* logMessage) {
   if (hasWebSocketClients() && logMessage != nullptr && canSendWebSocket()) {
     // Chrome closes the socket on a text frame that is not valid UTF-8 (TASK-1300):
@@ -459,12 +490,12 @@ void sendLogToWebSocket(const char* logMessage) {
     // character. Sanitise a copy at this transport boundary, so the PIC bytes stay
     // verbatim on serial, telnet, port 25238 and the raw diagnose path (ADR-177).
     if (wsUtf8Valid(logMessage)) {
-      wsNoteSendStatus(otLogWs.textAll(logMessage));
+      wsNoteSendStatus(wsTextAllNoThrow(logMessage));
     } else {
       if (wsSafeBufBusy) return;
       wsSafeBufBusy = true;
       wsUtf8Sanitize(logMessage, wsSafeBuf, sizeof(wsSafeBuf));
-      wsNoteSendStatus(otLogWs.textAll(wsSafeBuf));
+      wsNoteSendStatus(wsTextAllNoThrow(wsSafeBuf));
       wsSafeBufBusy = false;
     }
   }

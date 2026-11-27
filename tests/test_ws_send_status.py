@@ -43,7 +43,13 @@ struct AsyncWebSocket {
   SendStatus textAll(const char*) { calls++; return next; }
 };
 static AsyncWebSocket otLogWs;
-struct { struct { uint32_t iWsDropsTotal = 0; } heapdiag; } state;
+struct { struct { uint32_t iWsDropsTotal = 0, iWsAllocFail = 0; } heapdiag; } state;
+#include <new>
+#define PSTR(s) (s)
+#define DebugTf(...) ((void)0)
+static unsigned long millis() { return 0; }
+static uint32_t platformFreeHeap() { return 0; }
+static uint32_t platformMaxFreeBlock() { return 0; }
 static bool g_clients = true, g_heapOk = true;
 static bool hasWebSocketClients() { return g_clients; }
 static bool canSendWebSocket() { return g_heapOk; }
