@@ -285,3 +285,4 @@ One row per Architecture Decision Record. Scope is the Enforcement `path_glob` s
 | ADR-299 | Accepted | - | Remote telemetry is off until the user says yes, and the gateway asks the user in a dialog, at most at these moments. |
 | ADR-300 | Accepted | - | Decision maker: Robert van den Breemen (maintainer). |
 | ADR-301 | Accepted | - | At build time, scripts/patchpiolibs.py replaces the std::recursivemutex typedef in the libdeps copy of ESPAsyncWebSer... |
+| ADR-302 | Proposed | `src/**/*.py` | State one concrete chosen approach and its rationale. |
