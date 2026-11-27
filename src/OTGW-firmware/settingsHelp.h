@@ -107,7 +107,7 @@ static const char SETTINGS_HELP_JSON[] PROGMEM = R"json({
 "satflushtreshold":"Hours offline after which short-lived SAT data is cleared on enable. Default 24.",
 "satdhwenabled":"Standalone hot-water control. SAT sends the DHW setpoint only while this is on.",
 "satdhwenable":"Hot-water enable (HW=) sent to the gateway. Only used when the boiler reports a hot-water tank.",
-"satzonecount":"Number of extra zones (rooms) with their own PID, 1 to 4. Zones only raise the main room's demand.",
+"satzonecount":"Number of extra rooms with their own PID next to the main room, 0 to 4. 0 means no extra rooms. Extra rooms only raise the main room's demand.",
 "satzonetimeout":"Seconds without an update before a zone goes inactive, 30 to 3600. Default 300.",
 "satsensorarea0":"DS18B20 or BLE room sensor 1 of the averaged room temperature.",
 "satsensorarea1":"DS18B20 or BLE room sensor 2 of the averaged room temperature.",

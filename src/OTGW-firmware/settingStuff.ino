@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : settingsStuff
-**  Version  : v2.0.0-beta.465
+**  Version  : v2.0.0-beta.466
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -568,6 +568,7 @@ static bool g_sawSatFollowKey = false;   // TASK-1259: set when SATfollowthermos
 static bool g_sawOtdOhMarkerKey = false;   // TASK-1961: set when OTDohpicdefault is parsed; absent = OH not yet migrated to 1
 static bool g_sawSatBlePinOnlyMarkerKey = false;   // TASK-3011: set when SATblepinonly is parsed; absent = BLE pin/failover not yet migrated
 static bool g_sawSatPwmMarginMarkerKey = false;   // TASK-2005: set when SATpwmmargin2 is parsed; absent = margin not yet migrated
+static bool g_sawSatZoneCountKey = false;   // TASK-3102: set when SATzonecount is parsed; absent in an existing file = an install from before the key, which keeps 1
 // TASK-2013: true while readSettings() applies settings.ini. A value loaded from the file is not a user change:
 // SATtargettemp then holds the user's own target (satUserTargetTemp()), so it must not clear a preset that holds the
 // live target. Set and restored by readSettings() only, on every exit path (SettingsLoadScope).
@@ -611,6 +612,7 @@ void readSettings(bool show)
   g_sawOtdOhMarkerKey = false;   // TASK-1961: same sentinel pattern for the OH=1 migration marker
   g_sawSatPwmMarginMarkerKey = false;   // TASK-2005: same sentinel pattern for the switch margin migration
   g_sawSatBlePinOnlyMarkerKey = false;  // TASK-3011: same sentinel pattern for the BLE pin/failover migration
+  g_sawSatZoneCountKey = false;         // TASK-3102: same sentinel pattern for the zone count default
   if (!LittleFS.exists(SETTINGS_FILE))
   {  //create settings file if it does not exist yet.
     DebugTln(F(" .. file not found! --> created file!"));
@@ -748,6 +750,16 @@ void readSettings(bool show)
             settings.sat.sBleMAC, settings.sat.bBlePinNotice ? "kept, needs confirmation" : "none");
   }
   // [sat-blepinonly-migrate:end]
+  // [sat-zonecount-migrate:begin] TASK-3102 (entry 503, Robert Q12 A; entry 459). The default of SATzonecount is now 0 (no extra
+  // rooms). A settings file that predates the key has no stored value, so the install ran with the old default 1: it keeps 1 and the
+  // key is persisted, so this runs once. A fresh install writes its in-RAM defaults first (readSettings creates the file), so
+  // the key is present and 0 applies. A stored 0..4 is never changed.
+  if (!g_sawSatZoneCountKey) {
+    settings.sat.iZoneCount = 1;
+    settingsDirty = true;
+    DebugTln(F("[Settings] no SATzonecount key: an install from before the key keeps 1 extra room"));
+  }
+  // [sat-zonecount-migrate:end]
   if (!g_sawOnboardedKey) {
     settings.ui.bOnboarded = true;
     settingsDirty = true;              // persist the key so this migration runs once
@@ -1326,7 +1338,10 @@ void updateSetting(const char *field, const char *newValue)
   else if (strcasecmp_P(field, PSTR("SATsolarfreezeint")) == 0) settings.sat.bSolarFreezeIntegral = EVALBOOLEAN(newValue);
   else if (strcasecmp_P(field, PSTR("SATflushtreshold")) == 0)  settings.sat.iSatFlushThresholdH = (uint16_t)constrain(atoi(newValue), 1, 720);
   // Multi-zone PID (Task #233)
-  else if (strcasecmp_P(field, PSTR("SATzonecount")) == 0)    settings.sat.iZoneCount = (uint8_t)constrain(atoi(newValue), 1, 4);
+  else if (strcasecmp_P(field, PSTR("SATzonecount")) == 0) {   // TASK-3102: 0 = no extra rooms (entry 459); key presence = the migration above is done
+    g_sawSatZoneCountKey = true;
+    settings.sat.iZoneCount = (uint8_t)constrain(atoi(newValue), 0, 4);
+  }
   else if (strcasecmp_P(field, PSTR("SATzonetimeout")) == 0)  settings.sat.iZoneTimeoutS = (uint16_t)constrain(atoi(newValue), 30, 3600);
   // TASK-587: DS18B20 sensor-to-SAT-area mapping
   else if (strcasecmp_P(field, PSTR("SATsensorarea0")) == 0) strlcpy(settings.sat.sSensorArea[0], newValue, sizeof(settings.sat.sSensorArea[0]));

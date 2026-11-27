@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-beta.465
+**  Version  : v2.0.0-beta.466
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -4439,7 +4439,7 @@ void sendDeviceSettings()
   addBool(F("satdhwenabled"),     settings.sat.bDhwEnabled, "b");
   addBool(F("satdhwenable"),      settings.sat.bDhwEnable, "b");
   // Multi-zone PID (Task #233)
-  addInt (F("satzonecount"),      settings.sat.iZoneCount, "i", 1, 4);
+  addInt (F("satzonecount"),      settings.sat.iZoneCount, "i", 0, 4);
   addInt (F("satzonetimeout"),    settings.sat.iZoneTimeoutS, "i", 30, 3600);
   // DS18B20 sensor-to-area mapping (TASK-587): 16-hex Dallas addresses
   addStr (F("satsensorarea0"),    CSTR(settings.sat.sSensorArea[0]), "s", 17);
