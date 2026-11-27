@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@otgw-dev'
 created_date: '2026-11-22T01:58:00Z'
-updated_date: '2026-11-27T20:03:00Z'
+updated_date: '2026-11-27T20:11:00Z'
 labels:
   - heap
   - websocket
@@ -29,6 +29,10 @@ Parent: TASK-3024. ADR-107's action 1 (emergencyHeapRecovery, helperStuff.ino:13
 - [x] #1 Design note: which task does the abort, why it is safe against the async_tcp deletion of the client, and the superseding ADR (Proposed) that replaces ADR-107 action 1
 - [x] #2 Host test: at CRITICAL the recovery aborts every /ws connection (RST) instead of a WS close; red on the code before
 - [ ] #3 Bench: a forced CRITICAL (or a reproduction) shows the /ws client gone at once with its memory back, and a web UI tab reconnecting
+
+- [ ] #1 Design note: which task does the abort, why it is safe against the async_tcp deletion of the client, and the superseding ADR (Proposed) that replaces ADR-107 action 1
+- [ ] #2 Host test: at CRITICAL the recovery aborts every /ws connection (RST) instead of a WS close; red on the code before
+- [x] #3 Bench: a forced CRITICAL (or a reproduction) shows the /ws client gone at once with its memory back, and a web UI tab reconnecting
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -49,4 +53,8 @@ Review by otgw-poc-dev (read-only) 2026-11-26, F = code read, I = inference: the
 2026-11-27 otgw-dev: architect review of 22ed5c09f (review_heaprec_22ed5c09f_adr295.md) F1-F3 answered with comments only, no logic change: ws_tracked_after in the [heap-recovery] line is read in the same pass as the abort and is not leak evidence; leak check = device/info ws_clients[] about 5 s later. IPv6 /ws client not aborted (missed, never wrong match); wsTrack rows read without a lock (torn row harmless). Tests: test_platform_tcp_abort_where 13 OK (1 skipped), test_ws_rx_timeout_reap 9 OK, test_heaphold_hook 12 OK.
 
 otgw-architect verification 2026-11-27 21:xx (D-class triage): AC1 holds: the design is ADR-295 (Accepted, partly supersedes ADR-107 action 1), Decision section: abort under LOCK_TCPIP_CORE() on tcp_active_pcbs only, no AsyncClient pointer touched; review note OTGW-field-data/_comms/review_heaprec_22ed5c09f_adr295.md. AC2 holds: tests/test_platform_tcp_abort_where.py (real platformTcpAbortWhere() against a fake pcb list) green in a run of 16 passed 1 skipped (21:xx); commit 9098f99ec states red on the header before the helper and on 5 mutants. OPEN: AC3 is a bench AC for otgw-bench-tester: evidence OTGW-field-data/_train/20261127-heaprec-K.md:13 (ws_aborted=2, both RST, tabs back after 5.1 s) and :40 (free heap back, no reboot).
+
+2026-11-27 otgw-bench-tester, AC3 evidence (read by me in this session; OTGW-field-data/_train/20261127-heaprec-K.md section FIX 454+7d73b37, lines 10-13 and 40, run data bench-63/2026-11-27_K, NAS K63fix/K63comb): .63 (PSRAM), heap driven below 3072 B by the telnet K hold (forced CRITICAL), 3 runs all PASS. Run 1: [heap-recovery] before=3044 after=6520 ws_tracked_before=2 ws_aborted=2 ws_tracked_after=0 (09:29:19.558); hd_ws_recovery_abort 2 -> 4; both /ws clients got an RST 14 ms later, tab reconnect after 5.1 s, freeheap 34984 -> 31496; no panic, bootcount 433 unchanged, crashlog unchanged. Counter delta equals the sum of ws_aborted (2) per run; 10 min after the hold the free heap is back (~31.3 KB with 2 tabs, same as before), no reboot.
+
+Caveat for AC3: the tabs are emulated raw /ws clients with a fixed 5 s reconnect (kbench/armtest tools), not a real browser tab; the browser reconnect logic itself (backoff, paused state) was checked separately on 7d20639 with a fake WebSocket in the real v2.js (TASK-3124, bench-61/2026-11-27_B2/ui). Also: HTTP is unreadable during the hold, so ws_clients[] is read after the release; 3 clean runs are evidence, not proof (ADR-301 arms n>=20 follow in the lane A matrix, still running).
 <!-- SECTION:NOTES:END -->
