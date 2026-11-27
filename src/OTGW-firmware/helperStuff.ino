@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : helperStuff
-**  Version  : v2.0.0-beta.454
+**  Version  : v2.0.0-beta.455
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -1336,8 +1336,11 @@ void emergencyHeapRecovery() {
   actions |= 0x04;
 
   uint32_t heapAfter = platformFreeHeap();
-  // ws_tracked_before / ws_aborted / ws_tracked_after: a connection whose error event could not be allocated (new(nothrow) in the
-  // AsyncTCP error callback) keeps its tracked row, so after > 0 with before == aborted shows a leak on the bench (TASK-3025).
+  // ws_tracked_before / ws_aborted / ws_tracked_after (TASK-3025): the tracked rows are cleared by WS_EVT_DISCONNECT on
+  // async_tcp, after the error event (tcp_abort, AsyncClient::_error, _discard_cb, _onDisconnect). This line is written in the
+  // same pass as the abort, so ws_tracked_after normally still equals ws_tracked_before here: it is not leak evidence.
+  // The leak check (a connection whose error event could not be allocated, new(nothrow) in the AsyncTCP error callback,
+  // keeps its row) is /api/v2/device/info ws_clients[] about 5 s after this line.
   DebugTf(PSTR("[heap-recovery] before=%u after=%u delta=%+ld actions=0x%02X ws_tracked_before=%u ws_aborted=%u ws_tracked_after=%u\r\n"),
           (unsigned)heapBefore, (unsigned)heapAfter,
           (long)((int32_t)heapAfter - (int32_t)heapBefore),

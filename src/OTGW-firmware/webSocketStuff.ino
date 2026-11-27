@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : webSocketStuff.ino
-**  Version  : v2.0.0-beta.454
+**  Version  : v2.0.0-beta.455
 **
 **  Copyright (c) 2021-2025 Robert van den Breemen
 **
@@ -158,8 +158,10 @@ uint8_t webSocketSnapshotClients(WsClientSnap* out, uint8_t max, uint32_t now) {
 }
 // TASK-3025 (ADR-295): the /ws connections ADR-107's recovery aborts: local port 80 (the port-80 server /ws runs on)
 // with the remote address and port of a tracked client. Runs under the lwIP core lock inside platformTcpAbortWhere()
-// on the loop task; the rows are plain words written on async_tcp, so a row being written at that moment can only be
-// missed, never matched wrongly (lwIP keeps one pcb per 4-tuple).
+// on the loop task. The rows are plain words written on async_tcp and read here without a lock: a row being written at
+// that moment is missed, or can match a lingering old pcb of the same slot, which is an already dead /ws connection and
+// harmless (lwIP keeps one pcb per 4-tuple). Only IPv4 clients are matched: remoteIp is the IPv4 word, so an IPv6 /ws
+// client is not aborted here (missed, never a wrong match).
 static const uint16_t WS_LOCAL_PORT = 80;
 static bool wsAbortMatch(uint16_t localPort, uint32_t remoteIp, uint16_t remotePort) {
   if (localPort != WS_LOCAL_PORT) return false;
