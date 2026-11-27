@@ -64,7 +64,7 @@ static const char SETTINGS_HELP_JSON[] PROGMEM = R"json({
 "webhookurloff":"URL called when the trigger turns off. Must be a local network address.",
 "webhookcontenttype":"Content-Type header of the request. Only used when a payload is set.",
 "webhookpayload":"Request body template. Empty sends a GET; filled sends a POST with this body.",
-"ledblink":"Blink the status LED with OpenTherm traffic.",
+"ledblink":"Blink the status LED with OpenTherm traffic. On an OTGW32 the red LED blinks once a second as a heartbeat instead; OpenTherm traffic does not blink it.",
 "nightlyrestart":"Restart once a day to recover memory. Needs NTP sync. Takes about 30 s.",
 "updatecheck":"Show a notice when a newer firmware is on GitHub. Your browser asks GitHub (api.github.com) at most every 6 hours; the gateway itself sends nothing. Off: no request to GitHub.",
 "updatecheckbeta":"On a stable firmware, also tell about newer beta versions. A beta firmware is always told about newer betas and stable releases.",

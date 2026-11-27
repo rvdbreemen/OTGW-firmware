@@ -2179,6 +2179,8 @@
   var boardNoOutputPin = false;
   function boardHidesKey(k) {
     if (k === 'pictempsensor' && boardIsPic === false) return true;   // PIC Classic only (settingsHelp.h)
+    // The boot commands are PIC commands: sendPICBootCommands() returns at once without a PIC (OTGW-Core.ino:1559-1561), so on OT-Direct both rows do nothing.
+    if ((k === 'otgwcommandenable' || k === 'otgwcommands') && boardIsPic === false) return true;
     return boardNoOutputPin && SET_META[k] && SET_META[k].cat === 'outputs';
   }
   function applyPicTabGate(isPic, noOutputPin) {

@@ -19,7 +19,7 @@ const S = (value, maxlen = 30) => ({ value, type: 's', maxlen });
 const B = (value) => ({ value, type: 'b' });
 
 function fakeDevice(pic, extra = {}) {
-  const settings = Object.assign({ hostname: S('otgw'), pictempsensor: B(false), ledblink: B(true), gpiooutputsenabled: B(false), gpiooutputspin: { value: 11, type: 'i', min: 0, max: 48 }, s0counterenabled: B(false) },
+  const settings = Object.assign({ hostname: S('otgw'), pictempsensor: B(false), ledblink: B(true), gpiooutputsenabled: B(false), otgwcommandenable: B(false), otgwcommands: S('PS=0;GW=1', 128), gpiooutputspin: { value: 11, type: 'i', min: 0, max: 48 }, s0counterenabled: B(false) },
     pic ? {} : { otdmode: { value: 1, type: 'i', min: 0, max: 4 }, otdopenbypass: B(false), otdautobypass: B(false), otdhasbypassrelay: B(false) });
   const device = pic
     ? { hostname: 'otgw', otdirectavailable: false, otcommandinterface: 'PIC', picfwversion: '6.6', picfwtype: 'gateway' }
@@ -45,6 +45,7 @@ async function look(h, pic) {
   await h.evalJs(`(function(){ var r = document.querySelector('#setRail .rail-item[data-cat="otgw"]'); if (r) r.click(); })()`);
   await sleep(400);
   const picRow = await h.evalJs(`!!document.querySelector('.srow[data-key="pictempsensor"]')`);
+  const bootRows = await h.evalJs(`!!document.querySelector('.srow[data-key="otgwcommands"]') || !!document.querySelector('.srow[data-key="otgwcommandenable"]')`);
   let otd = null;
   if (!pic) {
     await h.evalJs(`document.querySelector('#setRail .rail-item[data-cat="otd"]').click()`);
@@ -54,7 +55,7 @@ async function look(h, pic) {
       var d = document.querySelector('#setCols .set-group .gdesc, #setCols .cat-desc, #setCols .set-desc');
       return { labels: labels, page: document.getElementById('setCols').textContent }; })()`);
   }
-  return { nav: (nav || '').trim(), picRow, otd };
+  return { nav: (nav || '').trim(), picRow, bootRows, otd };
 }
 
 test('OT-Direct board: no PIC temperature sensor row, nav subtitle without pic, not-available line, ventilation bypass labels', { skip }, async () => {
@@ -63,6 +64,7 @@ test('OT-Direct board: no PIC temperature sensor row, nav subtitle without pic, 
     const r = await look(h, false);
     if (process.env.OTGW_SHOT) await h.shot(process.env.OTGW_SHOT + '-otd.png');
     assert.equal(r.picRow, false, 'the PIC temperature sensor row is hidden on OT-Direct');
+    assert.equal(r.bootRows, false, 'the boot-commands rows do nothing without a PIC and are hidden on OT-Direct');
     assert.equal(r.nav, 'debug · files · system', 'Advanced subtitle has no pic');
     assert.match(r.otd.page, /Not available on this board: PIC firmware updates and Bluetooth sensors\./, 'the not-available line');
     assert.match(r.otd.labels.otdopenbypass, /Open ventilation bypass now/);
@@ -78,6 +80,7 @@ test('PIC board: the PIC temperature sensor row stays and the Advanced subtitle 
     const r = await look(h, true);
     if (process.env.OTGW_SHOT) await h.shot(process.env.OTGW_SHOT + '-pic.png');
     assert.equal(r.picRow, true, 'the PIC temperature sensor row is shown on a PIC board');
+    assert.equal(r.bootRows, true, 'the boot-commands rows stay on a PIC board');
     assert.equal(r.nav, 'pic · debug · files · system');
     assert.deepEqual(h.exceptions, []);
   } finally { await h.close(); }
