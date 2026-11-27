@@ -5,9 +5,9 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
-## [2.0.0-beta.457] - 2026-11-27
+## [2.0.0-beta.458] - 2026-11-27
 
-Build in this beta: beta.457 only (previous public beta: beta.452; beta.453 to beta.456 were internal test builds and were never published). [BENCH-TBD: soak result of the final build]
+Build in this beta: beta.458 only (previous public beta: beta.452; beta.453 to beta.457 were internal test builds and were never published). [BENCH-TBD: soak result of the final build]
 
 ### Changed
 - Web UI live connections: when memory is almost out, the gateway drops the browser connections of the live log at once instead of asking each tab to close; a tab connects again by itself (about 5 seconds in the bench with the fix alone; after a forced severe low-memory event the web interface and telnet were unreachable for 54 seconds up to almost 10 minutes in our tests on internal builds, see Known issues) (TASK-3025, ADR-295). New counter `hd_ws_recovery_abort` in `GET /api/v2/device/info`.
@@ -1277,8 +1277,8 @@ Legacy release. See git history for details.
 
 Legacy releases. See git history for details.
 
-[Unreleased]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.457...HEAD
-[2.0.0-beta.457]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.452...v2.0.0-beta.457
+[Unreleased]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.458...HEAD
+[2.0.0-beta.458]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.452...v2.0.0-beta.458
 [2.0.0-beta.452]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.451...v2.0.0-beta.452
 [2.0.0-beta.451]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.438...v2.0.0-beta.451
 [2.0.0-beta.438]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.432...v2.0.0-beta.438

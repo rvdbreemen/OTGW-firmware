@@ -1,23 +1,23 @@
-# OTGW-firmware v2.0.0-beta.457 Release Notes
+# OTGW-firmware v2.0.0-beta.458 Release Notes
 
 **Release date:** 2026-11-27
 **Branch:** dev
-**Build:** 2.0.0-beta.457 (the githash is in the asset names)
-**Compare:** [v2.0.0-beta.452...v2.0.0-beta.457](https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.452...v2.0.0-beta.457). "What is new in this beta, in plain words" is new for a beta.452 user; a user of an older beta also reads the sections below it.
+**Build:** 2.0.0-beta.458 (the githash is in the asset names)
+**Compare:** [v2.0.0-beta.452...v2.0.0-beta.458](https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.452...v2.0.0-beta.458). "What is new in this beta, in plain words" is new for a beta.452 user; a user of an older beta also reads the sections below it.
 
 > **Disclaimer: this is a beta of 2.0.0.** It is not a stable release and it has had no long field runs. Expect bugs, and keep a way back: save your settings, and keep the flash zip of the 2.0.0 build you run now, so you can flash it back over USB. A 1.x zip is ESP8266 firmware and does not run on an S3 Mini. If you need a gateway that just works, stay on the [1.x releases](https://github.com/rvdbreemen/OTGW-firmware/releases) for now.
 
 
 ## In short
 
-- **What this is:** beta.457 of the 2.0.0 line, for the OTGW Classic with a LOLIN S3 Mini or S3 Mini Pro (combo image). When memory gets very low, this beta cleans up stuck browser tabs, refuses new live-log connections of the web UI early, and catches the out-of-memory error when a log line is sent to the browser tabs. On the unit without extra memory, in 3 of 3 test holds (two scripted stand-ins for browser tabs, 120 seconds of almost no memory) this beta had no panic and no restart; the internal build without the catch restarted in 2 of 3.
+- **What this is:** beta.458 of the 2.0.0 line, for the OTGW Classic with a LOLIN S3 Mini or S3 Mini Pro (combo image). When memory gets very low, this beta cleans up stuck browser tabs, refuses new live-log connections of the web UI early, and catches the out-of-memory error when a log line is sent to the browser tabs. On the unit without extra memory, in 3 of 3 test holds (two scripted stand-ins for browser tabs, 120 seconds of almost no memory) this beta had no panic and no restart; the internal build without the catch restarted in 2 of 3.
 - **Who it is for:** anyone who keeps the web UI open in a browser, and anyone who wants to help test 2.0.0.
 - **How to update:** first save your settings (`curl http://<ip>/api/v2/settings -o settings-backup.json`). A unit that already runs 2.0.0: open `/update`, give it the flash zip, press **Update** and let it finish. A new S3 Mini or a unit on 1.x: USB first flash with `flash_otgw`, see "Before you flash".
 - **What is not tested:** a real browser reconnecting after a memory emergency (the bench used scripted stand-ins for browser tabs), and long field runs. See "Not verified yet, in plain words".
 
 ## Which builds are in this beta
 
-This beta is **build beta.457**. The previous public beta was beta.452. The builds beta.453 to beta.456 were internal test builds for the bench and were never published, so this beta carries what they held, and no build numbers lie in between that you ever saw. [BENCH-TBD: soak result of the final build on both test units]
+This beta is **build beta.458**. The previous public beta was beta.452. The builds beta.453 to beta.457 were internal test builds for the bench and were never published, so this beta carries what they held, and no build numbers lie in between that you ever saw. [BENCH-TBD: soak result of the final build on both test units]
 
 If you run beta.452, the changes below are what you get. If you run an older beta, read the sections "What changed since beta.451" and below as well.
 
