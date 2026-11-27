@@ -11,3 +11,5 @@
 Screenshots of the paused state on Monitor > Connection (row "Live link", Reconnect button): `paused-en.png`, `paused-nl.png`.
 Raw lines: `before_refuse.json`, `after_refuse.json`, `after_flap_en.txt`, `after_flap_nl.txt`.
 Not covered: a real device (bench .63/.76 browser check at B2/B3).
+
+UX review round (otgw-ux-designer): paused row now has the grey explanation line (EN/NL/DE/EL), the button uses the primary style with 44 px min height, 390 px shots: `paused-en-390.png`, `paused-nl-390.png`.

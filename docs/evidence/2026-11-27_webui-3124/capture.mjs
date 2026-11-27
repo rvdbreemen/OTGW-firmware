@@ -9,7 +9,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { startPage, sleep } from '../../../tests/webui/lib/page-harness.mjs';
 
-const [mode, secs, lang, outdir, shot] = process.argv.slice(2);
+const [mode, secs, lang, outdir, shot, width] = process.argv.slice(2);
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(HERE, '..', '..', '..');
 const asset = (p, q, s) => {
@@ -40,7 +40,7 @@ window.__ws = [];
   };
   window.WebSocket.CONNECTING = 0; window.WebSocket.OPEN = 1; window.WebSocket.CLOSING = 2; window.WebSocket.CLOSED = 3;
 })();`;
-const h = await startPage({ api, asset, beforeScript: before });
+const h = await startPage({ api, asset, beforeScript: before, width: Number(width) || 1400 });
 try {
   await h.until(`!!document.querySelector('.connsum')`, 40000);
   await h.evalJs(`document.querySelector('button.seg[data-page="monitor"]').click()`);
@@ -53,7 +53,7 @@ try {
     await h.evalJs(`[].forEach.call(document.querySelectorAll('button'), function (b) { if (/^(Not now|Niet nu)$/.test(b.textContent.trim())) b.click(); })`);
     await h.evalJs(`document.querySelector('button.subtab[data-tab="mconn"]').click()`);
     await sleep(800);
-    await h.evalJs(`document.getElementById('connDetail').scrollIntoView({ block: 'center' })`);
+    await h.evalJs(`(document.getElementById('wsResumeBtn') || document.getElementById('connDetail')).scrollIntoView({ block: 'center' })`);
     await sleep(500);
     console.log('btn:', await h.evalJs(`(document.getElementById('wsResumeBtn') || {}).textContent`));
     await h.shot(path.join(outdir, shot));

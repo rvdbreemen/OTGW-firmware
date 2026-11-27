@@ -254,6 +254,7 @@
     "conn_ws_reconnecting": "WebSocket · επανασύνδεση…",
     "conn_ws_paused": "WebSocket · σε παύση μετά από επαναλαμβανόμενες διακοπές",
     "conn_ws_resume": "Επανασύνδεση",
+    "conn_ws_paused_hint": "Η σελίδα σταμάτησε τις επαναλήψεις για να προστατεύσει την πύλη. Οι τιμές εξακολουθούν να ενημερώνονται με polling. Πατήστε Επανασύνδεση για να δοκιμάσετε ξανά.",
     "conn_no_link": "χωρίς σύνδεση",
     "conn_seen_ago": "πριν από {{s}}s",
     "conn_role_recency": "{{role}} · {{recency}}",

@@ -254,6 +254,7 @@
     "conn_ws_reconnecting": "WebSocket · opnieuw verbinden…",
     "conn_ws_paused": "WebSocket · gepauzeerd na herhaalde onderbrekingen",
     "conn_ws_resume": "Opnieuw verbinden",
+    "conn_ws_paused_hint": "De pagina probeert niet meer opnieuw om de gateway te sparen. Waarden worden nog steeds bijgewerkt via polling. Druk op Opnieuw verbinden om het weer te proberen.",
     "conn_no_link": "geen verbinding",
     "conn_seen_ago": "{{s}}s geleden gezien",
     "conn_role_recency": "{{role}} · {{recency}}",

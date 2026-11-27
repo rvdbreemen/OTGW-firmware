@@ -375,6 +375,7 @@
       "conn_ws_reconnecting": "WebSocket · reconnecting…",
       "conn_ws_paused": "WebSocket · paused after repeated drops",
       "conn_ws_resume": "Reconnect",
+      "conn_ws_paused_hint": "The page stopped retrying to protect the gateway. Values still update by polling. Press Reconnect to try again.",
       "conn_no_link": "no link",
       "conn_seen_ago": "seen {{s}}s ago",
       "conn_role_recency": "{{role}} · {{recency}}",
@@ -6069,9 +6070,10 @@
     // The exp line describes the healthy state ("… is answering") — showing it
     // while the node is down/degraded contradicts the fix hint, so omit it there.
     if (c.exp && c.s !== 'st-down' && c.s !== 'st-warn') { var ex = document.createElement('div'); ex.className = 'exp'; ex.textContent = c.exp; body.appendChild(ex); }
+    if (key === 'ws' && wsPaused) { var ph = document.createElement('div'); ph.className = 'exp'; ph.textContent = t('graph.conn_ws_paused_hint'); body.appendChild(ph); }
     if ((c.s === 'st-down' || c.s === 'st-warn') && c.fix && !(key === 'ws' && wsPaused)) { var fx = document.createElement('div'); fx.className = 'fix'; fx.textContent = '▸ ' + c.fix; body.appendChild(fx); }
     if (key === 'ws' && wsPaused) {
-      var rb = document.createElement('button'); rb.type = 'button'; rb.className = 'btn'; rb.id = 'wsResumeBtn';
+      var rb = document.createElement('button'); rb.type = 'button'; rb.className = 'fs-btn primary'; rb.id = 'wsResumeBtn';
       rb.textContent = t('graph.conn_ws_resume'); rb.addEventListener('click', wsResume); body.appendChild(rb);
     }
     row.appendChild(badge); row.appendChild(body);

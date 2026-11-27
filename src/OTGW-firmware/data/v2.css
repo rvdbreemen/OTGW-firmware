@@ -655,6 +655,7 @@ html[data-theme="dark"]{--accent:var(--brand-cyan);--nav:#383838;--tile-off:#545
   .connrow .nm{font-weight:700;font-size:.9rem;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
   .connrow .det{font-size:.8rem;color:var(--text);font-family:var(--font-mono);margin-top:2px}
   .connrow .exp{font-size:.78rem;color:var(--muted);margin-top:4px}
+  .connrow .fs-btn{min-height:44px;margin-top:8px;padding:8px 18px;font-weight:700;cursor:pointer}
   .connrow .fix{font-size:.78rem;color:var(--zone-alert);margin-top:4px;font-weight:600}
   .connrow .seen{font-size:.7rem;color:var(--muted);white-space:nowrap}
 

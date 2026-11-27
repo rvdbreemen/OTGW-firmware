@@ -254,6 +254,7 @@
     "conn_ws_reconnecting": "WebSocket · verbindet neu…",
     "conn_ws_paused": "WebSocket · pausiert nach wiederholten Abbrüchen",
     "conn_ws_resume": "Neu verbinden",
+    "conn_ws_paused_hint": "Die Seite versucht es nicht mehr, um das Gateway zu schonen. Werte werden weiterhin per Polling aktualisiert. Auf Neu verbinden drücken, um es erneut zu versuchen.",
     "conn_no_link": "keine Verbindung",
     "conn_seen_ago": "vor {{s}} s gesehen",
     "conn_role_recency": "{{role}} · {{recency}}",
