@@ -2,9 +2,9 @@
 
 ### Wat is OTGW-firmware?
 
-OTGW-firmware is de open-source firmware voor de NodoShop OpenTherm Gateway (OTGW). De firmware draait op een ESP32-S3 Wi-Fi-microcontroller (een LOLIN S3 Mini of S3 Mini Pro) in de OTGW Classic en verbindt de OpenTherm verwarmingsbus in uw woning met uw thuisnetwerk, een domotica-platform en een webbrowser.
+OTGW-firmware is de open-source firmware voor de NodoShop OpenTherm Gateway (OTGW). De firmware draait op een ESP32-S3 Wi-Fi-microcontroller (een LOLIN S3 Mini) in de OTGW Classic en verbindt de OpenTherm verwarmingsbus in uw woning met uw thuisnetwerk, een domotica-platform en een webbrowser.
 
-De firmware kent twee actieve lijnen. De 2.0.0-lijn (de `dev`-branch die hier beschreven wordt) is uitsluitend voor de ESP32-S3: hij is gebouwd op een async web stack plus FreeRTOS en draait op de NodoShop OTGW Classic met een LOLIN S3 Mini of S3 Mini Pro in de Wemos D1 mini-voet. De PIC blijft zitten; één firmware-image (`esp32-combo`) herkent hem bij het opstarten. De 1.x maintenance / LTS-lijn is de firmware voor de Wemos D1 mini (ESP8266); wie terug wil naar 1.x, plaatst de Wemos D1 mini terug. Beide lijnen worden gebouwd met PlatformIO.
+De firmware kent twee actieve lijnen. De 2.0.0-lijn (de `dev`-branch die hier beschreven wordt) is uitsluitend voor de ESP32-S3: hij is gebouwd op een async web stack plus FreeRTOS en draait op de NodoShop OTGW Classic met een LOLIN S3 Mini in de Wemos D1 mini-voet. De PIC blijft zitten; één firmware-image (`esp32-combo`) herkent hem bij het opstarten. De 1.x maintenance / LTS-lijn is de firmware voor de Wemos D1 mini (ESP8266); wie terug wil naar 1.x, plaatst de Wemos D1 mini terug. Beide lijnen worden gebouwd met PlatformIO. **LOLIN S3 Mini Pro:** de firmware herkent hem nog wel, maar het display werkt niet (getest door de beheerder), dus hij wordt niet aanbevolen. Gebruik de LOLIN S3 Mini, die is getest.
 
 Nieuw in de 2.0.0-lijn:
 
@@ -45,7 +45,7 @@ Firmware 2.0 ondersteunt twee hardwareconfiguraties: de OTGW Classic met een ESP
 
 #### De ESP-module
 
-De ESP32-S3 (LOLIN S3 Mini of S3 Mini Pro) in de Wemos D1 mini-voet voert de eigenlijke firmware uit. Hij verzorgt:
+De ESP32-S3 (LOLIN S3 Mini) in de Wemos D1 mini-voet voert de eigenlijke firmware uit. Hij verzorgt:
 
 - Wi-Fi
 - De webserver, WebSocket-server en REST API
@@ -70,7 +70,7 @@ Releases van 2.0.0 staan op de GitHub Releases-pagina: beta's verschijnen als Gi
 **Breaking change in deze release.** v2.0.0 gebruikt standaard een nieuwe, zelfbeschrijvende set MQTT-topicnamen (ADR-106). Zevenendertig OT-spec-georiënteerde binary_sensor-topics krijgen een duidelijker, Home Assistant-vriendelijk label (bijvoorbeeld: `master_ch_enable` wordt `central_heating_enabled`). Gebruikers met bestaande automations op de oude labels kunnen `settings.mqtt.bUseLegacyOtTopics` op `true` zetten om het v1.x-gedrag te behouden. De twee modi sluiten elkaar uit: of de nieuwe namen, of de oude namen worden gepubliceerd, nooit beide tegelijk. De REST API is ongewijzigd ten opzichte van v1.x.
 
 **ESP32-S3-ondersteuning**
-- Draait op de OTGW Classic met een LOLIN S3 Mini of S3 Mini Pro in de Wemos D1 mini-voet. De PIC blijft zitten; één `esp32-combo`-image herkent de PIC bij het opstarten.
+- Draait op de OTGW Classic met een LOLIN S3 Mini in de Wemos D1 mini-voet. De PIC blijft zitten; één `esp32-combo`-image herkent de PIC bij het opstarten.
 - OT-Direct-modus met de werkingsmodi gateway (standaard), monitor, master en loopback, alleen op hardware zonder PIC, de OpenTherm Gateway OTGW32 (Hoofdstuk 11)
 - Ethernet met runtime-failover van en naar Wi-Fi: alleen met Ethernet-hardware; de OTGW Classic heeft geen Ethernet
 - BLE temperatuursensoren: passieve Bluetooth LE-scan van Xiaomi MiBeacon (plaintext en encrypted v4/v5 via een per-sensor bindkey), ATC/pvvx custom firmware, en BTHome v2
@@ -115,9 +115,9 @@ Releases van 2.0.0 staan op de GitHub Releases-pagina: beta's verschijnen als Gi
 
 ### Platformvergelijking
 
-De 2.0.0-lijn draait uitsluitend op ESP32-S3. De tabel laat zien wat hij ondersteunt op de OTGW Classic met een LOLIN S3 Mini of S3 Mini Pro.
+De 2.0.0-lijn draait uitsluitend op ESP32-S3. De tabel laat zien wat hij ondersteunt op de OTGW Classic met een LOLIN S3 Mini.
 
-| Eigenschap | OTGW Classic + LOLIN S3 Mini / S3 Mini Pro |
+| Eigenschap | OTGW Classic + LOLIN S3 Mini |
 |---|---|
 | CPU | 240 MHz, 2 cores |
 | Flash | 4 MB (768 KB voor LittleFS) |
@@ -140,7 +140,7 @@ De 2.0.0-lijn draait uitsluitend op ESP32-S3. De tabel laat zien wat hij onderst
 Voor gebruik van OTGW-firmware heeft u nodig:
 
 **Hardware**
-- NodoShop OTGW Classic met een LOLIN S3 Mini of S3 Mini Pro (ESP32-S3) in de Wemos D1 mini-voet
+- NodoShop OTGW Classic met een LOLIN S3 Mini (ESP32-S3) in de Wemos D1 mini-voet
 - Een OpenTherm-compatibele cv-ketel
 - Een OpenTherm-compatibele thermostaat (of gebruik SAT als thermostaat)
 - Een thuisnetwerk met Wi-Fi (802.11 b/g/n, 2,4 GHz)

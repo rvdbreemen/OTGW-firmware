@@ -2,9 +2,9 @@
 
 ### What Is OTGW-firmware?
 
-OTGW-firmware turns the NodoShop OpenTherm Gateway into a fully networked smart heating controller. It runs on the ESP32-S3 Wi-Fi microcontroller (a LOLIN S3 Mini or S3 Mini Pro) plugged into the OTGW Classic, monitors the OpenTherm communication bus between your room thermostat and your boiler, and connects your entire heating system to your home automation platform via MQTT, a browser-based web interface, and a REST API.
+OTGW-firmware turns the NodoShop OpenTherm Gateway into a fully networked smart heating controller. It runs on the ESP32-S3 Wi-Fi microcontroller (a LOLIN S3 Mini) plugged into the OTGW Classic, monitors the OpenTherm communication bus between your room thermostat and your boiler, and connects your entire heating system to your home automation platform via MQTT, a browser-based web interface, and a REST API.
 
-The firmware has two active lines. The 2.0.0 line (the `dev` branch documented here) is ESP32-S3 only: it is built on an async web stack plus FreeRTOS and runs on the NodoShop OTGW Classic with a LOLIN S3 Mini or S3 Mini Pro in the Wemos D1 mini socket. The PIC stays in place, and one firmware image (`esp32-combo`) detects it at boot. The 1.x maintenance / LTS line is the firmware for the Wemos D1 mini (ESP8266); going back to 1.x means putting the Wemos D1 mini back. Both lines build with PlatformIO.
+The firmware has two active lines. The 2.0.0 line (the `dev` branch documented here) is ESP32-S3 only: it is built on an async web stack plus FreeRTOS and runs on the NodoShop OTGW Classic with a LOLIN S3 Mini in the Wemos D1 mini socket. The PIC stays in place, and one firmware image (`esp32-combo`) detects it at boot. The 1.x maintenance / LTS line is the firmware for the Wemos D1 mini (ESP8266); going back to 1.x means putting the Wemos D1 mini back. Both lines build with PlatformIO. **LOLIN S3 Mini Pro:** the firmware still recognises it, but its display does not work (tested by the maintainer), so it is not recommended. Use the LOLIN S3 Mini, which is tested.
 
 Highlights new in the 2.0.0 line:
 
@@ -17,7 +17,7 @@ Highlights new in the 2.0.0 line:
 
 OpenTherm is the communication protocol used by most modern central heating systems in Europe. A room thermostat and a boiler talk to each other over a two-wire OpenTherm bus, exchanging temperature requests, setpoints, modulation levels, fault codes, and dozens of other measurements.
 
-The NodoShop OpenTherm Gateway (OTGW) is a small hardware device that sits physically in-line on that two-wire bus, between the thermostat and the boiler. Inside the device is a PIC microcontroller (PIC16F88 or PIC16F1847) that implements the OpenTherm electrical interface. Alongside it sits the Wi-Fi module: on the 2.x line a LOLIN S3 Mini or S3 Mini Pro (ESP32-S3) in the Wemos D1 mini socket. The PIC decodes every OpenTherm frame on the bus and forwards it to the ESP over a serial link. The ESP firmware then makes all of that data available on your home network.
+The NodoShop OpenTherm Gateway (OTGW) is a small hardware device that sits physically in-line on that two-wire bus, between the thermostat and the boiler. Inside the device is a PIC microcontroller (PIC16F88 or PIC16F1847) that implements the OpenTherm electrical interface. Alongside it sits the Wi-Fi module: on the 2.x line a LOLIN S3 Mini (ESP32-S3) in the Wemos D1 mini socket. The PIC decodes every OpenTherm frame on the bus and forwards it to the ESP over a serial link. The ESP firmware then makes all of that data available on your home network.
 
 On its own, the PIC does its job quietly. OTGW-firmware is the software that makes the entire system useful: it decodes, displays, stores, publishes, and acts on every message the thermostat and boiler exchange.
 
@@ -62,7 +62,7 @@ Releases of 2.0.0 are on the GitHub Releases page: betas are published as GitHub
 
 #### Highlights
 
-- **ESP32-S3 platform**: The OTGW Classic runs with a LOLIN S3 Mini or S3 Mini Pro in the Wemos D1 mini socket. The PIC stays in place. One `esp32-combo` image detects the PIC at boot. Build with `build.bat` (Windows) or `./build.sh` (Linux/macOS).
+- **ESP32-S3 platform**: The OTGW Classic runs with a LOLIN S3 Mini in the Wemos D1 mini socket. The PIC stays in place. One `esp32-combo` image detects the PIC at boot. Build with `build.bat` (Windows) or `./build.sh` (Linux/macOS).
 - **OT-Direct mode**: operating modes gateway (default), monitor, master and loopback, only on hardware without a PIC, the OpenTherm Gateway OTGW32 (Chapter 11).
 - **Ethernet with runtime failover**: only with Ethernet hardware; the OTGW Classic has no Ethernet.
 - **BLE temperature sensors**: On the ESP32-S3, sensors are read passively over Bluetooth LE. Xiaomi MiBeacon (plaintext and encrypted v4/v5 via a per-sensor bindkey), ATC/pvvx custom firmware, and BTHome v2 are supported. Room temperature and humidity feed directly into SAT and Home Assistant.
@@ -85,9 +85,9 @@ Releases of 2.0.0 are on the GitHub Releases page: betas are published as GitHub
 
 ### Platform Comparison
 
-The 2.0.0 line runs on ESP32-S3 only. The table shows what it supports on the OTGW Classic with a LOLIN S3 Mini or S3 Mini Pro.
+The 2.0.0 line runs on ESP32-S3 only. The table shows what it supports on the OTGW Classic with a LOLIN S3 Mini.
 
-| Feature | OTGW Classic + LOLIN S3 Mini / S3 Mini Pro |
+| Feature | OTGW Classic + LOLIN S3 Mini |
 |---|---|
 | OpenTherm via PIC co-processor | Yes |
 | OT-Direct mode | No (only on hardware without a PIC) |
@@ -124,7 +124,7 @@ If you are upgrading from v1.x, start with Chapter 2 (the upgrade section) and t
 
 Before you begin, you need:
 
-- A NodoShop OTGW Classic with a LOLIN S3 Mini or S3 Mini Pro (ESP32-S3) in the Wemos D1 mini socket. Other boards are not officially supported.
+- A NodoShop OTGW Classic with a LOLIN S3 Mini (ESP32-S3) in the Wemos D1 mini socket. Other boards are not officially supported.
 - A USB cable for the first flash of the S3 Mini.
 - A computer with a USB port and Python 3.6 or higher installed (for the flash script), or PlatformIO installed (for building from source).
 - A home Wi-Fi network with a 2.4 GHz access point (the ESP32-S3 does not support 5 GHz).

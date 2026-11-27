@@ -20,7 +20,7 @@
 
 **Supported hardware:** exactly two configurations. Use the combo image (`esp32-combo`) for both.
 
-1. **The OTGW Classic with an ESP32-S3 module** (a LOLIN S3 Mini or S3 Mini Pro in the module socket). The PIC stays in place and talks OpenTherm.
+1. **The OTGW Classic with an ESP32-S3 module** (a LOLIN S3 Mini in the module socket). The PIC stays in place and talks OpenTherm. **LOLIN S3 Mini Pro:** the firmware still recognises it, but its display does not work (tested by the maintainer), so it is not recommended. Use the LOLIN S3 Mini, which is tested.
 2. **The OpenTherm Gateway OTGW32.** A board with an ESP32-S3 that speaks OpenTherm itself (OT-Direct), without a PIC. Version 1.0 of the OTGW32 is the first production run. The firmware does not use a bypass relay.
 
 Everything the gateway is for (OpenTherm, MQTT, Home Assistant, SAT) works on the OTGW32. A few optional extras (Bluetooth sensors, long graph history, bigger buffers) need PSRAM (extra working memory) and are off on this board.
@@ -99,7 +99,7 @@ curl http://<ip>/api/v2/settings -o settings-backup.json
 
 **2b. Upgrade paths to the stable** [verify each path on a bench unit before the release]:
 
-- **From 1.x (ESP8266):** a different firmware line. The ESP8266 board is replaced by an ESP32-S3 module (LOLIN S3 Mini or S3 Mini Pro); first flash over USB with `flash_otgw`. Settings do not carry over automatically; read the breaking changes below.
+- **From 1.x (ESP8266):** a different firmware line. The ESP8266 board is replaced by an ESP32-S3 module (LOLIN S3 Mini); first flash over USB with `flash_otgw`. Settings do not carry over automatically; read the breaking changes below.
 - **From a 2.0.0 beta on the 2240 KB table** (every beta up to the one that brings the new table): one USB migration with `flash_otgw --migrate --host <ip>` (Windows `flash_otgw.bat`, Linux and macOS `./flash_otgw.sh`). Over-the-air update alone is not enough: the new firmware on the old table keeps your settings but warns at boot and in `/update`, and the file-system step is refused. [verify: the bridge beta with the guards, ADR-298 release order]
 - **From the beta that already has the new table:** open `/update`, give it the release zip, press **Update**.
 - **Going back:** a migrated unit is rolled back only with the old release's full merged image over USB, never with the old tool's `--update`.
@@ -131,7 +131,7 @@ A note for beta users: from beta.162 to beta.170 no MQTT topic, setting or API f
 
 Checked against the last 1.x release, v1.7.9. Step by step: Chapter 2 of the manual, "Moving from 1.x to 2.0.0, step by step".
 
-- **ESP32-S3 only.** Replace the Wemos D1 mini with a LOLIN S3 Mini or S3 Mini Pro; the OTGW board and the PIC stay. Going back to 1.x means putting the Wemos back.
+- **ESP32-S3 only.** Replace the Wemos D1 mini with a LOLIN S3 Mini; the OTGW board and the PIC stay. Going back to 1.x means putting the Wemos back.
 - **First flash over USB** with `flash_otgw`; after that, updates go over WiFi.
 - **GPIO numbers differ.** Set the Dallas, S0 and output pins again after restoring a 1.x `settings.ini`.
 - **MQTT unique id.** The default unique id contains the MAC address, and the S3 has another one. Restore the 1.x `settings.ini` (or copy the Unique id) to keep your Home Assistant entities.
@@ -354,7 +354,7 @@ Timing and reliability:
 - Release files (TASK-3116, beta.474): the GitHub release has no loose `.ino.bin` or `.littlefs.bin` file and `SHA256SUMS` lists none, because an old 1.x flash tool matches those names and would write a 2.x image to an ESP8266. The images stay inside the `-flash.zip`.
 ### BLE (Bluetooth sensors)
 
-- On boards without PSRAM BLE can no longer be switched on (greyed out with "BLE needs PSRAM", refused by REST with 409 and by MQTT, a stored "on" cleared at first start); the LOLIN S3 Mini and S3 Mini Pro keep BLE (TASK-2025, beta.375).
+- On boards without PSRAM BLE can no longer be switched on (greyed out with "BLE needs PSRAM", refused by REST with 409 and by MQTT, a stored "on" cleared at first start); the LOLIN S3 Mini keep BLE (TASK-2025, beta.375).
 
 ### Capture tool
 
@@ -389,7 +389,7 @@ Timing and reliability:
 
 These are design limits of 2.0.0, not bugs.
 
-- **ESP32-S3 only.** 2.0.0 runs on the OTGW Classic with a LOLIN S3 Mini or S3 Mini Pro. The ESP8266 (Wemos D1 mini, NodeMCU) stays on 1.x.
+- **ESP32-S3 only.** 2.0.0 runs on the OTGW Classic with a LOLIN S3 Mini. The ESP8266 (Wemos D1 mini, NodeMCU) stays on 1.x.
 - **No HTTPS.** The web UI, the REST API and the WebSocket use plain HTTP and WS on your local network. Do not expose the gateway to the internet; use a VPN or a reverse proxy if you need remote access.
 - **BLE sensors need a board with PSRAM** (TASK-2025, ADR-257). On a board without PSRAM the BLE scanner does not start and the switch is disabled with "BLE needs PSRAM".
 - **Firmware SAT and a SAT integration in Home Assistant exclude each other.** While the firmware SAT is on, the gateway refuses `CS=`, `CH=`, `MM=`, `C2=`, `H2=`, `TT=` and `TC=` from MQTT and REST, so the integration cannot control (TASK-1695).

@@ -147,7 +147,7 @@ De MQTT Home Assistant-auto-discoverymetadata staat in `src/OTGW-firmware/MQTTHa
 
 ### 8.3 Boardhardwarevarianten
 
-De ondersteunde 2.x-hardware is de NodoShop OTGW Classic met een LOLIN S3 Mini of S3 Mini Pro in de Wemos D1 mini-socket; de PIC blijft zitten. De boarddefinities staan in `src/libraries/Platform/src/boards.h`. Elke PlatformIO-omgeving zet precies één `BOARD_*`-preprocessorvlag in `platformio.ini`, en `boards.h` vertaalt die vlag naar `HAS_*`-capability-vlaggen.
+De ondersteunde 2.x-hardware is de NodoShop OTGW Classic met een LOLIN S3 Mini in de Wemos D1 mini-socket; de PIC blijft zitten. De boarddefinities staan in `src/libraries/Platform/src/boards.h`. Elke PlatformIO-omgeving zet precies één `BOARD_*`-preprocessorvlag in `platformio.ini`, en `boards.h` vertaalt die vlag naar `HAS_*`-capability-vlaggen.
 
 **Deze vlaggen zijn boardniveau, niet MCU-niveau.** De aanwezigheid van een PIC, Ethernet-hardware of een directe OpenTherm-interface is een eigenschap van het specifieke Nodoshop-printboard, niet van de MCU-familie. Applicatiecode test alleen de `HAS_*`-vlaggen, nooit de ruwe `BOARD_*`-macro's.
 
@@ -194,7 +194,7 @@ De twee vaste single-engine targets doen geen runtime hardwaredetectie; elk link
 |---|---|---|
 | `esp32` | Zonder PIC | Alleen OTDirect |
 | `esp32-classic` | OTGW Classic + LOLIN S3 Mini | PIC (OTGWSerial via UART) |
-| `esp32-combo` | OTGW Classic + LOLIN S3 Mini of S3 Mini Pro, engine gekozen bij boot | Beide engines ingelinkt |
+| `esp32-combo` | OTGW Classic + LOLIN S3 Mini, engine gekozen bij boot | Beide engines ingelinkt |
 
 `esp32-combo` is het target dat gebouwd en uitgeleverd wordt, en het enige dat op `dev` gebouwd wordt. Bouw het met de wrapper, zonder target-argument:
 
@@ -259,7 +259,7 @@ De OTGW-firmware bevindt zich tussen de OpenTherm-verwarmingsbus en het domotica
 
 #### Niveau 2: Container (`c4-container.md`)
 
-De 2.x-firmware draait op een ESP32-S3 (LOLIN S3 Mini of S3 Mini Pro) in de NodoShop OTGW Classic. De PIC16F-co-processor handelt de OpenTherm-bus af; de ESP32-S3 praat ermee via UART op 9600 baud.
+De 2.x-firmware draait op een ESP32-S3 (LOLIN S3 Mini) in de NodoShop OTGW Classic. De PIC16F-co-processor handelt de OpenTherm-bus af; de ESP32-S3 praat ermee via UART op 9600 baud.
 
 #### Niveau 3: Component (`c4-component.md`)
 

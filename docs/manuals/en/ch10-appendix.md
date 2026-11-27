@@ -66,7 +66,7 @@ The full list of all 128 message IDs, including solar storage (IDs 101-103), ven
 | **ADR** | Architecture Decision Record. A short document capturing a significant design choice, its rationale, and its consequences. All ADRs live in `docs/adr/`. Once Accepted, an ADR is immutable. |
 | **AceTime** | Arduino timezone library used by the firmware for NTP time management and zone-aware timestamps. |
 | **ArduinoJson** | A popular Arduino JSON library. Removed from this project (ADR-146). REST JSON output goes through the `JsonEmit` streaming writer (`jsonEmit.h`); settings lines are read with `parseJsonKVLine()`. |
-| **BLE** | Bluetooth Low Energy. On the ESP32-S3 (LOLIN S3 Mini or S3 Mini Pro), the firmware can receive room temperature and humidity from a BTHome-compatible BLE sensor (e.g., a Xiaomi sensor). |
+| **BLE** | Bluetooth Low Energy. On the ESP32-S3 (LOLIN S3 Mini), the firmware can receive room temperature and humidity from a BTHome-compatible BLE sensor (e.g., a Xiaomi sensor). |
 | **boards.h** | Board-specific pin mapping header. Defines GPIO assignments and `HAS_*` capability flags per build (e.g., `BOARD_NODOSHOP_ESP32_COMBO`). Located at `src/libraries/Platform/src/boards.h`. |
 | **BTHome** | An open BLE advertisement protocol for home sensor devices. Used by the SAT BLE integration for passive scanning of room temperature sensors. |
 | **C4 model** | A four-level architecture documentation model: Context, Container, Component, Code. The firmware's architecture is documented using C4 in `docs/c4/`. |
@@ -76,7 +76,7 @@ The full list of all 128 message IDs, including solar storage (IDs 101-103), ven
 | **DHW** | Domestic Hot Water. The circuit supplying hot tap water, as distinct from the central heating circuit. |
 | **DUE()** | A timer macro from `safeTimers.h`. Returns true when the declared timer's interval has elapsed, and false otherwise. Handles `millis()` rollover safely. |
 | **1.x line** | The maintenance branch `otgw-1.x.x`, firmware for the Wemos D1 mini. Going back to 1.x means putting the Wemos D1 mini back in the OTGW Classic. |
-| **ESP32** | The Espressif ESP32-S3 on the LOLIN S3 Mini or S3 Mini Pro, used by the 2.x firmware in the OTGW Classic. Runs at 240 MHz and supports BLE. |
+| **ESP32** | The Espressif ESP32-S3 on the LOLIN S3 Mini, used by the 2.x firmware in the OTGW Classic. Runs at 240 MHz and supports BLE. |
 | **f8.8** | OpenTherm fixed-point data format: an 8-bit signed integer plus an 8-bit fractional part (1/256 per LSB). Used for all temperature values in the protocol. |
 | **Frame Bridge** | The abstraction layer (ADR-087) that provides a uniform OpenTherm frame interface regardless of whether the underlying transport is the PIC UART (PIC gateway mode) or OTDirect (OT-Direct mode). |
 | **HA** | Home Assistant. The primary target home automation platform for this firmware. |
@@ -249,7 +249,7 @@ The full changelog is in `CHANGELOG.md` at the repository root.
 
 Version 2.0.0 is a major release. The headline changes are:
 
-**ESP32-S3 line.** Version 2.0.0 runs on the NodoShop OTGW Classic with a LOLIN S3 Mini or S3 Mini Pro in the Wemos D1 mini socket; the PIC stays in place. One `esp32-combo` image detects the PIC at boot. A platform abstraction layer (`platform.h`, `boards.h`) isolates hardware differences. The 1.x firmware for the Wemos D1 mini (ESP8266) continues on its own maintenance line.
+**ESP32-S3 line.** Version 2.0.0 runs on the NodoShop OTGW Classic with a LOLIN S3 Mini in the Wemos D1 mini socket; the PIC stays in place. One `esp32-combo` image detects the PIC at boot. A platform abstraction layer (`platform.h`, `boards.h`) isolates hardware differences. The 1.x firmware for the Wemos D1 mini (ESP8266) continues on its own maintenance line.
 
 **SAT (Smart Autotune Thermostat).** The embedded PID thermostat is now a major feature. Version 2.0.0 adds PID v3 with deadband and anti-cycling, a heating curve advisor (INCREASE/DECREASE/HOLD), multi-zone room temperature averaging, Summer Simmer Index, solar gain compensation, DHW setpoint control, boiler gas consumption estimation, and BLE room temperature sensor support.
 
@@ -319,7 +319,7 @@ The ELF file is included in GitHub release artifacts specifically to support cra
 |-------------|--------|------|-----------|-------|------------|
 | `esp32` | Base environment, no PIC | ESP32-S3 | Arduino-ESP32 v3.3.5 (pioarduino fork) | 4 MB (custom partition) | 768 KB LittleFS |
 | `esp32-classic` | OTGW Classic + LOLIN S3 Mini | ESP32-S3 | Arduino-ESP32 v3.3.5 (pioarduino fork) | 4 MB (custom partition) | 768 KB LittleFS |
-| `esp32-combo` | OTGW Classic + LOLIN S3 Mini or S3 Mini Pro, engine picked at boot (built and shipped) | ESP32-S3 | Arduino-ESP32 v3.3.5 (pioarduino fork) | 4 MB (custom partition) | 768 KB LittleFS |
+| `esp32-combo` | OTGW Classic + LOLIN S3 Mini, engine picked at boot (built and shipped) | ESP32-S3 | Arduino-ESP32 v3.3.5 (pioarduino fork) | 4 MB (custom partition) | 768 KB LittleFS |
 
 ESP32-S3 partition layout (`partitions_otgw_esp32.csv`, ADR-191): a 960 KB safeboot updater (factory), a 2240 KB main firmware slot (`app0`), 768 KB LittleFS and a 64 KB coredump. Firmware OTA over WiFi goes through the safeboot updater, and bootloader rollback returns to safeboot if a new image fails to boot.
 
