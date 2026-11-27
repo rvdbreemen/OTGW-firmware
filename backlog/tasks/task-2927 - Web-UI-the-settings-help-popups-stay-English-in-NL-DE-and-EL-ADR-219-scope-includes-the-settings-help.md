@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-19T19:38:00Z'
-updated_date: '2026-11-27T08:00:00Z'
+updated_date: '2026-11-27T08:02:00Z'
 labels:
   - webui
   - i18n
@@ -41,4 +41,6 @@ Maintainer decision (Robert, 2026-11-19 19:54 UTC, Discord DM 157306383971555753
 2026-11-27 Note (coordinator, from otgw-webui): the NL, DE and EL packs grow by +6.5, +6.6 and +8.3 KB with the translated help texts. The free space on LittleFS has NOT been measured. Decision: this is 2.1.0 and nothing is pushed until the free space is measured (the OTGW32 unit has 768 KB LittleFS and no PSRAM). Also found in the TASK-2927 review: i18n/glossary.md item 50 gives Dutch 'ruimtesensor' for room sensor, but the nl pack labels and help texts use 'kamersensor' (satmultiarea label, satsensorarea*); the new help texts follow the pack. The glossary owner decides which term wins; if the glossary wins, the labels and the four satsensorarea help texts change.
 
 2026-11-27 Related: TASK-3118 (two English help defects, sathpcycle/satcyclesperhour and ethdns).
+
+2026-11-27 Owner of i18n/glossary.md: otgw-webui (he runs the translate skill and the packs), decided by the coordinator. The conflict ruimtesensor (glossary item 50) versus kamersensor (nl pack labels and help texts) is his decision; if the glossary wins, the labels and the four satsensorarea help texts change.
 <!-- SECTION:NOTES:END -->
