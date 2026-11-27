@@ -3,9 +3,10 @@ id: TASK-3144
 title: >-
   SAT: the heating-failure warning stays silent while the tolerance band holds
   CH off (Q-428a, entry 501, Sergeant D 'My answer is A')
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-11-27T21:31:00Z'
+updated_date: '2026-11-27T21:43:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -26,3 +27,9 @@ Decision: Robert chose option A (register entry 501, 2026-11-27 04:58:51 UTC: 'A
 - [ ] #2 While the tolerance band holds CH off no heating-failure flag, narration or event count is produced; the window restarts when heating is allowed again (earliest flag 15 min after the release)
 - [ ] #3 The register entry number of Sergeant D's answer is quoted in the task notes and the docs (firmware-sat-spec.md, MQTT.md) say what silent means
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-27 DUPLICATE of TASK-3112: the implementation of Q-428a already exists on lane/ba-428a (commit bffa3cfcd with note 293d11f5b, by Robert, not yet on origin/dev): SatDiagIn.bandOff = _sat_tolBandOff, satDiagEventsStep restarts the 15 min window in a band pause (SATcontrol.ino ~8198), a PWM OFF phase keeps counting, a flag already set stays; tests hf_band and hf_hold in tests/test_sat_diag_events.py. Review by otgw-poc-dev: same behaviour as the plan in this description except one point: this plan cleared an already-raised flag at pause start, lane/ba-428a keeps it. That point goes to Sergeant D as Q-3112b (advice: keep). Coordinator decision 2026-11-27: TASK-3112 stays the single task; this plan stays here as a note; nothing is implemented from this task.
+<!-- SECTION:NOTES:END -->
