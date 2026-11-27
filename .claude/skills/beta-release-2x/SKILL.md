@@ -150,6 +150,7 @@ from the file at create time.
    grep -n -E "TODO|TBD|XXX|—" docs/releases/RELEASE_NOTES_<v>.md
    grep -o -E "\]\([^)]+\)" docs/releases/RELEASE_NOTES_<v>.md | grep -v -E "\(https?://|\(#"   # relative links break on the release page
    ```
+   Give the notes a short "SAT changes in this beta" block: one line per SAT change, with the number of Sergeant D's entry that decided it (entry numbers stay out of the public text: keep the block in the tracking task or as an HTML comment in the notes file), so the post to Sergeant D in Phase 6 is a copy.
    While writing each line, note in the tracking task who raised the TASK (the source: tester, Discord message, GitHub issue or PR). Write "(reported by <handle>)" in the public notes only where that person is already credited there; never add a new name.
 3. CHANGELOG `[Unreleased]` holds every firmware change since the last beta
    (`git log --oneline <prev>..HEAD -- src/`). Fill gaps now.
@@ -357,6 +358,7 @@ from the file at create time.
    Record the message ids of all parts in the tracking task; the next release starts its
    change list from this post.
 3. **Tell the people who asked for it** (Robert, standing order 2026-11-27: "Informeer de gebruikers of testers die ideeen, features of taken aangedragen hebben op het moment dat ze gepubliceerd worden als een beta"). The comms session (BlueFlame) owns this step. Map each TASK that shipped to its source: the task file's links, the Discord message, the GitHub issue or PR, `.claude/discord-people.local.md`. Send one short message per person per release, in the place where they asked (their Discord thread or channel, or the GitHub issue), in English, answer first, with the real `<@ID>` mention: what changed, what is and is not verified, and the release link. Only things that actually shipped in this release. Keep a ledger in `OTGW-field-data/_comms/contributor_notices_<tag>.md` (person, task, place, message id); no notice twice. The notes and the CHANGELOG record the source per TASK while the lines are written (Phase 1), so this mapping is cheap.
+4. **Tell Sergeant D what changed in SAT** (Robert, standing order 2026-11-27: "sergeant vertelt wanneer je SAT aanpassing doorgevoerd hebt wat er aangepast is"). Owner: BlueFlame. One post per beta in `#dev-sat-mqtt` (with his real `<@ID>` mention, English, answer first, no build announcement) that lists: the numbers of HIS entries that are implemented in this beta; what the firmware does now, before and after, in plain words; what was tested and what was not (host tests, simulator bench, a real boiler or not); and the beta that carries it. Source: the Final Summaries of the tasks, the "SAT changes in this beta" block of the release notes, and the entries in `docs/sat/decisions`. Only things that shipped in this beta; a change that is not in the build is not announced. Record the message id in the tracking task.
 
 ### Phase 7: Close out
 
