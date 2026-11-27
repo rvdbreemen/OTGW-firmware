@@ -4594,7 +4594,9 @@
   // browser, else the OS preference, see the v2.html pre-paint script); the key stays in REST
   // and in the settings file.
   // TASK-2023: updatecheckasked is the one-time question's flag, set by the UI itself.
-  var SET_HIDE_ROW = { sat_onboarded: 1, ui_onboarded: 1, darktheme: 1, updatecheckasked: 1 };
+  // TASK-3121: the three bypass settings are stored and shown only, nothing reads them in this release (settingStuff.ino:500-501, restAPI.ino:629-630,
+  // the relay readers sit inside '#if HAS_BYPASS_RELAY'; docs ch11.2: bypass is not supported), so no row promises a function. Labels and help stay in the dictionaries.
+  var SET_HIDE_ROW = { sat_onboarded: 1, ui_onboarded: 1, darktheme: 1, updatecheckasked: 1, otdopenbypass: 1, otdautobypass: 1, otdhasbypassrelay: 1 };
   function humanizeKey(k) {
     var s = k.replace(/^(sat|otd|gpiosensors|gpiooutputs|s0counter|mqtt|wifi|eth|ntp|webhook|ui_|dallas)/, '');
     if (!s) s = k;
