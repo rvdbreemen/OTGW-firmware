@@ -12177,6 +12177,68 @@
         ],
         "superseded_by": null
       }
+    },
+    {
+      "id": "ADR-301",
+      "title": "Patch ESPAsyncWebServer 3.11.2 so its mutex is a static FreeRTOS recursive mutex that cannot fail to be created, through patch_pio_libs like ADR-232",
+      "path": "ADR-301-patch-espasyncwebserver-3-11-2-so-its-mutex-is-a-static-freertos-recursive-mutex-that-cannot-fail-to-be-created-through-patch-pio-libs-like-adr-232.md",
+      "format": "canonical",
+      "status": "Proposed",
+      "date": "2026-11-27",
+      "decision_summary": "At build time, scripts/patchpiolibs.py replaces the std::recursivemutex typedef in the libdeps copy of ESPAsyncWebSer...",
+      "topics": [
+        "dependency-patch",
+        "heap",
+        "low-memory",
+        "mutex",
+        "websocket"
+      ],
+      "aliases": [
+        "ESPAsyncWebServer mutex patch",
+        "static recursive mutex",
+        "uninitialised _queue_lock"
+      ],
+      "components": [
+        "asyncsrv::mutex_type in the patched ESPAsyncWebServer.h (patch_pio_libs)"
+      ],
+      "symbols": [
+        "asyncsrv::mutex_type",
+        "AsyncWebSocket::_newClient",
+        "AsyncWebSocketClient::_queue_lock",
+        "xSemaphoreCreateRecursiveMutexStatic"
+      ],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [
+          "The patch applies only to ESPAsyncWebServer 3.11.2 and fails the build loudly on any other content of ESPAsyncWebServer.h (fingerprint, as ADR-232).",
+          "After the patch, asyncsrv::mutextype allocates nothing from the heap when it is constructed.",
+          "The patch is documented in patchpiolibs.py with this ADR, the upstream status and the source lines above."
+        ],
+        "must_not": [
+          "Must not set ASYNCWEBSERVERUSEMUTEX to 0: that turns every lock into a no-op while textAll() runs on the loop task and the clients on asynctcp, a data race instead of a crash.",
+          "Must not change any other line of the library in this patch.",
+          "Must not remove the TASK-3119 handshake gate because of this patch."
+        ],
+        "exceptions": [
+          "None."
+        ],
+        "verification": [
+          "Host test (to be written with the implementation): the patch applies to the pinned file and the fingerprint check fails on a changed file; the patched header has no std::recursivemutex typedef.",
+          "Host test on the REAL patched class, cut from the patched header, against an RTOS stub whose malloc always fails: the mutex constructs and locks recursively (lock, lock, unlock, unlock, trylock). Red on a model of the unpatched path (a s...",
+          "Bench (otgw-bench-tester), the real proof: otgw-dev's crashrun2 scenario (K deep hold, repeated /ws connects during the hold), n >= 20 connects per arm, old build and patched build, on the bench Classic with PSRAM and on the OTGW32 witho..."
+        ]
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
     }
   ],
   "relationships": [
@@ -18985,6 +19047,12 @@
       "resolved": true
     },
     {
+      "source": "ADR-232",
+      "target": "ADR-301",
+      "type": "related",
+      "resolved": true
+    },
+    {
       "source": "ADR-233",
       "target": "ADR-056",
       "type": "related",
@@ -19987,6 +20055,12 @@
       "resolved": true
     },
     {
+      "source": "ADR-295",
+      "target": "ADR-301",
+      "type": "related",
+      "resolved": true
+    },
+    {
       "source": "ADR-296",
       "target": "ADR-236",
       "type": "related",
@@ -20151,6 +20225,24 @@
     {
       "source": "ADR-300",
       "target": "ADR-298",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-301",
+      "target": "ADR-147",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-301",
+      "target": "ADR-232",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-301",
+      "target": "ADR-295",
       "type": "related",
       "resolved": true
     }
