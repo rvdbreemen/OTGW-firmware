@@ -187,7 +187,7 @@ The 1.x line (maintenance branch `otgw-1.x.x`) runs on the Wemos D1 mini (ESP826
 
 #### The OpenTherm Gateway OTGW32
 
-The second supported configuration is the OpenTherm Gateway OTGW32: an ESP32-S3 board without a PIC that speaks OpenTherm itself (OT-Direct). It is a new device (hardware versions 1.0 and 1.1) that still has to prove itself in the field. Chapter 11 describes it and Chapter 12 compares it with the OTGW Classic.
+The second supported configuration is the OpenTherm Gateway OTGW32: an ESP32-S3 board without a PIC that speaks OpenTherm itself (OT-Direct). It is a new device (hardware versions 1.0 and 1.1) that still has to prove itself in the field. Its 10 way terminal block (J4) is not fitted at the factory. Chapter 11 describes it and Chapter 12 compares it with the OTGW Classic.
 
 #### Other Boards
 
@@ -5761,6 +5761,7 @@ Firmware 2.0 supports exactly two hardware configurations:
 - **Processor and memory:** an ESP32-S3 with 4 MB of flash and no PSRAM (the extra memory that the LOLIN S3 Mini module has). The firmware checks for PSRAM while it runs.
 - **OpenTherm:** the ESP32-S3 drives the boiler side and the thermostat side itself. The firmware calls this OT-Direct. There is no PIC, so there is no PIC firmware to update.
 - **Options in the firmware:** wired Ethernet (a W5500 chip), a small OLED display and a Dallas temperature sensor input are supported by the firmware. They have not been seen on real OTGW32 hardware in our tests.
+- **Connector:** the 10 way terminal block (J4) is not fitted at the factory; you fit it yourself. Terminal 1 is the one nearest the reset button. It carries 5 V, 3.3 V, GND, a 1-wire line, an SW line and the boiler and thermostat lines. No spare general-purpose pin is visible on it apart from the 1-wire line (hardware information from an OTGW32 owner; which terminal is which is not documented here yet).
 - **What the unit reports:** `GET /api/v2/device/info` shows `hardware_type` `otgw32` and the hardware mode `OT-Direct`. MQTT publishes the same as `otgw-firmware/hardware_type` and `otgw-firmware/hardware_mode`.
 
 ### 11.2 The operating modes

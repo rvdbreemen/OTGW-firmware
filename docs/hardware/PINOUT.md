@@ -60,6 +60,8 @@ D6=12, D7=13, D8=15, TX=1, RX=3, A0=ADC`.
 Truth = the reference `hwdef.h` (`#ifdef NODO`), mirrored into `boards.h`
 `BOARD_NODOSHOP_ESP32`. No PIC: OT protocol is driven directly by OTDirect.
 
+The 10 way terminal block (J4) is not fitted at the factory; the user fits it. Terminal 1 is the one nearest the reset button. The block carries 5 V, 3.3 V, GND, a 1-wire line, an SW line and the boiler and thermostat lines; no spare general-purpose pin is visible on it apart from the 1-wire line (GPIO 4). Which terminal is which is not documented here yet (hardware information from an OTGW32 owner).
+
 | Signal | S3 GPIO | Notes |
 |---|---|---|
 | OT master IN (from boiler) | 21 | OTDirect master |

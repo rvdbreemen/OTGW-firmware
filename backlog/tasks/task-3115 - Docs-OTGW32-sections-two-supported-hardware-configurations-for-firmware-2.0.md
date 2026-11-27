@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-27T05:41:00Z'
-updated_date: '2026-11-27T08:19:00Z'
+updated_date: '2026-11-27T08:35:00Z'
 labels:
   - docs
 milestone: 2.0.0
@@ -49,4 +49,6 @@ Robert 2026-11-27 (chat, relayed by the coordinator): the sale of the OTGW32 sta
 2026-11-27 CONFLICT for Robert (Q28), kept open: Robert's chat words relayed by the coordinator say that at release time only version 1.0 is available and that 1.0 is the first production run; an OTGW32 owner (a tester, #beta-testing message 1575787624054919179, 2026-11-27 08:17:26 UTC, unedited) wrote verbatim: 'Versions 1.0 & 1.1 are very similar, Version 1.1 has an optional bypass relay (not fitted as supplied). W5500 Ethernet uses SPI on GPIO 11,12,13,14,15. 1-Wire is connected to GPIO 4'. Docs now say only what the owner confirmed: 'Hardware versions 1.0 and 1.1 are very similar; version 1.1 has an optional bypass relay that is not fitted as supplied and is not used by the firmware'; the words 'first production run' and 'only version' are removed from README, manuals en and nl, the 2.0.0 draft notes and the skill until Robert confirms. Bypass stays 'not available in this release' (HAS_BYPASS_RELAY undefined).
 
 2026-11-27 PIN COMPARISON with the firmware (origin/dev): W5500 SPI boards.h:88-93 CS 14, INT 15, RST 16, SCK 12, MISO 13, MOSI 11 = consistent with 'GPIO 11 to 15' (the owner did not name RST 16). 1-Wire: boards.h:82 PIN_1WIRE 4 = consistent, but no source file reads PIN_1WIRE; the Dallas pin is settings.sensors.iPin with default 10 (Sensorstypes.h:23), and 10 is PIN_STEPUP_ENABLE (boards.h:79), a reserved board pin, so sensors_ext.ino:308-311 refuses it and starts no sensors until the user sets the pin; GPIO 4 is not in boardPinReserved (OTGW-firmware.h:1058-1067), so Dallas works when the pin is set to 4 (ch11 and h11 section 11.6 now say so). S0 default 12 (S0types.h:22) equals PIN_SPI_SCK 12 and the GPIO output default 16 (Outputstypes.h:22) equals PIN_SPI_RST 16 (boards.h:90-91): both clash with W5500. THE ONE REMAINING QUESTION: which header pins are free for the S0 counter and the GPIO output on the OTGW32, and should the firmware defaults for S0, output and the Dallas pin (10, to 4) move on the OTGW32 board class?
+
+2026-11-27 Terminal block facts from the hardware owner (#beta-testing 1575791889997635705, verbatim): 'That is the terminal block, pin 1 is nearest the reset button (on the right), the red cross means the connector block is not installed at the factory.' Docs now say: the 10 way terminal block (J4) is not fitted at the factory, the user fits it; terminal 1 is nearest the reset button; the block carries 5 V, 3.3 V, GND, a 1-wire line, an SW line and the boiler and thermostat lines; no spare GPIO visible apart from the 1-wire line (GPIO 4). The words are 'at the factory' (not 'as supplied'): the docs use his words; whether it stays true for the first run is not confirmed. NO pin-to-label order yet (eight labels for ten pins, BlueFlame asked for the list). Files: ch11 and h11 (11.1), ch02 and h02, docs/hardware/PINOUT.md section 2; also TASK-3120.
 <!-- SECTION:NOTES:END -->

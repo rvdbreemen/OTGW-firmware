@@ -21,7 +21,7 @@ De 1.x-lijn (onderhoudsbranch `otgw-1.x.x`) draait op de Wemos D1 mini (ESP8266)
 
 #### De OpenTherm Gateway OTGW32
 
-De tweede ondersteunde configuratie is de OpenTherm Gateway OTGW32: een ESP32-S3-print zonder PIC die zelf OpenTherm spreekt (OT-Direct). Het is een nieuw apparaat (hardwareversies 1.0 en 1.1) dat zich nog in het veld moet bewijzen. Hoofdstuk 11 beschrijft hem en Hoofdstuk 12 vergelijkt hem met de OTGW Classic.
+De tweede ondersteunde configuratie is de OpenTherm Gateway OTGW32: een ESP32-S3-print zonder PIC die zelf OpenTherm spreekt (OT-Direct). Het is een nieuw apparaat (hardwareversies 1.0 en 1.1) dat zich nog in het veld moet bewijzen. Het 10-polige klemmenblok (J4) is in de fabriek niet gemonteerd. Hoofdstuk 11 beschrijft hem en Hoofdstuk 12 vergelijkt hem met de OTGW Classic.
 
 #### Andere boards
 
