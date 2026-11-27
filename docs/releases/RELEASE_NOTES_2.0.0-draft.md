@@ -333,7 +333,7 @@ Timing and reliability:
 - A boiler "data invalid" answer is never stored as a value (TASK-1925, beta.280).
 - MsgIDs 1, 3, 14, 17 and 25 are never switched off after "unknown" answers (TASK-1801, beta.293).
 
-- OTGW32 pin defaults (TASK-3120, beta.474): Dallas sensors start on GPIO 4 (the old default GPIO 10 is a board pin and was refused, so sensors never started) and the S0 counter on GPIO 5, the DI pin of the terminal block (the old default GPIO 12 is the Ethernet clock). An installation that still holds an old default is moved once; a pin you chose yourself is never changed. The GPIO output has no pad on this board and is hidden and refused. The S0 counter does not start on the pin the enabled 1-wire sensors use. Host tests; counting S0 pulses on the DI pin is untested.
+- OTGW32 pin defaults (TASK-3120, beta.474): Dallas sensors start on GPIO 4 (the old default GPIO 10 is a board pin and was refused, so sensors never started) and the S0 counter on GPIO 5, the DI pin of the terminal block (the old default GPIO 12 is the Ethernet clock). An installation that still holds an old default is moved once; a pin you chose yourself is never changed. The GPIO output has no pad on this board and is hidden and refused. The S0 counter does not start on the pin the enabled 1-wire sensors use. Host tests; counting S0 pulses on the DI pin is untested. The DI pad and the 1-wire pad are 3.3 V inputs and are not 5 V tolerant: do not connect an S0 meter or sensor that drives them to 5 V or 12 V (reported by the board's hardware owner).
 ### PIC (OTGW Classic)
 
 - The PIC settings fill in about a minute after a restart instead of four to five (TASK-1971, beta.340).
@@ -397,6 +397,7 @@ These are design limits of 2.0.0, not bugs.
 
 ## Known issues
 
+- **Hardware limit of the OTGW32: 3.3 V only.** The DI pad (GPIO 5, the S0 default) and the 1-wire pad (GPIO 4) are 3.3 V inputs and are not 5 V tolerant. Do not connect an S0 meter or sensor that drives them to 5 V or 12 V (reported by the board's hardware owner).
 <!-- Carry-over from the beta.474 notes (2026-11-27, otgw-docs): re-check each item at the release commit. -->
 - **WiFi packet loss and failing filesystem updates while BLE scanning is on** (TASK-3126). On a Classic with an S3 module, BLE scanning can cause WiFi packet loss; a filesystem update over WiFi failed 5 of 5 times with BLE on in our tests (one unit). If an update fails, turn off "Enable BLE sensors" under Settings > Sensors, reboot, repeat the update.
 - **The web interface can be unreachable for up to about 3 minutes after a severe low-memory event** (TASK-3025, TASK-3119, TASK-3123). It recovers by itself; on a board without extra memory open pages can reconnect repeatedly. Close extra tabs.

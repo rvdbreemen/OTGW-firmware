@@ -32,7 +32,7 @@ Technical rows: you do not need these to choose or to use your unit.
 | **Flash and memory** | 4 MB flash. The LOLIN S3 Mini and S3 Mini Pro have extra memory (PSRAM). | 4 MB flash, no PSRAM. |
 | **REST requests at the same time** | At most 2 for now. | At most 2 for now; not measured for this board. |
 | **Start-up detection** | Finds the PIC and remembers that. | Finds no PIC and starts OT-Direct. Up to 3 PIC probes at every start while Board mode is Auto. |
-| **Free header pins** | As on the Classic board. | On the OTGW32 the Dallas sensors start on GPIO 4 (the 1-wire line) and the S0 counter on GPIO 5 (terminal 5, DI), and you can change both in the settings; counting S0 pulses on an OTGW32 has not been tested. The GPIO output has no pad on this board (chapter 11.6). The 1-wire and DI pads are 3.3 V inputs only, not 5 V tolerant: no 5 V or 12 V on them. |
+| **Free header pins** | As on the Classic board. | On the OTGW32 the Dallas sensors start on GPIO 4 (the 1-wire line) and the S0 counter on GPIO 5 (terminal 5, DI), and you can change both in the settings; counting S0 pulses on an OTGW32 has not been tested. The GPIO output has no pad on this board (chapter 11.6). The DI pad (GPIO 5, the S0 default) and the 1-wire pad (GPIO 4) are 3.3 V inputs and are not 5 V tolerant: do not connect an S0 meter or sensor that drives them to 5 V or 12 V. |
 
 ### 12.2 What is the same
 

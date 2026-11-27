@@ -32,7 +32,7 @@ Technische rijen: u hebt ze niet nodig om te kiezen of om uw apparaat te gebruik
 | **Flash en geheugen** | 4 MB flash. De LOLIN S3 Mini en S3 Mini Pro hebben extra geheugen (PSRAM). | 4 MB flash, geen PSRAM. |
 | **REST-verzoeken tegelijk** | Voorlopig maximaal 2. | Voorlopig maximaal 2; voor deze print niet gemeten. |
 | **Detectie bij het opstarten** | Vindt de PIC en onthoudt dat. | Vindt geen PIC en start OT-Direct. Tot 3 PIC-zoekpogingen bij elke start zolang Board mode op Auto staat. |
-| **Vrije headerpinnen** | Zoals op de Classic-print. | Op de OTGW32 beginnen de Dallas-sensoren op GPIO 4 (de 1-wire-lijn) en de S0-teller op GPIO 5 (klem 5, DI); beide kunt u in de instellingen wijzigen, en het tellen van S0-pulsen is op een OTGW32 niet getest. De GPIO-uitgang heeft op deze print geen pad (hoofdstuk 11.6). Het 1-wire- en het DI-pad zijn alleen 3,3 V-ingangen, niet 5 V-tolerant: geen 5 V of 12 V erop. |
+| **Vrije headerpinnen** | Zoals op de Classic-print. | Op de OTGW32 beginnen de Dallas-sensoren op GPIO 4 (de 1-wire-lijn) en de S0-teller op GPIO 5 (klem 5, DI); beide kunt u in de instellingen wijzigen, en het tellen van S0-pulsen is op een OTGW32 niet getest. De GPIO-uitgang heeft op deze print geen pad (hoofdstuk 11.6). Het DI-pad (GPIO 5, de S0-standaard) en het 1-wire-pad (GPIO 4) zijn 3,3 V-ingangen en niet 5 V-tolerant: sluit geen S0-meter of sensor aan die ze op 5 V of 12 V aanstuurt. |
 
 ### 12.2 Wat gelijk is
 
