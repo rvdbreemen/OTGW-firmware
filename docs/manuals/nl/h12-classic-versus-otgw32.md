@@ -4,7 +4,7 @@
 
 Firmware 2.0 ondersteunt twee hardwareconfiguraties: de **OTGW Classic met een ESP32-S3-module** (met een PIC-coprocessor) en de **OpenTherm Gateway OTGW32** (geen PIC, OT-Direct). Het meeste wat u doet is gelijk. Dit hoofdstuk zet op een rij wat verschilt, zodat u weet welke delen van deze handleiding voor uw apparaat gelden. Hoofdstuk 11 beschrijft de OTGW32 uitgebreider.
 
-> **De OTGW32 is een nieuw apparaat en moet zich nog in het veld bewijzen.** Versie 1.0 is de eerste productierun en de enige versie. Achter de Classic zitten alfa- en betaruns op meerdere apparaten; de OTGW32 heeft alleen op een testapparaat gedraaid, zonder thermostaat en zonder echte ketel.
+> **De OTGW32 is een nieuw apparaat en moet zich nog in het veld bewijzen.** De hardwareversies 1.0 en 1.1 lijken sterk op elkaar; versie 1.1 heeft een optioneel bypass-relais dat niet is gemonteerd bij levering en dat de firmware niet gebruikt. Achter de Classic zitten alfa- en betaruns op meerdere apparaten; de OTGW32 heeft alleen op een testapparaat gedraaid, zonder thermostaat en zonder echte ketel.
 
 ### 12.1 Naast elkaar
 
@@ -23,7 +23,7 @@ Firmware 2.0 ondersteunt twee hardwareconfiguraties: de **OTGW Classic met een E
 | **Detectie bij het opstarten** | Vindt de PIC en onthoudt dat. | Vindt geen PIC en start OT-Direct. Tot 3 PIC-zoekpogingen bij elke start zolang Board mode op Auto staat. |
 | **Bijwerken via WiFi** | De PIC blijft berichten doorgeven (niet op een testopstelling gemeten). | De verbinding thermostaat naar ketel is 1 tot 2 minuten onderbroken; de ketel draait op zijn eigen instellingen. |
 | **Vrije headerpinnen** | Zoals op de Classic-print. | De standaardpinnen voor S0, uitgang en Dallas botsen met pinnen die de print gebruikt; kies vrije pinnen (hoofdstuk 11.6). |
-| **Ervaring in het veld** | Alfa- en betaruns op meerdere apparaten. | Nieuw apparaat, versie 1.0, eerste productierun. |
+| **Ervaring in het veld** | Alfa- en betaruns op meerdere apparaten. | Nieuw apparaat, hardwareversies 1.0 en 1.1. |
 
 ### 12.2 Wat gelijk is
 

@@ -109,7 +109,7 @@ Version 2.0.0 is a major platform release. It targets the ESP32-S3 in the tradit
 Firmware 2.0 supports exactly two hardware configurations:
 
 1. **The OTGW Classic with an ESP32-S3 module.** The NodoShop OTGW with the PIC co-processor and a LOLIN S3 Mini or S3 Mini Pro in the module socket. The PIC talks OpenTherm; the ESP32-S3 is connected to it by a serial link.
-2. **The OpenTherm Gateway OTGW32.** A board with an ESP32-S3 that speaks OpenTherm itself, with its own interface to the boiler and to the thermostat (OT-Direct). There is no PIC on this board. Only version 1.0, the first production run, exists at this time.
+2. **The OpenTherm Gateway OTGW32.** A board with an ESP32-S3 that speaks OpenTherm itself, with its own interface to the boiler and to the thermostat (OT-Direct). There is no PIC on this board. Hardware versions 1.0 and 1.1 are very similar; version 1.1 has an optional bypass relay that is not fitted as supplied and is not used by the firmware.
 
 Both run the same firmware image (`esp32-combo`). At start-up the firmware detects which of the two it is on.
 
@@ -120,7 +120,7 @@ Both run the same firmware image (`esp32-combo`). At start-up the firmware detec
 | Flash and memory | 4 MB flash; the LOLIN S3 Mini has extra memory (PSRAM) | 4 MB flash, no PSRAM |
 | Web UI, SAT, MQTT, Home Assistant, REST | Yes | Yes |
 | Port 25238 for OTmonitor | Yes, off by default | Emulated, off by default |
-| Field experience | Alpha and beta runs on several units | New device, version 1.0 (first production run) |
+| Field experience | Alpha and beta runs on several units | New device, hardware versions 1.0 and 1.1 |
 
 **Disclaimer: the OTGW32 is a new device and still has to prove itself in the field.** Firmware 2.0 supports it, but so far it has only run on a bench, without a thermostat and without a real boiler on the bus (simulated boiler and master mode). What is not yet field-proven: the variety of boilers and thermostats, long runs, the Ethernet and OLED options on real hardware, and OTmonitor over port 25238. If you run an OTGW32, please report what you see: see "How to report" in the release notes.
 

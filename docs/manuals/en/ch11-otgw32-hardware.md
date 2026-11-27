@@ -7,7 +7,7 @@ Firmware 2.0 supports exactly two hardware configurations:
 1. **The OTGW Classic with an ESP32-S3 module.** The traditional gateway with the PIC co-processor and a LOLIN S3 Mini or S3 Mini Pro in the module socket (chapter 2).
 2. **The OpenTherm Gateway OTGW32.** A board with an ESP32-S3 that speaks OpenTherm itself, with its own interface to the boiler and to the thermostat. There is no PIC on this board. This chapter describes it. Chapter 12 compares the two.
 
-> **The OTGW32 is a new device and it still has to prove itself in the field.** Only version 1.0, the first production run, exists at this time. Firmware 2.0 supports it, but so far the firmware has only run on a bench unit, without a thermostat and without a real boiler on the bus (a simulated boiler, and master mode without a thermostat). What is not yet field-proven: the variety of boilers and thermostats, long runs, the Ethernet and OLED options on real hardware, and OTmonitor over port 25238. If you run an OTGW32, please send a capture with your report (see Chapter 7).
+> **The OTGW32 is a new device and it still has to prove itself in the field.** Hardware versions 1.0 and 1.1 are very similar; version 1.1 has an optional bypass relay that is not fitted as supplied and is not used by the firmware. Firmware 2.0 supports it, but so far the firmware has only run on a bench unit, without a thermostat and without a real boiler on the bus (a simulated boiler, and master mode without a thermostat). What is not yet field-proven: the variety of boilers and thermostats, long runs, the Ethernet and OLED options on real hardware, and OTmonitor over port 25238. If you run an OTGW32, please send a capture with your report (see Chapter 7).
 
 ### 11.1 What it is
 
@@ -27,7 +27,7 @@ OT-Direct has these modes. Choose one in the web UI (Settings, OT-Direct mode; t
 | **Master** | The unit is the OpenTherm master and polls the boiler itself. A thermostat is optional: if one stays connected, the unit answers it from its cache and passes its settings to the boiler. | `GW=2` or `GW=S` |
 | **Loopback** | A test mode with simulated boiler answers. No hardware is needed. | `GW=L` |
 
-A fifth mode, **bypass** (the thermostat wired straight to the boiler through a relay), is listed in some places, but this release has no relay support: choosing it falls back to gateway and `GW=P` answers `NG`. Do not plan on bypass.
+A fifth mode, **bypass** (the thermostat wired straight to the boiler through a relay), is listed in some places, but this release has no relay support (hardware version 1.1 has an optional relay, not fitted as supplied, and the firmware does not use it): choosing it falls back to gateway and `GW=P` answers `NG`. Do not plan on bypass.
 
 The mode is stored in the setting `OTDmode` and kept across restarts. In gateway mode the unit listens for the thermostat for 5 seconds at start-up. If it hears none, it runs in master mode for that start only; the next start looks again.
 
@@ -61,7 +61,7 @@ The web UI follows what the unit reports (`otcommandinterface`), not the board n
 - **REST:** for now, at most 2 requests are answered at the same time. A third gets HTTP 503 `Retry-After: 1`. The limit was not measured for this board class.
 - **Diagnostic recorder:** a small buffer of about 2 minutes instead of the large one.
 - **MQTT:** a unit without extra memory sends bursts in steps; the limits are not calibrated for it yet (see Known issues in the release notes).
-- **Free header pins:** the defaults for the S0 counter (GPIO 12), the GPIO output (GPIO 16) and the Dallas sensor (GPIO 10) are pins the board uses itself, so the firmware refuses the Dallas default and does not start sensors until you choose a free pin. Which header pins are free is not documented yet.
+- **Pins:** wired Ethernet (W5500) uses SPI on GPIO 11, 12, 13, 14 and 15, and the 1-Wire input for Dallas sensors is on GPIO 4 (hardware information from an OTGW32 owner, matching the pin table in `docs/hardware/PINOUT.md`). The firmware defaults for the Dallas sensor (GPIO 10), the S0 counter (GPIO 12) and the GPIO output (GPIO 16) are pins the board uses itself, so the firmware refuses the Dallas default and does not start sensors until you choose a pin: set the Dallas pin to 4. Which header pins are free for the S0 counter and the output is not documented yet.
 
 ### 11.7 What is the same as on the OTGW Classic
 

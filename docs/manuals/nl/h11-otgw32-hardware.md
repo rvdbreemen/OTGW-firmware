@@ -7,7 +7,7 @@ Firmware 2.0 ondersteunt precies twee hardwareconfiguraties:
 1. **De OTGW Classic met een ESP32-S3-module.** De traditionele gateway met de PIC-coprocessor en een LOLIN S3 Mini of S3 Mini Pro in de modulesocket (hoofdstuk 2).
 2. **De OpenTherm Gateway OTGW32.** Een print met een ESP32-S3 die zelf OpenTherm spreekt, met een eigen interface naar de ketel en naar de thermostaat. Op deze print zit geen PIC. Dit hoofdstuk beschrijft hem. Hoofdstuk 12 zet de twee naast elkaar.
 
-> **De OTGW32 is een nieuw apparaat en moet zich nog in het veld bewijzen.** Er bestaat op dit moment alleen versie 1.0, de eerste productierun. Firmware 2.0 ondersteunt hem, maar de firmware heeft tot nu toe alleen op een testopstelling gedraaid, zonder thermostaat en zonder echte ketel op de bus (een gesimuleerde ketel, en masterstand zonder thermostaat). Nog niet in het veld bewezen: de verscheidenheid aan ketels en thermostaten, lange runs, de opties Ethernet en OLED op echte hardware, en OTmonitor via poort 25238. Draait u een OTGW32? Stuur dan bij uw melding een capture mee (zie hoofdstuk 7).
+> **De OTGW32 is een nieuw apparaat en moet zich nog in het veld bewijzen.** De hardwareversies 1.0 en 1.1 lijken sterk op elkaar; versie 1.1 heeft een optioneel bypass-relais dat niet is gemonteerd bij levering en dat de firmware niet gebruikt. Firmware 2.0 ondersteunt hem, maar de firmware heeft tot nu toe alleen op een testopstelling gedraaid, zonder thermostaat en zonder echte ketel op de bus (een gesimuleerde ketel, en masterstand zonder thermostaat). Nog niet in het veld bewezen: de verscheidenheid aan ketels en thermostaten, lange runs, de opties Ethernet en OLED op echte hardware, en OTmonitor via poort 25238. Draait u een OTGW32? Stuur dan bij uw melding een capture mee (zie hoofdstuk 7).
 
 ### 11.1 Wat het is
 
@@ -27,7 +27,7 @@ OT-Direct kent deze standen. Kies er een in de webinterface (Settings, OT-Direct
 | **Master** | Het apparaat is de OpenTherm-master en vraagt de ketel zelf uit. Een thermostaat is optioneel: blijft er een aangesloten, dan beantwoordt het apparaat die uit zijn cache en geeft het de instellingen ervan door aan de ketel. | `GW=2` of `GW=S` |
 | **Loopback** | Een teststand met gesimuleerde ketelantwoorden. Er is geen hardware voor nodig. | `GW=L` |
 
-Een vijfde stand, **bypass** (de thermostaat via een relais rechtstreeks op de ketel), staat op sommige plaatsen genoemd, maar deze release heeft geen ondersteuning voor dat relais: kiest u bypass, dan valt het apparaat terug op gateway en antwoordt `GW=P` met `NG`. Reken dus niet op bypass.
+Een vijfde stand, **bypass** (de thermostaat via een relais rechtstreeks op de ketel), staat op sommige plaatsen genoemd, maar deze release heeft geen ondersteuning voor dat relais (hardwareversie 1.1 heeft een optioneel relais, niet gemonteerd bij levering, en de firmware gebruikt het niet): kiest u bypass, dan valt het apparaat terug op gateway en antwoordt `GW=P` met `NG`. Reken dus niet op bypass.
 
 De stand staat in de instelling `OTDmode` en blijft na een herstart bewaard. In gatewaystand luistert het apparaat bij het opstarten 5 seconden naar de thermostaat. Hoort het er geen, dan draait het alleen die start in masterstand; bij de volgende start kijkt het opnieuw.
 
@@ -60,7 +60,7 @@ De webinterface volgt wat het apparaat meldt (`otcommandinterface`), niet de naa
 - **REST:** voorlopig worden maximaal 2 verzoeken tegelijk beantwoord. Een derde krijgt HTTP 503 `Retry-After: 1`. De grens is voor deze printklasse niet gemeten.
 - **Diagnose-recorder:** een kleine buffer van ongeveer 2 minuten in plaats van de grote.
 - **MQTT:** een apparaat zonder extra geheugen verstuurt pieken in stappen; de grenzen zijn daarvoor nog niet gekalibreerd (zie Known issues in de releasenotes).
-- **Vrije headerpinnen:** de standaardpinnen voor de S0-teller (GPIO 12), de GPIO-uitgang (GPIO 16) en de Dallas-sensor (GPIO 10) zijn pinnen die de print zelf gebruikt. De firmware weigert daarom de Dallas-standaard en start geen sensoren totdat u een vrije pin kiest. Welke headerpinnen vrij zijn, is nog niet gedocumenteerd.
+- **Pinnen:** bekabeld Ethernet (W5500) gebruikt SPI op GPIO 11, 12, 13, 14 en 15, en de 1-Wire-ingang voor Dallas-sensoren zit op GPIO 4 (hardware-informatie van een OTGW32-bezitter, in overeenstemming met de pinnentabel in `docs/hardware/PINOUT.md`). De standaardpinnen van de firmware voor de Dallas-sensor (GPIO 10), de S0-teller (GPIO 12) en de GPIO-uitgang (GPIO 16) zijn pinnen die de print zelf gebruikt. De firmware weigert daarom de Dallas-standaard en start geen sensoren totdat u een pin kiest: zet de Dallas-pin op 4. Welke headerpinnen vrij zijn voor de S0-teller en de uitgang, is nog niet gedocumenteerd.
 
 ### 11.7 Wat gelijk is aan de OTGW Classic
 

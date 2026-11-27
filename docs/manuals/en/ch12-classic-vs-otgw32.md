@@ -4,7 +4,7 @@
 
 Firmware 2.0 supports two hardware configurations: the **OTGW Classic with an ESP32-S3 module** (with a PIC co-processor) and the **OpenTherm Gateway OTGW32** (no PIC, OT-Direct). Most of what you do is the same. This chapter lists what differs, so you know which parts of this manual apply to your unit. Chapter 11 describes the OTGW32 in more detail.
 
-> **The OTGW32 is a new device and still has to prove itself in the field.** Version 1.0 is the first production run and the only version. The Classic has alpha and beta runs on several units behind it; the OTGW32 has run on a bench unit only, without a thermostat and without a real boiler.
+> **The OTGW32 is a new device and still has to prove itself in the field.** Hardware versions 1.0 and 1.1 are very similar; version 1.1 has an optional bypass relay that is not fitted as supplied and is not used by the firmware. The Classic has alpha and beta runs on several units behind it; the OTGW32 has run on a bench unit only, without a thermostat and without a real boiler.
 
 ### 12.1 Side by side
 
@@ -23,7 +23,7 @@ Firmware 2.0 supports two hardware configurations: the **OTGW Classic with an ES
 | **Start-up detection** | Finds the PIC and remembers that. | Finds no PIC and starts OT-Direct. Up to 3 PIC probes at every start while Board mode is Auto. |
 | **Updating over WiFi** | The PIC keeps passing messages (not measured on a bench). | The thermostat to boiler link is interrupted for 1 to 2 minutes; the boiler runs on its own settings. |
 | **Free header pins** | As on the Classic board. | The S0, output and Dallas defaults clash with pins the board uses; choose free pins (chapter 11.6). |
-| **Field experience** | Alpha and beta runs on several units. | New device, version 1.0, first production run. |
+| **Field experience** | Alpha and beta runs on several units. | New device, hardware versions 1.0 and 1.1. |
 
 ### 12.2 What is the same
 
