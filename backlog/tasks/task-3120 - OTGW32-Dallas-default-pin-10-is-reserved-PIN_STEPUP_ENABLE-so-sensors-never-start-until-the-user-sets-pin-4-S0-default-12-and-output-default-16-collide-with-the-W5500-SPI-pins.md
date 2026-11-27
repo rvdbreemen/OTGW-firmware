@@ -8,7 +8,7 @@ status: To Do
 assignee:
   - '@claude'
 created_date: '2026-11-27T08:20:00Z'
-updated_date: '2026-11-27T08:37:00Z'
+updated_date: '2026-11-27T08:40:00Z'
 labels:
   - hardware
   - bug
@@ -44,4 +44,6 @@ Found by otgw-docs while writing the OTGW32 documentation (TASK-3115), coordinat
 2026-11-27 Second picture from the hardware owner (OTGW-field-data/_comms/tim_otgw32_esp32s3_wiring_1575792047544078358.png, opened by otgw-docs; docs and task use only): net names of the ESP32-S3-WROOM-1 module. Read: IO0 BOOT, IO1 OTM_TX, IO2 RED, IO3 no net, IO4 DQ, IO5 SWR, IO6 OTS_RX, IO7 OTS_TX, IO8 GRN, IO9 CFG, IO10 EN24, IO11 MOSI, IO12 SCK, IO13 MISO, IO14 CS, IO15 INT, IO16 RST; right side: TXD0, RXD0, IO17 SCL, IO18 SDA, IO19 DM and IO20 DP (USB), IO21 OTM_RX, IO35 to IO37 inside a PSRAM bracket, IO47 REL, IO48 RGN. COMPARISON with boards.h:56-97 and PINOUT.md section 2: MATCH for GPIO 0, 1, 2, 4, 6, 7, 9, 11 to 16, 17, 18, 21, 47. NOT in code or docs: GPIO 5 net SWR (unused by the firmware, meaning unconfirmed, probably the SW terminal) and GPIO 3 has no net. DIFFERENCES left unresolved: GPIO 10 is EN24 in the picture while boards.h:79 and PINOUT say 18 V step-up (the owner said 'Step up enable is GPIO 10 indeed'); GPIO 8 is GRN and GPIO 48 is RGN while boards.h:62-64 call 8 the status LED and 48 the OT green LED. The picture has NO net for an S0 counter or a GPIO output, which supports 'S0 and output: no spare net on the module' (Robert decides, Q32). Low resolution: unverified items are marked as such in PINOUT.md.
 
 2026-11-27 Terminal pins from the hardware owner (#beta-testing 1575792251446108192, verbatim): 'Pins 1 & 2 are OT boiler pins 3 & 4 are OT thermostat on the header block'. Confirmed for the docs: J4 (10 way terminal block, not fitted at the factory, pin 1 nearest the reset button): 1 and 2 OpenTherm boiler, 3 and 4 OpenTherm thermostat. NOT confirmed: terminals 5 to 10 (the picture labels 5 V, SW, GND, 3.3V, 1wire, GND, order unknown); the docs say 'terminals 5 to 10 carry power, ground, a switch line and the 1-wire line; the order is not documented yet'. With the schematic (no S0 or output net on the module) there is no spare GPIO for the S0 counter or the GPIO output visible; Robert decides (Q32).
+
+2026-11-27 From the hardware owner (#beta-testing 1575793194585694354, verbatim): 'It might be possible to do something in future with the spare GPIO pins on the ESP32-S3 but please be aware the tracks under the ESP are pretty congested as it's only a 2 layer board so tracking out another GPIO might be tricky.' Meaning: the module has spare GPIO pins that are not routed to a connector; a future board change is possible but NOT promised; today there is no spare GPIO on the terminal block. Docs say exactly that (ch11 11.6 and ch12, en and nl), without any promise of a future board. Consequence for this task: S0 and the GPIO output have no usable pin on this board today (supports hiding them on the OTGW32 board type, Robert decides, Q32).
 <!-- SECTION:NOTES:END -->
