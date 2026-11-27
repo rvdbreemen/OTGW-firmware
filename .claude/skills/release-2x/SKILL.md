@@ -214,6 +214,7 @@ Checkpoint 1 still gates every push, the tag and the publish (Robert, via the co
    the last announced beta). Record all message ids in the tracking task.
 2. **CHECKPOINT 3**: show the posts; send after approval with
    `mcp__discord-mcp__send_message`; read each channel back.
+3. **Tell the people who asked for it** (Robert, standing order 2026-11-27: "Informeer de gebruikers of testers die ideeen, features of taken aangedragen hebben op het moment dat ze gepubliceerd worden als een beta"). The comms session (BlueFlame) owns this step. Map each TASK that shipped to its source: the task file's links, the Discord message, the GitHub issue or PR, `.claude/discord-people.local.md`. Send one short message per person per release, in the place where they asked (their Discord thread or channel, or the GitHub issue), in English, answer first, with the real `<@ID>` mention: what changed, what is and is not verified, and the release link. Only things that actually shipped in this release. Keep a ledger in `OTGW-field-data/_comms/contributor_notices_<tag>.md` (person, task, place, message id); no notice twice. The notes and the CHANGELOG record the source per TASK while the lines are written (Phase 2), so this mapping is cheap.
 
 ### Phase 7: Back to dev
 

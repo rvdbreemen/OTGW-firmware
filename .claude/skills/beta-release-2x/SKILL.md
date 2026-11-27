@@ -150,6 +150,7 @@ from the file at create time.
    grep -n -E "TODO|TBD|XXX|—" docs/releases/RELEASE_NOTES_<v>.md
    grep -o -E "\]\([^)]+\)" docs/releases/RELEASE_NOTES_<v>.md | grep -v -E "\(https?://|\(#"   # relative links break on the release page
    ```
+   While writing each line, note in the tracking task who raised the TASK (the source: tester, Discord message, GitHub issue or PR). Write "(reported by <handle>)" in the public notes only where that person is already credited there; never add a new name.
 3. CHANGELOG `[Unreleased]` holds every firmware change since the last beta
    (`git log --oneline <prev>..HEAD -- src/`). Fill gaps now.
    **Every update goes into the notes and the CHANGELOG, not only the highlights** (Robert
@@ -355,6 +356,7 @@ from the file at create time.
    After sending, read the channel back and check the text arrived intact (every part, in order).
    Record the message ids of all parts in the tracking task; the next release starts its
    change list from this post.
+3. **Tell the people who asked for it** (Robert, standing order 2026-11-27: "Informeer de gebruikers of testers die ideeen, features of taken aangedragen hebben op het moment dat ze gepubliceerd worden als een beta"). The comms session (BlueFlame) owns this step. Map each TASK that shipped to its source: the task file's links, the Discord message, the GitHub issue or PR, `.claude/discord-people.local.md`. Send one short message per person per release, in the place where they asked (their Discord thread or channel, or the GitHub issue), in English, answer first, with the real `<@ID>` mention: what changed, what is and is not verified, and the release link. Only things that actually shipped in this release. Keep a ledger in `OTGW-field-data/_comms/contributor_notices_<tag>.md` (person, task, place, message id); no notice twice. The notes and the CHANGELOG record the source per TASK while the lines are written (Phase 1), so this mapping is cheap.
 
 ### Phase 7: Close out
 
