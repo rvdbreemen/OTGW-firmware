@@ -85,6 +85,8 @@ The 10 way terminal block (J4) is not fitted at the factory; the user fits it. T
 | Boot button | 0 | active LOW |
 | Config button | 9 | active LOW |
 
+Schematic check (net names of the ESP32-S3 module, from the picture an OTGW32 owner sent, 2026-11-27): the nets agree with the table for GPIO 0 (BOOT), 1 (OTM_TX), 2 (RED), 4 (DQ, the 1-wire line), 6 (OTS_RX), 7 (OTS_TX), 9 (CFG), 11 (MOSI), 12 (SCK), 13 (MISO), 14 (CS), 15 (INT), 16 (RST), 17 (SCL), 18 (SDA), 21 (OTM_RX) and 47 (REL). Not in the table: the picture shows a net SWR on GPIO 5 (the firmware does not use GPIO 5 and the meaning of SWR is not confirmed; it may be the SW terminal), and no net on GPIO 3. Unresolved differences: GPIO 10 is named EN24 in the picture while the table says an 18 V step-up; GPIO 8 is named GRN and GPIO 48 RGN while the table calls GPIO 8 the status LED and GPIO 48 the OT green LED. The picture shows no net for an S0 counter or a GPIO output.
+
 ---
 
 ## 3. esp32-classic: S3 Mini in the Classic D1-mini socket (ADR-126)

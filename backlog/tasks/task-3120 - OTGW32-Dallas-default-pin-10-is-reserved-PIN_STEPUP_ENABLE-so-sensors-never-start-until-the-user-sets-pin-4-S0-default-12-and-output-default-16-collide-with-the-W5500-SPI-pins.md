@@ -8,7 +8,7 @@ status: To Do
 assignee:
   - '@claude'
 created_date: '2026-11-27T08:20:00Z'
-updated_date: '2026-11-27T08:35:00Z'
+updated_date: '2026-11-27T08:36:00Z'
 labels:
   - hardware
   - bug
@@ -40,4 +40,6 @@ Found by otgw-docs while writing the OTGW32 documentation (TASK-3115), coordinat
 2026-11-27 Connector picture from the hardware owner (docs and task use only, not reposted; file OTGW-field-data/_comms/tim_otgw32_terminals_1575789914078056508.png, read by BlueFlame and opened by otgw-docs): a cropped schematic of connector J4 with ten pin numbers and a red cross drawn over it; the labels on the right, top to bottom, are Boiler, Thermostat, 5 V, SW, GND, 3.3V, 1wire, GND. UNCERTAIN: eight labels for ten pins, the pin-to-label order is not readable, and the meaning of the red cross is unknown (a follow-up question was asked of the sender). So no pin numbers and no meaning of the cross go into the docs. Safe facts: the connector carries 5 V, 3.3 V, GND, a 1-wire line, an SW line and the boiler and thermostat lines; no spare general-purpose GPIO is visible on it apart from the 1-wire line. This supports the recommendation that S0 and the GPIO output are not available on this board (no documented free pin), and it supports Dallas on GPIO 4. 'Which pins are free' stays unknown in the docs.
 
 2026-11-27 Answer of the hardware owner on the picture (#beta-testing 1575791889997635705, verbatim): 'That is the terminal block, pin 1 is nearest the reset button (on the right), the red cross means the connector block is not installed at the factory.' So J4 is the 10-way terminal block, pin 1 is nearest the reset button, and the block is not fitted at the factory (fitted by the user). The pin-to-label order is still not confirmed (eight labels for ten pins), so no pin numbers go into the docs; ch11 and h11 now say the block is not fitted at the factory and list what it carries.
+
+2026-11-27 Second picture from the hardware owner (OTGW-field-data/_comms/tim_otgw32_esp32s3_wiring_1575792047544078358.png, opened by otgw-docs; docs and task use only): net names of the ESP32-S3-WROOM-1 module. Read: IO0 BOOT, IO1 OTM_TX, IO2 RED, IO3 no net, IO4 DQ, IO5 SWR, IO6 OTS_RX, IO7 OTS_TX, IO8 GRN, IO9 CFG, IO10 EN24, IO11 MOSI, IO12 SCK, IO13 MISO, IO14 CS, IO15 INT, IO16 RST; right side: TXD0, RXD0, IO17 SCL, IO18 SDA, IO19 DM and IO20 DP (USB), IO21 OTM_RX, IO35 to IO37 inside a PSRAM bracket, IO47 REL, IO48 RGN. COMPARISON with boards.h:56-97 and PINOUT.md section 2: MATCH for GPIO 0, 1, 2, 4, 6, 7, 9, 11 to 16, 17, 18, 21, 47. NOT in code or docs: GPIO 5 net SWR (unused by the firmware, meaning unconfirmed, probably the SW terminal) and GPIO 3 has no net. DIFFERENCES left unresolved: GPIO 10 is EN24 in the picture while boards.h:79 and PINOUT say 18 V step-up (the owner said 'Step up enable is GPIO 10 indeed'); GPIO 8 is GRN and GPIO 48 is RGN while boards.h:62-64 call 8 the status LED and 48 the OT green LED. The picture has NO net for an S0 counter or a GPIO output, which supports 'S0 and output: no spare net on the module' (Robert decides, Q32). Low resolution: unverified items are marked as such in PINOUT.md.
 <!-- SECTION:NOTES:END -->
