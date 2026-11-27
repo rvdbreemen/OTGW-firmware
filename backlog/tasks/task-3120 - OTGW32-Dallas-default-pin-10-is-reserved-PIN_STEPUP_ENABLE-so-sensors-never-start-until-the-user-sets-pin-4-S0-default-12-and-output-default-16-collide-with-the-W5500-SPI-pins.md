@@ -11,6 +11,7 @@ created_date: '2026-11-27T08:20:00Z'
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 updated_date: '2026-11-27T14:05:00Z'
 =======
 updated_date: '2026-11-27T09:20:00Z'
@@ -21,6 +22,9 @@ updated_date: '2026-11-27T09:22:00Z'
 =======
 updated_date: '2026-11-27T14:11:00Z'
 >>>>>>> c54881764 (OTGW32: TASK-3120 S0 default pin 5 (the DI pad, confirmed by the hardware owner), a stored legacy 12 moves to 5)
+=======
+updated_date: '2026-11-27T14:14:00Z'
+>>>>>>> a4aa2a56c (OTGW32: TASK-3120 the S0 counter does not start on the pin the enabled 1-wire sensors use; comment fix for the zone count range (review N2))
 labels:
   - hardware
   - bug
@@ -107,5 +111,10 @@ COMPILE-RISK LIST for the build slot (coordinator 2026-11-27; the int8_t change 
 =======
 
 2026-11-27 otgw-poc-dev: the hardware owner corrected his answer (#beta-testing 1575874771017539776): DI (terminal pin 5) is wired to GPIO5 via 330R series, 3k3 pull-up, 470 pF to ground. OTGW32_S0_DEFAULT_PIN is now 5 (separate commit on lane-poc-b2). Migration decision: a stored legacy 12 becomes 5 on the OTGW32 map (not -1), skipped when the output or the Dallas pin already holds GPIO 5; a deliberately unset S0 (-1) and any other stored pin stay. GPIO 5 checked: not in boardPinReserved() for the OTGW32 map (PIN_* list in boards.h has no pin 5), no #define PIN_* = 5, no other use of GPIO 5 in OTGW-firmware, Platform and OpenTherm sources (grep); OTGWSerial not checked (PIC only). Host tests: tests/test_board_defaults_3120.py 3/3 (default 5, GPIO 5 not reserved, 12->5, output holding 5, -1 stays), red on the header before (cases 0,1,4,5 sen 4 s0 -1), tests/test_legacy_pin_defaults.py 3/3. NOT verified: pulse counting on the DI pad with a real S0 meter (bench item, one OTGW32, about 20 min); docs say untested.
+<<<<<<< HEAD
 >>>>>>> c54881764 (OTGW32: TASK-3120 S0 default pin 5 (the DI pad, confirmed by the hardware owner), a stored legacy 12 moves to 5)
+=======
+
+2026-11-27 otgw-poc-dev, droppable commit: initS0Count() does not start S0 on the pin the enabled 1-wire sensors use (message: GPIO%d is used by the 1-wire sensors, choose another pin). The Dallas sensors keep the pin; with sensors off S0 may use GPIO 4. Correction to my earlier S0 facts: the setters already call checkGPIOConflict() (settingStuff.ino:107, 1080, 1105) but only warn and still store the pin, and it ignores the enabled flags; init paths had no check. Test tests/test_s0_sensors_pin_collision_3120.py compiles the real initS0Count(): red on the code before (case 0: attached 1, expected 0), green on the fix.
+>>>>>>> a4aa2a56c (OTGW32: TASK-3120 the S0 counter does not start on the pin the enabled 1-wire sensors use; comment fix for the zone count range (review N2))
 <!-- SECTION:NOTES:END -->

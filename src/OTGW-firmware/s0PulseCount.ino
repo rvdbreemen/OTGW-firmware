@@ -1,7 +1,7 @@
 /* 
  ***************************************************************************  
  **  Program  : s0PulseCount
- **  Version  : v2.0.0-beta.469
+ **  Version  : v2.0.0-beta.470
  **
  **  Copyright (c) 2021-2024 Rob Roos / Robert van Breemen
  **     based on Framework ESP8266 from Willem Aandewiel
@@ -45,6 +45,10 @@
    }
    if (isBoardReservedPin(settings.s0.iPin)) {        // TASK-1552: never reconfigure a board pin
      DebugTf(PSTR("S0 counter: GPIO%d is used by the board, choose another pin; S0 not started\r\n"), settings.s0.iPin);
+     return;
+   }
+   if (settings.sensors.bEnabled && settings.sensors.iPin == settings.s0.iPin) {   // TASK-3120: one pin cannot be a 1-wire bus and a pulse input
+     DebugTf(PSTR("S0 counter: GPIO%d is used by the 1-wire sensors, choose another pin; S0 not started\r\n"), settings.s0.iPin);
      return;
    }
    //------------------------------------------------------------------------------------------------------------------------------

@@ -8672,7 +8672,7 @@ static void satControlLoopRun()
   const float pidRaw = pidOutput;   // TASK-1521: before zones, solar offset and clamps (SATTICK praw)
 
   // --- Multi-zone (secondary rooms) on the requested setpoint (thermo-nova climate.py:381-389, entry 116) ---
-  // Every configured zone (zone count 1-4) runs its PID output; satAggregateZoneSetpoint() keeps the
+  // Every configured zone (zone count 0-4, extra rooms next to the main room) runs its PID output; satAggregateZoneSetpoint() keeps the
   // primary output, raises it to the zones output and applies the overshoot cap, or does nothing in ECO.
   // A zone without usable inputs counts as no zone, so a setup that pushes no zone data is unchanged.
   {
