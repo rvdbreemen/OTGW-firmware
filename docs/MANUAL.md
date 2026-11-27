@@ -187,7 +187,7 @@ The 1.x line (maintenance branch `otgw-1.x.x`) runs on the Wemos D1 mini (ESP826
 
 #### The OpenTherm Gateway OTGW32
 
-The second supported configuration is the OpenTherm Gateway OTGW32: an ESP32-S3 board without a PIC that speaks OpenTherm itself (OT-Direct). It is a new device (hardware versions 1.0 and 1.1) that still has to prove itself in the field. Its 10 way terminal block (J4) is not fitted at the factory. Chapter 11 describes it and Chapter 12 compares it with the OTGW Classic.
+The second supported configuration is the OpenTherm Gateway OTGW32: an ESP32-S3 board without a PIC that speaks OpenTherm itself (OT-Direct). It is a new device (version 1.0 is the first production run) that still has to prove itself in the field. Its 10 way terminal block (J4) is not fitted at the factory. Chapter 11 describes it and Chapter 12 compares it with the OTGW Classic.
 
 #### Other Boards
 
@@ -5760,9 +5760,9 @@ Firmware 2.0 supports exactly two hardware configurations:
 
 **What works on the OTGW32:** everything the gateway is for (OpenTherm, MQTT, Home Assistant, SAT). A few optional extras (Bluetooth sensors, long graph history, bigger buffers) need PSRAM (extra working memory) and are off on this board.
 
-**Also not on the OTGW32:** the bypass relay (hardware version 1.1 has a place for one; it is not fitted as supplied and the firmware does not use it), a ready-made terminal block (the 10 way block J4 is not fitted at the factory: you fit it yourself) and PIC firmware updates (there is no PIC).
+**Also not on the OTGW32:** the bypass relay (the firmware does not use one), a ready-made terminal block (the 10 way block J4 is not fitted at the factory: you fit it yourself) and PIC firmware updates (there is no PIC).
 
-> **The OTGW32 is new, and the firmware for it has not run in a real home yet.** Hardware versions 1.0 and 1.1 are very similar; version 1.1 has an optional bypass relay that is not fitted as supplied and is not used by the firmware. Firmware 2.0 supports it, but so far the firmware has only run on a bench unit, without a thermostat and without a real boiler on the bus (a simulated boiler, and master mode without a thermostat). What is not yet field-proven: how it behaves with different boilers and thermostats, long runs, the Ethernet and OLED options on real hardware, and OTmonitor (a PC program for the OpenTherm Gateway) over port 25238. If you run an OTGW32, please send a capture with your report (see Chapter 7).
+> **The OTGW32 is new, and the firmware for it has not run in a real home yet.** Version 1.0 of the OTGW32 is the first production run. The firmware does not use a bypass relay. Firmware 2.0 supports the board, but so far the firmware has only run on a bench unit, without a thermostat and without a real boiler on the bus (a simulated boiler, and master mode without a thermostat). What is not yet field-proven: how it behaves with different boilers and thermostats, long runs, the Ethernet and OLED options on real hardware, and OTmonitor (a PC program for the OpenTherm Gateway) over port 25238. If you run an OTGW32, please send a capture with your report (see Chapter 7).
 
 **Which one do you have?** After the first flash the unit tells you: the web UI has an Advanced, PIC firmware tab on an OTGW Classic and no such tab on an OTGW32, and `hardware_type` in the device info (`/api/v2/device/info`) is `otgw-classic` or `otgw32`. If you are not sure which board you have, ask in the Discord support channel before you flash: a factory install erases the unit.
 
@@ -5771,7 +5771,7 @@ Firmware 2.0 supports exactly two hardware configurations:
 - **Processor and memory:** an ESP32-S3 with 4 MB of flash and no PSRAM (extra working memory; the LOLIN S3 Mini module has it). The firmware checks for PSRAM while it runs.
 - **OpenTherm:** the ESP32-S3 drives the boiler side and the thermostat side itself. The firmware calls this OT-Direct (the ESP32 does the work that the PIC does on the Classic). There is no PIC, so there is no PIC firmware to update.
 - **Options in the firmware:** wired Ethernet (a W5500 chip), a small OLED display and a Dallas temperature sensor input are supported by the firmware. They have not been seen on real OTGW32 hardware in our tests.
-- **Connector:** the 10 way terminal block (J4) is not fitted at the factory; you fit it yourself. Terminal 1 is the one nearest the reset button. Terminals 1 and 2 are the OpenTherm boiler lines and terminals 3 and 4 are the OpenTherm thermostat lines. Terminal 5 is labelled DI: it is connected to GPIO 5 through a 330 ohm series resistor, with a 3.3 k pull-up and a 470 pF capacitor to ground. Terminals 6 to 10 carry power, ground and the 1-wire line, but we do not know their order yet. Do not connect anything to terminals 6 to 10 until it is documented.
+- **Connector:** the 10 way terminal block (J4) is not fitted at the factory; you fit it yourself. Terminal 1 is the one nearest the reset button. Terminals 1 and 2 are the OpenTherm boiler lines and terminals 3 and 4 are the OpenTherm thermostat lines. Terminal 5 is labelled DI: it is connected to GPIO 5 through a 330 ohm series resistor, with a 3.3 k pull-up and a 470 pF capacitor to ground. Terminals 6 to 10 carry power, ground and the 1-wire line, but we do not know their order yet. Do not connect anything to terminals 6 to 10 until it is documented. Unused GPIOs of the ESP32-S3 are not brought out on the board (a congested two-layer board), so do not expect spare pins.
 - **What the unit reports:** `GET /api/v2/device/info` shows `hardware_type` `otgw32` and the hardware mode `OT-Direct`. MQTT publishes the same as `otgw-firmware/hardware_type` and `otgw-firmware/hardware_mode`.
 
 ### 11.2 The operating modes
@@ -5785,7 +5785,7 @@ OT-Direct has these modes. Choose one in the web UI (Settings, OT-Direct mode; t
 | **Master** | The unit is the OpenTherm master and polls the boiler itself. A thermostat is optional: if one stays connected, the unit answers it from its cache and passes its settings to the boiler. | `GW=2` or `GW=S` |
 | **Loopback** | A test mode with simulated boiler answers. No hardware is needed. | `GW=L` |
 
-A fifth mode, **bypass** (the thermostat wired straight to the boiler through a relay), is listed in some places, but this release has no relay support (hardware version 1.1 has an optional relay, not fitted as supplied, and the firmware does not use it): choosing it falls back to gateway and `GW=P` answers `NG`. Do not plan on bypass.
+A fifth mode, **bypass** (the thermostat wired straight to the boiler through a relay), is listed in some places, but this release has no relay support (the firmware does not use one): choosing it falls back to gateway and `GW=P` answers `NG`. Do not plan on bypass.
 
 The mode is stored in the setting `OTDmode` and kept across restarts. In gateway mode the unit listens for the thermostat for 5 seconds at start-up. If it hears none, it runs in master mode for that start only; the next start looks again.
 
@@ -5845,7 +5845,7 @@ Not tested on an OTGW32: a real thermostat on the bus, a real boiler in gateway 
 
 Firmware 2.0 supports two hardware configurations: the **OTGW Classic with an ESP32-S3 module** (with a PIC co-processor) and the **OpenTherm Gateway OTGW32** (no PIC, OT-Direct). Most of what you do is the same. This chapter lists what differs, so you know which parts of this manual apply to your unit. Chapter 11 describes the OTGW32 in more detail.
 
-> **The OTGW32 is new, and the firmware for it has not run in a real home yet.** Hardware versions 1.0 and 1.1 are very similar; version 1.1 has an optional bypass relay that is not fitted as supplied and is not used by the firmware. The Classic has alpha and beta runs on several units behind it; the OTGW32 has run on a bench unit only, without a thermostat and without a real boiler.
+> **The OTGW32 is new, and the firmware for it has not run in a real home yet.** Version 1.0 of the OTGW32 is the first production run. The firmware does not use a bypass relay. The Classic has alpha and beta runs on several units behind it; the OTGW32 has run on a bench unit only, without a thermostat and without a real boiler.
 
 **Which one do you have?** After the first flash the unit tells you: the web UI has an Advanced, PIC firmware tab on an OTGW Classic and no such tab on an OTGW32, and `hardware_type` in the device info (`/api/v2/device/info`) is `otgw-classic` or `otgw32`. If you are not sure which board you have, ask in the Discord support channel before you flash: a factory install erases the unit.
 
@@ -5862,7 +5862,7 @@ Firmware 2.0 supports two hardware configurations: the **OTGW Classic with an ES
 | **Bluetooth (BLE) room sensor** | Yes, on a module with PSRAM. | Off on this board (needs PSRAM). |
 | **Ethernet and OLED** | OLED optional. No Ethernet. | Ethernet (W5500) and OLED are supported by the firmware; not seen on real hardware in our tests. |
 | **Updating over WiFi** | The PIC keeps passing messages (not measured on a bench). | The thermostat to boiler link is interrupted for 1 to 2 minutes; the boiler runs on its own settings. |
-| **Field experience** | Alpha and beta runs on several units. | New device, hardware versions 1.0 and 1.1. |
+| **Field experience** | Alpha and beta runs on several units. | New device, version 1.0 is the first production run. |
 
 ### 12.1b For the curious
 

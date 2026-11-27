@@ -21,7 +21,7 @@ The 1.x line (maintenance branch `otgw-1.x.x`) runs on the Wemos D1 mini (ESP826
 
 #### The OpenTherm Gateway OTGW32
 
-The second supported configuration is the OpenTherm Gateway OTGW32: an ESP32-S3 board without a PIC that speaks OpenTherm itself (OT-Direct). It is a new device (hardware versions 1.0 and 1.1) that still has to prove itself in the field. Its 10 way terminal block (J4) is not fitted at the factory. Chapter 11 describes it and Chapter 12 compares it with the OTGW Classic.
+The second supported configuration is the OpenTherm Gateway OTGW32: an ESP32-S3 board without a PIC that speaks OpenTherm itself (OT-Direct). It is a new device (version 1.0 is the first production run) that still has to prove itself in the field. Its 10 way terminal block (J4) is not fitted at the factory. Chapter 11 describes it and Chapter 12 compares it with the OTGW Classic.
 
 #### Other Boards
 

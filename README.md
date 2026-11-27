@@ -109,7 +109,7 @@ Version 2.0.0 is a major platform release. It targets the ESP32-S3 in the tradit
 Firmware 2.0 supports exactly two hardware configurations:
 
 1. **The OTGW Classic with an ESP32-S3 module.** The NodoShop OTGW with the PIC co-processor (a small extra chip that speaks OpenTherm for the module) and a LOLIN S3 Mini or S3 Mini Pro in the module socket. The PIC talks OpenTherm; the ESP32-S3 is connected to it by a serial link.
-2. **The OpenTherm Gateway OTGW32.** A board with an ESP32-S3 that speaks OpenTherm itself, with its own connections to the boiler and to the thermostat (OT-Direct: the ESP32 does the work that the PIC does on the Classic). There is no PIC on this board. Hardware versions 1.0 and 1.1 are very similar; version 1.1 has an optional bypass relay that is not fitted as supplied and is not used by the firmware.
+2. **The OpenTherm Gateway OTGW32.** A board with an ESP32-S3 that speaks OpenTherm itself, with its own connections to the boiler and to the thermostat (OT-Direct: the ESP32 does the work that the PIC does on the Classic). There is no PIC on this board. Version 1.0 of the OTGW32 is the first production run. The firmware does not use a bypass relay.
 
 Both use the same release zip: download the file whose name contains `esp32-combo`, for example `OTGW-firmware-esp32-combo-<version>-flash.zip`. The firmware finds out by itself which of the two it is on.
 
@@ -121,11 +121,11 @@ Both use the same release zip: download the file whose name contains `esp32-comb
 | PIC firmware and PIC updates | Yes | No PIC, so none |
 | Web UI, SAT, MQTT, Home Assistant, REST | Yes | Yes |
 | Port 25238 (lets the PC program OTmonitor connect) | Yes, off by default | Imitated by the firmware, off by default |
-| Field experience | Alpha and beta runs on several units | New device, hardware versions 1.0 and 1.1 |
+| Field experience | Alpha and beta runs on several units | New device, version 1.0 is the first production run |
 
 **What works on the OTGW32:** everything the gateway is for (OpenTherm, MQTT, Home Assistant, SAT). A few optional extras (Bluetooth sensors, long graph history, bigger buffers) need PSRAM (extra working memory) and are off on this board.
 
-**Also not on the OTGW32:** the bypass relay (hardware version 1.1 has a place for one; it is not fitted as supplied and the firmware does not use it), a ready-made terminal block (the 10 way block J4 is not fitted at the factory: you fit it yourself) and PIC firmware updates (there is no PIC).
+**Also not on the OTGW32:** the bypass relay (the firmware does not use one), a ready-made terminal block (the 10 way block J4 is not fitted at the factory: you fit it yourself) and PIC firmware updates (there is no PIC).
 
 **The OTGW32 is new, and the firmware for it has not run in a real home yet.** Firmware 2.0 supports it, but so far it has only run on a bench, without a thermostat and without a real boiler on the bus (simulated boiler and master mode). What is not yet field-proven: how it behaves with different boilers and thermostats, long runs, the Ethernet and OLED options on real hardware, and OTmonitor (a PC program for the OpenTherm Gateway) over port 25238. If you run an OTGW32, you are among the first. Please send what you see, with a capture if you can (see [Reporting a problem](docs/manuals/en/ch07-troubleshooting.md)): it is how the gaps in the list above get closed.
 

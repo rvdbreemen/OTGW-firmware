@@ -4,7 +4,7 @@
 
 Firmware 2.0 ondersteunt twee hardwareconfiguraties: de **OTGW Classic met een ESP32-S3-module** (met een PIC-coprocessor) en de **OpenTherm Gateway OTGW32** (geen PIC, OT-Direct). Het meeste wat u doet is gelijk. Dit hoofdstuk zet op een rij wat verschilt, zodat u weet welke delen van deze handleiding voor uw apparaat gelden. Hoofdstuk 11 beschrijft de OTGW32 uitgebreider.
 
-> **De OTGW32 is nieuw en de firmware ervoor heeft nog niet in een echt huis gedraaid.** De hardwareversies 1.0 en 1.1 lijken sterk op elkaar; versie 1.1 heeft een optioneel bypass-relais dat niet is gemonteerd bij levering en dat de firmware niet gebruikt. De Classic is in alpha- en betatests op meerdere apparaten gedraaid; de OTGW32 heeft alleen op een testapparaat gedraaid, zonder thermostaat en zonder echte ketel.
+> **De OTGW32 is nieuw en de firmware ervoor heeft nog niet in een echt huis gedraaid.** Versie 1.0 van de OTGW32 is de eerste productierun. De firmware gebruikt geen bypass-relais. De Classic is in alpha- en betatests op meerdere apparaten gedraaid; de OTGW32 heeft alleen op een testapparaat gedraaid, zonder thermostaat en zonder echte ketel.
 
 **Welke heeft u?** Na de eerste flash laat het apparaat het zien: de webinterface heeft op een OTGW Classic een tabblad Advanced, PIC firmware en op een OTGW32 niet, en `hardware_type` in de device info (`/api/v2/device/info`) is `otgw-classic` of `otgw32`. Weet u niet zeker welke print u heeft, vraag het dan in het Discord-supportkanaal voordat u flasht: een fabrieksinstallatie wist het apparaat.
 
@@ -21,7 +21,7 @@ Firmware 2.0 ondersteunt twee hardwareconfiguraties: de **OTGW Classic met een E
 | **Bluetooth (BLE) kamersensor** | Ja, op een module met PSRAM. | Uit op deze print (heeft PSRAM nodig). |
 | **Ethernet en OLED** | OLED optioneel. Geen Ethernet. | Ethernet (W5500) en OLED worden door de firmware ondersteund; in onze tests niet op echte hardware gezien. |
 | **Bijwerken via WiFi** | De PIC blijft berichten doorgeven (niet op een testapparaat gemeten). | De verbinding thermostaat naar ketel is 1 tot 2 minuten onderbroken; de ketel draait op zijn eigen instellingen. |
-| **Ervaring in het veld** | Alpha- en betatests op meerdere apparaten. | Nieuw apparaat, hardwareversies 1.0 en 1.1. |
+| **Ervaring in het veld** | Alpha- en betatests op meerdere apparaten. | Nieuw apparaat, versie 1.0 is de eerste productierun. |
 
 ### 12.1b Voor de nieuwsgierigen
 
