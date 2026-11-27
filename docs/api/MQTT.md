@@ -378,7 +378,7 @@ These thresholds are tunable; they are guideline-level under ADR-111 and may be 
 | `sat/max_setpoint` | `"62.0"` | yes | Maximum flow setpoint SAT works with (°C) (TASK-1373): the user's Max flow setpoint (`set/<node>/sat/max_setpoint`) cut into the boiler's MsgID 49 bounds (20 to 80 without them), at most 50 for underfloor, 40 for a heat pump and 65 (the old global ceiling). While the user has not chosen a value: 62 for radiators, 50 for underfloor, 40 for a heat pump. Before TASK-1373 this was the fixed 62 / 45 / 40 table |
 | `sat/modulation_state` | `"OFF"` / `"HOT_WATER"` / `"PWM_OFF"` / `"COLD"` / `"ACTIVE"` | no | Modulation state. `"OFF"` while SAT is not active; `"COLD"` = flow temperature below 22 °C |
 | `sat/pwm_state` | `"IDLE"` / `"ON"` / `"OFF"` | no | PWM phase; `"IDLE"` when the control mode is not PWM |
-| `sat/current_modulation` | `"45"` | no | Modulation SAT sends (%), 100 while the last MM sent is `MM=T` (maximum PWM duty, TASK-1412.15) |
+| `sat/current_modulation` | `"45"` | no | Modulation SAT sends (%): the value of `MM=`, 0 for a gas boiler in PWM, the configured maximum otherwise (since TASK-3143 SAT sends no `MM=T` in PWM) |
 | `sat/sim/last_cmd` | command string | no | Last PIC / OT-Direct command that simulation mode kept off the bus. Published only while simulation is on |
 
 #### PID Components

@@ -8864,10 +8864,6 @@ static void satControlLoopRun()
                                                 src == SAT_SRC_HEAT_PUMP || src == SAT_SRC_HYBRID,
                                                 settings.sat.iMaxRelModulation,
                                                 satGetManufacturerQuirks());
-    // Entry 269 (Q-TW-4): while MM=T goes out (below), the published current_modulation is 100 %, not the 0 satComputeMM() gives a
-    // gas boiler in PWM. Same condition as mmTarget below; satPwmAtMaxDuty() and satColdCutActive() do not change in between.
-    state.sat.iCurrentModulation = satReportedModulation(!satColdCutActive() && satPwmAtMaxDuty() && hasOTCommandInterface(),
-                                                         state.sat.iCurrentModulation);
   }
 
   // --- COLD_SETPOINT cutoff (TASK-891.2, George): requested setpoint below the per-heating-system
@@ -8916,7 +8912,9 @@ static void satControlLoopRun()
   }
 
   // --- Send CS= and MM= commands to boiler when an OT command interface is available ---
-  const uint8_t mmTarget = (!coldCutoff && satPwmAtMaxDuty()) ? SAT_MM_T : state.sat.iCurrentModulation;   // TASK-1581
+  // TASK-3143 (Sergeant D entry 505): no MM=T while PWM runs, also not at the maximum duty. The MM sent is what satComputeMM() gave
+  // (0 for a gas boiler in PWM, the configured maximum in continuous mode, during a hot-water draw and for a heat pump or hybrid).
+  const uint8_t mmTarget = state.sat.iCurrentModulation;
   char mmTxt[4];
   if (mmTarget == SAT_MM_T) strlcpy(mmTxt, "T", sizeof(mmTxt));
   else                      snprintf_P(mmTxt, sizeof(mmTxt), PSTR("%u"), (unsigned)mmTarget);
