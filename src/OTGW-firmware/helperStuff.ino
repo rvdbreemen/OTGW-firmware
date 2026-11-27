@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : helperStuff
-**  Version  : v2.0.0-beta.458
+**  Version  : v2.0.0-beta.459
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -1319,6 +1319,7 @@ void emergencyHeapRecovery() {
   uint8_t wsAborted = 0;
   if (wsTrackedBefore > 0 && (wsAborted = doWebSocketDisconnectAll()) > 0) {
     actions |= 0x01;
+    webSocketNoteRecoveryAbort();   // TASK-3123: no /ws handshake for 30 s after a recovery that aborted /ws clients
   }
 
   // Action 2: drop OTGWstream port 25238 clients by stop+restart of the listener.

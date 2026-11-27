@@ -4,10 +4,11 @@ title: >-
   refuse /ws handshakes for a cooldown (30 s) after an emergency recovery that
   aborted >= 1 /ws client (reconnect loop observed on .76 with emulated tabs,
   bench-observed only)
-status: To Do
+status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-27T12:37:00Z'
+updated_date: '2026-11-27T13:25:00Z'
 labels:
   - webui
   - heap
@@ -31,3 +32,9 @@ After emergencyHeapRecovery() aborts the /ws clients (ADR-295), the browser tabs
 - [ ] #4 Host test tests/test_ws_handshake_cooldown.py compiling the real wsAdmitHandshake(): refuses at +0 s and +29.9 s, admits at +30 s, admits when no recovery happened, handles a wrap across 2^32; red on the code before the change; a mutant with the cooldown at 0 ms also fails
 - [ ] #5 Bench (otgw-bench-tester) on the unit without PSRAM, B1 run 2 recipe, n = 3: after each recovery no accepted /ws handshake within 30 s, no second recovery within 120 s of the first, tabs back within 40 s, the control run on the build before shows the loop; the prober load is recorded so the result is not credited to the prober
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-27 otgw-dev: implemented locally on lane/ws-cooldown (wt-d3-cool, on top of 3f9176298 + a merge of origin/dev), not built, not pushed. wsAdmitHandshake(freeHeap, connected, nowMs, lastRecoveryMs) refuses while (uint32_t)(now - lastRecoveryMs) < WS_RECOVERY_COOLDOWN_MS (30000); 0 = no recovery yet; emergencyHeapRecovery() calls webSocketNoteRecoveryAbort() only inside the branch where doWebSocketDisconnectAll() aborted >= 1 client (AC2); the handler counts the refusal as its own burst event WS_BURST_REJECTED_COOLDOWN and logs 'refused at the handshake (recovery cooldown, N s left)' (AC3). tests/test_ws_handshake_cooldown.py (7 tests): REAL functions on the host: refuses at +0 and +29.9 s, admits at +30 s, admits with no recovery, wrap across 2^32, old rules after the cooldown, mutant with 0 ms cooldown red, wiring guards; red before (functions absent). test_ws_handshake_heap_gate updated for the new signature. evaluate --quick 0 failed. NOT done: AC5 bench (n=3 on .76, control run before). The cooldown refuses through the library 401 path (see the gate-abort discussion): this lane does not include 2404fb9ae.
+<!-- SECTION:NOTES:END -->

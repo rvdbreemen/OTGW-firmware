@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : webSocketStuff.ino
-**  Version  : v2.0.0-beta.458
+**  Version  : v2.0.0-beta.459
 **
 **  Copyright (c) 2021-2025 Robert van den Breemen
 **
@@ -192,6 +192,7 @@ static const uint8_t WS_BURST_DISCONNECTED = 2;
 static const uint8_t WS_BURST_REJECTED_MAX = 3;
 static const uint8_t WS_BURST_REJECTED_HEAP = 4;
 static const uint8_t WS_BURST_ERROR = 5;
+static const uint8_t WS_BURST_REJECTED_COOLDOWN = 6;   // TASK-3123
 
 static unsigned long wsBurstWindowStartMs = 0;
 static uint8_t wsBurstConnects = 0;
@@ -199,6 +200,7 @@ static uint8_t wsBurstDisconnects = 0;
 static uint8_t wsBurstMaxRejects = 0;
 static uint8_t wsBurstHeapRejects = 0;
 static uint8_t wsBurstErrors = 0;
+static uint8_t wsBurstCooldownRejects = 0;   // TASK-3123
 static bool wsBurstLogged = false;
 const unsigned long WS_BURST_WINDOW_MS = 5000;
 const uint8_t WS_BURST_LOG_THRESHOLD = 3;
@@ -210,6 +212,7 @@ static void resetWebSocketBurstWindow(unsigned long now) {
   wsBurstMaxRejects = 0;
   wsBurstHeapRejects = 0;
   wsBurstErrors = 0;
+  wsBurstCooldownRejects = 0;
   wsBurstLogged = false;
 }
 
@@ -235,9 +238,12 @@ static void noteWebSocketBurstEvent(uint8_t eventType) {
     case WS_BURST_ERROR:
       wsBurstErrors++;
       break;
+    case WS_BURST_REJECTED_COOLDOWN:
+      wsBurstCooldownRejects++;
+      break;
   }
 
-  const uint8_t totalEvents = wsBurstConnects + wsBurstDisconnects + wsBurstMaxRejects + wsBurstHeapRejects + wsBurstErrors;
+  const uint8_t totalEvents = wsBurstConnects + wsBurstDisconnects + wsBurstMaxRejects + wsBurstHeapRejects + wsBurstErrors + wsBurstCooldownRejects;
   if (!wsBurstLogged && (totalEvents >= WS_BURST_LOG_THRESHOLD)) {
     DebugTf(PSTR("[%lu] WebSocket burst window=%lums total=%u conn=%u disc=%u rejMax=%u rejHeap=%u err=%u clients=%u heap=%u maxBlk=%u\r\n"),
             now,
@@ -276,7 +282,23 @@ uint16_t webSocketClientCount() {
 // (the library answers 401, the web UI reconnects after 5 s). The branches in webSocketEvent() stay as the second line:
 // the heap can still fall between the handshake and the client construction, one round trip later.
 // connected = otLogWs.count() at the handshake: the new client is not in the list yet, so a full list is count >= MAX.
-static bool wsAdmitHandshake(uint32_t freeHeap, uint16_t connected) {
+// TASK-3123: after an emergency recovery that aborted /ws clients the tabs reconnect after 5 s (v2.js), and on a unit without PSRAM that
+// drove the heap under 3 KB again within about 50 s, so the next recovery aborted them again (bench .76, B1 run 2). No handshake is
+// admitted for WS_RECOVERY_COOLDOWN_MS after such a recovery. lastRecoveryMs is millis() of that recovery, 0 = none yet; the unsigned
+// difference survives the wrap of millis().
+static const uint32_t WS_RECOVERY_COOLDOWN_MS = 30000;
+static uint32_t g_wsRecoveryMs = 0;
+void webSocketNoteRecoveryAbort() {   // called by emergencyHeapRecovery() (helperStuff.ino) when it aborted at least one /ws client
+  const uint32_t t = millis();
+  g_wsRecoveryMs = t ? t : 1;
+}
+static uint32_t wsCooldownLeftMs(uint32_t nowMs, uint32_t lastRecoveryMs) {
+  if (lastRecoveryMs == 0) return 0;
+  const uint32_t since = (uint32_t)(nowMs - lastRecoveryMs);
+  return since < WS_RECOVERY_COOLDOWN_MS ? (WS_RECOVERY_COOLDOWN_MS - since) : 0;
+}
+static bool wsAdmitHandshake(uint32_t freeHeap, uint16_t connected, uint32_t nowMs, uint32_t lastRecoveryMs) {
+  if (wsCooldownLeftMs(nowMs, lastRecoveryMs) > 0) return false;
   if (freeHeap < HEAP_WARNING_THRESHOLD) return false;
   if (connected >= MAX_WEBSOCKET_CLIENTS) return false;
   return true;
@@ -285,10 +307,18 @@ static bool wsAdmitHandshake(uint32_t freeHeap, uint16_t connected) {
 static bool wsHandshakeHandler(AsyncWebServerRequest*) {
   const uint32_t freeHeap = platformFreeHeap();
   const uint16_t connected = (uint16_t)otLogWs.count();
-  if (wsAdmitHandshake(freeHeap, connected)) return true;
+  const uint32_t now = millis();
+  if (wsAdmitHandshake(freeHeap, connected, now, g_wsRecoveryMs)) return true;
+  const uint32_t leftMs = wsCooldownLeftMs(now, g_wsRecoveryMs);
+  if (leftMs > 0) {
+    noteWebSocketBurstEvent(WS_BURST_REJECTED_COOLDOWN);
+    DebugTf(PSTR("[%lu] WebSocket: refused at the handshake (recovery cooldown, %lu s left)\r\n"),
+            (unsigned long)now, (unsigned long)((leftMs + 999UL) / 1000UL));
+    return false;
+  }
   noteWebSocketBurstEvent(freeHeap < HEAP_WARNING_THRESHOLD ? WS_BURST_REJECTED_HEAP : WS_BURST_REJECTED_MAX);
   DebugTf(PSTR("[%lu] WebSocket: refused at the handshake (free heap %u, %u connected)\r\n"),
-          millis(), (unsigned)freeHeap, (unsigned)connected);
+          (unsigned long)now, (unsigned)freeHeap, (unsigned)connected);
   return false;
 }
 
