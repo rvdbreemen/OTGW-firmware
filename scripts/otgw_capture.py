@@ -878,6 +878,16 @@ class StreamWriter:
         pass
 
 
+def silent_reconnect_seconds(args):
+    """TASK-3009: a telnet or /ws stream silent for this long while the health probe answers is reconnected.
+    Same N as the StreamWatch report (--stream-silent-minutes); 0 = off."""
+    return args.stream_silent_minutes * 60
+
+
+def describe_silence(seconds):
+    return f"{int(seconds // 60)} min" if seconds >= 60 and seconds % 60 == 0 else f"{int(seconds)} s"
+
+
 class StreamWatch:
     """TASK-3006: report a stream that has written nothing for `silent_seconds`.
 
@@ -1124,6 +1134,7 @@ def apply_keepalive(sock):
 
 class TelnetCapture(threading.Thread):
     include_trace = False   # --sat-trace: also switch on the HIGH_VOLUME_LABELS toggles
+    silent_reconnect = 0    # TASK-3009: seconds of no telnet bytes, with a healthy device, before a reconnect (0 = off)
     def __init__(self, cap, host, port, http_base, base_timeout, reconnect_delay,
                  post_disconnect_delay, idle_check):
         super().__init__(name="telnet", daemon=True)
@@ -1452,6 +1463,8 @@ class TelnetCapture(threading.Thread):
         last_probe_mono = time.monotonic()
         last_uptime_min = None
         last_ok_probe_wall = self.last_byte_wall
+        silent_probe_mono = time.monotonic()
+        silent_done_at = None   # last_byte_mono of the silence already answered with a reconnect
 
         def drop(why, line, start=None):
             state["reason"] = why
@@ -1551,6 +1564,21 @@ class TelnetCapture(threading.Thread):
                     last_ok_probe_wall = datetime.now(timezone.utc).astimezone()
                     if up is not None:
                         last_uptime_min = up
+
+            # TASK-3009: open socket, healthy device, but no byte for N: the stream is dead on the way (will_85903:
+            # five hours of silence). Reconnect once per silence; the gap starts at the last byte.
+            if (self.silent_reconnect > 0 and self.sock is not None and self.last_byte_mono != silent_done_at
+                    and time.monotonic() - self.last_byte_mono >= self.silent_reconnect
+                    and time.monotonic() - silent_probe_mono >= self.silent_reconnect):
+                ok, _up = self.health_probe()
+                silent_probe_mono = time.monotonic()
+                if ok:
+                    silent_done_at = self.last_byte_mono
+                    quiet = describe_silence(self.silent_reconnect)
+                    drop(f"stream silent {quiet}, health probe OK",
+                         f"Telnet silent for {quiet} while the health probe answers; reconnecting.",
+                         self.last_byte_wall)
+                    continue
 
             self.cap.wait(0.1)
 
@@ -1922,6 +1950,7 @@ class BrowserCapture(threading.Thread):
         stderr_handle = None
         requests = {}
         cdp_id = [0]
+        reconnects = 0
 
         def send(method, params=None):
             cdp_id[0] += 1
@@ -1931,111 +1960,62 @@ class BrowserCapture(threading.Thread):
             ws.send_json(payload)
 
         try:
-            self.log(f"browser executable: {self.browser_path}")
-            self.log(f"device url: {self.device_url}   cdp port: {self.debug_port}")
-            args = [self.browser_path, "--headless=new", "--disable-gpu", "--no-first-run",
-                    "--no-default-browser-check", "--disable-extensions", "--disable-background-networking",
-                    "--mute-audio",
-                    # Quiet Chromium's own stderr sink (task-manager fallback, USB
-                    # device_event_log, SmartScreen DNS timeout); browser.log is unaffected.
-                    "--disable-logging", "--log-level=3", "--disable-features=msSmartScreenProtection",
-                    "--remote-allow-origins=*", f"--remote-debugging-port={self.debug_port}",
-                    f"--user-data-dir={self.profile_dir}", "about:blank"]
             stderr_handle = open(self.cap.path("browser.stderr.log"), "ab")
-            popen_kwargs = {"stdout": subprocess.DEVNULL, "stderr": stderr_handle, "stdin": subprocess.DEVNULL}
-            if sys.platform.startswith("linux"):
-                popen_kwargs["preexec_fn"] = _linux_die_with_parent
-            if os.name == "nt":
-                popen_kwargs["creationflags"] = getattr(subprocess, "CREATE_NO_WINDOW", 0)
-            self.proc = subprocess.Popen(args, **popen_kwargs)
-            self.job = windows_kill_on_close_job(self.proc)
-
-            ws_url = None
-            deadline = time.monotonic() + 15
-            while not self.cap.stopping() and time.monotonic() < deadline:
-                try:
-                    with urllib.request.urlopen(f"http://127.0.0.1:{self.debug_port}/json", timeout=1) as response:
-                        targets = json.loads(response.read().decode("utf-8"))
-                    for target in targets:
-                        if target.get("type") == "page" and target.get("webSocketDebuggerUrl"):
-                            ws_url = target["webSocketDebuggerUrl"]
-                            break
-                    if ws_url:
-                        break
-                except Exception:
-                    self.cap.wait(0.3)
-                self.cap.wait(0.2)
-            if not ws_url:
-                if self.cap.stopping():
-                    self.result = "Browser capture: stopped before CDP page target was ready."
-                    self.log("stop requested before cdp page target was ready")
-                    return
-                raise RuntimeError(f"CDP page target not found on port {self.debug_port} within 15s")
-
-            self.log(f"cdp websocket: {ws_url}")
-            ws = WebSocket(ws_url)
-            self.log("cdp connected")
-            for method in ("Network.enable", "Runtime.enable", "Log.enable", "Page.enable"):
-                send(method)
-            send("Page.navigate", {"url": self.device_url})
-            self.log(f"domains enabled; navigating to {self.device_url}")
-
+            attached_once = False
+            failures = 0
             while not self.cap.stopping():
                 try:
-                    text = ws.recv_text()
-                except socket.timeout:
-                    continue
-                if text is None:
-                    break
-                try:
-                    evt = json.loads(text)
-                except Exception:
-                    continue
-                method = evt.get("method")
-                params = evt.get("params", {})
-                if method == "Runtime.consoleAPICalled":
-                    parts = []
-                    for arg in params.get("args", []):
-                        if "value" in arg:
-                            parts.append(str(arg["value"]))
-                        elif arg.get("description"):
-                            parts.append(str(arg["description"]))
-                        elif arg.get("unserializableValue"):
-                            parts.append(str(arg["unserializableValue"]))
-                        else:
-                            parts.append(f"[{arg.get('type', 'unknown')}]")
-                    self.log(f"[console.{params.get('type', 'log')}] " + " ".join(parts))
-                elif method == "Runtime.exceptionThrown":
-                    details = params.get("exceptionDetails", {})
-                    exc = details.get("exception", {})
-                    self.log("[exception] " + str(exc.get("description") or details.get("text") or "unknown exception"))
-                elif method == "Log.entryAdded":
-                    entry = params.get("entry", {})
-                    where = f" ({entry.get('url')})" if entry.get("url") else ""
-                    self.log(f"[log.{entry.get('level')}] {entry.get('text')}{where}")
-                elif method == "Network.requestWillBeSent":
-                    rid = params.get("requestId")
-                    if rid:
-                        requests[rid] = {"url": params.get("request", {}).get("url", ""),
-                                         "start": float(params.get("timestamp", 0)), "status": ""}
-                elif method == "Network.responseReceived":
-                    rid = params.get("requestId")
-                    if rid in requests:
-                        requests[rid]["status"] = str(params.get("response", {}).get("status", ""))
-                elif method == "Network.loadingFinished":
-                    record = requests.pop(params.get("requestId"), None)
-                    if record:
-                        ms = int((float(params.get("timestamp", 0)) - record["start"]) * 1000)
-                        self.log(f"[net] {ms:6d} ms  {record['status']:>3}  {record['url']}")
-                elif method == "Network.loadingFailed":
-                    record = requests.pop(params.get("requestId"), None)
-                    if record:
-                        self.log(f"[net] FAILED      {params.get('errorText')}  {record['url']}")
+                    if self.proc is None or self.proc.poll() is not None:
+                        if attached_once:
+                            self.log("browser process is gone; starting it again")
+                        self.launch_browser(stderr_handle)
+                    ws_url = self.find_page_target()
+                    if ws_url is None:
+                        if attached_once:
+                            break
+                        self.result = "Browser capture: stopped before CDP page target was ready."
+                        self.log("stop requested before cdp page target was ready")
+                        return
+                    self.log(f"cdp websocket: {ws_url}")
+                    ws = WebSocket(ws_url)
+                    self.log("cdp connected")
+                    for method in ("Network.enable", "Runtime.enable", "Log.enable", "Page.enable"):
+                        send(method)
+                    send("Page.navigate", {"url": self.device_url})
+                    self.log(f"domains enabled; navigating to {self.device_url}")
+                    if attached_once:
+                        reconnects += 1
+                        self.log("reconnected")
+                        self.cap.summary(f"Browser capture: reconnected {now_iso()} (re-attached to the page target, "
+                                         f"reconnect #{reconnects})")
+                    attached_once = True
+                    failures = 0
+                    self.pump(ws, requests)
+                    if self.cap.stopping():
+                        break
+                    raise ConnectionError("websocket closed by the browser")
+                except Exception as exc:
+                    # TASK-2979: before the first attach a failure ends the capture as before; once the page was
+                    # attached, a CDP error (websocket closed, browser gone) is retried with a back-off until the
+                    # run stops. The telnet and MQTT recorders reconnect the same way.
+                    if not attached_once:
+                        raise
+                    failures += 1
+                    self.flush_pending(requests)
+                    if ws is not None:
+                        ws.close()
+                        ws = None
+                    delay = min(2 ** min(failures - 1, 5), 30)
+                    if failures == 1 or failures % 10 == 0:
+                        self.cap.script_error(f"browser capture: {type(exc).__name__}: {exc}; re-attaching "
+                                              f"(attempt {failures}, next try in {delay}s)")
+                    self.log(f"[worker-error] {exc}; re-attaching in {delay}s (attempt {failures})")
+                    self.cap.wait(delay)
 
-            for record in requests.values():
-                status = record["status"] or "no-response"
-                self.log(f"[net] PENDING     {status:>3}  {record['url']}  (started, never finished)")
+            self.flush_pending(requests)
             self.log("stop requested; closing capture")
+            if reconnects:
+                self.result = f"Browser capture: completed normally ({reconnects} reconnect(s) after a CDP error)."
         except Exception as exc:
             self.result = f"Browser capture: error - {exc}"
             try:
@@ -2052,6 +2032,108 @@ class BrowserCapture(threading.Thread):
                 except Exception:
                     pass
             self.cap.summary(self.result)
+
+    def launch_browser(self, stderr_handle):
+        self.log(f"browser executable: {self.browser_path}")
+        self.log(f"device url: {self.device_url}   cdp port: {self.debug_port}")
+        args = [self.browser_path, "--headless=new", "--disable-gpu", "--no-first-run",
+                "--no-default-browser-check", "--disable-extensions", "--disable-background-networking",
+                "--mute-audio",
+                # Quiet Chromium's own stderr sink (task-manager fallback, USB
+                # device_event_log, SmartScreen DNS timeout); browser.log is unaffected.
+                "--disable-logging", "--log-level=3", "--disable-features=msSmartScreenProtection",
+                "--remote-allow-origins=*", f"--remote-debugging-port={self.debug_port}",
+                f"--user-data-dir={self.profile_dir}", "about:blank"]
+        popen_kwargs = {"stdout": subprocess.DEVNULL, "stderr": stderr_handle, "stdin": subprocess.DEVNULL}
+        if sys.platform.startswith("linux"):
+            popen_kwargs["preexec_fn"] = _linux_die_with_parent
+        if os.name == "nt":
+            popen_kwargs["creationflags"] = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+        self.proc = subprocess.Popen(args, **popen_kwargs)
+        self.job = windows_kill_on_close_job(self.proc)
+
+    def find_page_target(self):
+        """The CDP websocket URL of the page target; None when a stop came first."""
+        ws_url = None
+        deadline = time.monotonic() + 15
+        while not self.cap.stopping() and time.monotonic() < deadline:
+            try:
+                with urllib.request.urlopen(f"http://127.0.0.1:{self.debug_port}/json", timeout=1) as response:
+                    targets = json.loads(response.read().decode("utf-8"))
+                for target in targets:
+                    if target.get("type") == "page" and target.get("webSocketDebuggerUrl"):
+                        ws_url = target["webSocketDebuggerUrl"]
+                        break
+                if ws_url:
+                    break
+            except Exception:
+                self.cap.wait(0.3)
+            self.cap.wait(0.2)
+        if not ws_url:
+            if self.cap.stopping():
+                return None
+            raise RuntimeError(f"CDP page target not found on port {self.debug_port} within 15s")
+        return ws_url
+
+    def flush_pending(self, requests):
+        for record in requests.values():
+            status = record["status"] or "no-response"
+            self.log(f"[net] PENDING     {status:>3}  {record['url']}  (started, never finished)")
+        requests.clear()
+
+    def pump(self, ws, requests):
+        """Read CDP events until a stop request (returns) or the websocket ends (returns or raises)."""
+        while not self.cap.stopping():
+            try:
+                text = ws.recv_text()
+            except socket.timeout:
+                continue
+            if text is None:
+                return
+            try:
+                evt = json.loads(text)
+            except Exception:
+                continue
+            method = evt.get("method")
+            params = evt.get("params", {})
+            if method == "Runtime.consoleAPICalled":
+                parts = []
+                for arg in params.get("args", []):
+                    if "value" in arg:
+                        parts.append(str(arg["value"]))
+                    elif arg.get("description"):
+                        parts.append(str(arg["description"]))
+                    elif arg.get("unserializableValue"):
+                        parts.append(str(arg["unserializableValue"]))
+                    else:
+                        parts.append(f"[{arg.get('type', 'unknown')}]")
+                self.log(f"[console.{params.get('type', 'log')}] " + " ".join(parts))
+            elif method == "Runtime.exceptionThrown":
+                details = params.get("exceptionDetails", {})
+                exc = details.get("exception", {})
+                self.log("[exception] " + str(exc.get("description") or details.get("text") or "unknown exception"))
+            elif method == "Log.entryAdded":
+                entry = params.get("entry", {})
+                where = f" ({entry.get('url')})" if entry.get("url") else ""
+                self.log(f"[log.{entry.get('level')}] {entry.get('text')}{where}")
+            elif method == "Network.requestWillBeSent":
+                rid = params.get("requestId")
+                if rid:
+                    requests[rid] = {"url": params.get("request", {}).get("url", ""),
+                                     "start": float(params.get("timestamp", 0)), "status": ""}
+            elif method == "Network.responseReceived":
+                rid = params.get("requestId")
+                if rid in requests:
+                    requests[rid]["status"] = str(params.get("response", {}).get("status", ""))
+            elif method == "Network.loadingFinished":
+                record = requests.pop(params.get("requestId"), None)
+                if record:
+                    ms = int((float(params.get("timestamp", 0)) - record["start"]) * 1000)
+                    self.log(f"[net] {ms:6d} ms  {record['status']:>3}  {record['url']}")
+            elif method == "Network.loadingFailed":
+                record = requests.pop(params.get("requestId"), None)
+                if record:
+                    self.log(f"[net] FAILED      {params.get('errorText')}  {record['url']}")
 
     def stop_browser(self):
         if self.proc and self.proc.poll() is None:
@@ -2494,12 +2576,16 @@ class FrameCapture(threading.Thread):
     """Reads the device's /ws (the web UI's OT log stream) and records every frame.
     One extra WebSocket client; the device allows 3. Reconnects with a growing delay."""
 
+    silent_reconnect = 0    # TASK-3009: seconds without a frame, with a healthy device, before a reconnect (0 = off)
+
     def __init__(self, cap, host, port=80):
         super().__init__(name="otframes", daemon=True)
         self.cap = cap
         self.host = host
         self.port = port
+        self.health_url = f"http://{host}:{port}/api/v2/health"
         self.writer = None
+        self._silence_answered = False   # a reconnect for the current silence is done; a received frame clears it
 
     def run(self):
         result = "Frame recorder: completed normally."
@@ -2532,11 +2618,17 @@ class FrameCapture(threading.Thread):
                     self.writer.comment("connected to /ws")
                     last_error = None
                     delay = WS_RECONNECT_MIN
-                    self._read(ws)
-                    self.writer.comment("disconnected from /ws")
+                    silent_since = self._read(ws)
+                    self.writer.comment("disconnected from /ws" + (" (silent)" if silent_since else ""))
                     if not self.cap.stopping():
-                        gap_start = datetime.now().astimezone()
-                        gap_reason = "/ws closed by the device"
+                        if silent_since:
+                            gap_start = silent_since
+                            gap_reason = f"/ws silent {describe_silence(self.silent_reconnect)}, health probe OK"
+                            self.cap.summary(f"Frame recorder: no frame for {describe_silence(self.silent_reconnect)} while "
+                                             f"the health probe answers; reconnecting /ws ({now_iso()}).")
+                        else:
+                            gap_start = datetime.now().astimezone()
+                            gap_reason = "/ws closed by the device"
                 except Exception as exc:
                     text = f"{type(exc).__name__}: {exc}"
                     if gap_start is None:
@@ -2570,14 +2662,31 @@ class FrameCapture(threading.Thread):
         self.cap.gap(FRAMES_LOG, start, end, reason)
 
     def _read(self, ws):
+        """Record frames until the stream ends (returns None) or goes silent while the device is healthy
+        (returns the time of the last frame, TASK-3009)."""
+        last_data_mono = time.monotonic()
+        last_data_wall = datetime.now().astimezone()
+        last_probe_mono = last_data_mono
         while not self.cap.stopping():
             try:
                 text = ws.recv_text()
             except socket.timeout:
+                now = time.monotonic()
+                if (self.silent_reconnect > 0 and not self._silence_answered
+                        and now - last_data_mono >= self.silent_reconnect
+                        and now - last_probe_mono >= self.silent_reconnect):
+                    status, _body, _err, _ctype = http_get(self.health_url, 5, 4096)
+                    last_probe_mono = time.monotonic()
+                    if status is not None:   # any HTTP answer: the device is alive, the stream is not
+                        self._silence_answered = True
+                        return last_data_wall
                 continue
             if text is None:
-                return
+                return None
             received = datetime.now().astimezone()
+            last_data_mono = time.monotonic()
+            last_data_wall = received
+            self._silence_answered = False
             for line in text.splitlines():
                 parsed = parse_ot_log_line(line)
                 if parsed:
@@ -3963,7 +4072,8 @@ def build_parser():
     p.add_argument("--telnet-idle-check-seconds", type=ranged(1, 3600, allow_zero=True), default=60,
                    help="health-probe a silent telnet link after N s (0 = off)")
     p.add_argument("--stream-silent-minutes", type=ranged(1, 1440, allow_zero=True), default=10,
-                   help="report telnet.log, otframes.log or mqtt.log when it wrote nothing for N min (0 = off)")
+                   help="report telnet.log, otframes.log or mqtt.log when it wrote nothing for N min; a silent telnet or /ws "
+                        "stream is also reconnected once while the device answers its health probe (0 = off)")
     p.add_argument("--skip-browser-capture", action="store_true")
     p.add_argument("--browser-url")
     p.add_argument("--browser-debug-port", type=ranged(1, 65535), default=9222)
@@ -4380,6 +4490,7 @@ def main(argv=None):
         s("Frame recorder: disabled (--skip-frame-capture).")
     else:
         frames = FrameCapture(cap, args.device, args.http_port)
+        frames.silent_reconnect = silent_reconnect_seconds(args)
         frames.start()
         workers.append((frames, 10))
         s(f"Frame recorder started: ws://{args.device}:{args.http_port}/ws -> {FRAMES_LOG}, {SIM_LOG} (kept next to the transcript).")
@@ -4433,6 +4544,7 @@ def main(argv=None):
                            args.telnet_reconnect_delay_ms / 1000.0, args.telnet_post_disconnect_delay_ms / 1000.0,
                            args.telnet_idle_check_seconds)
     telnet.include_trace = args.sat_trace
+    telnet.silent_reconnect = silent_reconnect_seconds(args)
     telnet.start()
     s(f"Capture started: {now_iso()}", echo=False)
     print(f"Capturing into {run_path}")
