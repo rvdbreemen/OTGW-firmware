@@ -7,7 +7,7 @@ status: To Do
 assignee:
   - '@claude'
 created_date: '2026-11-26T06:39:00Z'
-updated_date: '2026-11-26T06:51:00Z'
+updated_date: '2026-11-27T04:51:00Z'
 labels: []
 dependencies: []
 ordinal: 1164000
@@ -38,4 +38,6 @@ Entry 499 (Sergeant D, Q-444c A, 2026-11-26, corrects 494): after a hot-water dr
 Evidence 2026-11-26 (host only, NOT verified on a unit): tests/test_sat_pwm_frozen_flow_dhw.py on the real PWM block with the control loop's DHW hooks: 8/8 green on the fix, 4/8 red on origin/dev (late draw: OFF pause 1016 s instead of 936 s, +80 s at 60 C, +104 s at 65 C); negative tests: no draw unchanged, draw before the first ON tick uses the live flow as today, next ON phase stores again, ON-phase duty keeps the live flow; mutants caught: literal bDhwActive (dead code, the old behaviour), flag never cleared, never update, freeze the live duty too. Other SAT host tests green (2993 live flow 17, on_freeze 25, hp_pwm 35, anchors 64, overshoot_sustain 93, start_limit 27, slave_lowload 20, tolerance_band 30); evaluate --quick 88/0. Commit e7a9f4cc2 local.
 
 Known limits: (1) a draw that no control tick and no flame edge sees (starts and ends between two ticks, flame stays on) leaves no trace in the PWM block, so the first tick after it still stores the draw-heated flow (pinned by test_known_limit_a_draw_that_no_control_tick_sees_is_not_covered); coordinator decision: no live DHW-bit polling, documented only. (2) Open sub-question to Sergeant D: last tick BEFORE the draw (implemented, our reading, test_last_tick_before_the_draw_differs_from_the_last_clean_tick: 50 C) versus last clean tick (52 C); if he answers A2 the change is one flag. Push held until his answer is recorded.
+
+2026-11-27 (otgw-webui): AC unit evidence = flashed + 5 h soak; simulation not discriminating (_comms/task3099_bench_result.md: the sim DHW draw also cools the sim room 19.94 -> 19.09 C in 300 s, PID jumps 30 -> 56.5, duty 1.00 after every tap, so no OFF phase). Fix is host-tested on the real PWM block, NOT verified old-vs-new on a unit; the AC for a real tap stays open. Robert chose A on question 17 (DM 1575733951773941821): ships in the 08:00 beta with this wording. Rebased on origin/dev 25875e928 as 2a6aea677; src diff against 9348c1a6f is 0 lines.
 <!-- SECTION:NOTES:END -->
