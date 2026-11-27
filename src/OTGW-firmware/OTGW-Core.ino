@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v2.0.0-beta.460
+**  Version  : v2.0.0-beta.461
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -3997,6 +3997,8 @@ CmdQueueResult addCommandToQueue(const char* buf, const int len, const bool forc
     v[n] = '\0';
     satNoteExternalCS(v);
   }
+  // TASK-3033: note a TT=/TC= override (also SAT's own) unless the SAT rule below (and the OT-Direct handler) refuses it.
+  if (satOwn || !satOwnsControlSetpoint() || !satBlocksExternalCommand(buf, len)) otOverrideNoteCommand(buf, len);
   if (!isPICEnabled()) {
 #if HAS_DIRECT_OT
     // On OTGW32, route commands directly to OT-direct handler
@@ -5871,6 +5873,60 @@ void clearOtSupportListsDirty(uint8_t bits) { otSupportListsDirty &= (uint8_t)~b
 void markOtSupportListsDirty(uint8_t bits)  { otSupportListsDirty |= bits; }   // a refused publish: the minute tick retries
 void clearBoilerUnsupportedDirty() { boilerUnsupportedDirty = false; }
 
+// --- otOverride begin
+// TASK-3033 (gruijter, Robert released it 2026-11-22): remember whether the thermostat follows a TT=/TC= override.
+// Observed behaviour only, no capability read. Same verdict rule as satPushRefusedDecide (TASK-1343): the thermostat's
+// own MsgID 16 T frame is within 0.25 C of the value sent = it follows; still different 300 s after the command = it
+// refuses (the PIC drops the override after about 3 minutes, gruijter's Honeywell Round keeps its own setpoint).
+// Every TT=/TC= counts, also SAT's own push, and with SAT off. TT=0 / TC=0 cancels the override and judges nothing.
+// An override equal to the thermostat's own setpoint proves nothing and is not judged. A gateway reset clears the
+// override too and then reads like a refusal (Sergeant D entry 16): the verdict is "observed", not "capability".
+enum : uint8_t { OT_OVERRIDE_UNKNOWN = 0, OT_OVERRIDE_FOLLOWED = 1, OT_OVERRIDE_REFUSED = 2 };
+static uint8_t  otOverrideVerdict = OT_OVERRIDE_UNKNOWN;
+static bool     otOverridePending = false;
+static float    otOverrideSentC   = 0.0f;
+static uint32_t otOverrideSentMs  = 0;
+static float    otOverrideLastTr  = 0.0f;
+static bool     otOverrideLastTrValid = false;
+
+static uint8_t otOverrideJudge(float sentC, uint32_t sinceMs, float tr, uint8_t prev) {
+  if (fabsf(tr - sentC) <= 0.25f) return OT_OVERRIDE_FOLLOWED;
+  if (sinceMs >= 300000UL) return OT_OVERRIDE_REFUSED;
+  return prev;   // inside the 5 minutes and different: not decided yet
+}
+
+// Called with every command text that enters addCommandToQueue (not a SAT-blocked external one).
+void otOverrideNoteCommand(const char* buf, int len) {
+  if (buf == nullptr || len < 4 || buf[0] != 'T' || (buf[1] != 'T' && buf[1] != 'C') || buf[2] != '=') return;
+  char v[12];
+  const int n = (len - 3) < (int)sizeof(v) - 1 ? (len - 3) : (int)sizeof(v) - 1;
+  memcpy(v, buf + 3, (size_t)n);
+  v[n] = '\0';
+  char* endp = nullptr;
+  const float f = strtof(v, &endp);
+  if (endp == v || (*endp != '\0' && *endp != '\r' && *endp != '\n') || !isfinite(f)) return;
+  if (f <= 0.0f) { otOverridePending = false; return; }   // cancel: the verdict stays as it was
+  if (otOverrideLastTrValid && fabsf(otOverrideLastTr - f) <= 0.25f) { otOverridePending = false; return; }   // proves nothing
+  otOverridePending = true;
+  otOverrideSentC   = f;
+  otOverrideSentMs  = millis();
+}
+
+// Called from processOT() for every MsgID 16 T frame (the thermostat's own value). Flag and dirty bit only: the OT lock is held.
+bool otOverrideOnThermostatSetpoint(float tr) {
+  otOverrideLastTr = tr;
+  otOverrideLastTrValid = true;
+  if (!otOverridePending) return false;
+  const uint8_t v = otOverrideJudge(otOverrideSentC, millis() - otOverrideSentMs, tr, otOverrideVerdict);
+  if (v == OT_OVERRIDE_FOLLOWED) otOverridePending = false;   // decided; a refusal stays pending until a later frame follows
+  if (v == otOverrideVerdict) return false;
+  otOverrideVerdict = v;
+  otSupportListsDirty |= OT_SUPPORT_LIST_OVERRIDE;
+  return true;
+}
+uint8_t getOtOverrideVerdict() { return otOverrideVerdict; }
+// --- otOverride end
+
 // TASK-1871: per-ID last boiler answer of this boot, for GET /api/v2/otgw/messages/<id>.
 // The bitmaps above are persisted across boots and have no time; these are RAM only and
 // say what the boiler answered last and when. Written by the loop task (processOT), read
@@ -6329,7 +6385,9 @@ void processOT(const char *buf, int len, bool suppressOutput, bool localAnswer, 
       // TASK-1901: not a replayed line (/otgw_simulation.log): with follow-thermostat on it would persist SATtargettemp.
       if (OTdata.id == OT_TrSet && OTdata.rsptype == OTGW_THERMOSTAT && OTdata.type == OT_WRITE_DATA
           && !OTdata.skipthis && !OTdata.bReplayed) {
-        satOnThermostatSetpoint(roundf(OTdata.f88() * 100.0f) / 100.0f);
+        const float trSet = roundf(OTdata.f88() * 100.0f) / 100.0f;
+        otOverrideOnThermostatSetpoint(trSet);   // TASK-3033
+        satOnThermostatSetpoint(trSet);
       }
 
       if (OTdata.rsptype == OTGW_BOILER && !OTdata.skipthis && !OTdata.bLocalAnswer && !OTdata.bReplayed) pmChainOnBoilerResponse(OTdata.id);   // TASK-1315

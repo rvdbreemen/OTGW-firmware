@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v2.0.0-beta.460
+**  Version  : v2.0.0-beta.461
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -318,7 +318,11 @@ bool isThermostatMsgIdSentWrite(uint8_t id);
 bool getBoilerUnsupportedDirty();
 void clearBoilerUnsupportedDirty();
 // TASK-3000: which of the two support lists changed since its last MQTT publish.
-enum : uint8_t { OT_SUPPORT_LIST_BOILER = 1, OT_SUPPORT_LIST_THERMOSTAT = 2 };
+enum : uint8_t { OT_SUPPORT_LIST_BOILER = 1, OT_SUPPORT_LIST_THERMOSTAT = 2, OT_SUPPORT_LIST_OVERRIDE = 4 };   // 4: TASK-3033 thermostat/override_refused
+// TASK-3033: does the thermostat follow a TT=/TC= override? 0 unknown, 1 followed, 2 refused (see OTGW-Core.ino, otOverride block).
+void otOverrideNoteCommand(const char* buf, int len);
+bool otOverrideOnThermostatSetpoint(float tr);
+uint8_t getOtOverrideVerdict();
 uint8_t getOtSupportListsDirty();
 void clearOtSupportListsDirty(uint8_t bits);
 void markOtSupportListsDirty(uint8_t bits);
