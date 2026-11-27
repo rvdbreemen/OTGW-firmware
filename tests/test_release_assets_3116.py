@@ -265,5 +265,91 @@ class Wiring(unittest.TestCase):
         self.assertNotIn("**local", main)
 
 
+class BuildScripts(unittest.TestCase):
+    """Follow-up (beta.458 publish): check_githash() with --build-commit must only fail on files the BUILD uses. A change to a
+    host-only tool under scripts/ (SAT replay, load tests) between the build commit and the release commit is not a
+    different binary. Real git repo in a temp dir, the real check_githash()."""
+
+    FILES = {
+        "build.py": "import webui_pages\nprint('scripts/check_app_size.py')\n",
+        "platformio.ini": "[env]\nextra_scripts =\n  pre:scripts/patch_pio_libs.py\n",
+        "scripts/webui_pages.py": "import helperlib\n",
+        "scripts/helperlib.py": "X = 1\n",
+        "scripts/patch_pio_libs.py": "Y = 1\n",
+        "scripts/check_app_size.py": "Z = 1\n",
+        "scripts/otgw_capture.py": "import sat_log_to_csv\n",
+        "scripts/sat_log_to_csv.py": "W = 1\n",
+        "scripts/sat_selftune_replay.py": "# host only\nimport sat_selftune_fixture\n",
+        "scripts/sat_selftune_fixture.py": "# host only\n",
+        "scripts/loadtest_sweep.py": "# host only\n",
+        "src/a.ino": "int a;\n",
+        "docs/x.md": "x\n",
+    }
+
+    def setUp(self):
+        self.td = tempfile.TemporaryDirectory()
+        self.repo = Path(self.td.name)
+
+        def git(*a):
+            return subprocess.run(["git", "-C", str(self.repo), *a], capture_output=True, text=True, check=True).stdout.strip()
+        self.git = git
+        git("init", "-q")
+        git("config", "user.email", "t@example.invalid")
+        git("config", "user.name", "t")
+        for n, c in self.FILES.items():
+            f = self.repo / n
+            f.parent.mkdir(parents=True, exist_ok=True)
+            f.write_text(c, newline="\n")
+        git("add", "-A")
+        git("commit", "-q", "-m", "build")
+        self.build = git("rev-parse", "HEAD")
+        self.tools = bp.Tools(self.repo, ["gh"], "x/y")
+
+    def tearDown(self):
+        self.td.cleanup()
+
+    def release_with(self, changes):
+        for n, c in changes.items():
+            (self.repo / n).write_text(c, newline="\n")
+        self.git("add", "-A")
+        self.git("commit", "-q", "-m", "release")
+        return self.git("rev-parse", "HEAD")
+
+    def check(self, rel):
+        return bp.check_githash(self.tools, rel, self.build[:9], self.build)
+
+    def test_build_scripts_derivation(self):
+        self.assertEqual(bp.build_scripts(self.tools, self.build), [
+            "scripts/check_app_size.py", "scripts/helperlib.py", "scripts/otgw_capture.py", "scripts/patch_pio_libs.py",
+            "scripts/sat_log_to_csv.py", "scripts/webui_pages.py"])
+
+    def test_host_tools_may_change(self):
+        rel = self.release_with({"scripts/sat_selftune_replay.py": "# changed\n", "scripts/loadtest_sweep.py": "# changed\n",
+                                 "docs/x.md": "y\n"})
+        self.assertIn("nothing changed", self.check(rel))
+
+    def test_a_file_the_build_uses_may_not_change(self):
+        for name in ("scripts/patch_pio_libs.py", "scripts/helperlib.py", "scripts/sat_log_to_csv.py",
+                     "scripts/check_app_size.py", "src/a.ino", "build.py", "platformio.ini"):
+            with self.subTest(name):
+                self.setUp()
+                rel = self.release_with({name: "# changed\n"})
+                with self.assertRaises(bp.Refuse):
+                    self.check(rel)
+
+    def test_the_old_check_refused_a_host_tool(self):
+        """RED on the code before: the whole scripts/ directory was checked (the file at origin/dev)."""
+        old = subprocess.run(["git", "show", "origin/dev:scripts/beta_publish.py"], cwd=REPO, capture_output=True, text=True,
+                             encoding="utf-8")
+        if old.returncode != 0 or "def build_scripts" in old.stdout:
+            self.skipTest("origin/dev already holds the new check")
+        m = type(sys)("bp_old")
+        exec(compile(old.stdout, "beta_publish_old.py", "exec"), m.__dict__)
+        rel = self.release_with({"scripts/sat_selftune_replay.py": "# changed\n"})
+        tools = m.Tools(self.repo, ["gh"], "x/y")
+        with self.assertRaises(m.Refuse):
+            m.check_githash(tools, rel, self.build[:9], self.build)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

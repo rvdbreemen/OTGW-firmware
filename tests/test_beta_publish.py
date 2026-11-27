@@ -396,10 +396,13 @@ class BuildCommit(Base):
         w = World(self)
         self.refused(w, "is not a commit", "--dry-run", "--build-commit", "deadbeef")
 
-    def test_scripts_change_after_the_build_is_refused_only_with_build_commit(self):
+    def test_a_host_only_script_change_after_the_build_is_accepted(self):
+        """beta.458: a scripts/ file the build does not use (SAT host tools, load tests) is not a different binary.
+        The scripts the build uses are checked in tests/test_release_assets_3116.py (BuildScripts)."""
         w = World(self)
         rel2 = self.add_commit(w, "scripts/tool.py", "x\n", "tool change")
-        self.refused(w, "scripts/tool.py changed", "--dry-run", "--build-commit", w.cand, commit=rel2)
+        rc, out, err = w.run("--dry-run", "--build-commit", w.cand, commit=rel2)
+        self.assertEqual(rc, 0, out + err)
         rc, out, err = w.run("--dry-run", commit=rel2)         # without the flag the normal path is as before
         self.assertEqual(rc, 0, out + err)
 

@@ -168,7 +168,32 @@ def find_semver_full(build_dir, semver):
     return hits[0]
 
 
-BUILD_COMMIT_PATHS = ("src/", "libraries/", "scripts/", "build.py", "platformio.ini")
+BUILD_COMMIT_PATHS = ("src/", "libraries/", "build.py", "platformio.ini")   # plus build_scripts(): the scripts the build uses
+SCRIPT_ROOTS = ("build.py", "platformio.ini", "scripts/otgw_capture.py")   # the build, its PlatformIO hooks, the capture tool in the zip
+
+
+def build_scripts(tools, rev):
+    """scripts/<name>.py files the build uses at `rev`: named by build.py or platformio.ini (scripts/<name>.py), imported
+    by them or by each other (import <name> / from <name> import ...), and the capture tool that ships in the flash zip.
+    A host-only tool under scripts/ (SAT replay, load tests, this publisher) is not in the set: changing it between the
+    build commit and the release commit does not change the binary."""
+    listing = tools.git("ls-tree", "-r", "--name-only", rev, "--", "scripts/", check=False).stdout.split()
+    avail = {n[len("scripts/"):-3] for n in listing if n.endswith(".py") and n.count("/") == 1}
+    found = {r[len("scripts/"):-3] for r in SCRIPT_ROOTS if r.startswith("scripts/") and r[len("scripts/"):-3] in avail}
+    todo, seen = list(SCRIPT_ROOTS), set()
+    while todo:
+        f = todo.pop()
+        if f in seen:
+            continue
+        seen.add(f)
+        text = tools.git("show", f"{rev}:{f}", check=False).stdout
+        names = set(re.findall(r"scripts[/\\]([A-Za-z0-9_]+)\.py", text))
+        names |= {m for m in re.findall(r"^\s*(?:from|import)\s+([A-Za-z0-9_]+)", text, re.M) if m in avail}
+        for n in sorted(names & avail):
+            if n not in found:
+                found.add(n)
+                todo.append(f"scripts/{n}.py")
+    return [f"scripts/{n}.py" for n in sorted(found)]
 
 
 def check_githash(tools, commit_full, githash, build_commit=None):
@@ -176,8 +201,9 @@ def check_githash(tools, commit_full, githash, build_commit=None):
     (the normal slot release: a docs-only release commit on top of the soaked candidate).
 
     With an explicit build_commit (--build-commit) the zip githash must belong to that commit and the release
-    commit must be it or a descendant with an empty diff under src/, libraries/, scripts/, build.py and
-    platformio.ini (a docs-only release commit on top of a fix build)."""
+    commit must be it or a descendant with an empty diff under src/, libraries/, build.py, platformio.ini and the
+    scripts the build uses (build_scripts(); host-only tools under scripts/ may change) - a docs-only release commit
+    on top of a fix build."""
     if build_commit:
         built = tools.git("rev-parse", "--verify", "-q", f"{build_commit}^{{commit}}", check=False)
         if built.returncode != 0:
@@ -191,13 +217,16 @@ def check_githash(tools, commit_full, githash, build_commit=None):
         anc = tools.git("merge-base", "--is-ancestor", built_full, commit_full, check=False)
         if anc.returncode != 0:
             raise Refuse(f"--build-commit {built_full[:9]} is not an ancestor of the release commit {commit_full[:9]}")
-        changed = tools.git("diff", "--name-only", built_full, commit_full, "--", *BUILD_COMMIT_PATHS).stdout.split()
+        checked = [*BUILD_COMMIT_PATHS, *build_scripts(tools, built_full), *build_scripts(tools, commit_full)]
+        checked = list(dict.fromkeys(checked))
+        changed = tools.git("diff", "--name-only", built_full, commit_full, "--", *checked).stdout.split()
         if changed:
             raise Refuse(f"{changed[0]} changed between the build commit {built_full[:9]} and the release commit "
-                         f"{commit_full[:9]} (checked: {' '.join(BUILD_COMMIT_PATHS)}): the binary is not what the "
+                         f"{commit_full[:9]} (checked: src/, libraries/, build.py, platformio.ini and the "
+                         f"{len(checked) - len(BUILD_COMMIT_PATHS)} scripts the build uses): the binary is not what the "
                          "tag contains")
         return (f"build commit {built_full[:9]} is an ancestor of the release commit, nothing changed under "
-                f"{', '.join(BUILD_COMMIT_PATHS)} since")
+                f"src/, libraries/, build.py, platformio.ini or the scripts the build uses since")
     if commit_full.startswith(githash):
         return "zip githash is the release commit"
     full = tools.git("rev-parse", "--verify", "-q", f"{githash}^{{commit}}", check=False)
