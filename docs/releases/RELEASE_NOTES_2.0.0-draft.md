@@ -16,7 +16,14 @@
 
 2.0.0 runs on the ESP32-S3 only and uses an asynchronous web server and FreeRTOS. The ESP8266 is no longer supported: going back to 1.x means putting the Wemos D1 mini back in.
 
-**Supported hardware:** the OTGW Classic with a LOLIN S3 Mini or S3 Mini Pro. Use the combo image (`esp32-combo`). The PIC stays in place. The same image also runs OT-Direct, the gateway mode that speaks OpenTherm without a PIC.
+**Supported hardware:** exactly two configurations. Use the combo image (`esp32-combo`) for both.
+
+1. **The OTGW Classic with an ESP32-S3 module** (a LOLIN S3 Mini or S3 Mini Pro in the module socket). The PIC stays in place and talks OpenTherm.
+2. **The OpenTherm Gateway OTGW32.** A board with an ESP32-S3 that speaks OpenTherm itself (OT-Direct), without a PIC. Only version 1.0, the first production run, exists at this time.
+
+> **The OTGW32 is a new device and still has to prove itself in the field.** Firmware 2.0 supports it, but so far it has only run on a bench unit, without a thermostat and without a real boiler on the bus (a simulated boiler, and master mode without a thermostat). Not yet field-proven: the variety of boilers and thermostats, long runs, the Ethernet and OLED options on real hardware, and OTmonitor over port 25238. If you run an OTGW32, please report what you see (see "How to report" below).
+
+The differences between the two are in chapters 11 and 12 of the manual.
 
 The web UI is the v2 web UI, the only web UI in 2.0.0. Read "Before you flash", "BREAKING changes" and "Known issues" first.
 

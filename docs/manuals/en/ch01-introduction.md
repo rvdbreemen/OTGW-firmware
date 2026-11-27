@@ -21,7 +21,7 @@ The NodoShop OpenTherm Gateway (OTGW) is a small hardware device that sits physi
 
 On its own, the PIC does its job quietly. OTGW-firmware is the software that makes the entire system useful: it decodes, displays, stores, publishes, and acts on every message the thermostat and boiler exchange.
 
-The firmware also has an OT-Direct mode, used only on hardware without a PIC. On the OTGW Classic the firmware detects the PIC at boot and runs in PIC gateway mode.
+Firmware 2.0 supports two hardware configurations: the OTGW Classic with an ESP32-S3 module (with a PIC), and the OpenTherm Gateway OTGW32 (no PIC; the firmware speaks OpenTherm itself, called OT-Direct). On the OTGW Classic the firmware detects the PIC at boot and runs in PIC gateway mode. The OTGW32 is a new device that still has to prove itself in the field; see Chapter 11, and Chapter 12 for the differences between the two.
 
 ### Key Features
 
@@ -49,7 +49,7 @@ The firmware also has an OT-Direct mode, used only on hardware without a PIC. On
 
 #### Hardware-Dependent Features
 
-- OT-Direct mode with five operating modes: only on hardware without a PIC.
+- OT-Direct mode with its operating modes (gateway, monitor, master, loopback): only on hardware without a PIC, the OpenTherm Gateway OTGW32 (Chapter 11).
 - Ethernet with runtime failover to and from Wi-Fi: only with Ethernet hardware. The OTGW Classic has no Ethernet.
 
 ### What Is New in v2.0.0
@@ -63,7 +63,7 @@ Releases of 2.0.0 are on the GitHub Releases page: betas are published as GitHub
 #### Highlights
 
 - **ESP32-S3 platform**: The OTGW Classic runs with a LOLIN S3 Mini or S3 Mini Pro in the Wemos D1 mini socket. The PIC stays in place. One `esp32-combo` image detects the PIC at boot. Build with `build.bat` (Windows) or `./build.sh` (Linux/macOS).
-- **OT-Direct mode**: five operating modes (thermostat, boiler, gateway, monitor, and a combined master+slave pair), only on hardware without a PIC.
+- **OT-Direct mode**: operating modes gateway (default), monitor, master and loopback, only on hardware without a PIC, the OpenTherm Gateway OTGW32 (Chapter 11).
 - **Ethernet with runtime failover**: only with Ethernet hardware; the OTGW Classic has no Ethernet.
 - **BLE temperature sensors**: On the ESP32-S3, sensors are read passively over Bluetooth LE. Xiaomi MiBeacon (plaintext and encrypted v4/v5 via a per-sensor bindkey), ATC/pvvx custom firmware, and BTHome v2 are supported. Room temperature and humidity feed directly into SAT and Home Assistant.
 - **SAT (Smart Autotune Thermostat)**: A full embedded heating controller with weather-compensated PID control, multi-zone support, Summer Simmer Index, solar gain compensation, pressure monitoring, OPV calibration, and six configurable presets.

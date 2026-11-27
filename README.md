@@ -7,15 +7,16 @@
 **Which firmware do you need?**
 
 - Your gateway has a **Wemos D1 mini or NodeMCU (ESP8266)**: use the stable 1.x firmware. Take the [latest stable release](https://github.com/rvdbreemen/OTGW-firmware/releases/latest) (currently v1.7.10) and read the [1.x README](https://github.com/rvdbreemen/OTGW-firmware/tree/otgw-1.x.x).
+- Your gateway is the **OpenTherm Gateway OTGW32**: firmware 2.0 supports it, as one of the two supported hardware configurations. Read the note on this new device under [Hardware Support](#hardware-support) first.
 - Your gateway has a **LOLIN S3 Mini or S3 Mini Pro (ESP32-S3)**, or you want to try 2.0.0 (swap the module first, see [Migrating from ESP8266](#migrating-from-esp8266-1x)): read on. 2.0.0 is in beta.
 
 > **Disclaimer: v2.0.0-beta.452 is a beta of the 2.0.0 line.** It is not a stable release. It has had alpha and beta testing on a small group of units, but not yet the long field runs a stable release needs. Expect bugs, save your settings before you flash (a power cut during a filesystem update can still reset them), and read the [release notes of this beta](https://github.com/rvdbreemen/OTGW-firmware/releases/tag/v2.0.0-beta.452) first, including the known issues.
 >
 > If you need a gateway that just works, stay on the 1.x line for now: the [`otgw-1.x.x` branch](https://github.com/rvdbreemen/OTGW-firmware/tree/otgw-1.x.x) and the [published releases](https://github.com/rvdbreemen/OTGW-firmware/releases).
 
-OTGW-firmware turns the NodoShop OpenTherm Gateway into a networked smart heating controller. It runs on an ESP32-S3 (LOLIN S3 Mini or S3 Mini Pro) in the traditional NodoShop OTGW with the PIC co-processor, monitors the OpenTherm bus between your thermostat and boiler, and connects your heating system to your home automation platform via MQTT, a browser-based web interface and a REST API. That combination is the supported hardware.
+OTGW-firmware turns the NodoShop OpenTherm Gateway into a networked smart heating controller. It runs on an ESP32-S3 (LOLIN S3 Mini or S3 Mini Pro) in the traditional NodoShop OTGW with the PIC co-processor, monitors the OpenTherm bus between your thermostat and boiler, and connects your heating system to your home automation platform via MQTT, a browser-based web interface and a REST API. Firmware 2.0 supports two hardware configurations, described under [Hardware Support](#hardware-support).
 
-A prototype ESP32 board that drives OpenTherm directly, without a PIC, also exists. It is a prototype and nothing more at this time.
+The second supported configuration is the **OpenTherm Gateway OTGW32**, a board with an ESP32-S3 that speaks OpenTherm itself (OT-Direct), without a PIC. It is a new device that still has to prove itself in the field: see [Hardware Support](#hardware-support).
 
 ---
 
@@ -23,7 +24,7 @@ A prototype ESP32 board that drives OpenTherm directly, without a PIC, also exis
 
 ### 0. Check your hardware
 
-2.0.0 runs on an ESP32-S3: a LOLIN S3 Mini or S3 Mini Pro in the NodoShop OTGW. Does your gateway still have the ESP8266 module (Wemos D1 mini or NodeMCU)? Then swap the module first: see [Migrating from ESP8266 (1.x)](#migrating-from-esp8266-1x). Or stay on the 1.x firmware.
+2.0.0 runs on an ESP32-S3: a LOLIN S3 Mini or S3 Mini Pro in the NodoShop OTGW. The OpenTherm Gateway OTGW32 is supported as well (see [Hardware Support](#hardware-support)). Does your gateway still have the ESP8266 module (Wemos D1 mini or NodeMCU)? Then swap the module first: see [Migrating from ESP8266 (1.x)](#migrating-from-esp8266-1x). Or stay on the 1.x firmware.
 
 ### 1. Flash the firmware
 
@@ -105,18 +106,25 @@ Version 2.0.0 is a major platform release. It targets the ESP32-S3 in the tradit
 
 ### Platform overview
 
-The supported hardware is the NodoShop OTGW with the PIC co-processor and an ESP32-S3 (LOLIN S3 Mini) in the module socket:
+Firmware 2.0 supports exactly two hardware configurations:
 
-| Feature | ESP32-S3 OTGW with PIC |
-|---|---|
-| OpenTherm via PIC co-processor | Yes (required) |
-| Wi-Fi | Yes |
-| OLED display | Yes |
-| SAT thermostat | Yes |
-| Dallas sensors | Yes |
-| S0 pulse counter | Yes |
+1. **The OTGW Classic with an ESP32-S3 module.** The NodoShop OTGW with the PIC co-processor and a LOLIN S3 Mini or S3 Mini Pro in the module socket. The PIC talks OpenTherm; the ESP32-S3 is connected to it by a serial link.
+2. **The OpenTherm Gateway OTGW32.** A board with an ESP32-S3 that speaks OpenTherm itself, with its own interface to the boiler and to the thermostat (OT-Direct). There is no PIC on this board. Only version 1.0, the first production run, exists at this time.
 
-A prototype ESP32 board with onboard OpenTherm also exists. It is a prototype and nothing more at this time.
+Both run the same firmware image (`esp32-combo`). At start-up the firmware detects which of the two it is on.
+
+| | OTGW Classic with an ESP32-S3 module | OpenTherm Gateway OTGW32 |
+|---|---|---|
+| OpenTherm interface | PIC co-processor, serial link | The ESP32-S3 itself (OT-Direct), no PIC |
+| PIC firmware and PIC updates | Yes | No PIC, so none |
+| Flash and memory | 4 MB flash; the LOLIN S3 Mini has extra memory (PSRAM) | 4 MB flash, no PSRAM |
+| Web UI, SAT, MQTT, Home Assistant, REST | Yes | Yes |
+| Port 25238 for OTmonitor | Yes, off by default | Emulated, off by default |
+| Field experience | Alpha and beta runs on several units | New device, version 1.0 (first production run) |
+
+**Disclaimer: the OTGW32 is a new device and still has to prove itself in the field.** Firmware 2.0 supports it, but so far it has only run on a bench, without a thermostat and without a real boiler on the bus (simulated boiler and master mode). What is not yet field-proven: the variety of boilers and thermostats, long runs, the Ethernet and OLED options on real hardware, and OTmonitor over port 25238. If you run an OTGW32, please report what you see: see "How to report" in the release notes.
+
+More: [OTGW32 hardware configuration](docs/manuals/en/ch11-otgw32-hardware.md) and [Differences between an OTGW Classic with PIC and an OTGW32](docs/manuals/en/ch12-classic-vs-otgw32.md) (Dutch: [OTGW32 hardwareconfiguratie](docs/manuals/nl/h11-otgw32-hardware.md) en [Verschillen](docs/manuals/nl/h12-classic-versus-otgw32.md)).
 
 ### Migrating from ESP8266 (1.x)
 

@@ -19,6 +19,10 @@ Characteristics:
 
 The 1.x line (maintenance branch `otgw-1.x.x`) runs on the Wemos D1 mini (ESP8266). Going back to 1.x means putting the Wemos D1 mini back in its socket and flashing a 1.x release; a 1.x zip does not run on an S3.
 
+#### The OpenTherm Gateway OTGW32
+
+The second supported configuration is the OpenTherm Gateway OTGW32: an ESP32-S3 board without a PIC that speaks OpenTherm itself (OT-Direct). It is a new device (version 1.0, first production run) that still has to prove itself in the field. Chapter 11 describes it and Chapter 12 compares it with the OTGW Classic.
+
 #### Other Boards
 
 Other ESP32-S3 boards may compile and run the firmware but are not tested or supported. GPIO pin assignments for Dallas sensors, OLED, and the S0 counter may need adjustment in the settings.

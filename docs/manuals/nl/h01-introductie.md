@@ -41,7 +41,7 @@ Een OpenTherm-bus werkt op 24 V gelijkspanning. De communicatie verloopt via Man
 
 Het NodoShop OTGW-printje bevat een PIC16F88 of PIC16F1847 microcontroller die de OpenTherm bus elektrisch afhandelt. De PIC zit fysiek in serie op de bus tussen de thermostaat en de ketel. Berichten worden onderschept, doorgegeven en op verzoek aangepast. De PIC communiceert met de ESP via UART op 9600 baud als ASCII-regels.
 
-De firmware kent ook een OT-Direct-modus, alleen voor hardware zonder PIC. Op de OTGW Classic herkent de firmware de PIC bij het opstarten en draait hij in PIC gateway mode.
+Firmware 2.0 ondersteunt twee hardwareconfiguraties: de OTGW Classic met een ESP32-S3-module (met een PIC) en de OpenTherm Gateway OTGW32 (geen PIC; de firmware spreekt zelf OpenTherm, OT-Direct genoemd). Op de OTGW Classic herkent de firmware de PIC bij het opstarten en draait hij in PIC gateway mode. De OTGW32 is een nieuw apparaat dat zich nog in het veld moet bewijzen; zie Hoofdstuk 11, en Hoofdstuk 12 voor de verschillen tussen de twee.
 
 #### De ESP-module
 
@@ -71,7 +71,7 @@ Releases van 2.0.0 staan op de GitHub Releases-pagina: beta's verschijnen als Gi
 
 **ESP32-S3-ondersteuning**
 - Draait op de OTGW Classic met een LOLIN S3 Mini of S3 Mini Pro in de Wemos D1 mini-voet. De PIC blijft zitten; één `esp32-combo`-image herkent de PIC bij het opstarten.
-- OT-Direct-modus met vijf werkingsmodi (thermostaat, ketel, gateway, monitor en gecombineerd master+slave), alleen op hardware zonder PIC
+- OT-Direct-modus met de werkingsmodi gateway (standaard), monitor, master en loopback, alleen op hardware zonder PIC, de OpenTherm Gateway OTGW32 (Hoofdstuk 11)
 - Ethernet met runtime-failover van en naar Wi-Fi: alleen met Ethernet-hardware; de OTGW Classic heeft geen Ethernet
 - BLE temperatuursensoren: passieve Bluetooth LE-scan van Xiaomi MiBeacon (plaintext en encrypted v4/v5 via een per-sensor bindkey), ATC/pvvx custom firmware, en BTHome v2
 - Aangepaste 4 MB-partitietabel: een safeboot-updater, één app-slot van 2240 KB en 768 KB LittleFS

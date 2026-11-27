@@ -19,6 +19,10 @@ Kenmerken:
 
 De 1.x-lijn (onderhoudsbranch `otgw-1.x.x`) draait op de Wemos D1 mini (ESP8266). Terug naar 1.x betekent de Wemos D1 mini terug in de voet zetten en een 1.x-release flashen; een 1.x-zip draait niet op een S3.
 
+#### De OpenTherm Gateway OTGW32
+
+De tweede ondersteunde configuratie is de OpenTherm Gateway OTGW32: een ESP32-S3-print zonder PIC die zelf OpenTherm spreekt (OT-Direct). Het is een nieuw apparaat (versie 1.0, eerste productierun) dat zich nog in het veld moet bewijzen. Hoofdstuk 11 beschrijft hem en Hoofdstuk 12 vergelijkt hem met de OTGW Classic.
+
 #### Andere boards
 
 OTGW-firmware kan in principe ook gebouwd worden voor andere ESP32-S3-boards, maar is uitsluitend getest en ondersteund op de NodoShop OTGW-hardware. De PIC co-processor op het NodoShop-printje is specifiek afgesteld op de OTGW-bedrading. Gebruik van andere hardware valt buiten de scope van dit handboek.
