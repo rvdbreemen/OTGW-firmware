@@ -7,7 +7,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [2.0.0-beta.474] - 2026-11-27
 
-Build in this beta: beta.474 only (previous public beta: beta.458; beta.459 to beta.473 were internal builds and were never published). [BENCH-TBD: soak sentence with minutes and units]
+Build in this beta: beta.474 only (previous public beta: beta.458; beta.459 to beta.473 were internal builds and were never published). The exact build (2.0.0-beta.474+7d20639) ran 62 minutes on a Classic with an S3 module and extra memory and 60 minutes on an OT-Direct board without extra memory, without a restart or a crash; a first run on the board without extra memory, overlapped by two web page sessions of our tester, reached a critical memory state once and recovered by itself.
 
 ### Changed
 - SAT: a thermostat setpoint change that equals one of the SAT presets selects that preset; this changes the thermostat path only, `sat/target` over MQTT works as before (TASK-3032). Host tests, and the MQTT steps ran on a test unit; not run with a real thermostat.
