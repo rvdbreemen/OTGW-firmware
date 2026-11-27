@@ -878,6 +878,16 @@ class StreamWriter:
         pass
 
 
+def silent_reconnect_seconds(args):
+    """TASK-3009: a telnet or /ws stream silent for this long while the health probe answers is reconnected.
+    Same N as the StreamWatch report (--stream-silent-minutes); 0 = off."""
+    return args.stream_silent_minutes * 60
+
+
+def describe_silence(seconds):
+    return f"{int(seconds // 60)} min" if seconds >= 60 and seconds % 60 == 0 else f"{int(seconds)} s"
+
+
 class StreamWatch:
     """TASK-3006: report a stream that has written nothing for `silent_seconds`.
 
@@ -1124,6 +1134,7 @@ def apply_keepalive(sock):
 
 class TelnetCapture(threading.Thread):
     include_trace = False   # --sat-trace: also switch on the HIGH_VOLUME_LABELS toggles
+    silent_reconnect = 0    # TASK-3009: seconds of no telnet bytes, with a healthy device, before a reconnect (0 = off)
     def __init__(self, cap, host, port, http_base, base_timeout, reconnect_delay,
                  post_disconnect_delay, idle_check):
         super().__init__(name="telnet", daemon=True)
@@ -1452,6 +1463,8 @@ class TelnetCapture(threading.Thread):
         last_probe_mono = time.monotonic()
         last_uptime_min = None
         last_ok_probe_wall = self.last_byte_wall
+        silent_probe_mono = time.monotonic()
+        silent_done_at = None   # last_byte_mono of the silence already answered with a reconnect
 
         def drop(why, line, start=None):
             state["reason"] = why
@@ -1551,6 +1564,21 @@ class TelnetCapture(threading.Thread):
                     last_ok_probe_wall = datetime.now(timezone.utc).astimezone()
                     if up is not None:
                         last_uptime_min = up
+
+            # TASK-3009: open socket, healthy device, but no byte for N: the stream is dead on the way (will_85903:
+            # five hours of silence). Reconnect once per silence; the gap starts at the last byte.
+            if (self.silent_reconnect > 0 and self.sock is not None and self.last_byte_mono != silent_done_at
+                    and time.monotonic() - self.last_byte_mono >= self.silent_reconnect
+                    and time.monotonic() - silent_probe_mono >= self.silent_reconnect):
+                ok, _up = self.health_probe()
+                silent_probe_mono = time.monotonic()
+                if ok:
+                    silent_done_at = self.last_byte_mono
+                    quiet = describe_silence(self.silent_reconnect)
+                    drop(f"stream silent {quiet}, health probe OK",
+                         f"Telnet silent for {quiet} while the health probe answers; reconnecting.",
+                         self.last_byte_wall)
+                    continue
 
             self.cap.wait(0.1)
 
@@ -2548,12 +2576,16 @@ class FrameCapture(threading.Thread):
     """Reads the device's /ws (the web UI's OT log stream) and records every frame.
     One extra WebSocket client; the device allows 3. Reconnects with a growing delay."""
 
+    silent_reconnect = 0    # TASK-3009: seconds without a frame, with a healthy device, before a reconnect (0 = off)
+
     def __init__(self, cap, host, port=80):
         super().__init__(name="otframes", daemon=True)
         self.cap = cap
         self.host = host
         self.port = port
+        self.health_url = f"http://{host}:{port}/api/v2/health"
         self.writer = None
+        self._silence_answered = False   # a reconnect for the current silence is done; a received frame clears it
 
     def run(self):
         result = "Frame recorder: completed normally."
@@ -2586,11 +2618,17 @@ class FrameCapture(threading.Thread):
                     self.writer.comment("connected to /ws")
                     last_error = None
                     delay = WS_RECONNECT_MIN
-                    self._read(ws)
-                    self.writer.comment("disconnected from /ws")
+                    silent_since = self._read(ws)
+                    self.writer.comment("disconnected from /ws" + (" (silent)" if silent_since else ""))
                     if not self.cap.stopping():
-                        gap_start = datetime.now().astimezone()
-                        gap_reason = "/ws closed by the device"
+                        if silent_since:
+                            gap_start = silent_since
+                            gap_reason = f"/ws silent {describe_silence(self.silent_reconnect)}, health probe OK"
+                            self.cap.summary(f"Frame recorder: no frame for {describe_silence(self.silent_reconnect)} while "
+                                             f"the health probe answers; reconnecting /ws ({now_iso()}).")
+                        else:
+                            gap_start = datetime.now().astimezone()
+                            gap_reason = "/ws closed by the device"
                 except Exception as exc:
                     text = f"{type(exc).__name__}: {exc}"
                     if gap_start is None:
@@ -2624,14 +2662,31 @@ class FrameCapture(threading.Thread):
         self.cap.gap(FRAMES_LOG, start, end, reason)
 
     def _read(self, ws):
+        """Record frames until the stream ends (returns None) or goes silent while the device is healthy
+        (returns the time of the last frame, TASK-3009)."""
+        last_data_mono = time.monotonic()
+        last_data_wall = datetime.now().astimezone()
+        last_probe_mono = last_data_mono
         while not self.cap.stopping():
             try:
                 text = ws.recv_text()
             except socket.timeout:
+                now = time.monotonic()
+                if (self.silent_reconnect > 0 and not self._silence_answered
+                        and now - last_data_mono >= self.silent_reconnect
+                        and now - last_probe_mono >= self.silent_reconnect):
+                    status, _body, _err, _ctype = http_get(self.health_url, 5, 4096)
+                    last_probe_mono = time.monotonic()
+                    if status is not None:   # any HTTP answer: the device is alive, the stream is not
+                        self._silence_answered = True
+                        return last_data_wall
                 continue
             if text is None:
-                return
+                return None
             received = datetime.now().astimezone()
+            last_data_mono = time.monotonic()
+            last_data_wall = received
+            self._silence_answered = False
             for line in text.splitlines():
                 parsed = parse_ot_log_line(line)
                 if parsed:
@@ -4017,7 +4072,8 @@ def build_parser():
     p.add_argument("--telnet-idle-check-seconds", type=ranged(1, 3600, allow_zero=True), default=60,
                    help="health-probe a silent telnet link after N s (0 = off)")
     p.add_argument("--stream-silent-minutes", type=ranged(1, 1440, allow_zero=True), default=10,
-                   help="report telnet.log, otframes.log or mqtt.log when it wrote nothing for N min (0 = off)")
+                   help="report telnet.log, otframes.log or mqtt.log when it wrote nothing for N min; a silent telnet or /ws "
+                        "stream is also reconnected once while the device answers its health probe (0 = off)")
     p.add_argument("--skip-browser-capture", action="store_true")
     p.add_argument("--browser-url")
     p.add_argument("--browser-debug-port", type=ranged(1, 65535), default=9222)
@@ -4434,6 +4490,7 @@ def main(argv=None):
         s("Frame recorder: disabled (--skip-frame-capture).")
     else:
         frames = FrameCapture(cap, args.device, args.http_port)
+        frames.silent_reconnect = silent_reconnect_seconds(args)
         frames.start()
         workers.append((frames, 10))
         s(f"Frame recorder started: ws://{args.device}:{args.http_port}/ws -> {FRAMES_LOG}, {SIM_LOG} (kept next to the transcript).")
@@ -4487,6 +4544,7 @@ def main(argv=None):
                            args.telnet_reconnect_delay_ms / 1000.0, args.telnet_post_disconnect_delay_ms / 1000.0,
                            args.telnet_idle_check_seconds)
     telnet.include_trace = args.sat_trace
+    telnet.silent_reconnect = silent_reconnect_seconds(args)
     telnet.start()
     s(f"Capture started: {now_iso()}", echo=False)
     print(f"Capturing into {run_path}")
