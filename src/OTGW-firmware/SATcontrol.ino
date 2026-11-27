@@ -5651,6 +5651,7 @@ void satPublishMQTT()
   static SATShadowF s_boiler_capacity, s_dhw_capacity, s_boiler_rated_kw, s_boiler_efficiency;
   static SATShadowF s_summer_threshold, s_target_temp_step;
   static SATShadowF s_min_pressure, s_max_pressure, s_max_pressure_drop;
+  static SATShadowF s_weather_lat, s_weather_lon;   // TASK-3016
   static SATShadowF s_preset_comfort, s_preset_eco, s_preset_away;
   static SATShadowF s_preset_sleep, s_preset_activity, s_preset_home;
   static SATShadowI s_cycles_this_hour, s_4h_cycles, s_current_modulation;
@@ -6144,6 +6145,9 @@ void satPublishMQTT()
   publishIfChangedF(F("sat/min_pressure"),        settings.sat.fMinPressure,       s_min_pressure,        SAT_EPS_PRESSURE,    1, true);
   publishIfChangedF(F("sat/max_pressure"),        settings.sat.fMaxPressure,       s_max_pressure,        SAT_EPS_PRESSURE,    1, true);
   publishIfChangedF(F("sat/max_pressure_drop"),   settings.sat.fMaxPressureDrop,   s_max_pressure_drop,   SAT_EPS_PRESSURE,    2, true);
+  // TASK-3016: the weather location as retained state (Robert 2026-11-21). Personal data: the coordinates sit on the broker; docs/api/MQTT.md says so.
+  publishIfChangedF(F("sat/weather_lat"),         settings.sat.fWeatherLat,        s_weather_lat,         SAT_EPS_COORD,       4, true);
+  publishIfChangedF(F("sat/weather_lon"),         settings.sat.fWeatherLon,        s_weather_lon,         SAT_EPS_COORD,       4, true);
   publishIfChangedF(F("sat/preset_comfort"),      settings.sat.fPresetComfort,     s_preset_comfort,      SAT_EPS_TEMP,        1, true);
   publishIfChangedF(F("sat/preset_eco"),          settings.sat.fPresetEco,         s_preset_eco,          SAT_EPS_TEMP,        1, true);
   publishIfChangedF(F("sat/preset_away"),         settings.sat.fPresetAway,        s_preset_away,         SAT_EPS_TEMP,        1, true);

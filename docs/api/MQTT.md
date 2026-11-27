@@ -619,6 +619,17 @@ Published only while weather is enabled (`SATweatherenable`) and the last poll w
 | `sat/weather/weather_code` | `"3"` | no | WMO weather code. Forecast builds only |
 | `sat/weather/is_day` | `"1"` / `"0"` | no | Daylight (payload `"1"`/`"0"`). Forecast builds only |
 
+#### Weather location (retained)
+
+The location the weather fetch and the sun elevation use (`satweatherlat`, `satweatherlon`, TASK-3016). Published through the on-change helper, 4 decimals, **retained**. `0.0000` for both means no location set.
+
+| Topic | Value | Retained | Description |
+| ----- | ----- | -------- | ----------- |
+| `sat/weather_lat` | `"52.3702"` | yes | Latitude in degrees (-90 to 90) |
+| `sat/weather_lon` | `"4.8952"` | yes | Longitude in degrees (-180 to 180) |
+
+**Privacy:** these are the user's coordinates. A retained topic keeps them on the MQTT broker and hands them to every client, bridge and log that subscribes to `#` or to this device's topics (Home Assistant, Homey, broker backups). Use a location that is accurate enough for the weather (a town centre works) or leave the setting at 0 if the broker is shared. Setting the location from the web UI or REST stays possible; the topics above are published either way once the value is not 0.
+
 #### Multi-zone Diagnostics
 
 Published retained on every multi-zone control pass, for each configured zone n (1-based). These topics bypass the on-change + heartbeat helpers.
@@ -1070,6 +1081,8 @@ SAT-specific commands are nested under the `sat/` sub-topic. All commands are su
 | ------------ | ------- | ----------- |
 | `sat/sun_elevation` | `"32.5"` | Push sun elevation in degrees (from HA sun entity). Wins over the value computed from the weather latitude/longitude while younger than 1 hour; REST `sat/status` reports `sun_elevation_source` (TASK-2015) |
 | `sat/solar_min_elevation` | `"12.0"` | Set minimum sun elevation for solar gain activation |
+| `sat/weather_lat` | `"52.3702"` | Set the weather latitude (-90 to 90, persisted like the REST setting `satweatherlat`). A payload that is not one number inside the range is ignored, not clamped. State echo: `sat/weather_lat` (retained) |
+| `sat/weather_lon` | `"4.8952"` | Set the weather longitude (-180 to 180, persisted like `satweatherlon`). Out-of-range or non-numeric payloads are ignored. State echo: `sat/weather_lon` (retained) |
 
 **PV-surplus Boost (TASK-640):**
 

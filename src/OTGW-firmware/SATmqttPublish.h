@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : SATmqttPublish.h
-**  Version  : v2.0.0-beta.459
+**  Version  : v2.0.0-beta.460
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -145,6 +145,7 @@ static constexpr float SAT_EPS_TEMP_COARSE = 0.1f;      // heating_curve, therma
 static constexpr float SAT_EPS_PID_OUTPUT  = 0.5f;      // pid_output (derivative jitter)
 static constexpr float SAT_EPS_PID_TERM    = 0.1f;      // pid_p, pid_i, pid_d
 static constexpr float SAT_EPS_ERROR       = 0.05f;
+static constexpr float SAT_EPS_COORD       = 0.00005f;  // weather latitude/longitude, published with 4 decimals
 static constexpr float SAT_EPS_KP          = 0.01f;
 static constexpr float SAT_EPS_KI          = 0.00001f;
 static constexpr float SAT_EPS_KD          = 0.1f;

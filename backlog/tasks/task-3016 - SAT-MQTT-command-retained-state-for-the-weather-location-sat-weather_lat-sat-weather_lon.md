@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-21T16:38:00Z'
-updated_date: '2026-11-26T10:33:00Z'
+updated_date: '2026-11-27T05:08:00Z'
 labels:
   - sat
   - mqtt
@@ -27,7 +27,7 @@ gruijter, #alpha-testing msg 1573739161251356854 (2026-11-21): the weather locat
 <!-- AC:BEGIN -->
 - [x] #1 Robert decides (command only, or command + retained state)
 - [ ] #2 MQTT set command for lat/lon validated to -90..90 / -180..180, persisted like the REST path; state published per the decision
-- [ ] #3 Host test on the real MQTT handler: valid value stored, out-of-range rejected (red before, green after)
+- [x] #3 Host test on the real MQTT handler: valid value stored, out-of-range rejected (red before, green after)
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -53,4 +53,8 @@ Gates: evaluate --quick, the SAT MQTT tests, test_settings_help if touched, prer
 Observation (not a change, coordinator 2026-11-26): the REST/settings path clamps an out-of-range coordinate (satweatherlat 95 becomes 90, settingStuff.ino:1189-1190 via clampSettingFloat; only non-finite input keeps the old value). The new MQTT command rejects instead; REST stays as is. Worktree wt-ba-3016 (lane/ba-3016, origin/dev 9f3b8af60) for the code.
 
 2026-11-26 11:3x evidence (wt-ba-3016, lane/ba-3016 on origin/dev 9f3b8af60, NOT committed yet, waits for the R1 dry run at 11:57): code = MQTTstuff.ino handlers _satSetCoordinate/_satWeatherLatCmd/_satWeatherLonCmd + two kSatMqttCmds rows; SATcontrol.ino two retained publishIfChangedF lines + shadows; SATmqttPublish.h SAT_EPS_COORD. Test tests/test_sat_weather_location_mqtt_3016.py (8 tests, compiles the real handlers, table, dispatchSatMqttCmd and publish lines): GREEN 8/8 on the fix; RED 8/8 with OTGW_SRC_REV=origin/dev (handlers/topics absent). Mutants all killed (5): range check dropped, trailing garbage accepted, lat not retained, 1 decimal instead of 4, lon range set to lat range. Other gates: test_sat_mqtt_contract_1485 15 OK, test_sat_mqtt_fallback 8 OK, test_sat_cmd_cache 31 OK, test_sat_mqtt_state exit 0, test_manual_generated + test_mqtt_doc_entity_counts OK, evaluate --quick 88 pass / 0 warn / 0 fail. Docs: docs/api/MQTT.md (state table + command rows + privacy note), manual ch05 EN and h05 NL (MANUAL.md regenerated). NOT verified: the real MQTT client and broker wire format (retained flag on the wire, restart persistence): bench-tester run with the build; bump + commit pending.
+
+2026-11-27 otgw-poc-dev took over the lane of otgw-webui (lane/ba-3016, commit 99146fb08, never pushed) on origin/dev 25875e928 as lane-poc-3016. Conflicts only in version.h and version.hash (took origin/dev, re-bumped to beta.453 with bin/bump-prerelease.sh).
+
+Evidence (host, real handlers, table, dispatch and publish lines compiled): tests/test_sat_weather_location_mqtt_3016.py 8/8 green on the fix, 8/8 red on origin/dev src (found 0 publishIfChangedF lines). Neighbours green: test_sat_mqtt_state 1 run OK, test_sat_mqtt_contract_1485 15/15, test_sat_mqtt_fallback 8/8. AC3 ticked on that. AC2 stays open: broker wire format, retained read-back and persistence across a restart are NOT run on a unit; the bench-tester checks them. Register: no entry touches the weather location (grep latitude, longitude, location, weather_lat in sergeant-d-corrections.md: only entries 2358 and 5280 lines on sun elevation, unrelated). evaluate.py --quick: see commit run.
 <!-- SECTION:NOTES:END -->
