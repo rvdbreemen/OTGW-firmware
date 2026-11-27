@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-27T05:41:00Z'
-updated_date: '2026-11-27T09:00:00Z'
+updated_date: '2026-11-27T09:56:00Z'
 labels:
   - docs
 milestone: 2.0.0
@@ -59,4 +59,6 @@ Robert 2026-11-27 (chat, relayed by the coordinator): the sale of the OTGW32 sta
 2026-11-27 (re-added by otgw-docs from otgw-ux-designer's uncommitted note in wt-ux, 08:48) UX newcomer review of the OTGW32 docs (otgw-ux-designer, read at origin/dev 9cc0f66d8, no reader test): 10 ranked changes with exact EN and NL text in OTGW-field-data/_comms/ux-otgw32-docs-newcomer-review.md. Main gaps: (1) nothing tells an owner how to recognise which configuration they have, only PIC or no PIC; (2) README names esp32-combo but the zip name has the board in it; (3) the do-not-expect list sits only in ch11; (4) terminals 5 to 10 order unknown: add 'connect nothing' (Robert to confirm); (6) the word Disclaimer reads as alarm, proposed 'new, has not run in a real home yet', and the README pointed to release notes without a link, use ch07; (7) the update heating warning gets its own line; (8) gloss PIC, PSRAM, OT-Direct, OTmonitor; (9) NL 'alfa- en betaruns' becomes 'alpha- en betatests'. Em dashes: 0 in the six files. Items marked [verify] need Robert or an OTGW32 owner. His finding 4 predates 397a954ef (DI pad, TASK-3120). All ten were applied by otgw-docs in fa03564e3 except the physical recognition line (see the note before).
 
 2026-11-27 DECISION (Robert, DM 1575798102273826878, relayed by the coordinator), verbatim: 'S0 is belofte van mij. Feature van 1.0.' Docs updated (ch11 11.6, h11, ch12 12.1b, h12, PINOUT): 'S0 energy meter counting is a firmware feature; on the OTGW32 it needs an input pin. The terminal block has a digital-input pad (DI, probably GPIO 5); the pin is not confirmed yet, so until then choose the pin yourself in the settings. The GPIO output has no pad on this board and is not available.' No pin promise.
+
+2026-11-27 WORDING RULE (coordinator, after Robert talked with the hardware owner): lead with what works, keep every fact. Applied in a local commit, NOT pushed until the coordinator says so: README, ch11/h11 (do-not-expect paragraph split into 'What works on the OTGW32' and 'Also not on the OTGW32'; 11.6 retitled 'Optional extras that need PSRAM, and other limits' with a lead sentence), ch12/h12 BLE row 'Off on this board (needs PSRAM)', README table row 'Flash and memory' removed (limits stay in the manual), 2.0 draft notes got the same lead sentence. Facts unchanged: no PSRAM, BLE refused, graph 1 h, REST 2, 4 MB.
 <!-- SECTION:NOTES:END -->

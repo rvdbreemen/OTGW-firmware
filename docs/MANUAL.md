@@ -5754,7 +5754,9 @@ Firmware 2.0 supports exactly two hardware configurations:
 1. **The OTGW Classic with an ESP32-S3 module.** The traditional gateway with the PIC co-processor and a LOLIN S3 Mini or S3 Mini Pro in the module socket (chapter 2).
 2. **The OpenTherm Gateway OTGW32.** A board with an ESP32-S3 that speaks OpenTherm itself, with its own connections to the boiler and to the thermostat. There is no PIC on this board. This chapter describes it. Chapter 12 compares the two.
 
-**On the OTGW32, do not expect:** the bypass relay (hardware version 1.1 has a place for one; it is not fitted as supplied and the firmware does not use it), a ready-made terminal block (the 10 way block J4 is not fitted at the factory: you fit it yourself), PIC firmware updates (there is no PIC), or Bluetooth room sensors (they need extra memory this board does not have).
+**What works on the OTGW32:** everything the gateway is for (OpenTherm, MQTT, Home Assistant, SAT). A few optional extras (Bluetooth sensors, long graph history, bigger buffers) need PSRAM (extra working memory) and are off on this board.
+
+**Also not on the OTGW32:** the bypass relay (hardware version 1.1 has a place for one; it is not fitted as supplied and the firmware does not use it), a ready-made terminal block (the 10 way block J4 is not fitted at the factory: you fit it yourself) and PIC firmware updates (there is no PIC).
 
 > **The OTGW32 is new, and the firmware for it has not run in a real home yet.** Hardware versions 1.0 and 1.1 are very similar; version 1.1 has an optional bypass relay that is not fitted as supplied and is not used by the firmware. Firmware 2.0 supports it, but so far the firmware has only run on a bench unit, without a thermostat and without a real boiler on the bus (a simulated boiler, and master mode without a thermostat). What is not yet field-proven: how it behaves with different boilers and thermostats, long runs, the Ethernet and OLED options on real hardware, and OTmonitor (a PC program for the OpenTherm Gateway) over port 25238. If you run an OTGW32, please send a capture with your report (see Chapter 7).
 
@@ -5807,10 +5809,12 @@ The web UI follows what the unit reports (`otcommandinterface`), not the board n
 - Everything else is the same: Home, Monitor, SAT, Settings.
 
 
-### 11.6 Limits that come from 4 MB flash and no PSRAM
+### 11.6 Optional extras that need PSRAM, and other limits
 
-- **Graph history** keeps 1 hour. Units with PSRAM keep a longer history (up to 7 days).
-- **Bluetooth (BLE) cannot be switched on** without PSRAM: the setting is visible but refused. A Bluetooth room sensor therefore cannot feed SAT on an OTGW32.
+The core of the gateway does not depend on PSRAM. The list below is what is different on a board with 4 MB of flash and no PSRAM.
+
+- **Graph history** keeps 1 hour on this board. Units with PSRAM keep a longer history (up to 7 days).
+- **Bluetooth (BLE) is off on this board** because it needs PSRAM: the setting is visible but refused. A Bluetooth room sensor therefore cannot feed SAT on an OTGW32.
 - **REST:** for now, at most 2 requests are answered at the same time. A third gets HTTP 503 `Retry-After: 1`. The limit was not measured for this board class.
 - **Diagnostic recorder:** a small buffer of about 2 minutes instead of the large one.
 - **MQTT:** a unit without extra memory sends bursts in steps; the limits are not calibrated for it yet (see Known issues in the release notes).
@@ -5851,7 +5855,7 @@ Firmware 2.0 supports two hardware configurations: the **OTGW Classic with an ES
 | **OTmonitor** | OTmonitor (a PC program for the OpenTherm Gateway) connects over port 25238. | USB is not an OTmonitor connection. Opening the USB port from a program can reset the unit, depending on how the program sets the USB control lines; this was not tested with OTmonitor. |
 | **Operating modes** | The PIC decides (gateway behaviour). You steer it with PIC commands. | Gateway (default), monitor, master, loopback (chapter 11.2). |
 | **Graph history** | Up to 7 days on a module with PSRAM. | 1 hour. |
-| **Bluetooth (BLE) room sensor** | Yes, on a module with PSRAM. | Cannot be switched on without PSRAM. |
+| **Bluetooth (BLE) room sensor** | Yes, on a module with PSRAM. | Off on this board (needs PSRAM). |
 | **Ethernet and OLED** | OLED optional. No Ethernet. | Ethernet (W5500) and OLED are supported by the firmware; not seen on real hardware in our tests. |
 | **Updating over WiFi** | The PIC keeps passing messages (not measured on a bench). | The thermostat to boiler link is interrupted for 1 to 2 minutes; the boiler runs on its own settings. |
 | **Field experience** | Alpha and beta runs on several units. | New device, hardware versions 1.0 and 1.1. |

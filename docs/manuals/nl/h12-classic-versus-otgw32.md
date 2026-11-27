@@ -18,7 +18,7 @@ Firmware 2.0 ondersteunt twee hardwareconfiguraties: de **OTGW Classic met een E
 | **OTmonitor** | OTmonitor (een pc-programma voor de OpenTherm Gateway) verbindt via poort 25238. | USB is geen OTmonitor-verbinding. Als een programma de USB-poort opent, kan het apparaat herstarten, afhankelijk van hoe het programma de USB-besturingslijnen zet; dit is niet met OTmonitor getest. |
 | **Werkstanden** | De PIC bepaalt (gatewaygedrag). U stuurt hem met PIC-commando's. | Gateway (standaard), monitor, master, loopback (hoofdstuk 11.2). |
 | **Grafiekgeschiedenis** | Tot 7 dagen op een module met PSRAM. | 1 uur. |
-| **Bluetooth (BLE) kamersensor** | Ja, op een module met PSRAM. | Kan zonder PSRAM niet worden aangezet. |
+| **Bluetooth (BLE) kamersensor** | Ja, op een module met PSRAM. | Uit op deze print (heeft PSRAM nodig). |
 | **Ethernet en OLED** | OLED optioneel. Geen Ethernet. | Ethernet (W5500) en OLED worden door de firmware ondersteund; in onze tests niet op echte hardware gezien. |
 | **Bijwerken via WiFi** | De PIC blijft berichten doorgeven (niet op een testapparaat gemeten). | De verbinding thermostaat naar ketel is 1 tot 2 minuten onderbroken; de ketel draait op zijn eigen instellingen. |
 | **Ervaring in het veld** | Alpha- en betatests op meerdere apparaten. | Nieuw apparaat, hardwareversies 1.0 en 1.1. |

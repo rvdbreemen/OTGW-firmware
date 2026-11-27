@@ -21,7 +21,9 @@
 1. **The OTGW Classic with an ESP32-S3 module** (a LOLIN S3 Mini or S3 Mini Pro in the module socket). The PIC stays in place and talks OpenTherm.
 2. **The OpenTherm Gateway OTGW32.** A board with an ESP32-S3 that speaks OpenTherm itself (OT-Direct), without a PIC. Hardware versions 1.0 and 1.1 are very similar; version 1.1 has an optional bypass relay that is not fitted as supplied and is not used by the firmware.
 
-> **The OTGW32 is a new device and still has to prove itself in the field.** Firmware 2.0 supports it, but so far it has only run on a bench unit, without a thermostat and without a real boiler on the bus (a simulated boiler, and master mode without a thermostat). Not yet field-proven: the variety of boilers and thermostats, long runs, the Ethernet and OLED options on real hardware, and OTmonitor over port 25238. If you run an OTGW32, please report what you see (see "How to report" below).
+Everything the gateway is for (OpenTherm, MQTT, Home Assistant, SAT) works on the OTGW32. A few optional extras (Bluetooth sensors, long graph history, bigger buffers) need PSRAM (extra working memory) and are off on this board.
+
+> **The OTGW32 is new, and the firmware for it has not run in a real home yet.** Firmware 2.0 supports it, but so far it has only run on a bench unit, without a thermostat and without a real boiler on the bus (a simulated boiler, and master mode without a thermostat). Not yet field-proven: the variety of boilers and thermostats, long runs, the Ethernet and OLED options on real hardware, and OTmonitor over port 25238. If you run an OTGW32, please report what you see (see "How to report" below).
 
 The differences between the two are in chapters 11 and 12 of the manual.
 

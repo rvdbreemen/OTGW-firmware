@@ -119,12 +119,13 @@ Both use the same release zip: download the file whose name contains `esp32-comb
 |---|---|---|
 | OpenTherm interface | PIC co-processor, serial link | The ESP32-S3 itself (OT-Direct), no PIC |
 | PIC firmware and PIC updates | Yes | No PIC, so none |
-| Flash and memory | 4 MB flash; the LOLIN S3 Mini has extra working memory (PSRAM) | 4 MB flash, no PSRAM |
 | Web UI, SAT, MQTT, Home Assistant, REST | Yes | Yes |
 | Port 25238 (lets the PC program OTmonitor connect) | Yes, off by default | Imitated by the firmware, off by default |
 | Field experience | Alpha and beta runs on several units | New device, hardware versions 1.0 and 1.1 |
 
-**On the OTGW32, do not expect:** the bypass relay (hardware version 1.1 has a place for one; it is not fitted as supplied and the firmware does not use it), a ready-made terminal block (the 10 way block J4 is not fitted at the factory: you fit it yourself), PIC firmware updates (there is no PIC), or Bluetooth room sensors (they need extra memory this board does not have).
+**What works on the OTGW32:** everything the gateway is for (OpenTherm, MQTT, Home Assistant, SAT). A few optional extras (Bluetooth sensors, long graph history, bigger buffers) need PSRAM (extra working memory) and are off on this board.
+
+**Also not on the OTGW32:** the bypass relay (hardware version 1.1 has a place for one; it is not fitted as supplied and the firmware does not use it), a ready-made terminal block (the 10 way block J4 is not fitted at the factory: you fit it yourself) and PIC firmware updates (there is no PIC).
 
 **The OTGW32 is new, and the firmware for it has not run in a real home yet.** Firmware 2.0 supports it, but so far it has only run on a bench, without a thermostat and without a real boiler on the bus (simulated boiler and master mode). What is not yet field-proven: how it behaves with different boilers and thermostats, long runs, the Ethernet and OLED options on real hardware, and OTmonitor (a PC program for the OpenTherm Gateway) over port 25238. If you run an OTGW32, you are among the first. Please send what you see, with a capture if you can (see [Reporting a problem](docs/manuals/en/ch07-troubleshooting.md)): it is how the gaps in the list above get closed.
 

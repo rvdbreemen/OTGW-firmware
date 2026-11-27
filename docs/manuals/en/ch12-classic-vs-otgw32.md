@@ -18,7 +18,7 @@ Firmware 2.0 supports two hardware configurations: the **OTGW Classic with an ES
 | **OTmonitor** | OTmonitor (a PC program for the OpenTherm Gateway) connects over port 25238. | USB is not an OTmonitor connection. Opening the USB port from a program can reset the unit, depending on how the program sets the USB control lines; this was not tested with OTmonitor. |
 | **Operating modes** | The PIC decides (gateway behaviour). You steer it with PIC commands. | Gateway (default), monitor, master, loopback (chapter 11.2). |
 | **Graph history** | Up to 7 days on a module with PSRAM. | 1 hour. |
-| **Bluetooth (BLE) room sensor** | Yes, on a module with PSRAM. | Cannot be switched on without PSRAM. |
+| **Bluetooth (BLE) room sensor** | Yes, on a module with PSRAM. | Off on this board (needs PSRAM). |
 | **Ethernet and OLED** | OLED optional. No Ethernet. | Ethernet (W5500) and OLED are supported by the firmware; not seen on real hardware in our tests. |
 | **Updating over WiFi** | The PIC keeps passing messages (not measured on a bench). | The thermostat to boiler link is interrupted for 1 to 2 minutes; the boiler runs on its own settings. |
 | **Field experience** | Alpha and beta runs on several units. | New device, hardware versions 1.0 and 1.1. |

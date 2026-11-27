@@ -7,7 +7,9 @@ Firmware 2.0 ondersteunt precies twee hardwareconfiguraties:
 1. **De OTGW Classic met een ESP32-S3-module.** De traditionele gateway met de PIC-coprocessor en een LOLIN S3 Mini of S3 Mini Pro in de modulesocket (hoofdstuk 2).
 2. **De OpenTherm Gateway OTGW32.** Een print met een ESP32-S3 die zelf OpenTherm spreekt, met eigen aansluitingen naar de ketel en naar de thermostaat. Op deze print zit geen PIC. Dit hoofdstuk beschrijft hem. Hoofdstuk 12 zet de twee naast elkaar.
 
-**Verwacht op de OTGW32 niet:** het bypass-relais (hardwareversie 1.1 heeft er plaats voor; het is bij levering niet gemonteerd en de firmware gebruikt het niet), een kant-en-klaar klemmenblok (het 10-polige blok J4 is in de fabriek niet gemonteerd: u monteert het zelf), PIC-firmware-updates (er is geen PIC) of Bluetooth-kamersensoren (die vragen extra geheugen dat deze print niet heeft).
+**Wat werkt op de OTGW32:** alles waarvoor de gateway er is (OpenTherm, MQTT, Home Assistant, SAT). Een paar optionele extra's (Bluetooth-sensoren, lange grafiekgeschiedenis, grotere buffers) hebben PSRAM (extra werkgeheugen) nodig en staan op deze print uit.
+
+**Ook niet op de OTGW32:** het bypass-relais (hardwareversie 1.1 heeft er plaats voor; het is bij levering niet gemonteerd en de firmware gebruikt het niet), een kant-en-klaar klemmenblok (het 10-polige blok J4 is in de fabriek niet gemonteerd: u monteert het zelf) en PIC-firmware-updates (er is geen PIC).
 
 > **De OTGW32 is nieuw en de firmware ervoor heeft nog niet in een echt huis gedraaid.** De hardwareversies 1.0 en 1.1 lijken sterk op elkaar; versie 1.1 heeft een optioneel bypass-relais dat niet is gemonteerd bij levering en dat de firmware niet gebruikt. Firmware 2.0 ondersteunt hem, maar de firmware heeft tot nu toe alleen op een testapparaat gedraaid, zonder thermostaat en zonder echte ketel op de bus (een gesimuleerde ketel, en masterstand zonder thermostaat). Nog niet in het veld bewezen: hoe het zich gedraagt met verschillende ketels en thermostaten, lange runs, de opties Ethernet en OLED op echte hardware, en OTmonitor (een pc-programma voor de OpenTherm Gateway) via poort 25238. Draait u een OTGW32? Stuur dan bij uw melding een capture mee (zie hoofdstuk 7).
 
@@ -59,10 +61,12 @@ De webinterface volgt wat het apparaat meldt (`otcommandinterface`), niet de naa
 - De panelen **OT-Direct overrides** en **OT-Direct status** en de instelling voor de OT-Direct-stand worden getoond.
 - De rest is gelijk: Home, Monitor, SAT, Settings.
 
-### 11.6 Grenzen door 4 MB flash en geen PSRAM
+### 11.6 Optionele extra's die PSRAM nodig hebben, en andere grenzen
 
-- **Grafiekgeschiedenis** bewaart 1 uur. Apparaten met PSRAM bewaren een langere geschiedenis (tot 7 dagen).
-- **Bluetooth (BLE) kan niet worden aangezet** zonder PSRAM: de instelling is zichtbaar maar wordt geweigerd. Een Bluetooth-kamersensor kan dus op een OTGW32 niet voor SAT dienen.
+De kern van de gateway hangt niet af van PSRAM. Onderstaande lijst is wat anders is op een print met 4 MB flash en zonder PSRAM.
+
+- **Grafiekgeschiedenis** bewaart op deze print 1 uur. Apparaten met PSRAM bewaren een langere geschiedenis (tot 7 dagen).
+- **Bluetooth (BLE) staat op deze print uit** omdat het PSRAM nodig heeft: de instelling is zichtbaar maar wordt geweigerd. Een Bluetooth-kamersensor kan dus op een OTGW32 niet voor SAT dienen.
 - **REST:** voorlopig worden maximaal 2 verzoeken tegelijk beantwoord. Een derde krijgt HTTP 503 `Retry-After: 1`. De grens is voor deze printklasse niet gemeten.
 - **Diagnose-recorder:** een kleine buffer van ongeveer 2 minuten in plaats van de grote.
 - **MQTT:** een apparaat zonder extra geheugen verstuurt pieken in stappen; de grenzen zijn daarvoor nog niet gekalibreerd (zie Known issues in de releasenotes).
