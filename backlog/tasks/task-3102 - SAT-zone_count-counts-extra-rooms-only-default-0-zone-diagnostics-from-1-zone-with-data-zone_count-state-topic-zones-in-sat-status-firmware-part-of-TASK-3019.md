@@ -4,10 +4,11 @@ title: >-
   SAT: zone_count counts extra rooms only (default 0), zone diagnostics from 1
   zone with data, zone_count state topic, zones in sat/status (firmware part of
   TASK-3019)
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-11-26T10:22:00Z'
-updated_date: '2026-11-26T11:53:00Z'
+updated_date: '2026-11-27T07:09:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -41,7 +42,17 @@ PLAIN WARNING: default 1 to 0 and clamp 0..4 change a SAT setting default and ra
 ## Implementation Plan
 
 <!-- SECTION:PLAN:BEGIN -->
-FINAL PLAN (otgw-webui 2026-11-26; implementation owner otgw-dev after the pacer fix and the REST study, about 17:00). Entries: 459 (default 0, zone_count counts extra rooms, diagnostics from 1 zone, Q12 A: no value migration), 116 (zones follow area.py aggregation), 378 (eco: main room only), 224 (zone PID reset rule), 111 (zone PID timer): none changed, the control loop (SATcontrol.ino:8602-8606) is not touched. ORDER inside this one task (each step its own commit, red/green host test on the real code): (1) default 0 (SATtypes.h:614 comment + initialiser), clamp 0..4 in settingStuff.ino:1251, REST range and settings help text, 'zone count 0 = no extra rooms'; with 0 no zone runs and nothing publishes. (2) satPublishZoneDiagnostics and the simulator zone block publish only zones with data: gate '> 1' replaced by 'z < iZoneCount and satZones[z].iLastUpdateMs != 0' (simulator: its own synthetic data counts as data, so the sim keeps working from zone_count 1); single-room installs with no zone data publish nothing new (TASK-1440 concern). (3) retained sat/zone_count via publishIfChangedI (ADR-111), shadow handled by the epoch. (4) zones array in /api/v2/sat/status: index, room_temp, setpoint, active for z < iZoneCount, written next to the other status fields in satSendStatusJSON (SATcontrol.ino ~4921); restcap/JSON size checked against the REST cap. (5) docs: MQTT.md rows sat/zone_count and the 'published from 1 zone with data' text, manual ch05 5.15 and h05, settings help. (6) bench-tester: push zone 1 room_temp and setpoint, see the three zone topics and zone_count, see none without data. After (4) lands, otgw-webui builds the web UI zone rows (TASK-3019: temperature, target, active per zone, hidden at 0 zones, EN/NL/DE/EL, red/green webui test, screenshots) as a separate lane; (4) is the only dependency.
+PLAN (otgw-poc-dev, 2026-11-27; lane-poc-3102 on origin/dev 71bf37997; nothing built, nothing run on a unit). Order as in the notes: step 0, 1, 2, 3, 4, docs, bench.
+Register: entries 459 (decision: default 0, diagnostics from 1 zone, zone_count state), 116 (zones follow area.py aggregation, unchanged), 378 and 421 (eco/comfort rule, unchanged), 224 (zone PID reset, unchanged), ADR-111 (publishIfChangedI + shadow reset). Robert's Q12 'A' (stored 1 stays 1, no value migration) is in the task notes but NOT yet a register entry (last entry here is 500): the notes say it is BlueFlame's to write BEFORE the code. I write the host tests first (red) and hold the firmware edits until that entry exists; I ask the coordinator for it.
+Facts at this base (grep, not run): default SATtypes.h:638 'iZoneCount = 1'; parse settingStuff.ino:1319 constrain(atoi, 1, 4); REST range restAPI.ino:4439 (satzonecount 1..4); MQTT passthrough MQTTstuff.ino:791 (table, key SATzonecount: it inherits the parse clamp); loops run z < iZoneCount: satShouldDiscoverZone :3871, satAggregateZoneSetpoint :3994, satPublishZoneDiagnostics :4092, control loop :8635; diagnostics gate 'iZoneCount > 1' at :8655; simulation gate '> 1' at :6925; per-zone data gate exists: SATZoneState.iLastUpdateMs != 0 (:3883, :4107).
+STEP 0 (AC7): sentinel g_sawSatZoneCountKey in settingStuff.ino (same pattern as g_sawSatBlePinOnlyMarkerKey :565/:609/:739/:1346), set in the SATzonecount branch, reset in readSettings; after the parse 'if (!seen) { iZoneCount = 1; settingsDirty = true; }' so an existing file without the key keeps 1 and persists it. Fresh install (no file): readSettings writes the in-RAM defaults first, so the key is present and the new default 0 applies. Empty/unopenable file takes the early returns with RAM defaults (0): no user data lost, said in the test notes.
+STEP 1 (AC2): default 0 (SATtypes.h), parse clamp 0..4 (settingStuff :1319), REST range 0..4 (restAPI :4439), settings help text (settingsHelp source + its gz via the project's helper, memory: settingsHelp.h needs its gz committed), fix the SATtypes.h comment. With 0 no zone runs: loops already iterate z < 0; check satControlLoop zoneCount math with 0 (no divide by zero, satAggregateZoneSetpoint n=0 returns the primary setpoint).
+STEP 2 (AC3): satPublishZoneDiagnostics gate changes from 'iZoneCount > 1' to 'iZoneCount >= 1', and per zone only when iLastUpdateMs != 0 (a zone that never received data publishes nothing; TASK-1440 concern kept). Remove '> 1' from the simulation gate only if the simulator's zone 1 data must run at 1 (check, not assumed).
+STEP 3 (AC4): sat/zone_count retained through publishIfChangedI (ADR-111), shadow added to the republish-all reset (tests/test_sat_mqtt_state.py pins that).
+STEP 4 (AC5): /api/v2/sat/status gets a zones array (index, room_temp, setpoint, active) for up to iZoneCount zones; webui (TASK-3019) reads it. JsonEmit writer, no ArduinoJson (ADR-146).
+Docs: MQTT.md (zone topics from 1 zone, zone_count), manuals ch05/h05 + ch09/h09 + MANUAL.md, settings help; no em dash (tests/test_docs_no_em_dash.py).
+Tests, host, real code, red on origin/dev then green: step 0 on the real readSettings/updateSetting path (absent key + file = 1; absent + no file = 0; stored 1 = 1; stored 0 = 0); parse clamp; publisher gate (zone with data at iZoneCount 1 publishes, zone without data publishes nothing); zone_count shadow; status renderer. Mutants per step. Neighbours: full tests folder at -j 2 (lesson of 3033: a new symbol breaks harness stubs).
+Not verifiable on host: broker wire format, a real zone sensor push; bench-tester AC6. Needs the coordinator: the register entry for Q12 before step 0 code; build slot after the bundle.
 <!-- SECTION:PLAN:END -->
 
 ## Implementation Notes
