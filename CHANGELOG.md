@@ -5,6 +5,25 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+## [2.0.0-beta.474] - 2026-11-27
+
+Build in this beta: beta.474 only (previous public beta: beta.458; beta.459 to beta.473 were internal builds and were never published). [BENCH-TBD: soak sentence with minutes and units]
+
+### Changed
+- SAT: a thermostat setpoint change that equals one of the SAT presets selects that preset (TASK-3032). Host tests only; not run with a real thermostat.
+- SAT, MQTT: the weather location can be set over MQTT with `sat/weather_lat` (-90 to 90) and `sat/weather_lon` (-180 to 180); a value out of range, or not one number, is ignored. The state is published retained on the same topics (TASK-3016). Host tests only; not run against a broker.
+- MQTT: new retained topic `otgw-firmware/thermostat/override_refused`: "false" when the thermostat's setpoint follows a `TT=` or `TC=` override within 0.25 C, "true" when it still differs 300 seconds after the command (TASK-3033). Host tests only; not run with a real thermostat.
+- SAT: new and reset installations start with 0 extra rooms (the old default 1 counted the main room); an installation that already saved the zone count keeps it, and an older settings file keeps 1. Zone topics `sat/zone/<n>/active|output|error` are published only for an extra room that has received data, `sat/zone_count` is retained, and `/api/v2/sat/status` has a `zones` array (TASK-3102). Host tests only.
+- OTGW32: Dallas sensors start on GPIO 4 and the S0 counter on GPIO 5, the DI pin of the terminal block; an installation that still holds an old default is moved once, a pin you chose yourself is never changed; the GPIO output has no pad on this board and is hidden and refused; the S0 counter does not start on the pin that enabled 1-wire sensors use (TASK-3120). Counting S0 pulses on the DI pin is untested.
+- Web UI: the page reconnects with a growing wait (5, 10, 20, 40, then 60 seconds, with jitter) and pauses after repeated short-lived connections; a Reconnect button resumes (TASK-3124). Tried in headless Chrome only. Also: help popover stays inside its card (TASK-3058), chart axis label no longer touches the axis (TASK-3052), clearer English settings help (TASK-3118), the File System table fits a 375 px screen (TASK-2926).
+- Release files: the GitHub release has no loose `.ino.bin` or `.littlefs.bin` file and `SHA256SUMS` lists none; the images stay inside the `-flash.zip` (TASK-3116).
+- Manual: rows for the new MQTT topics, the zone changes and the OTGW32 pins.
+- Internal: [COUNT-TBD] changes in documentation and decisions, task administration, bench test keys (beta builds only) and tooling; nothing to do for users.
+
+### Known issues
+- On a unit without extra memory, two web pages open at the same time plus other requests can bring the memory low for a moment; in our test the unit recovered by itself without a restart (one test run; the web UI reconnect backoff in this beta reduces repeated reconnects).
+- The issues of beta.458 are still open: BLE scanning WiFi loss and failing filesystem updates (TASK-3126), the web interface unreachable for up to about 3 minutes after a severe low-memory event (TASK-3025, TASK-3119), repeated reconnecting on a board without extra memory (TASK-3123) and the memory dip after a start (TASK-3024). See the release notes.
+
 ## [2.0.0-beta.458] - 2026-11-27
 
 Build in this beta: beta.458 only (previous public beta: beta.452; beta.453 to beta.457 were internal test builds and were never published). The exact build (2.0.0-beta.458+3f91762) ran 61 minutes on a Classic with an S3 module and 71 minutes on a unit without extra memory, without a restart or a crash.
@@ -1277,7 +1296,8 @@ Legacy release. See git history for details.
 
 Legacy releases. See git history for details.
 
-[Unreleased]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.458...HEAD
+[Unreleased]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.474...HEAD
+[2.0.0-beta.474]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.458...v2.0.0-beta.474
 [2.0.0-beta.458]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.452...v2.0.0-beta.458
 [2.0.0-beta.452]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.451...v2.0.0-beta.452
 [2.0.0-beta.451]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.438...v2.0.0-beta.451
