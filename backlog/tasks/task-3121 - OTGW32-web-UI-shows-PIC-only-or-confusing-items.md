@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-27T08:53:00Z'
-updated_date: '2026-11-27T09:05:00Z'
+updated_date: '2026-11-27T09:12:00Z'
 labels:
   - webui
   - hardware
@@ -33,4 +33,6 @@ From otgw-ux-designer's check of the web UI on an OTGW32 (OTGW-field-data/_comms
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-11-27 (otgw-webui) first part, local lane ba-otd (stacked on ba-3118), NOT pushed. Done with ux strings (_comms/ux-otgw32-ui-strings.md, ux NL/DE/EL drafts used): hide 'PIC temperature sensor' on a non-PIC board; Advanced nav subtitle 'debug · files · system' on OT-Direct (key h_home.nav_advanced_sub_otd, EN + nl/de/el); OT-Direct category line 'Not available on this board: PIC firmware updates and Bluetooth sensors.'; labels 'Open ventilation bypass now' and 'Ventilation bypass: automatic' (EN + packs); help of the two ventilation rows 'This is not the thermostat bypass relay.' (settingsHelp.h + Gz; pack translations of those two help texts come with TASK-2927, which must pick up the new English); GPIO outputs group hidden when device/info has_output_pin === false (otgw-poc-dev, TASK-3120: S0 stays visible, absent = shown). The board gate now runs at start (initPicTabGate at 1.2 s) and not only after Advanced was opened. Test tests/webui/otd-board-hints-3121.test.mjs 4 tests: green on the lane, 2 red on origin/dev (the two PIC/control tests pass on both). Neighbours green: otd-hidden-in-pic-mode 2, adv-pic-tab-hidden 3, settings-help 29, i18n-lang 6, i18n-no-hardcoded 3, lang-menu 7, hscroll-and-rail 4, otd-mode-running-note 1, progmem_assets_deflated 4. OPEN: command-bar placeholder and boot-commands help (wait for otgw-dev on PS=1 / boot commands), otdhasbypassrelay help (wait for otgw-dev: does the flag change anything), the S0 group with an unset pin (after otgw-poc-dev's field), has_output_pin exists only in the test fixture until his lane lands, screenshots (not taken), nl/de/el for the two new help texts.
+
+2026-11-27 part 4 (local, lane ba-otd): bypass rows hidden (coordinator decision); ledblink label 'Blink status LED' and help (ux section 4: 'Blink the status LED. On a PIC board it blinks with OpenTherm traffic. On an OTGW32 the red LED blinks once a second to show the unit is running; OpenTherm traffic does not make it blink.'), label NL/DE/EL from ux; screenshots OTGW-field-data/webui-screens/3121-otd-hints-2026-11-27/. FOLLOW-UP for TASK-2927: its NL/DE/EL help translations of otdopenbypass, otdautobypass and ledblink describe the OLD English; refresh them from _comms/ux-otgw32-ui-strings.md (sections 1 and 4) when 2927 stacks on this lane. OPEN: S0 group with an unset pin and the real has_output_pin field (otgw-poc-dev, lane-poc-3120).
 <!-- SECTION:NOTES:END -->
