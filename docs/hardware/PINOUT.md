@@ -60,7 +60,7 @@ D6=12, D7=13, D8=15, TX=1, RX=3, A0=ADC`.
 Truth = the reference `hwdef.h` (`#ifdef NODO`), mirrored into `boards.h`
 `BOARD_NODOSHOP_ESP32`. No PIC: OT protocol is driven directly by OTDirect.
 
-The 10 way terminal block (J4) is not fitted at the factory; the user fits it. Terminal 1 is the one nearest the reset button. Terminals 1 and 2 are the OpenTherm boiler lines and terminals 3 and 4 are the OpenTherm thermostat lines. Terminals 5 to 10 carry power, ground, a digital-input pad labelled DI and the 1-wire line (GPIO 4); we do not know the order yet. Do not connect anything to terminals 5 to 10 until it is documented. The photo of the board shows the DI pad; it is probably the SW line (net SWR on GPIO 5 in the schematic), and what it is wired to and whether it may be used is not confirmed (hardware information from an OTGW32 owner).
+The 10 way terminal block (J4) is not fitted at the factory; the user fits it. Terminal 1 is the one nearest the reset button. Terminals 1 and 2 are the OpenTherm boiler lines and terminals 3 and 4 are the OpenTherm thermostat lines. Terminals 5 to 10 carry power, ground, a digital-input pad labelled DI and the 1-wire line (GPIO 4); we do not know the order yet. Do not connect anything to terminals 5 to 10 until it is documented. The photo of the board shows the DI pad; it is probably the SW line (net SWR on GPIO 5 in the schematic), and what it is wired to and whether it may be used is not confirmed (hardware information from an OTGW32 owner). S0 energy meter counting is a firmware feature and needs an input pin: the DI pad is the candidate, the pin is not confirmed yet. The GPIO output has no pad on this board.
 
 | Signal | S3 GPIO | Notes |
 |---|---|---|

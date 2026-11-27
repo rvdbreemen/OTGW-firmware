@@ -32,7 +32,7 @@ Technical rows: you do not need these to choose or to use your unit.
 | **Flash and memory** | 4 MB flash. The LOLIN S3 Mini and S3 Mini Pro have extra memory (PSRAM). | 4 MB flash, no PSRAM. |
 | **REST requests at the same time** | At most 2 for now. | At most 2 for now; not measured for this board. |
 | **Start-up detection** | Finds the PIC and remembers that. | Finds no PIC and starts OT-Direct. Up to 3 PIC probes at every start while Board mode is Auto. |
-| **Free header pins** | As on the Classic board. | The S0, output and Dallas defaults clash with pins the board uses, and no free pin is confirmed (the terminal block has a digital-input pad DI whose use is not confirmed); set the Dallas pin to 4 (chapter 11.6). |
+| **Free header pins** | As on the Classic board. | The S0, output and Dallas defaults clash with pins the board uses. S0 counting needs an input pin: the terminal block has a digital-input pad DI (probably GPIO 5, not confirmed yet), so choose the pin yourself in the settings. The GPIO output has no pad on this board. Set the Dallas pin to 4 (chapter 11.6). |
 
 ### 12.2 What is the same
 

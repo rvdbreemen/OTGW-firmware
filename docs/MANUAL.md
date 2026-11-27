@@ -5814,7 +5814,7 @@ The web UI follows what the unit reports (`otcommandinterface`), not the board n
 - **REST:** for now, at most 2 requests are answered at the same time. A third gets HTTP 503 `Retry-After: 1`. The limit was not measured for this board class.
 - **Diagnostic recorder:** a small buffer of about 2 minutes instead of the large one.
 - **MQTT:** a unit without extra memory sends bursts in steps; the limits are not calibrated for it yet (see Known issues in the release notes).
-- **Pins:** wired Ethernet (W5500) uses SPI on GPIO 11, 12, 13, 14 and 15, and the 1-Wire input for Dallas sensors is on GPIO 4 (hardware information from an OTGW32 owner, matching the pin table in `docs/hardware/PINOUT.md`). The firmware defaults for the Dallas sensor (GPIO 10), the S0 counter (GPIO 12) and the GPIO output (GPIO 16) are pins the board uses itself, so the firmware refuses the Dallas default and does not start sensors until you choose a pin: set the Dallas pin to 4. No free pin is confirmed for the S0 counter and the GPIO output on this board: the terminal block has a digital-input pad (DI, GPIO 5 in the schematic) whose use is not confirmed, and the ESP32-S3 module itself has unused pins that are not routed to a connector.
+- **Pins:** wired Ethernet (W5500) uses SPI on GPIO 11, 12, 13, 14 and 15, and the 1-Wire input for Dallas sensors is on GPIO 4 (hardware information from an OTGW32 owner, matching the pin table in `docs/hardware/PINOUT.md`). The firmware defaults for the Dallas sensor (GPIO 10), the S0 counter (GPIO 12) and the GPIO output (GPIO 16) are pins the board uses itself, so the firmware refuses the Dallas default and does not start sensors until you choose a pin: set the Dallas pin to 4. S0 energy meter counting is a firmware feature; on the OTGW32 it needs an input pin. The terminal block has a digital-input pad (DI, probably GPIO 5); the pin is not confirmed yet, so until then choose the pin yourself in the settings. The GPIO output has no pad on this board and is not available. The ESP32-S3 module itself has unused pins that are not routed to a connector.
 
 ### 11.7 What is the same as on the OTGW Classic
 
@@ -5865,7 +5865,7 @@ Technical rows: you do not need these to choose or to use your unit.
 | **Flash and memory** | 4 MB flash. The LOLIN S3 Mini and S3 Mini Pro have extra memory (PSRAM). | 4 MB flash, no PSRAM. |
 | **REST requests at the same time** | At most 2 for now. | At most 2 for now; not measured for this board. |
 | **Start-up detection** | Finds the PIC and remembers that. | Finds no PIC and starts OT-Direct. Up to 3 PIC probes at every start while Board mode is Auto. |
-| **Free header pins** | As on the Classic board. | The S0, output and Dallas defaults clash with pins the board uses, and no free pin is confirmed (the terminal block has a digital-input pad DI whose use is not confirmed); set the Dallas pin to 4 (chapter 11.6). |
+| **Free header pins** | As on the Classic board. | The S0, output and Dallas defaults clash with pins the board uses. S0 counting needs an input pin: the terminal block has a digital-input pad DI (probably GPIO 5, not confirmed yet), so choose the pin yourself in the settings. The GPIO output has no pad on this board. Set the Dallas pin to 4 (chapter 11.6). |
 
 ### 12.2 What is the same
 
