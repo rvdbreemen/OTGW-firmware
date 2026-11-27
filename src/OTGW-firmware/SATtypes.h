@@ -150,6 +150,7 @@ struct SatDiagIn {
   uint32_t now;          // the tick time
   uint32_t intervalMs;   // the control tick interval
   bool chAsked;          // CH=1 goes out this tick
+  bool bandOff;          // the tolerance band holds CH off (a band pause; not a PWM OFF phase), Q-428a / entry 501
   bool flame;            // flame on
   bool flowAboveCs;      // the boiler flow is at or above the CS of this tick
   bool atMax;            // the requested setpoint is clamped to the maximum, or PWM runs at its maximum duty
