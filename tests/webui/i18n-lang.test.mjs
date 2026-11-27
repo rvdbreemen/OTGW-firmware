@@ -155,7 +155,9 @@ test('i18n packs cover the English keys with the same placeholders', () => {
       assert.ok(typeof pack[key] === 'string' && pack[key] !== '', file + ' misses ' + key);
       assert.equal(holders(pack[key]), holders(en[key]), file + ' placeholders of ' + key);
     }
-    for (const key of Object.keys(pack)) assert.ok(key in en, file + ' has ' + key + ', English does not');
+    // TASK-2927: settings.help.<key> texts translate settingsHelp.h (English lives in the firmware, not in I18N_EN);
+    // tests/webui/settings-help-pack-keys-2927.test.mjs checks those keys against settingsHelp.h.
+    for (const key of Object.keys(pack)) assert.ok(key in en || key.startsWith('settings.help.'), file + ' has ' + key + ', English does not');
   }
 });
 

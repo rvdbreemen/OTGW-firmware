@@ -4683,7 +4683,9 @@
     var m = SET_META[k];
     if (k === 'sathpcycle' || k === 'satcyclesperhour') return satPwmHelp();   // TASK-1550
     if (m && m.help) return setT('settings.help.' + k, m.help);   // TASK-2959 F10: translated like the hints
-    return (SETTINGS_HELP && typeof SETTINGS_HELP[k] === 'string') ? SETTINGS_HELP[k] : '';
+    // TASK-2927 (ADR-219): the language pack's 'settings.help.<key>' wins, the English text of settingsHelp.h is the per-key fallback.
+    var en = (SETTINGS_HELP && typeof SETTINGS_HELP[k] === 'string') ? SETTINGS_HELP[k] : '';
+    return en ? setT('settings.help.' + k, en) : '';
   }
   // One GET for the whole file. The promise is kept after a success; after a failure
   // (for example a 503 from the file-serve gate) it is dropped so the next open retries.
