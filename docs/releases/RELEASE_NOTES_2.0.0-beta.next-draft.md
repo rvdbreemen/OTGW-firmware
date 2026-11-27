@@ -1,6 +1,6 @@
 # OTGW-firmware v2.0.0-beta.NEXT Release Notes (draft skeleton)
 
-Not a release yet. Skeleton for the beta after beta.457, built from what sits in the lane `lane-poc-b2` (tip c6766a02b) and in three web UI lanes (3bb1245fd, 4cfbfadf7, e11cdbfd2). One line per user-visible change; every line needs its evidence checked again at the release commit. Not pushed.
+Not a release yet. Skeleton for the beta after beta.458, built from what sits in the lane `lane-poc-b2` (tip c6766a02b) and in three web UI lanes (3bb1245fd, 4cfbfadf7, e11cdbfd2). One line per user-visible change; every line needs its evidence checked again at the release commit. Not pushed.
 
 ## What is new in this beta, in plain words
 
@@ -33,4 +33,4 @@ Not a release yet. Skeleton for the beta after beta.457, built from what sits in
 
 ## Known issues
 
-(carry over from beta.457; add what the next bench shows)
+(carry over from beta.458; add what the next bench shows)
