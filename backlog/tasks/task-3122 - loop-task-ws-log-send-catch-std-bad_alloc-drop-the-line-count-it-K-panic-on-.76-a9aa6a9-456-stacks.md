@@ -7,6 +7,7 @@ status: To Do
 assignee:
   - '@claude'
 created_date: '2026-11-27T12:33:00Z'
+updated_date: '2026-11-27T15:08:00Z'
 labels:
   - webui
   - heap
@@ -29,3 +30,9 @@ The 456 K panic on the unit without PSRAM was an uncaught std::bad_alloc from op
 - [ ] #3 A grep note in the task lists other loop-task allocations that can throw (std containers, make_shared, String growth) in MQTTstuff, restAPI and OTGW-Core, with a judgement for each; only the /ws sites are fixed here, the others become their own tasks if needed
 - [ ] #4 Bench on the unit without PSRAM (otgw-bench-tester): K x3 with this build, no panic; ws_alloc_fail > 0 in at least one run, otherwise the run is reported as 'path not hit'
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-27 16:08 otgw-dev: pushed to origin/dev as merge commit f13bca537dcfa588c2e9d020bc44786e45cf384c (ff-only on c1326b990); the fix commit 3f9176298 (githash 3f91762, image 2.0.0-beta.458+3f91762) is its second parent and src/ is identical to it. Fix: every /ws broadcast goes through wsTextAllNoThrow(), which catches std::bad_alloc, drops the message, counts it (hd_ws_alloc_fail in /api/v2/health) and logs once per 10 s. Evidence: tests/test_ws_send_nothrow.py (4 tests, real send paths against a throwing textAll stub, mutants red); bench .76 with K x3 on 3f91762 = 0 panics in 3 (a9aa6a9: 2 of 3), the catch fired 502x in run 2; soaks 61 min on .63 and 71 min on .76 passed (bench-tester verdict files via coordinator). The commit message of 3f9176298 names TASK-3119 only (TASK-3122 files were not on its base). Still exposed, same family (the /ws broadcast path): client->close() in webSocketEvent reject branches, cleanupClients(), closeAll() (control-frame allocation); other loop-task allocations (MQTT publish gated only below 3072 B, String/vector growth, telnet) not audited.
+<!-- SECTION:NOTES:END -->
