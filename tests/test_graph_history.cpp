@@ -172,9 +172,9 @@ static bool jsonValue(const std::string& s, size_t& i) {
 }
 
 static void runCommon() {
-  check(sizeof(GraphHistSlot) == 16, "slot is 16 bytes (TASK-2018, ADR-256: satTarget column)");
-  check(GRAPH_HIST_SMALL_SLOTS * sizeof(GraphHistSlot) == 2016, "small ring is 2016 B (+252 B, ADR-256)");
-  check(GRAPH_HIST_LARGE_SLOTS * sizeof(GraphHistSlot) == 80736, "large ring is 80736 B (+10092 B, ADR-256)");
+  check(sizeof(GraphHistSlot) == 18, "slot is 18 bytes (TASK-3007, ADR-291: satRoom column after ADR-256's satTarget)");
+  check(GRAPH_HIST_SMALL_SLOTS * sizeof(GraphHistSlot) == 2268, "small ring is 2268 B (+252 B, ADR-291)");
+  check(GRAPH_HIST_LARGE_SLOTS * sizeof(GraphHistSlot) == 90828, "large ring is 90828 B (+10092 B, ADR-291)");
   check((GRAPH_HIST_SMALL_SLOTS - GRAPH_HIST_MARGIN) * GRAPH_HIST_SMALL_INTERVAL_S == 3600, "small ring emits exactly 1 h");
   check((GRAPH_HIST_LARGE_SLOTS - GRAPH_HIST_MARGIN) * GRAPH_HIST_LARGE_INTERVAL_S == 7 * 24 * 3600, "large ring holds exactly 7 days (TASK-1963)");
 
@@ -537,9 +537,74 @@ static void runSatTarget() {
   }
 }
 
+// TASK-3007 (ADR-291): the satRoom column, the room SAT regulates on. Same rules as satTarget: the array appears only when the served
+// window holds a value, no value is JSON null (never -1), a thinned group shows its newest value that is not empty, the array
+// follows satTarget, and a window without SAT room values keeps the body of ADR-256 byte for byte.
+static void runSatRoom() {
+  const uint32_t IV = (uint32_t)GRAPH_HIST_LARGE_INTERVAL_S * 1000UL;
+  check(graphHistEmptySlot().satRoom == GRAPH_HIST_NO_TEMP, "SAT room: an empty slot has no SAT room");
+  {  // two slots, the second with SAT room: column present right after satTarget, null for the slot without
+    RingBox b(GRAPH_HIST_LARGE_SLOTS, GRAPH_HIST_LARGE_INTERVAL_S);
+    graphHistIntervalsDue(b.r, b.c, 1000);
+    GraphHistSlot a = graphHistEmptySlot(); a.outside = 50;
+    GraphHistSlot s = graphHistEmptySlot(); s.outside = 50; s.satTarget = 210; s.satRoom = graphHistEncTemp(19.8f, true);
+    graphHistCommit(b.r, b.c, graphHistIntervalsDue(b.r, b.c, 1000 + IV), a);
+    graphHistCommit(b.r, b.c, graphHistIntervalsDue(b.r, b.c, 1000 + 2 * IV), s);
+    GraphHistSnapshot sn = graphHistMakeSnapshot(b.r, b.c, b.c.lastCommitMs);
+    const std::string json = emit(b.r, sn);
+    std::vector<std::string> col;
+    check(column(json, "satRoom", col) && col.size() == 2 && col[0] == "null" && col[1] == "198",
+          "SAT room: the column holds null, then 198 for the slot with a SAT room");
+    check(json.find("\"satTarget\":[null,210],\"satRoom\":[null,198],\"mod\":") != std::string::npos,
+          "SAT room: the array follows satTarget and precedes mod");
+    check(jsonValid(json), "SAT room: the body is valid JSON");
+  }
+  {  // satTarget present but no SAT room value in the window (room lost all the time): no satRoom array
+    RingBox b(GRAPH_HIST_LARGE_SLOTS, GRAPH_HIST_LARGE_INTERVAL_S);
+    graphHistIntervalsDue(b.r, b.c, 0);
+    for (uint32_t i = 1; i <= 10; i++) {
+      GraphHistSlot v = slotWithFlow(400); v.satTarget = 210;
+      graphHistCommit(b.r, b.c, graphHistIntervalsDue(b.r, b.c, i * IV), v);
+    }
+    const std::string json = emit(b.r, graphHistMakeSnapshot(b.r, b.c, b.c.lastCommitMs));
+    check(json.find("satTarget") != std::string::npos && json.find("satRoom") == std::string::npos,
+          "SAT room: a window without a SAT room value has no satRoom array (body as ADR-256)");
+  }
+  {  // SAT room values only before the served window: the array is omitted for the short window, present for the long one
+    RingBox b(GRAPH_HIST_LARGE_SLOTS, GRAPH_HIST_LARGE_INTERVAL_S);
+    graphHistIntervalsDue(b.r, b.c, 0);
+    for (uint32_t i = 1; i <= 100; i++) {
+      GraphHistSlot v = slotWithFlow(400);
+      if (i <= 50) v.satRoom = 205;
+      graphHistCommit(b.r, b.c, graphHistIntervalsDue(b.r, b.c, i * IV), v);
+    }
+    GraphHistSnapshot h1 = graphHistMakeSnapshot(b.r, b.c, b.c.lastCommitMs, 3600UL);
+    check(emit(b.r, h1).find("satRoom") == std::string::npos, "SAT room: a short window without a value has no array");
+    std::vector<std::string> col;
+    check(column(emit(b.r, graphHistMakeSnapshot(b.r, b.c, b.c.lastCommitMs)), "satRoom", col) && col.size() == 100 &&
+          col.front() == "205" && col.back() == "null", "SAT room: the 24 h window holds the values oldest to newest");
+  }
+  {  // ?hours=168 groups of 5: the newest value of a group that is not empty
+    RingBox b(GRAPH_HIST_LARGE_SLOTS, GRAPH_HIST_LARGE_INTERVAL_S);
+    graphHistIntervalsDue(b.r, b.c, 0);
+    const uint32_t N = GRAPH_HIST_LARGE_SLOTS - GRAPH_HIST_MARGIN;
+    for (uint32_t i = 1; i <= N; i++) {
+      GraphHistSlot v = slotWithFlow(1);
+      if (i % 5 == 2) v.satRoom = (int16_t)(190 + (i / 5) % 50);
+      graphHistCommit(b.r, b.c, graphHistIntervalsDue(b.r, b.c, i * IV), v);
+    }
+    GraphHistSnapshot w = graphHistMakeSnapshot(b.r, b.c, b.c.lastCommitMs, 168UL * 3600UL);
+    std::vector<std::string> col;
+    check(w.step == 5 && column(emit(b.r, w), "satRoom", col) && col.size() == 1008 &&
+          col.back() == std::to_string(190 + ((N - 3) / 5) % 50),
+          "SAT room: a thinned group shows its newest SAT room value (1008 groups)");
+  }
+}
+
 int main() {
   runCommon();
   runSatTarget();
+  runSatRoom();
   runSevenDay();
   runConfig("small 126x30s", GRAPH_HIST_SMALL_SLOTS, GRAPH_HIST_SMALL_INTERVAL_S);
   runConfig("large 5046x120s", GRAPH_HIST_LARGE_SLOTS, GRAPH_HIST_LARGE_INTERVAL_S);

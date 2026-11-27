@@ -2920,6 +2920,7 @@ static bool satTryRoomSource(uint8_t src, float* out)
   }
 }
 
+float satRoomForHistory();   // TASK-3007 (ADR-291): the graph history samples the room SAT regulates on
 static float satGetRoomTemp()
 {
   // Simulation mode overrides all other sources
@@ -2988,6 +2989,13 @@ static float satGetRoomTemp()
 
   _sat_roomSrc = 'T';
   return otRoom;
+}
+
+// TASK-3007 (ADR-291): the same value /api/v2/sat/status reports as room_temp, NAN when no source has a usable reading.
+float satRoomForHistory()
+{
+  const float v = satGetRoomTemp();
+  return satRoomTempUsable(v) ? v : NAN;
 }
 
 // TASK-3021 (entries 460, 461): the frost guard. While SAT is off and no thermostat is seen on the bus, a room at or below

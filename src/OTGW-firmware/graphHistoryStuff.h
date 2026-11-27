@@ -60,6 +60,7 @@ static const uint8_t GRAPH_HIST_NO_MOD  = 255;        // no value for the modula
 
 // One slot. Temperatures are value*10 rounded; mod is 0..100 rounded.
 // TASK-2018 (ADR-256, amends ADR-193/245): satTarget is the SAT target while SAT is enabled, else no value.
+// TASK-3007 (ADR-291): satRoom is the room temperature SAT regulates on while SAT is enabled and its room is not lost, else no value.
 struct GraphHistSlot {
   int16_t flow;
   int16_t ret;
@@ -68,14 +69,15 @@ struct GraphHistSlot {
   int16_t room;
   int16_t outside;
   int16_t satTarget;
+  int16_t satRoom;
   uint8_t mod;
   uint8_t flags;
 };
-static_assert(sizeof(GraphHistSlot) == 16, "GraphHistSlot must stay 16 bytes (ADR-256)");
+static_assert(sizeof(GraphHistSlot) == 18, "GraphHistSlot must stay 18 bytes (ADR-291)");
 
 inline GraphHistSlot graphHistEmptySlot() {
   GraphHistSlot s;
-  s.flow = s.ret = s.chSet = s.roomSet = s.room = s.outside = s.satTarget = GRAPH_HIST_NO_TEMP;
+  s.flow = s.ret = s.chSet = s.roomSet = s.room = s.outside = s.satTarget = s.satRoom = GRAPH_HIST_NO_TEMP;
   s.mod = GRAPH_HIST_NO_MOD;
   s.flags = 0;
   return s;
@@ -199,6 +201,7 @@ struct GraphHistSnapshot {
   uint16_t n;             // emitted (group) slots, at most GRAPH_HIST_MAX_EMIT
   uint16_t step;          // ring slots per emitted slot (1 = full resolution)
   bool     hasSatTarget;  // a slot of the window holds a SAT target: emit the satTarget array (ADR-256)
+  bool     hasSatRoom;    // a slot of the window holds a SAT room temperature: emit the satRoom array (ADR-291)
 };
 
 // TASK-1963 (ADR-245): windowS is the span the response covers (default 24 h, capped at 7 d and at
@@ -223,8 +226,12 @@ inline GraphHistSnapshot graphHistMakeSnapshot(const GraphHistRing& r, const Gra
   // TASK-2018 (ADR-256): decided once here, under the ring mutex, so every re-run of the emitter for a TCP window
   // gives the same body. The scan covers exactly the slots of the emitted groups.
   s.hasSatTarget = false;
-  for (uint32_t k = 0; k < (uint32_t)s.n * s.step && !s.hasSatTarget; k++)
-    s.hasSatTarget = r.slot[(s.start + k) % r.cap].satTarget != GRAPH_HIST_NO_TEMP;
+  s.hasSatRoom = false;
+  for (uint32_t k = 0; k < (uint32_t)s.n * s.step && !(s.hasSatTarget && s.hasSatRoom); k++) {
+    const GraphHistSlot& q = r.slot[(s.start + k) % r.cap];
+    if (q.satTarget != GRAPH_HIST_NO_TEMP) s.hasSatTarget = true;
+    if (q.satRoom != GRAPH_HIST_NO_TEMP)   s.hasSatRoom = true;
+  }
   return s;
 }
 
@@ -303,6 +310,8 @@ void graphHistEmitJson(W& je, const GraphHistRing& r, const GraphHistSnapshot& s
   graphHistEmitTempColumn(je, F("outside"), r, s, &GraphHistSlot::outside);
   // TASK-2018 (ADR-256): only when the window holds a SAT target, so a window without SAT keeps its body.
   if (s.hasSatTarget) graphHistEmitTempColumn(je, F("satTarget"), r, s, &GraphHistSlot::satTarget);
+  // TASK-3007 (ADR-291): same rule for the room SAT regulates on; JSON null for no value, a group takes its newest value.
+  if (s.hasSatRoom) graphHistEmitTempColumn(je, F("satRoom"), r, s, &GraphHistSlot::satRoom);
   je.beginArray(F("mod"));
   for (uint16_t i = 0; i < s.n; i++) {
     uint8_t v = GRAPH_HIST_NO_MOD;
