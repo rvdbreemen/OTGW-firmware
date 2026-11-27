@@ -161,6 +161,71 @@ def _require_main_firmware(host, password):
     raise SystemExit(3)
 
 
+# ADR-298: the LittleFS partition of each table (a mklittlefs image spans the whole partition). A unit whose table is not
+# the one these images are built for must be migrated over USB first; an image written over WiFi into a partition of
+# another size does not mount (littlefs checks the block count), and the web files and settings.ini are unreadable.
+FS_PARTITION_BY_LAYOUT = {"safeboot": 0xC0000, "safeboot2": 0xB0000}
+MIB = 1024 * 1024
+
+
+LAYOUT_MARKER = re.compile(rb"otgw-layout=([a-z0-9]+)")
+
+
+def app_image_layout(path):
+    """The partition table an app image is built for (the otgw-layout= marker), or None for an image without one."""
+    if not path:
+        return None
+    with open(path, "rb") as f:
+        m = LAYOUT_MARKER.search(f.read())
+    return m.group(1).decode("ascii") if m else None
+
+
+def unit_layout(d):
+    """The unit's table: partition_layout from device/info, else told from LittleFSsize of an older firmware."""
+    if d.get("partition_layout"):
+        return d["partition_layout"]
+    t = d.get("LittleFSsize")
+    if isinstance(t, (int, float)) and t > 0:
+        for name, part in FS_PARTITION_BY_LAYOUT.items():
+            if abs(t * MIB - part) <= 32 * 1024:
+                return name
+    return None
+
+
+def check_layout(host, fs, password="", app=None):
+    """Refuse before anything is sent when the filesystem image does not fit the unit's partition table.
+
+    Firmware with ADR-298 reports partition_layout and partition_layout_expected in device/info: a unit on another
+    table than the firmware expects is refused (the whole run, app and filesystem), and the image size must equal the
+    LittleFS partition of the unit's table. An older firmware has neither field: its LittleFSsize (the total bytes
+    of the mounted filesystem, in MiB) is compared with the image instead (not verified on a unit: the bench run
+    checks what an old firmware reports). Without any of these fields nothing can be told and the run goes on."""
+    try:
+        d = _get_json(host, "/api/v2/device/info", password=password)["device"]
+    except Exception:
+        return
+    layout, want = d.get("partition_layout"), d.get("partition_layout_expected")
+    hint = ("Migrate the unit once over USB first: flash_otgw.bat --migrate --host <ip> (flash_otgw.sh on Linux and "
+            "macOS). Over WiFi the new filesystem image would not mount and settings.ini would be unreadable.")
+    if layout and want and layout != want:
+        raise SystemExit(f"{host} has the '{layout}' partition layout, this firmware needs '{want}'. {hint}")
+    want_img = app_image_layout(app)
+    have = unit_layout(d)
+    if want_img and have and want_img != have:
+        raise SystemExit(f"the app image is built for the '{want_img}' partition layout but {host} has '{have}'. {hint}")
+    if not fs:
+        return
+    size = os.path.getsize(fs)
+    part = FS_PARTITION_BY_LAYOUT.get(layout) if layout else None
+    if part is None and not layout and isinstance(d.get("LittleFSsize"), (int, float)) and d["LittleFSsize"] > 0:
+        part = int(round(d["LittleFSsize"] * MIB))
+        if abs(size - part) <= 32 * 1024:   # half a 64K step: the totals of the two tables are 64K apart
+            part = size
+    if part is not None and size != part:
+        raise SystemExit(f"the filesystem image is {size} bytes but the LittleFS partition of {host} is about {part} "
+                         f"bytes: the image was built for another partition table. {hint}")
+
+
 def _version_hash(host):
     with urllib.request.urlopen(f"http://{host}/version.hash", timeout=4) as r:
         return r.read().decode("ascii", "replace").strip()
@@ -344,6 +409,8 @@ def main(argv=None):
     for what, path in (("app", app), ("filesystem", fs)):
         if path and (not os.path.isfile(path) or os.path.getsize(path) == 0):
             raise SystemExit(f"{what} image not found or empty: {path}; nothing was sent to the unit")
+
+    check_layout(a.host, fs, a.password, app)
 
     # GET /api/v2/settings needs the admin password when one is set (restAPI.ino handleSettings).
     before = _get_json(a.host, "/api/v2/settings", password=a.password)["settings"]

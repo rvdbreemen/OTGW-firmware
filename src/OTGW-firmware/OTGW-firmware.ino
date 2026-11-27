@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.ino
-**  Version  : v2.0.0-beta.474
+**  Version  : v2.0.0-beta.475
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -346,6 +346,11 @@ void setup() {
     if (otadataMsg[0]) SetupDebugf(PSTR("%s\r\n"), otadataMsg);
   }
   if (!LittleFSmounted) SetupDebugln(F("*** ERROR: LittleFS mount FAILED - running on compile-time defaults ***"));
+  // ADR-298: this firmware on another partition table than it is built for (an app OTA does not rewrite the table). It
+  // runs on the old filesystem; the filesystem OTA refuses images of the other table, /update names the USB migration.
+  if (strcmp(partitionLayout(), partitionLayoutExpected()) != 0)
+    SetupDebugf(PSTR("*** WARNING: partition table is '%s', this firmware is built for '%s': migrate once over USB (flash_otgw --migrate); no filesystem update until then ***\r\n"),
+                partitionLayout(), partitionLayoutExpected());
   if (LittleFSmounted && LittleFS.exists(SETTINGS_TMP_FILE)) LittleFS.remove(SETTINGS_TMP_FILE);   // TASK-1913: a reset mid-save leaves it; it holds secrets, and the web server is not up yet
   fsOtaRtcRestoreAtBoot(LittleFSmounted);   // TASK-1774: a reset during a filesystem OTA; before readSettings()
   cacheBootFlashInfo();   // A: cache static flash/FS values once; used by /api/v2/device/info

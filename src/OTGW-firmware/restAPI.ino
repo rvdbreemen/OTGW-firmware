@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-beta.474
+**  Version  : v2.0.0-beta.475
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -3536,6 +3536,8 @@ void sendDeviceInfoV2()
     // when firmware OTA works through safeboot), safeboot_available = the
     // ADR-191 safeboot updater is installed (firmware OTA via POST /safeboot).
     je.field(F("firmware_ota"),       firmwareOtaPath());
+    je.field(F("partition_layout"),          partitionLayout());           // ADR-298: legacy | safeboot | safeboot2 | unknown
+    je.field(F("partition_layout_expected"), partitionLayoutExpected());
     je.field(F("app_ota_available"),  hasSpareAppOtaSlot());
     je.field(F("safeboot_available"), hasSafeboot());
 

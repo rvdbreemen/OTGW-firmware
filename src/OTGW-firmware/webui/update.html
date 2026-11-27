@@ -197,7 +197,9 @@ var OTGWUpd = (function () {
       if (s.indexOf('OTGW-firmware') < 0) return { kind: 'foreign' };
       VER_RE.lastIndex = 0;
       while ((m = VER_RE.exec(s)) && vers.length < 20) vers.push(m[0]);
-      return vers.length ? { kind: 'app', vers: vers } : { kind: 'noversion' };
+      // The table the image is built for (ADR-298). Built at run time like the marker above: no literal in this page.
+      m = new RegExp('otgw-layout' + '=([a-z0-9]+)').exec(s);
+      return vers.length ? { kind: 'app', vers: vers, layout: m ? m[1] : '' } : { kind: 'noversion' };
     }
     if (b[0] === 0x50 && b[1] === 0x4B && b[2] === 3 && b[3] === 4) return { kind: 'zip' };
     head = bstr(b.subarray(0, Math.min(n, 4112)));
@@ -295,7 +297,7 @@ var OTGWUpd = (function () {
     E = capp.vers[0];
     for (i = 0; i < capp.vers.length; i++) { if (capp.vers[i] === hint) E = hint; }
     if (!has(fsf.u8, E.split('+')[1])) warns.push('These two files look like they come from different builds.');
-    return { app: app, fs: fsf, E: E, G: E.split('+')[1], slug: slug || slugOf(app.name), warns: warns };
+    return { app: app, fs: fsf, E: E, G: E.split('+')[1], slug: slug || slugOf(app.name), warns: warns, layout: capp.layout || '' };
   }
   // files: [{name}], rd(file) -> Promise<Uint8Array>
   function intake(files, rd) {
@@ -334,6 +336,7 @@ var OTGWUpd = (function () {
       if (!d || typeof d.fwversion !== 'string') return s;
       s.ok = true; s.ver = d.fwversion; s.host = d.hostname || ''; s.ip = d.ipaddress || ''; s.net = d.networkmode || '';
       s.board = d.board || ''; s.hw = d.hardware_type || ''; s.sb = d.safeboot_available === true; s.appOta = d.app_ota_available === true;
+      s.layout = d.partition_layout || ''; s.layoutWant = d.partition_layout_expected || '';
       return jget(io, '/api/v2/filesystem/hash-check', 8000).then(function (h) {
         var c = h.j && h.j.filesystem_check;
         s.fsMatch = c ? c.match === true : null; s.fsHash = (c && c.fs_hash) || '';
@@ -346,7 +349,11 @@ var OTGWUpd = (function () {
   // identity is only that 7-character hash, so a match is not proof the files are there.
   function planFor(s, r, host) {
     var w = r.warns.slice(), ok = !!(s && s.ok), same = ok && s.ver === r.E, mb = function (n) { return (n / 1048576).toFixed(2) + ' MB'; };
-    var p = { from: 'handover', info: '', warns: w, start: ok && s.sb && !s.appOta && isIPv4(host) };
+    var p = { from: 'handover', info: '', warns: w, start: ok && s.sb && !s.appOta && isIPv4(host), block: '' };
+    if (ok && r.layout && s.layout && r.layout !== s.layout) {
+      p.start = false;
+      p.block = 'These files are built for the "' + r.layout + '" partition layout but this unit has "' + s.layout + '". Migrate it once over USB first (flash_otgw --migrate --host <ip>), see the release notes.';
+    }
     if (ok && !hwOk(r.slug, s.hw)) w.push('These files are for another board type (' + r.slug + '); this unit reports ' + s.hw + '.');
     if (same && s.fsMatch === true && s.fsHash === r.G) { p.from = 'fs'; p.info = 'This unit already runs ' + r.E + ' with matching web files. Press Update to send the web files again anyway.'; }
     else if (same) { p.from = 'fs'; p.info = 'The unit already runs ' + r.E + '. Only the web files will be installed.'; }
@@ -658,7 +665,10 @@ var OTGWUpd = (function () {
       }
       var fsTxt = s.fsMatch === true ? 'match the firmware' : (s.fsMatch === false ? 'do NOT match the firmware (hash ' + (s.fsHash || 'unknown') + ')' : 'could not be checked');
       setText('unitInfo', 'Unit ' + (s.host || '?') + ' (' + (s.ip || '?') + ') runs ' + s.ver + '. Its web files ' + fsTxt + '.');
-      if (s.appOta) { blockOne('This unit takes a firmware image directly (two firmware slots). Use the manual forms below.'); }
+      if (s.layout && s.layoutWant && s.layout !== s.layoutWant) {
+        blockOne('This unit has the "' + s.layout + '" partition layout but this firmware needs "' + s.layoutWant + '". Migrate it once over USB (flash_otgw --migrate --host <ip>), see the release notes. The one-action update is off until then.');
+      }
+      else if (s.appOta) { blockOne('This unit takes a firmware image directly (two firmware slots). Use the manual forms below.'); }
       else if (!s.sb) { blockOne('This unit cannot update its firmware over WiFi. Use USB (flash_otgw) or, for the web files only, the manual form below.'); }
       else if (PROXIED && !U.isIPv4(location.hostname)) {
         note('This page was opened through a reverse proxy. The update works only if the proxy reaches the unit by IP address (' + (s.ip || '?') + '): the updater has no network name.', 'warn');
@@ -687,6 +697,7 @@ var OTGWUpd = (function () {
       // Behind a proxy the browser never talks to the unit's address itself; the proxy does,
       // so the unit's IP stands in for the host check.
       var p = U.planFor(snap, r, PROXIED && snap && snap.ip ? snap.ip : location.hostname);
+      if (p.block) { setText('oneFilesInfo', 'Not accepted: ' + p.block); refreshStart(); return; }
       plan = { r: r, from: p.from };
       setText('oneFilesInfo', p.info + (p.warns.length ? ' Warning: ' + p.warns.join(' ') : ''));
       refreshStart();

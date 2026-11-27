@@ -70,6 +70,33 @@ test('the header comment names a test file that exists', () => {
   assert.ok(fs.existsSync(path.join(ROOT, m[1])), m[1] + ' does not exist');
 });
 
+// ---------- ADR-298: the image says which partition table it is built for ----------
+function fakeApp(extra) {
+  const text = Buffer.from('OTGW-firmware 2.0.0-beta.435+abc1234 ' + extra + '\0');
+  const b = new Uint8Array(0x100 + text.length);
+  b[0] = 0xE9; b[12] = 9; b[0x20] = 0x32; b[0x21] = 0x54; b[0x22] = 0xCD; b[0x23] = 0xAB;   // MAGIC 0xABCD5432
+  b.set(text, 0x100);
+  return b;
+}
+test('classify: an app image reports the layout of its otgw-layout marker, none without one', () => {
+  assert.equal(U.classify(fakeApp('otgw-layout=safeboot2')).layout, 'safeboot2');
+  assert.equal(U.classify(fakeApp('')).layout, '');
+  assert.equal(U.classify(fakeApp('otgw-layout=safeboot2')).kind, 'app');
+});
+test('the page text itself carries no otgw-layout marker (a main image holds this page)', () => {
+  assert.ok(!/otgw-layout=/.test(header), 'the literal marker must not appear in update.html');
+});
+test('planFor: an image for another table than the unit has is not startable and carries the reason', () => {
+  const r = { E: '2.0.0-beta.435+abc1234', G: 'abc1234', slug: 'esp32-combo', warns: [], layout: 'safeboot2',
+              app: { u8: { length: 2023168 } }, fs: { u8: { length: 720896 } } };
+  const s = { ok: true, ver: '2.0.0-beta.430+0000000', fsMatch: true, fsHash: '0000000', sb: true, appOta: false, hw: 'otgw32', layout: 'safeboot' };
+  const p = U.planFor(s, r, '192.168.1.5');
+  assert.equal(p.start, false);
+  assert.match(p.block, /safeboot2.*safeboot.*USB/);
+  assert.equal(U.planFor(Object.assign({}, s, { layout: 'safeboot2' }), r, '192.168.1.5').block, '');
+  assert.equal(U.planFor(Object.assign({}, s, { layout: '' }), r, '192.168.1.5').block, '', 'a unit that reports no layout is not blocked');
+});
+
 test('the logic script does not touch the DOM', () => {
   assert.ok(!/\bdocument\b|\bwindow\b|\blocalStorage\b/.test(LOGIC));
 });

@@ -73,10 +73,13 @@ set "DOWNLOAD_URL=https://github.com/espressif/esptool/releases/download/%ESPTOO
 REM Partition offsets (see partitions_otgw_esp32.csv). app0=0x100000, spiffs=0x330000.
 set "APP_OFFSET=0x100000"
 set "FS_OFFSET=0x330000"
-REM Layout the images of this release are built for: "legacy" (app0 @0x10000)
-REM or "safeboot" (ADR-191: safeboot factory @0x10000, app0 @0x100000).
-REM The unit's layout is recognised by a "safeboot" label in its partition table.
-set "TOOL_LAYOUT=safeboot"
+REM The partition table these images are built for, told by the size of app0 in partitions_otgw_esp32.csv.
+REM The unit's table is recognised by the size of its app0 entry, not by the name "safeboot": two tables share the
+REM names, and a write at the other table's offsets lands inside its filesystem.
+REM   no app0 entry / no safeboot = "legacy"; 0x230000 = "safeboot" (ADR-191, LittleFS 768K at 0x330000);
+REM   0x240000 = "safeboot2" (app0 2304K, LittleFS 704K at 0x340000).
+set "TOOL_APP0_SIZE=0x230000"
+if /I "%TOOL_APP0_SIZE%"=="0x240000" ( set "TOOL_LAYOUT=safeboot2" ) else ( set "TOOL_LAYOUT=safeboot" )
 REM Migration images: slice 1 at 0x0, slice 2 right after NVS (0x9000 + 0x5000).
 set "MIGRATE_REST_OFFSET=0xE000"
 
@@ -467,17 +470,22 @@ if errorlevel 1 (
     exit /b 1
 )
 set "DEVICE_LAYOUT=legacy"
-powershell -NoProfile -Command "if ([Text.Encoding]::ASCII.GetString([IO.File]::ReadAllBytes('%PT_FILE%')).Contains('safeboot')) { exit 0 } else { exit 1 }"
-if not errorlevel 1 set "DEVICE_LAYOUT=safeboot"
+REM app0 entry: 32-byte entries, label at +12, size (little endian) at +8; prints legacy / safeboot / safeboot2 / unknown(app0=0x...)
+for /f "delims=" %%L in ('powershell -NoProfile -Command "$b=[IO.File]::ReadAllBytes('%PT_FILE%'); $s=[Text.Encoding]::ASCII.GetString($b); if (-not $s.Contains('safeboot')) { 'legacy' } else { $i=$s.IndexOf('app0'); if ($i -lt 4) { 'legacy' } else { $z=[BitConverter]::ToUInt32($b,$i-4); if ($z -eq 0x230000) { 'safeboot' } elseif ($z -eq 0x240000) { 'safeboot2' } else { 'unknown(app0=0x{0:X})' -f $z } } }"') do set "DEVICE_LAYOUT=%%L"
 del "%PT_FILE%" >nul 2>&1
 echo [OK] Unit layout: !DEVICE_LAYOUT!   images: %TOOL_LAYOUT%
 if /I not "!DEVICE_LAYOUT!"=="%TOOL_LAYOUT%" (
     echo [ERROR] This unit uses the !DEVICE_LAYOUT! partition layout; these images are for %TOOL_LAYOUT%.
-    echo         Run a one-time migration first:
-    echo           flash_otgw.bat --migrate --host ^<device ip^>
+    if /I "!DEVICE_LAYOUT!"=="legacy" goto :layout_needs_migrate
+    if /I "!DEVICE_LAYOUT!"=="safeboot" goto :layout_needs_migrate
+    echo         These images do not match that layout; use the flash package of the firmware the unit runs, or a full factory flash.
     exit /b 1
 )
 exit /b 0
+:layout_needs_migrate
+echo         Run a one-time migration first:
+echo           flash_otgw.bat --migrate --host ^<device ip^>
+exit /b 1
 
 
 :migrate_backup

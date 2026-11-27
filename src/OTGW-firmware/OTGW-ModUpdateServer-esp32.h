@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTGW-ModUpdateServer-esp32.h
-**  Version  : v2.0.0-beta.474
+**  Version  : v2.0.0-beta.475
 **
 **  ESP32 OTA update server — functional equivalent of the ESP8266
 **  OTGW-ModUpdateServer with Nodoshop hardware watchdog feeding.
@@ -120,6 +120,32 @@ inline const char *firmwareOtaPathFor(bool spareAppSlot, bool safeboot) {
   return spareAppSlot ? "direct" : (safeboot ? "safeboot" : "usb");
 }
 inline const char *firmwareOtaPath() { return firmwareOtaPathFor(hasSpareAppOtaSlot(), hasSafeboot()); }
+
+// ADR-298 (amends ADR-191): which partition table the unit runs, told by the size of app0 and not by the partition
+// names (the +64K table keeps them). device/info "partition_layout":
+//   "legacy"    no safeboot app (the table before ADR-191)
+//   "safeboot"  app0 2240K (0x230000), LittleFS 768K
+//   "safeboot2" app0 2304K (0x240000), LittleFS 704K
+//   "unknown"   any other app0 size
+// "partition_layout_expected" is the table this firmware is built for (partitions_otgw_esp32.csv); a unit on another
+// one needs the one-time USB migration, and the /update page blocks the one-action update until then.
+inline const char *partitionLayoutFor(bool safeboot, uint32_t app0Size) {
+  if (!safeboot) return "legacy";
+  if (app0Size == 0x230000u) return "safeboot";
+  if (app0Size == 0x240000u) return "safeboot2";
+  return "unknown";
+}
+inline const char *partitionLayout() {
+  const esp_partition_t *app0 = esp_partition_find_first(ESP_PARTITION_TYPE_APP, ESP_PARTITION_SUBTYPE_APP_OTA_0, nullptr);
+  return partitionLayoutFor(hasSafeboot(), app0 ? static_cast<uint32_t>(app0->size) : 0u);
+}
+// The table this firmware is built for (partitions_otgw_esp32.csv; tests/test_partition_mirrors.py checks it). The same
+// word is in the app image as "otgw-layout=<word>": the /update page and scripts/ota_flash.py read it from the IMAGE
+// before they send it, so an image for another table is refused while an older running app cannot know about it.
+#define OTGW_PARTITION_LAYOUT "safeboot"
+static const char kPartitionLayoutMarker[] __attribute__((used)) = "otgw-layout=" OTGW_PARTITION_LAYOUT;
+// Returns the word behind the marker, so the marker is referenced and survives the linker's section gc.
+inline const char *partitionLayoutExpected() { return kPartitionLayoutMarker + (sizeof("otgw-layout=") - 1); }
 
 // Mirror the hostname and the admin password into NVS for safeboot, which
 // cannot read settings.ini (LittleFS). Writes only on change, so calling it on
@@ -667,9 +693,23 @@ private:
       LittleFS.end();
       ::state.flash.bFsImageWriting = true;   // TASK-1909: no LittleFS.begin() elsewhere until the remount below
       fsWriterResume();   // TASK-2007: bFsImageWriting holds the writer from here; the remount pauses it again until the restore
-      if (uploadTotal > 0 && uploadTotal > fsSize) {
+      if (uploadTotal == 0) {
+        // ADR-298: without size= the image cannot be compared with this unit's partition before it is written, and an
+        // image built for another table does not mount afterwards (settings.ini unreadable). The /update page, the
+        // scripts and the documented curl calls send size=<bytes>.
+        strlcpy(_updaterError, "filesystem upload needs size=<bytes> in the query string (POST /update?cmd=100&size=<bytes>)", sizeof(_updaterError));
+        _dropKeptFiles();
+        fsOtaRtcWipe();
+      } else if (uploadTotal > fsSize) {
         strlcpy(_updaterError, "filesystem image too large", sizeof(_updaterError));
         _dropKeptFiles();   // the old filesystem is untouched; the copies are not needed
+        fsOtaRtcWipe();
+      } else if (uploadTotal < fsSize) {
+        // ADR-298: a mklittlefs image spans the whole partition, so a smaller one was built for another table. Written
+        // here it would not mount (littlefs checks the block count against the partition: lfs.c "Invalid block count"),
+        // and the web files and settings.ini would be unreadable. Refuse before any write; the old filesystem stays.
+        strlcpy(_updaterError, "filesystem image does not match this unit's partition layout: migrate once over USB (flash_otgw --migrate)", sizeof(_updaterError));
+        _dropKeptFiles();
         fsOtaRtcWipe();
       } else if (!Update.begin(fsSize, U_SPIFFS)) {  // U_SPIFFS covers LittleFS on ESP32
         _setUpdaterError();
