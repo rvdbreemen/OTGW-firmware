@@ -61,7 +61,7 @@ If you run beta.458, the changes below are what you get. If you run an older bet
 
 ### Behind the scenes
 
-- [COUNT-TBD] internal changes: documentation and decisions, task administration, test keys for the bench (beta builds only) and tooling. Nothing you need to do.
+- 28 internal changes: documentation and decisions, task administration, test keys for the bench (beta builds only) and tooling. Nothing you need to do.
 
 ### Thanks
 

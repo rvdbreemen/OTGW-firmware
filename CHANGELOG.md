@@ -18,7 +18,7 @@ Build in this beta: beta.474 only (previous public beta: beta.458; beta.459 to b
 - Web UI: the page reconnects with a growing wait (5, 10, 20, 40, then 60 seconds, with jitter) and pauses after repeated short-lived connections; a Reconnect button resumes (TASK-3124). Tried in headless Chrome only. Also: help popover stays inside its card (TASK-3058), chart axis label no longer touches the axis (TASK-3052), clearer English settings help (TASK-3118), the File System table fits a 375 px screen (TASK-2926).
 - Release files: the GitHub release has no loose `.ino.bin` or `.littlefs.bin` file and `SHA256SUMS` lists none; the images stay inside the `-flash.zip` (TASK-3116).
 - Manual: rows for the new MQTT topics, the zone changes and the OTGW32 pins.
-- Internal: [COUNT-TBD] changes in documentation and decisions, task administration, bench test keys (beta builds only) and tooling; nothing to do for users.
+- Internal: 28 changes in documentation and decisions, task administration, bench test keys (beta builds only) and tooling; nothing to do for users.
 
 ### Known issues
 - The retained state echo of the SAT settings topics (`sat/weather_lat`, `sat/weather_lon`, `sat/zone_count` and the other static `sat/*` settings) is published only once SAT is not held back by its start gates: the first 60 seconds after boot, a lost OpenTherm link, or a missing outside temperature. On a unit where SAT is held back, those topics stay empty; setting them over MQTT or REST still works. Same as in earlier betas.
