@@ -4,8 +4,10 @@ title: >-
   Docs C3: flash layout for ADR-298 (safeboot2, USB migration, rollback) in the
   same commit as the table change
 status: To Do
-assignee: []
+assignee:
+  - '@otgw-dev'
 created_date: '2026-11-27T18:42:00Z'
+updated_date: '2026-11-27T19:53:00Z'
 labels: []
 milestone: 2.0.0
 dependencies:

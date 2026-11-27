@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@otgw-dev'
 created_date: '2026-11-22T01:58:00Z'
-updated_date: '2026-11-27T06:21:00Z'
+updated_date: '2026-11-27T20:03:00Z'
 labels:
   - heap
   - websocket
@@ -26,8 +26,8 @@ Parent: TASK-3024. ADR-107's action 1 (emergencyHeapRecovery, helperStuff.ino:13
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Design note: which task does the abort, why it is safe against the async_tcp deletion of the client, and the superseding ADR (Proposed) that replaces ADR-107 action 1
-- [ ] #2 Host test: at CRITICAL the recovery aborts every /ws connection (RST) instead of a WS close; red on the code before
+- [x] #1 Design note: which task does the abort, why it is safe against the async_tcp deletion of the client, and the superseding ADR (Proposed) that replaces ADR-107 action 1
+- [x] #2 Host test: at CRITICAL the recovery aborts every /ws connection (RST) instead of a WS close; red on the code before
 - [ ] #3 Bench: a forced CRITICAL (or a reproduction) shows the /ws client gone at once with its memory back, and a web UI tab reconnecting
 <!-- AC:END -->
 
@@ -47,4 +47,6 @@ Parent: TASK-3024. ADR-107's action 1 (emergencyHeapRecovery, helperStuff.ino:13
 Review by otgw-poc-dev (read-only) 2026-11-26, F = code read, I = inference: the abort path is sound (AsyncTCP 3.4.10 tcp_error sets _pcb = nullptr under the core lock, AsyncTCP.cpp:496-512, no double abort). Taken over: the [heap-recovery] line now carries ws_tracked_before / ws_aborted / ws_tracked_after (a failed new(nothrow) of the error event would leave a tracked row), and the glued comment at hd_ws_recovery_abort is fixed. For the bench request: the deep hold floor of 1792 B free is below what WiFi/lwIP/async_tcp tolerate, so the unit may panic or lose WiFi inside the 2 min, and a loop stall means no self-release; plan K with 1 to 3 /ws clients incl. one DISCONNECTING, check iWsRecoveryAborts == clients, tracked rows 0 afterwards, free heap before/after, no async_tcp panic. Facts: the trigger is getHeapHealth() == CRITICAL, TOTAL free heap < 3072 sampled each loop with a 30 s rate limit (OTGW-firmware.ino:1110, helperStuff.ino:1138), NOT the largest block (do not quote max-block numbers as its margin); TASK-1386 saw min free 2240 with entered_critical 0 once (sampling misses dips): ask for fleet entered_critical/min-free values before claiming it never fires normally. v2.js reconnects after a fixed 5000 ms without jitter (v2.js:3039): optional web UI follow-up, not in this release.
 
 2026-11-27 otgw-dev: architect review of 22ed5c09f (review_heaprec_22ed5c09f_adr295.md) F1-F3 answered with comments only, no logic change: ws_tracked_after in the [heap-recovery] line is read in the same pass as the abort and is not leak evidence; leak check = device/info ws_clients[] about 5 s later. IPv6 /ws client not aborted (missed, never wrong match); wsTrack rows read without a lock (torn row harmless). Tests: test_platform_tcp_abort_where 13 OK (1 skipped), test_ws_rx_timeout_reap 9 OK, test_heaphold_hook 12 OK.
+
+otgw-architect verification 2026-11-27 21:xx (D-class triage): AC1 holds: the design is ADR-295 (Accepted, partly supersedes ADR-107 action 1), Decision section: abort under LOCK_TCPIP_CORE() on tcp_active_pcbs only, no AsyncClient pointer touched; review note OTGW-field-data/_comms/review_heaprec_22ed5c09f_adr295.md. AC2 holds: tests/test_platform_tcp_abort_where.py (real platformTcpAbortWhere() against a fake pcb list) green in a run of 16 passed 1 skipped (21:xx); commit 9098f99ec states red on the header before the helper and on 5 mutants. OPEN: AC3 is a bench AC for otgw-bench-tester: evidence OTGW-field-data/_train/20261127-heaprec-K.md:13 (ws_aborted=2, both RST, tabs back after 5.1 s) and :40 (free heap back, no reboot).
 <!-- SECTION:NOTES:END -->

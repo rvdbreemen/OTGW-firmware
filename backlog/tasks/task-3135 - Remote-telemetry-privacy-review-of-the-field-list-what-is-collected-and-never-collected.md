@@ -4,8 +4,10 @@ title: >-
   Remote telemetry: privacy review of the field list (what is collected and
   never collected)
 status: To Do
-assignee: []
+assignee:
+  - '@otgw-poc-dev'
 created_date: '2026-11-27T19:01:00Z'
+updated_date: '2026-11-27T19:54:00Z'
 labels: []
 milestone: 2.0.0
 dependencies: []

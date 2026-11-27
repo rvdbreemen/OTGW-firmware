@@ -2,8 +2,10 @@
 id: TASK-3134
 title: 'Remote telemetry: consent dialog and Settings row in the web UI'
 status: To Do
-assignee: []
+assignee:
+  - '@otgw-webui'
 created_date: '2026-11-27T18:58:00Z'
+updated_date: '2026-11-27T19:54:00Z'
 labels: []
 milestone: 2.0.0
 dependencies: []

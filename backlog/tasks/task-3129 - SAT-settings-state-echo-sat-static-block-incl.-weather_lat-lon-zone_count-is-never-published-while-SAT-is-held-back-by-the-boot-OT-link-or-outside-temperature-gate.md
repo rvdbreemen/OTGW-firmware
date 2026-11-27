@@ -5,8 +5,10 @@ title: >-
   is never published while SAT is held back by the boot, OT-link or
   outside-temperature gate
 status: To Do
-assignee: []
+assignee:
+  - '@otgw-poc-dev'
 created_date: '2026-11-27T18:36:00Z'
+updated_date: '2026-11-27T19:54:00Z'
 labels:
   - bug
   - sat

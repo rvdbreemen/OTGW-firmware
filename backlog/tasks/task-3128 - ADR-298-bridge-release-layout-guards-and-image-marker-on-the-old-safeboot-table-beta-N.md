@@ -4,8 +4,10 @@ title: >-
   ADR-298 bridge release: layout guards and image marker on the old safeboot
   table (beta N)
 status: To Do
-assignee: []
+assignee:
+  - '@otgw-dev'
 created_date: '2026-11-27T18:29:00Z'
+updated_date: '2026-11-27T19:53:00Z'
 labels: []
 milestone: 2.0.0
 dependencies: []

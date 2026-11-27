@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-21T16:38:00Z'
-updated_date: '2026-11-27T05:08:00Z'
+updated_date: '2026-11-27T20:05:00Z'
 labels:
   - sat
   - mqtt
@@ -57,4 +57,6 @@ Observation (not a change, coordinator 2026-11-26): the REST/settings path clamp
 2026-11-27 otgw-poc-dev took over the lane of otgw-webui (lane/ba-3016, commit 99146fb08, never pushed) on origin/dev 25875e928 as lane-poc-3016. Conflicts only in version.h and version.hash (took origin/dev, re-bumped to beta.453 with bin/bump-prerelease.sh).
 
 Evidence (host, real handlers, table, dispatch and publish lines compiled): tests/test_sat_weather_location_mqtt_3016.py 8/8 green on the fix, 8/8 red on origin/dev src (found 0 publishIfChangedF lines). Neighbours green: test_sat_mqtt_state 1 run OK, test_sat_mqtt_contract_1485 15/15, test_sat_mqtt_fallback 8/8. AC3 ticked on that. AC2 stays open: broker wire format, retained read-back and persistence across a restart are NOT run on a unit; the bench-tester checks them. Register: no entry touches the weather location (grep latitude, longitude, location, weather_lat in sergeant-d-corrections.md: only entries 2358 and 5280 lines on sun elevation, unrelated). evaluate.py --quick: see commit run.
+
+otgw-architect verification 2026-11-27 21:xx (D-class triage): kept. tests/test_sat_weather_location_mqtt_3016.py 8 passed (21:xx). AC2 not shown on a device: TASK-3129 (.63 800 s subscribe, zero sat/weather_lat or weather_lon) finds the state is never published while SAT is held back. AC2 closes with 3129 or with a bench read-back on a unit where SAT is active.
 <!-- SECTION:NOTES:END -->

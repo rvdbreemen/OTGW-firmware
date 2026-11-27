@@ -4,8 +4,10 @@ title: >-
   ADR-298 table change: app0 2304K, LittleFS 704K, safeboot2 layout and the
   --migrate image pair (beta N+1)
 status: To Do
-assignee: []
+assignee:
+  - '@otgw-dev'
 created_date: '2026-11-27T18:39:00Z'
+updated_date: '2026-11-27T19:53:00Z'
 labels: []
 milestone: 2.0.0
 dependencies:

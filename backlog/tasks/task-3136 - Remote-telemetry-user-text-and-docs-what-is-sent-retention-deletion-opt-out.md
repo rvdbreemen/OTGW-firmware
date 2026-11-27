@@ -4,8 +4,10 @@ title: >-
   Remote telemetry: user text and docs (what is sent, retention, deletion,
   opt-out)
 status: To Do
-assignee: []
+assignee:
+  - '@otgw-docs'
 created_date: '2026-11-27T19:04:00Z'
+updated_date: '2026-11-27T19:54:00Z'
 labels: []
 milestone: 2.0.0
 dependencies: []

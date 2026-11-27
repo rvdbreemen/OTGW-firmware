@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-25T05:40:00Z'
+updated_date: '2026-11-27T20:05:00Z'
 labels:
   - tooling
   - diag
@@ -30,3 +31,9 @@ ADR-268 (Accepted by Robert 2026-11-25, supersedes ADR-213 and ADR-214): diagRec
 - [ ] #5 Host tests for the recorder path and the REST endpoints are red on the old code where they test the new ring and green on the change; python scripts/run_tests.py and python evaluate.py --quick show no new FAIL
 - [ ] #6 The capture tool and decoder (scripts/otgw_capture.py, scripts/diag_decode.py) read the new format, or the task records why no change is needed
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+otgw-architect verification 2026-11-27 21:xx (D-class triage): proposed as a duplicate of TASK-3132 AC4 (diagRec removed in the same change as the telemetry merge, ADR-268). Not closed: the coordinator decides.
+<!-- SECTION:NOTES:END -->

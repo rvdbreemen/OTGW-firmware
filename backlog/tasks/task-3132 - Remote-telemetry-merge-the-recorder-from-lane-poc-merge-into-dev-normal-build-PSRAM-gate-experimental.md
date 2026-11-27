@@ -4,8 +4,10 @@ title: >-
   Remote telemetry: merge the recorder from lane-poc-merge into dev (normal
   build, PSRAM gate, experimental)
 status: To Do
-assignee: []
+assignee:
+  - '@otgw-dev'
 created_date: '2026-11-27T18:48:00Z'
+updated_date: '2026-11-27T19:53:00Z'
 labels: []
 milestone: 2.0.0
 dependencies: []

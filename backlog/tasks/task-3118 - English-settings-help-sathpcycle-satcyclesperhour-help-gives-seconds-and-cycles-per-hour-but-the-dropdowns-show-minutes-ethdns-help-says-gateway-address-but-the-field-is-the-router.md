@@ -4,11 +4,11 @@ title: >-
   English settings help: sathpcycle/satcyclesperhour help gives seconds and
   cycles per hour but the dropdowns show minutes; ethdns help says gateway
   address but the field is the router
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-27T07:56:00Z'
-updated_date: '2026-11-27T08:06:00Z'
+updated_date: '2026-11-27T20:03:00Z'
 labels:
   - webui
   - docs
@@ -26,8 +26,8 @@ Found by otgw-webui's translation reviewers (TASK-2927 review), relayed by the c
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 The help texts of sathpcycle, satcyclesperhour and ethdns are corrected and checked against the UI labels and the field meaning in the code (cite file:line)
-- [ ] #2 settingsHelpGz.h regenerated and python tests/test_progmem_assets_deflated.py green; one prerelease bump
+- [x] #1 The help texts of sathpcycle, satcyclesperhour and ethdns are corrected and checked against the UI labels and the field meaning in the code (cite file:line)
+- [x] #2 settingsHelpGz.h regenerated and python tests/test_progmem_assets_deflated.py green; one prerelease bump
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -37,3 +37,9 @@ Found by otgw-webui's translation reviewers (TASK-2927 review), relayed by the c
 
 2026-11-27 (otgw-webui): fixed in settingsHelp.h: ethdns 'router address' (Ethernet.ino:70 uses the router when DNS is 0.0.0.0; the field settings.eth.sGateway is the router address); sathpcycle and satcyclesperhour now in MINUTES like the dropdowns (30/40/60 min and 20/15 min; v2.js enum_min_* and pwm_help_*), cycles-per-hour wording kept. FACT: helpFor() returns satPwmHelp() (the pwm_help_* strings, already in minutes) for these two keys, so the settingsHelp.h text was not shown in the UI today; corrected so the file, the settings-help test and the translations agree. settingsHelpGz.h regenerated; settings-help 29 and test_progmem_assets_deflated 4 green; one prerelease bump. Not verified: rendering on a device.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+AC1: commit 4d70c8784 on origin/dev (git branch -r --contains): settingsHelp.h:27 ethdns 'uses the router address as DNS' matches Ethernet.ino:70-71 (dns==0.0.0.0 -> dns = gw); sathpcycle (:83) and satcyclesperhour (:130) now in minutes, matching the v2.js field hints 'Minutes' (v2.js:4434, :4486). AC2: settingsHelpGz.h regenerated in the same commit; python -m pytest tests/test_progmem_assets_deflated.py: 4 passed (run by otgw-architect); one bump beta.471 -> beta.472 in that commit.
+<!-- SECTION:FINAL_SUMMARY:END -->

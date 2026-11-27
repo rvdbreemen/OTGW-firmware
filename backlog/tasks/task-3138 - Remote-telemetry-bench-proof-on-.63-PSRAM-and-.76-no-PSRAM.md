@@ -2,8 +2,10 @@
 id: TASK-3138
 title: 'Remote telemetry: bench proof on .63 (PSRAM) and .76 (no PSRAM)'
 status: To Do
-assignee: []
+assignee:
+  - '@otgw-bench-tester'
 created_date: '2026-11-27T19:10:00Z'
+updated_date: '2026-11-27T19:54:00Z'
 labels: []
 milestone: 2.0.0
 dependencies: []
