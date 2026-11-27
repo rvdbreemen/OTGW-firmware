@@ -1108,6 +1108,7 @@
       "help_aria": "Help: {{label}}",
       "help_loading": "Loading…",
       "help_none": "No help text for this setting.",
+      "pin_not_set": "not set",
       "help_unavailable": "Help not available.",
       "help": {
         "satboilerratedkw": "kW gas input. Enables the gas estimate and caps it (0 = off)",
@@ -4864,10 +4865,14 @@
   // Password fields: GET returns a masked sentinel ("password=N"), never the real
   // secret. Show an empty field; only POST when the user actually typed something.
   function isPwd(k) { return setData[k] && setData[k].type === 'p'; }
+  // TASK-3120: a pin that can be "not set" travels as the integer -1 (firmware: s0counterpin, range -1..48). The field shows it EMPTY with a hint,
+  // and a cleared field is saved as -1.
+  var NOTSET_PIN_KEYS = { s0counterpin: 1 };
+  function pinShown(k, v) { return (NOTSET_PIN_KEYS[k] && ('' + v) === '-1') ? '' : '' + v; }
   function curVal(k) {
-    if (fieldDirty(k)) return setDirty[k];
+    if (fieldDirty(k)) return pinShown(k, setDirty[k]);
     if (isPwd(k)) return '';
-    return '' + setData[k].value;
+    return pinShown(k, setData[k].value);
   }
   // keys per category, honoring the search filter
   function keysForCat(id, q) {
@@ -5129,6 +5134,7 @@
       input.type = (type === 'p') ? 'password' : (type === 'i') ? 'number' : 'text';
       input.value = curVal(k);
       if (type === 'p') input.placeholder = '••••••••';
+      if (NOTSET_PIN_KEYS[k]) input.placeholder = t('settings.pin_not_set');   // TASK-3120
       if (meta.maxlen > 0) input.maxLength = meta.maxlen;
       var isIp = IP_KEY_RE.test(k), wasEmpty = input.value.trim() === '';
       input.addEventListener('input', function () {
@@ -5257,6 +5263,7 @@
     }
     // Password fields show empty; an empty value means "leave unchanged", so it is
     // never dirty and never POSTed (the GET-side value is a mask, not the secret).
+    if (NOTSET_PIN_KEYS[k] && ('' + val).trim() === '') val = '-1';   // TASK-3120: cleared = not set
     var same = ('' + setData[k].value) === val && !(k === 'otdmode' && otdRunningDiffers(val));   // TASK-1702
     if ((isPwd(k) && val === '') || same) delete setDirty[k];
     else setDirty[k] = val;

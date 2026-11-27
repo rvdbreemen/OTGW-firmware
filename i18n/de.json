@@ -1232,7 +1232,8 @@
     "wh_send_test": "{{state}}-Test senden",
     "wh_send_title": "Löst den gespeicherten {{state}}-Webhook aus (POST /api/v2/webhook/test)",
     "wh_sending": "{{state}} wird gesendet…",
-    "wh_sent": "✓ {{state}} {{ack}} · {{time}}"
+    "wh_sent": "✓ {{state}} {{ack}} · {{time}}",
+    "pin_not_set": "nicht gesetzt"
   },
   "stats": {
     "concl": {
