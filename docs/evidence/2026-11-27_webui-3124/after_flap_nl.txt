@@ -1,0 +1,2 @@
+{"mode":"flap","lang":"nl","data":"worktree","attempts":2,"at_s":[0.281,4.742],"gaps_s":[4.5]}
+btn: Opnieuw verbinden

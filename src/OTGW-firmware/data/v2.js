@@ -6069,7 +6069,7 @@
     // The exp line describes the healthy state ("… is answering") — showing it
     // while the node is down/degraded contradicts the fix hint, so omit it there.
     if (c.exp && c.s !== 'st-down' && c.s !== 'st-warn') { var ex = document.createElement('div'); ex.className = 'exp'; ex.textContent = c.exp; body.appendChild(ex); }
-    if ((c.s === 'st-down' || c.s === 'st-warn') && c.fix) { var fx = document.createElement('div'); fx.className = 'fix'; fx.textContent = '▸ ' + c.fix; body.appendChild(fx); }
+    if ((c.s === 'st-down' || c.s === 'st-warn') && c.fix && !(key === 'ws' && wsPaused)) { var fx = document.createElement('div'); fx.className = 'fix'; fx.textContent = '▸ ' + c.fix; body.appendChild(fx); }
     if (key === 'ws' && wsPaused) {
       var rb = document.createElement('button'); rb.type = 'button'; rb.className = 'btn'; rb.id = 'wsResumeBtn';
       rb.textContent = t('graph.conn_ws_resume'); rb.addEventListener('click', wsResume); body.appendChild(rb);
