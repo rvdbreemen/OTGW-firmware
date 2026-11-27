@@ -9,12 +9,14 @@ documents_shipped: false
 verified_in: []
 supersedes: []
 superseded_by: null
+related:
+  - "ADR-295"
 ---
 # ADR-107: Emergency Heap Recovery Actions (2.0.0 platform variant)
 
 ## Status
 
-Accepted, 2026-05-23.
+Accepted, 2026-05-23. Partly superseded by ADR-295 (2026-11-27): action 1 drops the /ws clients by aborting their TCP connections instead of a WebSocket close; actions 2 and 3 stand.
 
 ## Context
 

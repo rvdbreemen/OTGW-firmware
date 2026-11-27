@@ -1,27 +1,29 @@
 ---
 id: "ADR-295"
 title: "Emergency heap recovery drops the /ws clients by aborting their TCP connections instead of a WebSocket close (partly supersedes ADR-107 action 1)"
-status: "Proposed"
-date: "2026-11-22"
+status: "Accepted"
+date: "2026-11-27"
 binding: false
 gate: null
 documents_shipped: false
 verified_in: []
 supersedes: []
 superseded_by: null
-format: "canonical"
+related:
+  - "ADR-107"
 topics:
-  - emergency heap recovery
-  - websocket
-  - tcp abort
+  - "emergency heap recovery"
+  - "websocket"
+  - "tcp abort"
 aliases:
-  - heap recovery ws abort
+  - "heap recovery ws abort"
 components:
-  - emergencyHeapRecovery
+  - "emergencyHeapRecovery"
 symbols:
-  - emergencyHeapRecovery
-  - doWebSocketDisconnectAll
+  - "emergencyHeapRecovery"
+  - "doWebSocketDisconnectAll"
 context_scope: "selective"
+format: "canonical"
 ---
 
 <!-- markdownlint-disable MD025 -->
@@ -30,7 +32,7 @@ context_scope: "selective"
 
 ## Status
 
-Proposed, 2026-11-22.
+Accepted, 2026-11-27.
 
 ## Status History
 
@@ -41,6 +43,11 @@ status_history:
     changed_by: "Agent: Claude"
     reason: Initial proposal
     changed_via: adr-kit
+  - date: 2026-11-27
+    status: Accepted
+    changed_by: "Robert van den Breemen (decision, DM answer to the coordinator's question 19, relayed; DM text read by otgw-architect), recorded by Agent: Claude (otgw-architect)"
+    reason: "Accepted by Robert: verbatim 'B', then 'A', then after the coordinator's clarification 'A' (DM 1575741262919770196); option A of question 19 = accept now"
+    changed_via: adr-kit lifecycle
 ```
 
 ## Context
@@ -108,11 +115,11 @@ Scope: only action 1 of ADR-107 changes. Actions 2 and 3, the 30 s rate limit, t
 - A browser sees a RST instead of a close frame. v2.js reconnects on `onclose` in both cases (5 s).
 - If the error-event allocation in AsyncTCP's `tcp_error` fails at very low heap, the library never sees the disconnect. The client object then stays in the list with `_pcb` null until reboot. That is the same exposure as any RST from a peer today, and it is bounded by MAX_WEBSOCKET_CLIENTS + 1 rows.
 - Matching relies on remote IP and port. A new connection from the same IP and port between the connect and the abort cannot exist while the tracked one is alive, because lwIP keeps one pcb per 4-tuple.
+- *Risk (accepted before the bench)*: Robert accepted this ADR before the K bench ran (Open Questions). The Verification bench still runs: otgw-bench-tester writes one file under OTGW-field-data/_train/ with the /ws client count before and after each recovery, each `[heap-recovery]` telnet line (tracked, aborted, after), the reconnect timestamp of each web UI tab, 10 min without crash or reboot after the hold, and the control run on the build before this ADR. *Mitigation*: if that bench fails or is ambiguous, the change does not ship and a new ADR withdraws this one (Robert's option A, question 19 of 2026-11-27).
 
 ## Open Questions
 
-- [ ] Robert: accept the change of ADR-107 action 1 from a WebSocket close to a TCP abort.
-  — **Answer recorded 2026-11-27 by Agent: Claude (otgw-architect), from Robert van den Breemen (decision, relayed by the coordinator; not seen by otgw-architect):** Robert chose 'B' (DM 1575740179140972555, a reply to 1575739177839099907): accept after the K bench shows the /ws client gone and the browser tab reconnecting. Reading (the coordinator's and ours, not Robert's words): a conditional accept. This item stays open until the condition is met; then the accept gates run and the acceptance records the bench evidence path, without a new question to Robert. Condition, all from one K bench on the build of this ADR, in one file under OTGW-field-data/_train/ written by otgw-bench-tester: (1) the /ws client count before and after each recovery; (2) each `[heap-recovery]` telnet line with tracked, aborted and after, and aborted equal to the /ws clients connected at that moment (`hd_ws_recovery_abort` rises by the same number); (3) the reconnect timestamp of each web UI tab, within about 10 s; (4) no crash, reboot or crashlog for 10 min after the hold ends, and the free heap back after the hold; (5) the control run with the same K hold on the build before this ADR (Verification). If the bench fails or is ambiguous, this ADR is not accepted and the coordinator is told. Open point: Verification names .61 (no PSRAM); a run on .63 instead is a deviation that otgw-architect reports to the coordinator before accepting.
+- [x] Robert: accept the change of ADR-107 action 1 from a WebSocket close to a TCP abort. — **Answered 2026-11-27 by Robert van den Breemen (decision, DM answer to the coordinator's question 19, relayed; DM text read by otgw-architect), recorded by Agent: Claude (otgw-architect):** Accepted now (option A). Question 19 (BlueFlame Bot DM 1575739177839099907, 2026-11-27 05:04 UTC): A = accept now, the code goes to the 20:00 beta after the bench, a failed bench withdraws the ADR by a new ADR; B = accept after the K bench; C = reject. Robert answered verbatim 'B' (DM 1575740179140972555, 05:08:54 UTC), then 'A' (DM 1575740316235858064, 05:09:27 UTC). The coordinator asked which counts (DM 1575741164747759668, 05:12:49 UTC: 'Bedoelde je A, stuur nog A'); Robert answered verbatim 'A' (DM 1575741262919770196, 05:13:12 UTC). The latest answer, A, counts. DM texts read by otgw-architect from the DM history at 06:1x WEST.
 
 ## Related Decisions
 

@@ -11703,8 +11703,8 @@
       "title": "Emergency heap recovery drops the /ws clients by aborting their TCP connections instead of a WebSocket close (partly supersedes ADR-107 action 1)",
       "path": "ADR-295-emergency-heap-recovery-drops-the-ws-clients-by-aborting-their-tcp-connections-instead-of-a-websocket-close-partly-supersedes-adr-107-action-1.md",
       "format": "canonical",
-      "status": "Proposed",
-      "date": "2026-11-22",
+      "status": "Accepted",
+      "date": "2026-11-27",
       "decision_summary": "At CRITICAL heap, ADR-107 action 1 aborts every /ws TCP connection in lwIP, with a RST, instead of otLogWs.closeAll().",
       "topics": [
         "emergency heap recovery",
@@ -14602,6 +14602,12 @@
     {
       "source": "ADR-107",
       "target": "ADR-079",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-107",
+      "target": "ADR-295",
       "type": "related",
       "resolved": true
     },
