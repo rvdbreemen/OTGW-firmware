@@ -290,6 +290,7 @@ html[data-theme="dark"]{--accent:var(--brand-cyan);--nav:#383838;--tile-off:#545
   .stripcard svg{width:100%;height:auto;display:block}
   .axis-txt{fill:var(--muted);font-size:10px;font-family:var(--font-mono)}
   .axis-txt.gtitle{fill:var(--text);font-weight:600}
+  .axis-txt.yl{text-anchor:end}
   .legend{display:flex;gap:14px;font-family:var(--font-mono);font-size:.7rem;color:var(--muted);
     padding:6px 6px 2px;flex-wrap:wrap}
   .legend i{display:inline-block;width:14px;height:3px;border-radius:2px;margin-right:5px;vertical-align:middle}
@@ -759,8 +760,9 @@ html[data-theme="dark"]{--accent:var(--brand-cyan);--nav:#383838;--tile-off:#545
     border-radius:12px;overflow:hidden;box-shadow:var(--shadow);font-size:.83rem}
   .fstable td{padding:8px 12px;border-bottom:1px solid var(--border)}
   .fstable tr:last-child td{border-bottom:0}
+  @media (max-width:480px){.fstable td{padding:8px 6px}}
   .fstable tr:hover td{background:color-mix(in srgb,var(--accent) 6%,transparent)}
-  .fstable .fn{font-family:var(--font-mono);font-weight:700}
+  .fstable .fn{font-family:var(--font-mono);font-weight:700;overflow-wrap:anywhere}
   .fstable .fn.dir{color:var(--accent);cursor:pointer}
   .fstable .fsz{font-family:var(--font-mono);color:var(--muted);white-space:nowrap}
   .fstable a.fsact{color:var(--accent);text-decoration:none;font-weight:600;font-size:.78rem;cursor:pointer}

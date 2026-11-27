@@ -3659,7 +3659,9 @@
   function drawPanelChart(svg, spec) {
     var n = spec.n, H = { l: 18, m: 56, t: 120 }, y = 18, out = '', lines = '';
     function X(i) { return n > 1 ? C_X0 + i * (C_X1 - C_X0) / (n - 1) : C_X1; }
-    function txtEl(x, yy, s, cls) { return '<text class="axis-txt' + (cls ? ' ' + cls : '') + '" x="' + x + '" y="' + yy + '">' + esc(s) + '</text>'; }
+    function txtEl(x, yy, s, cls) { return '<text class="axis-txt' + (cls ? ' ' + cls : '') + '" x="' + x + '" y="' + yy + '"' + (cls === 'yl' ? ' text-anchor="end"' : '') + '>' + esc(s) + '</text>'; }
+    // TASK-3052: a y label is right-aligned 4 px left of the axis, so a long one (-10 C) never touches the line
+    function ylEl(yy, s) { return txtEl(C_X0 - 4, yy, s, 'yl'); }
     spec.panels.forEach(function (p) {
       var top = y, h = p.h || H[p.kind] || H.t, bot = top + h, lo = 0, hi = 100;
       out += txtEl(38, top - 3, p.title, 'gtitle');
@@ -3669,12 +3671,12 @@
         p.series.forEach(function (s) { s.vals.forEach(function (v) { if (v !== null && v !== undefined && isFinite(v)) { if (v < lo) lo = v; if (v > hi) hi = v; } }); });
         if (lo > hi) { lo = 10; hi = 90; }
         lo = Math.floor(lo / 10) * 10; hi = Math.max(Math.ceil(hi / 10) * 10, lo + 20);
-        out += txtEl(2, top + 6, Math.round(hi) + (p.unit || '')) + txtEl(2, (top + bot) / 2 + 3, Math.round((lo + hi) / 2) + (p.unit || '')) + txtEl(2, bot + 2, Math.round(lo) + (p.unit || ''));
+        out += ylEl(top + 6, Math.round(hi) + (p.unit || '')) + ylEl((top + bot) / 2 + 3, Math.round((lo + hi) / 2) + (p.unit || '')) + ylEl(bot + 2, Math.round(lo) + (p.unit || ''));
         out += '<line x1="' + C_X0 + '" y1="' + ((top + bot) / 2) + '" x2="' + C_X1 + '" y2="' + ((top + bot) / 2) + '" stroke="#8b949e" stroke-opacity=".2"/>';
       } else if (p.kind === 'm') {
-        out += txtEl(2, top + 6, '100%') + txtEl(2, bot + 2, '0%');
+        out += ylEl(top + 6, '100%') + ylEl(bot + 2, '0%');
       } else {
-        out += txtEl(2, top + 7, t('h_mon.graph_lane_on')) + txtEl(2, bot + 2, t('h_mon.graph_lane_off'));
+        out += ylEl(top + 7, t('h_mon.graph_lane_on')) + ylEl(bot + 2, t('h_mon.graph_lane_off'));
       }
       function Y(v) { return p.kind === 'l' ? bot - (v ? 14 : 0) : bot - (Math.max(lo, Math.min(hi, v)) - lo) / (hi - lo) * h; }
       p.series.forEach(function (s) {
@@ -4658,11 +4660,16 @@
     if (r.bottom < 0 || r.top > vh || r.right < 0 || r.left > vw) { hideHelp(); return; }
     // Measure at left 0: a fixed box with only `left` set shrinks to fit the space right of it,
     // so measuring at the previous left squeezed the popover on a phone (review finding).
+    // TASK-3058: the popover may cover its own card (.set-group) but not the card next to it, so the limits are the
+    // card's edges when the icon sits in one; an icon outside any card keeps the viewport limits.
+    var card = helpBtn.closest ? helpBtn.closest('.set-group') : null, cr = card ? card.getBoundingClientRect() : null;
+    var minL = cr ? Math.max(m, cr.left + 8) : m, maxR = cr ? Math.min(vw - m, cr.right - 8) : vw - m;
+    helpPop.style.maxWidth = cr ? Math.min(320, Math.max(160, maxR - minL)) + 'px' : '';
     helpPop.style.left = '0px';
     var w = helpPop.offsetWidth, h = helpPop.offsetHeight;
     var top = r.bottom + 6;
     if (top + h > vh - m && r.top - 6 - h >= m) top = r.top - 6 - h;   // no room below: open above
-    helpPop.style.left = Math.max(m, Math.min(r.left, vw - w - m)) + 'px';
+    helpPop.style.left = Math.max(minL, Math.min(r.left, maxR - w)) + 'px';
     helpPop.style.top = Math.max(m, top) + 'px';
   }
   function hideHelp() {
