@@ -3,10 +3,11 @@ id: TASK-3033
 title: >-
   Retained thermostat/override_refused flag: remember that the thermostat
   ignored a TT=/TC= override
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-11-22T10:33:00Z'
-updated_date: '2026-11-22T19:35:00Z'
+updated_date: '2026-11-27T05:10:00Z'
 labels:
   - mqtt
   - feature
@@ -26,6 +27,18 @@ Tester request (gruijter, #alpha-testing 1574009591627513958, 2026-11-22). therm
 <!-- AC:BEGIN -->
 - [ ] #1 Maintainer decides whether and in which release
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+PLAN (otgw-poc-dev, 2026-11-27; nothing built, nothing run on a unit). Scope per Robert 2026-11-22 (released: the thermostat flag only, boiler list leans no): one retained flag, observed behaviour, not a capability read.
+Facts: satPushRefusedDecide (SATcontrol.ino:2565-2573, TASK-1343) already judges 'T frame of MsgID 16 differs >=300 s after a TC= push' but only for SAT's push (bTCAccountedValid, iTCPushMs, fLastSentTC) and only while push setpoint is on; published as sat/push_refused (SATcontrol.ino:5469, retained). It is called from satOnThermostatSetpoint on every MsgID 16 T frame. TT=/TC= from MQTT/REST/telnet carry no timestamp or value today (only SAT's own TC= is tracked), so the new flag needs those two numbers for external overrides too.
+Files: (1) OTGW-Core.ino addCommandToQueue (:3991, sees every TT=/TC= with satOwn): record fOverrideSent + iOverrideMs for a non-zero TT=/TC= (0 = cancel clears the pending check). (2) SATcontrol.ino or OTGW-Core.ino next to satOnThermostatSetpoint: reuse satPushRefusedDecide as is (same 0.25 C and 300 s rule, so both flags agree); the verdict is only a state flag (processOT holds the OT lock, no MQTT there). (3) MQTTstuff.ino: publish otgw-firmware/thermostat/override_refused true/false, retained, via the same on-change helper pattern as sent_msgids; NOT tied to satIsEnabled (gruijter needs it with SAT off). (4) docs/api/MQTT.md row + manual line. (5) state in the types header, reset on boot and on MQTT reconnect republish.
+Topic name: otgw-firmware/thermostat/override_refused (next to thermostat/sent_msgids). HA discovery: none proposed. sat/push_refused has no discovery entry either (grep MQTTstuff.ino: no hit); a tri-state (unknown until a first override is judged) does not map to a binary_sensor. Consumer is Homey over MQTT. I ask only if Robert wants a diagnostic binary_sensor.
+Open design points to put to the coordinator: (a) before the first override since boot the flag is NOT published (an empty retained value would lie, same lesson as TASK-1781); (b) a gateway reset also clears an override (MsgID 9 reads 0 after the PIC clears it), which entry 16 already names as indistinguishable from a refusing thermostat: the flag stays 'observed after 300 s', a PIC reset inside the window can read as refused; label it in the docs; (c) persistence across reboot: not persisted, it is re-learned at the next override.
+Host test, red first (real functions compiled, like tests/test_sat_push_refused.py): thermostat T frame stays at its own value 300 s after an external TT=/TC= -> true; follows within 0.25 C -> false; TC=0 clears; value inside 300 s keeps the old verdict; SAT's own push still drives sat/push_refused unchanged. Red on origin/dev (no flag/topic), green on the fix; mutants: 300 s -> 30 s, 0.25 -> 2.5, retained false.
+Entries: 14 and 16 (push on target change, no re-push; 16 changes 14 and states the PIC-reset ambiguity) are touched in reading only: no SAT control behaviour changes, status only like entry 16 and TASK-1343. ADR-223 (TT=/TC= no longer replace MsgID 16, so a T frame is the thermostat's own value) is what makes the check valid. No new Sergeant D entry needed; I name that and ask you if you read it otherwise. Not verifiable on host: the thermostat itself; the bench has none, a field tester (gruijter's Honeywell ignores TT=/TC=, will_85903's follows) closes the evidence.
+<!-- SECTION:PLAN:END -->
 
 ## Implementation Notes
 
