@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-27T21:27:00Z'
-updated_date: '2026-11-27T21:34:00Z'
+updated_date: '2026-11-27T21:36:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -36,4 +36,6 @@ Sergeant D, 2026-11-27 (entry 505): MM=T only when SAT is in continuous mode; in
 Entry 505 (register OTGW-sat-decisions). Thermo-nova citations heating_control.py:510-523 and :133-139 at 7beaaf5 are cited, not yet confirmed by a second reader (otgw-architect to open both locations and try to refute; his verdict goes here). Release scope 2.0.0 is provisional until Sergeant D answers the scope question. Firmware send site: SATcontrol.ino:8914 (mmTarget) and :8921 (satSendMM); SAT_MM_T in satSendMM :758-771.
 
 Second reader (otgw-architect): thermo-nova never sends MM=T (confirmed); MM=0 in PWM has exceptions: hot water (maximum, default 100, heating_control.py:136-137, :519-520), Geminox (10, :522-523), no modulation management (nothing set, :512-515); state OFF follows _pwm.enabled (:139-140), so MM=0 also with PWM enabled and IDLE. The plan must treat hot water (entry 220: MM max during a draw) as unchanged and ask Sergeant D with the scope question. Notes: OTGW-field-data/_comms/second_reader_entry505_mm_pwm_2026-11-27.md.
+
+Entry 507 (Sergeant D, 2026-11-27 22:3x UTC, 'my answer is A'): release scope 2.0.0, built with host tests and the SAT simulation bench first. Our fallback (move to 2.1.0 if the simulation bench does not pass in time) is ours, not his; put to him again before it is taken. Milestone 2.0.0 is final.
 <!-- SECTION:NOTES:END -->
