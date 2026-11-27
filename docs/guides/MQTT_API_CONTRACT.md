@@ -399,7 +399,7 @@ Source: `MQTTstuff.ino` (MQTT subscribe handler)
 | SAT mode | Compatible gateway | Works with OTGW-firmware 2.0.0? | Works with OT-Thing? |
 |----------|-------------------|--------------------------------|---------------------|
 | `MQTT_OTTHING` | OT-Thing firmware | **No**: 2.0.0 does not publish nested JSON state | **Yes*** (see gap below) |
-| `MQTT_OPENTHERM` | OTGW, OTGW-firmware, OTGW-firmware 2.0.0 | **Yes** (full dialect match | **No**) OT-Thing does not speak flat scalar topics |
+| `MQTT_OPENTHERM` | OTGW, OTGW-firmware, OTGW-firmware 2.0.0 | **Yes**: full dialect match | **No**: OT-Thing does not speak flat scalar topics |
 | `MQTT_EMS` | EMS-bus gateways | No | No |
 
 *SAT `MQTT_OTTHING` vs OT-Thing topic suffix gap: SAT publishes commands to `{base}/chMode1` but OT-Thing subscribes to `{base}/chMode1/set`. The state subscription (`{base}/state`) matches. Status reads work; commands don't reach OT-Thing without a bridge or patch.
