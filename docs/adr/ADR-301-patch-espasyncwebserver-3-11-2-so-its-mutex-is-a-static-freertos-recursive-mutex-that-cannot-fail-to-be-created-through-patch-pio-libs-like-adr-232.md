@@ -1,7 +1,7 @@
 ---
 id: "ADR-301"
 title: "Patch ESPAsyncWebServer 3.11.2 so its mutex is a static FreeRTOS recursive mutex that cannot fail to be created, through patch_pio_libs like ADR-232"
-status: "Proposed"
+status: "Accepted"
 date: "2026-11-27"
 binding: false
 gate: null
@@ -39,7 +39,7 @@ format: "canonical"
 
 ## Status
 
-Proposed, 2026-11-27.
+Accepted, 2026-11-27.
 
 ## Status History
 
@@ -50,14 +50,19 @@ status_history:
     changed_by: "Agent: Claude (otgw-architect)"
     reason: Initial proposal
     changed_via: adr-kit
+  - date: 2026-11-27
+    status: Accepted
+    changed_by: "Robert van den Breemen (decision, DM answer to the coordinator's question 31, relayed; DM text read by otgw-architect), recorded by Agent: Claude (otgw-architect)"
+    reason: "Accepted by Robert: verbatim 'A. Toestemming om upstream PR te doen.' (DM 1575795976269074434), option A of question 31 = patch the library; the red/green bench stays a Verification item"
+    changed_via: adr-kit lifecycle
 ```
 
 ## Context
 
 Terms: WS (WebSocket, the `/ws` live log stream), SSE (Server-Sent Events, the library's event source), IDF (ESP-IDF, Espressif's
-IoT Development Framework under Arduino-ESP32), RTOS (FreeRTOS, the real-time operating system the firmware runs on), ACK (a TCP
-acknowledgement), RTT (round-trip time), OOM (out of memory), PSRAM (pseudo-static RAM, random-access memory; the extra memory some
-modules have).
+IoT Development Framework under Arduino-ESP32), RTOS (FreeRTOS, the real-time operating system the firmware runs on), TCP (Transmission Control Protocol), ACK (a TCP acknowledgement), RTT (round-trip time), OOM (out of memory),
+RAM (random-access memory), PSRAM (pseudo-static RAM, the extra memory some modules have), DWARF (the debug information format
+inside the ELF build file).
 
 **What crashed.** On the K bench of TASK-3025 (ADR-295: telnet key `K` holds the free heap under 3 KB), the unit crashed when a browser
 opened `/ws` during the hold. otgw-dev's analysis, from the crash in `OTGW-field-data/bench-63/2026-11-27_K/control/crash_run2/`:
@@ -70,7 +75,7 @@ the new WS client's mutex was never created, and its first lock faulted. Read in
   `_switchClient()` on the first ACK after the upgrade reply (`:1500-1526`), on the async_tcp task.
 - The toolchain (xtensa-esp-elf, libstdc++ 14.2.0) has no `PTHREAD_RECURSIVE_MUTEX_INITIALIZER` (newlib only has
   `PTHREAD_MUTEX_INITIALIZER` = `0xFFFFFFFF`, `sys/_pthreadtypes.h:172`), so `bits/gthr-default.h:68-74` selects an init function. The
-  `std::recursive_mutex` constructor calls it and drops the result (`<mutex>:89-93`, with libstdc++'s comment "XXX EAGAIN, ENOMEM, EPERM").
+  `std::recursive_mutex` constructor calls it and drops the result (`<mutex>:89-93`, with libstdc++'s comment `XXX EAGAIN, ENOMEM, EPERM`).
 - IDF 5.5.1 `pthread_mutex_init()` mallocs an `esp_pthread_mutex_t` and an RTOS recursive semaphore; on failure it returns `ENOMEM` or
   `EAGAIN` **without writing the mutex word** (`components/pthread/pthread.c:641-657`).
 - `pthread_mutex_lock()` creates the mutex late only when the word equals `0xFFFFFFFF` (`:724-735`); any other value is used as a pointer
@@ -150,7 +155,7 @@ typedef static_recursive_mutex mutex_type;
 
 - Host test (to be written with the implementation): the patch applies to the pinned file and the fingerprint check fails on a changed
   file; the patched header has no `std::recursive_mutex` typedef.
-- Host test on the REAL patched class, cut from the patched header, against an RTOS stub whose `malloc` always fails: the mutex
+- Host test on the real patched class, cut from the patched header, against an RTOS stub whose `malloc` always fails: the mutex
   constructs and locks recursively (lock, lock, unlock, unlock, try_lock). Red on a model of the unpatched path (a stub
   `pthread_mutex_init` that returns `ENOMEM` and leaves the word at a poison value). The model is labelled as a model.
 - Bench (otgw-bench-tester), the real proof: otgw-dev's crash_run2 scenario (K deep hold, repeated `/ws` connects during the hold),
@@ -182,7 +187,7 @@ typedef static_recursive_mutex mutex_type;
 
 **Negative:**
 
-- Each object with a mutex grows by `StaticSemaphore_t` (about 80 B, an *estimate*; the bench records `sizeof`). The heap semaphore it
+- Each object with a mutex grows by `StaticSemaphore_t` (about 80 B, an *estimate*; the bench records `sizeof`). Baseline: `sizeof(AsyncWebSocketClient)` = 168 B today (`DW_AT_byte_size` in the DWARF of the control elf 453+e0dde12, read by otgw-dev 2026-11-27); the `std::recursive_mutex` in it is the 4 B `pthread_mutex_t` handle (inferred from `sys/_pthreadtypes.h`). The heap semaphore it
   replaces is about the same size, so the net heap per client is about even. Mitigation: measured on the bench before acceptance.
 - A second local patch on a dependency to carry. Mitigation: the fingerprint check fails the build on a library update, and the upstream
   report aims to make the patch unnecessary.
@@ -191,10 +196,11 @@ typedef static_recursive_mutex mutex_type;
 
 ## Open Questions
 
-- [ ] Robert: approve this library patch under his rule "no library changes without explicit approval" (coordinator's DM question 31:
+- [x] Robert: approve this library patch under his rule "no library changes without explicit approval" (coordinator's DM question 31:
   A patch, B gate only, C nothing).
-- [ ] Robert: may the failure be reported upstream (ESP32Async/ESPAsyncWebServer issue, an outward post)?
-- [ ] Bench: does the crash_run2 scenario show crashes on the old build and none on the patched build, and what is the `sizeof` change?
+  — **Answered 2026-11-27 by Robert van den Breemen (decision, DM answer to the coordinator's question 31, relayed; DM text read by otgw-architect), recorded by Agent: Claude (otgw-architect):** Approved, option A (patch the library, ADR-232 mechanism). Question 31 (BlueFlame Bot DM 1575786437851480157, 2026-11-27 08:12 UTC) defined A as this patch, B as only the TASK-3119 gate, C as nothing on the library. Robert answered verbatim 'A. Toestemming om upstream PR te doen.' (DM 1575795976269074434, 08:50:37 UTC), read by otgw-architect from the DM history.
+- [x] Robert: may the failure be reported upstream (ESP32Async/ESPAsyncWebServer issue, an outward post)? — **Answered 2026-11-27 by Robert van den Breemen (decision, DM answer to the coordinator's question 31, relayed; DM text read by otgw-architect), recorded by Agent: Claude (otgw-architect):** Yes: same DM (1575795976269074434), verbatim 'A. Toestemming om upstream PR te doen.' (permission to make the upstream PR). The coordinator posts it only after the patched build has passed the red/green bench (n >= 20 per arm), without private data.
+- [x] Bench: does the crash_run2 scenario show crashes on the old build and none on the patched build, and what is the `sizeof` change? — **Answered 2026-11-27 by Agent: Claude (otgw-architect):** Deferred to Verification, not answered: the red/green K bench (crashes on the old build, none on the patched one, n >= 20 per arm, .63 and .76) and the measured sizeof run after the implementation, as for ADR-295. If the bench fails or is ambiguous, the patch does not ship and a new ADR withdraws this one.
 
 ## Related Decisions
 

@@ -12183,7 +12183,7 @@
       "title": "Patch ESPAsyncWebServer 3.11.2 so its mutex is a static FreeRTOS recursive mutex that cannot fail to be created, through patch_pio_libs like ADR-232",
       "path": "ADR-301-patch-espasyncwebserver-3-11-2-so-its-mutex-is-a-static-freertos-recursive-mutex-that-cannot-fail-to-be-created-through-patch-pio-libs-like-adr-232.md",
       "format": "canonical",
-      "status": "Proposed",
+      "status": "Accepted",
       "date": "2026-11-27",
       "decision_summary": "At build time, scripts/patchpiolibs.py replaces the std::recursivemutex typedef in the libdeps copy of ESPAsyncWebSer...",
       "topics": [
@@ -12224,7 +12224,7 @@
         ],
         "verification": [
           "Host test (to be written with the implementation): the patch applies to the pinned file and the fingerprint check fails on a changed file; the patched header has no std::recursivemutex typedef.",
-          "Host test on the REAL patched class, cut from the patched header, against an RTOS stub whose malloc always fails: the mutex constructs and locks recursively (lock, lock, unlock, unlock, trylock). Red on a model of the unpatched path (a s...",
+          "Host test on the real patched class, cut from the patched header, against an RTOS stub whose malloc always fails: the mutex constructs and locks recursively (lock, lock, unlock, unlock, trylock). Red on a model of the unpatched path (a s...",
           "Bench (otgw-bench-tester), the real proof: otgw-dev's crashrun2 scenario (K deep hold, repeated /ws connects during the hold), n >= 20 connects per arm, old build and patched build, on the bench Classic with PSRAM and on the OTGW32 witho..."
         ]
       },
