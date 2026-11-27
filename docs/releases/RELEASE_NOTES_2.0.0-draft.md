@@ -196,13 +196,13 @@ Most changes since the first 2.0.0 beta are already described above (Highlights 
 
 ### SAT
 
-- The derivative gain of the SAT PID is 0.05 x 8400 x Kp (was 0.063 x 8400 x Kp) (Sergeant D entries 425 and 427, TASK-2043, beta.386).
+- The derivative gain of the SAT PID is 0.04 x 8400 x Kp (it was 0.063, then 0.05; thermo-nova uses 0.07) (TASK-2043, TASK-3041).
 - With the room outside the 0.1 C band around the target, the PID integral is halved once and then held instead of reset to 0; the same applies to the zone thermostats (TASK-1890, beta.376).
 - SAT no longer switches from continuous to PWM while the tolerance band pauses heating (TASK-1887, beta.377).
 - PWM ON phases that start during a band pause do not count toward the hourly start limit, and the SAT narration names the value that decided a band stop or restart (TASK-1887, beta.358).
 - Fixed: within one burn SAT no longer flips back and forth between continuous and PWM, and those PWM re-entries no longer use up the cycles-per-hour limit. Once a burn has gone from PWM back to continuous, the switch margin no longer moves it to PWM: SAT stays continuous until the flame goes out, and only the safety switch can still take that burn to PWM. Only the first PWM ON of a burn counts toward the hourly limit. The safety switch back to PWM acts at 3.0 C above the request for 30 s instead of 3.5 C (Sergeant D entries 428 to 430, TASK-2913, beta.391).
 - SAT switches from continuous to PWM when the flow stays at least 2.0 C above its request for 60 s; the "PWM switch margin" setting (0.5 to 5.0 C) is in the web UI, REST and MQTT, and the 30 s safety switch stays (3.5 C, from beta.391 3.0 C) (TASK-1888, beta.345; TASK-2005, beta.361).
-- SAT leaves PWM for continuous mode when the flame is on and the request stays above the flow for 60 s (TASK-1933, beta.274).
+- SAT leaves PWM for continuous mode only on a real underheat: the flow must stay at least 3.0 C under the requested setpoint for 180 s and the flame must have burned at least 180 s, so the earliest exit is about 6 minutes after ignition; at the maximum setpoint PWM still ends after the 60 s start gate. This replaces the earlier rule "flame on and request above the flow for 60 s" (TASK-1933, beta.274), which made SAT flip between PWM and continuous in a replay of a field night (TASK-3008).
 - The PWM ON setpoint follows the latest flow temperature, as thermo-nova does (TASK-1990, beta.343, after the 2 minute average of beta.330 and beta.333).
 - SAT raises a diagnostic event when the burner does not light or heating fails, and leaves those hours out of the heating curve self-tune; it takes no control action (TASK-1882, beta.341).
 - A self-tune hour counts at 90 % clean ticks (108 of 120); ticks left out for hot water or sun only stay out of the hour's mean (TASK-1932, beta.339).
@@ -219,6 +219,19 @@ Most changes since the first 2.0.0 beta are already described above (Highlights 
 - Ten SAT settings show the range the gateway really stores, in the web UI and in `GET /api/v2/settings`; very small lower limits such as 0.005 are shown as they are (TASK-1941, beta.264 and beta.285).
 - SAT calibration markers are handled in memory and written to flash in the background, not from the web server (TASK-1911, beta.284).
 
+- No SAT command in the first 60 s after a reboot, then the heating curve alone until the first room temperature arrives; the gateway's own start-up reads of the boiler still run at once (TASK-1866, beta.348). Host test; with SAT on, the 60 s wait rests on the host test.
+- The PWM duty cycle follows the live flow temperature while the burner is on: duty = (requested setpoint - base) / (flow - base). Before, SAT used a boiler temperature frozen 180 s after ignition, so the duty hit 100 % during warm-up, SAT asked for full modulation and the burner overshot. While the burner is off the flow of the last ON moment is frozen; full modulation (`MM=T`) is asked only when the duty before capping is above 1.03 (TASK-2992, TASK-2993, beta.410). Host tests and a replay of a field flame; bench runs with the SAT simulator, not a real boiler.
+- In one flame the PWM ON time is one clock: it counts only PWM time, stands still in continuous, and continues when the fail-safe returns SAT to PWM (TASK-3039). Bench-tested with the SAT simulator on one unit; not with a real boiler.
+- The PID values Kp, Ki and Kd are rounded to 6 decimals instead of 3, so Ki no longer rounds to 0 at a low curve value; the PID output and the Summer Simmer index are rounded to 1 decimal, as in thermo-nova. Published MQTT and REST decimals are unchanged (TASK-3050).
+- A hot-water tap late in a heating burst no longer makes the next pause longer than needed: SAT keeps the flow temperature from just before the tap for the rest of that burst (TASK-3099, beta.452). Automatic checks only; not seen with a real hot-water tap.
+- SAT uses a Bluetooth (BLE) room sensor only when you chose it; an unchosen sensor never feeds SAT, and failing over from one BLE sensor to another is off by default (TASK-3011, beta.416).
+- SAT publishes which room temperature it actually uses: retained MQTT topic `sat/room_temp_source` (ble, areas, external, thermostat, simulation, estimate, none) and a Home Assistant diagnostic sensor "SAT Room Temp Source" (TASK-3015, beta.416).
+- A false No-ignition message is gone: while the tolerance band held the central heating off, the check counted the pause as heating asked for (TASK-3034).
+- Frost guard for a gateway without a thermostat: with SAT off and no thermostat seen on the OpenTherm bus, a room at or below 6 C makes the gateway ask the boiler for heat with a flow setpoint of 30 C until the room is back at 7 C. The temperatures are fixed. The room temperature must come from the Bluetooth sensor you chose for SAT or the external room temperature; without one the guard does nothing, and a `CS=` you set yourself takes precedence. Telnet lines `SAT: frost guard on` and `off`, REST `frost_guard_active` (TASK-3021). Bench: one OTGW Classic, no boiler; a thermostat appearing on the bus was not tested.
+- A thermostat setpoint change that equals one of the SAT presets selects that preset (TASK-3032, beta.474). Host tests; the thermostat path has not run with a real thermostat.
+- SAT zone count: new and reset installations start with 0 extra rooms (the old default 1 counted the main room); an existing settings file keeps its value. Zone topics `sat/zone/<n>/active|output|error` appear only for an extra room that has received data, `sat/zone_count` is retained and `/api/v2/sat/status` has a `zones` array (TASK-3102, beta.474). Host tests; the retained echo has a known limit, see Known issues.
+- The setting `satzoneheadroom` is removed: it had no effect (the zones always ask for the highest zone output). `POST /api/v2/settings` with this key answers 400 `Unknown setting name`; an old `settings.ini` that still has it loads normally (TASK-3089).
+- SAT settings are regrouped in the web UI: "Averaged room sensors" and "Zones" are two groups, the averaged sensors are numbered 1-4; setting keys, MQTT and REST did not change (TASK-3014).
 ### Home Assistant and MQTT
 
 <!-- Placeholder (after bench): MQTT pacer consolidation, one pacer for every MQTT publish path; describe the user-visible effect (publish timing, free memory under bursts) once its task and bench evidence are on dev. -->
@@ -231,6 +244,10 @@ Most changes since the first 2.0.0 beta are already described above (Highlights 
 - MQTT commands keep working after a low-memory connect: a refused command subscription is retried until accepted (TASK-1778, beta.260).
 - A planned reboot publishes the retained "offline" status first and then disconnects (TASK-1780, beta.262).
 
+- Weather location over MQTT: set `sat/weather_lat` (-90 to 90) and `sat/weather_lon` (-180 to 180); a value outside the range, or not one number, is ignored. The REST settings `satweatherlat` and `satweatherlon` are unchanged (TASK-3016, beta.474). Host tests and MQTT set steps on a test unit; see Known issues for when the retained echo stays empty.
+- The OpenTherm support table on MQTT: retained topics `otgw-firmware/boiler/supported_msgids` (the MsgIDs your boiler acknowledged) and `otgw-firmware/thermostat/sent_msgids` (the MsgIDs your thermostat sent), the same data as the OT support table in the web UI (TASK-3000).
+- New retained topic `otgw-firmware/thermostat/override_refused`: "false" when the thermostat's own setpoint follows a `TT=` or `TC=` override within 0.25 C, "true" when it still differs 300 seconds after the command. Host tests only; not run with a real thermostat (TASK-3033, beta.474).
+- The entities of each paired Bluetooth probe (temperature, humidity, battery, signal) carry the gateway availability and expire after 21 minutes without a value, so a dead probe shows `unavailable`; topics, unique ids and names do not change (TASK-2971). Host test; not bench-verified.
 ### Web UI and graphs
 
 - While SAT controls the heating, the room temperature on the Home page is the one SAT regulates on (for example your MQTT or BLE sensor), like the setpoint next to it and the Home Assistant thermostat card; the thermostat's own reading is in the tooltip. With SAT off, or while SAT has no valid room temperature, the page shows the thermostat's reading as before (TASK-2946, beta.402).
@@ -254,6 +271,15 @@ Most changes since the first 2.0.0 beta are already described above (Highlights 
 - Mission control follows the light and dark theme (TASK-1863, beta.267).
 - On a phone the language button and the Light/Dark switch have the same height (TASK-1873, beta.266).
 
+- The live log no longer stops silently: the gateway closes a live-log connection that stops taking data (after about 70 s), and the web UI reconnects by itself when its live log has been silent for 90 s (about 150 s in a background tab) (TASK-3017, beta.418). Host tests and bench runs including a 2 h run; a reconnect took about 7 s.
+- Memory emergencies and the live connections of the web UI (beta.458): stuck browser tabs are cleaned up when memory runs low (TASK-3025), a new live connection is refused early when memory is almost gone (TASK-3119), and an out-of-memory error in the live-log sending on a board without extra memory is caught (TASK-3122). After a severe low-memory event the web interface can still be unreachable for up to about 3 minutes, see Known issues.
+- The page reconnects politely: the web socket retries after 5, 10, 20, 40 and then 60 seconds with some jitter, pauses after three sockets that opened and closed within a minute (a Reconnect button resumes) (TASK-3124, beta.474). Tried in headless Chrome only.
+- The room temperature says whose it is: the overview has a visible thermostat line, the tag says which room temperature it shows, and the graph series are named so that the thermostat room (MsgID 24) and SAT's room source can be told apart, in English, Dutch and German (TASK-3035).
+- SAT page and Home polish: a paused SAT no longer repeats the same message three times and no longer draws a full modulation band or PID values in the history (TASK-3012); the SAT page shows one clear status per state, with a dash for values that are not available (TASK-2957); clearer texts and empty states (TASK-2959).
+- Accessibility and contrast: a "Skip to content" link, one main heading, labelled navigation, one visible focus ring, Settings categories reachable with Tab, Enter and Space, and the focus stays on the category after Enter (TASK-2958, TASK-2982, TASK-2991); better colour contrast in light and dark theme, 8 to 0 low-contrast findings in a design check (TASK-2956, TASK-2998, TASK-2997). Web UI tests on the real files.
+- Phone width: edge fade where more content is hidden, and Settings rail items on one line on wide screens (TASK-2960); the PIC firmware file table (TASK-3051) and the File System table (TASK-2926) fit a phone screen; the help popover stays inside its card and the chart axis label no longer touches the axis (TASK-3058, TASK-3052). Checked in a real browser layout with synthetic data.
+- The About screen at the end of Settings has three cards: Makers, Credits and Community, with a link to the full list in CONTRIBUTORS.md (TASK-2948, beta.403).
+- Clearer English settings help: `ethdns` names the router, and the PWM cycle help gives minutes like the dropdowns; other languages follow the translation sync (TASK-3118, beta.474).
 ### REST API
 
 - Fixed a crash when two web requests arrived while memory was nearly exhausted: the "busy" answer itself needed memory and stopped the firmware. With the largest free memory block under 4 KB the gateway now closes that connection without an answer; above it the 503 with `Retry-After` is unchanged (TASK-2910, beta.389).
@@ -307,6 +333,7 @@ Timing and reliability:
 - A boiler "data invalid" answer is never stored as a value (TASK-1925, beta.280).
 - MsgIDs 1, 3, 14, 17 and 25 are never switched off after "unknown" answers (TASK-1801, beta.293).
 
+- OTGW32 pin defaults (TASK-3120, beta.474): Dallas sensors start on GPIO 4 (the old default GPIO 10 is a board pin and was refused, so sensors never started) and the S0 counter on GPIO 5, the DI pin of the terminal block (the old default GPIO 12 is the Ethernet clock). An installation that still holds an old default is moved once; a pin you chose yourself is never changed. The GPIO output has no pad on this board and is hidden and refused. The S0 counter does not start on the pin the enabled 1-wire sensors use. Host tests; counting S0 pulses on the DI pin is untested.
 ### PIC (OTGW Classic)
 
 - The PIC settings fill in about a minute after a restart instead of four to five (TASK-1971, beta.340).
@@ -324,6 +351,7 @@ Timing and reliability:
 - The filesystem health check no longer writes to flash every 5 minutes; an unwritable filesystem is reported as health DEGRADED after the next SAT state-file write (TASK-2020, beta.373).
 - A reset during a save no longer empties the thermostat and boiler support files or the boot-detection log (TASK-1916, beta.282).
 
+- Release files (TASK-3116, beta.474): the GitHub release has no loose `.ino.bin` or `.littlefs.bin` file and `SHA256SUMS` lists none, because an old 1.x flash tool matches those names and would write a 2.x image to an ESP8266. The images stay inside the `-flash.zip`.
 ### BLE (Bluetooth sensors)
 
 - On boards without PSRAM BLE can no longer be switched on (greyed out with "BLE needs PSRAM", refused by REST with 409 and by MQTT, a stored "on" cleared at first start); the LOLIN S3 Mini and S3 Mini Pro keep BLE (TASK-2025, beta.375).
@@ -337,6 +365,10 @@ Timing and reliability:
 - On macOS with the built-in Python 3.9 the capture tool writes the graph history CSV again (TASK-2016).
 - The device check no longer counts an OT-Direct route that answers "not on this board" as a failure on an OTGW Classic (TASK-2012).
 
+- A failing output folder no longer loses a long capture: a failed write closes the file of that stream and the next write opens it again, lines of a folder that cannot be written are kept in memory (up to 8 MiB) and saved in a local fallback folder at the end, and a write that hangs on a stopped share is given up after 10 seconds (TASK-3006).
+- The capture tool records a sleep of the capture computer as a gap ("capture machine asleep or suspended") (TASK-2922).
+- Double-clicking `capture-mqtt-debug.bat` or `flash_otgw.bat` keeps the window open at the end, and the capture asks how long to record: until you press Q, 24 hours, or 3 days (TASK-2965).
+- The flash zip contains `sat_log_to_csv.py`, so the capture tool writes its SAT CSV files again (TASK-2917).
 ### WiFi
 
 - **The WiFi AP fallback is now part of the stable release** (TASK-2931, Robert's decision, beta.401). When the saved WiFi network cannot be reached, after 2 failed attempts (about a minute) or at boot, the gateway opens its own access point `OTGW-<last 3 bytes of the MAC>` (password `otgw1234`, web UI at `http://192.168.4.1`) and retries your network every 5 minutes. There is no AP fallback with the setting `wifinoportal` (the gateway keeps retrying without restarting) or, at runtime, while memory is critically low (it then restarts after 10 failed attempts; TASK-2923, beta.394, after a crash on a starved heap on the bench). Before beta.401 only beta builds had it. See section 6.1.3 of the manual.
