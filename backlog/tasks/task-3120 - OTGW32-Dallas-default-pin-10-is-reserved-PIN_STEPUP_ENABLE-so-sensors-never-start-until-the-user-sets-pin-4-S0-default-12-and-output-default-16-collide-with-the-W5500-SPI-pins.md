@@ -9,10 +9,14 @@ assignee:
   - '@claude'
 created_date: '2026-11-27T08:20:00Z'
 <<<<<<< HEAD
+<<<<<<< HEAD
 updated_date: '2026-11-27T14:05:00Z'
 =======
 updated_date: '2026-11-27T09:20:00Z'
 >>>>>>> fbbf155a6 (OTGW32: TASK-3120 Dallas default pin 4, S0 pin not set until the DI pad is confirmed, GPIO output hidden (Robert Q32 A, S0 stays))
+=======
+updated_date: '2026-11-27T09:22:00Z'
+>>>>>>> 558ea1fdb (docs(backlog): TASK-3120 compile-risk list for the build slot [no-task])
 labels:
   - hardware
   - bug
@@ -85,6 +89,14 @@ OPEN, not mine to decide: Tim's answer on the DI pad (GPIO 5; question 157579457
 =======
 
 2026-11-27 otgw-poc-dev implemented on lane-poc-3120 (coordinator decision A: -1 / int8_t). Code: OTGW-firmware.h legacyPinMigrated gets an OTGW32 target (Dallas legacy 10 -> OTGW32_DALLAS_PIN 4; S0 legacy 12 -> OTGW32_S0_DEFAULT_PIN -1; output PIN_KEEP), PIN_KEEP = no migration on that map, -1 is never 'busy'; boardHasOutputPin(map) block [board-has-output] (runtime, OTGW32 false); applyLegacyPinDefaults migrates sensors, S0 and output; S0types.h iPin int8_t; s0PulseCount.ino prints 'no pin set' and does not start; settingStuff S0COUNTERpin accepts -1, GPIOOUTPUTSenabled refuses to enable without an output pin; outputs_ext.ino initOutputs gate; restAPI: has_output_pin in device/info, s0counterpin range min -1, int32 casts; settings help + gz. Docs: ch11 11.6 en+nl, PINOUT.md, openapi has_output_pin. Evidence (host, real code compiled with the real boards.h): tests/test_board_defaults_3120.py 3/3 green, red on the old code; tests/test_legacy_pin_defaults.py updated for the new OTGW32 row (S0 12 -> -1, 1 write) green; test_board_pin_reserved, test_setting_gpio_range, test_progmem_assets_deflated, test_docs_no_em_dash green; 5 mutants killed (wrong Dallas target, migrate a non-legacy pin, predicate true on OTGW32, busy guard for -1, S0 default left 12). evaluate --quick see commit. NOT run: a firmware build (the type change int8_t is compile-checked only by the host harness), the full tests folder, a unit. DOWNGRADE (extra requirement 2): a previous firmware reading S0COUNTERpin -1 hits settingGpioInRange(-1) = false, logs 'not a GPIO of the ESP32-S3' and keeps its code default 12 (a W5500 pin on the OTGW32, refused by TASK-1552), so S0 simply does not start; Dallas pin 4 is read normally. The new firmware migrates again only when the stored value is the legacy default, so a downgrade then upgrade is stable. OPEN: web UI must render -1 as an empty S0 pin field (otgw-webui told), DI pad answer (Tim) = one-line change of OTGW32_S0_DEFAULT_PIN plus the test row. Benchmark needs the coordinator's slot.
+<<<<<<< HEAD
 >>>>>>> 380665a64 (OTGW32: TASK-3120 Dallas default pin 4, S0 pin not set until the DI pad is confirmed, GPIO output hidden (Robert Q32 A, S0 stays))
+<<<<<<< HEAD
 >>>>>>> fbbf155a6 (OTGW32: TASK-3120 Dallas default pin 4, S0 pin not set until the DI pad is confirmed, GPIO output hidden (Robert Q32 A, S0 stays))
+=======
+=======
+
+COMPILE-RISK LIST for the build slot (coordinator 2026-11-27; the int8_t change is only host-compiled). Every use of S0Section.iPin (src, grep s0.iPin), with the type effect: handleDebug.ino:77 printed with %d and an (int) cast (was %u/(unsigned)); restAPI.ino:509 and :2296 emitted through (int32_t) casts (was a raw uint8_t / (uint32_t)); restAPI.ino:4268 addInt takes int32_t value (addInt lambda at :4189, int minValue/maxValue: -1 is fine); s0PulseCount.ino:42 new check iPin < 0 (always false for the old uint8_t, now meaningful), :46 isBoardReservedPin(int) widens, :47/:55 %d (int8_t promotes to int), :52 pinMode(uint8_t pin, ...) and :54 digitalPinToInterrupt(...) receive an int8_t that is >= 0 there (the < 0 return is above them: a negative value can never reach them); settingStuff.ino:117 pin == settings.s0.iPin && iPin >= 0 (int vs int8_t, no sign warning), :138-147 legacyPinMigrated takes int and the result is assigned back to int8_t (implicit narrowing, same as sensors and outputs), :350 writeJsonIntKV(file, key, int8_t) (the sensors and outputs pins use it as int8_t already), :833/:1085/:1098 %d, :1090 and :1096 assignments from int. The new symbols: boardHasOutputPin() (OTGW-firmware.h, inline, after comboActivePinMap(), uses HAS_RUNTIME_HW_DETECT and HAS_DIRECT_OT from boards.h), constants LEGACY_SENSOR_PIN, OTGW32_DALLAS_PIN, OTGW32_S0_DEFAULT_PIN, PIN_KEEP (no clash found with grep PIN_KEEP in src/libraries). Residual risk: a name clash of PIN_KEEP in a library header, and a -Wsign-compare/-Wnarrowing flag set that the host MSVC compile does not use; both show up as the first compile error of the build slot.
+>>>>>>> a730e4c1e (docs(backlog): TASK-3120 compile-risk list for the build slot [no-task])
+>>>>>>> 558ea1fdb (docs(backlog): TASK-3120 compile-risk list for the build slot [no-task])
 <!-- SECTION:NOTES:END -->
