@@ -108,21 +108,25 @@ Version 2.0.0 is a major platform release. It targets the ESP32-S3 in the tradit
 
 Firmware 2.0 supports exactly two hardware configurations:
 
-1. **The OTGW Classic with an ESP32-S3 module.** The NodoShop OTGW with the PIC co-processor and a LOLIN S3 Mini or S3 Mini Pro in the module socket. The PIC talks OpenTherm; the ESP32-S3 is connected to it by a serial link.
-2. **The OpenTherm Gateway OTGW32.** A board with an ESP32-S3 that speaks OpenTherm itself, with its own interface to the boiler and to the thermostat (OT-Direct). There is no PIC on this board. Hardware versions 1.0 and 1.1 are very similar; version 1.1 has an optional bypass relay that is not fitted as supplied and is not used by the firmware.
+1. **The OTGW Classic with an ESP32-S3 module.** The NodoShop OTGW with the PIC co-processor (a small extra chip that speaks OpenTherm for the module) and a LOLIN S3 Mini or S3 Mini Pro in the module socket. The PIC talks OpenTherm; the ESP32-S3 is connected to it by a serial link.
+2. **The OpenTherm Gateway OTGW32.** A board with an ESP32-S3 that speaks OpenTherm itself, with its own connections to the boiler and to the thermostat (OT-Direct: the ESP32 does the work that the PIC does on the Classic). There is no PIC on this board. Hardware versions 1.0 and 1.1 are very similar; version 1.1 has an optional bypass relay that is not fitted as supplied and is not used by the firmware.
 
-Both run the same firmware image (`esp32-combo`). At start-up the firmware detects which of the two it is on.
+Both use the same release zip: download the file whose name contains `esp32-combo`, for example `OTGW-firmware-esp32-combo-<version>-flash.zip`. The firmware finds out by itself which of the two it is on.
+
+**Which one do you have?** After the first flash the unit tells you: the web UI has an Advanced, PIC firmware tab on an OTGW Classic and no such tab on an OTGW32, and `hardware_type` in the device info (`/api/v2/device/info`) is `otgw-classic` or `otgw32`. If you are not sure which board you have, ask in the Discord support channel before you flash: a factory install erases the unit.
 
 | | OTGW Classic with an ESP32-S3 module | OpenTherm Gateway OTGW32 |
 |---|---|---|
 | OpenTherm interface | PIC co-processor, serial link | The ESP32-S3 itself (OT-Direct), no PIC |
 | PIC firmware and PIC updates | Yes | No PIC, so none |
-| Flash and memory | 4 MB flash; the LOLIN S3 Mini has extra memory (PSRAM) | 4 MB flash, no PSRAM |
+| Flash and memory | 4 MB flash; the LOLIN S3 Mini has extra working memory (PSRAM) | 4 MB flash, no PSRAM |
 | Web UI, SAT, MQTT, Home Assistant, REST | Yes | Yes |
-| Port 25238 for OTmonitor | Yes, off by default | Emulated, off by default |
+| Port 25238 (lets the PC program OTmonitor connect) | Yes, off by default | Imitated by the firmware, off by default |
 | Field experience | Alpha and beta runs on several units | New device, hardware versions 1.0 and 1.1 |
 
-**Disclaimer: the OTGW32 is a new device and still has to prove itself in the field.** Firmware 2.0 supports it, but so far it has only run on a bench, without a thermostat and without a real boiler on the bus (simulated boiler and master mode). What is not yet field-proven: the variety of boilers and thermostats, long runs, the Ethernet and OLED options on real hardware, and OTmonitor over port 25238. If you run an OTGW32, please report what you see: see "How to report" in the release notes.
+**On the OTGW32, do not expect:** the bypass relay (hardware version 1.1 has a place for one; it is not fitted as supplied and the firmware does not use it), a ready-made terminal block (the 10 way block J4 is not fitted at the factory: you fit it yourself), PIC firmware updates (there is no PIC), or Bluetooth room sensors (they need extra memory this board does not have).
+
+**The OTGW32 is new, and the firmware for it has not run in a real home yet.** Firmware 2.0 supports it, but so far it has only run on a bench, without a thermostat and without a real boiler on the bus (simulated boiler and master mode). What is not yet field-proven: how it behaves with different boilers and thermostats, long runs, the Ethernet and OLED options on real hardware, and OTmonitor (a PC program for the OpenTherm Gateway) over port 25238. If you run an OTGW32, you are among the first. Please send what you see, with a capture if you can (see [Reporting a problem](docs/manuals/en/ch07-troubleshooting.md)): it is how the gaps in the list above get closed.
 
 More: [OTGW32 hardware configuration](docs/manuals/en/ch11-otgw32-hardware.md) and [Differences between an OTGW Classic with PIC and an OTGW32](docs/manuals/en/ch12-classic-vs-otgw32.md) (Dutch: [OTGW32 hardwareconfiguratie](docs/manuals/nl/h11-otgw32-hardware.md) en [Verschillen](docs/manuals/nl/h12-classic-versus-otgw32.md)).
 

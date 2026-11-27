@@ -5,16 +5,20 @@
 Firmware 2.0 ondersteunt precies twee hardwareconfiguraties:
 
 1. **De OTGW Classic met een ESP32-S3-module.** De traditionele gateway met de PIC-coprocessor en een LOLIN S3 Mini of S3 Mini Pro in de modulesocket (hoofdstuk 2).
-2. **De OpenTherm Gateway OTGW32.** Een print met een ESP32-S3 die zelf OpenTherm spreekt, met een eigen interface naar de ketel en naar de thermostaat. Op deze print zit geen PIC. Dit hoofdstuk beschrijft hem. Hoofdstuk 12 zet de twee naast elkaar.
+2. **De OpenTherm Gateway OTGW32.** Een print met een ESP32-S3 die zelf OpenTherm spreekt, met eigen aansluitingen naar de ketel en naar de thermostaat. Op deze print zit geen PIC. Dit hoofdstuk beschrijft hem. Hoofdstuk 12 zet de twee naast elkaar.
 
-> **De OTGW32 is een nieuw apparaat en moet zich nog in het veld bewijzen.** De hardwareversies 1.0 en 1.1 lijken sterk op elkaar; versie 1.1 heeft een optioneel bypass-relais dat niet is gemonteerd bij levering en dat de firmware niet gebruikt. Firmware 2.0 ondersteunt hem, maar de firmware heeft tot nu toe alleen op een testopstelling gedraaid, zonder thermostaat en zonder echte ketel op de bus (een gesimuleerde ketel, en masterstand zonder thermostaat). Nog niet in het veld bewezen: de verscheidenheid aan ketels en thermostaten, lange runs, de opties Ethernet en OLED op echte hardware, en OTmonitor via poort 25238. Draait u een OTGW32? Stuur dan bij uw melding een capture mee (zie hoofdstuk 7).
+**Verwacht op de OTGW32 niet:** het bypass-relais (hardwareversie 1.1 heeft er plaats voor; het is bij levering niet gemonteerd en de firmware gebruikt het niet), een kant-en-klaar klemmenblok (het 10-polige blok J4 is in de fabriek niet gemonteerd: u monteert het zelf), PIC-firmware-updates (er is geen PIC) of Bluetooth-kamersensoren (die vragen extra geheugen dat deze print niet heeft).
+
+> **De OTGW32 is nieuw en de firmware ervoor heeft nog niet in een echt huis gedraaid.** De hardwareversies 1.0 en 1.1 lijken sterk op elkaar; versie 1.1 heeft een optioneel bypass-relais dat niet is gemonteerd bij levering en dat de firmware niet gebruikt. Firmware 2.0 ondersteunt hem, maar de firmware heeft tot nu toe alleen op een testapparaat gedraaid, zonder thermostaat en zonder echte ketel op de bus (een gesimuleerde ketel, en masterstand zonder thermostaat). Nog niet in het veld bewezen: hoe het zich gedraagt met verschillende ketels en thermostaten, lange runs, de opties Ethernet en OLED op echte hardware, en OTmonitor (een pc-programma voor de OpenTherm Gateway) via poort 25238. Draait u een OTGW32? Stuur dan bij uw melding een capture mee (zie hoofdstuk 7).
+
+**Welke heeft u?** Na de eerste flash laat het apparaat het zien: de webinterface heeft op een OTGW Classic een tabblad Advanced, PIC firmware en op een OTGW32 niet, en `hardware_type` in de device info (`/api/v2/device/info`) is `otgw-classic` of `otgw32`. Weet u niet zeker welke print u heeft, vraag het dan in het Discord-supportkanaal voordat u flasht: een fabrieksinstallatie wist het apparaat.
 
 ### 11.1 Wat het is
 
-- **Processor en geheugen:** een ESP32-S3 met 4 MB flash en zonder PSRAM (het extra geheugen dat de LOLIN S3 Mini-module wel heeft). De firmware controleert tijdens het draaien of er PSRAM is.
-- **OpenTherm:** de ESP32-S3 stuurt zelf de ketelzijde en de thermostaatzijde aan. De firmware noemt dit OT-Direct. Er is geen PIC, dus er is ook geen PIC-firmware om bij te werken.
+- **Processor en geheugen:** een ESP32-S3 met 4 MB flash en zonder PSRAM (extra werkgeheugen; de LOLIN S3 Mini-module heeft het wel). De firmware controleert tijdens het draaien of er PSRAM is.
+- **OpenTherm:** de ESP32-S3 stuurt zelf de ketelzijde en de thermostaatzijde aan. De firmware noemt dit OT-Direct (de ESP32 doet het werk dat de PIC op de Classic doet). Er is geen PIC, dus er is ook geen PIC-firmware om bij te werken.
 - **Opties in de firmware:** bekabeld Ethernet (een W5500-chip), een klein OLED-schermpje en een ingang voor een Dallas-temperatuursensor worden door de firmware ondersteund. In onze tests zijn ze nog niet op echte OTGW32-hardware gezien.
-- **Aansluitblok:** het 10-polige klemmenblok (J4) is in de fabriek niet gemonteerd; u monteert het zelf. Klem 1 is de klem die het dichtst bij de resetknop zit. Klem 1 en 2 zijn de OpenTherm-lijnen van de ketel en klem 3 en 4 zijn de OpenTherm-lijnen van de thermostaat. Klem 5 tot en met 10 voeren voeding, massa, een digitaal-ingangspad met het opschrift DI en de 1-wire-lijn; de volgorde is nog niet gedocumenteerd. Het DI-pad is waarschijnlijk de SW-lijn (net SWR op GPIO 5 in het schema); waar het op is aangesloten en of het gebruikt mag worden, is niet bevestigd (hardware-informatie van een OTGW32-bezitter).
+- **Aansluitblok:** het 10-polige klemmenblok (J4) is in de fabriek niet gemonteerd; u monteert het zelf. Klem 1 is de klem die het dichtst bij de resetknop zit. Klem 1 en 2 zijn de OpenTherm-lijnen van de ketel en klem 3 en 4 zijn de OpenTherm-lijnen van de thermostaat. Klem 5 tot en met 10 voeren voeding, massa, een digitaal-ingangspad met het opschrift DI en de 1-wire-lijn, maar de volgorde kennen we nog niet. Sluit er niets op aan zolang die niet is gedocumenteerd. Het DI-pad is waarschijnlijk de SW-lijn; waar het op is aangesloten en of u het mag gebruiken, is niet bevestigd.
 - **Wat het apparaat meldt:** `GET /api/v2/device/info` toont `hardware_type` `otgw32` en de hardwaremodus `OT-Direct`. MQTT publiceert hetzelfde als `otgw-firmware/hardware_type` en `otgw-firmware/hardware_mode`.
 
 ### 11.2 De werkstanden
@@ -36,7 +40,8 @@ De stand staat in de instelling `OTDmode` en blijft na een herstart bewaard. In 
 
 - **Eerste installatie via USB:** gebruik `flash_otgw.bat` (Windows) of `./flash_otgw.sh` (Linux en macOS) uit de release-zip. Een fabrieksinstallatie wist het apparaat: het WiFi-wachtwoord en de instellingen zijn weg. De tool vindt de USB-poort zelf. (De oudere flashgids geldt alleen voor de 1.x ESP8266.)
 - **Bijwerken via WiFi:** open `http://<device-ip>/update` en geef de release-zip. De instellingen blijven bewaard; bewaar ze toch eerst.
-- **Waarschuwing voor de verwarming:** bij een apparaat dat rechtstreeks met de ketel praat, is de verbinding tussen thermostaat en ketel tijdens de update onderbroken, 1 tot 2 minuten. De ketel draait dan op zijn eigen instellingen. Kies een rustig moment.
+
+> **Voor u bijwerkt:** gedurende 1 tot 2 minuten is de thermostaat niet met de ketel verbonden en draait de ketel op zijn eigen instellingen. Kies een moment waarop niemand de komende minuten een warm huis nodig heeft.
 - **Flashindeling:** safeboot 960 KB, firmware 2240 KB, webbestanden 768 KB. Een apparaat met een oudere indeling heeft de eenmalige USB-migratie nodig (`flash_otgw --migrate --host <ip>`).
 
 ### 11.4 Hoe het apparaat merkt dat het een OTGW32 is
