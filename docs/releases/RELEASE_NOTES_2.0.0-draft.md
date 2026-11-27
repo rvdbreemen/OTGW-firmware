@@ -79,7 +79,7 @@ Remote telemetry sends a diagnostic recording from your gateway to a server of t
 - **How long:** deleted from the server after 30 days.
 - **Your gateway** is recognised by an ID that cannot be traced back to its MAC address, not by your name.
 - **Boards without PSRAM:** the setting is greyed out and nothing is ever sent.
-- **To have your data deleted** [ASK: Robert confirms the channel]: quote your telemetry ID in a GitHub issue or on the Discord support channel.
+- **To have your data deleted:** quote your telemetry ID in a GitHub issue or on the Discord support channel; we delete everything under that ID within 7 days. Switching telemetry off stops sending at once but does not delete data that was already sent; all data is deleted after 30 days anyway. Traffic on the OTmonitor port (25238) is not recorded.
 
 ---
 
