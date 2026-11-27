@@ -72,7 +72,7 @@ static void startStaleOverrideClear() {}                 // TASK-1991: covered b
 static bool staleOverrideClearStep() { return false; }
 static void publishBoilerUnsupportedMsgids() { q(5, 1); }
 static void clearBoilerUnsupportedDirty() { dirtyClearedAfterCsv = published[5] > 0 ? 1 : 0; }
-enum : uint8_t { OT_SUPPORT_LIST_BOILER = 1, OT_SUPPORT_LIST_THERMOSTAT = 2 };   // TASK-3000
+enum : uint8_t { OT_SUPPORT_LIST_BOILER = 1, OT_SUPPORT_LIST_THERMOSTAT = 2, OT_SUPPORT_LIST_OVERRIDE = 4 };   // TASK-3000, TASK-3033
 static int listsCleared = -1;
 static int listsOk = 1;
 static uint8_t publishOtSupportMsgidLists(uint8_t lists) { q(6, 2); return listsOk ? lists : 0; }
@@ -280,7 +280,7 @@ class MqttConnectStaging(unittest.TestCase):
 
     def test_support_lists_refused_at_connect_are_marked_for_the_minute_tick(self):
         r = self.run_mode("listsfail")
-        self.assertEqual((r["cleared"], r["marked"]), ("0", "3"), r)   # TASK-3000 review finding: no silent loss
+        self.assertEqual((r["cleared"], r["marked"]), ("0", "7"), r)   # TASK-3000 review finding: no silent loss; 7 = boiler, thermostat and (TASK-3033) override list
 
     def test_portions_keep_the_gap(self):
         r = self.run_mode("gap")

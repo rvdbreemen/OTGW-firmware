@@ -1,10 +1,11 @@
 ---
 id: TASK-3032
 title: 'SAT: a thermostat setpoint change that equals a preset selects that preset'
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-11-22T09:14:00Z'
-updated_date: '2026-11-22T09:22:00Z'
+updated_date: '2026-11-26T20:55:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -22,13 +23,27 @@ Decision: entry 465 in the private SAT register (Sergeant D, 2026-11-22, amends 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [ ] #1 Thermostat change to a preset value selects that preset (MQTT sat/preset and HA climate show it)
-- [ ] #2 Thermostat change to a non-preset value still clears the preset
-- [ ] #3 'Preset off' after a thermostat-driven match keeps the thermostat value (no stale restore)
-- [ ] #4 Host test on the real satAdoptThermostatSetpoint() red on the old code, green on the fix
+- [x] #2 Thermostat change to a non-preset value still clears the preset
+- [x] #3 'Preset off' after a thermostat-driven match keeps the thermostat value (no stale restore)
+- [x] #4 Host test on the real satAdoptThermostatSetpoint() red on the old code, green on the fix
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1) Add one static helper satPresetForValue(float) in SATcontrol.ino (same preset table and 0.05 C tolerance as satHandleTargetTemp, SATcontrol.ino:4078-4105 on origin/dev) and let satHandleTargetTemp use it, so the MQTT/web path and the thermostat path cannot drift apart. 2) satAdoptThermostatSetpoint() (SATcontrol.ino:2498): keep the order (preset NONE, pre-custom 0, updateSetting SATtargettemp so the 5-30 C clamp, control reset and deferred persist stay), then if the adopted value matches a preset set eActivePreset to it, keep fPreCustomTemp 0 and the target at the thermostat value, publish the preset topic once (final state only, no NONE then preset flap); no match: today behaviour. 3) AC3 follows from pre-custom 0: preset off restores nothing (satHandlePreset none only restores when fPreCustomTemp>0, :2468) so the thermostat value stays; verified in the test, not assumed. 4) No extra persist code: satPresetStateFormat/periodic compare (:2416) writes the changed preset. TC= echo handling (satTCNoteAdopted) unchanged: no TC= back. 5) Tests red-first: extend tests/test_sat_follow_thermostat.py (it compiles the real satAdoptThermostatSetpoint) with a preset table in the harness: match selects preset (AC1), non-match clears (AC2), preset off after match keeps value (AC3), tolerance edges 0.04/0.06, two presets with equal value picks the first as satHandleTargetTemp does; change test_adoption_clears_preset_without_restoring_pre_custom_temp, which asserts the old behaviour for 23.0, to a non-preset value. Red on origin/dev code, green on the fix. 6) Entries read against the register (grep preset/setpoint/thermostat/target, 405 public + private to 487): 465 (the decision, amends 25 for the equal-value case only), 25 (clear on non-match stays), 2/14/16/169 (follow + push: no TC= back, unchanged), 223 (a preset chosen while the window is open wins: the window switch is ended by updateSetting, same as today), 308 (restore after reboot: the matched preset is persisted by the existing compare), 469+ none found with preset in the title. No conflict found; not yet read: private entries 469-500 bodies. 7) Open: gruijter wants Homey to show the preset; release 2.0.0 per Robert 2026-11-22. No build/push/flash; otgw-webui reviews before code lands.
+<!-- SECTION:PLAN:END -->
 
 ## Implementation Notes
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-11-22: Robert in #alpha-testing (1573992000523341935): put it in the backlog and prioritize for the 2.0.0 release.
+
+Register check (coordinator request, 2026-11-26): all 32 private entries 469-500 (origin/main of the register, 5921af5) were scanned in full body text for preset, fPreCustom, satAdoptThermostat, thermostat setpoint, target temperature, setpoint change: 0 hit lines in every one. None touches presets or a thermostat setpoint change. This is a scripted keyword scan of the full bodies, not a line-by-line human read of all 32 entries. Entry 465 itself is the only one: it fixes the 0.05 C tolerance by reference ("within 0.05 C, as the MQTT/web UI path does, SATcontrol.ino:3895-3925 at origin/dev"), so the tolerance is Sergeant D's decision as recorded, taken from that path. Not fixed by the register or by entry 465: which preset wins when two presets have equal values (satHandleTargetTemp picks the first in code order comfort, eco, away, sleep, activity, home; the allowed ranges overlap, e.g. 15-22 C can hold comfort and eco): implementation choice (ours), same as the existing MQTT/web path, to be carried into the register later. Also ours: the target stays the thermostat value (within 0.05 C of the preset) instead of snapping to the preset value.
+
+2026-11-26 code on local lane-poc-3032, commit c5ce299c7 (not pushed, not built, not flashed). Reviewer otgw-webui verdict OK with 4 additions, all in the tests. Evidence: tests/test_sat_follow_thermostat.py, 48 tests; on the unchanged origin/dev code 15 new cases FAIL, on the fix all 48 pass; mutants (window switch not ended, stale pre-custom, tolerance 0.07) fail 1, 5 and 1 cases. Neighbours green: test_ha_climate_sat_follow 29, test_sat_pid_resets 17, test_sat_preset_persist 13, test_sat_push_setpoint 10, test_sat_rest_contract_1496 16. evaluate.py --quick: 89 passed, 0 failed. AC1 stays unticked: the host test proves the preset and the single preset-topic publish, not the HA climate entity on a unit. Interpretation (ours, 465): fPreCustomTemp stays 0 on a thermostat match (the MQTT path sets it to the old target); settings.ini then stores the matched preset value as the user target, equal to the thermostat value. Implementation choice (ours): equal-valued presets pick the first of comfort, eco, away, sleep, activity, home; target stays the thermostat value; a standing window switch is ended on a match to a non-activity preset. Needs: esp32-combo build and bench (thermostat change to a preset value, MQTT sat/preset and HA climate).
+
+2026-11-26 coordinator decision: no thermostat simulator. Ships in a later beta labelled 'host-tested; thermostat path not bench-run'. AC1 stays open until a tester with a real thermostat and Home Assistant answers the 3 plain steps (OTGW-field-data/_comms/task3032_bench_request.md, section 'Minimal tester steps (3)', release-note wording in the same file). Optional low-priority bench item on .63: the MQTT half (refactor kept behaviour, 2 host cases).
+
+2026-11-26 premise check for the coordinator (read-only, beta.428 = v2.0.0-beta.428 SATcontrol.ino vs will_85903 capture 2026-11-26_beta.428_capture). (1) The preset at 06:55:53, 11:33:45, 20:50:43 (eco) and 20:50:46 was set by the MQTT path, not by satAdoptThermostatSetpoint: transcript lines 'handleMQTTca: MQTT SAT cmd: target [21]' then 'satHandleTar(3959): SAT: target 21.0 matches preset comfort, activating preset' then 'satHandlePre(2463): SAT: preset comfort -> target 21.0' (SATcontrol.ino:3939-3960 on beta.428). All 14 target changes of the capture arrived as 'MQTT SAT cmd: target [x]' on OTGW/set/otgw-berghem/sat (22:50:47 22.5 ... 20:50:46 21). The thermostat-follow path never adopted anything: 0 lines 'follow thermostat: target', and all 8 SATFOLLOW lines say adopted=0 (the thermostat only echoed SAT's own pushed TC=, push=1). The 'Thermostat setpoint set to X (push setpoint)' narration is SAT pushing TC= after the MQTT target. Who sent the MQTT target (OpenHAB, or a rule that copies the thermostat's dial) is not visible in the log; the tester's guess 'wife turned the Honeywell' is not supported as the path into SAT. (2) satAdoptThermostatSetpoint on beta.428 is identical to origin/dev (SATcontrol.ino:2498-2511): it clears the preset. Host harness, same inputs, push OFF and push ON (last TC= 19.0, non-echo value): beta.428 code preset=0 in both, the fix preset=comfort in both; an echo of SAT's own TC= is not adopted with push ON on both. So push-setpoint on or off changes only WHETHER an edge is adopted, never whether a matching preset is selected. (3) Premise: entry 465 / gruijter's report is a thermostat-originated change (his Homey app shows none because a thermostat change never selects a preset); his settings are not in my data (not checked). 3032 is still needed for: SAT enabled + follow-thermostat on, setpoint arriving as the thermostat's MsgID 16 T frame, push on or off. It changes nothing for a setup like will_85903's where the target arrives over MQTT sat/target (that path already matched presets).
 <!-- SECTION:NOTES:END -->

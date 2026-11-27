@@ -5,18 +5,40 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
-## [2.0.0-beta.455] - 2026-11-27
+## [2.0.0-beta.474] - 2026-11-27
 
-Build in this beta: beta.455 only (previous public beta: beta.452; beta.453 and beta.454 were never published). It is the build that ran 60 minutes without a restart on two test units.
+Build in this beta: beta.474 only (previous public beta: beta.458; beta.459 to beta.473 were internal builds and were never published). The exact build (2.0.0-beta.474+7d20639) ran 62 minutes on a Classic with an S3 module and extra memory and 60 minutes on an OT-Direct board without extra memory, without a restart or a crash; a first run on the board without extra memory, overlapped by two web page sessions of our tester, reached a critical memory state once and recovered by itself.
 
 ### Changed
-- Web UI live connections: when memory is almost out, the gateway drops the browser connections of the live log at once instead of asking each tab to close; a tab connects again by itself (about 5 seconds in the bench with the fix alone; with this beta the unit was unreachable for about 1 to 3 minutes after a forced severe low-memory event, then recovered without a restart or crash) (TASK-3025, ADR-295). New counter `hd_ws_recovery_abort` in `GET /api/v2/device/info`.
-- Web UI live connections: a new connection is refused at the handshake while memory is almost gone, so the gateway no longer builds a connection it cannot close safely; a bench build panicked in 1 of 2 runs without this (TASK-3119). Checked with emulated browser tabs on a test unit (3 of 3 runs without a panic); not proven in real browsers.
-- Manual: new chapters 11 and 12 on hardware configurations; README says which release file to download (TASK-3115).
-- Internal: 42 changes in documentation and decisions, task administration, bench test keys (beta builds only) and tooling; nothing to do for users.
+- SAT: a thermostat setpoint change that equals one of the SAT presets selects that preset; this changes the thermostat path only, `sat/target` over MQTT works as before (TASK-3032). Host tests, and the MQTT steps ran on a test unit; not run with a real thermostat.
+- SAT, MQTT: the weather location can be set over MQTT with `sat/weather_lat` (-90 to 90) and `sat/weather_lon` (-180 to 180); a value out of range, or not one number, is ignored. The retained state echo on the same topics has a known limit, see Known issues (TASK-3016). Host tests only; the state echo was verified on a test unit with SAT simulation on (not a real boiler): the topics appeared within seconds.
+- MQTT: new retained topic `otgw-firmware/thermostat/override_refused`: "false" when the thermostat's setpoint follows a `TT=` or `TC=` override within 0.25 C, "true" when it still differs 300 seconds after the command (TASK-3033). Host tests only; not run with a real thermostat.
+- SAT: new and reset installations start with 0 extra rooms (the old default 1 counted the main room); an installation that already saved the zone count keeps it, and an older settings file keeps 1. Zone topics `sat/zone/<n>/active|output|error` are published only for an extra room that has received data, `sat/zone_count` is retained (with the limit in Known issues), and `/api/v2/sat/status` has a `zones` array (TASK-3102). Host tests only.
+- OTGW32: Dallas sensors start on GPIO 4 and the S0 counter on GPIO 5, the DI pin of the terminal block; an installation that still holds an old default is moved once, a pin you chose yourself is never changed; the GPIO output has no pad on this board and is hidden and refused; the S0 counter does not start on the pin that enabled 1-wire sensors use (TASK-3120). Counting S0 pulses on the DI pin is untested.
+- Web UI: the page reconnects with a growing wait (5, 10, 20, 40, then 60 seconds, with jitter) and pauses after repeated short-lived connections; a Reconnect button resumes (TASK-3124). Tried in headless Chrome only. Also: help popover stays inside its card (TASK-3058), chart axis label no longer touches the axis (TASK-3052), clearer English settings help (TASK-3118), the File System table fits a 375 px screen (TASK-2926).
+- Release files: the GitHub release has no loose `.ino.bin` or `.littlefs.bin` file and `SHA256SUMS` lists none; the images stay inside the `-flash.zip` (TASK-3116).
+- Manual: rows for the new MQTT topics, the zone changes and the OTGW32 pins.
+- Internal: 28 changes in documentation and decisions, task administration, bench test keys (beta builds only) and tooling; nothing to do for users.
 
 ### Known issues
-- Unit unreachable for about 1 to 3 minutes (54 seconds to 2.6 minutes in bench runs) after a severe low-memory event, then recovers by itself without a restart or crash. It needs nearly empty memory, forced on the bench with a test key; no user report. The early refusal of new connections is the likely contributor (not proven); a change is being tested for the next beta. beta.452 crashed in this situation (TASK-3025, TASK-3119).
+- The retained state echo of the SAT settings topics (`sat/weather_lat`, `sat/weather_lon`, `sat/zone_count` and the other static `sat/*` settings) is published only once SAT is not held back by its start gates: the first 60 seconds after boot, a lost OpenTherm link, or a missing outside temperature. On a unit where SAT is held back, those topics stay empty; setting them over MQTT or REST still works. Same as in earlier betas.
+- On a unit without extra memory, two web pages open at the same time plus other requests can bring the memory low for a moment; in our test the unit recovered by itself without a restart (one test run; the web UI reconnect backoff in this beta reduces repeated reconnects).
+- The issues of beta.458 are still open: BLE scanning WiFi loss and failing filesystem updates (TASK-3126), the web interface unreachable for up to about 3 minutes after a severe low-memory event (TASK-3025, TASK-3119), repeated reconnecting on a board without extra memory (TASK-3123) and the memory dip after a start (TASK-3024). See the release notes.
+
+## [2.0.0-beta.458] - 2026-11-27
+
+Build in this beta: beta.458 only (previous public beta: beta.452; beta.453 to beta.457 were internal test builds and were never published). The exact build (2.0.0-beta.458+3f91762) ran 61 minutes on a Classic with an S3 module and 71 minutes on a unit without extra memory, without a restart or a crash.
+
+### Changed
+- Web UI live connections: when memory is almost out, the gateway drops the browser connections of the live log at once instead of asking each tab to close; a tab connects again by itself (about 5 seconds in the bench with the fix alone; after a forced severe low-memory event the web interface and telnet were unreachable for 54 seconds up to almost 10 minutes in our tests on internal builds, see Known issues) (TASK-3025, ADR-295). New counter `hd_ws_recovery_abort` in `GET /api/v2/device/info`.
+- Fixed a crash in the live-log sending on boards without extra memory: when memory ran out the unit restarted; now that log line is dropped and counted (`hd_ws_alloc_fail` in `GET /api/v2/device/info`) (TASK-3122). A test build (a9aa6a9, never published) crashed there in a forced low-memory test.
+- Web UI live connections: a new connection is refused at the handshake while memory is almost gone, so the gateway no longer builds a connection it cannot close safely; a bench build panicked in 1 of 2 runs without this (TASK-3119). Checked with scripted stand-ins for browser tabs on a test unit (3 of 3 runs without a panic on beta.455, an internal build); not proven in real browsers.
+- Manual: new chapters 11 and 12 on hardware configurations; README says which release file to download (TASK-3115).
+- Internal: 63 changes in documentation and decisions, task administration, bench test keys (beta builds only) and tooling; nothing to do for users.
+
+### Known issues
+- On a Classic with an S3 module, BLE scanning can cause WiFi packet loss; in our tests (one unit, one run per state) a filesystem update over WiFi failed 5 of 5 times while BLE was on and worked at the first try with BLE off. If an update fails, turn off the SAT BLE setting ("Enable BLE sensors" under Settings, Sensors), reboot the gateway and repeat the update; turn it back on afterwards. Switching it off takes effect after a reboot: in our test the scan kept running until the reboot. (TASK-3126)
+- After a severe low-memory event (free memory under about 3 KB) the web interface (port 80) and telnet can be unreachable for up to about 3 minutes in our tests, once for almost 10 minutes (internal builds: 455 54 seconds to 2.6 minutes on the unit with extra memory; a test image with the early refusal on 130, 160 and 2 minutes 40 seconds; 456 55 seconds and 4 minutes 21 seconds on the unit with extra memory and 9 minutes 55 seconds on the unit without; this beta 92 seconds to 3 minutes in 3 runs, once about 6 minutes); the unit then normally recovers without a restart. The crash in the live-log sending on a board without extra memory is fixed in this beta (TASK-3122; 3 of 3 test holds without a panic on the unit without extra memory, the build without the catch restarted in 2 of 3); closing a live-log connection, or cleaning up connections, under the same low memory can still fail, and other places in the main loop that ask for memory were not checked (the sending of log lines is covered). On a board without extra memory, open web UI tabs can reconnect repeatedly under very low memory and keep the unit unreachable for several minutes; in the bench the unit recovered after the scripted tabs were stopped (bench: 3 low-memory events in 10 minutes with two reconnecting scripted stand-ins for browser tabs, driven by a test tool heavier than the web UI; real browsers not verified). Needs nearly empty memory, forced on the bench with a test key; no user report. MQTT, the OpenTherm link and SAT were not measured during these gaps. What to do: if the web UI stops answering, close other browser tabs that show the gateway and give it up to about 15 minutes to recover (15 minutes is our estimate, not a guarantee); in our tests it came back within 10 minutes. If it is still dark after 15 minutes, power-cycle the gateway and tell us. (TASK-3025, TASK-3119, TASK-3122, TASK-3123).
 - Memory dip in the first minutes after a start on a unit without PSRAM (the OTGW32): in the release soak of beta.452 the lowest free memory dropped to 648 bytes about 5 minutes after the start and the unit reported a critical memory state once. It did not restart or crash and the memory recovered to about 46 KB. The same unit showed a similar dip on beta.418, so it is not new in beta.452. Open (TASK-3024).
 
 ## [2.0.0-beta.452] - 2026-11-27
@@ -1275,8 +1297,9 @@ Legacy release. See git history for details.
 
 Legacy releases. See git history for details.
 
-[Unreleased]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.455...HEAD
-[2.0.0-beta.455]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.452...v2.0.0-beta.455
+[Unreleased]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.474...HEAD
+[2.0.0-beta.474]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.458...v2.0.0-beta.474
+[2.0.0-beta.458]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.452...v2.0.0-beta.458
 [2.0.0-beta.452]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.451...v2.0.0-beta.452
 [2.0.0-beta.451]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.438...v2.0.0-beta.451
 [2.0.0-beta.438]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.432...v2.0.0-beta.438

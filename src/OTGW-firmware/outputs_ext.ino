@@ -1,6 +1,6 @@
 /*********
 **  Program  : output_ext.ino
-**  Version  : v2.0.0-beta.462
+**  Version  : v2.0.0-beta.474
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Contributed by Sjorsjuhmaniac
@@ -40,6 +40,10 @@ void initOutputs() {
   DebugTf(PSTR("inside initOutputsO%d...\r\n"), 1);
 
   if (!settings.outputs.bEnabled) return;
+  if (!boardHasOutputPin()) {   // TASK-3120: the OTGW32 has no pad for the output
+    DebugTln(F("GPIO Outputs: this board has no output pin, not started"));
+    return;
+  }
   if (!validateGPIOOutputsConfig()) return;
 
   DebugTf(PSTR("init GPIO Output on GPIO%d...\r\n"), settings.outputs.iPin);

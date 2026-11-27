@@ -324,6 +324,8 @@ Weather data provides:
 | `satweatherlon` | 0.0 | -180 to 180 | Longitude |
 | `satweatherinterval` | 900 | 300-3600 s | Poll interval (default 15 min, minimum 5 min) |
 
+The location can also be set over MQTT: `sat/weather_lat` and `sat/weather_lon` (payload one number, for example `52.3702`; a value outside -90..90 or -180..180, or text, is ignored). The device publishes the current values back as retained `sat/weather_lat` and `sat/weather_lon` with 4 decimals. Because they are retained, your coordinates stay on the MQTT broker and reach every client that reads it: use a town-centre position, or keep the location at 0 on a shared broker (TASK-3016).
+
 Browsers only allow geolocation over HTTPS or on localhost. When you open the web UI over HTTPS (behind a reverse proxy), the SAT page shows a **Detect location** button. On plain `http://<device-ip>` the button is hidden and the SAT page shows this hint instead: "Enter your Latitude and Longitude under SAT settings › Weather, or let Home Assistant publish sat/sun_elevation." The words "SAT settings › Weather" are a link: it opens the SAT page in the Control view at the Weather group with the Latitude field focused (while SAT is off the fields are locked and the group heading gets the focus). **Detect location** only appears in a secure context, for example behind an HTTPS Home Assistant ingress. A published `sat/sun_elevation` only replaces the sun elevation for solar gain (section 5.10); fetching the weather itself still needs Latitude and Longitude. Weather data is fetched via plain HTTP (no HTTPS). The first fetch is gated 5 minutes after boot so DHCP, NTP, and MQTT have time to settle before the first HTTPS-free Open-Meteo call. The streaming JSON parser is allocation-free (no malloc inside the SAT loop). For debugging, the telnet console accepts `w` to force an immediate fetch + dump (TASK-513).
 
 ---
@@ -472,10 +474,10 @@ Zones receive their temperature and target via MQTT. Each zone, zone 1 included,
 
 | Setting | Default | Range | Description |
 |---|---|---|---|
-| `satzonecount` | 1 | 1-4 | Number of active heating zones |
+| `satzonecount` | 0 | 0-4 | Number of extra rooms next to the main room (0 = none) |
 | `satzonetimeout` | 300 | 60-3600 s | Seconds without update before a zone goes inactive |
 
-When `satzonecount` is 1 (default), SAT only uses a zone if room and target data is pushed for it. A zone without data does not count, so a setup without zone data behaves as before. The per-zone MQTT diagnostics (`sat/zone/<n>/...`) are published only when more than one zone is configured.
+`satzonecount` counts the extra rooms next to the main room: 0 (default) means no extra rooms, 1 to 4 add that many. SAT only uses an extra room if room and target data is pushed for it. A room without data does not count, so a setup without zone data behaves as before. The per-zone MQTT diagnostics (`sat/zone/<n>/...`) are published from one extra room, and only for a room that has received data. The retained state `sat/zone_count` echoes the setting, and `GET /api/v2/sat/status` lists the rooms in a `zones` array. An installation that saved its settings before this key existed keeps 1.
 
 ---
 

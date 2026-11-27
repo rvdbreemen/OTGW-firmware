@@ -1720,6 +1720,8 @@ Weather data provides:
 | `satweatherlon` | 0.0 | -180 to 180 | Longitude |
 | `satweatherinterval` | 900 | 300-3600 s | Poll interval (default 15 min, minimum 5 min) |
 
+The location can also be set over MQTT: `sat/weather_lat` and `sat/weather_lon` (payload one number, for example `52.3702`; a value outside -90..90 or -180..180, or text, is ignored). The device publishes the current values back as retained `sat/weather_lat` and `sat/weather_lon` with 4 decimals. Because they are retained, your coordinates stay on the MQTT broker and reach every client that reads it: use a town-centre position, or keep the location at 0 on a shared broker (TASK-3016).
+
 Browsers only allow geolocation over HTTPS or on localhost. When you open the web UI over HTTPS (behind a reverse proxy), the SAT page shows a **Detect location** button. On plain `http://<device-ip>` the button is hidden and the SAT page shows this hint instead: "Enter your Latitude and Longitude under SAT settings › Weather, or let Home Assistant publish sat/sun_elevation." The words "SAT settings › Weather" are a link: it opens the SAT page in the Control view at the Weather group with the Latitude field focused (while SAT is off the fields are locked and the group heading gets the focus). **Detect location** only appears in a secure context, for example behind an HTTPS Home Assistant ingress. A published `sat/sun_elevation` only replaces the sun elevation for solar gain (section 5.10); fetching the weather itself still needs Latitude and Longitude. Weather data is fetched via plain HTTP (no HTTPS). The first fetch is gated 5 minutes after boot so DHCP, NTP, and MQTT have time to settle before the first HTTPS-free Open-Meteo call. The streaming JSON parser is allocation-free (no malloc inside the SAT loop). For debugging, the telnet console accepts `w` to force an immediate fetch + dump (TASK-513).
 
 ---
@@ -1868,10 +1870,10 @@ Zones receive their temperature and target via MQTT. Each zone, zone 1 included,
 
 | Setting | Default | Range | Description |
 |---|---|---|---|
-| `satzonecount` | 1 | 1-4 | Number of active heating zones |
+| `satzonecount` | 0 | 0-4 | Number of extra rooms next to the main room (0 = none) |
 | `satzonetimeout` | 300 | 60-3600 s | Seconds without update before a zone goes inactive |
 
-When `satzonecount` is 1 (default), SAT only uses a zone if room and target data is pushed for it. A zone without data does not count, so a setup without zone data behaves as before. The per-zone MQTT diagnostics (`sat/zone/<n>/...`) are published only when more than one zone is configured.
+`satzonecount` counts the extra rooms next to the main room: 0 (default) means no extra rooms, 1 to 4 add that many. SAT only uses an extra room if room and target data is pushed for it. A room without data does not count, so a setup without zone data behaves as before. The per-zone MQTT diagnostics (`sat/zone/<n>/...`) are published from one extra room, and only for a room that has received data. The retained state `sat/zone_count` echoes the setting, and `GET /api/v2/sat/status` lists the rooms in a `zones` array. An installation that saved its settings before this key existed keeps 1.
 
 ---
 
@@ -4158,7 +4160,7 @@ All SAT endpoints require authentication.
 
 ##### GET /api/v2/sat
 
-Returns full SAT status. Alias: `GET /api/v2/sat/status`.
+Returns full SAT status. Alias: `GET /api/v2/sat/status`. It includes a `zones` array with one object per extra room (`index` from 1, `room_temp`, `setpoint`, `active`; `room_temp` and `setpoint` are `null` until the room has received data), up to `satzonecount` rooms; the array is empty when `satzonecount` is 0.
 
 Add `?detail=full` for extended diagnostics including synchronization health, pressure metrics, cycle diagnostics, and PID error statistics.
 
@@ -4891,6 +4893,8 @@ Topic: `{TopTopic}/set/{UniqueId}/sat/<command>`. Command names are matched case
 | `sat/control_mode` | `"continuous"` / `"pwm"` / `"auto"` (or `"1"` / `"2"` / `"0"`) / `"off"` | Set control mode. `"off"` switches SAT off, the same as `sat/enabled` 0. Any other non-numeric value is treated as `"auto"` |
 | `sat/preset` | `"comfort"` / `"eco"` / `"away"` / `"sleep"` / `"activity"` / `"home"` / `"none"` | Apply a preset; `"none"` clears it |
 | `sat/humidity` | `"58"` (0 to 100) | Push indoor humidity (%) |
+| `sat/weather_lat` | `"52.3702"` (-90 to 90) | Set the weather location latitude; anything but one number in range is ignored. State is retained on `sat/weather_lat` |
+| `sat/weather_lon` | `"4.8952"` (-180 to 180) | Set the weather location longitude; same rule. State is retained on `sat/weather_lon` |
 | `sat/heating_mode` | `"comfort"` / `"eco"` | Set heating mode |
 | `sat/sun_elevation` | `"32.5"` (-90 to 90) | Push sun elevation (degrees) |
 | `sat/window` | `"open"` / `"on"` / `"1"` = open, anything else = closed | Set window state (only acted on when window detection is enabled) |
@@ -5767,7 +5771,7 @@ Firmware 2.0 supports exactly two hardware configurations:
 - **Processor and memory:** an ESP32-S3 with 4 MB of flash and no PSRAM (extra working memory; the LOLIN S3 Mini module has it). The firmware checks for PSRAM while it runs.
 - **OpenTherm:** the ESP32-S3 drives the boiler side and the thermostat side itself. The firmware calls this OT-Direct (the ESP32 does the work that the PIC does on the Classic). There is no PIC, so there is no PIC firmware to update.
 - **Options in the firmware:** wired Ethernet (a W5500 chip), a small OLED display and a Dallas temperature sensor input are supported by the firmware. They have not been seen on real OTGW32 hardware in our tests.
-- **Connector:** the 10 way terminal block (J4) is not fitted at the factory; you fit it yourself. Terminal 1 is the one nearest the reset button. Terminals 1 and 2 are the OpenTherm boiler lines and terminals 3 and 4 are the OpenTherm thermostat lines. Terminals 5 to 10 carry power, ground, a digital-input pad labelled DI and the 1-wire line, but we do not know their order yet. Do not connect anything to them until it is documented. The DI pad is probably the SW line; what it is wired to and whether you may use it is not confirmed.
+- **Connector:** the 10 way terminal block (J4) is not fitted at the factory; you fit it yourself. Terminal 1 is the one nearest the reset button. Terminals 1 and 2 are the OpenTherm boiler lines and terminals 3 and 4 are the OpenTherm thermostat lines. Terminal 5 is labelled DI: it is connected to GPIO 5 through a 330 ohm series resistor, with a 3.3 k pull-up and a 470 pF capacitor to ground. Terminals 6 to 10 carry power, ground and the 1-wire line, but we do not know their order yet. Do not connect anything to terminals 6 to 10 until it is documented.
 - **What the unit reports:** `GET /api/v2/device/info` shows `hardware_type` `otgw32` and the hardware mode `OT-Direct`. MQTT publishes the same as `otgw-firmware/hardware_type` and `otgw-firmware/hardware_mode`.
 
 ### 11.2 The operating modes
@@ -5818,7 +5822,7 @@ The core of the gateway does not depend on PSRAM. The list below is what is diff
 - **REST:** for now, at most 2 requests are answered at the same time. A third gets HTTP 503 `Retry-After: 1`. The limit was not measured for this board class.
 - **Diagnostic recorder:** a small buffer of about 2 minutes instead of the large one.
 - **MQTT:** a unit without extra memory sends bursts in steps; the limits are not calibrated for it yet (see Known issues in the release notes).
-- **Pins:** wired Ethernet (W5500) uses SPI on GPIO 11, 12, 13, 14 and 15, and the 1-Wire input for Dallas sensors is on GPIO 4 (hardware information from an OTGW32 owner, matching the pin table in `docs/hardware/PINOUT.md`). The firmware defaults for the Dallas sensor (GPIO 10), the S0 counter (GPIO 12) and the GPIO output (GPIO 16) are pins the board uses itself, so the firmware refuses the Dallas default and does not start sensors until you choose a pin: set the Dallas pin to 4. S0 energy meter counting is a firmware feature; on the OTGW32 it needs an input pin. The terminal block has a digital-input pad (DI, probably GPIO 5); the pin is not confirmed yet, so until then choose the pin yourself in the settings. The GPIO output has no pad on this board and is not available. The ESP32-S3 module itself has unused pins that are not routed to a connector.
+- **Pins:** wired Ethernet (W5500) uses SPI on GPIO 11, 12, 13, 14 and 15, and the 1-Wire input for Dallas sensors is on GPIO 4 (hardware information from an OTGW32 owner, matching the pin table in `docs/hardware/PINOUT.md`). On an OTGW32 the Dallas pin starts at GPIO 4: an installation that still holds the old default (GPIO 10, a pin the board uses itself) is moved to 4 once, and a pin you chose yourself is never changed. S0 energy meter counting stays available and needs an input pin. Pin 5 (DI) of the terminal block is connected to GPIO 5 through a 330 ohm series resistor, with a 3.3 k pull-up and a 470 pF capacitor to ground, and is a general purpose digital input; the 1-wire line (GPIO 4, with a 3.3 k pull-up and a 470 pF capacitor to ground) is intended for DS18x20 temperature sensors. The old S0 default (GPIO 12) is a W5500 pin, so on an OTGW32 the S0 pin starts at GPIO 5, the DI pad; an installation that still holds the old default is moved to 5 once, and a pin you chose yourself is never changed. Counting pulses on the DI pad has not been tested with an S0 meter yet. The S0 counter does not start on a pin the enabled 1-wire sensors use. The GPIO output is not available on an OTGW32: there is no pad for it, so the setting is hidden in the web UI and refused (the `has_output_pin` field of `GET /api/v2/device/info` is false on this board). The ESP32-S3 module itself has unused pins that are not routed to a connector.
 
 ### 11.7 What is the same as on the OTGW Classic
 
@@ -5869,7 +5873,7 @@ Technical rows: you do not need these to choose or to use your unit.
 | **Flash and memory** | 4 MB flash. The LOLIN S3 Mini and S3 Mini Pro have extra memory (PSRAM). | 4 MB flash, no PSRAM. |
 | **REST requests at the same time** | At most 2 for now. | At most 2 for now; not measured for this board. |
 | **Start-up detection** | Finds the PIC and remembers that. | Finds no PIC and starts OT-Direct. Up to 3 PIC probes at every start while Board mode is Auto. |
-| **Free header pins** | As on the Classic board. | The S0, output and Dallas defaults clash with pins the board uses. S0 counting needs an input pin: the terminal block has a digital-input pad DI (probably GPIO 5, not confirmed yet), so choose the pin yourself in the settings. The GPIO output has no pad on this board. Set the Dallas pin to 4 (chapter 11.6). |
+| **Free header pins** | As on the Classic board. | The S0, output and Dallas defaults clash with pins the board uses. S0 counting needs an input pin: terminal 5 (DI) on the terminal block is connected to GPIO 5, the 1-wire line is GPIO 4, and the S0 counter has not been tested on an OTGW32; you choose the pin in the settings. The GPIO output has no pad on this board. Set the Dallas pin to 4 (chapter 11.6). |
 
 ### 12.2 What is the same
 

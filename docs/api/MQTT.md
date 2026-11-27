@@ -70,6 +70,7 @@ Published at startup, on MQTT (re)connect, and every 5 minutes.
 | `otgw-firmware/boiler/unsupported_msgids` | `"14W,24R,26R"` | MsgIDs the boiler answered with Unknown-DataID: `<id>R` for a read, `<id>W` for a write (retained; republished at every connect, also empty) |
 | `otgw-firmware/boiler/supported_msgids` | `"0R,3R,5R,25R,1W,16W"` | MsgIDs the boiler acknowledged (read ack `<id>R`, write ack `<id>W`); the `blAR`/`blAW` columns of `GET /api/v2/otgw/ot-support`. Retained, updated within a minute of a new MsgID and republished at every MQTT connect; published once at least one MsgID is known, never as an empty list |
 | `otgw-firmware/thermostat/sent_msgids` | `"0R,3R,17R,1W,16W,24W"` | MsgIDs the thermostat sent as read (`<id>R`) or write (`<id>W`); the `tsR`/`tsW` columns of `GET /api/v2/otgw/ot-support`. Retained, same update rule as `supported_msgids` |
+| `otgw-firmware/thermostat/override_refused` | `"true"` / `"false"` | Observed behaviour: does the thermostat follow a `TT=`/`TC=` override? `false` = its own MsgID 16 setpoint came within 0.25 C of the value sent; `true` = it still differed 300 s after the command (the PIC drops the override after about 3 minutes). Every `TT=`/`TC=` counts, SAT's own push too, also with SAT off; `TT=0`/`TC=0` cancels and judges nothing; an override equal to the thermostat's own setpoint is not judged. Retained, published only after the first judgement (before that the topic is absent, not `false`). Only a command the gateway accepted counts (queued or sent); one that was dropped is not judged. After a `true`, a thermostat dial turned to the value last sent flips the verdict to `false` (it did follow, this time). Not persisted over a restart. A gateway reset also clears the override and can read as `true` inside the 300 s window; this is what the gateway saw, not what the thermostat supports. Same publish and reconnect path as `sent_msgids` |
 | `otgw-firmware/command_retry_exceeded` | `"ON"` / `"OFF"` | `ON` after a dropped command, `OFF` again after the next confirmed command that is not a `PR=` readout or a SAT `PM=` message (retained; republished as `OFF` after a reboot). Home Assistant binary sensor "Command Dropped". The total count is `cmd_dropped` in `/api/v2/device/info`. A drop while MQTT is disconnected is not published afterwards. |
 
 Commands go through a queue on PIC boards. A new command replaces one with the same two-letter code that is still waiting (so `TT=20` followed by `TT=21` sends only `TT=21`), except `TP=` commands: each `TP=` is queued behind the others. Commands from MQTT and most internal ones are always queued, never replaced. A command the PIC does not confirm after 5 tries is dropped and reported on `otgw-firmware/command_dropped`. A command the PIC refuses (error code `NG`, `SE`, `BV`, `OR`, `NS`, `NF` or `OE`) is removed at once and reported there with the code, for example `ZZ=1 (NG)`; a refusal never sets `command_retry_exceeded` to `OFF`. OT-Direct boards (OTGW32) answer each command on the spot, so nothing is dropped there.
@@ -322,7 +323,7 @@ SAT topics no longer publish on every control cycle. Each topic under `sat/*` us
 
 **Home Assistant restart:** the ADR-174 republish resets the OT trackers and the SAT core-state shadows listed above. The other SAT shadows keep their last-published state, so the other non-retained `sat/*` topics (the BLE values included) wait for their next change or heartbeat, up to 11 minutes.
 
-**Exceptions to on-change + heartbeat:** the multi-zone diagnostics `sat/zone/<n>/*` are published retained on every multi-zone control pass, and when preset `"none"` restores the saved target, `sat/target` is published at once (retained) before the next regular pass.
+**Exceptions to on-change + heartbeat:** the zone diagnostics `sat/zone/<n>/*` are published retained, on change, from one extra room and only for a zone that has received data, and when preset `"none"` restores the saved target, `sat/target` is published at once (retained) before the next regular pass.
 
 **Float tolerance constants** (from `SATmqttPublish.h`):
 
@@ -619,15 +620,27 @@ Published only while weather is enabled (`SATweatherenable`) and the last poll w
 | `sat/weather/weather_code` | `"3"` | no | WMO weather code. Forecast builds only |
 | `sat/weather/is_day` | `"1"` / `"0"` | no | Daylight (payload `"1"`/`"0"`). Forecast builds only |
 
+#### Weather location (retained)
+
+The location the weather fetch and the sun elevation use (`satweatherlat`, `satweatherlon`, TASK-3016). Published through the on-change helper, 4 decimals, **retained**. `0.0000` for both means no location set.
+
+| Topic | Value | Retained | Description |
+| ----- | ----- | -------- | ----------- |
+| `sat/weather_lat` | `"52.3702"` | yes | Latitude in degrees (-90 to 90) |
+| `sat/weather_lon` | `"4.8952"` | yes | Longitude in degrees (-180 to 180) |
+
+**Privacy:** these are the user's coordinates. A retained topic keeps them on the MQTT broker and hands them to every client, bridge and log that subscribes to `#` or to this device's topics (Home Assistant, Homey, broker backups). Use a location that is accurate enough for the weather (a town centre works) or leave the setting at 0 if the broker is shared. Setting the location from the web UI or REST stays possible. The topics are published by the SAT publish pass, so only while SAT is enabled, and they are published with the value that is set: `0.0000` for a location that was never set (the value 0 is not skipped).
+
 #### Multi-zone Diagnostics
 
-Published retained on every multi-zone control pass, for each configured zone n (1-based). These topics bypass the on-change + heartbeat helpers.
+Published retained through the on-change helpers (ADR-111), for each configured extra room n (1-based) that has received data. With `zone_count` 0, or for a room that never received data, nothing is published.
 
 | Topic | Value | Retained | Description |
 | ----- | ----- | -------- | ----------- |
 | `sat/zone/<n>/active` | `"true"` / `"false"` | yes | Zone has fresh room temperature and setpoint and is not off |
 | `sat/zone/<n>/output` | `"42.5"` | yes | Zone PID output (°C) |
 | `sat/zone/<n>/error` | `"0.50"` | yes | Zone setpoint minus zone room temperature (°C) |
+| `sat/zone_count` | `"0"` | yes | Number of extra rooms (the `zone_count` command, 0 to 4); published with the other settings echoes |
 
 #### SAT Switch State Topics (TASK-284)
 
@@ -1061,7 +1074,7 @@ SAT-specific commands are nested under the `sat/` sub-topic. All commands are su
 | ------------ | ------- | ----------- |
 | `sat/zone/<n>/room_temp` | `"20.5"` | Push room temperature for zone n (1-based index) |
 | `sat/zone/<n>/setpoint` | `"21.0"` | Push setpoint for zone n (1-based index) |
-| `sat/zone_count` | `"2"` | Set number of active zones (1-4) |
+| `sat/zone_count` | `"2"` | Set the number of extra rooms next to the main room (0-4, default 0 = none). State echo: `sat/zone_count` (retained) |
 | `sat/zone_timeout_s` | `"600"` | Set zone inactivity timeout in seconds |
 
 **Solar and Sun Elevation:**
@@ -1070,6 +1083,8 @@ SAT-specific commands are nested under the `sat/` sub-topic. All commands are su
 | ------------ | ------- | ----------- |
 | `sat/sun_elevation` | `"32.5"` | Push sun elevation in degrees (from HA sun entity). Wins over the value computed from the weather latitude/longitude while younger than 1 hour; REST `sat/status` reports `sun_elevation_source` (TASK-2015) |
 | `sat/solar_min_elevation` | `"12.0"` | Set minimum sun elevation for solar gain activation |
+| `sat/weather_lat` | `"52.3702"` | Set the weather latitude (-90 to 90, persisted like the REST setting `satweatherlat`). A payload that is not one number inside the range is ignored, not clamped. State echo: `sat/weather_lat` (retained) |
+| `sat/weather_lon` | `"4.8952"` | Set the weather longitude (-180 to 180, persisted like `satweatherlon`). Out-of-range or non-numeric payloads are ignored. State echo: `sat/weather_lon` (retained) |
 
 **PV-surplus Boost (TASK-640):**
 

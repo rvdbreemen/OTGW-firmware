@@ -84,6 +84,7 @@ static bool otMasterRequestActive = false;   // a master request in flight (loop
 #define PSTR(s) (s)
 struct Ran { std::string text; bool onLoop; bool satOwn; };
 static std::vector<Ran> g_ran; static std::mutex g_ranMux;
+static void otOverrideNoteCommand(const char*, int) {}   // TASK-3033: noted once an OT-Direct command is accepted
 bool handleOTDirectCommand(const char* buf, int len, bool satOwn = false) {
   std::lock_guard<std::mutex> l(g_ranMux); g_ran.push_back({std::string(buf, len), g_loop, satOwn});
   return std::string(buf, len) != "XX=refused";
@@ -231,6 +232,8 @@ class SourceChecks(unittest.TestCase):
                 blk = braced(fn, fn.index("if (!satOwn && !satOwnsControlSetpoint()", h))
                 end = fn.index(blk, h) + len(blk) + 1
                 fn = fn[:h] + fn[end:]
+            # TASK-3033: the note of an accepted TT=/TC= override only reads the text; it is left out of this comparison.
+            fn = "".join(l for l in fn.splitlines(True) if "otOverrideNoteCommand(buf, len);" not in l)
             return fn
         self.assertEqual(pic_part(CORE), pic_part(base))
 

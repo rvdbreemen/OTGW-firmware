@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTDirect.ino
-**  Version  : v2.0.0-beta.462
+**  Version  : v2.0.0-beta.474
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -3883,7 +3883,7 @@ void otdCmdTextDrain() {
     }
     portEXIT_CRITICAL(&otdCmdTextMux);
     if (!ok) break;
-    handleOTDirectCommand(c.text, c.len, c.satOwn);   // outside the lock: the handler can take its own locks
+    if (handleOTDirectCommand(c.text, c.len, c.satOwn)) otOverrideNoteCommand(c.text, c.len);   // outside the lock: the handler can take its own locks; TASK-3033: only an accepted command is noted
   }
 }
 

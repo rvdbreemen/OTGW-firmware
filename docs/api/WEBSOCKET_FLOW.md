@@ -441,16 +441,13 @@ if (wsClientCount >= MAX_WEBSOCKET_CLIENTS) {
 
 ### Heap Protection
 
-**Check before accepting connection:**
-```cpp
-// webSocketStuff.ino:75-80
-if (ESP.getFreeHeap() < HEAP_WARNING_THRESHOLD) {
-  DebugTf(PSTR("Low heap (%u bytes), rejecting connection\r\n"), 
-          ESP.getFreeHeap());
-  webSocket.disconnect(num);  // Refuse if low memory
-  return;
-}
-```
+On the ESP32-S3 firmware (2.x) the live log (`/ws`) is protected at three points. The handshake gate and the emergency recovery are in `webSocketStuff.ino`; `canSendWebSocket()` is in `helperStuff.ino`.
+
+1. **Handshake gate** (`wsAdmitHandshake()`, TASK-3119). The check runs before the library builds the client object. A handshake is refused when the free heap is under `HEAP_WARNING_THRESHOLD` (5120 bytes) or when `MAX_WEBSOCKET_CLIENTS` (3) clients are connected. The library answers 401, the refusal is counted as a burst event and printed on telnet as "refused at the handshake", and the web UI tries again after about 5 seconds. The same two checks in the connect event handler stay as a second line, because the heap can still fall between the handshake and the client construction.
+2. **Sending** (`canSendWebSocket()`). Log lines are not sent while the heap is critical (under `HEAP_CRITICAL_THRESHOLD`, 3072 bytes).
+3. **Emergency recovery** (ADR-295, TASK-3025). When the heap is critical, the recovery frees memory by aborting the TCP connection of each `/ws` client instead of asking it to close (a client that does not answer a close frame can stay half open for a minute and keep its memory). `GET /api/v2/device/info` counts these drops in `hd_ws_recovery_abort`.
+
+**What a browser sees.** After an emergency recovery the open tabs reconnect by themselves. On the bench, after a forced severe low-memory event (free heap under about 3 KB), the web interface and telnet were unreachable for up to about 3 minutes (54 seconds to 2.6 minutes in 3 bench runs, 160 seconds the longest of all runs; one unit, few runs) and then normally recovered without a restart. On a board without extra memory, reconnecting emulated tabs were also seen to drive the heap down again and to cause repeated recoveries; in the bench the unit recovered after the scripted tabs were stopped (bench only; real browsers not verified). MQTT, the OpenTherm link and SAT were not measured during these gaps.
 
 ## Special Scenarios
 

@@ -311,5 +311,5 @@ def queue_region() -> str:
     hdr = rd(FW / "OTGW-firmware.h")
     m = "inline bool satBlocksExternalCommand("
     pred = hdr[hdr.index(m):hdr.index("\n}\n", hdr.index(m)) + 3]
-    pred_decl = "void satNoteExternalRefused(const char* buf, int len);\nbool satOwnsControlSetpoint();\n"
+    pred_decl = "void satNoteExternalRefused(const char* buf, int len);\nbool satOwnsControlSetpoint();\nstatic inline void otOverrideNoteCommand(const char*, int) {}\nstatic inline void otOverrideNoteUndelivered(const char*, int) {}\nstatic inline bool otOverrideOnThermostatSetpoint(float) { return false; }\n"
     return pred_decl + pred + "\n" + core[ch:ch_end] + "\n" + core[a:b]

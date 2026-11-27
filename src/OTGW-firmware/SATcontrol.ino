@@ -2436,6 +2436,25 @@ static void satResetControlStateIfTargetChanged(float before)
   if (fabsf(settings.sat.fTargetTemp - before) >= SAT_TARGET_CHANGE_MIN_C) satResetControlState();
 }
 
+// The preset whose temperature equals `temp` (strictly within 0.05 C), else SAT_PRESET_NONE. One table for
+// the MQTT/web target path (satHandleTargetTemp) and the thermostat path (satAdoptThermostatSetpoint), so
+// both pick the same preset; when two presets hold the same value the first in this order wins.
+static SATPreset satPresetForValue(float temp)
+{
+  const struct { SATPreset preset; float val; } presets[] = {
+    { SAT_PRESET_COMFORT,  settings.sat.fPresetComfort  },
+    { SAT_PRESET_ECO,      settings.sat.fPresetEco      },
+    { SAT_PRESET_AWAY,     settings.sat.fPresetAway     },
+    { SAT_PRESET_SLEEP,    settings.sat.fPresetSleep    },
+    { SAT_PRESET_ACTIVITY, settings.sat.fPresetActivity },
+    { SAT_PRESET_HOME,     settings.sat.fPresetHome     },
+  };
+  for (uint8_t i = 0; i < sizeof(presets) / sizeof(presets[0]); i++) {
+    if (fabsf(temp - presets[i].val) < 0.05f) return presets[i].preset;
+  }
+  return SAT_PRESET_NONE;
+}
+
 void satHandlePreset(const char* value)
 {
   SATPreset newPreset = SAT_PRESET_NONE;
@@ -2503,21 +2522,38 @@ void satHandlePreset(const char* value)
 // fPreCustomTemp: that restore would put the old pre-preset temperature back over the value the
 // user just chose. fPreCustomTemp is cleared so a later preset-none does not restore a stale value.
 // The target itself goes through updateSetting("SATtargettemp"), the same code a REST/MQTT target
-// change ends in (5-30 C clamp, deferred persist). satHandleTargetTemp() is not used here because
-// it maps a target that equals a preset value back onto that preset, which would undo the clear.
+// change ends in (5-30 C clamp, deferred persist); a real change clears the preset and the window
+// switch there. TASK-3032 (entry 465, amends entry 25 for this case only): when the thermostat value
+// equals a preset value (satPresetForValue, within 0.05 C) that preset becomes active after the
+// clear, with the thermostat value as target and fPreCustomTemp 0, so "preset off" later keeps the
+// thermostat value. The preset topic is published once, with the final state. A value that matches no
+// preset leaves the preset cleared.
 static void satAdoptThermostatSetpoint(float tr)
 {
   char valBuf[12];
   dtostrf(tr, 1, 1, valBuf);
   const bool hadPreset = (state.sat.eActivePreset != SAT_PRESET_NONE);
+  const SATPreset matched = satPresetForValue(tr);
   state.sat.eActivePreset  = SAT_PRESET_NONE;
   state.sat.fPreCustomTemp = 0.0f;
   updateSetting("SATtargettemp", valBuf);
+  if (matched != SAT_PRESET_NONE) {
+    // A window switch that updateSetting() left standing (the value equals the current target) ends
+    // here as it does for a preset chosen over MQTT, unless the thermostat chose the activity preset itself.
+    if (state.sat.fPreWindowTarget > 0.0f && matched != SAT_PRESET_ACTIVITY) {
+      state.sat.fPreWindowTarget   = 0.0f;
+      state.sat.fPreActivityTemp   = 0.0f;
+      state.sat.iPreWindowPreset   = (uint8_t)SAT_PRESET_NONE;
+      state.sat.iWindowOpenSinceMs = 0;
+    }
+    state.sat.eActivePreset = matched;
+  }
   _sat_followNarrPending = true;   // TASK-1521: narrated on the loop task (processOT holds the OT lock here)
   satTCNoteAdopted(settings.sat.fTargetTemp);   // the thermostat already has it: no TC= back (TASK-1272)
   SATDebugTf(PSTR("SAT: follow thermostat: target %.1f from thermostat setpoint%s\r\n"),
-             settings.sat.fTargetTemp, hadPreset ? ", preset cleared" : "");
-  if (hadPreset) satSyncPresetTopic(SAT_PRESET_NONE);
+             settings.sat.fTargetTemp,
+             (matched != SAT_PRESET_NONE) ? ", preset selected" : (hadPreset ? ", preset cleared" : ""));
+  if (matched != SAT_PRESET_NONE || hadPreset) satSyncPresetTopic(matched);
 }
 
 // Edge detector for "SAT target follows the thermostat setpoint" (TASK-1259). Pure: every input is an
@@ -2582,6 +2618,7 @@ static bool satPushRefusedDecide(bool pushOn, bool pushed, uint32_t sincePushMs,
 // either board (ADR-223). The PS=1 summary carries no T frame and is not a source.
 void satOnThermostatSetpoint(float tr)
 {
+  otOverrideOnThermostatSetpoint(tr);   // TASK-3033: also with SAT off (this runs for every thermostat T frame)
   const bool active = satIsEnabled() && settings.sat.bFollowThermostat;
   const bool hadBaseline = state.sat.bThermostatTrSetValid;
   const float baseline   = state.sat.fThermostatTrSet;
@@ -4065,6 +4102,7 @@ static void satPublishZoneDiagnostics()
   for (uint8_t i = 0; i < zoneCount; i++) {
     feedWatchDog();
     SATZoneState& z = satZones[i];
+    if (z.iLastUpdateMs == 0) continue;   // TASK-3102: a zone that never received data publishes nothing (TASK-1440: no retained traffic for a single-room install)
     // TASK-593: an OFF zone (HVACMode.OFF) reports inactive, matching its exclusion
     // from the zone PID and satAggregateZoneSetpoint().
     bool active = !z.bOff && z.bRoomValid && z.bSpValid && ((now - z.iLastUpdateMs) <= timeoutMs);
@@ -4095,20 +4133,11 @@ bool satHandleTargetTemp(const char* value)
     // Auto-map to preset if temperature exactly matches a preset value (Task #218).
     // Mirrors Python climate.py:562-568 behaviour: set_temperature auto-activates the preset
     // so that HA preset display and MQTT preset topic stay in sync.
-    struct { const char* name; float val; } presets[] = {
-      { "comfort",  settings.sat.fPresetComfort  },
-      { "eco",      settings.sat.fPresetEco      },
-      { "away",     settings.sat.fPresetAway     },
-      { "sleep",    settings.sat.fPresetSleep    },
-      { "activity", settings.sat.fPresetActivity },
-      { "home",     settings.sat.fPresetHome     },
-    };
-    for (uint8_t i = 0; i < sizeof(presets) / sizeof(presets[0]); i++) {
-      if (fabsf(temp - presets[i].val) < 0.05f) {
-        SATDebugTf(PSTR("SAT: target %.1f matches preset '%s', activating preset\r\n"), temp, presets[i].name);
-        satHandlePreset(presets[i].name);
-        return true;
-      }
+    const SATPreset matched = satPresetForValue(temp);   // the table the thermostat path uses too (TASK-3032)
+    if (matched != SAT_PRESET_NONE) {
+      SATDebugTf(PSTR("SAT: target %.1f matches preset '%s', activating preset\r\n"), temp, satGetPresetName(matched));
+      satHandlePreset(satGetPresetName(matched));
+      return true;
     }
     // No preset match: go through updateSetting() to persist via deferred flush
     updateSetting("SATtargettemp", value);
@@ -5033,6 +5062,30 @@ static void satEmitStatusLive(JsonEmit& je, float flowTemp, float returnTemp, bo
 // failover flag, and the results of the computed/side-effecting helpers
 // (satGetRoomTemp/OutsideTemp/MaxSetpoint, satCycleGet*, satBoilerHardwarePresent,
 // satGet*Name). settings.sat.* stays live (event-driven).
+// begin sat-status-zones record
+// TASK-3102 (entry 459): the extra rooms for /api/v2/sat/status, index 1-based, so the web UI rows of TASK-3019 can read them.
+// Plain parameters, not a struct, for the same reason as satEmitStatusLive(): the Arduino builder hoists prototypes.
+// A zone is active when it has had data, is not OFF, has a valid room temperature and setpoint, and is not older than the timeout.
+static bool satZoneStatusActive(bool hasData, bool off, bool roomValid, bool spValid, uint32_t lastMs, uint32_t nowMs, uint32_t timeoutMs)
+{
+  return hasData && !off && roomValid && spValid && ((uint32_t)(nowMs - lastMs) <= timeoutMs);
+}
+
+static void satEmitStatusZones(JsonEmit& je, uint8_t n, const bool* hasData, const bool* active, const float* roomTemp, const float* setpoint)
+{
+  je.beginArray(F("zones"));
+  for (uint8_t i = 0; i < n; i++) {
+    je.beginObject();
+    je.field(F("index"),     (int32_t)(i + 1));
+    je.field(F("room_temp"), hasData[i] ? roomTemp[i] : NAN);   // null until the zone has received data
+    je.field(F("setpoint"),  hasData[i] ? setpoint[i] : NAN);
+    je.field(F("active"),    active[i]);
+    je.endObject();
+  }
+  je.endArray();
+}
+// end sat-status-zones record
+
 struct SatStatusSnap {
   OTGWState st;                       // frozen copy of every state.* the emit reads
   float    otToutside;                // OTcurrentSystemState.Toutside
@@ -5053,6 +5106,9 @@ struct SatStatusSnap {
   SatPwmPhaseRec      pwmPh[SAT_PWM_PHASE_HIST];   // TASK-1880: oldest first, pwmPhCount valid
   uint8_t             pwmPhCount;
   SatPwmPhaseCounters pwmPhCnt;
+  uint8_t  zoneN;                    // TASK-3102: extra rooms in the zones array
+  bool     zoneHas[SAT_MAX_ZONES], zoneActive[SAT_MAX_ZONES];
+  float    zoneRoom[SAT_MAX_ZONES], zoneSp[SAT_MAX_ZONES];
 };
 
 static const char* satTuneReasonName(uint8_t r);   // TASK-1881: defined in the satCurveTune block below
@@ -5107,6 +5163,19 @@ void satSendStatusJSON()
     snap->pwmPh[k] = _pwmPhHist[(uint8_t)((_pwmPhHead + SAT_PWM_PHASE_HIST - _pwmPhCount + k) % SAT_PWM_PHASE_HIST)];
   }
   snap->pwmPhCnt      = _pwmPhCnt;
+  {   // TASK-3102: the extra rooms, frozen with the rest
+    uint8_t zc = settings.sat.iZoneCount;
+    if (zc > SAT_MAX_ZONES) zc = SAT_MAX_ZONES;
+    snap->zoneN = zc;
+    const uint32_t zNow = millis(), zTimeoutMs = (uint32_t)settings.sat.iZoneTimeoutS * 1000UL;
+    for (uint8_t i = 0; i < zc; i++) {
+      const SATZoneState& z = satZones[i];
+      snap->zoneHas[i]    = z.iLastUpdateMs != 0;
+      snap->zoneRoom[i]   = z.fRoomTemp;
+      snap->zoneSp[i]     = z.fSetpoint;
+      snap->zoneActive[i] = satZoneStatusActive(snap->zoneHas[i], z.bOff, z.bRoomValid, z.bSpValid, z.iLastUpdateMs, zNow, zTimeoutMs);
+    }
+  }
 
   // DETERMINISM GATE (TASK-883): this closure reads ONLY snap->*, settings.sat.*,
   // and F()/PSTR literals. No live state.*, OTcurrentSystemState.*, millis(), or
@@ -5181,6 +5250,7 @@ void satSendStatusJSON()
       je.endObject();
     }
     je.endArray();
+    satEmitStatusZones(je, snap->zoneN, snap->zoneHas, snap->zoneActive, snap->zoneRoom, snap->zoneSp);   // TASK-3102
     je.field(F("last_cycle_class"),     (int32_t)satReportedLastCycleClass(snap->st.sat, millis()));
     je.field(F("cycle_max_flow"),       snap->st.sat.fCycleMaxFlow);
     je.field(F("cycle_overshoot_sec"),  snap->st.sat.fCycleOvershootSec);
@@ -5624,12 +5694,14 @@ void satPublishMQTT()
   static SATShadowF s_boiler_capacity, s_dhw_capacity, s_boiler_rated_kw, s_boiler_efficiency;
   static SATShadowF s_summer_threshold, s_target_temp_step;
   static SATShadowF s_min_pressure, s_max_pressure, s_max_pressure_drop;
+  static SATShadowF s_weather_lat, s_weather_lon;   // TASK-3016
   static SATShadowF s_preset_comfort, s_preset_eco, s_preset_away;
   static SATShadowF s_preset_sleep, s_preset_activity, s_preset_home;
   static SATShadowI s_cycles_this_hour, s_4h_cycles, s_current_modulation;
   static SATShadowI s_pwm_ph_not_ignited, s_pwm_ph_last_cmd_on, s_pwm_ph_last_ign_delay, s_pwm_ph_last_flame_on, s_pwm_ph_last_ignited;   // TASK-1880
   static SATShadowI s_pv_boost_threshold_w, s_pv_boost_hold_s, s_pv_boost_max_duration_min;
   static SATShadowI s_sensor_max_age, s_cycles_per_hour, s_humidity_timeout_s;
+  static SATShadowI s_zone_count;   // TASK-3102
   static SATShadowI s_control_interval, s_max_modulation;
   static SATShadowI s_heating_system, s_manufacturer_id;
   static SATShadowB s_flame_health, s_valves_open;
@@ -5939,6 +6011,7 @@ void satPublishMQTT()
   publishIfChangedB(F("sat/error_monitoring"),     settings.sat.bErrorMonitoring,         s_error_monitoring,     true);
   publishIfChangedS(F("sat/heating_mode"),         settings.sat.iHeatingMode == 1 ? "eco" : "comfort", s_heating_mode, true);
   publishIfChangedI(F("sat/cycles_per_hour"),      (int32_t)settings.sat.iCyclesPerHour,  s_cycles_per_hour,      true);
+  publishIfChangedI(F("sat/zone_count"),           (int32_t)settings.sat.iZoneCount,      s_zone_count,           true);   // TASK-3102: retained state of the zone_count command
   publishIfChangedF(F("sat/valve_offset"),         settings.sat.fValveOffset,             s_valve_offset,         SAT_EPS_FRACTION, 2, true);
   publishIfChangedB(F("sat/solar_freeze_integral"), settings.sat.bSolarFreezeIntegral,    s_solar_freeze_integral, true);
 
@@ -6117,6 +6190,9 @@ void satPublishMQTT()
   publishIfChangedF(F("sat/min_pressure"),        settings.sat.fMinPressure,       s_min_pressure,        SAT_EPS_PRESSURE,    1, true);
   publishIfChangedF(F("sat/max_pressure"),        settings.sat.fMaxPressure,       s_max_pressure,        SAT_EPS_PRESSURE,    1, true);
   publishIfChangedF(F("sat/max_pressure_drop"),   settings.sat.fMaxPressureDrop,   s_max_pressure_drop,   SAT_EPS_PRESSURE,    2, true);
+  // TASK-3016: the weather location as retained state (Robert 2026-11-21). Personal data: the coordinates sit on the broker; docs/api/MQTT.md says so.
+  publishIfChangedF(F("sat/weather_lat"),         settings.sat.fWeatherLat,        s_weather_lat,         SAT_EPS_COORD,       4, true);
+  publishIfChangedF(F("sat/weather_lon"),         settings.sat.fWeatherLon,        s_weather_lon,         SAT_EPS_COORD,       4, true);
   publishIfChangedF(F("sat/preset_comfort"),      settings.sat.fPresetComfort,     s_preset_comfort,      SAT_EPS_TEMP,        1, true);
   publishIfChangedF(F("sat/preset_eco"),          settings.sat.fPresetEco,         s_preset_eco,          SAT_EPS_TEMP,        1, true);
   publishIfChangedF(F("sat/preset_away"),         settings.sat.fPresetAway,        s_preset_away,         SAT_EPS_TEMP,        1, true);
@@ -8596,7 +8672,7 @@ static void satControlLoopRun()
   const float pidRaw = pidOutput;   // TASK-1521: before zones, solar offset and clamps (SATTICK praw)
 
   // --- Multi-zone (secondary rooms) on the requested setpoint (thermo-nova climate.py:381-389, entry 116) ---
-  // Every configured zone (zone count 1-4) runs its PID output; satAggregateZoneSetpoint() keeps the
+  // Every configured zone (zone count 0-4, extra rooms next to the main room) runs its PID output; satAggregateZoneSetpoint() keeps the
   // primary output, raises it to the zones output and applies the overshoot cap, or does nothing in ECO.
   // A zone without usable inputs counts as no zone, so a setup that pushes no zone data is unchanged.
   {
@@ -8618,9 +8694,9 @@ static void satControlLoopRun()
     // in ECO (iHeatingMode 1) only the main room.
     _sat_tolErr = satToleranceMaxError(roomValid, satPidError(effectiveTarget, roomTemp), zoneErr, zoneUse, zoneCount,
                                        settings.sat.iHeatingMode == 1);
-    // Zone diagnostics stay gated at more than one zone: no new retained MQTT traffic for
-    // single-room setups (deliberate, TASK-1440).
-    if (settings.sat.iZoneCount > 1) satPublishZoneDiagnostics();
+    // Zone diagnostics run from one extra room (TASK-3102, entry 459); a zone that never received data publishes nothing
+    // (inside satPublishZoneDiagnostics), so a single-room install with no extra room adds no retained MQTT traffic (TASK-1440).
+    if (settings.sat.iZoneCount > 0) satPublishZoneDiagnostics();
   }
 
   // --- Solar gain compensation on the requested setpoint (thermo-nova climate.py:391-392) ---

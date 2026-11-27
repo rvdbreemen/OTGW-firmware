@@ -239,15 +239,19 @@ from the file at create time.
    git push origin v<semver>-beta.N
    git rev-parse --short "v<semver>-beta.N^{}"    # must be the bump commit
    ```
-3. SHA256SUMS over the assets (in the scratchpad, not in build/):
-   flash zip, `.ino.bin`, `.littlefs.bin`, `-merged-full.bin`, `.elf`
-   (lets a crash be decoded later), `OTGW-safeboot-<v>.bin`.
+3. SHA256SUMS over the uploaded assets (in the scratchpad, not in build/):
+   flash zip, `-merged-full.bin`, `.elf` (lets a crash be decoded later),
+   `OTGW-safeboot-<v>.bin`. **Never upload the loose `.ino.bin` or `.littlefs.bin`,
+   and never list them in SHA256SUMS** (TASK-3116): an old 1.x flash tool picks
+   them up by name and writes them to an ESP8266 with `--erase-all`. They stay
+   inside the flash zip under their own names. `scripts/beta_publish.py` refuses
+   an asset name a 1.x tool matches (`loose_asset_violations()`).
 4. Draft prerelease:
    ```bash
    gh release create v<semver>-beta.N --draft --prerelease --latest=false --verify-tag \
      --title "v<semver>-beta.N (<short theme>)" \
      --notes-file docs/releases/RELEASE_NOTES_<semver>-beta.N.md \
-     build/OTGW-firmware-esp32-combo-<v>-flash.zip build/...ino.bin build/...littlefs.bin \
+     build/OTGW-firmware-esp32-combo-<v>-flash.zip \
      build/...-merged-full.bin build/....elf build/OTGW-safeboot-<v>.bin "$SCRATCH/SHA256SUMS"
    gh release view v<semver>-beta.N --json isDraft,isPrerelease,assets \
      --jq '{d:.isDraft,p:.isPrerelease,a:[.assets[]|"\(.name) \(.size)"]}'

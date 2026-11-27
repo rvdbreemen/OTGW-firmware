@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : SATtypes.h
-**  Version  : v2.0.0-beta.462
+**  Version  : v2.0.0-beta.474
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -635,7 +635,7 @@ struct SATSection {
   // LittleFS persistence (Task #237)
   uint16_t iSatFlushThresholdH = 24;   // Hours offline before short-lived SAT data is auto-flushed on next enable
   // Multi-zone PID (Task #233)
-  uint8_t  iZoneCount          = 1;    // Number of active heating zones (1-4, default 1 = single-zone)
+  uint8_t  iZoneCount          = 0;    // Number of EXTRA rooms next to the main room (0-4, default 0 = no extra rooms; entry 459, entry 503)
   uint16_t iZoneTimeoutS       = 300;  // Seconds without update before zone is considered inactive (default 5 min)
   // TASK-587: DS18B20 sensor-to-SAT-area mapping (area 0..3)
   // Area sensor reference: either a Dallas address (16 hex chars) or a BLE MAC

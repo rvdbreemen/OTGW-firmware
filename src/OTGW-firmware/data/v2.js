@@ -373,6 +373,9 @@
       "conn_time_syncing": "time syncing",
       "conn_ws_streaming": "WebSocket · streaming",
       "conn_ws_reconnecting": "WebSocket · reconnecting…",
+      "conn_ws_paused": "WebSocket · paused after repeated drops",
+      "conn_ws_resume": "Reconnect",
+      "conn_ws_paused_hint": "The page stopped retrying to protect the gateway. Values still update by polling. Press Reconnect to try again.",
       "conn_no_link": "no link",
       "conn_seen_ago": "seen {{s}}s ago",
       "conn_role_recency": "{{role}} · {{recency}}",
@@ -3019,8 +3022,8 @@
       ws = new WebSocket(url);
       // TASK-3017: every message, the 30 s keepalive included, proves the stream is alive (wsWatchdogTick)
       ws.onmessage = function (ev) { wsLastMsgMs = Date.now(); onWsMessage(ev); };
-      ws.onopen = function () { wsOpenMs = Date.now(); wsLastMsgMs = wsOpenMs; noteWsMark(true); };
-      ws.onclose = function () { ws = null; noteWsMark(false); scheduleReconnect(); fetchSeed(); };
+      ws.onopen = function () { wsOpenMs = Date.now(); wsLastMsgMs = wsOpenMs; wsSockOpenedMs = wsOpenMs; noteWsMark(true); };
+      ws.onclose = function () { ws = null; noteWsMark(false); wsHandleClose(Date.now()); seedThrottled(); };
       ws.onerror = function () { try { if (ws) ws.close(); } catch (e) { } };
     } catch (e) { scheduleReconnect(); }
   }
@@ -3034,9 +3037,41 @@
     if (Date.now() - Math.max(wsOpenMs, wsLastMsgMs) < WS_SILENCE_MS) return;
     try { ws.close(); } catch (e) { }
   }
+  // TASK-3124: reconnect with exponential backoff (5, 10, 20, 40 s, then 60 s, +-20 % jitter) instead of a fixed 5 s.
+  // The attempt counter resets only after a socket stayed open 60 s, so a socket that opens and closes at once keeps
+  // the delay growing. Three sockets that opened and closed within 60 s pause the page (no automatic reconnect, a
+  // Reconnect button in the connection detail). fetchSeed from onclose and the 20 s timer runs at most once per 30 s.
+  var WS_BACKOFF_S = [5, 10, 20, 40, 60], WS_STABLE_MS = 60000, WS_FLAP_MAX = 3, WS_FLAP_WINDOW_MS = 60000, SEED_MIN_GAP_MS = 30000;
+  var wsAttempt = 0, wsPaused = false, wsSockOpenedMs = 0, wsFlapCloses = [], seedLastMs = 0;
+  function wsBackoffMs(attempt, rnd) {
+    var s = WS_BACKOFF_S[Math.min(attempt, WS_BACKOFF_S.length - 1)];
+    return Math.round(s * 1000 * (0.8 + 0.4 * rnd));
+  }
+  function wsHandleClose(now) {
+    var wasOpen = wsSockOpenedMs > 0;
+    if (wasOpen && now - wsSockOpenedMs >= WS_STABLE_MS) { wsAttempt = 0; wsFlapCloses = []; }
+    else if (wasOpen) {
+      wsFlapCloses = wsFlapCloses.filter(function (t0) { return now - t0 < WS_FLAP_WINDOW_MS; });
+      wsFlapCloses.push(now);
+    }
+    wsSockOpenedMs = 0;
+    if (wsFlapCloses.length >= WS_FLAP_MAX) { wsPaused = true; if (wsTimer) { clearTimeout(wsTimer); wsTimer = null; } renderConnDetail(); }
+    else scheduleReconnect();
+  }
+  function wsResume() {
+    wsPaused = false; wsAttempt = 0; wsFlapCloses = [];
+    if (wsTimer) { clearTimeout(wsTimer); wsTimer = null; }
+    if (!ws) connectWs();
+    renderConnDetail();
+  }
+  function seedThrottled() {
+    var now = Date.now();
+    if (now - seedLastMs < SEED_MIN_GAP_MS) return;
+    seedLastMs = now; fetchSeed();
+  }
   function scheduleReconnect() {
-    if (wsTimer) return;
-    wsTimer = setTimeout(function () { wsTimer = null; connectWs(); }, 5000);
+    if (wsTimer || wsPaused) return;
+    wsTimer = setTimeout(function () { wsTimer = null; connectWs(); }, wsBackoffMs(wsAttempt++, Math.random()));
   }
 
   // ---------- render scheduling ----------
@@ -3659,7 +3694,9 @@
   function drawPanelChart(svg, spec) {
     var n = spec.n, H = { l: 18, m: 56, t: 120 }, y = 18, out = '', lines = '';
     function X(i) { return n > 1 ? C_X0 + i * (C_X1 - C_X0) / (n - 1) : C_X1; }
-    function txtEl(x, yy, s, cls) { return '<text class="axis-txt' + (cls ? ' ' + cls : '') + '" x="' + x + '" y="' + yy + '">' + esc(s) + '</text>'; }
+    function txtEl(x, yy, s, cls) { return '<text class="axis-txt' + (cls ? ' ' + cls : '') + '" x="' + x + '" y="' + yy + '"' + (cls === 'yl' ? ' text-anchor="end"' : '') + '>' + esc(s) + '</text>'; }
+    // TASK-3052: a y label is right-aligned 4 px left of the axis, so a long one (-10 C) never touches the line
+    function ylEl(yy, s) { return txtEl(C_X0 - 4, yy, s, 'yl'); }
     spec.panels.forEach(function (p) {
       var top = y, h = p.h || H[p.kind] || H.t, bot = top + h, lo = 0, hi = 100;
       out += txtEl(38, top - 3, p.title, 'gtitle');
@@ -3669,12 +3706,12 @@
         p.series.forEach(function (s) { s.vals.forEach(function (v) { if (v !== null && v !== undefined && isFinite(v)) { if (v < lo) lo = v; if (v > hi) hi = v; } }); });
         if (lo > hi) { lo = 10; hi = 90; }
         lo = Math.floor(lo / 10) * 10; hi = Math.max(Math.ceil(hi / 10) * 10, lo + 20);
-        out += txtEl(2, top + 6, Math.round(hi) + (p.unit || '')) + txtEl(2, (top + bot) / 2 + 3, Math.round((lo + hi) / 2) + (p.unit || '')) + txtEl(2, bot + 2, Math.round(lo) + (p.unit || ''));
+        out += ylEl(top + 6, Math.round(hi) + (p.unit || '')) + ylEl((top + bot) / 2 + 3, Math.round((lo + hi) / 2) + (p.unit || '')) + ylEl(bot + 2, Math.round(lo) + (p.unit || ''));
         out += '<line x1="' + C_X0 + '" y1="' + ((top + bot) / 2) + '" x2="' + C_X1 + '" y2="' + ((top + bot) / 2) + '" stroke="#8b949e" stroke-opacity=".2"/>';
       } else if (p.kind === 'm') {
-        out += txtEl(2, top + 6, '100%') + txtEl(2, bot + 2, '0%');
+        out += ylEl(top + 6, '100%') + ylEl(bot + 2, '0%');
       } else {
-        out += txtEl(2, top + 7, t('h_mon.graph_lane_on')) + txtEl(2, bot + 2, t('h_mon.graph_lane_off'));
+        out += ylEl(top + 7, t('h_mon.graph_lane_on')) + ylEl(bot + 2, t('h_mon.graph_lane_off'));
       }
       function Y(v) { return p.kind === 'l' ? bot - (v ? 14 : 0) : bot - (Math.max(lo, Math.min(hi, v)) - lo) / (hi - lo) * h; }
       p.series.forEach(function (s) {
@@ -3982,7 +4019,7 @@
       // Live link (WS) + REST API — this browser session
       var wsUp = ws && ws.readyState === 1;
       CONN.ws.s = wsUp ? 'st-ok' : 'st-down';
-      CONN.ws.detail = wsUp ? t('graph.conn_ws_streaming') : t('graph.conn_ws_reconnecting');
+      CONN.ws.detail = wsUp ? t('graph.conn_ws_streaming') : (wsPaused ? t('graph.conn_ws_paused') : t('graph.conn_ws_reconnecting'));
       CONN.api.s = 'st-ok';
       renderConnMap(); renderConnStrip(); renderConnDetail();
       scheduleRender();   // TASK-2959 F4: the Home status line reads the boiler link
@@ -4658,11 +4695,16 @@
     if (r.bottom < 0 || r.top > vh || r.right < 0 || r.left > vw) { hideHelp(); return; }
     // Measure at left 0: a fixed box with only `left` set shrinks to fit the space right of it,
     // so measuring at the previous left squeezed the popover on a phone (review finding).
+    // TASK-3058: the popover may cover its own card (.set-group) but not the card next to it, so the limits are the
+    // card's edges when the icon sits in one; an icon outside any card keeps the viewport limits.
+    var card = helpBtn.closest ? helpBtn.closest('.set-group') : null, cr = card ? card.getBoundingClientRect() : null;
+    var minL = cr ? Math.max(m, cr.left + 8) : m, maxR = cr ? Math.min(vw - m, cr.right - 8) : vw - m;
+    helpPop.style.maxWidth = cr ? Math.min(320, Math.max(160, maxR - minL)) + 'px' : '';
     helpPop.style.left = '0px';
     var w = helpPop.offsetWidth, h = helpPop.offsetHeight;
     var top = r.bottom + 6;
     if (top + h > vh - m && r.top - 6 - h >= m) top = r.top - 6 - h;   // no room below: open above
-    helpPop.style.left = Math.max(m, Math.min(r.left, vw - w - m)) + 'px';
+    helpPop.style.left = Math.max(minL, Math.min(r.left, maxR - w)) + 'px';
     helpPop.style.top = Math.max(m, top) + 'px';
   }
   function hideHelp() {
@@ -6035,7 +6077,12 @@
     // The exp line describes the healthy state ("… is answering") — showing it
     // while the node is down/degraded contradicts the fix hint, so omit it there.
     if (c.exp && c.s !== 'st-down' && c.s !== 'st-warn') { var ex = document.createElement('div'); ex.className = 'exp'; ex.textContent = c.exp; body.appendChild(ex); }
-    if ((c.s === 'st-down' || c.s === 'st-warn') && c.fix) { var fx = document.createElement('div'); fx.className = 'fix'; fx.textContent = '▸ ' + c.fix; body.appendChild(fx); }
+    if (key === 'ws' && wsPaused) { var ph = document.createElement('div'); ph.className = 'exp'; ph.textContent = t('graph.conn_ws_paused_hint'); body.appendChild(ph); }
+    if ((c.s === 'st-down' || c.s === 'st-warn') && c.fix && !(key === 'ws' && wsPaused)) { var fx = document.createElement('div'); fx.className = 'fix'; fx.textContent = '▸ ' + c.fix; body.appendChild(fx); }
+    if (key === 'ws' && wsPaused) {
+      var rb = document.createElement('button'); rb.type = 'button'; rb.className = 'fs-btn primary'; rb.id = 'wsResumeBtn';
+      rb.textContent = t('graph.conn_ws_resume'); rb.addEventListener('click', wsResume); body.appendChild(rb);
+    }
     row.appendChild(badge); row.appendChild(body);
     return row;
   }
@@ -9342,7 +9389,7 @@
     // TASK-989: staggered (see the startup-burst note above) — seed/SAT/weather
     // trail the first-paint fetches one at a time instead of bursting together.
     setTimeout(fetchSeed, 2000); setTimeout(fetchSatStatus, 2800); setTimeout(fetchWeather, 3600);
-    setInterval(function () { if (!ws || ws.readyState !== 1) fetchSeed(); }, 20000);
+    setInterval(function () { if (!ws || ws.readyState !== 1) seedThrottled(); }, 20000);
     // TASK-1223.14: Monitor > Values / PS=1 otmonitor poll (no request unless needed),
     // and the PS=1 check (asks device/time only after 15 s of socket silence).
     // TASK-1741: these two get the tab's phase as well, so two tabs on Monitor > Values do not

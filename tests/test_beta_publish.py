@@ -309,14 +309,17 @@ class DryRun(Base):
         self.assertNotIn("--verify-tag", c)
         self.assertEqual(c[c.index("--target") + 1], w.rel)
         given = sorted(Path(x).name for x in c if x.endswith((".zip", ".bin", ".elf")) or x.endswith("SHA256SUMS"))
-        self.assertEqual(given, sorted([*w.names.values(), "SHA256SUMS"]))
+        # TASK-3116: the app and filesystem images stay inside the flash zip, they are not uploaded one by one
+        loose = [w.names[k] for k in ("zip", "merged", "elf", "safeboot")]
+        self.assertEqual(given, sorted([*loose, "SHA256SUMS"]))
+        self.assertEqual(bp.loose_asset_violations(given), [])
         self.assertEqual(w.ledger.read_text().split("\t")[1:], [SEMVER, "ok\n"])
 
-    def test_sha256sums_cover_the_six_assets(self):
+    def test_sha256sums_cover_the_uploaded_assets(self):
         w = World(self)
         self.assertEqual(w.run("--dry-run")[0], 0)
         lines = (w.scratch / "SHA256SUMS").read_text().splitlines()
-        self.assertEqual(len(lines), 6)
+        self.assertEqual(len(lines), 4)   # TASK-3116: zip, merged-full, elf, safeboot; no inner zip names
         for line in lines:
             digest, name = line.split("  ")
             self.assertEqual(digest, hashlib.sha256((w.build / name).read_bytes()).hexdigest())
@@ -516,7 +519,7 @@ class RealRun(Base):
         (r,) = st["releases"]
         self.assertEqual((r["tag"], r["draft"], r["prerelease"]), (TAG, False, True))
         self.assertEqual(st["latest"], "v1.7.10")
-        self.assertEqual(len(r["assets"]), 7)
+        self.assertEqual(len(r["assets"]), 5)   # TASK-3116: four files and SHA256SUMS; no loose .ino.bin / .littlefs.bin
         create = next(a for a in st["log"] if a[:2] == ["release", "create"])
         for flag in ("--draft", "--prerelease", "--latest=false", "--verify-tag"):
             self.assertIn(flag, create)

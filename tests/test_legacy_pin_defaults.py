@@ -54,14 +54,14 @@ static ComboPinMap comboActivePinMap() { return g_map; }
 static int g_writes = 0;
 static bool writeSettings(bool) { g_writes++; return true; }
 static void settingsMarkDirty() {}
-struct { struct { int8_t iPin = 10; } sensors; struct { uint8_t iPin = 12; } s0; struct { int8_t iPin = 16; } outputs; } settings;
+struct { struct { int8_t iPin = 10; } sensors; struct { int8_t iPin = 12; } s0; struct { int8_t iPin = 16; } outputs; } settings;   // TASK-3120: the S0 pin is int8_t, -1 = not set
 """
 
 # (map, sensors, s0, output) -> (s0, output, writes)
 CASES = [
     ("COMBO_MAP_CLASSIC",     10, 12, 16, 13, 11, 1),   # S3 Mini: D6 / D7 holes
     ("COMBO_MAP_CLASSIC_PRO", 10, 12, 16, 39, 37, 1),   # S3 Mini Pro: D6 / D8 holes
-    ("COMBO_MAP_OTGW32",      4,  12, 16, 12, 16, 0),   # OTGW32 keeps 12/16 (Robert 2026-11-07)
+    ("COMBO_MAP_OTGW32",      4,  12, 16, 5, 16, 1),    # OTGW32 (TASK-3120): S0 12 (W5500 SCK) becomes 5 (the DI pad); the output is hidden there and stays as it was
     ("COMBO_MAP_CLASSIC",     10, 5,  6,  5,  6,  0),   # the user's own pins stay
     ("COMBO_MAP_CLASSIC",     10, 12, 6,  13, 6,  1),   # only the legacy one moves
     ("COMBO_MAP_CLASSIC",     13, 12, 16, 12, 11, 1),   # D6 held by the sensors: S0 stays
@@ -151,7 +151,7 @@ class OutputValidatorAcceptsTheNewPins(unittest.TestCase):
         rsv = block(hdr, "// [board-pin-reserved:begin]", "// [board-pin-reserved:end]")
         val = function_body(OUTPUTS.read_text(encoding="utf-8"), "static bool validateGPIOOutputsConfig()")
         prelude = PRELUDE.replace("BOARDS_H", BOARDS.as_posix()).replace(
-            "struct { struct { int8_t iPin = 10; } sensors; struct { uint8_t iPin = 12; } s0; struct { int8_t iPin = 16; } outputs; } settings;",
+            "struct { struct { int8_t iPin = 10; } sensors; struct { int8_t iPin = 12; } s0; struct { int8_t iPin = 16; } outputs; } settings;",
             "struct { struct { int8_t iPin = 16; int8_t iTriggerBit = 0; } outputs; } settings;")
         prelude += "static ComboPinMap g_m; static bool isBoardReservedPin(int p);\n"
         cases = [("COMBO_MAP_CLASSIC_PRO", 37, 1), ("COMBO_MAP_CLASSIC_PRO", 38, 1), ("COMBO_MAP_CLASSIC", 11, 1),

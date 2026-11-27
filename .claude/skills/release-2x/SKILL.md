@@ -180,8 +180,10 @@ Checkpoint 1 still gates every push, the tag and the publish (Robert, via the co
    git push origin v<v>
    git rev-parse --short "v<v>^{}"
    ```
-3. SHA256SUMS (scratchpad) over the flash zip, `.ino.bin`, `.littlefs.bin`,
-   `-merged-full.bin`, `.elf`, `OTGW-safeboot-<v>.bin`.
+3. SHA256SUMS (scratchpad) over the flash zip, `-merged-full.bin`, `.elf`,
+   `OTGW-safeboot-<v>.bin`. No loose `.ino.bin` or `.littlefs.bin` asset and no such
+   name in SHA256SUMS (TASK-3116): an old 1.x flash tool would write them to an
+   ESP8266. They stay inside the flash zip.
 4. Draft:
    ```bash
    gh release create v<v> --draft --verify-tag --title "v<v> - <Short Title>" \

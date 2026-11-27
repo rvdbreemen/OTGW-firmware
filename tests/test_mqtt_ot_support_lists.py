@@ -57,7 +57,8 @@ typedef char __FlashStringHelper;
 #define F(s) s
 #define PSTR(s) s
 #define snprintf_P snprintf
-enum : uint8_t { OT_SUPPORT_LIST_BOILER = 1, OT_SUPPORT_LIST_THERMOSTAT = 2 };
+enum : uint8_t { OT_SUPPORT_LIST_BOILER = 1, OT_SUPPORT_LIST_THERMOSTAT = 2, OT_SUPPORT_LIST_OVERRIDE = 4 };  // TASK-3033: the publisher also serves the override flag
+static uint8_t getOtOverrideVerdict() { return 0; }   // TASK-3033: unknown, nothing published
 struct { struct { bool bEnable = true; } mqtt; } settings;
 struct { struct { bool bConnected = true; } mqtt; } state;
 static uint8_t aR[32], aW[32], sR[32], sW[32];

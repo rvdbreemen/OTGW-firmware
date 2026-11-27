@@ -38,6 +38,7 @@ Soak verdict file (my format, one `key: value` per line, `#` lines ignored):
 """
 import argparse
 import datetime
+import fnmatch
 import hashlib
 import os
 import re
@@ -131,6 +132,28 @@ def asset_names(semver_full):
     p = f"OTGW-firmware-{TARGET}-{semver_full}"
     return {"zip": f"{p}-flash.zip", "app": f"{p}.ino.bin", "fs": f"{p}.littlefs.bin",
             "merged": f"{p}-merged-full.bin", "elf": f"{p}.elf", "safeboot": f"OTGW-safeboot-{semver_full}.bin"}
+
+
+# TASK-3116: a 1.x flash tool (flash_otgw.sh/.bat, flash_esp.py) picks the newest release asset by name and writes it to
+# an ESP8266 with --erase-all; esptool does not stop an ESP32-S3 image there. So no loose release asset may carry one
+# of the names those tools look for. The app and filesystem images stay inside the flash zip, under their own names
+# (the update page of the 2.x betas reads them from there), and are not uploaded one by one.
+UPLOADED_KEYS = ("zip", "merged", "elf", "safeboot")
+LOOSE_GLOBS = ("*.ino.bin", "*.littlefs.bin", "OTGW-firmware-*.ino.bin", "OTGW-firmware*.littlefs.bin")   # flash_otgw.sh/.bat
+LOOSE_SUBSTRINGS = (".ino.bin", "fw.bin", "firmware.bin", "littlefs.bin", "fs.bin", "filesystem.bin")      # 1.x flash_esp.py, lowercased
+
+
+def loose_asset_violations(names):
+    """[(asset name, matcher)] for every release asset name a 1.x flash tool would pick up."""
+    hits = []
+    for n in names:
+        for g in LOOSE_GLOBS:
+            if fnmatch.fnmatchcase(n, g):
+                hits.append((n, f"glob {g}"))
+        for s in LOOSE_SUBSTRINGS:
+            if s in n.lower():
+                hits.append((n, f"substring {s}"))
+    return hits
 
 
 def find_semver_full(build_dir, semver):
@@ -341,13 +364,18 @@ def run(args, gh_cmd):
         if not p.is_file() or p.stat().st_size == 0:
             raise Refuse(f"missing or empty build file: {p}")
         local[name] = p
+    uploads = {names[k]: local[names[k]] for k in UPLOADED_KEYS}
+    bad = loose_asset_violations([*uploads, "SHA256SUMS"])
+    if bad:
+        raise Refuse(f"release asset {bad[0][0]} matches {bad[0][1]}, which an old 1.x flash tool would download and write "
+                     "to an ESP8266 (TASK-3116); app and filesystem images stay inside the flash zip")
     got = sha256_file(local[names["app"]])
     if got.lower() != args.soaked_sha256.lower():
         raise Refuse(f"{names['app']} sha256 {got} differs from the soaked sha256 {args.soaked_sha256}: "
                      "this is not the binary that was soaked")
     how = check_githash(tools, commit, githash, args.build_commit)
     n_in_zip = check_zip(local[names["zip"]], names)
-    step(3, f"build files ok: 6 assets, .ino.bin equals the soaked sha256, {how}, flash zip holds {n_in_zip} files")
+    step(3, f"build files ok: {len(uploads)} assets to upload, .ino.bin (stays in the zip) equals the soaked sha256, {how}, flash zip holds {n_in_zip} files")
 
     # 4. body
     append_text = None
@@ -368,8 +396,8 @@ def run(args, gh_cmd):
     body_file = scratch / "body.md"
     body_file.write_text(body, encoding="utf-8", newline="\n")
     sums = scratch / "SHA256SUMS"
-    sums.write_text("".join(f"{sha256_file(p)}  {n}\n" for n, p in local.items()), encoding="utf-8", newline="\n")
-    assets_all = {**local, "SHA256SUMS": sums}
+    sums.write_text("".join(f"{sha256_file(p)}  {n}\n" for n, p in uploads.items()), encoding="utf-8", newline="\n")
+    assets_all = {**uploads, "SHA256SUMS": sums}
 
     use_tag = args.tag if not args.dry_run else f"{args.tag}-dryrun.{datetime.datetime.now(datetime.timezone.utc):%Y%m%dT%H%M%S}"
     tag_msg = f"{semver}: {args.theme}"
@@ -394,7 +422,7 @@ def run(args, gh_cmd):
         if not args.dry_run:
             tools.git("push", "origin", f"refs/tags/{use_tag}")
         step(5, f"tag {use_tag} -> {commit[:9]}{' (local only, throw-away)' if args.dry_run else ' pushed'}")
-        step(6, f"SHA256SUMS written in {scratch} ({len(local)} lines)")
+        step(6, f"SHA256SUMS written in {scratch} ({len(uploads)} lines)")
 
         # 7. draft
         create = ["release", "create", use_tag, "--repo", tools.slug, "--draft", "--prerelease", "--latest=false",

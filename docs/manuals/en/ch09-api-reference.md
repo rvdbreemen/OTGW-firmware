@@ -530,7 +530,7 @@ All SAT endpoints require authentication.
 
 ##### GET /api/v2/sat
 
-Returns full SAT status. Alias: `GET /api/v2/sat/status`.
+Returns full SAT status. Alias: `GET /api/v2/sat/status`. It includes a `zones` array with one object per extra room (`index` from 1, `room_temp`, `setpoint`, `active`; `room_temp` and `setpoint` are `null` until the room has received data), up to `satzonecount` rooms; the array is empty when `satzonecount` is 0.
 
 Add `?detail=full` for extended diagnostics including synchronization health, pressure metrics, cycle diagnostics, and PID error statistics.
 
@@ -1263,6 +1263,8 @@ Topic: `{TopTopic}/set/{UniqueId}/sat/<command>`. Command names are matched case
 | `sat/control_mode` | `"continuous"` / `"pwm"` / `"auto"` (or `"1"` / `"2"` / `"0"`) / `"off"` | Set control mode. `"off"` switches SAT off, the same as `sat/enabled` 0. Any other non-numeric value is treated as `"auto"` |
 | `sat/preset` | `"comfort"` / `"eco"` / `"away"` / `"sleep"` / `"activity"` / `"home"` / `"none"` | Apply a preset; `"none"` clears it |
 | `sat/humidity` | `"58"` (0 to 100) | Push indoor humidity (%) |
+| `sat/weather_lat` | `"52.3702"` (-90 to 90) | Set the weather location latitude; anything but one number in range is ignored. State is retained on `sat/weather_lat` |
+| `sat/weather_lon` | `"4.8952"` (-180 to 180) | Set the weather location longitude; same rule. State is retained on `sat/weather_lon` |
 | `sat/heating_mode` | `"comfort"` / `"eco"` | Set heating mode |
 | `sat/sun_elevation` | `"32.5"` (-90 to 90) | Push sun elevation (degrees) |
 | `sat/window` | `"open"` / `"on"` / `"1"` = open, anything else = closed | Set window state (only acted on when window detection is enabled) |

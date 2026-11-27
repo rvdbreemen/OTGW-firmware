@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : MQTTstuff
-**  Version  : v2.0.0-beta.462
+**  Version  : v2.0.0-beta.474
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **      Modified version from (c) 2020 Willem Aandewiel
@@ -658,6 +658,21 @@ static void _satPvSurplusCmd(const char* v)      { satHandlePvSurplus(v); }     
 static void _satHumidityCmd(const char* v)       { satHandleHumidity(v); }
 static void _satSunElevationCmd(const char* v)   { satHandleSunElevation(v); }
 
+// TASK-3016: weather location over MQTT. The whole payload must be one finite number inside the range; anything else is ignored
+// (the REST path clamps instead, settingStuff.ino SATweatherlat/lon). A clamped 95 would store a wrong place.
+static void _satSetCoordinate(const char* v, const char* key, float lo, float hi) {
+  if (!v || !*v) return;
+  char* endp = nullptr;
+  float f = strtof(v, &endp);
+  if (endp == v || *endp != '\0' || !isfinite(f) || f < lo || f > hi) {
+    DebugTf(PSTR("MQTT: %s ignored, [%s] is not a number in %.0f..%.0f\r\n"), key, v, lo, hi);
+    return;
+  }
+  updateSetting(key, v);
+}
+static void _satWeatherLatCmd(const char* v)     { _satSetCoordinate(v, "SATweatherlat", -90.0f, 90.0f); }
+static void _satWeatherLonCmd(const char* v)     { _satSetCoordinate(v, "SATweatherlon", -180.0f, 180.0f); }
+
 static void _satResetIntegralCmd(const char* v)  { (void)v; satResetControlState(); }
 static void _satFlushCmd(const char* v) {
   (void)v;
@@ -774,6 +789,8 @@ static const SatMqttCmdEntry kSatMqttCmds[] PROGMEM = {
   { "valve_offset",           "SATvalveoffset",       nullptr },
   { "solar_freeze_integral",  "SATsolarfreezeint",    nullptr },
   { "zone_count",             "SATzonecount",         nullptr },
+  { "weather_lat",            nullptr,                _satWeatherLatCmd },   // TASK-3016
+  { "weather_lon",            nullptr,                _satWeatherLonCmd },   // TASK-3016
   { "zone_timeout_s",         "SATzonetimeout",       nullptr },
   { "solar_min_elevation",    "SATsolarminelev",      nullptr },
   { "flush_threshold_h",      "SATflushtreshold",     nullptr },
@@ -1928,7 +1945,7 @@ static void connStageTick() {
     default: {
       // TASK-3000: the two support lists (up to a few hundred bytes each) in a portion of their own, after the outbox drained.
       // A list this portion could not send (heap, a forced portion under the 16 KB floor) is marked for the minute tick.
-      const uint8_t all  = OT_SUPPORT_LIST_BOILER | OT_SUPPORT_LIST_THERMOSTAT;
+      const uint8_t all  = OT_SUPPORT_LIST_BOILER | OT_SUPPORT_LIST_THERMOSTAT | OT_SUPPORT_LIST_OVERRIDE;
       const uint8_t done = publishOtSupportMsgidLists(all);
       clearOtSupportListsDirty(done);
       markOtSupportListsDirty((uint8_t)(all & ~done));
@@ -2497,6 +2514,13 @@ uint8_t publishOtSupportMsgidLists(uint8_t lists) {
   if ((lists & OT_SUPPORT_LIST_THERMOSTAT) &&
       publishMsgidCsv(F("otgw-firmware/thermostat/sent_msgids"), isThermostatMsgIdSentRead, isThermostatMsgIdSentWrite))
     done |= OT_SUPPORT_LIST_THERMOSTAT;
+  // TASK-3033: retained true/false once a TT=/TC= override has been judged; before that nothing is published (an
+  // unknown verdict must not read as "works").
+  if (lists & OT_SUPPORT_LIST_OVERRIDE) {
+    const uint8_t v = getOtOverrideVerdict();
+    if (v == 0 || sendMQTTData(F("otgw-firmware/thermostat/override_refused"), v == 2 ? "true" : "false", true))
+      done |= OT_SUPPORT_LIST_OVERRIDE;
+  }
   return done;
 }
 

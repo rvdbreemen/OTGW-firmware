@@ -793,6 +793,9 @@ paths:
                       hardware_type:
                         type: string
                         description: 'Board codepath token ("otgw32", "esp8266", "esp32-classic")'
+                      has_output_pin:
+                        type: boolean
+                        description: 'false on the OTGW32 (no pad for the GPIO output, TASK-3120): hide the GPIO outputs group; absent on older firmware means shown'
                       oledpresent:
                         type: boolean
                         description: OLED display present on this board

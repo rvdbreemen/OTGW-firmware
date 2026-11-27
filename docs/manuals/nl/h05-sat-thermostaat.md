@@ -359,6 +359,8 @@ Weerdata levert:
 | `satweatherlon` | `0.0` | -180 tot 180 | Lengtegraad |
 | `satweatherinterval` | `900` | 300-3600 s | Poll-interval (standaard 15 min, minimum 5 min) |
 
+De locatie kan ook via MQTT worden gezet: `sat/weather_lat` en `sat/weather_lon` (payload is één getal, bijvoorbeeld `52.3702`; een waarde buiten -90..90 of -180..180, of tekst, wordt genegeerd). Het apparaat publiceert de huidige waarden terug als retained `sat/weather_lat` en `sat/weather_lon` met 4 decimalen. Omdat ze retained zijn, blijven uw coördinaten op de MQTT-broker staan en bereiken ze elke client die daarop leest: gebruik een positie in het stadscentrum, of laat de locatie op 0 bij een gedeelde broker (TASK-3016).
+
 De webinterface kan uw locatie automatisch detecteren via de browser (knop **Locatie bepalen**), maar browsers staan dat alleen toe via HTTPS of op localhost. De knop verschijnt dus alleen in een beveiligde verbinding, bijvoorbeeld achter een HTTPS-ingress van Home Assistant. Via gewoon `http://<device-ip>` ontbreekt de knop en toont de SAT-pagina deze hint: "Vul je breedte- en lengtegraad in onder SAT-instellingen › Weer, of laat Home Assistant sat/sun_elevation publiceren." De woorden "SAT-instellingen › Weer" zijn een link: die opent de SAT-pagina in de Control-weergave bij de groep Weer, met het veld breedtegraad geselecteerd (staat SAT uit, dan zijn de velden vergrendeld en krijgt de groepskop de focus). Een gepubliceerde `sat/sun_elevation` vervangt alleen de zonnestand voor solar gain (paragraaf 5.9); voor het ophalen van het weer zijn de breedte- en lengtegraad nog steeds nodig. Weerdata wordt opgehaald via plain HTTP (geen HTTPS). De eerste fetch wordt 5 minuten na opstart vertraagd zodat DHCP, NTP en MQTT eerst tot rust kunnen komen. De streaming JSON-parser is allocatie-vrij (geen malloc in de SAT-loop). Voor debugging accepteert de telnet-console `w` om direct een fetch + dump te forceren (TASK-513).
 
 ---
@@ -507,10 +509,10 @@ Zones ontvangen hun temperatuur en doel via MQTT. Elke zone, ook zone 1, is een 
 
 | Parameter | Standaard | Bereik | Omschrijving |
 |---|---|---|---|
-| `satzonecount` | `1` | 1-4 | Aantal actieve verwarmingszones |
+| `satzonecount` | `0` | 0-4 | Aantal extra ruimtes naast de hoofdruimte (0 = geen) |
 | `satzonetimeout` | `300` | 60-3600 s | Seconden zonder update voordat een zone inactief wordt |
 
-Wanneer `satzonecount` 1 is (standaard), gebruikt SAT een zone alleen als er ruimte- en doelwaarden voor worden gepusht. Een zone zonder gegevens telt niet mee, dus een opstelling zonder zonegegevens gedraagt zich zoals voorheen. De MQTT-diagnosewaarden per zone (`sat/zone/<n>/...`) worden alleen gepubliceerd bij meer dan een geconfigureerde zone.
+`satzonecount` telt de extra ruimtes naast de hoofdruimte: 0 (standaard) betekent geen extra ruimtes, 1 tot 4 voegen er zoveel toe. SAT gebruikt een extra ruimte alleen als er ruimte- en doelwaarden voor worden gepusht. Een ruimte zonder gegevens telt niet mee, dus een opstelling zonder zonegegevens gedraagt zich zoals voorheen. De MQTT-diagnosewaarden per zone (`sat/zone/<n>/...`) worden gepubliceerd vanaf een extra ruimte, en alleen voor een ruimte die gegevens heeft ontvangen. De retained status `sat/zone_count` geeft de instelling weer en `GET /api/v2/sat/status` toont de ruimtes in een `zones`-array. Een installatie die zijn instellingen opsloeg voordat deze sleutel bestond, houdt 1.
 
 ---
 

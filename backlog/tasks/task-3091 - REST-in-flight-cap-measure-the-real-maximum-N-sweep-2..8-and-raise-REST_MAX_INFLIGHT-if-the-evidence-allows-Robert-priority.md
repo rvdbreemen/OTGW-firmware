@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@otgw-poc-dev'
 created_date: '2026-11-25T23:22:00Z'
-updated_date: '2026-11-26T07:24:00Z'
+updated_date: '2026-11-27T15:17:00Z'
 labels:
   - rest
   - heap
@@ -43,4 +43,6 @@ Robert (2026-11-26 00:50): 'REST in-flight cap is 2 (REST_MAX_INFLIGHT, restAPI.
 AC3 done 2026-11-26 (otgw-webui): scripts/loadtest_sweep.py --restcap sweeps the REST in-flight cap per arm through the restcap override; rule equals rest_cap_decision_rule.md; 30 host tests against a fake device with the real gate logic, 19 mutants killed, evaluate --quick 88/0; pushed 4ce4731d8. Not run on a real unit yet (AC4, bench-tester).
 
 2026-11-26 otgw-dev: restcap (prerelease runtime override of REST_MAX_INFLIGHT, default 2 unchanged; /api/v2/debug/flags restcap and telnet key R) taken into the T2 stack as ONE commit from otgw-poc-dev's 963bfa348; tests/test_rest_cap_override.py 9/9. The loadtest_sweep --restcap tooling is already on origin/dev (4ce4731d8).
+
+2026-11-27 otgw-poc-dev: tests/test_loadtest_restcap_sweep.py is flaky under host load (failed once in a full -j 2 run next to a 190 s test_beta_publish run, test_a_higher_cap_sheds_fewer_503_and_the_cap_is_restored; 2 of 2 alone 30/30 OK): run it alone.
 <!-- SECTION:NOTES:END -->

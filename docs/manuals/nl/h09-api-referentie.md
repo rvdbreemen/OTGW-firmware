@@ -458,7 +458,7 @@ Meest recente crash-logboek opvragen. Retourneert een leeg object als er geen cr
 
 #### GET /api/v2/sat
 
-Smart Autotune Thermostat status opvragen. Authenticatie vereist. Alias: `GET /api/v2/sat/status`.
+Smart Autotune Thermostat status opvragen. Authenticatie vereist. Alias: `GET /api/v2/sat/status`. De respons bevat een `zones`-array met een object per extra ruimte (`index` vanaf 1, `room_temp`, `setpoint`, `active`; `room_temp` en `setpoint` zijn `null` tot de ruimte gegevens heeft ontvangen), maximaal `satzonecount` ruimtes; de array is leeg bij `satzonecount` 0.
 
 Voeg `?detail=full` toe voor uitgebreide diagnostiek, waaronder synchronisatie-gezondheid, drukmetrieken, cyclusdiagnostiek, PID-foutstatistieken.
 
@@ -1056,6 +1056,8 @@ Onderwerp: `{TopTopic}/set/{UniqueId}/sat/<commando>`. Commandonamen zijn niet h
 | `sat/control_mode` | `"continuous"` / `"pwm"` / `"auto"` (of `"1"` / `"2"` / `"0"`) / `"off"` | Bedrijfsmodus instellen. `"off"` zet SAT uit, net als `sat/enabled` 0. Elke andere niet-numerieke waarde geldt als `"auto"` |
 | `sat/preset` | `"comfort"` / `"eco"` / `"away"` / `"sleep"` / `"activity"` / `"home"` / `"none"` | Voorinstelling activeren; `"none"` wist de voorinstelling |
 | `sat/humidity` | `"58"` (0 tot 100) | Luchtvochtigheid binnen (%) doorgeven |
+| `sat/weather_lat` | `"52.3702"` (-90 tot 90) | Breedtegraad van de weerlocatie instellen; alles behalve één getal binnen het bereik wordt genegeerd. De status staat retained op `sat/weather_lat` |
+| `sat/weather_lon` | `"4.8952"` (-180 tot 180) | Lengtegraad van de weerlocatie instellen; zelfde regel. De status staat retained op `sat/weather_lon` |
 | `sat/heating_mode` | `"comfort"` / `"eco"` | Verwarmingsmodus instellen |
 | `sat/sun_elevation` | `"32.5"` (-90 tot 90) | Zonhoogte (graden) doorgeven |
 | `sat/window` | `"open"` / `"on"` / `"1"` = open, al het andere = dicht | Raamstand instellen (alleen gebruikt als raamdetectie aanstaat) |

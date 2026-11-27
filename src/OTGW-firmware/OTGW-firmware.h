@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v2.0.0-beta.462
+**  Version  : v2.0.0-beta.474
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -318,7 +318,12 @@ bool isThermostatMsgIdSentWrite(uint8_t id);
 bool getBoilerUnsupportedDirty();
 void clearBoilerUnsupportedDirty();
 // TASK-3000: which of the two support lists changed since its last MQTT publish.
-enum : uint8_t { OT_SUPPORT_LIST_BOILER = 1, OT_SUPPORT_LIST_THERMOSTAT = 2 };
+enum : uint8_t { OT_SUPPORT_LIST_BOILER = 1, OT_SUPPORT_LIST_THERMOSTAT = 2, OT_SUPPORT_LIST_OVERRIDE = 4 };   // 4: TASK-3033 thermostat/override_refused
+// TASK-3033: does the thermostat follow a TT=/TC= override? 0 unknown, 1 followed, 2 refused (see OTGW-Core.ino, otOverride block).
+void otOverrideNoteCommand(const char* buf, int len);
+void otOverrideNoteUndelivered(const char* buf, int len);   // TASK-3033: the PIC queue gave up on a TT=/TC= (retries used up, PIC refused it)
+bool otOverrideOnThermostatSetpoint(float tr);
+uint8_t getOtOverrideVerdict();
 uint8_t getOtSupportListsDirty();
 void clearOtSupportListsDirty(uint8_t bits);
 void markOtSupportListsDirty(uint8_t bits);
@@ -1076,6 +1081,21 @@ inline bool boardPinReserved(int pin, ComboPinMap map) {
 // [board-pin-reserved:end]
 inline bool isBoardReservedPin(int pin) { return boardPinReserved(pin, comboActivePinMap()); }
 
+// [board-has-output:begin] TASK-3120 (Robert Q32 A)
+// The OTGW32 has no pad for the GPIO output (no net on the ESP32-S3 module, no terminal on J4), so the output is hidden
+// there: not started, not enabled by a setting, has_output_pin false in device/info. A runtime predicate, not a compile
+// time macro: the combo image picks its board at boot (HAS_RUNTIME_HW_DETECT), like boardPinReserved().
+inline bool boardHasOutputPin(ComboPinMap map) {
+#if HAS_RUNTIME_HW_DETECT
+  return map != COMBO_MAP_OTGW32;
+#else
+  (void)map;
+  return !HAS_DIRECT_OT;   // a fixed OTGW32 build has none, a fixed Classic build has the D1-mini holes
+#endif
+}
+inline bool boardHasOutputPin() { return boardHasOutputPin(comboActivePinMap()); }
+// [board-has-output:end]
+
 // [legacy-pin-defaults:begin] TASK-1698
 // The S0 and output defaults carried over from 1.x (12 and 16) are board pins on both Classic S3
 // modules (see the TASK-1552 block above), so S0 or the output did nothing until the user changed
@@ -1086,21 +1106,27 @@ inline bool isBoardReservedPin(int pin) { return boardPinReserved(pin, comboActi
 // Sources: LOLIN variants lolin_s3_mini / lolin_s3_mini_pro pins_arduino.h (MISO/MOSI/SS =
 // 13/11/10 and 39/38/37; TFT on 33-36, 38, 40) and docs/hardware/combo-esp32-s3-pinout.md.
 // A pin the user chose stays, and so does a legacy default whose new hole another feature holds.
-// The OTGW32 map keeps 12/16: its free header pins are not documented yet.
+// TASK-3120 (Robert Q32 A, 'S0 is belofte van mij'): on the OTGW32 map the Dallas default 10 is the step-up enable pin,
+// so a stored 10 becomes GPIO 4 (the 1-Wire pin of the board); the S0 default 12 is the W5500 SCK, so a stored 12 becomes
+// GPIO 5, the DI pad of the terminal block (net SWR; the hardware owner confirmed 2026-11-27: 330 R series, 3k3 pull-up,
+// 470 pF to ground; not yet tested with an S0 meter). A target another feature holds stays unmoved. The output default 16 is the W5500 RST; the output is hidden on the OTGW32
+// (boardHasOutputPin() below), so it is not moved there. A stored pin that is not the legacy default never moves.
 #define LEGACY_S0_PIN            12
 #define LEGACY_OUTPUT_PIN        16
+#define LEGACY_SENSOR_PIN        10
 #define CLASSIC_S0_PIN           13   // S3 Mini, D6 hole
 #define CLASSIC_PRO_S0_PIN       39   // S3 Mini Pro, D6 hole
 #define CLASSIC_OUTPUT_PIN       11   // S3 Mini, D7 hole
 #define CLASSIC_PRO_OUTPUT_PIN   37   // S3 Mini Pro, D8 hole
-inline int legacyPinMigrated(int stored, int legacy, ComboPinMap map, int classicPin, int proPin,
+#define OTGW32_DALLAS_PIN        4    // PIN_1WIRE, boards.h
+#define OTGW32_S0_DEFAULT_PIN    5    // DI pad of the terminal block (net SWR), untested with an S0 meter
+#define PIN_KEEP                 1000 // "no migration on this map"
+inline int legacyPinMigrated(int stored, int legacy, ComboPinMap map, int classicPin, int proPin, int otgw32Pin,
                              int busyA, int busyB) {
   if (stored != legacy) return stored;
-  int target;
-  if (map == COMBO_MAP_CLASSIC) target = classicPin;
-  else if (map == COMBO_MAP_CLASSIC_PRO) target = proPin;
-  else return stored;
-  if (target == busyA || target == busyB) return stored;
+  const int target = (map == COMBO_MAP_CLASSIC) ? classicPin : (map == COMBO_MAP_CLASSIC_PRO) ? proPin : otgw32Pin;
+  if (target == PIN_KEEP) return stored;
+  if (target >= 0 && (target == busyA || target == busyB)) return stored;   // -1 (not set) is never "busy"
   return target;
 }
 // [legacy-pin-defaults:end]
