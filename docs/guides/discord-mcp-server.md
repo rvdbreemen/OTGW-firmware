@@ -61,7 +61,7 @@ ground truth blocks of CLAUDE.md. In short:
   `needs-maintainer-ok`. Read-only members get one reply: "Changes go through Robert."
 - Every SAT correction or decision by Sergeant D is recorded in
   `docs/sat/decisions/sergeant-d-corrections.md` in the same session, before it is implemented.
-- OTGW32 may be named in public (Robert, 2026-11-22); it is a prototype board.
+- The OTGW32 may be named in docs and on GitHub (Robert, 2026-11-27); it is one of the two supported hardware configurations for 2.0. No Discord announcement of the hardware launch until Robert says so (silent launch).
 
 ## When calls fail
 

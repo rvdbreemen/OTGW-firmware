@@ -94,8 +94,8 @@ python -I .claude/skills/analyze-capture/scripts/capture_plot.py <capture> --wor
   comparison with predictions, data-quality findings, questions for the tester). Name what was
   not verified.
 - Post to Discord only when Robert asks. Public posts follow `.claude/rules/discord.md`:
-  English, answer first, the real `<@ID>` mention (memory `feedback_discord_mention_ids`), never
-  name the OTGW32 board, at most 2000 characters per message (split into numbered parts), no
+  English, answer first, the real `<@ID>` mention (memory `feedback_discord_mention_ids`), the OTGW32
+  may be named, with no Discord announcement of the hardware launch until Robert says so, at most 2000 characters per message (split into numbered parts), no
   claim about what SAT should do. Read every post back.
 - Images: the Discord MCP tool cannot attach files. Post them through the alpha webhook the way
   `scripts/discord-post-build.sh` does (multipart `payload_json` plus `files[0]`, `files[1]`,

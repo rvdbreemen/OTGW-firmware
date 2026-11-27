@@ -38,7 +38,7 @@ never merges back into dev as a whole: its production commit comments out
 ## Writing style rules
 
 - **Never use em dashes.** All release text in English (the NL Discord post in idiomatic Dutch). No emojis.
-- **OTGW32 may be named publicly** (Robert, 2026-11-22): call it a prototype board.
+- **The OpenTherm Gateway OTGW32 may be named in docs and on GitHub; it is one of the two supported hardware configurations for firmware 2.0 (Robert, 2026-11-27). No Discord announcement of the hardware launch until Robert says so (silent launch, 27 Nov 2026).**
 
 ## Checkpoints (3)
 

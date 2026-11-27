@@ -89,8 +89,8 @@ picked up through step 1.
      question on the issue directly.
 5. **Working a GitHub task**:
    - Bug: follow "Bug fixing: reproduce, then prove". When the issue has no captures, ask
-     the reporter for them in an issue comment (English, answer first, never name the
-     OTGW32 board). Reference the issue in the commit body (`Fixes #<N>` / `Refs #<N>`).
+     the reporter for them in an issue comment (English, answer first; the OTGW32 may be named, but
+     the hardware launch is not announced on Discord until Robert says so). Reference the issue in the commit body (`Fixes #<N>` / `Refs #<N>`).
    - PR: check it out in its own worktree (`git worktree add ../wt-pr<N>` then
      `gh pr checkout <N>` there), run the tests, `evaluate.py --quick` and the combo build,
      and bench-test firmware changes. Post the review findings as a PR review comment.
@@ -245,7 +245,7 @@ If an AC cannot be evidenced (tester, hardware, maintainer sign-off): leave the 
 
 Post what was done: task id, the change in plain words, the evidence (old vs new) and
 the build tag (`2.0.0-alpha.N+hash`). Rules for that channel: English, answer first,
-OTGW32 may be named (prototype), do not tag Sergeant D on build announcements, and say
+the OTGW32 may be named (docs and GitHub; no hardware-launch announcement on Discord until Robert says so), do not tag Sergeant D on build announcements, and say
 plainly what is not verified yet.
 
 ## Step 9: leave the build ready

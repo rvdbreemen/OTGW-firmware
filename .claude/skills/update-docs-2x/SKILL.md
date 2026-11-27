@@ -38,9 +38,10 @@ A `--release` version with a `-` is beta mode; without a `-` it is stable mode.
 - **Never use em dashes.** Use colons, periods, commas or parentheses.
 - **Release documents in English.** Manual chapters: English and Dutch, always both.
 - **No emojis.** Concise and correct over long and impressive.
-- **OTGW32 may be named** in the README, release notes and post texts (Robert,
-  2026-11-22): call it a prototype board. The main public hardware stays "OTGW Classic
-  with a LOLIN S3 Mini / S3 Mini Pro".
+- **The OpenTherm Gateway OTGW32 may be named** in the README, manuals and release notes (Robert,
+  2026-11-27): it is one of the two supported hardware configurations for firmware 2.0, next to the
+  "OTGW Classic with a LOLIN S3 Mini / S3 Mini Pro". No Discord announcement of the hardware launch
+  until Robert says so (silent launch, 27 Nov 2026).
 - **2.x describes ESP32-S3 only.** ESP8266 appears only as "the 1.x line" (going back
   to 1.x means putting the Wemos back). A diff-scoped run does not rewrite old ESP8266
   passages on its own; Phase 1 reports the counts.

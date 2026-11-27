@@ -231,7 +231,7 @@ flowchart LR
 | 6 Reviewteam | Parallel: correctheid (Opus), projectregels, echtheid van tests, extra lenzen, bij SAT het register | Reviewers moeten weerleggen. Bevindingen worden zelf gecontroleerd. |
 | 7 Done | Final summary met bewijs per AC, bump, één commit per taak met expliciete paden | Nooit `--no-verify`. Graphify, buglog en cerebrum bijwerken. |
 | 9 Build en bench | esp32-combo-build, OTA naar een benchunit, test van het gedrag van deze taak | Mislukt: niets publiceren. Maximaal 3 uur tussen builds. Na een rebase opnieuw bouwen. |
-| 8 Publiceren | Push naar `dev`, `discord-post-build.sh -m "TASK-NNN: ..."`, verslag in gewone taal | Engels, het antwoord eerst, OTGW32 niet bij naam noemen, Sergeant D niet taggen bij builds |
+| 8 Publiceren | Push naar `dev`, `discord-post-build.sh -m "TASK-NNN: ..."`, verslag in gewone taal | Engels, het antwoord eerst, OTGW32 mag bij naam (docs en GitHub), geen aankondiging van de hardware op Discord tot Robert het zegt, Sergeant D niet taggen bij builds |
 
 **Stopcriteria:** niets uitvoerbaar, Robert zegt stop, twee mislukte reviewrondes op dezelfde taak, of een rate limit.
 

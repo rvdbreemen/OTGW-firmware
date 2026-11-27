@@ -2,7 +2,7 @@
 
 This rule file is loaded in every session (no `paths:` frontmatter). It was split out of CLAUDE.md by TASK-1631.
 
-Public-facing rules (English, answer first, real `<@ID>` mention, OTGW32 may be named (prototype, Robert 2026-11-22), Sergeant D's decisions recorded first) are in the AGENT-CORE block of CLAUDE.md. SAT questions to Sergeant D follow `.claude/rules/sat-ground-truth.md`.
+Public-facing rules (English, answer first, real `<@ID>` mention, OTGW32 may be named in docs and on GitHub, no Discord announcement of the hardware launch until Robert says so (Robert 2026-11-27), Sergeant D's decisions recorded first) are in the AGENT-CORE block of CLAUDE.md. SAT questions to Sergeant D follow `.claude/rules/sat-ground-truth.md`.
 
 ## MCP servers
 
