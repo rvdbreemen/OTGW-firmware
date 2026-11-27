@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-22T10:33:00Z'
-updated_date: '2026-11-27T14:09:00Z'
+updated_date: '2026-11-27T15:11:00Z'
 labels:
   - mqtt
   - feature
@@ -62,4 +62,6 @@ Evidence (host): tests/test_ot_override_refused_3033.py compiles the real otOver
 Design as built: topic otgw-firmware/thermostat/override_refused true/false retained; carried by the existing support-list dirty-bit mechanism (OT_SUPPORT_LIST_OVERRIDE = 4: minute tick plus reconnect republish); published only after the first judgement; not persisted. Every TT=/TC= counts (also SAT's own, also SAT off); TT=0/TC=0 cancels, judges nothing, verdict kept; an override equal to the thermostat's own last setpoint is not judged. Separate from sat/push_refused, which is unchanged. Known limit (entry 16): a gateway reset clears the override and can read as refused inside the 300 s window; documented in docs/api/MQTT.md. Entries 14, 16 and ADR-223 read; no control behaviour changed. ACs 2+ do not exist in the task: only AC1; leaving the task In Progress until bench/field evidence.
 
 2026-11-27 otgw-poc-dev, architect review of lane-poc-b2 (S1/S1b): otOverrideSentC/SentMs were written on async_tcp (REST, settings, PIC queue path) and read on the loop task, only the pending flag was atomic. Fix: the five fields (pending, seq, sentC, sentMs, lastTr) are written and read under one portMUX (otOverrideMux); the frame side takes a snapshot and clears the pending flag only if the sequence is unchanged; a text-ring command is now noted by otdCmdTextDrain() when handleOTDirectCommand() accepted it (not at the push). Evidence: tests/test_ot_override_refused_3033.py 9/9 incl. a two-thread stress (value 10 paired with time 1000, value 20 with 2000; 200000 rounds): red on c6766a02b (mismatch 334407), red on the fix with the lock removed (mutant), green on the fix. The stress needs the host scheduler to interleave; it shows the pairing invariant, not the Xtensa spinlock itself.
+
+2026-11-27 otgw-poc-dev, review item 1 (otgw-dev): on the PIC path a TT=/TC= is noted at queue insert; one the queue gave up on (retries used up, OTGW-Core.ino reportCommandDropped branch) or the PIC refused (error code, two sites) was never delivered and would read as thermostat refused after 300 s. Fix: otOverrideNoteUndelivered() withdraws the pending override with the same value at those three sites (an older command's failure leaves a newer pending one); the verdict stays as it was. Evidence: tests/test_ot_override_refused_3033.py 11/11 (the case without the failure report still gives the refusal, with it nothing; older failure leaves the newer; wiring: 3 call sites); old block has no such function (compile fails), harness stubs added in sat_loop_build.py, test_pic_pm_chain.py, test_cmd_queue_drop.cpp; 150 test files touching OTGW-Core/the loop harness: 148 + test_cmd_queue_drop fixed and rerun green. Not run: the real PIC retry/refusal path on hardware. Item 2 (ring path: the 300 s window starts at drain, not at push) accepted as is, comment already says the note is made when the handler accepts it.
 <!-- SECTION:NOTES:END -->

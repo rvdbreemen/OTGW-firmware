@@ -85,6 +85,7 @@ static inline void otOverrideNoteCommand(const char* b, int n) {   // TASK-3033:
   g_noted++;
   std::snprintf(g_notedLast, sizeof g_notedLast, "%.*s", n < 23 ? n : 23, b);
 }
+static inline void otOverrideNoteUndelivered(const char*, int) {}   // TASK-3033: a command the queue gave up on
 static void satNoteExternalCS(const char*) {}   // TASK-3021: addCommandToQueue() tells the frost guard about a foreign CS=
 // TASK-1695 refuse gate in addCommandToQueue(): never reached here, SAT does not own the setpoint (above).
 static bool satBlocksExternalCommand(const char*, int) { return false; }

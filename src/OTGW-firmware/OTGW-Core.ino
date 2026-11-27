@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v2.0.0-beta.470
+**  Version  : v2.0.0-beta.471
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -4272,6 +4272,7 @@ void handleCommandQueue(){
       snprintf_P(cMsg, sizeof(cMsg), PSTR("%s [dropped]"), cmdqueue[i].cmd);
       sendEventToWebSocket('!', cMsg);
       reportCommandDropped(cmdqueue[i].cmd);
+      otOverrideNoteUndelivered(cmdqueue[i].cmd, cmdqueue[i].cmdlen);   // TASK-3033: never delivered, so no verdict
       if (isPrioCmd(cmdqueue[i].cmd)) prioSlotRelease();   // never echoed: do not hold the slot for it
       removeFromCmdQueue(i);
       // the last attempt is still on the wire: wait for its echo or the timeout before the next command
@@ -4340,6 +4341,7 @@ void checkCommandResponse(const char *buf, unsigned int len){
         if (isPrioCmd(cmdqueue[t].cmd)) prioSlotRelease();   // the PIC refused it, so its slot never loaded
         OTDebugTf(PSTR("CmdQueue: PIC refused [%d]:[%s] with [%s]@N@"), t, cmdqueue[t].cmd, code);
         reportCommandRejected(cmdqueue[t].cmd, code);
+        otOverrideNoteUndelivered(cmdqueue[t].cmd, cmdqueue[t].cmdlen);   // TASK-3033: the PIC refused it, so no verdict
         removeFromCmdQueue(t);
         return;
       }
@@ -4359,6 +4361,7 @@ void checkCommandResponse(const char *buf, unsigned int len){
       if (rejected) {
         OTDebugTf(PSTR("CmdQueue: PIC refused [%d]:[%s] with [%s]\r\n"), i, cmdqueue[i].cmd, code);
         reportCommandRejected(cmdqueue[i].cmd, code);
+        otOverrideNoteUndelivered(cmdqueue[i].cmd, cmdqueue[i].cmdlen);   // TASK-3033: the PIC refused it, so no verdict
         removeFromCmdQueue(i);
         break;
       }
@@ -5919,6 +5922,23 @@ void otOverrideNoteCommand(const char* buf, int len) {
     otOverridePending = true;
     otOverrideSeq++;
   }
+  portEXIT_CRITICAL(&otOverrideMux);
+}
+
+// A TT=/TC= that never reached the PIC (the queue used up its retries, or the PIC answered with an error code) is not an
+// override the thermostat could have followed or ignored: the override it was noted for is withdrawn, the verdict stays
+// as it was. Only the pending override with the same value is withdrawn; an older command's failure leaves a newer one.
+void otOverrideNoteUndelivered(const char* buf, int len) {
+  if (buf == nullptr || len < 4 || buf[0] != 'T' || (buf[1] != 'T' && buf[1] != 'C') || buf[2] != '=') return;
+  char v[12];
+  const int n = (len - 3) < (int)sizeof(v) - 1 ? (len - 3) : (int)sizeof(v) - 1;
+  memcpy(v, buf + 3, (size_t)n);
+  v[n] = '\0';
+  char* endp = nullptr;
+  const float f = strtof(v, &endp);
+  if (endp == v || (*endp != '\0' && *endp != '\r' && *endp != '\n') || !isfinite(f)) return;
+  portENTER_CRITICAL(&otOverrideMux);
+  if (otOverridePending && fabsf(otOverrideSentC - f) <= 0.005f) otOverridePending = false;
   portEXIT_CRITICAL(&otOverrideMux);
 }
 

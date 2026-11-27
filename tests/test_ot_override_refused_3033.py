@@ -76,6 +76,7 @@ int main(int argc, char** argv) {
   while (scanf("%7s %31s %lu", kind, arg, &ms) == 3) {
     g_ms = (uint32_t)ms;
     if (!strcmp(kind, "cmd")) otOverrideNoteCommand(arg, (int)strlen(arg));
+    else if (!strcmp(kind, "undeliv")) otOverrideNoteUndelivered(arg, (int)strlen(arg));
     else otOverrideOnThermostatSetpoint((float)atof(arg));
     printf("%d %d\n", (int)getOtOverrideVerdict(), (int)otSupportListsDirty);
     otSupportListsDirty = 0;
@@ -173,6 +174,21 @@ class Override(unittest.TestCase):
         self.assertEqual(res[2][0], 2)
         self.assertEqual(res[-1], (1, 4))
 
+    def test_an_undelivered_command_is_not_judged(self):
+        """Review item 1 (otgw-dev): on the PIC path the command is noted at queue insert; one the queue gave up on
+        (retries used up) or the PIC refused (error code) was never delivered and must not read as 'thermostat refused'."""
+        ev = [("frame", "15.0", 0), ("cmd", "TT=19.5", 1000), ("undeliv", "TT=19.5", 20000), ("frame", "15.0", 400000)]
+        res = self.run_script(ev)
+        self.assertEqual(res[-1], (0, 0))                      # unknown stays unknown, nothing to publish
+        # the same without the failure report is the refusal (the contrast that makes the case above meaningful)
+        res = self.run_script([("frame", "15.0", 0), ("cmd", "TT=19.5", 1000), ("frame", "15.0", 400000)])
+        self.assertEqual(res[-1], (2, 4))
+
+    def test_the_failure_of_an_older_command_leaves_the_newer_one(self):
+        ev = [("frame", "15.0", 0), ("cmd", "TT=19.0", 1000), ("cmd", "TT=20.0", 2000), ("undeliv", "TT=19.0", 3000),
+              ("frame", "15.0", 400000)]
+        self.assertEqual(self.run_script(ev)[-1], (2, 4))       # TT=20.0 still pending and ignored by the thermostat
+
     def test_garbage_and_other_commands_ignored(self):
         ev = [("frame", "15.0", 0), ("cmd", "TT=abc", 0), ("cmd", "TX=19.5", 0), ("cmd", "TT=", 0), ("cmd", "CS=60", 0),
               ("frame", "15.0", 400000)]
@@ -208,6 +224,9 @@ class Wiring(unittest.TestCase):
         self.assertNotIn("std::atomic", blk)
         self.assertEqual(blk.count("portENTER_CRITICAL(&otOverrideMux)"), blk.count("portEXIT_CRITICAL(&otOverrideMux)"))
         self.assertGreaterEqual(blk.count("portENTER_CRITICAL(&otOverrideMux)"), 3)
+        # item 1: the PIC queue reports a command it gave up on (retries used up, PIC error code) to the override state
+        self.assertEqual(core.count("otOverrideNoteUndelivered(cmdqueue["), 3, "retry exhaustion, PIC refusal x2")
+        self.assertIn("void otOverrideNoteUndelivered(const char* buf, int len);", hdr)
         self.assertIn("OT_SUPPORT_LIST_OVERRIDE = 4", hdr)
         self.assertIn('F("otgw-firmware/thermostat/override_refused")', mqtt)
         self.assertRegex(mqtt, r"OT_SUPPORT_LIST_BOILER \| OT_SUPPORT_LIST_THERMOSTAT \| OT_SUPPORT_LIST_OVERRIDE")

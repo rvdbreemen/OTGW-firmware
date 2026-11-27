@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v2.0.0-beta.470
+**  Version  : v2.0.0-beta.471
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -321,6 +321,7 @@ void clearBoilerUnsupportedDirty();
 enum : uint8_t { OT_SUPPORT_LIST_BOILER = 1, OT_SUPPORT_LIST_THERMOSTAT = 2, OT_SUPPORT_LIST_OVERRIDE = 4 };   // 4: TASK-3033 thermostat/override_refused
 // TASK-3033: does the thermostat follow a TT=/TC= override? 0 unknown, 1 followed, 2 refused (see OTGW-Core.ino, otOverride block).
 void otOverrideNoteCommand(const char* buf, int len);
+void otOverrideNoteUndelivered(const char* buf, int len);   // TASK-3033: the PIC queue gave up on a TT=/TC= (retries used up, PIC refused it)
 bool otOverrideOnThermostatSetpoint(float tr);
 uint8_t getOtOverrideVerdict();
 uint8_t getOtSupportListsDirty();
