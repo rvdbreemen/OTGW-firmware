@@ -22,7 +22,7 @@ All containers live on a single physical device. There is no Docker, no Kubernet
 
 | Target | PlatformIO env | Board macro | Hardware | Asset token |
 |---|---|---|---|---|
-| `esp32` | `esp32` | `BOARD_NODOSHOP_ESP32` | OTGW32 / OT-Thing PCB: OTDirect, W5500 Ethernet, OLED, no PIC | `esp32-otgw32` |
+| `esp32` | `esp32` | `BOARD_NODOSHOP_ESP32` | OTGW32 board: OTDirect, W5500 Ethernet, OLED, no PIC | `esp32-otgw32` |
 | `esp32-classic` | `esp32-classic` | `BOARD_NODOSHOP_ESP32_CLASSIC` | OTGW Classic PCB with a LOLIN S3 Mini: PIC gateway, no OTDirect | `esp32-classic` |
 | `esp32-combo` | `esp32-combo` | `BOARD_NODOSHOP_ESP32_COMBO` | One image for both boards, PIC or OTDirect picked at boot (ADR-127); the default for S3 builds | `esp32-combo` |
 

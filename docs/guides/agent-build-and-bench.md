@@ -37,7 +37,7 @@ Build targets on `dev` (`build.py --target` choices; ESP8266 exists only on `otg
 
 | Target | Hardware | Asset name token |
 |---|---|---|
-| `esp32` | OTGW32 / OT-Thing PCB (OTDirect) | `esp32-otgw32` |
+| `esp32` | OTGW32 board (OTDirect) | `esp32-otgw32` |
 | `esp32-classic` | OTGW Classic + LOLIN S3 Mini (PIC) | `esp32-classic` |
 | `esp32-combo` | One image for both boards, PIC or OTDirect picked at boot (ADR-127); the default for S3 builds and what the bench runs | `esp32-combo` |
 

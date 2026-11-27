@@ -91,7 +91,7 @@ Board definitions live in the Platform library (`src/libraries/Platform/src/boar
 
 | Target | Flags (from `boards.h`) | Notes |
 |--------|-------------------------|-------|
-| `esp32` (OTGW32 / OT-Thing PCB) | `HAS_PIC=0`, `HAS_DIRECT_OT=1`, `HAS_ETH_CAPABLE=1` | OTDirect owns the OT bus; I2C SDA 18 / SCL 17; boot button GPIO 0; W5500 on SPI; bypass relay GPIO 47 |
+| `esp32` (OTGW32 board) | `HAS_PIC=0`, `HAS_DIRECT_OT=1`, `HAS_ETH_CAPABLE=1` | OTDirect owns the OT bus; I2C SDA 18 / SCL 17; boot button GPIO 0; W5500 on SPI; bypass relay GPIO 47 |
 | `esp32-classic` (OTGW Classic + LOLIN S3 Mini) | `HAS_PIC=1`, `HAS_PIC_WATCHDOG=1`, `HAS_STATUS_PIXEL=1` | I2C SDA 35 / SCL 36 (0x26 watchdog and OLED); button GPIO 18 |
 | `esp32-combo` (one binary for both, ADR-127) | all of the above plus `HAS_RUNTIME_HW_DETECT=1` | PIC vs OTDirect decided at boot; pins resolved at runtime by `activeI2cSda()`, `activeI2cScl()`, `activeButton()`, `activeLed1()`, `activeLed2()`, `activePicRst()` from `settings.iBoardMode` and `state.hw` |
 
