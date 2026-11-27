@@ -1,7 +1,7 @@
 /* 
  ***************************************************************************  
  **  Program  : s0PulseCount
- **  Version  : v2.0.0-beta.468
+ **  Version  : v2.0.0-beta.469
  **
  **  Copyright (c) 2021-2024 Rob Roos / Robert van Breemen
  **     based on Framework ESP8266 from Willem Aandewiel
@@ -39,7 +39,7 @@
  void initS0Count()
  {
    if (!settings.s0.bEnabled) return;
-   if (settings.s0.iPin < 0) {                        // TASK-3120: not set (the OTGW32 default until the DI pad is confirmed)
+   if (settings.s0.iPin < 0) {                        // TASK-3120: not set (the user cleared it)
      DebugTln(F("S0 counter: no pin set, choose a pin in the settings; S0 not started"));
      return;
    }

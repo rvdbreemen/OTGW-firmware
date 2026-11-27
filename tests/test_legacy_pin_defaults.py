@@ -61,7 +61,7 @@ struct { struct { int8_t iPin = 10; } sensors; struct { int8_t iPin = 12; } s0; 
 CASES = [
     ("COMBO_MAP_CLASSIC",     10, 12, 16, 13, 11, 1),   # S3 Mini: D6 / D7 holes
     ("COMBO_MAP_CLASSIC_PRO", 10, 12, 16, 39, 37, 1),   # S3 Mini Pro: D6 / D8 holes
-    ("COMBO_MAP_OTGW32",      4,  12, 16, -1, 16, 1),   # OTGW32 (TASK-3120, Robert Q32 A): S0 12 (W5500 SCK) becomes not set; the output is hidden there and stays as it was
+    ("COMBO_MAP_OTGW32",      4,  12, 16, 5, 16, 1),    # OTGW32 (TASK-3120): S0 12 (W5500 SCK) becomes 5 (the DI pad); the output is hidden there and stays as it was
     ("COMBO_MAP_CLASSIC",     10, 5,  6,  5,  6,  0),   # the user's own pins stay
     ("COMBO_MAP_CLASSIC",     10, 12, 6,  13, 6,  1),   # only the legacy one moves
     ("COMBO_MAP_CLASSIC",     13, 12, 16, 12, 11, 1),   # D6 held by the sensors: S0 stays

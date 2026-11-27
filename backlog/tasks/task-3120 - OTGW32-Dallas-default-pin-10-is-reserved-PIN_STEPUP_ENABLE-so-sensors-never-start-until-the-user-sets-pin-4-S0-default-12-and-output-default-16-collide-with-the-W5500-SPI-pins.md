@@ -10,6 +10,7 @@ assignee:
 created_date: '2026-11-27T08:20:00Z'
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 updated_date: '2026-11-27T14:05:00Z'
 =======
 updated_date: '2026-11-27T09:20:00Z'
@@ -17,6 +18,9 @@ updated_date: '2026-11-27T09:20:00Z'
 =======
 updated_date: '2026-11-27T09:22:00Z'
 >>>>>>> 558ea1fdb (docs(backlog): TASK-3120 compile-risk list for the build slot [no-task])
+=======
+updated_date: '2026-11-27T14:11:00Z'
+>>>>>>> c54881764 (OTGW32: TASK-3120 S0 default pin 5 (the DI pad, confirmed by the hardware owner), a stored legacy 12 moves to 5)
 labels:
   - hardware
   - bug
@@ -98,5 +102,10 @@ OPEN, not mine to decide: Tim's answer on the DI pad (GPIO 5; question 157579457
 
 COMPILE-RISK LIST for the build slot (coordinator 2026-11-27; the int8_t change is only host-compiled). Every use of S0Section.iPin (src, grep s0.iPin), with the type effect: handleDebug.ino:77 printed with %d and an (int) cast (was %u/(unsigned)); restAPI.ino:509 and :2296 emitted through (int32_t) casts (was a raw uint8_t / (uint32_t)); restAPI.ino:4268 addInt takes int32_t value (addInt lambda at :4189, int minValue/maxValue: -1 is fine); s0PulseCount.ino:42 new check iPin < 0 (always false for the old uint8_t, now meaningful), :46 isBoardReservedPin(int) widens, :47/:55 %d (int8_t promotes to int), :52 pinMode(uint8_t pin, ...) and :54 digitalPinToInterrupt(...) receive an int8_t that is >= 0 there (the < 0 return is above them: a negative value can never reach them); settingStuff.ino:117 pin == settings.s0.iPin && iPin >= 0 (int vs int8_t, no sign warning), :138-147 legacyPinMigrated takes int and the result is assigned back to int8_t (implicit narrowing, same as sensors and outputs), :350 writeJsonIntKV(file, key, int8_t) (the sensors and outputs pins use it as int8_t already), :833/:1085/:1098 %d, :1090 and :1096 assignments from int. The new symbols: boardHasOutputPin() (OTGW-firmware.h, inline, after comboActivePinMap(), uses HAS_RUNTIME_HW_DETECT and HAS_DIRECT_OT from boards.h), constants LEGACY_SENSOR_PIN, OTGW32_DALLAS_PIN, OTGW32_S0_DEFAULT_PIN, PIN_KEEP (no clash found with grep PIN_KEEP in src/libraries). Residual risk: a name clash of PIN_KEEP in a library header, and a -Wsign-compare/-Wnarrowing flag set that the host MSVC compile does not use; both show up as the first compile error of the build slot.
 >>>>>>> a730e4c1e (docs(backlog): TASK-3120 compile-risk list for the build slot [no-task])
+<<<<<<< HEAD
 >>>>>>> 558ea1fdb (docs(backlog): TASK-3120 compile-risk list for the build slot [no-task])
+=======
+
+2026-11-27 otgw-poc-dev: the hardware owner corrected his answer (#beta-testing 1575874771017539776): DI (terminal pin 5) is wired to GPIO5 via 330R series, 3k3 pull-up, 470 pF to ground. OTGW32_S0_DEFAULT_PIN is now 5 (separate commit on lane-poc-b2). Migration decision: a stored legacy 12 becomes 5 on the OTGW32 map (not -1), skipped when the output or the Dallas pin already holds GPIO 5; a deliberately unset S0 (-1) and any other stored pin stay. GPIO 5 checked: not in boardPinReserved() for the OTGW32 map (PIN_* list in boards.h has no pin 5), no #define PIN_* = 5, no other use of GPIO 5 in OTGW-firmware, Platform and OpenTherm sources (grep); OTGWSerial not checked (PIC only). Host tests: tests/test_board_defaults_3120.py 3/3 (default 5, GPIO 5 not reserved, 12->5, output holding 5, -1 stays), red on the header before (cases 0,1,4,5 sen 4 s0 -1), tests/test_legacy_pin_defaults.py 3/3. NOT verified: pulse counting on the DI pad with a real S0 meter (bench item, one OTGW32, about 20 min); docs say untested.
+>>>>>>> c54881764 (OTGW32: TASK-3120 S0 default pin 5 (the DI pad, confirmed by the hardware owner), a stored legacy 12 moves to 5)
 <!-- SECTION:NOTES:END -->

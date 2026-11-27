@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v2.0.0-beta.468
+**  Version  : v2.0.0-beta.469
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -1107,8 +1107,8 @@ inline bool boardHasOutputPin() { return boardHasOutputPin(comboActivePinMap());
 // A pin the user chose stays, and so does a legacy default whose new hole another feature holds.
 // TASK-3120 (Robert Q32 A, 'S0 is belofte van mij'): on the OTGW32 map the Dallas default 10 is the step-up enable pin,
 // so a stored 10 becomes GPIO 4 (the 1-Wire pin of the board); the S0 default 12 is the W5500 SCK, so a stored 12 becomes
-// NOT SET (-1) until the hardware owner confirms the DI pad (GPIO 5, net SWR): then OTGW32_S0_DEFAULT_PIN becomes 5, the
-// one-line change, with its test case. The output default 16 is the W5500 RST; the output is hidden on the OTGW32
+// GPIO 5, the DI pad of the terminal block (net SWR; the hardware owner confirmed 2026-11-27: 330 R series, 3k3 pull-up,
+// 470 pF to ground; not yet tested with an S0 meter). A target another feature holds stays unmoved. The output default 16 is the W5500 RST; the output is hidden on the OTGW32
 // (boardHasOutputPin() below), so it is not moved there. A stored pin that is not the legacy default never moves.
 #define LEGACY_S0_PIN            12
 #define LEGACY_OUTPUT_PIN        16
@@ -1118,7 +1118,7 @@ inline bool boardHasOutputPin() { return boardHasOutputPin(comboActivePinMap());
 #define CLASSIC_OUTPUT_PIN       11   // S3 Mini, D7 hole
 #define CLASSIC_PRO_OUTPUT_PIN   37   // S3 Mini Pro, D8 hole
 #define OTGW32_DALLAS_PIN        4    // PIN_1WIRE, boards.h
-#define OTGW32_S0_DEFAULT_PIN    (-1) // not set until the DI pad (GPIO 5) is confirmed
+#define OTGW32_S0_DEFAULT_PIN    5    // DI pad of the terminal block (net SWR), untested with an S0 meter
 #define PIN_KEEP                 1000 // "no migration on this map"
 inline int legacyPinMigrated(int stored, int legacy, ComboPinMap map, int classicPin, int proPin, int otgw32Pin,
                              int busyA, int busyB) {

@@ -54,7 +54,7 @@ static const char SETTINGS_HELP_JSON[] PROGMEM = R"json({
 "gpiooutputspin":"GPIO number that drives the output, not the hole. Default on an OTGW Classic: D7 is GPIO 11 on the S3 Mini, the D8 hole is GPIO 37 on the S3 Mini Pro. On other boards choose a free GPIO.",
 "gpiooutputstriggerbit":"Status bit that switches the output: 0 = fault, 1 = CH active, 2 = DHW active, 3 = flame; 8-15 thermostat (8 = CH enable).",
 "s0counterenabled":"Count pulses from an S0 energy meter and publish power and totals.",
-"s0counterpin":"GPIO number wired to the S0 meter pulse output, not the hole. Default on an OTGW Classic: D6 is GPIO 13 on the S3 Mini, GPIO 39 on the S3 Mini Pro. On an OTGW32 the pin starts as not set (-1): choose a free GPIO. On other boards choose a free GPIO.",
+"s0counterpin":"GPIO number wired to the S0 meter pulse output, not the hole. Default on an OTGW Classic: D6 is GPIO 13 on the S3 Mini, GPIO 39 on the S3 Mini Pro. On an OTGW32 it is GPIO 5, the DI pad of the terminal block (not tested with an S0 meter yet); -1 means not set. On other boards choose a free GPIO.",
 "s0counterpulsekw":"Pulses your meter gives per kWh. Default 1000. See the label on the meter.",
 "s0counterinterval":"Seconds between S0 reports. Default 60.",
 "s0counterdebouncetime":"Ignore pulses closer together than this many ms. Default 80; raise it for a bouncy meter.",

@@ -31,14 +31,16 @@ SRC = old.SRC
 
 # (map, sensors, s0, output, expected sensors, expected s0, expected output, writes)
 CASES = [
-    ("COMBO_MAP_OTGW32", 10, 12, 16, 4, -1, 16, 1),    # all legacy: Dallas to GPIO 4, S0 not set, output left alone
-    ("COMBO_MAP_OTGW32", 4, 12, 16, 4, -1, 16, 1),     # Dallas already on 4
+    ("COMBO_MAP_OTGW32", 10, 12, 16, 4, 5, 16, 1),     # all legacy: Dallas to GPIO 4, S0 to 5 (the DI pad), output left alone
+    ("COMBO_MAP_OTGW32", 4, 12, 16, 4, 5, 16, 1),      # Dallas already on 4
     ("COMBO_MAP_OTGW32", 10, 5, 16, 4, 5, 16, 1),      # the user's own S0 pin 5 stays
     ("COMBO_MAP_OTGW32", 15, 7, 40, 15, 7, 40, 0),     # nothing legacy: nothing moves, nothing written
-    ("COMBO_MAP_OTGW32", 10, 12, -1, 4, -1, -1, 1),    # output disabled (-1) stays
-    ("COMBO_MAP_OTGW32", -1, 12, 16, -1, -1, 16, 1),   # sensors disabled (-1) is not the legacy 10
+    ("COMBO_MAP_OTGW32", 10, 12, -1, 4, 5, -1, 1),     # output disabled (-1) stays
+    ("COMBO_MAP_OTGW32", -1, 12, 16, -1, 5, 16, 1),    # sensors disabled (-1) is not the legacy 10
     ("COMBO_MAP_OTGW32", 10, 4, 16, 10, 4, 16, 0),     # GPIO 4 held by the user's own S0 pin: Dallas stays
-    ("COMBO_MAP_OTGW32", 11, 12, 16, 11, -1, 16, 1),   # a stored sensors pin 11 is never touched
+    ("COMBO_MAP_OTGW32", 11, 12, 16, 11, 5, 16, 1),    # a stored sensors pin 11 is never touched
+    ("COMBO_MAP_OTGW32", 15, 12, 5, 15, 12, 5, 0),     # GPIO 5 already held by the output: S0 is not moved onto it
+    ("COMBO_MAP_OTGW32", 15, -1, 16, 15, -1, 16, 0),   # S0 deliberately not set (-1) stays not set
     ("COMBO_MAP_CLASSIC", 10, 12, 16, 10, 13, 11, 1),  # Classic: Dallas default 10 is the valid D8 hole, unchanged (TASK-1698)
     ("COMBO_MAP_CLASSIC_PRO", 10, 12, 16, 10, 39, 37, 1),
 ]
@@ -66,7 +68,9 @@ def build_and_run():
                  f"  if (g_writes!=0) {{ std::printf(\"FAIL case {i}: second boot wrote the settings again\\n\"); bad++; }}\n")
         if esen != sen:   # a pin that moved must be a free pin of its map
             main += (f"  if (boardPinReserved({esen},{m})) {{ std::printf(\"FAIL case {i}: new Dallas pin {esen} is a board pin\\n\"); bad++; }}\n")
-    main += ("  if (!boardPinReserved(10,COMBO_MAP_OTGW32)) { std::printf(\"FAIL legacy Dallas 10 is not reserved on OTGW32\\n\"); bad++; }\n"
+    main += ("  if (boardPinReserved(5,COMBO_MAP_OTGW32)) { std::printf(\"FAIL GPIO 5 (DI pad) is reserved on OTGW32\\n\"); bad++; }\n"
+             "  if (OTGW32_S0_DEFAULT_PIN != 5) { std::printf(\"FAIL OTGW32 S0 default is not 5\\n\"); bad++; }\n"
+             "  if (!boardPinReserved(10,COMBO_MAP_OTGW32)) { std::printf(\"FAIL legacy Dallas 10 is not reserved on OTGW32\\n\"); bad++; }\n"
              "  if (boardPinReserved(4,COMBO_MAP_OTGW32)) { std::printf(\"FAIL GPIO 4 is reserved on OTGW32\\n\"); bad++; }\n"
              "  if (!boardPinReserved(12,COMBO_MAP_OTGW32) || !boardPinReserved(16,COMBO_MAP_OTGW32)) { std::printf(\"FAIL legacy S0/output are not W5500 pins\\n\"); bad++; }\n"
              "  if (boardHasOutputPin(COMBO_MAP_OTGW32)) { std::printf(\"FAIL OTGW32 has an output pin\\n\"); bad++; }\n"
