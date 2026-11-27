@@ -229,7 +229,7 @@ The firmware drives status LEDs to indicate the device state. On the S3 Mini the
 | Both LEDs off (normal operation) | WiFi connected, OpenTherm traffic flowing. LEDs are only used for brief blinks during processing. |
 | Rapid blinks during boot | Setup phase. Three quick blinks signal completion of a setup step. |
 
-An OTGW Classic with a LOLIN S3 Mini or S3 Mini Pro also uses the LOLIN's on-board RGB pixel to show the WiFi state. It flashes once per second (the `LED blink` setting does not affect it):
+An OTGW Classic with a LOLIN S3 Mini also uses the LOLIN's on-board RGB pixel to show the WiFi state. It flashes once per second (the `LED blink` setting does not affect it):
 
 | Pixel colour | Meaning |
 |---|---|

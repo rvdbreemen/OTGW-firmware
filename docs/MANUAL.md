@@ -10,9 +10,9 @@ This manual covers the full OTGW-firmware v2.0.0 product for both end users (Cha
 
 ### What Is OTGW-firmware?
 
-OTGW-firmware turns the NodoShop OpenTherm Gateway into a fully networked smart heating controller. It runs on the ESP32-S3 Wi-Fi microcontroller (a LOLIN S3 Mini or S3 Mini Pro) plugged into the OTGW Classic, monitors the OpenTherm communication bus between your room thermostat and your boiler, and connects your entire heating system to your home automation platform via MQTT, a browser-based web interface, and a REST API.
+OTGW-firmware turns the NodoShop OpenTherm Gateway into a fully networked smart heating controller. It runs on the ESP32-S3 Wi-Fi microcontroller (a LOLIN S3 Mini) plugged into the OTGW Classic, monitors the OpenTherm communication bus between your room thermostat and your boiler, and connects your entire heating system to your home automation platform via MQTT, a browser-based web interface, and a REST API.
 
-The firmware has two active lines. The 2.0.0 line (the `dev` branch documented here) is ESP32-S3 only: it is built on an async web stack plus FreeRTOS and runs on the NodoShop OTGW Classic with a LOLIN S3 Mini or S3 Mini Pro in the Wemos D1 mini socket. The PIC stays in place, and one firmware image (`esp32-combo`) detects it at boot. The 1.x maintenance / LTS line is the firmware for the Wemos D1 mini (ESP8266); going back to 1.x means putting the Wemos D1 mini back. Both lines build with PlatformIO.
+The firmware has two active lines. The 2.0.0 line (the `dev` branch documented here) is ESP32-S3 only: it is built on an async web stack plus FreeRTOS and runs on the NodoShop OTGW Classic with a LOLIN S3 Mini in the Wemos D1 mini socket. The PIC stays in place, and one firmware image (`esp32-combo`) detects it at boot. The 1.x maintenance / LTS line is the firmware for the Wemos D1 mini (ESP8266); going back to 1.x means putting the Wemos D1 mini back. Both lines build with PlatformIO. **LOLIN S3 Mini Pro:** the firmware still recognises it, but its display does not work (tested by the maintainer), so it is not recommended. Use the LOLIN S3 Mini, which is tested.
 
 Highlights new in the 2.0.0 line:
 
@@ -25,7 +25,7 @@ Highlights new in the 2.0.0 line:
 
 OpenTherm is the communication protocol used by most modern central heating systems in Europe. A room thermostat and a boiler talk to each other over a two-wire OpenTherm bus, exchanging temperature requests, setpoints, modulation levels, fault codes, and dozens of other measurements.
 
-The NodoShop OpenTherm Gateway (OTGW) is a small hardware device that sits physically in-line on that two-wire bus, between the thermostat and the boiler. Inside the device is a PIC microcontroller (PIC16F88 or PIC16F1847) that implements the OpenTherm electrical interface. Alongside it sits the Wi-Fi module: on the 2.x line a LOLIN S3 Mini or S3 Mini Pro (ESP32-S3) in the Wemos D1 mini socket. The PIC decodes every OpenTherm frame on the bus and forwards it to the ESP over a serial link. The ESP firmware then makes all of that data available on your home network.
+The NodoShop OpenTherm Gateway (OTGW) is a small hardware device that sits physically in-line on that two-wire bus, between the thermostat and the boiler. Inside the device is a PIC microcontroller (PIC16F88 or PIC16F1847) that implements the OpenTherm electrical interface. Alongside it sits the Wi-Fi module: on the 2.x line a LOLIN S3 Mini (ESP32-S3) in the Wemos D1 mini socket. The PIC decodes every OpenTherm frame on the bus and forwards it to the ESP over a serial link. The ESP firmware then makes all of that data available on your home network.
 
 On its own, the PIC does its job quietly. OTGW-firmware is the software that makes the entire system useful: it decodes, displays, stores, publishes, and acts on every message the thermostat and boiler exchange.
 
@@ -70,7 +70,7 @@ Releases of 2.0.0 are on the GitHub Releases page: betas are published as GitHub
 
 #### Highlights
 
-- **ESP32-S3 platform**: The OTGW Classic runs with a LOLIN S3 Mini or S3 Mini Pro in the Wemos D1 mini socket. The PIC stays in place. One `esp32-combo` image detects the PIC at boot. Build with `build.bat` (Windows) or `./build.sh` (Linux/macOS).
+- **ESP32-S3 platform**: The OTGW Classic runs with a LOLIN S3 Mini in the Wemos D1 mini socket. The PIC stays in place. One `esp32-combo` image detects the PIC at boot. Build with `build.bat` (Windows) or `./build.sh` (Linux/macOS).
 - **OT-Direct mode**: operating modes gateway (default), monitor, master and loopback, only on hardware without a PIC, the OpenTherm Gateway OTGW32 (Chapter 11).
 - **Ethernet with runtime failover**: only with Ethernet hardware; the OTGW Classic has no Ethernet.
 - **BLE temperature sensors**: On the ESP32-S3, sensors are read passively over Bluetooth LE. Xiaomi MiBeacon (plaintext and encrypted v4/v5 via a per-sensor bindkey), ATC/pvvx custom firmware, and BTHome v2 are supported. Room temperature and humidity feed directly into SAT and Home Assistant.
@@ -93,9 +93,9 @@ Releases of 2.0.0 are on the GitHub Releases page: betas are published as GitHub
 
 ### Platform Comparison
 
-The 2.0.0 line runs on ESP32-S3 only. The table shows what it supports on the OTGW Classic with a LOLIN S3 Mini or S3 Mini Pro.
+The 2.0.0 line runs on ESP32-S3 only. The table shows what it supports on the OTGW Classic with a LOLIN S3 Mini.
 
-| Feature | OTGW Classic + LOLIN S3 Mini / S3 Mini Pro |
+| Feature | OTGW Classic + LOLIN S3 Mini |
 |---|---|
 | OpenTherm via PIC co-processor | Yes |
 | OT-Direct mode | No (only on hardware without a PIC) |
@@ -132,7 +132,7 @@ If you are upgrading from v1.x, start with Chapter 2 (the upgrade section) and t
 
 Before you begin, you need:
 
-- A NodoShop OTGW Classic with a LOLIN S3 Mini or S3 Mini Pro (ESP32-S3) in the Wemos D1 mini socket. Other boards are not officially supported.
+- A NodoShop OTGW Classic with a LOLIN S3 Mini (ESP32-S3) in the Wemos D1 mini socket. Other boards are not officially supported.
 - A USB cable for the first flash of the S3 Mini.
 - A computer with a USB port and Python 3.6 or higher installed (for the flash script), or PlatformIO installed (for building from source).
 - A home Wi-Fi network with a 2.4 GHz access point (the ESP32-S3 does not support 5 GHz).
@@ -168,14 +168,14 @@ The full technical documentation, including the C4 architecture diagrams, the AP
 
 ### Supported Hardware
 
-#### OTGW Classic with LOLIN S3 Mini or S3 Mini Pro (NodoShop)
+#### OTGW Classic with LOLIN S3 Mini (NodoShop)
 
-The 2.x firmware runs on the NodoShop OTGW Classic with a LOLIN S3 Mini or S3 Mini Pro (ESP32-S3) in the Wemos D1 mini socket. The S3 Mini fits the Wemos D1 mini socket: each Classic signal lands on the S3 GPIO at the matching hole. The PIC stays in place. You flash one image, `esp32-combo`, which detects the PIC at boot and runs in PIC gateway mode.
+The 2.x firmware runs on the NodoShop OTGW Classic with a LOLIN S3 Mini (ESP32-S3) in the Wemos D1 mini socket. The S3 Mini fits the Wemos D1 mini socket: each Classic signal lands on the S3 GPIO at the matching hole. The PIC stays in place. You flash one image, `esp32-combo`, which detects the PIC at boot and runs in PIC gateway mode. **LOLIN S3 Mini Pro:** the firmware still recognises it, but its display does not work (tested by the maintainer), so it is not recommended. Use the LOLIN S3 Mini, which is tested.
 
 Characteristics:
 
 - PIC16F88 or PIC16F1847 co-processor for the OpenTherm bus
-- ESP32-S3 (LOLIN S3 Mini or S3 Mini Pro) in the Wemos D1 mini socket
+- ESP32-S3 (LOLIN S3 Mini) in the Wemos D1 mini socket
 - 4 MB SPI flash with a safeboot partition layout: one firmware slot plus an updater for firmware updates over WiFi (see Partition Table below)
 - I2C header for the external watchdog and an optional SSD1306 OLED display
 - 1-Wire GPIO for Dallas DS18B20 temperature sensors
@@ -313,7 +313,7 @@ The S0 pulse counter reads electricity pulses from an energy meter that has an S
 
 #### BLE Temperature Sensors
 
-Up to four Xiaomi LYWSD03MMC Bluetooth LE sensors are supported on the ESP32-S3; the LOLIN S3 Mini and S3 Mini Pro both have the BLE radio. The firmware reads them passively using the BTHome v2 protocol (these sensors broadcast their readings as advertisements; no pairing is required). Room temperature and humidity from these sensors feed into the SAT multi-zone averaging and are published to Home Assistant as individual sensor entities.
+Up to four Xiaomi LYWSD03MMC Bluetooth LE sensors are supported on the ESP32-S3; the LOLIN S3 Mini has the BLE radio. The firmware reads them passively using the BTHome v2 protocol (these sensors broadcast their readings as advertisements; no pairing is required). Room temperature and humidity from these sensors feed into the SAT multi-zone averaging and are published to Home Assistant as individual sensor entities.
 
 ### Flashing the Firmware
 
@@ -447,7 +447,7 @@ If you have a firmware binary file and want to upload it directly:
 #### Moving from 1.x to 2.0.0, step by step
 
 1. **On the 1.x unit, save your settings.** Open the File Manager (FSexplorer) and download `settings.ini` and, if you have Dallas sensors, `dallas_labels.ini`. The MQTT **Unique id** is in `settings.ini`; keeping it keeps your Home Assistant entities (see the notes below).
-2. **Swap the module.** Power off the OTGW and replace the Wemos D1 mini with a LOLIN S3 Mini or S3 Mini Pro.
+2. **Swap the module.** Power off the OTGW and replace the Wemos D1 mini with a LOLIN S3 Mini.
 3. **Flash the S3 over USB** with `flash_otgw` (see First-Time Flashing with flash_otgw).
 4. **Connect it to your WiFi** through its access point (see First-Time Setup: Connecting to Wi-Fi). WiFi credentials are not stored in `settings.ini`, so this step is needed either way.
 5. **Put your settings back.** Upload the saved `settings.ini` (and `dallas_labels.ini`) in the File Manager and restart the gateway: settings are read at boot. The hostname and the unique id of the 1.x unit come with the file.
@@ -457,7 +457,7 @@ If you have a firmware binary file and want to upload it directly:
 
 #### Notes When Upgrading from v1.x
 
-- Moving from 1.x to 2.x means replacing the Wemos D1 mini with a LOLIN S3 Mini or S3 Mini Pro and flashing it over USB (see Flashing the Firmware). Going back to 1.x means putting the Wemos D1 mini back and flashing a 1.x release; a 1.x zip does not run on an S3.
+- Moving from 1.x to 2.x means replacing the Wemos D1 mini with a LOLIN S3 Mini and flashing it over USB (see Flashing the Firmware). Going back to 1.x means putting the Wemos D1 mini back and flashing a 1.x release; a 1.x zip does not run on an S3.
 - No settings migration is required. Settings files from v1.3.x load without modification in v2.0.0.
 - MQTT topics, the REST API and the web UI changed in places compared with v1.x (for example the v2 web UI replaces the classic web UI, a fresh install gets the default hostname `OTGW2` instead of `OTGW`, and while the new firmware SAT is on the gateway refuses heating commands from MQTT and REST). See the 2.0.0 section of [docs/BREAKING_CHANGES.md](BREAKING_CHANGES.md#200).
 - If you are upgrading from before v1.2.0, be aware that REST API v0 and v1 endpoints were removed in v1.2.0. Only `/api/v2/` endpoints are available. See [docs/BREAKING_CHANGES.md](BREAKING_CHANGES.md).
@@ -1879,7 +1879,7 @@ Zones receive their temperature and target via MQTT. Each zone, zone 1 included,
 
 ### 5.16 BLE Temperature Sensor (ESP32 Only)
 
-On the LOLIN S3 Mini and S3 Mini Pro, SAT scans for BLE temperature sensors and can use one as the room temperature input. BLE sensors are surfaced under their own **Sensors** category in the web UI (not buried under SAT), alongside the 1-Wire and GPIO sensors. Scanning is a passive, continuous background activity that is **on by default** (subject to the PSRAM gate below), so sensors appear on their own over time. The BLE stack is **NimBLE-Arduino** (ADR-092), which replaced Bluedroid in 2.0.0 and frees roughly 400 KB of flash. Supported advertising formats:
+On the LOLIN S3 Mini, SAT scans for BLE temperature sensors and can use one as the room temperature input. BLE sensors are surfaced under their own **Sensors** category in the web UI (not buried under SAT), alongside the 1-Wire and GPIO sensors. Scanning is a passive, continuous background activity that is **on by default** (subject to the PSRAM gate below), so sensors appear on their own over time. The BLE stack is **NimBLE-Arduino** (ADR-092), which replaced Bluedroid in 2.0.0 and frees roughly 400 KB of flash. Supported advertising formats:
 
 - **ATC/pvvx custom firmware** (Xiaomi LYWSD03MMC with custom firmware): service data UUID 0x181A. Reports temperature, humidity, and battery level.
 - **BTHome v2**: service data UUID 0xFCD2. Standard BTHome protocol for temperature and humidity sensors. Encrypted advertisements are rejected.
@@ -1891,7 +1891,7 @@ The radio runs a **continuous scan** from boot (TASK-494). Every format-pass adv
 
 One combined firmware image ships for all ESP32 boards; `psramFound()` decides at runtime whether BLE actually scans:
 
-- **Boards with PSRAM** (the LOLIN S3 Mini and S3 Mini Pro): BLE runs by default. The extra RAM absorbs the NimBLE stack without destabilising the rest of the firmware.
+- **Boards with PSRAM** (the LOLIN S3 Mini): BLE runs by default. The extra RAM absorbs the NimBLE stack without destabilising the rest of the firmware.
 - **Boards without PSRAM**: BLE cannot be switched on (TASK-2025, ADR-257). Without PSRAM the scanner uses up the memory the gateway needs: on a test unit the heap ran out within about 2 minutes and the gateway stopped answering. The **Enable BLE sensors** switch stays visible but is disabled and greyed out, with the reason as its tooltip, and the BLE card says so. A REST or MQTT request to switch it on is refused (REST answers `409` with `BLE needs PSRAM: not available on this board`), and a stored `on`, for example from settings saved on an older firmware, is switched off at boot and saved as off.
 
 In short, BLE is active when it is enabled AND the board has PSRAM. Firmware before 2.0.0-beta.375 let you accept a risk warning to run BLE without PSRAM; if such a gateway hangs or becomes unreachable, section 7.12a shows how to recover it.
@@ -2579,7 +2579,7 @@ The firmware drives status LEDs to indicate the device state. On the S3 Mini the
 | Both LEDs off (normal operation) | WiFi connected, OpenTherm traffic flowing. LEDs are only used for brief blinks during processing. |
 | Rapid blinks during boot | Setup phase. Three quick blinks signal completion of a setup step. |
 
-An OTGW Classic with a LOLIN S3 Mini or S3 Mini Pro also uses the LOLIN's on-board RGB pixel to show the WiFi state. It flashes once per second (the `LED blink` setting does not affect it):
+An OTGW Classic with a LOLIN S3 Mini also uses the LOLIN's on-board RGB pixel to show the WiFi state. It flashes once per second (the `LED blink` setting does not affect it):
 
 | Pixel colour | Meaning |
 |---|---|
@@ -2927,7 +2927,7 @@ The MQTT Home Assistant auto-discovery metadata lives in `src/OTGW-firmware/MQTT
 
 ### Board Hardware Variants
 
-The supported 2.x hardware is the NodoShop OTGW Classic with a LOLIN S3 Mini or S3 Mini Pro in the Wemos D1 mini socket; the PIC stays in place. Board definitions live in `src/libraries/Platform/src/boards.h`. Each PlatformIO environment sets exactly one `BOARD_*` preprocessor flag in `platformio.ini`, and `boards.h` turns that flag into `HAS_*` capability flags.
+The supported 2.x hardware is the NodoShop OTGW Classic with a LOLIN S3 Mini in the Wemos D1 mini socket; the PIC stays in place. Board definitions live in `src/libraries/Platform/src/boards.h`. Each PlatformIO environment sets exactly one `BOARD_*` preprocessor flag in `platformio.ini`, and `boards.h` turns that flag into `HAS_*` capability flags.
 
 **These flags are board-level, not MCU-level.** The presence of a PIC, Ethernet hardware, or a direct OpenTherm interface is a property of the specific Nodoshop PCB, not of the MCU family. Application code tests only the `HAS_*` flags, never the raw `BOARD_*` macros.
 
@@ -2974,7 +2974,7 @@ The two fixed single-engine targets do no runtime hardware detection; each links
 |---|---|---|
 | `esp32` | No PIC | OTDirect only |
 | `esp32-classic` | OTGW Classic + LOLIN S3 Mini | PIC (OTGWSerial over UART) |
-| `esp32-combo` | OTGW Classic + LOLIN S3 Mini or S3 Mini Pro, engine picked at boot | Both engines linked in |
+| `esp32-combo` | OTGW Classic + LOLIN S3 Mini, engine picked at boot | Both engines linked in |
 
 `esp32-combo` is the target that is built and shipped, and the only one built on `dev`. Build it with the wrapper, without a target argument:
 
@@ -3039,7 +3039,7 @@ The OTGW-firmware sits between the OpenTherm heating bus and the home automation
 
 #### Level 2: Container (`c4-container.md`)
 
-The 2.x firmware runs on an ESP32-S3 (LOLIN S3 Mini or S3 Mini Pro) in the NodoShop OTGW Classic. The PIC16F co-processor handles the OpenTherm electrical bus; the ESP32-S3 communicates with it over UART at 9600 baud.
+The 2.x firmware runs on an ESP32-S3 (LOLIN S3 Mini) in the NodoShop OTGW Classic. The PIC16F co-processor handles the OpenTherm electrical bus; the ESP32-S3 communicates with it over UART at 9600 baud.
 
 #### Level 3: Component (`c4-component.md`)
 
@@ -5185,7 +5185,7 @@ The full list of all 128 message IDs, including solar storage (IDs 101-103), ven
 | **ADR** | Architecture Decision Record. A short document capturing a significant design choice, its rationale, and its consequences. All ADRs live in `docs/adr/`. Once Accepted, an ADR is immutable. |
 | **AceTime** | Arduino timezone library used by the firmware for NTP time management and zone-aware timestamps. |
 | **ArduinoJson** | A popular Arduino JSON library. Removed from this project (ADR-146). REST JSON output goes through the `JsonEmit` streaming writer (`jsonEmit.h`); settings lines are read with `parseJsonKVLine()`. |
-| **BLE** | Bluetooth Low Energy. On the ESP32-S3 (LOLIN S3 Mini or S3 Mini Pro), the firmware can receive room temperature and humidity from a BTHome-compatible BLE sensor (e.g., a Xiaomi sensor). |
+| **BLE** | Bluetooth Low Energy. On the ESP32-S3 (LOLIN S3 Mini), the firmware can receive room temperature and humidity from a BTHome-compatible BLE sensor (e.g., a Xiaomi sensor). |
 | **boards.h** | Board-specific pin mapping header. Defines GPIO assignments and `HAS_*` capability flags per build (e.g., `BOARD_NODOSHOP_ESP32_COMBO`). Located at `src/libraries/Platform/src/boards.h`. |
 | **BTHome** | An open BLE advertisement protocol for home sensor devices. Used by the SAT BLE integration for passive scanning of room temperature sensors. |
 | **C4 model** | A four-level architecture documentation model: Context, Container, Component, Code. The firmware's architecture is documented using C4 in `docs/c4/`. |
@@ -5195,7 +5195,7 @@ The full list of all 128 message IDs, including solar storage (IDs 101-103), ven
 | **DHW** | Domestic Hot Water. The circuit supplying hot tap water, as distinct from the central heating circuit. |
 | **DUE()** | A timer macro from `safeTimers.h`. Returns true when the declared timer's interval has elapsed, and false otherwise. Handles `millis()` rollover safely. |
 | **1.x line** | The maintenance branch `otgw-1.x.x`, firmware for the Wemos D1 mini. Going back to 1.x means putting the Wemos D1 mini back in the OTGW Classic. |
-| **ESP32** | The Espressif ESP32-S3 on the LOLIN S3 Mini or S3 Mini Pro, used by the 2.x firmware in the OTGW Classic. Runs at 240 MHz and supports BLE. |
+| **ESP32** | The Espressif ESP32-S3 on the LOLIN S3 Mini, used by the 2.x firmware in the OTGW Classic. Runs at 240 MHz and supports BLE. |
 | **f8.8** | OpenTherm fixed-point data format: an 8-bit signed integer plus an 8-bit fractional part (1/256 per LSB). Used for all temperature values in the protocol. |
 | **Frame Bridge** | The abstraction layer (ADR-087) that provides a uniform OpenTherm frame interface regardless of whether the underlying transport is the PIC UART (PIC gateway mode) or OTDirect (OT-Direct mode). |
 | **HA** | Home Assistant. The primary target home automation platform for this firmware. |
@@ -5368,7 +5368,7 @@ The full changelog is in `CHANGELOG.md` at the repository root.
 
 Version 2.0.0 is a major release. The headline changes are:
 
-**ESP32-S3 line.** Version 2.0.0 runs on the NodoShop OTGW Classic with a LOLIN S3 Mini or S3 Mini Pro in the Wemos D1 mini socket; the PIC stays in place. One `esp32-combo` image detects the PIC at boot. A platform abstraction layer (`platform.h`, `boards.h`) isolates hardware differences. The 1.x firmware for the Wemos D1 mini (ESP8266) continues on its own maintenance line.
+**ESP32-S3 line.** Version 2.0.0 runs on the NodoShop OTGW Classic with a LOLIN S3 Mini in the Wemos D1 mini socket; the PIC stays in place. One `esp32-combo` image detects the PIC at boot. A platform abstraction layer (`platform.h`, `boards.h`) isolates hardware differences. The 1.x firmware for the Wemos D1 mini (ESP8266) continues on its own maintenance line.
 
 **SAT (Smart Autotune Thermostat).** The embedded PID thermostat is now a major feature. Version 2.0.0 adds PID v3 with deadband and anti-cycling, a heating curve advisor (INCREASE/DECREASE/HOLD), multi-zone room temperature averaging, Summer Simmer Index, solar gain compensation, DHW setpoint control, boiler gas consumption estimation, and BLE room temperature sensor support.
 
@@ -5438,7 +5438,7 @@ The ELF file is included in GitHub release artifacts specifically to support cra
 |-------------|--------|------|-----------|-------|------------|
 | `esp32` | Base environment, no PIC | ESP32-S3 | Arduino-ESP32 v3.3.5 (pioarduino fork) | 4 MB (custom partition) | 768 KB LittleFS |
 | `esp32-classic` | OTGW Classic + LOLIN S3 Mini | ESP32-S3 | Arduino-ESP32 v3.3.5 (pioarduino fork) | 4 MB (custom partition) | 768 KB LittleFS |
-| `esp32-combo` | OTGW Classic + LOLIN S3 Mini or S3 Mini Pro, engine picked at boot (built and shipped) | ESP32-S3 | Arduino-ESP32 v3.3.5 (pioarduino fork) | 4 MB (custom partition) | 768 KB LittleFS |
+| `esp32-combo` | OTGW Classic + LOLIN S3 Mini, engine picked at boot (built and shipped) | ESP32-S3 | Arduino-ESP32 v3.3.5 (pioarduino fork) | 4 MB (custom partition) | 768 KB LittleFS |
 
 ESP32-S3 partition layout (`partitions_otgw_esp32.csv`, ADR-191): a 960 KB safeboot updater (factory), a 2240 KB main firmware slot (`app0`), 768 KB LittleFS and a 64 KB coredump. Firmware OTA over WiFi goes through the safeboot updater, and bootloader rollback returns to safeboot if a new image fails to boot.
 
@@ -5755,7 +5755,7 @@ These ADRs were introduced as part of the v2.0.0 development cycle (the ESP32-S3
 
 Firmware 2.0 supports exactly two hardware configurations:
 
-1. **The OTGW Classic with an ESP32-S3 module.** The traditional gateway with the PIC co-processor and a LOLIN S3 Mini or S3 Mini Pro in the module socket (chapter 2).
+1. **The OTGW Classic with an ESP32-S3 module.** The traditional gateway with the PIC co-processor and a LOLIN S3 Mini in the module socket (chapter 2).
 2. **The OpenTherm Gateway OTGW32.** A board with an ESP32-S3 that speaks OpenTherm itself, with its own connections to the boiler and to the thermostat. There is no PIC on this board. This chapter describes it. Chapter 12 compares the two.
 
 **What works on the OTGW32:** everything the gateway is for (OpenTherm, MQTT, Home Assistant, SAT). A few optional extras (Bluetooth sensors, long graph history, bigger buffers) need PSRAM (extra working memory) and are off on this board.
@@ -5870,7 +5870,7 @@ Technical rows: you do not need these to choose or to use your unit.
 
 | | OTGW Classic with an ESP32-S3 module | OpenTherm Gateway OTGW32 |
 |---|---|---|
-| **Flash and memory** | 4 MB flash. The LOLIN S3 Mini and S3 Mini Pro have extra memory (PSRAM). | 4 MB flash, no PSRAM. |
+| **Flash and memory** | 4 MB flash. The LOLIN S3 Mini have extra memory (PSRAM). | 4 MB flash, no PSRAM. |
 | **REST requests at the same time** | At most 2 for now. | At most 2 for now; not measured for this board. |
 | **Start-up detection** | Finds the PIC and remembers that. | Finds no PIC and starts OT-Direct. Up to 3 PIC probes at every start while Board mode is Auto. |
 | **Free header pins** | As on the Classic board. | On the OTGW32 the Dallas sensors start on GPIO 4 (the 1-wire line) and the S0 counter on GPIO 5 (terminal 5, DI), and you can change both in the settings; counting S0 pulses on an OTGW32 has not been tested. The GPIO output has no pad on this board (chapter 11.6). The DI pad (GPIO 5, the S0 default) and the 1-wire pad (GPIO 4) are 3.3 V inputs and are not 5 V tolerant: do not connect an S0 meter or sensor that drives them to 5 V or 12 V. |

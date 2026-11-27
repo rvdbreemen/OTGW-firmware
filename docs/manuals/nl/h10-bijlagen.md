@@ -79,14 +79,14 @@ Volledige specificatie: `docs/opentherm specification/OpenTherm-Protocol-Specifi
 | Term | Uitleg |
 |------|--------|
 | **ADR** | Architecture Decision Record: document dat een architectuurkeuze met context en afweging vastlegt. Zie `docs/adr/`. |
-| **BLE** | Bluetooth Low Energy: draadloze verbinding voor SAT-temperatuursensoren, werkt op de ESP32-S3 (LOLIN S3 Mini of S3 Mini Pro). |
+| **BLE** | Bluetooth Low Energy: draadloze verbinding voor SAT-temperatuursensoren, werkt op de ESP32-S3 (LOLIN S3 Mini). |
 | **boards.h** | Board-specifiek pin-mapping headerbestand. Definieert GPIO-toewijzingen en `HAS_*`-capability flags per build (bijv. `BOARD_NODOSHOP_ESP32_COMBO`). Locatie: `src/libraries/Platform/src/boards.h`. |
 | **BTHome** | Open BLE-protocol voor thuisautomatisensoren, ondersteund door SAT. |
 | **C4** | C4-model: architectuurvisualisatiemethode in vier niveaus: Context, Container, Component, Code. Zie `docs/c4/`. |
 | **CH** | Central Heating: ruimteverwarming (de CV). |
 | **DHW** | Domestic Hot Water: warmwatervoorziening (sanitair warm water). |
 | **1.x-lijn** | De onderhoudsbranch `otgw-1.x.x`, firmware voor de Wemos D1 mini. Terug naar 1.x betekent de Wemos D1 mini terugplaatsen in de OTGW Classic. |
-| **ESP32** | Espressif ESP32-S3 op de LOLIN S3 Mini of S3 Mini Pro, draait op 240 MHz en ondersteunt BLE; gebruikt door de 2.x-firmware in de OTGW Classic. |
+| **ESP32** | Espressif ESP32-S3 op de LOLIN S3 Mini, draait op 240 MHz en ondersteunt BLE; gebruikt door de 2.x-firmware in de OTGW Classic. |
 | **Frame Bridge** | Abstractielaag (ADR-087) die een uniforme OpenTherm frame-interface biedt, ongeacht of het onderliggende transport de PIC UART (PIC-gatewaymodus) of OTDirect (OT-Direct-modus) is. |
 | **F8.8** | OpenTherm-getal met vaste komma: 16 bits, waarvan 8 bit geheel en 8 bit breuk (resolutie 1/256 ≈ 0,004). |
 | **HA** | Home Assistant: open source domotica-platform, primaire integratiedoelstelling. |
@@ -276,7 +276,7 @@ Het volledige wijzigingslogboek staat in `CHANGELOG.md` in de repository. Hieron
 Dit is een grote versiesprong met uitgebreide nieuwe functionaliteit:
 
 **Nieuw:**
-- ESP32-S3-lijn: 2.0.0 draait op de Nodoshop OTGW Classic met een LOLIN S3 Mini of S3 Mini Pro in de Wemos D1 mini-voet; de PIC blijft zitten. Eén `esp32-combo`-image detecteert de PIC bij het opstarten. De 1.x-firmware voor de Wemos D1 mini (ESP8266) gaat door als eigen onderhoudslijn
+- ESP32-S3-lijn: 2.0.0 draait op de Nodoshop OTGW Classic met een LOLIN S3 Mini in de Wemos D1 mini-voet; de PIC blijft zitten. Eén `esp32-combo`-image detecteert de PIC bij het opstarten. De 1.x-firmware voor de Wemos D1 mini (ESP8266) gaat door als eigen onderhoudslijn
 - SAT (Smart Autotune Thermostat): volledig PID-regelalgoritme met stooklijnadvies, multi-zone, drukbewaking, zomerschemaschakelaar, BLE-sensoren
 - Optioneel OLED-display via SSD1306 op de I2C-header van de OTGW Classic
 - AP-fallback modus (alle builds vanaf beta.401): tijdelijk access point bij onbereikbaar WiFi (paragraaf 6.1.3)

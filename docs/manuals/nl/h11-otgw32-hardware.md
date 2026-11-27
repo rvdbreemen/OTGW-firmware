@@ -4,7 +4,7 @@
 
 Firmware 2.0 ondersteunt precies twee hardwareconfiguraties:
 
-1. **De OTGW Classic met een ESP32-S3-module.** De traditionele gateway met de PIC-coprocessor en een LOLIN S3 Mini of S3 Mini Pro in de modulesocket (hoofdstuk 2).
+1. **De OTGW Classic met een ESP32-S3-module.** De traditionele gateway met de PIC-coprocessor en een LOLIN S3 Mini in de modulesocket (hoofdstuk 2).
 2. **De OpenTherm Gateway OTGW32.** Een print met een ESP32-S3 die zelf OpenTherm spreekt, met eigen aansluitingen naar de ketel en naar de thermostaat. Op deze print zit geen PIC. Dit hoofdstuk beschrijft hem. Hoofdstuk 12 zet de twee naast elkaar.
 
 **Wat werkt op de OTGW32:** alles waarvoor de gateway er is (OpenTherm, MQTT, Home Assistant, SAT). Een paar optionele extra's (Bluetooth-sensoren, lange grafiekgeschiedenis, grotere buffers) hebben PSRAM (extra werkgeheugen) nodig en staan op deze print uit.

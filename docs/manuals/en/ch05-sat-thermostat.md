@@ -483,7 +483,7 @@ Zones receive their temperature and target via MQTT. Each zone, zone 1 included,
 
 ### 5.16 BLE Temperature Sensor (ESP32 Only)
 
-On the LOLIN S3 Mini and S3 Mini Pro, SAT scans for BLE temperature sensors and can use one as the room temperature input. BLE sensors are surfaced under their own **Sensors** category in the web UI (not buried under SAT), alongside the 1-Wire and GPIO sensors. Scanning is a passive, continuous background activity that is **on by default** (subject to the PSRAM gate below), so sensors appear on their own over time. The BLE stack is **NimBLE-Arduino** (ADR-092), which replaced Bluedroid in 2.0.0 and frees roughly 400 KB of flash. Supported advertising formats:
+On the LOLIN S3 Mini, SAT scans for BLE temperature sensors and can use one as the room temperature input. BLE sensors are surfaced under their own **Sensors** category in the web UI (not buried under SAT), alongside the 1-Wire and GPIO sensors. Scanning is a passive, continuous background activity that is **on by default** (subject to the PSRAM gate below), so sensors appear on their own over time. The BLE stack is **NimBLE-Arduino** (ADR-092), which replaced Bluedroid in 2.0.0 and frees roughly 400 KB of flash. Supported advertising formats:
 
 - **ATC/pvvx custom firmware** (Xiaomi LYWSD03MMC with custom firmware): service data UUID 0x181A. Reports temperature, humidity, and battery level.
 - **BTHome v2**: service data UUID 0xFCD2. Standard BTHome protocol for temperature and humidity sensors. Encrypted advertisements are rejected.
@@ -495,7 +495,7 @@ The radio runs a **continuous scan** from boot (TASK-494). Every format-pass adv
 
 One combined firmware image ships for all ESP32 boards; `psramFound()` decides at runtime whether BLE actually scans:
 
-- **Boards with PSRAM** (the LOLIN S3 Mini and S3 Mini Pro): BLE runs by default. The extra RAM absorbs the NimBLE stack without destabilising the rest of the firmware.
+- **Boards with PSRAM** (the LOLIN S3 Mini): BLE runs by default. The extra RAM absorbs the NimBLE stack without destabilising the rest of the firmware.
 - **Boards without PSRAM**: BLE cannot be switched on (TASK-2025, ADR-257). Without PSRAM the scanner uses up the memory the gateway needs: on a test unit the heap ran out within about 2 minutes and the gateway stopped answering. The **Enable BLE sensors** switch stays visible but is disabled and greyed out, with the reason as its tooltip, and the BLE card says so. A REST or MQTT request to switch it on is refused (REST answers `409` with `BLE needs PSRAM: not available on this board`), and a stored `on`, for example from settings saved on an older firmware, is switched off at boot and saved as off.
 
 In short, BLE is active when it is enabled AND the board has PSRAM. Firmware before 2.0.0-beta.375 let you accept a risk warning to run BLE without PSRAM; if such a gateway hangs or becomes unreachable, section 7.12a shows how to recover it.

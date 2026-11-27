@@ -2,14 +2,14 @@
 
 ### Ondersteunde hardware
 
-#### NodoShop OTGW Classic met LOLIN S3 Mini of S3 Mini Pro
+#### NodoShop OTGW Classic met LOLIN S3 Mini
 
-De 2.x-firmware draait op de NodoShop OTGW Classic met een LOLIN S3 Mini of S3 Mini Pro (ESP32-S3) in de Wemos D1 mini-voet. De S3 Mini past in de Wemos D1 mini-voet: elk Classic-signaal komt uit op de S3-GPIO achter het bijbehorende gaatje. De PIC blijft zitten. U flasht een enkel image, `esp32-combo`, dat bij het opstarten de PIC detecteert en in PIC-gatewaymodus draait.
+De 2.x-firmware draait op de NodoShop OTGW Classic met een LOLIN S3 Mini (ESP32-S3) in de Wemos D1 mini-voet. De S3 Mini past in de Wemos D1 mini-voet: elk Classic-signaal komt uit op de S3-GPIO achter het bijbehorende gaatje. De PIC blijft zitten. U flasht een enkel image, `esp32-combo`, dat bij het opstarten de PIC detecteert en in PIC-gatewaymodus draait. **LOLIN S3 Mini Pro:** de firmware herkent hem nog wel, maar het display werkt niet (getest door de beheerder), dus hij wordt niet aanbevolen. Gebruik de LOLIN S3 Mini, die is getest.
 
 Kenmerken:
 
 - PIC16F88 of PIC16F1847 co-processor voor de OpenTherm bus
-- ESP32-S3 (LOLIN S3 Mini of S3 Mini Pro) in de Wemos D1 mini-voet
+- ESP32-S3 (LOLIN S3 Mini) in de Wemos D1 mini-voet
 - 4 MB SPI-flash met een safeboot-partitielayout: een firmwareslot plus een updater voor firmware-updates via WiFi (zie Partitietabel hieronder)
 - I2C-header voor de externe watchdog en een optioneel SSD1306 OLED-display
 - 1-Wire GPIO voor Dallas DS18B20 temperatuursensoren
@@ -171,7 +171,7 @@ De S0-ingang maakt het mogelijk een S0-compatibele energiemeter (bijv. een slimm
 
 #### BLE temperatuursensoren
 
-Op de ESP32-S3 kunnen tot vier Xiaomi LYWSD03MMC Bluetooth LE sensoren worden uitgelezen; de LOLIN S3 Mini en S3 Mini Pro hebben allebei de BLE-radio. De firmware scant passief via het BTHome v2-protocol: de sensoren zenden hun waarden uit als advertisements, er is geen koppeling of verbinding nodig. Ruimtetemperatuur en luchtvochtigheid van deze sensoren worden gebruikt voor de SAT multi-zone middeling en als individuele sensorentiteiten gepubliceerd naar Home Assistant.
+Op de ESP32-S3 kunnen tot vier Xiaomi LYWSD03MMC Bluetooth LE sensoren worden uitgelezen; de LOLIN S3 Mini hebben allebei de BLE-radio. De firmware scant passief via het BTHome v2-protocol: de sensoren zenden hun waarden uit als advertisements, er is geen koppeling of verbinding nodig. Ruimtetemperatuur en luchtvochtigheid van deze sensoren worden gebruikt voor de SAT multi-zone middeling en als individuele sensorentiteiten gepubliceerd naar Home Assistant.
 
 ---
 
@@ -311,7 +311,7 @@ Als alternatief kunt u een firmwarebinary handmatig uploaden:
 #### Van 1.x naar 2.0.0, stap voor stap
 
 1. **Bewaar op de 1.x-unit uw instellingen.** Open de bestandsbeheerder (FSexplorer) en download `settings.ini` en, als u Dallas-sensoren heeft, `dallas_labels.ini`. De MQTT **Unique id** staat in `settings.ini`; houdt u die, dan houdt u uw Home Assistant-entiteiten (zie de opmerkingen hieronder).
-2. **Wissel de module.** Zet de OTGW uit en vervang de Wemos D1 mini door een LOLIN S3 Mini of S3 Mini Pro.
+2. **Wissel de module.** Zet de OTGW uit en vervang de Wemos D1 mini door een LOLIN S3 Mini.
 3. **Flash de S3 via USB** met `flash_otgw` (zie Eerste installatie via flash_otgw).
 4. **Verbind hem met uw WiFi** via zijn access point (zie de eerste WiFi-installatie). WiFi-gegevens staan niet in `settings.ini`, dus deze stap is altijd nodig.
 5. **Zet uw instellingen terug.** Upload het bewaarde `settings.ini` (en `dallas_labels.ini`) in de bestandsbeheerder en herstart de gateway: instellingen worden bij het opstarten gelezen. De hostnaam en de unique id van de 1.x-unit komen met het bestand mee.
@@ -321,7 +321,7 @@ Als alternatief kunt u een firmwarebinary handmatig uploaden:
 
 #### Opmerkingen bij upgraden van v1.x
 
-- Overstappen van 1.x naar 2.x betekent de Wemos D1 mini vervangen door een LOLIN S3 Mini of S3 Mini Pro en die via USB flashen (zie Firmware flashen). Terug naar 1.x betekent de Wemos D1 mini terugplaatsen en een 1.x-release flashen; een 1.x-zip draait niet op een S3.
+- Overstappen van 1.x naar 2.x betekent de Wemos D1 mini vervangen door een LOLIN S3 Mini en die via USB flashen (zie Firmware flashen). Terug naar 1.x betekent de Wemos D1 mini terugplaatsen en een 1.x-release flashen; een 1.x-zip draait niet op een S3.
 - Geen settings-migratie nodig. Instellingenbestanden van v1.3.x laden zonder wijziging in v2.0.0.
 - MQTT-topics, de REST API en de webinterface zijn op punten veranderd ten opzichte van v1.x (bijvoorbeeld: de v2-webinterface vervangt de klassieke webinterface, een nieuwe installatie krijgt de standaardhostnaam `OTGW2` in plaats van `OTGW`, en terwijl de nieuwe firmware-SAT aan staat weigert de gateway verwarmingscommando's via MQTT en REST). Zie de 2.0.0-sectie van [docs/BREAKING_CHANGES.md](../../BREAKING_CHANGES.md#200).
 - Als u upgradet van een versie voor v1.2.0: REST API v0 en v1 endpoints zijn verwijderd in v1.2.0. Alleen `/api/v2/` endpoints zijn beschikbaar. Zie [docs/BREAKING_CHANGES.md](../../BREAKING_CHANGES.md).

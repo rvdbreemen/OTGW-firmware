@@ -518,7 +518,7 @@ Zones ontvangen hun temperatuur en doel via MQTT. Elke zone, ook zone 1, is een 
 
 ### 5.15 BLE-temperatuursensor (alleen ESP32)
 
-Op de LOLIN S3 Mini en S3 Mini Pro scant SAT BLE-temperatuursensoren en kan er een als ruimtetemperatuurinvoer gebruiken. BLE-sensoren staan in de webinterface onder hun eigen categorie **Sensors** (niet meer verstopt onder SAT), naast de 1-Wire- en GPIO-sensoren. Scannen is een passieve, continue achtergrondactiviteit die **standaard aan** staat (onder voorbehoud van de PSRAM-poort hieronder), zodat sensoren vanzelf verschijnen. De BLE-stack is **NimBLE-Arduino** (ADR-092), die in 2.0.0 Bluedroid heeft vervangen en zo'n 400 KB flash bespaart. Ondersteunde advertising-formaten:
+Op de LOLIN S3 Mini scant SAT BLE-temperatuursensoren en kan er een als ruimtetemperatuurinvoer gebruiken. BLE-sensoren staan in de webinterface onder hun eigen categorie **Sensors** (niet meer verstopt onder SAT), naast de 1-Wire- en GPIO-sensoren. Scannen is een passieve, continue achtergrondactiviteit die **standaard aan** staat (onder voorbehoud van de PSRAM-poort hieronder), zodat sensoren vanzelf verschijnen. De BLE-stack is **NimBLE-Arduino** (ADR-092), die in 2.0.0 Bluedroid heeft vervangen en zo'n 400 KB flash bespaart. Ondersteunde advertising-formaten:
 
 - **ATC/pvvx custom firmware** (Xiaomi LYWSD03MMC met custom firmware): service data UUID 0x181A. Rapporteert temperatuur, luchtvochtigheid en batterijniveau.
 - **BTHome v2**: service data UUID 0xFCD2. Standaard BTHome-protocol voor temperatuur- en luchtvochtigheidssensoren. Versleutelde advertisements worden geweigerd.
@@ -530,7 +530,7 @@ De radio voert sinds 2.0.0 een **continue scan** uit vanaf boot (TASK-494). Elk 
 
 Er wordt een enkele gecombineerde firmware-image geleverd voor alle ESP32-boards; `psramFound()` bepaalt bij runtime of BLE daadwerkelijk scant:
 
-- **Boards MET PSRAM** (de LOLIN S3 Mini en S3 Mini Pro): BLE draait standaard. Het extra RAM vangt de NimBLE-stack op zonder de rest van de firmware te destabiliseren.
+- **Boards MET PSRAM** (de LOLIN S3 Mini): BLE draait standaard. Het extra RAM vangt de NimBLE-stack op zonder de rest van de firmware te destabiliseren.
 - **Boards ZONDER PSRAM**: BLE kan niet worden ingeschakeld (TASK-2025, ADR-257). Zonder PSRAM gebruikt de scanner het geheugen op dat de gateway nodig heeft: op een testunit was de heap binnen ongeveer 2 minuten op en reageerde de gateway niet meer. De schakelaar **BLE-sensoren inschakelen** blijft zichtbaar maar is uitgeschakeld en grijs, met de reden als tooltip, en de BLE-kaart meldt het. Een REST- of MQTT-verzoek om BLE aan te zetten wordt geweigerd (REST antwoordt `409` met `BLE needs PSRAM: not available on this board`), en een opgeslagen `aan`, bijvoorbeeld uit instellingen van een oudere firmware, wordt bij het opstarten uitgezet en als uit opgeslagen.
 
 Kort gezegd: BLE is actief wanneer het is ingeschakeld EN het board PSRAM heeft. Firmware van vóór 2.0.0-beta.375 liet u een risicowaarschuwing accepteren om BLE zonder PSRAM te draaien; loopt zo'n gateway vast of wordt hij onbereikbaar, dan staat in paragraaf 7.12a hoe u hem herstelt.

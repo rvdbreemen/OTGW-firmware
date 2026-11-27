@@ -8,13 +8,13 @@
 
 - Your gateway has a **Wemos D1 mini or NodeMCU (ESP8266)**: use the stable 1.x firmware. Take the [latest stable release](https://github.com/rvdbreemen/OTGW-firmware/releases/latest) (currently v1.7.10) and read the [1.x README](https://github.com/rvdbreemen/OTGW-firmware/tree/otgw-1.x.x).
 - Your gateway is the **OpenTherm Gateway OTGW32**: firmware 2.0 supports it, as one of the two supported hardware configurations. Read the note on this new device under [Hardware Support](#hardware-support) first.
-- Your gateway has a **LOLIN S3 Mini or S3 Mini Pro (ESP32-S3)**, or you want to try 2.0.0 (swap the module first, see [Migrating from ESP8266](#migrating-from-esp8266-1x)): read on. 2.0.0 is in beta.
+- Your gateway has a **LOLIN S3 Mini (ESP32-S3)**, or you want to try 2.0.0 (swap the module first, see [Migrating from ESP8266](#migrating-from-esp8266-1x)): read on. 2.0.0 is in beta.
 
 > **Disclaimer: v2.0.0-beta.474 is a beta of the 2.0.0 line.** It is not a stable release. It has had alpha and beta testing on a small group of units, but not yet the long field runs a stable release needs. Expect bugs, save your settings before you flash (a power cut during a filesystem update can still reset them), and read the [release notes of this beta](https://github.com/rvdbreemen/OTGW-firmware/releases/tag/v2.0.0-beta.474) first, including the known issues.
 >
 > If you need a gateway that just works, stay on the 1.x line for now: the [`otgw-1.x.x` branch](https://github.com/rvdbreemen/OTGW-firmware/tree/otgw-1.x.x) and the [published releases](https://github.com/rvdbreemen/OTGW-firmware/releases).
 
-OTGW-firmware turns the NodoShop OpenTherm Gateway into a networked smart heating controller. It runs on an ESP32-S3 (LOLIN S3 Mini or S3 Mini Pro) in the traditional NodoShop OTGW with the PIC co-processor, monitors the OpenTherm bus between your thermostat and boiler, and connects your heating system to your home automation platform via MQTT, a browser-based web interface and a REST API. Firmware 2.0 supports two hardware configurations, described under [Hardware Support](#hardware-support).
+OTGW-firmware turns the NodoShop OpenTherm Gateway into a networked smart heating controller. It runs on an ESP32-S3 (LOLIN S3 Mini) in the traditional NodoShop OTGW with the PIC co-processor, monitors the OpenTherm bus between your thermostat and boiler, and connects your heating system to your home automation platform via MQTT, a browser-based web interface and a REST API. Firmware 2.0 supports two hardware configurations, described under [Hardware Support](#hardware-support).
 
 The second supported configuration is the **OpenTherm Gateway OTGW32**, a board with an ESP32-S3 that speaks OpenTherm itself (OT-Direct), without a PIC. It is a new device that still has to prove itself in the field: see [Hardware Support](#hardware-support).
 
@@ -24,7 +24,7 @@ The second supported configuration is the **OpenTherm Gateway OTGW32**, a board 
 
 ### 0. Check your hardware
 
-2.0.0 runs on an ESP32-S3: a LOLIN S3 Mini or S3 Mini Pro in the NodoShop OTGW. The OpenTherm Gateway OTGW32 is supported as well (see [Hardware Support](#hardware-support)). Does your gateway still have the ESP8266 module (Wemos D1 mini or NodeMCU)? Then swap the module first: see [Migrating from ESP8266 (1.x)](#migrating-from-esp8266-1x). Or stay on the 1.x firmware.
+2.0.0 runs on an ESP32-S3: a LOLIN S3 Mini in the NodoShop OTGW. The OpenTherm Gateway OTGW32 is supported as well (see [Hardware Support](#hardware-support)). Does your gateway still have the ESP8266 module (Wemos D1 mini or NodeMCU)? Then swap the module first: see [Migrating from ESP8266 (1.x)](#migrating-from-esp8266-1x). Or stay on the 1.x firmware.
 
 ### 1. Flash the firmware
 
@@ -67,7 +67,7 @@ Version 2.0.0 is a major platform release. It targets the ESP32-S3 in the tradit
 
 ### Highlights
 
-- **ESP32-S3 platform**: an asynchronous web server and FreeRTOS on a LOLIN S3 Mini (or S3 Mini Pro) in place of the old Wemos D1 mini. One firmware image (`esp32-combo`) detects the board at boot.
+- **ESP32-S3 platform**: an asynchronous web server and FreeRTOS on a LOLIN S3 Mini in place of the old Wemos D1 mini. One firmware image (`esp32-combo`) detects the board at boot.
 - **v2 web UI**: the only web UI in 2.0.0. Live value table, graph with history, help text for every setting, SAT page. The File Explorer stays as the recovery page.
 - **Firmware updates over WiFi**: a small recovery updater (called safeboot) sits next to the firmware. If an update fails or a new firmware crashes in its first 30 seconds, the unit returns to the recovery updater and stays reachable. Units with an older flash layout (the way the memory is divided) need one USB migration first.
 - **SAT (Smart Autotune Thermostat), opt-in**: an embedded heating controller, off by default. See [SAT](#sat-smart-autotune-thermostat).
@@ -108,7 +108,7 @@ Version 2.0.0 is a major platform release. It targets the ESP32-S3 in the tradit
 
 Firmware 2.0 supports exactly two hardware configurations:
 
-1. **The OTGW Classic with an ESP32-S3 module.** The NodoShop OTGW with the PIC co-processor (a small extra chip that speaks OpenTherm for the module) and a LOLIN S3 Mini or S3 Mini Pro in the module socket. The PIC talks OpenTherm; the ESP32-S3 is connected to it by a serial link.
+1. **The OTGW Classic with an ESP32-S3 module.** The NodoShop OTGW with the PIC co-processor (a small extra chip that speaks OpenTherm for the module) and a LOLIN S3 Mini in the module socket. The PIC talks OpenTherm; the ESP32-S3 is connected to it by a serial link. **LOLIN S3 Mini Pro:** the firmware still recognises it, but its display does not work (tested by the maintainer), so it is not recommended. Use the LOLIN S3 Mini, which is tested.
 2. **The OpenTherm Gateway OTGW32.** A board with an ESP32-S3 that speaks OpenTherm itself, with its own connections to the boiler and to the thermostat (OT-Direct: the ESP32 does the work that the PIC does on the Classic). There is no PIC on this board. Version 1.0 of the OTGW32 is the first production run. The firmware does not use a bypass relay.
 
 Both use the same release zip: download the file whose name contains `esp32-combo`, for example `OTGW-firmware-esp32-combo-<version>-flash.zip`. The firmware finds out by itself which of the two it is on.

@@ -10,7 +10,7 @@
 
 ## In short
 
-- **What this is:** beta.474 of the 2.0.0 line, for the OTGW Classic with a LOLIN S3 Mini or S3 Mini Pro (combo image) and for the OTGW32. New: SAT follows a thermostat setpoint that equals a preset, the weather location can be set over MQTT, a new topic tells whether the thermostat ignores a temperature override, the zone count starts at 0 extra rooms, the OTGW32 gets sensible pin defaults, the web page reconnects more politely, and the release page no longer carries loose firmware files.
+- **What this is:** beta.474 of the 2.0.0 line, for the OTGW Classic with a LOLIN S3 Mini (combo image) and for the OTGW32. New: SAT follows a thermostat setpoint that equals a preset, the weather location can be set over MQTT, a new topic tells whether the thermostat ignores a temperature override, the zone count starts at 0 extra rooms, the OTGW32 gets sensible pin defaults, the web page reconnects more politely, and the release page no longer carries loose firmware files.
 - **Who it is for:** anyone who wants to help test 2.0.0, and OTGW32 owners who use 1-wire sensors or an S0 meter.
 - **How to update:** first save your settings (`curl http://<ip>/api/v2/settings -o settings-backup.json`). A unit that already runs 2.0.0: open `/update`, give it the flash zip, press **Update** and let it finish. A new S3 Mini or a unit on 1.x: USB first flash with `flash_otgw`, see "Before you flash".
 - **What is not tested:** nearly all new SAT and MQTT lines are checked with host tests only, not with a real thermostat, boiler or broker; no S0 pulses were counted on the OTGW32; the web page reconnect was tried in headless Chrome only. See "Not verified yet, in plain words".
@@ -117,7 +117,7 @@ A public beta of the 2.0.0 line. 2.0.0 runs on the ESP32-S3 only and uses an asy
 
 The purpose of this beta is field data. We want more people to run it on real heating systems and tell us what happens.
 
-**Supported hardware for this beta:** the OTGW Classic with a LOLIN S3 Mini or S3 Mini Pro. Use the combo image (`esp32-combo`). The PIC stays in place.
+**Supported hardware for this beta:** the OTGW Classic with a LOLIN S3 Mini. Use the combo image (`esp32-combo`). The PIC stays in place. **LOLIN S3 Mini Pro:** the firmware still recognises it, but its display does not work (tested by the maintainer), so it is not recommended. Use the LOLIN S3 Mini, which is tested.
 
 Read "Before you flash", "BREAKING changes" and "Known issues" first.
 
@@ -399,7 +399,7 @@ The builds beta.375 to beta.382. For users with SAT on, the main changes are a f
 
 ### BLE (Bluetooth sensors)
 
-- **beta.375: on boards without PSRAM, BLE can no longer be switched on, so the gateway cannot run out of memory and hang** (TASK-2025). The "Enable BLE sensors" switch is greyed out with the note "BLE needs PSRAM", a stored "on" is cleared at the first start, and REST (409 with the reason) and MQTT refuse it. The LOLIN S3 Mini and S3 Mini Pro have PSRAM and keep BLE as before. Tested: host and web UI tests that fail on the old code; on the bench unit without PSRAM, BLE stored on was switched off at boot and saved within 10 s, the scanner never started in 4 minutes, free memory stayed at 47-51 KB. Not verified: why a gateway that ran out of memory hung instead of restarting itself (TASK-2026, open).
+- **beta.375: on boards without PSRAM, BLE can no longer be switched on, so the gateway cannot run out of memory and hang** (TASK-2025). The "Enable BLE sensors" switch is greyed out with the note "BLE needs PSRAM", a stored "on" is cleared at the first start, and REST (409 with the reason) and MQTT refuse it. The LOLIN S3 Mini have PSRAM and keep BLE as before. Tested: host and web UI tests that fail on the old code; on the bench unit without PSRAM, BLE stored on was switched off at boot and saved within 10 s, the scanner never started in 4 minutes, free memory stayed at 47-51 KB. Not verified: why a gateway that ran out of memory hung instead of restarting itself (TASK-2026, open).
 
 ### SAT
 

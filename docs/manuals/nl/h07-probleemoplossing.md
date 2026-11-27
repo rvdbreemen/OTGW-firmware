@@ -359,7 +359,7 @@ De firmware gebruikt status-LEDs om de apparaatstatus aan te geven. Op de S3 Min
 | Beide LEDs uit (normale werking) | WiFi verbonden, OpenTherm-verkeer actief. LEDs worden alleen kort gebruikt voor verwerkingsindicatie. |
 | Snelle knipperingen tijdens opstarten | Setup-fase. Drie snelle knipperingen signaleren voltooiing van een setup-stap. |
 
-Een OTGW Classic met een LOLIN S3 Mini of S3 Mini Pro toont de WiFi-status ook met de RGB-pixel op de LOLIN. Die knippert één keer per seconde (de instelling `LED blink` heeft er geen invloed op):
+Een OTGW Classic met een LOLIN S3 Mini toont de WiFi-status ook met de RGB-pixel op de LOLIN. Die knippert één keer per seconde (de instelling `LED blink` heeft er geen invloed op):
 
 | Kleur pixel | Betekenis |
 |---|---|
