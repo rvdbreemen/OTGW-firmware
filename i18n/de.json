@@ -222,6 +222,7 @@
     "series_ch_set": "Vorlauf-Soll",
     "series_room_set": "Thermostat-Soll",
     "series_sat_target": "SAT-Ziel",
+    "series_sat_room": "SAT-Raum",
     "series_room": "Raum",
     "series_room_thermostat": "Raum (Thermostat)",
     "sat_room_note": "SAT nutzt {{temp}} ({{source}}). Das Diagramm zeigt den Messwert des Thermostats.",

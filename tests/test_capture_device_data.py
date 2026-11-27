@@ -68,18 +68,18 @@ class ConverterCase(unittest.TestCase):
     def test_header_and_rows(self):
         text = oc.graph_history_csv(response(), NOW_MS)
         lines = text.split("\n")
-        self.assertEqual(lines[0], "epoch_ms,flow,ret,chSet,roomSet,satTarget,room,outside,dhw,mod,flame,dhw_on,ch")   # TASK-2018
+        self.assertEqual(lines[0], "epoch_ms,flow,ret,chSet,roomSet,satTarget,satRoom,room,outside,dhw,mod,flame,dhw_on,ch")   # TASK-2018, TASK-3007
         self.assertFalse(text.endswith("\n"))
         # slot 1 has no value and no flag: dropped; slot 2 has only dhw_on: kept
         self.assertEqual(len(lines), 1 + 5)
         t0 = NOW_MS - 37000 - 6 * 120000
         t0 -= t0 % 5000
-        self.assertEqual(lines[1], f"{t0},45.2,30.1,50,20.5,,19.8,7.3,,34,1,0,1")
+        self.assertEqual(lines[1], f"{t0},45.2,30.1,50,20.5,,,19.8,7.3,,34,1,0,1")
         t2 = NOW_MS - 37000 - 4 * 120000
         t2 -= t2 % 5000
-        self.assertEqual(lines[2], f"{t2},,,,,,,,,,0,1,0")
-        self.assertTrue(lines[3].endswith(",45.5,30.2,50,20.5,,,7.2,,0,0,0,1"))   # room null -> empty cell
-        self.assertTrue(lines[5].endswith(",-0.5,0,10,20.5,,19.9,-1.2,,,0,0,0"))
+        self.assertEqual(lines[2], f"{t2},,,,,,,,,,,0,1,0")
+        self.assertTrue(lines[3].endswith(",45.5,30.2,50,20.5,,,,7.2,,0,0,0,1"))   # room null -> empty cell
+        self.assertTrue(lines[5].endswith(",-0.5,0,10,20.5,,,19.9,-1.2,,,0,0,0"))
 
     def test_sat_target_column_when_the_device_sends_it(self):
         # TASK-2018 (ADR-256): the satTarget array is only in a response whose window held a SAT target
@@ -90,6 +90,16 @@ class ConverterCase(unittest.TestCase):
         self.assertEqual(lines[5].split(",")[5], "")
         short = dict(response(), satTarget=[210])   # wrong length: an empty column, as the web UI does
         self.assertEqual(oc.graph_history_csv(short, NOW_MS).split("\n")[1].split(",")[5], "")
+
+    def test_sat_room_column_when_the_device_sends_it(self):
+        # TASK-3007 (ADR-291): satRoom sits after satTarget; null is an empty cell, a wrong length an empty column
+        j = dict(response(), satRoom=[205, None, None, 206, 207, None])
+        lines = oc.graph_history_csv(j, NOW_MS).split("\n")
+        self.assertEqual(lines[1].split(",")[6], "20.5")
+        self.assertEqual(lines[4].split(",")[6], "20.7", lines[4])
+        self.assertEqual(lines[5].split(",")[6], "")
+        short = dict(response(), satRoom=[205])
+        self.assertEqual(oc.graph_history_csv(short, NOW_MS).split("\n")[1].split(",")[6], "")
 
     def test_slot_times_step_by_the_interval(self):
         rows = oc.graph_history_rows(response(iv=30), NOW_MS)
