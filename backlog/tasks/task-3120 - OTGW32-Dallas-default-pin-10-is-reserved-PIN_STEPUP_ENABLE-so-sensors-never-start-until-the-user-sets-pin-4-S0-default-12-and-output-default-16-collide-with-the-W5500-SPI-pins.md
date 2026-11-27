@@ -8,7 +8,7 @@ status: To Do
 assignee:
   - '@claude'
 created_date: '2026-11-27T08:20:00Z'
-updated_date: '2026-11-27T09:00:00Z'
+updated_date: '2026-11-27T14:05:00Z'
 labels:
   - hardware
   - bug
@@ -54,4 +54,8 @@ Found by otgw-docs while writing the OTGW32 documentation (TASK-3115), coordinat
 2026-11-27 EFFECT ON Q32: S0 may be possible on the DI pad (GPIO 5) after all, so the earlier recommendation to hide S0 on the OTGW32 board type is WITHHELD until the owner answers what DI is wired to and whether it may be a pulse input (one question asked by BlueFlame). The GPIO output still has no pad (no net, no terminal): hiding the output on this board type stays recommended. The Dallas half is unchanged: default pin 4. Docs changed to: the block has a digital-input pad DI whose use is not confirmed; no free pin confirmed for S0 and output.
 
 2026-11-27 DECISION (Robert, DM 1575798102273826878, relayed by the coordinator, not seen by otgw-docs), verbatim: 'S0 is belofte van mij. Feature van 1.0.' So S0 stays a supported firmware feature on the OTGW32 and is NOT hidden: the earlier recommendation to hide S0 is dropped. The GPIO output is the one that has no pad on this board and is hidden or marked not available (Robert decides the exact handling). Dallas stays default pin 4. For S0 the pin is still to be confirmed (the DI pad, probably GPIO 5): until then the user chooses the pin in the settings; no pin promise in the docs. AC1 of this task therefore reads: S0 default pin that does not collide with the board (candidate GPIO 5, pending the owner's answer), output not available on this board type, Dallas default 4.
+
+2026-11-27 (otgw-docs) hardware owner's answer in #beta-testing, relayed by BlueFlame: the DI pad is present and not connected; the only usable digital input on the terminal block is the pin marked 1wire (GPIO 4, 3k3 pull-up, 470 pF to ground), intended for DS18x20 sensors. Docs (PINOUT.md, ch11 11.6 and terminals line, ch12, NL h11 and h12, MANUAL.md) now say exactly that: 'DI pad present, not connected', no 'probably the SW line', no 'probably GPIO 5'. Nothing is written about whether S0 may use the 1wire pin: that is Robert's open decision. The earlier S0 AC wording ('DI candidate') no longer matches the facts; the AC owner decides.
+
+2026-11-27 (otgw-docs) CORRECTION of the note above: the hardware owner corrected his own answer. Terminal pin 5 'DI' is connected to GPIO 5 through a 330 ohm series resistor, with a 3.3 k pull-up and a 470 pF capacitor to ground (net SWR); it is a digital input, and the 1wire pin (GPIO 4) is the other one. The 'DI candidate' wording of the AC is valid again. Docs (PINOUT.md, ch11, ch12, NL h11 and h12, MANUAL.md) now say that, with 'untested on the OTGW32' for S0 and 'You choose the S0 pin in the settings'. No handle or name in public text.
 <!-- SECTION:NOTES:END -->
