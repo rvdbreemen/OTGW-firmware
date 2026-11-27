@@ -11311,6 +11311,71 @@
       }
     },
     {
+      "id": "ADR-267",
+      "title": "Turn Nagle on for the WebSocket socket at connect so a slow reader cannot pin a full-segment buffer per small frame",
+      "path": "ADR-267-turn-nagle-on-for-the-websocket-socket-at-connect-so-a-slow-reader-cannot-pin-a-full-segment-buffer-per-small-frame.md",
+      "format": "canonical",
+      "status": "Proposed",
+      "date": "2026-11-20",
+      "decision_summary": "At WSEVTCONNECT, the firmware turns Nagle on for that WebSocket client's TCP connection with client->client()->setNoD...",
+      "topics": [
+        "heap",
+        "lwip",
+        "nagle",
+        "no-psram",
+        "websocket"
+      ],
+      "aliases": [
+        "Nagle on /ws",
+        "TCP_NODELAY on the live log socket",
+        "WebSocket setNoDelay(false)",
+        "WS MSS pbuf per frame"
+      ],
+      "components": [
+        "WS_EVT_CONNECT handler in webSocketStuff.ino (per-client TCP option)"
+      ],
+      "symbols": [
+        "AsyncClient::setNoDelay",
+        "AsyncWebSocketClient::client",
+        "LWIP_NETIF_TX_SINGLE_PBUF",
+        "onWebSocketEvent",
+        "WS_EVT_CONNECT"
+      ],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [
+          "The WSEVTCONNECT branch in webSocketStuff.ino calls setNoDelay(false) on the accepted client's AsyncClient. It does so after the client-limit and heap checks have accepted the connection.",
+          "The call is made in our firmware, not in a patched library."
+        ],
+        "must_not": [
+          "Must not change the server-wide NoDelay default for port 80. REST and static files keep NoDelay.",
+          "Must not change lwIP options (TCPOVERSIZE, LWIPNETIFTXSINGLEPBUF, TCPMSS) through a custom sdkconfig for this purpose (see the alternatives).",
+          "Must not reintroduce a heap-tier gate for WebSocket sends: ADR-167 retired that model."
+        ],
+        "exceptions": [
+          "None."
+        ],
+        "verification": [
+          "tests/testwsnagleonconnect.py (to be written under TASK-2954). It compiles or scans the real WSEVTCONNECT branch, passes when setNoDelay(false) is called on the accepted client, and fails on the code from before this ADR.",
+          "Bench, TASK-2954 AC3: the no-PSRAM OTGW32 bench unit (192.168.88.76) with a /ws client keeps hdminfreeheap above 10 KB. AC2: log latency on /ws stays below 250 ms.",
+          "The bench runs on a build that already has ADR-266 (beta.451 or later) and ADR-295, so the MQTT segment term and the emergency recovery are the same in both arms. Arms: that build without this change, and with it (the parked commit 7e700..."
+        ]
+      },
+      "scope": {
+        "path_globs": [
+          "src/OTGW-firmware/webSocketStuff.ino"
+        ]
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
+    },
+    {
       "id": "ADR-268",
       "title": "Retire diagRec: the remote telemetry recorder's local ring becomes the one local diagnostic recorder",
       "path": "ADR-268-retire-diagrec-the-remote-telemetry-recorder-s-local-ring-becomes-the-one-local-diagnostic-recorder.md",
@@ -19654,6 +19719,48 @@
     {
       "source": "ADR-266",
       "target": "ADR-265",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-267",
+      "target": "ADR-165",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-267",
+      "target": "ADR-167",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-267",
+      "target": "ADR-188",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-267",
+      "target": "ADR-240",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-267",
+      "target": "ADR-266",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-267",
+      "target": "ADR-295",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-267",
+      "target": "ADR-300",
       "type": "related",
       "resolved": true
     },

@@ -271,6 +271,7 @@ One row per Architecture Decision Record. Scope is the Enforcement `path_glob` s
 | ADR-264 | Accepted | - | espMqttClient comes from our fork. |
 | ADR-265 | Accepted | - | Every deferrable MQTT bulk publisher asks one shared pacer, mqttPaceAllows() in MQTTstuff.ino, before it publishes. |
 | ADR-266 | Accepted | - | Nagle on for the MQTT socket. |
+| ADR-267 | Proposed | `src/OTGW-firmware/webSocketStuff.ino` | At WSEVTCONNECT, the firmware turns Nagle on for that WebSocket client's TCP connection with client->client()->setNoD... |
 | ADR-268 | Accepted | - | The firmware keeps one local diagnostic recorder: the local ring of the remote telemetry recorder. |
 | ADR-290 | Superseded | - | Outbound TLS client only, for this one upload. |
 | ADR-291 | Accepted | - | The device history slot gets an eighth int16t temperature column, satRoom, so a slot is 18 bytes. |
