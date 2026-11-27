@@ -22,7 +22,7 @@ Firmware 2.0 ondersteunt twee hardwareconfiguraties: de **OTGW Classic met een E
 | **Ethernet en OLED** | OLED optioneel. Geen Ethernet. | Ethernet (W5500) en OLED worden door de firmware ondersteund; in onze tests niet op echte hardware gezien. |
 | **Detectie bij het opstarten** | Vindt de PIC en onthoudt dat. | Vindt geen PIC en start OT-Direct. Tot 3 PIC-zoekpogingen bij elke start zolang Board mode op Auto staat. |
 | **Bijwerken via WiFi** | De PIC blijft berichten doorgeven (niet op een testopstelling gemeten). | De verbinding thermostaat naar ketel is 1 tot 2 minuten onderbroken; de ketel draait op zijn eigen instellingen. |
-| **Vrije headerpinnen** | Zoals op de Classic-print. | De standaardpinnen voor S0, uitgang en Dallas botsen met pinnen die de print gebruikt, en er komt geen vrije pin op het klemmenblok uit; zet de Dallas-pin op 4 (hoofdstuk 11.6). |
+| **Vrije headerpinnen** | Zoals op de Classic-print. | De standaardpinnen voor S0, uitgang en Dallas botsen met pinnen die de print gebruikt, en er is geen vrije pin bevestigd (het klemmenblok heeft een digitaal-ingangspad DI waarvan het gebruik niet is bevestigd); zet de Dallas-pin op 4 (hoofdstuk 11.6). |
 | **Ervaring in het veld** | Alfa- en betaruns op meerdere apparaten. | Nieuw apparaat, hardwareversies 1.0 en 1.1. |
 
 ### 12.2 Wat gelijk is

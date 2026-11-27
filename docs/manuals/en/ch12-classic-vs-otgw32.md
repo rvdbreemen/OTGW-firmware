@@ -22,7 +22,7 @@ Firmware 2.0 supports two hardware configurations: the **OTGW Classic with an ES
 | **Ethernet and OLED** | OLED optional. No Ethernet. | Ethernet (W5500) and OLED are supported by the firmware; not seen on real hardware in our tests. |
 | **Start-up detection** | Finds the PIC and remembers that. | Finds no PIC and starts OT-Direct. Up to 3 PIC probes at every start while Board mode is Auto. |
 | **Updating over WiFi** | The PIC keeps passing messages (not measured on a bench). | The thermostat to boiler link is interrupted for 1 to 2 minutes; the boiler runs on its own settings. |
-| **Free header pins** | As on the Classic board. | The S0, output and Dallas defaults clash with pins the board uses, and no spare pin reaches the terminal block; set the Dallas pin to 4 (chapter 11.6). |
+| **Free header pins** | As on the Classic board. | The S0, output and Dallas defaults clash with pins the board uses, and no free pin is confirmed (the terminal block has a digital-input pad DI whose use is not confirmed); set the Dallas pin to 4 (chapter 11.6). |
 | **Field experience** | Alpha and beta runs on several units. | New device, hardware versions 1.0 and 1.1. |
 
 ### 12.2 What is the same

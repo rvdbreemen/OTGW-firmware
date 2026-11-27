@@ -5761,7 +5761,7 @@ Firmware 2.0 supports exactly two hardware configurations:
 - **Processor and memory:** an ESP32-S3 with 4 MB of flash and no PSRAM (the extra memory that the LOLIN S3 Mini module has). The firmware checks for PSRAM while it runs.
 - **OpenTherm:** the ESP32-S3 drives the boiler side and the thermostat side itself. The firmware calls this OT-Direct. There is no PIC, so there is no PIC firmware to update.
 - **Options in the firmware:** wired Ethernet (a W5500 chip), a small OLED display and a Dallas temperature sensor input are supported by the firmware. They have not been seen on real OTGW32 hardware in our tests.
-- **Connector:** the 10 way terminal block (J4) is not fitted at the factory; you fit it yourself. Terminal 1 is the one nearest the reset button. Terminals 1 and 2 are the OpenTherm boiler lines and terminals 3 and 4 are the OpenTherm thermostat lines. Terminals 5 to 10 carry power, ground, a switch line and the 1-wire line; the order is not documented yet. No spare general-purpose pin is visible on the block apart from the 1-wire line (hardware information from an OTGW32 owner).
+- **Connector:** the 10 way terminal block (J4) is not fitted at the factory; you fit it yourself. Terminal 1 is the one nearest the reset button. Terminals 1 and 2 are the OpenTherm boiler lines and terminals 3 and 4 are the OpenTherm thermostat lines. Terminals 5 to 10 carry power, ground, a digital-input pad labelled DI and the 1-wire line; the order is not documented yet. The DI pad is probably the SW line (net SWR on GPIO 5 in the schematic); what it is wired to and whether it may be used is not confirmed (hardware information from an OTGW32 owner).
 - **What the unit reports:** `GET /api/v2/device/info` shows `hardware_type` `otgw32` and the hardware mode `OT-Direct`. MQTT publishes the same as `otgw-firmware/hardware_type` and `otgw-firmware/hardware_mode`.
 
 ### 11.2 The operating modes
@@ -5809,7 +5809,7 @@ The web UI follows what the unit reports (`otcommandinterface`), not the board n
 - **REST:** for now, at most 2 requests are answered at the same time. A third gets HTTP 503 `Retry-After: 1`. The limit was not measured for this board class.
 - **Diagnostic recorder:** a small buffer of about 2 minutes instead of the large one.
 - **MQTT:** a unit without extra memory sends bursts in steps; the limits are not calibrated for it yet (see Known issues in the release notes).
-- **Pins:** wired Ethernet (W5500) uses SPI on GPIO 11, 12, 13, 14 and 15, and the 1-Wire input for Dallas sensors is on GPIO 4 (hardware information from an OTGW32 owner, matching the pin table in `docs/hardware/PINOUT.md`). The firmware defaults for the Dallas sensor (GPIO 10), the S0 counter (GPIO 12) and the GPIO output (GPIO 16) are pins the board uses itself, so the firmware refuses the Dallas default and does not start sensors until you choose a pin: set the Dallas pin to 4. Today no spare general-purpose pin reaches the terminal block, so the S0 counter and the GPIO output have no free pin on this board; the ESP32-S3 module itself has unused pins that are not routed to a connector.
+- **Pins:** wired Ethernet (W5500) uses SPI on GPIO 11, 12, 13, 14 and 15, and the 1-Wire input for Dallas sensors is on GPIO 4 (hardware information from an OTGW32 owner, matching the pin table in `docs/hardware/PINOUT.md`). The firmware defaults for the Dallas sensor (GPIO 10), the S0 counter (GPIO 12) and the GPIO output (GPIO 16) are pins the board uses itself, so the firmware refuses the Dallas default and does not start sensors until you choose a pin: set the Dallas pin to 4. No free pin is confirmed for the S0 counter and the GPIO output on this board: the terminal block has a digital-input pad (DI, GPIO 5 in the schematic) whose use is not confirmed, and the ESP32-S3 module itself has unused pins that are not routed to a connector.
 
 ### 11.7 What is the same as on the OTGW Classic
 
@@ -5850,7 +5850,7 @@ Firmware 2.0 supports two hardware configurations: the **OTGW Classic with an ES
 | **Ethernet and OLED** | OLED optional. No Ethernet. | Ethernet (W5500) and OLED are supported by the firmware; not seen on real hardware in our tests. |
 | **Start-up detection** | Finds the PIC and remembers that. | Finds no PIC and starts OT-Direct. Up to 3 PIC probes at every start while Board mode is Auto. |
 | **Updating over WiFi** | The PIC keeps passing messages (not measured on a bench). | The thermostat to boiler link is interrupted for 1 to 2 minutes; the boiler runs on its own settings. |
-| **Free header pins** | As on the Classic board. | The S0, output and Dallas defaults clash with pins the board uses, and no spare pin reaches the terminal block; set the Dallas pin to 4 (chapter 11.6). |
+| **Free header pins** | As on the Classic board. | The S0, output and Dallas defaults clash with pins the board uses, and no free pin is confirmed (the terminal block has a digital-input pad DI whose use is not confirmed); set the Dallas pin to 4 (chapter 11.6). |
 | **Field experience** | Alpha and beta runs on several units. | New device, hardware versions 1.0 and 1.1. |
 
 ### 12.2 What is the same
