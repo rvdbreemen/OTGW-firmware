@@ -87,6 +87,8 @@ The 10 way terminal block (J4) is not fitted at the factory; the user fits it. T
 
 Schematic check (net names of the ESP32-S3 module, from the picture an OTGW32 owner sent, 2026-11-27): the nets agree with the table for GPIO 0 (BOOT), 1 (OTM_TX), 2 (RED), 4 (DQ, the 1-wire line), 6 (OTS_RX), 7 (OTS_TX), 9 (CFG), 11 (MOSI), 12 (SCK), 13 (MISO), 14 (CS), 15 (INT), 16 (RST), 17 (SCL), 18 (SDA) and 21 (OTM_RX). GPIO 47 is named REL in the picture; that it is the bypass relay is likely but not confirmed. Not in the table: the picture shows a net SWR on GPIO 5, which is terminal 5 (DI), confirmed by the hardware owner (the firmware does not use GPIO 5 by default), and no net on GPIO 3. Unresolved differences: GPIO 10 is named EN24 in the picture while the table says an 18 V step-up; GPIO 8 is named GRN and GPIO 48 RGN while the table calls GPIO 8 the status LED and GPIO 48 the OT green LED. The picture shows no net for an S0 counter or a GPIO output.
 
+Firmware defaults on the OTGW32 (TASK-3120): the Dallas pin starts at GPIO 4 (a stored legacy default 10, the step-up enable pin, is moved to 4 once; any other stored pin stays); the S0 counter pin starts as not set (-1) because its old default 12 is the W5500 SCK, until the DI pad (GPIO 5, net SWR) is confirmed as a pulse input; the GPIO output is not available (no pad), `has_output_pin` is false in `GET /api/v2/device/info`.
+
 ---
 
 ## 3. esp32-classic: S3 Mini in the Classic D1-mini socket (ADR-126)

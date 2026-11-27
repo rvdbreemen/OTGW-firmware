@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-beta.464
+**  Version  : v2.0.0-beta.465
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -506,7 +506,7 @@ static void sendSensorStatus() {
     // S0 pulse counter
     je.beginObject(F("s0"));          // "s0":{
     je.field(F("enabled"),  settings.s0.bEnabled);
-    je.field(F("gpio"),     settings.s0.iPin);
+    je.field(F("gpio"),     (int32_t)settings.s0.iPin);   // TASK-3120: -1 = not set
     je.field(F("poll_sec"), settings.s0.iInterval);
     je.field(F("pulses"),   (uint32_t)OTGWs0pulseCount);
     je.field(F("total"),    (uint32_t)OTGWs0pulseCountTot);
@@ -2293,7 +2293,7 @@ static void handleDebugDump(const char words[][API_WORD_LEN], uint8_t wc, HTTPMe
     je.field(F("settings.sensors.interval"), (int32_t)settings.sensors.iInterval);
 
     je.field(F("settings.s0.enabled"), settings.s0.bEnabled);
-    je.field(F("settings.s0.pin"), (uint32_t)settings.s0.iPin);
+    je.field(F("settings.s0.pin"), (int32_t)settings.s0.iPin);   // TASK-3120: -1 = not set
     je.field(F("settings.s0.debounce_ms"), (uint32_t)settings.s0.iDebounceTime);
     je.field(F("settings.s0.pulse_kw"), (uint32_t)settings.s0.iPulsekw);
     je.field(F("settings.s0.interval"), (uint32_t)settings.s0.iInterval);
@@ -3337,6 +3337,7 @@ void sendDeviceInfoV2()
     je.field(F("platform"), F(PLATFORM_NAME));
     je.field(F("board"), snap->boardNm);
     je.field(F("hardware_type"), snap->hwTypeName);  // ADR-113: static board class for codepath selection
+    je.field(F("has_output_pin"), boardHasOutputPin());   // TASK-3120: false on the OTGW32 (no pad), the web UI hides the GPIO outputs
     je.field(F("hardwaremode"), snap->hwModeName);
     je.field(F("networkmode"), snap->netModeName);
     je.field(F("oledpresent"), snap->st.hw.bOLEDPresent);
@@ -4266,7 +4267,7 @@ void sendDeviceSettings()
   addInt(F("gpiosensorspin"), settings.sensors.iPin, "i", 0, SETTING_GPIO_MAX);   // TASK-1686
   addInt(F("gpiosensorsinterval"), settings.sensors.iInterval, "i", 5, 65535);
   addBool(F("s0counterenabled"), settings.s0.bEnabled, "b");
-  addInt(F("s0counterpin"), settings.s0.iPin, "i", 1, SETTING_GPIO_MAX);         // TASK-1686
+  addInt(F("s0counterpin"), settings.s0.iPin, "i", -1, SETTING_GPIO_MAX);        // TASK-1686; TASK-3120: -1 = not set (the OTGW32 default until the DI pad is confirmed)
   addInt(F("s0counterdebouncetime"), settings.s0.iDebounceTime, "i", 0, 1000);
   addInt(F("s0counterpulsekw"), settings.s0.iPulsekw, "i", 1, 5000);
   addInt(F("s0counterinterval"), settings.s0.iInterval, "i", 5, 65535);

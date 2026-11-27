@@ -8,7 +8,11 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-27T08:20:00Z'
+<<<<<<< HEAD
 updated_date: '2026-11-27T14:05:00Z'
+=======
+updated_date: '2026-11-27T09:20:00Z'
+>>>>>>> fbbf155a6 (OTGW32: TASK-3120 Dallas default pin 4, S0 pin not set until the DI pad is confirmed, GPIO output hidden (Robert Q32 A, S0 stays))
 labels:
   - hardware
   - bug
@@ -73,6 +77,14 @@ OPEN, not mine to decide: Tim's answer on the DI pad (GPIO 5; question 157579457
 =======
 =======
 2026-11-27 otgw-poc-dev: plan written (lane-poc-3120). Told otgw-webui: has_output_pin only, S0 NOT hidden, S0 pin may be unset on the OTGW32. Code not started: red tests first, after the coordinator confirms the S0 sentinel choice (int8_t -1) or names another.
+<<<<<<< HEAD
 >>>>>>> 37173d749 (docs(backlog): TASK-3120 In Progress, plan (Dallas 4, S0 unset until DI confirmed, output hidden on OTGW32) [no-task])
+<<<<<<< HEAD
 >>>>>>> 4cab77806 (docs(backlog): TASK-3120 In Progress, plan (Dallas 4, S0 unset until DI confirmed, output hidden on OTGW32) [no-task])
+=======
+=======
+
+2026-11-27 otgw-poc-dev implemented on lane-poc-3120 (coordinator decision A: -1 / int8_t). Code: OTGW-firmware.h legacyPinMigrated gets an OTGW32 target (Dallas legacy 10 -> OTGW32_DALLAS_PIN 4; S0 legacy 12 -> OTGW32_S0_DEFAULT_PIN -1; output PIN_KEEP), PIN_KEEP = no migration on that map, -1 is never 'busy'; boardHasOutputPin(map) block [board-has-output] (runtime, OTGW32 false); applyLegacyPinDefaults migrates sensors, S0 and output; S0types.h iPin int8_t; s0PulseCount.ino prints 'no pin set' and does not start; settingStuff S0COUNTERpin accepts -1, GPIOOUTPUTSenabled refuses to enable without an output pin; outputs_ext.ino initOutputs gate; restAPI: has_output_pin in device/info, s0counterpin range min -1, int32 casts; settings help + gz. Docs: ch11 11.6 en+nl, PINOUT.md, openapi has_output_pin. Evidence (host, real code compiled with the real boards.h): tests/test_board_defaults_3120.py 3/3 green, red on the old code; tests/test_legacy_pin_defaults.py updated for the new OTGW32 row (S0 12 -> -1, 1 write) green; test_board_pin_reserved, test_setting_gpio_range, test_progmem_assets_deflated, test_docs_no_em_dash green; 5 mutants killed (wrong Dallas target, migrate a non-legacy pin, predicate true on OTGW32, busy guard for -1, S0 default left 12). evaluate --quick see commit. NOT run: a firmware build (the type change int8_t is compile-checked only by the host harness), the full tests folder, a unit. DOWNGRADE (extra requirement 2): a previous firmware reading S0COUNTERpin -1 hits settingGpioInRange(-1) = false, logs 'not a GPIO of the ESP32-S3' and keeps its code default 12 (a W5500 pin on the OTGW32, refused by TASK-1552), so S0 simply does not start; Dallas pin 4 is read normally. The new firmware migrates again only when the stored value is the legacy default, so a downgrade then upgrade is stable. OPEN: web UI must render -1 as an empty S0 pin field (otgw-webui told), DI pad answer (Tim) = one-line change of OTGW32_S0_DEFAULT_PIN plus the test row. Benchmark needs the coordinator's slot.
+>>>>>>> 380665a64 (OTGW32: TASK-3120 Dallas default pin 4, S0 pin not set until the DI pad is confirmed, GPIO output hidden (Robert Q32 A, S0 stays))
+>>>>>>> fbbf155a6 (OTGW32: TASK-3120 Dallas default pin 4, S0 pin not set until the DI pad is confirmed, GPIO output hidden (Robert Q32 A, S0 stays))
 <!-- SECTION:NOTES:END -->

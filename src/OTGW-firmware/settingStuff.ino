@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : settingsStuff
-**  Version  : v2.0.0-beta.464
+**  Version  : v2.0.0-beta.465
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -133,13 +133,17 @@ bool checkGPIOConflict(int pin, GPIOConflictCaller caller)
 void applyLegacyPinDefaults()
 {
   const ComboPinMap map = comboActivePinMap();
+  // TASK-3120: the Dallas default 10 is the step-up enable pin on the OTGW32 and moves to GPIO 4 there; the Classic maps keep it
+  const int sen = legacyPinMigrated(settings.sensors.iPin, LEGACY_SENSOR_PIN, map, PIN_KEEP, PIN_KEEP,
+                                    OTGW32_DALLAS_PIN, settings.s0.iPin, settings.outputs.iPin);
   const int s0  = legacyPinMigrated(settings.s0.iPin, LEGACY_S0_PIN, map, CLASSIC_S0_PIN,
-                                    CLASSIC_PRO_S0_PIN, settings.sensors.iPin, settings.outputs.iPin);
+                                    CLASSIC_PRO_S0_PIN, OTGW32_S0_DEFAULT_PIN, sen, settings.outputs.iPin);
   const int out = legacyPinMigrated(settings.outputs.iPin, LEGACY_OUTPUT_PIN, map, CLASSIC_OUTPUT_PIN,
-                                    CLASSIC_PRO_OUTPUT_PIN, settings.sensors.iPin, s0);
-  if (s0 == settings.s0.iPin && out == settings.outputs.iPin) return;
-  DebugTf(PSTR("Board pin defaults: S0 pin %d -> %d, output pin %d -> %d\r\n"),
-          settings.s0.iPin, s0, settings.outputs.iPin, out);
+                                    CLASSIC_PRO_OUTPUT_PIN, PIN_KEEP, sen, s0);
+  if (sen == settings.sensors.iPin && s0 == settings.s0.iPin && out == settings.outputs.iPin) return;
+  DebugTf(PSTR("Board pin defaults: Dallas pin %d -> %d, S0 pin %d -> %d, output pin %d -> %d\r\n"),
+          settings.sensors.iPin, sen, settings.s0.iPin, s0, settings.outputs.iPin, out);
+  settings.sensors.iPin = sen;
   settings.s0.iPin = s0;
   settings.outputs.iPin = out;
   if (!writeSettings(false)) settingsMarkDirty();   // TASK-1495: a failed write is retried by the flush
@@ -1083,7 +1087,8 @@ void updateSetting(const char *field, const char *newValue)
   else if (strcasecmp_P(field, PSTR("S0COUNTERpin")) == 0)
   {
     int newPin = atoi(newValue);
-    if (!settingGpioInRange(newPin)) { DebugTf(PSTR("WARNING: S0COUNTERpin %d is not a GPIO of the ESP32-S3 (0-21, 26-48), ignored\r\n"), newPin); }
+    if (newPin == -1) { settings.s0.iPin = -1; DebugTf(PSTR("S0COUNTERpin: not set (%d)\r\n"), newPin); }   // TASK-3120
+    else if (!settingGpioInRange(newPin)) { DebugTf(PSTR("WARNING: S0COUNTERpin %d is not a GPIO of the ESP32-S3 (0-21, 26-48), ignored\r\n"), newPin); }
     else {
       if (checkGPIOConflict(newPin, GPIOConflictCaller::S0)) {
         DebugTf(PSTR("WARNING: GPIO%d conflicts with another enabled feature!\r\n"), newPin);
@@ -1106,9 +1111,14 @@ void updateSetting(const char *field, const char *newValue)
   else if (strcasecmp_P(field, PSTR("OTGWcommands"))==0)         strlcpy(settings.picBoot.sCommands, newValue, sizeof(settings.picBoot.sCommands));
   else if (strcasecmp_P(field, PSTR("GPIOOUTPUTSenabled")) == 0)
   {
-    settings.outputs.bEnabled = EVALBOOLEAN(newValue);
-    Debugln();
-    DebugTf(PSTR("Need reboot before GPIO OUTPUTS will be enabled on pin GPIO%d!\r\n\n"), settings.outputs.iPin);
+    if (EVALBOOLEAN(newValue) && !boardHasOutputPin()) {   // TASK-3120: no pad for the output on this board
+      settings.outputs.bEnabled = false;
+      DebugTln(F("GPIO OUTPUTS: this board has no output pin, not enabled"));
+    } else {
+      settings.outputs.bEnabled = EVALBOOLEAN(newValue);
+      Debugln();
+      DebugTf(PSTR("Need reboot before GPIO OUTPUTS will be enabled on pin GPIO%d!\r\n\n"), settings.outputs.iPin);
+    }
   }
   else if (strcasecmp_P(field, PSTR("GPIOOUTPUTSpin")) == 0)
   {

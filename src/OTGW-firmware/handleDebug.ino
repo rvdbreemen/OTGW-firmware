@@ -74,7 +74,7 @@ static void dumpDebugInfo() {
 
     Debugln(F("[settings.s0]"));
     Debugf(PSTR("enabled: %s\r\n"), settings.s0.bEnabled ? "true" : "false");
-    Debugf(PSTR("pin: %u\r\n"), (unsigned)settings.s0.iPin);
+    Debugf(PSTR("pin: %d\r\n"), (int)settings.s0.iPin);
     Debugf(PSTR("debounce_ms: %u\r\n"), (unsigned)settings.s0.iDebounceTime);
     Debugf(PSTR("pulse_kw: %u\r\n"), (unsigned)settings.s0.iPulsekw);
     Debugf(PSTR("interval: %u\r\n"), (unsigned)settings.s0.iInterval);
