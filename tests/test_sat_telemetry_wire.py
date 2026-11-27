@@ -459,27 +459,14 @@ def check_mod_suppressed_follows_the_suppression_state():
 
 
 def check_published_modulation_equals_the_mm_on_the_wire():
-    """O2 / entry 269 (Q-TW-4). At the maximum PWM duty SAT sends MM=T (entries 242, 243, 246); the published current_modulation
-    is 100 then, with the predicate of mmTarget, and satComputeMM()'s value otherwise."""
+    """O2 / entry 269 (Q-TW-4), after TASK-3143 (Sergeant D entry 505): SAT sends no MM=T while PWM runs, so there is no MM=T for
+    current_modulation to report as 100: the published value is the MM the control tick sends, the value satComputeMM() gave."""
     src = SAT_INO.read_text(encoding="utf-8").replace("\r\n", "\n")
-    fn = re.search(r"^static uint8_t satReportedModulation\([^\n]*\}$", src, re.M)
-    assert fn, "no satReportedModulation(): the published current_modulation never shows the MM=T that went out"
-    assert re.search(r"iCurrentModulation\s*=\s*satReportedModulation\(\s*!(?:_sat_coldCut|satColdCutActive\(\)) && satPwmAtMaxDuty\(\)", src), \
-        "the control tick does not publish satReportedModulation() with the mmTarget predicate"
-    assert re.search(r"mmTarget = \(!coldCutoff && satPwmAtMaxDuty\(\)\) \? SAT_MM_T", src)
-    with tempfile.TemporaryDirectory() as d:
-        cpp = Path(d) / "rm.cpp"
-        cpp.write_text("#include <cstdint>\n#include <cstdio>\n#include <cstdlib>\n" + fn.group(0) + r"""
-int main(int, char** a) { printf("%u\n", (unsigned)satReportedModulation(atoi(a[1]) != 0, (uint8_t)atoi(a[2]))); }
-""", encoding="utf-8")
-        exe = compile_cpp(cpp, Path(d) / "rm.exe")
-        if not exe:
-            raise unittest.SkipTest("no host C++ compiler")
-
-        def out(m, v):
-            return int(subprocess.run([str(exe), str(m), str(v)], capture_output=True, text=True).stdout)
-        assert out(1, 0) == 100 and out(1, 37) == 100, "MM=T goes out: 100"
-        assert out(0, 0) == 0 and out(0, 37) == 37 and out(0, 100) == 100, "otherwise the satComputeMM() value"
+    assert re.search(r"const uint8_t mmTarget = state\.sat\.iCurrentModulation;", src), \
+        "the control tick does not send the value satComputeMM() gave (mmTarget)"
+    assert "SAT_MM_T" not in re.search(r"const uint8_t mmTarget[^\n]*", src).group(0), "mmTarget still has an MM=T branch (entry 505)"
+    assert not re.search(r"iCurrentModulation\s*=\s*satReportedModulation\(", src), \
+        "the control tick overrides current_modulation for an MM=T that is no longer sent"
 
 
 class TelemetryDecisions(unittest.TestCase):
