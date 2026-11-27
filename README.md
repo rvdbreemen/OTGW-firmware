@@ -38,13 +38,13 @@ Choose the route that fits your unit:
 
   Use the USB port of the S3 module; it has built-in USB and normally needs no extra driver. The tool finds the port by itself. If it does not, or more than one S3 is connected, name the port: `flash_otgw.bat --port COM5` (Windows) or `./flash_otgw.sh --port /dev/ttyACM0` (Linux). More in [Flashing the Firmware](docs/manuals/en/ch02-hardware-setup.md#flashing-the-firmware).
 
-- **Unit already on 2.0.0:** update over WiFi: open `http://<device-ip>/update` and choose the files from the release zip; your settings stay (save them first anyway: a power cut during the update can still reset them). During the update the gateway does nothing for your heating for 1 to 2 minutes, so pick a quiet moment. A unit on the old partition layout (an early 2.0.0 alpha) needs a one-time USB step first, which changes how the unit's memory is divided. See [docs/guides/WIFI_FIRMWARE_UPDATE.md](docs/guides/WIFI_FIRMWARE_UPDATE.md).
+- **Unit already on 2.0.0:** update over WiFi: open `http://<device-ip>/update` and choose the files from the release zip; your settings stay (save them first anyway: a power cut during the update can still reset them). During the update the gateway does nothing for your heating for 1 to 2 minutes, so pick a quiet moment. A unit with the old memory layout (an early 2.0.0 alpha) needs a one-time USB step first, which changes how the unit's flash memory is divided. See [docs/guides/WIFI_FIRMWARE_UPDATE.md](docs/guides/WIFI_FIRMWARE_UPDATE.md).
 
 To build from source, see [docs/guides/BUILD.md](docs/guides/BUILD.md).
 
 ### 2. Connect to Wi-Fi
 
-On first boot the device creates an access point named `<hostname>-<mac>`, for example `OTGW2-A4:CF:12:21:B4:F8`. Connect to it. A captive portal opens where you enter your home Wi-Fi credentials. On an ESP32 board with a W5500 and an Ethernet cable plugged in, wired Ethernet is used directly and the Wi-Fi setup is optional.
+On first boot the device creates its own WiFi network named `<hostname>-<mac>`, for example `OTGW2-A4:CF:12:21:B4:F8`. Connect to it with your phone or PC. A setup page opens where you enter the credentials of your home WiFi. On an ESP32 board with a W5500 and an Ethernet cable plugged in, wired Ethernet is used directly and the WiFi setup is optional.
 
 ### 3. Open the Web UI
 
@@ -68,7 +68,7 @@ Version 2.0.0 is a major platform release. It targets the ESP32-S3 in the tradit
 
 - **ESP32-S3 platform**: an asynchronous web server and FreeRTOS on a LOLIN S3 Mini (or S3 Mini Pro) in place of the old Wemos D1 mini. One firmware image (`esp32-combo`) detects the board at boot.
 - **v2 web UI**: the only web UI in 2.0.0. Live value table, graph with history, help text for every setting, SAT page. The File Explorer stays as the recovery page.
-- **Firmware updates over WiFi**: a small safeboot updater sits next to the firmware. If an update fails or a new firmware crashes in its first 30 seconds, the unit returns to safeboot and stays reachable. Units on an older flash layout need one USB migration first.
+- **Firmware updates over WiFi**: a small recovery updater (called safeboot) sits next to the firmware. If an update fails or a new firmware crashes in its first 30 seconds, the unit returns to the recovery updater and stays reachable. Units with an older flash layout (the way the memory is divided) need one USB migration first.
 - **SAT (Smart Autotune Thermostat), opt-in**: an embedded heating controller, off by default. See [SAT](#sat-smart-autotune-thermostat).
 - **Home Assistant**: MQTT auto-discovery for the OpenTherm values, SAT, sensors and diagnostics, including SAT power, energy and gas estimates for the Energy dashboard.
 - **Works behind a reverse proxy**, including a Home Assistant sidebar panel (ingress). Guide: [docs/guides/REVERSE_PROXY_AND_HA_INGRESS.md](docs/guides/REVERSE_PROXY_AND_HA_INGRESS.md).
@@ -92,7 +92,7 @@ Version 2.0.0 is a major platform release. It targets the ESP32-S3 in the tradit
 - DS18B20 Dallas temperature sensors with custom labels (up to 16)
 - S0 pulse-counting energy meter
 - Optional SSD1306 OLED display (128x64, I2C)
-- Firmware and filesystem updates over WiFi through a safeboot updater
+- Updates over WiFi of the firmware and of the web page files (the filesystem), through the recovery updater (safeboot)
 - TCP serial bridge on port 25238 for OTmonitor and the HA built-in integration (off by default)
 - Telnet debug log on port 23
 - Webhook callbacks on OpenTherm status bit changes
@@ -296,7 +296,7 @@ Set an **endpoint password** in Settings (`httppasswd`) to require HTTP Basic Au
 - Reading and changing device settings
 - File upload, download, and delete
 - Reboot and wireless reset
-- OTA firmware and filesystem updates
+- Updates over WiFi (OTA) of the firmware and of the web page files
 - Webhook test
 
 Live monitoring, sensor values, and the WebSocket stream remain open without authentication.

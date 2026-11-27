@@ -3,11 +3,11 @@ id: TASK-3045
 title: >-
   Docs: owner wording and structure of the update, recovery and flash guides
   (review items 7 to 11)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-25T05:23:00Z'
-updated_date: '2026-11-25T05:34:00Z'
+updated_date: '2026-11-27T05:50:00Z'
 labels:
   - docs
   - ux
@@ -26,7 +26,7 @@ otgw-ux-designer review docs/reviews/2026-11-25_ux-owner-first-run-text/README.m
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [x] #1 Owner guide for the WiFi update exists (max one page: migrate once, update from /update, what to do when it fails, heating warning first); engineering reference keeps its content; every link to WIFI_FIRMWARE_UPDATE.md in README, manuals and guides still resolves
-- [ ] #2 WIFI_RECOVERY_TRIPLE_RESET.md starts with the numbered recovery steps and the power-dropout warning; FLASH_GUIDE.md says in its title that it is not for 2.0.0; the jargon list of the review is explained or replaced in README and the guides
+- [x] #2 WIFI_RECOVERY_TRIPLE_RESET.md starts with the numbered recovery steps and the power-dropout warning; FLASH_GUIDE.md says in its title that it is not for 2.0.0; the jargon list of the review is explained or replaced in README and the guides
 - [x] #3 docs/MANUAL.md regenerated with python scripts/build_manual.py and python scripts/run_tests.py shows test_manual_generated passing; the grep of both source of truth lines (networkStuff.ino:321-332 and :503-513) is repeated at fix time for any network name that appears
 <!-- AC:END -->
 
@@ -38,4 +38,12 @@ otgw-ux-designer review docs/reviews/2026-11-25_ux-owner-first-run-text/README.m
 AC2 partly: WIFI_RECOVERY_TRIPLE_RESET.md now starts with the numbered recovery steps and the power-dropout warning, mechanism last; FLASH_GUIDE.md is titled 'Flashing the 1.x ESP8266 (not for 2.0.0)'; jargon in the guides explained or replaced (filesystem -> web files, flash layout explained, safeboot = updater, captive portal -> setup page, access point explained once, WiFiManager and ADR numbers only in the mechanism part; mDNS only as 'use the address, not otgw2.local'). NOT done and not ticked: the same jargon in README.md (filesystem, flash layout, USB migration, safeboot, captive portal, access point in the disclaimer, Quick Start and highlights): README is held until the coordinator has Robert's clearance (R1). The 'one vocabulary' item (gateway / unit / web UI / WiFi) is applied in the three guides only; ch02/ch06 manuals still mix unit/device.
 
 AC3: python scripts/build_manual.py wrote docs/MANUAL.md (no diff: no chapter changed); python scripts/run_tests.py test_manual_generated test_fs_update_keep: PASS test_manual_generated (4 tests), PASS test_fs_update_keep (38 tests). Source lines re-read at origin/dev 52c7b91ca: networkStuff.ino:322-332 builds thisAP = hostname + '-' + the six MAC bytes as %02X with colons, :442 is the only startConfigPortal(thisAP) call, :513 WiFi.softAP(apSSID, "otgw1234") is the fallback; the recovery guide's network table matches them. No new claim about what the web UI or OLED shows. TASK-3045 stays In Progress for the README part of AC2.
+
+2026-11-27 README jargon pass done by otgw-docs: access point and captive portal replaced by 'its own WiFi network' and 'a setup page', safeboot explained as the recovery updater, flash layout and the old memory layout explained in plain words, filesystem named as the web page files. The guides were done earlier (notes above).
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+AC1 and AC3 were ticked earlier. AC2: WIFI_RECOVERY_TRIPLE_RESET.md starts with the numbered recovery steps and the power-dropout warning, FLASH_GUIDE.md is titled as not for 2.0.0, the jargon in the guides was explained or replaced earlier (notes), and the README jargon pass was done on 2026-11-27 (README.md lines for the first boot, the safeboot updater and the update lists). Commit 514b57d98 (beta.428) for the earlier part. No test run in this step; README edit not yet covered by a docs test run at the time of writing. closed under Robert's waiver 2026-11-27 (chat: Je hebt mijn toestemming om zaken af te ronden); field/.61/bench criteria waived as listed.
+<!-- SECTION:FINAL_SUMMARY:END -->

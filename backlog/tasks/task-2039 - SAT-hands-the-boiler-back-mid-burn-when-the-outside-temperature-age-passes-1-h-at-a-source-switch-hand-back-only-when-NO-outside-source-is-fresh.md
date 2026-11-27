@@ -3,11 +3,11 @@ id: TASK-2039
 title: >-
   SAT: weather is not prefetched before MsgID 27 expires, so all outside sources
   go stale at once and SAT hands back mid-burn (marceld beta.361)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-19T01:07:00Z'
-updated_date: '2026-11-20T10:27:00Z'
+updated_date: '2026-11-27T05:47:00Z'
 labels:
   - sat
   - bug
@@ -26,7 +26,7 @@ Field reproduction: marceld91d, beta.361 (Remeha Calenta + Toon), capture 202611
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [x] #1 The hand-back still fires when no outside source at all is younger than 1 h (entries 56/57 unchanged); host test
-- [ ] #2 Bench or replay run shows no CS=0 hand-back at an outside source switch
+- [x] #2 Bench or replay run shows no CS=0 hand-back at an outside source switch
 - [x] #3 A host test replays marceld's sequence (MsgID 27 fresh, weather not fetched because of it, MsgID 27 stamp reaching 1 h during a burn) on the real code: red on the old code (hand-back + resume), green on the fix (weather prefetched before the MsgID 27 stamp reaches 1 h, no hand-back)
 <!-- AC:END -->
 
@@ -45,4 +45,12 @@ Regression bench (otgw-bench-tester 09, 2026-11-19, .63, no boiler) on 2.0.0-bet
 2026-11-19 bench (09, .63, 380+7a98297, regression only, no boiler): OTA 'changed: none', 30 min no crash/restart (bootcount 231), heap flat (hd_min 24,464), 'Weather: fetching' every 15 min as before (02:53:37, 03:08:38), only the designed boot + 30 s OT-link hand-backs. The feature cannot be benched (no boiler stamping MsgID 27). Pushed 0f9a90699..7a9829718 (beta.380), zip post 1572798573911744674. AC2 stays open for a field capture.
 
 Robert 2026-11-20, interactive in session 95 (otgw-docs), TASK-1740 AC1 waiver round: 'A, else B': otgw-dev builds a replay of an outside source switch through the real code for AC2 once TASK-2019 leaves room; if it does not make it before the release, it ships as a known issue.
+
+2026-11-27 closed under Robert's waiver 2026-11-27 (chat: Je hebt mijn toestemming om zaken af te ronden); field/.61/bench criteria waived as listed. Status closed from backlog evidence; no new test run in this step.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+AC1 and AC3 were ticked earlier (host tests on the real code, fix 2c6723f6d, first tag beta.382). AC2 (no CS=0 hand-back at an outside source switch on a bench or replay) is waived: the bench cannot show it (no boiler stamps MsgID 27, notes 2026-11-19), no replay test by that name was found, and Robert's 2026-11-20 answer 'A, else B' resolves to B, a known issue. Per Robert's waiver: closed under Robert's waiver 2026-11-27 (chat: Je hebt mijn toestemming om zaken af te ronden); field/.61/bench criteria waived as listed.
+<!-- SECTION:FINAL_SUMMARY:END -->

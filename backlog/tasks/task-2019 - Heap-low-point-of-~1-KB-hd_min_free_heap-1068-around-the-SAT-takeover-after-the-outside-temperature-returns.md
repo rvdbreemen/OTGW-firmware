@@ -3,11 +3,11 @@ id: TASK-2019
 title: >-
   Heap low point of ~1 KB (hd_min_free_heap 1068) around the SAT takeover after
   the outside temperature returns
-status: In Progress
+status: Done
 assignee:
   - '@otgw-dev'
 created_date: '2026-11-18T10:04:00Z'
-updated_date: '2026-11-20T11:46:00Z'
+updated_date: '2026-11-27T05:48:00Z'
 labels:
   - heap
   - sat
@@ -27,7 +27,7 @@ ordinal: 1036000
 <!-- AC:BEGIN -->
 - [x] #1 The dip is reproduced on the bench and placed in time: reboot, wait for 'outside temperature missing', inject outdoor_temp, sample hd_min every 1-2 s (09's recipe)
 - [x] #2 The allocation behind the dip is named with file:line and evidence (heap trace, outbox count or a host reproduction)
-- [ ] #3 Fix or a decision recorded; the same repro shows the dip gone (red/green)
+- [x] #3 Fix or a decision recorded; the same repro shows the dip gone (red/green)
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -88,4 +88,12 @@ Robert 2026-11-20, interactive in session 95 (otgw-docs), TASK-1740 AC1 waiver r
 2026-11-20 diagnosis of the dip mechanism (otgw-dev; hypothesis with three numeric matches, confirmation needed). The probe records show the 20-38 KB is NOT held: run3 (09:22:44) at=13 from=12 free 40484 -> 16628 (-23856, outbox 25 -> 9, mqttTx 1037), then at=7 from=6 14 ms later free 45984 (+29356). So it is a transient allocation inside one MQTTclient.loop(), freed on the broker's ACK. In every run that loop sent exactly 16 packets (outbox 25 -> 9: run2 -20312 B, run3 -23856 B, contaminated run -38268 B), i.e. 1.27-1.49 KB per packet regardless of payload (~150 sat topics ~10.8 KB in total, so ~70 B each). lwIP of our libs (D:/DevData/platformio/packages/framework-arduinoespressif32-libs/esp32s3/dio_qspi/include/sdkconfig.h): CONFIG_LWIP_TCP_MSS 1436, CONFIG_LWIP_TCP_SND_BUF_DEFAULT 5744, CONFIG_LWIP_TCP_OVERSIZE_MSS 1. TCP_SND_QUEUELEN = (4*5744 + 1435)/1436 = 16 segments (ESP-IDF lwipopts formula; reading, not opened in this session). Reading: espMqttClient's _checkOutbox() (MqttClient.cpp:354) calls one ::send() per MQTT packet. With TCP_NODELAY (NetworkClient sets it on connect; reading) each send becomes its own segment, and TCP_OVERSIZE_MSS allocates an MSS-sized pbuf (~1.5 KB with headers and heap overhead) per segment. So one loop costs min(queued packets, 16 segments) x ~1.5 KB, independent of payload size, until the ACKs return. Consequences: (a) the TASK-2019 pace window only bounds SAT's share; any other publisher that fills the outbox (OT values, overrides, climate bridge) still produces the 16-segment flush; (b) a per-loop() packet cap n in the lib (ADR-264) bounds the dip to about n x 1.5 KB, which answers OQ0 (scales with packets per loop: yes, by this reading); (c) coalescing several MQTT packets into one send() (EMC_TX_BUFFER_SIZE 1440) would cut segments and heap further. Not verified: the TCP_SND_QUEUELEN formula and NetworkClient's NODELAY in the IDF/Arduino source; the beta.403 run4 raw probes (on the NAS).
 
 2026-11-20 PARKED (coordinator, after the diagnosis above): the pace-window fix (commit 54bd8b8bc, beta.403+54bd8b8, benched on .61: NOT GREEN, run4 drop -29.4 KB) is NOT pushed. It is kept on the local branch park/task-2019-pace in wt-2026 (otgw-dev). Decide after ADR-265/266: the pace window may come back as part of the shared pacer, next to the espMqttClient per-loop cap (ADR-264, TASK-2949.3/.5). Upstream connect-timeout PR: https://github.com/bertmelis/espMqttClient/pull/192. AC3 stays open.
+
+2026-11-27 closed under Robert's waiver 2026-11-27 (chat: Je hebt mijn toestemming om zaken af te ronden); field/.61/bench criteria waived as listed. Status closed from backlog evidence; no new test run in this step.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+AC1 and AC2 were ticked earlier (dip reproduced and placed in time, allocation named). AC3: the pace-window fix was parked on 2026-11-20; the shared MQTT pacer (TASK-2949.6, first tag beta.451) is the successor. The old-versus-new takeover recipe was NOT run; the .63 run stands in for .61: the beta.451 soak on .63 shows no pace waiting and a largest-block floor of about 19.4 KB (_comms/beta451_soak_paragraph.md). Caveat: the class of units without extra memory was not measured. Per Robert's waiver: closed under Robert's waiver 2026-11-27 (chat: Je hebt mijn toestemming om zaken af te ronden); field/.61/bench criteria waived as listed.
+<!-- SECTION:FINAL_SUMMARY:END -->

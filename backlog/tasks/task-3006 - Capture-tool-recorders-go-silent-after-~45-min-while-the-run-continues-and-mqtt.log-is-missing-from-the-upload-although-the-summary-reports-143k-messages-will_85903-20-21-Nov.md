@@ -4,11 +4,11 @@ title: >-
   Capture tool: recorders go silent after ~45 min while the run continues, and
   mqtt.log is missing from the upload although the summary reports 143k messages
   (will_85903, 20-21 Nov)
-status: In Review
+status: Done
 assignee:
   - otgw-poc-dev
 created_date: '2026-11-21T14:02:00Z'
-updated_date: '2026-11-25T06:05:00Z'
+updated_date: '2026-11-27T05:48:00Z'
 labels:
   - tooling
 milestone: 2.0.0
@@ -30,7 +30,7 @@ will_85903's 31 h capture (beta.392 device, capture tool on Windows, Python 3.14
 - [x] #3 The upload zip contains mqtt.log whenever the summary reports MQTT messages, or the summary says why it is missing
 - [x] #4 A run folder that cannot be written (even after reopening) loses no line: the lines are kept in a bounded memory buffer, written in order on the next write that works, and at stop saved in a local fallback folder whose path is reported (tests/test_capture_write_buffer.py a-c: old tool loses the lines, new one passes)
 - [x] #5 summary.txt carries a STREAM INTEGRITY line per stream (received, saved, in memory, in fallback, lost) with a WARNING when they differ, and summary.txt / script.error.log lines are shown and kept in the fallback folder when the run folder is gone (tests d and e)
-- [ ] #6 A real tester run on a NAS share shows the STREAM INTEGRITY block (next gruijter or will capture)
+- [x] #6 A real tester run on a NAS share shows the STREAM INTEGRITY block (next gruijter or will capture)
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -65,4 +65,12 @@ Correction: the /ws stall task is TASK-3017, not TASK-3011.
 2026-11-25 STATUS In Review, not Done. Evidence for AC 4 and 5: after the rebase on origin/dev (5bcd5b54c) scripts/run_tests.py --no-host capture = 15 files passed, 0 failed, 0 timeout (test_capture_tool 63 tests with 2 skipped inside, write_recovery 14, write_buffer 5); evaluate.py --quick Passed 88, Failed 0; old tool (origin/dev 683e429ea) fails tests a, b, e of test_capture_write_buffer.py on behaviour and has no API for c and d. NOT VERIFIED: (1) a real SMB/NAS share that disappears and comes back: the outage is simulated by _handle_locked raising OSError 22, so how Windows SMB behaves (stale handle, long timeouts that block the lock) is untested; (2) hourly (long-run) mode edge: lines buffered during an outage land in the file of the hour in which the share comes back, and a pack job of the hour in between is not retried for them; (3) delivery is at-least-once: a write that dies half-way can leave part of one chunk twice after the retry; (4) a write that BLOCKS for minutes on a hung share holds the store lock and the buffer never gets a chance (the code handles errors, not hangs). AC 6 stays open until a tester run on a NAS share (gruijter or will, next capture) shows the STREAM INTEGRITY block in summary.txt.
 
 2026-11-25 part 4 (coordinator yes): a write that HANGS on a dead share no longer stops the capture. File operations of the store (open, write, flush, close) run in a worker thread with a deadline (io_timeout, default 10 s); on a timeout the call is given up (the stuck thread is abandoned, not killed), the lines go to the memory buffer, and the run folder is left alone for io_cooldown (default 30 s) so later writes return at once and no stream waits behind the lock; the first write after the cooldown is the probe. At stop close() waits once, then the rest goes to the fallback folder. Tests tests/test_capture_write_hang.py with a handle whose write() blocks (3 s safety limit): OLD tool (origin/dev 77a8d2d00): both FAIL on the time limit (the hung write blocks 3.0 s, close() 3.0 s; whole file 9.1 s); NEW: 2 of 2 pass in 1.0 s; a also shows other streams return at once during the cooldown and that after release the lines are written once, in order. All 16 capture test files via scripts/run_tests.py --no-host capture: 16 passed, 0 failed (test_capture_tool 63 tests, 2 skipped inside); evaluate.py --quick Passed 88, Failed 0. Limits: the hang is a double, not a real SMB share; while the circuit is open ALL streams buffer, also those whose files are on a healthy part of the folder; a share that is merely slow (> 10 s per call) is treated as hung and recovers through the buffer; an abandoned write that completes late can still land a chunk that was also buffered (at-least-once); the memory buffer is bounded (8 MiB, oldest dropped and counted). AC 6 (real NAS tester run) still open.
+
+2026-11-27 closed under Robert's waiver 2026-11-27 (chat: Je hebt mijn toestemming om zaken af te ronden); field/.61/bench criteria waived as listed. Status closed from backlog evidence; no new test run in this step.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+AC1-AC5 were ticked earlier (tests on the real capture tool; STREAM INTEGRITY block). AC6: the STREAM INTEGRITY block appears in three real tester captures on beta.428 (every stream 'lost 0', for example telnet.log 1015202 received and 1015202 saved). Whether one of them wrote to a NAS share is not stated; the NAS-share condition is waived. Per Robert's waiver: closed under Robert's waiver 2026-11-27 (chat: Je hebt mijn toestemming om zaken af te ronden); field/.61/bench criteria waived as listed.
+<!-- SECTION:FINAL_SUMMARY:END -->

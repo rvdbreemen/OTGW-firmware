@@ -1,11 +1,11 @@
 ---
 id: TASK-2993
 title: 'SAT: PWM duty always with the live flow, no held BT (entry 437, Sergeant D)'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-21T03:28:00Z'
-updated_date: '2026-11-21T12:47:00Z'
+updated_date: '2026-11-27T05:47:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -22,11 +22,11 @@ Sergeant D, entry 437 (#dev-sat-mqtt 2026-11-21 03:25 UTC, msg 15735397191475529
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Robert's OK (reversing entry 64) and Sergeant D's answer on the start-up filter are recorded in docs/sat/sergeant-d-corrections.md before any code change
-- [ ] #2 A host test on the real PWM duty code shows the duty staying at 1.00 with a held BT while the live flow rises (current code, red) and following the live flow with the fix (green); base+1 floor kept
-- [ ] #3 The start-up filter follows Sergeant D's answer (none, or N s), with a test for the window edge
-- [ ] #4 Replay of indigo_light 19 Nov 21:27-21:33 gives live-flow duties of about 101 % then about 47 %, no range 5 after 21:28:30, no MM=T, no saturation exit; replay reports the remaining switches with TASK-2987 + 2989
-- [ ] #5 Bench via the NAS (replay or simulation) before the push
+- [x] #1 Robert's OK (reversing entry 64) and Sergeant D's answer on the start-up filter are recorded in docs/sat/sergeant-d-corrections.md before any code change
+- [x] #2 A host test on the real PWM duty code shows the duty staying at 1.00 with a held BT while the live flow rises (current code, red) and following the live flow with the fix (green); base+1 floor kept
+- [x] #3 The start-up filter follows Sergeant D's answer (none, or N s), with a test for the window edge
+- [x] #4 Replay of indigo_light 19 Nov 21:27-21:33 gives live-flow duties of about 101 % then about 47 %, no range 5 after 21:28:30, no MM=T, no saturation exit; replay reports the remaining switches with TASK-2987 + 2989
+- [x] #5 Bench via the NAS (replay or simulation) before the push
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -57,4 +57,12 @@ Sergeant D, entry 437 (#dev-sat-mqtt 2026-11-21 03:25 UTC, msg 15735397191475529
 2026-11-21 (92): field evidence from marceld91d's capture (beta.392, Remeha + Toon, heating_system 2 = underfloor, base 20; WeTransfer upload, analysis msg 1573678851236700273). Morning ignition 21 Nov 09:03:50 local: flow 35.1 at +16 s, then 32.2-33.3 C from +40 s to +90 s with the request 34.5-34.85, flow back above the request at about +100 s. With the beta.410 rule (30 s smoothing incl. the +30 s tick, then live flow) the raw duty would be 1.19 (+50 s), 1.12 (+80 s), 1.05 (+110 s), so MM=T for about 3 ticks / 90 s. On 392 MM=T was sent from +20 s and SAT went continuous 09:05:40-09:14:10. This is the 'dip that lasts' case of Q-438a on a real boiler; Sergeant D chose 30 s (entry 443) on indigo's dip that passed within 30 s. Night setback 17 C: 0 CH ticks between 21:31 and 09:02, room 19.0 -> 17.8. Charts: scratchpad marcel1121_charts (overview, morning-ignition).
 
 2026-11-21 (92) CORRECTION of my marceld91d note: my raw duty 1.19 at +50 s was a hand calculation and wrong. otgw-dev's replay through the real beta.410 code (REPORT.md in his scratchpad marcel/): the 30 s window is anchored at the first tick that sees the flame (09:04:10), so 09:04:40 still uses the EMA (0.962); +80 s 1.117 and +110 s 1.046 match (base 20). MM=T at 09:05:10 and 09:05:40 at both bases. Key result: beta.410 switches exactly like beta.392 at this ignition: 09:05:40 PWM -> continuous by ADR-236 (request > flow for 60 s, 0 C margin; gate ended 09:04:50), 09:14:10 fail-safe -> PWM. The duty fix and the 30 s window do not change these switches; this is the guard case (TASK-2989 margin), sequenced after the public duty release by entry 445.
+
+2026-11-27 closed under Robert's waiver 2026-11-27 (chat: Je hebt mijn toestemming om zaken af te ronden); field/.61/bench criteria waived as listed. Status closed from backlog evidence; no new test run in this step.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+AC1: Robert's OK and Sergeant D's answers are recorded (entries 441, 438/443, 444/446/447). AC2: tests/test_sat_pwm_live_flow_duty_2993.py 16 of 16 (18 fail on the old code). AC3: start-up filter 30 s plus 1 s tick-jitter slack, WindowToleratesTickJitter red on 9d2007d. AC4: the test reproduces the logged duty of the 19 Nov flame within 0.011 on the old code; the replay report is a scratchpad file and was not re-verified. AC5: same .61 simulation run as TASK-2992. Commit bce9496a5, first tag beta.410. Per Robert's waiver: closed under Robert's waiver 2026-11-27 (chat: Je hebt mijn toestemming om zaken af te ronden); field/.61/bench criteria waived as listed.
+<!-- SECTION:FINAL_SUMMARY:END -->

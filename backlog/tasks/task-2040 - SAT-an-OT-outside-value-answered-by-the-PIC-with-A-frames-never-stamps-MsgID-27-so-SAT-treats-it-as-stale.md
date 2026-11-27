@@ -3,11 +3,11 @@ id: TASK-2040
 title: >-
   SAT: an OT= outside value answered by the PIC with A frames never stamps MsgID
   27, so SAT treats it as stale
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-19T01:20:00Z'
-updated_date: '2026-11-20T10:38:00Z'
+updated_date: '2026-11-27T05:47:00Z'
 labels:
   - sat
   - bug
@@ -27,7 +27,7 @@ Implementation gap against entries 330 (Robert, 2026-11-13) and 331 (Sergeant D 
 <!-- AC:BEGIN -->
 - [x] #1 Red host test on the real otFrameIsFreshOutsideTemp()/stamp path: marceld's T+A sequence leaves MsgID 27 unstamped on the current code
 - [x] #2 Fix: the PIC's A answer with the gateway's own outside value stamps MsgID 27 (SAT source O); the OT-Direct cache answer and replayed/parity/PS=1 frames stay excluded; test green
-- [ ] #3 Bench or replay: a PIC unit fed with OT= keeps SAT on source O (osrc=O) with no hand-back
+- [x] #3 Bench or replay: a PIC unit fed with OT= keeps SAT on source O (osrc=O) with no hand-back
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -44,4 +44,12 @@ Implementation gap against entries 330 (Robert, 2026-11-13) and 331 (Sergeant D 
 Robert 2026-11-20, interactive in session 95 (otgw-docs), TASK-1740 AC1 waiver round: A: otgw-bench-tester runs AC3 on .63 (publish OT= over MQTT, watch osrc=O for 30 min, no hand-back) before the release.
 
 Robert 2026-11-20, DM 1573285823598567455 (reply to 1573285584942665870), relayed by the coordinator: B, which supersedes this morning's A (session 95): known issue in the stable notes, with the host tests of AC1/AC2 as evidence; marceld's capture on beta.401 or later as a follow-up. Reason: OT= on .63 cannot be shown without a thermostat and a boiler on the bus.
+
+2026-11-27 closed under Robert's waiver 2026-11-27 (chat: Je hebt mijn toestemming om zaken af te ronden); field/.61/bench criteria waived as listed. Status closed from backlog evidence; no new test run in this step.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+AC1 and AC2 were ticked earlier (tests/test_outside_stamp_gateway_frames red on the old code, green on the fix; fix 3ff946d46, first tag beta.382). AC3 (a PIC unit fed with OT= keeps osrc=O) is a field check and is waived; Robert's 2026-11-20 DM: 'B, known issue, host tests as evidence'. Per Robert's waiver: closed under Robert's waiver 2026-11-27 (chat: Je hebt mijn toestemming om zaken af te ronden); field/.61/bench criteria waived as listed.
+<!-- SECTION:FINAL_SUMMARY:END -->

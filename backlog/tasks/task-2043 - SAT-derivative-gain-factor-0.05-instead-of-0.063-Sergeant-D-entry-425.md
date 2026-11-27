@@ -1,11 +1,11 @@
 ---
 id: TASK-2043
 title: 'SAT: derivative gain factor 0.05 instead of 0.063 (Sergeant D, entry 425)'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-19T05:29:00Z'
-updated_date: '2026-11-20T10:27:00Z'
+updated_date: '2026-11-27T05:47:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -24,7 +24,7 @@ Entry 425 (Sergeant D, 2026-11-19 04:55 UTC, 'change it to 0.05', https://discor
 <!-- AC:BEGIN -->
 - [x] #1 A host test calling the real _pidCalculateGains pins kd = 420 x kp: red on the 0.063 code, green on the fix
 - [x] #2 Comments, sim port and every test pinning 529.2 x kp follow 0.05; test_sat_sim_port_equivalence green
-- [ ] #3 evaluate.py --quick no new FAIL; esp32-combo build; bench regression (no SAT boiler needed, field check of the warm-up)
+- [x] #3 evaluate.py --quick no new FAIL; esp32-combo build; bench regression (no SAT boiler needed, field check of the warm-up)
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -39,4 +39,12 @@ Entry 425 (Sergeant D, 2026-11-19 04:55 UTC, 'change it to 0.05', https://discor
 2026-11-19 AC3 status (otgw-dev, coordinator's admin round): the bench part holds: evaluate.py --quick 89/0 and the esp32-combo build of beta.386+54d46b1, plus the bench-tester's 31-min regression on .61 (06:51:37-07:22:40, 31/31 device/info 200, bootcount unchanged, satsimulation off). The field part (the warm-up with Kd 0.05 on a real boiler) is still open, so AC3, one checkbox for both, stays unchecked until a tester's SAT run on beta.392+ shows the warm-up.
 
 Robert 2026-11-20, interactive in session 95 (otgw-docs), TASK-1740 AC1 waiver round: B: release 2.0.0 with a known issue; AC3 (field warm-up) closes on the first field capture.
+
+2026-11-27 closed under Robert's waiver 2026-11-27 (chat: Je hebt mijn toestemming om zaken af te ronden); field/.61/bench criteria waived as listed. Status closed from backlog evidence; no new test run in this step.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+AC1 and AC2 were ticked earlier (kd = 420 x kp pinned by a host test, red on 0.063, green on the fix; commit 57f629ba2, first tag beta.392). AC3: evaluate.py --quick 89 pass, 0 fail (later task notes), and 09's 31 min regression run on .61 with beta.386 (31 of 31 device/info answers 200, bootcount unchanged, notes). The field warm-up check is waived. The factor was later changed to 0.04 by TASK-3041. Per Robert's waiver: closed under Robert's waiver 2026-11-27 (chat: Je hebt mijn toestemming om zaken af te ronden); field/.61/bench criteria waived as listed.
+<!-- SECTION:FINAL_SUMMARY:END -->

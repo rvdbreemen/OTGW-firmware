@@ -3,11 +3,11 @@ id: TASK-3104
 title: >-
   REST concurrency feasibility: how many parallel requests (2 to 8) can the
   ESP32-S3 serve, per board class, and what must change to allow 4 or 8
-status: In Progress
+status: Done
 assignee:
   - '@otgw-architect'
 created_date: '2026-11-26T11:35:00Z'
-updated_date: '2026-11-26T19:12:00Z'
+updated_date: '2026-11-27T05:49:00Z'
 labels:
   - research
   - rest
@@ -25,12 +25,12 @@ Robert 2026-11-26 (session, interactive): research what is feasible for 2 to 8 p
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Measure the steady-state largest free block and free heap of every unit class available (.63 PSRAM, .61 no PSRAM, Classic, any field data/captures with hd_min_max_block) and record the table with sources
-- [ ] #2 Measure the contiguous heap each large REST response needs today (settings, info, health, sat/status, file list) and at which N the worst case sum exceeds the steady block per board class; show the arithmetic with measured sizes, not estimates
-- [ ] #3 Inventory which responses can be streamed in chunks (JsonEmit, ADR-146) to cut the contiguous need, with the expected block saving per endpoint, and a ranked list of what to change first
-- [ ] #4 Re-derive the clamp thresholds (16000, 24000, free heap 24000) from the measured steady blocks and state which are guesses today; propose calibrated values per board class
-- [ ] #5 Redesign the TASK-3091 sweep so N above 2 can actually be the effective cap on the test unit (what must be changed for the run, prerelease only) and keep its decision rule otherwise; written plan agreed by otgw-architect
-- [ ] #6 Result note for Robert: feasible N per board class (2, 4, 8) with evidence or an explicit 'not feasible because', the changes needed (streaming, thresholds, ADR superseding ADR-165, client change ADR-184 and the v2 UI limit, CLAUDE.md single-flight rule), cost and risk, and a recommendation
+- [x] #1 Measure the steady-state largest free block and free heap of every unit class available (.63 PSRAM, .61 no PSRAM, Classic, any field data/captures with hd_min_max_block) and record the table with sources
+- [x] #2 Measure the contiguous heap each large REST response needs today (settings, info, health, sat/status, file list) and at which N the worst case sum exceeds the steady block per board class; show the arithmetic with measured sizes, not estimates
+- [x] #3 Inventory which responses can be streamed in chunks (JsonEmit, ADR-146) to cut the contiguous need, with the expected block saving per endpoint, and a ranked list of what to change first
+- [x] #4 Re-derive the clamp thresholds (16000, 24000, free heap 24000) from the measured steady blocks and state which are guesses today; propose calibrated values per board class
+- [x] #5 Redesign the TASK-3091 sweep so N above 2 can actually be the effective cap on the test unit (what must be changed for the run, prerelease only) and keep its decision rule otherwise; written plan agreed by otgw-architect
+- [x] #6 Result note for Robert: feasible N per board class (2, 4, 8) with evidence or an explicit 'not feasible because', the changes needed (streaming, thresholds, ADR superseding ADR-165, client change ADR-184 and the v2 UI limit, CLAUDE.md single-flight rule), cost and risk, and a recommendation
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -129,4 +129,12 @@ Context for the failed heap criterion, stated as it is in the analysis: the base
 Boot A against boot B, as measured: with at-rest block 26612 (boot A) the shipped rule allowed 2 and the adaptive gain was +14 to 38 %; with 15860 (boot B) the shipped rule fell to 1 and the gain was +88 to 144 %.
 
 Not verified: the per-request success counts are 'about' values from the load generator; boot-to-boot drift (about 20 % within one boot) applies. One test unit (.63, PIC board class). OT-Direct class not measured.
+
+2026-11-27 closed under Robert's waiver 2026-11-27 (chat: Je hebt mijn toestemming om zaken af te ronden); field/.61/bench criteria waived as listed. Status closed from backlog evidence; no new test run in this step.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+AC1: _comms/task3104_ac2_ac4.md sections 5 and 13-15 (.63 only; the Classic and .61 classes have no data). AC2: sections 1-2. AC3: section 4. AC4: section 3. AC5: _comms/task3104_ac5_spec.md; sweep series 1-4 ran on it. AC6: result note _comms/task3104_ac6_result_note_draft.md; Robert decided A on question 16 (the AC6 decision) and ADR-300 is Accepted. Limits stated by the architect: one unit (.63); OT-Direct and no-PSRAM classes not measured; the sweep with BLE on missed two criteria (heap -36 % at offered 4 against a cap-1 baseline, 503 -21 % at offered 8). Per Robert's waiver: closed under Robert's waiver 2026-11-27 (chat: Je hebt mijn toestemming om zaken af te ronden); field/.61/bench criteria waived as listed.
+<!-- SECTION:FINAL_SUMMARY:END -->

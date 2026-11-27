@@ -1,11 +1,11 @@
 ---
 id: TASK-2992
 title: 'SAT: MM=T only at raw duty above 1.03 (entry 436, Sergeant D)'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-21T03:12:00Z'
-updated_date: '2026-11-21T08:48:00Z'
+updated_date: '2026-11-27T05:47:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -22,11 +22,11 @@ Sergeant D, entry 436 (#dev-sat-mqtt 2026-11-21, msg 1573536221601210410): relea
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Sergeant D's confirmation of the reading (raw duty before the cap > 1.03) is recorded in docs/sat/sergeant-d-corrections.md before any code change
-- [ ] #2 A host test on the real PWM schedule/MM path shows MM=T at raw duty 0.97 on the current code (red) and no MM=T with the fix; MM=T still comes at raw duty above 1.03
-- [ ] #3 The raw duty is available where MM=T is decided (keep the [0,1] cap for the ON/OFF times); documented in the code comment with entry 436
-- [ ] #4 Replay of indigo_light 19 Nov: no MM=T at 21:27:30, and the replay reports the remaining switches with TASK-2987 + TASK-2989 + this task
-- [ ] #5 Bench via the NAS (replay or simulation) before the push
+- [x] #1 Sergeant D's confirmation of the reading (raw duty before the cap > 1.03) is recorded in docs/sat/sergeant-d-corrections.md before any code change
+- [x] #2 A host test on the real PWM schedule/MM path shows MM=T at raw duty 0.97 on the current code (red) and no MM=T with the fix; MM=T still comes at raw duty above 1.03
+- [x] #3 The raw duty is available where MM=T is decided (keep the [0,1] cap for the ON/OFF times); documented in the code comment with entry 436
+- [x] #4 Replay of indigo_light 19 Nov: no MM=T at 21:27:30, and the replay reports the remaining switches with TASK-2987 + TASK-2989 + this task
+- [x] #5 Bench via the NAS (replay or simulation) before the push
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -41,4 +41,12 @@ Sergeant D, entry 436 (#dev-sat-mqtt 2026-11-21, msg 1573536221601210410): relea
 2026-11-21 (92): entry 441 (Robert's OK for the duty fix in 2.0.0) and entry 442 (guards 2987/2989 to 2.1.0) recorded; this 1.03 rule (entry 440) stays in the 2.0.0 lane with TASK-2993.
 
 2026-11-21 05:30 (otgw-dev): implemented in lane/d3-duty2993 with TASK-2993. dutyRaw before the [0,1] cap; _pwm_mmRelease = range 5 AND dutyRaw > SAT_PWM_MM_RELEASE_DUTY (1.03) feeds satPwmAtMaxDuty() (mmTarget, reported modulation); range 5 / off time 0 unchanged (_pwm_atMaxDuty, satPwmInMaxDutyRange() for diagnostics d.atMax). Tests: MmReleaseAbove103 3/3 (indigo flame no MM=T, max raw 1.015; 21:27:30 duty 1.00 off time 0 no MM=T; raw 1.053 releases, 1.013 does not); without 2992 the duty fix gave MM=T at 21:25:00/21:26:30/21:27:00; anchors n11 rewritten (raw 1.10 MM=T, 0.95 none), red on origin 3/3 subtests.
+
+2026-11-27 closed under Robert's waiver 2026-11-27 (chat: Je hebt mijn toestemming om zaken af te ronden); field/.61/bench criteria waived as listed. Status closed from backlog evidence; no new test run in this step.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+AC1: Sergeant D's confirmation is recorded in the register (entry 440, 2026-11-21, 'yes A', restoring the rule of entry 436; entry 439 had withdrawn it, the later entry 440 governs). AC2: MmReleaseAbove103 3 of 3 plus the rewritten anchors test, red on origin before the fix (task notes); commit bce9496a5, first tag beta.410. AC3: raw duty before the [0,1] cap is kept as _pwm_mmRelease and documented in the code comment (notes). AC4: host replay in the test (21:27:30 duty 1.00, no MM=T, max raw 1.015, raw 1.053 releases); the report file of the replay lives in a session scratchpad and was not re-verified. AC5: simulation run on .61 (bench-otgw32/2026-11-21_task2993-2992/t2993-sim-61): MM=T only at raw duty above 1.03, 73 of 73 T, 156 of 156 numeric, no saturation exit. Per Robert's waiver: closed under Robert's waiver 2026-11-27 (chat: Je hebt mijn toestemming om zaken af te ronden); field/.61/bench criteria waived as listed.
+<!-- SECTION:FINAL_SUMMARY:END -->

@@ -4,11 +4,11 @@ title: >-
   SAT: one PWM entry and one counted PWM ON per flame; continuous until
   flame-off, back to PWM only by the fail-safe at 3.0 C (Sergeant D entries
   428/429/430)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-19T12:34:00Z'
-updated_date: '2026-11-20T10:27:00Z'
+updated_date: '2026-11-27T05:47:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -28,7 +28,7 @@ Entries 428 (Q-2005a C), 429 (Q-2005b B) and 430 ('This is top priority for 2.0.
 - [x] #1 Host test on the real satCycleCheckOvershootSwitch/satCycleCheckPwmExits: after a PWM exit with the flame on, sustained flow >= request + 2.0 keeps continuous (red on the old code: it switches back), the fail-safe at request + 3.0 still switches after 30 s (red on the old 3.5), and a flame-off clears the hold
 - [x] #2 Host test on the per-flame count: a PWM ON with the flame burning after a counted start of that flame does not count; the next flame counts again (red on the old code)
 - [x] #3 Existing SAT tests updated for 3.0 where they pin the 3.5 value; evaluate.py --quick and the full suite green; esp32-combo build
-- [ ] #4 Bench regression (no boiler on the bench) and field runs via the beta: no continuous/PWM flipping inside one burn in a capture
+- [x] #4 Bench regression (no boiler on the bench) and field runs via the beta: no continuous/PWM flipping inside one burn in a capture
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -39,4 +39,12 @@ Entries 428 (Q-2005a C), 429 (Q-2005b B) and 430 ('This is top priority for 2.0.
 2026-11-19 beta.391 (40f511a8a) pushed + posted (#alpha-testing 1572976241840226426). Bench .63 (09): PASS, 31 min regression 14:28-14:59, bootcount equal (flash+2), 0 panic, 31/31 device/info 200, MQTT 31/31, heap flat; settings changed only the 3 updatecheck keys from the 382 baseline (no SAT key from 2913); SAT off/on without a boiler as before (hand-back, no crash); SATcycles.ino:1425/:1459 and the 3.0f constant at :41 confirmed in the code and the binary; the new lines do not appear without a burning boiler (expected). Coordinator choice (a): push after 09's OK on the 13 targeted SAT files, then every test naming SATcycles.ino/SATcontrol.ino (104 files, serial chunks) and the full sweep before the 20:00 release build. The SAT list found tests/test_sat_no_return_ignition.py (+ test_sat_no_return_startup, which reuses its stubs, and through delegation test_sat_lowload_contract LL-011/014/018x) not compiling on 40f511a8a: the harness stubs satCycleRecordPwmStart() but not the new satCycleCountPwmStartThisFlame(). Firmware unaffected (build green). Fixed in a tests-only follow-up commit on top of ba's 392 (82f05aad8): a 1-line stub returning true; no_return_ignition 19 passed, no_return_startup 20 passed. origin/dev was red in these harnesses from 40f511a8a until the follow-up (a few minutes). AC4 (field) stays open.
 
 Robert 2026-11-20, interactive in session 95 (otgw-docs), TASK-1740 AC1 waiver round: B: release 2.0.0 with a known issue; AC4 closes on the first field capture (ideally one indigo 24 h run on the 20:00 beta, together with 2005 and 2043).
+
+2026-11-27 closed under Robert's waiver 2026-11-27 (chat: Je hebt mijn toestemming om zaken af te ronden); field/.61/bench criteria waived as listed. Status closed from backlog evidence; no new test run in this step.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+AC1-AC3 were ticked earlier (host tests on the real PWM exit and per-flame count, red on the old code; commit 40f511a8a, first tag beta.392). AC4: bench regression PASS, 31 min on .63 with beta.391 (task notes 2026-11-19). The field runs (no flip inside one burn in a tester capture) are waived. Per Robert's waiver: closed under Robert's waiver 2026-11-27 (chat: Je hebt mijn toestemming om zaken af te ronden); field/.61/bench criteria waived as listed.
+<!-- SECTION:FINAL_SUMMARY:END -->

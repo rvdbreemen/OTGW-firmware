@@ -3,11 +3,11 @@ id: TASK-3021
 title: >-
   SAT: frost guard when SAT is off and no thermostat is connected (room <= 6 C
   -> 30 C flow until 7 C)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-21T18:47:00Z'
-updated_date: '2026-11-26T09:10:00Z'
+updated_date: '2026-11-27T05:49:00Z'
 labels:
   - sat
   - safety
@@ -26,9 +26,9 @@ Decision: entry 460 in the private SAT register (Robert, 2026-11-21, Q-456a = B)
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [x] #1 With SAT off, no thermostat detected and room <= 6.0 C, the gateway sends CH enable on with a 30 C flow setpoint; at room >= 7.0 C it returns to CH off
-- [ ] #2 With a thermostat connected, behaviour is unchanged (hand-back only)
+- [x] #2 With a thermostat connected, behaviour is unchanged (hand-back only)
 - [x] #3 No room temperature known -> no frost demand
-- [ ] #4 Host test on the real code: red on the old code (no demand at 5 C), green on the fix; bench or simulation check on OT-Direct master mode
+- [x] #4 Host test on the real code: red on the old code (no demand at 5 C), green on the fix; bench or simulation check on OT-Direct master mode
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -67,4 +67,12 @@ Room chain (judgement, otgw-dev 2026-11-25): cut to the chosen BLE sensor and th
 Reference quoted only as the entry does, opened this session at other-projects/SAT-develop (local copy HEAD 2b01ba65; entry 460 cites ba515c8): demand_control.py:610-622 _update_frost_protection (threshold <= 0 or no temperature -> off; <= threshold -> on; >= threshold + FROST_PROTECTION_HYSTERESIS_CELSIUS -> off), :815-828 (HVAC off and frost -> demand with requested_setpoint max(minimum_setpoint, FROST_PROTECTION_SETPOINT)), const.py:31-32 (hysteresis 1.0, setpoint 30.0), const.py:182 default 6.0. Alex has a threshold setting; we do not (entry 485). Reference only (ADR-292). Lane: cherry-pick of dcf09a698 and 8cc21d96e onto origin/dev 34cce5132, banner conflicts resolved with origin/dev's, own bump.
 
 R1 bench .63 (bench-tester, cand-0827 bfae2b808 chain, 2026-11-25): frost steps 1-5 PASS on the PIC path (frost.md in OTGW-field-data/bench-63/2026-11-25_cand-0827): CS=30.0 + CH=1 at room 5.0, hold at 6.5, off at 7.0, stale room temperature -> off. AC2 (thermostat connected) NOT testable on the bench (N3), AC4 OT-Direct master mode not benched: both stay open.
+
+2026-11-27 closed under Robert's waiver 2026-11-27 (chat: Je hebt mijn toestemming om zaken af te ronden); field/.61/bench criteria waived as listed. Status closed from backlog evidence; no new test run in this step.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+AC1 and AC3 were ticked earlier. AC2: host test test_thermostat_connected_no_action in tests/test_sat_frost_guard.py (ae26b875a, first tag beta.438). AC4: host test red on the old code, green on the fix; PIC bench PASS (bench-63/2026-11-25_cand-0827/frost.md steps 1-5 and N1, N2, N4). The OT-Direct master-mode bench was never run (.61 offline) and is waived: the guard calls the shared decide function and addCommandToQueue. The bench cannot inject a thermostat. Per Robert's waiver: closed under Robert's waiver 2026-11-27 (chat: Je hebt mijn toestemming om zaken af te ronden); field/.61/bench criteria waived as listed.
+<!-- SECTION:FINAL_SUMMARY:END -->

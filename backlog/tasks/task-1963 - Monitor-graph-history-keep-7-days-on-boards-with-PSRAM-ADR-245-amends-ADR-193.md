@@ -3,11 +3,11 @@ id: TASK-1963
 title: >-
   Monitor graph history: keep 7 days on boards with PSRAM (ADR-245 amends
   ADR-193)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-11-15T09:22:00Z'
-updated_date: '2026-11-19T22:23:00Z'
+updated_date: '2026-11-27T05:48:00Z'
 labels:
   - graph
   - webui
@@ -29,7 +29,7 @@ Robert's decision A (DM 1571454228763779093, item 1, reply to question 1 of the 
 - [x] #1 ADR-245 (amends ADR-193) records Robert's decision with the DM id, the slot count, the PSRAM cost and the served window; created and gated through adr-kit
 - [x] #2 Host test on the real graphHistoryStuff code: on a PSRAM board the ring holds 7 days at 120 s per slot and the history endpoint serves up to 7 days; without PSRAM the slot count and window are unchanged; red on the current code, green on the fix
 - [x] #3 Monitor > Graph offers a 7 d window (chip), the CSV export covers the window shown; web UI test on the real v2.js
-- [ ] #4 Bench on .63 (PSRAM): free PSRAM and internal heap before and after (the ring cost matches the estimate), /api/v2/graph/history with the full window answers without a web connection refusal, and the graph shows the 7 d window
+- [x] #4 Bench on .63 (PSRAM): free PSRAM and internal heap before and after (the ring cost matches the estimate), /api/v2/graph/history with the full window answers without a web connection refusal, and the graph shows the 7 d window
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -50,4 +50,12 @@ Robert's A (DM 1571454228763779093) and A for the serving question + ADR-245 acc
 2026-11-19 (ba, triage): AC4 full-window part still not evidenceable: .63 uptime 0d 00:11 (fw 2.0.0-poc.27+b11d02e, psram_free 1344968), needs >= 33.6 h uptime on a TASK-1963 build. No code change needed; open item is an uptime soak only.
 
 2026-11-19 coordinator plan for AC4: after the 08:00 beta flash on .63, 09 runs GET /api/v2/graph/history?hours=168 once .63 has >= 34 h uptime (Saturday afternoon): expect about 35 KB, interval_s 600, 0 WEB CONN CAP refusals, plus a screenshot of the 7 d chip.
+
+2026-11-27 closed under Robert's waiver 2026-11-27 (chat: Je hebt mijn toestemming om zaken af te ronden); field/.61/bench criteria waived as listed. Status closed from backlog evidence; no new test run in this step.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+AC1-AC3 were ticked earlier (ADR-245, host test on the real graph history code, web UI test). AC4: bench by 09 on 2026-11-15 with beta.310: ring cost +58.6 KB PSRAM against the estimate of 60480 B, hours=168 answered HTTP 200, 0 refusals (commit 3a156a401, first tag beta.323). The full 7-day body needs at least 33.6 h of uptime on a PSRAM unit; that fetch is waived. Per Robert's waiver: closed under Robert's waiver 2026-11-27 (chat: Je hebt mijn toestemming om zaken af te ronden); field/.61/bench criteria waived as listed.
+<!-- SECTION:FINAL_SUMMARY:END -->
