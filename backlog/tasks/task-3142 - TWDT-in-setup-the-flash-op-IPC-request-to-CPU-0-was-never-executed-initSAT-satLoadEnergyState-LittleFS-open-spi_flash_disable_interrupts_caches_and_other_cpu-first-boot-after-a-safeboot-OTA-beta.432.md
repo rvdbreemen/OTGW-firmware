@@ -8,6 +8,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-11-27T21:11:00Z'
+updated_date: '2026-11-27T21:17:00Z'
 labels:
   - crash
 milestone: 2.0.0
@@ -28,3 +29,9 @@ gruijter's capture holds a core dump of 2026-11-25 20:46:45 'Task watchdog', loo
 - [ ] #2 If our copy loses a wake-up the path is fixed with a host test red on the old code; if it is identical the race is reported upstream and a mitigation (a bounded retry or a log of the IPC state) is decided
 - [ ] #3 A second dump, if one appears, is decoded against this one (frames, ipc0 state, can_start flag)
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-27 reconciled with otgw-dev: the timeout is the firmware's own 30 s (initWatchDog, esp_task_wdt timeout_ms = 30000, trigger_panic = true, OTGW-Core.ino:1639 on 43ac963), not the IDF default of 5 s: loopTask sat 30 s inside the flash-cache-disable call (cache_utils.c:176). Evidence for the cause is the gdb decode of all tasks (poc-dev): CPU 0 idle (IDLE0 in wait-for-interrupt), ipc0 and ipc1 idle in ulTaskGenericNotifyTake, s_flash_op_can_start and s_flash_op_complete both false: the IPC request was never executed. The caller of fopen is not in the 16-frame summary; the full gdb stack names it: satLoadEnergyState (SATcontrol.ino:4284) <- initSAT (:6500) <- setup (OTGW-firmware.ino:633). otgw-dev did not run gdb himself and has not verified the task states independently. Decode: OTGW-field-data/_comms/decode_gruijter_twdt_2026-11-25.md
+<!-- SECTION:NOTES:END -->
