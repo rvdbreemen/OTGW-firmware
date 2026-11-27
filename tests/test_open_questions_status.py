@@ -93,5 +93,47 @@ class OpenQuestionsStatus(unittest.TestCase):
         self.assertNotIn("**Update 20", top, "dated update paragraphs belong in the History section")
 
 
+
+class LedgerGuard(unittest.TestCase):
+    """Robert, 2026-11-27: every question has a unique id and its post is recorded; never repeat a question."""
+
+    def setUp(self):
+        import importlib.util
+        spec = importlib.util.spec_from_file_location(
+            "sat_open_questions", Path(__file__).resolve().parent.parent / "scripts" / "sat_open_questions.py")
+        self.mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(self.mod)
+
+    LINK_A = "[msg](https://discord.com/channels/1/2/111)"
+    LINK_B = "[msg](https://discord.com/channels/1/2/222)"
+
+    def table(self, *rows):
+        return "\n".join(rows) + "\n"
+
+    def test_real_table_has_no_ledger_problem(self):
+        if not DOC.exists():
+            self.skipTest("docs/sat/decisions submodule not checked out (private repo)")
+        self.assertEqual(self.mod.ledger_problems(DOC.read_text(encoding="utf-8")), [])
+
+    def test_asked_without_post_id_is_refused(self):
+        t = self.table("| Q-9a | - | asked 2026-11-27 | topic | TASK-1 |")
+        self.assertTrue(any("no [msg]" in p for p in self.mod.ledger_problems(t)))
+
+    def test_asked_with_post_id_is_accepted(self):
+        t = self.table(f"| Q-9a | - | asked 2026-11-27 ({self.LINK_A}) | topic | TASK-1 |")
+        self.assertEqual(self.mod.ledger_problems(t), [])
+
+    def test_open_id_used_twice_is_refused(self):
+        t = self.table(f"| Q-9a | - | asked ({self.LINK_A}) | topic | T |", f"| Q-9a | - | queued | other | T |")
+        self.assertTrue(any("used by 2 rows" in p for p in self.mod.ledger_problems(t)))
+
+    def test_same_post_in_two_open_rows_is_refused(self):
+        t = self.table(f"| Q-9a | - | asked ({self.LINK_A}) | topic | T |", f"| Q-9b | - | asked ({self.LINK_A}) | other | T |")
+        self.assertTrue(any("more than one open row" in p for p in self.mod.ledger_problems(t)))
+
+    def test_re_ask_in_the_same_row_is_accepted(self):
+        t = self.table(f"| Q-9a | - | asked ({self.LINK_A}); re-asked ({self.LINK_B}) | topic | T |")
+        self.assertEqual(self.mod.ledger_problems(t), [])
+
 if __name__ == "__main__":
     unittest.main()
