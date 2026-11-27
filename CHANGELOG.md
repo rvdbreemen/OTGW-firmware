@@ -14,7 +14,7 @@ Build in this beta: beta.458 only (previous public beta: beta.452; beta.453 to b
 - Fixed a crash in the live-log sending on boards without extra memory: when memory ran out the unit restarted; now that log line is dropped and counted (`hd_ws_alloc_fail` in `GET /api/v2/device/info`) (TASK-3122). A test build (a9aa6a9, never published) crashed there in a forced low-memory test.
 - Web UI live connections: a new connection is refused at the handshake while memory is almost gone, so the gateway no longer builds a connection it cannot close safely; a bench build panicked in 1 of 2 runs without this (TASK-3119). Checked with scripted stand-ins for browser tabs on a test unit (3 of 3 runs without a panic on beta.455, an internal build); not proven in real browsers.
 - Manual: new chapters 11 and 12 on hardware configurations; README says which release file to download (TASK-3115).
-- Internal: [COUNT-TBD] changes in documentation and decisions, task administration, bench test keys (beta builds only) and tooling; nothing to do for users.
+- Internal: 63 changes in documentation and decisions, task administration, bench test keys (beta builds only) and tooling; nothing to do for users.
 
 ### Known issues
 - On a Classic with an S3 module, BLE scanning can cause WiFi packet loss; in our tests (one unit, one run per state) a filesystem update over WiFi failed 5 of 5 times while BLE was on and worked at the first try with BLE off. If an update fails, turn off the SAT BLE setting ("Enable BLE sensors" under Settings, Sensors), reboot the gateway and repeat the update; turn it back on afterwards. Switching it off takes effect after a reboot: in our test the scan kept running until the reboot. (TASK-3126)
