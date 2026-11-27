@@ -435,6 +435,7 @@
       "nav_monitor_sub": "log · stats · support · graph · connection",
       "nav_settings_sub": "grouped & scannable",
       "nav_advanced_sub": "pic · debug · files · system",
+      "nav_advanced_sub_otd": "debug · files · system",
       "nav_diagnose": "Diagnose",
       "nav_diagnose_sub": "PIC test menu",
       "viewpick_title": "Choose home view",
@@ -1032,7 +1033,7 @@
           "title": "Time / NTP"
         },
         "otd": {
-          "desc": "Direct OpenTherm control (hardware without a PIC).",
+          "desc": "Direct OpenTherm control (hardware without a PIC). Not available on this board: PIC firmware updates and Bluetooth sensors.",
           "title": "OT-Direct"
         },
         "otgw": {
@@ -1184,7 +1185,7 @@
         "ntphostname": "NTP server",
         "ntpsendtime": "Send time to thermostat",
         "ntptimezone": "Timezone",
-        "otdautobypass": "Auto bypass",
+        "otdautobypass": "Ventilation bypass: automatic",
         "otdautodetect": "Auto-detect OT-Direct mode",
         "otdenableslave": "Enable slave (thermostat) passthrough",
         "otdfailsafe": "Fail-safe on OT bus loss",
@@ -1192,7 +1193,7 @@
         "otdhasbypassrelay": "Bypass relay fitted",
         "otdmode": "OT-Direct mode",
         "otdmsginterval": "Message interval",
-        "otdopenbypass": "Open bypass now",
+        "otdopenbypass": "Open ventilation bypass now",
         "otdsetbacktemp": "Setback temperature",
         "otdsummermode": "Summer mode (CH off)",
         "otdventenable": "Ventilation enabled",
@@ -2168,13 +2169,27 @@
   // ---------- Advanced sub-tabs (TASK-982): PIC / Debug / File System / System ----------
   // TASK-1843: without a PIC (OT-Direct) the PIC firmware tab has nothing to offer: hide it, and leave
   // it for Debug Information when it was the open tab. Only a known answer decides (fetchPic/initPicTabGate).
-  function applyPicTabGate(isPic) {
+  // The board's command interface once the device has answered: true = PIC, false = OT-Direct (or another non-PIC), null = not known yet.
+  // Only a known answer hides anything (an unknown one leaves the UI as it was).
+  var boardIsPic = null;
+  // device/info has_output_pin === false: the board has no pad for the GPIO output (TASK-3120), so its group is hidden; absent or true = shown.
+  var boardNoOutputPin = false;
+  function boardHidesKey(k) {
+    if (k === 'pictempsensor' && boardIsPic === false) return true;   // PIC Classic only (settingsHelp.h)
+    return boardNoOutputPin && SET_META[k] && SET_META[k].cat === 'outputs';
+  }
+  function applyPicTabGate(isPic, noOutputPin) {
+    var changed = boardIsPic !== isPic; boardIsPic = isPic;
+    if (noOutputPin !== undefined && boardNoOutputPin !== noOutputPin) { boardNoOutputPin = noOutputPin; changed = true; }
+    var sub = document.querySelector('#nav [data-page="advanced"] small, .seg[data-page="advanced"] small');   // no PIC tab, so no 'pic' in the nav subtitle
+    if (sub) { var sk = isPic ? 'h_home.nav_advanced_sub' : 'h_home.nav_advanced_sub_otd'; sub.setAttribute('data-i18n', sk); sub.textContent = t(sk); }
+    if (changed && document.getElementById('setRail') && setData && Object.keys(setData).length) renderSettings();   // the settings rows depend on the board
     var tab = document.querySelector('#advTabs .subtab[data-adv="pic"]'); if (!tab) return;
     tab.hidden = !isPic;
     if (!isPic && tab.classList.contains('active')) showAdvTab('debug');
   }
   function initPicTabGate() {
-    withDeviceInfo(function (d) { if (d && d.otcommandinterface !== undefined) applyPicTabGate((d.otcommandinterface || '') === 'PIC'); });
+    withDeviceInfo(function (d) { if (d && d.otcommandinterface !== undefined) applyPicTabGate((d.otcommandinterface || '') === 'PIC', d.has_output_pin === false); });
   }
   function showAdvTab(k) {
     document.querySelectorAll('#advTabs .subtab').forEach(function (s) {
@@ -4311,7 +4326,7 @@
     { id: 'mqtt',     title: 'MQTT',                   icon: '📨', reboot: false, desc: 'Broker connection and Home Assistant publishing.' },
     { id: 'ntp',      title: 'Time / NTP',             icon: '🕐', reboot: false, desc: 'Clock synchronisation.' },
     { id: 'otgw',     title: 'OpenTherm Gateway',      icon: '🔥', reboot: false, desc: 'Commands sent to the PIC at boot.' },
-    { id: 'otd',      title: 'OT-Direct',              icon: '🎚', reboot: false, desc: 'Direct OpenTherm control (hardware without a PIC).' },
+    { id: 'otd',      title: 'OT-Direct',              icon: '🎚', reboot: false, desc: 'Direct OpenTherm control (hardware without a PIC). Not available on this board: PIC firmware updates and Bluetooth sensors.' },
     { id: 'sensors',  title: 'Sensors',                icon: '🌡', reboot: false, desc: '1-Wire / GPIO temperature sensors and the BLE roster.' },
     { id: 'outputs',  title: 'GPIO Outputs',           icon: '🔌', reboot: false, desc: 'Drive a GPIO from OT state.' },
     { id: 's0',       title: 'S0 Pulse Counter',       icon: '⚡', reboot: false, desc: 'Energy pulse counting.' },
@@ -4398,8 +4413,8 @@
     otdmode:         { cat: 'otd', label: 'OT-Direct mode' },
     // OT-Direct ventilation (TASK-933 Phase 2)
     otdventenable:       { cat: 'otd', label: 'Ventilation enabled' },
-    otdopenbypass:       { cat: 'otd', label: 'Open bypass now' },
-    otdautobypass:       { cat: 'otd', label: 'Auto bypass' },
+    otdopenbypass:       { cat: 'otd', label: 'Open ventilation bypass now' },
+    otdautobypass:       { cat: 'otd', label: 'Ventilation bypass: automatic' },
     otdfreeventenable:   { cat: 'otd', label: 'Free ventilation' },
     otdventsetpoint:     { cat: 'otd', label: 'Ventilation setpoint', hint: '%' },
     otdhasbypassrelay:   { cat: 'otd', label: 'Bypass relay fitted' },
@@ -4864,7 +4879,7 @@
     // per-category counts and a REBOOT badge on reboot-sensitive categories.
     var firstNonEmpty = '';
     function catKeys(id) {   // TASK-1012: never render internal onboarding flags
-      return keysForCat(id, q).filter(function (k) { return !SET_HIDE_ROW[k]; });
+      return keysForCat(id, q).filter(function (k) { return !SET_HIDE_ROW[k] && !boardHidesKey(k); });
     }
     function catShown(id) { return id === 'sat' ? keysForCat(id, q).length : catKeys(id).length; }
     SET_CATS.forEach(function (c) {
@@ -9294,7 +9309,7 @@
     // chips and the PIC-tab visibility (withDeviceInfo dedups + caches 8s).
     // TASK-1223.16: the same snapshot seeds the OT-Direct mode chip (otdmode) before the
     // first otdirect/status read.
-    setTimeout(function () { applyPicTabVisibility(); withDeviceInfo(function (d) { if (d) { fillHeaderIdentity(d); if (d.otdmode) setOtdMode(d.otdmode); } }); }, 1200);
+    setTimeout(function () { applyPicTabVisibility(); initPicTabGate(); withDeviceInfo(function (d) { if (d) { fillHeaderIdentity(d); if (d.otdmode) setOtdMode(d.otdmode); } }); }, 1200);
     // TASK-991: on a bench setup (no boiler/thermostat on the bus, PIC board), offer
     // simulation mode once. Delayed past the boot burst so the bus state has settled.
     setTimeout(maybePromptSimulation, 12000);

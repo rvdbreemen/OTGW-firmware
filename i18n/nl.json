@@ -353,7 +353,8 @@
     "leg_setpoint": "setpoint",
     "leg_modulation": "modulatie",
     "strip_aria": "Live grafiek van aanvoer, retour, setpoint en modulatie",
-    "ticker_aria": "Live OpenTherm-berichten"
+    "ticker_aria": "Live OpenTherm-berichten",
+    "nav_advanced_sub_otd": "debug · bestanden · systeem"
   },
   "h_mon": {
     "cmd_aria": "OTGW-commando",
@@ -911,7 +912,7 @@
         "title": "Tijd / NTP"
       },
       "otd": {
-        "desc": "Directe OpenTherm-aansturing (hardware zonder PIC).",
+        "desc": "Directe OpenTherm-aansturing (hardware zonder PIC). Niet beschikbaar op deze print: PIC-firmware-updates en Bluetooth-sensoren.",
         "title": "OT-Direct"
       },
       "otgw": {
@@ -1063,7 +1064,7 @@
       "ntphostname": "NTP-server",
       "ntpsendtime": "Tijd naar thermostaat sturen",
       "ntptimezone": "Tijdzone",
-      "otdautobypass": "Automatische bypass",
+      "otdautobypass": "Ventilatie-bypass: automatisch",
       "otdautodetect": "OT-Direct-modus automatisch herkennen",
       "otdenableslave": "Thermostaat doorgeven (slave-passthrough)",
       "otdfailsafe": "Veilige stand bij uitval OT-bus",
@@ -1071,7 +1072,7 @@
       "otdhasbypassrelay": "Bypassrelais aanwezig",
       "otdmode": "OT-Direct-modus",
       "otdmsginterval": "Berichtinterval",
-      "otdopenbypass": "Bypass nu openen",
+      "otdopenbypass": "Ventilatie-bypass nu openen",
       "otdsetbacktemp": "Verlaagde temperatuur",
       "otdsummermode": "Zomerstand (cv uit)",
       "otdventenable": "Ventilatie ingeschakeld",
