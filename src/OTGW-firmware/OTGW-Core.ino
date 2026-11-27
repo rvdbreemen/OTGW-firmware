@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v2.0.0-beta.467
+**  Version  : v2.0.0-beta.468
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -4005,7 +4005,7 @@ CmdQueueResult addCommandToQueue(const char* buf, const int len, const bool forc
       // on the loop task, in order; a full ring is Dropped. On the loop task the older queued commands run first, and
       // while they must wait for a frame in flight, this one queues behind them.
       if (!platformOnLoopTask() || otdCmdTextMustWait()) {
-        if (otdCmdTextPush(buf, len, satOwn)) { otOverrideNoteCommand(buf, len); return CmdQueueResult::Queued; }   // TASK-3033: only an accepted command is noted
+        if (otdCmdTextPush(buf, len, satOwn)) return CmdQueueResult::Queued;   // TASK-3033: noted by otdCmdTextDrain() once the handler accepts it
         OTDebugTf(PSTR("CmdQueue: OT-Direct command [%.*s] dropped, text ring full\r\n"), len, buf);
         return CmdQueueResult::Dropped;
       }
@@ -5875,7 +5875,6 @@ void markOtSupportListsDirty(uint8_t bits)  { otSupportListsDirty |= bits; }   /
 void clearBoilerUnsupportedDirty() { boilerUnsupportedDirty = false; }
 
 // --- otOverride begin
-#include <atomic>
 // TASK-3033 (gruijter, Robert released it 2026-11-22): remember whether the thermostat follows a TT=/TC= override.
 // Observed behaviour only, no capability read. Same verdict rule as satPushRefusedDecide (TASK-1343): the thermostat's
 // own MsgID 16 T frame is within 0.25 C of the value sent = it follows; still different 300 s after the command = it
@@ -5885,7 +5884,11 @@ void clearBoilerUnsupportedDirty() { boilerUnsupportedDirty = false; }
 // override too and then reads like a refusal (Sergeant D entry 16): the verdict is "observed", not "capability".
 enum : uint8_t { OT_OVERRIDE_UNKNOWN = 0, OT_OVERRIDE_FOLLOWED = 1, OT_OVERRIDE_REFUSED = 2 };
 static uint8_t  otOverrideVerdict = OT_OVERRIDE_UNKNOWN;
-static std::atomic<bool> otOverridePending{false};   // set last (release) so a frame on the loop task never reads half of a new override
+// The command side runs on the loop task and on async_tcp (REST, settings), the frame side on the loop task: the five
+// fields below are written and read together under one spinlock, so a frame never pairs a new value with an old time.
+static portMUX_TYPE otOverrideMux = portMUX_INITIALIZER_UNLOCKED;
+static bool     otOverridePending = false;
+static uint32_t otOverrideSeq     = 0;       // counts the commands that were noted: a verdict clears only the override it judged
 static float    otOverrideSentC   = 0.0f;
 static uint32_t otOverrideSentMs  = 0;
 static float    otOverrideLastTr  = 0.0f;
@@ -5897,7 +5900,8 @@ static uint8_t otOverrideJudge(float sentC, uint32_t sinceMs, float tr, uint8_t 
   return prev;   // inside the 5 minutes and different: not decided yet
 }
 
-// Called with every command text that enters addCommandToQueue (not a SAT-blocked external one).
+// Called with every command text the OT-Direct handler accepted (loop task: addCommandToQueue, otdCmdTextDrain) and
+// with every command text queued for the PIC (addCommandToQueue, any task). Not with a SAT-blocked external one.
 void otOverrideNoteCommand(const char* buf, int len) {
   if (buf == nullptr || len < 4 || buf[0] != 'T' || (buf[1] != 'T' && buf[1] != 'C') || buf[2] != '=') return;
   char v[12];
@@ -5907,21 +5911,34 @@ void otOverrideNoteCommand(const char* buf, int len) {
   char* endp = nullptr;
   const float f = strtof(v, &endp);
   if (endp == v || (*endp != '\0' && *endp != '\r' && *endp != '\n') || !isfinite(f)) return;
-  otOverridePending.store(false, std::memory_order_release);   // addCommandToQueue also runs on async_tcp: hide the old override first
-  if (f <= 0.0f) return;   // cancel: the verdict stays as it was
-  if (otOverrideLastTrValid && fabsf(otOverrideLastTr - f) <= 0.25f) return;   // proves nothing
-  otOverrideSentC   = f;
-  otOverrideSentMs  = millis();
-  otOverridePending.store(true, std::memory_order_release);
+  portENTER_CRITICAL(&otOverrideMux);   // addCommandToQueue also runs on async_tcp
+  otOverridePending = false;            // a new command always ends the old override
+  if (f > 0.0f && !(otOverrideLastTrValid && fabsf(otOverrideLastTr - f) <= 0.25f)) {   // 0 cancels, an equal value proves nothing
+    otOverrideSentC   = f;
+    otOverrideSentMs  = millis();
+    otOverridePending = true;
+    otOverrideSeq++;
+  }
+  portEXIT_CRITICAL(&otOverrideMux);
 }
 
 // Called from processOT() for every MsgID 16 T frame (the thermostat's own value). Flag and dirty bit only: the OT lock is held.
 bool otOverrideOnThermostatSetpoint(float tr) {
+  portENTER_CRITICAL(&otOverrideMux);
   otOverrideLastTr = tr;
   otOverrideLastTrValid = true;
-  if (!otOverridePending.load(std::memory_order_acquire)) return false;
-  const uint8_t v = otOverrideJudge(otOverrideSentC, millis() - otOverrideSentMs, tr, otOverrideVerdict);
-  if (v == OT_OVERRIDE_FOLLOWED) otOverridePending.store(false, std::memory_order_release);   // decided; a refusal stays pending until a later frame follows
+  const bool     pending = otOverridePending;
+  const float    sentC   = otOverrideSentC;
+  const uint32_t sentMs  = otOverrideSentMs;
+  const uint32_t seq     = otOverrideSeq;
+  portEXIT_CRITICAL(&otOverrideMux);
+  if (!pending) return false;
+  const uint8_t v = otOverrideJudge(sentC, millis() - sentMs, tr, otOverrideVerdict);
+  if (v == OT_OVERRIDE_FOLLOWED) {   // decided; a refusal stays pending until a later frame follows
+    portENTER_CRITICAL(&otOverrideMux);
+    if (otOverrideSeq == seq) otOverridePending = false;   // not when a newer command arrived meanwhile
+    portEXIT_CRITICAL(&otOverrideMux);
+  }
   if (v == otOverrideVerdict) return false;
   otOverrideVerdict = v;
   otSupportListsDirty |= OT_SUPPORT_LIST_OVERRIDE;

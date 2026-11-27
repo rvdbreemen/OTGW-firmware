@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-22T10:33:00Z'
-updated_date: '2026-11-27T05:43:00Z'
+updated_date: '2026-11-27T14:09:00Z'
 labels:
   - mqtt
   - feature
@@ -60,4 +60,6 @@ Entries: 14 and 16 (push on target change, no re-push; 16 changes 14 and states 
 Evidence (host): tests/test_ot_override_refused_3033.py compiles the real otOverride block from OTGW-Core.ino: 8/8 green; against origin/dev OTGW-Core.ino red (block missing, setUpClass error); 5 mutants killed (300 s -> 30 s, 0.25 -> 2.5, cancel resets verdict, no 'equal to own setpoint' guard, no dirty mark). Neighbours green: test_mqtt_ot_support_lists 10/10 (stub extended with the new list bit), test_sat_push_refused 6/6; evaluate.py --quick 89 pass / 0 fail. Wiring (call sites, topic, reconnect republish, docs row) is a TEXT check, not a run. NOT run: the true/false payload branch of publishOtSupportMsgidLists (the stub returns verdict 0), the broker, any thermostat. Needs a field thermostat to close (gruijter's Honeywell should read true after 5 min, will_85903's false); no bench unit has a thermostat.
 
 Design as built: topic otgw-firmware/thermostat/override_refused true/false retained; carried by the existing support-list dirty-bit mechanism (OT_SUPPORT_LIST_OVERRIDE = 4: minute tick plus reconnect republish); published only after the first judgement; not persisted. Every TT=/TC= counts (also SAT's own, also SAT off); TT=0/TC=0 cancels, judges nothing, verdict kept; an override equal to the thermostat's own last setpoint is not judged. Separate from sat/push_refused, which is unchanged. Known limit (entry 16): a gateway reset clears the override and can read as refused inside the 300 s window; documented in docs/api/MQTT.md. Entries 14, 16 and ADR-223 read; no control behaviour changed. ACs 2+ do not exist in the task: only AC1; leaving the task In Progress until bench/field evidence.
+
+2026-11-27 otgw-poc-dev, architect review of lane-poc-b2 (S1/S1b): otOverrideSentC/SentMs were written on async_tcp (REST, settings, PIC queue path) and read on the loop task, only the pending flag was atomic. Fix: the five fields (pending, seq, sentC, sentMs, lastTr) are written and read under one portMUX (otOverrideMux); the frame side takes a snapshot and clears the pending flag only if the sequence is unchanged; a text-ring command is now noted by otdCmdTextDrain() when handleOTDirectCommand() accepted it (not at the push). Evidence: tests/test_ot_override_refused_3033.py 9/9 incl. a two-thread stress (value 10 paired with time 1000, value 20 with 2000; 200000 rounds): red on c6766a02b (mismatch 334407), red on the fix with the lock removed (mutant), green on the fix. The stress needs the host scheduler to interleave; it shows the pairing invariant, not the Xtensa spinlock itself.
 <!-- SECTION:NOTES:END -->
