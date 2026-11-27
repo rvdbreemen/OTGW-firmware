@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-27T08:04:00Z'
-updated_date: '2026-11-27T12:39:00Z'
+updated_date: '2026-11-27T13:26:00Z'
 labels:
   - bug
   - ws
@@ -40,4 +40,6 @@ Found by the K bench control run 2 on .63 (build 453+e0dde12, so also in beta.45
 2026-11-27 otgw-dev: handshake gate implemented locally on lane/ws-reject-lowheap (wt-d3-wsrej). wsAdmitHandshake(freeHeap, connected): refuse when free heap < HEAP_WARNING_THRESHOLD (5120) or connected >= MAX_WEBSOCKET_CLIENTS (3); wsHandshakeHandler registered with otLogWs.handleHandshake() before server.addHandler(); the library answers 401 before the client object exists; WS_BURST_REJECTED_HEAP/MAX counted; the two event branches stay as the second line. Limit: the heap can still fall between the handshake and _newClient() (one round trip). Test tests/test_ws_handshake_heap_gate.py: red before (wsAdmitHandshake not found), green after (6 tests), two mutants red (registration removed, threshold <=). The library crash itself cannot run on the host: bench = K hold + 5 s reconnect tabs. Reboot counter: rebootcount is written by updateRebootCount() (helperStuff.ino:158) from setup() at OTGW-firmware.ino:559, after WiFi/NTP/telnet/mDNS and before startWebserver(); a boot that dies earlier is not counted.
 
 2026-11-27 otgw-dev: .76 K panic (B1 a9aa6a9 and 456, loopTask, std::bad_alloc from operator new in std::deque<AsyncWebSocketMessage>::emplace_back <- AsyncWebSocketClient::_queueMessage <- AsyncWebSocket::textAll <- sendLogToWebSocket): fix on lane lane/ws-send-guard (wt-d3-ring, local): every textAll goes through wsTextAllNoThrow() (try/catch std::bad_alloc, drops the message, counts it in state.heapdiag.iWsAllocDrops = device/info hd_ws_alloc_drops, logs one rate-limited telnet line per 10 s); the log path (valid and sanitised), sendWebSocketJSON and the 30 s keepalive use it, the last two now also count into ws_drops via wsNoteSendStatus. Exceptions are enabled in this build (cpp_flags -fexceptions). Test tests/test_ws_send_nothrow.py (3 tests, REAL functions vs a stub AsyncWebSocket that throws bad_alloc): all 4 send paths return, count 1 alloc drop and 1 ws drop per message, log once per interval; mutant 'exception escapes the helper' red; test_ws_send_status stubs updated (helper pulled into its slice). NOT reachable on the host: the real library/operator new on the unit and whether the library stays consistent after the throw (read: RAII lock, deque strong guarantee). Bench: K hold on .76 x3.
+
+2026-11-27 otgw-dev: lane A (lane/ws-lowmem): the lwIP ring a7237cab2 (prerelease, telnet key T) is part of the measured low-memory block with the cooldown (TASK-3123) and the gate abort; see the TASK-3123 and lane notes.
 <!-- SECTION:NOTES:END -->

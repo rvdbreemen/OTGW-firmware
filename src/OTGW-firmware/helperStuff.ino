@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : helperStuff
-**  Version  : v2.0.0-beta.459
+**  Version  : v2.0.0-beta.460
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -637,6 +637,33 @@ uint32_t getMinFreeHeap() {
   return platformMinFreeHeap();
 }
 
+#if defined(_VERSION_PRERELEASE)
+// TASK-3119 follow-up (tcpRingDiag.h): one lwIP / heap sample per second into a RAM ring, printed to telnet on request (key 'T') by the
+// loop task, so a stall after a memory emergency can be read once telnet answers again. Prerelease builds only, 2880 B of RAM.
+static TcpRing g_tcpRing;
+static volatile bool s_tcpRingDumpReq = false;
+void tcpRingRequestDump() { s_tcpRingDumpReq = true; }
+void tcpRingTick() {
+  const PlatformTcpHoldSnapshot t = platformTcpHoldSnapshot(80);   // one walk of the pcb lists under the core lock per second
+  tcpRingPush(g_tcpRing, state.uptime.iSeconds, platformFreeHeap(), platformMaxFreeBlock(), t.active, t.timeWait, t.txPcbs);
+  if (!s_tcpRingDumpReq) return;
+  s_tcpRingDumpReq = false;
+  DebugTf(PSTR("tcpring: %u samples, min free %u B, armed %d (sec=free/maxblk/active/timewait/tx80, 4 per line, oldest first)\r\n"),
+          (unsigned)g_tcpRing.count, (unsigned)(g_tcpRing.count ? tcpRingMinFree(g_tcpRing) : 0), (int)tcpRingArmed(g_tcpRing));
+  for (uint16_t i = 0; i < g_tcpRing.count; i += 4) {
+    char line[160];
+    int n = 0;
+    for (uint16_t k = i; k < i + 4 && k < g_tcpRing.count; k++) {
+      const TcpRingSample& x = tcpRingAt(g_tcpRing, k);
+      n += snprintf_P(line + n, sizeof(line) - n, PSTR("%lu=%u/%u/%u/%u/%u  "), (unsigned long)x.upSec, (unsigned)x.freeQ * 16u,
+                      (unsigned)x.maxBlockQ * 16u, (unsigned)x.active, (unsigned)x.timeWait, (unsigned)x.tx80);
+      if (n >= (int)sizeof(line) - 1) break;
+    }
+    DebugTf(PSTR("tcpring %s\r\n"), line);
+  }
+}
+#endif
+
 // TASK-934 soak instrumentation. Sampled once per second from doTaskEvery1s().
 // platformMaxFreeBlock() is ESP.getMaxAllocHeap() on ESP32 (cheap, no umm free-list
 // walk), so 1 Hz sampling is negligible. Pure observation: does NOT gate or alter
@@ -655,6 +682,9 @@ void sampleHeapWatermark() {
   state.heapdiag.aMaxBlockBucket[b]++;
   // TASK-1017: lwIP active TCP PCB count, loop-task-only (see platformTcpActivePcbCount).
   state.heapdiag.iTcpActivePcbs = platformTcpActivePcbCount();
+#if defined(_VERSION_PRERELEASE)
+  tcpRingTick();   // TASK-3119 follow-up: the 1 Hz lwIP / heap ring
+#endif
 }
 
 // TASK-1673: called every loop() iteration. Reading free heap is cheap; the TCP walk (core
