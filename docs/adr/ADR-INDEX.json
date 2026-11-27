@@ -12374,32 +12374,48 @@
       "title": "One beta carries the ADR-298 guards, the new partition table and remote telemetry together (partly supersedes ADR-298 release order)",
       "path": "ADR-304-one-beta-carries-the-adr-298-guards-the-new-partition-table-and-remote-telemetry-together-partly-supersedes-adr-298-release-order.md",
       "format": "canonical",
-      "status": "Proposed",
+      "status": "Rejected",
       "date": "2026-11-27",
-      "decision_summary": "State one concrete chosen approach and its rationale.",
-      "topics": [],
-      "aliases": [],
-      "components": [],
-      "symbols": [],
+      "decision_summary": "The first public beta with remote telemetry also carries the ADR-298 guards and the new partition table, in one relea...",
+      "topics": [
+        "beta release",
+        "partition table migration",
+        "release order"
+      ],
+      "aliases": [
+        "combined telemetry and partition beta",
+        "no bridge beta"
+      ],
+      "components": [
+        "partition table release order"
+      ],
+      "symbols": [
+        "otgw-layout",
+        "partition_layout"
+      ],
       "context_scope": "selective",
       "decision_contract": {
         "must": [
-          "State required implementation constraints."
+          "Put the migration steps at the top of the notes of that beta, above every other change, and in the #beta-testing announcement (ADR-298's notice Must, Robert's wording requirement): a breaking change; one flashotgw --migrate over USB per...",
+          "Say in the same notes what a tester sees after a browser update without migration: the firmware installs, the web files do not, the unit warns, settings stay, and the remote telemetry rows under Settings > System cannot be switched on (\"...",
+          "Pass the migration bench before the beta is published (bench-tester, unit .63): the fallback path (a published beta, /update with the combined app), then --migrate, then the checks of ADR-298 Verification plus BLE, MQTT and the telemetry...",
+          "Keep the guards in this release, so the next release can rely on them."
         ],
         "must_not": [
-          "State prohibited implementation choices."
+          "Publish this beta before the migration bench has passed.",
+          "Describe an OTA migration route in any text for testers."
         ],
         "exceptions": [
-          "State explicit exceptions, or None."
+          "None."
         ],
         "verification": [
-          "Name the test, command, or source anchor that verifies this decision."
+          "Bench on .63 by otgw-bench-tester: fallback, migration, the ADR-298 checks, settings 0 differences, telemetry ID equal before and after.",
+          "otgw-webui's code read (see Consequences) is checked on .63 in the fallback state: three telemetry rows under Settings > System, \"save failed\" when one is switched on, the layout warning on /update.",
+          "The beta notes are checked against the Must list before publishing (otgw-docs)."
         ]
       },
       "scope": {
-        "path_globs": [
-          "src/**/*.py"
-        ]
+        "path_globs": []
       },
       "metadata": {
         "binding": false,
@@ -20479,6 +20495,30 @@
     {
       "source": "ADR-303",
       "target": "ADR-255",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-304",
+      "target": "ADR-191",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-304",
+      "target": "ADR-298",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-304",
+      "target": "ADR-299",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-304",
+      "target": "ADR-302",
       "type": "related",
       "resolved": true
     }

@@ -1,7 +1,7 @@
 ---
 id: "ADR-304"
 title: "One beta carries the ADR-298 guards, the new partition table and remote telemetry together (partly supersedes ADR-298 release order)"
-status: "Proposed"
+status: "Rejected"
 date: "2026-11-27"
 binding: false
 gate: null
@@ -9,7 +9,6 @@ documents_shipped: false
 verified_in: []
 supersedes: []
 superseded_by: null
-format: "canonical"
 topics:
   - "partition table migration"
   - "release order"
@@ -23,6 +22,7 @@ symbols:
   - "partition_layout"
   - "otgw-layout"
 context_scope: "selective"
+format: "canonical"
 ---
 
 <!-- markdownlint-disable MD025 -->
@@ -31,7 +31,7 @@ context_scope: "selective"
 
 ## Status
 
-Proposed, 2026-11-27. Waiting for Robert's explicit choice between this ADR (one combined beta) and the bridge release first
+Rejected, 2026-11-27.
 (ADR-298 as written). If he chooses the bridge first, this ADR is Rejected and ADR-298 stays unchanged.
 
 ## Status History
@@ -43,6 +43,11 @@ status_history:
     changed_by: "Agent: Claude (otgw-architect)"
     reason: "Initial proposal, drafted on the coordinator's request after Robert's DMs 1575990956073951535 and 1575991202275393567"
     changed_via: adr-kit
+  - date: 2026-11-27
+    status: Rejected
+    changed_by: "Robert van den Breemen (decision, Discord DM 1575993338816106708 'B', read by otgw-architect), recorded by Agent: Claude (otgw-architect)"
+    reason: "Rejected: Robert chose B, the bridge beta first (Saturday 20:00, old table, guards, no telemetry), then telemetry with the new table (Sunday 08:00), answering DM 1575991889738338345. ADR-298 stays as written."
+    changed_via: adr-kit lifecycle
 ```
 
 ## Context
