@@ -1,23 +1,23 @@
-# OTGW-firmware v2.0.0-beta.455 Release Notes
+# OTGW-firmware v2.0.0-beta.457 Release Notes
 
 **Release date:** 2026-11-27
 **Branch:** dev
-**Build:** 2.0.0-beta.455 (the githash is in the asset names)
-**Compare:** [v2.0.0-beta.452...v2.0.0-beta.455](https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.452...v2.0.0-beta.455). "What is new in this beta, in plain words" is new for a beta.452 user; a user of an older beta also reads the sections below it.
+**Build:** 2.0.0-beta.457 (the githash is in the asset names)
+**Compare:** [v2.0.0-beta.452...v2.0.0-beta.457](https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.452...v2.0.0-beta.457). "What is new in this beta, in plain words" is new for a beta.452 user; a user of an older beta also reads the sections below it.
 
 > **Disclaimer: this is a beta of 2.0.0.** It is not a stable release and it has had no long field runs. Expect bugs, and keep a way back: save your settings, and keep the flash zip of the 2.0.0 build you run now, so you can flash it back over USB. A 1.x zip is ESP8266 firmware and does not run on an S3 Mini. If you need a gateway that just works, stay on the [1.x releases](https://github.com/rvdbreemen/OTGW-firmware/releases) for now.
 
 
 ## In short
 
-- **What this is:** beta.455 of the 2.0.0 line, for the OTGW Classic with a LOLIN S3 Mini or S3 Mini Pro (combo image). It helps the gateway cope when its memory runs low: stuck browser tabs are cleaned up, and a new browser connection is refused early instead of risking a crash.
+- **What this is:** beta.457 of the 2.0.0 line, for the OTGW Classic with a LOLIN S3 Mini or S3 Mini Pro (combo image). It helps the gateway cope when its memory runs low: stuck browser tabs are cleaned up, a crash in the live-log sending on boards without extra memory is fixed, and a new browser connection is refused early instead of risking a crash.
 - **Who it is for:** anyone who keeps the web UI open in a browser, and anyone who wants to help test 2.0.0.
 - **How to update:** first save your settings (`curl http://<ip>/api/v2/settings -o settings-backup.json`). A unit that already runs 2.0.0: open `/update`, give it the flash zip, press **Update** and let it finish. A new S3 Mini or a unit on 1.x: USB first flash with `flash_otgw`, see "Before you flash".
 - **What is not tested:** a real browser reconnecting after a memory emergency (the bench used emulated browser tabs), and long field runs. See "Not verified yet, in plain words".
 
 ## Which builds are in this beta
 
-This beta is **build beta.455**. The previous public beta was beta.452. The builds beta.453 and beta.454 were never published: they were test builds for the bench, so this beta carries what they held, and no build numbers lie in between that you ever saw. [BENCH-TBD: soak result of the final build on both test units]
+This beta is **build beta.457**. The previous public beta was beta.452. The builds beta.453 to beta.456 were internal test builds for the bench and were never published, so this beta carries what they held, and no build numbers lie in between that you ever saw. [BENCH-TBD: soak result of the final build on both test units]
 
 If you run beta.452, the changes below are what you get. If you run an older beta, read the sections "What changed since beta.451" and below as well.
 
@@ -29,7 +29,7 @@ If you run beta.452, the changes below are what you get. If you run an older bet
 
 - **Stuck browser tabs are cleaned up when memory runs low** (TASK-3025). When the gateway is almost out of memory it frees some by dropping the browser connections that stream the live log. Before, it asked each tab to close politely, and a tab that did not answer could stay half open for more than a minute and keep holding memory. Now the gateway drops such a connection at once, and an open web UI tab connects again by itself. In the bench with the fix on its own, the tabs were back after about 5 seconds. With this beta, after a forced severe low-memory event, the web interface and telnet were unreachable for about 1 to 3 minutes in our tests (54 seconds to 2.6 minutes in the three runs of this beta, 160 seconds the longest we measured), and then the unit recovered by itself, without a restart or a crash in those runs. The early refusal of new connections (next item) is the likely contributor, and a change is being tested; that is not proven. The old beta.452 crashed in this situation. You may see the live view blink once after a memory emergency; the gateway does not restart for it. A new counter `hd_ws_recovery_abort` in `GET /api/v2/device/info` counts these drops.
 - **A new browser connection is refused early when memory is almost gone** (TASK-3119). The code that closes a new live connection while memory is almost empty could make the gateway panic: in a bench test with two emulated browser tabs the old build panicked in 1 of 2 runs. That code is the same in beta.452, but it needs memory to be nearly empty, which we forced on the bench with a test key. We have no report of it from a user. Now the gateway refuses the new connection at the handshake, before it builds anything for it, and the tab tries again later.
-- **Fixed a crash in the live-log sending on boards without extra memory** (TASK-3122). When memory ran out, the unit restarted: an allocation failed while a log line was queued for the browser tabs, and nothing caught it. Now that log line is dropped and counted (`hd_ws_alloc_drops` in `GET /api/v2/device/info`). A test build of this beta (a9aa6a9, never published) crashed in exactly this place in a forced low-memory test on a unit without extra memory. A fix for it is in this beta.
+- **Fixed a crash in the live-log sending on boards without extra memory** (TASK-3122). When memory ran out, the unit restarted: an allocation failed while a log line was queued for the browser tabs, and nothing caught it. Now that log line is dropped and counted (`hd_ws_alloc_fail` in `GET /api/v2/device/info`). A test build of this beta (a9aa6a9, never published) crashed in exactly this place in a forced low-memory test on a unit without extra memory. A fix for it is in this beta.
 - **Bench result.** On a classic test unit (with the PIC, and with extra memory), with two emulated browser tabs and memory held almost empty for about 100 seconds: the build that ships ran 3 of 3 runs without a panic and without a restart, and the free memory was back to normal 10 minutes later. The tabs came back in all 3 runs, but only after about 1 to 3 minutes. Three runs are evidence, not proof. [BENCH-TBD: K x3 on the unit without extra memory with the final build, and the soaks]
 
 ### Manual
@@ -44,7 +44,7 @@ If you run beta.452, the changes below are what you get. If you run an older bet
 
 ### Behind the scenes
 
-- 42 internal changes: documentation and decisions, task administration, test keys for the bench (beta builds only) and tooling. Nothing you need to do.
+- [COUNT-TBD] internal changes: documentation and decisions, task administration, test keys for the bench (beta builds only) and tooling. Nothing you need to do.
 
 ### Thanks
 

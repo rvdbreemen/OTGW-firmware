@@ -5,16 +5,16 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
-## [2.0.0-beta.455] - 2026-11-27
+## [2.0.0-beta.457] - 2026-11-27
 
-Build in this beta: beta.455 only (previous public beta: beta.452; beta.453 and beta.454 were never published). [BENCH-TBD: soak result of the final build]
+Build in this beta: beta.457 only (previous public beta: beta.452; beta.453 to beta.456 were internal test builds and were never published). [BENCH-TBD: soak result of the final build]
 
 ### Changed
 - Web UI live connections: when memory is almost out, the gateway drops the browser connections of the live log at once instead of asking each tab to close; a tab connects again by itself (about 5 seconds in the bench with the fix alone; with this beta the web interface and telnet were unreachable for about 1 to 3 minutes in our tests after a forced severe low-memory event, see Known issues) (TASK-3025, ADR-295). New counter `hd_ws_recovery_abort` in `GET /api/v2/device/info`.
-- Fixed a crash in the live-log sending on boards without extra memory: when memory ran out the unit restarted; now that log line is dropped and counted (`hd_ws_alloc_drops` in `GET /api/v2/device/info`) (TASK-3122). A test build (a9aa6a9, never published) crashed there in a forced low-memory test.
+- Fixed a crash in the live-log sending on boards without extra memory: when memory ran out the unit restarted; now that log line is dropped and counted (`hd_ws_alloc_fail` in `GET /api/v2/device/info`) (TASK-3122). A test build (a9aa6a9, never published) crashed there in a forced low-memory test.
 - Web UI live connections: a new connection is refused at the handshake while memory is almost gone, so the gateway no longer builds a connection it cannot close safely; a bench build panicked in 1 of 2 runs without this (TASK-3119). Checked with emulated browser tabs on a test unit (3 of 3 runs without a panic); not proven in real browsers.
 - Manual: new chapters 11 and 12 on hardware configurations; README says which release file to download (TASK-3115).
-- Internal: 42 changes in documentation and decisions, task administration, bench test keys (beta builds only) and tooling; nothing to do for users.
+- Internal: [COUNT-TBD] changes in documentation and decisions, task administration, bench test keys (beta builds only) and tooling; nothing to do for users.
 
 ### Known issues
 - After a severe low-memory event (free memory under about 3 KB) the web interface (port 80) and telnet can be unreachable for up to about 3 minutes in our tests (54 seconds to 2.6 minutes in 3 runs of this beta, 160 seconds the longest of all runs, one unit); the unit then normally recovers without a restart. The crash in the live-log sending on a board without extra memory is fixed in this beta (TASK-3122); closing a web-socket client or cleaning up clients under the same low memory can still fail, and other allocations in the main loop were not audited (the broadcast path is covered). On a board without extra memory (no PSRAM), open web UI tabs can, under very low memory, repeatedly reconnect and make the device unreachable for several minutes; closing the tabs lets it recover (bench: 3 low-memory events in 10 minutes with two reconnecting emulated tabs; emulated tabs in the bench, real browsers not verified). Needs nearly empty memory, forced on the bench with a test key; no user report. MQTT, the OpenTherm link and SAT were not measured during these gaps (TASK-3025, TASK-3119).
@@ -1276,8 +1276,8 @@ Legacy release. See git history for details.
 
 Legacy releases. See git history for details.
 
-[Unreleased]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.455...HEAD
-[2.0.0-beta.455]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.452...v2.0.0-beta.455
+[Unreleased]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.457...HEAD
+[2.0.0-beta.457]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.452...v2.0.0-beta.457
 [2.0.0-beta.452]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.451...v2.0.0-beta.452
 [2.0.0-beta.451]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.438...v2.0.0-beta.451
 [2.0.0-beta.438]: https://github.com/rvdbreemen/OTGW-firmware/compare/v2.0.0-beta.432...v2.0.0-beta.438
