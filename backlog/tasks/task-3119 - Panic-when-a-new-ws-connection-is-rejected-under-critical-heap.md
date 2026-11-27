@@ -5,6 +5,7 @@ status: To Do
 assignee:
   - '@claude'
 created_date: '2026-11-27T08:04:00Z'
+updated_date: '2026-11-27T08:08:00Z'
 labels:
   - bug
   - ws
@@ -27,4 +28,12 @@ Found by the K bench control run 2 on .63 (build 453+e0dde12, so also in beta.45
 - [ ] #2 Host test that calls the real rejecting branch: red on the old code, green on the fix
 - [ ] #3 Bench repeat of the 2-tab reconnect sequence of the K control run with no panic on the fixed build (otgw-bench-tester)
 - [ ] #4 CHANGELOG known-issue line until fixed, and the line in the next beta notes
+- [ ] #5 python evaluate.py --quick shows no new FAIL
+- [ ] #6 Follow-up decision recorded: an ESPAsyncWebServer mutex-init check through the ADR-232 patch mechanism (do it or decline, with the reason)
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-11-27 otgw-dev's analysis and fix plan (his request 09:10, merged into this task instead of a duplicate): bench-tester K-control run 2 on .63, build beta.453+e0dde12, crash 2026-11-27 08:49:16 (first panic only; the second outage was the bench script's K toggle). Decode: OTGW-field-data/bench-63/2026-11-27_K/control/crash_run2/decoded.txt: pthread_mutex_lock <- recursive_mutex::lock <- AsyncWebSocketClient::_queueControl <- close() <- webSocketEvent webSocketStuff.ino:281 (WS_EVT_CONNECT 'Low heap, rejecting connection') <- AsyncWebSocket::_newClient. Hypothesis (otgw-dev): the WS client object is constructed (std::recursive_mutex constructor, pthread_mutex_init under no heap) before our low-heap reject runs. Also reachable in the field (2 tabs reconnecting under low heap). Fix plan: refuse in otLogWs.handleHandshake before the client object exists (heap below HEAP_WARNING_THRESHOLD or client count at MAX_WEBSOCKET_CLIENTS), keep the event branches; host test for the predicate; bench = the same K run plus tabs reconnecting every 5 s, refusals counted.
+<!-- SECTION:NOTES:END -->
