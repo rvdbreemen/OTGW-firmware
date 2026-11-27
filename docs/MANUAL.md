@@ -2309,7 +2309,7 @@ OTmonitor (Schelte Bron's monitoring tool for the OpenTherm Gateway) connects to
 
 Things to know:
 
-- **USB is not an OTmonitor connection.** On hardware without a PIC the USB port is for flashing and diagnostics only. Opening that USB port from OTmonitor resets the gateway (the same USB line signals that start a USB flash), so the gateway would reboot in the middle of heating. Use TCP port 25238.
+- **USB is not an OTmonitor connection.** On hardware without a PIC the USB port is for flashing and diagnostics only. Opening the USB port from a program can reset the gateway, depending on how the program sets the USB control lines (the same lines that start a USB flash); this was not tested with OTmonitor. Use TCP port 25238.
 - **Never flash the PIC over WiFi with OTmonitor.** A failed or interrupted upload over the network can leave the PIC unusable. To update the PIC firmware on a Classic, use **Advanced > PIC firmware** in the web interface.
 - **SAT changes what OTmonitor may do.** While SAT is enabled, the gateway refuses commands that would change the boiler control (for example `CS=`), so they cannot fight SAT. On a Classic, the port then passes only plain text command lines to the PIC and drops binary data, so a PIC upgrade through OTmonitor is not possible while SAT is on.
 - Port 25238 has no password. Keep it off when you do not use it, and do not forward it from your router.
@@ -2744,7 +2744,7 @@ The OTGW32 is a new device that still has to prove itself in the field (chapter 
 - **Dallas sensors do not start.** The default pin (GPIO 10) is used by the board itself and is refused. Choose a free pin in the settings. The same goes for the S0 counter and the GPIO output, whose defaults clash with pins the board uses.
 - **Bluetooth cannot be switched on.** It needs PSRAM, which this board does not have.
 - **The graph shows only the last hour.** Without PSRAM the unit keeps 1 hour of history.
-- **OTmonitor resets the unit when it opens the USB port.** USB is not an OTmonitor connection on this board. Use TCP port 25238 over the network (off by default, see section 6.7).
+- **Opening the USB port from OTmonitor can reset the unit.** USB is not an OTmonitor connection on this board; whether it resets depends on how the program sets the USB control lines and was not tested with OTmonitor. Use TCP port 25238 over the network (off by default, see section 6.7).
 - **Start-up takes a few seconds longer in Board mode Auto.** The unit probes for a PIC up to 3 times. Set Board mode to OT-Direct to probe once.
 - **Reporting:** send a capture (see 7.14) and say which hardware you have.
 
@@ -5771,7 +5771,7 @@ OT-Direct has these modes. Choose one in the web UI (Settings, OT-Direct mode; t
 |---|---|---|
 | **Gateway** (default) | Sits between the thermostat and the boiler like the PIC does: it forwards the thermostat's messages, answers some itself and applies the overrides (SAT, `CS=`, `TT=` and so on). | `GW=1` |
 | **Monitor** | Forwards every message unchanged and logs everything. Nothing is overridden. | `GW=0` or `GW=M` |
-| **Master** | The unit is the only OpenTherm master. No thermostat is expected. | `GW=2` or `GW=S` |
+| **Master** | The unit is the OpenTherm master and polls the boiler itself. A thermostat is optional: if one stays connected, the unit answers it from its cache and passes its settings to the boiler. | `GW=2` or `GW=S` |
 | **Loopback** | A test mode with simulated boiler answers. No hardware is needed. | `GW=L` |
 
 A fifth mode, **bypass** (the thermostat wired straight to the boiler through a relay), is listed in some places, but this release has no relay support: choosing it falls back to gateway and `GW=P` answers `NG`. Do not plan on bypass.
@@ -5805,14 +5805,14 @@ The web UI follows what the unit reports (`otcommandinterface`), not the board n
 
 - **Graph history** keeps 1 hour. Units with PSRAM keep a longer history (up to 7 days).
 - **Bluetooth (BLE) cannot be switched on** without PSRAM: the setting is visible but refused. A Bluetooth room sensor therefore cannot feed SAT on an OTGW32.
-- **REST:** at most 2 requests are answered at the same time. A third gets HTTP 503 `Retry-After: 1`. The limit was not measured for this board class.
+- **REST:** for now, at most 2 requests are answered at the same time. A third gets HTTP 503 `Retry-After: 1`. The limit was not measured for this board class.
 - **Diagnostic recorder:** a small buffer of about 2 minutes instead of the large one.
 - **MQTT:** a unit without extra memory sends bursts in steps; the limits are not calibrated for it yet (see Known issues in the release notes).
 - **Free header pins:** the defaults for the S0 counter (GPIO 12), the GPIO output (GPIO 16) and the Dallas sensor (GPIO 10) are pins the board uses itself, so the firmware refuses the Dallas default and does not start sensors until you choose a free pin. Which header pins are free is not documented yet.
 
 ### 11.7 What is the same as on the OTGW Classic
 
-- **SAT** is available and is the only temperature controller on OT-Direct. In gateway mode it works through the CH-enable bit of the relayed status message. A capture with a live thermostat that shows the boiler following SAT on an OTGW32 is still open. (chapter 5)
+- **SAT** is available. It is the only controller built into the firmware on OT-Direct; without SAT the thermostat controls the boiler as usual. In gateway mode it works through the control setpoint and the CH-enable bit of the relayed status message. A capture with a live thermostat that shows the boiler following SAT on an OTGW32 is still open. (chapter 5)
 - **MQTT, Home Assistant, the REST API and the web UI** work the same. Discovery is just in time, so an OTGW32 only gets entities for the OpenTherm messages it has seen.
 - **Port 25238** (for OTmonitor and the Home Assistant OpenTherm Gateway integration) is emulated on OT-Direct, line by line, and is off by default. It was not tested with OTmonitor on an OTGW32. A PIC firmware upgrade through OTmonitor does not exist on this board.
 - **Return temperature:** in gateway mode the unit asks the boiler for it in the slot of a supported thermostat request and answers the thermostat from its cache.
@@ -5840,7 +5840,7 @@ Firmware 2.0 supports two hardware configurations: the **OTGW Classic with an ES
 | **Who speaks OpenTherm** | The PIC co-processor. The ESP32-S3 talks to the PIC over a serial link. | The ESP32-S3 itself (OT-Direct), with its own interface to the boiler and to the thermostat. |
 | **PIC firmware and its updates** | Yes. Update it from the web UI (Advanced, PIC firmware). Never over WiFi with OTmonitor. | There is no PIC. The PIC firmware tab is hidden. |
 | **Serial bridge, port 25238** | Passes the PIC's serial stream. Off by default. While SAT is on it filters control commands. | Emulated line by line. Off by default. Not tested with OTmonitor on an OTGW32. |
-| **OTmonitor** | OTmonitor connects over port 25238. | USB is not an OTmonitor connection. Opening that port from OTmonitor resets the unit. |
+| **OTmonitor** | OTmonitor connects over port 25238. | USB is not an OTmonitor connection. Opening the USB port from a program can reset the unit, depending on how the program sets the USB control lines; this was not tested with OTmonitor. |
 | **Operating modes** | The PIC decides (gateway behaviour). You steer it with PIC commands. | Gateway (default), monitor, master, loopback (chapter 11.2). |
 | **Flash and memory** | 4 MB flash. The LOLIN S3 Mini and S3 Mini Pro have extra memory (PSRAM). | 4 MB flash, no PSRAM. |
 | **Graph history** | Up to 7 days on a module with PSRAM. | 1 hour. |
@@ -5855,7 +5855,7 @@ Firmware 2.0 supports two hardware configurations: the **OTGW Classic with an ES
 ### 12.2 What is the same
 
 - The **web UI**, the **REST API**, **MQTT** and **Home Assistant** discovery.
-- **SAT** (the Smart Autotune Thermostat) works on both. On the OTGW32 it is the only temperature controller.
+- **SAT** (the Smart Autotune Thermostat) works on both. On the OTGW32 it is the only controller built into the firmware; without SAT the thermostat controls the boiler as usual.
 - The **settings**, the **update page** (`/update`) and the **safeboot** recovery.
 - The **one firmware image** for both: the release zip for `esp32-combo`. The firmware finds out at start-up which one it runs on.
 

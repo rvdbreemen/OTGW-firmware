@@ -167,7 +167,7 @@ OTmonitor (Schelte Bron's monitoring tool for the OpenTherm Gateway) connects to
 
 Things to know:
 
-- **USB is not an OTmonitor connection.** On hardware without a PIC the USB port is for flashing and diagnostics only. Opening that USB port from OTmonitor resets the gateway (the same USB line signals that start a USB flash), so the gateway would reboot in the middle of heating. Use TCP port 25238.
+- **USB is not an OTmonitor connection.** On hardware without a PIC the USB port is for flashing and diagnostics only. Opening the USB port from a program can reset the gateway, depending on how the program sets the USB control lines (the same lines that start a USB flash); this was not tested with OTmonitor. Use TCP port 25238.
 - **Never flash the PIC over WiFi with OTmonitor.** A failed or interrupted upload over the network can leave the PIC unusable. To update the PIC firmware on a Classic, use **Advanced > PIC firmware** in the web interface.
 - **SAT changes what OTmonitor may do.** While SAT is enabled, the gateway refuses commands that would change the boiler control (for example `CS=`), so they cannot fight SAT. On a Classic, the port then passes only plain text command lines to the PIC and drops binary data, so a PIC upgrade through OTmonitor is not possible while SAT is on.
 - Port 25238 has no password. Keep it off when you do not use it, and do not forward it from your router.

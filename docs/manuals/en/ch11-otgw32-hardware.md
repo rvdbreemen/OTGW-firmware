@@ -24,7 +24,7 @@ OT-Direct has these modes. Choose one in the web UI (Settings, OT-Direct mode; t
 |---|---|---|
 | **Gateway** (default) | Sits between the thermostat and the boiler like the PIC does: it forwards the thermostat's messages, answers some itself and applies the overrides (SAT, `CS=`, `TT=` and so on). | `GW=1` |
 | **Monitor** | Forwards every message unchanged and logs everything. Nothing is overridden. | `GW=0` or `GW=M` |
-| **Master** | The unit is the only OpenTherm master. No thermostat is expected. | `GW=2` or `GW=S` |
+| **Master** | The unit is the OpenTherm master and polls the boiler itself. A thermostat is optional: if one stays connected, the unit answers it from its cache and passes its settings to the boiler. | `GW=2` or `GW=S` |
 | **Loopback** | A test mode with simulated boiler answers. No hardware is needed. | `GW=L` |
 
 A fifth mode, **bypass** (the thermostat wired straight to the boiler through a relay), is listed in some places, but this release has no relay support: choosing it falls back to gateway and `GW=P` answers `NG`. Do not plan on bypass.
@@ -58,14 +58,14 @@ The web UI follows what the unit reports (`otcommandinterface`), not the board n
 
 - **Graph history** keeps 1 hour. Units with PSRAM keep a longer history (up to 7 days).
 - **Bluetooth (BLE) cannot be switched on** without PSRAM: the setting is visible but refused. A Bluetooth room sensor therefore cannot feed SAT on an OTGW32.
-- **REST:** at most 2 requests are answered at the same time. A third gets HTTP 503 `Retry-After: 1`. The limit was not measured for this board class.
+- **REST:** for now, at most 2 requests are answered at the same time. A third gets HTTP 503 `Retry-After: 1`. The limit was not measured for this board class.
 - **Diagnostic recorder:** a small buffer of about 2 minutes instead of the large one.
 - **MQTT:** a unit without extra memory sends bursts in steps; the limits are not calibrated for it yet (see Known issues in the release notes).
 - **Free header pins:** the defaults for the S0 counter (GPIO 12), the GPIO output (GPIO 16) and the Dallas sensor (GPIO 10) are pins the board uses itself, so the firmware refuses the Dallas default and does not start sensors until you choose a free pin. Which header pins are free is not documented yet.
 
 ### 11.7 What is the same as on the OTGW Classic
 
-- **SAT** is available and is the only temperature controller on OT-Direct. In gateway mode it works through the CH-enable bit of the relayed status message. A capture with a live thermostat that shows the boiler following SAT on an OTGW32 is still open. (chapter 5)
+- **SAT** is available. It is the only controller built into the firmware on OT-Direct; without SAT the thermostat controls the boiler as usual. In gateway mode it works through the control setpoint and the CH-enable bit of the relayed status message. A capture with a live thermostat that shows the boiler following SAT on an OTGW32 is still open. (chapter 5)
 - **MQTT, Home Assistant, the REST API and the web UI** work the same. Discovery is just in time, so an OTGW32 only gets entities for the OpenTherm messages it has seen.
 - **Port 25238** (for OTmonitor and the Home Assistant OpenTherm Gateway integration) is emulated on OT-Direct, line by line, and is off by default. It was not tested with OTmonitor on an OTGW32. A PIC firmware upgrade through OTmonitor does not exist on this board.
 - **Return temperature:** in gateway mode the unit asks the boiler for it in the slot of a supported thermostat request and answers the thermostat from its cache.

@@ -549,7 +549,7 @@ De OTGW32 is een nieuw apparaat dat zich nog in het veld moet bewijzen (hoofdstu
 - **Dallas-sensoren starten niet.** De standaardpin (GPIO 10) wordt door de print zelf gebruikt en wordt geweigerd. Kies een vrije pin in de instellingen. Hetzelfde geldt voor de S0-teller en de GPIO-uitgang, waarvan de standaardpinnen botsen met pinnen die de print gebruikt.
 - **Bluetooth kan niet worden aangezet.** Het heeft PSRAM nodig, en die heeft deze print niet.
 - **De grafiek toont maar het laatste uur.** Zonder PSRAM bewaart het apparaat 1 uur geschiedenis.
-- **OTmonitor herstart het apparaat zodra hij de USB-poort opent.** USB is op deze print geen OTmonitor-verbinding. Gebruik TCP-poort 25238 via het netwerk (standaard uit, zie paragraaf 6.7).
+- **Als OTmonitor de USB-poort opent, kan het apparaat herstarten.** USB is op deze print geen OTmonitor-verbinding; of het herstart hangt af van hoe het programma de USB-besturingslijnen zet en is niet met OTmonitor getest. Gebruik TCP-poort 25238 via het netwerk (standaard uit, zie paragraaf 6.7).
 - **Het opstarten duurt een paar seconden langer bij Board mode Auto.** Het apparaat zoekt tot 3 keer naar een PIC. Zet Board mode op OT-Direct om eenmaal te zoeken.
 - **Melden:** stuur een capture mee (zie 7.14) en vermeld welke hardware u heeft.
 

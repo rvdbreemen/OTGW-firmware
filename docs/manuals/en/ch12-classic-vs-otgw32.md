@@ -13,7 +13,7 @@ Firmware 2.0 supports two hardware configurations: the **OTGW Classic with an ES
 | **Who speaks OpenTherm** | The PIC co-processor. The ESP32-S3 talks to the PIC over a serial link. | The ESP32-S3 itself (OT-Direct), with its own interface to the boiler and to the thermostat. |
 | **PIC firmware and its updates** | Yes. Update it from the web UI (Advanced, PIC firmware). Never over WiFi with OTmonitor. | There is no PIC. The PIC firmware tab is hidden. |
 | **Serial bridge, port 25238** | Passes the PIC's serial stream. Off by default. While SAT is on it filters control commands. | Emulated line by line. Off by default. Not tested with OTmonitor on an OTGW32. |
-| **OTmonitor** | OTmonitor connects over port 25238. | USB is not an OTmonitor connection. Opening that port from OTmonitor resets the unit. |
+| **OTmonitor** | OTmonitor connects over port 25238. | USB is not an OTmonitor connection. Opening the USB port from a program can reset the unit, depending on how the program sets the USB control lines; this was not tested with OTmonitor. |
 | **Operating modes** | The PIC decides (gateway behaviour). You steer it with PIC commands. | Gateway (default), monitor, master, loopback (chapter 11.2). |
 | **Flash and memory** | 4 MB flash. The LOLIN S3 Mini and S3 Mini Pro have extra memory (PSRAM). | 4 MB flash, no PSRAM. |
 | **Graph history** | Up to 7 days on a module with PSRAM. | 1 hour. |
@@ -28,7 +28,7 @@ Firmware 2.0 supports two hardware configurations: the **OTGW Classic with an ES
 ### 12.2 What is the same
 
 - The **web UI**, the **REST API**, **MQTT** and **Home Assistant** discovery.
-- **SAT** (the Smart Autotune Thermostat) works on both. On the OTGW32 it is the only temperature controller.
+- **SAT** (the Smart Autotune Thermostat) works on both. On the OTGW32 it is the only controller built into the firmware; without SAT the thermostat controls the boiler as usual.
 - The **settings**, the **update page** (`/update`) and the **safeboot** recovery.
 - The **one firmware image** for both: the release zip for `esp32-combo`. The firmware finds out at start-up which one it runs on.
 

@@ -13,7 +13,7 @@ Firmware 2.0 ondersteunt twee hardwareconfiguraties: de **OTGW Classic met een E
 | **Wie spreekt OpenTherm** | De PIC-coprocessor. De ESP32-S3 praat met de PIC over een seriële verbinding. | De ESP32-S3 zelf (OT-Direct), met een eigen interface naar de ketel en naar de thermostaat. |
 | **PIC-firmware en updates daarvan** | Ja. Werk hem bij vanuit de webinterface (Advanced, PIC firmware). Nooit via WiFi met OTmonitor. | Er is geen PIC. Het tabblad PIC firmware is verborgen. |
 | **Seriële brug, poort 25238** | Geeft de seriële stroom van de PIC door. Standaard uit. Zolang SAT aan staat, filtert hij besturingscommando's. | Regel voor regel nagebootst. Standaard uit. Op een OTGW32 niet met OTmonitor getest. |
-| **OTmonitor** | OTmonitor verbindt via poort 25238. | USB is geen OTmonitor-verbinding. Als OTmonitor die poort opent, herstart het apparaat. |
+| **OTmonitor** | OTmonitor verbindt via poort 25238. | USB is geen OTmonitor-verbinding. Als een programma de USB-poort opent, kan het apparaat herstarten, afhankelijk van hoe het programma de USB-besturingslijnen zet; dit is niet met OTmonitor getest. |
 | **Werkstanden** | De PIC bepaalt (gatewaygedrag). U stuurt hem met PIC-commando's. | Gateway (standaard), monitor, master, loopback (hoofdstuk 11.2). |
 | **Flash en geheugen** | 4 MB flash. De LOLIN S3 Mini en S3 Mini Pro hebben extra geheugen (PSRAM). | 4 MB flash, geen PSRAM. |
 | **Grafiekgeschiedenis** | Tot 7 dagen op een module met PSRAM. | 1 uur. |
@@ -28,7 +28,7 @@ Firmware 2.0 ondersteunt twee hardwareconfiguraties: de **OTGW Classic met een E
 ### 12.2 Wat gelijk is
 
 - De **webinterface**, de **REST-API**, **MQTT** en de **Home Assistant**-discovery.
-- **SAT** (de Smart Autotune Thermostat) werkt op beide. Op de OTGW32 is het de enige temperatuurregelaar.
+- **SAT** (de Smart Autotune Thermostat) werkt op beide. Op de OTGW32 is het de enige regelaar die in de firmware is ingebouwd; zonder SAT regelt de thermostaat de ketel zoals gebruikelijk.
 - De **instellingen**, de **updatepagina** (`/update`) en het **safeboot**-herstel.
 - **Eén firmware-image** voor beide: de release-zip voor `esp32-combo`. De firmware merkt bij het opstarten op welke van de twee hij draait.
 

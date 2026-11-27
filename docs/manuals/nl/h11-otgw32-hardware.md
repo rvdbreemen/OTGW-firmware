@@ -24,7 +24,7 @@ OT-Direct kent deze standen. Kies er een in de webinterface (Settings, OT-Direct
 |---|---|---|
 | **Gateway** (standaard) | Zit tussen thermostaat en ketel zoals de PIC dat doet: stuurt de berichten van de thermostaat door, beantwoordt er een aantal zelf en past de overrides toe (SAT, `CS=`, `TT=` enzovoort). | `GW=1` |
 | **Monitor** | Stuurt elk bericht ongewijzigd door en logt alles. Er wordt niets overschreven. | `GW=0` of `GW=M` |
-| **Master** | Het apparaat is de enige OpenTherm-master. Er wordt geen thermostaat verwacht. | `GW=2` of `GW=S` |
+| **Master** | Het apparaat is de OpenTherm-master en vraagt de ketel zelf uit. Een thermostaat is optioneel: blijft er een aangesloten, dan beantwoordt het apparaat die uit zijn cache en geeft het de instellingen ervan door aan de ketel. | `GW=2` of `GW=S` |
 | **Loopback** | Een teststand met gesimuleerde ketelantwoorden. Er is geen hardware voor nodig. | `GW=L` |
 
 Een vijfde stand, **bypass** (de thermostaat via een relais rechtstreeks op de ketel), staat op sommige plaatsen genoemd, maar deze release heeft geen ondersteuning voor dat relais: kiest u bypass, dan valt het apparaat terug op gateway en antwoordt `GW=P` met `NG`. Reken dus niet op bypass.
@@ -57,14 +57,14 @@ De webinterface volgt wat het apparaat meldt (`otcommandinterface`), niet de naa
 
 - **Grafiekgeschiedenis** bewaart 1 uur. Apparaten met PSRAM bewaren een langere geschiedenis (tot 7 dagen).
 - **Bluetooth (BLE) kan niet worden aangezet** zonder PSRAM: de instelling is zichtbaar maar wordt geweigerd. Een Bluetooth-kamersensor kan dus op een OTGW32 niet voor SAT dienen.
-- **REST:** maximaal 2 verzoeken tegelijk worden beantwoord. Een derde krijgt HTTP 503 `Retry-After: 1`. De grens is voor deze printklasse niet gemeten.
+- **REST:** voorlopig worden maximaal 2 verzoeken tegelijk beantwoord. Een derde krijgt HTTP 503 `Retry-After: 1`. De grens is voor deze printklasse niet gemeten.
 - **Diagnose-recorder:** een kleine buffer van ongeveer 2 minuten in plaats van de grote.
 - **MQTT:** een apparaat zonder extra geheugen verstuurt pieken in stappen; de grenzen zijn daarvoor nog niet gekalibreerd (zie Known issues in de releasenotes).
 - **Vrije headerpinnen:** de standaardpinnen voor de S0-teller (GPIO 12), de GPIO-uitgang (GPIO 16) en de Dallas-sensor (GPIO 10) zijn pinnen die de print zelf gebruikt. De firmware weigert daarom de Dallas-standaard en start geen sensoren totdat u een vrije pin kiest. Welke headerpinnen vrij zijn, is nog niet gedocumenteerd.
 
 ### 11.7 Wat gelijk is aan de OTGW Classic
 
-- **SAT** is beschikbaar en is op OT-Direct de enige temperatuurregelaar. In gatewaystand werkt het via het CH-enable-bit van het doorgestuurde statusbericht. Een capture met een echte thermostaat waarin de ketel SAT volgt op een OTGW32, ontbreekt nog.
+- **SAT** is beschikbaar. Het is op OT-Direct de enige regelaar die in de firmware is ingebouwd; zonder SAT regelt de thermostaat de ketel zoals gebruikelijk. In gatewaystand werkt het via het regelsetpunt en het CH-enable-bit van het doorgestuurde statusbericht. Een capture met een echte thermostaat waarin de ketel SAT volgt op een OTGW32, ontbreekt nog.
 - **MQTT, Home Assistant, de REST-API en de webinterface** werken gelijk. De discovery is just-in-time, dus een OTGW32 krijgt alleen entiteiten voor de OpenTherm-berichten die hij heeft gezien.
 - **Poort 25238** (voor OTmonitor en de OpenTherm Gateway-integratie van Home Assistant) wordt op OT-Direct regel voor regel nagebootst en staat standaard uit. Hij is op een OTGW32 niet met OTmonitor getest. Een PIC-firmware-upgrade via OTmonitor bestaat op deze print niet.
 - **Retourtemperatuur:** in gatewaystand vraagt het apparaat die aan de ketel in de ruimte van een ondersteund thermostaatverzoek en antwoordt de thermostaat uit zijn cache.

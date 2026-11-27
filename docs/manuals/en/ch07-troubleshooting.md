@@ -396,7 +396,7 @@ The OTGW32 is a new device that still has to prove itself in the field (chapter 
 - **Dallas sensors do not start.** The default pin (GPIO 10) is used by the board itself and is refused. Choose a free pin in the settings. The same goes for the S0 counter and the GPIO output, whose defaults clash with pins the board uses.
 - **Bluetooth cannot be switched on.** It needs PSRAM, which this board does not have.
 - **The graph shows only the last hour.** Without PSRAM the unit keeps 1 hour of history.
-- **OTmonitor resets the unit when it opens the USB port.** USB is not an OTmonitor connection on this board. Use TCP port 25238 over the network (off by default, see section 6.7).
+- **Opening the USB port from OTmonitor can reset the unit.** USB is not an OTmonitor connection on this board; whether it resets depends on how the program sets the USB control lines and was not tested with OTmonitor. Use TCP port 25238 over the network (off by default, see section 6.7).
 - **Start-up takes a few seconds longer in Board mode Auto.** The unit probes for a PIC up to 3 times. Set Board mode to OT-Direct to probe once.
 - **Reporting:** send a capture (see 7.14) and say which hardware you have.
 

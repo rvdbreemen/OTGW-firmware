@@ -183,7 +183,7 @@ OTmonitor (het monitorprogramma van Schelte Bron voor de OpenTherm Gateway) verb
 
 Goed om te weten:
 
-- **USB is geen OTmonitor-verbinding.** Op hardware zonder PIC is de USB-poort alleen voor flashen en diagnose. Als OTmonitor die USB-poort opent, herstart de gateway (door dezelfde USB-lijnsignalen waarmee een USB-flash start), dus midden in het stoken. Gebruik TCP-poort 25238.
+- **USB is geen OTmonitor-verbinding.** Op hardware zonder PIC is de USB-poort alleen voor flashen en diagnose. Als een programma de USB-poort opent, kan de gateway herstarten, afhankelijk van hoe het programma de USB-besturingslijnen zet (dezelfde lijnen waarmee een USB-flash start); dit is niet met OTmonitor getest. Gebruik TCP-poort 25238.
 - **Flash de PIC nooit via WiFi met OTmonitor.** Een mislukte of onderbroken upload over het netwerk kan de PIC onbruikbaar maken. Gebruik voor een update van de PIC-firmware op een Classic **Advanced > PIC firmware** in de webinterface.
 - **SAT beperkt wat OTmonitor mag.** Zolang SAT aan staat, weigert de gateway commando's die de ketelregeling zouden veranderen (bijvoorbeeld `CS=`), zodat ze niet tegen SAT in kunnen werken. Op een Classic laat de poort dan alleen gewone tekstregels naar de PIC door en worden binaire gegevens weggegooid. Een PIC-upgrade via OTmonitor kan dus niet zolang SAT aan staat.
 - Poort 25238 heeft geen wachtwoord. Laat hem uit als u hem niet gebruikt, en zet hem niet open in uw router.
