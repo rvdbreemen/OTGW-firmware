@@ -10,12 +10,13 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 Build in this beta: beta.455 only (previous public beta: beta.452; beta.453 and beta.454 were never published). It is the build that ran 60 minutes without a restart on two test units.
 
 ### Changed
-- Web UI live connections: when memory is almost out, the gateway drops the browser connections of the live log at once instead of asking each tab to close; a tab connects again by itself (about 5 seconds in the bench with the fix build; within 5.5 minutes with the final build, being checked) (TASK-3025, ADR-295). New counter `hd_ws_recovery_abort` in `GET /api/v2/device/info`.
+- Web UI live connections: when memory is almost out, the gateway drops the browser connections of the live log at once instead of asking each tab to close; a tab connects again by itself (about 5 seconds in the bench with the fix alone; with this beta the unit was unreachable for about 1 to 3 minutes after a forced severe low-memory event, then recovered without a restart or crash) (TASK-3025, ADR-295). New counter `hd_ws_recovery_abort` in `GET /api/v2/device/info`.
 - Web UI live connections: a new connection is refused at the handshake while memory is almost gone, so the gateway no longer builds a connection it cannot close safely; a bench build panicked in 1 of 2 runs without this (TASK-3119). Checked with emulated browser tabs on a test unit (3 of 3 runs without a panic); not proven in real browsers.
 - Manual: new chapters 11 and 12 on hardware configurations; README says which release file to download (TASK-3115).
 - Internal: 42 changes in documentation and decisions, task administration, bench test keys (beta builds only) and tooling; nothing to do for users.
 
 ### Known issues
+- Unit unreachable for about 1 to 3 minutes (54 seconds to 2.6 minutes in bench runs) after a severe low-memory event, then recovers by itself without a restart or crash. It needs nearly empty memory, forced on the bench with a test key; no user report. The early refusal of new connections is the likely contributor (not proven); a change is being tested for the next beta. beta.452 crashed in this situation (TASK-3025, TASK-3119).
 - Memory dip in the first minutes after a start on a unit without PSRAM (the OTGW32): in the release soak of beta.452 the lowest free memory dropped to 648 bytes about 5 minutes after the start and the unit reported a critical memory state once. It did not restart or crash and the memory recovered to about 46 KB. The same unit showed a similar dip on beta.418, so it is not new in beta.452. Open (TASK-3024).
 
 ## [2.0.0-beta.452] - 2026-11-27
