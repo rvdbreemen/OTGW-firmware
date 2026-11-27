@@ -1,11 +1,11 @@
 ---
 id: TASK-3119
 title: Panic when a new /ws connection is rejected under critical heap
-status: To Do
+status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-11-27T08:04:00Z'
-updated_date: '2026-11-27T08:08:00Z'
+updated_date: '2026-11-27T08:11:00Z'
 labels:
   - bug
   - ws
@@ -36,4 +36,6 @@ Found by the K bench control run 2 on .63 (build 453+e0dde12, so also in beta.45
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-11-27 otgw-dev's analysis and fix plan (his request 09:10, merged into this task instead of a duplicate): bench-tester K-control run 2 on .63, build beta.453+e0dde12, crash 2026-11-27 08:49:16 (first panic only; the second outage was the bench script's K toggle). Decode: OTGW-field-data/bench-63/2026-11-27_K/control/crash_run2/decoded.txt: pthread_mutex_lock <- recursive_mutex::lock <- AsyncWebSocketClient::_queueControl <- close() <- webSocketEvent webSocketStuff.ino:281 (WS_EVT_CONNECT 'Low heap, rejecting connection') <- AsyncWebSocket::_newClient. Hypothesis (otgw-dev): the WS client object is constructed (std::recursive_mutex constructor, pthread_mutex_init under no heap) before our low-heap reject runs. Also reachable in the field (2 tabs reconnecting under low heap). Fix plan: refuse in otLogWs.handleHandshake before the client object exists (heap below HEAP_WARNING_THRESHOLD or client count at MAX_WEBSOCKET_CLIENTS), keep the event branches; host test for the predicate; bench = the same K run plus tabs reconnecting every 5 s, refusals counted.
+
+2026-11-27 otgw-dev: handshake gate implemented locally on lane/ws-reject-lowheap (wt-d3-wsrej). wsAdmitHandshake(freeHeap, connected): refuse when free heap < HEAP_WARNING_THRESHOLD (5120) or connected >= MAX_WEBSOCKET_CLIENTS (3); wsHandshakeHandler registered with otLogWs.handleHandshake() before server.addHandler(); the library answers 401 before the client object exists; WS_BURST_REJECTED_HEAP/MAX counted; the two event branches stay as the second line. Limit: the heap can still fall between the handshake and _newClient() (one round trip). Test tests/test_ws_handshake_heap_gate.py: red before (wsAdmitHandshake not found), green after (6 tests), two mutants red (registration removed, threshold <=). The library crash itself cannot run on the host: bench = K hold + 5 s reconnect tabs. Reboot counter: rebootcount is written by updateRebootCount() (helperStuff.ino:158) from setup() at OTGW-firmware.ino:559, after WiFi/NTP/telnet/mDNS and before startWebserver(); a boot that dies earlier is not counted.
 <!-- SECTION:NOTES:END -->

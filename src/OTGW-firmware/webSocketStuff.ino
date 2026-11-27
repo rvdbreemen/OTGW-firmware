@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : webSocketStuff.ino
-**  Version  : v2.0.0-beta.454
+**  Version  : v2.0.0-beta.455
 **
 **  Copyright (c) 2021-2025 Robert van den Breemen
 **
@@ -263,6 +263,33 @@ uint16_t webSocketClientCount() {
 }
 
 //===========================================================================================
+// Handshake gate (TASK-3119)
+//===========================================================================================
+// AsyncWebSocket builds the client object (AsyncWebSocketClient, with a std::recursive_mutex whose constructor calls
+// pthread_mutex_init(): a malloc plus a FreeRTOS semaphore) BEFORE it fires WS_EVT_CONNECT. Under a critical heap that
+// construction can fail silently and the first lock of the unwritten mutex panics async_tcp (bench 2026-11-27, K hold,
+// tabs reconnecting every 5 s: close() in the 'Low heap' branch below locked it). So a connection that would be refused
+// anyway is refused here, in AsyncWebSocket::handleRequest(), before the 101 response and before the client exists
+// (the library answers 401, the web UI reconnects after 5 s). The branches in webSocketEvent() stay as the second line:
+// the heap can still fall between the handshake and the client construction, one round trip later.
+// connected = otLogWs.count() at the handshake: the new client is not in the list yet, so a full list is count >= MAX.
+static bool wsAdmitHandshake(uint32_t freeHeap, uint16_t connected) {
+  if (freeHeap < HEAP_WARNING_THRESHOLD) return false;
+  if (connected >= MAX_WEBSOCKET_CLIENTS) return false;
+  return true;
+}
+
+static bool wsHandshakeHandler(AsyncWebServerRequest*) {
+  const uint32_t freeHeap = platformFreeHeap();
+  const uint16_t connected = (uint16_t)otLogWs.count();
+  if (wsAdmitHandshake(freeHeap, connected)) return true;
+  noteWebSocketBurstEvent(freeHeap < HEAP_WARNING_THRESHOLD ? WS_BURST_REJECTED_HEAP : WS_BURST_REJECTED_MAX);
+  DebugTf(PSTR("[%lu] WebSocket: refused at the handshake (free heap %u, %u connected)\r\n"),
+          millis(), (unsigned)freeHeap, (unsigned)connected);
+  return false;
+}
+
+//===========================================================================================
 // WebSocket event handler (AsyncWebSocket AwsEventHandler signature)
 //===========================================================================================
 // NOTE: AsyncWebSocket maintains its own client list (otLogWs.count()), so there is
@@ -368,6 +395,7 @@ void startWebSocket() {
   if (wsInitialized) return;
 
   otLogWs.onEvent(webSocketEvent);
+  otLogWs.handleHandshake(wsHandshakeHandler);   // TASK-3119: refuse before the library builds the client object
   server.addHandler(&otLogWs);
 
   wsInitialized = true;
