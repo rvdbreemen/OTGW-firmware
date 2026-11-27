@@ -36,7 +36,7 @@ MAIN = r"""
 @@FN@@
 int main(int argc, char** argv) {
   if (argc < 3) return 2;
-  std::printf("%d\n", (int)wsAdmitHandshake((uint32_t)atol(argv[1]), (uint16_t)atoi(argv[2])));
+  std::printf("%d\n", (int)wsAdmitHandshake((uint32_t)atol(argv[1]), (uint16_t)atoi(argv[2]), 0u, 0u));
   return 0;
 }
 """
@@ -56,7 +56,8 @@ class HandshakeGate(unittest.TestCase):
         warn = re.search(r"#define HEAP_WARNING_THRESHOLD\s+(\d+)", HELPER_INO.read_text(encoding="utf-8"))
         assert warn, "HEAP_WARNING_THRESHOLD not found in helperStuff.ino"
         cls.warn = int(warn.group(1))
-        fn = cut(cls.src, "static bool wsAdmitHandshake(")
+        consts = "".join(m.group(0) + chr(10) for m in re.finditer(r"^static const uint32_t WS_RECOVERY_COOLDOWN_MS\s*=.*;", cls.src, re.M))
+        fn = consts + cut(cls.src, "static uint32_t wsCooldownLeftMs(") + chr(10) + cut(cls.src, "static bool wsAdmitHandshake(")
         cls.tmp = tempfile.TemporaryDirectory()
         cpp = Path(cls.tmp.name) / "gate.cpp"
         cpp.write_text(MAIN.replace("@@FN@@", fn).replace("@@WARN@@", str(cls.warn)), encoding="utf-8")
@@ -96,7 +97,7 @@ class HandshakeGate(unittest.TestCase):
         self.assertLess(body.index("otLogWs.handleHandshake("), body.index("server.addHandler(&otLogWs)"))
         # the handler takes its decision from wsAdmitHandshake(), with the live heap and the connected count
         handler = cut(self.src, "static bool wsHandshakeHandler(")
-        self.assertIn("wsAdmitHandshake(freeHeap, connected)", handler)
+        self.assertIn("wsAdmitHandshake(freeHeap, connected, now, lastRec)", handler)
         self.assertIn("platformFreeHeap()", handler)
         self.assertIn("otLogWs.count()", handler)
 

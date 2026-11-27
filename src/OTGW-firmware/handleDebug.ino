@@ -602,6 +602,10 @@ void handleDebugChar(char c){
                 s_heapHoldReq = 2;
                 DebugTln(F("heaphold DEEP: request queued (K or H again releases, 2 min releases by itself)"));
                 break;
+            case 'T':   // TASK-3119 follow-up: print the 1 Hz lwIP / heap ring (the loop task prints it at its next tick)
+                tcpRingRequestDump();
+                DebugTln(F("tcpring: dump requested (prints within a second)"));
+                break;
             case 'B':   // TASK-2921 bench hook: REST in-flight cap 1, busy path closes without a response
                 DebugTf(PSTR("REST starved-heap simulation: %s (B toggles, off at boot)\r\n"),
                         restDebugToggleForceStarved() ? "ON" : "off");

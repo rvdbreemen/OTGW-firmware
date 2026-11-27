@@ -47,6 +47,9 @@ static const DebugFlagDef kDebugFlags[] = {
   { "pacedrip",  'y', &DebugSection::bPaceDrip,       "MQTT pacer discovery drip", nullptr },
   { "paceconn",  'c', &DebugSection::bPaceConn,       "MQTT pacer connect stages", nullptr },
   { "pacetail",  'k', &DebugSection::bPaceTail,       "MQTT pacer override sweep and stats", nullptr },
+  // TASK-3119 / TASK-3123 lane A: the two /ws low-memory measures as bench arms of one binary (base / cooldown / abort / both), RAM only (a reboot sets both back to true)
+  { "wscool",    'm', &DebugSection::bWsCooldown,     "WS recovery cooldown",     nullptr },
+  { "wsabort",   't', &DebugSection::bWsAbort,        "WS handshake abort",       nullptr },
 #endif
   { "mqttgate",  'g', &DebugSection::bMQTTGate,       "MQTT Gating",              nullptr },
   { "ntp",       'n', &DebugSection::bNTP,            "NTP",                      nullptr },

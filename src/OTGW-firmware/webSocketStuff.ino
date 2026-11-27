@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : webSocketStuff.ino
-**  Version  : v2.0.0-beta.475
+**  Version  : v2.0.0-beta.476
 **
 **  Copyright (c) 2021-2025 Robert van den Breemen
 **
@@ -192,6 +192,7 @@ static const uint8_t WS_BURST_DISCONNECTED = 2;
 static const uint8_t WS_BURST_REJECTED_MAX = 3;
 static const uint8_t WS_BURST_REJECTED_HEAP = 4;
 static const uint8_t WS_BURST_ERROR = 5;
+static const uint8_t WS_BURST_REJECTED_COOLDOWN = 6;   // TASK-3123
 
 static unsigned long wsBurstWindowStartMs = 0;
 static uint8_t wsBurstConnects = 0;
@@ -199,6 +200,7 @@ static uint8_t wsBurstDisconnects = 0;
 static uint8_t wsBurstMaxRejects = 0;
 static uint8_t wsBurstHeapRejects = 0;
 static uint8_t wsBurstErrors = 0;
+static uint8_t wsBurstCooldownRejects = 0;   // TASK-3123
 static bool wsBurstLogged = false;
 const unsigned long WS_BURST_WINDOW_MS = 5000;
 const uint8_t WS_BURST_LOG_THRESHOLD = 3;
@@ -210,6 +212,7 @@ static void resetWebSocketBurstWindow(unsigned long now) {
   wsBurstMaxRejects = 0;
   wsBurstHeapRejects = 0;
   wsBurstErrors = 0;
+  wsBurstCooldownRejects = 0;
   wsBurstLogged = false;
 }
 
@@ -235,9 +238,12 @@ static void noteWebSocketBurstEvent(uint8_t eventType) {
     case WS_BURST_ERROR:
       wsBurstErrors++;
       break;
+    case WS_BURST_REJECTED_COOLDOWN:
+      wsBurstCooldownRejects++;
+      break;
   }
 
-  const uint8_t totalEvents = wsBurstConnects + wsBurstDisconnects + wsBurstMaxRejects + wsBurstHeapRejects + wsBurstErrors;
+  const uint8_t totalEvents = wsBurstConnects + wsBurstDisconnects + wsBurstMaxRejects + wsBurstHeapRejects + wsBurstErrors + wsBurstCooldownRejects;
   if (!wsBurstLogged && (totalEvents >= WS_BURST_LOG_THRESHOLD)) {
     DebugTf(PSTR("[%lu] WebSocket burst window=%lums total=%u conn=%u disc=%u rejMax=%u rejHeap=%u err=%u clients=%u heap=%u maxBlk=%u\r\n"),
             now,
@@ -276,19 +282,73 @@ uint16_t webSocketClientCount() {
 // (the library answers 401, the web UI reconnects after 5 s). The branches in webSocketEvent() stay as the second line:
 // the heap can still fall between the handshake and the client construction, one round trip later.
 // connected = otLogWs.count() at the handshake: the new client is not in the list yet, so a full list is count >= MAX.
-static bool wsAdmitHandshake(uint32_t freeHeap, uint16_t connected) {
+// TASK-3123: after an emergency recovery that aborted /ws clients the tabs reconnect after 5 s (v2.js), and on a unit without PSRAM that
+// drove the heap under 3 KB again within about 50 s, so the next recovery aborted them again (bench .76, B1 run 2). No handshake is
+// admitted for WS_RECOVERY_COOLDOWN_MS after such a recovery. lastRecoveryMs is millis() of that recovery, 0 = none yet; the unsigned
+// difference survives the wrap of millis().
+static const uint32_t WS_RECOVERY_COOLDOWN_MS = 30000;
+static uint32_t g_wsRecoveryMs = 0;
+void webSocketNoteRecoveryAbort() {   // called by emergencyHeapRecovery() (helperStuff.ino) when it aborted at least one /ws client
+  const uint32_t t = millis();
+  g_wsRecoveryMs = t ? t : 1;
+}
+static uint32_t wsCooldownLeftMs(uint32_t nowMs, uint32_t lastRecoveryMs) {
+  if (lastRecoveryMs == 0) return 0;
+  const uint32_t since = (uint32_t)(nowMs - lastRecoveryMs);
+  return since < WS_RECOVERY_COOLDOWN_MS ? (WS_RECOVERY_COOLDOWN_MS - since) : 0;
+}
+static bool wsAdmitHandshake(uint32_t freeHeap, uint16_t connected, uint32_t nowMs, uint32_t lastRecoveryMs) {
+  if (wsCooldownLeftMs(nowMs, lastRecoveryMs) > 0) return false;
   if (freeHeap < HEAP_WARNING_THRESHOLD) return false;
   if (connected >= MAX_WEBSOCKET_CLIENTS) return false;
   return true;
 }
 
-static bool wsHandshakeHandler(AsyncWebServerRequest*) {
+// Lane A bench arms (prerelease builds only, RAM only, both on at boot): telnet keys m (wscool) and t (wsabort), REST names wscool and wsabort.
+// A release build has no switch: it runs what WS_RELEASE_COOLDOWN and WS_RELEASE_ABORT say, one constant per measure. The rule was: an arm
+// is on by default only if it is no worse than base on stall length and panics. Lane A matrix (TASK-3123 AC5, .76, no PSRAM, n = 5 per arm, 20
+// holds, 0 panics): base dead median 159.2 s (123-273), cooldown 120.1 s (116-152) and no alloc fail: ON; abort alone median 120.3 s but one hold
+// of 304.5 s, the longest of all: OFF until n >= 20; both not better than base (148.9 s): OFF. With a switch off the handler behaves exactly
+// like the handler of the send-guard build 3f9176298 (tests/test_ws_handshake_lowmem_arms.py compares the two on a grid, byte for byte).
+static const bool WS_RELEASE_COOLDOWN = true;
+static const bool WS_RELEASE_ABORT = false;
+static bool wsCooldownArmed() {
+#if defined(_VERSION_PRERELEASE)
+  return state.debug.bWsCooldown;
+#else
+  return WS_RELEASE_COOLDOWN;
+#endif
+}
+static bool wsAbortArmed() {
+#if defined(_VERSION_PRERELEASE)
+  return state.debug.bWsAbort;
+#else
+  return WS_RELEASE_ABORT;
+#endif
+}
+static bool wsHandshakeHandler(AsyncWebServerRequest* request) {
   const uint32_t freeHeap = platformFreeHeap();
   const uint16_t connected = (uint16_t)otLogWs.count();
-  if (wsAdmitHandshake(freeHeap, connected)) return true;
-  noteWebSocketBurstEvent(freeHeap < HEAP_WARNING_THRESHOLD ? WS_BURST_REJECTED_HEAP : WS_BURST_REJECTED_MAX);
-  DebugTf(PSTR("[%lu] WebSocket: refused at the handshake (free heap %u, %u connected)\r\n"),
-          millis(), (unsigned)freeHeap, (unsigned)connected);
+  const uint32_t now = millis();
+  const uint32_t lastRec = wsCooldownArmed() ? g_wsRecoveryMs : 0;
+  if (wsAdmitHandshake(freeHeap, connected, now, lastRec)) return true;
+  const uint32_t leftMs = wsCooldownLeftMs(now, lastRec);
+  if (leftMs > 0) {
+    noteWebSocketBurstEvent(WS_BURST_REJECTED_COOLDOWN);
+    DebugTf(PSTR("[%lu] WebSocket: refused at the handshake (recovery cooldown, %lu s left)\r\n"),
+            (unsigned long)now, (unsigned long)((leftMs + 999UL) / 1000UL));
+  } else {
+    noteWebSocketBurstEvent(freeHeap < HEAP_WARNING_THRESHOLD ? WS_BURST_REJECTED_HEAP : WS_BURST_REJECTED_MAX);
+    DebugTf(PSTR("[%lu] WebSocket: refused at the handshake (free heap %u, %u connected)\r\n"),
+            (unsigned long)now, (unsigned)freeHeap, (unsigned)connected);
+  }
+  // The refusal ends the connection with a RST: tcp_abort() queues nothing and frees the pcb at once. Returning false alone makes the
+  // library build and write a 401 through a path that does not pass webBeginRequest() (no send cap, no ADR-189 abort on the ack
+  // timeout, graceful close, rx timeout 0): at a floor heap that answer can stay unsent and hold a half-closed connection (bench
+  // 2026-11-27, 455: :80 and :23 silent for about 54 s after the hold; mechanism inferred, the lane A arms decide it). After the abort
+  // AsyncClient::add() writes nothing (pcb is NULL), so the 401 the library still creates is never sent. Not request->abort(): it sets
+  // _sent, and the library's send(401) would then drop its response object without deleting it.
+  if (wsAbortArmed() && request && request->client()) request->client()->abort();
   return false;
 }
 

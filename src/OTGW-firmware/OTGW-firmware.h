@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v2.0.0-beta.475
+**  Version  : v2.0.0-beta.476
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -1291,6 +1291,7 @@ void maybeWarnFlashMismatch();                     // one-shot flash-config sani
 //Now load Debug & network library
 #include "debugStuff.h"
 #include "debugFlags.h"          // TASK-1561: debug log flags by name (telnet keys + REST /api/v2/debug/flags)
+#include "tcpRingDiag.h"         // TASK-3119: 1 Hz lwIP / heap ring for the stall after a memory emergency, prerelease builds only (empty in a stable build)
 #include "networkStuff.h"
 #include "helperStuff.h"
 #include "graphHistoryStuff.h"   // TASK-1296: device-side Monitor graph history (ADR-081 stuff.h)
