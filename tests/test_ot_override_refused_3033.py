@@ -136,7 +136,7 @@ class Wiring(unittest.TestCase):
         core = (SRC / "OTGW-Core.ino").read_text(encoding="utf-8")
         mqtt = (SRC / "MQTTstuff.ino").read_text(encoding="utf-8")
         hdr = (SRC / "OTGW-firmware.h").read_text(encoding="utf-8")
-        self.assertIn("otOverrideOnThermostatSetpoint(trSet);", core)
+        self.assertIn("otOverrideOnThermostatSetpoint(roundf(OTdata.f88() * 100.0f) / 100.0f);", core)
         self.assertLess(core.index("otOverrideNoteCommand(buf, len);"), core.index("if (!isPICEnabled()) {"))
         self.assertIn("OT_SUPPORT_LIST_OVERRIDE = 4", hdr)
         self.assertIn('F("otgw-firmware/thermostat/override_refused")', mqtt)

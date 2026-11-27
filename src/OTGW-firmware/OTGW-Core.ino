@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v2.0.0-beta.461
+**  Version  : v2.0.0-beta.462
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -6385,9 +6385,8 @@ void processOT(const char *buf, int len, bool suppressOutput, bool localAnswer, 
       // TASK-1901: not a replayed line (/otgw_simulation.log): with follow-thermostat on it would persist SATtargettemp.
       if (OTdata.id == OT_TrSet && OTdata.rsptype == OTGW_THERMOSTAT && OTdata.type == OT_WRITE_DATA
           && !OTdata.skipthis && !OTdata.bReplayed) {
-        const float trSet = roundf(OTdata.f88() * 100.0f) / 100.0f;
-        otOverrideOnThermostatSetpoint(trSet);   // TASK-3033
-        satOnThermostatSetpoint(trSet);
+        satOnThermostatSetpoint(roundf(OTdata.f88() * 100.0f) / 100.0f);
+        otOverrideOnThermostatSetpoint(roundf(OTdata.f88() * 100.0f) / 100.0f);   // TASK-3033
       }
 
       if (OTdata.rsptype == OTGW_BOILER && !OTdata.skipthis && !OTdata.bLocalAnswer && !OTdata.bReplayed) pmChainOnBoilerResponse(OTdata.id);   // TASK-1315
